@@ -1,4 +1,4 @@
--- R48: native 3D store samples. Boots use the exact wearable geometry.
+-- R48: native 3D store samples. Boots use the exact wearable geometry (R111: with glass/ice transparency and reflectance).
 local RS=game:GetService('ReplicatedStorage');local Boots=require(RS:WaitForChild('RunnerBootArt'));local Ribbon=require(RS:WaitForChild('RunnerTrailArt'))
 local A={};local V,CF=Vector3.new,CFrame.new
 function A.Color(product)
@@ -12,7 +12,7 @@ function A.Specs(product,biome)
  if product.Type=='Accessory'then
   biome=product.Biome or biome or'Desert'
   for _,x in ipairs({-.65,.65})do
-   local function boot(specs,frame)for _,s in ipairs(specs)do p(s.Name,s.Size,frame*s.Frame,s.Color,s.Material,s.Shape)end end
+   local function boot(specs,frame)for _,s in ipairs(specs)do p(s.Name,s.Size,frame*s.Frame,s.Color,s.Material,s.Shape);out[#out].Transparency=s.Transparency;out[#out].Reflectance=s.Reflectance end end
    boot(Boots.Specs(V(1,.7,1.8),false,biome or'Forest',accent),CF(x,.39,0))
    boot(Boots.ShinSpecs(V(1.05,1.45,1.05),false,biome or'Forest',accent),CF(x,1.475,0))
    boot(Boots.KneeSpecs(V(1.1,1.4,1.1),false,biome or'Forest',accent),CF(x,2.90,0))
@@ -55,7 +55,8 @@ end
 function A.Build(product,biome)
  local model=Instance.new('Model');model.Name=product.Name or'Shop product'
  for _,s in ipairs(A.Specs(product,biome))do
-  local p=Instance.new(s.Shape=='Wedge'and'WedgePart'or'Part');p.Name=s.Name;p.Size=s.Size;p.CFrame=s.Frame;p.Color=s.Color;p.Material=s.Material
+  local p=Instance.new(s.Shape=='Wedge'and'WedgePart'or s.Shape=='CornerWedge'and'CornerWedgePart'or'Part');p.Name=s.Name;p.Size=s.Size;p.CFrame=s.Frame;p.Color=s.Color;p.Material=s.Material
+  if s.Transparency then p.Transparency=s.Transparency end;if s.Reflectance then p.Reflectance=s.Reflectance end
   p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false;p.Parent=model
  end
  return model

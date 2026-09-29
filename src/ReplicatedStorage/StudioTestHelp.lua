@@ -25,7 +25,7 @@ return {
  {'/test event status','Inspect the event and reset counters. event clear removes an unclaimed event.'},
  {'/test eclipse 1 @username','Give a Void Pack: any regular Secret/Cosmic/King + 1/200 normal Mech roll.'},
  {'/test packset storm @username','Give one of each ordinary pack tier from a biome, with current odds.'},
- {'/test odds storm common 1','Show real per-seed odds; common/uncommon/rare/epic/legendary/mythic; luck 1–2.'},
+ {'/test odds storm common 1','Show real per-seed odds; common/uncommon/rare/epic/legendary/mythic; luck 1–5000000 (boots 5/50/2000/100000/5000000).'},
  {'/test odds event 2','Event odds ignore luck and always give Secret or above.'},
  {'/test pity 30','Preview Legendary every 5 resets, Mythic every 10, event every 3; does not alter the server.'},
  {'/test refreshcycle 30','Run the real refresh into reset 30: both guarantees and the special event. Server-wide; omit @target.'},

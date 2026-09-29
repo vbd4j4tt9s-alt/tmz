@@ -560,7 +560,7 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
     seed.Body.CFrame=frame
     seed.PackPosition=frame.Position;seed.PackRadius=bounds.Radius
     seed.PackSize=size;seed.PackMutation=mutation
-    seed.BagVariant=variant;seed.SeedScale=seedScale;seed.OddsVersion=81
+    seed.BagVariant=variant;seed.SeedScale=seedScale;seed.OddsVersion=PackRules.OddsVersion
     seed.Generation=(seed.Generation or 0)+1
     seed.Model:SetAttribute("SeedArtVersion",123)
     seed.Model:SetAttribute("BagVariant",variant);seed.Model:SetAttribute("SeedScale",seedScale)
@@ -980,7 +980,8 @@ function ChestService:_activatePack(player,tool)
     if opening.Clicks<PackRules.OpenClicks then return end
     local success,failure=xpcall(function()
         -- Atomic server-owned transaction: repeated clicks cannot reroll or duplicate.
-        local reward,reason=self.PlayerData:OpenSeedPack(player,tool:GetAttribute("SeedInventoryId"),self.PackRandom:NextNumber())
+        -- R111: a draw function, not one number: King odds reach 1 in 1T and are rolled in stages.
+        local reward,reason=self.PlayerData:OpenSeedPack(player,tool:GetAttribute("SeedInventoryId"),function()return self.PackRandom:NextNumber()end)
         if not reward then
             self.Notifications:Show(player,reason,Color3.fromRGB(255,185,100),2)
             self:_finishOpening(player,opening);return

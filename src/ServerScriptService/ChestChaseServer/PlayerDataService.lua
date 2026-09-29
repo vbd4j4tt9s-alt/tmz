@@ -631,7 +631,7 @@ function PlayerDataService:RefreshBoostMultipliers(player)
 		end
 	end
 	player:SetAttribute("TreadmillMultiplier", bestSpeedMultiplier)
-	bestLuckMultiplier=math.clamp(bestLuckMultiplier,1,2)
+	bestLuckMultiplier=math.clamp(bestLuckMultiplier,1,require(game:GetService('ReplicatedStorage').BalanceValues81).MaxLuck)
 	player:SetAttribute("ChestLuckMultiplier", bestLuckMultiplier)
 	return bestSpeedMultiplier, bestLuckMultiplier
 end
@@ -896,7 +896,7 @@ function PlayerDataService:Load(player)
 					or string.format("%d_%d", player.UserId, chestNumber),
 				Kind = savedChest.Kind == "Pack" and "Pack" or "Seed",
                 PaidRandom=savedChest.PaidRandom==true,
-                BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=savedChest.OddsVersion==81 and 81 or nil,
+                BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=(savedChest.OddsVersion==81 or savedChest.OddsVersion==PackRules.OddsVersion)and savedChest.OddsVersion or nil,
             PackSize=PackRules.SanitizePackSize(savedChest.PackSize),PackMutation=PackRules.MutationKey(savedChest.PackMutation),Weather=Weather.Key(savedChest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(savedChest.WeatherCheckedEvent),
                 SeedScale = PackRules.SanitizeSeedScale(savedChest.SeedScale),
 				ChestNumber = chestNumber,

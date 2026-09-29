@@ -57,11 +57,12 @@ function X.Execute(ctx,p,action,a)
  if action=='voidcheck'then
   if #a~=0 then return false,'Use voidcheck [@username].'end
   local mech=require(RS.MechCatalog);local fmt=require(RS.OddsText85).Format
-  local odds=Packs.SeedOdds(ctx.Config,7,'EclipseReliquary',1,81);local total,mechTotal=0,0
+  local odds=Packs.SeedOdds(ctx.Config,7,'EclipseReliquary',1,Packs.OddsVersion);local total,mechTotal=0,0
   for _,n in pairs(odds)do total+=n end
   local lines={'Void Pack: all regular Secret/Cosmic/King seeds; Mech branch 1/200.','Mech seeds come only from this branch. Conditional / overall odds:'};local ticket=0
   for _,s in ipairs(mech.Seeds)do
-   local seed=Packs.Roll(ctx.Config,7,.995+.005*(ticket+s.Chance/2)/100,1,'EclipseReliquary',81);ticket+=s.Chance
+   local units,k={0,(ticket+s.Chance/2)/100},0 -- first draw takes the 1/200 Mech branch, second picks the seed
+   local seed=Packs.Roll(ctx.Config,7,function()k+=1;return units[k]or 0 end,1,'EclipseReliquary',Packs.OddsVersion);ticket+=s.Chance
    if not seed or seed.Id~=s.Id then return false,'Mech branch check failed for '..s.Name end
    mechTotal+=(odds[s.Id]or 0);table.insert(lines,s.Name..': '..fmt(s.Chance)..' / '..fmt(odds[s.Id]))
   end
@@ -76,7 +77,7 @@ function X.Execute(ctx,p,action,a)
   return true,'World Void Pack set to '..event.Seed.PackSize..'x '..coat..'. The normal event and banking flow remain active.'
  elseif action=='balance84' then
   local P=require(RS.Progression81);local maximum=ctx.Config.TrainingPointsPerSecond*require(RS.BalanceRules).Training(30000,6,true)
-  return true,'100B points = '..P.Speed('100000000000')..' speed | 10T = '..P.Speed('10000000000000')..' speed (+0.1 per 10x points above 100B) | max training '..maximum..'/s | max boot luck 2x | keeper 600'
+  return true,'100B points = '..P.Speed('100000000000')..' speed | 10T = '..P.Speed('10000000000000')..' speed (+0.1 per 10x points above 100B) | max training '..maximum..'/s | max boot luck x'..T.MaxLuck..' | keeper 600'
  elseif action=='gardenbonus'then
   local b=require(RS.GardenBonusRules84).Read(data:GetFenceTier(p),p:GetAttribute('DoubleGrowthOwned')==true)
   return true,'Garden size ×'..b.Size..' | grow time ×'..b.Time..' | fence '..data:GetFenceTier(p)..' | growth pass '..b.Growth..'x'
@@ -133,8 +134,8 @@ function X.Execute(ctx,p,action,a)
   local st,key,luck
   if a[1]=='event'or a[1]=='eclipse'then st=7;key='EclipseReliquary';luck=tonumber(a[2]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>2 then return false,'Use odds event [luck].'end
   else st=stage(a[1]);key=variant(a[2]);luck=tonumber(a[3]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>3 then return false,'Use odds <biome> <tier> [luck].'end end
-  if not st or st==8 or not key or not luck or luck~=luck or luck<1 or luck>2 then return false,'Use odds storm mythic [1–2] or odds event.'end
-  local lines={key=='EclipseReliquary'and 'Void Pack | all regular Secret/Cosmic/King seeds | 1/200 normal Mech roll | luck does not affect this pack' or ctx.Config.BiomeNames[st]..' | '..Packs.GetPackTier(key).Name..' | luck '..luck};local odds=Packs.SeedOdds(ctx.Config,st,key,luck,81)
+  if not st or st==8 or not key or not luck or luck~=luck or luck<1 or luck>T.MaxLuck then return false,'Use odds storm mythic [1–'..T.MaxLuck..'] or odds event.'end
+  local lines={key=='EclipseReliquary'and 'Void Pack | all regular Secret/Cosmic/King seeds | 1/200 normal Mech roll | luck does not affect this pack' or ctx.Config.BiomeNames[st]..' | '..Packs.GetPackTier(key).Name..' | luck '..luck};local odds=Packs.SeedOdds(ctx.Config,st,key,luck,Packs.OddsVersion)
   for _,seed in ipairs(Packs.RewardPool(ctx.Config,st,key))do local n=odds[seed.Id]or 0;if n>0 then table.insert(lines,seed.Name..': '..require(RS.OddsText85).Format(n))end end
   return true,table.concat(lines,'\n')
  elseif action=='pity'then
@@ -174,7 +175,7 @@ function X.Execute(ctx,p,action,a)
   if #a>1 or not count or not st or st==8 then return false,action=='eclipse'and'Use eclipse [1–20].'or'Use packset <biome>.'end
   if #data:GetChestRecords(p)+count>ctx.Config.MaxSavedChests then return false,'Make space in the target inventory.'end
   for i=1,count do
-   local record,reason=data:AddChest(p,{Stage=st,BagVariant=action=='eclipse'and'EclipseReliquary'or string.format('Pack%02d',i),PackSize=1,PackMutation='None',OddsVersion=81})
+   local record,reason=data:AddChest(p,{Stage=st,BagVariant=action=='eclipse'and'EclipseReliquary'or string.format('Pack%02d',i),PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
    if not record then return false,'Stopped after '..(i-1)..' packs: '..tostring(reason)end
   end
   ctx.Chests:SyncTools(p);save(ctx,p);return true,'Added '..count..' packs with the current odds.'

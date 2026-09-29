@@ -372,5 +372,40 @@ function Rules.Roll(config,stage,unitRoll,luck,variantKey,version)
  for i,weight in ipairs(weights)do if ticket<weight then return pool[i],Rules.GetRarity(pool[i].Id)end;ticket-=weight end
  return nil
 end
+-- R111: new world/event packs carry OddsVersion 111 (PackOdds111, King 1/1T in a Common pack, exact staged roll).
+-- Earlier packs keep their version and their old odds, with luck mapped back to the old boots (x1.15..x2).
+-- Roll takes a draw function (e.g. function() return random:NextNumber() end); old paths use one number from it.
+local N=require(script.Parent.PackOdds111)
+Rules.OddsVersion=N.Version
+local roll81,odds81=Rules.Roll,Rules.SeedOdds
+local function current(stage,variantKey,version)
+ return version==N.Version and stage~=8 and(N.PackFloor[variantKey]~=nil or variantKey=='EclipseReliquary'and stage==7)
+end
+function Rules.SeedOdds(config,stage,variantKey,luck,version)
+ if version==nil then version=N.Version end
+ if not current(stage,variantKey,version)then return odds81(config,stage,variantKey,N.LegacyLuck(luck),version)end
+ local void=variantKey=='EclipseReliquary'
+ local pool=void and require(script.Parent.VoidPackOdds85).Pools(config,Rules)or Rules.ObtainablePool(config,stage)or{}
+ local out={};local odds=N.SeedOdds(pool,Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck)
+ for id,p in pairs(odds or{})do out[id]=100*p*(void and 1-N.Void.MechChance or 1)end
+ if void then for _,s in ipairs(require(script.Parent.MechCatalog).Seeds)do
+  if config.GetSeedById(s.Id)then out[s.Id]=(out[s.Id]or 0)+N.Void.MechChance*s.Chance end
+ end end
+ return out
+end
+function Rules.Roll(config,stage,draw,luck,variantKey,version)
+ if not current(stage,variantKey,version)then
+  return roll81(config,stage,type(draw)=='function'and draw()or draw,N.LegacyLuck(luck),variantKey,version)
+ end
+ if type(draw)~='function'then return nil end -- one number cannot roll 1 in 1T exactly
+ if variantKey=='EclipseReliquary'then
+  if N.Chance(N.Void.MechChance,draw)then
+   local item=require(script.Parent.MechCatalog).Roll(draw())
+   return item and config.GetSeedById(item.Id),item and item.Rarity
+  end
+  return N.Roll(require(script.Parent.VoidPackOdds85).Pools(config,Rules),Rules.GetRarity,'Rare',variantKey,1,draw)
+ end
+ return N.Roll(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,draw)
+end
 
 return Rules

@@ -185,7 +185,7 @@ local function executeFor(ctx,player,text,requester)
     table.insert(pending,{Id=HttpService:GenerateGUID(false),Kind=isPack and'Pack'or'Seed',ChestNumber=serial,ChestName=seed.Name,
      Stage=spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,AccentColor=seed.Color,Rarity=spec.rarity,
      SeedScale=isPack and Packs.NewSeedScale(spec.stage,variant,size)or Packs.SanitizeSeedScale(size),
-     BagVariant=variant,OddsVersion=isPack and 81 or nil,PackSize=isPack and size or 1,PackMutation=coat})
+     BagVariant=variant,OddsVersion=isPack and Packs.OddsVersion or nil,PackSize=isPack and size or 1,PackMutation=coat})
    end
   end
   player:SetAttribute('ChestInventorySerial',serial)

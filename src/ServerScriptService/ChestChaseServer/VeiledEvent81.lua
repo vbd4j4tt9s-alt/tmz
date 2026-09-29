@@ -50,7 +50,7 @@ function E:Spawn(cycle)
  local glow=Instance.new('PointLight');glow.Enabled=false;glow.Parent=body
  model.Parent=folder
  local seed={Model=model,Body=body,Prompt=prompt,Billboard=billboard,Glow=glow,Stage=7,EventKeeper=true,
-  Kind='Pack',SeedName='Void Pack',Available=false,Generation=cycle,PartState={},PackHome=body.Position,OddsVersion=81}
+  Kind='Pack',SeedName='Void Pack',Available=false,Generation=cycle,PartState={},PackHome=body.Position,OddsVersion=require(RS.SeedPackRules).OddsVersion}
  self.Seed=seed;chase.KnownSeeds[seed]=true
  chase.Chests:RefreshWorldPack(seed,'EclipseReliquary')
  self.Connection=prompt.Triggered:Connect(function(player)chase:Begin(player,seed)end)

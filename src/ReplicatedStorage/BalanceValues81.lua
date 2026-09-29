@@ -5,9 +5,13 @@ local R=require(script.Parent.RouteBalance83)
 T.KeeperSpeeds=R.KeeperSpeeds;T.SpawnWeights=R.SpawnWeights
 -- R84: exact saved points are retained; new training takes longer at every tier.
 T.SpeedTailPerDecade=.1 -- R88: 500 at 100B, only +0.1 per tenfold increase afterwards.
-T.PointCurve={{0,24},{800,30},{3000,38},{10000,48},{50000,64},{300000,82},{2000000,110},{20000000,155},{500000000,215},{20000000000,350},{100000000000,500}}
+-- R111: need = keeper close speed x1.10 per biome (35/55/88/141/226/363); the first minute of training gives
+-- a milestone every few seconds (26 at 5 s, 28 at 15 s, 31 at 30 s, 35 at 60 s on the first machine).
+T.PointCurve={{0,24},{500,26},{1500,28},{3000,31},{6000,35},{120000,55},{1500000,88},{20000000,141},{300000000,226},{5000000000,363},{100000000000,500}}
 T.MachineMultipliers={1,4,20,100,600,4000,30000}
-T.BootLuck={1.15,1.3,1.5,1.75,2}
+-- R111: displayed boot luck. PackOdds111 applies it per tier as luck^power (King full, Cosmic ^.40 ... Legendary ^.08).
+T.BootLuck={5,50,2000,100000,5000000}
+T.MaxLuck=5000000 -- the only luck cap; server, HUD and owner commands read it here.
 -- Early purchases now take a few normal harvests rather than hundreds.
 T.MachineCosts={0,250000,5000000,150000000,10000000000,500000000000,8000000000000}
 T.TrailCosts={MintTrail=200000,ArcTrail=4000000,SolarTrail=120000000,AuroraTrail=12000000000,NebulaTrail=800000000000,RoyalTrail=9000000000000}

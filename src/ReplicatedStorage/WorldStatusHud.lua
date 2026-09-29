@@ -7,7 +7,7 @@ function H.Boosts(player)
  local speed=Balance.Training(Balance.TrainingTiers[tier]or 1,player:GetAttribute('TreadmillMultiplier'),player:GetAttribute('DoubleSpeedOwned')==true)
  local luck=tonumber(player:GetAttribute('ChestLuckMultiplier'))or 1
  if luck~=luck or luck==math.huge or luck==-math.huge then luck=1 end
- return speed,math.clamp(luck,1,2)
+ return speed,math.clamp(luck,1,require(RS.BalanceValues81).MaxLuck)
 end
 function H.Multiplier(n)
  if n>=1000 then
@@ -104,7 +104,7 @@ function H.Create(pg,player)
   for i,row in ipairs(boostRows)do
    local active=values[i]>1;row.Root.Visible=active;hasBoosts=hasBoosts or active
    local text=H.Multiplier(values[i]);if row.Value.Text~=text then row.Value.Text=text end
-   row.Root:SetAttribute('AccessibleLabel',row.Label..' ×'..tostring(values[i]))
+   row.Root:SetAttribute('AccessibleLabel',row.Label..' '..text)
    if i==1 then row.Root:SetAttribute('PointsPerSecond',100*values[i]);row.Root:SetAttribute('Breakdown',tostring(Balance.TrainingTiers[math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)])..' machine × '..tostring(player:GetAttribute('TreadmillMultiplier')or 1)..' trail × '..(player:GetAttribute('DoubleSpeedOwned')and'2' or'1')..' pass')end
   end
   update()
