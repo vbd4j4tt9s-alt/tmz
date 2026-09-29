@@ -65,8 +65,8 @@ local function keepUpright(r)
     local humanoid,root=r.Humanoid,r.Root
     local allow=authoredFall(r)
     allowTrips(r,allow)
-    if allow or humanoid.Health<=0 or humanoid.Sit or root.Anchored
-        or player:GetAttribute('StudioTestFlying')or player:GetAttribute('StudioTestNoclip')then return end
+    if allow or humanoid.Health<=0 or humanoid.Sit or root.Anchored or player:GetAttribute('GuardianFlingActive')
+        or player:GetAttribute('TreadmillTraining')or player:GetAttribute('StudioTestFlying')or player:GetAttribute('StudioTestNoclip')then return end
     local frame=root.CFrame
     local state=humanoid:GetState()
     if state==States.FallingDown or state==States.Ragdoll or state==States.PlatformStanding then

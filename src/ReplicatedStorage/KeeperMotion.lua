@@ -41,7 +41,7 @@ local function sample(state,frame,hint)
     state.Velocity=clock>base[1]and(position-base[2])/(clock-base[1])or Vector3.zero
     return true
 end
-function Motion.Update(state,frame,speed,asleep,alerted,dt,stage,chasing)
+function Motion.Update(state,frame,speed,asleep,alerted,dt,stage,chasing,exact)
     local elapsed=math.clamp(dt,0,.5)
     dt=math.clamp(dt,0,.1)
     local active=not asleep and not alerted
@@ -65,6 +65,16 @@ function Motion.Update(state,frame,speed,asleep,alerted,dt,stage,chasing)
     state.Turn=((state.Turn or 0)+(turnTarget-(state.Turn or 0))*(1-math.exp(-dt*6)))
     state.Clock+=elapsed
     local raw=state.Raw
+    local rotation=state.Frame.Rotation:Lerp(frame.Rotation,1-math.exp(-dt*Motion.TurnRate))
+    if exact then
+        -- A client-computed path (recovery dash) is already smooth: ease onto it, then restart the estimate.
+        local offset=(state.Exact and state.Offset or state.Frame.Position-frame.Position)*math.exp(-dt*20)
+        state.Exact,state.Offset=true,offset
+        state.Raw=frame;state.RawAt=state.Clock;state.Velocity=Vector3.zero;table.clear(state.Samples)
+        state.Frame=CFrame.new(frame.Position+offset)*rotation
+        return state
+    end
+    state.Exact=false
     if (frame.Position~=raw.Position or frame.LookVector~=raw.LookVector)
         and not sample(state,frame,math.max(0,speed))then state.Frame=frame;state.Turn=0;return state end
     -- Between packets, carry on at the measured velocity for about one packet interval.
@@ -79,7 +89,7 @@ function Motion.Update(state,frame,speed,asleep,alerted,dt,stage,chasing)
     local goal=frame.Position+velocity*math.min(age,horizon)
     local position=goal+(carried-goal)*math.exp(-dt*rate)
     if (position-goal).Magnitude>Motion.SnapDistance+velocity.Magnitude*.25 then position=goal end
-    state.Frame=CFrame.new(position)*state.Frame.Rotation:Lerp(frame.Rotation,1-math.exp(-dt*Motion.TurnRate))
+    state.Frame=CFrame.new(position)*rotation
     return state
 end
 return Motion

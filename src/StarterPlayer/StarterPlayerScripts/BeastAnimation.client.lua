@@ -109,8 +109,8 @@ local render=Run.RenderStepped:Connect(function(dt)
   end
   local speed=model:GetAttribute('KeeperTravelSpeed')
   if type(speed)~='number' or speed~=speed then speed=r.ObservedSpeed end
-  local frame=Dash.VisualFrame(model,now,r.Root.CFrame)
-  local motion=Motion.Update(r.Motion,frame,speed,asleep,state=='ALERTED'or state=='ATTACKING',dt,r.Stage,state=='CHASING'or state=='DASHING')
+  local rootFrame=r.Root.CFrame;local frame=Dash.VisualFrame(model,now,rootFrame)
+  local motion=Motion.Update(r.Motion,frame,speed,asleep,state=='ALERTED'or state=='ATTACKING',dt,r.Stage,state=='CHASING'or state=='DASHING',frame~=rootFrame)
   local distance=(camera.CFrame.Position-r.Root.Position).Magnitude
   local voiceReady=now-(model:GetAttribute('KeeperLastHitAt')or -100)>1.1
   if not voiceReady then r.Sound:Stop() end
