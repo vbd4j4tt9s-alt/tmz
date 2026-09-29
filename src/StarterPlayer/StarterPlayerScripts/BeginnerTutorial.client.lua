@@ -36,7 +36,7 @@ local avatar=Instance.new('ImageLabel');avatar.Name='Avatar';avatar.BackgroundTr
 local nameTag=Instance.new('Frame');nameTag.Name='NameTag';nameTag.BackgroundColor3=Color3.new(1,1,1);nameTag.Size=UDim2.fromOffset(0,24);nameTag.AutomaticSize=Enum.AutomaticSize.X;nameTag.ZIndex=5;nameTag.Parent=card
 local tagPad=Instance.new('UIPadding');tagPad.PaddingLeft=UDim.new(0,10);tagPad.PaddingRight=UDim.new(0,10);tagPad.Parent=nameTag
 round(nameTag);gradient(nameTag,RGB(190,255,120),RGB(58,190,72));stroke(nameTag,INK,2)
-local tagText=text(nameTag,'Label','GUIDE',15);tagText.Size=UDim2.fromScale(0,1);tagText.AutomaticSize=Enum.AutomaticSize.X;tagText.ZIndex=6
+local tagText=text(nameTag,'Label',type(Guide.GuideName)=='string'and Guide.GuideName~=''and string.upper(Guide.GuideName)or'GUIDE',15);tagText.Size=UDim2.fromScale(0,1);tagText.AutomaticSize=Enum.AutomaticSize.X;tagText.ZIndex=6
 local stepPill=Instance.new('Frame');stepPill.Name='StepPill';stepPill.AnchorPoint=Vector2.new(1,0);stepPill.BackgroundColor3=Color3.new(1,1,1);stepPill.Position=UDim2.new(1,-44,0,-12);stepPill.Size=UDim2.fromOffset(92,24);stepPill.ZIndex=5;stepPill.Parent=card
 round(stepPill);local pillFill=gradient(stepPill,RGB(255,236,120),RGB(255,178,42));stroke(stepPill,INK,2)
 local stepText=text(stepPill,'Label','STEP 1/'..Guide.StepCount,14);stepText.Size=UDim2.fromScale(1,1);stepText.ZIndex=6
@@ -381,6 +381,7 @@ task.spawn(function()
  if ok and type(image)=='string'and image~=''and not dead then
   for _,b in ipairs({badge,bigBadge})do b.Avatar.Image=image;b.Avatar.Visible=true;b.Face.Visible=false end
  end
+ if type(Guide.GuideName)=='string'and Guide.GuideName~=''then tagText.Text=string.upper(Guide.GuideName);return end
  local okName,name=pcall(Players.GetNameFromUserIdAsync,Players,id)
  if okName and type(name)=='string'and name~=''and not dead then tagText.Text=string.upper(name)end
 end)

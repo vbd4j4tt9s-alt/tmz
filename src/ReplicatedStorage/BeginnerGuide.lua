@@ -3,6 +3,8 @@
 local G={Version=1,Bits={Begin=1,Pack=2,Seed=4,Train=8,Plant=16,Harvest=32,Sell=64,Cash=128}}
 -- Optional: set a Roblox user id here to force whose avatar guides players (nil = the game's owner).
 G.GuideUserId=nil
+-- Name on the guide's tag (nil = that account's username).
+G.GuideName='TMZ'
 -- {name}, {Steal}, {Tap}, {Use} are filled per device.
 G.Steps={
  {Text="Hi {name}! 👋 Follow the red arrows. {Steal} a seed pack!",Target='Pack',Marker='STEAL!'},
