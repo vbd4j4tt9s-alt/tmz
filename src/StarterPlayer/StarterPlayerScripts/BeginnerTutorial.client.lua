@@ -1,9 +1,9 @@
--- R110: Sprout guides new players. Friendly objective card at the top centre, a welcome pop-up on the first join,
--- a flowing red arrow trail on the ground to every goal (built on this client only, so only you see it),
--- a bouncing marker over the goal and a pointer at the pack in the hotbar.
+-- R111: the game owner's avatar guides new players through five short steps: a welcome pop-up on the first join,
+-- an objective card at the top centre, a straight red arrow line from your feet to every goal (built on this client
+-- only, so only you see it), a bouncing marker over the goal, a pointer at the pack in the hotbar, then quick tips.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Input=game:GetService('UserInputService');local Tween=game:GetService('TweenService');local TextService=game:GetService('TextService')
-local Paths=game:GetService('PathfindingService');local GuiService=game:GetService('GuiService')
+local GuiService=game:GetService('GuiService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local request=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('PremiumRequest')
 local Guide=require(RS.BeginnerGuide);local Theme=require(RS.GardenTheme);local Layout=require(RS.HudLayout)
 local Names=require(RS:WaitForChild('GardenDisplayNames'));local Catalog=require(RS:WaitForChild('PlantCatalog'))
@@ -29,18 +29,24 @@ local gui=Instance.new('ScreenGui');gui.Name='BeginnerTutorial';gui.ResetOnSpawn
 local card=Instance.new('Frame');card.Name='GuideCard';card.AnchorPoint=Vector2.new(.5,0);card.BackgroundColor3=Color3.new(1,1,1);card.BorderSizePixel=0;card.Visible=false;card.Parent=gui
 round(card,UDim.new(0,16));gradient(card,RGB(74,88,165),RGB(27,32,70));local rim=stroke(card,RGB(255,214,79),3);local pop=Instance.new('UIScale');pop.Parent=card
 local shine=Instance.new('Frame');shine.Name='Shine';shine.BackgroundColor3=Color3.new(1,1,1);shine.BackgroundTransparency=.8;shine.BorderSizePixel=0;shine.Position=UDim2.fromOffset(14,5);shine.Size=UDim2.new(1,-28,0,3);shine.Parent=card;round(shine)
-local badge=Instance.new('Frame');badge.Name='Sprout';badge.AnchorPoint=Vector2.new(.5,.5);badge.BackgroundColor3=Color3.new(1,1,1);badge.ZIndex=3;badge.Parent=card
+local badge=Instance.new('Frame');badge.Name='Guide';badge.AnchorPoint=Vector2.new(.5,.5);badge.BackgroundColor3=Color3.new(1,1,1);badge.ZIndex=3;badge.Parent=card
 round(badge);gradient(badge,RGB(190,255,120),RGB(58,190,72));stroke(badge,Color3.new(1,1,1),3)
 local face=text(badge,'Face','🌱',30);face.Size=UDim2.fromScale(1,1);face.TextScaled=true;face.TextStrokeTransparency=1;face.ZIndex=4
-local nameTag=Instance.new('Frame');nameTag.Name='NameTag';nameTag.BackgroundColor3=Color3.new(1,1,1);nameTag.Size=UDim2.fromOffset(78,24);nameTag.ZIndex=5;nameTag.Parent=card
+local avatar=Instance.new('ImageLabel');avatar.Name='Avatar';avatar.BackgroundTransparency=1;avatar.Size=UDim2.fromScale(1,1);avatar.Visible=false;avatar.ZIndex=4;avatar.Parent=badge;round(avatar)
+local nameTag=Instance.new('Frame');nameTag.Name='NameTag';nameTag.BackgroundColor3=Color3.new(1,1,1);nameTag.Size=UDim2.fromOffset(0,24);nameTag.AutomaticSize=Enum.AutomaticSize.X;nameTag.ZIndex=5;nameTag.Parent=card
+local tagPad=Instance.new('UIPadding');tagPad.PaddingLeft=UDim.new(0,10);tagPad.PaddingRight=UDim.new(0,10);tagPad.Parent=nameTag
 round(nameTag);gradient(nameTag,RGB(190,255,120),RGB(58,190,72));stroke(nameTag,INK,2)
-local tagText=text(nameTag,'Label','SPROUT',15);tagText.Size=UDim2.fromScale(1,1);tagText.ZIndex=6
+local tagText=text(nameTag,'Label','GUIDE',15);tagText.Size=UDim2.fromScale(0,1);tagText.AutomaticSize=Enum.AutomaticSize.X;tagText.ZIndex=6
 local stepPill=Instance.new('Frame');stepPill.Name='StepPill';stepPill.AnchorPoint=Vector2.new(1,0);stepPill.BackgroundColor3=Color3.new(1,1,1);stepPill.Position=UDim2.new(1,-44,0,-12);stepPill.Size=UDim2.fromOffset(92,24);stepPill.ZIndex=5;stepPill.Parent=card
 round(stepPill);local pillFill=gradient(stepPill,RGB(255,236,120),RGB(255,178,42));stroke(stepPill,INK,2)
-local stepText=text(stepPill,'Label','STEP 1/9',14);stepText.Size=UDim2.fromScale(1,1);stepText.ZIndex=6
+local stepText=text(stepPill,'Label','STEP 1/'..Guide.StepCount,14);stepText.Size=UDim2.fromScale(1,1);stepText.ZIndex=6
 local close=Instance.new('TextButton');close.Name='Skip';close.AnchorPoint=Vector2.new(1,0);close.Position=UDim2.new(1,-8,0,8);close.Size=UDim2.fromOffset(28,28);close.BackgroundColor3=RGB(16,20,48);close.BackgroundTransparency=.35
-close.Font=FONT;close.Text='✕';close.TextSize=16;close.TextColor3=RGB(227,232,240);close.AutoButtonColor=true;close.ZIndex=6;close:SetAttribute('AccessibleLabel','Skip tutorial');close.Parent=card;round(close)
+close.Font=FONT;close.Text='X';close.TextSize=16;close.TextColor3=RGB(227,232,240);close.AutoButtonColor=true;close.ZIndex=6;close:SetAttribute('AccessibleLabel','Skip tutorial');close.Parent=card;round(close)
 local message=text(card,'Instruction','',20);message.RichText=true;message.TextWrapped=true;message.TextXAlignment=Enum.TextXAlignment.Left;message.TextYAlignment=Enum.TextYAlignment.Top;message.ZIndex=3
+-- Tips step: NEXT skips to the next tip (they also advance by themselves).
+local nextTip=Instance.new('TextButton');nextTip.Name='NextTip';nextTip.AnchorPoint=Vector2.new(1,1);nextTip.Position=UDim2.new(1,-10,1,-5);nextTip.Size=UDim2.fromOffset(64,20);nextTip.BackgroundColor3=Color3.new(1,1,1);nextTip.Text='';nextTip.Visible=false;nextTip.ZIndex=6;nextTip.Parent=card
+round(nextTip,UDim.new(0,10));gradient(nextTip,RGB(190,255,120),RGB(46,176,64));stroke(nextTip,INK,2)
+local nextText=text(nextTip,'Label','NEXT',13);nextText.Size=UDim2.fromScale(1,1);nextText.ZIndex=7
 local dots=Instance.new('Frame');dots.Name='Progress';dots.BackgroundTransparency=1;dots.AnchorPoint=Vector2.new(0,1);dots.ZIndex=3;dots.Parent=card
 local dotList=Instance.new('UIListLayout');dotList.FillDirection=Enum.FillDirection.Horizontal;dotList.Padding=UDim.new(0,5);dotList.VerticalAlignment=Enum.VerticalAlignment.Center;dotList.Parent=dots
 local dotFrames={}
@@ -49,7 +55,7 @@ for i=1,Guide.StepCount do local d=Instance.new('Frame');d.Name='Dot'..i;d.Size=
 -- Welcome pop-up for a brand-new (or replaying) player.
 local welcome=Instance.new('Frame');welcome.Name='Welcome';welcome.AnchorPoint=Vector2.new(.5,.5);welcome.Position=UDim2.fromScale(.5,.42);welcome.BackgroundColor3=Color3.new(1,1,1);welcome.Visible=false;welcome.ZIndex=10;welcome.Parent=gui
 round(welcome,UDim.new(0,20));gradient(welcome,RGB(82,98,182),RGB(27,32,70));stroke(welcome,RGB(255,214,79),4);local welcomeScale=Instance.new('UIScale');welcomeScale.Parent=welcome
-local bigBadge=badge:Clone();bigBadge.Name='Sprout';bigBadge.Position=UDim2.new(.5,0,0,0);bigBadge.Size=UDim2.fromOffset(84,84);bigBadge.ZIndex=12;bigBadge.Face.ZIndex=13;bigBadge.Parent=welcome
+local bigBadge=badge:Clone();bigBadge.Name='Guide';bigBadge.Position=UDim2.new(.5,0,0,0);bigBadge.Size=UDim2.fromOffset(84,84);bigBadge.ZIndex=12;bigBadge.Face.ZIndex=13;bigBadge.Avatar.ZIndex=13;bigBadge.Parent=welcome
 local welcomeTitle=text(welcome,'Title',Guide.Welcome.Title,30,RGB(255,224,71));welcomeTitle.AnchorPoint=Vector2.new(.5,0);welcomeTitle.Position=UDim2.new(.5,0,0,50);welcomeTitle.Size=UDim2.new(1,-32,0,36);welcomeTitle.TextScaled=true;welcomeTitle.ZIndex=11
 local welcomeText=text(welcome,'Body','',20);welcomeText.RichText=true;welcomeText.TextWrapped=true;welcomeText.AnchorPoint=Vector2.new(.5,0);welcomeText.Position=UDim2.new(.5,0,0,94);welcomeText.ZIndex=11
 local go=Instance.new('TextButton');go.Name='Go';go.AnchorPoint=Vector2.new(.5,1);go.Size=UDim2.fromOffset(200,50);go.BackgroundColor3=Color3.new(1,1,1);go.Text='';go.ZIndex=11;go.Parent=welcome
@@ -76,23 +82,23 @@ local markerArrow=Instance.new('Frame');markerArrow.Name='ArrowHolder';markerArr
 local markerText=text(marker,'Label','',22);markerText.Size=UDim2.new(1,0,0,26);markerText.TextStrokeTransparency=0
 local markerDistance=text(marker,'Distance','',15,RGB(255,236,160));markerDistance.Position=UDim2.fromOffset(0,24);markerDistance.Size=UDim2.new(1,0,0,18);markerDistance.TextStrokeTransparency=0
 local RED,WHITE=RGB(255,48,48),RGB(255,255,255)
-local TRAIL_COUNT,SPACING,FLOW,REACH=40,2.6,4.5,2.4
+local TRAIL_COUNT,SPACING,FLOW,REACH=36,3,4.5,2.4
 local trailParts,chevrons,lastAlpha={}, {}, {}
 local function flat(name,size,color,material)
  local p=Instance.new('Part');p.Name=name;p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false;p.Locked=true
  p.Size=size;p.Color=color;p.Material=material;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Transparency=1;p.Parent=folder
  trailParts[#trailParts+1]=p;return p
 end
--- Chevron in its own frame: forward is -Z, tip at z=-0.55. Red neon arms sit on slightly larger white rims.
-local ANGLE,ARM=math.rad(50),1.35
+-- Chevron in its own frame: forward is -Z, tip at z=-0.7. Red neon arms sit on slightly larger white rims.
+local ANGLE,ARM,TIP=math.rad(45),1.7,-.7
 local sa,ca=math.sin(ANGLE),math.cos(ANGLE)
 local shape={
- CFrame.new(-sa*ARM/2,.03,-.55+ca*ARM/2)*CFrame.Angles(0,-ANGLE,0),CFrame.new(sa*ARM/2,.03,-.55+ca*ARM/2)*CFrame.Angles(0,ANGLE,0),
- CFrame.new(-sa*ARM/2,0,-.55+ca*ARM/2)*CFrame.Angles(0,-ANGLE,0),CFrame.new(sa*ARM/2,0,-.55+ca*ARM/2)*CFrame.Angles(0,ANGLE,0),
+ CFrame.new(-sa*ARM/2,.03,TIP+ca*ARM/2)*CFrame.Angles(0,-ANGLE,0),CFrame.new(sa*ARM/2,.03,TIP+ca*ARM/2)*CFrame.Angles(0,ANGLE,0),
+ CFrame.new(-sa*ARM/2,0,TIP+ca*ARM/2)*CFrame.Angles(0,-ANGLE,0),CFrame.new(sa*ARM/2,0,TIP+ca*ARM/2)*CFrame.Angles(0,ANGLE,0),
 }
 for i=1,TRAIL_COUNT do
- chevrons[i]={flat('ArmL',Vector3.new(.5,.06,ARM),RED,Enum.Material.Neon),flat('ArmR',Vector3.new(.5,.06,ARM),RED,Enum.Material.Neon),
-  flat('RimL',Vector3.new(.86,.04,ARM+.34),WHITE,Enum.Material.SmoothPlastic),flat('RimR',Vector3.new(.86,.04,ARM+.34),WHITE,Enum.Material.SmoothPlastic)}
+ chevrons[i]={flat('ArmL',Vector3.new(.7,.06,ARM),RED,Enum.Material.Neon),flat('ArmR',Vector3.new(.7,.06,ARM),RED,Enum.Material.Neon),
+  flat('RimL',Vector3.new(1.1,.04,ARM+.4),WHITE,Enum.Material.SmoothPlastic),flat('RimR',Vector3.new(1.1,.04,ARM+.4),WHITE,Enum.Material.SmoothPlastic)}
  lastAlpha[i]=1
 end
 local movable=table.move(trailParts,1,TRAIL_COUNT*4,1,{})
@@ -105,8 +111,7 @@ folder.Parent=workspace
 local dead,busy=false,false;local info:{[string]:any}={};local step=0;local shownStep=0;local connections={};local metrics
 local poll,introSeconds,revealed,welcomeUntil=0,0,0,0;local fetch,render,place
 local welcomed,welcomeOpen,finishedUntil,skipArmedUntil,wasActive,skipped=false,false,0,0,false,false
-local lastDevice,lastActual
-local route={Points={},Normals={},Distance={},Total=0,Target=nil,Building=false,Serial=0,Last=0}
+local lastDevice,lastActual,lastTip
 local cardFont,cardBadge,cardBottom=20,60,0;local currentText=''
 
 local function alphaFor(i,value)
@@ -131,77 +136,38 @@ local function hasGoal()
 end
 local function blocked()return pg:GetAttribute('SeedMenu')~=nil or pg:GetAttribute('TitleActive')==true end
 
--- Ground route: pathfinding when it succeeds, otherwise a straight line; every sample snapped to the ground.
+-- Straight line from the player's feet to the goal, rebuilt every frame, so it never drifts away from the player.
+-- It ignores walls on purpose: each arrow is dropped onto whatever floor is under its spot on the line.
 local rayParams=RaycastParams.new();rayParams.FilterType=Enum.RaycastFilterType.Exclude;rayParams.RespectCanCollide=true
-local function snap(point)
- local hit=workspace:Raycast(point+Vector3.new(0,3,0),Vector3.new(0,-14,0),rayParams)
+local function ground(x,z,y)
+ local hit=workspace:Raycast(Vector3.new(x,y+4,z),Vector3.new(0,-24,0),rayParams)
  if hit then local n=hit.Normal.Y>.6 and hit.Normal or Vector3.yAxis;return hit.Position+n*.06,n end
- return point,Vector3.yAxis
-end
-local function rebuild(from,to)
- route.Building=true;route.Serial+=1;local serial=route.Serial;rayParams.FilterDescendantsInstances={folder,player.Character}
- task.spawn(function()
-  local corners
-  local path=Paths:CreatePath({AgentRadius=2,AgentHeight=5,AgentCanJump=true,WaypointSpacing=6})
-  local ok=pcall(function()path:ComputeAsync(from,to)end)
-  if ok and path.Status==Enum.PathStatus.Success then
-   corners={};for _,w in ipairs(path:GetWaypoints())do corners[#corners+1]=w.Position end
-  end
-  if dead or serial~=route.Serial then return end
-  if not corners or #corners<2 then corners={from-Vector3.new(0,3,0),to}end
-  local points,normals,distance={}, {}, {}
-  local total=0;local previous
-  for i=1,#corners-1 do
-   local a,b=corners[i],corners[i+1];local length=(b-a).Magnitude;local pieces=math.max(1,math.ceil(length/2))
-   for k=(i==1 and 0 or 1),pieces do
-    local p,n=snap(a:Lerp(b,k/pieces))
-    if previous then total+=(Vector3.new(p.X,0,p.Z)-Vector3.new(previous.X,0,previous.Z)).Magnitude end
-    points[#points+1]=p;normals[#normals+1]=n;distance[#distance+1]=total;previous=p
-    if #points>=400 then break end
-   end
-   if #points>=400 then break end
-  end
-  route.Points,route.Normals,route.Distance,route.Total,route.Target=points,normals,distance,total,to
-  route.Building=false;route.Last=os.clock()
- end)
-end
-local function nearestOnRoute(position)
- local pts=route.Points;local best,bestS=math.huge,0
- for i=1,#pts-1 do
-  local a,b=pts[i],pts[i+1];local ab=Vector3.new(b.X-a.X,0,b.Z-a.Z);local ap=Vector3.new(position.X-a.X,0,position.Z-a.Z)
-  local len2=ab:Dot(ab);local t=len2>0 and math.clamp(ap:Dot(ab)/len2,0,1)or 0
-  local d=(ap-ab*t).Magnitude
-  if d<best then best=d;bestS=route.Distance[i]+(route.Distance[i+1]-route.Distance[i])*t end
- end
- return bestS,best
+ return Vector3.new(x,y,z),Vector3.yAxis
 end
 local cframes=table.create(TRAIL_COUNT*4)
 local function drawTrail(root,target)
- local pts=route.Points;if #pts<2 then hideTrail();return end
- local s0,off=nearestOnRoute(root.Position)
- local now=os.clock();local phase=(now*FLOW)%SPACING;local stop=route.Total-REACH
- local j=1
+ rayParams.FilterDescendantsInstances={folder,player.Character}
+ local from=root.Position;local feet=from.Y-3
+ local flatDelta=Vector3.new(target.X-from.X,0,target.Z-from.Z);local length=flatDelta.Magnitude
+ if length<.01 then hideTrail();return end
+ local look=flatDelta/length;local now=os.clock();local phase=(now*FLOW)%SPACING;local stop=length-REACH
  for i=1,TRAIL_COUNT do
-  local s=s0+.6+phase+(i-1)*SPACING;local base=(i-1)*4
+  local s=.8+phase+(i-1)*SPACING;local base=(i-1)*4
   if s>stop then
    for k=1,4 do cframes[base+k]=PARKED end;alphaFor(i,1)
   else
-   while j<#pts-1 and route.Distance[j+1]<s do j+=1 end
-   local d0,d1=route.Distance[j],route.Distance[j+1];local t=d1>d0 and math.clamp((s-d0)/(d1-d0),0,1)or 0
-   local p=pts[j]:Lerp(pts[j+1],t);local n=route.Normals[j]
-   local ahead=pts[j+1]-pts[j];ahead=ahead-n*ahead:Dot(n)
-   if ahead.Magnitude<.01 then ahead=Vector3.new(target.X-p.X,0,target.Z-p.Z)end
-   if ahead.Magnitude<.01 then ahead=Vector3.zAxis end
-   local look=ahead.Unit;local right=look:Cross(n).Unit;local frame=CFrame.fromMatrix(p,right,n,-look)
+   local y=feet+(target.Y-feet)*(s/length)
+   local p,n=ground(from.X+look.X*s,from.Z+look.Z*s,y)
+   local fwd=look-n*look:Dot(n);if fwd.Magnitude<.01 then fwd=look end;fwd=fwd.Unit
+   local frame=CFrame.fromMatrix(p,fwd:Cross(n).Unit,n,-fwd)
    for k=1,4 do cframes[base+k]=frame*shape[k]end
-   -- Fade in at the feet and out at the goal; very faint when the player is far off the route.
-   local near=math.clamp((s-s0-.6)/2,0,1);local far=math.clamp((stop-s)/3,0,1);local lost=off>14 and .5 or 1
-   alphaFor(i,1-math.min(near,far)*lost)
+   -- Fade in at the feet and out at the goal.
+   alphaFor(i,1-math.min(math.clamp((s-.8)/1.5,0,1),math.clamp((stop-s)/3,0,1)))
   end
  end
  workspace:BulkMoveTo(movable,cframes,Enum.BulkMoveMode.FireCFrameChanged)
  -- Goal spot under the target, gently pulsing.
- local spot=pts[#pts];local pulse=.5+.08*math.sin(now*5)
+ local spot=ground(target.X,target.Z,target.Y);local pulse=.5+.08*math.sin(now*5)
  ring.CFrame=CFrame.new(spot+Vector3.new(0,.05,0))*CFrame.Angles(0,0,math.rad(90))
  if ringAlpha~=pulse then ringAlpha=pulse;ring.Transparency=pulse end
 end
@@ -210,13 +176,6 @@ local function updateWorld(dt)
  local target=currentTarget()
  if not root or not target or not hasGoal()or blocked()or step==0 then hideTrail();marker.Enabled=false;edge.Visible=false;return end
  local flat2=Vector3.new(target.X-root.Position.X,0,target.Z-root.Position.Z).Magnitude
- -- Rebuild when the goal moved, the player wandered off the route, or every few seconds while far away.
- if not route.Building then
-  local moved=not route.Target or(route.Target-target).Magnitude>4
-  local _,off=0,0;if #route.Points>1 then _,off=nearestOnRoute(root.Position)end
-  local age=os.clock()-route.Last
-  if moved or(off>6 and age>.75)or(age>4 and flat2>12)then rebuild(root.Position,target)end
- end
  if flat2<6 then hideTrail()else drawTrail(root,target)end
  anchor.Position=target;marker.Enabled=true
  local bob=math.sin(os.clock()*4)*.5;marker.StudsOffsetWorldSpace=Vector3.new(0,4.5+bob,0)
@@ -292,11 +251,11 @@ place=function()
  nameTag.Position=UDim2.fromOffset(12,-12)
  message.TextSize=cardFont;message.Position=UDim2.fromOffset(area,20);message.Size=UDim2.new(1,-area-40,1,-44)
  dots.Position=UDim2.new(0,area,1,-12);dots.Size=UDim2.new(1,-area-40,0,10)
- -- Welcome pop-up: centred, above the card area.
+ -- Welcome pop-up: top centre, so the player and the arrows under them stay in view.
  local ww=math.min(metrics.Phone and 420 or 480,w-32);local body=textHeight(Guide.Plain(welcomeText.Text),metrics.Phone and 18 or 20,ww-40)
  welcomeText.TextSize=metrics.Phone and 18 or 20;welcomeText.Size=UDim2.new(1,-40,0,body+4)
  local wh=94+body+18+50+18;welcome.Size=UDim2.fromOffset(ww,wh);go.Position=UDim2.new(.5,0,1,-16)
- welcome.Position=UDim2.fromOffset(w/2,math.clamp(h*.42,wh/2+46,h-wh/2-8))
+ welcome.Position=UDim2.fromOffset(w/2,math.min(50+wh/2,h-wh/2-8))
 end
 local function setText(value)
  if value==currentText then return end
@@ -319,12 +278,12 @@ local function showWelcome(on)
  render()
 end
 go.Activated:Connect(function()showWelcome(false)end)
+nextTip.Activated:Connect(function()introSeconds=(math.floor(introSeconds/Guide.TipSeconds)+1)*Guide.TipSeconds;render()end)
 
 render=function()
  local actual=player:GetAttribute('TutorialStep')or 0
  step=actual
- if actual==1 and player:GetAttribute('ChestChaseSeedCarrying')then step=2
- elseif actual==5 and info.Step==6 then step=6 end
+ if actual==1 and player:GetAttribute('ChestChaseSeedCarrying')then step=2 end
  local spec=Guide.Steps[step]
  if actual>0 then wasActive=true end
  -- Entering step 1 of a fresh or replayed run (mask 0/1) earns a new welcome.
@@ -335,12 +294,13 @@ render=function()
  if welcomeOpen and(step~=1 or blocked())then welcomeOpen=false;welcome.Visible=false end
  local finishing=spec==nil and os.clock()<finishedUntil
  card.Visible=(spec~=nil or finishing)and not welcomeOpen and not blocked()and pg:GetAttribute('GardenMenuExpanded')~=true
- local short=metrics~=nil and metrics.Phone==true
+ nextTip.Visible=false
  if finishing then
-  stepText.Text='DONE!';setText(Guide.Format(short and Guide.FinishedShort or Guide.Finished,device(),player.DisplayName));paintDots()
+  stepText.Text='DONE!';setText(Guide.Format(Guide.Finished,device(),player.DisplayName));paintDots()
  elseif spec then
-  local value=Guide.Copy(spec,'Text',short)
-  if step==1 and info.WaitingForPack then value=short and Guide.WaitingShort or Guide.Waiting
+  local value=spec.Text
+  if spec.Tips then local tip=math.clamp(math.floor(introSeconds/Guide.TipSeconds)+1,1,#Guide.Tips);lastTip=tip;value=Guide.Tips[tip];nextTip.Visible=true
+  elseif step==1 and info.WaitingForPack then value=Guide.Waiting
   elseif step==3 then local tool,equipped=packTool();if tool and equipped and spec.Equipped then value=spec.Equipped end end
   if os.clock()>=skipArmedUntil then stepText.Text=('STEP %d/%d'):format(step,Guide.StepCount)end
   setText(Guide.Format(value,device(),player.DisplayName));paintDots()
@@ -380,7 +340,7 @@ connections[#connections+1]=Run.RenderStepped:Connect(function(dt)
   revealed+=dt*60;local total=utf8.len(Guide.Plain(currentText))or #currentText
   if revealed>=total then message.MaxVisibleGraphemes=-1 else message.MaxVisibleGraphemes=math.floor(revealed)end
  end
- badge.Rotation=math.sin(os.clock()*2.4)*7;bigBadge.Rotation=math.sin(os.clock()*2.4)*7
+ badge.Rotation=math.sin(os.clock()*2.4)*4;bigBadge.Rotation=math.sin(os.clock()*2.4)*4
  rim.Transparency=.15+.15*math.sin(os.clock()*3)
  updateWorld(dt);updatePointer()
 end)
@@ -390,6 +350,7 @@ connections[#connections+1]=Run.Heartbeat:Connect(function(dt)
  if current and current.Informational then
   if card.Visible then introSeconds+=dt end
   if introSeconds>=current.Seconds and not busy then introSeconds=0;poll=0;fetch('TreadmillInfo');return end
+  if current.Tips and math.floor(introSeconds/Guide.TipSeconds)+1~=lastTip then render()end
  else introSeconds=0 end
  poll+=dt;if poll>=1 then poll=0;fetch()end
 end)
@@ -403,4 +364,24 @@ connections[#connections+1]=Input.LastInputTypeChanged:Connect(function()local n
 local unwatch=Layout.Watch(gui,function(m)local was=metrics and metrics.Phone;metrics=m;if was~=m.Phone then currentText='';render()end;place();if card.Visible then pg:SetAttribute('TutorialCardBottom',cardBottom)end end)
 local function cleanup()if dead then return end;dead=true;unwatch();folder:Destroy();pg:SetAttribute('TutorialCardBottom',nil);for _,c in ipairs(connections)do c:Disconnect()end end
 gui.Destroying:Connect(cleanup);script.Destroying:Connect(function()cleanup();gui:Destroy()end)
+-- The guide is the game owner's avatar (or BeginnerGuide.GuideUserId); in Studio it is you. Falls back to the sprout.
+task.spawn(function()
+ local id=Guide.GuideUserId
+ if type(id)~='number'or id<=0 then
+  id=nil
+  if game.CreatorType==Enum.CreatorType.User and game.CreatorId>0 then id=game.CreatorId
+  elseif game.CreatorType==Enum.CreatorType.Group and game.CreatorId>0 then
+   local ok,group=pcall(function()return game:GetService('GroupService'):GetGroupInfoAsync(game.CreatorId)end)
+   if ok and type(group)=='table'and type(group.Owner)=='table'then id=tonumber(group.Owner.Id)end
+  end
+  if not id and Run:IsStudio()and player.UserId>0 then id=player.UserId end
+ end
+ if not id or dead then return end
+ local ok,image=pcall(Players.GetUserThumbnailAsync,Players,id,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size150x150)
+ if ok and type(image)=='string'and image~=''and not dead then
+  for _,b in ipairs({badge,bigBadge})do b.Avatar.Image=image;b.Avatar.Visible=true;b.Face.Visible=false end
+ end
+ local okName,name=pcall(Players.GetNameFromUserIdAsync,Players,id)
+ if okName and type(name)=='string'and name~=''and not dead then tagText.Text=string.upper(name)end
+end)
 paintDots();render();fetch()

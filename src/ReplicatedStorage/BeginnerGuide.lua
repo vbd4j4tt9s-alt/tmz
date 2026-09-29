@@ -1,29 +1,34 @@
--- R110: friendly guide copy (short lines on phones), device wording and a top-centre card that never covers the HUD or the player.
+-- R111: five short steps that end right after planting, then quick tips. Simple words (about grade 3).
+-- The guide is the game owner's avatar (the client picks it). Game name: Steal A Pack.
 local G={Version=1,Bits={Begin=1,Pack=2,Seed=4,Train=8,Plant=16,Harvest=32,Sell=64,Cash=128}}
--- Sprout (the guide) talks to the player like a friend. {name}, {Tap}, {use}, {steal}, {Hover} are filled per device.
+-- Optional: set a Roblox user id here to force whose avatar guides players (nil = the game's owner).
+G.GuideUserId=nil
+-- {name}, {Steal}, {Tap}, {Use} are filled per device.
 G.Steps={
- {Text="Hey {name}! 👋 I'm Sprout, your buddy. Follow the red arrows to a seed pack and {steal} it!",Short="Hey {name}! 👋 Follow the red arrows and {steal} a seed pack!",Target='Pack',Marker='STEAL!'},
- {Text="Yoink! 😆 Now RUN back to your base before the keeper catches you!",Short="Yoink! 😆 RUN back to your base before the keeper gets you!",Target='Safety',Marker='SAFE ZONE'},
- {Text="Nice steal, {name}! {Tap} your pack in the hotbar to rip it open 🎁",Short="Nice steal! {Tap} your pack in the hotbar to open it 🎁",Equipped="Ooh, shiny! {use} to rip it open 🎁"},
- {Text="A seed! 🌱 Follow the arrows to your garden and plant it in the dirt.",Short="A seed! 🌱 Follow the arrows and plant it in your garden.",Target='Garden',Marker='YOUR GARDEN'},
- {Text="Now it grows... ⏳ Plants keep growing even while you go steal more packs!",Short="Now it grows... ⏳ Go steal more packs while you wait!",Target='Garden',Marker='GROWING'},
- {Text="It's ready! 🍓 Go harvest your crop.",Target='Garden',Marker='HARVEST'},
- {Text="Take your crop to the market and cash in! 💰",Short="Sell your crop at the market! 💰",Target='Market',Marker='MARKET'},
- {Text="{Hover} the cash to scoop it up. Ka-ching! 🤑",Short="{Hover} the cash to scoop it up! 🤑"},
- {Text="Last tip: treadmills make you faster, and faster means rarer packs! Go get 'em, {name}! 🏃",Short="Treadmills make you faster = rarer packs! Go get 'em! 🏃",Target='Treadmill',Marker='TREADMILL',Informational=true,Seconds=8},
+ {Text="Hi {name}! 👋 Follow the red arrows. {Steal} a seed pack!",Target='Pack',Marker='STEAL!'},
+ {Text="You got it! 😆 Run home fast. Don't get caught!",Target='Safety',Marker='HOME'},
+ {Text="{Tap} your pack to open it! 🎁",Equipped="{Use} to open it! 🎁"},
+ {Text="You got a seed! 🌱 Plant it in your garden.",Target='Garden',Marker='PLANT HERE'},
+ {Text="",Tips=true,Informational=true},
 }
-G.Welcome={Title='Welcome to Chest Chase!',Text="Hey {name}! I'm Sprout 🌱 Steal seed packs, grow them, and get rich. I'll show you how. It only takes a minute!",Button="LET'S GO!"}
-G.Waiting="All the nearby packs are taken. A fresh one pops up in a moment! ⏳"
-G.WaitingShort="Packs are respawning... one pops up in a moment! ⏳"
-G.Finished="You're all set, {name}! 🎉 Now go build the best garden ever!"
-G.FinishedShort="You're all set, {name}! 🎉 Have fun!"
--- Phones get the short line; the welcome pop-up carries the longer introduction.
-function G.Copy(spec,key,short)if short and spec[key..'Short']then return spec[key..'Short']end;if short and key=='Text'and spec.Short then return spec.Short end;return spec[key]end
+-- Step 5 shows these one at a time, then the tutorial is done. No waiting for the plant to grow.
+G.Tips={
+ "Your plant grows by itself! 🌱",
+ "Pick the fruit when it is ready. 🍎",
+ "Sell fruit at the market for cash! 💰",
+ "Get faster to steal better packs! 🏃",
+}
+G.TipSeconds=3.5
+G.Steps[5].Seconds=#G.Tips*G.TipSeconds
+G.Welcome={Title='Welcome to Steal A Pack!',Text="Hi {name}! 👋 Let's steal your first seed pack!",Button="LET'S GO!"}
+G.Waiting="No packs right now. One comes soon! ⏳"
+G.Finished="You're ready, {name}! Have fun! 🎉"
+function G.Copy(spec,key)return spec[key]end
 G.StepCount=#G.Steps
 local words={
- Touch={Tap='Tap',use='Tap anywhere',steal='tap STEAL on',Hover='Tap'},
- Gamepad={Tap='Pick',use='Press R2',steal='press X to STEAL',Hover='Grab'},
- Mouse={Tap='Click',use='Click anywhere',steal='press E to STEAL',Hover='Hover over'},
+ Touch={Steal='Tap STEAL to grab',Tap='Tap',Use='Tap'},
+ Gamepad={Steal='Press X to steal',Tap='Pick',Use='Press R2'},
+ Mouse={Steal='Press E to steal',Tap='Click',Use='Click'},
 }
 -- Fills placeholders. The name is escaped because the label uses RichText.
 function G.Format(text,device,name)
@@ -35,7 +40,8 @@ function G.Format(text,device,name)
  end))
 end
 function G.Plain(text)return(tostring(text):gsub('<[^>]->',''):gsub('&lt;','<'):gsub('&gt;','>'):gsub('&amp;','&'))end
-local order={{'Pack',1},{'Seed',3},{'Plant',4},{'Harvest',5},{'Sell',7},{'Cash',8},{'Train',9}}
+-- Harvest/Sell/Cash still record progress but no longer hold the tutorial open.
+local order={{'Pack',1},{'Seed',3},{'Plant',4},{'Train',5}}
 function G.Read(saved)
  if type(saved)~='table'then return {Version=1,Mask=1,Done=false}end
  local mask=saved.Mask
@@ -56,7 +62,7 @@ function G.Event(state,event)
  return true
 end
 function G.Action(state,action)
- if action=='TreadmillInfo'and G.Step(state)==9 then state.Mask=bit32.bor(state.Mask,G.Bits.Train);state.Done=true;return true end
+ if action=='TreadmillInfo'and G.Step(state)==5 then state.Mask=bit32.bor(state.Mask,G.Bits.Train);state.Done=true;return true end
  if action=='Replay'then state.Mask=1;state.Done=false;return true end
  if action=='Skip'then state.Done=true;return true end
  return false

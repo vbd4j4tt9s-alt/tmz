@@ -13,7 +13,7 @@ function camera.WorldToViewportPoint(_,p)return V3(640+p.X*4,360-p.Z*2,5),math.a
 function workspace.Raycast(_,origin,dir)if origin.Y>0 and origin.Y+dir.Y<=0 then return {Position=V3(origin.X,0,origin.Z),Normal=V3(0,1,0),Instance=workspace}end;return nil end
 local moved=0
 function workspace.BulkMoveTo(_,parts,cframes)check(#parts==#cframes,'BulkMoveTo sizes match');for i,p in ipairs(parts)do p._props.CFrame=cframes[i];p._props.Position=cframes[i].Position end;moved+=1 end
-local Run=service('RunService');Run.RenderStepped=R.signal();Run.Heartbeat=R.signal();Run.Stepped=R.signal()
+local Run=service('RunService');Run.RenderStepped=R.signal();Run.Heartbeat=R.signal();Run.Stepped=R.signal();Run.IsStudio=function()return false end
 local UIS=service('UserInputService');UIS.TouchEnabled=false;UIS.MouseEnabled=true;UIS.LastInputTypeChanged=R.signal()
 local lastInput=R.Enum.UserInputType.MouseMovement;function UIS.GetLastInputType()return lastInput end
 local Tween=service('TweenService');function Tween.Create(_,obj,_,props)return {Play=function()for k,v in pairs(props)do obj[k]=v end end,Cancel=function()end,Completed=R.signal()}end
@@ -25,6 +25,10 @@ local Paths=service('PathfindingService');function Paths.CreatePath()local path=
  return path end
 local Gui=service('GuiService');Gui.ReducedMotionEnabled=false;function Gui.GetInsetArea()return {Min=R.Vector2.new(0,0),Width=1280,Height=720}end
 local Players=service('Players');local RS=service('ReplicatedStorage')
+game.CreatorType=R.Enum.CreatorType.User;game.CreatorId=777
+function Players.GetUserThumbnailAsync(_,id)return 'rbxthumb://type=AvatarHeadShot&id='..id end
+function Players.GetNameFromUserIdAsync(_,id)return id==777 and'OwnerName'or'someone'end
+
 local player=new('Player');player.Name='Tester';player.DisplayName='Alex';player.Parent=Players;Players.LocalPlayer=player
 local pg=new('PlayerGui');pg.Name='PlayerGui';pg.Parent=player
 local backpack=new('Backpack');backpack.Name='Backpack';backpack.Parent=player
@@ -80,14 +84,18 @@ local gui=pg:FindFirstChild('BeginnerTutorial');check(gui~=nil,'gui created')
 local card=gui.GuideCard;local welcome=gui.Welcome
 check(welcome.Visible==true,'welcome shows for a new player');check(card.Visible==false,'card waits behind welcome')
 check(welcome.Body.Text:find('Alex',1,true)~=nil,'welcome uses display name')
+check(welcome.Title.Text=='Welcome to Steal A Pack!','game name in welcome')
+check(welcome.Guide.Avatar.Visible==true and welcome.Guide.Avatar.Image:find('777',1,true)~=nil,'owner avatar on welcome badge')
+check(gui.GuideCard.NameTag.Label.Text=='OWNERNAME','owner name on tag')
+check(gui.GuideCard.Skip.Text=='X','skip shows a plain X')
 -- Trail: chevrons ahead of the player point at the goal.
 local trail=workspace:FindFirstChild('TutorialTrail');check(trail~=nil,'trail folder')
 local visible,pointing,count=0,0,0
 local target=V3(40,3,60)
 for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'then count+=1;if p.Transparency<1 then visible+=1
  local to=(target-p.CFrame.Position);if to.Magnitude>1 then local arm=p.CFrame.LookVector end end end end
-check(count==40,'40 chevrons built');check(visible>=10,'chevrons visible during welcome: '..visible)
-check(pathCalls>=1,'pathfinding used');check(moved>30,'trail animated with BulkMoveTo')
+check(count==36,'36 chevrons built');check(visible>=10,'chevrons visible during welcome: '..visible)
+check(pathCalls==0,'no pathfinding');check(moved>30,'trail animated with BulkMoveTo')
 -- Chevron geometry: left+right arm midpoint lies behind the tip; tip points along the route toward the goal.
 local L,Rt;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and not L and p.Transparency<.5 then L=p end end
 local idx=table.find(trail:GetChildren(),L);Rt=trail:GetChildren()[idx+1]
@@ -95,14 +103,14 @@ local mid=(L.CFrame.Position+Rt.CFrame.Position)/2
 local tipDir=(L.CFrame.LookVector+Rt.CFrame.LookVector).Unit
 check(Rt.Name=='ArmR','arm pairing')
 -- Both arms' -Z (LookVector) point toward the shared tip; their average must head roughly along the route.
-local routeDir=(V3(30,0,30)-V3(0,0,0)).Unit -- first leg goes toward the detour midpoint (30,0,30)
+local routeDir=(V3(40,0,60)-V3(0,0,0)).Unit -- straight at the goal
 check(tipDir:Dot(routeDir)>.7,('chevron points along route (dot=%.2f)'):format(tipDir:Dot(routeDir)))
 check(math.abs(mid.Y-.09)<.05,'chevrons sit on the ground (y='..mid.Y..')')
 -- Dismiss welcome.
 welcome.Go.Activated:Fire();frames(30)
 check(welcome.Visible==false,'welcome closes');check(card.Visible==true,'card shows after welcome')
-check(card.Instruction.Text:find('Sprout',1,true)~=nil,'step 1 text');check(card.StepPill.Label.Text=='STEP 1/9','step pill')
-check(card.Instruction.Text:find('press E to STEAL',1,true)~=nil,'mouse wording')
+check(card.Instruction.Text:find('Follow the red arrows',1,true)~=nil,'step 1 text');check(card.StepPill.Label.Text=='STEP 1/5','step pill')
+check(card.Instruction.Text:find('Press E to steal',1,true)~=nil,'mouse wording')
 check(card.AnchorPoint.Y==0 and card.Position.Y.Offset<200,'card sits at the top ('..card.Position.Y.Offset..')')
 check(type(pg:GetAttribute('TutorialCardBottom'))=='number','notice reservation published')
 check(card.Instruction.MaxVisibleGraphemes>=0,'typewriter running');frames(150);check(card.Instruction.MaxVisibleGraphemes==-1,'typewriter finishes')
@@ -110,35 +118,49 @@ check(gui.Goal.Enabled==true,'goal marker on');check(gui.Goal.Label.Text=='STEAL
 -- Walk toward the goal; trail start follows the player.
 for i=1,20 do root.CFrame=CF(i,3,i*1.4);frames(3)end
 local nearest=math.huge;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then local d=p.CFrame.Position-root.CFrame.Position;nearest=math.min(nearest,math.sqrt(d.X^2+d.Z^2))end end
-check(nearest<7,'trail starts at the player after moving ('..math.floor(nearest)..')')
+check(nearest<4.5,'trail starts at the player after moving ('..math.floor(nearest)..')')
+do local rp=root.CFrame.Position;local dir=(V3(40,0,60)-V3(rp.X,0,rp.Z)).Unit;local worst=0
+ for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then
+  local rel=V3(p.CFrame.Position.X-rp.X,0,p.CFrame.Position.Z-rp.Z);local side=(rel-dir*rel:Dot(dir)).Magnitude;worst=math.max(worst,side)
+ end end
+ check(worst<1.6,('arrows sit on the straight line (max sideways %.2f)'):format(worst))
+end
 -- Near the goal the trail hides.
 root.CFrame=CF(39,3,58);frames(10)
 local shown=0;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then shown+=1 end end
 check(shown==0,'trail hidden at the goal')
 -- Step 2: carrying.
 serverStep={Kind='Safety',Target=V3(0,3,-20)};player:SetAttribute('ChestChaseSeedCarrying',true);frames(90)
-check(card.Instruction.Text:find('RUN',1,true)~=nil,'step 2 text');check(sounds[#sounds]=='Bubble06','step change sound')
+check(card.Instruction.Text:find('Run home',1,true)~=nil,'step 2 text');check(sounds[#sounds]=='Bubble06','step change sound')
 -- Step 3: pack in backpack; pointer over its slot; equipped wording.
 player:SetAttribute('ChestChaseSeedCarrying',nil);serverStep={Kind=nil,Target=nil}
 local tool=new('Tool');tool.Name='Forest Pack';tool:SetAttribute('SeedPackTool',true);tool.Parent=backpack
 dock.Slot2.ItemName.Text='Forest Pack';player:SetAttribute('TutorialStep',3);frames(90)
-check(card.StepPill.Label.Text=='STEP 3/9','step 3 pill');check(gui.HotbarPointer.Visible==true,'hotbar pointer visible')
+check(card.StepPill.Label.Text=='STEP 3/5','step 3 pill');check(gui.HotbarPointer.Visible==true,'hotbar pointer visible')
 check(math.abs(gui.HotbarPointer.Position.X.Offset-(540+32))<1,'pointer over slot 2 ('..gui.HotbarPointer.Position.X.Offset..')')
 local shownTrail=0;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then shownTrail+=1 end end
 check(shownTrail==0,'no trail on a step without a world goal')
 tool.Parent=character;player:SetAttribute('ChestChaseSeedCarrying',false);frames(90)
-check(card.Instruction.Text:find('anywhere',1,true)~=nil,'equipped wording');check(gui.HotbarPointer.Visible==false,'pointer hides once equipped')
+check(card.Instruction.Text:find('Click to open',1,true)~=nil,'equipped wording');check(gui.HotbarPointer.Visible==false,'pointer hides once equipped')
 -- Menu wheel open hides the card.
 pg:SetAttribute('GardenMenuExpanded',true);frames(2);check(card.Visible==false,'card hides while menu open')
 check(pg:GetAttribute('TutorialCardBottom')==nil,'reservation cleared while hidden')
 pg:SetAttribute('GardenMenuExpanded',false);frames(2);check(card.Visible==true,'card returns')
 -- Touch wording.
 UIS.TouchEnabled=true;UIS.MouseEnabled=false;lastInput=R.Enum.UserInputType.Touch;UIS.LastInputTypeChanged:Fire(lastInput);frames(5)
-check(card.Instruction.Text:find('Tap anywhere',1,true)~=nil,'touch wording')
--- Step 9 informational completes itself after 8 seconds and shows the finish card.
-serverStep={Kind='Treadmill',Target=V3(-10,3,-30)};player:SetAttribute('TutorialStep',9);frames(60*9)
-check(table.find(commands,'TreadmillInfo')~=nil,'treadmill step auto-completes')
+check(card.Instruction.Text:find('Tap to open',1,true)~=nil,'touch wording')
+-- Step 5 tips: four slides, NEXT skips ahead, then the tutorial completes itself and shows the finish card.
+serverStep={Kind=nil,Target=nil};player:SetAttribute('TutorialStep',5);frames(10)
+check(card.StepPill.Label.Text=='STEP 5/5','tips pill');check(card.NextTip.Visible==true,'NEXT shown on tips')
+check(card.Instruction.Text:find('grows by itself',1,true)~=nil,'tip 1: '..card.Instruction.Text)
+frames(60*4);check(card.Instruction.Text:find('Pick the fruit',1,true)~=nil,'tip 2 after 3.5 s: '..card.Instruction.Text)
+card.NextTip.Activated:Fire();frames(2);check(card.Instruction.Text:find('Sell fruit',1,true)~=nil,'NEXT jumps to tip 3')
+local trailOnTips=0;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then trailOnTips+=1 end end
+check(trailOnTips==0,'no arrows during tips')
+frames(60*8)
+check(table.find(commands,'TreadmillInfo')~=nil,'tips complete the tutorial')
 check(card.Visible==true and card.StepPill.Label.Text=='DONE!','finish card shows');check(sounds[#sounds]=='GemClaim','finish sound')
+check(card.NextTip.Visible==false,'NEXT hidden on finish card')
 frames(60*6);check(card.Visible==false,'finish card hides after 5 s')
 -- Replay then skip with two taps: no finish card.
 player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialMask',1);player:SetAttribute('TutorialStep',1);serverStep={Kind='Pack',Target=V3(40,3,60)};frames(30)
