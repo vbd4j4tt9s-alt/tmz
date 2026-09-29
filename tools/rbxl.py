@@ -57,12 +57,15 @@ def load(path):
             pname, o = rstr(body, 4); pname = pname.decode()
             t = body[o]; o+=1
             cname, rs = classes[cid]
-            if t == 0x01 and pname in ('Name','Source'):
+            if t == 0x01 and pname in ('Name','Source','Value'):
                 for r in rs:
                     s, o = rstr(body, o)
                     inst[r][pname] = s
             elif t == 0x02 and pname in ('Disabled','Enabled'):
                 for i,r in enumerate(rs): inst[r][pname] = bool(body[o+i])
+            elif t == 0x13 and pname == 'Value':
+                vals, _ = refs(body, o, len(rs))
+                for r,v in zip(rs,vals): inst[r]['ValueRef'] = v
             elif t == 0x12 and pname == 'RunContext':
                 n=len(rs); raw=body[o:o+4*n]
                 for i,r in enumerate(rs):

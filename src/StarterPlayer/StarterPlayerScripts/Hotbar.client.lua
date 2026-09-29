@@ -185,7 +185,11 @@ layout=function()
  visibleSlots=metrics.Slots
  local gap=6;local side=metrics.SlotSize
  dock.Position=UDim2.new(.5,metrics.HotbarShiftX or 0,1,-metrics.HotbarBottom);dock.Size=UDim2.fromOffset((visibleSlots+1)*side+visibleSlots*gap,side)
- for i,b in ipairs(slots)do b.Visible=i<=visibleSlots;b.ItemName.TextScaled=true;b.Size=UDim2.fromOffset(side,side);b.Position=UDim2.fromOffset((i-1)*(side+gap),0)end
+ for i,b in ipairs(slots)do b.Visible=i<=visibleSlots;b.ItemName.TextScaled=true;b.Size=UDim2.fromOffset(side,side);b.Position=UDim2.fromOffset((i-1)*(side+gap),0)
+  -- R110: slot text grows with the larger slots.
+  local fit=b.ItemName:FindFirstChildOfClass('UITextSizeConstraint');if fit then fit.MaxTextSize=math.max(11,math.floor(side*.2))end
+  b.Number.TextSize=math.max(11,math.floor(side*.2));b.Number.Size=UDim2.fromOffset(math.floor(side*.34),math.floor(side*.29))
+ end
  open.Size=UDim2.fromOffset(side,side);open.Position=UDim2.new(1,-side,0,0)
  if pg:GetAttribute('ChestHotbarReserve')~=side+78 then pg:SetAttribute('ChestHotbarReserve',side+78)end
  local height=view.Y;MenuStyle.Place(panel,pg,math.min(900,width*.86),math.min(620,height*.66))

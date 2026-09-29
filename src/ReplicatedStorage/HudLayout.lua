@@ -1,12 +1,12 @@
--- R107: mobile timers and balances share a right-aligned dock; desktop metrics are unchanged.
+-- R110: larger menu wheel and hotbar slots on every screen; phones keep five slots when they fit.
 local L={}
 local function overlaps(a,b,pad)
  pad=pad or 0
  return a.X<b.X+b.W+pad and a.X+a.W>b.X-pad and a.Y<b.Y+b.H+pad and a.Y+a.H>b.Y-pad
 end
 local function phoneLayout(w,h,controls)
- local portrait=h>w;local side=44;local gap=6
- local menuSize=(portrait and h<520 or not portrait and h<280)and 48 or 54
+ local portrait=h>w;local side=56;local gap=6
+ local menuSize=(portrait and h<520 or not portrait and h<280)and 52 or 64
  local thumbWidth=math.min(160,math.max(120,math.floor(w*.32)))
  local thumbHeight=math.min(160,math.max(120,math.floor(h*.32)))
  local left={X=0,Y=h-thumbHeight,W=thumbWidth,H=thumbHeight}
@@ -20,16 +20,18 @@ local function phoneLayout(w,h,controls)
   end
  end
  local lane=right.X-left.W-16
+ -- R110: largest slot (56 down to 44) that still keeps five slots on screen.
+ while side>44 and math.floor(((portrait and w-16 or lane)+gap)/(side+gap))-1<5 do side-=2 end
  local slots=math.clamp(math.floor(((portrait and w-16 or lane)+gap)/(side+gap))-1,1,5)
  local hotbarBottom=portrait and math.max(left.H,right.H)+8 or 12
  local barWidth=(slots+1)*side+slots*gap
  local barCenter=portrait and w/2 or(left.W+right.X)/2
  local bar={X=barCenter-barWidth/2,Y=h-hotbarBottom-side,W=barWidth,H=side}
  local menuHalf=menuSize/2;local menuClear=menuHalf+8
- if menuSize==54 and left.Y<150 then menuSize=48;menuHalf=24;menuClear=32 end
+ if menuSize==64 and left.Y<150 then menuSize=52;menuHalf=26;menuClear=34 end
  local center=math.max(menuClear,math.min(h/2,(portrait and bar.Y or left.Y)-menuClear))
- local radius=math.max(0,math.min(menuSize==54 and 86 or 80,center-menuClear))
- local radiusX=radius<68 and 178 or menuSize==54 and 86 or 80
+ local radius=math.max(0,math.min(menuSize==64 and 102 or 86,center-menuClear))
+ local radiusX=radius<72 and 178 or menuSize==64 and 102 or 86
  local offsets={{X=0,Y=-radius},{X=radiusX/math.sqrt(2),Y=-radius/math.sqrt(2)},{X=radiusX,Y=0}}
  local statusScale=portrait and .72 or .63
  local statusHorizontal=not portrait and 8+82*statusScale+6+136>right.Y-6
@@ -68,7 +70,7 @@ function L.Read(view,touch,controls)
  if touch then return phoneLayout(w,h,controls)end
  local short=h<480;local compact=w<1050 or(touch and h<650)
  local slots=compact and 5 or 10
- local side=math.min(touch and(compact and 44 or 48)or(compact and 52 or 56),math.floor((w-32-slots*6)/(slots+1)))
+ local side=math.min(touch and(compact and 44 or 48)or(compact and 60 or 66),math.floor((w-32-slots*6)/(slots+1)))
  if h<300 then side=math.min(side,math.floor(h*.18))end
  local hotbarBottom=touch and w<500 and h>w and math.min(100,math.floor(h*.16))or(h<240 and 8 or 12)
  local nav=short and math.min(48,math.max(28,math.floor(h*.18)))or compact and 48 or 58
@@ -94,7 +96,7 @@ function L.Read(view,touch,controls)
  local walletStack=walletH*3+gap*2
  local speedY=h-bottom-walletStack;local walletX=12
  -- The closed hub stays centered. Only resolve a real collision with the balances.
- local hubSize=h<280 and 48 or 54;local hubTop=(h-hubSize)/2
+ local hubSize=h<280 and 52 or 64;local hubTop=(h-hubSize)/2
  if speedY<hubTop+hubSize+8 and h-bottom>hubTop-8 then
   local compactHeight=math.floor((h-bottom-hubTop-hubSize-12)/3)
   if compactHeight>=20 then walletH=math.min(walletH,compactHeight);gap=2;walletStack=walletH*3+gap*2;speedY=h-bottom-walletStack
@@ -111,8 +113,8 @@ function L.Read(view,touch,controls)
  local statusHeight=stacked and 211 or 125
  statusScale=math.min(statusScale,math.max(1,h-bottom-8-(short and ownerSize+8 or 0))/statusHeight)
  local ownerY=short and 8 or math.max(8,math.min(h*.5-24,h-bottom-statusHeight*statusScale-ownerSize-8))
- local optionSize=h<224 and 44 or h<280 and 48 or 54
- local radius=math.min(hubSize==54 and 86 or 80,h/2-optionSize/2-(h<212 and 4 or 8))
+ local optionSize=h<224 and 44 or h<280 and 50 or 64
+ local radius=math.min(hubSize==64 and 102 or 84,h/2-optionSize/2-(h<212 and 4 or 8))
  -- Exceptionally short canvases widen the upper arc; targets never shrink below44px.
  local radiusX=radius<76 and math.min(178,w-10-(hubSize-optionSize)/2-optionSize-6)or radius
  local offsets={{X=0,Y=-radius},{X=radiusX/math.sqrt(2),Y=-radius/math.sqrt(2)},{X=radiusX,Y=0}}
