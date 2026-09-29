@@ -2,7 +2,7 @@
 import subprocess, sys, os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 paste, out = sys.argv[1], sys.argv[2]
-base = sys.argv[3] if len(sys.argv) > 3 else 'HEAD'
+base = sys.argv[3] if len(sys.argv) > 3 else 'r107-live'
 def git(*a): return subprocess.run(['git', '-C', ROOT, *a], check=True, capture_output=True).stdout
 manifest = {}
 for line in git('show', f'{base}:src/MANIFEST.tsv').decode().splitlines()[1:]:

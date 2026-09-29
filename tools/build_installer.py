@@ -14,7 +14,7 @@ import base64, difflib, hashlib, subprocess, sys, os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
-base = 'HEAD'
+base = 'r107-live'  # what is live in the place; installers patch from here
 if '--base' in sys.argv: base = sys.argv[sys.argv.index('--base') + 1]; args.remove(base)
 release, backup_name, out_path = args[:3]
 
