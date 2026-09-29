@@ -28,7 +28,14 @@ assert not untracked, f'New scripts are not supported by this installer: {untrac
 
 def sha(b): return hashlib.sha256(b).hexdigest()
 def patches(before, after):
-    ops = difflib.SequenceMatcher(None, before, after, autojunk=False).get_opcodes()
+    # Only diff the region between the common prefix and suffix; big files usually change in a few spots.
+    head = 0
+    while head < min(len(before), len(after)) and before[head] == after[head]: head += 1
+    tail = 0
+    while tail < min(len(before), len(after)) - head and before[-1 - tail] == after[-1 - tail]: tail += 1
+    mid_b, mid_a = before[head:len(before) - tail], after[head:len(after) - tail]
+    ops = [(t, i1 + head, i2 + head, j1 + head, j2 + head)
+           for t, i1, i2, j1, j2 in difflib.SequenceMatcher(None, mid_b, mid_a, autojunk=False).get_opcodes()]
     spans = []  # (i1, i2, j1, j2) in before/after coordinates; merge edits separated by < 24 equal bytes
     for tag, i1, i2, j1, j2 in ops:
         if tag == 'equal': continue
