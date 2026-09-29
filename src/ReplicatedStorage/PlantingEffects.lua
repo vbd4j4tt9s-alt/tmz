@@ -301,7 +301,7 @@ function E:StartPile(r)
  local camera=workspace.CurrentCamera;local position=r.Origin.Position
  local distance=camera and(camera.CFrame.Position-position).Magnitude or 0
  local e=self:Emitter(position+V(0,.15,0))
- if distance<=M.Tuning.SoundRange then self:PlaySounds(e,self:Owned(r))end
+ if distance<=M.Tuning.SoundRange then self:PlaySounds(e,self:Owned(r),M.Size(r.Base).Radius)end
  local skip=mode()=='off'or distance>M.Tuning.FarRange
  if not skip and camera and distance>30 then local _,visible=camera:WorldToViewportPoint(position+V(0,.5,0));skip=not visible end
  local room=budget.Chunks-self.LiveChunks
@@ -371,13 +371,16 @@ function E:Burst(e,layout,budget,reduced,near,palette)
   e.Clods.Speed=NumberRange.new(6+1.2*R,10+2*R);e.Clods:Emit(clods)
  end
 end
-function E:PlaySounds(e,own)
+-- Bigger mounds sound heavier: the thud and crunch drop in pitch and gain a little volume with the pile radius.
+function E:PlaySounds(e,own,radius)
  local now=os.clock();if now<self.NextSound then return end;self.NextSound=now+.09
+ local heavy=math.clamp(((radius or 1)-1)/3.5,0,1)
  for _,layer in ipairs(M.Sounds)do
   local sound=e.Sounds[layer.Key]
   if sound and layer.Volume>0 and(own or not layer.OwnOnly)then
-   table.insert(self.Queue,{At=now+(layer.Delay or 0),Sound=sound,Volume=layer.Volume*(own and 1 or M.Tuning.OthersVolume),
-    Speed=self.Random:NextNumber(layer.Pitch[1],layer.Pitch[2]),Start=layer.Start,Length=layer.Length})
+   local weight=(layer.Key=='Thud'or layer.Key=='Crunch')and heavy or 0
+   table.insert(self.Queue,{At=now+(layer.Delay or 0),Sound=sound,Volume=math.min(1,layer.Volume*(own and 1 or M.Tuning.OthersVolume)*(1+.3*weight)),
+    Speed=self.Random:NextNumber(layer.Pitch[1],layer.Pitch[2])*(1-.18*weight),Start=layer.Start,Length=layer.Length})
   end
  end
 end

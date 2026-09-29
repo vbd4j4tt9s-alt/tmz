@@ -246,14 +246,37 @@ layout=function()
  local height=view.Y;MenuStyle.Place(panel,pg,math.min(900,width*.86),math.min(620,height*.66))
  local compact=height<480 and width>540
  local title=panel.Title
- title.Size=compact and UDim2.fromOffset(145,36)or UDim2.new(1,-65,0,40)
- search.Position=compact and UDim2.fromOffset(170,12)or UDim2.fromOffset(16,54)
- search.Size=compact and UDim2.new(1,-234,0,30)or UDim2.new(1,-32,0,36)
- filters.Position=UDim2.fromOffset(16,compact and 56 or 98);filters.Size=compact and UDim2.new(.68,-24,0,28)or UDim2.new(1,-32,0,32)
- rarityFilter.Position=compact and UDim2.new(.68,0,0,56)or UDim2.fromOffset(16,138)
- rarityFilter.Size=compact and UDim2.new(.32,-16,0,28)or UDim2.new(1,-32,0,30)
- rarityMenu.Position=UDim2.fromOffset(16,compact and 88 or 174)
- scroll.Position=UDim2.fromOffset(16,compact and 94 or 178);scroll.Size=UDim2.new(1,-32,1,compact and -130 or -218)
+ -- R112: wide panels get a left column of square category cards and a search box top-right.
+ local sheetWidth,sheetHeight=panel.Size.X.Offset,panel.Size.Y.Offset;local column=not compact and sheetWidth>=560
+ if column then
+  local searchWidth=math.clamp(math.floor(sheetWidth*.34),160,280);local tab=76;local left=16+tab+12
+  local tabHeight=math.clamp(math.floor((sheetHeight-102)/4)-6,48,76);local icon=math.floor(tabHeight*.46)
+  title.Size=UDim2.new(1,-(searchWidth+120),0,40)
+  search.Position=UDim2.new(1,-(searchWidth+58),0,12);search.Size=UDim2.fromOffset(searchWidth,32)
+  filters.Position=UDim2.fromOffset(16,58);filters.Size=UDim2.new(0,tab,1,-100)
+  for i,name in ipairs({'All','Seeds','Fruit','Tools'})do
+   local b=filterButtons[name];b.Size=UDim2.fromOffset(tab,tabHeight);b.Position=UDim2.fromOffset(0,(i-1)*(tabHeight+6))
+   b.TabIcon.AnchorPoint=Vector2.new(.5,0);b.TabIcon.Position=UDim2.new(.5,0,0,math.floor(tabHeight*.12));b.TabIcon.Size=UDim2.fromOffset(icon,icon)
+   b.Caption.Position=UDim2.new(0,4,1,-math.floor(tabHeight*.38));b.Caption.Size=UDim2.new(1,-8,0,math.floor(tabHeight*.34))
+  end
+  rarityFilter.Position=UDim2.fromOffset(left,58);rarityFilter.Size=UDim2.fromOffset(math.min(220,sheetWidth-left-16),30)
+  rarityMenu.Position=UDim2.fromOffset(left,92);rarityMenu.Size=UDim2.new(1,-(left+16),0,110)
+  scroll.Position=UDim2.fromOffset(left,96);scroll.Size=UDim2.new(1,-(left+16),1,-130)
+ else
+  title.Size=compact and UDim2.fromOffset(145,36)or UDim2.new(1,-65,0,40)
+  search.Position=compact and UDim2.fromOffset(170,12)or UDim2.fromOffset(16,54)
+  search.Size=compact and UDim2.new(1,-234,0,30)or UDim2.new(1,-32,0,36)
+  filters.Position=UDim2.fromOffset(16,compact and 56 or 98);filters.Size=compact and UDim2.new(.68,-24,0,28)or UDim2.new(1,-32,0,32)
+  for i,name in ipairs({'All','Seeds','Fruit','Tools'})do
+   local b=filterButtons[name];b.Size=UDim2.new(.25,-6,1,0);b.Position=UDim2.new((i-1)*.25,0,0,0)
+   b.TabIcon.AnchorPoint=Vector2.new(0,.5);b.TabIcon.Position=UDim2.new(0,6,.5,0);b.TabIcon.Size=UDim2.fromOffset(14,14)
+   b.Caption.Position=UDim2.fromOffset(22,0);b.Caption.Size=UDim2.new(1,-26,1,0)
+  end
+  rarityFilter.Position=compact and UDim2.new(.68,0,0,56)or UDim2.fromOffset(16,138)
+  rarityFilter.Size=compact and UDim2.new(.32,-16,0,28)or UDim2.new(1,-32,0,30)
+  rarityMenu.Position=UDim2.fromOffset(16,compact and 88 or 174);rarityMenu.Size=UDim2.new(1,-32,0,110)
+  scroll.Position=UDim2.fromOffset(16,compact and 94 or 178);scroll.Size=UDim2.new(1,-32,1,compact and -130 or -218)
+ end
  renderRows()
 end
 local function character(char)
