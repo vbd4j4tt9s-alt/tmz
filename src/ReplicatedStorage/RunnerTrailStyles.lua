@@ -1,5 +1,6 @@
 -- R111: per-biome boot ground effects and their client budget. Cosmetic only; read by RunnerTrailEffects.
 -- Print = footprint parts and how they age, Burst = particles kicked up on each print, Idle = aura while standing.
+-- Ribbon = the R47 ground ribbon colours; slightly more transparent than R47 (.2) so the fresh prints show through.
 -- Textures are Roblox built-ins (rbxasset://textures/particles/...), so nothing has to be uploaded.
 local S={}
 local C,V=Color3.fromRGB,Vector3.new
@@ -12,7 +13,7 @@ S.FadeIn=.8;S.FadeOut=.25
 -- Emitter fields: Size/Alpha {start,end} or {start,middle,end}; Life/Speed/Spin {min,max}; Glow=LightEmission;
 -- Light=LightInfluence; Shape/Style=ParticleEmitterShape/ShapeStyle on the idle part (disc at the wearer's soles).
 S.Themes={
- Desert={Ribbon={C(226,190,128),C(176,132,80)},RibbonAlpha=.45,RibbonGlow=0,
+ Desert={Ribbon={C(226,190,128),C(176,132,80)},RibbonAlpha=.5,RibbonGlow=0,
   Print={Kind='Sand',Life=2.6,Hold=.35,Alpha=.12,Color=C(168,126,80),Accent=C(138,100,62),Material=M.Sand},
   Burst={
    {Name='Dust puff',Texture=SMOKE,Color=C(222,192,142),Count=2,Size={.7,2.1},Life={.5,.9},Speed={1.5,3.5},Spread=70,Accel=V(0,-1,0),Drag=3,Alpha={.5,1},Glow=0,Light=1},
@@ -22,7 +23,7 @@ S.Themes={
    {Name='Swirling sand',Texture=SMOKE,Color=C(226,196,142),Rate=6,Size={.5,1.4},Life={1.2,1.8},Speed={.2,.5},Alpha={.6,1},Glow=0,Light=1,Locked=true,Shape='Disc',Style='Surface'},
    {Name='Sand grains',Texture=SPARK,Color=C(214,176,112),Rate=10,Size={.12,.08},Life={1,1.6},Speed={.3,.8},Accel=V(0,.3,0),Alpha={.2,1},Glow=0,Light=.8,Locked=true,Shape='Disc'},
   }}},
- Snow={Ribbon={C(214,240,255),C(140,196,240)},RibbonAlpha=.35,RibbonGlow=.35,
+ Snow={Ribbon={C(214,240,255),C(140,196,240)},RibbonAlpha=.42,RibbonGlow=.35,
   -- Prints start as clear ice, then crystallise into white frost with a small star before fading.
   Print={Kind='Frost',Life=3,Hold=.55,Alpha=.25,Turn=.3,Color=C(150,204,242),Material=M.Ice,Reflectance=.25,Color2=C(236,246,255),Material2=M.Snow,Accent=C(200,236,255)},
   Burst={
@@ -33,7 +34,7 @@ S.Themes={
    {Name='Frost mist',Texture=SMOKE,Color=C(210,232,250),Rate=3,Size={1.2,2.6},Life={2,3},Speed={.1,.3},Accel=V(0,-.1,0),Alpha={.72,1},Glow=.1,Light=1,Shape='Disc'},
    {Name='Snowflakes',Texture=SPARK,Color=C(250,252,255),Rate=6,Size={.18,.12},Life={1.6,2.4},Speed={1,1.6},Accel=V(0,-1.4,0),Alpha={.1,1},Glow=.5,Light=.5,Spin={-60,60},Shape='Disc'},
   }}},
- Lava={Ribbon={C(255,140,53),C(195,62,35)},RibbonAlpha=.2,RibbonGlow=.65,
+ Lava={Ribbon={C(255,140,53),C(195,62,35)},RibbonAlpha=.35,RibbonGlow=.65,
   -- Prints glow like fresh magma, cool through red to dark basalt, then fade.
   Print={Kind='Ember',Life=2.4,Hold=.55,Alpha=.05,Turn=.45,Turn2=.7,Color=C(255,200,90),Color2=C(226,68,24),Accent=C(255,236,160),Cool=C(58,42,36),Material2=M.Basalt},
   Burst={
@@ -44,7 +45,7 @@ S.Themes={
    {Name='Rising embers',Texture=SPARK,Color=C(255,150,50),Tail=C(255,70,20),Rate=8,Size={.16,0},Life={.9,1.6},Speed={1.2,2.6},Spread=25,Accel=V(.2,1.2,0),Alpha={0,.3},Glow=1,Light=0,Shape='Disc'},
    {Name='Heat haze',Texture=SMOKE,Color=C(120,70,50),Rate=2,Size={.8,2.2},Life={1,1.6},Speed={1.4,2.4},Spread=15,Alpha={.82,1},Glow=.2,Light=1,Shape='Disc'},
   }}},
- Crystal={Ribbon={C(193,152,250),C(115,178,237)},RibbonAlpha=.2,RibbonGlow=.65,
+ Crystal={Ribbon={C(193,152,250),C(115,178,237)},RibbonAlpha=.35,RibbonGlow=.65,
   -- Three small reflective shards poke out of each print; the centre one twinkles.
   Print={Kind='Crystal',Life=2.6,Hold=.5,Alpha=.15,Color=C(222,204,255),Material=M.Glass,Reflectance=.5,Accent=C(178,112,255)},
   Burst={
@@ -53,7 +54,7 @@ S.Themes={
   Idle={Spin=.9,Shards=3,ShardColor=C(228,212,255),ShardGlow=C(170,96,255),Emitters={
    {Name='Crystal twinkles',Texture=SPARK,Color=C(236,220,255),Tail=C(180,120,255),Rate=7,Size={0,.4,0},Life={.5,.9},Speed={.4,1},Spread=40,Drag=1,Alpha={0,.2},Glow=1,Light=0,Shape='Disc'},
   }}},
- Storm={Ribbon={C(177,232,255),C(94,146,248)},RibbonAlpha=.2,RibbonGlow=.65,
+ Storm={Ribbon={C(177,232,255),C(94,146,248)},RibbonAlpha=.35,RibbonGlow=.65,
   -- Zigzag prints flicker like a live wire, shift from white-cyan to blue and fade.
   Print={Kind='Lightning',Life=1.6,Hold=.4,Alpha=.08,Turn=.3,Color=C(200,244,255),Color2=C(70,140,255)},
   Arc=.3,ArcColor=C(190,240,255),

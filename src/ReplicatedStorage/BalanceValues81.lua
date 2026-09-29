@@ -5,8 +5,8 @@ local R=require(script.Parent.RouteBalance83)
 T.KeeperSpeeds=R.KeeperSpeeds;T.SpawnWeights=R.SpawnWeights
 -- R84: exact saved points are retained; new training takes longer at every tier.
 T.SpeedTailPerDecade=.1 -- R88: 500 at 100B, only +0.1 per tenfold increase afterwards.
--- R112: need = keeper close speed x1.10 per biome (35/55/88/141/226/363); the first minute of training gives
--- a milestone every few seconds (26 at 5 s, 28 at 15 s, 31 at 30 s, 35 at 60 s on the first machine).
+-- R112: need = keeper close speed x1.10 per biome (35/55/88/141/226/363). The first minute of training is
+-- front-loaded for new players: 26 at 5 s, 28 at 15 s, 31 at 30 s, 35 (Jungle) at 60 s on the first machine.
 T.PointCurve={{0,24},{500,26},{1500,28},{3000,31},{6000,35},{120000,55},{1500000,88},{20000000,141},{300000000,226},{5000000000,363},{100000000000,500}}
 T.MachineMultipliers={1,4,20,100,600,4000,30000}
 -- R112: displayed boot luck. PackOdds112 applies it per tier as luck^power (King full, Cosmic ^.40 ... Legendary ^.08).

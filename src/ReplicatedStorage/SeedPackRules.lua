@@ -381,7 +381,7 @@ local roll81,odds81=Rules.Roll,Rules.SeedOdds
 local function current(stage,variantKey,version)
  return version==N.Version and stage~=8 and(N.PackFloor[variantKey]~=nil or variantKey=='EclipseReliquary'and stage==7)
 end
-function Rules.SeedOdds(config,stage,variantKey,luck,version)
+Rules.SeedOdds=function(config,stage,variantKey,luck,version)
  if version==nil then version=N.Version end
  if not current(stage,variantKey,version)then return odds81(config,stage,variantKey,N.LegacyLuck(luck),version)end
  local void=variantKey=='EclipseReliquary'
@@ -393,7 +393,7 @@ function Rules.SeedOdds(config,stage,variantKey,luck,version)
  end end
  return out
 end
-function Rules.Roll(config,stage,draw,luck,variantKey,version)
+Rules.Roll=function(config,stage,draw,luck,variantKey,version)
  if not current(stage,variantKey,version)then
   return roll81(config,stage,type(draw)=='function'and draw()or draw,N.LegacyLuck(luck),variantKey,version)
  end

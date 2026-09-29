@@ -83,8 +83,8 @@ w('')
 # ---------------- first 10 minutes
 w('### N1. New player: speed vs time on the starter treadmill (100 points/s; x2 with the speed pass)')
 w('')
-w('| Treadmill time | Points | Speed live (R110) | Speed approved proposal | Speed final | "FASTER!" notice | Forest keeper (20) | Jungle keeper (32) |')
-w('|---|---|---|---|---|---|---|---|')
+w('| Treadmill time | Points | Speed live (R110) | Speed approved proposal | Speed final | vs Forest keeper (close 20) | vs Jungle keeper (close 32) |')
+w('|---|---|---|---|---|---|---|')
 prop = [(0, 24), (6000, 35), (120000, 55), (1500000, 88), (20000000, 141), (300000000, 226), (5000000000, 363), (100000000000, 500)]
 spd = {int(r[1]): float(r[2]) for r in rows if r[0] == 'SPEED'}
 for secs in [0, 5, 15, 30, 45, 60, 120, 300, 600]:
@@ -92,10 +92,9 @@ for secs in [0, 5, 15, 30, 45, 60, 120, 300, 600]:
     live = speed_from_points(pts, POINT_CURVE)
     ap = speed_from_points(pts, prop)
     fin = speed_from_points(pts, knots)
-    note = next((f'{b:g}' for a, b in knots if a == pts and a > 0), '')
     fk = 'outruns x%.2f' % (fin / 20)
     jk = ('outruns x%.2f' % (fin / 32)) if fin > 32 else 'too slow'
-    w(f'| {secs//60}:{secs%60:02d} | {pts:,} | {live:.1f} | {ap:.1f} | {fin:.1f} | {note} | {fk} | {jk} |')
+    w(f'| {secs//60}:{secs%60:02d} | {pts:,} | {live:.1f} | {ap:.1f} | {fin:.1f} | {fk} | {jk} |')
 w('')
 open('out_tables112.md', 'w').write('\n'.join(OUT) + '\n')
 print('\n'.join(OUT))

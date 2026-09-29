@@ -38,15 +38,15 @@ Chance per pack of getting that tier **or better**, and the average active time 
 
 ### N1. New player: speed vs time on the starter treadmill (100 points/s; x2 with the speed pass)
 
-| Treadmill time | Points | Speed live (R110) | Speed approved proposal | Speed final | "FASTER!" notice | Forest keeper (20) | Jungle keeper (32) |
-|---|---|---|---|---|---|---|---|
-| 0:00 | 0 | 24.0 | 24.0 | 24.0 |  | outruns x1.20 | too slow |
-| 0:05 | 500 | 27.8 | 24.9 | 26.0 | 26 | outruns x1.30 | too slow |
-| 0:15 | 1,500 | 32.5 | 26.8 | 28.0 | 28 | outruns x1.40 | too slow |
-| 0:30 | 3,000 | 38.0 | 29.5 | 31.0 | 31 | outruns x1.55 | too slow |
-| 0:45 | 4,500 | 40.1 | 32.2 | 33.0 |  | outruns x1.65 | outruns x1.03 |
-| 1:00 | 6,000 | 42.3 | 35.0 | 35.0 | 35 | outruns x1.75 | outruns x1.09 |
-| 2:00 | 12,000 | 48.8 | 36.1 | 36.1 |  | outruns x1.80 | outruns x1.13 |
-| 5:00 | 30,000 | 56.0 | 39.2 | 39.2 |  | outruns x1.96 | outruns x1.23 |
-| 10:00 | 60,000 | 64.7 | 44.5 | 44.5 |  | outruns x2.22 | outruns x1.39 |
+| Treadmill time | Points | Speed live (R110) | Speed approved proposal | Speed final | vs Forest keeper (close 20) | vs Jungle keeper (close 32) |
+|---|---|---|---|---|---|---|
+| 0:00 | 0 | 24.0 | 24.0 | 24.0 | outruns x1.20 | too slow |
+| 0:05 | 500 | 27.8 | 24.9 | 26.0 | outruns x1.30 | too slow |
+| 0:15 | 1,500 | 32.5 | 26.8 | 28.0 | outruns x1.40 | too slow |
+| 0:30 | 3,000 | 38.0 | 29.5 | 31.0 | outruns x1.55 | too slow |
+| 0:45 | 4,500 | 40.1 | 32.2 | 33.0 | outruns x1.65 | outruns x1.03 |
+| 1:00 | 6,000 | 42.3 | 35.0 | 35.0 | outruns x1.75 | outruns x1.09 |
+| 2:00 | 12,000 | 48.8 | 36.1 | 36.1 | outruns x1.80 | outruns x1.13 |
+| 5:00 | 30,000 | 56.0 | 39.2 | 39.2 | outruns x1.96 | outruns x1.23 |
+| 10:00 | 60,000 | 64.7 | 44.5 | 44.5 | outruns x2.22 | outruns x1.39 |
 

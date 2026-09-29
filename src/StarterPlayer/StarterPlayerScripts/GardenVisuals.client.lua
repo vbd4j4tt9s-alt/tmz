@@ -18,6 +18,11 @@ local Batch=require(RS:WaitForChild('PlantAnimationBatch'))
 local animationBatch=Batch.new(workspace)
 local Planner=require(RS:WaitForChild('PlantDetailPlanner'))
 local PackRules=require(RS:WaitForChild('SeedPackRules'))
+-- R112: dirt pile + sound when a crop is freshly planted, and a growth-point mark while it stands.
+-- Cosmetic only: if it cannot start, plant visuals carry on without it.
+local okPlanting,Planting=pcall(function()return require(RS:WaitForChild('PlantingEffects')).new()end)
+if not okPlanting then warn('[R112] Planting effects off: '..tostring(Planting));Planting={Add=function()end,Remove=function()end,Destroy=function()end}end
+script.Destroying:Connect(function()Planting:Destroy()end)
 local meshWarnings={}
 -- Keep existing animation caps. Only spare capacity reaches visible, readable distant models.
 local function motionVisible(entry,near,far)
@@ -60,9 +65,9 @@ local function clear(item,r,keepWork)
  if r.Visual then r.Visual:Destroy();r.Visual=nil end
  r.Rig=nil;r.Pose=nil;r.QueuePose=false;r.Swaying=false;r.Key=nil;r.FruitKey=nil;r.FxKey=nil;hideSupports(item,r,false)
 end
-local function track(item)
+local function track(item,initial)
  if not item:IsA('Model')or not item:GetAttribute('GardenPlantV141')or tracked[item]then return end
- local r={};tracked[item]=r
+ local r={};tracked[item]=r;Planting:Add(item,initial==true)
  r.Connection=item.DescendantAdded:Connect(function(p)
   -- Parent replication can arrive before FruitProxy/HarvestIndex attributes.
   -- Coalesce the whole support update instead of relying on those attributes at this event.
@@ -70,10 +75,10 @@ local function track(item)
   if branch.Name=='SolidPlant'or branch.Name=='GrowingFruit'or branch.Name=='FruitPrompts'then r.SupportsDirty=true end
  end)
 end
-for _,item in ipairs(map:GetDescendants())do track(item)end
-map.DescendantAdded:Connect(track)
+for _,item in ipairs(map:GetDescendants())do track(item,true)end
+map.DescendantAdded:Connect(function(item)track(item,false)end)
 map.DescendantRemoving:Connect(function(item)
- local r=tracked[item];if r then tracked[item]=nil;r.Connection:Disconnect();clear(item,r) end
+ local r=tracked[item];if r then tracked[item]=nil;r.Connection:Disconnect();clear(item,r);Planting:Remove(item) end
 end)
 local function data(item)
  return require(RS.GardenViewState).Read(item)
