@@ -1,4 +1,4 @@
--- R110: Sprout guides new players. Friendly card above the hotbar, a welcome pop-up on the first join,
+-- R110: Sprout guides new players. Friendly objective card at the top centre, a welcome pop-up on the first join,
 -- a flowing red arrow trail on the ground to every goal (built on this client only, so only you see it),
 -- a bouncing marker over the goal and a pointer at the pack in the hotbar.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
@@ -26,7 +26,7 @@ end
 
 -- Screen pieces ---------------------------------------------------------------------------
 local gui=Instance.new('ScreenGui');gui.Name='BeginnerTutorial';gui.ResetOnSpawn=false;gui.DisplayOrder=25;gui.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
-local card=Instance.new('Frame');card.Name='GuideCard';card.AnchorPoint=Vector2.new(.5,1);card.BackgroundColor3=Color3.new(1,1,1);card.BorderSizePixel=0;card.Visible=false;card.Parent=gui
+local card=Instance.new('Frame');card.Name='GuideCard';card.AnchorPoint=Vector2.new(.5,0);card.BackgroundColor3=Color3.new(1,1,1);card.BorderSizePixel=0;card.Visible=false;card.Parent=gui
 round(card,UDim.new(0,16));gradient(card,RGB(74,88,165),RGB(27,32,70));local rim=stroke(card,RGB(255,214,79),3);local pop=Instance.new('UIScale');pop.Parent=card
 local shine=Instance.new('Frame');shine.Name='Shine';shine.BackgroundColor3=Color3.new(1,1,1);shine.BackgroundTransparency=.8;shine.BorderSizePixel=0;shine.Position=UDim2.fromOffset(14,5);shine.Size=UDim2.new(1,-28,0,3);shine.Parent=card;round(shine)
 local badge=Instance.new('Frame');badge.Name='Sprout';badge.AnchorPoint=Vector2.new(.5,.5);badge.BackgroundColor3=Color3.new(1,1,1);badge.ZIndex=3;badge.Parent=card
@@ -107,7 +107,7 @@ local poll,introSeconds,revealed,welcomeUntil=0,0,0,0;local fetch,render,place
 local welcomed,welcomeOpen,finishedUntil,skipArmedUntil,wasActive,skipped=false,false,0,0,false,false
 local lastDevice,lastActual
 local route={Points={},Normals={},Distance={},Total=0,Target=nil,Building=false,Serial=0,Last=0}
-local cardFont,cardBadge=20,60;local currentText=''
+local cardFont,cardBadge,cardBottom=20,60,0;local currentText=''
 
 local function alphaFor(i,value)
  value=math.clamp(math.floor(value*10+.5)/10,0,1)
@@ -278,11 +278,16 @@ place=function()
  if not metrics then return end
  local view=Layout.Viewport(gui);local w,h=view.X,view.Y
  cardFont=Guide.Font(metrics,w,h);cardBadge=metrics.Phone and 46 or 60
- local c=Guide.Card(w,h,metrics,cardHeight)
- if not c.Clear then c=Guide.Card(w,h,metrics,cardHeight,true)end
- if not c.Clear then cardFont-=2;c=Guide.Card(w,h,metrics,cardHeight,true)end
+ -- The reserved box includes the 12px the name tag and step pill stick out above the card.
+ local function reserved(width)return cardHeight(width)+12 end
+ -- Strict first; small screens may let the card reach the head, then use a smaller font, then drop the reservation.
+ local c=Guide.Card(w,h,metrics,reserved)
+ if not c.Clear then c=Guide.Card(w,h,metrics,reserved,1)end
+ if not c.Clear then cardFont-=2;c=Guide.Card(w,h,metrics,reserved,1)end
+ if not c.Clear then c=Guide.Card(w,h,metrics,reserved,2)end
+ cardBottom=c.Top+c.Height
  local area=cardBadge+24
- card.Position=UDim2.fromOffset(c.X,c.Bottom);card.Size=UDim2.fromOffset(c.Width,c.Height)
+ card.Position=UDim2.fromOffset(c.X,c.Top+12);card.Size=UDim2.fromOffset(c.Width,c.Height-12)
  badge.Size=UDim2.fromOffset(cardBadge,cardBadge);badge.Position=UDim2.new(0,12+cardBadge/2,.5,4)
  nameTag.Position=UDim2.fromOffset(12,-12)
  message.TextSize=cardFont;message.Position=UDim2.fromOffset(area,20);message.Size=UDim2.new(1,-area-40,1,-44)
@@ -330,16 +335,18 @@ render=function()
  if welcomeOpen and(step~=1 or blocked())then welcomeOpen=false;welcome.Visible=false end
  local finishing=spec==nil and os.clock()<finishedUntil
  card.Visible=(spec~=nil or finishing)and not welcomeOpen and not blocked()and pg:GetAttribute('GardenMenuExpanded')~=true
+ local short=metrics~=nil and metrics.Phone==true
  if finishing then
-  stepText.Text='DONE!';setText(Guide.Format(Guide.Finished,device(),player.DisplayName));paintDots()
+  stepText.Text='DONE!';setText(Guide.Format(short and Guide.FinishedShort or Guide.Finished,device(),player.DisplayName));paintDots()
  elseif spec then
-  local value=spec.Text
-  if step==1 and info.WaitingForPack then value=Guide.Waiting
+  local value=Guide.Copy(spec,'Text',short)
+  if step==1 and info.WaitingForPack then value=short and Guide.WaitingShort or Guide.Waiting
   elseif step==3 then local tool,equipped=packTool();if tool and equipped and spec.Equipped then value=spec.Equipped end end
   if os.clock()>=skipArmedUntil then stepText.Text=('STEP %d/%d'):format(step,Guide.StepCount)end
   setText(Guide.Format(value,device(),player.DisplayName));paintDots()
   markerText.Text=spec.Marker or''
  end
+ pg:SetAttribute('TutorialCardBottom',card.Visible and cardBottom or nil)
  if step~=shownStep then
   if step>0 and card.Visible then bounce(pop,.82);if shownStep>0 then sound('Bubble06')end end
   shownStep=step
@@ -393,7 +400,7 @@ connections[#connections+1]=player:GetAttributeChangedSignal('TutorialDone'):Con
 end)
 for _,name in ipairs({'SeedMenu','TitleActive','GardenMenuExpanded'})do connections[#connections+1]=pg:GetAttributeChangedSignal(name):Connect(render)end
 connections[#connections+1]=Input.LastInputTypeChanged:Connect(function()local now=device();if now~=lastDevice then lastDevice=now;if step>0 then render()end end end)
-local unwatch=Layout.Watch(gui,function(m)metrics=m;place()end)
-local function cleanup()if dead then return end;dead=true;unwatch();folder:Destroy();for _,c in ipairs(connections)do c:Disconnect()end end
+local unwatch=Layout.Watch(gui,function(m)local was=metrics and metrics.Phone;metrics=m;if was~=m.Phone then currentText='';render()end;place();if card.Visible then pg:SetAttribute('TutorialCardBottom',cardBottom)end end)
+local function cleanup()if dead then return end;dead=true;unwatch();folder:Destroy();pg:SetAttribute('TutorialCardBottom',nil);for _,c in ipairs(connections)do c:Disconnect()end end
 gui.Destroying:Connect(cleanup);script.Destroying:Connect(function()cleanup();gui:Destroy()end)
 paintDots();render();fetch()

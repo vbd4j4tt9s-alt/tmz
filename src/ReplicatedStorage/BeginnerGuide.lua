@@ -1,20 +1,24 @@
--- R110: friendly guide copy, device wording and a card placement that never covers the HUD.
+-- R110: friendly guide copy (short lines on phones), device wording and a top-centre card that never covers the HUD or the player.
 local G={Version=1,Bits={Begin=1,Pack=2,Seed=4,Train=8,Plant=16,Harvest=32,Sell=64,Cash=128}}
 -- Sprout (the guide) talks to the player like a friend. {name}, {Tap}, {use}, {steal}, {Hover} are filled per device.
 G.Steps={
- {Text="Hey {name}! 👋 I'm Sprout, your buddy. Follow the red arrows to a seed pack and {steal} it!",Target='Pack',Marker='STEAL!'},
- {Text="Yoink! 😆 Now RUN back to your base before the keeper catches you!",Target='Safety',Marker='SAFE ZONE'},
- {Text="Nice steal, {name}! {Tap} your pack in the hotbar to rip it open 🎁",Equipped="Ooh, shiny! {use} to rip it open 🎁"},
- {Text="A seed! 🌱 Follow the arrows to your garden and plant it in the dirt.",Target='Garden',Marker='YOUR GARDEN'},
- {Text="Now it grows... ⏳ Plants keep growing even while you go steal more packs!",Target='Garden',Marker='GROWING'},
+ {Text="Hey {name}! 👋 I'm Sprout, your buddy. Follow the red arrows to a seed pack and {steal} it!",Short="Hey {name}! 👋 Follow the red arrows and {steal} a seed pack!",Target='Pack',Marker='STEAL!'},
+ {Text="Yoink! 😆 Now RUN back to your base before the keeper catches you!",Short="Yoink! 😆 RUN back to your base before the keeper gets you!",Target='Safety',Marker='SAFE ZONE'},
+ {Text="Nice steal, {name}! {Tap} your pack in the hotbar to rip it open 🎁",Short="Nice steal! {Tap} your pack in the hotbar to open it 🎁",Equipped="Ooh, shiny! {use} to rip it open 🎁"},
+ {Text="A seed! 🌱 Follow the arrows to your garden and plant it in the dirt.",Short="A seed! 🌱 Follow the arrows and plant it in your garden.",Target='Garden',Marker='YOUR GARDEN'},
+ {Text="Now it grows... ⏳ Plants keep growing even while you go steal more packs!",Short="Now it grows... ⏳ Go steal more packs while you wait!",Target='Garden',Marker='GROWING'},
  {Text="It's ready! 🍓 Go harvest your crop.",Target='Garden',Marker='HARVEST'},
- {Text="Take your crop to the market and cash in! 💰",Target='Market',Marker='MARKET'},
- {Text="{Hover} the cash to scoop it up. Ka-ching! 🤑"},
- {Text="Last tip: treadmills make you faster, and faster means rarer packs! Go get 'em, {name}! 🏃",Target='Treadmill',Marker='TREADMILL',Informational=true,Seconds=8},
+ {Text="Take your crop to the market and cash in! 💰",Short="Sell your crop at the market! 💰",Target='Market',Marker='MARKET'},
+ {Text="{Hover} the cash to scoop it up. Ka-ching! 🤑",Short="{Hover} the cash to scoop it up! 🤑"},
+ {Text="Last tip: treadmills make you faster, and faster means rarer packs! Go get 'em, {name}! 🏃",Short="Treadmills make you faster = rarer packs! Go get 'em! 🏃",Target='Treadmill',Marker='TREADMILL',Informational=true,Seconds=8},
 }
 G.Welcome={Title='Welcome to Chest Chase!',Text="Hey {name}! I'm Sprout 🌱 Steal seed packs, grow them, and get rich. I'll show you how. It only takes a minute!",Button="LET'S GO!"}
 G.Waiting="All the nearby packs are taken. A fresh one pops up in a moment! ⏳"
+G.WaitingShort="Packs are respawning... one pops up in a moment! ⏳"
 G.Finished="You're all set, {name}! 🎉 Now go build the best garden ever!"
+G.FinishedShort="You're all set, {name}! 🎉 Have fun!"
+-- Phones get the short line; the welcome pop-up carries the longer introduction.
+function G.Copy(spec,key,short)if short and spec[key..'Short']then return spec[key..'Short']end;if short and key=='Text'and spec.Short then return spec.Short end;return spec[key]end
 G.StepCount=#G.Steps
 local words={
  Touch={Tap='Tap',use='Tap anywhere',steal='tap STEAL on',Hover='Tap'},
@@ -62,6 +66,8 @@ function G.Layout(w,h,step)
  return {X=w-width-12,Y=h<480 and 116 or 76,Width=width,Height=step==9 and(compact and 68 or 56)or(compact and 50 or 46),Font=compact and 17 or 20}
 end
 -- Screen boxes the tutorial card must never cover (mirrors how each HUD script positions itself).
+-- The default camera keeps the character in the middle of the screen, head near the centre, feet below it,
+-- so that area is reserved too: the card must never hide the player or the start of the arrow trail.
 function G.Obstacles(m,w,h,relaxed)
  local boxes={};local shift=m.MenuShiftY or 0
  -- Relaxed: the menu button draws above the tutorial (DisplayOrder 33 vs 25), so it may sit over the card edge.
@@ -78,34 +84,34 @@ function G.Obstacles(m,w,h,relaxed)
   local sw=(m.StatusStacked and 190 or 337)*m.StatusScale;local sh=(m.StatusStacked and 211 or 125)*m.StatusScale
   boxes[#boxes+1]={X=w-12-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh}
  end
+ -- relaxed 1 lets the card reach the head (small phones); relaxed 2 drops the reservation (tiniest screens).
+ local half=math.max(50,h*.09);local from=relaxed==1 and h*.5 or h*.42
+ if relaxed~=2 then boxes[#boxes+1]={X=w/2-half,Y=from,W=half*2,H=h*.8-from,Character=true}end
  return boxes
 end
 function G.Font(m,w,h)return m.Phone and((h<400 or w<400)and 16 or 17)or(h<560 and 18 or 21)end
--- Bottom-centre card above the hotbar. Slides up and narrows until it clears every HUD box.
--- heightFor(width) returns the card height for that width (text wraps, so it depends on width).
-function G.Card(w,h,m,heightFor,relaxed)
- local boxes=G.Obstacles(m,w,h,relaxed);local cx=w/2+(m.HotbarShiftX or 0)
- local start=h-m.HotbarBottom-m.SlotSize-(m.HotbarDetails~=false and 50 or 10)
+-- Objective card at the top centre (where Roblox players look for goals). It slides down, narrows or
+-- shifts until it clears every HUD box and the character. heightFor(width) gives the card height at a width.
+function G.Card(w,h,m,heightFor,relaxed,top)
+ local boxes=G.Obstacles(m,w,h,relaxed);top=math.max(8,top or 8)
  local widest=math.min(m.Phone and 460 or 540,w-24)
+ local tallest=math.max(150,heightFor(widest)*1.6)
  local function clear(box)
-  if box.X<8 or box.Y<8 or box.X+box.W>w-8 then return false end
+  if box.X<8 or box.Y<8 or box.X+box.W>w-8 or box.Y+box.H>h-8 then return false end
   for _,b in ipairs(boxes)do if box.X<b.X+b.W+6 and box.X+box.W>b.X-6 and box.Y<b.Y+b.H+6 and box.Y+box.H>b.Y-6 then return false end end
   return true
  end
  local afterHub=relaxed and 8 or m.MenuX+m.MenuSize+10
- -- Never trade a low position for a tall, skinny card.
- local tallest=math.max(150,heightFor(widest)*1.6)
- for bottom=start,60,-6 do
+ for y=top,h*.6,6 do
   for width=widest,math.min(widest,220),-20 do
    local height=heightFor(width)
    if height>tallest then break end
-   -- Centred on the hotbar first, then beside the menu button, then against the right edge.
-   for _,x in ipairs({cx-width/2,afterHub,w-8-width})do
-    local box={X=x,Y=bottom-height,W=width,H=height}
-    if clear(box)then return {X=x+width/2,Bottom=bottom,Width=width,Height=height,Clear=true}end
+   for _,x in ipairs({w/2-width/2,afterHub,w-8-width})do
+    local box={X=x,Y=y,W=width,H=height}
+    if clear(box)then return {X=x+width/2,Top=y,Width=width,Height=height,Clear=true}end
    end
   end
  end
- return {X=w/2,Bottom=start,Width=widest,Height=heightFor(widest),Clear=false}
+ return {X=w/2,Top=top,Width=widest,Height=heightFor(widest),Clear=false}
 end
 return G

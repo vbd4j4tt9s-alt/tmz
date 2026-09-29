@@ -36,6 +36,8 @@ local function update()
  local safe=Gui:GetInsetArea(Enum.ScreenInsets.CoreUISafeInsets);local view=Vector2.new(safe.Width,safe.Height);local top=0
  local nav=object('ChestEconomyTopBar','StationTravel')
  if nav and nav.Visible then top=math.max(top,nav.AbsolutePosition.Y+nav.AbsoluteSize.Y)end
+ -- R110: notices stack below the tutorial objective card while it is showing.
+ top=math.max(top,tonumber(pg:GetAttribute('TutorialCardBottom'))or 0)
  local biome=object('BiomeEntryUI','BiomeTitle');local run=object('ChestRunAlertUI','RunWarning');local banner=object('ChestChaseBanner','Message')
  local feedback=object('ChestEconomyUI','GardenFeedback');local shovel=object('GardenShovelUI','ShovelFeedback')
  local flags={Biome=biome and biome.Visible,Run=run and run.Visible,Banner=textVisible(banner),Feedback=textVisible(feedback),Shovel=textVisible(shovel),Modal=pg:GetAttribute('SeedMenu')~=nil}
