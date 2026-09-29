@@ -86,7 +86,7 @@ check(welcome.Visible==true,'welcome shows for a new player');check(card.Visible
 check(welcome.Body.Text:find('Alex',1,true)~=nil,'welcome uses display name')
 check(welcome.Title.Text=='Welcome to Steal A Pack!','game name in welcome')
 check(welcome.Guide.Avatar.Visible==true and welcome.Guide.Avatar.Image:find('777',1,true)~=nil,'owner avatar on welcome badge')
-check(gui.GuideCard.NameTag.Label.Text=='OWNERNAME','owner name on tag')
+check(gui.GuideCard.NameTag.Label.Text=='TMZ','guide name TMZ on tag')
 check(gui.GuideCard.Skip.Text=='X','skip shows a plain X')
 -- Trail: chevrons ahead of the player point at the goal.
 local trail=workspace:FindFirstChild('TutorialTrail');check(trail~=nil,'trail folder')
