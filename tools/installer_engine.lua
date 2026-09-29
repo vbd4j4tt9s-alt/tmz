@@ -77,38 +77,62 @@ return function(mode)
  for _,entry in ipairs(folder:GetChildren())do
   local path=entry:GetAttribute('Path');local spec=specs[path]
   assert(spec and not seen[path],'__TAG__ Invalid or duplicated backup entry.');seen[path]=true
-  local item=resolve(path);local target=unique(entry,'Target')
-  assert(item.ClassName==spec.Class and target:IsA('ObjectValue')and target.Value==item,'__TAG__ Script object was replaced: '..path)
-  local a,b=unique(entry,'Before'),unique(entry,'After')
-  assert(a:IsA('StringValue')and b:IsA('StringValue'),'__TAG__ Invalid source backup.')
-  assert(#a.Value==spec.BeforeBytes and sha256(a.Value)==spec.BeforeSHA256 and #b.Value==spec.AfterBytes and sha256(b.Value)==spec.AfterSHA256,'__TAG__ Damaged source backup: '..path)
-  sources[#sources+1]={Item=item,Before=a.Value,After=b.Value}
+  local target=unique(entry,'Target');local b=unique(entry,'After')
+  assert(target:IsA('ObjectValue')and b:IsA('StringValue')and #b.Value==spec.AfterBytes and sha256(b.Value)==spec.AfterSHA256,'__TAG__ Damaged source backup: '..path)
+  if spec.New then
+   -- A script this update adds: installed = in place, undone = parked inside this backup entry.
+   local item=target.Value;local parentPath,name=path:match('^(.*)/([^/]+)$')
+   assert(item and item.ClassName==spec.Class and item.Name==name,'__TAG__ Added script object was replaced: '..path)
+   sources[#sources+1]={New=true,Item=item,Entry=entry,Home=resolve(parentPath),Name=name,After=b.Value}
+  else
+   local item=resolve(path)
+   assert(item.ClassName==spec.Class and target.Value==item,'__TAG__ Script object was replaced: '..path)
+   local a=unique(entry,'Before')
+   assert(a:IsA('StringValue')and #a.Value==spec.BeforeBytes and sha256(a.Value)==spec.BeforeSHA256,'__TAG__ Damaged source backup: '..path)
+   sources[#sources+1]={Item=item,Before=a.Value,After=b.Value}
+  end
  end
  local from,to=mode=='install'and'Before'or'After',mode=='install'and'After'or'Before'
+ -- Added scripts: 'Before' means parked in the backup, 'After' means in place. Their source never changes.
+ local function state(c)
+  if c.New then
+   assert(read(c.Item)==c.After,'__TAG__ Added script has later edits; nothing changed: '..c.Item:GetFullName())
+   if c.Item.Parent==c.Home then return'After'elseif c.Item.Parent==c.Entry then return'Before'end
+   error('__TAG__ Added script was moved; nothing changed: '..c.Item:GetFullName())
+  end
+  local current=read(c.Item)
+  if current==c.Before then return'Before'elseif current==c.After then return'After'end
+  error('__TAG__ Source has later edits; nothing changed: '..c.Item:GetFullName())
+ end
+ local function put(c,where)
+  if c.New then
+   if where=='After'then
+    for _,other in ipairs(c.Home:GetChildren())do assert(other==c.Item or other.Name~=c.Name,'__TAG__ Something named '..c.Name..' already exists in '..c.Home:GetFullName())end
+    c.Item.Parent=c.Home
+   else c.Item.Parent=c.Entry end
+   assert(state(c)==where,'__TAG__ Move did not persist: '..c.Name)
+  else write(c.Item,c[where=='After'and'Before'or'After'],c[where])end
+ end
  local fromCount,toCount=0,0
  for _,c in ipairs(sources)do
-  local current=read(c.Item)
-  if current==c[from]then fromCount+=1 elseif current==c[to]then toCount+=1
-  else error('__TAG__ Source has later edits; nothing changed: '..c.Item:GetFullName())end
+  local current=state(c)
+  if current==from then fromCount+=1 else toCount+=1 end
  end
  if toCount==#sources then print('__TAG__ Already '..(mode=='install'and'installed.'or'undone.'));return end
  assert(fromCount==#sources and toCount==0,'__TAG__ Mixed script versions; nothing changed.')
  local attempted={}
  local okay,why=xpcall(function()
   for _,c in ipairs(sources)do
-   assert(read(c.Item)==c[from],'__TAG__ Script changed during installation.')
-   attempted[#attempted+1]=c;write(c.Item,c[from],c[to])
+   assert(state(c)==from,'__TAG__ Script changed during installation.')
+   attempted[#attempted+1]=c;put(c,to)
   end
-  for _,c in ipairs(sources)do assert(read(c.Item)==c[to],'__TAG__ Final source verification failed.')end
+  for _,c in ipairs(sources)do assert(state(c)==to,'__TAG__ Final source verification failed.')end
  end,debug.traceback)
  if not okay then
   local errors={}
   for i=#attempted,1,-1 do
    local c=attempted[i]
-   local ok,err=pcall(function()
-    local current=read(c.Item)
-    if current==c[to]then write(c.Item,c[to],c[from])else assert(current==c[from],'Source changed during rollback: '..c.Item:GetFullName())end
-   end)
+   local ok,err=pcall(function()if state(c)==to then put(c,from)end end)
    if not ok then errors[#errors+1]=tostring(err)end
   end
   package:SetAttribute('State',#errors==0 and'RolledBack'or'RestoreIncomplete')

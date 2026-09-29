@@ -21,6 +21,19 @@ local byPath={};for _,p in ipairs(patches)do byPath[p.Path]=p.Patches end
 local backup=Instance.new('Folder');backup.Name='__BACKUP__'
 local sources=Instance.new('Folder');sources.Name='Sources';sources.Parent=backup
 for i,spec in ipairs(specs)do
+ if spec.New then
+  -- A script this update adds. It is created parked inside the backup; the installer moves it into place.
+  local parentPath,name=spec.Path:match('^(.*)/([^/]+)$');local home=resolve(parentPath)
+  assert(home:FindFirstChild(name)==nil,'__TAG__ '..spec.Path..' already exists. Nothing changed.')
+  local after=''
+  for _,p in ipairs(byPath[spec.Path])do after=after..decode(p[3])end
+  assert(#after==spec.AfterBytes and sha256(after)==spec.AfterSHA256,'__TAG__ Patch check failed for '..spec.Path..'. Nothing changed.')
+  local entry=Instance.new('Folder');entry.Name=string.format('%02d',i);entry:SetAttribute('Path',spec.Path);entry:SetAttribute('New',true);entry.Parent=sources
+  local b=Instance.new('StringValue');b.Name='After';b.Value=after;b.Parent=entry
+  local item=Instance.new(spec.Class);item.Name=name;item.Source=after;item.Parent=entry
+  local t=Instance.new('ObjectValue');t.Name='Target';t.Value=item;t.Parent=entry
+  continue
+ end
  local item=resolve(spec.Path)
  assert(item.ClassName==spec.Class,'__TAG__ '..spec.Path..' is a '..item.ClassName..', expected '..spec.Class..'. Nothing changed.')
  local before=editor:GetEditorSource(item)

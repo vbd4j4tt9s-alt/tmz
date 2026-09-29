@@ -22,9 +22,16 @@ def git(*a): return subprocess.run(['git', '-C', ROOT, *a], check=True, capture_
 manifest = {}
 for line in git('show', f'{base}:src/MANIFEST.tsv').decode('utf-8').splitlines()[1:]:
     cls, path, f = line.split('\t'); manifest[f] = (cls, path)
-changed = [p[len('src/'):] for p in git('diff', '--name-only', base, '--', 'src').decode().split() if p.endswith('.lua')]
-untracked = [p[len('src/'):] for p in git('ls-files', '--others', '--exclude-standard', 'src').decode().split() if p.endswith('.lua')]
-assert not untracked, f'New scripts are not supported by this installer: {untracked}'
+status = [l.split('\t') for l in git('diff', '--name-status', base, '--', 'src').decode().splitlines()]
+changed = [p[len('src/'):] for s, p in status if p.endswith('.lua') and s == 'M']
+added = [p[len('src/'):] for s, p in status if p.endswith('.lua') and s == 'A']
+added += [p[len('src/'):] for p in git('ls-files', '--others', '--exclude-standard', 'src').decode().split() if p.endswith('.lua')]
+assert all(s in ('M', 'A') for s, p in status if p.endswith('.lua')), f'Deleted/renamed scripts are not supported: {status}'
+def added_script(f):
+    # Class from the Rojo suffix; folder-style init scripts are not supported for added scripts.
+    assert not os.path.basename(f).startswith('init.'), f'{f}: add scripts as plain files, not init scripts'
+    for suffix, cls in (('.server.lua', 'Script'), ('.client.lua', 'LocalScript'), ('.lua', 'ModuleScript')):
+        if f.endswith(suffix): return cls, f[:-len(suffix)]
 
 def sha(b): return hashlib.sha256(b).hexdigest()
 def patches(before, after):
@@ -61,12 +68,22 @@ for f in sorted(changed):
     ps = patches(before, after)
     specs.append((path, cls, before, after, ps))
     print(f'{path}: {len(before)} -> {len(after)} bytes, {len(ps)} patches')
+new_paths = set()
+for f in sorted(added):
+    cls, path = added_script(f)
+    after = open(os.path.join(ROOT, 'src', f), 'rb').read()
+    specs.append((path, cls, None, after, [(1, 0, base64.b64encode(after).decode())]))
+    new_paths.add(path)
+    print(f'{path}: NEW {cls}, {len(after)} bytes')
 
 engine = open(os.path.join(ROOT, 'tools', 'installer_engine.lua'), 'rb').read().decode('utf-8')
 tag = f'[{release}]'
 engine = engine.replace('__TAG__', tag).replace('__RELEASE__', release)
 spec_rows = []
 for path, cls, before, after, _ in specs:
+    if before is None:
+        spec_rows.append('{Path=%s,Class=%s,New=true,AfterBytes=%d,AfterSHA256=%s}' % (lua_str(path), lua_str(cls), len(after), lua_str(sha(after))))
+        continue
     spec_rows.append('{Path=%s,Class=%s,BeforeBytes=%d,AfterBytes=%d,BeforeSHA256=%s,AfterSHA256=%s}' % (
         lua_str(path), lua_str(cls), len(before), len(after), lua_str(sha(before)), lua_str(sha(after))))
 engine = engine.replace('__SPECS__', '{' + ','.join(spec_rows) + '}')
