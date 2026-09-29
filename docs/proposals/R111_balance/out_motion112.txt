@@ -1,0 +1,63 @@
+ratio | speed | scenario                              | corrections | server clamps | WalkSpeed!=client cap | top client speed
+    1 |    24 | base only (square, never on track)    |           0 |             0 |                     0 | 24.0
+    1 |    24 | base -> track -> base                 |           0 |             0 |                     0 | 24.0
+    1 |    24 | diagonal crossings of the line        |           0 |             0 |                     0 | 24.0
+    1 |    24 | on track only                         |           0 |             0 |                     0 | 24.0
+    1 |    35 | base only (square, never on track)    |           0 |             0 |                     0 | 35.0
+    1 |    35 | base -> track -> base                 |           0 |             0 |                     0 | 35.0
+    1 |    35 | diagonal crossings of the line        |           0 |             0 |                     0 | 35.0
+    1 |    35 | on track only                         |           0 |             0 |                     0 | 35.0
+    1 |    88 | base only (square, never on track)    |           0 |             0 |                     0 | 88.0
+    1 |    88 | base -> track -> base                 |           0 |             0 |                     0 | 88.0
+    1 |    88 | diagonal crossings of the line        |           0 |             0 |                     0 | 88.0
+    1 |    88 | on track only                         |           0 |             0 |                     0 | 88.0
+    1 |   226 | base only (square, never on track)    |           0 |             0 |                     0 | 226.0
+    1 |   226 | base -> track -> base                 |           0 |             0 |                     0 | 226.0
+    1 |   226 | diagonal crossings of the line        |           0 |             0 |                     0 | 226.0
+    1 |   226 | on track only                         |           0 |             0 |                     0 | 226.0
+    1 |   363 | base only (square, never on track)    |           0 |             0 |                     0 | 363.0
+    1 |   363 | base -> track -> base                 |           0 |             0 |                     0 | 363.0
+    1 |   363 | diagonal crossings of the line        |           0 |             0 |                     0 | 363.0
+    1 |   363 | on track only                         |           0 |             0 |                     0 | 363.0
+    1 |   500 | base only (square, never on track)    |           0 |             0 |                     0 | 500.0
+    1 |   500 | base -> track -> base                 |           0 |             0 |                     0 | 500.0
+    1 |   500 | diagonal crossings of the line        |           0 |             0 |                     0 | 500.0
+    1 |   500 | on track only                         |           0 |             0 |                     0 | 500.0
+  0.4 |    24 | base only (square, never on track)    |           0 |             0 |                     0 | 9.6
+  0.4 |    24 | base -> track -> base                 |           0 |             0 |                     0 | 9.6
+  0.4 |    24 | diagonal crossings of the line        |           0 |             0 |                     0 | 9.6
+  0.4 |    24 | on track only                         |           0 |             0 |                     0 | 24.0
+  0.4 |    35 | base only (square, never on track)    |           0 |             0 |                     0 | 14.0
+  0.4 |    35 | base -> track -> base                 |           0 |             0 |                     0 | 35.0
+  0.4 |    35 | diagonal crossings of the line        |           0 |             0 |                     0 | 14.0
+  0.4 |    35 | on track only                         |           0 |             0 |                     0 | 35.0
+  0.4 |    88 | base only (square, never on track)    |           0 |             0 |                     0 | 35.2
+  0.4 |    88 | base -> track -> base                 |           0 |             0 |                     0 | 88.0
+  0.4 |    88 | diagonal crossings of the line        |           0 |             0 |                     0 | 88.0
+  0.4 |    88 | on track only                         |           0 |             0 |                     0 | 88.0
+  0.4 |   226 | base only (square, never on track)    |           0 |             0 |                     0 | 90.4
+  0.4 |   226 | base -> track -> base                 |           0 |             0 |                     0 | 226.0
+  0.4 |   226 | diagonal crossings of the line        |           0 |             0 |                     0 | 226.0
+  0.4 |   226 | on track only                         |           0 |             0 |                     0 | 226.0
+  0.4 |   363 | base only (square, never on track)    |           0 |             0 |                     0 | 145.2
+  0.4 |   363 | base -> track -> base                 |           0 |             1 |                     0 | 363.0
+  0.4 |   363 | diagonal crossings of the line        |           0 |             0 |                     0 | 363.0
+  0.4 |   363 | on track only                         |           0 |             0 |                     0 | 363.0
+  0.4 |   500 | base only (square, never on track)    |           0 |             0 |                     0 | 200.0
+  0.4 |   500 | base -> track -> base                 |           0 |             0 |                     0 | 500.0
+  0.4 |   500 | diagonal crossings of the line        |           0 |             0 |                     0 | 500.0
+  0.4 |   500 | on track only                         |           0 |             0 |                     0 | 500.0
+
+Over-speed clients (x = multiple of earned speed, ignoring the ceiling):
+ratio 1   speed  24 client x1.0: corrections in base  0, on track  0
+ratio 1   speed  24 client x1.3: corrections in base  0, on track  0
+ratio 1   speed  24 client x2.0: corrections in base 16, on track 12
+ratio 1   speed 363 client x1.0: corrections in base  0, on track  0
+ratio 1   speed 363 client x1.3: corrections in base  2, on track  2
+ratio 1   speed 363 client x2.0: corrections in base 20, on track 18
+ratio 0.4 speed  24 client x1.0: corrections in base 15, on track  0
+ratio 0.4 speed  24 client x1.3: corrections in base 19, on track  0
+ratio 0.4 speed  24 client x2.0: corrections in base 22, on track 13
+ratio 0.4 speed 363 client x1.0: corrections in base 23, on track  0
+ratio 0.4 speed 363 client x1.3: corrections in base 24, on track  4
+ratio 0.4 speed 363 client x2.0: corrections in base 24, on track 18

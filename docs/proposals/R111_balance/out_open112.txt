@@ -1,0 +1,13 @@
+OddsVersion 112: opened 75600 packs through ChestService:_activatePack (7 biomes x 6 packs x 6 boots x 300): 0 invalid rewards
+  tiers seen: Common=3047 Uncommon=9294 Rare=23358 Legendary=15427 Mythic=21867 Secret=2416 Cosmic=189 King=2
+Storm Mythic pack, Electric boots, OddsVersion  81: King   observed 0.0390 expected 0.0358 (z=+2.42)
+Storm Mythic pack, Electric boots, OddsVersion 112: King   observed 0.0010 expected 0.0010 (z=+0.00)
+Storm Mythic pack, Electric boots, OddsVersion  81: Secret observed 0.2615 expected 0.2627 (z=-0.38)
+Storm Mythic pack, Electric boots, OddsVersion 112: Secret observed 0.2468 expected 0.2500 (z=-1.05)
+Legacy unversioned pack opened: VoltOrchidSeed (Legendary)
+Void pack v81, 4000 opens: Secret 3195 Cosmic 674 King 117 other(Mech) 14
+Void pack v112, 4000 opens: Secret 3795 Cosmic 190 King 0 other(Mech) 15
+Mech pack (stage 8, gem product, unchanged): 2000/2000 rewards are Mech seeds
+Roll with one number: v112 -> nil (refused), v81 -> ThunderTulipSeed
+RefreshBoostMultipliers (best owned, cumulative): RunnerHalo=5 StormCrown=50 LavaBoots=2000 CrystalBoots=100000 MythicOrbit=5000000 Fake=5000000
+Only Frost boots owned -> luck 50
