@@ -19,11 +19,13 @@ Written 2026-09-29 from a claude.ai chat session. Read "Status" and "How to work
 
 | Item | State |
 |---|---|
-| Live scripts | **R107** (`Config.Version = 'V149 R107'`, `ProfileVersion = 20`) |
+| Live scripts | **R107** (`Config.Version = 'V149 R107'`, `ProfileVersion = 20`). **R110 installer ready** (`installers/R110_install.lua`, notes in `docs/releases/R110.md`), not yet installed by the owner. |
 | R108 (tutorial / mobile HUD / movement / rarity) | Backup exists in `ServerStorage/ChestChase_R108_TutorialMovementRarity_Backup`, state `Undone`. Not currently applied. |
 | Packs spawning outside the map (Forest biome) | **Fixed** (owner reported it fixed after applying the R109 pack-fix paste script below). Root cause verified by running the real code in Lua 5.4. The paste script itself was not run by the assistant. |
 | R109 safety-net clamp in `ChestService` | Drafted, **untested, not shipped** (see "Optional / untested") |
 | `R109_polish_snippets.lua` | Untested snippets from a code review of R108; not an installer |
+| Balancing (rarity to 1/1Qa, boot luck, speed) | Proposal only, waiting for owner decisions: `docs/proposals/R110_balancing_proposal.md` |
+| Repo tooling | `tools/rbxl.py` + `tools/export.py` (read .rbxl), `tools/build_installer.py` (installer from git diff vs R107 commit 46043d4), `tools/sourcemap.py` (luau-lsp). Luau CLI + luau-lsp from GitHub releases work in the container. |
 
 ## Game in one paragraph
 
