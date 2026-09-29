@@ -1,10 +1,10 @@
--- R111: odds for OddsVersion 111 packs. Keep this table frozen once shipped; banked packs keep the version they spawned with.
+-- R112: odds for OddsVersion 112 packs. Keep this table frozen once shipped; banked packs keep the version they spawned with.
 -- Each tier above a pack's lowest tier has a 1 in N chance. Boots multiply it by luck^Power (full on King, partial below),
 -- never above Cap unless the pack's own chance is higher. The lowest tier gets the rest and keeps at least 40% of its
 -- no-boot share: Legendary, Mythic, then Secret give chance back first (each keeps half), Cosmic and King are never touched.
 -- Missing tiers: Common..Mythic pass their share up to the next tier that exists (never into Secret+); Secret+ are not rolled.
 local T=require(script.Parent.BalanceValues81)
-local O={Version=111,Gate=1e-5}
+local O={Version=112,Gate=1e-5}
 O.Order={'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
 O.Rank={};for i,t in ipairs(O.Order)do O.Rank[t]=i end
 O.PackFloor={Pack01='Common',Pack02='Common',Pack03='Uncommon',Pack04='Rare',Pack05='Rare',Pack06='Legendary'}
@@ -25,7 +25,7 @@ O.Giveback={'Legendary','Mythic','Secret'}
 O.FloorKeep,O.GivebackKeep=.4,.5
 -- Void (event) pack: luck-free, 1/200 Mech branch, then King 1/200M and Cosmic 1/20; Secret is the rest.
 O.Void={MechChance=.005,OneIn={King=2e8,Cosmic=20}}
--- Packs banked before R111 keep the old boots' luck (x1.15..x2), matched by the best boot the new luck reaches.
+-- Packs banked before R112 keep the old boots' luck (x1.15..x2), matched by the best boot the new luck reaches.
 O.LegacyBootLuck={1.15,1.3,1.5,1.75,2}
 function O.LegacyLuck(luck)
  local old=1

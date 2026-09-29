@@ -1,6 +1,6 @@
 -- Display only: reduced fractions with whole-number numerators and denominators.
 local F={}
--- R111: denominators from a million up read 1/1M, 1/16.7B, 1/1T (three significant figures).
+-- R112: denominators from a million up read 1/1M, 1/16.7B, 1/1T (three significant figures).
 function F.Count(n)
  if n<1e6 then return string.format('%.0f',n)end
  local suffix={'K','M','B','T','Qa'};local group=math.clamp(math.floor(math.log10(n)/3),2,5)

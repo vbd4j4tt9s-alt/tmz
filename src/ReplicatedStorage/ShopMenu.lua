@@ -47,7 +47,7 @@ function M:MakeRow(product,index,layout)
  Preview.Attach(view,product,self.State.BootBiome or'Forest')
  local left,right=layout.Left,layout.Right
  label(row,'Name',product.Name,UDim2.fromOffset(left,10),UDim2.new(1,-left-right,0,layout.Narrow and 47 or 38),layout.Narrow and 22 or 27,true,C.Text)
- local boost=require(RS.WorldStatusHud).Multiplier(product.SpeedMultiplier or product.LuckMultiplier or 1) -- R111: ×5M, ×100K
+ local boost=require(RS.WorldStatusHud).Multiplier(product.SpeedMultiplier or product.LuckMultiplier or 1) -- R112: ×5M, ×100K
  local benefit=label(row,'Benefit',boost,UDim2.fromOffset(left,layout.Narrow and 56 or 52),UDim2.new(1,-left-right,0,49),layout.Narrow and 37 or 44,true,accent)
  local benefitType=label(row,'BenefitType',product.SpeedMultiplier and'Speed gain'or'Pack luck',UDim2.fromOffset(left,layout.Narrow and 102 or 103),UDim2.new(1,-left-right,0,25),layout.Narrow and 20 or 22,true,C.Text)
  require(RS.GardenTextFit).Attach(benefitType,layout.Narrow and 20 or 22,18)

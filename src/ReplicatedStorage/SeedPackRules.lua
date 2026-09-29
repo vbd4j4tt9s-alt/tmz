@@ -372,10 +372,10 @@ function Rules.Roll(config,stage,unitRoll,luck,variantKey,version)
  for i,weight in ipairs(weights)do if ticket<weight then return pool[i],Rules.GetRarity(pool[i].Id)end;ticket-=weight end
  return nil
 end
--- R111: new world/event packs carry OddsVersion 111 (PackOdds111, King 1/1T in a Common pack, exact staged roll).
+-- R112: new world/event packs carry OddsVersion 112 (PackOdds112, King 1/1T in a Common pack, exact staged roll).
 -- Earlier packs keep their version and their old odds, with luck mapped back to the old boots (x1.15..x2).
 -- Roll takes a draw function (e.g. function() return random:NextNumber() end); old paths use one number from it.
-local N=require(script.Parent.PackOdds111)
+local N=require(script.Parent.PackOdds112)
 Rules.OddsVersion=N.Version
 local roll81,odds81=Rules.Roll,Rules.SeedOdds
 local function current(stage,variantKey,version)

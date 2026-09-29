@@ -1,5 +1,5 @@
 -- R80. Horizontal movement math; the server owns the unlocked speed ceiling.
--- R111: BaseAreaRatio 1 = no base-area slow zone (was .4). Every consumer reads this one value; set it below 1 to restore.
+-- R112: BaseAreaRatio 1 = no base-area slow zone (was .4). Every consumer reads this one value; set it below 1 to restore.
 local M={Version=97,BaseSpeed=24,BaseAreaRatio=1,TimeToTop=0,
     BrakeSeconds=.035,MinBraking=500,StoppingDistance=3,LateralStoppingDistance=3,
     AirControl=.35,Deadzone=.025,MaxStep=.1,CastLength=512,MaxCasts=16,Skin=.12}

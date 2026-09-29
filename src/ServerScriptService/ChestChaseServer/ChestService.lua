@@ -980,7 +980,7 @@ function ChestService:_activatePack(player,tool)
     if opening.Clicks<PackRules.OpenClicks then return end
     local success,failure=xpcall(function()
         -- Atomic server-owned transaction: repeated clicks cannot reroll or duplicate.
-        -- R111: a draw function, not one number: King odds reach 1 in 1T and are rolled in stages.
+        -- R112: a draw function, not one number: King odds reach 1 in 1T and are rolled in stages.
         local reward,reason=self.PlayerData:OpenSeedPack(player,tool:GetAttribute("SeedInventoryId"),function()return self.PackRandom:NextNumber()end)
         if not reward then
             self.Notifications:Show(player,reason,Color3.fromRGB(255,185,100),2)

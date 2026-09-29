@@ -1,7 +1,7 @@
 -- Stable stage IDs; world distances are independent of saved progression.
 local R={Order={1,6,2,3,4,5,7},Start=-100,OldLengths={[1]=225,[6]=270,[2]=292.5,[3]=315,[4]=360,[5]=405,[7]=450},
  Lengths={[1]=180,[6]=450,[2]=650,[3]=850,[4]=1050,[5]=1300,[7]=1600},
- KeeperSpeeds={[1]={20,23,26},[6]={32,37,42},[2]={50,57,65},[3]={80,92,104},[4]={128,147,166},[5]={205,236,266},[7]={330,379,429}}, -- R111: close speed x1.6 per biome; mid x1.15, far x1.3
+ KeeperSpeeds={[1]={20,23,26},[6]={32,37,42},[2]={50,57,65},[3]={80,92,104},[4]={128,147,166},[5]={205,236,266},[7]={330,379,429}}, -- R112: close speed x1.6 per biome; mid x1.15, far x1.3
  EventSpeed=600,EventReturnSpeed=600,SpawnWeights={38,25,15,7,10,5}}
 R.OldStart={};R.NewStart={};local old,new=R.Start,R.Start
 for _,id in ipairs(R.Order)do R.OldStart[id]=old;R.NewStart[id]=new;old+=R.OldLengths[id];new+=R.Lengths[id]end

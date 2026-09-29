@@ -8,7 +8,7 @@ driver, out = sys.argv[1], sys.argv[2]
 overrides = dict(a.split('=', 1) for a in sys.argv[3:])
 names = ['BalanceValues81','PackOdds81','EconomyBalance90','EconomyScaling91','RouteBalance83','BalanceRules',
          'SeedPackRules','SpeedPoints','Progression81','PackSchedule81','VoidPackOdds85','MechCatalog','SizeNumbers',
-         'RarityRevealSequence','KeeperPursuit','KeeperCombat','RunnerMotion','OddsText85','RarePackRules','WeatherTraits','PlantCatalog','PackOdds111']
+         'RarityRevealSequence','KeeperPursuit','KeeperCombat','RunnerMotion','OddsText85','RarePackRules','WeatherTraits','PlantCatalog','PackOdds112']
 parts = []
 for n in names:
     p = overrides.get(n, os.path.join(SRC, n + '.lua'))

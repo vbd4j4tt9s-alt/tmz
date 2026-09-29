@@ -1,4 +1,4 @@
-"""R111 (approved) pack odds - independent Python model of ReplicatedStorage/PackOdds111.lua.
+"""R112 (approved; spec R111_balancing_spec.md) pack odds - independent Python model of ReplicatedStorage/PackOdds112.lua.
 
 Owner decisions: 8 tiers only (no Divine/Eternal), King 1 in 1T in a Common pack, pack ladder x1/2.5/6/20/60/200
 on Secret/Cosmic/King, boots Sand x5 .. Electric x5M with luck applied per tier as luck**POWER[tier].
