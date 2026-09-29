@@ -20,19 +20,20 @@ S.Themes={
    {Name='Kicked sand',Texture=SPARK,Color=C(205,166,108),Count=3,Size={.15,.1},Life={.3,.6},Speed={3,6},Spread=50,Accel=V(0,-20,0),Alpha={.1,1},Glow=0,Light=.8},
   },
   Idle={Spin=2.4,Emitters={
-   {Name='Swirling sand',Texture=SMOKE,Color=C(226,196,142),Rate=6,Size={.5,1.4},Life={1.2,1.8},Speed={.2,.5},Alpha={.6,1},Glow=0,Light=1,Locked=true,Shape='Disc',Style='Surface'},
-   {Name='Sand grains',Texture=SPARK,Color=C(214,176,112),Rate=10,Size={.12,.08},Life={1,1.6},Speed={.3,.8},Accel=V(0,.3,0),Alpha={.2,1},Glow=0,Light=.8,Locked=true,Shape='Disc'},
+   {Name='Swirling sand',Texture=SMOKE,Color=C(244,222,172),Rate=8,Size={1,2},Life={1.2,1.8},Speed={.2,.5},Alpha={.35,1},Glow=0,Light=1,Locked=true,Shape='Disc',Style='Surface'},
+   {Name='Sand grains',Texture=SPARK,Color=C(160,120,72),Rate=14,Size={.17,.1},Life={1,1.6},Speed={.3,.8},Accel=V(0,.3,0),Alpha={.1,1},Glow=0,Light=.8,Locked=true,Shape='Disc'},
   }}},
  Snow={Ribbon={C(214,240,255),C(140,196,240)},RibbonAlpha=.42,RibbonGlow=.35,
   -- Prints start as clear ice, then crystallise into white frost with a small star before fading.
-  Print={Kind='Frost',Life=3,Hold=.55,Alpha=.25,Turn=.3,Color=C(150,204,242),Material=M.Ice,Reflectance=.25,Color2=C(236,246,255),Material2=M.Snow,Accent=C(200,236,255)},
+  Print={Kind='Frost',Life=3,Hold=.55,Alpha=.2,Turn=.3,Color=C(128,190,240),Material=M.Ice,Reflectance=.25,Color2=C(236,246,255),Material2=M.Snow,Accent=C(200,236,255)},
   Burst={
    {Name='Snow puff',Texture=SMOKE,Color=C(235,245,255),Count=2,Size={.6,1.7},Life={.5,.8},Speed={1.5,3},Spread=70,Drag=3,Alpha={.45,1},Glow=.1,Light=1},
    {Name='Snow flecks',Texture=SPARK,Color=C(245,250,255),Count=4,Size={.16,.1},Life={.4,.8},Speed={3,6},Spread=55,Accel=V(0,-12,0),Alpha={0,1},Glow=.4,Light=.6},
   },
-  Idle={Emitters={
-   {Name='Frost mist',Texture=SMOKE,Color=C(210,232,250),Rate=3,Size={1.2,2.6},Life={2,3},Speed={.1,.3},Accel=V(0,-.1,0),Alpha={.72,1},Glow=.1,Light=1,Shape='Disc'},
-   {Name='Snowflakes',Texture=SPARK,Color=C(250,252,255),Rate=6,Size={.18,.12},Life={1.6,2.4},Speed={1,1.6},Accel=V(0,-1.4,0),Alpha={.1,1},Glow=.5,Light=.5,Spin={-60,60},Shape='Disc'},
+  -- Frost crystals creep over the ground around the feet while the wearer stands still.
+  Idle={Patches={Count=6,Kind='Frost',Material=M.Ice,Color=C(140,200,250),Reflectance=.35,Alpha=.1,Size={.46,.28},Radius={.95,1.35}},Emitters={
+   {Name='Frost mist',Texture=SMOKE,Color=C(186,220,248),Rate=3,Size={1.2,2.6},Life={2,3},Speed={.1,.3},Accel=V(0,-.1,0),Alpha={.55,1},Glow=.1,Light=1,Shape='Disc'},
+   {Name='Snowflakes',Texture=SPARK,Color=C(250,252,255),Rate=9,Size={.2,.14},Life={1.6,2.4},Speed={1,1.6},Accel=V(0,-1.4,0),Alpha={.05,1},Glow=.7,Light=.4,Spin={-60,60},Shape='Disc'},
   }}},
  Lava={Ribbon={C(255,140,53),C(195,62,35)},RibbonAlpha=.35,RibbonGlow=.65,
   -- Prints glow like fresh magma, cool through red to dark basalt, then fade.
@@ -41,9 +42,10 @@ S.Themes={
    {Name='Magma sparks',Texture=SPARK,Color=C(255,160,60),Tail=C(255,70,20),Count=5,Size={.18,0},Life={.3,.6},Speed={6,12},Spread=45,Accel=V(0,-26,0),Alpha={0,.4},Glow=1,Light=0},
    {Name='Ash puff',Texture=SMOKE,Color=C(70,56,52),Count=1,Size={.6,1.6},Life={.6,1},Speed={1,2},Spread=40,Accel=V(0,2,0),Alpha={.6,1},Glow=0,Light=1},
   },
-  Idle={Emitters={
-   {Name='Rising embers',Texture=SPARK,Color=C(255,150,50),Tail=C(255,70,20),Rate=8,Size={.16,0},Life={.9,1.6},Speed={1.2,2.6},Spread=25,Accel=V(.2,1.2,0),Alpha={0,.3},Glow=1,Light=0,Shape='Disc'},
-   {Name='Heat haze',Texture=SMOKE,Color=C(120,70,50),Rate=2,Size={.8,2.2},Life={1,1.6},Speed={1.4,2.4},Spread=15,Alpha={.82,1},Glow=.2,Light=1,Shape='Disc'},
+  -- Hot cracks glow in the ground around the feet.
+  Idle={Patches={Count=4,Kind='Crack',Material=M.Neon,Color=C(255,110,30),Alpha=.1,Size={.09,.6},Radius={.85,1.2}},Emitters={
+   {Name='Rising embers',Texture=SPARK,Color=C(255,150,50),Tail=C(255,70,20),Rate=12,Size={.24,0},Life={.9,1.6},Speed={1.2,2.6},Spread=25,Accel=V(.2,1.2,0),Alpha={0,.3},Glow=1,Light=0,Shape='Disc'},
+   {Name='Heat haze',Texture=SMOKE,Color=C(120,70,50),Rate=2,Size={.8,2.2},Life={1,1.6},Speed={1.4,2.4},Spread=15,Alpha={.78,1},Glow=.2,Light=1,Shape='Disc'},
   }}},
  Crystal={Ribbon={C(193,152,250),C(115,178,237)},RibbonAlpha=.35,RibbonGlow=.65,
   -- Three small reflective shards poke out of each print; the centre one twinkles.
@@ -52,7 +54,7 @@ S.Themes={
    {Name='Crystal sparkles',Texture=SPARK,Color=C(232,212,255),Tail=C(170,110,255),Count=4,Size={0,.34,0},Life={.4,.8},Speed={1.5,3.5},Spread=60,Accel=V(0,-3,0),Alpha={0,.2},Glow=1,Light=0},
   },
   Idle={Spin=.9,Shards=3,ShardColor=C(228,212,255),ShardGlow=C(170,96,255),Emitters={
-   {Name='Crystal twinkles',Texture=SPARK,Color=C(236,220,255),Tail=C(180,120,255),Rate=7,Size={0,.4,0},Life={.5,.9},Speed={.4,1},Spread=40,Drag=1,Alpha={0,.2},Glow=1,Light=0,Shape='Disc'},
+   {Name='Crystal twinkles',Texture=SPARK,Color=C(236,220,255),Tail=C(180,120,255),Rate=10,Size={0,.5,0},Life={.5,.9},Speed={.4,1},Spread=40,Drag=1,Alpha={0,.2},Glow=1,Light=0,Shape='Disc'},
   }}},
  Storm={Ribbon={C(177,232,255),C(94,146,248)},RibbonAlpha=.35,RibbonGlow=.65,
   -- Zigzag prints flicker like a live wire, shift from white-cyan to blue and fade.
@@ -62,7 +64,7 @@ S.Themes={
    {Name='Static sparks',Texture=SPARK,Color=C(170,235,255),Tail=C(80,150,255),Count=5,Size={.16,0},Life={.12,.3},Speed={8,15},Spread=80,Drag=6,Alpha={0,.2},Glow=1,Light=0},
   },
   Idle={ArcEvery={.35,.9},Emitters={
-   {Name='Crackling sparks',Texture=SPARK,Color=C(160,230,255),Tail=C(90,160,255),Rate=9,Size={.18,0},Life={.1,.25},Speed={3,6},Spread=60,Drag=4,Alpha={0,.2},Glow=1,Light=0,Shape='Disc'},
+   {Name='Crackling sparks',Texture=SPARK,Color=C(160,230,255),Tail=C(90,160,255),Rate=18,Size={.22,0},Life={.15,.35},Speed={3,6},Spread=60,Drag=4,Alpha={0,.2},Glow=1,Light=0,Shape='Disc'},
   }}},
 }
 function S.Theme(name)return S.Themes[name]end
@@ -119,7 +121,7 @@ function S.PrintParts(kind,scale,stretch,mirror)
  end
  -- Sole print: forefoot, heel and a third piece (toe dig, frost star or glowing crack).
  local third
- if kind=='Frost'then third={Size=V(.3,.02,.3)*k,Frame=CFrame.new(0,.012,0)*CFrame.Angles(0,.79,0),Tone=2}
+ if kind=='Frost'then third={Size=V(.22,.02,.22)*k,Frame=CFrame.new(0,.012,0)*CFrame.Angles(0,.79,0),Tone=2}
  elseif kind=='Ember'then third={Size=V(.07*k,.03*k,.62*z),Frame=yaw*CFrame.new(0,.01,-.02*z)*CFrame.Angles(0,.5*mirror,0),Tone=2}
  else third={Size=V(.34*k,.035*k,.1*z),Frame=yaw*CFrame.new(0,.008,-.52*z),Tone=2}end
  return {

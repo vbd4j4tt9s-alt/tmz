@@ -5,16 +5,35 @@ local Theme=require(game:GetService('ReplicatedStorage'):WaitForChild('GardenThe
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Input=game:GetService('UserInputService')
 local StarterGui=game:GetService('StarterGui');local GuiService=game:GetService('GuiService');local CAS=game:GetService('ContextActionService')
 local Names=require(RS:WaitForChild('GardenDisplayNames'));local Info=require(RS:WaitForChild('HarvestItemInfo'));local State=require(RS:WaitForChild('GardenInventoryState')).new()
+-- R112: item pictures (cached 3D renders or flat icons) and display-only kg weights.
+local Pictures=require(RS:WaitForChild('ItemPictures'));local Weight=require(RS:WaitForChild('ItemWeight'))
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local bag=player:WaitForChild('Backpack')
 local old=pg:FindFirstChild('ChestToolHotbar');if old then old:Destroy()end
 local gui=Instance.new('ScreenGui');gui.Name='ChestToolHotbar';gui.ResetOnSpawn=false;gui.IgnoreGuiInset=false;gui.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets;gui.DisplayOrder=25;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
-local C={Panel=Theme.Colors.Panel,Slot=Theme.Colors.Card,Green=Theme.Colors.Mint,Text=Theme.Colors.Text,Muted=Theme.Colors.Muted}
+local C={Panel=Theme.Colors.Panel,Slot=Theme.Colors.Card,Green=Theme.Colors.Mint,Text=Theme.Colors.Text,Muted=Theme.Colors.Muted,
+ Sheet=Color3.fromRGB(20,46,35),Tile=Color3.fromRGB(37,76,57),TileOn=Color3.fromRGB(65,120,76),Well=Color3.fromRGB(14,33,25)}
 local function corner(p)local c=Instance.new('UICorner');c.CornerRadius=UDim.new(0,8);c.Parent=p end
 local function label(parent,name,size,position,text,fontSize)
  local l=Instance.new('TextLabel');l.Name=name;l.Size=size;l.Position=position;l.Text=text;l.TextColor3=C.Text;l.BackgroundTransparency=1;l.Font=Theme.Font;l.TextSize=fontSize or 13;l.TextWrapped=true;l.Parent=parent;Fit.Attach(l,fontSize or 13,8);return l
 end
 local function button(parent,name,text,size,position)
  local b=Instance.new('TextButton');b.Name=name;b.Text=text;b.Size=size;b.Position=position;b.BackgroundColor3=C.Slot;b.TextColor3=C.Text;b.Font=Theme.Bold;b.TextSize=14;b.AutoButtonColor=true;b.Parent=parent;corner(b);Fit.Attach(b,14,8);return b
+end
+-- R112: slot names keep their exact text (the tutorial matches it); long names only shrink or clip visually.
+local function plainLabel(parent,name)
+ local l=Instance.new('TextLabel');l.Name=name;l.Text='';l.BackgroundTransparency=1;l.Font=Theme.Font;l.TextColor3=C.Text;l.TextScaled=true;l.TextWrapped=true;l.TextTruncate=Enum.TextTruncate.AtEnd;l.ZIndex=3;l.Parent=parent
+ local fit=Instance.new('UITextSizeConstraint');fit.MinTextSize=7;fit.MaxTextSize=11;fit.Parent=l;return l
+end
+local function tint(l,rarity)
+ local style=Theme.Rarity(rarity);l.TextColor3=style.Fill and Color3.new(1,1,1)or style.TextColor or style.Color
+ local stroke=l:FindFirstChild('RarityOutline')or Instance.new('UIStroke');stroke.Name='RarityOutline';stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Contextual;stroke.Color=style.Outline or Color3.fromRGB(19,31,28);stroke.Thickness=1;stroke.Parent=l
+ local fill=l:FindFirstChild('RarityFill')
+ if style.Fill then if not fill then fill=Instance.new('UIGradient');fill.Name='RarityFill';fill.Rotation=90;fill.Parent=l end;fill.Color=style.Fill elseif fill then fill:Destroy()end
+end
+local function picture(parent)local f=Instance.new('Frame');f.Name='Picture';f.BackgroundTransparency=1;f.Active=false;f.ZIndex=1;f.Parent=parent;return f end
+local function countBadge(parent)
+ local l=Instance.new('TextLabel');l.Name='Count';l.Text='';l.BackgroundColor3=Color3.new(0,0,0);l.BackgroundTransparency=.35;l.TextColor3=C.Text;l.Font=Theme.Bold;l.TextSize=12
+ l.Size=UDim2.fromOffset(28,16);l.Visible=false;l.ZIndex=4;l.Parent=parent;corner(l);return l
 end
 local function selectionBorder(b)
  local stroke=Instance.new('UIStroke');stroke.Name='SelectionOutline';stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border;stroke.Color=Color3.new(1,1,1);stroke.Thickness=2;stroke.Enabled=false;stroke.Parent=b
@@ -36,14 +55,15 @@ local panel=Instance.new('Frame');panel.Name='Inventory';panel.AnchorPoint=Vecto
 local constraint=Instance.new('UISizeConstraint');constraint.MaxSize=Vector2.new(900,620);constraint.Parent=panel
 label(panel,'Title',UDim2.new(1,-65,0,40),UDim2.fromOffset(16,8),'Inventory',20).TextXAlignment=Enum.TextXAlignment.Left
 require(RS:WaitForChild('GardenMenuStyle')).Panel(panel,46)
+panel.BackgroundColor3=C.Sheet;panel.BackgroundTransparency=.1 -- R112: dark translucent green sheet.
 local close=button(panel,'Close','×',UDim2.fromOffset(36,36),UDim2.new(1,-48,0,10))
-local search=Instance.new('TextBox');search.Name='Search';search.PlaceholderText='Search';search.Text='';search.ClearTextOnFocus=false;search.Size=UDim2.new(1,-32,0,36);search.Position=UDim2.fromOffset(16,54);search.BackgroundColor3=C.Slot;search.TextColor3=C.Text;search.PlaceholderColor3=C.Muted;search.Font=Enum.Font.FredokaOne;search.TextSize=14;search.Parent=panel;corner(search);require(RS:WaitForChild('GardenMenuStyle')).Inset(search)
+local search=Instance.new('TextBox');search.Name='Search';search.PlaceholderText='Search';search.Text='';search.ClearTextOnFocus=false;search.Size=UDim2.new(1,-32,0,36);search.Position=UDim2.fromOffset(16,54);search.BackgroundColor3=C.Slot;search.TextColor3=C.Text;search.PlaceholderColor3=C.Muted;search.Font=Enum.Font.FredokaOne;search.TextSize=14;search.Parent=panel;corner(search);require(RS:WaitForChild('GardenMenuStyle')).Inset(search);search.BackgroundColor3=C.Well
 local filters=Instance.new('Frame');filters.Name='Categories';filters.BackgroundTransparency=1;filters.Size=UDim2.new(1,-32,0,32);filters.Position=UDim2.fromOffset(16,98);filters.Parent=panel
 local scroll=Instance.new('ScrollingFrame');scroll.Name='Items';scroll.BackgroundTransparency=1;scroll.BorderSizePixel=0;scroll.Size=UDim2.new(1,-32,1,-218);scroll.Position=UDim2.fromOffset(16,178);scroll.ScrollBarThickness=5;scroll.CanvasSize=UDim2.new();scroll.Parent=panel
 label(panel,'Hint',UDim2.new(1,-32,0,26),UDim2.new(0,16,1,-32),'Click to equip • Drag a slot or item onto the hotbar',12).TextColor3=C.Muted
-local rarityFilter=button(panel,'RarityFilter','Rarity: All',UDim2.new(1,-32,0,30),UDim2.fromOffset(16,138))
+local rarityFilter=button(panel,'RarityFilter','Rarity: All',UDim2.new(1,-32,0,30),UDim2.fromOffset(16,138));rarityFilter.BackgroundColor3=C.Tile
 local arrow=Theme.ControlIcon(rarityFilter,'chevron');arrow.Position=UDim2.new(1,-24,.5,-7)
-local rarityMenu=Instance.new('Frame');rarityMenu.Name='RarityOptions';rarityMenu.Position=UDim2.fromOffset(16,174);rarityMenu.Size=UDim2.new(1,-32,0,110);rarityMenu.BackgroundColor3=C.Panel;rarityMenu.BorderSizePixel=0;rarityMenu.Visible=false;rarityMenu.ZIndex=10;rarityMenu.Parent=panel;corner(rarityMenu)
+local rarityMenu=Instance.new('Frame');rarityMenu.Name='RarityOptions';rarityMenu.Position=UDim2.fromOffset(16,174);rarityMenu.Size=UDim2.new(1,-32,0,110);rarityMenu.BackgroundColor3=C.Sheet;rarityMenu.BorderSizePixel=0;rarityMenu.Visible=false;rarityMenu.ZIndex=10;rarityMenu.Parent=panel;corner(rarityMenu)
 local rarityCategory='All'
 local slots={};local rows={};local category='All';local visibleSlots=10;local sequence=0;local seen=setmetatable({},{__mode='k'});local toolConns={};local characterConns={};local allConns={};local queued=false;local drag;local suppressedUntil=0;local selectedKey
 local refresh,renderRows,layout
@@ -75,16 +95,19 @@ end
 for i=1,10 do
  local b=button(dock,'Slot'..i,'',UDim2.fromOffset(56,56),UDim2.new());slots[i]=b
  selectionBorder(b);Theme.CardBorder(b,'Common')
- label(b,'Number',UDim2.fromOffset(20,17),UDim2.fromOffset(3,1),i==10 and'0'or tostring(i),11).TextColor3=C.Muted
- local nameLabel=label(b,'ItemName',UDim2.new(1,-8,1,-29),UDim2.fromOffset(4,14),'',12)
- local fontSize=Instance.new('UITextSizeConstraint');fontSize.MinTextSize=8;fontSize.MaxTextSize=11;fontSize.Parent=nameLabel
- local detail=label(b,'ItemTraits',UDim2.new(1,-4,0,12),UDim2.new(0,2,1,-14),'',9);detail.TextScaled=true;detail.TextColor3=C.Muted
+ -- R112: picture behind the number, a small exact name along the bottom, weight and stack count on the picture.
+ picture(b)
+ local number=label(b,'Number',UDim2.fromOffset(20,17),UDim2.fromOffset(3,1),i==10 and'0'or tostring(i),11);number.TextColor3=C.Muted;number.ZIndex=3
+ plainLabel(b,'ItemName')
+ local weight=label(b,'ItemWeight',UDim2.new(1,-4,0,12),UDim2.new(0,2,1,-26),'',9);weight.TextXAlignment=Enum.TextXAlignment.Right;weight.ZIndex=3
+ countBadge(b)
  b.Activated:Connect(function()if os.clock()>=suppressedUntil and State.Slots[i]then equip(State.Slots[i])end end)
  b.InputBegan:Connect(function(input)if State.Slots[i]then beginDrag(b,State.Slots[i],input)end end)
 end
 local filterButtons={}
 for i,name in ipairs({'All','Seeds','Fruit','Tools'})do
  local b=button(filters,name,'',UDim2.new(.25,-6,1,0),UDim2.new((i-1)*.25,0,0,0));filterButtons[name]=b;local caption=label(b,'Caption',UDim2.new(1,-8,1,0),UDim2.fromOffset(4,0),name,14)
+ b.BackgroundColor3=C.Tile;Theme.ControlIcon(b,name).Name='TabIcon' -- R112: square icon cards; placed by layout.
  b.Activated:Connect(function()category=name;listDirty=true;scroll.CanvasPosition=Vector2.zero;renderRows()end)
 end
 local function rarity(tool)
@@ -101,9 +124,19 @@ local function emblem(button0,tool)
  button0:SetAttribute('EmblemRarity',value)
  local old=button0:FindFirstChild('RarityDecoration');if old then old:Destroy()end
  Theme.CardBorder(button0,value)
- if value~=''then local icon=Theme.Icon(button0,value);icon.Name='RarityDecoration';icon.Size=UDim2.fromOffset(12,12);icon.Position=UDim2.new(1,-15,0,2)end
+ if value~=''then local icon=Theme.Icon(button0,value);icon.Name='RarityDecoration';icon.Size=UDim2.fromOffset(12,12);icon.Position=UDim2.new(1,-15,0,2);icon.ZIndex=3 end
 end
 local function kind(tool)return tool:GetAttribute('HarvestItemTool')and'Fruit'or(tool:GetAttribute('GardenSeed')or tool:GetAttribute('SeedPackTool'))and'Seeds'or'Tools'end
+local function weighedName(tool)local kg=Weight.ToolText(tool);local name=Names.Tool(tool,Catalog);return kg~=''and name..' ('..kg..')'or name end
+-- R112: identical packs, seeds and fruit share one card/slot with a count; tools stay separate.
+local stackFields={Pack={'Stage','BagVariant','PackSize','PackMutation','Weather','SeedScale'},Seed={'SeedId','SeedScale','Mutation','Weather','Rarity'},
+ Fruit={'SeedId','FruitScale','Mutation','Weather','SellValue','FruitName','FruitIndex','Rarity'}}
+local function stackKey(tool)
+ local group=tool:GetAttribute('SeedPackTool')and'Pack'or tool:GetAttribute('GardenSeed')and'Seed'or tool:GetAttribute('HarvestItemTool')and'Fruit'
+ if not group then return nil end
+ local parts={group,tool.Name};for _,field in ipairs(stackFields[group])do table.insert(parts,tostring(tool:GetAttribute(field)))end
+ return 'stack|'..table.concat(parts,'|')
+end
 renderRows=function()
  if not panel.Visible then return end
  local changed=listDirty
@@ -111,9 +144,9 @@ renderRows=function()
   table.clear(matched);local term=search.Text:lower()
   for key,e in pairs(State.Items)do if(category=='All'or kind(e.Tool)==category)and(rarityCategory=='All'or rarity(e.Tool)==rarityCategory)and Names.Search(e.Tool,Catalog):find(term,1,true)then table.insert(matched,{Key=key,Entry=e})end end
   table.sort(matched,function(a,b)return a.Entry.Order<b.Entry.Order end);listDirty=false
-  for name,b in pairs(filterButtons)do b.BackgroundColor3=name==category and Color3.fromRGB(65,99,66)or C.Slot end
+  for name,b in pairs(filterButtons)do b.BackgroundColor3=name==category and C.TileOn or C.Tile end
  end
- local width=scroll.AbsoluteSize.X;local side=width<400 and 64 or 72;local cell=side+8;local cols=math.max(1,math.floor((math.max(1,width-12)+8)/cell))
+ local width=scroll.AbsoluteSize.X;local side=width<400 and 84 or width<640 and 92 or 104;local cell=side+8;local cols=math.max(1,math.floor((math.max(1,width-12)+8)/cell))
  local canvas=math.ceil(#matched/cols)*cell+8
  local y=math.clamp(scroll.CanvasPosition.Y,0,math.max(0,canvas-scroll.AbsoluteSize.Y))
  local firstRow=math.max(0,math.floor(y/cell)-1);local lastRow=firstRow+math.ceil(scroll.AbsoluteSize.Y/cell)+2
@@ -125,18 +158,22 @@ renderRows=function()
  for index=firstRow*cols+1,math.min(#matched,(lastRow+1)*cols)do
   local item=matched[index];local b=rows[item.Key];used[item.Key]=true
   if not b then
-   b=button(scroll,'Item','',UDim2.fromOffset(side,side),UDim2.new());b.TextWrapped=true;b:SetAttribute('InventoryKey',item.Key);rows[item.Key]=b
-   local name=label(b,'ItemName',UDim2.new(1,-10,1,-35),UDim2.fromOffset(5,15),'',13);name.TextScaled=true
-   local limit=Instance.new('UITextSizeConstraint');limit.MinTextSize=8;limit.MaxTextSize=13;limit.Parent=name
-   local detail=label(b,'ItemTraits',UDim2.new(1,-6,0,15),UDim2.new(0,3,1,-17),'',9);detail.TextScaled=true;detail.TextColor3=C.Muted
+   b=button(scroll,'Item','',UDim2.fromOffset(side,side),UDim2.new());b.TextWrapped=true;b.BackgroundColor3=C.Tile;b:SetAttribute('InventoryKey',item.Key);rows[item.Key]=b
+   -- R112: big picture, then a small readable "Name (2.4kg)" under it.
+   local art=picture(b);art.Position=UDim2.fromOffset(6,5);art.Size=UDim2.new(1,-12,1,-37)
+   local name=label(b,'ItemName',UDim2.new(1,-8,0,28),UDim2.new(0,4,1,-31),'',12);name.ZIndex=3
+   local detail=label(b,'ItemTraits',UDim2.new(1,-8,0,13),UDim2.new(0,4,1,-45),'',10);detail.ZIndex=3
+   countBadge(b).Position=UDim2.fromOffset(4,4)
    selectionBorder(b)
    b.Activated:Connect(function()if os.clock()>=suppressedUntil then equip(b:GetAttribute('InventoryKey'))end end)
    b.InputBegan:Connect(function(input)beginDrag(b,b:GetAttribute('InventoryKey'),input)end)
   end
   b.Size=UDim2.fromOffset(side,side);b.Position=UDim2.fromOffset(4+(index-1)%cols*cell,4+math.floor((index-1)/cols)*cell)
   local tool=item.Entry.Tool;local name=rarity(tool)or''
-  if b:GetAttribute('NameRarity')~=name then decorate(b.ItemName,tool,13);b:SetAttribute('NameRarity',name)end
-  emblem(b,tool);b.ItemName.Text=Names.Tool(tool,Catalog);b.ItemTraits.Text=traits(tool);Traits.Style(b.ItemTraits,Traits.Tool(tool))
+  if b:GetAttribute('NameRarity')~=name then decorate(b.ItemName,tool,12);b:SetAttribute('NameRarity',name)end
+  emblem(b,tool);b.ItemName.Text=weighedName(tool);b.ItemTraits.Text=traits(tool);Traits.Style(b.ItemTraits,Traits.Tool(tool))
+  local count=item.Entry.Count or 1;b.Count.Text='x'..count;b.Count.Visible=count>1
+  Pictures.Show(b.Picture,tool,2)
   b:SetAttribute('Selected',tool.Parent==player.Character)
  end
  -- Keep overlapping cells alive. Only retire cells after entering cells exist.
@@ -157,7 +194,12 @@ refresh=function()
  local items={};local containers={bag};if player.Character then table.insert(containers,player.Character)end
  for _,container in ipairs(containers)do for _,tool in ipairs(container:GetChildren())do if tool:IsA('Tool')then
   if not seen[tool]then sequence+=1;seen[tool]=sequence end
-  local key=Info.Key(tool)or('tool-'..seen[tool]);items[key]={Tool=tool,Order=tool:GetAttribute('GardenShovel')and-1 or seen[tool]}
+  local key=stackKey(tool)or Info.Key(tool)or('tool-'..seen[tool]);local order=tool:GetAttribute('GardenShovel')and-1 or seen[tool];local e=items[key]
+  if not e then items[key]={Tool=tool,Order=order,Count=1}
+  else -- The equipped copy, else the oldest, represents a stack.
+   e.Count+=1;e.Order=math.min(e.Order,order)
+   if tool.Parent==player.Character or(e.Tool.Parent~=player.Character and seen[tool]<seen[e.Tool])then e.Tool=tool end
+  end
   if tool.Parent==player.Character then selectedKey=key end
   if not toolConns[tool]then toolConns[tool]=watchTool(tool,function()refresh()end)end
  end end end
@@ -165,12 +207,15 @@ refresh=function()
  State:Reconcile(items);listDirty=true
  local active=selectedKey and items[selectedKey];if not active or active.Tool.Parent~=player.Character then selectedKey=nil end
  local selectedTool=selectedKey and items[selectedKey].Tool
- selectedLabel.Text=selectedTool and Names.Tool(selectedTool,Catalog)or''
+ selectedLabel.Text=selectedTool and weighedName(selectedTool)or''
  selectedTraits.Text=selectedTool and traits(selectedTool)or'';Traits.Style(selectedTraits,Traits.Tool(selectedTool))
  decorate(selectedLabel,selectedTool,14)
  for i,b in ipairs(slots)do
-  local e=items[State.Slots[i]];b.ItemName.Text=e and Names.Tool(e.Tool,Catalog)or'';b.ItemTraits.Text=e and traits(e.Tool)or'';Traits.Style(b.ItemTraits,Traits.Tool(e and e.Tool))
-  emblem(b,e and e.Tool);decorate(b.ItemName,e and e.Tool,11);b:SetAttribute('Selected',e~=nil and e.Tool.Parent==player.Character);b.BackgroundTransparency=e and .10 or .50
+  local e=items[State.Slots[i]];local tool=e and e.Tool
+  b.ItemName.Text=tool and Names.Tool(tool,Catalog)or'';tint(b.ItemName,tool and rarity(tool)or'Common')
+  b.ItemWeight.Text=tool and Weight.ToolText(tool)or'';Traits.Style(b.ItemWeight,Traits.Tool(tool))
+  local count=e and e.Count or 0;b.Count.Text='x'..count;b.Count.Visible=count>1;Pictures.Show(b.Picture,tool,1)
+  emblem(b,tool);b:SetAttribute('Selected',e~=nil and tool.Parent==player.Character);b.BackgroundTransparency=e and .10 or .50
  end
  renderRows()
 end
@@ -185,9 +230,15 @@ layout=function()
  visibleSlots=metrics.Slots
  local gap=6;local side=metrics.SlotSize
  dock.Position=UDim2.new(.5,metrics.HotbarShiftX or 0,1,-metrics.HotbarBottom);dock.Size=UDim2.fromOffset((visibleSlots+1)*side+visibleSlots*gap,side)
- for i,b in ipairs(slots)do b.Visible=i<=visibleSlots;b.ItemName.TextScaled=true;b.Size=UDim2.fromOffset(side,side);b.Position=UDim2.fromOffset((i-1)*(side+gap),0)
+ local nameHeight=math.max(12,math.floor(side*.3));local small=math.max(8,math.floor(side*.15))
+ for i,b in ipairs(slots)do b.Visible=i<=visibleSlots;b.Size=UDim2.fromOffset(side,side);b.Position=UDim2.fromOffset((i-1)*(side+gap),0)
+  -- R112: picture fills the slot above a two-line name strip; weight and count sit on the picture's lower edge.
+  b.Picture.Position=UDim2.fromOffset(3,3);b.Picture.Size=UDim2.new(1,-6,1,-(nameHeight+3))
+  b.ItemName.Position=UDim2.new(0,2,1,-(nameHeight+1));b.ItemName.Size=UDim2.new(1,-4,0,nameHeight)
+  b.ItemWeight.Visible=side>=52;b.ItemWeight.Position=UDim2.new(0,2,1,-(nameHeight+small+3));b.ItemWeight.Size=UDim2.new(1,-4,0,small+2);Fit.Attach(b.ItemWeight,small+1,7)
+  b.Count.Position=UDim2.new(0,3,1,-(nameHeight+small+5));b.Count.Size=UDim2.fromOffset(math.max(22,math.floor(side*.4)),small+4);b.Count.TextSize=small+1
   -- R110: slot text grows with the larger slots.
-  local fit=b.ItemName:FindFirstChildOfClass('UITextSizeConstraint');if fit then fit.MaxTextSize=math.max(11,math.floor(side*.2))end
+  local fit=b.ItemName:FindFirstChildOfClass('UITextSizeConstraint');if fit then fit.MaxTextSize=math.max(8,math.floor(side*.17))end
   b.Number.TextSize=math.max(11,math.floor(side*.2));b.Number.Size=UDim2.fromOffset(math.floor(side*.34),math.floor(side*.29))
  end
  open.Size=UDim2.fromOffset(side,side);open.Position=UDim2.new(1,-side,0,0)

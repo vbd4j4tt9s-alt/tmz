@@ -136,7 +136,7 @@ function E:AgeMark(m,t,now,reduced)
    m.Stage=1
    for i=1,2 do local p=m.Parts[i];p.Material=P.Material2;p.Color=P.Color2;p.Reflectance=0;p.Size=p.Size*V(1.08,1,1.08)end
   end
-  alpha(m,1,a);alpha(m,2,a);alpha(m,3,m.Stage==0 and 1 or math.max(a,.2))
+  alpha(m,1,a);alpha(m,2,a);alpha(m,3,m.Stage==0 and 1 or math.max(a,.35))
   return
  elseif kind=='Ember'then
   if m.Stage==0 then
@@ -214,25 +214,31 @@ function E:TakeIdle(r)
  if self.IdleActive>=b.Idle+(r.Local and 1 or 0)then return nil end -- the local wearer may always have one
  local list=self.IdleFree[r.ThemeName];local rig=list and table.remove(list)
  if not rig then
-  rig={Theme=r.ThemeName,Part=cosmetic(self.Folder,'Boot idle aura'),Emitters={},Shards={},Rates={},Angle=0,NextArc=0}
+  rig={Theme=r.ThemeName,Part=cosmetic(self.Folder,'Boot idle aura'),Emitters={},Shards={},Patches={},Rates={},Angle=0,NextArc=0}
   rig.Part.Size=V(2.4,.2,2.4)
   for i,spec in ipairs(idle.Emitters)do rig.Emitters[i]=emitter(rig.Part,spec)end
   for i=1,idle.Shards or 0 do
    local s=cosmetic(self.Folder,'Boot idle shard');s.Material=i==1 and Mat.Neon or Mat.Glass;s.Color=i==1 and idle.ShardGlow or idle.ShardColor;s.Reflectance=i==1 and 0 or .5
    rig.Shards[i]=s
   end
+  local patch=idle.Patches
+  for i=1,patch and patch.Count or 0 do
+   local s=cosmetic(self.Folder,'Boot idle patch');s.Material=patch.Material;s.Color=patch.Color;s.Reflectance=patch.Reflectance or 0
+   rig.Patches[i]=s
+  end
   self.IdleRigs+=1
  end
  self.IdleActive+=1;r.Idle=rig;return rig
 end
 function E:DestroyIdle(rig)
- rig.Part:Destroy();for _,s in ipairs(rig.Shards)do s:Destroy()end;self.IdleRigs-=1
+ rig.Part:Destroy();for _,s in ipairs(rig.Shards)do s:Destroy()end;for _,s in ipairs(rig.Patches)do s:Destroy()end;self.IdleRigs-=1
 end
 function E:DropIdle(r,clear)
  local rig=r.Idle;if not rig then return end
  r.Idle=nil;r.Fade=0;self.IdleActive-=1
  for i,e in ipairs(rig.Emitters)do e.Enabled=false;e.Rate=0;rig.Rates[i]=0;if clear then e:Clear()end end
  for _,s in ipairs(rig.Shards)do s.Transparency=1 end
+ for _,s in ipairs(rig.Patches)do s.Transparency=1 end;rig.Center=nil
  if self.IdleRigs>self.Budget.Idle+1 then self:DestroyIdle(rig);return end
  self.IdleFree[rig.Theme]=self.IdleFree[rig.Theme]or{};table.insert(self.IdleFree[rig.Theme],rig)
 end
@@ -252,13 +258,30 @@ function E:StepIdle(r,dt,now,want)
  end
  for i,s in ipairs(rig.Shards)do
   local angle=rig.Angle+i*2.09;local bob=b.Reduced and 0 or math.sin(now*2+i)*.12
-  s.Size=V(.18,.3,.18)*scale
-  s.CFrame=CF(center+V(math.cos(angle)*1.15*scale,(.45+i*.12+bob)*scale,math.sin(angle)*1.15*scale))*CFrame.Angles(.4,b.Reduced and i or now*1.3+i,.3)
+  s.Size=V(.2,.34,.2)*scale
+  s.CFrame=CF(center+V(math.cos(angle)*1.6*scale,(.55+i*.15+bob)*scale,math.sin(angle)*1.6*scale))*CFrame.Angles(.4,b.Reduced and i or now*1.3+i,.3)
   local a=1-(i==1 and .9 or .85)*r.Fade;if math.abs(s.Transparency-a)>=.04 or a>=1 then s.Transparency=a end
  end
+ -- Ground patches sit in a ring around the feet; placed when the wearer settles, faded with the aura.
+ local patch=idle.Patches
+ if patch then
+  if not rig.Center or(rig.Center-center).Magnitude>.08 then
+   rig.Center=center
+   for i,s in ipairs(rig.Patches)do
+    local angle=yaw+i*6.283/#rig.Patches+(i%2)*.35;local radius=(patch.Radius[1]+(patch.Radius[2]-patch.Radius[1])*((i*.618)%1))*scale
+    local size=patch.Kind=='Crack'and V(patch.Size[1],.03,patch.Size[2])or V(patch.Size[1],.03,patch.Size[1])*(1-.35*((i*.382)%1))
+    s.Size=size*scale;s.CFrame=CF(center+V(math.cos(angle)*radius,-.03,math.sin(angle)*radius))*CFrame.Angles(0,patch.Kind=='Crack'and angle+.4 or angle+.79,0)
+   end
+  end
+  local a=1-(1-patch.Alpha)*r.Fade
+  for _,s in ipairs(rig.Patches)do if math.abs(s.Transparency-a)>=.04 or(a>=1 and s.Transparency<1)then s.Transparency=a end end
+ end
  if idle.ArcEvery and r.Fade>.5 and now>=rig.NextArc then
+  -- A short discharge jumps from the outer side of one boot to the ground.
   rig.NextArc=now+idle.ArcEvery[1]+math.random()*(idle.ArcEvery[2]-idle.ArcEvery[1])
-  self:Arc(left+V(0,.05,0),right+V(0,.05,0),now,r.Theme.ArcColor,.45*scale)
+  local side=math.random()<.5 and -1 or 1;local frame=r.Root.CFrame;local sole=side<0 and left or right
+  local out=frame.RightVector*side
+  self:Arc(sole+out*.55*scale+V(0,.3*scale,0),sole+out*(1.4+math.random()*.4)*scale+frame.LookVector*((math.random()-.5)*1.2*scale),now,r.Theme.ArcColor,.3*scale)
  end
 end
 -- Per-runner step ----------------------------------------------------------------------------------------------

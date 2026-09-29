@@ -40,9 +40,9 @@ M.Tuning={
 }
 -- Per quality tier (ClientFxBudget 1 = low .. 3 = high); graphics level 1-3 forces tier 1, 4-6 caps at tier 2.
 M.Budgets={
- {Piles=2,Chunks=48,PerPile=20,Flyers=0,Particles=.4,Marks=60,Shadows=false},
- {Piles=4,Chunks=110,PerPile=34,Flyers=3,Particles=.7,Marks=110,Shadows=false},
- {Piles=6,Chunks=200,PerPile=54,Flyers=6,Particles=1,Marks=160,Shadows=true},
+ {Piles=2,Chunks=50,PerPile=22,Flyers=0,Particles=.4,Marks=60,Shadows=false},
+ {Piles=4,Chunks=130,PerPile=44,Flyers=3,Particles=.7,Marks=110,Shadows=false},
+ {Piles=6,Chunks=260,PerPile=96,Flyers=6,Particles=1,Marks=160,Shadows=true},
 }
 local SOIL=Color3.fromRGB(112,75,45)
 local SMOKE='rbxasset://textures/particles/smoke_main.dds'
@@ -50,11 +50,13 @@ local SPARK='rbxasset://textures/particles/sparkles_main.dds'
 
 -- Pure geometry (also used by the offline renders) --------------------------------------------------------------------
 -- Pile scale from the plant footprint (catalog Radius x PlantScale), square-root scaled and clamped: a 2-stud herb
--- gets a ~1.1-stud ring, a 10-stud apple tree ~1.9, a 37-stud king tree ~3.1, giant rolls cap at 4.5.
+-- gets a ~1.1-stud mound of ~18 cubes, a 10-stud apple tree ~1.9 / ~25, a 37-stud king tree ~3.1 / ~36, giant
+-- rolls cap at 4.5 / ~48. Cubes grow with the mound (0.4 to 1 stud) so big piles stay chunky and low-poly.
 function M.Size(base)
  base=tonumber(base)or 0;if base~=base then base=0 end;base=math.clamp(base,0,1e4)
- local radius=math.clamp(.55+.42*math.sqrt(base),1,4.5)
- return {Base=base,Radius=radius,Height=radius*.42,Chunk=math.clamp(.19+.115*radius,.3,.72),Hollow=math.max(.26,radius*.27),Mark=math.clamp(radius*.42,.45,1.35)}
+ local radius=math.clamp(.55+.42*math.sqrt(base),1,4.5);local hollow=math.max(.26,radius*.27)
+ local count=math.floor(8+9*radius+.5)
+ return {Base=base,Radius=radius,Height=radius*.4,Hollow=hollow,Count=count,Chunk=math.sqrt(math.pi*(radius^2-hollow^2)/count)*.86,Mark=math.clamp(radius*.42,.45,1.35)}
 end
 function M.BaseRadius(seedId,plantScale)
  local def=Catalog[seedId];if not def then return 2 end
@@ -65,12 +67,14 @@ function M.Hash(text)
  for i=1,#text do h=(h*33+string.byte(text,i))%2147483647 end
  return h
 end
-local function build(size,s,seed,flyers)
+local GOLDEN=math.pi*(3-math.sqrt(5))
+local function build(size,count,seed,flyers)
  local rng=Random.new(seed)
  local R,H,ri=size.Radius,size.Height,size.Hollow
- local peak=ri+(R-ri)*.32
+ local s=math.clamp(math.sqrt(math.pi*(R*R-ri*ri)/count)*.86,.28,1.3)
+ local peak=ri+(R-ri)*.3
  local function height(r)
-  if r<=peak then return H*(.7+.3*math.clamp((r-ri)/math.max(.01,peak-ri),0,1))end
+  if r<=peak then return H*(.72+.28*math.clamp((r-ri)/math.max(.01,peak-ri),0,1))end
   local u=math.clamp((r-peak)/math.max(.01,R-peak),0,1);return H*(1-u*u)
  end
  local chunks={}
@@ -80,56 +84,49 @@ local function build(size,s,seed,flyers)
    WobbleX=rng:NextNumber(-.5,.5),WobbleZ=rng:NextNumber(-.5,.5)}
   table.insert(chunks,c);return c
  end
- local r=ri+s*.5;local ring=0
- while r<=R-s*.3 do
-  ring+=1
-  local n=math.max(6,math.floor(2*math.pi*r/(s*1.02)))
-  local outer=r+s*.96>R-s*.3
-  local phase=rng:NextNumber(0,2*math.pi)
-  for i=1,n do
-   -- The outermost ring is a loose scatter, not a wall.
-   if not outer or rng:NextNumber()<.6 then
-    local a=phase+(i-1+rng:NextNumber(-.28,.28))*2*math.pi/n
-    local rr=r+rng:NextNumber(-.16,.16)*s
-    local edge=s*rng:NextNumber(.8,1.2)
-    local top=math.max(edge*.42,height(rr)*rng:NextNumber(.86,1.12))
-    local x,z=math.cos(a)*rr,math.sin(a)*rr
-    local wave=math.clamp((rr-ri)/math.max(.01,R-ri),0,1)
-    local delay=.02+wave*.16+rng:NextNumber(0,.05);local sink=(1-wave)*.28+rng:NextNumber(0,.08)
-    local tone=math.clamp(math.floor(1+top/math.max(.01,H)*2.2+rng:NextNumber(0,1.6)),1,4)
-    local y=top-edge*.5
-    add(x,y,z,edge,tone,delay,sink)
-    -- Support cubes under tall ones, so nothing floats; each overlaps the one above a little.
-    for _=1,2 do
-     local bottom=y-edge*.5
-     if bottom<=edge*.12 then break end
-     local below=edge*rng:NextNumber(1,1.18)
-     y=bottom-below*.32;edge=below
-     add(x+rng:NextNumber(-.08,.08)*below,y,z+rng:NextNumber(-.08,.08)*below,edge,math.max(1,tone-1),delay-.015,sink+.02)
-    end
-   end
+ -- Sunflower spiral over the ring around the seed hole, biased toward the rim; outer cubes are smaller clods.
+ local turn=rng:NextNumber(0,2*math.pi)
+ for i=1,count do
+  local f=((i-.5)/count)^1.25
+  local rr=math.clamp(math.sqrt(ri*ri+(R*R-ri*ri)*f)+rng:NextNumber(-.12,.12)*s,ri+s*.4,R-s*.2)
+  local a=turn+i*GOLDEN+rng:NextNumber(-.12,.12)
+  local wave=math.clamp((rr-ri)/math.max(.01,R-ri),0,1)
+  local top=height(rr)*rng:NextNumber(.88,1.12)
+  -- Tall rim cubes are a little bigger, so a mound needs at most one support cube under each.
+  local edge=math.max(s*(1.12-.34*wave)*rng:NextNumber(.86,1.14),top/1.75);top=math.max(edge*.42,top)
+  local x,z=math.cos(a)*rr,math.sin(a)*rr
+  local delay=.02+wave*.16+rng:NextNumber(0,.05);local sink=(1-wave)*.28+rng:NextNumber(0,.08)
+  local tone=math.clamp(math.floor(1+top/math.max(.01,H)*2.2+rng:NextNumber(0,1.6)),1,4)
+  local y=top-edge*.5
+  add(x,y,z,edge,tone,delay,sink)
+  -- Support cubes under tall ones, so nothing floats; each overlaps the one above a little.
+  for _=1,2 do
+   local bottom=y-edge*.5
+   if bottom<=edge*.2 then break end
+   local below=edge*rng:NextNumber(1,1.15)
+   y=bottom-below*.3;edge=below
+   add(x+rng:NextNumber(-.08,.08)*below,y,z+rng:NextNumber(-.08,.08)*below,edge,math.max(1,tone-1),delay-.015,sink+.02)
   end
-  r+=s*.96
  end
  -- A few chunks are tossed out of the hole and land on top of the rim.
  for _=1,flyers do
   local a=rng:NextNumber(0,2*math.pi);local rr=math.clamp(peak+rng:NextNumber(-.2,.25)*s,ri+s*.3,R)
-  local edge=s*rng:NextNumber(.62,.86)
-  local c=add(math.cos(a)*rr,height(rr)+edge*.38,math.sin(a)*rr,edge,rng:NextInteger(3,4),rng:NextNumber(.03,.12),rng:NextNumber(0,.08))
+  local edge=s*rng:NextNumber(.6,.8)
+  local c=add(math.cos(a)*rr,height(rr)+edge*.4,math.sin(a)*rr,edge,rng:NextInteger(3,4),rng:NextNumber(.03,.12),rng:NextNumber(0,.08))
   c.Flyer=true;c.Flight=rng:NextNumber(.42,.56);c.Apex=(.7+.3*R)*rng:NextNumber(.85,1.15)
   c.Spin=V(rng:NextNumber(-7,7),rng:NextNumber(-5,5),rng:NextNumber(-7,7))
  end
- return {Size=size,Chunk=s,Chunks=chunks,Rings=ring,Flyers=flyers}
+ return {Size=size,Chunk=s,Chunks=chunks,Count=count,Flyers=flyers}
 end
 -- Deterministic chunk layout in the soil frame (Y up, 0 = soil top); the same crop id gives the same pile on every
--- client. Over the cap, chunks get bigger instead of sparser so the mound keeps its shape.
+-- client. Over the cap, fewer but bigger cubes keep the mound's shape.
 function M.Layout(base,seed,cap,flyers)
  local size=M.Size(base)
  cap=math.max(6,math.floor(tonumber(cap)or 54));flyers=math.clamp(math.floor(tonumber(flyers)or 0),0,2+math.floor(size.Radius))
- local s=size.Chunk;local out=build(size,s,seed,flyers)
- for _=1,8 do
+ local count=size.Count;local out=build(size,count,seed,flyers)
+ for _=1,10 do
   if #out.Chunks<=cap then break end
-  s*=1.13;out=build(size,s,seed,flyers)
+  count=math.max(4,math.floor(math.min(count*.88,count*cap/#out.Chunks)));out=build(size,count,seed,flyers)
  end
  while #out.Chunks>cap do table.remove(out.Chunks)end
  return out
