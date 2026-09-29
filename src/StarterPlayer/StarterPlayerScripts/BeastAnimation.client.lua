@@ -13,6 +13,7 @@ local UpgradePose=require(Storage:WaitForChild('KeeperUpgradePose'))
 local Sleep=require(Storage:WaitForChild('KeeperSleep'))
 local Surge=require(Storage:WaitForChild('KeeperSurge'))
 local Budget=require(Storage.CosmeticBudget);local Fx=require(Storage.ClientFxBudget);local Strike=require(Storage.KeeperStrikeFrames)
+local Combat=require(Storage.KeeperCombat)
 local records,watchers,pending={},{},{}
 local BLACK=Color3.new(0,0,0)
 local destroyed=false
@@ -128,8 +129,10 @@ local render=Run.RenderStepped:Connect(function(dt)
   local target=Pose.Frames(r.Stage,motion.Time,motion.Awake,motion.Moving,motion.Cycle,motion.Urgency,motion.Speed,motion.Turn)
   target=AttackPose.Apply(r.Stage,target,now,model:GetAttribute('KeeperAttackAt'))
   local attackAt=model:GetAttribute('KeeperAttackAt')
-  if attackAt and now>=attackAt and now-attackAt<1.5 then
-   target=Strike.Frames(r.Stage,now,attackAt);motion.Frame=r.Root.CFrame;motion.Awake=1
+  -- R110: strike pose only while it is live. KeeperAttackAt outlives a miss, and the old 1.5 s
+  -- window slid a chasing keeper in its idle pose on the raw, packet-stepped root.
+  if attackAt and now>=attackAt and now-attackAt<Combat.Get(r.Stage).Windup+Combat.Recovery then
+   target=Strike.Frames(r.Stage,now,attackAt);motion.Awake=1
   end
   if r.Surge then Surge.Step(r.Surge,motion.Frame,target,now,distance<190 and math.max(.25,motion.Awake)or 0)end
   r.Sleep:Update(asleep and motion.Awake<.15,distance,now,motion.Frame*target.Head)

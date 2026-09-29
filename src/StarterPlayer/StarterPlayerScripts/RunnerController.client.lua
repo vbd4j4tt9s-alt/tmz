@@ -44,9 +44,47 @@ local function suspended(r)
         or state==Enum.HumanoidStateType.Seated or state==Enum.HumanoidStateType.Dead
         or state==Enum.HumanoidStateType.Climbing or state==Enum.HumanoidStateType.Swimming
 end
+-- R110: a high-speed bump must never trip the runner. Only RagdollService's knockback owns a fall:
+-- it flags GuardianRagdollActive/ChestChaseRagdollActive and sets PlatformStand/EvaluateStateMachine.
+-- Humanoid state is simulated by the owning client, so this has to run here, not on the server.
+local States=Enum.HumanoidStateType
+local tripStates={States.FallingDown,States.Ragdoll}
+local steady={[States.Running]=true,[States.RunningNoPhysics]=true,[States.Freefall]=true,[States.Landed]=true,[States.Jumping]=true}
+local upright=math.cos(math.rad(30))
+local function authoredFall(r)
+    local h=r.Humanoid
+    return player:GetAttribute('GuardianRagdollActive')==true or r.Character:GetAttribute('ChestChaseRagdollActive')==true
+        or h.PlatformStand or not h.EvaluateStateMachine
+end
+local function allowTrips(r,allow)
+    if r.TripsAllowed==allow then return end
+    r.TripsAllowed=allow
+    for i,state in ipairs(tripStates)do r.Humanoid:SetStateEnabled(state,allow and r.TripDefaults[i])end
+end
+local function keepUpright(r)
+    local humanoid,root=r.Humanoid,r.Root
+    local allow=authoredFall(r)
+    allowTrips(r,allow)
+    if allow or humanoid.Health<=0 or humanoid.Sit or root.Anchored
+        or player:GetAttribute('StudioTestFlying')or player:GetAttribute('StudioTestNoclip')then return end
+    local frame=root.CFrame
+    local state=humanoid:GetState()
+    if state==States.FallingDown or state==States.Ragdoll or state==States.PlatformStanding then
+        humanoid:ChangeState(frame.UpVector.Y<upright and humanoid:GetStateEnabled(States.GettingUp)and States.GettingUp or States.Running)
+    elseif not steady[state]then return end -- GettingUp, climbing, swimming, seats and Physics keep their own control
+    -- Contact torque, not intent: clear pitch/roll spin and stand a tipped root back up (yaw kept).
+    local spin=root.AssemblyAngularVelocity
+    if spin.X*spin.X+spin.Z*spin.Z>.04 then root.AssemblyAngularVelocity=Vector3.new(0,spin.Y,0)end
+    if frame.UpVector.Y<upright then
+        local look=Motion.Flat(frame.LookVector)
+        if look.Magnitude<.2 then look=Motion.Flat(frame.UpVector*-math.sign(frame.LookVector.Y))end
+        if look.Magnitude>.001 then root.CFrame=CFrame.lookAt(frame.Position,frame.Position+look.Unit)end
+    end
+end
 local function clear()
     if record then
         for _,c in ipairs(record.Connections)do c:Disconnect()end
+        if record.Humanoid.Parent then allowTrips(record,true)end
         if record.Humanoid.Parent and not suspended(record)then record.Humanoid.WalkSpeed=cap()end
     end
     record=nil
@@ -65,8 +103,10 @@ local function attach(character)
     params.FilterType=Enum.RaycastFilterType.Exclude;params.FilterDescendantsInstances={character}
     params.RespectCanCollide=true;params.IgnoreWater=false
     record={Character=character,Humanoid=humanoid,Root=root,Params=params,Velocity=Vector3.zero,
-        Input=Vector3.zero,Connections={},Tracks=setmetatable({},{__mode='k'}),HullAt=0}
+        Input=Vector3.zero,Connections={},Tracks=setmetatable({},{__mode='k'}),HullAt=0,
+        TripDefaults={humanoid:GetStateEnabled(States.FallingDown),humanoid:GetStateEnabled(States.Ragdoll)}}
     local r=record
+    allowTrips(r,authoredFall(r))
     local function observe(track)
         local animation=track.Animation
         if animation and animation:GetAttribute('ChestChaseGameplayAnimation')then return end
@@ -142,6 +182,10 @@ table.insert(connections,Run.PostSimulation:Connect(function()
     else velocity=Vector3.new(0,velocity.Y,0)end
     root.AssemblyLinearVelocity=velocity
     r.Velocity=Motion.Flat(velocity)
+end))
+table.insert(connections,Run.PostSimulation:Connect(function()
+    local r=record
+    if r and player.Character==r.Character and r.Root.Parent and r.Humanoid.Parent then keepUpright(r)end
 end))
 table.insert(connections,Run.PreAnimation:Connect(function(dt)
     local r=record
