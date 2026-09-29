@@ -1,0 +1,50 @@
+-- R88: practical 500 speed ceiling; exact saved points continue without a designed cap.
+local Points=require(script.Parent.SpeedPoints)
+local T=require(script.Parent.BalanceValues81)
+local R={}
+-- Saved points keep their R81 meaning; only the physical pace changes in R82.
+local migrationCurve={{0,24},{20000,30},{100000,45},{500000,75},{2000000,130},{20000000,300},{500000000,650},{20000000000,1300},{1000000000000,2400},{20000000000000,3800},{100000000000000,5000}}
+local function curveSpeed(points,knots,tail,logarithmic)
+ local s=Points.Normalize(points);local last=knots[#knots]
+ if Points.Compare(s,Points.Normalize(last[1]))>0 then return last[2]+tail*(Points.Log10(s)-math.log10(last[1]))end
+ local n=tonumber(s)
+ for i=2,#knots do local a,b=knots[i-1],knots[i]
+  if n<=b[1]then
+   local t=logarithmic and a[1]>=2000000 and math.log(n/a[1])/math.log(b[1]/a[1])or(n-a[1])/(b[1]-a[1])
+   return a[2]+(b[2]-a[2])*t
+  end
+ end
+ return last[2]
+end
+function R.Speed(points)return curveSpeed(points,T.PointCurve,T.SpeedTailPerDecade,true)end
+function R.PointsAt(speed)
+ if speed<=24 then return '0'end
+ for i=2,#migrationCurve do
+  local a,b=migrationCurve[i-1],migrationCurve[i]
+  if speed<=b[2]then return Points.Normalize(math.ceil(a[1]+(b[1]-a[1])*(speed-a[2])/(b[2]-a[2])))end
+ end
+ -- Migration only calls this with the old finite ceiling (5,000).
+ return '100000000000000'
+end
+local old={{0,24},{1000,28},{5000,32},{15000,37},{35000,43},{75000,50},{150000,58},{300000,66},{600000,74},
+ {2000000,125},{5000000,220},{15000000,500},{35000000,1000},{75000000,2000},{150000000,3000},{350000000,4000},{600000000,4500}}
+function R.LegacySpeed(n)
+ n=math.clamp(tonumber(n)or 0,0,1000000000)
+ for i=2,#old do local a,b=old[i-1],old[i];if n<=b[1]then return a[2]+(b[2]-a[2])*(n-a[1])/(b[1]-a[1])end end
+ return 4500+500*math.log(n/600000000)/math.log(1000000000/600000000)
+end
+function R.Migrate(oldPoints)
+ local original=Points.Normalize(oldPoints);local converted=R.PointsAt(R.LegacySpeed(oldPoints))
+ return Points.Compare(original,converted)>0 and original or converted
+end
+function R.LegacySave(points)
+ local speed=curveSpeed(points,migrationCurve,100)
+ for i=2,#old do local a,b=old[i-1],old[i];if speed<=b[2]then return math.ceil(a[1]+(b[1]-a[1])*(speed-a[2])/(b[2]-a[2]))end end
+ return math.min(1000000000,math.ceil(600000000*(1000000000/600000000)^((math.min(speed,5000)-4500)/500)))
+end
+function R.Playback(speed)
+ local knots=T.AnimationRateCurve
+ for i=2,#knots do local a,b=knots[i-1],knots[i];if speed<=b[1]then return a[2]+(b[2]-a[2])*(math.max(0,speed)-a[1])/(b[1]-a[1])end end
+ return 10
+end
+return R

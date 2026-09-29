@@ -1,0 +1,1 @@
+-- R82: ordinary UI uses its original authored colors. The blanket recolor pass is retired.

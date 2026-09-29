@@ -1,0 +1,207 @@
+-- R82 extension. Only the server-authorized command dispatcher calls Execute.
+local RS=game:GetService('ReplicatedStorage')
+local Players=game:GetService('Players')
+local Packs=require(RS.SeedPackRules);local T=require(RS.BalanceValues81)
+local State=require(script.Parent.OwnerTestState82)
+local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,balance84=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true}}
+local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8}
+local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary'}
+local function integer(s,lo,hi)local n=tonumber(s);return n and n==n and n%1==0 and n>=lo and n<=hi and n or nil end
+local function stage(s)return biomes[tostring(s or''):lower()]or integer(s,1,8)end
+local function variant(s)return tiers[tostring(s or''):lower()]or (integer(s,1,6)and string.format('Pack%02d',tonumber(s)))end
+local function seedId(s)
+ local query=tostring(s or''):lower()
+ for _,spec in ipairs(Packs.SeedDesigns)do if spec.id:lower()==query then return spec.id end end
+end
+local function safe(ctx,p)
+ if p:GetAttribute('ChestChaseRunActive')or ctx.Chase:IsPlayerBusy(p)or ctx.Chests:IsOpening(p)or p:GetAttribute('ChestChaseSeedCarrying')then return false,'Finish the target’s chase or pack opening first.'end
+ return true
+end
+local function applySpeed(ctx,p)
+ local h=p.Character and p.Character:FindFirstChildOfClass('Humanoid')
+ if h then ctx.Bases:_applyPhysicalSpeed(p,h,ctx.Data:GetOrCreateSpeedValue(p).Value)end
+ require(script.Parent.MovementGuard).Reset(p)
+end
+local function save(ctx,p)ctx.Data:MarkDirty(p);ctx.Data:QueueGardenSave(p)end
+function X.Execute(ctx,p,action,a)
+ local map=ctx.Map.MapRoot;local event=ctx.Chase.Event81;local data=ctx.Data
+ if action=='void'then action='eclipse'end
+ if action=='cashoffers'then
+  if #a~=0 then return false,'Use cashoffers @username.'end
+  local lines={};local Cash=require(RS.CashNumbers)
+  for _,row in ipairs(require(RS.PremiumPricing).Bundles)do if row.Kind=='Cash'then local quote=data:BundleQuote(p,row.Key);if quote then lines[#lines+1]=row.Tier..': '..Cash.Compact(quote.Amount)..' Cash / '..quote.GemPrice..' Gems'end end end
+  return true,table.concat(lines,'\n')
+ elseif action=='economy'then
+  if #a~=0 then return false,'Use economy.'end
+  local E=require(RS.EconomyBalance90);local Cash=require(RS.CashNumbers)
+  local function row(name,values)local out={};for _,v in ipairs(values)do out[#out+1]=Cash.Compact(v)end;return name..': '..table.concat(out,' / ')end
+  return true,table.concat({row('Treadmills',E.MachineCosts),row('Trails',{E.TrailCosts.MintTrail,E.TrailCosts.ArcTrail,E.TrailCosts.SolarTrail,E.TrailCosts.AuroraTrail,E.TrailCosts.NebulaTrail,E.TrailCosts.RoyalTrail}),row('Boots',E.BootCosts),row('Fences',E.FenceCosts),'Normal fruit up to '..Cash.Compact(E.MaxBaseFruitValue)..'; size/mutation/weather bonuses still apply.','Cash capacity '..Cash.Compact(E.MaxCash)..'; owned upgrades and harvested fruit are retained.'},'\n')
+ elseif action=='collisions'then
+  if #a~=0 then return false,'Use collisions.'end
+  local count=require(RS.WalkthroughProps90).Apply(map)
+  return true,'Walk-through props checked: '..count..' parts. Plants, floors and boundaries retained; leaderboard scrolling and market prompts stay active.'
+ end
+ if action=='weather'then
+  local kind=({rain='Rain',thunder='Thunderstorm',thunderstorm='Thunderstorm',blizzard='Blizzard',clear='Clear'})[a[1]]
+  if #a~=1 or not kind then return false,'Use weather clear/rain/thunder/blizzard. For local Snow, visit the Snow biome during clear weather.'end
+  local service=ctx.Chests.Weather;if not service then return false,'Weather is loading.'end
+  local now=workspace:GetServerTimeNow();service.TestSerial=(service.TestSerial or 0)+1
+  service.Override={Kind=kind,Cycle=-service.TestSerial,Until=now+require(RS.WeatherTraits).Duration};service:Step(now)
+  return true,'Server weather: '..kind..'. Normal weather resumes after this event.'
+ elseif action=='mechshop'then
+  if #a~=0 then return false,'Use mechshop.'end
+  local C=require(RS.MechCatalog);local lines={'Mech packs: select SINGLE / 5 PACKS / 10 PACKS in SHOP.'}
+  for _,offer in ipairs(C.Offers)do lines[#lines+1]=offer.Count..' for '..offer.GemPrice..' Gems | target '..offer.TargetRobuxPrice..' Robux | product '..(C.ProductId(offer.Count)>0 and'configured'or'not configured')end
+  lines[#lines+1]='Robux buttons use the live Roblox price. This command grants nothing.';return true,table.concat(lines,'\n')
+ end
+ if action=='voidcheck'then
+  if #a~=0 then return false,'Use voidcheck [@username].'end
+  local mech=require(RS.MechCatalog);local fmt=require(RS.OddsText85).Format
+  local odds=Packs.SeedOdds(ctx.Config,7,'EclipseReliquary',1,81);local total,mechTotal=0,0
+  for _,n in pairs(odds)do total+=n end
+  local lines={'Void Pack: all regular Secret/Cosmic/King seeds; Mech branch 1/200.','Mech seeds come only from this branch. Conditional / overall odds:'};local ticket=0
+  for _,s in ipairs(mech.Seeds)do
+   local seed=Packs.Roll(ctx.Config,7,.995+.005*(ticket+s.Chance/2)/100,1,'EclipseReliquary',81);ticket+=s.Chance
+   if not seed or seed.Id~=s.Id then return false,'Mech branch check failed for '..s.Name end
+   mechTotal+=(odds[s.Id]or 0);table.insert(lines,s.Name..': '..fmt(s.Chance)..' / '..fmt(odds[s.Id]))
+  end
+  if math.abs(total-100)>1e-7 or math.abs(mechTotal-.5)>1e-7 then return false,'Void odds totals do not match.'end
+  table.insert(lines,'PASS: total odds 1/1; Mech branch 1/200; all six nested rolls match. No items granted.')
+  return true,table.concat(lines,'\n')
+ elseif action=='eventpack'then
+  local size=tonumber(a[1]);local coat=({none='None',gold='Gold',diamond='Diamond'})[(a[2]or'none'):lower()]
+  if #a<1 or #a>2 or not size or size~=size or size<.5 or size>25 or not coat then return false,'Use eventpack <0.5–25> [none|gold|diamond].'end
+  if not event or not event.Seed or not event.Seed.Available or ctx.Map.Refreshing then return false,'Spawn an available event first; finish any event chase or dropped pack.'end
+  ctx.Chests:RefreshWorldPack(event.Seed,'EclipseReliquary',size,coat)
+  return true,'World Void Pack set to '..event.Seed.PackSize..'x '..coat..'. The normal event and banking flow remain active.'
+ elseif action=='balance84' then
+  local P=require(RS.Progression81);local maximum=ctx.Config.TrainingPointsPerSecond*require(RS.BalanceRules).Training(30000,6,true)
+  return true,'100B points = '..P.Speed('100000000000')..' speed | 10T = '..P.Speed('10000000000000')..' speed (+0.1 per 10x points above 100B) | max training '..maximum..'/s | max boot luck 2x | keeper 600'
+ elseif action=='gardenbonus'then
+  local b=require(RS.GardenBonusRules84).Read(data:GetFenceTier(p),p:GetAttribute('DoubleGrowthOwned')==true)
+  return true,'Garden size ×'..b.Size..' | grow time ×'..b.Time..' | fence '..data:GetFenceTier(p)..' | growth pass '..b.Growth..'x'
+ elseif action=='keepersmack'then
+  if not event or not event.Guardian or not event.Guardian.Parent then return false,'Spawn the event first.'end
+  for _,run in pairs(ctx.Chase.Runs)do if run.Chest.EventKeeper then return false,'Wait until the event chase ends.'end end
+  local k=event.Guardian;local state=k:GetAttribute('GuardianBehavior');local awake=k:GetAttribute('VeiledAwakeAt')
+  local at=workspace:GetServerTimeNow();k:SetAttribute('VeiledAwakeAt',at-1);k:SetAttribute('KeeperAttackAt',at);k:SetAttribute('GuardianBehavior','ATTACKING')
+  task.delay(.85,function()if k.Parent and k:GetAttribute('KeeperAttackAt')==at and (k:GetAttribute('TargetUserId')or 0)==0 then k:SetAttribute('KeeperAttackAt',nil);k:SetAttribute('GuardianBehavior',state);k:SetAttribute('VeiledAwakeAt',awake)end end)
+  return true,'Smack pose preview. No player is hit.'
+ elseif action=='routes'then
+  local r=require(RS.RouteBalance83);local lines={'R84 route: '..(r.End-r.Start)..' studs | special keeper '..r.EventSpeed}
+  for _,id in ipairs(r.Order)do table.insert(lines,ctx.Config.BiomeNames[id]..': '..r.Lengths[id]..' studs | keeper '..table.concat(r.KeeperSpeeds[id],'/'))end
+  return true,table.concat(lines,'\n')
+ elseif action=='spawnodds'then
+  local lines={'Natural spawn chance per slot (pity can add guarantees):'}
+  for i,n in ipairs(require(RS.RouteBalance83).SpawnWeights)do table.insert(lines,Packs.PackTiers[i].Name..': '..n..'%')end
+  return true,table.concat(lines,'\n')
+ elseif action=='notice'then
+  if #a~=1 then return false,'Use notice event/legendary/mythic/giant.'end
+  local id='test:'..game:GetService('HttpService'):GenerateGUID(false)
+  if a[1]=='event'then if not event then return false,'Event not ready.'end;event.Remote:FireClient(p,0,id);return true,'Arrival notification sent to target.'end
+  local key=a[1]=='legendary'and'Pack05'or a[1]=='mythic'and'Pack06'or a[1]=='giant'and'Pack01'
+  if not key then return false,'Use notice event/legendary/mythic/giant.'end
+  local m=require(RS.RarePackRules).Message(7,key,a[1]=='giant'and 7.5 or 1,key=='Pack05'and'Gold'or'None');if not m then return false,'That pack does not meet the rare notification odds.'end;m.SpawnId=id;ctx.Chests.RarePackSpawn:FireClient(p,m)
+  return true,'Spawn notification sent to target; no world pack created.'
+ end
+ if action=='event'then
+  local mode=(a[1]or'spawn'):lower();if #a>1 then return false,'Use event spawn, clear, go or status.'end
+  if not event then return false,'Event service is not ready.'end
+  if mode=='status'then return true,'Event active: '..tostring(map:GetAttribute('VeiledEventActive'))..' | cycle '..tostring(map:GetAttribute('VeiledEventCycle')or 0)..' | reset '..tostring(map:GetAttribute('BiomeRefreshCycle')or 0)..' | captured '..tostring(map:GetAttribute('VeiledEventClaimed')==true)end
+  if mode=='spawn'or mode=='clear'then
+   if ctx.Map.Refreshing then return false,'Wait until the refresh finishes.'end
+   for _,run in pairs(ctx.Chase.Runs)do if run.Chest.EventKeeper then return false,'The event pack is being carried. Finish that chase first.'end end
+   for _,drop in pairs(ctx.Chase.Drops)do if drop.Chest.EventKeeper and not drop.Claimed then return false,'Recover the dropped event pack before replacing this event.'end end
+   if mode=='clear'then event:Clear();return true,'Event cleared.'end
+   local cycle=(math.floor((map:GetAttribute('VeiledEventCycle')or 0)/3)+1)*3
+   event:Spawn(cycle);return event.Seed~=nil,'Storm Peaks event spawned. Normal reset counter is unchanged.'
+  elseif mode=='go'then
+   local okay,why=safe(ctx,p);if not okay then return false,why end
+   if not event.Seed or not event.Seed.Model.Parent or ctx.Map.Refreshing then return false,'Spawn the event first.'end
+   local c=p.Character;local root=c and c:FindFirstChild('HumanoidRootPart');if not root then return false,'Wait for the target’s character.'end
+   ctx.Bases:StopTraining(p,false);State.ClearMovement(p)
+   root.AssemblyLinearVelocity=Vector3.zero;root.AssemblyAngularVelocity=Vector3.zero
+   c:PivotTo(event.Seed.Body.CFrame*CFrame.new(0,0,-10));require(script.Parent.MovementGuard).Reset(p)
+   return true,'Teleported near the Void Pack.'
+  end
+  return false,'Use event spawn, clear, go or status.'
+ elseif action=='training'then
+  if #a~=0 then return false,'Use training [@username].'end
+  local points=data:GetOrCreateSpeedValue(p).Value
+  return true,'Treadmill only | base '..ctx.Config.TrainingPointsPerSecond..'/s | multiplier '..ctx.Bases:GetTreadmillMultiplier(p)..' | total '..(ctx.Config.TrainingPointsPerSecond*ctx.Bases:GetTreadmillMultiplier(p))..'/s | training '..tostring(p:GetAttribute('TreadmillTraining')==true)..' | physical '..string.format('%.2f',ctx.Config.GetPlayerWalkSpeed(p,points))..' | points '..points
+ elseif action=='odds'then
+  local st,key,luck
+  if a[1]=='event'or a[1]=='eclipse'then st=7;key='EclipseReliquary';luck=tonumber(a[2]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>2 then return false,'Use odds event [luck].'end
+  else st=stage(a[1]);key=variant(a[2]);luck=tonumber(a[3]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>3 then return false,'Use odds <biome> <tier> [luck].'end end
+  if not st or st==8 or not key or not luck or luck~=luck or luck<1 or luck>2 then return false,'Use odds storm mythic [1–2] or odds event.'end
+  local lines={key=='EclipseReliquary'and 'Void Pack | all regular Secret/Cosmic/King seeds | 1/200 normal Mech roll | luck does not affect this pack' or ctx.Config.BiomeNames[st]..' | '..Packs.GetPackTier(key).Name..' | luck '..luck};local odds=Packs.SeedOdds(ctx.Config,st,key,luck,81)
+  for _,seed in ipairs(Packs.RewardPool(ctx.Config,st,key))do local n=odds[seed.Id]or 0;if n>0 then table.insert(lines,seed.Name..': '..require(RS.OddsText85).Format(n))end end
+  return true,table.concat(lines,'\n')
+ elseif action=='pity'then
+  local cycle=integer(a[1],0,1000000);if #a~=1 or not cycle then return false,'Use pity <completed reset number>.'end
+  local plan=require(RS.PackSchedule81).Plan(cycle,table.create(35,'Pack01'),function(lo)return lo end)
+  return true,'Reset '..cycle..': 35 ordinary slots | Legendary guaranteed '..tostring(table.find(plan,'Pack05')~=nil)..' | Mythic guaranteed '..tostring(table.find(plan,'Pack06')~=nil)..' | event '..tostring(require(RS.PackSchedule81).Event(cycle))
+ elseif action=='refreshcycle'then
+  local cycle=integer(a[1],1,1000000);if #a~=1 or not cycle then return false,'Use refreshcycle <completed reset to test>.'end
+  if ctx.Map.Refreshing then return false,'Refresh already running.'end
+  map:SetAttribute('BiomeRefreshCycle',cycle-1);ctx.Chase:_beginBiomeRefresh(os.clock())
+  return true,'Refreshing in 10s • reset '..cycle
+ elseif action=='indexinfo'then
+  if #a~=1 then return false,'Use indexinfo <biome|SeedId>.'end
+  local st=stage(a[1]);local premium=data:GetPremium(p)
+  if st then return true,'Completion reward: '..T.CompletionGems[st]..' Gems | complete '..tostring(data:BiomeComplete(p,st))..' | claimed '..tostring(premium.Biomes[tostring(st)]==true)..' | pending legacy difference '..tostring((premium.BiomeBackpay81 or{})[tostring(st)]or 0)end
+  local id=seedId(a[1]);if not id then return false,'Unknown biome or SeedId.'end
+  return true,id..' | first '..tostring(T.IndexFirst[id])..' Cash | repeat '..tostring(T.IndexRepeat[id])..' Cash | claimable '..tostring(premium.SeedRewards[id]or 0)
+ end
+ local okay,why=safe(ctx,p);if not okay then return false,why end
+ if action=='fence'then
+  local tier=integer(a[1],1,7);if #a~=1 or not tier then return false,'Use fence <1–7>.'end
+  data.Fences=data.Fences or{};data.Fences[p]=tier;data:PublishFenceData(p)
+  require(script.Parent.GardenUpgradeService).Refresh(ctx.Bases,p);save(ctx,p)
+  return true,'Fence tier '..tier..'. Bonuses apply to new planting and later fruit growth.'
+ elseif action=='movespeed'then
+  if #a~=1 then return false,'Use movespeed <24–500|off>.'end
+  local n=a[1]=='off'and nil or tonumber(a[1])
+  if a[1]~='off'and(not n or n~=n or n<24 or n>500)then return false,'Physical test speed must be 24–500.'end
+  State.SetSpeed(p,n);p:SetAttribute('StudioMovementSpeedOverride',nil);applySpeed(ctx,p)
+  return true,n and('Temporary movement speed: '..n..'. Earned points unchanged.')or'Normal earned movement restored.'
+ elseif action=='animrate'then
+  if #a~=1 then return false,'Use animrate <0.1–10|off>.'end
+  local n=a[1]=='off'and nil or tonumber(a[1]);if a[1]~='off'and(not n or n~=n or n<.1 or n>10)then return false,'Animation rate must be 0.1–10.'end
+  p:SetAttribute('OwnerAnimationRate82',n);return true,n and('Temporary run animation rate: '..n..'x')or'Normal animation scaling restored.'
+ elseif action=='eclipse'or action=='packset'then
+  local count=action=='eclipse'and integer(a[1]or'1',1,20)or 6;local st=action=='eclipse'and 7 or stage(a[1])
+  if #a>1 or not count or not st or st==8 then return false,action=='eclipse'and'Use eclipse [1–20].'or'Use packset <biome>.'end
+  if #data:GetChestRecords(p)+count>ctx.Config.MaxSavedChests then return false,'Make space in the target inventory.'end
+  for i=1,count do
+   local record,reason=data:AddChest(p,{Stage=st,BagVariant=action=='eclipse'and'EclipseReliquary'or string.format('Pack%02d',i),PackSize=1,PackMutation='None',OddsVersion=81})
+   if not record then return false,'Stopped after '..(i-1)..' packs: '..tostring(reason)end
+  end
+  ctx.Chests:SyncTools(p);save(ctx,p);return true,'Added '..count..' packs with the current odds.'
+ elseif action=='gems'then
+  local amount=integer(a[2],0,require(RS.MechCatalog).MaxGems)
+  if #a~=2 or(a[1]~='set'and a[1]~='add')or not amount then return false,'Use gems set/add <amount>.'end
+  local premium=data:GetPremium(p);if a[1]=='add'then amount+=premium.Gems end
+  local pending=require(RS.SaleReceiptRules).Total(data.Gardens[p].PendingSales or{},'Gems')
+  if amount+pending>require(RS.MechCatalog).MaxGems then return false,'Gem limit includes pending rewards.'end
+  premium.Gems=amount;data:PublishPremium(p);save(ctx,p);return true,'Gems: '..amount
+ elseif action=='boots'or action=='trail'then
+  local products=action=='boots'and ctx.Config.ShopCatalog.Accessories or ctx.Config.ShopCatalog.Trails
+  local i=integer(a[1],1,#products);if #a~=1 or not i then return false,'Use '..action..' <1–'..#products..'>.'end
+  local product=products[i];data:AddBoost(p,product.Id);data:EquipBoost(p,product.Id);data:RefreshBoostMultipliers(p);save(ctx,p)
+  return true,'Unlocked '..product.Name..'. Highest owned upgrade supplies the bonus.'
+ elseif action=='bundle'then
+  if #a~=1 then return false,'Use bundle <bundle key>.'end
+  local found;for _,row in ipairs(require(RS.PremiumPricing).Bundles)do if row.Key:lower()==a[1]:lower()then found=row end end
+  if not found then return false,'Unknown bundle key. See help.'end
+  local granted,reason=data:GrantPremiumBundle(p,found.Key);if granted then applySpeed(ctx,p);save(ctx,p)end
+  return granted,granted and('Test grant: '..found.Name..'. No purchase charged.')or tostring(reason)
+ elseif action=='claimindex'then
+  if #a~=1 then return false,'Use claimindex <biome|SeedId>.'end
+  local st=stage(a[1]);if st then return data:ClaimIndexBiome(p,st)end
+  local id=seedId(a[1]);if not id then return false,'Unknown biome or SeedId.'end
+  return data:ClaimIndexSeed(p,id)
+ end
+ return false,'Unknown update command.'
+end
+return X

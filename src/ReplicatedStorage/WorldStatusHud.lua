@@ -1,0 +1,127 @@
+-- R71: distinct icon-only boosts; the refresh timer uses the existing night moon.
+local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Input=game:GetService('UserInputService');local Gui=game:GetService('GuiService');local Tween=game:GetService('TweenService')
+local Layout=require(RS.HudLayout);local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI);local State=require(RS.WorldStatusState);local Balance=require(RS.BalanceRules)
+local H={};local C=Color3.fromRGB
+function H.Boosts(player)
+ local tier=math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)
+ local speed=Balance.Training(Balance.TrainingTiers[tier]or 1,player:GetAttribute('TreadmillMultiplier'),player:GetAttribute('DoubleSpeedOwned')==true)
+ local luck=tonumber(player:GetAttribute('ChestLuckMultiplier'))or 1
+ if luck~=luck or luck==math.huge or luck==-math.huge then luck=1 end
+ return speed,math.clamp(luck,1,2)
+end
+function H.Multiplier(n)
+ if n>=1000 then
+  local units={{1e12,'T'},{1e9,'B'},{1e6,'M'},{1e3,'K'}}
+  for _,u in ipairs(units)do if n>=u[1]then return '×'..string.format('%.2f',n/u[1]):gsub('0+$',''):gsub('%.$','')..u[2]end end
+ end
+ return '×'..string.format('%.2f',n):gsub('0+$',''):gsub('%.$','')
+end
+local colors={Clear=C(255,211,99),Snow=C(183,237,255),Rain=C(94,194,255),Blizzard=C(210,238,255),Thunderstorm=C(186,157,255),Track=C(116,243,180),Refresh=C(255,196,101)}
+local function block(parent,name,pos,size,color,radius)
+ local f=Instance.new('Frame');f.Name=name;f.Position=pos;f.Size=size;f.BackgroundColor3=color;f.BorderSizePixel=0;f.Active=false;f.Parent=parent;if radius then Theme.Corner(f,radius)end;return f
+end
+local function label(parent,name,pos,size,font)
+ local t=Instance.new('TextLabel');t.Name=name;t.Text='';t.BackgroundTransparency=1;t.Position=pos;t.Size=size;t.TextXAlignment=Enum.TextXAlignment.Left;Bright.Text(t,font);t.Parent=parent;return t
+end
+local function line(parent,x,y,w,h,angle,color)
+ local p=block(parent,'Glyph',UDim2.fromScale(x,y),UDim2.fromScale(w,h),color,2);p.AnchorPoint=Vector2.new(.5,.5);p.Rotation=angle or 0;return p
+end
+local function icon(parent,kind,color)
+ for _,p in ipairs(parent:GetChildren())do p:Destroy()end
+ require(RS.HudArtwork).Attach(parent,(kind=='Track'or kind=='Refresh')and'Moon'or'Weather'..kind)
+end
+function H.Create(pg,player)
+ local old=pg:FindFirstChild('WorldStatus');if old then old:Destroy()end
+ local gui=Instance.new('ScreenGui');gui.Name='WorldStatus';gui.ResetOnSpawn=false;gui.DisplayOrder=23;gui.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets;gui.Parent=pg
+ local root=block(gui,'StatusStack',UDim2.new(1,-12,1,-22),UDim2.fromOffset(190,82),Color3.new());root.AnchorPoint=Vector2.new(1,1);root.BackgroundTransparency=1
+ local scale=Instance.new('UIScale');scale.Parent=root
+ local rows={};local connections={};local dead=false;local elapsed=0
+ for i,name in ipairs({'Weather','Track'})do
+  local card=block(root,name,UDim2.fromOffset(0,(i-1)*43),UDim2.new(1,0,0,39),Color3.new(),7);card.BackgroundTransparency=.73
+  local glyph=block(card,'Icon',UDim2.fromOffset(7,4),UDim2.fromOffset(30,30),Color3.new());glyph.BackgroundTransparency=1
+  local time=label(card,'Time',UDim2.fromOffset(44,1),UDim2.new(1,-51,1,-2),28);time.TextXAlignment=Enum.TextXAlignment.Right;time.TextStrokeTransparency=.08
+  rows[name]={Root=card,Glyph=glyph,Time=time}
+ end
+ local special=block(root,'SpecialKeeper',UDim2.fromOffset(0,0),UDim2.fromOffset(190,39),C(26,17,42),7);special.Visible=false;special.BackgroundTransparency=.18
+ local specialTitle=label(special,'Title',UDim2.fromOffset(9,0),UDim2.new(1,-18,0,21),18);specialTitle.Text='THE VEILED ONE';specialTitle.TextColor3=C(229,205,255);specialTitle.TextXAlignment=Enum.TextXAlignment.Center
+ local specialHint=label(special,'Hint',UDim2.fromOffset(9,20),UDim2.new(1,-18,0,16),12);specialHint.TextColor3=C(201,190,225);specialHint.TextXAlignment=Enum.TextXAlignment.Center
+ local boostRows={};local hasBoosts=false
+ for i,name in ipairs({'Speed gain','Pack luck'})do
+  local card=block(root,i==1 and'SpeedBoost'or'LuckBoost',UDim2.fromOffset(0,(i-1)*43),UDim2.fromOffset(137,39),Color3.new());card.BackgroundTransparency=1;card.Visible=false
+  local glyph=block(card,'Icon',UDim2.fromOffset(0,1),UDim2.fromOffset(37,37),Color3.new());glyph.BackgroundTransparency=1
+  require(RS.HudArtwork).Attach(glyph,i==1 and'Bolt'or'Clover')
+  local value=label(card,'Value',UDim2.fromOffset(39,1),UDim2.fromOffset(94,37),26);value.TextXAlignment=Enum.TextXAlignment.Right
+  value.TextColor3=i==1 and C(255,211,99)or C(116,243,180);require(RS.GardenTextFit).Attach(value,26,16)
+  boostRows[i]={Root=card,Value=value,Label=name}
+ end
+ local function paint(row,data,key)
+  row.Time.Text=data.Time;row.Time.TextColor3=colors[key]or colors.Clear
+  row.Root:SetAttribute('AccessibleLabel',data.Title..' '..data.Time)
+  if row.Kind~=key then row.Kind=key;icon(row.Glyph,key,colors[key]or colors.Clear);row.Root:SetAttribute('StatusKind',key)end
+ end
+ local function update(now)
+  if dead then return end
+  local camera=workspace.CurrentCamera;local viewport=require(RS.HudLayout).Viewport(gui)
+  local m=require(RS.HudLayout).Read(viewport,Input.TouchEnabled,Layout.Controls(gui))
+  local map=workspace:FindFirstChild('ChestChaseMap');local event=map and map:GetAttribute('VeiledEventActive')==true
+  special.Visible=event
+  specialHint.Text=player:GetAttribute('SpecialKeeperChase84')and'CHASING YOU' or'AT STORM PEAKS'
+  scale.Scale=m.StatusScale
+  if m.Phone then
+   local width=m.StatusHorizontal and 388 or 190
+   root.Size=UDim2.fromOffset(width,m.StatusHorizontal and 39 or 82)
+   for i,name in ipairs({'Weather','Track'})do
+    rows[name].Root.Position=UDim2.fromOffset(m.StatusHorizontal and (i-1)*198 or 0,m.StatusHorizontal and 0 or (i-1)*43)
+    rows[name].Root.Size=UDim2.fromOffset(190,39)
+   end
+   -- Boosts and the event stay beside the rail; they never move the timers or balances.
+   local belowY=(m.SpeedY+m.WalletHeight+6-m.StatusTop)/m.StatusScale
+   for i,row in ipairs(boostRows)do
+    row.Root.Position=m.WalletHorizontal and UDim2.fromOffset(width-282+(i-1)*145,belowY)or UDim2.fromOffset(m.StatusSideRight-137,(i-1)*43)
+   end
+   special.Position=m.WalletHorizontal and UDim2.fromOffset(width-480,belowY)or UDim2.fromOffset(m.StatusSideRight-190,86)
+  else
+   local offset=event and 43 or 0
+   local stacked=m.StatusStacked and hasBoosts
+   root.Size=UDim2.fromOffset(hasBoosts and not stacked and 337 or 190,82+offset+(stacked and 86 or 0));
+   special.Position=UDim2.fromOffset(hasBoosts and not stacked and 147 or 0,0)
+   for i,row in ipairs(boostRows)do row.Root.Position=UDim2.fromOffset(stacked and 26 or 0,offset+(i-1)*43)end
+   scale.Scale=m.StatusScale
+   for i,name in ipairs({'Weather','Track'})do
+   rows[name].Root.Position=UDim2.fromOffset(hasBoosts and not stacked and 147 or 0,offset+(stacked and 86 or 0)+(i-1)*43);rows[name].Root.Size=UDim2.fromOffset(190,39)
+   end
+  end
+  root.AnchorPoint=Vector2.new(1,m.StatusTop and 0 or 1)
+  root.Position=m.StatusTop and UDim2.new(1,-12,0,m.StatusTop)or UDim2.new(1,-12,1,-m.StatusBottom)
+  root.Visible=pg:GetAttribute('SeedMenu')==nil
+  local character=player.Character;local hum=character and character:FindFirstChildOfClass('Humanoid');local part=character and character:FindFirstChild('HumanoidRootPart')
+  local point=part and hum and hum.Health>0 and part.Position or nil
+  local weather,track=State.Read(RS,workspace:FindFirstChild('ChestChaseMap'),point,now or workspace:GetServerTimeNow())
+  paint(rows.Weather,weather,weather.Kind);paint(rows.Track,track,track.Closed and'Refresh'or'Track')
+ end
+ local function updateBoosts()
+  local values={H.Boosts(player)};hasBoosts=false
+  for i,row in ipairs(boostRows)do
+   local active=values[i]>1;row.Root.Visible=active;hasBoosts=hasBoosts or active
+   local text=H.Multiplier(values[i]);if row.Value.Text~=text then row.Value.Text=text end
+   row.Root:SetAttribute('AccessibleLabel',row.Label..' ×'..tostring(values[i]))
+   if i==1 then row.Root:SetAttribute('PointsPerSecond',100*values[i]);row.Root:SetAttribute('Breakdown',tostring(Balance.TrainingTiers[math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)])..' machine × '..tostring(player:GetAttribute('TreadmillMultiplier')or 1)..' trail × '..(player:GetAttribute('DoubleSpeedOwned')and'2' or'1')..' pass')end
+  end
+  update()
+ end
+ for _,attribute in ipairs({'TreadmillTier','TreadmillMultiplier','ChestLuckMultiplier','DoubleSpeedOwned'})do
+  connections[#connections+1]=player:GetAttributeChangedSignal(attribute):Connect(updateBoosts)
+ end
+ connections[#connections+1]=Run.Heartbeat:Connect(function(dt)elapsed+=dt;if elapsed>=.25 then elapsed=0;update()end end)
+ connections[#connections+1]=pg:GetAttributeChangedSignal('SeedMenu'):Connect(function()root.Visible=pg:GetAttribute('SeedMenu')==nil end)
+ local stopLayout
+ local function cleanup()
+  if dead then return end;dead=true
+  if stopLayout then stopLayout()end
+  for _,c in ipairs(connections)do c:Disconnect()end
+ end
+ connections[#connections+1]=gui.Destroying:Connect(cleanup)
+ updateBoosts();stopLayout=Layout.Watch(gui,function()update()end)
+ return {Gui=gui,Update=update,Destroy=function()cleanup();gui:Destroy()end}
+end
+return H
