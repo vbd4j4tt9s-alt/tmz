@@ -35,7 +35,7 @@ function R.Message(stage,variant,size,mutation,context)
  local words={};local weather=W.Key(context and context.Weather)
  if weather~='None'then table.insert(words,W.Display(weather))end
  if mutation~='None'then table.insert(words,mutation)end
- if size~=1 then table.insert(words,tostring(size)..'x')end -- R112: size text -> ItemWeight
+ if size~=1 then local ok,kg=pcall(function()return require(script.Parent.ItemWeight).Text('Pack',variant,size)end);table.insert(words,ok and kg or tostring(size)..'x')end -- R112: pack weight in kg
  table.insert(words,tier.Name..' Pack')
  return {Text=table.concat(words,' '),Biome=P.DesignBiomes[stage]or'Biome',Stage=stage,Tier=tier.Name,Size=size,Mutation=mutation,Weather=weather,Probability=odds,Color=tier.Color}
 end

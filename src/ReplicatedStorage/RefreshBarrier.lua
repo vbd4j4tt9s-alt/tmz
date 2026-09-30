@@ -8,7 +8,7 @@ function B.Format(seconds)return tostring(math.max(0,math.ceil(tonumber(seconds)
 local function frame(name,parent,x,y,w,h,color,round)
  local f=Instance.new('Frame');f.Name=name;f.Position=UDim2.fromOffset(x,y);f.Size=UDim2.fromOffset(w,h)
  f.BackgroundColor3=color or Color3.new();f.BackgroundTransparency=color and 0 or 1;f.BorderSizePixel=0;f.Parent=parent
- if round then local c=Instance.new('UICorner');c.CornerRadius=round==true and UDim.new(.5,0)or UDim.new(0,round);c.Parent=f end
+ if round then local c=Instance.new('UICorner');c.CornerRadius=UDim.new(.5,0);c.Parent=f end
  return f
 end
 local function stroke(parent,thickness)
@@ -45,10 +45,10 @@ function B.Build(line,startZ,parent)
   gui.CanvasSize=canvas;gui.LightInfluence=0;gui.Brightness=1;gui.Parent=wall
   -- Unlit full-face paper: the wall reads flat white under the black refresh sky.
   local panel=frame('NightSign',gui,0,0,canvas.X,canvas.Y,B.Paper)
-  local sign=frame('Sign',panel,0,0,730,300);sign.AnchorPoint=Vector2.new(.5,.5);sign.Position=UDim2.fromScale(.5,1-B.SignHeight)
+  local sign=frame('Sign',panel,0,0,760,300);sign.AnchorPoint=Vector2.new(.5,.5);sign.Position=UDim2.fromScale(.5,1-B.SignHeight)
   icon(sign,0,10)
   local scale=2.6
-  local count=Instance.new('TextLabel');count.Name='Count';count.AnchorPoint=Vector2.new(0,.5);count.Position=UDim2.fromOffset(310,150)
+  local count=Instance.new('TextLabel');count.Name='Count';count.AnchorPoint=Vector2.new(0,.5);count.Position=UDim2.fromOffset(340,150)
   count.Size=UDim2.fromOffset(math.floor(420/scale),math.floor(300/scale));count.BackgroundTransparency=1;count.Font=Enum.Font.FredokaOne
   count.Text=B.Format(10);count.TextSize=100;count.TextColor3=B.Ink;count.TextStrokeTransparency=1;count.TextXAlignment=Enum.TextXAlignment.Left;count.Parent=sign
   local grow=Instance.new('UIScale');grow.Scale=scale;grow.Parent=count -- TextSize caps at 100 px
