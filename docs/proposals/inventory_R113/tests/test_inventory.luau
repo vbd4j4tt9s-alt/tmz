@@ -124,12 +124,13 @@ W.UIS.InputChanged:Fire({UserInputType=R.Enum.UserInputType.MouseMovement,Positi
 W.UIS.InputEnded:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,Position=R.Vector3.new(tp.X,tp.Y,0)});frames(5)
 check(dock.Slot5.ItemName.Text=='Golden Idol','drag places item on slot 5')
 panel.Categories.All.Activated:Fire();frames(5)
--- Low graphics: flat icons only.
-player:SetAttribute('FastMode',true);frames(30)
+-- R113b: the automatic frame-rate mode (FastMode) keeps the pictures; only the player's own Low setting flattens them.
+player:SetAttribute('FastMode',true);frames(30);check(P.Stats().Views>10,'auto fast mode keeps pictures ('..P.Stats().Views..')')
+player:SetAttribute('FastMode',false);player:SetAttribute('QualityChoice','Low');frames(30)
 check(P.Stats().Views==0,'low graphics: no viewports ('..P.Stats().Views..')')
 local flatShown=0;for i=1,10 do local p=dock['Slot'..i].Picture;if p:FindFirstChild('FlatIcon')and p.FlatIcon.Visible then flatShown+=1 end end
 check(flatShown==10,'low graphics: flat icons in every slot '..flatShown)
-player:SetAttribute('FastMode',false);frames(60);check(P.Stats().Views>10,'pictures come back')
+player:SetAttribute('QualityChoice','Auto');frames(60);check(P.Stats().Views>10,'pictures come back')
 -- Close; hidden pictures are released after the grace period.
 key('Escape');frames(20);check(not panel.Visible,'Esc closes');frames(60*4)
 check(P.Stats().Views<=10,'hidden grid releases views: '..P.Stats().Views);check(P.Stats().Spare<=P.MaxSpare,'parked views bounded '..P.Stats().Spare)

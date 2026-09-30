@@ -1,17 +1,16 @@
--- R113: BASE / TRACK fast-travel buttons beside the menu hub. The server checks every request
+-- R113b: BASE / TRACK fast-travel rectangles, centred in Roblox's top bar row (owner request). The server checks every request
 -- (FastTravelService); this script only shows the buttons, the shared cooldown and a dimmed state.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
 local remotes=RS:WaitForChild('ChestChaseRemotes')
 local requestBase=remotes:WaitForChild('RequestBaseTeleport');local requestTrack=remotes:WaitForChild('RequestTrackTeleport')
-local Layout=require(RS:WaitForChild('HudLayout'));local Bright=require(RS:WaitForChild('BrightUI'));local Fit=require(RS:WaitForChild('GardenTextFit'))
+local Bright=require(RS:WaitForChild('BrightUI'));local Fit=require(RS:WaitForChild('GardenTextFit'))
 local Icons=require(RS:WaitForChild('VectorIcons91'))
 local old=pg:FindFirstChild('TravelButtons');if old then old:Destroy()end
 -- Below the tutorial card (25) and the menu hub (33): anything important draws above these buttons.
-local gui=Instance.new('ScreenGui');gui.Name='TravelButtons';gui.ResetOnSpawn=false;gui.DisplayOrder=24;gui.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
+local gui=Instance.new('ScreenGui');gui.Name='TravelButtons';gui.ResetOnSpawn=false;gui.DisplayOrder=24;gui.ScreenInsets=Enum.ScreenInsets.TopbarSafeInsets;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
 local holder=Instance.new('Frame');holder.Name='TravelPair';holder.BackgroundTransparency=1;holder.Visible=false;holder.Parent=gui
-local connections={};local metrics;local lastSent=0
-local function px(value,size)return math.floor(value*size/48+.5)end
+local connections={};local lastSent=0
 local function make(name,caption,icon,color,remote,order)
  local b=Instance.new('TextButton');b.Name=name;b.Text='';b.BorderSizePixel=0;b.ZIndex=10;b.LayoutOrder=order;b.Parent=holder
  Bright.Button(b,color);b:SetAttribute('AccessibleLabel',caption=='BASE'and'Teleport to your base'or'Teleport to the front of the track')
@@ -44,31 +43,25 @@ local function paint()
  elseif left<=0 and cooling then cooling:Disconnect();cooling=nil end
 end
 local function refresh()
- local t=metrics and metrics.Travel
- local card=tonumber(pg:GetAttribute('TutorialCardBottom'))
- holder.Visible=t~=nil and pg:GetAttribute('TitleActive')~=true and pg:GetAttribute('SeedMenu')==nil
-  and not(t.UnderWheel and pg:GetAttribute('GardenMenuExpanded')==true)
-  -- The tutorial card has priority on small screens: step aside while it reaches down to the pair.
-  and not(card and card+6>t.Y)
+ holder.Visible=pg:GetAttribute('TitleActive')~=true and pg:GetAttribute('SeedMenu')==nil
 end
-local function layout(m)
- metrics=m;local t=m.Travel
- if t then
-  holder.Position=UDim2.fromOffset(t.X,t.Y);holder.Size=UDim2.fromOffset(t.W,t.H)
-  for i,entry in ipairs({base,track})do
-   local k=i-1;local size=t.Size
-   entry.Button.Size=UDim2.fromOffset(size,size)
-   entry.Button.Position=UDim2.fromOffset(t.Horizontal and k*(size+t.Gap)or 0,t.Horizontal and 0 or k*(size+t.Gap))
-   local captionHeight=px(14,size);local iconSide=size-captionHeight-px(4,size)
-   entry.Icon.Position=UDim2.new(.5,0,0,px(3,size));entry.Icon.Size=UDim2.fromOffset(iconSide,iconSide)
-   entry.Caption.Position=UDim2.new(0,0,1,-captionHeight);entry.Caption.Size=UDim2.new(1,0,0,captionHeight);entry.Caption.TextSize=px(10,size)
-   Fit.Attach(entry.Caption,px(10,size),px(8,size))
-  end
+-- The top bar row between Roblox's own buttons: two rectangles, icon left and caption right, centred.
+local function layout()
+ local area=gui.AbsoluteSize;if area.X<=0 or area.Y<=0 then return end
+ local gap=8;local height=math.clamp(area.Y-8,30,44);local width=math.floor(math.clamp((area.X-16-gap)/2,72,132))
+ holder.AnchorPoint=Vector2.new(.5,.5);holder.Position=UDim2.fromScale(.5,.5);holder.Size=UDim2.fromOffset(width*2+gap,height)
+ for i,entry in ipairs({base,track})do
+  entry.Button.Size=UDim2.fromOffset(width,height);entry.Button.Position=UDim2.fromOffset((i-1)*(width+gap),0)
+  local icon=height-10
+  entry.Icon.AnchorPoint=Vector2.new(0,.5);entry.Icon.Position=UDim2.new(0,6,.5,0);entry.Icon.Size=UDim2.fromOffset(icon,icon)
+  entry.Caption.Position=UDim2.fromOffset(icon+10,0);entry.Caption.Size=UDim2.new(1,-icon-16,1,0)
+  local font=math.clamp(math.floor(height*.42),12,18);entry.Caption.TextSize=font;Fit.Attach(entry.Caption,font,10)
  end
  refresh()
 end
-local stopLayout=Layout.Watch(gui,layout)
-for _,key in ipairs({'TitleActive','SeedMenu','GardenMenuExpanded','TutorialCardBottom'})do connections[#connections+1]=pg:GetAttributeChangedSignal(key):Connect(refresh)end
+local sized=gui:GetPropertyChangedSignal('AbsoluteSize'):Connect(layout);task.defer(layout)
+local function stopLayout()sized:Disconnect()end
+for _,key in ipairs({'TitleActive','SeedMenu'})do connections[#connections+1]=pg:GetAttributeChangedSignal(key):Connect(refresh)end
 for _,key in ipairs({'FastTravelReadyAt','ChestChaseSeedCarrying','ChestChaseRunActive','TreadmillTraining','GuardianRagdollActive','GuardianFlingActive'})do connections[#connections+1]=player:GetAttributeChangedSignal(key):Connect(paint)end
 paint();refresh()
 gui.Destroying:Connect(function()

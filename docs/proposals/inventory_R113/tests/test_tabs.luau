@@ -58,6 +58,7 @@ for _,v in ipairs(views)do
    local r={N=name,X=fx+b.Position.X.Offset,Y=fy+b.Position.Y.Offset,W=b.Size.X.Offset,H=b.Size.Y.Offset}
    if ov(r,sheet,0)then problems[#problems+1]=name..' inside sheet'end
    if r.X<0 or r.Y<0 or r.X+r.W>w or r.Y+r.H>h then problems[#problems+1]=name..' offscreen'end
+   if mode~='row'and(r.Y<sheet.Y or r.Y+r.H>sheet.Y+sheet.H)then problems[#problems+1]=name..' sticks out of sheet height'end
    if r.W<44 then problems[#problems+1]=name..' <44px'end
    for _,x in ipairs(boxes(m,w,h))do if ov(r,x,0)then problems[#problems+1]=name..'x'..x.N end end
   end

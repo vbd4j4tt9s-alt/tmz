@@ -268,7 +268,8 @@ local function placeTabs(m,w,h)
   return panel.Size.X.Offset,panel.Size.Y.Offset,panel.Position.X.Offset,panel.Position.Y.Offset
  end
  -- Left: for each card size (1 or 2 cards wide) the widest sheet whose cards clear the HUD (sliding the cards down the sheet edge,
- -- or up to 48 px above it, if needed); best grid area x card size wins, a single column preferred.
+ -- if needed; tiny screens may raise the whole sheet up to 48 px instead). R113b: cards never stick out above the
+ -- sheet's top edge (owner saw "All" poking out). Best grid area x card size wins, a single column preferred.
  local best
  local function left(t,across,minWidth,lift)
   local bw,bh=across*t+(across-1)*6,(4/across)*t+(4/across-1)*6;local width=maxWidth
@@ -277,9 +278,10 @@ local function placeTabs(m,w,h)
    if sw+bw+gap<=w-16 then
     local shifts={0};for k=8,sh,8 do if k+bh<=sh then table.insert(shifts,k)end;if k<=lift and top-k>=8 then table.insert(shifts,-k)end end
     for _,dy in ipairs(shifts)do
-     if bh-math.max(0,-dy)<=sh and clear(x,top+dy,bw,bh)then
+     if bh<=sh and clear(x,top+dy,bw,bh)then
+      -- dy<0: raise the whole sheet by -dy so the cards stay level with its top edge.
       local score=sw*sh*(t/72)*(across==1 and 1.25 or 1)*(1-math.max(0,-dy)/300)
-      if not best or score>best.Score then best={Score=score,Width=width,T=t,Across=across,Dy=dy,Shift=(bw+gap)/2}end
+      if not best or score>best.Score then best={Score=score,Width=width,T=t,Across=across,Dy=math.max(0,dy),Raise=math.max(0,-dy),Shift=(bw+gap)/2}end
       return
      end
     end
@@ -287,11 +289,11 @@ local function placeTabs(m,w,h)
    width-=20
   end
  end
- for _,lift in ipairs({48,h})do -- tiny screens may lift the cards further above the sheet
+ for _,lift in ipairs({0,48})do -- raise the sheet only when nothing fits without it
   if not best then for _,t in ipairs({72,64,56,48,44})do left(t,1,math.min(maxWidth,220),lift);left(t,2,math.min(maxWidth,220),lift)end end
  end
  if best then
-  local _,_,cx,cy=place(best.Width);panel.Position=UDim2.fromOffset(cx+best.Shift,cy);return 'Left',best.T,best.Across,best.Dy
+  local _,_,cx,cy=place(best.Width);panel.Position=UDim2.fromOffset(cx+best.Shift,cy-best.Raise);return 'Left',best.T,best.Across,best.Dy
  end
  -- Row: the sheet moves down by one card; the row sits at its left edge, right edge or centre.
  for _,t in ipairs({56,48,44})do

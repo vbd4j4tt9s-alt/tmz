@@ -29,6 +29,7 @@ local status=text(panel,'SaveStatus','',UDim2.new(0,16,1,-27),UDim2.new(1,-32,0,
 local values=Config.Read();local controls={};local dirty={};local touched={};local serial=0;local saving=false;local dead=false;local connections={}
 local function apply(key,value)
  values[key]=value;Mixer.Set(key,value)
+ if key=='Quality'then player:SetAttribute('QualityChoice',value)end -- R113b: the player's own choice (Auto/Low/...)
  if key=='Quality'and value~='Auto'then player:SetAttribute('FastMode',value=='Low')end
  local row=controls[key];if row then row.Value.Text=type(value)=='number'and value..'%'or value;if row.Fill then row.Fill.Size=UDim2.fromScale(value/100,1)end end
 end

@@ -142,9 +142,10 @@ end
 function P.Low()
  local player=Players.LocalPlayer
  local mode=player and player:GetAttribute('StudioPlantEffects')
- if mode=='off'or mode=='low'or(player and player:GetAttribute('FastMode')==true)then return true end
- local ok,low=pcall(function()return require(RS:WaitForChild('ClientFxBudget')).Low()end)
- return ok and low==true
+ -- R113b: only the player's own Low setting (or the Studio test switch) turns pictures into flat icons.
+ -- The automatic frame-rate governor (FastMode / ClientFxBudget) no longer does: it flips on in Studio Play
+ -- and on slower devices, and made every picture a flat icon. The per-frame build budget still limits cost.
+ return mode=='off'or mode=='low'or(player~=nil and player:GetAttribute('QualityChoice')=='Low')
 end
 -- 'shown' inside every clip; 'near' just outside a scroll window (kept warm for scrolling in).
 local function visible(holder)
