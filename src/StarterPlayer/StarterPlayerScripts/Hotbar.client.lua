@@ -173,7 +173,7 @@ renderRows=function()
  local used={};local last=math.min(#matched,(lastRow+1)*cols)
  for index=firstRow*cols+1,last do used[matched[index].Key]=true end
  -- R113: cards leaving the window are recycled (their picture is parked by look), never rebuilt per item.
- for key,b in pairs(rows)do if not used[key]then rows[key]=nil;Pictures.Clear(b.Picture)
+ for rowKey,b in pairs(rows)do if not used[rowKey]then rows[rowKey]=nil;Pictures.Clear(b.Picture)
   if #freeCards<32 then b.Visible=false;b.Name='SpareItem';b:SetAttribute('InventoryKey',nil);table.insert(freeCards,b)else b:Destroy()end
  end end
  for index=firstRow*cols+1,last do
