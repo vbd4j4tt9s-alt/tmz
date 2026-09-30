@@ -122,6 +122,8 @@ local render=Run.RenderStepped:Connect(function(dt)
    if not r.Sound.IsPlaying then Timing.Play(r.Sound);r.LastVoice=now end
   elseif asleep or state=='RETURNING' or distance>=110 then r.Sound:Stop() end
   r.State=state
+  -- R112: when this client first saw the attack; the wind-back restarts there instead of popping in.
+  local seenAttack=model:GetAttribute('KeeperAttackAt');if seenAttack~=r.AttackAt then r.AttackAt=seenAttack;r.AttackSeen=now end
   local onScreen=true
   if distance>160 then local _,seen=camera:WorldToViewportPoint(r.Root.Position);onScreen=seen end
   if not Budget.KeeperDue(distance,asleep,motion.Awake,onScreen,now,r.LastPose,Fx.Low())then continue end
@@ -132,7 +134,7 @@ local render=Run.RenderStepped:Connect(function(dt)
   -- R110: strike pose only while it is live. KeeperAttackAt outlives a miss, and the old 1.5 s
   -- window slid a chasing keeper in its idle pose on the raw, packet-stepped root.
   if attackAt and now>=attackAt and now-attackAt<Combat.Get(r.Stage).Windup+Combat.Recovery then
-   target=Strike.Frames(r.Stage,now,attackAt);motion.Awake=1
+   target=Strike.Frames(r.Stage,now,attackAt,r.AttackSeen and r.AttackSeen-attackAt);motion.Awake=1
   end
   if r.Surge then Surge.Step(r.Surge,motion.Frame,target,now,distance<190 and math.max(.25,motion.Awake)or 0)end
   r.Sleep:Update(asleep and motion.Awake<.15,distance,now,motion.Frame*target.Head)

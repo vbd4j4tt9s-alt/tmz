@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#9fc6e8}#l{position:absolute;left:10px;top:8px;font:15px sans-serif;color:#111;background:rgba(255,255,255,.8);padding:4px 8px;border-radius:4px}</style></head>
+<body><div id="l"></div><script type="module">
+import * as THREE from './three.module.js';const C=(r,g,b)=>new THREE.Color().setRGB(r,g,b,THREE.SRGBColorSpace);
+const q=new URLSearchParams(location.search);const kind=q.get('k'),frame=+q.get('f'),mark=q.get('m')==='1',label=q.get('label');
+const data=await (await fetch('layouts.json')).json();const d=data[kind];
+const W=900,H=620;const r=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});r.setSize(W,H);r.shadowMap.enabled=true;document.body.appendChild(r.domElement);
+const s=new THREE.Scene();s.background=new THREE.Color(0x9fc6e8);
+const R=d.radius;const cam=new THREE.PerspectiveCamera(40,W/H,.05,500);const dist=Math.max(4.2,R*3.4);cam.position.set(dist*.75,dist*.62,dist*.95);cam.lookAt(0,R*.12,0);
+s.add(new THREE.HemisphereLight(0xdfefff,0x6b5a40,1.1));const sun=new THREE.DirectionalLight(0xffffff,2.1);sun.position.set(6,12,4);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);const sc=sun.shadow.camera;sc.left=sc.bottom=-12;sc.right=sc.top=12;s.add(sun);
+const soil=new THREE.Mesh(new THREE.BoxGeometry(30,.8,30),new THREE.MeshLambertMaterial({color:C(112/255,75/255,45/255)}));soil.position.y=-.4;soil.receiveShadow=true;s.add(soil);
+const grass=new THREE.Mesh(new THREE.BoxGeometry(200,.8,200),new THREE.MeshLambertMaterial({color:0x5fa044}));grass.position.set(0,-.9,0);s.add(grass);
+// the fresh seed (PlantGrowth 'New seed' ball, ~0.3 studs)
+const seed=new THREE.Mesh(new THREE.SphereGeometry(.15,16,12),new THREE.MeshLambertMaterial({color:C(117/255,89/255,51/255)}));seed.position.y=.025+.135;seed.castShadow=true;s.add(seed);
+if(!mark){for(const c of d.frames[frame].chunks){const m=new THREE.Mesh(new THREE.BoxGeometry(c.s,c.s,c.s),new THREE.MeshLambertMaterial({color:C(...c.c)}));
+ const f=c.cf;const mat=new THREE.Matrix4().set(f[3],f[4],f[5],f[0],f[6],f[7],f[8],f[1],f[9],f[10],f[11],f[2],0,0,0,1);m.applyMatrix4(mat);m.castShadow=true;m.receiveShadow=true;s.add(m);}}
+else{const o=new THREE.Mesh(new THREE.CylinderGeometry(d.mark,d.mark,.08,40),new THREE.MeshLambertMaterial({color:C(...d.markOuter)}));s.add(o);
+ const i=new THREE.Mesh(new THREE.CylinderGeometry(d.mark*.45,d.mark*.45,.08,32),new THREE.MeshLambertMaterial({color:C(...d.markInner)}));i.position.y=.02;s.add(i);}
+// 5-stud reference post (Roblox character height)
+const post=new THREE.Mesh(new THREE.BoxGeometry(.25,5,.25),new THREE.MeshLambertMaterial({color:0xdddddd}));post.position.set(R+1.2,2.5,-R*.6);post.castShadow=true;s.add(post);
+document.getElementById('l').textContent=label+' — APPROXIMATION (three.js, not Roblox); white post = 5 studs';
+r.render(s,cam);window.done=true;
+</script></body></html>

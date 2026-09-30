@@ -2,6 +2,9 @@
 local P=require(script.Parent.SeedPackRules)
 local W=require(script.Parent.WeatherTraits)
 local R={Threshold=.01}
+-- R112: only these PackTiers are announced (owner: "legendary or above"); every such spawn is announced.
+R.NoticeTiers={Legendary=true,Mythic=true}
+function R.Notifies(tierName)return R.NoticeTiers[tierName]==true end
 function R.TierProbabilities(cycle,count)
  local weights={};for i,key in ipairs(P.VariantOrder)do weights[i]=P.Variants[key].SpawnWeight end
  local values=require(script.Parent.PackSchedule81).Probabilities(cycle or 0,count,weights)
@@ -27,11 +30,12 @@ function R.Qualifies(variant,size,mutation,context)
 end
 function R.Message(stage,variant,size,mutation,context)
  local odds=R.Probability(variant,size,mutation,context)
- if not odds or odds>=R.Threshold then return nil end
- local tier=P.GetPackTier(variant);local words={};local weather=W.Key(context and context.Weather)
+ local tier=P.GetPackTier(variant)
+ if not odds or not R.Notifies(tier.Name)then return nil end
+ local words={};local weather=W.Key(context and context.Weather)
  if weather~='None'then table.insert(words,W.Display(weather))end
  if mutation~='None'then table.insert(words,mutation)end
- if size~=1 then table.insert(words,tostring(size)..'x')end
+ if size~=1 then table.insert(words,tostring(size)..'x')end -- R112: size text -> ItemWeight
  table.insert(words,tier.Name..' Pack')
  return {Text=table.concat(words,' '),Biome=P.DesignBiomes[stage]or'Biome',Stage=stage,Tier=tier.Name,Size=size,Mutation=mutation,Weather=weather,Probability=odds,Color=tier.Color}
 end
