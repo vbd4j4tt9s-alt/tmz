@@ -14,13 +14,14 @@ One loop step = one 300 s pack refresh (SeedPackRules.RefreshInterval):
   3. Harvest: the player spends up to GARDEN_S seconds picking the most valuable ready fruits at PICK_RATE fruits/s
      (one press per fruit, GardenHoldHarvest.lua:1), then sells everything. Fruit value x MULT (average
      size/Gold/Diamond/weather bonus measured with the real PlantRules.Fruit: +1.8%).
+  Raids stop when they would eat into GARDEN_S + MIN_TRAIN (the player keeps >= 60 s/cycle on the treadmill).
   4. Treadmill: the rest of the 300 s: 100 pts/s x machine x trail (x2 speed pass).
   5. Shopping: repeatedly buy the cheapest affordable next item among machine / trail / boot / fence (greedy).
 """
 import random, statistics, math, collections
 from live import *
 
-DEFAULTS = dict(SHARE=0.6, OVERHEAD=15.0, TARGET_BIOMES=2, CYCLE=300.0, GARDEN_S=75.0, PICK_RATE=1.0,
+DEFAULTS = dict(SHARE=0.6, OVERHEAD=15.0, TARGET_BIOMES=2, CYCLE=300.0, GARDEN_S=75.0, PICK_RATE=1.0, MIN_TRAIN=60.0,
                 GARDEN_CAP=1800, MULT=1.018, SPEED_PASS=False, GROWTH_PASS=False, BUY_FENCE=True,
                 CHECKPOINTS=(1, 5, 20, 50, 100))
 
@@ -91,15 +92,17 @@ def run_once(eco, rng, P, trace=False):
             events.setdefault('biome:' + BIOME_NAME[b], t)
         targets = list(reversed(unlocked))[:P['TARGET_BIOMES']]
         left = P['CYCLE']
+        raid_left = P['CYCLE'] - P['MIN_TRAIN'] - P['GARDEN_S']
         ftime = eco.fence_time[fence]
         for b in targets:
             avail = PACKS_PER * P['SHARE']
             whole = int(avail) + (1 if rng.random() < avail - int(avail) else 0)
             run_t = 2 * CAMP_DIST[b] / S + P['OVERHEAD']
             for _ in range(whole):
-                if left < run_t:
+                if raid_left < run_t:
                     break
                 left -= run_t
+                raid_left -= run_t
                 r = rng.random()
                 pack = next((pk for c, pk in MIX_C if r < c), PACKS[-1])
                 sid = roll(rng, b, pack, boot + 1)
@@ -150,7 +153,7 @@ def run_once(eco, rng, P, trace=False):
             src[s] -= k
             budget -= k
             used += k / P['PICK_RATE']
-            got = k * v * P['MULT']
+            got = k * v * P['MULT'] * getattr(eco, 'fence_value', [1] * 7)[fence]
             cash += got; earned += got; earned_src['fruit'] += got
         left -= used
         mult = eco.machine_mult[machine] * (eco.trail_mult[trail] if trail >= 0 else 1) * (2 if P['SPEED_PASS'] else 1)
