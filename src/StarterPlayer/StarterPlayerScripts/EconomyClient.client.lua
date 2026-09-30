@@ -701,7 +701,7 @@ local function bindGardenPrompt(prompt)
 	prompt:GetPropertyChangedSignal("Enabled"):Connect(function() refreshPrompt(prompt) end)
 	refreshPrompt(prompt)
 end
-workspace.DescendantAdded:Connect(function(item) task.defer(bindGardenPrompt, item) end)
+workspace.DescendantAdded:Connect(function(item) if item:IsA("ProximityPrompt") then task.defer(bindGardenPrompt, item) end end)
 for _, item in ipairs(workspace:GetDescendants()) do bindGardenPrompt(item) end
 playerGui:GetAttributeChangedSignal('SelectedGardenFruitIndex'):Connect(function()
  for prompt in pairs(boundPrompts)do if prompt.Parent then refreshPrompt(prompt)end end

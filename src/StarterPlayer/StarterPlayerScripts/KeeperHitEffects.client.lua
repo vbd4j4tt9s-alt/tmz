@@ -8,6 +8,7 @@ local Audio=require(RS:WaitForChild('KeeperAudio'))
 local Bat=require(RS:WaitForChild('BatConfig'))
 local Voices=require(RS:WaitForChild('KeeperVoices'))
 local Sfx=require(RS:WaitForChild('LocalSfx'))
+local KFx=require(RS:WaitForChild('KeeperFx')) -- R113: pooled ground ring + dust at a keeper hit
 local player=Players.LocalPlayer
 local remotes=RS:WaitForChild('ChestChaseRemotes',20);if not remotes then return end
 local remote=remotes:WaitForChild('KeeperHit',20);if not remote then return end
@@ -56,7 +57,15 @@ local connection=remote.OnClientEvent:Connect(function(hit)
  local snap=batHit and Bat.SlapSoundId or Audio.Asset('Impact');if snap then Sfx.Play(snap,hit.Position,batHit and Bat.SlapVolume or Audio.ImpactVolume,1,2)end
  local voice,volume,pitch=Audio.Voice(hit.Stage,'Catch',hit.VoiceId)
  if voice then Sfx.Play(voice,hit.Position,volume,pitch,3)end
- if distance<150 then burst(hit.Position)end
+ if distance<150 then
+  burst(hit.Position)
+  local look=not batHit and KFx.Stages[hit.Stage]
+  if look then
+   local ground=hit.Position-Vector3.new(0,2.8,0)
+   KFx.Ring(ground,look.Dust:Lerp(Color3.new(1,1,1),.45),3,12*math.min(1.4,look.Size),.4)
+   KFx.Burst(ground,look.Dust,hit.VictimUserId==player.UserId and 10 or 6,3*look.Size)
+  end
+ end
  local victim=hit.VictimUserId==player.UserId
  if victim or distance<38 then kick={At=os.clock(),Strength=victim and 1 or .18*(1-distance/38),Victim=victim}end
 end)

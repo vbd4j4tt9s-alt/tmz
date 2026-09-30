@@ -472,7 +472,8 @@ function BaseService:_updateTrainingPlayer(player, deltaTime)
 	local multiplier = self:GetTreadmillMultiplier(player)
 	if multiplier ~= multiplier or multiplier == math.huge then multiplier = 1 end
 	multiplier = math.max(1, multiplier)
-	player:SetAttribute("TreadmillGainPerSecond", self.Config.TrainingPointsPerSecond * multiplier)
+	local gainRate = self.Config.TrainingPointsPerSecond * multiplier
+	if player:GetAttribute("TreadmillGainPerSecond") ~= gainRate then player:SetAttribute("TreadmillGainPerSecond", gainRate) end
 	local animationSpeed = self:_getTreadmillAnimationSpeed(multiplier)
 	local previousAnimationSpeed = session.AnimationSpeed or animationSpeed
 	if session.Track and math.abs(animationSpeed - previousAnimationSpeed) > 0.001 then

@@ -14,6 +14,9 @@ local Sleep=require(Storage:WaitForChild('KeeperSleep'))
 local Surge=require(Storage:WaitForChild('KeeperSurge'))
 local Budget=require(Storage.CosmeticBudget);local Fx=require(Storage.ClientFxBudget);local Strike=require(Storage.KeeperStrikeFrames)
 local Combat=require(Storage.KeeperCombat)
+-- R113: client-only polish (look-at, wake roar, weight, follow-through, taunt), effects and accent parts.
+local Polish=require(Storage:WaitForChild('KeeperPolish'));local KFx=require(Storage:WaitForChild('KeeperFx'));local Accents=require(Storage:WaitForChild('KeeperAccents'))
+local Players=game:GetService('Players')
 local records,watchers,pending={},{},{}
 local BLACK=Color3.new(0,0,0)
 local destroyed=false
@@ -25,7 +28,7 @@ end
 
 local function clear(model)
  local record=records[model]
- if record then if record.Surge then Surge.Destroy(record.Surge)end;record.Sound:Destroy();record.Sleep:Destroy();records[model]=nil end
+ if record then if record.Surge then Surge.Destroy(record.Surge)end;KFx.Destroy(record.Fx);Accents.Destroy(record.Accents);record.Sound:Destroy();record.Sleep:Destroy();records[model]=nil end
 end
 local function bind(model)
  if destroyed then return end
@@ -57,7 +60,8 @@ local function bind(model)
  for _,p in ipairs(parts) do if p.Eye then eyes(p.Part,p.EyeColor,awake,p.TreeRest~=nil) end end
  records[model]={Root=root,Rig=rig,Parts=parts,Stage=stage,Awake=awake,
   Last=root.Position,SampleTime=0,SampleTravel=0,ObservedSpeed=0,LastVoice=-100,Sound=sound,State=state,
-  Surge=stage==7 and Surge.New(model)or nil,Motion=Motion.new(root.CFrame,awake),Sleep=Sleep.new(root,stage,Config[stage])}
+  Surge=stage==7 and Surge.New(model)or nil,Motion=Motion.new(root.CFrame,awake),Sleep=Sleep.new(root,stage,Config[stage]),
+  Polish=Polish.new(),Fx=KFx.new(root,stage),Accents=Accents.new(model,stage),PoseDt=0}
 end
 local function schedule(model)
  if pending[model] then return end
@@ -121,9 +125,21 @@ local render=Run.RenderStepped:Connect(function(dt)
    and (state~=r.State or now-r.LastVoice>(Voices[r.Stage].Gap or 6)) and now-r.LastVoice>2 then
    if not r.Sound.IsPlaying then Timing.Play(r.Sound);r.LastVoice=now end
   elseif asleep or state=='RETURNING' or distance>=110 then r.Sound:Stop() end
+  -- R113: wake roar starts when a sleeping keeper is first seen alerted.
+  local wasAsleep=r.State=='GUARDING'or r.State=='SLEEPING'
+  if wasAsleep and not asleep and state~='RETURNING'then r.WakeAt=now end
   r.State=state
   -- R112: when this client first saw the attack; the wind-back restarts there instead of popping in.
   local seenAttack=model:GetAttribute('KeeperAttackAt');if seenAttack~=r.AttackAt then r.AttackAt=seenAttack;r.AttackSeen=now end
+  -- R113: effects run every frame (footfall phase), culled by distance inside KeeperFx.
+  local character=Players.LocalPlayer and Players.LocalPlayer.Character
+  local own=character and character:FindFirstChild('HumanoidRootPart')
+  local localDistance=own and(own.Position-r.Root.Position).Magnitude or distance
+  local low=Fx.Low();local hunting=state=='CHASING'or state=='DASHING'or state=='ALERTED'or state=='ATTACKING'
+  local fxc={Now=now,Distance=distance,LocalDistance=localDistance,Asleep=asleep,Awake=motion.Awake,Moving=motion.Moving,
+   Cycle=motion.Cycle,Urgency=motion.Urgency,Chasing=hunting,Frame=motion.Frame,Frames=r.LastTarget,Low=low}
+  KFx.Step(r.Fx,fxc)
+  r.PoseDt+=dt
   local onScreen=true
   if distance>160 then local _,seen=camera:WorldToViewportPoint(r.Root.Position);onScreen=seen end
   if not Budget.KeeperDue(distance,asleep,motion.Awake,onScreen,now,r.LastPose,Fx.Low())then continue end
@@ -133,11 +149,29 @@ local render=Run.RenderStepped:Connect(function(dt)
   local attackAt=model:GetAttribute('KeeperAttackAt')
   -- R110: strike pose only while it is live. KeeperAttackAt outlives a miss, and the old 1.5 s
   -- window slid a chasing keeper in its idle pose on the raw, packet-stepped root.
-  if attackAt and now>=attackAt and now-attackAt<Combat.Get(r.Stage).Windup+Combat.Recovery then
-   target=Strike.Frames(r.Stage,now,attackAt,r.AttackSeen and r.AttackSeen-attackAt);motion.Awake=1
+  local windup=Combat.Get(r.Stage).Windup;local striking=false
+  if attackAt and now>=attackAt and now-attackAt<windup+Combat.Recovery then
+   target=Strike.Frames(r.Stage,now,attackAt,r.AttackSeen and r.AttackSeen-attackAt);motion.Awake=1;striking=true
   end
+  -- R113: taunt once after a landed catch; slam dust at the visual impact.
+  local lastHit=model:GetAttribute('KeeperLastHitAt')
+  if attackAt and type(lastHit)=='number'and lastHit>=attackAt and r.TauntFor~=attackAt then r.TauntFor=attackAt;r.TauntAt=attackAt+windup+Combat.Recovery end
+  if attackAt and now>=attackAt+windup and r.SlamFor~=attackAt then
+   r.SlamFor=attackAt;if now-attackAt-windup<.2 then fxc.Frames=target;KFx.Slam(r.Fx,fxc)end
+  end
+  local look
+  if not asleep then
+   local id=model:GetAttribute('TargetUserId');local who=type(id)=='number'and id>0 and Players:GetPlayerByUserId(id)
+   local body=who and who.Character and who.Character:FindFirstChild('HumanoidRootPart')
+   if body and (body.Position-r.Root.Position).Magnitude<90 then look=body.Position end
+  end
+  target=Polish.Apply(r.Polish,r.Stage,target,{Now=now,Dt=r.PoseDt,Awake=motion.Awake,Moving=motion.Moving,Speed=motion.Speed,
+   Frame=motion.Frame,Asleep=asleep,Look=look,Stir=asleep and localDistance<24,Strike=striking,
+   Impact=attackAt and attackAt+windup,WakeAt=r.WakeAt,TauntAt=r.TauntAt})
+  r.PoseDt=0;r.LastTarget=target
+  if r.WakeAt and r.WakeFxFor~=r.WakeAt then r.WakeFxFor=r.WakeAt;fxc.Frames=target;KFx.Wake(r.Fx,fxc)end
   if r.Surge then Surge.Step(r.Surge,motion.Frame,target,now,distance<190 and math.max(.25,motion.Awake)or 0)end
-  r.Sleep:Update(asleep and motion.Awake<.15,distance,now,motion.Frame*target.Head)
+  r.Sleep:Update(asleep and motion.Awake<.15,distance,now,motion.Frame*target.Head,low)
   -- R78: full-rate nearby combat; distant geometry updates use bounded LOD.
   for _,p in ipairs(r.Parts)do if p.Part.Parent then
    local pose,size=UpgradePose.PartPose(p.Rest,p.TreeRest or p.IdleRest,p.Size,p.TreeSize or p.IdleSize,target[p.Group],motion.Awake)
@@ -145,6 +179,7 @@ local render=Run.RenderStepped:Connect(function(dt)
    if (p.TreeRest or p.IdleRest)and p.Part.Size~=size then p.Part.Size=size end
    if p.Eye and p.LastEyeAwake~=motion.Awake then eyes(p.Part,p.EyeColor,motion.Awake,p.TreeRest~=nil);p.LastEyeAwake=motion.Awake end
   end end
+  Accents.Pose(r.Accents,target,motion.Frame,motion.Awake,now,hunting and not asleep,moveParts,moveFrames)
  end
  if #moveParts>0 then workspace:BulkMoveTo(moveParts,moveFrames,Enum.BulkMoveMode.FireCFrameChanged)end
 end)

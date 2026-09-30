@@ -16,7 +16,7 @@ end
 function Art.Dress(model,stage)
  local existing=model:FindFirstChild('BeastBody')
  if model:GetAttribute('GardenerArtVersion')==99 and model:GetAttribute('KeeperClientAnimated')==true
-  and existing and existing:GetAttribute('VisualVersion')==version(stage) then return model end
+  and existing and existing:GetAttribute('VisualVersion')==version(stage) then Upgrades.Refinish(existing,stage);return model end
  local root=assert(model:FindFirstChild('HumanoidRootPart') or model.PrimaryPart,'Keeper root missing')
  local rig=Art.Build(stage);rig.Name='BeastBody'
  local initial=stage==5 and require(game:GetService('ReplicatedStorage').KeeperUpgradePose).Frames(5,0,0,0,0,0,0,0)

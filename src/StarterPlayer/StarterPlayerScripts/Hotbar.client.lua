@@ -160,7 +160,8 @@ renderRows=function()
   table.sort(matched,function(a,b)return a.Entry.Order<b.Entry.Order end);listDirty=false
   for name,b in pairs(filterButtons)do b.BackgroundColor3=name==category and C.TileOn or C.Tile;b:SetAttribute('Selected',name==category)end
  end
- local width=scroll.AbsoluteSize.X;local side=width<400 and 84 or width<640 and 92 or 104;local cell=side+8;local cols=math.max(1,math.floor((math.max(1,width-12)+8)/cell))
+ local width=scroll.AbsoluteSize.X;local side=width<400 and 84 or width<640 and 92 or 104;side=math.max(64,math.min(side,scroll.AbsoluteSize.Y-8)) -- R113: short grids get smaller cards.
+ local cell=side+8;local cols=math.max(1,math.floor((math.max(1,width-12)+8)/cell))
  local canvas=math.ceil(#matched/cols)*cell+8
  local y=math.clamp(scroll.CanvasPosition.Y,0,math.max(0,canvas-scroll.AbsoluteSize.Y))
  -- R113: two rows kept above and below the view, so cards (and their pictures) are ready before they scroll in.
@@ -253,7 +254,7 @@ local function hudBoxes(m,w,h)
  end
  return b
 end
--- Places the sheet and returns how the category cards go: 'Column' (left of the sheet) or 'Row' (above it, at x).
+-- Places the sheet and returns where the category cards go: 'Left' of the sheet (1 or 2 cards wide) or a 'Row' above it.
 local function placeTabs(m,w,h)
  local boxes=hudBoxes(m,w,h);local gap=8
  local function clear(x,y,bw,bh)
@@ -264,27 +265,42 @@ local function placeTabs(m,w,h)
  local maxWidth,wanted=math.min(900,w*.86),math.min(620,h*.66)
  local function place(width)
   MenuStyle.Place(panel,pg,width,wanted)
-  local sw,sh=panel.Size.X.Offset,panel.Size.Y.Offset;return sw,sh,panel.Position.X.Offset,panel.Position.Y.Offset
+  return panel.Size.X.Offset,panel.Size.Y.Offset,panel.Position.X.Offset,panel.Position.Y.Offset
  end
- -- Column: the sheet narrows (the pair stays centred) until the cards clear the HUD.
- for _,t in ipairs({72,64,56,48})do
-  local width=maxWidth
-  while width>=math.min(maxWidth,420)do
-   local sw,sh,cx,cy=place(width);cx+=(t+gap)/2
-   if sw+t+gap<=w-16 and 4*t+18<=sh and clear(cx-sw/2-gap-t,cy-sh/2,t,4*t+18)then panel.Position=UDim2.fromOffset(cx,cy);return 'Column',t,0 end
-   width-=40
+ -- Left: for each card size (1 or 2 cards wide) the widest sheet whose cards clear the HUD (sliding the cards up or
+ -- down along the sheet edge if needed); the arrangement leaving the biggest grid wins, bigger cards breaking ties.
+ local best
+ local function left(t,across,minWidth)
+  local bw,bh=across*t+(across-1)*6,(4/across)*t+(4/across-1)*6;local width=maxWidth
+  while width>=minWidth do
+   local sw,sh,cx,cy=place(width);cx+=(bw+gap)/2;local top=cy-sh/2;local x=cx-sw/2-gap-bw
+   if sw+bw+gap<=w-16 then
+    local shifts={0};for k=8,sh,8 do if k+bh<=sh then table.insert(shifts,k)end;if top-k>=8 then table.insert(shifts,-k)end end
+    for _,dy in ipairs(shifts)do
+     if bh-math.max(0,-dy)<=sh and clear(x,top+dy,bw,bh)then
+      local score=sw*sh*(.7+.3*t/72)*(across==1 and 1.05 or 1)
+      if not best or score>best.Score then best={Score=score,Width=width,T=t,Across=across,Dy=dy,Shift=(bw+gap)/2}end
+      return
+     end
+    end
+   end
+   width-=20
   end
+ end
+ for _,t in ipairs({72,64,56,48,44})do left(t,1,math.min(maxWidth,220));left(t,2,math.min(maxWidth,220))end
+ if best then
+  local _,_,cx,cy=place(best.Width);panel.Position=UDim2.fromOffset(cx+best.Shift,cy);return 'Left',best.T,best.Across,best.Dy
  end
  -- Row: the sheet moves down by one card; the row sits at its left edge, right edge or centre.
  for _,t in ipairs({56,48,44})do
   local sw,sh,cx,cy=place(maxWidth);local rowWidth=4*t+18;local top=cy-sh/2
   if sh-t-gap>=180 then
    for _,x in ipairs({0,sw-rowWidth,(sw-rowWidth)/2})do
-    if clear(cx-sw/2+x,top,rowWidth,t)then panel.Size=UDim2.fromOffset(sw,sh-t-gap);panel.Position=UDim2.fromOffset(cx,cy+(t+gap)/2);return 'Row',t,x end
+    if clear(cx-sw/2+x,top,rowWidth,t)then panel.Size=UDim2.fromOffset(sw,sh-t-gap);panel.Position=UDim2.fromOffset(cx,cy+(t+gap)/2);return 'Row',t,4,x end
    end
   end
  end
- local sw,sh,cx,cy=place(maxWidth);panel.Size=UDim2.fromOffset(sw,sh-52);panel.Position=UDim2.fromOffset(cx,cy+26);return 'Row',44,0
+ local sw,sh,cx,cy=place(maxWidth);panel.Size=UDim2.fromOffset(sw,sh-52);panel.Position=UDim2.fromOffset(cx,cy+26);return 'Row',44,4,0
 end
 layout=function()
  local camera=workspace.CurrentCamera;local view=require(RS.HudLayout).Viewport(gui);local width=view.X
@@ -308,19 +324,27 @@ layout=function()
  open.Size=UDim2.fromOffset(side,side);open.Position=UDim2.new(1,-side,0,0)
  if pg:GetAttribute('ChestHotbarReserve')~=side+78 then pg:SetAttribute('ChestHotbarReserve',side+78)end
  local height=view.Y
- -- R113: category cards sit outside the sheet: a column on its left, else a row above it; never over the HUD.
- local mode,tab,rowX=placeTabs(metrics,width,height)
+ -- R113: category cards sit outside the sheet: a column (or 2x2 block) on its left, else a row above it; never over the HUD.
+ local mode,tab,across,rowX=placeTabs(metrics,width,height) -- rowX: row x, or the column's vertical shift
  local sheetWidth,sheetHeight=panel.Size.X.Offset,panel.Size.Y.Offset;local title=panel.Title
- local tabGap=8;local caption=math.max(11,math.floor(tab*.2))
- if mode=='Column'then filters.Position=UDim2.fromOffset(-(tab+tabGap),0);filters.Size=UDim2.fromOffset(tab,4*tab+18)
- else filters.Position=UDim2.fromOffset(rowX,-(tab+tabGap));filters.Size=UDim2.fromOffset(4*tab+18,tab)end
+ local tabGap=8;local caption=math.max(11,math.floor(tab*.2));local blockWidth,blockHeight=across*tab+(across-1)*6,(4/across)*tab+(4/across-1)*6
+ if mode=='Left'then filters.Position=UDim2.fromOffset(-(blockWidth+tabGap),rowX)else filters.Position=UDim2.fromOffset(rowX,-(tab+tabGap))end
+ filters.Size=UDim2.fromOffset(blockWidth,blockHeight)
  for i,name in ipairs({'All','Seeds','Fruit','Tools'})do
-  local b=filterButtons[name];local at=(i-1)*(tab+6);b.Size=UDim2.fromOffset(tab,tab)
-  b.Position=mode=='Column'and UDim2.fromOffset(0,at)or UDim2.fromOffset(at,0)
+  local b=filterButtons[name];b.Size=UDim2.fromOffset(tab,tab);b.Position=UDim2.fromOffset((i-1)%across*(tab+6),math.floor((i-1)/across)*(tab+6))
   b.Picture.Position=UDim2.fromOffset(4,3);b.Picture.Size=UDim2.new(1,-8,1,-(caption+7))
   b.Caption.Position=UDim2.new(0,2,1,-(caption+4));b.Caption.Size=UDim2.new(1,-4,0,caption+2);Fit.Attach(b.Caption,caption,8)
  end
- if sheetWidth>=560 then
+ local short=sheetHeight<300 and sheetWidth>=440;panel.Hint.Visible=not short
+ if short then
+  -- Short sheets (landscape phones): title, search and rarity share the header; the grid gets the rest.
+  local rarityWidth=math.min(150,math.floor(sheetWidth*.24));local searchWidth=math.clamp(sheetWidth-(126+rarityWidth+66),110,260)
+  title.Size=UDim2.fromOffset(110,36)
+  search.Position=UDim2.new(1,-(searchWidth+rarityWidth+66),0,12);search.Size=UDim2.fromOffset(searchWidth,30)
+  rarityFilter.Position=UDim2.new(1,-(rarityWidth+58),0,12);rarityFilter.Size=UDim2.fromOffset(rarityWidth,30)
+  rarityMenu.Position=UDim2.fromOffset(16,48);rarityMenu.Size=UDim2.new(1,-32,0,110)
+  scroll.Position=UDim2.fromOffset(16,54);scroll.Size=UDim2.new(1,-32,1,-62)
+ elseif sheetWidth>=560 then
   -- Wide sheets: search in the header, rarity row, then the grid.
   local searchWidth=math.clamp(math.floor(sheetWidth*.34),160,280)
   title.Size=UDim2.new(1,-(searchWidth+120),0,40)

@@ -5,12 +5,12 @@
 -- scroll window stay warm; list looks are prefetched; clones are time-budgeted and hurry while scrolling.
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Players=game:GetService('Players');local Tags=game:GetService('CollectionService')
-local P={MaxTemplates=128,MaxViews=60,MaxParts=9000,MaxWarm=36,WarmParts=4000,WarmMargin=240,MaxSpare=48,SpareParts=4000,GuessParts=60,
- CloneSeconds=.0015,HurryCloneSeconds=.004,HurrySeconds=.4,BuildSeconds=.002,BuildParts=24,SweepSeconds=.2,Grace=3,RetrySeconds=15,LoadingRetrySeconds=2}
+local P={MaxTemplates=160,MaxViews=60,MaxParts=9000,MaxWarm=36,WarmParts=4000,WarmMargin=240,MaxSpare=48,SpareParts=4000,GuessParts=60,
+ CloneSeconds=.0015,HurryCloneSeconds=.004,HurrySeconds=.4,BuildSeconds=.002,HurryBuildSeconds=.004,BuildParts=24,SweepSeconds=.2,Grace=3,RetrySeconds=15,LoadingRetrySeconds=2}
 local RGB=Color3.fromRGB
 local records=setmetatable({},{__mode='k'});local templates={};local templateCount=0
 local queue={};local queued={};local failed={};local fills={};local job;local connection;local sweepClock=0;local dirty=false
-local spare={};local spareCount,spareParts=0,0;local listed={};local warned={};local hurryUntil=0;local cloneSpent,cloneFrame=0,-1
+local spare={};local spareCount,spareParts=0,0;local listed={};local warned={};local hurryUntil=0;local cloneSpent=0
 local function mutationKey(value)return(value=='Gold'or value=='Diamond')and value or'None'end
 local function hex(value,fallback)
  if type(value)~='string'or#value~=6 then return fallback end
@@ -292,7 +292,7 @@ local function stepBuild()
   end
  end
  if job then
-  job.Parts=P.BuildParts;job.Deadline=os.clock()+P.BuildSeconds
+  job.Parts=P.BuildParts;job.Deadline=os.clock()+(os.clock()<hurryUntil and P.HurryBuildSeconds or P.BuildSeconds)
   local ok,why=coroutine.resume(job.Thread)
   if not ok then
    -- Meshes that are still replicating come back quickly; real failures wait longer.

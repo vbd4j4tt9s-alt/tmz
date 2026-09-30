@@ -17,9 +17,12 @@ Run:BindToRenderStep('GiantVisualSafety',Enum.RenderPriority.Camera.Value+4,func
    local gap=Vector3.new(math.max(0,math.abs(pos.X)-h.X),math.max(0,math.abs(pos.Y)-h.Y),math.max(0,math.abs(pos.Z)-h.Z)).Magnitude
    local fade=gap<9 and .92*(1-gap/9)or 0
    local previous=p:GetAttribute('GiantSafetyFade')or 0
-   -- Respect opening/LOD invisibility written by their owning renderer.
-   if p.LocalTransparencyModifier<=previous+.001 then p.LocalTransparencyModifier=fade end
-   p:SetAttribute('GiantSafetyFade',fade)
+   -- R113: skip the two writes when nothing changed (almost every far part, every pass).
+   if fade~=previous or math.abs(p.LocalTransparencyModifier-fade)>.001 then
+    -- Respect opening/LOD invisibility written by their owning renderer.
+    if p.LocalTransparencyModifier<=previous+.001 then p.LocalTransparencyModifier=fade end
+    p:SetAttribute('GiantSafetyFade',fade)
+   end
   end
  end
 end)
