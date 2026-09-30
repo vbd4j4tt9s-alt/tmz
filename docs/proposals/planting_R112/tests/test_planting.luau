@@ -101,18 +101,21 @@ do
  local tones={};for _,p in ipairs(chunks)do if p.Transparency<1 then tones[tostring(p.Color.R)]=true end end
  local nt=0;for _ in pairs(tones)do nt+=1 end;check(nt>=3,'settled: several shades of brown ('..nt..')')
  local s=sounds(W,'Planting ')
- check(s['Planting Thud']==1 and s['Planting Crunch']==1 and s['Planting Pop']==1 and s['Planting Sparkle']==nil,'fresh: thud + crunch + pop played once each')
+ -- R114: Dig when the pile pops up, Land when the last tossed chunk lands, Settle when the pile sinks.
+ check(s['Planting Dig']==1 and s['Planting Land']==1 and s['Planting Settle']==nil and s['Planting Sparkle']==nil,'fresh: dig + land played once, settle not yet')
+ local settled=W.P.Settled(pile.Layout)
  for _,p in ipairs(W.plays)do
-  if p.Name=='Planting Pop'then check(p.Speed>=1.12*.99 and p.Speed<=1.26,'pop pitch in range '..p.Speed)end
-  if p.Name=='Planting Thud'then check(p.Speed<.8 and p.Speed>.6,'thud pitch low '..p.Speed)end
+  if p.Name=='Planting Dig'then check(math.abs(p.At-pile.Start)<=.04,('dig on the pop-up (%.3f s)'):format(p.At-pile.Start))end
+  if p.Name=='Planting Land'then check(math.abs(p.At-(pile.Start+settled))<=.04,('land when the chunks land (%.3f vs %.3f s)'):format(p.At-pile.Start,settled))end
+  check(p.Speed>=.9 and p.Speed<=1.05,'natural pitch '..p.Speed)
   check(p.Parent and p.Parent.ClassName=='Attachment','sound is positional (attachment)')
  end
- local crunch;for _,e in ipairs(fx.Emitters)do if e.Sounds.Crunch and e.Sounds.Crunch._plays then crunch=e.Sounds.Crunch end end
- check(crunch and crunch._playing==false,'crunch is cut short')
  -- Hold, then sink; the mark fades in while the chunks sink.
  local sinkAt=pile.Start+pile.SinkAfter
  W.frames(math.floor((sinkAt-W.R.clock)*60)-2)
  check(#fx.Piles==1 and marks(W)==0,'hold: pile still up, no mark yet')
+ W.frames(4);local settle;for _,p in ipairs(W.plays)do if p.Name=='Planting Settle'then settle=p end end
+ check(settle and math.abs(settle.At-sinkAt)<=.04,'settle sound when the pile starts sinking ('..(settle and('%.3f'):format(settle.At-sinkAt)or'none')..')')
  W.frames(12)
  local mk=parts(W,'Planting mark')[1]
  check(mk and mk.Transparency<1 and mk.Transparency>0,'sink: mark fading in ('..tostring(mk and mk.Transparency)..')')
@@ -169,8 +172,8 @@ local function burst(opts,label)
  for _=1,300 do W.frames(1);maxPiles=math.max(maxPiles,#fx.Piles);maxChunks=math.max(maxChunks,fx.LiveChunks)end
  local b=fx:Budget()
  check(maxPiles<=b.Piles and maxChunks<=b.Chunks,('%s: caps respected (piles %d/%d, chunks %d/%d)'):format(label,maxPiles,b.Piles,maxChunks,b.Chunks))
- local s=sounds(W,'Planting Thud')
- check((s['Planting Thud']or 0)==1,label..': one sound set per burst of plantings ('..tostring(s['Planting Thud'])..')')
+ local s=sounds(W,'Planting Dig')
+ check((s['Planting Dig']or 0)==1,label..': one sound set per burst of plantings ('..tostring(s['Planting Dig'])..')')
  W.frames(60*6)
  check(fx.LiveChunks==0,label..': all chunks returned')
  check(marks(W)==10,label..': every crop still gets a mark ('..marks(W)..')')
@@ -247,19 +250,19 @@ do
  local W=setup({Owner=99})
  local fx=W.P.new();W.frames(60*4)
  local m=W.crop('SunflowerSeed',0,0,math.floor(W.serverNow));fx:Add(m,false);W.frames(10)
- local thud;for _,p in ipairs(W.plays)do if p.Name=='Planting Thud'then thud=p end end
- check(thud and thud.Volume<W.P.Sounds[1].Volume,'someone else planting: quieter thud')
+ local dig;for _,p in ipairs(W.plays)do if p.Name=='Planting Dig'then dig=p end end
+ check(dig and dig.Volume<W.P.Sounds[1].Volume,'someone else planting: quieter dig')
  fx:Destroy()
 end
 -- 9. Sound id overrides via attributes on the ModuleScript ---------------------------------------------------------
 do
  local W=setup()
  W.RS.PlantingEffects:SetAttribute('SparkleSoundId',123456789)
- W.RS.PlantingEffects:SetAttribute('PopSoundId','')
+ W.RS.PlantingEffects:SetAttribute('LandSoundId','')
  local fx=W.P.new();W.frames(60*4)
- local m=W.crop('SunflowerSeed',0,0,math.floor(W.serverNow));fx:Add(m,false);W.frames(20)
+ local m=W.crop('SunflowerSeed',0,0,math.floor(W.serverNow));fx:Add(m,false);W.frames(90)
  local s=sounds(W,'Planting ')
- check(s['Planting Sparkle']==1 and s['Planting Pop']==nil,'attribute overrides: sparkle added, pop removed')
+ check(s['Planting Sparkle']==1 and s['Planting Land']==nil and s['Planting Dig']==1,'attribute overrides: sparkle added, land removed')
  local id;for _,p in ipairs(W.plays)do if p.Name=='Planting Sparkle'then id=p.Id end end
  check(id=='rbxassetid://123456789','override id normalised ('..tostring(id)..')')
  fx:Destroy()

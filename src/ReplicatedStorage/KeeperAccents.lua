@@ -1,6 +1,6 @@
 -- R113: a few client-only accent parts per keeper (biome read + silhouette), moved with the pose groups.
 -- They exist only on clients: the server's KeeperContact never sees them, so reach and hits are unchanged.
--- Budget: at most 3 parts per keeper, no collision/query/touch/shadow.
+-- Budget: at most 5 parts per keeper, no collision/query/touch/shadow.
 local A={}
 local V,CF=Vector3.new,CFrame.new
 local function rgb(r,g,b)return Color3.fromRGB(r,g,b)end
@@ -26,10 +26,12 @@ A.Specs={
   {Group='Head',At=V(0,28.2,0),Size=V(.7,1.9,.7),Material='Neon',Color=rgb(170,128,236),Anim='Orbit',Index=1},
   {Group='Head',At=V(0,28.2,0),Size=V(.6,1.6,.6),Material='Neon',Color=rgb(226,196,255),Anim='Orbit',Index=2},
  },
- [7]={ -- Storm Colossus: a small storm cloud crown.
-  {Group='Head',At=V(-2.8,32.0,.5),Size=V(5.0,2.6,4.5),Shape='Ball',Material='SmoothPlastic',Color=rgb(70,76,92),Transparency=.12,Anim='Drift',Index=0},
-  {Group='Head',At=V(2.6,32.3,-.3),Size=V(4.6,2.4,4.2),Shape='Ball',Material='SmoothPlastic',Color=rgb(82,88,106),Transparency=.12,Anim='Drift',Index=1},
-  {Group='Head',At=V(0,33.4,.2),Size=V(5.6,3.0,5.0),Shape='Ball',Material='SmoothPlastic',Color=rgb(60,66,82),Transparency=.12,Anim='Drift',Index=2},
+ [7]={ -- Storm Colossus: a storm cloud crown (R114: about twice as big, five puffs, owner request).
+  {Group='Head',At=V(-5.0,33.4,.6),Size=V(8.6,4.6,7.6),Shape='Ball',Material='SmoothPlastic',Color=rgb(70,76,92),Transparency=.12,Anim='Drift',Index=0},
+  {Group='Head',At=V(4.8,33.7,-.4),Size=V(8.0,4.4,7.2),Shape='Ball',Material='SmoothPlastic',Color=rgb(82,88,106),Transparency=.12,Anim='Drift',Index=1},
+  {Group='Head',At=V(0,35.4,.2),Size=V(10.0,5.4,8.8),Shape='Ball',Material='SmoothPlastic',Color=rgb(60,66,82),Transparency=.12,Anim='Drift',Index=2},
+  {Group='Head',At=V(-2.2,33.2,-3.4),Size=V(6.4,3.6,5.6),Shape='Ball',Material='SmoothPlastic',Color=rgb(76,82,98),Transparency=.12,Anim='Drift',Index=3},
+  {Group='Head',At=V(2.4,33.4,3.6),Size=V(6.8,3.6,6.0),Shape='Ball',Material='SmoothPlastic',Color=rgb(66,72,88),Transparency=.12,Anim='Drift',Index=4},
  },
 }
 function A.new(model,stage)

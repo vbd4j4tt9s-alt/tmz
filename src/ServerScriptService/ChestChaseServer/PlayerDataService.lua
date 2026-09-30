@@ -1126,6 +1126,9 @@ function PlayerDataService:Save(player, reason, forceSave, finalization)
 	local saveData = self:_buildSaveData(player)
 	saveData.SeedSaveCommitId = HttpService:GenerateGUID(false)
 	local revisionAtStart = self.Revision[player] or 0
+	-- R114: remembered so quick garden saves keep to one write per ~7 s per player (DataStore allows one per 6 s per key).
+	self.LastSaveAt = self.LastSaveAt or setmetatable({}, { __mode = "k" })
+	self.LastSaveAt[player] = os.clock()
 	self.Saving[player] = true
 	local conflict = false
 	local success, savedOrError = self:_runRequest(function()
@@ -1391,7 +1394,8 @@ function PlayerDataService:QueueGardenSave(player)
 	if self.GardenSaveQueued[player] or not self.CanSave[player] then return end
 	local ticket = {}
 	self.GardenSaveQueued[player] = ticket
-	task.delay(2, function()
+	local last = self.LastSaveAt and self.LastSaveAt[player]
+	task.delay(math.max(2, last and 7 - (os.clock() - last) or 0), function()
 		if self.GardenSaveQueued[player] ~= ticket then return end
 		self.GardenSaveQueued[player] = nil
 		if not player.Parent or not self:IsLoaded(player) or not self.CanSave[player] then return end

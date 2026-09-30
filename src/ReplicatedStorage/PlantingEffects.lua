@@ -19,15 +19,17 @@ local M={}
 -- Owner settings ---------------------------------------------------------------------------------------------------
 -- Sound layers, all positional at the planted spot. Swap an id here, or set a '<Key>SoundId' attribute on this
 -- ModuleScript (a number or 'rbxassetid://...'). An empty id or Volume 0 turns a layer off.
---  Thud:    built-in soft landing thump (ships with every client, same file every character plays on landing).
---  Crunch:  the pack-opening paper tear (SeedPackRules.TearSoundId) pitched down into a short crumbly scatter.
---  Pop:     the harvest bubble pop (InteractionAudio Bubble06) pitched up, so planting and picking feel related.
+-- R114: the owner's three planting sounds, each synced to a moment of the dirt pile (Beat) plus Delay seconds:
+--  Dig    (118769294546013) Beat 'Start':   the pile pops out of the soil with the dirt burst.
+--  Land   (137853494539894) Beat 'Settled': the last tossed chunk lands on the rim.
+--  Settle (97631814076710)  Beat 'Sink':    the pile sinks back into the soil.
+-- Start = seconds of silence to skip at the front of a file (also settable per id on SoundTiming as Start_<id>).
 --  Sparkle: off until a short soft chime is added; plays for the planter only.
 M.Sounds={
- {Key='Thud',Id='rbxasset://sounds/action_jump_land.mp3',Volume=.55,Pitch={.70,.80},Delay=0},
- {Key='Crunch',Id='rbxassetid://9125725227',Volume=.30,Pitch={.50,.60},Delay=.02,Start=.10,Length=.28},
- {Key='Pop',Id='rbxassetid://131731955363530',Volume=.22,Pitch={1.12,1.26},Delay=.08},
- {Key='Sparkle',Id='',Volume=.06,Pitch={1.2,1.35},Delay=.16,OwnOnly=true},
+ {Key='Dig',Id='rbxassetid://118769294546013',Volume=.5,Pitch={.96,1.04},Beat='Start',Delay=0},
+ {Key='Land',Id='rbxassetid://137853494539894',Volume=.45,Pitch={.96,1.04},Beat='Settled',Delay=0},
+ {Key='Settle',Id='rbxassetid://97631814076710',Volume=.4,Pitch={.96,1.04},Beat='Sink',Delay=0},
+ {Key='Sparkle',Id='',Volume=.06,Pitch={1.2,1.35},Beat='Start',Delay=.16,OwnOnly=true},
 }
 M.Tuning={
  FreshSeconds=6,       -- PlantedAt (server clock) younger than this counts as a new planting
@@ -301,11 +303,15 @@ function E:StartPile(r)
  local camera=workspace.CurrentCamera;local position=r.Origin.Position
  local distance=camera and(camera.CFrame.Position-position).Magnitude or 0
  local e=self:Emitter(position+V(0,.15,0))
- if distance<=M.Tuning.SoundRange then self:PlaySounds(e,self:Owned(r),M.Size(r.Base).Radius)end
+ local sounding=distance<=M.Tuning.SoundRange
  local skip=mode()=='off'or distance>M.Tuning.FarRange
  if not skip and camera and distance>30 then local _,visible=camera:WorldToViewportPoint(position+V(0,.5,0));skip=not visible end
  local room=budget.Chunks-self.LiveChunks
- if skip or #self.Piles>=budget.Piles or room<8 then self.Stats.Skipped+=1;return false end
+ if skip or #self.Piles>=budget.Piles or room<8 then
+  -- No pile drawn (far away, off screen or over budget): the sounds keep the timing of a typical pile.
+  if sounding then self:PlaySounds(e,self:Owned(r),M.Size(r.Base).Radius,M.Beats())end
+  self.Stats.Skipped+=1;return false
+ end
  local near=distance<=M.Tuning.NearRange
  local layout=M.Layout(r.Base,M.Hash(r.Key),math.min(near and budget.PerPile or math.floor(budget.PerPile*.5),room),(near and not reduced)and budget.Flyers or 0)
  local settled=M.Settled(layout)
@@ -313,6 +319,7 @@ function E:StartPile(r)
   SinkAfter=settled+(reduced and M.Tuning.HoldSeconds*.75 or M.Tuning.HoldSeconds)}
  local sinkEnd=0;for _,c in ipairs(layout.Chunks)do sinkEnd=math.max(sinkEnd,c.Sink)end
  pile.EndAfter=pile.SinkAfter+sinkEnd+M.Tuning.SinkSeconds
+ if sounding then self:PlaySounds(e,self:Owned(r),M.Size(r.Base).Radius,{Start=0,Settled=settled,Sink=pile.SinkAfter})end
  for i,c in ipairs(layout.Chunks)do
   local p=self:Chunk(budget);p.Size=V(c.Size,c.Size,c.Size);p.Color=r.Palette[c.Tone]
   p.CFrame=pile.Origin*(M.Pose(c,0,pile.SinkAfter,reduced)or CF(c.Position)*c.Rotation);p.Transparency=0;pile.Parts[i]=p
@@ -371,16 +378,20 @@ function E:Burst(e,layout,budget,reduced,near,palette)
   e.Clods.Speed=NumberRange.new(6+1.2*R,10+2*R);e.Clods:Emit(clods)
  end
 end
--- Bigger mounds sound heavier: the thud and crunch drop in pitch and gain a little volume with the pile radius.
-function E:PlaySounds(e,own,radius)
+-- Beat times (seconds after planting) of a typical pile, used when no pile is drawn.
+function M.Beats()
+ local settled=M.Tuning.RiseSeconds+.2
+ return {Start=0,Settled=settled,Sink=settled+M.Tuning.HoldSeconds}
+end
+-- Bigger mounds sound a little heavier: lower pitch and a touch more volume with the pile radius.
+function E:PlaySounds(e,own,radius,beats)
  local now=os.clock();if now<self.NextSound then return end;self.NextSound=now+.09
- local heavy=math.clamp(((radius or 1)-1)/3.5,0,1)
+ local heavy=math.clamp(((radius or 1)-1)/3.5,0,1);beats=beats or M.Beats()
  for _,layer in ipairs(M.Sounds)do
   local sound=e.Sounds[layer.Key]
   if sound and layer.Volume>0 and(own or not layer.OwnOnly)then
-   local weight=(layer.Key=='Thud'or layer.Key=='Crunch')and heavy or 0
-   table.insert(self.Queue,{At=now+(layer.Delay or 0),Sound=sound,Volume=math.min(1,layer.Volume*(own and 1 or M.Tuning.OthersVolume)*(1+.3*weight)),
-    Speed=self.Random:NextNumber(layer.Pitch[1],layer.Pitch[2])*(1-.18*weight),Start=layer.Start,Length=layer.Length})
+   table.insert(self.Queue,{At=now+(beats[layer.Beat or'Start']or 0)+(layer.Delay or 0),Sound=sound,Volume=math.min(1,layer.Volume*(own and 1 or M.Tuning.OthersVolume)*(1+.3*heavy)),
+    Speed=self.Random:NextNumber(layer.Pitch[1],layer.Pitch[2])*(1-.12*heavy),Start=layer.Start,Length=layer.Length})
   end
  end
 end
@@ -411,7 +422,8 @@ function E:Cull()
  for _,r in pairs(self.Records)do
   if not r.Origin and r.Model then self:Resolve(r)end
   local d=r.Origin and eye and(r.Origin.Position-eye).Magnitude or 0
-  if r.Origin and not r.Gone and not r.HoldMark and not off and(M.Tuning.MarkAllCrops or r.Planted)and d<=M.Tuning.MarkRange then
+  -- A crop in its short removal grace (r.Gone) keeps its mark until Release, so a stage rebuild never blinks it.
+  if r.Origin and not r.HoldMark and not off and(M.Tuning.MarkAllCrops or r.Planted)and d<=M.Tuning.MarkRange then
    r.Distance=d;table.insert(want,r)
   elseif r.Mark then self:HideMark(r)end
  end
@@ -434,12 +446,14 @@ function E:Step()
   local r=self.Leaving[i]
   if not r.Gone or r.Released then table.remove(self.Leaving,i)elseif now>=r.Gone then table.remove(self.Leaving,i);self:Release(r)end
  end
- -- Sound layers are queued so their offsets stay in step with the visuals; a cold (unloaded) voice is skipped.
+ -- Sound layers are queued so they land on the pile's beats.
  for i=#self.Queue,1,-1 do
   local q=self.Queue[i]
   if now>=q.At then
-   table.remove(self.Queue,i)
-   if q.Sound.IsLoaded and q.Sound.Parent then
+   -- A voice still loading may wait up to .25 s; later than that it would be out of step with the pile, so it is skipped.
+   local waiting=not q.Sound.IsLoaded and q.Sound.Parent~=nil and now<q.At+.25
+   if not waiting then table.remove(self.Queue,i)end
+   if not waiting and q.Sound.IsLoaded and q.Sound.Parent then
     for j=#self.Stopping,1,-1 do if self.Stopping[j].Sound==q.Sound then table.remove(self.Stopping,j)end end
     q.Sound:Stop();q.Sound.Volume=q.Volume;q.Sound.PlaybackSpeed=q.Speed;Timing.Play(q.Sound,q.Start);self.Stats.Sounds+=1
     if q.Length then table.insert(self.Stopping,{Sound=q.Sound,At=now,Length=q.Length,Volume=q.Volume})end

@@ -209,7 +209,7 @@ Players.PlayerRemoving:Connect(function(player)
 	popupSequences[player] = nil
 end)
 
-print("[V0.55] PASS - Speed gains emit from the head through a narrow 30-degree cone.")
+if game:GetService('RunService'):IsStudio()then print("[V0.55] PASS - Speed gains emit from the head through a narrow 30-degree cone.") end -- R114: Studio-only load message
 
 
 do
@@ -328,7 +328,7 @@ table.insert(connections,script.Destroying:Connect(function()
     for _,record in pairs(belts)do releaseBelt(record)end
     table.clear(belts)
 end))
-print('[V134] PASS - forward arrows and living biome tracks; jump to exit.')
+if game:GetService('RunService'):IsStudio()then print('[V134] PASS - forward arrows and living biome tracks; jump to exit.') end -- R114: Studio-only load message
 end
 
 

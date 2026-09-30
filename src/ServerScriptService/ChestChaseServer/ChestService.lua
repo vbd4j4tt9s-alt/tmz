@@ -893,7 +893,11 @@ function ChestService:StartGardens()
                     task.wait(interval)
                     if not self.GardensRunning then return end
                     local ok, failure = pcall(function() self:RenderGarden(base, self.Bases:GetOwner(base), slot) end)
-                    if not ok then warn("[V149] Garden refresh: "..tostring(failure)) end
+                    -- R114: a repeating failure is reported at most once every 30 s instead of every refresh.
+                    if not ok and os.clock() >= (self.NextGardenWarn or 0) then
+                        self.NextGardenWarn = os.clock() + 30
+                        warn("[V149] Garden refresh: "..tostring(failure))
+                    end
                 end
             end
 		end

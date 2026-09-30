@@ -413,4 +413,4 @@ script.Destroying:Connect(function()
 	warningGui:Destroy()
 	effectsGui:Destroy()
 end)
-print("[V103] PASS - chase warnings and seed reward effects loaded.")
+if game:GetService('RunService'):IsStudio()then print("[V103] PASS - chase warnings and seed reward effects loaded.") end -- R114: Studio-only load message

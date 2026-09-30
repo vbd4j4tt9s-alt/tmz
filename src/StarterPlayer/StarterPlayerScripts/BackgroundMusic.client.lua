@@ -422,4 +422,4 @@ end)
 insideTrack=trackIsActive()
 setChaseMusicActive(chaseIsActive())
 
-print('[V123 FIX1] Music controller ready; audio availability is checked separately.')
+if game:GetService('RunService'):IsStudio()then print('[V123 FIX1] Music controller ready; audio availability is checked separately.') end -- R114: Studio-only load message

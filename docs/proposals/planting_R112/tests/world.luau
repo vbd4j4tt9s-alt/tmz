@@ -16,7 +16,7 @@ function RandomMT:NextInteger(a,b)return a+math.floor(self:_next()*(b-a+1))%(b-a
 W.Random={new=rnew}
 -- Extra Instance methods the effect uses.
 local Inst=R.Inst
-Inst.Play=function(self)self._playing=true;self._plays=(self._plays or 0)+1;W.plays[#W.plays+1]={Name=self.Name,Id=self.SoundId,Speed=self.PlaybackSpeed,Volume=self.Volume,Parent=self.Parent}end
+Inst.Play=function(self)self._playing=true;self._plays=(self._plays or 0)+1;W.plays[#W.plays+1]={At=R.clock,Name=self.Name,Id=self.SoundId,Speed=self.PlaybackSpeed,Volume=self.Volume,Parent=self.Parent}end
 Inst.Stop=function(self)self._playing=false end
 Inst.Emit=function(self,n)self._emitted=(self._emitted or 0)+n;W.emits[#W.emits+1]={Name=self.Name,Count=n}end
 Inst.Clear=function(self)end

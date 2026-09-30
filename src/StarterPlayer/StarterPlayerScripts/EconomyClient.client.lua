@@ -18,7 +18,7 @@ local GuiService = game:GetService("GuiService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-print("[V0.78] EconomyClient starting...")
+if game:GetService('RunService'):IsStudio()then print("[V0.78] EconomyClient starting...") end -- R114: Studio-only load message
 
 local function requireChild(parent, name)
 	local child = parent:WaitForChild(name, 10)
@@ -533,7 +533,7 @@ local function queueSellRefresh()
 end
 
 player:GetAttributeChangedSignal("DataStatus"):Connect(queueSellRefresh)
-print("[V114] Shop and Sell ready; custom garden inventory ready.")
+if game:GetService('RunService'):IsStudio()then print("[V114] Shop and Sell ready; custom garden inventory ready.") end -- R114: Studio-only load message
 
 -- Garden planting remains independent of the temporarily retired Inventory UI.
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -729,4 +729,4 @@ end)
 player.CharacterRemoving:Connect(function() crosshair.Visible = false end)
 player:GetAttributeChangedSignal("GardenRevision"):Connect(queueSellRefresh)
 if panel.Visible then renderCurrentTab() end
-print("[V0.78] PASS - click/tap planting, gamepad RT aiming, per-crop harvest controls and Garden V2 UI loaded.")
+if game:GetService('RunService'):IsStudio()then print("[V0.78] PASS - click/tap planting, gamepad RT aiming, per-crop harvest controls and Garden V2 UI loaded.") end -- R114: Studio-only load message

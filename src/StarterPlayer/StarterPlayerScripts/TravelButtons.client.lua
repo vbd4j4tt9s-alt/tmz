@@ -1,6 +1,6 @@
--- R113b: BASE / TRACK fast-travel rectangles, centred in Roblox's top bar row (owner request). The server checks every request
+-- R113b: BASE / TRACK fast-travel rectangles in Roblox's top bar row (owner request). R114: centred on the whole screen. The server checks every request
 -- (FastTravelService); this script only shows the buttons, the shared cooldown and a dimmed state.
-local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
+local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local GuiService=game:GetService('GuiService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
 local remotes=RS:WaitForChild('ChestChaseRemotes')
 local requestBase=remotes:WaitForChild('RequestBaseTeleport');local requestTrack=remotes:WaitForChild('RequestTrackTeleport')
@@ -8,7 +8,7 @@ local Bright=require(RS:WaitForChild('BrightUI'));local Fit=require(RS:WaitForCh
 local Icons=require(RS:WaitForChild('VectorIcons91'))
 local old=pg:FindFirstChild('TravelButtons');if old then old:Destroy()end
 -- Below the tutorial card (25) and the menu hub (33): anything important draws above these buttons.
-local gui=Instance.new('ScreenGui');gui.Name='TravelButtons';gui.ResetOnSpawn=false;gui.DisplayOrder=24;gui.ScreenInsets=Enum.ScreenInsets.TopbarSafeInsets;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
+local gui=Instance.new('ScreenGui');gui.Name='TravelButtons';gui.ResetOnSpawn=false;gui.DisplayOrder=24;gui.ScreenInsets=Enum.ScreenInsets.None;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
 local holder=Instance.new('Frame');holder.Name='TravelPair';holder.BackgroundTransparency=1;holder.Visible=false;holder.Parent=gui
 local connections={};local lastSent=0
 local function make(name,caption,icon,color,remote,order)
@@ -45,11 +45,18 @@ end
 local function refresh()
  holder.Visible=pg:GetAttribute('TitleActive')~=true and pg:GetAttribute('SeedMenu')==nil
 end
--- The top bar row between Roblox's own buttons: two rectangles, icon left and caption right, centred.
+-- The top bar row: two rectangles, icon left and caption right, centred on the screen. GuiService.TopbarInset is the
+-- free part of that row (between Roblox's own buttons), so the pair shrinks to stay inside it; if the screen centre is
+-- too close to Roblox's buttons it centres in the free part instead.
 local function layout()
  local area=gui.AbsoluteSize;if area.X<=0 or area.Y<=0 then return end
- local gap=8;local height=math.clamp(area.Y-8,30,44);local width=math.floor(math.clamp((area.X-16-gap)/2,72,132))
- holder.AnchorPoint=Vector2.new(.5,.5);holder.Position=UDim2.fromScale(.5,.5);holder.Size=UDim2.fromOffset(width*2+gap,height)
+ local inset=GuiService.TopbarInset;local left,right,top,rowHeight=0,area.X,0,52
+ if typeof(inset)=='Rect'and inset.Width>0 and inset.Height>0 then left,right,top,rowHeight=inset.Min.X,inset.Max.X,inset.Min.Y,inset.Height end
+ local gap=8;local height=math.clamp(rowHeight-8,30,44)
+ local centre=area.X/2;local half=math.min(centre-left,right-centre)-8
+ if half<80 then centre=(left+right)/2;half=(right-left)/2-8 end
+ local width=math.floor(math.clamp((half*2-gap)/2,72,132))
+ holder.AnchorPoint=Vector2.new(.5,.5);holder.Position=UDim2.fromOffset(math.floor(centre),math.floor(top+rowHeight/2));holder.Size=UDim2.fromOffset(width*2+gap,height)
  for i,entry in ipairs({base,track})do
   entry.Button.Size=UDim2.fromOffset(width,height);entry.Button.Position=UDim2.fromOffset((i-1)*(width+gap),0)
   local icon=height-10
@@ -60,7 +67,8 @@ local function layout()
  refresh()
 end
 local sized=gui:GetPropertyChangedSignal('AbsoluteSize'):Connect(layout);task.defer(layout)
-local function stopLayout()sized:Disconnect()end
+local inset=GuiService:GetPropertyChangedSignal('TopbarInset'):Connect(layout)
+local function stopLayout()sized:Disconnect();inset:Disconnect()end
 for _,key in ipairs({'TitleActive','SeedMenu'})do connections[#connections+1]=pg:GetAttributeChangedSignal(key):Connect(refresh)end
 for _,key in ipairs({'FastTravelReadyAt','ChestChaseSeedCarrying','ChestChaseRunActive','TreadmillTraining','GuardianRagdollActive','GuardianFlingActive'})do connections[#connections+1]=player:GetAttributeChangedSignal(key):Connect(paint)end
 paint();refresh()
