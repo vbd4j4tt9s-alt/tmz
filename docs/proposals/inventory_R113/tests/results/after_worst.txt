@@ -1,0 +1,5 @@
+fixture=worst tools=232  at rest after open: visible=24 fallback=0 (flat 0, blank 0) views=56 templates=160
+    40 px/frame: 202 frames, fallback cards/frame avg 7.40 max 24, frames with any fallback 120 (59%), fallback share 31.0% of 4818 card-frames, worst sim work 1.3 ms; settled: 14
+    80 px/frame: 102 frames, fallback cards/frame avg 9.06 max 24, frames with any fallback 68 (67%), fallback share 38.1% of 2426 card-frames, worst sim work 1.3 ms; settled: 14
+   160 px/frame:  52 frames, fallback cards/frame avg 8.63 max 24, frames with any fallback 33 (63%), fallback share 36.4% of 1234 card-frames, worst sim work 1.6 ms; settled: 14
+  end: views=36 parts=1036 templates=160 records=68

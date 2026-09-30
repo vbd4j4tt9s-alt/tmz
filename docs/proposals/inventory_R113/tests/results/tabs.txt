@@ -1,0 +1,45 @@
+PC    1920x1080     left   tab=72 sheet= 900x620 grid= 868x490 | ok
+PC    1366x768      left   tab=72 sheet= 900x506 grid= 868x376 | ok
+PC    1280x720      left   tab=72 sheet= 780x475 grid= 748x345 | ok
+PC    1024x768      left   tab=72 sheet= 780x506 grid= 748x376 | ok
+PC     800x600      left2x2 tab=72 sheet= 608x396 grid= 576x266 | ok
+PC    1280x540      left2x2 tab=72 sheet= 900x356 grid= 868x226 | ok
+PC     960x480      left2x2 tab=64 sheet= 785x316 grid= 753x186 | ok
+PC     700x400      left2x2 tab=44 sheet= 582x252 grid= 550x190 | ok
+TOUCH  568x320      left2x2 tab=48 sheet= 428x188 grid= 396x126 | ok
+TOUCH  568x320  ctl left2x2 tab=48 sheet= 428x188 grid= 396x126 | ok
+TOUCH  667x375      left2x2 tab=64 sheet= 493x237 grid= 461x175 | ok
+TOUCH  667x375  ctl left2x2 tab=64 sheet= 493x237 grid= 461x175 | ok
+TOUCH  740x360      left2x2 tab=64 sheet= 576x216 grid= 544x154 | ok
+TOUCH  740x360  ctl left2x2 tab=64 sheet= 576x216 grid= 544x154 | ok
+TOUCH  812x375      left2x2 tab=64 sheet= 638x231 grid= 606x169 | ok
+TOUCH  812x375  ctl left2x2 tab=64 sheet= 638x231 grid= 606x169 | ok
+TOUCH  844x390      left2x2 tab=72 sheet= 665x246 grid= 633x184 | ok
+TOUCH  844x390  ctl left2x2 tab=72 sheet= 665x246 grid= 633x184 | ok
+TOUCH  896x414      left2x2 tab=72 sheet= 710x270 grid= 678x208 | ok
+TOUCH  896x414  ctl left2x2 tab=72 sheet= 710x270 grid= 678x208 | ok
+TOUCH  932x430      left2x2 tab=72 sheet= 741x283 grid= 709x221 | ok
+TOUCH  932x430  ctl left2x2 tab=72 sheet= 741x283 grid= 709x221 | ok
+TOUCH  800x360      left2x2 tab=64 sheet= 628x216 grid= 596x154 | ok
+TOUCH  800x360  ctl left2x2 tab=64 sheet= 628x216 grid= 596x154 | ok
+TOUCH 1024x768      left   tab=72 sheet= 780x506 grid= 748x376 | ok
+TOUCH 1024x768  ctl left   tab=72 sheet= 780x506 grid= 748x376 | ok
+TOUCH 1180x820      left   tab=72 sheet= 900x541 grid= 868x411 | ok
+TOUCH 1180x820  ctl left   tab=72 sheet= 900x541 grid= 868x411 | ok
+TOUCH 1366x1024     left   tab=72 sheet= 900x620 grid= 868x490 | ok
+TOUCH 1366x1024 ctl left   tab=72 sheet= 900x620 grid= 868x490 | ok
+TOUCH  320x568      left   tab=48 sheet= 235x280 grid= 203x218 | ok
+TOUCH  320x568  ctl left   tab=48 sheet= 235x280 grid= 203x218 | ok
+TOUCH  375x667      left   tab=64 sheet= 282x369 grid= 250x203 | ok
+TOUCH  375x667  ctl left   tab=64 sheet= 282x369 grid= 250x203 | ok
+TOUCH  390x844      left   tab=72 sheet= 275x544 grid= 243x378 | ok
+TOUCH  390x844  ctl left   tab=72 sheet= 275x544 grid= 243x378 | ok
+TOUCH  430x932      left   tab=72 sheet= 329x615 grid= 297x449 | ok
+TOUCH  430x932  ctl left   tab=72 sheet= 329x615 grid= 297x449 | ok
+TOUCH  360x740      left   tab=64 sheet= 269x444 grid= 237x278 | ok
+TOUCH  360x740  ctl left   tab=64 sheet= 269x444 grid= 237x278 | ok
+TOUCH  768x1024     left   tab=72 sheet= 660x620 grid= 628x490 | ok
+TOUCH  768x1024 ctl left   tab=72 sheet= 660x620 grid= 628x490 | ok
+TOUCH  820x1180     left   tab=72 sheet= 705x620 grid= 673x490 | ok
+TOUCH  820x1180 ctl left   tab=72 sheet= 705x620 grid= 673x490 | ok
+44 checks, 0 failures

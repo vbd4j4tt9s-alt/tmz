@@ -1,0 +1,79 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#1b1b1b;font-family:'Fredoka One','Arial Rounded MT Bold',Arial,sans-serif}
+.screen{position:relative;overflow:hidden;background:linear-gradient(#8fc6ea 0,#bfe3f5 38%,#6aa84f 38%,#4e8a3a 100%);display:inline-block;vertical-align:top;margin:0}
+.abs{position:absolute;box-sizing:border-box}
+.hud{border:1.5px dashed rgba(255,255,255,.85);background:rgba(20,30,60,.35);color:#fff;font-size:10px;padding:2px;border-radius:6px}
+.sheet{border-radius:8px;background:rgba(20,46,35,.9);box-shadow:inset 0 0 0 1.5px rgba(147,255,69,.5)}
+.header{left:8px;top:8px;right:8px;height:38px;border-radius:10px;background:linear-gradient(90deg,rgba(65,99,77,.7),rgba(65,99,77,.1))}
+.title{color:#fff;font-size:20px}
+.search{border-radius:8px;background:#0e2119;box-shadow:inset 0 0 0 1px rgba(106,144,225,.7);color:#cce0ff;font-size:14px;padding-left:10px;display:flex;align-items:center}
+.close{border-radius:8px;background:#30366a;color:#fff;text-align:center;font-size:22px}
+.tab{border-radius:8px;background:#254c39;color:#fff;text-align:center;box-shadow:inset 0 0 0 1.2px rgba(154,176,152,.8),0 2px 6px rgba(0,0,0,.35)}
+.tab.on{background:#41784c;box-shadow:inset 0 0 0 2px #fff,0 2px 6px rgba(0,0,0,.35)}
+.tab img{position:absolute;left:4px;top:3px;object-fit:contain}
+.tab .cap{position:absolute;left:0;right:0;-webkit-text-stroke:.4px #13201c;paint-order:stroke}
+.rar{border-radius:8px;background:#254c39;color:#fff;font-size:14px;text-align:center;display:flex;align-items:center;justify-content:center}
+.card{border-radius:8px;background:#254c39}
+.card img{position:absolute;left:6px;top:5px;object-fit:contain}
+.nm{position:absolute;left:4px;right:4px;bottom:3px;height:28px;font-size:12px;line-height:13.5px;text-align:center;display:flex;align-items:center;justify-content:center;-webkit-text-stroke:.5px #13201c;paint-order:stroke}
+.cnt{position:absolute;left:4px;top:4px;padding:0 5px;height:16px;line-height:16px;border-radius:8px;background:rgba(0,0,0,.65);color:#fff;font-size:12px}
+.hint{color:#cce0ff;font-size:12px}
+.slot{border-radius:8px;background:rgba(48,54,106,.9)}
+.slot img{position:absolute;left:3px;top:3px;object-fit:contain}
+.slot .num{position:absolute;left:3px;top:1px;color:#cce0ff;font-size:12px}
+.slot .sn{position:absolute;left:2px;right:2px;bottom:1px;font-size:8px;line-height:9px;text-align:center;-webkit-text-stroke:.3px #13201c;paint-order:stroke}
+.lbl{position:absolute;right:8px;top:6px;background:rgba(0,0,0,.65);color:#ffe047;padding:3px 8px;border-radius:6px;font-size:13px;z-index:50}
+.cap2{color:#ddd;font-size:14px;padding:6px 8px}
+</style></head><body><div id="root"></div>
+<script type="module">
+import * as THREE from './three.module.js';
+const items=await (await fetch('geo.json')).json();const layouts=await (await fetch('layouts.json')).json();
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});renderer.setClearColor(0,0);
+function wedge(){const g=new THREE.BufferGeometry();const v=[[-.5,-.5,-.5],[.5,-.5,-.5],[-.5,-.5,.5],[.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]];
+ const f=[[0,2,1],[1,2,3],[2,4,3],[3,4,5],[0,1,4],[1,5,4],[0,4,2],[1,3,5]];const pos=[];for(const t of f)for(const i of t)pos.push(...v[i]);g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();return g}
+function shot(it,w,h){const scene=new THREE.Scene();scene.add(new THREE.AmbientLight(0xffffff,1.25));const d=new THREE.DirectionalLight(0xfff7e4,2.2);d.position.set(.45,.8,-1);scene.add(d);
+ const d2=new THREE.DirectionalLight(0xffffff,.5);d2.position.set(-.5,.3,1);scene.add(d2);
+ for(const p of it.parts){let g;const s=p.s;
+  if(p.mesh&&p.mesh.type==='Sphere'){g=new THREE.SphereGeometry(.5,24,16);g.scale(s[0]*p.mesh.scale[0],s[1]*p.mesh.scale[1],s[2]*p.mesh.scale[2])}
+  else if(p.shape==='Ball'){const r=Math.min(...s)/2;g=new THREE.SphereGeometry(r,24,16)}
+  else if(p.shape==='Cylinder'){g=new THREE.CylinderGeometry(Math.min(s[1],s[2])/2,Math.min(s[1],s[2])/2,s[0],24);g.rotateZ(-Math.PI/2)}
+  else if(p.c==='WedgePart'){g=wedge();g.scale(...s)}
+  else g=new THREE.BoxGeometry(...s);
+  const col=new THREE.Color(p.col[0],p.col[1],p.col[2]);const neon=p.mat==='Neon',glass=p.mat==='Glass',metal=p.mat==='Metal';
+  const m=new THREE.MeshStandardMaterial({color:col,roughness:metal?.35:.7,metalness:metal?.55:0,transparent:p.t>0||glass,opacity:1-Math.max(p.t,glass?.25:0),emissive:neon?col:0x000000,emissiveIntensity:neon?.8:0});
+  const mesh=new THREE.Mesh(g,m);const r=p.r;const M=new THREE.Matrix4().set(r[0],r[1],r[2],p.p[0],r[3],r[4],r[5],p.p[1],r[6],r[7],r[8],p.p[2],0,0,0,1);mesh.applyMatrix4(M);scene.add(mesh)}
+ const c=it.camera;const cam=new THREE.PerspectiveCamera(c.fov,w/h,.01,1000);cam.position.set(...c.p);cam.up.set(...c.up);cam.lookAt(c.p[0]+c.look[0],c.p[1]+c.look[1],c.p[2]+c.look[2]);
+ renderer.setSize(w,h);renderer.render(scene,cam);return renderer.domElement.toDataURL()}
+const acc={Common:'#9ab098',Uncommon:'#509f6c',Rare:'#4381da',Legendary:'#e39e24',Mythic:'#de2a34'};
+const txt={Common:'#d5e0d2',Uncommon:'#97e49a',Rare:'#83c7ff',Legendary:'#ffd153',Mythic:'#ff6468'};
+const tabs=items.filter(i=>i.tab),goods=items.filter(i=>!i.tab);
+for(const it of items){it.img=shot(it,256,256)}
+const box=(r,cls,inner='',style='')=>`<div class="abs ${cls}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;${style}">${inner}</div>`;
+function screen(L,label){
+ const {w,h}=L;let s=`<div class="screen" style="width:${w}px;height:${h}px">`;
+ for(const b of L.hud){if(b.n==='Hotbar')continue;const nm={Hub:'Menu',Travel:'BASE / TRACK',OwnerTools:'Owner',ThumbL:'Joystick',ThumbR:'Jump'}[b.n]||b.n.replace('Wallet','');s+=box(b,'hud',nm)}
+ const S=L.sheet;s+=box(S,'sheet');const wide=S.w>=560,short=S.h<300,titled=!short||S.w>=440;
+ const X=v=>S.x+v,Y=v=>S.y+v;
+ s+=box({x:X(8),y:Y(8),w:S.w-16,h:38},'header');if(titled)s+=box({x:X(16),y:Y(12),w:120,h:30},'title','Inventory');s+=box({x:X(S.w-48),y:Y(10),w:36,h:36},'close','×');
+ if(short){const room=S.w-66-(titled?126:16),rw=Math.min(150,Math.floor(room*.38)),sw=room-rw-8;s+=box({x:X(S.w-(sw+rw+66)),y:Y(12),w:sw,h:30},'search','Search');s+=box({x:X(S.w-(rw+58)),y:Y(12),w:rw,h:30},'rar','Rarity: All ⌄')}
+ else if(wide){const sw=Math.max(160,Math.min(280,Math.floor(S.w*.34)));s+=box({x:X(S.w-(sw+58)),y:Y(12),w:sw,h:32},'search','Search');s+=box({x:X(16),y:Y(58),w:Math.min(220,S.w-32),h:30},'rar','Rarity: All ⌄')}
+ else{s+=box({x:X(16),y:Y(54),w:S.w-32,h:34},'search','Search');s+=box({x:X(16),y:Y(94),w:S.w-32,h:30},'rar','Rarity: All ⌄')}
+ if(!short)s+=box({x:X(16),y:Y(S.h-30),w:S.w-32,h:26},'hint','Click to equip • Drag a slot or item onto the hotbar');
+ const G=L.grid;let side=G.w<400?84:G.w<640?92:104;side=Math.max(64,Math.min(side,G.h-8));const cell=side+8,cols=Math.max(1,Math.floor((G.w-12+8)/cell));
+ s+=`<div class="abs" style="left:${G.x}px;top:${G.y}px;width:${G.w}px;height:${G.h}px;overflow:hidden">`;
+ goods.forEach((it,i)=>{const x=4+(i%cols)*cell,y=4+Math.floor(i/cols)*cell;if(y>G.h)return;const nm=it.kg?`${it.name} (${it.kg})`:it.name;
+  s+=`<div class="abs card" style="left:${x}px;top:${y}px;width:${side}px;height:${side}px;box-shadow:inset 0 0 0 1.2px ${acc[it.rarity]}"><img src="${it.img}" style="width:${side-12}px;height:${side-37}px"><div class="nm" style="color:${txt[it.rarity]}">${nm}</div>${it.count>1?`<div class="cnt">x${it.count}</div>`:''}</div>`});
+ s+='</div>';
+ tabs.forEach((it,i)=>{const r=L.tabs[i];const cap=Math.max(11,Math.floor(r.w*.2));
+  s+=box(r,'tab'+(i==0?' on':''),`<img src="${it.img}" style="width:${r.w-8}px;height:${r.h-cap-7}px"><div class="cap" style="bottom:3px;font-size:${cap}px">${it.name}</div>`)});
+ const hb=L.hud.find(b=>b.n==='Hotbar');const side2=L.slot;const bar=[0,4,7,11,14,1,8,16,2,15];
+ for(let i=0;i<L.slots;i++){const it=goods[bar[i]];const x=hb.x+i*(side2+6),y=hb.y+hb.h-side2;
+  s+=`<div class="abs slot" style="left:${x}px;top:${y}px;width:${side2}px;height:${side2}px;box-shadow:inset 0 0 0 1.2px ${acc[it.rarity]}"><img src="${it.img}" style="width:${side2-6}px;height:${side2-24}px"><div class="num">${(i+1)%10}</div><div class="sn" style="color:${txt[it.rarity]}">${it.name}</div></div>`}
+ s+=`<div class="abs slot" style="left:${hb.x+L.slots*(side2+6)}px;top:${hb.y+hb.h-side2}px;width:${side2}px;height:${side2}px;color:#fff;text-align:center;line-height:${side2}px;font-size:14px">Bag</div>`;
+ s+=`<div class="lbl">MOCK-UP ${label}</div></div>`;return s}
+const which=new URLSearchParams(location.search).get('v');
+let html='';
+if(which==='phones'){html=`<div style="display:flex;gap:16px;padding:8px;align-items:flex-start"><div>${screen(layouts[1],'844×390 phone')}<div class="cap2">Landscape phone: 2×2 cards left of the sheet (HUD boxes dashed)</div></div><div>${screen(layouts[2],'390×844 phone')}<div class="cap2">Portrait phone: column left of the sheet</div></div></div>`}
+else html=screen(layouts[0],'1280×720 (offline render, not in-game)');
+document.getElementById('root').innerHTML=html;window.done=true;
+</script></body></html>

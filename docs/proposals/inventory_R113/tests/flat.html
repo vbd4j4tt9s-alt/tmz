@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#14291f;font-family:Arial,sans-serif;color:#dfe}
+.row{display:flex;gap:10px;padding:8px 12px;align-items:center}.lab{width:150px;font-size:14px}
+.cell{position:relative;width:96px;height:96px;border-radius:8px;background:#254c39;box-shadow:inset 0 0 0 1.2px #9ab098}
+.f{position:absolute;box-sizing:border-box}
+.t{position:absolute;right:8px;top:6px;background:rgba(0,0,0,.6);color:#ffe047;padding:3px 8px;border-radius:6px;font-size:12px}
+</style></head><body><div id="r" style="position:relative;padding-top:28px"></div><script type="module">
+const load=async n=>(await fetch(n)).json();const old=await load('flat_old.json'),neu=await load('flat_new.json');
+const names=['Forest pack','Gold pack','Watermelon seed','Gold blueberry seed','Apple','Watermelon','Diamond blueberry','Shovel','Bat'];
+function draw(n,W,H){const w=n.w*W,h=n.h*H;const x=n.x*W-n.ax*w,y=n.y*H-n.ay*h;const m=Math.min(w,h);
+ const rad=n.round!==null?Math.min(n.round*m,m/2):0;const bg=n.g?`linear-gradient(${n.g[2]+90}deg,${n.g[0]},${n.g[1]})`:n.c;
+ let s=`<div class="f" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;background:${bg};opacity:${1-n.t};border-radius:${rad}px;transform:rotate(${n.r}deg);${n.s?`border:1.5px solid ${n.s};`:''}">`;
+ for(const k of n.k)s+=draw(k,w,h);return s+'</div>'}
+const row=(lab,set)=>`<div class="row"><div class="lab">${lab}</div>${set.map(icon=>`<div class="cell"><div class="f" style="left:6px;top:5px;width:84px;height:84px">${icon.map(n=>draw(n,84,84)).join('')}</div></div>`).join('')}</div>`;
+document.getElementById('r').innerHTML=`<div class="t">MOCK-UP flat fallback icons (HTML render of the Frame layout)</div>`+row('R112 flat icons',old)+row('R113 flat icons',neu)+`<div class="row"><div class="lab"></div>${names.map(n=>`<div style="width:96px;font-size:11px;text-align:center">${n}</div>`).join('')}</div>`;window.done=true;
+</script></body></html>

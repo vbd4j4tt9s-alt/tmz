@@ -213,6 +213,9 @@ local function flat(holder,spec)
  elseif spec.Shovel then
   shade(shape(root,'Shaft',.46,.08,.08,.56,RGB(150,104,62),.4,40),RGB(180,130,80),RGB(118,80,46))
   outline(shade(shape(root,'Blade',.2,.52,.3,.32,RGB(170,178,186),.35,40),RGB(222,228,234),RGB(122,130,140)),RGB(70,76,84),1)
+ elseif spec.Tool and spec.Tool:GetAttribute('ChestChaseBat')then
+  local bat=shade(shape(root,'Barrel',.42,.06,.17,.66,RGB(178,139,91),.5,40),RGB(212,172,120),RGB(136,100,60),0);outline(bat,RGB(88,62,38),1)
+  shape(root,'Knob',.22,.6,.14,.1,RGB(43,39,37),.5,40)
  else
   local icon=require(RS:WaitForChild('GardenTheme')).ControlIcon(root,'Tools');icon.AnchorPoint=Vector2.new(.5,.5);icon.Position=UDim2.fromScale(.5,.5);icon.Size=UDim2.fromScale(.62,.62)
  end

@@ -1,0 +1,5 @@
+COLD fixture=typical tools=128  at rest after open: visible=24 fallback=0 (flat 0, blank 0) views=34 templates=16
+    40 px/frame: 102 frames, fallback cards/frame avg 5.00 max 12, frames with any fallback 79 (77%), fallback share 20.9% of 2442 card-frames, worst sim work 1.4 ms; settled: 12
+    80 px/frame:  52 frames, fallback cards/frame avg 11.13 max 15, frames with any fallback 51 (98%), fallback share 46.6% of 1242 card-frames, worst sim work 1.0 ms; settled: 9
+   160 px/frame:  26 frames, fallback cards/frame avg 15.42 max 19, frames with any fallback 26 (100%), fallback share 64.9% of 618 card-frames, worst sim work 2.0 ms; settled: 15
+  end: views=34 parts=646 templates=22 records=52
