@@ -199,3 +199,29 @@ Storm, average pack, "tier or better", time at 72 packs/h:
 | Lava x20K | 1 in 6 (5 min) | 1 in 35 (29 min) | 1 in 980 (14 h) | 1 in 2.6M (never) |
 | Crystal x1M | 1 in 4 (3 min) | 1 in 17 (14 min) | 1 in 205 (3 h) | 1 in 51.5K (716 h) |
 | Thunder x50M | 1 in 3 (3 min) | 1 in 11 (9 min) | 1 in 80 (1 h) | **1 in 1,031 (14 h)** |
+
+## Seed chances inside each pack type (R112b, biome with every rarity)
+
+Pack spawn mix: Common 38%, Uncommon 25%, Rare 15%, Epic 7%, Legendary 10%, Mythic 5%.
+
+No boots:
+
+| Pack | Common | Uncommon | Rare | Legendary | Mythic | Secret | Cosmic | King |
+|---|---|---|---|---|---|---|---|---|
+| Common | 1 in 1.7 | 1 in 4 | 1 in 8 | 1 in 30 | 1 in 200 | 1 in 10K | 1 in 1M | 1 in 1T |
+| Uncommon | 1 in 2.6 | 1 in 3 | 1 in 5 | 1 in 15 | 1 in 80 | 1 in 4K | 1 in 400K | 1 in 400B |
+| Rare | - | 1 in 2.4 | 1 in 2.5 | 1 in 7 | 1 in 30 | 1 in 1.67K | 1 in 167K | 1 in 167B |
+| Epic | - | - | 1 in 1.8 | 1 in 3 | 1 in 10 | 1 in 500 | 1 in 50K | 1 in 50B |
+| Legendary | - | - | 1 in 2.9 | 1 in 2.5 | 1 in 4 | 1 in 167 | 1 in 16.7K | 1 in 16.7B |
+| Mythic | - | - | - | 1 in 1.7 | 1 in 2.5 | 1 in 50 | 1 in 5K | 1 in 5B |
+
+Thunder Boots (x50M):
+
+| Pack | Common | Uncommon | Rare | Legendary | Mythic | Secret | Cosmic | King |
+|---|---|---|---|---|---|---|---|---|
+| Common | 1 in 2.6 | 1 in 4 | 1 in 8 | 1 in 7.3 | 1 in 12 | 1 in 70 | 1 in 833 | 1 in 20K |
+| Uncommon | 1 in 6.5 | 1 in 3 | 1 in 10 | 1 in 6.3 | 1 in 4.7 | 1 in 28 | 1 in 333 | 1 in 8K |
+| Rare | - | 1 in 5.9 | 1 in 5 | 1 in 11 | 1 in 2.2 | 1 in 12 | 1 in 139 | 1 in 3.3K |
+| Epic | - | - | 1 in 4.4 | 1 in 6 | 1 in 3 | 1 in 4 | 1 in 42 | 1 in 1K |
+| Legendary | - | - | 1 in 7.3 | 1 in 5 | 1 in 2.8 | 1 in 4 | 1 in 20 | 1 in 333 |
+| Mythic | - | - | - | 1 in 4.2 | 1 in 2.2 | 1 in 4 | 1 in 20 | 1 in 100 |
