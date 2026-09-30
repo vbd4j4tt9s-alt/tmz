@@ -106,8 +106,9 @@ for i=1,10 do
 end
 local filterButtons={}
 for i,name in ipairs({'All','Seeds','Fruit','Tools'})do
- local b=button(filters,name,'',UDim2.new(.25,-6,1,0),UDim2.new((i-1)*.25,0,0,0));filterButtons[name]=b;local caption=label(b,'Caption',UDim2.new(1,-8,1,0),UDim2.fromOffset(4,0),name,14)
- b.BackgroundColor3=C.Tile;Theme.ControlIcon(b,name).Name='TabIcon' -- R112: square icon cards; placed by layout.
+ local b=button(filters,name,'',UDim2.fromOffset(64,64),UDim2.new());filterButtons[name]=b;label(b,'Caption',UDim2.new(1,-4,0,18),UDim2.new(0,2,1,-20),name,13).ZIndex=3
+ -- R113: square picture cards outside the sheet: a pack (All), a seed, a fruit and the shovel, drawn like the items.
+ b.BackgroundColor3=C.Tile;selectionBorder(b);Pictures.ShowSample(picture(b),name,0);b:SetAttribute('Selected',name=='All')
  b.Activated:Connect(function()category=name;listDirty=true;scroll.CanvasPosition=Vector2.zero;renderRows()end)
 end
 local function rarity(tool)
@@ -137,6 +138,19 @@ local function stackKey(tool)
  local parts={group,tool.Name};for _,field in ipairs(stackFields[group])do table.insert(parts,tostring(tool:GetAttribute(field)))end
  return 'stack|'..table.concat(parts,'|')
 end
+local freeCards={}
+local function makeCard()
+ local b=button(scroll,'Item','',UDim2.fromOffset(92,92),UDim2.new());b.TextWrapped=true;b.BackgroundColor3=C.Tile
+ -- R112: big picture, then a small readable "Name (2.4kg)" under it.
+ local art=picture(b);art.Position=UDim2.fromOffset(6,5);art.Size=UDim2.new(1,-12,1,-37)
+ local name=label(b,'ItemName',UDim2.new(1,-8,0,28),UDim2.new(0,4,1,-31),'',12);name.ZIndex=3
+ local detail=label(b,'ItemTraits',UDim2.new(1,-8,0,13),UDim2.new(0,4,1,-45),'',10);detail.ZIndex=3
+ countBadge(b).Position=UDim2.fromOffset(4,4)
+ selectionBorder(b)
+ b.Activated:Connect(function()local key=b:GetAttribute('InventoryKey');if key and os.clock()>=suppressedUntil then equip(key)end end)
+ b.InputBegan:Connect(function(input)local key=b:GetAttribute('InventoryKey');if key then beginDrag(b,key,input)end end)
+ return b
+end
 renderRows=function()
  if not panel.Visible then return end
  local changed=listDirty
@@ -144,29 +158,28 @@ renderRows=function()
   table.clear(matched);local term=search.Text:lower()
   for key,e in pairs(State.Items)do if(category=='All'or kind(e.Tool)==category)and(rarityCategory=='All'or rarity(e.Tool)==rarityCategory)and Names.Search(e.Tool,Catalog):find(term,1,true)then table.insert(matched,{Key=key,Entry=e})end end
   table.sort(matched,function(a,b)return a.Entry.Order<b.Entry.Order end);listDirty=false
-  for name,b in pairs(filterButtons)do b.BackgroundColor3=name==category and C.TileOn or C.Tile end
+  for name,b in pairs(filterButtons)do b.BackgroundColor3=name==category and C.TileOn or C.Tile;b:SetAttribute('Selected',name==category)end
  end
  local width=scroll.AbsoluteSize.X;local side=width<400 and 84 or width<640 and 92 or 104;local cell=side+8;local cols=math.max(1,math.floor((math.max(1,width-12)+8)/cell))
  local canvas=math.ceil(#matched/cols)*cell+8
  local y=math.clamp(scroll.CanvasPosition.Y,0,math.max(0,canvas-scroll.AbsoluteSize.Y))
- local firstRow=math.max(0,math.floor(y/cell)-1);local lastRow=firstRow+math.ceil(scroll.AbsoluteSize.Y/cell)+2
+ -- R113: two rows kept above and below the view, so cards (and their pictures) are ready before they scroll in.
+ local firstRow=math.max(0,math.floor(y/cell)-2);local lastRow=math.floor(y/cell)+math.ceil(scroll.AbsoluteSize.Y/cell)+2
  local key=table.concat({firstRow,lastRow,cols,side,#matched},':')
  if not changed and viewKey==key then return end;viewKey=key
  scroll.CanvasSize=UDim2.fromOffset(0,canvas)
  if y~=scroll.CanvasPosition.Y then scroll.CanvasPosition=Vector2.new(0,y)end
- local used={}
- for index=firstRow*cols+1,math.min(#matched,(lastRow+1)*cols)do
-  local item=matched[index];local b=rows[item.Key];used[item.Key]=true
+ local used={};local last=math.min(#matched,(lastRow+1)*cols)
+ for index=firstRow*cols+1,last do used[matched[index].Key]=true end
+ -- R113: cards leaving the window are recycled (their picture is parked by look), never rebuilt per item.
+ for key,b in pairs(rows)do if not used[key]then rows[key]=nil;Pictures.Clear(b.Picture)
+  if #freeCards<32 then b.Visible=false;b.Name='SpareItem';b:SetAttribute('InventoryKey',nil);table.insert(freeCards,b)else b:Destroy()end
+ end end
+ for index=firstRow*cols+1,last do
+  local item=matched[index];local b=rows[item.Key]
   if not b then
-   b=button(scroll,'Item','',UDim2.fromOffset(side,side),UDim2.new());b.TextWrapped=true;b.BackgroundColor3=C.Tile;b:SetAttribute('InventoryKey',item.Key);rows[item.Key]=b
-   -- R112: big picture, then a small readable "Name (2.4kg)" under it.
-   local art=picture(b);art.Position=UDim2.fromOffset(6,5);art.Size=UDim2.new(1,-12,1,-37)
-   local name=label(b,'ItemName',UDim2.new(1,-8,0,28),UDim2.new(0,4,1,-31),'',12);name.ZIndex=3
-   local detail=label(b,'ItemTraits',UDim2.new(1,-8,0,13),UDim2.new(0,4,1,-45),'',10);detail.ZIndex=3
-   countBadge(b).Position=UDim2.fromOffset(4,4)
-   selectionBorder(b)
-   b.Activated:Connect(function()if os.clock()>=suppressedUntil then equip(b:GetAttribute('InventoryKey'))end end)
-   b.InputBegan:Connect(function(input)beginDrag(b,b:GetAttribute('InventoryKey'),input)end)
+   b=table.remove(freeCards)or makeCard()
+   b.Name='Item';b.Visible=true;b:SetAttribute('InventoryKey',item.Key);rows[item.Key]=b
   end
   b.Size=UDim2.fromOffset(side,side);b.Position=UDim2.fromOffset(4+(index-1)%cols*cell,4+math.floor((index-1)/cols)*cell)
   local tool=item.Entry.Tool;local name=rarity(tool)or''
@@ -176,8 +189,6 @@ renderRows=function()
   Pictures.Show(b.Picture,tool,2)
   b:SetAttribute('Selected',tool.Parent==player.Character)
  end
- -- Keep overlapping cells alive. Only retire cells after entering cells exist.
- for key,b in pairs(rows)do if not used[key]then b:Destroy();rows[key]=nil end end
 end
 
 rarityFilter.Activated:Connect(function()rarityMenu.Visible=not rarityMenu.Visible end)
@@ -205,6 +216,9 @@ refresh=function()
  end end end
  for tool,c in pairs(toolConns)do if tool.Parent~=bag and tool.Parent~=player.Character then c:Disconnect();toolConns[tool]=nil end end
  State:Reconcile(items);listDirty=true
+ -- R113: build every look in the bag ahead of time (time-sliced), in inventory order.
+ local ordered={};for _,e in pairs(items)do table.insert(ordered,e)end;table.sort(ordered,function(a,b)return a.Order<b.Order end)
+ for i,e in ipairs(ordered)do ordered[i]=e.Tool end;Pictures.Prefetch(ordered)
  local active=selectedKey and items[selectedKey];if not active or active.Tool.Parent~=player.Character then selectedKey=nil end
  local selectedTool=selectedKey and items[selectedKey].Tool
  selectedLabel.Text=selectedTool and weighedName(selectedTool)or''
@@ -221,6 +235,56 @@ refresh=function()
 end
 local function queue()
  if queued then return end;queued=true;task.defer(function()queued=false;if gui.Parent then refresh()end end)
+end
+-- R113: HUD boxes that stay on screen while the bag is open (same metrics HudLayout gives each HUD script).
+local function hudBoxes(m,w,h)
+ local shared=require(RS.HudLayout).HudBoxes
+ if shared then local b=shared(m,w,h,false);local t=m.Travel;if t then table.insert(b,{X=t.X,Y=t.Y,W=t.W,H=t.H})end;return b end
+ local b={{X=m.MenuX,Y=h/2+(m.MenuShiftY or 0)-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}}
+ local bar=(m.Slots+1)*m.SlotSize+m.Slots*6
+ table.insert(b,{X=w/2+(m.HotbarShiftX or 0)-bar/2,Y=h-m.HotbarBottom-m.SlotSize,W=bar,H=m.SlotSize})
+ for _,k in ipairs({'Speed','Cash','Gem'})do table.insert(b,{X=m[k..'X']or m.WalletX,Y=m[k..'Y'],W=m.WalletWidth,H=m.WalletHeight})end
+ if m.Phone then
+  local sw=(m.StatusHorizontal and 388 or 190)*m.StatusScale;local sh=(m.StatusHorizontal and 39 or 82)*m.StatusScale
+  table.insert(b,{X=w-12-sw,Y=8,W=sw,H=sh});for _,z in ipairs(m.ThumbZones or{})do table.insert(b,z)end
+ else
+  local sw=(m.StatusStacked and 190 or 337)*m.StatusScale;local sh=(m.StatusStacked and 211 or 125)*m.StatusScale
+  table.insert(b,{X=w-12-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh})
+ end
+ return b
+end
+-- Places the sheet and returns how the category cards go: 'Column' (left of the sheet) or 'Row' (above it, at x).
+local function placeTabs(m,w,h)
+ local boxes=hudBoxes(m,w,h);local gap=8
+ local function clear(x,y,bw,bh)
+  if x<4 or y<4 or x+bw>w-4 or y+bh>h-4 then return false end
+  for _,b in ipairs(boxes)do if x<b.X+b.W+4 and x+bw>b.X-4 and y<b.Y+b.H+4 and y+bh>b.Y-4 then return false end end
+  return true
+ end
+ local maxWidth,wanted=math.min(900,w*.86),math.min(620,h*.66)
+ local function place(width)
+  MenuStyle.Place(panel,pg,width,wanted)
+  local sw,sh=panel.Size.X.Offset,panel.Size.Y.Offset;return sw,sh,panel.Position.X.Offset,panel.Position.Y.Offset
+ end
+ -- Column: the sheet narrows (the pair stays centred) until the cards clear the HUD.
+ for _,t in ipairs({72,64,56,48})do
+  local width=maxWidth
+  while width>=math.min(maxWidth,420)do
+   local sw,sh,cx,cy=place(width);cx+=(t+gap)/2
+   if sw+t+gap<=w-16 and 4*t+18<=sh and clear(cx-sw/2-gap-t,cy-sh/2,t,4*t+18)then panel.Position=UDim2.fromOffset(cx,cy);return 'Column',t,0 end
+   width-=40
+  end
+ end
+ -- Row: the sheet moves down by one card; the row sits at its left edge, right edge or centre.
+ for _,t in ipairs({56,48,44})do
+  local sw,sh,cx,cy=place(maxWidth);local rowWidth=4*t+18;local top=cy-sh/2
+  if sh-t-gap>=180 then
+   for _,x in ipairs({0,sw-rowWidth,(sw-rowWidth)/2})do
+    if clear(cx-sw/2+x,top,rowWidth,t)then panel.Size=UDim2.fromOffset(sw,sh-t-gap);panel.Position=UDim2.fromOffset(cx,cy+(t+gap)/2);return 'Row',t,x end
+   end
+  end
+ end
+ local sw,sh,cx,cy=place(maxWidth);panel.Size=UDim2.fromOffset(sw,sh-52);panel.Position=UDim2.fromOffset(cx,cy+26);return 'Row',44,0
 end
 layout=function()
  local camera=workspace.CurrentCamera;local view=require(RS.HudLayout).Viewport(gui);local width=view.X
@@ -243,39 +307,33 @@ layout=function()
  end
  open.Size=UDim2.fromOffset(side,side);open.Position=UDim2.new(1,-side,0,0)
  if pg:GetAttribute('ChestHotbarReserve')~=side+78 then pg:SetAttribute('ChestHotbarReserve',side+78)end
- local height=view.Y;MenuStyle.Place(panel,pg,math.min(900,width*.86),math.min(620,height*.66))
- local compact=height<480 and width>540
- local title=panel.Title
- -- R112: wide panels get a left column of square category cards and a search box top-right.
- local sheetWidth,sheetHeight=panel.Size.X.Offset,panel.Size.Y.Offset;local column=not compact and sheetWidth>=560
- if column then
-  local searchWidth=math.clamp(math.floor(sheetWidth*.34),160,280);local tab=76;local left=16+tab+12
-  local tabHeight=math.clamp(math.floor((sheetHeight-102)/4)-6,48,76);local icon=math.floor(tabHeight*.46)
+ local height=view.Y
+ -- R113: category cards sit outside the sheet: a column on its left, else a row above it; never over the HUD.
+ local mode,tab,rowX=placeTabs(metrics,width,height)
+ local sheetWidth,sheetHeight=panel.Size.X.Offset,panel.Size.Y.Offset;local title=panel.Title
+ local tabGap=8;local caption=math.max(11,math.floor(tab*.2))
+ if mode=='Column'then filters.Position=UDim2.fromOffset(-(tab+tabGap),0);filters.Size=UDim2.fromOffset(tab,4*tab+18)
+ else filters.Position=UDim2.fromOffset(rowX,-(tab+tabGap));filters.Size=UDim2.fromOffset(4*tab+18,tab)end
+ for i,name in ipairs({'All','Seeds','Fruit','Tools'})do
+  local b=filterButtons[name];local at=(i-1)*(tab+6);b.Size=UDim2.fromOffset(tab,tab)
+  b.Position=mode=='Column'and UDim2.fromOffset(0,at)or UDim2.fromOffset(at,0)
+  b.Picture.Position=UDim2.fromOffset(4,3);b.Picture.Size=UDim2.new(1,-8,1,-(caption+7))
+  b.Caption.Position=UDim2.new(0,2,1,-(caption+4));b.Caption.Size=UDim2.new(1,-4,0,caption+2);Fit.Attach(b.Caption,caption,8)
+ end
+ if sheetWidth>=560 then
+  -- Wide sheets: search in the header, rarity row, then the grid.
+  local searchWidth=math.clamp(math.floor(sheetWidth*.34),160,280)
   title.Size=UDim2.new(1,-(searchWidth+120),0,40)
   search.Position=UDim2.new(1,-(searchWidth+58),0,12);search.Size=UDim2.fromOffset(searchWidth,32)
-  filters.Position=UDim2.fromOffset(16,58);filters.Size=UDim2.new(0,tab,1,-100)
-  for i,name in ipairs({'All','Seeds','Fruit','Tools'})do
-   local b=filterButtons[name];b.Size=UDim2.fromOffset(tab,tabHeight);b.Position=UDim2.fromOffset(0,(i-1)*(tabHeight+6))
-   b.TabIcon.AnchorPoint=Vector2.new(.5,0);b.TabIcon.Position=UDim2.new(.5,0,0,math.floor(tabHeight*.12));b.TabIcon.Size=UDim2.fromOffset(icon,icon)
-   b.Caption.Position=UDim2.new(0,4,1,-math.floor(tabHeight*.38));b.Caption.Size=UDim2.new(1,-8,0,math.floor(tabHeight*.34))
-  end
-  rarityFilter.Position=UDim2.fromOffset(left,58);rarityFilter.Size=UDim2.fromOffset(math.min(220,sheetWidth-left-16),30)
-  rarityMenu.Position=UDim2.fromOffset(left,92);rarityMenu.Size=UDim2.new(1,-(left+16),0,110)
-  scroll.Position=UDim2.fromOffset(left,96);scroll.Size=UDim2.new(1,-(left+16),1,-130)
+  rarityFilter.Position=UDim2.fromOffset(16,58);rarityFilter.Size=UDim2.fromOffset(math.min(220,sheetWidth-32),30)
+  rarityMenu.Position=UDim2.fromOffset(16,92);rarityMenu.Size=UDim2.new(1,-32,0,110)
+  scroll.Position=UDim2.fromOffset(16,96);scroll.Size=UDim2.new(1,-32,1,-130)
  else
-  title.Size=compact and UDim2.fromOffset(145,36)or UDim2.new(1,-65,0,40)
-  search.Position=compact and UDim2.fromOffset(170,12)or UDim2.fromOffset(16,54)
-  search.Size=compact and UDim2.new(1,-234,0,30)or UDim2.new(1,-32,0,36)
-  filters.Position=UDim2.fromOffset(16,compact and 56 or 98);filters.Size=compact and UDim2.new(.68,-24,0,28)or UDim2.new(1,-32,0,32)
-  for i,name in ipairs({'All','Seeds','Fruit','Tools'})do
-   local b=filterButtons[name];b.Size=UDim2.new(.25,-6,1,0);b.Position=UDim2.new((i-1)*.25,0,0,0)
-   b.TabIcon.AnchorPoint=Vector2.new(0,.5);b.TabIcon.Position=UDim2.new(0,6,.5,0);b.TabIcon.Size=UDim2.fromOffset(14,14)
-   b.Caption.Position=UDim2.fromOffset(22,0);b.Caption.Size=UDim2.new(1,-26,1,0)
-  end
-  rarityFilter.Position=compact and UDim2.new(.68,0,0,56)or UDim2.fromOffset(16,138)
-  rarityFilter.Size=compact and UDim2.new(.32,-16,0,28)or UDim2.new(1,-32,0,30)
-  rarityMenu.Position=UDim2.fromOffset(16,compact and 88 or 174);rarityMenu.Size=UDim2.new(1,-32,0,110)
-  scroll.Position=UDim2.fromOffset(16,compact and 94 or 178);scroll.Size=UDim2.new(1,-32,1,compact and -130 or -218)
+  title.Size=UDim2.new(1,-65,0,40)
+  search.Position=UDim2.fromOffset(16,54);search.Size=UDim2.new(1,-32,0,34)
+  rarityFilter.Position=UDim2.fromOffset(16,94);rarityFilter.Size=UDim2.new(1,-32,0,30)
+  rarityMenu.Position=UDim2.fromOffset(16,128);rarityMenu.Size=UDim2.new(1,-32,0,110)
+  scroll.Position=UDim2.fromOffset(16,132);scroll.Size=UDim2.new(1,-32,1,-166)
  end
  renderRows()
 end
@@ -291,7 +349,7 @@ end
 connect(player.ChildAdded,function(child)if child:IsA('Backpack')then watchBag(child)end end)
 watchBag(bag);connect(player.CharacterAdded,character);character(player.Character)
 connect(search:GetPropertyChangedSignal('Text'),function()listDirty=true;scroll.CanvasPosition=Vector2.zero;renderRows()end)
-connect(scroll:GetPropertyChangedSignal('CanvasPosition'),renderRows);connect(scroll:GetPropertyChangedSignal('AbsoluteSize'),renderRows)
+connect(scroll:GetPropertyChangedSignal('CanvasPosition'),function()Pictures.Hurry();renderRows()end);connect(scroll:GetPropertyChangedSignal('AbsoluteSize'),renderRows)
 connect(pg:GetAttributeChangedSignal('SeedMenu'),function()dock.Visible=(pg:GetAttribute('SeedMenu')==nil or pg:GetAttribute('SeedMenu')=='Inventory');if panel.Visible and pg:GetAttribute('SeedMenu')~='Inventory'then toggle(false)end end)
 connect(Input.InputChanged,function(input)
  if not drag then return end

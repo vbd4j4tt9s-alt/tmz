@@ -24,7 +24,13 @@ local function boxes(m,w,h,touch)
   local sw=(m.StatusStacked and 190 or 337)*m.StatusScale;local sh=(m.StatusStacked and 211 or 125)*m.StatusScale
   b[#b+1]={N='Status',X=w-12-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh}
   --owner tools metric is unused by any consumer
+  b[#b+1]={N='OwnerTools',X=10,Y=8,W=48,H=48}
  end
+ -- R113: BASE/TRACK pair. UnderWheel pairs hide while the wheel is open, so they may share space with options.
+ local t=m.Travel
+ if t then for i,n in ipairs({'TravelBase','TravelTrack'})do
+  local k=i-1;b[#b+1]={N=n,X=t.X+(t.Horizontal and k*(t.Size+t.Gap)or 0),Y=t.Y+(t.Horizontal and 0 or k*(t.Size+t.Gap)),W=t.Size,H=t.Size,Under=t.UnderWheel,Travel=true}
+ end end
  return b
 end
 local views={}
@@ -39,14 +45,16 @@ for _,v in ipairs(views)do
   for i=1,#b do local a=b[i]
    if a.X<-0.5 or a.Y<-0.5 or a.X+a.W>w+.5 or a.Y+a.H>h+.5 then problems[#problems+1]=a.N..' offscreen' end
    for j=i+1,#b do local c=b[j]
-    if not(a.Zone and c.Zone)and not(a.Soft or c.Soft)and ov(a,c,0)then
+    local wheel=(a.Under and c.N:sub(1,3)=='Opt')or(c.Under and a.N:sub(1,3)=='Opt')
+    if not(a.Zone and c.Zone)and not wheel and(not(a.Soft or c.Soft)or a.Travel or c.Travel)and ov(a,c,(a.Travel or c.Travel)and 4 or 0)then
      -- Thumb zones only matter for real controls; details row is soft (hidden automatically if flagged).
      problems[#problems+1]=a.N..'x'..c.N
     end
    end
   end
+  if not m.Travel then problems[#problems+1]='no travel spot' elseif m.Travel.Size<44 then problems[#problems+1]='travel too small' end
   total+=#problems
-  print(string.format('%s %4dx%-4d %s hub=%d opt=%d slot=%d slots=%d wallet=%dx%d | %s',touch and'TOUCH'or'PC   ',w,h,ctl and'ctl'or'   ',m.MenuSize,m.MenuOptionSize,m.SlotSize,m.Slots,m.WalletWidth,m.WalletHeight,#problems==0 and'ok'or table.concat(problems,', ')))
+  print(string.format('%s %4dx%-4d %s hub=%d opt=%d slot=%d slots=%d wallet=%dx%d tp=%s | %s',touch and'TOUCH'or'PC   ',w,h,ctl and'ctl'or'   ',m.MenuSize,m.MenuOptionSize,m.SlotSize,m.Slots,m.WalletWidth,m.WalletHeight,m.Travel and string.format('%d,%d %d%s',m.Travel.X,m.Travel.Y,m.Travel.Size,m.Travel.UnderWheel and'W'or'')or'-',#problems==0 and'ok'or table.concat(problems,', ')))
  end
 end
 print('TOTAL OVERLAPS',total)

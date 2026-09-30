@@ -21,11 +21,11 @@ end
 local function serial(player)
     player:SetAttribute('MovementResetSerial',(player:GetAttribute('MovementResetSerial')or 0)+1)
 end
-function M.Reset(player)
+function M.Reset(player,grace)
     local c,h,r=root(player)
     if r then
         local now=os.clock()
-        M.Records[player]={Character=c,At=now,Frame=r.CFrame,Grace=now+.25,Budget=M.Config and Motion.Burst(speed(player))or 12}
+        M.Records[player]={Character=c,At=now,Frame=r.CFrame,Grace=now+(tonumber(grace)or .25),Budget=M.Config and Motion.Burst(speed(player))or 12}
         serial(player)
     else M.Records[player]=nil end
 end

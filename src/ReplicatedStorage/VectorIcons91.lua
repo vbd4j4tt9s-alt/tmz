@@ -61,6 +61,16 @@ function I.Draw(parent,kind,silhouette)
  elseif kind=='Forest'then
   shape('Trunk',.45,.54,.12,.32,C(157,104,63),0,.12,true)
   for i=0,2 do local size=.29+i*.13;shape('Pine tier',.5-size/2,.17+i*.16,size,size,C(53,177-i*15,93),45,.10,true)end
+ elseif kind=='Home'then -- R113: BASE travel button
+  shape('Roof',.28,.17,.44,.44,C(239,84,84),45,.08,true)
+  shape('Walls',.24,.42,.52,.44,cream,0,.06,true)
+  shape('Door',.43,.60,.14,.26,C(157,104,63),0,.2,true)
+ elseif kind=='Track'then -- R113: TRACK travel button (start flag on the Forest track)
+  shape('Ground',.12,.80,.76,.10,green,0,.4,true)
+  shape('Pole',.27,.12,.07,.72,C(236,244,255),0,.3,true)
+  shape('Flag',.33,.14,.46,.30,gold,0,.08,true)
+  shape('Flag check',.47,.14,.14,.15,ink,0,0)
+  shape('Flag check',.61,.29,.14,.15,ink,0,0)
  else
   shape('Stem',.47,.40,.065,.42,green,0,.4)
   leaf(.20,.23,.35,.20,green,30);leaf(.50,.32,.30,.18,C(157,238,106),-28)

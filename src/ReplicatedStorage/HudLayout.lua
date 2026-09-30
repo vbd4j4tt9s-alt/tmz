@@ -4,6 +4,47 @@ local function overlaps(a,b,pad)
  pad=pad or 0
  return a.X<b.X+b.W+pad and a.X+a.W>b.X-pad and a.Y<b.Y+b.H+pad and a.Y+a.H>b.Y-pad
 end
+-- R113: BASE/TRACK travel pair. First candidate that clears every HUD box by 6px wins; a spot to the
+-- right of the hub is only used with Travel.UnderWheel=true (the pair hides while the wheel is open).
+function L.HudBoxes(m,w,h,wheel)
+ local b={};local shift=m.MenuShiftY or 0
+ b[#b+1]={N='Hub',X=m.MenuX,Y=h/2+shift-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}
+ if wheel then for i,o in ipairs(m.MenuOffsets)do b[#b+1]={N='Opt'..i,X=m.MenuX+(m.MenuSize-m.MenuOptionSize)/2+o.X,Y=h/2+shift-m.MenuOptionSize/2+o.Y,W=m.MenuOptionSize,H=m.MenuOptionSize}end end
+ local bw=(m.Slots+1)*m.SlotSize+m.Slots*6;local detail=m.HotbarDetails~=false and 44 or 0
+ b[#b+1]={N='Hotbar',X=w/2+(m.HotbarShiftX or 0)-bw/2,Y=h-m.HotbarBottom-m.SlotSize-detail,W=bw,H=m.SlotSize+detail}
+ for _,k in ipairs({'Speed','Cash','Gem'})do b[#b+1]={N='Wallet'..k,X=m[k..'X']or m.WalletX,Y=m[k..'Y'],W=m.WalletWidth,H=m.WalletHeight}end
+ if m.Phone then
+  local sw=(m.StatusHorizontal and 388 or 190)*m.StatusScale;local sh=(m.StatusHorizontal and 39 or 82)*m.StatusScale
+  b[#b+1]={N='Status',X=w-12-sw,Y=8,W=sw,H=sh}
+  for i,z in ipairs(m.ThumbZones)do b[#b+1]={N=i==1 and'ThumbL'or'ThumbR',X=z.X,Y=z.Y,W=z.W,H=z.H}end
+ else
+  local sw=(m.StatusStacked and 190 or 337)*m.StatusScale;local sh=(m.StatusStacked and 211 or 125)*m.StatusScale
+  b[#b+1]={N='Status',X=w-12-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh}
+  b[#b+1]={N='OwnerTools',X=10,Y=8,W=48,H=48}
+ end
+ return b
+end
+local function travel(m,w,h)
+ local hubY=h/2+(m.MenuShiftY or 0)-m.MenuSize/2;local gap=8
+ local near={L.HudBoxes(m,w,h,true),L.HudBoxes(m,w,h,false)}
+ local function clear(x,y,bw,bh,boxes)
+  if x<8 or y<8 or x+bw>w-8 or y+bh>h-8 then return false end
+  for _,b in ipairs(boxes)do if overlaps({X=x,Y=y,W=bw,H=bh},b,6)then return false end end
+  return true
+ end
+ for _,size in ipairs({m.Phone and 52 or 56,48,44})do
+  local below=hubY+m.MenuSize+10
+  local spots={{m.MenuX,below,true,false},{m.MenuX+(m.MenuSize-size)/2,below,false,false},
+   {m.MenuX+m.MenuSize+10,hubY+(m.MenuSize-size)/2,true,true},{m.MenuX+m.MenuSize+10,hubY+m.MenuSize/2-size-gap/2,false,true}}
+  for _,s in ipairs(spots)do
+   local bw=s[3]and size*2+gap or size;local bh=s[3]and size or size*2+gap
+   if clear(s[1],s[2],bw,bh,near[s[4]and 2 or 1])then
+    return {X=s[1],Y=s[2],W=bw,H=bh,Size=size,Gap=gap,Horizontal=s[3],UnderWheel=s[4]}
+   end
+  end
+ end
+ return nil
+end
 local function phoneLayout(w,h,controls)
  local portrait=h>w;local side=56;local gap=6
  local menuSize=(portrait and h<520 or not portrait and h<280)and 52 or 64
@@ -53,7 +94,7 @@ local function phoneLayout(w,h,controls)
  for _,o in ipairs(offsets)do
   if overlaps(details,{X=10+o.X,Y=center-menuHalf+o.Y,W=menuSize,H=menuSize},4)then showDetails=false end
  end
- return {Phone=true,PhonePortrait=portrait,Slots=slots,SlotSize=side,HotbarBottom=hotbarBottom,HotbarShiftX=barCenter-w/2,HotbarDetails=showDetails,
+ local m={Phone=true,PhonePortrait=portrait,Slots=slots,SlotSize=side,HotbarBottom=hotbarBottom,HotbarShiftX=barCenter-w/2,HotbarDetails=showDetails,
   NavSize=menuSize,NavWidth=menuSize,NavGap=6,NavX=10,NavY=center-menuHalf,NavHorizontal=false,
   WalletWidth=walletW,WalletHeight=walletHeight,WalletX=walletX,WalletPlus=44,WalletIcon=horizontal and 22 or 26,WalletFont=20,
   WalletHorizontal=horizontal,WalletCompactTap=horizontal,
@@ -63,7 +104,7 @@ local function phoneLayout(w,h,controls)
   Short=h<480,Compact=true,StatusScale=statusScale,StatusTop=8,StatusBottom=h-8-timerHeight,StatusStacked=false,StatusHorizontal=statusHorizontal,StatusSideRight=math.min(0,statusWidth/statusScale-walletW/statusScale)-10,
   HideOwnerTools=true,OwnerToolsSize=48,OwnerToolsX=10,OwnerToolsY=8,
   ThumbZones={left,right}}
-
+ m.Travel=travel(m,w,h);return m
 end
 function L.Read(view,touch,controls)
  local w,h=math.max(240,view.X),math.max(150,view.Y)
@@ -142,9 +183,10 @@ function L.Read(view,touch,controls)
  end
  cashY=speedY+walletH+gap;gemY=cashY+walletH+gap
 
- return {Slots=slots,SlotSize=side,HotbarBottom=hotbarBottom,NavSize=nav,NavWidth=navWidth,NavGap=navGap,NavX=10,NavY=navY,NavHorizontal=short,
+ local m={Slots=slots,SlotSize=side,HotbarBottom=hotbarBottom,NavSize=nav,NavWidth=navWidth,NavGap=navGap,NavX=10,NavY=navY,NavHorizontal=short,
   WalletWidth=walletW,WalletHeight=walletH,WalletX=walletX,MenuSize=hubSize,MenuX=10,MenuOptionSize=optionSize,MenuOffsets=offsets,MenuRadius=radius,MenuRadiusX=radiusX,SpeedY=speedY,CashY=cashY,GemY=gemY,Short=short,Compact=compact,
   StatusScale=statusScale,StatusBottom=bottom,StatusStacked=stacked,OwnerToolsSize=ownerSize,OwnerToolsY=ownerY}
+ m.Travel=travel(m,w,h);return m
 end
 function L.Viewport(gui)
  local root=gui and(gui:IsA('ScreenGui')and gui or gui:FindFirstAncestorOfClass('ScreenGui'))
