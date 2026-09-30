@@ -267,18 +267,18 @@ local function placeTabs(m,w,h)
   MenuStyle.Place(panel,pg,width,wanted)
   return panel.Size.X.Offset,panel.Size.Y.Offset,panel.Position.X.Offset,panel.Position.Y.Offset
  end
- -- Left: for each card size (1 or 2 cards wide) the widest sheet whose cards clear the HUD (sliding the cards up or
- -- down along the sheet edge if needed); the arrangement leaving the biggest grid wins, bigger cards breaking ties.
+ -- Left: for each card size (1 or 2 cards wide) the widest sheet whose cards clear the HUD (sliding the cards down the sheet edge,
+ -- or up to 48 px above it, if needed); best grid area x card size wins, a single column preferred.
  local best
- local function left(t,across,minWidth)
+ local function left(t,across,minWidth,lift)
   local bw,bh=across*t+(across-1)*6,(4/across)*t+(4/across-1)*6;local width=maxWidth
   while width>=minWidth do
    local sw,sh,cx,cy=place(width);cx+=(bw+gap)/2;local top=cy-sh/2;local x=cx-sw/2-gap-bw
    if sw+bw+gap<=w-16 then
-    local shifts={0};for k=8,sh,8 do if k+bh<=sh then table.insert(shifts,k)end;if top-k>=8 then table.insert(shifts,-k)end end
+    local shifts={0};for k=8,sh,8 do if k+bh<=sh then table.insert(shifts,k)end;if k<=lift and top-k>=8 then table.insert(shifts,-k)end end
     for _,dy in ipairs(shifts)do
      if bh-math.max(0,-dy)<=sh and clear(x,top+dy,bw,bh)then
-      local score=sw*sh*(.7+.3*t/72)*(across==1 and 1.05 or 1)
+      local score=sw*sh*(t/72)*(across==1 and 1.25 or 1)*(1-math.max(0,-dy)/300)
       if not best or score>best.Score then best={Score=score,Width=width,T=t,Across=across,Dy=dy,Shift=(bw+gap)/2}end
       return
      end
@@ -287,7 +287,9 @@ local function placeTabs(m,w,h)
    width-=20
   end
  end
- for _,t in ipairs({72,64,56,48,44})do left(t,1,math.min(maxWidth,220));left(t,2,math.min(maxWidth,220))end
+ for _,lift in ipairs({48,h})do -- tiny screens may lift the cards further above the sheet
+  if not best then for _,t in ipairs({72,64,56,48,44})do left(t,1,math.min(maxWidth,220),lift);left(t,2,math.min(maxWidth,220),lift)end end
+ end
  if best then
   local _,_,cx,cy=place(best.Width);panel.Position=UDim2.fromOffset(cx+best.Shift,cy);return 'Left',best.T,best.Across,best.Dy
  end
@@ -322,7 +324,9 @@ layout=function()
   b.Number.TextSize=math.max(11,math.floor(side*.2));b.Number.Size=UDim2.fromOffset(math.floor(side*.34),math.floor(side*.29))
  end
  open.Size=UDim2.fromOffset(side,side);open.Position=UDim2.new(1,-side,0,0)
- if pg:GetAttribute('ChestHotbarReserve')~=side+78 then pg:SetAttribute('ChestHotbarReserve',side+78)end
+ -- R113: raised hotbars (portrait phones sit it above the thumb controls) reserve their real height, so sheets end above it.
+ local reserve=side+78+math.max(0,(metrics.HotbarBottom or 12)-12)
+ if pg:GetAttribute('ChestHotbarReserve')~=reserve then pg:SetAttribute('ChestHotbarReserve',reserve)end
  local height=view.Y
  -- R113: category cards sit outside the sheet: a column (or 2x2 block) on its left, else a row above it; never over the HUD.
  local mode,tab,across,rowX=placeTabs(metrics,width,height) -- rowX: row x, or the column's vertical shift
@@ -335,10 +339,10 @@ layout=function()
   b.Picture.Position=UDim2.fromOffset(4,3);b.Picture.Size=UDim2.new(1,-8,1,-(caption+7))
   b.Caption.Position=UDim2.new(0,2,1,-(caption+4));b.Caption.Size=UDim2.new(1,-4,0,caption+2);Fit.Attach(b.Caption,caption,8)
  end
- local short=sheetHeight<300 and sheetWidth>=440;panel.Hint.Visible=not short
+ local short=sheetHeight<300;panel.Hint.Visible=not short;title.Visible=not short or sheetWidth>=440
  if short then
-  -- Short sheets (landscape phones): title, search and rarity share the header; the grid gets the rest.
-  local rarityWidth=math.min(150,math.floor(sheetWidth*.24));local searchWidth=math.clamp(sheetWidth-(126+rarityWidth+66),110,260)
+  -- Short sheets (phones): search and rarity share the header (with the title when it fits); the grid gets the rest.
+  local room=sheetWidth-66-(title.Visible and 126 or 16);local rarityWidth=math.min(150,math.floor(room*.38));local searchWidth=room-rarityWidth-8
   title.Size=UDim2.fromOffset(110,36)
   search.Position=UDim2.new(1,-(searchWidth+rarityWidth+66),0,12);search.Size=UDim2.fromOffset(searchWidth,30)
   rarityFilter.Position=UDim2.new(1,-(rarityWidth+58),0,12);rarityFilter.Size=UDim2.fromOffset(rarityWidth,30)

@@ -101,6 +101,8 @@ local render=Run.RenderStepped:Connect(function(dt)
   return
  end
  local now=workspace:GetServerTimeNow()
+ local character=Players.LocalPlayer and Players.LocalPlayer.Character
+ local own=character and character:FindFirstChild('HumanoidRootPart');local low=Fx.Low()
  for model,r in pairs(records) do
   if not model:IsDescendantOf(workspace) or r.Rig.Parent~=model or not r.Root.Parent then clear(model);continue end
   local state=model:GetAttribute('GuardianBehavior') or 'GUARDING'
@@ -127,15 +129,13 @@ local render=Run.RenderStepped:Connect(function(dt)
   elseif asleep or state=='RETURNING' or distance>=110 then r.Sound:Stop() end
   -- R113: wake roar starts when a sleeping keeper is first seen alerted.
   local wasAsleep=r.State=='GUARDING'or r.State=='SLEEPING'
-  if wasAsleep and not asleep and state~='RETURNING'then r.WakeAt=now end
+  if wasAsleep and(state=='ALERTED'or state=='CHASING'or state=='DASHING')then r.WakeAt=now end
   r.State=state
   -- R112: when this client first saw the attack; the wind-back restarts there instead of popping in.
   local seenAttack=model:GetAttribute('KeeperAttackAt');if seenAttack~=r.AttackAt then r.AttackAt=seenAttack;r.AttackSeen=now end
   -- R113: effects run every frame (footfall phase), culled by distance inside KeeperFx.
-  local character=Players.LocalPlayer and Players.LocalPlayer.Character
-  local own=character and character:FindFirstChild('HumanoidRootPart')
   local localDistance=own and(own.Position-r.Root.Position).Magnitude or distance
-  local low=Fx.Low();local hunting=state=='CHASING'or state=='DASHING'or state=='ALERTED'or state=='ATTACKING'
+  local hunting=state=='CHASING'or state=='DASHING'or state=='ALERTED'or state=='ATTACKING'
   local fxc={Now=now,Distance=distance,LocalDistance=localDistance,Asleep=asleep,Awake=motion.Awake,Moving=motion.Moving,
    Cycle=motion.Cycle,Urgency=motion.Urgency,Chasing=hunting,Frame=motion.Frame,Frames=r.LastTarget,Low=low}
   KFx.Step(r.Fx,fxc)

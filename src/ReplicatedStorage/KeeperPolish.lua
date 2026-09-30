@@ -10,13 +10,13 @@ local function smooth(t)t=math.clamp(t,0,1);return t*t*(3-2*t)end
 -- Look: max head yaw (rad); Pitch: max head pitch; Lean: weight-shift pitch; Roar: head lift on wake;
 -- Crouch: wake anticipation drop (studs); Arms: roar arm flare; Breath: sleep rise (studs); Taunt: catch style.
 P.Tune={
- [1]={Look=.40,Pitch=.22,Lean=.045,Roar=.30,Crouch=.9,Arms=.50,Breath=0,Rear=0,Taunt='Roar'},
+ [1]={Look=.30,Pitch=.10,Lean=.045,Roar=.30,Crouch=.9,Arms=.50,Breath=0,Rear=0,Taunt='Roar'},
  [2]={Look=.70,Pitch=.35,Lean=0,Roar=.40,Crouch=0,Rise=1.3,Breath=.05,Rear=0,Taunt='Hiss'},
  [3]={Look=.60,Pitch=.30,Lean=.07,Roar=.45,Crouch=.45,Breath=.06,Rear=.10,Taunt='Roar'},
  [4]={Look=.55,Pitch=.30,Lean=.06,Roar=.50,Crouch=.50,Breath=.07,Rear=.09,Taunt='Roar'},
  [5]={Look=.40,Pitch=.20,Lean=.035,Roar=.22,Crouch=.8,Arms=.20,Breath=.05,Rear=0,Taunt='Roar'},
  [6]={Look=.55,Pitch=.30,Lean=.07,Roar=.45,Crouch=.50,Arms=.55,Breath=.07,Rear=.08,Taunt='Beat'},
- [7]={Look=.35,Pitch=.18,Lean=.035,Roar=.22,Crouch=1.3,Arms=.40,Breath=.06,Rear=0,Taunt='Roar'},
+ [7]={Look=.35,Pitch=.12,Lean=.035,Roar=.22,Crouch=1.3,Arms=.40,Breath=.06,Rear=0,Taunt='Roar'},
 }
 P.WakeSeconds=1.35;P.TauntSeconds=1.6;P.StrikeBlendIn=.08;P.StrikeBlendOut=.16
 local rigs={}
