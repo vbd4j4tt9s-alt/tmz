@@ -1,0 +1,74 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#000;font-family:'Fredoka One','Arial Rounded MT Bold',Arial,sans-serif}
+.screen{position:relative;width:1280px;height:720px;overflow:hidden;background:linear-gradient(#8fc6ea 0,#bfe3f5 38%,#6aa84f 38%,#4e8a3a 100%)}
+.ground{position:absolute;left:0;top:274px;width:1280px;height:446px;background:repeating-linear-gradient(90deg,rgba(0,0,0,.05) 0 80px,transparent 80px 160px)}
+.panel{position:absolute;left:190px;top:92px;width:900px;height:475px;border-radius:8px;background:rgba(20,46,35,.9);box-shadow:inset 0 0 0 1.5px rgba(147,255,69,.5)}
+.header{position:absolute;left:8px;top:8px;right:8px;height:38px;border-radius:10px;background:linear-gradient(90deg,rgba(65,99,77,.7),rgba(65,99,77,.1))}
+.title{position:absolute;left:16px;top:14px;color:#fff;font-size:20px}
+.search{position:absolute;right:58px;top:12px;width:280px;height:32px;border-radius:8px;background:#0e2119;box-shadow:inset 0 0 0 1px rgba(106,144,225,.7);color:#cce0ff;font-size:14px;line-height:32px;padding-left:10px;box-sizing:border-box}
+.close{position:absolute;right:12px;top:10px;width:36px;height:36px;border-radius:8px;background:#30366a;color:#fff;text-align:center;line-height:36px;font-size:22px}
+.tab{position:absolute;left:16px;width:76px;height:76px;border-radius:8px;background:#254c39;color:#fff;font-size:14px;text-align:center;box-shadow:inset 0 0 0 1.2px rgba(154,176,152,.8)}
+.tab.on{background:#41784c;box-shadow:inset 0 0 0 2px #fff}
+.tab .ic{position:absolute;left:21px;top:8px;width:34px;height:34px}
+.tab .cap{position:absolute;left:0;right:0;bottom:8px}
+.rar{position:absolute;left:104px;top:58px;width:220px;height:30px;border-radius:8px;background:#254c39;color:#fff;font-size:14px;line-height:30px;text-align:center}
+.grid{position:absolute;left:104px;top:96px;width:780px;height:345px;overflow:hidden}
+.card{position:absolute;width:104px;height:104px;border-radius:8px;background:#254c39}
+.card img,.slot img{position:absolute;left:6px;top:5px;width:92px;height:67px;object-fit:contain}
+.nm{position:absolute;left:4px;right:4px;bottom:3px;height:28px;font-size:12px;line-height:13.5px;text-align:center;display:flex;align-items:center;justify-content:center;-webkit-text-stroke:.5px #13201c;paint-order:stroke}
+.tr{position:absolute;left:4px;right:4px;bottom:32px;font-size:10px;text-align:center;color:#fff;background:linear-gradient(90deg,#ffd047,#fff,#ffd047);-webkit-background-clip:text;color:transparent}
+.cnt{position:absolute;left:4px;top:4px;padding:0 5px;height:16px;line-height:16px;border-radius:8px;background:rgba(0,0,0,.65);color:#fff;font-size:12px}
+.gem{position:absolute;right:3px;top:3px;width:10px;height:10px;transform:rotate(45deg)}
+.hint{position:absolute;left:16px;bottom:8px;color:#cce0ff;font-size:12px}
+.dock{position:absolute;left:274px;top:642px}
+.slot{position:absolute;top:0;width:66px;height:66px;border-radius:8px;background:rgba(48,54,106,.9)}
+.slot img{left:3px;top:3px;width:60px;height:40px}
+.slot .num{position:absolute;left:3px;top:1px;color:#cce0ff;font-size:13px}
+.slot .sn{position:absolute;left:2px;right:2px;bottom:1px;height:19px;font-size:8.5px;line-height:9.5px;text-align:center;display:flex;align-items:center;justify-content:center;-webkit-text-stroke:.35px #13201c;paint-order:stroke}
+.slot .kg{position:absolute;right:3px;bottom:22px;font-size:9px;color:#c8d5df;-webkit-text-stroke:.4px #11 1b2f}
+.slot .cnt{top:auto;bottom:22px;left:3px;height:13px;line-height:13px;font-size:10px}
+.sel{box-shadow:inset 0 0 0 2px #fff!important}
+.lbl{position:absolute;right:10px;top:8px;background:rgba(0,0,0,.6);color:#ffe047;padding:4px 10px;border-radius:6px;font-size:14px}
+.selname{position:absolute;left:274px;width:792px;top:598px;text-align:center;color:#ffd153;font-size:14px;-webkit-text-stroke:.6px #3e2008}
+</style></head><body><div id="root"></div>
+<script type="module">
+import * as THREE from './three.module.js';
+const items=await (await fetch('geo.json')).json();
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});renderer.setSize(256,256);renderer.setClearColor(0,0);
+function wedge(){const g=new THREE.BufferGeometry();const v=[[-.5,-.5,-.5],[.5,-.5,-.5],[-.5,-.5,.5],[.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]];
+ const f=[[0,2,1],[1,2,3],[2,4,3],[3,4,5],[0,1,4],[1,5,4],[0,4,2],[1,3,5]];const pos=[];for(const t of f)for(const i of t)pos.push(...v[i]);g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();return g}
+function shot(it,w,h){const scene=new THREE.Scene();scene.add(new THREE.AmbientLight(0xffffff,1.25));const d=new THREE.DirectionalLight(0xfff7e4,2.2);d.position.set(.45,.8,-1);scene.add(d);
+ const d2=new THREE.DirectionalLight(0xffffff,.5);d2.position.set(-.5,.3,1);scene.add(d2);
+ for(const p of it.parts){let g;const s=p.s;
+  if(p.mesh&&p.mesh.type==='Sphere'){g=new THREE.SphereGeometry(.5,24,16);g.scale(s[0]*p.mesh.scale[0],s[1]*p.mesh.scale[1],s[2]*p.mesh.scale[2])}
+  else if(p.shape==='Ball'){const r=Math.min(...s)/2;g=new THREE.SphereGeometry(r,24,16)}
+  else if(p.shape==='Cylinder'){g=new THREE.CylinderGeometry(Math.min(s[1],s[2])/2,Math.min(s[1],s[2])/2,s[0],24);g.rotateZ(-Math.PI/2)}
+  else if(p.c==='WedgePart'){g=wedge();g.scale(...s)}
+  else if(p.c==='MeshPart'){g=new THREE.BoxGeometry(...s);}
+  else g=new THREE.BoxGeometry(...s);
+  const col=new THREE.Color(p.col[0],p.col[1],p.col[2]);const neon=p.mat==='Neon',glass=p.mat==='Glass',metal=p.mat==='Metal';
+  const m=new THREE.MeshStandardMaterial({color:col,roughness:metal?.35:.7,metalness:metal?.55:0,transparent:p.t>0||glass,opacity:1-Math.max(p.t,glass?.25:0),emissive:neon?col:0x000000,emissiveIntensity:neon?.8:0});
+  const mesh=new THREE.Mesh(g,m);const r=p.r;const M=new THREE.Matrix4().set(r[0],r[1],r[2],p.p[0],r[3],r[4],r[5],p.p[1],r[6],r[7],r[8],p.p[2],0,0,0,1);mesh.applyMatrix4(M);scene.add(mesh)}
+ const c=it.camera;const cam=new THREE.PerspectiveCamera(c.fov,w/h,.01,1000);cam.position.set(...c.p);cam.up.set(...c.up);cam.lookAt(c.p[0]+c.look[0],c.p[1]+c.look[1],c.p[2]+c.look[2]);
+ renderer.setSize(w,h);renderer.render(scene,cam);return renderer.domElement.toDataURL()}
+const acc={Common:'#9ab098',Uncommon:'#509f6c',Rare:'#4381da',Legendary:'#e39e24',Mythic:'#de2a34'};
+const txt={Common:'#d5e0d2',Uncommon:'#97e49a',Rare:'#83c7ff',Legendary:'#ffd153',Mythic:'#ff6468'};
+for(const it of items){it.card=shot(it,276,201);it.slot=shot(it,180,120)}
+const tabs=['All','Seeds','Fruit','Tools'];
+const icons={All:'<svg viewBox="0 0 14 14" class="ic"><rect x="2" y="2" width="4" height="4" fill="#fff"/><rect x="8" y="2" width="4" height="4" fill="#fff"/><rect x="2" y="8" width="4" height="4" fill="#fff"/><rect x="8" y="8" width="4" height="4" fill="#fff"/></svg>',
+ Seeds:'<svg viewBox="0 0 14 14" class="ic"><ellipse cx="7" cy="8" rx="3" ry="4.2" fill="#fff" transform="rotate(-25 7 8)"/><circle cx="10" cy="2.4" r="1.7" fill="#93ff45"/></svg>',
+ Fruit:'<svg viewBox="0 0 14 14" class="ic"><circle cx="7" cy="8.3" r="4.6" fill="#fff"/><ellipse cx="9.6" cy="2.6" rx="2.2" ry="1.3" fill="#93ff45" transform="rotate(-30 9.6 2.6)"/></svg>',
+ Tools:'<svg viewBox="0 0 14 14" class="ic"><rect x="6.2" y="1.5" width="1.8" height="7.5" fill="#fff" transform="rotate(30 7 5)"/><ellipse cx="5.5" cy="10.2" rx="3" ry="2" fill="#fff" transform="rotate(30 5.5 10.2)"/></svg>'};
+let h='<div class="screen"><div class="ground"></div><div class="lbl">MOCK-UP (offline render, not in-game)</div><div class="panel"><div class="header"></div><div class="title">Inventory</div><div class="search">Search</div><div class="close">×</div>';
+tabs.forEach((t,i)=>h+=`<div class="tab ${i==0?'on':''}" style="top:${58+i*82}px">${icons[t]}<div class="cap">${t}</div></div>`);
+h+='<div class="rar">Rarity: All ⌄</div><div class="grid">';
+items.forEach((it,i)=>{const x=4+(i%7)*112,y=4+Math.floor(i/7)*112;const nm=it.kg?`${it.name} (${it.kg})`:it.name;
+ const trait=it.mutation!=='None'?`<div class="tr">${it.mutation}</div>`:'';
+ h+=`<div class="card" style="left:${x}px;top:${y}px;box-shadow:inset 0 0 0 1.2px ${acc[it.rarity]}"><img src="${it.card}">${trait}<div class="nm" style="color:${txt[it.rarity]}">${nm}</div>${it.count>1?`<div class="cnt">x${it.count}</div>`:''}<div class="gem" style="background:${txt[it.rarity]}"></div></div>`});
+h+='</div><div class="hint">Click to equip • Drag a slot or item onto the hotbar</div></div>';
+const bar=[14,15,0,3,7,9,1,16,11,5];
+h+='<div class="selname">Gold Desert Seed Pack (6.3kg)</div><div class="dock">';
+bar.forEach((k,i)=>{const it=items[k];h+=`<div class="slot ${i==6?'sel':''}" style="left:${i*72}px;box-shadow:inset 0 0 0 1.2px ${acc[it.rarity]}"><img src="${it.slot}"><div class="num">${(i+1)%10}</div>${it.kg?`<div class="kg">${it.kg}</div>`:''}${it.count>1?`<div class="cnt">x${it.count}</div>`:''}<div class="sn" style="color:${txt[it.rarity]}">${it.name}</div></div>`});
+h+=`<div class="slot" style="left:${10*72}px;color:#fff;text-align:center;line-height:66px;font-size:14px">Bag</div></div></div>`;
+document.getElementById('root').innerHTML=h;window.done=true;
+</script></body></html>
