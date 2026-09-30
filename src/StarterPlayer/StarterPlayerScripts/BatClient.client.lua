@@ -77,7 +77,10 @@ table.insert(connections,remote.OnClientEvent:Connect(function(event)
  local handle=tool:FindFirstChild('Handle');if not handle then return end
  restore(character)
  local entries=joints(character,handle);if #entries==0 then return end
- poses[character]={Tool=tool,Joints=entries,At=event.At};activateFrames()
+ -- R112: Lead lets a late-arriving swing still show its full wind-back; R6 samples the one-piece arm.
+ local hum=character:FindFirstChildOfClass('Humanoid')
+ poses[character]={Tool=tool,Joints=entries,At=event.At,Lead=math.max(0,workspace:GetServerTimeNow()-event.At),
+  R6=hum~=nil and hum.RigType==Enum.HumanoidRigType.R6};activateFrames()
 end))
 -- Clear our previous overlay before Animator evaluates; never accumulate a procedural offset.
 activateFrames=function()
@@ -95,7 +98,7 @@ end)
    or character:GetAttribute('ChestChaseRagdollActive')or t>=C.Windup+C.Recovery then restore(character)
   else
    for _,entry in ipairs(p.Joints)do if entry.Joint.Parent then
-    local target,weight=Pose.Sample(entry.Name,t)
+    local target,weight=Pose.Sample(entry.Name,t,p.Lead,p.R6)
     if entry.Property=='Transform'then
      resetJoint(entry);entry.Base=entry.Joint.Transform
      target=entry.Basis:Inverse()*target*entry.Basis
