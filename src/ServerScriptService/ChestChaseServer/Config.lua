@@ -256,7 +256,7 @@ Config.ShopCatalog = {
         {Id="StormCrown",Name="Frost Boots",Type="Accessory",Biome="Snow",Price=6800,LuckMultiplier=2,Color=Color3.fromRGB(190,233,251),Description="Fur cuffs and ice-blue armor."},
         {Id="LavaBoots",Name="Lava Boots",Type="Accessory",Biome="Lava",Price=10400,LuckMultiplier=2.5,Color=Color3.fromRGB(255,140,53),Description="Volcanic plates and glowing ember vents."},
         {Id="CrystalBoots",Name="Crystal Boots",Type="Accessory",Biome="Crystal",Price=14000,LuckMultiplier=3,Color=Color3.fromRGB(193,152,250),Description="Purple crystal fins and silver guards."},
-        {Id="MythicOrbit",Name="Electric Boots",Type="Accessory",Biome="Storm",Price=18000,LuckMultiplier=3.5,Color=Color3.fromRGB(177,232,255),Description="Lightning coils and bright electric rails."},
+        {Id="MythicOrbit",Name="Thunder Boots",Type="Accessory",Biome="Storm",Price=18000,LuckMultiplier=3.5,Color=Color3.fromRGB(177,232,255),Description="Lightning coils and bright electric rails."},
     },
 }
 

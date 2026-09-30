@@ -22,11 +22,11 @@ MID_ONE_IN = {
 }
 POWER = dict(Uncommon=0, Rare=0, Legendary=.08, Mythic=.16, Secret=.28, Cosmic=.40, King=1)
 CAP = dict(Uncommon=1, Rare=1, Legendary=.5, Mythic=.45, Secret=.25, Cosmic=.05, King=.01)
-GIVEBACK = ['Legendary', 'Mythic', 'Secret']   # Cosmic and King are never squeezed by the floor guard
+GIVEBACK = ['Rare', 'Legendary', 'Mythic', 'Secret']   # Cosmic and King are never squeezed by the floor guard
 FLOOR_KEEP, GIVEBACK_KEEP = .40, .50
-MAX_LUCK = 5e6
+MAX_LUCK = 5e7
 BOOTS = ['Sand', 'Frost', 'Lava', 'Crystal', 'Electric']
-BOOT_LUCK = [5, 50, 2000, 100000, 5000000]
+BOOT_LUCK = [50, 500, 20000, 1000000, 50000000]
 LEGACY_BOOT_LUCK = [1.15, 1.3, 1.5, 1.75, 2]
 VOID_MECH = .005
 VOID_ONE_IN = dict(Cosmic=20, King=2e8)   # Secret = rest; applies inside the 99.5% direct branch

@@ -21,7 +21,8 @@ O.MidOneIn={
 }
 O.Power={Uncommon=0,Rare=0,Legendary=.08,Mythic=.16,Secret=.28,Cosmic=.40,King=1}
 O.Cap={Uncommon=1,Rare=1,Legendary=.5,Mythic=.45,Secret=.25,Cosmic=.05,King=.01}
-O.Giveback={'Legendary','Mythic','Secret'}
+-- R112b: a fixed Rare share gives way first, so at x50M luck a better pack never gives less Legendary+.
+O.Giveback={'Rare','Legendary','Mythic','Secret'}
 O.FloorKeep,O.GivebackKeep=.4,.5
 -- Void (event) pack: luck-free, 1/200 Mech branch, then King 1/200M and Cosmic 1/20; Secret is the rest.
 O.Void={MechChance=.005,OneIn={King=2e8,Cosmic=20}}

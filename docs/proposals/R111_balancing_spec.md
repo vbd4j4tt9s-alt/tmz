@@ -182,3 +182,20 @@ lowered again). The tutorial's "SAFE ZONE" is about keepers stopping at the line
   `/test voidcheck` -> PASS, `/test packset storm` then open packs, `/test boots 5` -> HUD "Pack luck ×5M", shop shows
   ×5 / ×50 / ×2K / ×100K / ×5M, index card shows "King 1/1T"; a fresh profile's first minute on the treadmill; a pack
   banked before the update opens (old odds).
+
+## R112b update (owner): Thunder Boots, King 1 in ~1,000
+
+Every boot's luck x10: Sand x50, Frost x500, Lava x20K, Crystal x1M, **Thunder x50M** (Electric Boots renamed Thunder Boots; `MaxLuck` 50M).
+A fixed Rare share now gives way first under the 40% floor guard (`Giveback` Rare, Legendary, Mythic, Secret), which removed the one
+inversion x50M caused (Snow Rare pack below Uncommon pack for Legendary+). Suite re-run: 0 violations, Luau = Python to 1e-15, 75,600 opens OK.
+
+Storm, average pack, "tier or better", time at 72 packs/h:
+
+| Boot | Mythic+ | Secret+ | Cosmic+ | King |
+|---|---|---|---|---|
+| none | 1 in 16 (13 min) | 1 in 510 (7 h) | 1 in 51.5K (716 h) | never |
+| Sand x50 | 1 in 9 (8 min) | 1 in 170 (2 h) | 1 in 10.8K (150 h) | never |
+| Frost x500 | 1 in 8 (7 min) | 1 in 89 (1 h) | 1 in 4.3K (60 h) | never |
+| Lava x20K | 1 in 6 (5 min) | 1 in 35 (29 min) | 1 in 980 (14 h) | 1 in 2.6M (never) |
+| Crystal x1M | 1 in 4 (3 min) | 1 in 17 (14 min) | 1 in 205 (3 h) | 1 in 51.5K (716 h) |
+| Thunder x50M | 1 in 3 (3 min) | 1 in 11 (9 min) | 1 in 80 (1 h) | **1 in 1,031 (14 h)** |

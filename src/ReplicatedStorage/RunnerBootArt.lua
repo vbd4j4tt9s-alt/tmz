@@ -23,7 +23,7 @@ local looks={
   Fin={Overlay={0,.15},Tongue={0,.15},Trim={0,.2},Tread={0,.2}}},
  Lava={Tier=3,Shaft=.58,Accent={255,140,53},Outsole={22,18,18},Midsole={58,48,46},Upper={44,37,37},Overlay={255,140,53},Cuff={22,18,18},Tongue={255,140,53},Glow={255,96,20},Obsidian={26,20,30},
   Mat={Outsole=M.Basalt,Midsole=M.Basalt,Upper=M.Basalt,Overlay=M.CrackedLava,Cuff=M.Basalt,Tongue=M.CrackedLava}},
- Crystal={Tier=4,Shaft=.62,Shell=1.06,Accent={193,152,250},Outsole={30,22,50},Midsole={240,233,255},Upper={140,92,236},Toe={200,168,255},Overlay={208,214,230},Cuff={208,214,230},Tongue={186,150,255},Glow={170,96,255},Core={120,50,230},Shard={205,170,255},
+ Crystal={Tier=4,Shaft=.62,Shell=1.06,Accent={193,152,250},Outsole={30,22,50},Midsole={240,233,255},Upper={116,68,214},Toe={176,136,250},Overlay={208,214,230},Cuff={208,214,230},Tongue={170,128,250},Glow={170,96,255},Core={104,38,214},Shard={200,160,255},
   Mat={Outsole=M.Glass,Upper=M.Glass,Toe=M.Glass,Overlay=M.Metal,Cuff=M.Metal,Tongue=M.Glass,Trim=M.Metal},
   Fin={Outsole={0,.25},Midsole={0,.15},Upper={.28,.3},Vamp={.1,.35},Toe={.1,.4},Overlay={0,.25},Cuff={0,.25},Tongue={.15,.3},Trim={0,.25},Shard={.12,.45}}},
  Storm={Tier=5,Shaft=.66,Accent={177,232,255},Outsole={16,20,32},Midsole={242,247,255},Upper={34,66,170},Overlay={242,247,255},Cuff={16,20,32},Tongue={242,247,255},Glow={40,196,255},

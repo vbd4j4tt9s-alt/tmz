@@ -10,8 +10,9 @@ T.SpeedTailPerDecade=.1 -- R88: 500 at 100B, only +0.1 per tenfold increase afte
 T.PointCurve={{0,24},{500,26},{1500,28},{3000,31},{6000,35},{120000,55},{1500000,88},{20000000,141},{300000000,226},{5000000000,363},{100000000000,500}}
 T.MachineMultipliers={1,4,20,100,600,4000,30000}
 -- R112: displayed boot luck. PackOdds112 applies it per tier as luck^power (King full, Cosmic ^.40 ... Legendary ^.08).
-T.BootLuck={5,50,2000,100000,5000000}
-T.MaxLuck=5000000 -- the only luck cap; server, HUD and owner commands read it here.
+-- R112b: every boot x10 so Thunder Boots (x50M) see a King about 1 in 1,000 packs.
+T.BootLuck={50,500,20000,1000000,50000000}
+T.MaxLuck=50000000 -- the only luck cap; server, HUD and owner commands read it here.
 -- Early purchases now take a few normal harvests rather than hundreds.
 T.MachineCosts={0,250000,5000000,150000000,10000000000,500000000000,8000000000000}
 T.TrailCosts={MintTrail=200000,ArcTrail=4000000,SolarTrail=120000000,AuroraTrail=12000000000,NebulaTrail=800000000000,RoyalTrail=9000000000000}

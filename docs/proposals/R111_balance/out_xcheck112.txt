@@ -1,6 +1,6 @@
-OddsVersion 112: 3510 seed odds (7 biomes x 6 packs x 13 luck values), Luau vs Python: max abs diff 2.31e-14 percentage points, max relative diff 2.39e-15
+OddsVersion 112: 3510 seed odds (7 biomes x 6 packs x 13 luck values), Luau vs Python: max abs diff 2.13e-14 percentage points, max relative diff 1.26e-15
 OddsVersion 81 : 3510 seed odds, Luau (new code, luck mapped to old boots) vs verified old-odds port: max abs diff 1.42e-14 pp, max relative 2.19e-16
 Void 112: 15 direct seeds, max relative diff 1.3e-16; King tier 1 in 201,005,025, Cosmic 1 in 20.10, total 100.000000000000%
 Monotonic: 3360 comparisons (better boot same pack, better pack same boot, every tier "X or better"): 0 violations
-Lowest tier keeps at least 40.0% of its no-boot share (worst: ('Forest', 'Pack05', 50, 0.14))
+Lowest tier keeps at least 40.0% of its no-boot share (worst: ('Snow', 'Pack04', 50000000, 0.2259))
 Tables summing to 1 with no negative share: 252/252

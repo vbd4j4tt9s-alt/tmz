@@ -5,22 +5,22 @@ Chance per pack of getting that tier **or better**, and the average active time 
 | Boot (shown luck) | Mythic+ | Secret+ | Cosmic+ | King |
 |---|---|---|---|---|
 | none (-) | 1 in 15.6 (13 min) | 1 in 510 (7.1 h) | 1 in 51.5K (716 h) | 1 in 51.5B (never (~81,693 yr nonstop)) |
-| Sand (x5) | 1 in 12.5 (10 min) | 1 in 324 (4.5 h) | 1 in 27.1K (376 h) | 1 in 10.3B (never (~16,339 yr nonstop)) |
-| Frost (x50) | 1 in 9.48 (8 min) | 1 in 170 (2.4 h) | 1 in 10.8K (150 h) | 1 in 1.03B (never (~1,634 yr nonstop)) |
-| Lava (x2K) | 1 in 7.05 (6 min) | 1 in 59.8 (50 min) | 1 in 2.46K (34 h) | 1 in 25.8M (357,814 h (~40.8 yr nonstop)) |
-| Crystal (x100K) | 1 in 4.99 (4 min) | 1 in 26.3 (22 min) | 1 in 515 (7.1 h) | 1 in 515K (7,156 h (~0.8 yr nonstop)) |
-| Electric (x5M) | 1 in 3.57 (3 min) | 1 in 14.4 (12 min) | 1 in 141 (2.0 h) | 1 in 10.3K (143 h) |
+| Sand (x50) | 1 in 9.48 (8 min) | 1 in 170 (2.4 h) | 1 in 10.8K (150 h) | 1 in 1.03B (never (~1,634 yr nonstop)) |
+| Frost (x500) | 1 in 7.99 (7 min) | 1 in 88.6 (1.2 h) | 1 in 4.29K (60 h) | 1 in 103M (never (~163 yr nonstop)) |
+| Lava (x20K) | 1 in 5.66 (5 min) | 1 in 35 (29 min) | 1 in 980 (14 h) | 1 in 2.58M (35,781 h (~4.1 yr nonstop)) |
+| Crystal (x1M) | 1 in 4.1 (3 min) | 1 in 17.1 (14 min) | 1 in 205 (2.8 h) | 1 in 51.5K (716 h) |
+| Electric (x50M) | 1 in 3.03 (3 min) | 1 in 10.5 (9 min) | 1 in 80.2 (1.1 h) | 1 in 1.03K (14 h) |
 
 ### F2. King per pack (1 in N), no boots vs Electric boots (x5M), any biome with a King seed
 
 | Pack | no boots | Electric |
 |---|---|---|
-| Common | 1 in 1T | 1 in 200K |
-| Uncommon | 1 in 400B | 1 in 80K |
-| Rare | 1 in 167B | 1 in 33.3K |
-| Epic | 1 in 50B | 1 in 10K |
-| Legendary | 1 in 16.7B | 1 in 3.33K |
-| Mythic | 1 in 5B | 1 in 1K |
+| Common | 1 in 1T | 1 in 20K |
+| Uncommon | 1 in 400B | 1 in 8K |
+| Rare | 1 in 167B | 1 in 3.33K |
+| Epic | 1 in 50B | 1 in 1K |
+| Legendary | 1 in 16.7B | 1 in 333 |
+| Mythic | 1 in 5B | 1 in 100 |
 
 ### S1. Tracks vs speed (camp = pack cluster; distances from the base line, geometry unchanged)
 

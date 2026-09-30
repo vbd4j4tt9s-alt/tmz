@@ -1,6 +1,7 @@
 local RS=game:GetService('ReplicatedStorage');local Preview=require(RS:WaitForChild('HarvestViewport'));local Cash=require(RS:WaitForChild('CashNumbers'));local Theme=require(RS:WaitForChild('GardenTheme'));local Catalog=require(RS:WaitForChild('PlantCatalog'))
 local Names=require(RS:WaitForChild('GardenDisplayNames'));local Style=require(RS:WaitForChild('GardenMenuStyle'))
 local Filters=require(RS:WaitForChild('CropFilters'));local Numbers=require(RS:WaitForChild('SizeNumbers'));local Traits=require(RS.ItemTraitNames)
+local Weight=require(RS:WaitForChild('ItemWeight')) -- R112: sizes read as kg.
 local Menu={};Menu.__index=Menu;local C=Theme.Colors
 local function text(parent,name,content,pos,size,font,bold,color)
  local x=Instance.new('TextLabel');x.Name=name;x.Text=content;x.Position=pos;x.Size=size;x.BackgroundTransparency=1;x.TextWrapped=true;x.TextXAlignment=Enum.TextXAlignment.Left;require(RS.BrightUI).Text(x,font or 18,color);x.Parent=parent;return x
@@ -62,7 +63,7 @@ function Menu:UpdateRow(row,item)
  local r=self.Data[row];r.Item=item
  local traitText=Traits.Lines(item,22);if traitText==''then traitText='Normal'end
  Traits.Style(r.Traits,item)
- local values={Name=Names.Fruit(item.SeedId,item.FruitName or item.Name)..((item.Count or 1)>1 and' ×'..item.Count or''),Traits=traitText..'\n'..Numbers.Format(math.min(25,item.FruitScale or 1))..'× size',Details='Bonus + '..tostring(math.max(0,require(script.Parent.BalanceRules).Half((item.CashMultiplier or 1)-1)))..'× · Total ×'..Numbers.Format(Numbers.Half(item.CashMultiplier or 1)),Action='Sell\n$'..Cash.Compact(item.SellValue)}
+ local values={Name=Names.Fruit(item.SeedId,item.FruitName or item.Name)..((item.Count or 1)>1 and' ×'..item.Count or''),Traits=traitText..'\n'..Weight.Text('Fruit',item.SeedId,math.min(25,item.FruitScale or 1)),Details='Bonus + '..tostring(math.max(0,require(script.Parent.BalanceRules).Half((item.CashMultiplier or 1)-1)))..'× · Total ×'..Numbers.Format(Numbers.Half(item.CashMultiplier or 1)),Action='Sell\n$'..Cash.Compact(item.SellValue)}
  for field,value in pairs(values)do if r[field].Text~=value then r[field].Text=value end end
  r.Action:SetAttribute('ExactCash',Cash.Exact(item.SellValue));r.Action.Active=self.State.CanSell==true;r.Action.AutoButtonColor=r.Action.Active;r.Action.BackgroundTransparency=r.Action.Active and 0 or .5
 end

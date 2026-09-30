@@ -393,7 +393,7 @@ function E:ShowMark(r,fade)
   m={Outer=outer,Inner=inner}
  end
  local size=M.Size(r.Base);local flat=CFrame.Angles(0,0,math.pi/2)
- m.Outer.Size=V(.08,size.Mark*2,size.Mark*2);m.Outer.CFrame=r.Origin*CF(0,0,0)*flat;m.Outer.Color=r.Palette[1]:Lerp(Color3.new(0,0,0),.12)
+ m.Outer.Size=V(.08,size.Mark*2,size.Mark*2);m.Outer.CFrame=r.Origin*flat;m.Outer.Color=r.Palette[1]:Lerp(Color3.new(0,0,0),.12)
  m.Inner.Size=V(.08,size.Mark*.9,size.Mark*.9);m.Inner.CFrame=r.Origin*CF(0,.02,0)*flat;m.Inner.Color=r.Palette[1]:Lerp(Color3.new(0,0,0),.42)
  local alpha=fade and 1 or 0;m.Outer.Transparency=alpha;m.Inner.Transparency=alpha
  if fade then table.insert(self.Fading,{Mark=m,Start=os.clock()})end
@@ -440,6 +440,7 @@ function E:Step()
   if now>=q.At then
    table.remove(self.Queue,i)
    if q.Sound.IsLoaded and q.Sound.Parent then
+    for j=#self.Stopping,1,-1 do if self.Stopping[j].Sound==q.Sound then table.remove(self.Stopping,j)end end
     q.Sound:Stop();q.Sound.Volume=q.Volume;q.Sound.PlaybackSpeed=q.Speed;Timing.Play(q.Sound,q.Start);self.Stats.Sounds+=1
     if q.Length then table.insert(self.Stopping,{Sound=q.Sound,At=now,Length=q.Length,Volume=q.Volume})end
    end
