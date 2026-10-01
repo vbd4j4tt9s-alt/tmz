@@ -18,8 +18,8 @@ local function bodyBounds()
  end end
  cache=b;return b
 end
--- R122: the Void (EclipseReliquary) design lives in EclipsePackArt; this module keeps the Mech rig
--- and the shared approved body bounds.
+-- R122: the Void (EclipseReliquary) design lives in EclipsePackArt (SeedPackRenderer/SeedPackVisuals
+-- call it directly); this module keeps the Mech rig and the shared approved body bounds.
 function A.BodyBounds()return bodyBounds()end
 -- Baked from the approved Forest_01 body and shallow printed-surface triangles.
 -- Each record is width, height and CFrame components; no runtime mesh fitting.
@@ -60,7 +60,6 @@ local fittedPrint={
 }
 local mechSpecs
 function A.Specs(kind)
- if kind~='MechLimited'then return require(script.Parent.EclipsePackArt).Specs()end
  if mechSpecs then return mechSpecs end
  local out={};local bounds=bodyBounds();local minZ,maxZ=bounds.MinZ,bounds.MaxZ
  local silver,light,graphite,gold,cyan=RGB(180,197,207),RGB(232,238,241),RGB(53,66,79),RGB(242,180,65),RGB(34,231,255)
@@ -116,13 +115,11 @@ end
  mechSpecs=out;return out
 end
 function A.Bounds(kind,scale)
- if kind~='MechLimited'then return require(script.Parent.EclipsePackArt).Bounds(scale)end
  local b=table.clone(bodyBounds());local depth=kind=='MechLimited'and .075 or .055;b.MinZ-=depth;b.MaxZ+=depth;b.Radius+=kind=='MechLimited'and .085 or .06;b.MinY-=.04;b.MaxY+=.04
  for k,v in pairs(b)do b[k]=v*(scale or 1)end;return b
 end
 function A.Build(bag,kind)
  if bag:GetAttribute('SpecialPackDesign89')then return true end
- if kind~='MechLimited'then return require(script.Parent.EclipsePackArt).Build(bag)end
  Renderer.BuildStandard(bag,A.TemplateKey)
  local root=bag.PrimaryPart;local folder=bag:FindFirstChild('PackGeometry');local scale=bag:GetAttribute('VisualScale')or 1
  local mech=kind=='MechLimited';local body=mech and RGB(231,237,239)or RGB(22,13,43);local trim=mech and RGB(246,171,75)or RGB(159,128,219)

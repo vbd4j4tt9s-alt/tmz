@@ -223,7 +223,10 @@ end
 
 local boundsCache={}
 function Visuals.Bounds(stage,variant,size)
-    if variant=='EclipseReliquary'or variant=='MechLimited'then
+    if variant=='EclipseReliquary'then
+        return require(script.Parent.EclipsePackArt).Bounds(Rules.GetVariant(variant).BagScale*Rules.GetTheme(stage).Scale*Rules.SanitizePackSize(size))
+    end
+    if variant=='MechLimited'then
         return require(script.Parent.SpecialPackArt89).Bounds(variant,Rules.GetVariant(variant).BagScale*Rules.GetTheme(stage).Scale*Rules.SanitizePackSize(size))
     end
     local key=Rules.DesignKey(stage,variant)
