@@ -1048,6 +1048,49 @@ function PlayerDataService:Load(player)
 	return true
 end
 
+-- R122: the exact saved row for one live seed/pack record (DataStore-safe: no Color3).
+function PlayerDataService:SerializeSeedRecord(chestRecord)
+	local accentColor = chestRecord.AccentColor or self.Map:GetStageAccent(chestRecord.Stage)
+	return {
+		Id = string.sub(chestRecord.Id, 1, 80),
+		Kind = chestRecord.Kind or "Seed",
+            PaidRandom=chestRecord.PaidRandom==true,
+            BagVariant = PackRules.VariantKey(chestRecord.BagVariant),OddsVersion=chestRecord.OddsVersion,
+            PackSize=PackRules.SanitizePackSize(chestRecord.PackSize),PackMutation=PackRules.MutationKey(chestRecord.PackMutation),Weather=Weather.Key(chestRecord.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chestRecord.WeatherCheckedEvent),
+            SeedScale = PackRules.SanitizeSeedScale(chestRecord.SeedScale),
+		ChestNumber = chestRecord.ChestNumber,
+		ChestName = string.sub(chestRecord.ChestName, 1, 80),
+		Stage = chestRecord.Stage,
+		AccentR = accentColor.R,
+		AccentG = accentColor.G,
+		AccentB = accentColor.B,
+		GuaranteedRarity = chestRecord.GuaranteedRarity,
+		SeedId = string.sub(chestRecord.SeedId or "UnknownSeed", 1, 80),
+		SeedName = string.sub(chestRecord.SeedName or "Unknown Seed", 1, 80),
+		SeedEmoji = string.sub(chestRecord.SeedEmoji or "🌱", 1, 16),
+	}
+end
+
+-- R122: strict decode of a seed/pack row that arrives as a gift. Anything a normal save
+-- could not have produced is refused (the gift stays in the inbox for review).
+function PlayerDataService:DecodeGiftedSeed(player, saved)
+	if type(saved) ~= "table" or (saved.Kind ~= "Pack" and saved.Kind ~= "Seed")
+		or type(saved.Id) ~= "string" or #saved.Id < 1 or #saved.Id > 80
+		or type(saved.ChestName) ~= "string" or #saved.ChestName > 80
+		or type(saved.Stage) ~= "number" or saved.Stage ~= saved.Stage or saved.Stage % 1 ~= 0 or saved.Stage < 1 or saved.Stage > 8
+		or type(saved.ChestNumber) ~= "number" or saved.ChestNumber ~= saved.ChestNumber or saved.ChestNumber < 1 or saved.ChestNumber > 1e12 then
+		return nil
+	end
+	for _, key in ipairs({"AccentR", "AccentG", "AccentB", "SeedScale", "PackSize"}) do
+		local v = saved[key]
+		if v ~= nil and (type(v) ~= "number" or v ~= v or math.abs(v) == math.huge) then return nil end
+	end
+	if saved.Kind == "Seed" and (type(saved.SeedId) ~= "string" or not self.Config.GetSeedById(saved.SeedId)) then return nil end
+	local record = self:_canonicalizeSeedRecord(self:_decodeSavedSeedRecord(player, saved, 1))
+	if record.Kind == "Seed" and record.SeedId ~= saved.SeedId then return nil end
+	return record
+end
+
 function PlayerDataService:_buildSaveData(player)
 	local items = {}
 	local lootChildren = self:GetOrCreateLootInventory(player):GetChildren()
@@ -1067,25 +1110,7 @@ function PlayerDataService:_buildSaveData(player)
 
 	local savedChests = {}
 	for _, chestRecord in ipairs(self:GetChestRecords(player)) do
-		local accentColor = chestRecord.AccentColor or self.Map:GetStageAccent(chestRecord.Stage)
-		table.insert(savedChests, {
-			Id = string.sub(chestRecord.Id, 1, 80),
-			Kind = chestRecord.Kind or "Seed",
-            PaidRandom=chestRecord.PaidRandom==true,
-            BagVariant = PackRules.VariantKey(chestRecord.BagVariant),OddsVersion=chestRecord.OddsVersion,
-            PackSize=PackRules.SanitizePackSize(chestRecord.PackSize),PackMutation=PackRules.MutationKey(chestRecord.PackMutation),Weather=Weather.Key(chestRecord.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chestRecord.WeatherCheckedEvent),
-            SeedScale = PackRules.SanitizeSeedScale(chestRecord.SeedScale),
-			ChestNumber = chestRecord.ChestNumber,
-			ChestName = string.sub(chestRecord.ChestName, 1, 80),
-			Stage = chestRecord.Stage,
-			AccentR = accentColor.R,
-			AccentG = accentColor.G,
-			AccentB = accentColor.B,
-			GuaranteedRarity = chestRecord.GuaranteedRarity,
-			SeedId = string.sub(chestRecord.SeedId or "UnknownSeed", 1, 80),
-			SeedName = string.sub(chestRecord.SeedName or "Unknown Seed", 1, 80),
-			SeedEmoji = string.sub(chestRecord.SeedEmoji or "🌱", 1, 16),
-		})
+		table.insert(savedChests, self:SerializeSeedRecord(chestRecord))
 	end
 
 	local savedBoosts = {}
