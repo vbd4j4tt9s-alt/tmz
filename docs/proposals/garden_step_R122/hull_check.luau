@@ -1,4 +1,5 @@
--- R80. Bounded continuous body sweeps, shared by the owning client and server guard.
+local V=function(x,y,z)return{X=x,Y=y,Z=z}end
+local src=[==========[-- R80. Bounded continuous body sweeps, shared by the owning client and server guard.
 local Motion=require(script.Parent.RunnerMotion)
 local M={}
 function M.Hull(character,humanoid,root)
@@ -44,3 +45,19 @@ function M.Slide(world,frame,size,offset,delta,params)
  return moved
 end
 return M
+]==========]
+src=src:gsub("local Motion=require%(script.Parent.RunnerMotion%)","local Motion={}")
+local fn=loadstring(src);setfenv(fn,setmetatable({Vector3={new=V},Enum={HumanoidRigType={R6='R6',R15='R15'}},math=math},{__index=_G}));local M=fn()
+local fails=0
+for _,c in ipairs({{'R15 normal',2,2,nil},{'R15 small',1.4,1.2,nil},{'R15 big',3,3,nil},{'R6',2,0,2}})do
+ local root={Size=V(2,c[2],1)};local hum={RigType=c[4]and'R6'or'R15',HipHeight=c[3]}
+ local ch={FindFirstChild=function(_,n)if c[4]and n=='Left Leg'then return{Size=V(1,c[4],1)}end end}
+ local size,off=M.Hull(ch,hum,root)
+ local standing=c[2]/2+c[3]+(c[4]or 0)
+ local bottom=off.Y-size.Y/2+standing -- above the feet
+ local top=bottom+size.Y
+ print(c[1],('clears %.2f studs, hull top %.2f above feet'):format(bottom,top))
+ if bottom<=0.85 then fails+=1;print('FAIL: 0.8 edge still blocks')end
+ if top<standing+0.5 then fails+=1;print('FAIL: hull no longer covers the body')end
+end
+print(fails==0 and'all ok'or fails..' failures')
