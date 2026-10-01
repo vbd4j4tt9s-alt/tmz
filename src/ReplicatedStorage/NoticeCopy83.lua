@@ -14,7 +14,9 @@ function N.Pack(m)
  local emoji=(tonumber(m.Size)or 1)>7 and'📏'or m.Mutation=='Diamond'and'💎'or m.Mutation=='Gold'and'✨'or N.Emojis[m.Tier]or'✨'
  return emoji..' '..prefix..N.Color(name,m.Color or Color3.new(1,1,1))..' spawned in '..N.Color(m.Biome,colors[m.Stage]or Color3.fromRGB(175,220,255))..'!'
 end
-function N.Arrival()return '🌑 '..N.Color('He has arrived...',Color3.fromRGB(221,195,255))..'  '..N.Color('Void Pack',Color3.fromRGB(184,141,255))..' awaits in '..N.Color('Storm Peaks',colors[7])..'.'end
+function N.Arrival()return '🌑 '..N.Color('He has arrived...',Color3.fromRGB(221,195,255))..'  '..N.Color('Two Void Packs',Color3.fromRGB(184,141,255))..' await in '..N.Color('Storm Peaks',colors[7])..'.'end
+-- R122: nobody stole a Void Pack for three refreshes, so the remaining packs changed.
+function N.VoidShift()return '🌌 '..N.Color('The void shifts...',Color3.fromRGB(221,195,255))..'  The '..N.Color('Void Packs',Color3.fromRGB(184,141,255))..' in '..N.Color('Storm Peaks',colors[7])..' changed.'end
 function N.Weather(m)
  local W=require(script.Parent.WeatherTraits);local trait=W.Key(m.Trait);local row=W.Traits[trait]
  local names={};local function add(n,singular,plural)
