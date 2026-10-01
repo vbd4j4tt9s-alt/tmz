@@ -246,6 +246,7 @@ for si,s in ipairs(screens)do
    captionFits(c.RobuxPass,c.Name..' robux');captionFits(c.GemPerk,c.Name..' gems');textFits(c.Title,c.Name..' title')
   end
  end
+ local twoRows=0
  for _,row in ipairs(Pricing.Bundles)do
   local c=bundleFrame(row.Key);check(c~=nil,name..': bundle '..row.Key)
   if c then

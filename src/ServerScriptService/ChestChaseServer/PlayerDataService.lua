@@ -694,6 +694,72 @@ function PlayerDataService:_clearDiscoveredLoot(discoveries)
 	end
 end
 
+-- R122: one saved seed/pack row -> live record. Shared by Load and seed/pack gifts so a
+-- gifted item decodes exactly like a reloaded one (traits are never re-rolled).
+function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNumber)
+	local stage = math.clamp(
+		math.floor((tonumber(savedChest.Stage) or 1) + 0.5),
+		1,
+		(savedChest.BagVariant=='MechLimited'or require(game:GetService('ReplicatedStorage').MechCatalog).Is(savedChest.SeedId))and 8 or self.Config.StageCount
+	)
+	local chestNumber = math.max(
+		1,
+		math.floor((tonumber(savedChest.ChestNumber) or fallbackNumber) + 0.5)
+	)
+	local fallbackSeedIndex = (chestNumber - 1) % 5 + 1
+	local fallbackSeed = self.Config.GetSeedDefinition(stage, fallbackSeedIndex)
+	local accentColor = self.Map:GetStageAccent(stage)
+	if type(savedChest.AccentR) == "number"
+		and type(savedChest.AccentG) == "number"
+		and type(savedChest.AccentB) == "number" then
+		accentColor = Color3.new(
+			math.clamp(savedChest.AccentR, 0, 1),
+			math.clamp(savedChest.AccentG, 0, 1),
+			math.clamp(savedChest.AccentB, 0, 1)
+		)
+	end
+
+	return {
+		Id = type(savedChest.Id) == "string" and string.sub(savedChest.Id, 1, 80)
+			or string.format("%d_%d", player.UserId, chestNumber),
+		Kind = savedChest.Kind == "Pack" and "Pack" or "Seed",
+                PaidRandom=savedChest.PaidRandom==true,
+                BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=(savedChest.OddsVersion==81 or savedChest.OddsVersion==PackRules.OddsVersion)and savedChest.OddsVersion or nil,
+            PackSize=PackRules.SanitizePackSize(savedChest.PackSize),PackMutation=PackRules.MutationKey(savedChest.PackMutation),Weather=Weather.Key(savedChest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(savedChest.WeatherCheckedEvent),
+                SeedScale = PackRules.SanitizeSeedScale(savedChest.SeedScale),
+		ChestNumber = chestNumber,
+		ChestName = type(savedChest.ChestName) == "string"
+			and string.sub(savedChest.ChestName, 1, 80)
+			or string.format("Stage_%d_Chest", stage),
+		Stage = stage,
+		AccentColor = accentColor,
+		GuaranteedRarity = type(savedChest.GuaranteedRarity) == "string"
+			and self.Config.RarityColors[savedChest.GuaranteedRarity]
+			and savedChest.GuaranteedRarity
+			or nil,
+		SeedId = type(savedChest.SeedId) == "string"
+			and string.sub(savedChest.SeedId, 1, 80)
+			or fallbackSeed.Id,
+		SeedName = type(savedChest.SeedName) == "string"
+			and string.sub(savedChest.SeedName, 1, 80)
+			or fallbackSeed.Name,
+		SeedEmoji = type(savedChest.SeedEmoji) == "string"
+			and string.sub(savedChest.SeedEmoji, 1, 16)
+			or fallbackSeed.Emoji,
+	}
+end
+
+function PlayerDataService:_canonicalizeSeedRecord(record)
+	if record.Kind == "Pack" then
+		record.SeedScale=PackRules.NewSeedScale(record.Stage,record.BagVariant,record.PackSize)
+		record.SeedId, record.SeedName, record.SeedEmoji, record.GuaranteedRarity = nil, nil, nil, nil
+		return record
+	end
+	local canonical = self.Config.GetSeedById(record.SeedId)
+	if canonical then record.SeedName, record.SeedEmoji, record.AccentColor = canonical.Name, canonical.Emoji, canonical.Color end
+	return record
+end
+
 function PlayerDataService:Load(player)
 	local success, storedData = self:_runRequest(function()
 		return self.Store:GetAsync(self:_getKey(player))
@@ -867,70 +933,17 @@ function PlayerDataService:Load(player)
 	local highestChestNumber = 0
 	for _, savedChest in ipairs(loadedChests) do
 		if type(savedChest) == "table" then
-			local stage = math.clamp(
-				math.floor((tonumber(savedChest.Stage) or 1) + 0.5),
-				1,
-				(savedChest.BagVariant=='MechLimited'or require(game:GetService('ReplicatedStorage').MechCatalog).Is(savedChest.SeedId))and 8 or self.Config.StageCount
-			)
-			local chestNumber = math.max(
-				1,
-				math.floor((tonumber(savedChest.ChestNumber) or loadedChestCount + 1) + 0.5)
-			)
-			local fallbackSeedIndex = (chestNumber - 1) % 5 + 1
-			local fallbackSeed = self.Config.GetSeedDefinition(stage, fallbackSeedIndex)
-			local accentColor = self.Map:GetStageAccent(stage)
-			if type(savedChest.AccentR) == "number"
-				and type(savedChest.AccentG) == "number"
-				and type(savedChest.AccentB) == "number" then
-				accentColor = Color3.new(
-					math.clamp(savedChest.AccentR, 0, 1),
-					math.clamp(savedChest.AccentG, 0, 1),
-					math.clamp(savedChest.AccentB, 0, 1)
-				)
-			end
-
+			local record = self:_decodeSavedSeedRecord(player, savedChest, loadedChestCount + 1)
 			loadedChestCount = loadedChestCount + 1
-			highestChestNumber = math.max(highestChestNumber, chestNumber)
-			table.insert(self.ChestRecords[player], {
-				Id = type(savedChest.Id) == "string" and string.sub(savedChest.Id, 1, 80)
-					or string.format("%d_%d", player.UserId, chestNumber),
-				Kind = savedChest.Kind == "Pack" and "Pack" or "Seed",
-                PaidRandom=savedChest.PaidRandom==true,
-                BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=(savedChest.OddsVersion==81 or savedChest.OddsVersion==PackRules.OddsVersion)and savedChest.OddsVersion or nil,
-            PackSize=PackRules.SanitizePackSize(savedChest.PackSize),PackMutation=PackRules.MutationKey(savedChest.PackMutation),Weather=Weather.Key(savedChest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(savedChest.WeatherCheckedEvent),
-                SeedScale = PackRules.SanitizeSeedScale(savedChest.SeedScale),
-				ChestNumber = chestNumber,
-				ChestName = type(savedChest.ChestName) == "string"
-					and string.sub(savedChest.ChestName, 1, 80)
-					or string.format("Stage_%d_Chest", stage),
-				Stage = stage,
-				AccentColor = accentColor,
-				GuaranteedRarity = type(savedChest.GuaranteedRarity) == "string"
-					and self.Config.RarityColors[savedChest.GuaranteedRarity]
-					and savedChest.GuaranteedRarity
-					or nil,
-				SeedId = type(savedChest.SeedId) == "string"
-					and string.sub(savedChest.SeedId, 1, 80)
-					or fallbackSeed.Id,
-				SeedName = type(savedChest.SeedName) == "string"
-					and string.sub(savedChest.SeedName, 1, 80)
-					or fallbackSeed.Name,
-				SeedEmoji = type(savedChest.SeedEmoji) == "string"
-					and string.sub(savedChest.SeedEmoji, 1, 16)
-					or fallbackSeed.Emoji,
-			})
+			highestChestNumber = math.max(highestChestNumber, record.ChestNumber)
+			table.insert(self.ChestRecords[player], record)
 		end
 	end
 
 	for _, record in ipairs(self.ChestRecords[player]) do
-        if record.Kind == "Pack" then
-            record.SeedScale=PackRules.NewSeedScale(record.Stage,record.BagVariant,record.PackSize)
-            record.SeedId, record.SeedName, record.SeedEmoji, record.GuaranteedRarity = nil, nil, nil, nil
-            continue
-        end
-		local canonical = self.Config.GetSeedById(record.SeedId)
-		if canonical then record.SeedName, record.SeedEmoji, record.AccentColor = canonical.Name, canonical.Emoji, canonical.Color end
+		self:_canonicalizeSeedRecord(record)
 	end
+
 	self.OwnedBoosts[player] = {}
     self.EquippedBoosts[player] = {}
 	for _, productId in ipairs(loadedBoosts) do
