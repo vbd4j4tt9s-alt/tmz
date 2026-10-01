@@ -81,6 +81,7 @@ connect(Run.Heartbeat,function(dt)
  elapsed+=dt;if elapsed<.1 then return end;elapsed=0
  if box.Visible and(not equipped()or not valid(pending))then close()end
  target=aim();selectionView:Set(target,nil,workspace.CurrentCamera)
- if feedback.Text~=''and os.clock()>feedbackUntil then feedback.Text=''end
+ -- R122: when idle, show the track-hole hint TrackHoleClient publishes (nil = empty, as before).
+ if os.clock()>feedbackUntil then local hint=pg:GetAttribute('ShovelHint');hint=type(hint)=='string'and hint or'';if feedback.Text~=hint then feedback.Text=hint end end
 end)
 script.Destroying:Connect(function()close();releasePicker();for _,c in ipairs(conns)do c:Disconnect()end;CAS:UnbindAction('GardenShovelRemove');selectionView:Destroy();gui:Destroy()end)

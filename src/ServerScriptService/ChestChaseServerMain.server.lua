@@ -133,6 +133,10 @@ local function runServer()
 	startupPhase = "starting ChaseService"
 	chaseService:Start()
 	stormService:Start()
+	-- R122: shovel holes on the track (only pack carriers fall in).
+	local TrackHoleService = loadModule("TrackHoleService", {"new","Start","Request","Step","ClearAll","CleanupPlayer"})
+	local trackHoles = construct("TrackHoleService", TrackHoleService.new, Config, mapService, chaseService, notifications)
+	trackHoles:Start()
 	startupPhase = "starting FastTravelService"
 	fastTravelService:Start()
 	startupPhase = "starting EconomyService"
@@ -211,6 +215,7 @@ local function runServer()
         gifts:Cleanup(player)
         premium:Cleanup(player)
 		playerData:FinalizePlayer(player, "PlayerRemoving")
+		trackHoles:CleanupPlayer(player)
 		chaseService:CleanupPlayer(player)
 		chestService:CleanupPlayer(player)
 		economyService:CleanupPlayer(player)

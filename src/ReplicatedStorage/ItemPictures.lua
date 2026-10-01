@@ -191,12 +191,20 @@ local function flat(holder,spec)
  local ok,rules=pcall(packRules);if not ok then rules=nil end
  local shadow=shape(root,'Shadow',.2,.84,.6,.1,black,1);shadow.BackgroundTransparency=.72
  if spec.Kind=='Pack'then
-  local theme=rules and rules.BiomeThemes[spec.Stage]or{Body=RGB(179,138,85),Ink=RGB(57,103,48),Trim=RGB(108,135,61)}
+  -- R122: the Void Pack keeps its own black-violet look in the flat icon too.
+  local void=spec.Variant=='EclipseReliquary'
+  local theme=void and{Body=RGB(9,5,20),Ink=RGB(48,26,82),Trim=RGB(176,104,255)}or rules and rules.BiomeThemes[spec.Stage]or{Body=RGB(179,138,85),Ink=RGB(57,103,48),Trim=RGB(108,135,61)}
   local tier=rules and rules.GetPackTier(spec.Variant);local body=coats[spec.Mutation]or theme.Body
-  local bag=shade(shape(root,'Pouch',.24,.1,.52,.76,body,.14,-4),body:Lerp(white,.25),body:Lerp(black,.25));outline(bag,body:Lerp(black,.55))
+  local bag=shade(shape(root,'Pouch',.24,.1,.52,.76,body,.14,-4),body:Lerp(white,.25),body:Lerp(black,.25));outline(bag,void and RGB(150,80,230)or body:Lerp(black,.55))
   shade(shape(bag,'Seal',0,0,1,.14,theme.Ink,.3),theme.Ink:Lerp(white,.15),theme.Ink:Lerp(black,.2))
-  shape(bag,'Label',.16,.26,.68,.34,body:Lerp(white,.62),.2)
-  shape(bag,'Seed',.39,.3,.22,.26,theme.Ink,1,-20)
+  if void then
+   local ring=shape(bag,'VoidRing',.2,.24,.6,.44,RGB(255,120,214),1)
+   shape(ring,'VoidHole',.12,.12,.76,.76,black,1);shape(ring,'VoidPupil',.44,.2,.12,.6,RGB(255,30,70),1)
+   for i,at in ipairs({{.12,.2},{.8,.18},{.16,.78},{.78,.74}})do shape(bag,'VoidStar'..i,at[1],at[2],.06,.04,i%2==0 and RGB(150,232,255)or white,1)end
+  else
+   shape(bag,'Label',.16,.26,.68,.34,body:Lerp(white,.62),.2)
+   shape(bag,'Seed',.39,.3,.22,.26,theme.Ink,1,-20)
+  end
   shape(bag,'TierBand',0,.7,1,.1,tier and tier.Color or theme.Trim,nil)
   shape(bag,'Shine',.08,.18,.08,.5,white,1).BackgroundTransparency=.7
  elseif spec.Kind=='Seed'or spec.Kind=='Fruit'then

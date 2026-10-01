@@ -19,7 +19,7 @@ function Service.Sync(chests,player)
   end
  end end end
  if not shovel then
-  shovel=Instance.new('Tool');shovel.Name='Shovel';shovel.ToolTip='Remove a plant from your garden';shovel.CanBeDropped=false;shovel.RequiresHandle=true;shovel.ManualActivationOnly=true
+  shovel=Instance.new('Tool');shovel.Name='Shovel';shovel.ToolTip='Remove a plant • Dig a hole on the track';shovel.CanBeDropped=false;shovel.RequiresHandle=true;shovel.ManualActivationOnly=true
   shovel:SetAttribute('GardenShovel',true);shovel:SetAttribute('InventoryKey','shovel');shovel:SetAttribute('ShovelAssetId',Shovel.AssetId)
   local h=handle(shovel);local appearance
   shovel.Equipped:Connect(function()if appearance then appearance:Destroy()end;appearance=Shovel.Build(shovel,h)end)
