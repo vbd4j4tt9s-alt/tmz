@@ -44,9 +44,19 @@ function H.Create(pg,player)
   local time=label(card,'Time',UDim2.fromOffset(44,1),UDim2.new(1,-51,1,-2),28);time.TextXAlignment=Enum.TextXAlignment.Right;time.TextStrokeTransparency=.08
   rows[name]={Root=card,Glyph=glyph,Time=time}
  end
- local special=block(root,'SpecialKeeper',UDim2.fromOffset(0,0),UDim2.fromOffset(190,39),C(26,17,42),7);special.Visible=false;special.BackgroundTransparency=.18
- local specialTitle=label(special,'Title',UDim2.fromOffset(9,0),UDim2.new(1,-18,0,21),18);specialTitle.Text='THE VEILED ONE';specialTitle.TextColor3=C(229,205,255);specialTitle.TextXAlignment=Enum.TextXAlignment.Center
- local specialHint=label(special,'Hint',UDim2.fromOffset(9,20),UDim2.new(1,-18,0,16),12);specialHint.TextColor3=C(201,190,225);specialHint.TextXAlignment=Enum.TextXAlignment.Center
+ -- R122: event notifier card: storm emblem on the left, violet gradient + outline + soft inner glow.
+ -- Same 190x39 footprint and positions as before; every addition stays inside the card bounds.
+ local special=block(root,'SpecialKeeper',UDim2.fromOffset(0,0),UDim2.fromOffset(190,39),Color3.new(1,1,1),8);special.Visible=false;special.BackgroundTransparency=.08
+ Bright.Gradient(special,C(78,44,128),C(22,13,40),0);Bright.Outline(special,C(186,140,255),1.5).Transparency=.15
+ local glow=block(special,'Glow',UDim2.fromOffset(0,0),UDim2.fromScale(1,1),C(196,150,255),8);glow.BackgroundTransparency=.82;glow.ZIndex=0
+ local fade=Instance.new('UIGradient');fade.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(.35,.7),NumberSequenceKeypoint.new(1,1)});fade.Parent=glow
+ local badge=block(special,'IconBadge',UDim2.fromOffset(4,4),UDim2.fromOffset(31,31),C(40,22,70),16);badge.BackgroundTransparency=.25
+ local ring=Instance.new('UIStroke');ring.Name='IconRing';ring.Color=C(201,160,255);ring.Thickness=1;ring.Transparency=.3;ring.Parent=badge
+ local emblem=block(badge,'Icon',UDim2.fromOffset(1,1),UDim2.new(1,-2,1,-2),Color3.new());emblem.BackgroundTransparency=1
+ require(RS.HudArtwork).Attach(emblem,'WeatherThunderstorm')
+ local specialTitle=label(special,'Title',UDim2.fromOffset(40,1),UDim2.new(1,-46,0,21),18);specialTitle.Text='THE VEILED ONE';specialTitle.TextColor3=C(236,216,255);specialTitle.TextXAlignment=Enum.TextXAlignment.Center
+ local specialHint=label(special,'Hint',UDim2.fromOffset(40,20),UDim2.new(1,-46,0,16),12);specialHint.TextColor3=C(208,196,234);specialHint.TextXAlignment=Enum.TextXAlignment.Center
+ require(RS.GardenTextFit).Attach(specialTitle,18,13);require(RS.GardenTextFit).Attach(specialHint,12,10)
  local boostRows={};local hasBoosts=false
  for i,name in ipairs({'Speed gain','Pack luck'})do
   local card=block(root,i==1 and'SpeedBoost'or'LuckBoost',UDim2.fromOffset(0,(i-1)*43),UDim2.fromOffset(137,39),Color3.new());card.BackgroundTransparency=1;card.Visible=false
