@@ -100,6 +100,7 @@ S.Themes={
   Ring={Colors=RAINBOW,Radius=3,Life=.45,Width=.14},
   Sprint={Emitters={
    {Name='Prism streak',Texture=SPARK,Colors=RAINBOW,Rate=14,Size={0,.3,0},Life={.35,.6},Speed={.2,.8},Drag=2,Alpha={0,.2},Glow=1,Light=0},
+   {Name='Light streak',Texture=SPARK,Color=C(255,255,255),Tail=C(200,170,255),Rate=6,Size={.4,0},Life={.2,.35},Speed={0,.3},Alpha={.1,.4},Glow=1,Light=0,Spin={0,0}},
   }},
   -- Light catches the heel gem; rainbow sparkles drift off the glass shaft.
   Glint={
@@ -133,17 +134,21 @@ S.Themes={
   Strike={Height=16,Color=C(235,250,255),Glow=C(90,190,255),Life=.3,Light=6,Range=18},
   Sprint={Emitters={
    {Name='Plasma streak',Texture=SPARK,Color=C(200,244,255),Tail=C(70,140,255),Rate=18,Size={.2,0},Life={.15,.3},Speed={1,3},Drag=4,Alpha={0,.2},Glow=1,Light=0},
+   {Name='Static trail',Texture=SMOKE,Color=C(120,200,255),Tail=C(40,90,200),Rate=8,Size={.5,1.2},Life={.25,.45},Speed={0,.4},Alpha={.5,1},Glow=1,Light=0},
   }},
   Glint={
    {Name='Coil sparks',On='Volt coil',Texture=SPARK,Color=C(200,244,255),Tail=C(70,140,255),Rate=5,Size={.14,0},Life={.1,.25},Speed={2,5},Drag=5,Alpha={0,.2},Glow=1,Light=0},
+   {Name='Spine sparks',On='Tesla spine',Texture=SPARK,Color=C(235,250,255),Tail=C(90,190,255),Rate=3,Size={.12,0},Life={.1,.2},Speed={3,6},Spread=50,Drag=5,Alpha={0,.2},Glow=1,Light=0},
   },
   -- The three coils on each shin glow brighter in turn, running up the leg (faster when running).
   Coils={Name='Volt coil',Hot=C(235,252,255),Speed=7},
   -- Electric field: a force-field dome, four charged nodes circling the feet, arcs between the boots, nodes and ground.
   Idle={ArcEvery={.25,.6},BootArcs=true,Spin=2.2,Shards=4,ShardMaterial=M.Neon,ShardColors={C(220,248,255),C(90,190,255)},Orbit={Radius=1.25,Height=.25,Size=.16},
-   Dome={Material=M.ForceField,Color=C(110,200,255),Size=4.4,Alpha=0},Emitters={
+   Dome={Material=M.ForceField,Color=C(110,200,255),Size=4.4,Alpha=0},
+   Patches={Count=6,Kind='Crack',Material=M.Neon,Color=C(120,210,255),Alpha=.25,Size={.06,.5},Radius={1.1,1.5}},Emitters={
    {Name='Crackling sparks',Texture=SPARK,Color=C(160,230,255),Tail=C(90,160,255),Rate=18,Size={.22,0},Life={.15,.35},Speed={3,6},Spread=60,Drag=4,Alpha={0,.2},Glow=1,Light=0,Shape='Disc'},
    {Name='Static motes',Texture=SPARK,Color=C(220,248,255),Tail=C(90,160,255),Rate=6,Size={0,.2,0},Life={1,1.6},Speed={.3,.7},Spread=30,Accel=V(0,.6,0),Alpha={0,.3},Glow=1,Light=0,Shape='Disc'},
+   {Name='Field glow',Texture=SMOKE,Color=C(90,180,255),Rate=2,Size={1.4,2.4},Life={.8,1.2},Speed={.1,.3},Alpha={.75,1},Glow=1,Light=0,Shape='Disc'},
   }}},
 }
 function S.Theme(name)return S.Themes[name]end

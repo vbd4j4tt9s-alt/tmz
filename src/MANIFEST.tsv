@@ -432,3 +432,5 @@ ModuleScript	ReplicatedStorage/KeeperFx	ReplicatedStorage/KeeperFx.lua
 ModuleScript	ReplicatedStorage/KeeperAccents	ReplicatedStorage/KeeperAccents.lua
 ModuleScript	ReplicatedStorage/RunnerTrailAuraFx	ReplicatedStorage/RunnerTrailAuraFx.lua
 LocalScript	StarterPlayer/StarterPlayerScripts/RunnerTrailAura	StarterPlayer/StarterPlayerScripts/RunnerTrailAura.client.lua
+ModuleScript	ReplicatedStorage/RunnerBootFx	ReplicatedStorage/RunnerBootFx.lua
+ModuleScript	ReplicatedStorage/TreadmillFx	ReplicatedStorage/TreadmillFx.lua
