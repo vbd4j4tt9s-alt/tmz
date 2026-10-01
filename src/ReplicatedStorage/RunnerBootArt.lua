@@ -3,6 +3,11 @@
 -- Sand: leather and canvas, sand-worn toe and heel, a cloth wrap. Frost: glacier ice, snow fur cuff, icicles.
 -- Lava: basalt with cracked-lava plates, glowing magma seams and obsidian shards. Crystal: reflective glass shell
 -- over a glowing core, crystal toe and a crown of shards. Electric: blue metal and foil, volt trims, side bolt, static field.
+-- R117: every tier adds a heel emblem (the chase camera sees the back of the boots) and its own trims, more per tier:
+-- Sand stitched patch + sun stone; Frost ice gem + glowing snowflake; Lava magma gem, glowing sole seam, obsidian spur
+-- and horns; Crystal faceted heel gem, prism toe, rainbow facets and a glowing crown prism; Thunder metal spine with a
+-- bolt emblem, three glowing Tesla coils, prongs and a heel thruster. Parts per leg: 22 / 26 / 29 / 33 / 37.
+-- Names matter: the client effects find 'Volt coil', 'Heel gem', 'Toe prism' and 'Outsole' parts by name.
 -- Block, Wedge and CornerWedge parts only. Specs may carry Transparency/Reflectance; ShopProductArt shows them too.
 local A={}
 local V,CF=Vector3.new,CFrame.new
@@ -16,17 +21,18 @@ local TURN=CFrame.Angles(0,math.pi/2,0) -- wedge profile faces the front instead
 -- Mat = material per role (SmoothPlastic when missing); Fin = {Transparency, Reflectance} per role.
 -- Shell > 1 widens the collar/shaft so a glowing core fits between the leg and the glass.
 local looks={
- Desert={Tier=1,Shaft=.5,Accent={233,192,113},Outsole={52,38,30},Midsole={246,238,219},Upper={205,154,96},Overlay={112,76,50},Cuff={112,76,50},Tongue={230,190,134},Laces={84,58,40},Dust={222,194,146},
+ Desert={Tier=1,Shaft=.5,Accent={233,192,113},Outsole={52,38,30},Midsole={246,238,219},Upper={205,154,96},Overlay={112,76,50},Cuff={112,76,50},Tongue={230,190,134},Laces={84,58,40},Dust={222,194,146},Emblem={244,206,120},
   Mat={Outsole=M.Rubber,Midsole=M.Sandstone,Upper=M.Leather,Overlay=M.Leather,Cuff=M.Leather,Tongue=M.Fabric,Laces=M.Fabric,Trim=M.Fabric,Tread=M.Sandstone}},
- Snow={Tier=2,Shaft=.56,Accent={150,212,248},Outsole={32,50,82},Midsole={246,251,255},Upper={214,232,248},Overlay={66,112,170},Cuff={250,252,255},Tongue={66,112,170},Laces={250,252,255},Ice={128,200,250},
+ Snow={Tier=2,Shaft=.56,Accent={150,212,248},Outsole={32,50,82},Midsole={246,251,255},Upper={214,232,248},Overlay={66,112,170},Cuff={250,252,255},Tongue={66,112,170},Laces={250,252,255},Ice={128,200,250},Flake={196,236,255},
   Mat={Outsole=M.Glacier,Midsole=M.Snow,Upper=M.Glacier,Overlay=M.Ice,Cuff=M.Snow,Tongue=M.Ice,Laces=M.Fabric,Trim=M.Ice,Tread=M.Ice},
   Fin={Overlay={0,.15},Tongue={0,.15},Trim={0,.2},Tread={0,.2}}},
- Lava={Tier=3,Shaft=.58,Accent={255,140,53},Outsole={22,18,18},Midsole={58,48,46},Upper={44,37,37},Overlay={255,140,53},Cuff={22,18,18},Tongue={255,140,53},Glow={255,96,20},Obsidian={26,20,30},
+ Lava={Tier=3,Shaft=.58,Accent={255,140,53},Outsole={22,18,18},Midsole={58,48,46},Upper={44,37,37},Overlay={255,140,53},Cuff={22,18,18},Tongue={255,140,53},Glow={255,96,20},Obsidian={26,20,30},Hot={255,196,90},
   Mat={Outsole=M.Basalt,Midsole=M.Basalt,Upper=M.Basalt,Overlay=M.CrackedLava,Cuff=M.Basalt,Tongue=M.CrackedLava}},
  Crystal={Tier=4,Shaft=.62,Shell=1.06,Accent={193,152,250},Outsole={30,22,50},Midsole={240,233,255},Upper={116,68,214},Toe={176,136,250},Overlay={208,214,230},Cuff={208,214,230},Tongue={170,128,250},Glow={170,96,255},Core={104,38,214},Shard={200,160,255},
+  Rainbow={{255,150,214},{140,230,255},{255,226,140},{170,255,200}},
   Mat={Outsole=M.Glass,Upper=M.Glass,Toe=M.Glass,Overlay=M.Metal,Cuff=M.Metal,Tongue=M.Glass,Trim=M.Metal},
   Fin={Outsole={0,.25},Midsole={0,.15},Upper={.28,.3},Vamp={.1,.35},Toe={.1,.4},Overlay={0,.25},Cuff={0,.25},Tongue={.15,.3},Trim={0,.25},Shard={.12,.45}}},
- Storm={Tier=5,Shaft=.66,Accent={177,232,255},Outsole={16,20,32},Midsole={242,247,255},Upper={34,66,170},Overlay={242,247,255},Cuff={16,20,32},Tongue={242,247,255},Glow={40,196,255},
+ Storm={Tier=5,Shaft=.66,Accent={177,232,255},Outsole={16,20,32},Midsole={242,247,255},Upper={34,66,170},Overlay={242,247,255},Cuff={16,20,32},Tongue={242,247,255},Glow={40,196,255},Steel={120,132,156},Spark={224,250,255},
   Mat={Outsole=M.Rubber,Upper=M.Metal,Overlay=M.Foil,Cuff=M.Metal,Tongue=M.Foil,Trim=M.Foil},
   Fin={Upper={0,.12},Overlay={0,.1},Cuff={0,.1},Trim={0,.1}}},
  Forest={Tier=1,Shaft=.5,Accent={122,185,103},Outsole={42,38,32},Midsole={238,242,228},Upper={94,120,76},Overlay={62,52,40},Cuff={62,52,40},Tongue={124,152,100},Laces={42,38,32}},
@@ -87,6 +93,27 @@ function A.Specs(size,r6,biome,accent)
    p('Side bolt',V(w*.03,u*.24,u*.26),CF(side*w*.52,base+u*.46,-u*.08)*DOWN,glow,Neon,'Wedge',side)
    p('Side bolt',V(w*.03,u*.22,u*.26),CF(side*w*.52,base+u*.3,u*.06)*DOWN,glow,Neon,'Wedge',side)
   end
+ end
+ -- R117 tier trims on the foot. The toe welt runs along the top front edge of the toe box.
+ local welt=CF(0,base+u*.31,toe+u*.09)
+ if L.Tier==1 and L.Dust then
+  p('Toe stitch',V(w*.93,u*.025,u*.035),welt,acc,M.Fabric)
+ elseif L.Tier==3 then
+  p('Toe welt',V(w*.93,u*.03,u*.035),welt,glow,Neon)
+  -- A glowing seam where the basalt outsole meets the midsole, visible all the way round.
+  p('Magma sole seam',V(w*1.075,u*.03,len),CF(0,base+u*.04,(heel+toe+u*.04)*.5),glow,Neon)
+  p('Heel spur',V(w*.12,u*.18,u*.24),CF(0,base+u*.16,heel+u*.1)*BACK,rgb(L.Obsidian),M.Glass,'Wedge',nil,{0,.45})
+ elseif L.Tier==4 then
+  -- A faceted prism sits on the toe; rainbow glass facets interrupt the glowing midsole stripe.
+  p('Toe prism',V(u*.24,u*.14,u*.24),CF(0,base+u*.43,toe+u*.27)*CFrame.Angles(0,math.pi/4,0),rgb(L.Shard),M.Glass,nil,nil,{.08,.5})
+  p('Toe facet',V(u*.17,u*.12,u*.17),CF(0,base+u*.56,toe+u*.27)*CFrame.Angles(0,math.pi/4,0),rgb(L.Shard),M.Glass,'CornerWedge',nil,{.08,.5})
+  for i,c in ipairs(L.Rainbow)do
+   p('Prism facet',V(w*1.1,u*.075,u*.11),CF(0,base+u*.105,toe+u*(.36+i*.24)),rgb(c),M.Glass,nil,nil,{.05,.5})
+  end
+ elseif L.Tier==5 then
+  -- A metal thruster on the heel, glowing at the back.
+  p('Heel thruster',V(w*.46,u*.14,u*.1),CF(0,base+u*.27,heel+u*.07),rgb(L.Steel),M.Metal,nil,nil,{0,.2})
+  p('Thruster glow',V(w*.34,u*.06,u*.02),CF(0,base+u*.27,heel+u*.125),rgb(L.Spark),Neon)
  end
  return out
 end
@@ -160,6 +187,55 @@ function A.ShinSpecs(size,r6,biome,accent)
     -- Three swept-back feathers form a small wing on the outer ankle.
     p('Volt wing',V(w*.06,h*f[1],w*f[2]),CF(side*w*.54,bottom+h*(.78-i*.12),back-w*(.12-i*.08))*CFrame.Angles(f[3],0,0),i==2 and acc or glow,Neon,'Wedge',side)
    end
+  end
+ end
+ -- R117 tier emblem on the back of the shaft, then the tier's own trims.
+ local ey=bottom+h*.5;local diamond=CFrame.Angles(0,0,math.pi/4)
+ local function emblem(name,s,z,color,material,finish)p(name,V(w*s,w*s,w*.05),CF(0,ey,back+w*z)*diamond,color,material,nil,nil,finish)end
+ if L.Tier==1 and L.Dust then
+  emblem('Heel patch',.3,.02,rgb(L.Overlay),M.Leather)
+  emblem('Sun stone',.16,.045,rgb(L.Emblem),M.Sandstone)
+ elseif L.Tier==2 then
+  emblem('Gem frame',.32,.02,rgb(L.Cuff),M.Snow)
+  emblem('Frost gem',.2,.045,rgb(L.Ice),M.Glass,{.1,.45})
+  -- A small glowing snowflake on the outer ankle: three crossed bars.
+  for _,side in ipairs({-1,1})do
+   for i=0,2 do
+    p('Snowflake',V(w*.03,w*.28,w*.035),CF(side*w*.535,bottom+h*.24,d*.2)*CFrame.Angles(i*math.pi/3,0,0),rgb(L.Flake),Neon,nil,side)
+   end
+  end
+ elseif L.Tier==3 then
+  emblem('Gem bezel',.34,.02,rgb(L.Midsole),M.Basalt)
+  emblem('Magma gem',.2,.045,rgb(L.Hot),Neon)
+  p('Tongue vent',V(w*.08,(high-low)*.55,w*.02),CF(0,(high+low)*.5,front-lip-w*.045),glow,Neon)
+  -- Obsidian horns sweep back from the outer top of the cuff.
+  for _,side in ipairs({-1,1})do
+   p('Heel horn',V(w*.1,w*.36,w*.17),CF(side*w*.4,top+w*.12,back-w*.04)*CFrame.Angles(.35,0,side*-.25),rgb(L.Obsidian),M.Glass,'Wedge',side,{0,.45})
+   p('Heel horn',V(w*.08,w*.24,w*.13),CF(side*w*.47,top+w*.06,back-w*.24)*CFrame.Angles(.3,0,side*-.35),rgb(L.Obsidian),M.Glass,'Wedge',side,{0,.45})
+  end
+ elseif L.Tier==4 then
+  -- A faceted heel gem in a metal setting, glowing from inside; a tall glass prism crowns the back of the cuff.
+  local shard=fin(L,'Shard')
+  emblem('Gem setting',.38,.02,rgb(L.Overlay),M.Metal,{0,.3})
+  p('Heel gem',V(w*.26,w*.26,w*.09),CF(0,ey,back+w*.06)*diamond,rgb(L.Shard),M.Glass,nil,nil,{.1,.5})
+  p('Gem core',V(w*.12,w*.12,w*.06),CF(0,ey,back+w*.06)*diamond,rgb(L.Glow),Neon)
+  local crown=CF(0,top+w*.24,back-w*.16)*CFrame.Angles(0,math.pi/4,0)
+  p('Crown prism',V(w*.16,w*.46,w*.16),crown,rgb(L.Shard),M.Glass,nil,nil,shard)
+  p('Prism heart',V(w*.07,w*.34,w*.07),crown,rgb(L.Glow),Neon)
+  p('Prism tip',V(w*.16,w*.2,w*.16),crown*CF(0,w*.33,0),rgb(L.Shard),M.Glass,'CornerWedge',nil,shard)
+ elseif L.Tier==5 then
+  -- Tesla coils: three glowing bands over the static field on a metal base ring.
+  p('Coil base',V(w*1.14,w*.07,d*1.14),CF(0,bottom+h*.1,0),rgb(L.Steel),M.Metal,nil,nil,{0,.2})
+  for i,t in ipairs({.26,.42,.58})do p('Volt coil',V(w*1.1,w*.04,d*1.1),CF(0,bottom+h*t,0),glow,Neon)end
+  -- A metal spine down the back carries a bolt emblem in a diamond ring.
+  p('Tesla spine',V(w*.14,h*.8,w*.08),CF(0,bottom+h*.5,back+w*.05),rgb(L.Steel),M.Metal,nil,nil,{0,.2})
+  p('Emblem ring',V(w*.34,w*.34,w*.03),CF(0,ey,back+w*.105)*diamond,rgb(L.Cuff),M.Metal,nil,nil,{0,.15})
+  p('Bolt emblem',V(w*.03,w*.2,w*.17),CF(-w*.035,ey+w*.065,back+w*.135)*TURN*DOWN,rgb(L.Spark),Neon,'Wedge')
+  p('Bolt emblem',V(w*.03,w*.18,w*.17),CF(w*.035,ey-w*.065,back+w*.135)*TURN*DOWN,rgb(L.Spark),Neon,'Wedge')
+  -- Two prongs with glowing tips rise from the back of the cuff.
+  for _,x in ipairs({-.3,.3})do
+   p('Volt prong',V(w*.06,w*.34,w*.06),CF(x*w,top+w*.15,back-w*.06),rgb(L.Steel),M.Metal,nil,nil,{0,.2})
+   p('Prong tip',V(w*.1,w*.1,w*.1),CF(x*w,top+w*.36,back-w*.06)*CFrame.Angles(math.pi/4,0,math.pi/4),rgb(L.Spark),Neon)
   end
  end
  return out
