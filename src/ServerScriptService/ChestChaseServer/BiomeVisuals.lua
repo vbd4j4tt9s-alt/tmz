@@ -830,7 +830,7 @@ local function treadmillFlairR117(k)
         local list={};for _,v in ipairs(m:GetChildren())do if v.Name==name then table.insert(list,v)end end;return list
     end
 
-    -- Every tier: an outward tier plaque (Roman numeral + name) and tier pips on the runner's console.
+    -- Every tier: an outward tier plaque (Roman numeral) and tier pips on the runner's console. R118: no names (owner request).
     local plaque=keep(rawp('Tier plaque',V(3.4,1.5,.08),CF(0,4.1,TREADMILL_FRONT_FACE[tier]-.045),theme.Ink,Enum.Material.SmoothPlastic))
     local plaqueGui=Instance.new('SurfaceGui');plaqueGui.Name='TierPlaqueDisplay';plaqueGui.Face=Enum.NormalId.Front
     plaqueGui.CanvasSize=Vector2.new(340,150);plaqueGui.LightInfluence=.2;plaqueGui.MaxDistance=160;plaqueGui.Parent=plaque
@@ -840,12 +840,10 @@ local function treadmillFlairR117(k)
         t.Position=UDim2.new(0,8,0,y);t.Size=UDim2.new(1,-16,0,h);t.TextScaled=true;t.Font=Enum.Font.FredokaOne
         t.TextColor3=color;t.TextStrokeColor3=theme.Ink;t.TextStrokeTransparency=.2;t.Parent=parent;return t
     end
-    label(plaqueGui,'TierNumeral',TREADMILL_NUMERALS[tier],4,92,theme.Glow)
-    label(plaqueGui,'TierName',string.upper(theme.Name),96,48,theme.Trim)
+    label(plaqueGui,'TierNumeral',TREADMILL_NUMERALS[tier],10,130,theme.Glow)
     if k.face then
-        label(k.face,'ConsoleTierName',theme.Name,10,70,theme.Glow)
         local row=Instance.new('Frame');row.Name='TierPips';row.BackgroundTransparency=1
-        row.Position=UDim2.new(.5,-245,0,100);row.Size=UDim2.new(0,490,0,54);row.Parent=k.face
+        row.AnchorPoint=Vector2.new(.5,.5);row.Position=UDim2.fromScale(.5,.5);row.Size=UDim2.new(0,490,0,54);row.Parent=k.face
         for i=1,7 do
             local pip=Instance.new('Frame');pip.Name='TierPip'..i;pip.BorderSizePixel=0
             pip.Position=UDim2.new(0,(i-1)*72,0,4);pip.Size=UDim2.new(0,58,0,46)

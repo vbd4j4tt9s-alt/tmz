@@ -3,12 +3,13 @@
 local E={Version=90,MaxCash=900000000000000,MaxBaseFruitValue=100000000000}
 E.Version=91
 -- R117: the last treadmill, trail and boots take about 200 hours of active play altogether (simulated active player:
--- Thunder boots ~76 h, Machine 7 ~149 h, Royal trail ~194 h). Everything bought in the first ~3 hours keeps its old price.
-E.MachineCosts={0,250000,11900000,562000000,26700000000,5100000000000,150000000000000}
-local trails={200000,10400000,538000000,120000000000,130000000000000,170000000000000}
+-- Thunder boots ~79 h, Machine 7 ~154 h, Royal trail ~200 h). Everything bought in the first ~3 hours keeps its old price.
+-- R118: late prices x1.2 to match the bigger size/coat/weather fruit bonuses (BalanceRules).
+E.MachineCosts={0,250000,11900000,562000000,26700000000,6100000000000,180000000000000}
+local trails={200000,10400000,538000000,144000000000,156000000000000,204000000000000}
 E.TrailCosts={};for i,id in ipairs({'MintTrail','ArcTrail','SolarTrail','AuroraTrail','NebulaTrail','RoyalTrail'})do E.TrailCosts[id]=trails[i]end
-E.BootCosts={750000,64100000,5480000000,1500000000000,130000000000000}
-E.FenceCosts={0,500000,18000000,646000000,23200000000,1300000000000,60000000000000}
+E.BootCosts={750000,64100000,5480000000,1800000000000,156000000000000}
+E.FenceCosts={0,500000,18000000,646000000,23200000000,1560000000000,72000000000000}
 -- R116: value order. Every plant's income comes from one rule: income per second = biome base x tier multiplier.
 -- Regrowing plants: value per fruit = income x RegrowSeconds / FruitCount. Single-harvest plants: 10 minutes of income.
 -- Tier: Common 1, Uncommon 1.6, Rare 2.5, Legendary 4, Mythic 7, Secret 20, Cosmic 60, King 500 (Mech: Cosmic 40, King 100).

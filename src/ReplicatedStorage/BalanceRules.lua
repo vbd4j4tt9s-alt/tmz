@@ -17,10 +17,17 @@ function B.Half(n)return math.floor(n*2+.5)/2 end
 function B.Training(machine,trail,premium)
  return math.clamp(finite(machine,1),1,30000)*math.clamp(finite(trail,1),1,6)*(premium and 2 or 1)
 end
-function B.SizeCash(size)return B.Half(1+(math.sqrt(math.clamp(finite(size,1),.5,25))-1)*.5)end
-function B.MutationCash(mutation)return mutation=='Diamond'and 3 or mutation=='Gold'and 2 or 1 end
+-- R118: fruit bonuses multiply (owner request: bigger and easy to read).
+--  Size: cash x the fruit's size (a size x2 fruit pays double; smaller than x1 still pays x1).
+--  Coat: Gold x3, Diamond x6.  Weather: Drippy x2, Frosted x3, Charged x5 (stacked weathers multiply).
+--  The total is capped at x100 so the biggest fruit stays far inside the save limits.
+B.MaxCashMultiplier=100
+B.MutationMultipliers={Gold=3,Diamond=6}
+local function cents(n)return math.floor(n*100+.5)/100 end
+function B.SizeCash(size)return cents(math.clamp(finite(size,1),1,25))end
+function B.MutationCash(mutation)return B.MutationMultipliers[mutation]or 1 end
 function B.CashMultiplier(sizeBonus,mutation,weatherBonus)
- return B.Half(math.clamp(finite(sizeBonus,1),1,3)+B.MutationCash(mutation)-1+math.clamp(finite(weatherBonus,1),1,4)-1)
+ return cents(math.min(B.MaxCashMultiplier,math.clamp(finite(sizeBonus,1),1,25)*B.MutationCash(mutation)*math.clamp(finite(weatherBonus,1),1,30)))
 end
 function B.PlantScale(seed,unit)
  seed=math.clamp(finite(seed,1),.5,25);unit=math.clamp(finite(unit,1),0,1)

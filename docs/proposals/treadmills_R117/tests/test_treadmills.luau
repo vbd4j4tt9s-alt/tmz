@@ -104,6 +104,9 @@ for tier=1,7 do
  local pips=art:FindFirstChild('Console screen').ConsoleDisplay.TierPips
  local lit=0;for i=1,7 do local c=pips['TierPip'..i].BackgroundColor3;if not(near(c.R,.12)and near(c.G,.13)and near(c.B,.16))then lit+=1 end end
  check(lit==tier,tag..'console pips lit = tier')
+ -- R118: no treadmill shows a name (owner request).
+ local named=0;for _,d in ipairs(art:GetDescendants())do if d:IsA('TextLabel')and d.Text:lower():find('runner')then named+=1 end end
+ check(named==0,tag..'no name text ('..named..')')
  print(string.format('T%d %-15s parts %3d (was %3d)  emitters %2d  lights %d  fx %2d  spin %d  pulse %2d',tier,art:GetAttribute('TreadmillTierName'),#parts,#bases(oldArt),emitters,lightsN,fxCount,
   countWhere(art,function(d)return d:GetAttribute('TreadmillSpin')~=nil end),countWhere(art,function(d)return d:GetAttribute('TreadmillPulse')~=nil end)))
 end

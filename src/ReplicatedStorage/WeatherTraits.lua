@@ -2,12 +2,13 @@
 local B=require(script.Parent.BalanceRules)
 local W={Interval=900,Duration=180,PackChance=B.WeatherPackChance,FruitChance=B.WeatherFruitChance,PlantChance=B.WeatherPlantChance,InheritanceChance=B.WeatherInheritance}
 W.Order={'Drippy','Frosted','Charged'}
-W.Traits={None={Rank=0,Multiplier=1},Drippy={Rank=1,Multiplier=1.5,Color=Color3.fromRGB(90,197,255)},Frosted={Rank=2,Multiplier=2,Color=Color3.fromRGB(202,241,255)},Charged={Rank=3,Multiplier=2.5,Color=Color3.fromRGB(177,144,255)}}
+-- R118: Drippy x2, Frosted x3, Charged x5; stacked weathers multiply (Drippy+Frosted+Charged = x30).
+W.Traits={None={Rank=0,Multiplier=1},Drippy={Rank=1,Multiplier=2,Color=Color3.fromRGB(90,197,255)},Frosted={Rank=2,Multiplier=3,Color=Color3.fromRGB(202,241,255)},Charged={Rank=3,Multiplier=5,Color=Color3.fromRGB(177,144,255)}}
 -- Keep indexed metadata compatible with every existing inventory, preview and sale path.
 for mask=1,7 do
  local list={};local multiplier,rank,color=1,0,nil
  for index,key in ipairs(W.Order)do if bit32.band(mask,2^(index-1))~=0 then
-  local trait=W.Traits[key];list[#list+1]=key;multiplier+=trait.Multiplier-1;rank=trait.Rank;color=trait.Color
+  local trait=W.Traits[key];list[#list+1]=key;multiplier*=trait.Multiplier;rank=trait.Rank;color=trait.Color
  end end
  local key=table.concat(list,'+');if not W.Traits[key]then W.Traits[key]={Rank=rank,Multiplier=multiplier,Color=color}end
 end
