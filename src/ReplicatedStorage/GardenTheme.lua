@@ -53,6 +53,13 @@ local function shape(parent,name,x,y,w,h,color,round,rotation)
  local p=Instance.new('Frame');p.Name=name;p.Position=UDim2.fromScale(x,y);p.Size=UDim2.fromScale(w,h);p.BorderSizePixel=0;p.BackgroundColor3=color;p.Rotation=rotation or 0;p.Active=false;p.Parent=parent
  if round then T.Corner(p,100)end;return p
 end
+-- R122: emblem helpers (top-to-bottom gradient fill and a thin outline ring).
+local function fill(frame,top,bottom,rotation)
+ local g=Instance.new('UIGradient');g.Color=ColorSequence.new(top,bottom);g.Rotation=rotation or 90;g.Parent=frame;return g
+end
+local function ring(frame,color,thickness)
+ local st=Instance.new('UIStroke');st.Color=color;st.Thickness=thickness or 1;st.ApplyStrokeMode=Enum.ApplyStrokeMode.Border;st.Parent=frame;return st
+end
 function T.ControlIcon(parent,kind)
  local root=Instance.new('Frame');root.Name='ControlIcon';root.BackgroundTransparency=1;root.Size=UDim2.fromOffset(14,14);root.Active=false;root.Parent=parent
  local c=T.Colors.Text
@@ -82,22 +89,33 @@ function T.Icon(parent,rarity)
   shape(root,'Star',.17,.12,.10,.10,RGB(255,255,255),false,45);shape(root,'Satellite',.73,.17,.13,.13,RGB(235,232,255),true)
   shape(root,'DistantStar',.81,.76,.08,.08,RGB(255,255,255),false,45)
  elseif style.Symbol=='star'then
-  shape(root,'FlameLeft',.15,.31,.24,.45,a,false,-30)
-  shape(root,'FlameRight',.61,.31,.24,.45,a,false,30)
-  shape(root,'FlameCrest',.37,.12,.26,.55,c,false,45)
-  shape(root,'Heart',.34,.49,.32,.32,RGB(255,179,156),false,45)
-  shape(root,'HeartFacet',.44,.49,.12,.25,RGB(255,245,221),false,25)
+  -- R122 Mythic: a crimson crest gem in a dark frame with a bright core and two side sparks.
+  local glow=shape(root,'MythicGlow',.10,.10,.80,.80,a,true);glow.BackgroundTransparency=.55
+  local frame=shape(root,'CrestFrame',.17,.17,.66,.66,style.Outline,false,45)
+  local gem=shape(root,'CrestGem',.24,.24,.52,.52,Color3.new(1,1,1),false,45);fill(gem,RGB(255,150,140),RGB(196,18,40),90)
+  local core=shape(root,'CrestCore',.37,.37,.26,.26,Color3.new(1,1,1),false,45);fill(core,RGB(255,250,238),RGB(255,150,130),90)
+  shape(root,'SparkLeft',.02,.44,.13,.13,RGB(255,214,206),false,45)
+  shape(root,'SparkRight',.85,.44,.13,.13,RGB(255,214,206),false,45)
+  shape(root,'Glint',.37,.25,.08,.08,Color3.new(1,1,1),true)
  elseif style.Symbol=='sun'then
-  shape(root,'RayA',.39,.08,.22,.84,a,false,45);shape(root,'RayB',.08,.39,.84,.22,a,false,45);shape(root,'Core',.29,.29,.42,.42,c,style.Symbol=='sun',45)
+  -- R122 Legendary: a golden sunburst medallion (8 rays, outlined disc, shine).
+  for i=0,3 do local ray=shape(root,'Ray'..i,.43,.02,.14,.96,Color3.new(1,1,1),false,i*45);fill(ray,RGB(255,236,150),RGB(232,150,22),90)end
+  local disc=shape(root,'SunDisc',.21,.21,.58,.58,Color3.new(1,1,1),true);fill(disc,RGB(255,248,196),RGB(240,166,24),45);ring(disc,style.Outline,1)
+  shape(root,'SunCore',.36,.36,.28,.28,RGB(255,252,226),true)
+  shape(root,'Glint',.31,.29,.10,.10,Color3.new(1,1,1),true)
  elseif style.Symbol=='key'then
-  shape(root,'SealEdge',.17,.17,.64,.64,RGB(0,0,0),false,45)
-  shape(root,'Seal',.23,.23,.52,.52,c,false,45)
-  shape(root,'KeyEye',.40,.33,.19,.19,RGB(0,0,0),true)
-  shape(root,'Keyhole',.46,.46,.07,.25,RGB(0,0,0),false)
-  shape(root,'SealGlint',.76,.07,.10,.10,c,false,45)
- elseif style.Symbol=='diamond'then shape(root,'Gem',.25,.21,.51,.59,c,false,45)
- elseif style.Symbol=='leaf'then shape(root,'Leaf',.22,.17,.48,.68,c,true,35);shape(root,'Stem',.47,.43,.07,.47,a,false,35)
- else shape(root,'Seed',.30,.25,.40,.56,c,true,-25)end
+  -- R122 Secret: a black seal with a silver ring and a glowing white keyhole.
+  local seal=shape(root,'Seal',.08,.08,.84,.84,Color3.new(1,1,1),true);fill(seal,RGB(58,60,70),RGB(4,4,8),90);ring(seal,RGB(214,218,228),1)
+  shape(root,'KeyEye',.38,.24,.24,.24,Color3.new(1,1,1),true)
+  shape(root,'Keyhole',.43,.40,.14,.32,Color3.new(1,1,1),false)
+  shape(root,'SealGlint',.25,.20,.09,.09,RGB(200,204,214),true)
+ elseif style.Symbol=='diamond'then
+  local gem=shape(root,'Gem',.22,.18,.56,.62,Color3.new(1,1,1),false,45);fill(gem,RGB(186,228,255),RGB(46,118,214),90);ring(gem,RGB(22,58,120),1)
+  shape(root,'GemGlint',.40,.30,.10,.10,Color3.new(1,1,1),true)
+ elseif style.Symbol=='leaf'then
+  local leaf=shape(root,'Leaf',.22,.13,.50,.70,Color3.new(1,1,1),true,35);fill(leaf,RGB(186,246,170),RGB(56,160,84),90);ring(leaf,RGB(28,92,48),1)
+  shape(root,'Stem',.47,.43,.07,.47,a,false,35)
+ else local seed=shape(root,'Seed',.30,.22,.40,.58,c,true,-25);ring(seed,RGB(96,110,94),1)end
  return root
 end
 local animations={};local connection;local clock=0
