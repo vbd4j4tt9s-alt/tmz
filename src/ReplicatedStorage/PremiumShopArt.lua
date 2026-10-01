@@ -150,6 +150,9 @@ local function measure(text,size)
  local ok,v=pcall(function()return TextService:GetTextSize(text,size,Theme.Font,Vector2.new(4000,400))end)
  return ok and v and v.X or #text*size*.55
 end
+A.Measure=measure
+-- R122: Robux price captions read "49 Robux" (number then word, no Robux glyph).
+function A.RobuxText(price)return tostring(price)..' Robux'end
 -- Lay out icon + caption centred in the button. Call after the button gets its pixel Size.
 function A.Fit(b)
  local w,h=b.Size.X.Offset,b.Size.Y.Offset

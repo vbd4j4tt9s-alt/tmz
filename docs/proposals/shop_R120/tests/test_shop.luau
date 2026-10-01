@@ -31,11 +31,11 @@ RS.GamePassCatalog:SetAttribute('GrowthPassId',101);RS.GamePassCatalog:SetAttrib
 for i,row in ipairs(Pricing.Bundles)do RS.PremiumPricing:SetAttribute(row.IdAttribute,200+i);robux[200+i]=row.RobuxPrice end
 for i,offer in ipairs(Mech.Offers)do RS.MechCatalog:SetAttribute(offer.Attribute,300+i);robux[300+i]=offer.TargetRobuxPrice end
 RS.PassGiftCatalog:SetAttribute('GrowthGiftProductId',401);RS.PassGiftCatalog:SetAttribute('SpeedGiftProductId',402);robux[401]=499;robux[402]=449
--- R121: 10-minute boost + gift products (CashMega's gift id is left unset -> SOON).
-local GiftProducts=W.module('GiftProducts');local Boost=W.module('SpeedBoost')
+-- R121 gift / boost ids are set too: R122 must show no gift or boost UI even when they exist.
+local GiftProducts=W.module('GiftProducts');local Boost=W.module('SpeedBoost');local Art=W.module('PremiumShopArt')
 RS.PremiumPricing:SetAttribute('SpeedBoost10ProductId',501);robux[501]=49
-local giftId={}
-for i,row in ipairs(GiftProducts.Rows)do if row.Key~='CashMega'then giftId[row.Key]=600+i;RS.GiftProducts:SetAttribute(row.Attribute,600+i);robux[600+i]=59 end end
+for i,row in ipairs(GiftProducts.Rows)do RS.GiftProducts:SetAttribute(row.Attribute,600+i);robux[600+i]=59 end
+local function rbx(n)return tostring(n)..' Robux'end
 local Market=W.service('MarketplaceService');local prompts={};local credits={}
 Market.GetProductInfoAsync=function(_,id)return robux[id]and{PriceInRobux=robux[id],IsForSale=true}or nil end
 Market.PromptGamePassPurchase=function(_,p,id)prompts[#prompts+1]={p,id}end
@@ -229,7 +229,7 @@ for si,s in ipairs(screens)do
  local pack=page.LimitedMechPack
  for _,offer in ipairs(Mech.Offers)do check(pack:FindFirstChild('Quantity'..offer.Count)~=nil,name..': pack quantity '..offer.Count)end
  check(caption(pack.BuyWithGems)=='80',name..': pack gem price '..tostring(caption(pack.BuyWithGems)))
- check(caption(pack.BuyWithRobux)=='80',name..': pack robux price '..tostring(caption(pack.BuyWithRobux)))
+ check(caption(pack.BuyWithRobux)==rbx(80),name..': pack robux price '..tostring(caption(pack.BuyWithRobux)))
  captionFits(pack.BuyWithGems,'pack gems');captionFits(pack.BuyWithRobux,'pack robux')
  textFits(pack.PackTitle,'pack title');textFits(pack.Contents,'LIMITED TIME')
  check(#pack.Outcomes:GetChildren()>=6,name..': six pack outcomes')
@@ -238,51 +238,40 @@ for si,s in ipairs(screens)do
  for _,pass in ipairs(Passes)do
   local cards={page[pass.Key]}
   for _,c in ipairs(cards)do
-   check(c.GiftPass~=nil and c.GemPerk~=nil and c.RobuxPass~=nil,name..': '..c.Name..' has gift/gems/robux')
-   check(caption(c.RobuxPass)==tostring(robux[pass.Key=='Growth'and 101 or 102]),name..': '..c.Name..' robux price '..tostring(caption(c.RobuxPass)))
+   check(c:FindFirstChild('GiftPass')==nil and c.GemPerk~=nil and c.RobuxPass~=nil,name..': '..c.Name..' has gems/robux, no gift')
+   check(rect(c.GemPerk).X+rect(c.GemPerk).W<=rect(c.RobuxPass).X and math.abs(rect(c.GemPerk).Y-rect(c.RobuxPass).Y)<1,name..': '..c.Name..' [Gems | Robux] row')
+   check(caption(c.RobuxPass)==rbx(robux[pass.Key=='Growth'and 101 or 102]),name..': '..c.Name..' robux price '..tostring(caption(c.RobuxPass)))
    check(caption(c.GemPerk)==tostring(Mech.PassGemPrices[pass.Key]),name..': '..c.Name..' gem price')
-   for _,b in ipairs({c.GiftPass,c.GemPerk,c.RobuxPass})do check(inside(rect(b),rect(c),1),name..': '..c.Name..'.'..b.Name..' inside card')end
+   for _,b in ipairs({c.GemPerk,c.RobuxPass})do check(inside(rect(b),rect(c),1),name..': '..c.Name..'.'..b.Name..' inside card')end
    captionFits(c.RobuxPass,c.Name..' robux');captionFits(c.GemPerk,c.Name..' gems');textFits(c.Title,c.Name..' title')
   end
  end
  for _,row in ipairs(Pricing.Bundles)do
   local c=bundleFrame(row.Key);check(c~=nil,name..': bundle '..row.Key)
   if c then
-   check(caption(c.RobuxBundle)==tostring(row.RobuxPrice),name..': '..row.Key..' robux price')
+   check(caption(c.RobuxBundle)==rbx(row.RobuxPrice),name..': '..row.Key..' robux price')
    check(caption(c.GemBundle)==tostring(row.GemPrice),name..': '..row.Key..' gem price')
    check(inside(rect(c.RobuxBundle),rect(c),1)and inside(rect(c.GemBundle),rect(c),1),name..': '..row.Key..' buttons inside card')
    captionFits(c.RobuxBundle,row.Key..' robux');captionFits(c.GemBundle,row.Key..' gems');textFits(c.Amount,row.Key..' amount')
-   -- R121: purple gift button left of the prices; grey SOON while its gift id is unset.
-   local g=c:FindFirstChild('GiftBundle');check(g~=nil,name..': '..row.Key..' gift button')
-   if g then
-    check(inside(rect(g),rect(c),1),name..': '..row.Key..' gift inside card')
-    check(rect(g).X<rect(c.RobuxBundle).X and math.abs(rect(g).Y-rect(c.RobuxBundle).Y)<1 and(rect(g).X<rect(c.GemBundle).X or rect(c.GemBundle).Y<rect(g).Y),name..': '..row.Key..' gift left of the prices')
-    check(not L.Overlaps(rect(g),rect(c.GemBundle),-.5)and not L.Overlaps(rect(c.GemBundle),rect(c.RobuxBundle),-.5)and not L.Overlaps(rect(c.GemBundle),rect(c.Amount),-.5),name..': '..row.Key..' buttons do not overlap')
-    check(math.abs(rect(g).W-rect(g).H)<1,name..': '..row.Key..' gift button square')
-    local ready=giftId[row.Key]~=nil
-    check(g:GetAttribute('GiftState')==(ready and'Ready'or'Soon')and g.Active==ready and g.Soon.Visible==not ready,name..': '..row.Key..' gift state '..tostring(g:GetAttribute('GiftState')))
-    if not ready then textFits(g.Soon,row.Key..' SOON')end
-   end
+   -- R122: no gift button; [Gems | Robux] on one row unless the card is too narrow.
+   check(c:FindFirstChild('GiftBundle')==nil,name..': '..row.Key..' has no gift button')
+   local gr,rr=rect(c.GemBundle),rect(c.RobuxBundle)
+   check(not L.Overlaps(gr,rr,-.5)and not L.Overlaps(gr,rect(c.Amount),-.5)and not L.Overlaps(rr,rect(c.Amount),-.5),name..': '..row.Key..' buttons do not overlap')
+   if c:GetAttribute('PriceRows')==1 then check(math.abs(gr.Y-rr.Y)<1 and gr.X<rr.X,name..': '..row.Key..' one price row')
+   else twoRows+=1;check(gr.W>=rect(c).W*.8 and rr.W>=rect(c).W*.8,name..': '..row.Key..' two full-width rows')end
+   check(c.RobuxBundle.Content:FindFirstChild('Icon')==nil,name..': '..row.Key..' Robux button has no glyph')
   end
  end
- -- R121: Mech pack gift button and the 10-minute boost banner.
- check(pack.GiftPack~=nil and inside(rect(pack.GiftPack),rect(pack),1),name..': pack gift inside banner')
- check(rect(pack.GiftPack).X<rect(pack.BuyWithGems).X,name..': pack gift left of the prices')
- check(pack.GiftPack:GetAttribute('GiftState')=='Ready',name..': pack gift ready')
- captionFits(pack.BuyWithGems,'pack gems with gift')
- local banner=page.SpeedBoostBanner
- check(banner~=nil and banner:FindFirstChild('GemPerk')==nil and banner:FindFirstChild('RobuxPass')==nil,name..': banner sells the boost, not the pass')
- check(caption(banner.RobuxBoost)=='49',name..': boost price '..tostring(caption(banner.RobuxBoost)))
- captionFits(banner.RobuxBoost,'boost robux')
- for _,b in ipairs({banner.RobuxBoost,banner.GiftBoost,banner.Timer})do check(inside(rect(b),rect(banner),1),name..': banner '..b.Name..' inside')end
- check(banner.Timer.Text=='10 MIN BOOST',name..': banner idle timer text');textFits(banner.Timer,'banner timer');textFits(banner.Minutes,'banner 10 MIN')
- check(banner.GiftBoost:GetAttribute('GiftState')=='Ready',name..': boost gift ready')
+ -- R122: no gift button on the pack, no Robux glyph, and no boost banner anywhere.
+ check(pack:FindFirstChild('GiftPack')==nil and pack.BuyWithRobux.Content:FindFirstChild('Icon')==nil,name..': pack has no gift / Robux glyph')
+ check(page:FindFirstChild('SpeedBoostBanner')==nil and page:FindFirstChild('SpeedPassBanner')==nil,name..': no DOUBLE SPEED banner')
+ check(sectionTop('Speed')<rect(bundleFrame('SpeedSmall')).Y and rect(bundleFrame('SpeedSmall')).Y-sectionTop('Speed')<rect(page.SpeedHeader).H+40,name..': SPEED opens with the bundles')
+ if current.w>480 then check(twoRows==0,name..': all bundles keep one price row')end
  for _,n in ipairs({'GemQuantity','Maximum','Convert','Heading','Rate','Cost'})do check(inside(rect(page.ConvertCash[n]),rect(page.ConvertCash),1),name..': gems '..n..' inside card')end
  -- Section order and card grid.
  local tops={};for _,key in ipairs(order)do tops[#tops+1]=sectionTop(key)end
  for i=2,#tops do check(tops[i]>tops[i-1],name..': section order '..order[i-1]..' < '..order[i])end
- check(rect(page.SpeedBoostBanner).Y>sectionTop('Speed')and rect(page.SpeedBoostBanner).Y<rect(bundleFrame('SpeedSmall')).Y,name..': DOUBLE SPEED banner opens SPEED')
- local cards={}
+  local cards={}
  for _,c in ipairs(page:GetChildren())do if c:IsA('GuiObject')then cards[#cards+1]=c end end
  local pw=page.AbsoluteSize.X-page.ScrollBarThickness
  for i,a in ipairs(cards)do
@@ -369,7 +358,7 @@ local function last()return calls[#calls]end
 local pack=page.LimitedMechPack
 calls={};act(pack.BuyWithRobux);check(last()and last()[1]=='RobuxPack'and last()[2]==1,'RobuxPack 1')
 act(pack.Quantity5);act(pack.BuyWithRobux);check(last()[1]=='RobuxPack'and last()[2]==5,'RobuxPack 5')
-check(caption(pack.BuyWithRobux)=='375'and caption(pack.BuyWithGems)=='375','quantity 5 prices')
+check(caption(pack.BuyWithRobux)==rbx(375)and caption(pack.BuyWithGems)=='375','quantity 5 prices')
 check(pack.Quantity5:GetAttribute('Selected')==true and pack.Quantity1:GetAttribute('Selected')==false,'quantity selection shown')
 act(pack.BuyWithGems);check(last()[1]=='BuyPack'and last()[2]==5,'BuyPack 5')
 act(pack.Quantity10);act(pack.BuyWithGems);check(last()[2]==10,'BuyPack 10')
@@ -383,83 +372,34 @@ for _,pass in ipairs(Passes)do
  for _,c in ipairs(cards)do
   local n=#prompts;act(c.RobuxPass);check(#prompts==n+1 and prompts[#prompts][1]==player and prompts[#prompts][2]==Passes.Id(pass),'PromptGamePassPurchase '..c.Name)
   act(c.GemPerk);check(last()[1]=='BuyPerk'and last()[2]==pass.Key,'BuyPerk '..c.Name)
-  act(c.GiftPass);local picker=panel.PassGiftPicker;check(picker.Visible,'gift dialog opens from '..c.Name)
-  local rec=picker.Recipients:FindFirstChild('Recipient');check(rec~=nil,'gift recipient listed')
-  act(rec);act(picker.GiftWithRobux);check(last()[1]=='RobuxGift'and last()[2]==pass.Key,'RobuxGift '..pass.Key)
-  act(picker.GiftWithGems);check(last()[1]=='GiftPass'and last()[2].Key==pass.Key and last()[2].RecipientId==2 and last()[2].Payment=='Gems','GiftPass gems '..pass.Key)
-  act(picker.CloseGift);check(not picker.Visible,'gift dialog closes')
  end
 end
--- R121: gift buttons -> recipient dialog -> gift product purchase request -----------------------------
-local picker=panel.PassGiftPicker
-local function giftThrough(button,key,label)
- local n=#calls;act(button)
- if not check(picker.Visible,'gift dialog opens for '..label)then return end
- check(picker.GiftWithGems.Visible==false,'no Gems option for product gift '..label)
- check(picker.GiftWithRobux.Text=='59 Robux','gift price shown for '..label..' ('..picker.GiftWithRobux.Text..')')
- check(#calls==n,'opening the dialog sends nothing for '..label)
- act(picker.GiftWithRobux);check(#calls==n,'no request before choosing a player ('..label..')')
- act(picker.Recipients:FindFirstChild('Recipient'));act(picker.GiftWithRobux)
- check(last()[1]=='RobuxProductGift'and type(last()[2])=='table'and last()[2].Key==key and last()[2].RecipientId==2,'RobuxProductGift '..key)
- act(picker.CloseGift)
+-- R122: no gift dialog / boost entry points remain in the shop.
+check(panel:FindFirstChild('PassGiftPicker')==nil,'no gift dialog built')
+for _,d in ipairs(gui:GetDescendants())do
+ if d.Name=='GiftPass'or d.Name=='GiftBundle'or d.Name=='GiftPack'or d.Name=='GiftBoost'or d.Name=='RobuxBoost'then check(false,'leftover '..d:GetFullName())end
+ if d:GetAttribute('ButtonIcon')=='Gift'or d:GetAttribute('ButtonIcon')=='Robux'then check(false,'leftover glyph button '..d:GetFullName())end
 end
-for _,row in ipairs(Pricing.Bundles)do
- local c=bundleFrame(row.Key)
- if giftId[row.Key]then giftThrough(c.GiftBundle,row.Key,row.Key)
- else local n=#calls;act(c.GiftBundle);check(not picker.Visible and #calls==n,'SOON gift button does nothing ('..row.Key..')')end
-end
-for _,offer in ipairs(Mech.Offers)do act(pack['Quantity'..offer.Count]);giftThrough(pack.GiftPack,'MechPack'..offer.Count,'pack x'..offer.Count)end
-act(pack.Quantity1)
-giftThrough(page.SpeedBoostBanner.GiftBoost,'SpeedBoost10','boost')
--- Pass gift dialog still offers Gems after a product gift.
-act(page.Growth.GiftPass);check(picker.GiftWithGems.Visible==true and picker.Visible,'pass gift dialog keeps Gems');act(picker.CloseGift)
--- A saved gift credit (recipient left before the receipt) is sent with GiftProduct.
-credits={CashSmall=1};act(page.Growth.GemPerk)
-act(bundleFrame('CashSmall').GiftBundle);act(picker.Recipients:FindFirstChild('Recipient'))
-check(picker.GiftWithRobux.Text=='Send gift · 1 ready','saved credit shown ('..picker.GiftWithRobux.Text..')')
-act(picker.GiftWithRobux);check(last()[1]=='GiftProduct'and last()[2].Key=='CashSmall'and last()[2].RecipientId==2,'GiftProduct sends the saved credit')
-credits={};act(picker.CloseGift)
--- Gift id removed at runtime -> SOON again.
-RS.GiftProducts:SetAttribute('GiftCashSmallProductId',0);act(page.Growth.GemPerk)
-check(bundleFrame('CashSmall').GiftBundle:GetAttribute('GiftState')=='Soon'and not bundleFrame('CashSmall').GiftBundle.Active,'gift turns SOON when its id is cleared')
-RS.GiftProducts:SetAttribute('GiftCashSmallProductId',giftId.CashSmall);act(page.Growth.GemPerk)
--- 10-minute boost: buy, countdown, expiry, missing id.
-local banner=page.SpeedBoostBanner
-act(banner.RobuxBoost);check(last()[1]=='RobuxBoost','boost buy sends RobuxBoost')
-player:SetAttribute('SpeedBoostEndsAt',math.floor(R.clock)+600);R.advance(0)
-check(banner.Timer.Text=='ACTIVE '..Boost.Clock(Boost.PlayerRemaining(player)),'banner shows the active countdown ('..banner.Timer.Text..')')
-check(string.find(banner.Timer.Text,'10m',1,true)~=nil or string.find(banner.Timer.Text,'9m',1,true)~=nil,'countdown ~10 minutes')
-check(caption(banner.RobuxBoost)=='49','boost price still shown while active')
-W.Gui.ReducedMotionEnabled=true;act(jumpRoot.JumpSpeed);layout();emit('boost');W.Gui.ReducedMotionEnabled=false
-W.frames(65,1);layout()
-check(string.find(banner.Timer.Text,'8m',1,true)~=nil,'countdown ticks while the shop is open ('..banner.Timer.Text..')')
-W.frames(560,1);layout()
-check(banner.Timer.Text=='10 MIN BOOST'and banner:GetAttribute('BoostActive')==false,'countdown ends after 10 minutes ('..banner.Timer.Text..')')
-check(Boost.Clock(59)=='59s'and Boost.Clock(61)=='1m 1s'and Boost.Clock(3600)=='1h 0m','clock format')
-RS.PremiumPricing:SetAttribute('SpeedBoost10ProductId',0);act(page.Growth.GemPerk)
-check(caption(banner.RobuxBoost)=='SOON'and not banner.RobuxBoost.Active,'boost shows SOON without a product id')
-local nb=#calls;act(banner.RobuxBoost);check(#calls==nb,'SOON boost does nothing')
-RS.PremiumPricing:SetAttribute('SpeedBoost10ProductId',501);act(page.Growth.GemPerk)
+check(Art.RobuxText(49)=='49 Robux','price format "49 Robux"')
 local gems=page.ConvertCash;gems.GemQuantity.Text='12';act(gems.Convert);check(last()[1]=='Convert'and last()[2]==12,'Convert 12')
 -- Owned passes show OWNED (both Speed views); Growth untouched.
 player:SetAttribute('DoubleSpeedOwned',true);layout()
-check(caption(page.SpeedBoostBanner.RobuxBoost)=='49','boost still for sale when the pass is owned')
 for _,c in ipairs({page.Speed})do
  check(caption(c.RobuxPass)=='OWNED','OWNED on '..c.Name);check(c.GemPerk.Visible==false,'gem hidden when owned on '..c.Name)
- check(c.RobuxPass.Active==false,'owned robux inactive on '..c.Name);check(c.GiftPass.Visible~=false,'gift still available when owned on '..c.Name)
+ check(c.RobuxPass.Active==false,'owned robux inactive on '..c.Name)
  check(inside(rect(c.RobuxPass),rect(c),1),'owned button inside '..c.Name)
 end
 local n=#prompts;act(page.Speed.RobuxPass);check(#prompts==n,'no prompt for an owned pass')
-check(caption(page.Growth.RobuxPass)=='467','Growth still for sale')
+check(caption(page.Growth.RobuxPass)==rbx(467),'Growth still for sale')
 act(jumpRoot.JumpPasses);layout();emit('owned')
 player:SetAttribute('DoubleSpeedOwned',false);layout()
-check(caption(page.Speed.RobuxPass)=='399'and page.Speed.GemPerk.Visible,'ownership loss restores buttons')
+check(caption(page.Speed.RobuxPass)==rbx(399)and page.Speed.GemPerk.Visible,'ownership loss restores buttons')
 -- Status toast shows a server message and hides.
 remote.InvokeServer=function(_,action,value)calls[#calls+1]={action,value};local s=serverState();s.Message='Complete the Roblox purchase prompt.';return s end
 act(page.Growth.GemPerk);check(panel.Status.Visible and panel.Status.Text~='','status message shown')
 R.advance(3.1);check(not panel.Status.Visible,'status hides after 3 s')
 check(reveals==6,'six outcome previews built once ('..reveals..')')
--- R121: HUD countdown next to the bottom-right boost rows (WorldStatusHud).
+-- R121 HUD countdown (kept for legacy boosts; hidden when no boost is active).
 do
  player:SetAttribute('SpeedBoostEndsAt',nil)
  local okay,err=pcall(function()
