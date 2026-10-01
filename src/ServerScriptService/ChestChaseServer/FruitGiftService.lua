@@ -50,7 +50,7 @@ end
 function S:Accept(to,id)
  if type(id)~='string'then return end;local offer=self.Offers[id]
  if not offer or offer.To~=to then return end;self.Offers[id]=nil
- if offer.Kind=='Seed'then return self:AcceptSeed(to,id,offer)end
+ if offer.Kind=='Seed'then self:AcceptSeed(to,id,offer);return end
  local from=offer.From
  if os.clock()>offer.Expires or not self:Available(from)or not self:Available(to)or not self:Near(from,to)or not self:Held(from,offer.CropId)then self.Remote:FireClient(to,'Status','Gift expired. Ask them to offer again.');return end
  local garden=self.Data.Gardens[from];garden.OutgoingGifts=garden.OutgoingGifts or{}

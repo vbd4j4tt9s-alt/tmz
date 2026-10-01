@@ -635,6 +635,12 @@ local function placeAt(screenPosition, isViewport)
 	local seed = equippedGardenSeed()
 	if not seed then return end
 	local hit = rayAt(screenPosition, isViewport)
+	-- R122: clicking another player with a seed is a gift (FruitGiftClient), not a planting miss.
+	local model = hit and hit.Instance:FindFirstAncestorOfClass("Model")
+	while model do
+		if Players:GetPlayerFromCharacter(model) then return end
+		model = model:FindFirstAncestorOfClass("Model")
+	end
 	if not hit or not hit.Instance:GetAttribute("GardenSoil") then gardenToast("AIM AT SOIL IN YOUR GARDEN", true); return end
 	sendGarden("Place", {Soil = hit.Instance, Position = hit.Position, SeedInventoryId = seed:GetAttribute("SeedInventoryId")})
 end

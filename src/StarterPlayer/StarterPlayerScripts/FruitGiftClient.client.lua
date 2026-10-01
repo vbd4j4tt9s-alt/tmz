@@ -1,25 +1,39 @@
 -- R79: equip a crop and click/tap a nearby player. No recipient menu or acceptance dialog.
+-- R122: the same click/tap/RT gives a held seed pack or seed (inventory items only).
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Input=game:GetService('UserInputService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local Remote=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('FruitGift')
 local Theme=require(RS.GardenTheme);local Audio=require(RS.InteractionAudio)
 local gui=Instance.new('ScreenGui');gui.Name='FruitGifts';gui.ResetOnSpawn=false;gui.DisplayOrder=36;gui.Parent=pg
 local status=Instance.new('TextLabel');status.Name='GiftStatus';status.Text='';status.Visible=false;status.AnchorPoint=Vector2.new(.5,0);status.Position=UDim2.new(.5,0,1,-220);status.Size=UDim2.new(.8,0,0,38);status.BackgroundTransparency=1;status.TextWrapped=true;Theme.Text(status,17,true,Theme.Colors.Gold);status.Parent=gui
 local serial,last=0,-10;local connections={};local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Exclude
+-- Returns the held giftable Tool, its inventory id and the remote action.
+local function heldItem(character)
+ for _,t in ipairs(character and character:GetChildren()or{})do
+  if t:IsA('Tool')and t.Enabled then
+   if t:GetAttribute('HarvestItemTool')then return t,t:GetAttribute('HarvestInventoryId'),'Give'end
+   if t:GetAttribute('SeedPackTool')or t:GetAttribute('GardenSeed')then return t,t:GetAttribute('SeedInventoryId'),'GiveSeed'end
+  end
+ end
+ return nil
+end
 local function give(point)
  if os.clock()-last<.65 or pg:GetAttribute('SeedMenu')or player:GetAttribute('ChestChaseRunActive')then return end
- local character=player.Character;local held
- for _,t in ipairs(character and character:GetChildren()or{})do if t:IsA('Tool')and t.Enabled and t:GetAttribute('HarvestItemTool')then held=t;break end end
- local id=held and held:GetAttribute('HarvestInventoryId');local camera=workspace.CurrentCamera
- if not id or not camera then return end
+ local character=player.Character;local held,id,action=heldItem(character)
+ if action=='GiveSeed'and(player:GetAttribute('ChestChaseSeedCarrying')or player:GetAttribute('ChestChaseQueued'))then return end
+ local camera=workspace.CurrentCamera
+ if not held or type(id)~='string'or not camera then return end
  local ray=camera:ViewportPointToRay(point.X,point.Y);params.FilterDescendantsInstances={character}
  local result=workspace:Raycast(ray.Origin,ray.Direction*250,params);if not result then return end
  local node=result.Instance;local target
  while node and node~=workspace do if node:IsA('Model')then target=Players:GetPlayerFromCharacter(node);if target then break end end;node=node.Parent end
  local root=character:FindFirstChild('HumanoidRootPart');local other=target and target.Character and target.Character:FindFirstChild('HumanoidRootPart')
- if target and target~=player and root and other and(root.Position-other.Position).Magnitude<=18 then last=os.clock();Remote:FireServer('Give',target.UserId,id)end
+ if target and target~=player and root and other and(root.Position-other.Position).Magnitude<=18 then last=os.clock();Remote:FireServer(action,target.UserId,id)end
 end
 table.insert(connections,Input.InputBegan:Connect(function(input,processed)
- if processed or Input:GetFocusedTextBox()then return end
+ if Input:GetFocusedTextBox()then return end
+ -- The garden's RT action sinks input while a seed is held; it ignores players, so let RT reach here.
+ local _,_,action=heldItem(player.Character)
+ if processed and not(action=='GiveSeed'and input.KeyCode==Enum.KeyCode.ButtonR2)then return end
  if input.UserInputType==Enum.UserInputType.MouseButton1 then give(Input:GetMouseLocation())
  elseif input.KeyCode==Enum.KeyCode.ButtonR2 then local camera=workspace.CurrentCamera;if camera then give(camera.ViewportSize*.5)end end
 end))
