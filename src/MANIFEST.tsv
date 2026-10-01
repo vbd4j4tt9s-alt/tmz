@@ -430,3 +430,5 @@ LocalScript	StarterPlayer/StarterPlayerScripts/TravelButtons	StarterPlayer/Start
 ModuleScript	ReplicatedStorage/KeeperPolish	ReplicatedStorage/KeeperPolish.lua
 ModuleScript	ReplicatedStorage/KeeperFx	ReplicatedStorage/KeeperFx.lua
 ModuleScript	ReplicatedStorage/KeeperAccents	ReplicatedStorage/KeeperAccents.lua
+ModuleScript	ReplicatedStorage/RunnerTrailAuraFx	ReplicatedStorage/RunnerTrailAuraFx.lua
+LocalScript	StarterPlayer/StarterPlayerScripts/RunnerTrailAura	StarterPlayer/StarterPlayerScripts/RunnerTrailAura.client.lua

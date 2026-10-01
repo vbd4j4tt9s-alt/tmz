@@ -18,16 +18,103 @@ function A.Specs(product,biome)
    boot(Boots.KneeSpecs(V(1.1,1.4,1.1),false,biome or'Forest',accent),CF(x,2.90,0))
   end
  elseif product.Type=='Trail'then
+  -- R117: the preview shows each tier's live look: layered ribbon + core, then sparks (Arc), embers and a flare
+  -- (Solar), an aurora veil (Aurora), a star swirl (Nebula) and Royal's gold/purple double helix, gold trim,
+  -- crown, jewels, glitter and footstep glints. Blocks only (static ViewportFrame; particles do not render there).
+  local look=Ribbon.Look and Ribbon.Look(product.Id);local tier=look and look.Tier or 0;local id=product.Id
   p('Runner body',V(1.65,1.85,.8),CF(0,2.3,-.5),dark)
   p('Runner head',V(.85,.85,.85),CF(0,3.65,-.5),silver)
   for _,x in ipairs({-.48,.48})do p('Runner leg',V(.64,1.4,.7),CF(x,.67,-.5)*CFrame.Angles(x*.35,0,0),dark)end
   for _,x in ipairs({-1.08,1.08})do p('Runner arm',V(.45,1.6,.6),CF(x,2.35,-.5)*CFrame.Angles(-x*.35,0,0),silver)end
   p('Chest badge',V(.55,.28,.06),CF(0,2.55,-.93),accent)
+  local neon=Enum.Material.Neon
   local function point(t)return V(math.sin(t*3.9)*.45,2.40+math.sin(t*4.2)*.22,.22+t*7.4)end
+  local function seg(name,a,b,thick,height,color,alpha)
+   if(b-a).Magnitude<1e-3 then return end
+   p(name,V(thick,height,(b-a).Magnitude+.012),CFrame.lookAt((a+b)*.5,b),color,neon);if alpha then out[#out].Transparency=alpha end
+  end
+  local function hash(i,k)local x=math.sin(i*12.9898+k*78.233)*43758.5453;return x-math.floor(x)end
+  local function dot(name,pos,size,color,alpha,spin)
+   p(name,V(size,size,size),CF(pos)*CFrame.Angles(spin or 0,0,math.pi/4),color,neon);if alpha then out[#out].Transparency=alpha end
+  end
+  local widthScale=look and look.Width or 1
   for i=1,24 do
-   local t=(i-.5)/24;local a,b=point((i-1)/24),point(i/24);local f=CFrame.lookAt((a+b)*.5,b);local width=math.max(.02,Ribbon.Width(t));local col=Ribbon.Color(accent,t,product.Id)
-   p('Full ribbon',V(.045,1.52*width,(b-a).Magnitude+.012),f,col,Enum.Material.Neon)
-   p('Ribbon volume',V(1.02*width,.045,(b-a).Magnitude+.012),f,col,Enum.Material.Neon)
+   local t=(i-.5)/24;local a,b=point((i-1)/24),point(i/24);local width=math.max(.02,Ribbon.Width(t))*widthScale;local col=Ribbon.Color(accent,t,id)
+   seg('Full ribbon',a,b,.045,1.52*width,col)
+   seg('Ribbon volume',a,b,1.02*width,.045,col)
+   if look then seg('Ribbon core',a,b,.075,1.52*width*(look.CoreWidth+.08),Ribbon.Sample(look.Core,t),.15)end
+  end
+  local function motes(name,count,colors,spreadY,size)
+   for i=1,count do
+    local t=.08+.84*hash(i,1);local c=point(t)+V((hash(i,2)-.5)*1.4,(hash(i,3)-.5)*spreadY,0)
+    dot(name,c,size*(1-t*.5),Ribbon.Sample(colors,hash(i,4)),.1,hash(i,5)*3)
+   end
+  end
+  if tier>=1 then motes('Ribbon mote',2+tier*2,look.Core,2.2,.13)end
+  if tier==2 then
+   for i=1,6 do
+    local t=.1+i*.12;local c=point(t);local side=i%2==1 and 1 or -1;local a=c+V(.15*side,.55*side,0);local b=a+V(.35*side,.28*side,.3)
+    seg('Arc spark',a,b,.05,.05,Color3.fromRGB(230,248,255));seg('Arc spark',b,b+V(-.2*side,.32*side,.25),.05,.05,Color3.fromRGB(120,190,255))
+   end
+  elseif tier==3 then
+   for i=1,9 do
+    local t=.1+.8*hash(i,7);dot('Solar ember',point(t)+V((hash(i,8)-.5)*.9,.7+hash(i,9)*1.1,0),.14,Ribbon.Sample(look.Colors,hash(i,6)),.05)
+   end
+   p('Solar flare',V(.85,.85,.06),CF(0,2.45,.12)*CFrame.Angles(0,0,math.pi/4),Color3.fromRGB(255,226,120),neon);out[#out].Transparency=.3
+   p('Solar flare',V(1.25,.12,.05),CF(0,2.45,.14),Color3.fromRGB(255,250,210),neon);out[#out].Transparency=.2
+  elseif tier==4 then
+   for i=1,16 do
+    local t0,t1=(i-1)/16*.85,i/16*.85;local lift=function(t)return point(t)+V(0,1.15+math.sin(t*9)*.18,.15)end
+    seg('Aurora veil',lift(t0),lift(t1),.04,.9*(1-t0*.7),Ribbon.Sample(look.Colors,(t0+.5)%1,.35),.45)
+   end
+  elseif tier==5 then
+   local prev
+   for i=0,28 do
+    local t=i/28*.9;local ang=t*12;local c=point(t)+V(math.cos(ang)*1.0*(1-t*.4),math.sin(ang)*1.0*(1-t*.4),0)
+    if prev then seg('Nebula swirl',prev,c,.07,.07,Ribbon.Sample({Color3.fromRGB(255,206,255),Color3.fromRGB(150,90,255),Color3.fromRGB(90,210,255)},t))end;prev=c
+   end
+   for i=1,6 do
+    local c=point(.1+.8*hash(i,11))+V((hash(i,12)-.5)*1.8,(hash(i,13)-.5)*2.2,0);local size=.32+hash(i,14)*.2
+    p('Nebula star',V(size,.05,.05),CF(c),Color3.fromRGB(255,244,255),neon);p('Nebula star',V(.05,size,.05),CF(c),Color3.fromRGB(255,170,245),neon)
+   end
+   for i=1,4 do
+    local c=point(.2+.18*i)+V((hash(i,15)-.5)*.6,(hash(i,16)-.5)*.8,0)
+    p('Nebula cloud',V(.9,.7,.5),CF(c)*CFrame.Angles(hash(i,17),hash(i,18),0),Ribbon.Sample(look.Colors,hash(i,19)),neon);out[#out].Transparency=.72
+   end
+  elseif tier>=6 then
+   local gold,purple=Color3.fromRGB(255,206,64),Color3.fromRGB(150,60,230)
+   for _,phase in ipairs({0,math.pi})do
+    local prev
+    for i=0,28 do
+     local t=i/28*.9;local ang=t*11+phase;local r=1.0*(1-t*.35);local c=point(t)+V(math.cos(ang)*r,math.sin(ang)*r,0)
+     if prev then seg(phase==0 and'Royal gold helix'or'Royal purple helix',prev,c,.08,.08,phase==0 and gold:Lerp(Color3.fromRGB(255,250,210),(1-t)*.5)or purple)end;prev=c
+    end
+   end
+   for i=1,12 do
+    local t0,t1=(i-1)/12,i/12;local w0,w1=Ribbon.Width(t0)*widthScale*.76,Ribbon.Width(t1)*widthScale*.76
+    for _,side in ipairs({1,-1})do seg('Royal trim',point(t0)+V(0,w0*side,0),point(t1)+V(0,w1*side,0),.07,.07,gold)end
+   end
+   -- Crown: a gold band, five diamond points with jewel tips, a purple centre jewel.
+   local cy,cz=4.12,-.5
+   for i=0,9 do
+    local a0,a1=i/10*2*math.pi,(i+1)/10*2*math.pi
+    seg('Crown band',V(math.sin(a0)*.46,cy,cz-math.cos(a0)*.46),V(math.sin(a1)*.46,cy,cz-math.cos(a1)*.46),.05,.13,gold)
+   end
+   for i=0,4 do
+    local a=i/5*2*math.pi;local c=V(math.sin(a)*.46,cy+.17,cz-math.cos(a)*.46)
+    p('Crown point',V(.17,.17,.05),CF(c)*CFrame.Angles(0,-a,0)*CFrame.Angles(0,0,math.pi/4),gold,neon)
+    dot('Crown gem',c+V(0,.16,0),.08,i==0 and Color3.fromRGB(190,70,255)or Color3.fromRGB(255,250,220))
+   end
+   dot('Crown jewel',V(0,cy,cz-.5),.13,Color3.fromRGB(170,50,255))
+   for i=1,5 do
+    local t=.12+i*.15;local c=point(t)+V((hash(i,21)-.5)*1.2,(hash(i,22)-.5)*1.6,0)
+    p('Royal jewel',V(.16,.26,.16),CF(c)*CFrame.Angles(0,hash(i,23)*3,math.pi/4),Ribbon.Sample({Color3.fromRGB(206,96,255),Color3.fromRGB(255,80,170),Color3.fromRGB(120,60,255)},hash(i,24)),neon)
+   end
+   for i=1,14 do dot('Royal glitter',point(.05+.9*hash(i,25))+V((hash(i,26)-.5)*1.6,(hash(i,27)-.5)*2.4,0),.07,Color3.fromRGB(255,232,140))end
+   for _,x in ipairs({-.48,.48})do
+    local c=V(x,.04,-.2);p('Step glint',V(.34,.05,.05),CF(c),Color3.fromRGB(255,240,170),neon);p('Step glint',V(.05,.05,.34),CF(c),Color3.fromRGB(255,240,170),neon)
+   end
+   p('Royal flare',V(.95,.95,.06),CF(0,2.45,.12)*CFrame.Angles(0,0,math.pi/4),Color3.fromRGB(255,226,140),neon);out[#out].Transparency=.35
   end
  elseif product.Id=='TreasureMagnet'then
   p('Magnet bridge',V(1.7,.55,.65),CF(0,0,0),accent,Enum.Material.Metal)

@@ -6,4 +6,8 @@ local added=player.CharacterAdded:Connect(attach);local removed=player.Character
 local heartbeat=Run.Heartbeat:Connect(function(dt)elapsed+=dt;if elapsed<1/30 then return end;local step=elapsed;elapsed=0;if current then current:Step(step)end end)
 local state=player:GetAttributeChangedSignal('TreadmillTraining'):Connect(function()if current then current:Step(0)end end)
 if player.Character then attach(player.Character)end
-script.Destroying:Connect(function()clear();added:Disconnect();removed:Disconnect();heartbeat:Disconnect();state:Disconnect()end)
+-- R117: tier effects (emitters/lights/pulses/orbits/arcs) for nearby treadmills. A failure here never stops run playback.
+local stopFx,stopped
+script.Destroying:Connect(function()stopped=true;clear();added:Disconnect();removed:Disconnect();heartbeat:Disconnect();state:Disconnect();if stopFx then stopFx()end end)
+local fxOk,fxStop=pcall(function()return require(RS:WaitForChild('TreadmillFx',10)).Start(player)end)
+if not fxOk then warn('[R117] Treadmill effects disabled: '..tostring(fxStop))elseif stopped then fxStop()else stopFx=fxStop end

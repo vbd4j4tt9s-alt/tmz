@@ -62,7 +62,7 @@ function A.Tier(id)local look=A.Looks[id];return look and look.Tier or 0 end
 local function sample(colors,t,phase)
  local n=#colors
  if not phase or phase==0 then
-  local x=math.clamp(t,0,1)*(n-1);local i=math.min(n-1,math.floor(x))
+  local x=math.clamp(t,0,1)*(n-1);local i=math.min(n-2,math.floor(x))
   return colors[i+1]:Lerp(colors[i+2],x-i)
  end
  local u=(math.clamp(t,0,1)*(n-1)/n+phase)%1*n;local i=math.floor(u)%n
@@ -111,7 +111,7 @@ function A.Configure(trail,color,layer,id)
   trail.Color=A.Sequence(id,layer,0);trail.Transparency=A.Transparency(id,layer)
   trail.LightEmission=layer==1 and look.Glow or look.CoreGlow;trail.MaxLength=look.Reach
   pcall(function()trail.Brightness=1+look.Tier*(layer==1 and .12 or .25)end)
-  trail:SetAttribute('TrailTier',look.Tier)
+  trail:SetAttribute('TrailTier',look.Tier);trail:SetAttribute('TrailLayer117',layer)
  else
   trail.Color=ColorSequence.new(color or Color3.new(1,1,1))
   local alpha=layer==1 and .20 or .45

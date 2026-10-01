@@ -749,6 +749,317 @@ local treadmillThemes={
  {Name='Prism Runner',Body=RGB(217,181,250),Trim=RGB(124,228,222),Glow=RGB(250,223,255),Ink=RGB(119,80,155),Material=Enum.Material.Glass},
  {Name='Thunder Runner',Body=RGB(111,155,237),Trim=RGB(255,224,96),Glow=RGB(255,247,193),Ink=RGB(56,82,153),Material=Enum.Material.Metal},
 }
+-- R117: tier flair. Static, non-colliding parts plus disabled emitters/lights/beams. The client
+-- (TreadmillFx) enables and animates them by quality budget, distance, FastMode and ReducedMotion.
+-- Attributes read by TreadmillFx: TreadmillFx (role), TreadmillFxQuality (minimum ClientFxBudget tier),
+-- TreadmillFxRate/Burst/Brightness, TreadmillPulse*, TreadmillHue, TreadmillSpin*, TreadmillFlicker.
+local TREADMILL_NUMERALS={'I','II','III','IV','V','VI','VII'}
+-- Outer (-Z) face of each tier's front sign, in origin space after the V137 length scale.
+local TREADMILL_FRONT_FACE={-7.78,-8.11,-8.28,-8.015,-8.065,-8.10,-8.16}
+local function treadmillFlairR117(k)
+    local m,origin,tier,theme,surface=k.m,k.origin,k.tier,k.theme,k.surface
+    local p,rawp,sphere,rod,longer=k.p,k.rawp,k.sphere,k.rod,k.longer
+    local made={}
+    local function keep(v)if v and v:IsA('BasePart')then v.CastShadow=false;table.insert(made,v)end;return v end
+    local function P(...)return keep(p(...))end
+    local function S(...)return keep(sphere(...))end
+    local function R(name,a,b,width,color,material)return keep(rod(name,a,b,width,color,material))end
+    local function att(name,pos,axisUp)
+        local a=Instance.new('Attachment');a.Name=name
+        a.CFrame=CF(longer(pos)-V(0,.18,0))*(axisUp and CFrame.Angles(0,0,math.pi/2)or CFrame.identity)
+        a.Parent=surface;return a
+    end
+    local function seq(...)
+        local colors={...}
+        if #colors==1 then return ColorSequence.new(colors[1])end
+        local points={}
+        for i,c in ipairs(colors)do table.insert(points,ColorSequenceKeypoint.new((i-1)/(#colors-1),c))end
+        return ColorSequence.new(points)
+    end
+    -- o: Color (ColorSequence), Rate, Burst, Life{a,b}, Speed{a,b}, Size, Texture, Accel, Spread, Light, Drag, Dir
+    local function emit(a,name,role,quality,o)
+        local e=Instance.new('ParticleEmitter');e.Name=name;e.Enabled=false
+        e.Texture='rbxasset://textures/particles/'..(o.Texture or'sparkles')..'_main.dds'
+        e.Color=o.Color;e.Rate=role=='Burst'and 0 or o.Rate
+        e.Lifetime=NumberRange.new(o.Life[1],o.Life[2]);e.Speed=NumberRange.new(o.Speed[1],o.Speed[2])
+        e.SpreadAngle=Vector2.new(o.Spread or 30,o.Spread or 30);e.EmissionDirection=o.Dir or Enum.NormalId.Top
+        e.Acceleration=o.Accel or V(0,0,0);e.Drag=o.Drag or 0
+        e.LightEmission=o.Light or .7;e.LightInfluence=o.Texture=='smoke'and .6 or .1
+        e.Rotation=NumberRange.new(0,360);e.RotSpeed=NumberRange.new(-40,40)
+        e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,o.Size*.4),NumberSequenceKeypoint.new(.35,o.Size),NumberSequenceKeypoint.new(1,o.Size*(o.Texture=='smoke'and 1.6 or .1))})
+        e.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.12,o.Texture=='smoke'and .55 or .1),NumberSequenceKeypoint.new(1,1)})
+        e:SetAttribute('TreadmillFx',role);e:SetAttribute('TreadmillFxQuality',quality)
+        e:SetAttribute('TreadmillFxRate',o.Rate or 0);e:SetAttribute('TreadmillFxBurst',o.Burst or 0)
+        e.Parent=a;return e
+    end
+    local function glow(parent,name,color,brightness,range,quality,flicker)
+        local l=Instance.new('PointLight');l.Name=name;l.Enabled=false;l.Shadows=false
+        l.Color=color;l.Brightness=brightness;l.Range=range
+        l:SetAttribute('TreadmillFx','Light');l:SetAttribute('TreadmillFxQuality',quality)
+        l:SetAttribute('TreadmillFxBrightness',brightness);l:SetAttribute('TreadmillFlicker',flicker==true)
+        l.Parent=parent;return l
+    end
+    local function pulse(v,amp,speed,phase)
+        if not v then return end
+        v:SetAttribute('TreadmillPulse',amp);v:SetAttribute('TreadmillPulseSpeed',speed)
+        v:SetAttribute('TreadmillPulsePhase',phase or 0);v:SetAttribute('TreadmillPulseBase',v.Transparency)
+        return v
+    end
+    local function hue(v,phase)if v then v:SetAttribute('TreadmillHue',phase or 0)end;return v end
+    -- Orbit about the pivot's Y axis. Pivot and rest are stored in belt (origin) space.
+    local function spin(v,pivot,speed,quality)
+        v:SetAttribute('TreadmillSpin',speed);v:SetAttribute('TreadmillFxQuality',quality)
+        v:SetAttribute('TreadmillSpinPivot',pivot);v:SetAttribute('TreadmillSpinRest',origin:ToObjectSpace(v.CFrame))
+        return v
+    end
+    local function arc(name,a0,a1,color,width,curve,quality,role)
+        local b=Instance.new('Beam');b.Name=name;b.Enabled=false;b.Attachment0=a0;b.Attachment1=a1
+        b.Color=color;b.Width0=width;b.Width1=width*.6;b.FaceCamera=true;b.Segments=role=='Ribbon'and 16 or 8
+        b.LightEmission=1;b.LightInfluence=0;b.CurveSize0=curve;b.CurveSize1=-curve
+        b.Texture='rbxasset://textures/particles/sparkles_main.dds';b.TextureLength=role=='Ribbon'and 5 or 2
+        b.TextureSpeed=role=='Ribbon'and .35 or 3
+        b.Transparency=role=='Ribbon'and NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.25,.45),NumberSequenceKeypoint.new(.75,.45),NumberSequenceKeypoint.new(1,1)})or NumberSequence.new(.05)
+        b:SetAttribute('TreadmillFx',role or'Arc');b:SetAttribute('TreadmillFxQuality',quality)
+        b:SetAttribute('TreadmillArcCurve',curve);b.Parent=m;return b
+    end
+    local function orbiter(name,size,frame,color,material,ball)
+        local v=keep(rawp(name,size,frame,color,material));if ball then v.Shape=Enum.PartType.Ball end;return v
+    end
+    local function named(name)return m:FindFirstChild(name)end
+    local function allNamed(name)
+        local list={};for _,v in ipairs(m:GetChildren())do if v.Name==name then table.insert(list,v)end end;return list
+    end
+
+    -- Every tier: an outward tier plaque (Roman numeral + name) and tier pips on the runner's console.
+    local plaque=keep(rawp('Tier plaque',V(3.4,1.5,.08),CF(0,4.1,TREADMILL_FRONT_FACE[tier]-.045),theme.Ink,Enum.Material.SmoothPlastic))
+    local plaqueGui=Instance.new('SurfaceGui');plaqueGui.Name='TierPlaqueDisplay';plaqueGui.Face=Enum.NormalId.Front
+    plaqueGui.CanvasSize=Vector2.new(340,150);plaqueGui.LightInfluence=.2;plaqueGui.MaxDistance=160;plaqueGui.Parent=plaque
+    local rim=Instance.new('UIStroke');rim.Name='TierRim';rim.Color=theme.Glow;rim.Thickness=tier>=5 and 7 or 4;rim.Parent=plaqueGui
+    local function label(parent,name,text,y,h,color)
+        local t=Instance.new('TextLabel');t.Name=name;t.BackgroundTransparency=1;t.Text=text
+        t.Position=UDim2.new(0,8,0,y);t.Size=UDim2.new(1,-16,0,h);t.TextScaled=true;t.Font=Enum.Font.FredokaOne
+        t.TextColor3=color;t.TextStrokeColor3=theme.Ink;t.TextStrokeTransparency=.2;t.Parent=parent;return t
+    end
+    label(plaqueGui,'TierNumeral',TREADMILL_NUMERALS[tier],4,92,theme.Glow)
+    label(plaqueGui,'TierName',string.upper(theme.Name),96,48,theme.Trim)
+    if k.face then
+        label(k.face,'ConsoleTierName',theme.Name,10,70,theme.Glow)
+        local row=Instance.new('Frame');row.Name='TierPips';row.BackgroundTransparency=1
+        row.Position=UDim2.new(.5,-245,0,100);row.Size=UDim2.new(0,490,0,54);row.Parent=k.face
+        for i=1,7 do
+            local pip=Instance.new('Frame');pip.Name='TierPip'..i;pip.BorderSizePixel=0
+            pip.Position=UDim2.new(0,(i-1)*72,0,4);pip.Size=UDim2.new(0,58,0,46)
+            pip.BackgroundColor3=i<=tier and theme.Glow or Color3.new(.12,.13,.16);pip.Parent=row
+            local corner=Instance.new('UICorner');corner.CornerRadius=UDim.new(.5,0);corner.Parent=pip
+        end
+    end
+    -- Every tier: one themed burst when a run starts (emitted once by the client, never continuous).
+    local start=att('Start burst',V(0,.8,0))
+    local burstColor=({seq(RGB(168,232,110),RGB(255,240,150)),seq(RGB(255,222,109),RGB(90,220,150)),seq(RGB(255,236,170),RGB(232,141,90)),
+        seq(RGB(235,255,255),RGB(120,210,255)),seq(RGB(255,230,90),RGB(255,90,20)),seq(RGB(255,170,250),RGB(130,240,230),RGB(255,250,170)),
+        seq(RGB(255,255,230),RGB(120,180,255))})[tier]
+    emit(start,'Start sparkle burst','Burst',2,{Color=burstColor,Burst=6+tier*3,Life={.5,1.1},Speed={6,10+tier},Size=.25+tier*.04,Spread=80,Drag=3,Accel=V(0,-3,0)})
+    if tier>=5 then
+        emit(start,'Start flare burst','Burst',3,{Color=seq(theme.Glow),Burst=tier-3,Life={.25,.4},Speed={0,0},Size=4+tier,Texture='flare',Light=1})
+        -- Edge lights frame the belt and breathe faster while someone trains.
+        for side=-1,1,2 do
+            pulse(P('Belt edge light',V(.12,.05,12.6*1.2),CF(side*4.5,.27,0),theme.Glow,Enum.Material.Neon),.45,1.4,side*.5)
+        end
+    end
+
+    if tier==1 then
+        for side=-1,1,2 do
+            local x=side*6.75
+            R('Lantern cord',V(x,4.15,-2.2),V(x,3.55,-2.2),.08,theme.Ink,Enum.Material.Wood)
+            S('Lantern cap',V(.62,.22,.62),CF(x,3.58,-2.2),theme.Ink,Enum.Material.Wood)
+            local lamp=pulse(S('Firefly lantern',V(.55,.72,.55),CF(x,3.18,-2.2),RGB(255,214,120),Enum.Material.Neon),.3,.9,side)
+            glow(lamp,'Lantern glow',RGB(255,205,120),.8,10,2)
+            R('Mushroom stem',V(side*6.75,-.85,5.2),V(side*6.75,-.05,5.2),.38,RGB(240,229,205))
+            S('Mushroom cap',V(1.1,.5,1.1),CF(side*6.75,.05,5.2),RGB(214,83,64))
+        end
+        emit(att('Fireflies',V(0,3.2,0)),'Fireflies','Ambient',2,{Color=seq(RGB(214,255,120)),Rate=2,Life={2.5,4},Speed={.4,1},Size=.18,Spread=180,Drag=.6})
+        emit(att('Leaf trail',V(0,.5,6.2)),'Leaf trail','Training',3,{Color=seq(RGB(120,200,90),RGB(200,170,80)),Rate=4,Life={.6,1.1},Speed={1.5,3},Size=.16,Spread=45,Accel=V(0,-2,0)})
+    elseif tier==2 then
+        for side=-1,1,2 do
+            local x=side*6.1
+            R('Temple brazier bowl',V(x,4.1,-5.95),V(x,4.55,-5.95),1.35,theme.Glow,Enum.Material.Metal)
+            local flame=pulse(S('Brazier flame',V(.85,1.05,.85),CF(x,4.95,-5.95),RGB(255,160,60),Enum.Material.Neon),.35,2.2,side)
+            glow(flame,'Brazier glow',RGB(255,170,80),.9,12,2,true)
+            emit(att('Brazier embers',V(x,5.2,-5.95)),'Brazier embers','Ambient',2,{Color=seq(RGB(255,220,120),RGB(255,110,40)),Rate=5,Life={.6,1.2},Speed={1.5,2.6},Size=.16,Spread=18,Drag=1})
+            pulse(keep(rawp('Jade idol eye',V(.7,.7,.25),CF(side*3.45,4.55,TREADMILL_FRONT_FACE[2]-.08),theme.Trim,Enum.Material.Neon)),.35,1.1,0)
+            S('Vine blossom',V(.42,.42,.42),CF(x+side*.74,1.5,-6.1),RGB(255,120,170),Enum.Material.Neon)
+            S('Vine blossom',V(.42,.42,.42),CF(x+side*.36,2.85,-6.55),RGB(255,236,120),Enum.Material.Neon)
+        end
+        emit(att('Jungle pollen',V(0,3.4,-1)),'Jungle pollen','Ambient',3,{Color=seq(RGB(255,236,140)),Rate=2,Life={2.5,4},Speed={.3,.8},Size=.12,Spread=180,Drag=.4})
+    elseif tier==3 then
+        pulse(named('Giant sun crest heart'),.3,.8,0)
+        glow(named('Giant sun crest heart')or plaque,'Sun crest glow',RGB(255,220,140),1,14,2)
+        for side=-1,1,2 do
+            local x=side*6.1
+            local shell=keep(rawp('Scarab shell',V(.8,1.0,.3),CF(x,2.9,-8.72),theme.Trim,Enum.Material.Metal));shell.Shape=Enum.PartType.Ball
+            local gem=keep(rawp('Scarab gem',V(.36,.36,.16),CF(x,3.3,-8.84),theme.Glow,Enum.Material.Neon));gem.Shape=Enum.PartType.Ball
+            pulse(gem,.4,1.2,side)
+            pulse(S('Sunstone finial',V(.72,.72,.72),CF(x,2.85,3.9),theme.Glow,Enum.Material.Neon),.3,.8,side*.5)
+        end
+        emit(att('Sun glints',V(0,6.55,-6.3)),'Sun glints','Ambient',2,{Color=seq(RGB(255,250,200)),Rate=3,Life={.8,1.4},Speed={1,2},Size=.22,Spread=180,Drag=1.5})
+        emit(att('Sand swirl',V(0,.2,0)),'Sand swirl','Ambient',3,{Color=seq(RGB(235,200,140)),Rate=1.5,Life={2,3},Speed={.5,1},Size=1.2,Texture='smoke',Spread=90,Accel=origin:VectorToWorldSpace(V(.6,.2,0))})
+        emit(att('Kicked sand',V(0,.4,6.4)),'Kicked sand','Training',2,{Color=seq(RGB(240,205,150)),Rate=6,Life={.6,1},Speed={2,3.5},Size=.8,Texture='smoke',Spread=35,Accel=V(0,-1,0)})
+    elseif tier==4 then
+        for j,x in ipairs({-4,-2.3,0,2.3,4})do
+            local len=.9+((j+1)%3)*.35
+            local icicle=keep(rawp('Hanging icicle',V(.32,len,.32),CF(x,2.75-len/2+.15,-7.95),theme.Glow,Enum.Material.Ice))
+            icicle.Shape=Enum.PartType.Ball;icicle.Transparency=.2
+        end
+        for _,heart in ipairs(allNamed('Frozen crown luminous heart'))do pulse(heart,.35,1,heart.Position.X)end
+        local crown=named('Frozen crown luminous heart')
+        glow(crown or plaque,'Glacier glow',RGB(170,235,255),1,14,2)
+        local a0,a1=att('Aurora left',V(-6.5,7.8,-6.6),true),att('Aurora right',V(6.5,7.8,-6.6),true)
+        arc('Aurora ribbon',a0,a1,seq(RGB(110,255,200),RGB(120,200,255),RGB(190,140,255)),1.8,4.5,2,'Ribbon')
+        emit(att('Snowfall',V(0,9.5,-1)),'Snowfall','Ambient',2,{Color=seq(RGB(245,252,255)),Rate=4,Life={4,6},Speed={.6,1.2},Size=.2,Spread=75,Dir=Enum.NormalId.Bottom,Accel=V(0,-.4,0),Light=.3})
+        emit(att('Frost breath',V(0,.5,6.3)),'Frost breath','Training',3,{Color=seq(RGB(230,250,255)),Rate=4,Life={.8,1.3},Speed={1,2},Size=.9,Texture='smoke',Spread=40})
+    elseif tier==5 then
+        for side=-1,1,2 do
+            local x=side*6.1
+            pulse(P('Lava channel',V(.18,.22,12.4*1.2),CF(side*6.26,-.35,0),RGB(255,110,30),Enum.Material.Neon),.4,1.1,side)
+            for j=1,4 do pulse(P('Magma vent slit',V(.1,.12,.9),CF(side*6.27,-.62,(j-2.5)*3),RGB(255,190,60),Enum.Material.Neon),.6,2.4,j*.8)end
+            for j=1,3 do keep(rawp('Forge grate',V(1.2,.14,.1),CF(x,1.2+j*.5,-8.9),RGB(255,150,50),Enum.Material.Neon))end
+            -- Rear magma pylons: basalt column, crucible and a breathing molten pool.
+            R('Magma pylon column',V(x,-.7,7.2),V(x,3.2,7.2),1.1,theme.Ink,Enum.Material.Basalt)
+            R('Magma pylon ring',V(x,2.6,7.2),V(x,2.85,7.2),1.35,theme.Trim,Enum.Material.Neon)
+            R('Magma pylon crucible',V(x,3.2,7.2),V(x,3.75,7.2),1.6,theme.Body,Enum.Material.Basalt)
+            local pool=pulse(S('Magma pylon pool',V(1.25,.4,1.25),CF(x,3.78,7.2),RGB(255,150,40),Enum.Material.Neon),.3,1.6,side)
+            for j=-1,1,2 do P('Basalt crucible spike',V(.35,.9,.35),CF(x+j*.62,4.05,7.2)*CFrame.Angles(0,0,-j*.35),theme.Ink,Enum.Material.Basalt,'WedgePart')end
+            glow(pool,'Crucible glow',RGB(255,140,50),1.1,12,2,true)
+            local top=att('Pylon embers',V(x,4,7.2))
+            emit(top,'Pylon embers','Ambient',2,{Color=seq(RGB(255,230,120),RGB(255,90,20)),Rate=5,Life={1,1.8},Speed={2,3.5},Size=.18,Spread=20,Drag=.5})
+            emit(top,'Pylon smoke','Ambient',3,{Color=seq(RGB(70,60,66)),Rate=1.2,Life={2.5,3.5},Speed={1.5,2.5},Size=1.3,Texture='smoke',Spread=12,Light=0})
+            for j=1,3 do P('Rail magma spike',V(.5,.9,.5),CF(x,3.55+j*.3,3.9-j*2.6)*CFrame.Angles(0,0,-side*.25),theme.Ink,Enum.Material.Basalt,'WedgePart')end
+            pulse(keep(rawp('Magma cascade',V(.55,2.6,.08),CF(side*3.4,4.05,TREADMILL_FRONT_FACE[5]-.045),RGB(255,120,30),Enum.Material.Neon)),.35,1.8,side)
+            emit(att('Belt flames',V(side*4.4,.4,0)),'Belt flames','Training',2,{Color=seq(RGB(255,220,90),RGB(255,70,20)),Rate=9,Life={.35,.7},Speed={1.5,3},Size=.3,Spread=25,Light=1})
+            for _,z in ipairs({-6.6,6.6})do
+                keep(rawp('Lava seep',V(1.4,.12,1.0),CF(side*6.9,-.86,z*1.2),RGB(255,120,30),Enum.Material.Neon)).Shape=Enum.PartType.Ball
+            end
+        end
+        -- Three molten rocks orbit the front sigil in the plane facing outwards.
+        local pivot=CF(longer(V(0,6.15,-6.35)))*CFrame.Angles(math.rad(-12),0,0)
+        for j=1,3 do
+            local a=j*math.pi*2/3
+            spin(orbiter('Orbiting magma rock',V(.66,.52,.6),pivot*CF(math.cos(a)*2.1,0,math.sin(a)*2.1)*CFrame.Angles(a,a*.5,0),theme.Ink,Enum.Material.Basalt,true),pivot,.9,2)
+            spin(orbiter('Orbiting magma core',V(.36,.36,.36),pivot*CF(math.cos(a)*2.1,.28,math.sin(a)*2.1),RGB(255,170,50),Enum.Material.Neon,true),pivot,.9,2)
+        end
+        for j=1,4 do
+            local a=math.rad(-10+j*40)
+            P('Forge crown spike',V(.4,1.0,.4),CF(math.cos(a)*1.7,6.15+math.sin(a)*1.7,-6.4)*CFrame.Angles(0,0,a-math.pi/2),theme.Ink,Enum.Material.Basalt,'WedgePart')
+        end
+        local halo=keep(k.frontDisc('Sigil halo',V(0,6.15,-6.2),1.55,.1,RGB(255,120,30),Enum.Material.Neon));halo.Transparency=.35
+        pulse(halo,.4,1.3,0)
+        for _,tip in ipairs(allNamed('Molten horn tip'))do pulse(tip,.3,1.5,tip.Position.X)end
+        glow(named('Molten front sigil luminous heart')or plaque,'Sigil glow',RGB(255,150,60),1.2,14,2)
+        glow(att('Underglow',V(0,-.55,0)),'Lava underglow',RGB(255,110,40),1.3,15,3)
+        emit(att('Sigil embers',V(0,6.15,-6.4)),'Sigil embers','Ambient',3,{Color=seq(RGB(255,200,90)),Rate=3,Life={.8,1.4},Speed={1,2},Size=.16,Spread=180,Drag=1.2})
+    elseif tier==6 then
+        for _,v in ipairs(allNamed('Prism inlay'))do hue(v,v.Position.Z*.07)end
+        for i,v in ipairs(allNamed('Crystal crown brace'))do hue(v,i*.5)end
+        for side=-1,1,2 do
+            local x=side*6.3
+            hue(R('Prism light pillar',V(x,3.85,3.7),V(x,6.6,3.7),.22,theme.Glow,Enum.Material.Neon),side*.25)
+            local tip=hue(S('Prism pillar star',V(.55,.55,.55),CF(x,6.75,3.7),theme.Glow,Enum.Material.Neon),side*.25)
+            glow(tip,'Prism pillar light',theme.Glow,.9,11,3)
+            hue(glow(att('Front prism light',V(x,4.4,-6.2)),'Front prism light',theme.Trim,1,13,2),side*.3)
+            emit(att('Rail glints '..side,V(x,4,0)),'Rail prism motes','Ambient',3,{Color=seq(RGB(255,170,250),RGB(130,240,230)),Rate=2,Life={1.5,2.5},Speed={.3,.8},Size=.16,Spread=180,Drag=.5})
+        end
+        -- Six prism shards orbit the crown centerpiece.
+        local pivot=CF(longer(V(0,6.4,-6.3)))
+        for j=1,6 do
+            local a=j*math.pi/3
+            local frame=pivot*CF(math.cos(a)*2.4,j%2==0 and .5 or -.35,math.sin(a)*2.4)*CFrame.Angles(math.pi/4,a,math.pi/4)
+            local shard=orbiter('Orbiting prism shard',V(.42,.85,.42),frame,j%2==0 and theme.Trim or RGB(255,170,245),Enum.Material.Neon,false)
+            hue(shard,j/6);spin(shard,pivot,.7,2)
+        end
+        local a0,a1=att('Rainbow left',V(-6.3,7.6,-6.1),true),att('Rainbow right',V(6.3,7.6,-6.1),true)
+        arc('Rainbow arch',a0,a1,seq(RGB(255,90,90),RGB(255,190,70),RGB(255,250,110),RGB(110,240,140),RGB(100,190,255),RGB(190,120,255)),1.4,5.5,2,'Ribbon')
+        emit(att('Crown glints',V(0,6.4,-6.3)),'Crown glints','Ambient',2,{Color=seq(RGB(255,255,255),RGB(255,190,250),RGB(150,255,240)),Rate=5,Life={.8,1.5},Speed={1.5,3},Size=.24,Spread=180,Drag=1.5})
+        emit(att('Rainbow trail',V(0,.5,6.3)),'Rainbow trail','Training',2,{Color=seq(RGB(255,120,120),RGB(255,240,120),RGB(120,255,180),RGB(140,170,255),RGB(240,140,255)),Rate=10,Life={.5,.9},Speed={2,4},Size=.22,Spread=40,Drag=1})
+    elseif tier==7 then
+        local live=RGB(150,205,255)
+        local coilTops={}
+        for side=-1,1,2 do
+            local x=side*6.1
+            -- Tesla coils on both power housings.
+            R('Tesla coil core',V(x,5.6,-6.5),V(x,8.35,-6.5),.45,theme.Ink,Enum.Material.Metal)
+            for j=1,3 do
+                local y=6.3+j*.55
+                local ring=R('Tesla coil ring',V(x,y,-6.5),V(x,y+.14,-6.5),1.25-j*.15,j==2 and live or RGB(214,140,70),j==2 and Enum.Material.Neon or Enum.Material.Metal)
+                if j==2 then pulse(ring,.4,3,side)end
+            end
+            R('Tesla crown ring',V(x,8.45,-6.5),V(x,8.6,-6.5),1.75,theme.Body,Enum.Material.Metal)
+            local crown=pulse(S('Tesla crown orb',V(1.1,1.1,1.1),CF(x,8.85,-6.5),theme.Glow,Enum.Material.Neon),.3,2.6,side)
+            glow(crown,'Tesla glow',live,1.2,14,2,true)
+            local top=att('Tesla top '..side,V(x,9.0,-6.5),true);coilTops[side]=top
+            emit(top,'Tesla sparks','Ambient',2,{Color=seq(RGB(255,255,255),live),Rate=6,Life={.15,.35},Speed={5,9},Size=.2,Spread=180,Light=1})
+            -- Rail lightning spires, rear capacitor banks, swept thunder wings and charge cells.
+            for _,z in ipairs({2.0,-1.6})do
+                R('Storm spire',V(x,z==2.0 and 3.45 or 4.05,z),V(x,(z==2.0 and 3.45 or 4.05)+1.7,z),.16,theme.Body,Enum.Material.Metal)
+                pulse(S('Storm spire tip',V(.36,.36,.36),CF(x,(z==2.0 and 3.45 or 4.05)+1.85,z),theme.Glow,Enum.Material.Neon),.5,3.4,z)
+            end
+            R('Capacitor bank',V(x,-.7,7.2),V(x,2.6,7.2),1.15,theme.Ink,Enum.Material.Metal)
+            for j=1,2 do pulse(R('Capacitor charge band',V(x,.3+j*.8,7.2),V(x,.48+j*.8,7.2),1.25,live,Enum.Material.Neon),.5,2.2,j)end
+            S('Capacitor insulator',V(.9,.7,.9),CF(x,2.85,7.2),RGB(235,240,250),Enum.Material.Glass)
+            -- Swept wing feathers: each leaves the housing's outer side and climbs outwards.
+            for j=1,3 do
+                local a,length=math.rad(10+j*15),2.7-j*.35
+                local root=V(x+side*.95,2.7+j*.75,-6.5)
+                local frame=CF(root+V(side*math.cos(a),math.sin(a),0)*length/2)*CFrame.Angles(0,0,side*a)
+                P('Thunder wing blade',V(length,.26,1.1-j*.15),frame,theme.Body,Enum.Material.Metal)
+                pulse(P('Thunder wing edge',V(length*.94,.09,.3),frame*CF(0,.17,0),theme.Glow,Enum.Material.Neon),.35,2,j)
+            end
+            for j=1,6 do pulse(P('Charge cell',V(.14,.3,1.15),CF(side*6.26,-.35,(3.5-j)*1.75),live,Enum.Material.Neon),.75,6,-j*1.05)end
+        end
+        -- Conductor arch over the belt: the runner passes under a live lightning gate.
+        local archPoints={V(-5.9,4.3,-3.2),V(-4.4,7.4,-3.2),V(-1.6,8.6,-3.2),V(1.6,8.6,-3.2),V(4.4,7.4,-3.2),V(5.9,4.3,-3.2)}
+        k.railPath('Conductor arch',archPoints,.5,theme.Ink,Enum.Material.Metal)
+        for _,v in ipairs(m:GetChildren())do if v.Name=='Conductor arch'or v.Name=='Conductor arch joint'then keep(v)end end
+        local archNodes={}
+        for j=2,5 do
+            local node=pulse(S('Arch conductor node',V(.55,.55,.55),CF(archPoints[j]-V(0,.42,0)),theme.Glow,Enum.Material.Neon),.5,4,j)
+            table.insert(archNodes,att('Arch node '..j,archPoints[j]-V(0,.5,0),true))
+            if j==3 then glow(node,'Arch glow',live,1,12,3,true)end
+        end
+        -- Storm cloud above the crest; its core flashes when lightning strikes.
+        for j,s in ipairs({{-2.6,10.4,1.7},{-1.1,11.0,2.1},{.7,11.15,2.3},{2.4,10.6,1.8},{-.3,10.2,1.9},{1.4,10.0,1.5},{-1.9,10.0,1.4},{3.3,10.15,1.2}})do
+            local puff=S('Storm cloud puff',V(s[3]*1.6,s[3],s[3]*1.25),CF(s[1],s[2],-7.2),j%2==0 and RGB(64,72,98)or RGB(84,92,120))
+            puff.Transparency=.12
+        end
+        local core=S('Storm cloud core',V(2.6,1.2,1.4),CF(.2,10.4,-7.15),live,Enum.Material.Neon);core.Transparency=.55
+        core:SetAttribute('TreadmillFlashCore',true)
+        glow(core,'Storm cloud flash',RGB(200,225,255),1.6,18,3,true)
+        local cloud=att('Storm cloud',V(.2,10,-7.2))
+        emit(cloud,'Storm drizzle','Ambient',3,{Color=seq(RGB(170,200,255)),Rate=7,Life={.6,.9},Speed={9,12},Size=.07,Spread=14,Dir=Enum.NormalId.Bottom,Light=.4})
+        -- Energy orbs circle the giant front lightning crest.
+        local crest=V(0,6.35,-6.3)
+        local pivot=CF(longer(crest))*CFrame.Angles(math.rad(-20),0,0)
+        for j=1,3 do
+            local a=j*math.pi*2/3
+            spin(orbiter('Orbiting energy orb',V(.55,.55,.55),pivot*CF(math.cos(a)*2.6,0,math.sin(a)*2.6),theme.Glow,Enum.Material.Neon,true),pivot,1.6,2)
+        end
+        local halo=keep(k.frontDisc('Crest halo',V(0,6.35,-6.0),2.0,.1,live,Enum.Material.Neon));halo.Transparency=.4
+        pulse(halo,.45,2.2,0)
+        keep(k.frontDisc('Crest backplate',V(0,6.35,-5.92),1.85,.12,theme.Ink,Enum.Material.Metal))
+        local crestNode=att('Crest strike',crest+V(0,.6,-.4),true)
+        -- Lightning arcs: flickered on the client, more often while someone trains.
+        arc('Coil bridge arc',coilTops[-1],coilTops[1],seq(RGB(255,255,255),live),.35,3.5,2)
+        arc('Left strike arc',coilTops[-1],crestNode,seq(live,RGB(255,255,255)),.25,1.2,2)
+        arc('Right strike arc',coilTops[1],crestNode,seq(live,RGB(255,255,255)),.25,-1.2,2)
+        arc('Cloud strike arc',att('Cloud base',V(.2,9.6,-7.2),true),crestNode,seq(RGB(255,255,255),live),.4,.8,3)
+        arc('Arch lightning',archNodes[1],archNodes[4],seq(live,RGB(255,255,255)),.3,1.4,2)
+        glow(att('Storm underglow',V(0,-.55,0)),'Storm underglow',RGB(110,160,255),1.2,15,3)
+        for side=-1,1,2 do
+            emit(att('Static motes '..side,V(side*4.2,.45,0)),'Static motes','Training',2,{Color=seq(RGB(255,255,255),live),Rate=10,Life={.2,.45},Speed={2,5},Size=.16,Spread=60,Light=1})
+        end
+        emit(start,'Thunderclap sparks','Burst',2,{Color=seq(RGB(255,255,255),live),Burst=26,Life={.3,.7},Speed={12,20},Size=.18,Spread=180,Drag=4,Light=1})
+    end
+    return made
+end
 function Art.BuildTreadmillV131(base,tier)
     tier=math.clamp(math.floor(tonumber(tier)or 1),1,7)
     local theme=treadmillThemes[tier]
@@ -1012,13 +1323,14 @@ function Art.BuildTreadmillV131(base,tier)
                 p('Temple pillar foot',V(1.85,.48,1.85),CF(x,.30,z),theme.Body,Enum.Material.Sandstone)
             end
             -- Seven alternating closed links create a hanging chain, not another straight tube rail.
+            -- R117: four-bar (rhombic) links read the same at play distance with a third fewer parts.
             for link=1,7 do
                 local t=(link-.5)/7
                 local z=3.55-t*9.4;local y=3.65-math.sin(t*math.pi)*.68
                 local tilt=link%2==0 and math.rad(62)or 0
                 local frame=CF(x,y,z)*CFrame.Angles(0,0,tilt)
-                for j=1,6 do
-                    local a=(j-1)*math.pi/3;local b=j*math.pi/3
+                for j=1,4 do
+                    local a=(j-1)*math.pi/2;local b=j*math.pi/2
                     rod('Hanging jungle chain',frame*V(0,math.sin(a)*.48,math.cos(a)*.86),frame*V(0,math.sin(b)*.48,math.cos(b)*.86),.27,theme.Glow,Enum.Material.Metal)
                 end
             end
@@ -1085,7 +1397,11 @@ function Art.BuildTreadmillV131(base,tier)
             railPath('Angular prism rail',{V(x,.6,4.5),V(x,2.6,3.45),V(x,3.25,.8),V(x,4.15,-2.0),V(x,4.4,-5.9)},.78,theme.Trim,Enum.Material.Glass)
             diamond('Oversized front diamond',CF(x,4.15,-6.1)*CFrame.Angles(0,.3,side*.08),2.6,6.0,2.5,theme.Trim,false)
             diamond('Amethyst rear diamond',CF(x,1.9,3.7),1.7,3.7,1.7,theme.Body,false)
-            diamond('Side rose quartz',CF(x,1.5,-.7),1.45,2.6,1.3,RGB(245,165,229),false)
+            -- R117: a three-point rose quartz cluster replaces the 17-part side diamond (budget for orbiting shards).
+            for j,s in ipairs({{0,1.75,0,1.0,.15},{-.35,1.2,.65,.7,-.35},{.3,1.15,-.7,.62,.4}})do
+                local quartz=p('Side rose quartz',V(s[4],s[4]*1.7,s[4]),CF(x+side*s[1],s[2],-.7+s[3])*CFrame.Angles(s[5],j,side*.25),RGB(245,165,229),Enum.Material.Glass)
+                quartz.Transparency=.18;quartz.Reflectance=.12;quartz.CastShadow=false
+            end
         end
         p('Prism console surround',V(9.8,2.75,1.2),CF(0,4.15,-6.25),theme.Body,Enum.Material.Glass).Transparency=.16
         diamond('Diamond crown centerpiece',CF(0,6.4,-6.3),2.25,2.6,1.25,theme.Glow,false)
@@ -1109,6 +1425,9 @@ function Art.BuildTreadmillV131(base,tier)
         local bolt={V(1.15,7.45,-6.3),V(-.7,6.2,-6.3),V(.65,6.2,-6.3),V(-1.1,5.3,-6.3)}
         railPath('Giant front lightning crest',bolt,.55,theme.Trim,Enum.Material.Neon)
     end
+    treadmillFlairR117({m=m,origin=origin,tier=tier,theme=theme,surface=surface,face=face,p=p,rawp=rawp,sphere=sphere,
+        rod=rod,railPath=railPath,frontDisc=frontDisc,longer=longer})
+    m:SetAttribute('TreadmillFxVersion',117);m:SetAttribute('TreadmillTierName',theme.Name)
     -- New geometry is complete before replacing the previous appearance.
     if not belt then
         belt=part(base,'Treadmill',beltSize,origin,RGB(37,50,66),Enum.Material.SmoothPlastic)

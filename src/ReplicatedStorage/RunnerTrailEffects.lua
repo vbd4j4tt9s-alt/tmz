@@ -2,8 +2,11 @@
 -- R111: every boot tier gets biome footprints that age (sand fades, frost crystallises, lava cools, crystal twinkles,
 -- storm flickers), step bursts from one shared emitter set, and an idle aura while the wearer stands still.
 -- Pools are capped by the RunnerTrailStyles budget. Nothing here connects events; Release/Destroy free everything.
+-- R117: landing / sprint-start moments (rings, lightning strikes), boot-mounted emitters, coil pulse and arcs between
+-- the boots (RunnerBootFx); rainbow crystal prints; idle rigs with rainbow prisms, field nodes and a force-field dome.
 local Rules=require(script.Parent.RunnerTrailRules)
 local Styles=require(script.Parent.RunnerTrailStyles)
+local BootFx=require(script.Parent.RunnerBootFx)
 local E={};E.__index=E
 local V,CF=Vector3.new,CFrame.new
 local Mat=Enum.Material
@@ -21,7 +24,13 @@ end
 local SHAPES={Disc=Enum.ParticleEmitterShape.Disc,Cylinder=Enum.ParticleEmitterShape.Cylinder,Sphere=Enum.ParticleEmitterShape.Sphere,Box=Enum.ParticleEmitterShape.Box}
 local function emitter(parent,spec)
  local e=Instance.new('ParticleEmitter');e.Name=spec.Name;e.Texture=spec.Texture
- e.Color=ColorSequence.new(spec.Color,spec.Tail or spec.Color);e.Size=sequence(spec.Size);e.Transparency=sequence(spec.Alpha or{0,1})
+ if spec.Colors then
+  -- A rainbow: the colours spread evenly over each particle's life.
+  local keys={};local n=#spec.Colors
+  for i,c in ipairs(spec.Colors)do keys[i]=ColorSequenceKeypoint.new((i-1)/(n-1),c)end
+  e.Color=ColorSequence.new(keys)
+ else e.Color=ColorSequence.new(spec.Color,spec.Tail or spec.Color)end
+ e.Size=sequence(spec.Size);e.Transparency=sequence(spec.Alpha or{0,1})
  e.Lifetime=range(spec.Life);e.Speed=range(spec.Speed or{0});e.SpreadAngle=Vector2.new(spec.Spread or 180,spec.Spread or 180)
  e.Acceleration=spec.Accel or Vector3.zero;e.Drag=spec.Drag or 0;e.LightEmission=spec.Glow or 0;e.LightInfluence=spec.Light or 1
  e.Rotation=NumberRange.new(0,360);e.RotSpeed=range(spec.Spin or{-40,40});e.LockedToPart=spec.Locked==true;e.VelocityInheritance=0
@@ -33,7 +42,8 @@ function E.new(parent)
  local old=(parent or workspace):FindFirstChild('RunnerGroundEffects');if old then old:Destroy()end
  local folder=Instance.new('Folder');folder.Name='RunnerGroundEffects';folder.Parent=parent or workspace
  return setmetatable({Folder=folder,Rings={Local={Marks={},Cursor=0},Others={Marks={},Cursor=0}},Records={},
-  Bursts={},Arcs={},ArcCursor=0,IdleFree={},IdleRigs=0,IdleActive=0,Budget=Styles.Budget(3,false),Spent=0,SpentAt=-math.huge},E)
+  Bursts={},Arcs={},ArcCursor=0,IdleFree={},IdleRigs=0,IdleActive=0,Budget=Styles.Budget(3,false),Spent=0,SpentAt=-math.huge,
+  Moments={},MomentCursor=0,Attached=0,Prints=0},E)
 end
 -- Budget changes shrink pools: idle marks/arcs above the new cap are destroyed, busy ones finish first.
 function E:SetBudget(b)
@@ -47,6 +57,12 @@ function E:SetBudget(b)
  if self.ArcCursor>b.Arcs then self.ArcCursor=0 end
  for _,list in pairs(self.IdleFree)do
   while #list>0 and self.IdleRigs>b.Idle+1 do self:DestroyIdle(table.remove(list))end
+ end
+ for i=#self.Moments,b.Moments+1,-1 do local m=self.Moments[i];if m.Until then break end;self:DestroyMoment(m);self.Moments[i]=nil end
+ if self.MomentCursor>b.Moments then self.MomentCursor=0 end
+ -- Other runners' boot emitters above the new cap are removed (farthest records first is not tracked; any extra goes).
+ if self.Attached>b.Attach then
+  for r in pairs(self.Records)do if self.Attached<=b.Attach then break end;if r.Attach and r.Attach.Counted then self:Detach(r)end end
  end
 end
 function E:Bind(character,cosmetics,isLocal)
@@ -84,6 +100,7 @@ function E:Release(r)
  self:Premium(r,false,0)
  self:Disable(r,true)
  self:DropIdle(r,true)
+ self:Detach(r)
  for _,g in ipairs(r.Ground)do g.Part:Destroy()end
  r.Ground={};self.Records[r]=nil
 end
@@ -107,7 +124,7 @@ function E:Stamp(frame,theme,scale,now,ringName,speed,mirror)
  if not m then
   m={Parts={}};for _=1,3 do table.insert(m.Parts,cosmetic(self.Folder,'Fading boot mark'))end;ring.Marks[ring.Cursor]=m
  end
- local P=theme.Print;speed=speed or 0
+ local P=theme.Print;speed=speed or 0;self.Prints+=1
  m.Born=now;m.Life=Styles.Life(theme,speed);m.Live=true;m.Print=P;m.Stage=0;m.Step=nil;m.Alpha={};m.Seed=math.random()*6.28
  local shapes=Styles.PrintParts(P.Kind,scale,Styles.Stretch(speed),mirror or 1);m.Count=#shapes
  for i,p in ipairs(m.Parts)do
@@ -116,7 +133,9 @@ function E:Stamp(frame,theme,scale,now,ringName,speed,mirror)
    p.Size=s.Size;p.CFrame=frame*s.Frame
    local accent=s.Tone==2
    if P.Kind=='Ember'or P.Kind=='Lightning'then p.Material=Mat.Neon;p.Color=accent and P.Accent or P.Color;p.Reflectance=0
-   elseif P.Kind=='Crystal'then p.Material=accent and Mat.Neon or P.Material;p.Color=accent and P.Accent or P.Color;p.Reflectance=accent and 0 or P.Reflectance
+   elseif P.Kind=='Crystal'then
+    local glow=P.Rainbow and P.Rainbow[self.Prints%#P.Rainbow+1]or P.Accent
+    p.Material=accent and Mat.Neon or P.Material;p.Color=accent and glow or P.Color;p.Reflectance=accent and 0 or P.Reflectance
    elseif P.Kind=='Frost'then p.Material=accent and Mat.Neon or P.Material;p.Color=accent and P.Accent or P.Color;p.Reflectance=accent and 0 or P.Reflectance
    else p.Material=P.Material;p.Color=accent and P.Accent or P.Color;p.Reflectance=0 end
    -- The frost star only appears once the print crystallises.
@@ -162,20 +181,22 @@ function E:StepMarks(now)
   if t>=1 then m.Live=false;for i=1,3 do alpha(m,i,1)end else self:AgeMark(m,t,now,reduced)end
  end end end
  self:StepArcs(now)
+ self:StepMoments(now)
 end
 -- Step bursts: one emitter set per look, moved to the print and emitted, capped per second ------------------
-function E:Burst(frame,theme,now,speed)
- local b=self.Budget;if b.Scale<=0 or not theme.Burst then return 0 end
+-- list defaults to theme.Burst (steps); landing moments pass theme.Land. One emitter set per list.
+function E:Burst(frame,theme,now,speed,list)
+ local b=self.Budget;list=list or theme.Burst;if b.Scale<=0 or not list then return 0 end
  if now-self.SpentAt>=1 then self.SpentAt=now;self.Spent=0 end
- local rig=self.Bursts[theme]
+ local rig=self.Bursts[list]
  if not rig then
   if not self.BurstHolder then self.BurstHolder=cosmetic(self.Folder,'Boot step bursts')end
   local a=Instance.new('Attachment');a.Name='Boot step burst';a.Parent=self.BurstHolder
-  rig={Attachment=a,Emitters={}};for i,spec in ipairs(theme.Burst)do rig.Emitters[i]=emitter(a,spec)end;self.Bursts[theme]=rig
+  rig={Attachment=a,Emitters={}};for i,spec in ipairs(list)do rig.Emitters[i]=emitter(a,spec)end;self.Bursts[list]=rig
  end
  rig.Attachment.WorldCFrame=frame
  local k=Styles.BurstScale(speed,b);local total=0
- for i,spec in ipairs(theme.Burst)do
+ for i,spec in ipairs(list)do
   local n=math.floor(spec.Count*k+.5);if i==1 then n=math.max(1,n)end
   if n>0 and self.Spent+n<=b.Particles then self.Spent+=n;total+=n;rig.Emitters[i]:Emit(n)end
  end
@@ -209,6 +230,14 @@ local function soles(r)
  local a=(left.CFrame*CF(0,-left.Size.Y*.5,0)).Position;local b=(right.CFrame*CF(0,-right.Size.Y*.5,0)).Position
  return a,b,math.clamp(left.Size.X,.4,2.5)
 end
+-- R117: a landing / sprint-start moment on the ground under the feet (one extra ray per moment).
+function E:FireMoment(r,kind,now,params)
+ local left,right,scale=soles(r);if not left then return 0 end
+ local center=(left+right)*.5
+ local hit=workspace:Raycast(center+V(0,1.5*scale,0),V(0,-4*scale,0),params)
+ r.Scale=scale
+ return self:Moment(r,kind,hit and hit.Position or V(center.X,math.min(left.Y,right.Y),center.Z),now)
+end
 function E:TakeIdle(r)
  local b=self.Budget;local idle=r.Theme.Idle;if not idle or b.Idle<=0 then return nil end
  if self.IdleActive>=b.Idle+(r.Local and 1 or 0)then return nil end -- the local wearer may always have one
@@ -218,20 +247,28 @@ function E:TakeIdle(r)
   rig.Part.Size=V(2.4,.2,2.4)
   for i,spec in ipairs(idle.Emitters)do rig.Emitters[i]=emitter(rig.Part,spec)end
   for i=1,idle.Shards or 0 do
-   local s=cosmetic(self.Folder,'Boot idle shard');s.Material=i==1 and Mat.Neon or Mat.Glass;s.Color=i==1 and idle.ShardGlow or idle.ShardColor;s.Reflectance=i==1 and 0 or .5
+   -- Shard 1 glows unless the look gives a material; ShardColors cycles (rainbow prisms, field nodes).
+   local s=cosmetic(self.Folder,'Boot idle shard');local glow=i==1 and not idle.ShardMaterial
+   s.Material=idle.ShardMaterial or(glow and Mat.Neon or Mat.Glass)
+   s.Color=glow and idle.ShardGlow or(idle.ShardColors and idle.ShardColors[(i-1)%#idle.ShardColors+1])or idle.ShardColor
+   s.Reflectance=s.Material==Mat.Glass and .5 or 0
    rig.Shards[i]=s
   end
   local patch=idle.Patches
   for i=1,patch and patch.Count or 0 do
-   local s=cosmetic(self.Folder,'Boot idle patch');s.Material=patch.Material;s.Color=patch.Color;s.Reflectance=patch.Reflectance or 0
+   local s=cosmetic(self.Folder,'Boot idle patch');s.Material=patch.Material;s.Color=patch.Colors and patch.Colors[(i-1)%#patch.Colors+1]or patch.Color;s.Reflectance=patch.Reflectance or 0
    rig.Patches[i]=s
+  end
+  if idle.Dome then
+   local d=cosmetic(self.Folder,'Boot idle dome');d.Shape=Enum.PartType.Ball;d.Material=idle.Dome.Material;d.Color=idle.Dome.Color;rig.Dome=d
   end
   self.IdleRigs+=1
  end
  self.IdleActive+=1;r.Idle=rig;return rig
 end
 function E:DestroyIdle(rig)
- rig.Part:Destroy();for _,s in ipairs(rig.Shards)do s:Destroy()end;for _,s in ipairs(rig.Patches)do s:Destroy()end;self.IdleRigs-=1
+ rig.Part:Destroy();for _,s in ipairs(rig.Shards)do s:Destroy()end;for _,s in ipairs(rig.Patches)do s:Destroy()end
+ if rig.Dome then rig.Dome:Destroy()end;self.IdleRigs-=1
 end
 function E:DropIdle(r,clear)
  local rig=r.Idle;if not rig then return end
@@ -239,6 +276,7 @@ function E:DropIdle(r,clear)
  for i,e in ipairs(rig.Emitters)do e.Enabled=false;e.Rate=0;rig.Rates[i]=0;if clear then e:Clear()end end
  for _,s in ipairs(rig.Shards)do s.Transparency=1 end
  for _,s in ipairs(rig.Patches)do s.Transparency=1 end;rig.Center=nil
+ if rig.Dome then rig.Dome.Transparency=1 end
  if self.IdleRigs>self.Budget.Idle+1 then self:DestroyIdle(rig);return end
  self.IdleFree[rig.Theme]=self.IdleFree[rig.Theme]or{};table.insert(self.IdleFree[rig.Theme],rig)
 end
@@ -256,11 +294,19 @@ function E:StepIdle(r,dt,now,want)
   local rate=idle.Emitters[i].Rate*r.Fade*b.Scale
   if math.abs(rate-(rig.Rates[i]or 0))>=.25 or(rate==0)~=((rig.Rates[i]or 0)==0)then rig.Rates[i]=rate;e.Rate=rate;e.Enabled=rate>0 end
  end
+ local orbit=idle.Orbit;local count=#rig.Shards
  for i,s in ipairs(rig.Shards)do
-  local angle=rig.Angle+i*2.09;local bob=b.Reduced and 0 or math.sin(now*2+i)*.12
-  s.Size=V(.2,.34,.2)*scale
-  s.CFrame=CF(center+V(math.cos(angle)*1.6*scale,(.55+i*.15+bob)*scale,math.sin(angle)*1.6*scale))*CFrame.Angles(.4,b.Reduced and i or now*1.3+i,.3)
+  local angle=rig.Angle+i*2*math.pi/count;local bob=b.Reduced and 0 or math.sin(now*2+i)*.12
+  local radius=(orbit and orbit.Radius or 1.6)*scale;local height=orbit and orbit.Height+bob*.5 or .55+i*.15+bob
+  s.Size=(orbit and V(orbit.Size,orbit.Size,orbit.Size)or V(.2,.34,.2))*scale
+  s.CFrame=CF(center+V(math.cos(angle)*radius,height*scale,math.sin(angle)*radius))*CFrame.Angles(.4,b.Reduced and i or now*1.3+i,.3)
   local a=1-(i==1 and .9 or .85)*r.Fade;if math.abs(s.Transparency-a)>=.04 or a>=1 then s.Transparency=a end
+ end
+ if rig.Dome then
+  -- The field dome is centred on the ground, so only its top half shows; it breathes unless motion is reduced.
+  local dome=idle.Dome;local size=dome.Size*scale*(b.Reduced and 1 or 1+.04*math.sin(now*5))
+  rig.Dome.Size=V(size,size,size);rig.Dome.CFrame=CF(center)
+  local a=1-(1-dome.Alpha)*r.Fade;if math.abs(rig.Dome.Transparency-a)>=.04 or a>=1 then rig.Dome.Transparency=a end
  end
  -- Ground patches sit in a ring around the feet; placed when the wearer settles, faded with the aura.
  local patch=idle.Patches
@@ -279,9 +325,18 @@ function E:StepIdle(r,dt,now,want)
  if idle.ArcEvery and r.Fade>.5 and now>=rig.NextArc then
   -- A short discharge jumps from the outer side of one boot to the ground.
   rig.NextArc=now+idle.ArcEvery[1]+math.random()*(idle.ArcEvery[2]-idle.ArcEvery[1])
-  local side=math.random()<.5 and -1 or 1;local frame=r.Root.CFrame;local sole=side<0 and left or right
-  local out=frame.RightVector*side
-  self:Arc(sole+out*.55*scale+V(0,.3*scale,0),sole+out*(1.4+math.random()*.4)*scale+frame.LookVector*((math.random()-.5)*1.2*scale),now,r.Theme.ArcColor,.3*scale)
+  local pick=math.random()
+  if idle.BootArcs and pick<.3 then
+   r.NextBootArc=0;self:BootArc(r,now,left,right,scale)
+  elseif #rig.Shards>=2 and pick<.55 then
+   -- Between two neighbouring field nodes.
+   local i=math.random(1,#rig.Shards);local a,c=rig.Shards[i],rig.Shards[i%#rig.Shards+1]
+   self:Arc(a.CFrame.Position,c.CFrame.Position,now,r.Theme.ArcColor,.2*scale)
+  else
+   local side=math.random()<.5 and -1 or 1;local frame=r.Root.CFrame;local sole=side<0 and left or right
+   local out=frame.RightVector*side
+   self:Arc(sole+out*.55*scale+V(0,.3*scale,0),sole+out*(1.4+math.random()*.4)*scale+frame.LookVector*((math.random()-.5)*1.2*scale),now,r.Theme.ArcColor,.3*scale)
+  end
  end
 end
 -- Per-runner step ----------------------------------------------------------------------------------------------
@@ -290,7 +345,7 @@ function E:Step(r,dt,now,params,detail)
  detail=detail or 3
  r.Humanoid=r.Humanoid or r.Character:FindFirstChildOfClass('Humanoid')
  local root,h=r.Root,r.Humanoid
- if not root or not root.Parent or not h or not r.Cosmetics.Parent then self:Disable(r,true);self:DropIdle(r,true);return end
+ if not root or not root.Parent or not h or not r.Cosmetics.Parent then self:Disable(r,true);self:DropIdle(r,true);self:Detach(r);return end
  local v=root.AssemblyLinearVelocity;local speed=V(v.X,0,v.Z).Magnitude
  local position=root.Position;local distance=r.LastPosition and(position-r.LastPosition).Magnitude or 0
  local discontinuous=Rules.Discontinuous(distance,dt,speed);r.LastPosition=position
@@ -304,6 +359,17 @@ function E:Step(r,dt,now,params,detail)
  local training=r.Player~=nil and r.Player:GetAttribute('TreadmillTraining')==true
  local still=r.Theme~=nil and h.Health>0 and grounded and not blocked and(training or speed<Styles.StillSpeed)
  r.Still=still and r.Still+dt or 0
+ -- R117: landing after Styles.LandAir s in the air; sprint start after standing Styles.StartRest s. Full detail only.
+ local full=detail>=3 and r.Theme~=nil;local alive=h.Health>0
+ local air=r.Air or 0;r.Air=(alive and not grounded and not blocked)and air+dt or 0
+ if still then r.Rested=r.Still;r.RestGrace=0
+ elseif r.Rested then r.RestGrace=(r.RestGrace or 0)+dt;if r.RestGrace>.4 then r.Rested=nil end end
+ local event
+ if alive and grounded and not blocked and air>=Styles.LandAir then event='Land'
+ elseif moving and grounded and not training and r.Rested and r.Rested>=Styles.StartRest and speed>=Styles.StartSpeed then event='Start';r.Rested=nil end
+ if event and full then self:FireMoment(r,event,now,params)end
+ self:StepAttached(r,dt,now,full,moving and grounded and speed>=Styles.SprintSpeed,speed)
+ if full and moving and r.Theme.BootArc then local left,right,scale=soles(r);if left then self:BootArc(r,now,left,right,scale)end end
  self:StepIdle(r,dt,now,still and r.Still>=Styles.StillDelay and detail>=3)
  if not r.Theme or training or not Rules.Ground(speed,grounded,h.Health>0,blocked)then
   for _,g in ipairs(r.Ground)do deactivate(g.Trail,blocked or not grounded)end
@@ -340,7 +406,10 @@ function E:Step(r,dt,now,params,detail)
 end
 function E:Destroy()
  for r in pairs(self.Records)do self:Release(r)end
+ for _,m in ipairs(self.Moments)do self:DestroyMoment(m)end
  self.Records={};self.Rings={Local={Marks={},Cursor=0},Others={Marks={},Cursor=0}};self.Bursts={};self.Arcs={};self.IdleFree={};self.IdleRigs=0;self.IdleActive=0
+ self.Moments={};self.MomentCursor=0;self.Attached=0
  self.Folder:Destroy()
 end
+BootFx.Install(E,emitter)
 return E
