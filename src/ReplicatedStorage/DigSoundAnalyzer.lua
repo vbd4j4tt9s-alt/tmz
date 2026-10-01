@@ -72,9 +72,7 @@ function A.Preview(gap)
  print(string.format('[DigSound] previewing %d variants',#list))
  for i,s in ipairs(list)do
   print(string.format('[DigSound]  variant #%d  %.3f s + %.3f s',i,s.Start,s.Length))
-  player.Last=i==1 and #list or i-1 -- make Choose land on i (sequential preview)
-  player.Rng={NextInteger=function()return i<(player.Last or 0)and i or i-1 end,NextNumber=function()return 1 end}
-  player:Play(camera and camera.CFrame.Position or Vector3.zero)
+  player:Play(camera and camera.CFrame.Position or Vector3.zero,1,i)
   task.wait(s.Length+(gap or .4))
  end
 end

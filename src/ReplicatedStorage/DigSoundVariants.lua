@@ -114,7 +114,8 @@ function Player:Choose(pitchScale)
  return list[index],index,pitch
 end
 -- Plays one variant at position. Returns the Sound (or nil). stopAt is driven by Length / pitch.
-function Player:Play(position,pitchScale)
+-- index (optional, Studio preview) plays that exact variant at pitch 1.
+function Player:Play(position,pitchScale,index)
  local cfg=self.Config
  local anchor=Instance.new('Part');anchor.Name='DigSoundAnchor';anchor.Size=Vector3.one;anchor.Transparency=1
  anchor.Anchored=true;anchor.CanCollide=false;anchor.CanTouch=false;anchor.CanQuery=false;anchor.Position=position
@@ -126,7 +127,8 @@ function Player:Play(position,pitchScale)
  local function start()
   if started or not sound.Parent then return end
   if self.TimeLength<=0 and sound.TimeLength>0 then self.TimeLength=sound.TimeLength end
-  local segment,_,pitch=self:Choose(pitchScale)
+  local segment,_,pitch
+  if index then segment=self:Segments()[index];pitch=1 else segment,_,pitch=self:Choose(pitchScale)end
   if not segment then anchor:Destroy();return end
   started=true
   sound.PlaybackSpeed=math.clamp(pitch,.5,2);sound.TimePosition=segment.Start;sound:Play()

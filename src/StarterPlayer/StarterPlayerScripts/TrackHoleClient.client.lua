@@ -7,12 +7,14 @@ local Tween=game:GetService('TweenService');local Debris=game:GetService('Debris
 local C=require(RS:WaitForChild('TrackHoleConfig'))
 local Sfx=require(RS:WaitForChild('LocalSfx'))
 local Planting=require(RS:WaitForChild('PlantingEffects'))
+local DigSound=require(RS:WaitForChild('DigSoundVariants'))
 local Motion=RS:WaitForChild('RunnerMotion')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
 local remote=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('TrackHole')
 local V3=Vector3.new
 local sounds={};for _,s in ipairs(Planting.Sounds)do sounds[s.Key]=s.Id end
-local conns={};local lastSend=0;local hintShown=false;local elapsed=0
+local digSound=DigSound.new();Sfx.Preload({C.DigSound.Id})
+local conns={};local lastSend=-math.huge;local hintShown=false;local elapsed=0
 
 local function shovel()
  local char=player.Character;local hum=char and char:FindFirstChildOfClass('Humanoid');local tool=char and char:FindFirstChildOfClass('Tool')
@@ -93,9 +95,9 @@ table.insert(conns,remote.OnClientEvent:Connect(function(fx)
  local soil=Color3.fromRGB(104,69,41)
  if fx.Kind=='Dig'then
   local model=holeModel(fx.Id);if model then grow(model)end
-  burst(fx.Position,8,soil,2.2);Sfx.Play(sounds.Dig,fx.Position,.45,1,2)
+  burst(fx.Position,8,soil,2.2);digSound:Play(fx.Position)
  elseif fx.Kind=='Cover'then
-  burst(fx.Position,6,soil,1);Sfx.Play(sounds.Settle,fx.Position,.4,1,2)
+  burst(fx.Position,6,soil,1);digSound:Play(fx.Position,C.DigSound.CoverPitch)
  elseif fx.Kind=='Trap'then
   burst(fx.Position,10,soil,3);Sfx.Play(sounds.Land,fx.Position,.5,.9,2)
  end
@@ -109,7 +111,7 @@ end))
 table.insert(conns,Input.TouchTapInWorld:Connect(function(position,processed)if not processed then dig(position)end end))
 CAS:BindActionAtPriority('TrackHoleDig',function(_,state)
  local char=shovel();if not char or not onTrack(char)then return Enum.ContextActionResult.Pass end
- if state==Enum.UserInputState.Begin then local camera=workspace.CurrentCamera;dig(camera and camera.ViewportSize/2)end
+ if state==Enum.UserInputState.Begin then local camera=workspace.CurrentCamera;dig(camera and Vector2.new(camera.ViewportSize.X/2,camera.ViewportSize.Y/2))end
  return Enum.ContextActionResult.Sink
 end,false,2101,Enum.KeyCode.ButtonR2)
 
