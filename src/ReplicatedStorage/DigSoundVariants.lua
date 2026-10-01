@@ -55,9 +55,9 @@ end
 function V.Pick(count,last,rng)
  if count<=0 then return nil end
  if count==1 then return 1 end
- local roll=rng and rng:NextInteger(1,count-1)or math.random(1,count-1)
- if last and roll>=last then roll+=1 end
- if not last then roll=rng and rng:NextInteger(1,count)or math.random(1,count)end
+ local function int(a,b)if rng then return rng:NextInteger(a,b)end;return math.random(a,b)end
+ if type(last)~='number'or last<1 or last>count then return int(1,count)end
+ local roll=int(1,count-1);if roll>=last then roll+=1 end
  return roll
 end
 
