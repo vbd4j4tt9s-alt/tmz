@@ -5,8 +5,8 @@
 -- over a glowing core, crystal toe and a crown of shards. Electric: blue metal and foil, volt trims, side bolt, static field.
 -- R117: every tier adds a heel emblem (the chase camera sees the back of the boots) and its own trims, more per tier:
 -- Sand stitched patch + sun stone; Frost ice gem + glowing snowflake; Lava magma gem, glowing sole seam, obsidian spur
--- and horns; Crystal faceted heel gem, prism toe, rainbow facets and a glowing crown prism; Thunder metal spine with a
--- bolt emblem, three glowing Tesla coils, prongs and a heel thruster. Parts per leg: 22 / 26 / 29 / 33 / 36.
+-- and horns; Crystal faceted heel and tongue gems, prism toe, rainbow facets and a glowing crown prism; Thunder metal spine with a
+-- bolt emblem, three glowing Tesla coils, prongs, a heel thruster and a tongue bolt. Parts per leg: 22 / 26 / 29 / 35 / 38.
 -- Names matter: the client effects find 'Volt coil', 'Heel gem', 'Toe prism' and 'Outsole' parts by name.
 -- Block, Wedge and CornerWedge parts only. Specs may carry Transparency/Reflectance; ShopProductArt shows them too.
 local A={}
@@ -105,8 +105,8 @@ function A.Specs(size,r6,biome,accent)
   p('Heel spur',V(w*.12,u*.18,u*.24),CF(0,base+u*.16,heel+u*.1)*BACK,rgb(L.Obsidian),M.Glass,'Wedge',nil,{0,.45})
  elseif L.Tier==4 then
   -- A faceted prism sits on the toe; rainbow glass facets interrupt the glowing midsole stripe.
-  p('Toe prism',V(u*.24,u*.14,u*.24),CF(0,base+u*.43,toe+u*.27)*CFrame.Angles(0,math.pi/4,0),rgb(L.Shard),M.Glass,nil,nil,{.08,.5})
-  p('Toe facet',V(u*.17,u*.12,u*.17),CF(0,base+u*.56,toe+u*.27)*CFrame.Angles(0,math.pi/4,0),rgb(L.Shard),M.Glass,'CornerWedge',nil,{.08,.5})
+  p('Toe prism',V(u*.3,u*.16,u*.3),CF(0,base+u*.45,toe+u*.27)*CFrame.Angles(0,math.pi/4,0),rgb(L.Shard),M.Glass,nil,nil,{.08,.5})
+  p('Toe facet',V(u*.21,u*.14,u*.21),CF(0,base+u*.6,toe+u*.27)*CFrame.Angles(0,math.pi/4,0),rgb(L.Shard),M.Glass,'CornerWedge',nil,{.08,.5})
   for i,c in ipairs(L.Rainbow)do
    p('Prism facet',V(w*1.1,u*.12,u*.1),CF(0,base+u*.105,toe+u*(.36+i*.24)),rgb(c),M.Glass,nil,nil,{.05,.5})
   end
@@ -223,6 +223,10 @@ function A.ShinSpecs(size,r6,biome,accent)
   p('Crown prism',V(w*.16,w*.46,w*.16),crown,rgb(L.Shard),M.Glass,nil,nil,shard)
   p('Prism heart',V(w*.07,w*.34,w*.07),crown,rgb(L.Glow),Neon)
   p('Prism tip',V(w*.16,w*.2,w*.16),crown*CF(0,w*.33,0),rgb(L.Shard),M.Glass,'CornerWedge',nil,shard)
+  -- The front gets a glowing gem on the tongue, seen by other players and in the shop.
+  local tongue=CF(0,(high+low)*.5+w*.06,front-lip-w*.065)*diamond
+  p('Tongue gem',V(w*.22,w*.22,w*.06),tongue,rgb(L.Shard),M.Glass,nil,nil,{.3,.4})
+  p('Tongue core',V(w*.11,w*.11,w*.04),tongue,rgb(L.Glow),Neon)
  elseif L.Tier==5 then
   -- Tesla coils: three glowing bands over the static field on a metal base ring.
   p('Coil base',V(w*1.14,w*.07,d*1.14),CF(0,bottom+h*.1,0),rgb(L.Steel),M.Metal,nil,nil,{0,.2})
@@ -232,6 +236,10 @@ function A.ShinSpecs(size,r6,biome,accent)
   p('Emblem ring',V(w*.34,w*.34,w*.03),CF(0,ey,back+w*.105)*diamond,rgb(L.Cuff),M.Metal,nil,nil,{0,.15})
   p('Bolt emblem',V(w*.03,w*.2,w*.17),CF(-w*.035,ey+w*.065,back+w*.135)*TURN*DOWN,rgb(L.Spark),Neon,'Wedge')
   p('Bolt emblem',V(w*.03,w*.18,w*.17),CF(w*.035,ey-w*.065,back+w*.135)*TURN*DOWN,rgb(L.Spark),Neon,'Wedge')
+  -- A glowing bolt on the foil tongue for the front view.
+  local ty=(high+low)*.5+w*.04;local tz=front-lip-w*.055
+  p('Tongue bolt',V(w*.03,w*.2,w*.16),CF(-w*.03,ty+w*.065,tz)*TURN*DOWN,glow,Neon,'Wedge')
+  p('Tongue bolt',V(w*.03,w*.18,w*.16),CF(w*.03,ty-w*.065,tz)*TURN*DOWN,glow,Neon,'Wedge')
   -- Two prongs with glowing tips rise from the back of the cuff.
   for _,x in ipairs({-.3,.3})do
    p('Volt prong',V(w*.06,w*.38,w*.06),CF(x*w,top+w*.13,back+w*.04),rgb(L.Steel),M.Metal,nil,nil,{0,.2})

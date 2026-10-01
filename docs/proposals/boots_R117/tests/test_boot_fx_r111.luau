@@ -1,6 +1,7 @@
 --!nocheck
--- R117 copy of the R111 suite. Two checks changed with the R117 design: parts per leg (was <=22, now each tier's
--- R117 count, at most 40) and the crystal idle orbit (was 3 shards, now 5). Run with run.sh (bundle name boot_bundle).
+-- R117 copy of the R111 suite. Three checks changed with the R117 design: parts per leg (was <=22, now each tier's
+-- R117 count, at most 40), the crystal idle orbit (was 3 shards, now 5) and the live-part bound (idle rigs up to 12
+-- parts, was 7). Run with run.sh (bundle name boot_bundle).
 -- R111 boot effects: runs the REAL RunnerTrailClient + RunnerTrailEffects + RunnerTrailStyles + ClientFxBudget
 -- (and RunnerBootArt.Create for the rigs) under the Roblox mock through walk -> stop -> idle -> walk -> 500 st/s ->
 -- crowd -> low budget -> reduced motion -> unequip -> respawn -> leave -> script destroyed.
@@ -121,7 +122,7 @@ for _,r in pairs(runners)do
  check(r.Folder:GetAttribute('BootCount')==2,r.Player.Name..' boots on both legs')
  local perLeg={}
  for _,m in ipairs(r.Folder:GetChildren())do if m:IsA('Model')then local n=0;for _,p in ipairs(m:GetChildren())do if p:IsA('BasePart')then n+=1;check(p:FindFirstChildOfClass('WeldConstraint')~=nil,'boot part welded')end end;perLeg[m.Name]=n end end
- local want=({Desert=22,Snow=26,Lava=29,Crystal=33,Storm=36})[r.Folder:GetAttribute('BootBiome')]
+ local want=({Desert=22,Snow=26,Lava=29,Crystal=35,Storm=38})[r.Folder:GetAttribute('BootBiome')]
  check(perLeg.LeftRunnerBoot==want and perLeg.RightRunnerBoot==want and want<=40,r.Player.Name..' R117 parts per leg ('..tostring(perLeg.LeftRunnerBoot)..', want '..tostring(want)..')')
 end
 -- Client --------------------------------------------------------------------------------------------------------
@@ -261,7 +262,7 @@ local removalLive=0;for _,c in ipairs(Players.PlayerRemoving._c)do if c.Connecte
 check(hbBefore==1 and hbAfter==0 and removalLive==0,'connections disconnected on destroy')
 check(aliveEffectParts()==0,'no effect parts left after destroy ('..aliveEffectParts()..')')
 check(workspace:FindFirstChild('RunnerGroundEffects')==nil,'effects folder removed')
-local maxParts=3*(b3.LocalMarks+b3.OtherMarks)+3*b3.Arcs+7*(b3.Idle+1)+1+2*b3.Characters
+local maxParts=3*(b3.LocalMarks+b3.OtherMarks)+3*b3.Arcs+12*(b3.Idle+1)+1+2*b3.Characters -- R117: idle rigs hold up to 12 parts (was 7)
 print(string.format('peak live effect parts %d (bound %d), rays %d',peakParts,maxParts,rays))
 check(peakParts<=maxParts,'peak effect parts within the pool bound')
 print(string.format('%d checks, %d failures',checks,fails))

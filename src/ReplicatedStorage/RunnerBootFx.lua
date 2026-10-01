@@ -12,6 +12,7 @@ local V,CF=Vector3.new,CFrame.new
 local X={}
 local RING=8 -- ring segments
 local BOLT=6 -- main bolt segments; the branch adds 3
+local NORTH=Vector3.new(0,0,1) -- up vector for near-vertical bolt segments (the default Y up would be degenerate)
 local function quiet(parent,name)
  local p=Instance.new('Part');p.Name=name;p.Size=V(.1,.1,.1);p.Transparency=1;p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false;p.Material=Enum.Material.Neon;p.Parent=parent;return p
 end
@@ -106,13 +107,13 @@ function X.Install(E,emitter)
   points[BOLT+1]=bottom
   for k=1,BOLT do
    local p=m.Bolt[k];local s,e=points[k],points[k+1]
-   p.Size=V(.22-.1*k/BOLT,.22-.1*k/BOLT,(e-s).Magnitude+.1);p.CFrame=CFrame.lookAt((s+e)*.5,e)
+   p.Size=V(.22-.1*k/BOLT,.22-.1*k/BOLT,(e-s).Magnitude+.1);p.CFrame=CFrame.lookAt((s+e)*.5,e,NORTH)
   end
   -- A branch forks off the second joint and dies out sideways.
   local from=points[3];local dir=(side*(math.random()<.5 and -1 or 1)+V(0,-1.1,0)).Unit
   for k=1,3 do
    local p=m.Bolt[BOLT+k];local to=from+dir*1.4+V((math.random()-.5)*.8,0,(math.random()-.5)*.8)
-   p.Size=V(.09,.09,(to-from).Magnitude+.05);p.CFrame=CFrame.lookAt((from+to)*.5,to);from=to
+   p.Size=V(.09,.09,(to-from).Magnitude+.05);p.CFrame=CFrame.lookAt((from+to)*.5,to,NORTH);from=to
   end
  end
  -- position = ground point under the feet. Returns the particles emitted (for tests and the per-second cap).
