@@ -1428,6 +1428,10 @@ function Art.BuildTreadmillV131(base,tier)
     treadmillFlairR117({m=m,origin=origin,tier=tier,theme=theme,surface=surface,face=face,p=p,rawp=rawp,sphere=sphere,
         rod=rod,railPath=railPath,frontDisc=frontDisc,longer=longer})
     m:SetAttribute('TreadmillFxVersion',117);m:SetAttribute('TreadmillTierName',theme.Name)
+    -- R117: small ornaments never cast shadows (cheaper, and they only speckle the deck).
+    for _,v in ipairs(m:GetDescendants())do
+        if v:IsA('BasePart')and math.max(v.Size.X,v.Size.Y,v.Size.Z)<2 then v.CastShadow=false end
+    end
     -- New geometry is complete before replacing the previous appearance.
     if not belt then
         belt=part(base,'Treadmill',beltSize,origin,RGB(37,50,66),Enum.Material.SmoothPlastic)
