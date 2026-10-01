@@ -1,5 +1,16 @@
 # R121 product ids to fill in
 
+> **R122 update (owner request): nothing on this page needs to be filled in any more.**
+> The shop no longer shows gift buttons or the "DOUBLE Your SPEED" 10-minute boost banner, so
+> `SpeedBoost10ProductId` and all 14 `Gift...ProductId` attributes below are **optional / unused**.
+> Leave them empty. The server code for them stays in place but has no way to be bought from the shop.
+> The ids that still matter are the existing ones: the bundle ids on `PremiumPricing`
+> (`CashSmallProductId` ... `SpeedMegaProductId`), the Mech pack ids on `MechCatalog`
+> (`MechPackProductId`, `MechPack5ProductId`, `MechPack10ProductId`), the pass ids on `GamePassCatalog`,
+> and the pass gift ids on `PassGiftCatalog` (also no longer reachable from the shop).
+>
+> The rest of this page is kept for reference (R121).
+
 Every id is an **attribute on a ModuleScript in ReplicatedStorage**. In Studio, select the ModuleScript,
 go to Properties > Attributes, press **+**, type the attribute name exactly as written below, pick type
 **Number** and paste the developer product id. A missing attribute or `0` means "not set": its button
@@ -9,7 +20,7 @@ needs to change in code.
 The Robux price in the shop always comes from the live price you set on the Creator Dashboard. The
 "price shown" column below is the price the shop was designed for.
 
-## 1. New: the 10-minute x2 Speed boost (sold by the SPEED banner)
+## 1. (R122: unused) the 10-minute x2 Speed boost
 
 | Product | Price shown (suggested) | Attribute | ModuleScript |
 |---|---|---|---|
@@ -20,7 +31,7 @@ What the buyer gets: training speed gain x2 for 10 minutes. Buying again adds 10
 The timer keeps running in real time and survives leaving and rejoining. The permanent x2 Speed
 **game pass** in PASSES is unchanged.
 
-## 2. New: gift versions (all attributes go on `ReplicatedStorage.GiftProducts`)
+## 2. (R122: unused) gift versions (attributes on `ReplicatedStorage.GiftProducts`)
 
 | Product | Price shown | Gift attribute (on `GiftProducts`) | Normal product attribute (already used) |
 |---|---|---|---|
@@ -56,7 +67,7 @@ already exist and keep their R79 attributes `GrowthGiftProductId` / `SpeedGiftPr
 5. Every id must be different. If the same id is pasted into two attributes, the game refuses both
    (no purchase opens and receipts wait) instead of guessing which reward to give.
 
-## How a gift works in game
+## How a gift worked in game (R121 only; removed from the shop in R122)
 
 - Every bundle card, the Mech pack banner and the SPEED boost banner have a purple gift button left of
   the prices. It opens the same "Gift" player list as pass gifts (players in this server).
