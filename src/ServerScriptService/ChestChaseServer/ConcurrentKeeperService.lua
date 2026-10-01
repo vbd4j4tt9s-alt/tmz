@@ -612,10 +612,11 @@ return function(Legacy)
         for _,target in ipairs(active)do self:_updateActiveRun(deltaTime,target)end
         if self.Event81 then self.Event81:Step(deltaTime)end
         self:_updateReturningGuardians(deltaTime)
+        -- R121: the countdown text changes once a second; build and write it only then (was every Heartbeat).
+        local grace = math.clamp(tonumber(self.Config.DroppedChestClaimGrace) or .35, 0, 1)
         for token,drop in pairs(self.Drops) do
             local remaining = math.max(0, math.ceil(drop.ExpiresAt-os.clock()))
-            if drop.Label.Parent then drop.Label.Text = remaining.."s" end
-            local grace = math.clamp(tonumber(self.Config.DroppedChestClaimGrace) or .35, 0, 1)
+            if drop.Label.Parent and drop.ShownRemaining ~= remaining then drop.ShownRemaining = remaining;drop.Label.Text = remaining.."s" end
             if os.clock() > drop.ExpiresAt+grace then self:_expireDroppedChest(token) end
         end
         self.GuardianMaintenanceAccumulator += deltaTime

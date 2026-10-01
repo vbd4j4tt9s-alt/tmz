@@ -70,8 +70,15 @@ local connection=remote.OnClientEvent:Connect(function(hit)
  if victim or distance<38 then kick={At=os.clock(),Strength=victim and 1 or .18*(1-distance/38),Victim=victim}end
 end)
 Run:BindToRenderStep('ChestChaseKeeperImpactReset',Enum.RenderPriority.Camera.Value-2,resetCamera)
+local idle=false
 Run:BindToRenderStep('ChestChaseKeeperImpact',Enum.RenderPriority.Camera.Value+2,function()
  resetCamera();local now=os.clock()
+ -- R121: with no burst and no kick, the overlay is already clear; skip the five per-frame writes.
+ if #effects==0 and not kick then
+  if not idle then idle=true;flash.BackgroundTransparency=1;for _,f in ipairs(borders)do f.BackgroundTransparency=1 end end
+  return
+ end
+ idle=false
  for i=#effects,1,-1 do
   local e=effects[i];local u=(now-e.At)/.26
   if u>=1 or not e.Anchor.Parent then e.Anchor:Destroy();table.remove(effects,i)

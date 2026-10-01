@@ -274,6 +274,7 @@ local function syncBelt(belt)
     record.Motion=motion;record.Emitters=emitters
 end
 local scan,elapsed=1,0
+local moving,frames={},{} -- R121: reused BulkMoveTo buffers (were new tables every 30 Hz tick)
 table.insert(connections,Run.Heartbeat:Connect(function(dt)
     scan+=dt;elapsed+=dt
     if scan>=1 then
@@ -289,7 +290,7 @@ table.insert(connections,Run.Heartbeat:Connect(function(dt)
     local low=player:GetAttribute('FastMode')==true
     if elapsed<(low and 1/20 or 1/30)then return end
     local step=math.min(elapsed,.10);elapsed=0
-    local camera=workspace.CurrentCamera;local moving,frames={},{}
+    local camera=workspace.CurrentCamera;table.clear(moving);table.clear(frames)
     for belt,record in pairs(belts)do
         if not belt:IsDescendantOf(workspace)or record.Art.Parent~=belt.Parent then
             releaseBelt(record);belts[belt]=nil

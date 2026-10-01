@@ -2,20 +2,30 @@
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Gui=game:GetService('GuiService')
 local Art=require(RS:WaitForChild('ShopProductArt'));local Geometry=require(RS:WaitForChild('HarvestGeometry'))
 local V={};local entries={};local connection;local elapsed=0
+-- R121: a hidden result also returns the ancestor that hid the view and its property, so the
+-- per-frame loops can re-check that one ancestor instead of walking the whole GUI chain again.
 function V.Visible(view)
  if not view.Parent or view.AbsoluteSize.X<=0 or view.AbsoluteSize.Y<=0 then return false end
  local lo,hi=view.AbsolutePosition,view.AbsolutePosition+view.AbsoluteSize;local node=view
  while node do
   if node:IsA('GuiObject')then
-   if not node.Visible then return false end
+   if not node.Visible then return false,node,'Visible' end
    if node.ClipsDescendants then
     local p,q=node.AbsolutePosition,node.AbsolutePosition+node.AbsoluteSize
     if hi.X<=p.X or hi.Y<=p.Y or lo.X>=q.X or lo.Y>=q.Y then return false end
    end
-  elseif node:IsA('ScreenGui')and not node.Enabled then return false end
+  elseif node:IsA('ScreenGui')and not node.Enabled then return false,node,'Enabled' end
   node=node.Parent
  end
  return true
+end
+-- Same answer as V.Visible(e.View) whenever the cached blocker is still hidden and still above the view
+-- (the full walk would stop there or earlier with false). Otherwise does the full walk and caches.
+function V.CachedVisible(e)
+ local blocker=e.HiddenBy
+ if blocker and blocker[e.HiddenProp]==false and(blocker==e.View or e.View:IsDescendantOf(blocker))then return false end
+ local visible,node,prop=V.Visible(e.View);e.HiddenBy=node;e.HiddenProp=prop
+ return visible
 end
 local function pose(e)
  local s=e.View.AbsoluteSize;if e.LastSize==s and e.LastAngle==e.Angle then return end;e.LastSize=s;e.LastAngle=e.Angle;local aspect=math.max(.25,s.X/math.max(1,s.Y))
@@ -25,7 +35,7 @@ local function pose(e)
 end
 local function step(dt)
  elapsed+=dt;local player=game:GetService('Players').LocalPlayer;if elapsed<(player and player:GetAttribute('FastMode')and 1/15 or 1/30)then return end;local d=math.min(elapsed,.1);elapsed=0
- for e in pairs(entries)do if V.Visible(e.View)then
+ for e in pairs(entries)do if V.CachedVisible(e)then
   if not Gui.ReducedMotionEnabled then e.Angle=(e.Angle+d*.48)%(2*math.pi)end
   pose(e)
  end end

@@ -119,14 +119,23 @@ local render=Run.RenderStepped:Connect(function(dt)
   local motion=Motion.Update(r.Motion,frame,speed,asleep,state=='ALERTED'or state=='ATTACKING',dt,r.Stage,state=='CHASING'or state=='DASHING',frame~=rootFrame)
   local distance=(camera.CFrame.Position-r.Root.Position).Magnitude
   local voiceReady=now-(model:GetAttribute('KeeperLastHitAt')or -100)>1.1
-  if not voiceReady then r.Sound:Stop() end
-  local voiceId,volume,pitch=Audio.Voice(r.Stage,'Alert',model:GetAttribute('KeeperVoiceId'))
-  if r.Sound.SoundId~=(voiceId or '')then r.Sound.SoundId=voiceId or ''end
-  r.Sound.Volume=volume;r.Sound.PlaybackSpeed=pitch
+  -- R121: Stop only a sound that is playing (was a Stop call per keeper per frame).
+  if not voiceReady and r.Sound.Playing then r.Sound:Stop() end
+  -- R121: resolve the voice when the override changes (and twice a second for live module attributes),
+  -- not every frame; Sound properties are written only when they differ.
+  local override=model:GetAttribute('KeeperVoiceId')
+  if not r.VoiceAt or override~=r.VoiceKey or now>=r.VoiceAt then
+   r.VoiceKey=override;r.VoiceAt=now+.5
+   local id,volume,pitch=Audio.Voice(r.Stage,'Alert',override);r.VoiceId=id
+   if r.Sound.SoundId~=(id or '')then r.Sound.SoundId=id or ''end
+   if r.Sound.Volume~=volume then r.Sound.Volume=volume end
+   if r.Sound.PlaybackSpeed~=pitch then r.Sound.PlaybackSpeed=pitch end
+  end
+  local voiceId=r.VoiceId
   if voiceId and voiceReady and distance<110 and (state=='ALERTED' or state=='CHASING')
    and (state~=r.State or now-r.LastVoice>(Voices[r.Stage].Gap or 6)) and now-r.LastVoice>2 then
    if not r.Sound.IsPlaying then Timing.Play(r.Sound);r.LastVoice=now end
-  elseif asleep or state=='RETURNING' or distance>=110 then r.Sound:Stop() end
+  elseif (asleep or state=='RETURNING' or distance>=110) and r.Sound.Playing then r.Sound:Stop() end
   -- R113: wake roar starts when a sleeping keeper is first seen alerted.
   local wasAsleep=r.State=='GUARDING'or r.State=='SLEEPING'
   if wasAsleep and(state=='ALERTED'or state=='CHASING'or state=='DASHING')then r.WakeAt=now end
@@ -136,8 +145,10 @@ local render=Run.RenderStepped:Connect(function(dt)
   -- R113: effects run every frame (footfall phase), culled by distance inside KeeperFx.
   local localDistance=own and(own.Position-r.Root.Position).Magnitude or distance
   local hunting=state=='CHASING'or state=='DASHING'or state=='ALERTED'or state=='ATTACKING'
-  local fxc={Now=now,Distance=distance,LocalDistance=localDistance,Asleep=asleep,Awake=motion.Awake,Moving=motion.Moving,
-   Cycle=motion.Cycle,Urgency=motion.Urgency,Chasing=hunting,Frame=motion.Frame,Frames=r.LastTarget,Low=low}
+  -- R121: one reusable effect context per keeper (was a new 12-field table per keeper per frame).
+  local fxc=r.FxContext;if not fxc then fxc={};r.FxContext=fxc end
+  fxc.Now=now;fxc.Distance=distance;fxc.LocalDistance=localDistance;fxc.Asleep=asleep;fxc.Awake=motion.Awake;fxc.Moving=motion.Moving
+  fxc.Cycle=motion.Cycle;fxc.Urgency=motion.Urgency;fxc.Chasing=hunting;fxc.Frame=motion.Frame;fxc.Frames=r.LastTarget;fxc.Low=low
   KFx.Step(r.Fx,fxc)
   r.PoseDt+=dt
   local onScreen=true

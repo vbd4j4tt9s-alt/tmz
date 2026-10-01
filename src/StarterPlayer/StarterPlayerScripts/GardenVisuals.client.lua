@@ -232,8 +232,13 @@ RunService.Heartbeat:Connect(function(dt)
    local r=entry.Record
    if r.Visual and not r.Build and r.Crop and r.Origin then
     if r.Growing then
-     Visuals.UpdateGrowth(r.Visual,r.Crop,now)
-     for index=1,r.Def.FruitCount do local child=r.Visual:FindFirstChild('Harvest_'..index);if child then Visuals.UpdateGrowth(child,r.Crop,now)end end
+     -- R121: growth takes 70+ s. Plants within 75 studs keep the full 20 Hz; farther ones refresh at
+     -- 10 Hz (MotionDue) on screen and 2 Hz off screen. Each refresh rewrites every part of the plant.
+     if entry.Distance<75 or(r.MotionDue and(entry.OnScreen or now>=(r.NextGrowthAt or 0)))then
+      r.NextGrowthAt=now+.5
+      Visuals.UpdateGrowth(r.Visual,r.Crop,now)
+      for index=1,r.Def.FruitCount do local child=r.Visual:FindFirstChild('Harvest_'..index);if child then Visuals.UpdateGrowth(child,r.Crop,now)end end
+     end
     elseif not Hologram.Is(r.Crop.SeedId)and not r.FruitOnly and r.Crop.SeedId~='ObsidianMawSeed'and r.Mode=='normal'and motionVisible(entry,65,220) and windModels<6 and windParts+entry.Cost<=600 then
      windParts+=entry.Cost;windModels+=1
      if r.MotionDue then r.Pose=r.Origin*Growth.Sway(r.Crop.SeedId,r.Def,r.Crop,now);r.Rig=r.Rig or Batch.Capture(r.Visual,r.Origin);r.QueuePose=true;r.Swaying=true end

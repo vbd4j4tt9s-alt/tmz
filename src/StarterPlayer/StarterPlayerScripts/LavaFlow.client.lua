@@ -27,8 +27,10 @@ local function addMagma(v)
   elseif type(pulse)=='number'then p.Surface[v]=pulse end
  elseif v:IsA('Beam')and v:GetAttribute('MagmaCurrent')then p.Currents[v]=v:GetAttribute('MagmaCurrent')end
 end
+-- R121: reused BulkMoveTo buffers (were two new tables every 20 Hz tick).
+local magmaParts,magmaFrames={},{}
 local function animateMagma(t,camera)
- local parts,frames={},{}
+ local parts,frames=magmaParts,magmaFrames;table.clear(parts);table.clear(frames)
  for m,p in pairs(pools)do
   if not m:IsDescendantOf(workspace)then pools[m]=nil
   elseif (camera-p.Center).Magnitude<280 then
@@ -53,7 +55,7 @@ local function animateMagma(t,camera)
    end
   end
  end
- if #parts>0 then workspace:BulkMoveTo(parts,frames,Enum.BulkMoveMode.FireCFrameChanged)end
+ -- Flushed by the caller together with the route glows (one BulkMoveTo per tick).
 end
 
 local function register(m)
@@ -64,7 +66,8 @@ local function register(m)
   local node=m:GetAttribute('Node'..i);if typeof(node)~='Vector3' then return end;nodes[i]=node
   if i>1 then local len=(node-nodes[i-1]).Magnitude;if len<.01 then return end;lengths[i-1]=len;total+=len end
  end
- routes[m]={Nodes=nodes,Lengths=lengths,Total=total,Speed=m:GetAttribute('FlowSpeed')or 7,Glows={}}
+ -- R121: the route version tag is read once here instead of twice per glow per tick.
+ routes[m]={Nodes=nodes,Lengths=lengths,Total=total,Speed=m:GetAttribute('FlowSpeed')or 7,Glows={},V128=m:GetAttribute('LavaRouteV128')and true or false}
  for _,p in ipairs(m:GetChildren())do if p:IsA('BasePart') and type(p:GetAttribute('FlowPhase'))=='number'then routes[m].Glows[p]=p:GetAttribute('FlowPhase')end end
 end
 local function add(v)
@@ -92,14 +95,15 @@ Run.RenderStepped:Connect(function(dt)
      if p.Parent~=model then route.Glows[p]=nil
      else
       local distance=(t*route.Speed+phase*route.Total)%route.Total
-      if model:GetAttribute('LavaRouteV128')then
+      if route.V128 then
        p.Transparency=.48+.52*math.max(1-math.clamp(distance/3,0,1),1-math.clamp((route.Total-distance)/7,0,1))
       end
       for i,len in ipairs(route.Lengths)do
        if distance<=len then
-        local a,b=route.Nodes[i],route.Nodes[i+1];local pos=a:Lerp(b,distance/len)+Vector3.new(0,model:GetAttribute('LavaRouteV128')and .055 or .18,0)
+        local a,b=route.Nodes[i],route.Nodes[i+1];local pos=a:Lerp(b,distance/len)+Vector3.new(0,route.V128 and .055 or .18,0)
         local delta=b-a
-        p.CFrame=CFrame.new(pos)*CFrame.Angles(0,math.atan2(-delta.X,-delta.Z),0)*CFrame.Angles(math.atan2(delta.Y,Vector3.new(delta.X,0,delta.Z).Magnitude),0,0);break
+        table.insert(magmaParts,p)
+        table.insert(magmaFrames,CFrame.new(pos)*CFrame.Angles(0,math.atan2(-delta.X,-delta.Z),0)*CFrame.Angles(math.atan2(delta.Y,Vector3.new(delta.X,0,delta.Z).Magnitude),0,0));break
        end
        distance-=len
       end
@@ -108,4 +112,5 @@ Run.RenderStepped:Connect(function(dt)
    end
   end
  end
+ if #magmaParts>0 then workspace:BulkMoveTo(magmaParts,magmaFrames,Enum.BulkMoveMode.FireCFrameChanged)end
 end)

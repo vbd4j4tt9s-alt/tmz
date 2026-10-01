@@ -1,7 +1,7 @@
 -- One shared camera loop for collection cards and the premium outcome gallery.
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Gui=game:GetService('GuiService')
 local FX=require(RS.ItemVisualEffects)
-local Geometry=require(RS.HarvestGeometry);local Visible=require(RS.ShopViewport).Visible
+local Geometry=require(RS.HarvestGeometry);local CachedVisible=require(RS.ShopViewport).CachedVisible
 local V={};local entries={};local connection;local elapsed=0
 local function silhouette(model)
  for _,p in ipairs(model:GetDescendants())do
@@ -68,7 +68,8 @@ function V.Attach(view,id,adult,known)
  attempt()
  if not connection then connection=Run.Heartbeat:Connect(function(dt)
   elapsed+=dt;if elapsed<1/20 then return end;elapsed=0;local count,retries=0,0;local t=os.clock();local player=game:GetService('Players').LocalPlayer;local budget=require(RS.CosmeticBudget).CollectionViews(player and player:GetAttribute('FastMode'))
-  for r in pairs(entries)do if count<budget and Visible(r.View)then
+  -- R121: cards stay attached after the Index closes; the cached hidden ancestor makes those checks cheap.
+  for r in pairs(entries)do if count<budget and CachedVisible(r)then
    count+=1
    if r.Ready then pose(r,t);if r.FX then FX.Step(r.FX,CFrame.new(r.Center),math.max(r.Size.X,r.Size.Z)*.5,r.Size.Y,t,1)end
    elseif not r.Busy and t>=r.RetryAt and retries<2 then retries+=1;r.Try()end

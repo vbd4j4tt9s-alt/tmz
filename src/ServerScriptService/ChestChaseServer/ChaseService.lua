@@ -492,9 +492,22 @@ function ChaseService:_ensureGuardianVisibility(model, stage, root)
 	highlight.Enabled = true
 end
 
+-- R121: the chase calls this every Heartbeat for each active keeper. Scan a guardian once, then again
+-- only after a BillboardGui/SurfaceGui is added under it (same result, no per-frame GetDescendants).
+local noticeWatch = setmetatable({}, {__mode = "k"})
 function ChaseService:_setGuardianNoticeVisual(guardian, isVisible)
 	-- Pose, RUN!! and the existing sound communicate notice without floating NPC tags.
 	if not guardian then return end
+	local watch = noticeWatch[guardian]
+	if watch and not watch.Dirty then return end
+	if not watch then
+		watch = {Dirty = true}
+		watch.Connection = guardian.DescendantAdded:Connect(function(descendant)
+			if descendant:IsA("BillboardGui") or descendant:IsA("SurfaceGui") then watch.Dirty = true end
+		end)
+		noticeWatch[guardian] = watch
+	end
+	watch.Dirty = false
 	for _, descendant in ipairs(guardian:GetDescendants()) do
 		if descendant:IsA("BillboardGui") or descendant:IsA("SurfaceGui") then descendant:Destroy() end
 	end

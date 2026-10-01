@@ -13,7 +13,7 @@ function S.Attach(root,rays)
   spokes=Instance.new('Frame');spokes.Name='Sunrays';spokes.BackgroundTransparency=1;spokes.AnchorPoint=Vector2.new(.5,.5);spokes.Position=UDim2.fromScale(.22,.46);spokes.Size=UDim2.fromOffset(320,320);spokes.Parent=pane
   for i=0,9 do local ray=Instance.new('Frame');ray.Name='Ray';ray.AnchorPoint=Vector2.new(.5,.5);ray.Position=UDim2.fromScale(.5,.5);ray.Size=UDim2.fromScale(.035,1.6);ray.Rotation=i*18;ray.BorderSizePixel=0;ray.BackgroundColor3=Color3.new(1,1,1);ray.BackgroundTransparency=.94;ray.Active=false;ray.Parent=spokes end
  end
- entries[root]={Sweep=stripe,Rays=spokes,Phase=0}
+ entries[root]={View=root,Sweep=stripe,Rays=spokes,Phase=0}
  root.Destroying:Connect(function()entries[root]=nil;if not next(entries)and connection then connection:Disconnect();connection=nil end end)
  if not connection then connection=Run.Heartbeat:Connect(function(dt)
   elapsed+=dt;if elapsed<1/20 then return end;local step=elapsed;elapsed=0
@@ -22,7 +22,8 @@ function S.Attach(root,rays)
  end
   Viewport=Viewport or require(script.Parent.ShopViewport)
   for r,e in pairs(entries)do
-   if count<16 and Viewport.Visible(r)then
+   -- R121: most shined buttons sit in closed menus; re-check only the cached hidden ancestor.
+   if count<16 and Viewport.CachedVisible(e)then
     count+=1;e.Phase=(e.Phase+step)%4.6
     local sweeping=e.Phase<1.6;show(e.Sweep,sweeping)
     if sweeping then e.Sweep.Position=UDim2.fromScale(-.35+e.Phase/1.6*1.8,-.4)end
