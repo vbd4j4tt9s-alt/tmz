@@ -143,8 +143,8 @@ Config.GuardianNoticeDelay = 0.5
 Config.GuardianRagdollMinDuration = 0.5
 Config.GuardianRagdollMaxDuration = 1.5
 -- Keeper catches get a readable tumble; lightning keeps its existing stun timing.
-Config.KeeperRagdollMinDuration = 1.8
-Config.KeeperRagdollMaxDuration = 2.4
+Config.KeeperRagdollMinDuration = 2.7 -- R122: longer flights (up to ~2 s airborne) still end on the ground before recovery
+Config.KeeperRagdollMaxDuration = 3.3
 Config.KeeperRagdollRecoveryGrace = 0.35
 
 -- V104: keeper floors follow physical biome rank. Player scaling is bounded

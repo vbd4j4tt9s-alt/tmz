@@ -114,7 +114,21 @@ function Ragdoll:Clear(player)
         player:SetAttribute('GuardianFlingActive',false)
     end
 end
-function Ragdoll:Apply(player,velocity,cause)
+-- R122: optional stunSeconds (track holes) sets an exact time on the ground; other causes are unchanged.
+function Ragdoll.KeepOnTrack(position,velocity)
+    local motion=game:GetService('ReplicatedStorage'):FindFirstChild('RunnerMotion')
+    local lineZ=motion and motion:GetAttribute('TrackBoundaryZ');local centerX=motion and motion:GetAttribute('TrackCenterX')
+    local half=motion and motion:GetAttribute('TrackHalfWidth')
+    if type(lineZ)~='number'or type(centerX)~='number'or type(half)~='number'or half<=12 then return velocity end
+    if position.Z<lineZ or math.abs(position.X-centerX)>half then return velocity end -- only while on the track
+    local flight=2*math.max(0,velocity.Y)/math.max(1,workspace.Gravity)
+    if flight<=0 then return velocity end
+    local margin=half-10;local landing=position.X+velocity.X*flight
+    local target=math.clamp(landing,centerX-margin,centerX+margin)
+    if target==landing then return velocity end
+    return Vector3.new((target-position.X)/flight,velocity.Y,velocity.Z)
+end
+function Ragdoll:Apply(player,velocity,cause,stunSeconds)
     if not self:CanHit(player)then return nil end
     local character=player.Character
     local humanoid=character and character:FindFirstChildOfClass('Humanoid')
@@ -125,6 +139,9 @@ function Ragdoll:Apply(player,velocity,cause)
     if character:FindFirstChild('_ChestChaseRagdoll')then
         warn('[V117 FIX1] Existing ragdoll objects; refusing a second physics controller.');return nil
     end
+    -- R122: keeper flings go much higher than the track's 48-stud side walls. On the track, limit only the sideways
+    -- (X) part so the predicted landing point stays inside the walls; height and the push along the track are unchanged.
+    if cause=='Keeper'then velocity=Ragdoll.KeepOnTrack(root.Position,velocity)end
     local minimum=math.clamp(tonumber(self.Config.GuardianRagdollMinDuration)or .5,.4,2)
     local maximum=math.clamp(tonumber(self.Config.GuardianRagdollMaxDuration)or 1.5,minimum,2)
     local keeperHit=cause=='Keeper'
@@ -133,6 +150,7 @@ function Ragdoll:Apply(player,velocity,cause)
         maximum=math.clamp(tonumber(self.Config.KeeperRagdollMaxDuration)or 2.4,minimum,4)
     end
     if cause=='Bat'then minimum=Knockback.Bat.Stun;maximum=minimum end
+    if type(stunSeconds)=='number'and stunSeconds==stunSeconds then minimum=math.clamp(stunSeconds,.4,6);maximum=minimum end
     local duration=self.Random:NextNumber(minimum,maximum)
     local record={Character=character,Humanoid=humanoid,Root=root,Active=true,Duration=duration,
         AutoRotate=humanoid.AutoRotate,PlatformStand=humanoid.PlatformStand,RequiresNeck=humanoid.RequiresNeck,
