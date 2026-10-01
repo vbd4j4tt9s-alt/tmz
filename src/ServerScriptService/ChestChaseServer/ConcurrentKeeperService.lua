@@ -202,7 +202,9 @@ return function(Legacy)
         local slot=chest and chest.OriginSlot
         -- A drop belongs to one spawn cycle. Never resurrect a banked pack or
         -- overwrite the fresh pack that a later global refresh put in this slot.
-        if self.Map.Refreshing or not slot or not self.KnownSeeds[slot] or slot.Available
+        -- R122: Veiled event slots survive refreshes, so their packs go home even
+        -- while the track is closed (hidden until VeiledEvent81:AfterRefresh reopens them).
+        if (self.Map.Refreshing and not chest.EventKeeper) or not slot or not self.KnownSeeds[slot] or slot.Available
             or not slot.Model.Parent or slot.Generation~=chest.OriginGeneration
             or slot.BagVariant~=chest.BagVariant then return false end
         for _,drop in pairs(self.Drops) do
@@ -289,8 +291,10 @@ return function(Legacy)
         self.Runs[run.Player] = nil
         self.Starting[run.Player] = nil
         if not banked and (not caught or not ok) then self:_returnPackToOrigin(run.Chest) end
-        if banked and run.Chest.EventKeeper then self.Event81:Captured(run.Chest)
-        elseif wasTarget then self:_advanceKeeper(run.KeeperKey, run.Chaser) end
+        -- R122: a banked event pack is a steal; the keeper then hands off to the next
+        -- queued thief of its other pack (or leaves if that was the last one).
+        if banked and run.Chest.EventKeeper and self.Event81 then self.Event81:Captured(run.Chest) end
+        if wasTarget then self:_advanceKeeper(run.KeeperKey, run.Chaser) end
         if not ok then warn("[V0.87] Seed run ended with an error: " .. tostring(err)) end
     end
 
@@ -568,7 +572,8 @@ return function(Legacy)
         local tokens={};for token in pairs(self.Drops) do table.insert(tokens,token) end
         for _,token in ipairs(tokens) do self:_expireDroppedChest(token) end
         self.KeeperQueues={}
-        if self.Event81 then self.Event81:Clear()end
+        -- R122: refreshes no longer despawn the Veiled One or its packs; only hide them.
+        if self.Event81 then self.Event81:RefreshVisibility()end
     end
     function Service:_updateBiomeRefresh(now)
         if not self.NextRefreshAt then return end
@@ -593,7 +598,7 @@ return function(Legacy)
         self.Chests:SetWorldPacksClosed(false)
         self.RefreshEndsAt=nil;self.RefreshCountdown=nil
         self.Map.MapRoot:SetAttribute("BiomeRefreshCycle",(self.Map.MapRoot:GetAttribute("BiomeRefreshCycle") or 0)+1)
-        if self.Event81 then self.Event81:Spawn(self.Map.MapRoot:GetAttribute("BiomeRefreshCycle"))end
+        if self.Event81 then self.Event81:AfterRefresh(self.Map.MapRoot:GetAttribute("BiomeRefreshCycle"))end
     end
 
     function Service:_heartbeat(deltaTime)
@@ -665,7 +670,7 @@ return function(Legacy)
         if RunService:IsStudio()then
             self.Map.MapRoot:GetAttributeChangedSignal('R81TestEvent'):Connect(function()
                 local value=self.Map.MapRoot:GetAttribute('R81TestEvent')
-                if value then self.Map.MapRoot:SetAttribute('R81TestEvent',nil);self.Event81:Spawn(type(value)=='number'and value or 3)end
+                if value then self.Map.MapRoot:SetAttribute('R81TestEvent',nil);self.Event81:Spawn(type(value)=='number'and value or 3,true)end
             end)
         end
         self.NextRefreshAt=os.clock()+PackRules.RefreshInterval

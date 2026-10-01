@@ -108,14 +108,14 @@ function X.Execute(ctx,p,action,a)
  if action=='event'then
   local mode=(a[1]or'spawn'):lower();if #a>1 then return false,'Use event spawn, clear, go or status.'end
   if not event then return false,'Event service is not ready.'end
-  if mode=='status'then return true,'Event active: '..tostring(map:GetAttribute('VeiledEventActive'))..' | cycle '..tostring(map:GetAttribute('VeiledEventCycle')or 0)..' | reset '..tostring(map:GetAttribute('BiomeRefreshCycle')or 0)..' | captured '..tostring(map:GetAttribute('VeiledEventClaimed')==true)end
+  if mode=='status'then return true,'Event active: '..tostring(map:GetAttribute('VeiledEventActive'))..' | cycle '..tostring(map:GetAttribute('VeiledEventCycle')or 0)..' | reset '..tostring(map:GetAttribute('BiomeRefreshCycle')or 0)..' | captured '..tostring(map:GetAttribute('VeiledEventClaimed')==true)..' | packs left '..tostring(map:GetAttribute('VeiledPacksLeft')or 0)..' | unstolen refreshes '..tostring(map:GetAttribute('VeiledUnstolenRefreshes')or 0)..'/3'end
   if mode=='spawn'or mode=='clear'then
    if ctx.Map.Refreshing then return false,'Wait until the refresh finishes.'end
    for _,run in pairs(ctx.Chase.Runs)do if run.Chest.EventKeeper then return false,'The event pack is being carried. Finish that chase first.'end end
    for _,drop in pairs(ctx.Chase.Drops)do if drop.Chest.EventKeeper and not drop.Claimed then return false,'Recover the dropped event pack before replacing this event.'end end
    if mode=='clear'then event:Clear();return true,'Event cleared.'end
    local cycle=(math.floor((map:GetAttribute('VeiledEventCycle')or 0)/3)+1)*3
-   event:Spawn(cycle);return event.Seed~=nil,'Storm Peaks event spawned. Normal reset counter is unchanged.'
+   event:Spawn(cycle,true);return event.Seed~=nil,'Storm Peaks event spawned. Normal reset counter is unchanged.'
   elseif mode=='go'then
    local okay,why=safe(ctx,p);if not okay then return false,why end
    if not event.Seed or not event.Seed.Model.Parent or ctx.Map.Refreshing then return false,'Spawn the event first.'end
