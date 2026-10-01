@@ -118,14 +118,12 @@ local function traits(tool)return Traits.Text(Traits.Tool(tool))end
 local function decorate(label,tool,size)
  Theme.RarityText(label,tool and rarity(tool)or'Common',size);Fit.Attach(label,size,8)
 end
-local function emblem(button0,tool)
+-- R123: no rarity emblem; the slot/card border itself carries the rarity (GardenCardMotion.Rarity).
+local function rarityBorder(button0,tool)
  local item=tool and(tool:GetAttribute('GardenSeed')or tool:GetAttribute('SeedPackTool')or tool:GetAttribute('HarvestItemTool'))
  local value=item and(rarity(tool)or'')or''
- if button0:GetAttribute('EmblemRarity')==value then return end
- button0:SetAttribute('EmblemRarity',value)
- local old=button0:FindFirstChild('RarityDecoration');if old then old:Destroy()end
- Theme.CardBorder(button0,value)
- if value~=''then local icon=Theme.Icon(button0,value);icon.Name='RarityDecoration';icon.Size=UDim2.fromOffset(12,12);icon.Position=UDim2.new(1,-15,0,2);icon.ZIndex=3 end
+ if button0:GetAttribute('BorderFor')==value then return end
+ button0:SetAttribute('BorderFor',value);Theme.CardBorder(button0,value)
 end
 local function kind(tool)return tool:GetAttribute('HarvestItemTool')and'Fruit'or(tool:GetAttribute('GardenSeed')or tool:GetAttribute('SeedPackTool'))and'Seeds'or'Tools'end
 local function weighedName(tool)local kg=Weight.ToolText(tool);local name=Names.Tool(tool,Catalog);return kg~=''and name..' ('..kg..')'or name end
@@ -185,7 +183,7 @@ renderRows=function()
   b.Size=UDim2.fromOffset(side,side);b.Position=UDim2.fromOffset(4+(index-1)%cols*cell,4+math.floor((index-1)/cols)*cell)
   local tool=item.Entry.Tool;local name=rarity(tool)or''
   if b:GetAttribute('NameRarity')~=name then decorate(b.ItemName,tool,12);b:SetAttribute('NameRarity',name)end
-  emblem(b,tool);b.ItemName.Text=weighedName(tool);b.ItemTraits.Text=traits(tool);Traits.Style(b.ItemTraits,Traits.Tool(tool))
+  rarityBorder(b,tool);b.ItemName.Text=weighedName(tool);b.ItemTraits.Text=traits(tool);Traits.Style(b.ItemTraits,Traits.Tool(tool))
   local count=item.Entry.Count or 1;b.Count.Text='x'..count;b.Count.Visible=count>1
   Pictures.Show(b.Picture,tool,2)
   b:SetAttribute('Selected',tool.Parent==player.Character)
@@ -230,7 +228,7 @@ refresh=function()
   b.ItemName.Text=tool and Names.Tool(tool,Catalog)or'';tint(b.ItemName,tool and rarity(tool)or'Common')
   b.ItemWeight.Text=tool and Weight.ToolText(tool)or'';Traits.Style(b.ItemWeight,Traits.Tool(tool))
   local count=e and e.Count or 0;b.Count.Text='x'..count;b.Count.Visible=count>1;Pictures.Show(b.Picture,tool,1)
-  emblem(b,tool);b:SetAttribute('Selected',e~=nil and tool.Parent==player.Character);b.BackgroundTransparency=e and .10 or .50
+  rarityBorder(b,tool);b:SetAttribute('Selected',e~=nil and tool.Parent==player.Character);b.BackgroundTransparency=e and .10 or .50
  end
  renderRows()
 end

@@ -19,9 +19,12 @@ end
 function B.Header(root)
  root.BackgroundColor3=Color3.new(1,1,1);B.Gradient(root,RGB(184,255,111),RGB(64,201,75),25);B.Outline(root,RGB(18,50,31),2)
 end
-function B.Card(root,accent,limited)
+-- R123: pass a rarity to give the card that rarity's own border (GardenCardMotion.Rarity) instead of a flat outline.
+function B.Card(root,accent,limited,rarity)
  root.BackgroundColor3=Color3.new(1,1,1);B.Gradient(root,accent:Lerp(RGB(18,30,74),.6),RGB(26,35,76),40);corner(root,8)
- if limited then require(script.Parent.GardenCardMotion).Limited(root)else B.Outline(root,accent,2)end
+ if limited then require(script.Parent.GardenCardMotion).Limited(root)
+ elseif rarity then local old=root:FindFirstChild('BrightOutline');if old then old:Destroy()end;Theme.CardBorder(root,rarity)
+ else B.Outline(root,accent,2)end
 end
 function B.Button(root,color)
  root.BackgroundColor3=Color3.new(1,1,1);B.Gradient(root,color:Lerp(Color3.new(1,1,1),.24),color:Lerp(Color3.new(),.12),90);B.Outline(root,nil,2);corner(root,6)

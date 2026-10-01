@@ -128,7 +128,7 @@ local function signature(entry)local id=entry:GetAttribute('SeedId');return tost
 local function makeCard(entry,index)
  local id=entry:GetAttribute('SeedId');local seedKnown=owned('DiscoveredSeeds',id);local adultKnown=seedKnown and owned('DiscoveredPlants',id);local reward=amount(id);local rarity=entry:GetAttribute('Rarity')or'Common'
  local card=Instance.new('TextButton');card.Name=id;card.Text='';card.LayoutOrder=index;card.BorderSizePixel=0;card.AutoButtonColor=false;card.Parent=list
- Bright.Card(card,Theme.Rarity(rarity).Accent,selected==8)
+ Bright.Card(card,Theme.Rarity(rarity).Accent,selected==8,rarity) -- R123: rarity border
  local name=text(card,'Name',seedKnown and(entry:GetAttribute('DisplayName')or id)or'???',UDim2.fromOffset(6,5),UDim2.new(1,-12,0,38),16)
  local view=Instance.new('ViewportFrame');view.Name='Preview';view.BackgroundTransparency=1;view.Position=UDim2.fromOffset(6,43);view.Size=UDim2.new(1,-12,0,111);view.Ambient=Color3.fromRGB(215,219,240);view.LightColor=Color3.fromRGB(255,253,246);view.Parent=card
  local stop=Preview.Attach(view,id,false,seedKnown);local adult=false;local generation=0

@@ -13,25 +13,25 @@ local function label(parent,name,y,height,size)
 end
 local function panel(name,width,height)
  local p=Instance.new('Frame');p.Name=name;p.Size=UDim2.fromOffset(width,height);p.BackgroundColor3=Theme.Colors.Panel;p.BackgroundTransparency=.08;p.BorderSizePixel=0;p.Visible=false;p.Parent=gui;Theme.Corner(p,10)
- local stroke=Instance.new('UIStroke');stroke.Name='Edge';stroke.Color=Theme.Colors.Line;stroke.Thickness=1;stroke.Parent=p;return p
+ Theme.CardBorder(p,'Common');return p -- R123: rarity border (set per fruit) instead of a plain edge
 end
 local indicator=Instance.new('BillboardGui');indicator.Name='SelectedPlant';indicator.Size=UDim2.fromOffset(228,46);indicator.Enabled=false;indicator.AlwaysOnTop=true;indicator.LightInfluence=0;indicator.MaxDistance=math.huge;indicator.ClipsDescendants=false;indicator.Parent=pg
 local title=Instance.new('Frame');title.Name='Title';title.AnchorPoint=Vector2.new(.5,0);title.Position=UDim2.fromScale(.5,0);title.Size=UDim2.fromOffset(204,23);title.BackgroundTransparency=1;title.Parent=indicator
-local nameLabel=label(title,'PlantName',0,23,14);nameLabel.Position=UDim2.fromOffset(24,0);nameLabel.Size=UDim2.new(1,-24,1,0);nameLabel.TextScaled=true
+local nameLabel=label(title,'PlantName',0,23,14);nameLabel.Position=UDim2.fromOffset(0,0);nameLabel.Size=UDim2.fromScale(1,1);nameLabel.TextScaled=true;nameLabel.TextXAlignment=Enum.TextXAlignment.Center -- R123: no emblem; the name takes the whole title
 local fit=Instance.new('UITextSizeConstraint');fit.MinTextSize=12;fit.MaxTextSize=14;fit.Parent=nameLabel
 local plantTraits=label(indicator,'PlantTraits',24,0,11);plantTraits.TextWrapped=true;plantTraits.TextXAlignment=Enum.TextXAlignment.Center;plantTraits.TextYAlignment=Enum.TextYAlignment.Top
 local timer=label(indicator,'GrowthTime',24,20,12);timer.TextXAlignment=Enum.TextXAlignment.Center;timer.TextStrokeColor3=Color3.new(0,0,0);timer.TextStrokeTransparency=.25
-local selected,selectedIcon,selectedAnchor;local targetHeight=1;local displayedHeight=1;local nextMeasure=0;local lastProgress
+local selected,selectedAnchor;local targetHeight=1;local displayedHeight=1;local nextMeasure=0;local lastProgress
 local harvestWorld=Instance.new('BillboardGui');harvestWorld.Name='HarvestFruit';harvestWorld.Size=UDim2.fromOffset(220,50);harvestWorld.Enabled=false;harvestWorld.Active=true;harvestWorld.AlwaysOnTop=true;harvestWorld.LightInfluence=0;harvestWorld.MaxDistance=math.huge;harvestWorld.SizeOffset=Vector2.new(0,.5);harvestWorld.StudsOffset=Vector3.new(0,.25,0);harvestWorld.StudsOffsetWorldSpace=Vector3.new(0,.25,0);harvestWorld.Parent=pg
 local harvest=panel('Harvest',220,50);harvest.Parent=harvestWorld;harvest.Position=UDim2.fromOffset(0,0)
-local harvestName=label(harvest,'FruitName',3,17,13);harvestName.Position=UDim2.fromOffset(46,3);harvestName.Size=UDim2.new(1,-70,0,17);harvestName.TextScaled=true
+local harvestName=label(harvest,'FruitName',3,17,13);harvestName.Position=UDim2.fromOffset(46,3);harvestName.Size=UDim2.new(1,-52,0,17);harvestName.TextScaled=true
 local harvestFit=Instance.new('UITextSizeConstraint');harvestFit.MinTextSize=10;harvestFit.MaxTextSize=13;harvestFit.Parent=harvestName
 local traits=label(harvest,'FruitTraits',21,13,10);traits.Position=UDim2.fromOffset(46,21);traits.Size=UDim2.new(1,-52,0,13);traits.TextScaled=true;traits.TextWrapped=true;traits.TextYAlignment=Enum.TextYAlignment.Top
 local traitsFit=Instance.new('UITextSizeConstraint');traitsFit.MinTextSize=9;traitsFit.MaxTextSize=10;traitsFit.Parent=traits
 local action=label(harvest,'Action',36,11,10);action.Position=UDim2.fromOffset(46,36);action.Size=UDim2.new(1,-52,0,11);action.TextColor3=Theme.Colors.Mint
 local keyButton=Instance.new('TextButton');keyButton.Name='HarvestKey';keyButton:SetAttribute('ButtonSound',false);keyButton.Position=UDim2.fromOffset(7,8);keyButton.Size=UDim2.fromOffset(34,34);keyButton.BackgroundColor3=Theme.Colors.Card;keyButton.Text='E';Theme.Text(keyButton,17,true);keyButton.Parent=harvest;Theme.Corner(keyButton,7)
 local edge=Instance.new('UIStroke');edge.ApplyStrokeMode=Enum.ApplyStrokeMode.Border;edge.Color=Color3.new(1,1,1);edge.Transparency=.25;edge.Parent=keyButton
-local harvestBadge,displayedPrompt;local shown={};local currentPrompt;local lastTraits
+local displayedPrompt;local shown={};local currentPrompt;local lastTraits
 connect(harvest.MouseEnter,function()overHarvest=true end);connect(harvest.MouseLeave,function()overHarvest=false end)
 local selectionView=require(RS:WaitForChild('PlantSelectionView')).new('PlantSelection',Color3.new(1,1,1),.90,.20)
 local selectedPart
@@ -125,9 +125,8 @@ local function selectAt(pointer)
  if not anchor then clearSelection();return end
  selected=target;selectedAnchor=anchor;local id=target:GetAttribute('SeedId');local def=Catalog[id]
  nameLabel.Text=Names.Plant(id,def.Name);Theme.RarityText(nameLabel,def.Rarity,14);plantTraitLabel(target)
- if selectedIcon then selectedIcon:Destroy()end;selectedIcon=Theme.Icon(title,def.Rarity);selectedIcon.Size=UDim2.fromOffset(18,18);selectedIcon.Position=UDim2.fromOffset(0,2)
- -- Compact centered title; decoration has its own space, never over the lettering.
- title.Size=UDim2.fromOffset(math.clamp(#nameLabel.Text*8+24,88,220),23)
+ -- Compact centered title, lettering only (R123: rarity emblems removed).
+ title.Size=UDim2.fromOffset(math.clamp(#nameLabel.Text*8+8,72,204),23)
  targetHeight=topHeight(target,anchor);displayedHeight=targetHeight;lastProgress=nil
  indicator.Adornee=anchor;indicator.StudsOffsetWorldSpace=Vector3.new(0,displayedHeight+.3,0);indicator.Enabled=true
  selectedPart=hitPart;selectionView:Set(target,selectedPart,camera)
@@ -192,8 +191,7 @@ connect(Run.Heartbeat,function(dt)
   if displayedPrompt~=currentPrompt then
    displayedPrompt=currentPrompt;local model=Picker.Plant(currentPrompt);local def=model and Catalog[model:GetAttribute('SeedId')];local rarity=def and def.Rarity or'Common'
    local fruitName=def and Names.Fruit(model:GetAttribute('SeedId'),def.HarvestName)
-   harvestName.Text=fruitName or currentPrompt.ObjectText;Theme.RarityText(harvestName,rarity,13);harvest.Edge.Color=Theme.Rarity(rarity).Accent
-   if harvestBadge then harvestBadge:Destroy()end;harvestBadge=Theme.Icon(harvest,rarity);harvestBadge.Size=UDim2.fromOffset(14,14);harvestBadge.Position=UDim2.new(1,-20,0,5)
+   harvestName.Text=fruitName or currentPrompt.ObjectText;Theme.RarityText(harvestName,rarity,13);Theme.CardBorder(harvest,rarity) -- R123: the panel border carries the rarity
 
   end
   local crop=cropData(selected);local def=Catalog[crop.SeedId];local fruit=Rules.Fruit(crop,currentPrompt:GetAttribute('GardenFruitIndex'),def)

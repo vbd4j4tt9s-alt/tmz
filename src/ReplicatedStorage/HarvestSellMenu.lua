@@ -45,11 +45,12 @@ function Menu:Clear()
 end
 function Menu:MakeRow(item,narrow,height)
  local def=Catalog[item.SeedId];local rarity=item.Rarity or(def and def.Rarity)or'Common';local style=Theme.Rarity(rarity)
- local row=Instance.new('Frame');row.Name='Harvest';row.Size=UDim2.new(1,-7,0,height-9);row.BackgroundColor3=C.Card;row.BorderSizePixel=0;row.Parent=self.List;require(RS.BrightUI).Card(row,style.Accent,false);Style.Accent(row,style.Accent)
+ local row=Instance.new('Frame');row.Name='Harvest';row.Size=UDim2.new(1,-7,0,height-9);row.BackgroundColor3=C.Card;row.BorderSizePixel=0;row.Parent=self.List;require(RS.BrightUI).Card(row,style.Accent,false,rarity);Style.Accent(row,style.Accent)
  local preview=Instance.new('ViewportFrame');preview.Name='RotatingHarvest';preview.Position=UDim2.fromOffset(10,10);preview.Size=UDim2.fromOffset(narrow and 84 or 128,narrow and 96 or 134);preview.BackgroundColor3=C.Inset;preview.BorderSizePixel=0;preview.Ambient=Color3.fromRGB(185,185,185);preview.LightColor=Color3.fromRGB(255,244,220);preview.LightDirection=Vector3.new(-1,-1,-1);preview.Parent=row;Theme.Corner(preview,8);Style.Inset(preview);Preview.Attach(preview,item)
  local left=narrow and 104 or 150;local right=narrow and 10 or 164
  local name=text(row,'Name','',UDim2.fromOffset(left,8),UDim2.new(1,-left-right,0,44),narrow and 21 or 25,true,style.Color);name.TextYAlignment=Enum.TextYAlignment.Top;Theme.RarityText(name,rarity,narrow and 21 or 25);require(RS.GardenTextFit).Attach(name,narrow and 21 or 25,17)
- local badge=Theme.Badge(row,rarity,false,true);badge.Position=UDim2.fromOffset(left,53)
+ -- R123: rarity name only (no emblem), starting at the name's left edge; the row border carries the rarity.
+ local word=text(row,'RarityName',rarity,UDim2.fromOffset(left,53),UDim2.fromOffset(110,22),12,true,style.Color);word.TextWrapped=false;Theme.RarityText(word,rarity,rarity=='King'and 14 or 12,false)
  local traits=text(row,'Traits','',UDim2.fromOffset(narrow and 10 or left,narrow and 116 or 84),UDim2.new(1,-(narrow and 20 or left+right),0,narrow and 56 or 62),narrow and 16 or 18,false,C.Text)
  traits.TextYAlignment=Enum.TextYAlignment.Top;require(RS.GardenTextFit).Attach(traits,narrow and 16 or 18,12)
  local details=text(row,'Multipliers','',UDim2.fromOffset(narrow and 10 or left,narrow and 178 or 150),UDim2.new(1,-(narrow and 20 or left+right),0,narrow and 24 or 40),narrow and 16 or 17,false,C.Muted)
