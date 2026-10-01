@@ -3,6 +3,10 @@
 -- main-ribbon colour shimmer, Royal crown glints and footstep sparkles, and an idle shimmer on Nebula and Royal.
 -- Built-in particle textures only. Rigs are pooled per trail; nothing here connects events (the client script owns
 -- the Heartbeat and PlayerRemoving connections), and Release/Destroy free everything a rig made.
+-- R118: head pieces (RunnerTrailArt.HeadPiece): Royal wears a glowing crown, Nebula a ring of orbiting space dust and
+-- Aurora a shimmering halo. Client-only parts welded to the Head (massless, no collision/query/touch/shadow), following
+-- the Head's LocalTransparencyModifier (hidden in first person). Layers marked Head=true live on Head attachments
+-- (crown glints, halo motes, orbiting dust) and only run while the head piece is shown.
 local Art=require(script.Parent.RunnerTrailArt)
 local F={};F.__index=F
 local V,C=Vector3.new,Color3.fromRGB
@@ -14,7 +18,8 @@ F.Prefix='TrailAura_'
 -- Layer kinds: Emit (continuous, When Move/Idle), Burst (on starting to run), Pulse (timed glints at points),
 -- Ribbon (secondary Trail; Veil sways, Helix orbits), Shift (main ribbon colour drift/sheen), Light (local runner).
 -- MinDetail: 1 = always (motes), 2 = near/on-screen, 3 = full detail only. Motion layers are off for Reduced Motion.
-local CROWN={'Crown1','Crown2','Crown3','Crown4','Crown5'}
+-- When='Always': runs moving or standing. Head=true: attached to the Head (head-space points from Art.HeadPiece).
+local TIPS={'Tip1','Tip2','Tip3','Tip4','Tip5'}
 F.Specs={
  MintTrail={Tier=1,Layers={
   {Name='Motes',Kind='Emit',When='Move',At='Mid',MinDetail=1,Texture=SPARK,Colors={C(214,255,238),C(96,238,172),C(40,190,130)},Size={.32,.2,0},Alpha={.15,.35,1},Life={.45,.85},Speed={.8,2.2},Rate=9,Drag=2.5,Glow=.6},
@@ -38,6 +43,7 @@ F.Specs={
   {Name='Veil',Kind='Ribbon',Mode='Veil',MinDetail=2,Palette='AuroraTrail',Cycle=.22,Alpha={.5,.68,1},Width={1,.75,0},Glow=1,Life=.9},
   {Name='Shimmer',Kind='Shift',MinDetail=3,Motion=true,Speed=.12},
   {Name='Burst',Kind='Burst',At='Mid',MinDetail=2,Motion=true,Texture=SPARK,Colors={C(150,255,222),C(130,200,255),C(255,140,220)},Size={.5,.2,0},Alpha={0,.2,1},Life={.4,.65},Speed={8,12},Count=16,Drag=3,Spin={-180,180},Glow=1,Bright=1.6},
+  {Name='HaloMotes',Kind='Emit',When='Always',At='HaloC',Head=true,MinDetail=3,Texture=SPARK,Colors={C(170,255,226),C(140,200,255),C(240,160,255)},Size={0,.16,0},Alpha={0,.2,1},Life={.6,1},Speed={.5,.8},Rate=5,Drag=1.5,Accel=V(0,.4,0),Spin={-90,90},Glow=1,Bright=1.6,Locked=true},
  }},
  NebulaTrail={Tier=5,Layers={
   {Name='Stardust',Kind='Emit',When='Move',At='Mid',MinDetail=1,Texture=SPARK,Colors={C(255,255,255),C(190,160,255),C(110,200,255)},Size={.16,.1,0},Alpha={0,.2,1},Life={.9,1.6},Speed={.5,1.6},Rate=22,Drag=1.2,Glow=1,Bright=1.5},
@@ -48,6 +54,8 @@ F.Specs={
   {Name='Light',Kind='Light',At='Mid',MinDetail=3,LocalOnly=true,Color=C(170,110,255),Brightness=.9,Range=9},
   {Name='Burst',Kind='Burst',At='Mid',MinDetail=2,Motion=true,Texture=SPARK,Colors={C(255,255,255),C(200,140,255),C(100,200,255)},Size={.5,.2,0},Alpha={0,.2,1},Life={.4,.7},Speed={10,16},Count=22,Drag=3,Glow=1,Bright=2},
   {Name='Idle',Kind='Emit',When='Idle',At='Mid',MinDetail=3,Texture=SPARK,Colors={C(255,255,255),C(180,140,255)},Size={0,.32,0},Alpha={0,.1,1},Life={1,1.6},Speed={.3,.6},Rate=5,Spin={-60,60},Glow=1,Bright=1.8,Locked=true},
+  {Name='HeadDust',Kind='Emit',When='Always',At='Dust1',Head=true,MinDetail=3,Texture=SPARK,Colors={C(240,228,255),C(170,110,255),C(96,176,255)},Size={.12,.08,0},Alpha={0,.25,1},Life={1,1.6},Speed={.05,.2},Rate=14,Drag=1,Spin={-60,60},Glow=1,Bright=1.6,Locked=true},
+  {Name='HeadStars',Kind='Emit',When='Always',At='Dust2',Head=true,MinDetail=3,Texture=SPARK,Colors={C(255,246,255),C(200,170,255)},Size={0,.26,0},Alpha={0,0,1},Life={.5,.9},Speed={.1,.3},Rate=3,Drag=1,Spin={-90,90},Glow=1,Bright=2.2,Locked=true},
  }},
  RoyalTrail={Tier=6,Layers={
   {Name='Glitter',Kind='Emit',When='Move',At='Mid',MinDetail=1,Texture=SPARK,Colors={C(255,252,222),C(255,214,80),C(230,160,30)},Size={.2,.12,0},Alpha={0,.15,1},Life={.7,1.2},Speed={.6,2},Rate=26,Accel=V(0,-4,0),Drag=1,Spin={-200,200},Glow=1,Bright=2},
@@ -55,24 +63,26 @@ F.Specs={
   {Name='GoldHelix',Kind='Ribbon',Mode='Helix',MinDetail=2,Radius=1.05,Speed=4.4,Phase=0,Gap=.26,Colors={C(255,250,212),C(255,206,64),C(220,150,20)},Alpha={.1,.35,1},Width={1,.75,0},Glow=1,Life=.8},
   {Name='PurpleHelix',Kind='Ribbon',Mode='Helix',MinDetail=2,Radius=1.05,Speed=4.4,Phase=math.pi,Gap=.26,Colors={C(232,172,255),C(150,60,230),C(90,30,170)},Alpha={.15,.4,1},Width={1,.75,0},Glow=.9,Life=.8},
   {Name='Sheen',Kind='Shift',MinDetail=3,Motion=true,Speed=.45},
-  {Name='Crown',Kind='Pulse',At=CROWN,MinDetail=3,Every=.9,IdleEvery=1.6,OnBurst=true,Count=1,Texture=SPARK,Colors={C(255,250,214),C(255,206,64)},Jewel={C(255,190,255),C(170,60,255)},Size={0,.75,0},Alpha={0,0,1},Life={.45,.6},Speed={0},Glow=1,Bright=2.5,Locked=true},
+  {Name='Crown',Kind='Pulse',At=TIPS,Head=true,MinDetail=3,Every=.9,IdleEvery=1.6,OnBurst=true,Count=1,Texture=SPARK,Colors={C(255,250,214),C(255,206,64)},Jewel={C(255,190,255),C(170,60,255)},Size={0,.75,0},Alpha={0,0,1},Life={.45,.6},Speed={0},Glow=1,Bright=2.5,Locked=true},
   {Name='Steps',Kind='Pulse',At={'FootL','FootR'},MinDetail=3,Stride=true,Ground=true,Count=3,Texture=SPARK,Colors={C(255,252,222),C(255,200,60)},Size={.35,0},Alpha={0,1},Life={.25,.4},Speed={1,2.5},Spread=50,Glow=1,Bright=2},
   {Name='Glow',Kind='Emit',When='Move',At='Mid',MinDetail=2,Texture=FLARE,Colors={C(255,226,140),C(190,90,255)},Size={3,3.8},Alpha={.7,1},Life={.2,.3},Speed={0},Rate=9,Glow=1,Locked=true},
   {Name='Light',Kind='Light',At='Mid',MinDetail=3,LocalOnly=true,Color=C(255,200,120),Brightness=1,Range=10},
   {Name='Burst',Kind='Burst',At='Mid',MinDetail=2,Motion=true,Texture=SPARK,Colors={C(255,255,230),C(255,200,60),C(170,70,255)},Size={.6,.25,0},Alpha={0,.2,1},Life={.45,.75},Speed={12,18},Count=30,Drag=3,Spin={-180,180},Glow=1,Bright=2.2},
-  {Name='Idle',Kind='Emit',When='Idle',At='CrownC',MinDetail=3,Texture=SPARK,Colors={C(255,250,214),C(255,200,60)},Size={.22,.12,0},Alpha={0,.15,1},Life={1,1.5},Speed={.2,.5},Rate=6,Accel=V(0,-1.6,0),Spin={-120,120},Glow=1,Bright=1.8},
+  {Name='Idle',Kind='Emit',When='Idle',At='CrownTop',Head=true,MinDetail=3,Texture=SPARK,Colors={C(255,250,214),C(255,200,60)},Size={.22,.12,0},Alpha={0,.15,1},Life={1,1.5},Speed={.2,.5},Rate=6,Accel=V(0,-1.6,0),Spin={-120,120},Glow=1,Bright=1.8},
  }},
 }
 function F.LayerCount(id)local s=F.Specs[id];return s and #s.Layers or 0 end
+function F.HasHeadPiece(id)return Art.HeadKind(id)~=nil end
 -- Budget ------------------------------------------------------------------------------------------------------------
 -- quality: ClientFxBudget tier (1 = low / FastMode). graphics: Roblox graphics level 1-10 (optional).
+-- Heads: how many other runners may show a head piece (near/on-screen ones only); the local runner always does.
 function F.Budget(quality,reduced,graphics)
  local tier=math.clamp(math.floor(tonumber(quality)or 3),1,3)
  if type(graphics)=='number'and graphics>=1 then if graphics<=3 then tier=1 elseif graphics<=6 then tier=math.min(tier,2)end end
  local b
- if tier==1 then b={Tier=1,Characters=1,Full=0,Near=0,Range=0,Rate=.4,MaxDetail=1,Scale=.5}
- elseif tier==2 then b={Tier=2,Characters=4,Full=1,Near=40,Range=90,Rate=.6,MaxDetail=3,Scale=.75}
- else b={Tier=3,Characters=8,Full=3,Near=60,Range=140,Rate=1,MaxDetail=3,Scale=1}end
+ if tier==1 then b={Tier=1,Characters=1,Full=0,Near=0,Range=0,Rate=.4,MaxDetail=1,Scale=.5,Heads=0}
+ elseif tier==2 then b={Tier=2,Characters=4,Full=1,Near=40,Range=90,Rate=.6,MaxDetail=3,Scale=.75,Heads=2}
+ else b={Tier=3,Characters=8,Full=3,Near=60,Range=140,Rate=1,MaxDetail=3,Scale=1,Heads=5}end
  b.Reduced=reduced==true;b.Motion=not b.Reduced
  if b.Reduced then b.MaxDetail=math.min(b.MaxDetail,2);b.Rate*=.5;b.Scale*=.5 end
  return b
@@ -92,10 +102,6 @@ function F.Points(rootSize,lo,hi)
  local p={Mid=V(0,mid,back+.05),High=V(0,hi-.2*scale,back+.1),Low=V(0,lo+.3*scale,back+.1),
   FootL=V(-.45*scale,lo+.05,0),FootR=V(.45*scale,lo+.05,0),CrownC=V(0,hi+.42*scale,0),
   Swirl=V(0,mid,back+.35*scale),VeilTop=V(0,hi+.95*scale,back+.3*scale),VeilBottom=V(0,mid+.2*scale,back+.3*scale),Scale=scale}
- for i,name in ipairs(CROWN)do
-  local a=(i-1)*2*math.pi/5;local r=.5*scale
-  p[name]=V(math.sin(a)*r,hi+(.42+(i%2==1 and .16 or .06))*scale,-math.cos(a)*r)
- end
  return p
 end
 -- Instances ------------------------------------------------------------------------------------------------------------
@@ -125,15 +131,16 @@ local function newAttachment(name,parentAtt)
  local a=Instance.new('Attachment');a.Name=F.Prefix..name;if parentAtt then a.Parent=parentAtt end;return a
 end
 function F.new()
- return setmetatable({Records={},Free={},Pool=0,PoolMax=1,Built=0,Budget=F.Budget(3,false),Clock=0},F)
+ return setmetatable({Records={},Free={},Pool=0,PoolMax=1,Built=0,PiecesBuilt=0,Budget=F.Budget(3,false),Clock=0},F)
 end
 function F:_build(id)
- local spec=F.Specs[id];local rig={Id=id,Spec=spec,Atts={},Layers={},All={}}
+ local spec=F.Specs[id];local rig={Id=id,Spec=spec,Atts={},Layers={},All={},HeadKeys={},Home={}}
  local function att(key)
   local a=rig.Atts[key];if not a then a=newAttachment(key);rig.Atts[key]=a;table.insert(rig.All,a)end;return a
  end
  for _,layer in ipairs(spec.Layers)do
   local L={Spec=layer,Emitters={},Next=0,Side=0}
+  if layer.Head then for _,key in ipairs(type(layer.At)=='table'and layer.At or{layer.At})do rig.HeadKeys[key]=true end end
   if layer.Kind=='Emit'or layer.Kind=='Burst'then
    local e=emitter(layer);e.Parent=att(layer.At);table.insert(L.Emitters,e)
   elseif layer.Kind=='Pulse'then
@@ -158,18 +165,23 @@ function F:_destroyRig(rig)
  for _,a in ipairs(rig.All)do pcall(function()a:Destroy()end)end
  rig.All={};rig.Dead=true
 end
--- Moves a pooled rig onto a root. Returns false if Roblox refuses the reparent (destroyed instances).
-function F:_attach(rig,root,lo,hi)
- local p=F.Points(root.Size,lo,hi);rig.Points=p;rig.Root=root
+-- Moves a pooled rig onto a root (and its Head layers onto the head). Returns false if Roblox refuses the reparent
+-- (destroyed instances). Without a head, head attachments wait on the root above the body (their layers stay off).
+function F:_attach(rig,root,lo,hi,head)
+ local p=F.Points(root.Size,lo,hi);rig.Points=p;rig.Root=root;rig.Head=head;rig.Home={}
+ local piece=head and Art.HeadPiece(rig.Id,Art.HeadSize(head))
+ rig.HeadPoints=piece and piece.Points;rig.Orbits=piece and piece.Orbits or{}
  for key,a in pairs(rig.Atts)do
-  local pos=p[key]
-  if not pos then
+  local pos=p[key];rig.Home[a]=root
+  if rig.HeadKeys[key]then
+   pos=rig.HeadPoints and rig.HeadPoints[key];if pos then rig.Home[a]=head else pos=p.CrownC end
+  elseif not pos then
    local base=key:sub(-1);local name=key:sub(1,-2)
    for _,L in ipairs(rig.Layers)do if L.Spec.Name==name then pos=self:_ribbonPoint(L,p,base=='0'and -1 or 1,0,false)end end
   end
   a.Position=pos or p.Mid
  end
- local ok=pcall(function()for _,a in ipairs(rig.All)do a.Parent=root end end)
+ local ok=pcall(function()for _,a in ipairs(rig.All)do a.Parent=rig.Home[a]end end)
  return ok
 end
 function F:_ribbonPoint(L,p,side,now,animate)
@@ -199,13 +211,106 @@ function F:_recycle(rig)
  self:_park(rig,true)
  -- A respawn may already have destroyed the old root (and our attachments with it): never pool those.
  local ok=not rig.Dead
- if ok then for _,a in ipairs(rig.All)do if a.Parent~=rig.Root then ok=false;break end end end
+ if ok then for _,a in ipairs(rig.All)do if a.Parent==nil or a.Parent~=rig.Home[a]then ok=false;break end end end
  ok=ok and pcall(function()for _,a in ipairs(rig.All)do a.Parent=nil end end)
- rig.Root=nil
+ rig.Root=nil;rig.Head=nil;rig.Home={}
  if not ok or self.Pool>=self.PoolMax*#Art.Order then self:_destroyRig(rig);return end
  local list=self.Free[rig.Id]or{};self.Free[rig.Id]=list
  if #list>=self.PoolMax then self:_destroyRig(rig);return end
  table.insert(list,rig);self.Pool+=1
+end
+-- Head pieces ----------------------------------------------------------------------------------------------------------
+-- One Model under the Head: invisible pivot parts welded to the Head (one per ring), visible parts welded to a pivot.
+local function piecePart(name,size,color,material,alpha)
+ local p=Instance.new('Part');p.Name=name;p.Size=size;p.Color=color;p.Material=material;p.Transparency=alpha or 0
+ p.Anchored=false;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false;p.Massless=true
+ p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth
+ pcall(function()p.EnableFluidForces=false end)
+ return p
+end
+local function weld(part0,part1,c0)
+ local w=Instance.new('Weld');w.Name=F.Prefix..'Weld';w.Part0=part0;w.Part1=part1;w.C0=c0;w.Parent=part1;return w
+end
+function F:_buildPiece(id,head,simple)
+ local w,h=Art.HeadSize(head);local spec=Art.HeadPiece(id,w,h,simple);if not spec then return nil end
+ local model=Instance.new('Model');model.Name=F.Prefix..'HeadPiece'
+ local piece={Id=id,Spec=spec,Simple=simple,Model=model,Head=head,Size=head.Size,Parts={},Pivots={},Shimmer={},LTM=-1,Animated=false}
+ local base=head.CFrame
+ for i,ring in ipairs(spec.Rings)do
+  local pv=piecePart(F.Prefix..'Pivot',V(.05,.05,.05),C(255,255,255),Enum.Material.SmoothPlastic,1)
+  local c0=CFrame.new(0,ring.Y,0);pv.CFrame=base*c0;pv.Parent=model
+  piece.Pivots[i]={Part=pv,Weld=weld(head,pv,c0),Base=c0,Y=ring.Y,Speed=ring.Speed or 0,Bob=ring.Bob}
+ end
+ for _,sp in ipairs(spec.Parts)do
+  local pv=piece.Pivots[sp.Ring]or piece.Pivots[1]
+  local part=piecePart(sp.Name,sp.Size,sp.Color,sp.Material,sp.Transparency);if sp.Reflectance then part.Reflectance=sp.Reflectance end
+  part.CFrame=pv.Part.CFrame*sp.Offset;part.Parent=model;weld(pv.Part,part,sp.Offset)
+  table.insert(piece.Parts,part)
+  if sp.Shimmer then table.insert(piece.Shimmer,{Part=part,Kind=sp.Shimmer.Kind,T=sp.Shimmer.T,Color=sp.Color,Alpha=sp.Transparency or 0})end
+ end
+ local ok=pcall(function()model.Parent=head end)
+ if not ok then pcall(function()model:Destroy()end);return nil end
+ self.PiecesBuilt+=1
+ return piece
+end
+local function dropPiece(rec)
+ local pc=rec.Piece;if not pc then return end
+ rec.Piece=nil;rec.HeadHidden=false;pcall(function()pc.Model:Destroy()end)
+end
+-- want: show a head piece; simple: the low-quality version. An unwanted piece is stashed (unparented) for a moment
+-- so runners hovering at a budget edge do not rebuild it every scan, then destroyed.
+function F:_piece(rec,want,simple)
+ local pc=rec.Piece
+ -- Rebuilt when the quality version or the head changes (respawn, avatar rescale) or Roblox removed the model.
+ if pc and(pc.Simple~=simple or pc.Head~=rec.Head or(rec.Head and pc.Size~=rec.Head.Size)or(not pc.Stashed and pc.Model.Parent~=rec.Head))then dropPiece(rec);pc=nil end
+ if want then
+  if not pc then rec.Piece=self:_buildPiece(rec.Id,rec.Head,simple)
+  elseif pc.Stashed then if pcall(function()pc.Model.Parent=rec.Head end)then pc.Stashed=nil else dropPiece(rec)end end
+ elseif pc then
+  if not pc.Stashed then pc.Stashed=self.Clock;rec.HeadHidden=false;pcall(function()pc.Model.Parent=nil end)
+  elseif self.Clock-pc.Stashed>=1.5 then dropPiece(rec)end
+ end
+end
+-- First person: the camera fades the Head through LocalTransparencyModifier; the head piece copies it.
+local function syncPiece(rec)
+ local pc=rec.Piece;if not pc or pc.Stashed then rec.HeadHidden=false;return end
+ local head=rec.Head;local l=head and head.Parent and tonumber(head.LocalTransparencyModifier)or 0
+ if l~=pc.LTM then pc.LTM=l;for _,p in ipairs(pc.Parts)do p.LocalTransparencyModifier=l end end
+ rec.HeadHidden=l>=.5
+end
+F.SyncPiece=syncPiece
+local SHEEN=Art.HeadColors.Sheen
+local function shimmerAt(pc,now)
+ for _,sh in ipairs(pc.Shimmer)do
+  if sh.Kind=='Gold'then
+   local d=math.abs((sh.T-now*.32+.5)%1-.5);local w=math.max(0,1-d/.14)
+   sh.Part.Color=sh.Color:Lerp(SHEEN,w*.85)
+  elseif sh.Kind=='Cycle'then
+   sh.Part.Color=Art.Cycle(Art.Looks.AuroraTrail.Colors,sh.T+now*.09)
+  elseif sh.Kind=='Twinkle'then
+   local k=math.max(0,math.sin(now*2.6+sh.T*6.283))^6;sh.Part.Transparency=sh.Alpha+(1-sh.Alpha)*.8*k
+  end
+ end
+end
+local function settlePiece(pc)
+ if not pc.Animated then return end;pc.Animated=false
+ for _,pv in ipairs(pc.Pivots)do pv.Weld.C0=pv.Base end
+ for _,sh in ipairs(pc.Shimmer)do sh.Part.Color=sh.Color;sh.Part.Transparency=sh.Alpha end
+end
+-- Orbiting/bobbing rings, crown sheen, halo colour flow, star twinkle and the orbiting dust emitters.
+function F:_animatePiece(rec,now)
+ local pc=rec.Piece;local t=now+rec.Phase*3;pc.Animated=true
+ for _,pv in ipairs(pc.Pivots)do
+  if pv.Speed~=0 or pv.Bob then pv.Weld.C0=CFrame.new(0,pv.Y+(pv.Bob and math.sin(t*1.8)*pv.Bob or 0),0)*CFrame.Angles(0,t*pv.Speed,0)end
+ end
+ local rig=rec.Rig
+ if rig and rig.Head==rec.Head then
+  for _,o in ipairs(rig.Orbits or{})do
+   local a=rig.Atts[o.Key]
+   if a and a.Parent==rec.Head then local q=o.Phase+t*o.Speed;a.Position=o.Center+V(math.sin(q)*o.Radius,math.sin(q*1.7)*o.Lift,-math.cos(q)*o.Radius)end
+  end
+ end
+ if now>=(pc.ShimmerAt or 0)then pc.ShimmerAt=now+.08;shimmerAt(pc,t)end
 end
 local function restoreShift(rec)
  if not rec.Shifted then return end;rec.Shifted=false
@@ -213,7 +318,7 @@ local function restoreShift(rec)
 end
 function F:Release(player)
  local rec=self.Records[player];if not rec then return end
- self.Records[player]=nil;restoreShift(rec)
+ self.Records[player]=nil;restoreShift(rec);dropPiece(rec)
  if rec.Rig then self:_recycle(rec.Rig);rec.Rig=nil end
 end
 local function bodyTrails(folder)
@@ -228,11 +333,12 @@ function F:Scan(players,localPlayer,camera,budget)
   local root=character and character:FindFirstChild('HumanoidRootPart');local id=folder and folder:GetAttribute('TrailId84')
   if root and id and F.Specs[id]then
    local isLocal=player==localPlayer;local distance=isLocal and -1 or(eye and(root.Position-eye).Magnitude or math.huge)
-   if isLocal or distance<=budget.Range then table.insert(candidates,{Player=player,Character=character,Folder=folder,Root=root,Id=id,Distance=distance,Local=isLocal})end
+   local head=character:FindFirstChild('Head');if head and not head:IsA('BasePart')then head=nil end
+   if isLocal or distance<=budget.Range then table.insert(candidates,{Player=player,Character=character,Folder=folder,Root=root,Head=head,Id=id,Distance=distance,Local=isLocal})end
   end
  end
  table.sort(candidates,function(a,b)return a.Distance<b.Distance end)
- local wanted={};local rank=0
+ local wanted={};local rank=0;local heads=0
  for i=1,math.min(budget.Characters,#candidates)do
   local c=candidates[i];local onScreen=true
   if not c.Local then
@@ -241,9 +347,9 @@ function F:Scan(players,localPlayer,camera,budget)
   end
   local detail=F.Detail(c.Local,c.Distance,onScreen,rank,budget)
   local rec=self.Records[c.Player]
-  if rec and(rec.Character~=c.Character or rec.Folder~=c.Folder or rec.Id~=c.Id or rec.Root~=c.Root)then self:Release(c.Player);rec=nil end
+  if rec and(rec.Character~=c.Character or rec.Folder~=c.Folder or rec.Id~=c.Id or rec.Root~=c.Root or rec.Head~=c.Head or(c.Head and rec.HeadSize~=c.Head.Size))then self:Release(c.Player);rec=nil end
   if not rec then
-   rec={Player=c.Player,Character=c.Character,Folder=c.Folder,Root=c.Root,Id=c.Id,Local=c.Local,Still=0,Moving=false,LastBurst=-math.huge,Logic=0,ShiftAt=0,Phase=math.random(),Shifted=false,Body={}}
+   rec={Player=c.Player,Character=c.Character,Folder=c.Folder,Root=c.Root,Head=c.Head,HeadSize=c.Head and c.Head.Size,Id=c.Id,Local=c.Local,Still=0,Moving=false,LastBurst=-math.huge,Logic=0,ShiftAt=0,Phase=math.random(),Shifted=false,Body={}}
    self.Records[c.Player]=rec
   end
   rec.Body=bodyTrails(c.Folder);rec.Humanoid=c.Character:FindFirstChildOfClass('Humanoid')
@@ -251,8 +357,12 @@ function F:Scan(players,localPlayer,camera,budget)
    local rig=self:_acquire(c.Id)
    local lo=tonumber(c.Folder:GetAttribute('TrailLow84'));local hi=tonumber(c.Folder:GetAttribute('TrailHigh84'))
    if not lo or not hi then lo,hi=Art.BodyRange(c.Character,c.Root)end
-   if self:_attach(rig,c.Root,lo,hi)then rec.Rig=rig else self:_destroyRig(rig)end
+   if self:_attach(rig,c.Root,lo,hi,c.Head)then rec.Rig=rig else self:_destroyRig(rig)end
   end
+  -- Head piece: always for the local runner (simplified on low quality), for others only near/on-screen, capped.
+  local wantPiece=c.Head~=nil and F.HasHeadPiece(c.Id)and(c.Local or(detail>=2 and heads<(budget.Heads or 0)))
+  if wantPiece and not c.Local then heads+=1 end
+  self:_piece(rec,wantPiece,detail<=1)
   if detail==0 and rec.Rig and rec.Detail~=0 then self:_park(rec.Rig,false);restoreShift(rec)end
   if detail<3 then restoreShift(rec)end
   rec.Detail=detail;wanted[c.Player]=true
@@ -269,6 +379,7 @@ function F:_layerOn(rec,L)
  if rec.Detail<(s.MinDetail or 1)then return false end
  if s.LocalOnly and not rec.Local then return false end
  if s.Motion and not b.Motion then return false end
+ if s.Head and(not rec.Piece or rec.Piece.Stashed or rec.HeadHidden or rec.Rig.Head~=rec.Head)then return false end
  return true
 end
 local function setRate(L,e,rate)
@@ -297,7 +408,7 @@ function F:_logic(rec,dt,now)
  for _,L in ipairs(rig.Layers)do
   local s=L.Spec;local on=self:_layerOn(rec,L)
   if s.Kind=='Emit'then
-   local active=on and((s.When=='Move'and run)or(s.When=='Idle'and idle))
+   local active=on and((s.When=='Move'and run)or(s.When=='Idle'and idle)or(s.When=='Always'and alive))
    local e=L.Emitters[1]
    if active then setRate(L,e,s.Rate*b.Rate*detailRate*(s.When=='Move'and speedRate or 1))end
    if e.Enabled~=active then e.Enabled=active end
@@ -345,6 +456,11 @@ end
 function F:Step(dt,now)
  self.Clock+=dt
  for _,rec in pairs(self.Records)do
+  local pc=rec.Piece
+  if pc and not pc.Stashed then
+   syncPiece(rec)
+   if rec.Detail>=3 and self.Budget.Motion and not rec.HeadHidden and rec.Head.Parent then self:_animatePiece(rec,now)else settlePiece(pc)end
+  end
   if rec.Rig and rec.Detail>0 then
    rec.Logic+=dt
    local every=rec.Detail>=2 and .05 or .1
@@ -354,9 +470,10 @@ function F:Step(dt,now)
  end
 end
 function F:Stats()
- local s={Records=0,Rigs=0,Pooled=self.Pool,Emitting=0,Ribbons=0,Lights=0,Built=self.Built}
+ local s={Records=0,Rigs=0,Pooled=self.Pool,Emitting=0,Ribbons=0,Lights=0,Built=self.Built,Pieces=0,PieceParts=0}
  for _,rec in pairs(self.Records)do
   s.Records+=1
+  if rec.Piece and not rec.Piece.Stashed then s.Pieces+=1;s.PieceParts+=#rec.Piece.Parts end
   if rec.Rig then s.Rigs+=1
    for _,L in ipairs(rec.Rig.Layers)do
     for _,e in ipairs(L.Emitters)do if e.Enabled then s.Emitting+=1 end end

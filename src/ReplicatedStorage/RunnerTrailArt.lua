@@ -121,4 +121,91 @@ function A.Configure(trail,color,layer,id)
  trail.FaceCamera=true;trail.LightInfluence=0;trail.MinLength=.06;trail.Lifetime=1.4;trail.Enabled=false
  trail:SetAttribute('PlainColourTrail91',true)
 end
+-- R118: head pieces worn by the top trails: Royal's glowing crown, Nebula's orbiting space dust and Aurora's halo.
+-- Built in head space (origin = Head centre, -Z = face, +Y = up) from the visible head size, so the live client
+-- (RunnerTrailAuraFx, welded to the Head) and the shop preview (ShopProductArt) share one geometry. Parts hang off
+-- "rings" (pivots): ring 1 is static, Nebula's rings 2/3 spin. Shimmer tags drive the client's gentle animation.
+A.HeadKinds={AuroraTrail='Halo',NebulaTrail='Dust',RoyalTrail='Crown'}
+function A.HeadKind(id)return A.HeadKinds[id]end
+-- Visible head size (width, height). Classic R6 heads are 2x1x1 parts drawn through a 1.25-scaled head mesh;
+-- R15/mesh heads are their part size.
+function A.HeadSize(head)
+ local s=head.Size;local w,h=math.min(s.X,s.Z),s.Y
+ local mesh=head:FindFirstChildOfClass('SpecialMesh')
+ if mesh and mesh.Scale then w=math.min(s.X*mesh.Scale.X,s.Z*mesh.Scale.Z);h=s.Y*mesh.Scale.Y end
+ return math.clamp(w,.5,4),math.clamp(h,.5,4)
+end
+A.HeadColors={
+ Gold=C(255,200,52),Rim=C(255,236,160),Point=C(255,214,70),Sheen=C(255,252,232),Purple=C(176,56,255),Red=C(236,36,92),
+ Dust={C(236,220,255),C(168,96,255),C(104,182,255),C(255,150,236),C(126,70,230)},Star=C(255,246,255),StarTint=C(214,180,255),
+}
+-- Cyclic palette sample (x wraps): used for the aurora halo's colour flow.
+function A.Cycle(colors,x)local n=#colors;local u=(x%1)*n;local i=math.floor(u)%n;return colors[i+1]:Lerp(colors[i%n+1],u-math.floor(u))end
+local function hash(i,k)local x=math.sin(i*12.9898+k*78.233)*43758.5453;return x-math.floor(x)end
+-- Returns {Kind,Rings={{Y,Speed,Bob}},Parts={{Name,Size,Offset,Ring,Color,Material,Transparency,Reflectance,Shimmer}},
+-- Points={name=head-space Vector3},Orbits={{Key,Center,Radius,Speed,Phase,Lift}}} or nil. simple = low-quality version.
+function A.HeadPiece(id,w,h,simple)
+ local kind=A.HeadKinds[id];if not kind then return nil end
+ local V,CF,ang=Vector3.new,CFrame.new,CFrame.Angles;local u=w;local top=h/2;local HC=A.HeadColors
+ local neon,metal=Enum.Material.Neon,Enum.Material.Metal
+ local out={Kind=kind,Rings={},Parts={},Points={},Orbits={}}
+ local function part(name,size,offset,color,material,alpha,ring,shimmer)
+  local t={Name=name,Size=size,Offset=offset,Color=color,Material=material,Transparency=alpha or 0,Ring=ring or 1,Shimmer=shimmer}
+  table.insert(out.Parts,t);return t
+ end
+ local function around(a,r,y)return V(math.sin(a)*r,y,-math.cos(a)*r)end
+ if kind=='Crown'then
+  -- Worn like a hat: the band wraps the top of the head, five points rise above it, jewels on band and tips.
+  local r=.53*u;local bandH=.2*u;local y0=top-.04*u;out.Rings[1]={Y=y0,Speed=0}
+  local seg=2*r*math.sin(math.pi/10)+.02*u
+  for i=0,9 do
+   local a=(i+.5)/10*2*math.pi
+   local band=part('Crown band',V(seg,bandH,.07*u),CF(around(a,r,0))*ang(0,-a,0),HC.Gold,metal);band.Reflectance=.2
+   if not simple then part('Crown rim',V(seg,.045*u,.09*u),CF(around(a,r+.005*u,bandH/2))*ang(0,-a,0),HC.Rim,neon,0,1,{Kind='Gold',T=(i+.5)/10})end
+  end
+  local py=bandH/2+.1*u;local tipY=py+.22*u*.7071+.035*u
+  for i=0,4 do
+   local a=i/5*2*math.pi
+   part('Crown point',V(.22*u,.22*u,.05*u),CF(around(a,r,py))*ang(0,-a,0)*ang(0,0,math.pi/4),HC.Point,neon,0,1,{Kind='Gold',T=i/5})
+   local gem=i%2==0 and HC.Purple or HC.Red
+   if not simple then
+    part('Crown gem',V(.09*u,.09*u,.09*u),CF(around(a,r,tipY))*ang(.6,-a,math.pi/4),gem,neon)
+    part('Crown jewel',V((i==0 and .15 or .11)*u,(i==0 and .15 or .11)*u,.04*u),CF(around(a,r+.045*u,0))*ang(0,-a,0)*ang(0,0,math.pi/4),gem,neon)
+   elseif i==0 then
+    part('Crown jewel',V(.15*u,.15*u,.04*u),CF(around(a,r+.045*u,0))*ang(0,-a,0)*ang(0,0,math.pi/4),gem,neon)
+   end
+   out.Points['Tip'..(i+1)]=around(a,r,y0+tipY)
+  end
+  out.Points.CrownTop=V(0,y0+bandH/2+.15*u,0)
+ elseif kind=='Halo'then
+  -- A shimmering aurora ring floating just above the head, with a soft wider glow band.
+  local r=.44*u;local y0=top+.24*u;out.Rings[1]={Y=y0,Speed=.5,Bob=.035*u}
+  local n=12;local seg=2*r*math.sin(math.pi/n)+.02*u;local colors=A.Looks.AuroraTrail.Colors
+  for i=0,n-1 do
+   local a=(i+.5)/n*2*math.pi;local c=A.Cycle(colors,i/n)
+   part('Aurora halo',V(seg,.07*u,.07*u),CF(around(a,r,0))*ang(0,-a,0),c,neon,.18,1,{Kind='Cycle',T=i/n})
+   if not simple then part('Aurora halo glow',V(seg*1.1,.03*u,.2*u),CF(around(a,r,0))*ang(0,-a,0),c,neon,.62,1,{Kind='Cycle',T=i/n})end
+  end
+  out.Points.HaloC=V(0,y0,0)
+ else
+  -- Space dust: specks and a few four-point stars on two counter-rotating rings close around the head.
+  local cy=top*.45;out.Rings[1]={Y=cy,Speed=0};out.Rings[2]={Y=cy,Speed=1.2};out.Rings[3]={Y=cy,Speed=-.75}
+  local function speck(i,ring,r0)
+   local a=i*2.399+hash(i,1);local r=(r0+.1*hash(i,2))*u;local y=(hash(i,3)-.45)*.55*u;local s=(.06+.05*hash(i,4))*u
+   part('Space dust',V(s,s,s),CF(around(a,r,y))*ang(hash(i,5)*3,a,math.pi/4),HC.Dust[(i-1)%#HC.Dust+1],neon,.12+.2*hash(i,6),ring,{Kind='Twinkle',T=hash(i,7)})
+  end
+  for i=1,simple and 5 or 9 do speck(i,2,.64)end
+  if not simple then for i=10,13 do speck(i,3,.72)end end
+  for i=1,simple and 2 or 3 do
+   local a=i/3*2*math.pi+.4;local p=around(a,.74*u,(i==2 and -.12 or .18+.06*i)*u);local s=(.24+.04*i)*u
+   local face=CF(p)*ang(0,-a,0)
+   part('Dust star',V(s,.035*u,.035*u),face*ang(0,0,math.pi/4),HC.Star,neon,0,3,{Kind='Twinkle',T=i/3})
+   part('Dust star',V(.035*u,s,.035*u),face*ang(0,0,math.pi/4),HC.StarTint,neon,0,3,{Kind='Twinkle',T=i/3})
+  end
+  local c=V(0,cy,0);out.Points.DustC=c
+  out.Orbits={{Key='Dust1',Center=c,Radius=.7*u,Speed=1.6,Phase=0,Lift=.18*u},{Key='Dust2',Center=c,Radius=.74*u,Speed=1.6,Phase=math.pi,Lift=.18*u}}
+  for _,o in ipairs(out.Orbits)do out.Points[o.Key]=c+V(math.sin(o.Phase)*o.Radius,0,-math.cos(o.Phase)*o.Radius)end
+ end
+ return out
+end
 return A

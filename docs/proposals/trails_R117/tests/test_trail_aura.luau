@@ -110,6 +110,8 @@ local function spawn(p,pos,id)
  local character=new('Model');character.Name=p.Name;character.Parent=workspace
  local h=new('Humanoid');h.Health=100;h.Sit=false;h.PlatformStand=false;h.FloorMaterial=R.Enum.Material.Plastic;h.Parent=character
  local root=new('Part');root.Name='HumanoidRootPart';root.Size=V3(2,2,1);root.CFrame=CF(pos.X,pos.Y,pos.Z);root.AssemblyLinearVelocity=V3(0,0,0);root.Parent=character
+ -- R118: an R15 head (head pieces and the crown glints live on it).
+ local head=new('Part');head.Name='Head';head.Size=V3(1.2,1.2,1.2);head.CFrame=CF(pos.X,pos.Y+2.6,pos.Z);head.LocalTransparencyModifier=0;head.Parent=character
  p.Character=character;setFolder(character,id);return character,root
 end
 local me=addPlayer('Me',true);local myChar,myRoot=spawn(me,V3(0,5,-10),'RoyalTrail')
@@ -129,7 +131,7 @@ local function setSpeed(root,s)root.AssemblyLinearVelocity=V3(0,0,-s)end
 frames(2)
 local mine=fx.Records[me]
 check(mine and mine.Rig and mine.Detail==3,'local Royal runner gets a full rig')
-check(children(myRoot)>=10,'aura attachments live on the local root')
+check(children(myRoot)+children(myChar.Head)>=10,'aura attachments live on the local root and head')
 local s=fx:Stats()
 check(s.Rigs<=8,'at most 8 auras ('..s.Rigs..')')
 local full=0;for p,rec in pairs(fx.Records)do if rec.Detail==3 and p~=me then full+=1 end end

@@ -2,6 +2,8 @@
 -- Follows the server's ChestChaseCosmetics folder (TrailId84/TrailLow84/TrailHigh84): new/changed/removed trails,
 -- respawns and leaving players are picked up by the scan. Budget: ClientFxBudget (FastMode = low), graphics level,
 -- Reduced Motion. Boot effects stay in RunnerTrailClient; this script never touches the boot pools.
+-- R118: the manager also puts the trail's head piece (Royal crown, Nebula space dust, Aurora halo) on each Head and
+-- copies the Head's LocalTransparencyModifier to it every frame (first person hides it); Release/Destroy free it.
 local Players=game:GetService('Players')
 local RunService=game:GetService('RunService')
 local Gui=game:GetService('GuiService')

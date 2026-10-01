@@ -20,7 +20,8 @@ function A.Specs(product,biome)
  elseif product.Type=='Trail'then
   -- R117: the preview shows each tier's live look: layered ribbon + core, then sparks (Arc), embers and a flare
   -- (Solar), an aurora veil (Aurora), a star swirl (Nebula) and Royal's gold/purple double helix, gold trim,
-  -- crown, jewels, glitter and footstep glints. Blocks only (static ViewportFrame; particles do not render there).
+  -- jewels, glitter and footstep glints; R118: plus the head piece (crown, space dust, halo).
+  -- Blocks only (static ViewportFrame; particles do not render there).
   local look=Ribbon.Look and Ribbon.Look(product.Id);local tier=look and look.Tier or 0;local id=product.Id
   p('Runner body',V(1.65,1.85,.8),CF(0,2.3,-.5),dark)
   p('Runner head',V(.85,.85,.85),CF(0,3.65,-.5),silver)
@@ -94,18 +95,6 @@ function A.Specs(product,biome)
     local t0,t1=(i-1)/12,i/12;local w0,w1=Ribbon.Width(t0)*widthScale*.76,Ribbon.Width(t1)*widthScale*.76
     for _,side in ipairs({1,-1})do seg('Royal trim',point(t0)+V(0,w0*side,0),point(t1)+V(0,w1*side,0),.07,.07,gold)end
    end
-   -- Crown: a gold band, five diamond points with jewel tips, a purple centre jewel.
-   local cy,cz=4.12,-.5
-   for i=0,9 do
-    local a0,a1=i/10*2*math.pi,(i+1)/10*2*math.pi
-    seg('Crown band',V(math.sin(a0)*.46,cy,cz-math.cos(a0)*.46),V(math.sin(a1)*.46,cy,cz-math.cos(a1)*.46),.05,.13,gold)
-   end
-   for i=0,4 do
-    local a=i/5*2*math.pi;local c=V(math.sin(a)*.46,cy+.17,cz-math.cos(a)*.46)
-    p('Crown point',V(.17,.17,.05),CF(c)*CFrame.Angles(0,-a,0)*CFrame.Angles(0,0,math.pi/4),gold,neon)
-    dot('Crown gem',c+V(0,.16,0),.08,i==0 and Color3.fromRGB(190,70,255)or Color3.fromRGB(255,250,220))
-   end
-   dot('Crown jewel',V(0,cy,cz-.5),.13,Color3.fromRGB(170,50,255))
    for i=1,5 do
     local t=.12+i*.15;local c=point(t)+V((hash(i,21)-.5)*1.2,(hash(i,22)-.5)*1.6,0)
     p('Royal jewel',V(.16,.26,.16),CF(c)*CFrame.Angles(0,hash(i,23)*3,math.pi/4),Ribbon.Sample({Color3.fromRGB(206,96,255),Color3.fromRGB(255,80,170),Color3.fromRGB(120,60,255)},hash(i,24)),neon)
@@ -115,6 +104,15 @@ function A.Specs(product,biome)
     local c=V(x,.04,-.2);p('Step glint',V(.34,.05,.05),CF(c),Color3.fromRGB(255,240,170),neon);p('Step glint',V(.05,.05,.34),CF(c),Color3.fromRGB(255,240,170),neon)
    end
    p('Royal flare',V(.95,.95,.06),CF(0,2.45,.12)*CFrame.Angles(0,0,math.pi/4),Color3.fromRGB(255,226,140),neon);out[#out].Transparency=.35
+  end
+  -- R118: the head piece worn in game (Royal crown, Nebula space dust, Aurora halo), same geometry as the live one.
+  local head=Ribbon.HeadPiece and Ribbon.HeadPiece(id,.85,.85,false)
+  if head then
+   local headFrame=CF(0,3.65,-.5)
+   for _,sp in ipairs(head.Parts)do
+    local ring=head.Rings[sp.Ring]or head.Rings[1]
+    p(sp.Name,sp.Size,headFrame*CF(0,ring.Y,0)*sp.Offset,sp.Color,sp.Material);out[#out].Transparency=sp.Transparency;out[#out].Reflectance=sp.Reflectance
+   end
   end
  elseif product.Id=='TreasureMagnet'then
   p('Magnet bridge',V(1.7,.55,.65),CF(0,0,0),accent,Enum.Material.Metal)
