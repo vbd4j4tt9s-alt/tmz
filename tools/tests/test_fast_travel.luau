@@ -59,7 +59,7 @@ module(RS,'RunnerSweep',{Hull=function()return V3(2,5,1),V3()end,Cast=function(_
 module(RS,'HudLayout',nil,'HudLayout');module(RS,'VectorIcons91',nil,'VectorIcons91')
 module(RS,'GardenTextFit',{Attach=function()end})
 local brightButtons={}
-module(RS,'BrightUI',{Button=function(b,c)brightButtons[#brightButtons+1]=b;b.BackgroundColor3=c end,Text=function(l,s)l.TextSize=s end})
+module(RS,'BrightUI',{Button=function(b,c)brightButtons[#brightButtons+1]=b;b.BackgroundColor3=c;local g=new('Frame');g.Name='GlassHighlight';g.BackgroundTransparency=.86;g.Parent=b end,Text=function(l,s)l.TextSize=s end})
 env=setmetatable({game=game,workspace=workspace,Instance=R.Instance,Vector3=R.Vector3,Vector2=R.Vector2,CFrame=R.CFrame,UDim=R.UDim,UDim2=R.UDim2,Color3=R.Color3,Enum=R.Enum,
  RaycastParams={new=function()return {}end},typeof=R.typeof,task=R.task,require=req,os={clock=function()return R.clock end,time=os.time},utf8=utf8,warn=function(...)print('WARN',...)end},{__index=_G})
 -- Server ---------------------------------------------------------------------------------
@@ -88,9 +88,12 @@ local pair=gui and gui:FindFirstChild('TravelPair')
 local baseButton=pair and pair:FindFirstChild('BaseButton');local trackButton=pair and pair:FindFirstChild('TrackButton')
 check(baseButton and trackButton,'both buttons exist')
 check(#brightButtons==2,'both styled with BrightUI.Button')
-check(baseButton:FindFirstChild('Icon'):FindFirstChild('InstantIcon')~=nil and trackButton:FindFirstChild('Icon'):FindFirstChild('InstantIcon')~=nil,'vector icons drawn')
-check(baseButton:FindFirstChild('Icon').InstantIcon:GetAttribute('VectorIcon91')=='Home','BASE icon is Home')
-check(trackButton:FindFirstChild('Icon').InstantIcon:GetAttribute('VectorIcon91')=='Track','TRACK icon is Track')
+-- R116: text only (no pictures), glossy highlight, drop shadow and a bounce scale on each button.
+check(baseButton:FindFirstChild('Icon')==nil and trackButton:FindFirstChild('Icon')==nil,'no pictures on the buttons')
+check(baseButton.Caption.Text=='BASE'and trackButton.Caption.Text=='TRACK','captions')
+check(baseButton:FindFirstChild('GlassHighlight')and baseButton.GlassHighlight.BackgroundTransparency<.86,'stronger top highlight')
+check(pair:FindFirstChild('BaseButtonShadow')and pair:FindFirstChild('TrackButtonShadow'),'drop shadows')
+check(baseButton:FindFirstChild('Bounce')and trackButton:FindFirstChild('Bounce'),'bounce scale')
 -- R114: rectangles in Roblox's top bar row, centred on the screen, inside the free part of the row (GuiService.TopbarInset).
 check(gui.ScreenInsets==R.Enum.ScreenInsets.None,'pair drawn in screen space')
 local Gui=service('GuiService')
@@ -101,6 +104,8 @@ check(pair.Visible==true,'pair visible')
 check(pair.AnchorPoint.X==.5 and pair.Position.X.Offset==640 and pair.Position.Y.Offset==29,'pair centred on the screen, in the top row')
 check(baseButton.Size.X.Offset>baseButton.Size.Y.Offset*2,'BASE is a wide rectangle')
 check(baseButton.Size.Y.Offset==44,'row height')
+check(pair.BaseButtonShadow.Size.X.Offset==baseButton.Size.X.Offset and pair.BaseButtonShadow.Position.Y.Offset==baseButton.Position.Y.Offset+3 and pair.TrackButtonShadow.Position.X.Offset==trackButton.Position.X.Offset,'shadows under the buttons')
+local cap=baseButton.Caption;check(cap.Position.X.Offset==6 and cap.TextSize>=14,'caption centred and bigger')
 check(trackButton.Position.X.Offset==baseButton.Size.X.Offset+8,'TRACK beside BASE')
 local function inside()local half=pair.Size.X.Offset/2;local x=pair.Position.X.Offset;local i=Gui.TopbarInset;return x-half>=i.Min.X and x+half<=i.Max.X end
 check(inside(),'pair stays between Roblox buttons (PC)')

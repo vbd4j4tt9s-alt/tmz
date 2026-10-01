@@ -21,7 +21,7 @@ function Wallet.new(parent)
   local compactTap=Instance.new('TextButton');compactTap.Name='CompactPurchase';compactTap.Text='';compactTap.BackgroundTransparency=1;compactTap.Size=UDim2.fromScale(1,1);compactTap.ZIndex=53;compactTap.Visible=false;compactTap.Parent=root
   compactTap:SetAttribute('AccessibleLabel','Buy '..kind);compactTap:SetAttribute('ButtonHighlight',false)
   table.insert(connections,compactTap.Activated:Connect(buy))
-  return setmetatable({Root=root,Amount=amount,AmountScale=amountScale,Icon=icon,IconScale=scale,More=plus,CompactTap=compactTap,Kind=kind,LastPulse=-math.huge},Wallet)
+  return setmetatable({Root=root,Amount=amount,AmountScale=amountScale,Icon=icon,IconScale=scale,More=plus,CompactTap=compactTap,Kind=kind,LastPulse=-math.huge,Born=os.clock()},Wallet)
  end
  self=row('CashHud',C(114,255,57),'Cash','Cash');self.Gems=row('GemHud',C(115,222,255),'Gems','Gems');self.Speed=row('SpeedHud',C(255,255,255),'Speed','Speed')
  local rows={self.Speed,self,self.Gems};local dead=false
@@ -78,6 +78,11 @@ end
 function Wallet:SetValue(value)
  local content=(self.Kind=='Cash'and'$'or'')..Numbers.Compact(value)
  if self.Amount.Text~=content then self.Amount.Text=content end
+ -- R116: cash and gems jump when they go up, like speed. Not while the save is first loading in (first 3 s).
+ if self.Kind~='Speed'and type(value)=='number'then
+  if self.Shown~=nil and value>self.Shown and os.clock()-(self.Born or 0)>3 then self:Jump()end
+  self.Shown=value
+ end
  self.Root:SetAttribute('ExactCash',Numbers.Exact(value));self.Root:SetAttribute('AccessibleLabel',(self.Kind or'Cash')..' '..Numbers.Exact(value))
 end
 function Wallet:Jump()
