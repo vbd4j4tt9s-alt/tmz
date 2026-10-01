@@ -6,18 +6,24 @@ local W=require('./world');local F=require('./fixtures');local R=W.R;local V3,CF
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
 F.packAssets(W)
-local Visuals=W.module('SeedPackVisuals');local Art=W.module('EclipsePackArt');local PackFx=W.module('VoidPackFx');local Rules=W.module('SeedPackRules')
+local Visuals=W.module('SeedPackVisuals');local Art=W.module('EclipsePackArt');local Shared=W.module('SpecialPackArt89');local PackFx=W.module('VoidPackFx');local Rules=W.module('SeedPackRules')
 local specs=Art.Specs()
 local function parts(bag)local out={};for _,p in ipairs(bag:GetDescendants())do if p:IsA('BasePart')and p~=bag.PrimaryPart then out[#out+1]=p end end;return out end
 local function named(bag)local n,set=0,{};for _,s in ipairs(specs)do set[s.Name]=true end;for _,p in ipairs(parts(bag))do if set[p.Name]then n+=1 end end;return n end
 print(('spec parts %d (budget %d)'):format(#specs,Art.Budget.MaxParts))
 check(#specs<=Art.Budget.MaxParts,'part budget')
 local kinds=setmetatable({},{__index=function(_,k)local n=0;for _,s in ipairs(specs)do if s.Name:sub(1,#k)==k then n+=1 end end;return n end})
-for _,k in ipairs({'VoidNebula','GalaxyArm','VoidSingularity','PhotonRing','AccretionDisc','VoidPupil','VoidIris','StarV','StarSpeck','RuneSigil','EventHorizon','HaloDebris'})do
+for _,k in ipairs({'VoidNebula','GalaxyArm','VoidSingularity','PhotonRing','AccretionDisc','VoidPupil','VoidIris','StarV','StarSpeck','RuneSigil'})do
  check((kinds[k]or 0)>0,'design element present: '..k)
 end
 local spin,pulse=0,0;for _,s in ipairs(specs)do if s.Spin then spin+=1 end;if s.Pulse then pulse+=1 end end
 check(spin>0 and pulse>0,'motion hints: '..spin..' spinning, '..pulse..' pulsing parts')
+-- R122b: halo removed - nothing outside the body, and the outline equals the standard pack body.
+do local names={};for _,sp in ipairs(Art.Specs())do names[sp.Name:gsub('%d','')]=true end
+ check(not names.EventHorizon and not names.HaloDebris,'no halo or debris parts')
+ local b,body=Art.Bounds(1),Shared.BodyBounds()
+ check(b.Radius<=body.Radius+.06 and b.MaxY<=body.MaxY+.06 and b.MinY>=body.MinY-.06,'outline matches the standard pack body ('..string.format('%.2f vs %.2f',b.Radius,body.Radius)..')')
+end
 -- Bounds hold every part (including spin sweeps) at several sizes.
 local function inside(bag,b,label)
  local root=bag.PrimaryPart.CFrame;local worst=0
