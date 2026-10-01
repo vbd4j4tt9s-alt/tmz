@@ -1,9 +1,12 @@
--- R79: compact pack, pass, cash and speed pages; durable pass gifting.
-local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Market=game:GetService('MarketplaceService');local Run=game:GetService('RunService')
+-- R120: one scrolling Robux shop (FEATURED, PASSES, SPEED, MONEY, GEMS) with a quick-jump column.
+-- Products, prices and every purchase / gift / owned flow are unchanged from R79; only the look and layout moved.
+local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Market=game:GetService('MarketplaceService')
+local Tween=game:GetService('TweenService');local GuiService=game:GetService('GuiService');local UIS=game:GetService('UserInputService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local Theme=require(RS:WaitForChild('GardenTheme'));local Passes=require(RS:WaitForChild('GamePassCatalog'))
 local Pricing=require(RS.PremiumPricing);local Catalog=require(RS:WaitForChild('MechCatalog'));local Cash=require(RS:WaitForChild('CashNumbers'));local Audio=require(RS:WaitForChild('InteractionAudio'))
-local Bright=require(RS.BrightUI);local Preview=require(RS.CollectionViewport);local Artwork=require(RS.HudArtwork)
+local Bright=require(RS.BrightUI);local Artwork=require(RS.HudArtwork);local Art=require(RS.PremiumShopArt);local Layout=require(RS.PremiumLayout);local Hud=require(RS.HudLayout)
 local request=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('PremiumRequest')
+local C=Color3.fromRGB
 local old=pg:FindFirstChild('GardenPasses');if old then old:Destroy()end
 local gui=Instance.new('ScreenGui');gui.Name='GardenPasses';gui.ResetOnSpawn=false;gui.DisplayOrder=34;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
 local function label(parent,name,text,pos,size,font,color)
@@ -12,70 +15,81 @@ local function label(parent,name,text,pos,size,font,color)
 end
 local function button(parent,name,text,pos,size,color)
  local b=Instance.new('TextButton');b.Name=name;b.Text=text;b.Position=pos;b.Size=size;b.BorderSizePixel=0;b.BackgroundColor3=color or Theme.Colors.Mint
- b.TextSize=18;Bright.Button(b,color or Theme.Colors.Mint);b.Parent=parent;return b
+ b.TextSize=18;b.ZIndex=5;Bright.Button(b,color or Theme.Colors.Mint);Art.Stroke(b,Art.Ink,2.5,'BrightOutline');b.Parent=parent;return b
 end
-local toggle=button(gui,'PassesButton','',UDim2.new(0,18,.5,42),UDim2.fromOffset(68,68),Color3.fromRGB(125,222,44));toggle.AnchorPoint=Vector2.new(0,.5);toggle.TextSize=12
+local toggle=button(gui,'PassesButton','',UDim2.new(0,18,.5,42),UDim2.fromOffset(68,68),C(125,222,44));toggle.AnchorPoint=Vector2.new(0,.5);toggle.TextSize=12;toggle.ZIndex=1
 local shopIcon=Artwork.Attach(toggle,'RobuxShop');shopIcon.Position=UDim2.fromOffset(5,0);shopIcon.Size=UDim2.new(1,-10,1,-11)
 local caption=label(toggle,'Caption','SHOP',UDim2.new(0,0,1,-19),UDim2.new(1,0,0,18),14);caption.TextXAlignment=Enum.TextXAlignment.Center
-require(RS.HudLayout).Navigation(toggle,3)
-local shade=button(gui,'Shade','',UDim2.fromScale(0,0),UDim2.fromScale(1,1),Color3.new());shade.BackgroundTransparency=.4;shade.Visible=false;shade:FindFirstChild('BrightFill'):Destroy();shade:FindFirstChild('BrightOutline'):Destroy()
+Hud.Navigation(toggle,3)
+local shade=button(gui,'Shade','',UDim2.fromScale(0,0),UDim2.fromScale(1,1),Color3.new());shade.ZIndex=1;shade.BackgroundTransparency=.4;shade.Visible=false;shade:FindFirstChild('BrightFill'):Destroy();shade:FindFirstChild('BrightOutline'):Destroy()
 require(RS.MenuBackdrop).Attach(gui,shade,false)
-local panel=Instance.new('Frame');panel.Name='PremiumShop';panel.AnchorPoint=Vector2.new(.5,.5);panel.Position=UDim2.fromScale(.5,.5);panel.Size=UDim2.new(.94,0,.9,0);panel.BackgroundColor3=Theme.Colors.Panel;panel.BorderSizePixel=0;panel.Visible=false;panel.Parent=gui;Bright.Panel(panel)
-local limit=Instance.new('UISizeConstraint');limit.MaxSize=Vector2.new(1050,800);limit.Parent=panel
-local header=Instance.new('Frame');header.Name='Header';header.Size=UDim2.new(1,0,0,60);header.BorderSizePixel=0;header.Parent=panel;Bright.Header(header)
-label(header,'Title','SHOP',UDim2.fromOffset(18,2),UDim2.new(1,-90,1,-4),36)
-local close=button(header,'Close','X',UDim2.new(1,-54,0,8),UDim2.fromOffset(44,44),Color3.fromRGB(255,57,81))
-local connections={};local reveals={};local giftDialog;local fitPanel
-local Layout=require(RS.PremiumLayout)
+-- Panel: green glossy header + dark studded body holding one vertical page.
+local panel=Art.Frame(gui,'PremiumShop',C(40,42,52));panel.Visible=false;panel.Active=true;panel.ZIndex=2;Art.Corner(panel,10);Art.Stroke(panel,Art.Ink,4)
+local header=Art.Frame(panel,'Header',Color3.new(1,1,1));header.ClipsDescendants=true;header.ZIndex=3;Art.Corner(header,8);Art.Stroke(header,C(22,96,24),2)
+Art.Gradient(header,{C(150,255,90),C(84,230,58),C(52,196,40)},90)
+Art.LPattern(header,28,2,C(40,150,30),.55);Art.Stripes(header)
+local title=Art.Text(header,'Title','Shop',40);title.TextXAlignment=Enum.TextXAlignment.Left;title.ZIndex=4
+local close=Instance.new('TextButton');close.Name='Close';close.Text='';close.AutoButtonColor=true;close.BorderSizePixel=0;close.ZIndex=6;close.Parent=header
+close.BackgroundColor3=Art.Colors.Close;Art.Corner(close,4);Art.Stroke(close,C(90,6,10),3);Art.Gradient(close,{C(255,70,70),C(214,20,28)},90)
+local closeX=Art.Text(close,'X','X',30);closeX.Size=UDim2.fromScale(1,1);closeX.ZIndex=7;close:SetAttribute('AccessibleLabel','Close shop')
+local body=Art.Frame(panel,'Body',C(52,54,66));body.ClipsDescendants=true;body.ZIndex=2;Art.Corner(body,8)
+Art.Studs(body,10,30,C(30,31,40),.25)
+local page=Instance.new('ScrollingFrame');page.Name='Page';page.BackgroundTransparency=1;page.BorderSizePixel=0;page.ScrollBarThickness=6;page.ScrollBarImageColor3=C(200,204,220)
+page.ScrollingDirection=Enum.ScrollingDirection.Y;page.CanvasSize=UDim2.new();page.AutomaticCanvasSize=Enum.AutomaticSize.None;page.ElasticBehavior=Enum.ElasticBehavior.WhenScrollable;page.ZIndex=3;page.Parent=body
+local status=Art.Text(panel,'Status','',16,Theme.Colors.Mint);status.BackgroundTransparency=.15;status.BackgroundColor3=C(16,18,26);status.ZIndex=12;status.Visible=false;status.TextWrapped=true;Art.Corner(status,8)
+-- Quick-jump column outside the panel (a row above it in portrait).
+local jumpRoot=Art.Frame(gui,'JumpButtons',nil,1);jumpRoot.Visible=false;jumpRoot.ZIndex=2
+local SectionColor={Featured=C(255,170,40),Passes=C(255,226,40),Speed=C(70,222,255),Money=C(110,255,70),Gems=C(214,150,255)}
+local jumpButtons={}
+for i,s in ipairs(Layout.Sections)do
+ local b=Instance.new('TextButton');b.Name='Jump'..s.Key;b.Text='';b.AutoButtonColor=false;b.BorderSizePixel=0;b.BackgroundColor3=C(18,20,30);b.BackgroundTransparency=.35;b.LayoutOrder=i;b.Parent=jumpRoot
+ Art.Corner(b,10);local ring=Art.Stroke(b,SectionColor[s.Key],3,'Current');ring.Enabled=false
+ b:SetAttribute('Section',s.Key);b:SetAttribute('AccessibleLabel','Jump to '..s.Label)
+ local icon=Art.Frame(b,'Icon',nil,1);icon.ZIndex=2
+ if s.Key=='Featured'then require(RS.VectorIcons91).Draw(icon,'Mech')
+ elseif s.Key=='Passes'then require(RS.PremiumEmblems).Draw(icon,'Crown')
+ elseif s.Key=='Speed'then require(RS.PremiumEmblems).Draw(icon,'Bolt')
+ elseif s.Key=='Money'then require(RS.PremiumEmblems).Draw(icon,'Money')
+ else require(RS.GemIcon).new(icon)end
+ local name=Art.Text(b,'Label',s.Label,16,SectionColor[s.Key]);name.ZIndex=3
+ local scale=Instance.new('UIScale');scale.Parent=b
+ jumpButtons[s.Key]=b
+end
+local connections={};local reveals={};local giftDialog
 local function watch(signal,fn)local c=signal:Connect(fn);table.insert(connections,c);return c end
-local tabs,pages={},{};local selected='Packs';local busy=false;local state={};local refresh;local packInfos={};local packCount=1;local quantityButtons={}
-for i,name in ipairs({'Packs','Passes','Cash','Speed','Gems'})do
- local tab=button(panel,name..'Tab',name:upper(),UDim2.new((i-1)/5,12,0,69),UDim2.new(1/5,-14,0,36),Theme.Colors.Card);tab.TextSize=16;require(RS.GardenTextFit).Attach(tab,16,11);tabs[name]=tab
- local page=Instance.new('ScrollingFrame');page.Name=name;page.BackgroundTransparency=1;page.BorderSizePixel=0;page.Position=UDim2.fromOffset(12,115);page.Size=UDim2.new(1,-24,1,-155);page.CanvasSize=UDim2.new();page.AutomaticCanvasSize=Enum.AutomaticSize.Y;page.ScrollBarThickness=4;page.Visible=false;page.Parent=panel;pages[name]=page
- local layout=Instance.new('UIListLayout');layout.Padding=UDim.new(0,12);layout.SortOrder=Enum.SortOrder.LayoutOrder;layout.Parent=page
- tab.Activated:Connect(function()pg:SetAttribute('PremiumPage',name)end)
-end
-local status=label(panel,'Status','',UDim2.new(0,14,1,-40),UDim2.new(1,-28,0,32),13,Theme.Colors.Mint)
-local function selectPage(name)
- if name=='Perks'then name='Passes'end
- selected=pages[name]and name or'Packs'
- for key,page in pairs(pages)do page.Visible=key==selected;Bright.Button(tabs[key],key==selected and Theme.Colors.Mint or Color3.fromRGB(81,105,188));tabs[key].TextColor3=Theme.Colors.Text end
-end
-local function card(page,name,height)
- local f=Instance.new('Frame');f.Name=name;f.Size=UDim2.new(1,-6,0,height);f.BackgroundColor3=Theme.Colors.Card;f.BorderSizePixel=0;f.Parent=pages[page];Bright.Card(f,Color3.fromRGB(82,178,255),false);return f
-end
-local pack=card('Packs','LimitedMechPack',596)
-Bright.Card(pack,Color3.fromRGB(46,220,255),true);pack.ClipsDescendants=true
-require(RS.PackViewport89).DecorateCard(pack)
-local banner=Instance.new('Frame');banner.Name='ChromaticBanner';banner.Size=UDim2.new(1,-20,0,5);banner.Position=UDim2.fromOffset(10,8);banner.BackgroundColor3=Color3.new(1,1,1);banner.BorderSizePixel=0;banner.Parent=pack
-local rainbow=Instance.new('UIGradient');rainbow.Color=ColorSequence.new(Color3.fromRGB(94,229,243),Color3.fromRGB(248,187,84));rainbow.Parent=banner
-local packTitle=label(pack,'Name','MECH PACK',UDim2.fromOffset(16,25),UDim2.new(1,-32,0,49),38);packTitle.TextXAlignment=Enum.TextXAlignment.Center;packTitle.TextWrapped=false;require(RS.GardenTextFit).Attach(packTitle,38,22)
+local busy=false;local state:{[string]:any}={};local refresh;local packInfos={};local packCount=1;local quantityButtons={}
+local relayout
+-- Section titles "-- PASSES --".
+local sectionHeaders={}
+for _,s in ipairs(Layout.Sections)do if s.Key~='Featured'then
+ local t=Art.Text(page,s.Key..'Header','-- '..s.Title..' --',30,SectionColor[s.Key]);t.ZIndex=4;sectionHeaders[s.Key]=t
+end end
+-- FEATURED: limited Mech pack banner (same products, quantity picker and buttons as before).
+local pack=Art.Card(page,'LimitedMechPack',{C(255,196,60),C(255,96,44),C(196,34,74),C(110,30,150)})
+pack.Fill.Rotation=100
+local packTitle=Art.Text(pack,'PackTitle','LIMITED MECH PACK',34);packTitle.ZIndex=4;packTitle.TextXAlignment=Enum.TextXAlignment.Left
+local limited=Art.Text(pack,'Contents','LIMITED TIME!',20,C(255,236,90));limited.ZIndex=4;limited.TextXAlignment=Enum.TextXAlignment.Right
+local stage=Art.Frame(pack,'PreviewStage',C(20,12,40),.55);stage.ZIndex=2;Art.Corner(stage,10);Art.Stroke(stage,Art.Ink,2)
+local packView=require(RS.PackViewport89).Create(stage)
+local dock=stage:FindFirstChild('MechDockingBay');if dock then dock.Visible=false end
+packView.AnchorPoint=Vector2.zero;packView.Position=UDim2.fromScale(0,0);packView.Size=UDim2.fromScale(1,1);packView.ZIndex=3
 require(RS.GuiShine).Attach(pack,false)
-local limited=label(pack,'Contents','LIMITED',UDim2.fromOffset(16,78),UDim2.new(1,-32,0,27),19,Color3.fromRGB(255,206,111));limited.TextXAlignment=Enum.TextXAlignment.Center
-require(RS.PackViewport89).Create(pack)
-local outcomes=Instance.new('Frame');outcomes.Name='Outcomes';outcomes.Position=UDim2.fromOffset(14,282);outcomes.Size=UDim2.new(1,-28,0,278);outcomes.BackgroundTransparency=1;outcomes.Parent=pack
-local outcomeGrid=Instance.new('UIGridLayout');outcomeGrid.CellPadding=UDim2.fromOffset(8,8);outcomeGrid.SortOrder=Enum.SortOrder.LayoutOrder;outcomeGrid.Parent=outcomes
+local outcomes=Art.Frame(pack,'Outcomes',nil,1);outcomes.ZIndex=3
 for i,s in ipairs(Catalog.Seeds)do
- local item=Instance.new('TextButton');item.Text='';item.AutoButtonColor=false;item.Name=s.Id;item.LayoutOrder=i;item.BorderSizePixel=0;item.Parent=outcomes;Bright.Card(item,Theme.Rarity(s.Rarity).Accent,true)
- local view=Instance.new('ViewportFrame');view.Name='Plant';view.BackgroundTransparency=1;view.AnchorPoint=Vector2.new(.5,1);view.Position=UDim2.new(.5,0,1,-49);view.Size=UDim2.new(.65+i*.055,-8,.68+i*.02,-30);view.Ambient=Color3.fromRGB(224,225,242);view.LightColor=Color3.new(1,1,1);view.Parent=item
+ local item=Instance.new('TextButton');item.Text='';item.AutoButtonColor=false;item.Name=s.Id;item.LayoutOrder=i;item.BorderSizePixel=0;item.BackgroundColor3=Color3.new(1,1,1);item.ZIndex=3;item.Parent=outcomes
+ local accent=Theme.Rarity(s.Rarity).Accent;Art.Corner(item,6);Art.Stroke(item,Art.Ink,2);Art.Gradient(item,{accent:Lerp(Color3.new(1,1,1),.25),accent:Lerp(C(20,10,40),.55)},90)
+ local view=Instance.new('ViewportFrame');view.Name='Plant';view.BackgroundTransparency=1;view.Position=UDim2.fromScale(.04,.02);view.Size=UDim2.fromScale(.92,.8);view.Ambient=C(224,225,242);view.LightColor=Color3.new(1,1,1);view.ZIndex=4;view.Parent=item
  table.insert(reveals,require(RS.ShopSeedReveal).Attach(item,view,s.Id,player))
- local name=label(item,'Name',s.Name,UDim2.fromOffset(3,2),UDim2.new(1,-6,0,39),16);name.TextXAlignment=Enum.TextXAlignment.Center
- local chance=label(item,'Chance',require(RS.OddsText85).Format(s.Chance),UDim2.new(0,4,1,-34),UDim2.new(1,-8,0,27),21,s.Rarity=='King'and Theme.Colors.Gold or Color3.new(1,1,1));chance.TextXAlignment=Enum.TextXAlignment.Center
+ local name=Art.Text(item,'SeedName',s.Name,12);name.ZIndex=5;name.TextWrapped=true
+ local chance=Art.Text(item,'Chance',require(RS.OddsText85).Format(s.Chance),18,s.Rarity=='King'and Theme.Colors.Gold or Color3.new(1,1,1));chance.ZIndex=6;chance.TextXAlignment=Enum.TextXAlignment.Right
 end
-local function gallerySize()
- local w=outcomes.AbsoluteSize.X>0 and outcomes.AbsoluteSize.X or 300;local cols=w>=700 and 6 or w>=420 and 3 or 2
- local height=cols==6 and 214 or 174;outcomeGrid.CellSize=UDim2.fromOffset(math.floor((w-(cols-1)*8)/cols),height)
- local rows=6/cols;local total=height*rows+(rows-1)*8;outcomes.Size=UDim2.new(1,-28,0,total);pack.Size=UDim2.new(1,-6,0,282+total+128)
-end
-watch(outcomes:GetPropertyChangedSignal('AbsoluteSize'),gallerySize);gallerySize()
-local gemBuy=button(pack,'BuyWithGems',Catalog.GemPrice..' Gems',UDim2.new(0,14,1,-66),UDim2.new(.5,-20,0,49),Color3.fromRGB(44,197,255))
-local robuxBuy=button(pack,'BuyWithRobux','Unavailable',UDim2.new(.5,6,1,-66),UDim2.new(.5,-20,0,49),Color3.fromRGB(130,244,60))
-for i,offer in ipairs(Catalog.Offers)do
- local b=button(pack,'Quantity'..offer.Count,offer.Count==1 and'SINGLE'or offer.Count..' PACKS',UDim2.new((i-1)/3,14,1,-111),UDim2.new(1/3,-20,0,35),Theme.Colors.Card)
- b.TextSize=15;require(RS.GardenTextFit).Attach(b,15,11);quantityButtons[offer.Count]=b
+local gemBuy=Art.Button(pack,'BuyWithGems',Art.Colors.Gem,'Gem')
+local robuxBuy=Art.Button(pack,'BuyWithRobux',Art.Colors.Robux,'Robux')
+for _,offer in ipairs(Catalog.Offers)do
+ local b=button(pack,'Quantity'..offer.Count,offer.Count==1 and'SINGLE'or offer.Count..' PACKS',UDim2.new(),UDim2.new(),C(70,74,96))
+ b.TextSize=15;require(RS.GardenTextFit).Attach(b,15,10);quantityButtons[offer.Count]=b
  b.Activated:Connect(function()if busy then return end;packCount=offer.Count;refresh()end)
 end
-require(RS.GardenTextFit).Attach(gemBuy,18,12);require(RS.GardenTextFit).Attach(robuxBuy,18,12)
 -- Retry transient metadata failures without displaying a made-up Robux price.
 local function marketplaceInfo(id,kind,done)
  if id<=0 then return end
@@ -91,80 +105,83 @@ local function marketplaceInfo(id,kind,done)
   end
  end)
 end
-local passButtons={}
-local boostRow=Instance.new('Frame');boostRow.Name='BoostCards';boostRow.BackgroundTransparency=1;boostRow.Size=UDim2.new(1,-6,0,300);boostRow.Parent=pages.Passes
-local boostGrid=Instance.new('UIGridLayout');boostGrid.CellPadding=UDim2.fromOffset(14,14);boostGrid.SortOrder=Enum.SortOrder.LayoutOrder;boostGrid.Parent=boostRow
+-- PASSES: one card per pass; the Speed pass also gets the SPEED banner. Every view of a pass shares its state.
+local passButtons={};local passViews={}
 local boostArt=require(RS.PremiumBoostCard)
 for i,pass in ipairs(Passes)do
- local c=boostArt.Create(boostRow,pass,i);local gem=c.GemPerk;local robux=c.RobuxPass
- passButtons[pass.Key]={Gem=gem,Robux=robux,Pass=pass}
- local id=Passes.Id(pass)
- marketplaceInfo(id,Enum.InfoType.GamePass,function(info)passButtons[pass.Key].Info=info end)
+ local c=boostArt.Create(page,pass,i)
+ local row={Gem=c.GemPerk,Robux=c.RobuxPass,Pass=pass,Views={}}
+ passButtons[pass.Key]=row
+ table.insert(row.Views,{Card=c,Gem=c.GemPerk,Robux=c.RobuxPass,Gift=c.GiftPass,Banner=false})
+ marketplaceInfo(Passes.Id(pass),Enum.InfoType.GamePass,function(info)passButtons[pass.Key].Info=info end)
 end
-local function boostSize()
- local w=boostRow.AbsoluteSize.X>0 and boostRow.AbsoluteSize.X or 280;local cols=w>=740 and 2 or 1
- boostGrid.CellSize=UDim2.fromOffset(math.floor((w-(cols-1)*14)/cols),300)
- boostRow.Size=UDim2.new(1,-6,0,cols==2 and 300 or 614)
+local speedBanner
+if passButtons.Speed then
+ speedBanner=boostArt.CreateBanner(page,passButtons.Speed.Pass)
+ table.insert(passButtons.Speed.Views,{Card=speedBanner,Gem=speedBanner.GemPerk,Robux=speedBanner.RobuxPass,Gift=speedBanner.GiftPass,Banner=true})
 end
-watch(boostRow:GetPropertyChangedSignal('AbsoluteSize'),boostSize);boostSize()
-local bundleButtons={}
+for _,row in pairs(passButtons)do for _,v in ipairs(row.Views)do table.insert(passViews,v)end end
+-- SPEED and MONEY bundles.
+local bundleButtons={};local bundleOrder={Speed={},Cash={}}
 local BundleArt=require(RS.PremiumBundleCard)
-for _,kind in ipairs({'Cash','Speed'})do
- local grid=Instance.new('Frame');grid.Name=kind..'Bundles';grid.BackgroundTransparency=1;grid.Size=UDim2.new(1,-6,0,584);grid.LayoutOrder=1;grid.Parent=pages[kind]
- local rows={}
+for _,kind in ipairs({'Speed','Cash'})do
  for _,row in ipairs(Pricing.Bundles)do if row.Kind==kind then
-  local c=BundleArt.Create(grid,row,#rows+1);table.insert(rows,c)
+  local list=bundleOrder[kind];local c=BundleArt.Create(page,row,#list+1);table.insert(list,row.Key)
   bundleButtons[row.Key]={Frame=c,Gem=c:FindFirstChild('GemBundle'),Robux=c.RobuxBundle,Row=row}
  end end
- local function layoutBundles()
-  local boxes,height=Layout.Bundles(grid.AbsoluteSize.X>0 and grid.AbsoluteSize.X or 300,kind=='Speed'and 268 or 286)
-  for i,c in ipairs(rows)do local box=boxes[i];c.Position=UDim2.fromOffset(box.X,box.Y);c.Size=UDim2.fromOffset(box.W,box.H)end
-  local size=UDim2.new(1,-6,0,height);if grid.Size~=size then grid.Size=size end
- end
- watch(grid:GetPropertyChangedSignal('AbsoluteSize'),layoutBundles);layoutBundles()
 end
 local function productInfo(id,done)
  marketplaceInfo(id,Enum.InfoType.Product,done)
 end
 for _,offer in ipairs(Catalog.Offers)do productInfo(Catalog.ProductId(offer.Count),function(info)packInfos[offer.Count]=info end)end
 for _,row in pairs(bundleButtons)do productInfo(Pricing.ProductId(row.Row),function(info)row.Info=info end)end
-local gems=card('Gems','ConvertCash',305)
-local gemIcon=require(RS.GemIcon).new(gems);gemIcon.Position=UDim2.fromOffset(15,15);gemIcon.Size=UDim2.fromOffset(52,52)
-label(gems,'Heading','CASH TO GEMS',UDim2.fromOffset(80,16),UDim2.new(1,-95,0,40),22,Color3.fromRGB(116,222,255))
-label(gems,'Rate',Cash.Compact(Catalog.CashPerGem)..' Cash = 1 Gem',UDim2.fromOffset(16,80),UDim2.new(1,-32,0,30),17)
-label(gems,'QuantityLabel','How many Gems?',UDim2.fromOffset(16,118),UDim2.new(1,-32,0,24),14)
-local quantity=Instance.new('TextBox');quantity.Name='GemQuantity';quantity.Text='1';quantity.ClearTextOnFocus=false;quantity.PlaceholderText='Whole number';quantity.Position=UDim2.fromOffset(16,151);quantity.Size=UDim2.new(1,-112,0,42);quantity.BackgroundColor3=Theme.Colors.Panel;quantity.BorderSizePixel=0;Bright.Text(quantity,20);Theme.Corner(quantity,8);quantity.Parent=gems
-local maxButton=button(gems,'Maximum','MAX',UDim2.new(1,-84,0,151),UDim2.fromOffset(68,42))
-local cost=label(gems,'Cost','Cost: '..Cash.Compact(Catalog.CashPerGem)..' Cash',UDim2.fromOffset(16,204),UDim2.new(1,-32,0,27),14)
-local convert=button(gems,'Convert','CONVERT',UDim2.new(0,16,1,-55),UDim2.new(1,-32,0,42),Color3.fromRGB(98,211,255))
-local ways=card('Gems','EarnGems',117)
-label(ways,'Title','COMPLETE YOUR PLANT INDEX',UDim2.fromOffset(16,12),UDim2.new(1,-32,0,33),18,Theme.Colors.Gold)
-label(ways,'Detail','Collect Gems from your plant index.',UDim2.fromOffset(16,48),UDim2.new(1,-32,0,57),14)
+-- GEMS: cash -> gems converter (unchanged rules) and the index tip.
+local gems=Art.Card(page,'ConvertCash',{C(120,226,255),C(70,140,250),C(110,70,230)})
+local gemIcon=require(RS.GemIcon).new(gems);gemIcon.ZIndex=3
+local gemHeading=Art.Text(gems,'Heading','CASH TO GEMS',26,C(190,246,255));gemHeading.ZIndex=4;gemHeading.TextXAlignment=Enum.TextXAlignment.Left
+local rate=Art.Text(gems,'Rate',Cash.Compact(Catalog.CashPerGem)..' Cash = 1 Gem',18);rate.ZIndex=4;rate.TextXAlignment=Enum.TextXAlignment.Left
+local quantityLabel=Art.Text(gems,'QuantityLabel','How many Gems?',15);quantityLabel.ZIndex=4;quantityLabel.TextXAlignment=Enum.TextXAlignment.Left
+local quantity=Instance.new('TextBox');quantity.Name='GemQuantity';quantity.Text='1';quantity.ClearTextOnFocus=false;quantity.PlaceholderText='Whole number';quantity.BackgroundColor3=C(24,26,40);quantity.BorderSizePixel=0;quantity.ZIndex=5;Bright.Text(quantity,20);Theme.Corner(quantity,8);Art.Stroke(quantity,Art.Ink,2);quantity.Parent=gems
+local maxButton=button(gems,'Maximum','MAX',UDim2.new(),UDim2.new(),C(255,196,52))
+local cost=Art.Text(gems,'Cost','Cost: '..Cash.Compact(Catalog.CashPerGem)..' Cash',15);cost.ZIndex=4;cost.TextXAlignment=Enum.TextXAlignment.Left
+local convert=button(gems,'Convert','CONVERT',UDim2.new(),UDim2.new(),C(98,211,255))
+local ways=Art.Card(page,'EarnGems',{C(90,94,124),C(58,60,86)},false)
+local waysTitle=Art.Text(ways,'Title','COMPLETE YOUR PLANT INDEX',20,Theme.Colors.Gold);waysTitle.ZIndex=4;waysTitle.TextXAlignment=Enum.TextXAlignment.Left
+local waysDetail=Art.Text(ways,'Detail','Collect Gems from your plant index.',15);waysDetail.ZIndex=4;waysDetail.TextXAlignment=Enum.TextXAlignment.Left
 local function active(b,enabled)b.Interactable=enabled;b.Active=enabled;b.AutoButtonColor=enabled;b.BackgroundTransparency=enabled and 0 or .45 end
+local layoutKey;local content;local frame
+local function setPrice(b,text,icon,color)Art.SetCaption(b,text,icon,color)end
 refresh=function()
  local offer=Catalog.Offer(packCount);local available=state.PackOffers and state.PackOffers[tostring(packCount)]or{}
  local gemLive=available.GemAvailable==true
- gemBuy.Text=state.OnSale==false and'Off sale'or(gemLive and offer.GemPrice..' Gems'or'Unavailable');active(gemBuy,gemLive and not busy)
+ setPrice(gemBuy,state.OnSale==false and'Off sale'or(gemLive and tostring(offer.GemPrice)or'Unavailable'),gemLive);active(gemBuy,gemLive and not busy)
  local packInfo=packInfos[packCount];local packPrice=packInfo and packInfo.PriceInRobux
  local packLive=available.RobuxAvailable==true and packPrice~=nil and packInfo.IsForSale~=false
- robuxBuy.Text=packLive and(packPrice..' Robux')or'Unavailable';active(robuxBuy,packLive and not busy)
- for count,b in pairs(quantityButtons)do Bright.Button(b,count==packCount and Color3.fromRGB(43,184,216)or Theme.Colors.Card);active(b,not busy)end
+ setPrice(robuxBuy,packLive and tostring(packPrice)or'Unavailable',packLive);active(robuxBuy,packLive and not busy)
+ for count,b in pairs(quantityButtons)do Bright.Button(b,count==packCount and C(255,186,40)or C(70,74,96));Art.Stroke(b,Art.Ink,2.5,'BrightOutline');b:SetAttribute('Selected',count==packCount);active(b,not busy)end
  for key,row in pairs(bundleButtons)do
   local quote=state.Bundles and state.Bundles[key]
   row.Quote=quote and quote.Amount and {Key=key,Amount=quote.Amount,GemPrice=quote.GemPrice}or nil
-  if row.Gem then active(row.Gem,not busy and row.Quote~=nil);row.Gem.Text=(quote and quote.GemPrice or row.Row.GemPrice)..' Gems'end
+  if row.Gem then active(row.Gem,not busy and row.Quote~=nil);setPrice(row.Gem,tostring(quote and quote.GemPrice or row.Row.GemPrice))end
   local amount=row.Frame:FindFirstChild('Amount')
-  if amount then amount.Text=row.Row.Kind=='Cash'and row.Row.Name or Cash.Compact(row.Row.Amount)end
+  if amount then amount.Text=BundleArt.AmountText(row.Row)end
   local info=row.Info;local ready=quote and quote.Available==true and info and info.IsForSale~=false and info.PriceInRobux~=nil
-  row.Robux.Text=ready and(info.PriceInRobux..' Robux')or'Unavailable';active(row.Robux,ready and not busy)
+  setPrice(row.Robux,ready and tostring(info.PriceInRobux)or'Unavailable',ready==true);active(row.Robux,ready and not busy)
  end
+ local reflow=false
  for _,row in pairs(passButtons)do
   local owned=player:GetAttribute(row.Pass.Attribute)==true
   local ownershipReady=player:GetAttribute(row.Pass.Key..'OwnershipReady')==true
-  row.Gem.Text=owned and'Owned'or not ownershipReady and'Checking ownership…'or Catalog.PassGemPrices[row.Pass.Key]..' Gems';active(row.Gem,ownershipReady and not owned and not busy)
-  local info=row.Info;row.Robux.Text=owned and'Owned'or info and info.IsForSale and info.PriceInRobux and(info.PriceInRobux..' Robux')or'Unavailable'
-  active(row.Robux,not owned and not busy and info~=nil and info.IsForSale==true)
+  local info=row.Info;local forSale=info~=nil and info.IsForSale==true and info.PriceInRobux~=nil
+  for _,v in ipairs(row.Views)do
+   if v.Gem.Visible==owned then v.Gem.Visible=not owned;reflow=true end
+   setPrice(v.Gem,owned and'Owned'or not ownershipReady and'Checking…'or tostring(Catalog.PassGemPrices[row.Pass.Key]),ownershipReady and not owned);active(v.Gem,ownershipReady and not owned and not busy)
+   setPrice(v.Robux,owned and'OWNED'or forSale and tostring(info.PriceInRobux)or'Unavailable',forSale and not owned,owned and Art.Colors.Owned or Art.Colors.Robux)
+   active(v.Robux,not owned and not busy and info~=nil and info.IsForSale==true)
+   v.Card:SetAttribute('Owned',owned)
+  end
  end
+ if reflow and relayout then relayout(true)end
  if giftDialog then giftDialog:Refresh()end
 end
 local pendingState=false
@@ -189,9 +206,11 @@ local giftInfos={}
 for _,pass in ipairs(Passes)do productInfo(require(RS.PassGiftCatalog).ProductId(pass.Key),function(info)giftInfos[pass.Key]=info end)end
 giftDialog=require(RS.PassGiftDialog).Create(panel,player,act,function()return state end,function(key)return giftInfos[key]end)
 for _,row in pairs(passButtons)do
- row.Gem.Parent.GiftPass.Activated:Connect(function()giftDialog:Open(row.Pass)end)
- row.Gem.Activated:Connect(function()if row.Gem.Active then act('BuyPerk',row.Pass.Key)end end)
- row.Robux.Activated:Connect(function()if row.Robux.Active then pcall(Market.PromptGamePassPurchase,Market,player,Passes.Id(row.Pass))end end)
+ for _,v in ipairs(row.Views)do
+  v.Gift.Activated:Connect(function()giftDialog:Open(row.Pass)end)
+  v.Gem.Activated:Connect(function()if v.Gem.Active then act('BuyPerk',row.Pass.Key)end end)
+  v.Robux.Activated:Connect(function()if v.Robux.Active then pcall(Market.PromptGamePassPurchase,Market,player,Passes.Id(row.Pass))end end)
+ end
  watch(player:GetAttributeChangedSignal(row.Pass.Attribute),refresh)
  watch(player:GetAttributeChangedSignal(row.Pass.Key..'OwnershipReady'),refresh)
 end
@@ -199,24 +218,179 @@ local function count()local n=tonumber(quantity.Text);return n and n==n and n%1=
 quantity:GetPropertyChangedSignal('Text'):Connect(function()local n=count();cost.Text=n and('Cost: '..Cash.Compact(n*Catalog.CashPerGem)..' Cash')or'Enter 1–9,000 Gems.'end)
 maxButton.Activated:Connect(function()local stats=player:FindFirstChild('ChestChaseStats');local cash=stats and stats:FindFirstChild('Cash');quantity.Text=tostring(math.min(9000,math.floor((cash and cash.Value or 0)/Catalog.CashPerGem)))end)
 convert.Activated:Connect(function()local n=count();if n then act('Convert',n)else status.Text='Enter a whole number of Gems.'end end)
+-- Layout ----------------------------------------------------------------------------------------
+local function place(item,r,dx,dy)item.Position=UDim2.fromOffset(r.X+(dx or 0),r.Y+(dy or 0));item.Size=UDim2.fromOffset(r.W,r.H)end
+local function viewport()
+ local size=gui.AbsoluteSize
+ if size and size.X>0 and size.Y>0 then return size end
+ return workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
+end
+local function layoutFeatured(f,k,button)
+ local w=content.Cards.Featured.W
+ local p=f.Pad
+ if f.Wide then
+  -- Title left, "LIMITED TIME!" right; the subtitle drops under the title when the row is too tight.
+  local titleW=math.floor((w-p*2)*.64)
+  place(packTitle,{X=p,Y=p,W=titleW,H=f.TitleH});Art.SetTextSize(packTitle,math.floor(f.TitleH/1.2),12)
+  place(limited,{X=p+titleW,Y=p,W=w-p*2-titleW,H=f.TitleH});limited.TextXAlignment=Enum.TextXAlignment.Right
+  Art.SetTextSize(limited,math.floor(f.TitleH*.5),10)
+ else
+  local h1=math.floor(f.TitleH*.58);local h2=f.TitleH-h1
+  place(packTitle,{X=p,Y=p,W=w-p*2,H=h1});Art.SetTextSize(packTitle,math.floor((h1-2)/1.16),12)
+  place(limited,{X=p,Y=p+h1,W=w-p*2,H=h2});limited.TextXAlignment=Enum.TextXAlignment.Left
+  Art.SetTextSize(limited,math.floor((h2-2)/1.16),10)
+ end
+ place(stage,f.Preview)
+ local box={X=f.Tiles[1].X,Y=f.Tiles[1].Y,W=f.Tiles[#f.Tiles].X+f.Tiles[#f.Tiles].W-f.Tiles[1].X,H=f.Tiles[#f.Tiles].Y+f.Tiles[#f.Tiles].H-f.Tiles[1].Y}
+ place(outcomes,box)
+ for i,s in ipairs(Catalog.Seeds)do
+  local t=f.Tiles[i];local item=outcomes:FindFirstChild(s.Id)
+  if item and t then
+   place(item,t,-box.X,-box.Y)
+   local nameH=math.max(12,math.floor(math.min(t.H*.2,18*k+4)))
+   item.SeedName.Position=UDim2.fromOffset(2,2);item.SeedName.Size=UDim2.fromOffset(t.W-4,nameH);Art.SetTextSize(item.SeedName,math.floor(nameH*.8),8)
+   local cH=math.max(14,math.floor(math.min(t.H*.24,22*k+4)))
+   item.Chance.Position=UDim2.fromOffset(2,t.H-cH-2);item.Chance.Size=UDim2.fromOffset(t.W-6,cH);Art.SetTextSize(item.Chance,math.floor(cH*.9),10)
+   item.Plant.Position=UDim2.fromOffset(2,nameH);item.Plant.Size=UDim2.fromOffset(t.W-4,t.H-nameH-cH*.5)
+  end
+ end
+ for i,offer in ipairs(Catalog.Offers)do local b=quantityButtons[offer.Count];if b and f.Chips[i]then place(b,f.Chips[i]);b.TextSize=math.max(10,math.floor(button*.4))end end
+ place(gemBuy,f.Gem);place(robuxBuy,f.Robux);Art.Fit(gemBuy);Art.Fit(robuxBuy)
+end
+local function layoutGems(r,k,button)
+ local p=math.max(6,math.floor(12*k));local w,h=r.W,r.H
+ local icon=math.floor(math.min(56*k+8,h*.3))
+ gemIcon.Position=UDim2.fromOffset(p,p);gemIcon.Size=UDim2.fromOffset(icon,icon)
+ local headH=math.floor(math.max(20,30*k))
+ if r.Wide then
+  local left=w*.48
+  place(gemHeading,{X=p*2+icon,Y=p,W=left-icon-p*2,H=headH});Art.SetTextSize(gemHeading,math.floor(headH*.85),12)
+  place(rate,{X=p*2+icon,Y=p+headH,W=left-icon-p*2,H=headH*.75});Art.SetTextSize(rate,math.floor(headH*.6),10)
+  place(cost,{X=p,Y=h-p-headH,W=left-p,H=headH*.8});Art.SetTextSize(cost,math.floor(headH*.55),10)
+  local rx=left+p;local rw=w-rx-p
+  place(quantityLabel,{X=rx,Y=p,W=rw,H=headH*.7});Art.SetTextSize(quantityLabel,math.floor(headH*.55),10)
+  local boxY=p+headH*.75+4
+  place(quantity,{X=rx,Y=boxY,W=rw-button*1.8-6,H=button});quantity.TextSize=math.max(14,math.floor(button*.5))
+  place(maxButton,{X=rx+rw-button*1.8,Y=boxY,W=button*1.8,H=button})
+  place(convert,{X=rx,Y=boxY+button+8,W=rw,H=button})
+ else
+  place(gemHeading,{X=p*2+icon,Y=p,W=w-icon-p*3,H=headH});Art.SetTextSize(gemHeading,math.floor(headH*.85),12)
+  place(rate,{X=p*2+icon,Y=p+headH,W=w-icon-p*3,H=headH*.75});Art.SetTextSize(rate,math.floor(headH*.6),10)
+  local y=p+math.max(icon,headH*1.75)+6
+  place(quantityLabel,{X=p,Y=y,W=w-p*2,H=headH*.7});Art.SetTextSize(quantityLabel,math.floor(headH*.55),10);y+=headH*.7+2
+  place(quantity,{X=p,Y=y,W=w-p*3-button*1.8,H=button});quantity.TextSize=math.max(14,math.floor(button*.5))
+  place(maxButton,{X=w-p-button*1.8,Y=y,W=button*1.8,H=button});y+=button+4
+  place(cost,{X=p,Y=y,W=w-p*2,H=headH*.7});Art.SetTextSize(cost,math.floor(headH*.55),10)
+  place(convert,{X=p,Y=h-p-button,W=w-p*2,H=button})
+ end
+ maxButton.TextSize=math.max(12,math.floor(button*.45));convert.TextSize=math.max(12,math.floor(button*.45))
+end
+relayout=function(force)
+ local size=viewport();local touch=UIS.TouchEnabled;local controls=Hud.Controls(gui)
+ local key=string.format('%d:%d:%s',size.X,size.Y,tostring(touch))
+ if controls then for name,c in pairs(controls)do key..=string.format(':%s%d,%d,%d,%d',name,c.X,c.Y,c.W,c.H)end end
+ if key==layoutKey and not force then return end
+ local previous=layoutKey;layoutKey=key
+ frame=Layout.Frame(size.X,size.Y,touch,controls)
+ local k=frame.K;local P=frame.Panel
+ place(panel,P);header.Position=UDim2.fromOffset(0,0);header.Size=UDim2.fromOffset(P.W,frame.Header)
+ local cs=frame.Header-12;close.Size=UDim2.fromOffset(cs,cs);close.Position=UDim2.fromOffset(P.W-cs-6,6);Art.SetTextSize(closeX,math.floor(cs*.75),14)
+ title.Position=UDim2.fromOffset(14,0);title.Size=UDim2.fromOffset(P.W-cs-40,frame.Header);Art.SetTextSize(title,math.floor(frame.Header*.7),18)
+ local inset=math.max(4,math.floor(6*k))
+ body.Position=UDim2.fromOffset(inset,frame.Header+2);body.Size=UDim2.fromOffset(P.W-inset*2,P.H-frame.Header-2-inset)
+ page.Position=UDim2.fromOffset(0,0);page.Size=UDim2.fromOffset(P.W-inset*2,P.H-frame.Header-2-inset)
+ page.ScrollBarThickness=touch and 4 or 6
+ local width=P.W-inset*2-page.ScrollBarThickness-2
+ content=Layout.Content(width,k,{Passes=#Passes,Speed=#bundleOrder.Speed,Money=#bundleOrder.Cash})
+ page.CanvasSize=UDim2.fromOffset(0,content.Height)
+ local button=content.Button
+ for key2,t in pairs(sectionHeaders)do local r=content.Cards[key2..'Header'];place(t,r);Art.SetTextSize(t,math.floor(r.H*.78),16)end
+ place(pack,content.Cards.Featured);layoutFeatured(content.Featured,k,button)
+ for i,pass in ipairs(Passes)do local row=passButtons[pass.Key];local r=content.PassCards[i]
+  if row and r then local c=row.Views[1].Card;place(c,r);boostArt.Layout(c,r.W,r.H,button,k)end end
+ if speedBanner then local r=content.Cards.SpeedBanner;place(speedBanner,r);boostArt.LayoutBanner(speedBanner,r.W,r.H,button,k)end
+ for kind,list in pairs(bundleOrder)do
+  local rects=content[(kind=='Cash'and'Money'or kind)..'Cards']
+  for i,keyName in ipairs(list)do local row=bundleButtons[keyName];local r=rects[i];row.Rect=r;place(row.Frame,r);BundleArt.Layout(row.Frame,r.W,r.H,button,k)end
+ end
+ place(gems,content.Cards.Convert);layoutGems(content.Cards.Convert,k,button)
+ local e=content.Cards.Earn;place(ways,e)
+ local ep=math.max(6,math.floor(12*k))
+ place(waysTitle,{X=ep,Y=ep*.6,W=e.W-ep*2,H=e.H*.45});Art.SetTextSize(waysTitle,math.floor(e.H*.32),11)
+ place(waysDetail,{X=ep,Y=e.H*.52,W=e.W-ep*2,H=e.H*.36});Art.SetTextSize(waysDetail,math.floor(e.H*.24),10)
+ -- Status toast along the bottom of the panel.
+ local sh=math.max(26,math.floor(34*k));place(status,{X=inset*2,Y=P.H-sh-inset*2,W=P.W-inset*4,H=sh});Art.SetTextSize(status,math.floor(sh*.5),10)
+ -- Jump buttons.
+ jumpRoot.Position=UDim2.fromOffset(0,0);jumpRoot.Size=UDim2.fromScale(1,1)
+ for i,s in ipairs(Layout.Sections)do
+  local b=jumpButtons[s.Key];local r=frame.Buttons[i];place(b,r)
+  local labelH=frame.Labels and math.max(12,math.floor(r.H*.28))or 0
+  local iconSide=math.min(r.W,r.H-labelH)-8
+  b.Icon.Position=UDim2.fromOffset((r.W-iconSide)/2,4);b.Icon.Size=UDim2.fromOffset(iconSide,iconSide)
+  b.Label.Visible=frame.Labels;b.Label.Position=UDim2.fromOffset(0,r.H-labelH-2);b.Label.Size=UDim2.fromOffset(r.W,labelH);Art.SetTextSize(b.Label,labelH,9)
+ end
+ if previous and page.CanvasPosition.Y>math.max(0,content.Height-page.Size.Y.Offset)then page.CanvasPosition=Vector2.new(0,math.max(0,content.Height-page.Size.Y.Offset))end
+end
+-- Scrolling / jumping ---------------------------------------------------------------------------
+local scrollTween;local pinned;local current
+local function setCurrent(key)
+ if current==key then return end;current=key
+ for name,b in pairs(jumpButtons)do
+  local on=name==key;b.Current.Enabled=on;b.BackgroundTransparency=on and .05 or .35;b.UIScale.Scale=on and 1.06 or 1;b:SetAttribute('Current',on)
+ end
+end
+local function updateCurrent()
+ if not content then return end
+ setCurrent(Layout.Current(content,page.CanvasPosition.Y,page.Size.Y.Offset,pinned))
+end
+local function scrollTo(y,smooth)
+ if scrollTween then scrollTween:Cancel();scrollTween=nil end
+ y=math.max(0,math.min(y,math.max(0,content.Height-page.Size.Y.Offset)))
+ local target=Vector2.new(0,y)
+ if smooth and not GuiService.ReducedMotionEnabled and panel.Visible then
+  scrollTween=Tween:Create(page,TweenInfo.new(.35,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{CanvasPosition=target});scrollTween:Play()
+ else page.CanvasPosition=target end
+ page:SetAttribute('TargetY',y)
+end
+local function goTo(pageName,smooth)
+ relayout()
+ local key=Layout.PageSection[pageName or'Packs']or'Featured'
+ pinned=key;scrollTo(Layout.Target(content,key,page.Size.Y.Offset),smooth);setCurrent(key)
+end
+for _,s in ipairs(Layout.Sections)do
+ jumpButtons[s.Key].Activated:Connect(function()
+  if pg:GetAttribute('PremiumPage')==s.Page then goTo(s.Page,true)else pg:SetAttribute('PremiumPage',s.Page)end
+ end)
+end
+watch(page:GetPropertyChangedSignal('CanvasPosition'),updateCurrent)
 local function focusBundle()
  local key=pg:GetAttribute('PremiumFocus');local row=bundleButtons[key]
  if not row then return end
  task.defer(function()
-  if not gui.Parent or not panel.Visible or not pages[row.Row.Kind].Visible then return end
-  local page=pages[row.Row.Kind];local y=row.Frame.AbsolutePosition.Y-page.AbsolutePosition.Y+page.CanvasPosition.Y
-  page.CanvasPosition=Vector2.new(0,math.max(0,y-8));pg:SetAttribute('PremiumFocus',nil)
+  if not gui.Parent or not panel.Visible or not row.Rect then return end
+  local headerH=content.Cards[(row.Row.Kind=='Cash'and'Money'or'Speed')..'Header'].H
+  scrollTo(row.Rect.Y-headerH-content.Gap,false);pg:SetAttribute('PremiumFocus',nil)
  end)
 end
 local function open(value)
- local changed=panel.Visible~=value;panel.Visible=value;shade.Visible=value
- if value then selectPage(pg:GetAttribute('PremiumPage')or'Packs');if pg:GetAttribute('SeedMenu')~='Passes'then pg:SetAttribute('SeedMenu','Passes')end;if changed then act('State')end;focusBundle()
- else if giftDialog then giftDialog:Close()end;if pg:GetAttribute('SeedMenu')=='Passes'then pg:SetAttribute('SeedMenu',nil)end end
+ local changed=panel.Visible~=value
+ if value then relayout()end
+ panel.Visible=value;shade.Visible=value;jumpRoot.Visible=value
+ if value then
+  if changed then goTo(pg:GetAttribute('PremiumPage'),false)end
+  if pg:GetAttribute('SeedMenu')~='Passes'then pg:SetAttribute('SeedMenu','Passes')end;if changed then act('State')end;focusBundle()
+ else
+  if scrollTween then scrollTween:Cancel();scrollTween=nil end
+  if giftDialog then giftDialog:Close()end;if pg:GetAttribute('SeedMenu')=='Passes'then pg:SetAttribute('SeedMenu',nil)end
+  -- Reopening from the SHOP button starts at the top; other scripts set PremiumPage before opening.
+  if changed then pg:SetAttribute('PremiumPage',nil)end
+ end
  -- The shared navigation wheel owns its option visibility.
 end
 toggle.Activated:Connect(function()open(not panel.Visible)end)
 close.Activated:Connect(function()open(false)end);shade.Activated:Connect(function()open(false)end)
-watch(pg:GetAttributeChangedSignal('PremiumPage'),function()selectPage(pg:GetAttribute('PremiumPage'))end)
+watch(pg:GetAttributeChangedSignal('PremiumPage'),function()if panel.Visible and pg:GetAttribute('PremiumPage')then goTo(pg:GetAttribute('PremiumPage'),true)end end)
+watch(pg:GetAttributeChangedSignal('PremiumFocus'),function()if panel.Visible then focusBundle()end end)
 watch(pg:GetAttributeChangedSignal('SeedMenu'),function()open(pg:GetAttribute('SeedMenu')=='Passes')end)
 watch(player:GetAttributeChangedSignal('PaidRandomAllowed'),function()if panel.Visible and not busy then act('State')end end)
 local stateQueued=false
@@ -235,21 +409,12 @@ watch(player:GetAttributeChangedSignal('PremiumRevision'),function()
  end
 end)
 local statusSerial=0
-fitPanel=function()
- local page=pages[selected];local list=page:FindFirstChildOfClass('UIListLayout');local camera=workspace.CurrentCamera
- local viewport=camera and camera.ViewportSize.Y or 720;local height=list and list.AbsoluteContentSize.Y or 450
- local hasStatus=status.Text~='';local target=Layout.PanelHeight(height,viewport,hasStatus)
- local size=UDim2.new(.94,0,0,target);if panel.Size~=size then panel.Size=size end
- local pageSize=UDim2.new(1,-24,1,hasStatus and -155 or -127);if page.Size~=pageSize then page.Size=pageSize end
- status.Visible=hasStatus
-end
-for _,page in pairs(pages)do local list=page:FindFirstChildOfClass('UIListLayout');watch(list:GetPropertyChangedSignal('AbsoluteContentSize'),function()if page.Visible then fitPanel()end end)end
-watch(panel:GetPropertyChangedSignal('AbsoluteSize'),fitPanel)
 watch(status:GetPropertyChangedSignal('Text'),function()
- fitPanel();statusSerial+=1;local serial=statusSerial
+ status.Visible=status.Text~='';statusSerial+=1;local serial=statusSerial
  if status.Text~=''then task.delay(3,function()if gui.Parent and statusSerial==serial then status.Text=''end end)end
 end)
-watch(panel:GetPropertyChangedSignal('Visible'),fitPanel)
-watch(pg:GetAttributeChangedSignal('PremiumPage'),fitPanel)
-gui.Destroying:Connect(function()for _,r in ipairs(reveals)do r.Destroy()end;for _,c in ipairs(connections)do c:Disconnect()end end)
-selectPage('Packs');refresh();fitPanel()
+-- Re-layout on viewport, touch and thumb-control changes (HudLayout watches all three).
+local stopWatch=Hud.Watch(gui,function()if content then relayout()end end)
+watch(GuiService:GetPropertyChangedSignal('ReducedMotionEnabled'),function()if scrollTween and GuiService.ReducedMotionEnabled then scrollTween:Cancel();scrollTween=nil;local y=page:GetAttribute('TargetY');if y then page.CanvasPosition=Vector2.new(0,y)end end end)
+gui.Destroying:Connect(function()stopWatch();for _,r in ipairs(reveals)do r.Destroy()end;for _,c in ipairs(connections)do c:Disconnect()end end)
+relayout(true);refresh();setCurrent('Featured')

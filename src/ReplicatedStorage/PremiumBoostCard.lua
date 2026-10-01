@@ -1,51 +1,107 @@
--- R62: two large perk cards; existing entitlement and purchase code owns actions.
+-- R120: pass cards in the reference style. Wide card: emblem left, title + description right,
+-- bottom row [Gift | Gems | Robux]. Banner: "DOUBLE Your SPEED  x1 > x2". Wiring lives in GamePassClient.
 local RS=game:GetService('ReplicatedStorage')
-local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI);local Catalog=require(RS.MechCatalog)
-local B={};local C=Color3.fromRGB;local Fit=require(RS.GardenTextFit)
-local function frame(parent,name,pos,size,color,radius)
- local f=Instance.new('Frame');f.Name=name;f.Position=pos;f.Size=size;f.BackgroundColor3=color;f.BorderSizePixel=0;f.Active=false;f.Parent=parent
- if radius then Theme.Corner(f,radius)end;return f
-end
-local function text(parent,name,value,pos,size,font,color)
- local t=Instance.new('TextLabel');t.Name=name;t.Text=value;t.Position=pos;t.Size=size;t.BackgroundTransparency=1;Bright.Text(t,font,color);Fit.Attach(t,font,math.min(font,16));t.Parent=parent;return t
-end
-local function purchase(parent,name,value,pos,size,color)
- local b=Instance.new('TextButton');b.Name=name;b.Text=value;b.Position=pos;b.Size=size;b.BorderSizePixel=0;b.TextSize=21;Bright.Button(b,color);Fit.Attach(b,21,14);b.Parent=parent;return b
+local Art=require(RS.PremiumShopArt);local Bright=require(RS.BrightUI);local Catalog=require(RS.MechCatalog)
+local B={};local C=Color3.fromRGB
+B.Copy={Growth={Title='x2 Growth',Detail='Plants grow x2 faster!'},Speed={Title='x2 Speed',Detail='Train x2 speed!'}}
+local function buttons(card,pass)
+ Art.Button(card,'GiftPass',Art.Colors.Gift,'Gift');Art.SetCaption(card.GiftPass,'')
+ card.GiftPass:SetAttribute('AccessibleLabel','Gift '..pass.Name)
+ Art.Button(card,'GemPerk',Art.Colors.Gem,'Gem');Art.SetCaption(card.GemPerk,tostring(Catalog.PassGemPrices[pass.Key]))
+ Art.Button(card,'RobuxPass',Art.Colors.Robux,'Robux');Art.SetCaption(card.RobuxPass,'Unavailable',false)
 end
 function B.Create(parent,pass,order)
  local growth=pass.Key=='Growth'
- local card=frame(parent,pass.Key,UDim2.new(),UDim2.fromOffset(440,300),Color3.new(1,1,1),9);card.LayoutOrder=order;card.ClipsDescendants=true
- local fill=Bright.Gradient(card,growth and C(255,211,107)or C(69,215,255),growth and C(166,154,255)or C(53,114,237),25)
- if growth then fill.Color=Bright.Rainbow end
- Bright.Outline(card,C(9,17,33),3)
- -- Bounded stud detail, independent of animated backgrounds and buttons.
- for row=0,5 do for col=0,10 do
-  local stud=frame(card,'Stud',UDim2.new(col/10,-4,0,13+row*39),UDim2.fromOffset(7,7),C(255,255,255),1);stud.BackgroundTransparency=.9
- end end
- local stage=frame(card,'IconStage',UDim2.new(0,12,0,59),UDim2.new(.39,-16,0,155),Color3.new(1,1,1),80);stage.BackgroundTransparency=.85
- text(card,'Name',growth and '×2 GROWTH'or'×2 SPEED',UDim2.fromOffset(12,10),UDim2.new(1,-82,0,43),32)
- if growth then
-  local holder=frame(stage,'ClockHolder',UDim2.fromScale(.5,.5),UDim2.fromScale(.94,.94),Color3.new(1,1,1));holder.AnchorPoint=Vector2.new(.5,.5);holder.BackgroundTransparency=1
-  local ratio=Instance.new('UIAspectRatioConstraint');ratio.AspectRatio=1;ratio.Parent=holder
-  local rim=frame(holder,'RainbowClock',UDim2.fromScale(.05,.1),UDim2.fromScale(.9,.9),Color3.new(1,1,1),100);Bright.Outline(rim,C(13,23,35),3)
-  local rainbow=Instance.new('UIGradient');rainbow.Color=Bright.Rainbow;rainbow.Rotation=25;rainbow.Parent=rim
-  frame(holder,'ClockButton',UDim2.fromScale(.4,0),UDim2.fromScale(.2,.13),C(255,173,77),3)
-  local face=frame(rim,'Face',UDim2.fromScale(.1,.1),UDim2.fromScale(.8,.8),C(250,253,255),100)
-  for i=0,3 do local a=i*math.pi/2;local mark=frame(face,'Hour',UDim2.fromScale(.5+math.sin(a)*.36,.5-math.cos(a)*.36),UDim2.fromScale(.035,.07),C(104,133,163),2);mark.AnchorPoint=Vector2.new(.5,.5);mark.Rotation=i*90 end
-  local hand=frame(face,'Minute',UDim2.fromScale(.475,.21),UDim2.fromScale(.05,.3),C(16,35,61),3)
-  frame(face,'HourHand',UDim2.fromScale(.48,.47),UDim2.fromScale(.26,.05),C(16,35,61),3)
-  local pin=frame(face,'Pin',UDim2.fromScale(.5,.5),UDim2.fromScale(.095,.095),C(16,35,61),8);pin.AnchorPoint=Vector2.new(.5,.5)
- else
-  require(RS.PremiumEmblems).Draw(stage,'Bolt')
- end
- require(RS.GuiShine).Attach(card,true)
- local copy=text(card,'Detail',growth and '×2 growth'or'×2 training',UDim2.new(.4,0,0,65),UDim2.new(.6,-12,0,106),27)
- copy.TextXAlignment=Enum.TextXAlignment.Center
- local badge=frame(card,'Permanent',UDim2.new(.43,0,0,176),UDim2.new(.54,-15,0,27),C(20,36,61),5);badge.BackgroundTransparency=.15
- text(badge,'Caption','PERMANENT',UDim2.new(),UDim2.fromScale(1,1),14,C(229,253,255))
- purchase(card,'GemPerk',Catalog.PassGemPrices[pass.Key]..' Gems',UDim2.new(0,12,1,-71),UDim2.new(.42,-17,0,54),C(155,104,255))
- purchase(card,'RobuxPass','Unavailable',UDim2.new(.42,3,1,-71),UDim2.new(.58,-15,0,54),C(129,246,38))
- local gift=purchase(card,'GiftPass','GIFT',UDim2.new(1,-70,0,10),UDim2.fromOffset(58,37),C(231,89,230));Fit.Attach(gift,16,13)
+ local card=Art.Card(parent,pass.Key,growth and{C(255,90,200),C(255,214,70)}or{C(255,252,170),C(255,222,40),C(255,168,24)})
+ card.LayoutOrder=order;card:SetAttribute('PassKey',pass.Key)
+ if growth then card.Fill.Color=Bright.Rainbow;card.Fill.Rotation=20 end
+ local stage=Art.Frame(card,'IconStage',nil,1);stage.ZIndex=2
+ if growth then Art.Clock(stage)else Art.Coin(stage,'Bolt')end
+ local copy=B.Copy[pass.Key]or{Title=pass.Name,Detail=pass.Description}
+ Art.Text(card,'Title',copy.Title,30).ZIndex=4
+ local detail=Art.Text(card,'Detail',copy.Detail,24);detail.ZIndex=4;detail.TextWrapped=true
+ local tag=Art.Text(card,'Permanent','PERMANENT',13,C(255,248,190));tag.ZIndex=4
+ buttons(card,pass)
+ require(RS.GuiShine).Attach(card,false)
  return card
+end
+function B.Layout(card,w,h,button,k)
+ local pad=math.max(6,math.floor(10*k))
+ local rowY=h-pad-button
+ local stageSide=math.min(rowY-pad,math.floor(w*.36))
+ card.IconStage.Position=UDim2.fromOffset(pad,pad+math.floor((rowY-pad-stageSide)/2));card.IconStage.Size=UDim2.fromOffset(stageSide,stageSide)
+ card.LightRays.Position=UDim2.fromOffset(pad+stageSide/2,pad+(rowY-pad)/2);card.LightRays.Size=UDim2.fromOffset(stageSide*2,stageSide*2)
+ local tx=pad*2+stageSide;local tw=w-tx-pad
+ local titleH=math.floor(math.max(20,34*k))
+ card.Title.Position=UDim2.fromOffset(tx,pad);card.Title.Size=UDim2.fromOffset(tw,titleH);Art.SetTextSize(card.Title,math.floor(titleH*.92),14)
+ local tagH=math.floor(math.max(14,18*k))
+ local detailY=pad+titleH+2;local detailH=rowY-detailY-tagH-4
+ card.Detail.Position=UDim2.fromOffset(tx,detailY);card.Detail.Size=UDim2.fromOffset(tw,detailH);Art.SetTextSize(card.Detail,math.floor(math.min(detailH*.42,28*k)),11)
+ card.Permanent.Position=UDim2.fromOffset(tx,rowY-tagH-2);card.Permanent.Size=UDim2.fromOffset(tw,tagH);Art.SetTextSize(card.Permanent,math.floor(tagH*.85),9)
+ local g=math.max(4,math.floor(6*k))
+ card.GiftPass.Position=UDim2.fromOffset(pad,rowY);card.GiftPass.Size=UDim2.fromOffset(button,button)
+ local rest=w-pad*2-button-g*2;local gemW=math.floor(rest*(w<300 and .47 or .38))
+ card.GemPerk.Position=UDim2.fromOffset(pad+button+g,rowY);card.GemPerk.Size=UDim2.fromOffset(gemW,button)
+ card.RobuxPass.Position=UDim2.fromOffset(pad+button+g*2+gemW,rowY);card.RobuxPass.Size=UDim2.fromOffset(rest-gemW,button)
+ if card.GemPerk.Visible==false then
+  card.RobuxPass.Position=card.GemPerk.Position;card.RobuxPass.Size=UDim2.fromOffset(rest+g,button)
+ end
+ for _,b in ipairs({card.GiftPass,card.GemPerk,card.RobuxPass})do Art.Fit(b)end
+end
+-- Full-width "DOUBLE Your SPEED" banner for the Speed pass.
+function B.CreateBanner(parent,pass)
+ local card=Art.Card(parent,'SpeedPassBanner',{C(120,232,255),C(40,190,250),C(20,140,236)})
+ card:SetAttribute('PassKey',pass.Key)
+ card.LightRays.ZIndex=1
+ local pile=Art.Pile(card,'Bolt',5);pile.ZIndex=2
+ local title=Art.Text(card,'Title','Your SPEED',30);title.ZIndex=4
+ local double=Art.Text(card,'Double','DOUBLE',30,C(70,255,60));double.ZIndex=5
+ local x1=Art.Text(card,'From','x1',60);x1.ZIndex=4
+ local arrow=Art.Triangle(card);arrow.ZIndex=4
+ local x2=Art.Text(card,'To','x2',72,C(255,226,40));x2.ZIndex=4
+ buttons(card,pass)
+ require(RS.GuiShine).Attach(card,false)
+ return card
+end
+local function measure(text,size)
+ local ok,v=pcall(function()return game:GetService('TextService'):GetTextSize(text,size,require(RS.GardenTheme).Font,Vector2.new(4000,400))end)
+ return ok and v and v.X or #text*size*.55
+end
+function B.LayoutBanner(card,w,h,button,k)
+ local pad=math.max(6,math.floor(10*k));local g=math.max(4,math.floor(6*k))
+ local titleH=math.floor(math.max(22,36*k))
+ local titleSize=math.floor((titleH-3)/1.15)
+ -- "DOUBLE" (green) and "Your SPEED" (white) side by side, centred as one title.
+ local fullW=measure('DOUBLE Your SPEED',titleSize)
+ if fullW>w-pad*2-16 then titleSize=math.max(14,math.floor(titleSize*(w-pad*2-16)/fullW))end
+ local first=measure('DOUBLE',titleSize);local space=measure(' ',titleSize);local rest=measure('Your SPEED',titleSize)
+ local x=math.floor((w-(first+space+rest))/2)
+ card.Double.TextXAlignment=Enum.TextXAlignment.Left;card.Title.TextXAlignment=Enum.TextXAlignment.Left
+ card.Double.Position=UDim2.fromOffset(x,pad);card.Double.Size=UDim2.fromOffset(first+10,titleH);Art.SetTextSize(card.Double,titleSize,titleSize)
+ card.Title.Position=UDim2.fromOffset(x+first+space,pad);card.Title.Size=UDim2.fromOffset(rest+10,titleH);Art.SetTextSize(card.Title,titleSize,titleSize)
+ local narrow=w<460
+ local buyW=narrow and math.floor(w*.42)or math.floor(math.min(w*.3,260))
+ local midY=pad+titleH+4;local midH=h-midY-pad
+ local buyX=w-pad-buyW
+ -- Right column: Robux on top, then [Gift | Gems].
+ local stack=button*2+g;local by=midY+math.max(0,math.floor((midH-stack)/2))
+ card.RobuxPass.Position=UDim2.fromOffset(buyX,by);card.RobuxPass.Size=UDim2.fromOffset(buyW,button)
+ card.GiftPass.Position=UDim2.fromOffset(buyX,by+button+g);card.GiftPass.Size=UDim2.fromOffset(button,button)
+ card.GemPerk.Position=UDim2.fromOffset(buyX+button+g,by+button+g);card.GemPerk.Size=UDim2.fromOffset(buyW-button-g,button)
+ if card.GemPerk.Visible==false then card.RobuxPass.Size=UDim2.fromOffset(buyW,button*2+g)end
+ for _,b in ipairs({card.GiftPass,card.GemPerk,card.RobuxPass})do Art.Fit(b)end
+ local pileSide=math.min(midH,math.floor(w*.2))
+ card.BundleArtwork.Position=UDim2.fromOffset(pad,h-pad-pileSide);card.BundleArtwork.Size=UDim2.fromOffset(pileSide,pileSide)
+ card.LightRays.Position=UDim2.fromOffset(w*.42,midY+midH/2);card.LightRays.Size=UDim2.fromOffset(w*.9,w*.9)
+ -- x1 > x2 centred between the pile and the buy column.
+ local left=narrow and pad or pad*2+pileSide;local right=buyX-g
+ local bigH=math.floor(math.min(midH*.95,90*k));local span=right-left
+ local fromW=math.floor(span*.32);local arrowW=math.floor(math.min(bigH*.45,span*.14));local toW=math.floor(span*.4)
+ local bx=left+math.floor((span-fromW-arrowW-toW-g*2)/2)
+ local y=midY+math.floor((midH-bigH)/2)
+ card.From.Position=UDim2.fromOffset(bx,y);card.From.Size=UDim2.fromOffset(fromW,bigH);Art.SetTextSize(card.From,math.floor(bigH*.8),16)
+ card.Arrow.Position=UDim2.fromOffset(bx+fromW+g,y+bigH/2-arrowW);card.Arrow.Size=UDim2.fromOffset(arrowW,arrowW*2)
+ card.To.Position=UDim2.fromOffset(bx+fromW+arrowW+g*2,y-math.floor(bigH*.08));card.To.Size=UDim2.fromOffset(toW,math.floor(bigH*1.12));Art.SetTextSize(card.To,math.floor(bigH*.95),18)
+ card.BundleArtwork.Visible=not narrow
 end
 return B
