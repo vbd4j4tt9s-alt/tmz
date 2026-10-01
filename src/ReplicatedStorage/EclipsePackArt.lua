@@ -1,7 +1,7 @@
 -- R122: "Void Pack" (EclipseReliquary) redesign - an ominous, space-themed pack.
 -- Black-violet void body; on both faces a spinning spiral galaxy and nebula haze around a black
 -- singularity, a white-hot photon ring and a tilted accretion disc, a crimson slit EYE, star field
--- and four rune sigils. No halo outside the body: same outline as every other pack.
+-- and four rune sigils; around the whole pack a tilted, spinning event-horizon halo with debris.
 -- Built only from Parts on the approved Forest_01 body (no uploaded ids). The same Build serves
 -- world, carried, dropped, inventory pictures (ItemPictures), previews and the opening copy.
 -- Motion hints are attributes only (VoidSpin/VoidPivot/VoidPulse/VoidPhase); VeiledEventClient81
@@ -100,7 +100,22 @@ function A.Specs()
    pulse(segment('RuneSigil'..tag..r..'_'..k,base*CF(rune[1]+V(0,0,-.016)),stroke[1],stroke[2],.022,.01,P.Rune),.5,r*1.3)
   end end
  end
- -- R122b: no halo/debris around the pack (owner): the Void Pack keeps exactly the standard pack outline.
+ -- Event-horizon halo around the whole pack: a tilted circle, so spinning never changes its outline.
+ local halo=CF(0,-.04,0)*CFrame.Angles(.12,.32,0)
+ local radius=1.34
+ for i=1,26 do
+  if i%7~=0 then -- gaps make the rotation readable
+   local a,b=(i-1)*math.pi*2/26,i*math.pi*2/26
+   local t=(math.sin(a*2)+1)*.5
+   local s=segment('EventHorizon'..i,halo,V(math.cos(a)*radius,math.sin(a)*radius,0),V(math.cos(b)*radius,math.sin(b)*radius,0),.05,.03,lerp(P.Halo,P.HaloHot,t),.1+.25*(1-t))
+   spin(s,halo,-.5)
+  end
+ end
+ for i,a in ipairs({.6,2.7,4.6})do
+  local size=({.16,.12,.10})[i]
+  local s=add('HaloDebris'..i,V(size,size*.8,size*.9),halo*CF(math.cos(a)*radius,math.sin(a)*radius,0)*CFrame.Angles(a,a*1.7,a*.6),P.Debris,Enum.Material.Slate)
+  spin(s,halo,-.5)
+ end
  specs=out;return out
 end
 -- Conservative bounds: the body plus every part corner, with spinning parts swept around their pivot.
