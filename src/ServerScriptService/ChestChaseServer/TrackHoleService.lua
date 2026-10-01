@@ -140,15 +140,16 @@ end
 -- Visual: a flat dark circle with a lighter rim and dirt crumbs. No terrain change, no collision, no queries.
 function S:_build(hole)
  local model=Instance.new('Model');model.Name='TrackHole_'..hole.Id
- local function part(name,size,cframe,color,material)
+ local function part(name,size,cframe,color,material,round)
   local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=cframe;p.Color=color;p.Material=material
   p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false
-  p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=model;return p
+  p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth
+  if round then p.Shape=Enum.PartType.Cylinder end;p.Parent=model;return p
  end
  local at=hole.Position;local lay=CFrame.Angles(0,0,math.pi/2) -- cylinder axis X -> up
  local rimD=C.Diameter+C.RimWidth*2
- part('Rim',V3(.06,rimD,rimD),CFrame.new(at+V3(0,.03,0))*lay,SOIL_RIM,Enum.Material.Ground)
- local pit=part('Pit',V3(.08,C.Diameter,C.Diameter),CFrame.new(at+V3(0,.04,0))*lay,SOIL_PIT,Enum.Material.SmoothPlastic)
+ part('Rim',V3(.06,rimD,rimD),CFrame.new(at+V3(0,.03,0))*lay,SOIL_RIM,Enum.Material.Ground,true)
+ local pit=part('Pit',V3(.08,C.Diameter,C.Diameter),CFrame.new(at+V3(0,.04,0))*lay,SOIL_PIT,Enum.Material.SmoothPlastic,true)
  local rng=self.Random
  for i=1,C.CrumbCount do
   local angle=(i/C.CrumbCount)*math.pi*2+rng:NextNumber(-.3,.3)
