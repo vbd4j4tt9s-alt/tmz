@@ -15,7 +15,8 @@ local function userId(n)return type(n)=='number'and n==n and n%1==0 and n>0 and 
 function S.new(data,chests,passGifts)
  local self=setmetatable({Data=data,Chests=chests,PassGifts=passGifts,Busy={},Working={},Intent={},Warned={},
   Store=DS:GetDataStore('ChestChase_ProductInbox_v1'..(game:GetService('RunService'):IsStudio()and'_Studio'or''))},S)
- task.spawn(function()while task.wait(15)do for _,p in ipairs(Players:GetPlayers())do task.spawn(function()self:Recover(p)end)end end end)
+ -- 30 s (pass gifts use 15 s): keeps both inbox loops well inside the DataStore read budget.
+ task.spawn(function()while task.wait(30)do for _,p in ipairs(Players:GetPlayers())do task.spawn(function()self:Recover(p)end)end end end)
  return self
 end
 function S:Ready(p)return p and p.Parent and self.Data:IsLoaded(p)and self.Data.CanSave[p]end
@@ -149,7 +150,7 @@ function S:Recover(p)
     local fresh=false
     if not state.ProductGiftReceipts[id]then
      if count(state.ProductGiftReceipts)>=Catalog.MaxInbox then continue end
-     -- A full bag / currency limit keeps the gift waiting in the inbox; it is retried every 15 s.
+     -- A full bag / currency limit keeps the gift waiting in the inbox; it is retried every 30 s.
      local can=self:CanReceive(p,gift.Key)
      if not can then
       if not self.Warned[p]then self.Warned[p]=true;self:Notify(p,'You have a gift waiting! Make room to receive '..Catalog.Name(gift.Key)..'.')end

@@ -8,11 +8,11 @@
 --  +300B CASH                CashProductId           (PremiumPricing)    GiftCashProductId
 --  +650B CASH                CashValueProductId      (PremiumPricing)    GiftCashValueProductId
 --  +1.4T CASH                CashMegaProductId       (PremiumPricing)    GiftCashMegaProductId
---  Speed bundle (Small)      SpeedSmallProductId     (PremiumPricing)    GiftSpeedSmallProductId
---  Speed bundle (Medium)     SpeedMediumProductId    (PremiumPricing)    GiftSpeedMediumProductId
---  Speed bundle (Large)      SpeedProductId          (PremiumPricing)    GiftSpeedProductId
---  Speed bundle (Value)      SpeedValueProductId     (PremiumPricing)    GiftSpeedValueProductId
---  Speed bundle (Mega)       SpeedMegaProductId      (PremiumPricing)    GiftSpeedMegaProductId
+--  +250K SPEED               SpeedSmallProductId     (PremiumPricing)    GiftSpeedSmallProductId
+--  +1M SPEED                 SpeedMediumProductId    (PremiumPricing)    GiftSpeedMediumProductId
+--  +3M SPEED                 SpeedProductId          (PremiumPricing)    GiftSpeedProductId
+--  +8M SPEED                 SpeedValueProductId     (PremiumPricing)    GiftSpeedValueProductId
+--  +25M SPEED                SpeedMegaProductId      (PremiumPricing)    GiftSpeedMegaProductId
 --  Limited Mech Pack x1      MechPackProductId       (MechCatalog)       GiftMechPackProductId
 --  Limited Mech Pack x5      MechPack5ProductId      (MechCatalog)       GiftMechPack5ProductId
 --  Limited Mech Pack x10     MechPack10ProductId     (MechCatalog)       GiftMechPack10ProductId
