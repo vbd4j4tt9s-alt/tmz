@@ -38,12 +38,37 @@ function E:Active()return self.Folder~=nil and self.Folder.Parent~=nil end
 function E:LiveSlots()
  local out={};for _,slot in ipairs(self.Slots)do if not slot.Stolen then table.insert(out,slot)end end;return out
 end
+-- Server time of the next scheduled arrival, or nil while the Veiled One is here (no second spawn
+-- while active). Spawns happen when a refresh ENDS (its new cycle number passes PackSchedule81.Event).
+function E.NextArrival(map,refreshing,interval,closed,schedule)
+ local cycle=tonumber(map:GetAttribute('BiomeRefreshCycle'))or 0
+ local nextBegin=map:GetAttribute('NextBiomeRefreshAt')
+ if type(nextBegin)~='number'then return nil end
+ local firstEnd=nextBegin+closed;local firstCycle=cycle+1
+ if refreshing then
+  local endsAt=map:GetAttribute('BiomeRefreshEndsAt')
+  if type(endsAt)=='number'and schedule(cycle+1)then return endsAt end
+  firstCycle=cycle+2
+ end
+ for k=0,30 do if schedule(firstCycle+k)then return firstEnd+k*interval end end
+ return nil
+end
+function E:PublishSchedule()
+ local map=self.Chase.Map.MapRoot
+ local at=nil
+ if not self:Active()then
+  at=E.NextArrival(map,self.Chase.Map.Refreshing==true,PackRules.RefreshInterval,PackRules.RefreshClosedSeconds,require(RS.PackSchedule81).Event)
+ end
+ map:SetAttribute('VeiledNextAt',at)
+ return at
+end
 function E:_publish()
  local map=self.Chase.Map.MapRoot;local live=self:LiveSlots()
  -- Back-compat alias for owner commands (eventpack / go): the first pack that is still guarded.
  self.Seed=live[1]
  map:SetAttribute('VeiledPacksLeft',self:Active()and #live or 0)
  map:SetAttribute('VeiledUnstolenRefreshes',self:Active()and self.Unstolen or 0)
+ self:PublishSchedule()
 end
 function E:EnsureGuardian()
  if not self.Home or not self.Folder or not self.Folder.Parent then return nil end
@@ -170,7 +195,11 @@ function E:Reroll()
 end
 -- Called by ConcurrentKeeperService after every completed track refresh (replaces the old Spawn call).
 function E:AfterRefresh(cycle)
- if not self:Active()then return self:Spawn(cycle)end
+ if not self:Active()then
+  local spawned=self:Spawn(cycle)
+  if not spawned then self:PublishSchedule()end
+  return spawned
+ end
  local chase=self.Chase
  for index,slot in ipairs(self.Slots)do
   if not slot.Stolen and not self:Outstanding(slot)then

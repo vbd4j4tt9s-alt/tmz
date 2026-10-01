@@ -573,7 +573,7 @@ return function(Legacy)
         for _,token in ipairs(tokens) do self:_expireDroppedChest(token) end
         self.KeeperQueues={}
         -- R122: refreshes no longer despawn the Veiled One or its packs; only hide them.
-        if self.Event81 then self.Event81:RefreshVisibility()end
+        if self.Event81 then self.Event81:RefreshVisibility();self.Event81:PublishSchedule()end
     end
     function Service:_updateBiomeRefresh(now)
         if not self.NextRefreshAt then return end
@@ -675,6 +675,7 @@ return function(Legacy)
         end
         self.NextRefreshAt=os.clock()+PackRules.RefreshInterval
         self.Map.MapRoot:SetAttribute("NextBiomeRefreshAt",workspace:GetServerTimeNow()+PackRules.RefreshInterval)
+        self.Event81:PublishSchedule()
         self:_captureGuardianBlueprints()
         self:_maintainGuardians()
         for _,seed in ipairs(self.Map.Chests) do
