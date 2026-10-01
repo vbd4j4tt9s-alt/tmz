@@ -3,7 +3,15 @@ local Players=game:GetService('Players');local Run=game:GetService('RunService')
 local Landscape=require(game:GetService('ReplicatedStorage'):WaitForChild('LeaderboardLandscape'))
 local Cash=require(game:GetService('ReplicatedStorage'):WaitForChild('CashNumbers'))
 local Points=require(game:GetService('ReplicatedStorage').SpeedPoints)
-local S={};S.__index=S
+local S={Size=100,ServerRows=10};S.__index=S
+local Http=game:GetService('HttpService')
+-- Whole points from a base-10 log (the sorted index); exact to ~9 significant digits, plenty for the board.
+function S.FromLog(log)
+ if type(log)~='number'or log~=log or log<0 then return '0'end
+ if log<15 then return Points.Normalize(10^log)end
+ local e=math.floor(log);local digits=string.format('%.0f',10^(log-e)*1e14)
+ return Points.Normalize(digits..string.rep('0',math.max(0,e-14)))
+end
 local specs={{Key='hub.top1',Stat='Speed',Title='TOP SPEED',Badge='SPEED',Prefix=''}, {Key='hub.cash.top1',Stat='Cash',Title='MOST MONEY',Badge='MONEY',Prefix='$'}}
 function S.new(data)
  local self=setmetatable({Data=data,Stores={},Rows={},Names={},Boards={},Writes={},Last={},Updated={},Failed={},Stopped=false},S)
@@ -74,9 +82,18 @@ function S:Render()
    local rows=self:Top(spec.Stat);state.Empty.Visible=#rows==0
    state.Empty.Text=self.Failed[spec.Stat]and'Global rankings unavailable. Retrying…'or self.Updated[spec.Stat]and'Be the first to rank!'or'Loading global rankings…'
    state.Scope.Text=self.Failed[spec.Stat]and'GLOBAL • RETRYING UPDATE'or'GLOBAL • UPDATES EVERY MINUTE'
-   state.List.CanvasSize=UDim2.fromOffset(0,#rows*108)
-   for i,entry in ipairs(rows)do local row=self:_row(state,i,spec);row.Frame.Visible=true;local info=self.Names[entry.UserId];row.Name.Text=info and info.DisplayName or('Player '..entry.UserId);row.Avatar.Image='rbxthumb://type=AvatarHeadShot&id='..entry.UserId..'&w=150&h=150';row.Score.Text=spec.Prefix..Cash.Compact(entry.Score)end
-   for i=#rows+1,#state.Rows do state.Rows[i].Frame.Visible=false end
+   -- Rows for every player's own scrollable board (LeaderboardClient). The server sign keeps a short top 10 fallback.
+   local packed={}
+   for i,entry in ipairs(rows)do local info=self.Names[entry.UserId];packed[i]={u=entry.UserId,n=info and info.DisplayName or('Player '..entry.UserId),s=spec.Prefix..Cash.Compact(entry.Score)}end
+   local okJson,json=pcall(Http.JSONEncode,Http,packed)
+   model:SetAttribute('LeaderboardTitle',spec.Title);model:SetAttribute('LeaderboardBadge',spec.Badge)
+   model:SetAttribute('LeaderboardStatus',self.Failed[spec.Stat]and'retry'or self.Updated[spec.Stat]and'ok'or'loading')
+   model:SetAttribute('LeaderboardUpdated',self.Updated[spec.Stat]or 0)
+   if okJson then model:SetAttribute('LeaderboardRows',json)end
+   local shown=math.min(#rows,S.ServerRows)
+   state.List.CanvasSize=UDim2.fromOffset(0,shown*108)
+   for i,entry in ipairs(rows)do if i>shown then break end;local row=self:_row(state,i,spec);row.Frame.Visible=true;local info=self.Names[entry.UserId];row.Name.Text=info and info.DisplayName or('Player '..entry.UserId);row.Avatar.Image='rbxthumb://type=AvatarHeadShot&id='..entry.UserId..'&w=150&h=150';row.Score.Text=spec.Prefix..Cash.Compact(entry.Score)end
+   for i=shown+1,#state.Rows do state.Rows[i].Frame.Visible=false end
   end end
  end
 end
@@ -84,27 +101,31 @@ function S:Refresh()
  if self.Refreshing then return end;self.Refreshing=true
  local wanted,seen={},{}
  for _,spec in ipairs(specs)do
-  local ok,pages=pcall(self.Stores[spec.Stat].GetSortedAsync,self.Stores[spec.Stat],false,spec.Stat=='Speed'and 100 or 25)
+  -- R118: top 100 on both boards (players scroll the board on their own screen, LeaderboardClient).
+  local ok,pages=pcall(self.Stores[spec.Stat].GetSortedAsync,self.Stores[spec.Stat],false,S.Size)
   self.Failed[spec.Stat]=not ok
   if ok then
-   local rows={};local complete=true
+   local rows={};local complete=true;local reads=0
    for _,entry in ipairs(pages:GetCurrentPage())do
     local id=tonumber(entry.key);local score=entry.value
     if id and id>0 then
      if spec.Stat=='Speed'then
-      local cached=self.ExactCache[id]
-      if not cached or os.clock()-cached.At>55 then
+      -- The sorted value is log10(points) x 1e9, precise enough for the board's short number. Only the top 10 read
+      -- the exact store, and only when their sorted value changed, to stay inside the DataStore read budget.
+      local cached=self.ExactCache[id];local index=tonumber(score)or 0
+      if #rows<10 and(not cached or cached.Index~=index)and reads<12 then
+       reads+=1
        local readOK,exact=pcall(self.ExactSpeed.GetAsync,self.ExactSpeed,tostring(id))
-       if readOK and Points.Valid(exact)then cached={Score=exact,At=os.clock()};self.ExactCache[id]=cached
-       else complete=false end
+       if readOK and Points.Valid(exact)then cached={Score=exact,At=os.clock(),Index=index};self.ExactCache[id]=cached
+       elseif not readOK then complete=false end
       end
-      score=cached and cached.Score or nil
+      score=cached and cached.Index==index and cached.Score or S.FromLog(index/1000000000)
      end
      if score~=nil then table.insert(rows,{UserId=id,Score=score})end
     end
    end
    if spec.Stat=='Speed'then table.sort(rows,function(a,b)local c=Points.Compare(a.Score,b.Score);return c==0 and a.UserId<b.UserId or c>0 end)end
-   while #rows>25 do table.remove(rows)end
+   while #rows>S.Size do table.remove(rows)end
    if not complete then self.Failed[spec.Stat]=true end
    for _,row in ipairs(rows)do local id=row.UserId;if not self.Names[id]and not seen[id]then seen[id]=true;table.insert(wanted,id)end end
    self.Rows[spec.Stat]=rows;self.Updated[spec.Stat]=os.time()
