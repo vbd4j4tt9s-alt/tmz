@@ -1,10 +1,12 @@
 -- R71: distinct icon-only boosts; the refresh timer uses the existing night moon.
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Input=game:GetService('UserInputService');local Gui=game:GetService('GuiService');local Tween=game:GetService('TweenService')
 local Layout=require(RS.HudLayout);local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI);local State=require(RS.WorldStatusState);local Balance=require(RS.BalanceRules)
+local SpeedBoost=require(RS.SpeedBoost)
 local H={};local C=Color3.fromRGB
 function H.Boosts(player)
  local tier=math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)
- local speed=Balance.Training(Balance.TrainingTiers[tier]or 1,player:GetAttribute('TreadmillMultiplier'),player:GetAttribute('DoubleSpeedOwned')==true)
+ -- R121: the timed x2 boost multiplies with the permanent pass (same as the server's BaseService).
+ local speed=Balance.Training(Balance.TrainingTiers[tier]or 1,player:GetAttribute('TreadmillMultiplier'),player:GetAttribute('DoubleSpeedOwned')==true)*SpeedBoost.PlayerFactor(player)
  local luck=tonumber(player:GetAttribute('ChestLuckMultiplier'))or 1
  if luck~=luck or luck==math.huge or luck==-math.huge then luck=1 end
  return speed,math.clamp(luck,1,require(RS.BalanceValues81).MaxLuck)
@@ -54,6 +56,22 @@ function H.Create(pg,player)
   value.TextColor3=i==1 and C(255,211,99)or C(116,243,180);require(RS.GardenTextFit).Attach(value,26,16)
   boostRows[i]={Root=card,Value=value,Label=name}
  end
+ -- R121: x2 Speed boost countdown (bolt + "9m 59s"), shown just above the boost rows while active.
+ local boostTimer=block(root,'SpeedBoostTimer',UDim2.fromOffset(0,-43),UDim2.fromOffset(137,39),Color3.new(),7);boostTimer.BackgroundTransparency=.73;boostTimer.Visible=false
+ local timerGlyph=block(boostTimer,'Icon',UDim2.fromOffset(4,3),UDim2.fromOffset(33,33),Color3.new());timerGlyph.BackgroundTransparency=1
+ require(RS.HudArtwork).Attach(timerGlyph,'Bolt')
+ local timerText=label(boostTimer,'Time',UDim2.fromOffset(39,1),UDim2.fromOffset(92,37),26);timerText.TextXAlignment=Enum.TextXAlignment.Right;timerText.TextColor3=C(255,226,40)
+ require(RS.GardenTextFit).Attach(timerText,26,14)
+ local boostWasActive=false;local updateBoosts
+ local function paintBoostTimer(now)
+  local remaining=SpeedBoost.PlayerRemaining(player,now)
+  local on=remaining>0;boostTimer.Visible=on
+  if on then
+   local text=SpeedBoost.Clock(remaining);if timerText.Text~=text then timerText.Text=text end
+   boostTimer:SetAttribute('AccessibleLabel','x2 Speed boost '..text..' left')
+  end
+  return on
+ end
  local function paint(row,data,key)
   row.Time.Text=data.Time;row.Time.TextColor3=colors[key]or colors.Clear
   row.Root:SetAttribute('AccessibleLabel',data.Title..' '..data.Time)
@@ -98,18 +116,24 @@ function H.Create(pg,player)
   local point=part and hum and hum.Health>0 and part.Position or nil
   local weather,track=State.Read(RS,workspace:FindFirstChild('ChestChaseMap'),point,now or workspace:GetServerTimeNow())
   paint(rows.Weather,weather,weather.Kind);paint(rows.Track,track,track.Closed and'Refresh'or'Track')
+  local first=boostRows[1].Root.Position
+  if m.Phone and m.WalletHorizontal then boostTimer.Position=UDim2.fromOffset(first.X.Offset,first.Y.Offset+43)
+  else boostTimer.Position=UDim2.fromOffset(first.X.Offset,first.Y.Offset-43)end
+  local on=paintBoostTimer(now or workspace:GetServerTimeNow())
+  -- Start / expiry changes the speed multiplier row too.
+  if on~=boostWasActive then boostWasActive=on;task.defer(function()if not dead and updateBoosts then updateBoosts()end end)end
  end
- local function updateBoosts()
+ updateBoosts=function()
   local values={H.Boosts(player)};hasBoosts=false
   for i,row in ipairs(boostRows)do
    local active=values[i]>1;row.Root.Visible=active;hasBoosts=hasBoosts or active
    local text=H.Multiplier(values[i]);if row.Value.Text~=text then row.Value.Text=text end
    row.Root:SetAttribute('AccessibleLabel',row.Label..' '..text)
-   if i==1 then row.Root:SetAttribute('PointsPerSecond',100*values[i]);row.Root:SetAttribute('Breakdown',tostring(Balance.TrainingTiers[math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)])..' machine × '..tostring(player:GetAttribute('TreadmillMultiplier')or 1)..' trail × '..(player:GetAttribute('DoubleSpeedOwned')and'2' or'1')..' pass')end
+   if i==1 then row.Root:SetAttribute('PointsPerSecond',100*values[i]);row.Root:SetAttribute('Breakdown',tostring(Balance.TrainingTiers[math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)])..' machine × '..tostring(player:GetAttribute('TreadmillMultiplier')or 1)..' trail × '..(player:GetAttribute('DoubleSpeedOwned')and'2' or'1')..' pass × '..SpeedBoost.PlayerFactor(player)..' boost')end
   end
   update()
  end
- for _,attribute in ipairs({'TreadmillTier','TreadmillMultiplier','ChestLuckMultiplier','DoubleSpeedOwned'})do
+ for _,attribute in ipairs({'TreadmillTier','TreadmillMultiplier','ChestLuckMultiplier','DoubleSpeedOwned',SpeedBoost.Attribute})do
   connections[#connections+1]=player:GetAttributeChangedSignal(attribute):Connect(updateBoosts)
  end
  connections[#connections+1]=Run.Heartbeat:Connect(function(dt)elapsed+=dt;if elapsed>=.25 then elapsed=0;update()end end)

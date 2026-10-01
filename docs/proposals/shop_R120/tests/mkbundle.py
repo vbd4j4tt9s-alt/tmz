@@ -9,6 +9,10 @@ for f in sorted(os.listdir(src + '/ReplicatedStorage')):
     if f.endswith('.lua'):
         pairs.append((f[:-4], src + '/ReplicatedStorage/' + f))
 pairs.append(('GamePassClient', src + '/StarterPlayer/StarterPlayerScripts/GamePassClient.client.lua'))
+# R121: server purchase modules for test_server.luau (moved under a ChestChaseServer folder there).
+for name in ['PremiumService', 'PremiumRouting', 'SecurityGate', 'PassGiftService', 'PassGiftState', 'ProductGiftService',
+             'ProductGiftState', 'PremiumProgress', 'BaseService']:
+    pairs.append((name, src + '/ServerScriptService/ChestChaseServer/' + name + '.lua'))
 parts = ['return {']
 for name, path in pairs:
     s = open(path, 'rb').read().decode('utf-8')

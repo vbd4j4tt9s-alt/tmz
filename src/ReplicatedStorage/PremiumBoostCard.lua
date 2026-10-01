@@ -1,5 +1,7 @@
 -- R120: pass cards in the reference style. Wide card: emblem left, title + description right,
 -- bottom row [Gift | Gems | Robux]. Banner: "DOUBLE Your SPEED  x1 > x2". Wiring lives in GamePassClient.
+-- R121: the banner sells the consumable 10-minute x2 boost (PremiumPricing.Boost), not the permanent pass:
+-- right column [Robux price] over [Gift | 10 MIN / active countdown].
 local RS=game:GetService('ReplicatedStorage')
 local Art=require(RS.PremiumShopArt);local Bright=require(RS.BrightUI);local Catalog=require(RS.MechCatalog)
 local B={};local C=Color3.fromRGB
@@ -48,10 +50,10 @@ function B.Layout(card,w,h,button,k)
  end
  for _,b in ipairs({card.GiftPass,card.GemPerk,card.RobuxPass})do Art.Fit(b)end
 end
--- Full-width "DOUBLE Your SPEED" banner for the Speed pass.
-function B.CreateBanner(parent,pass)
- local card=Art.Card(parent,'SpeedPassBanner',{C(120,232,255),C(40,190,250),C(20,140,236)})
- card:SetAttribute('PassKey',pass.Key)
+-- Full-width "DOUBLE Your SPEED" banner for the 10-minute boost product.
+function B.CreateBanner(parent,boost)
+ local card=Art.Card(parent,'SpeedBoostBanner',{C(120,232,255),C(40,190,250),C(20,140,236)})
+ card:SetAttribute('ProductKey',boost.Key)
  card.LightRays.ZIndex=1
  local pile=Art.Pile(card,'Bolt',5);pile.ZIndex=2
  local title=Art.Text(card,'Title','Your SPEED',30);title.ZIndex=4
@@ -59,7 +61,12 @@ function B.CreateBanner(parent,pass)
  local x1=Art.Text(card,'From','x1',60);x1.ZIndex=4
  local arrow=Art.Triangle(card);arrow.ZIndex=4
  local x2=Art.Text(card,'To','x2',72,C(255,226,40));x2.ZIndex=4
- buttons(card,pass)
+ local minutes=Art.Text(card,'Minutes','10 MIN',22,C(255,255,255));minutes.ZIndex=5
+ require(RS.PremiumBundleCard).GiftButton(card,'GiftBoost','Gift '..boost.Name)
+ Art.Button(card,'RobuxBoost',Art.Colors.Robux,'Robux');Art.SetCaption(card.RobuxBoost,'Unavailable',false)
+ local timer=Art.Text(card,'Timer','10 MIN BOOST',18,C(255,255,255));timer.ZIndex=6
+ timer.BackgroundTransparency=.35;timer.BackgroundColor3=C(14,40,90);Art.Corner(timer,8);Art.Stroke(timer,Art.Ink,2,'Frame')
+ timer.ClipsDescendants=false
  require(RS.GuiShine).Attach(card,false)
  return card
 end
@@ -83,13 +90,14 @@ function B.LayoutBanner(card,w,h,button,k)
  local buyW=narrow and math.floor(w*.42)or math.floor(math.min(w*.3,260))
  local midY=pad+titleH+4;local midH=h-midY-pad
  local buyX=w-pad-buyW
- -- Right column: Robux on top, then [Gift | Gems].
+ -- Right column: Robux on top, then [Gift | 10 MIN / countdown].
  local stack=button*2+g;local by=midY+math.max(0,math.floor((midH-stack)/2))
- card.RobuxPass.Position=UDim2.fromOffset(buyX,by);card.RobuxPass.Size=UDim2.fromOffset(buyW,button)
- card.GiftPass.Position=UDim2.fromOffset(buyX,by+button+g);card.GiftPass.Size=UDim2.fromOffset(button,button)
- card.GemPerk.Position=UDim2.fromOffset(buyX+button+g,by+button+g);card.GemPerk.Size=UDim2.fromOffset(buyW-button-g,button)
- if card.GemPerk.Visible==false then card.RobuxPass.Size=UDim2.fromOffset(buyW,button*2+g)end
- for _,b in ipairs({card.GiftPass,card.GemPerk,card.RobuxPass})do Art.Fit(b)end
+ card.RobuxBoost.Position=UDim2.fromOffset(buyX,by);card.RobuxBoost.Size=UDim2.fromOffset(buyW,button)
+ card.GiftBoost.Position=UDim2.fromOffset(buyX,by+button+g);card.GiftBoost.Size=UDim2.fromOffset(button,button)
+ card.Timer.Position=UDim2.fromOffset(buyX+button+g,by+button+g);card.Timer.Size=UDim2.fromOffset(buyW-button-g,button)
+ Art.SetTextSize(card.Timer,math.floor(math.min(button*.48,(buyW-button-g)/7)),9)
+ for _,b in ipairs({card.GiftBoost,card.RobuxBoost})do Art.Fit(b)end
+ Art.SetTextSize(card.GiftBoost.Soon,math.max(8,math.floor(button*.26)),7)
  local pileSide=math.min(midH,math.floor(w*.2))
  card.BundleArtwork.Position=UDim2.fromOffset(pad,h-pad-pileSide);card.BundleArtwork.Size=UDim2.fromOffset(pileSide,pileSide)
  card.LightRays.Position=UDim2.fromOffset(w*.42,midY+midH/2);card.LightRays.Size=UDim2.fromOffset(w*.9,w*.9)
@@ -102,6 +110,8 @@ function B.LayoutBanner(card,w,h,button,k)
  card.From.Position=UDim2.fromOffset(bx,y);card.From.Size=UDim2.fromOffset(fromW,bigH);Art.SetTextSize(card.From,math.floor(bigH*.8),16)
  card.Arrow.Position=UDim2.fromOffset(bx+fromW+g,y+bigH/2-arrowW);card.Arrow.Size=UDim2.fromOffset(arrowW,arrowW*2)
  card.To.Position=UDim2.fromOffset(bx+fromW+arrowW+g*2,y-math.floor(bigH*.08));card.To.Size=UDim2.fromOffset(toW,math.floor(bigH*1.12));Art.SetTextSize(card.To,math.floor(bigH*.95),18)
+ local minH=math.floor(math.max(14,bigH*.3))
+ card.Minutes.Position=UDim2.fromOffset(bx+fromW+arrowW+g*2,math.min(h-pad-minH,y+bigH-math.floor(minH*.3)));card.Minutes.Size=UDim2.fromOffset(toW,minH);Art.SetTextSize(card.Minutes,math.floor(minH*.9),10)
  card.BundleArtwork.Visible=not narrow
 end
 return B

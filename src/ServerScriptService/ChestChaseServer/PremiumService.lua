@@ -2,6 +2,7 @@ local RS=game:GetService('ReplicatedStorage');local Players=game:GetService('Pla
 local Market=game:GetService('MarketplaceService');local Policy=game:GetService('PolicyService')
 local Catalog=require(RS.MechCatalog);local Pricing=require(RS.PremiumPricing)
 local Gifts=require(RS.PassGiftCatalog);local Routing=require(script.Parent.PremiumRouting);local Gate=require(script.Parent.SecurityGate)
+local ProductGifts=require(RS.GiftProducts);local Boost=require(RS.SpeedBoost)
 local Service={};Service.__index=Service
 local MAX_RECEIPTS=20000
 local function receiptSpace(state)
@@ -30,7 +31,8 @@ function Service:LoadProduct(id,publish,retryDelay)
 end
 function Service.new(data,chests,passes)
  local remote=Instance.new('RemoteFunction');remote.Name='PremiumRequest';remote.Parent=RS:WaitForChild('ChestChaseRemotes')
- local self=setmetatable({Data=data,Chests=chests,Passes=passes,Last={},Busy={},Product=nil,PackProducts={},Products={},GiftProducts={},Gifts=require(script.Parent.PassGiftService).new(data,passes),Remote=remote},Service)
+ local self=setmetatable({Data=data,Chests=chests,Passes=passes,Last={},Busy={},Product=nil,PackProducts={},Products={},GiftProducts={},Gifts=require(script.Parent.PassGiftService).new(data,passes),Remote=remote,GiftProductInfos={},BoostInfo=nil},Service)
+ self.ProductGifts=require(script.Parent.ProductGiftService).new(data,chests,self.Gifts)
  remote.OnServerInvoke=function(p,action,value)
   if not Gate.Allow(p,'PremiumRequest',action,value)then return {Success=false,Message='Please wait.'}end
   if not data:IsLoaded(p)then return {Success=false,Message='YOUR DATA IS LOADING'}end
@@ -62,7 +64,7 @@ function Service.new(data,chests,passes)
    return self:State(p)
   end
   if not data.CanSave[p]then return {Success=false,Message='PURCHASES ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE'}end
-  if(action=='RobuxBundle'or action=='RobuxGift'or action=='RobuxPack')and not receiptSpace(data:GetPremium(p))then
+  if(action=='RobuxBundle'or action=='RobuxGift'or action=='RobuxPack'or action=='RobuxBoost'or action=='RobuxProductGift')and not receiptSpace(data:GetPremium(p))then
    local state=self:State(p);state.Success=false;state.Message='ROBUX PURCHASES ARE UNAVAILABLE FOR THIS SAVE';return state
   end
   local okay,message
@@ -86,6 +88,22 @@ function Service.new(data,chests,passes)
    if pass and route=='Gift'and routed==value and info and info.IsForSale~=false and(credits[value]or 0)<Gifts.MaxCredits then
     okay=pcall(Market.PromptProductPurchase,Market,p,id);message=okay and'Complete the Roblox purchase prompt.'or'Purchase could not open.'
    else okay=false;message='THIS GIFT PURCHASE IS UNAVAILABLE'end
+  elseif action=='RobuxBoost'then
+   -- R121: consumable x2 training boost for 10 minutes (stacks up to 60 minutes).
+   local id=Pricing.ProductId(Pricing.Boost);local route,routed=Routing.Resolve(id);local info=self.BoostInfo
+   local can,why=data:CanBuySpeedBoost(p)
+   if route=='Boost'and routed==Pricing.Boost.Key and info and info.IsForSale~=false and can then
+    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=okay and'Complete the Roblox purchase prompt.'or'Purchase could not open.'
+   else okay=false;message=route=='Boost'and why or'THIS PURCHASE IS UNAVAILABLE'end
+  elseif action=='RobuxProductGift'then
+   -- R121: buy a gift version of a product for a player in this server.
+   local giftKey=type(value)=='table'and value.Key;local row=ProductGifts.Find(giftKey)
+   local id=row and ProductGifts.ProductId(giftKey)or 0;local route,routed=Routing.Resolve(id);local info=row and self.GiftProductInfos[giftKey]
+   if row and route=='ProductGift'and routed==giftKey and info and info.IsForSale~=false then
+    okay,message=self.ProductGifts:Prompt(p,giftKey,value.RecipientId)
+   else okay=false;message='THIS GIFT PURCHASE IS UNAVAILABLE'end
+  elseif action=='GiftProduct'then
+   if type(value)=='table'then okay,message=self.ProductGifts:Send(p,value.Key,value.RecipientId)else okay=false;message='Choose a gift.'end
   elseif action=='BuyPerk'then okay,message=data:BuyGemPerk(p,value);if okay then task.spawn(function()passes:Refresh(p)end)end
   elseif action=='RobuxPack'then
    local offer=Catalog.Offer(value);local count=offer and offer.Count
@@ -116,6 +134,16 @@ function Service.new(data,chests,passes)
    self:LoadProduct(id,function(info)self.GiftProducts[pass.Key]=info end)
   end)end
  end
+ for _,row in ipairs(ProductGifts.Rows)do
+  local id=ProductGifts.ProductId(row.Key);local route,key=Routing.Resolve(id)
+  if route=='ProductGift'and key==row.Key then task.spawn(function()
+   self:LoadProduct(id,function(info)self.GiftProductInfos[row.Key]=info end)
+  end)end
+ end
+ do
+  local id=Pricing.ProductId(Pricing.Boost);local route=Routing.Resolve(id)
+  if route=='Boost'then task.spawn(function()self:LoadProduct(id,function(info)self.BoostInfo=info end)end)end
+ end
  return self
 end
 function Service:Setup(player)
@@ -126,7 +154,7 @@ function Service:Setup(player)
   player:SetAttribute('PaidRandomAllowed',result.ArePaidRandomItemsRestricted==false)
   player:SetAttribute('PaidTradingAllowed',result.IsPaidItemTradingAllowed==true)
  end
- self.Data:PublishPremium(player);self.Data:RefreshBiomeRewards(player);self.Gifts:Recover(player)
+ self.Data:PublishPremium(player);self.Data:RefreshBiomeRewards(player);self.Gifts:Recover(player);self.ProductGifts:Recover(player)
 end
 function Service:State(player)
  local state=self.Data:GetPremium(player);local bundles={};local giftProducts={};local offers={}
@@ -146,7 +174,17 @@ function Service:State(player)
    Amount=quote and quote.Amount,GemPrice=quote and quote.GemPrice,RobuxAmount=row.Amount}
  end
  for _,pass in ipairs(require(RS.GamePassCatalog))do local route,key=Routing.Resolve(Gifts.ProductId(pass.Key));local info=(self.GiftProducts or{})[pass.Key];giftProducts[pass.Key]={Available=robuxReady and route=='Gift'and key==pass.Key and info~=nil and info.IsForSale~=false}end
- return {PackOffers=offers,GiftProducts=giftProducts,GiftCredits=state.GiftCredits,Bundles=bundles,Success=true,Gems=state.Gems,Cash=self.Data:GetCash(player),GemPrice=Catalog.GemPrice,CashPerGem=Catalog.CashPerGem,
+ -- R121: gift versions of every product + the x2 Speed boost.
+ local productGifts={}
+ for _,row in ipairs(ProductGifts.Rows)do
+  local route,key=Routing.Resolve(ProductGifts.ProductId(row.Key));local info=(self.GiftProductInfos or{})[row.Key]
+  local allowed=row.Kind~='Mech'or(Catalog.OnSale()and player:GetAttribute('PaidRandomAllowed')==true)
+  productGifts[row.Key]={Available=robuxReady and allowed and route=='ProductGift'and key==row.Key and info~=nil and info.IsForSale~=false,RobuxPrice=info and info.PriceInRobux}
+ end
+ local boostRoute=Routing.Resolve(Pricing.ProductId(Pricing.Boost));local boostInfo=self.BoostInfo
+ local boost={Available=robuxReady and boostRoute=='Boost'and boostInfo~=nil and boostInfo.IsForSale~=false and self.Data:CanBuySpeedBoost(player)==true,
+  EndsAt=state.SpeedBoostEndsAt,Remaining=Boost.Remaining(state.SpeedBoostEndsAt,os.time()),RobuxPrice=boostInfo and boostInfo.PriceInRobux}
+ return {PackOffers=offers,GiftProducts=giftProducts,ProductGifts=productGifts,ProductGiftCredits=state.ProductGiftCredits,Boost=boost,GiftCredits=state.GiftCredits,Bundles=bundles,Success=true,Gems=state.Gems,Cash=self.Data:GetCash(player),GemPrice=Catalog.GemPrice,CashPerGem=Catalog.CashPerGem,
   OnSale=Catalog.OnSale(),GemPackAvailable=offers['1'].GemAvailable,RobuxPrice=self.Product and self.Product.PriceInRobux,
   RobuxAvailable=offers['1'].RobuxAvailable,
   PendingSales=self.Data:GetPendingSales(player),Entitlements=state.Entitlements,BiomeRewards=state.Biomes}
@@ -155,7 +193,7 @@ function Service:ProcessReceipt(receipt)
  local later=Enum.ProductPurchaseDecision.NotProcessedYet
  if type(receipt)~='table'or type(receipt.ProductId)~='number'or type(receipt.PurchaseId)~='string'or #receipt.PurchaseId<1 or #receipt.PurchaseId>100 then return later end
  local kind,key=Routing.Resolve(receipt.ProductId);if not kind then return later end
- local mech=kind=='Mech';local bundle=kind=='Bundle'and key or nil
+ local mech=kind=='Mech';local bundle=kind=='Bundle'and key or nil;local fresh=false
  local player=Players:GetPlayerByUserId(receipt.PlayerId)
  if not player or not self.Data:IsLoaded(player)or not self.Data.CanSave[player]or self.Busy[player]then return later end
  self.Busy[player]=true
@@ -166,13 +204,19 @@ function Service:ProcessReceipt(receipt)
    local granted
    if mech then granted=self.Data:GrantMechPacks(player,true,key)
    elseif bundle then granted=self.Data:GrantPremiumBundle(player,bundle)
+   elseif kind=='Boost'then granted=self.Data:ExtendSpeedBoost(player)
+   elseif kind=='ProductGift'then
+    -- R121: the paid gift is first saved as the buyer's credit, then sent to the chosen recipient.
+    local credits=state.ProductGiftCredits
+    if(credits[key]or 0)>=ProductGifts.MaxCredits then return later end
+    credits[key]=(credits[key]or 0)+1;granted=true
    else
     if(state.GiftCredits[key]or 0)>=Gifts.MaxCredits then return later end
     state.GiftCredits[key]=(state.GiftCredits[key]or 0)+1;granted=true
    end
    if not granted then return later end
    -- Pack and receipt enter the same profile transaction. Never acknowledge before a successful save.
-   state.Receipts[receipt.PurchaseId]=true;self.Data:MarkDirty(player)
+   state.Receipts[receipt.PurchaseId]=true;self.Data:MarkDirty(player);fresh=true
   end
   self.Data:WaitForSave(player,5)
   if not self.Data:Save(player,'PremiumProductReceipt',true)then return later end
@@ -181,7 +225,14 @@ function Service:ProcessReceipt(receipt)
   return Enum.ProductPurchaseDecision.PurchaseGranted
  end)
  self.Busy[player]=nil
+ if okay and decision==Enum.ProductPurchaseDecision.PurchaseGranted and fresh then
+  if kind=='ProductGift'then task.spawn(function()self.ProductGifts:AfterReceipt(player,key)end)
+  elseif kind=='Boost'then self:Notify(player,'x2 Speed boost active: '..Boost.Clock(self.Data:SpeedBoostRemaining(player))..' left!')end
+ end
  return okay and decision or later
 end
-function Service:Cleanup(player)self.Last[player]=nil;self.Gifts:Cleanup(player)end
+function Service:Notify(player,message)
+ local n=self.Data.Notifications;if n and player.Parent then pcall(n.Show,n,player,message,nil,4)end
+end
+function Service:Cleanup(player)self.Last[player]=nil;self.Gifts:Cleanup(player);self.ProductGifts:Cleanup(player)end
 return Service

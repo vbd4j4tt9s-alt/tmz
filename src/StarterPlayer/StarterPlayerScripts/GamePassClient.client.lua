@@ -1,11 +1,14 @@
 -- R120: one scrolling Robux shop (FEATURED, PASSES, SPEED, MONEY, GEMS) with a quick-jump column.
 -- Products, prices and every purchase / gift / owned flow are unchanged from R79; only the look and layout moved.
+-- R121: purple gift button on every Robux product (gift developer products, ids on GiftProducts; SOON while unset)
+-- and the SPEED banner sells the 10-minute x2 boost (PremiumPricing.Boost) with a live countdown.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Market=game:GetService('MarketplaceService')
 local Tween=game:GetService('TweenService');local GuiService=game:GetService('GuiService');local UIS=game:GetService('UserInputService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local Theme=require(RS:WaitForChild('GardenTheme'));local Passes=require(RS:WaitForChild('GamePassCatalog'))
 local Pricing=require(RS.PremiumPricing);local Catalog=require(RS:WaitForChild('MechCatalog'));local Cash=require(RS:WaitForChild('CashNumbers'));local Audio=require(RS:WaitForChild('InteractionAudio'))
 local Bright=require(RS.BrightUI);local Artwork=require(RS.HudArtwork);local Art=require(RS.PremiumShopArt);local Layout=require(RS.PremiumLayout);local Hud=require(RS.HudLayout)
 local request=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('PremiumRequest')
+local GiftProducts=require(RS.GiftProducts);local Boost=require(RS.SpeedBoost)
 local C=Color3.fromRGB
 local old=pg:FindFirstChild('GardenPasses');if old then old:Destroy()end
 local gui=Instance.new('ScreenGui');gui.Name='GardenPasses';gui.ResetOnSpawn=false;gui.DisplayOrder=34;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
@@ -83,6 +86,8 @@ for i,s in ipairs(Catalog.Seeds)do
  local name=Art.Text(item,'SeedName',s.Name,12);name.ZIndex=5;name.TextWrapped=true
  local chance=Art.Text(item,'Chance',require(RS.OddsText85).Format(s.Chance),18,s.Rarity=='King'and Theme.Colors.Gold or Color3.new(1,1,1));chance.ZIndex=6;chance.TextXAlignment=Enum.TextXAlignment.Right
 end
+local BundleArt=require(RS.PremiumBundleCard)
+local giftPack=BundleArt.GiftButton(pack,'GiftPack','Gift '..Catalog.Name)
 local gemBuy=Art.Button(pack,'BuyWithGems',Art.Colors.Gem,'Gem')
 local robuxBuy=Art.Button(pack,'BuyWithRobux',Art.Colors.Robux,'Robux')
 for _,offer in ipairs(Catalog.Offers)do
@@ -115,19 +120,16 @@ for i,pass in ipairs(Passes)do
  table.insert(row.Views,{Card=c,Gem=c.GemPerk,Robux=c.RobuxPass,Gift=c.GiftPass,Banner=false})
  marketplaceInfo(Passes.Id(pass),Enum.InfoType.GamePass,function(info)passButtons[pass.Key].Info=info end)
 end
-local speedBanner
-if passButtons.Speed then
- speedBanner=boostArt.CreateBanner(page,passButtons.Speed.Pass)
- table.insert(passButtons.Speed.Views,{Card=speedBanner,Gem=speedBanner.GemPerk,Robux=speedBanner.RobuxPass,Gift=speedBanner.GiftPass,Banner=true})
-end
+-- SPEED banner: the 10-minute x2 boost (consumable product), not the permanent pass.
+local speedBanner=boostArt.CreateBanner(page,Pricing.Boost);local boostInfo
+marketplaceInfo(Pricing.ProductId(Pricing.Boost),Enum.InfoType.Product,function(info)boostInfo=info end)
 for _,row in pairs(passButtons)do for _,v in ipairs(row.Views)do table.insert(passViews,v)end end
 -- SPEED and MONEY bundles.
 local bundleButtons={};local bundleOrder={Speed={},Cash={}}
-local BundleArt=require(RS.PremiumBundleCard)
 for _,kind in ipairs({'Speed','Cash'})do
  for _,row in ipairs(Pricing.Bundles)do if row.Kind==kind then
   local list=bundleOrder[kind];local c=BundleArt.Create(page,row,#list+1);table.insert(list,row.Key)
-  bundleButtons[row.Key]={Frame=c,Gem=c:FindFirstChild('GemBundle'),Robux=c.RobuxBundle,Row=row}
+  bundleButtons[row.Key]={Frame=c,Gem=c:FindFirstChild('GemBundle'),Robux=c.RobuxBundle,Gift=c.GiftBundle,Row=row}
  end end
 end
 local function productInfo(id,done)
@@ -135,6 +137,14 @@ local function productInfo(id,done)
 end
 for _,offer in ipairs(Catalog.Offers)do productInfo(Catalog.ProductId(offer.Count),function(info)packInfos[offer.Count]=info end)end
 for _,row in pairs(bundleButtons)do productInfo(Pricing.ProductId(row.Row),function(info)row.Info=info end)end
+local giftProductInfos={}
+for _,row in ipairs(GiftProducts.Rows)do productInfo(GiftProducts.ProductId(row.Key),function(info)giftProductInfos[row.Key]=info end)end
+-- Every gift button: purple when its gift product id is set, grey "SOON" (inactive) while it is 0 / missing.
+local giftButtons={}
+local function giftKeyForPack()return GiftProducts.MechKey(packCount)end
+giftButtons[#giftButtons+1]={Button=giftPack,Key=giftKeyForPack}
+for key,row in pairs(bundleButtons)do giftButtons[#giftButtons+1]={Button=row.Gift,Key=function()return key end}end
+giftButtons[#giftButtons+1]={Button=speedBanner.GiftBoost,Key=function()return Pricing.Boost.Key end}
 -- GEMS: cash -> gems converter (unchanged rules) and the index tip.
 local gems=Art.Card(page,'ConvertCash',{C(120,226,255),C(70,140,250),C(110,70,230)})
 local gemIcon=require(RS.GemIcon).new(gems);gemIcon.ZIndex=3
@@ -182,6 +192,19 @@ refresh=function()
   end
  end
  if reflow and relayout then relayout(true)end
+ for _,g in ipairs(giftButtons)do
+  local ready=GiftProducts.ProductId(g.Key())>0
+  BundleArt.SetGiftState(g.Button,ready);active(g.Button,ready and not busy)
+ end
+ -- 10-minute boost banner: live price, SOON while its id is unset, countdown while active.
+ local boostId=Pricing.ProductId(Pricing.Boost);local quote=state.Boost
+ local boostReady=boostId>0 and quote~=nil and quote.Available==true and boostInfo~=nil and boostInfo.IsForSale~=false and boostInfo.PriceInRobux~=nil
+ setPrice(speedBanner.RobuxBoost,boostId==0 and'SOON'or boostReady and tostring(boostInfo.PriceInRobux)or'Unavailable',boostReady==true,boostId==0 and Art.Colors.Off or Art.Colors.Robux)
+ active(speedBanner.RobuxBoost,boostReady and not busy)
+ local remaining=Boost.PlayerRemaining(player)
+ local timerText=remaining>0 and('ACTIVE '..Boost.Clock(remaining))or'10 MIN BOOST'
+ if speedBanner.Timer.Text~=timerText then speedBanner.Timer.Text=timerText end
+ speedBanner:SetAttribute('BoostActive',remaining>0)
  if giftDialog then giftDialog:Refresh()end
 end
 local pendingState=false
@@ -190,7 +213,7 @@ local function act(action,value,onDone)
  task.spawn(function()
   local okay,result=pcall(request.InvokeServer,request,action,value);busy=false
   if not gui.Parent then return end
-  if okay and type(result)=='table'then if result.Gems~=nil then state=result end;status.Text=result.Message or'';if action~='State'and result.Success and action~='RobuxPack'and action~='RobuxBundle'and action~='RobuxGift'then Audio.Transaction('Buy')end
+  if okay and type(result)=='table'then if result.Gems~=nil then state=result end;status.Text=result.Message or'';if action~='State'and result.Success and action~='RobuxPack'and action~='RobuxBundle'and action~='RobuxGift'and action~='RobuxBoost'and action~='RobuxProductGift'then Audio.Transaction('Buy')end
   else status.Text='Please try again.'end;refresh()
   if onDone then onDone(okay and result or nil)end
   if pendingState and not busy then pendingState=false;if panel.Visible then act('State')end end
@@ -204,7 +227,15 @@ for key,row in pairs(bundleButtons)do
 end
 local giftInfos={}
 for _,pass in ipairs(Passes)do productInfo(require(RS.PassGiftCatalog).ProductId(pass.Key),function(info)giftInfos[pass.Key]=info end)end
-giftDialog=require(RS.PassGiftDialog).Create(panel,player,act,function()return state end,function(key)return giftInfos[key]end)
+giftDialog=require(RS.PassGiftDialog).Create(panel,player,act,function()return state end,function(key)return giftInfos[key]end,function(key)return giftProductInfos[key]end)
+for _,g in ipairs(giftButtons)do
+ g.Button.Activated:Connect(function()
+  local key=g.Key();if not g.Button.Active or GiftProducts.ProductId(key)==0 then return end
+  giftDialog:OpenProduct({Key=key,Name=GiftProducts.Name(key)})
+ end)
+end
+speedBanner.RobuxBoost.Activated:Connect(function()if speedBanner.RobuxBoost.Active then act('RobuxBoost')end end)
+watch(player:GetAttributeChangedSignal(Boost.Attribute),function()refresh()end)
 for _,row in pairs(passButtons)do
  for _,v in ipairs(row.Views)do
   v.Gift.Activated:Connect(function()giftDialog:Open(row.Pass)end)
@@ -255,7 +286,8 @@ local function layoutFeatured(f,k,button)
   end
  end
  for i,offer in ipairs(Catalog.Offers)do local b=quantityButtons[offer.Count];if b and f.Chips[i]then place(b,f.Chips[i]);b.TextSize=math.max(10,math.floor(button*.4))end end
- place(gemBuy,f.Gem);place(robuxBuy,f.Robux);Art.Fit(gemBuy);Art.Fit(robuxBuy)
+ place(giftPack,f.Gift);place(gemBuy,f.Gem);place(robuxBuy,f.Robux)
+ Art.Fit(giftPack);Art.Fit(gemBuy);Art.Fit(robuxBuy);Art.SetTextSize(giftPack.Soon,math.max(8,math.floor(f.Gift.H*.26)),7)
 end
 local function layoutGems(r,k,button)
  local p=math.max(6,math.floor(12*k));local w,h=r.W,r.H
@@ -415,6 +447,14 @@ watch(status:GetPropertyChangedSignal('Text'),function()
 end)
 -- Re-layout on viewport, touch and thumb-control changes (HudLayout watches all three).
 local stopWatch=Hud.Watch(gui,function()if content then relayout()end end)
+-- Boost countdown on the banner (once a second while the shop is open).
+local boostClock=0
+watch(game:GetService('RunService').Heartbeat,function(dt)
+ boostClock+=dt;if boostClock<1 or not panel.Visible then return end;boostClock=0
+ local remaining=Boost.PlayerRemaining(player)
+ local text=remaining>0 and('ACTIVE '..Boost.Clock(remaining))or'10 MIN BOOST'
+ if speedBanner.Timer.Text~=text then if remaining<=0 and speedBanner:GetAttribute('BoostActive')then if busy then pendingState=true else act('State')end end;refresh()end
+end)
 watch(GuiService:GetPropertyChangedSignal('ReducedMotionEnabled'),function()if scrollTween and GuiService.ReducedMotionEnabled then scrollTween:Cancel();scrollTween=nil;local y=page:GetAttribute('TargetY');if y then page.CanvasPosition=Vector2.new(0,y)end end end)
 gui.Destroying:Connect(function()stopWatch();for _,r in ipairs(reveals)do r.Destroy()end;for _,c in ipairs(connections)do c:Disconnect()end end)
 relayout(true);refresh();setCurrent('Featured')

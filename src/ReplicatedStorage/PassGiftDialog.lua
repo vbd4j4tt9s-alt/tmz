@@ -1,8 +1,10 @@
 local RS=game:GetService('ReplicatedStorage');local Players=game:GetService('Players')
 local Bright=require(RS.BrightUI);local Theme=require(RS.GardenTheme);local Mech=require(RS.MechCatalog)
+-- R121: also gifts developer products (OpenProduct): pick a player here, then the gift product prompt opens;
+-- the server delivers the reward to that player after the receipt (saved credits are sent with 'GiftProduct').
 local D={}
-function D.Create(parent,player,act,stateFor,infoFor)
- local self={Selected=nil,Pass=nil,Pending=nil}
+function D.Create(parent,player,act,stateFor,infoFor,productInfoFor)
+ local self={Selected=nil,Pass=nil,Pending=nil,Mode='Pass'}
  local veil=Instance.new('TextButton');veil.Name='GiftVeil';veil.Text='';veil.BackgroundColor3=Color3.new();veil.BackgroundTransparency=.35;veil.Size=UDim2.fromScale(1,1);veil.ZIndex=19;veil.Visible=false;veil.Parent=parent
  local panel=Instance.new('Frame');panel.Name='PassGiftPicker';panel.AnchorPoint=Vector2.new(.5,.5);panel.Position=UDim2.fromScale(.5,.5);panel.Size=UDim2.new(.94,0,.92,0);panel.ZIndex=20;panel.Active=true;panel.Visible=false;panel.BorderSizePixel=0;panel.Parent=parent;Bright.Panel(panel)
  local max=Instance.new('UISizeConstraint');max.MaxSize=Vector2.new(460,490);max.Parent=panel
@@ -18,10 +20,24 @@ function D.Create(parent,player,act,stateFor,infoFor)
  function self:Close()self.Pending=nil;panel.Visible=false;veil.Visible=false end
  local function send(payment)
   if not self.Pass or not self.Selected then return end
+  if self.Mode=='Product'then
+   act('GiftProduct',{Key=self.Pass.Key,RecipientId=self.Selected},function(result)if result and result.Success then self:Close()else feedback.Text=result and result.Message or'Please try again.'end end)
+   return
+  end
   act('GiftPass',{Key=self.Pass.Key,RecipientId=self.Selected,Payment=payment},function(result)if result and result.Success then self:Close()else feedback.Text=result and result.Message or'Please try again.'end end)
  end
  function self:Refresh()
   if not panel.Visible or not self.Pass then return end
+  if self.Mode=='Product'then
+   local state=stateFor();local credit=(state.ProductGiftCredits or{})[self.Pass.Key]or 0
+   local available=(state.ProductGifts or{})[self.Pass.Key];local info=productInfoFor and productInfoFor(self.Pass.Key)
+   local ready=available and available.Available and info and info.PriceInRobux and info.IsForSale~=false
+   gem.Visible=false;gem.Interactable=false
+   robux.Text=credit>0 and('Send gift · '..credit..' ready')or ready and(info.PriceInRobux..' Robux')or'Unavailable'
+   robux.Interactable=self.Selected~=nil and(credit>0 or ready==true)
+   return
+  end
+  gem.Visible=true
   local state=stateFor();local credit=(state.GiftCredits or{})[self.Pass.Key]or 0
   local available=(state.GiftProducts or{})[self.Pass.Key];local info=infoFor(self.Pass.Key)
   local ready=available and available.Available and info and info.PriceInRobux and info.IsForSale~=false
@@ -43,13 +59,22 @@ function D.Create(parent,player,act,stateFor,infoFor)
   list.CanvasSize=UDim2.fromOffset(0,n*52)
   if n==0 then local t=Instance.new('TextLabel');t.Text='No other players here';t.Size=UDim2.new(1,0,0,50);t.BackgroundTransparency=1;t.ZIndex=23;Bright.Text(t,18);t.Parent=list end
  end
- function self:Open(pass)feedback.Text='';self.Pass=pass;self.Selected=nil;self.Pending=nil;title.Text='Gift '..pass.Name;veil.Visible=true;panel.Visible=true;recipients();self:Refresh()end
+ function self:OpenProduct(item)self.Mode='Product';feedback.Text='';self.Pass=item;self.Selected=nil;self.Pending=nil;title.Text='Gift '..item.Name;veil.Visible=true;panel.Visible=true;recipients();self:Refresh()end
+ function self:Open(pass)self.Mode='Pass';feedback.Text='';self.Pass=pass;self.Selected=nil;self.Pending=nil;title.Text='Gift '..pass.Name;veil.Visible=true;panel.Visible=true;recipients();self:Refresh()end
  function self:IsOpen()return panel.Visible end
  close.Activated:Connect(function()self:Close()end);veil.Activated:Connect(function()self:Close()end)
- gem.Activated:Connect(function()if gem.Interactable then send('Gems')end end)
+ gem.Activated:Connect(function()if gem.Interactable and self.Mode=='Pass'then send('Gems')end end)
  robux.Activated:Connect(function()
   if not robux.Interactable or not self.Selected then return end
-  local key=self.Pass.Key;local userId=self.Selected;local credit=(stateFor().GiftCredits or{})[key]or 0
+  local key=self.Pass.Key;local userId=self.Selected
+  if self.Mode=='Product'then
+   if((stateFor().ProductGiftCredits or{})[key]or 0)>0 then send('Credit');return end
+   act('RobuxProductGift',{Key=key,RecipientId=userId},function(result)
+    if panel.Visible then feedback.Text=result and result.Success and'Finish the purchase; the gift is sent automatically.'or result and result.Message or'Please try again.'end
+   end)
+   return
+  end
+  local credit=(stateFor().GiftCredits or{})[key]or 0
   if credit>0 then send('Credit');return end
   act('RobuxGift',key,function(result)
    if result and result.Success and panel.Visible and self.Pass.Key==key and self.Selected==userId then self.Pending={Key=key,UserId=userId,Before=credit};self:Refresh()elseif panel.Visible then feedback.Text=result and result.Message or'Please try again.'end

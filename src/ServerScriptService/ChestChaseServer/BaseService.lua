@@ -530,7 +530,9 @@ function BaseService:GetTreadmillMultiplier(player)
     local tier=self.PlayerData:GetTreadmillData(player).Tier
     local boost=tonumber(player:GetAttribute('TreadmillMultiplier'))or 1
     if boost~=boost or boost==math.huge or boost==-math.huge then boost=1 end
-    return require(game:GetService('ReplicatedStorage').BalanceRules).Training(self.Config.TreadmillTiers[tier].Multiplier,boost,player:GetAttribute('DoubleSpeedOwned')==true)
+    -- R121: the timed x2 boost multiplies with machine, trail and the permanent x2 Speed pass.
+    local timed=self.PlayerData.SpeedBoostFactor and self.PlayerData:SpeedBoostFactor(player)or 1
+    return require(game:GetService('ReplicatedStorage').BalanceRules).Training(self.Config.TreadmillTiers[tier].Multiplier,boost,player:GetAttribute('DoubleSpeedOwned')==true)*timed
 end
 function BaseService:TreadmillSnapshot(player,message)
     local data=self.PlayerData:GetTreadmillData(player);local tiers={}

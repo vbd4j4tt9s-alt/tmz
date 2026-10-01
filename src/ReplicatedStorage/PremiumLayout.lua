@@ -156,6 +156,8 @@ function L.Content(width,k,counts)
   local cw=math.floor((chipsW-cg*2)/3)
   f.Chips={};for i=1,3 do f.Chips[i]={X=x+(i-1)*(cw+cg),Y=rowY,W=cw,H=button}end
   local buyX=x+cw*3+cg*3;local buyW=x+width-buyX
+  -- R121: square gift button first, then [Gems | Robux].
+  f.Gift={X=buyX,Y=rowY,W=button,H=button};buyX+=button+cg;buyW-=button+cg
   local gw=math.floor((buyW-cg)*.42)
   f.Gem={X=buyX,Y=rowY,W=gw,H=button};f.Robux={X=buyX+gw+cg,Y=rowY,W=buyW-gw-cg,H=button}
  end
@@ -188,8 +190,9 @@ function L.Content(width,k,counts)
   local rowY=ty+2*th+tg+8
   local cw=math.floor((inner-fp*2-tg*2)/3)
   f.Chips={};for i=1,3 do f.Chips[i]={X=fp+(i-1)*(cw+tg),Y=rowY,W=cw,H=button}end
-  local buyY=rowY+button+tg;local gw=math.floor((inner-fp*2-tg)*.42)
-  f.Gem={X=fp,Y=buyY,W=gw,H=button};f.Robux={X=fp+gw+tg,Y=buyY,W=inner-fp*2-gw-tg,H=button}
+  local buyY=rowY+button+tg;local bx=fp+button+tg;local gw=math.floor((inner-bx-fp-tg)*.42)
+  f.Gift={X=fp,Y=buyY,W=button,H=button}
+  f.Gem={X=bx,Y=buyY,W=gw,H=button};f.Robux={X=bx+gw+tg,Y=buyY,W=inner-fp-bx-gw-tg,H=button}
   f.H=buyY+button+fp
  end
  out.Featured=f
