@@ -91,9 +91,14 @@ function H.Create(pg,player)
   if dead then return end
   local camera=workspace.CurrentCamera;local viewport=require(RS.HudLayout).Viewport(gui)
   local m=require(RS.HudLayout).Read(viewport,Input.TouchEnabled,Layout.Controls(gui))
-  local map=workspace:FindFirstChild('ChestChaseMap');local event=map and map:GetAttribute('VeiledEventActive')==true
+  local map=workspace:FindFirstChild('ChestChaseMap');local active=map and map:GetAttribute('VeiledEventActive')==true
+  -- R122: between events the same card is the third timer: "ARRIVES IN 3m 12s" (server time VeiledNextAt).
+  local nextAt=map and map:GetAttribute('VeiledNextAt');local waitFor=type(nextAt)=='number'and nextAt-(now or workspace:GetServerTimeNow())or nil
+  local event=active or(waitFor~=nil and waitFor>0)
   special.Visible=event
-  specialHint.Text=player:GetAttribute('SpecialKeeperChase84')and'CHASING YOU' or'AT STORM PEAKS'
+  local hint=active and(player:GetAttribute('SpecialKeeperChase84')and'CHASING YOU' or'AT STORM PEAKS')or(event and'ARRIVES IN '..SpeedBoost.Clock(waitFor))or''
+  if specialHint.Text~=hint then specialHint.Text=hint end
+  special:SetAttribute('AccessibleLabel','The Veiled One '..hint:lower())
   scale.Scale=m.StatusScale
   if m.Phone then
    local width=m.StatusHorizontal and 388 or 190
