@@ -24,6 +24,7 @@ W.env.RaycastParams={new=function()return {}end}
 function W.workspace.Raycast()return nil end
 local fired={}
 do local inew=R.Instance.new;R.Instance.new=function(class,parent)local o=inew(class,parent)
+ if class=='Tool'then o.Equipped=R.signal();o.Unequipped=R.signal()end
  if class=='RemoteEvent'then o.OnServerEvent=R.signal();o.OnClientEvent=R.signal()
   o.FireAllClients=function(_,payload)fired[#fired+1]=payload end;o.FireClient=function()end end;return o end end
 local function step(dt)R.advance(dt);Run.Heartbeat:Fire(dt);Run.PostSimulation:Fire(dt)end

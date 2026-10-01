@@ -49,4 +49,22 @@ return {
   Tripped='%s FELL IN YOUR HOLE!',
  },
  Hint='Dig holes on the track: thieves carrying a pack fall in',
+
+ -- Dig / cover sound: one long recording with several digs, played as short variants (see DigSoundVariants and
+ -- docs/proposals/holes_R122/DIG_SOUND.md). Variant source, first match wins:
+ --  1. attribute DigSegments on this ModuleScript (JSON, written by the Studio tool DigSoundAnalyzer),
+ --  2. Segments below ({Start=seconds,Length=seconds}, paste the tool's printout),
+ --  3. fallback: the loaded sound's TimeLength split into FallbackVariants equal windows.
+ DigSound={
+  Id='rbxassetid://93793180254708',
+  Volume=.5,PitchMin=.93,PitchMax=1.07, -- random pitch per play; never the same variant twice in a row
+  CoverPitch=.86,                       -- covering a hole plays a variant a little lower
+  RollOffMin=12,RollOffMax=150,         -- positional at the hole; nearby players hear it
+  FallbackVariants=6,MaxLength=1.2,     -- fallback split; every variant is cut to at most MaxLength seconds
+  LoadGrace=.5,                         -- skip a play whose sound took longer than this to load (stale)
+  Attribute='DigSegments',
+  Segments={},
+  -- Studio analyzer defaults (DigSoundAnalyzer.Run(options) overrides any of these)
+  Analyzer={Use='Peak',Threshold=nil,Sensitivity=.3,QuietGap=.12,Preroll=.03,Tail=.06,MinLength=.08,MaxLength=1.2},
+ },
 }

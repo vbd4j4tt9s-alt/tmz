@@ -179,7 +179,7 @@ if __name__ == '__main__':
     c = render(rows['void'], (3.6, 1.6, 4.2), (0, 0, 0), 440, 440, 36, 'back 3/4')
     d = render(rows['gold'], (-2.0, .8, -5.6), (0, 0, 0), 440, 440, 34, 'Gold coat variation')
     e = render(rows['void'], (-5.6, .6, -.6), (0, 0, 0), 440, 440, 34, 'side (halo depth)')
-    sheet = Image.new('RGB', (900+20+440*2+10, 900+20+440), (12, 8, 22))
+    sheet = Image.new('RGB', (900+20+440*2+10, 1000), (12, 8, 22))
     sheet.paste(a, (0, 0)); sheet.paste(b, (920, 0)); sheet.paste(c, (920+450, 0))
     sheet.paste(d, (920, 450)); sheet.paste(e, (920+450, 450))
     note = render([], (0, 0, -5), (0, 0, 0), 10, 10)
