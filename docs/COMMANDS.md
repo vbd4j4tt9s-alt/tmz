@@ -1,4 +1,4 @@
-# Test commands and tools (R124)
+# Test commands and tools (R125)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -155,3 +155,10 @@ listed separately any more because each one is the same as a command above.
    - Biome title: run from Forest into Jungle; the name fades in, then fades away.
    - Refresh wall: `refreshpacks`; the moon and count are centred and "REFRESHING" has looping dots.
    - King border: `seeds all @me`; the King cards have ruby corner gems.
+10. **R125:**
+   - Stealing needs a 1 s hold of E (a dropped pack 0.5 s).
+   - Biome titles show their logo in the medallion and fade away.
+   - Rare-and-up plants outside Forest grow 15 min to 4 h and are worth more per harvest.
+   - Tutorial: the TRACK ring in step 1, plus BASE / TRACK tips.
+   - Esc menu: the "plants grow offline" card.
+   - Shop: the Featured star logo.

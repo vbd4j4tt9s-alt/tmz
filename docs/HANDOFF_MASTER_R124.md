@@ -4,6 +4,7 @@ Generated 2 Oct 2026 from the Claude Code session that built R114–R123, follow
 
 Revision changelog
 - R124 update (2 Oct): R123 is installed and checked in the owner's place; R124 is built (source + installer), not installed. Sections 1–3, 5–8, 10–12 updated; the R123 history below is kept where still true.
+- R125 update (2 Oct, later): built, not installed. Hold E to steal (1 s / 0.5 s), biome title redo (logo in a CanvasGroup medallion — R124's plain-Frame title lost the logos in Studio), slower plant growth (owner answers: up to 4 h King; Common/Uncommon/Forest/Mech unchanged; regrow same factor; value x max(1,factor/2) capped 9e10), tutorial TRACK/BASE teaching, Esc-menu offline-growth card, Featured star logo, shovel tip wording. Installer `installers/R125_install.lua` (~60 KB, 13 scripts, base `181aa89` = R124; mock 41/41). Notes: `docs/releases/R125.md`. Install order: R124 then R125.
 - R123 handoff: replaces docs/HANDOFF.md (29 Sep, R107/R110 era) as the current master. The baseline moves from "V149 prepared" to "V150 R123 source".
 - R123 handoff: the V4.1 Section 6 plant-visual seed rows are moved to verification debt (no evidence they were worked in this repo). The newest user tasks are reconciled into Section 6.
 
