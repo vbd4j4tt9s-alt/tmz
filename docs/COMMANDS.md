@@ -1,4 +1,4 @@
-# Test commands and tools (R128)
+# Test commands and tools (R129)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -174,3 +174,6 @@ listed separately any more because each one is the same as a command above.
    - Walk and run through Forest / Jungle: pollen and fireflies stay put instead of sliding with the camera.
    - Hold a pack or seed with a ring/orbit (`weather rain all`) and run: the effect stays on the item.
    - Steal a pack and let the keeper catch up: it lands its swing instead of repeating it.
+14. **R129:**
+   - Device emulator, landscape phone: balances bottom-left, boosts/The Darkened/timers bottom-right above jump, MENU left, BASE/TRACK top, hotbar centred.
+   - `weather rain` in the base: turn the camera, the rain keeps falling and the sky darkens; on the track there is no weather.
