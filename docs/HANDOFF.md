@@ -1,5 +1,7 @@
 # Chest Chase (sap_F.rbxl) - project handoff
 
+> **Superseded:** the current master handoff is `docs/HANDOFF_MASTER_R123.md`. This file is kept for map geometry / startup-order history.
+
 Written 2026-09-29 from a claude.ai chat session. Read "Status" and "How to work with me" first.
 
 > **Checked against the uploaded place file on 2026-09-29 (Claude Code session):**
