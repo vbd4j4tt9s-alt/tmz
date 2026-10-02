@@ -14,6 +14,7 @@ local connection=Run.Heartbeat:Connect(function(dt)
   scan=0;local character=player.Character;local root=character and character:FindFirstChild('HumanoidRootPart');local hum=character and character:FindFirstChildOfClass('Humanoid')
   stage=Mood.Stage(map,root and hum and hum.Health>0 and root.Position or nil,stage)
  end
- renderer:Step(stage,RS:GetAttribute('GlobalWeather')or'Clear',player:GetAttribute('FastMode')==true,refresh,step)
+ -- R129 (owner): weather only darkens the base area; on the track (stage > 0) the biome's own look stays.
+ renderer:Step(stage,stage==0 and(RS:GetAttribute('GlobalWeather')or'Clear')or'Clear',player:GetAttribute('FastMode')==true,refresh,step)
 end)
 script.Destroying:Connect(function()if dead then return end;dead=true;connection:Disconnect();if renderer then renderer:Destroy()end end)

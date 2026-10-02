@@ -37,6 +37,9 @@ function Wallet.new(parent)
    r.Amount.AnchorPoint=Vector2.new(0,.5);r.Amount.Position=UDim2.new(0,side+5,.5,0);r.Amount.Size=UDim2.new(1,-side-(m.WalletCompactTap and 8 or plus+12),1,0)
    local font=m.WalletFont or math.min(42,math.floor(side*.8));require(RS.GardenTextFit).Attach(r.Amount,font,m.Phone and 16 or math.max(10,math.floor(font*.7)))
    r.Root.Visible=pg:GetAttribute('SeedMenu')==nil
+   -- R129: landscape phones keep the balances in the thumbstick corner: only the + buttons take touches there,
+   -- the rows themselves let a thumb drag start on them.
+   if r.Root:IsA('GuiButton')then local live=m.WalletPassive~=true;r.Root.Active=live;pcall(function()r.Root.Interactable=live end)end
   end
  end
  local function watch(signal,fn)connections[#connections+1]=signal:Connect(fn)end

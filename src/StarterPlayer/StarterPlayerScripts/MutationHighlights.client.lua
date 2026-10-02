@@ -37,7 +37,7 @@ local function fruitModel(model,index)
  return nil
 end
 local function makeLabel(entry)
- local gui=Instance.new('BillboardGui');gui.Name='Mutation_'..entry.CropId;gui.AlwaysOnTop=true;gui.LightInfluence=0;gui.MaxDistance=260
+ local gui=Instance.new('BillboardGui');gui.Name='Mutation_'..entry.CropId;gui.AlwaysOnTop=true;gui.LightInfluence=0;gui.MaxDistance=math.huge -- R129: seen through walls from any distance
  gui.Size=UDim2.fromOffset(300,64);gui.ResetOnSpawn=false;gui.Parent=folder
  local text=Instance.new('TextLabel');text.Name='Text';text.BackgroundTransparency=1;text.Size=UDim2.fromScale(1,1);text.Font=Enum.Font.FredokaOne
  text.TextScaled=true;text.TextColor3=Color3.new(1,1,1);text.Text=entry.Text;text.Parent=gui

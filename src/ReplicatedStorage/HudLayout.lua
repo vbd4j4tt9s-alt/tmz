@@ -13,7 +13,11 @@ function L.HudBoxes(m,w,h,wheel)
  local bw=(m.Slots+1)*m.SlotSize+m.Slots*6;local detail=m.HotbarDetails~=false and 44 or 0
  b[#b+1]={N='Hotbar',X=w/2+(m.HotbarShiftX or 0)-bw/2,Y=h-m.HotbarBottom-m.SlotSize-detail,W=bw,H=m.SlotSize+detail}
  for _,k in ipairs({'Speed','Cash','Gem'})do b[#b+1]={N='Wallet'..k,X=m[k..'X']or m.WalletX,Y=m[k..'Y'],W=m.WalletWidth,H=m.WalletHeight}end
- if m.Phone then
+ if m.PhoneWide then
+  -- R129: landscape phones: the corner status stack (boosts, The Darkened, timers) and the jump button.
+  b[#b+1]={N='Status',X=m.StatusBox.X,Y=m.StatusBox.Y,W=m.StatusBox.W,H=m.StatusBox.H}
+  for _,z in ipairs(m.ThumbZones)do b[#b+1]={N='Jump',X=z.X,Y=z.Y,W=z.W,H=z.H}end
+ elseif m.Phone then
   local sw=(m.StatusHorizontal and 388 or 190)*m.StatusScale;local sh=(m.StatusHorizontal and 39 or 82)*m.StatusScale
   b[#b+1]={N='Status',X=w-12-sw,Y=8,W=sw,H=sh}
   for i,z in ipairs(m.ThumbZones)do b[#b+1]={N=i==1 and'ThumbL'or'ThumbR',X=z.X,Y=z.Y,W=z.W,H=z.H}end
@@ -45,7 +49,50 @@ local function travel(m,w,h)
  end
  return nil
 end
+-- R129 (owner reference): landscape touch screens keep the HUD on the edges: the balances as text rows in the
+-- bottom-left corner, boosts, The Darkened card and the timers stacked in the bottom-right corner just above the jump
+-- button, the MENU button on the left middle and the hotbar centred at the bottom. BASE / TRACK stay centred in
+-- Roblox's top bar row (TravelButtons).
+local function wideLayout(w,h,controls)
+ local small=math.min(w,h)<=500;local gap=6
+ local jump=controls and controls.Jump;local stick=controls and controls.Joystick
+ if not(jump and jump.W>0 and jump.H>0)then jump=small and{X=w-95,Y=h-90,W=70,H=70}or{X=w-170,Y=h-210,W=120,H=120}end
+ if not(stick and stick.W>0 and stick.H>0)then stick=small and{X=20,Y=h-110,W=90,H=90}or{X=60,Y=h-180,W=120,H=120}end
+ -- Balances: bottom-left text rows (Speed, Cash, Gems).
+ local rowH=math.clamp(math.floor(h*.075),24,32);local rowGap=2;local walletW=math.clamp(math.floor(w*.18),130,190)
+ local walletStack=rowH*3+rowGap*2;local walletX=10;local walletY=h-6-walletStack
+ -- Boosts, The Darkened card and timers: bottom-right rows above the jump button; room for 2 boosts + event + 2 timers.
+ local statusScale=math.clamp(math.min(rowH/39*1.05,w*.17/190),.5,.85);local statusW=190*statusScale
+ local statusH=(5*43-4)*statusScale;local statusBottom=h-(jump.Y-8)
+ local status={X=w-12-statusW,Y=h-statusBottom-statusH,W=statusW,H=statusH}
+ -- Hotbar: centred on the screen between the balances and the jump button.
+ local laneL,laneR=walletX+walletW+8,jump.X-8;local half=math.min(w/2-laneL,laneR-w/2);local side,slots=64,5
+ while side>40 and(slots+1)*side+slots*gap>half*2 do side-=2 end
+ if(slots+1)*side+slots*gap>half*2 then slots=math.max(1,math.floor((half*2+gap)/(side+gap))-1)end
+ local barW=(slots+1)*side+slots*gap;local hotbarBottom=6;local bar={X=w/2-barW/2,Y=h-hotbarBottom-side,W=barW,H=side}
+ -- MENU button on the left middle, above the balances; its wheel opens up and to the right.
+ local menuSize=h<280 and 52 or 64;local menuHalf=menuSize/2;local menuClear=menuHalf+8
+ local center=math.max(menuClear,math.min(h/2,walletY-10-menuHalf))
+ local radius=math.max(0,math.min(menuSize==64 and 102 or 86,center-menuClear))
+ local radiusX=radius<72 and 178 or radius
+ local offsets={{X=0,Y=-radius},{X=radiusX/math.sqrt(2),Y=-radius/math.sqrt(2)},{X=radiusX,Y=0}}
+ local details={X=bar.X,Y=bar.Y-44,W=bar.W,H=44};local showDetails=true
+ for _,b in ipairs({status,{X=walletX,Y=walletY,W=walletW,H=walletStack},{X=10,Y=center-menuHalf,W=menuSize,H=menuSize}})do if overlaps(details,b,4)then showDetails=false end end
+ local jumpZone={X=jump.X-6,Y=jump.Y-6,W=jump.W+12,H=jump.H+12}
+ local m={Phone=true,PhoneWide=true,PhonePortrait=false,Slots=slots,SlotSize=side,HotbarBottom=hotbarBottom,HotbarShiftX=0,HotbarDetails=showDetails,
+  NavSize=menuSize,NavWidth=menuSize,NavGap=6,NavX=10,NavY=center-menuHalf,NavHorizontal=false,
+  MenuSize=menuSize,MenuX=10,MenuShiftY=center-h/2,MenuOptionSize=menuSize,MenuOffsets=offsets,MenuRadius=radius,MenuRadiusX=radiusX,
+  WalletWidth=walletW,WalletHeight=rowH,WalletX=walletX,WalletPlus=math.floor(rowH*.75),WalletIcon=rowH-2,WalletFont=math.floor(rowH*.8),
+  WalletHorizontal=false,WalletCompactTap=false,WalletPassive=true,
+  SpeedX=walletX,CashX=walletX,GemX=walletX,SpeedY=walletY,CashY=walletY+rowH+rowGap,GemY=walletY+(rowH+rowGap)*2,
+  Short=h<480,Compact=true,StatusScale=statusScale,StatusCorner='BottomRight',StatusRight=12,StatusBottom=statusBottom,StatusPlain=true,
+  StatusBox=status,StatusStacked=false,StatusHorizontal=false,StatusSideRight=0,
+  HideOwnerTools=true,OwnerToolsSize=48,OwnerToolsX=10,OwnerToolsY=8,
+  ThumbZones={jumpZone},Joystick=stick,Jump=jump}
+ m.Travel=travel(m,w,h);return m
+end
 local function phoneLayout(w,h,controls)
+ if w>h then return wideLayout(w,h,controls)end
  local portrait=h>w;local side=64;local gap=6 -- R127 (owner): bigger hotbar slots (was 56); still shrinks to keep five slots
  local menuSize=(portrait and h<520 or not portrait and h<280)and 52 or 64
  local thumbWidth=math.min(160,math.max(120,math.floor(w*.32)))

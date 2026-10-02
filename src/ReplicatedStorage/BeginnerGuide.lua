@@ -84,6 +84,18 @@ end
 -- so that area is reserved too: the card must never hide the player or the start of the arrow trail.
 function G.Obstacles(m,w,h,relaxed)
  local boxes={};local shift=m.MenuShiftY or 0
+ if m.PhoneWide then
+  -- R129: landscape phones: MENU button, both corners, hotbar and the jump button.
+  if not relaxed then boxes[#boxes+1]={X=m.MenuX,Y=h/2+shift-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}end
+  local barWidth=(m.Slots+1)*m.SlotSize+m.Slots*6;local barY=h-m.HotbarBottom-m.SlotSize;local detail=m.HotbarDetails~=false and 44 or 0
+  boxes[#boxes+1]={X=w/2+(m.HotbarShiftX or 0)-barWidth/2,Y=barY-detail,W=barWidth,H=m.SlotSize+detail}
+  for _,k in ipairs({'Speed','Cash','Gem'})do boxes[#boxes+1]={X=m[k..'X']or m.WalletX,Y=m[k..'Y'],W=m.WalletWidth,H=m.WalletHeight}end
+  boxes[#boxes+1]={X=m.StatusBox.X,Y=m.StatusBox.Y,W=m.StatusBox.W,H=m.StatusBox.H}
+  for _,z in ipairs(m.ThumbZones or{})do boxes[#boxes+1]={X=z.X,Y=z.Y,W=z.W,H=z.H}end
+  local half=math.max(50,h*.09);local from=relaxed==1 and h*.5 or h*.42
+  if relaxed~=2 then boxes[#boxes+1]={X=w/2-half,Y=from,W=half*2,H=h*.8-from,Character=true}end
+  return boxes
+ end
  -- Relaxed: the menu button draws above the tutorial (DisplayOrder 33 vs 25), so it may sit over the card edge.
  if not relaxed then boxes[#boxes+1]={X=m.MenuX,Y=h/2+shift-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}end
  -- The open menu wheel is not listed: the card hides while the wheel is open.

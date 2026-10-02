@@ -46,7 +46,7 @@ local function setStage(nextStage)
     emitter.Enabled=true;mist.Enabled=style.Mist==true
 end
 local function locate(camera)
-    if not alive or not camera or(Storage:GetAttribute('GlobalWeather')or'Clear')~='Clear'then return 0 end
+    if not alive or not camera then return 0 end -- R129: weather is base-only, so the track keeps its biome effects
     local character=player.Character;local root=character and character:FindFirstChild('HumanoidRootPart')
     local humanoid=character and character:FindFirstChildOfClass('Humanoid')
     local map=workspace:FindFirstChild('ChestChaseMap')

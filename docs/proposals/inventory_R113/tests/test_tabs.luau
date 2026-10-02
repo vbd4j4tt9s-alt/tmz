@@ -22,6 +22,13 @@ end
 -- Independent HUD box list (mirrors tools/tests/hud_overlap_harness.luau), incl. travel pair and owner tile.
 local function boxes(m,w,h)
  local b={};local shift=m.MenuShiftY or 0
+ if m.PhoneWide then
+  -- R129: landscape phones hide everything but the hotbar while the Bag is open; the jump button stays.
+  local bw=(m.Slots+1)*m.SlotSize+m.Slots*6
+  b[#b+1]={N='Hotbar',X=w/2+(m.HotbarShiftX or 0)-bw/2,Y=h-m.HotbarBottom-m.SlotSize,W=bw,H=m.SlotSize}
+  for _,z in ipairs(m.ThumbZones)do b[#b+1]={N='Jump',X=z.X,Y=z.Y,W=z.W,H=z.H}end
+  return b
+ end
  b[#b+1]={N='Hub',X=m.MenuX,Y=h/2+shift-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}
  local bw=(m.Slots+1)*m.SlotSize+m.Slots*6
  b[#b+1]={N='Hotbar',X=w/2+(m.HotbarShiftX or 0)-bw/2,Y=h-m.HotbarBottom-m.SlotSize,W=bw,H=m.SlotSize}

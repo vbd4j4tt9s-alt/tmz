@@ -32,13 +32,18 @@ function M.Palette(stage,weather,low,refresh)
  local p=M.Profiles[stage]or M.Profiles[0]
  local out={Light=table.clone(p.Light),Grade=table.clone(p.Grade),Air=table.clone(p.Air),Bloom=p.Bloom,Sun=.008}
  if weather=='Rain'or weather=='Thunderstorm'or weather=='Blizzard'then
+  -- R129 (owner): a real overcast: the sky and the light go dark grey under the storm clouds (snow: pale grey).
   local snow=weather=='Blizzard';local storm=weather=='Thunderstorm'
-  out.Grade.TintColor=out.Grade.TintColor:Lerp(snow and C(235,245,255)or C(233,241,252),.35)
-  out.Grade.Saturation=snow and .015 or .025
-  out.Air.Color=out.Air.Color:Lerp(snow and C(226,239,253)or C(191,207,227),.40)
-  out.Air.Density=math.min(.22,out.Air.Density+(snow and .035 or .025))
-  out.Air.Haze=math.min(.85,out.Air.Haze+.12);out.Air.Glare=0;out.Sun=0
-  out.Light.Brightness=storm and 2.3 or 2.45
+  out.Grade.TintColor=out.Grade.TintColor:Lerp(snow and C(226,236,250)or C(200,210,228),.6)
+  out.Grade.Saturation=snow and -.08 or storm and -.2 or -.14;out.Grade.Brightness=snow and -.01 or storm and -.05 or -.03
+  out.Air.Color=out.Air.Color:Lerp(snow and C(196,206,220)or storm and C(66,72,88)or C(96,104,120),.8)
+  out.Air.Decay=out.Air.Decay:Lerp(snow and C(160,172,190)or storm and C(46,50,64)or C(70,78,94),.8)
+  out.Air.Density=math.min(.42,out.Air.Density+(snow and .16 or storm and .2 or .14))
+  out.Air.Haze=math.min(2.2,out.Air.Haze+(snow and .9 or .7));out.Air.Glare=0;out.Sun=0;out.Bloom=(out.Bloom or 0)*.5
+  out.Light.Brightness=snow and 1.9 or storm and 1.15 or 1.45
+  out.Light.ExposureCompensation=snow and -.05 or storm and -.35 or -.22
+  out.Light.Ambient=out.Light.Ambient:Lerp(snow and C(150,158,172)or C(92,98,112),.5)
+  out.Light.OutdoorAmbient=out.Light.OutdoorAmbient:Lerp(snow and C(170,178,192)or C(104,110,126),.5)
  end
  if stage==4 or stage==5 or stage==7 then out.Sun=0 end
  if low then out.Bloom=0;out.Sun=0;out.Air.Density*=.75;out.Air.Haze*=.5;out.Air.Glare=0 end

@@ -66,9 +66,46 @@ local flash=Instance.new('ColorCorrectionEffect');flash.Name='DistantThunderGlow
 local thunder=Instance.new('Sound');thunder.Name='DistantThunder';thunder.SoundId=require(RS.StormConfig).ThunderId;thunder.Volume=.22;thunder.PlaybackSpeed=.9;thunder.Parent=folder
 -- R123: load the thunder before the first storm so it lands on the first bolt's flash instead of after it.
 task.spawn(function()pcall(function()game:GetService('ContentProvider'):PreloadAsync({thunder})end)end)
-local Notice=require(RS.WorldNoticeTiming);local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Exclude;params.RespectCanCollide=true
+local Notice=require(RS.WorldNoticeTiming)
 local bolt=Lightning.New(folder);local profile;local profileTier;local nextBolt=0;local lastPosition;local lastCamera
-local clock=0;local updateClock=0;local noticeClock=0;local indoors=false;local lastBolt=-100
+local clock=0;local updateClock=0;local noticeClock=0;local lastBolt=-100
+-- R129 (owner): weather belongs to the base area. There the rain / snow is real (world-space, and the old camera
+-- "roof" check that switched it off whenever the camera passed under something is gone) and the clouds turn dark;
+-- on the track there is no weather effect at all (the biome's own effects show instead).
+local Mood=require(RS.BiomeMood)
+local function inBase()
+ local character=player.Character;local root=character and character:FindFirstChild('HumanoidRootPart')
+ local map=workspace:FindFirstChild('ChestChaseMap')
+ if not root or not map then return true end
+ return Mood.Stage(map,root.Position,0)==0
+end
+-- Dark clouds: the place's own Terrain clouds are thickened and darkened while it rains / snows in the base (only
+-- Cover, Density and Color are touched; Enabled stays with RefreshSky). Without a cloud layer one is added for the
+-- weather and removed after. Values ease in and out and are restored exactly.
+local Clouds={Level=0,Kind='Rain'}
+Clouds.Targets={Rain={Cover=.86,Density=.82,Color=Color3.fromRGB(92,98,112)},Thunderstorm={Cover=.92,Density=.92,Color=Color3.fromRGB(60,64,78)},
+ Blizzard={Cover=.88,Density=.75,Color=Color3.fromRGB(186,194,206)}}
+function Clouds.Step(kind,dt)
+ local target=kind and 1 or 0;if kind then Clouds.Kind=kind end
+ Clouds.Level=Clouds.Level+(target-Clouds.Level)*(1-math.exp(-(dt or 0)*1.5))
+ if math.abs(Clouds.Level-target)<.01 then Clouds.Level=target end
+ local terrain=workspace:FindFirstChildOfClass('Terrain');if not terrain then return end
+ local c=Clouds.Object
+ if Clouds.Level>0 and(not c or not c.Parent)then
+  c=terrain:FindFirstChildOfClass('Clouds')
+  if c then Clouds.Saved={Cover=c.Cover,Density=c.Density,Color=c.Color};Clouds.Made=false
+  else c=Instance.new('Clouds');c.Name='WeatherClouds';Clouds.Saved={Cover=0,Density=0,Color=Color3.fromRGB(255,255,255)};c.Cover=0;c.Density=0;c.Parent=terrain;Clouds.Made=true end
+  Clouds.Object=c
+ end
+ if not c or not Clouds.Saved then return end
+ local base,goal,k=Clouds.Saved,Clouds.Targets[Clouds.Kind]or Clouds.Targets.Rain,Clouds.Level
+ if k<=0 then
+  if Clouds.Made then c:Destroy()else c.Cover=base.Cover;c.Density=base.Density;c.Color=base.Color end
+  Clouds.Object=nil;Clouds.Saved=nil;return
+ end
+ c.Cover=base.Cover+(math.max(base.Cover,goal.Cover)-base.Cover)*k;c.Density=base.Density+(math.max(base.Density,goal.Density)-base.Density)*k
+ c.Color=base.Color:Lerp(goal.Color,k)
+end
 local function weather(kind)
  emitter:Clear();emitter.Enabled=false;flash.Enabled=false
  if kind=='Clear'then return end
@@ -91,7 +128,10 @@ local tick=Run.Heartbeat:Connect(function(dt)
  local camera=workspace.CurrentCamera;local now=workspace:GetServerTimeNow();clock+=step;noticeClock+=step
  local kind=RS:GetAttribute('GlobalWeather')or'Clear'
  if kind~=previousKind then weather(kind);previousKind=kind end
- if not camera or kind=='Clear'then emitter.Enabled=false;clearStrike();return end
+ local here=kind~='Clear'and inBase()
+ Clouds.Step(here and kind or nil,step)
+ -- On the track: no rain, snow or lightning (drops already falling simply finish).
+ if not camera or not here then if emitter.Enabled then emitter.Enabled=false end;clearStrike();return end
  if profileTier~=tier then
   profile=Presentation.Profile(kind,tier,mobile);profileTier=tier
   anchor.Size=Vector3.new(profile.Width,.1,profile.Depth)
@@ -103,12 +143,8 @@ local tick=Run.Heartbeat:Connect(function(dt)
  lastCamera=camera;lastPosition=p
  local look=camera.CFrame.LookVector;local forward=Vector3.new(look.X,0,look.Z)
  forward=forward.Magnitude>.01 and forward.Unit or Vector3.new(0,0,-1)
- if clock>=.5 then
-  clock=0;params.FilterDescendantsInstances={folder,player.Character}
-  indoors=workspace:Raycast(p,Vector3.new(0,80,0),params)~=nil
- end
- if emitter.Enabled==indoors then emitter.Enabled=not indoors;if indoors then emitter:Clear()end end
- if kind=='Thunderstorm'and not indoors then
+ if not emitter.Enabled then emitter.Enabled=true end
+ if kind=='Thunderstorm'then
   if now>=nextBolt then
    lastBolt=now;nextBolt=now+(low and 12 or 8.5)
    local far=p+forward*125
@@ -130,4 +166,4 @@ local follow=Run.RenderStepped:Connect(function(dt)
  if (anchor.Position-target).Magnitude>.05 then anchor.CFrame=CFrame.new(target)end
 end)
 local typography=require(RS.GardenTypography).Apply(pg)
-script.Destroying:Connect(function()typography:Disconnect();tick:Disconnect();follow:Disconnect();bolt:Destroy();folder:Destroy();flash:Destroy()end)
+script.Destroying:Connect(function()typography:Disconnect();tick:Disconnect();follow:Disconnect();Clouds.Level=0;Clouds.Step(nil,0);bolt:Destroy();folder:Destroy();flash:Destroy()end)

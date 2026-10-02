@@ -111,7 +111,18 @@ function H.Create(pg,player)
   if specialHint.Text~=hint then specialHint.Text=hint end
   special:SetAttribute('AccessibleLabel','The Darkened '..hint:lower())
   scale.Scale=m.StatusScale
-  if m.Phone then
+  -- R129: plain text rows (no card) on landscape phones; cards everywhere else.
+  for _,name in ipairs({'Weather','Track'})do local want=m.StatusPlain and 1 or .73;if rows[name].Root.BackgroundTransparency~=want then rows[name].Root.BackgroundTransparency=want end end
+  if m.StatusCorner then
+   -- R129 (owner reference): landscape phones: one stack in the bottom-right corner above the jump button:
+   -- boosts, then The Darkened card (owner: "together with the other timers"), then the two timers.
+   local list={};for _,row in ipairs(boostRows)do if row.Root.Visible then list[#list+1]=row end end
+   local y=0
+   for _,row in ipairs(list)do row.Root.Position=UDim2.fromOffset(190-137,y);y+=43 end
+   if special.Visible then special.Position=UDim2.fromOffset(0,y);y+=43 end
+   for _,name in ipairs({'Weather','Track'})do rows[name].Root.Position=UDim2.fromOffset(0,y);rows[name].Root.Size=UDim2.fromOffset(190,39);y+=43 end
+   root.Size=UDim2.fromOffset(190,y-4)
+  elseif m.Phone then
    local width=m.StatusHorizontal and 388 or 190
    root.Size=UDim2.fromOffset(width,m.StatusHorizontal and 39 or 82)
    for i,name in ipairs({'Weather','Track'})do
@@ -136,7 +147,7 @@ function H.Create(pg,player)
    end
   end
   root.AnchorPoint=Vector2.new(1,m.StatusTop and 0 or 1)
-  root.Position=m.StatusTop and UDim2.new(1,-12,0,m.StatusTop)or UDim2.new(1,-12,1,-m.StatusBottom)
+  root.Position=m.StatusTop and UDim2.new(1,-12,0,m.StatusTop)or UDim2.new(1,-(m.StatusRight or 12),1,-m.StatusBottom)
   root.Visible=pg:GetAttribute('SeedMenu')==nil
   local character=player.Character;local hum=character and character:FindFirstChildOfClass('Humanoid');local part=character and character:FindFirstChild('HumanoidRootPart')
   local point=part and hum and hum.Health>0 and part.Position or nil

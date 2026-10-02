@@ -112,7 +112,7 @@ def render(data, k):
     W, H = data['canvas']; canvas = Image.new('RGBA', (int(W * k), int(H * k)), (*BG, 255))
     for it in data['items']:
         x, y, w, h = it['x'] * k, it['y'] * k, it['w'] * k, it['h'] * k
-        if w < .5 or h < .5: continue
+        if w < 1 or h < 1: continue
         pad = int(max([s['t'] * k for s in it['strokes']] + [0]) + 2)
         pw, ph = int(w) + 2 * pad, int(h) + 2 * pad
         patch = Image.new('RGBA', (pw, ph))

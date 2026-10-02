@@ -70,6 +70,8 @@ check(rainbow and rainbow:IsA('Highlight')and rainbow.Adornee==cropModel,'my pla
 local label=labels:FindFirstChild('Mutation_c1')
 check(label and label:FindFirstChild('Text').Text:find('Drippy Watermelon',1,true),'label names the plant: '..tostring(label and label:FindFirstChild('Text').Text))
 check(label and label.Adornee==anchor and label.AlwaysOnTop,'label floats over the plant')
+check(label and label.MaxDistance==math.huge,'R129: label shows from any distance')
+check(rainbow.DepthMode==R.Enum.HighlightDepthMode.AlwaysOnTop,'R129: rainbow outline shows through walls')
 W.frames(1,1/60);local c1=rainbow.FillColor;W.frames(30,1/60);local c2=rainbow.FillColor
 check(c1 and c2 and(math.abs(c1.R-c2.R)+math.abs(c1.G-c2.G)+math.abs(c1.B-c2.B))>.2,'outline colour cycles (rainbow)')
 check(rainbow.FillColor~=rainbow.OutlineColor,'fill and outline are different hues')

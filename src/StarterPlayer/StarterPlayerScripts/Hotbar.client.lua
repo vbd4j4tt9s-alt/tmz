@@ -239,6 +239,9 @@ end
 -- R113: HUD boxes that stay on screen while the bag is open (same metrics HudLayout gives each HUD script).
 local function hudBoxes(m,w,h)
  local shared=require(RS.HudLayout).HudBoxes
+ -- R129: on landscape phones the balances, timers, menu stack and BASE/TRACK hide while the Bag is open (SeedMenu), so
+ -- the sheet only has to clear the hotbar and the jump button.
+ if shared and m.PhoneWide then local out={};for _,x in ipairs(shared(m,w,h,false))do if x.N=='Hotbar'or x.N=='Jump'then out[#out+1]=x end end;return out end
  if shared then local b=shared(m,w,h,false);local t=m.Travel;if t then table.insert(b,{X=t.X,Y=t.Y,W=t.W,H=t.H})end;return b end
  local b={{X=m.MenuX,Y=h/2+(m.MenuShiftY or 0)-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}}
  local bar=(m.Slots+1)*m.SlotSize+m.Slots*6
