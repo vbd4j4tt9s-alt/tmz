@@ -11,13 +11,14 @@ local M={};local CF,V=CFrame.new,Vector3.new
 local function smooth(t)t=math.clamp(t,0,1);return t*t*(3-2*t)end
 local function around(p,x,y,z)return CF(p)*CFrame.Angles(0,y,0)*CFrame.Angles(x,0,z)*CF(-p)end
 -- Cock/Release: fractions of W; Peak: follow-through peak as a fraction of the post-hold recovery.
+-- R124 Ground: the move smashes the ground (KeeperFx plays the ground-slam sound at the visual impact).
 M.Moves={
- [1]={Name='Overhead hammer',Cock=.55,Release=.66,Peak=.35,Accent='Dust',Tip={'LeftArm','RightArm'}},
+ [1]={Name='Overhead hammer',Cock=.55,Release=.66,Peak=.35,Accent='Dust',Tip={'LeftArm','RightArm'},Ground=true},
  [2]={Name='Coil strike',Cock=.55,Release=.68,Peak=.30,Accent='Sand',Tip={'Head'}},
  [3]={Name='Pounce swipe',Cock=.50,Release=.62,Peak=.35,Accent='Frost',Tip={'RightFrontLeg'}},
  [4]={Name='Rear-up rake',Cock=.55,Release=.66,Peak=.40,Accent='Fire',Tip={'RightFrontLeg'}},
  [5]={Name='Diagonal slash',Cock=.55,Release=.66,Peak=.35,Accent='Crystal',Tip={'Sword'}},
- [6]={Name='Chest-beat slam',Cock=.62,Release=.72,Peak=.30,Accent='Slam',Tip={'LeftArm','RightArm'}},
+ [6]={Name='Chest-beat slam',Cock=.62,Release=.72,Peak=.30,Accent='Slam',Tip={'LeftArm','RightArm'},Ground=true},
  [7]={Name='Storm uppercut',Cock=.55,Release=.64,Peak=.40,Accent='Lightning',Tip={'RightArm'}},
  Veiled={Name='Spectral lunge',Cock=.58,Release=.70,Peak=.40,Accent='Spectral'},
 }

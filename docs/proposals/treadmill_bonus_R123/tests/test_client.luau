@@ -62,7 +62,7 @@ local function spinTo(res,label2)
  check(#cards==Rules.Strip.Count,label2..': strip has '..#cards..' cards')
  local win=cards[Rules.Strip.Win]
  check(win and win.Rarity.Text==string.upper(res.Rarity),label2..': winning card is the server result ('..tostring(win and win.Rarity.Text)..')')
- check(panel.Odds.Text:find('Common 38%%')and panel.Odds.Text:find('Mythic 5%%'),label2..': odds list shows every rarity %')
+ check(panel.Odds.Text:find('Common 43.5%%')and panel.Odds.Text:find('Legendary 2%%')and panel.Odds.Text:find('Mythic 0.5%%')and panel.Odds.Text:find('Secret 0.1%%'),label2..': odds list shows every rarity % (R124 odds)')
  check(panel.Actions.Skip.Visible==true and panel.Actions.Close.Visible==false,label2..': SKIP while spinning')
  local start=R.clock;local frames=0
  while panel.Actions.Skip.Visible and frames<2000 do W.frames(1,1/60);frames+=1 end
@@ -70,6 +70,15 @@ local function spinTo(res,label2)
  local center=576/2;local x=strip.Position.X.Offset+win.Position.X.Offset+Rules.Strip.CardWidth/2
  check(math.abs(x-center)<Rules.Strip.CardWidth/2,label2..string.format(': stops with the winner under the marker (%.1f px off)',x-center))
  check(panel.Actions.Close.Visible==true,label2..': CLOSE after the stop')
+ -- R124 layout: rows stacked (result above the buttons), the visible buttons centred as a group.
+ local function bottom(x)return x.Position.Y.Offset+x.Size.Y.Offset end
+ check(bottom(panel.Result)<=panel.Actions.Position.Y.Offset,label2..': result text ends above the buttons')
+ check(bottom(panel.Odds)<=panel.Pool.Position.Y.Offset and bottom(panel.Pool)<=panel.Result.Position.Y.Offset,label2..': odds / pool / result rows do not overlap')
+ check(bottom(panel.Actions)<=panel.Size.Y.Offset,label2..': buttons inside the panel')
+ local shownButtons={};for _,b in ipairs(panel.Actions:GetChildren())do if b:IsA('TextButton')and b.Visible then shownButtons[#shownButtons+1]=b end end
+ local lo,hi=math.huge,-math.huge
+ for _,b in ipairs(shownButtons)do lo=math.min(lo,b.Position.X.Offset);hi=math.max(hi,b.Position.X.Offset+b.Size.X.Offset);check(b.Position.X.Scale==.5,label2..': button anchored to the centre')end
+ check(math.abs(lo+hi)<1,label2..string.format(': %d button(s) centred (%.1f .. %.1f)',#shownButtons,lo,hi))
  return took,panel,win,cards
 end
 local took,panel,win=spinTo({Ok=true,Stage=6,Variant='Pack03',Rarity='Rare',Label='Jungle Seed Pack',Pool='1,6',Ready=1},'Rare')
@@ -80,20 +89,31 @@ local maxRate=0
 for i=2,#ticks do local gap=ticks[i].At-ticks[i-1].At;check(gap>=1/30-1e-6,'ticks never faster than 30/s');if gap>0 then maxRate=math.max(maxRate,1/gap)end end
 check(ticks[#ticks].Pitch>ticks[1].Pitch,'tick pitch rises as the strip slows')
 check(#shown>=Rules.Strip.Count,'cards use pack pictures (ItemPictures) from the pool')
-local poolOk=true;for _,s in ipairs(shown)do if s.Stage~=1 and s.Stage~=6 then poolOk=false end end
+local poolOk=true;for _,s in ipairs(shown)do if s.Stage~=1 and s.Stage~=6 and not(s.Variant=='EclipseReliquary'and s.Stage==7)then poolOk=false end end
 check(poolOk,'filler cards only from the published pool (Forest/Jungle)')
 check(panel.Result.Text:find('RARE')~=nil,'result text: '..panel.Result.Text)
-check(#reveals==0 and panel.Flash.BackgroundTransparency==1,'Rare: no special flash/fanfare')
+check(#reveals==0 and win:FindFirstChild('BorderGlow')==nil and panel:FindFirstChild('Flash')==nil,'Rare: no border light-up / fanfare')
+check(win:FindFirstChild('Design')==nil,'Rare card has no special design')
 check(table.find(played,'KaChing')~=nil,'Rare: normal reveal sound')
 panel.Actions.Close.Activated:Fire();check(overlay.Enabled==false,'CLOSE hides the overlay')
 -- Legendary: flash + glow + fanfare
 set('Ready',1)
 took,panel,win=spinTo({Ok=true,Stage=1,Variant='Pack05',Rarity='Legendary',Label='Forest Seed Pack',Pool='1',Ready=0},'Legendary')
 check(#reveals>0 and table.find(played,'GemClaim')~=nil,'Legendary: fanfare sounds')
-check(win.Picture:FindFirstChild('Glow')~=nil,'Legendary: glow on the winning card')
-check(panel.Flash.BackgroundTransparency==1,'Legendary: flash faded out (tweened)')
+check(win:FindFirstChild('BorderGlow')~=nil and win.Picture:FindFirstChild('Glow')==nil,'Legendary: light-up on the card border, not over the picture')
+check(panel:FindFirstChild('Flash')==nil and panel:FindFirstChildOfClass('UIStroke').Thickness>=4,'Legendary: no full-panel flash; the panel border lights up')
+local rays=0;for _,c in ipairs(win.Design:GetChildren())do if c.Name:find('^Ray')then rays+=1 end end
+check(rays==6 and win.Design:FindFirstChild('Stud1')~=nil,'Legendary card design: sunburst + gold corner studs')
 check(panel.Actions.Again.Visible==false,'no ROLL AGAIN when none are ready')
 panel.Actions.Close.Activated:Fire()
+-- Secret = the Void Pack: SECRET card with the starfield design and the border light-up.
+set('Ready',1)
+took,panel,win=spinTo({Ok=true,Stage=7,Variant='EclipseReliquary',Rarity='Secret',Label='Void Pack',Pool='1',Ready=0},'Secret')
+check(win.Biome.Text=='Void Pack'and win.Design:FindFirstChild('Star1')~=nil and win.Design:FindFirstChild('Nebula')~=nil,'Secret card: Void Pack label, starfield design')
+check(win:FindFirstChild('BorderGlow')~=nil and #reveals>0,'Secret: border light-up + fanfare')
+check(panel.Pool.Text:find('Secret = Void Pack',1,true)~=nil,'pool line explains Secret')
+panel.Actions.Close.Activated:Fire()
+check(panel:FindFirstChildOfClass('UIStroke').Thickness==3,'panel border back to normal after close')
 -- SKIP and ReducedMotion
 set('Ready',1);reply={Ok=true,Stage=1,Variant='Pack06',Rarity='Mythic',Label='Forest Seed Pack',Pool='1',Ready=0}
 button.Activated:Fire();W.frames(5,1/60);overlay.Panel.Actions.Skip.Activated:Fire()

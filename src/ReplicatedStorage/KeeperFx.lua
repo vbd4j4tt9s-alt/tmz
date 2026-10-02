@@ -6,6 +6,10 @@ local Config=require(script.Parent.KeeperRigConfig)
 local Combat=require(script.Parent.KeeperCombat)
 local Signature=require(script.Parent.KeeperSignatureStrike)
 local Fx={MaxLights=3,DustDistance=120,BreathDistance=90,ShakeDistance=60,Rate=90,LowRate=35}
+-- R124: keepers whose move smashes the ground (KeeperSignatureStrike Ground) play this at the visual impact frame.
+-- Punches, swipes and pushes keep their sounds. A silent lead-in can be trimmed with SoundTiming Start_<id>.
+Fx.GroundSound={Id='rbxassetid://73468358342062',Volume=.5,Lifetime=4}
+local groundPreloaded=false
 local V,CF=Vector3.new,CFrame.new
 local SMOKE='rbxasset://textures/particles/smoke_main.dds'
 local SPARK='rbxasset://textures/particles/sparkles_main.dds'
@@ -189,6 +193,8 @@ local function center(b)return V((b[1][1]+b[2][1])/2,(b[1][2]+b[2][2])/2,(b[1][3
 function Fx.new(root,stage)
  local spec=Fx.Stages[stage];local rig=Config[stage];if not spec or not rig then return nil end
  local self={Root=root,Stage=stage,Spec=spec,Feet={},NextBreath=0,NextSlither=0,LastCycle=nil}
+ self.GroundSound=(Signature.Moves[stage]and Signature.Moves[stage].Ground)==true
+ if self.GroundSound and not groundPreloaded then groundPreloaded=true;require(script.Parent.LocalSfx).Preload({Fx.GroundSound.Id})end
  local s=spec.Size
  self.Foot=Instance.new('Attachment');self.Foot.Name='KeeperFxFoot';self.Foot.Parent=root
  self.Dust=emitter(self.Foot,SMOKE,spec.Dust,3.2*s,.5,.8,5*s)
@@ -310,6 +316,7 @@ function Fx.Slam(self,c)
  local n=Fx.Spend(c.Low and 2 or 4,c.Now,c.Low)
  if n>0 then place(self.Foot,self.Root,CF(V(strike.X,point.Y,strike.Z)));self.Dust:Emit(n)end
  if self.Accent then Fx.Accent(self.Accent,strike,c.Frame,c.Low)end
+ if self.GroundSound then require(script.Parent.LocalSfx).Play(Fx.GroundSound.Id,V(strike.X,point.Y,strike.Z),Fx.GroundSound.Volume,1,Fx.GroundSound.Lifetime)end
  if spec.Heavy>0 and c.LocalDistance and c.LocalDistance<40 then Fx.Shake(spec.Heavy*.6*(1-c.LocalDistance/40))end
 end
 function Fx.Destroy(self)

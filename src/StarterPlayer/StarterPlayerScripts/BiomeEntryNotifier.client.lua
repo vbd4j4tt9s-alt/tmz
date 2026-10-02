@@ -1,4 +1,6 @@
 -- R69: illustrated biome crest and warm lettering; short, forward-only notices.
+-- R124: a plain Frame faded element by element (a CanvasGroup that runs out of render memory draws unfaded, so the
+-- title popped off instead of fading). Fades in, holds, then fades away.
 local Players = game:GetService('Players')
 local Run = game:GetService('RunService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
@@ -15,7 +17,7 @@ gui.ResetOnSpawn = false
 gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 gui.DisplayOrder = 45
 gui.Parent = playerGui
-local group = Instance.new('CanvasGroup')
+local group = Instance.new('Frame')
 group.Name = 'BiomeTitle'
 group.Size = UDim2.fromOffset(490, 110)
 group.AnchorPoint = Vector2.new(.5, .5)
@@ -69,9 +71,32 @@ end
 local gate = Gate.new()
 local shownAt, poll = -100, 0
 local dismissAt, dismissFrom
+local IN, HOLD, OUT = .2, 2.2, .8 -- seconds: fade in, fully visible until HOLD, then fade away over OUT
+-- Every transparency under the title, with its resting value; alpha 0 = resting, 1 = gone.
+local fades, alphaNow = {}, 1
+local function addFade(x)
+    local function add(prop) fades[#fades+1] = {Item=x, Prop=prop, Base=x[prop]} end
+    if x:IsA('GuiObject') then add('BackgroundTransparency') end
+    if x:IsA('TextLabel') then add('TextTransparency'); add('TextStrokeTransparency')
+    elseif x:IsA('ImageLabel') then add('ImageTransparency')
+    elseif x:IsA('UIStroke') then add('Transparency') end
+end
+local function setAlpha(alpha)
+    alphaNow = alpha
+    for _, f in ipairs(fades) do
+        local v = f.Base + (1 - f.Base) * alpha
+        if f.Item[f.Prop] ~= v then f.Item[f.Prop] = v end
+    end
+end
+local function captureFades()
+    setAlpha(0); table.clear(fades) -- back to resting values before re-reading them
+    for _, x in ipairs(group:GetDescendants()) do addFade(x) end
+end
+-- Artwork that finishes loading while the title shows joins the fade.
+group.DescendantAdded:Connect(function(x) if group.Visible then local n = #fades; addFade(x); for i = n + 1, #fades do local f = fades[i]; f.Item[f.Prop] = f.Base + (1 - f.Base) * alphaNow end end end)
 local function dismiss()
     if group.Visible and not dismissAt then
-        dismissAt=os.clock();dismissFrom=group.GroupTransparency
+        dismissAt=os.clock();dismissFrom=alphaNow
     end
 end
 local function show(stage)
@@ -88,7 +113,8 @@ local function show(stage)
     gradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.new(1,1,1)),ColorSequenceKeypoint.new(.45,style.Accent),ColorSequenceKeypoint.new(1,style.Color)})
     shownAt = os.clock()
     dismissAt=nil;dismissFrom=nil
-    group.GroupTransparency=1
+    captureFades()
+    setAlpha(1)
     group.Visible = true
 end
 local spawnConnection = player.CharacterAdded:Connect(function()
@@ -133,24 +159,25 @@ renderConnection = Run.RenderStepped:Connect(function(dt)
     end
     if not group.Visible then return end
     local now=os.clock();local age=now-shownAt
-    -- A complete two-second notice; turning back also fades without restarting the clock.
+    -- Fade in, hold, fade away; turning back also fades without restarting the clock.
     local alpha
     if dismissAt then
         local progress=math.clamp((now-dismissAt)/.45,0,1)
         local eased=progress*progress*(3-2*progress)
         alpha=dismissFrom+(1-dismissFrom)*eased
-    elseif age<.16 then alpha=1-age/.16
+    elseif age<IN then alpha=1-age/IN
     else
-        local progress=math.clamp((age-1.3)/.7,0,1)
+        local progress=math.clamp((age-HOLD)/OUT,0,1)
         alpha=progress*progress*(3-2*progress)
     end
-    group.GroupTransparency=alpha
-    if age>=2 or(dismissAt and now-dismissAt>=.45)then group.GroupTransparency=1;group.Visible=false;return end
+    if alpha~=alphaNow then setAlpha(alpha) end
+    if age>=HOLD+OUT or(dismissAt and now-dismissAt>=.45)then setAlpha(1);group.Visible=false;return end
     local camera = workspace.CurrentCamera
     local fit = group:GetAttribute('NoticeFit')or(camera and math.clamp((camera.ViewportSize.X - 24) / 490, .55, 1)or 1)
     local reduced=game:GetService('GuiService').ReducedMotionEnabled
     local progress=math.min(age/.35,1);local settle=1+2.2*(progress-1)^3+1.2*(progress-1)^2
-    scale.Scale=fit*(reduced and 1 or .9+.1*settle)
+    local away=reduced and 0 or math.clamp((age-HOLD)/OUT,0,1)*.06 -- shrinks a touch as it fades away
+    scale.Scale=fit*(reduced and 1 or .9+.1*settle)*(1-away)
     badge.Rotation=reduced and 0 or(-5-9*math.exp(-age*9)*math.cos(age*12))
 end)
 

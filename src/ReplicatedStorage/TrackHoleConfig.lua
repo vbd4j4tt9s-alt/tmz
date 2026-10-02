@@ -9,7 +9,7 @@ return {
  CrumbCount=9,           -- loose dirt cubes scattered around the rim
 
  -- Limits (anti-grief)
- CooldownSeconds=8,      -- per player, between two digs (covering is not a dig)
+ CooldownSeconds=3,      -- per player, between two digs (covering is not a dig). R124: 8 -> 3
  MaxPerPlayer=4,         -- active holes per player; the 5th dig is refused
  MaxPerServer=30,        -- active holes in the whole server
  LifetimeSeconds=180,    -- a hole closes by itself after 3 minutes
@@ -34,7 +34,7 @@ return {
  SurfaceTolerance=.6,    -- walkable top surface must be this close to the biome ground (thin overlays ok)
 
  Messages={
-  Cooldown='SHOVEL READY IN %dS',
+  Cooldown='%ds',          -- R124: only the time left
   Carrying="CAN'T DIG WHILE CARRYING A PACK",
   Refreshing='TRACK IS REFRESHING',
   Ground='DIG ON THE TRACK GROUND',
@@ -48,7 +48,10 @@ return {
   Trapped='YOU FELL IN A HOLE! PACK DROPPED',
   Tripped='%s FELL IN YOUR HOLE!',
  },
- Hint='Dig holes on the track: thieves carrying a pack fall in',
+ -- R124: shown once when the shovel comes out on the track, then fades (replaces the permanent hint line).
+ Hint='Dig holes on the ground to trap pack thieves!',
+ HintSeconds=4,
+ HintRepeatSeconds=30, -- not shown again sooner than this
 
  -- Dig / cover sound: one long recording with several digs, played as short variants (see DigSoundVariants and
  -- docs/proposals/holes_R122/DIG_SOUND.md). Variant source, first match wins:

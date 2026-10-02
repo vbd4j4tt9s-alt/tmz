@@ -1078,7 +1078,7 @@ function ChaseService:_applyGuardianFling(run)
     keeper:SetAttribute('KeeperLastHitAt',now)
     self.HitSerial+=1
     self.HitRemote:FireAllClients({Id=self.HitSerial,At=now,Position=root.Position,Stage=run.Stage,
-        VoiceId=keeper:GetAttribute('KeeperVoiceId'),VictimUserId=run.Player.UserId,Direction=direction})
+        VoiceId=keeper:GetAttribute('KeeperVoiceId'),VictimUserId=run.Player.UserId,Direction=direction,Veiled=special and true or nil}) -- R124: The Darkened's own catch effect
     return true
 end
 

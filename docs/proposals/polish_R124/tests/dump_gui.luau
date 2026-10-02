@@ -1,0 +1,69 @@
+--!nocheck
+-- Generic GUI dump for previews: walks a real GUI tree built under the Roblox mock and returns JSON with absolute
+-- rectangles (offset/scale/anchor/UIScale), rotation, background, corners, strokes, gradients and text.
+-- render_gui.py draws it. Approximation: no real font metrics, images are placeholders.
+local function n(v)return v==nil and'null'or string.format('%.2f',v)end
+local function c3(c)return c and string.format('[%d,%d,%d]',math.floor(c.R*255+.5),math.floor(c.G*255+.5),math.floor(c.B*255+.5))or'null'end
+local function q(s)return'"'..tostring(s):gsub('\\','\\\\'):gsub('"','\\"'):gsub('\n','\\n')..'"'end
+local function colorSeq(cs)
+ if not cs then return'null'end
+ if type(cs.A)=='table'and cs.A.R==nil then local out={}
+  for _,k in ipairs(cs.A)do out[#out+1]='['..n(k.T)..','..c3(k.V)..']'end;return'['..table.concat(out,',')..']'end
+ local a,b=cs.A,cs.B or cs.A;return'[[0,'..c3(a)..'],[1,'..c3(b)..']]'
+end
+local function numSeq(ns)
+ if not ns then return'null'end
+ if type(ns.A)=='table'then local out={}
+  for _,k in ipairs(ns.A)do out[#out+1]='['..n(k.T)..','..n(k.V)..']'end;return'['..table.concat(out,',')..']'end
+ local a,b=ns.A,ns.B or ns.A;return'[[0,'..n(a)..'],[1,'..n(b)..']]'
+end
+local function child(o,class)for _,c in ipairs(o:GetChildren())do if c.ClassName==class then return c end end end
+local function gradient(o)
+ local g=child(o,'UIGradient');if not g or g.Enabled==false then return'null'end
+ local off=g.Offset;return string.format('{"color":%s,"alpha":%s,"rot":%s,"off":[%s,%s]}',colorSeq(g.Color),numSeq(g.Transparency),n(g.Rotation or 0),n(off and off.X or 0),n(off and off.Y or 0))
+end
+local GUI={Frame=true,TextLabel=true,TextButton=true,ImageLabel=true,ImageButton=true,ScrollingFrame=true,CanvasGroup=true}
+return function(root,W,H)
+ local items={}
+ local function walk(o,px,py,pw,ph,k,clip,depth)
+  local kids={}
+  for i,c in ipairs(o:GetChildren())do if GUI[c.ClassName]then kids[#kids+1]={c,i}end end
+  table.sort(kids,function(a,b)local za,zb=a[1].ZIndex or 1,b[1].ZIndex or 1;if za~=zb then return za<zb end;return a[2]<b[2]end)
+  for _,pair in ipairs(kids)do
+   local c=pair[1]
+   if c.Visible~=false then
+    local s,p=c.Size,c.Position;local ap=c.AnchorPoint or {X=0,Y=0}
+    local scale=child(c,'UIScale');local own=scale and scale.Scale or 1
+    local w=(s.X.Scale*pw+s.X.Offset*k);local h=(s.Y.Scale*ph+s.Y.Offset*k)
+    local ax=px+p.X.Scale*pw+p.X.Offset*k;local ay=py+p.Y.Scale*ph+p.Y.Offset*k
+    w*=own;h*=own;local x,y=ax-ap.X*w,ay-ap.Y*h
+    local corner=child(c,'UICorner');local r=corner and(corner.CornerRadius.Scale*math.min(w,h)+corner.CornerRadius.Offset*k*own)or 0
+    local strokes={}
+    for _,st in ipairs(c:GetChildren())do if st.ClassName=='UIStroke'and st.Enabled~=false then
+     strokes[#strokes+1]=string.format('{"color":%s,"t":%s,"alpha":%s,"grad":%s,"mode":%s}',c3(st.Color),n((st.Thickness or 1)*k*own),n(st.Transparency or 0),gradient(st),q(st.ApplyStrokeMode and st.ApplyStrokeMode.Name or'Contextual'))
+    end end
+    local isText=c.ClassName=='TextLabel'or c.ClassName=='TextButton'
+    local text='null'
+    if isText and c.Text and c.Text~=''then
+     local fit=child(c,'UITextSizeConstraint')
+     text=string.format('{"s":%s,"size":%s,"scaled":%s,"max":%s,"color":%s,"alpha":%s,"stroke":%s,"strokeAlpha":%s,"x":%s,"y":%s,"rich":%s,"font":%s}',
+      q(c.Text),n((c.TextSize or 14)*k*own),tostring(c.TextScaled==true),n(fit and fit.MaxTextSize*k*own or nil),c3(c.TextColor3),n(c.TextTransparency or 0),
+      c3(c.TextStrokeColor3),n(c.TextStrokeTransparency or 1),q(c.TextXAlignment and c.TextXAlignment.Name or'Center'),q(c.TextYAlignment and c.TextYAlignment.Name or'Center'),
+      tostring(c.RichText==true),q(c.Font and c.Font.Name or'Gotham'))
+    end
+    local bgA=c.BackgroundTransparency or 0
+    items[#items+1]=string.format('{"n":%s,"k":%s,"x":%s,"y":%s,"w":%s,"h":%s,"rot":%s,"bg":%s,"bgA":%s,"r":%s,"grad":%s,"strokes":[%s],"text":%s,"clip":%s,"d":%d,"img":%s}',
+     q(c.Name),q(c.ClassName),n(x),n(y),n(w),n(h),n(c.Rotation or 0),c3(c.BackgroundColor3),n(bgA),n(r),gradient(c),table.concat(strokes,','),text,
+     clip and('['..n(clip[1])..','..n(clip[2])..','..n(clip[3])..','..n(clip[4])..']')or'null',depth,tostring(c.ClassName=='ImageLabel'))
+    local nclip=clip
+    if c.ClipsDescendants then
+     if clip then local x1,y1=math.max(x,clip[1]),math.max(y,clip[2]);nclip={x1,y1,math.min(x+w,clip[1]+clip[3])-x1,math.min(y+h,clip[2]+clip[4])-y1}
+     else nclip={x,y,w,h}end
+    end
+    walk(c,x,y,w,h,k*own,nclip,depth+1)
+   end
+  end
+ end
+ walk(root,0,0,W,H,1,nil,0)
+ return'{"canvas":['..W..','..H..'],"items":['..table.concat(items,',')..']}'
+end

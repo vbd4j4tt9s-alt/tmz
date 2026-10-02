@@ -192,7 +192,7 @@ function X.Execute(ctx,p,action,a)
   local mode=(a[1]or'status'):lower()
   if mode=='ready'then
    local n=integer(a[2]or'1',0,2);if #a>2 or not n then return false,'Use bonus ready <0–2>.'end
-   bonus.Ready[p]=0;local ok,ready=bonus:GrantReady(p,n);return ok,'Ready rolls: '..tostring(ready)..' (the button shows now; leaving the game loses them).'
+   bonus.Ready[p]=0;local ok,ready=bonus:GrantReady(p,n);return ok,'Bonus rolls ready: '..tostring(ready)
   elseif mode=='progress'then
    local text=a[2]or'';local m,sec=text:match('^(%d+):(%d%d)$');local seconds=m and tonumber(m)*60+tonumber(sec)or tonumber(text)
    if #a~=2 or not seconds or seconds~=seconds or seconds<0 or seconds>600 then return false,'Use bonus progress <0–600 seconds or m:ss>, e.g. bonus progress 9:50.'end

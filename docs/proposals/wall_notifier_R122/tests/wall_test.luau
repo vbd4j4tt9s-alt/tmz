@@ -83,6 +83,25 @@ for i=0,110 do now=1000+i*.1;R.advance(.1);Run.RenderStepped:Fire(.1)
  if i==72 then check(count.Text=='3s','at 7.2 s shows 3s (got '..count.Text..')')end
 end
 for n=0,10 do check(seen[n..'s'],'showed '..n..'s')end
+-- R124: moon + count centred as one group for every number; caption + three dots that loop . .. ... (blank).
+for _,txt in ipairs({'10s','3s','0s'})do
+ for _,l in ipairs(labels)do l.Text=txt:sub(1,-2)end
+ local sg=faces[1].NightSign.Sign;local moon,c=sg.MoonIcon,sg.Count
+ local left=moon.Position.X.Offset;local right=sg.Size.X.Offset-(c.Position.X.Offset+(c.Size.X.Offset-8)*c.UIScale.Scale)
+ check(math.abs(left-right)<=12,('%s: moon + count centred (left %.0f, right %.0f)'):format(txt,left,right))
+ check(c.Size.Y.Offset*c.UIScale.Scale>=200,txt..': count still big')
+end
+local sg=faces[1].NightSign.Sign
+check(sg:FindFirstChild('Caption')and sg.Caption.Text=='REFRESHING','caption under the count')
+local cycle={}
+map:SetAttribute('BiomeRefreshEndsAt',2000);map:SetAttribute('BiomesRefreshing',true)
+for i=0,24 do now=1500+i*.1;R.advance(.1);Run.RenderStepped:Fire(.1)
+ local lit=0;for d=1,3 do if sg['Dot'..d].BackgroundTransparency==0 then lit+=1 end end;cycle[#cycle+1]=lit
+end
+local str=table.concat(cycle,'')
+check(str:find('0+1+2+3+0')~=nil,'dots loop 0 -> 1 -> 2 -> 3 -> 0 lit ('..str..')')
+local back=wall:GetChildren()[2];check(faces[2].NightSign.Sign.Dot1.BackgroundTransparency==sg.Dot1.BackgroundTransparency,'both faces animate together')
+check(faces[1].NightSign:FindFirstChild('InsetBorder')~=nil and faces[1].NightSign:FindFirstChild('Star1')~=nil,'inset border + faint stars')
 print(('wall checks %d, fails %d'):format(checks,fails))
 -- Dump GUI tree of the front face for rendering (absolute canvas px).
 local out={}

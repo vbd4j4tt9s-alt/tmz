@@ -23,7 +23,7 @@ M.Styles={
  Mythic={Line=RGB(228,34,52),Thickness=2.2,Transparency=0,Glow={Color=RGB(255,64,78),Thickness=3,Spread=3,Low=.82,High=.35},Motion='Pulse',Period=1.8},
  Secret={Line=RGB(6,6,9),Thickness=2.4,Transparency=0,Inner={Color=RGB(255,255,255),Inset=2,Thickness=1,Transparency=.05,Gradient=band(RGB(150,154,164),RGB(255,255,255),.1),GradientRotation=35},Motion='Shimmer',Period=4.5},
  Cosmic={Line=RGB(255,255,255),Thickness=2.2,Transparency=0,Gradient=seq({{0,RGB(92,58,214)},{.35,RGB(174,124,255)},{.6,RGB(236,200,255)},{.8,RGB(130,92,240)},{1,RGB(92,58,214)}}),Sparkles=6,Motion='Starfield',Period=2.4},
- King={Line=RGB(255,255,255),Thickness=2.6,Transparency=0,Gradient=seq({{0,RGB(214,138,22)},{.3,RGB(255,214,92)},{.5,RGB(255,252,226)},{.7,RGB(255,214,92)},{1,RGB(214,138,22)}}),Glow={Color=RGB(255,214,104),Thickness=3,Spread=3,Low=.75,High=.3},Gems={Color=RGB(255,206,64),Core=RGB(255,250,222),Edge=RGB(110,62,10)},Motion='Radiant',Period=2.6},
+ King={Line=RGB(255,255,255),Thickness=2.6,Transparency=0,Gradient=seq({{0,RGB(214,138,22)},{.3,RGB(255,214,92)},{.5,RGB(255,252,226)},{.7,RGB(255,214,92)},{1,RGB(214,138,22)}}),Glow={Color=RGB(255,214,104),Thickness=3,Spread=3,Low=.75,High=.3},Gems={Color=RGB(255,206,64),Edge=RGB(120,70,10),Ruby=RGB(214,18,52),RubyLight=RGB(255,96,120),RubyDeep=RGB(120,2,24),Facet=RGB(70,0,14),Core=RGB(255,236,240)},Motion='Radiant',Period=2.6},
 }
 M.Order={'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
 local function visible(root)
@@ -64,6 +64,7 @@ local function pose(e,t)
  elseif s.Motion=='Radiant'then
   e.Gradient.Rotation=t and(u*360)or 45
   local k=t and(.5-.5*math.cos(u*math.pi*2))or .5;e.Glow.Transparency=s.Glow.Low+(s.Glow.High-s.Glow.Low)*k
+  if e.GemCores then for i,c in ipairs(e.GemCores)do c.BackgroundTransparency=t and .55*(1-math.max(0,math.sin((u+i*.25)*math.pi*2)))or .1 end end
  end
 end
 M.Pose=pose
@@ -107,7 +108,7 @@ local function record(root)
 end
 local function clearRarity(e)
  if e.Overlay then e.Overlay:Destroy()end
- e.Overlay=nil;e.Glow=nil;e.InnerGradient=nil;e.Sparkles=nil;e.Rarity=nil
+ e.Overlay=nil;e.Glow=nil;e.InnerGradient=nil;e.Sparkles=nil;e.GemCores=nil;e.Rarity=nil
 end
 function M.Apply(root,color,shine)
  local e=record(root);if e.Rarity then clearRarity(e);root:SetAttribute('BorderRarity',nil)end
@@ -162,10 +163,17 @@ function M.Rarity(root,rarity)
    if s.Inner.Gradient then local g=Instance.new('UIGradient');g.Name='Shimmer';g.Color=s.Inner.Gradient;g.Rotation=s.Inner.GradientRotation or 0;g.Parent=l;e.InnerGradient=g end
   end
   if s.Gems then
+   -- R124: polished rubies in gold settings: gold bezel (CrownGem), faceted ruby with light-to-deep shading, a dark
+   -- facet edge and a bright specular core that twinkles with the King glow.
+   e.GemCores={}
    for i,p in ipairs({{0,0},{1,0},{0,1},{1,1}})do
-    local gem=dot(overlay,'CrownGem'..i,p[1],p[2],8,s.Gems.Color,45,z+1);line(gem,s.Gems.Edge,1,0)
-    gem.Position=UDim2.new(p[1],p[1]==0 and 3 or-3,p[2],p[2]==0 and 3 or-3) -- tucked into the corner curve
-    dot(gem,'Core',.5,.5,3,s.Gems.Core,0,z+1)
+    local gem=dot(overlay,'CrownGem'..i,p[1],p[2],11,s.Gems.Color,45,z+1);line(gem,s.Gems.Edge,1,0)
+    gem.Position=UDim2.new(p[1],p[1]==0 and 4 or-4,p[2],p[2]==0 and 4 or-4) -- tucked into the corner curve
+    local ruby=dot(gem,'Ruby',.5,.5,7,s.Gems.Ruby,0,z+2);local facet=line(ruby,s.Gems.Facet,1,.1);facet.Name='Facet'
+    local shade=Instance.new('UIGradient');shade.Name='Shade';shade.Rotation=90
+    shade.Color=seq({{0,s.Gems.RubyLight},{.45,s.Gems.Ruby},{1,s.Gems.RubyDeep}});shade.Parent=ruby
+    local table_=dot(ruby,'Table',.5,.5,3,s.Gems.RubyLight,0,z+2);table_.BackgroundTransparency=.35 -- the flat top facet
+    e.GemCores[i]=dot(gem,'Core',.36,.36,2,s.Gems.Core,0,z+3)
    end
   end
   if s.Sparkles then

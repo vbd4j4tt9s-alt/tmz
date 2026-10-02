@@ -89,6 +89,7 @@ function MapService.new(config)
     require(script.Parent.ForestLayout87).Apply(mapRoot)
     require(script.Parent.RouteDress84).Apply(mapRoot)
     require(script.Parent.FloorSafety86).Apply(mapRoot)
+    require(script.Parent.HideBushes124).Apply(mapRoot) -- R124: Forest/Jungle bushes big enough to hide in
     raiseMapBoundaries(mapRoot)
 
 

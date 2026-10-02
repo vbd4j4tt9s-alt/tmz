@@ -1,6 +1,7 @@
 -- R122: shovel holes on the track (client). Sends only an optional aim point; the server decides everything.
 -- Click / tap / R2 with the Shovel equipped while on the track: dig a hole there (or cover your own hole).
--- Also plays the dig / cover / fall effects for everyone and shows a one-line hint on the shovel feedback label.
+-- Also plays the dig / cover / fall effects for everyone. R124: a short tip fades in and out when the shovel comes out
+-- on the track (no permanent hint line any more).
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage')
 local Input=game:GetService('UserInputService');local Run=game:GetService('RunService');local CAS=game:GetService('ContextActionService')
 local Tween=game:GetService('TweenService');local Debris=game:GetService('Debris')
@@ -16,7 +17,8 @@ local sounds={};for _,s in ipairs(Planting.Sounds)do sounds[s.Key]=s.Id end
 -- R123: the trap thud (planting 'Land' layer) is preloaded with the dig recording so the first fall is not silent / late.
 local digSound=DigSound.new();Sfx.Preload({C.DigSound.Id,sounds.Land})
 local Fx=require(RS:WaitForChild('ClientFxBudget'));local Gui=game:GetService('GuiService')
-local conns={};local lastSend=-math.huge;local hintShown=false;local elapsed=0
+local Feed=require(RS:WaitForChild('NoticeFeed83'))
+local conns={};local lastSend=-math.huge;local onTrackNow=false;local hintAt=-math.huge;local elapsed=0
 
 local function shovel()
  local char=player.Character;local hum=char and char:FindFirstChildOfClass('Humanoid');local tool=char and char:FindFirstChildOfClass('Tool')
@@ -120,24 +122,16 @@ CAS:BindActionAtPriority('TrackHoleDig',function(_,state)
  return Enum.ContextActionResult.Sink
 end,false,2101,Enum.KeyCode.ButtonR2)
 
--- Hint on the shovel feedback line (GardenShovel shows it when idle).
-local function mine()
- local n=0;local folder=workspace:FindFirstChild('ChestChaseMap')and workspace.ChestChaseMap:FindFirstChild('TrackHoles',true)
- if folder then for _,m in ipairs(folder:GetChildren())do if m:GetAttribute('OwnerUserId')==player.UserId then n+=1 end end end
- return n
-end
+-- R124: tip when the shovel comes out on the track; it fades by itself (NoticeFeed). Not repeated within HintRepeatSeconds.
 table.insert(conns,Run.Heartbeat:Connect(function(dt)
  elapsed+=dt;if elapsed<.25 then return end;elapsed=0
  local char=shovel();local show=char~=nil and onTrack(char)~=nil
- if show then
-  local verb=(Input.TouchEnabled and not Input.MouseEnabled)and'Tap'or(Input.GamepadEnabled and not Input.MouseEnabled)and'Press R2 on'or'Click'
-  local n=mine()
-  pg:SetAttribute('ShovelHint',n>=C.MaxPerPlayer and string.format('%d/%d holes dug. %s one of your holes to cover it.',n,C.MaxPerPlayer,verb)
-   or string.format('%s the ground to dig a hole (%d/%d). Pack thieves fall in!',verb,n,C.MaxPerPlayer))
-  hintShown=true
- elseif hintShown then pg:SetAttribute('ShovelHint',nil);hintShown=false end
+ if show and not onTrackNow then
+  local now=os.clock()
+  if now-hintAt>=C.HintRepeatSeconds then hintAt=now;Feed.Plain(C.Hint,Color3.fromRGB(255,187,91),C.HintSeconds)end
+ end
+ onTrackNow=show
 end))
 script.Destroying:Connect(function()
  for _,c in ipairs(conns)do c:Disconnect()end;CAS:UnbindAction('TrackHoleDig')
- if hintShown then pg:SetAttribute('ShovelHint',nil)end
 end)

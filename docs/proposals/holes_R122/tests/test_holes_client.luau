@@ -56,6 +56,8 @@ local shovel=R.new('Tool');shovel.Name='Shovel';shovel:SetAttribute('GardenShove
 local function frames(n)for _=1,n do R.advance(1/30);Run.Heartbeat:Fire(1/30);Run.RenderStepped:Fire(1/30)end end
 local function click()UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1},false)end
 
+-- R124: the shovel tip goes through NoticeFeed83 (fades by itself); spy on it.
+local Feed=W.module('NoticeFeed83');local tips={};Feed.Plain=function(text,color,duration)tips[#tips+1]={Text=text,Duration=duration,At=R.clock}end
 -- Load the real client scripts -----------------------------------------------------------------------------------
 local clientScript=R.new('LocalScript');clientScript.Name='TrackHoleClient'
 local okLoad,err=pcall(W.load,'TrackHoleClient',clientScript)
@@ -85,19 +87,19 @@ check(#fired==4,'no request without the shovel equipped')
 shovel.Parent=char;me:SetAttribute('ChestChaseSeedCarrying',true);frames(10);click()
 check(#fired==4,'no request while carrying a pack');me:SetAttribute('ChestChaseSeedCarrying',false)
 
--- 2. Hint
-frames(10)
-local hint=pg:GetAttribute('ShovelHint')
-check(type(hint)=='string'and hint:find('dig a hole',1,true)and hint:find('(0/4)',1,true),'hint shown on the track: '..tostring(hint))
-for i=1,4 do local m=R.new('Model');m.Name='TrackHole_'..i;m:SetAttribute('OwnerUserId',7);m.Parent=holesFolder end
-frames(10);hint=pg:GetAttribute('ShovelHint')
-check(hint and hint:find('4/4',1,true)and hint:find('cover',1,true),'full hint tells how to cover: '..tostring(hint))
-root.CFrame=CF(0,3,-40);frames(10);check(pg:GetAttribute('ShovelHint')==nil,'hint cleared off the track')
+-- 2. Tip (R124): one fading notice when the shovel comes out on the track; no permanent hint line; not repeated within 30 s.
+local HC=W.module('TrackHoleConfig')
+check(#tips==1 and tips[1].Text==HC.Hint and tips[1].Duration==HC.HintSeconds and HC.Hint:find('trap',1,true)~=nil,'tip shown once on the track: '..tostring(tips[1]and tips[1].Text))
+check(pg:GetAttribute('ShovelHint')==nil,'no permanent hint line')
+root.CFrame=CF(0,3,-40);frames(10);root.CFrame=CF(0,3,100);frames(10)
+check(#tips==1,'leaving and re-entering within 30 s does not repeat the tip')
+root.CFrame=CF(0,3,-40);frames(10);R.advance(31);root.CFrame=CF(0,3,100);frames(10)
+check(#tips==2,'tip shown again after 30 s')
+shovel.Parent=nil;frames(10);R.advance(31);frames(10);check(#tips==2,'no tip without the shovel')
+shovel.Parent=char;frames(10);check(#tips==3,'tip when the shovel comes out on the track')
 if okGarden then
  local label=pg:FindFirstChild('GardenShovelUI')and pg.GardenShovelUI:FindFirstChild('ShovelFeedback')
- root.CFrame=CF(0,3,100);frames(10)
- check(label and label.Text==pg:GetAttribute('ShovelHint'),'GardenShovel shows the hint when idle')
- root.CFrame=CF(0,3,-40);frames(10);check(label and label.Text=='','hint gone in the garden (unchanged behaviour)')
+ frames(10);check(label and label.Text=='','shovel feedback line stays empty on the track')
 end
 
 -- 3. Effects: dig grows the replicated hole and plays a dig variant at the hole

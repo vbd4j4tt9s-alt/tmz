@@ -149,29 +149,42 @@ print('Treadmill tier -> bonus pool');print(table.concat(mapping,'\n'))
 local all=Rules.DecodePool(attr(A2,'Pool'));local seen={}
 for _,s in ipairs(all)do seen[s]=true end
 check(#all==7 and seen[1]and seen[2]and seen[3]and seen[4]and seen[5]and seen[6]and seen[7],'Storm treadmill: all 7 biomes')
--- Storm claims: biome spread + never Void / Mech
+-- Storm claims: biome spread + never Mech (R124: a Void Pack, when it comes up, is the Secret tier and always Storm)
 local stageCount,variantSeen={},{}
 for _=1,60 do
  Bonus.Ready[A2]=1;R.advance(2);local r=invoke(A2)
  if r.Ok then stageCount[r.Stage]=(stageCount[r.Stage]or 0)+1;variantSeen[r.Variant]=true end
  local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)];Data:RemoveChest(A2,last.Id)
 end
-check(not variantSeen.EclipseReliquary and not variantSeen.MechLimited,'never a Void or Mech pack')
+check(not variantSeen.MechLimited,'never a Mech pack')
 local distinct=0;for _ in pairs(stageCount)do distinct+=1 end
 check(distinct>=5,'60 Storm claims spread over many biomes ('..distinct..')')
--- 8. Odds: the existing world spawn weights, uniform biome, luck-free --------------------------------------
-local odds=Rules.VariantOdds();local spawn={Pack01=38,Pack02=25,Pack03=15,Pack04=7,Pack05=10,Pack06=5}
-for k,v in pairs(spawn)do check(near(odds[k],v/100,1e-9),k..' chance = world spawn weight '..v..'%')end
+-- 8. Odds (R124 owner spec): Secret/Void 0.1, Mythic 0.5, Legendary 2, rest 43.5/28.6/17.2/8.1; uniform biome, luck-free
+local odds=Rules.VariantOdds();local spec={Pack01=43.5,Pack02=28.6,Pack03=17.2,Pack04=8.1,Pack05=2,Pack06=.5,EclipseReliquary=.1}
+local sum=0;for k,v in pairs(spec)do sum+=v;check(near(odds[k],v/100,1e-9),k..' chance = '..v..'%')end;check(near(sum,100,1e-9),'odds add up to 100%')
+check(Rules.Tier('EclipseReliquary')=='Secret'and Rules.Special.Secret and Rules.Special.Legendary and Rules.Special.Mythic,'Void Pack shows as SECRET and gets the special reveal')
 math.randomseed(7);local rng={NextNumber=function()return math.random()end};local n=200000;local vc,sc={},{}
 for _=1,n do local p=Rules.RollPack(all,function()return rng:NextNumber()end);vc[p.Variant]=(vc[p.Variant]or 0)+1;sc[p.Stage]=(sc[p.Stage]or 0)+1 end
 local rows={}
 for _,k in ipairs(Rules.VariantOrder)do
  local got=(vc[k]or 0)/n;local want=odds[k];local tol=4*math.sqrt(want*(1-want)/n)
  check(near(got,want,tol),string.format('%s observed %.3f%% vs %.3f%%',k,got*100,want*100))
- rows[#rows+1]=string.format('  %-9s %-6s spec %6.2f%%  observed %6.3f%%',PackRules.GetPackTier(k).Name,k,want*100,got*100)
+ rows[#rows+1]=string.format('  %-9s %-16s spec %6.2f%%  observed %6.3f%%',(Rules.Tier(k)),k,want*100,got*100)
 end
 print('Bonus roll odds over '..n..' rolls (Storm pool)');print(table.concat(rows,'\n'))
-for s=1,7 do check(near((sc[s]or 0)/n,1/7,4*math.sqrt((1/7)*(6/7)/n)),'biome '..s..' ~1/7')end
+local void=odds.EclipseReliquary
+for s=1,7 do local want=(1-void)/7+(s==7 and void or 0);check(near((sc[s]or 0)/n,want,4*math.sqrt(want*(1-want)/n)),'biome '..s..' ~1/7 (Storm + the Void share)')end
+-- A Secret result is a real Storm Void Pack, even from a Forest-only pool, and is granted like any other pack.
+do
+ local p=Rules.RollPack({1},(function()local k=0;return function()k+=1;return k==1 and 0 or .9995 end end)())
+ check(p.Variant=='EclipseReliquary'and p.Stage==7,'Secret roll from a Forest pool = Storm Void Pack')
+ local saved=Bonus.Random;Bonus.Random={NextNumber=function(_)return .9995 end}
+ Bonus.Ready[A2]=1;R.advance(2);local r=invoke(A2);Bonus.Random=saved
+ local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)]
+ check(r.Ok and r.Variant=='EclipseReliquary'and r.Stage==7 and r.Rarity=='Secret'and r.Biome=='Void Pack','server returns SECRET Void Pack: '..tostring(r.Rarity)..' '..tostring(r.Biome))
+ check(last and last.BagVariant=='EclipseReliquary'and last.Stage==7,'Void Pack granted to the bag as a Storm pack')
+ if last then Data:RemoveChest(A2,last.Id)end
+end
 -- Luck/boots never change a result: same random stream, boots on vs off -> identical claims
 local function seq(luck)
  A2:SetAttribute('ChestLuckMultiplier',luck);Bonus.Random=Random.new(99);local out={}

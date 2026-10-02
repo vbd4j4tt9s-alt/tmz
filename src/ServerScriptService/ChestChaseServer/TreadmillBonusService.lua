@@ -115,7 +115,7 @@ function S:Roll(player)
   if not ok then warn('[R123] Bonus pack Tool appears on the next sync: '..tostring(err))end
  end
  local rarity=Rules.Tier(pick.Variant)
- return {Ok=true,Stage=pick.Stage,Variant=pick.Variant,Rarity=rarity,Biome=PackRules.DesignBiomes[pick.Stage],
+ return {Ok=true,Stage=pick.Stage,Variant=pick.Variant,Rarity=rarity,Biome=pick.Variant==Rules.Void.Variant and Rules.Void.Label or PackRules.DesignBiomes[pick.Stage],
   Label=PackRules.PackLabel(pick.Stage,pick.Variant,1,'None'),Id=record.Id,Pool=Rules.EncodePool(stages),Ready=ready-1}
 end
 return S

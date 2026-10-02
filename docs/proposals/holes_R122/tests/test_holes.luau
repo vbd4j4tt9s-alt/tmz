@@ -136,7 +136,7 @@ local function onlyHole(p)for _,h in pairs(holes.ByOwner[p]or{})do return h end 
 local function clearAll()holes:ClearAll();table.clear(fired);table.clear(notes)end
 
 -- 1. Config sanity: one table, owner's numbers ---------------------------------------------------------------------
-check(C.MaxPerPlayer==4 and C.CooldownSeconds==8 and C.MaxPerServer==30 and C.LifetimeSeconds==180 and C.ArmSeconds==1
+check(C.MaxPerPlayer==4 and C.CooldownSeconds==3 and C.MaxPerServer==30 and C.LifetimeSeconds==180 and C.ArmSeconds==1
  and C.RagdollSeconds==4 and C.Diameter>=3 and C.Diameter<=3.5,'config values')
 check(holes.Remote.Parent==remotes and holes.Remote.Name=='TrackHole','TrackHole remote created in ChestChaseRemotes')
 check(holes.Folder.Parent==runtime,'holes folder lives in the runtime folder')
@@ -186,9 +186,9 @@ moveTo(A,0,3,100)
 ok=dig(A);Gate.Cleanup(A)
 moveTo(A,0,3,120)
 ok,why=holes:Request(A)
-check(not ok and why=='Cooldown'and noted(A,'SHOVEL READY IN 8S'),'cooldown 8 s')
-step(7.5);Gate.Cleanup(A);ok,why=holes:Request(A);check(not ok and why=='Cooldown','still cooling at 7.5 s')
-step(.6);Gate.Cleanup(A);ok,why=holes:Request(A);check(ok,'dig again after 8 s')
+check(not ok and why=='Cooldown'and noted(A,'3s'),'cooldown 3 s, message is just the time')
+step(2.5);Gate.Cleanup(A);ok,why=holes:Request(A);check(not ok and why=='Cooldown'and noted(A,'1s'),'still cooling at 2.5 s')
+step(.6);Gate.Cleanup(A);ok,why=holes:Request(A);check(ok,'dig again after 3 s')
 clearAll()
 
 -- 6. Spot rules
