@@ -73,7 +73,7 @@ local function spinTo(res,label2)
  -- R124 layout: rows stacked (result above the buttons), the visible buttons centred as a group.
  local function bottom(x)return x.Position.Y.Offset+x.Size.Y.Offset end
  check(bottom(panel.Result)<=panel.Actions.Position.Y.Offset,label2..': result text ends above the buttons')
- check(bottom(panel.Odds)<=panel.Pool.Position.Y.Offset and bottom(panel.Pool)<=panel.Result.Position.Y.Offset,label2..': odds / pool / result rows do not overlap')
+ check(bottom(panel.Odds)<=panel.Result.Position.Y.Offset and panel:FindFirstChild('Pool')==nil,label2..': odds / result rows do not overlap; no "Packs from" line')
  check(bottom(panel.Actions)<=panel.Size.Y.Offset,label2..': buttons inside the panel')
  local shownButtons={};for _,b in ipairs(panel.Actions:GetChildren())do if b:IsA('TextButton')and b.Visible then shownButtons[#shownButtons+1]=b end end
  local lo,hi=math.huge,-math.huge
@@ -111,7 +111,6 @@ set('Ready',1)
 took,panel,win=spinTo({Ok=true,Stage=7,Variant='EclipseReliquary',Rarity='Secret',Label='Void Pack',Pool='1',Ready=0},'Secret')
 check(win.Biome.Text=='Void Pack'and win.Design:FindFirstChild('Star1')~=nil and win.Design:FindFirstChild('Nebula')~=nil,'Secret card: Void Pack label, starfield design')
 check(win:FindFirstChild('BorderGlow')~=nil and #reveals>0,'Secret: border light-up + fanfare')
-check(panel.Pool.Text:find('Secret = Void Pack',1,true)~=nil,'pool line explains Secret')
 panel.Actions.Close.Activated:Fire()
 check(panel:FindFirstChildOfClass('UIStroke').Thickness==3,'panel border back to normal after close')
 -- SKIP and ReducedMotion

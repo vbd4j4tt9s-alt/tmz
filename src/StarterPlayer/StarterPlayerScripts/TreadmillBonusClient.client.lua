@@ -141,8 +141,6 @@ local arrowBottom=text(window,'MarkerBottom','▲',18,GOLD);arrowBottom.ZIndex=9
 local oddsLine=make('TextLabel',{Name='Odds',RichText=true,BackgroundTransparency=1,Font=Enum.Font.GothamBold,TextColor3=Color3.new(1,1,1),
  TextStrokeColor3=INK,TextStrokeTransparency=.3,TextWrapped=true,TextScaled=true,ZIndex=3},panel)
 make('UITextSizeConstraint',{MaxTextSize=14,MinTextSize=9},oddsLine)
-local poolLine=text(panel,'Pool','',12,RGB(200,210,255));poolLine.ZIndex=3;poolLine.Font=Enum.Font.GothamBold;poolLine.TextScaled=true
-make('UITextSizeConstraint',{MaxTextSize=12,MinTextSize=8},poolLine)
 local result=text(panel,'Result','',18);result.ZIndex=3;result.TextScaled=true
 make('UITextSizeConstraint',{MaxTextSize=18,MinTextSize=11},result)
 local actions=make('Frame',{Name='Actions',BackgroundTransparency=1,ZIndex=3},panel)
@@ -169,10 +167,6 @@ local function oddsText()
  end
  return table.concat(parts,'  ·  ')
 end
-local function poolText(stages)
- local names={};for _,s in ipairs(stages)do table.insert(names,biomeName(s))end
- return 'Packs from: '..table.concat(names,', ')..(#stages>1 and(' (each '..Rules.Percent(1/#stages)..')')or'')..'  ·  Secret = '..Rules.Void.Label
-end
 local panelW,cardH=600,128
 local CARD_Y=10 -- room above/below the cards for the border light-up
 local function layoutOverlay()
@@ -180,12 +174,11 @@ local function layoutOverlay()
  panelW=math.floor(math.min(w-24,660));local short=h<420
  cardH=short and 104 or 128
  -- Rows top to bottom; each starts below the previous one, so text and buttons never overlap.
- local ribbonH=short and 26 or 30;local oddsH=short and 28 or 34;local poolH=short and 14 or 16;local resultH=short and 22 or 26;local actionH=short and 38 or 42
+ local ribbonH=short and 26 or 30;local oddsH=short and 28 or 34;local resultH=short and 22 or 26;local actionH=short and 38 or 42
  local y=10
  ribbon.Position=UDim2.new(.5,0,0,y);ribbon.Size=UDim2.fromOffset(math.min(380,panelW-90),ribbonH);y+=ribbonH+8
  window.Position=UDim2.fromOffset(14,y);window.Size=UDim2.new(1,-28,0,cardH+2*CARD_Y);y+=cardH+2*CARD_Y+6
- oddsLine.Position=UDim2.fromOffset(16,y);oddsLine.Size=UDim2.new(1,-32,0,oddsH);y+=oddsH+2
- poolLine.Position=UDim2.fromOffset(16,y);poolLine.Size=UDim2.new(1,-32,0,poolH);y+=poolH+4
+ oddsLine.Position=UDim2.fromOffset(16,y);oddsLine.Size=UDim2.new(1,-32,0,oddsH);y+=oddsH+4
  result.Position=UDim2.fromOffset(16,y);result.Size=UDim2.new(1,-32,0,resultH);y+=resultH+8
  actions.Position=UDim2.fromOffset(16,y);actions.Size=UDim2.new(1,-32,0,actionH);y+=actionH+14
  panel.Size=UDim2.fromOffset(panelW,math.min(h-16,y))
@@ -317,7 +310,7 @@ local function startRoll(res)
  current=res;overlay.Enabled=true;layoutOverlay()
  stopGlow();result.Text='';result.TextColor3=Color3.new(1,1,1)
  local stages=Rules.DecodePool(res.Pool);if #stages==0 then stages={res.Stage}end
- oddsLine.Text=oddsText();poolLine.Text=poolText(stages)
+ oddsLine.Text=oddsText() -- R124: no "Packs from ..." line (owner)
  local winner={Stage=res.Stage,Variant=res.Variant}
  local rng=Random.new()
  for i,pack in ipairs(Rules.BuildStrip(stages,winner,function()return rng:NextNumber()end))do buildCard(i,pack)end
