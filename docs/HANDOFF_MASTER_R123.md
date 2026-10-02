@@ -16,7 +16,10 @@ Revision changelog
   - `src/MANIFEST.tsv` lists every script: 448 rows, matching the files.
 - **Source version.** `Config.Version='V150 R123'`, `ProfileVersion=20`. Source is CURRENT at commit `fae4310`. The last source change was the commit before it; `fae4310` only added the rebuilt installer.
 - **Delivery.** Each release is one paste-into-Command-Bar installer with a backup and undo (`installers/R1xx_install.lua`). The owner installs them in Studio. The assistant can't run Studio.
-- **Installed (runtime) state: known from the owner's uploaded place `sapf.rbxl` (2 Oct). R123 not installed; Play cannot start.**
+- **Installed (runtime) state, 2 Oct 14:46: R123 INSTALLED in Edit; a clean Play run is not yet reported.**
+  - Owner ran the one-line redo (`[R123] Installed` at 14:34:34). `check_R123.lua` at 14:46 (Edit) shows: `Config.Version='V150 R123'`; PremiumRouting needs GiftProducts: false; new R123 scripts missing: none; R123 backup state Installed; R121 backup state Built.
+  - The only Play Output so far (14:34:31) was snapshotted mid-install (Section 7 item 2). No Play since the install finished.
+- **Earlier state, from the uploaded place `sapf.rbxl` (2 Oct): R123 not installed; Play could not start.**
   - Scripts are byte-exact R121 (`9b13846`) minus the 4 deleted modules. R121 still requires them in 10 places (`PremiumRouting:2`, `PremiumService:5`, `PremiumProgress`, `GamePassClient:11`, `WorldStatusHud:4`), so the server and clients error on start.
   - `ServerStorage.ChestChase_R123_Backup` is State `Undone`. It holds 71 entries, all matching current `src/`, and its Installer hashes to `3558ed99…` (the current build). It was made by the 05:56 paste (`69619fc`), which never set the `Build` attribute. So the 06:04 installer (`fae4310`) refused it as "older": a false refusal.
   - Fix: the paste wrapper now also recognises a same-build backup by its Installer hash (`tools/installer_paste.lua`). The rebuilt `installers/R123_install.lua` is one paste, with no undo or delete. Mock-run against the uploaded place: 28/28. Owner has not run it yet.
