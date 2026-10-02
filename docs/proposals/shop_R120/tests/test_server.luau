@@ -144,7 +144,7 @@ check(receipt(buyer,giftId.CashSmall,pid)==Granted,'duplicate receipt acknowledg
 check(pendingCash(friend)==friendCash+30000000000,'duplicate receipt grants nothing')
 check((Data:GetPremium(buyer).ProductGiftCredits.CashSmall or 0)==0,'duplicate receipt adds no credit')
 -- Durable chain completes: outbox and inbox clean up after the recovery loop runs.
-advance(31)
+advance(121) -- R123: gift recovery runs every 60 s (was 15/30 s)
 check(next(Data:GetPremium(buyer).ProductOutbox)==nil,'buyer outbox cleared')
 check(inbox.Data['2']==nil or next(inbox.Data['2'])==nil,'recipient inbox cleared')
 check(next(Data:GetPremium(friend).ProductGiftReceipts)==nil,'recipient receipt marker cleared')
