@@ -165,7 +165,7 @@ check((Chests.Synced[A]or 0)>0 and(Chests.Synced[B]or 0)>0,'both hotbars resynce
 local recv=lastFor(B);check(recv and recv.Action=='Received'and recv.Text:find('seed pack'),'recipient notified: '..tostring(recv and recv.Text))
 local sent=false;for _,f in ipairs(fired)do if f.P==A and f.Text and f.Text:find('Gift sent to Bob')then sent=true end end
 check(sent,'giver notified')
-advance(31) -- acknowledgements finish on the 15 s background recovery loop (same as fruit)
+advance(121) -- acknowledgements finish on the background recovery loop (R123: every 60 s, two passes)
 check(next(Data.Gardens[A].OutgoingSeedGifts)==nil,'giver outbox cleaned up')
 local box=seedStore().Data[tostring(B.UserId)]
 check(box==nil or next(box)==nil,'recipient inbox cleaned up')

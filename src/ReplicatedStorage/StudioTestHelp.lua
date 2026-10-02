@@ -20,7 +20,7 @@ return {
  {'/test speed 100000000000 @username','SAVE 100B points: physical speed 500, immediate on full input. speed sets points; it does not set studs/second.'},
  {'/test movespeed 500 @username','Temporary physical speed override (24–500). movespeed off restores earned movement.'},
  {'/test animrate 2.5 @username','Temporary 2.5× running/treadmill animation. animrate off restores normal scaling.'},
- {'/test event spawn','Spawn the seated Veiled One and its one Void Pack at Storm Peaks.'},
+ {'/test event spawn','Spawn The Dark and its two Void Packs at Storm Peaks.'},
  {'/test event go @username','Teleport near the current event pack.'},
  {'/test event status','Inspect the event and reset counters. event clear removes an unclaimed event.'},
  {'/test eclipse 1 @username','Give a Void Pack: any regular Secret/Cosmic/King + 1/200 normal Mech roll.'},

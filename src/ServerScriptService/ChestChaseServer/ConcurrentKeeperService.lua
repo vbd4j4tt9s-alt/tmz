@@ -231,7 +231,8 @@ return function(Legacy)
         else
             self:_returnPackToOrigin(run.Chest)
         end
-        self.Notifications:Show(run.Player,hit and hit.Cause=='Bat'and 'SMACK! PACK DROPPED'or hit and hit.Cause=='Lightning'and 'ZAP! PACK DROPPED'or 'CAUGHT! PACK DROPPED',Color3.fromRGB(255,130,92),3)
+        -- R123: TrackHoleService shows its own 'fell in a hole' toast.
+        if not(hit and hit.Cause=='Hole')then self.Notifications:Show(run.Player,hit and hit.Cause=='Bat'and 'SMACK! PACK DROPPED'or hit and hit.Cause=='Lightning'and 'ZAP! PACK DROPPED'or 'CAUGHT! PACK DROPPED',Color3.fromRGB(255,130,92),3) end
         -- Drop timers are handled in the shared heartbeat, with no stale delayed reset.
     end
 

@@ -203,6 +203,12 @@ chase.Drops[99]={Position=V3(40,0,700)}
 moveTo(B,42,3,700);ok,why=dig(B);check(not ok and why=='Pack','not on a dropped pack')
 chase.Drops[99]=nil
 moveTo(B,40,3,700);ok,why=dig(B);check(ok,'same spot ok once the drop is gone')
+-- R123: The Dark's Void Pack slots and its home (Event81) block holes too.
+chase.Event81={Home=CF(-40,5,800),Slots={{PackHome=V3(-40,5,760)},{PackHome=V3(-20,5,760),Stolen=true}},Active=function()return true end}
+moveTo(B,-41,3,760);ok,why=dig(B);check(not ok and why=='Pack','not on a Void Pack slot')
+moveTo(B,-39,3,801);ok,why=dig(B);check(not ok and why=='Camp','not at The Dark\'s home')
+moveTo(B,-20,3,760);ok,why=dig(B);check(ok,'a stolen Void Pack slot no longer blocks')
+chase.Event81=nil
 clearAll()
 
 -- 7. Player state rules
@@ -244,7 +250,7 @@ check(chase.Runs[B]==nil and B:GetAttribute('ChestChaseSeedCarrying')==false,'ar
 local drop;for _,d in pairs(chase.Drops)do if d.Chest==run.Chest then drop=d end end
 check(drop~=nil and slot.Available==false,'pack dropped on the ground via ConcurrentKeeperService (not returned, not banked)')
 check(flings==0,'keeper fling skipped (ImpactApplied)')
-check(noted(B,'CAUGHT! PACK DROPPED')and noted(B,C.Messages.Trapped),'drop notice + hole notice')
+check(not noted(B,'CAUGHT! PACK DROPPED')and noted(B,C.Messages.Trapped),'only the hole notice (R123: no double toast)')
 check(noted(A,string.format(C.Messages.Tripped,'Ben')),'digger told who fell in')
 check(trapHole.Model.Parent==nil and holes.Holes[trapHole.Id]==nil and holeCount(A)==0,'hole used up by the trap; slot freed')
 check(fired[#fired].Kind=='Trap'and fired[#fired].VictimUserId==B.UserId,'trap effect broadcast')

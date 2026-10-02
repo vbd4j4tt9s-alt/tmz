@@ -54,7 +54,7 @@ function H.Create(pg,player)
  local ring=Instance.new('UIStroke');ring.Name='IconRing';ring.Color=C(201,160,255);ring.Thickness=1;ring.Transparency=.3;ring.Parent=badge
  local emblem=block(badge,'Icon',UDim2.fromOffset(1,1),UDim2.new(1,-2,1,-2),Color3.new());emblem.BackgroundTransparency=1
  require(RS.HudArtwork).Attach(emblem,'WeatherThunderstorm')
- local specialTitle=label(special,'Title',UDim2.fromOffset(40,1),UDim2.new(1,-46,0,21),18);specialTitle.Text='THE VEILED ONE';specialTitle.TextColor3=C(236,216,255);specialTitle.TextXAlignment=Enum.TextXAlignment.Center
+ local specialTitle=label(special,'Title',UDim2.fromOffset(40,1),UDim2.new(1,-46,0,21),18);specialTitle.Text='THE DARK';specialTitle.TextColor3=C(236,216,255);specialTitle.TextXAlignment=Enum.TextXAlignment.Center
  local specialHint=label(special,'Hint',UDim2.fromOffset(40,20),UDim2.new(1,-46,0,16),12);specialHint.TextColor3=C(208,196,234);specialHint.TextXAlignment=Enum.TextXAlignment.Center
  require(RS.GardenTextFit).Attach(specialTitle,18,13);require(RS.GardenTextFit).Attach(specialHint,12,10)
  local boostRows={};local hasBoosts=false
@@ -98,7 +98,7 @@ function H.Create(pg,player)
   special.Visible=event
   local hint=active and(player:GetAttribute('SpecialKeeperChase84')and'CHASING YOU' or'AT STORM PEAKS')or(event and'ARRIVES IN '..SpeedBoost.Clock(waitFor))or''
   if specialHint.Text~=hint then specialHint.Text=hint end
-  special:SetAttribute('AccessibleLabel','The Veiled One '..hint:lower())
+  special:SetAttribute('AccessibleLabel','The Dark '..hint:lower())
   scale.Scale=m.StatusScale
   if m.Phone then
    local width=m.StatusHorizontal and 388 or 190

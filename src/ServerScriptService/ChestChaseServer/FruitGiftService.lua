@@ -21,7 +21,8 @@ function S.new(data,chests,chase,notes)
   if action=='Give'then self:Offer(p,a,b)
   elseif action=='GiveSeed'then self:OfferSeed(p,a,b)end
  end)
- task.spawn(function()while remote.Parent do task.wait(15);for id,o in pairs(self.Offers)do if os.clock()>o.Expires or not o.From.Parent or not o.To.Parent then self.Offers[id]=nil end end;for _,p in ipairs(Players:GetPlayers())do task.spawn(function()self:Recover(p)end)end end end)
+ -- R123: offers are swept every 15 s; inboxes (2 DataStore reads per player) only every 60 s. Join and each send still recover at once.
+ task.spawn(function()local pass=0;while remote.Parent do task.wait(15);pass+=1;for id,o in pairs(self.Offers)do if os.clock()>o.Expires or not o.From.Parent or not o.To.Parent then self.Offers[id]=nil end end;if pass%4==0 then for _,p in ipairs(Players:GetPlayers())do task.spawn(function()self:Recover(p)end)end end end end)
  return self
 end
 function S:Available(p)

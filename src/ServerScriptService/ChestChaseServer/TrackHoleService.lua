@@ -104,6 +104,9 @@ function S:_campHomes()
   if ok and typeof(frame)=='CFrame'then homes[#homes+1]=frame.Position end
  end
  for _,frame in pairs(chase.GuardianHomeCFrames or{})do if typeof(frame)=='CFrame'then homes[#homes+1]=frame.Position end end
+ -- The Dark (Event81) sits at its own home, not in GuardianHomeCFrames.
+ local event=chase.Event81
+ if event and event.Home and(event.Active==nil or event:Active())then homes[#homes+1]=event.Home.Position end
  return homes
 end
 
@@ -115,6 +118,11 @@ function S:_spotProblem(point)
  for _,seed in ipairs(self.Map.Chests or{})do
   local body=seed.Body
   if body and body.Parent and flat(body.Position-point).Magnitude<C.PackClearance then return'Pack'end
+ end
+ local event=self.Chase.Event81
+ for _,slot in ipairs(event and event.Slots or{})do
+  local at=slot.PackHome or(slot.Body and slot.Body.Position)
+  if not slot.Stolen and typeof(at)=='Vector3'and flat(at-point).Magnitude<C.PackClearance then return'Pack'end
  end
  for _,drop in pairs(self.Chase.Drops or{})do
   if typeof(drop.Position)=='Vector3'and flat(drop.Position-point).Magnitude<C.PackClearance then return'Pack'end

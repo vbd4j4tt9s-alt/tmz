@@ -16,7 +16,7 @@ function S.new(data,chests,passGifts)
  local self=setmetatable({Data=data,Chests=chests,PassGifts=passGifts,Busy={},Working={},Intent={},Warned={},
   Store=DS:GetDataStore('ChestChase_ProductInbox_v1'..(game:GetService('RunService'):IsStudio()and'_Studio'or''))},S)
  -- 30 s (pass gifts use 15 s): keeps both inbox loops well inside the DataStore read budget.
- task.spawn(function()while task.wait(30)do for _,p in ipairs(Players:GetPlayers())do task.spawn(function()self:Recover(p)end)end end end)
+ task.spawn(function()while task.wait(60)do for _,p in ipairs(Players:GetPlayers())do task.spawn(function()self:Recover(p)end)end end end)
  return self
 end
 function S:Ready(p)return p and p.Parent and self.Data:IsLoaded(p)and self.Data.CanSave[p]end

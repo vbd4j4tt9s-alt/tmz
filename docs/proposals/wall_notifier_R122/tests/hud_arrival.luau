@@ -40,7 +40,7 @@ for _,variant in ipairs({'WorldStatusHudOld','WorldStatusHud'})do
  end
 end
 -- Text fits at a readable size in the narrower text column (144 px).
-for _,t in ipairs({{'THE VEILED ONE',18,13,144},{'AT STORM PEAKS',12,10,144},{'CHASING YOU',12,10,144}})do
+for _,t in ipairs({{'THE DARK',18,13,144},{'AT STORM PEAKS',12,10,144},{'CHASING YOU',12,10,144}})do
  local shown,size,cut=Fit.Layout(t[1],t[4],t[2]==18 and 21 or 16,R.Enum.Font.FredokaOne,t[2],t[3])
  print(('%q -> size %d%s'):format(t[1],size,cut and' (shortened)'or''));check(not cut and size>=t[3],t[1]..' fits')
 end

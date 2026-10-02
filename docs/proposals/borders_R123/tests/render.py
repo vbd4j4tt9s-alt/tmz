@@ -15,8 +15,8 @@ TEXT = {'Common': ((213, 224, 210), (19, 31, 28)), 'Uncommon': ((151, 228, 154),
         'Legendary': ((255, 200, 70), (62, 32, 8)), 'Mythic': ((250, 70, 80), (58, 8, 17)), 'Secret': ((255, 255, 255), (0, 0, 0)),
         'Cosmic': ((172, 159, 242), (255, 255, 255)), 'King': ((255, 226, 130), (105, 57, 9))}
 NOTE = {'Common': 'thin grey-green line', 'Uncommon': 'green line', 'Rare': 'blue double line', 'Legendary': 'gold, slow shine sweep',
-        'Mythic': 'crimson, pulsing glow', 'Secret': 'black + white line, silver shimmer', 'Cosmic': 'violet, edge starfield sparkle',
-        'King': 'gold, crown-gem corners, radiant glow'}
+        'Mythic': 'crimson, pulsing glow', 'Secret': 'black/white, silver shimmer', 'Cosmic': 'violet, edge sparkles',
+        'King': 'gold, gem corners, glow'}
 FRUIT = {'Common': (150, 200, 90), 'Uncommon': (110, 200, 120), 'Rare': (90, 160, 240), 'Legendary': (255, 190, 60), 'Mythic': (230, 60, 70),
          'Secret': (60, 60, 70), 'Cosmic': (130, 100, 230), 'King': (255, 215, 90)}
 
@@ -119,11 +119,12 @@ cw = CARD * K; cell_w = cw + GAP * K // 2; cell_h = cw + 40 * K
 animated = ['Legendary', 'Mythic', 'Secret', 'Cosmic', 'King']
 small_rows = len(animated)
 W = COLS * cell_w + GAP * K // 2
-H = TOP * K + 2 * cell_h + 60 * K + small_rows * (cw + 16 * K) // 2 + 20 * K
+BEFORE_H = 30 * K + (cw + 40 * K) // 2
+H = TOP * K + 2 * cell_h + 60 * K + small_rows * (cw + 16 * K) // 2 + 20 * K + BEFORE_H
 img = Image.new('RGBA', (W, H), SHEET + (255,))
 d = ImageDraw.Draw(img)
 text(d, (W // 2, 22 * K), 'R123 rarity borders on the inventory card (no emblems)', 15, (255, 255, 255), anchor='mm')
-text(d, (W // 2, 44 * K), 'PIL approximation of the real GardenCardMotion instances (dump.luau), 104 px card shown at 4x', 9, (204, 224, 255), anchor='mm')
+text(d, (W // 2, 44 * K), 'PIL approximation of the real GardenCardMotion instances (dump.luau), 104 px card shown at 2x', 9, (204, 224, 255), anchor='mm')
 for i, r in enumerate(ORDER):
     ox = GAP * K // 2 + (i % COLS) * cell_w; oy = TOP * K + (i // COLS) * cell_h
     card(img, ox, oy, r, poses['motion-a'][r])
@@ -142,5 +143,20 @@ img.alpha_composite(small, ((W - small.width) // 2, y0 + 14 * K))
 for j, r in enumerate(animated):
     fill, outline = TEXT[r]
     text(d, ((W - small.width) // 2 - 8 * K, y0 + 14 * K + j * small.height // small_rows + small.height // small_rows // 2), r, 10, fill, outline, anchor='rm')
+# Before (R122): every rarity had the same 1.2 px accent line (shine on Legendary+) plus a 12 px corner emblem.
+ACCENT = {'Common': (154, 176, 152), 'Uncommon': (80, 159, 108), 'Rare': (67, 129, 218), 'Legendary': (227, 158, 36), 'Mythic': (222, 42, 52),
+          'Secret': (180, 184, 192), 'Cosmic': (158, 148, 218), 'King': (247, 178, 46)}
+yb = y0 + 14 * K + small.height + 14 * K
+text(d, (W // 2, yb), 'before (R122): same 1.2 px accent line + corner emblem (marker; see emblems_R122)', 9, (204, 224, 255), anchor='mm')
+strip = Image.new('RGBA', (8 * (cw + 10 * K), cw + 40 * K), SHEET + (255,))
+for i, r in enumerate(ORDER):
+    ox = i * (cw + 10 * K) + 5 * K
+    card(strip, ox, 6 * K, r, [['stroke', '%d,%d,%d' % ACCENT[r], '1.2', '0.18']])
+    sd = ImageDraw.Draw(strip); ex, ey = ox + (CARD - 9) * K, 6 * K + 8 * K
+    sd.ellipse([ex - 6 * K, ey - 6 * K, ex + 6 * K, ey + 6 * K], fill=ACCENT[r] + (255,), outline=(255, 255, 255, 255), width=K)
+    fill, outline = TEXT[r]; text(sd, (ox + cw // 2, 6 * K + cw + 16 * K), r, 12, fill, outline, anchor='mm')
+strip = strip.resize((strip.width * W // strip.width // 1, strip.height * W // strip.width), Image.LANCZOS) if strip.width > W else strip
+img.alpha_composite(strip, ((W - strip.width) // 2, yb + 10 * K))
+img = img.crop((0, 0, W, min(H, yb + 10 * K + strip.height + 6 * K)))
 img.convert('RGB').resize((W // 2, H // 2), Image.LANCZOS).save(OUT)
 print('wrote', OUT, W // 2, H // 2)

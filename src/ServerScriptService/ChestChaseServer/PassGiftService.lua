@@ -6,7 +6,7 @@ local function count(t)local n=0;for _ in pairs(t)do n+=1 end;return n end
 local function clone(v)if type(v)~='table'then return v end;local t={};for k,x in pairs(v)do t[k]=clone(x)end;return t end
 function S.new(data,passes)
  local self=setmetatable({Data=data,Passes=passes,Busy={},Working={},Store=DS:GetDataStore('ChestChase_PassInbox_v1'..(game:GetService('RunService'):IsStudio()and'_Studio'or''))},S)
- task.spawn(function()while task.wait(15)do for _,p in ipairs(Players:GetPlayers())do task.spawn(function()self:Recover(p)end)end end end)
+ task.spawn(function()while task.wait(60)do for _,p in ipairs(Players:GetPlayers())do task.spawn(function()self:Recover(p)end)end end end)
  return self
 end
 function S:Owns(p,key)
