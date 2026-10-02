@@ -203,10 +203,10 @@ chase.Drops[99]={Position=V3(40,0,700)}
 moveTo(B,42,3,700);ok,why=dig(B);check(not ok and why=='Pack','not on a dropped pack')
 chase.Drops[99]=nil
 moveTo(B,40,3,700);ok,why=dig(B);check(ok,'same spot ok once the drop is gone')
--- R123: The Dark's Void Pack slots and its home (Event81) block holes too.
+-- R123: The Darkened's Void Pack slots and its home (Event81) block holes too.
 chase.Event81={Home=CF(-40,5,800),Slots={{PackHome=V3(-40,5,760)},{PackHome=V3(-20,5,760),Stolen=true}},Active=function()return true end}
 moveTo(B,-41,3,760);ok,why=dig(B);check(not ok and why=='Pack','not on a Void Pack slot')
-moveTo(B,-39,3,801);ok,why=dig(B);check(not ok and why=='Camp','not at The Dark\'s home')
+moveTo(B,-39,3,801);ok,why=dig(B);check(not ok and why=='Camp','not at The Darkened\'s home')
 moveTo(B,-20,3,760);ok,why=dig(B);check(ok,'a stolen Void Pack slot no longer blocks')
 chase.Event81=nil
 clearAll()
@@ -386,7 +386,7 @@ ok,msg=X.Execute(ctx,O,'fling',{'storm'});check(not ok,'no second ragdoll while 
 chase.Ragdoll:Clear(O);step(2)
 ok,msg=X.Execute(ctx,O,'fling',{'storm'});check(ok and chase.Ragdoll:IsActive(O)and msg:find('182 up',1,true),'fling storm uses the Storm keeper launch: '..tostring(msg))
 chase.Ragdoll:Clear(O);step(2)
-ok,msg=X.Execute(ctx,O,'fling',{'dark'});check(ok and msg:find('The Dark',1,true)and msg:find('200 up',1,true),'fling dark uses The Dark launch: '..tostring(msg))
+ok,msg=X.Execute(ctx,O,'fling',{'darkened'});check(ok and msg:find('The Darkened',1,true)and msg:find('200 up',1,true),'fling dark uses The Darkened launch: '..tostring(msg))
 chase.Ragdoll:Clear(O);step(2)
 ok,msg=X.Execute(ctx,O,'fling',{'mars'});check(not ok,'unknown fling biome refused')
 ok,msg=X.Execute(ctx,O,'ragdoll',{'60'});check(not ok,'ragdoll over 10 s refused')

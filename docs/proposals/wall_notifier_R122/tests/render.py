@@ -72,7 +72,7 @@ def card(new,hint='AT STORM PEAKS'):
     if not new:
         layer=Image.new('RGB',(W,H),(26,17,42));bg.paste(layer,(ox,oy),rounded((W,H),7*K,int(255*.82)))
         d=ImageDraw.Draw(bg)
-        d.text((ox+W/2,oy+11*K),'THE DARK',font=F(15*K),fill=(229,205,255),anchor='mm',stroke_width=K,stroke_fill=(8,13,24))
+        d.text((ox+W/2,oy+11*K),'THE DARKENED',font=F(15*K),fill=(229,205,255),anchor='mm',stroke_width=K,stroke_fill=(8,13,24))
         d.text((ox+W/2,oy+28*K),hint,font=F(10*K),fill=(201,190,225),anchor='mm',stroke_width=K,stroke_fill=(8,13,24))
         return bg
     grad=Image.new('RGB',(W,H))
@@ -92,7 +92,7 @@ def card(new,hint='AT STORM PEAKS'):
     ic=icon('WeatherThunderstorm',scale=3,bg=(40,22,70)).convert('RGB').resize((bs-2*K-6,bs-2*K-6),Image.LANCZOS)
     bg.paste(ic,(bx+K+3,by+K+3),rounded(ic.size,ic.size[0]//2,255))
     cx=ox+40*K+(W-46*K)/2
-    d.text((cx,oy+11.5*K),'THE DARK',font=F(13*K),fill=(236,216,255),anchor='mm',stroke_width=K,stroke_fill=(8,13,24))
+    d.text((cx,oy+11.5*K),'THE DARKENED',font=F(13*K),fill=(236,216,255),anchor='mm',stroke_width=K,stroke_fill=(8,13,24))
     d.text((cx,oy+28*K),hint,font=F(10*K),fill=(208,196,234),anchor='mm',stroke_width=K,stroke_fill=(8,13,24))
     return bg
 cs=[card(False),card(True),card(True,'CHASING YOU')]

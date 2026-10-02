@@ -153,16 +153,16 @@ function X.Execute(ctx,p,action,a)
  end
  -- R123 tools: keeper fling / ragdoll previews, track holes, gift recovery and admin access.
  if action=='fling'then
-  if #a>1 then return false,'Use fling <biome|dark> [@username].'end
-  local which=(a[1]or'storm'):lower();local dark=which=='dark'or which=='event'
-  local st=not dark and stage(which);if not dark and(not st or st==8)then return false,'Use fling forest…storm or fling dark.'end
+  if #a>1 then return false,'Use fling <biome|darkened> [@username].'end
+  local which=(a[1]or'storm'):lower();local dark=which=='dark'or which=='darkened'or which=='event'
+  local st=not dark and stage(which);if not dark and(not st or st==8)then return false,'Use fling forest…storm or fling darkened.'end
   local c=p.Character;local root=c and c:FindFirstChild('HumanoidRootPart');if not root then return false,'Wait for the target’s character.'end
   local K=require(RS.KnockbackConfig);local h,v
   if dark then h,v=K.SpecialKeeper.Horizontal,K.SpecialKeeper.Vertical
   else local settings=ctx.Chase:_getGuardianSettings(st);h,v=settings.FlingHorizontal,settings.FlingVertical end
   local back=-root.CFrame.LookVector;back=Vector3.new(back.X,0,back.Z);back=back.Magnitude>.01 and back.Unit or Vector3.new(0,0,-1)
   if not ctx.Chase.Ragdoll:Apply(p,back*h+Vector3.new(0,v,0),'Keeper')then return false,'Target can’t be flung right now (already ragdolled or no character).'end
-  return true,'Flung like the '..(dark and'The Dark'or ctx.Config.BiomeNames[st])..' keeper: '..h..' sideways / '..v..' up. Nothing dropped.'
+  return true,'Flung like the '..(dark and'The Darkened'or ctx.Config.BiomeNames[st])..' keeper: '..h..' sideways / '..v..' up. Nothing dropped.'
  elseif action=='ragdoll'then
   local seconds=tonumber(a[1]or'4');if #a>1 or not seconds or seconds~=seconds or seconds<.5 or seconds>10 then return false,'Use ragdoll [0.5–10 seconds] [@username].'end
   if not ctx.Chase.Ragdoll:Apply(p,Vector3.new(0,12,0),'Hole',seconds)then return false,'Target can’t be ragdolled right now.'end

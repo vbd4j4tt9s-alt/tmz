@@ -104,7 +104,7 @@ function S:_campHomes()
   if ok and typeof(frame)=='CFrame'then homes[#homes+1]=frame.Position end
  end
  for _,frame in pairs(chase.GuardianHomeCFrames or{})do if typeof(frame)=='CFrame'then homes[#homes+1]=frame.Position end end
- -- The Dark (Event81) sits at its own home, not in GuardianHomeCFrames.
+ -- The Darkened (Event81) sits at its own home, not in GuardianHomeCFrames.
  local event=chase.Event81
  if event and event.Home and(event.Active==nil or event:Active())then homes[#homes+1]=event.Home.Position end
  return homes

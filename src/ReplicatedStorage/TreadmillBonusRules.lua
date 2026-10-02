@@ -107,26 +107,44 @@ function B.NewSpin(opts)
  function s:Skip()return self:Step(self.Duration)end
  return s
 end
--- Button placement: first spot that clears every HUD box (HudLayout.HudBoxes with the wheel open) by 6 px.
+-- Button placement: the first spot that clears every box (HudLayout.HudBoxes with the wheel open, plus any extra
+-- boxes such as the Biome/Run/Feedback notice rows) by 6 px; else a scan for the clear spot nearest the preferred one.
 local function overlaps(a,b,pad)return a.X<b.X+b.W+pad and a.X+a.W>b.X-pad and a.Y<b.Y+b.H+pad and a.Y+a.H>b.Y-pad end
-function B.Place(m,w,h,boxes)
+B.NoticeFlags={Biome=true,Run=true,Feedback=true}
+function B.Place(m,w,h,boxes,extra)
+ local all={};for _,b in ipairs(boxes)do all[#all+1]=b end;for _,b in ipairs(extra or{})do all[#all+1]=b end
  local bw,bh=m.Phone and 176 or 212,m.Phone and 46 or 52
  local detail=m.HotbarDetails~=false and 44 or 0
  local barTop=h-m.HotbarBottom-m.SlotSize-detail
  local hubY=h/2+(m.MenuShiftY or 0)-m.MenuSize/2
+ local function clear(r)
+  if r.X<8 or r.Y<8 or r.X+r.W>w-8 or r.Y+r.H>h-8 then return false end
+  for _,b in ipairs(all)do if overlaps(r,b,6)then return false end end
+  return true
+ end
+ local preferX,preferY=w/2+(m.HotbarShiftX or 0)-bw/2,barTop-10-bh
  local spots={
-  {w/2+(m.HotbarShiftX or 0)-bw/2,barTop-10-bh}, -- just above the hotbar, centred
+  {preferX,preferY}, -- just above the hotbar, centred
   {w-12-bw,h*.5-bh/2},{w-12-bw,h*.38-bh/2},{w-12-bw,h*.62-bh/2}, -- right edge
   {10,hubY+m.MenuSize+10},{10,hubY-10-bh}, -- under / over the menu hub
  }
- for _,scale in ipairs({1,.85})do
-  local sw,sh=math.floor(bw*scale),math.max(44,math.floor(bh*scale))
+ local sizes={{bw,bh},{math.floor(bw*.85),math.max(44,math.floor(bh*.9))},{140,44}}
+ for _,size in ipairs(sizes)do
+  local sw,sh=size[1],size[2]
   for _,s in ipairs(spots)do
    local r={X=math.floor(s[1]+(bw-sw)/2),Y=math.floor(s[2]+(bh-sh)/2),W=sw,H=sh}
-   local ok=r.X>=8 and r.Y>=8 and r.X+r.W<=w-8 and r.Y+r.H<=h-8
-   if ok then for _,b in ipairs(boxes)do if overlaps(r,b,6)then ok=false;break end end end
-   if ok then return r end
+   if clear(r)then return r end
   end
+ end
+ -- Scan (8 px grid) for the clear spot closest to the preferred one, largest size first.
+ for _,size in ipairs(sizes)do
+  local best,bestD
+  for y=8,h-8-size[2],8 do for x=8,w-8-size[1],8 do
+   local r={X=x,Y=y,W=size[1],H=size[2]}
+   local d=(x-preferX)^2+(y-preferY)^2
+   if(not bestD or d<bestD)and clear(r)then best,bestD=r,d end
+  end end
+  if best then return best end
  end
  return {X=math.floor(w/2-bw/2),Y=math.floor(h*.3),W=bw,H=bh}
 end
