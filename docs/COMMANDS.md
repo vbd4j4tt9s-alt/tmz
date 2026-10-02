@@ -1,4 +1,4 @@
-# Test commands and tools (R126)
+# Test commands and tools (R127)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -73,7 +73,7 @@
 | `pity 30`, `spawnodds`, `routes` | Look at guarantees, spawn chances and keeper speeds |
 | `fling storm @name` | Fling them like that biome's keeper (forest … storm, or `darkened`). Tests the air time; nothing drops |
 | `ragdoll 4 @name` | Knock them down for 0.5–10 s |
-| `weather thunder` (server) | `clear`, `rain`, `thunder` or `blizzard` |
+| `weather thunder` (server) | `clear`, `rain`, `thunder` or `blizzard`. Add `all` (e.g. `weather rain all`) to make every exposed pack, plant and fruit change: tests the R127 highlights |
 | `event spawn` / `event clear` (server) | Spawn or remove The Darkened and its 2 Void Packs |
 | `event status` (server) | Packs left, unstolen refreshes (the packs reroll after 3) |
 | `event go @name` | Teleport next to a Void Pack |
@@ -165,3 +165,7 @@ listed separately any more because each one is the same as a command above.
 11. **R126:**
    - `bonus ready 2 @me`, roll, and check the bag: pack sizes vary (mostly 1x).
    - Buy Mech packs with Gems: each pack has its own size, and a bigger pack opens a bigger seed.
+12. **R127:**
+   - `weather blizzard all` near your garden: packs glow, your plant gets a rainbow outline + label, the message names it.
+   - `event spawn`: the lights flicker out, far things go black, a glow around you, lights back after ~10 s.
+   - Hotbar and Bag are bigger; `spawnodds` shows Legendary 3% / Mythic 1%.
