@@ -128,7 +128,7 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 
 | Item | Latest desired behavior | Starting status | Acceptance / next evidence |
 |---|---|---|---|
-| Install R123 correctly | Server boots on V150 R123 with no `GiftProducts`/`SpeedBoost`/`KeeperSignatureStrike` errors | UNKNOWN / VERIFY | Owner pastes the rebuilt installer once (Section 8) and sends Output plus the `check_R123.lua` lines |
+| Install R123 correctly | Server boots on V150 R123 with no `GiftProducts`/`SpeedBoost`/`KeeperSignatureStrike` errors | UNKNOWN / VERIFY | Full paste was truncated (Section 8). Owner runs the one-line redo from the existing backup and sends Output plus the `check_R123.lua` lines |
 | Bonus roll odds | Owner wording: "same rarities as the already existing percentages for seeds regarding the packs it just common to mythic". Earlier: "mythic ≈0.5% and legendary 2". Implemented interpretation: track spawn weights 38/25/15/7/10/5 | UNKNOWN / VERIFY | Owner confirms 10% / 5% or 2% / 0.5%; it's a one-line change in `TreadmillBonusRules` |
 | Keeper re-look | Refine the dragon, snow tiger, snake and gorilla. Show before/after first | PROPOSED | Owner yes/no/changes per keeper. The "before" renders are reconstructions; compare with Studio. Dragon is 127 parts (a ~100-part option exists) |
 | Bonus progress bar placement | Owner asked for a bar "above the treadmill". Implemented: a billboard above the player's head while on the treadmill | UNKNOWN / VERIFY | Owner accepts, or wants it on the treadmill model |
@@ -154,9 +154,10 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 
 - **Install chain.** R110 … R121 are sequential, each requiring the previous one. R122 was never released separately. **R123 requires R121** (base commit `9b13846`). It refuses if any patched script differs from R121 bytes.
 - **Owner fix sequence** (Edit mode, Play stopped), for the place as uploaded:
-  1. Paste the rebuilt `R123_install.lua`. No undo or delete first: it re-uses the same-build backup already there. Expect `[R123] Installed.`
+  1. Run `require(game.ServerStorage.ChestChase_R123_Backup.Installer)("install")`. The backup there is this exact build (Installer hash `3558ed99…`, 71 After sources = `src/`). The engine re-checks every hash itself. Expect `[R123] Installed.`
   2. Save, then start a new Play session.
-  3. Fallback if it still says "older": delete `ServerStorage.ChestChase_R123_Backup` (already Undone) and paste again.
+  3. Do NOT use the full paste for this. The owner's paste of the 324,915-byte `R123_install.lua` was cut after line 99 (~324,046 chars), giving `CommandBar:100: Expected 'end' (to close 'do' at line 77), got <eof>`. That is reproduced offline by truncating at 324,046 bytes. Nothing ran.
+  4. If the backup is ever lost: build a split (2-part) R123 paste. Not built yet.
 - **Scripts removed from source:** `GiftProducts`, `SpeedBoost`, `ProductGiftService`, `ProductGiftState`.
   - The owner deleted all four (confirmed in the uploaded place).
   - The installer never touches deleted scripts. Leftovers are unused and safe to delete.
@@ -168,7 +169,7 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
   - Command: `python3 tools/build_installer.py R124 ChestChase_R124_Backup installers/R124_install.lua --base <R123 source commit>`, from a clean `git worktree` at HEAD.
   - Test with `tools/installer_testdata.py` + `tools/tests/test_installer.luau`.
   - Builds take ~3–5 min (large Config).
-- **Size.** About 324 KB. If the Command Bar truncates the paste, it refuses with "damaged while copying"; split into two releases.
+- **Size.** The owner's paste path truncates at ~324,000 characters. A 323,944-byte paste got through; a 324,915-byte one was cut after line 99 and failed to parse (not "damaged while copying": truncation before the end is a syntax error, and nothing runs). Keep every paste under ~300 KB; split anything larger.
 
 ## 9. Regression Guardrails
 
