@@ -1,41 +1,48 @@
--- R122: Veiled One arrival - one sound for every player plus a one-second "lights out".
--- The darkness is a local ScreenGui drawn BELOW the HUD (DisplayOrder < 0): the 3D world goes dark
--- except a soft circle of visibility around the local character. Lighting is never modified, so
--- nothing has to be restored and nothing can be left dark (respawn, interruption, a second arrival,
--- or a script reload simply destroy the overlay). Reduced Motion: softer, slower fade, no hard snap.
--- Triggered by the server remote with its server timestamp; stale or replayed arrivals are ignored.
+-- R122: Veiled One arrival - one sound for every player plus a "lights out".
+-- R127 (owner): the lights-out is a real view-distance cut, like someone switching the lights off. The lights flicker
+-- out, then the air goes black a short way from the camera: nearby things stay visible, everything further away is
+-- black. A soft lantern glow (local only) lights the ground right around your own character. After a few seconds
+-- the lights come back. The world is darkened only through EnvironmentLighting.SetBlackout (the one biome palette
+-- blend), which writes the normal palette back exactly at level 0, on Stop, on teardown and on respawn.
+-- Reduced Motion: no flicker, a slower and slightly lighter fade. Triggered by the server remote with its server
+-- timestamp; replays are ignored, and a late delivery joins the darkness part-way instead of restarting it.
 local Players=game:GetService('Players')
 local Run=game:GetService('RunService')
 local Gui=game:GetService('GuiService')
 local F={}
 F.SoundId='rbxassetid://113339179211972'
 F.Volume=.8
-F.Duration=1           -- seconds of lights-out
-F.MaxAge=1.5           -- ignore an arrival older than this (late joiners / delayed delivery)
-F.BubbleStuds=7        -- visibility radius around the character
-F.Darkest=.04          -- overlay GroupTransparency at full dark (normal)
-F.DarkestReduced=.35   -- gentler darkness under Reduced Motion
+F.Flicker=.45          -- seconds the lights stutter before going out
+F.Hold=7               -- seconds fully dark
+F.Return=2.5           -- seconds for the lights to come back
+F.Duration=F.Flicker+F.Hold+F.Return
+F.MaxAge=F.Flicker+F.Hold  -- a delivery later than this is ignored (the darkness is nearly over)
+F.SoundMaxAge=1.5      -- the arrival sound only plays for a fresh delivery
+F.ReducedLevel=.85     -- Reduced Motion: slightly lighter darkness
+F.LanternRange=22      -- studs of soft light around the local character
+F.LanternBrightness=1.6
+F.LanternColor=Color3.fromRGB(255,214,170)
+-- Flicker pattern (time share of F.Flicker, level): off, half back on, off, flutter, off.
+F.FlickerKeys={{0,0},{.16,1},{.29,.35},{.49,1},{.64,.55},{.8,1},{1,1}}
 local played={}        -- serial -> true (one sound / one darkness per arrival)
-local current           -- active overlay handle
+local current          -- active handle
 local sound
--- Overlay transparency at time t (0..Duration). 1 = invisible.
-function F.Darkness(t,reduced)
- local d=F.Duration
- if t<0 or t>=d then return 1 end
- local dark=reduced and F.DarkestReduced or F.Darkest
- local rise=reduced and .3 or .1;local fall=reduced and .4 or .3
- local k
- if t<rise then k=t/rise elseif t>d-fall then k=(d-t)/fall else k=1 end
- k=k*k*(3-2*k) -- smoothstep: no hard flash
- return 1-(1-dark)*k
-end
--- Screen radius (px) of a world-space sphere; clamped for tiny / huge screens.
-function F.HoleRadius(camera,worldPos,studs)
- local cf=camera.CFrame;local depth=(worldPos-cf.Position):Dot(cf.LookVector)
- local vp=camera.ViewportSize;local short=math.min(vp.X,vp.Y)
- if depth<=.5 then return short*.45 end
- local px=studs/(depth*math.tan(math.rad(camera.FieldOfView)/2))*vp.Y/2
- return math.clamp(px,48,short*.45)
+local function env()return require(script.Parent.EnvironmentLighting)end
+local function smooth(k)k=math.clamp(k,0,1);return k*k*(3-2*k)end
+-- Darkness level 0..1 at time t since the arrival.
+function F.Level(t,reduced)
+ if type(t)~='number'or t<0 or t>=F.Duration then return 0 end
+ local top=reduced and F.ReducedLevel or 1
+ if t<F.Flicker then
+  if reduced then return top*smooth(t/F.Flicker)end
+  local u=t/F.Flicker;local keys=F.FlickerKeys
+  for i=2,#keys do local a,b=keys[i-1],keys[i]
+   if u<=b[1]then return a[2]+(b[2]-a[2])*(u-a[1])/math.max(1e-6,b[1]-a[1])end
+  end
+  return 1
+ end
+ if t<F.Flicker+F.Hold then return top end
+ return top*smooth((F.Duration-t)/F.Return)
 end
 function F.Preload()
  if sound then return sound end
@@ -50,86 +57,57 @@ function F.PlaySound()
  s:Stop();require(script.Parent.SoundTiming).Play(s)
  return s
 end
-local function frame(parent,name)
- local f=Instance.new('Frame');f.Name=name;f.BorderSizePixel=0;f.BackgroundColor3=Color3.new(0,0,0);f.BackgroundTransparency=0;f.Parent=parent;return f
-end
--- Stop and remove the overlay immediately (safe to call any time).
+-- Stop at once and give the lights back (safe to call any time).
 function F.Stop()
  local h=current;current=nil
  if h then
   if h.Connection then h.Connection:Disconnect()end
-  if h.Gui then h.Gui:Destroy()end
+  if h.Lantern then h.Lantern:Destroy()end
  end
+ if h or env().Level>0 then env().SetBlackout(0)end
 end
 function F.Active()return current~=nil end
--- Lights-out overlay. `clock` defaults to os.clock (tests pass their own).
-function F.LightsOut(clock)
+-- The lantern lives on the local character's root (a client-made light other players never see).
+local function lantern(h,level)
+ local player=Players.LocalPlayer;local character=player and player.Character
+ local root=character and(character:FindFirstChild('HumanoidRootPart')or character:FindFirstChild('Head'))
+ if h.Lantern and(not root or h.Lantern.Parent~=root)then h.Lantern:Destroy();h.Lantern=nil end
+ if not root then return end
+ if not h.Lantern then
+  local light=Instance.new('PointLight');light.Name='VeiledLantern';light.Range=F.LanternRange;light.Color=F.LanternColor
+  light.Shadows=false;light.Brightness=0;light.Parent=root;h.Lantern=light
+ end
+ h.Lantern.Brightness=F.LanternBrightness*level
+end
+-- Start the darkness. `clock` defaults to os.clock (tests pass their own); `offset` skips ahead (late delivery).
+function F.LightsOut(clock,offset)
  F.Stop()
- local player=Players.LocalPlayer;local pg=player and player:FindFirstChildOfClass('PlayerGui')
- if not pg then return nil end
  clock=clock or os.clock
- local reduced=Gui.ReducedMotionEnabled==true
- local screen=Instance.new('ScreenGui');screen.Name='VeiledLightsOut';screen.ResetOnSpawn=false;screen.IgnoreGuiInset=true
- screen.DisplayOrder=-20;screen.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
- -- One CanvasGroup fades everything uniformly, so overlapping dark pieces never band.
- local group=Instance.new('CanvasGroup');group.Name='Darkness';group.BackgroundTransparency=1;group.Size=UDim2.fromScale(1,1);group.GroupTransparency=1;group.Parent=screen
- local top,bottom,left,right=frame(group,'Top'),frame(group,'Bottom'),frame(group,'Left'),frame(group,'Right')
- -- Round edge of the visibility bubble: an opaque thick ring plus three soft inner rings.
- local rings={}
- for i,alpha in ipairs({0,.45,.7,.88})do
-  local ring=Instance.new('Frame');ring.Name='BubbleEdge'..i;ring.BackgroundTransparency=1;ring.AnchorPoint=Vector2.new(.5,.5);ring.Parent=group
-  local corner=Instance.new('UICorner');corner.CornerRadius=UDim.new(.5,0);corner.Parent=ring
-  local stroke=Instance.new('UIStroke');stroke.Color=Color3.new(0,0,0);stroke.Transparency=alpha;stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border;stroke.Parent=ring
-  rings[i]={Frame=ring,Stroke=stroke}
- end
- screen.Parent=pg
- local h={Gui=screen,Group=group,Started=clock(),Reduced=reduced}
+ local h={Started=clock()-math.max(0,tonumber(offset)or 0),Reduced=Gui.ReducedMotionEnabled==true}
  current=h
- local function layout()
-  local camera=workspace.CurrentCamera;if not camera then return end
-  local vp=camera.ViewportSize
-  local character=player.Character;local root=character and(character:FindFirstChild('Head')or character:FindFirstChild('HumanoidRootPart'))
-  local cx,cy,r=vp.X/2,vp.Y/2,0
-  if root then
-   local point,onScreen=camera:WorldToViewportPoint(root.Position)
-   if onScreen then cx,cy=point.X,point.Y;r=F.HoleRadius(camera,root.Position,F.BubbleStuds)end
-  end
-  local soft=math.max(6,r*.08)
-  local outer=r+r*.5 -- ring of width .5r covers the corners of the square hole
-  local half=r>0 and outer/math.sqrt(2)-1 or 0
-  top.Position=UDim2.fromOffset(0,0);top.Size=UDim2.new(1,0,0,math.max(0,cy-half))
-  bottom.Position=UDim2.fromOffset(0,cy+half);bottom.Size=UDim2.new(1,0,0,math.max(0,vp.Y-cy-half))
-  left.Position=UDim2.fromOffset(0,cy-half);left.Size=UDim2.fromOffset(math.max(0,cx-half),half*2)
-  right.Position=UDim2.fromOffset(cx+half,cy-half);right.Size=UDim2.fromOffset(math.max(0,vp.X-cx-half),half*2)
-  for i,ring in ipairs(rings)do
-   local inner=i==1 and r or r-soft*(i-1)
-   ring.Frame.Visible=r>0 and inner>0
-   ring.Frame.Position=UDim2.fromOffset(cx,cy);ring.Frame.Size=UDim2.fromOffset(inner*2,inner*2)
-   ring.Stroke.Thickness=i==1 and r*.5+2 or soft
-  end
- end
  local function step()
   if current~=h then return end
   local t=clock()-h.Started
   if t>=F.Duration then F.Stop();return end
-  group.GroupTransparency=F.Darkness(t,reduced)
-  layout()
+  local level=F.Level(t,h.Reduced)
+  env().SetBlackout(level);lantern(h,level)
  end
  h.Step=step
  h.Connection=Run.RenderStepped:Connect(step)
  step()
- -- Safety net: even if rendering stops, the overlay is gone shortly after one second.
- task.delay(F.Duration+.25,function()if current==h then F.Stop()end end)
+ -- Safety net: even if rendering stops, the lights come back shortly after the effect ends.
+ task.delay(F.Duration+.25-math.max(0,tonumber(offset)or 0),function()if current==h then F.Stop()end end)
  return h
 end
--- Remote handler: (cycle, serial, serverAt). Returns true when the arrival effects started.
+-- Remote handler: (serial, serverAt). Returns true when the arrival effects started.
 function F.Arrive(serial,at,now)
  if type(serial)~='number'or type(at)~='number'or played[serial]then return false end
  now=now or workspace:GetServerTimeNow()
- if math.abs(now-at)>F.MaxAge then return false end -- stale: late joiner or delayed delivery
+ local age=now-at
+ if age<-2 or age>F.MaxAge then return false end -- stale: late joiner or very delayed delivery
  played[serial]=true
- F.PlaySound()
- F.LightsOut()
+ if age<=F.SoundMaxAge then F.PlaySound()end
+ F.LightsOut(nil,math.max(0,age))
  return true
 end
 function F._Reset()played={};F.Stop()end

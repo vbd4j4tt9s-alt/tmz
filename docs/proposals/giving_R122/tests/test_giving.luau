@@ -324,7 +324,7 @@ for _,id in ipairs({pack.Id,seed.Id,mech.Id})do local r=find(B,id);sameTraits(r 
 -- R126 (owner): bought Mech packs roll a pack size like world packs; the seed inside follows it (1x stays scale 1).
 do
  local PackRules=W.module('SeedPackRules');local want={};for _,row in ipairs(PackRules.PackSizes)do want[row.Scale]=row.Weight/100 end
- local n,count,bad=3000,{},0
+ local n,count,bad=6000,{},0
  for _=1,n do
   local rec=Data:GrantMechPack(C,true)
   if not(rec and rec.BagVariant=='MechLimited'and want[rec.PackSize]and rec.SeedScale==PackRules.NewSeedScale(8,'MechLimited',rec.PackSize))then bad+=1 end
@@ -333,7 +333,7 @@ do
  check(bad==0,'R126: every Mech pack gets a world-table size and matching seed scale ('..bad..' bad)')
  local big=0;for s,c in pairs(count)do if s>1 then big+=c end end
  local share=(count[1]or 0)/n
- check(math.abs(share-want[1])<4*math.sqrt(want[1]*(1-want[1])/n),string.format('R126: ~80.8%% of Mech packs are 1x (got %.1f%%)',share*100))
+ check(math.abs(share-want[1])<5*math.sqrt(want[1]*(1-want[1])/n),string.format('R126: ~%.1f%% of Mech packs are 1x (got %.1f%%)',want[1]*100,share*100))
  check(big>0 and(count[.5]or 0)>0,'R126: Mech sizes vary both ways ('..big..' bigger, '..tostring(count[.5])..' half-size)')
  check(PackRules.NewSeedScale(8,'MechLimited',1)==1 and PackRules.NewSeedScale(8,'MechLimited',2.5)==2.5 and PackRules.NewSeedScale(8,'MechLimited',.5)==.5,'R126: Mech seed scale 1x=1, 2.5x=2.5, 0.5x=0.5')
  local five=Data:GrantMechPacks(C,true,5)

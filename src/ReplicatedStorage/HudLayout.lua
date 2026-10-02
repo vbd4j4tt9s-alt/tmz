@@ -46,7 +46,7 @@ local function travel(m,w,h)
  return nil
 end
 local function phoneLayout(w,h,controls)
- local portrait=h>w;local side=56;local gap=6
+ local portrait=h>w;local side=64;local gap=6 -- R127 (owner): bigger hotbar slots (was 56); still shrinks to keep five slots
  local menuSize=(portrait and h<520 or not portrait and h<280)and 52 or 64
  local thumbWidth=math.min(160,math.max(120,math.floor(w*.32)))
  local thumbHeight=math.min(160,math.max(120,math.floor(h*.32)))
@@ -61,7 +61,7 @@ local function phoneLayout(w,h,controls)
   end
  end
  local lane=right.X-left.W-16
- -- R110: largest slot (56 down to 44) that still keeps five slots on screen.
+ -- R110: largest slot (64 down to 44 since R127) that still keeps five slots on screen.
  while side>44 and math.floor(((portrait and w-16 or lane)+gap)/(side+gap))-1<5 do side-=2 end
  local slots=math.clamp(math.floor(((portrait and w-16 or lane)+gap)/(side+gap))-1,1,5)
  local hotbarBottom=portrait and math.max(left.H,right.H)+8 or 12
@@ -111,7 +111,8 @@ function L.Read(view,touch,controls)
  if touch then return phoneLayout(w,h,controls)end
  local short=h<480;local compact=w<1050 or(touch and h<650)
  local slots=compact and 5 or 10
- local side=math.min(touch and(compact and 44 or 48)or(compact and 60 or 66),math.floor((w-32-slots*6)/(slots+1)))
+ -- R127 (owner): bigger hotbar slots on computers: 82 px (was 66), 72 px on narrow windows (was 60).
+ local side=math.min(touch and(compact and 44 or 48)or(compact and 72 or 82),math.floor((w-32-slots*6)/(slots+1)))
  if h<300 then side=math.min(side,math.floor(h*.18))end
  local hotbarBottom=touch and w<500 and h>w and math.min(100,math.floor(h*.16))or(h<240 and 8 or 12)
  local nav=short and math.min(48,math.max(28,math.floor(h*.18)))or compact and 48 or 58

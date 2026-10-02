@@ -8,7 +8,9 @@ B.KeeperOrder={1,6,2,3,4,5,7}
 B.KeeperFloors={};B.KeeperCeilings={}
 for stage,row in pairs(tuning.KeeperSpeeds)do B.KeeperFloors[stage]=row[1];B.KeeperCeilings[stage]=row[3]end
 B.RarityWeights={Common=55,Uncommon=28,Rare=12,Legendary=3.8,Mythic=1,Secret=.16,Cosmic=.035,King=.005}
-B.PackSizes={{Scale=.5,Weight=3},{Scale=1,Weight=80.799},{Scale=1.5,Weight=13},{Scale=2.5,Weight=2.8},{Scale=3.5,Weight=.35},{Scale=5,Weight=.04},{Scale=7.5,Weight=.008},{Scale=10,Weight=.002},{Scale=15,Weight=.0007},{Scale=20,Weight=.0002},{Scale=25,Weight=.0001}}
+-- R127 (owner): giant packs are more common. Was .5:3 1:80.799 1.5:13 2.5:2.8 3.5:.35 5:.04 7.5:.008 10:.002 15:.0007 20:.0002 25:.0001
+-- (5x+ 0.051%, 10x+ 0.003%); now 5x+ 0.6% (~12x), 10x+ 0.05% (~17x), 25x 0.001% (10x). Used by world packs, Mech packs and bonus rolls.
+B.PackSizes={{Scale=.5,Weight=3},{Scale=1,Weight=76.5},{Scale=1.5,Weight=14},{Scale=2.5,Weight=4.5},{Scale=3.5,Weight=1.4},{Scale=5,Weight=.45},{Scale=7.5,Weight=.1},{Scale=10,Weight=.035},{Scale=15,Weight=.01},{Scale=20,Weight=.004},{Scale=25,Weight=.001}}
 B.MutationWeights={None=95,Gold=4.5,Diamond=.5}
 B.MutationInheritance=.20;B.WeatherInheritance=.20
 B.WeatherPackChance=.02;B.WeatherFruitChance=.02;B.WeatherPlantChance=.02

@@ -1,6 +1,15 @@
 -- R73: a single local palette. Borrow and restore authored effects; never clear Lighting.
 local Mood=require(script.Parent.BiomeMood)
 local E={};E.__index=E;local active
+-- R127: lights-out level 0..1 (VeiledArrivalFx, The Darkened's arrival). While it is above 0 the palette is blended
+-- toward BiomeMood.Dark and written at once every step (the level itself is the animation); the step where it
+-- returns to 0 writes the plain biome palette back exactly.
+E.Level=0
+function E.Active()return active end
+function E.SetBlackout(k)
+ E.Level=math.clamp(tonumber(k)or 0,0,1)
+ local a=active;if a and not a.Dead and a.Last then a:Step(a.Last[1],a.Last[2],a.Last[3],a.Last[4],0)end
+end
 function E.new(lighting)
  if active then active:Destroy()end
  local self=setmetatable({Lighting=lighting,Saved={},Created={},Detached={},Dead=false,Settled=false},E);active=self
@@ -38,10 +47,14 @@ local function close(a,b)
 end
 function E:Step(stage,weather,low,refresh,dt)
  if self.Dead then return end
+ local last=self.Last or{};last[1],last[2],last[3],last[4]=stage,weather,low,refresh;self.Last=last
+ local level=E.Level or 0;local dark=level>0 or self.Dark==true
  local key=tostring(stage)..':'..tostring(weather)..':'..tostring(low)..':'..tostring(refresh)
- if key~=self.Key then self.Key=key;self.Target=Mood.Palette(stage,weather,low,refresh);self.Settled=false end
+ if dark then self.Key=nil;self.Target=Mood.Blackout(Mood.Palette(stage,weather,low,refresh),level);self.Settled=false
+ elseif key~=self.Key then self.Key=key;self.Target=Mood.Palette(stage,weather,low,refresh);self.Settled=false end
+ self.Dark=level>0
  if self.Settled then return end
- local alpha=1-math.exp(-math.min(dt,.2)*2.8);local done=true
+ local alpha=dark and 1 or 1-math.exp(-math.min(dt,.2)*2.8);local done=true
  local function apply(object,values)
   for name,target in pairs(values)do
    local current=object[name]

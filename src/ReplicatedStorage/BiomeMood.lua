@@ -82,4 +82,20 @@ function M.SoundTargets(stage,weather,refresh,chase,alive)
  if chase then for key,value in pairs(t)do t[key]=value*.12 end end
  return t
 end
+-- R127 (owner): The Darkened's arrival turns the lights off. The air goes black a short way from the camera, so only
+-- nearby things can be seen and everything further away is black; no sun, dim ambient, drained colour.
+-- Blackout(palette,k) blends any biome palette toward it (k 0..1); k=0 returns the palette untouched.
+M.Dark={Light={Brightness=0,ExposureCompensation=-.35,Ambient=C(12,10,20),OutdoorAmbient=C(16,14,26),ColorShift_Top=C(0,0,0),ColorShift_Bottom=C(0,0,0)},
+ Air={Color=C(0,0,0),Decay=C(0,0,0),Density=.7,Offset=0,Haze=0,Glare=0},
+ Grade={TintColor=C(214,206,240),Brightness=-.04,Contrast=.1,Saturation=-.3}}
+function M.Blackout(out,k)
+ k=math.clamp(tonumber(k)or 0,0,1);if k<=0 then return out end
+ local function mix(dst,src)
+  if type(dst)~='table'then return end
+  for name,v in pairs(src)do local a=dst[name];if a~=nil then dst[name]=typeof(v)=='Color3'and a:Lerp(v,k)or a+(v-a)*k end end
+ end
+ mix(out.Light,M.Dark.Light);mix(out.Air,M.Dark.Air);mix(out.Grade,M.Dark.Grade)
+ out.Bloom=(out.Bloom or 0)*(1-k);out.Sun=(out.Sun or 0)*(1-k)
+ return out
+end
 return M

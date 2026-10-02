@@ -52,7 +52,7 @@ local selectedFit=Instance.new('UITextSizeConstraint');selectedFit.MinTextSize=1
 local selectedTraits=label(dock,'SelectedTraits',UDim2.new(1,0,0,16),UDim2.fromOffset(0,-18),'',11);selectedTraits.TextColor3=C.Muted
 local open=button(dock,'OpenInventory','Bag',UDim2.fromOffset(56,56),UDim2.new(1,-56,0,0))
 local panel=Instance.new('Frame');panel.Name='Inventory';panel.AnchorPoint=Vector2.new(.5,.5);panel.Position=UDim2.fromScale(.5,.49);panel.Size=UDim2.new(.86,0,.66,0);panel.BackgroundColor3=C.Panel;panel.BackgroundTransparency=.05;panel.Visible=false;panel.Parent=gui;corner(panel)
-local constraint=Instance.new('UISizeConstraint');constraint.MaxSize=Vector2.new(900,620);constraint.Parent=panel
+local constraint=Instance.new('UISizeConstraint');constraint.MaxSize=Vector2.new(1080,740);constraint.Parent=panel
 label(panel,'Title',UDim2.new(1,-65,0,40),UDim2.fromOffset(16,8),'Inventory',20).TextXAlignment=Enum.TextXAlignment.Left
 require(RS:WaitForChild('GardenMenuStyle')).Panel(panel,46)
 panel.BackgroundColor3=C.Sheet;panel.BackgroundTransparency=.1 -- R112: dark translucent green sheet.
@@ -158,7 +158,8 @@ renderRows=function()
   table.sort(matched,function(a,b)return a.Entry.Order<b.Entry.Order end);listDirty=false
   for name,b in pairs(filterButtons)do b.BackgroundColor3=name==category and C.TileOn or C.Tile;b:SetAttribute('Selected',name==category)end
  end
- local width=scroll.AbsoluteSize.X;local side=width<400 and 84 or width<640 and 92 or 104;side=math.max(64,math.min(side,scroll.AbsoluteSize.Y-8)) -- R113: short grids get smaller cards.
+ local width=scroll.AbsoluteSize.X;local side=width<400 and 96 or width<640 and 108 or 124; -- R127: bigger cards (were 84/92/104)
+ side=math.max(64,math.min(side,scroll.AbsoluteSize.Y-8)) -- R113: short grids get smaller cards.
  local cell=side+8;local cols=math.max(1,math.floor((math.max(1,width-12)+8)/cell))
  local canvas=math.ceil(#matched/cols)*cell+8
  local y=math.clamp(scroll.CanvasPosition.Y,0,math.max(0,canvas-scroll.AbsoluteSize.Y))
@@ -260,7 +261,7 @@ local function placeTabs(m,w,h)
   for _,b in ipairs(boxes)do if x<b.X+b.W+4 and x+bw>b.X-4 and y<b.Y+b.H+4 and y+bh>b.Y-4 then return false end end
   return true
  end
- local maxWidth,wanted=math.min(900,w*.86),math.min(620,h*.66)
+ local maxWidth,wanted=math.min(1080,w*.9),math.min(740,h*.74) -- R127 (owner): bigger Bag sheet (was 900 x 620, 86% x 66%)
  local function place(width)
   MenuStyle.Place(panel,pg,width,wanted)
   return panel.Size.X.Offset,panel.Size.Y.Offset,panel.Position.X.Offset,panel.Position.Y.Offset
@@ -288,13 +289,13 @@ local function placeTabs(m,w,h)
   end
  end
  for _,lift in ipairs({0,48})do -- raise the sheet only when nothing fits without it
-  if not best then for _,t in ipairs({72,64,56,48,44})do left(t,1,math.min(maxWidth,220),lift);left(t,2,math.min(maxWidth,220),lift)end end
+  if not best then for _,t in ipairs({84,72,64,56,48,44})do left(t,1,math.min(maxWidth,220),lift);left(t,2,math.min(maxWidth,220),lift)end end
  end
  if best then
   local _,_,cx,cy=place(best.Width);panel.Position=UDim2.fromOffset(cx+best.Shift,cy-best.Raise);return 'Left',best.T,best.Across,best.Dy
  end
  -- Row: the sheet moves down by one card; the row sits at its left edge, right edge or centre.
- for _,t in ipairs({56,48,44})do
+ for _,t in ipairs({64,56,48,44})do
   local sw,sh,cx,cy=place(maxWidth);local rowWidth=4*t+18;local top=cy-sh/2
   if sh-t-gap>=180 then
    for _,x in ipairs({0,sw-rowWidth,(sw-rowWidth)/2})do

@@ -56,7 +56,7 @@ return {
  {'/test routes','Biome lengths and keeper speeds.'},
  {'/test fling storm @username','Fling like a keeper (forest … storm, or darkened). Tests air time; nothing drops.'},
  {'/test ragdoll 4 @username','Ragdoll for 0.5–10 s, like falling in a hole.'},
- {'/test weather thunder','server: Weather clear, rain, thunder or blizzard.'},
+ {'/test weather thunder','server: Weather clear, rain, thunder or blizzard. Add all (rain all) to change every pack/plant/fruit.'},
  {'/test event spawn','server: Spawn The Darkened and its two Void Packs. event clear removes them.'},
  {'/test event status','server: The Darkened’s state, packs left and unstolen refreshes (reroll at 3).'},
  {'/test event go @username','Teleport next to a Void Pack.'},

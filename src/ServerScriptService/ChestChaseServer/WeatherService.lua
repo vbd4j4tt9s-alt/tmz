@@ -2,6 +2,8 @@
 local RS=game:GetService('ReplicatedStorage');local Players=game:GetService('Players');local Run=game:GetService('RunService')
 local W=require(RS.WeatherTraits);local Rules=require(RS.PlantRules);local Catalog=require(RS.PlantCatalog)
 local FX=require(RS.ItemEffectAnchor)
+-- R127: a pack that adopts weather glows for everyone; plant/fruit notices carry which plant changed (MutationGlow127).
+local Glow=require(RS.MutationGlow127);local CS=game:GetService('CollectionService')
 local Service={};Service.__index=Service
 local function eventKey(kind,cycle)
  local trait=W.Events[kind];if not trait then return nil end
@@ -11,21 +13,42 @@ function Service.new(data,chests)
  local remotes=RS:WaitForChild(chests.Config and chests.Config.RemoteFolderName or 'ChestChaseRemotes')
  local notice=remotes:FindFirstChild('WeatherAdopted')or Instance.new('RemoteEvent')
  notice.Name='WeatherAdopted';notice.Parent=remotes
- return setmetatable({Data=data,Chests=chests,Notice=notice,PackSeen=setmetatable({},{__mode='k'}),FruitSeen=setmetatable({},{__mode='k'}),PendingPacks={},NoticeSerial=0,Cycle=nil,Kind='Clear',Clock=0},Service)
+ return setmetatable({Data=data,Chests=chests,Notice=notice,PackSeen=setmetatable({},{__mode='k'}),FruitSeen=setmetatable({},{__mode='k'}),PendingPacks={},Glows=setmetatable({},{__mode='k'}),NoticeSerial=0,Cycle=nil,Kind='Clear',Clock=0},Service)
 end
 function Service:State(now)
  if self.Override and now<self.Override.Until then return self.Override.Kind,self.Override.Cycle,self.Override.Until,self.Override.Until end
  return W.Schedule(now)
+end
+-- One Highlight per pack, on the pack art itself (SeedPacket / the carried bag), so a respawn or a drop removes it.
+function Service:GlowPack(owner,target,trait,seed)
+ if not target or not target.Parent then return nil end
+ local old=self.Glows[owner];if old and old.Highlight then old.Highlight:Destroy();self.Glows[owner]=nil end
+ -- Roblox draws at most 31 highlights per screen: packs keep to MaxPackGlows, leaving room for owner plant outlines.
+ local n=0;for _ in pairs(self.Glows)do n+=1 end;if n>=Glow.MaxPackGlows then return nil end
+ local h=Instance.new('Highlight');h.Name=Glow.Name;h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+ h.FillColor=Glow.Color(trait);h.OutlineColor=Color3.new(1,1,1);h.FillTransparency=.45;h.OutlineTransparency=0
+ h:SetAttribute('Trait',trait);h:SetAttribute('Until',workspace:GetServerTimeNow()+Glow.PackSeconds)
+ h.Adornee=target;h.Parent=target;CS:AddTag(h,Glow.Tag)
+ self.Glows[owner]={Highlight=h,Until=os.clock()+Glow.PackSeconds,Seed=seed,Generation=seed and seed.Generation}
+ return h
+end
+function Service:ExpireGlows()
+ local now=os.clock()
+ for owner,g in pairs(self.Glows)do
+  local gone=not g.Highlight.Parent or now>=g.Until
+  if g.Seed and(not g.Seed.Available or g.Seed.Generation~=g.Generation)then gone=true end
+  if gone then g.Highlight:Destroy();self.Glows[owner]=nil end
+ end
 end
 function Service:ApplyPack(seed,kind,cycle)
  local event,trait=eventKey(kind,cycle);if not event then return false end
  if not seed.Available or not seed.Model or not seed.Model.Parent then return false end
  local key=event..':'..tostring(seed.Generation);if self.PackSeen[seed]==key then return false end;self.PackSeen[seed]=key
  seed.WeatherCheckedEvent=event
- if W.Has(seed.Weather,trait)or W.Roll(seed.Model.Name..':'..seed.Stage..':'..seed.Generation,'pack-weather:'..cycle)>=W.PackChance then return false end
+ if W.Has(seed.Weather,trait)or (not self.ForceAll and W.Roll(seed.Model.Name..':'..seed.Stage..':'..seed.Generation,'pack-weather:'..cycle)>=W.PackChance)then return false end
  local weather=W.Merge(seed.Weather,trait)
  seed.Weather=weather;seed.Model:SetAttribute('WeatherTrait',weather)
- local packet=seed.Model:FindFirstChild('SeedPacket');if packet then FX.Set(packet,weather,nil,1.18*seed.PackSize,2.36*seed.PackSize)end
+ local packet=seed.Model:FindFirstChild('SeedPacket');if packet then FX.Set(packet,weather,nil,1.18*seed.PackSize,2.36*seed.PackSize);self:GlowPack(seed,packet,trait,seed)end
  local group=event..':'..tostring(seed.Stage);local pending=self.PendingPacks[group]
  if not pending then pending={Event=event,Trait=trait,Stage=seed.Stage,Count=0};self.PendingPacks[group]=pending end
  pending.Count+=1
@@ -44,10 +67,10 @@ function Service:ApplyHeldPack(player,kind,cycle)
  if not record or record.WeatherCheckedEvent==event then return false end
  -- The roll uses persisted identity, never equip count or the transient carry model.
  record.WeatherCheckedEvent=event
- if W.Has(record.Weather,trait)or W.Roll(record.Id,'owned-pack-weather:'..cycle)>=W.PackChance then return false,true end
+ if W.Has(record.Weather,trait)or (not self.ForceAll and W.Roll(record.Id,'owned-pack-weather:'..cycle)>=W.PackChance)then return false,true end
  local weather=W.Merge(record.Weather,trait)
  record.Weather=weather;tool:SetAttribute('Weather',weather);bag:SetAttribute('Weather',weather)
- local size=record.PackSize or 1;FX.Set(bag,weather,nil,size,2*size)
+ local size=record.PackSize or 1;FX.Set(bag,weather,nil,size,2*size);self:GlowPack(player,bag,trait)
  return true,true
 end
 function Service:ApplyCrop(crop,kind,cycle)
@@ -57,26 +80,28 @@ function Service:ApplyCrop(crop,kind,cycle)
  local plants,fruits=0,0
  if not seen.Plant then
   seen.Plant=true
-  if not W.Has(crop.Weather,trait)and W.Roll(crop.Id,'plant-weather:'..cycle)<W.PlantChance then
+  if not W.Has(crop.Weather,trait)and (self.ForceAll or W.Roll(crop.Id,'plant-weather:'..cycle)<W.PlantChance)then
    crop.Weather=W.Merge(crop.Weather,trait);plants=1
   end
  end
+ local changedFruits={}
  -- A whole-plant harvest is the same exposed object and must never receive a second roll.
  if def.Mode~='whole'then for index=1,def.FruitCount do
   local fruitCycle=Rules.FruitCycle(crop,index)
   if not Rules.IsPicked(crop,index)and seen.Slots[index]~=fruitCycle then
    seen.Slots[index]=fruitCycle
    local before=W.Fruit(crop,index,fruitCycle)
-   if not W.Has(before,trait)and W.Roll(crop.Id,'event-weather:'..cycle..':'..fruitCycle..':'..index)<W.FruitChance then
+   if not W.Has(before,trait)and (self.ForceAll or W.Roll(crop.Id,'event-weather:'..cycle..':'..fruitCycle..':'..index)<W.FruitChance)then
     crop.FruitWeather=crop.FruitWeather or{}
     local previous=crop.FruitWeather[tostring(index)]
     -- Save only direct fruit layers. Inheritance stays tied to the plant and stable roll.
     local direct=previous and previous.Cycle==fruitCycle and previous.Kind or'None'
-    crop.FruitWeather[tostring(index)]={Kind=W.Merge(direct,trait),Cycle=fruitCycle,Event=cycle};fruits+=1
+    crop.FruitWeather[tostring(index)]={Kind=W.Merge(direct,trait),Cycle=fruitCycle,Event=cycle};fruits+=1;table.insert(changedFruits,index)
    end
   end
  end end
- return plants+fruits>0,{Plants=plants,Fruits=fruits,Count=plants+fruits,Trait=trait,Event=event}
+ local item=plants+fruits>0 and{CropId=crop.Id,SeedId=crop.SeedId,Plant=plants>0,Fruits=changedFruits}or nil
+ return plants+fruits>0,{Plants=plants,Fruits=fruits,Count=plants+fruits,Trait=trait,Event=event,Item=item}
 end
 function Service:SendNotice(player,packet,event)
  self.NoticeSerial+=1
@@ -91,28 +116,30 @@ function Service:FlushPacks()
 end
 function Service:Step(now)
  local kind,cycle,ends,nextAt=self:State(now)
+ -- R127: owner test 'weather rain all' makes every exposed pack, plant and fruit change during that event.
+ self.ForceAll=self.Override~=nil and self.Override.All==true and now<self.Override.Until
  if self.Kind~=kind or self.Cycle~=cycle then
   self.Kind=kind;self.Cycle=cycle;RS:SetAttribute('GlobalWeather',kind);RS:SetAttribute('WeatherEndsAt',ends);RS:SetAttribute('NextWeatherAt',nextAt);RS:SetAttribute('WeatherEvent',cycle)
  end
  if W.Events[kind]then
   for _,seed in ipairs(self.Chests.Map.Chests)do self:ApplyPack(seed,kind,cycle)end
   for _,player in ipairs(Players:GetPlayers())do if self.Data:IsLoaded(player)then
-   local garden=self.Data.Gardens[player];local plants,fruits=0,0
+   local garden=self.Data.Gardens[player];local plants,fruits,items=0,0,{}
    local packChanged,packChecked=self:ApplyHeldPack(player,kind,cycle);local packs=packChanged and 1 or 0
    for _,crops in pairs(garden and garden.Plots or{})do for _,crop in ipairs(crops)do
     local changed,counts=self:ApplyCrop(crop,kind,cycle)
-    if changed then plants+=counts.Plants;fruits+=counts.Fruits end
+    if changed then plants+=counts.Plants;fruits+=counts.Fruits;if counts.Item and #items<Glow.MaxItems then table.insert(items,counts.Item)end end
    end end
    if plants+fruits+packs>0 or packChecked then
     if plants+fruits>0 then self.Data:_gardenChanged(player)end
     if packs>0 then self.Data:_notifySeedInventory(player)end
     self.Data:MarkDirty(player);self.Data:QueueGardenSave(player)
     if plants+fruits>0 then self.Chests:RenderGarden(self.Chests.Bases:GetPlayerBase(player),player)end
-    if plants+fruits+packs>0 then self:SendNotice(player,{Trait=W.Events[kind],Count=plants+fruits+packs,Plants=plants,Fruits=fruits,Packs=packs,Scope='Owned'},eventKey(kind,cycle))end
+    if plants+fruits+packs>0 then self:SendNotice(player,{Trait=W.Events[kind],Count=plants+fruits+packs,Plants=plants,Fruits=fruits,Packs=packs,Scope='Owned',Items=#items>0 and items or nil},eventKey(kind,cycle))end
    end
   end end
  end
- self:FlushPacks()
+ self:FlushPacks();self:ExpireGlows()
 end
 function Service:Start()
  self.Chests.Weather=self;self:Step(workspace:GetServerTimeNow())

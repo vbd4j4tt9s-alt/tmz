@@ -186,7 +186,7 @@ do
  local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)]
  check(r.Ok and r.Variant=='EclipseReliquary'and r.Stage==7 and r.Rarity=='Secret'and r.Biome=='Void Pack','server returns SECRET Void Pack: '..tostring(r.Rarity)..' '..tostring(r.Biome))
  check(last and last.BagVariant=='EclipseReliquary'and last.Stage==7,'Void Pack granted to the bag as a Storm pack')
- check(last and last.PackSize==PackRules.RollPackSize(.9995)and last.PackSize==5 and r.Size==5,'R126: the Void Pack rolls a size too (.9995 -> 5x)')
+ check(last and last.PackSize==PackRules.RollPackSize(.9995)and last.PackSize>1 and r.Size==last.PackSize,'R126: the Void Pack rolls a size too (.9995 -> '..tostring(last and last.PackSize)..'x)')
  if last then Data:RemoveChest(A2,last.Id)end
 end
 -- Luck/boots never change a result: same random stream, boots on vs off -> identical claims

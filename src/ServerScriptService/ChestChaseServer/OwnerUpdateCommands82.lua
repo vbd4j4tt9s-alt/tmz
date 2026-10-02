@@ -43,11 +43,12 @@ function X.Execute(ctx,p,action,a)
  end
  if action=='weather'then
   local kind=({rain='Rain',thunder='Thunderstorm',thunderstorm='Thunderstorm',blizzard='Blizzard',clear='Clear'})[a[1]]
-  if #a~=1 or not kind then return false,'Use weather clear/rain/thunder/blizzard. For local Snow, visit the Snow biome during clear weather.'end
+  local all=a[2]=='all'and kind~='Clear'
+  if(#a~=1 and not all)or not kind then return false,'Use weather clear/rain/thunder/blizzard (add all to change every pack/plant/fruit). For local Snow, visit the Snow biome during clear weather.'end
   local service=ctx.Chests.Weather;if not service then return false,'Weather is loading.'end
   local now=workspace:GetServerTimeNow();service.TestSerial=(service.TestSerial or 0)+1
-  service.Override={Kind=kind,Cycle=-service.TestSerial,Until=now+require(RS.WeatherTraits).Duration};service:Step(now)
-  return true,'Server weather: '..kind..'. Normal weather resumes after this event.'
+  service.Override={Kind=kind,Cycle=-service.TestSerial,Until=now+require(RS.WeatherTraits).Duration,All=all};service:Step(now)
+  return true,'Server weather: '..kind..(all and' - every exposed pack, plant and fruit changes (R127 highlight test)'or'')..'. Normal weather resumes after this event.'
  elseif action=='mechshop'then
   if #a~=0 then return false,'Use mechshop.'end
   local C=require(RS.MechCatalog);local lines={'Mech packs: select SINGLE / 5 PACKS / 10 PACKS in SHOP.'}

@@ -106,6 +106,11 @@ function F.Weather(m)
  if not old then old={Trait=trait,Scope=scope,Stage=stage,Count=0,Plants=0,Fruits=0,Packs=0};weatherPending[group]=old end
  old.Count+=count
  for _,key in ipairs({'Plants','Fruits','Packs'})do local n=tonumber(m[key]);if n and n==n and n>0 and n<=count then old[key]+=math.floor(n)end end
+ -- R127: owner notices carry which plants/fruits changed, so the text can name them.
+ if scope=='Owned'and type(m.Items)=='table'then
+  local Glow=require(script.Parent.MutationGlow127);old.Items=old.Items or{}
+  for _,item in ipairs(Glow.Items(m.Items,require(script.Parent.PlantCatalog)))do if #old.Items<Glow.MaxItems then table.insert(old.Items,item)end end
+ end
  if weatherScheduled then return end;weatherScheduled=true
  task.delay(.2,function()
   if not alive then return end;weatherScheduled=false
