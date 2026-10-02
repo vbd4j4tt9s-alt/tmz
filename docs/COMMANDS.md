@@ -1,4 +1,4 @@
-# Test commands and tools (R129)
+# Test commands and tools (R130)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -140,7 +140,7 @@ listed separately any more because each one is the same as a command above.
    - `fling forest @me` … `fling storm @me`: each tier goes higher and you land inside the walls.
    - `keepersmack`, and steal a pack in each biome to see each keeper's own hit animation.
    - R124: the Forest hammer and Jungle slam play the ground-slam sound on the impact frame; The Darkened's catch plays its own sound with a purple impact.
-5. **Gifts:** give fruit, a seed and a pack to the alt. `gifts @me` should show 0 within a minute.
+5. **Gifts:** hold fruit, a seed and a pack and click the alt (R130: they light up, then a popup asks "Are you sure you want to give … to …?"; press Give). The alt gets a notice naming you and the item. `gifts @me` should show 0 within a minute.
 6. **Rarity borders:**
    - `rarepacks @me` and `seeds all @me`, then open the inventory: every rarity has its own border and there are no emblems.
 7. **Shop:** prices read "49 Robux", there are no gift buttons and no 2x speed banner.
@@ -177,3 +177,8 @@ listed separately any more because each one is the same as a command above.
 14. **R129:**
    - Device emulator, landscape phone: balances bottom-left, boosts/The Darkened/timers bottom-right above jump, MENU left, BASE/TRACK top, hotbar centred.
    - `weather rain` in the base: turn the camera, the rain keeps falling and the sky darkens; on the track there is no weather.
+15. **R130:**
+   - Hold a fruit, seed or pack and point at the alt: they light up gold when close enough. Click: the popup names the item and the alt. Cancel does nothing; Give sends it and the alt sees "🎁 <you> gave you <item>!".
+   - Click the alt from far away: "Get closer to <name> to give."
+   - `refreshpacks`: the sky goes dark during the refresh (black sky, or a midnight sky with dark air on clients without the image API), and comes back after. With `weather rain` on, no grey cloud layer appears during the refresh.
+   - Keepers still stand at home and chase normally (their idle upkeep is lighter now).
