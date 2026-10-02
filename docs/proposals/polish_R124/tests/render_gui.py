@@ -102,6 +102,12 @@ def draw_text(canvas, it, k):
             tx += ww + font(size).getlength(' ')
         ty += lh
 
+def put(dst, patch, ox, oy):
+    # alpha_composite the visible part of patch at (ox, oy); nothing when it lies outside dst.
+    x0, y0 = max(0, ox), max(0, oy); x1, y1 = min(dst.width, ox + patch.width), min(dst.height, oy + patch.height)
+    if x1 <= x0 or y1 <= y0: return False
+    dst.alpha_composite(patch.crop((x0 - ox, y0 - oy, x1 - ox, y1 - oy)), (x0, y0)); return True
+
 def render(data, k):
     W, H = data['canvas']; canvas = Image.new('RGBA', (int(W * k), int(H * k)), (*BG, 255))
     for it in data['items']:
@@ -125,12 +131,18 @@ def render(data, k):
         cx, cy = x + w / 2, y + h / 2
         ox, oy = int(cx - patch.width / 2), int(cy - patch.height / 2)
         if it['clip']:
-            c = [v * k for v in it['clip']]; layer = Image.new('RGBA', canvas.size); layer.alpha_composite(patch, (max(0, ox), max(0, oy)), (max(0, -ox), max(0, -oy)))
+            c = [v * k for v in it['clip']]; layer = Image.new('RGBA', canvas.size)
+            if not put(layer, patch, ox, oy): continue
             m = Image.new('L', canvas.size, 0); ImageDraw.Draw(m).rectangle((c[0], c[1], c[0] + c[2], c[1] + c[3]), fill=255)
             layer.putalpha(Image.composite(layer.getchannel('A'), m, m)); canvas.alpha_composite(layer)
         else:
-            canvas.alpha_composite(patch, (max(0, ox), max(0, oy)), (max(0, -ox), max(0, -oy)))
-        if it['text']: draw_text(canvas, it, k)
+            put(canvas, patch, ox, oy)
+        if it['text']:
+            if it['clip']:
+                c = [v * k for v in it['clip']]; layer = Image.new('RGBA', canvas.size); draw_text(layer, it, k)
+                m = Image.new('L', canvas.size, 0); ImageDraw.Draw(m).rectangle((c[0], c[1], c[0] + c[2], c[1] + c[3]), fill=255)
+                layer.putalpha(Image.composite(layer.getchannel('A'), m, m)); canvas.alpha_composite(layer)
+            else: draw_text(canvas, it, k)
     return canvas
 
 img = render(json.load(open(SRC)), K)

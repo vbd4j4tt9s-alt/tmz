@@ -101,7 +101,7 @@ local oldRoll=pg:FindFirstChild('TreadmillBonusRoll');if oldRoll then oldRoll:De
 local overlay=make('ScreenGui',{Name='TreadmillBonusRoll',ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=60,Enabled=false,
  ZIndexBehavior=Enum.ZIndexBehavior.Sibling},pg)
 make('Frame',{Name='Backdrop',BackgroundColor3=Color3.new(0,0,0),BackgroundTransparency=.45,Size=UDim2.fromScale(1,1),Active=true},overlay)
-local panel=make('Frame',{Name='Panel',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),BackgroundColor3=RGB(30,36,74),ZIndex=2},overlay)
+local panel=make('Frame',{Name='Panel',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),BackgroundColor3=Color3.new(1,1,1),ZIndex=2},overlay) -- colour comes from the gradient
 round(panel,16);local panelStroke=stroke(panel,GOLD,3)
 make('UIGradient',{Color=ColorSequence.new({ColorSequenceKeypoint.new(0,RGB(66,58,150)),ColorSequenceKeypoint.new(.55,RGB(34,30,86)),ColorSequenceKeypoint.new(1,RGB(18,16,46))}),Rotation=70},panel)
 local function diamond(parent,name,size,color,z)
@@ -122,7 +122,7 @@ make('UIGradient',{Color=ColorSequence.new({ColorSequenceKeypoint.new(0,RGB(255,
 for i,x in ipairs({0,1})do local tail=diamond(ribbon,'Tail'..i,14,RGB(214,128,30),2);tail.Position=UDim2.new(x,x==0 and 2 or-2,.5,0)end
 local heading=text(ribbon,'Title','🎁 TREADMILL BONUS ROLL',19,INK);heading.ZIndex=4;heading.Size=UDim2.fromScale(1,1)
 heading.TextStrokeColor3=RGB(255,248,220);heading.TextStrokeTransparency=.4
-local window=make('Frame',{Name='StripWindow',BackgroundColor3=RGB(10,12,28),ClipsDescendants=true,ZIndex=3},panel)
+local window=make('Frame',{Name='StripWindow',BackgroundColor3=Color3.new(1,1,1),ClipsDescendants=true,ZIndex=3},panel) -- colour comes from the gradient
 round(window,10);stroke(window,RGB(120,110,200),2)
 make('UIGradient',{Color=ColorSequence.new(RGB(30,30,62),RGB(8,10,24)),Rotation=90},window)
 local strip=make('Frame',{Name='Strip',BackgroundTransparency=1,ZIndex=4},window)

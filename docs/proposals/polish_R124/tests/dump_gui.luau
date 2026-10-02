@@ -7,12 +7,14 @@ local function c3(c)return c and string.format('[%d,%d,%d]',math.floor(c.R*255+.
 local function q(s)return'"'..tostring(s):gsub('\\','\\\\'):gsub('"','\\"'):gsub('\n','\\n')..'"'end
 local function colorSeq(cs)
  if not cs then return'null'end
+ if cs.R~=nil then return'[[0,'..c3(cs)..'],[1,'..c3(cs)..']]'end
  if type(cs.A)=='table'and cs.A.R==nil then local out={}
   for _,k in ipairs(cs.A)do out[#out+1]='['..n(k.T)..','..c3(k.V)..']'end;return'['..table.concat(out,',')..']'end
  local a,b=cs.A,cs.B or cs.A;return'[[0,'..c3(a)..'],[1,'..c3(b)..']]'
 end
 local function numSeq(ns)
  if not ns then return'null'end
+ if type(ns)=='number'then return'[[0,'..n(ns)..'],[1,'..n(ns)..']]'end
  if type(ns.A)=='table'then local out={}
   for _,k in ipairs(ns.A)do out[#out+1]='['..n(k.T)..','..n(k.V)..']'end;return'['..table.concat(out,',')..']'end
  local a,b=ns.A,ns.B or ns.A;return'[[0,'..n(a)..'],[1,'..n(b)..']]'
