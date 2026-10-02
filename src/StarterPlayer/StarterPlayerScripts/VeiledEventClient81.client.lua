@@ -44,7 +44,15 @@ watch(Run.RenderStepped,function(dt)
    r.ImpactFor=attackAt;if now-impact<.2 and distance<KFx.DustDistance then KFx.Accent('Spectral',root.CFrame*CFrame.new(0,-4,-6),root.CFrame,Fx.Get()==1)end
   end
  end
- if not effectTick then return end
+ -- R128 (owner): a carried Void Pack's rings and debris follow it every frame (they trailed behind at 30 Hz).
+ if not effectTick then
+  local reducedNow=Gui.ReducedMotionEnabled==true;table.clear(parts);table.clear(frames)
+  for bag,r in pairs(bags)do local c=r.Capture
+   if r.Carried and c and c.Fx and c.Root.Parent then PackFx.Step(c,now,c.Root.CFrame,tier,reducedNow,r.Lit,parts,frames)end
+  end
+  if #parts>0 then workspace:BulkMoveTo(parts,frames,Enum.BulkMoveMode.FireCFrameChanged)end
+  return
+ end
  local reduced=Gui.ReducedMotionEnabled==true
  local B=PackFx.Budget
  table.clear(parts);table.clear(frames)
@@ -62,12 +70,14 @@ watch(Run.RenderStepped,function(dt)
   if bag:GetAttribute('WorldPack')and bag.Name~='OpeningBag'and c.Anchored and distance<B.MotionDistance then
    frame=PackFx.Pose(c,now,parts,frames,not reduced and distance<B.SpinDistance)
   end
-  if distance<B.EffectDistance then table.insert(near,{Capture=c,Distance=distance,Frame=frame})end
+  r.Carried=not bag:GetAttribute('WorldPack')or bag.Name=='OpeningBag'
+  if distance<B.EffectDistance then table.insert(near,{Capture=c,Distance=distance,Frame=frame,Record=r})end
  end
  table.sort(near,function(a,b)return a.Distance<b.Distance end)
  local budget=mode=='off'and 0 or B.Bags[tier]or 1
  for i,item in ipairs(near)do
   local c=item.Capture
+  item.Record.Lit=i<=B.Lights
   if i>budget then if c.Fx then PackFx.Clear(c)end;continue end
   if c.Fx and c.Fx.Tier~=tier then PackFx.Clear(c)end
   if not c.Fx then PackFx.Create(c,tier)end

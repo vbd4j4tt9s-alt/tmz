@@ -9,6 +9,9 @@ local function remove(p)targets[p]=nil;selected[p]=nil;if records[p]then Effects
 local function add(p)if p:IsA('BasePart')then targets[p]=true end end
 for _,p in ipairs(Tags:GetTagged('GardenItemFX'))do add(p)end
 local added=Tags:GetInstanceAddedSignal('GardenItemFX'):Connect(add);local removed=Tags:GetInstanceRemovedSignal('GardenItemFX'):Connect(remove)
+-- R128 (owner): an item someone is carrying (inside a character) has its effect stepped every frame so the rings
+-- and orbits stay on it while running; items lying in the world keep the cheaper 20 Hz (10 Hz low) animation.
+local function carried(p)local m=p:FindFirstAncestorOfClass('Model');while m do if m:FindFirstChildOfClass('Humanoid')then return true end;m=m:FindFirstAncestorOfClass('Model')end;return false end
 local function visible(p)
  if not p:IsDescendantOf(workspace)then return false end
  local a=p.Parent
@@ -41,6 +44,7 @@ local c=Run.Heartbeat:Connect(function(dt)
   for _,item in ipairs(pending)do
    local p=item.Part;selected[p]=true;local e=records[p]
    if e and(e.Weather~=item.Weather or e.Mech~=item.Mech)then Effects.Destroy(e);records[p]=nil end
+   if records[p]then records[p].Carried=carried(p)end
   end
   for p,e in pairs(records)do if not selected[p]then Effects.Destroy(e);records[p]=nil end end
  end
@@ -49,14 +53,16 @@ local c=Run.Heartbeat:Connect(function(dt)
  while pendingIndex<=#pending and created<createLimit do
   local item=pending[pendingIndex];pendingIndex+=1;local p=item.Part
   if selected[p]and not records[p]and p.Parent and visible(p)then
-   records[p]=Effects.New(folder,item.Weather,item.Mech);created+=1
+   records[p]=Effects.New(folder,item.Weather,item.Mech);records[p].Carried=carried(p);created+=1
   end
  end
- if elapsed<(low and .1 or .05)then return end;elapsed=0;local t=workspace:GetServerTimeNow()
+ local full=elapsed>=(low and .1 or .05);if full then elapsed=0 end;local t=workspace:GetServerTimeNow();local stepped=false
  for p,e in pairs(records)do
-  if p.Parent and visible(p)then Effects.Step(e,p.CFrame*CFrame.new(p:GetAttribute('EffectOffset')or Vector3.zero),p:GetAttribute('EffectRadius'),p:GetAttribute('EffectHeight'),t,nil,batch)
-  else Effects.Destroy(e);records[p]=nil end
+  if full or e.Carried then
+   if p.Parent and visible(p)then Effects.Step(e,p.CFrame*CFrame.new(p:GetAttribute('EffectOffset')or Vector3.zero),p:GetAttribute('EffectRadius'),p:GetAttribute('EffectHeight'),t,nil,batch);stepped=true
+   else Effects.Destroy(e);records[p]=nil end
+  end
  end
- batch:Flush()
+ if stepped then batch:Flush()end
 end)
 script.Destroying:Connect(function()c:Disconnect();added:Disconnect();removed:Disconnect();folder:Destroy();table.clear(records);table.clear(targets);table.clear(pending)end)

@@ -59,7 +59,8 @@ local mobile=game:GetService('UserInputService').TouchEnabled
 local Timing=require(RS.SoundTiming)
 local folder=Instance.new('Folder');folder.Name='_GlobalWeatherR59';folder.Parent=workspace
 local anchor=Instance.new('Part');anchor.Size=Vector3.new(86,.1,78);anchor.Transparency=1;anchor.Anchored=true;anchor.CanCollide=false;anchor.CanTouch=false;anchor.CanQuery=false;anchor.CastShadow=false;anchor.Parent=folder
-local emitter=Instance.new('ParticleEmitter');emitter.Name='Precipitation';emitter.Texture='rbxasset://textures/particles/sparkles_main.dds';emitter.Enabled=false;emitter.Rate=0;emitter.EmissionDirection=Enum.NormalId.Bottom;emitter.LightInfluence=.2;emitter.SpreadAngle=Vector2.new(12,12);emitter.VelocityInheritance=0;emitter.Parent=anchor
+local Field=require(RS:WaitForChild('AmbientParticleField128'));local field=Field.new() -- R128: rain/snow live in the world
+local emitter=Instance.new('ParticleEmitter');emitter.Name='Precipitation';emitter.VelocityInheritance=0;emitter.Texture='rbxasset://textures/particles/sparkles_main.dds';emitter.Enabled=false;emitter.Rate=0;emitter.EmissionDirection=Enum.NormalId.Bottom;emitter.LightInfluence=.2;emitter.SpreadAngle=Vector2.new(12,12);emitter.VelocityInheritance=0;emitter.Parent=anchor
 -- R73: the shared biome lighting controller blends weather colour; only lightning flashes live here.
 local flash=Instance.new('ColorCorrectionEffect');flash.Name='DistantThunderGlow';flash.Enabled=false;flash.Parent=Lighting
 local thunder=Instance.new('Sound');thunder.Name='DistantThunder';thunder.SoundId=require(RS.StormConfig).ThunderId;thunder.Volume=.22;thunder.PlaybackSpeed=.9;thunder.Parent=folder
@@ -76,7 +77,7 @@ local function weather(kind)
  emitter.Squash=NumberSequence.new(snow and 0 or -.88)
  emitter.Orientation=snow and Enum.ParticleOrientation.FacingCamera or Enum.ParticleOrientation.VelocityParallel
  emitter.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.12,.18),NumberSequenceKeypoint.new(.8,.24),NumberSequenceKeypoint.new(1,1)})
- emitter.LightEmission=snow and .24 or .13;emitter.LockedToPart=true
+ emitter.LightEmission=snow and .24 or .13;emitter.LockedToPart=false
  emitter.Rotation=NumberRange.new(0,snow and 360 or 0);emitter.RotSpeed=NumberRange.new(snow and -40 or 0,snow and 40 or 0)
  emitter.Acceleration=snow and Vector3.new(10,-4,3)or Vector3.new(5,-18,0)
  profileTier=nil
@@ -98,12 +99,10 @@ local tick=Run.Heartbeat:Connect(function(dt)
   emitter.Lifetime=NumberRange.new(profile.Life*.8,profile.Life);emitter.Speed=NumberRange.new(profile.Speed*.85,profile.Speed*1.15)
  end
  local p=camera.CFrame.Position
- if camera~=lastCamera or(lastPosition and(p-lastPosition).Magnitude>45)then emitter:Clear();clock=.5 end
+ if camera~=lastCamera or(lastPosition and(p-lastPosition).Magnitude>150)then emitter:Clear();clock=.5;Field.Reset(field)end -- R128: teleports only, not fast running
  lastCamera=camera;lastPosition=p
  local look=camera.CFrame.LookVector;local forward=Vector3.new(look.X,0,look.Z)
  forward=forward.Magnitude>.01 and forward.Unit or Vector3.new(0,0,-1)
- local target=p+forward*7+Vector3.new(0,profile.Height,0)
- if (anchor.Position-target).Magnitude>.05 then anchor.CFrame=CFrame.new(target)end
  if clock>=.5 then
   clock=0;params.FilterDescendantsInstances={folder,player.Character}
   indoors=workspace:Raycast(p,Vector3.new(0,80,0),params)~=nil
@@ -121,5 +120,14 @@ local tick=Run.Heartbeat:Connect(function(dt)
  else clearStrike()end
 
 end)
+-- R128: the precipitation birth box follows the camera every frame, led ahead of a runner by the fall time.
+local follow=Run.RenderStepped:Connect(function(dt)
+ local camera=workspace.CurrentCamera
+ if not camera or not profile or not emitter.Enabled then return end
+ local velocity=Field.Track(field,camera.CFrame.Position,dt)
+ local lead,maxLead=Field.Lead(profile.Height,profile.Speed,true)
+ local target=Field.Target(camera.CFrame,7,profile.Height,velocity,lead,maxLead)
+ if (anchor.Position-target).Magnitude>.05 then anchor.CFrame=CFrame.new(target)end
+end)
 local typography=require(RS.GardenTypography).Apply(pg)
-script.Destroying:Connect(function()typography:Disconnect();tick:Disconnect();bolt:Destroy();folder:Destroy();flash:Destroy()end)
+script.Destroying:Connect(function()typography:Disconnect();tick:Disconnect();follow:Disconnect();bolt:Destroy();folder:Destroy();flash:Destroy()end)

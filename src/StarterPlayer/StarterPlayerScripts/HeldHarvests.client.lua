@@ -60,7 +60,12 @@ local connection=Run.Heartbeat:Connect(function(dt)
   if not okay then retry[job.Tool]=os.clock()+5;warn('[V149] Held fruit: '..tostring(why));cancel()
   elseif coroutine.status(job.Thread)=='dead'then job=nil end
  end
- if motionClock>=.05 then
+ if motionClock<.05 then
+  -- R128 (owner): between the 20 Hz motion steps, held fruit effects still follow the hand every frame (their orbits
+  -- trailed behind runners). Only already-running effect sets move; nothing new is built here.
+  local now=workspace:GetServerTimeNow()
+  for tool,state in pairs(states)do if state.Rig and equipped(tool)then Rig.Follow(state.Rig,now)end end
+ else
   motionClock=0;local now=workspace:GetServerTimeNow();local fx=0
   debug.profilebegin('Held fruit animation')
   for tool,state in pairs(states)do local e=selected[tool];if e and state.Rig then

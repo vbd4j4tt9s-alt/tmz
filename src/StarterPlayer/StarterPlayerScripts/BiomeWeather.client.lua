@@ -1,9 +1,11 @@
 -- Local weather around the view, behind UI. Never changes music or gameplay.
+-- R128 (owner): particles live in the world (AmbientParticleField128); only the birth box follows the camera.
 local Players=game:GetService('Players')
 local Run=game:GetService('RunService')
 local Storage=game:GetService('ReplicatedStorage')
 local Styles=require(Storage:WaitForChild('BiomeWeatherConfig'))
 local Fx=require(Storage.ClientFxBudget)
+local Field=require(Storage:WaitForChild('AmbientParticleField128'));local field=Field.new()
 local mobile=game:GetService('UserInputService').TouchEnabled
 local player=Players.LocalPlayer
 local folder=Instance.new('Folder');folder.Name='_BiomeWeatherV105';folder.Parent=workspace
@@ -11,12 +13,12 @@ local anchor=Instance.new('Part');anchor.Name='Weather around camera';anchor.Siz
 anchor.Transparency=1;anchor.Anchored=true;anchor.CanCollide=false;anchor.CanTouch=false;anchor.CanQuery=false
 anchor.CastShadow=false;anchor.Parent=folder
 local emitter=Instance.new('ParticleEmitter');emitter.Enabled=false;emitter.Rate=0
-emitter.LockedToPart=true;emitter.VelocityInheritance=0;emitter.LightInfluence=.25
+emitter.LockedToPart=false;emitter.VelocityInheritance=0;emitter.LightInfluence=.25
 emitter.Rotation=NumberRange.new(0,360);emitter.Parent=anchor
 local mist=Instance.new('ParticleEmitter');mist.Name='Jungle mist';mist.Enabled=false
 mist.Texture='rbxasset://textures/particles/smoke_main.dds';mist.Color=ColorSequence.new(Color3.fromRGB(143,177,146))
 mist.Size=NumberSequence.new(8);mist.Lifetime=NumberRange.new(3);mist.Rate=1.5
-mist.Speed=NumberRange.new(.8);mist.LockedToPart=true;mist.LightInfluence=.8
+mist.Speed=NumberRange.new(.8);mist.LockedToPart=false;mist.VelocityInheritance=0;mist.LightInfluence=.8
 mist.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.3,.94),NumberSequenceKeypoint.new(1,1)})
 mist.Parent=anchor
 local stage,style=0,nil
@@ -28,7 +30,7 @@ local function setStage(nextStage)
     stage=nextStage;style=Styles[stage];blend=0;drift=1;lastRate=-1;lastAnchor=nil
     emitter:Clear();mist:Clear();emitter.Enabled=false;mist.Enabled=false
     if not style then return end
-    emitter.LockedToPart=true;emitter.Name=style.Name;emitter.Texture=style.Texture;emitter.Color=ColorSequence.new(style.Color)
+    emitter.LockedToPart=false;emitter.Name=style.Name;emitter.Texture=style.Texture;emitter.Color=ColorSequence.new(style.Color)
     emitter.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,style.Size*.65),NumberSequenceKeypoint.new(.35,style.Size),NumberSequenceKeypoint.new(1,style.Size*.5)})
     emitter.Lifetime=NumberRange.new(style.Life*.75,style.Life);emitter.Speed=NumberRange.new(style.Speed*.8,style.Speed*1.2)
     emitter.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.15,style.Fade),
@@ -61,20 +63,23 @@ local connections={}
 table.insert(connections,player.CharacterRemoving:Connect(function()alive=false;setStage(0);lastPosition=nil end))
 table.insert(connections,player.CharacterAdded:Connect(function()alive=true;elapsed=1;lastPosition=nil end))
 table.insert(connections,Run.RenderStepped:Connect(function(dt)
+    -- R128: the birth box follows the camera every frame, led ahead of a runner; particles already born stay put.
+    local view=workspace.CurrentCamera
+    if view and style and view==currentCamera then
+        local velocity=Field.Track(field,view.CFrame.Position,dt)
+        local lead,maxLead=Field.Lead(style.Height,style.Speed,style.Falling)
+        local target=Field.Target(view.CFrame,9,style.Height,velocity,lead,maxLead)
+        if not lastAnchor or(target-lastAnchor).Magnitude>.01 then anchor.CFrame=CFrame.new(target);lastAnchor=target end
+    end
     frameClock+=dt;local tier=Fx.Get();if frameClock<(tier==1 and .1 or .05)then return end
     dt=frameClock;frameClock=0;clock+=dt;elapsed+=dt
     local camera=workspace.CurrentCamera
-    if camera~=currentCamera then currentCamera=camera;emitter:Clear();mist:Clear();lastPosition=nil;elapsed=1 end
+    if camera~=currentCamera then currentCamera=camera;emitter:Clear();mist:Clear();lastPosition=nil;elapsed=1;Field.Reset(field)end
     if elapsed>=.1 then elapsed=0;setStage(locate(camera))end
     if not camera or not style then return end
     local p=camera.CFrame.Position
-    if lastPosition and (p-lastPosition).Magnitude>35 then emitter:Clear();mist:Clear()end
+    if lastPosition and (p-lastPosition).Magnitude>150 then emitter:Clear();mist:Clear();Field.Reset(field)end -- teleport (not fast running): drop the old field
     lastPosition=p
-    -- Camera-local precipitation cannot be outrun; world-up orientation keeps snow falling down.
-    local look=camera.CFrame.LookVector;local forward=Vector3.new(look.X,0,look.Z)
-    if forward.Magnitude>.01 then forward=forward.Unit else forward=Vector3.new(0,0,-1)end
-    local target=p+forward*9+Vector3.new(0,style.Height,0)
-    if not lastAnchor or(target-lastAnchor).Magnitude>.01 then anchor.CFrame=CFrame.new(target);lastAnchor=target end
     blend=math.min(1,blend+dt*2);local cap=mobile and 90 or math.huge;local rate=math.min(cap,style.Rate*(tier==1 and .65 or tier==2 and .85 or 1))*blend
     local fog=style.Mist==true and tier>1;if mist.Enabled~=fog then mist.Enabled=fog end
     if rate~=lastRate then emitter.Rate=rate;lastRate=rate end

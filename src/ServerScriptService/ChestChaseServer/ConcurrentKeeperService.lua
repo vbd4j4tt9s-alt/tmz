@@ -358,7 +358,7 @@ return function(Legacy)
         if run.Attack or run.Finishing or self.KeeperTargets[run.KeeperKey]~=run or self.Map.Refreshing then return false end
         local keeper=run.Chaser;local character,humanoid,root=self:_validCharacter(run.Player)
         if not keeper or not keeper.PrimaryPart or character~=run.Character or root.Anchored or not self.Ragdoll:CanHit(run.Player)then return false end
-        if self:_crossedBoundary(root.Position)or not Combat.InReach(run.Stage,keeper.PrimaryPart.Position,root.Position)then return false end
+        if self:_crossedBoundary(root.Position)or not Combat.InStrike(run.Stage,keeper.PrimaryPart.Position,root.Position)then return false end -- R128: start close
         self.AttackSerial=(self.AttackSerial or 0)+1
         local now=os.clock();local spec=Combat.Get(run.Stage)
         run.Attack={Serial=self.AttackSerial,Keeper=keeper,Token=run.GuardianLeaseToken,ImpactAt=now+spec.Windup}
@@ -404,7 +404,9 @@ return function(Legacy)
         -- Track the thief through the brief windup; never teleport or freeze the player.
         if not Contact.Touching(run.Chaser,character)then self:_moveKeeperToward(run,deltaTime,0)end
         if os.clock()<attack.ImpactAt then return end
-        if Contact.Touching(run.Chaser,character)and self.Ragdoll:CanHit(run.Player)then
+        -- R128: a swing started close lands if the thief is still in strike range (or the bodies touch).
+        local inStrike=run.Chaser.PrimaryPart and Combat.InStrike(run.Stage,run.Chaser.PrimaryPart.Position,root.Position,Combat.HitPadding)
+        if(inStrike or Contact.Touching(run.Chaser,character))and self.Ragdoll:CanHit(run.Player)then
             run.KeeperImpactCommitted=true
             self:Finish(false,true,run)
         else
@@ -513,11 +515,11 @@ return function(Legacy)
         chaser:SetAttribute("GuardianBehavior", "CHASING")
         self:_setGuardianNoticeVisual(chaser, false)
         self:_publishRunEffects(run, distance, deltaTime)
-        if os.clock()>=run.CatchEnabledAt and Combat.InReach(run.Stage,core.Position,root.Position)and self:_beginKeeperAttack(run)then return end
+        if os.clock()>=run.CatchEnabledAt and Combat.InStrike(run.Stage,core.Position,root.Position)and self:_beginKeeperAttack(run)then return end
         self:_moveKeeperToward(run,deltaTime,0)
         -- At extreme speeds the entire contact range can be crossed in one server step.
         -- Start the existing windup after movement too; impact still requires real body overlap.
-        if os.clock()>=run.CatchEnabledAt and Combat.InReach(run.Stage,chaser.PrimaryPart.Position,root.Position)then
+        if os.clock()>=run.CatchEnabledAt and Combat.InStrike(run.Stage,chaser.PrimaryPart.Position,root.Position)then
             self:_beginKeeperAttack(run)
         end
     end

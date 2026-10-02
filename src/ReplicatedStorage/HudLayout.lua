@@ -129,6 +129,10 @@ function L.Read(view,touch,controls)
  if short then nav=math.min(nav,math.floor((w-statusWidth*statusScale-32-navGap*2)/3));navWidth=nav end
  local barWidth=(slots+1)*side+slots*6
  local hudExtent=math.max(walletW,statusWidth*statusScale)+20
+ -- R128 (owner): shrink the hotbar a bit (never below the pre-R127 66 / 60 px) when that lets the balances, boosts and
+ -- timers sit at the bottom beside it instead of being lifted above it.
+ local fitSide=math.floor((w-2*hudExtent-slots*6)/(slots+1))
+ if(w-barWidth)/2<hudExtent and fitSide>=math.min(side,compact and 60 or 66)then side=math.min(side,fitSide);barWidth=(slots+1)*side+slots*6 end
  local bottom=(w-barWidth)/2<hudExtent and hotbarBottom+side+12 or 16
  if touch then bottom=math.max(bottom,math.min(160,math.floor(h*.32)))end
  -- Only the navigation dock becomes a compact row on shallow viewports. The balances stay left/bottom.

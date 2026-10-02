@@ -404,7 +404,9 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
         end
         -- The shared rig also drives held packs. Servos change joint offsets;
         -- anchored parts join this frame's batch exactly once.
-        if r.MechMotion and(worldMoved or(polish and r.OnScreen and(r.Distance or math.huge)<=DETAIL_DISTANCE))then
+        -- R128 (owner): a carried pack's aura, orbit and Mech rig follow it every frame (they trailed behind at 30 Hz).
+        local carried=not r.World and r.OnScreen
+        if r.MechMotion and(worldMoved or carried or(polish and r.OnScreen and(r.Distance or math.huge)<=DETAIL_DISTANCE))then
             r.MechMotion:Step(Gui.ReducedMotionEnabled and 0 or now,rootFrame,move)
         end
         if r.Distant and not r.Detailed and distantPolish then
@@ -416,7 +418,7 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
             r.Highlight.OutlineTransparency=r.Rank==1 and .94 or math.max(.25,.80-r.Rank*.07)+.04*math.sin(now*1.4+r.Phase)
         end
         local fx=r.Fx
-        if fx and polish then
+        if fx and(polish or carried)then
             move(fx.Anchor,rootFrame)
             local orbitFrame=AuraGeometry.Frame(rootFrame,r.OrbitBounds)
             move(fx.OrbitAnchor,orbitFrame)

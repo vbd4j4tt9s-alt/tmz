@@ -50,7 +50,7 @@ local function frames(seconds)W.frames(math.floor(seconds*60+.5),1/60)end
 -- Darkness curve ------------------------------------------------------------------------------------------------------
 check(F.Level(-.1,false)==0 and F.Level(F.Duration,false)==0,'no darkness outside the effect')
 check(F.Level(F.Flicker+1,false)==1 and F.Level(F.Flicker+F.Hold-.01,false)==1,'fully dark during the hold ('..F.Hold..' s)')
-check(F.Duration>=8 and F.Duration<=12,'lasts '..F.Duration..' s (lights flicker out, hold, come back)')
+check(math.abs(F.Duration-6.95)<1e-9,'lasts '..F.Duration..' s (R128: 3 s shorter than R127)')
 local drops=0;local prev,rising=0,true;for i=1,90 do local v=F.Level(i/90*F.Flicker,false);if rising and v<prev-1e-9 then drops+=1;rising=false elseif v>prev+1e-9 then rising=true end;prev=v end
 check(drops>=2,'normal: the lights flicker before going out ('..drops..' flickers)')
 local mono=true;prev=0;for i=1,90 do local v=F.Level(i/90*F.Flicker,true);if v<prev-1e-9 then mono=false end;prev=v end

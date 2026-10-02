@@ -2,7 +2,7 @@
 -- R127 (owner): the lights-out is a real view-distance cut, like someone switching the lights off. The lights flicker
 -- out, then the air goes black a short way from the camera: nearby things stay visible, everything further away is
 -- black. A soft lantern glow (local only) lights the ground right around your own character. After a few seconds
--- the lights come back. The world is darkened only through EnvironmentLighting.SetBlackout (the one biome palette
+-- the lights come back (about 7 s in all since R128). The world is darkened only through EnvironmentLighting.SetBlackout (the one biome palette
 -- blend), which writes the normal palette back exactly at level 0, on Stop, on teardown and on respawn.
 -- Reduced Motion: no flicker, a slower and slightly lighter fade. Triggered by the server remote with its server
 -- timestamp; replays are ignored, and a late delivery joins the darkness part-way instead of restarting it.
@@ -13,7 +13,7 @@ local F={}
 F.SoundId='rbxassetid://113339179211972'
 F.Volume=.8
 F.Flicker=.45          -- seconds the lights stutter before going out
-F.Hold=7               -- seconds fully dark
+F.Hold=4               -- seconds fully dark (R128 owner: whole effect 3 s shorter, ~7 s)
 F.Return=2.5           -- seconds for the lights to come back
 F.Duration=F.Flicker+F.Hold+F.Return
 F.MaxAge=F.Flicker+F.Hold  -- a delivery later than this is ignored (the darkness is nearly over)
