@@ -129,6 +129,7 @@ local function runServer()
 	startupPhase = "starting ChestService"
 	chestService:Start()
     local weather=require(modules.WeatherService).new(playerData,chestService);weather:Start()
+    require(modules.FruitOfHourService).new(notifications):Start() -- R132
     require(ReplicatedStorage.GardenTypography).Apply(mapService.MapRoot)
 	startupPhase = "starting ChaseService"
 	chaseService:Start()

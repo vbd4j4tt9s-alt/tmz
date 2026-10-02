@@ -1,0 +1,89 @@
+--!nocheck
+-- Market preview (not a test): runs the REAL builders on the mock and prints one JSON scene for render_market.mjs.
+-- WHICH = 'new' (the real MarketLayout with the R132 polish and the floating Fruit of the Hour) or
+-- 'old' (the R131 market, MarketLayoutR131).
+local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
+local which=WHICH or'new'
+-- Mock gaps: Model scale (Roblox scales every part about the pivot) and a full lookAt.
+do local Inst=R.Inst
+ -- Models pivot like Roblox: PrimaryPart, else the stored pivot, else the box centre; PivotTo moves every part.
+ local partPivot,partGet=Inst.PivotTo,Inst.GetPivot
+ function Inst:GetPivot()
+  if self._class=='Model'then local pp=self._props.PrimaryPart;if pp then return pp.CFrame end;if self._pivot then return self._pivot end;return(self:GetBoundingBox())end
+  return partGet(self)
+ end
+ function Inst:PivotTo(cf)
+  if self._class~='Model'then return partPivot(self,cf)end
+  local delta=cf*self:GetPivot():Inverse()
+  for _,d in ipairs(self:GetDescendants())do if d:IsA('BasePart')then d.CFrame=delta*d.CFrame end end
+  if not self._props.PrimaryPart then self._pivot=cf end
+ end
+ function Inst:GetScale()return self._scale or 1 end
+ function Inst:ScaleTo(k)
+  local f=k/(self._scale or 1);self._scale=k;local pivot=self:GetPivot()
+  for _,d in ipairs(self:GetDescendants())do if d:IsA('BasePart')then
+   local rel=pivot:Inverse()*d.CFrame;d.Size=d.Size*f
+   d.CFrame=pivot*R.CFrame.new(rel.Position.X*f,rel.Position.Y*f,rel.Position.Z*f)*rel.Rotation
+   local mesh=d:FindFirstChildOfClass('SpecialMesh');if mesh and mesh.Scale then mesh.Scale=mesh.Scale end
+  end end
+ end
+ R.CFrame.lookAt=function(p,t,up)
+  local f=(t-p).Unit;local u0=up or V3(0,1,0)
+  if math.abs(f.X*u0.X+f.Y*u0.Y+f.Z*u0.Z)>.999 then u0=math.abs(f.Y)>.9 and V3(0,0,1)or V3(0,1,0)end
+  local r=f:Cross(u0).Unit;local u=r:Cross(f)
+  return R.CFrame.new(p.X,p.Y,p.Z,r.X,u.X,-f.X,r.Y,u.Y,-f.Y,r.Z,u.Z,-f.Z)
+ end
+ W.env.CFrame=R.CFrame
+end
+local map=R.new('Model');map.Name='ChestChaseMap';map.Parent=W.workspace
+local hub=R.new('Folder');hub.Name='EconomyHub';hub.Parent=map
+for _,n in ipairs({'BuyStation','SellStation'})do local s=R.new('Part');s.Name=n;s.Parent=hub end
+local Center
+if which=='old'then local M=W.module('MarketLayoutR131');Center=M.Center;M.Apply(map)
+else local M=W.module('MarketLayout');Center=M.Center;M.Apply(map);R.advance(.1)end
+local preview=R.new('Model');preview.Name='PreviewStandIns';preview.Parent=W.workspace
+if which=='new'then
+ local M=W.module('MarketLayout')
+ -- The Fruit of the Hour floating over the cradle, built like FruitOfHourDisplay does on clients.
+ local current=W.module('FruitOfHour').At(FOH_TIME or 1759430000)
+ local ok,model=pcall(W.module('HarvestPresentation').Build,{SeedId=FOH_ID or current.SeedId,Mutation='None',Weather='None'})
+ if ok and model then
+  model.Parent=preview;local _,box=model:GetBoundingBox();model:ScaleTo(2.6/math.max(box.X,box.Y,box.Z))
+  local c=model:GetBoundingBox();local at=Center+M.FruitOfHour+V3(0,7.2,0)
+  model:PivotTo(CF(at+(model:GetPivot().Position-c.Position))*R.CFrame.Angles(0,.5,0))
+ end
+end
+-- Dump --------------------------------------------------------------------------------------------------------
+local function n(v)return string.format('%.4f',v)end
+local function c3(c)if not c then return"[163,162,165]"end;return string.format('[%d,%d,%d]',math.floor(c.R*255+.5),math.floor(c.G*255+.5),math.floor(c.B*255+.5))end
+local function q(s)return'"'..tostring(s):gsub('\\','\\\\'):gsub('"','\\"'):gsub('\n','\\n')..'"'end
+local function enumName(e)if type(e)=='table'and e.Name then return e.Name end;local s=tostring(e);return s:match('([%w_]+)$')or s end
+local parts,lights={},{}
+local id=0
+local function walk(o)
+ for _,c in ipairs(o:GetChildren())do
+  if c:IsA('BasePart')then
+   id+=1;local cf=c.CFrame;local r=cf.R;local p=cf.Position;local s=c.Size
+   local shape=c.ClassName=='WedgePart'and'Wedge'or c.ClassName=='CornerWedgePart'and'Corner'or(c.Shape and enumName(c.Shape))or'Block'
+   local mesh=c:FindFirstChildOfClass('SpecialMesh')
+   if mesh and enumName(mesh.MeshType)=='Sphere'then local k=mesh.Scale or V3(1,1,1);shape='Ball';s=V3(s.X*k.X,s.Y*k.Y,s.Z*k.Z)end
+   local guis={}
+   for _,g in ipairs(c:GetChildren())do if g.ClassName=='SurfaceGui'then
+    local lines={}
+    for _,t in ipairs(g:GetChildren())do if t.ClassName=='TextLabel'then
+     local pos,size=t.Position,t.Size
+     table.insert(lines,string.format('{"text":%s,"color":%s,"x":%s,"y":%s,"w":%s,"h":%s,"stroke":%s}',q(t.Text),c3(t.TextColor3),n(pos.X.Scale),n(pos.Y.Scale),n(size.X.Scale),n(size.Y.Scale),(t.TextStrokeTransparency or 1)<1 and'true'or'false'))
+    end end
+    local cs=g.CanvasSize or R.Vector2.new(800,200)
+    table.insert(guis,string.format('{"face":%s,"canvas":[%s,%s],"lines":[%s]}',q(enumName(g.Face)),n(cs.X),n(cs.Y),table.concat(lines,',')))
+   end end
+   for _,l in ipairs(c:GetChildren())do if l.ClassName=='PointLight'then table.insert(lights,string.format('{"p":[%s,%s,%s],"color":%s,"range":%s}',n(p.X),n(p.Y),n(p.Z),c3(l.Color),n(l.Range or 10)))end end
+   table.insert(parts,string.format('{"name":%s,"shape":%s,"size":[%s,%s,%s],"p":[%s,%s,%s],"r":[%s,%s,%s,%s,%s,%s,%s,%s,%s],"color":%s,"material":%s,"t":%s,"guis":[%s]}',
+    q(c.Name),q(shape),n(s.X),n(s.Y),n(s.Z),n(p.X),n(p.Y),n(p.Z),n(r[1][1]),n(r[1][2]),n(r[1][3]),n(r[2][1]),n(r[2][2]),n(r[2][3]),n(r[3][1]),n(r[3][2]),n(r[3][3]),
+    c3(c.Color),q(enumName(c.Material)),n(c.Transparency or 0),table.concat(guis,',')))
+  end
+  walk(c)
+ end
+end
+walk(W.workspace)
+print(string.format('{"center":[%s,%s,%s],"parts":[%s],"lights":[%s]}',n(Center.X),n(Center.Y),n(Center.Z),table.concat(parts,','),table.concat(lights,',')))

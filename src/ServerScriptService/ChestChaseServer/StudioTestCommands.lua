@@ -136,6 +136,20 @@ local function executeFor(ctx,player,text,requester)
   if not ctx.ServerClearer then ctx.ServerClearer=ServerClear.new(ctx)end
   return ctx.ServerClearer:Request(requester,action=='clearinventory'and 'inventory'or 'garden')
  end
+ if action=='fruithour'then
+  -- R132: /test fruithour [fruit] [1.5-3] makes a fruit the Fruit of the Hour for 10 minutes; off returns to the clock.
+  local Hour=require(RS:WaitForChild('FruitOfHour'));local now=workspace:GetServerTimeNow()
+  if #a==1 and key(a[1])=='off'then Hour.SetTest(nil);return true,'Fruit of the Hour follows the clock again: '..(Hour.At(now).Name or'?')..'.'end
+  local m=3;if #a>0 and tonumber(a[#a])then m=number(table.remove(a),3,Hour.Min,Hour.Max);if not m then return false,'The bonus must be 1.5 to 3.'end end
+  local id
+  if #a==0 then local list=Hour.Candidates();id=list[math.random(1,#list)]
+  else
+   for _,spec in ipairs(choose(table.concat(a,' '),false))do if table.find(Hour.Candidates(),spec.id)then id=spec.id end end
+   if not id then return false,'Unknown fruit. Try /test fruithour apple 3 (catalog all lists them).'end
+  end
+  Hour.SetTest(id,m,now,600)
+  return true,('Fruit of the Hour for 10 minutes: %s sells ×%.1f. /test fruithour off ends it.'):format(Hour.Name(id),m)
+ end
  -- Mutations wait until normal game transactions are finished.
  if ctx.Chase:IsPlayerBusy(player)or player:GetAttribute('ChestChaseRunActive')or player:GetAttribute('ChestChaseSeedCarrying')then return false,'Finish your chase before using this test command.'end
  if ctx.Chests:IsOpening(player)then return false,'Wait for the pack to finish opening.'end

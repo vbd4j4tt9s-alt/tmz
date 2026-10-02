@@ -1561,12 +1561,14 @@ function PlayerDataService:SellHarvest(player, harvestId)
 	for index, crop in ipairs(garden and garden.Harvests or {}) do
 		if crop.Id == harvestId then
 			if not self.Config.GardenPlants[crop.SeedId] then return false, "THIS HARVEST NEEDS A NEWER UPDATE" end
-			local receipt,reason=self:_prepareSale(player,crop.Value);if not receipt then return false,reason end
+			-- R132: the Fruit of the Hour sells for its bonus (x1.5 to x3).
+			local value=require(game:GetService('ReplicatedStorage').FruitOfHour).SaleValue(crop.SeedId,crop.Value,workspace:GetServerTimeNow())
+			local receipt,reason=self:_prepareSale(player,value);if not receipt then return false,reason end
 			table.remove(garden.Harvests, index)
 			table.insert(garden.PendingSales,receipt)
 			self:_gardenChanged(player)
 			self:TutorialEvent(player,'Sell')
-			return true, crop.Value
+			return true, value
 		end
 	end
 	return false, "THAT HARVEST WAS ALREADY SOLD OR IS NOT YOURS"
@@ -1585,10 +1587,10 @@ function PlayerDataService:SellAllHarvests(player)
  if not self:IsLoaded(player)then return false,'YOUR DATA IS STILL LOADING'end
  local garden=self.Gardens[player];local crops=garden and garden.Harvests or{}
  if #crops==0 then return false,'NO CROPS TO SELL'end
- local total=0
+ local total=0;local Hour=require(game:GetService('ReplicatedStorage').FruitOfHour);local now=workspace:GetServerTimeNow()
  for _,crop in ipairs(crops)do
   if not self.Config.GardenPlants[crop.SeedId]or not gardenInteger(crop.Value,1,9000000000000)then return false,'THIS HARVEST NEEDS A NEWER UPDATE'end
-  total+=crop.Value
+  total+=Hour.SaleValue(crop.SeedId,crop.Value,now) -- R132: Fruit of the Hour bonus
  end
  local receipt,reason=self:_prepareSale(player,total);if not receipt then return false,reason end
  local count=#crops;garden.Harvests={};table.insert(garden.PendingSales,receipt);self:_gardenChanged(player)
@@ -1628,7 +1630,9 @@ function PlayerDataService:GetHarvestInventory(player)
             local key = crop.SeedId..":"..crop.Value..":"..mutation..":"..weather..":"..fruitScale..(holo.Is(crop.SeedId)and(":"..holo.Form(crop,crop.FruitIndex))or'')
 			local group = groups[key]
 			if not group then
-				group = {SeedId = crop.SeedId, InventoryId = crop.Id, Count = 0, SellValue = crop.Value,
+				-- R132: the list shows what it sells for now (Fruit of the Hour bonus included).
+				local hourBonus=require(game:GetService('ReplicatedStorage').FruitOfHour).Multiplier(crop.SeedId,workspace:GetServerTimeNow())
+				group = {SeedId = crop.SeedId, InventoryId = crop.Id, Count = 0, SellValue = math.floor(crop.Value*hourBonus+.5), HourMultiplier = hourBonus>1 and hourBonus or nil,
                     VisualCrop = {SourceCropId=crop.SourceCropId or crop.Id,FruitIndex=crop.FruitIndex or 1,HarvestCycle=crop.HarvestCycle or 0},
 					Name = (weather~="None"and Weather.Display(weather).." "or"")..(mutation ~= "None" and mutation.." " or "")..fruitName, Mutation=mutation,Weather=weather,WeatherMultiplier=Weather.Traits[weather].Multiplier, FruitScale=fruitScale, Emoji = seed.Emoji, Stage = stage,
 					Color = {R = seed.Color.R * 255, G = seed.Color.G * 255, B = seed.Color.B * 255}}

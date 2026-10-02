@@ -392,5 +392,60 @@ do
  check(opened and opened.Kind=='Seed'and opened.SeedScale==2.5,'R126: opening a 2.5x Mech pack gives a 2.5x seed ('..tostring(opened and opened.SeedScale)..')')
  if opened then Data:RemoveChest(C,opened.Id)end
 end
+-- R132 (owner): the Fruit of the Hour sells for x1.5 to x3 (single sale, sell all, and the price the sell menu shows).
+do
+ local Hour=W.module('FruitOfHour')
+ local slot=1
+ local function grow(p)
+  local fp=Data:AddChest(p,{Stage=1,BagVariant='Pack01',PackSize=1});Data:OpenSeedPack(p,fp.Id,function()return .1 end)
+  slot+=1;local s=find(p,fp.Id);local ok,c=Data:PlantSeed(p,slot,s.Id,{OffsetX=0,OffsetZ=0},os.time())
+  assert(ok,'R132 fixture plant: '..tostring(c));assert(Data:HarvestPlant(p,slot,c.Id,c.ReadyAt+1),'R132 fixture harvest')
+  return Data.Gardens[p].Harvests[#Data.Gardens[p].Harvests]
+ end
+ Data.Gardens[A].Harvests={};Data.Gardens[A].PendingSales={}
+ local crop=grow(A)
+ local hot,cold
+ for h=480000,480000+24*60 do local c=Hour.At(h*3600);if c.SeedId==crop.SeedId and not hot then hot=c end;if c.SeedId~=crop.SeedId and not cold then cold=c end end
+ check(hot and cold,'R132 fixture: an hour with and one without this fruit')
+ local realNow=W.workspace.GetServerTimeNow;local clock=hot.StartsAt+60
+ W.workspace.GetServerTimeNow=function()return clock end
+ local want=math.floor(crop.Value*hot.Multiplier+.5)
+ local listed;for _,g in ipairs(Data:GetHarvestInventory(A))do if g.InventoryId==crop.Id then listed=g end end
+ check(listed and listed.SellValue==want and listed.HourMultiplier==hot.Multiplier,('R132: sell menu lists the bonus price (%s -> %s, x%.1f)'):format(crop.Value,tostring(listed and listed.SellValue),hot.Multiplier))
+ local ok,paid=Data:SellHarvest(A,crop.Id)
+ local receipt=Data.Gardens[A].PendingSales[#Data.Gardens[A].PendingSales]
+ check(ok and paid==want and receipt and receipt.Amount==want,('R132: selling the Fruit of the Hour pays the bonus (%s, receipt %s)'):format(tostring(paid),tostring(receipt and receipt.Amount)))
+ Data.Gardens[A].PendingSales={}
+ local c2=grow(A);clock=cold.StartsAt+60
+ local ok2,paid2=Data:SellHarvest(A,c2.Id)
+ check(ok2 and paid2==c2.Value,'R132: in another hour the same fruit sells for its normal price')
+ local listed2;Data.Gardens[A].PendingSales={};local c3=grow(A);local c4=grow(A)
+ for _,g in ipairs(Data:GetHarvestInventory(A))do if g.InventoryId==c3.Id or g.InventoryId==c4.Id then listed2=g end end
+ check(listed2 and listed2.SellValue==c3.Value and listed2.HourMultiplier==nil,'R132: no bonus shown outside its hour')
+ clock=hot.StartsAt+3000
+ local ok3,total,count=Data:SellAllHarvests(A)
+ local wantAll=math.floor(c3.Value*hot.Multiplier+.5)+math.floor(c4.Value*hot.Multiplier+.5)
+ check(ok3 and total==wantAll and count==2,('R132: sell all adds the bonus to each fruit (%s, want %s)'):format(tostring(total),wantAll))
+ Data.Gardens[A].PendingSales={}
+ -- /test fruithour (owner test): a chosen fruit and bonus for 10 minutes, then back to the clock.
+ local Cmd=server('StudioTestCommands');local studio=Run.IsStudio;Run.IsStudio=function()return true end
+ local ctx={Data=Data,Chase=Chase,Chests=Chests};clock=cold.StartsAt+10
+ local name=Hour.Name(crop.SeedId)
+ local okc,msgc=Cmd.Execute(ctx,A,'/test fruithour '..name..' 2.5')
+ local forced=Hour.At(clock)
+ check(okc and forced.SeedId==crop.SeedId and forced.Multiplier==2.5 and forced.Test,'R132: /test fruithour '..name..' 2.5 -> '..tostring(msgc))
+ local c5=grow(A);local ok5,paid5=Data:SellHarvest(A,c5.Id)
+ check(ok5 and paid5==math.floor(c5.Value*2.5+.5),'R132: the test fruit sells for the test bonus ('..tostring(paid5)..')')
+ Data.Gardens[A].PendingSales={}
+ clock+=601;check(Hour.At(clock).SeedId==cold.SeedId and not Hour.At(clock).Test,'R132: the test ends after 10 minutes')
+ clock-=601;okc=Cmd.Execute(ctx,A,'/test fruithour off')
+ check(okc and RS:GetAttribute('FruitOfHourTest')==nil and Hour.At(clock).SeedId==cold.SeedId,'R132: fruithour off goes back to the clock')
+ check(not Cmd.Execute(ctx,A,'/test fruithour '..name..' 9'),'R132: a bonus over x3 is refused')
+ check(not Cmd.Execute(ctx,A,'/test fruithour no such fruit'),'R132: an unknown fruit is refused')
+ check(not Cmd.Execute(ctx,A,'/test fruithour '..name..' @Bob'),'R132: fruithour is server-wide (no @target)')
+ local okr,msgr=Cmd.Execute(ctx,A,'/test fruithour');check(okr and Hour.At(clock).Test and Hour.At(clock).Multiplier==3,'R132: plain fruithour picks a fruit at x3: '..tostring(msgr))
+ Cmd.Execute(ctx,A,'/test fruithour off');Run.IsStudio=studio
+ W.workspace.GetServerTimeNow=realNow
+end
 print(string.format('%d/%d checks passed%s',checks-fails,checks,fails>0 and(' ('..fails..' FAILED)')or''))
 if fails>0 then error('failures',0)end

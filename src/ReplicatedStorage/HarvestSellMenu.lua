@@ -64,7 +64,7 @@ function Menu:UpdateRow(row,item)
  local r=self.Data[row];r.Item=item
  local traitText=Traits.Lines(item,22);if traitText==''then traitText='Normal'end
  Traits.Style(r.Traits,item)
- local values={Name=Names.Fruit(item.SeedId,item.FruitName or item.Name)..((item.Count or 1)>1 and' ×'..item.Count or''),Traits=traitText..'\n'..Weight.Text('Fruit',item.SeedId,math.min(25,item.FruitScale or 1)),Details='Bonus ×'..string.format('%g',math.floor((item.CashMultiplier or 1)*100+.5)/100)..' (size × coat × weather)',Action='Sell\n$'..Cash.Compact(item.SellValue)}
+ local values={Name=Names.Fruit(item.SeedId,item.FruitName or item.Name)..((item.Count or 1)>1 and' ×'..item.Count or''),Traits=traitText..'\n'..Weight.Text('Fruit',item.SeedId,math.min(25,item.FruitScale or 1)),Details='Bonus ×'..string.format('%g',math.floor((item.CashMultiplier or 1)*100+.5)/100)..' (size × coat × weather)'..(item.HourMultiplier and('\n🌟 Fruit of the Hour ×'..string.format('%.1f',item.HourMultiplier))or''),Action='Sell\n$'..Cash.Compact(item.SellValue)}
  for field,value in pairs(values)do if r[field].Text~=value then r[field].Text=value end end
  r.Action:SetAttribute('ExactCash',Cash.Exact(item.SellValue));r.Action.Active=self.State.CanSell==true;r.Action.AutoButtonColor=r.Action.Active;r.Action.BackgroundTransparency=r.Action.Active and 0 or .5
 end

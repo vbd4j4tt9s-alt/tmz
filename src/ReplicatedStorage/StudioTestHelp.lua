@@ -46,6 +46,7 @@ return {
  {'/test regrow @username','Make fruit ready again on mature plants.'},
  {'/test harvestall @username','Pick all ready fruit that fits the bag.'},
  {'/test sellall @username','Sell all harvested fruit.'},
+ {'/test fruithour ember pumpkin 3','server: Make a fruit the Fruit of the Hour (x1.5–3) for 10 minutes. fruithour off goes back to the clock.'},
  {'/test clear inventory @username','Clear seeds, packs and fruit (keeps the shovel). Also: seeds, packs, plants, harvests, all.'},
  {'/test clearinventory all','server: Clear everyone’s inventory. cleargarden all clears everyone’s garden.'},
 
