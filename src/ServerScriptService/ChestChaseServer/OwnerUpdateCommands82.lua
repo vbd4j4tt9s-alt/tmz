@@ -195,8 +195,9 @@ function X.Execute(ctx,p,action,a)
    bonus.Ready[p]=0;local ok,ready=bonus:GrantReady(p,n);return ok,'Bonus rolls ready: '..tostring(ready)
   elseif mode=='progress'then
    local text=a[2]or'';local m,sec=text:match('^(%d+):(%d%d)$');local seconds=m and tonumber(m)*60+tonumber(sec)or tonumber(text)
-   if #a~=2 or not seconds or seconds~=seconds or seconds<0 or seconds>600 then return false,'Use bonus progress <0–600 seconds or m:ss>, e.g. bonus progress 9:50.'end
-   local ok,left=bonus:SetProgress(p,seconds);return ok,'Saved treadmill progress: '..math.floor(tonumber(left)or 0)..' / 600 s. Get on the treadmill to see the bar.'
+   local interval=require(game:GetService('ReplicatedStorage').TreadmillBonusRules).IntervalSeconds -- R124: 360 s (was 600)
+   if #a~=2 or not seconds or seconds~=seconds or seconds<0 or seconds>interval then return false,'Use bonus progress <0–'..interval..' seconds or m:ss>, e.g. bonus progress 5:50.'end
+   local ok,left=bonus:SetProgress(p,seconds);return ok,'Saved treadmill progress: '..math.floor(tonumber(left)or 0)..' / '..interval..' s. Get on the treadmill to see the bar.'
   elseif mode=='roll'then
    if #a~=1 then return false,'Use bonus roll.'end
    local result=bonus:Roll(p);if result.Error then return false,result.Error end
@@ -204,7 +205,7 @@ function X.Execute(ctx,p,action,a)
   elseif mode=='status'then
    if #a>1 then return false,'Use bonus, bonus ready <n>, bonus progress <s> or bonus roll.'end
    local names={};for _,st in ipairs(bonus:Pool(p))do names[#names+1]=ctx.Config.BiomeNames[st]end
-   return true,'Ready '..bonus:GetReady(p)..'/2 | saved progress '..math.floor(bonus:GetProgress(p))..'/600 s | on treadmill '..tostring(p:GetAttribute('TreadmillTraining')==true)..' | pool: '..table.concat(names,', ')
+   return true,'Ready '..bonus:GetReady(p)..'/2 | saved progress '..math.floor(bonus:GetProgress(p))..'/'..require(game:GetService('ReplicatedStorage').TreadmillBonusRules).IntervalSeconds..' s | on treadmill '..tostring(p:GetAttribute('TreadmillTraining')==true)..' | pool: '..table.concat(names,', ')
   end
   return false,'Use bonus, bonus ready <n>, bonus progress <s> or bonus roll.'
  elseif action=='admins'then

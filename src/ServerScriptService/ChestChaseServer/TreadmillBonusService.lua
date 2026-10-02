@@ -56,7 +56,7 @@ function S:Cleanup(player)
 end
 -- Public API (owner/test commands). All clamp to the normal rules and republish the attributes.
 -- :GrantReady(player,n) adds n READY rolls (cap 2, session only); :SetProgress(player,seconds) sets saved progress
--- (0..600); :Pool(player) -> {stage,...} for the best owned treadmill; :GetReady / :GetProgress read state.
+-- (0..Rules.IntervalSeconds); :Pool(player) -> {stage,...} for the best owned treadmill; :GetReady / :GetProgress read state.
 function S:GrantReady(player,n)
  if not self.Data:IsLoaded(player)then return false end
  self.Ready[player]=Rules.ReadyCount(self:GetReady(player)+(tonumber(n)or 1));self:_publish(player);return true,self:GetReady(player)

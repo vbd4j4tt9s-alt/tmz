@@ -71,7 +71,7 @@ return {
  {'— TREADMILL BONUS —',''},
  {'/test bonus @username','Ready rolls, saved progress toward the next one, and which biomes are in their roll pool.'},
  {'/test bonus ready 2 @username','Set 0–2 ready rolls (the roll button appears). Leaving the game loses them.'},
- {'/test bonus progress 9:50 @username','Set saved treadmill time (seconds or m:ss, max 10:00). 9:50 = roll in 10 s on the treadmill.'},
+ {'/test bonus progress 5:50 @username','Set saved treadmill time (seconds or m:ss, max 6:00). 5:50 = roll in 10 s on the treadmill.'},
  {'/test bonus roll @username','Use a ready roll for them now (grants the pack, no animation).'},
 
  {'— GIFTS —',''},

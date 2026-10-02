@@ -1,7 +1,8 @@
 -- R123: treadmill bonus rolls (owner request, final spec). Pure rules shared by TreadmillBonusService (server,
 -- authoritative) and TreadmillBonusClient (roll button, crate-style strip, progress bar over the player).
 --
--- Earning: only time on a treadmill counts (the server's own BaseService.TrainingSessions lock). Every 10 minutes of
+-- Earning: only time on a treadmill counts (the server's own BaseService.TrainingSessions lock). Every 6 minutes (R124;
+-- was 10) of
 -- treadmill time makes one roll READY. Progress is SAVED (profile Premium.TreadmillBonusProgress, seconds): 5 minutes,
 -- get off, rejoin tomorrow -> still 5 minutes. READY rolls stack to 2 and are NOT saved (leaving the game loses them);
 -- while 2 are ready the timer pauses (time beyond the cap is lost).
@@ -19,7 +20,7 @@
 --    The Void Pack is not a biome pick: when Secret comes up it is always the Storm Void Pack (any treadmill).
 --    The paid Mech pack is never in the pool.
 local PackRules=require(script.Parent.SeedPackRules)
-local B={Version=124,IntervalSeconds=600,MaxReady=2,SaveEvery=10,RollCooldown=1,RemoteName='TreadmillBonusRoll'}
+local B={Version=124,IntervalSeconds=360,MaxReady=2,SaveEvery=10,RollCooldown=1,RemoteName='TreadmillBonusRoll'}
 B.VariantOrder={'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06','EclipseReliquary'}
 B.Odds={Pack01=.435,Pack02=.286,Pack03=.172,Pack04=.081,Pack05=.02,Pack06=.005,EclipseReliquary=.001}
 B.Void={Variant='EclipseReliquary',Stage=7,Name='Secret',Color=Color3.fromRGB(190,144,255),Label='Void Pack'}
