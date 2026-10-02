@@ -1,4 +1,4 @@
-# Test commands and tools (R130)
+# Test commands and tools (R131)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -182,3 +182,7 @@ listed separately any more because each one is the same as a command above.
    - Click the alt from far away: "Get closer to <name> to give."
    - `refreshpacks`: the sky goes dark during the refresh (black sky, or a midnight sky with dark air on clients without the image API), and comes back after. With `weather rain` on, no grey cloud layer appears during the refresh.
    - Keepers still stand at home and chase normally (their idle upkeep is lighter now).
+16. **R131:**
+   - Gifts in Studio (Clients and Servers, 2 players): Player1 gives to Player2; Player2 gets "🎁 Player1 gave you …!" with a chime. With Studio API access off, Player1 is told to turn it on.
+   - Look across the base: the garden name bubbles are smaller from far away and don't cover gardens.
+   - `weather rain`: mutations are rare (0.2% per minute); `weather rain all` still forces them.
