@@ -105,7 +105,8 @@ function S:Roll(player)
  if not pick then return {Error='Bonus packs are unavailable right now.',Ready=ready}end
  -- The existing grant path (what ChestService:Bank does for a stolen pack): AddChest never yields, so the roll,
  -- the grant and spending the roll happen in one step; the Tool is synced afterwards.
- local record,reason=self.Data:AddChest(player,{Stage=pick.Stage,BagVariant=pick.Variant,PackSize=1,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion})
+ local size=PackRules.RollPackSize(self.Random:NextNumber()) -- R126: rolls a pack size like world packs
+ local record,reason=self.Data:AddChest(player,{Stage=pick.Stage,BagVariant=pick.Variant,PackSize=size,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion})
  if not record then return {Error=reason or'PACK COULD NOT BE ADDED',Ready=ready}end
  self.Ready[player]=ready-1
  if self.Data.QueueGardenSave then self.Data:QueueGardenSave(player)end
@@ -116,6 +117,6 @@ function S:Roll(player)
  end
  local rarity=Rules.Tier(pick.Variant)
  return {Ok=true,Stage=pick.Stage,Variant=pick.Variant,Rarity=rarity,Biome=pick.Variant==Rules.Void.Variant and Rules.Void.Label or PackRules.DesignBiomes[pick.Stage],
-  Label=PackRules.PackLabel(pick.Stage,pick.Variant,1,'None'),Id=record.Id,Pool=Rules.EncodePool(stages),Ready=ready-1}
+  Label=PackRules.PackLabel(pick.Stage,pick.Variant,size,'None'),Size=record.PackSize,Id=record.Id,Pool=Rules.EncodePool(stages),Ready=ready-1}
 end
 return S

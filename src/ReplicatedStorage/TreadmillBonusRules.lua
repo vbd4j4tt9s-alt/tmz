@@ -7,7 +7,7 @@
 -- get off, rejoin tomorrow -> still 5 minutes. READY rolls stack to 2 and are NOT saved (leaving the game loses them);
 -- while 2 are ready the timer pauses (time beyond the cap is lost).
 --
--- What a roll gives: one ordinary world seed pack (PackSize 1, no coat, no weather, current odds version), granted
+-- What a roll gives: one ordinary world seed pack (R126: a rolled pack size like world packs; no coat, no weather, current odds version), granted
 -- with PlayerData:AddChest + ChestService:SyncTools (the ChestService:Bank path for a stolen pack), so opening it uses the normal seed odds and boot luck as usual.
 --  * Pack rarity (R124 owner odds, B.Odds; no longer the world spawn weights):
 --      Secret = the Void Pack ("the cosmic pack", EclipseReliquary, always a Storm pack) 0.1%

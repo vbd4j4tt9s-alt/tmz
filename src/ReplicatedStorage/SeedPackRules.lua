@@ -91,7 +91,7 @@ function Rules.SeedSizeCap(stage,key,packSize)
     return math.min(Rules.MaxSeedScale,Rules.SeedBaseScale(stage,key)*(1.4+math.max(0,size-1)))
 end
 function Rules.NewSeedScale(stage,key,packSize)
-    if key=='MechLimited'then return 1 end
+    -- R126: Mech packs now roll a size too; their seeds follow it like any pack (a 1x Mech pack still gives scale 1).
     local size=Rules.SanitizePackSize(packSize)
     for _,spec in ipairs(Rules.SeedDesigns)do if spec.id=='SupernovaBloomSeed'then spec.name='Boom Bloom'end end
 return require(script.Parent.SizeNumbers).Half(math.min(Rules.SeedBaseScale(stage,key)*size,Rules.SeedSizeCap(stage,key,size)))

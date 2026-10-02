@@ -3,6 +3,8 @@ local RS=game:GetService('ReplicatedStorage');local Http=game:GetService('HttpSe
 local Catalog=require(RS.MechCatalog);local PackRules=require(RS.SeedPackRules);local Receipts=require(RS.SaleReceiptRules)
 local T=require(RS.BalanceValues81)
 local P={}
+-- R126 (owner): bought Mech packs roll a pack size like world packs (BalanceRules.PackSizes).
+local SizeRandom=Random.new()
 local function integer(n,lo,hi)return type(n)=='number'and n==n and n%1==0 and n>=lo and n<=hi end
 local function copy(t)local out={};for k,v in pairs(t)do out[k]=type(v)=='table'and copy(v)or v end;return out end
 function P.Decode(saved)
@@ -110,7 +112,7 @@ function P.Attach(Data)
   local serial=player:GetAttribute('ChestInventorySerial');local added={}
   local success,err=pcall(function()
    for _=1,offer.Count do
-    local record,reason=self:AddChest(player,{Stage=8,BagVariant=Catalog.Variant,PackSize=1,PackMutation='None'})
+    local record,reason=self:AddChest(player,{Stage=8,BagVariant=Catalog.Variant,PackSize=PackRules.RollPackSize(SizeRandom:NextNumber()),PackMutation='None'})
     assert(record,reason or 'PACK COULD NOT BE ADDED')
     record.PaidRandom=paid==true;record.ChestName=Catalog.Name;added[#added+1]=record
    end

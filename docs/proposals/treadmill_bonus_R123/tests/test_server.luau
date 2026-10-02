@@ -99,7 +99,9 @@ check(packs(A)==before+1,'exactly one pack added')
 local rec=Data:GetChestRecords(A)[packs(A)]
 check(rec and rec.Kind=='Pack'and rec.Id==res.Id,'granted record is a Pack with the returned id')
 check(rec and rec.Stage==1 and res.Stage==1,'Forest treadmill -> Forest pack')
-check(rec and rec.BagVariant==res.Variant and rec.OddsVersion==PackRules.OddsVersion and rec.PackSize==1 and rec.PackMutation=='None','plain world pack, current odds version')
+check(rec and rec.BagVariant==res.Variant and rec.OddsVersion==PackRules.OddsVersion and rec.PackMutation=='None','plain world pack, current odds version')
+check(rec and rec.PackSize==res.Size and PackRules.SanitizePackSize(res.Size)==res.Size,'R126: the rolled pack size is saved and returned ('..tostring(res.Size)..')')
+check(rec and rec.SeedScale==PackRules.NewSeedScale(rec.Stage,rec.BagVariant,rec.PackSize),'R126: seed scale follows the pack size like a world pack')
 check(res.Rarity==PackRules.GetPackTier(res.Variant).Name,'result rarity = the pack tier ('..tostring(res.Rarity)..')')
 check((Chests.Synced[A]or 0)==synced+1,'Tool synced once')
 check(attr(A,'Ready')==1 and res.Ready==1,'one roll spent')
@@ -184,6 +186,7 @@ do
  local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)]
  check(r.Ok and r.Variant=='EclipseReliquary'and r.Stage==7 and r.Rarity=='Secret'and r.Biome=='Void Pack','server returns SECRET Void Pack: '..tostring(r.Rarity)..' '..tostring(r.Biome))
  check(last and last.BagVariant=='EclipseReliquary'and last.Stage==7,'Void Pack granted to the bag as a Storm pack')
+ check(last and last.PackSize==PackRules.RollPackSize(.9995)and last.PackSize==5 and r.Size==5,'R126: the Void Pack rolls a size too (.9995 -> 5x)')
  if last then Data:RemoveChest(A2,last.Id)end
 end
 -- Luck/boots never change a result: same random stream, boots on vs off -> identical claims
@@ -194,6 +197,29 @@ local function seq(luck)
  return table.concat(out,'|')
 end
 check(seq(1)==seq(50000000),'boot luck x50M gives the identical 40 claims')
+-- R126 (owner): every roll also rolls the pack size from the world table (BalanceRules.PackSizes), luck-free.
+do
+ local want,weights={},{};for _,row in ipairs(PackRules.PackSizes)do want[row.Scale]=row.Weight/100 end
+ local saved=Bonus.Random;math.randomseed(126);Bonus.Random={NextNumber=function(_)return math.random()end}
+ A2:SetAttribute('ChestLuckMultiplier',50000000)
+ local n,count,bad,scaleBad,labelBad=6000,{},0,0,0
+ for _=1,n do
+  Bonus.Ready[A2]=1;R.advance(2);local r=invoke(A2)
+  local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)]
+  if not(r.Ok and last and last.Id==r.Id and want[last.PackSize]and r.Size==last.PackSize)then bad+=1 end
+  if last and last.SeedScale~=PackRules.NewSeedScale(last.Stage,last.BagVariant,last.PackSize)then scaleBad+=1 end
+  if r.Label~=PackRules.PackLabel(r.Stage,r.Variant,1,'None')then labelBad+=1 end
+  if last then count[last.PackSize]=(count[last.PackSize]or 0)+1;Data:RemoveChest(A2,last.Id)end
+ end
+ Bonus.Random=saved;A2:SetAttribute('ChestLuckMultiplier',1)
+ check(bad==0,'R126: every roll grants a size from the world table ('..bad..' bad)')
+ check(scaleBad==0,'R126: every rolled pack seed scale = NewSeedScale(size)')
+ check(labelBad==0,'R126: result text unchanged (the label never names the size)')
+ for _,s in ipairs({.5,1,1.5,2.5})do local p=want[s];local got=(count[s]or 0)/n
+  check(near(got,p,4*math.sqrt(p*(1-p)/n)),string.format('R126: size %sx ~%.1f%% (got %.2f%%)',s,p*100,got*100))end
+ local big=0;for s,c in pairs(count)do if s>1 then big+=c end end
+ check(big>0 and(count[1]or 0)<n,'R126: sizes really vary ('..big..' bigger than 1x)')
+end
 -- 9. Upgrading the treadmill republishes the pool immediately; leaving drops session state -----------------
 Data:GetTreadmillData(A2).Tier=2;Bonus:Step(0);check(attr(A2,'Pool')=='1,6','upgrade/downgrade republishes pool ('..tostring(attr(A2,'Pool'))..')')
 -- 10. Public API used by owner test commands
