@@ -90,7 +90,7 @@ end
 local Gifts=server('FruitGiftService').new(Data,Chests,Chase,nil)
 local Remote=remotes.FruitGift
 local fired={}
-function Remote.FireClient(_,p,action,msg)fired[#fired+1]={P=p,Action=action,Text=msg}end
+function Remote.FireClient(_,p,action,msg,info)fired[#fired+1]={P=p,Action=action,Text=msg,Info=info}end
 local function lastFor(p)for i=#fired,1,-1 do if fired[i].P==p then return fired[i]end end end
 -- Players ---------------------------------------------------------------------------------------------
 local unequipped=0
@@ -301,7 +301,7 @@ check(ok,'fixture harvested: '..tostring(harvest))
 local fruit=Data.Gardens[A].Harvests[#Data.Gardens[A].Harvests]
 local fruitId=fruit.Id;local fruitValue=fruit.Value
 local hb=#Data.Gardens[B].Harvests
--- R130: with the notice service the receiver gets a notice in the stack; the status line stays empty.
+-- R131: the receiver's client shows the notice and plays the chime from the 'Received' event (no second server notice).
 local shown={};Gifts.Notes={Show=function(_,p,text)shown[#shown+1]={P=p,Text=text}end}
 holdFruit(A,fruit);send(A,'Give',B,fruitId)
 Gifts.Notes=nil
@@ -309,8 +309,8 @@ local fa=false;for _,c in ipairs(Data.Gardens[A].Harvests)do if c.Id==fruitId th
 local fb;for _,c in ipairs(Data.Gardens[B].Harvests)do if c.Id==fruitId then fb=c end end
 check(not fa and fb~=nil and #Data.Gardens[B].Harvests==hb+1,'fruit moved to recipient')
 check(fb and fb.Value==fruitValue,'fruit value preserved')
-recv=lastFor(B);check(recv and recv.Action=='Received'and recv.Text=='','fruit receipt: sound cue only on the status line')
-check(#shown==1 and shown[1].P==B and shown[1].Text=='🎁 Alice gave you Golden Apple!','fruit receipt notice names giver and item: '..tostring(shown[1]and shown[1].Text))
+recv=lastFor(B);check(recv and recv.Action=='Received'and recv.Text=='🎁 Alice gave you Golden Apple!'and recv.Info and recv.Info.From=='Alice'and recv.Info.Item=='Golden Apple','fruit receipt names giver and item: '..tostring(recv and recv.Text))
+check(#shown==0,'no duplicate server notice')
 local fs=false;for _,f in ipairs(fired)do if f.P==A and f.Text and f.Text:find('Gift sent to Bob! (Golden Apple)',1,true)then fs=true end end
 check(fs,'fruit giver told the gift was sent (R130)')
 advance(31)
@@ -320,6 +320,48 @@ local fb2=fruitBox and fruitBox.Data[tostring(B.UserId)];check(fb2==nil or next(
 -- A seed id sent through the fruit action does nothing.
 local p8=Data:AddChest(A,{Stage=1,BagVariant='Pack01',PackSize=1});hold(A,p8)
 send(A,'Give',B,p8.Id);check(find(A,p8.Id)~=nil,'pack id via the fruit action is ignored')
+
+-- R131 gifting fixes ------------------------------------------------------------------------------------
+do
+ local Service=server('FruitGiftService')
+ -- Every inbox read skips the DataStore read cache.
+ local optsSeen={}
+ for name,st in pairs(stores)do if name:find('Inbox')then local get=st.GetAsync
+  st.GetAsync=function(self,key,opts)optsSeen[#optsSeen+1]=opts;return get(self,key)end end end
+ -- Studio test players have negative UserIds (Player1 = -1, Player2 = -2).
+ local S1=makePlayer(-1,'Player1',200);local S2=makePlayer(-2,'Player2',206)
+ Service.SetStudio(true)
+ local sp=Data:AddChest(S1,{Stage=2,BagVariant='Pack02',PackSize=1});hold(S1,sp)
+ send(S1,'GiveSeed',S2,sp.Id)
+ check(find(S1,sp.Id)==nil and find(S2,sp.Id)~=nil,'Studio: Player1 gives a pack to Player2 (negative UserIds)')
+ local r=lastFor(S2);check(r and r.Action=='Received'and r.Info and r.Info.From=='Player1','Studio: Player2 is notified')
+ Service.SetStudio(false)
+ local sp2=Data:AddChest(S1,{Stage=2,BagVariant='Pack02',PackSize=1});hold(S1,sp2)
+ send(S1,'GiveSeed',S2,sp2.Id);check(find(S1,sp2.Id)~=nil,'live servers still refuse ids <= 0')
+ check(Service.ValidUserId(5)and not Service.ValidUserId(0)and not Service.ValidUserId(-3)and not Service.ValidUserId(1.5),'id rules (live)')
+ -- Refusals say why instead of doing nothing.
+ local function statusFor(p)for i=#fired,1,-1 do if fired[i].P==p and fired[i].Action=='Status'then return fired[i].Text end end end
+ local q=Data:AddChest(A,{Stage=1,BagVariant='Pack01',PackSize=1});hold(A,q)
+ Data.CanSave[B]=false;send(A,'GiveSeed',B,q.Id)
+ check(find(A,q.Id)~=nil and(statusFor(A)or''):find("Bob's save is not ready",1,true),'receiver without a save: giver is told ('..tostring(statusFor(A))..')')
+ Data.CanSave[B]=true;Data.CanSave[A]=false;Service.SetStudio(true);send(A,'GiveSeed',B,q.Id)
+ check(find(A,q.Id)~=nil and(statusFor(A)or''):find('Studio API access',1,true),'Studio without saving: told to turn on API access')
+ Data.CanSave[A]=true;Service.SetStudio(false)
+ Chase.Busy[B]=true;send(A,'GiveSeed',B,q.Id);Chase.Busy[B]=nil
+ check(find(A,q.Id)~=nil and(statusFor(A)or''):find('in a run',1,true),'receiver in a run: giver is told')
+ blockLine=true;send(A,'GiveSeed',B,q.Id);blockLine=false
+ check(find(A,q.Id)~=nil and(statusFor(A)or''):find('Something is between you',1,true),'blocked line of sight: giver is told')
+ -- A gift save or inbox check in progress is waited out instead of refusing the click.
+ Gifts.Working[B]=true;task2.spawn(function()task2.wait(1.5);Gifts.Working[B]=nil end)
+ send(A,'GiveSeed',B,q.Id)
+ check(find(A,q.Id)==nil and find(B,q.Id)~=nil,'gift goes through after the receiver\'s inbox check finishes')
+ -- A gift that lands during the receiver's inbox check is picked up right after it.
+ Gifts.Working[B]=true;Gifts:Recover(B);check(Gifts.Again and Gifts.Again[B]==true,'skipped inbox check is queued again')
+ Gifts.Working[B]=nil;recover(B);advance(1)
+ check(Gifts.Again[B]==nil,'and runs once more right after')
+ local uncached=false;for _,o in ipairs(optsSeen)do if type(o)=='table'and o.UseCache==false then uncached=true end end
+ check(uncached,'inbox reads skip the 4 s read cache')
+end
 
 -- 12. Reload round trip: the recipient's saved items decode to the same traits ---------------------------
 Data:Save(B,'final',true)

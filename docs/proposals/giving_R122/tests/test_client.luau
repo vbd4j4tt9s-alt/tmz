@@ -30,6 +30,7 @@ local aim
 function W.workspace.Raycast()return aim and {Instance=aim.Character.HumanoidRootPart}or nil end
 W.env.RaycastParams={new=function()return {}end}
 W.stub('InteractionAudio',{Transaction=function()end,Play=function()end})
+local gifts={};W.stub('NoticeFeed83',{Gift=function(text)gifts[#gifts+1]=text end,Push=function()end,Plain=function()end})
 local script=R.new('LocalScript');script.Name='FruitGiftClient'
 W.load('FruitGiftClient',script)
 local gui=pg:FindFirstChild('FruitGifts');local dialog=gui and gui:FindFirstChild('GiftConfirm')
@@ -107,7 +108,11 @@ local root=R.new('Part');root.Name='HumanoidRootPart';root.Position=R.Vector3.ne
 gone:Destroy();near.Character=respawn;W.frames(10)
 check(lit(near),'light comes back on the respawned character')
 -- Messages: the receiver's text is in the notice stack; the status line shows only text the server puts there.
-remote.OnClientEvent:Fire('Received','');check(status.Visible==false,'Received with no text: nothing on the status line')
+remote.OnClientEvent:Fire('Received','🎁 Alice gave you Golden Apple!',{From='Alice',Item='Golden Apple'})
+check(status.Visible==false,'a received gift is not on the giver status line')
+check(#gifts==1 and gifts[1]:find('Alice',1,true)and gifts[1]:find('Golden Apple',1,true)and gifts[1]:find('gave you',1,true),'received gift goes to the notice stack (with its chime): '..tostring(gifts[1]))
+remote.OnClientEvent:Fire('Received','<b>x</b> gave you y!')
+check(#gifts==2 and not gifts[2]:find('<b>',1,true),'plain fallback text is escaped')
 remote.OnClientEvent:Fire('Status','Gift sent to Near!');check(status.Visible and shown(status)=='Gift sent to Near!','sender status shown')
 print(string.format('%d/%d checks passed%s',checks-fails,checks,fails>0 and(' ('..fails..' FAILED)')or''))
 if fails>0 then error('failures',0)end

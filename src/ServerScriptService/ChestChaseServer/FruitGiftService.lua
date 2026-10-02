@@ -34,6 +34,43 @@ end
 function S:Available(p)
  return p and p.Parent and self.Data:IsLoaded(p)and self.Data.CanSave[p]and not self.Busy[p]and not self.Working[p]and not self.Chase:IsPlayerBusy(p)and not p:GetAttribute('GuardianRagdollActive')and body(p)
 end
+-- R131 fix (owner: "gifting doesn't seem to work"). Studio's test players (Player1, Player2…) have negative UserIds;
+-- the old check refused every id <= 0, so no gift ever went through in a Studio test. Live ids are always positive.
+local studio=game:GetService('RunService'):IsStudio()
+function S.ValidUserId(id)
+ return type(id)=='number'and id==id and id%1==0 and math.abs(id)<9007199254740991 and(id>0 or(studio and id<0))
+end
+function S.SetStudio(on)studio=on==true end -- tests
+-- Why a gift between these two can't happen right now (nil = it can). Said to the giver instead of doing nothing.
+function S:Refusal(from,to)
+ local function who(p,me,other)
+  if not p.Parent then return other end
+  if not self.Data:IsLoaded(p)then return me and'Your data is still loading.'or p.DisplayName..'\'s data is still loading.'end
+  if not self.Data.CanSave[p]then
+   if studio then return'Gifts need saving: turn on Studio API access (Game Settings > Security) and test again.'end
+   return me and'Your save is not ready, so gifts are off. Rejoin to fix it.'or p.DisplayName..'\'s save is not ready, so they can\'t receive gifts.'
+  end
+  if self.Busy[p]or self.Working[p]then return me and'Still saving your last gift. Try again in a moment.'or p.DisplayName..' is receiving another gift. Try again in a moment.'end
+  if self.Chase:IsPlayerBusy(p)then return me and'Finish your run first.'or p.DisplayName..' is in a run right now.'end
+  if p:GetAttribute('GuardianRagdollActive')or not body(p)then return'Try again in a moment.'end
+  return nil
+ end
+ return who(from,true,'Try again in a moment.')or who(to,false,'They left the game.')
+end
+-- A gift save or inbox check takes a few seconds; wait it out instead of refusing the click.
+function S:Settle(a,b)
+ for _=1,32 do
+  if not(self.Busy[a]or self.Working[a]or self.Busy[b]or self.Working[b])then return true end
+  task.wait(.25)
+ end
+ return false
+end
+function S:CanStart(from,to)
+ self:Settle(from,to)
+ local why=self:Refusal(from,to)
+ if why then self.Remote:FireClient(from,'Status',why);return false end
+ return true
+end
 function S:Near(a,b)local ar,br=body(a),body(b);if not ar or not br or(ar.Position-br.Position).Magnitude>18 then return false end
  local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Exclude;params.FilterDescendantsInstances={a.Character,b.Character};params.RespectCanCollide=true
  return workspace:Raycast(ar.Position,br.Position-ar.Position,params)==nil end
@@ -43,14 +80,19 @@ end
 -- R130: a gift to a player who walked out of reach says so instead of doing nothing.
 function S:TooFar(from,to)
  if self:Near(from,to)then return false end
- if to and to.Parent and body(from)and body(to)then self.Remote:FireClient(from,'Status','Get closer to '..to.DisplayName..' to give.')end
+ local a,b=body(from),body(to)
+ if to and to.Parent and a and b then
+  local close=(a.Position-b.Position).Magnitude<=18
+  self.Remote:FireClient(from,'Status',close and('Something is between you and '..to.DisplayName..'. Move to where you can see them.')or('Get closer to '..to.DisplayName..' to give.'))
+ end
  return true
 end
 function S:Offer(from,userId,cropId)
  local now=os.clock();if now-(self.Last[from]or -10)<2 then return end;self.Last[from]=now
- if type(userId)~='number'or userId~=userId or userId<=0 or userId>=9007199254740991 or userId%1~=0 or type(cropId)~='string'or #cropId>100 then return end
+ if not S.ValidUserId(userId)or type(cropId)~='string'or #cropId>100 then return end
  local to=Players:GetPlayerByUserId(userId)
- if to==from or not require(script.Parent.MovementGuard).Check(from)or not self:Available(from)or not self:Available(to)or self:TooFar(from,to)or not self:Held(from,cropId)then return end
+ if not to or to==from or not require(script.Parent.MovementGuard).Check(from)or not self:CanStart(from,to)or self:TooFar(from,to)then return end
+ if not self:Held(from,cropId)then self.Remote:FireClient(from,'Status','Hold the item you want to give.');return end
  local crop;for _,c in ipairs(self.Data.Gardens[from].Harvests)do if c.Id==cropId then crop=c;break end end
  if not crop then return end
  if crop.PaidRandom and(from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true)then self.Remote:FireClient(from,'Status','This purchased crop cannot be gifted between these accounts.');return end
@@ -135,9 +177,9 @@ function S:SeedPaidBlocked(record,from,to)
 end
 function S:OfferSeed(from,userId,itemId)
  local now=os.clock();if now-(self.Last[from]or -10)<2 then return end;self.Last[from]=now
- if type(userId)~='number'or userId~=userId or userId<=0 or userId>=9007199254740991 or userId%1~=0 or type(itemId)~='string'or #itemId<1 or #itemId>100 then return end
+ if not S.ValidUserId(userId)or type(itemId)~='string'or #itemId<1 or #itemId>100 then return end
  local to=Players:GetPlayerByUserId(userId)
- if to==from or not require(script.Parent.MovementGuard).Check(from)or not self:Available(from)or not self:Available(to)or self:TooFar(from,to)then return end
+ if not to or to==from or not require(script.Parent.MovementGuard).Check(from)or not self:CanStart(from,to)or self:TooFar(from,to)then return end
  local record=self:FindSeed(from,itemId)
  if not record or(record.Kind~='Pack'and record.Kind~='Seed')or not self:HeldSeed(from,itemId,record.Kind)then return end
  local blocked=self:SeedBlocked(from,itemId);if blocked then self.Remote:FireClient(from,'Status',blocked);return end
@@ -211,7 +253,9 @@ function S:QueueInbox(fromId,id,gift,channel)
  end,self[channel.Store])
 end
 function S:Recover(p)
- if self.Working[p]or self.Busy[p]or not p.Parent or not self.Data:IsLoaded(p)or not self.Data.CanSave[p]then return end
+ if not p.Parent or not self.Data:IsLoaded(p)or not self.Data.CanSave[p]then return end
+ -- R131: a gift that lands while this player's inbox check is running is picked up right after it, not 60 s later.
+ if self.Working[p]or self.Busy[p]then self.Again=self.Again or{};self.Again[p]=true;return end
  self.Working[p]=true
  local ok,err=pcall(function()
   for _,channel in ipairs(CHANNELS)do
@@ -219,6 +263,14 @@ function S:Recover(p)
   end
  end)
  self.Working[p]=nil;if not ok then warn('[R52] Gift recovery deferred: '..tostring(err))end
+ if self.Again and self.Again[p]then self.Again[p]=nil;task.defer(function()self:Recover(p)end)end
+end
+-- R131: inbox reads skip the 4 s DataStore read cache, so a gift queued a moment ago is seen.
+local fresh
+local function readInbox(store,key)
+ if fresh==nil then fresh=false;pcall(function()local o=Instance.new('DataStoreGetOptions');o.UseCache=false;fresh=o end)end
+ if fresh then return pcall(store.GetAsync,store,key,fresh)end
+ return pcall(store.GetAsync,store,key)
 end
 -- Returns false when recovery must stop for this pass (a save failed or the player left).
 function S:_recoverChannel(p,channel)
@@ -241,7 +293,7 @@ function S:_recoverChannel(p,channel)
    if inbox then outbox[id]=nil;self.Data:MarkDirty(p);if not self:Save(p,'GiftOutboxComplete')then return false end end
   end
  end
- local read,inbox=pcall(store.GetAsync,store,tostring(p.UserId));if not read or type(inbox)~='table'then return true end
+ local read,inbox=readInbox(store,tostring(p.UserId));if not read or type(inbox)~='table'then return true end
  for id,gift in pairs(inbox)do
   if not p.Parent or self.Data.Gardens[p]~=garden or not self.Data:IsLoaded(p)then return false end
   if gift.State=='Ready'then
@@ -263,10 +315,9 @@ function S:_recoverChannel(p,channel)
    if not self:Save(p,'GiftReceived')then return false end
    local saved=self:ChangeInbox(p.UserId,function(box)if box[id]and box[id].State=='Ready'then box[id].State='Delivered'end end,store)
    if saved then
-    local what=self:ReceivedText(gift,channel)
-    -- R130: a notice in the game's notice stack (the gift status line stays for the sound only).
-    if self.Notes then self.Notes:Show(p,what,Color3.fromRGB(255,215,70),4.5)end
-    self.Remote:FireClient(p,'Received',self.Notes and''or what)
+    -- R131: the receiver's client shows a gold notice with a reward sound (FruitGiftClient).
+    local what,giver,item=self:ReceivedText(gift,channel)
+    self.Remote:FireClient(p,'Received',what,{From=giver,Item=item})
    end
   elseif gift.State=='Final'then
    if receipts[id]then receipts[id]=nil;self.Data:MarkDirty(p)end
@@ -285,10 +336,11 @@ function S:ReceivedText(gift,channel)
  if not item then
   if channel.Name=='Seed'then item=(type(gift.Seed)=='table'and gift.Seed.Kind=='Pack')and'a seed pack'or'a seed'else item='a crop'end
  end
- return '🎁 '..(who or'Someone')..' gave you '..item..'!'
+ who=who or'Someone'
+ return '🎁 '..who..' gave you '..item..'!',who,item
 end
 function S:Cleanup(p)
- self.Last[p]=nil
+ self.Last[p]=nil;if self.Again then self.Again[p]=nil end
  for id,o in pairs(self.Offers)do if o.From==p or o.To==p then self.Offers[id]=nil end end
 end
 return S

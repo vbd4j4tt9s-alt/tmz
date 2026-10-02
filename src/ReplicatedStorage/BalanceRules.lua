@@ -13,7 +13,8 @@ B.RarityWeights={Common=55,Uncommon=28,Rare=12,Legendary=3.8,Mythic=1,Secret=.16
 B.PackSizes={{Scale=.5,Weight=3},{Scale=1,Weight=76.5},{Scale=1.5,Weight=14},{Scale=2.5,Weight=4.5},{Scale=3.5,Weight=1.4},{Scale=5,Weight=.45},{Scale=7.5,Weight=.1},{Scale=10,Weight=.035},{Scale=15,Weight=.01},{Scale=20,Weight=.004},{Scale=25,Weight=.001}}
 B.MutationWeights={None=95,Gold=4.5,Diamond=.5}
 B.MutationInheritance=.20;B.WeatherInheritance=.20
-B.WeatherPackChance=.02;B.WeatherFruitChance=.02;B.WeatherPlantChance=.02
+-- R131 (owner): 0.2% per minute of weather for every pack, plant and fruit (was one 2% roll per 3-minute event).
+B.WeatherPackChance=.002;B.WeatherFruitChance=.002;B.WeatherPlantChance=.002
 local function finite(n,fallback)return type(n)=='number'and n==n and math.abs(n)<math.huge and n or fallback end
 function B.Half(n)return math.floor(n*2+.5)/2 end
 function B.Training(machine,trail,premium)

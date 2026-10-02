@@ -7,7 +7,7 @@
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Input=game:GetService('UserInputService')
 local Run=game:GetService('RunService');local GuiService=game:GetService('GuiService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local Remote=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('FruitGift')
-local Theme=require(RS.GardenTheme);local Audio=require(RS.InteractionAudio);local Bright=require(RS.BrightUI)
+local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI);local Feed=require(RS.NoticeFeed83);local Copy=require(RS.NoticeCopy83)
 local RANGE=18;local HOVER_RANGE=250;local SEND_GAP=2.05
 local gui=Instance.new('ScreenGui');gui.Name='FruitGifts';gui.ResetOnSpawn=false;gui.DisplayOrder=36;gui.Parent=pg
 local status=Instance.new('TextLabel');status.Name='GiftStatus';status.Text='';status.Visible=false;status.AnchorPoint=Vector2.new(.5,0);status.Position=UDim2.new(.5,0,1,-220);status.Size=UDim2.new(.8,0,0,38);status.BackgroundTransparency=1;status.TextWrapped=true;Theme.Text(status,17,true,Theme.Colors.Gold);status.Parent=gui
@@ -101,8 +101,9 @@ local function give(point)
 end
 local function confirm()
  local p=pending;if not p then return end
+ -- Matched by inventory id: a refreshed Tool for the same item is still the same gift.
  local held,id,action=giftable()
- if held~=p.Tool or id~=p.Id or action~=p.Action then close();say('Hold the item you want to give.');return end
+ if not held or id~=p.Id or action~=p.Action then close();say('Hold the item you want to give.');return end
  if not p.Target.Parent then close();return end
  if not inReach(p.Target)then close();say('Get closer to '..p.Target.DisplayName..' to give.');return end
  close()
@@ -129,7 +130,7 @@ table.insert(connections,Run.RenderStepped:Connect(function(dt)
  hoverClock+=dt;if hoverClock<1/12 then return end;hoverClock=0
  if pending then
   local held,id=giftable()
-  if held~=pending.Tool or id~=pending.Id or not pending.Target.Parent then close()else light(pending.Target);return end
+  if not held or id~=pending.Id or not pending.Target.Parent then close()else light(pending.Target);return end
  end
  local target
  if giftable()then
@@ -141,10 +142,13 @@ table.insert(connections,Run.RenderStepped:Connect(function(dt)
  end
  if target then light(target)elseif glow then light(nil)end
 end))
-table.insert(connections,Remote.OnClientEvent:Connect(function(action,message)
- if action~='Status'and action~='Received'then return end
- if action=='Received'then Audio.Transaction('Equip')end
- -- R130: the receiver's notice is in the notice stack; the status line only shows text the server put here.
- if message~=nil and message~=''then say(message)end
+table.insert(connections,Remote.OnClientEvent:Connect(function(action,message,info)
+ if action=='Received'then
+  -- R131 (owner): the receiver gets a gold notice at the top with a reward chime.
+  local text=type(info)=='table'and type(info.From)=='string'and type(info.Item)=='string'and Copy.Gift(info.From,info.Item)
+   or(type(message)=='string'and message~=''and Copy.Escape(message))or Copy.Gift('Someone','a gift')
+  Feed.Gift(text);return
+ end
+ if action=='Status'and message~=nil and message~=''then say(message)end
 end))
 script.Destroying:Connect(function()for _,c in ipairs(connections)do c:Disconnect()end;if glow then glow:Destroy()end;gui:Destroy()end)

@@ -15,6 +15,24 @@ local themes={
 local function part(parent,name,size,cf,color,material,collide,class)
  local p=Instance.new(class or'Part');p.Name=name;p.Size=size;p.CFrame=cf;p.Color=color;p.Material=material or Enum.Material.SmoothPlastic;p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=true;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=parent;return p
 end
+-- R131 (owner): the badges were a fixed 210x128 px drawn on top of everything, so from a distance one covered the
+-- garden under it and gardens in front of it. Now the size is in studs (11 x 7) plus a small pixel floor, so a badge
+-- shrinks with distance like the garden below it, and nearer things are drawn over it. With no avatar picture (Studio
+-- test players), only the name shows instead of a blank circle. Older badges are restyled when the owner updates.
+local BADGE_REVISION=131
+local function styleBadge(gui)
+ if gui:GetAttribute('BadgeRevision')==BADGE_REVISION then return end
+ gui:SetAttribute('BadgeRevision',BADGE_REVISION)
+ gui.Size=UDim2.new(11,34,7,22);gui.AlwaysOnTop=false
+ local portrait=gui:FindFirstChild('Portrait')
+ if portrait then
+  portrait.AnchorPoint=Vector2.new(.5,0);portrait.Position=UDim2.fromScale(.5,.02);portrait.Size=UDim2.fromScale(.6,.6)
+  local square=portrait:FindFirstChildOfClass('UIAspectRatioConstraint')or Instance.new('UIAspectRatioConstraint')
+  square.AspectRatio=1;square.DominantAxis=Enum.DominantAxis.Height;square.Parent=portrait
+  local outline=portrait:FindFirstChildOfClass('UIStroke');if outline then outline.Thickness=2 end
+ end
+ local name=gui:FindFirstChild('OwnerName');if name then name.Position=UDim2.fromScale(0,.64);name.Size=UDim2.fromScale(1,.34)end
+end
 -- R99: a fixed high landmark; exceptional plants never move the owner marker.
 local function ownerBadge(base,root,pad,front)
  local anchor=part(root,'Owner marker',V(.1,.1,.1),pad.CFrame*CF(0,pad.Size.Y/2+64,front),RGB(255,255,255))
@@ -26,6 +44,7 @@ local function ownerBadge(base,root,pad,front)
  local name=Instance.new('TextLabel');name.Name='OwnerName';name.Position=UDim2.fromOffset(4,85);name.Size=UDim2.new(1,-8,0,38);name.BackgroundTransparency=1;name.Font=Enum.Font.FredokaOne;name.TextColor3=RGB(255,255,255);name.TextScaled=true;name.TextWrapped=false;name.RichText=false;name.TextTruncate=Enum.TextTruncate.AtEnd;name.Parent=gui
  local edge=Instance.new('UIStroke');edge.Thickness=2;edge.Color=RGB(24,29,36);edge.Parent=name
  local fit=Instance.new('UITextSizeConstraint');fit.MinTextSize=10;fit.MaxTextSize=28;fit.Parent=name
+ styleBadge(gui)
  return gui
 end
 function A.UpdateOwner(base,displayName)
@@ -33,7 +52,8 @@ function A.UpdateOwner(base,displayName)
  local root=base:FindFirstChild('GardenFence34');local gui=root and root:FindFirstChild('GardenOwnerBadge',true)
  if not gui then return end
  local name=base:GetAttribute('BaseOwnerDisplayName')or'';local id=base:GetAttribute('BaseOwnerUserId')or 0
- gui.Enabled=name~='';gui.OwnerName.Text=name
+ styleBadge(gui)
+ gui.Enabled=name~='';gui.OwnerName.Text=name;gui.Portrait.Visible=id>0;gui.OwnerName.Position=UDim2.fromScale(0,id>0 and .64 or .33)
  -- Names stay readable even while Roblox is preparing a new portrait.
  if gui:GetAttribute('PortraitUserId')==id then return end
  gui:SetAttribute('PortraitUserId',id)

@@ -2,7 +2,8 @@
 local F={};local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Copy=require(script.Parent.NoticeCopy83);local Layout=require(script.Parent.NoticeLayout85);local Queue={};local Showing={};local Seen={}
 local seenOrder={};local started=false;local alive=true;local root,host,pg;local serial=0
-local cueIds={RarePack='rbxassetid://118818986767152',WeatherAdopted='rbxassetid://133449446616894'}
+-- R131: Gift = the reward chime (InteractionAudio GemClaim) for a received gift.
+local cueIds={RarePack='rbxassetid://118818986767152',WeatherAdopted='rbxassetid://133449446616894',Gift='rbxassetid://82559527540705'}
 local voices={};local nextWarm=0;local cueUntil=0;local currentVoice
 local function warm()
  local now=os.clock();if now<nextWarm then return end;nextWarm=now+10
@@ -77,6 +78,8 @@ function F.Push(text,duration,key,priority,sound)
   if priority==true and #Showing>=3 then Showing[1].Label:Destroy();table.remove(Showing,1)end
  else table.insert(Queue,item)end
 end
+-- R131: a received gift, shown first with its chime.
+function F.Gift(text)F.Push(text,5,nil,true,'Gift')end
 function F.Plain(text,color,duration,key)F.Push(Copy.Color(text,color or Color3.new(1,1,1)),duration,key)end
 local pending={};local scheduled=false
 function F.Pack(m)
