@@ -128,7 +128,7 @@ function B.Place(m,w,h,boxes,extra)
   {w-12-bw,h*.5-bh/2},{w-12-bw,h*.38-bh/2},{w-12-bw,h*.62-bh/2}, -- right edge
   {10,hubY+m.MenuSize+10},{10,hubY-10-bh}, -- under / over the menu hub
  }
- local sizes={{bw,bh},{math.floor(bw*.85),math.max(44,math.floor(bh*.9))},{140,44}}
+ local sizes={{bw,bh},{math.floor(bw*.85),math.max(44,math.floor(bh*.9))},{140,44},{124,44}} -- 124: text-only (no icon)
  for _,size in ipairs(sizes)do
   local sw,sh=size[1],size[2]
   for _,s in ipairs(spots)do

@@ -26,7 +26,7 @@ for _,v in ipairs(views)do
   local r=Rules.Place(m,w,h,boxes,extra)
   local tag=string.format('%s %dx%d%s',touch and'TOUCH'or'PC',w,h,ctl and' ctl'or'')
   check(r.X>=8 and r.Y>=8 and r.X+r.W<=w-8 and r.Y+r.H<=h-8,tag..' on screen')
-  check(r.H>=44 and r.W>=140,tag..' touch-sized')
+  check(r.H>=44 and r.W>=124,tag..' touch-sized')
   for _,b in ipairs(boxes)do check(not ov(r,b,6),tag..' clear of '..b.N)end
   check(not ov(r,{X=w/2-140,Y=0,W=280,H=60},0),tag..' clear of the top-bar travel row')
   for _,b in ipairs(extra)do check(not ov(r,b,0),tag..' clear of notice row '..b.N)end

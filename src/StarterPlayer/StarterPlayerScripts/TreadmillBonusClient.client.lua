@@ -15,7 +15,7 @@ local function optional(name)
  local ok,value=pcall(require,module);return ok and value or nil
 end
 local Pictures=optional('ItemPictures');local Audio=optional('InteractionAudio');local Reveal=optional('RarityRevealAudio')
-local Mixer=optional('AudioMixer');local Timing=optional('SoundTiming')
+local Mixer=optional('AudioMixer');local Timing=optional('SoundTiming');local Notices=optional('HudNoticeLayout')
 local RGB=Color3.fromRGB;local INK=RGB(10,14,28);local GOLD=RGB(255,206,72)
 local connections={}
 local function connect(signal,fn)local c=signal:Connect(fn);table.insert(connections,c);return c end
@@ -73,9 +73,19 @@ end
 local function layoutButton()
  local view=Layout.Viewport(hud);local w,h=view.X,view.Y
  local m=Layout.Read(view,game:GetService('UserInputService').TouchEnabled,Layout.Controls(hud))
- local r=Rules.Place(m,w,h,Layout.HudBoxes(m,w,h,true))
+ local extra={}
+ if Notices then
+  local inset=GuiService.TopbarInset;local top=typeof(inset)=='Rect'and inset.Height>0 and inset.Max.Y or 36
+  local ok,rows=pcall(Notices.Calculate,w,h,top,Rules.NoticeFlags)
+  if ok then for name,row in pairs(rows)do if type(row)=='table'then table.insert(extra,{N=name,X=row.X-row.Width/2,Y=row.Y,W=row.Width,H=row.Height})end end end
+ end
+ local r=Rules.Place(m,w,h,Layout.HudBoxes(m,w,h,true),extra)
  button.Position=UDim2.fromOffset(r.X,r.Y);button.Size=UDim2.fromOffset(r.W,r.H)
  title.TextSize=r.H>=50 and 20 or 17
+ -- Narrow phones get the text-only size: drop the gift icon and use the full width for the caption.
+ local icon=r.W>=140;gift.Visible=icon;local left=icon and 46 or 8
+ title.Position=UDim2.fromOffset(left,2);title.Size=UDim2.new(1,-left-8,.58,0)
+ sub.Position=UDim2.new(0,left,.58,-2);sub.Size=UDim2.new(1,-left-8,.36,0)
 end
 connect(hud:GetPropertyChangedSignal('AbsoluteSize'),layoutButton);task.defer(layoutButton)
 local function flashMessage(message)
