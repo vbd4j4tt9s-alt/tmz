@@ -1,4 +1,4 @@
-# Test commands and tools (R123)
+# Test commands and tools (R124)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -93,7 +93,7 @@
 |---|---|
 | `bonus @name` | Ready rolls (0–2), saved progress, their roll pool |
 | `bonus ready 2 @name` | Make rolls ready; the button appears |
-| `bonus progress 9:50 @name` | Saved treadmill time. 9:50 means a roll after 10 more seconds on the treadmill |
+| `bonus progress 5:50 @name` | Saved treadmill time (max 6:00). 5:50 means a roll after 10 more seconds on the treadmill |
 | `bonus roll @name` | Use a ready roll for them now, with no animation |
 
 ## Gifts
@@ -122,11 +122,12 @@ listed separately any more because each one is the same as a command above.
 
 ## Test plan by feature (two accounts help: a main and an alt)
 1. **Treadmill bonus:**
-   - `bonus progress 9:50 @me`, then get on the treadmill. The bar counts down and the button appears.
-   - Roll and check the strip, the clicks and the odds panel.
+   - `bonus progress 5:50 @me`, then get on the treadmill. The bar counts down and the button appears (a roll every 6 min).
+   - Roll and check the strip, the clicks, the odds line (Secret 0.1% = Void Pack) and the border light-up on Legendary / Mythic / Secret.
    - `bonus ready 2 @me` to see the stacked badge.
    - Leave and rejoin: the rolls are gone, but the saved progress stays.
    - `treadmill 1` versus `treadmill 7`: the pool changes from Forest only to all biomes.
+   - `bonus ready 2 @me`, roll, and check CLOSE / ROLL AGAIN sit centred under the result text.
 2. **The Darkened:**
    - `event spawn`, then `event go @me`. Steal one Void Pack, then the other; it leaves after the second.
    - `refreshpacks` three times without stealing: the packs reroll (`event status`).
@@ -134,9 +135,11 @@ listed separately any more because each one is the same as a command above.
 3. **Holes:**
    - The alt steals a pack on the track (holes only catch players carrying a pack). Dig a hole in their path, or `dig @you` right where they will run; they fall for 4 s and the pack drops.
    - Dig 4 holes, then try a 5th (refused). Cover one with the shovel, or wait 3 min for it to expire.
+   - R124: the tip fades when the shovel comes out on the track; clicking again within 3 s shows just the time ("2s").
 4. **Keepers:**
    - `fling forest @me` … `fling storm @me`: each tier goes higher and you land inside the walls.
    - `keepersmack`, and steal a pack in each biome to see each keeper's own hit animation.
+   - R124: the Forest hammer and Jungle slam play the ground-slam sound on the impact frame; The Darkened's catch plays its own sound with a purple impact.
 5. **Gifts:** give fruit, a seed and a pack to the alt. `gifts @me` should show 0 within a minute.
 6. **Rarity borders:**
    - `rarepacks @me` and `seeds all @me`, then open the inventory: every rarity has its own border and there are no emblems.
@@ -147,3 +150,8 @@ listed separately any more because each one is the same as a command above.
    - The refresh countdown beeps line up with the numbers.
    - The chase alarm.
    - Pack opening.
+9. **R124 extras:**
+   - Bushes: walk into a Forest or Jungle bush; it turns see-through for you, and your alt sees a solid bush and no name.
+   - Biome title: run from Forest into Jungle; the name fades in, then fades away.
+   - Refresh wall: `refreshpacks`; the moon and count are centred and "REFRESHING" has looping dots.
+   - King border: `seeds all @me`; the King cards have ruby corner gems.

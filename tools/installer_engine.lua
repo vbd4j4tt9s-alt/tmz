@@ -120,6 +120,8 @@ return function(mode)
  end
  if toCount==#sources then print('__TAG__ Already '..(mode=='install'and'installed.'or'undone.'));return end
  assert(fromCount==#sources and toCount==0,'__TAG__ Mixed script versions; nothing changed.')
+ -- R124: Play started while scripts are still being written copies a half-installed place; say so up front.
+ print(mode=='install'and'__TAG__ Installing... do not press Play until it says Installed.'or'__TAG__ Undoing... do not press Play until it says Undone.')
  local attempted={}
  local okay,why=xpcall(function()
   for _,c in ipairs(sources)do

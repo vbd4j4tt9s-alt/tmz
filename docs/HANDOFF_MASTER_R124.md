@@ -1,8 +1,9 @@
-# CHEST CHASE / "Steal A Pack" — MASTER HANDOFF (R123)
+# CHEST CHASE / "Steal A Pack" — MASTER HANDOFF (R124)
 
 Generated 2 Oct 2026 from the Claude Code session that built R114–R123, following MASTER HANDOFF GENERATION PROMPT V4.1.
 
 Revision changelog
+- R124 update (2 Oct): R123 is installed and checked in the owner's place; R124 is built (source + installer), not installed. Sections 1–3, 5–8, 10–12 updated; the R123 history below is kept where still true.
 - R123 handoff: replaces docs/HANDOFF.md (29 Sep, R107/R110 era) as the current master. The baseline moves from "V149 prepared" to "V150 R123 source".
 - R123 handoff: the V4.1 Section 6 plant-visual seed rows are moved to verification debt (no evidence they were worked in this repo). The newest user tasks are reconciled into Section 6.
 
@@ -14,7 +15,7 @@ Revision changelog
 - **Source of truth.** Git repo `vbd4j4tt9s-alt/tmz`, branch `claude/chest-chase-handoff-f04hg8`.
   - Scripts are exported Rojo-style under `src/`: `*.server.lua` = Script, `*.client.lua` = LocalScript, `*.lua` = ModuleScript.
   - `src/MANIFEST.tsv` lists every script: 448 rows, matching the files.
-- **Source version.** `Config.Version='V150 R123'`, `ProfileVersion=20`. Source is CURRENT at commit `fae4310`. The last source change was the commit before it; `fae4310` only added the rebuilt installer.
+- **Source version.** `Config.Version='V150 R124'`, `ProfileVersion=20` (unchanged: no save-format change). R124 source = commits after `b6cdbc7` on branch `claude/compassionate-brown-lohfok`; `installers/R124_install.lua` is built from it with base `b6cdbc7` (= R123 source).
 - **Delivery.** Each release is one paste-into-Command-Bar installer with a backup and undo (`installers/R1xx_install.lua`). The owner installs them in Studio. The assistant can't run Studio.
 - **Installed (runtime) state, 2 Oct 14:46: R123 INSTALLED in Edit; a clean Play run is not yet reported.**
   - Owner ran the one-line redo (`[R123] Installed` at 14:34:34). `check_R123.lua` at 14:46 (Edit) shows: `Config.Version='V150 R123'`; PremiumRouting needs GiftProducts: false; new R123 scripts missing: none; R123 backup state Installed; R121 backup state Built.
@@ -30,7 +31,7 @@ Revision changelog
   - None is user-accepted, apart from the rename and shop wording the owner explicitly asked for (code exists; result not reviewed).
 - **Active task.**
   1. Get the correct R123 build installed and booting.
-  2. Owner decisions: bonus-roll odds and keeper re-look approval.
+  2. Owner installs R124 (one paste, ~78 KB) and runs the R124 test list (`docs/releases/R124.md`). Keeper re-look approval is still open.
   3. Live test pass using `docs/COMMANDS.md`.
 - **Owner preferences.**
   - Casual and short. Wants results, not theory.
@@ -41,9 +42,10 @@ Revision changelog
 
 | Item | Value / evidence | Freshness |
 |---|---|---|
-| Source | Repo `src/` at `fae4310`; `Config.lua:732` reads `Config.Version='V150 R123';Config.ProfileVersion=20` | CURRENT |
+| Source | Repo `src/` at the latest commit of `claude/compassionate-brown-lohfok`; `Config.lua` reads `Config.Version='V150 R124';Config.ProfileVersion=20` | CURRENT |
 | Last confirmed installed release | R121 (owner Output 13:42 showed `[V149 R121]`) | STALE (owner then installed R123 builds) |
 | R123 installer | `installers/R123_install.lua`, 324,915 bytes, 71 scripts, build `3558ed99…`. Base = R121 commit `9b13846`. Mock install test 99/99. Mock run against the uploaded `sapf.rbxl`: 28/28 | CURRENT (3rd build: only the paste wrapper changed) |
+| R124 installer | `installers/R124_install.lua`, ~77.6 KB, 20 scripts (17 patched + 3 new: HideBushes124, HideBushClient, BiomeEffectGovernor). Base = `b6cdbc7` (R123). Mock install test 48/48; all paths checked against the uploaded `sapf.rbxl` tree | CURRENT, NOT INSTALLED |
 | Superseded R123 build | The first build (~320 KB) still required `GiftProducts`. Its backup in the owner's place made later pastes re-run it | SUPERSEDED, possibly still installed |
 | Place check | `installers/check_R123.lua`: read-only; prints version, missing new scripts, leftovers, backup states | Not yet run by owner |
 | Older reference | `docs/HANDOFF.md`: map geometry, startup order, R107–R110 notes | Historical; geometry notes still valid |
@@ -65,16 +67,17 @@ Revision changelog
   - Arrival: sound 113339179211972 plus a 1 s lights-out with a visibility circle. The HUD card reads "ARRIVES IN …" between events.
   - The Void Pack keeps its halo.
 - **Shovel holes.**
-  - Max 4 per player, 3.4 studs wide, 3-minute lifetime.
+  - Max 4 per player, 3.4 studs wide, 3-minute lifetime, 3 s cooldown between digs (R124; was 8). A cooldown click shows just the time ("2s"); a fading tip ("Dig holes on the ground to trap pack thieves!") replaces the old permanent hint line.
   - They trap only pack carriers: 4 s ragdoll, and the pack drops.
   - Slots free up on a trap, a cover, expiry, a refresh or leaving.
   - Not allowed on pack pads, keeper camps, The Darkened's home or its Void Packs, or the entrance.
+- **Hide-in bushes (R124).** The 8 Forest/Jungle `Bush`/`Bush top` pairs (saved map parts) are enlarged at runtime by `HideBushes124` after the track stretch: 7.5 studs tall, >= 9 wide, walk-through, CanQuery off. `HideBushClient`: see-through for the hider, other players' default names hidden inside (carry nameplate still shows).
 - **Treadmill bonus rolls.**
-  - One roll per 600 s of treadmill time. Saved progress lives in `Premium.TreadmillBonusProgress`.
+  - One roll per 360 s (6 min, R124; was 600) of treadmill time. Saved progress lives in `Premium.TreadmillBonusProgress`.
   - Up to 2 ready rolls; they are session-only and lost on leave.
   - A CS:GO-style strip with a click per card. The server decides the result and grants the pack via `PlayerData:AddChest`.
   - Pool is cumulative by best treadmill: Forest → +Jungle → … → Storm = all 7 biomes. Void and Mech packs are never included.
-  - Current odds are the track spawn weights 38/25/15/7/10/5 (Common → Mythic). See Section 6 for the open question.
+  - Odds (R124, owner): Secret = Void Pack (always Storm) 0.1%, Mythic 0.5%, Legendary 2%; Common 43.5 / Uncommon 28.6 / Rare 17.2 / Epic 8.1 (old 38:25:15:7 shape). Mech never. No "Packs from" line in the window (owner).
 - **Giving.** Fruit, seeds and packs can be given to a nearby player. Durable DataStore inboxes: `ChestChase_FruitInbox_v1`, `ChestChase_SeedInbox_v1`. Recovery runs every 60 s, on join, and after a send.
 - **Shop.**
   - Prices read "N Robux" with no icon.
@@ -119,8 +122,8 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 | The Darkened event | As Section 3 | IMPLEMENTED (veiled 92 + 73 + 37; HUD 58) | — |
 | Keeper fling + ragdoll | Higher per tier, inside walls, 2.7–3.3 s | IMPLEMENTED (fling safety; keepers 70/10/3479) | Feel unverified |
 | Unique keeper hit animations | Distinct per keeper; server timing unchanged | IMPLEMENTED (`strikes_R123` 196 + 12; server frames diff 0; renders in `docs/proposals/strikes_R123`) | — |
-| Shovel holes | As Section 3 | IMPLEMENTED (holes 106 + 64) | Dig sound cut points unset until the owner runs the analyzer |
-| Treadmill bonus rolls | As Section 3 | IMPLEMENTED (bonus 90 + 93 + 740) | Odds question open |
+| Shovel holes | As Section 3 | IMPLEMENTED (holes 106 + 66; R124 cooldown/tip) | Dig sound cut points unset until the owner runs the analyzer |
+| Treadmill bonus rolls | As Section 3 | IMPLEMENTED (bonus 98 + 128 + 740; R124 odds, 6 min, window redesign; previews `docs/proposals/polish_R124/roll_window*.png`) | R124 not installed; look not owner-reviewed |
 | Sound sync + FX polish | All sounds synced; effects polished | IMPLEMENTED (sync 22) | 7 sound ids have unmeasured lead-in silence |
 | Garden step / refresh wall / blackout | Runners step onto bed edges; wall and cover sized to the track | IMPLEMENTED (wall 158, blackout 1255) | — |
 | Keeper re-look (dragon, snow tiger, snake, gorilla) | Owner must approve renders first | PROPOSED | Proposal only: `docs/proposals/keeper_looks_R123/`; **not in `src/`** |
@@ -131,8 +134,11 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 
 | Item | Latest desired behavior | Starting status | Acceptance / next evidence |
 |---|---|---|---|
-| Install R123 correctly | Server boots on V150 R123 with no `GiftProducts`/`SpeedBoost`/`KeeperSignatureStrike` errors | UNKNOWN / VERIFY | Full paste was truncated (Section 8). Owner runs the one-line redo from the existing backup and sends Output plus the `check_R123.lua` lines |
-| Bonus roll odds | Owner wording: "same rarities as the already existing percentages for seeds regarding the packs it just common to mythic". Earlier: "mythic ≈0.5% and legendary 2". Implemented interpretation: track spawn weights 38/25/15/7/10/5 | UNKNOWN / VERIFY | Owner confirms 10% / 5% or 2% / 0.5%; it's a one-line change in `TreadmillBonusRules` |
+| Install R123 correctly | Server boots on V150 R123 | IMPLEMENTED + edit-side VERIFIED (check_R123 at 14:46: version R123, nothing missing, backup Installed) | A clean Play run on R123 was not reported before R124 work started |
+| Install R124 | Paste `installers/R124_install.lua` once; wait for `[R124] Installed.` before Play | BUILT, NOT INSTALLED | Owner Output + R124 test list |
+| Biome notifier fade | Owner: biome notifier text should fade away | IMPLEMENTED (BiomeEntryNotifier: Frame + per-element fade; mock 8/8). Interpretation: the title already had a CanvasGroup fade that likely failed to render; not verified in Studio | Owner confirms it fades |
+| Keeper sounds | Forest hammer + Jungle slam: 73468358342062 at the visual impact; The Darkened catch: 119010321306307 + purple sci-fi impact | IMPLEMENTED (mock 49/49) | Lead-in silence of both ids unmeasured (assets not downloadable here) |
+| Bonus roll odds | Owner (2 Oct): "secret pack … just the cosmic pack at 0.1%, the mythic 0.5% and legendary 2%" | IMPLEMENTED in R124 (rest kept in the old 38:25:15:7 shape — an interpretation; owner may want other numbers) | Owner confirms after install |
 | Keeper re-look | Refine the dragon, snow tiger, snake and gorilla. Show before/after first | PROPOSED | Owner yes/no/changes per keeper. The "before" renders are reconstructions; compare with Studio. Dragon is 127 parts (a ~100-part option exists) |
 | Bonus progress bar placement | Owner asked for a bar "above the treadmill". Implemented: a billboard above the player's head while on the treadmill | UNKNOWN / VERIFY | Owner accepts, or wants it on the treadmill model |
 | Ready-button behavior | Owner: "cover the screen in case where players don't press". Implemented interpretation: a prominent pulsing button, not a blocking overlay; missed time is lost past 2 ready rolls | UNKNOWN / VERIFY | Owner confirms that reading |
@@ -144,7 +150,7 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 
 1. **Owner place is on R121 with the gift modules deleted, so the server fails to start.** Evidence: uploaded `sapf.rbxl` (Section 1). The 06:04 installer falsely refused the same-build backup; fixed in the rebuilt installer. Next check: owner pastes it once, then runs `check_R123.lua`.
 2. **`KeeperSignatureStrike` missing in Play: cause found.** It was Play started while the installer was still writing. Owner Output 14:34:31–34 shows a Play snapshot with entries 01–28 at R123 (`KeeperFx`, `ChaseService`, `ConcurrentKeeperService`, `Config` = V150 R123) and 41+ still R121 (`VeiledEvent81` lacks `PublishSchedule`, `ChestChaseServerMain`, `GamePassClient` requires `GiftProducts`). New scripts 61–71 were not moved yet. The edit-side one-line redo then finished: `[R123] Installed` at 14:34:34. Next check: a NEW Play after Save, plus `check_R123.lua`.
-   - **For R124:** the engine should print "Installing… wait for Installed before pressing Play" at start. Don't change `installer_engine.lua` for R123: it would change the build hash and the owner's backup would be refused again.
+   - **Done in R124:** the installer engine prints "Installing... do not press Play until it says Installed." before writing (R124 and later builds; R123's embedded engine is unchanged).
 3. **Plant visuals from the prior chat's snapshot** (Ice Berries, Ash Tomato, Dragonfruit, Glass Cactus, fuller bushes): APPROVED in the old handoff, with no implementation evidence in this repo's R110–R123 history. Next check: inspect `PlantArt*`/`PlantCatalog` and ask the owner if still wanted.
 4. **Hold-E harvesting and clear inventory/garden commands:** implementation reported in the prior handoff; runtime never live-tested.
 5. **V116 ragdoll-engine keeper catch:** live feel verification still outstanding. Later work (R122 fling heights, KeepOnTrack) builds on it.
@@ -202,12 +208,15 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 | `/test balance84`; duplicate help rows (`eclipse` = `void`, 3× `rarepacks`) | DEPRECATED (the `eclipse` alias still works) |
 | Treadmill name labels | DEPRECATED (R119) |
 | Seed-inbox poll every 15 s | SUPERSEDED by 60 s plus on join / after a send |
-| Bonus roll every 15 min, "Uncommon or higher" | SUPERSEDED by 10 min, Common–Mythic (odds still open) |
+| Bonus roll every 15 min, "Uncommon or higher"; then 10 min with spawn-weight odds 38/25/15/7/10/5 | SUPERSEDED by 6 min with R124 odds (Section 3) |
+| Permanent shovel hint line "Click the ground to dig a hole (n/4)…" | DEPRECATED (R124: fading tip) |
+| "Packs from: Forest, Jungle…" line in the roll window; full-panel white flash on special results | DEPRECATED (owner, R124) |
+| Pasting the 324 KB R123 installer | DO NOT: the owner's paste path truncates at ~324,000 characters; use the one-line redo, keep pastes < 300 KB |
 | First R123 build (~320 KB) | SUPERSEDED; never reinstall it |
 
 ## 11. Testing / Acceptance Checklist
 
-**Deterministic (offline, establishes Implementation only).** All passed at `fae4310`'s source.
+**Deterministic (offline, establishes Implementation only).** All passed on the R124 source (2 Oct). New in R124: `bushes_R124` 112, `polish_R124` 49 + 8 + 11 (keepers, notifier, perf), wall `run_wall.sh` 168; bonus 98 + 128 + 740; holes 106 + 66; borders 2137; installer R124 48. Previews: `sh docs/proposals/polish_R124/tests/preview.sh`.
 
 - `luau-compile` on all 448 scripts; `MANIFEST.tsv` matches the files.
 - Suites via `sh docs/proposals/<suite>/tests/run.sh`:
@@ -256,12 +265,10 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 
 ## 12. Next Recommended Action
 
-1. Get the owner's Output after the one-paste install (Section 8) plus the `check_R123.lua` lines. Don't build new features until V150 R123 boots cleanly.
-2. Resolve the Section 6 questions: bonus odds, keeper re-look approval, progress-bar placement, button interpretation, Mech in the pool.
-3. Then ship R124 with only the approved deltas:
-   - odds change;
-   - approved keeper models (`BeastModelsRefined` → `BeastModels` routing, a version bump to 123, and the KeeperAccents Ice Fang shard removal per `docs/proposals/keeper_looks_R123/NOTES.md`);
-   - any fixes from the live test.
+1. Owner installs R124 (Edit mode, Play stopped, one paste; wait for `[R124] Installed.`), saves, starts a new Play, and sends Output.
+2. Owner runs the R124 test list in `docs/releases/R124.md` and reviews the previews in `docs/proposals/polish_R124/`.
+3. Open owner decisions: keeper re-look approval; whether the Common–Epic split (43.5/28.6/17.2/8.1) is right; sound `Start_<id>` trims if the new sounds play late.
+4. Then R125 with only what the owner asks or the live test finds.
 
 ## 13. Fresh-Conversation Bootstrap Block
 
