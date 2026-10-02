@@ -68,6 +68,12 @@ return {
  {'/test holes','server: List holes on the track per player. holes clear removes them all.'},
  {'/test dig @username','Dig a hole at the target’s feet, skipping the cooldown (they must hold the shovel on the track; the 4-hole limit still applies).'},
 
+ {'— TREADMILL BONUS —',''},
+ {'/test bonus @username','Ready rolls, saved progress toward the next one, and which biomes are in their roll pool.'},
+ {'/test bonus ready 2 @username','Set 0–2 ready rolls (the roll button appears). Leaving the game loses them.'},
+ {'/test bonus progress 9:50 @username','Set saved treadmill time (seconds or m:ss, max 10:00). 9:50 = roll in 10 s on the treadmill.'},
+ {'/test bonus roll @username','Use a ready roll for them now (grants the pack, no animation).'},
+
  {'— GIFTS —',''},
  {'/test gifts @username','Gifts this player sent that are still finishing.'},
  {'/test gifts recover @username','Finish stuck gifts now (normally automatic within a minute).'},

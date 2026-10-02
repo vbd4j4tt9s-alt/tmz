@@ -3,7 +3,7 @@ local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Packs=require(RS.SeedPackRules);local T=require(RS.BalanceValues81)
 local State=require(script.Parent.OwnerTestState82)
-local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true}}
+local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true}}
 local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8}
 local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary'}
 local function integer(s,lo,hi)local n=tonumber(s);return n and n==n and n%1==0 and n>=lo and n<=hi and n or nil end
@@ -187,6 +187,26 @@ function X.Execute(ctx,p,action,a)
   if #a~=0 then return false,'Use gifts [@username] or gifts recover [@username].'end
   local garden=data.Gardens[p]or{};local function count(t)local n=0;for _ in pairs(t or{})do n+=1 end;return n end
   return true,'Waiting to finish: fruit '..count(garden.OutgoingGifts)..' | seeds/packs '..count(garden.OutgoingSeedGifts)..'. These clear within about a minute while both players are online.'
+ elseif action=='bonus'then
+  local bonus=ctx.Chase.TreadmillBonus;if not bonus then return false,'Treadmill bonus is not running.'end
+  local mode=(a[1]or'status'):lower()
+  if mode=='ready'then
+   local n=integer(a[2]or'1',0,2);if #a>2 or not n then return false,'Use bonus ready <0–2>.'end
+   bonus.Ready[p]=0;local ok,ready=bonus:GrantReady(p,n);return ok,'Ready rolls: '..tostring(ready)..' (the button shows now; leaving the game loses them).'
+  elseif mode=='progress'then
+   local text=a[2]or'';local m,sec=text:match('^(%d+):(%d%d)$');local seconds=m and tonumber(m)*60+tonumber(sec)or tonumber(text)
+   if #a~=2 or not seconds or seconds~=seconds or seconds<0 or seconds>600 then return false,'Use bonus progress <0–600 seconds or m:ss>, e.g. bonus progress 9:50.'end
+   local ok,left=bonus:SetProgress(p,seconds);return ok,'Saved treadmill progress: '..math.floor(tonumber(left)or 0)..' / 600 s. Get on the treadmill to see the bar.'
+  elseif mode=='roll'then
+   if #a~=1 then return false,'Use bonus roll.'end
+   local result=bonus:Roll(p);if result.Error then return false,result.Error end
+   return true,'Rolled for the target (no animation): '..tostring(result.Label or result.Variant)..' ('..tostring(result.Rarity)..'). Ready left: '..tostring(result.Ready)..'.'
+  elseif mode=='status'then
+   if #a>1 then return false,'Use bonus, bonus ready <n>, bonus progress <s> or bonus roll.'end
+   local names={};for _,st in ipairs(bonus:Pool(p))do names[#names+1]=ctx.Config.BiomeNames[st]end
+   return true,'Ready '..bonus:GetReady(p)..'/2 | saved progress '..math.floor(bonus:GetProgress(p))..'/600 s | on treadmill '..tostring(p:GetAttribute('TreadmillTraining')==true)..' | pool: '..table.concat(names,', ')
+  end
+  return false,'Use bonus, bonus ready <n>, bonus progress <s> or bonus roll.'
  elseif action=='admins'then
   if #a~=0 then return false,'Use admins.'end
   local ids=script.Parent.OwnerCommandAccess:GetAttribute('AdminUserIds')

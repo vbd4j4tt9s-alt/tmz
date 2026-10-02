@@ -148,6 +148,8 @@ local function runServer()
 	local TreadmillBonusService = loadModule("TreadmillBonusService", {"new","Start","Setup","Cleanup","Roll"})
 	local treadmillBonus = construct("TreadmillBonusService", TreadmillBonusService.new, Config, playerData, baseService, chestService, notifications)
 	treadmillBonus:Start()
+	-- R123: owner test commands reach these services through the chase service (ctx.Chase).
+	chaseService.TrackHoles=trackHoles;chaseService.Gifts=gifts;chaseService.TreadmillBonus=treadmillBonus
 	startupPhase = "starting autosave and resetting field"
 	playerData:StartAutosave()
 	mapService:ResetCourse()

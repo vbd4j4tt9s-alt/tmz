@@ -43,7 +43,7 @@ function S:_publish(player)
  player:SetAttribute(Rules.Attr.Ready,ready)
  player:SetAttribute(Rules.Attr.Left,math.ceil(left))
  player:SetAttribute(Rules.Attr.DueAt,(st.Training and ready<Rules.MaxReady)and workspace:GetServerTimeNow()+left or nil)
- local pool=Rules.EncodePool(self:PoolStages(player));st.Pool=pool
+ local pool=Rules.EncodePool(self:PoolStages(player));st.Tier=self.Data:GetTreadmillData(player).Tier
  player:SetAttribute(Rules.Attr.Pool,pool)
 end
 -- Called once the profile is loaded (publishes the saved progress and the pool).
@@ -54,6 +54,18 @@ end
 function S:Cleanup(player)
  self.State[player]=nil;self.Ready[player]=nil;self.LastRoll[player]=nil
 end
+-- Public API (owner/test commands). All clamp to the normal rules and republish the attributes.
+-- :GrantReady(player,n) adds n READY rolls (cap 2, session only); :SetProgress(player,seconds) sets saved progress
+-- (0..600); :Pool(player) -> {stage,...} for the best owned treadmill; :GetReady / :GetProgress read state.
+function S:GrantReady(player,n)
+ if not self.Data:IsLoaded(player)then return false end
+ self.Ready[player]=Rules.ReadyCount(self:GetReady(player)+(tonumber(n)or 1));self:_publish(player);return true,self:GetReady(player)
+end
+function S:SetProgress(player,seconds)
+ if not self.Data:IsLoaded(player)then return false end
+ self:_setProgress(player,tonumber(seconds)or 0);self.Data:MarkDirty(player);self:_publish(player);return true,self:GetProgress(player)
+end
+function S:Pool(player)return self:PoolStages(player)end
 function S:Step(dt)
  dt=math.max(0,tonumber(dt)or 0)
  for _,player in ipairs(Players:GetPlayers())do self:StepPlayer(player,dt)end
@@ -76,7 +88,7 @@ function S:StepPlayer(player,dt)
  elseif changed and st.Unsaved>0 then
   st.Unsaved=0;self.Data:MarkDirty(player)
  end
- if not changed and st.Pool~=Rules.EncodePool(self:PoolStages(player))then changed=true end -- treadmill upgraded
+ if not changed and st.Tier~=self.Data:GetTreadmillData(player).Tier then changed=true end -- treadmill upgraded
  if changed then self:_publish(player)end
 end
 function S:Roll(player)

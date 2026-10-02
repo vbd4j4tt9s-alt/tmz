@@ -182,6 +182,27 @@ end
 check(seq(1)==seq(50000000),'boot luck x50M gives the identical 40 claims')
 -- 9. Upgrading the treadmill republishes the pool immediately; leaving drops session state -----------------
 Data:GetTreadmillData(A2).Tier=2;Bonus:Step(0);check(attr(A2,'Pool')=='1,6','upgrade/downgrade republishes pool ('..tostring(attr(A2,'Pool'))..')')
+-- 10. Public API used by owner test commands
+check(Bonus:GrantReady(A2,5)and attr(A2,'Ready')==2,':GrantReady clamps to 2')
+check(Bonus:SetProgress(A2,9999)and Bonus:GetProgress(A2)==600 and attr(A2,'Left')==0,':SetProgress clamps to 600')
+Bonus:SetProgress(A2,123);check(attr(A2,'Left')==477,':SetProgress republishes time left')
+local pool=Bonus:Pool(A2);check(#pool==2 and pool[1]==1 and pool[2]==6,':Pool returns the stages')
 Bonus:Cleanup(A2);check(Bonus.Ready[A2]==nil and Bonus.State[A2]==nil,'cleanup drops session state')
+-- R123 owner commands (/test bonus ...) through OwnerUpdateCommands82.Execute
+do
+ local X=server('OwnerUpdateCommands82')
+ local O=makePlayer(303,'Owen')
+ local ctx={Chase={TreadmillBonus=Bonus},Data=Data,Config=Config,Map={MapRoot=R.new('Folder')}}
+ local ok,msg=X.Execute(ctx,O,'bonus',{});check(ok and msg:find('Ready 0/2',1,true)and msg:find('pool: Forest',1,true),'bonus status: '..tostring(msg))
+ ok,msg=X.Execute(ctx,O,'bonus',{'ready','2'});check(ok and Bonus:GetReady(O)==2 and attr(O,'Ready')==2,'bonus ready 2: '..tostring(msg))
+ ok,msg=X.Execute(ctx,O,'bonus',{'ready','1'});check(ok and Bonus:GetReady(O)==1,'bonus ready sets (not adds): '..tostring(msg))
+ ok,msg=X.Execute(ctx,O,'bonus',{'ready','5'});check(not ok and Bonus:GetReady(O)==1,'bonus ready over 2 refused')
+ ok,msg=X.Execute(ctx,O,'bonus',{'progress','9:50'});check(ok and Bonus:GetProgress(O)==590,'bonus progress 9:50 = 590 s: '..tostring(msg))
+ ok,msg=X.Execute(ctx,O,'bonus',{'progress','700'});check(not ok and Bonus:GetProgress(O)==590,'bonus progress over 600 refused')
+ local before=packs(O)
+ ok,msg=X.Execute(ctx,O,'bonus',{'roll'});check(ok and packs(O)==before+1 and Bonus:GetReady(O)==0,'bonus roll grants one pack: '..tostring(msg))
+ R.advance(2);ok,msg=X.Execute(ctx,O,'bonus',{'roll'});check(not ok and packs(O)==before+1,'bonus roll with none ready refused: '..tostring(msg))
+ ok,msg=X.Execute(ctx,O,'bonus',{'spin'});check(not ok,'unknown bonus mode refused')
+end
 print(string.format('%d/%d checks passed%s',checks-fails,checks,fails>0 and(' ('..fails..' FAILED)')or''))
 if fails>0 then error('failures',0)end
