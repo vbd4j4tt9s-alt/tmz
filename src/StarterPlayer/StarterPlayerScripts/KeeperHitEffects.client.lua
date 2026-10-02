@@ -49,7 +49,7 @@ end
 local connection=remote.OnClientEvent:Connect(function(hit)
  if type(hit)~='table'or type(hit.Id)~='number'or hit.Id<=lastId or typeof(hit.Position)~='Vector3'then return end
  lastId=hit.Id
- if type(hit.At)~='number'or workspace:GetServerTimeNow()-hit.At>2 then return end
+ if type(hit.At)~='number'or workspace:GetServerTimeNow()-hit.At>.75 then return end -- R123: was 2 s; a later hit would sound long after the strike (.75 still covers high ping)
  local camera=workspace.CurrentCamera;if not camera then return end
  local distance=(camera.CFrame.Position-hit.Position).Magnitude
  if distance>260 then return end
