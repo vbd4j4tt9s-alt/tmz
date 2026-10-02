@@ -4,7 +4,11 @@
 assert(not game:GetService('RunService'):IsRunning(),'[R123] Stop Play first.')
 local storage=game:GetService('ServerStorage')
 local existing=storage:FindFirstChild('ChestChase_R123_Backup')
-if existing then require(existing:WaitForChild('Installer'))('install');return end
+if existing then
+ -- Same build pasted again: redo. A different build with the same backup name must never run the old one.
+ assert(existing:GetAttribute('Build')=='3558ed9955213ceece07eb777d48a9ff8cc7a673c9a55be79b0b08af9b49f72a','[R123] An older [R123] backup is in ServerStorage. Undo it first: require(game.ServerStorage.ChestChase_R123_Backup.Installer)("undo") then delete ServerStorage.ChestChase_R123_Backup and paste this again. Nothing changed.')
+ require(existing:WaitForChild('Installer'))('install');return
+end
 -- ASCII-only transport keeps embedded sources independent of pasted Unicode and indentation.
 local alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local values={};for i=1,#alphabet do values[alphabet:sub(i,i)]=i-1 end
@@ -95,6 +99,6 @@ for i,spec in ipairs(specs)do
  local t=Instance.new('ObjectValue');t.Name='Target';t.Value=item;t.Parent=entry
 end
 local installer=Instance.new('ModuleScript');installer.Name='Installer';installer.Source=engineSource;installer.Parent=backup
-backup:SetAttribute('SourceCount',#specs);backup:SetAttribute('State','Built');backup.Parent=storage
+backup:SetAttribute('SourceCount',#specs);backup:SetAttribute('Build','3558ed9955213ceece07eb777d48a9ff8cc7a673c9a55be79b0b08af9b49f72a');backup:SetAttribute('State','Built');backup.Parent=storage
 require(installer)('install')
 print('[R123] Backup: ServerStorage.ChestChase_R123_Backup   Undo: require(game.ServerStorage.ChestChase_R123_Backup.Installer)("undo")')
