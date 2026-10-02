@@ -41,7 +41,7 @@ close.Activated:Connect(function()panel.Visible=false end)
 local scroll=Instance.new('ScrollingFrame');scroll.BackgroundTransparency=1;scroll.BorderSizePixel=0;scroll.Position=UDim2.fromOffset(16,45)
 scroll.Name='CommandScroll';scroll.Size=UDim2.new(1,-64,1,-144);scroll.ScrollBarThickness=9;scroll.ScrollBarImageColor3=Color3.fromRGB(64,128,99);scroll.ScrollingDirection=Enum.ScrollingDirection.Y;scroll.Active=true;scroll.ScrollingEnabled=true;scroll.ClipsDescendants=true;scroll.AutomaticCanvasSize=Enum.AutomaticSize.None;scroll.CanvasSize=UDim2.new();scroll.Parent=panel
 local lines={'F4 closes this panel. Owner commands work in public servers. Append @username or @all. Progression changes save; movement and animation overrides are temporary.',''}
-for _,entry in ipairs(help)do table.insert(lines,entry[1]..'\n'..entry[2]..'\n')end
+for _,entry in ipairs(help)do table.insert(lines,entry[2]==''and('\n'..entry[1])or(entry[1]..'\n'..entry[2]..'\n'))end
 local helpLabel=label(scroll,table.concat(lines,'\n'),UDim2.new(),UDim2.new(1,-12,0,0),14);helpLabel.Name='CommandHelp';helpLabel.TextWrapped=true
 local resizeQueued=false
 local function resizeHelp()

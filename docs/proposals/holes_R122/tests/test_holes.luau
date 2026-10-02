@@ -368,5 +368,30 @@ check(made and made:GetAttribute('GardenShovel')==true and made.ManualActivation
  and made:GetAttribute('InventoryKey')=='shovel'and made.RequiresHandle==true,'garden shovel tool unchanged')
 check(made and made.ToolTip:find('Remove a plant',1,true)and made.ToolTip:find('Dig a hole on the track',1,true),'tooltip hints the hole feature')
 
+-- 18. R123 owner commands: dig / holes / holes clear / ragdoll / fling (OwnerUpdateCommands82.Execute)
+local X=server('OwnerUpdateCommands82')
+chase.TrackHoles=holes
+function chase:_getGuardianSettings(st)local k=W.module('KnockbackConfig').Keeper[st];return {FlingHorizontal=k[1],FlingVertical=k[2]}end
+local ctx={Chase=chase,Map=Map,Data={Gardens={}},Config={BiomeNames={'Forest','Desert','Snow','Lava','Crystal','Jungle','Storm'}}}
+local O=newPlayer('Ola',V3(40,3,1000))
+local ok,msg=X.Execute(ctx,O,'dig',{});check(ok and holeCount(O)==1,'dig @target digs at their feet: '..tostring(msg))
+moveTo(O,40,3,1040);ok,msg=X.Execute(ctx,O,'dig',{});check(ok and holeCount(O)==2,'dig skips the 8 s cooldown: '..tostring(msg))
+ok,msg=X.Execute(ctx,O,'holes',{});check(ok and msg:find('@Ola: 2',1,true),'holes lists per player: '..tostring(msg))
+O.Character.Shovel.Parent=O.Backpack;moveTo(O,40,3,1080)
+ok,msg=X.Execute(ctx,O,'dig',{});check(not ok and msg:find('shovel',1,true),'dig needs the shovel: '..tostring(msg))
+O.Character.Humanoid:UnequipTools();O.Backpack.Shovel.Parent=O.Character
+ok,msg=X.Execute(ctx,O,'holes',{'clear'});check(ok and holes.Count==0,'holes clear removes all: '..tostring(msg))
+ok,msg=X.Execute(ctx,O,'ragdoll',{'4'});check(ok and chase.Ragdoll:IsActive(O)and near(O:GetAttribute('LastGuardianRagdollDuration'),4),'ragdoll 4 lasts 4 s: '..tostring(msg))
+ok,msg=X.Execute(ctx,O,'fling',{'storm'});check(not ok,'no second ragdoll while one is active')
+chase.Ragdoll:Clear(O);step(2)
+ok,msg=X.Execute(ctx,O,'fling',{'storm'});check(ok and chase.Ragdoll:IsActive(O)and msg:find('182 up',1,true),'fling storm uses the Storm keeper launch: '..tostring(msg))
+chase.Ragdoll:Clear(O);step(2)
+ok,msg=X.Execute(ctx,O,'fling',{'dark'});check(ok and msg:find('The Dark',1,true)and msg:find('200 up',1,true),'fling dark uses The Dark launch: '..tostring(msg))
+chase.Ragdoll:Clear(O);step(2)
+ok,msg=X.Execute(ctx,O,'fling',{'mars'});check(not ok,'unknown fling biome refused')
+ok,msg=X.Execute(ctx,O,'ragdoll',{'60'});check(not ok,'ragdoll over 10 s refused')
+local T=server('OwnerCommandTargets82')
+check(T.IsGlobal('/test holes clear')and T.IsGlobal('holes')and T.IsGlobal('admins')and not T.IsGlobal('dig')and not T.IsGlobal('fling storm'),'server-wide commands refuse @target; player commands accept it')
+
 print(string.format('%s: %d checks, %d failures',fails==0 and'PASS'or'FAIL',checks,fails))
 if fails>0 then error('failures',0)end

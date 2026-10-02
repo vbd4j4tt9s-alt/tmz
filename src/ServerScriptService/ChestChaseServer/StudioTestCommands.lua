@@ -109,7 +109,7 @@ local function executeFor(ctx,player,text,requester)
  local function exact(min,max)return #a>=min and #a<=(max or min)end
  if action=='help'then
   local lines={'OWNER COMMANDS — Public servers: owner / configured admins. Add @username or @all at the end. Inventory, currency and progression changes are saved; movespeed, animrate and flight are temporary.'}
-  for _,entry in ipairs(Help)do table.insert(lines,entry[1]..' — '..entry[2])end
+  for _,entry in ipairs(Help)do table.insert(lines,entry[2]==''and entry[1]or entry[1]..' — '..entry[2])end
   return true,table.concat(lines,'\n')
  elseif action=='catalog'then
   if not exact(0,1)then return false,'Use /test catalog [all|biome].'end

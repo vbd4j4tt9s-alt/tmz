@@ -3,7 +3,7 @@ local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Packs=require(RS.SeedPackRules);local T=require(RS.BalanceValues81)
 local State=require(script.Parent.OwnerTestState82)
-local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,balance84=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true}}
+local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true}}
 local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8}
 local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary'}
 local function integer(s,lo,hi)local n=tonumber(s);return n and n==n and n%1==0 and n>=lo and n<=hi and n or nil end
@@ -75,9 +75,6 @@ function X.Execute(ctx,p,action,a)
   if not event or not event.Seed or not event.Seed.Available or ctx.Map.Refreshing then return false,'Spawn an available event first; finish any event chase or dropped pack.'end
   ctx.Chests:RefreshWorldPack(event.Seed,'EclipseReliquary',size,coat)
   return true,'World Void Pack set to '..event.Seed.PackSize..'x '..coat..'. The normal event and banking flow remain active.'
- elseif action=='balance84' then
-  local P=require(RS.Progression81);local maximum=ctx.Config.TrainingPointsPerSecond*require(RS.BalanceRules).Training(30000,6,true)
-  return true,'100B points = '..P.Speed('100000000000')..' speed | 10T = '..P.Speed('10000000000000')..' speed (+0.1 per 10x points above 100B) | max training '..maximum..'/s | max boot luck x'..T.MaxLuck..' | keeper 600'
  elseif action=='gardenbonus'then
   local b=require(RS.GardenBonusRules84).Read(data:GetFenceTier(p),p:GetAttribute('DoubleGrowthOwned')==true)
   return true,'Garden size ×'..b.Size..' | grow time ×'..b.Time..' | fence '..data:GetFenceTier(p)..' | growth pass '..b.Growth..'x'
@@ -153,6 +150,49 @@ function X.Execute(ctx,p,action,a)
   if st then return true,'Completion reward: '..T.CompletionGems[st]..' Gems | complete '..tostring(data:BiomeComplete(p,st))..' | claimed '..tostring(premium.Biomes[tostring(st)]==true)..' | pending legacy difference '..tostring((premium.BiomeBackpay81 or{})[tostring(st)]or 0)end
   local id=seedId(a[1]);if not id then return false,'Unknown biome or SeedId.'end
   return true,id..' | first '..tostring(T.IndexFirst[id])..' Cash | repeat '..tostring(T.IndexRepeat[id])..' Cash | claimable '..tostring(premium.SeedRewards[id]or 0)
+ end
+ -- R123 tools: keeper fling / ragdoll previews, track holes, gift recovery and admin access.
+ if action=='fling'then
+  if #a>1 then return false,'Use fling <biome|dark> [@username].'end
+  local which=(a[1]or'storm'):lower();local dark=which=='dark'or which=='event'
+  local st=not dark and stage(which);if not dark and(not st or st==8)then return false,'Use fling forest…storm or fling dark.'end
+  local c=p.Character;local root=c and c:FindFirstChild('HumanoidRootPart');if not root then return false,'Wait for the target’s character.'end
+  local K=require(RS.KnockbackConfig);local h,v
+  if dark then h,v=K.SpecialKeeper.Horizontal,K.SpecialKeeper.Vertical
+  else local settings=ctx.Chase:_getGuardianSettings(st);h,v=settings.FlingHorizontal,settings.FlingVertical end
+  local back=-root.CFrame.LookVector;back=Vector3.new(back.X,0,back.Z);back=back.Magnitude>.01 and back.Unit or Vector3.new(0,0,-1)
+  if not ctx.Chase.Ragdoll:Apply(p,back*h+Vector3.new(0,v,0),'Keeper')then return false,'Target can’t be flung right now (already ragdolled or no character).'end
+  return true,'Flung like the '..(dark and'The Dark'or ctx.Config.BiomeNames[st])..' keeper: '..h..' sideways / '..v..' up. Nothing dropped.'
+ elseif action=='ragdoll'then
+  local seconds=tonumber(a[1]or'4');if #a>1 or not seconds or seconds~=seconds or seconds<.5 or seconds>10 then return false,'Use ragdoll [0.5–10 seconds] [@username].'end
+  if not ctx.Chase.Ragdoll:Apply(p,Vector3.new(0,12,0),'Hole',seconds)then return false,'Target can’t be ragdolled right now.'end
+  return true,'Ragdolled for '..seconds..' s (same as falling in a hole). Nothing dropped.'
+ elseif action=='holes'then
+  local holes=ctx.Chase.TrackHoles;if not holes then return false,'Track holes are not running.'end
+  if a[1]=='clear'and #a==1 then local n=holes.Count;holes:ClearAll();return true,'Removed '..n..' holes from the track.'end
+  if #a~=0 then return false,'Use holes (list) or holes clear.'end
+  local C=require(RS.TrackHoleConfig);local lines={'Holes on the track: '..holes.Count..'/'..C.MaxPerServer..' | max '..C.MaxPerPlayer..' each | last '..C.LifetimeSeconds..' s'}
+  for owner,list in pairs(holes.ByOwner)do local n=0;for _ in pairs(list)do n+=1 end;if n>0 then lines[#lines+1]='@'..owner.Name..': '..n end end
+  return true,table.concat(lines,'\n')
+ elseif action=='dig'then
+  if #a~=0 then return false,'Use dig [@username] (the target must hold the shovel on the track).'end
+  local holes=ctx.Chase.TrackHoles;if not holes then return false,'Track holes are not running.'end
+  holes.NextDig[p]=nil;pcall(function()require(script.Parent.SecurityGate).Cleanup(p)end)
+  local ok,why=holes:Request(p)
+  local reasons={Shovel='Equip the shovel first.',OffTrack='Stand on the track.',Carrying='Can’t dig while carrying a pack.',PlayerCap='Already has the maximum number of holes.',Pack='Too close to a pack.',Camp='Too close to a keeper.',Spacing='Too close to another hole.',Entrance='Too close to the entrance.',Ground='No ground here.',Refreshing='The track is refreshing.',Downed='Target is ragdolled.'}
+  return ok,ok and(why=='Covered'and'Covered one of the target’s holes.'or'Dug a hole at the target’s feet (cooldown skipped).')or(reasons[why]or tostring(why))
+ elseif action=='gifts'then
+  local gifts=ctx.Chase.Gifts;if not gifts then return false,'Gift service is not running.'end
+  if a[1]=='recover'and #a==1 then task.spawn(function()gifts:Recover(p)end);return true,'Gift recovery started for the target (pending sends and received gifts).'end
+  if #a~=0 then return false,'Use gifts [@username] or gifts recover [@username].'end
+  local garden=data.Gardens[p]or{};local function count(t)local n=0;for _ in pairs(t or{})do n+=1 end;return n end
+  return true,'Waiting to finish: fruit '..count(garden.OutgoingGifts)..' | seeds/packs '..count(garden.OutgoingSeedGifts)..'. These clear within about a minute while both players are online.'
+ elseif action=='admins'then
+  if #a~=0 then return false,'Use admins.'end
+  local ids=script.Parent.OwnerCommandAccess:GetAttribute('AdminUserIds')
+  local lines={'Owner: '..(game.CreatorType==Enum.CreatorType.Group and('group '..game.CreatorId..' owner')or('user '..game.CreatorId)),'Extra admins (AdminUserIds on ServerScriptService.ChestChaseServer.OwnerCommandAccess): '..((ids and ids~='')and ids or'none')}
+  for _,other in ipairs(Players:GetPlayers())do if require(script.Parent.OwnerCommandAccess).IsAllowed(other)then lines[#lines+1]='In this server with access: @'..other.Name end end
+  return true,table.concat(lines,'\n')
  end
  local okay,why=safe(ctx,p);if not okay then return false,why end
  if action=='fence'then
