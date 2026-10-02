@@ -12,7 +12,9 @@ local Dash=require(Storage:WaitForChild('KeeperRecoveryDash'))
 local UpgradePose=require(Storage:WaitForChild('KeeperUpgradePose'))
 local Sleep=require(Storage:WaitForChild('KeeperSleep'))
 local Surge=require(Storage:WaitForChild('KeeperSurge'))
-local Budget=require(Storage.CosmeticBudget);local Fx=require(Storage.ClientFxBudget);local Strike=require(Storage.KeeperStrikeFrames)
+local Budget=require(Storage.CosmeticBudget);local Fx=require(Storage.ClientFxBudget)
+-- R123: each keeper's own hit animation (client only); the server still tests contact with KeeperStrikeFrames.
+local Signature=require(Storage:WaitForChild('KeeperSignatureStrike'))
 local Combat=require(Storage.KeeperCombat)
 -- R113: client-only polish (look-at, wake roar, weight, follow-through, taunt), effects and accent parts.
 local Polish=require(Storage:WaitForChild('KeeperPolish'));local KFx=require(Storage:WaitForChild('KeeperFx'));local Accents=require(Storage:WaitForChild('KeeperAccents'))
@@ -162,7 +164,7 @@ local render=Run.RenderStepped:Connect(function(dt)
   -- window slid a chasing keeper in its idle pose on the raw, packet-stepped root.
   local windup=Combat.Get(r.Stage).Windup;local striking=false
   if attackAt and now>=attackAt and now-attackAt<windup+Combat.Recovery then
-   target=Strike.Frames(r.Stage,now,attackAt,r.AttackSeen and r.AttackSeen-attackAt);motion.Awake=1;striking=true
+   target=Signature.Frames(r.Stage,now,attackAt,r.AttackSeen and r.AttackSeen-attackAt);motion.Awake=1;striking=true
   end
   -- R113: taunt once after a landed catch; slam dust at the visual impact.
   local lastHit=model:GetAttribute('KeeperLastHitAt')

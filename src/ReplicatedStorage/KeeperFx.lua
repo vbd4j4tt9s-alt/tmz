@@ -4,6 +4,7 @@
 -- (FastMode / ClientFxBudget tier 1) except footfall dust at half count; shake off with ReducedMotion.
 local Config=require(script.Parent.KeeperRigConfig)
 local Combat=require(script.Parent.KeeperCombat)
+local Signature=require(script.Parent.KeeperSignatureStrike)
 local Fx={MaxLights=3,DustDistance=120,BreathDistance=90,ShakeDistance=60,Rate=90,LowRate=35}
 local V,CF=Vector3.new,CFrame.new
 local SMOKE='rbxasset://textures/particles/smoke_main.dds'
@@ -33,7 +34,7 @@ local function emitter(parent,texture,color,size,alpha,life,speed,glow)
 end
 -- Shared pools and governors ------------------------------------------------------------------
 local tokens,tokenAt=Fx.Rate,0
-local lit={};local rings={};local shake={Amount=0,At=0};local folder,connection,camState
+local lit={};local rings={};local shake={Amount=0,At=0};local folder,connection,camState;local bolt
 local function low()
  local ok,budget=pcall(require,script.Parent.ClientFxBudget)
  return ok and budget.Low()or false
@@ -43,6 +44,9 @@ local function reduced()
  return ok and value==true
 end
 function Fx.Spend(count,now,isLow)
+ -- R123: one clock for the bucket. Callers pass server time (Step/Wake/Slam) or os.clock (Burst); mixing them
+ -- drove the bucket far negative after any footfall, silently dropping hit bursts.
+ now=os.clock()
  local rate=isLow and Fx.LowRate or Fx.Rate
  tokens=math.min(rate,tokens+(now-tokenAt)*rate);tokenAt=now
  count=math.min(count,math.floor(tokens));if count<=0 then return 0 end
@@ -57,6 +61,12 @@ local function tick()
    local e=1-(1-u)^3;local d=r.From+(r.To-r.From)*e
    r.Part.Size=V(.18,d,d);r.Part.Transparency=.35+.65*u
   end
+ end
+ -- R123: lightning accent flash fades over Fx.BoltSeconds.
+ if bolt and bolt.Live then
+  local u=(now-bolt.At)/Fx.BoltSeconds
+  if u>=1 or not bolt.Part.Parent then bolt.Live=false;bolt.Part.Transparency=1;bolt.Light.Enabled=false
+  else bolt.Part.Transparency=.1+.9*u;bolt.Light.Brightness=bolt.Peak*(1-u)end
  end
  -- Bounded camera shake (reset/apply around the camera update, like KeeperHitEffects).
  local camera=workspace.CurrentCamera
@@ -109,9 +119,70 @@ function Fx.Burst(position,color,count,size)
   local a=Instance.new('Attachment');a.Parent=p;burstAnchor={Part=p,Emitter=emitter(a,SMOKE,color,4,.45,.9,9)}
   burstAnchor.Emitter.EmissionDirection=Enum.NormalId.Top;burstAnchor.Emitter.SpreadAngle=Vector2.new(80,80)
  end
- count=Fx.Spend(count,os.clock(),low());if count<=0 then return end
+ count=Fx.Spend(count,os.clock(),low());if count<=0 then return 0 end
  local e=burstAnchor.Emitter;burstAnchor.Part.CFrame=CF(position)
  e.Color=ColorSequence.new(color);e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,size*.45),NumberSequenceKeypoint.new(1,size)});e:Emit(count)
+ return count
+end
+-- R123: per-move impact accents at the strike point (KeeperSignatureStrike.Moves[stage].Accent).
+-- Spark: glowing shards/embers/sparks (shared emitter); Dust: ground dust; Rings: ground rings (pooled, max 6);
+-- Arc: emit along a sweep arc in front; Bolt: one pooled neon bolt + light flash. Every particle goes through
+-- Fx.Spend; low graphics keeps only dust (halved) and rings, ReducedMotion drops the light flash.
+Fx.BoltSeconds=.14
+Fx.Accents={
+ Dust={Color=rgb(112,94,66),Dust=10,Size=4.5,Rings=1,Ring={4,20},Ground=true},
+ Sand={Color=rgb(226,200,142),Dust=9,Size=2.6,Rings=1,Ring={2,9},Ground=true},
+ Frost={Color=rgb(206,236,255),Spark=9,SparkSize=.9,Rings=1,Ring={2,10}},
+ Fire={Color=rgb(255,128,34),Spark=4,SparkSize=1.1,Arc=true,Dust=3,Size=2.2,DustColor=rgb(72,62,58)},
+ Crystal={Color=rgb(214,176,255),Spark=10,SparkSize=1.0,Rings=1,Ring={2,11}},
+ Slam={Color=rgb(98,86,54),Dust=10,Size=3.4,Rings=2,Ring={3,15},Ground=true},
+ Lightning={Color=rgb(170,212,255),Spark=8,SparkSize=1.3,Bolt=true,Rings=1,Ring={4,18}},
+ Spectral={Color=rgb(204,173,255),Spark=8,SparkSize=1.1,Rings=1,Ring={3,12},Dust=4,Size=2.4,DustColor=rgb(25,21,35)},
+}
+local sparkAnchor
+local function spark(position,color,count,size,isLow)
+ ensure();if not folder or isLow then return 0 end
+ if not sparkAnchor then
+  local p=Instance.new('Part');p.Name='KeeperFxSpark';p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.Transparency=1;p.Size=V(.2,.2,.2);p.Parent=folder
+  local a=Instance.new('Attachment');a.Parent=p;sparkAnchor={Part=p,Emitter=emitter(a,SPARK,color,1,.05,.45,16,true)}
+  sparkAnchor.Emitter.SpreadAngle=Vector2.new(180,180);sparkAnchor.Emitter.Acceleration=V(0,-14,0);sparkAnchor.Emitter.Drag=2
+ end
+ count=Fx.Spend(count,os.clock(),false);if count<=0 then return 0 end
+ local e=sparkAnchor.Emitter;sparkAnchor.Part.CFrame=CF(position)
+ e.Color=ColorSequence.new(color);e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,size),NumberSequenceKeypoint.new(1,size*.2)});e:Emit(count)
+ return count
+end
+local function flash(position,color)
+ ensure();if not folder then return end
+ if not bolt then
+  local p=Instance.new('Part');p.Name='KeeperFxBolt';p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false
+  p.Material=Enum.Material.Neon;p.Transparency=1;p.Size=V(.5,24,.5);p.Parent=folder
+  local l=Instance.new('PointLight');l.Range=18;l.Shadows=false;l.Enabled=false;l.Parent=p
+  bolt={Part=p,Light=l,Live=false,At=0,Peak=0}
+ end
+ bolt.Part.Color=color;bolt.Light.Color=color
+ bolt.Part.CFrame=CF(position+V(0,12,0))*CFrame.Angles(0,math.random()*math.pi,.12)
+ bolt.Part.Transparency=.1;bolt.At=os.clock();bolt.Live=true
+ bolt.Peak=reduced()and 0 or 3;bolt.Light.Brightness=bolt.Peak;bolt.Light.Enabled=bolt.Peak>0
+end
+-- kind: accent name; point: world strike point; frame: keeper visual root (facing); isLow: low graphics.
+function Fx.Accent(kind,point,frame,isLow)
+ local a=Fx.Accents[kind];if not a then return 0 end
+ local ground=a.Ground and V(point.X,frame and(frame*V(0,-4,0)).Y or point.Y,point.Z)or point
+ local emitted=0
+ for i=1,(a.Rings or 0)do Fx.Ring(ground,a.Color:Lerp(Color3.new(1,1,1),.35),a.Ring[1]*i,a.Ring[2]/i^.5,.35+.12*i)end
+ if a.Dust then
+  local count=isLow and math.ceil(a.Dust/2)or a.Dust
+  emitted+=Fx.Burst(ground,a.DustColor or a.Color,count,a.Size)or 0
+ end
+ if a.Spark then
+  if a.Arc and frame then
+   -- Three bursts along a sweep from the striker's right to its left, through the strike point.
+   for i=-1,1 do emitted+=spark(point+frame:VectorToWorldSpace(V(-i*3.5,.5*math.abs(i),1.2*math.abs(i))),a.Color,a.Spark,a.SparkSize,isLow)end
+  else emitted+=spark(point,a.Color,a.Spark,a.SparkSize,isLow)end
+ end
+ if a.Bolt and not isLow then flash(point,a.Color)end
+ return emitted
 end
 -- Per keeper ------------------------------------------------------------------------------------
 local function center(b)return V((b[1][1]+b[2][1])/2,(b[1][2]+b[2][2])/2,(b[1][3]+b[2][3])/2)end
@@ -126,6 +197,16 @@ function Fx.new(root,stage)
   if group:find('Leg')or(stage==6 and group:find('Arm'))then self.Feet[group]=V((b[1][1]+b[2][1])/2,math.min(b[1][2],b[2][2]),(b[1][3]+b[2][3])/2)end
  end
  self.BodyPoint=rig.Bounds.Body and center(rig.Bounds.Body)or V(0,0,0)
+ -- R123: strike tips (rest space) for the impact accent: front of a head, bottom of a limb or blade.
+ local move=Signature.Moves[stage];self.Accent=move and move.Accent;self.Tips={}
+ for _,group in ipairs(move and move.Tip or {})do
+  local b=rig.Bounds[group]
+  if b then
+   local tip=group=='Head'and V((b[1][1]+b[2][1])/2,(b[1][2]+b[2][2])/2,math.min(b[1][3],b[2][3]))
+    or V((b[1][1]+b[2][1])/2,math.min(b[1][2],b[2][2]),(b[1][3]+b[2][3])/2)
+   table.insert(self.Tips,{Group=group,Point=tip})
+  end
+ end
  if spec.Breath and Fx.Mouth[stage]then
   self.Mouth=Instance.new('Attachment');self.Mouth.Name='KeeperFxMouth';self.Mouth.Parent=root
   self.Breath=emitter(self.Mouth,SMOKE,spec.Breath.Color,spec.Breath.Size*2.2,spec.Breath.Alpha,.9,6)
@@ -222,12 +303,14 @@ function Fx.Slam(self,c)
  if not self or self.Destroyed or c.Distance>Fx.DustDistance then return end
  local spec=self.Spec;local reach=Combat.Get(self.Stage).Reach
  local point=c.Frame*V(0,-4,-reach*.55)
- local n=Fx.Spend(c.Low and 3 or 8,c.Now,c.Low)
- if n>0 then place(self.Foot,self.Root,CF(point));self.Dust:Emit(n)end
- if spec.Heavy>0 then
-  Fx.Ring(point,spec.Dust:Lerp(Color3.new(1,1,1),.4),2*spec.Size,9*spec.Size,.4)
-  if c.LocalDistance and c.LocalDistance<40 then Fx.Shake(spec.Heavy*.6*(1-c.LocalDistance/40))end
- end
+ -- R123: the move's own accent at its striking tip (from the client strike frames), small and budgeted.
+ local tip,n0=V(),0
+ if c.Frames then for _,t in ipairs(self.Tips)do local f=c.Frames[t.Group];if f then tip+=c.Frame*(f*t.Point);n0+=1 end end end
+ local strike=n0>0 and tip/n0 or point
+ local n=Fx.Spend(c.Low and 2 or 4,c.Now,c.Low)
+ if n>0 then place(self.Foot,self.Root,CF(V(strike.X,point.Y,strike.Z)));self.Dust:Emit(n)end
+ if self.Accent then Fx.Accent(self.Accent,strike,c.Frame,c.Low)end
+ if spec.Heavy>0 and c.LocalDistance and c.LocalDistance<40 then Fx.Shake(spec.Heavy*.6*(1-c.LocalDistance/40))end
 end
 function Fx.Destroy(self)
  if not self or self.Destroyed then return end

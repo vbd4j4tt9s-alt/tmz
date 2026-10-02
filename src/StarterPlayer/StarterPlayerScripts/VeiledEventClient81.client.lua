@@ -5,6 +5,8 @@ local Gui=game:GetService('GuiService')
 local Art=require(RS:WaitForChild('VeiledKeeper81'));local Fx=require(RS.ClientFxBudget)
 local Feed=require(RS.NoticeFeed83);local Copy=require(RS.NoticeCopy83)
 local PackFx=require(RS:WaitForChild('VoidPackFx'));local Arrival=require(RS:WaitForChild('VeiledArrivalFx'))
+-- R123: client-only spectral lunge (Art.ClientFrames) and a small impact accent; the server pose is unchanged.
+local KFx=require(RS:WaitForChild('KeeperFx'));local Combat=require(RS:WaitForChild('KeeperCombat'))
 local keepers,bags={},{};local connections={};local alive=true
 local function watch(signal,fn)connections[#connections+1]=signal:Connect(fn)end
 local function keeper(model)if model:IsA('Model')then keepers[model]={At=-100}end end
@@ -33,7 +35,14 @@ watch(Run.RenderStepped,function(dt)
  for m,r in pairs(keepers)do
   local root=m.PrimaryPart;if not m.Parent or not root then keepers[m]=nil;continue end
   local distance=(root.Position-origin).Magnitude;local period=distance<350 and 0 or distance<900 and .15 or 1
-  if now-r.At>=period then r.At=now;Art.Apply(m,now)end
+  -- R112-style lead: a late-seen attack plays its wind-up from where this client first saw it.
+  local attackAt=m:GetAttribute('KeeperAttackAt');if attackAt~=r.AttackAt then r.AttackAt=attackAt;r.Seen=now end
+  local striking=type(attackAt)=='number'and now>=attackAt and now-attackAt<Combat.Get(7).Windup+Combat.Recovery
+  if striking or now-r.At>=period then r.At=now;Art.Apply(m,now,Art.ClientFrames(m,now,r.Seen and r.Seen-(attackAt or now)))end
+  local impact=type(attackAt)=='number'and attackAt+Combat.Get(7).Windup
+  if impact and now>=impact and r.ImpactFor~=attackAt then
+   r.ImpactFor=attackAt;if now-impact<.2 and distance<KFx.DustDistance then KFx.Accent('Spectral',root.CFrame*CFrame.new(0,-4,-6),root.CFrame,Fx.Get()==1)end
+  end
  end
  if not effectTick then return end
  local reduced=Gui.ReducedMotionEnabled==true

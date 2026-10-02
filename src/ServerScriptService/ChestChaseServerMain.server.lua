@@ -144,6 +144,10 @@ local function runServer()
 	speedBoard:Start()
 	startupPhase = "starting treadmill training"
 	baseService:StartTraining()
+	-- R123: treadmill bonus rolls (every 10 min of treadmill time; TreadmillBonusRules).
+	local TreadmillBonusService = loadModule("TreadmillBonusService", {"new","Start","Setup","Cleanup","Roll"})
+	local treadmillBonus = construct("TreadmillBonusService", TreadmillBonusService.new, Config, playerData, baseService, chestService, notifications)
+	treadmillBonus:Start()
 	startupPhase = "starting autosave and resetting field"
 	playerData:StartAutosave()
 	mapService:ResetCourse()
@@ -199,6 +203,7 @@ local function runServer()
 		lootToolService:SetupPlayer(player)
 		economyService:SetupPlayer(player)
         task.spawn(function()gifts:Recover(player)end)
+        treadmillBonus:Setup(player)
 		if player.Character then
 			task.spawn(setupCharacter, player.Character)
 		end
@@ -213,6 +218,7 @@ local function runServer()
         require(modules.SecurityGate).Cleanup(player);require(modules.MovementGuard).Cleanup(player)
         task.spawn(function()speedBoard:Publish(player)end)
         gifts:Cleanup(player)
+        treadmillBonus:Cleanup(player)
         premium:Cleanup(player)
 		playerData:FinalizePlayer(player, "PlayerRemoving")
 		trackHoles:CleanupPlayer(player)

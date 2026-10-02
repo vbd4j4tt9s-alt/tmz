@@ -67,7 +67,7 @@ end
 local tremble=function(amount)return math.sin(E*57)*amount*H end
 
 local moves={}
--- 1 Timber Golem: rises tall with both fists swung overhead, then hammers them down together into the ground.
+-- 1 Timber Golem: rises tall with both fists flung up in a wide V over the crown, then hammers them down together into the ground.
 moves[1]=function(out,frames,r)
  local P,s=r.P,r.Scale
  local B=CF(0,mix(.35,-1.55,-1.85)*s,mix(.30,-.45,-.55)*s)*around(P.Body,mix(.20,-.12,-.18)+tremble(.02),0,0)
@@ -75,25 +75,25 @@ moves[1]=function(out,frames,r)
  out.Head=B*frames.Head*around(P.Head,mix(.24,-.14,-.22),0,0)
  for _,g in ipairs({'LeftArm','RightArm'})do
   local p=P[g];local i=inward(p)
-  out[g]=B*frames[g]*around(p,mix(3.45,.62,.82)+tremble(.05),mix(0,-i*.28,-i*.34),mix(i*.34,i*.12,0))
+  out[g]=B*frames[g]*around(p,mix(2.85,.62,.82)+tremble(.05),mix(0,-i*.28,-i*.34),mix(-i*.80,i*.12,0))
  end
 end
 -- 2 Sand Snake: coils back into a raised S with the jaw gaping, lunges the head forward and snaps shut,
 -- then a whip runs down the body to the tail tip.
 moves[2]=function(out,frames,r)
  local P=r.P
- local lift=around(r.J2,mix(.42,-.04,.10),0,0)
+ local lift=around(r.J2,mix(.62,-.04,.10),0,0)
  out.Segment1=lift*frames.Segment1
  local acc=CFrame.identity
  for i=2,9 do
   local g='Segment'..i;local f=frames[g];local j=r['J'..i]
   if f and j then
-   local coil=(i<=6 and(i%2==0 and .30 or -.30)or 0)*K
+   local coil=(i<=6 and(i%2==0 and .45 or -.45)or 0)*K
    local whip=i>=3 and F*.55*math.sin(E*24-i*.95)*math.min(1,(i-2)/4)or 0
    local joint=(acc*f)*j;acc=CF(joint)*CFrame.Angles(0,coil+whip,0)*CF(-joint)*acc;out[g]=acc*f
   end
  end
- local B=CF(0,mix(1.4,.25,.65),mix(1.9,-2.2,-1.1))*lift
+ local B=CF(0,mix(2.4,.25,.65),mix(2.2,-2.2,-1.1))*lift
  headJaw(out,frames,P,B,mix(-.26,.10,.06)+tremble(.03),math.sin(E*9)*.10*K,mix(.70,-.08,.28))
 end
 -- 3 Ice Fang: crouches with tail high and a paw cocked, springs forward in a short arc, swipes the paw across.
@@ -141,7 +141,7 @@ moves[5]=function(out,frames)
  Knight=Knight or require(script.Parent.CrystalKnightPose)
  if not knightKeys then
   local d=Knight.Direction
-  knightKeys={Rest=d(V(0,.88,-.48)),Wound=d(V(-.30,.75,.59)),Cut=d(V(.55,-.45,-.70)),Past=d(V(.75,-.55,.25))}
+  knightKeys={Rest=d(V(0,.88,-.48)),Wound=d(V(-.30,.75,.59)),Cut=d(V(.05,-.60,-.80)),Past=d(V(.75,-.55,.25))}
  end
  local k=knightKeys
  local function lerpV(a,b,c,d)return a*(1-K-C-F)+b*K+c*C+d*F end
@@ -152,7 +152,7 @@ moves[5]=function(out,frames)
  elseif F>0 then rotation=k.Rest:Lerp(k.Past,F)
  else rotation=k.Rest:Lerp(k.Wound,K)end
  local custom={Twist=V(mix(-.10,.12,.18)+tremble(.015),mix(.45,-.35,-.60),0),
-  Right=lerpV(V(7.5,16.6,5),V(9.5,25,-1.5),V(-1.5,12.5,10),V(-6,9,6)),
+  Right=lerpV(V(7.5,16.6,5),V(9.5,25,-1.5),V(-2,11.5,10.5),V(-6,9,6)),
   Left=lerpV(V(-9.0,8.5,1.8),V(-6,16,7),V(-7.5,13,1),V(-8,15,-1)),Rotation=rotation}
  local adapted=Knight.Adapt(frames,1,0,0,E,0,0,custom)
  for g,f in pairs(adapted)do out[g]=f end
@@ -179,11 +179,11 @@ end
 -- uppercut that connects low in front and carries high overhead.
 moves[7]=function(out,frames,r)
  local P,s=r.P,r.Scale
- local B=CF(0,mix(-1.1,-2.2,.15)*s,mix(.35,-.55,-.75)*s)*around(P.Body,mix(-.12,-.08,.22),mix(.35,-.15,-.40)+tremble(.02),0)
+ local B=CF(0,mix(-1.1,-2.2,.15)*s,mix(.35,-.55,-.75)*s)*around(P.Body,mix(-.12,-.08,.22),mix(.50,-.15,-.40)+tremble(.02),0)
  out.Body=B*frames.Body
  out.Head=B*frames.Head*around(P.Head,mix(-.15,0,.25),mix(-.20,.10,.20),0)
  local i=inward(P.RightArm)
- out.RightArm=B*frames.RightArm*around(P.RightArm,mix(-.95,.55,2.50)+tremble(.05),mix(0,-i*.15,-i*.25),mix(-i*.25,0,i*.10))
+ out.RightArm=B*frames.RightArm*around(P.RightArm,mix(-1.35,.55,2.50)+tremble(.05),mix(0,-i*.15,-i*.25),mix(-i*.25,0,i*.10))
  local j=inward(P.LeftArm)
  out.LeftArm=B*frames.LeftArm*around(P.LeftArm,mix(.55,-.25,-.45),mix(-j*.20,0,0),mix(j*.20,0,0))
 end

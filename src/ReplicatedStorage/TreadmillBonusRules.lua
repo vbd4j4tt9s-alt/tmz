@@ -1,100 +1,80 @@
--- R123: treadmill bonus rolls (owner request). Pure rules shared by TreadmillBonusService (server, authoritative)
--- and TreadmillBonusClient (button + crate-style roll strip). Nothing here reads luck, boots, passes or boosts.
+-- R123: treadmill bonus rolls (owner request, final spec). Pure rules shared by TreadmillBonusService (server,
+-- authoritative) and TreadmillBonusClient (roll button, crate-style strip, progress bar over the player).
 --
--- Earning: every 10 minutes of treadmill training (BaseService.TrainingSessions, server side) makes one bonus roll
--- READY. Leaving the treadmill pauses progress; back on within 60 s keeps it, off for more than 60 s (or leaving the
--- game) resets it to 0. Unspent READY rolls are saved (max 5); training progress is session-only. At 5 ready rolls
--- the timer stops until one is used. Clicking the button asks the server to roll: it picks the rarity, adds the pack
--- to the seed bag at once (never lost if the player leaves mid-animation) and the client only animates the result.
+-- Earning: only time on a treadmill counts (the server's own BaseService.TrainingSessions lock). Every 10 minutes of
+-- treadmill time makes one roll READY. Progress is SAVED (profile Premium.TreadmillBonusProgress, seconds): 5 minutes,
+-- get off, rejoin tomorrow -> still 5 minutes. READY rolls stack to 2 and are NOT saved (leaving the game loses them);
+-- while 2 are ready the timer pauses (time beyond the cap is lost).
 --
--- Bonus roll odds (rarity of the seed inside the pack; no Common; luck-free; same for everyone):
---   Rarity      Bonus roll        Normal Forest pack (PackOdds112 Pack01, no boots), for comparison
---   Uncommon    65%               25%
---   Rare        32.4899%          12.5%
---   Legendary   2%                3.333%   (reduced)
---   Mythic      0.5%              0.5%
---   Secret      0.01%  (1/10K)    0.01%    (kept at the base pack's tiny chance, never boosted)
---   Cosmic      0.0001% (1/1M)    0.0001%
---   King        1e-10% (1/1T)     1e-10%
---   Common      0%                58.66%
--- Rare takes whatever the other rows leave (1 - all others). A biome with no seed of a rolled tier passes that
--- tier's share up to the next tier it has (Uncommon -> Rare -> Legendary -> Mythic, as PackOdds112 does); a missing
--- Secret/Cosmic/King share goes to the biome's lowest bonus tier. The pack's biome is the player's CURRENT treadmill
--- machine (Trail Runner = Forest ... Thunder Runner = Storm). Opening the pack picks one seed of the rolled rarity
--- from that biome, evenly.
-local N=require(script.Parent.PackOdds112)
-local B={Version=123,IntervalSeconds=600,GraceSeconds=60,MaxReady=5,RollCooldown=1,RemoteName='TreadmillBonusRoll'}
-B.Order={'Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
-B.Rank={};for i,t in ipairs(B.Order)do B.Rank[t]=i end
-B.Odds={Uncommon=.65,Legendary=.02,Mythic=.005,Secret=1e-4,Cosmic=1e-6,King=1e-12}
-B.Odds.Rare=1-B.Odds.Uncommon-B.Odds.Legendary-B.Odds.Mythic-B.Odds.Secret-B.Odds.Cosmic-B.Odds.King
--- Pack look per rolled rarity (SeedPackRules.GetPackTier: Design 2 = Uncommon, 3 = Rare, 5 = Legendary, 6 = Mythic).
-B.Variants={Uncommon='Pack02',Rare='Pack03',Legendary='Pack05',Mythic='Pack06',Secret='Pack06',Cosmic='Pack06',King='Pack06'}
+-- What a roll gives: one ordinary world seed pack (PackSize 1, no coat, no weather, current odds version), granted
+-- with PlayerData:AddChest + ChestService:SyncTools (the ChestService:Bank path for a stolen pack), so opening it uses the normal seed odds and boot luck as usual.
+--  * Pack rarity = the pack's tier (SeedPackRules.GetPackTier) at the game's existing world spawn weights
+--    (SeedPackRules.Variants[*].SpawnWeight <- BalanceValues81/RouteBalance83.SpawnWeights), unchanged:
+--      Common (Pack01) 38%   Uncommon (Pack02) 25%   Rare (Pack03) 15%   Epic (Pack04) 7%
+--      Legendary (Pack05) 10%   Mythic (Pack06) 5%
+--  * Biome = evenly among the biomes the player's best owned treadmill unlocks, cumulative in machine order:
+--      1 Trail Runner -> Forest | 2 Vine Runner +Jungle | 3 Dune Runner +Desert | 4 Glacier Runner +Snow
+--      5 Magma Runner +Lava | 6 Prism Runner +Crystal | 7 Thunder Runner +Storm (= every biome pack)
+--    The Void pack (EclipseReliquary) and the paid Mech pack are never in the pool.
+local PackRules=require(script.Parent.SeedPackRules)
+local B={Version=123,IntervalSeconds=600,MaxReady=2,SaveEvery=10,RollCooldown=1,RemoteName='TreadmillBonusRoll'}
+B.VariantOrder={'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06'}
+B.Special={Legendary=true,Mythic=true} -- flash + glow + fanfare on the result
 -- Player attributes the server publishes (client reads only).
-B.Attr={Ready='TreadmillBonusReady',DueAt='TreadmillBonusDueAt',Paused='TreadmillBonusPausedLeft',Interval='TreadmillBonusInterval'}
-function B.IsTier(t)return type(t)=='string'and B.Rank[t]~=nil end
+B.Attr={Ready='TreadmillBonusReady',DueAt='TreadmillBonusDueAt',Left='TreadmillBonusLeft',Interval='TreadmillBonusInterval',Pool='TreadmillBonusPool'}
 function B.ReadyCount(v)
  if type(v)~='number'or v~=v or math.abs(v)==math.huge then return 0 end
  return math.clamp(math.floor(v),0,B.MaxReady)
 end
--- present: set of rarities that have at least one seed in the biome. Returns {tier = probability}, summing to 1.
-function B.TierOdds(present)
- local out={};local leftover=0;local lowest
- for _,t in ipairs(B.Order)do if present[t]then lowest=t;break end end
- if not lowest then return nil end
- for i,t in ipairs(B.Order)do
-  local p=B.Odds[t]
-  if present[t]then out[t]=(out[t]or 0)+p
-  elseif i<=B.Rank.Mythic then
-   local moved=false
-   for j=i+1,B.Rank.Mythic do local up=B.Order[j];if present[up]then out[up]=(out[up]or 0)+p;moved=true;break end end
-   if not moved then leftover+=p end
-  else leftover+=p end
- end
- if leftover>0 then out[lowest]=(out[lowest]or 0)+leftover end
+function B.Progress(v)
+ if type(v)~='number'or v~=v or math.abs(v)==math.huge then return 0 end
+ return math.clamp(v,0,B.IntervalSeconds)
+end
+-- Pool stages for a treadmill level (cumulative over Config.TreadmillTiers, in machine order).
+function B.PoolStages(tiers,level)
+ local out={};level=math.clamp(math.floor(tonumber(level)or 1),1,#tiers)
+ for i=1,level do local st=tiers[i].Stage;if st and st>=1 and st<=7 then table.insert(out,st)end end
  return out
 end
-function B.Present(pool,getRarity)
- local present={};for _,seed in ipairs(pool or{})do present[(getRarity(seed.Id))]=true end;return present
+function B.EncodePool(stages)local t={};for i,s in ipairs(stages)do t[i]=tostring(s)end;return table.concat(t,',')end
+function B.DecodePool(text)
+ local out={};if type(text)~='string'then return out end
+ for n in text:gmatch('%d+')do local s=tonumber(n);if s and s>=1 and s<=7 and #out<7 then table.insert(out,s)end end
+ return out
 end
-function B.PoolOdds(pool,getRarity)return B.TierOdds(B.Present(pool,getRarity))end
--- Exact staged roll (King is 1 in 1T): draw() returns a uniform number in [0,1).
-function B.RollTier(odds,draw)return N.RollTier(odds,draw)end
-local function drawFrom(draw)
- if type(draw)=='function'then return draw end
- local n=type(draw)=='number'and draw==draw and draw or .5
- return function()return n end
+function B.Tier(variant)local tier=PackRules.GetPackTier(variant);return tier.Name,tier.Color end
+-- {variant = probability} from the live world spawn weights.
+function B.VariantOdds()
+ local total=0;for _,k in ipairs(B.VariantOrder)do total+=PackRules.Variants[k].SpawnWeight end
+ local out={};for _,k in ipairs(B.VariantOrder)do out[k]=PackRules.Variants[k].SpawnWeight/total end;return out
 end
--- Opening a bonus pack: one seed of the rolled tier, evenly. If the biome lost that tier, the nearest tier above
--- (then below) that it has.
-function B.RollSeed(pool,getRarity,tier,draw)
- draw=drawFrom(draw);if not B.IsTier(tier)then return nil end
- local by={};for _,seed in ipairs(pool or{})do local t=getRarity(seed.Id);by[t]=by[t]or{};table.insert(by[t],seed)end
- local list=by[tier]
- if not list then for i=B.Rank[tier]+1,#B.Order do list=by[B.Order[i]];if list then break end end end
- if not list then for i=B.Rank[tier]-1,1,-1 do list=by[B.Order[i]];if list then break end end end
- if not list then return nil end
- local u=draw();u=type(u)=='number'and u==u and u or 0
- local seed=list[math.clamp(math.floor(u*#list)+1,1,#list)]
- return seed,(getRarity(seed.Id))
-end
--- {seedId = percent} for a bonus pack of this tier (pack tooltip).
-function B.SeedOdds(pool,getRarity,tier)
- local list={};for _,seed in ipairs(pool or{})do if getRarity(seed.Id)==tier then table.insert(list,seed)end end
- local out={};for _,seed in ipairs(list)do out[seed.Id]=100/#list end;return out
+-- draw(): uniform [0,1). Returns {Stage=, Variant=}.
+function B.RollPack(stages,draw)
+ if #stages==0 then return nil end
+ local u=draw();u=type(u)=='number'and u==u and math.clamp(u,0,1-1e-12)or 0
+ local stage=stages[math.floor(u*#stages)+1]
+ local v=draw();v=type(v)=='number'and v==v and math.clamp(v,0,1-1e-12)or 0
+ local odds=B.VariantOdds();local variant=B.VariantOrder[#B.VariantOrder]
+ for _,k in ipairs(B.VariantOrder)do v-=odds[k];if v<0 then variant=k;break end end
+ return {Stage=stage,Variant=variant}
 end
 function B.Percent(p)
  local v=p*100
- if v>=1 then return(string.format('%.2f',v):gsub('%.?0+$',''))..'%'end
- if v>=.0001 then return(string.format('%.4f',v):gsub('%.?0+$',''))..'%'end
- return '1 in '..string.format('%.0f',1/p)
+ if v>=1 then return(string.format('%.1f',v):gsub('%.0$',''))..'%'end
+ return(string.format('%.2f',v):gsub('%.?0+$',''))..'%'
+end
+-- Rows for the odds panel: {Name, Color, Percent text} per pack rarity, plus the biome count.
+function B.OddsRows()
+ local odds=B.VariantOdds();local rows={}
+ for _,k in ipairs(B.VariantOrder)do local name,color=B.Tier(k);table.insert(rows,{Variant=k,Name=name,Color=color,Chance=odds[k],Text=B.Percent(odds[k])})end
+ return rows
 end
 -- Roll strip (crate style) -------------------------------------------------------------------------------------
 B.Strip={Count=46,Win=40,Pitch=112,CardWidth=104,Duration=5,ReducedDuration=1.2,ReducedLead=4,MaxTicksPerSecond=30}
--- Fillers are cosmetic and drawn from the same odds; the winning card is the server's result.
-function B.BuildStrip(odds,result,draw,count,win)
+-- Fillers are cosmetic and drawn from the same pool and odds; the winning card is the server's result.
+function B.BuildStrip(stages,result,draw,count,win)
  count=count or B.Strip.Count;win=win or B.Strip.Win;local cards={}
- for i=1,count do cards[i]=i==win and result or B.RollTier(odds,draw)or'Uncommon'end
+ for i=1,count do cards[i]=i==win and result or B.RollPack(stages,draw)or result end
  return cards
 end
 function B.Ease(a)a=math.clamp(a,0,1);return 1-(1-a)^4 end
@@ -131,7 +111,7 @@ end
 local function overlaps(a,b,pad)return a.X<b.X+b.W+pad and a.X+a.W>b.X-pad and a.Y<b.Y+b.H+pad and a.Y+a.H>b.Y-pad end
 function B.Place(m,w,h,boxes)
  local bw,bh=m.Phone and 176 or 212,m.Phone and 46 or 52
- local barW=(m.Slots+1)*m.SlotSize+m.Slots*6;local detail=m.HotbarDetails~=false and 44 or 0
+ local detail=m.HotbarDetails~=false and 44 or 0
  local barTop=h-m.HotbarBottom-m.SlotSize-detail
  local hubY=h/2+(m.MenuShiftY or 0)-m.MenuSize/2
  local spots={
