@@ -1,4 +1,4 @@
-# Test commands and tools (R127)
+# Test commands and tools (R128)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -169,3 +169,8 @@ listed separately any more because each one is the same as a command above.
    - `weather blizzard all` near your garden: packs glow, your plant gets a rainbow outline + label, the message names it.
    - `event spawn`: the lights flicker out, far things go black, a glow around you, lights back after ~10 s.
    - Hotbar and Bag are bigger; `spawnodds` shows Legendary 3% / Mythic 1%.
+13. **R128:**
+   - `event spawn`: lights-out is about 7 s now.
+   - Walk and run through Forest / Jungle: pollen and fireflies stay put instead of sliding with the camera.
+   - Hold a pack or seed with a ring/orbit (`weather rain all`) and run: the effect stays on the item.
+   - Steal a pack and let the keeper catch up: it lands its swing instead of repeating it.
