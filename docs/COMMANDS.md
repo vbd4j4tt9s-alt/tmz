@@ -1,4 +1,4 @@
-# Test commands and tools (R131)
+# Test commands and tools (R132)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -62,6 +62,7 @@
 | `plants all @name` | Mature examples of every crop |
 | `growall @name`, `growth 50 @name`, `growtime 30 @name`, `regrow @name` | Growth states |
 | `harvestall @name`, `sellall @name` | Pick and sell |
+| `fruithour ember pumpkin 3` (server) | Make a fruit the Fruit of the Hour for 10 minutes, bonus 1.5–3 (default 3). `fruithour` alone picks one at random; `fruithour off` goes back to the clock |
 | `clear inventory @name` | Also `seeds`, `packs`, `plants`, `harvests`, `all` |
 | `clearinventory all`, `cleargarden all` (server) | Clear everyone |
 
@@ -186,3 +187,8 @@ listed separately any more because each one is the same as a command above.
    - Gifts in Studio (Clients and Servers, 2 players): Player1 gives to Player2; Player2 gets "🎁 Player1 gave you …!" with a chime. With Studio API access off, Player1 is told to turn it on.
    - Look across the base: the garden name bubbles are smaller from far away and don't cover gardens.
    - `weather rain`: mutations are rare (0.2% per minute); `weather rain all` still forces them.
+17. **R132:**
+   - Go to the market: string lights, warm lamps, flower boxes, produce stands, and the game's own fruit and plants on the counter, stands and planters. No chalkboard.
+   - The pedestal to the right of the arrival spot: the Fruit of the Hour turns slowly over it with its name, "SELLS ×2.3" and the time left.
+   - `fruithour apple 3`, then harvest/hold an apple and open the sell menu: the apple shows "🌟 Fruit of the Hour ×3.0" and sells for 3×. Everyone gets the gold notice. `fruithour off` puts the hour's fruit back.
+   - Go home: a 🏠 floats over the middle of your base. Your alt sees it over their own base only.
