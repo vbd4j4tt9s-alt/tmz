@@ -3,13 +3,17 @@
 -- Undo any time: require(game.ServerStorage.__BACKUP__.Installer)("undo")   Redo: ...("install")
 assert(not game:GetService('RunService'):IsRunning(),'__TAG__ Stop Play first.')
 local storage=game:GetService('ServerStorage')
+-- @@ENGINE_HELPERS@@
 local existing=storage:FindFirstChild('__BACKUP__')
 if existing then
  -- Same build pasted again: redo. A different build with the same backup name must never run the old one.
- assert(existing:GetAttribute('Build')=='__ENGINE_SHA__','__TAG__ An older __TAG__ backup is in ServerStorage. Undo it first: require(game.ServerStorage.__BACKUP__.Installer)("undo") then delete ServerStorage.__BACKUP__ and paste this again. Nothing changed.')
+ -- Same build = Build attribute, or an Installer identical to this one (pastes before the attribute never set it).
+ local installer=existing:FindFirstChild('Installer')
+ local same=existing:GetAttribute('Build')=='__ENGINE_SHA__'or(installer~=nil and installer:IsA('ModuleScript')and sha256(installer.Source)=='__ENGINE_SHA__')
+ assert(same,'__TAG__ An older __TAG__ backup is in ServerStorage. Undo it first: require(game.ServerStorage.__BACKUP__.Installer)("undo") then delete ServerStorage.__BACKUP__ and paste this again. Nothing changed.')
+ existing:SetAttribute('Build','__ENGINE_SHA__')
  require(existing:WaitForChild('Installer'))('install');return
 end
--- @@ENGINE_HELPERS@@
 local specs=__SPECS__
 local patches=__PATCHES__
 local engineSource=decode(__ENGINE_B64__)

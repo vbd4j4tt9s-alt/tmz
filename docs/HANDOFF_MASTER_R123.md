@@ -16,13 +16,11 @@ Revision changelog
   - `src/MANIFEST.tsv` lists every script: 448 rows, matching the files.
 - **Source version.** `Config.Version='V150 R123'`, `ProfileVersion=20`. Source is CURRENT at commit `fae4310`. The last source change was the commit before it; `fae4310` only added the rebuilt installer.
 - **Delivery.** Each release is one paste-into-Command-Bar installer with a backup and undo (`installers/R1xx_install.lua`). The owner installs them in Studio. The assistant can't run Studio.
-- **Installed (runtime) state: UNKNOWN / VERIFY.**
-  - The last owner Output (13:57) showed `V150 R123` running the first, superseded R123 build. The server failed to start because `PremiumRouting` requires `GiftProducts`, which the owner had deliberately deleted.
-  - The owner was given these fix steps:
-    1. Undo the old R123 backup.
-    2. Delete `ServerStorage.ChestChase_R123_Backup`.
-    3. Paste the rebuilt `installers/R123_install.lua`.
-  - No confirmation has come back yet.
+- **Installed (runtime) state: known from the owner's uploaded place `sapf.rbxl` (2 Oct). R123 not installed; Play cannot start.**
+  - Scripts are byte-exact R121 (`9b13846`) minus the 4 deleted modules. R121 still requires them in 10 places (`PremiumRouting:2`, `PremiumService:5`, `PremiumProgress`, `GamePassClient:11`, `WorldStatusHud:4`), so the server and clients error on start.
+  - `ServerStorage.ChestChase_R123_Backup` is State `Undone`. It holds 71 entries, all matching current `src/`, and its Installer hashes to `3558ed99…` (the current build). It was made by the 05:56 paste (`69619fc`), which never set the `Build` attribute. So the 06:04 installer (`fae4310`) refused it as "older": a false refusal.
+  - Fix: the paste wrapper now also recognises a same-build backup by its Installer hash (`tools/installer_paste.lua`). The rebuilt `installers/R123_install.lua` is one paste, with no undo or delete. Mock-run against the uploaded place: 28/28. Owner has not run it yet.
+  - `ChestChase_R121_Backup` is State `Built`, though its 22 modified sources are exactly in place. Cause unknown. R123 never reads it. Its 4 added scripts are the ones the owner deleted, so R121's own undo/redo can no longer run (expected, not needed).
 - **Truth layers.**
   - All R122/R123 features are IMPLEMENTED: present in source, passing offline mock tests.
   - None is VERIFIED at runtime.
@@ -42,12 +40,12 @@ Revision changelog
 |---|---|---|
 | Source | Repo `src/` at `fae4310`; `Config.lua:732` reads `Config.Version='V150 R123';Config.ProfileVersion=20` | CURRENT |
 | Last confirmed installed release | R121 (owner Output 13:42 showed `[V149 R121]`) | STALE (owner then installed R123 builds) |
-| R123 installer | `installers/R123_install.lua`, 324,481 bytes, 71 scripts. Base = R121 commit `9b13846`. Mock install test 94/94 | CURRENT |
+| R123 installer | `installers/R123_install.lua`, 324,915 bytes, 71 scripts, build `3558ed99…`. Base = R121 commit `9b13846`. Mock install test 99/99. Mock run against the uploaded `sapf.rbxl`: 28/28 | CURRENT (3rd build: only the paste wrapper changed) |
 | Superseded R123 build | The first build (~320 KB) still required `GiftProducts`. Its backup in the owner's place made later pastes re-run it | SUPERSEDED, possibly still installed |
 | Place check | `installers/check_R123.lua`: read-only; prints version, missing new scripts, leftovers, backup states | Not yet run by owner |
 | Older reference | `docs/HANDOFF.md`: map geometry, startup order, R107–R110 notes | Historical; geometry notes still valid |
 | Release notes | `docs/releases/R110.md`–`R121.md`, `R123.md` (R122 was folded into R123) | CURRENT |
-| Mismatch | Owner Output showed `KeeperSignatureStrike is not a valid member of ReplicatedStorage` with the old build. Cause unknown; possibly a partial or stale-backup state | UNKNOWN / VERIFY |
+| Mismatch | Owner Output showed `KeeperSignatureStrike is not a valid member of ReplicatedStorage` with the old build. All 3 R123 builds add the module, and the uploaded place has it correctly parked in the Undone backup. So this was a half-applied state, not code. The mock install puts it in place | UNKNOWN / VERIFY |
 
 ## 3. Core Game Loop and Current Design
 
@@ -124,13 +122,13 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 | Garden step / refresh wall / blackout | Runners step onto bed edges; wall and cover sized to the track | IMPLEMENTED (wall 158, blackout 1255) | — |
 | Keeper re-look (dragon, snow tiger, snake, gorilla) | Owner must approve renders first | PROPOSED | Proposal only: `docs/proposals/keeper_looks_R123/`; **not in `src/`** |
 | Owner commands | Work on others (`@name`/`@all`) in public servers; redundant ones removed | IMPLEMENTED (bonus/holes command tests) | Published-server run not done |
-| Installer safety | Hash-guarded; undo; refuses a stale same-name backup | IMPLEMENTED (installer 94) | Runtime: the stale-backup bug hit the owner once |
+| Installer safety | Hash-guarded; undo; refuses a different build's same-name backup; re-uses the same build's backup even without the `Build` attribute | IMPLEMENTED (installer 99; place mock 28) | Runtime: the stale-backup bug hit the owner once. Then the 06:04 guard falsely refused the owner's same-build backup (fixed) |
 
 ## 6. Current Active Task
 
 | Item | Latest desired behavior | Starting status | Acceptance / next evidence |
 |---|---|---|---|
-| Install R123 correctly | Server boots on V150 R123 with no `GiftProducts`/`SpeedBoost`/`KeeperSignatureStrike` errors | UNKNOWN / VERIFY | Owner runs the 3 fix steps (Section 8) and sends Output plus the `check_R123.lua` lines |
+| Install R123 correctly | Server boots on V150 R123 with no `GiftProducts`/`SpeedBoost`/`KeeperSignatureStrike` errors | UNKNOWN / VERIFY | Owner pastes the rebuilt installer once (Section 8) and sends Output plus the `check_R123.lua` lines |
 | Bonus roll odds | Owner wording: "same rarities as the already existing percentages for seeds regarding the packs it just common to mythic". Earlier: "mythic ≈0.5% and legendary 2". Implemented interpretation: track spawn weights 38/25/15/7/10/5 | UNKNOWN / VERIFY | Owner confirms 10% / 5% or 2% / 0.5%; it's a one-line change in `TreadmillBonusRules` |
 | Keeper re-look | Refine the dragon, snow tiger, snake and gorilla. Show before/after first | PROPOSED | Owner yes/no/changes per keeper. The "before" renders are reconstructions; compare with Studio. Dragon is 127 parts (a ~100-part option exists) |
 | Bonus progress bar placement | Owner asked for a bar "above the treadmill". Implemented: a billboard above the player's head while on the treadmill | UNKNOWN / VERIFY | Owner accepts, or wants it on the treadmill model |
@@ -141,8 +139,8 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 
 ## 7. Open Bugs / Verification Debt
 
-1. **Owner place may still run the superseded R123 build, so the server fails to start.** Evidence: Output 13:57. Next check: the fix steps, then `check_R123.lua`.
-2. **`KeeperSignatureStrike` missing in Play** with the old build. Cause unknown. Next check: `check_R123.lua` "missing" line after a correct reinstall.
+1. **Owner place is on R121 with the gift modules deleted, so the server fails to start.** Evidence: uploaded `sapf.rbxl` (Section 1). The 06:04 installer falsely refused the same-build backup; fixed in the rebuilt installer. Next check: owner pastes it once, then runs `check_R123.lua`.
+2. **`KeeperSignatureStrike` missing in Play** with the old build. Not a code fault: every build adds it, and it is parked correctly in the uploaded place. Next check: the `check_R123.lua` "missing" line after install.
 3. **Plant visuals from the prior chat's snapshot** (Ice Berries, Ash Tomato, Dragonfruit, Glass Cactus, fuller bushes): APPROVED in the old handoff, with no implementation evidence in this repo's R110–R123 history. Next check: inspect `PlantArt*`/`PlantCatalog` and ask the owner if still wanted.
 4. **Hold-E harvesting and clear inventory/garden commands:** implementation reported in the prior handoff; runtime never live-tested.
 5. **V116 ragdoll-engine keeper catch:** live feel verification still outstanding. Later work (R122 fling heights, KeepOnTrack) builds on it.
@@ -155,13 +153,12 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 ## 8. Migration / Installer / Rollback State
 
 - **Install chain.** R110 … R121 are sequential, each requiring the previous one. R122 was never released separately. **R123 requires R121** (base commit `9b13846`). It refuses if any patched script differs from R121 bytes.
-- **Owner fix sequence** (Edit mode, Play stopped):
-  1. `require(game.ServerStorage.ChestChase_R123_Backup.Installer)("undo")`
-  2. Delete `ServerStorage.ChestChase_R123_Backup`.
-  3. Paste the rebuilt `R123_install.lua`.
-  4. Save, then start a new Play session.
+- **Owner fix sequence** (Edit mode, Play stopped), for the place as uploaded:
+  1. Paste the rebuilt `R123_install.lua`. No undo or delete first: it re-uses the same-build backup already there. Expect `[R123] Installed.`
+  2. Save, then start a new Play session.
+  3. Fallback if it still says "older": delete `ServerStorage.ChestChase_R123_Backup` (already Undone) and paste again.
 - **Scripts removed from source:** `GiftProducts`, `SpeedBoost`, `ProductGiftService`, `ProductGiftState`.
-  - The owner already deleted at least the first two.
+  - The owner deleted all four (confirmed in the uploaded place).
   - The installer never touches deleted scripts. Leftovers are unused and safe to delete.
 - **Paste-script rule (new):** a same-name backup from a **different build** is refused with undo steps. The same build pasted again re-runs install, which is harmless.
 - **Every backup:** `ServerStorage/ChestChase_R1xx_Backup` holds an `Installer` module; `("undo")` / `("install")`.
@@ -237,7 +234,7 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
   | HUD | 58 |
   | Wall / blackout | 158 / 1255 |
 
-- Installer: 94.
+- Installer: 99. Installer against the uploaded `sapf.rbxl`: 28 (scratch harness built from the place file with `tools/rbxl.py`).
 
 **Live / runtime (owner in Studio; Test > Clients and Servers, 2 players).** Follow the "Test plan by feature" in `docs/COMMANDS.md`:
 - Bonus rolls: progress save, the 2-roll cap, loss on leave, pool by tier, strip and clicks, the Legendary/Mythic effect.
@@ -254,7 +251,7 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 
 ## 12. Next Recommended Action
 
-1. Get the owner's Output after the fix steps (Section 8) plus the `check_R123.lua` lines. Don't build new features until V150 R123 boots cleanly.
+1. Get the owner's Output after the one-paste install (Section 8) plus the `check_R123.lua` lines. Don't build new features until V150 R123 boots cleanly.
 2. Resolve the Section 6 questions: bonus odds, keeper re-look approval, progress-bar placement, button interpretation, Mech in the pool.
 3. Then ship R124 with only the approved deltas:
    - odds change;

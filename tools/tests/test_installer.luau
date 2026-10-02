@@ -77,6 +77,13 @@ local w4=world()
 do local f=R.new('Folder');f.Name=BACKUP;f:SetAttribute('Build','an-older-build');f.Parent=w4.Storage end
 ok,err=w4.Run(D.PASTE);check(not ok and tostring(err):find('older',1,true)~=nil and tostring(err):find('undo',1,true)~=nil,'older backup refused with undo steps: '..tostring(err))
 check(all(w4,'Before'),'nothing written when an older backup exists')
+-- 6c) This same build's backup made by a paste script that never set Build (undone since): recognised by its Installer, re-installed.
+local w5=world();ok,err=w5.Run(D.PASTE);check(ok,'6c setup install: '..tostring(err))
+local b5=w5.Storage:FindFirstChild(BACKUP);local sha=b5:GetAttribute('Build');b5:SetAttribute('Build',nil)
+ok,err=pcall(w5.Req(b5.Installer),'undo');check(ok and all(w5,'Before'),'6c setup undo: '..tostring(err))
+ok,err=w5.Run(D.PASTE);check(ok,'same build without Build attribute is re-used, not refused: '..tostring(err))
+check(all(w5,'After')and b5:GetAttribute('State')=='Installed','...and installs from it')
+check(b5:GetAttribute('Build')==sha and #w5.Storage:GetChildren()==1,'...stamps Build, no second backup')
 -- 7) A write failure midway rolls everything back.
 local w3=world();local writes=0
 local editor=w3.Game:GetService('ScriptEditorService');local real=editor.UpdateSourceAsync
