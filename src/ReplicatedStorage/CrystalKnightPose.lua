@@ -19,12 +19,19 @@ local function direction(d)
  if right.Magnitude<.01 then right=Vector3.zAxis-up*up:Dot(Vector3.zAxis)end
  right=right.Unit;return CFrame.fromMatrix(Vector3.zero,right,up,right:Cross(up))
 end
-function M.Adapt(base,awake,moving,cycle,t,load,hit)
+-- R123: custom (client-only KeeperSignatureStrike) = {Twist=Vector3(pitch,yaw,0), Right=, Left= (author space), Rotation=CFrame}.
+-- Server callers never pass it, so their frames are unchanged.
+function M.Adapt(base,awake,moving,cycle,t,load,hit,custom)
  local out=table.clone(base);local a=math.clamp(awake or 1,0,1);a=a*a*(3-2*a)
  load=load or 0;hit=hit or 0;local body=base.Body
  if load>0 or hit>0 then
   local pivot=author(0,18,0)
   local twist=CF(pivot)*CFrame.Angles(-.07*load+.1*hit,.18*load-.32*hit,0)*CF(-pivot)
+  body=twist*body;out.Body=body;out.Head=twist*base.Head
+ end
+ if custom then
+  local pivot=author(0,18,0)
+  local twist=CF(pivot)*CFrame.Angles(custom.Twist.X,custom.Twist.Y,0)*CF(-pivot)
   body=twist*body;out.Body=body;out.Head=twist*base.Head
  end
  local bob=math.sin(cycle or 0)*.35*(moving or 0)
@@ -37,6 +44,10 @@ function M.Adapt(base,awake,moving,cycle,t,load,hit)
  -- Rotation interpolation avoids the zero direction at the idle-to-raised midpoint.
  local rotation=direction(V(0,-1,0)):Lerp(direction(V(0,.88,-.48)),a)
  rotation=rotation:Lerp(direction(V(.20,.96,.22)),load):Lerp(direction(V(-.33,-.64,-.70)),hit)
+ if custom then
+  rightTarget=author(custom.Right.X,custom.Right.Y,custom.Right.Z);leftTarget=author(custom.Left.X,custom.Left.Y,custom.Left.Z)
+  rotation=custom.Rotation
+ end
  local hand
  for _,side in ipairs({'Left','Right'})do
   local s=side=='Left'and -1 or 1
@@ -49,4 +60,5 @@ function M.Adapt(base,awake,moving,cycle,t,load,hit)
  out.Sword=CF(hand)*body.Rotation*rotation*CF(-restGrip)
  return out
 end
+M.Direction=direction
 return M

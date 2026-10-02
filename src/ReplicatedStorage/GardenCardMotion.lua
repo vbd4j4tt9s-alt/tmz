@@ -59,7 +59,7 @@ local function pose(e,t)
   e.Gradient.Rotation=t and(u*360)or 30
   for i,star in ipairs(e.Sparkles)do
    local k=t and math.max(0,math.sin((u+i/#e.Sparkles)*math.pi*2))or(i%2==0 and .8 or .25)
-   star.BackgroundTransparency=1-k*.95;local d=2+math.floor(k*2+.5);star.Size=UDim2.fromOffset(d,d)
+   star.BackgroundTransparency=1-k*.95;local d=3+math.floor(k*2+.5);star.Size=UDim2.fromOffset(d,d)
   end
  elseif s.Motion=='Radiant'then
   e.Gradient.Rotation=t and(u*360)or 45

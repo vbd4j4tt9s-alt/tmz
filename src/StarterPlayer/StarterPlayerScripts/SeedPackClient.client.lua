@@ -18,6 +18,7 @@ if not library or not catalog then return end
 local records={}
 local connections={}
 local lastHeavenlyAt=-math.huge
+local TEAR_AUDIO_GRACE=.25
 local effects=Instance.new("Folder");effects.Name="_LocalSeedPackEffects";effects.Parent=workspace
 local preload=Instance.new("Sound");preload.SoundId=Rules.TearSoundId;preload.Volume=0;preload.Parent=effects
 local bellPreload=Instance.new("Sound");bellPreload.SoundId=Rules.RevealBellSoundId;bellPreload.Volume=0;bellPreload.Parent=effects
@@ -117,10 +118,14 @@ local function beginReveal(record,at,seedId,now)
     local count=rarity.Rank<3 and (rarity.Rank==1 and 4 or 8)or 0
     for i=1,count do record.Celestial[i]=cosmeticPart("Rarity light",effect,rarity.Color,Vector3.one*.08)end
     if rarity.Rank>=3 then record.SeedMotion=Visuals.CreateSeedMotion(seed,effect,true)end
-    if now-at<Rules.TearSeconds then
+    -- R123: the reveal reaches this client one replication delay after RevealAt. Up to TEAR_AUDIO_GRACE late, the
+    -- tear still plays while the paper scraps fly (its short envelope is shifted to start now); later it is skipped.
+    local lag=now-at;record.TearShift=0
+    if lag<Rules.TearSeconds+TEAR_AUDIO_GRACE then
         local sound=Instance.new("Sound");sound.Name="Paper bag tearing";sound.SoundId=Rules.TearSoundId
         sound.Volume=0;sound.Looped=false;sound.RollOffMinDistance=5;sound.RollOffMaxDistance=36;sound.Parent=copy.PrimaryPart
-        sound.TimePosition=Rules.TearSoundStart+math.max(0,now-at-.12);sound:Play();record.TearSound=sound
+        record.TearShift=math.max(0,lag-.02)
+        sound.TimePosition=Rules.TearSoundStart+math.clamp(lag,0,.02);sound:Play();record.TearSound=sound
     end
 end
 local function renderReveal(record,now)
@@ -163,8 +168,9 @@ local function renderReveal(record,now)
         scrap.Transparency=t<release and 1 or math.clamp((age-.1)/.55,0,1)
     end
     if record.TearSound then
-        if t>Rules.TearSeconds+.1 then record.TearSound:Stop();record.TearSound=nil
-        else record.TearSound.Volume=Rules.TearVolume*math.clamp(t/.025,0,1)*math.clamp((Rules.TearSeconds+.08-t)/.15,0,1)end
+        local tt=t-(record.TearShift or 0)
+        if tt>Rules.TearSeconds+.1 then record.TearSound:Stop();record.TearSound=nil
+        else record.TearSound.Volume=Rules.TearVolume*math.clamp(tt/.025,0,1)*math.clamp((Rules.TearSeconds+.08-tt)/.15,0,1)end
     end
     local revealStart=require(ReplicatedStorage.RarityRevealSequence).SeedAt(record.RarityRank);local age=math.max(0,t-revealStart)
     local timing=require(ReplicatedStorage.BalanceRules)

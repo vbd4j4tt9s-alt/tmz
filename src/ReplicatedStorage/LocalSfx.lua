@@ -4,6 +4,9 @@ local Content=game:GetService('ContentProvider')
 local SoundService=game:GetService('SoundService')
 local Timing=require(script.Parent.SoundTiming)
 local Sfx={};local active={};local unavailable={};local warned={}
+-- R123: the same id fired twice within DedupeSeconds at (almost) the same spot plays once (no doubled / phased hits).
+Sfx.DedupeSeconds=.035;Sfx.DedupeStuds=6
+local recent={}
 local function valid(id)return type(id)=='string'and id:match('^rbxassetid://[1-9]%d*$')end
 function Sfx.Preload(ids)
     task.spawn(function()
@@ -26,6 +29,10 @@ function Sfx.Play(id,position,volume,pitch,lifetime)
         return
     end
     local now=os.clock()
+    local last=recent[id]
+    if last and now-last.At<Sfx.DedupeSeconds and((last.Position==nil and position==nil)
+        or(last.Position and position and(last.Position-position).Magnitude<=Sfx.DedupeStuds))then return end
+    recent[id]={At=now,Position=position}
     for i=#active,1,-1 do if not active[i].Item.Parent or active[i].Until<=now then table.remove(active,i)end end
     if #active>=12 then return end
     local parent=SoundService;local anchor

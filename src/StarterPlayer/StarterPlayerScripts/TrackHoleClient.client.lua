@@ -13,7 +13,9 @@ local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
 local remote=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('TrackHole')
 local V3=Vector3.new
 local sounds={};for _,s in ipairs(Planting.Sounds)do sounds[s.Key]=s.Id end
-local digSound=DigSound.new();Sfx.Preload({C.DigSound.Id})
+-- R123: the trap thud (planting 'Land' layer) is preloaded with the dig recording so the first fall is not silent / late.
+local digSound=DigSound.new();Sfx.Preload({C.DigSound.Id,sounds.Land})
+local Fx=require(RS:WaitForChild('ClientFxBudget'));local Gui=game:GetService('GuiService')
 local conns={};local lastSend=-math.huge;local hintShown=false;local elapsed=0
 
 local function shovel()
@@ -57,6 +59,9 @@ local function near(position,range)
  return camera and(camera.CFrame.Position-position).Magnitude<=range
 end
 local function burst(position,count,color,height)
+ -- R123: dirt chunks follow the shared FX budget (FastMode / low tier: half) and Reduced Motion (lower toss).
+ local tier=Fx.Get();count=math.max(3,math.floor(count*(tier==1 and .5 or tier==2 and .75 or 1)+.5))
+ if Gui.ReducedMotionEnabled==true then height*=.5 end
  for i=1,count do
   local p=Instance.new('Part');p.Name='HoleDirt';local s=.18+math.random()*.28;p.Size=V3(s,s,s)
   p.Color=color;p.Material=Enum.Material.Ground;p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false

@@ -90,7 +90,7 @@ local function beginReveal(bag)
  clearCopy(false)
  local _,rarity=Rules.GetRarity(bag:GetAttribute('RevealSeedId'))
  local at=bag:GetAttribute('RevealAt');if not at then return end
- reveal={At=at,Rank=rarity.Rank,Color=rarity.Color};revealAudio.Begin(rarity.Rank)
+ reveal={At=at,Rank=rarity.Rank,Color=rarity.Color};revealAudio.Begin(rarity.Rank,workspace:GetServerTimeNow()-at)
  kick(rarity.Rank>=6 and 2.1 or 1.65)
 end
 local function watchTool(tool)

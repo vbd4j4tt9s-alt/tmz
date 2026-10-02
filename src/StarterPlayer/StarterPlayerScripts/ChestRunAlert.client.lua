@@ -29,7 +29,14 @@ local alarm = Instance.new("Sound")
 alarm.Name = "ChestRunAlarm"
 alarm.Volume = 0.16
 alarm.Looped = false
+-- R123: the server publishes the alarm id so it is loaded before the first run (it used to download on the
+-- first "Show" and start late against the RUN!! label, or not at all).
+do
+	local preset = remote:GetAttribute("AlarmSoundId")
+	if type(preset) == "string" and preset:match("^rbxassetid://%d+$") then alarm.SoundId = preset end
+end
 alarm.Parent = SoundService
+local SoundTiming = require(ReplicatedStorage:WaitForChild("SoundTiming"))
 local heartbeat = Instance.new("Sound")
 heartbeat.Name = "ChestChaseHeartbeat"
 heartbeat.SoundId = remote:GetAttribute("HeartbeatSoundId") or ""
@@ -68,6 +75,9 @@ local heartbeatReady = false
 local successSoundReady = false
 task.spawn(function() heartbeatReady = preloadSound(heartbeat, "Heartbeat") end)
 task.spawn(function() successSoundReady = preloadSound(successSound, "Success") end)
+task.spawn(function()
+	if alarm.SoundId ~= "" then pcall(function() ContentProvider:PreloadAsync({alarm}) end) end
+end)
 
 local function newScreen(name, order)
 	local gui = Instance.new("ScreenGui")
@@ -319,9 +329,11 @@ connection = RunService.RenderStepped:Connect(function(dt)
 	if active and pendingAlarm and pendingAlarm.Token == token and playedAlarmToken ~= token then
 		playedAlarmToken = token
 		if type(pendingAlarm.SoundId) == "string" and pendingAlarm.SoundId:match("^rbxassetid://%d+$") then
-			alarm.SoundId = pendingAlarm.SoundId
+			if alarm.SoundId ~= pendingAlarm.SoundId then alarm.SoundId = pendingAlarm.SoundId end
 			alarm.Volume = math.clamp(tonumber(pendingAlarm.Volume) or 0.16,0,0.35)
-			alarm:Play()
+			-- Same frame as the RUN!! label; a cold load that arrives more than 0.5 s late is dropped, not played late.
+			alarm:Stop()
+			SoundTiming.Play(alarm)
 		end
 	end
 	if not active and successElapsed>=successFlashDuration and visualStrength<.001 and math.abs(fovOffset)<.001 then return end

@@ -123,7 +123,9 @@ function Ragdoll.KeepOnTrack(position,velocity)
     if position.Z<lineZ or math.abs(position.X-centerX)>half then return velocity end -- only while on the track
     local flight=2*math.max(0,velocity.Y)/math.max(1,workspace.Gravity)
     if flight<=0 then return velocity end
-    local margin=half-10;local landing=position.X+velocity.X*flight
+    -- TrackHalfWidth is the movement zone (wall inner face + 24 studs, MapService); the side walls' inner faces sit
+    -- about 25 studs inside it (x = +-89 on the live track). Land at least 8 studs inside the walls.
+    local margin=math.max(10,half-25-8);local landing=position.X+velocity.X*flight
     local target=math.clamp(landing,centerX-margin,centerX+margin)
     if target==landing then return velocity end
     return Vector3.new((target-position.X)/flight,velocity.Y,velocity.Z)

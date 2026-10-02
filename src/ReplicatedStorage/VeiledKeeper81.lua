@@ -17,16 +17,20 @@ local function curledArm(shoulder,wrist,side)
  local elbow=shoulder+along*alongLength+bend*math.sqrt(math.max(0,4.4*4.4-alongLength*alongLength))
  return downFrame(shoulder,elbow,side),downFrame(elbow,wrist,side)
 end
-local function jointPose(t,sleep,move,speed,load,hit)
+-- R123: sig (client only, from KeeperSignatureStrike.Veiled) layers the signature lunge; nil = the server pose.
+local function jointPose(t,sleep,move,speed,load,hit,sig)
  local p={};local phase=t*math.pi*2*2.15
  local wave=math.sin(phase)*move;local breath=math.sin(t*1.25)*.035
  local bob=math.abs(math.cos(phase))*.13*move+breath*(1-move)
  p.Hip=CF(0,3.65-6.15*sleep+bob,.1+1.6*sleep)
+ if sig then p.Hip=p.Hip*CF(0,sig.Sink,sig.Forward)end
  -- Long opposing strides and a low, forward-driving silhouette.
  local core=p.Hip*CF(0,1,0)*CFrame.Angles(-.08-.92*sleep-.38*move,math.sin(phase)*.055*move,0)
+ if sig then core=core*CFrame.Angles(sig.Lean,0,0)end
  p.Waist=core*CF(0,.9,0);p.Torso=core*CF(0,3,0)
  p.Neck=p.Torso*CF(0,2.15,0)
  p.Head=p.Neck*CF(0,1.55-.65*sleep,-.15-.3*sleep)*CFrame.Angles(-.12-.55*sleep+.20*move,0,0)
+ if sig then p.Head=p.Head*CFrame.Angles(sig.HeadPitch,0,sig.Tilt)end
  for _,side in ipairs({-1,1})do
   local q=side<0 and'L'or'R';local swing=side*wave
   local shoulderBase=p.Torso*CF(side*2.65,.95,0)
@@ -35,6 +39,9 @@ local function jointPose(t,sleep,move,speed,load,hit)
   -- One right-arm back-swing, then a direct forward swat; no overhead windmill.
   if side==1 then local attack=math.max(load,hit)
    pitch=pitch*(1-attack)-.70*load+1.55*hit;elbow=elbow*(1-attack)-.22*load-.12*hit
+  end
+  if sig then
+   pitch=pitch*(1-sig.Blend)+(side==1 and sig.PitchR or sig.PitchL);elbow=elbow*(1-sig.Blend)+sig.Elbow;roll+=side*sig.RollOut
   end
   local shoulder=shoulderBase*CFrame.Angles(pitch,0,roll)
   local upper=shoulder*CF(0,-2.2,0)
@@ -74,8 +81,18 @@ function K.Frames(model,now)
  local out={};for key,f in pairs(localFrames)do out[key]=rootFrame*f end
  return out
 end
-function K.Apply(model,now)
- local frames=K.Frames(model,now);if not frames then return end
+-- R123: the client's view: the signature lunge inside the strike window, otherwise exactly K.Frames.
+-- lead: seconds of the windup this client missed (late replication). The server never calls this.
+function K.ClientFrames(model,now,lead)
+ local sig=model.PrimaryPart and require(script.Parent.KeeperSignatureStrike).Veiled(now,model:GetAttribute('KeeperAttackAt'),lead)
+ if not sig then return K.Frames(model,now)end
+ local localFrames=jointPose(now,0,0,model:GetAttribute('KeeperTravelSpeed')or 600,0,0,sig)
+ local rootFrame=require(script.Parent.KeeperRecoveryDash).VisualFrame(model,now,model.PrimaryPart.CFrame)
+ local out={};for key,f in pairs(localFrames)do out[key]=rootFrame*f end
+ return out
+end
+function K.Apply(model,now,frames)
+ frames=frames or K.Frames(model,now);if not frames then return end
  local parts=cached[model]
  if not parts then
   parts={};for _,p in ipairs(model:GetChildren())do local group=p:GetAttribute('VeiledGroup');local cf=p:GetAttribute('VeiledFrame')

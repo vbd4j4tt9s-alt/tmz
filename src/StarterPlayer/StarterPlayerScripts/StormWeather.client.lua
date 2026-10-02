@@ -104,7 +104,10 @@ local function groundImpact(center,radius,now)
     burst.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,.45),NumberSequenceKeypoint.new(1,0)})
     burst.Lifetime=NumberRange.new(.25,.55);burst.Speed=NumberRange.new(12,23)
     burst.SpreadAngle=Vector2.new(60,60);burst.Acceleration=Vector3.new(0,-30,0)
-    burst.LightEmission=1;burst.Rate=0;burst.Parent=anchor;burst:Emit(Fx.Low()and 10 or 22)
+    -- R123: unlit sparks that fade out instead of vanishing at full opacity; fewer under Reduced Motion.
+    burst.LightEmission=1;burst.LightInfluence=0
+    burst.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(.6,.25),NumberSequenceKeypoint.new(1,1)})
+    burst.Rate=0;burst.Parent=anchor;burst:Emit((Fx.Low()or Gui.ReducedMotionEnabled)and 10 or 22)
     table.insert(impacts,{At=now,Anchor=anchor,Ring=ring,Stroke=stroke,Disc=disc})
 end
 local function lightning(id,center,radius,now)

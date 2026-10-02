@@ -63,6 +63,8 @@ local emitter=Instance.new('ParticleEmitter');emitter.Name='Precipitation';emitt
 -- R73: the shared biome lighting controller blends weather colour; only lightning flashes live here.
 local flash=Instance.new('ColorCorrectionEffect');flash.Name='DistantThunderGlow';flash.Enabled=false;flash.Parent=Lighting
 local thunder=Instance.new('Sound');thunder.Name='DistantThunder';thunder.SoundId=require(RS.StormConfig).ThunderId;thunder.Volume=.22;thunder.PlaybackSpeed=.9;thunder.Parent=folder
+-- R123: load the thunder before the first storm so it lands on the first bolt's flash instead of after it.
+task.spawn(function()pcall(function()game:GetService('ContentProvider'):PreloadAsync({thunder})end)end)
 local Notice=require(RS.WorldNoticeTiming);local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Exclude;params.RespectCanCollide=true
 local bolt=Lightning.New(folder);local profile;local profileTier;local nextBolt=0;local lastPosition;local lastCamera
 local clock=0;local updateClock=0;local noticeClock=0;local indoors=false;local lastBolt=-100

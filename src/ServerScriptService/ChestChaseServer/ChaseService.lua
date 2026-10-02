@@ -94,6 +94,12 @@ function ChaseService.new(config, mapService, playerData, baseService, chestServ
 	runAlertRemote:SetAttribute("HeartbeatDistance", config.ChaseHeartbeatDistance)
 	runAlertRemote:SetAttribute("CatchDistance", config.ChaserCatchDistance)
 	runAlertRemote:SetAttribute("SuccessSoundId", config.ChaseSuccessSoundId or "")
+	-- R123: publish the run alarm id up front so clients preload it (it was only sent with the first "Show").
+	local alarmSoundId = config.GuardianAlertSoundId
+	if type(alarmSoundId) ~= "string" or not string.match(alarmSoundId, "^rbxassetid://%d+$") then
+		alarmSoundId = config.ChestAlarmSoundId
+	end
+	runAlertRemote:SetAttribute("AlarmSoundId", type(alarmSoundId) == "string" and alarmSoundId or "")
 	runAlertRemote:SetAttribute("SuccessSoundVolume", config.ChaseSuccessSoundVolume or 0.18)
 	runAlertRemote:SetAttribute("SuccessFlashStrength", config.ChaseSuccessFlashStrength or 0.32)
 	runAlertRemote:SetAttribute("SuccessFlashDuration", config.ChaseSuccessFlashDuration or 0.9)

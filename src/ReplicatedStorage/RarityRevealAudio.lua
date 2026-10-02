@@ -11,19 +11,25 @@ function A.Preload()
  end
  task.spawn(function()pcall(function()Content:PreloadAsync(all)end)end)
 end
-function A.Play(key,pitch)
+-- skip: seconds of the cue already elapsed on the screen timeline (file seconds = skip x pitch).
+function A.Play(key,pitch,skip)
  A.Preload();local sound=pool[key];if not sound or not sound.IsLoaded then return false end
  sound:Stop();sound.PlaybackSpeed=pitch or 1
- require(script.Parent.SoundTiming).Play(sound,tonumber(script:GetAttribute(key..'Start'))or sources[key].Start)
+ local start=tonumber(script:GetAttribute(key..'Start'))or sources[key].Start
+ require(script.Parent.SoundTiming).Play(sound,start+math.max(0,tonumber(skip)or 0)*(pitch or 1))
  return true
 end
 function A.Stop()beat=0;for _,s in pairs(pool)do s:Stop()end end
-function A.Begin(rank)
+-- R123: elapsed = server-timeline seconds already shown when the reveal reaches this client (replication delay).
+-- The whoosh joins mid-build so its peak still lands on the seed burst; a stale opener chime is dropped.
+A.ChimeGrace=.35
+function A.Begin(rank,elapsed)
  A.Stop();A.Preload()
+ elapsed=math.max(0,tonumber(elapsed)or 0)
  if rank>=6 then
   local seconds=require(script.Parent.RarityRevealSequence).SeedAt(rank)
-  A.Play('Whoosh',math.clamp(2.8/seconds,.75,2))
- else A.Play('Chime',rank==5 and .88 or 1.12)end
+  if elapsed<seconds-.05 then A.Play('Whoosh',math.clamp(2.8/seconds,.75,2),elapsed)end
+ elseif elapsed<=A.ChimeGrace then A.Play('Chime',rank==5 and .88 or 1.12)end
 end
 function A.Step(rank,t)
  if rank<6 then return end

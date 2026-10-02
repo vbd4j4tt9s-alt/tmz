@@ -19,7 +19,8 @@ local function step()
  if number then
   if sound.IsLoaded then sound:Stop();sound.PlaybackSpeed=({.9,1.06,1.25})[number];sound.TimePosition=0;sound:Play()end
  end
- if now-lastPaint>=.1 then
+ -- R123: repaint on the cue frame so the wall's 3 / 2 / 1 changes with its beep (the paint is otherwise throttled).
+ if number or now-lastPaint>=.1 then
   lastPaint=now
   if not barrier or not barrier.Parent or not paint then
    local runtime=map:FindFirstChild('_GameplayRuntime');barrier=runtime and runtime:FindFirstChild('BiomeRefreshWall')

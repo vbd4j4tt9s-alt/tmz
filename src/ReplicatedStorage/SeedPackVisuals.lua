@@ -189,7 +189,10 @@ function Visuals.Seed(seed,index,origin,parent,scale,weldRoot,mutation)
  glow.Texture="rbxasset://textures/particles/sparkles_main.dds";glow.Color=ColorSequence.new(style.Color)
  glow.LightEmission=1;glow.Rate=style.Rank>=4 and 3 or 1;glow.Lifetime=NumberRange.new(.5,.85)
  glow.Speed=NumberRange.new(.2,.4);glow.SpreadAngle=Vector2.new(180,180)
- glow.Size=NumberSequence.new(.08*scale);glow.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.15),NumberSequenceKeypoint.new(1,1)})
+ -- R123: motes fade in and taper out (were born at full size/opacity and popped); unlit so they read the same day and night.
+ glow.LightInfluence=0
+ glow.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,.05*scale),NumberSequenceKeypoint.new(.3,.08*scale),NumberSequenceKeypoint.new(1,.02*scale)})
+ glow.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.2,.15),NumberSequenceKeypoint.new(1,1)})
  glow.Parent=root
  if style.Rank>=3 then game:GetService("CollectionService"):AddTag(m,Rules.SeedMotion.Tag)end
  m.Parent=parent;return m
