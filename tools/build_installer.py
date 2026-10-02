@@ -26,7 +26,10 @@ status = [l.split('\t') for l in git('diff', '--name-status', base, '--', 'src')
 changed = [p[len('src/'):] for s, p in status if p.endswith('.lua') and s == 'M']
 added = [p[len('src/'):] for s, p in status if p.endswith('.lua') and s == 'A']
 added += [p[len('src/'):] for p in git('ls-files', '--others', '--exclude-standard', 'src').decode().split() if p.endswith('.lua')]
-assert all(s in ('M', 'A') for s, p in status if p.endswith('.lua')), f'Deleted/renamed scripts are not supported: {status}'
+# Scripts deleted from src/ are left alone in the place (nothing requires them any more; the owner may already have removed them).
+deleted = [p[len('src/'):] for s, p in status if p.endswith('.lua') and s == 'D']
+for f in deleted: print(f'{f}: deleted in src/, not touched by the installer')
+assert all(s in ('M', 'A', 'D') for s, p in status if p.endswith('.lua')), f'Renamed scripts are not supported: {status}'
 def added_script(f):
     # Class from the Rojo suffix; folder-style init scripts are not supported for added scripts.
     assert not os.path.basename(f).startswith('init.'), f'{f}: add scripts as plain files, not init scripts'

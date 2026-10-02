@@ -1,7 +1,18 @@
 -- R71: distinct icon-only boosts; the refresh timer uses the existing night moon.
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Input=game:GetService('UserInputService');local Gui=game:GetService('GuiService');local Tween=game:GetService('TweenService')
 local Layout=require(RS.HudLayout);local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI);local State=require(RS.WorldStatusState);local Balance=require(RS.BalanceRules)
-local SpeedBoost=require(RS.SpeedBoost)
+-- R123: the timed x2 boost (and its SpeedBoost module) was removed; the boost is always off. Clock stays for the timers.
+local SpeedBoost={Attribute='SpeedBoostEndsAt'}
+function SpeedBoost.PlayerFactor()return 1 end
+function SpeedBoost.PlayerRemaining()return 0 end
+function SpeedBoost.Clock(seconds)
+ seconds=tonumber(seconds)or 0;if seconds~=seconds or seconds==math.huge or seconds==-math.huge then seconds=0 end
+ seconds=math.max(0,math.ceil(seconds))
+ local h=seconds//3600;local m=(seconds%3600)//60;local s=seconds%60
+ if h>0 then return string.format('%dh %dm',h,m)end
+ if m>0 then return string.format('%dm %ds',m,s)end
+ return string.format('%ds',s)
+end
 local H={};local C=Color3.fromRGB
 function H.Boosts(player)
  local tier=math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)

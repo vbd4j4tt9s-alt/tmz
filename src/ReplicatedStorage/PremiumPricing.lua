@@ -23,8 +23,6 @@ local speedTier=0
 for _,row in ipairs(P.Bundles)do if row.Kind=='Speed'then
  speedTier+=1;row.GemPrice=require(script.Parent.EconomyScaling91).BundleGemPrices[speedTier]
 end end
--- R121: consumable x2 training boost sold by the SPEED banner (owner sets SpeedBoost10ProductId on this ModuleScript).
-P.Boost={Key='SpeedBoost10',Kind='Boost',Name='x2 SPEED · 10 MIN',RobuxPrice=49,IdAttribute='SpeedBoost10ProductId'}
 function P.FromRobux(price)return math.ceil(price*P.GemsPerRobux)end
 function P.Find(key)for _,row in ipairs(P.Bundles)do if row.Key==key then return row end end end
 function P.ProductId(row)

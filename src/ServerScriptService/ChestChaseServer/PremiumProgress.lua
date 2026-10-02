@@ -18,7 +18,6 @@ function P.Decode(saved)
  end
  local result=copy(saved)
  if not require(script.Parent.PassGiftState).Valid(result)then return nil end
- if not require(script.Parent.ProductGiftState).Valid(result)then return nil end
  if result.BiomeHalfRewards==nil then result.BiomeHalfRewards={}end
  if type(result.BiomeHalfRewards)~='table'then return nil end
  for key,value in pairs(result.BiomeHalfRewards)do
@@ -57,7 +56,6 @@ function P.Attach(Data)
  function Data:GetPremium(player)
   self.Premium=self.Premium or{};if not self.Premium[player]then self.Premium[player]=P.Decode(nil)end
   require(script.Parent.PassGiftState).Initialize(self.Premium[player])
-  require(script.Parent.ProductGiftState).Initialize(self.Premium[player])
   return self.Premium[player]
  end
  function Data:PublishPremium(player)
@@ -70,7 +68,6 @@ function P.Attach(Data)
    player:SetAttribute('IndexBiomeHalfReward'..i,(state.BiomeHalfRewards or{})[tostring(i)]==true)
    player:SetAttribute('IndexBiomeBackpay'..i,pending)
   end
-  player:SetAttribute(require(RS.SpeedBoost).Attribute,state.SpeedBoostEndsAt)
   self:PublishIndex(player)
   player:SetAttribute('PremiumRevision',(player:GetAttribute('PremiumRevision')or 0)+1)
  end
@@ -139,24 +136,7 @@ function P.Attach(Data)
   state.Gems-=offer.GemPrice;self:PublishPremium(player);self:MarkDirty(player)
   return true,offer.Count==1 and'Mech pack added to your bag.'or offer.Count..' Mech packs added to your bag.'
  end
- -- R121: timed x2 training boost. Server-authoritative: os.time() against the saved expiry.
- function Data:SpeedBoostFactor(player)
-  local Boost=require(RS.SpeedBoost);local state=self.Premium and self.Premium[player]
-  return state and Boost.FactorAt(state.SpeedBoostEndsAt,os.time())or 1
- end
- function Data:SpeedBoostRemaining(player)
-  return require(RS.SpeedBoost).Remaining(self:GetPremium(player).SpeedBoostEndsAt,os.time())
- end
- function Data:CanBuySpeedBoost(player)
-  if not self:IsLoaded(player)then return false,'YOUR DATA IS LOADING'end
-  if not require(RS.SpeedBoost).CanStack(self:GetPremium(player).SpeedBoostEndsAt,os.time())then return false,'BOOST IS FULL (60 MIN MAX)'end
-  return true
- end
- function Data:ExtendSpeedBoost(player)
-  if not self:IsLoaded(player)then return false,'YOUR DATA IS LOADING'end
-  local state=self:GetPremium(player);state.SpeedBoostEndsAt=require(RS.SpeedBoost).Extend(state.SpeedBoostEndsAt,os.time())
-  player:SetAttribute(require(RS.SpeedBoost).Attribute,state.SpeedBoostEndsAt);self:MarkDirty(player);return true
- end
+ -- R123: the R121 timed x2 boost and product gifts were removed; old saved fields are kept untouched and unused.
  function Data:CanReceiveBundle(player,key)
   local row=require(RS.PremiumPricing).Find(key)
   if not row or not self:IsLoaded(player)then return false,'UNAVAILABLE'end

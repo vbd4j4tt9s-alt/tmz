@@ -1,5 +1,5 @@
 --!nocheck
--- R121 server purchases under the Roblox mock: real PremiumService / PremiumRouting / ProductGiftService /
+-- R121 server purchases under the Roblox mock: real PremiumService / PremiumRouting /
 -- PremiumProgress / PassGiftService with stubbed MarketplaceService, DataStoreService and a small fake
 -- PlayerDataService (profile saves are deep copies, so save/load is real PremiumProgress.Decode).
 -- Run from a folder holding roblox.luau, world.luau and rs_bundle.luau (see run.sh).
@@ -59,18 +59,13 @@ Market.UserOwnsGamePassAsync=function()return false end
 local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=RS
 -- Server modules live in ServerScriptService.ChestChaseServer so script.Parent lookups work.
 local folder=R.new('Folder');folder.Name='ChestChaseServer';folder.Parent=W.service('ServerScriptService')
-for _,n in ipairs({'PremiumService','PremiumRouting','SecurityGate','PassGiftService','PassGiftState','ProductGiftService','ProductGiftState','PremiumProgress','BaseService'})do RS[n].Parent=folder end
+for _,n in ipairs({'PremiumService','PremiumRouting','SecurityGate','PassGiftService','PassGiftState','PremiumProgress','BaseService'})do RS[n].Parent=folder end
 local function server(n)return W.require(folder[n])end
 -- Product ids ------------------------------------------------------------------------------------------
-local Pricing=W.module('PremiumPricing');local Mech=W.module('MechCatalog');local GiftProducts=W.module('GiftProducts');local Boost=W.module('SpeedBoost')
+local Pricing=W.module('PremiumPricing');local Mech=W.module('MechCatalog');
 for i,row in ipairs(Pricing.Bundles)do RS.PremiumPricing:SetAttribute(row.IdAttribute,200+i);robux[200+i]=row.RobuxPrice end
 for i,offer in ipairs(Mech.Offers)do RS.MechCatalog:SetAttribute(offer.Attribute,300+i);robux[300+i]=offer.TargetRobuxPrice end
 RS.PassGiftCatalog:SetAttribute('GrowthGiftProductId',401);RS.PassGiftCatalog:SetAttribute('SpeedGiftProductId',402);robux[401]=499;robux[402]=449
-RS.PremiumPricing:SetAttribute('SpeedBoost10ProductId',501);robux[501]=49
-local giftId={}
-for i,row in ipairs(GiftProducts.Rows)do
- if row.Key~='CashMega'then giftId[row.Key]=600+i;RS.GiftProducts:SetAttribute(row.Attribute,600+i);robux[600+i]=49 end
-end
 -- Fake PlayerDataService (+ real PremiumProgress methods) ----------------------------------------
 local Progress=server('PremiumProgress')
 local notes={}
@@ -112,135 +107,25 @@ end
 local Granted=R.Enum.ProductPurchaseDecision.PurchaseGranted;local Later=R.Enum.ProductPurchaseDecision.NotProcessedYet
 local function noteFor(p,pattern)for i=#notes,1,-1 do if notes[i].P==p and string.find(notes[i].Text,pattern,1,true)then return notes[i].Text end end;return nil end
 local function pendingCash(p)local n=0;for _,r in ipairs(Data.Gardens[p].PendingSales or{})do if r.Currency=='Cash'then n+=r.Amount end end;return n end
-local inbox=stores['ChestChase_ProductInbox_v1']
-check(inbox~=nil,'product gift inbox DataStore opened')
--- Routing ---------------------------------------------------------------------------------------------
+-- R123: the R121 product gifts and 10-minute x2 boost are removed (their modules were deleted from the place).
 local Routing=server('PremiumRouting')
-check(select(1,Routing.Resolve(501))=='Boost','boost id routes to Boost')
-for key,id in pairs(giftId)do local kind,k=Routing.Resolve(id);check(kind=='ProductGift'and k==key,'gift id routes '..key)end
-check(Routing.Resolve(201)=='Bundle'and Routing.Resolve(301)=='Mech'and Routing.Resolve(401)=='Gift','existing routes unchanged')
-check(GiftProducts.ProductId('CashMega')==0,'missing gift id reads 0')
--- State ---------------------------------------------------------------------------------------------
+check(select(1,Routing.Resolve(201))=='Bundle'and select(1,Routing.Resolve(301))=='Mech'and select(1,Routing.Resolve(402))=='Gift','bundle/Mech/pass-gift ids still route')
+check(Routing.Resolve(501)==nil and Routing.Resolve(601)==nil,'old boost / product-gift ids route nowhere')
 local st=invoke(buyer,'State')
-check(st.ProductGifts and st.ProductGifts.CashSmall.Available==true,'State: gift CashSmall available')
-check(st.ProductGifts.CashMega.Available==false,'State: gift without id unavailable')
-check(st.ProductGifts.MechPack5.Available==true and st.ProductGifts.SpeedBoost10.Available==true,'State: Mech/boost gifts available')
-check(st.Boost and st.Boost.Available==true and st.Boost.Remaining==0,'State: boost purchasable, inactive')
--- Gift flow: dialog -> prompt the GIFT product -> receipt -> recipient gets the reward -----------------
-prompts={}
-local r=invoke(buyer,'RobuxProductGift',{Key='CashSmall',RecipientId=2})
-check(r.Success==true,'RobuxProductGift succeeds ('..tostring(r.Message)..')')
-check(#prompts==1 and prompts[1][1]==buyer and prompts[1][2]==giftId.CashSmall,'gift product prompted (not the normal product)')
-local friendCash=pendingCash(friend);local buyerCash=pendingCash(buyer)
-local decision,pid=receipt(buyer,giftId.CashSmall)
-check(decision==Granted,'gift receipt granted')
-check(pendingCash(friend)==friendCash+30000000000,'recipient received +30B cash ('..pendingCash(friend)..')')
-check(pendingCash(buyer)==buyerCash,'buyer did not receive the cash')
-check((Data:GetPremium(buyer).ProductGiftCredits.CashSmall or 0)==0,'buyer credit spent on delivery')
-check(noteFor(buyer,'Gift sent to Friendly')~=nil,'buyer notified')
-check(noteFor(friend,'Buyer gifted you +30B CASH')~=nil,'recipient notified')
--- Idempotent per PurchaseId.
-check(receipt(buyer,giftId.CashSmall,pid)==Granted,'duplicate receipt acknowledged')
-check(pendingCash(friend)==friendCash+30000000000,'duplicate receipt grants nothing')
-check((Data:GetPremium(buyer).ProductGiftCredits.CashSmall or 0)==0,'duplicate receipt adds no credit')
--- Durable chain completes: outbox and inbox clean up after the recovery loop runs.
-advance(121) -- R123: gift recovery runs every 60 s (was 15/30 s)
-check(next(Data:GetPremium(buyer).ProductOutbox)==nil,'buyer outbox cleared')
-check(inbox.Data['2']==nil or next(inbox.Data['2'])==nil,'recipient inbox cleared')
-check(next(Data:GetPremium(friend).ProductGiftReceipts)==nil,'recipient receipt marker cleared')
-check(pendingCash(friend)==friendCash+30000000000,'no double grant through recovery')
--- Speed bundle + Mech pack gifts.
-local speed0=Data.Speed[friend]
-invoke(buyer,'RobuxProductGift',{Key='SpeedSmall',RecipientId=2});receipt(buyer,giftId.SpeedSmall)
-check(Data.Speed[friend]==speed0+Pricing.Find('SpeedSmall').Amount,'speed bundle gift adds speed to recipient')
-local packs=#Data.Chests[friend]
-invoke(buyer,'RobuxProductGift',{Key='MechPack5',RecipientId=2});receipt(buyer,giftId.MechPack5)
-check(#Data.Chests[friend]==packs+5,'Mech x5 gift adds 5 packs to recipient')
-check(Data.Chests[friend][#Data.Chests[friend]].PaidRandom==true,'gifted packs marked paid')
-friend:SetAttribute('PaidRandomAllowed',false);prompts={}
-r=invoke(buyer,'RobuxProductGift',{Key='MechPack1',RecipientId=2})
-check(r.Success==false and #prompts==0,'no Mech gift to a player whose policy blocks paid packs')
-friend:SetAttribute('PaidRandomAllowed',true)
--- Missing gift id / bad recipients.
-prompts={}
-r=invoke(buyer,'RobuxProductGift',{Key='CashMega',RecipientId=2});check(r.Success==false and #prompts==0,'missing gift id: no prompt')
-r=invoke(buyer,'RobuxProductGift',{Key='CashSmall',RecipientId=1});check(r.Success==false and #prompts==0,'cannot gift yourself')
-r=invoke(buyer,'RobuxProductGift',{Key='CashSmall',RecipientId=99});check(r.Success==false and #prompts==0,'recipient must be in the server')
--- Recipient left before the receipt: the gift is kept as the buyer's credit, then sent later.
-invoke(buyer,'RobuxProductGift',{Key='CashMedium',RecipientId=2})
-leave(friend,Service)
-check(receipt(buyer,giftId.CashMedium)==Granted,'receipt granted while recipient is away')
-check(Data:GetPremium(buyer).ProductGiftCredits.CashMedium==1,'gift kept as buyer credit')
-check(noteFor(buyer,'gift saved')~=nil or noteFor(buyer,'Gift saved')~=nil,'buyer told the gift is saved')
-st=invoke(buyer,'State');check(st.ProductGiftCredits.CashMedium==1,'State reports the saved credit')
-join(friend);Service:Setup(friend)
-local before=pendingCash(friend)
-r=invoke(buyer,'GiftProduct',{Key='CashMedium',RecipientId=2})
-check(r.Success==true,'saved credit sent with GiftProduct ('..tostring(r.Message)..')')
-check(pendingCash(friend)==before+100000000000,'recipient received the saved gift')
-check((Data:GetPremium(buyer).ProductGiftCredits.CashMedium or 0)==0,'credit spent')
-r=invoke(buyer,'GiftProduct',{Key='CashMedium',RecipientId=2});check(r.Success==false,'no second send without credit')
--- Recipient offline after the debit: the durable inbox delivers on the next join.
-Data:GetPremium(buyer).ProductGiftCredits.Cash=1
-local svcGifts=Service.ProductGifts
-local origRecover=svcGifts.Recover;local skip=true
-svcGifts.Recover=function(self,p)if skip and p==friend then return end;return origRecover(self,p)end
-before=pendingCash(friend)
-r=invoke(buyer,'GiftProduct',{Key='Cash',RecipientId=2});check(r.Success,'send while recipient about to leave')
-leave(friend,Service);skip=false
-check(inbox.Data['2']~=nil and next(inbox.Data['2'])~=nil,'gift waits in the durable inbox')
-join(friend);Service:Setup(friend)
-check(pendingCash(friend)==before+300000000000,'offline recipient receives the gift on rejoin')
-svcGifts.Recover=origRecover
--- Save failure: the receipt is not acknowledged (Roblox retries it).
-Data.FailSave=true
-invoke(buyer,'RobuxProductGift',{Key='SpeedMedium',RecipientId=2})
-local d2,pid2=receipt(buyer,giftId.SpeedMedium)
-check(d2==Later,'receipt not acknowledged when the save fails')
-Data.FailSave=false
-check(receipt(buyer,giftId.SpeedMedium,pid2)==Granted,'retried receipt granted')
-check(Data:GetPremium(buyer).ProductGiftCredits.SpeedMedium==1,'retried gift receipt credited exactly once')
--- 10-minute x2 boost -----------------------------------------------------------------------------------------
+check(st.Success==true and st.Boost==nil and st.ProductGifts==nil and st.ProductGiftCredits==nil,'State has no boost or product gifts')
+local r=invoke(buyer,'RobuxBoost');check(r.Success==false and r.Message=='UNKNOWN ACTION','RobuxBoost is gone')
+r=invoke(buyer,'RobuxProductGift',{Key='CashSmall',RecipientId=2});check(r.Success==false and r.Message=='UNKNOWN ACTION','RobuxProductGift is gone')
+r=invoke(buyer,'GiftProduct',{Key='CashSmall',RecipientId=2});check(r.Success==false and r.Message=='UNKNOWN ACTION','GiftProduct is gone')
+check(receipt(buyer,501)==Later,'a receipt for an unknown product is not granted')
 local Base=server('BaseService')
 local fakeBase={PlayerData=Data,Config={TreadmillTiers={{Multiplier=1}}}}
-local function mult(p)return Base.GetTreadmillMultiplier(fakeBase,p)end
-check(mult(buyer)==1,'training x1 without boost')
-prompts={}
-r=invoke(buyer,'RobuxBoost');check(r.Success==true and #prompts==1 and prompts[1][2]==501,'RobuxBoost prompts the boost product')
-check(receipt(buyer,501)==Granted,'boost receipt granted')
-local ends=Data:GetPremium(buyer).SpeedBoostEndsAt
-check(ends==math.floor(R.clock)+600,'boost sets expiry now+10 min')
-check(buyer:GetAttribute('SpeedBoostEndsAt')==ends,'expiry mirrored to player attribute')
-check(noteFor(buyer,'x2 Speed boost active')~=nil,'boost notification')
-check(mult(buyer)==2,'training x2 during boost')
-buyer:SetAttribute('DoubleSpeedOwned',true);check(mult(buyer)==4,'boost stacks with the x2 pass (x4)');buyer:SetAttribute('DoubleSpeedOwned',false)
-local _,bpid=receipt(buyer,501)
-check(Data:GetPremium(buyer).SpeedBoostEndsAt==ends+600,'second boost extends by 10 min')
-check(receipt(buyer,501,bpid)==Granted and Data:GetPremium(buyer).SpeedBoostEndsAt==ends+600,'boost receipt idempotent')
-st=invoke(buyer,'State');check(st.Boost.Remaining>=1190 and st.Boost.Remaining<=1200,'State reports remaining boost ('..tostring(st.Boost.Remaining)..')')
-for _=1,4 do receipt(buyer,501)end
-st=invoke(buyer,'State');check(st.Boost.Available==false,'boost capped at 60 min for new purchases')
-prompts={};r=invoke(buyer,'RobuxBoost');check(r.Success==false and #prompts==0,'no prompt when the boost is full')
--- Persists across save/load (expiry in server time).
-Data:Save(buyer);local endsSaved=Data:GetPremium(buyer).SpeedBoostEndsAt
-leave(buyer,Service);advance(60);join(buyer);Service:Setup(buyer)
-check(Data:GetPremium(buyer).SpeedBoostEndsAt==endsSaved,'boost expiry survives rejoin')
-check(buyer:GetAttribute('SpeedBoostEndsAt')==endsSaved,'attribute republished on join')
-check(mult(buyer)==2,'training x2 after rejoin')
-advance(endsSaved-R.clock+1)
-check(mult(buyer)==1,'training back to x1 after expiry')
-check(Boost.PlayerRemaining(buyer)==0,'client remaining 0 after expiry')
--- Boost gift.
-local fEnds=Data:GetPremium(friend).SpeedBoostEndsAt
-invoke(buyer,'RobuxProductGift',{Key='SpeedBoost10',RecipientId=2});receipt(buyer,giftId.SpeedBoost10)
-check(Data:GetPremium(friend).SpeedBoostEndsAt==math.floor(R.clock)+600 and fEnds==nil,'boost gift starts the recipient boost')
-check(mult(friend)==2,'gifted boost doubles the recipient training')
--- Save validation.
-local saved=deep(Data.Saved[buyer.UserId].Premium)
-saved.SpeedBoostEndsAt='broken';local dec=Progress.Decode(saved)
-check(dec~=nil and dec.SpeedBoostEndsAt==nil,'damaged boost expiry is dropped, save kept')
-saved=deep(Data.Saved[buyer.UserId].Premium);saved.ProductGiftCredits={Nope=1}
-check(Progress.Decode(saved)==nil,'unknown gift credit key rejected like pass gifts')
+check(Base.GetTreadmillMultiplier(fakeBase,buyer)==1,'training stays x1 (no timed boost)')
+-- Old saves that still hold R121 fields load fine and keep the fields untouched.
+local old=deep(Data:GetPremium(buyer));old.SpeedBoostEndsAt=os.time()+600;old.ProductGiftCredits={CashSmall=1};old.ProductOutbox={x={RecipientId=2,Key='CashSmall',State='Pending'}};old.ProductGiftReceipts={y=true}
+local dec=Progress.Decode(old)
+check(dec~=nil and dec.ProductGiftCredits.CashSmall==1 and dec.SpeedBoostEndsAt==old.SpeedBoostEndsAt,'old R121 save fields decode and are kept')
+Data.Premium[buyer]=dec;check(Base.GetTreadmillMultiplier(fakeBase,buyer)==1,'a saved boost no longer doubles training')
+local before
 -- Existing flows untouched ------------------------------------------------------------------------------------
 prompts={}
 r=invoke(buyer,'RobuxBundle','CashSmall');check(r.Success and prompts[1][2]==201,'RobuxBundle still prompts the normal product')

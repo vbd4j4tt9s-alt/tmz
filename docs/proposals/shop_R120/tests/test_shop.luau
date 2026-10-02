@@ -32,9 +32,7 @@ for i,row in ipairs(Pricing.Bundles)do RS.PremiumPricing:SetAttribute(row.IdAttr
 for i,offer in ipairs(Mech.Offers)do RS.MechCatalog:SetAttribute(offer.Attribute,300+i);robux[300+i]=offer.TargetRobuxPrice end
 RS.PassGiftCatalog:SetAttribute('GrowthGiftProductId',401);RS.PassGiftCatalog:SetAttribute('SpeedGiftProductId',402);robux[401]=499;robux[402]=449
 -- R121 gift / boost ids are set too: R122 must show no gift or boost UI even when they exist.
-local GiftProducts=W.module('GiftProducts');local Boost=W.module('SpeedBoost');local Art=W.module('PremiumShopArt')
-RS.PremiumPricing:SetAttribute('SpeedBoost10ProductId',501);robux[501]=49
-for i,row in ipairs(GiftProducts.Rows)do RS.GiftProducts:SetAttribute(row.Attribute,600+i);robux[600+i]=59 end
+local Art=W.module('PremiumShopArt')
 local function rbx(n)return tostring(n)..' Robux'end
 local Market=W.service('MarketplaceService');local prompts={};local credits={}
 Market.GetProductInfoAsync=function(_,id)return robux[id]and{PriceInRobux=robux[id],IsForSale=true}or nil end
@@ -43,9 +41,7 @@ Market.PromptGamePassPurchase=function(_,p,id)prompts[#prompts+1]={p,id}end
 local function serverState()
  local offers={};for _,o in ipairs(Mech.Offers)do offers[tostring(o.Count)]={Count=o.Count,GemPrice=o.GemPrice,GemAvailable=true,RobuxAvailable=true,RobuxPrice=o.TargetRobuxPrice}end
  local bundles={};for _,row in ipairs(Pricing.Bundles)do bundles[row.Key]={Available=true,Amount=row.Amount,GemPrice=row.GemPrice,RobuxAmount=row.Amount}end
- local productGifts={};for _,row in ipairs(GiftProducts.Rows)do productGifts[row.Key]={Available=GiftProducts.ProductId(row.Key)>0}end
- return {PackOffers=offers,Bundles=bundles,GiftProducts={Growth={Available=true},Speed={Available=true}},GiftCredits={},Gems=500,OnSale=true,Success=true,Message='',
-  ProductGifts=productGifts,ProductGiftCredits=table.clone(credits),Boost={Available=true,Remaining=0}}
+ return {PackOffers=offers,Bundles=bundles,GiftProducts={Growth={Available=true},Speed={Available=true}},GiftCredits={},Gems=500,OnSale=true,Success=true,Message=''}
 end
 local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=RS
 local remote=R.new('RemoteFunction');remote.Name='PremiumRequest';remote.Parent=remotes;local calls={}
@@ -400,23 +396,16 @@ remote.InvokeServer=function(_,action,value)calls[#calls+1]={action,value};local
 act(page.Growth.GemPerk);check(panel.Status.Visible and panel.Status.Text~='','status message shown')
 R.advance(3.1);check(not panel.Status.Visible,'status hides after 3 s')
 check(reveals==6,'six outcome previews built once ('..reveals..')')
--- R121 HUD countdown (kept for legacy boosts; hidden when no boost is active).
+-- R123: the timed boost is removed; a leftover SpeedBoostEndsAt attribute never shows a timer or doubles the gain.
 do
- player:SetAttribute('SpeedBoostEndsAt',nil)
  local okay,err=pcall(function()
   local Hud=W.module('WorldStatusHud');local h=Hud.Create(pg,player)
   local root=pg.WorldStatus.StatusStack;local timer=root.SpeedBoostTimer;local speedRow=root.SpeedBoost
-  check(timer.Visible==false,'HUD: no boost timer without a boost')
   player:SetAttribute('SpeedBoostEndsAt',math.floor(R.clock)+600);W.frames(20,1/60);R.advance(0)
-  check(timer.Visible==true,'HUD: boost timer shown while active')
-  check(timer.Time.Text=='10m 0s'or timer.Time.Text=='9m 59s','HUD: countdown text ('..tostring(timer.Time.Text)..')')
-  check(speedRow.Visible==true and speedRow.Value.Text=='×2','HUD: speed gain row shows ×2 ('..tostring(speedRow.Value.Text)..')')
-  player:SetAttribute('DoubleSpeedOwned',true);R.advance(0);check(speedRow.Value.Text=='×4','HUD: boost × pass = ×4 ('..tostring(speedRow.Value.Text)..')')
-  player:SetAttribute('DoubleSpeedOwned',false)
-  W.frames(130,1);check(string.find(timer.Time.Text,'7m',1,true)~=nil,'HUD: countdown ticks ('..timer.Time.Text..')')
-  W.frames(480,1);R.advance(0)
-  check(timer.Visible==false,'HUD: timer hides after expiry')
-  check(speedRow.Visible==false,'HUD: speed row back to x1 after expiry')
+  check(timer.Visible==false,'HUD: no boost timer even with an old boost attribute')
+  check(speedRow.Visible==false,'HUD: speed row stays x1 without the pass')
+  player:SetAttribute('DoubleSpeedOwned',true);R.advance(0);check(speedRow.Visible==true and speedRow.Value.Text=='×2','HUD: x2 pass still shows ×2 ('..tostring(speedRow.Value.Text)..')')
+  player:SetAttribute('DoubleSpeedOwned',false);player:SetAttribute('SpeedBoostEndsAt',nil)
   h.Destroy()
  end)
  check(okay,'HUD test ran: '..tostring(err))
