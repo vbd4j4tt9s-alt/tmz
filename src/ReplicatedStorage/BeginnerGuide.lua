@@ -15,11 +15,17 @@ G.Steps={
 }
 -- Step 5 shows these one at a time, then the tutorial is done. No waiting for the plant to grow.
 G.Tips={
- "Your plant grows by itself! 🌱",
+ "Your plant grows by itself, even when you're offline! 🌱",
  "Pick the fruit when it is ready. 🍎",
  "Sell fruit at the market for cash! 💰",
+ "{TapBase} at the top to zoom home! 🏠",
+ "{TapTrack} to zoom back to the track! 🏃",
  "Get faster to steal better packs! 🏃",
 }
+-- R125 (owner): the BASE / TRACK top-bar buttons are taught. Tip index -> the button the tutorial highlights.
+G.TipButtons={[4]='BaseButton',[5]='TrackButton'}
+-- Step 1 while the player is not on the track yet (presentation only; saved progress is unchanged).
+G.TravelTrack="{TapTrack} at the top to zoom to the track! 🏃"
 G.TipSeconds=3.5
 G.Steps[5].Seconds=#G.Tips*G.TipSeconds
 G.Welcome={Title='Welcome to Steal A Pack!',Text="Hi {name}! 👋 Let's steal your first seed pack!",Button="LET'S GO!"}
@@ -28,9 +34,9 @@ G.Finished="You're ready, {name}! Have fun! 🎉"
 function G.Copy(spec,key)return spec[key]end
 G.StepCount=#G.Steps
 local words={
- Touch={Steal='Tap STEAL to grab',Tap='Tap',Use='Tap'},
- Gamepad={Steal='Press X to steal',Tap='Pick',Use='Press R2'},
- Mouse={Steal='Press E to steal',Tap='Click',Use='Click'},
+ Touch={Steal='Hold STEAL to grab',Tap='Tap',Use='Tap',TapTrack='Tap TRACK',TapBase='Tap BASE'},
+ Gamepad={Steal='Hold X to steal',Tap='Pick',Use='Press R2',TapTrack='Select TRACK',TapBase='Select BASE'},
+ Mouse={Steal='Hold E to steal',Tap='Click',Use='Click',TapTrack='Click TRACK',TapBase='Click BASE'},
 }
 -- Fills placeholders. The name is escaped because the label uses RichText.
 function G.Format(text,device,name)

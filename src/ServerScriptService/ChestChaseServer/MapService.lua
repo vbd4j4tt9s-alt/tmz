@@ -331,6 +331,7 @@ function MapService:_bindChests()
 			local prompt = requireChild(self.Config, latch, "ClaimPrompt", "ProximityPrompt")
 			prompt.ActionText = "STEAL"
 			prompt.ObjectText = ""
+			prompt.HoldDuration = self.Config.StealHoldSeconds or 1 -- R125: hold E to steal
 			local label, billboard = getBillboardText(self.Config, hinge)
 			local glow = requireChild(self.Config, body, "ChestGlow", "PointLight")
 			local accentColor = model:GetAttribute("AccentColor") or glow.Color

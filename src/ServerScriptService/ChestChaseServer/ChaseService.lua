@@ -286,7 +286,7 @@ function ChaseService:_createDroppedChest(position, chest, dropToken)
 	prompt.Name = "RecoverPrompt"
 	prompt.ActionText = "STEAL"
 	prompt.ObjectText = ""
-	prompt.HoldDuration = 0
+	prompt.HoldDuration = self.Config.DroppedStealHoldSeconds or .5 -- R125: hold E to steal (short: a drop lasts 5 s)
 	prompt.MaxActivationDistance = 24
 	prompt.RequiresLineOfSight = false
     local bounds=self.Chests:GetPackBounds(chest.Stage,chest.BagVariant,chest.PackSize)

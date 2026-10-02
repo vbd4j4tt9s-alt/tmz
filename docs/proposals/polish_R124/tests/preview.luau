@@ -63,6 +63,37 @@ elseif mode=='wall' then
  local paint=B.Decorate(wall);paint(DOTS_AT or 1.3,SECONDS or 3)
  local gui;for _,g in ipairs(wall:GetChildren())do if g.ClassName=='SurfaceGui'then gui=g;break end end
  print('JSON '..dump(gui,gui.CanvasSize.X,gui.CanvasSize.Y))
+elseif mode=='notifier' then
+ local map=R.new('Model');map.Name='ChestChaseMap';map.Parent=W.workspace
+ local order={1,6,2,3,4,5,7};local z=0
+ for _,st in ipairs(order)do map:SetAttribute('BiomeStartZ_'..st,z);map:SetAttribute('BiomeEndZ_'..st,z+200);z+=200 end
+ me.CharacterAdded=R.signal()
+ local char=R.new('Model');char.Parent=W.workspace;me.Character=char
+ local root=R.new('Part');root.Name='HumanoidRootPart';root.Parent=char
+ local hum=R.new('Humanoid');hum.Health=100;hum.WalkSpeed=16;hum.MoveDirection=V3(0,0,1);hum.Parent=char
+ W.load('BiomeEntryNotifier',R.new('LocalScript'))
+ local idx=table.find(order,STAGE or 5);local start=(idx-1)*200-10
+ root.CFrame=CF(0,3,start);W.frames(5)
+ local zz=start;for i=1,60 do zz+=16/60;root.CFrame=CF(0,3,zz);W.frames(1)end
+ W.frames(30,1/60)
+ print('JSON '..dump(pg.BiomeEntryUI,1280,720))
+elseif mode=='featured' then
+ local sg=R.Instance.new('ScreenGui');sg.Parent=pg
+ for i,kind in ipairs({'Featured','Crown'})do
+  local b=frame(sg,'Jump'..kind,20+(i-1)*130,20,110,96,RGB(18,20,30),10);b.BackgroundTransparency=.1
+  local st=R.Instance.new('UIStroke');st.Color=i==1 and RGB(255,170,40)or RGB(255,226,40);st.Thickness=3;st.Parent=b
+  local icon=frame(b,'Icon',.25,.08,.5,.56,RGB(0,0,0),nil,true,true);icon.BackgroundTransparency=1
+  W.module('PremiumEmblems').Draw(icon,kind)
+  local t=R.Instance.new('TextLabel');t.Text=i==1 and'Featured'or'Passes';t.TextSize=16;t.Font=R.Enum.Font.GothamBlack;t.TextColor3=i==1 and RGB(255,170,40)or RGB(255,226,40)
+  t.BackgroundTransparency=1;t.Position=R.UDim2.fromScale(0,.66);t.Size=R.UDim2.fromScale(1,.3);t.TextStrokeTransparency=1;t.Parent=b
+ end
+ print('JSON '..dump(sg,280,136))
+elseif mode=='offline' then
+ W.Gui.MenuOpened=R.signal();W.Gui.MenuClosed=R.signal();W.Gui.MenuIsOpen=false
+ local map=R.new('Model');map.Name='ChestChaseMap';map.Parent=W.workspace
+ local p=R.new('Part');p:SetAttribute('GardenOwnerId',1);p:SetAttribute('GardenPlantCount',6);p.Parent=map
+ W.load('OfflineGrowthNotice',R.new('LocalScript'));W.Gui.MenuOpened:Fire()
+ print('JSON '..dump(pg.OfflineGrowthNotice,1280,720))
 elseif mode=='gems' then
  local M=W.module(GEMS_MODULE or 'GardenCardMotion')
  local sg=R.Instance.new('ScreenGui');sg.Parent=pg

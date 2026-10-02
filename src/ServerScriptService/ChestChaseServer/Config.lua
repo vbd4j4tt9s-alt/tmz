@@ -137,6 +137,9 @@ Config.GuardianFarSpeedMultiplier = 1.08
 Config.GuardianSpeedResponse = 4 -- response rate/sec; smooth, frame-independent
 Config.DroppedChestDuration = 5
 Config.DroppedChestClaimGrace = 0.35
+-- R125 (owner): hold E to steal. World seed packs and Void Packs need a 1 s hold; a dropped pack (5 s window) 0.5 s.
+Config.StealHoldSeconds = 1
+Config.DroppedStealHoldSeconds = 0.5
 Config.DroppedChestGuardianRestartDistance = 24
 Config.GuardianFlingProtectionTime = 1.25
 Config.GuardianNoticeDelay = 0.5
@@ -729,7 +732,7 @@ function Config.Validate()
 end
 -- R67 tuning does not migrate or reset saved points, crops, wallets or ownership.
 local balance=require(game:GetService('ReplicatedStorage').BalanceRules)
-Config.Version='V150 R124';Config.ProfileVersion=20;Config.SpeedMilestones=balance.SpeedMilestones
+Config.Version='V150 R125';Config.ProfileVersion=20;Config.SpeedMilestones=balance.SpeedMilestones
 Config.MaxTrainedSpeed=nil;Config.MaxWalkSpeed=nil;Config.TrainingPointsPerSecond=100
 for i,tier in ipairs(Config.TreadmillTiers)do tier.Multiplier=balance.TrainingTiers[i]end
 for _,product in ipairs(Config.ShopCatalog.Trails)do product.SpeedMultiplier=balance.TrailMultipliers[product.Id]or product.SpeedMultiplier;product.Description=''end

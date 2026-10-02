@@ -4,7 +4,7 @@ out = sys.argv[1]
 here = os.path.dirname(os.path.abspath(__file__))
 src = os.path.normpath(os.path.join(here, '../../../../src'))
 pairs = [(f[:-4], src + '/ReplicatedStorage/' + f) for f in sorted(os.listdir(src + '/ReplicatedStorage')) if f.endswith('.lua')]
-for n in ('BiomeEntryNotifier', 'TreadmillBonusClient', 'TrackRefreshSky', 'KeeperHitEffects', 'VeiledEventClient81', 'BiomeEffectGovernor', 'GardenLiftPrompts'):
+for n in ('BiomeEntryNotifier', 'TreadmillBonusClient', 'TrackRefreshSky', 'KeeperHitEffects', 'VeiledEventClient81', 'BiomeEffectGovernor', 'GardenLiftPrompts', 'OfflineGrowthNotice'):
     pairs.append((n, src + '/StarterPlayer/StarterPlayerScripts/' + n + '.client.lua'))
 parts = ['return {']
 for name, path in pairs:

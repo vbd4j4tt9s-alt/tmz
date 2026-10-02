@@ -110,7 +110,7 @@ check(math.abs(mid.Y-.09)<.05,'chevrons sit on the ground (y='..mid.Y..')')
 welcome.Go.Activated:Fire();frames(30)
 check(welcome.Visible==false,'welcome closes');check(card.Visible==true,'card shows after welcome')
 check(card.Instruction.Text:find('Follow the red arrows',1,true)~=nil,'step 1 text');check(card.StepPill.Label.Text=='STEP 1/5','step pill')
-check(card.Instruction.Text:find('Press E to steal',1,true)~=nil,'mouse wording')
+check(card.Instruction.Text:find('Hold E to steal',1,true)~=nil,'mouse wording (R125: hold E)')
 check(card.AnchorPoint.Y==0 and card.Position.Y.Offset<200,'card sits at the top ('..card.Position.Y.Offset..')')
 check(type(pg:GetAttribute('TutorialCardBottom'))=='number','notice reservation published')
 check(card.Instruction.MaxVisibleGraphemes>=0,'typewriter running');frames(150);check(card.Instruction.MaxVisibleGraphemes==-1,'typewriter finishes')
@@ -155,6 +155,20 @@ check(card.StepPill.Label.Text=='STEP 5/5','tips pill');check(card.NextTip.Visib
 check(card.Instruction.Text:find('grows by itself',1,true)~=nil,'tip 1: '..card.Instruction.Text)
 frames(60*4);check(card.Instruction.Text:find('Pick the fruit',1,true)~=nil,'tip 2 after 3.5 s: '..card.Instruction.Text)
 card.NextTip.Activated:Fire();frames(2);check(card.Instruction.Text:find('Sell fruit',1,true)~=nil,'NEXT jumps to tip 3')
+-- R125: tips 4 / 5 teach the BASE and TRACK top-bar buttons and highlight them.
+local travel=new('ScreenGui');travel.Name='TravelButtons';travel.Parent=pg
+local pair=new('Frame');pair.Name='TravelPair';pair.Visible=true;pair.Parent=travel
+local baseB=new('TextButton');baseB.Name='BaseButton';baseB.AbsolutePosition=R.Vector2.new(560,8);baseB.AbsoluteSize=R.Vector2.new(70,36);baseB.Parent=pair
+local trackB=new('TextButton');trackB.Name='TrackButton';trackB.AbsolutePosition=R.Vector2.new(650,8);trackB.AbsoluteSize=R.Vector2.new(70,36);trackB.Parent=pair
+card.NextTip.Activated:Fire();frames(2)
+local ringUi=pg.BeginnerTutorial:FindFirstChild('TravelHighlight');local arrowUi=pg.BeginnerTutorial:FindFirstChild('TravelPointer')
+check(card.Instruction.Text:find('BASE',1,true)~=nil,'tip 4 teaches BASE: '..card.Instruction.Text)
+check(ringUi and ringUi.Visible and ringUi.Position.X.Offset<=560 and ringUi.Position.X.Offset>=550,'BASE button ringed')
+check(arrowUi and arrowUi.Visible,'arrow under the BASE button')
+card.NextTip.Activated:Fire();frames(2)
+check(card.Instruction.Text:find('TRACK',1,true)~=nil,'tip 5 teaches TRACK: '..card.Instruction.Text)
+check(ringUi.Visible and ringUi.Position.X.Offset>=640,'TRACK button ringed')
+card.NextTip.Activated:Fire();frames(2);check(card.Instruction.Text:find('faster',1,true)~=nil and not ringUi.Visible,'tip 6, no highlight')
 local trailOnTips=0;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then trailOnTips+=1 end end
 check(trailOnTips==0,'no arrows during tips')
 frames(60*8)
@@ -169,6 +183,18 @@ card.Skip.Activated:Fire();frames(5);check(card.StepPill.Label.Text=='SKIP?','fi
 card.Skip.Activated:Fire();frames(30);check(table.find(commands,'Skip')~=nil,'second tap skips')
 check(card.Visible==false,'no finish card after skip')
 frames(60*4);check(card.StepPill.Label.Text~='SKIP?','pill resets')
+-- R125: step 1 off the track first asks for TRACK (ring on the button); on the track the steal wording returns.
+local motion=new('ModuleScript');motion.Name='RunnerMotion';motion:SetAttribute('TrackBoundaryZ',50);motion:SetAttribute('TrackCenterX',0);motion:SetAttribute('TrackHalfWidth',114);motion.Parent=RS
+player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialMask',3);player:SetAttribute('TutorialStep',1);serverStep={Kind='Pack',Target=V3(40,3,60)}
+root.CFrame=CF(0,3,0);frames(40)
+check(card.Visible and card.Instruction.Text:find('TRACK',1,true)~=nil,'off the track: '..card.Instruction.Text)
+check(pg.BeginnerTutorial.TravelHighlight.Visible and pg.BeginnerTutorial.TravelHighlight.Position.X.Offset>=640,'TRACK button ringed in step 1')
+root.CFrame=CF(0,3,60);frames(40)
+check(card.Instruction.Text:find('Follow the red arrows',1,true)~=nil and card.Instruction.Text:find('Hold',1,true)~=nil,'on the track: steal wording ('..card.Instruction.Text..')')
+check(not pg.BeginnerTutorial.TravelHighlight.Visible,'ring gone on the track')
+player:SetAttribute('TutorialStep',3);frames(10)
+check(card:FindFirstChild('Stamp')and card.Stamp.Visible,'NICE! stamp when a step is done')
+frames(60*2);check(not card.Stamp.Visible,'stamp fades')
 -- Cleanup.
 scriptInst.Destroying:Fire();check(workspace:FindFirstChild('TutorialTrail')==nil,'trail removed on cleanup')
 frames(5)

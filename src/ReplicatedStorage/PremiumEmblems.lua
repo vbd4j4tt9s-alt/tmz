@@ -34,6 +34,15 @@ function E.Draw(parent,kind)
   local points={};for i=0,15 do local a=-math.pi/2+i*math.pi/8;local r=i%2==1 and .065 or i%4==0 and .49 or .25;points[#points+1]={.5+math.cos(a)*r,.5+math.sin(a)*r}end
   polygon(root,'Starlight',points,C(231,236,255))
   box(root,'White core',.473,.473,.054,.054,C(255,255,255),true)
+ elseif kind=='Featured'then
+  -- R125 (owner): the shop's Featured logo. A gold star with a dark outline, a lighter bevel, a glint and a sparkle.
+  local function star(cx,cy,ro,ri)local pts={};for i=0,9 do local a=-math.pi/2+i*math.pi/5;local r=i%2==0 and ro or ri;pts[#pts+1]={cx+math.cos(a)*r,cy+math.sin(a)*r}end;return pts end
+  polygon(root,'Star outline',star(.47,.54,.47,.21),C(52,28,6))
+  polygon(root,'Gold',star(.47,.54,.40,.18),C(255,178,32))
+  polygon(root,'Bevel',star(.47,.52,.27,.12),C(255,226,110))
+  local glint=box(root,'Glint',.36,.42,.07,.07,C(255,255,245));glint.Rotation=45
+  local sparkle={};for i=0,7 do local a=-math.pi/2+i*math.pi/4;local r=i%2==0 and .14 or .035;sparkle[#sparkle+1]={.83+math.cos(a)*r,.2+math.sin(a)*r}end
+  polygon(root,'Sparkle',sparkle,C(255,250,225))
  elseif kind=='Star'then
   local points={};for i=0,9 do local a=-math.pi/2+i*math.pi/5;local r=i%2==0 and .44 or .19;points[#points+1]={.5+math.cos(a)*r,.5+math.sin(a)*r}end
   polygon(root,'Star',points,C(242,243,255));polygon(root,'Star core',{{.5,.2},{.58,.48},{.5,.64},{.42,.48}},C(255,255,255))

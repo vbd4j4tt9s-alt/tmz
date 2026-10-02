@@ -48,7 +48,7 @@ for i,s in ipairs(Layout.Sections)do
  Art.Corner(b,10);local ring=Art.Stroke(b,SectionColor[s.Key],3,'Current');ring.Enabled=false
  b:SetAttribute('Section',s.Key);b:SetAttribute('AccessibleLabel','Jump to '..s.Label)
  local icon=Art.Frame(b,'Icon',nil,1);icon.ZIndex=2
- if s.Key=='Featured'then require(RS.VectorIcons91).Draw(icon,'Mech')
+ if s.Key=='Featured'then require(RS.PremiumEmblems).Draw(icon,'Featured') -- R125: own logo (was the Mech gem)
  elseif s.Key=='Passes'then require(RS.PremiumEmblems).Draw(icon,'Crown')
  elseif s.Key=='Speed'then require(RS.PremiumEmblems).Draw(icon,'Bolt')
  elseif s.Key=='Money'then require(RS.PremiumEmblems).Draw(icon,'Money')

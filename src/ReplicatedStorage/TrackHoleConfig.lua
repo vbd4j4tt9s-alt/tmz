@@ -49,7 +49,7 @@ return {
   Tripped='%s FELL IN YOUR HOLE!',
  },
  -- R124: shown once when the shovel comes out on the track, then fades (replaces the permanent hint line).
- Hint='Dig holes on the ground to trap pack thieves!',
+ Hint='Dig holes on the ground to trap players!', -- R125 (owner): 'players', not 'pack thieves'
  HintSeconds=4,
  HintRepeatSeconds=30, -- not shown again sooner than this
 

@@ -123,7 +123,7 @@ function E:_makeSlot(index,cycle,ground,floorY,endZ)
  local body=Instance.new('Part');body.Name='Body';body.Size=Vector3.new(.3,.3,.3);body.Anchored=true;body.Transparency=1
  body.CanCollide=false;body.CanQuery=false;body.CanTouch=false
  body.CFrame=CFrame.new(ground.Position.X+(E.SlotOffsets[index]or 0),floorY+5,endZ-48);body.Parent=model;model.PrimaryPart=body
- local prompt=Instance.new('ProximityPrompt');prompt.Name='Steal';prompt.KeyboardKeyCode=Enum.KeyCode.E;prompt.HoldDuration=0
+ local prompt=Instance.new('ProximityPrompt');prompt.Name='Steal';prompt.KeyboardKeyCode=Enum.KeyCode.E;prompt.HoldDuration=chase.Config.StealHoldSeconds or 1 -- R125: hold E
  prompt.MaxActivationDistance=24;prompt.RequiresLineOfSight=false;prompt.ActionText='STEAL';prompt.ObjectText='Void Pack';prompt.Parent=body
  local billboard=Instance.new('BillboardGui');billboard.Enabled=false;billboard.Parent=body
  local glow=Instance.new('PointLight');glow.Enabled=false;glow.Parent=body

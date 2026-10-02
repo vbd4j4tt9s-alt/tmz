@@ -133,5 +133,7 @@ for id,value in pairs(require(script.Parent.BalanceValues81).SeedValues)do
  local plant=assert(Catalog[id],'Missing approved seed '..id);plant.Value=value;if plant.Regrows==false then plant.SingleHarvestBonus=6 end
 end
 for id,seconds in pairs(require(script.Parent.EconomyBalance90).RegrowSeconds)do Catalog[id].RegrowSeconds=seconds end
+-- R125: slower growth above Uncommon (up to 4 h for King); Forest, Common, Uncommon and Mech plants unchanged.
+require(script.Parent.GrowthPace125).Apply(Catalog)
 return Catalog
 

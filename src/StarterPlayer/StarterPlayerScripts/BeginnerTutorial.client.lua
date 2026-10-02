@@ -72,6 +72,14 @@ local function arrow(parent,color)
  return frame
 end
 local pointer=Instance.new('Frame');pointer.Name='HotbarPointer';pointer.AnchorPoint=Vector2.new(.5,1);pointer.Size=UDim2.fromOffset(34,44);pointer.BackgroundTransparency=1;pointer.Visible=false;pointer.ZIndex=8;pointer.Parent=gui;arrow(pointer)
+-- R125: TRACK / BASE top-bar buttons are part of the tutorial (owner): a pulsing ring and a bouncing arrow under the
+-- button the card talks about (presentation only; saved progress is unchanged).
+local travelRing=Instance.new('Frame');travelRing.Name='TravelHighlight';travelRing.BackgroundTransparency=1;travelRing.Visible=false;travelRing.ZIndex=9;travelRing.Parent=gui
+round(travelRing,UDim.new(0,12));local travelStroke=stroke(travelRing,RGB(255,232,72),3)
+local travelPointer=Instance.new('Frame');travelPointer.Name='TravelPointer';travelPointer.AnchorPoint=Vector2.new(.5,0);travelPointer.Size=UDim2.fromOffset(30,38);travelPointer.BackgroundTransparency=1;travelPointer.Rotation=180;travelPointer.Visible=false;travelPointer.ZIndex=9;travelPointer.Parent=gui;arrow(travelPointer)
+-- "NICE!" stamp when a step is done.
+local stamp=text(card,'Stamp','NICE! ✔',22,RGB(150,255,100));stamp.AnchorPoint=Vector2.new(1,1);stamp.Position=UDim2.new(1,-14,1,-4);stamp.Size=UDim2.fromOffset(120,28);stamp.Rotation=-8;stamp.ZIndex=8;stamp.Visible=false
+local stampScale=Instance.new('UIScale');stampScale.Parent=stamp
 local edge=Instance.new('Frame');edge.Name='Direction';edge.Size=UDim2.fromOffset(30,40);edge.AnchorPoint=Vector2.new(.5,.5);edge.BackgroundTransparency=1;edge.Visible=false;edge.Parent=gui;arrow(edge,RGB(255,72,72))
 
 -- World pieces (created by this client only, so nobody else sees them) --------------------
@@ -112,6 +120,7 @@ local dead,busy=false,false;local info:{[string]:any}={};local step=0;local show
 local poll,introSeconds,revealed,welcomeUntil=0,0,0,0;local fetch,render,place
 local welcomed,welcomeOpen,finishedUntil,skipArmedUntil,wasActive,skipped=false,false,0,0,false,false
 local lastDevice,lastActual,lastTip
+local highlightButton,lastOnTrack,stampUntil=nil,nil,0
 local cardFont,cardBadge,cardBottom=20,60,0;local currentText=''
 
 local function alphaFor(i,value)
@@ -135,6 +144,26 @@ local function hasGoal()
  return spec~=nil and spec.Target~=nil and spec.Target==info.Kind and currentTarget()~=nil
 end
 local function blocked()return pg:GetAttribute('SeedMenu')~=nil or pg:GetAttribute('TitleActive')==true end
+-- On the biome track (same test as the shovel holes); unknown geometry counts as on it, so nobody is nagged.
+local function onTrack()
+ local character=player.Character;local root=character and character:FindFirstChild('HumanoidRootPart');if not root then return true end
+ local motion=RS:FindFirstChild('RunnerMotion');local lineZ=motion and motion:GetAttribute('TrackBoundaryZ')
+ if type(lineZ)~='number'then return true end
+ local cx,half=tonumber(motion:GetAttribute('TrackCenterX'))or 0,tonumber(motion:GetAttribute('TrackHalfWidth'))or 120
+ return root.Position.Z>lineZ and math.abs(root.Position.X-cx)<=half
+end
+local function travelButton(name)
+ local t=pg:FindFirstChild('TravelButtons');local pair=t and t:FindFirstChild('TravelPair')
+ return pair and pair.Visible and pair:FindFirstChild(name)or nil
+end
+local function updateTravel()
+ local b=highlightButton and card.Visible and travelButton(highlightButton)
+ if not b then if travelRing.Visible or travelPointer.Visible then travelRing.Visible=false;travelPointer.Visible=false end;return end
+ local origin=gui.AbsolutePosition;local at=b.AbsolutePosition-origin;local size=b.AbsoluteSize;local t=os.clock();local calm=GuiService.ReducedMotionEnabled
+ travelRing.Position=UDim2.fromOffset(at.X-5,at.Y-5);travelRing.Size=UDim2.fromOffset(size.X+10,size.Y+10);travelRing.Visible=true
+ travelStroke.Transparency=calm and .1 or .1+.4*(.5+.5*math.sin(t*6))
+ travelPointer.Position=UDim2.fromOffset(at.X+size.X/2,at.Y+size.Y+6+(calm and 0 or math.abs(math.sin(t*5))*6));travelPointer.Visible=true
+end
 
 -- Straight line from the player's feet to the goal, rebuilt every frame, so it never drifts away from the player.
 -- It ignores walls on purpose: each arrow is dropped onto whatever floor is under its spot on the line.
@@ -294,12 +323,13 @@ render=function()
  if welcomeOpen and(step~=1 or blocked())then welcomeOpen=false;welcome.Visible=false end
  local finishing=spec==nil and os.clock()<finishedUntil
  card.Visible=(spec~=nil or finishing)and not welcomeOpen and not blocked()and pg:GetAttribute('GardenMenuExpanded')~=true
- nextTip.Visible=false
+ nextTip.Visible=false;highlightButton=nil
  if finishing then
   stepText.Text='DONE!';setText(Guide.Format(Guide.Finished,device(),player.DisplayName));paintDots()
  elseif spec then
   local value=spec.Text
-  if spec.Tips then local tip=math.clamp(math.floor(introSeconds/Guide.TipSeconds)+1,1,#Guide.Tips);lastTip=tip;value=Guide.Tips[tip];nextTip.Visible=true
+  if spec.Tips then local tip=math.clamp(math.floor(introSeconds/Guide.TipSeconds)+1,1,#Guide.Tips);lastTip=tip;value=Guide.Tips[tip];nextTip.Visible=true;highlightButton=Guide.TipButtons[tip]
+  elseif step==1 and not player:GetAttribute('ChestChaseSeedCarrying')and not onTrack()then value=Guide.TravelTrack;highlightButton='TrackButton';lastOnTrack=false
   elseif step==1 and info.WaitingForPack then value=Guide.Waiting
   elseif step==3 then local tool,equipped=packTool();if tool and equipped and spec.Equipped then value=spec.Equipped end end
   if os.clock()>=skipArmedUntil then stepText.Text=('STEP %d/%d'):format(step,Guide.StepCount)end
@@ -309,6 +339,7 @@ render=function()
  pg:SetAttribute('TutorialCardBottom',card.Visible and cardBottom or nil)
  if step~=shownStep then
   if step>0 and card.Visible then bounce(pop,.82);if shownStep>0 then sound('Bubble06')end end
+  if step>shownStep and shownStep>0 and card.Visible then stamp.Visible=true;stamp.TextTransparency=0;stamp.TextStrokeTransparency=.15;bounce(stampScale,.4);stampUntil=os.clock()+1.2 end
   shownStep=step
  end
 end
@@ -334,7 +365,7 @@ end)
 connections[#connections+1]=Run.RenderStepped:Connect(function(dt)
  if dead then return end
  -- Nothing to animate once the tutorial is finished and every piece is hidden.
- if step==0 and not card.Visible and not welcomeOpen then if marker.Enabled or edge.Visible or pointer.Visible or ringAlpha~=1 then hideTrail();marker.Enabled=false;edge.Visible=false;pointer.Visible=false end;return end
+ if step==0 and not card.Visible and not welcomeOpen then if marker.Enabled or edge.Visible or pointer.Visible or travelRing.Visible or ringAlpha~=1 then hideTrail();marker.Enabled=false;edge.Visible=false;pointer.Visible=false;travelRing.Visible=false;travelPointer.Visible=false end;return end
  if welcomeOpen and(os.clock()>welcomeUntil or player:GetAttribute('ChestChaseSeedCarrying'))then showWelcome(false)end
  if card.Visible and message.MaxVisibleGraphemes>=0 then
   revealed+=dt*60;local total=utf8.len(Guide.Plain(currentText))or #currentText
@@ -342,7 +373,8 @@ connections[#connections+1]=Run.RenderStepped:Connect(function(dt)
  end
  badge.Rotation=math.sin(os.clock()*2.4)*4;bigBadge.Rotation=math.sin(os.clock()*2.4)*4
  rim.Transparency=.15+.15*math.sin(os.clock()*3)
- updateWorld(dt);updatePointer()
+ updateWorld(dt);updatePointer();updateTravel()
+ if stamp.Visible then local left=stampUntil-os.clock();if left<=0 then stamp.Visible=false else local a=left<.4 and 1-left/.4 or 0;stamp.TextTransparency=a;stamp.TextStrokeTransparency=math.max(.15,a)end end
 end)
 connections[#connections+1]=Run.Heartbeat:Connect(function(dt)
  if dead or step==0 then return end
@@ -353,6 +385,8 @@ connections[#connections+1]=Run.Heartbeat:Connect(function(dt)
   if current.Tips and math.floor(introSeconds/Guide.TipSeconds)+1~=lastTip then render()end
  else introSeconds=0 end
  poll+=dt;if poll>=1 then poll=0;fetch()end
+ -- Step 1: re-render when the player reaches (or leaves) the track, so the TRACK hint comes and goes.
+ if step==1 then local now=onTrack();if now~=lastOnTrack then lastOnTrack=now;render()end end
 end)
 for _,name in ipairs({'TutorialStep','ChestChaseSeedCarrying'})do connections[#connections+1]=player:GetAttributeChangedSignal(name):Connect(function()info={};render();task.delay(.25,function()fetch()end)end)end
 connections[#connections+1]=player:GetAttributeChangedSignal('TutorialDone'):Connect(function()
