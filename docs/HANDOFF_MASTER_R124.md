@@ -5,6 +5,7 @@ Generated 2 Oct 2026 from the Claude Code session that built R114–R123, follow
 Revision changelog
 - R124 update (2 Oct): R123 is installed and checked in the owner's place; R124 is built (source + installer), not installed. Sections 1–3, 5–8, 10–12 updated; the R123 history below is kept where still true.
 - R125 update (2 Oct, later): built, not installed. Hold E to steal (1 s / 0.5 s), biome title redo (logo in a CanvasGroup medallion — R124's plain-Frame title lost the logos in Studio), slower plant growth (owner answers: up to 4 h King; Common/Uncommon/Forest/Mech unchanged; regrow same factor; value x max(1,factor/2) capped 9e10), tutorial TRACK/BASE teaching, Esc-menu offline-growth card, Featured star logo, shovel tip wording. Installer `installers/R125_install.lua` (~60 KB, 13 scripts, base `181aa89` = R124; mock 41/41). Notes: `docs/releases/R125.md`. Install order: R124 then R125.
+- R126 update (2 Oct, later): built, not installed. Bought Mech packs (each pack of a 5/10 bundle) and treadmill bonus rolls (Void Pack too) roll PackSize from BalanceRules.PackSizes like world packs; `SeedPackRules.NewSeedScale` no longer pins MechLimited to 1, so Mech seeds follow the size (1x unchanged). No UI change (owner: "no animation or transition"); bonus result gains `Size`, text unchanged. Installer `installers/R126_install.lua` (~24 KB, 5 scripts, base `d53bd77` = R125; mock 31/31). Notes: `docs/releases/R126.md`. Install order: R124, R125, R126.
 - R123 handoff: replaces docs/HANDOFF.md (29 Sep, R107/R110 era) as the current master. The baseline moves from "V149 prepared" to "V150 R123 source".
 - R123 handoff: the V4.1 Section 6 plant-visual seed rows are moved to verification debt (no evidence they were worked in this repo). The newest user tasks are reconciled into Section 6.
 
@@ -269,7 +270,8 @@ Every row except Shop removals, Gifts, Owner commands and Installer uses "Implem
 1. Owner installs R124 (Edit mode, Play stopped, one paste; wait for `[R124] Installed.`), saves, starts a new Play, and sends Output.
 2. Owner runs the R124 test list in `docs/releases/R124.md` and reviews the previews in `docs/proposals/polish_R124/`.
 3. Open owner decisions: keeper re-look approval; whether the Common–Epic split (43.5/28.6/17.2/8.1) is right; sound `Start_<id>` trims if the new sounds play late.
-4. Then R125 with only what the owner asks or the live test finds.
+4. Then R125 and R126 (`docs/releases/R125.md`, `R126.md`), in order, each waiting for its `Installed.` line.
+5. Then R127 with only what the owner asks or the live test finds.
 
 ## 13. Fresh-Conversation Bootstrap Block
 

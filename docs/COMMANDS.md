@@ -1,4 +1,4 @@
-# Test commands and tools (R125)
+# Test commands and tools (R126)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -162,3 +162,6 @@ listed separately any more because each one is the same as a command above.
    - Tutorial: the TRACK ring in step 1, plus BASE / TRACK tips.
    - Esc menu: the "plants grow offline" card.
    - Shop: the Featured star logo.
+11. **R126:**
+   - `bonus ready 2 @me`, roll, and check the bag: pack sizes vary (mostly 1x).
+   - Buy Mech packs with Gems: each pack has its own size, and a bigger pack opens a bigger seed.
