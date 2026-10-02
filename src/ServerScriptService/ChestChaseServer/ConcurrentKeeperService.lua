@@ -524,17 +524,49 @@ return function(Legacy)
         end
     end
 
+    -- R130 (performance): an idle keeper at home used to be fully re-prepared 4 times a second (every part's
+    -- transparency / collision / four attributes rewritten, a visibility scan and a re-pivot). Once prepared it now only
+    -- gets the cheap checks: back home if it moved, idle attributes written only when different. It is fully
+    -- re-prepared when its parts change, after it was used for a chase or replaced, and every 5 s as a safety net.
+    Service.IdleRefreshSeconds=5
+    local function setIf(model,key,value)if model:GetAttribute(key)~=value then model:SetAttribute(key,value)end end
+    local function atHome(model,frame)
+        local at=((model:GetAttribute("GardenerArtVersion")==91 or model:GetAttribute("KeeperClientAnimated")==true)and model.PrimaryPart and model.PrimaryPart.CFrame)or model:GetPivot()
+        return(at.Position-frame.Position).Magnitude<1e-3 and at.LookVector:Dot(frame.LookVector)>.99999 and at.UpVector:Dot(frame.UpVector)>.99999
+    end
+    function Service:_forgetIdleKeeper(stage)
+        local idle=self.IdleKeepers and self.IdleKeepers[stage];if not idle then return end
+        for _,c in ipairs(idle.Connections)do c:Disconnect()end;self.IdleKeepers[stage]=nil
+    end
     function Service:_maintainGuardians()
+        self.IdleKeepers=self.IdleKeepers or {}
+        local now=os.clock()
         for stage=1,self.Config.StageCount do
             -- A live target owns recovery; maintenance must not replace or recenter it.
-            if not self.KeeperTargets[stage] and not self.ReturningGuardians[stage] then
-                local guardian = self:_ensurePersistentGuardian(stage)
+            if self.KeeperTargets[stage] or self.ReturningGuardians[stage] then
+                self:_forgetIdleKeeper(stage) -- used for a chase: fully re-prepared when it is idle again
+            else
+                local idle=self.IdleKeepers[stage];local current=self.Map.GuardiansByStage and self.Map.GuardiansByStage[stage]
+                local guardian
+                if idle and not idle.Dirty and now<idle.Next and idle.Model==current and current.Parent and current.PrimaryPart then
+                    guardian=current
+                else
+                    self:_forgetIdleKeeper(stage)
+                    guardian = self:_ensurePersistentGuardian(stage)
+                    if guardian then
+                        local record={Model=guardian,Next=now+Service.IdleRefreshSeconds,Dirty=false}
+                        local function dirty()record.Dirty=true end
+                        record.Connections={guardian.DescendantAdded:Connect(dirty),guardian.DescendantRemoving:Connect(dirty),guardian.AncestryChanged:Connect(dirty)}
+                        self.IdleKeepers[stage]=record
+                    end
+                end
                 if guardian then
-                    pivotKeeper(guardian, self:_getGuardianHomeCFrame(stage))
-                    guardian:SetAttribute("GuardianBehavior", "GUARDING")
-                    guardian:SetAttribute("KeeperTravelSpeed",0)
-                    guardian:SetAttribute("GuardianLeaseToken", 0)
-                    guardian:SetAttribute("TargetUserId", 0)
+                    local home=self:_getGuardianHomeCFrame(stage)
+                    if not atHome(guardian,home)then pivotKeeper(guardian, home)end
+                    setIf(guardian,"GuardianBehavior", "GUARDING")
+                    setIf(guardian,"KeeperTravelSpeed",0)
+                    setIf(guardian,"GuardianLeaseToken", 0)
+                    setIf(guardian,"TargetUserId", 0)
                 end
             end
         end

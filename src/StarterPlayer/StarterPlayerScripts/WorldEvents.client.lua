@@ -129,7 +129,8 @@ local tick=Run.Heartbeat:Connect(function(dt)
  local kind=RS:GetAttribute('GlobalWeather')or'Clear'
  if kind~=previousKind then weather(kind);previousKind=kind end
  local here=kind~='Clear'and inBase()
- Clouds.Step(here and kind or nil,step)
+ -- R130: no weather clouds during a track refresh (the refresh sky is dark and cloudless).
+ Clouds.Step(here and Lighting:GetAttribute('TrackRefreshActive')~=true and kind or nil,step)
  -- On the track: no rain, snow or lightning (drops already falling simply finish).
  if not camera or not here then if emitter.Enabled then emitter.Enabled=false end;clearStrike();return end
  if profileTier~=tier then

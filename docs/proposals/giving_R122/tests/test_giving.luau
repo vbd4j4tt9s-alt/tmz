@@ -111,11 +111,11 @@ end
 local A=makePlayer(101,'Alice',0);local B=makePlayer(202,'Bob',6);local C=makePlayer(303,'Carol',60)
 local function rootOf(p)return p.Character.HumanoidRootPart end
 local function hold(p,record)
- local t=R.new('Tool');t.Name='item'
+ local t=R.new('Tool');t.Name=record.Kind=='Pack'and'Test Pack'or'Test Seed'
  if record.Kind=='Pack'then t:SetAttribute('SeedPackTool',true)else t:SetAttribute('GardenSeed',true)end
  t:SetAttribute('SeedInventoryId',record.Id);t.Parent=p.Character;return t
 end
-local function holdFruit(p,crop)local t=R.new('Tool');t:SetAttribute('HarvestItemTool',true);t:SetAttribute('HarvestInventoryId',crop.Id);t.Parent=p.Character;return t end
+local function holdFruit(p,crop)local t=R.new('Tool');t.Name='Golden Apple';t:SetAttribute('HarvestItemTool',true);t:SetAttribute('HarvestInventoryId',crop.Id);t.Parent=p.Character;return t end
 local function find(p,id)for _,r in ipairs(Data:GetChestRecords(p))do if r.Id==id then return r end end end
 local function seedRecords(p)return #Data:GetChestRecords(p)end
 -- Each send is a fresh remote call through SecurityGate after the 2 s gift cooldown.
@@ -162,7 +162,7 @@ sameTraits(savedRow(B,pack.Id),packTraits,'recipient save')
 check(Data.Revision[A]>aRevision and Data.Revision[B]>bRevision,'both profiles marked dirty')
 check(A:GetAttribute('SeedInventoryCount')==seedRecords(A)and B:GetAttribute('SeedInventoryCount')==seedRecords(B),'both inventory counters refreshed')
 check((Chests.Synced[A]or 0)>0 and(Chests.Synced[B]or 0)>0,'both hotbars resynced')
-local recv=lastFor(B);check(recv and recv.Action=='Received'and recv.Text:find('seed pack'),'recipient notified: '..tostring(recv and recv.Text))
+local recv=lastFor(B);check(recv and recv.Action=='Received'and recv.Text=='🎁 Alice gave you Test Pack!','recipient notified with giver and item (R130): '..tostring(recv and recv.Text))
 local sent=false;for _,f in ipairs(fired)do if f.P==A and f.Text and f.Text:find('Gift sent to Bob')then sent=true end end
 check(sent,'giver notified')
 advance(121) -- acknowledgements finish on the background recovery loop (R123: every 60 s, two passes)
@@ -178,7 +178,7 @@ local gs=find(B,seed.Id)
 check(gs and gs.Kind=='Seed','recipient owns the seed')
 sameTraits(gs and Data:SerializeSeedRecord(gs),seedTraits,'gifted seed')
 check(B.DiscoveredSeeds:FindFirstChild(seed.SeedId)~=nil,'recipient index marks the seed discovered')
-recv=lastFor(B);check(recv and recv.Text:find('a seed!'),'seed receipt notice')
+recv=lastFor(B);check(recv and recv.Text=='🎁 Alice gave you Test Seed!','seed receipt notice names the seed: '..tostring(recv and recv.Text))
 
 -- 3. Recipient full: refused up front, nothing lost ------------------------------------------------------
 local p2=Data:AddChest(A,{Stage=1,BagVariant='Pack01',PackSize=1});hold(A,p2)
@@ -301,12 +301,18 @@ check(ok,'fixture harvested: '..tostring(harvest))
 local fruit=Data.Gardens[A].Harvests[#Data.Gardens[A].Harvests]
 local fruitId=fruit.Id;local fruitValue=fruit.Value
 local hb=#Data.Gardens[B].Harvests
+-- R130: with the notice service the receiver gets a notice in the stack; the status line stays empty.
+local shown={};Gifts.Notes={Show=function(_,p,text)shown[#shown+1]={P=p,Text=text}end}
 holdFruit(A,fruit);send(A,'Give',B,fruitId)
+Gifts.Notes=nil
 local fa=false;for _,c in ipairs(Data.Gardens[A].Harvests)do if c.Id==fruitId then fa=true end end
 local fb;for _,c in ipairs(Data.Gardens[B].Harvests)do if c.Id==fruitId then fb=c end end
 check(not fa and fb~=nil and #Data.Gardens[B].Harvests==hb+1,'fruit moved to recipient')
 check(fb and fb.Value==fruitValue,'fruit value preserved')
-recv=lastFor(B);check(recv and recv.Text=='A gifted crop was added to your bag.','fruit receipt notice unchanged')
+recv=lastFor(B);check(recv and recv.Action=='Received'and recv.Text=='','fruit receipt: sound cue only on the status line')
+check(#shown==1 and shown[1].P==B and shown[1].Text=='🎁 Alice gave you Golden Apple!','fruit receipt notice names giver and item: '..tostring(shown[1]and shown[1].Text))
+local fs=false;for _,f in ipairs(fired)do if f.P==A and f.Text and f.Text:find('Gift sent to Bob! (Golden Apple)',1,true)then fs=true end end
+check(fs,'fruit giver told the gift was sent (R130)')
 advance(31)
 check(next(Data.Gardens[A].OutgoingGifts)==nil,'fruit outbox cleaned')
 local fruitBox;for name,s in pairs(stores)do if name:find('FruitInbox')then fruitBox=s end end

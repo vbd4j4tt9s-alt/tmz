@@ -1,5 +1,5 @@
 -- R68: a black sky, without switching off the world's lights. Scoped and reversible.
-local Lighting=game:GetService('Lighting');local A={};local image;local attempted=false
+local Lighting=game:GetService('Lighting');local A={NightDensity=.32};local image;local attempted=false
 local faces={'SkyboxBackContent','SkyboxDownContent','SkyboxFrontContent','SkyboxLeftContent','SkyboxRightContent','SkyboxUpContent'}
 local function blackImage()
  if not attempted then
@@ -20,7 +20,7 @@ function A.Begin()
  for _,child in ipairs(Lighting:GetChildren())do
   if child:IsA('Sky')then skies[#skies+1]=child;child.Parent=nil
   elseif child:IsA('Atmosphere')then
-   air[#air+1]={Object=child,Density=child.Density,Haze=child.Haze,Glare=child.Glare};child.Density=0;child.Haze=0;child.Glare=0
+   air[#air+1]={Object=child,Density=child.Density,Haze=child.Haze,Glare=child.Glare,Color=child.Color,Decay=child.Decay,Offset=child.Offset}
   end
  end
  local terrain=workspace:FindFirstChildOfClass('Terrain')
@@ -35,12 +35,32 @@ function A.Begin()
   local function readable(c)return Color3.new(math.max(c.R,.55),math.max(c.G,.55),math.max(c.B,.55))end
   Lighting.ClockTime=0;Lighting.Ambient=readable(Lighting.Ambient);Lighting.OutdoorAmbient=readable(Lighting.OutdoorAmbient)
  end
- sky.Parent=Lighting
+ -- R130 (owner: "when the track refreshes the sky turns dark too"). With the black sky image the air is cleared so the
+ -- black shows. Without it (no image API on that client) the sky used to stay light: now there is no texture-less Sky
+ -- (Roblox's own sky follows the midnight clock) and the air turns black like The Darkened's lights-out, at about the
+ -- usual view distance, so the sky and the far distance go dark while the base stays readable.
+ if ok then
+  sky.Parent=Lighting
+  for _,v in ipairs(air)do v.Object.Density=0;v.Object.Haze=0;v.Object.Glare=0 end
+ else
+  sky:Destroy();sky=nil
+  if #air==0 then
+   local night=Instance.new('Atmosphere');night.Name='TrackRefreshNightAir';night.Density=0;night.Parent=Lighting
+   air[1]={Object=night,Made=true}
+  end
+  for _,v in ipairs(air)do
+   local a=v.Object;a.Color=Color3.new();a.Decay=Color3.new();a.Offset=0;a.Haze=0;a.Glare=0;a.Density=math.max(a.Density,A.NightDensity)
+  end
+ end
  local restored=false
  return function()
-  if restored then return end;restored=true;sky:Destroy()
+  if restored then return end;restored=true;if sky then sky:Destroy()end
   for _,old in ipairs(skies)do if old.Parent==nil then old.Parent=Lighting end end
-  for _,v in ipairs(air)do if v.Object.Parent==Lighting then v.Object.Density=v.Density;v.Object.Haze=v.Haze;v.Object.Glare=v.Glare end end
+  for _,v in ipairs(air)do
+   local a=v.Object
+   if v.Made then a:Destroy()
+   elseif a.Parent==Lighting then a.Density=v.Density;a.Haze=v.Haze;a.Glare=v.Glare;a.Color=v.Color;a.Decay=v.Decay;a.Offset=v.Offset end
+  end
   for _,v in ipairs(clouds)do if v.Object.Parent then v.Object.Enabled=v.Enabled end end
   if fallback then for k,v in pairs(fallback)do Lighting[k]=v end end
   Lighting:SetAttribute('TrackRefreshActive',priorRefresh)

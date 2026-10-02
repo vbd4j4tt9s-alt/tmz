@@ -6,6 +6,12 @@ local Players=game:GetService('Players');local RS=game:GetService('ReplicatedSto
 local S={};S.__index=S
 local function count(t)local n=0;for _ in pairs(t or{})do n+=1 end;return n end
 local function clone(v)if type(v)~='table'then return v end;local out={};for k,x in pairs(v)do out[k]=clone(x)end;return out end
+-- R130 (owner): the receiver gets a notice naming the giver and the item ("Alice gave you Golden Apple!"). The held
+-- Tool's name (the same name the hotbar shows) travels with the gift; older gifts without it use a generic name.
+local function itemName(tool)
+ local n=tool and tool.Name;if type(n)~='string'then return nil end
+ n=n:gsub('%c',''):sub(1,60);return #n>0 and n or nil
+end
 local function body(p)local c=p.Character;local h=c and c:FindFirstChildOfClass('Humanoid');local r=c and c:FindFirstChild('HumanoidRootPart');return h and h.Health>0 and r end
 -- Fruit keeps its original keys. Seeds/packs: separate outbox, receipts and DataStore.
 local CHANNELS={
@@ -32,13 +38,19 @@ function S:Near(a,b)local ar,br=body(a),body(b);if not ar or not br or(ar.Positi
  local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Exclude;params.FilterDescendantsInstances={a.Character,b.Character};params.RespectCanCollide=true
  return workspace:Raycast(ar.Position,br.Position-ar.Position,params)==nil end
 function S:Held(p,id)
- local c=p.Character;for _,t in ipairs(c and c:GetChildren()or{})do if t:IsA('Tool')and t:GetAttribute('HarvestItemTool')and t:GetAttribute('HarvestInventoryId')==id then return true end end;return false
+ local c=p.Character;for _,t in ipairs(c and c:GetChildren()or{})do if t:IsA('Tool')and t:GetAttribute('HarvestItemTool')and t:GetAttribute('HarvestInventoryId')==id then return t end end;return nil
+end
+-- R130: a gift to a player who walked out of reach says so instead of doing nothing.
+function S:TooFar(from,to)
+ if self:Near(from,to)then return false end
+ if to and to.Parent and body(from)and body(to)then self.Remote:FireClient(from,'Status','Get closer to '..to.DisplayName..' to give.')end
+ return true
 end
 function S:Offer(from,userId,cropId)
  local now=os.clock();if now-(self.Last[from]or -10)<2 then return end;self.Last[from]=now
  if type(userId)~='number'or userId~=userId or userId<=0 or userId>=9007199254740991 or userId%1~=0 or type(cropId)~='string'or #cropId>100 then return end
  local to=Players:GetPlayerByUserId(userId)
- if to==from or not require(script.Parent.MovementGuard).Check(from)or not self:Available(from)or not self:Available(to)or not self:Near(from,to)or not self:Held(from,cropId)then return end
+ if to==from or not require(script.Parent.MovementGuard).Check(from)or not self:Available(from)or not self:Available(to)or self:TooFar(from,to)or not self:Held(from,cropId)then return end
  local crop;for _,c in ipairs(self.Data.Gardens[from].Harvests)do if c.Id==cropId then crop=c;break end end
  if not crop then return end
  if crop.PaidRandom and(from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true)then self.Remote:FireClient(from,'Status','This purchased crop cannot be gifted between these accounts.');return end
@@ -60,7 +72,7 @@ function S:Accept(to,id)
  if crop.PaidRandom and(from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true)then return end
  -- No yield between inventory removal and persistent outbox staging.
  self.Busy[from]=true;self.Busy[to]=true
- local gift={RecipientId=to.UserId,Crop=clone(crop),State='Pending'}
+ local gift={RecipientId=to.UserId,Crop=clone(crop),State='Pending',Name=itemName(self:Held(from,offer.CropId))}
  table.remove(garden.Harvests,index);garden.OutgoingGifts[id]=gift
  self.Data:MarkDirty(from);self.Data:_gardenChanged(from);self.Chests:SyncTools(from)
  self.Remote:FireClient(from,'Status','Saving your gift…')
@@ -81,7 +93,7 @@ function S:_deliver(from,to,id,gift,channel)
  end
  self.Busy[from]=nil;self.Busy[to]=nil
  if queued then
-  if channel.Name=='Seed'then self.Remote:FireClient(from,'Status','Gift sent to '..to.DisplayName..'!')end
+  self.Remote:FireClient(from,'Status','Gift sent to '..to.DisplayName..'!'..(gift.Name and(' ('..gift.Name..')')or''))
   self:Recover(from);self:Recover(to)
  else
   self.Remote:FireClient(from,'Status','Gift is pending a safe save. It will retry automatically.')
@@ -125,7 +137,7 @@ function S:OfferSeed(from,userId,itemId)
  local now=os.clock();if now-(self.Last[from]or -10)<2 then return end;self.Last[from]=now
  if type(userId)~='number'or userId~=userId or userId<=0 or userId>=9007199254740991 or userId%1~=0 or type(itemId)~='string'or #itemId<1 or #itemId>100 then return end
  local to=Players:GetPlayerByUserId(userId)
- if to==from or not require(script.Parent.MovementGuard).Check(from)or not self:Available(from)or not self:Available(to)or not self:Near(from,to)then return end
+ if to==from or not require(script.Parent.MovementGuard).Check(from)or not self:Available(from)or not self:Available(to)or self:TooFar(from,to)then return end
  local record=self:FindSeed(from,itemId)
  if not record or(record.Kind~='Pack'and record.Kind~='Seed')or not self:HeldSeed(from,itemId,record.Kind)then return end
  local blocked=self:SeedBlocked(from,itemId);if blocked then self.Remote:FireClient(from,'Status',blocked);return end
@@ -151,7 +163,7 @@ function S:AcceptSeed(to,id,offer)
  -- No yield between inventory removal and persistent outbox staging.
  self.Busy[from]=true;self.Busy[to]=true
  local _,index=self:FindSeed(from,offer.ItemId)
- local gift={RecipientId=to.UserId,Seed=row,State='Pending'}
+ local gift={RecipientId=to.UserId,Seed=row,State='Pending',Name=itemName(tool)}
  table.remove(self.Data:GetChestRecords(from),index);garden.OutgoingSeedGifts[id]=gift
  self.Data:_notifySeedInventory(from);self.Data:MarkDirty(from);self.Data:_gardenChanged(from)
  -- Unequip first so a held pack ends its (uncommitted) opening normally; SyncTools then removes the Tool.
@@ -195,7 +207,7 @@ end
 function S:QueueInbox(fromId,id,gift,channel)
  channel=channel or CHANNELS[1]
  return self:ChangeInbox(gift.RecipientId,function(box)
-  if not box[id]then if count(box)>=128 then return false end;box[id]={State='Ready',From=fromId,[channel.Field]=clone(gift[channel.Field])}end
+  if not box[id]then if count(box)>=128 then return false end;box[id]={State='Ready',From=fromId,Name=gift.Name,[channel.Field]=clone(gift[channel.Field])}end
  end,self[channel.Store])
 end
 function S:Recover(p)
@@ -251,12 +263,10 @@ function S:_recoverChannel(p,channel)
    if not self:Save(p,'GiftReceived')then return false end
    local saved=self:ChangeInbox(p.UserId,function(box)if box[id]and box[id].State=='Ready'then box[id].State='Delivered'end end,store)
    if saved then
-    local what='A gifted crop was added to your bag.'
-    if channel.Name=='Seed'then
-     local name=gift.From and Players:GetPlayerByUserId(gift.From);name=name and name.DisplayName or'Someone'
-     what=name..' gave you '..((type(gift.Seed)=='table'and gift.Seed.Kind=='Pack')and'a seed pack!'or'a seed!')
-    end
-    self.Remote:FireClient(p,'Received',what)
+    local what=self:ReceivedText(gift,channel)
+    -- R130: a notice in the game's notice stack (the gift status line stays for the sound only).
+    if self.Notes then self.Notes:Show(p,what,Color3.fromRGB(255,215,70),4.5)end
+    self.Remote:FireClient(p,'Received',self.Notes and''or what)
    end
   elseif gift.State=='Final'then
    if receipts[id]then receipts[id]=nil;self.Data:MarkDirty(p)end
@@ -266,6 +276,16 @@ function S:_recoverChannel(p,channel)
   end
  end
  return true
+end
+function S:ReceivedText(gift,channel)
+ local giver=type(gift.From)=='number'and Players:GetPlayerByUserId(gift.From)
+ local who=giver and giver.DisplayName
+ if not who and type(gift.From)=='number'then local ok,n=pcall(Players.GetNameFromUserIdAsync,Players,gift.From);who=ok and type(n)=='string'and n or nil end
+ local item=type(gift.Name)=='string'and itemName({Name=gift.Name})
+ if not item then
+  if channel.Name=='Seed'then item=(type(gift.Seed)=='table'and gift.Seed.Kind=='Pack')and'a seed pack'or'a seed'else item='a crop'end
+ end
+ return '🎁 '..(who or'Someone')..' gave you '..item..'!'
 end
 function S:Cleanup(p)
  self.Last[p]=nil

@@ -29,9 +29,16 @@ function M.Reset(player,grace)
         serial(player)
     else M.Records[player]=nil end
 end
+-- R130 (performance): one RaycastParams reused for every check (it was created 10 times a second per moving player).
+-- The barrier list is still looked up on every check; the filter is only rewritten when that list changes.
+local shared={Params=nil,Include={}}
 local function barriers(player,character,r)
-    local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Include
-    params.RespectCanCollide=true;params.CollisionGroup=r.CollisionGroup
+    local params=shared.Params
+    if not params then
+        params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Include;params.RespectCanCollide=true
+        params.FilterDescendantsInstances={};shared.Params=params
+    end
+    if params.CollisionGroup~=r.CollisionGroup then params.CollisionGroup=r.CollisionGroup end
     local map=M.Bases.Map and M.Bases.Map.MapRoot or workspace:FindFirstChild('ChestChaseMap')
     local include={}
     if map then
@@ -43,7 +50,9 @@ local function barriers(player,character,r)
         local gate=runtime and runtime:FindFirstChild('BiomeRefreshWall')
         if gate then table.insert(include,gate)end
     end
-    params.FilterDescendantsInstances=include
+    local last=shared.Include;local same=#last==#include
+    if same then for i=1,#include do if last[i]~=include[i]then same=false;break end end end
+    if not same then params.FilterDescendantsInstances=include;shared.Include=include end
     return params,#include>0
 end
 local function correct(player,c,h,r,state,now,frame)
