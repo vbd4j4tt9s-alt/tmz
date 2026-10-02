@@ -4,7 +4,11 @@
 assert(not game:GetService('RunService'):IsRunning(),'__TAG__ Stop Play first.')
 local storage=game:GetService('ServerStorage')
 local existing=storage:FindFirstChild('__BACKUP__')
-if existing then require(existing:WaitForChild('Installer'))('install');return end
+if existing then
+ -- Same build pasted again: redo. A different build with the same backup name must never run the old one.
+ assert(existing:GetAttribute('Build')=='__ENGINE_SHA__','__TAG__ An older __TAG__ backup is in ServerStorage. Undo it first: require(game.ServerStorage.__BACKUP__.Installer)("undo") then delete ServerStorage.__BACKUP__ and paste this again. Nothing changed.')
+ require(existing:WaitForChild('Installer'))('install');return
+end
 -- @@ENGINE_HELPERS@@
 local specs=__SPECS__
 local patches=__PATCHES__
@@ -49,6 +53,6 @@ for i,spec in ipairs(specs)do
  local t=Instance.new('ObjectValue');t.Name='Target';t.Value=item;t.Parent=entry
 end
 local installer=Instance.new('ModuleScript');installer.Name='Installer';installer.Source=engineSource;installer.Parent=backup
-backup:SetAttribute('SourceCount',#specs);backup:SetAttribute('State','Built');backup.Parent=storage
+backup:SetAttribute('SourceCount',#specs);backup:SetAttribute('Build','__ENGINE_SHA__');backup:SetAttribute('State','Built');backup.Parent=storage
 require(installer)('install')
 print('__TAG__ Backup: ServerStorage.__BACKUP__   Undo: require(game.ServerStorage.__BACKUP__.Installer)("undo")')

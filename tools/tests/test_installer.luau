@@ -72,6 +72,11 @@ ok,err=w2.Run(D.PASTE);check(not ok and tostring(err):find('not the version',1,t
 check(w2.Storage:FindFirstChild(BACKUP)==nil,'no backup left behind on refusal')
 local unchanged=true;for i,s in ipairs(D.Scripts)do if s~=victim and not s.New and w2.Items[s.Path].Source~=s.Before then unchanged=false end;if s.New and w2.Items[s.Path]~=nil then unchanged=false end end
 check(unchanged,'nothing written on refusal')
+-- 6b) A backup left by a DIFFERENT build of the same release: refuse, never run the old installer.
+local w4=world()
+do local f=R.new('Folder');f.Name=BACKUP;f:SetAttribute('Build','an-older-build');f.Parent=w4.Storage end
+ok,err=w4.Run(D.PASTE);check(not ok and tostring(err):find('older',1,true)~=nil and tostring(err):find('undo',1,true)~=nil,'older backup refused with undo steps: '..tostring(err))
+check(all(w4,'Before'),'nothing written when an older backup exists')
 -- 7) A write failure midway rolls everything back.
 local w3=world();local writes=0
 local editor=w3.Game:GetService('ScriptEditorService');local real=editor.UpdateSourceAsync
