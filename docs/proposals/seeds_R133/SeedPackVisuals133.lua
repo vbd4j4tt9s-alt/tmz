@@ -217,7 +217,7 @@ function Visuals.Seed(seed,index,origin,parent,scale,weldRoot,mutation)
    local made={};for i=1,#points-1 do made[#made+1]=line(name,points[i],points[i+1],width,color,mat)end;return made
   end
   local function anim(item,kind)
-   if type(item)=='table'then for _,x in ipairs(item)do x:SetAttribute('SeedAnim',kind)end else item:SetAttribute('SeedAnim',kind)end
+   if typeof(item)=='Instance'then item:SetAttribute('SeedAnim',kind)else for _,x in ipairs(item)do x:SetAttribute('SeedAnim',kind)end end
    return item
   end
   sig.Draw({p=p,oval=oval,line=line,leaf=leaf,shard=shard,ring=ring,bolt=bolt,top=top,bottom=bottom,ink=ink,leafColor=leafColor,
