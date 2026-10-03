@@ -1,4 +1,4 @@
-# Test commands and tools (R134)
+# Test commands and tools (R135)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -199,3 +199,5 @@ listed separately any more because each one is the same as a command above.
 19. **R134:**
    - `seeds all`, open the Bag: every seed looks different, no side wings. Hold Diamond Vine, Prism Pepper, Ash Tomato, Iceberry, Venom Vine, Prism Monarch.
    - Hold a Legendary+ seed: flames/crystals/glows animate; `give prism monarch seed`: crown and golden rays.
+20. **R135:**
+   - Market: counter crates hold prickly pears, pineapples and glowing lanterns; stands hold watermelons, apples, grape bunches / pumpkins, tomatoes, snow melons. No berries, nothing hovering; inside shelves full of mixed packs.
