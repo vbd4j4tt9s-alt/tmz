@@ -1,4 +1,4 @@
-# Test commands and tools (R139)
+# Test commands and tools (R140)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -72,6 +72,7 @@
 | `refreshpacks` (server) | Refresh the track now |
 | `refreshcycle 30` (server) | Refresh into reset 30. Legendary every 5 resets, Mythic every 10, The Darkened every 3 |
 | `pity 30`, `spawnodds`, `routes` | Look at guarantees, spawn chances and keeper speeds |
+| `daily`, `daily next`, `daily done`, `daily week`, `daily reset` (`@name`) | R140 login week + daily quests: show the state; pretend a new day (login claim back, quests from 0); finish today's quests; make the next claim day 7 (Mech pack); start over |
 | `packluck`, `packluck 29 @name` | R137 hidden big-pack luck (players never see it): packs since a 5x+ / 10x+ and the track's refreshes; a number sets the 5x count (29 = next earned pack is 5x+) |
 | `fling storm @name` | Fling them like that biome's keeper (forest … storm, or `darkened`). Tests the air time; nothing drops |
 | `ragdoll 4 @name` | Knock them down for 0.5–10 s |
@@ -220,3 +221,9 @@ listed separately any more because each one is the same as a command above.
    - Steal and bank a pack: its hotbar slot (and Bag card) gets a spinning rainbow border, ~4 s, then it fades. Packs you joined with stay plain, also after a reset.
    - Hotbar full: a new pack's Bag card glows when you open the Bag.
    - Free tutorial pack: the finish card says 🎁 FREE PACK!, the notice FREE Forest Seed Pack; its tooltip matches a normal Forest pack (no luck row). Replay: no second one. Gift it: the alt gets a normal Forest pack.
+25. **R140:**
+   - 🎁 DAILY and 👥 INVITE sit right of TRACK in the top bar (phone too). DAILY's red number = login reward + finished quests.
+   - After the tutorial the week opens by itself: claim day 1 (Gems float in). `daily next` → claim day 2; `daily week` → claim day 7 = a Mech pack in the Bag (rainbow ring).
+   - Steal and bank 3 packs: ✅ QUEST DONE notice, CLAIM in QUESTS gives 💎5. `daily done` finishes all three.
+   - Live server with a friend: both get a "Friend boost" notice, INVITE shows +10% / +20%, and you run faster. INVITE opens Roblox's invite screen.
+   - "Your plant is ready" needs the one-time setup in `docs/releases/R140.md` (notification string id on SocialService.MessageId, API key secret `PlantReadyKey`, HTTP on).
