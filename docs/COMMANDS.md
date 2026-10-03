@@ -1,4 +1,4 @@
-# Test commands and tools (R138)
+# Test commands and tools (R139)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -213,6 +213,10 @@ listed separately any more because each one is the same as a command above.
    - Index: rarity + 1/N chips, SEED/GROWN chips, CLAIM pill, Common → King order, ringed tab, FOUND total.
 23. **R138:**
    - Settings > replay the tutorial: picture welcome, icon + 2-3 word cards with key chips, step icon row, clicking indicator while opening (pips fill), 3 picture slides, YOU'RE READY! + confetti.
-   - Finishing it (first time on the account) gives a Lucky Forest Pack (2x rates; tooltip shows 🍀 2x LUCK).
+   - Finishing it (first time on the account) gives a free Forest pack with 2x rates (R139: kept secret, see 24).
    - Open packs: Common pop, Uncommon pop + note, Rare sparkle + two notes, small ring/sparkles; `rarepacks @you`: Secret/Cosmic/King louder.
    - Index: a waiting reward puts a count on INDEX, ! on MENU and a dot on its biome tab; claiming plays ka-ching / gem sound; no gray box above names.
+24. **R139:**
+   - Steal and bank a pack: its hotbar slot (and Bag card) gets a spinning rainbow border, ~4 s, then it fades. Packs you joined with stay plain, also after a reset.
+   - Hotbar full: a new pack's Bag card glows when you open the Bag.
+   - Free tutorial pack: the finish card says 🎁 FREE PACK!, the notice FREE Forest Seed Pack; its tooltip matches a normal Forest pack (no luck row). Replay: no second one. Gift it: the alt gets a normal Forest pack.
