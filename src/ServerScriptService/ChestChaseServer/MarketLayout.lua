@@ -9,7 +9,7 @@ M.FruitOfHour=Vector3.new(-20,0,-30)        -- pedestal centre: right of the arr
 function M.Apply(map)
  local hub=assert(map:FindFirstChild('EconomyHub'))
  local old=hub:FindFirstChild('MerchantStands');if old then old:Destroy()end
- local model=Instance.new('Model');model.Name='MerchantStands';model:SetAttribute('MarketRevision',69);model:SetAttribute('MarketPolish',135)
+ local model=Instance.new('Model');model.Name='MerchantStands';model:SetAttribute('MarketRevision',69);model:SetAttribute('MarketPolish',136)
  local wood={194,137,86};local lightWood={246,215,155};local darkWood={80,61,53};local trim={32,121,125}
  local function part(name,size,position,color,material,solid)
   local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=CFrame.new(M.Center+position);p.Color=Color3.fromRGB(unpack(color));p.Material=material or Enum.Material.SmoothPlastic
@@ -212,7 +212,7 @@ local function seat(model,center,bounds)
  end
  return bounds.Y*.3
 end
-local function settle(model,origin,at,size,turn,sits)
+local function settle(model,origin,at,size,turn,sits,hangs)
  for _,d in ipairs(model:GetDescendants())do
   if d:IsA('BasePart')then d.Anchored=true;d.CanCollide=false;d.CanTouch=false;d.CanQuery=false;d.CastShadow=d.Size.Magnitude>1.2
   elseif d:IsA('BaseScript')or d:IsA('ParticleEmitter')or d:IsA('Sound')then d:Destroy()end
@@ -230,13 +230,20 @@ local function settle(model,origin,at,size,turn,sits)
  -- Turn about the visible centre, then put the seat on `at`.
  local pivot=model:GetPivot()
  local fromCenter=CFrame.new(pivot.Position-center)*pivot.Rotation
- model:PivotTo(origin*CFrame.new(at+Vector3.new(0,bounds.Y/2-lift,0))*CFrame.Angles(0,turn or 0,0)*fromCenter)
+ -- Hanging things (R136 lanterns) put their visible top on `at` instead.
+ local y=hangs and-bounds.Y/2 or bounds.Y/2-lift
+ model:PivotTo(origin*CFrame.new(at+Vector3.new(0,y,0))*CFrame.Angles(0,turn or 0,0)*fromCenter)
  return model
 end
 local function fruit(id,parent,origin,at,size,turn)
  local model=require(RS:WaitForChild('HarvestPresentation')).Build({SeedId=id,Mutation='None',Weather='None'})
  assert(model,'no fruit model for '..id);model.Name='Market fruit';model.Parent=parent
  return settle(model,origin,at,size,turn,true)
+end
+local function lantern(id,parent,origin,at,size,turn)
+ local model=require(RS:WaitForChild('HarvestPresentation')).Build({SeedId=id,Mutation='None',Weather='None'})
+ assert(model,'no fruit model for '..id);model.Name='Hanging lantern';model.Parent=parent
+ return settle(model,origin,at,size,turn,false,true)
 end
 local function plant(id,parent,origin,at,size,turn)
  local model=require(RS:WaitForChild('PlantVisuals')).Build(id,CFrame.new(),nil,4)
@@ -270,6 +277,7 @@ M.Showcase={
  Planter={X=22.44,Z=-13.94,Soil=3.79},
  FlowerBox='MooncapSeed',FlowerSoil=6.42,
  Shelves={X=13.6,Z=13.77,Tops={7.565,12.835},PerShelf=5,Spacing=2.1,Size=1.75},
+ Lanterns={-9,0,9},LanternTop=16.9,LanternSize=2.1,                 -- R136: lantern fruits hang under the ceiling beam
  Back={Pots={{-9.2,'BluebellSeed',2.6},{-12.8,'LanternFernSeed',3.2},{9.2,'TigerOrchidSeed',2.8},{16.6,'SunflowerBloomSeed',3}}},
 }
 function M.Polish(model)
@@ -313,14 +321,14 @@ function M.Polish(model)
   part('Produce tier',Vector3.new(5.4,h,1.6),Vector3.new(side*23.2,h/2,-23+t*1.4),P.DarkWood,nil,true)
   part('Tier edge',Vector3.new(5.5,.14,.18),Vector3.new(side*23.2,h-.07,-23.8+t*1.4),P.Gold)
  end end
- -- Warm lamps hanging from a ceiling beam that rests on the two side door lintels.
+ -- Warm lanterns hanging from a ceiling beam that rests on the two side door lintels.
  part('Ceiling beam',Vector3.new(39.6,.7,.7),Vector3.new(0,19.05,3),P.DarkWood)
  for _,x in ipairs({-9,0,9})do
-  rod('Lamp cord',Vector3.new(x,18.7,3),Vector3.new(x,16.9,3),.12,P.DarkWood)
-  local shade=part('Lamp shade',Vector3.new(.45,1.9,1.9),CFrame.new(x,16.7,3)*CFrame.Angles(0,0,math.pi/2),P.Teal);shade.Shape=Enum.PartType.Cylinder
-  part('Lamp cap',Vector3.new(.5,.3,.5),Vector3.new(x,17.0,3),P.Gold)
-  local light=Instance.new('PointLight');light.Color=Color3.fromRGB(255,214,160);light.Brightness=.8;light.Range=18;light.Shadows=false
-  light.Parent=bulb('Ceiling lamp',.9,Vector3.new(x,16.15,3),{255,214,150})
+  -- R136 (owner: "replace the lights with the lantern fruits"): a Lantern Fern fruit hangs from each cord (built with
+  -- the other showcase models); the warm light stays on an invisible holder so it shines even before the fruit loads.
+  rod('Lamp cord',Vector3.new(x,18.7,3),Vector3.new(x,M.Showcase.LanternTop,3),.12,P.DarkWood)
+  local holder=part('Lantern light',Vector3.new(.3,.3,.3),Vector3.new(x,M.Showcase.LanternTop-M.Showcase.LanternSize/2,3),{255,214,150});holder.Transparency=1
+  local light=Instance.new('PointLight');light.Color=Color3.fromRGB(255,214,160);light.Brightness=.9;light.Range=18;light.Shadows=false;light.Parent=holder
  end
  -- Behind the market (owner: "the back looks plain"): pots with the game's plants, crates and a barrel on the deck.
  local backZ=17.1;local deckTop=.85
@@ -358,6 +366,7 @@ function M.Polish(model)
   for i,spec in ipairs(S.Back.Pots)do
    local h=i%2==0 and 2.1 or 1.6;try(plant,spec[2],show,origin,Vector3.new(spec[1],.85+h+.08,17.1),spec[3],i*.9)
   end
+  for i,x in ipairs(S.Lanterns)do try(lantern,'LanternFernSeed',show,origin,Vector3.new(x,S.LanternTop+.05,3),S.LanternSize,i*.7)end
   local sh=S.Shelves;local packs=M.ShelfPacks(#sh.Tops*2*sh.PerShelf);local n=0
   for _,side in ipairs({-1,1})do for _,top in ipairs(sh.Tops)do for k=1,sh.PerShelf do
    n+=1;local x=side*sh.X+(k-(sh.PerShelf+1)/2)*sh.Spacing

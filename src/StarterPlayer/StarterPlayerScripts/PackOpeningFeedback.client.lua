@@ -138,32 +138,64 @@ Run:BindToRenderStep('ChestChasePackPresentation',Enum.RenderPriority.Camera.Val
   local duration=rank>=6 and 0 or .7
   burst.Visible=rank<6 and t>=0 and t<.23
   if burst.Visible then local a=math.clamp(t/.23,0,1);burst.Size=UDim2.fromScale(.08+.38*a,.08+.38*a);burstStroke.Transparency=a;burstStroke.Color=reveal.Color end
-  if t<duration then
-   local fade=math.clamp((t-(rank>=6 and .5 or .15))/(duration-(rank>=6 and .5 or .15)),0,1)
-   local rise=1-(1-math.clamp(t/.3,0,1))^3
-   -- Common to Rare use the world seed reveal. No screen-cover treatment.
-   if rank>=4 then
-    panel.Visible=rank>=6
-    panel.BackgroundColor3=rank==6 and Color3.fromRGB(7,7,10)or rank==7 and Color3.fromRGB(12,8,33)or Color3.fromRGB(40,25,5)
-    panel.BackgroundTransparency=fade
-    local color=rank==6 and white or rank==7 and Color3.fromRGB(180,159,255)or rank==5 and Color3.fromRGB(255,85,102)or Color3.fromRGB(255,213,100)
-    ring.Visible=true;ring.Size=UDim2.fromScale(.15+rise*.49,.15+rise*.49);stroke.Color=color;stroke.Transparency=fade;stroke.Thickness=rank>=6 and 4 or 2
-    local n=rank>=6 and 24 or 10
+  -- R136 (owner: polish Legendary / Mythic pulls): motes gather during their short charge-up, then the ring bursts
+  -- out with a soft colour flash exactly when the seed does.
+  local at=require(RS.RarityRevealSequence).SeedAt(rank)
+  if rank==4 or rank==5 then
+   local color=rank==5 and Color3.fromRGB(235,120,255)or Color3.fromRGB(255,213,100)
+   local n=rank==5 and 16 or 10
+   if t<at then
+    local q=math.clamp(t/at,0,1)
+    ring.Visible=false;panel.Visible=false
     for i,p in ipairs(nodes)do
      p.Visible=i<=n
      if p.Visible then
-      local angle=i*math.pi*2/n+(rank==7 and t*.45 or 0);local radius=.17+rise*(rank>=6 and .39 or .20)
+      local angle=i*math.pi*2/n+t*(rank==5 and 2.2 or 1.6);local radius=.46-q*.32
       p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
-      p.BackgroundColor3=color;p.BackgroundTransparency=fade
-      if rank==6 then p.Size=UDim2.fromScale(.006,.05+rise*.08);p.Rotation=angle*180/math.pi+90
-      elseif rank==7 then p.Size=UDim2.fromScale(.008+(i%3)*.004,.008+(i%3)*.004);p.Rotation=45+t*50
-      elseif rank==8 then p.Size=UDim2.fromScale(.007,.10+rise*.10);p.Rotation=angle*180/math.pi+90
-      else p.Size=UDim2.fromScale(.008,.018);p.Rotation=45+t*40 end
+      p.Size=UDim2.fromScale(.01,.01);p.Rotation=45;p.BackgroundColor3=color;p.BackgroundTransparency=1-q*.85
      end
     end
-    for _,p in ipairs(crownParts)do p.Visible=rank==8;p.BackgroundTransparency=fade end
-   end
-  elseif rank<6 then hideEffects()end
+   elseif t<at+.75 then
+    local tb=t-at;local fade=math.clamp((tb-.15)/.6,0,1);local rise=1-(1-math.clamp(tb/.3,0,1))^3
+    panel.Visible=not reduced()and tb<.3;panel.BackgroundColor3=color;panel.BackgroundTransparency=.72+math.clamp(tb/.3,0,1)*.28
+    ring.Visible=true;ring.Size=UDim2.fromScale(.15+rise*.55,.15+rise*.55);stroke.Color=color;stroke.Transparency=fade;stroke.Thickness=rank==5 and 3 or 2
+    for i,p in ipairs(nodes)do
+     p.Visible=i<=n
+     if p.Visible then
+      local angle=i*math.pi*2/n;local radius=.14+rise*(rank==5 and .30 or .24)
+      p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
+      p.Size=UDim2.fromScale(.009,.024);p.Rotation=angle*180/math.pi+90;p.BackgroundColor3=color;p.BackgroundTransparency=fade
+     end
+    end
+   else ring.Visible=false;panel.Visible=false;for _,p in ipairs(nodes)do p.Visible=false end end
+  else
+   if t<duration then
+    local fade=math.clamp((t-(rank>=6 and .5 or .15))/(duration-(rank>=6 and .5 or .15)),0,1)
+    local rise=1-(1-math.clamp(t/.3,0,1))^3
+    -- Common to Rare use the world seed reveal. No screen-cover treatment.
+    if rank>=4 then
+     panel.Visible=rank>=6
+     panel.BackgroundColor3=rank==6 and Color3.fromRGB(7,7,10)or rank==7 and Color3.fromRGB(12,8,33)or Color3.fromRGB(40,25,5)
+     panel.BackgroundTransparency=fade
+     local color=rank==6 and white or rank==7 and Color3.fromRGB(180,159,255)or rank==5 and Color3.fromRGB(255,85,102)or Color3.fromRGB(255,213,100)
+     ring.Visible=true;ring.Size=UDim2.fromScale(.15+rise*.49,.15+rise*.49);stroke.Color=color;stroke.Transparency=fade;stroke.Thickness=rank>=6 and 4 or 2
+     local n=rank>=6 and 24 or 10
+     for i,p in ipairs(nodes)do
+      p.Visible=i<=n
+      if p.Visible then
+       local angle=i*math.pi*2/n+(rank==7 and t*.45 or 0);local radius=.17+rise*(rank>=6 and .39 or .20)
+       p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
+       p.BackgroundColor3=color;p.BackgroundTransparency=fade
+       if rank==6 then p.Size=UDim2.fromScale(.006,.05+rise*.08);p.Rotation=angle*180/math.pi+90
+       elseif rank==7 then p.Size=UDim2.fromScale(.008+(i%3)*.004,.008+(i%3)*.004);p.Rotation=45+t*50
+       elseif rank==8 then p.Size=UDim2.fromScale(.007,.10+rise*.10);p.Rotation=angle*180/math.pi+90
+       else p.Size=UDim2.fromScale(.008,.018);p.Rotation=45+t*40 end
+      end
+     end
+     for _,p in ipairs(crownParts)do p.Visible=rank==8;p.BackgroundTransparency=fade end
+    end
+   elseif rank<6 then hideEffects()end
+  end
  end
  if shake then
   local age=now-shake.At

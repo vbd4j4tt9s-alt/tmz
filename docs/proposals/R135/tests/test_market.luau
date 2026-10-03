@@ -51,7 +51,7 @@ W.env.warn=function(msg,...)if not tostring(msg):find('pack mesh',1,true)then sk
 local map,hub=build(M)
 local stands=hub:FindFirstChild('MerchantStands')
 local C=M.Center
-check(stands and stands:GetAttribute('MarketRevision')==69 and stands:GetAttribute('MarketPolish')==135,'still the R69 market building, R135 polish')
+check(stands and stands:GetAttribute('MarketRevision')==69 and stands:GetAttribute('MarketPolish')==136,'still the R69 market building, R136 polish')
 local now=names(stands)
 local lost={}
 for name,count in pairs(oldNames)do
@@ -97,7 +97,10 @@ for _,cord in ipairs(each(stands,'Lamp cord'))do
  local up=cord.Position.Y+cord.Size.Z/2
  check(beam and math.abs(up-bottom(beam))<.06,('lamp cord reaches the beam (%.2f vs %.2f)'):format(up,beam and bottom(beam)or 0))
 end
-check(#each(stands,'Ceiling lamp')==3 and #each(stands,'Lamp shade')==3,'three warm lamps')
+-- R136 (owner: "replace the lights with the lantern fruits"): no lamp shades; three warm lights for the lanterns.
+local holders=each(stands,'Lantern light');local lit=0
+for _,h in ipairs(holders)do if h.Transparency==1 and h:FindFirstChildOfClass('PointLight')then lit+=1 end end
+check(#each(stands,'Ceiling lamp')==0 and #each(stands,'Lamp shade')==0 and lit==3,'lamps replaced: three warm lantern lights')
 local wires=each(stands,'Light wire');local bulbs=each(stands,'String light')
 check(#bulbs==15 and #wires==16,'15 string lights on a 16-piece wire')
 local posts={};for _,p in ipairs(each(stands,'Porch support'))do posts[#posts+1]=p end
@@ -156,7 +159,7 @@ local show=stands:FindFirstChild('MarketShowcase')
 local count={};for _,c in ipairs(show and show:GetChildren()or{})do count[c.Name]=(count[c.Name]or 0)+1 end
 local wantFruit=#M.Showcase.Counter*3+2*(2+3+3)
 check((count['Market fruit']or 0)==wantFruit,('fruit in the counter crates and on the stands, none on the sign (%d/%d)'):format(count['Market fruit']or 0,wantFruit))
-local wantPlants=2+4+#M.Showcase.Back.Pots
+local wantPlants=2+4+#M.Showcase.Back.Pots -- (lanterns are counted separately)
 check((count['Market plant']or 0)==wantPlants,('plants in the planters, flower boxes and back pots (%d/%d)'):format(count['Market plant']or 0,wantPlants))
 check(skipped==0,'no fruit or plant was skipped ('..skipped..')')
 local loose=0;for _,d in ipairs(show and show:GetDescendants()or{})do
@@ -196,6 +199,19 @@ check(standsOn(C+V3(23.2-2.4/2,M.Showcase.StandStep,-23),1.9),'stand fruit sits 
 check(standsOn(C+V3(23.2,3*M.Showcase.StandStep,-23+2*1.4),1.3),'stand fruit sits on the top step')
 do local plantModel,sunkPlant=standsOn(C+V3(M.Showcase.Planter.X,M.Showcase.Planter.Soil-.05,M.Showcase.Planter.Z),5)
  check(plantModel and sunkPlant<.05,'the planter plant grows right out of the soil (stem not sunk: '..tostring(sunkPlant)..')')end
+-- R136: a Lantern Fern fruit hangs from each lamp cord, its visible top on the cord's end.
+do
+ local cords=each(stands,'Lamp cord');local hung=0
+ for _,m in ipairs(show:GetChildren())do if m.Name=='Hanging lantern'then
+  local c,b=visibleBottom(m);local topY=c.Y+b.Y;local best=math.huge
+  for _,cord in ipairs(cords)do
+   local low=cord.Position-V3(0,cord.Size.Z/2,0)
+   best=math.min(best,(V3(c.X,topY,c.Z)-low).Magnitude)
+  end
+  if best<.2 and math.abs(math.max(b.X,b.Y,b.Z)-M.Showcase.LanternSize)<.06 then hung+=1 end
+ end end
+ check(hung==3,'three lantern fruits hang from the cords ('..hung..')')
+end
 -- R135 (owner: "the berries are still floating; use fruits that stand easier, like the lantern fruit") ------------
 local berries={BluebellSeed=true,IceberrySeed=true}
 local picked={};for _,id in ipairs(M.Showcase.Counter)do picked[#picked+1]=id end

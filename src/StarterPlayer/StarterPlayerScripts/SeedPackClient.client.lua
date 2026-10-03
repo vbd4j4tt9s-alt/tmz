@@ -29,6 +29,7 @@ Debris:AddItem(bellPreload,12)
 local function destroyEffect(record)
     if record.CameraState then local saved=record.CameraState;record.CameraState=nil;local camera=workspace.CurrentCamera;if camera==saved.Camera then camera.CameraType=saved.Type;camera.CFrame=saved.Frame;camera.Focus=saved.Focus end end
     if record.SeedMotion then record.SeedMotion:Destroy();record.SeedMotion=nil end
+    if record.Flourish then record.Flourish:Destroy();record.Flourish=nil end
     if record.Effect then record.Effect:Destroy();record.Effect=nil end
     for _,part in ipairs(record.Hidden or {}) do
         if part.Parent then
@@ -118,6 +119,8 @@ local function beginReveal(record,at,seedId,now)
     local count=rarity.Rank<3 and (rarity.Rank==1 and 4 or 8)or 0
     for i=1,count do record.Celestial[i]=cosmeticPart("Rarity light",effect,rarity.Color,Vector3.one*.08)end
     if rarity.Rank>=3 then record.SeedMotion=Visuals.CreateSeedMotion(seed,effect,true)end
+    -- R136: Legendary / Mythic pulls get a charge-up and a burst (pillar, shockwave, sparkles, sound for onlookers).
+    record.Flourish=require(ReplicatedStorage:WaitForChild("RevealFlourish")).Create(effect,rarity.Rank,record.Bag:GetAttribute("VisualScale")or 1)
     -- R123: the reveal reaches this client one replication delay after RevealAt. Up to TEAR_AUDIO_GRACE late, the
     -- tear still plays while the paper scraps fly (its short envelope is shifted to start now); later it is skipped.
     local lag=now-at;record.TearShift=0
@@ -173,6 +176,10 @@ local function renderReveal(record,now)
         else record.TearSound.Volume=Rules.TearVolume*math.clamp(tt/.025,0,1)*math.clamp((Rules.TearSeconds+.08-tt)/.15,0,1)end
     end
     local revealStart=require(ReplicatedStorage.RarityRevealSequence).SeedAt(record.RarityRank);local age=math.max(0,t-revealStart)
+    if record.Flourish then
+        local char=Players.LocalPlayer and Players.LocalPlayer.Character
+        record.Flourish:Update(root*CFrame.new(0,mouth,0),t,revealStart,not(char and bag:IsDescendantOf(char)))
+    end
     local timing=require(ReplicatedStorage.BalanceRules)
     local rise,slide=timing.SeedPhase(age);local ease=1-(1-rise)^3
     local scale=record.SeedBaseScale -- slide the seed out at its real held size
