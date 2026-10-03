@@ -302,7 +302,11 @@ function Config.GetPlayerWalkSpeed(player,speedStat)
     if game:GetService('RunService'):IsStudio()and type(override)=='number'and override==override and math.abs(override)<math.huge then
         return math.clamp(override,Config.BaseWalkSpeed,500)
     end
-    return Config.GetWalkSpeed(speedStat)
+    -- R140: friends in the same server (SocialService sets FriendSpeedBoost; DailyRewards has the numbers).
+    local boost=player and player:GetAttribute('FriendSpeedBoost')
+    local D=require(game:GetService('ReplicatedStorage').DailyRewards)
+    boost=type(boost)=='number'and boost==boost and math.clamp(boost,1,D.MaxMultiplier())or 1
+    return Config.GetWalkSpeed(speedStat)*boost
 end
 
 function Config.NormalizeSpeedStat(value)
@@ -732,7 +736,7 @@ function Config.Validate()
 end
 -- R67 tuning does not migrate or reset saved points, crops, wallets or ownership.
 local balance=require(game:GetService('ReplicatedStorage').BalanceRules)
-Config.Version='V150 R139';Config.ProfileVersion=20;Config.SpeedMilestones=balance.SpeedMilestones
+Config.Version='V150 R140';Config.ProfileVersion=20;Config.SpeedMilestones=balance.SpeedMilestones
 Config.MaxTrainedSpeed=nil;Config.MaxWalkSpeed=nil;Config.TrainingPointsPerSecond=100
 for i,tier in ipairs(Config.TreadmillTiers)do tier.Multiplier=balance.TrainingTiers[i]end
 for _,product in ipairs(Config.ShopCatalog.Trails)do product.SpeedMultiplier=balance.TrailMultipliers[product.Id]or product.SpeedMultiplier;product.Description=''end

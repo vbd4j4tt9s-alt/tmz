@@ -190,6 +190,7 @@ end
 function ChestService:Bank(player, seed)
 	local record, reason = self.PlayerData:AddChest(player, seed, {Luck=true}) -- R137: hidden pack-size pity
 	if not record then return nil, reason end
+	self.PlayerData:QuestEvent(player,'Steal',1) -- R140 daily quest: a pack stolen from the track and banked
 	self:SyncTools(player)
 	return record
 end

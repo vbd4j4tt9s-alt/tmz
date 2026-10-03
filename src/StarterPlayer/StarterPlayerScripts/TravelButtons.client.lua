@@ -10,6 +10,10 @@ local old=pg:FindFirstChild('TravelButtons');if old then old:Destroy()end
 -- Below the tutorial card (25) and the menu hub (33): anything important draws above these buttons.
 local gui=Instance.new('ScreenGui');gui.Name='TravelButtons';gui.ResetOnSpawn=false;gui.DisplayOrder=24;gui.ScreenInsets=Enum.ScreenInsets.None;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
 local holder=Instance.new('Frame');holder.Name='TravelPair';holder.BackgroundTransparency=1;holder.Visible=false;holder.Parent=gui
+-- R140: two square slots in the same row, right of TRACK, for the 🎁 DAILY and 👥 INVITE buttons (DailyRewardsClient
+-- builds them inside these frames). They show and hide with the pair.
+local icons=Instance.new('Frame');icons.Name='TopIcons';icons.BackgroundTransparency=1;icons.Visible=false;icons.Parent=gui
+for i,name in ipairs({'Daily','Invite'})do local slot=Instance.new('Frame');slot.Name=name;slot.BackgroundTransparency=1;slot.LayoutOrder=i;slot.Parent=icons end
 local connections={};local lastSent=0
 -- R116: text-only buttons (pictures removed, owner request) with a stronger glossy highlight, a drop shadow and a
 -- hover / press bounce.
@@ -60,7 +64,7 @@ local function paint()
  elseif left<=0 and cooling then cooling:Disconnect();cooling=nil end
 end
 local function refresh()
- holder.Visible=pg:GetAttribute('TitleActive')~=true and pg:GetAttribute('SeedMenu')==nil
+ holder.Visible=pg:GetAttribute('TitleActive')~=true and pg:GetAttribute('SeedMenu')==nil;icons.Visible=holder.Visible
 end
 -- The top bar row: two rectangles, icon left and caption right, centred on the screen. GuiService.TopbarInset is the
 -- free part of that row (between Roblox's own buttons), so the pair shrinks to stay inside it; if the screen centre is
@@ -73,6 +77,17 @@ local function layout()
  local centre=area.X/2;local half=math.min(centre-left,right-centre)-8
  if half<80 then centre=(left+right)/2;half=(right-left)/2-8 end
  local width=math.floor(math.clamp((half*2-gap)/2,72,132))
+ -- R140: the DAILY / INVITE squares go right of TRACK. If they would reach Roblox's buttons, the pair narrows (not
+ -- below 72), then the whole row slides left; with no room at all (screens under ~370 px) they drop to the left edge
+ -- just under the row, where phones have nothing (the MENU button is at the left middle).
+ local side=height;local iconsW=side*2+gap;local limit=right-8
+ local function over()return centre+width+gap/2+gap+iconsW-limit end
+ if over()>0 then width=math.max(72,width-math.ceil(over()/2))end
+ if over()>0 and centre-over()-width-gap/2>=left+8 then centre-=over()end
+ local iconX,iconY=centre+width+gap/2+gap,top+rowHeight/2-side/2
+ if iconX+iconsW>limit then iconX=left+8;iconY=top+rowHeight+4 end
+ icons.Position=UDim2.fromOffset(math.floor(iconX),math.floor(iconY));icons.Size=UDim2.fromOffset(iconsW,side)
+ for i,name in ipairs({'Daily','Invite'})do local slot=icons[name];slot.Position=UDim2.fromOffset((i-1)*(side+gap),0);slot.Size=UDim2.fromOffset(side,side)end
  holder.AnchorPoint=Vector2.new(.5,.5);holder.Position=UDim2.fromOffset(math.floor(centre),math.floor(top+rowHeight/2));holder.Size=UDim2.fromOffset(width*2+gap,height)
  for i,entry in ipairs({base,track})do
   entry.Button.Size=UDim2.fromOffset(width,height);entry.Button.Position=UDim2.fromOffset((i-1)*(width+gap),0)

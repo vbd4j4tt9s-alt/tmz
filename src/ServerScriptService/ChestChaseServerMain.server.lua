@@ -120,6 +120,7 @@ local function runServer()
 	local gifts=require(modules.FruitGiftService).new(playerData,chestService,chaseService,notifications)
 	local gamePasses=require(modules.GamePassService).new(playerData,baseService,chestService)
     local premium=require(modules.PremiumService).new(playerData,chestService,gamePasses)
+    local social=require(modules.SocialService).new(playerData,notifications):Start() -- R140: friend boost, plant-ready notifications, daily rollover
 	require(modules.MovementGuard).Start(Config,playerData,baseService)
 	startupPhase = "connecting chase and training"
 	baseService:SetBusyChecker(function(player)
@@ -207,6 +208,7 @@ local function runServer()
 		economyService:SetupPlayer(player)
         task.spawn(function()gifts:Recover(player)end)
         treadmillBonus:Setup(player)
+        social:Setup(player)
 		if player.Character then
 			task.spawn(setupCharacter, player.Character)
 		end
@@ -223,6 +225,7 @@ local function runServer()
         gifts:Cleanup(player)
         treadmillBonus:Cleanup(player)
         premium:Cleanup(player)
+        social:Leaving(player) -- (reads the garden, so before the profile is finalized; never yields)
 		playerData:FinalizePlayer(player, "PlayerRemoving")
 		trackHoles:CleanupPlayer(player)
 		chaseService:CleanupPlayer(player)

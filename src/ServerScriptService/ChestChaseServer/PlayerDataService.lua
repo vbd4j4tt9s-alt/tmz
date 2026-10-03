@@ -411,6 +411,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         self:_notifySeedInventory(player)
         self:QueueGardenSave(player)
         self:TutorialEvent(player,'Seed')
+        self:QuestEvent(player,'Open',1) -- R140 daily quest
         return reward
     end
     return nil, "THIS PACK IS NO LONGER IN YOUR INVENTORY"
@@ -1487,6 +1488,7 @@ function PlayerDataService:PlantSeed(player, slot, seedInventoryId, placement, n
 	self:_notifySeedInventory(player)
 	self:_gardenChanged(player)
 	self:TutorialEvent(player,'Plant')
+	self:QuestEvent(player,'Plant',1) -- R140 daily quest
 	return true, gardenClone(crop)
 end
 
@@ -1529,6 +1531,7 @@ function PlayerDataService:HarvestPlant(player, slot, expectedCropId, now, fruit
     if PlantRules.FinishFruit(crop,definition,fruitIndex,now,self:GetFenceTier(player))then table.remove(crops,cropIndex)end
 	self:_gardenChanged(player)
 	self:TutorialEvent(player,'Harvest')
+	self:QuestEvent(player,'Harvest',1) -- R140 daily quest
 	return true, gardenClone(harvest)
 end
 
@@ -1577,6 +1580,7 @@ function PlayerDataService:SellHarvest(player, harvestId)
 			table.insert(garden.PendingSales,receipt)
 			self:_gardenChanged(player)
 			self:TutorialEvent(player,'Sell')
+			self:QuestEvent(player,'Sell',1) -- R140 daily quest
 			return true, value
 		end
 	end
@@ -1604,6 +1608,7 @@ function PlayerDataService:SellAllHarvests(player)
  local receipt,reason=self:_prepareSale(player,total);if not receipt then return false,reason end
  local count=#crops;garden.Harvests={};table.insert(garden.PendingSales,receipt);self:_gardenChanged(player)
  self:TutorialEvent(player,'Sell')
+ self:QuestEvent(player,'Sell',count) -- R140 daily quest (every fruit sold counts)
  return true,total,count
 end
 
@@ -1734,4 +1739,5 @@ require(script.Parent.GardenFenceData).Install(PlayerDataService)
 require(script.Parent.PackSizePityData).Install(PlayerDataService)
 require(script.Parent.PremiumProgress).Attach(PlayerDataService)
 require(script.Parent.TutorialProgress).Attach(PlayerDataService)
+require(script.Parent.DailyProgress).Attach(PlayerDataService) -- R140: login rewards + daily quests
 return PlayerDataService

@@ -3,7 +3,7 @@ local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Packs=require(RS.SeedPackRules);local T=require(RS.BalanceValues81)
 local State=require(script.Parent.OwnerTestState82)
-local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true}}
+local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true,daily=true}}
 local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8}
 local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary'}
 local function integer(s,lo,hi)local n=tonumber(s);return n and n==n and n%1==0 and n>=lo and n<=hi and n or nil end
@@ -150,6 +150,24 @@ function X.Execute(ctx,p,action,a)
   end
   local mine,track=data:GetPackLuck(p),require(RS.PackSizePity).State(ctx.Chests.TrackLuck)
   return true,p.Name..': '..mine.Big..' packs since a 5x+ (sure by 30), '..mine.Giant..' since a 10x+ (sure by 200) | track: '..track.Big..' refreshes since a 5x+ (sure by 6), '..track.Giant..' since a 10x+ (sure by 12)'
+ elseif action=='daily'then
+  -- R140 owner test of the login week and daily quests without waiting for midnight UTC:
+  -- daily [@name] | daily next (a new day: the login claim and fresh quest progress) | daily done (finish today's
+  -- quests) | daily week (the next claim is day 7, the Mech pack) | daily reset.
+  local D=require(RS.DailyRewards);local sub=tostring(a[1]or''):lower()
+  if #a>1 or(sub~=''and sub~='next'and sub~='done'and sub~='week'and sub~='reset')then return false,'Use daily [next|done|week|reset] @username.'end
+  local daily,quests,day=data:DailyData(p)
+  if sub=='next'then
+   if daily.Login.Day==day then daily.Login.Day=day-1 end
+   daily.Quests={Day=day,Progress={},Claimed={}};for i=1,#quests.Keys do daily.Quests.Progress[i]=0;daily.Quests.Claimed[i]=false end
+  elseif sub=='done'then
+   for i,q in ipairs(quests.Keys)do daily.Quests.Progress[i]=D.Quests[q].Goal end
+  elseif sub=='week'then daily.Login={Step=#D.Login-1,Day=day-1}
+  elseif sub=='reset'then data:GetPremium(p).Daily=nil end
+  if sub~=''then data:PublishDaily(p);save(ctx,p)end
+  local state=data:DailyState(p);local rows={}
+  for _,q in ipairs(state.Quests)do rows[#rows+1]=q.Text..' '..q.Progress..'/'..q.Goal..(q.Claimed and' ✓'or'')end
+  return true,p.Name..': login day '..state.Login.Claimed..'/7 claimed'..(state.Login.Ready and(', day '..state.Login.Next..' ready')or', next tomorrow')..' | '..table.concat(rows,' | ')..' | new day in '..D.Countdown(state.ResetIn)
  elseif action=='refreshcycle'then
   local cycle=integer(a[1],1,1000000);if #a~=1 or not cycle then return false,'Use refreshcycle <completed reset to test>.'end
   if ctx.Map.Refreshing then return false,'Refresh already running.'end

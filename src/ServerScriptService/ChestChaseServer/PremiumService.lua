@@ -50,6 +50,20 @@ function Service.new(data,chests,passes)
    end
    return require(script.Parent.TutorialTargets).State(data,chests,p)
   end
+  -- R140: the DAILY panel: value 'State', 'ClaimLogin' or {Quest=index}. Claims need a profile that can save.
+  if action=='Daily'then
+   self.Last[p]=self.Last[p]or{};local now=os.clock()
+   if now-(self.Last[p].Daily or-10)<.3 then return {Success=false,Message='TRY AGAIN IN A MOMENT'}end;self.Last[p].Daily=now
+   if value=='State'then return data:DailyState(p)end
+   if not data.CanSave[p]then local state=data:DailyState(p);state.Success=false;state.Message='REWARDS ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE';return state end
+   local okay,message
+   if value=='ClaimLogin'then
+    okay,message=data:ClaimDailyLogin(p)
+    if okay then pcall(function()chests:SyncTools(p)end)end -- day 7: the Mech pack lands in the hotbar
+   elseif type(value)=='table'then okay,message=data:ClaimDailyQuest(p,value.Quest)
+   else okay,message=false,'UNKNOWN ACTION'end
+   local state=data:DailyState(p);state.Success=okay==true;state.Message=message;return state
+  end
   if action=='SettingsState'or action=='SetSetting'then
    local config=require(RS.SettingsConfig);local state=data:GetPremium(p);state.Settings=config.Read(state.Settings)
    if action=='SettingsState'then return {Success=true,Settings=state.Settings}end
