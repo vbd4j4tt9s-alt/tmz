@@ -1,4 +1,5 @@
 -- R111: five short steps that end right after planting, then quick tips. Simple words (about grade 3).
+-- R133: casual, funny voice with emojis (owner).
 -- The guide is the game owner's avatar (the client picks it). Game name: Steal A Pack.
 local G={Version=1,Bits={Begin=1,Pack=2,Seed=4,Train=8,Plant=16,Harvest=32,Sell=64,Cash=128}}
 -- Optional: set a Roblox user id here to force whose avatar guides players (nil = the game's owner).
@@ -6,31 +7,34 @@ G.GuideUserId=nil
 -- Name on the guide's tag (nil = that account's username).
 G.GuideName='TMZ'
 -- {name}, {Steal}, {Tap}, {Use} are filled per device.
+-- R133 (owner: "make it sound more human, don't over explain, type it like how you talk, add emojis"): same steps and
+-- tips, casual voice. Keep each line short; the card wraps long lines.
 G.Steps={
- {Text="Hi {name}! 👋 Follow the red arrows. {Steal} a seed pack!",Target='Pack',Marker='STEAL!'},
- {Text="You got it! 😆 Run home fast. Don't get caught!",Target='Safety',Marker='HOME'},
- {Text="{Tap} your pack to open it! 🎁",Equipped="{Use} to open it! 🎁"},
- {Text="You got a seed! 🌱 Plant it in your garden.",Target='Garden',Marker='PLANT HERE'},
+ {Text="Yo {name}! 👋 Follow the red arrows, {Steal} a pack 😈",Target='Pack',Marker='STEAL!'},
+ {Text="YOINK! 😆 Run home quick 🏃💨 don't get caught lol",Target='Safety',Marker='HOME'},
+ {Text="{Tap} your pack to open it 🎁👀",Equipped="{Use} to open it 🎁👀"},
+ {Text="A seed!! 🌱 Go plant it in your garden 👇",Target='Garden',Marker='PLANT HERE'},
  {Text="",Tips=true,Informational=true},
 }
 -- Step 5 shows these one at a time, then the tutorial is done. No waiting for the plant to grow.
 G.Tips={
- "Your plant grows by itself, even when you're offline! 🌱",
- "Pick the fruit when it is ready. 🍎",
- "Sell fruit at the market for cash! 💰",
- "{TapBase} at the top to zoom home! 🏠",
- "{TapTrack} to zoom back to the track! 🏃",
- "Get faster to steal better packs! 🏃",
+ "Your plant grows by itself... even when you're offline 😴🌱",
+ "Pick the fruit when it's ready 🍎 nom nom",
+ "Sell fruit at the market = 💰💰💰 nice!",
+ "{TapBase} up top to zoom home 🏠💨",
+ "{TapTrack} to zoom back to the track 🏃💨",
+ "Get faster = steal better packs 😤🔥",
+ "🌟 Fruit of the Hour sells up to 3x 🤑🤑🤑",
 }
 -- R125 (owner): the BASE / TRACK top-bar buttons are taught. Tip index -> the button the tutorial highlights.
 G.TipButtons={[4]='BaseButton',[5]='TrackButton'}
 -- Step 1 while the player is not on the track yet (presentation only; saved progress is unchanged).
-G.TravelTrack="{TapTrack} at the top to zoom to the track! 🏃"
+G.TravelTrack="{TapTrack} up top to zoom to the track 🏃💨"
 G.TipSeconds=3.5
 G.Steps[5].Seconds=#G.Tips*G.TipSeconds
-G.Welcome={Title='Welcome to Steal A Pack!',Text="Hi {name}! 👋 Let's steal your first seed pack!",Button="LET'S GO!"}
-G.Waiting="No packs right now. One comes soon! ⏳"
-G.Finished="You're ready, {name}! Have fun! 🎉"
+G.Welcome={Title='Welcome to Steal A Pack!',Text="Hey {name}! 👋 Ready to steal your first seed pack? 😈",Button="LET'S GO!"}
+G.Waiting="No packs rn 😭 one's coming soon, hang tight ⏳"
+G.Finished="You're a pro, {name}! Is just nice! 🤑🤑🤑"
 function G.Copy(spec,key)return spec[key]end
 G.StepCount=#G.Steps
 local words={

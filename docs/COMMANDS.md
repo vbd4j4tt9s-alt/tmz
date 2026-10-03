@@ -1,4 +1,4 @@
-# Test commands and tools (R132)
+# Test commands and tools (R133)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -192,3 +192,7 @@ listed separately any more because each one is the same as a command above.
    - The pedestal to the right of the arrival spot: the Fruit of the Hour turns slowly over it with its name, "SELLS ×2.3" and the time left.
    - `fruithour apple 3`, then harvest/hold an apple and open the sell menu: the apple shows "🌟 Fruit of the Hour ×3.0" and sells for 3×. Everyone gets the gold notice. `fruithour off` puts the hour's fruit back.
    - Go home: a 🏠 floats over the middle of your base. Your alt sees it over their own base only.
+18. **R133:**
+   - Market: fruit sits on the crates and steps (no floating), all 4 shelves are full of mixed packs, soil in the planters and flower boxes, a wall behind the front sign, no MARKET text from inside, lamps hang from a ceiling beam, pots and a barrel at the back.
+   - Fruit of the Hour: big fruit, small two-line label above it. `fruithour apple 3` to switch it.
+   - Tutorial: Settings > replay the tutorial: casual lines with emojis.

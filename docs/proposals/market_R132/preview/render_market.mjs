@@ -18,8 +18,9 @@ const views=[
   {file:'market_now_hero',scene:'old',cam:[-66,22,-86],at:[-15,9,-10],fov:45},
   {file:'market_polished_front',scene:'new',cam:[0,10,-66],at:[0,10,0],fov:45},
   {file:'market_now_front',scene:'old',cam:[0,10,-66],at:[0,10,0],fov:45},
-  {file:'market_polished_inside',scene:'new',cam:[8,9,-16],at:[0,6.5,6],fov:55},
-  {file:'market_polished_fruit_of_the_hour',scene:'new',cam:[-9,8,-43],at:[-20,5.5,-30],fov:45},
+  {file:'market_polished_inside',scene:'new',cam:[6,10,-14],at:[0,9,10],fov:60},
+  {file:'market_polished_back',scene:'new',cam:[34,16,56],at:[0,5,14],fov:45},
+  {file:'market_polished_fruit_of_the_hour',scene:'new',cam:[-6,10,-46],at:[-20,7.5,-30],fov:42},
   {file:'market_polished_dusk',scene:'new',cam:[-66,22,-86],at:[-15,9,-10],fov:45,mode:'dusk'},
 ];
 for(const v of views){

@@ -91,6 +91,14 @@ local holder=R.new('Model');holder.Name='FruitOfTheHour';holder.Parent=stands
 local anchor=R.new('Part');anchor.Name='FruitAnchor';anchor.Size=V3(1,1,1);anchor.CFrame=CF(-20,11.2,-299);anchor.Transparency=1;anchor.Parent=holder
 W.workspace.CurrentCamera.CFrame=CF(-20,12,-280)
 R.advance(start-R.clock)
+-- R133: fruit models carry hidden parts (the rest of the plant). Simulate one: a big invisible part above the fruit.
+local HP=W.module('HarvestPresentation');local realBuild=HP.Build
+HP.Build=function(...)
+ local m,crop,index=realBuild(...)
+ if m then local ghost=R.new('Part');ghost.Name='Hidden plant';ghost.Size=V3(8,8,8);ghost.CFrame=CF(0,9,0);ghost.Transparency=1;ghost.Parent=m end
+ return m,crop,index
+end
+local Geometry=W.module('HarvestGeometry')
 local script=R.new('LocalScript');script.Name='FruitOfHourDisplay'
 W.load('FruitOfHourDisplay',script)
 W.frames(40)
@@ -98,22 +106,26 @@ local display=W.workspace:FindFirstChild('FruitOfHourDisplay')
 local label=display and display:FindFirstChild('FruitOfHourLabel')
 local current=Hour.At(W.workspace:GetServerTimeNow())
 check(label and label.Adornee==anchor,'label hangs over the pedestal anchor')
-check(label and label.AlwaysOnTop==false and label.LightInfluence==0 and label.Size.X.Scale>0,'label: sized in studs, not drawn through walls, unlit')
-local rows=label and{T=label.Title.Text,N=label.FruitName.Text,B=label.Bonus.Text,L=label.TimeLeft.Text}or{}
+check(label and label.AlwaysOnTop==false and label.LightInfluence==0,'label: not drawn through walls, unlit')
+-- R133 (owner: "the text is obscuring the fruit; the fruit should be the emphasis"): small, studs only, above the fruit.
+check(label and label.Size.X.Scale<=6 and label.Size.Y.Scale<=1.6 and label.Size.X.Offset==0 and label.Size.Y.Offset==0,
+ ('label is small and sized in studs only (%.1f x %.1f studs)'):format(label and label.Size.X.Scale or -1,label and label.Size.Y.Scale or -1))
+check(label and label.StudsOffsetWorldSpace.Y-label.Size.Y.Scale/2>=4.2/2+.3,'label sits above the fruit, not over it')
+local rows=label and{N=label.FruitName.Text,B=label.Bonus.Text}or{}
+check(label and label:FindFirstChild('Title')==nil and label:FindFirstChild('TimeLeft')==nil,'two lines only (the plaque already says FRUIT OF THE HOUR)')
 check(rows.N==current.Name,'shows the fruit name ('..tostring(rows.N)..')')
-check(rows.B==('SELLS ×%.1f'):format(current.Multiplier),'shows the bonus ('..tostring(rows.B)..')')
-check(rows.L and rows.L:match('^%d+:%d%d left$'),'shows time left ('..tostring(rows.L)..')')
+check(rows.B and rows.B:match('^×'..('%.1f'):format(current.Multiplier):gsub('%.','%%.')..'  ·  %d+:%d%d$'),'shows bonus and time left ('..tostring(rows.B)..')')
 local fruit=display and display:FindFirstChild('FruitOfTheHour')
 check(fruit~=nil,'the real fruit model floats over the pedestal')
 if fruit then
- local _,box=fruit:GetBoundingBox();local big=math.max(box.X,box.Y,box.Z)
- check(math.abs(big-2.6)<.15,('fruit sized to 2.6 studs (%.2f)'):format(big))
- local c=fruit:GetBoundingBox()
- check((c.Position-anchor.Position).Magnitude<.6,('fruit centred on the anchor (%.2f away)'):format((c.Position-anchor.Position).Magnitude))
+ local c,box=Geometry.Bounds(fruit);local big=math.max(box.X,box.Y,box.Z)
+ check(math.abs(big-4.2)<.15,('visible fruit sized to 4.2 studs, hidden plant ignored (%.2f)'):format(big))
+ check((c-anchor.Position).Magnitude<.35,('visible fruit centred on the anchor (%.2f away)'):format((c-anchor.Position).Magnitude))
  local anyCollide=false;for _,d in ipairs(fruit:GetDescendants())do if d:IsA('BasePart')and(d.CanCollide or d.CanQuery or d.CanTouch or not d.Anchored)then anyCollide=true end end
  check(not anyCollide,'display fruit is anchored and cannot be touched or hit')
  local look1=fruit:GetPivot().LookVector;W.frames(30);local look2=fruit:GetPivot().LookVector
  check((look1-look2).Magnitude>.05,'fruit turns slowly while you are near')
+ local c2=Geometry.Bounds(fruit);check((c2-anchor.Position).Magnitude<.35,'still centred while it turns')
  W.workspace.CurrentCamera.CFrame=CF(600,12,-280);local look3=fruit:GetPivot().LookVector;W.frames(30)
  check((fruit:GetPivot().LookVector-look3).Magnitude<1e-6,'no animation work when the camera is far away')
  W.workspace.CurrentCamera.CFrame=CF(-20,12,-280)

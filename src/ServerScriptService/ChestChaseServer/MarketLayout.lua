@@ -9,7 +9,7 @@ M.FruitOfHour=Vector3.new(-20,0,-30)        -- pedestal centre: right of the arr
 function M.Apply(map)
  local hub=assert(map:FindFirstChild('EconomyHub'))
  local old=hub:FindFirstChild('MerchantStands');if old then old:Destroy()end
- local model=Instance.new('Model');model.Name='MerchantStands';model:SetAttribute('MarketRevision',69)
+ local model=Instance.new('Model');model.Name='MerchantStands';model:SetAttribute('MarketRevision',69);model:SetAttribute('MarketPolish',133)
  local wood={194,137,86};local lightWood={246,215,155};local darkWood={80,61,53};local trim={32,121,125}
  local function part(name,size,position,color,material,solid)
   local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=CFrame.new(M.Center+position);p.Color=Color3.fromRGB(unpack(color));p.Material=material or Enum.Material.SmoothPlastic
@@ -44,7 +44,6 @@ function M.Apply(map)
   part('Side entrance lintel',Vector3.new(.9,1.1,8),Vector3.new(x,10.45,.3),trim,Enum.Material.SmoothPlastic,true)
   part('Side doorstep',Vector3.new(3,.2,9),Vector3.new(side*14,.1,.3),wood,Enum.Material.SmoothPlastic,true)
   part('Side eave beam',Vector3.new(.65,.55,21),Vector3.new(side*13.35,10.95,0),darkWood)
-  beam('Porch diagonal brace',Vector3.new(x,8.15,-8.6),Vector3.new(x-side*2.5,10.8,-8.6),.48,trim)
  end
  part('Porch header',Vector3.new(24,.7,.85),Vector3.new(0,10.9,-8.6),darkWood)
  local run,rise=13.65,5.2;local angle=math.atan(rise/run);local slope=math.sqrt(run*run+rise*rise)
@@ -88,12 +87,16 @@ function M.Apply(map)
   end
  end
  for _,x in ipairs({-9.5,9.5})do
-  beam('Lantern hanger',Vector3.new(x,9.65,-9.0),Vector3.new(x,8.45,-9.0),.12,darkWood)
+  beam('Lantern hanger',Vector3.new(x,10.62,-9.0),Vector3.new(x,8.45,-9.0),.12,darkWood) -- R133: up to the porch header
   local glow=part('Warm lantern',Vector3.new(.62,.85,.62),Vector3.new(x,8,-9),{255,207,123},Enum.Material.Neon)
   for _,y in ipairs({7.5,8.5})do part('Lantern cap',Vector3.new(.9,.18,.9),Vector3.new(x,y,-9),darkWood)end
   for _,side in ipairs({-1,1})do part('Lantern frame',Vector3.new(.1,1,.76),Vector3.new(x+side*.38,8,-9),darkWood)end
   local lamp=Instance.new('PointLight');lamp.Color=Color3.fromRGB(255,213,146);lamp.Brightness=.55;lamp.Range=10;lamp.Shadows=false;lamp.Parent=glow
  end
+ -- R133 (owner: "make sure there is an actual wall behind the market sign"): a timber fascia fills the front between
+ -- the corner posts, from the sign's bottom up to the porch header; the open front below it is unchanged.
+ part('Front fascia wall',Vector3.new(22.4,3.25,.5),Vector3.new(0,8.925,-8.6),wood,Enum.Material.SmoothPlastic,true)
+ part('Fascia trim',Vector3.new(22.4,.28,.62),Vector3.new(0,7.3,-8.6),lightWood)
  local sign=part('Market sign',Vector3.new(16.6,2.65,.4),Vector3.new(0,9.2,-9.35),{22,92,108})
  part('Sign top trim',Vector3.new(17.1,.25,.55),Vector3.new(0,10.65,-9.35),lightWood)
  part('Sign bottom trim',Vector3.new(17.1,.25,.55),Vector3.new(0,7.8,-9.35),lightWood)
@@ -126,6 +129,13 @@ function M.Apply(map)
   local extra=sign:Clone();extra.Name='Market entrance sign';extra.Size=Vector3.new(8,1.8,.35)
   extra.CFrame=CFrame.new(M.Center+Vector3.new(door[1],door[2],door[3]))*CFrame.Angles(0,door[4],0);extra.Parent=model
  end
+ -- R133: lettering that faces into the market is removed (front sign: it faces the fascia; door signs: inside).
+ for _,board in ipairs(model:GetChildren())do if board.Name=='Market sign'or board.Name=='Market entrance sign'then
+  for _,gui in ipairs(board:GetChildren())do if gui:IsA('SurfaceGui')then
+   local normal=board.CFrame:VectorToWorldSpace(Vector3.FromNormalId(gui.Face))
+   if normal:Dot(M.Center-board.Position)>0 then gui:Destroy()end
+  end end
+ end end
  local sizeFactor=1.70
  for _,p in ipairs(model:GetDescendants())do if p:IsA('BasePart')then
   -- Keep the enlarged building's counter at avatar height.
@@ -151,9 +161,13 @@ function M.Apply(map)
  return model
 end
 -- R132 polish, in final (already scaled) local studs. Floor top y=.85; counter top y~4.48; awning edge z~-22.
+-- R133 (owner's play test): every added piece now rests on or hangs from something (string lights hang on their wire
+-- between the porch posts, lamps hang from a ceiling beam, produce stands are solid steps), plants grow out of soil,
+-- every shelf is full of random packs, and the back of the market has pots and crates.
 local RS=game:GetService('ReplicatedStorage')
 local P={Teal={36,141,144},TealDark={22,92,108},Cream={255,233,183},Gold={247,209,119},GoldDeep={241,187,78},
- Wood={194,137,86},LightWood={246,215,155},DarkWood={80,61,53},Stone={232,224,206}}
+ Wood={194,137,86},LightWood={246,215,155},DarkWood={80,61,53},Stone={232,224,206},Soil={92,64,46},
+ Clay={196,104,66},ClayLight={222,138,94},ClayDark={150,74,48}}
 local function rgb(c)return Color3.fromRGB(c[1],c[2],c[3])end
 local function maker(parent,origin)
  local function part(name,size,at,color,material,solid)
@@ -164,9 +178,20 @@ local function maker(parent,origin)
  local function bulb(name,d,at,color)
   local p=part(name,Vector3.new(d,d,d),at,color,Enum.Material.Neon);p.Shape=Enum.PartType.Ball;p.CastShadow=false;return p
  end
- return part,bulb
+ -- A rod from a to b (local studs).
+ local function rod(name,a,b,width,color,material)
+  local up=math.abs((b-a).Unit:Dot(Vector3.yAxis))>.98 and Vector3.xAxis or Vector3.yAxis
+  return part(name,Vector3.new(width,width,(b-a).Magnitude),CFrame.lookAt((a+b)*.5,b,up),color,material)
+ end
+ -- An upright round piece (Roblox part cylinders run along X): bottom at y, height h, diameter d.
+ local function drum(name,x,y,z,h,d,color,material,solid)
+  local p=part(name,Vector3.new(h,d,d),CFrame.new(x,y+h/2,z)*CFrame.Angles(0,0,math.pi/2),color,material,solid);p.Shape=Enum.PartType.Cylinder;return p
+ end
+ return part,bulb,rod,drum
 end
 -- The game's own models, sized to `size` studs (largest side) and stood with their bottom centre at `at`.
+-- R133: measured on the VISIBLE parts only (HarvestGeometry). Fruit and plant models carry hidden parts (the rest of
+-- the plant); measuring those made fruit tiny and left it floating above its spot in R132.
 local function settle(model,origin,at,size,turn)
  for _,d in ipairs(model:GetDescendants())do
   if d:IsA('BasePart')then d.Anchored=true;d.CanCollide=false;d.CanTouch=false;d.CanQuery=false;d.CastShadow=d.Size.Magnitude>1.2
@@ -174,11 +199,16 @@ local function settle(model,origin,at,size,turn)
  end
  local CS=game:GetService('CollectionService')
  for _,d in ipairs({model,table.unpack(model:GetDescendants())})do for _,tag in ipairs(CS:GetTags(d))do CS:RemoveTag(d,tag)end end
- local _,box=model:GetBoundingBox();local biggest=math.max(box.X,box.Y,box.Z)
- if biggest>0 then model:ScaleTo(model:GetScale()*size/biggest)end
- -- Turn about the model's own centre, then stand that centre bounds.Y/2 above `at`.
- local center,bounds=model:GetBoundingBox();local pivot=model:GetPivot()
- local fromCenter=CFrame.new(pivot.Position-center.Position)*pivot.Rotation
+ local center,bounds=require(RS:WaitForChild('HarvestGeometry')).Bounds(model)
+ local biggest=math.max(bounds.X,bounds.Y,bounds.Z)
+ if biggest>0 then
+  -- ScaleTo scales about the pivot, so the visible box scales about it too.
+  local k=size/biggest;local pivot=model:GetPivot().Position
+  model:ScaleTo(model:GetScale()*k);center=pivot+(center-pivot)*k;bounds*=k
+ end
+ -- Turn about the visible centre, then stand it bounds.Y/2 above `at`.
+ local pivot=model:GetPivot()
+ local fromCenter=CFrame.new(pivot.Position-center)*pivot.Rotation
  model:PivotTo(origin*CFrame.new(at+Vector3.new(0,bounds.Y/2,0))*CFrame.Angles(0,turn or 0,0)*fromCenter)
  return model
 end
@@ -192,78 +222,133 @@ local function plant(id,parent,origin,at,size,turn)
  assert(model,'no plant model for '..id);model.Name='Market plant';model.Parent=parent
  return settle(model,origin,at,size,turn)
 end
-local function pack(stage,parent,origin,at,size,turn)
- local model=require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.new(),nil,1,nil,stage,'Pack01',1,1,'None')
+local function pack(spec,parent,origin,at,size,turn)
+ local model=require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.new(),nil,1,nil,spec.Stage,spec.Variant,1,1,'None')
  model.Name='Market seed pack';model.Parent=parent
  return settle(model,origin,at,size,turn)
 end
--- Real fruit / plants / packs, in light models only (parts, no baked meshes).
+-- R133 (owner: "random packs, like a mythic forest or a legendary snow ... fill it up"): each server shows a different
+-- mix of biomes and pack tiers, never the same pack twice.
+function M.ShelfPacks(count,random)
+ random=random or Random.new()
+ local Rules=require(RS:WaitForChild('SeedPackRules'));local all={}
+ for stage=1,7 do for _,variant in ipairs(Rules.VariantOrder)do table.insert(all,{Stage=stage,Variant=variant})end end
+ for i=#all,2,-1 do local j=random:NextInteger(1,i);all[i],all[j]=all[j],all[i]end
+ local out={};for i=1,math.min(count,#all)do out[i]=all[i]end
+ return out
+end
+-- Where things stand (final local studs).
 M.Showcase={
- Sign={{'AppleSeed',Vector3.new(15.9,14.3,-16.3),2.7},{'EmberBloomSeed',Vector3.new(-15.9,14.3,-16.3),2.8}},
- Counter={{'AppleSeed',-4.42},{'IceberrySeed',0},{'AshRoseSeed',4.42}},
+ Counter={'AppleSeed','IceberrySeed','AshRoseSeed'},          -- the three produce crates on the counter
+ Crates={X={-4.42,0,4.42},Y=5.5,Z=3.4,Spacing=1.15,Size=1.2},
  Stands={[1]={'SunflowerSeed','AppleSeed','BluebellSeed'},[-1]={'EmberBloomSeed','AshRoseSeed','IceberrySeed'}},
+ StandStep=1.05,
  Planters={[1]='SunflowerBloomSeed',[-1]='PineappleSeed'},
- FlowerBox='MooncapSeed',
- Packs={1,6,2,3,4,5,7},
+ Planter={X=22.44,Z=-13.94,Soil=3.79},
+ FlowerBox='MooncapSeed',FlowerSoil=6.42,
+ Shelves={X=13.6,Z=13.77,Tops={7.565,12.835},PerShelf=5,Spacing=2.1,Size=1.75},
+ Back={Pots={{-9.2,'BluebellSeed',2.6},{-12.8,'LanternFernSeed',3.2},{9.2,'TigerOrchidSeed',2.8},{16.6,'SunflowerBloomSeed',3}}},
 }
 function M.Polish(model)
  local origin=CFrame.new(M.Center)
- local part,bulb=maker(model,origin)
+ local part,bulb,rod,drum=maker(model,origin)
  -- The R69 coloured balls and seed-jar blocks make room for the real things.
  for _,d in ipairs(model:GetDescendants())do
   if d:IsA('BasePart')and(d.Name=='Fresh produce'or d.Name=='Fruit stem'or d.Name=='Porch leaves'or d.Name=='Coral flower'or d.Name=='Seed jar'or d.Name=='Jar lid')then d:Destroy()end
  end
- -- String lights under the striped awning
- local colors={{255,214,120},{255,150,170},{140,230,255},{180,255,150}}
- part('Light wire',Vector3.new(36.4,.06,.06),Vector3.new(0,11.2,-22.15),P.DarkWood)
- for i=0,14 do
-  local x=-17.5+i*2.5;local sag=math.sin(((i%5)+.5)/5*math.pi)*.6
-  bulb('String light',.5,Vector3.new(x,11-sag,-22.15),colors[i%4+1])
+ -- R133: the R69 counter crates hovered .05 above the counter top; set them down on it.
+ for _,d in ipairs(model:GetChildren())do
+  if d:IsA('BasePart')and(d.Name=='Produce crate'or d.Name=='Crate rim')then d.CFrame=CFrame.new(0,-.051,0)*d.CFrame end
  end
- -- Flower boxes under the four side windows
+ -- R133: the porch posts stand off the deck and their gold feet hovered above the grass: footings to the ground.
+ for _,side in ipairs({-1,1})do part('Porch footing',Vector3.new(1.25,.78,1.25),Vector3.new(side*18.19,.39,-21.76),P.Stone,nil,true)end
+ -- String lights: the wire runs from porch post to porch post (x = +-18.19, z = -21.76) and dips to each bulb.
+ local colors={{255,214,120},{255,150,170},{140,230,255},{180,255,150}}
+ local last=Vector3.new(-18.19,11.35,-21.76)
+ for i=0,14 do
+  local x=-17.5+i*2.5;local sag=math.sin(((i%5)+.5)/5*math.pi)*.45
+  local top=Vector3.new(x,11.3-sag,-21.76)
+  rod('Light wire',last,top,.07,P.DarkWood);last=top
+  bulb('String light',.5,top-Vector3.new(0,.27,0),colors[i%4+1])
+ end
+ rod('Light wire',last,Vector3.new(18.19,11.35,-21.76),.07,P.DarkWood)
+ -- Flower boxes under the four side windows, with soil.
  for _,side in ipairs({-1,1})do for _,z in ipairs({-10.7,11.7})do
   part('Flower box',Vector3.new(1.4,1,6.6),Vector3.new(side*21.1,5.6,z),P.Teal)
   part('Flower box rim',Vector3.new(1.6,.2,6.8),Vector3.new(side*21.1,6.15,z),P.Gold)
+  part('Flower box soil',Vector3.new(1.2,.24,6.4),Vector3.new(side*21.1,M.Showcase.FlowerSoil-.12,z),P.Soil,Enum.Material.Ground)
  end end
- -- Produce stands beside the porch posts
- for _,side in ipairs({-1,1})do for t=0,2 do
-  part('Produce tier',Vector3.new(5.4,.8,1.6),Vector3.new(side*23.2,.4+t*1.05,-23+t*1.4),P.DarkWood,nil,true)
- end end
- -- Warm lamps under the roof (also light the counter at night)
- for _,x in ipairs({-9,0,9})do
-  part('Lamp cord',Vector3.new(.12,4,.12),Vector3.new(x,20,3),P.DarkWood)
-  local shade=part('Lamp shade',Vector3.new(.5,2.2,2.2),CFrame.new(x,18.1,3)*CFrame.Angles(0,0,math.rad(90)),P.Teal);shade.Shape=Enum.PartType.Cylinder
-  local light=Instance.new('PointLight');light.Color=Color3.fromRGB(255,214,160);light.Brightness=.8;light.Range=18;light.Shadows=false
-  light.Parent=bulb('Ceiling lamp',1,Vector3.new(x,17.5,3),{255,214,150})
+ -- Soil in the two corner planters (the plants grow out of it).
+ for _,side in ipairs({-1,1})do
+  local c=M.Showcase.Planter
+  part('Planter soil',Vector3.new(3.7,.2,3.7),Vector3.new(side*c.X,c.Soil-.1,c.Z),P.Soil,Enum.Material.Ground)
  end
+ -- Produce stands beside the porch posts: three solid steps standing on the ground.
+ local step=M.Showcase.StandStep
+ for _,side in ipairs({-1,1})do for t=0,2 do
+  local h=(t+1)*step
+  part('Produce tier',Vector3.new(5.4,h,1.6),Vector3.new(side*23.2,h/2,-23+t*1.4),P.DarkWood,nil,true)
+  part('Tier edge',Vector3.new(5.5,.14,.18),Vector3.new(side*23.2,h-.07,-23.8+t*1.4),P.Gold)
+ end end
+ -- Warm lamps hanging from a ceiling beam that rests on the two side door lintels.
+ part('Ceiling beam',Vector3.new(39.6,.7,.7),Vector3.new(0,19.05,3),P.DarkWood)
+ for _,x in ipairs({-9,0,9})do
+  rod('Lamp cord',Vector3.new(x,18.7,3),Vector3.new(x,16.9,3),.12,P.DarkWood)
+  local shade=part('Lamp shade',Vector3.new(.45,1.9,1.9),CFrame.new(x,16.7,3)*CFrame.Angles(0,0,math.pi/2),P.Teal);shade.Shape=Enum.PartType.Cylinder
+  part('Lamp cap',Vector3.new(.5,.3,.5),Vector3.new(x,17.0,3),P.Gold)
+  local light=Instance.new('PointLight');light.Color=Color3.fromRGB(255,214,160);light.Brightness=.8;light.Range=18;light.Shadows=false
+  light.Parent=bulb('Ceiling lamp',.9,Vector3.new(x,16.15,3),{255,214,150})
+ end
+ -- Behind the market (owner: "the back looks plain"): pots with the game's plants, crates and a barrel on the deck.
+ local backZ=17.1;local deckTop=.85
+ for i,spec in ipairs(M.Showcase.Back.Pots)do
+  local x=spec[1];local h=i%2==0 and 2.1 or 1.6;local d=i%2==0 and 2.3 or 1.9
+  local color=i==3 and P.Teal or P.Clay
+  drum('Pot',x,deckTop,backZ,h,d,color,nil,true)
+  drum('Pot band',x,deckTop+h*.55,backZ,.22,d+.08,i==3 and P.TealDark or P.ClayDark)
+  drum('Pot rim',x,deckTop+h-.28,backZ,.3,d+.3,i==3 and P.Gold or P.ClayLight)
+  drum('Pot soil',x,deckTop+h,backZ,.1,d-.1,P.Soil,Enum.Material.Ground)
+ end
+ for _,v in ipairs({{-16.4,0},{-16.4,1}})do
+  part('Wooden crate',Vector3.new(2.2,1.6,2),Vector3.new(v[1],deckTop+.8+v[2]*1.6,backZ+.1),P.Wood,Enum.Material.WoodPlanks,true)
+  part('Crate slat',Vector3.new(2.26,.18,2.06),Vector3.new(v[1],deckTop+.8+v[2]*1.6,backZ+.1),P.DarkWood)
+ end
+ drum('Water barrel',12.8,deckTop,backZ,2.4,2,P.Wood,Enum.Material.WoodPlanks,true)
+ for _,y in ipairs({.45,1.95})do drum('Barrel hoop',12.8,deckTop+y,backZ,.18,2.08,P.DarkWood,Enum.Material.Metal)end
+ drum('Barrel water',12.8,deckTop+2.4,backZ,.06,1.8,{104,190,220},Enum.Material.Glass)
  M.Pedestal(model,origin)
  -- The game's own fruit, plants and seed packs, built right after the market (each one on its own).
  local show=Instance.new('Model');show.Name='MarketShowcase';show.Parent=model
- local function try(fn,...)local ok,why=pcall(fn,...);if not ok then warn('[R132] Market showcase skipped one model: '..tostring(why))end end
+ local function try(fn,...)local ok,why=pcall(fn,...);if not ok then warn('[R133] Market showcase skipped one model: '..tostring(why))end end
  task.defer(function()
-  local S=M.Showcase
-  for _,s in ipairs(S.Sign)do try(fruit,s[1],show,origin,s[2],s[3],math.rad(-20))end
-  for _,c in ipairs(S.Counter)do for n=-1,1,2 do try(fruit,c[1],show,origin,Vector3.new(c[2]+n*.62,5.2,3.2),1.05,n*.6)end end
+  local S=M.Showcase;local c=S.Crates
+  for i,id in ipairs(S.Counter)do for n=-1,1 do try(fruit,id,show,origin,Vector3.new(c.X[i]+n*c.Spacing,c.Y,c.Z),c.Size,n*.6)end end
   for side,list in pairs(S.Stands)do for t=0,2 do
    local id=list[t+1];local count=t==0 and 2 or 3
    for k=1,count do
     local x=side*23.2+(k-(count+1)/2)*(count==2 and 2.4 or 1.6)
-    try(fruit,id,show,origin,Vector3.new(x,.8+t*1.05,-23+t*1.4),t==0 and 1.9 or 1.3,k*1.3)
+    try(fruit,id,show,origin,Vector3.new(x,(t+1)*S.StandStep,-23+t*1.4),t==0 and 1.9 or 1.3,k*1.3)
    end
   end end
-  for side,id in pairs(S.Planters)do try(plant,id,show,origin,Vector3.new(side*22.44,3.6,-13.94),5,side*.4)end
-  for _,side in ipairs({-1,1})do for _,z in ipairs({-10.7,11.7})do try(plant,S.FlowerBox,show,origin,Vector3.new(side*21.1,6.25,z),2.2,side*1.2)end end
-  for i,stage in ipairs(S.Packs)do
-   local shelf=i<=4 and -13.6 or 13.6;local slot=(i-1)%4
-   try(pack,stage,show,origin,Vector3.new(shelf+(slot-1.5)*2.2,7.45+(slot%2)*0,13.6),1.7,math.pi)
+  for side,id in pairs(S.Planters)do try(plant,id,show,origin,Vector3.new(side*S.Planter.X,S.Planter.Soil-.05,S.Planter.Z),5,side*.4)end
+  for _,side in ipairs({-1,1})do for _,z in ipairs({-10.7,11.7})do try(plant,S.FlowerBox,show,origin,Vector3.new(side*21.1,S.FlowerSoil-.04,z),2.2,side*1.2)end end
+  for i,spec in ipairs(S.Back.Pots)do
+   local h=i%2==0 and 2.1 or 1.6;try(plant,spec[2],show,origin,Vector3.new(spec[1],.85+h+.08,17.1),spec[3],i*.9)
   end
+  local sh=S.Shelves;local packs=M.ShelfPacks(#sh.Tops*2*sh.PerShelf);local n=0
+  for _,side in ipairs({-1,1})do for _,top in ipairs(sh.Tops)do for k=1,sh.PerShelf do
+   n+=1;local x=side*sh.X+(k-(sh.PerShelf+1)/2)*sh.Spacing
+   try(pack,packs[n],show,origin,Vector3.new(x,top,sh.Z),sh.Size,math.pi+(k%2==0 and .12 or -.08))
+  end end end
  end)
 end
 -- Fruit of the Hour pedestal: stone plinth, teal column, gold cradle; the fruit floats above the cradle (client:
 -- FruitOfHourDisplay builds it, spins it and shows the bonus). No discs or rings (owner: "remove the discs").
+-- R133 (owner: "the fruit is not big enough"): the fruit floats higher and bigger, lit by a soft projector beam.
+M.FruitHeight=8.4
 function M.Pedestal(parent,origin)
  local holder=Instance.new('Model');holder.Name='FruitOfTheHour';holder.Parent=parent
- local part=maker(holder,origin*CFrame.new(M.FruitOfHour))
+ local part,_,_,drum=maker(holder,origin*CFrame.new(M.FruitOfHour))
  part('Pedestal plinth',Vector3.new(6,.8,6),Vector3.new(0,.4,0),P.Stone,nil,true)
  part('Plinth trim',Vector3.new(6.2,.2,6.2),Vector3.new(0,.9,0),P.Gold)
  for _,x in ipairs({-2.7,2.7})do for _,z in ipairs({-2.7,2.7})do
@@ -281,12 +366,13 @@ function M.Pedestal(parent,origin)
   local a=i*math.pi/2+math.pi/4
   part('Cradle prong',Vector3.new(.22,1.7,.22),CFrame.new(math.cos(a)*1.15,5.65,math.sin(a)*1.15)*CFrame.Angles(0,-a,0)*CFrame.Angles(0,0,math.rad(-18)),P.GoldDeep)
  end
+ local beam=drum('Projector beam',0,5.04,0,M.FruitHeight-5.04,1.7,{255,236,170},Enum.Material.Neon);beam.Transparency=.86;beam.CastShadow=false
  local plaque=part('Pedestal plaque',Vector3.new(3,.7,.1),Vector3.new(0,2.25,-1.98),{30,34,50})
  local gui=Instance.new('SurfaceGui');gui.Name='Lettering';gui.Face=Enum.NormalId.Front;gui.CanvasSize=Vector2.new(500,116);gui.LightInfluence=0;gui.Parent=plaque
  local t=Instance.new('TextLabel');t.Name='Line1';t.BackgroundTransparency=1;t.Size=UDim2.fromScale(1,1);t.Font=Enum.Font.FredokaOne;t.TextScaled=true
  t.Text='FRUIT OF THE HOUR';t.TextColor3=rgb(P.Gold);t.Parent=gui
- local anchor=part('FruitAnchor',Vector3.new(1,1,1),Vector3.new(0,7.2,0),P.Gold);anchor.Transparency=1
- local light=Instance.new('PointLight');light.Name='FruitLight';light.Color=Color3.fromRGB(255,224,150);light.Brightness=1.2;light.Range=12;light.Shadows=false;light.Parent=anchor
+ local anchor=part('FruitAnchor',Vector3.new(1,1,1),Vector3.new(0,M.FruitHeight,0),P.Gold);anchor.Transparency=1
+ local light=Instance.new('PointLight');light.Name='FruitLight';light.Color=Color3.fromRGB(255,224,150);light.Brightness=1.4;light.Range=14;light.Shadows=false;light.Parent=anchor
  return holder,anchor
 end
 return M

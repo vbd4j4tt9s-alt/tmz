@@ -1,7 +1,7 @@
 #!/bin/sh
 # Usage: sh run.sh [scratch dir]. R132 checks on the Roblox mock with the real modules:
 #  test_fruit_of_hour.luau - the hourly pick over a year, sale bonus, server announcer, pedestal display, sell menu line.
-#  test_market.luau        - the polished R69 market: building kept, real fruit/plants, pedestal without discs.
+#  (test_market.luau moved to docs/proposals/R133/tests in R133.)
 #  test_home_marker.luau   - the 🏠 over the middle of your own base only.
 # Selling with the bonus (PlayerDataService) is in docs/proposals/giving_R122/tests (R132 block).
 set -e

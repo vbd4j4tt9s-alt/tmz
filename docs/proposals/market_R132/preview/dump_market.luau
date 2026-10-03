@@ -34,6 +34,11 @@ do local Inst=R.Inst
   return R.CFrame.new(p.X,p.Y,p.Z,r.X,u.X,-f.X,r.Y,u.Y,-f.Y,r.Z,u.Z,-f.Z)
  end
  W.env.CFrame=R.CFrame
+ R.Vector3.FromNormalId=R.Vector3.FromNormalId or function(n)
+  local name=type(n)=='table'and n.Name or tostring(n):match('(%a+)$')
+  return({Front=V3(0,0,-1),Back=V3(0,0,1),Left=V3(-1,0,0),Right=V3(1,0,0),Top=V3(0,1,0),Bottom=V3(0,-1,0)})[name]
+ end
+ W.env.Vector3=R.Vector3
 end
 local map=R.new('Model');map.Name='ChestChaseMap';map.Parent=W.workspace
 local hub=R.new('Folder');hub.Name='EconomyHub';hub.Parent=map
@@ -48,9 +53,11 @@ if which=='new'then
  local current=W.module('FruitOfHour').At(FOH_TIME or 1759430000)
  local ok,model=pcall(W.module('HarvestPresentation').Build,{SeedId=FOH_ID or current.SeedId,Mutation='None',Weather='None'})
  if ok and model then
-  model.Parent=preview;local _,box=model:GetBoundingBox();model:ScaleTo(2.6/math.max(box.X,box.Y,box.Z))
-  local c=model:GetBoundingBox();local at=Center+M.FruitOfHour+V3(0,7.2,0)
-  model:PivotTo(CF(at+(model:GetPivot().Position-c.Position))*R.CFrame.Angles(0,.5,0))
+  -- Like FruitOfHourDisplay (R133): sized and centred on the visible parts, 4.2 studs, at the anchor height.
+  model.Parent=preview;local c,box=W.module('HarvestGeometry').Bounds(model);local pivot=model:GetPivot().Position
+  local k=4.2/math.max(box.X,box.Y,box.Z);model:ScaleTo(k);c=pivot+(c-pivot)*k
+  local at=Center+M.FruitOfHour+V3(0,M.FruitHeight or 7.2,0)
+  model:PivotTo(CF(at)*R.CFrame.Angles(0,.5,0)*CF(pivot-c))
  end
 end
 -- Dump --------------------------------------------------------------------------------------------------------
@@ -78,8 +85,9 @@ local function walk(o)
     table.insert(guis,string.format('{"face":%s,"canvas":[%s,%s],"lines":[%s]}',q(enumName(g.Face)),n(cs.X),n(cs.Y),table.concat(lines,',')))
    end end
    for _,l in ipairs(c:GetChildren())do if l.ClassName=='PointLight'then table.insert(lights,string.format('{"p":[%s,%s,%s],"color":%s,"range":%s}',n(p.X),n(p.Y),n(p.Z),c3(l.Color),n(l.Range or 10)))end end
-   table.insert(parts,string.format('{"name":%s,"shape":%s,"size":[%s,%s,%s],"p":[%s,%s,%s],"r":[%s,%s,%s,%s,%s,%s,%s,%s,%s],"color":%s,"material":%s,"t":%s,"guis":[%s]}',
-    q(c.Name),q(shape),n(s.X),n(s.Y),n(s.Z),n(p.X),n(p.Y),n(p.Z),n(r[1][1]),n(r[1][2]),n(r[1][3]),n(r[2][1]),n(r[2][2]),n(r[2][3]),n(r[3][1]),n(r[3][2]),n(r[3][3]),
+   local group=0;local a=c;while a and a.Parent do if a.Parent.Name=='MarketShowcase'then group=table.find(a.Parent:GetChildren(),a)or 0;break end;if a.Parent.Name=='PreviewStandIns'then group=-1;break end;a=a.Parent end
+   table.insert(parts,string.format('{"group":%d,"name":%s,"shape":%s,"size":[%s,%s,%s],"p":[%s,%s,%s],"r":[%s,%s,%s,%s,%s,%s,%s,%s,%s],"color":%s,"material":%s,"t":%s,"guis":[%s]}',
+    group,q(c.Name),q(shape),n(s.X),n(s.Y),n(s.Z),n(p.X),n(p.Y),n(p.Z),n(r[1][1]),n(r[1][2]),n(r[1][3]),n(r[2][1]),n(r[2][2]),n(r[2][3]),n(r[3][1]),n(r[3][2]),n(r[3][3]),
     c3(c.Color),q(enumName(c.Material)),n(c.Transparency or 0),table.concat(guis,',')))
   end
   walk(c)
