@@ -40,6 +40,14 @@ function Service.new(data,chests,passes)
    if now-(self.Last[p].Tutorial or-10)<.2 then return {Success=false}end;self.Last[p].Tutorial=now
    if value~='State'and not data:TutorialAction(p,value)then return {Success=false}end
    data:PublishTutorial(p)
+   -- R138: finishing the tutorial (the last slides) earns the free 2x-luck Forest pack, once per account.
+   if(value=='TreadmillInfo'or value=='Skip')and p:GetAttribute('TutorialDone')==true then
+    local gift=data:GrantStarterPack(p)
+    if gift then
+     pcall(function()chests:SyncTools(p)end)
+     if data.Notifications then data.Notifications:Show(p,require(RS.BeginnerGuide).StarterPack.Notice,Color3.fromRGB(150,255,110),5)end
+    end
+   end
    return require(script.Parent.TutorialTargets).State(data,chests,p)
   end
   if action=='SettingsState'or action=='SetSetting'then

@@ -56,9 +56,14 @@ local pitch=math.clamp(2.8/W.module('RarityRevealSequence').SeedAt(7),.75,2)
 A.Begin(7,0);check(whoosh.IsPlaying and near(whoosh.TimePosition,.44,1e-4),'on-time reveal: whoosh from its trimmed start')
 A.Begin(7,.3);check(whoosh.IsPlaying and near(whoosh.TimePosition,.44+.3*pitch,1e-4),'late reveal: whoosh skips the elapsed build (x pitch)')
 A.Begin(7,2.6);check(not whoosh.IsPlaying,'reveal already past the burst: no whoosh')
-A.Begin(3,.1);check(chime.IsPlaying,'opener chime plays within the grace')
-A.Begin(3,.6);check(not chime.IsPlaying,'stale opener chime is dropped (burst ring already gone)')
-A.Begin(3);check(chime.IsPlaying,'old call shape (no elapsed) unchanged')
+-- R138: Common..Rare sound when the seed pops out (Burst), not at Begin; each tier differs; a late cue is dropped.
+local pop,note,note2,spark=SS:FindFirstChild('Reveal_Pop'),SS:FindFirstChild('Reveal_Note'),SS:FindFirstChild('Reveal_Note2'),SS:FindFirstChild('Reveal_Spark')
+A.Begin(3,.1);check(not chime.IsPlaying and not pop.IsPlaying and not note.IsPlaying,'low tiers: nothing at the start any more')
+A.Stop();A.Burst(1,.1);check(pop.IsPlaying and not note.IsPlaying and not spark.IsPlaying,'Common: a pop')
+A.Stop();A.Burst(2,.1);check(pop.IsPlaying and not note.IsPlaying,'Uncommon: a pop...');R.advance(.1);check(note.IsPlaying and note.PlaybackSpeed>pop.PlaybackSpeed,'...then a rising note')
+A.Stop();A.Burst(3,.1);check(spark.IsPlaying and note.IsPlaying and not pop.IsPlaying,'Rare: a sparkle and a note...');R.advance(.1);check(note2.IsPlaying and note2.PlaybackSpeed>note.PlaybackSpeed,'...then a higher note')
+A.Stop();A.Burst(2,.8);R.advance(.2);check(not pop.IsPlaying and not note.IsPlaying,'a low-tier cue reaching this client late is dropped')
+A.Stop();A.Burst(3);check(spark.IsPlaying,'old call shape (no time) still plays')
 -- R136: Legendary / Mythic get a whoosh during their charge-up (it joins late like Secret+), then chimes and an impact.
 local impact=SS:FindFirstChild('Reveal_Impact')
 A.Begin(4,0);check(whoosh.IsPlaying and not chime.IsPlaying,'Legendary: whoosh on the charge-up')
@@ -67,6 +72,13 @@ A.Begin(4,.69);check(not whoosh.IsPlaying,'Legendary reveal already at its burst
 A.Begin(5,0);A.Step(5,.5);check(chime.IsPlaying,'Mythic: a rising chime half way through the charge-up')
 A.Burst(5);check(not whoosh.IsPlaying and impact.IsPlaying and chime.IsPlaying,'Mythic burst: impact + chime, whoosh cut')
 A.Burst(7);check(not whoosh.IsPlaying,'burst still cuts the whoosh')
+-- R138 (owner: Secret / Cosmic / King more audible): louder build, beats and burst; King adds a low impact.
+local royal=SS:FindFirstChild('Reveal_Royal')
+A.Begin(7,0);check(whoosh.IsPlaying and whoosh.Volume>=.2,'Cosmic: the build is louder ('..whoosh.Volume..', was .09)')
+A.Step(7,1.0);check(chime.IsPlaying and chime.Volume>=.12,'Cosmic: louder beats ('..chime.Volume..', was .04)')
+A.Begin(6,0);A.Burst(6);check(impact.IsPlaying and impact.Volume>=.28,'Secret: louder burst ('..impact.Volume..', was .12)')
+A.Stop();A.Burst(8);check(impact.IsPlaying and impact.Volume>=.3 and royal.IsPlaying and royal.Volume>=.3 and spark.IsPlaying,'King: louder impact and fanfare plus a low hit')
+A.Stop();A.Begin(4,0);check(whoosh.IsPlaying and whoosh.Volume<.1,'Legendary keeps its R136 volume')
 
 -- 3. TrackRefreshSky: each countdown beep and the wall number change on the same frame ------------------------------
 local paints={}

@@ -24,6 +24,12 @@ for _,d in ipairs({'Mouse','Touch','Gamepad'})do for i,st in ipairs(G.Steps)do f
  local f=G.Format(t,d,'Kid');check(not f:find('{',1,true),'placeholder left: '..f)
  local words=0;for _ in G.Plain(f):gmatch('%S+')do words+=1 end;check(words<=14,('%s step %d is %d words'):format(d,i,words))
 end end end
-for _,t in ipairs(G.Tips)do local w=0;for _ in t:gmatch('%S+')do w+=1 end;check(w<=10,'tip too long: '..t)end
+for _,t in ipairs(G.Tips)do local w=0;for _ in t.Title:gmatch('%S+')do w+=1 end;check(w<=5,'R138 slide title too long: '..t.Title)end
+-- R138 (owner: oversimplified): every card is an icon and at most four words.
+for i,st in ipairs(G.Steps)do if not st.Tips then
+ for _,t in ipairs({st.Title,st.EquippedTitle})do local w=0;for _ in t:gmatch('%S+')do w+=1 end;check(w>=1 and w<=4,'step '..i..' title: '..t)end
+ check(type(st.Icon)=='string'and st.Icon~='','step '..i..' has an icon')
+end end
+for _,look in ipairs({G.TravelTrack,G.Waiting,G.Finished})do local w=0;for _ in look.Title:gmatch('%S+')do w+=1 end;check(w<=4 and look.Icon~=nil,'look title: '..look.Title)end
 print(G.Format(G.Steps[1].Text,'Touch','Kid'));print(G.Format(G.Steps[3].Text,'Mouse','Kid'))
 print(fails==0 and'FLOW OK'or('FAILURES '..fails))

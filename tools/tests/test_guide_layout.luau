@@ -4,7 +4,7 @@ local fails=0;local function check(c,msg)if not c then fails+=1;print('FAIL',msg
 -- 2) formatting
 for _,d in ipairs({'Mouse','Touch','Gamepad','???'})do
  for i,s in ipairs(G.Steps)do
-  for _,t in ipairs({s.Text,s.Equipped})do
+  for _,t in ipairs({s.Text,s.Equipped,s.Title,s.EquippedTitle,s.Chip and s.Chip.Key,s.Chip and s.Chip.Label,s.EquippedChip and s.EquippedChip.Key})do
    local f=G.Format(t,d,'Bob<3&Co')
    check(not f:find('{',1,true),'placeholder left '..d..' '..i..': '..f)
    check(f:find('Bob&lt;3&amp;Co',1,true)or not t:find('{name}',1,true),'escape '..i)
@@ -28,7 +28,8 @@ for _,v in ipairs(views)do
   local m=L.Read({X=w,Y=h},touch,ctl and touch and controls(w,h)or nil)
   local font=G.Font(m,w,h);local badge=m.Phone and 46 or 60;local longest=longestFor(m.Phone)
   -- Height estimate: average glyph ~0.55em, 1.2 line height, 20 top + 26 bottom chrome.
-  local function heightFor(width)local per=math.max(1,math.floor((width-badge-40)/(font*.55)));local lines=math.ceil(longest/per);return math.max(badge+30,20+lines*font*1.2+28)+12 end
+  -- R138: the visual card has a fixed height (icon, title, chip, step row) + the 12px name tag.
+  local function heightFor(width)return(m.Phone and 100 or 112)+12 end
   local c=G.Card(w,h,m,heightFor)
   local relaxed=nil
   if not c.Clear then relaxed=1;c=G.Card(w,h,m,heightFor,1)end

@@ -950,8 +950,9 @@ function ChestService:_holdPack(player,tool)
     local record
     for _,candidate in ipairs(self.PlayerData:GetChestRecords(player))do if candidate.Id==tool:GetAttribute('SeedInventoryId')then record=candidate;break end end
     if record then
-        local odds=PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,player:GetAttribute('ChestLuckMultiplier'),record.OddsVersion or 0)
+        local odds=PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,player:GetAttribute('ChestLuckMultiplier'),record.OddsVersion or 0,record.RateBoost)
         local rows={PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)}
+        if record.RateBoost then table.insert(rows,'🍀 2x LUCK (free starter pack)')end
         for _,seed in ipairs(PackRules.RewardPool(self.Config,record.Stage,record.BagVariant)or{})do
             if(odds[seed.Id]or 0)>0 then table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))end
         end

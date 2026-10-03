@@ -134,7 +134,7 @@ Run:BindToRenderStep('ChestChasePackPresentation',Enum.RenderPriority.Camera.Val
  if reveal then
   local t=workspace:GetServerTimeNow()-reveal.At;local rank=reveal.Rank
   local sequenceState=sequence:Step(rank,t,reduced());revealAudio.Step(rank,t)
-  if not reveal.Burst and t>=require(RS.RarityRevealSequence).SeedAt(rank)then reveal.Burst=true;revealAudio.Burst(rank);kick(rank==8 and 2.6 or rank==7 and 2 or 1.2)end
+  if not reveal.Burst and t>=require(RS.RarityRevealSequence).SeedAt(rank)then reveal.Burst=true;revealAudio.Burst(rank,t);kick(rank==8 and 2.6 or rank==7 and 2 or 1.2)end
   local duration=rank>=6 and 0 or .7
   burst.Visible=rank<6 and t>=0 and t<.23
   if burst.Visible then local a=math.clamp(t/.23,0,1);burst.Size=UDim2.fromScale(.08+.38*a,.08+.38*a);burstStroke.Transparency=a;burstStroke.Color=reveal.Color end
@@ -173,6 +173,23 @@ Run:BindToRenderStep('ChestChasePackPresentation',Enum.RenderPriority.Camera.Val
     local fade=math.clamp((t-(rank>=6 and .5 or .15))/(duration-(rank>=6 and .5 or .15)),0,1)
     local rise=1-(1-math.clamp(t/.3,0,1))^3
     -- Common to Rare use the world seed reveal. No screen-cover treatment.
+    -- R138 (owner: "very little minor animations" for Common / Uncommon / Rare): a few tiny sparkles pop out in the
+    -- tier colour when the seed does (4 / 6 / 8), plus a faint second ring for Rare. Skipped with reduced motion.
+    if rank<=3 then
+     local tb=t-at;local life=.45
+     local show=tb>=0 and tb<life and not reduced()
+     local k=math.clamp(tb/life,0,1);local pop=1-(1-k)^3;local n=rank==3 and 8 or rank==2 and 6 or 4
+     ring.Visible=show and rank==3
+     if ring.Visible then ring.Size=UDim2.fromScale(.1+pop*.22,.1+pop*.22);stroke.Color=reveal.Color;stroke.Transparency=.35+k*.65;stroke.Thickness=2 end
+     for i,p in ipairs(nodes)do
+      p.Visible=show and i<=n
+      if p.Visible then
+       local angle=i*math.pi*2/n+.4;local radius=.05+pop*(.06+rank*.025);local size=.006+rank*.0015
+       p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
+       p.Size=UDim2.fromScale(size,size);p.Rotation=45+tb*160;p.BackgroundColor3=reveal.Color;p.BackgroundTransparency=k
+      end
+     end
+    end
     if rank>=4 then
      panel.Visible=rank>=6
      panel.BackgroundColor3=rank==6 and Color3.fromRGB(7,7,10)or rank==7 and Color3.fromRGB(12,8,33)or Color3.fromRGB(40,25,5)

@@ -15,7 +15,8 @@ check(Seq.SeedAt(6)==1.35 and Seq.SeedAt(7)==2.45 and Seq.SeedAt(8)==3.35,'Secre
 check(math.abs(Rules.GetRevealDuration('Legendary')-Rules.GetRevealDuration('Rare')-.6)<1e-9,'the opening lasts .6 s longer for Legendary')
 check(math.abs(Rules.GetRevealDuration('Mythic')-Rules.GetRevealDuration('Rare')-.9)<1e-9,'and .9 s longer for Mythic')
 -- 2. Flourish -----------------------------------------------------------------------------------------------------
-check(F.Create(W.workspace,3,1)==nil and F.Create(W.workspace,6,1)==nil,'only Legendary and Mythic get the flourish')
+check(F.Create(W.workspace,6,1)==nil and F.Create(W.workspace,8,1)==nil,'Secret and up keep their own reveal (no flourish)')
+local minor=F.Create(W.workspace,3,1);check(minor and minor.Style.Minor and minor.Pillar==nil,'R138: Common..Rare get only the small flourish (no pillar)');minor:Destroy()
 local emitted={}
 local inew=R.Instance.new
 R.Instance.new=function(class,parent)local o=inew(class,parent);if class=='ParticleEmitter'then function o.Emit(_,n)emitted[#emitted+1]=n end end;if class=='Sound'then function o.Play(self)self.IsPlaying=true end end;return o end

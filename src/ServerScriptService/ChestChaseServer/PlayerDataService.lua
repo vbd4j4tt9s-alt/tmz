@@ -370,6 +370,7 @@ function PlayerDataService:AddChest(player, chest, options)
         BagVariant = PackRules.VariantKey(chest.BagVariant),OddsVersion=chest.OddsVersion or 81,
             PackSize=PackRules.SanitizePackSize(packSize),PackMutation=PackRules.MutationKey(chest.PackMutation),Weather=Weather.Key(chest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chest.WeatherCheckedEvent),
         SeedScale = PackRules.NewSeedScale(chest.Stage,chest.BagVariant,packSize),
+        RateBoost = PackRules.SanitizeRateBoost(chest.RateBoost), -- R138: the free starter pack's 2x rates
 	}
 	table.insert(self:GetChestRecords(player), record)
     if chest.Stage<=self.Config.StageCount then self:MarkTreadmillBiome(player,chest.Stage)end
@@ -388,7 +389,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         if pack.Id ~= inventoryId then continue end
         if pack.Kind ~= "Pack" then return nil, "THIS PACK WAS ALREADY OPENED" end
         if pack.PaidRandom and player:GetAttribute('PaidRandomAllowed')~=true then return nil,'THIS PURCHASED PACK IS UNAVAILABLE FOR THIS ACCOUNT' end
-        local seed, rarity = PackRules.Roll(self.Config,pack.Stage,unitRoll,player:GetAttribute("ChestLuckMultiplier"),pack.BagVariant,pack.OddsVersion)
+        local seed, rarity = PackRules.Roll(self.Config,pack.Stage,unitRoll,player:GetAttribute("ChestLuckMultiplier"),pack.BagVariant,pack.OddsVersion,pack.RateBoost)
         local testSeed=require(script.Parent.RarePackTests).Expected(self,player,pack.Id)
         if testSeed then seed=self.Config.GetSeedById(testSeed);rarity=PackRules.GetRarity(testSeed)end
         if not seed then return nil, "THIS PACK NEEDS AN UPDATE" end
@@ -727,7 +728,7 @@ function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNu
 		Id = type(savedChest.Id) == "string" and string.sub(savedChest.Id, 1, 80)
 			or string.format("%d_%d", player.UserId, chestNumber),
 		Kind = savedChest.Kind == "Pack" and "Pack" or "Seed",
-                PaidRandom=savedChest.PaidRandom==true,
+                PaidRandom=savedChest.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(savedChest.RateBoost),
                 BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=PackRules.ValidOddsVersion(savedChest.OddsVersion)and savedChest.OddsVersion or nil, -- R137: 81, 112 and 137 all load
             PackSize=PackRules.SanitizePackSize(savedChest.PackSize),PackMutation=PackRules.MutationKey(savedChest.PackMutation),Weather=Weather.Key(savedChest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(savedChest.WeatherCheckedEvent),
                 SeedScale = PackRules.SanitizeSeedScale(savedChest.SeedScale),
@@ -1059,7 +1060,7 @@ function PlayerDataService:SerializeSeedRecord(chestRecord)
 	return {
 		Id = string.sub(chestRecord.Id, 1, 80),
 		Kind = chestRecord.Kind or "Seed",
-            PaidRandom=chestRecord.PaidRandom==true,
+            PaidRandom=chestRecord.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(chestRecord.RateBoost),
             BagVariant = PackRules.VariantKey(chestRecord.BagVariant),OddsVersion=chestRecord.OddsVersion,
             PackSize=PackRules.SanitizePackSize(chestRecord.PackSize),PackMutation=PackRules.MutationKey(chestRecord.PackMutation),Weather=Weather.Key(chestRecord.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chestRecord.WeatherCheckedEvent),
             SeedScale = PackRules.SanitizeSeedScale(chestRecord.SeedScale),

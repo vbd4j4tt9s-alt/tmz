@@ -420,17 +420,19 @@ local function current137(stage,variantKey,version)
  return version==N137.Version and stage~=8 and N137.PackFloor[variantKey]~=nil
 end
 local function older(version)return version==N137.Version and N.Version or version end
-Rules.SeedOdds=function(config,stage,variantKey,luck,version)
+-- R138: boost = a pack's own rate boost (the free starter pack after the tutorial: 2x); only version-137 packs use it.
+function Rules.SanitizeRateBoost(value)return value==2 and 2 or nil end
+Rules.SeedOdds=function(config,stage,variantKey,luck,version,boost)
  if version==nil then version=N137.Version end
  if not current137(stage,variantKey,version)then return odds112(config,stage,variantKey,luck,older(version))end
- local out={};local odds=N137.SeedOdds(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,stage)
+ local out={};local odds=N137.SeedOdds(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,stage,Rules.SanitizeRateBoost(boost))
  for id,p in pairs(odds or{})do out[id]=100*p end
  return out
 end
-Rules.Roll=function(config,stage,draw,luck,variantKey,version)
+Rules.Roll=function(config,stage,draw,luck,variantKey,version,boost)
  if not current137(stage,variantKey,version)then return roll112(config,stage,draw,luck,variantKey,older(version))end
  if type(draw)~='function'then return nil end
- return N137.Roll(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,draw,stage)
+ return N137.Roll(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,draw,stage,Rules.SanitizeRateBoost(boost))
 end
 
 return Rules

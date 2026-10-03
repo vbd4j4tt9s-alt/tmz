@@ -6,41 +6,46 @@ local G={Version=1,Bits={Begin=1,Pack=2,Seed=4,Train=8,Plant=16,Harvest=32,Sell=
 G.GuideUserId=nil
 -- Name on the guide's tag (nil = that account's username).
 G.GuideName='TMZ'
--- {name}, {Steal}, {Tap}, {Use} are filled per device.
--- R133 (owner: "make it sound more human, don't over explain, type it like how you talk, add emojis"): same steps and
--- tips, casual voice. Keep each line short; the card wraps long lines.
+-- {name}, {Steal}, {Tap}, {Use}, {StealKey}, {OpenKey}, {PickKey}, {OpenVerb} are filled per device.
+-- R138 (owner: "make the tutorial clearly visual, just make it oversimplified"): every card is a big icon, two or three
+-- words and one key chip; a row of step icons shows the whole loop. Text stays as a plain description (tests).
 G.Steps={
- {Text="Yo {name}! 👋 Follow the red arrows, {Steal} a pack 😈",Target='Pack',Marker='STEAL!'},
- {Text="YOINK! 😆 Run home quick 🏃💨 don't get caught lol",Target='Safety',Marker='HOME'},
- {Text="{Tap} your pack to open it 🎁👀",Equipped="{Use} to open it 🎁👀"},
- {Text="A seed!! 🌱 Go plant it in your garden 👇",Target='Garden',Marker='PLANT HERE'},
- {Text="",Tips=true,Informational=true},
+ {Icon='🎒',Title='STEAL A PACK',Chip={Key='{StealKey}',Label='HOLD'},Text="{Steal} a pack 😈",Target='Pack',Marker='😈 STEAL!'},
+ {Icon='🏠',Title='RUN HOME!',Chip={Arrow=true,Label='FOLLOW THE ARROWS'},Text="Run home, don't get caught 🏃💨",Target='Safety',Marker='🏠 HOME'},
+ {Icon='🎁',Title='OPEN IT',Chip={Key='{PickKey}',Label='YOUR PACK'},Text="{Tap} your pack 🎁",
+  Equipped="{Use} to open it 🎁",EquippedTitle='KEEP {OpenVerb}!',EquippedChip={Key='{OpenKey}',Label='OPEN IT'}},
+ {Icon='🌱',Title='PLANT IT',Chip={Arrow=true,Label='FOLLOW THE ARROWS'},Text="Plant your seed in your garden 🌱",Target='Garden',Marker='🌱 PLANT'},
+ {Icon='💰',Title='',Text="",Tips=true,Informational=true},
 }
--- Step 5 shows these one at a time, then the tutorial is done. No waiting for the plant to grow.
+-- Step 5: picture slides, one at a time, then the tutorial is done. No waiting for the plant to grow.
 G.Tips={
- "Your plant grows by itself... even when you're offline 😴🌱",
- "Pick the fruit when it's ready 🍎 nom nom",
- "Sell fruit at the market = 💰💰💰 nice!",
- "{TapBase} up top to zoom home 🏠💨",
- "{TapTrack} to zoom back to the track 🏃💨",
- "Get faster = steal better packs 😤🔥",
- "🌟 Fruit of the Hour sells up to 3x 🤑🤑🤑",
+ {Icon='🌱',Title='GROW ➜ PICK ➜ SELL',Chip={Label='🌱 ➜ 🍎 ➜ 💰'},Text="Plants grow, pick the fruit, sell it 💰"},
+ {Icon='🏠',Title='ZOOM HOME',Chip={Key='BASE',Label='UP TOP'},Text="{TapBase} up top to zoom home 🏠",Button='BaseButton'},
+ {Icon='🏃',Title='ZOOM TO TRACK',Chip={Key='TRACK',Label='UP TOP'},Text="{TapTrack} up top for the track 🏃",Button='TrackButton'},
 }
 -- R125 (owner): the BASE / TRACK top-bar buttons are taught. Tip index -> the button the tutorial highlights.
-G.TipButtons={[4]='BaseButton',[5]='TrackButton'}
+G.TipButtons={};for i,tip in ipairs(G.Tips)do G.TipButtons[i]=tip.Button end
 -- Step 1 while the player is not on the track yet (presentation only; saved progress is unchanged).
-G.TravelTrack="{TapTrack} up top to zoom to the track 🏃💨"
-G.TipSeconds=3.5
+G.TravelTrack={Icon='🏃',Title='GO TO THE TRACK',Chip={Key='TRACK',Label='UP TOP'},Text="{TapTrack} up top to zoom to the track 🏃💨"}
+G.TipSeconds=5
 G.Steps[5].Seconds=#G.Tips*G.TipSeconds
-G.Welcome={Title='Welcome to Steal A Pack!',Text="Hey {name}! 👋 Ready to steal your first seed pack? 😈",Button="LET'S GO!"}
-G.Waiting="No packs rn 😭 one's coming soon, hang tight ⏳"
-G.Finished="You're a pro, {name}! Is just nice! 🤑🤑🤑"
+G.Welcome={Title='STEAL A PACK!',Text="Hey {name}! 👋",Button="LET'S GO!",
+ Strip={{Icon='🎒',Word='STEAL'},{Icon='🏠',Word='RUN HOME'},{Icon='🎁',Word='OPEN'},{Icon='🌱',Word='PLANT'}}}
+G.Waiting={Icon='⏳',Title='PACKS SOON',Chip={Label='HANG TIGHT'},Text="No packs right now, one's coming ⏳"}
+G.Finished={Icon='🏆',Title="YOU'RE READY!",Chip={Label='🎁 FREE LUCKY PACK!'},Text="You're a pro, {name}! 🤑"}
+G.FinishedAgain={Label='HAVE FUN {name}!'} -- the chip when the free pack was already given (a replay)
+-- R138 (owner): finishing the tutorial gives one free Forest pack with 2x rates (server: TutorialProgress.GrantStarterPack).
+G.StarterPack={Name='Lucky Forest Pack',Notice='🎁 FREE Lucky Forest Pack! 2x luck 🍀 Check your Bag!'}
+-- The step row on the card: one icon per step.
+G.Progress={'🎒','🏠','🎁','🌱','💰'}
+-- R138 (owner: "a clicking indicator to visually show players to keep clicking to open a pack").
+G.ClickHint={Mouse={Hand='🖱️',Word='CLICK!'},Touch={Hand='👆',Word='TAP!'},Gamepad={Hand='🎮',Word='R2!'}}
 function G.Copy(spec,key)return spec[key]end
 G.StepCount=#G.Steps
 local words={
- Touch={Steal='Hold STEAL to grab',Tap='Tap',Use='Tap',TapTrack='Tap TRACK',TapBase='Tap BASE'},
- Gamepad={Steal='Hold X to steal',Tap='Pick',Use='Press R2',TapTrack='Select TRACK',TapBase='Select BASE'},
- Mouse={Steal='Hold E to steal',Tap='Click',Use='Click',TapTrack='Click TRACK',TapBase='Click BASE'},
+ Touch={Steal='Hold STEAL to grab',Tap='Tap',Use='Tap',TapTrack='Tap TRACK',TapBase='Tap BASE',StealKey='STEAL',OpenKey='TAP',PickKey='TAP',OpenVerb='TAPPING'},
+ Gamepad={Steal='Hold X to steal',Tap='Pick',Use='Press R2',TapTrack='Select TRACK',TapBase='Select BASE',StealKey='X',OpenKey='R2',PickKey='PICK',OpenVerb='PRESSING'},
+ Mouse={Steal='Hold E to steal',Tap='Click',Use='Click',TapTrack='Click TRACK',TapBase='Click BASE',StealKey='E',OpenKey='CLICK',PickKey='CLICK',OpenVerb='CLICKING'},
 }
 -- Fills placeholders. The name is escaped because the label uses RichText.
 function G.Format(text,device,name)

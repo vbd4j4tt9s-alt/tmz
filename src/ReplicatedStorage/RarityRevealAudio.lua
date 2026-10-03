@@ -1,7 +1,10 @@
 -- R66: preloaded, opener-only build / impact / fanfare, synchronised to the screen timeline.
 local Sound=game:GetService('SoundService');local Content=game:GetService('ContentProvider')
 local A={};local pool={};local beat=0
-local sources={Whoosh={Id='rbxassetid://9120768742',Volume=.09,Start=.44},Impact={Id='rbxassetid://9120769331',Volume=.12,Start=.04},Royal={Id='rbxassetid://12222253',Volume=.10,Start=0},Chime={Id='rbxasset://sounds/electronicpingshort.wav',Volume=.04,Start=0}}
+local sources={Whoosh={Id='rbxassetid://9120768742',Volume=.09,Start=.44},Impact={Id='rbxassetid://9120769331',Volume=.12,Start=.04},Royal={Id='rbxassetid://12222253',Volume=.10,Start=0},Chime={Id='rbxasset://sounds/electronicpingshort.wav',Volume=.04,Start=0},
+ -- R138: Common / Uncommon / Rare pulls (the bubble pop from InteractionAudio, two clearer notes, a soft sparkle).
+ Pop={Id='rbxassetid://96764044228884',Volume=.18,Start=0},Note={Id='rbxasset://sounds/electronicpingshort.wav',Volume=.07,Start=0},
+ Note2={Id='rbxasset://sounds/electronicpingshort.wav',Volume=.07,Start=0},Spark={Id='rbxassetid://9120769331',Volume=.06,Start=.04}}
 function A.Preload()
  if next(pool)then return end
  local all={}
@@ -12,9 +15,10 @@ function A.Preload()
  task.spawn(function()pcall(function()Content:PreloadAsync(all)end)end)
 end
 -- skip: seconds of the cue already elapsed on the screen timeline (file seconds = skip x pitch).
-function A.Play(key,pitch,skip)
+-- volume (R138): optional, for this play only (Secret / Cosmic / King play louder).
+function A.Play(key,pitch,skip,volume)
  A.Preload();local sound=pool[key];if not sound or not sound.IsLoaded then return false end
- sound:Stop();sound.PlaybackSpeed=pitch or 1
+ sound:Stop();sound.PlaybackSpeed=pitch or 1;sound.Volume=volume or tonumber(script:GetAttribute(key..'Volume'))or sources[key].Volume
  local start=tonumber(script:GetAttribute(key..'Start'))or sources[key].Start
  require(script.Parent.SoundTiming).Play(sound,start+math.max(0,tonumber(skip)or 0)*(pitch or 1))
  return true
@@ -26,15 +30,23 @@ A.ChimeGrace=.35
 -- R136 (owner: Legendary / Mythic pulls get sound effects): a quick rising whoosh during their short charge-up, one
 -- (Legendary) or two (Mythic) rising chimes, then an impact with a bright chime on the burst.
 A.CuePitch={[4]=1.6,[5]=1.35}
+-- R138 (owner: "add sound effects for getting common and uncommon, rare"): each low tier sounds different, played when
+-- the seed pops out. Common: a pop. Uncommon: a pop and a rising note. Rare: a sparkle and two rising notes.
+A.Low={[1]={{'Pop',1.08,0}},[2]={{'Pop',1.22,0},{'Note',1.3,.08}},[3]={{'Spark',1.7,0},{'Note',1.12,0},{'Note2',1.5,.09}}}
+A.LowGrace=.6
+-- R138 (owner: "make the sounds for cosmic and secret and king more noticeable or audible"): their build, beats and
+-- burst play 2-3x louder than before (they were .04-.12), and King adds a second, lower impact under the fanfare.
+A.Loud={[6]={Whoosh=.22,Chime=.13,Impact=.30},[7]={Whoosh=.24,Chime=.15,Impact=.34},[8]={Whoosh=.26,Chime=.16,Impact=.36,Royal=.32,Spark=.2}}
+local function loud(rank,key)local t=A.Loud[rank];return t and t[key]end
 function A.Begin(rank,elapsed)
  A.Stop();A.Preload()
  elapsed=math.max(0,tonumber(elapsed)or 0)
  local seconds=require(script.Parent.RarityRevealSequence).SeedAt(rank)
  if rank>=6 then
-  if elapsed<seconds-.05 then A.Play('Whoosh',math.clamp(2.8/seconds,.75,2),elapsed)end
+  if elapsed<seconds-.05 then A.Play('Whoosh',math.clamp(2.8/seconds,.75,2),elapsed,loud(rank,'Whoosh'))end
  elseif rank>=4 then
   if elapsed<seconds-.05 then A.Play('Whoosh',A.CuePitch[rank],elapsed)end
- elseif elapsed<=A.ChimeGrace then A.Play('Chime',1.12)end
+ end -- R138: Common..Rare sound on the burst (A.Low), not here.
 end
 function A.Step(rank,t)
  if rank<4 then return end
@@ -44,14 +56,23 @@ function A.Step(rank,t)
  else target=(rank==5 and q>=.75)and 2 or q>=.45 and 1 or 0 end
  if target>beat and q<1 then
   beat=target
-  if rank>=6 then A.Play('Chime',(.55+beat*.17)*(rank==8 and .85 or 1))else A.Play('Chime',(rank==5 and .8 or .95)+beat*.15)end
+  if rank>=6 then A.Play('Chime',(.55+beat*.17)*(rank==8 and .85 or 1),nil,loud(rank,'Chime'))else A.Play('Chime',(rank==5 and .8 or .95)+beat*.15)end
  end
 end
-function A.Burst(rank)
+-- t: seconds since the reveal began (a low-tier cue reaching this client too late is dropped).
+function A.Burst(rank,t)
  if pool.Whoosh then pool.Whoosh:Stop()end
+ local low=A.Low[rank]
+ if low then
+  if tonumber(t)and t>require(script.Parent.RarityRevealSequence).SeedAt(rank)+A.LowGrace then return end
+  for _,cue in ipairs(low)do
+   if cue[3]<=0 then A.Play(cue[1],cue[2])else task.delay(cue[3],function()A.Play(cue[1],cue[2])end)end
+  end
+  return
+ end
  if rank>=6 then
-  if not A.Play('Impact',rank==8 and .88 or rank==7 and 1 or 1.15)then A.Play('Chime',.65)end
-  if rank==8 then A.Play('Royal',.92)end
+  if not A.Play('Impact',rank==8 and .88 or rank==7 and 1 or 1.15,nil,loud(rank,'Impact'))then A.Play('Chime',.65,nil,loud(rank,'Chime'))end
+  if rank==8 then A.Play('Royal',.92,nil,loud(rank,'Royal'));A.Play('Spark',.6,nil,loud(rank,'Spark'))end
  elseif rank>=4 then
   A.Play('Impact',rank==5 and 1.05 or 1.3)
   A.Play('Chime',rank==5 and .75 or 1.15)

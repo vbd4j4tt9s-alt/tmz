@@ -66,7 +66,50 @@ local function counts(stage)
  for _,entry in ipairs(catalog:GetChildren())do local id=entry:GetAttribute('SeedId');if entry:GetAttribute('Stage')==stage and type(id)=='string'and id~=''then total+=1;if owned('DiscoveredSeeds',id)then seeds+=1 end;if owned('DiscoveredPlants',id)then plants+=1 end end end
  return seeds,plants,total
 end
+-- R138 (owner: "whenever there are unclaimed rewards it notifies the player in the index"): a red count badge on the
+-- INDEX button, a ! on the MENU button (so it shows with the menu closed) and a dot on every biome tab with something
+-- to claim. Counted from what this client already knows: seed cash rewards and the biome gem milestones.
+local function badge(parent,name,size)
+ local b=parent:FindFirstChild(name)
+ if not b then
+  b=Instance.new('Frame');b.Name=name;b.AnchorPoint=Vector2.new(.5,.5);b.BackgroundColor3=Color3.fromRGB(255,58,72);b.BorderSizePixel=0;b.ZIndex=20;b.Visible=false;b.Parent=parent;Theme.Corner(b,size)
+  local st=Instance.new('UIStroke');st.Color=Color3.new(1,1,1);st.Thickness=2;st.Parent=b
+  local t=Instance.new('TextLabel');t.Name='Count';t.BackgroundTransparency=1;t.Size=UDim2.fromScale(1,1);t.Font=Enum.Font.FredokaOne;t.TextScaled=true;t.TextColor3=Color3.new(1,1,1);t.ZIndex=21;t.Text='';t.Parent=b
+  local scale=Instance.new('UIScale');scale.Parent=b
+ end
+ b.Size=UDim2.fromOffset(size,size);return b
+end
+local function waiting(stage)
+ local n=0
+ for _,entry in ipairs(catalog:GetChildren())do local id=entry:GetAttribute('SeedId');if entry:GetAttribute('Stage')==stage and type(id)=='string'and amount(id)>0 then n+=1 end end
+ local seeds,plants,total=counts(stage)
+ if total>0 then
+  local halfTaken=halfClaimedHere[stage]or player:GetAttribute('IndexBiomeHalfReward'..stage)==true
+  local taken=claimedHere[stage]or player:GetAttribute('IndexBiomeReward'..stage)==true
+  local backpay=player:GetAttribute('IndexBiomeBackpay'..stage)or 0
+  if seeds+plants>=total and not halfTaken then n+=1 end
+  if((seeds==total and plants==total)or backpay>0)and not taken then n+=1 end
+ end
+ return n
+end
+local alertTotal=0
+local function updateAlerts()
+ local total=0
+ for stage=1,8 do
+  local n=waiting(stage);total+=n
+  local t=tabsByStage[stage];if t then local dot=badge(t.Button,'RewardDot',14);dot.Position=UDim2.new(1,-6,0,6);dot.Visible=n>0;dot.Count.Text=''end
+ end
+ local mine=badge(toggle,'RewardBadge',24);mine.Position=UDim2.new(1,-6,0,6);mine.Visible=total>0;mine.Count.Text=total>9 and'9+'or tostring(total)
+ local nav=pg:FindFirstChild('GardenNavigation');local hub=nav and nav:FindFirstChild('MenuButton')
+ if hub then local alert=badge(hub,'IndexRewardAlert',20);alert.Position=UDim2.new(1,-4,0,4);alert.Visible=total>0;alert.Count.Text='!'end
+ if total>alertTotal and not Gui.ReducedMotionEnabled then
+  for _,b in ipairs({mine,hub and hub:FindFirstChild('IndexRewardAlert')})do if b then local sc=b:FindFirstChildOfClass('UIScale');sc.Scale=1.5;Tween:Create(sc,TweenInfo.new(.35,Enum.EasingStyle.Back),{Scale=1}):Play()end end
+ end
+ alertTotal=total
+end
+local alertQueued=false
 local function queue()
+ if not alertQueued then alertQueued=true;task.defer(function()alertQueued=false;if gui.Parent then updateAlerts()end end)end
  if queued then return end;queued=true;task.defer(function()queued=false;if gui.Parent and panel.Visible then render()end end)
 end
 local function claim(action,value)
@@ -75,6 +118,8 @@ local function claim(action,value)
  task.spawn(function()
   local ok,result=pcall(request.InvokeServer,request,action,value);busy=false;if not gui.Parent then return end
   status.Text=ok and type(result)=='table'and(result.Message or'')or'Please try again.';status.Visible=status.Text~=''
+  -- R138 (owner: "add sfx for claiming the rewards"): a cash reward rings the till; gem rewards keep the gem cue.
+  if action=='ClaimSeed'and ok and type(result)=='table'and result.Success==true then Audio.Play('KaChing')end
   if(action=='ClaimBiome'or action=='ClaimBiomeHalf')and ok and type(result)=='table'and result.Success==true then
    if action=='ClaimBiomeHalf'then halfClaimedHere[value]=true else claimedHere[value]=true end
    -- The cue and Gem pulse share the authoritative success event. Never play on a rejected click.
@@ -151,10 +196,9 @@ local function makeCard(entry,index)
  local card=Instance.new('TextButton');card.Name=id;card.Text='';card.LayoutOrder=rank(rarity)*10000+index;card.BorderSizePixel=0;card.AutoButtonColor=false;card.Parent=list
  Bright.Card(card,Theme.Rarity(rarity).Accent,selected==8,rarity) -- R123: rarity border
  local style=Theme.Rarity(rarity)
- -- R137: soft rarity glow and a pedestal shadow behind the model.
+ -- R137: soft rarity glow behind the model (R138: the pedestal shadow is gone; owner: "empty gray box above the texts").
  local glow=Instance.new('Frame');glow.Name='Glow';glow.AnchorPoint=Vector2.new(.5,.5);glow.Position=UDim2.new(.5,0,0,88);glow.Size=UDim2.fromOffset(118,118);glow.BackgroundColor3=style.Color;glow.BackgroundTransparency=seedKnown and .78 or .9;glow.BorderSizePixel=0;glow.Parent=card;Theme.Corner(glow,59)
  local core=Instance.new('Frame');core.Name='Core';core.AnchorPoint=Vector2.new(.5,.5);core.Position=UDim2.fromScale(.5,.5);core.Size=UDim2.fromScale(.6,.6);core.BackgroundColor3=style.Color;core.BackgroundTransparency=seedKnown and .72 or .9;core.BorderSizePixel=0;core.Parent=glow;Theme.Corner(core,36)
- local pedestal=Instance.new('Frame');pedestal.Name='Pedestal';pedestal.AnchorPoint=Vector2.new(.5,.5);pedestal.Position=UDim2.new(.5,0,0,138);pedestal.Size=UDim2.new(.62,0,0,12);pedestal.BackgroundColor3=Color3.new();pedestal.BackgroundTransparency=.62;pedestal.BorderSizePixel=0;pedestal.Parent=card;Theme.Corner(pedestal,6)
  local view=Instance.new('ViewportFrame');view.Name='Preview';view.BackgroundTransparency=1;view.Position=UDim2.fromOffset(6,30);view.Size=UDim2.new(1,-12,0,112);view.Ambient=Color3.fromRGB(215,219,240);view.LightColor=Color3.fromRGB(255,253,246);view.Parent=card
  local stop=Preview.Attach(view,id,false,seedKnown);local adult=false;local generation=0
  -- Top row: rarity chip and the 1/N chance (OddsText85).
@@ -267,5 +311,7 @@ watch(catalog.ChildAdded,observeEntry);watch(catalog.ChildRemoved,queue)
 for _,entry in ipairs(catalog:GetChildren())do observeEntry(entry)end
 watch(player.DescendantAdded,observeDiscovery)
 for _,name in ipairs({'DiscoveredSeeds','DiscoveredPlants'})do local folder=player:FindFirstChild(name);if folder then observeDiscovery(folder)end end
+-- R138: the MENU button is built by HudLayout (maybe after this script); badge it once it exists.
+watch(pg.ChildAdded,function(child)if child.Name=='GardenNavigation'then queue()end end)
 gui.Destroying:Connect(function()if fillTween then fillTween:Cancel()end;if rewardTween then rewardTween:Cancel()end;for _,c in ipairs(connections)do c:Disconnect()end end)
 resize()

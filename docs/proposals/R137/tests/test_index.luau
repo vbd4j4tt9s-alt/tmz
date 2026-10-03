@@ -48,7 +48,7 @@ local water=list:FindFirstChild('SunflowerSeed');local apple=list:FindFirstChild
 check(chipText(water,'SeedChip'):find('✓')and chipText(water,'GrownChip'):find('✓')and water.Reward.Text:find('COMPLETE'),'a fully found seed: SEED ✓, GROWN ✓, COMPLETE')
 check(chipText(apple,'SeedChip'):find('✓')and chipText(apple,'GrownChip'):find('?'),'a seed not grown yet: SEED ✓, GROWN ?')
 check(sun:FindFirstChild('Name').Text=='???'and chipText(sun,'SeedChip'):find('?'),'an unknown seed stays ??? with empty chips')
-check(sun:FindFirstChild('Glow')and sun:FindFirstChild('Pedestal')and sun:FindFirstChild('Preview'),'glow, pedestal and the 3D model on every card')
+check(sun:FindFirstChild('Glow')and not sun:FindFirstChild('Pedestal')and sun:FindFirstChild('Preview'),'glow and the 3D model on every card (R138: no pedestal box)')
 local moon=list:FindFirstChild('MooncapSeed');local claimPill=moon:FindFirstChild('ClaimPill')
 check(claimPill and claimPill.Reward.Text:find('^CLAIM %$'),'a reward to claim shows a gold CLAIM pill')
 moon.Activated:Fire();W.frames(3)

@@ -7,6 +7,8 @@
 --    Desert's Mythic was 1/6 in a Common pack and Crystal's 1/26).
 --  * A missing floor tier steps DOWN to the nearest tier that exists (only up when nothing exists below), so Desert's
 --    Epic/Legendary/Mythic packs no longer always give its Mythic.
+-- R138: an optional per-pack rate boost (the free starter pack: 2) multiplies every tier's own chance before boots
+-- luck; omitted (1) the odds are exactly as before.
 -- Each tier above a pack's lowest tier has a 1 in N chance. Boots multiply it by luck^Power (full on King, partial below),
 -- never above Cap unless the pack's own chance is higher. The lowest tier gets the rest and keeps at least 40% of its
 -- no-boot share: Legendary, Mythic, then Secret give chance back first (each keeps half), Cosmic and King are never touched.
@@ -68,7 +70,7 @@ function O.Floor(present,biomeFloor,pack)
  return nil
 end
 -- present: set of tiers with at least one seed here; stage: the biome's stage id. Returns {tier = probability}, summing to 1.
-function O.TierOdds(present,biomeFloor,pack,luck,stage)
+function O.TierOdds(present,biomeFloor,pack,luck,stage,boost)
  if not O.PackFloor[pack]then return nil end
  luck=O.Luck(luck)
  local floor=O.Floor(present,biomeFloor,pack)
@@ -77,12 +79,12 @@ function O.TierOdds(present,biomeFloor,pack,luck,stage)
  for i=O.Rank[floor]+1,#O.Order do
   local t=O.Order[i]
   if present[t]then
-   local base=1/oneIn(pack,t,stage)
+   local base=(boost or 1)/oneIn(pack,t,stage)
    out[t]=math.min(math.max(base,O.Cap[t]),base*luck^O.Power[t])
   end
  end
  if luck>1 then
-  local base=O.TierOdds(present,biomeFloor,pack,1,stage)
+  local base=O.TierOdds(present,biomeFloor,pack,1,stage,boost)
   local total=0;for _,v in pairs(out)do total+=v end
   local need=total-(1-O.FloorKeep*base[floor])
   for _,t in ipairs(O.Giveback)do
@@ -109,9 +111,9 @@ local function group(pool,getRarity)
  return byTier,present
 end
 -- Same-tier seeds split their tier evenly. Returns {seedId = probability} or nil.
-function O.SeedOdds(pool,getRarity,biomeFloor,pack,luck,stage)
+function O.SeedOdds(pool,getRarity,biomeFloor,pack,luck,stage,boost)
  local byTier,present=group(pool,getRarity)
- local tiers=pack=='EclipseReliquary'and O.VoidTierOdds(present)or O.TierOdds(present,biomeFloor,pack,luck,stage)
+ local tiers=pack=='EclipseReliquary'and O.VoidTierOdds(present)or O.TierOdds(present,biomeFloor,pack,luck,stage,boost)
  if not tiers then return nil end
  local out={}
  for tier,p in pairs(tiers)do local seeds=byTier[tier]or{};for _,seed in ipairs(seeds)do out[seed.Id]=p/#seeds end end
@@ -141,9 +143,9 @@ function O.RollTier(odds,draw)
  return lowest
 end
 -- draw: function returning a uniform number in [0,1). Returns seed, tier.
-function O.Roll(pool,getRarity,biomeFloor,pack,luck,draw,stage)
+function O.Roll(pool,getRarity,biomeFloor,pack,luck,draw,stage,boost)
  local byTier,present=group(pool,getRarity)
- local tiers=pack=='EclipseReliquary'and O.VoidTierOdds(present)or O.TierOdds(present,biomeFloor,pack,luck,stage)
+ local tiers=pack=='EclipseReliquary'and O.VoidTierOdds(present)or O.TierOdds(present,biomeFloor,pack,luck,stage,boost)
  if not tiers then return nil end
  local tier=O.RollTier(tiers,draw);local seeds=tier and byTier[tier]
  if not seeds or #seeds==0 then return nil end
