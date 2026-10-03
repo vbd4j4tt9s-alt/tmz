@@ -9,7 +9,7 @@ M.FruitOfHour=Vector3.new(-20,0,-30)        -- pedestal centre: right of the arr
 function M.Apply(map)
  local hub=assert(map:FindFirstChild('EconomyHub'))
  local old=hub:FindFirstChild('MerchantStands');if old then old:Destroy()end
- local model=Instance.new('Model');model.Name='MerchantStands';model:SetAttribute('MarketRevision',69);model:SetAttribute('MarketPolish',133)
+ local model=Instance.new('Model');model.Name='MerchantStands';model:SetAttribute('MarketRevision',69);model:SetAttribute('MarketPolish',135)
  local wood={194,137,86};local lightWood={246,215,155};local darkWood={80,61,53};local trim={32,121,125}
  local function part(name,size,position,color,material,solid)
   local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=CFrame.new(M.Center+position);p.Color=Color3.fromRGB(unpack(color));p.Material=material or Enum.Material.SmoothPlastic
@@ -160,7 +160,7 @@ function M.Apply(map)
  end
  return model
 end
--- R132 polish, in final (already scaled) local studs. Floor top y=.85; counter top y~4.48; awning edge z~-22.
+-- R135 (owner: fruit that stands). R132 polish, in final (already scaled) local studs. Floor top y=.85; counter top y~4.48; awning edge z~-22.
 -- R133 (owner's play test): every added piece now rests on or hangs from something (string lights hang on their wire
 -- between the porch posts, lamps hang from a ceiling beam, produce stands are solid steps), plants grow out of soil,
 -- every shelf is full of random packs, and the back of the market has pots and crates.
@@ -192,7 +192,27 @@ end
 -- The game's own models, sized to `size` studs (largest side) and stood with their bottom centre at `at`.
 -- R133: measured on the VISIBLE parts only (HarvestGeometry). Fruit and plant models carry hidden parts (the rest of
 -- the plant); measuring those made fruit tiny and left it floating above its spot in R132.
-local function settle(model,origin,at,size,turn)
+-- R135: a fruit "sits" on its seat: the first height (within its lower 30%) where it is at least 40% as wide as at its
+-- widest. A stub, stem or point below the seat sinks into the crate or step, so the fruit sits instead of balancing.
+local function seat(model,center,bounds)
+ local boxes={}
+ for _,p in ipairs(model:GetDescendants())do if p:IsA('BasePart')and p.Transparency<.95 then
+  local size=p:GetAttribute('ArtSize')or p.Size;if p:IsA('Part')and p.Shape==Enum.PartType.Cylinder then size=p.Size end
+  local cf=p.CFrame;local r,u,l=cf.RightVector*size.X/2,cf.UpVector*size.Y/2,cf.LookVector*size.Z/2
+  local e=Vector3.new(math.abs(r.X)+math.abs(u.X)+math.abs(l.X),math.abs(r.Y)+math.abs(u.Y)+math.abs(l.Y),math.abs(r.Z)+math.abs(u.Z)+math.abs(l.Z))
+  boxes[#boxes+1]={Lo=cf.Position-e,Hi=cf.Position+e}
+ end end
+ local bottom=center.Y-bounds.Y/2;local widest=math.max(bounds.X,bounds.Z)
+ for i=0,12 do
+  local y=bottom+bounds.Y*.3*i/12;local x0,x1,z0,z1=math.huge,-math.huge,math.huge,-math.huge
+  for _,b in ipairs(boxes)do if b.Lo.Y<=y+.001 and b.Hi.Y>=y-.001 then
+   x0=math.min(x0,b.Lo.X);x1=math.max(x1,b.Hi.X);z0=math.min(z0,b.Lo.Z);z1=math.max(z1,b.Hi.Z)
+  end end
+  if x1>x0 and math.max(x1-x0,z1-z0)>=widest*.4 then return y-bottom end
+ end
+ return bounds.Y*.3
+end
+local function settle(model,origin,at,size,turn,sits)
  for _,d in ipairs(model:GetDescendants())do
   if d:IsA('BasePart')then d.Anchored=true;d.CanCollide=false;d.CanTouch=false;d.CanQuery=false;d.CastShadow=d.Size.Magnitude>1.2
   elseif d:IsA('BaseScript')or d:IsA('ParticleEmitter')or d:IsA('Sound')then d:Destroy()end
@@ -200,22 +220,23 @@ local function settle(model,origin,at,size,turn)
  local CS=game:GetService('CollectionService')
  for _,d in ipairs({model,table.unpack(model:GetDescendants())})do for _,tag in ipairs(CS:GetTags(d))do CS:RemoveTag(d,tag)end end
  local center,bounds=require(RS:WaitForChild('HarvestGeometry')).Bounds(model)
+ local lift=sits and seat(model,center,bounds)or 0 -- fruit sits on its seat; plants and packs stand on their bottom
  local biggest=math.max(bounds.X,bounds.Y,bounds.Z)
  if biggest>0 then
-  -- ScaleTo scales about the pivot, so the visible box scales about it too.
+  -- ScaleTo scales about the pivot, so the visible box (and the seat) scale about it too.
   local k=size/biggest;local pivot=model:GetPivot().Position
-  model:ScaleTo(model:GetScale()*k);center=pivot+(center-pivot)*k;bounds*=k
+  model:ScaleTo(model:GetScale()*k);center=pivot+(center-pivot)*k;bounds*=k;lift*=k
  end
- -- Turn about the visible centre, then stand it bounds.Y/2 above `at`.
+ -- Turn about the visible centre, then put the seat on `at`.
  local pivot=model:GetPivot()
  local fromCenter=CFrame.new(pivot.Position-center)*pivot.Rotation
- model:PivotTo(origin*CFrame.new(at+Vector3.new(0,bounds.Y/2,0))*CFrame.Angles(0,turn or 0,0)*fromCenter)
+ model:PivotTo(origin*CFrame.new(at+Vector3.new(0,bounds.Y/2-lift,0))*CFrame.Angles(0,turn or 0,0)*fromCenter)
  return model
 end
 local function fruit(id,parent,origin,at,size,turn)
  local model=require(RS:WaitForChild('HarvestPresentation')).Build({SeedId=id,Mutation='None',Weather='None'})
  assert(model,'no fruit model for '..id);model.Name='Market fruit';model.Parent=parent
- return settle(model,origin,at,size,turn)
+ return settle(model,origin,at,size,turn,true)
 end
 local function plant(id,parent,origin,at,size,turn)
  local model=require(RS:WaitForChild('PlantVisuals')).Build(id,CFrame.new(),nil,4)
@@ -239,9 +260,11 @@ function M.ShelfPacks(count,random)
 end
 -- Where things stand (final local studs).
 M.Showcase={
- Counter={'AppleSeed','IceberrySeed','AshRoseSeed'},          -- the three produce crates on the counter
+ -- R135 (owner: "the berries still float; use fruits that stand easier, like the lantern fruit"): only solid,
+ -- flat-bottomed fruit (no berry clusters, flowers or crescents).
+ Counter={'LanternFernSeed','PineappleSeed','CactusSeed'},     -- lantern, pineapple and prickly pear crates
  Crates={X={-4.42,0,4.42},Y=5.5,Z=3.4,Spacing=1.15,Size=1.2},
- Stands={[1]={'SunflowerSeed','AppleSeed','BluebellSeed'},[-1]={'EmberBloomSeed','AshRoseSeed','IceberrySeed'}},
+ Stands={[1]={'SunflowerSeed','AppleSeed','AmethystSeed'},[-1]={'EmberBloomSeed','AshRoseSeed','SnowdropSeed'}},
  StandStep=1.05,
  Planters={[1]='SunflowerBloomSeed',[-1]='PineappleSeed'},
  Planter={X=22.44,Z=-13.94,Soil=3.79},

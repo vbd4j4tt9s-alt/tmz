@@ -51,7 +51,7 @@ W.env.warn=function(msg,...)if not tostring(msg):find('pack mesh',1,true)then sk
 local map,hub=build(M)
 local stands=hub:FindFirstChild('MerchantStands')
 local C=M.Center
-check(stands and stands:GetAttribute('MarketRevision')==69 and stands:GetAttribute('MarketPolish')==133,'still the R69 market building, R133 polish')
+check(stands and stands:GetAttribute('MarketRevision')==69 and stands:GetAttribute('MarketPolish')==135,'still the R69 market building, R135 polish')
 local now=names(stands)
 local lost={}
 for name,count in pairs(oldNames)do
@@ -185,7 +185,8 @@ local function standsOn(at,size)
   -- World-aligned box: a turned model is up to ~1.45x wider and its box centre shifts a little sideways.
   local foot,b=visibleBottom(m);local d=(foot-at).Magnitude;best=math.min(best,d)
   local flat=V3(foot.X-at.X,0,foot.Z-at.Z).Magnitude;local big=math.max(b.X,b.Y,b.Z)
-  if math.abs(foot.Y-at.Y)<.02 and flat<.15 and big>=size-.06 and big<=size*1.45 and b.Y<=size+.06 then return m end
+  -- R135: a fruit sits on its seat, so a stub or point below it may sink into the crate/step (up to 30% of its height).
+  if foot.Y<=at.Y+.02 and foot.Y>=at.Y-.3*b.Y-.02 and flat<.15 and big>=size-.06 and big<=size*1.45 and b.Y<=size+.06 then return m,at.Y-foot.Y end
  end
  print(('  nearest visible bottom %.3f studs away'):format(best))
 end
@@ -193,7 +194,45 @@ local cr=M.Showcase.Crates
 check(standsOn(C+V3(cr.X[1]-cr.Spacing,cr.Y,cr.Z),cr.Size),'counter fruit sits in its crate at '..cr.Size..' studs (visible size)')
 check(standsOn(C+V3(23.2-2.4/2,M.Showcase.StandStep,-23),1.9),'stand fruit sits on the bottom step')
 check(standsOn(C+V3(23.2,3*M.Showcase.StandStep,-23+2*1.4),1.3),'stand fruit sits on the top step')
-check(standsOn(C+V3(M.Showcase.Planter.X,M.Showcase.Planter.Soil-.05,M.Showcase.Planter.Z),5),'the planter plant grows out of the soil')
+do local plantModel,sunkPlant=standsOn(C+V3(M.Showcase.Planter.X,M.Showcase.Planter.Soil-.05,M.Showcase.Planter.Z),5)
+ check(plantModel and sunkPlant<.05,'the planter plant grows right out of the soil (stem not sunk: '..tostring(sunkPlant)..')')end
+-- R135 (owner: "the berries are still floating; use fruits that stand easier, like the lantern fruit") ------------
+local berries={BluebellSeed=true,IceberrySeed=true}
+local picked={};for _,id in ipairs(M.Showcase.Counter)do picked[#picked+1]=id end
+for _,list in pairs(M.Showcase.Stands)do for _,id in ipairs(list)do picked[#picked+1]=id end end
+local bad={};for _,id in ipairs(picked)do if berries[id]then bad[#bad+1]=id end end
+check(#bad==0,'no berry clusters on the counter or stands ('..table.concat(bad,', ')..')')
+check(table.find(M.Showcase.Counter,'LanternFernSeed')~=nil,'lantern fruit in a counter crate')
+-- Every fruit is one solid piece: its visible parts all touch (the berry clusters were balls touching at a point).
+local function solid(m)
+ local ps={};for _,d in ipairs(m:GetDescendants())do if d:IsA('BasePart')and d.Transparency<.95 then ps[#ps+1]=d end end
+ local function box(p)local sz=p.Size;local mesh=p:FindFirstChildOfClass('SpecialMesh');if mesh and mesh.Scale then sz=V3(sz.X*mesh.Scale.X,sz.Y*mesh.Scale.Y,sz.Z*mesh.Scale.Z)end
+  local e=sz/2;local r=p.CFrame.R;local h=V3(math.abs(r[1][1])*e.X+math.abs(r[1][2])*e.Y+math.abs(r[1][3])*e.Z,math.abs(r[2][1])*e.X+math.abs(r[2][2])*e.Y+math.abs(r[2][3])*e.Z,math.abs(r[3][1])*e.X+math.abs(r[3][2])*e.Y+math.abs(r[3][3])*e.Z)
+  return p.Position-h,p.Position+h,sz end
+ local lo,hi,vol={},{},{};local total=0
+ for i,p in ipairs(ps)do local a,b,sz=box(p);lo[i],hi[i]=a,b;vol[i]=sz.X*sz.Y*sz.Z;total+=vol[i]end
+ local group={};for i=1,#ps do group[i]=i end
+ local function find(i)while group[i]~=i do i=group[i]end;return i end
+ for i=1,#ps do for j=i+1,#ps do
+  if lo[i].X<=hi[j].X+.02 and lo[j].X<=hi[i].X+.02 and lo[i].Y<=hi[j].Y+.02 and lo[j].Y<=hi[i].Y+.02 and lo[i].Z<=hi[j].Z+.02 and lo[j].Z<=hi[i].Z+.02 then group[find(i)]=find(j)end
+ end end
+ local sums={};for i=1,#ps do local g=find(i);sums[g]=(sums[g]or 0)+vol[i]end
+ local best=0;for _,v in pairs(sums)do best=math.max(best,v)end
+ return best/math.max(total,1e-9)
+end
+local weakest,which=1,''
+for _,m in ipairs(show:GetChildren())do if m.Name=='Market fruit'then local s2=solid(m);if s2<weakest then weakest,which=s2,m:GetAttribute('HarvestIndex')end end end
+check(weakest>=.85,('every market fruit is one solid piece (weakest %.0f%% in one piece)'):format(weakest*100))
+-- The lantern sits in its crate: its stub sinks below the crate surface, its body rests on it.
+local lx=cr.X[table.find(M.Showcase.Counter,'LanternFernSeed')]
+local lantern,sunk=standsOn(C+V3(lx,cr.Y,cr.Z),cr.Size)
+check(lantern and sunk>.01,('the lantern sits in its crate (stub %.2f studs into it)'):format(sunk or -1))
+local melon,flat=standsOn(C+V3(23.2-2.4/2,M.Showcase.StandStep,-23),1.9)
+check(melon and flat<.05,'a flat-bottomed watermelon sits right on the step ('..tostring(flat)..')')
+-- The inside shelves stay full of random packs (owner: "fill the shelves inside with packs, it can be random").
+local shelfSpots=0;local sh2=M.Showcase.Shelves
+for _,t in ipairs(sh2.Tops)do for _,side in ipairs({-1,1})do for k=1,sh2.PerShelf do shelfSpots+=1 end end end
+check(shelfSpots==20 and #M.ShelfPacks(shelfSpots,W.env.Random.new(3))==20,'20 random packs for the 4 inside shelves')
 local soilTop=nil;for _,s in ipairs(each(stands,'Planter soil'))do soilTop=top(s)end
 check(soilTop and math.abs(soilTop-(C.Y+M.Showcase.Planter.Soil))<.01,'planter soil top matches where the plant stands')
 -- Shelf packs: 20, random, no repeats; on the shelves.

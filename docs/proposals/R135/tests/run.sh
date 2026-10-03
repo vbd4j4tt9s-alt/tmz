@@ -1,5 +1,5 @@
 #!/bin/sh
-# Usage: sh run.sh [scratch dir]. R133 checks on the Roblox mock with the real modules:
+# Usage: sh run.sh [scratch dir]. R133 + R135 market checks on the Roblox mock with the real modules:
 #  test_market.luau - the owner's R132 play-test fixes: fruit on its visible parts, full random pack shelves, soil,
 #                     wall behind the front sign, no inside MARKET lettering, hanging lights, back pottery, pedestal.
 # Fruit of the Hour display and the home marker: docs/proposals/R132/tests. Tutorial text: tools/tests/test_tutorial.luau.

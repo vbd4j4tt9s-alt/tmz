@@ -9,7 +9,7 @@ M.FruitOfHour=Vector3.new(-20,0,-30)        -- pedestal centre: right of the arr
 function M.Apply(map)
  local hub=assert(map:FindFirstChild('EconomyHub'))
  local old=hub:FindFirstChild('MerchantStands');if old then old:Destroy()end
- local model=Instance.new('Model');model.Name='MerchantStands';model:SetAttribute('MarketRevision',69);model:SetAttribute('MarketPolish',133)
+ local model=Instance.new('Model');model.Name='MerchantStands';model:SetAttribute('MarketRevision',69);model:SetAttribute('MarketPolish',135)
  local wood={194,137,86};local lightWood={246,215,155};local darkWood={80,61,53};local trim={32,121,125}
  local function part(name,size,position,color,material,solid)
   local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=CFrame.new(M.Center+position);p.Color=Color3.fromRGB(unpack(color));p.Material=material or Enum.Material.SmoothPlastic
@@ -160,7 +160,7 @@ function M.Apply(map)
  end
  return model
 end
--- R135 PROPOSAL (fruit that stands). R132 polish, in final (already scaled) local studs. Floor top y=.85; counter top y~4.48; awning edge z~-22.
+-- R135 (owner: fruit that stands). R132 polish, in final (already scaled) local studs. Floor top y=.85; counter top y~4.48; awning edge z~-22.
 -- R133 (owner's play test): every added piece now rests on or hangs from something (string lights hang on their wire
 -- between the porch posts, lamps hang from a ceiling beam, produce stands are solid steps), plants grow out of soil,
 -- every shelf is full of random packs, and the back of the market has pots and crates.
@@ -212,7 +212,7 @@ local function seat(model,center,bounds)
  end
  return bounds.Y*.3
 end
-local function settle(model,origin,at,size,turn)
+local function settle(model,origin,at,size,turn,sits)
  for _,d in ipairs(model:GetDescendants())do
   if d:IsA('BasePart')then d.Anchored=true;d.CanCollide=false;d.CanTouch=false;d.CanQuery=false;d.CastShadow=d.Size.Magnitude>1.2
   elseif d:IsA('BaseScript')or d:IsA('ParticleEmitter')or d:IsA('Sound')then d:Destroy()end
@@ -220,7 +220,7 @@ local function settle(model,origin,at,size,turn)
  local CS=game:GetService('CollectionService')
  for _,d in ipairs({model,table.unpack(model:GetDescendants())})do for _,tag in ipairs(CS:GetTags(d))do CS:RemoveTag(d,tag)end end
  local center,bounds=require(RS:WaitForChild('HarvestGeometry')).Bounds(model)
- local lift=seat(model,center,bounds)
+ local lift=sits and seat(model,center,bounds)or 0 -- fruit sits on its seat; plants and packs stand on their bottom
  local biggest=math.max(bounds.X,bounds.Y,bounds.Z)
  if biggest>0 then
   -- ScaleTo scales about the pivot, so the visible box (and the seat) scale about it too.
@@ -236,7 +236,7 @@ end
 local function fruit(id,parent,origin,at,size,turn)
  local model=require(RS:WaitForChild('HarvestPresentation')).Build({SeedId=id,Mutation='None',Weather='None'})
  assert(model,'no fruit model for '..id);model.Name='Market fruit';model.Parent=parent
- return settle(model,origin,at,size,turn)
+ return settle(model,origin,at,size,turn,true)
 end
 local function plant(id,parent,origin,at,size,turn)
  local model=require(RS:WaitForChild('PlantVisuals')).Build(id,CFrame.new(),nil,4)
