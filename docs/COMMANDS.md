@@ -1,4 +1,4 @@
-# Test commands and tools (R136)
+# Test commands and tools (R137)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -72,6 +72,7 @@
 | `refreshpacks` (server) | Refresh the track now |
 | `refreshcycle 30` (server) | Refresh into reset 30. Legendary every 5 resets, Mythic every 10, The Darkened every 3 |
 | `pity 30`, `spawnodds`, `routes` | Look at guarantees, spawn chances and keeper speeds |
+| `packluck`, `packluck 29 @name` | R137 hidden big-pack luck (players never see it): packs since a 5x+ / 10x+ and the track's refreshes; a number sets the 5x count (29 = next earned pack is 5x+) |
 | `fling storm @name` | Fling them like that biome's keeper (forest … storm, or `darkened`). Tests the air time; nothing drops |
 | `ragdoll 4 @name` | Knock them down for 0.5–10 s |
 | `weather thunder` (server) | `clear`, `rain`, `thunder` or `blizzard`. Add `all` (e.g. `weather rain all`) to make every exposed pack, plant and fruit change: tests the R127 highlights |
@@ -204,3 +205,9 @@ listed separately any more because each one is the same as a command above.
 21. **R136:**
    - `rarepacks @you`, open the Legendary and Mythic ones: charge-up with sparkles swirling in, whoosh + chimes, then a light beam, ring(s) and sparkle burst with a hit. Mythic is bigger and pink (two rings, a spiral up the beam). A second player nearby sees it and hears a sparkle sound.
    - Index: every chance reads `1/…`. Market: three lantern fruits glow on the ceiling cords.
+22. **R137:**
+   - `packluck 29`, steal and bank a pack: it comes out 5x+. `packluck` shows the counters (nothing is shown to players).
+   - `odds forest common`: Legendary 1/60, Mythic 1/400; Desert Mythic 1/600.
+   - Leaderboard: ▲ / ▼, mouse wheel while pointing at it (no camera zoom), drag. Rank 100 reachable.
+   - Graphics Low: hotbar, Bag and the bonus reel still show real 3D pictures (no flat icons).
+   - Index: rarity + 1/N chips, SEED/GROWN chips, CLAIM pill, Common → King order, ringed tab, FOUND total.
