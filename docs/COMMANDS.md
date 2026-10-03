@@ -1,4 +1,4 @@
-# Test commands and tools (R133)
+# Test commands and tools (R134)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -196,3 +196,6 @@ listed separately any more because each one is the same as a command above.
    - Market: fruit sits on the crates and steps (no floating), all 4 shelves are full of mixed packs, soil in the planters and flower boxes, a wall behind the front sign, no MARKET text from inside, lamps hang from a ceiling beam, pots and a barrel at the back.
    - Fruit of the Hour: big fruit, small two-line label above it. `fruithour apple 3` to switch it.
    - Tutorial: Settings > replay the tutorial: casual lines with emojis.
+19. **R134:**
+   - `seeds all`, open the Bag: every seed looks different, no side wings. Hold Diamond Vine, Prism Pepper, Ash Tomato, Iceberry, Venom Vine, Prism Monarch.
+   - Hold a Legendary+ seed: flames/crystals/glows animate; `give prism monarch seed`: crown and golden rays.
