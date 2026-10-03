@@ -200,6 +200,7 @@ function S:AcceptSeed(to,id,offer)
  if count(garden.OutgoingSeedGifts)>=32 or #self.Data:GetChestRecords(to)>=self.Data.Config.MaxSavedChests then self.Remote:FireClient(from,'Status','Finish pending gifts or make inventory room first.');return end
  if self:SeedPaidBlocked(record,from,to)then return end
  local row=self.Data:SerializeSeedRecord(record)
+ row.RateBoost=nil -- R139 (owner: the free pack is "a 1 time thing"): its luck stays with the player who earned it
  if not self.Data:DecodeGiftedSeed(to,row)then self.Remote:FireClient(from,'Status','This item cannot be gifted.');return end
  local tool=self:HeldSeed(from,offer.ItemId,record.Kind)
  -- No yield between inventory removal and persistent outbox staging.

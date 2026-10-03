@@ -32,10 +32,12 @@ G.Steps[5].Seconds=#G.Tips*G.TipSeconds
 G.Welcome={Title='STEAL A PACK!',Text="Hey {name}! 👋",Button="LET'S GO!",
  Strip={{Icon='🎒',Word='STEAL'},{Icon='🏠',Word='RUN HOME'},{Icon='🎁',Word='OPEN'},{Icon='🌱',Word='PLANT'}}}
 G.Waiting={Icon='⏳',Title='PACKS SOON',Chip={Label='HANG TIGHT'},Text="No packs right now, one's coming ⏳"}
-G.Finished={Icon='🏆',Title="YOU'RE READY!",Chip={Label='🎁 FREE LUCKY PACK!'},Text="You're a pro, {name}! 🤑"}
+G.Finished={Icon='🏆',Title="YOU'RE READY!",Chip={Label='🎁 FREE PACK!'},Text="You're a pro, {name}! 🤑"}
 G.FinishedAgain={Label='HAVE FUN {name}!'} -- the chip when the free pack was already given (a replay)
 -- R138 (owner): finishing the tutorial gives one free Forest pack with 2x rates (server: TutorialProgress.GrantStarterPack).
-G.StarterPack={Name='Lucky Forest Pack',Notice='🎁 FREE Lucky Forest Pack! 2x luck 🍀 Check your Bag!'}
+-- R139 (owner: "make it so that players dont know that the pack is 2x luck"): it is named, announced and shows its odds
+-- exactly like any Forest pack; only the server knows.
+G.StarterPack={Name='Seed Pack',Notice='🎁 FREE Forest Seed Pack! Check your Bag!'}
 -- The step row on the card: one icon per step.
 G.Progress={'🎒','🏠','🎁','🌱','💰'}
 -- R138 (owner: "a clicking indicator to visually show players to keep clicking to open a pack").

@@ -193,7 +193,7 @@ check(trailOnTips==0,'no arrows during tips')
 for _=1,60*12 do frames(1);if card.Instruction.Text=="YOU'RE READY!"then break end end
 check(table.find(commands,'TreadmillInfo')~=nil,'tips complete the tutorial')
 check(card.Visible==true and card.Instruction.Text=="YOU'RE READY!"and card.StepIcon.Glyph.Text=='🏆','finish card: YOU\'RE READY! 🏆')
-check(card.Hint.Label.Text=='🎁 FREE LUCKY PACK!','R138: the finish card tells them about the free pack');check(sounds[#sounds]=='GemClaim','finish sound')
+check(card.Hint.Label.Text=='🎁 FREE PACK!','R138: the finish card tells them about the free pack (R139: no word of its luck)');check(sounds[#sounds]=='GemClaim','finish sound')
 check(gui.Confetti.Visible,'confetti on the finish');frames(60*3);check(not gui.Confetti.Visible,'confetti clears')
 check(card.NextTip.Visible==false,'NEXT hidden on finish card')
 frames(60*3);check(card.Visible==false,'finish card hides after 5 s')

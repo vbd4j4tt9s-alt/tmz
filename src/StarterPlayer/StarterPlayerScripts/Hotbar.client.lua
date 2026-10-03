@@ -67,6 +67,67 @@ local rarityMenu=Instance.new('Frame');rarityMenu.Name='RarityOptions';rarityMen
 local rarityCategory='All'
 local slots={};local rows={};local category='All';local visibleSlots=10;local sequence=0;local seen=setmetatable({},{__mode='k'});local toolConns={};local characterConns={};local allConns={};local queued=false;local drag;local suppressedUntil=0;local selectedKey
 local refresh,renderRows,layout
+-- R139 (owner: "new packs will be highlighted temporarily in the inventory, a rainbow border, temporary, fades after
+-- a while"): a pack that arrives while you play (not the ones you had when you joined) gets a spinning rainbow ring on
+-- its hotbar slot and Bag card. It waits until you can see it, stays 4 s, then fades out over 2 s.
+local Run=game:GetService('RunService')
+local GLOW_HOLD,GLOW_FADE,GLOW_MAX=4,2,600
+local knownPacks={};local fresh={};local glowing=setmetatable({},{__mode='k'});local glowConn
+local RAINBOW=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(255,72,72)),ColorSequenceKeypoint.new(.17,Color3.fromRGB(255,170,40)),
+ ColorSequenceKeypoint.new(.33,Color3.fromRGB(255,240,70)),ColorSequenceKeypoint.new(.5,Color3.fromRGB(90,235,110)),ColorSequenceKeypoint.new(.67,Color3.fromRGB(70,190,255)),
+ ColorSequenceKeypoint.new(.83,Color3.fromRGB(150,110,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(255,72,72))})
+local function glowOf(b)
+ local g=b:FindFirstChild('NewGlow')
+ if not g then
+  g=Instance.new('Frame');g.Name='NewGlow';g.BackgroundTransparency=1;g.Size=UDim2.fromScale(1,1);g.Active=false;g.ZIndex=(b.ZIndex or 1)+6;g.Visible=false;g.Parent=b
+  local c=Instance.new('UICorner');c.CornerRadius=UDim.new(0,8);c.Parent=g -- same corners as the card; the ring draws just outside its edge
+  local st=Instance.new('UIStroke');st.Name='Rainbow';st.ApplyStrokeMode=Enum.ApplyStrokeMode.Border;st.Thickness=3.5;st.Color=Color3.new(1,1,1);st.Parent=g
+  local gr=Instance.new('UIGradient');gr.Color=RAINBOW;gr.Parent=st
+ end
+ return g
+end
+local function onScreen(b)
+ if not b.Visible or b.AbsoluteSize.X<=0 then return false end
+ if b:IsDescendantOf(panel)then return panel.Visible end
+ return dock.Visible
+end
+local stepGlow
+local function paintGlow(b,key)
+ local f=key and fresh[key]
+ if not f then local g=b:FindFirstChild('NewGlow');if g then g.Visible=false end;glowing[b]=nil;return end
+ glowing[b]=key;glowOf(b).Visible=true
+ if not glowConn then glowConn=Run.RenderStepped:Connect(function()stepGlow()end)end
+end
+stepGlow=function()
+ local now=os.clock();local calm=GuiService.ReducedMotionEnabled
+ for b,key in pairs(glowing)do
+  local f=fresh[key];local g=b.Parent and b:FindFirstChild('NewGlow')
+  if not f or not g or b:GetAttribute('InventoryKey')~=key and not b:IsDescendantOf(dock)then if g then g.Visible=false end;glowing[b]=nil
+  else
+   if not f.SeenAt and onScreen(b)then f.SeenAt=now end
+   local alpha=0
+   if f.SeenAt then local age=now-f.SeenAt;alpha=age<=GLOW_HOLD and 0 or math.clamp((age-GLOW_HOLD)/GLOW_FADE,0,1)end
+   g.Rainbow.Transparency=alpha;g.Rainbow.UIGradient.Rotation=calm and 45 or(now*140)%360
+  end
+ end
+ for key,f in pairs(fresh)do
+  if f.SeenAt and now-f.SeenAt>GLOW_HOLD+GLOW_FADE or now-f.Born>GLOW_MAX then fresh[key]=nil end
+ end
+ if not next(fresh)then
+  for b in pairs(glowing)do local g=b:FindFirstChild('NewGlow');if g then g.Visible=false end end;table.clear(glowing)
+  if glowConn then glowConn:Disconnect();glowConn=nil end
+ end
+end
+-- New = numbered after your save loaded (the server stamps PackNumber on the tool and PackSerialAtJoin on you), so
+-- the packs you joined with never glow. Each pack glows once: tools rebuilt on a respawn or a sync keep their id.
+local function notePack(tool,key)
+ if not tool:GetAttribute('SeedPackTool')then return end
+ local id=tool:GetAttribute('SeedInventoryId')or tool
+ if knownPacks[id]then return end;knownPacks[id]=true
+ local number,joined=tool:GetAttribute('PackNumber'),player:GetAttribute('PackSerialAtJoin')
+ if not key or type(number)~='number'or type(joined)~='number'or number<=joined then return end
+ local f=fresh[key];if f then f.SeenAt=nil;f.Born=os.clock()else fresh[key]={Born=os.clock()}end
+end
 local function watchTool(tool,onChanged)
  local links={tool:GetPropertyChangedSignal('Name'):Connect(onChanged)}
  for _,attribute in ipairs({'Mutation','PackMutation','Weather'})do table.insert(links,tool:GetAttributeChangedSignal(attribute):Connect(onChanged))end
@@ -173,6 +234,7 @@ renderRows=function()
  for index=firstRow*cols+1,last do used[matched[index].Key]=true end
  -- R113: cards leaving the window are recycled (their picture is parked by look), never rebuilt per item.
  for rowKey,b in pairs(rows)do if not used[rowKey]then rows[rowKey]=nil;Pictures.Clear(b.Picture)
+  paintGlow(b,nil)
   if #freeCards<32 then b.Visible=false;b.Name='SpareItem';b:SetAttribute('InventoryKey',nil);table.insert(freeCards,b)else b:Destroy()end
  end end
  for index=firstRow*cols+1,last do
@@ -188,6 +250,7 @@ renderRows=function()
   local count=item.Entry.Count or 1;b.Count.Text='x'..count;b.Count.Visible=count>1
   Pictures.Show(b.Picture,tool,2)
   b:SetAttribute('Selected',tool.Parent==player.Character)
+  paintGlow(b,item.Key)
  end
 end
 
@@ -205,7 +268,7 @@ refresh=function()
  local items={};local containers={bag};if player.Character then table.insert(containers,player.Character)end
  for _,container in ipairs(containers)do for _,tool in ipairs(container:GetChildren())do if tool:IsA('Tool')then
   if not seen[tool]then sequence+=1;seen[tool]=sequence end
-  local key=stackKey(tool)or Info.Key(tool)or('tool-'..seen[tool]);local order=tool:GetAttribute('GardenShovel')and-1 or seen[tool];local e=items[key]
+  local key=stackKey(tool)or Info.Key(tool)or('tool-'..seen[tool]);notePack(tool,key)local order=tool:GetAttribute('GardenShovel')and-1 or seen[tool];local e=items[key]
   if not e then items[key]={Tool=tool,Order=order,Count=1}
   else -- The equipped copy, else the oldest, represents a stack.
    e.Count+=1;e.Order=math.min(e.Order,order)
@@ -230,6 +293,7 @@ refresh=function()
   b.ItemWeight.Text=tool and Weight.ToolText(tool)or'';Traits.Style(b.ItemWeight,Traits.Tool(tool))
   local count=e and e.Count or 0;b.Count.Text='x'..count;b.Count.Visible=count>1;Pictures.Show(b.Picture,tool,1)
   rarityBorder(b,tool);b:SetAttribute('Selected',e~=nil and tool.Parent==player.Character);b.BackgroundTransparency=e and .10 or .50
+  paintGlow(b,e and State.Slots[i]or nil)
  end
  renderRows()
 end
@@ -379,6 +443,7 @@ local function watchBag(nextBag)
  table.insert(bagConns,bag.ChildAdded:Connect(queue));table.insert(bagConns,bag.ChildRemoved:Connect(queue));queue()
 end
 connect(player.ChildAdded,function(child)if child:IsA('Backpack')then watchBag(child)end end)
+connect(panel:GetPropertyChangedSignal('Visible'),function()if next(fresh)then listDirty=true;renderRows()end end)
 watchBag(bag);connect(player.CharacterAdded,character);character(player.Character)
 connect(search:GetPropertyChangedSignal('Text'),function()listDirty=true;scroll.CanvasPosition=Vector2.zero;renderRows()end)
 connect(scroll:GetPropertyChangedSignal('CanvasPosition'),function()Pictures.Hurry();renderRows()end);connect(scroll:GetPropertyChangedSignal('AbsoluteSize'),renderRows)
@@ -416,6 +481,7 @@ local stopHudLayout=require(RS.HudLayout).Watch(gui,layout)
 connect(pg:GetAttributeChangedSignal('HudNoticeBottom'),layout);refresh()
 for attempt=1,5 do local okay=pcall(function()StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)end);if okay then break end;task.wait(.2)end
 script.Destroying:Connect(function()
+ if glowConn then glowConn:Disconnect();glowConn=nil end
  for _,c in ipairs(allConns)do c:Disconnect()end;for _,c in ipairs(characterConns)do c:Disconnect()end;for _,c in pairs(toolConns)do c:Disconnect()end
  for _,c in ipairs(bagConns)do c:Disconnect()end
  stopHudLayout();CAS:UnbindAction('GardenHotbarCycle');pg:SetAttribute('ChestHotbarReserve',nil);gui:Destroy()

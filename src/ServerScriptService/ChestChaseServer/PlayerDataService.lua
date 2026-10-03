@@ -1025,6 +1025,7 @@ function PlayerDataService:Load(player)
 	end)
 	player:SetAttribute("ChestInventorySerial", math.max(highestChestNumber,
 		type(storedData) == "table" and tonumber(storedData.SeedInventorySerial) or 0))
+	player:SetAttribute("PackSerialAtJoin", player:GetAttribute("ChestInventorySerial")) -- R139: packs numbered above this are new (hotbar rainbow)
 	player:SetAttribute("SeedInventoryCount", #self.ChestRecords[player])
 	player:SetAttribute("LootCount", loadedItemCount)
     local pedestalMigrationNeeded = self.PedestalItems[player] ~= nil
@@ -1094,6 +1095,7 @@ function PlayerDataService:DecodeGiftedSeed(player, saved)
 	if saved.Kind == "Seed" and (type(saved.SeedId) ~= "string" or not self.Config.GetSeedById(saved.SeedId)) then return nil end
 	local record = self:_canonicalizeSeedRecord(self:_decodeSavedSeedRecord(player, saved, 1))
 	if record.Kind == "Seed" and record.SeedId ~= saved.SeedId then return nil end
+	record.RateBoost = nil -- R139: a gifted starter pack arrives as a normal pack (gifts staged before R139 too)
 	return record
 end
 
