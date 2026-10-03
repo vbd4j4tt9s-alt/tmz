@@ -1,4 +1,4 @@
-# Test commands and tools (R137)
+# Test commands and tools (R138)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -211,3 +211,8 @@ listed separately any more because each one is the same as a command above.
    - Leaderboard: ▲ / ▼, mouse wheel while pointing at it (no camera zoom), drag. Rank 100 reachable.
    - Graphics Low: hotbar, Bag and the bonus reel still show real 3D pictures (no flat icons).
    - Index: rarity + 1/N chips, SEED/GROWN chips, CLAIM pill, Common → King order, ringed tab, FOUND total.
+23. **R138:**
+   - Settings > replay the tutorial: picture welcome, icon + 2-3 word cards with key chips, step icon row, clicking indicator while opening (pips fill), 3 picture slides, YOU'RE READY! + confetti.
+   - Finishing it (first time on the account) gives a Lucky Forest Pack (2x rates; tooltip shows 🍀 2x LUCK).
+   - Open packs: Common pop, Uncommon pop + note, Rare sparkle + two notes, small ring/sparkles; `rarepacks @you`: Secret/Cosmic/King louder.
+   - Index: a waiting reward puts a count on INDEX, ! on MENU and a dot on its biome tab; claiming plays ka-ching / gem sound; no gray box above names.
