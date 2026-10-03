@@ -1,4 +1,4 @@
-# Test commands and tools (R135)
+# Test commands and tools (R136)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -201,3 +201,6 @@ listed separately any more because each one is the same as a command above.
    - Hold a Legendary+ seed: flames/crystals/glows animate; `give prism monarch seed`: crown and golden rays.
 20. **R135:**
    - Market: counter crates hold prickly pears, pineapples and glowing lanterns; stands hold watermelons, apples, grape bunches / pumpkins, tomatoes, snow melons. No berries, nothing hovering; inside shelves full of mixed packs.
+21. **R136:**
+   - `rarepacks @you`, open the Legendary and Mythic ones: charge-up with sparkles swirling in, whoosh + chimes, then a light beam, ring(s) and sparkle burst with a hit. Mythic is bigger and pink (two rings, a spiral up the beam). A second player nearby sees it and hears a sparkle sound.
+   - Index: every chance reads `1/…`. Market: three lantern fruits glow on the ceiling cords.
