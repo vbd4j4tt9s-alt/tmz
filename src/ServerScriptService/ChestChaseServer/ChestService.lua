@@ -188,7 +188,7 @@ function ChestService:OnCharacterAdded(player)
 end
 
 function ChestService:Bank(player, seed)
-	local record, reason = self.PlayerData:AddChest(player, seed)
+	local record, reason = self.PlayerData:AddChest(player, seed, {Luck=true}) -- R137: hidden pack-size pity
 	if not record then return nil, reason end
 	self:SyncTools(player)
 	return record
@@ -530,11 +530,13 @@ function ChestService:FindPackPlacement(preferred,stage,variant,size,ownSlot,dro
     return nil
 end
 
-function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,spawnOdds)
+-- rolledSize (R137): the size SkinWorldSeeds already rolled for this spot (after the hidden track pity); it is an
+-- ordinary roll, unlike testSize, so alerts and odds treat it as natural.
+function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,spawnOdds,rolledSize)
     seed.Prompt.MaxActivationDistance=24;seed.Prompt.RequiresLineOfSight=false
     seed.Weather='None';seed.WeatherCheckedEvent=nil;seed.Model:SetAttribute('WeatherTrait','None')
     local variant=forcedVariant or PackRules.RollVariant(self.PackRandom:NextNumber())
-    local size=testSize and PackRules.SanitizePackSize(testSize)or PackRules.RollPackSize(self.PackRandom:NextNumber())
+    local size=testSize and PackRules.SanitizePackSize(testSize)or rolledSize and PackRules.SanitizePackSize(rolledSize)or PackRules.RollPackSize(self.PackRandom:NextNumber())
     local mutation=testMutation and PackRules.MutationKey(testMutation)or PackRules.RollMutation(self.PackRandom:NextNumber())
     seed.PackHome=seed.PackHome or seed.Body.Position
     -- Keep the rolled size: search forward into clear ground instead of shrinking it.
@@ -589,7 +591,17 @@ function ChestService:SkinWorldSeeds(cycle)
     for i in ipairs(self.Map.Chests)do variants[i]=PackRules.RollVariant(self.PackRandom:NextNumber())end
     variants=require(ReplicatedStorage.PackSchedule81).Plan(cycle or 0,variants,function(a,b)return self.PackRandom:NextInteger(a,b)end)
     local odds=require(ReplicatedStorage.RarePackRules).TierProbabilities(cycle or 0,#variants)
-    for i,seed in ipairs(self.Map.Chests)do self:RefreshWorldPack(seed,variants[i],nil,nil,odds[variants[i]])end
+    -- R137: every spot's size is rolled first so the hidden track pity (PackSizePity) can make one random spot big
+    -- after a dry spell. Its counters move with the packs that actually spawned.
+    local Pity=require(ReplicatedStorage.PackSizePity)
+    local sizes={};for i in ipairs(self.Map.Chests)do sizes[i]=PackRules.RollPackSize(self.PackRandom:NextNumber())end
+    sizes=Pity.PlanTrack(self.TrackLuck,sizes,function()return self.PackRandom:NextNumber()end)
+    for i,seed in ipairs(self.Map.Chests)do self:RefreshWorldPack(seed,variants[i],nil,nil,odds[variants[i]],sizes[i])end
+    local biggest=0
+    for _,seed in ipairs(self.Map.Chests)do
+        if seed.Available and table.find(PackRules.VariantOrder,seed.BagVariant)then biggest=math.max(biggest,seed.PackSize or 1)end
+    end
+    self.TrackLuck=Pity.After(Pity.Track,self.TrackLuck,biggest)
 end
 function ChestService:SetWorldPacksClosed(closed)
     for _,seed in ipairs(self.Map.Chests) do self:SetWorldPackAvailable(seed,seed.Available) end

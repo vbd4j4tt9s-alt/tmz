@@ -54,6 +54,7 @@ return {
  {'/test refreshpacks','server: Run the normal track refresh now.'},
  {'/test refreshcycle 30','server: Refresh into reset 30 (Legendary every 5, Mythic every 10, The Darkened every 3).'},
  {'/test pity 30','Preview what reset 30 guarantees. spawnodds shows normal slot chances.'},
+ {'/test packluck @username 29','Hidden big-pack luck (players never see it). 29 makes their next earned pack 5x+.'},
  {'/test routes','Biome lengths and keeper speeds.'},
  {'/test fling storm @username','Fling like a keeper (forest … storm, or darkened). Tests air time; nothing drops.'},
  {'/test ragdoll 4 @username','Ragdoll for 0.5–10 s, like falling in a hole.'},

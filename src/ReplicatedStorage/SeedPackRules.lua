@@ -408,4 +408,29 @@ Rules.Roll=function(config,stage,draw,luck,variantKey,version)
  return N.Roll(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,draw)
 end
 
+-- R137 (owner-approved, docs/proposals/pity_R136): new world/event packs carry OddsVersion 137 (PackOdds137: Legendary and
+-- Mythic rarer down the biome list, no pass-up into Mythic, a missing floor steps down). 112 packs keep PackOdds112 and
+-- older packs their old odds, exactly as before (Void and Mech packs too).
+local N137=require(script.Parent.PackOdds137)
+Rules.OddsVersion=N137.Version
+Rules.OddsVersions={[81]=true,[N.Version]=true,[N137.Version]=true}
+function Rules.ValidOddsVersion(version)return Rules.OddsVersions[version]==true end
+local roll112,odds112=Rules.Roll,Rules.SeedOdds
+local function current137(stage,variantKey,version)
+ return version==N137.Version and stage~=8 and N137.PackFloor[variantKey]~=nil
+end
+local function older(version)return version==N137.Version and N.Version or version end
+Rules.SeedOdds=function(config,stage,variantKey,luck,version)
+ if version==nil then version=N137.Version end
+ if not current137(stage,variantKey,version)then return odds112(config,stage,variantKey,luck,older(version))end
+ local out={};local odds=N137.SeedOdds(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,stage)
+ for id,p in pairs(odds or{})do out[id]=100*p end
+ return out
+end
+Rules.Roll=function(config,stage,draw,luck,variantKey,version)
+ if not current137(stage,variantKey,version)then return roll112(config,stage,draw,luck,variantKey,older(version))end
+ if type(draw)~='function'then return nil end
+ return N137.Roll(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,draw,stage)
+end
+
 return Rules

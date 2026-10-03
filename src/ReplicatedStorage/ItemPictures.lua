@@ -1,23 +1,22 @@
 -- R112: pictures for inventory cards and hotbar slots, built from the game's own art modules.
 -- One template per item look (LRU); only visible holders clone it into a ViewportFrame, within a
--- view/part budget and a few clones per frame. Everything else, and low graphics, shows a flat icon.
+-- view/part budget and a few clones per frame.
 -- R113: released views are parked per look and reused (no rebuild while scrolling); holders just outside a
 -- scroll window stay warm; list looks are prefetched; clones are time-budgeted and hurry while scrolling.
+-- R137 (owner: "sometimes the lower icon versions of the packs and seeds show up [in the hotbar and spinning things]
+-- remove those from the game ... they don't get replaced with the low render versions at all"): the flat 2D icons are
+-- gone. A picture on screen is always the real 3D model: no view/part cap, no Low-graphics swap. While a look is still
+-- being built the holder stays empty (builds now run several per frame while something on screen waits, and
+-- P.Warm builds a set of looks ahead, e.g. the bonus reel). The caps only limit off-screen (warm/parked) views.
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Players=game:GetService('Players');local Tags=game:GetService('CollectionService')
-local P={MaxTemplates=160,MaxViews=60,MaxParts=9000,MaxWarm=36,WarmParts=4000,WarmMargin=240,MaxSpare=48,SpareParts=4000,GuessParts=60,
+local P={MaxTemplates=160,MaxViews=60,MaxParts=9000,MaxWarm=36,WarmParts=4000,WaitBuildSeconds=.008,WarmMargin=240,MaxSpare=48,SpareParts=4000,GuessParts=60,
  CloneSeconds=.0015,HurryCloneSeconds=.004,HurrySeconds=.4,BuildSeconds=.002,HurryBuildSeconds=.004,BuildParts=24,SweepSeconds=.2,Grace=3,RetrySeconds=15,LoadingRetrySeconds=2}
 local RGB=Color3.fromRGB
 local records=setmetatable({},{__mode='k'});local templates={};local templateCount=0
 local queue={};local queued={};local failed={};local fills={};local job;local connection;local sweepClock=0;local dirty=false
 local spare={};local spareCount,spareParts=0,0;local listed={};local warned={};local hurryUntil=0;local cloneSpent=0
 local function mutationKey(value)return(value=='Gold'or value=='Diamond')and value or'None'end
-local function hex(value,fallback)
- if type(value)~='string'or#value~=6 then return fallback end
- local r,g,b=tonumber(value:sub(1,2),16),tonumber(value:sub(3,4),16),tonumber(value:sub(5,6),16)
- return r and g and b and RGB(r,g,b)or fallback
-end
-local function packRules()return require(RS:WaitForChild('SeedPackRules'))end
 -- Same crop identity HarvestPresentation.Build uses, so the key matches what it draws.
 local function harvestCrop(tool,id)
  return {Id=tool:GetAttribute('SourceCropId')or tool:GetAttribute('HarvestInventoryId')or'preview',SeedId=id,PlantScale=1,SeedScale=1,
@@ -139,14 +138,8 @@ local function evict()
   templates[oldest].Model:Destroy();templates[oldest]=nil;templateCount-=1;dropSpare(oldest)
  end
 end
-function P.Low()
- local player=Players.LocalPlayer
- local mode=player and player:GetAttribute('StudioPlantEffects')
- -- R113b: only the player's own Low setting (or the Studio test switch) turns pictures into flat icons.
- -- The automatic frame-rate governor (FastMode / ClientFxBudget) no longer does: it flips on in Studio Play
- -- and on slower devices, and made every picture a flat icon. The per-frame build budget still limits cost.
- return mode=='off'or mode=='low'or(player~=nil and player:GetAttribute('QualityChoice')=='Low')
-end
+-- R137: pictures never switch to a lower look; kept for callers, always false.
+function P.Low()return false end
 -- 'shown' inside every clip; 'near' just outside a scroll window (kept warm for scrolling in).
 local function visible(holder)
  if not holder.Parent or holder.AbsoluteSize.X<=0 or holder.AbsoluteSize.Y<=0 then return false end
@@ -170,70 +163,7 @@ local function visible(holder)
  end
  return false
 end
--- Flat icons: a few native frames, coloured from the same art data.
-local function shape(parent,name,x,y,w,h,color,round,rotation)
- local f=Instance.new('Frame');f.Name=name;f.Position=UDim2.fromScale(x,y);f.Size=UDim2.fromScale(w,h);f.BorderSizePixel=0;f.BackgroundColor3=color;f.Rotation=rotation or 0;f.Active=false;f.Parent=parent
- if round then local c=Instance.new('UICorner');c.CornerRadius=UDim.new(round,0);c.Parent=f end
- return f
-end
-local coats={Gold=RGB(255,201,70),Diamond=RGB(213,247,255)}
-local function shade(frame,top,bottom,rotation)
- local g=Instance.new('UIGradient');g.Rotation=rotation or 90;g.Color=ColorSequence.new(top,bottom);g.Parent=frame;return frame
-end
-local function outline(frame,color,thickness)
- local s=Instance.new('UIStroke');s.ApplyStrokeMode=Enum.ApplyStrokeMode.Border;s.Color=color;s.Thickness=thickness or 1.5;s.Transparency=.15;s.Parent=frame;return frame
-end
-local white,black=RGB(255,255,255),RGB(0,0,0)
--- R113: flat icons shaded like the 3D pictures (gradient body, rim, highlight, soft shadow); rarely seen now.
-local function flat(holder,spec)
- local root=Instance.new('Frame');root.Name='FlatIcon';root.BackgroundTransparency=1;root.Size=UDim2.fromScale(1,1);root.Active=false;root.ZIndex=holder.ZIndex;root.AnchorPoint=Vector2.new(.5,.5);root.Position=UDim2.fromScale(.5,.5);root.Parent=holder
- local aspect=Instance.new('UIAspectRatioConstraint');aspect.AspectRatio=1;aspect.Parent=root
- local ok,rules=pcall(packRules);if not ok then rules=nil end
- local shadow=shape(root,'Shadow',.2,.84,.6,.1,black,1);shadow.BackgroundTransparency=.72
- if spec.Kind=='Pack'then
-  -- R122: the Void Pack keeps its own black-violet look in the flat icon too.
-  local void=spec.Variant=='EclipseReliquary'
-  local theme=void and{Body=RGB(9,5,20),Ink=RGB(48,26,82),Trim=RGB(176,104,255)}or rules and rules.BiomeThemes[spec.Stage]or{Body=RGB(179,138,85),Ink=RGB(57,103,48),Trim=RGB(108,135,61)}
-  local tier=rules and rules.GetPackTier(spec.Variant);local body=coats[spec.Mutation]or theme.Body
-  local bag=shade(shape(root,'Pouch',.24,.1,.52,.76,body,.14,-4),body:Lerp(white,.25),body:Lerp(black,.25));outline(bag,void and RGB(150,80,230)or body:Lerp(black,.55))
-  shade(shape(bag,'Seal',0,0,1,.14,theme.Ink,.3),theme.Ink:Lerp(white,.15),theme.Ink:Lerp(black,.2))
-  if void then
-   local ring=shape(bag,'VoidRing',.2,.24,.6,.44,RGB(255,120,214),1)
-   shape(ring,'VoidHole',.12,.12,.76,.76,black,1);shape(ring,'VoidPupil',.44,.2,.12,.6,RGB(255,30,70),1)
-   for i,at in ipairs({{.12,.2},{.8,.18},{.16,.78},{.78,.74}})do shape(bag,'VoidStar'..i,at[1],at[2],.06,.04,i%2==0 and RGB(150,232,255)or white,1)end
-  else
-   shape(bag,'Label',.16,.26,.68,.34,body:Lerp(white,.62),.2)
-   shape(bag,'Seed',.39,.3,.22,.26,theme.Ink,1,-20)
-  end
-  shape(bag,'TierBand',0,.7,1,.1,tier and tier.Color or theme.Trim,nil)
-  shape(bag,'Shine',.08,.18,.08,.5,white,1).BackgroundTransparency=.7
- elseif spec.Kind=='Seed'or spec.Kind=='Fruit'then
-  local design=rules and rules.SeedDesignById[spec.Id]
-  local top,bottom,ink=hex(design and design.top,RGB(116,185,103)),hex(design and design.bottom,RGB(215,238,161)),hex(design and design.ink,RGB(36,84,52))
-  if coats[spec.Mutation]then top=coats[spec.Mutation];bottom=top:Lerp(white,.45)end
-  if spec.Kind=='Seed'then
-   local body=shade(shape(root,'Seed',.32,.14,.36,.66,top,1,-22),bottom,top:Lerp(black,.3));outline(body,top:Lerp(black,.55))
-   shape(body,'Shine',.22,.14,.22,.3,white,1).BackgroundTransparency=.45;shape(body,'Speck',.5,.52,.16,.12,ink,1)
-  else
-   local fruit=shade(shape(root,'Fruit',.17,.2,.66,.64,top,1),top:Lerp(white,.3),top:Lerp(black,.38));outline(fruit,top:Lerp(black,.6))
-   shape(fruit,'Shine',.18,.14,.26,.2,white,1,-30).BackgroundTransparency=.35
-   shape(root,'Stem',.48,.1,.05,.16,RGB(111,78,45),.4,12);shade(shape(root,'Leaf',.53,.08,.24,.12,RGB(107,196,86),1,-28),RGB(146,222,108),RGB(64,142,58))
-  end
- elseif spec.Shovel then
-  shade(shape(root,'Shaft',.46,.08,.08,.56,RGB(150,104,62),.4,40),RGB(180,130,80),RGB(118,80,46))
-  outline(shade(shape(root,'Blade',.2,.52,.3,.32,RGB(170,178,186),.35,40),RGB(222,228,234),RGB(122,130,140)),RGB(70,76,84),1)
- elseif spec.Tool and spec.Tool:GetAttribute('ChestChaseBat')then
-  local bat=shade(shape(root,'Barrel',.42,.06,.17,.66,RGB(178,139,91),.5,40),RGB(212,172,120),RGB(136,100,60),0);outline(bat,RGB(88,62,38),1)
-  shape(root,'Knob',.22,.6,.14,.1,RGB(43,39,37),.5,40)
- else
-  local icon=require(RS:WaitForChild('GardenTheme')).ControlIcon(root,'Tools');icon.AnchorPoint=Vector2.new(.5,.5);icon.Position=UDim2.fromScale(.5,.5);icon.Size=UDim2.fromScale(.62,.62)
- end
- return root
-end
-local viewCount=0;local lowNow=false
-local function showFlat(r)
- if r.Flat then r.Flat.Visible=true elseif r.Spec then r.Flat=flat(r.Holder,r.Spec)end
-end
+local viewCount=0;local waiting=false
 -- A released view is parked under its look (unparented, so it does not render) and reattached later for free.
 local function park(key,view,parts)
  local list=spare[key];if not list then list={};spare[key]=list end
@@ -249,11 +179,10 @@ end
 local function release(r)
  if r.View then
   local view=r.View;r.View=nil;viewCount-=1
-  if templates[r.ViewKey]and not lowNow then view.Parent=nil;park(r.ViewKey,view,r.Parts)else view:Destroy()end
+  if templates[r.ViewKey]then view.Parent=nil;park(r.ViewKey,view,r.Parts)else view:Destroy()end
   r.ViewKey=nil;r.Parts=0
  end
  fills[r]=nil
- if r.Key then showFlat(r)end
 end
 local function budget()return os.clock()<hurryUntil and P.HurryCloneSeconds or P.CloneSeconds end
 -- Attach a parked view of this look, or clone the template while this frame's clone budget lasts.
@@ -273,7 +202,6 @@ local function fill(r,force)
  end
  t.Used=os.clock();view.ZIndex=r.Holder.ZIndex;view.Parent=r.Holder
  r.View=view;r.ViewKey=r.Key;r.Parts=t.Parts;viewCount+=1;fills[r]=nil
- if r.Flat then r.Flat.Visible=false end
  return true
 end
 local function request(key,spec,urgent)
@@ -317,7 +245,7 @@ local function stepBuild()
 end
 local function sweep()
  local now=os.clock();local shown,near,held={},{},{}
- lowNow=P.Low()
+ waiting=false
  for holder,r in pairs(records)do
   if r.Key then
    local state=visible(holder);r.Visible=state=='shown'
@@ -331,7 +259,16 @@ local function sweep()
  end
  table.sort(shown,order);table.sort(near,order)
  local count,parts=0,0
- local function admit(r,cost,views,partLimit)if not lowNow and count<views and parts+cost<=partLimit then count+=1;parts+=cost;return true end;return false end
+ local function admit(r,cost,views,partLimit)if count<views and parts+cost<=partLimit then count+=1;parts+=cost;return true end;return false end
+ -- R137: everything on screen gets its real picture (never capped); a look whose meshes are still loading
+ -- retries soon and the holder stays empty meanwhile.
+ for _,r in ipairs(shown)do
+  local t=templates[r.Key];count+=1;parts+=t and t.Parts or P.GuessParts
+  if not t then
+   waiting=true
+   if not(failed[r.Key]and now<failed[r.Key])then request(r.Key,r.Spec,true)end
+  elseif not r.View then fills[r]=1 end
+ end
  local function place(list,views,partLimit,rank)
   for _,r in ipairs(list)do
    local t=templates[r.Key]
@@ -341,12 +278,10 @@ local function sweep()
    else release(r)end
   end
  end
- place(shown,P.MaxViews,P.MaxParts,1)
  -- Holders just outside the scroll window keep (or get) a picture, so scrolling reveals finished cards.
  place(near,P.MaxViews+P.MaxWarm,P.MaxParts+P.WarmParts,2)
  -- Recently hidden pictures stay briefly (scroll back, reopen) but never exceed the budget.
  for _,r in ipairs(held)do if now-r.Seen>P.Grace or not admit(r,r.Parts or 0,P.MaxViews+P.MaxWarm,P.MaxParts+P.WarmParts)then release(r)end end
- if lowNow then for key in pairs(spare)do dropSpare(key)end end
 end
 local function active()
  if job or #queue>0 or next(fills)then return true end
@@ -356,7 +291,10 @@ end
 local function step(dt)
  sweepClock+=dt
  if dirty or sweepClock>=P.SweepSeconds or os.clock()<hurryUntil then sweepClock=0;dirty=false;sweep()end
- stepBuild()
+ -- R137: while a picture on screen waits for its look, several looks build per frame (within a small budget).
+ local started=os.clock();local limit=waiting and P.WaitBuildSeconds or 0
+ repeat stepBuild() until not waiting or(not job and #queue==0)or os.clock()-started>=limit
+ if waiting and not job and #queue==0 then dirty=true end
  -- Visible holders first, then warm ones; at least one clone per frame, more while the clone budget lasts.
  local list={};for r in pairs(fills)do table.insert(list,r)end
  table.sort(list,function(a,b)return fills[a]<fills[b]end)
@@ -377,12 +315,10 @@ local function showKey(holder,key,spec,priority)
  r.Priority=priority or r.Priority
  if key==r.Key then if key then r.Spec=spec end;return end
  r.Key=nil;if r.View then release(r)end
- if r.Flat then r.Flat:Destroy();r.Flat=nil end
  r.Key=key;r.Spec=spec
  if not key then return end
- -- R113: a ready look attaches at once (parked view or budgeted clone), so recycled cards never flash a flat icon.
- local ready=not lowNow and viewCount<P.MaxViews+P.MaxWarm and not(failed[key]and os.clock()<failed[key])
- if ready and fill(r)then r.Seen=os.clock()else showFlat(r)end
+ -- R113: a ready look attaches at once (parked view or budgeted clone); R137: otherwise its build is put first.
+ if templates[key]then if fill(r,true)then r.Seen=os.clock()end else request(key,spec,true)end
  wake()
 end
 -- priority: 0 category tabs, 1 hotbar, 2 inventory grid. Passing nil clears the holder.
@@ -391,13 +327,19 @@ function P.ShowSample(holder,name,priority)local key,spec=P.SampleKey(name);show
 function P.Clear(holder)if records[holder]then showKey(holder,nil,nil)end end
 -- R113: the looks of a whole list (in order) are built ahead of time and kept before other looks.
 function P.Prefetch(tools)
- table.clear(listed);if P.Low()then return end
+ table.clear(listed)
  local count=0
  for _,tool in ipairs(tools)do
   local key,spec=P.Key(tool)
   if key and not listed[key]then listed[key]=true;count+=1;if count<=P.MaxTemplates then request(key,spec,false)end end
  end
  if count>0 then wake()end
+end
+-- R137: build these looks ahead (e.g. every card of the bonus reel before it spins), without touching the list order.
+function P.Warm(tools)
+ local count=0
+ for _,tool in ipairs(tools)do local key,spec=P.Key(tool);if key and not templates[key]then request(key,spec,false);count+=1 end end
+ if count>0 then hurryUntil=os.clock()+P.HurrySeconds;wake()end
 end
 -- R113: called while a list scrolls; sweeps every frame and raises the clone budget for a moment.
 function P.Hurry()hurryUntil=os.clock()+P.HurrySeconds;wake()end

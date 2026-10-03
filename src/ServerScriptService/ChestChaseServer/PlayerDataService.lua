@@ -353,9 +353,13 @@ function PlayerDataService:HasChest(player, chestId)
 	return false
 end
 
-function PlayerDataService:AddChest(player, chest)
+-- R137: options.Luck = a pack the player earned (track steal, event pack, treadmill bonus): its size goes through
+-- the hidden pack-size pity (PackSizePityData). Bought, gifted and test packs pass no options.
+function PlayerDataService:AddChest(player, chest, options)
 	local canReceive, reason = self:CanReceiveSeed(player)
 	if not canReceive then return nil, reason end
+	local packSize = chest.PackSize
+	if type(options) == "table" and options.Luck then packSize = self:RollPackLuck(player, chest.Stage, PackRules.VariantKey(chest.BagVariant), PackRules.SanitizePackSize(chest.PackSize)) end
 	local chestNumber = (player:GetAttribute("ChestInventorySerial") or 0) + 1
 	player:SetAttribute("ChestInventorySerial", chestNumber)
 	-- Escaping banks a biome pack; no seed is rolled or discovered yet.
@@ -364,8 +368,8 @@ function PlayerDataService:AddChest(player, chest)
 		ChestNumber = chestNumber, ChestName = "Seed Pack", Kind = "Pack",
 		Stage = chest.Stage, AccentColor = self.Map:GetStageAccent(chest.Stage),
         BagVariant = PackRules.VariantKey(chest.BagVariant),OddsVersion=chest.OddsVersion or 81,
-            PackSize=PackRules.SanitizePackSize(chest.PackSize),PackMutation=PackRules.MutationKey(chest.PackMutation),Weather=Weather.Key(chest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chest.WeatherCheckedEvent),
-        SeedScale = PackRules.NewSeedScale(chest.Stage,chest.BagVariant,chest.PackSize),
+            PackSize=PackRules.SanitizePackSize(packSize),PackMutation=PackRules.MutationKey(chest.PackMutation),Weather=Weather.Key(chest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chest.WeatherCheckedEvent),
+        SeedScale = PackRules.NewSeedScale(chest.Stage,chest.BagVariant,packSize),
 	}
 	table.insert(self:GetChestRecords(player), record)
     if chest.Stage<=self.Config.StageCount then self:MarkTreadmillBiome(player,chest.Stage)end
@@ -724,7 +728,7 @@ function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNu
 			or string.format("%d_%d", player.UserId, chestNumber),
 		Kind = savedChest.Kind == "Pack" and "Pack" or "Seed",
                 PaidRandom=savedChest.PaidRandom==true,
-                BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=(savedChest.OddsVersion==81 or savedChest.OddsVersion==PackRules.OddsVersion)and savedChest.OddsVersion or nil,
+                BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=PackRules.ValidOddsVersion(savedChest.OddsVersion)and savedChest.OddsVersion or nil, -- R137: 81, 112 and 137 all load
             PackSize=PackRules.SanitizePackSize(savedChest.PackSize),PackMutation=PackRules.MutationKey(savedChest.PackMutation),Weather=Weather.Key(savedChest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(savedChest.WeatherCheckedEvent),
                 SeedScale = PackRules.SanitizeSeedScale(savedChest.SeedScale),
 		ChestNumber = chestNumber,
@@ -1029,6 +1033,7 @@ function PlayerDataService:Load(player)
     end
 	self:LoadTreadmillData(player,type(storedData)=="table" and storedData.Treadmill or nil)
     self:LoadFenceData(player,type(storedData)=='table'and storedData.Fence or nil)
+    self:LoadPackLuck(player,type(storedData)=='table'and storedData.PackLuck or nil)
 	player:SetAttribute("DataStatus", "Loaded")
 	self.Loaded[player] = true
 	self.CanSave[player] = true
@@ -1148,6 +1153,7 @@ function PlayerDataService:_buildSaveData(player)
         EquippedBoosts = self:CopyEquippedBoosts(player),
         Treadmill = self:CopyTreadmillData(player),
         Fence = self:CopyFenceData(player),
+        PackLuck = self:CopyPackLuck(player),
 		DiscoveredItems = discoveredItems,
 		PedestalItem = savedPedestalItem,
 		SavedAt = os.time(),
@@ -1722,6 +1728,7 @@ function PlayerDataService:SelectTreadmillSkin(player,tier)
 end
 
 require(script.Parent.GardenFenceData).Install(PlayerDataService)
+require(script.Parent.PackSizePityData).Install(PlayerDataService)
 require(script.Parent.PremiumProgress).Attach(PlayerDataService)
 require(script.Parent.TutorialProgress).Attach(PlayerDataService)
 return PlayerDataService

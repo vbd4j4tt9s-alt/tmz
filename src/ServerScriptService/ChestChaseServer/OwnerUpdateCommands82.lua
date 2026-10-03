@@ -3,7 +3,7 @@ local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Packs=require(RS.SeedPackRules);local T=require(RS.BalanceValues81)
 local State=require(script.Parent.OwnerTestState82)
-local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true}}
+local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true}}
 local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8}
 local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary'}
 local function integer(s,lo,hi)local n=tonumber(s);return n and n==n and n%1==0 and n>=lo and n<=hi and n or nil end
@@ -140,6 +140,16 @@ function X.Execute(ctx,p,action,a)
   local cycle=integer(a[1],0,1000000);if #a~=1 or not cycle then return false,'Use pity <completed reset number>.'end
   local plan=require(RS.PackSchedule81).Plan(cycle,table.create(35,'Pack01'),function(lo)return lo end)
   return true,'Reset '..cycle..': 35 ordinary slots | Legendary guaranteed '..tostring(table.find(plan,'Pack05')~=nil)..' | Mythic guaranteed '..tostring(table.find(plan,'Pack06')~=nil)..' | event '..tostring(require(RS.PackSchedule81).Event(cycle))
+ elseif action=='packluck'then
+  -- R137 owner check of the hidden pack-size pity (players never see it): packluck @name [5x count] [10x count].
+  if #a>2 then return false,'Use packluck @username [packs since a 5x+] [packs since a 10x+].'end
+  if #a>=1 then
+   local big,giant=integer(a[1],0,1000000),a[2]and integer(a[2],0,1000000)or data:GetPackLuck(p).Giant
+   if not big or not giant then return false,'Use packluck @username [packs since a 5x+] [packs since a 10x+].'end
+   data:LoadPackLuck(p,{Big=big,Giant=giant});save(ctx,p)
+  end
+  local mine,track=data:GetPackLuck(p),require(RS.PackSizePity).State(ctx.Chests.TrackLuck)
+  return true,p.Name..': '..mine.Big..' packs since a 5x+ (sure by 30), '..mine.Giant..' since a 10x+ (sure by 200) | track: '..track.Big..' refreshes since a 5x+ (sure by 6), '..track.Giant..' since a 10x+ (sure by 12)'
  elseif action=='refreshcycle'then
   local cycle=integer(a[1],1,1000000);if #a~=1 or not cycle then return false,'Use refreshcycle <completed reset to test>.'end
   if ctx.Map.Refreshing then return false,'Refresh already running.'end

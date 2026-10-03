@@ -204,6 +204,8 @@ do
  A2:SetAttribute('ChestLuckMultiplier',50000000)
  local n,count,bad,scaleBad,labelBad=6000,{},0,0,0
  for _=1,n do
+  -- R137: bonus packs also go through the hidden size pity; with its counters at 0 the natural table shows.
+  Data:LoadPackLuck(A2,{Big=0,Giant=0})
   Bonus.Ready[A2]=1;R.advance(2);local r=invoke(A2)
   local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)]
   if not(r.Ok and last and last.Id==r.Id and want[last.PackSize]and r.Size==last.PackSize)then bad+=1 end

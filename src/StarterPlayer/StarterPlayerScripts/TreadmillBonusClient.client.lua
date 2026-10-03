@@ -251,8 +251,9 @@ local function buildCard(i,pack)
  make('UIGradient',{Color=ColorSequence.new(Color3.new(1,1,1),RGB(150,150,170)),Rotation=90},f)
  local motion=Rules.Special[tierName]and design(f,tierName,color)or nil
  local holder=make('Frame',{Name='Picture',BackgroundTransparency=1,Position=UDim2.fromOffset(6,4),Size=UDim2.new(1,-12,1,-40),ZIndex=6},f)
+ local proxy
  if Pictures then
-  local proxy=Instance.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',pack.Stage)
+  proxy=Instance.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',pack.Stage)
   proxy:SetAttribute('BagVariant',pack.Variant);proxy:SetAttribute('PackMutation','None')
   pcall(Pictures.Show,holder,proxy,2)
  else
@@ -261,7 +262,7 @@ local function buildCard(i,pack)
  local name=text(f,'Rarity',string.upper(tierName),13,color);name.ZIndex=7;name.Size=UDim2.new(1,-6,0,16);name.Position=UDim2.new(0,3,1,-35)
  local biome=text(f,'Biome',pack.Variant==Rules.Void.Variant and Rules.Void.Label or biomeName(pack.Stage),11,RGB(225,230,255));biome.ZIndex=7;biome.Font=Enum.Font.GothamBold
  biome.Size=UDim2.new(1,-6,0,14);biome.Position=UDim2.new(0,3,1,-18)
- local entry={Frame=f,Holder=holder,Stroke=edge,Pack=pack,Tier=tierName,Color=color,Motion=motion};cards[i]=entry;return entry
+ local entry={Frame=f,Holder=holder,Stroke=edge,Pack=pack,Tier=tierName,Color=color,Motion=motion,Proxy=proxy};cards[i]=entry;return entry
 end
 local function place(offset)
  local center=window.AbsoluteSize.X>0 and window.AbsoluteSize.X/2 or(panelW-28)/2
@@ -314,6 +315,8 @@ local function startRoll(res)
  local winner={Stage=res.Stage,Variant=res.Variant}
  local rng=Random.new()
  for i,pack in ipairs(Rules.BuildStrip(stages,winner,function()return rng:NextNumber()end))do buildCard(i,pack)end
+ -- R137: every card's real pack picture is built before it scrolls into view (no flat stand-ins any more).
+ if Pictures and Pictures.Warm then local proxies={};for _,c in ipairs(cards)do if c.Proxy then proxies[#proxies+1]=c.Proxy end end;pcall(Pictures.Warm,proxies)end
  strip.Size=UDim2.fromOffset(#cards*Rules.Strip.Pitch,cardH+2*CARD_Y)
  spin=Rules.NewSpin({Reduced=GuiService.ReducedMotionEnabled,Jitter=rng:NextNumber(-.3,.3)})
  place(spin.Offset)

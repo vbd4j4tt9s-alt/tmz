@@ -1,4 +1,7 @@
 -- R104: independent halfway/end claims, live discovery updates and explicit reward states.
+-- R137 (owner: "polish up the index"): cards with a rarity chip and a 1/N odds chip, a soft rarity glow and pedestal
+-- behind a bigger model, the name under it, SEED / GROWN check chips and a gold CLAIM pill; cards sorted Common to
+-- King; the selected biome tab is ringed; the header shows everything found so far.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Tween=game:GetService('TweenService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local remotes=RS:WaitForChild('ChestChaseRemotes')
 local catalog=remotes:WaitForChild('SeedCatalog');local request=remotes:WaitForChild('PremiumRequest')
@@ -24,6 +27,10 @@ local panel=Instance.new('Frame');panel.Name='IndexPanel';panel.AnchorPoint=Vect
 local limit=Instance.new('UISizeConstraint');limit.MaxSize=Vector2.new(980,760);limit.Parent=panel
 local header=Instance.new('Frame');header.Name='Header';header.Size=UDim2.new(1,0,0,62);header.BorderSizePixel=0;header.Parent=panel;Bright.Header(header)
 local title=text(header,'Title','PLANT INDEX',UDim2.fromOffset(18,3),UDim2.new(1,-88,1,-6),30);title.TextXAlignment=Enum.TextXAlignment.Left
+-- R137: everything found so far, across every biome.
+local total=Instance.new('Frame');total.Name='TotalFound';total.AnchorPoint=Vector2.new(1,.5);total.Position=UDim2.new(1,-66,.5,0);total.Size=UDim2.fromOffset(190,36);total.BackgroundColor3=Color3.fromRGB(14,52,30);total.BackgroundTransparency=.25;total.BorderSizePixel=0;total.Parent=header;Theme.Corner(total,18)
+local totalStroke=Instance.new('UIStroke');totalStroke.Color=Color3.fromRGB(18,50,31);totalStroke.Thickness=2;totalStroke.Parent=total
+local totalText=text(total,'Count','',UDim2.fromOffset(8,0),UDim2.new(1,-16,1,0),16);totalText.TextWrapped=false
 local close=button(header,'Close','X',UDim2.new(1,-54,0,9),UDim2.fromOffset(44,44),Color3.fromRGB(255,61,85))
 local tabs=Instance.new('ScrollingFrame');tabs.Name='BiomeProgress';tabs.Position=UDim2.fromOffset(12,73);tabs.Size=UDim2.new(1,-24,0,68);tabs.BackgroundTransparency=1;tabs.BorderSizePixel=0;tabs.CanvasSize=UDim2.new();tabs.AutomaticCanvasSize=Enum.AutomaticSize.X;tabs.ScrollingDirection=Enum.ScrollingDirection.X;tabs.ScrollBarThickness=3;tabs.Parent=panel
 local tabLayout=Instance.new('UIListLayout');tabLayout.FillDirection=Enum.FillDirection.Horizontal;tabLayout.Padding=UDim.new(0,8);tabLayout.SortOrder=Enum.SortOrder.LayoutOrder;tabLayout.Parent=tabs
@@ -85,7 +92,7 @@ for i,pair in ipairs(order)do
  local stage,name=pair[1],pair[2];local b=button(tabs,'Biome'..stage,'',UDim2.new(),UDim2.fromOffset(122,58),Color3.fromRGB(73,109,204));b.LayoutOrder=i
  local nameLabel=require(RS.BiomeArtwork).Attach(b,name:sub(1,1)..name:sub(2):lower());nameLabel.Name='BiomeLogo';nameLabel.Position=UDim2.fromOffset(12,1);nameLabel.Size=UDim2.fromOffset(44,44);b:SetAttribute('BiomeName',name)
  local countLabel=text(b,'Count','0 / 0',UDim2.fromOffset(56,12),UDim2.new(1,-60,0,24),14)
- local tiny=Instance.new('Frame');tiny.Name='Fill';tiny.Position=UDim2.new(0,5,1,-8);tiny.Size=UDim2.new(0,0,0,4);tiny.BackgroundColor3=Theme.Colors.Mint;tiny.BorderSizePixel=0;tiny.Parent=b
+ local tiny=Instance.new('Frame');tiny.Name='Fill';tiny.Position=UDim2.new(0,5,1,-9);tiny.Size=UDim2.new(0,0,0,5);tiny.BackgroundColor3=Theme.Colors.Mint;tiny.BorderSizePixel=0;tiny.Parent=b;Theme.Corner(tiny,3)
  tabsByStage[stage]={Button=b,Count=countLabel,Fill=tiny,Name=nameLabel}
  b.Activated:Connect(function()selected=stage;list.CanvasPosition=Vector2.zero;if rewardTween then rewardTween:Cancel()end;bonusScale.Scale=1;middleScale.Scale=1;render()end)
 end
@@ -101,6 +108,7 @@ local function resize()
  local barY=compact and progressY+progressH+gemSize/2-barH/2+4 or 198
  local listY=barY+barH/2+gemSize/2+28;local footer=compact and 24 or 37
  header.Size=UDim2.new(1,0,0,headerH);title.TextSize=compact and(tight and 22 or 26)or 30
+ total.Size=UDim2.fromOffset(compact and 150 or 190,compact and headerH-12 or 36);total.Position=UDim2.new(1,-(compact and headerH or 66),.5,0);totalText.TextSize=compact and 13 or 16;total.Visible=panelWidth>=420
  local closeSize=compact and(tight and 32 or 36)or 44
  close.Position=UDim2.new(1,-closeSize-10,0,(headerH-closeSize)/2);close.Size=UDim2.fromOffset(closeSize,closeSize)
  tabs.Position=UDim2.fromOffset(12,tabY);tabs.Size=UDim2.new(1,-24,0,tabH)
@@ -115,7 +123,7 @@ local function resize()
   local bh=compact and tabH-4 or 58;local bw=compact and 106 or 122
   t.Button.Size=UDim2.fromOffset(bw,bh);t.Name.Position=UDim2.fromOffset(compact and 6 or 12,1);t.Name.Size=UDim2.fromOffset(compact and bh-6 or 44,compact and bh-6 or 44)
   t.Count.Position=UDim2.fromOffset(compact and bh+2 or 56,compact and 2 or 12);t.Count.Size=UDim2.new(1,-(compact and bh+6 or 60),0,compact and bh-8 or 24);t.Count.TextSize=compact and 12 or 14
-  local seeds,plants,total=counts(stage);t.Fill.Size=UDim2.fromOffset(math.max(0,(bw-10)*(total>0 and(seeds+plants)/(total*2)or 0)),4)
+  local seeds,plants,total=counts(stage);t.Fill.Size=UDim2.fromOffset(math.max(0,(bw-10)*(total>0 and(seeds+plants)/(total*2)or 0)),5)
  end
  list.Position=UDim2.fromOffset(13,listY);list.Size=UDim2.new(1,-26,1,-listY-footer)
  status.Position=UDim2.new(0,16,1,compact and -22 or -30);status.Size=UDim2.new(1,-32,0,compact and 18 or 24);status.TextSize=compact and 12 or 14
@@ -125,17 +133,48 @@ end
 watch(gui:GetPropertyChangedSignal('AbsoluteSize'),resize)
 watch(list:GetPropertyChangedSignal('AbsoluteSize'),resize)
 local function signature(entry)local id=entry:GetAttribute('SeedId');return tostring(owned('DiscoveredSeeds',id))..':'..tostring(owned('DiscoveredPlants',id))..':'..tostring(amount(id))end
+local RarityRank=require(RS.SeedPackRules).Rarities
+local function rank(rarity)local r=RarityRank[rarity];return r and r.Rank or 1 end
+local function pill(parent,name,pos,size,fill,alpha,line)
+ local f=Instance.new('Frame');f.Name=name;f.Position=pos;f.Size=size;f.BackgroundColor3=fill;f.BackgroundTransparency=alpha or 0;f.BorderSizePixel=0;f.Parent=parent;Theme.Corner(f,10)
+ if line then local st=Instance.new('UIStroke');st.Color=line;st.Thickness=1.5;st.Transparency=.15;st.Parent=f end
+ return f
+end
+local function chip(parent,name,label,known,pos,size)
+ local f=pill(parent,name,pos,size,known and Theme.Colors.Mint or Color3.fromRGB(10,16,36),known and 0 or .45,known and Color3.fromRGB(32,92,24)or Theme.Colors.Line)
+ local t=text(f,'Label',label..(known and'  ✓'or'  ?'),UDim2.fromScale(0,0),UDim2.fromScale(1,1),11,known and Color3.fromRGB(16,44,12)or Theme.Colors.Muted)
+ if known then t.TextStrokeTransparency=1 end
+ return f
+end
 local function makeCard(entry,index)
  local id=entry:GetAttribute('SeedId');local seedKnown=owned('DiscoveredSeeds',id);local adultKnown=seedKnown and owned('DiscoveredPlants',id);local reward=amount(id);local rarity=entry:GetAttribute('Rarity')or'Common'
- local card=Instance.new('TextButton');card.Name=id;card.Text='';card.LayoutOrder=index;card.BorderSizePixel=0;card.AutoButtonColor=false;card.Parent=list
+ local card=Instance.new('TextButton');card.Name=id;card.Text='';card.LayoutOrder=rank(rarity)*10000+index;card.BorderSizePixel=0;card.AutoButtonColor=false;card.Parent=list
  Bright.Card(card,Theme.Rarity(rarity).Accent,selected==8,rarity) -- R123: rarity border
- local name=text(card,'Name',seedKnown and(entry:GetAttribute('DisplayName')or id)or'???',UDim2.fromOffset(6,5),UDim2.new(1,-12,0,38),16)
- local view=Instance.new('ViewportFrame');view.Name='Preview';view.BackgroundTransparency=1;view.Position=UDim2.fromOffset(6,43);view.Size=UDim2.new(1,-12,0,111);view.Ambient=Color3.fromRGB(215,219,240);view.LightColor=Color3.fromRGB(255,253,246);view.Parent=card
+ local style=Theme.Rarity(rarity)
+ -- R137: soft rarity glow and a pedestal shadow behind the model.
+ local glow=Instance.new('Frame');glow.Name='Glow';glow.AnchorPoint=Vector2.new(.5,.5);glow.Position=UDim2.new(.5,0,0,88);glow.Size=UDim2.fromOffset(118,118);glow.BackgroundColor3=style.Color;glow.BackgroundTransparency=seedKnown and .78 or .9;glow.BorderSizePixel=0;glow.Parent=card;Theme.Corner(glow,59)
+ local core=Instance.new('Frame');core.Name='Core';core.AnchorPoint=Vector2.new(.5,.5);core.Position=UDim2.fromScale(.5,.5);core.Size=UDim2.fromScale(.6,.6);core.BackgroundColor3=style.Color;core.BackgroundTransparency=seedKnown and .72 or .9;core.BorderSizePixel=0;core.Parent=glow;Theme.Corner(core,36)
+ local pedestal=Instance.new('Frame');pedestal.Name='Pedestal';pedestal.AnchorPoint=Vector2.new(.5,.5);pedestal.Position=UDim2.new(.5,0,0,138);pedestal.Size=UDim2.new(.62,0,0,12);pedestal.BackgroundColor3=Color3.new();pedestal.BackgroundTransparency=.62;pedestal.BorderSizePixel=0;pedestal.Parent=card;Theme.Corner(pedestal,6)
+ local view=Instance.new('ViewportFrame');view.Name='Preview';view.BackgroundTransparency=1;view.Position=UDim2.fromOffset(6,30);view.Size=UDim2.new(1,-12,0,112);view.Ambient=Color3.fromRGB(215,219,240);view.LightColor=Color3.fromRGB(255,253,246);view.Parent=card
  local stop=Preview.Attach(view,id,false,seedKnown);local adult=false;local generation=0
- local state=text(card,'State',(seedKnown and'SEED' or'???')..'  /  '..(adultKnown and'GROWN' or'???'),UDim2.fromOffset(4,155),UDim2.new(1,-8,0,19),12,adultKnown and Theme.Colors.Mint or Theme.Colors.Muted)
+ -- Top row: rarity chip and the 1/N chance (OddsText85).
  local chance=entry:GetAttribute('BaseChance');local odds=chance and require(RS.OddsText85).Format(chance)or'–'
- local rarityLabel=text(card,'Rarity',rarity..'  '..odds,UDim2.fromOffset(4,171),UDim2.new(1,-8,0,17),12,Theme.Rarity(rarity).Color)
- local caption=text(card,'Reward',reward>0 and('CLAIM $'..Cash.Compact(reward))or'',UDim2.new(0,5,1,-29),UDim2.new(1,-10,0,24),14,reward>0 and Theme.Colors.Gold or Theme.Rarity(rarity).Color)
+ local rarityChip=pill(card,'RarityChip',UDim2.fromOffset(7,7),UDim2.new(.58,-7,0,21),Color3.fromRGB(10,14,32),.2,style.Accent)
+ local rarityLabel=text(rarityChip,'Rarity',string.upper(rarity),UDim2.fromOffset(4,0),UDim2.new(1,-8,1,0),12);Theme.RarityText(rarityLabel,rarity,12,false)
+ local oddsChip=pill(card,'OddsChip',UDim2.new(.58,4,0,7),UDim2.new(.42,-11,0,21),Color3.fromRGB(10,14,32),.2,Theme.Colors.Line)
+ text(oddsChip,'Odds',odds,UDim2.fromOffset(3,0),UDim2.new(1,-6,1,0),12,Color3.new(1,1,1))
+ local name=text(card,'Name',seedKnown and(entry:GetAttribute('DisplayName')or id)or'???',UDim2.fromOffset(6,144),UDim2.new(1,-12,0,22),16)
+ name.TextWrapped=false;name.TextScaled=true;local fit=Instance.new('UITextSizeConstraint');fit.MaxTextSize=16;fit.MinTextSize=10;fit.Parent=name
+ local seedChip=chip(card,'SeedChip','SEED',seedKnown,UDim2.fromOffset(7,170),UDim2.new(.5,-10,0,20))
+ local grownChip=chip(card,'GrownChip','GROWN',adultKnown,UDim2.new(.5,3,0,170),UDim2.new(.5,-10,0,20))
+ local caption
+ if reward>0 then
+  local claimPill=pill(card,'ClaimPill',UDim2.new(0,7,1,-29),UDim2.new(1,-14,0,23),Color3.new(1,1,1),0,Color3.fromRGB(110,64,6))
+  Bright.Gradient(claimPill,Color3.fromRGB(255,232,112),Color3.fromRGB(242,164,34),90)
+  caption=text(claimPill,'Reward','CLAIM $'..Cash.Compact(reward),UDim2.fromScale(0,0),UDim2.fromScale(1,1),14,Color3.fromRGB(70,38,6));caption.TextStrokeTransparency=1
+ else
+  caption=text(card,'Reward',adultKnown and'★ COMPLETE'or'',UDim2.new(0,5,1,-28),UDim2.new(1,-10,0,22),13,Theme.Colors.Mint)
+ end
  local zoom=Instance.new('UIScale');zoom.Scale=1;zoom.Parent=view
  local function show(value)
   if value==adult then return end;adult=value;generation+=1;local token=generation
@@ -156,9 +195,16 @@ end
 render=function()
  if not panel.Visible then return end
  local wanted={}
- for stage,t in pairs(tabsByStage)do local seeds,plants,total=counts(stage);local n=seeds+plants;local max=total*2;t.Count.Text=n..' / '..max;t.Fill.Size=UDim2.fromOffset(math.max(0,(t.Button.Size.X.Offset-10)*(max>0 and n/max or 0)),4);t.Button.BackgroundColor3=stage==selected and Color3.fromRGB(80,149,194)or Color3.fromRGB(73,109,204) end
+ local found,all=0,0
+ for stage,t in pairs(tabsByStage)do
+  local seeds,plants,total=counts(stage);local n=seeds+plants;local max=total*2;found+=n;all+=max
+  t.Count.Text=n..' / '..max;t.Fill.Size=UDim2.fromOffset(math.max(0,(t.Button.Size.X.Offset-10)*(max>0 and n/max or 0)),5);t.Button.BackgroundColor3=stage==selected and Color3.fromRGB(80,149,194)or Color3.fromRGB(73,109,204)
+  -- R137: the open biome gets a white ring.
+  local ring=t.Button:FindFirstChild('BrightOutline');if ring then ring.Color=stage==selected and Color3.new(1,1,1)or Color3.fromRGB(12,17,38);ring.Thickness=stage==selected and 3 or 2 end
+ end
+ totalText.Text='FOUND '..found..' / '..all
  local seeds,plants,total=counts(selected);local complete=total>0 and seeds==total and plants==total;local taken=claimedHere[selected]or player:GetAttribute('IndexBiomeReward'..selected)==true
- progress.Text=seeds..' / '..total..' SEEDS   '..plants..' / '..total..' PLANTS'
+ progress.Text=seeds..'/'..total..' SEEDS  •  '..plants..'/'..total..' PLANTS'
  if fillTween then fillTween:Cancel()end
  fillTween=Tween:Create(fill,TweenInfo.new(Gui.ReducedMotionEnabled and 0 or .22),{Size=UDim2.fromScale(total>0 and math.clamp((seeds+plants)/(total*2),0,1)or 0,1)});fillTween:Play()
  local tuning=require(RS.BalanceValues81);local totalGems=tuning.CompletionGems[selected]or 0

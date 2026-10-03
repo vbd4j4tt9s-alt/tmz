@@ -1,6 +1,14 @@
 # Proposal: more big packs with pity, and rarer Legendary / Mythic seeds
 
-**None of this is in the game yet.** Tell me OK, or change any number, and I'll build it as R137.
+**Status: approved and built in R137** (`docs/releases/R137.md`). The owner added:
+- "the pity thing and giant drop thing has to feel random", "dont put a indicator or anything".
+So the meter and drops are hidden soft ramps, not fixed counters:
+- **Player:** the chance grows after 18 / 150 packs and is sure by 30 / 200.
+- **Track:** it grows after 1 / 5 refreshes and is sure by 6 / 12, at a random spot.
+- **Measured:** a 5x+ every ~20 packs, a 10x+ every ~120, ~7 big packs per server-hour and a 10x+ every ~36 min.
+
+The text below is the proposal as sent.
+
 
 All numbers below come from the real odds code. `odds_now.luau` dumps today's odds from the real `PackOdds112` on the mock, and `sim.py` checks its model against that dump (they match to 0.00000001%). `sim.py` then works out the new numbers and simulates 4,000 server-hours and 3 million pack openings. The full output is in `sim_output.txt`.
 

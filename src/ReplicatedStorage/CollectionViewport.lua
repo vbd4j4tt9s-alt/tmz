@@ -12,7 +12,7 @@ local function silhouette(model)
   elseif p:IsA('Decal')or p:IsA('Texture')or p:IsA('SurfaceAppearance')or p:IsA('ParticleEmitter')or p:IsA('Light')then p:Destroy()end
  end
 end
-local function build(id,adult)
+local function build(id,adult,attempts)
  if not adult then
   local remotes=RS:FindFirstChild('ChestChaseRemotes');local library=remotes and remotes:FindFirstChild('SeedArt');local seeds=library and library:FindFirstChild('Seeds');local model=seeds and seeds:FindFirstChild(id)
   if model then return model:Clone()end
@@ -21,8 +21,10 @@ local function build(id,adult)
  end
  local crop={Id='preview',SeedId=id,PlantScale=1,SeedScale=1,Mutation='None',HarvestCycle=0,PickedMask=0,PlantedAt=0,MatureAt=1,ReadyAt=1}
  local visuals=require(RS.PlantVisuals)
- if visuals.DetailCost(id,crop)<=1500 and visuals.DetailReady(id,crop)then return visuals.Build(id,CFrame.new(),crop,4,math.huge)end
- return require(RS.DistantPlantView).Build(crop,CFrame.new(),math.huge)
+ -- R137 (owner: never the low render versions): always the full plant. While its meshes are still loading the card
+ -- stays empty and retries (it used to show the far-away stand-in, DistantPlantView); after 8 tries it builds anyway.
+ if visuals.DetailReady(id,crop)or(attempts or 0)>=8 then return visuals.Build(id,CFrame.new(),crop,4,math.huge)end
+ return nil
 end
 local function pose(e,t)
  local size=e.View.AbsoluteSize;local aspect=math.max(.25,size.X/math.max(1,size.Y));local half=math.atan(math.tan(math.rad(16))*math.min(1,aspect))
@@ -41,7 +43,7 @@ function V.Attach(view,id,adult,known)
   if dead or e.Busy or e.Ready then return end;e.Busy=true;e.Attempts+=1
   task.defer(function()
    if dead then e.Busy=false;return end
-   local ok,model=pcall(build,id,adult)
+   local ok,model=pcall(build,id,adult,e.Attempts)
    if dead then if ok and model then model:Destroy()end;e.Busy=false;return end
    if ok and model then
     local visible=false
@@ -53,7 +55,7 @@ function V.Attach(view,id,adult,known)
      if known and not adult and require(RS.MechCatalog).ById[id]then e.FX=FX.New(world,'None',true)end
     else model:Destroy()end
    end
-   e.Busy=false;e.RetryAt=os.clock()+math.min(20,2^math.min(e.Attempts-1,5))
+   e.Busy=false;e.RetryAt=os.clock()+math.min(3,.5*2^math.min(e.Attempts-1,3)) -- R137: quick retries while meshes load
    view:SetAttribute('PreviewReady91',e.Ready)
   end)
  end
