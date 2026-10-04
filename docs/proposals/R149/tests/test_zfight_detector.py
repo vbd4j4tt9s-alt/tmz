@@ -29,9 +29,11 @@ def rot_z(a):
     return [[c, -s, 0], [s, c, 0], [0, 0, 1]]
 
 
-def part(name, size, p, color=(200, 0, 0), r=I3, shape='Block', cls='Part', t=0, material='SmoothPlastic', faces=None, area='test'):
-    d = {'path': 'Workspace/' + name, 'name': name, 'class': cls, 'shape': shape, 'size': list(size), 'p': list(p), 'r': r,
+def part(name, size, p, color=(200, 0, 0), r=I3, shape='Block', cls='Part', t=0, material='SmoothPlastic', faces=None, area='test', ltm=None, path=None):
+    d = {'path': path or 'Workspace/' + name, 'name': name, 'class': cls, 'shape': shape, 'size': list(size), 'p': list(p), 'r': r,
          'color': list(color), 'material': material, 't': t, 'area': area}
+    if ltm is not None:
+        d['ltm'] = ltm
     if faces:
         d['faces'] = faces
     return d
@@ -130,5 +132,61 @@ fs, _ = run([part('Aw1', (4, .2, 4), (0, 3, 0)), part('Aw2', (4, .2, 4), (2, 3, 
 check(any(x['faceA'] == 'Bottom' for x in fs), 'undersides 2.9 studs above the floor: counted')
 fs, _ = run([part('Lo1', (4, .2, 4), (0, .4, 0)), part('Lo2', (4, .2, 4), (2, .4, 0), (0, 0, 200))])
 check(not any(x['faceA'] == 'Bottom' for x in fs), 'undersides .3 above the floor: no camera fits under them')
+# 14. LocalTransparencyModifier (the R149 keyboard hides the real track floor and its decals on every client with 1): what is drawn is
+# 1 - (1 - t) x (1 - ltm) for parts and for decals
+check(abs(Z.effective_t(0, 1) - 1) < 1e-9 and abs(Z.effective_t(.5, .5) - .75) < 1e-9 and Z.effective_t(0, 0) == 0 and abs(Z.effective_t(.3, 0) - .3) < 1e-9 and Z.effective_t(1, 0) == 1,
+      'effective transparency = 1 - (1 - t) x (1 - ltm)')
+check(abs(Z.Part(0, part('H', (4, 2, 4), (0, 3, 0), t=.5, ltm=.5)).t - .75) < 1e-9, 'a part with t .5 and ltm .5 is drawn at .75')
+fs, same = run([part('A', (4, 2, 4), (0, 3, 0)), part('B', (4, 2, 4), (2, 3, 0), (0, 0, 200))])
+check(any(x['faceA'] == 'Top' for x in fs), '(control: two coplanar boxes of different colours are found)')
+fs, same = run([part('A', (4, 2, 4), (0, 3, 0), ltm=1), part('B', (4, 2, 4), (2, 3, 0), (0, 0, 200))])
+check(not fs and not same, 'a part hidden with LocalTransparencyModifier 1 (t 0) is not drawn: nothing fights with it (' + str(tiers(fs)) + ')')
+fs, same = run([part('A', (4, 2, 4), (0, 3, 0), ltm=.5), part('B', (4, 2, 4), (2, 3, 0), (0, 0, 200))])
+check(any(x['faceA'] == 'Top' for x in fs), 'a half-hidden part (ltm .5) still draws, so it still fights')
+fs, same = run([part('Hid', (200, 1, 200), (0, -0.5, 0), (80, 160, 80), ltm=1)])
+check(not fs and not same, 'the keyboard\'s hidden floor on top of the map\'s own floor (same plane, both 200 x 200): not drawn, no finding')
+fs, same = run([part('Floor2', (200, 1, 200), (0, -0.5, 0), (80, 160, 80))])
+check(any(x['tier'] == 'coplanar' for x in fs + same), '(control: the same two floors without the modifier are coplanar)')
+deco = [{'kind': 'Decal', 'face': 'Top', 'sig': 'grass', 't': 0, 'ltm': 1}]
+fs, same = run([part('A', (4, 2, 4), (0, 3, 0)), part('B', (4, 2, 4), (2, 3, 0), faces=deco)])
+check(not fs and same, 'a decal hidden with its own LocalTransparencyModifier 1 does not make its face look different (look-alike)')
+deco = [{'kind': 'Decal', 'face': 'Top', 'sig': 'grass', 't': 0, 'ltm': 0}]
+fs, same = run([part('A', (4, 2, 4), (0, 3, 0)), part('B', (4, 2, 4), (2, 3, 0), faces=deco)])
+check(any(x['faceA'] == 'Top' for x in fs), '(control: the same decal without the modifier makes it differ)')
+deco = [{'kind': 'Decal', 'face': 'Top', 'sig': 'grass', 't': .5, 'ltm': .5}]
+fs, same = run([part('A', (4, 2, 4), (0, 3, 0)), part('B', (4, 2, 4), (2, 3, 0), faces=deco)])
+check(any(x['faceA'] == 'Top' for x in fs), 'a decal drawn at .75 still counts as a decoration')
+
+# 15. the keyboard fills the space under its floor: a bed (a Block called Bed, top at 2.4) with keycap meshes standing on it (tops 4.55, 0.5
+# gaps) lies under the (hidden) floor; the rim and pit of a shovel hole lie 0.02 above the key tops, their undersides level
+KB = 'Workspace/KeyboardTrackVisuals/'
+bed = part('Bed', (180, 1, 180), (0, 1.9, 0), (60, 80, 60), path=KB + 'Bed/Bed')
+keys = [part('Key', (7.68, 4.65, 7.68), (-86 + 8.18 * i, 2.225, -86 + 8.18 * j), (150, 200, 120), shape='Mesh', cls='MeshPart', path=KB + 'Keys/Key') for i in range(22) for j in range(22)]
+cyl = rot_z(math.pi / 2)
+hole = [part('Rim', (.04, 4, 4), (0, 4.59, 0), (100, 70, 40), r=cyl, shape='Cylinder', path='Workspace/TrackHoles/H/Rim'),
+        part('Pit', (.08, 3.4, 3.4), (0, 4.61, 0), (40, 30, 20), r=cyl, shape='Cylinder', path='Workspace/TrackHoles/H/Pit')]
+check(abs(keys[0]['p'][1] + 4.65 / 2 - 4.55) < 1e-9 and abs(hole[0]['p'][1] - .02 - 4.57) < 1e-9, '(the scene: key tops 4.55, hole undersides 4.57)')
+fs, same = run(keys + [bed] + hole)
+check(not [x for x in counted(fs) if x['faceA'] in ('Left', 'Right') and 'TrackHoles' in x['pathA']], 'a shovel hole\'s rim and pit undersides 0.02 above the key tops: no camera fits, not counted (' + str([x['faceA'] for x in counted(fs)]) + ')')
+fs, same = run(hole)
+check([x for x in counted(fs) if x['faceA'] in ('Left', 'Right') and 'TrackHoles' in x['pathA']], '(control: the same hole 0.57 above a plain floor: its undersides are found)')
+# the real floor's undersides inside the keyboard (the floor slab y 3 .. 4 over the bed, 0.6 above its top) and a wall's: filled by keys
+slab = part('GroundSlab', (180, 1, 180), (0, 3.5, 0), (80, 160, 80), ltm=0, path='Workspace/Map/Slab')
+wall = part('Wall', (3, 1, 40), (0, 3.5, 0), (200, 200, 200), path='Workspace/Map/Wall')
+fs, same = run(keys + [bed, slab, wall])
+check(not [x for x in counted(fs) if x['faceA'] == 'Bottom'], 'two parts whose undersides (y 3.0) lie over the bed inside the keyboard: the keycaps fill that space, not counted (' + str([(x['pathA'], x['faceA']) for x in counted(fs)]) + ')')
+bed2 = part('Bed', (180, 1, 180), (0, 1.9, 0), (60, 80, 60), path='Workspace/Elsewhere/Bed')
+fs, same = run([bed2, slab, wall])
+check([x for x in counted(fs) if x['faceA'] == 'Bottom'], '(control: the same slab and wall over a plain block 0.6 below: their undersides count)')
+# above the key layer there is room: an awning 3 studs above the key tops is still checked
+aw1 = part('Aw1', (4, .2, 4), (0, 7.6, 0), path='Workspace/Awning/A1')
+aw2 = part('Aw2', (4, .2, 4), (2, 7.6, 0), (0, 0, 200), path='Workspace/Awning/A2')
+fs, same = run(keys + [bed, aw1, aw2])
+check([x for x in counted(fs) if x['faceA'] == 'Bottom'], 'an awning 3 studs above the key tops: a camera fits under it, still counted')
+# beside the keyboard (outside the bed's rectangle) nothing is filled
+aw3 = part('Aw3', (4, .2, 4), (94, 3, 0), path='Workspace/Awning/A3')
+aw4 = part('Aw4', (4, .2, 4), (96, 3, 0), (0, 0, 200), path='Workspace/Awning/A4')
+fs, same = run(keys + [bed, aw3, aw4])
+check([x for x in counted(fs) if x['faceA'] == 'Bottom'], 'beside the keyboard the space under a face is free (3 studs up over the floor): counted')
 print('%d checks, %d failed' % (checks, fails))
 sys.exit(1 if fails else 0)

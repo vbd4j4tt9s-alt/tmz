@@ -22,6 +22,7 @@ local W=require(RS:WaitForChild('WeatherWorld149'));local Patches=require(RS:Wai
 local Fx=require(RS:WaitForChild('ClientFxBudget'));local Mood=require(RS:WaitForChild('BiomeMood'))
 local V3,V2,CF=Vector3.new,Vector2.new,CFrame.new
 local floor,min,max,abs=math.floor,math.min,math.max,math.abs
+local byte=string.byte
 local clock=os.clock
 local player=Players.LocalPlayer
 local KP,NR,NS=ColorSequence.new,NumberRange.new,NumberSequence.new
@@ -42,6 +43,7 @@ local tierCfg=W.Tier(3);local reduced=false
 local kind='Clear';local profile=nil;local shownKind='Clear'
 local blend=0
 local area=W.Area({GetAttribute=function()return nil end});local areaNext={}
+local areaMap,areaConn,areaDirty=nil,nil,true       -- the map the area was read from, its AttributeChanged connection, 'read it again'
 local fx,fy,fz,fgy=0,0,0,0;local haveFocus=false;local inBase=true
 local win={I=nil,J=nil,Size=0}
 local tiles,tileOf,tileCount={}, {},0
@@ -200,18 +202,20 @@ end
 -- Snow patches (blizzard) -----------------------------------------------------------------------------------------------------
 local events=W.NewEvents()
 local poolW=nil;local bound,boundList,boundN={}, {},0;local rejected,rejectedN={},0
-local plots,plotN,plotsDirty={}, 0,true;local basesWatch
+local plots,plotN,plotsDirty={}, 0,true;local basesWatch,basesOf
 local function patchKey(i,j)return W.CellKey(i,j)end
 local function collectPlots()
  plotsDirty=false;plotN=0
  local map=workspace:FindFirstChild('ChestChaseMap');local bases=map and map:FindFirstChild('Bases')
  if not bases then return end
- if not basesWatch then
-  basesWatch=bases.DescendantAdded:Connect(function(d)if d.Name:match('^DirtPlot_%d')then plotsDirty=true end end)
-  conns[#conns+1]=basesWatch
+ if bases~=basesOf then -- (a refreshed map has a new Bases: watch that one, the old connection goes)
+  if basesWatch then basesWatch:Disconnect() end
+  basesOf=bases
+  -- every garden part that streams in passes here: one byte compare first ('D' = 68), the pattern only for names that start with it
+  basesWatch=bases.DescendantAdded:Connect(function(d)local n=d.Name;if byte(n,1)==68 and n:match('^DirtPlot_%d')then plotsDirty=true end end)
  end
  for _,d in ipairs(bases:GetDescendants())do
-  if d:IsA('BasePart')and d.Name:match('^DirtPlot_%d')then
+  if byte(d.Name,1)==68 and d:IsA('BasePart')and d.Name:match('^DirtPlot_%d')then
    local c,s=d.CFrame,d.Size;local r,u=c.RightVector,c.UpVector;local l=r:Cross(u) -- the part's own axes (a plot may be turned a quarter)
    plotN+=1;local row=plots[plotN]or{};plots[plotN]=row
    row[1],row[2]=c.Position.X,c.Position.Z
@@ -277,7 +281,8 @@ local function bindPatch(i,j,now)
  end
  rec.Key=key;bound[key]=rec;boundN+=1;boundList[boundN]=rec;rec.Idx=boundN
  rec.T=W.PatchTransparency(levelOf(rec,now))
- if Patches.Fill(poolW,rec,s.N,1,y+W.Patch.Rise+s.Thickness/2)==0 then dropPatch(rec)end
+ -- (a deterministic step by cell parity: overlapping patches of neighbouring cells never share a plane, W.PatchStep)
+ if Patches.Fill(poolW,rec,s.N,1,y+W.Patch.Rise+s.Thickness/2+W.PatchStep(i,j))==0 then dropPatch(rec)end
  return true
 end
 local function updatePatches(now,snowing)
@@ -329,7 +334,9 @@ local function step(dt,now)
  if tierNow==nil then tierNow,tierWant,tierSince=t,t,now
  else
   if t~=tierWant then tierWant,tierSince=t,now end
-  if tierWant~=tierNow and now-tierSince>=W.TierHold then tierNow=tierWant;tierCfg=W.Tier(tierNow);releaseAll();win.I=nil;buildPatchPool();if profile then setKind(kind,now)end end
+  -- (a tier change re-profiles the weather that is SHOWN: while it fades out (kind is Clear already) the fade goes on with the new tier's
+  -- numbers instead of being cut by setKind('Clear') dropping the profile)
+  if tierWant~=tierNow and now-tierSince>=W.TierHold then tierNow=tierWant;tierCfg=W.Tier(tierNow);releaseAll();win.I=nil;buildPatchPool();if profile and shownKind~='Clear'then setKind(shownKind,now)end end
  end
  tierCfg=W.Tier(tierNow)
  if not poolW then buildPatchPool()end
@@ -338,6 +345,9 @@ local function step(dt,now)
  if k~=kind then kind=k end
  local wasReduced=profile and profile.Gust==0
  if k~='Clear'and(shownKind~=k or(profile~=nil and wasReduced~=reduced))then shownKind=k;setKind(k,now)end
+ -- clear sky and nothing left to fade out or show (the tiles went quiet in the step the fade ended): no base check, no area read, no ground
+ -- raycast - that was ~10 raycasts and ~150 attribute reads a second for nothing. Weather starting is noticed above (kind / shownKind).
+ if kind=='Clear'and shownKind=='Clear'and blend<=0 and boundN==0 and not W.Active(events,now)then return end
  -- where the player is: weather belongs to the base (R129)
  inBase=true
  if p then
@@ -347,9 +357,15 @@ local function step(dt,now)
  local active=kind~='Clear'and inBase and haveFocus
  blend=max(0,min(1,blend+(active and dt/W.Ramp.Up or-dt/W.Ramp.Down)))
  if blend<=0 and kind=='Clear'and shownKind~='Clear'then shownKind='Clear';profile=nil end
- -- weather area (the track rectangle) and the player's ground
+ -- weather area (the track rectangle): read again only when the map's attributes change (or the map instance is a new one)
  local map=workspace:FindFirstChild('ChestChaseMap')
- if map then
+ if map~=areaMap then
+  if areaConn then areaConn:Disconnect();areaConn=nil end
+  areaMap=map;areaDirty=true
+  if map then areaConn=map.AttributeChanged:Connect(function()areaDirty=true end)end
+ end
+ if map and areaDirty then
+  areaDirty=false
   W.Area(map,areaNext)
   if not W.SameArea(areaNext,area)then area,areaNext=areaNext,area;releaseAll();clearPatches()end
  end
@@ -393,6 +409,8 @@ local destroyed=false
 local function cleanup()
  if destroyed then return end;destroyed=true;running=false
  for _,c in ipairs(conns)do c:Disconnect()end;table.clear(conns)
+ if areaConn then areaConn:Disconnect();areaConn=nil end
+ if basesWatch then basesWatch:Disconnect();basesWatch=nil end
  for _,t in ipairs(tiles)do t.Emitter:Clear();t.Spray:Clear();t.Ripple:Clear()end
  table.clear(tiles);table.clear(tileOf);table.clear(bound);table.clear(boundList);boundN=0
  folder:Destroy()

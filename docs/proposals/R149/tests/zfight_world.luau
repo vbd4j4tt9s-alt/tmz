@@ -138,7 +138,8 @@ function Z.path(o,stop)
  return table.concat(t,'/')
 end
 -- Every visible BasePart under root (Transparency < 1, or see-through but carrying a SurfaceGui / Decal / Texture, which still draws)
--- with its face decorations; `area` is a label from areaOf(part) (or nil).
+-- with its face decorations; `area` is a label from areaOf(part) (or nil). A part / decal with a LocalTransparencyModifier (the R149 keyboard
+-- hides the real track floor and its decals with 1 on the client) carries it as "ltm": zfight.py draws with 1 - (1 - t) x (1 - ltm).
 function Z.dump(root,areaOf,extra)
  local out={}
  local function walk(o)
@@ -153,7 +154,7 @@ function Z.dump(root,areaOf,extra)
     local faces,mesh={},nil
     for _,d in ipairs(c._children)do
      if d._class=='Decal'or d._class=='Texture'then
-      faces[#faces+1]=string.format('{"kind":%s,"face":%s,"sig":%s,"t":%s}',q(d._class),q(enumName(d._props.Face)or'Front'),q(d._props.Texture or''),n4(d._props.Transparency or 0))
+      faces[#faces+1]=string.format('{"kind":%s,"face":%s,"sig":%s,"t":%s,"ltm":%s}',q(d._class),q(enumName(d._props.Face)or'Front'),q(d._props.Texture or''),n4(d._props.Transparency or 0),n4(d._props.LocalTransparencyModifier or 0))
      elseif d._class=='SurfaceGui'and d._props.Enabled~=false then
       faces[#faces+1]=string.format('{"kind":"SurfaceGui","face":%s,"sig":%s,"t":0,"alwaysOnTop":%s}',q(enumName(d._props.Face)or'Front'),q('gui:'..d._props.Name),d._props.AlwaysOnTop and'true'or'false')
      elseif d._class=='SpecialMesh'then
@@ -162,14 +163,15 @@ function Z.dump(root,areaOf,extra)
      end
     end
     local area=areaOf and areaOf(c)or nil
+    local ltm=c._props.LocalTransparencyModifier or 0
     local saved=''
     if c._place and c._place.cf then
      local t={};for k,v in ipairs(c._place.cf)do t[k]=string.format('%.6g',v)end
      saved=string.format(',"saved":{"cf":[%s],"s":[%s,%s,%s]}',table.concat(t,','),string.format('%.6g',c._place.s[1]),string.format('%.6g',c._place.s[2]),string.format('%.6g',c._place.s[3]))
     end
-    out[#out+1]=string.format('{"path":%s,"name":%s,"class":%s,"shape":%s,"size":[%s,%s,%s],"p":[%s,%s,%s],"r":[[%s,%s,%s],[%s,%s,%s],[%s,%s,%s]],"color":%s,"material":%s,"t":%s%s%s%s%s}',
+    out[#out+1]=string.format('{"path":%s,"name":%s,"class":%s,"shape":%s,"size":[%s,%s,%s],"p":[%s,%s,%s],"r":[[%s,%s,%s],[%s,%s,%s],[%s,%s,%s]],"color":%s,"material":%s,"t":%s%s%s%s%s%s}',
      q(Z.path(c)),q(c._props.Name),q(cls),q(shape),n4(s.X),n4(s.Y),n4(s.Z),n4(p.X),n4(p.Y),n4(p.Z),n4(r[1][1]),n4(r[1][2]),n4(r[1][3]),n4(r[2][1]),n4(r[2][2]),n4(r[2][3]),n4(r[3][1]),n4(r[3][2]),n4(r[3][3]),
-     rgb(c._props.Color),q(enumName(c._props.Material)or'Plastic'),n4(c._props.Transparency or 0),#faces>0 and(',"faces":['..table.concat(faces,',')..']')or'',mesh and(',"mesh":'..mesh)or'',area and(',"area":'..q(area))or'',saved)
+     rgb(c._props.Color),q(enumName(c._props.Material)or'Plastic'),n4(c._props.Transparency or 0),(ltm~=0)and(',"ltm":'..n4(ltm))or'',#faces>0 and(',"faces":['..table.concat(faces,',')..']')or'',mesh and(',"mesh":'..mesh)or'',area and(',"area":'..q(area))or'',saved)
    end
    walk(c)
   end

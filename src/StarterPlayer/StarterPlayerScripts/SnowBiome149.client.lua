@@ -14,7 +14,13 @@
 --    spacebar zone at the start: the "Snow" bar and its label stay clean;
 --  * a light DUSTING of small discs between them, kept AWAY from the runner: dust is invisible within (legend radius + 6) studs of him and
 --    fades in beyond, so the letters on the keys under and around his feet are never covered; off on tier 1 / FastMode;
---  * nothing within 16-24 studs of a pack or a keeper camp of the biome (they stay legible), nothing past the floor edges or the biome ends.
+--  * nothing within 16-24 studs of a pack or a keeper camp of the biome (they stay legible), nothing past the floor edges or the biome ends;
+--  * SHOVEL HOLES (R149 review): a patch lies a little higher than a hole's Pit / Rim (the keyboard lifts them onto the key tops), so a patch
+--    over a hole would hide an armed trap. Every hole of the biome (its Pit) is on the avoid list: a patch whose discs reach a hole is
+--    dropped, and not bound again until the hole is gone (never put on `skip`: those cells come back). The list is re-read every second,
+--    and at once when a hole appears / goes, whatever the pack count does: packs, camps and holes that moved or went re-open their cells;
+--  * HEIGHT STEPS: patches of neighbouring cells lie in four different planes (WeatherWorld149.BiomeStep, .004 apart, all lobes of one
+--    patch in one plane) so two overlapping patches are never coplanar (they are opaque now: nothing fights, nothing is translucent).
 -- Budgets: ClientFxBudget tiers (window radius, part budget, lobes per distance band), 5 Hz scans, bounded binds / reshapes per scan,
 -- pooled parts, nothing allocated per frame. The keyboard script is only read (its config and its folder), never changed.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
@@ -35,19 +41,20 @@ local pool=nil
 local z0,z1,cx=nil,nil,0;local layoutSig=''
 local surface=nil
 local bound,boundList,boundN={}, {},0;local skip,skipN={}, 0
-local avoid,avoidN={}, 0;local avoidCount=-1
+local avoidSkip,avoidSkipN={}, 0                       -- cells rejected for an avoid zone (pack, camp, hole): re-opened when the list changes
+local avoid,avoidN={}, 0;local avoidSig=-1
 local fx,fz=0,0;local haveFocus=false
 local stepClock,slowClock=0,1
 local reshapeCursor=1
 
-local function patchY(rec)return surface+B.Rise+(rec.Spec.Thickness or B.Thickness)/2 end
+local function patchY(rec)return surface+B.Rise+(rec.Spec.Thickness or B.Thickness)/2+(rec.Step or 0)end
 local function dropPatch(rec)
  local last=boundList[boundN];boundList[rec.Idx]=last;last.Idx=rec.Idx;boundList[boundN]=nil;boundN-=1
  bound[rec.Key]=nil;Patches.Release(pool,rec)
 end
 local function clearAll()
  if pool then while boundN>0 do dropPatch(boundList[boundN])end end
- table.clear(skip);skipN=0
+ table.clear(skip);skipN=0;table.clear(avoidSkip);avoidSkipN=0
 end
 local function buildPool()
  if pool then clearAll();Patches.Destroy(pool)end
@@ -60,22 +67,80 @@ local function readSurface()
  if K and keyboard then return K.KeyTop(0)end
  return(K and K.Config.FloorTop or 4)
 end
--- Packs and keeper camps of this biome: patches keep clear of them.
+-- Packs and keeper camps of this biome: patches keep clear of them (a circle, 16 / 24 studs plus half the patch). Shovel holes (their Pit, in
+-- the biome's range): a patch that reaches the hole's rim with any of its discs is dropped. avoid[k] = {x, z, radius, isHole}.
+local holesFolder,holesWatch,holeConns=nil,nil,{}
+local function findHoles()
+ if holesFolder and holesFolder:IsDescendantOf(workspace)then return holesFolder end
+ local runtime=map:FindFirstChild('_GameplayRuntime')
+ holesFolder=runtime and runtime:FindFirstChild('TrackHoles')
+ if not holesFolder then runtime=workspace:FindFirstChild('_GameplayRuntime');holesFolder=runtime and runtime:FindFirstChild('TrackHoles')end
+ if not holesFolder then holesFolder=map:FindFirstChild('TrackHoles')end
+ return holesFolder
+end
+local function addAvoid(x,z,r,isHole)
+ avoidN+=1;local a=avoid[avoidN]or{};avoid[avoidN]=a;a[1],a[2],a[3],a[4]=x,z,r,isHole
+ return a
+end
 local function readAvoid()
  avoidN=0
+ local sig=0
  local seeds=map:FindFirstChild('Seeds')
  if seeds then for _,m in ipairs(seeds:GetChildren())do if m:GetAttribute('Stage')==STAGE then
   local ok,pivot=pcall(m.GetPivot,m)
-  if ok and pivot then avoidN+=1;local a=avoid[avoidN]or{};avoid[avoidN]=a;a[1],a[2],a[3]=pivot.Position.X,pivot.Position.Z,16 end
+  if ok and pivot then addAvoid(pivot.Position.X,pivot.Position.Z,16,false)end
  end end end
  local camps=map:FindFirstChild('GuardianEncounters')
  if camps then for _,m in ipairs(camps:GetChildren())do if m:GetAttribute('Stage')==STAGE then
   local home=m:GetAttribute('GuardianHomeCFrame')
-  if typeof(home)=='CFrame'then avoidN+=1;local a=avoid[avoidN]or{};avoid[avoidN]=a;a[1],a[2],a[3]=home.Position.X,home.Position.Z,24 end
+  if typeof(home)=='CFrame'then addAvoid(home.Position.X,home.Position.Z,24,false)end
  end end end
+ local f=findHoles()
+ if f then
+  -- changes to the holes re-read the list at once (a hole must never sit under a patch for a second); re-hooked when the folder is replaced
+  if f~=holesWatch then
+   for _,c in ipairs(holeConns)do c:Disconnect()end;table.clear(holeConns)
+   holesWatch=f
+   holeConns[1]=f.DescendantAdded:Connect(function()slowClock=1 end);holeConns[2]=f.DescendantRemoving:Connect(function()slowClock=1 end)
+  end
+  local lo,hi=(z0 or -math.huge)-20,(z1 or math.huge)+20
+  for _,model in ipairs(f:GetChildren())do
+   local pit=model:FindFirstChild('Pit')
+   if pit then
+    local p=pit.Position
+    if p.Z>=lo and p.Z<=hi then
+     -- the rim's outer edge (the Pit is a Cylinder lying on its side: Y / Z are its diameter) and a little margin
+     local rim=model:FindFirstChild('Rim');local d=math.max(pit.Size.Y,pit.Size.Z)
+     if rim and rim:IsA('BasePart')then d=math.max(d,rim.Size.Y,rim.Size.Z)end
+     addAvoid(p.X,p.Z,d*.5+.3,true)
+    end
+   end
+  end
+ end
+ for k=1,avoidN do local a=avoid[k];sig=(sig*31+floor(a[1]*8)*7+floor(a[2]*8)*13+floor(a[3]*8)*17+(a[4]and 5 or 3))%1000000007 end
+ return sig*7+avoidN
 end
-local function nearAvoid(x,z,extent)
- for k=1,avoidN do local a=avoid[k];local dx,dz=x-a[1],z-a[2];local r=a[3]+extent*.5;if dx*dx+dz*dz<r*r then return true end end
+-- Does any disc of the patch in `s` (its lobes: centre + LX/LZ, half sizes LA along (sin yaw, cos yaw) / LB across, the lone far lobe
+-- stretched by FarScale) reach the circle (x, z, r)? The ellipse grown by r on both axes: a little generous at the ends, never short.
+local function reachesHole(s,x,z,r)
+ for k=1,s.N do
+  local f=(k==1 and s.N>1)and B.FarScale or 1
+  local dx,dz=x-(s.X+s.LX[k]),z-(s.Z+s.LZ[k])
+  local sy,cy=math.sin(s.LY[k]),math.cos(s.LY[k])
+  local u=dx*sy+dz*cy;local v=-dx*cy+dz*sy
+  local a,b=s.LA[k]*f+r,s.LB[k]*f+r
+  if(u/a)^2+(v/b)^2<1 then return true end
+ end
+ return false
+end
+-- avoided: a patch (spec s, extent) near a pack / camp circle, or reaching a hole
+local function nearAvoid(s)
+ local x,z,extent=s.X,s.Z,s.Extent
+ for k=1,avoidN do
+  local a=avoid[k]
+  if a[4]then if reachesHole(s,a[1],a[2],a[3])then return true end
+  else local dx,dz=x-a[1],z-a[2];local r=a[3]+extent*.5;if dx*dx+dz*dz<r*r then return true end end
+ end
  return false
 end
 local function readLayout()
@@ -93,17 +158,21 @@ local function bind(i,j)
  local key=W.CellKey(i,j);local s=rec.Spec
  local ok=W.BiomeSpec(i,j,z0,z1,cx,s)
  if ok and s.Kind=='dust'and not cfg.Biome.Dust then ok=false end
- if ok and nearAvoid(s.X,s.Z,s.Extent)then ok=false end
+ local avoided=false
+ if ok and nearAvoid(s)then ok=false;avoided=true end
  if not ok then
   Patches.Release(pool,rec)
-  if skipN<4000 then skip[key]=true;skipN+=1 end
+  -- a cell that is only avoided (a pack, a camp, a hole) is remembered apart from the ones that can never hold a patch: it comes back
+  -- when the avoid list changes (the hole is filled, the pack is gone)
+  if avoided then if avoidSkipN<4000 then avoidSkip[key]=true;avoidSkipN+=1 end
+  elseif skipN<4000 then skip[key]=true;skipN+=1 end
   return true
  end
  local d=math.sqrt((s.X-fx)^2+(s.Z-fz)^2)
- rec.Key=key;bound[key]=rec;boundN+=1;boundList[boundN]=rec;rec.Idx=boundN
+ rec.Key=key;rec.Step=W.BiomeStep(i,j);bound[key]=rec;boundN+=1;boundList[boundN]=rec;rec.Idx=boundN
  rec.T=s.Kind=='dust'and W.DustTransparency(d,clearRadius())or B.FinalTransparency
  local lobes=s.Kind=='dust'and 1 or W.BiomeLobes(cfg.Biome,d,s.N)
- if Patches.Fill(pool,rec,lobes,B.FarScale,patchY(rec))==0 then dropPatch(rec)end
+ if Patches.Fill(pool,rec,lobes,B.FarScale,patchY(rec),0)==0 then dropPatch(rec)end
  return true
 end
 
@@ -134,8 +203,14 @@ local function step(dt,now)
    surface=s
    for k=1,boundN do local rec=boundList[k];Patches.Lift(rec,patchY(rec))end
   end
-  local seeds=map:FindFirstChild('Seeds');local count=(seeds and #seeds:GetChildren()or 0)
-  if count~=avoidCount then avoidCount=count;readAvoid()end
+  -- the avoid list (packs, camps, shovel holes): re-read every pass. When it changed (a pack stolen or dropped, a camp moved, a hole dug or
+  -- filled) the patches that now reach an avoid zone are dropped, and the cells that were avoided are looked at again
+  local newSig=readAvoid()
+  if newSig~=avoidSig then
+   avoidSig=newSig
+   table.clear(avoidSkip);avoidSkipN=0
+   for k=boundN,1,-1 do local rec=boundList[k];if nearAvoid(rec.Spec)then dropPatch(rec)end end
+  end
  end
  if not z0 or not haveFocus then return end
  local R=bc.Radius
@@ -153,7 +228,7 @@ local function step(dt,now)
    local zc=z0+(j+.5)*B.Cell
    for i=0,cols-1 do
     local key=W.CellKey(i,j)
-    if budget>0 and not bound[key]and not skip[key]then
+    if budget>0 and not bound[key]and not skip[key]and not avoidSkip[key]then
      local xc=cx-B.Half+(i+.5)*B.Cell
      if(xc-fx)^2+(zc-fz)^2<=R*R then if bind(i,j)then budget-=1 end end
     end
@@ -176,7 +251,7 @@ local function step(dt,now)
    if s.Kind~='dust'and reshape>0 then
     local d=math.sqrt((s.X-fx)^2+(s.Z-fz)^2)
     local want=W.BiomeLobes(bc,d,s.N)
-    if want~=rec.Lobes then Patches.Fill(pool,rec,want,B.FarScale,patchY(rec));reshape-=1 end
+    if want~=rec.Lobes then Patches.Fill(pool,rec,want,B.FarScale,patchY(rec),0);reshape-=1 end
    end
   end
  end
@@ -190,6 +265,7 @@ local destroyed=false
 script.Destroying:Connect(function()
  if destroyed then return end;destroyed=true;running=false
  for _,c in ipairs(conns)do c:Disconnect()end;table.clear(conns)
+ for _,c in ipairs(holeConns)do c:Disconnect()end;table.clear(holeConns)
  table.clear(bound);table.clear(boundList);boundN=0
  folder:Destroy()
 end)

@@ -12,7 +12,7 @@ local ROLL=math.pi/2
 function P.new(parent,maxDiscs,maxPatches,maxLobes)
  local pool={Parent=parent,MaxDiscs=maxDiscs,Made=0,Free={},FreeN=0,Records={},RecordsFree={},RecordsFreeN=0,MaxLobes=maxLobes or 3,Used=0}
  for k=1,maxPatches do
-  local rec={Spec={},Discs={},DiscN=0,Key=0,T=1,Y=0,Lobes=0,Idx=0,Level=0}
+  local rec={Spec={},Discs={},DiscN=0,Key=0,T=1,Y=0,Lobes=0,Idx=0,Level=0,LobeStep=.004}
   pool.Records[k]=rec;pool.RecordsFree[k]=rec
  end
  pool.RecordsFreeN=maxPatches
@@ -39,7 +39,7 @@ end
 function P.Take(pool)
  local n=pool.RecordsFreeN;if n==0 then return nil end
  local rec=pool.RecordsFree[n];pool.RecordsFree[n]=nil;pool.RecordsFreeN=n-1
- rec.DiscN=0;rec.Lobes=0;rec.T=1;rec.Key=0;rec.Idx=0;rec.Level=0
+ rec.DiscN=0;rec.Lobes=0;rec.T=1;rec.Key=0;rec.Idx=0;rec.Level=0;rec.LobeStep=.004
  pool.Used+=1
  return rec
 end
@@ -51,9 +51,13 @@ function P.Release(pool,rec)
  pool.Used-=1
 end
 -- Draw the first `lobes` lobes of rec.Spec at height y (the discs' centre plane; thickness from the spec). scale stretches a lone lobe that
--- stands in for the whole blob (far patches). Returns how many discs it got (fewer when the part budget is out).
-function P.Fill(pool,rec,lobes,scale,y)
+-- stands in for the whole blob (far patches). lobeStep = how much higher each further lobe lies (default .004: lobes that overlap while the
+-- patch is still fading in are never coplanar; the permanent, opaque Snow-biome patches pass 0 - all lobes of one patch are one colour, so
+-- they cannot show a seam, and the patch's own height step keeps it clear of its neighbours). Returns how many discs it got (fewer when
+-- the part budget is out).
+function P.Fill(pool,rec,lobes,scale,y,lobeStep)
  local s=rec.Spec;lobes=math.min(lobes,s.N,pool.MaxLobes)
+ local ls=lobeStep or rec.LobeStep or .004;rec.LobeStep=ls
  -- drop discs beyond what is wanted, take the missing ones
  for k=rec.DiscN,lobes+1,-1 do giveDisc(pool,rec.Discs[k]);rec.Discs[k]=nil end
  if rec.DiscN>lobes then rec.DiscN=lobes end
@@ -67,7 +71,7 @@ function P.Fill(pool,rec,lobes,scale,y)
  for k=1,rec.DiscN do
   local d=rec.Discs[k]
   d.Size=V3(th,2*s.LB[k]*f,2*s.LA[k]*f)
-  d.CFrame=CF(s.X+s.LX[k],y+(k-1)*.004,s.Z+s.LZ[k])*CFrame.Angles(0,s.LY[k],ROLL)
+  d.CFrame=CF(s.X+s.LX[k],y+(k-1)*ls,s.Z+s.LZ[k])*CFrame.Angles(0,s.LY[k],ROLL)
   d.Color=color
   d.Transparency=rec.T
  end
@@ -79,7 +83,7 @@ function P.Lift(rec,y)
  if rec.Y==y then return end
  for k=1,rec.DiscN do
   local d=rec.Discs[k];local p=d.CFrame.Position
-  d.CFrame=CF(p.X,y+(k-1)*.004,p.Z)*CFrame.Angles(0,rec.Spec.LY[k],ROLL)
+  d.CFrame=CF(p.X,y+(k-1)*(rec.LobeStep or .004),p.Z)*CFrame.Angles(0,rec.Spec.LY[k],ROLL)
  end
  rec.Y=y
 end

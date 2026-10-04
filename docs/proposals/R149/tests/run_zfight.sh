@@ -3,7 +3,9 @@
 # R149 z-fighting (owner: "try to take out all the z fighting within the shop and so on"):
 #  test_zfight_detector.py - tools/zfight.py on hand-made scenes with a known answer (coplanar / near / far / strict tiers, look-alike
 #                            colours, decals and see-through SurfaceGui parts, opposite faces, hidden overlaps, rotations, wedges,
-#                            cylinder discs and sides, balls, meshes, the map's outer edge, undersides with no room for a camera).
+#                            cylinder discs and sides, balls, meshes, the map's outer edge, undersides with no room for a camera, a part or decal hidden
+#                            with LocalTransparencyModifier (drawn at 1 - (1 - t) x (1 - ltm): the keyboard hides the real floor that way), the keyboard's
+#                            keycaps / bed filling the space under the floor and under a shovel hole's rim).
 #  test_zfight_fixer.luau  - ZFightFix149 on the Roblox mock: sane data; moves exactly the matching saved parts by their small local move
 #                            and nothing else (decoys, turned / resized / ambiguous parts skipped, idempotent, one log line); on the
 #                            owner's place every fix finds exactly one part and no other part changes; MapService.new calls it first.

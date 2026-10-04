@@ -2,6 +2,9 @@
 -- R149 (owner): "rework weather ... not a camera-only thing ... make rain, blizzard and thunder actually happen: droplets actually fall from
 -- the sky onto the ground ... snow patches fade in and fade out". Part 1: WeatherWorld149.lua (pure). Part 2: the real
 -- WeatherWorld149.client.lua (+ WorldEvents.client.lua for thunder) on the Roblox mock world.
+-- ADDED by the R149 performance patch (review part 1, fix round A): tier-2 (phone) particle cap 900 (worst live 1268 -> 878), opaque snow patches,
+-- patch height steps (no two overlapping lobes coplanar), a clear sky does no raycast / attribute read, the weather area is read when the map
+-- changes, a tier change in the middle of a fade-out keeps the fade (8b, 11b).
 local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -94,7 +97,7 @@ do
  check(not WW.Area(R.new('Model')).Valid,'Area() of a map without biomes is not valid')
 
  -- Budget: the sum of rate x lifetime over all tiles never passes the tier cap, whatever the player's spot in a tile.
- local lines={}
+ local lines={};local phone={}
  for _,kind in ipairs(kinds)do
   local liveByTier={}
   for tier=1,3 do
@@ -112,7 +115,7 @@ do
     live*=1+p.SplashFactor;worst=max(worst,live)
     local nd=min(WW.MaxTileRate*p.LifeAvg/(S*S),scale*p.Density);nearDensity=min(nearDensity,nd)
    end
-   liveByTier[tier]=worst
+   liveByTier[tier]=worst;if tier==2 then phone[kind]=worst end
    check(worst<=p.Cap*1.0001,('%s tier %d: live drops + splash particles %.0f <= cap %.0f'):format(kind,tier,worst,p.Cap))
    check(worstRate<=WW.MaxTileRate+1e-9,('%s tier %d: no emitter above %d drops/s (%.0f)'):format(kind,tier,WW.MaxTileRate,worstRate))
    lines[#lines+1]=('  %-12s tier %d: %2d tiles of %d, cap %4d, worst live %4.0f, density by the player %.3f /stud^2'):format(kind,tier,(2*Rr+1)^2,S,p.Cap,worst,nearDensity)
@@ -124,6 +127,13 @@ do
  check(WW.Tier(3).R==2 and WW.Tier(2).R==1 and WW.Tier(1).R==1 and WW.Tier(3).Tile>=50 and WW.Tier(3).Tile<=70,'tiers: 5x5 tiles of 50..70 studs on tier 3, 3x3 below')
  check(WW.Tier(3).Patch.Discs>WW.Tier(2).Patch.Discs and WW.Tier(2).Patch.Discs>WW.Tier(1).Patch.Discs and WW.Tier(3).Biome.Discs>WW.Tier(2).Biome.Discs and WW.Tier(2).Biome.Discs>WW.Tier(1).Biome.Discs,'tiers: fewer patch parts on lower tiers')
  check(WW.Tier(1).Biome.Dust==false and WW.Tier(3).Biome.Dust==true,'tiers: no key dusting on tier 1')
+ -- R149 review part 1 (finding 5): rain on phones was ~13x R148's camera bubble (1,268 live particles); tier 2 is capped at 900
+ check(WW.Tier(2).Cap==900 and WW.Tier(3).Cap==3200 and WW.Tier(1).Cap==600,'tiers: particle caps 3200 / 900 / 600 (tier 2 was 1300)')
+ check(phone.Rain<=900*1.0001 and phone.Thunderstorm<=900*1.0001 and phone.Blizzard<=900*1.0001,('phones (tier 2): at most %.0f live rain / %.0f thunder / %.0f blizzard particles (cap 900; the review measured 1,268 for rain and thunder)'):format(phone.Rain,phone.Thunderstorm,phone.Blizzard))
+ print(('phones (tier 2) worst live particles: rain %.0f, thunder %.0f, blizzard %.0f (before: 1268 / 1268 / 1268)'):format(phone.Rain,phone.Thunderstorm,phone.Blizzard))
+ -- (finding 6) no snow patch is translucent once it has faded in: it stays out of the sorted transparent pass (translucent only while fading)
+ check(WW.Patch.FinalTransparency==0 and WW.Biome.FinalTransparency==0 and WW.PatchTransparency(1)==0 and WW.PatchTransparency(.5)>0 and WW.PatchTransparency(.5)<1 and WW.PatchTransparency(0)==1,'snow patches: final transparency 0 (weather and Snow-biome), translucent only while fading in / out')
+ check(WW.DustTransparency(200,26)==0 and WW.DustTransparency(26,26)==1,'Snow-biome dust: solid beyond its fade, hidden near the runner')
 
  -- Patch layout: deterministic, bounded, irregular
  local a,b={}, {}
@@ -141,6 +151,40 @@ do
  check(same,'patch layout is deterministic and its fade times stay in 10..20 s in / 20..40 s out')
  check(present/total>.55 and present/total<.69,('about 62%% of the cells carry a patch (%.2f)'):format(present/total))
  check(maxExt<16 and minExt>4,('patches are blobs of %.1f..%.1f studs reach'):format(minExt,maxExt))
+ -- height steps: no two overlapping lobes (of any two patches up to 3 cells apart) are in the same plane. A weather patch lies W.PatchStep(i, j) =
+ -- .012 x ((i mod 2) + 2 (j mod 2)) higher, its lobes .004 apart (LobeStep), so every (patch, lobe) pair has its own level in a 2 x 2 block.
+ do
+  local function inside(e,x,z)local dx,dz=x-e.X,z-e.Z;local u=dx*e.AX+dz*e.AZ;local v=dx*e.BX+dz*e.BZ;return(u/e.A)^2+(v/e.B)^2<=1 end
+  local function overlaps(e1,e2)
+   if inside(e2,e1.X,e1.Z)or inside(e1,e2.X,e2.Z)then return true end
+   for t=0,23 do local a=t/24*2*math.pi
+    for _,r in ipairs({1,.5})do
+     local u,v=math.cos(a)*e1.A*r,math.sin(a)*e1.B*r
+     if inside(e2,e1.X+u*e1.AX+v*e1.BX,e1.Z+u*e1.AZ+v*e1.BZ)then return true end
+    end
+   end
+   return false
+  end
+  local list={};local sp={}
+  for i=-12,12 do for j=-12,12 do
+   if WW.PatchSpec(i,j,sp)then
+    local c={I=i,J=j,N=sp.N,L={}}
+    for k=1,sp.N do local sy,cy=math.sin(sp.LY[k]),math.cos(sp.LY[k]);c.L[k]={X=sp.X+sp.LX[k],Z=sp.Z+sp.LZ[k],A=sp.LA[k],B=sp.LB[k],AX=sy,AZ=cy,BX=-cy,BZ=sy,Y=WW.PatchStep(i,j)+(k-1)*WW.Patch.LobeStep}end
+    list[#list+1]=c
+   end
+  end end
+  local total,clash,sameLevel=0,0,0
+  for a=1,#list do for b=a+1,#list do
+   local A,Bp=list[a],list[b]
+   if abs(A.I-Bp.I)<=3 and abs(A.J-Bp.J)<=3 then
+    for _,la in ipairs(A.L)do for _,lb in ipairs(Bp.L)do
+     if overlaps(la,lb)then total+=1;if abs(la.Y-lb.Y)<.004-1e-9 then clash+=1 end end
+    end end
+   end
+  end end
+  check(WW.PatchLevel(0,0)==0 and WW.PatchLevel(1,0)==1 and WW.PatchLevel(0,1)==2 and WW.PatchLevel(-1,-1)==3 and near(WW.PatchStep(1,1),.036)and near(WW.Patch.LobeStep,.004),'weather patch steps: .012 x ((i mod 2) + 2 (j mod 2)), lobes .004 apart')
+  check(#list>200 and total>=5 and clash==0,('weather patches (%d in 25 x 25 cells): %d overlapping lobe pairs, none within .004 of each other in height (%d)'):format(#list,total,clash))
+ end
  -- fade timing (Level folds the snow history)
  local ev=WW.NewEvents()
  check(not WW.Mark(ev,0,false)and ev.N==0,'no event for "no snow" at the start')
@@ -216,6 +260,10 @@ end
 for _,a in ipairs({{-60,-200},{-60,-170},{-30,-200},{40,-210},{70,-180}})do addPlot(a[1],a[2],20,24)end
 local floorPart=R.new('Part');floorPart.Name='LobbyFloor'
 local rays=0
+local attrReads=0 -- GetAttribute calls on the map (the weather area is 15 of them)
+do local orig=R.Inst.GetAttribute;R.Inst.GetAttribute=function(self,k)if self==map then attrReads+=1 end;return orig(self,k)end end
+local areaCalls=0 -- WeatherWorld149.Area calls (the client re-reads the area only when the map's attributes change)
+do local orig=WW.Area;WW.Area=function(...)areaCalls+=1;return orig(...)end end
 function workspace.Raycast(_,origin,dir)
  rays+=1
  for _,pl in ipairs(plots)do if abs(origin.X-pl.x)<=pl.hx and abs(origin.Z-pl.z)<=pl.hz then return {Position=V3(origin.X,GROUND+.3,origin.Z),Normal=V3(0,1,0),Instance=pl.part}end end
@@ -251,6 +299,10 @@ W.RS:SetAttribute('GlobalWeather','Clear')
 local sc=R.new('LocalScript');sc.Name='WeatherWorld149';W.load('WeatherWorld',sc)
 frames(1)
 check(root()~=nil and #active()==0 and #tiles()==0,'clear weather: nothing emits (and no tiles are even made)')
+do
+ local r0,a0=rays,attrReads;frames(10)
+ check(rays==r0 and attrReads==a0,('clear sky: no ground raycast and no map attribute read while nothing falls or fades (%d raycasts, %d reads in 10 s; it was ~10 raycasts and ~150 reads a second)'):format(rays-r0,attrReads-a0))
+end
 check(connected(Run.Heartbeat)==heartbeat0+1,'one Heartbeat connection for the whole system')
 
 -- 1. Rain: 5x5 world-fixed tiles around the player, clipped to the base
@@ -400,7 +452,7 @@ local shown=0;local allFinal=true;local props=true;local trackOk,plotOk,heightOk
 for _,d in ipairs(discs())do
  local T=d.Transparency
  if T<1 then
-  shown+=1;if T>.06+1e-9 then allFinal=false end
+  shown+=1;if T~=0 then allFinal=false end
   local p=d.CFrame.Position;local r=max(d.Size.Y,d.Size.Z)/2
   if d.Anchored~=true or d.CanCollide~=false or d.CanTouch~=false or d.CanQuery~=false or d.CastShadow~=false or d.Shape.Name~='Cylinder'or d.Size.X>.1 then props=false end
   local bottom=p.Y-d.Size.X/2-GROUND
@@ -410,9 +462,33 @@ for _,d in ipairs(discs())do
  end
 end
 check(shown>=60,('after 28 s the snow has settled: %d patch discs in view'):format(shown))
-check(allFinal,'settled patches are white (transparency .04) - persist while it snows')
+check(allFinal,'settled patches are fully opaque white (transparency 0, they were .04) - persist while it snows')
 check(props,'patches are flat cylinders: anchored, no collision / touch / query / shadow, thinner than 0.1')
 check(heightOk2,'patches lie 0.07-0.12 above the ground (no z-fighting, not floating)')
+do -- no two overlapping discs (of any patches) are in one plane: the cell's step (.012 apart) + the lobes' step (.004 apart)
+ local function ellipse(d)
+  local p=d.CFrame.Position;local up,look=d.CFrame.UpVector,d.CFrame.LookVector
+  return {X=p.X,Z=p.Z,Y=p.Y-d.Size.X/2,A=d.Size.Z/2,B=d.Size.Y/2,AX=-look.X,AZ=-look.Z,BX=up.X,BZ=up.Z}
+ end
+ local function inside(e,x,z)local dx,dz=x-e.X,z-e.Z;local u=dx*e.AX+dz*e.AZ;local v=dx*e.BX+dz*e.BZ;return(u/e.A)^2+(v/e.B)^2<=1 end
+ local function overlaps(e1,e2)
+  if inside(e2,e1.X,e1.Z)or inside(e1,e2.X,e2.Z)then return true end
+  for t=0,23 do local a=t/24*2*math.pi
+   for _,r in ipairs({1,.5})do
+    local u,v=math.cos(a)*e1.A*r,math.sin(a)*e1.B*r
+    if inside(e2,e1.X+u*e1.AX+v*e1.BX,e1.Z+u*e1.AZ+v*e1.BZ)then return true end
+   end
+  end
+  return false
+ end
+ local es={};for _,d in ipairs(discs())do if d.Transparency<1 then es[#es+1]=ellipse(d)end end
+ local nOver,nSame=0,0
+ for a=1,#es do for b=a+1,#es do
+  local e1,e2=es[a],es[b]
+  if abs(e1.X-e2.X)<30 and abs(e1.Z-e2.Z)<30 and overlaps(e1,e2)then nOver+=1;if abs(e1.Y-e2.Y)<.004-1e-6 then nSame+=1 end end
+ end end
+ check(#es>=60 and nOver>=5 and nSame==0,('%d discs in view: %d pairs overlap, none lies in the plane of the other (%d coplanar)'):format(#es,nOver,nSame))
+end
 check(trackOk,'no patch reaches the track (weather area = base)')
 check(plotOk,'no patch lies on a garden bed (DirtPlot)')
 check(monotonic,'while it snows a patch only gets whiter (transparency never goes up)')
@@ -421,7 +497,7 @@ for _,t in pairs(firstFinal)do nIn+=1;minIn=min(minIn,t);maxIn=max(maxIn,t);if t
 check(nIn>=shown*.95 and inRange>=nIn*.97,('patches finish fading in between %.1f and %.1f s (10-20 s each; %d / %d in range)'):format(minIn,maxIn,inRange,nIn))
 check(maxIn-minIn>=4,'the patches do not all fade at the same moment')
 frames(30)
-local shown2=0;for _,d in ipairs(discs())do if d.Transparency<1 then shown2+=1;if d.Transparency>.06+1e-9 then allFinal=false end end end
+local shown2=0;for _,d in ipairs(discs())do if d.Transparency<1 then shown2+=1;if d.Transparency~=0 then allFinal=false end end end
 check(shown2==shown and allFinal,'60 s into the snow: the same patches, still white (they persist while it snows)')
 check(#pf:GetChildren()<=WW.Tier(3).Patch.Discs,'patch parts stay within the tier-3 budget ('..#pf:GetChildren()..' / '..WW.Tier(3).Patch.Discs..')')
 
@@ -510,6 +586,28 @@ local fixedCount=0;for _ in pairs(fixed)do fixedCount+=1 end
 check(fixedCount==1,'Reduced Motion: no gusts (steady wind)')
 Gui.ReducedMotionEnabled=false;frames(1.5)
 
+-- 8b. R149 review part 1 (finding 15): a quality-tier change that lands while the weather is fading out used to cut the fade (setKind('Clear')
+-- dropped the profile, every tile went quiet at once). The fade goes on with the new tier's numbers.
+do
+ W.RS:SetAttribute('GlobalWeather','Rain');tier=3;frames(4)
+ tier=2;frames(2.6)                                 -- wanted for 2.6 s of the 3 s it has to hold
+ check(#active()==expected(3,'Rain'),'(still tier 3: the change has not held 3 s yet)')
+ W.RS:SetAttribute('GlobalWeather','Clear');frames(.3) -- the fade-out starts (1.5 s) ...
+ local before=#active()
+ frames(.4)                                          -- ... the tier changes in the middle of it (3.0 s)
+ local mid=active();local midLive=liveSum(mid)
+ local p2fade=WW.Profile('Rain',2,false)
+ check(before>0 and #mid>0 and midLive>0,('a tier change in the middle of a fade-out: the drops are still falling (%d tiles before, %d after)'):format(before,#mid))
+ check(midLive+splashLive(mid)<=p2fade.Cap*1.001,'...at the new tier\'s numbers (within its cap)')
+ frames(.4)
+ local late=liveSum(active())
+ check(late<midLive,('...and still fading (%.0f -> %.0f live drops)'):format(midLive,late))
+ frames(1.5)
+ check(#active()==0,'...until they are gone')
+ W.RS:SetAttribute('GlobalWeather','Rain');tier=3;frames(5)
+ check(#active()==expected(3,'Rain'),'back to rain on tier 3')
+end
+
 -- 9. Respawn: the weather keeps falling; the window re-centres on the new spot
 clears=0
 player.CharacterRemoving:Fire(char);char:Destroy();player.Character=nil;frames(1.5)
@@ -537,6 +635,22 @@ check(text:find('LookVector',1,true)==nil and text:find('RenderStepped',1,true)=
 check(text:find('LockedToPart=false',1,true)~=nil and text:find('LockedToPart=true',1,true)==nil,'emitters are never locked to their part')
 check(W.B.WorldEvents:find('Field.Target',1,true)==nil and W.B.WorldEvents:find("Name='Precipitation'",1,true)==nil and W.B.WorldEvents:find('LookVector',1,true)==nil,'WorldEvents no longer has a camera-following emitter or aims bolts by the camera')
 check(text:find('RemoteEvent',1,true)==nil and text:find('FireServer',1,true)==nil,'client only: no remotes')
+
+-- 11b. R149 review part 1 (finding 15): the weather area (15 map attribute reads) is read when the map's attributes change, not every 0.1 s; a clear
+-- sky with nothing left to fade does no raycast and no attribute read at all.
+do
+ local r0,a0,c0=rays,attrReads,areaCalls;frames(10)
+ check(areaCalls==c0,('rain falling steadily: the weather area is not re-read every step (%d reads in 10 s, it was 100)'):format(areaCalls-c0))
+ c0=areaCalls;map:SetAttribute('BiomeEndZ_6',950);frames(1)
+ check(areaCalls>c0,'...but it is read again when the map\'s attributes change ('..(areaCalls-c0)..' reads)')
+ map:SetAttribute('BiomeEndZ_6',900);frames(1)
+ W.RS:SetAttribute('GlobalWeather','Clear');frames(60)
+ r0,a0=rays,attrReads;frames(10)
+ check(rays==r0 and attrReads==a0,('after the weather and its patches have faded away: no raycast, no attribute read (%d / %d)'):format(rays-r0,attrReads-a0))
+ W.RS:SetAttribute('GlobalWeather','Rain');frames(3)
+ check(#active()>=8 and rays>r0,'...and rain starting again is picked up at once')
+ check(W.B.WeatherWorld:find('byte(',1,true)~=nil,'garden parts that stream in are filtered by their first byte before any pattern match')
+end
 
 -- 12. Teardown
 sc.Destroying:Fire()

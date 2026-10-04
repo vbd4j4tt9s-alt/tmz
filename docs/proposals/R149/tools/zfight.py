@@ -3,8 +3,12 @@
 Usage: python3 zfight.py <scene.json> [--area AREA] [--tier TIER] [--grep TEXT] [--group] [--list N] [--json out.json]
 A scene is {"parts": [...], "playable": [[x0, z0, x1, z1], ...]} as written by rbxl_geom.py (the place file) or by
 tests/zfight_scene.luau (the whole map after the real start-up builders): each part has path, name, class / shape, size, p,
-r (3x3 rows), color, material, t (transparency), optional faces (Decal / Texture / SurfaceGui on a face), mesh (SpecialMesh)
-and area (a label for the per-area table).
+r (3x3 rows), color, material, t (transparency), optional ltm (LocalTransparencyModifier), optional faces (Decal / Texture /
+SurfaceGui on a face, a Decal / Texture with its own t and ltm), mesh (SpecialMesh) and area (a label for the per-area table).
+
+What the player sees is the EFFECTIVE transparency 1 - (1 - t) x (1 - ltm), for parts and for decals / textures: the R149
+keyboard hides the real track floor (BiomeGround_n, and its decals) on every client with LocalTransparencyModifier = 1, so a
+floor with t = 0 and ltm = 1 is not drawn and nothing can fight with it.
 
 What counts as z-fighting (both surfaces visible and looking different, otherwise no flicker can be seen):
   * two flat faces of different parts that point the SAME way, lie in (nearly) the same plane and overlap (> 0.02 stud^2):
@@ -26,7 +30,10 @@ part, or outside the playable boxes (the map's outer faces), or, for a face poin
 underside of the map) or less than 0.5 stud of room between it and the solid under it (no camera fits).
 Look-alike pairs (same colour within 1/255 per channel, same material, transparency and face decals / textures / GUIs)
 flicker invisibly and are listed apart; a Decal / Texture / SurfaceGui makes its face look different, and a see-through
-part carrying a SurfaceGui still draws that GUI (its decorated faces take part)."""
+part carrying a SurfaceGui still draws that GUI (its decorated faces take part).
+The keyboard fills the space under its floor: a downward face inside the keyboard's volume (from the top of its sunken bed up to
+CAMERA_GAP above the resting key tops, over the bed) is never looked at, whatever the gaps between the keycaps leave free: the
+keycaps are meshes (no solid here) but the camera cannot get between them (0.5 stud gaps) - see keyboard_fill()."""
 import json, math, sys, collections
 
 COPLANAR, NEAR, FAR_CAP, FAR_K, PIXELS_K = 0.002, 0.02, 300.0, 0.002, 64.0
@@ -39,6 +46,11 @@ VISIBLE_T = 0.98
 CAMERA_GAP = 0.5           # a downward face less than this above the solid under it cannot be looked at (camera near plane)
 LOOK_ALIKE = 1             # colours this close (per 0-255 channel; float rounding), same material / transparency / decals: no visible flicker
 PLAYABLE = []              # [x0, z0, x1, z1] boxes a camera can be in (the scene's "playable"); empty = everywhere
+
+
+def effective_t(t, ltm=0.0):
+    """What the client draws: Roblox multiplies the two opacities (Transparency, LocalTransparencyModifier) of a part / decal."""
+    return 1.0 - (1.0 - float(t or 0.0)) * (1.0 - float(ltm or 0.0))
 
 
 def vadd(a, b): return (a[0] + b[0], a[1] + b[1], a[2] + b[2])
@@ -100,10 +112,10 @@ class Part:
         self.size = size
         self.color = tuple(int(c) for c in d.get('color', (163, 162, 165)))
         self.material = d.get('material', 'Plastic')
-        self.t = float(d.get('t', 0))
+        self.t = effective_t(d.get('t', 0), d.get('ltm', 0))
         self.decor = collections.defaultdict(list)
         for f in d.get('faces', []) or []:
-            if f.get('t', 0) < VISIBLE_T and not f.get('alwaysOnTop'):
+            if effective_t(f.get('t', 0), f.get('ltm', 0)) < VISIBLE_T and not f.get('alwaysOnTop'):
                 self.decor[f['face']].append(f.get('kind', '?') + ':' + str(f.get('sig', '')))
         ext = [sum(abs(self.cols[k][a]) * size[k] / 2 for k in range(3)) for a in range(3)]
         self.lo = tuple(self.p[a] - ext[a] for a in range(3))
@@ -292,9 +304,40 @@ def covered(grid, w, skip):
     return False
 
 
+KEYBOARD_MARK = 'KeyboardTrackVisuals'
+FILL = []                  # [x0, z0, x1, z1, ylo, yhi] volumes a camera cannot be in (the keyboard: bed top .. resting key tops + CAMERA_GAP)
+
+
+def keyboard_fill(parts):
+    """The space the R149 keyboard fills. Its keycaps are MeshParts (not solid here) standing in 0.5 stud gaps on a sunken bed, so the
+    scene sees 'a floor 0.6 below' under every face of the real floor and under a shovel hole's rim: a downward face there looks
+    like a ceiling a camera can look up at, but nothing fits between the keys. For every keyboard bed block (a Block called Bed
+    under KeyboardTrackVisuals) the volume over the bed from its top to CAMERA_GAP above the resting key tops is filled (the keys of the
+    scene set the height; a scene only has the keys around its runner, the bed runs the whole track)."""
+    out = []
+    tops = [k.hi[1] for k in parts if KEYBOARD_MARK in k.path and k.name in ('Key', 'Spacebar') and k.t < VISIBLE_T]
+    for b in parts:
+        if KEYBOARD_MARK not in b.path or b.name != 'Bed' or b.shape != 'Block' or b.t >= VISIBLE_T:
+            continue
+        above = [t for t in tops if t > b.hi[1]]
+        if above:
+            out.append([b.lo[0], b.lo[2], b.hi[0], b.hi[2], b.hi[1], max(above) + CAMERA_GAP])
+    return out
+
+
+def in_fill(w):
+    for x0, z0, x1, z1, ylo, yhi in FILL:
+        if x0 <= w[0] <= x1 and z0 <= w[2] <= z1 and ylo <= w[1] <= yhi:
+            return True
+    return False
+
+
 def floor_below(grid, w, skip):
     """Can a camera get under a downward face at w and look up at it? Only when there is a floor somewhere below (not the
-    underside of the map) and at least CAMERA_GAP of free space between the face and the first solid under it."""
+    underside of the map), at least CAMERA_GAP of free space between the face and the first solid under it, and the point is not
+    inside the keyboard's filled volume (keycaps and their gaps over the bed)."""
+    if in_fill(w):
+        return False
     best = None
     for q in grid.column(w[0], w[2]):
         if q.i in skip or q.t >= VISIBLE_T or q.lo[1] >= w[1] or not q.solid:
@@ -330,6 +373,7 @@ def strict_threshold(poly):
 def detect(parts, max_offset=0.6, want=None):
     """Returns findings: list of dicts (pair, faces, offset, area, tier, visible fraction, look-alike)."""
     live = [p for p in parts if p.t < VISIBLE_T or p.gui_only]
+    FILL[:] = keyboard_fill(live)
     grid = Grid(live)
     groups = collections.defaultdict(list)
     BIN = 0.25

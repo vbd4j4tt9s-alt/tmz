@@ -10,6 +10,9 @@
 #  test_keyboard_fx.luau - the Storm lightning warning / impact rings and the shovel dirt bursts (StormWeather.client.lua, TrackHoleClient.client.lua,
 #                        ReplicatedStorage.KeyboardSurface149) next to the real KeyboardTrack.client.lua: on the keyboard they sit at or above the
 #                        key tops, everywhere else (arena past the last row, beside the field, no keyboard, no helper) at the old floor height.
+# R149 performance patch (review part 1): tier-2 rain cap 900 (phones), opaque snow patches, height steps (no two overlapping patches coplanar),
+# Snow-biome patches never cover a shovel hole (and come back when it is filled), the avoid list follows packs / camps / holes, a tier change keeps
+# a fade-out going, a clear sky does no raycast / attribute read, the weather area is read when the map changes.
 # With "mutate" the same suites run against deliberately broken copies of the sources: every mutation must make a test fail.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -73,5 +76,17 @@ mutate "the helper still lifts after the keyboard is gone" $R/KeyboardSurface149
 mutate "the helper lowers a surface above the key tops" $R/KeyboardSurface149.lua "return math.max(0,top-(floorY or K.Config.FloorTop))" "return top-(floorY or K.Config.FloorTop)"
 mutate "the helper lifts by a fixed .3 instead of the key height" $R/KeyboardSurface149.lua "return math.max(0,top-(floorY or K.Config.FloorTop))" "return .3"
 unset SUITES
+# R149 performance patch (review part 1)
+mutate "phones get the old 1300 particle cap again" $R/WeatherWorld149.lua "[2]={R=1,Tile=50,Cap=900," "[2]={R=1,Tile=50,Cap=1300,"
+mutate "weather patches translucent again (.04)" $R/WeatherWorld149.lua "Rise=.07,FinalTransparency=0," "Rise=.07,FinalTransparency=.04,"
+mutate "Snow-biome patches translucent again (.06)" $R/WeatherWorld149.lua "FinalTransparency=0,DustClear=26" "FinalTransparency=.06,DustClear=26"
+mutate "every patch at the same height (overlaps are coplanar)" $R/WeatherWorld149.lua "function W.PatchLevel(i,j)return(i%2)+2*(j%2)end" "function W.PatchLevel(i,j)return 0 end"
+mutate "Snow-biome patches cover shovel holes" $S/SnowBiome149.client.lua "if reachesHole(s,a[1],a[2],a[3])then return true end" "local _=0"
+mutate "a cell avoided for a hole goes on the permanent skip list" $S/SnowBiome149.client.lua "  if avoided then if avoidSkipN<4000 then avoidSkip[key]=true;avoidSkipN+=1 end
+  elseif skipN<4000 then skip[key]=true;skipN+=1 end" "  if skipN<4000 then skip[key]=true;skipN+=1 end"
+mutate "the avoid list is not refreshed when packs / camps / holes change" $S/SnowBiome149.client.lua "  if newSig~=avoidSig then" "  if false then"
+mutate "a tier change cuts the weather fade-out" $S/WeatherWorld149.client.lua "if profile and shownKind~='Clear'then setKind(shownKind,now)end end" "if profile then setKind(kind,now)end end"
+mutate "a clear sky still raycasts and reads the area every step" $S/WeatherWorld149.client.lua " if kind=='Clear'and shownKind=='Clear'and blend<=0 and boundN==0 and not W.Active(events,now)then return end" " local _=0"
+mutate "the weather area is read again every step" $S/WeatherWorld149.client.lua " if map and areaDirty then" " if map then"
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]

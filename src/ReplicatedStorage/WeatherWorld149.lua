@@ -56,12 +56,13 @@ W.CapMargin=.975  -- rates are only rewritten when they moved by 2.5%; this keep
 -- tile size, Cap = live particles (rate x lifetime, splashes too) over all tiles, Near / Far = distance (nearest point of a tile to the player) at which the
 -- tile weight is 1 / MinWeight, SplashMin = lowest tile weight that gets ground splashes. Cap counts the splash particles as well. Patch = weather snow patches (Radius around the
 -- player, Discs = pooled flat parts), Biome = permanent Snow-biome patches (Lobes by distance band: <Near, <Mid, farther; Dust = the
--- sparse dusting on the keys).
+-- sparse dusting on the keys). Tier 2 (phones) Cap 900 (R149 review: 1300 was ~13x R148's camera bubble; ~40% fewer particles right around the
+-- player stay dense enough, the far tiles are the ones thinned).
 W.MinWeight=.1
 W.Tiers={
  [3]={R=2,Tile=50,Cap=3200,Near=15,Far=90,SplashMin=.3,Patch={Radius=130,Discs=210},
   Biome={Radius=170,Discs=300,Lobes={3,2,1},Near=70,Mid=120,Dust=true,Bind=40,Reshape=8}},
- [2]={R=1,Tile=50,Cap=1300,Near=12,Far=70,SplashMin=.6,Patch={Radius=100,Discs=120},
+ [2]={R=1,Tile=50,Cap=900,Near=12,Far=70,SplashMin=.6,Patch={Radius=100,Discs=120},
   Biome={Radius=120,Discs=170,Lobes={3,2,1},Near=50,Mid=90,Dust=true,Bind=30,Reshape=6}},
  [1]={R=1,Tile=50,Cap=600,Near=10,Far=50,SplashMin=.99,Patch={Radius=70,Discs=50},
   Biome={Radius=80,Discs=60,Lobes={1,1,1},Near=0,Mid=0,Dust=false,Bind=20,Reshape=4}},
@@ -202,7 +203,8 @@ local function lobes(spec,i,j,salt,r,count)
 end
 
 -- Weather patches (base): cells of Cell studs, Chance of a patch per cell, main radius RMin..RMax.
-W.Patch={Cell=26,Chance=.62,RMin=4.5,RMax=8.5,Count=3,Thickness=.06,Rise=.07,FinalTransparency=.04,FadeIn={10,20},FadeOut={20,40},Samples=.6}
+W.Patch={Cell=26,Chance=.62,RMin=4.5,RMax=8.5,Count=3,Thickness=.06,Rise=.07,FinalTransparency=0,FadeIn={10,20},FadeOut={20,40},Samples=.6,
+ LobeStep=.004,Step=.012}
 -- Fills spec for cell (i, j); returns false when the cell has no patch.
 function W.PatchSpec(i,j,spec)
  local P=W.Patch
@@ -257,13 +259,22 @@ function W.PatchTransparency(level,final)
  return W.Quant(1-level*(1-final))
 end
 
+-- Height steps: two patches of neighbouring cells can overlap and would be drawn in the same plane (z-fighting, now that no patch is
+-- translucent any more). Every patch lies a deterministic step higher by its cell's parity: level = (i mod 2) + 2 (j mod 2), so the four
+-- cells of every 2 x 2 block (any two cells of Chebyshev distance 1) are on four different planes. Weather patches step by Patch.Step
+-- (.012: their lobes are .004 apart, so no lobe of one patch shares a plane with a lobe of another), Snow-biome patches by Biome.Step (.004,
+-- all their lobes in one plane).
+function W.PatchLevel(i,j)return(i%2)+2*(j%2)end
+function W.PatchStep(i,j)return W.PatchLevel(i,j)*W.Patch.Step end
+function W.BiomeStep(i,j)return W.PatchLevel(i,j)*W.Biome.Step end
+
 -- Snow biome (permanent): cells of Cell studs from the biome's start, 12 columns across the floor. Edge columns at both sides get big
 -- drifts, the first / last BorderRows rows (past the spacebar) get patches over the whole width, the rest only a sparse dusting of small
 -- discs. Nothing in the spacebar zone (SpaceClear studs from the biome start) so its label stays clean, nothing past the biome's ends,
 -- nothing past the floor's edges.
 W.Biome={Cell=15,Half=90,EdgeCols=1,BorderRows=4,SpaceClear=12,EdgeChance=.85,BorderChance=.45,DustChance=.2,
  Edge={RMin=4.2,RMax=8.6},Border={RMin=3.5,RMax=7.4},Dust={RMin=.7,RMax=1.9},
- Rise=.1,Thickness=.06,DustThickness=.04,FinalTransparency=.06,DustClear=26,DustFade=10,FarScale=1.25}
+ Rise=.1,Thickness=.06,DustThickness=.04,FinalTransparency=0,DustClear=26,DustFade=10,FarScale=1.25,Step=.004}
 function W.BiomeCols()return floor(2*W.Biome.Half/W.Biome.Cell+.5)end
 function W.BiomeRows(z0,z1)return max(0,floor((z1-z0)/W.Biome.Cell))end
 -- Fills spec for cell (i = column 0.., j = row 0.. from z0); cx = track centre X. Returns false when the cell has no patch.

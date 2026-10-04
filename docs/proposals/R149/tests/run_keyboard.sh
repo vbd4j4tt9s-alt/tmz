@@ -9,7 +9,13 @@
 #                       sit at distinct heights), the arena floor drawn by a local copy, letters upright in keyboard order on strips and
 #                       riding with pressed keys, spacebar labels, presses / clicks (one recording, per-presser cadence, no stacked
 #                       bursts, Effects volume 0), other players, keepers, shovel holes, pack platforms, tiers, 1000 studs/s, teleports,
-#                       reduced motion, teardown (floor restored), template fallbacks).
+#                       reduced motion, teardown (floor restored), template fallbacks) and, from the R149 performance patch (review part 1):
+#                       the camera never sinks under the keys (a render step after the camera module; Scriptable / first person / off the
+#                       keyboard untouched), a camera turn on a phone is spread over ~8 cheap frames (no burst; the measured worst frame and
+#                       frames-to-settle are printed), unchanged letter values / recycled keys' Transparency are not rewritten, parked strips are
+#                       off, spacebar labels have a render limit, the stripped template is cloned (no per-key children), a template that stops
+#                       cloning falls back once, the floor is hidden last and given back when start() or the frame step fails, the connection
+#                       list does not grow with streaming.
 # The R148 suite (docs/proposals/R147/tests/test_keyboard.luau) tested the retired layered design; its runner now runs this suite.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -40,7 +46,7 @@ if [ "$MODE" != "mutate" ]; then
  bundle "$REPO/src"
  echo "== test_keyboard (R149)"
  runsuite || { tail -40 "$OUT/cl/keyboard.log";exit 1; }
- grep -E "^(parts|sprints|teleports|counts):" "$OUT/cl/keyboard.log" || true;tail -1 "$OUT/cl/keyboard.log"
+ grep -E "^(parts|sprints|teleports|counts|sprint writes|turn )" "$OUT/cl/keyboard.log" || true;tail -1 "$OUT/cl/keyboard.log"
  exit 0
 fi
 # --- mutation checks: break one thing at a time in a copy of src, the suite must fail ------------------------------------------------
@@ -71,5 +77,36 @@ mutate "the bed sits at the floor plane (z-fighting)" $R " BedDepth=1.6," " BedD
 mutate "short range (the far keys stop at 330 studs)" $R "[3]={Back=12,Ahead=122," "[3]={Back=12,Ahead=40,"
 mutate "Lava keys back to candy strawberry" $R "Shades={{150,36,28},{198,58,26},{236,108,34},{112,30,30}}" "Shades={{255,120,150},{232,72,104},{255,150,170},{196,48,84}}"
 mutate "three alternating click recordings" $S "sound.SoundId='rbxassetid://'..tostring(C.ClickSoundId)" "sound.SoundId='rbxassetid://'..tostring(C.ClickSoundIds[(i-1)%3+1])"
+# R149 performance patch (review part 1)
+mutate "the camera clamp runs before the camera module (one frame late)" $S "Enum.RenderPriority.Camera.Value+1" "Enum.RenderPriority.Camera.Value-1"
+mutate "the camera clamp never lifts the camera" $S "  cam.CFrame=cf+V3(0,camMinY-y,0)" "  local _=cf"
+mutate "the camera clamp also moves Scriptable cameras" $S "  if not cam or cam.CameraType==SCRIPTABLE then return end" "  if not cam then return end"
+mutate "the camera clamp fights first person" $S "  if focus and(focus.Position-p).Magnitude<1.2 then return end" "  local _=focus"
+mutate "a camera turn is a burst again (4x the budget in two frames)" $S "  local burst=false
+" "  local burst=true
+"
+mutate "RowsPerFrame back to 8" $R "KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4}" "KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=8}"
+mutate "letter labels rewritten on every bind" $S "     if st.PX[i]~=px or st.PY[i]~=py then" "     if true then"
+mutate "a parked strip keeps its gui on" $S "    if st.On then st.On=false;st.Gui.Enabled=false end
+   end
+  end
+  parkN=0" "    local _=0
+   end
+  end
+  parkN=0"
+mutate "a bound strip's gui is never switched back on" $S "   if not st.On then st.On=true;st.Gui.Enabled=true end" "   local _=0"
+mutate "the spacebar labels have no render limit" $S "pcall(function()gui.MaxDistance=C.SpacebarMaxDistance end);" ""
+mutate "a recycled key is hidden at once and shown again" $S "    hideN+=1;hideList[hideN]=s -- hidden at the end of the pass unless a row dressed in it takes the slot (then it is never written twice)" "    kPart[s].Transparency=1;shown[s]=nil"
+mutate "the real floor is hidden before the keeper scan (early in start)" $S " scanKeepers()
+ table.insert(conns,CS:GetInstanceAddedSignal('BiomeKeeper'):Connect(addKeeper))
+ armGround()" " armGround()
+ scanKeepers()
+ table.insert(conns,CS:GetInstanceAddedSignal('BiomeKeeper'):Connect(addKeeper))"
+mutate "start() is not protected: an error leaves the floor hidden" $S " local ok,err=pcall(start)" " local ok,err=true,start()"
+mutate "a failing frame step never gives the floor back" $S "  if failed>=3 and not stopped then" "  if false then"
+mutate "a template that cannot clone is retried every frame" $S "  template=nil
+  warn('[R149] keyboard: the keycap template stopped cloning; the keys stay plain blocks')" "  warn('[R149] keyboard: the keycap template stopped cloning; the keys stay plain blocks')"
+mutate "the template is cloned with its toolbox children" $S "then stripPart(c);template=c end" "then template=c end"
+mutate "connections of containers that left the game stay in the list" $S "   if not c.Connected or not container:IsDescendantOf(workspace)then c:Disconnect();watched[container]=nil end" "   local _=0"
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]

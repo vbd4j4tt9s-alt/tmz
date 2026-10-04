@@ -18,6 +18,9 @@
 --    of pressed keys is diffed with the last frame; only the changing keys animate (quad-out down, back-out up) via BulkMoveTo.
 --  * Shovel holes: lifted onto the key tops (every part, once per part, streamed-in parts too); the keys under a hole stay up. Pack platforms
 --    hold the keys under them down (silently), so the platform shows on them.
+--  * Camera: the real floor is hidden (LocalTransparencyModifier 1), so it no longer stops the default camera (Popper only treats a part as an
+--    occluder below 0.25 transparency): a render step right after the camera module keeps the camera at least 0.6 above the resting key tops
+--    while it is over the keyboard (translation only, the look direction stays; Scriptable cameras and first person are left alone).
 --  * Clicks: one recording, pitch 0.98 .. 1.02 (keepers 0.94), the same volume rule for all (3D roll-off from the key), a steady cadence per
 --    presser (K.Allow: at most one click per 1/12 s each, evenly spaced while sprinting) and a voice pool that reuses the oldest voice; no
 --    shared budget that drops some runners' clicks. Effects volume 0 (Settings) = silent.
@@ -41,17 +44,25 @@ end
 local Fx,Mixer,Dash=optional('ClientFxBudget'),optional('AudioMixer'),optional('KeeperRecoveryDash')
 
 local conns={};local folder;local started=false;local stopped=false
-local hidden={}                                      -- real floor part -> {Faces = {decals / textures}, Patches = {local copies}}
+local hidden={}                                      -- real floor part -> {Faces = {decals / textures}, Patches = {local copies}, Conn = its ChildAdded}
 local function restoreGround()
  for part,rec in pairs(hidden)do
+  if rec.Conn then rec.Conn:Disconnect();rec.Conn=nil end
   pcall(function()part.LocalTransparencyModifier=0 end)
   for _,d in ipairs(rec.Faces)do pcall(function()d.LocalTransparencyModifier=0 end)end
  end
  table.clear(hidden)
 end
 local unlift=nil                                     -- puts lifted shovel-hole parts back at their server height (set by start)
+local CAMERA_STEP='KeyboardCameraFloor'
+local cameraBound=false
+local function unbindCamera()
+ if cameraBound then cameraBound=false;pcall(Run.UnbindFromRenderStep,Run,CAMERA_STEP)end
+end
+-- Teardown, also the error path of start(): the real floor is shown again, the camera clamp and every connection go, the folder goes.
 local function cleanup()
  stopped=true
+ unbindCamera()
  for _,c in ipairs(conns)do c:Disconnect()end;table.clear(conns)
  restoreGround()
  if unlift then pcall(unlift);unlift=nil end
@@ -104,9 +115,20 @@ local function start()
  end
 
  -- The real floor: hidden for this client under the keyboard; the rest of a floor part is drawn by a local copy ------------------------
- local scanGround
+ -- (armed at the very end of start(): until the keys exist and the frame step is connected, the floor stays visible - an error half way
+ -- through start() must never leave an invisible floor and no keys)
+ local scanGround,armGround
+ -- The camera clamp's rectangle: the keys plus whatever hidden floor the local copies redraw (The Darkened's arena), grown by 2 studs
+ local clampRect={CX-HALF-2,CX+HALF+2,geo.Z0-2,geo.Segs[#geo.Segs].EndZ+2}
  do
  local keyRect={CX-HALF,CX+HALF,geo.Z0,geo.Segs[#geo.Segs].EndZ}
+ local function growClamp()
+  local x0,x1,z0,z1=keyRect[1],keyRect[2],keyRect[3],keyRect[4]
+  for _,rec in pairs(hidden)do
+   for _,r in ipairs(rec.Rects)do x0=min(x0,r[1]);x1=max(x1,r[2]);z0=min(z0,r[3]);z1=max(z1,r[4])end
+  end
+  clampRect[1],clampRect[2],clampRect[3],clampRect[4]=x0-2,x1+2,z0-2,z1+2
+ end
  local function extents(part)
   local cf,s=part.CFrame,part.Size
   local r,u,l=cf.RightVector,cf.UpVector,cf.LookVector
@@ -149,41 +171,55 @@ local function start()
   local x0,x1,y0,y1,z0,z1=extents(part)
   if abs(y1-F)>.6 then return end                      -- not the track floor at the keyboard's height
   if x1<=keyRect[1]or x0>=keyRect[2]or z1<=keyRect[3]or z0>=keyRect[4]then return end
-  local rec={Faces={},Patches={}}
+  local rec={Faces={},Patches={},Rects={}}
   for _,rect in ipairs(K.RectMinus({x0,x1,z0,z1},keyRect))do
-   if rect[2]-rect[1]>.01 and rect[4]-rect[3]>.01 then rec.Patches[#rec.Patches+1]=makePatch(part,rect,y0,y1)end
+   if rect[2]-rect[1]>.01 and rect[4]-rect[3]>.01 then rec.Patches[#rec.Patches+1]=makePatch(part,rect,y0,y1);rec.Rects[#rec.Rects+1]=rect end
   end
   hidden[part]=rec
   part.LocalTransparencyModifier=1
   hideFaces(part,rec)
-  -- a texture / decal that streams in after its floor is hidden at once too (a Decal ignores its part's modifier)
-  rec.Conn=part.ChildAdded:Connect(function(d)if hidden[part]==rec then hideFaces(part,rec)end end);table.insert(conns,rec.Conn)
+  growClamp()
+  -- a texture / decal that streams in after its floor is hidden at once too (a Decal ignores its part's modifier). The connection lives in
+  -- the record only (a part that streams out takes it with it), not in the long-lived list: a 2000-stud floor part that streams in and out
+  -- all session must not grow that list.
+  rec.Conn=part.ChildAdded:Connect(function(d)if hidden[part]==rec then hideFaces(part,rec)end end)
  end
- local hooked=setmetatable({},{__mode='k'})
- local function hook(container)
-  if hooked[container]then return end;hooked[container]=true
-  table.insert(conns,container.ChildAdded:Connect(function(c)hideGround(c)end))
+ -- A floor container (the map, Obby.Biomes, each biome model) is watched for floors that stream in: one connection per container instance. A
+ -- container that left the game (streamed out, replaced) loses its connection at the next ground scan, so the long-lived list never grows.
+ local watched={}
+ local function watch(container,onChild)
+  if watched[container]then return end
+  local c=container.ChildAdded:Connect(onChild);watched[container]=c;table.insert(conns,c)
+ end
+ local function hook(container)watch(container,hideGround)end
+ local function pruneConns()
+  for container,c in pairs(watched)do
+   if not c.Connected or not container:IsDescendantOf(workspace)then c:Disconnect();watched[container]=nil end
+  end
+  for i=#conns,1,-1 do if not conns[i].Connected then table.remove(conns,i)end end
  end
  function scanGround()
+  local gone=false
   for part,rec in pairs(hidden)do
    if not part.Parent then
-    for _,p in ipairs(rec.Patches)do p:Destroy()end;hidden[part]=nil
-    if rec.Conn then rec.Conn:Disconnect()end
+    for _,p in ipairs(rec.Patches)do p:Destroy()end;hidden[part]=nil;gone=true
+    if rec.Conn then rec.Conn:Disconnect();rec.Conn=nil end
    else
     if part.LocalTransparencyModifier~=1 then part.LocalTransparencyModifier=1 end
     hideFaces(part,rec)
    end
   end
+  if gone then growClamp()end
   for _,c in ipairs(map:GetChildren())do hideGround(c)end
   local obby=map:FindFirstChild('Obby');local biomes=obby and obby:FindFirstChild('Biomes')
   if biomes then
-   if not hooked[biomes]then hooked[biomes]=true;table.insert(conns,biomes.ChildAdded:Connect(function(m)hook(m);for _,c in ipairs(m:GetChildren())do hideGround(c)end end))end
+   watch(biomes,function(m)hook(m);for _,c in ipairs(m:GetChildren())do hideGround(c)end end)
    for _,m in ipairs(biomes:GetChildren())do hook(m);for _,c in ipairs(m:GetChildren())do hideGround(c)end end
   end
+  pruneConns()
  end
- hook(map)
+ function armGround()hook(map);scanGround()end
  end
- scanGround()
 
  -- State -----------------------------------------------------------------------------------------------------
  local focusX,focusZ,hasRoot=CX,geo.Z0,false
@@ -192,12 +228,14 @@ local function start()
  local now,frameNo,reduced=clock(),0,false
  local tier,wantTier,wantSince=0,0,0
  local tierCfg=K.Tier(3)
- local template=nil;local templateReady=false
+ local template=nil;local templateReady=false         -- template = a private, script-stripped copy of ReplicatedStorage.R142Keycap
  -- per key slot (and BARBASE + bar): part, centre, depth 0..1, height fudge, dress frame, cell
  local kPart,kX,kZ,kDepth,kOff,kFresh,kKey,kRow,kCol={},{},{},{},{},{},{},{},{}
  local slotOf={}                                     -- cell key (row * 64 + col) -> slot
  local freeSlots,freeN,made=table.create(256),0,0
  local plainSlot={}                                  -- slots whose part is a plain block (template not there yet)
+ local shown={}                                      -- slot -> its part is visible (Transparency 0): a recycled key is only written when this changes
+ local hideList,hideN={},0                           -- slots released in this window pass (hidden at its end unless they were dressed again)
  local rowBound,boundRows,boundRowPos={},{},{}
  local boundKeys=0
  local downPos,animPos,animT0,animFrom,animTo,animDur={},{},{},{},{},{}
@@ -209,7 +247,7 @@ local function start()
  local holeCell,platCell,platList={},{},{};local barHole,barPlat={},{}
  local holeRects,platRects,clearSig,holesFolder={},{},nil,nil
  local windowDirty,pendingBind,pendingLegend=true,false,false
- local facing,facingWant,facingSince,turnBurst=1,1,0,false        -- the window's long side: +1 = toward +Z, -1 = toward -Z (see K.Facing)
+ local facing,facingWant,facingSince=1,1,0                         -- the window's long side: +1 = toward +Z, -1 = toward -Z (see K.Facing)
 
  -- Lists with O(1) removal --------------------------------------------------------------------------------------
  local function listAdd(list,pos,idx)local n=#list+1;list[n]=idx;pos[idx]=n end
@@ -258,14 +296,19 @@ local function start()
   gui.PixelsPerStud=PPS;gui.LightInfluence=0;gui.AlwaysOnTop=false;pcall(function()gui.MaxDistance=LG.MaxDistance end);gui.Parent=parent
   return gui
  end
- local stripFree,stripFreeN={},0
+ -- Strips wait in one pool per half row (k): a strip always serves the same half, so its labels keep their positions when it is bound again.
+ -- A strip released in a pass is only parked (moved away, its gui switched off) at the end of the pass if no row took it again.
+ local stripFree,stripFreeN={}, {}
+ for k=1,STRIPS do stripFree[k]={};stripFreeN[k]=0 end
+ local parkList,parkN={},0
  local stripsOfRow,stripRows,stripRowPos={},{},{}
- local function newStrip()
+ local function newStrip(k)
   local p=Instance.new('Part');p.Name='LegendStrip';flat(p);p.Transparency=1;p.Size=V3(1,.05,1);p.CFrame=CF(CX,F-200,0);p.Parent=legendFolder
   local gui=letterGui('Letters',p)
   local labels={}
   for i=1,SPAN do local l=letterLabel(gui);l.Size=UDim2.fromOffset(KW*PPS,KW*PPS);labels[i]=l end
-  return {Part=p,Gui=gui,Labels=labels,W=0,D=0,Alpha=-1}
+  -- the last value written to each label (a TextLabel change re-renders the whole 1440 x 131 px SurfaceGui: unchanged values are never written)
+  return {Part=p,Gui=gui,Labels=labels,K=k,W=0,D=0,Alpha=-1,On=true,Free=false,Parked=false,PX={},PY={},Tx={},Ink={},Vis={true,true,true,true,true,true,true,true,true,true,true}}
  end
  local keyLegendOf={}                                -- slot -> pooled per-key letter while the key is down
  local function labelShown(row,col)
@@ -278,8 +321,8 @@ local function start()
  local function setLabel(row,col,shown)
   local list=stripsOfRow[row];if not list then return end
   local k=(col-1)//SPAN+1;local st=list[k];if not st then return end
-  local l=st.Labels[col-(k-1)*SPAN]
-  if l.Visible~=shown then l.Visible=shown end
+  local i=col-(k-1)*SPAN
+  if st.Vis[i]~=shown then st.Vis[i]=shown;st.Labels[i].Visible=shown end
  end
  local labelMarks,labelMarkN,labelMarkAt={},0,{}
  local function markLabel(slot)
@@ -305,28 +348,36 @@ local function start()
   local list={}
   for k=1,STRIPS do
    local st
-   if stripFreeN>0 then st=stripFree[stripFreeN];stripFree[stripFreeN]=nil;stripFreeN-=1 else st=newStrip()end
+   local n=stripFreeN[k]
+   if n>0 then st=stripFree[k][n];stripFree[k][n]=nil;stripFreeN[k]=n-1 else st=newStrip(k)end
+   st.Free=false;st.Parked=false
    local c0=(k-1)*SPAN+1;local c1=min(COLS,k*SPAN)
    local w=(c1-c0+1)*P;local xMin=LEFT-c1*P
    if abs(st.W-w)>1e-6 or abs(st.D-d)>1e-6 then st.W=w;st.D=d;st.Part.Size=V3(w,.05,d)end
    st.Part.CFrame=CF(xMin+w/2,y,z)
+   if not st.On then st.On=true;st.Gui.Enabled=true end
+   local py=d/2*PPS
    for i=1,SPAN do
     local l=st.Labels[i];local c=c0+i-1
     if c<=c1 then
-     local x=(LEFT-(c-.5)*P)-xMin
-     l.Position=UDim2.fromOffset(x*PPS,d/2*PPS)
-     l.Text=K.Legend(row,c);l.TextColor3=inkColor(stage,row,c)
-     l.Visible=labelShown(row,c)
-    else l.Visible=false end
+     local px=((LEFT-(c-.5)*P)-xMin)*PPS
+     if st.PX[i]~=px or st.PY[i]~=py then st.PX[i]=px;st.PY[i]=py;l.Position=UDim2.fromOffset(px,py)end
+     local text=K.Legend(row,c);if st.Tx[i]~=text then st.Tx[i]=text;l.Text=text end
+     local ink=inkColor(stage,row,c);if st.Ink[i]~=ink then st.Ink[i]=ink;l.TextColor3=ink end
+     local vis=labelShown(row,c);if st.Vis[i]~=vis then st.Vis[i]=vis;l.Visible=vis end
+    elseif st.Vis[i]~=false then st.Vis[i]=false;l.Visible=false end
    end
-   st.Alpha=-1;stripAlpha(st,K.LegendAlpha(tier,(row-focusRow)*facing))
+   stripAlpha(st,K.LegendAlpha(tier,(row-focusRow)*facing)) -- (st.Alpha is kept across rows: only a changed fade is written)
    list[k]=st
   end
   stripsOfRow[row]=list;listAdd(stripRows,stripRowPos,row)
  end
  local function releaseStrips(row)
   local list=stripsOfRow[row];if not list then return end
-  for _,st in ipairs(list)do st.Part.CFrame=CF(CX,F-200,0);stripFreeN+=1;stripFree[stripFreeN]=st end
+  for _,st in ipairs(list)do
+   st.Free=true;local k=st.K;stripFreeN[k]+=1;stripFree[k][stripFreeN[k]]=st
+   parkN+=1;parkList[parkN]=st
+  end
   stripsOfRow[row]=nil;listRemove(stripRows,stripRowPos,row)
  end
  -- per-key letters (a key that is down keeps its letter while it moves)
@@ -349,15 +400,24 @@ local function start()
  local function stripPart(part)
   for _,d in ipairs(part:GetDescendants())do if d:IsA('BaseScript')or d:IsA('Sound')or d:IsA('SurfaceGui')or d:IsA('Decal')then d:Destroy()end end
  end
+ -- A keycap: a clone of the private, already stripped template. A template that stops cloning (it cannot normally: nobody else holds it) is
+ -- dropped once, with one warning: from then on every new key is a plain block and nothing is retried (swapPass stops with it).
+ local function cloneKeycap()
+  if not template then return nil end
+  local ok,c=pcall(template.Clone,template)
+  if ok and typeof(c)=='Instance'and c:IsA('BasePart')then return c end
+  template=nil
+  warn('[R149] keyboard: the keycap template stopped cloning; the keys stay plain blocks')
+  return nil
+ end
+ local function dressKeyPart(part)
+  part.Name='Key';flat(part);part.Size=V3(KW,C.KeyY,KW);part.Transparency=1;part.CFrame=CF(CX,F-200,0);part.Parent=keyFolder
+  return part
+ end
  local function newKeyPart()
-  local part
-  if template then local ok,c=pcall(template.Clone,template);if ok and typeof(c)=='Instance'and c:IsA('BasePart')then part=c end end
-  local mesh=part~=nil
+  local part=cloneKeycap();local mesh=part~=nil
   if not part then part=Instance.new('Part');part.Material=Enum.Material.SmoothPlastic end
-  part.Name='Key';flat(part);part.Size=V3(KW,C.KeyY,KW);part.Transparency=1;part.CFrame=CF(CX,F-200,0)
-  if mesh then stripPart(part)end
-  part.Parent=keyFolder
-  return part,mesh
+  return dressKeyPart(part),mesh
  end
  local function takeSlot()
   if freeN>0 then local s=freeSlots[freeN];freeSlots[freeN]=nil;freeN-=1;return s end
@@ -372,7 +432,8 @@ local function start()
    local s=takeSlot();local key=row*64+col
    slotOf[key]=s;kKey[s]=key;kRow[s]=row;kCol[s]=col
    kX[s]=LEFT-(col-.5)*P;kZ[s]=z;kDepth[s]=0;kFresh[s]=frameNo
-   local part=kPart[s];part.Color=K.CellColor(stage,row,col,1);part.Transparency=0
+   local part=kPart[s];part.Color=K.CellColor(stage,row,col,1)
+   if not shown[s]then shown[s]=true;part.Transparency=0 end -- a slot recycled in the same pass is still visible: no write
    queueMove(s)
   end
   rowBound[row]=true;listAdd(boundRows,boundRowPos,row);boundKeys+=COLS
@@ -383,7 +444,8 @@ local function start()
    local key=row*64+col;local s=slotOf[key]
    if s then
     dropKeyLegend(s);clearKeyState(s)
-    slotOf[key]=nil;kKey[s]=0;kPart[s].Transparency=1
+    slotOf[key]=nil;kKey[s]=0
+    hideN+=1;hideList[hideN]=s -- hidden at the end of the pass unless a row dressed in it takes the slot (then it is never written twice)
     freeN+=1;freeSlots[freeN]=s
    end
   end
@@ -391,7 +453,8 @@ local function start()
  end
  -- swap a plain block for a keycap in place (the template replicated after the keys were dressed)
  local function swapSlot(s)
-  local old=kPart[s];local part,mesh=newKeyPart();if not mesh then part:Destroy();return false end
+  local old=kPart[s];local clone=cloneKeycap();if not clone then return false end
+  local part=dressKeyPart(clone)
   part.Color=old.Color;part.Transparency=old.Transparency
   kPart[s]=part;kOff[s]=C.TopOffset;plainSlot[s]=nil
   local e=keyLegendOf[s];if e then e.Gui.Parent=part end
@@ -403,11 +466,13 @@ local function start()
  local function windowPass(dt)
   local wa,wb,ka,kb=K.KeyWindow(geo,tier,focusRow,facing)
   local scale=min(2,max(1,dt*60))
-  -- after a teleport (respawn, a pad) the rows right around the runner are missing, after the window turned round its long side is:
-  -- catch up with 4x the budget until they are there
-  local burst=turnBurst
+  -- after a teleport (respawn, a pad) the rows right around the runner are missing: catch up with 4x the budget until they are there.
+  -- A window that turned round (the camera swung to the other way) gets no burst: its long side is dressed nearest first within the
+  -- normal budget (about 8 frames) and the rows it no longer needs are released at the same rate - one hitch of thousands of writes
+  -- on a phone (where the Follow camera turns on every pack carry) became a few cheap frames.
+  local burst=false
   for r=max(wa,focusRow-2),min(wb,focusRow+2)do if not rowBound[r]and not barOfRow[r]then burst=true;break end end
-  local budget=floor(tierCfg.Bind*scale*(burst and C.TeleportBurst or 1));local relBudget=budget*4
+  local budget=floor(tierCfg.Bind*scale*(burst and C.TeleportBurst or 1));local relBudget=budget
   local released=0
   for i=#boundRows,1,-1 do
    local r=boundRows[i]
@@ -422,7 +487,12 @@ local function start()
     end
    end
   end
-  if not pending then turnBurst=false end
+  -- hide the keys that were released and not dressed again in this pass (a recycled key keeps its Transparency 0: one write, not two)
+  for i=1,hideN do
+   local slot=hideList[i];hideList[i]=nil
+   if kKey[slot]==0 and shown[slot]then shown[slot]=nil;kPart[slot].Transparency=1 end
+  end
+  hideN=0
   return pending or released>=relBudget
  end
  local function legendWindowPass()
@@ -444,6 +514,16 @@ local function start()
    local a=K.LegendAlpha(tier,(r-focusRow)*facing)
    for _,st in ipairs(stripsOfRow[r])do stripAlpha(st,a)end
   end
+  -- park the strips no row took again: moved away, and neither drawn nor rendered (their gui is off until they are bound again; a parked
+  -- strip sat within MaxDistance of the base). A strip that goes straight to another row is not touched.
+  for i=1,parkN do
+   local st=parkList[i];parkList[i]=nil
+   if st.Free and not st.Parked then
+    st.Parked=true;st.Part.CFrame=CF(CX,F-200,0)
+    if st.On then st.On=false;st.Gui.Enabled=false end
+   end
+  end
+  parkN=0
   return pending
  end
 
@@ -456,7 +536,7 @@ local function start()
   local p=Instance.new('Part');p.Name='Spacebar';p.Size=V3(HALF*2-C.Gap,C.KeyY,depth);p.Color=Color3.fromRGB(cr,cg,cb)
   p.Material=Enum.Material.SmoothPlastic;flat(p);p.CFrame=CF(CX,F-200,0);p.Parent=keyFolder
   local gui=Instance.new('SurfaceGui');gui.Name='SpacebarLegend';gui.Face=Enum.NormalId.Top;gui.LightInfluence=0;gui.AlwaysOnTop=false
-  gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud;gui.PixelsPerStud=C.SpacebarPixelsPerStud;gui.Parent=p
+  gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud;gui.PixelsPerStud=C.SpacebarPixelsPerStud;pcall(function()gui.MaxDistance=C.SpacebarMaxDistance end);gui.Parent=p
   local label=Instance.new('TextLabel');label.Name='Biome';label.BackgroundTransparency=1;label.BorderSizePixel=0
   label.AnchorPoint=V2(.5,.5);label.Position=UDim2.fromScale(.5,.5);label.Size=UDim2.fromScale(1,.9);label.Rotation=180
   label.Font=FONT;label.TextScaled=true;label.TextStrokeTransparency=1;label.Text=string.upper(bar.Name);label.TextColor3=creamInk;label.Parent=gui
@@ -472,9 +552,11 @@ local function start()
   if not found and C.UseKeycapMesh~=false then local ok,t=pcall(function()return RS:WaitForChild('R142Keycap',30)end);if ok and typeof(t)=='Instance'then found=t end end
   if stopped then return end
   if found and found:IsA('BasePart')then
-   -- a template that cannot be cloned (Archivable off) is no template: the keys stay plain blocks instead of being swapped every frame
+   -- a template that cannot be cloned (Archivable off) is no template: the keys stay plain blocks instead of being swapped every frame.
+   -- The one clone made to find out IS the template from then on, stripped once of the toolbox's scripts / guis / sounds / decals: the
+   -- ~2,000 key clones no longer copy those children only to destroy them again (and nobody else can stop it cloning).
    local ok,c=pcall(found.Clone,found)
-   if ok and typeof(c)=='Instance'then c:Destroy();template=found end
+   if ok and typeof(c)=='Instance'and c:IsA('BasePart')then stripPart(c);template=c end
   end
   templateReady=true
   if not template and C.UseKeycapMesh~=false then warn('[R149] keyboard: ReplicatedStorage.R142Keycap is missing; the keys are plain blocks')end
@@ -776,7 +858,7 @@ local function start()
    local want=K.Facing(cam.CFrame.LookVector.Z,facingWant)
    if frameNo==1 then facing=want end                -- the first window already faces the camera's way
    if want~=facingWant then facingWant=want;facingSince=now end
-   if facingWant~=facing and now-facingSince>=C.FacingHoldSeconds then facing=facingWant;windowDirty=true;turnBurst=true end
+   if facingWant~=facing and now-facingSince>=C.FacingHoldSeconds then facing=facingWant;windowDirty=true end
   end
   focusCol=max(1,min(COLS,geo.ColOfX(focusX)))
  end
@@ -818,9 +900,49 @@ local function start()
   flushLabels()
   flushMoves()
  end
- table.insert(conns,Run.RenderStepped:Connect(step))
- table.insert(conns,CS:GetInstanceAddedSignal('BiomeKeeper'):Connect(addKeeper))
+
+ -- The camera: with the real floor hidden nothing stops the default camera from sinking into the keys or under the bed (looking up from the
+ -- track at a distance of ~12 studs puts it at y 1..4). A render step just after the camera module (Camera priority + 1) lifts it, by
+ -- translation only so its look direction stays, to at least `camMinY` while it is over the keyboard / the arena copy. One CFrame read and
+ -- a few compares per frame, a CFrame write only when it actually sinks. Scriptable cameras (the pack opening, cut-scenes) and first
+ -- person (the camera within ~1 stud of its focus) are left alone.
+ local camMinY=K.KeyTop(0)+C.CameraAbove
+ local SCRIPTABLE=Enum.CameraType.Scriptable
+ local function cameraStep()
+  if stopped then return end
+  local cam=workspace.CurrentCamera
+  if not cam or cam.CameraType==SCRIPTABLE then return end
+  local cf=cam.CFrame;local p=cf.Position;local y=p.Y
+  if y>=camMinY then return end
+  local x,z=p.X,p.Z
+  if x<clampRect[1]or x>clampRect[2]or z<clampRect[3]or z>clampRect[4]then return end
+  local focus=cam.Focus
+  if focus and(focus.Position-p).Magnitude<1.2 then return end
+  cam.CFrame=cf+V3(0,camMinY-y,0)
+ end
+
+ -- Everything that can fail is above this line. Only now does the real floor go: a client whose start-up failed half way keeps a visible
+ -- floor (and the pcall around start() restores it for good).
  scanKeepers()
+ table.insert(conns,CS:GetInstanceAddedSignal('BiomeKeeper'):Connect(addKeeper))
+ armGround()
+ pcall(Run.UnbindFromRenderStep,Run,CAMERA_STEP)
+ if pcall(Run.BindToRenderStep,Run,CAMERA_STEP,Enum.RenderPriority.Camera.Value+1,cameraStep)then cameraBound=true end
+ local failed=0
+ -- a frame that errors (a destroyed part, a bad value) is reported; three in a row give the keyboard up and the floor back
+ table.insert(conns,Run.RenderStepped:Connect(function(dt)
+  local ok,err=pcall(step,dt)
+  if ok then failed=0;return end
+  failed+=1;warn('[R149] keyboard: frame error: '..tostring(err))
+  if failed>=3 and not stopped then warn('[R149] keyboard: giving up, the real floor is shown again');cleanup()end
+ end))
+end
+
+-- A start() that errors leaves nothing behind: the floor is shown again, everything it made is removed, and it is not retried.
+local function safeStart()
+ if started or stopped then return end
+ local ok,err=pcall(start)
+ if not ok then warn('[R149] keyboard: start-up failed, the real floor stays: '..tostring(err));cleanup()end
 end
 
 -- The biome attributes arrive with the map: build once all seven biomes are described (or, for a map that describes fewer,
@@ -836,8 +958,8 @@ local function mapStarted()return type(map:GetAttribute('BiomeTrackEndZ'))=='num
 local waiting;local link
 local function tryStart()
  if started or stopped then return end
- if mapComplete()then start()
- elseif mapStarted()and not waiting then waiting=true;task.delay(2,start)end
+ if mapComplete()then safeStart()
+ elseif mapStarted()and not waiting then waiting=true;task.delay(2,safeStart)end
  if started and link then link:Disconnect();link=nil end
 end
 tryStart()

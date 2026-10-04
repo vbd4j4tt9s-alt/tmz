@@ -26,6 +26,9 @@
 --  REMOVED (the layered design is gone): K.Hierarchy / K.Windows / K.WindowCount / K.NearestOrd checks, plain / 2x2 .. 16x16 block layers,
 --   "finer block higher" overlap ordering, per-layer bind budgets, "676 keycaps in a 26 x 26 window", "2000+ studs of coarse blocks";
 --   replaced by: one key representation everywhere, row windows per tier (~1000 / 620 / 380 studs ahead), caps, nearest-first binding.
+-- ADDED by the R149 performance patch (docs/proposals/R149/review_part1.md, fix round A): the camera clamp (1b), the hide-last start-up (1c, 15), no
+-- turn burst on a phone with the measured worst frame (5c), unchanged letter values / single key Transparency writes / parked strips off (4c), the
+-- stripped template (before 'parts:'), the connection list (11b), the swapPass fallback (13b), the failing start-up / frame step (15).
 local W=require('./world');local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -273,9 +276,11 @@ local Players=W.service('Players');local player=R.new('Player');player.Name='Tes
 local others={}
 function Players.GetPlayers()local t={player};for _,p in ipairs(others)do t[#t+1]=p end;return t end
 -- Mock gaps filled here: real BulkMoveTo, Sound:Play/Stop, ContentProvider, a controllable ClientFxBudget.
-local bulkCalls,inBulk=0,false
+local bulkCalls,inBulk,bulkParts=0,false,0
+local bulkBreak=false
 function workspace.BulkMoveTo(_,parts,cfs)
- bulkCalls+=1;assert(#parts==#cfs,'BulkMoveTo lists must match')
+ if bulkBreak then error('BulkMoveTo: injected failure')end
+ bulkCalls+=1;bulkParts+=#parts;assert(#parts==#cfs,'BulkMoveTo lists must match')
  inBulk=true;for i,p in ipairs(parts)do p.CFrame=cfs[i]end;inBulk=false
 end
 local plays={}
@@ -291,15 +296,36 @@ W.service('ContentProvider').PreloadAsync=function()contentCalls+=1 end
 do local clone=R.Inst.Clone;R.Inst.Clone=function(self)local c=clone(self);local t=rawget(c._props,'_tags');if t then c._props._tags=table.clone(t)end;return c end end
 local fxTier=3
 W.stub('ClientFxBudget',{Get=function()return fxTier end,Low=function()return fxTier==1 end})
--- count writes per frame: Color on keys (= keys dressed), CFrame on keys outside BulkMoveTo
-local writes={key=0};local cframeWrites=0
+-- count writes per frame: Color on keys (= keys dressed), CFrame on keys outside BulkMoveTo. While `measure` is on, every property write on an
+-- instance under the keyboard folder (visRoot) is counted too (all = everything but Parent; the rest by kind), and a part whose Transparency is
+-- written twice in one frame is counted (tpTwice). cam = CFrame writes on the camera.
+local writes={key=0,all=0,tp=0,tpTwice=0,pos=0,text=0,ink=0,vis=0,alpha=0,gui=0,strip=0,cam=0};local cframeWrites=0
+local measure,visRoot,tpAt=false,nil,{}
+-- what already existed when the real floor was hidden for the first time after `hideSeen` was reset (the end of start())
+local hideSeen=nil
+local function snapshot()local t={Bed=0,Spacebar=0,KeyClick=0,Key=0};for _,o in ipairs(R.created)do local n=o._props.Name;if t[n]~=nil and o._parent~=nil then t[n]+=1 end end;return t end
+local function underKeyboard(o)local p=o._parent;while p do if p==visRoot then return true end;p=p._parent end;return false end
 local origNew=R.instMeta.__newindex
 R.instMeta.__newindex=function(o,k,v)
- if k=='Color'and o._props.Name=='Key'then writes.key+=1 end
- if k=='CFrame'and o._props.Name=='Key'and not inBulk then cframeWrites+=1 end
+ local name=o._props.Name
+ if k=='Color'and name=='Key'then writes.key+=1 end
+ if k=='CFrame'and name=='Key'and not inBulk then cframeWrites+=1 end
+ if k=='CFrame'and o==workspace.CurrentCamera then writes.cam+=1 end
+ if k=='LocalTransparencyModifier'and v==1 and hideSeen==nil and name:match('^BiomeGround_')then hideSeen=snapshot()end
+ if measure and k~='Parent'and visRoot and underKeyboard(o)then
+  writes.all+=1
+  if name=='Key'then
+   if k=='Transparency'then writes.tp+=1;if tpAt[o]==R.clock then writes.tpTwice+=1 end;tpAt[o]=R.clock end
+  elseif name=='Letter'then
+   if k=='Position'then writes.pos+=1 elseif k=='Text'then writes.text+=1 elseif k=='TextColor3'then writes.ink+=1 elseif k=='Visible'then writes.vis+=1 elseif k=='TextTransparency'then writes.alpha+=1 end
+  elseif name=='LegendStrip'then
+   if k=='CFrame'and v.Position.Y>0 then writes.strip+=1 end
+  elseif k=='Enabled'then writes.gui+=1 end
+ end
  return origNew(o,k,v)
 end
 local function resetWrites()writes.key=0 end
+local function resetAll()for k in pairs(writes)do writes[k]=0 end;bulkParts=0 end
 
 -- the world: map without the biome attributes yet; Obby/Biomes/<biome>/BiomeGround_n floors (top at y 4, the Storm floor running into
 -- The Darkened's arena), a lobby floor before the track, the keycap template
@@ -351,7 +377,7 @@ frames(5)
 check(workspace:FindFirstChild('KeyboardTrackVisuals')==nil and floors[1].LocalTransparencyModifier~=1,'without the biome attributes nothing is built or hidden yet (it waits for them)')
 for k,v in pairs(ATTR)do map:SetAttribute(k,v)end
 frames(60)
-local vis=workspace:FindFirstChild('KeyboardTrackVisuals')
+local vis=workspace:FindFirstChild('KeyboardTrackVisuals');visRoot=vis
 check(vis~=nil,'the visuals folder appears once the attributes exist')
 local keysF,bedF,legF,groundF=vis:FindFirstChild('Keys'),vis:FindFirstChild('Bed'),vis:FindFirstChild('Legends'),vis:FindFirstChild('Ground')
 check(keysF and bedF and legF and groundF and vis:FindFirstChild('Sounds')and not vis:FindFirstChild('Blocks2'),'sub folders Bed / Keys / Legends / Sounds / Ground; no coarse block layers any more')
@@ -552,9 +578,61 @@ local nIds=0;for _ in pairs(ids)do nIds+=1 end
 check(voices==C.ClickVoices and routed==voices,'a pool of '..C.ClickVoices..' click voices, routed through AudioMixer (Effects group) ('..routed..')')
 check(nIds==1 and ids['rbxassetid://113108830240353'],'every voice plays the same recording (one click sound; was three alternating)')
 check(contentCalls>=1,'the click is preloaded')
+-- the toolbox keycap template carries a SurfaceGui / TextLabel / Script; it is stripped ONCE and the keys are clones of the stripped copy: the
+-- ~3,000 clones copy none of those children (R149 review part 1, finding 12: they were cloned and destroyed again for every pooled key)
+do
+ local scripts,guis,labels=0,0,0
+ for _,o in ipairs(R.created)do if o._class=='Script'then scripts+=1 elseif o._class=='SurfaceGui'and o._props.Name=='SurfaceGui'then guis+=1 elseif o._class=='TextLabel'and o._props.Name=='TextLabel'then labels+=1 end end
+ check(scripts<=2 and guis<=2 and labels<=2,('the template\'s own children are cloned at most twice in all (%d scripts, %d guis, %d labels), not once per key'):format(scripts,guis,labels))
+ check(tscript.Parent==template and tgui.Parent==template and tlabel.Parent==tgui and RS:FindFirstChild('R142Keycap')==template,'...and the real template in ReplicatedStorage is left as it was')
+ local kcs=keyParts();local bare=true;for _,pt in ipairs(kcs)do if #pt:GetChildren()~=0 then bare=false end end
+ check(bare and #kcs>2500,'every key is a bare keycap (no child at all)')
+end
 print(('parts: %d keys (%d dressed), %d bed / rim parts, %d letter strips (%d letters), %d ground patches, 7 spacebars'):format(keyN,#keyParts(),#bedF:GetChildren(),#strips,#strips*11,#groundF:GetChildren()))
 local c0=#R.created;frames(60);check(#R.created==c0,'standing still: no instance is created frame to frame ('..(#R.created-c0)..' in 60 frames)')
 end
+
+-- 1b. R149 review part 1, finding 1: the real floor is hidden (LocalTransparencyModifier 1), so it no longer stops the default camera from
+-- sinking into the keys / under the bed. A render step right after the camera module lifts a low camera over the keyboard (or the arena
+-- copy) to the key tops + 0.6 by translation (the look direction stays), and leaves Scriptable cameras, first person and everything off the
+-- keyboard alone.
+do
+ local Run=W.Run;local CAM=R.Enum.CameraType
+ local bound=W.rsBound['KeyboardCameraFloor']
+ check(bound~=nil and bound.Prio==R.Enum.RenderPriority.Camera.Value+1,'the camera clamp is a render step bound right after the camera module (priority Camera + 1) once the keyboard is built')
+ local MINY=K.KeyTop(0)+C.CameraAbove
+ check(near(C.CameraAbove,.6)and near(MINY,5.15),'the clamp keeps the camera at least 0.6 above the resting key tops (5.15)')
+ camera.CameraType=CAM.Custom;camera.Focus=nil
+ local function aim(x,y,z)camera.CFrame=R.CFrame.lookAt(V3(x,y,z),V3(x+7,y+30,z+60))end
+ local function sample(x,y,z,focus)aim(x,y,z);camera.Focus=focus;local look=camera.CFrame.LookVector;frames(1);local p=camera.CFrame.Position;return p,look,camera.CFrame.LookVector end
+ local zk=cz(BR)
+ local p,l0,l1=sample(0,2.5,zk,CF(0,10,zk+10))
+ check(near(p.Y,MINY,1e-9)and near(p.X,0,1e-9)and near(p.Z,zk,1e-9),'a camera that sank between the keys (y 2.5) is lifted to 0.6 above the key tops (5.15), x / z untouched')
+ check(near(l1.X,l0.X,1e-9)and near(l1.Y,l0.Y,1e-9)and near(l1.Z,l0.Z,1e-9),'...by translation only: its look direction is the same')
+ p=sample(30,.5,zk,CF(30,10,zk+10))
+ check(near(p.Y,MINY,1e-9),'a camera under the bed (y 0.5, looking up at its underside) is lifted too')
+ resetAll();p=sample(0,MINY,zk,CF(0,12,zk));local atRest=writes.cam
+ p=sample(0,MINY+.01,zk,CF(0,12,zk));p=sample(0,10,zk,CF(0,12,zk));p=sample(0,20,zk,CF(0,22,zk))
+ check(atRest==1 and writes.cam==4,'a camera at or above 5.15 is never written (only the test\'s own CFrame writes: '..writes.cam..')')
+ check(sample(0,3,5900,CF(0,12,5890)).Y==MINY or near(sample(0,3,5900,CF(0,12,5890)).Y,MINY,1e-9),'the arena copy (z 5860 .. 5980, no keys) has the same floor for the camera')
+ check(near(sample(200,2,zk,CF(200,12,zk)).Y,2,1e-9)and near(sample(-91.5,2,zk,CF(0,12,zk)).Y,MINY,1e-9),'beside the field (x 200) the camera is left alone; 1.5 studs off the edge it is still lifted')
+ check(near(sample(0,2,-300,CF(0,12,-300)).Y,2,1e-9)and near(sample(0,2,6100,CF(0,12,6100)).Y,2,1e-9),'before the first biome (the lobby) and past the arena the camera is left alone')
+ camera.CameraType=CAM.Scriptable
+ check(near(sample(0,2.5,zk,CF(0,10,zk+10)).Y,2.5,1e-9),'a Scriptable camera (the pack opening, cut-scenes) is never moved')
+ camera.CameraType=CAM.Custom
+ check(near(sample(0,2.5,zk,CF(0,3,zk)).Y,2.5,1e-9),'first person (the camera within a stud of its focus) is left alone')
+ check(near(sample(0,2.5,zk,CF(0,5,zk)).Y,MINY,1e-9),'...a third person camera 2.5 studs from its focus is not first person')
+ -- it runs AFTER the camera module: a camera module that sinks every frame is lifted every frame (not one frame late)
+ Run:BindToRenderStep('FakeCameraModule',R.Enum.RenderPriority.Camera.Value,function()aim(5,2,zk);camera.Focus=CF(5,10,zk+10)end)
+ local always=true;for _=1,5 do frames(1);if not near(camera.CFrame.Position.Y,MINY,1e-9)then always=false end end
+ Run:UnbindFromRenderStep('FakeCameraModule')
+ check(always,'the clamp runs after the camera module in the same frame (priority 201 after the camera at 200)')
+ look(100);camera.Focus=nil;frames(2)
+ resetAll();frames(30);check(writes.cam==0,'with the camera up where it belongs the clamp writes nothing, frame after frame')
+ check(W.rsBound['KeyboardCameraFloor']~=nil and W.rsOrder[1]=='KeyboardCameraFloor'and #W.rsOrder==1,'one render step is bound (no duplicates)')
+end
+-- 1c. the real floor is hidden last (finding 9): at the end of start(), after everything that can fail, not before the keys / bed / sounds exist
+check(hideSeen~=nil and hideSeen.Bed>0 and hideSeen.Spacebar==7 and hideSeen.KeyClick==C.ClickVoices,('the real floor is hidden at the very end of start(): the bed (%d pieces), 7 spacebars and %d click voices already existed'):format(hideSeen and hideSeen.Bed or 0,hideSeen and hideSeen.KeyClick or 0))
 
 -- 2. a runner presses a key and releases it
 local R10,C20=BR,9
@@ -673,6 +751,50 @@ do
  end
  print('sprints: '..table.concat(summary,' | '))
 end
+-- 4c. R149 review part 1 (findings 7 and 8): what a sprint writes. Inside the Snow biome (one row pitch, so a letter strip rebound on another row
+-- keeps its label positions) at 1000 studs/s on tier 3. Unchanged label values are not written; a recycled key is written once, not hidden and shown
+-- again in the same frame; a parked letter strip is switched off (its SurfaceGui is not rendered), a bound one is on.
+do
+ hum.FloorMaterial=PLASTIC;put(cx(11),nil,1300);frames(80)
+ local made=0;for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'then made+=1 end end
+ measure=true;visRoot=workspace.KeyboardTrackVisuals;resetAll()
+ local z=1300;local n=36
+ for f=1,n do z+=1000/60;put(cx(11),nil,z);frames(1)end
+ measure=false
+ local rowsDressed=writes.key/22;local stripsBound=writes.strip
+ local naive=stripsBound*11
+ print(('sprint writes: 1000 studs/s for %d frames (tier 3, %d letter strips made): %d property writes in all = %.0f a frame; %d strips bound; labels: Position %d, Text %d, TextColor3 %d, Visible %d, TextTransparency %d of %d each if every label were rewritten; strip guis switched %d times; keys dressed %d, key Transparency writes %d (twice in one frame: %d)'):format(
+  n,made,writes.all,writes.all/n,stripsBound,writes.pos,writes.text,writes.ink,writes.vis,writes.alpha,naive,writes.gui,writes.key,writes.tp,writes.tpTwice))
+ check(stripsBound>=40 and writes.key>=22*40,('the sprint dressed %d rows of keys and %d strips'):format(rowsDressed,stripsBound))
+ check(writes.pos<=naive*.25,('letter labels keep their positions: %d Position writes (a rewrite of every bound label would be %d)'):format(writes.pos,naive))
+ check(writes.vis<=naive*.1,('...and their Visible flag: %d writes (%d if every label were rewritten)'):format(writes.vis,naive))
+ check(writes.tp<=writes.key*.1,('a recycled key is not hidden and shown again: %d Transparency writes for %d keys dressed (one write for a key that is dressed again in the same pass)'):format(writes.tp,writes.key))
+ check(writes.tpTwice==0,'no key has its Transparency written twice in one frame')
+ -- parked strips are off, bound strips are on
+ local on,off,onParked,offBound=0,0,0,0
+ for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'then
+  local gui=st:FindFirstChildWhichIsA('SurfaceGui');local active=st.CFrame.Position.Y>0
+  if active then if gui.Enabled==true then on+=1 else offBound+=1 end else if gui.Enabled==false then off+=1 else onParked+=1 end end
+ end end
+ check(on>=40 and offBound==0 and onParked==0,('bound letter strips have their SurfaceGui on (%d), parked ones have it off (%d parked, %d parked ones still on, %d bound ones off)'):format(on,off,onParked,offBound))
+ check(off>=0,'(parked strips: '..off..')')
+ -- a teleport away leaves every strip of the old place parked and disabled, and the new place's strips enabled again
+ put(cx(11),nil,3000);frames(60)
+ local act,parked,bad=0,0,0
+ for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'then
+  local gui=st:FindFirstChildWhichIsA('SurfaceGui');local active=st.CFrame.Position.Y>0
+  if active then act+=1;if gui.Enabled~=true then bad+=1 end else parked+=1;if gui.Enabled~=false then bad+=1 end end
+ end end
+ check(act>=40 and parked>=1 and bad==0,('after a 1,700-stud teleport: %d strips bound and on, %d parked and off, %d wrong'):format(act,parked,bad))
+ -- the guis' look is unchanged: 16 px per stud, the same render limit; the spacebars have one too
+ local lookOk=true
+ for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'then local gui=st:FindFirstChildWhichIsA('SurfaceGui');if gui.PixelsPerStud~=16 or gui.MaxDistance~=LT.MaxDistance then lookOk=false end end end
+ check(lookOk and LT.PixelsPerStud==16,'letter strips are still 16 px per stud with MaxDistance '..LT.MaxDistance)
+ local barsOk=0
+ for _,p in ipairs(keysF:GetChildren())do if p.Name=='Spacebar'then local gui=p:FindFirstChildWhichIsA('SurfaceGui');if gui and gui.MaxDistance==C.SpacebarMaxDistance and C.SpacebarMaxDistance>=LT.MaxDistance then barsOk+=1 end end end
+ check(barsOk==7,'the seven spacebar labels have a render limit too ('..C.SpacebarMaxDistance..' studs, at least the strips\' '..LT.MaxDistance..')')
+ put(cx(11),nil,cz(BR));frames(80)
+end
 -- 5. trips of 1000+ studs and back: nothing leaks, nothing exceeds the caps
 do
 put(cx(11),nil,cz(BR));frames(60)
@@ -734,21 +856,53 @@ do
  check(near(b3,behind,1e-6),'a glance back shorter than the hold (0.2 s) changes nothing')
  look(100);frames(30);look(-100)
  local over,settled=0,nil;resetWrites()
- for f=1,40 do
+ for f=1,60 do
   resetWrites();frames(1)
-  if writes.key>K.Tier(3).Bind*C.TeleportBurst then over+=1 end
+  if writes.key>K.Tier(3).Bind then over+=1 end
   local bb,aa=reach();if not settled and bb>=990 then settled=f end
  end
  local bk,ak=reach()
  check(bk>=990 and ak<=12*P+4*P+P,('after turning round (camera toward -Z): keys reach %.0f studs toward -Z, %.0f toward +Z'):format(bk,ak))
- check(settled and settled<=0.2*60+6,'...the long side is rebuilt within ~6 frames after the 0.2 s hold ('..tostring(settled)..' frames)')
- check(over==0,'...within the turn budget per frame')
+ -- R149 review part 1: a turn is not a burst any more (it was 4x the budget in two frames); it is dressed nearest first at the normal rate
+ local holdFrames=math.ceil(C.FacingHoldSeconds*60)+1;local rowsPerFrame=floor(K.Tier(3).Bind/22)
+ check(settled and settled<=holdFrames+math.ceil(K.Tier(3).Ahead/rowsPerFrame)+2,('...the long side is rebuilt within the 0.2 s hold + %d rows a frame (%s frames)'):format(rowsPerFrame,tostring(settled)))
+ check(over==0,'...never more than the normal per-frame budget of keys dressed (no turn burst)')
  local a,b=K.KeyWindow(g,3,g.RowOfZ(2400),-1);coverage(a,b,'facing -Z')
  local stripsZ={};for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 then stripsZ[#stripsZ+1]=st.CFrame.Position.Z end end
  local lo,hi=1e9,-1e9;for _,z in ipairs(stripsZ)do lo=min(lo,z);hi=max(hi,z)end
  check(2400-lo>=140 and hi-2400<=3*P+P,('letters follow the facing too: %.0f studs toward -Z, %.0f toward +Z'):format(2400-lo,hi-2400))
  look(100);frames(40)
  local _,aBack=reach();check(aBack>=990,'turning back to +Z restores the long side ahead')
+end
+-- 5c. R149 review part 1 (finding 2): the camera swings round on a PHONE (tier 2: the Follow camera turns on every pack carry). The window of
+-- ~68 rows swaps its long side; this used to be 4x the budget in two frames (the review measured 4,802 property writes + 792 BulkMoveTo parts in
+-- the first frame, then 2,340 + 704) and released every row at 16x. Now no burst: nearest rows first at the normal rate (9 rows a frame on tier 2),
+-- rows released at the same rate, letters 4 rows a frame - a few cheap frames instead of two heavy ones.
+do
+ hum.FloorMaterial=AIR;fxTier=2;put(cx(11),F+9,2400);look(100);frames(60*5)
+ local t2=K.Tier(2)
+ look(-100)
+ measure=true;visRoot=workspace.KeyboardTrackVisuals;resetAll()
+ local worstW,worstM,worstKeys,worstStrips,worstTp,firstF,lastF,sumW,sumM=0,0,0,0,0,nil,nil,0,0
+ local perFrame={}
+ for f=1,120 do
+  resetAll();frames(1)
+  worstW=max(worstW,writes.all);worstM=max(worstM,bulkParts);worstKeys=max(worstKeys,writes.key);worstStrips=max(worstStrips,writes.strip);worstTp=max(worstTp,writes.tp)
+  sumW+=writes.all;sumM+=bulkParts
+  if writes.all>0 or bulkParts>0 then firstF=firstF or f;lastF=f;perFrame[#perFrame+1]=writes.all end
+ end
+ measure=false
+ local settle=lastF and lastF-firstF+1 or 0
+ print(('turn (tier 2, camera swings from +Z to -Z): worst frame %d property writes + %d BulkMoveTo parts (%d keys dressed, %d letter strips bound, %d key Transparency writes); %d frames to settle, %d writes + %d parts in all; first frames: %s'):format(
+  worstW,worstM,worstKeys,worstStrips,worstTp,settle,sumW,sumM,table.concat(perFrame,' ',1,min(#perFrame,10))))
+ check(worstM<=t2.Bind,('no burst on a turn: at most %d keys moved in a frame (%d) - the review measured 792 then 704'):format(t2.Bind,worstM))
+ check(worstKeys<=t2.Bind,('...and at most %d keys dressed in a frame (%d)'):format(t2.Bind,worstKeys))
+ check(worstW<=2000,('...worst frame %d property writes (the review measured 4,802 then 2,340, 1,722 with its proposed fix)'):format(worstW))
+ check(worstStrips<=2*C.Legend.RowsPerFrame and C.Legend.RowsPerFrame==4,('...letters %d rows a frame at most (RowsPerFrame 4: %d strips in a frame)'):format(C.Legend.RowsPerFrame,worstStrips))
+ check(settle>=3 and settle<=16,('...the window is rebuilt within %d frames (a handful of cheap frames, not two heavy ones)'):format(settle))
+ local a,b=K.KeyWindow(g,2,g.RowOfZ(2400),-1);coverage(a,b,'tier 2, facing -Z after the turn')
+ look(100);frames(60*2);local a2,b2=K.KeyWindow(g,2,g.RowOfZ(2400),1);coverage(a2,b2,'tier 2, turned back')
+ fxTier=3;frames(60*5)
 end
 -- 6. other players
 do
@@ -974,6 +1128,38 @@ do
  check(fresh.LocalTransparencyModifier==0,'teardown restores it too')
  fresh:Destroy();storm.Parent=m7
 end
+-- 11b. R149 review part 1 (finding 15): the script's connection list does not grow with every floor part / biome model that streams back in
+-- (each one used to add a ChildAdded connection that stayed in the list after it was disconnected). The list is found by watching table.insert.
+do
+ local realTable=table;local captured={}
+ local proxy=setmetatable({insert=function(t,...)local v=select(select('#',...),...);if type(v)=='table'and v.Connected~=nil and v._f then captured[t]=true end;return realTable.insert(t,...)end},{__index=realTable})
+ local saved=W.env.table;W.env.table=proxy
+ local scC=R.new('LocalScript');scC.Name='KeyboardTrack';W.load('KeyboardTrackClient',scC)
+ put(cx(11),nil,cz(BR));frames(30)
+ local conns,best=nil,0;for t in pairs(captured)do if #t>best then best=#t;conns=t end end
+ check(conns~=nil and best>=5,'(found the script\'s connection list: '..best..' connections)')
+ local base=conns and #conns or 0
+ local storm=floors[7];local m7=storm.Parent
+ for _=1,15 do
+  local fresh=R.new('Part');fresh.Name='BiomeGround_7';fresh.Size=storm.Size;fresh.CFrame=storm.CFrame;fresh.Archivable=true;fresh.Parent=m7
+  frames(1);local late=R.new('Decal');late.Name='Late';late.Parent=fresh
+  fresh.Parent=nil;frames(60*2+20)
+ end
+ local grown=conns and #conns or 0
+ check(grown<=base,('15 floor parts that streamed in and out: the connection list has %d entries (%d before)'):format(grown,base))
+ -- a whole biome model that streams out and comes back as a new instance
+ for n=1,10 do
+  local m=R.new('Model');m.Name='Biome'..(10+n);m.Parent=biomesF;frames(1)
+  local part=R.new('Part');part.Name='BiomeGround_9';part.Size=V3(180,4,100);part.CFrame=CF(0,2,6500);part.Parent=m;frames(1)
+  m.Parent=nil;frames(60*2+20)
+ end
+ check(conns and #conns<=base,('...and 10 biome models that streamed in and out: %d entries'):format(conns and #conns or -1))
+ -- teardown disconnects what is left
+ scC.Destroying:Fire();frames(2)
+ local live=0;for _,c in ipairs(conns or{})do if c.Connected then live+=1 end end
+ check(live==0 and workspace:FindFirstChild('KeyboardTrackVisuals')==nil,'teardown leaves no connection of the keyboard connected')
+ W.env.table=saved
+end
 -- 12. no template: plain blocks, still works; columns on RunnerMotion.TrackCenterX
 template.Parent=nil
 RS:FindFirstChild('RunnerMotion'):SetAttribute('TrackCenterX',12)
@@ -1022,6 +1208,37 @@ do
  scL.Destroying:Fire();frames(2)
  R.Inst.WaitForChild=origWait
 end
+-- 13b. R149 review part 1 (finding 11): a template that stops cloning after it was accepted must not make swapPass create and destroy a Part
+-- every frame for ever: the keys stay plain blocks, one warning, nothing retried.
+do
+ template.Parent=nil
+ local origWait=R.Inst.WaitForChild;local resume=nil
+ R.Inst.WaitForChild=function(self,n,t)if n=='R142Keycap'then resume=coroutine.running();coroutine.yield();return template end;return origWait(self,n,t)end
+ local scF=R.new('LocalScript');scF.Name='KeyboardTrack'
+ W.load('KeyboardTrackClient',scF)
+ put(cx(11),nil,cz(BR));hum.FloorMaterial=AIR;frames(60)
+ local visF=workspace:FindFirstChild('KeyboardTrackVisuals')
+ template.Parent=RS
+ local cloneBroken=false;local origClone=R.Inst.Clone
+ R.Inst.Clone=function(self,...)if cloneBroken and self._class=='MeshPart'then error('injected: Archivable is off')end;return origClone(self,...)end
+ if resume then coroutine.resume(resume)end -- accepted: one clone is made and stripped
+ cloneBroken=true                            -- from now on every clone of the keycap fails
+ local warns0=W.warns or 0;local created0=#R.created
+ frames(1);local firstGrowth=#R.created-created0
+ frames(40)
+ local grown=#R.created-created0
+ local plain,mesh=0,0;for _,p in ipairs(visF.Keys:GetChildren())do if p.Name=='Key'and p.Transparency==0 then if p._class=='MeshPart'then mesh+=1 else plain+=1 end end end
+ check(grown<=1,('a template that stops cloning: no Part is created and destroyed again every frame (%d instances in 41 frames, %d in the first)'):format(grown,firstGrowth))
+ check((W.warns or 0)==warns0+1,'...it is reported once ('..((W.warns or 0)-warns0)..' warnings)')
+ check(mesh==0 and plain>2500,'...the keys stay plain blocks ('..plain..'), none is missing')
+ -- the keys still press and the window still moves with plain blocks only
+ hum.FloorMaterial=PLASTIC;put(cx(11),nil,cz(BR+300));frames(40)
+ local plain2=0;for _,p in ipairs(visF.Keys:GetChildren())do if p.Name=='Key'and p.Transparency==0 then plain2+=1 end end
+ check(plain2>2500 and #R.created-created0<=4000,'...and the window keeps following the runner with plain blocks ('..plain2..' keys)')
+ R.Inst.Clone=origClone;R.Inst.WaitForChild=origWait
+ scF.Destroying:Fire();frames(2)
+ template.Parent=nil
+end
 -- 14. a map that describes only its first biome: built after a short wait
 template.Parent=RS
 for n=2,7 do map:SetAttribute('BiomeStartZ_'..n,nil);map:SetAttribute('BiomeEndZ_'..n,nil)end
@@ -1036,6 +1253,66 @@ local wides=0;for _,p in ipairs(vis3.Keys:GetChildren())do if p.Name=='Spacebar'
 check(wides==1,'a one-biome map has one spacebar ('..wides..')')
 sc3.Destroying:Fire();frames(2)
 check(workspace:FindFirstChild('KeyboardTrackVisuals')==nil and floors[1].LocalTransparencyModifier==0,'and tears down (floor shown again)')
+
+-- 15. R149 review part 1 (finding 9): start() hid the real floor before the rest was built, so an error later left an invisible floor and no
+-- keys for the session. Now the floor is hidden at the very end (everything that can fail is above it) and any failure (start-up, or three
+-- frames in a row) gives the floor back, removes what was made and is not retried.
+do
+ for k,v in pairs(ATTR)do map:SetAttribute(k,v)end
+ template.Parent=RS
+ local function allShown()for _,fp in ipairs(floors)do if fp.LocalTransparencyModifier~=0 then return false end end;return true end
+ local function clean(label)
+  check(allShown(),label..': the real floor is visible')
+  check(workspace:FindFirstChild('KeyboardTrackVisuals')==nil and W.rsBound['KeyboardCameraFloor']==nil,label..': the keyboard folder and the camera clamp are gone')
+ end
+ -- (a) an error before anything is hidden (the keeper scan fails)
+ do
+  local realGet=W.CS.GetTagged;W.CS.GetTagged=function(self,tag)if tag=='BiomeKeeper'then error('injected: keeper lookup failed')end;return realGet(self,tag)end
+  local warns0=W.warns or 0;hideSeen=nil
+  local scA=R.new('LocalScript');scA.Name='KeyboardTrack';check(pcall(W.load,'KeyboardTrackClient',scA),'(a) loading does not raise')
+  frames(10);W.CS.GetTagged=realGet
+  check(hideSeen==nil,'(a) start() failed before the floor was touched: it was never hidden')
+  clean('(a) start() fails early');check((W.warns or 0)>warns0,'(a) the failure is reported')
+  local c0=#R.created;map:SetAttribute('Poke',1);frames(30);check(#R.created==c0,'(a) it is not retried')
+  scA.Destroying:Fire();frames(2)
+ end
+ -- (b) an error after the floor was hidden (connecting the frame step fails): the pcall around start() gives it back
+ do
+  local sig=W.Run.RenderStepped;local realConnect=sig.Connect
+  sig.Connect=function()error('injected: connect failed')end
+  hideSeen=nil;local warns0=W.warns or 0
+  local scB=R.new('LocalScript');scB.Name='KeyboardTrack';check(pcall(W.load,'KeyboardTrackClient',scB),'(b) loading does not raise')
+  sig.Connect=realConnect;frames(10)
+  check(hideSeen~=nil,'(b) the floor WAS hidden (the failure came after it)')
+  clean('(b) start() fails after the floor was hidden');check((W.warns or 0)>warns0,'(b) the failure is reported')
+  scB.Destroying:Fire();frames(2)
+ end
+ -- (c) the frame step fails every frame (a destroyed part, a bad value): three in a row and the keyboard gives up, the floor comes back
+ do
+  local warns0=W.warns or 0
+  local scC2=R.new('LocalScript');scC2.Name='KeyboardTrack';W.load('KeyboardTrackClient',scC2)
+  put(cx(11),nil,cz(BR));hum.FloorMaterial=AIR;frames(30)
+  check(not allShown() and workspace:FindFirstChild('KeyboardTrackVisuals')~=nil,'(c) a healthy keyboard has the real floor hidden')
+  hum.FloorMaterial=PLASTIC;local zw=cz(BR)
+  local function walk()zw+=P*1.5;put(cx(11),nil,zw);frames(1)end
+  bulkBreak=true;walk()
+  check(not allShown(),'(c) one failing frame is tolerated')
+  for _=1,5 do walk()end;bulkBreak=false
+  clean('(c) the frame step failed three frames in a row');check((W.warns or 0)>=warns0+3,'(c) every failing frame is reported ('..((W.warns or 0)-warns0)..' warnings)')
+  frames(30)
+  scC2.Destroying:Fire();frames(2)
+ end
+ -- (d) a single failing frame in between is forgiven: the count is of frames IN A ROW
+ do
+  local scD=R.new('LocalScript');scD.Name='KeyboardTrack';W.load('KeyboardTrackClient',scD)
+  hum.FloorMaterial=PLASTIC;put(cx(11),nil,cz(BR));frames(30);local zw=cz(BR)
+  local function walk()zw+=P*1.5;put(cx(11),nil,zw);frames(1)end
+  for _=1,4 do bulkBreak=true;walk();bulkBreak=false;walk();walk();walk()end
+  check(not allShown()and workspace:FindFirstChild('KeyboardTrackVisuals')~=nil,'(d) failing frames that are not three in a row do not stop the keyboard')
+  scD.Destroying:Fire();frames(2)
+  check(allShown(),'(d) teardown shows the floor')
+ end
+end
 
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

@@ -46,14 +46,17 @@ K.Config={
  ClickVolume=.8,ClickRollOffMin=16,ClickRollOffMax=90,ClickRange=90,ClickVoices=12,
  ClickGap=1/12,                                           -- per presser: at most one click every 1/12 s, evenly spaced while sprinting
  TierHoldSeconds=3,                                       -- a ClientFxBudget tier change applies after it has held this long
- TeleportBurst=4,                                         -- keys dressed in a frame where the rows around the runner are missing (a teleport) or the
-                                                          -- window just turned round: x Bind
+ TeleportBurst=4,                                         -- keys dressed (and released) in a frame where the rows around the runner are missing (a
+                                                          -- teleport): x Bind. A camera turn gets no burst (it is spread over ~8 frames, R149 review)
  FacingThreshold=.25,FacingHoldSeconds=.2,                -- the long side of the window follows the camera along the track (runners carry packs back
                                                           -- to base facing -Z): it turns once the camera's LookVector.Z passes +-0.25 for 0.2 s
+ CameraAbove=.6,                                          -- the camera never sinks under (resting key top + this): the real floor is hidden, so it no
+                                                          -- longer stops the default camera (Popper) from dropping into the keys / under the bed
  -- letters: PixelsPerStud on every letter SurfaceGui (TextHeight * PixelsPerStud = TextSize <= 100), Lift = strip above the resting key
- -- tops, KeysPerStrip = letters per SurfaceGui (a half row), MaxDistance = the guis' own render limit, RowsPerFrame = rows of letters dressed per frame
- Legend={PixelsPerStud=16,TextHeight=4.6,Lift=.03,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=8},
- SpacebarPixelsPerStud=10,
+ -- tops, KeysPerStrip = letters per SurfaceGui (a half row), MaxDistance = the guis' own render limit, RowsPerFrame = rows of letters dressed per
+ -- frame (4, so a camera turn spreads the letters over several frames). The spacebars' biome names are big: they get their own render limit.
+ Legend={PixelsPerStud=16,TextHeight=4.6,Lift=.03,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4},
+ SpacebarPixelsPerStud=10,SpacebarMaxDistance=800,
  GroundScanSeconds=2,
 }
 local C=K.Config
