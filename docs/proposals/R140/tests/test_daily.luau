@@ -1,6 +1,8 @@
 --!nocheck
 -- R140 (owner: "daily login rewards, per week, at the end players get 1 mech pack", "daily quests like steal 3 packs,
--- that quest gives 5 gems", "speed boost for friends in the server", "the your plant is ready thing"): the real
+-- that quest gives 5 gems", "speed boost for friends in the server", "the your plant is ready thing"), updated for the
+-- owner's live numbers (R141 DailyRewards/DailyProgress: login days 1-4 = a random seed pack, day 5 = 2 Gems, day 6 =
+-- 3 Gems, day 7 = 1 Mech pack; quests pay 2 Gems each, capped at 6 Gems a day, R140-era claims count 5): the real
 -- PlayerDataService (DailyProgress, AddChest, GrantMechPacks, OpenSeedPack, save rows), ChestService.Bank,
 -- SocialService (friend boost, the shared plant-ready queue, the day rollover), Config.GetPlayerWalkSpeed and the
 -- owner's daily command. MemoryStore and the Open Cloud call are faked; mock time = os.time.
@@ -66,23 +68,52 @@ local function nextDay(n)R.clock+=86400*(n or 1)end
 local A=makePlayer(501,'Ava')
 -- 1. The rules.
 check(#D.Login==7 and D.Login[7].MechPack==1,'a week of 7 login rewards, day 7 = 1 Mech pack')
+check(D.Login[1].SeedPack==1 and D.Login[2].SeedPack==1 and D.Login[3].SeedPack==1 and D.Login[4].SeedPack==1,'days 1-4 = a random seed pack each')
+check(D.Login[5].Gems==2 and D.Login[6].Gems==3 and D.Login[5].SeedPack==nil and D.Login[6].MechPack==nil,'day 5 = 2 Gems, day 6 = 3 Gems')
+local stagesOk=#D.SeedPackStages==7;for i=1,7 do if D.SeedPackStages[i]~=i then stagesOk=false end end
+local variantsOk=true;for _,v in ipairs({'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06'})do if D.SeedPackVariants[v]~=true then variantsOk=false end end
+for k in pairs(D.SeedPackVariants)do if not table.find(Rules.VariantOrder,k)then variantsOk=false end end
+check(stagesOk and variantsOk,'the seed pack pool: stages 1-7, variants Pack01-Pack06 only')
+check(D.RewardText(D.Login[1])=='RANDOM PACK'and D.RewardText(D.Login[5])=='+2'and D.RewardText(D.Login[6])=='+3'and D.RewardText(D.Login[7])=='MECH PACK','card texts: RANDOM PACK, +2, +3, MECH PACK')
 local k1,k2=D.QuestKeys(501,D.Day(R.clock)),D.QuestKeys(501,D.Day(R.clock)+1)
-check(#k1==3 and k1[1]==1 and D.Quests[1].Key=='Steal'and D.Quests[1].Goal==3 and D.QuestGems==5,'3 quests a day, the first is always "Steal 3 packs", 5 Gems each')
+check(#k1==3 and k1[1]==1 and D.Quests[1].Key=='Steal'and D.Quests[1].Goal==3 and D.QuestGems==2,'3 quests a day, the first is always "Steal 3 packs", 2 Gems each')
+check(D.QuestGemCap==6 and D.QuestsPerDay*D.QuestGems==D.QuestGemCap,'at most 6 Gems a day from quests (three 2-Gem quests fit exactly)')
 check(k1[2]~=k1[3]and k1[2]~=1 and k1[3]~=1,'the other two are different quests')
 local same=true;for i=1,3 do if D.QuestKeys(501,D.Day(R.clock))[i]~=k1[i]then same=false end end
 check(same,'the same player gets the same quests all day')
 local varied=false;for d=1,10 do local k=D.QuestKeys(501,D.Day(R.clock)+d);if k[2]~=k1[2]or k[3]~=k1[3]then varied=true end end
 check(varied,'and other quests on other days')
--- 2. Login week.
+-- 2. Login week (live: days 1-4 = a random seed pack, day 5 = 2 Gems, day 6 = 3 Gems, day 7 = 1 Mech pack).
+local records=Data:GetChestRecords(A)
+local addCalls,lastAdd,luckCalls=0,nil,0
+local realAdd,realLuck=Data.AddChest,Data.RollPackLuck
+Data.AddChest=function(self,p,chest,options)addCalls+=1;lastAdd={Chest=chest,Options=options};return realAdd(self,p,chest,options)end
+Data.RollPackLuck=function(...)luckCalls+=1;return realLuck(...)end
+local sizeOk={};for _,e in ipairs(Rules.PackSizes)do sizeOk[e.Scale]=true end
+local function isDailyPack(r)
+ return type(r)=='table'and r.Kind=='Pack'and table.find(D.SeedPackStages,r.Stage)~=nil and D.SeedPackVariants[r.BagVariant]==true
+  and sizeOk[r.PackSize]==true and r.PackMutation=='None'and not r.PaidRandom and r.RateBoost==nil
+end
 Data:PublishDaily(A)
 check(A:GetAttribute('DailyLoginReady')==true and A:GetAttribute('DailyQuestsReady')==0,'a new player has day 1 waiting')
+local bag0=#records
 local ok,msg,info=Data:ClaimDailyLogin(A)
-check(ok and info.Day==1 and pendingGems(A)[1]==5,'day 1: 5 Gems (as collectable Gems, like Index rewards): '..tostring(msg))
+local rec1=records[bag0+1]
+check(ok and info.Day==1 and info.Reward.SeedPack==1 and #records==bag0+1 and #pendingGems(A)==0,'day 1: a random seed pack in the Bag, no Gems: '..tostring(msg))
+check(isDailyPack(rec1),'the pack: stage 1-7, a Pack01-06 variant, a rolled size, no mutation, not a paid item ('..tostring(rec1 and rec1.Stage)..', '..tostring(rec1 and rec1.BagVariant)..', x'..tostring(rec1 and rec1.PackSize)..')')
+check(addCalls==1 and lastAdd.Options==nil and luckCalls==0 and lastAdd.Chest.PackSize==rec1.PackSize,'no luck / pity roll: AddChest gets no options and the size is the plain roll')
 check(A:GetAttribute('DailyLoginReady')==false and A:GetAttribute('DailyLoginStep')==1,'the badge clears after claiming')
 local again,why=Data:ClaimDailyLogin(A);check(not again and tostring(why):find('TOMORROW'),'only one claim a day: '..tostring(why))
-local got={5}
-for d=2,6 do nextDay();local o,_,i=Data:ClaimDailyLogin(A);local g=pendingGems(A);got[d]=o and g[#g]end
-check(got[2]==5 and got[3]==10 and got[4]==10 and got[5]==15 and got[6]==15,'days 2-6: 5, 10, 10, 15, 15 Gems ('..table.concat({got[2]or 0,got[3]or 0,got[4]or 0,got[5]or 0,got[6]or 0},', ')..')')
+check(#records==bag0+1 and addCalls==1,'(and nothing was granted twice)')
+for d=2,4 do
+ nextDay();local n0=#records;local o,_,i=Data:ClaimDailyLogin(A)
+ check(o and i.Day==d and i.Reward.SeedPack==1 and #records==n0+1 and isDailyPack(records[n0+1])and #pendingGems(A)==0,'day '..d..': another random seed pack, no Gems')
+end
+nextDay();local o5,_,i5=Data:ClaimDailyLogin(A);local g5=pendingGems(A)
+check(o5 and i5.Day==5 and #g5==1 and g5[1]==2,'day 5: 2 Gems (as collectable Gems, like Index rewards)')
+nextDay();local o6,_,i6=Data:ClaimDailyLogin(A);local g6=pendingGems(A)
+check(o6 and i6.Day==6 and #g6==2 and g6[2]==3,'day 6: 3 Gems')
+check(#records==bag0+4,'days 5 and 6 add no pack')
 nextDay()
 local before=#Data:GetChestRecords(A)
 local o7,m7,i7=Data:ClaimDailyLogin(A)
@@ -90,21 +121,57 @@ local mech;for _,r in ipairs(Data:GetChestRecords(A))do if r.BagVariant=='MechLi
 check(o7 and i7.Day==7 and #Data:GetChestRecords(A)==before+1 and mech and mech.Stage==8,'day 7: a Mech pack in the Bag ('..tostring(m7)..')')
 check(mech and mech.PaidRandom==false,'a free pack (not a paid random item), so it opens for everyone')
 nextDay();local o8,_,i8=Data:ClaimDailyLogin(A)
-check(o8 and i8.Day==1,'the next day the week starts again at day 1')
+check(o8 and i8.Day==1 and isDailyPack(records[#records]),'the next day the week starts again at day 1 (a random seed pack)')
 nextDay(3);local o9,_,i9=Data:ClaimDailyLogin(A)
 check(o9 and i9.Day==2,'missing days only pauses the week (day 2 after a 2-day gap)')
--- A full Bag holds the Mech pack claim (nothing lost, the claim stays).
+Data.AddChest=nil;Data.RollPackLuck=nil
+-- The random pool over many grants: every stage 1-7, only Pack01-06, only real pack sizes, never luck / paid / mutated.
+do
+ local stages,variants,sizes={},{},{};local bad=0;local n=700
+ for _=1,n do
+  local before2=#records;local rec,whyNot=Data:GrantDailyPack(A,false)
+  if not isDailyPack(rec)or #records~=before2+1 then bad+=1 else
+   stages[rec.Stage]=(stages[rec.Stage]or 0)+1;variants[rec.BagVariant]=(variants[rec.BagVariant]or 0)+1;sizes[rec.PackSize]=(sizes[rec.PackSize]or 0)+1
+  end
+  while #records>before2 do table.remove(records)end
+ end
+ local allStages=true;for st=1,7 do if(stages[st]or 0)<40 then allStages=false end end
+ local onlySix=true;for v in pairs(variants)do if not D.SeedPackVariants[v]then onlySix=false end end
+ check(bad==0,'700 random grants are all valid daily packs')
+ check(allStages,'every stage 1-7 comes up (about 100 each: '..table.concat({stages[1]or 0,stages[2]or 0,stages[3]or 0,stages[4]or 0,stages[5]or 0,stages[6]or 0,stages[7]or 0},', ')..')')
+ check(onlySix and (variants.Pack01 or 0)>250 and (variants.Pack01 or 0)<450 and (variants.Pack02 or 0)>100 and (variants.Pack03 or 0)>40 and(sizes[1]or 0)>400,'variants only Pack01-06 with Pack01 about half; size x1 most common (Pack01 '..(variants.Pack01 or 0)..', Pack02 '..(variants.Pack02 or 0)..', x1 '..(sizes[1]or 0)..')')
+end
+-- A claim needs a saving profile (data.CanSave), for the login week and for quests alike.
+do
+ Data:GetPremium(A).Daily.Login={Step=0,Day=D.Day(R.clock)-1}
+ local n0,g0=#records,#pendingGems(A)
+ Data.CanSave[A]=false
+ local c1,w1=Data:ClaimDailyLogin(A);local c2,w2=Data:ClaimDailyQuest(A,1)
+ check(not c1 and tostring(w1):find('CAN SAVE',1,true)and #records==n0 and Data:DailyState(A).Login.Ready,'login claim refused while the profile cannot save: '..tostring(w1))
+ check(not c2 and tostring(w2):find('CAN SAVE',1,true)and #pendingGems(A)==g0,'quest claim refused while the profile cannot save: '..tostring(w2))
+ Data:GetPremium(A).Daily.Login={Step=4,Day=D.Day(R.clock)-1}
+ local c3=Data:ClaimDailyLogin(A);check(not c3 and #pendingGems(A)==g0 and Data:DailyState(A).Login.Next==5,'and the Gem days too (day 5 stays open)')
+ Data.CanSave[A]=true
+ check((Data:ClaimDailyLogin(A))and pendingGems(A)[g0+1]==2,'with a saving profile the claim goes through (day 5: 2 Gems)')
+end
+-- A full Bag holds a pack claim (nothing lost, the claim stays): the seed pack days and the Mech pack day.
 local fill={};local cap=Config.MaxSavedChests
+local saved=table.clone(records);while #records<cap do records[#records+1]={Id='filler'..#records,Kind='Seed',SeedId='SunflowerSeed',ChestNumber=1}end
+Data:GetPremium(A).Daily.Login={Step=2,Day=D.Day(R.clock)-1}
+local fullSeed,fullSeedWhy=Data:ClaimDailyLogin(A)
+check(not fullSeed and tostring(fullSeedWhy):find('MAKE ROOM',1,true)and Data:DailyState(A).Login.Ready and Data:DailyState(A).Login.Next==3 and #records==cap,'a full Bag: the day 3 seed pack waits (claim still open): '..tostring(fullSeedWhy))
 Data:GetPremium(A).Daily.Login={Step=6,Day=D.Day(R.clock)-1}
-local records=Data:GetChestRecords(A);local saved=table.clone(records);while #records<cap do records[#records+1]={Id='filler'..#records,Kind='Seed',SeedId='SunflowerSeed',ChestNumber=1}end
 local full,fullWhy=Data:ClaimDailyLogin(A)
 check(not full and Data:DailyState(A).Login.Ready and Data:DailyState(A).Login.Next==7,'a full Bag: the Mech pack waits (claim still open): '..tostring(fullWhy))
+Data:GetPremium(A).Daily.Login={Step=4,Day=D.Day(R.clock)-1}
+check((Data:ClaimDailyLogin(A))and Data:DailyState(A).Login.Claimed==5,'but the Gem days still pay with a full Bag')
+Data:GetPremium(A).Daily.Login={Step=6,Day=D.Day(R.clock)-1}
 table.clear(records);for _,r in ipairs(saved)do records[#records+1]=r end
-check((Data:ClaimDailyLogin(A)),'and can be claimed after making room')
+check((Data:ClaimDailyLogin(A)),'and the Mech pack can be claimed after making room')
 -- 3. Daily quests.
 nextDay();Data:PublishDaily(A)
 local st=Data:DailyState(A)
-check(#st.Quests==3 and st.Quests[1].Text=='Steal 3 packs'and st.Quests[1].Progress==0 and st.Quests[1].Gems==5,'today: '..st.Quests[1].Text..', '..st.Quests[2].Text..', '..st.Quests[3].Text)
+check(#st.Quests==3 and st.Quests[1].Text=='Steal 3 packs'and st.Quests[1].Progress==0 and st.Quests[1].Gems==2 and not st.Quests[1].Blocked and st.QuestGemsGranted==0 and st.QuestGemCap==6,'today (2 Gems each, 0 of 6 granted): '..st.Quests[1].Text..', '..st.Quests[2].Text..', '..st.Quests[3].Text)
 local claimEarly=Data:ClaimDailyQuest(A,1);check(not claimEarly,'an unfinished quest cannot be claimed')
 local Chests=server('ChestService');local synced=0
 local fakeChests=setmetatable({PlayerData=Data,SyncTools=function()synced+=1 end},{__index=Chests})
@@ -119,7 +186,8 @@ check(done,'a notice says the quest is done')
 Chests.Bank(fakeChests,A,seed);check(Data:DailyState(A).Quests[1].Progress==3,'progress stops at the goal')
 local gemsBefore=#pendingGems(A)
 local qok=Data:ClaimDailyQuest(A,1)
-check(qok and #pendingGems(A)==gemsBefore+1 and pendingGems(A)[#pendingGems(A)]==5 and A:GetAttribute('DailyQuestsReady')==0,'claiming pays 5 Gems')
+check(qok and #pendingGems(A)==gemsBefore+1 and pendingGems(A)[#pendingGems(A)]==2 and A:GetAttribute('DailyQuestsReady')==0,'claiming pays 2 Gems')
+check(Data:DailyState(A).QuestGemsGranted==2 and Data:DailyState(A).Quests[1].Claimed,'and counts toward the daily cap (2 of 6)')
 check(not Data:ClaimDailyQuest(A,1)and not Data:ClaimDailyQuest(A,9)and not Data:ClaimDailyQuest(A,'1'),'no second claim, no bad index')
 -- The other hooks (each action counts where it really happens).
 local calls={};local real=Data.QuestEvent
@@ -135,6 +203,40 @@ check(src:find("self:TutorialEvent(player,'Plant')\n\tself:QuestEvent(player,'Pl
 local daily=Data:GetPremium(A).Daily;local qs=Data:DailyState(A).Quests
 local key2=qs[2].Key;for i=1,qs[2].Goal do Data:QuestEvent(A,key2,1)end
 check(Data:DailyState(A).Quests[2].Progress==qs[2].Goal and A:GetAttribute('DailyQuestsReady')==1,'quest 2 ('..qs[2].Text..') completes the same way')
+-- The daily Gem cap: 6 Gems = exactly three of the 2-Gem quests.
+do
+ local q2ok=Data:ClaimDailyQuest(A,2)
+ local key3=Data:DailyState(A).Quests[3];for i=1,key3.Goal do Data:QuestEvent(A,key3.Key,1)end
+ check(q2ok and A:GetAttribute('DailyQuestsReady')==1,'quest 2 claimed (4 of 6), quest 3 completes: still claimable')
+ local g0=#pendingGems(A);local q3ok=Data:ClaimDailyQuest(A,3);local fin=Data:DailyState(A)
+ check(q3ok and #pendingGems(A)==g0+1 and pendingGems(A)[g0+1]==2 and fin.QuestGemsGranted==6 and fin.Quests[1].Claimed and fin.Quests[2].Claimed and fin.Quests[3].Claimed,'all three quests pay 2 Gems each: 6 of 6 Gems today')
+ check(not fin.Quests[1].Blocked and not fin.Quests[2].Blocked and not fin.Quests[3].Blocked and A:GetAttribute('DailyQuestsReady')==0,'(claimed quests are DONE, not "limit reached")')
+ local rv=Data:GetPremium(A).Daily.Quests
+ check(rv.GemsGranted==6 and rv.RewardVersion==D.RewardVersion and D.QuestBlocked({GemsGranted=6}),'the saved state carries GemsGranted 6 and the reward version; one more claim would be blocked')
+ -- R140-era saves: no reward version, every claimed quest was worth 5 Gems (one claim already uses 5 of the 6).
+ local day=D.Day(R.clock)
+ local function setQuests(t)t.Day=day;Data:GetPremium(A).Daily.Quests=t;Data:PublishDaily(A);return Data:DailyState(A)end
+ local legacy=setQuests({Progress={3,3,3},Claimed={true,false,false}})
+ check(legacy.QuestGemsGranted==5 and legacy.Quests[1].Claimed and not legacy.Quests[1].Blocked and legacy.Quests[2].Blocked and legacy.Quests[3].Blocked,'one R140 claim counts 5 Gems: the other quests are blocked ("DAILY LIMIT")')
+ check(A:GetAttribute('DailyQuestsReady')==0,'and the badge does not count blocked quests')
+ local g1=#pendingGems(A);local bq,bwhy=Data:ClaimDailyQuest(A,2)
+ check(not bq and tostring(bwhy):find('LIMIT',1,true)and #pendingGems(A)==g1 and not Data:GetPremium(A).Daily.Quests.Claimed[2],'a blocked claim pays nothing and is not marked: '..tostring(bwhy))
+ check(Data:GetPremium(A).Daily.Quests.GemsGranted==5 and Data:GetPremium(A).Daily.Quests.RewardVersion==D.RewardVersion,'the state is upgraded in place (GemsGranted 5, current reward version)')
+ local two=setQuests({Progress={3,3,3},Claimed={true,true,false}});check(two.QuestGemsGranted==10 and two.Quests[3].Blocked,'two R140 claims: 10 Gems counted, nothing more today')
+ -- Current-version saves count 2 per claim (and keep a larger stored total).
+ local cur=setQuests({RewardVersion=D.RewardVersion,Progress={3,3,3},Claimed={true,false,false}})
+ check(cur.QuestGemsGranted==2 and not cur.Quests[2].Blocked and A:GetAttribute('DailyQuestsReady')==2,'a current-version claim counts 2: two more quests are claimable')
+ local c2ok=Data:ClaimDailyQuest(A,2);local c3ok=Data:ClaimDailyQuest(A,3)
+ check(c2ok and c3ok and Data:DailyState(A).QuestGemsGranted==6,'and both pay (6 of 6)')
+ local stored=setQuests({RewardVersion=D.RewardVersion,GemsGranted=5,Progress={3,3,3},Claimed={true,false,false}})
+ check(stored.QuestGemsGranted==5 and stored.Quests[2].Blocked,'a stored total above the claims is kept (never lowered)')
+ local stripped=setQuests({RewardVersion=D.RewardVersion,GemsGranted='x',Progress={3,3,3},Claimed={true,true,false}})
+ check(stripped.QuestGemsGranted==4 and not stripped.Quests[3].Blocked,'a missing / broken total falls back to claims x 2 (4)')
+ local bogus=setQuests({RewardVersion=D.RewardVersion,GemsGranted=-3,Progress={3,3,3},Claimed={false,false,false}})
+ check(bogus.QuestGemsGranted==0 and not bogus.Quests[1].Blocked,'a negative total is ignored')
+ local nextQ=D.ReadQuests({Day=day,Progress={3,3,3},Claimed={true,true,true}},day+1,501)
+ check(nextQ.GemsGranted==0 and not nextQ.Claimed[1]and not D.QuestBlocked(nextQ),'a new UTC day starts at 0 of 6 again')
+end
 -- 4. A new day: fresh quests, the login claim back.
 nextDay();local new=Data:DailyState(A)
 check(new.Quests[1].Progress==0 and not new.Quests[1].Claimed and new.Login.Ready,'the next day: new quests from 0 and a login claim')
@@ -147,9 +249,15 @@ local P=server('PremiumProgress')
 local decoded=P.Decode(save.Premium);check(decoded and decoded.Daily and decoded.Daily.Quests.Progress[1]==2,'and load back')
 local broken=table.clone(save.Premium);broken.Daily={Login={Step=99,Day='x'},Quests='nope'}
 local bd=P.Decode(broken);check(bd~=nil,'a broken Daily entry does not stop the profile loading')
-Data:GetPremium(A).Daily={Login={Step=99},Quests={Day=D.Day(R.clock),Progress={50,-1,'x'},Claimed={true,true,true}}}
+Data:GetPremium(A).Daily={Login={Step=99},Quests={Day=D.Day(R.clock),Progress={50,-1,'x'},Claimed={false,false,false}}}
 local fixed=Data:DailyState(A)
 check(fixed.Login.Claimed==0 and fixed.Quests[1].Progress==0 and not fixed.Quests[1].Claimed and fixed.Quests[2].Progress==0 and not fixed.Quests[2].Claimed,'impossible values are reset (never paid out)')
+local g99=#pendingGems(A);check(not Data:ClaimDailyQuest(A,1)and not Data:ClaimDailyQuest(A,2)and not Data:ClaimDailyQuest(A,3)and #pendingGems(A)==g99,'(and none of those quests can be claimed)')
+-- The live code never undoes a claim marker: claimed flags survive bad progress numbers, still without any payout.
+Data:GetPremium(A).Daily={Login={Step=99},Quests={Day=D.Day(R.clock),Progress={50,-1,'x'},Claimed={true,true,true}}}
+local kept=Data:DailyState(A)
+check(kept.Quests[1].Progress==0 and kept.Quests[2].Progress==0 and kept.Quests[1].Claimed and kept.Quests[2].Claimed and kept.Quests[3].Claimed,'claim markers are kept (a claim is never undone), progress is reset')
+check(not Data:ClaimDailyQuest(A,1)and #pendingGems(A)==g99 and kept.QuestGemsGranted==15,'no payout from them, and R140-era claims count 5 each (15) toward the cap')
 -- 6. Friend boost.
 local Social=server('SocialService');local social=Social.new(Data,Notes)
 local friends={['501:502']=true,['501:503']=true}
