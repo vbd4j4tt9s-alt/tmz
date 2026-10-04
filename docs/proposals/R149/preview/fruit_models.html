@@ -1,0 +1,97 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Fruit models preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// R149 fruit-model preview: draws a dump_fruit_models.luau scene. Roblox parts as boxes / wedges / corner wedges / balls / cylinders
+// (a SpecialMesh sphere is a stretched ball; a Roblox cylinder's axis is its local X). A baked plant mesh ("Mesh" + key) is drawn
+// from its real vertex data (meshes.json, read from the place file by extract_meshes.py, plus gen_meshes.py's generated ones):
+// unit-box vertices scaled by the part Size, vertex colours multiplied by the part Color, smooth vertex normals, like the
+// EditableMesh MeshPart. A mesh with no data is a stand-in ellipsoid of its bounding box. Neon is unlit colour.
+// No Roblox textures, decals or Future lighting: a design preview.
+import * as THREE from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+function triGeometry(tris){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(tris.flat(),3));g.computeVertexNormals();return g}
+// Roblox WedgePart: a right triangle in the YZ plane extruded along X. Tall edge at +Z (back), slope down to -Z (front).
+function wedgeGeometry(){
+  const A=[0,-.5,.5],B=[0,-.5,-.5],C=[0,.5,.5];const L=p=>[-.5,p[1],p[2]],Rr=p=>[.5,p[1],p[2]];const t=[];const tri=(a,b,c)=>t.push(a,b,c);
+  tri(Rr(A),Rr(B),Rr(C));tri(L(A),L(C),L(B));tri(L(A),L(B),Rr(B));tri(L(A),Rr(B),Rr(A));tri(L(A),Rr(A),Rr(C));tri(L(A),Rr(C),L(C));tri(L(B),L(C),Rr(C));tri(L(B),Rr(C),Rr(B));
+  return triGeometry(t);
+}
+// Roblox CornerWedgePart: a rectangular base (y=-.5) and a peak above its +X/-Z corner.
+function cornerGeometry(){
+  const P=[.5,.5,-.5],a=[-.5,-.5,-.5],b=[.5,-.5,-.5],c=[.5,-.5,.5],d=[-.5,-.5,.5];const t=[];const tri=(x,y,z)=>t.push(x,y,z);
+  tri(a,b,c);tri(a,c,d);   // base
+  tri(b,a,P);tri(c,b,P);   // the two upright faces under the peak
+  tri(a,d,P);tri(d,c,P);   // the two slopes
+  return triGeometry(t);
+}
+const envTex=new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04).texture;
+const geoBox=new THREE.BoxGeometry(1,1,1),geoSphere=new THREE.SphereGeometry(.5,48,32),geoWedge=wedgeGeometry(),geoCorner=cornerGeometry(),geoCyl=new THREE.CylinderGeometry(.5,.5,1,40).rotateZ(Math.PI/2);
+const meshGeo={};
+window.addMeshes=function(table){
+  let n=0;
+  for(const [key,m] of Object.entries(table)){
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(m.v.flat(),3));
+    g.setAttribute('normal',new THREE.Float32BufferAttribute(m.n.flat(),3));
+    const lin=[];for(const c of m.c){const k=new THREE.Color().setRGB(c[0],c[1],c[2],THREE.SRGBColorSpace);lin.push(k.r,k.g,k.b)}
+    g.setAttribute('color',new THREE.Float32BufferAttribute(lin,3));
+    g.setIndex(m.f.flat().map(i=>i-1));meshGeo[key]=g;n++;
+  }
+  return n;
+};
+function standIn(p){
+  // No mesh data: an ellipsoid of the bounding box. Meshes whose colour lives in their vertices have a white part colour.
+  if(p.color[0]>230&&p.color[1]>230&&p.color[2]>230){const k=(p.mesh||'').toLowerCase();return k.includes('pepper')?[214,58,30]:k.includes('cocoa')?[186,88,20]:k.includes('heart')?[240,140,20]:[74,140,64]}
+  return p.color;
+}
+window.shoot=function(scene,W,H,opts){
+  opts=opts||{};renderer.setSize(W,H);
+  const s=new THREE.Scene();s.background=new THREE.Color(opts.bg??0xa9d8f5);
+  s.add(new THREE.HemisphereLight(0xeaf6ff,0x5f8f55,1.25));
+  const group=new THREE.Group();s.add(group);let standIns=0;
+  for(const p of scene.parts){
+    if(p.t>=.995)continue;
+    const m=new THREE.Matrix4().set(p.r[0],p.r[1],p.r[2],p.p[0],p.r[3],p.r[4],p.r[5],p.p[1],p.r[6],p.r[7],p.r[8],p.p[2],0,0,0,1);
+    const real=p.shape==='Mesh'&&meshGeo[p.mesh];if(p.shape==='Mesh'&&!real)standIns++;
+    const geo=real?meshGeo[p.mesh]:(p.shape==='Ball'||p.shape==='Mesh')?geoSphere:p.shape==='Wedge'?geoWedge:p.shape==='Corner'?geoCorner:p.shape==='Cylinder'?geoCyl:geoBox;
+    const color=p.shape==='Mesh'&&!real?standIn(p):p.color;
+    let mat;
+    if(p.material==='Neon')mat=new THREE.MeshBasicMaterial({color:col(color).multiplyScalar(1.05),transparent:p.t>0,opacity:1-p.t,toneMapped:false,depthWrite:p.t<.5});
+    else if(p.material==='Glass')mat=new THREE.MeshPhysicalMaterial({color:col(color),roughness:.06,metalness:0,transparent:true,opacity:Math.max(.25,1-p.t),depthWrite:false,clearcoat:1,envMap:envTex,envMapIntensity:.6});
+    else{
+      const metal=p.material==='Metal';
+      mat=new THREE.MeshStandardMaterial({color:col(color),vertexColors:!!real,roughness:metal?.3:Math.max(.25,.62-p.refl*1.8),metalness:metal?.85:Math.min(.25,p.refl),
+        transparent:p.t>0,opacity:1-p.t,depthWrite:p.t<.5,side:(p.shape==='Wedge'||p.shape==='Corner'||real)?THREE.DoubleSide:THREE.FrontSide,envMap:envTex,envMapIntensity:metal?.9:.18});
+    }
+    const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;
+    mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(p.size[0],p.size[1],p.size[2]));
+    mesh.castShadow=p.material!=='Neon'&&p.t<.3;mesh.receiveShadow=p.material!=='Neon';group.add(mesh);
+  }
+  group.updateMatrixWorld(true);
+  const v=scene.view;let T=new THREE.Vector3(...(v.target||[0,0,0]));let dist=v.dist||10;
+  if(v.auto){
+    const box=new THREE.Box3();group.children.forEach(o=>box.expandByObject(o));const sph=box.getBoundingSphere(new THREE.Sphere());
+    T=sph.center.clone();if(v.lift)T.y+=sph.radius*v.lift;dist=sph.radius/Math.sin(v.fov*Math.PI/360)*(v.margin||1.05);
+  }
+  if(!opts.noGround){
+    const g=new THREE.Mesh(new THREE.CircleGeometry(400,64),new THREE.MeshStandardMaterial({color:0x6fb35c,roughness:.95}));
+    g.rotation.x=-Math.PI/2;g.position.y=-.02;g.receiveShadow=true;s.add(g);
+  }
+  const sun=new THREE.DirectionalLight(0xfff2dd,2.3);sun.position.set(T.x-30,T.y+60,T.z-45);sun.target.position.copy(T);
+  sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);const ex=dist*.6;Object.assign(sun.shadow.camera,{left:-ex,right:ex,top:ex,bottom:-ex,near:1,far:400});sun.shadow.bias=-.0006;
+  s.add(sun,sun.target);
+  const az=v.az*Math.PI/180,el=v.el*Math.PI/180;
+  const cam=new THREE.PerspectiveCamera(v.fov,W/H,.05,800);
+  // Roblox front is -Z: the camera stands in front (negative Z) and a little to the side, like ItemPictures' fruit view.
+  cam.position.set(T.x+Math.sin(az)*Math.cos(el)*dist,T.y+Math.sin(el)*dist,T.z-Math.cos(az)*Math.cos(el)*dist);cam.lookAt(T);
+  renderer.render(s,cam);return {url:renderer.domElement.toDataURL('image/png'),standIns};
+};
+window.ready=true;
+</script></body></html>
