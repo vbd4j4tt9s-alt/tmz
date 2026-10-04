@@ -1,6 +1,9 @@
 """Build a paste-into-Command-Bar installer from the difference between git BASE and the working tree.
 
-usage: python3 tools/build_installer.py RELEASE BACKUP_NAME OUT.lua [--base REV] [--retire retire.json]
+usage: python3 tools/build_installer.py RELEASE BACKUP_NAME OUT.lua [--base REV] [--retire retire.json] [--manifest FILE]
+
+--manifest FILE: read the script list (class, path in the place, file) from FILE instead of BASE's src/MANIFEST.tsv. Use it when
+  BASE's manifest is stale, e.g. docs/releases/R147_base_manifest.tsv = tools/export.py of the live place (its scripts match BASE).
 
 - Every changed script under src/ becomes byte patches {offset(1-based), bytesRemoved, base64Inserted}
   against the live source. The live source must match the BASE version's byte length and SHA-256, so the
@@ -38,13 +41,20 @@ args = [a for a in sys.argv[1:] if not a.startswith('--')]
 base = '46043d4'  # r107-live: what is live in the place; installers patch from here
 if '--base' in sys.argv: base = sys.argv[sys.argv.index('--base') + 1]; args.remove(base)
 retire_file = None
+manifest_file = None
+if '--manifest' in sys.argv: manifest_file = sys.argv[sys.argv.index('--manifest') + 1]; args.remove(manifest_file)
 if '--retire' in sys.argv: retire_file = sys.argv[sys.argv.index('--retire') + 1]; args.remove(retire_file)
 release, backup_name, out_path = args[:3]
 
 def git(*a): return subprocess.run(['git', '-C', ROOT, *a], check=True, capture_output=True).stdout
 manifest = {}
-for line in git('show', f'{base}:src/MANIFEST.tsv').decode('utf-8').splitlines()[1:]:
+manifest_text = open(os.path.join(ROOT, manifest_file), encoding='utf-8').read() if manifest_file else git('show', f'{base}:src/MANIFEST.tsv').decode('utf-8')
+for line in manifest_text.splitlines()[1:]:
     cls, path, f = line.split('\t'); manifest[f] = (cls, path)
+# A manifest file must describe BASE exactly: every script it lists is BASE's file (the patches are built from BASE).
+if manifest_file:
+    in_base = {p[len('src/'):] for p in git('ls-tree', '-r', '--name-only', base, 'src').decode().split() if p.endswith('.lua')}
+    assert set(manifest) == in_base, f'{manifest_file} does not list exactly the scripts in {base}: {sorted(set(manifest) ^ in_base)[:8]}'
 status = [l.split('\t') for l in git('diff', '--name-status', base, '--', 'src').decode().splitlines()]
 changed = [p[len('src/'):] for s, p in status if p.endswith('.lua') and s == 'M']
 added = [p[len('src/'):] for s, p in status if p.endswith('.lua') and s == 'A']
