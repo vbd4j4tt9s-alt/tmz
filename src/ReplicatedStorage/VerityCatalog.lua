@@ -14,4 +14,14 @@ local C={Id='VeritySeed',Variant='VerityReliquary',PackStage=7,Stage=9,Biome='Ve
 }
 function C.Is(id)return id==C.Id end
 function C.IsPack(variant)return variant==C.Variant end
+-- The growing plant (PlantCatalog calls this before the SeedValues loop, like MechCatalog.ApplyPlants). One ball-shaped
+-- fruit that regrows. Verity=true keeps it out of GrowthPace125 (its Seconds/RegrowSeconds/Value are final as written).
+-- Art lives in VerityPlantArt (plant/seed art), not here.
+function C.ApplyPlants(catalog)
+ catalog[C.Id]={Id=C.Id,Name=C.Name,Biome=C.Biome,Stage=C.Stage,Rarity=C.Rarity,Rank=8,Tree=false,Mode='repeat',
+  HarvestName=C.FruitName,HarvestMode='fruit',FruitCount=C.FruitCount,Verity=true,
+  Sockets={{0,1.6,0}},FruitCenters={{0,12.6,0}},FruitRadii={11},
+  Height=23.6,Radius=11.2,BaseScale=1,AuthoredHeight=23.6,
+  Seconds=C.Seconds,RegrowSeconds=C.RegrowSeconds,Value=C.Value}
+end
 return C

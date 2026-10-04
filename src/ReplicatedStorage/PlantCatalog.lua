@@ -129,6 +129,7 @@ for _,id in ipairs({'SunflowerBloomSeed','WinterPineSeed','LavaLotusSeed','DateP
  local d=Catalog[id];d.Regrows=false;d.SingleHarvestBonus=4;d.Value*=4
 end
 require(game:GetService('ReplicatedStorage'):WaitForChild('MechCatalog')).ApplyPlants(Catalog)
+require(game:GetService('ReplicatedStorage'):WaitForChild('VerityCatalog')).ApplyPlants(Catalog) -- R147: before the SeedValues loop
 for id,value in pairs(require(script.Parent.BalanceValues81).SeedValues)do
  local plant=assert(Catalog[id],'Missing approved seed '..id);plant.Value=value;if plant.Regrows==false then plant.SingleHarvestBonus=6 end
 end

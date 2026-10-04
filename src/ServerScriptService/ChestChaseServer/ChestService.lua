@@ -922,6 +922,41 @@ function ChestService:IsOpening(player)
     local opening=self.Openings[player]
     return opening~=nil and opening.Committed==true
 end
+-- R147: the Verity NPC gives a Verity Pack for a Void Pack. id = the pack's inventory Id (the NPC passes the one the player
+-- chose); without one, the Void Pack in the player's hand, else the first Void Pack in the bag. Returns the new record, or nil
+-- and the reason with nothing changed. A pack whose opening is committed (the reveal is playing) is refused; an opening that
+-- has only been started (held, clicks) is finished first, then the Tool is rebuilt for the new pack.
+function ChestService:ConvertVoidPack(player, id)
+	if not player or not self.PlayerData:IsLoaded(player) then return nil, "YOUR DATA IS STILL LOADING" end
+	if id == nil then
+		local character = player.Character
+		if character then
+			for _, child in ipairs(character:GetChildren()) do
+				if child:IsA("Tool") and child:GetAttribute("SeedPackTool") and child:GetAttribute("BagVariant") == "EclipseReliquary" then
+					local held = child:GetAttribute("SeedInventoryId")
+					if self.PlayerData:CheckVoidPack(player, held) then id = held; break end
+				end
+			end
+		end
+		if id == nil then
+			for _, record in ipairs(self.PlayerData:GetChestRecords(player)) do
+				if record.Kind == "Pack" and record.BagVariant == "EclipseReliquary" and record.Stage == 7 then id = record.Id; break end
+			end
+		end
+		if id == nil then return nil, "YOU HAVE NO VOID PACK TO GIVE" end
+	end
+	local target, reason = self.PlayerData:CheckVoidPack(player, id)
+	if not target then return nil, reason end
+	local opening = self.Openings[player]
+	if opening and opening.Tool and opening.Tool:GetAttribute("SeedInventoryId") == target.Id then
+		if opening.Committed then return nil, "WAIT FOR THAT PACK TO FINISH OPENING" end
+		self:_finishOpening(player, opening)
+	end
+	local record, why = self.PlayerData:ConvertVoidPack(player, target.Id)
+	if not record then return nil, why end
+	self:SyncTools(player)
+	return record
+end
 function ChestService:_finishOpening(player, opening, skipSync)
     if not opening or self.Openings[player] ~= opening then return end
     self.Openings[player]=nil

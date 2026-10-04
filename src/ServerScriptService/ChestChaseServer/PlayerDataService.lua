@@ -11,6 +11,7 @@ local Weather=require(game:GetService('ReplicatedStorage').WeatherTraits)
 local Points=require(game:GetService('ReplicatedStorage').SpeedPoints)
 local Progression=require(game:GetService('ReplicatedStorage').Progression81)
 local PackRules = require(game:GetService("ReplicatedStorage"):WaitForChild("SeedPackRules"))
+local VerityCatalog = require(game:GetService("ReplicatedStorage"):WaitForChild("VerityCatalog")) -- R147
 
 local function gardenClonePremium(t)local o={};for k,v in pairs(t)do o[k]=type(v)=='table'and gardenClonePremium(v)or v end;return o end
 local PlayerDataService = {}
@@ -397,7 +398,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         if not rewardCash then return nil,reason end
         local reward = {
             Id=pack.Id, ChestNumber=pack.ChestNumber, ChestName=seed.Name, Kind="Seed",
-            PaidRandom=pack.PaidRandom==true,Stage=pack.BagVariant=='EclipseReliquary'and PackRules.SeedDesignById[seed.Id].SaveStage or pack.Stage, SeedId=seed.Id, SeedName=seed.Name, SeedEmoji=seed.Emoji,
+            PaidRandom=pack.PaidRandom==true,Stage=(pack.BagVariant=='EclipseReliquary'or VerityCatalog.IsPack(pack.BagVariant))and PackRules.SeedDesignById[seed.Id].SaveStage or pack.Stage, SeedId=seed.Id, SeedName=seed.Name, SeedEmoji=seed.Emoji,
             AccentColor=seed.Color, Rarity=rarity, SeedScale=PackRules.NewSeedScale(pack.Stage,pack.BagVariant,pack.PackSize),
             BagVariant=PackRules.VariantKey(pack.BagVariant),OddsVersion=pack.OddsVersion,
             PackSize=PackRules.SanitizePackSize(pack.PackSize),PackMutation=PackRules.MutationKey(pack.PackMutation),Weather=Weather.Key(pack.Weather),WeatherCheckedEvent=Weather.CheckedEvent(pack.WeatherCheckedEvent),
@@ -415,6 +416,50 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         return reward
     end
     return nil, "THIS PACK IS NO LONGER IN YOUR INVENTORY"
+end
+
+-- R147: the Verity NPC turns a Void Pack into a Verity Pack. CheckVoidPack finds the record or says why not (changes nothing).
+function PlayerDataService:CheckVoidPack(player, inventoryId)
+	if not self:IsLoaded(player) then return nil, "YOUR DATA IS STILL LOADING" end
+	if type(inventoryId) ~= "string" or #inventoryId > 80 then return nil, "INVALID PACK" end
+	for _, pack in ipairs(self:GetChestRecords(player)) do
+		if pack.Id == inventoryId then
+			if pack.Kind ~= "Pack" or pack.BagVariant ~= "EclipseReliquary" or pack.Stage ~= 7 then return nil, "ONLY A VOID PACK CAN BE GIVEN TO VERITY" end
+			return pack
+		end
+	end
+	return nil, "THAT PACK IS NO LONGER IN YOUR INVENTORY"
+end
+
+-- One non-yielding inventory transaction, like OpenSeedPack. The Verity Pack takes the Void Pack's slot (the bag keeps its
+-- order) with a fresh Id from the serial; size, coat, weather and the paid flag carry over. Returns the new record, or nil
+-- and the reason with nothing changed.
+function PlayerDataService:ConvertVoidPack(player, inventoryId)
+	local old, reason = self:CheckVoidPack(player, inventoryId)
+	if not old then return nil, reason end
+	local records = self:GetChestRecords(player)
+	for index, pack in ipairs(records) do
+		if pack ~= old then continue end
+		local chestNumber = (player:GetAttribute("ChestInventorySerial") or 0) + 1
+		player:SetAttribute("ChestInventorySerial", chestNumber)
+		local size = PackRules.SanitizePackSize(pack.PackSize)
+		local record = {
+			Id = string.format("%d_%d", player.UserId, chestNumber),
+			ChestNumber = chestNumber, ChestName = "Seed Pack", Kind = "Pack",
+			Stage = VerityCatalog.PackStage, AccentColor = pack.AccentColor or self.Map:GetStageAccent(VerityCatalog.PackStage),
+			BagVariant = VerityCatalog.Variant, OddsVersion = PackRules.OddsVersion,
+			PackSize = size, PackMutation = PackRules.MutationKey(pack.PackMutation), Weather = Weather.Key(pack.Weather),
+			WeatherCheckedEvent = Weather.CheckedEvent(pack.WeatherCheckedEvent), PaidRandom = pack.PaidRandom == true,
+			SeedScale = PackRules.NewSeedScale(VerityCatalog.PackStage, VerityCatalog.Variant, size),
+		}
+		records[index] = record
+		local tests = self.StudioPackRewards and self.StudioPackRewards[player]
+		if tests then tests[pack.Id] = nil end -- an owner-test guarantee on the old pack does not carry over
+		self:_notifySeedInventory(player)
+		self:MarkDirty(player)
+		return record
+	end
+	return nil, "THAT PACK IS NO LONGER IN YOUR INVENTORY"
 end
 
 function PlayerDataService:AddCash(player, amount)
@@ -706,7 +751,8 @@ function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNu
 	local stage = math.clamp(
 		math.floor((tonumber(savedChest.Stage) or 1) + 0.5),
 		1,
-		(savedChest.BagVariant=='MechLimited'or require(game:GetService('ReplicatedStorage').MechCatalog).Is(savedChest.SeedId))and 8 or self.Config.StageCount
+		(savedChest.BagVariant=='MechLimited'or require(game:GetService('ReplicatedStorage').MechCatalog).Is(savedChest.SeedId))and 8
+			or VerityCatalog.Is(savedChest.SeedId)and VerityCatalog.Stage or self.Config.StageCount -- R147: the Verity seed keeps its Index category 9
 	)
 	local chestNumber = math.max(
 		1,
@@ -1085,7 +1131,7 @@ function PlayerDataService:DecodeGiftedSeed(player, saved)
 	if type(saved) ~= "table" or (saved.Kind ~= "Pack" and saved.Kind ~= "Seed")
 		or type(saved.Id) ~= "string" or #saved.Id < 1 or #saved.Id > 80
 		or type(saved.ChestName) ~= "string" or #saved.ChestName > 80
-		or type(saved.Stage) ~= "number" or saved.Stage ~= saved.Stage or saved.Stage % 1 ~= 0 or saved.Stage < 1 or saved.Stage > 8
+		or type(saved.Stage) ~= "number" or saved.Stage ~= saved.Stage or saved.Stage % 1 ~= 0 or saved.Stage < 1 or saved.Stage > 9
 		or type(saved.ChestNumber) ~= "number" or saved.ChestNumber ~= saved.ChestNumber or saved.ChestNumber < 1 or saved.ChestNumber > 1e12 then
 		return nil
 	end

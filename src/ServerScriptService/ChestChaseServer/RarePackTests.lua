@@ -2,6 +2,7 @@
 local Run=game:GetService('RunService');local RS=game:GetService('ReplicatedStorage')
 local Http=game:GetService('HttpService');local Packs=require(RS.SeedPackRules)
 local T={Rarities={'Legendary','Mythic','Secret','Cosmic','King'}}
+local Verity=require(RS.VerityCatalog)
 function T.Grant(data,player,selector,requester)
  if not require(script.Parent.OwnerCommandAccess).IsAllowed(requester or player)then return false,'Owner or configured admin required.'end
  if not data:IsLoaded(player)then return false,'Wait for your data to load.'end
@@ -13,15 +14,17 @@ function T.Grant(data,player,selector,requester)
   table.insert(selected,found)
  end end
  if selector=='mech'then for _,s in ipairs(require(RS.MechCatalog).Seeds)do table.insert(selected,Packs.SeedDesignById[s.Id])end end
- if #selected==0 then return false,'Use /test rarepacks [mech|legendary|mythic|secret|cosmic|king].'end
+ -- R147: rarepacks verity = one TEST Verity pack that reveals the Verity seed (a Verity pack, stage 7; the seed lands in Index category 9).
+ if selector=='verity'then table.insert(selected,Packs.SeedDesignById[Verity.Id])end
+ if #selected==0 then return false,'Use /test rarepacks [mech|verity|legendary|mythic|secret|cosmic|king].'end
  local records=data:GetChestRecords(player)
  if #records+#selected>data.Config.MaxSavedChests then return false,'Inventory full. Make space first.'end
  local pending={};local serial=player:GetAttribute('ChestInventorySerial')or 0
  for _,spec in ipairs(selected)do
   local seed=data.Config.GetSeedById(spec.id);if not seed then return false,'Seed catalog mismatch.'end
   serial+=1;table.insert(pending,{Id=Http:GenerateGUID(false),Kind='Pack',ChestNumber=serial,ChestName=seed.Name,
-   Stage=spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,AccentColor=seed.Color,Rarity=spec.rarity,
-   SeedScale=1,OddsVersion=81,BagVariant=spec.stage==8 and'MechLimited'or'Pack06',PackSize=1,PackMutation='None'})
+   Stage=Verity.Is(spec.id)and Verity.PackStage or spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,AccentColor=seed.Color,Rarity=spec.rarity,
+   SeedScale=1,OddsVersion=Verity.Is(spec.id)and Packs.OddsVersion or 81,BagVariant=Verity.Is(spec.id)and Verity.Variant or spec.stage==8 and'MechLimited'or'Pack06',PackSize=1,PackMutation='None'})
  end
  data.StudioPackRewards=data.StudioPackRewards or setmetatable({},{__mode='k'})
  local overrides=data.StudioPackRewards[player]or{};data.StudioPackRewards[player]=overrides

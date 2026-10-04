@@ -10,7 +10,8 @@ local G={Version=125,Round=10}
 G.MaxValue=9e10
 G.Bands={Rare={900,1800},Epic={1800,2700},Legendary={2700,3600},Mythic={3600,5400},Secret={7200,9000},Cosmic={9000,10800},King={10800,14400}}
 function G.Exempt(def)
- return def.Stage==1 or def.Mech==true or G.Bands[def.Rarity]==nil
+ -- R147: the Verity plant (VerityCatalog) is final as written: 4 h, regrow 1500 s, 9e10 (the per-fruit cap).
+ return def.Stage==1 or def.Mech==true or def.Verity==true or G.Bands[def.Rarity]==nil
 end
 local function round(v,unit)return math.floor(v/unit+.5)*unit end
 local applied=setmetatable({},{__mode='k'}) -- catalogs already paced (no marker key inside the catalog)

@@ -1,5 +1,6 @@
 -- V119. Server rolls rewards; clients only render the published result.
 local Rules = {}
+local Verity = require(script.Parent.VerityCatalog) -- R147
 Rules.Version = 139
 Rules.MaxPackSize = 25
 Rules.MaxSeedScale = 25
@@ -29,6 +30,7 @@ Rules.PackTiers = {
 function Rules.GetPackTier(key)
     if key=='EclipseReliquary'then return {Name='Secret+',Color=Color3.fromRGB(190,144,255),Rate=7},7 end
     if key=='MechLimited'then return {Name='Limited',Color=Color3.fromRGB(88,225,255),Rate=6},6 end
+    if key==Verity.Variant then return {Name='Verity',Color=Color3.fromRGB(255,213,46),Rate=7},7 end -- R147
     local variant=Rules.Variants[key]
     local rank=variant and (variant.Design or ({Small=1,Standard=2,Grand=3})[key]) or 2
     for _,spec in ipairs(Rules.SeedDesigns)do if spec.id=='SupernovaBloomSeed'then spec.name='Boom Bloom'end end
@@ -169,7 +171,7 @@ function Rules.ObtainableStage(id)
 end
 for i=#Rules.SeedDesigns,1,-1 do if Rules.IsRetired(Rules.SeedDesigns[i].id)then table.remove(Rules.SeedDesigns,i)end end
 function Rules.BuildSeedCatalog()
- local catalog={{},{},{},{},{},{},{},{}}
+ local catalog={{},{},{},{},{},{},{},{},{}} -- R147: stage 9 = Verity
  for id,spec in pairs(Rules.SeedDesignById)do
   local hex=spec.top
   catalog[spec.SaveStage][spec.index]={Id=id,Name=spec.name..' Seed',Emoji='🌱',Retired=Rules.IsRetired(id),ObtainStage=spec.stage,
@@ -181,7 +183,7 @@ local obtainableCache=setmetatable({},{__mode='k'})
 function Rules.ObtainablePool(config,stage)
  local pools=obtainableCache[config]
  if not pools then
-  pools={{},{},{},{},{},{},{},{}}
+  pools={{},{},{},{},{},{},{},{},{}} -- R147: stage 9 = Verity
   for _,catalog in ipairs(config.SeedCatalogByStage)do for _,seed in ipairs(catalog)do
    if not Rules.IsRetired(seed.Id)then table.insert(pools[Rules.ObtainableStage(seed.Id)],seed)end
   end end
@@ -292,6 +294,7 @@ end
 function Rules.PackLabel(stage,variant,size,mutation)
     if variant=='EclipseReliquary'then local m=Rules.MutationKey(mutation);return(m~='None'and m..' 'or'')..'Void Pack'end
     if variant=='MechLimited'then return 'Limited Mech Pack'end
+    if variant==Verity.Variant then local m=Rules.MutationKey(mutation);return(m~='None'and m..' 'or'')..Verity.PackName end -- R147
     mutation=Rules.MutationKey(mutation)
     return (mutation~='None'and mutation..' 'or '')..
         (Rules.DesignBiomes[stage]or 'Biome')..' Seed Pack'
@@ -335,6 +338,12 @@ for index,s in ipairs(Mech.Seeds)do
  local spec={id=s.Id,name=s.Name,rarity=s.Rarity,stage=8,SaveStage=8,biome='Mech',index=index,top='36a6ff',bottom='1f2b39',ink='60dbff',pattern='Leaf',addition='none'}
  table.insert(Rules.SeedDesigns,spec);Rules.SeedDesignById[s.Id]=spec;Rules.SeedRarityById[s.Id]=s.Rarity
 end
+-- R147: the Verity seed (rarity King, its own Index category: stage 9, SaveStage 9). Planted like any plant (PlantCatalog), found
+-- only in the Verity pack (VerityPackOdds), never in a world pack, a Void pack or the Mech pool.
+do
+ local spec={id=Verity.Id,name=Verity.Name,rarity=Verity.Rarity,stage=Verity.Stage,SaveStage=Verity.Stage,biome=Verity.Biome,index=1,top='ffd52e',bottom='f0aa14',ink='fff8d0',pattern='None',addition='none'}
+ table.insert(Rules.SeedDesigns,spec);Rules.SeedDesignById[Verity.Id]=spec;Rules.SeedRarityById[Verity.Id]=Verity.Rarity
+end
 for name,weight in pairs(require(script.Parent.BalanceRules).RarityWeights)do Rules.Rarities[name].Weight=weight;Rules.Rarities[name].Duration=Rules.GetRevealDuration(name)end
 
 -- Versioned R81 world packs. Legacy unversioned and Small/Standard/Grand keep old Roll.
@@ -344,6 +353,8 @@ local O=require(script.Parent.PackOdds81)
 local approved=require(script.Parent.BalanceValues81)
 for i,key in ipairs(Rules.VariantOrder)do Rules.Variants[key].SpawnWeight=approved.SpawnWeights[i]end
 Rules.Variants.EclipseReliquary={Name='Void Pack',BagScale=.96,SeedScale=1.35,RareBias=1,SpawnWeight=0,Trim=7,Design=6,OddsLabel='All Secret / Cosmic / King seeds + 1/200 Mech roll'}
+-- R147: a Void pack handed to Verity comes back as a Verity pack (same stage 7, size, coat and weather; own odds).
+Rules.Variants[Verity.Variant]={Name=Verity.PackName,BagScale=.96,SeedScale=1.35,RareBias=1,SpawnWeight=0,Trim=7,Design=6,OddsLabel='Verity seed 1/100 + Secret / Cosmic / Mech'}
 function Rules.RewardPool(config,stage,variant)
  if variant=='EclipseReliquary'then local _,all=require(script.Parent.VoidPackOdds85).Pools(config,Rules);return all end
  return Rules.ObtainablePool(config,stage)
@@ -433,6 +444,32 @@ Rules.Roll=function(config,stage,draw,luck,variantKey,version,boost)
  if not current137(stage,variantKey,version)then return roll112(config,stage,draw,luck,variantKey,older(version))end
  if type(draw)~='function'then return nil end
  return N137.Roll(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,draw,stage,Rules.SanitizeRateBoost(boost))
+end
+
+-- R147 (owner): the Verity pack. The OUTERMOST wrapper, so it never depends on a pack's saved odds version (Void packs carry
+-- OddsVersion 137 but roll the 112 path, and the hold tooltip passes version 0). Everything else is passed through untouched.
+--  * SeedOdds: a Verity pack (stage 7) = VerityPackOdds; stage 9 (the Verity Index category) = the Verity seed at 1% (the
+--    catalog's BaseChance, so the Index chip reads 1/100); other packs and stages as before.
+--  * Roll: a Verity pack rolls VerityPackOdds (a draw function, like the 112/137 Void roll); the Verity seed is not in any other pack.
+--  * RewardPool: the hold tooltip's list (Verity seed, Secret / Cosmic seeds, Mech seeds without the Crowncore Tree).
+local VerityPackOdds=require(script.Parent.VerityPackOdds)
+local roll137,odds137,pool137=Rules.Roll,Rules.SeedOdds,Rules.RewardPool
+Rules.RewardPool=function(config,stage,variant)
+ if variant==Verity.Variant then local _,all=VerityPackOdds.Pools(config,Rules);return all end
+ return pool137(config,stage,variant)
+end
+Rules.SeedOdds=function(config,stage,variantKey,luck,version,boost)
+ if variantKey==Verity.Variant then return stage==Verity.PackStage and VerityPackOdds.Odds(config,Rules)or{}end
+ if stage==Verity.Stage then return {[Verity.Id]=100*Verity.VerityChance}end
+ return odds137(config,stage,variantKey,luck,version,boost)
+end
+Rules.Roll=function(config,stage,draw,luck,variantKey,version,boost)
+ if variantKey==Verity.Variant then
+  if stage~=Verity.PackStage then return nil end
+  return VerityPackOdds.Roll(config,Rules,draw)
+ end
+ if stage==Verity.Stage then return nil end
+ return roll137(config,stage,draw,luck,variantKey,version,boost)
 end
 
 return Rules

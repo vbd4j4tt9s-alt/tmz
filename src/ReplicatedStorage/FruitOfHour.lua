@@ -9,7 +9,8 @@ function F.Candidates()
  local Rules=require(RS:WaitForChild('SeedPackRules'));local Catalog=require(RS:WaitForChild('PlantCatalog'))
  local out={}
  for _,spec in ipairs(Rules.SeedDesigns)do
-  if Catalog[spec.id]and not Rules.IsRetired(spec.id)then table.insert(out,spec.id)end
+  -- R147: the Verity plant is a pack-only reward, never the Fruit of the Hour (keeps today's 51 candidates).
+  if Catalog[spec.id]and not Rules.IsRetired(spec.id)and not Catalog[spec.id].Verity then table.insert(out,spec.id)end
  end
  table.sort(out);candidates=out;return out
 end

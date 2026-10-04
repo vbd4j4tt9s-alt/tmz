@@ -720,6 +720,8 @@ for stage,launch in ipairs(Knockback.Keeper)do
  Config.GuardianSettingsByStage[stage].FlingVertical=launch[2]
 end
 Config.BiomeNames[8]='Mech';Config.BiomeRank[8]=8
+-- R147: the Verity seed's own Index category (stage 9). Not a map biome (StageCount stays 7), like Mech.
+Config.BiomeNames[9]='Verity';Config.BiomeRank[9]=9
 local validateBase=Config.Validate
 function Config.Validate()
  validateBase()
@@ -733,6 +735,11 @@ function Config.Validate()
   assert(plant and plant.Mech and plant.FruitCount==#plant.Sockets and plant.Value>0,'Invalid mech plant')
  end
  assert(math.abs(total-100)<.000001,'Limited seed chances must total 100%')
+ -- R147: stage 9 holds exactly the Verity seed, and its plant keeps the Verity flag and the per-fruit cap.
+ local verity=require(game:GetService('ReplicatedStorage').VerityCatalog)
+ assert(#Config.SeedCatalogByStage[verity.Stage]==1 and Config.SeedCatalogByStage[verity.Stage][1].Id==verity.Id,'Invalid Verity seed category')
+ local vplant=Config.GardenPlants[verity.Id]
+ assert(vplant and vplant.Verity==true and vplant.FruitCount==#vplant.Sockets and vplant.Value>0 and vplant.Value<=require(game:GetService('ReplicatedStorage').GrowthPace125).MaxValue,'Invalid Verity plant')
 end
 -- R67 tuning does not migrate or reset saved points, crops, wallets or ownership.
 local balance=require(game:GetService('ReplicatedStorage').BalanceRules)

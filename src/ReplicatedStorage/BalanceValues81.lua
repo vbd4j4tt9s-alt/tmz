@@ -23,5 +23,12 @@ require(script.Parent.EconomyBalance90).Apply(T)
 T.LegacyCompletionGems=T.CompletionGems
 T.HalfwayGems=10
 T.CompletionGems={[1]=20,[6]=20,[2]=20,[3]=20,[4]=20,[5]=20,[7]=20,[8]=100}
+-- R147: the Verity seed (Index category 9): fruit value, first / repeat index cash and the category's completion Gems.
+-- (HalfwayGems is one number for every category, so it is not repeated here.)
+do
+ local V=require(script.Parent.VerityCatalog)
+ T.SeedValues[V.Id]=V.Value;T.IndexFirst[V.Id]=V.IndexFirst;T.IndexRepeat[V.Id]=V.IndexRepeat
+ T.CompletionGems[V.Stage]=V.CompletionGems
+end
 T.Version=91
 return T

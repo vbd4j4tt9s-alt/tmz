@@ -3,11 +3,11 @@ local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Packs=require(RS.SeedPackRules);local T=require(RS.BalanceValues81)
 local State=require(script.Parent.OwnerTestState82)
-local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true,daily=true,mystery=true}}
-local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8}
-local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary'}
+local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true,daily=true,mystery=true,verity=true}}
+local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8,verity=9}
+local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary',verity='VerityReliquary'}
 local function integer(s,lo,hi)local n=tonumber(s);return n and n==n and n%1==0 and n>=lo and n<=hi and n or nil end
-local function stage(s)return biomes[tostring(s or''):lower()]or integer(s,1,8)end
+local function stage(s)return biomes[tostring(s or''):lower()]or integer(s,1,9)end
 local function variant(s)return tiers[tostring(s or''):lower()]or (integer(s,1,6)and string.format('Pack%02d',tonumber(s)))end
 local function seedId(s)
  local query=tostring(s or''):lower()
@@ -131,9 +131,10 @@ function X.Execute(ctx,p,action,a)
  elseif action=='odds'then
   local st,key,luck
   if a[1]=='event'or a[1]=='eclipse'then st=7;key='EclipseReliquary';luck=tonumber(a[2]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>2 then return false,'Use odds event [luck].'end
+  elseif a[1]=='verity'then st=7;key='VerityReliquary';luck=tonumber(a[2]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>2 then return false,'Use odds verity [luck].'end
   else st=stage(a[1]);key=variant(a[2]);luck=tonumber(a[3]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>3 then return false,'Use odds <biome> <tier> [luck].'end end
-  if not st or st==8 or not key or not luck or luck~=luck or luck<1 or luck>T.MaxLuck then return false,'Use odds storm mythic [1–'..T.MaxLuck..'] or odds event.'end
-  local lines={key=='EclipseReliquary'and 'Void Pack | all regular Secret/Cosmic/King seeds | 1/200 normal Mech roll | luck does not affect this pack' or ctx.Config.BiomeNames[st]..' | '..Packs.GetPackTier(key).Name..' | luck '..luck};local odds=Packs.SeedOdds(ctx.Config,st,key,luck,Packs.OddsVersion)
+  if not st or st>=8 or not key or not luck or luck~=luck or luck<1 or luck>T.MaxLuck then return false,'Use odds storm mythic [1–'..T.MaxLuck..'], odds event or odds verity.'end
+  local lines={key=='EclipseReliquary'and 'Void Pack | all regular Secret/Cosmic/King seeds | 1/200 normal Mech roll | luck does not affect this pack' or key=='VerityReliquary'and 'Verity Pack | Verity seed 1/100, then the Void pack without its King seeds (1/200 Mech roll without the Crowncore Tree) | luck does not affect this pack' or ctx.Config.BiomeNames[st]..' | '..Packs.GetPackTier(key).Name..' | luck '..luck};local odds=Packs.SeedOdds(ctx.Config,st,key,luck,Packs.OddsVersion)
   for _,seed in ipairs(Packs.RewardPool(ctx.Config,st,key))do local n=odds[seed.Id]or 0;if n>0 then table.insert(lines,seed.Name..': '..require(RS.OddsText85).Format(n))end end
   return true,table.concat(lines,'\n')
  elseif action=='pity'then
@@ -198,7 +199,7 @@ function X.Execute(ctx,p,action,a)
  if action=='fling'then
   if #a>1 then return false,'Use fling <biome|darkened> [@username].'end
   local which=(a[1]or'storm'):lower();local dark=which=='dark'or which=='darkened'or which=='event'
-  local st=not dark and stage(which);if not dark and(not st or st==8)then return false,'Use fling forest…storm or fling darkened.'end
+  local st=not dark and stage(which);if not dark and(not st or st>=8)then return false,'Use fling forest…storm or fling darkened.'end
   local c=p.Character;local root=c and c:FindFirstChild('HumanoidRootPart');if not root then return false,'Wait for the target’s character.'end
   local K=require(RS.KnockbackConfig);local h,v
   if dark then h,v=K.SpecialKeeper.Horizontal,K.SpecialKeeper.Vertical
@@ -274,12 +275,16 @@ function X.Execute(ctx,p,action,a)
   if #a~=1 then return false,'Use animrate <0.1–10|off>.'end
   local n=a[1]=='off'and nil or tonumber(a[1]);if a[1]~='off'and(not n or n~=n or n<.1 or n>10)then return false,'Animation rate must be 0.1–10.'end
   p:SetAttribute('OwnerAnimationRate82',n);return true,n and('Temporary run animation rate: '..n..'x')or'Normal animation scaling restored.'
- elseif action=='eclipse'or action=='packset'then
-  local count=action=='eclipse'and integer(a[1]or'1',1,20)or 6;local st=action=='eclipse'and 7 or stage(a[1])
-  if #a>1 or not count or not st or st==8 then return false,action=='eclipse'and'Use eclipse [1–20].'or'Use packset <biome>.'end
+ elseif action=='eclipse'or action=='packset'or action=='verity'then
+  -- R147: verity [1-20] = Verity packs, like eclipse = Void packs. (A bad number is refused for verity; eclipse keeps its old
+  -- "or 6" fallback, which silently gave 6 Void packs for a bad number.)
+  local count,st
+  if action=='verity'then count=integer(a[1]or'1',1,20);st=7
+  else count=action=='eclipse'and integer(a[1]or'1',1,20)or 6;st=action=='eclipse'and 7 or stage(a[1])end
+  if #a>1 or not count or not st or st>=8 then return false,action=='eclipse'and'Use eclipse [1–20].'or action=='verity'and'Use verity [1–20].'or'Use packset <biome>.'end
   if #data:GetChestRecords(p)+count>ctx.Config.MaxSavedChests then return false,'Make space in the target inventory.'end
   for i=1,count do
-   local record,reason=data:AddChest(p,{Stage=st,BagVariant=action=='eclipse'and'EclipseReliquary'or string.format('Pack%02d',i),PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
+   local record,reason=data:AddChest(p,{Stage=st,BagVariant=action=='eclipse'and'EclipseReliquary'or action=='verity'and'VerityReliquary'or string.format('Pack%02d',i),PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
    if not record then return false,'Stopped after '..(i-1)..' packs: '..tostring(reason)end
   end
   ctx.Chests:SyncTools(p);save(ctx,p);return true,'Added '..count..' packs with the current odds.'

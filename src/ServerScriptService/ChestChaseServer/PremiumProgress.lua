@@ -15,7 +15,7 @@ function P.Decode(saved)
   local n=0;for id,v in pairs(saved[key])do
    n+=1;if n>20000 or type(id)~='string'or #id<1 or #id>100 or v~=true then return nil end
    if key=='Entitlements'and not Catalog.PassGemPrices[id]then return nil end
-   if key=='Biomes'and not integer(tonumber(id),1,8)then return nil end
+   if key=='Biomes'and not integer(tonumber(id),1,9)then return nil end
   end
  end
  local result=copy(saved)
@@ -24,7 +24,7 @@ function P.Decode(saved)
  if type(result.BiomeHalfRewards)~='table'then return nil end
  for key,value in pairs(result.BiomeHalfRewards)do
   local stage=type(key)=='string'and tonumber(key)
-  if not integer(stage,1,8)or key~=tostring(stage)or value~=true then return nil end
+  if not integer(stage,1,9)or key~=tostring(stage)or value~=true then return nil end
  end
  if result.IndexRewardVersion~=nil and result.IndexRewardVersion~=104 then return nil end
  -- Pre-R104 full rewards included the midpoint. New claims are independent.
@@ -47,7 +47,7 @@ function P.Decode(saved)
  if result.Tutorial~=nil then result.Tutorial=require(RS.BeginnerGuide).Read(result.Tutorial);if not result.Tutorial then return nil end end
   result.BiomeBackpay81=result.BiomeBackpay81 or{}
   if type(result.BiomeBackpay81)~='table'then return nil end
-  for key,value in pairs(result.BiomeBackpay81)do if not integer(tonumber(key),1,8)or not integer(value,0,50)then return nil end end
+  for key,value in pairs(result.BiomeBackpay81)do if not integer(tonumber(key),1,9)or not integer(value,0,50)then return nil end end
   if result.BalanceVersion81~=81 then
    for key in pairs(result.Biomes)do result.BiomeBackpay81[key]=math.max(0,(T.LegacyCompletionGems[tonumber(key)]or 5)-5)end
    result.BalanceVersion81=81
@@ -65,7 +65,7 @@ function P.Attach(Data)
   for _,pass in ipairs(require(RS.GamePassCatalog))do
    if state.Entitlements[pass.Key]then player:SetAttribute(pass.Attribute,true)end
   end
-  for i=1,8 do local pending=(state.BiomeBackpay81 or{})[tostring(i)]or 0
+  for i=1,9 do local pending=(state.BiomeBackpay81 or{})[tostring(i)]or 0
    player:SetAttribute('IndexBiomeReward'..i,state.Biomes[tostring(i)]==true and pending==0)
    player:SetAttribute('IndexBiomeHalfReward'..i,(state.BiomeHalfRewards or{})[tostring(i)]==true)
    player:SetAttribute('IndexBiomeBackpay'..i,pending)
@@ -248,7 +248,7 @@ function P.Attach(Data)
   return true,'Collect your Cash.'
  end
  function Data:ClaimIndexBiomeHalf(player,stage)
-  if not self:IsLoaded(player)or not integer(stage,1,8)then return false,'INVALID BIOME'end
+  if not self:IsLoaded(player)or not integer(stage,1,9)then return false,'INVALID BIOME'end
   local state=self:GetPremium(player);local key=tostring(stage)
   if(state.BiomeHalfRewards or{})[key]then return false,'ALREADY CLAIMED'end
   local seeds,plants,total=self:IndexProgress(player,stage)
@@ -259,7 +259,7 @@ function P.Attach(Data)
   self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true,'Collect your Gems.'
  end
  function Data:ClaimIndexBiome(player,stage)
-  if not self:IsLoaded(player)or not integer(stage,1,8)then return false,'INVALID BIOME'end
+  if not self:IsLoaded(player)or not integer(stage,1,9)then return false,'INVALID BIOME'end
   local state=self:GetPremium(player);local key=tostring(stage)
   local backpay=(state.BiomeBackpay81 or{})[key]or 0
   if state.Biomes[key]and backpay==0 then return false,'ALREADY CLAIMED'end
