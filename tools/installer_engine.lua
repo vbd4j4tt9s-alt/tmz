@@ -62,6 +62,36 @@ local function findPath(names)
     end
     return item
 end
+-- A StringValue.Value must be shorter than 200,000 bytes, so text of CHUNK bytes or more is stored as a Folder of numbered StringValues
+-- ('1'..'n', each shorter than CHUNK, cut only at UTF-8 character boundaries). Shorter text stays one StringValue.
+local CHUNK=100000
+local function storeText(parent,name,text)
+    if #text<CHUNK then local v=Instance.new('StringValue');v.Name=name;v.Value=text;v.Parent=parent;return end
+    local folder=Instance.new('Folder');folder.Name=name;local n,i=0,1
+    while i<=#text do
+        local j=math.min(i+CHUNK-2,#text)
+        while j>i and j<#text and text:byte(j+1)>=128 and text:byte(j+1)<192 do j-=1 end
+        n+=1;local v=Instance.new('StringValue');v.Name=tostring(n);v.Value=text:sub(i,j);v.Parent=folder;i=j+1
+    end
+    folder:SetAttribute('Bytes',#text);folder:SetAttribute('Chunks',n);folder.Parent=parent
+end
+-- The text storeText saved under `name` in entry; refuses a missing, duplicated, incomplete or resized backup.
+local function loadText(entry,name)
+    local found,count=nil,0
+    for _,child in ipairs(entry:GetChildren())do if child.Name==name then found=child;count+=1 end end
+    local bad='__TAG__ Damaged source backup: '..name..' in '..entry:GetFullName()
+    assert(count==1,bad)
+    if found:IsA('StringValue')then return found.Value end
+    local kids=found:GetChildren();local n=found:GetAttribute('Chunks')
+    assert(found:IsA('Folder')and n==#kids,bad)
+    local parts={}
+    for i=1,n do
+        local part,c=nil,0
+        for _,k in ipairs(kids)do if k.Name==tostring(i)then part=k;c+=1 end end
+        assert(c==1 and part:IsA('StringValue'),bad);parts[i]=part.Value
+    end
+    local text=table.concat(parts);assert(#text==found:GetAttribute('Bytes'),bad);return text
+end
 
 -- @@SPLIT@@
 local sourceSpecs=__SPECS__
@@ -117,19 +147,19 @@ return function(mode)
  for _,entry in ipairs(folder:GetChildren())do
   local path=entry:GetAttribute('Path');local spec=specs[path]
   assert(spec and not seen[path],'__TAG__ Invalid or duplicated backup entry.');seen[path]=true
-  local target=unique(entry,'Target');local b=unique(entry,'After')
-  assert(target:IsA('ObjectValue')and b:IsA('StringValue')and #b.Value==spec.AfterBytes and sha256(b.Value)==spec.AfterSHA256,'__TAG__ Damaged source backup: '..path)
+  local target=unique(entry,'Target');local b=loadText(entry,'After')
+  assert(target:IsA('ObjectValue')and #b==spec.AfterBytes and sha256(b)==spec.AfterSHA256,'__TAG__ Damaged source backup: '..path)
   if spec.New then
    -- A script this update adds: installed = in place, undone = parked inside this backup entry.
    local item=target.Value;local parentPath,name=path:match('^(.*)/([^/]+)$')
    assert(item and item.ClassName==spec.Class and item.Name==name,'__TAG__ Added script object was replaced: '..path)
-   sources[#sources+1]={New=true,Item=item,Entry=entry,Home=resolve(parentPath),Name=name,After=b.Value}
+   sources[#sources+1]={New=true,Item=item,Entry=entry,Home=resolve(parentPath),Name=name,After=b}
   else
    local item=resolve(path)
    assert(item.ClassName==spec.Class and target.Value==item,'__TAG__ Script object was replaced: '..path)
-   local a=unique(entry,'Before')
-   assert(a:IsA('StringValue')and #a.Value==spec.BeforeBytes and sha256(a.Value)==spec.BeforeSHA256,'__TAG__ Damaged source backup: '..path)
-   sources[#sources+1]={Item=item,Before=a.Value,After=b.Value}
+   local a=loadText(entry,'Before')
+   assert(#a==spec.BeforeBytes and sha256(a)==spec.BeforeSHA256,'__TAG__ Damaged source backup: '..path)
+   sources[#sources+1]={Item=item,Before=a,After=b}
   end
  end
  local from,to=mode=='install'and'Before'or'After',mode=='install'and'After'or'Before'

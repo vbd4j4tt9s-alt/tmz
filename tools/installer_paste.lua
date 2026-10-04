@@ -39,7 +39,7 @@ for i,spec in ipairs(specs)do
   for _,p in ipairs(byPath[spec.Path])do after=after..decode(p[3])end
   assert(#after==spec.AfterBytes and sha256(after)==spec.AfterSHA256,'__TAG__ Patch check failed for '..spec.Path..'. Nothing changed.')
   local entry=Instance.new('Folder');entry.Name=string.format('%02d',i);entry:SetAttribute('Path',spec.Path);entry:SetAttribute('New',true);entry.Parent=sources
-  local b=Instance.new('StringValue');b.Name='After';b.Value=after;b.Parent=entry
+  storeText(entry,'After',after)
   local item=Instance.new(spec.Class);item.Name=name;item.Source=after;item.Parent=entry
   local t=Instance.new('ObjectValue');t.Name='Target';t.Value=item;t.Parent=entry
   continue
@@ -54,8 +54,7 @@ for i,spec in ipairs(specs)do
  for _,p in ipairs(list)do after=after:sub(1,p[1]-1)..decode(p[3])..after:sub(p[1]+p[2])end
  assert(#after==spec.AfterBytes and sha256(after)==spec.AfterSHA256,'__TAG__ Patch check failed for '..spec.Path..'. Nothing changed.')
  local entry=Instance.new('Folder');entry.Name=string.format('%02d',i);entry:SetAttribute('Path',spec.Path);entry.Parent=sources
- local a=Instance.new('StringValue');a.Name='Before';a.Value=before;a.Parent=entry
- local b=Instance.new('StringValue');b.Name='After';b.Value=after;b.Parent=entry
+ storeText(entry,'Before',before);storeText(entry,'After',after)
  local t=Instance.new('ObjectValue');t.Name='Target';t.Value=item;t.Parent=entry
 end
 if #retireList>0 then

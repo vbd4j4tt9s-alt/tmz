@@ -271,4 +271,101 @@ else
  hand.Parent=cb.Retired:FindFirstChild('04').Parked
  ok,err=pcall(ci,'undo');check(ok and restored(csnap)and all(cw,'Before'),'retire: undo works once it matches again: '..tostring(err))
 end
+-- 10) Roblox refuses a StringValue.Value of 200,000 bytes or more, so the backup stores sources of 100,000+ bytes as Folders of chunks.
+do
+ local CH=100000
+ local sv=R.new('StringValue')
+ check(pcall(function()sv.Value=string.rep('x',199999)end),'chunks: the mock accepts a 199,999-byte StringValue')
+ local bigOk,bigErr=pcall(function()sv.Value=string.rep('x',200000)end)
+ check(not bigOk and tostring(bigErr):find('Unable to assign property Value. Provided string length (200000) is greater than or equal to max length (200000)',1,true)~=nil,'chunks: the mock refuses 200,000 bytes like Roblox: '..tostring(bigErr))
+ local scr=R.new('ModuleScript');check(pcall(function()scr.Source=string.rep('x',300000)end),'chunks: the mock does not limit Script.Source')
+ local function specOf(path)for _,s in ipairs(D.Scripts)do if s.Path==path then return s end end end
+ -- Is `node` the stored form of `text`? (a StringValue below CH, else a Folder of valid UTF-8 chunks that join back exactly)
+ local function holds(node,text)
+  if node==nil then return false,'missing'end
+  if #text<CH then return node:IsA('StringValue')and node.Value==text,'small text must stay one StringValue'end
+  if not node:IsA('Folder')then return false,'large text must be a Folder'end
+  local n=node:GetAttribute('Chunks');local kids=node:GetChildren()
+  if node:GetAttribute('Bytes')~=#text or n~=#kids or n<2 then return false,'Bytes/Chunks attributes'end
+  local valid=utf8.len(text)~=nil;local parts={}
+  for i=1,n do
+   local part=node:FindFirstChild(tostring(i))
+   if not(part and part:IsA('StringValue'))then return false,'chunk '..i..' missing'end
+   local v=part.Value;local first=string.byte(v,1)
+   if #v==0 or #v>=CH then return false,'chunk '..i..' has '..#v..' bytes'end
+   if first>=128 and first<192 then return false,'chunk '..i..' starts inside a character'end
+   if valid and utf8.len(v)==nil then return false,'chunk '..i..' is not valid UTF-8'end
+   parts[i]=v
+  end
+  return table.concat(parts)==text,'chunks do not join back to the source'
+ end
+ local cw=world();ok,err=cw.Run(D.PASTE);check(ok,'chunks: paste runs: '..tostring(err))
+ local cb=cw.Storage:FindFirstChild(BACKUP);local big,small,biggest,biggestNew=0,0,nil,nil
+ for _,entry in ipairs(cb.Sources:GetChildren())do
+  local s=specOf(entry:GetAttribute('Path'))
+  for _,key in ipairs({'Before','After'})do
+   local text=s[key]
+   if text==nil then check(entry:FindFirstChild(key)==nil,'chunks: an added script has no '..key..': '..s.Path)
+   else
+    local good,why=holds(entry:FindFirstChild(key),text);check(good,'chunks: '..s.Path..' '..key..' is stored correctly: '..tostring(why))
+    if #text>=CH then big+=1 else small+=1 end
+    -- the largest changed script (its Before) and the largest added one, for the damage checks below
+    if #text>=CH and key=='Before'and(not biggest or #text>#specOf(biggest:GetAttribute('Path')).Before)then biggest=entry end
+    if #text>=CH and s.New and(not biggestNew or #text>#specOf(biggestNew:GetAttribute('Path')).After)then biggestNew=entry end
+   end
+  end
+ end
+ for _,d in ipairs(cb:GetDescendants())do if d:IsA('StringValue')then check(#d.Value<CH,'chunks: no StringValue holds '..#d.Value..' bytes: '..d:GetFullName())end end
+ if big==0 then print('chunk damage checks skipped: no source of '..CH..' bytes or more in the bundle (use tools/tests/chunk_fixture.py)')
+ else
+  print(('chunked sources: %d large texts in chunks, %d small ones as plain StringValues'):format(big,small))
+  local inst=cw.Req(cb.Installer)
+  -- A damaged backup is refused before anything is written: every script keeps its current version.
+  local function refused(label,mode)
+   ok,err=pcall(inst,mode);check(not ok and tostring(err):find('Damaged source backup',1,true)~=nil,'chunks: '..label..' refused: '..tostring(err))
+   check(all(cw,mode=='undo'and'After'or'Before')and cb:GetAttribute('State')==(mode=='undo'and'Installed'or'Undone'),'chunks: '..label..' changed nothing')
+  end
+  local function damage(entry,key,mode)
+   local f=entry:FindFirstChild(key);local who=entry:GetAttribute('Path')..' '..key..' ('..mode..')'
+   if f:IsA('Folder')then
+    local c=f:FindFirstChild('2');local old=c.Value;local n=f:GetAttribute('Chunks');local bytes=f:GetAttribute('Bytes');local extra
+    local function drop()if extra then extra.Parent=nil;extra=nil end end
+    local function add(class,name)extra=R.new(class);extra.Name=name;extra.Parent=f end
+    local steps={
+     {'edited chunk',function()c.Value=old:sub(1,9)..(old:sub(10,10)=='x'and'y'or'x')..old:sub(11)end,function()c.Value=old end},
+     {'shortened chunk',function()c.Value=old:sub(1,-2)end,function()c.Value=old end},
+     {'missing chunk',function()c.Parent=nil end,function()c.Parent=f end},
+     {'renamed chunk',function()c.Name='9'end,function()c.Name='2'end},
+     {'duplicated chunk',function()extra=c:Clone();extra.Parent=f end,drop},
+     {'chunk replaced by a Folder',function()c.Parent=nil;add('Folder','2')end,function()drop();c.Parent=f end},
+     {'extra child',function()add('StringValue','x')end,drop},
+     {'wrong Chunks attribute',function()f:SetAttribute('Chunks',n+1)end,function()f:SetAttribute('Chunks',n)end},
+     {'wrong Bytes attribute',function()f:SetAttribute('Bytes',bytes+1)end,function()f:SetAttribute('Bytes',bytes)end},
+     {'missing '..key,function()f.Parent=nil end,function()f.Parent=entry end},
+    }
+    for _,step in ipairs(steps)do step[2]();refused(who..': '..step[1],mode);step[3]()end
+   end
+   -- repaired: the backup is whole again
+   return pcall(inst,mode)
+  end
+  for _,key in ipairs({'After','Before'})do
+   ok,err=damage(biggest,key,'undo');check(ok and all(cw,'Before'),'chunks: undo works once '..key..' is repaired: '..tostring(err))
+   ok,err=pcall(inst,'install');check(ok and all(cw,'After'),'chunks: redo is byte-exact: '..tostring(err))
+  end
+  -- ...the same when it is the redo that meets the damage, and when the damage is met by pasting again
+  ok,err=pcall(inst,'undo');check(ok and all(cw,'Before'),'chunks: undo before the redo checks: '..tostring(err))
+  ok,err=damage(biggest,'Before','install');check(ok and all(cw,'After'),'chunks: redo works once Before is repaired: '..tostring(err))
+  local f=biggest:FindFirstChild('After');local c=f:IsA('Folder')and f:FindFirstChild('2')
+  if c then
+   local old=c.Value;c.Value=old:sub(1,-2);ok,err=cw.Run(D.PASTE)
+   check(not ok and tostring(err):find('Damaged source backup',1,true)~=nil,'chunks: pasting again over a damaged backup is refused: '..tostring(err))
+   check(all(cw,'After'),'chunks: ...and changed nothing');c.Value=old
+  end
+  -- a big added script
+  if biggestNew then
+   ok,err=damage(biggestNew,'After','undo');check(ok and all(cw,'Before'),'chunks: undo works once the added script backup is repaired: '..tostring(err))
+   ok,err=pcall(inst,'install');check(ok and all(cw,'After'),'chunks: redo after the added script repair: '..tostring(err))
+  end
+ end
+end
 print(('%d checks, %d failures'):format(checks,fails))

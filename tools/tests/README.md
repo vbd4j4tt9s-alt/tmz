@@ -7,6 +7,8 @@ luau-lsp from https://github.com/JohnnyMorganz/luau-lsp/releases (+ `scripts/glo
 - `bundle.py OUT name=path ...` - packs real script sources as strings so tests can `loadstring` them with the mock env.
 - `test_installer.luau` - runs a built paste installer end to end (install, re-paste, undo, redo, refusals, rollback,
   added scripts). Data: `python3 tools/installer_testdata.py <installer.lua> inst_bundle.luau <BackupName> [base]`.
+  Sources of 100,000+ bytes are backed up as Folders of chunks (a Roblox StringValue holds under 200,000 bytes; the mock refuses more),
+  and a damaged chunk is refused. `chunk_fixture.py OUTDIR` builds a synthetic release with 100 KB+ multibyte scripts and runs this test on it.
 - `test_tutorial.luau` - smoke-runs BeginnerTutorial with the real BeginnerGuide/HudLayout (bundle them as tut_bundle.luau).
 - `test_guide_layout.luau`, `hud_overlap_harness.luau` - card placement / HUD overlap checks over 26 screen sizes
   (require copies of the modules named as in the file headers).
