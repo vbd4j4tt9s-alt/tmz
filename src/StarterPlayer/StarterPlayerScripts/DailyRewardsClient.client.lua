@@ -87,7 +87,9 @@ for d=1,#D.Login do
  local edge=stroke(card,big and RGB(196,150,255)or Theme.Colors.Line,2);edge.Name='Edge'
  local dayText=text(card,'DayLabel','DAY '..d,15);dayText.ZIndex=4
  local art=new('Frame',{Name='Art',BackgroundTransparency=1,ZIndex=3},card)
- if reward.MechPack then
+ if reward.Pack then
+  local e=text(art,'Emoji','🎒',30);e.Size=UDim2.fromScale(1,1);e.TextScaled=true
+ elseif reward.MechPack then
   local shown=false
   if Pictures then
    local proxy=Instance.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',8);proxy:SetAttribute('BagVariant','MechLimited');proxy:SetAttribute('PackMutation','None')
@@ -110,7 +112,7 @@ end
 local claimButton=new('TextButton',{Name='ClaimButton',Text='',BorderSizePixel=0},pages.Login);Bright.Button(claimButton,GOLD)
 local claimText=text(claimButton,'Caption','',22);claimText.Size=UDim2.new(1,-16,1,0);claimText.Position=UDim2.fromOffset(8,0);claimText.ZIndex=12
 new('UIScale',{Name='Pulse'},claimButton)
--- QUESTS page: three rows (icon, task, progress bar, 💎5 and a CLAIM button) and the time until the new quests.
+-- QUESTS page: three rows (icon, task, progress bar, 💎 reward and a CLAIM button) and the time until the new quests.
 local questTitle=text(pages.Quests,'Title','DAILY QUESTS',20);questTitle.TextXAlignment=Enum.TextXAlignment.Left
 local questReset=text(pages.Quests,'Reset','',15,Theme.Colors.Muted);questReset.TextXAlignment=Enum.TextXAlignment.Right
 local rows={}

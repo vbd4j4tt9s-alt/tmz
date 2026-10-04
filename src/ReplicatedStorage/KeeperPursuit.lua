@@ -16,6 +16,12 @@ function P.Speed(_settings,_playerSpeed,distance,stage,_observedSpeed)
     if gap<=250 then return row[2]+(row[3]-row[2])*(gap-100)/150 end
     return row[3]
 end
+-- R141: a keeper runs at its slowest (row[1]) while it is close, so a runner faster than that always pulls away:
+-- the walk speed needed to outrun this biome's keeper (the label over its head).
+function P.EscapeSpeed(stage)
+    local row=require(script.Parent.BalanceValues81).KeeperSpeeds[stage]or {20,23,27}
+    return row[1]
+end
 function P.Smooth(current,target,dt)
     target=Motion.Finite(target)and math.max(0,target)or 0
     current=Motion.Finite(current)and math.max(0,current)or target

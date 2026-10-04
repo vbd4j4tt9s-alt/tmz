@@ -1,4 +1,4 @@
--- R140 (owner): weekly login rewards (day 7 = a Mech pack) and daily quests (5 Gems each), saved in the premium
+-- R140 (owner): weekly login rewards (day 7 = a Mech pack) and daily quests (Gems each: DailyRewards.QuestGems), saved in the premium
 -- profile as Daily={Login={Step,Day},Quests={Day,Progress,Claimed}}. Every change here is a non-yielding profile
 -- transaction, so a claim can never pay twice. The numbers live in ReplicatedStorage.DailyRewards.
 local RS=game:GetService('ReplicatedStorage')
@@ -40,6 +40,16 @@ function T.Attach(Data)
    local records,why=self:GrantMechPacks(player,false,reward.MechPack)
    if not records then return false,why end
    message='🤖 FREE MECH PACK! Check your Bag!'
+  elseif reward.Pack then
+   -- R141: a random seed pack, rolled like a treadmill bonus roll (an earned pack: it goes through the size luck).
+   local Bonus=require(RS.TreadmillBonusRules);local PackRules=require(RS.SeedPackRules)
+   self.DailyRandom=self.DailyRandom or Random.new()
+   local pick=Bonus.RollPack(Bonus.PoolStages(self.Config.TreadmillTiers,self:GetTreadmillData(player).Tier),function()return self.DailyRandom:NextNumber()end)
+   if not pick then return false,'TRY AGAIN'end
+   local record,why=self:AddChest(player,{Stage=pick.Stage,BagVariant=pick.Variant,PackSize=1,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion},{Luck=true})
+   if not record then return false,why end
+   local tier=PackRules.GetPackTier(pick.Variant)
+   message='🎒 '..tier.Name..' '..PackRules.PackLabel(pick.Stage,pick.Variant,record.PackSize,'None')..'! Check your Bag!'
   else
    local okay,why=self:QueueCurrency(player,reward.Gems,'Gems');if not okay then return false,why end
    message='Collect your Gems.'

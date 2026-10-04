@@ -4,10 +4,13 @@
 -- Days are UTC days, so everyone's new day starts at the same moment.
 local D={}
 -- One week of login rewards: one claim per day; after day 7 the week starts again at day 1.
-D.Login={{Gems=5},{Gems=5},{Gems=10},{Gems=10},{Gems=15},{Gems=15},{MechPack=1}}
+-- R141 (owner: "day 5 and 6 can be 2 and 3 gems, then for day 1 to 4 it is a random seed pack"): Pack = one random
+-- seed pack, rolled like a treadmill bonus roll (a biome your treadmills unlock, the bonus roll's rarity odds).
+D.Login={{Pack=1},{Pack=1},{Pack=1},{Pack=1},{Gems=2},{Gems=3},{MechPack=1}}
 -- false: a missed day only pauses the week (you continue where you left off). true: a missed day restarts it at day 1.
 D.ResetIfMissed=false
-D.QuestGems=5;D.QuestsPerDay=3
+-- R141 (owner: "daily quests gems are reduced to a max of 6 gems daily"): 3 quests x 2 Gems.
+D.QuestGems=2;D.QuestsPerDay=3
 -- Quest 1 is always the steal quest; the other two are picked from the rest, fixed for each player and day.
 D.Quests={
  {Key='Steal',Goal=3,Text='Steal 3 packs',Icon='🎒'},
@@ -64,6 +67,7 @@ end
 function D.MaxMultiplier()return 1+D.FriendBoostMaxFriends*D.FriendBoostPerFriend end
 function D.RewardText(reward)
  if reward.MechPack then return reward.MechPack==1 and'MECH PACK'or reward.MechPack..' MECH PACKS'end
+ if reward.Pack then return reward.Pack==1 and'SEED PACK'or reward.Pack..' SEED PACKS'end
  return '+'..reward.Gems
 end
 function D.Countdown(seconds)
