@@ -72,7 +72,14 @@ function E:_publish()
 end
 function E:EnsureGuardian()
  if not self.Home or not self.Folder or not self.Folder.Parent then return nil end
- if not self.Guardian or not self.Guardian.Parent then self.Guardian=Art.Build(self.Home,self.Folder)end
+ if not self.Guardian or not self.Guardian.Parent then
+  self.Guardian=Art.Build(self.Home,self.Folder)
+  -- R141: The Darkened runs at a fixed speed; its label shows the Speed that outruns it.
+  if self.Guardian then
+   self.Guardian:SetAttribute('KeeperEscapeSpeed',require(game:GetService('ReplicatedStorage').RouteBalance83).EventSpeed)
+   game:GetService('CollectionService'):AddTag(self.Guardian,'BiomeKeeper')
+  end
+ end
  return self.Guardian
 end
 function E:_dropSlot(slot)
