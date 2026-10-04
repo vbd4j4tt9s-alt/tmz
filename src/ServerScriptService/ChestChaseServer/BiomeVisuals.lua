@@ -1171,7 +1171,9 @@ function Art.BuildTreadmillV131(base,tier)
     local beltSize=V(9.4,.4,13.2*lengthScale)
     local trackColors={RGB(37,50,66),RGB(34,67,57),RGB(218,166,91),RGB(146,228,250),RGB(244,75,28),RGB(127,133,215),RGB(29,48,100)}
     local trackMaterials={Enum.Material.SmoothPlastic,Enum.Material.SmoothPlastic,Enum.Material.Sand,Enum.Material.Ice,Enum.Material.Neon,Enum.Material.Glass,Enum.Material.Metal}
-    local underlay=p('Track underlay',V(9.2,.12,12.8),CF(0,.065,0),tier==4 and RGB(43,134,193)or tier==6 and RGB(91,68,160)or theme.Ink)
+    -- R149 (z-fighting): the underlay ends where the surface starts (its top was .005 inside the surface, so the two shared a
+    -- flickering strip down both long sides).
+    local underlay=p('Track underlay',V(9.2,.12,12.8),CF(0,.06,0),tier==4 and RGB(43,134,193)or tier==6 and RGB(91,68,160)or theme.Ink)
     local surface=p('Track surface',V(9.2,.12,12.8),CF(0,.18,0),trackColors[tier],trackMaterials[tier])
     surface.Transparency=(tier==4 and .42)or(tier==6 and .35)or 0
     surface.Reflectance=(tier==4 or tier==6)and .12 or 0
@@ -1250,7 +1252,8 @@ function Art.BuildTreadmillV131(base,tier)
                 local frame=CF(side*(1.35+(i%3)*.98),.263,0)*CFrame.Angles(0,side*(.2+(i%2)*.35),0)
                 local current=flow('Molten current',V(.35+(i%2)*.34,.035,1.55),frame,i%2==0 and RGB(255,197,55)or RGB(255,125,24),Enum.Material.Neon,phase,1.12,.10,true)
                 current.Shape=Enum.PartType.Ball
-                local crust=flow('Floating basalt flake',V(.65,.045,.8),CF(side*(2+(i%3)*.8),.28,0)*CFrame.Angles(0,i*.7,0),RGB(66,43,55),Enum.Material.Basalt,(phase+.07)%1,.9,.05)
+                -- R149: .25 (was .28: its top was .005 under the passing chevrons' top and flickered through them)
+                local crust=flow('Floating basalt flake',V(.65,.045,.8),CF(side*(2+(i%3)*.8),.25,0)*CFrame.Angles(0,i*.7,0),RGB(66,43,55),Enum.Material.Basalt,(phase+.07)%1,.9,.05)
             end
         end
     elseif tier==6 then
@@ -1270,7 +1273,8 @@ function Art.BuildTreadmillV131(base,tier)
             for i=1,3 do
                 local phase=(i-.5)/3
                 local x=side*(2.05+(i%2)*.9)
-                local points={V(x,.28,.72),V(x-side*.40,.28,.17),V(x+side*.24,.28,.17),V(x-side*.14,.28,-.75)}
+                -- R149: .262 (was .28: .006 under the passing chevrons' top)
+                local points={V(x,.262,.72),V(x-side*.40,.262,.17),V(x+side*.24,.262,.17),V(x-side*.14,.262,-.75)}
                 for j=1,3 do
                     local bolt=flatLine('Travelling lightning',points[j],points[j+1],.16,theme.Glow,Enum.Material.Neon)
                     motion(bolt,'Flow',phase,origin:ToObjectSpace(bolt.CFrame),1.8,.06,true)
@@ -1360,7 +1364,8 @@ function Art.BuildTreadmillV131(base,tier)
             local x=side*6.15
             for j=1,3 do
                 local height=2.4+j*.6;local z=5-j*3.05
-                local fin=p('Tall glacier fin',V(1.45,height,3.15),CF(x,height/2+.4,z),j%2==0 and theme.Trim or theme.Body,Enum.Material.Ice,'WedgePart')
+                -- R149: 3.0 long (was 3.15: x1.2 that overlapped the next fin by .12, sharing a flickering patch of their undersides)
+                local fin=p('Tall glacier fin',V(1.45,height,3.0),CF(x,height/2+.4,z),j%2==0 and theme.Trim or theme.Body,Enum.Material.Ice,'WedgePart')
                 fin.Transparency=.38;fin.Reflectance=.12
                 rod('Glacier fin glint',V(x+side*.73,.57,z-1.5),V(x+side*.73,height+.38,z+1.5),.13,theme.Glow,Enum.Material.Neon)
             end
@@ -1419,7 +1424,7 @@ function Art.BuildTreadmillV131(base,tier)
             p('Stormline angled cap',V(2.05,.6,1.85),CF(x,5.7,-6.5),theme.Trim,Enum.Material.Metal,'WedgePart')
             for j=1,3 do p('Cooling vent',V(.65,.16,.10),CF(x+side*.2,1.45+j*.55,-5.49),theme.Ink,Enum.Material.Metal)end
         end
-        p('Stormline console bridge',V(10.4,2.7,1.2),CF(0,4.15,-6.3),theme.Body,Enum.Material.Metal)
+        p('Stormline console bridge',V(10.4,2.7,1.25),CF(0,4.15,-6.3),theme.Body,Enum.Material.Metal) -- R149: 1.25 deep (its back was .015 off the power housings')
         local bolt={V(1.15,7.45,-6.3),V(-.7,6.2,-6.3),V(.65,6.2,-6.3),V(-1.1,5.3,-6.3)}
         railPath('Giant front lightning crest',bolt,.55,theme.Trim,Enum.Material.Neon)
     end

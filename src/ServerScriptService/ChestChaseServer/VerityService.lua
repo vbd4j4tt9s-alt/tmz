@@ -63,7 +63,8 @@ function V:_build(hub)
  keepSolid(dais)
  disc(model,'Dais rim',.3,C.DaisDiameter+.8,CFrame.new(floor+Vector3.new(0,.15,0)),gold,Enum.Material.SmoothPlastic)
  local ring=disc(model,'Glow ring',.22,C.RingDiameter,CFrame.new(daisTop+Vector3.new(0,.11,0)),C.RingColor,Enum.Material.Neon);ring.Transparency=.1
- disc(model,'Inlay',.26,C.RingDiameter-1.2,CFrame.new(daisTop+Vector3.new(0,.13,0)),dark,Enum.Material.Slate)
+ -- R149 (z-fighting): the inlay's top is .08 above the ring's (was .04; on the 20-stud disc that shimmered from far away).
+ disc(model,'Inlay',.3,C.RingDiameter-1.2,CFrame.new(daisTop+Vector3.new(0,.15,0)),dark,Enum.Material.Slate)
  -- Verity: a solid yellow ball with her smiley on the front (Decals project onto a ball) and the back. The Ball is the
  -- collider too: players walk up to its curve and stop. (A Ball part is always as wide as it is tall.)
  local size=C.BodySize;local middle=daisTop+Vector3.new(0,C.FootOffset+size/2,0)

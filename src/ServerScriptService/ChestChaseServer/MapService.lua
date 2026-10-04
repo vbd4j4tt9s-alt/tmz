@@ -78,6 +78,8 @@ function MapService.new(config)
 	)
 	mapRoot:SetAttribute("GameplayControllerActive", true)
 	self.MapRoot = mapRoot
+    -- R149: a few saved place parts that z-fight are nudged apart first, while they are still where the place saved them.
+    do local ok,err=pcall(function()require(script.Parent.ZFightFix149).Apply(mapRoot)end);if not ok then warn('[R149] Z-fighting fix skipped: '..tostring(err))end end
     -- Build scenery before ChestService caches pack-placement obstacles.
     local art=require(script.Parent.BiomeVisuals)
     art.ApplyVolcanoV129(mapRoot)

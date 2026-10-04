@@ -156,7 +156,8 @@ function S:_build(hole)
  end
  local at=hole.Position;local lay=CFrame.Angles(0,0,math.pi/2) -- cylinder axis X -> up
  local rimD=C.Diameter+C.RimWidth*2
- part('Rim',V3(.06,rimD,rimD),CFrame.new(at+V3(0,.03,0))*lay,SOIL_RIM,Enum.Material.Ground,true)
+ -- R149: the rim is .04 thick (was .06), so the pit's top is .04 above the rim's instead of .02 (that flickered far away).
+ part('Rim',V3(.04,rimD,rimD),CFrame.new(at+V3(0,.02,0))*lay,SOIL_RIM,Enum.Material.Ground,true)
  local pit=part('Pit',V3(.08,C.Diameter,C.Diameter),CFrame.new(at+V3(0,.04,0))*lay,SOIL_PIT,Enum.Material.SmoothPlastic,true)
  local rng=self.Random
  for i=1,C.CrumbCount do

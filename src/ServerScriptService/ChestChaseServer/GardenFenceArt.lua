@@ -81,7 +81,8 @@ function A.Build(base,level)
  local function p(name,size,frame,color,material,collide,class)return part(root,name,size,cf*frame,color or theme.Body,material or theme.Material,collide,class)end
  -- The soil keeps its saved footprint. Fence feet sit outside its trim on a grounded sill.
  local side=pad.Size.X/2+2;local back=-pad.Size.Z/2-2;local front=pad.Size.Z/2-2
- local depth=pad.Size.Y+.02;local footingY=(.02-pad.Size.Y)/2
+ -- R149: the sill stands .08 above the pad (was .02: the front sills lie on the pad and flickered against it).
+ local depth=pad.Size.Y+.08;local footingY=(.08-pad.Size.Y)/2
  for _,sign in ipairs({-1,1})do
   p('Fence foundation',V(3.2,depth,front-back),CF(sign*side,footingY,(back+front)/2),theme.Body,Enum.Material.Slate,true)
   p('Fence foundation',V(side-16+3.8,depth,4.4),CF(sign*(side+16-.6)/2,footingY,front),theme.Body,Enum.Material.Slate,true)
@@ -110,7 +111,7 @@ function A.Build(base,level)
    if level==7 then
     p('Electric panel inset',V(length-3.5,1.3,.08),frame*CF(0,1.75,.61),RGB(31,46,59),Enum.Material.Metal)
     p('Electric light strip',V(length-4,.10,.09),frame*CF(0,2.1,.67),theme.Accent,Enum.Material.Neon)
-    p('Panel contact',V(.35,.8,.12),frame*CF(length*.22,1.75,.69),RGB(245,209,113),Enum.Material.Metal)
+    p('Panel contact',V(.35,.8,.12),frame*CF(length*.22,1.72,.69),RGB(245,209,113),Enum.Material.Metal) -- R149: 1.72 (its top was the light strip's top)
    elseif level==6 then p('Lava channel',V(length-3,.12,.09),frame*CF(0,1.2,.61),theme.Accent,Enum.Material.Neon)
    elseif level==5 then
     for _,x in ipairs({-.22,.22})do p('Crystal inset',V(.85,1.25,.14),frame*CF(length*x,1.75,.63)*CFrame.Angles(0,0,math.pi/4),theme.Accent,Enum.Material.Neon)end

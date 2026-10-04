@@ -37,11 +37,13 @@ function M.Apply(map)
    part('Side lower wall',Vector3.new(.7,3,4.6),Vector3.new(x,2,z),wood,Enum.Material.SmoothPlastic,true)
    part('Side window header',Vector3.new(.7,1.3,4.6),Vector3.new(x,10.35,z),wood,Enum.Material.SmoothPlastic,true)
    local pane=part('Window glass',Vector3.new(.2,5.7,3.7),Vector3.new(x,6.6,z),{104,211,220},Enum.Material.SmoothPlastic,true);pane.Transparency=.25
-   for _,y in ipairs({3.7,9.6})do part('Window horizontal frame',Vector3.new(.95,.25,4.3),Vector3.new(x,y,z),lightWood)end
+   -- R149 (owner: "take out all the z fighting within the shop"): the frame is a little thinner than the corner timber and
+   -- the uprights (.9 vs .95), so its ends no longer share their faces.
+   for _,y in ipairs({3.7,9.6})do part('Window horizontal frame',Vector3.new(.9,.25,4.3),Vector3.new(x,y,z),lightWood)end
    for _,offset in ipairs({-2,0,2})do part('Window upright',Vector3.new(.95,5.8,.22),Vector3.new(x,6.6,z+offset),darkWood)end
   end
   for _,z in ipairs({-3.7,4.3})do part('Door timber jamb',Vector3.new(.9,10.1,.65),Vector3.new(x,5.5,z),darkWood,Enum.Material.SmoothPlastic,true)end
-  part('Side entrance lintel',Vector3.new(.9,1.1,8),Vector3.new(x,10.45,.3),trim,Enum.Material.SmoothPlastic,true)
+  part('Side entrance lintel',Vector3.new(1,1.1,8),Vector3.new(x,10.45,.3),trim,Enum.Material.SmoothPlastic,true) -- R149: proud of the .9 jambs
   part('Side doorstep',Vector3.new(3,.2,9),Vector3.new(side*14,.1,.3),wood,Enum.Material.SmoothPlastic,true)
   part('Side eave beam',Vector3.new(.65,.55,21),Vector3.new(side*13.35,10.95,0),darkWood)
  end
@@ -52,17 +54,22 @@ function M.Apply(map)
    local f=(row-.5)/6
    local p=part('Green roof course',Vector3.new(slope/6+.10,.55,24.5),Vector3.new(side*run*f,16.25-rise*f,0),row%2==0 and{29,150,151}or{43,173,165},Enum.Material.SmoothPlastic)
    p.CFrame*=CFrame.Angles(0,0,-side*angle)
+   -- R149: neighbouring courses overlap by .1 and were the same thickness, so the two colours flickered in a stripe along every
+   -- seam. Every other course sits .04 proud (like lapped shingles); no face is shared any more.
+   if row%2==0 then p.CFrame*=CFrame.new(0,.04,0)end
   end
   for _,z in ipairs({-12.3,12.3})do
-   local p=part('Gable edge trim',Vector3.new(slope+.4,.5,.55),Vector3.new(side*run*.5,16.25-rise*.5,z),darkWood)
+   -- R149: the edge trim is thicker than the courses (.7 vs .55 + .04), so it frames them instead of hiding a face .025 inside.
+   local p=part('Gable edge trim',Vector3.new(slope+.4,.7,.55),Vector3.new(side*run*.5,16.25-rise*.5,z),darkWood)
    p.CFrame*=CFrame.Angles(0,0,-side*angle)
   end
  end
- part('Roof ridge',Vector3.new(.85,.65,25.2),Vector3.new(0,16.38,0),{28,111,129})
+ part('Roof ridge',Vector3.new(.85,.65,25.5),Vector3.new(0,16.38,0),{28,111,129}) -- R149: 25.5 (was 25.2, its ends were .025 off the trims)
  for _,z in ipairs({-8.6,9.2})do
   for level=0,5 do
    local width=math.max(1.6,23.5-level*4.2)
-   part('Gable timber infill',Vector3.new(width,.85,.6),Vector3.new(0,11.35+level*.8,z),level%2==0 and lightWood or wood,Enum.Material.SmoothPlastic)
+   -- R149: the boards overlap by .05; the dark boards are .08 thinner so the two colours never share a face.
+   part('Gable timber infill',Vector3.new(width,.85,level%2==0 and .6 or .52),Vector3.new(0,11.35+level*.8,z),level%2==0 and lightWood or wood,Enum.Material.SmoothPlastic)
   end
   part('Gable center beam',Vector3.new(.55,4.9,.8),Vector3.new(0,13.6,z),darkWood)
  end
@@ -79,7 +86,7 @@ function M.Apply(map)
  end end
  for _,x in ipairs({-2.6,0,2.6})do
   part('Produce crate',Vector3.new(2.3,.6,2.6),Vector3.new(x,4.62,2),darkWood,Enum.Material.SmoothPlastic)
-  for _,side in ipairs({-1,1})do part('Crate rim',Vector3.new(2.35,.35,.2),Vector3.new(x,5.0,2+side*1.2),lightWood)end
+  for _,side in ipairs({-1,1})do part('Crate rim',Vector3.new(2.35,.35,.2),Vector3.new(x,5.0,2+side*1.23),lightWood)end -- R149: .03 proud of the crate's face
   for n=-1,1 do
    local at=Vector3.new(x+n*.64,5.18,1.9)
    ball('Fresh produce',at,Vector3.new(.72,.85,.85),x<0 and{211,81,57}or x>0 and{113,166,72}or{221,170,66})
@@ -107,9 +114,10 @@ function M.Apply(map)
  -- Coral and cream porch canopy; all pieces are walk-through, including the porch posts.
  for i=1,10 do
   local x=(i-5.5)*2.15;local color=i%2==0 and{250,116,105}or{255,233,183}
-  local canopy=part('Striped porch awning',Vector3.new(2.16,.18,3.9),Vector3.new(x,7.55,-11.0),color)
+  -- R149: the stripes meet edge to edge (2.15 wide at a 2.15 pitch; at 2.16 each seam was a flickering coral / cream strip).
+  local canopy=part('Striped porch awning',Vector3.new(2.15,.18,3.9),Vector3.new(x,7.55,-11.0),color)
   canopy.CFrame*=CFrame.Angles(math.rad(-9),0,0)
-  part('Awning scallop',Vector3.new(2.14,.5,.17),Vector3.new(x,7.02,-12.95),color)
+  part('Awning scallop',Vector3.new(2.14,.5,.17),Vector3.new(x,7.04,-12.97),color) -- R149: clear of the porch posts' faces (was y 7.02, z -12.95)
  end
  for _,side in ipairs({-1,1})do
   part('Porch support',Vector3.new(.42,6.75,.42),Vector3.new(side*10.7,3.88,-12.8),trim,Enum.Material.SmoothPlastic,true)
@@ -126,7 +134,7 @@ function M.Apply(map)
  part('Counter gold rail',Vector3.new(8.25,.16,.22),Vector3.new(0,3.78,.23),{248,211,127})
  -- Matching signs over the rear and side doors make every approach recognizable.
  for _,door in ipairs({{0,9.2,9.7,0},{-12.2,9.2,.3,math.pi/2},{12.2,9.2,.3,math.pi/2}})do
-  local extra=sign:Clone();extra.Name='Market entrance sign';extra.Size=Vector3.new(8,1.8,.35)
+  local extra=sign:Clone();extra.Name='Market entrance sign';extra.Size=Vector3.new(7.9,1.8,.35) -- R149: 7.9, the lintels are 8 long
   extra.CFrame=CFrame.new(M.Center+Vector3.new(door[1],door[2],door[3]))*CFrame.Angles(0,door[4],0);extra.Parent=model
  end
  -- R133: lettering that faces into the market is removed (front sign: it faces the fascia; door signs: inside).
@@ -212,6 +220,56 @@ local function seat(model,center,bounds)
  end
  return bounds.Y*.3
 end
+-- R149 (z-fighting): an upward flat face of a showcase model that lands within .025 of the top of a market part under or
+-- around it (a fruit's flat patch just above its step, a boxy fruit's top level with the next step) flickers against that
+-- top. Sink the model just enough (at most .045) to tuck such faces under the top.
+local function boxes(parts)
+ local out={}
+ for _,p in ipairs(parts)do
+  local size=p:GetAttribute('ArtSize')or p.Size;local cf=p.CFrame
+  local r,u,l=cf.RightVector*size.X/2,cf.UpVector*size.Y/2,cf.LookVector*size.Z/2
+  local e=Vector3.new(math.abs(r.X)+math.abs(u.X)+math.abs(l.X),math.abs(r.Y)+math.abs(u.Y)+math.abs(l.Y),math.abs(r.Z)+math.abs(u.Z)+math.abs(l.Z))
+  out[#out+1]={Part=p,Lo=cf.Position-e,Hi=cf.Position+e}
+ end
+ return out
+end
+local function flatTops(p)
+ local tops={}
+ if p:IsA('Part')and p.Shape==Enum.PartType.Ball then return tops end
+ local mesh=p:FindFirstChildOfClass('SpecialMesh');if mesh and mesh.MeshType~=Enum.MeshType.Brick then return tops end
+ local size=p:GetAttribute('ArtSize')or p.Size;local cf=p.CFrame
+ for k,axis in ipairs({cf.RightVector,cf.UpVector,cf.LookVector})do
+  local round=p:IsA('Part')and p.Shape==Enum.PartType.Cylinder and k~=1 -- a cylinder's flat faces are its two ends
+  if math.abs(axis.Y)>.999 and not round then tops[#tops+1]=cf.Y+({size.X,size.Y,size.Z})[k]/2 end
+ end
+ return tops
+end
+local function clearTops(model)
+ local market=model.Parent and model.Parent.Parent;if not market then return end
+ local own={};for _,p in ipairs(model:GetDescendants())do if p:IsA('BasePart')and p.Transparency<.95 then own[#own+1]=p end end
+ local mine=boxes(own);if #mine==0 then return end
+ local lo,hi=mine[1].Lo,mine[1].Hi
+ for _,b in ipairs(mine)do lo=Vector3.new(math.min(lo.X,b.Lo.X),math.min(lo.Y,b.Lo.Y),math.min(lo.Z,b.Lo.Z));hi=Vector3.new(math.max(hi.X,b.Hi.X),math.max(hi.Y,b.Hi.Y),math.max(hi.Z,b.Hi.Z))end
+ local surfaces={}
+ for _,p in ipairs(market:GetDescendants())do
+  if p:IsA('BasePart')and p.Transparency<.95 and not p:IsDescendantOf(model.Parent)then
+   local b=boxes({p})[1]
+   if b.Lo.X<=hi.X and b.Hi.X>=lo.X and b.Lo.Z<=hi.Z and b.Hi.Z>=lo.Z and b.Hi.Y>=lo.Y-.1 and b.Lo.Y<=hi.Y+.1 then
+    for _,t in ipairs(flatTops(p))do surfaces[#surfaces+1]=t end
+   end
+  end
+ end
+ local tops={};for _,p in ipairs(own)do for _,t in ipairs(flatTops(p))do tops[#tops+1]=t end end
+ local sink=0
+ for _=1,#tops*#surfaces+1 do
+  local clash=nil
+  for _,t in ipairs(tops)do for _,s in ipairs(surfaces)do if math.abs(t-sink-s)<.025 then clash=t-s;break end end;if clash then break end end
+  if not clash then break end
+  sink=clash+.026
+  if sink>.045 then return end
+ end
+ if sink>0 then model:PivotTo(CFrame.new(0,-sink,0)*model:GetPivot())end
+end
 local function settle(model,origin,at,size,turn,sits,hangs)
  for _,d in ipairs(model:GetDescendants())do
   if d:IsA('BasePart')then d.Anchored=true;d.CanCollide=false;d.CanTouch=false;d.CanQuery=false;d.CastShadow=d.Size.Magnitude>1.2
@@ -233,6 +291,7 @@ local function settle(model,origin,at,size,turn,sits,hangs)
  -- Hanging things (R136 lanterns) put their visible top on `at` instead.
  local y=hangs and-bounds.Y/2 or bounds.Y/2-lift
  model:PivotTo(origin*CFrame.new(at+Vector3.new(0,y,0))*CFrame.Angles(0,turn or 0,0)*fromCenter)
+ if not hangs then clearTops(model)end
  return model
 end
 local function fruit(id,parent,origin,at,size,turn)
@@ -306,7 +365,7 @@ function M.Polish(model)
  -- Flower boxes under the four side windows, with soil.
  for _,side in ipairs({-1,1})do for _,z in ipairs({-10.7,11.7})do
   part('Flower box',Vector3.new(1.4,1,6.6),Vector3.new(side*21.1,5.6,z),P.Teal)
-  part('Flower box rim',Vector3.new(1.6,.2,6.8),Vector3.new(side*21.1,6.15,z),P.Gold)
+  part('Flower box rim',Vector3.new(1.6,.2,6.8),Vector3.new(side*21.1,6.12,z),P.Gold) -- R149: 6.12 (at 6.15 its underside was .03 off the window frame's)
   part('Flower box soil',Vector3.new(1.2,.24,6.4),Vector3.new(side*21.1,M.Showcase.FlowerSoil-.12,z),P.Soil,Enum.Material.Ground)
  end end
  -- Soil in the two corner planters (the plants grow out of it).
@@ -319,7 +378,7 @@ function M.Polish(model)
  for _,side in ipairs({-1,1})do for t=0,2 do
   local h=(t+1)*step
   part('Produce tier',Vector3.new(5.4,h,1.6),Vector3.new(side*23.2,h/2,-23+t*1.4),P.DarkWood,nil,true)
-  part('Tier edge',Vector3.new(5.5,.14,.18),Vector3.new(side*23.2,h-.07,-23.8+t*1.4),P.Gold)
+  part('Tier edge',Vector3.new(5.5,.14,.18),Vector3.new(side*23.2,h-.04,-23.8+t*1.4),P.Gold) -- R149: .03 above the step (its top was the step's top)
  end end
  -- Warm lanterns hanging from a ceiling beam that rests on the two side door lintels.
  part('Ceiling beam',Vector3.new(39.6,.7,.7),Vector3.new(0,19.05,3),P.DarkWood)
