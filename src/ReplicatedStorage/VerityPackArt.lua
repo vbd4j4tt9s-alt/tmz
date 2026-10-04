@@ -1,84 +1,117 @@
--- R148 (owner: "verity pack should be using our default pack mesh and sizes and painting it yellow and adding a smiley face on top of
--- it, keep it simple for the verity pack design"): the Verity pack (BagVariant 'VerityReliquary', Stage 7) is our plain pack - the
--- default pouch mesh at the plain pack's size (SeedPackRules: the Standard design and scale), so Bounds, carry layout, hold, hotbar,
--- Bag, opening and tear are an ordinary pack's - painted yellow, with Verity's picture (VerityConfig.Image, the NPC card's: one source
--- of truth; a thin black smiley line drawing on a transparent background) on its front and back.
---  * Yellow 255,255,0 all over the pouch (no biome colours or textures); the seal and the tear strips a darker yellow so the pack
---    shape still reads. A Gold / Diamond coat paints it like any other pack; the picture stays on top.
---  * The picture is a Decal on a thin plate in the pack's yellow that sits on the outermost front and back surface (so no part of the
---    mesh can cover it, whatever the template's own orientation and details). Decals, not SurfaceGuis: SurfaceGuis do not render in a
---    ViewportFrame, and the hotbar / Bag pictures are viewports. The plates are ordinary opaque parts, painted by a coat too.
---  * A Decal follows only its own properties: SeedPackClient / PackOpeningFeedback / GiantVisualSafety hide and fade it like a part.
---  * The magic is VoidPackFx's gold set (Fx): subtle sparkle emitters and a warm light (no outline, debris or comets), nothing purple.
-local Catalog=require(script.Parent.VerityCatalog)
+-- R149 (owner: "regarding verity pack i just need it to be pure yellow and the face plastered nice onto the pack thats the only design
+-- needed", then "make sure the face is not floating on the pack ... make sure its nicely plastered on to the pack"): the Verity pack
+-- (BagVariant 'VerityReliquary', Stage 7) is a pure yellow pouch with Verity's face (VerityConfig.Image, the NPC card's picture: one
+-- source of truth) on its front and its back. Nothing else: no glow, no sparkles, no light, no other colour.
+--  * Why it is built from plain parts and not from the approved pouch mesh (R148 painted that mesh yellow and the live pack showed a BLACK
+--    panel with brown / orange sticks and no face): the approved pouch (Storm_02: ONE MeshPart, Color white, no TextureID, no
+--    SurfaceAppearance) carries its whole print in the mesh's VERTEX COLOURS, and a part's Color is multiplied with them (yellow 255,255,0
+--    x dark navy = black, x orange = brown, x the pale crimps = yellow). Colour can only be tinted, never replaced, so no Color value
+--    can make that mesh pure yellow, and a Decal's transparent pixels show the mesh's own black. (The same reason the plants have a
+--    _Neutral template with white vertex colours.) The picture plates R148 added floated off the curved pouch.
+--  * The pack: a flat-faced yellow sachet with rounded long edges, the same footprint (width, height) as the plain pack's pouch, between
+--    the plain pack's own BottomSeal / TearStrips (SeedPackVisuals), so Visuals.Bounds, the carry layout, the hold, the hotbar / Bag
+--    picture, the opening and the tear are an ordinary pack's. Parts: VerityFace (a square block whose Front and Back faces carry the
+--    picture) with a block above and below it, a rounded edge on each side and a pinched end (two thin slanted slabs) at the top and the
+--    bottom, hiding the seal. The picture is a Decal ON the face block's own surface: nothing stands off the pack, so from the side
+--    there is no step, and nothing is in front of it. Every other part's outer surface starts on the face plane or behind it.
+--  * Decals, not SurfaceGuis: SurfaceGuis do not render in a ViewportFrame, and the hotbar / Bag pictures are viewports. A Decal follows only
+--    its own properties: SeedPackClient / PackOpeningFeedback / GiantVisualSafety hide and fade it like a part.
+--  * Every part is 255,255,0 SmoothPlastic (the seal and the tear strips too). A Gold / Diamond coat paints it like any other pack
+--    (SeedPackVisuals: every part takes the coat's colour and material, a Diamond one at .10 transparency); the Decal stays white on top.
 local Config=require(script.Parent.VerityConfig)
 local Renderer=require(script.Parent.SeedPackRenderer)
-local RGB=Color3.fromRGB
-local C=Catalog.Palette
-local A={Image=Config.Image,Yellow=RGB(255,255,0),Dark=RGB(214,190,0),Revision=148,
- -- The picture's plate: its side as a share of the pouch's width / height at scale 1, its thickness, how far it sinks into the surface.
- FaceWidth=.75,FaceHeight=.62,PlateDepth=.02,PlateSink=.008}
-local SPARK='rbxasset://textures/particles/sparkles_main.dds'
--- Fx colours for VoidPackFx (same fields as VoidPackFx.Void; no Debris / Comet / Fill / Outline = none of those pieces): gold
--- sparkles, a soft gold glow and a warm light - nothing purple.
-A.Fx={
- Haze={Texture=SPARK,Colors={C.Ball,C.Honey},Size={.5,1.1},Emission=.7,Alpha=.55},
- Nebula={Texture=SPARK,Colors={C.Amber,C.Gloss},Size={.5,1.1},Emission=1,Alpha=.35},
- Stars={Texture=SPARK,Colors={C.White,C.Honey},Size={.10,.03},Emission=1,Alpha=.15},
- Light=RGB(255,196,70),
-}
--- The pouch's extent at scale 1 (every mesh of the design's template, as SpecialPackArt89.BodyBounds does for the shared body).
+local V,CF=Vector3.new,CFrame.new
+local A={Image=Config.Image,Yellow=Color3.fromRGB(255,255,0),Revision=149,
+ -- The sachet's thickness as a share of the plain pouch's front-to-back size, and the share of the height its square face block may take.
+ DepthShare=.56,FaceHeightShare=.9,
+ -- The blocks above / below the face block reach this far under it and sit this far behind its surface (so the face block alone is the
+ -- outermost, never a coplanar overlap with the picture on it).
+ Overlap=.01,Recess=.004,
+ -- The pinched ends: how far the slanted slabs reach past the body, the crimp thickness they meet, their own thickness.
+ TaperHeight=.16,TaperTip=.035,TaperThickness=.03}
+-- The plain pack's pouch at scale 1: the x / y / z range of every MeshPart of the design's template (the default Storm_02 pouch when the
+-- template is missing, so the pack always builds).
 local cache={}
-local function extent(key)
+local function footprint(key)
  if cache[key]then return cache[key]end
- local t=assert(Renderer.GetGeometry(key),'Approved pack template missing: '..tostring(key))
- local b={Radius=1,MinY=-1.22,MaxY=1.22,MinZ=0,MaxZ=0}
- for _,p in ipairs(t:GetChildren())do if p:IsA('MeshPart')then
+ local t=Renderer.GetGeometry(key)
+ local lo,hi=V(math.huge,math.huge,math.huge),V(-math.huge,-math.huge,-math.huge)
+ for _,p in ipairs(t and t:GetChildren()or{})do if p:IsA('MeshPart')then
   local f=p:GetAttribute('PackLocalFrame')
-  for _,x in ipairs({-.5,.5})do for _,y in ipairs({-.5,.5})do for _,z in ipairs({-.5,.5})do
-   local q=f*Vector3.new(p.Size.X*x,p.Size.Y*y,p.Size.Z*z)
-   b.Radius=math.max(b.Radius,Vector3.new(q.X,0,q.Z).Magnitude);b.MinY=math.min(b.MinY,q.Y);b.MaxY=math.max(b.MaxY,q.Y)
-   b.MinZ=math.min(b.MinZ,q.Z);b.MaxZ=math.max(b.MaxZ,q.Z)
-  end end end
+  if typeof(f)=='CFrame'then for _,x in ipairs({-.5,.5})do for _,y in ipairs({-.5,.5})do for _,z in ipairs({-.5,.5})do
+   local q=f*V(p.Size.X*x,p.Size.Y*y,p.Size.Z*z)
+   lo=V(math.min(lo.X,q.X),math.min(lo.Y,q.Y),math.min(lo.Z,q.Z));hi=V(math.max(hi.X,q.X),math.max(hi.Y,q.Y),math.max(hi.Z,q.Z))
+  end end end end
  end end
+ local b=lo.X<hi.X and{MinX=lo.X,MaxX=hi.X,MinY=lo.Y,MaxY=hi.Y,MinZ=lo.Z,MaxZ=hi.Z}or{MinX=-.985,MaxX=.985,MinY=-1.04,MaxY=1.02,MinZ=-.549,MaxZ=.455}
  cache[key]=b;return b
 end
--- The plate's side at scale 1 and the z of its centre for the front (-1) / back (+1): on the outermost surface of the pouch.
-function A.Side(key)
- local b=extent(key)
- return math.min(A.FaceWidth*2*b.Radius,A.FaceHeight*(b.MaxY-b.MinY))
+-- The parts at scale 1, in the pack's root frame: {Name,Size,Frame,Shape?,Picture?}. Pure data: Build places them at the pack's scale.
+function A.Layout(key)
+ local b=footprint(key)
+ local W,H=b.MaxX-b.MinX,b.MaxY-b.MinY;local cx,cy=(b.MinX+b.MaxX)/2,(b.MinY+b.MaxY)/2
+ -- depth D, the width of the flat middle S = W - D (the two rounded edges are D wide each); S stays a square face block.
+ local D=math.min(A.DepthShare*(b.MaxZ-b.MinZ),W*.5)
+ if W-D>H*A.FaceHeightShare then D=W-H*A.FaceHeightShare end
+ local S=W-D;local rest=(H-S)/2;local out={}
+ local function add(name,size,frame,shape,picture)out[#out+1]={Name=name,Size=size,Frame=frame,Shape=shape,Picture=picture}end
+ add('VerityFace',V(S,S,D),CF(cx,cy,0),nil,true)
+ local h=rest+A.Overlap;local d=D-2*A.Recess
+ add('VerityBodyTop',V(S,h,d),CF(cx,cy+S/2-A.Overlap+h/2,0))
+ add('VerityBodyBottom',V(S,h,d),CF(cx,cy-S/2+A.Overlap-h/2,0))
+ -- the rounded long edges: vertical cylinders (a Cylinder part runs along its X, so a quarter turn stands it up), tangent to the faces
+ for _,side in ipairs({-1,1})do
+  add(side<0 and'VerityEdgeLeft'or'VerityEdgeRight',V(H,D,D),CF(cx+side*S/2,cy,0)*CFrame.Angles(0,0,math.pi/2),Enum.PartType.Cylinder)
+ end
+ -- the pinched ends: a thin slanted slab from the body's top / bottom edge (flush with the face plane) in to the crimp of the plain pack's
+ -- seal (the ordinary BottomSeal / TearStrips, which these hide), one slab per side, so the pouch tapers to a seam like the real one. Only
+ -- the outer surface matters: each slab starts exactly on the body's outer edge and slopes inward, never in front of the face.
+ local th,tip,tall=A.TaperThickness,A.TaperTip,A.TaperHeight
+ local dz=(D-tip)/2;local len=math.sqrt(dz*dz+tall*tall);local theta=math.atan2(dz,tall)
+ local ny,nz=dz/len,-tall/len -- outward normal of the front-top slab; its centre sits half a thickness inside the outer surface
+ for _,up in ipairs({1,-1})do for _,zs in ipairs({-1,1})do -- up: top / bottom; zs: front (-Z) / back (+Z)
+  add('VerityTaper'..(up>0 and'Top'or'Bottom')..(zs<0 and'Front'or'Back'),V(S+D*.5,len,th),
+   CF(cx,cy+up*(H/2+tall/2-ny*th/2),zs*((D+tip)/4+nz*th/2))*CFrame.Angles(-up*zs*theta,0,0))
+ end end
+ return out,{Width=W,Height=H,Depth=D,Face=S}
 end
-function A.PlateZ(key,direction)
- local b=extent(key)
- if direction<0 then return b.MinZ-A.PlateDepth/2+A.PlateSink end
- return b.MaxZ+A.PlateDepth/2-A.PlateSink
-end
+-- The face block's side at scale 1.
+function A.FaceSide(key)local _,m=A.Layout(key);return m.Face end
 function A.Build(bag,isValid)
  if bag:GetAttribute('VerityPack')then return true end
- -- The ordinary pack for this design (SeedPackRules gives the Verity record the Standard design): the same mesh, parts and tear.
  local key=bag:GetAttribute('PackArtKey')or''
- if Renderer.BuildStandard(bag,key,isValid)==false then return false end
- local root=bag.PrimaryPart;local folder=bag:FindFirstChild('PackGeometry');local scale=bag:GetAttribute('VisualScale')or 1
- for _,p in ipairs(folder:GetChildren())do if p:IsA('MeshPart')then
-  p.TextureID='';p.MaterialVariant='';p.Material=Enum.Material.SmoothPlastic;p.Color=A.Yellow;p.Reflectance=0
-  for _,v in ipairs(p:GetChildren())do if v:IsA('SurfaceAppearance')then v:Destroy()end end
- end end
- for _,p in ipairs(bag:GetChildren())do if p:IsA('BasePart')and(p.Name=='BottomSeal'or p:GetAttribute('TearIndex'))then p.Color=A.Dark;p.Material=Enum.Material.SmoothPlastic end end
- -- The picture: a plate on the front and one on the back, each with its Decal on its outer face.
- local side,depth=A.Side(key),A.PlateDepth
+ local root=bag.PrimaryPart;assert(root,'[R149] The Verity pack needs its root part.')
+ if isValid and not isValid()then return false end
+ local scale=bag:GetAttribute('VisualScale')or 1
  local giant=(bag:GetAttribute('PackSize')or 1)>10
- for _,spec in ipairs({{'VerityFaceFront',-1,Enum.NormalId.Front},{'VerityFaceBack',1,Enum.NormalId.Back}})do
-  local p=Instance.new('Part');p.Name=spec[1];p.Size=Vector3.new(side,side,depth)*scale
-  local frame=CFrame.new(0,0,A.PlateZ(key,spec[2])*scale);p.CFrame=root.CFrame*frame;p:SetAttribute('PackLocalFrame',frame)
+ local folder=Instance.new('Folder');folder.Name='PackGeometry'
+ local specs=A.Layout(key)
+ for _,s in ipairs(specs)do
+  local p=Instance.new('Part');p.Name=s.Name;if s.Shape then p.Shape=s.Shape end
+  p.Size=s.Size*scale
+  local frame=CF(s.Frame.Position*scale)*s.Frame.Rotation
+  p.CFrame=root.CFrame*frame;p:SetAttribute('PackLocalFrame',frame)
   p.Color=A.Yellow;p.Material=Enum.Material.SmoothPlastic;p.Reflectance=0;p.Transparency=0
   p.Anchored=root.Anchored;p.Massless=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false
   p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth
   if not p.Anchored then local w=Instance.new('WeldConstraint');w.Part0=root;w.Part1=p;w.Parent=p end
   if giant then game:GetService('CollectionService'):AddTag(p,'GiantVisualPart')end
-  local d=Instance.new('Decal');d.Name='VerityPicture';d.Face=spec[3];d.Texture=A.Image;d.Color3=Color3.new(1,1,1);d.Transparency=0;d.Parent=p
+  if s.Picture then
+   -- Verity's picture, as it is, white (untinted), on the block's own Front and Back faces.
+   for _,side in ipairs({Enum.NormalId.Front,Enum.NormalId.Back})do
+    local d=Instance.new('Decal');d.Name='VerityPicture';d.Face=side;d.Texture=A.Image;d.Color3=Color3.new(1,1,1);d.Transparency=0;d.Parent=p
+   end
+  end
   p.Parent=folder
  end
- bag:SetAttribute('CompactPackPartCount',(bag:GetAttribute('CompactPackPartCount')or 10)+2)
+ -- The seal and the tear strips of the ordinary pack: the same yellow.
+ for _,p in ipairs(bag:GetChildren())do if p:IsA('BasePart')and(p.Name=='BottomSeal'or p:GetAttribute('TearIndex'))then
+  p.Color=A.Yellow;p.Material=Enum.Material.SmoothPlastic;p.Reflectance=0
+ end end
+ if isValid and not isValid()then folder:Destroy();return false end
+ folder.Parent=bag
+ -- (the root part and the seal / 8 tear strips are the ordinary pack's ten)
+ bag:SetAttribute('CompactPackPartCount',#specs+10);bag:SetAttribute('CompactPackReady',true)
  bag:SetAttribute('PaperColor',A.Yellow);bag:SetAttribute('PreserveTextStyle',true)
  bag:SetAttribute('VerityPack',true);bag:SetAttribute('VerityPackDesign',A.Revision)
  return true

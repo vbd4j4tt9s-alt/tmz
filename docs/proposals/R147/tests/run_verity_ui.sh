@@ -9,7 +9,7 @@ HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 BASE=${VERITY_UI_BASE:-23235ce}
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
 T=$REPO/tools/tests;INV=$REPO/docs/proposals/inventory_R113/tests;C=$REPO/src/StarterPlayer/StarterPlayerScripts
-cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/test_verity_ui.luau" "$OUT/"
+cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/test_verity_ui.luau" "$HERE/../../R149/tests/verity_template.luau" "$OUT/" # (R149: the real Storm_02 template: one MeshPart)
 show(){ git -C "$REPO" show "$BASE:$1"; }
 show src/ReplicatedStorage/SeedPackVisuals.lua | sed -e "s/script.Parent.SeedPackRenderer/script.Parent.SeedPackRendererBase/g" -e "s/script.Parent.EclipsePackArt/script.Parent.EclipsePackArtBase/g" > "$OUT/SeedPackVisualsBase.lua"
 show src/ReplicatedStorage/SeedPackRenderer.lua | sed -e "s/script.Parent.EclipsePackArt/script.Parent.EclipsePackArtBase/g" > "$OUT/SeedPackRendererBase.lua"

@@ -3,15 +3,15 @@
 -- Roblox mock with the real SeedPackVisuals / SeedPackRenderer / EclipsePackArt / VerityPackArt / VoidPackFx / ItemPictures /
 -- VeiledEventClient81 / SeedPackRender / ChestIndex of this checkout. The comparison "before" modules are the base commit's
 -- (git show BASE:..., loaded as SeedPackVisualsBase / SeedPackRendererBase / EclipsePackArtBase / VoidPackFxBase / ChestIndexBase).
---  1. the Verity pack art (owner, R148: "verity pack should be using our default pack mesh and sizes and painting it yellow and adding a
---     smiley face on top of it, keep it simple"): the plain pack (the Standard design and scale, so Bounds / carry / tear are an
---     ordinary pack's, part for part), every mesh yellow 255,255,0 (the seal and tear strips a darker yellow), VerityConfig's
---     picture as Decals on a plate on its front and on its back (Decals: SurfaceGuis do not render in the hotbar / Bag viewports);
---     Gold / Diamond coats paint it like any pack and the Decals stay white on top; on every path: world, dropped, carried,
---     CarryBag, opening copy, inventory picture, viewport;
+--  1. the Verity pack art (R149, owner: "pure yellow and the face plastered nice onto the pack, that's the only design needed"; R148 painted
+--     the template MeshPart yellow and the live pack showed a black panel: its print is in vertex colours, which Color only multiplies): plain
+--     parts of the plain pack's footprint - a face block with VerityConfig's picture as Decals on its own Front and Back (Decals: SurfaceGuis do not
+--     render in the hotbar / Bag viewports), the body around it, rounded edges, pinched ends - every part (the seal and tear strips too) exactly
+--     255,255,0; Gold / Diamond coats paint it like any pack and the Decals stay white on top; on every path: world, dropped, carried, CarryBag,
+--     opening copy, inventory picture, viewport (docs/proposals/R149/tests/test_verity_pack.luau checks every context in depth);
 --  2. the Void pack, the Mech pack and the ordinary packs build part for part what the base commit built (and bound the same);
---  3. VoidPackFx: Void effects identical to the base's; Verity effects gold sparkles and a warm light only (no smoke, debris, comets
---     or outline, nothing purple); the real VeiledEventClient81 loop gives a carried Verity pack those; SeedPackRender leaves it alone;
+--  3. VoidPackFx: Void effects identical to the base's; the Verity pack has NO effects (R149: the R147 / R148 gold sparkles and light are gone):
+--     the real VeiledEventClient81 loop gives a carried Void pack its fx and a Verity pack none; SeedPackRender leaves it alone;
 --     the opening scripts and GiantVisualSafety hide / fade its Decals too (they follow only their own properties);
 --  4. (the Index checks - tab 9 VERITY, its card, rewards, alerts, the tab row - moved to docs/proposals/R148/tests/test_index_limited.luau: R148 made
 --     MECH and VERITY one LIMITED tab).
@@ -31,7 +31,7 @@ R.CFrame.lookAt=function(p,t,up)
 end
 R.CFrame.fromMatrix=function(p,x,y,z)z=z or x:Cross(y);return R.CFrame.new(p.X,p.Y,p.Z,x.X,y.X,z.X,x.Y,y.Y,z.Y,x.Z,y.Z,z.Z)end
 W.env.CFrame=R.CFrame
-F.packAssets(W)
+F.packAssets(W);require('./verity_template')(W)
 local Players=W.service('Players');local player=R.new('Player');player.Name='Tester';player.UserId=147;player.Parent=Players;Players.LocalPlayer=player
 local pg=R.new('PlayerGui');pg.Name='PlayerGui';pg.Parent=player
 local Cat=W.module('VerityCatalog');local Rules=W.module('SeedPackRules')
@@ -103,13 +103,8 @@ local Pic=W.module('HarvestGeometry')
 local KEY=Rules.DesignKey(7,VERITY)
 check(VerityArt.Image==IMAGE and Config.Image==IMAGE,'the picture is VerityConfig.Image, rbxassetid://102712963740896 (the NPC card\'s)')
 check(not W.B.VerityPackArt:find('102712963740896',1,true)and W.B.VerityCatalog:find("FaceImageId='rbxassetid://102712963740896'",1,true)~=nil,'(source: the pack art takes the id from VerityConfig; VerityCatalog holds it as the FaceImageId literal for the ball, test_verity_art keeps the two equal)')
-check(colorIs(VerityArt.Yellow,255,255,0)and select(3,rgb(VerityArt.Dark))==0 and select(1,rgb(VerityArt.Dark))>180 and warm(VerityArt.Dark),'yellow 255,255,0, and a slightly darker yellow for the trims')
-do
- local fx=VerityArt.Fx;local allWarm=true
- for _,k in ipairs({'Haze','Nebula','Stars'})do check(fx[k].Texture:find('sparkles_main')~=nil,'Fx.'..k..': a built-in sparkle texture');for _,c in ipairs(fx[k].Colors)do if not warm(c)then allWarm=false end end end
- check(allWarm and warm(fx.Light),'every effect colour is warm gold / cream, nothing purple')
- check(fx.Debris==nil and fx.Comet==nil and fx.Trail==nil and fx.Fill==nil and fx.Outline==nil,'no debris, comets or outline')
-end
+check(colorIs(VerityArt.Yellow,255,255,0)and VerityArt.Dark==nil and VerityArt.Revision==149,'pure yellow 255,255,0, no darker yellow; revision 149')
+check(VerityArt.Fx==nil and PackFx.PaletteFor(nil)==PackFx.Void,'no effect set: the Verity pack has no sparkles, no glow, no light')
 -- our default pack: the Standard design and scale, so size / Bounds / carry are an ordinary pack's
 local pv,std=Rules.GetVariant(VERITY),Rules.GetVariant('Standard')
 check(pv.BagScale==std.BagScale and pv.BagScale==1 and Rules.DesignKey(7,VERITY)==Rules.DesignKey(7,'Standard')and KEY=='Storm_02','the Verity record is the plain pack: BagScale 1 and the Standard design ('..KEY..')')
@@ -120,7 +115,7 @@ end
 
 -- 2. Building: every path ---------------------------------------------------------------------------------------------------------------
 local function bagAt(mod,y,stage,variant,size,coat)return mod.Bag(CF(0,y,0),W.workspace,1,nil,stage,variant,1,size,coat or'None')end
--- zslack: the picture plates stand (depth - sink) proud of the pouch's front / back, the one place a part leaves the plain pack's Bounds
+-- zslack: how far a part may leave the plain pack's Bounds in z (none now: the pack is the plain pouch's footprint, nothing stands off it)
 local function inside(bag,b,label,zslack)
  local root=bag.PrimaryPart.CFrame;local worst,worstZ=0,0
  for _,p in ipairs(parts(bag))do
@@ -133,71 +128,66 @@ local function inside(bag,b,label,zslack)
  return check(worst<=1e-3 and worstZ<=(zslack or 0)+1e-3,label..': all parts inside Bounds (worst overshoot '..string.format('%.4f, z %.4f of %.4f allowed',worst,worstZ,zslack or 0)..')')
 end
 local function decalsOf(inst)local out={};for _,d in ipairs(inst:GetDescendants())do if d:IsA('Decal')then out[#out+1]=d end end;return out end
-local function others(bag)local out={};for _,p in ipairs(parts(bag))do if not p.Name:match('^VerityFace')then out[#out+1]=p end end;return out end
 local voidBags,verityBags={},{}
 for _,case in ipairs({{1,'None'},{2.5,'Gold'},{25,'Diamond'},{.5,'None'}})do
  local size,coat=case[1],case[2];local label=('%sx %s'):format(size,coat)
  local void=bagAt(Visuals,10,7,VOID,size,coat);local vr=bagAt(Visuals,10,7,VERITY,size,coat);local plain=bagAt(Visuals,10,7,'Standard',size,coat)
- local pr,po=parts(vr),others(vr);local scale=vr:GetAttribute('VisualScale')
+ local pr=parts(vr);local scale=vr:GetAttribute('VisualScale')
  check(vr:GetAttribute('BagVariant')==VERITY and vr:GetAttribute('Stage')==7 and vr:GetAttribute('PackRarity')=='Verity'and vr:GetAttribute('PackRank')==7,label..': Verity record attributes (variant, stage 7, tier Verity, rank 7)')
  check(vr:GetAttribute('VerityPack')==true and vr:GetAttribute('CompactPackReady')==true and vr:GetAttribute('EclipsePack')==nil and vr:GetAttribute('SpecialPackDesign89')==nil,label..': an ordinary pack build (VerityPack; not the reliquary)')
  check(vr:GetAttribute('CompactPackPartCount')==#pr+1 and near(scale,plain:GetAttribute('VisualScale')),label..': CompactPackPartCount counts every part ('..tostring(vr:GetAttribute('CompactPackPartCount'))..'); the plain pack\'s VisualScale')
- -- it IS the ordinary pack: the same parts, sizes and places, plus the two picture plates
- local same=#po==#parts(plain)
- for i=1,math.min(#po,#parts(plain))do local a,b=po[i],parts(plain)[i];if a._class~=b._class or a.Name~=b.Name or ser(a.Size)~=ser(b.Size)or ser(a.CFrame)~=ser(b.CFrame)then same=false end end
- check(same,label..': the plain pack\'s parts, sizes and places ('..#po..' parts: mesh, seal, 8 tear strips, root) plus two plates')
+ -- the plain pack's root, seal and 8 tear strips (same sizes and places) plus the pouch built from plain parts
+ local ordinary={};for _,p in ipairs(parts(plain))do if p.Parent==plain then ordinary[#ordinary+1]=p end end
+ local mine={};for _,p in ipairs(pr)do if p.Parent==vr then mine[#mine+1]=p end end
+ local same=#mine==#ordinary
+ for i=1,math.min(#mine,#ordinary)do local a,b=mine[i],ordinary[i];if a._class~=b._class or a.Name~=b.Name or ser(a.Size)~=ser(b.Size)or ser(a.CFrame)~=ser(b.CFrame)then same=false end end
+ check(same and #mine==9,label..': the plain pack\'s own seal and 8 tear strips, same sizes and places ('..#mine..' parts)')
+ local geo=vr:FindFirstChild('PackGeometry');local nGeo=geo and #geo:GetChildren()or 0;local meshes=0
+ for _,p in ipairs(pr)do if p:IsA('MeshPart')then meshes+=1 end end
+ check(geo and nGeo==#VerityArt.Layout(KEY)and meshes==0,label..': the pouch is '..nGeo..' plain parts, no mesh')
  local tear=0;for _,p in ipairs(vr:GetChildren())do if p:GetAttribute('TearIndex')then tear+=1 end end
  check(tear==8 and vr:FindFirstChild('BottomSeal')~=nil,label..': the normal tear strips and seal are there (the tear / opening work as on any pack)')
- local stray=0;for _,p in ipairs(pr)do if p.Name:match('^Galaxy')or p.Name:match('^Rune')or p.Name:match('^Photon')or p.Name:match('^EventHorizon')or p.Name:match('^HaloDebris')or p.Name:match('^Void')or p.Name:match('^VerityRim')or p.Name=='VerityCard'then stray+=1 end end
- check(stray==0,label..': no reliquary pieces, rings, runes, eye, halo, rim or card')
+ local stray=0;for _,p in ipairs(pr)do if p.Name:match('^Galaxy')or p.Name:match('^Rune')or p.Name:match('^Photon')or p.Name:match('^EventHorizon')or p.Name:match('^HaloDebris')or p.Name:match('^Void')or p.Name:match('^VerityRim')or p.Name=='VerityCard'or p.Name:match('^VerityFace[FB]')then stray+=1 end end
+ check(stray==0,label..': no reliquary pieces, rings, runes, eye, halo, rim, card or plates')
  -- yellow, or the coat
  local c=Rules.PackMutations[coat]
  if coat=='None'then
-  local meshes,yellow,warmAll=0,0,true
-  for _,p in ipairs(pr)do
-   if p:IsA('MeshPart')then meshes+=1;if colorIs(p.Color,255,255,0)and p.Material.Name=='SmoothPlastic'and p.TextureID==''then yellow+=1 end end
-   local r,g,b=rgb(p.Color);if not(b==0 and r>=g)then warmAll=false end
-  end
-  check(meshes>=1 and yellow==meshes,label..': every mesh of the pouch is yellow 255,255,0, SmoothPlastic, no texture ('..yellow..'/'..meshes..')')
-  check(warmAll,label..': every part is yellow or darker yellow: no biome colour anywhere')
-  local darkOk=true;for _,p in ipairs(vr:GetChildren())do if p.Name=='BottomSeal'or p:GetAttribute('TearIndex')then darkOk=darkOk and rgbKey(p.Color)==rgbKey(VerityArt.Dark)end end
-  check(darkOk,label..': seal and tear strips in the darker yellow')
+  local pure=0;for _,p in ipairs(pr)do if colorIs(p.Color,255,255,0)and p.Material.Name=='SmoothPlastic'and p.Transparency==0 and p.Reflectance==0 then pure+=1 end end
+  check(pure==#pr,label..': every part (the seal and the tear strips too) is exactly 255,255,0 SmoothPlastic ('..pure..'/'..#pr..')')
   check(colorIs(vr:GetAttribute('PaperColor'),255,255,0),label..': PaperColor (the opening paper) is yellow')
-  local noApp=true;for _,d in ipairs(vr:GetDescendants())do if d:IsA('SurfaceAppearance')then noApp=false end end;check(noApp,label..': no SurfaceAppearance left from the biome art')
+  local noApp=true;for _,d in ipairs(vr:GetDescendants())do if d:IsA('SurfaceAppearance')or d:IsA('Texture')or d:IsA('SurfaceGui')then noApp=false end end;check(noApp,label..': no SurfaceAppearance / Texture / SurfaceGui from the biome art')
  else
   local painted=true;for _,p in ipairs(pr)do if rgbKey(p.Color)~=rgbKey(c.Color)or p.Material~=c.Material then painted=false end end
-  check(painted,label..': the '..coat..' coat paints the whole pack, plates included, like any other pack')
+  check(painted,label..': the '..coat..' coat paints the whole pack like any other pack')
   check(rgbKey(vr:GetAttribute('PaperColor'))==rgbKey(c.Color),label..': PaperColor is the coat\'s')
  end
- -- the picture: a plate on each outer face, each with its Decal
- local front,back=vr:FindFirstChild('VerityFaceFront',true),vr:FindFirstChild('VerityFaceBack',true)
- if check(front and back and front:IsA('Part')and back:IsA('Part'),label..': a front plate and a back plate')then
-  local side=VerityArt.Side(KEY)*scale
-  check(near(front.Size.X,side,1e-6)and near(front.Size.Y,side,1e-6)and near(back.Size.X,side,1e-6)and near(front.Size.Z,VerityArt.PlateDepth*scale,1e-6),label..(': square plates %.3f studs a side, thin'):format(side))
-  check(front.Transparency==(coat=='Diamond'and .10 or 0)and back.Transparency==front.Transparency,label..': opaque (the coat\'s own transparency at most)')
-  check(front.Anchored and front.CanCollide==false and front.CanQuery==false and front.CanTouch==false and front.Massless,label..': inert world parts, anchored')
-  local rootCF=vr.PrimaryPart.CFrame
-  local fz,bz=(rootCF:Inverse()*front.CFrame).Position.Z,(rootCF:Inverse()*back.CFrame).Position.Z
-  local fx0,fy0=(rootCF:Inverse()*front.CFrame).Position.X,(rootCF:Inverse()*front.CFrame).Position.Y
-  check(fz<0 and bz>0 and near(fx0,0,1e-6)and near(fy0,0,1e-6),label..': centred on the pack, one on the front (-Z), one on the back (+Z)')
-  -- nothing of the pouch is in front of them
-  local clear=true
-  for _,p in ipairs(po)do if p~=vr.PrimaryPart then
+ -- the picture: Decals on the face block's own Front and Back
+ local face=vr:FindFirstChild('VerityFace',true)
+ if check(face and face:IsA('Part'),label..': a face block')then
+  local side=VerityArt.FaceSide(KEY)*scale
+  check(near(face.Size.X,side,1e-6)and near(face.Size.Y,side,1e-6),label..(': square, %.3f studs a side'):format(side))
+  check(face.Transparency==(coat=='Diamond'and .10 or 0),label..': opaque (the coat\'s own transparency at most)')
+  check(face.Anchored and face.CanCollide==false and face.CanQuery==false and face.CanTouch==false and face.Massless,label..': inert world part, anchored')
+  local rootCF=vr.PrimaryPart.CFrame;local fl=rootCF:Inverse()*face.CFrame
+  check(near(fl.Position.X,0,1e-6)and near(fl.Position.Z,0,1e-6),label..': centred on the pack')
+  -- nothing is in front of the picture
+  local clear=true;local fz0,fz1=fl.Position.Z-face.Size.Z/2,fl.Position.Z+face.Size.Z/2
+  for _,p in ipairs(pr)do if p~=face then
    local lo,hi=1e9,-1e9
    for _,x in ipairs({-1,1})do for _,y in ipairs({-1,1})do for _,z in ipairs({-1,1})do local q=(rootCF:Inverse()*p.CFrame)*V3(p.Size.X*.5*x,p.Size.Y*.5*y,p.Size.Z*.5*z);lo=math.min(lo,q.Z);hi=math.max(hi,q.Z)end end end
-   if lo<fz-front.Size.Z/2+.004*scale-1e-6 or hi>bz+back.Size.Z/2-.004*scale+1e-6 then clear=false end
+   if lo<fz0-1e-6*scale or hi>fz1+1e-6*scale then clear=false end
   end end
-  check(clear,label..': the plates are the outermost surfaces: no part of the pack covers the picture')
-  local fd,bd=decalsOf(front),decalsOf(back)
-  check(#fd==1 and #bd==1 and #decalsOf(vr)==2 and fd[1].Face.Name=='Front'and bd[1].Face.Name=='Back','exactly one Decal per plate, on its outer face (Front / Back)')
-  for _,d in ipairs({fd[1],bd[1]})do
+  check(clear,label..': the face block is the outermost surface on both sides: no part of the pack covers the picture')
+  local ds=decalsOf(face)
+  check(#ds==2 and #decalsOf(vr)==2 and((ds[1].Face.Name=='Front'and ds[2].Face.Name=='Back')or(ds[1].Face.Name=='Back'and ds[2].Face.Name=='Front')),'exactly two Decals, on the face block\'s own Front and Back')
+  for _,d in ipairs(ds)do
    check(d.Texture==IMAGE and d.Transparency==0 and colorIs(d.Color3,255,255,255),label..': the '..d.Face.Name..' Decal is the Verity picture, white (untinted), on top, whatever the coat')
   end
  end
- local br=Visuals.Bounds(7,VERITY,size);inside(vr,br,label,(VerityArt.PlateDepth-VerityArt.PlateSink)*scale)
+ local br=Visuals.Bounds(7,VERITY,size);inside(vr,br,label,0)
  check(boundsLine(br)==boundsLine(Visuals.Bounds(7,'Standard',size)),label..': Bounds are the plain pack\'s ('..string.format('R %.3f, Y %.3f..%.3f',br.Radius,br.MinY,br.MaxY)..')')
  check(W.CS:HasTag(vr,'BiomeSeedPackVisual'),label..': tagged BiomeSeedPackVisual (the effects owner finds it)')
- if size>10 then local tagged=0;for _,p in ipairs({front,back})do if W.CS:HasTag(p,'GiantVisualPart')then tagged+=1 end end;check(tagged==2,label..': a giant pack\'s plates are GiantVisualParts (the camera fade reaches the picture)')end
+ if size>10 then local tagged=0;for _,p in ipairs(pr)do if W.CS:HasTag(p,'GiantVisualPart')then tagged+=1 end end;check(tagged==#pr-9,label..': a giant pack\'s pouch parts (the face block with the picture too) are GiantVisualParts (the camera fade reaches the picture)')end
  local ids=0;for _,d in ipairs(vr:GetDescendants())do for _,k in ipairs({'TextureID','Texture','Image'})do local v=d._props[k];if type(v)=='string'and v:find('rbxassetid')and v~=IMAGE then ids+=1 end end end
  check(ids==0,label..': no uploaded asset but the picture')
  plain:Destroy()
@@ -210,7 +200,7 @@ local hrp=R.new('Part');hrp.Name='HumanoidRootPart';hrp.Size=V3(2,2,1);hrp.CFram
 local held=Visuals.Bag(CF(0,5,1),char,1,torso,7,VERITY,1,1,'None')
 do
  local welded=true;for _,p in ipairs(parts(held))do if p.Anchored or not p:FindFirstChildOfClass('WeldConstraint')then welded=false end end
- check(welded,'held: every part (the plates too) is welded to the carrier ('..#parts(held)..' parts)')
+ check(welded,'held: every part (the face block too) is welded to the carrier ('..#parts(held)..' parts)')
  local ok,carry=pcall(Visuals.CarryBag,char,7,VERITY,1,1,'None');local okS,carryS=pcall(Visuals.CarryBag,char,7,'Standard',1,1,'None')
  check(ok and carry and carry.Name=='CarriedSeed'and carry:GetAttribute('SeedPackCarry')==true and carry:GetAttribute('BagVariant')==VERITY,'CarryBag builds the carried Verity pack: '..tostring(carry))
  check(okS and carryS and ser(carry:GetAttribute('CarryRootOffset'))==ser(carryS:GetAttribute('CarryRootOffset'))and near(carry:GetAttribute('CarryBackZ')or 0,carryS:GetAttribute('CarryBackZ')or 1e9)and near(carry:GetAttribute('CarryDisplayMultiplier'),carryS:GetAttribute('CarryDisplayMultiplier')),'the carry layout (offset, back Z, size) is the plain pack\'s')
@@ -218,11 +208,11 @@ do
  local wcount=0;for _,d in ipairs(carry:GetDescendants())do if d:IsA('WeldConstraint')then wcount+=1 end end
  check(wcount==#parts(carry)+1 and #decalsOf(carry)==2,'the carried pack is welded (and the root to the torso); both Decals came along ('..wcount..' welds)')
  carry:Destroy();carryS:Destroy()
- -- the opening copy (SeedPackClient / PackOpeningFeedback clone the bag): the plates and both Decals are there
+ -- the opening copy (SeedPackClient / PackOpeningFeedback clone the bag): the face block and both Decals are there
  local copy=held:Clone();copy.Name='OpeningBag'
  for _,d in ipairs(copy:GetDescendants())do if d:IsA('WeldConstraint')then d:Destroy()elseif d:IsA('BasePart')then d.Anchored=true end end
  local cds=decalsOf(copy)
- check(#cds==2 and cds[1].Texture==IMAGE and cds[2].Texture==IMAGE and copy:FindFirstChild('VerityFaceFront',true)~=nil,'the opening copy keeps the plates and their two Decals')
+ check(#cds==2 and cds[1].Texture==IMAGE and cds[2].Texture==IMAGE and copy:FindFirstChild('VerityFace',true)~=nil,'the opening copy keeps the face block and its two Decals')
 end
 -- Inventory / hotbar / Bag pictures (ItemPictures builds exactly Visuals.Bag, into a ViewportFrame) and a viewport preview.
 do
@@ -239,19 +229,19 @@ do
  for _=1,200 do W.frames(1)end
  local view,view2,view3,view4=holder:FindFirstChild('ItemViewport'),holder2:FindFirstChild('ItemViewport'),holder3:FindFirstChild('ItemViewport'),holder4:FindFirstChild('ItemViewport')
  check(view and view2 and view3 and view4,'the Verity pack, a Gold Verity pack, a Void pack and a plain pack all get their real 3D picture (hotbar / Bag slot)')
- local function stats(v)local n,yellow,plates=0,0,0;for _,d in ipairs(v:GetDescendants())do if d:IsA('BasePart')then n+=1;if colorIs(d.Color,255,255,0)then yellow+=1 end;if d.Name:match('^VerityFace')then plates+=1 end end end;return n,yellow,plates end
- local n,yellow,plates=stats(view);local n4=stats(view4)
- check(plates==2 and #decalsOf(view)==2 and yellow>=3 and n==n4+2,('the Verity picture is the plain pack plus the two plates, yellow, with both Decals (%d parts, plain %d, %d yellow)'):format(n,n4,yellow))
+ local function stats(v)local n,yellow,faces,mesh=0,0,0,0;for _,d in ipairs(v:GetDescendants())do if d:IsA('BasePart')then n+=1;if colorIs(d.Color,255,255,0)and d.Material.Name=='SmoothPlastic'then yellow+=1 end;if d.Name=='VerityFace'then faces+=1 end;if d:IsA('MeshPart')then mesh+=1 end end end;return n,yellow,faces,mesh end
+ local n,yellow,faces,mesh=stats(view)
+ check(faces==1 and #decalsOf(view)==2 and mesh==0 and yellow==n and n==#VerityArt.Layout(KEY)+9,('the Verity picture is the pouch\'s plain parts and the seal / strips, every one pure yellow, with both Decals on the face block (%d parts, %d yellow)'):format(n,yellow))
  for _,d in ipairs(view and decalsOf(view)or{})do check(d.Texture==IMAGE,'the viewport Decal shows the Verity picture ('..d.Face.Name..')')end
- local _,_,platesG=stats(view3)
- check(platesG==2 and #decalsOf(view3)==2 and colorIs(decalsOf(view3)[1].Color3,255,255,255),'a Gold Verity picture keeps both white Decals')
+ local _,_,facesG=stats(view3)
+ check(facesG==1 and #decalsOf(view3)==2 and colorIs(decalsOf(view3)[1].Color3,255,255,255),'a Gold Verity picture keeps both white Decals')
  local c1,s1=Pic.Bounds(view:GetChildren()[2]or view);local c2,s2=Pic.Bounds(view4:GetChildren()[2]or view4)
- check(s1.X>0 and near(s1.X,s2.X,.02)and near(s1.Y,s2.Y,.02),'the picture is framed like a plain pack\'s ('..string.format('%.2f x %.2f',s1.X,s1.Y)..' vs '..string.format('%.2f x %.2f',s2.X,s2.Y)..')')
+ check(s1.X>0 and s1.X<=s2.X*1.02 and s1.Y<=s2.Y*1.15 and s1.Y>=s2.Y*.9,'the picture is framed like a plain pack\'s ('..string.format('%.2f x %.2f',s1.X,s1.Y)..' vs '..string.format('%.2f x %.2f',s2.X,s2.Y)..')')
  local n2=0;for _,d in ipairs(view2 and view2:GetDescendants()or{})do if d:IsA('BasePart')then n2+=1 end end
  check(n2>100,'(the Void picture is still its 100+ parts: '..n2..')')
  local wm=R.new('WorldModel');local vf=R.new('ViewportFrame');wm.Parent=vf
  local prev=Visuals.Bag(CF(0,0,0),wm,1,nil,7,VERITY,1,1,'None')
- check(prev.Parent==wm and #decalsOf(prev)==2 and prev:FindFirstChild('VerityFaceFront',true)~=nil,'a viewport preview (WorldModel parent) builds the plates and their Decals')
+ check(prev.Parent==wm and #decalsOf(prev)==2 and prev:FindFirstChild('VerityFace',true)~=nil,'a viewport preview (WorldModel parent) builds the face block and its Decals')
 end
 
 -- 3. Everything that is not the Verity pack builds exactly what it did ------------------------------------------------------------------
@@ -304,11 +294,8 @@ do
  local voidBag=voidBags[1];local verityBag=verityBags[1]
  local cv,cb=PackFx.Capture(voidBag),PackFxBase.Capture(voidBag)
  check(cv.Palette==PackFx.Void and cv.Spinners==cb.Spinners and #cv.Pulsers==#cb.Pulsers and #cv.Parts==#cb.Parts,'Void capture: the Void fx palette, the same spinners / pulsers / parts as the base')
- local cr=PackFx.Capture(verityBag)
- local plainBag=bagAt(Visuals,80,7,'Standard',1,'None');local cp=PackFx.Capture(plainBag)
- check(cr and cr.Palette==VerityArt.Fx and cr.Spinners==0 and #cr.Pulsers==0 and #cr.Parts==#cp.Parts+2,'Verity capture: the Verity fx palette; no spin / pulse hints; the plain pack\'s parts and the two plates ('..#cr.Parts..')')
- plainBag:Destroy()
- check(PackFx.PaletteFor(verityBag)==VerityArt.Fx and PackFx.PaletteFor(voidBag)==PackFx.Void and PackFx.PaletteFor(bagAt(Visuals,70,3,'Pack03',1,'None'))==PackFx.Void,'PaletteFor: Verity -> its own, everything else -> the Void set')
+ -- R149: the Verity pack has no effect set of its own any more: a capture of it would take the Void set, and nothing tracks it (below)
+ check(PackFx.PaletteFor(verityBag)==PackFx.Void and PackFx.PaletteFor(voidBag)==PackFx.Void and PackFx.PaletteFor(bagAt(Visuals,70,3,'Pack03',1,'None'))==PackFx.Void,'PaletteFor: only the Void set is left')
  for tier=1,3 do
   local a=fxFolderFor(PackFx,voidBag,tier);local b=fxFolderFor(PackFxBase,voidBag,tier)
   local da,db=fxDump(a),fxDump(b)
@@ -322,29 +309,6 @@ do
   local colors=true;for i,e in ipairs(a.Pulsers)do if rgbKey(e.Part.Color)~=rgbKey(b.Pulsers[i].Part.Color)then colors=false end end
   check(poses and same2 and colors,'tier '..tier..': Step and Pulse leave the Void effects exactly as the base does')
   PackFx.Clear(a);PackFxBase.Clear(b)
- end
- -- Verity: gold sparkles and a warm light, no void haze, no debris, comets or outline.
- for tier=1,3 do
-  local c=PackFx.Capture(verityBag);local fx=PackFx.Create(c,tier)
-  check(#fx.Debris==0 and #fx.Comets==0 and fx.Highlight==nil,'tier '..tier..': no orbiting debris, no comets, no outline around the face')
-  local sparkles,smoke=0,0
-  for _,e in ipairs({fx.Haze,fx.Nebula,fx.Stars})do if e.Texture:find('sparkles_main')then sparkles+=1 end;if e.Texture:find('smoke')then smoke+=1 end end
-  check(sparkles==3 and smoke==0,'tier '..tier..': three gold sparkle emitters, no smoke / void haze')
-  local okColors=true;local bad=''
-  local function seq(cs)if cs.A and cs.A.R then return{cs.A,cs.B}end;return{}end
-  for _,e in ipairs({fx.Haze,fx.Nebula,fx.Stars})do for _,col in ipairs(seq(e.Color))do if not warm(col)then okColors=false;bad=e.Name end end end
-  if not warm(fx.Light.Color)then okColors=false;bad='light'end
-  check(okColors,'tier '..tier..': every effect colour is warm gold / cream, nothing purple ('..bad..')')
-  check(colorIs(fx.Light.Color,255,196,70),'tier '..tier..': a warm gold light')
-  local others=0;for _,d in ipairs(fx.Folder:GetChildren())do if d.Name~='VoidFxCore'then others+=1 end end
-  check(others==0 and fx.Folder.Name=='_VoidPackFx122'and fx.Nebula.Texture:match('^rbxasset://textures/')~=nil,'tier '..tier..': the folder holds only the core with the emitters and the light; built-in textures only')
-  local list,frames={},{};PackFx.Step(c,10,verityBag.PrimaryPart.CFrame,tier,false,true,list,frames)
-  check(#list==1 and fx.Light.Enabled==(tier==3)and fx.Nebula.Enabled==(tier>1)and fx.Stars.Enabled==(tier==3),'tier '..tier..': the same gating as the Void pack (light only at full quality); only the core moves')
-  local a,b={},{};local la,lb={},{}
-  PackFx.Step(c,3,verityBag.PrimaryPart.CFrame,tier,true,false,la,a);PackFx.Step(c,7,verityBag.PrimaryPart.CFrame,tier,true,false,lb,b)
-  check(not fx.Nebula.Enabled,'tier '..tier..': Reduced Motion: no swirl')
-  PackFx.Pulse(c,1.234,false);PackFx.Clear(c)
-  check(fx.Folder.Parent==nil and c.Fx==nil,'tier '..tier..': clearing removes the effects')
  end
 end
 
@@ -363,29 +327,25 @@ do
  local sc=R.new('LocalScript');sc.Name='VeiledEventClient81';W.load('VeiledEventClient81',sc)
  W.frames(20,1/30)
  local folders={};for _,f in ipairs(W.workspace:GetChildren())do if f.Name=='_VoidPackFx122'then folders[#folders+1]=f end end
- check(#folders==2,'the real VeiledEventClient81 gives both a carried Verity pack and a carried Void pack effects ('..#folders..')')
- local goldFx,voidFx
+ check(#folders==1,'the real VeiledEventClient81 gives a carried Void pack effects and a carried Verity pack none ('..#folders..' effect set)')
+ local voidFx
  for _,f in ipairs(folders)do
   local h=f:FindFirstChild('VoidDistortion')
-  if h and h.Adornee==void and colorIs(h.OutlineColor,150,80,230)then voidFx=f elseif not h then goldFx=f end
+  if h and h.Adornee==void and colorIs(h.OutlineColor,150,80,230)then voidFx=f end
  end
- check(voidFx~=nil and goldFx~=nil,'the Void pack\'s effects are still violet with their outline; the Verity pack\'s have no outline')
- if goldFx then
-  local emitters,debris,comets,others=0,0,0,0
-  for _,d in ipairs(goldFx:GetDescendants())do
-   if d:IsA('ParticleEmitter')then emitters+=1;check(d.Texture:find('sparkles_main')~=nil,'a Verity emitter uses the sparkle texture')
-   elseif d.Name=='VoidDebris'then debris+=1 elseif d.Name=='VoidComet'then comets+=1 elseif d:IsA('BasePart')and d.Name~='VoidFxCore'then others+=1 end
-  end
-  local light=goldFx:FindFirstChild('VoidFxCore')and goldFx.VoidFxCore:FindFirstChild('VoidPulseLight')
-  check(emitters==3 and debris==0 and comets==0 and others==0,'the Verity effects: gold sparkle emitters only (3), no debris or comets ('..emitters..' / '..debris..' / '..comets..')')
-  check(light and colorIs(light.Color,255,196,70),'and the warm gold light')
+ check(voidFx~=nil,'the Void pack\'s effects are still violet with their outline')
+ local verityStuff=0
+ for _,d in ipairs(W.workspace:GetDescendants())do
+  if d:IsA('Highlight')and d.Adornee==verity then verityStuff+=1 end
+  if(d:IsA('ParticleEmitter')or d:IsA('PointLight')or d:IsA('Beam')or d:IsA('Trail'))and d:IsDescendantOf(verity)then verityStuff+=1 end
  end
+ check(verityStuff==0,'nothing glows, sparkles or shines on the Verity pack ('..verityStuff..')')
  local lights=0;for _,f in ipairs(folders)do local core=f:FindFirstChild('VoidFxCore');local l=core and core:FindFirstChild('VoidPulseLight');if l and l.Enabled then lights+=1 end end
- check(lights==1,'one pulsing light in the scene')
+ check(lights==1,'one pulsing light in the scene (the Void pack\'s)')
  -- a non-reliquary pack is never tracked
  local plain=bagAt(Visuals,10,3,'Pack03',1,'None');plain:SetAttribute('WorldPack',false);W.frames(10,1/30)
  local n=0;for _,f in ipairs(W.workspace:GetChildren())do if f.Name=='_VoidPackFx122'then n+=1 end end
- check(n==2,'an ordinary pack gets no void / verity effects')
+ check(n==1,'an ordinary pack gets no void effects')
  plain:Destroy()
  verity:Destroy();void:Destroy();W.frames(5,1/30)
  n=0;for _,f in ipairs(W.workspace:GetChildren())do if f.Name=='_VoidPackFx122'then n+=1 end end
@@ -407,7 +367,7 @@ do
  check((W.B.SeedPackRender:find("v=='EclipseReliquary'or v==VerityVariant then return end",1,true))~=nil,'(source: the early return names both reliquary variants)')
 end
 -- Source wiring.
-check(W.B.SeedPackRenderer:find("VerityPackArt",1,true)~=nil and W.B.SeedPackVisuals:find("VerityPackArt",1,true)==nil and W.B.SeedPackVisuals:find("CoatSkip",1,true)==nil and W.B.VeiledEventClient81:find("VerityVariant",1,true)~=nil,'(source: only the renderer and the effects owner name the Verity variant: Bounds and the coat loop are the plain pack\'s)')
+check(W.B.SeedPackRenderer:find("VerityPackArt",1,true)~=nil and W.B.SeedPackVisuals:find("VerityPackArt",1,true)==nil and W.B.SeedPackVisuals:find("CoatSkip",1,true)==nil and W.B.VeiledEventClient81:find("VerityVariant",1,true)==nil,'(source: only the renderer names the Verity art: Bounds, the coat loop and the effects owner are the plain pack\'s - R149: the effects owner no longer tracks the Verity pack)')
 
 -- 5b. The opening. A Decal follows only its own properties, not its part's: the two scripts that hide the carried pack (the click copy,
 -- the tear) and fade its copy treat the picture's Decals like parts. The real scripts on the mock, with a carried Verity pack.
@@ -432,7 +392,7 @@ do
  local def=R.new('Folder');def.Name='SunflowerSeed';def:SetAttribute('DisplayName','Sunflower Seed');def.Parent=cat
  local seedModel=Visuals.Seed({Id='SunflowerSeed'},1,CF(0,0,0),nil,1,nil,'None');seedModel.Name='SunflowerSeed';seedModel.Parent=seeds
  local function zero(model)for _,d in ipairs(model:GetDescendants())do if d:IsA('BasePart')or d:IsA('Decal')then d.LocalTransparencyModifier=0 end end end
- local function cardDecals(model)return model:FindFirstChild('VerityFaceFront',true),decalsOf(model)end
+ local function cardDecals(model)return model:FindFirstChild('VerityFace',true),decalsOf(model)end
  -- (a) PackOpeningFeedback: clicking the held pack shakes a copy and hides the real one
  local sc1=R.new('LocalScript');sc1.Name='PackOpeningFeedback'
  local okA,errA=pcall(W.load,'PackOpeningFeedback',sc1)
@@ -442,7 +402,7 @@ do
   binds.ChestChasePackPresentation();tool.Activated:Fire();binds.ChestChasePackPresentation()
   local copy=W.workspace:FindFirstChild('_LocalClickingPack')
   local card,ds=cardDecals(carry)
-  check(copy~=nil and copy:FindFirstChild('VerityFaceFront',true)~=nil and #decalsOf(copy)==2,'clicking the held Verity pack makes the shaking copy with the plates and both Decals')
+  check(copy~=nil and copy:FindFirstChild('VerityFace',true)~=nil and #decalsOf(copy)==2,'clicking the held Verity pack makes the shaking copy with the face block and both Decals')
   check(card and card.LocalTransparencyModifier==1 and #ds==2 and ds[1].LocalTransparencyModifier==1 and ds[2].LocalTransparencyModifier==1,'and hides the real pack: its plate and both of its Decals')
   local shown=true;for _,d in ipairs(copy and decalsOf(copy)or{})do if(d.LocalTransparencyModifier or 0)~=0 then shown=false end end
   check(shown,'while the copy\'s Decals stay shown')
@@ -464,7 +424,7 @@ do
   local okRun,errRun=pcall(W.frames,3,1/30)
   check(okRun,'the reveal runs without an error: '..tostring(errRun))
   local copy,cds=copyDecals()
-  check(copy~=nil and copy:FindFirstChild('VerityFaceFront',true)~=nil and #cds==2,'the tear works on a copy of the Verity pack: the plates and both Decals')
+  check(copy~=nil and copy:FindFirstChild('VerityFace',true)~=nil and #cds==2,'the tear works on a copy of the Verity pack: the face block and both Decals')
   check(card.LocalTransparencyModifier==1 and ds[1].LocalTransparencyModifier==1 and ds[2].LocalTransparencyModifier==1,'the real pack (plate and both Decals) is hidden while the copy plays')
   check(cds[1]and cds[1].Transparency==0 and cds[2].Transparency==0,'the picture is fully visible while the paper tears')
   W.frames(24,1/30);copy,cds=copyDecals()
@@ -505,6 +465,6 @@ do
  end
  p:Destroy();W.Run.BindToRenderStep,W.Run.UnbindFromRenderStep=oldB,oldU
 end
-print(('Verity pack: the plain pack, yellow, with two %.2f-stud picture plates (the Void pack has %d parts); effects compared at 3 tiers'):format(VerityArt.Side(KEY),#voidSpecs))
+print(('Verity pack: pure yellow plain parts, a %.2f-stud face block with the picture on its own Front and Back (the Void pack has %d parts); effects compared at 3 tiers'):format(VerityArt.FaceSide(KEY),#voidSpecs))
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

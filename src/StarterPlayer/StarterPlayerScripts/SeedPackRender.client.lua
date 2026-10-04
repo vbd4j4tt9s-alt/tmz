@@ -313,7 +313,7 @@ local function initialize(bag,r)
 end
 local VerityVariant=require(RS:WaitForChild('VerityCatalog')).Variant
 local function track(bag)
-    -- R147: the Verity pack, like the Void pack, has its own motion and fx (VoidPackFx via VeiledEventClient81): no generic rarity glints.
+    -- R147: the Void pack has its own motion and fx (VoidPackFx via VeiledEventClient81), so no generic rarity glints. R149: the Verity pack has no effects at all (pure yellow with her face), so it is left alone too.
     local v=bag:GetAttribute('BagVariant')
     if v=='EclipseReliquary'or v==VerityVariant then return end
     if not bag:IsA('Model')or records[bag]then return end

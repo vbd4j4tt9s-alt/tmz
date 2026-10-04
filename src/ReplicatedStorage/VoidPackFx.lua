@@ -14,9 +14,9 @@ X.Budget={
  Lights=1,                      -- one pulsing light in the whole scene (nearest pack, tier 3)
  EffectDistance=160,MotionDistance=850,SpinDistance=160,
 }
--- R147: every colour / texture of the effect set. X.Void is the Void pack's (what this module always built); the Verity pack (its
--- face picture) takes VerityPackArt.Fx: gold sparkles and a warm light instead of the void haze and the violet glow, and no orbiting
--- debris, comets or outline (a palette without Debris / Comet / Fill has none of those).
+-- R147: every colour / texture of the effect set. X.Void is the Void pack's (what this module always built). R147 / R148 gave the Verity
+-- pack its own gold set here; R149 (owner: the Verity pack's "only design needed" is pure yellow and her face) removed it: the Verity pack
+-- has no effects at all, so nothing here tracks or captures it any more (VeiledEventClient81 only tracks the Void pack).
 X.Void={
  Haze={Texture=SMOKE,Colors={Color3.fromRGB(6,3,14),Color3.fromRGB(40,18,66)},Size={.6,1.5},Emission=0,Alpha=.30},
  Nebula={Texture=SMOKE,Colors={Color3.fromRGB(255,90,210),Color3.fromRGB(80,170,255)},Size={.9,1.9},Emission=.7,Alpha=.62},
@@ -24,10 +24,7 @@ X.Void={
  Debris=Color3.fromRGB(24,16,38),Comet=Color3.fromRGB(255,190,250),Trail={Color3.fromRGB(255,160,240),Color3.fromRGB(120,90,255)},
  Fill=Color3.fromRGB(20,6,40),Outline=Color3.fromRGB(150,80,230),Light=Color3.fromRGB(170,90,255),
 }
-function X.PaletteFor(bag)
- if bag:GetAttribute('BagVariant')==require(script.Parent.VerityCatalog).Variant then return require(script.Parent.VerityPackArt).Fx end
- return X.Void
-end
+function X.PaletteFor(_bag)return X.Void end
 local function isFinite(n)return type(n)=='number'and n==n and math.abs(n)<math.huge end
 function X.Capture(bag)
  local root=bag.PrimaryPart

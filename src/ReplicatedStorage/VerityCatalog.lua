@@ -13,7 +13,7 @@ local C={Id='VeritySeed',Variant='VerityReliquary',PackStage=7,Stage=9,Biome='Ve
  -- (VerityConfig requires this module, so it cannot be required from here); the test keeps the two equal.
  FaceImageId='rbxassetid://102712963740896',
  Palette={Ball=Color3.fromRGB(255,213,46),Gloss=Color3.fromRGB(255,252,232),LeafOuter=Color3.fromRGB(68,160,72),LeafInner=Color3.fromRGB(96,188,88),
-  -- The pack art (VerityPackArt) and its fx: warm accents around the gold ball and cream gloss.
+  -- Warm accents around the gold ball and cream gloss (the pack, R149, is plain 255,255,0 and uses none of these).
   Amber=Color3.fromRGB(255,170,30),Honey=Color3.fromRGB(255,236,150),Shade=Color3.fromRGB(112,70,6),White=Color3.fromRGB(255,255,248)},
 }
 function C.Is(id)return id==C.Id end
