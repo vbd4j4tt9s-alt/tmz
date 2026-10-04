@@ -595,6 +595,29 @@ check(listFrame:FindFirstChild('VeritySeed'):FindFirstChild('Reward').Text:find(
 player:SetAttribute('IndexBiomeBackpay9',100);frames(6);check(bonus:GetAttribute('RewardGems')==100,'backpay on category 9 is shown through the same attribute listeners')
 player:SetAttribute('IndexBiomeBackpay9',nil);frames(3)
 -- 6e. screens
+-- GiantVisualSafety: a giant pack's surfaces fade near the camera; a Decal (the Verity picture) ignores its part's modifier, so it is
+-- faded the same way, and a Decal an opening hid (modifier 1) stays hidden.
+do
+ local gb={};local oldB,oldU=W.Run.BindToRenderStep,W.Run.UnbindFromRenderStep
+ W.Run.BindToRenderStep=function(_,name,_,fn)gb[name]=fn end;W.Run.UnbindFromRenderStep=function(_,name)gb[name]=nil end
+ local cam=W.workspace.CurrentCamera;cam.CFrame=CF(0,10,0)
+ local p=R.new('Part');p.Name='VerityCard';p.Size=V3(40,40,.4);p.CFrame=CF(0,10,4);p.LocalTransparencyModifier=0;p.Parent=W.workspace
+ local front=R.new('Decal');front.LocalTransparencyModifier=0;front.Parent=p
+ local hidden=R.new('Decal');hidden.LocalTransparencyModifier=1;hidden.Parent=p
+ W.service('CollectionService'):AddTag(p,'GiantVisualPart')
+ local sc=R.new('LocalScript');sc.Name='GiantVisualSafety'
+ local ok,err=pcall(W.load,'GiantVisualSafety',sc)
+ if check(ok and gb.GiantVisualSafety~=nil,'the real GiantVisualSafety loads on the mock: '..tostring(err))then
+  gb.GiantVisualSafety(.1)
+  check(p.LocalTransparencyModifier>.4 and near(front.LocalTransparencyModifier,p.LocalTransparencyModifier),'a giant Verity card next to the camera fades, and its picture Decal fades with it')
+  check(hidden.LocalTransparencyModifier==1,'a Decal an opening hid stays hidden')
+  p.CFrame=CF(0,10,200);gb.GiantVisualSafety(.1)
+  check(p.LocalTransparencyModifier==0 and front.LocalTransparencyModifier==0 and hidden.LocalTransparencyModifier==1,'far away again: the card and its picture are back, the hidden Decal stays hidden')
+  p.CFrame=CF(0,10,4);gb.GiantVisualSafety(.1);sc.Destroying:Fire()
+  check(p.LocalTransparencyModifier==0 and front.LocalTransparencyModifier==0,'removing the script restores the card and its picture')
+ end
+ p:Destroy();W.Run.BindToRenderStep,W.Run.UnbindFromRenderStep=oldB,oldU
+end
 print(('Verity pack: a %.2f-stud card with 2 Decals (the Void pack has %d parts); effects compared at 3 tiers'):format(VerityArt.Side(),#voidSpecs))
 print('tab row (strip width / canvas width) by screen:')
 local NOTE={}

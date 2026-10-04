@@ -21,9 +21,11 @@ Run:BindToRenderStep('GiantVisualSafety',Enum.RenderPriority.Camera.Value+4,func
    if fade~=previous or math.abs(p.LocalTransparencyModifier-fade)>.001 then
     -- Respect opening/LOD invisibility written by their owning renderer.
     if p.LocalTransparencyModifier<=previous+.001 then p.LocalTransparencyModifier=fade end
+    -- R147: a Decal (the Verity pack's picture) ignores its part's modifier, so it fades the same way (and stays hidden while an opening hides it).
+    for _,d in ipairs(p:GetChildren())do if d:IsA('Decal')and d.LocalTransparencyModifier<=previous+.001 then d.LocalTransparencyModifier=fade end end
     p:SetAttribute('GiantSafetyFade',fade)
    end
   end
  end
 end)
-script.Destroying:Connect(function()Run:UnbindFromRenderStep('GiantVisualSafety');for _,p in ipairs(parts)do if p.Parent and p.LocalTransparencyModifier==(p:GetAttribute('GiantSafetyFade')or 0)then p.LocalTransparencyModifier=0 end end end)
+script.Destroying:Connect(function()Run:UnbindFromRenderStep('GiantVisualSafety');for _,p in ipairs(parts)do if p.Parent and p.LocalTransparencyModifier==(p:GetAttribute('GiantSafetyFade')or 0)then p.LocalTransparencyModifier=0;for _,d in ipairs(p:GetChildren())do if d:IsA('Decal')and d.LocalTransparencyModifier==(p:GetAttribute('GiantSafetyFade')or 0)then d.LocalTransparencyModifier=0 end end end end end)

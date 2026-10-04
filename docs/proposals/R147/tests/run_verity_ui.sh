@@ -21,6 +21,6 @@ sed "s#/home/user/tmz/src#$REPO/src#" "$INV/mkbundle.py" > "$OUT/mkbundle_cl.py"
 python3 "$OUT/mkbundle_cl.py" "$OUT/rs_bundle.luau" SeedPackVisualsBase="$OUT/SeedPackVisualsBase.lua" SeedPackRendererBase="$OUT/SeedPackRendererBase.lua" \
  EclipsePackArtBase="$OUT/EclipsePackArtBase.lua" VoidPackFxBase="$OUT/VoidPackFxBase.lua" ChestIndexBase="$OUT/ChestIndexBase.lua" \
  ChestIndex="$C/ChestIndex.client.lua" VeiledEventClient81="$C/VeiledEventClient81.client.lua" SeedPackRender="$C/SeedPackRender.client.lua" \
- PackOpeningFeedback="$C/PackOpeningFeedback.client.lua" SeedPackClient="$C/SeedPackClient.client.lua" >/dev/null
+ PackOpeningFeedback="$C/PackOpeningFeedback.client.lua" SeedPackClient="$C/SeedPackClient.client.lua" GiantVisualSafety="$C/GiantVisualSafety.client.lua" >/dev/null
 cd "$OUT";echo "== test_verity_ui";timeout 600 /opt/luau/luau test_verity_ui.luau > test_verity_ui.log 2>&1 || { grep -v '^WARN' test_verity_ui.log | tail -60;exit 1; }
 grep -v '^WARN' test_verity_ui.log
