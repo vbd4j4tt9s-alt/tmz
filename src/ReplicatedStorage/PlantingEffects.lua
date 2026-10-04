@@ -269,6 +269,13 @@ function E:Release(r)
  for model in pairs(r.Models)do self.ByModel[model]=nil end
  self.Records[r.Key]=nil;r.Released=true
 end
+-- R149: the server time at which this crop's dirt pile sinks (the 'Sink' beat), for a crop planted a moment ago; nil for anything that was already there
+-- (joins, streaming, rebuilds). The plant growth drawing starts the seedling's rise from it, so the sprout and the pile agree on every client.
+function E:SinkTime(model)
+ local r=self.ByModel[model]
+ if not r or not r.Planted or not r.PileClock or not r.PileSink then return nil end
+ return workspace:GetServerTimeNow()-(os.clock()-r.PileClock)+r.PileSink
+end
 function E:Remember(key)
  if self.Fired[key]then return end
  self.Fired[key]=true;table.insert(self.FiredOrder,key)
@@ -300,6 +307,7 @@ function E:FreeChunk(p)
 end
 function E:StartPile(r)
  local budget,reduced=self:Budget()
+ r.PileClock=os.clock();r.PileSink=M.Beats().Sink -- R149: when the pile sinks (a drawn pile overwrites this with its own beat below)
  local camera=workspace.CurrentCamera;local position=r.Origin.Position
  local distance=camera and(camera.CFrame.Position-position).Magnitude or 0
  local e=self:Emitter(position+V(0,.15,0))
@@ -317,6 +325,7 @@ function E:StartPile(r)
  local settled=M.Settled(layout)
  local pile={Record=r,Origin=r.Origin,Start=os.clock(),Layout=layout,Chunks=layout.Chunks,Parts={},Rest={},Reduced=reduced,
   SinkAfter=settled+(reduced and M.Tuning.HoldSeconds*.75 or M.Tuning.HoldSeconds)}
+ r.PileSink=pile.SinkAfter
  local sinkEnd=0;for _,c in ipairs(layout.Chunks)do sinkEnd=math.max(sinkEnd,c.Sink)end
  pile.EndAfter=pile.SinkAfter+sinkEnd+M.Tuning.SinkSeconds
  if sounding then self:PlaySounds(e,self:Owned(r),M.Size(r.Base).Radius,{Start=0,Settled=settled,Sink=pile.SinkAfter})end

@@ -5,6 +5,7 @@ local Theme=require(game:GetService('ReplicatedStorage'):WaitForChild('GardenThe
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Input=game:GetService('UserInputService')
 local StarterGui=game:GetService('StarterGui');local GuiService=game:GetService('GuiService');local CAS=game:GetService('ContextActionService')
 local Names=require(RS:WaitForChild('GardenDisplayNames'));local Info=require(RS:WaitForChild('HarvestItemInfo'));local State=require(RS:WaitForChild('GardenInventoryState')).new()
+local Arrival=require(RS:WaitForChild('HarvestArrival'))
 -- R112: item pictures (cached 3D renders or flat icons) and display-only kg weights.
 local Pictures=require(RS:WaitForChild('ItemPictures'));local Weight=require(RS:WaitForChild('ItemWeight'))
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local bag=player:WaitForChild('Backpack')
@@ -132,6 +133,32 @@ local function watchTool(tool,onChanged)
  local links={tool:GetPropertyChangedSignal('Name'):Connect(onChanged)}
  for _,attribute in ipairs({'Mutation','PackMutation','Weather'})do table.insert(links,tool:GetAttributeChangedSignal(attribute):Connect(onChanged))end
  return {Disconnect=function()for _,connection in ipairs(links)do connection:Disconnect()end end}
+end
+-- R149 (owner: the picked fruit floats into the player and appears in the inventory): a harvested item is in the Backpack as soon as the server adds it,
+-- but the Hotbar does not SHOW it until the fruit has arrived (HarvestArrival; instantly when no fruit flies: reduced motion, low quality, far away).
+-- When it shows, its slot (or the Bag button when the item is not on a visible slot; and its card while the Bag is open) flashes once.
+local FLASH_SECONDS=.32
+local flashes={};local flashConn;local released={}
+local function flashOf(b)
+ local f=b:FindFirstChild('ArrivalFlash')
+ if not f then
+  f=Instance.new('Frame');f.Name='ArrivalFlash';f.BackgroundColor3=Color3.new(1,1,1);f.BackgroundTransparency=1;f.BorderSizePixel=0;f.Size=UDim2.fromScale(1,1);f.Active=false
+  f.ZIndex=(b.ZIndex or 1)+7;f.Parent=b;local c=Instance.new('UICorner');c.CornerRadius=UDim.new(0,8);c.Parent=f
+ end
+ return f
+end
+local function stepFlashes()
+ local now=os.clock()
+ for b,at in pairs(flashes)do
+  local f=b.Parent and b:FindFirstChild('ArrivalFlash');local u=(now-at)/FLASH_SECONDS
+  if not f or u>=1 then if f then f.BackgroundTransparency=1 end;flashes[b]=nil
+  else f.BackgroundTransparency=.3+.7*u*u end
+ end
+ if not next(flashes)and flashConn then flashConn:Disconnect();flashConn=nil end
+end
+local function flash(b)
+ flashOf(b).BackgroundTransparency=.3;flashes[b]=os.clock()
+ if not flashConn then flashConn=Run.RenderStepped:Connect(stepFlashes)end
 end
 local matched={};local listDirty=true;local viewKey
 local function connect(signal,fn)local c=signal:Connect(fn);table.insert(allConns,c);return c end
@@ -266,9 +293,13 @@ end
 
 refresh=function()
  local items={};local containers={bag};if player.Character then table.insert(containers,player.Character)end
- for _,container in ipairs(containers)do for _,tool in ipairs(container:GetChildren())do if tool:IsA('Tool')then
+ local arrived;local clock=os.clock()
+ for k,at in pairs(released)do if clock-at>6 then released[k]=nil end end
+ for _,container in ipairs(containers)do for _,tool in ipairs(container:GetChildren())do if tool:IsA('Tool')and not Arrival.Holds(tool)then
   if not seen[tool]then sequence+=1;seen[tool]=sequence end
   local key=stackKey(tool)or Info.Key(tool)or('tool-'..seen[tool]);notePack(tool,key)local order=tool:GetAttribute('GardenShovel')and-1 or seen[tool];local e=items[key]
+  local arrival=released[Arrival.ToolKey(tool)or'']
+  if arrival then released[Arrival.ToolKey(tool)]=nil;arrived=arrived or{};arrived[key]=true end
   if not e then items[key]={Tool=tool,Order=order,Count=1}
   else -- The equipped copy, else the oldest, represents a stack.
    e.Count+=1;e.Order=math.min(e.Order,order)
@@ -296,6 +327,14 @@ refresh=function()
   paintGlow(b,e and State.Slots[i]or nil)
  end
  renderRows()
+ if arrived then
+  for key in pairs(arrived)do
+   local shown=false
+   for i,b in ipairs(slots)do if b.Visible and State.Slots[i]==key then flash(b);shown=true end end
+   if not shown then flash(open)end
+   if panel.Visible and rows[key]then flash(rows[key])end
+  end
+ end
 end
 local function queue()
  if queued then return end;queued=true;task.defer(function()queued=false;if gui.Parent then refresh()end end)
@@ -445,6 +484,8 @@ end
 connect(player.ChildAdded,function(child)if child:IsA('Backpack')then watchBag(child)end end)
 connect(panel:GetPropertyChangedSignal('Visible'),function()if next(fresh)then listDirty=true;renderRows()end end)
 watchBag(bag);connect(player.CharacterAdded,character);character(player.Character)
+-- A hold ended (the fruit arrived, or none will): show the item now. `cue` is false for a request that failed (nothing to celebrate).
+table.insert(allConns,Arrival.OnRelease(function(k,cue)if cue then released[k]=os.clock()end;queue()end))
 connect(search:GetPropertyChangedSignal('Text'),function()listDirty=true;scroll.CanvasPosition=Vector2.zero;renderRows()end)
 connect(scroll:GetPropertyChangedSignal('CanvasPosition'),function()Pictures.Hurry();renderRows()end);connect(scroll:GetPropertyChangedSignal('AbsoluteSize'),renderRows)
 connect(pg:GetAttributeChangedSignal('SeedMenu'),function()dock.Visible=(pg:GetAttribute('SeedMenu')==nil or pg:GetAttribute('SeedMenu')=='Inventory');if panel.Visible and pg:GetAttribute('SeedMenu')~='Inventory'then toggle(false)end end)
@@ -482,6 +523,7 @@ connect(pg:GetAttributeChangedSignal('HudNoticeBottom'),layout);refresh()
 for attempt=1,5 do local okay=pcall(function()StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)end);if okay then break end;task.wait(.2)end
 script.Destroying:Connect(function()
  if glowConn then glowConn:Disconnect();glowConn=nil end
+ if flashConn then flashConn:Disconnect();flashConn=nil end
  for _,c in ipairs(allConns)do c:Disconnect()end;for _,c in ipairs(characterConns)do c:Disconnect()end;for _,c in pairs(toolConns)do c:Disconnect()end
  for _,c in ipairs(bagConns)do c:Disconnect()end
  stopHudLayout();CAS:UnbindAction('GardenHotbarCycle');pg:SetAttribute('ChestHotbarReserve',nil);gui:Destroy()

@@ -223,12 +223,14 @@ for _,id in ipairs(IDS)do for d=1,4 do
   local g=Visuals.BuildGrowing(id,origin,crop(id),f*def.Seconds)
   local vis=parts(g,true);local glo,ghi=math.huge,-math.huge;local fruitVisible=0
   for _,d in ipairs(vis)do local a,b=extent(d);glo=math.min(glo,a);ghi=math.max(ghi,b);if d.Parent and d.Parent.Name:find('Harvest_')then fruitVisible+=1 end end
-  if ghi<lastTop-1e-6 then monotonic=false end;lastTop=ghi
+  -- (R149 growth style: a fruit plumps +5 % near the end of its growth and settles at exactly its own size when it is ripe)
+  if ghi<lastTop-1e-6 and not(f==1 and ghi>=lastTop/1.06-1e-6)then monotonic=false end;lastTop=ghi
   lines[#lines+1]=('%d%%: %d visible, top %.2f'):format(f*100,#vis,ghi)
   check(glo>=-.0501,('%s growing %d%%: nothing under the soil (%.4f)'):format(tag,f*100,glo))
   check(#parts(g)<=w.specs+20,('%s growing %d%%: %d parts in all (the %d art parts plus the generic growth pieces)'):format(tag,f*100,#parts(g),w.specs))
   if f==0 then check(#vis==1,tag..': 0%: only the new seed shows ('..#vis..')')end
-  if f==.1 then check(fruitVisible==0 and ghi<1,tag..': 10%: a sprout, no fruit yet (top '..ghi..')')end
+  -- (R149 growth style: the fast-start size curve gives ~35 % size at 25 % growth, so a plant at 10 % stands ~12 % of its height instead of under 1 stud)
+  if f==.1 then check(fruitVisible==0 and ghi<math.max(1,w.height*.2),tag..': 10%: a sprout, no fruit yet (top '..ghi..')')end
   if f==.5 then check(ghi<w.height*.75,tag..': 50%: still growing (top '..ghi..' of '..w.height..')')end
   if f==.9 then check(fruitVisible>0 and ghi>w.height*.5,tag..': 90%: the fruit is showing, the body nearly done (top '..ghi..')')end
   if f==1 then check(#vis==w.specs and near(ghi,w.height,.002),tag..': 100%: the whole '..w.specs..'-part plant, Height '..w.height)end
@@ -429,7 +431,8 @@ do
      local visible,reach=0,0;local so=V3(table.unpack(art.Sockets[g]))
      for _,x in ipairs(child:GetDescendants())do if x:IsA('BasePart')and x.Transparency<1 and not x:GetAttribute('GrowthTemporary')then visible+=1;reach=math.max(reach,(x.CFrame.Position-so).Magnitude)end end
      if visible<lastVisible then monotonic=false end;lastVisible=visible
-     if reach<lastReach-1e-6 then monotonic=false end;lastReach=reach
+     -- (R149 growth style: a fruit plumps +5 % at 90 % of its growth and settles at exactly its own size when it is ripe)
+     if reach<lastReach-1e-6 and not(f==1 and reach>=lastReach/1.06-1e-6)then monotonic=false end;lastReach=reach
      ends[f]={visible=visible,reach=reach};if f==1 then ends.scale=Rules.Fruit(cr,g,def).Scale end -- (the fruit's own size trait of this crop and cycle)
      Visuals.EndGrowth(child,cr,now+duration)
     end

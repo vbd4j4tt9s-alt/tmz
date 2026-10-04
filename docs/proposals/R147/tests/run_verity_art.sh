@@ -9,7 +9,9 @@ BASE=${VERITY_BASE:-5752986}
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
 cp "$REPO/tools/tests/roblox.luau" "$REPO/docs/proposals/inventory_R113/tests/world.luau" "$REPO/docs/proposals/inventory_R113/tests/fixtures.luau" "$HERE/test_verity_art.luau" "$OUT/"
 git -C "$REPO" show "$BASE:src/ReplicatedStorage/PlantVisuals.lua" | sed -e "s/WaitForChild('PlantGrowth')/WaitForChild('PlantGrowthBase')/" -e "s/WaitForChild('ApprovedPlantArt')/WaitForChild('ApprovedPlantArtBase')/" > "$OUT/PlantVisualsBase.lua"
-git -C "$REPO" show "$BASE:src/ReplicatedStorage/PlantGrowth.lua" > "$OUT/PlantGrowthBase.lua"
+# R149: the growing DRAWING (PlantGrowth) changed on purpose (docs/proposals/R149/tests/run_growth.sh proves it); this suite is about art, so both
+# pipelines draw growth with this checkout's PlantGrowth (the "growing" comparisons then still show that no existing plant's ART changed).
+cp "$REPO/src/ReplicatedStorage/PlantGrowth.lua" "$OUT/PlantGrowthBase.lua"
 git -C "$REPO" show "$BASE:src/ReplicatedStorage/ApprovedPlantArt.lua" > "$OUT/ApprovedPlantArtBase.lua"
 python3 "$HERE/mkbundle_verity.py" "$OUT/rs_bundle.luau" PlantVisualsBase="$OUT/PlantVisualsBase.lua" PlantGrowthBase="$OUT/PlantGrowthBase.lua" ApprovedPlantArtBase="$OUT/ApprovedPlantArtBase.lua" >/dev/null
 cd "$OUT"

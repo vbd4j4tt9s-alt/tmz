@@ -2,8 +2,10 @@
 # Usage: sh run_fruit_models.sh [scratch dir]   (needs /opt/luau/luau, python3 + numpy)
 # R149 fruit models on the Roblox mock with the REAL modules of this checkout, proved against the BASE commit (FRUIT_BASE, default 0b08836 = the branch commit just before the redesigns were merged; it was 38b1afa, the R149
 # proposal commit, in the agent worktree):
-#  0. files: only the 8 art / key modules below differ from the base under src/ (Lantern Fern's ApprovedPlantArt2, PlantArtCrystal (Amethyst Grape),
-#     PlantGrowth, GardenVisuals, PlantVisuals, the R148 seeds, Verity ... are byte for byte the base's);
+#  0. files: only the 8 art / key modules below (and, since the growth-style change, the files run_growth.sh covers: PlantGrowth, PlantGrowthFx,
+#     HarvestArrival, GardenVisuals, Hotbar, EconomyClient, PlantAnimationBatch, PlantingEffects) differ from the base under src/ (Lantern Fern's
+#     ApprovedPlantArt2, PlantArtCrystal (Amethyst Grape), PlantVisuals, the R148 seeds, Verity ... are byte for byte the base's). The art suites draw
+#     growth with the BASE's PlantGrowth (the growing drawing changed on purpose; run_growth.sh proves that);
 #  1. regression diff: dump_plants.luau runs on the BASE and on this checkout (every plant of the catalog, 2 crops each, 8 for the Ash Tomato and the
 #     Prickly Pear, every mode: art, ripe, growing, coats, harvest items, proxies, supports, prompts); check_plants_diff.py allows only the 8 redesigned
 #     fruit (art / plant / harvest lines) and the Ash Tomato's variations (a design-1 crop must stay identical);
@@ -28,9 +30,22 @@ src/ReplicatedStorage/PlantArtSnow.lua
 src/ReplicatedStorage/TreeReworkData2.lua
 src/ReplicatedStorage/TreeReworkData4.lua
 EOF
+# R149 growth style (phase 1, run_growth.sh) changed these files as well. They are not art: the art suites below draw growth with the BASE's PlantGrowth.
+cat >> "$OUT/allowed.txt" <<'EOF'
+src/MANIFEST.tsv
+src/ReplicatedStorage/HarvestArrival.lua
+src/ReplicatedStorage/PlantAnimationBatch.lua
+src/ReplicatedStorage/PlantGrowth.lua
+src/ReplicatedStorage/PlantGrowthFx.lua
+src/ReplicatedStorage/PlantingEffects.lua
+src/StarterPlayer/StarterPlayerScripts/EconomyClient.client.lua
+src/StarterPlayer/StarterPlayerScripts/GardenVisuals.client.lua
+src/StarterPlayer/StarterPlayerScripts/Hotbar.client.lua
+EOF
+LC_ALL=C sort -o "$OUT/allowed.txt" "$OUT/allowed.txt"
 git -C "$REPO" diff --name-only "$BASE" -- src | LC_ALL=C sort > "$OUT/changed.txt"
 echo "== files against $BASE"
-if diff "$OUT/allowed.txt" "$OUT/changed.txt" > "$OUT/files.diff";then echo "only the 8 art / key modules differ under src/ (Lantern Fern, Amethyst Grape, PlantGrowth, PlantVisuals, GardenVisuals, the R148 seeds, Verity: byte for byte)"
+if diff "$OUT/allowed.txt" "$OUT/changed.txt" > "$OUT/files.diff";then echo "only the 8 art / key modules and the R149 growth-style files differ under src/ (Lantern Fern, Amethyst Grape, PlantVisuals, the R148 seeds, Verity: byte for byte)"
 else echo "unexpected src/ changes:";cat "$OUT/files.diff";stop;fi
 # --- 1. worlds: the base commit and this checkout ----------------------------------------------------------------------------------------------
 rm -rf "$OUT/base" "$OUT/new" "$OUT/srcbase";mkdir -p "$OUT/base" "$OUT/new" "$OUT/srcbase"
@@ -39,7 +54,7 @@ B=$OUT/srcbase/src/ReplicatedStorage
 for d in base new;do cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/dump_plants.luau" "$HERE/scene_base.luau" "$OUT/$d/";done
 python3 "$HERE/mkbundle_any.py" "$B" "$OUT/base/rs_bundle.luau" >/dev/null
 python3 "$HERE/mkbundle_any.py" "$REPO/src/ReplicatedStorage" "$OUT/new/rs_bundle.luau" \
- PlantArtForestBase="$B/PlantArtForest.lua" PlantArtSnowBase="$B/PlantArtSnow.lua" PlantArtLavaBase="$B/PlantArtLava.lua" PlantArtCrystalBase="$B/PlantArtCrystal.lua" \
+ PlantGrowth="$B/PlantGrowth.lua" PlantArtForestBase="$B/PlantArtForest.lua" PlantArtSnowBase="$B/PlantArtSnow.lua" PlantArtLavaBase="$B/PlantArtLava.lua" PlantArtCrystalBase="$B/PlantArtCrystal.lua" \
  TreeReworkData2Base="$B/TreeReworkData2.lua" TreeReworkData4Base="$B/TreeReworkData4.lua" ApprovedPlantArt2Base="$B/ApprovedPlantArt2.lua" ApprovedPlantArt5Base="$B/ApprovedPlantArt5.lua" \
  ApprovedPlantArt6Base="$B/ApprovedPlantArt6.lua" ApprovedPlantArtBase="$B/ApprovedPlantArt.lua" >/dev/null
 echo "== regression diff against $BASE (every plant, every mode)"

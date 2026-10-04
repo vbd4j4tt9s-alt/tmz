@@ -16,13 +16,22 @@ local Effects=require(RS:WaitForChild('PlantEffects'))
 local Trees=require(RS:WaitForChild('TreeReworkMotion'))
 local Batch=require(RS:WaitForChild('PlantAnimationBatch'))
 local animationBatch=Batch.new(workspace)
+local Gui=game:GetService('GuiService')
+local Arrival=require(RS:WaitForChild('HarvestArrival'))
 local Planner=require(RS:WaitForChild('PlantDetailPlanner'))
 local PackRules=require(RS:WaitForChild('SeedPackRules'))
 -- R112: dirt pile + sound when a crop is freshly planted, and a growth-point mark while it stands.
 -- Cosmetic only: if it cannot start, plant visuals carry on without it.
 local okPlanting,Planting=pcall(function()return require(RS:WaitForChild('PlantingEffects')).new()end)
-if not okPlanting then warn('[R112] Planting effects off: '..tostring(Planting));Planting={Add=function()end,Remove=function()end,Destroy=function()end}end
-script.Destroying:Connect(function()Planting:Destroy()end)
+if not okPlanting then warn('[R112] Planting effects off: '..tostring(Planting));Planting={Add=function()end,Remove=function()end,Destroy=function()end,SinkTime=function()return nil end}end
+-- R149: the ripe bounce + glints and the harvest flight (docs/proposals/R149/growth_style.md #7 / #8, owner's change to #8). Cosmetic only: if it cannot
+-- start, or fails, plants are drawn and fruit vanishes exactly as before (and the inventory is told at once).
+local NoAnim={Ripe=function()return false end,Harvest=function(_,_,_,index,crop)Arrival.Land(crop.Id,index);return false end,Clear=function()end,Settle=function()end,
+ StepFrame=function()end,StepBounces=function()end,SetMode=function()end,Active=function()return 0,0 end,Destroy=function()end}
+local okAnim,Anim=pcall(function()return require(RS:WaitForChild('PlantGrowthFx')).new({Parent=workspace})end)
+if not okAnim then warn('[R149] Plant growth fx off: '..tostring(Anim));Anim=NoAnim end
+script.Destroying:Connect(function()Planting:Destroy();Anim:Destroy()end)
+local harvestNames={};for i=1,12 do harvestNames[i]='Harvest_'..i end
 local meshWarnings={}
 -- Keep existing animation caps. Only spare capacity reaches visible, readable distant models.
 local function motionVisible(entry,near,far)
@@ -38,6 +47,18 @@ local function resetPetals(r)
  if r.Floating then for _,entry in ipairs(r.Floating)do if entry.Part.Parent then entry.Part.CFrame=entry.Frame end end end
  r.Floating=nil;r.PetalsMoving=false
 end
+-- R149 (#2): a growing plant sways through PlantGrowth.Place. Its growth states: the visual's own, and the regrowing fruit models under it.
+local function growthStates(r,fn,a,b)
+ local n=0
+ local state=Growth.StateOf(r.Visual);if state then n+=fn(state,a,b)end
+ for index=1,r.Def.FruitCount do
+  local child=r.Visual:FindFirstChild(harvestNames[index]or'Harvest_'..index)
+  if child then local grown=Growth.StateOf(child);if grown then n+=fn(grown,a,b)end end
+ end
+ return n
+end
+local function placeGrowth(state,pose,batch)return Growth.Place(state,pose,batch)end
+local function collectGrowth(state,out)Growth.Parts(state,out);return 0 end
 local function hidePart(p,hidden)
  -- R148: a Decal (Verity's face on her ball) ignores its part's modifier, so it is hidden with its part.
  if p:IsA('BasePart')or p:IsA('Decal')then p.LocalTransparencyModifier=hidden and 1 or 0 end
@@ -61,6 +82,7 @@ local function clear(item,r,keepWork)
  if r.Maw then Maw.Reset(r.Maw,r.Origin);r.Maw=nil end
  if r.Build and not keepWork then r.Build.Cancelled=true end
  resetPetals(r)
+ Anim:Clear(r,keepWork);r.GrowthSway=false;if not keepWork then r.BuiltStage=nil;r.JustMatured=false end
  if r.Bells then Bells.Reset(r.Bells,r.Origin);r.Bells=nil end
  clearEffects(r)
  if r.Visual then r.Visual:Destroy();r.Visual=nil end
@@ -79,7 +101,7 @@ end
 for _,item in ipairs(map:GetDescendants())do track(item,true)end
 map.DescendantAdded:Connect(function(item)track(item,false)end)
 map.DescendantRemoving:Connect(function(item)
- local r=tracked[item];if r then tracked[item]=nil;r.Connection:Disconnect();clear(item,r);Planting:Remove(item) end
+ local r=tracked[item];if r then tracked[item]=nil;r.Connection:Disconnect();clear(item,r);Planting:Remove(item);Arrival.LandCrop(item:GetAttribute('CropId')) end
 end)
 local function data(item)
  return require(RS.GardenViewState).Read(item)
@@ -97,10 +119,19 @@ local function syncFruit(item,r,crop,def,stage,at,work)
  if stage<4 then r.FruitKey=revision;return end
  local now=workspace:GetServerTimeNow();local ripe=item:GetAttribute('FruitReady')==true
  for index=1,def.FruitCount do
-  local name='Harvest_'..index;local child=r.Visual:FindFirstChild(name)
+  local name=harvestNames[index]or'Harvest_'..index;local child=r.Visual:FindFirstChild(name)
   local visible=(not r.FruitOnly or r.Selection[index])and not Rules.IsPicked(crop,index)
   local ripe=Rules.FruitReady(crop,index,now);local cycle=Rules.FruitCycle(crop,index)
-  if child and(not visible or child:GetAttribute('FruitCycle')~=cycle)then child:Destroy();child=nil end
+  if child and(not visible or child:GetAttribute('FruitCycle')~=cycle)then
+   -- R149 (#8): a ripe fruit that was picked floats to the harvester (its own parts, no clone); one that was still growing, or hidden by the detail
+   -- planner, just goes. Either way the inventory is told when the fruit has arrived or will not.
+   local flew=false
+   if Rules.IsPicked(crop,index)or child:GetAttribute('FruitCycle')~=cycle then
+    flew=Growth.StateOf(child)==nil and Anim:Harvest(r,child,index,crop,item)
+    if not flew then Arrival.Land(crop.Id,index)end
+   end
+   if not flew then child:Destroy()end;child=nil
+  end
   if visible and not child then
    local source=table.clone(crop);source.ReadyAt=0
    local art=Visuals.Build(crop.SeedId,at,source,4,math.huge,index,work)
@@ -109,8 +140,14 @@ local function syncFruit(item,r,crop,def,stage,at,work)
     if not ripe then Visuals.BeginGrowth(child,crop.SeedId,crop,at);Visuals.UpdateGrowth(child,crop,now)end
    end
    art:Destroy();fruitUpdates+=1
-  elseif child and ripe then Visuals.EndGrowth(child,crop,now)end
+  elseif child and ripe then
+   local was=Growth.StateOf(child)~=nil
+   Visuals.EndGrowth(child,crop,now)
+   -- R149 (#7): it has just ripened (or the whole plant has just matured): one bounce and a few glints, once.
+   if was or r.JustMatured then Anim:Ripe(r,child,index,crop,cycle)end
+  end
  end
+ if r.JustMatured and def.Mode=='whole'then Anim:Ripe(r,nil,1,crop,0)end
  r.Cycle=crop.HarvestCycle;r.FruitKey=revision
 end
 local function updateEffects(item,r,def,crop,at,stage)
@@ -124,6 +161,8 @@ local function show(item,r,work)
  if not r.WantDetail then clear(item,r);return end
  local crop=data(item);local def=Catalog[crop.SeedId];local anchor=item:FindFirstChild('CropAnchor')
  if not def or not anchor or crop.ReadyAt==nil then return end
+ -- R149 (#3): the seedling rises as the R112 dirt pile of a freshly planted crop sinks (nil = the default beat, PlantedAt + 2.9 s).
+ if crop.PlantedAt and workspace:GetServerTimeNow()-crop.PlantedAt<8 then crop.SproutAt=Planting:SinkTime(item)end
  local stage=item:GetAttribute('GrowthStage')or 1
  local ready,meshKey,meshError=Visuals.DetailReady(crop.SeedId,crop,r.DetailMode=='fruit'and r.Selected or nil)
  if not ready then
@@ -146,16 +185,25 @@ local function show(item,r,work)
   end)
   if not okay then r.RetryAt=os.clock()+5;warn('[V142] Plant detail fallback: '..tostring(visual));return end
   -- Commit without yielding: keep the previous complete model until its replacement is ready.
+  local wasStage=r.BuiltStage
   clear(item,r,true);r.FruitOnly=fruitOnly;r.Selection=selection;r.AppliedModeKey=modeKey
   visual.Name='LocalPlantArt';visual.Parent=item;r.Visual=visual;r.Key=key;r.AssetRevision=Visuals.AssetRevision();builds+=1
   r.Cycle=crop.HarvestCycle;r.FruitKey=nil;hideSupports(item,r,true)
+  r.BuiltStage=stage;r.JustMatured=not fruitOnly and wasStage~=nil and wasStage<4 and stage==4
  end
- if r.Rig then animationBatch:Pose(r.Rig,r.Origin);animationBatch:Flush();r.Swaying=false end
+ -- Every part goes back to rest (and a bounce ends) before anything is rebuilt or captured, so a rig is only ever captured from the rest pose.
+ if r.Rig or r.GrowthSway then
+  if r.Rig then animationBatch:Pose(r.Rig,r.Origin)end
+  if r.GrowthSway then growthStates(r,placeGrowth,nil,animationBatch)end
+  animationBatch:Flush();r.Swaying=false;r.GrowthSway=false
+ end
+ Anim:Settle(r)
  if r.Maw then Maw.Reset(r.Maw,r.Origin);r.Maw=nil end
  if r.Bells then Bells.Reset(r.Bells,r.Origin);r.Bells=nil end
  r.Rig=nil;r.Pose=nil
  r.Crop=crop;r.Def=def;r.Origin=anchor.CFrame;r.Growing=stage<4 or not item:GetAttribute('FruitReady')or item:GetAttribute('FruitGrowing')==true
  syncFruit(item,r,crop,def,stage,anchor.CFrame,work)
+ r.JustMatured=false
  if not r.Growing and not r.FruitOnly then r.Rig=Batch.Capture(r.Visual,r.Origin)end
  r.Pose=r.Origin
  -- Camera selection never changes the art key or rebuilds the body.
@@ -186,6 +234,7 @@ local function finishJob(job)
 end
 local animateClock=0;local frameAverage=1/60
 RunService.Heartbeat:Connect(function(dt)
+ Growth.Batch=nil -- (R149: set only inside the animation step below; a step that failed must not leave it set)
  animateClock+=dt;frameAverage+=(math.min(dt,.1)-frameAverage)*.05
  for _,entry in ipairs(ordered)do local r=entry.Record
   if r.SupportsDirty then r.SupportsDirty=false;r.HiddenKey=nil;hideSupports(entry.Item,r,r.Hidden==true)end
@@ -220,6 +269,7 @@ RunService.Heartbeat:Connect(function(dt)
   if not okay or coroutine.status(job.Thread)=='dead'then finishJob(job)end
  end
  if RunService:IsStudio()or player:GetAttribute('ChestChaseCommandsAllowed')then player:SetAttribute('PlantBuildInProgress',activeBuild~=nil)end
+ Anim:StepFrame() -- R149 (#8): the harvest flights, smooth every frame (one call, no connection per fruit); nothing runs when none fly
  if animateClock<(Fx.Low()and .1 or 1/20)then return end;animateClock=0
  debug.profilebegin('Plant animations');local animationStarted=os.clock()
  local t=workspace:GetServerTimeNow()
@@ -227,6 +277,8 @@ RunService.Heartbeat:Connect(function(dt)
   local r=entry.Record;r.MotionDue=entry.Distance<75 or t>=(r.NextMotionAt or 0)
   if r.MotionDue then r.NextMotionAt=t+.1 end
  end
+ local reducedNow=Gui.ReducedMotionEnabled==true
+ Growth.Batch=animationBatch -- R149: PlantGrowth.Apply queues its CFrames here (flushed below, one BulkMoveTo); every other caller writes directly
  do
   local now=t;local windParts,windModels=0,0
   for _,entry in ipairs(ordered)do
@@ -234,11 +286,28 @@ RunService.Heartbeat:Connect(function(dt)
    if r.Visual and not r.Build and r.Crop and r.Origin then
     if r.Growing then
      -- R121: growth takes 70+ s. Plants within 75 studs keep the full 20 Hz; farther ones refresh at
-     -- 10 Hz (MotionDue) on screen and 2 Hz off screen. Each refresh rewrites every part of the plant.
+     -- 10 Hz (MotionDue) on screen and 2 Hz off screen. R149 (#1): a refresh rewrites a plant only when its growth moved by 1/600
+     -- (PlantGrowth.Apply), and only the properties that changed; its CFrames go through the animation batch.
+     local seed=r.Crop.SeedId
+     -- R149 (#3): a crop planted a moment ago follows its dirt pile (the pile starts after the plant shows up, so this is read until the seedling is up).
+     if r.Crop.PlantedAt and now-r.Crop.PlantedAt<8 then r.Crop.SproutAt=Planting:SinkTime(entry.Item)end
+     -- R149 (#2): growing and regrowing plants sway too, inside the same wind budget as ripe ones (6 plants / 600 parts). The pose is set first, so a
+     -- refresh below writes at it; the parts the growth states do not move (the rest of the plant) go through the rig.
+     if not reducedNow and r.Mode=='normal'and not r.FruitOnly and Growth.Sways(seed,r.Def)and not Hologram.Is(seed)and seed~='ObsidianMawSeed'and motionVisible(entry,65,220)and windModels<6 and windParts+entry.Cost<=600 then
+      windParts+=entry.Cost;windModels+=1
+      if r.MotionDue then
+       r.Pose=r.Origin*Growth.Sway(seed,r.Def,r.Crop,now)
+       if not r.Rig then local skip={};growthStates(r,collectGrowth,skip);r.Rig=Batch.Capture(r.Visual,r.Origin,skip)end
+       growthStates(r,placeGrowth,r.Pose,animationBatch);r.QueuePose=true;r.Swaying=true;r.GrowthSway=true
+      end
+     elseif r.Swaying or r.GrowthSway then
+      r.Pose=r.Origin;r.QueuePose=true;r.Swaying=false
+      if r.GrowthSway then growthStates(r,placeGrowth,nil,animationBatch);r.GrowthSway=false end
+     end
      if entry.Distance<75 or(r.MotionDue and(entry.OnScreen or now>=(r.NextGrowthAt or 0)))then
       r.NextGrowthAt=now+.5
       Visuals.UpdateGrowth(r.Visual,r.Crop,now)
-      for index=1,r.Def.FruitCount do local child=r.Visual:FindFirstChild('Harvest_'..index);if child then Visuals.UpdateGrowth(child,r.Crop,now)end end
+      for index=1,r.Def.FruitCount do local child=r.Visual:FindFirstChild(harvestNames[index]or'Harvest_'..index);if child then Visuals.UpdateGrowth(child,r.Crop,now)end end
      end
     elseif not Hologram.Is(r.Crop.SeedId)and not r.FruitOnly and r.Crop.SeedId~='ObsidianMawSeed'and r.Mode=='normal'and motionVisible(entry,65,220) and windModels<6 and windParts+entry.Cost<=600 then
      windParts+=entry.Cost;windModels+=1
@@ -247,6 +316,8 @@ RunService.Heartbeat:Connect(function(dt)
    end
   end
  end
+ Growth.Batch=nil
+ Anim:StepBounces(animationBatch) -- R149 (#7): queued before the rigs are posed, which only fill the parts not queued yet
  local bellCount,petalModels,petalParts,mawCount=0,0,0,0
  for _,entry in ipairs(ordered)do
   local r=entry.Record
@@ -299,6 +370,7 @@ task.spawn(function()
   if camera then
    local projection=Planner.View(camera)
    local list={};local mode=player:GetAttribute('StudioPlantEffects')or'normal';mode=mode or'normal';if Fx.Low()and mode~='off'then mode='low'end
+   Anim:SetMode(mode)
    for item,r in pairs(tracked)do
     local id=item:GetAttribute('SeedId');local def=Catalog[id]
     local anchor=r.Anchor;if not anchor or not anchor.Parent then anchor=item:FindFirstChild('CropAnchor');r.Anchor=anchor end
@@ -384,6 +456,9 @@ task.spawn(function()
     player:SetAttribute('PlantBuildPartLimit',(Fx.Low()or frameAverage>1/40)and 12 or 32);player:SetAttribute('PlantBuildPartsLastStep',lastBuildParts)
     player:SetAttribute('PlantAnimationEntries',#active);player:SetAttribute('PlantBuildQueue',#pending);player:SetAttribute('PlantDetailRange',Planner.FarRange)
     player:SetAttribute('PlantEffectModels',fx);player:SetAttribute('PlantArtBuilds',builds);player:SetAttribute('PlantFruitUpdates',fruitUpdates)
+    -- R149: growth writes (Applies = refreshes asked, Rewrites = plants actually rewritten, Skips = nothing moved by 1/600) and the cues in the air
+    local stats=Growth.Stats;player:SetAttribute('PlantGrowthApplies',stats.Applies);player:SetAttribute('PlantGrowthRewrites',stats.Rewrites);player:SetAttribute('PlantGrowthSkips',stats.Skips)
+    local pulses,flights=Anim:Active();player:SetAttribute('PlantGrowthPulses',pulses);player:SetAttribute('PlantGrowthFlights',flights)
    end
   end
   task.wait(.3)

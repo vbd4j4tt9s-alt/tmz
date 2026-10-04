@@ -44,7 +44,9 @@ grep -v '^WARN' "$OUT/new/roster.log" | tail -${ROSTER_LINES:-1}
 mkdir -p "$OUT/art";cd "$OUT/art"
 cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/test_roster_art.luau" "$REPO/docs/proposals/seeds_R133/preview/check_floating.py" "$OUT/art/"
 git -C "$REPO" show "$BASE:src/ReplicatedStorage/PlantVisuals.lua" | sed -e "s/WaitForChild('PlantGrowth')/WaitForChild('PlantGrowthBase')/" -e "s/WaitForChild('ApprovedPlantArt')/WaitForChild('ApprovedPlantArtBase')/" > PlantVisualsBase.lua
-git -C "$REPO" show "$BASE:src/ReplicatedStorage/PlantGrowth.lua" > PlantGrowthBase.lua
+# R149: the growing DRAWING (PlantGrowth) changed on purpose (docs/proposals/R149/tests/run_growth.sh proves it); this suite is about art, so both
+# pipelines draw growth with this checkout's PlantGrowth (the "growing" comparisons then still show that no existing plant's ART changed).
+cp "$REPO/src/ReplicatedStorage/PlantGrowth.lua" PlantGrowthBase.lua
 git -C "$REPO" show "$BASE:src/ReplicatedStorage/ApprovedPlantArt.lua" > ApprovedPlantArtBase.lua
 # (ChestIndex and GardenVisuals = the real client scripts the test drives)
 python3 "$REPO/docs/proposals/R147/tests/mkbundle_verity.py" rs_bundle.luau PlantVisualsBase=PlantVisualsBase.lua PlantGrowthBase=PlantGrowthBase.lua ApprovedPlantArtBase=ApprovedPlantArtBase.lua ChestIndex="$REPO/src/StarterPlayer/StarterPlayerScripts/ChestIndex.client.lua" GardenVisuals="$REPO/src/StarterPlayer/StarterPlayerScripts/GardenVisuals.client.lua" >/dev/null

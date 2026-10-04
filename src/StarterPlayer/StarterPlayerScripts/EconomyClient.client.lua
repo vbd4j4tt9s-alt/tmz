@@ -572,6 +572,7 @@ end
 
 local HttpService = game:GetService("HttpService")
 local ContextActionService = game:GetService("ContextActionService")
+local Arrival = require(ReplicatedStorage:WaitForChild("HarvestArrival"))
 local gardenBusy, lastGardenAction = false, -math.huge
 local function equippedGardenSeed()
 	local character = player.Character
@@ -588,8 +589,11 @@ local function sendGarden(action, payload)
 	payload.RequestId = HttpService:GenerateGUID(false)
 	payload.Character = player.Character
 	gardenBusy = true
+	-- R149: the picked fruit floats to the player (GardenVisuals); the Hotbar shows the new item when it arrives. Cosmetic: the item is in the bag at once.
+	if action == "Harvest" then Arrival.Expect(payload.CropId, payload.FruitIndex) end
 	local ok, result = pcall(function() return gardenInteract:InvokeServer(action, payload) end)
 	gardenBusy = false
+	if action == "Harvest" and not (ok and type(result) == "table" and result.Success == true) then Arrival.Cancel(payload.CropId, payload.FruitIndex) end
 	if payload.Character ~= player.Character then return end
 	if not ok or type(result) ~= "table" then gardenToast("GARDEN DID NOT RESPOND — TRY AGAIN", true); return end
 	gardenToast(result.Message, result.Success ~= true)

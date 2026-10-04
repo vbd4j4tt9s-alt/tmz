@@ -181,6 +181,8 @@ Cost says "lines" for the code change, not counting tests. Every item is **clien
 - *Cost:* it animates the picked fruit's **own** parts, which are thrown away right after anyway, so no clone and no new parts. At most 2-5 pops at
   once. About 70 lines in `PlantGrowthFx`, plus about 8 lines in `GardenVisuals`.
 - *Risk:* low.
+- **Owner change (as built):** the squash / stretch / puff is replaced by "when harvesting just change it so that it floats into the player and
+  disappears after and appears in the players inventory". See section 7.
 
 ### Nice (phase 2)
 
@@ -266,3 +268,24 @@ Cost says "lines" for the code change, not counting tests. Every item is **clien
 - `preview/dump_growth.luau`: builds every frame with the real modules and prints the scenes, the INFO rows, the colour strips and the size table.
 - `preview/render_growth.mjs`: draws the scenes with `fruit_models.html` (shared with the fruit-model preview).
 - `preview/make_growth_sheet.py`: composes the sheet.
+
+## 7. As built (phase 1)
+
+Items #1 to #7 are built as specified above. **#8 follows the owner's change**: the picked fruit floats into the harvesting player and
+the item then shows in their inventory.
+
+- **Flight:** the picked fruit's own parts (no clone) lift off and fly along a smooth arc to the harvester's `HumanoidRootPart` plus 0.9 studs,
+  following the player if they move. They take 0.4 to 0.7 s (longer for a far player), shrink to 55 % and vanish on arrival. Gold / Diamond /
+  mutated / giant fruit keep their colours and materials. Other players see the same flight to the garden's owner (the harvester), because the
+  plant's attribute change already replicates to everyone; nothing new is sent.
+- **Inventory:** the server adds the item at once and nothing about the data changes. On the harvester's client the new module `HarvestArrival`
+  holds the item's *appearance* in the hotbar / Bag until the fruit lands (at most 1.5 s, then it shows anyway). The matching slot (or the Bag
+  button when the slot is not visible) then flashes for 0.32 s.
+- **Limits:** at most 8 flights and 200 parts at once (5 / 120 on phones); beyond that, or with reduced motion, or on the lowest quality tier, the
+  fruit vanishes at once as before and nothing is held. One per-frame step for all flights, no per-fruit connection. A harvester who leaves,
+  dies or streams out, or a plant that streams out, removes the fruit and releases the inventory.
+- **Not touched:** Lantern Fern and Amethyst Grape keep today's exact look (no flight, no sway change); Mech, Verity, Starfruit, Maw, Frostbell and
+  floating-petal plants are skipped by `PlantGrowthFx`.
+- **Tests:** `tests/run_growth.sh <dir>` runs the six growth suites, the floating-parts check and the write benchmark; `... mutate` plants 20
+  mutations that the suites must catch.
+- **Preview:** `growth_style_built.png` (before vs now, the real modules); `preview/run_growth_preview.sh` renders it.
