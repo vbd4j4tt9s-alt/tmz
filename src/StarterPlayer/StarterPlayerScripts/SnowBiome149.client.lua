@@ -2,10 +2,12 @@
 -- snow patches, built from a deterministic layout (WeatherWorld149.BiomeSpec: a hash of grid cells, so every client builds the same) in a
 -- window around the runner, with level of detail by distance. They never fade and do not depend on the weather.
 --
--- THE KEYBOARD (R148, KeyboardTrack.client.lua) covers the whole 180-wide floor edge to edge: resting key tops 4.45 (K.KeyTop(0)), a dark
--- bed under them, plain blocks at the coarser layers a few hundredths lower. There is no bare snow floor left to lay patches on, so:
---  * the patches sit ABOVE the resting key tops (K.KeyTop(0) + Rise + half the patch thickness): never coplanar with a key, a block, the
---    bed or the floor, so nothing z-fights; a pressed key only sinks away from under a patch;
+-- THE KEYBOARD (R149, KeyboardTrack.client.lua) covers the whole 180-wide floor edge to edge (from the first biome's start to BiomeTrackEndZ
+-- - 120): big keycaps with ONE look at every distance (no coarse / flat layers) standing on a sunken bed of grout, resting key tops at
+-- K.KeyTop(0) = floor top + RestRise (4.0 + 0.55 = 4.55; 0.08 above the floor while pressed), the real floor hidden for this client. There
+-- is no bare snow floor left to lay patches on, so:
+--  * the patches sit ABOVE the resting key tops (K.KeyTop(0) + Rise + half the patch thickness): never coplanar with a key, the bed or the
+--    floor, so nothing z-fights; a pressed key only sinks away from under a patch;
 --  * EDGE DRIFTS: big irregular blobs (up to three overlapping flat ellipses) along both side edges of the floor (the outer 15 studs, where
 --    the scenery stones and ice pillars stand) - the snow banks look snowy and the lane keys the runner uses stay clean;
 --  * BORDER patches: over the whole width in the first and last rows of the biome (the entry and exit of the snow), but never in the

@@ -2,7 +2,8 @@
 # Usage: sh run.sh [scratch dir]. Runs the R122 track-hole tests under the Roblox mock:
 #  test_holes.luau        - real TrackHoleService + real ConcurrentKeeperService Finish/drop path + real RagdollService
 #                           (mock R6 rig) + real SecurityGate / HarvestToolService.
-#  test_holes_client.luau - real TrackHoleClient input routing / hint / effects and GardenShovel hint passthrough.
+#  test_holes_client.luau - real TrackHoleClient input routing / hint / effects and GardenShovel hint passthrough (R149: dirt bursts lifted
+#                           onto the keyboard's key tops where the keyboard is drawn, at the floor elsewhere).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 OUT=${1:-$(mktemp -d)}

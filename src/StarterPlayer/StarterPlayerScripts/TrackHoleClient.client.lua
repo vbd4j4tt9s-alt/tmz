@@ -61,6 +61,9 @@ local function near(position,range)
  return camera and(camera.CFrame.Position-position).Magnitude<=range
 end
 local function burst(position,count,color,height)
+ -- R149: the keyboard's key tops stand above the (hidden) floor: dirt tossed from floor height would be under the keys, so it starts and lands on them.
+ local okKeys,lift=pcall(function()return require(RS.KeyboardSurface149).Lift(position.X,position.Z,position.Y)end)
+ if okKeys and lift>0 then position+=V3(0,lift,0)end
  -- R123: dirt chunks follow the shared FX budget (FastMode / low tier: half) and Reduced Motion (lower toss).
  local tier=Fx.Get();count=math.max(3,math.floor(count*(tier==1 and .5 or tier==2 and .75 or 1)+.5))
  if Gui.ReducedMotionEnabled==true then height*=.5 end

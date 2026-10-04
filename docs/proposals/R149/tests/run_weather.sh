@@ -7,22 +7,26 @@
 #                        respawn, teardown, no allocation while running).
 #  test_snowbiome.luau - SnowBiome149.client.lua next to the real KeyboardTrack.client.lua (permanent patches: layout, keyboard clearances,
 #                        spacebar zone, legend dust rule, LOD, budgets, avoid zones, deterministic, teardown).
+#  test_keyboard_fx.luau - the Storm lightning warning / impact rings and the shovel dirt bursts (StormWeather.client.lua, TrackHoleClient.client.lua,
+#                        ReplicatedStorage.KeyboardSurface149) next to the real KeyboardTrack.client.lua: on the keyboard they sit at or above the
+#                        key tops, everywhere else (arena past the last row, beside the field, no keyboard, no helper) at the old floor height.
 # With "mutate" the same suites run against deliberately broken copies of the sources: every mutation must make a test fail.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};MODE=$2;mkdir -p "$OUT/cl"
 T=$REPO/tools/tests;INV=$REPO/docs/proposals/inventory_R113/tests
-cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/test_weather.luau" "$HERE/test_snowbiome.luau" "$OUT/cl/"
+cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/test_weather.luau" "$HERE/test_snowbiome.luau" "$HERE/test_keyboard_fx.luau" "$OUT/cl/"
 # mkbundle.py reads /home/user/tmz/src; bundle the given src tree (a worktree has its own).
 bundle() { # $1 = src tree
  sed "s#'/home/user/tmz/src'#'$1'#" "$INV/mkbundle.py" > "$OUT/mkbundle.py"
  C=$1/StarterPlayer/StarterPlayerScripts
  python3 "$OUT/mkbundle.py" "$OUT/cl/rs_bundle.luau" WeatherWorld="$C/WeatherWorld149.client.lua" SnowBiome="$C/SnowBiome149.client.lua" \
-  KeyboardTrackClient="$C/KeyboardTrack.client.lua" WorldEvents="$C/WorldEvents.client.lua" >/dev/null
+  KeyboardTrackClient="$C/KeyboardTrack.client.lua" WorldEvents="$C/WorldEvents.client.lua" \
+  StormWeather="$C/StormWeather.client.lua" TrackHoleClient="$C/TrackHoleClient.client.lua" >/dev/null
 }
 runall() { # prints the last line of each suite; returns non-zero when one fails
  rc=0
- for t in test_weather test_snowbiome; do
+ for t in ${SUITES:-test_weather test_snowbiome test_keyboard_fx}; do
   echo "== $t"
   if (cd "$OUT/cl" && timeout 600 /opt/luau/luau $t.luau > $t.log 2>&1); then tail -1 "$OUT/cl/$t.log"; else tail -12 "$OUT/cl/$t.log"; rc=1; fi
  done
@@ -58,5 +62,16 @@ mutate "snow patches vanish at once when the snow ends" $R/WeatherWorld149.lua "
 mutate "snow patches lie on the key tops (z-fight)" $R/WeatherWorld149.lua " Rise=.1,Thickness=.06,DustThickness=.04" " Rise=-.2,Thickness=.06,DustThickness=.04"
 mutate "snow biome patches cover the spacebar zone" $R/WeatherWorld149.lua "SpaceClear=12" "SpaceClear=-200"
 mutate "a camera spin moves the tiles (window follows the camera)" $S/WeatherWorld149.client.lua "if W.Recenter(win,fx,fz,tierCfg.Tile,tierCfg.Tile*.2)or" "if W.Recenter(win,workspace.CurrentCamera.CFrame.Position.X,workspace.CurrentCamera.CFrame.Position.Z,tierCfg.Tile,0)or"
+# the keyboard effects (R149): only their own suite needs to run
+SUITES=test_keyboard_fx
+mutate "the storm warning ring is left at floor level (under the keys)" $S/StormWeather.client.lua "clearWarning();center=onKeys(center)" "clearWarning()"
+mutate "the storm impact (ring, flash, bolt end) is left at floor level" $S/StormWeather.client.lua "    center=onKeys(center)
+    local top=" "    local top="
+mutate "the dirt bursts start and land at floor level" $S/TrackHoleClient.client.lua "if okKeys and lift>0 then position+=V3(0,lift,0)end" "if false then position+=V3(0,lift,0)end"
+mutate "the helper lifts everywhere (arena, beside the field)" $R/KeyboardSurface149.lua "if x0 and x>=x0 and x<=x1 and z>=z0 and z<z1 then" "if x0 then"
+mutate "the helper still lifts after the keyboard is gone" $R/KeyboardSurface149.lua "if not k or not workspace:FindFirstChild('KeyboardTrackVisuals')then return nil end" "if not k then return nil end"
+mutate "the helper lowers a surface above the key tops" $R/KeyboardSurface149.lua "return math.max(0,top-(floorY or K.Config.FloorTop))" "return top-(floorY or K.Config.FloorTop)"
+mutate "the helper lifts by a fixed .3 instead of the key height" $R/KeyboardSurface149.lua "return math.max(0,top-(floorY or K.Config.FloorTop))" "return .3"
+unset SUITES
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]

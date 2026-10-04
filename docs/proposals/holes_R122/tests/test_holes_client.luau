@@ -2,6 +2,7 @@
 -- R122 holes, client side + dig sound variants under the Roblox mock. Real: TrackHoleClient, GardenShovel (hint
 -- passthrough), DigSoundVariants (Pick / Resolve / Detect / segment playback), DigSoundAnalyzer (Run on a mocked
 -- AudioPlayer + AudioAnalyzer, Report). Run from a folder holding roblox.luau, world.luau, rs_bundle.luau (see run.sh).
+-- R149: the dirt bursts start / land on the keyboard's key tops where the keyboard is drawn (KeyboardSurface149), at the floor elsewhere (3b).
 local W=require('./world');local R=W.R
 local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -117,6 +118,63 @@ check(#sounds==before+2 and sounds[#sounds].PlaybackSpeed<1,'cover uses the vari
 holeRemote.OnClientEvent:Fire({Kind='Trap',Id=9,Position=V3(0,0,100)})
 holeRemote.OnClientEvent:Fire('junk');holeRemote.OnClientEvent:Fire({Kind='Dig'})
 check(true,'junk fx payloads ignored')
+
+-- 3b. R149: the dirt bursts ride on the keyboard's key tops where the keyboard is drawn (the new keys stand 0.55 above the floor and the real
+-- floor is hidden, so dirt tossed from floor height would be under them); everywhere else they stay at the floor, exactly as before.
+do
+ local K=W.module('KeyboardTrack');local FL=K.Config.FloorTop;local top0=K.KeyTop(0)
+ local Tween=W.service('TweenService');local origCreate=Tween.Create
+ local starts,goals={}, {}
+ Tween.Create=function(self,obj,info,props)
+  if obj.Name=='HoleDirt'and props.CFrame then
+   if not starts[obj]then starts[obj]=obj.CFrame.Position;goals[obj]={}end
+   table.insert(goals[obj],props.CFrame.Position)
+  end
+  return origCreate(self,obj,info,props)
+ end
+ local function dirt(kind,pos)
+  for _,d in ipairs(W.workspace:GetChildren())do if d.Name=='HoleDirt'then d:Destroy()end end
+  starts,goals={}, {}
+  holeRemote.OnClientEvent:Fire({Kind=kind,Id=3,Position=pos,OwnerUserId=7})
+  local out={}
+  for _,d in ipairs(W.workspace:GetChildren())do if d.Name=='HoleDirt'and starts[d]then out[#out+1]={Start=starts[d],Peak=goals[d][1],Land=goals[d][2]}end end
+  return out
+ end
+ -- every chunk starts .2 above `base`, lands s * .4 (.072 .. .184) above it and is tossed up at least .5 above it
+ local function dirtAt(list,base)
+  local ok=#list>0
+  for _,d in ipairs(list)do
+   if not near(d.Start.Y,base+.2)or d.Land.Y<base+.072-1e-6 or d.Land.Y>base+.184+1e-6 or d.Peak.Y<base+.5 then ok=false end
+  end
+  return ok
+ end
+ local function lowest(list)local lo=math.huge;for _,d in ipairs(list)do lo=math.min(lo,d.Start.Y,d.Peak.Y,d.Land.Y)end;return lo end
+ local FLOOR=V3(0,FL,100)
+ local counts={Dig=8,Cover=6,Trap=10}
+ -- no keyboard (the folder KeyboardTrack.client builds is not there): the old burst at the floor
+ for _,kind in ipairs({'Dig','Cover','Trap'})do
+  local list=dirt(kind,FLOOR)
+  check(#list==counts[kind]and dirtAt(list,FL),kind..' without the keyboard: '..#list..' dirt chunks at the floor (start .2, landing .07 .. .18 above it)')
+ end
+ -- the keyboard drawn (its folder + the map's biome attributes: the covered rectangle is the one KeyboardTrack builds)
+ for k,v in pairs({BiomeStartZ_1=-100,BiomeEndZ_1=1000,BiomeTrackEndZ=1120})do map:SetAttribute(k,v)end
+ local kbFolder=R.new('Folder');kbFolder.Name='KeyboardTrackVisuals';kbFolder.Parent=W.workspace
+ for _,kind in ipairs({'Dig','Cover','Trap'})do
+  local list=dirt(kind,FLOOR)
+  check(#list==counts[kind]and lowest(list)>=top0-1e-6,kind..' on the keyboard: every chunk starts, peaks and lands at or above the resting key top ('..string.format('%.3f',lowest(list))..' >= '..string.format('%.3f',top0)..')')
+  check(dirtAt(list,top0),kind..' on the keyboard: the same burst, moved up by the key rise (start '..string.format('%.2f',top0+.2)..')')
+ end
+ check(dirtAt(dirt('Dig',V3(100,FL,100)),FL),'beside the 180-wide keyboard (x = 100) the dirt stays at the floor')
+ check(dirtAt(dirt('Dig',V3(0,top0+1,100)),top0+1),'a surface already above the key tops is not lowered')
+ W.workspace.CurrentCamera.CFrame=CF(0,20,1000)
+ check(dirtAt(dirt('Dig',V3(0,FL,1050)),FL),'past the last key row (the arena) the dirt stays at the floor')
+ W.workspace.CurrentCamera.CFrame=CF(0,20,-30)
+ kbFolder:Destroy()
+ check(dirtAt(dirt('Dig',FLOOR),FL),'once the keyboard is gone the dirt is back at the floor')
+ for k in pairs({BiomeStartZ_1=1,BiomeEndZ_1=1,BiomeTrackEndZ=1})do map:SetAttribute(k,nil)end
+ for _,d in ipairs(W.workspace:GetChildren())do if d.Name=='HoleDirt'then d:Destroy()end end
+ Tween.Create=origCreate
+end
 
 -- 4. DigSoundVariants
 local DS=W.module('DigSoundVariants');local cfg=DS.Config

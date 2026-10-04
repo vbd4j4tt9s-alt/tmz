@@ -427,6 +427,16 @@ for _,p in ipairs(keys)do local pos=p.CFrame.Position;local col,row=g.ColOfX(pos
 check(colourOk,'every key has its cell\'s biome colour (K.CellColor), near and far alike')
 local restOk=true;for _,p in ipairs(keys)do if not near(top(p),K.KeyTop(0),1e-6)then restOk=false end end
 check(restOk,'every resting key top is at the floor + 0.55 (near and far alike)')
+-- effects authored at floor level (Storm lightning rings, shovel dirt: test_keyboard_fx.luau) read the key tops through KeyboardSurface149
+do
+ local KS=W.module('KeyboardSurface149');local kp=keys[#keys//2];local kpx,kpz=kp.CFrame.Position.X,kp.CFrame.Position.Z
+ W.fxProbe={X=kpx,Z=kpz}
+ check(near(KS.TopY(kpx,kpz),top(kp))and near(KS.Lift(kpx,kpz,F),top(kp)-F)and near(KS.Lift(kpx,kpz,F),C.RestRise),'effects: the helper\'s key-top height at a key is that key\'s top, a floor-level effect is lifted by the rest rise')
+ local x0,x1,z0,z1=KS.Rect()
+ check(near(x0,g.CenterX-g.HalfWidth)and near(x1,g.CenterX+g.HalfWidth)and near(z0,g.Z0)and near(z1,g.KeyEndZ),'effects: the helper covers the rectangle the keys cover (x '..tostring(x0)..' .. '..tostring(x1)..', z '..tostring(z0)..' .. '..tostring(z1)..')')
+ check(KS.Lift(x1+1,kpz,F)==0 and KS.Lift(kpx,g.KeyEndZ+5,F)==0 and KS.Lift(kpx,g.Z0-5,F)==0 and KS.Lift(kpx,kpz,K.KeyTop(0)+1)==0,'effects: no lift beside the keys, in the arena, before the first biome, or for a surface already above the key tops')
+ check(near(KS.Lift(kpx,kpz,F),C.HoleLift-.02),'effects: the same rise the shovel holes are lifted by (HoleLift - .02 of authored clearance)')
+end
 -- bed and rims: each biome's grout colour, sunken
 local bedParts,bedLen,bedOk,rimOk,rims,ends={},0,true,true,0,0
 for _,p in ipairs(bedF:GetChildren())do
@@ -945,6 +955,7 @@ check(workspace:FindFirstChild('KeyboardTrackVisuals')==nil,'the folder goes wit
 local restored=true;for _,fp in ipairs(floors)do if fp.LocalTransparencyModifier~=0 then restored=false end end
 check(restored and grassTex.LocalTransparencyModifier==0,'teardown shows the real floor (and its texture) again')
 check(keepPitRef and near(keepPitRef.CFrame.Position.Y,F+.04,1e-6),'teardown puts a lifted shovel hole back at its server height')
+check(W.module('KeyboardSurface149').Lift(W.fxProbe.X,W.fxProbe.Z,F)==0,'teardown: floor-level effects are no longer lifted (no keyboard folder, no keys)')
 for _,h in ipairs(runtime:GetDescendants())do if h.Name=='TrackHoles'then h:Destroy()end end
 local before2=#R.created;frames(30);check(#R.created==before2,'nothing runs after the script is destroyed')
 check(nonRemote(),'still no RemoteEvent / RemoteFunction anywhere')

@@ -69,8 +69,15 @@ local function locateGround()
         if floor and floor:IsA('BasePart')then return floor end
     end end
 end
+-- R149: the keyboard's key tops stand above the (hidden) floor, so the ring / impact drawn at floor height would be under the keys:
+-- lift them onto the key tops wherever the keyboard is drawn (KeyboardSurface149; no lift off the keyboard).
+local function onKeys(center)
+    if not ground then return center end
+    local ok,lift=pcall(function()return require(Storage.KeyboardSurface149).Lift(center.X,center.Z,ground.Position.Y+ground.Size.Y/2)end)
+    return ok and lift>0 and center+Vector3.new(0,lift,0)or center
+end
 local function makeWarning(id,center,radius)
-    clearWarning()
+    clearWarning();center=onKeys(center)
     local anchor=part('Lightning warning',Vector3.new(radius*2,.06,radius*2),CFrame.new(center),Color3.new(1,0,0))
     anchor.Transparency=1
     local gui=Instance.new('SurfaceGui');gui.Name='Strike area';gui.Face=Enum.NormalId.Top
@@ -111,6 +118,7 @@ local function groundImpact(center,radius,now)
     table.insert(impacts,{At=now,Anchor=anchor,Ring=ring,Stroke=stroke,Disc=disc})
 end
 local function lightning(id,center,radius,now)
+    center=onKeys(center)
     local top=center+Vector3.new(0,Config.CloudHeight,0);local closest=math.huge
     for _,c in ipairs(clouds)do if not c.Low then
         local p=c.Anchor.Position;local d=(Vector3.new(p.X,center.Y,p.Z)-center).Magnitude

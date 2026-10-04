@@ -104,6 +104,9 @@ local function scene(name,player3,extra)
 end
 
 runnerAt(20,-140)
+-- the camera looks down the track (+Z), as the runner's does: the keyboard turns its long side toward the camera's facing (the mock's default camera
+-- looks toward -Z, which would build the rows ahead of the runner toward the base)
+workspace.CurrentCamera.CFrame=R.CFrame.lookAt(V3(0,20,0),V3(0,20,100))
 RS:SetAttribute('GlobalWeather','Clear')
 local kb=R.new('LocalScript');kb.Name='KeyboardTrack';W.load('KeyboardTrackClient',kb)
 local ww=R.new('LocalScript');ww.Name='WeatherWorld149';W.load('WeatherWorld',ww)
