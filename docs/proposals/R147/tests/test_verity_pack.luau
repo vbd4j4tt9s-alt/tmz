@@ -128,7 +128,7 @@ check(V.Variant=='VerityReliquary'and V.Id=='VeritySeed'and V.PackStage==7 and V
 check(Rules.VariantKey('VerityReliquary')=='VerityReliquary'and Rules.VariantKey('EclipseReliquary')=='EclipseReliquary'and Rules.VariantKey('Bogus')=='Standard',
  'the Verity variant is registered (an unknown BagVariant still becomes Standard)')
 local pv=Rules.Variants.VerityReliquary
-check(pv and pv.Name=='Verity Pack'and pv.BagScale==.96 and pv.SeedScale==1.35 and pv.RareBias==1 and pv.SpawnWeight==0 and pv.Trim==7 and pv.Design==6
+check(pv and pv.Name=='Verity Pack'and pv.BagScale==1 and pv.SeedScale==1.35 and pv.RareBias==1 and pv.SpawnWeight==0 and pv.Trim==7 and pv.Design==2
  and pv.OddsLabel=='Verity seed 1/100 + Secret / Cosmic / Mech','the Verity pack variant row')
 check(#Rules.VariantOrder==6 and not table.find(Rules.VariantOrder,'VerityReliquary'),'world spawns still use Pack01-Pack06 only')
 local tier,rank=Rules.GetPackTier('VerityReliquary')

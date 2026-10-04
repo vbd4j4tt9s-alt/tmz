@@ -37,16 +37,14 @@ function groundTexture(){
   g.strokeStyle='rgba(255,255,255,.10)';g.lineWidth=4;g.strokeRect(0,0,256,256);
   const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(60,60);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
-// A STAND-IN for the owner's picture (three.js cannot fetch the Roblox image): a simple gold smiley and a label.
+// A STAND-IN for the owner's picture (three.js cannot fetch the Roblox image): the real one is a thin black smiley line drawing (two dots
+// and a smile) on a transparent background, so a black dots-and-smile drawing and a small label are drawn on a transparent canvas.
 function standIn(texId){
   const cv=document.createElement('canvas');cv.width=cv.height=512;const g=cv.getContext('2d');
-  g.clearRect(0,0,512,512);
-  g.beginPath();g.arc(256,230,170,0,Math.PI*2);g.fillStyle='#ffd52e';g.fill();g.lineWidth=12;g.strokeStyle='#a56a00';g.stroke();
-  g.fillStyle='#5a3a00';g.beginPath();g.ellipse(200,190,17,30,0,0,Math.PI*2);g.fill();g.beginPath();g.ellipse(312,190,17,30,0,0,Math.PI*2);g.fill();
-  g.lineWidth=15;g.lineCap='round';g.beginPath();g.arc(256,244,92,.18*Math.PI,.82*Math.PI);g.stroke();
-  g.fillStyle='rgba(255,255,255,.55)';g.beginPath();g.ellipse(190,118,34,16,-.5,0,Math.PI*2);g.fill();
-  g.fillStyle='rgba(20,24,38,.82)';g.fillRect(24,424,464,76);g.fillStyle='#fff3c0';g.textAlign='center';
-  g.font='bold 25px sans-serif';g.fillText('your Verity picture goes here',256,455);g.font='21px sans-serif';g.fillText('('+texId+')',256,485);
+  g.clearRect(0,0,512,512);g.strokeStyle='#111';g.fillStyle='#111';g.lineCap='round';
+  g.beginPath();g.arc(180,190,20,0,Math.PI*2);g.fill();g.beginPath();g.arc(332,190,20,0,Math.PI*2);g.fill();
+  g.lineWidth=16;g.beginPath();g.arc(256,236,126,.2*Math.PI,.8*Math.PI);g.stroke();
+  g.font='bold 24px sans-serif';g.textAlign='center';g.fillText('stand-in smiley',256,438);g.font='19px sans-serif';g.fillText('('+texId+')',256,468);
   const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
 // A few gold dots around the card: VoidPackFx's sparkle emitters (approximate; the real ones are particles and move).
@@ -93,7 +91,7 @@ window.shoot=function(scene,W,H,opts){
       dm.matrixAutoUpdate=false;
       const place=new THREE.Matrix4().makeTranslation(0,0,(front?-1:1)*(p.size[2]/2+.004)).multiply(new THREE.Matrix4().makeRotationY(front?Math.PI:0)).multiply(new THREE.Matrix4().makeScale(p.size[0],p.size[1],1));
       dm.matrix.copy(m).multiply(place);s.add(dm);
-      if(front){const c=new THREE.Vector3(p.p[0],p.p[1],p.p[2]);s.add(sparkles(c,Math.max(p.size[0],p.size[1])*.62))}
+      if(front){const c=new THREE.Vector3(p.p[0],p.p[1],p.p[2]);s.add(sparkles(c,Math.max(p.size[0],p.size[1])*1.05))}
     }
   }
   const az=v.az*Math.PI/180,el=v.el*Math.PI/180;

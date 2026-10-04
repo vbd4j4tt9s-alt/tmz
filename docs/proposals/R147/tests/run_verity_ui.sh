@@ -2,11 +2,11 @@
 # Usage: sh run_verity_ui.sh [scratch dir]. R147 Verity pack art + Index tab 9 (client side) on the Roblox mock (/opt/luau/luau) with
 # the REAL modules / scripts of this checkout (SeedPackVisuals, SeedPackRenderer, EclipsePackArt, VerityPackArt, VoidPackFx,
 # ItemPictures, VeiledEventClient81, SeedPackRender, ChestIndex). "Nothing existing changed" compares against the base commit
-# (VERITY_UI_BASE, default 15e4a50 = the branch head before the face-card pack), whose SeedPackVisuals / SeedPackRenderer / EclipsePackArt / VoidPackFx /
+# (VERITY_UI_BASE, default 23235ce = R147 as installed), whose SeedPackVisuals / SeedPackRenderer / EclipsePackArt / VoidPackFx /
 # ChestIndex come from git, are renamed (...Base) and run beside the new ones part by part.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
-BASE=${VERITY_UI_BASE:-15e4a50}
+BASE=${VERITY_UI_BASE:-23235ce}
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
 T=$REPO/tools/tests;INV=$REPO/docs/proposals/inventory_R113/tests;C=$REPO/src/StarterPlayer/StarterPlayerScripts
 cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/test_verity_ui.luau" "$OUT/"

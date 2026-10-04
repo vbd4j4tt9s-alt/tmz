@@ -354,7 +354,8 @@ local approved=require(script.Parent.BalanceValues81)
 for i,key in ipairs(Rules.VariantOrder)do Rules.Variants[key].SpawnWeight=approved.SpawnWeights[i]end
 Rules.Variants.EclipseReliquary={Name='Void Pack',BagScale=.96,SeedScale=1.35,RareBias=1,SpawnWeight=0,Trim=7,Design=6,OddsLabel='All Secret / Cosmic / King seeds + 1/200 Mech roll'}
 -- R147: a Void pack handed to Verity comes back as a Verity pack (same stage 7, size, coat and weather; own odds).
-Rules.Variants[Verity.Variant]={Name=Verity.PackName,BagScale=.96,SeedScale=1.35,RareBias=1,SpawnWeight=0,Trim=7,Design=6,OddsLabel='Verity seed 1/100 + Secret / Cosmic / Mech'}
+-- R148 (owner): it looks like our plain pack (the Standard design and size) painted yellow with a smiley on it (VerityPackArt).
+Rules.Variants[Verity.Variant]={Name=Verity.PackName,BagScale=1,SeedScale=1.35,RareBias=1,SpawnWeight=0,Trim=7,Design=2,OddsLabel='Verity seed 1/100 + Secret / Cosmic / Mech'}
 function Rules.RewardPool(config,stage,variant)
  if variant=='EclipseReliquary'then local _,all=require(script.Parent.VoidPackOdds85).Pools(config,Rules);return all end
  return Rules.ObtainablePool(config,stage)

@@ -14,7 +14,7 @@ function Renderer.Clear(bag)
 end
 function Renderer.Build(bag,isValid)
     if bag:GetAttribute('BagVariant')=='EclipseReliquary'then return require(script.Parent.EclipsePackArt).Build(bag)end
-    if bag:GetAttribute('BagVariant')==require(script.Parent.VerityCatalog).Variant then return require(script.Parent.VerityPackArt).Build(bag)end -- R147: the Void shape in gold
+    if bag:GetAttribute('BagVariant')==require(script.Parent.VerityCatalog).Variant then return require(script.Parent.VerityPackArt).Build(bag,isValid)end -- R148: the plain pack, yellow, with a smiley
     if bag:GetAttribute('BagVariant')=='MechLimited'then
         if bag:GetAttribute('CompactPackReady')then return true end
         return require(script.Parent.MechArt).Pack(bag)
