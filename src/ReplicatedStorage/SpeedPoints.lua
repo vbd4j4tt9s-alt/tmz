@@ -34,7 +34,8 @@ end
 -- the exact points needed (a decimal string, or a number). RoundUp2 rounds it UP to 2 significant figures (so it is never
 -- below the real need; values under 100 go up to the next multiple of 5), as exact decimal text of any size. NeedText
 -- writes that whole, with thousands separators and the largest suffix that keeps the number whole (K M B T Qa ... Dc):
--- 3800 -> "3,800", 18000 -> "18K", 1.2M -> "1,200K", 2.6B -> "2,600M", 22B -> "22B"; "0" for nothing; "∞" from 10^36 on.
+-- 3800 -> "3,800", 18000 -> "18K", 540000 -> "540K"; from a million up one decimal is allowed (R148): 1.2M, 16M, 2.6B, 22B;
+-- "0" for nothing; "∞" from 10^36 on.
 function P.RoundUp2(v)
  v=P.Normalize(v);local len=#v
  if len<=2 then return tostring(math.ceil(tonumber(v)/5)*5)end
@@ -48,6 +49,10 @@ local function withCommas(digits)return(digits:reverse():gsub('(%d%d%d)','%1,'):
 function P.NeedText(v)
  local r=P.RoundUp2(v);if #r>36 then return'∞'end
  if #r<=4 then return withCommas(r)end -- below 10,000: in full
+ if #r>=7 then -- R148 (owner: "B or mil can have decimal points"): a million and up reads 1.2M, 16M, 2.6B, 22B
+  local group=math.min(math.floor((#r-1)/3),#NEED_SUFFIXES);local first=#r-3*group
+  local tenth=r:sub(first+1,first+1);return r:sub(1,first)..((tenth~=''and tenth~='0')and'.'..tenth or'')..NEED_SUFFIXES[group]
+ end
  local zeros=#r-#(r:gsub('0+$',''))
  local group=math.min(math.floor(zeros/3),#NEED_SUFFIXES)
  return withCommas(r:sub(1,#r-3*group))..(NEED_SUFFIXES[group]or'')
