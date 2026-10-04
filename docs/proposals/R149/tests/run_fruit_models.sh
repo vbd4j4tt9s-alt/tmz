@@ -1,6 +1,6 @@
 #!/bin/sh
 # Usage: sh run_fruit_models.sh [scratch dir]   (needs /opt/luau/luau, python3 + numpy)
-# R149 fruit models on the Roblox mock with the REAL modules of this checkout, proved against the BASE commit (FRUIT_BASE, default 38b1afa = the R149
+# R149 fruit models on the Roblox mock with the REAL modules of this checkout, proved against the BASE commit (FRUIT_BASE, default 0b08836 = the branch commit just before the redesigns were merged; 38b1afa in the agent worktree) =
 # proposal commit, the last one before the redesigns):
 #  0. files: only the 8 art / key modules below differ from the base under src/ (Lantern Fern's ApprovedPlantArt2, PlantArtCrystal (Amethyst Grape),
 #     PlantGrowth, GardenVisuals, PlantVisuals, the R148 seeds, Verity ... are byte for byte the base's);
@@ -12,7 +12,7 @@
 # Set FRUIT_KEEP_GOING=1 to run every stage after a failure (the exit status stays non-zero).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
-BASE=${FRUIT_BASE:-38b1afa}
+BASE=${FRUIT_BASE:-0b08836}
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
 RC=0
 stop(){ if [ -n "$FRUIT_KEEP_GOING" ];then RC=1;else exit 1;fi; }
