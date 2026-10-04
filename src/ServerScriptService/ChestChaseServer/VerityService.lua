@@ -168,9 +168,13 @@ function V:_openingBlocks(player,record)
  return record~=nil and tool~=nil and tool:GetAttribute('SeedInventoryId')==record.Id and(tonumber(opening.Clicks)or 0)>0
 end
 -- Returns true and the new Verity record, or false and the reason (also sent to the player as 'Refused').
--- Validation order: event running, data / save, range, busy, opening, rate limit, ChestService ready, owns a Void pack. Nothing yields.
+-- Validation order: rate limit (over-limit requests get no reply at all), event running, data / save, range, busy, opening, ChestService
+-- ready, owns a Void pack. Nothing yields.
 function V:Give(player,...)
  if not player or not player.Parent then return false end
+ -- Spam is dropped without an answer, before anything that replies (the dialog's button is locked while it waits, so real
+ -- players never hit this); every refusal below counts against the same budget.
+ if not require(script.Parent.SecurityGate).Allow(player,'VerityGive',...)then return false end
  -- The limited event is over: she takes nothing (the clock is the server's, UTC).
  if not Limited.Active(os.time())then return self:_refuse(player,R.EventEnded)end
  local data=self.Data
@@ -184,8 +188,6 @@ function V:Give(player,...)
  end
  local record,index=self:Pick(player)
  if self:_openingBlocks(player,record)then return self:_refuse(player,R.Opening)end
- -- Spam is dropped without an answer (the dialog's button is locked while it waits, so real players never hit this).
- if not require(script.Parent.SecurityGate).Allow(player,'VerityGive',...)then return false end
  local chests=self.Chests
  if type(chests)~='table'or type(chests.ConvertVoidPack)~='function'then return self:_refuse(player,R.NotReady)end
  if not record then return self:_refuse(player,R.NoVoid)end

@@ -294,11 +294,44 @@ do local lo3=1e9;for _=1,200 do frames(1);lo3=math.min(lo3,(sign.StudsOffset.Y-s
  -- She streams out and in (the model is removed and added again): the session still remembers.
  W.CS:RemoveTag(model,'VerityNPC');frames(2)
  check(sign:FindFirstChild('Mark')==nil and sign:FindFirstChild('Timer')==nil,'(streamed out: her marker and timer go)')
+ check(near(body.CFrame.Position.Y,16.45,1e-6)and near(lookOf().Z,1,1e-6)and near(lookOf().X,0,1e-6)and body.Size.X==22,'(and she is left exactly as the server placed her, so the next entry takes that as home)')
  W.CS:AddTag(model,'VerityNPC');frames(3)
  mark=sign:FindFirstChild('Mark');timerLabel=sign:FindFirstChild('Timer')
  check(mark and not mark.Visible and timerLabel and timerLabel.Text:find('^EVENT ENDS IN '),'streamed back in: still no "!" (the session remembers), the timer is back')
  -- A respawn (new Backpack and Character) does not bring it back either.
  backpack:Destroy();local fresh=R.new('Backpack');fresh.Parent=player;frames(2);backpack=fresh;check(not mark.Visible,'a respawn does not bring it back')
+end
+-- 3c. Far away she is left alone: no writes to her collidable, queryable body (R148 review) ---------------------------------------------------
+do
+ local cfWrites,sizeWrites=0,0
+ body:GetPropertyChangedSignal('CFrame'):Connect(function()cfWrites+=1 end)
+ body:GetPropertyChangedSignal('Size'):Connect(function()sizeWrites+=1 end)
+ local D=C.AnimateDistance
+ check(D==300,'beyond 300 studs (VerityConfig.AnimateDistance) the client leaves her body alone')
+ local function camAt(dist)aim(0,16.45,bodyAt.Z+dist);frames(3)end
+ -- just inside the range: she moves (turns to the camera, bobs)
+ camAt(D-10);cfWrites=0;frames(60)
+ check(cfWrites>=30,'at '..(D-10)..' studs she is still animated ('..cfWrites..' CFrame writes in 60 frames)')
+ sizeWrites=0;frames(100);check(sizeWrites==0,'(and her Size is not rewritten while she is not talking: '..sizeWrites..' writes)')
+ -- beyond it: set back to the server's pose once, then not a single write
+ camAt(D+10);local settled=near(body.CFrame.Position.Y,16.45,1e-6)and near(lookOf().Z,1,1e-6)and near(lookOf().X,0,1e-6)and body.Size.X==22
+ check(settled,'beyond '..D..' studs she is put back to how the server placed her (once)')
+ cfWrites,sizeWrites=0,0;frames(200)
+ check(cfWrites==0 and sizeWrites==0,'and then 200 frames with the camera far away: no CFrame and no Size writes ('..cfWrites..' / '..sizeWrites..')')
+ aim(300,200,bodyAt.Z+500);frames(60);check(cfWrites==0 and sizeWrites==0,'(any direction: camera 600 studs off)')
+ -- her voice plays while the camera is far: no swelling writes either
+ standAt(0,7,-318);frames(5);server('Open',{VoidPacks=0,Delivered=3});local vs=body:FindFirstChild('VerityGreeting');local playing0=vs and vs.IsPlaying
+ cfWrites,sizeWrites=0,0;frames(100)
+ check(playing0 and cfWrites==0 and sizeWrites==0 and body.Size.X==22,'her voice playing (dialog opened) with the camera far away: still no writes, she does not swell')
+ panel.Header.Close.Activated:Fire();frames(2);R.advance(4);frames(60);standAt(0,7,-150);frames(30)
+ -- back in range: writes resume and she is right (faces the camera, normal size once the voice is done)
+ aim(100,16.45,bodyAt.Z);frames(2);cfWrites=0;frames(100)
+ check(cfWrites>=50,'back inside the range the writes resume ('..cfWrites..' in 100 frames)')
+ check(near(lookOf().X,1,.03)and body.Size.X==22,'and she is correct again: turned to the camera, back at her size')
+ -- when nothing changes there is nothing to write (no bob, camera still): the pose is only rewritten when it changes
+ local cfg=C.FootOffset;C.FootOffset=0;frames(60);cfWrites=0;frames(120)
+ check(cfWrites==0,'with nothing moving (no bob offset, camera still, settled) she is not rewritten at all ('..cfWrites..' writes)');C.FootOffset=cfg
+ aim(0,20,-300);frames(100)
 end
 -- 4. The dialog -----------------------------------------------------------------------------------------------------------------------
 local gBefore=greetings()

@@ -103,6 +103,12 @@ local S=C.Sign
 local MARK_BASE=(S.Mark.Top+S.Mark.Height)/S.H     -- the glyph rests on the bottom of its row
 local MARK_BOUNCE=S.Mark.Bounce/S.H
 local function markAt(lift)return UDim2.fromScale(.5,MARK_BASE-lift)end
+local function settle(e) -- back to how the server placed her (one write, only if she had been moved)
+ if not e.Moved then return end
+ e.Moved=false;e.Yaw=e.Yaw0;e.Talk=0;e.Scale=1;e.LastY=nil;e.LastYaw=nil;e.LastScale=nil
+ e.Body.Size=Vector3.new(e.Size,e.Size,e.Size);e.Body.CFrame=e.Home
+ if e.Mark.Parent then e.Mark.Position=markAt(0)end
+end
 local function refreshTimer()
  local e=entry;if not e or not e.Timer.Parent then return end
  local text,live=eventTimerText();e.Timer.Text=text;e.Timer.TextColor3=live and C.EventColor or RED
@@ -143,6 +149,7 @@ local function attach(model)
 end
 local function detach(model)
  if entry and entry.Model==model then
+  if entry.Body.Parent then settle(entry)end -- leave her as the server placed her (the next entry reads that as home)
   if entry.Mark then entry.Mark:Destroy()end
   if entry.Timer then entry.Timer:Destroy()end
   if voice.Sound then voice.Sound:Destroy();voice.Sound=nil;voice.Checked=false;voice.Playing=false end
@@ -156,6 +163,9 @@ do -- (the model may already be in the map without the tag having replicated yet
  if model then attach(model)end
 end
 -- Each frame: turn to the camera, bob, swell while she talks, bounce the "?"; four times a second, greet whoever came close.
+-- Her Body is a big collidable, queryable anchored ball, so it is only written to when it matters: not at all while the camera is
+-- beyond VerityConfig.AnimateDistance (she is set back to how the server placed her once, then left alone; her sign is not drawn
+-- that far either) and not on a frame where nothing about her pose changed. Coming back, she picks up again from the rest pose.
 local function playerRoot()
  local character=player.Character;return character and character:FindFirstChild('HumanoidRootPart')
 end
@@ -173,15 +183,9 @@ watch(Run.RenderStepped,function(dt)
    e.Near=near
   end
  end
- if GuiService.ReducedMotionEnabled then
-  if e.Moved then -- back to how the server placed her
-   e.Moved=false;e.Yaw=e.Yaw0;e.Talk=0;e.Scale=1;e.Body.Size=Vector3.new(e.Size,e.Size,e.Size);e.Body.CFrame=e.Home
-   if e.Mark.Parent then e.Mark.Position=markAt(0)end
-  end
-  return
- end
- local now=os.clock()
  local camera=workspace.CurrentCamera
+ if GuiService.ReducedMotionEnabled or(camera and(camera.CFrame.Position-e.Base).Magnitude>C.AnimateDistance)then settle(e);return end
+ local now=os.clock()
  if camera then
   local to=camera.CFrame.Position-e.Base;local flat=math.sqrt(to.X*to.X+to.Z*to.Z)
   if flat>1 then
@@ -192,9 +196,13 @@ watch(Run.RenderStepped,function(dt)
  local want=speaking()and 1 or 0
  e.Talk+=(want-e.Talk)*(1-math.exp(-10*dt));if want==0 and e.Talk<.002 then e.Talk=0 end
  local scale=1+C.TalkPulse*e.Talk*(.5+.5*math.sin(now*C.TalkPulseRate))
- if scale~=e.Scale then e.Scale=scale;local d=e.Size*scale;e.Body.Size=Vector3.new(d,d,d)end
+ if scale~=e.Scale then e.Scale=scale;local d=e.Size*scale;e.Body.Size=Vector3.new(d,d,d);e.Moved=true end
  local lift=e.Size*(scale-1)/2
- e.Body.CFrame=CFrame.new(e.Base+Vector3.new(0,math.sin(now*1.4)*C.FootOffset+lift,0))*CFrame.Angles(0,e.Yaw,0);e.Moved=true
+ local y=e.Base.Y+math.sin(now*1.4)*C.FootOffset+lift
+ if not e.LastY or math.abs(y-e.LastY)>1e-3 or math.abs(wrap(e.Yaw-e.LastYaw))>1e-4 then -- nothing changed: no write
+  e.LastY=y;e.LastYaw=e.Yaw;e.Moved=true
+  e.Body.CFrame=CFrame.new(e.Base.X,y,e.Base.Z)*CFrame.Angles(0,e.Yaw,0)
+ end
  if e.Has and e.Mark.Parent then e.Mark.Position=markAt(math.abs(math.sin(now*4.2))*MARK_BOUNCE)end
 end)
 -- Re-count the Void Tools whenever Tools come and go in the Backpack or the Character (and once a second, in case an
@@ -403,7 +411,7 @@ gui.Destroying:Connect(function()
  if entry then
   if entry.Mark then entry.Mark:Destroy()end
   if entry.Timer then entry.Timer:Destroy()end
-  if entry.Moved and entry.Body.Parent then entry.Body.Size=Vector3.new(entry.Size,entry.Size,entry.Size);entry.Body.CFrame=entry.Home end -- leave her as the server placed her
+  if entry.Body.Parent then settle(entry)end -- leave her as the server placed her
   if voice.Sound then voice.Sound:Destroy();voice.Sound=nil end
   entry=nil
  end

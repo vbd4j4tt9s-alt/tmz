@@ -416,12 +416,30 @@ do
  check(count(K,VERITY)==2 and count(K,VOID)==4 and #convertCalls==2,'6 quick Gives: only the burst of 2 goes through ('..count(K,VERITY)..' converted)')
  check(#inbox(K)-before==2 and msgs(K,'Done')==2 and msgs(K,'Refused')==0,'the other 4 are dropped without an answer')
  R.advance(1.05);remote.OnServerEvent:Fire(K,'Give');check(count(K,VERITY)==3,'a second later one more goes through')
- -- Refusals do not use up the budget: the player can still hand in right after being told "come closer".
+ -- The rate gate comes first (R148 review): every refusal counts against the same budget and an over-limit request gets NO reply at all
+ -- (no refusal text, nothing), whatever it would have been refused for.
  local L=makePlayer('Lou');local _,root=spawn(L,0,7,-250);void(L,1)
  for _=1,5 do remote.OnServerEvent:Fire(L,'Give')end
- check(msgs(L,'Refused')==5,'five refusals for being too far are all answered')
+ check(msgs(L,'Refused')==2 and #inbox(L)==2,'five quick Gives from too far away: only the burst of 2 is answered ("come closer"), the other 3 get no reply ('..msgs(L,'Refused')..' replies)')
  root.CFrame=R.CFrame.new(STAND.X,STAND.Y,STAND.Z);remote.OnServerEvent:Fire(L,'Give')
- check(count(L,VERITY)==1,'and the next, in range, still works')
+ check(count(L,VERITY)==0 and #inbox(L)==2,'and the next one, now in range, is dropped too until the budget refills (the spammer has to wait)')
+ R.advance(2.05);remote.OnServerEvent:Fire(L,'Give')
+ check(count(L,VERITY)==1,'a couple of seconds later it goes through')
+ -- The same for every other early refusal: replies are capped at the burst.
+ local function replies(name,p,setup,undo)
+  R.advance(3);if setup then setup()end
+  local n0=#inbox(p);local d0=#convertCalls
+  for _=1,8 do remote.OnServerEvent:Fire(p,'Give')end
+  check(#inbox(p)-n0==2 and #convertCalls==d0,name..': 8 quick Gives, 2 replies (the burst), the other 6 silent ('..(#inbox(p)-n0)..')')
+  if undo then undo()end
+ end
+ local Q=makePlayer('Quin');local _,qroot=spawn(Q);void(Q,2)
+ replies('data not loaded',Q,function()Data.Loaded[Q]=false end,function()Data.Loaded[Q]=true end)
+ replies('data cannot save',Q,function()Data.CanSave[Q]=false end,function()Data.CanSave[Q]=true end)
+ replies('too far',Q,function()qroot.CFrame=R.CFrame.new(0,7,-250)end,function()qroot.CFrame=R.CFrame.new(STAND.X,STAND.Y,STAND.Z)end)
+ replies('carrying',Q,function()Q:SetAttribute('ChestChaseSeedCarrying',true)end,function()Q:SetAttribute('ChestChaseSeedCarrying',nil)end)
+ replies('ragdolled',Q,function()Q:SetAttribute('GuardianRagdollActive',true)end,function()Q:SetAttribute('GuardianRagdollActive',nil)end)
+ replies('no Void pack',Q,function()for _,r in ipairs(table.clone(Data:GetChestRecords(Q)))do if r.BagVariant==VOID then Data:RemoveChest(Q,r.Id)end end end)
 end
 -- Hostile remote calls: wrong action, arguments, a table that loops. Nothing happens.
 do
@@ -455,14 +473,17 @@ do
  local Y=makePlayer('Yan');spawn(Y)
  refusal('ended, and no Void pack at all',Y,C.Reasons.EventEnded)
  -- Spam after the end: refused (never converted), still rate limited like any hand-in.
- convertCalls={};for _=1,6 do remote.OnServerEvent:Fire(Z,'Give')end
+ R.advance(3);convertCalls={};local r0=#inbox(Z);for _=1,6 do remote.OnServerEvent:Fire(Z,'Give')end
  check(#convertCalls==0 and count(Z,VOID)==1 and count(Z,VERITY)==2,'six quick Gives after the end convert nothing')
+ check(#inbox(Z)-r0==2 and msgs(Z,'Refused')>=2,'and only the burst of 2 is answered with EVENT ENDED: the 4 over-limit ones get no reply at all ('..(#inbox(Z)-r0)..' replies)')
+ local lastReply=last(Z);check(lastReply.Args[1]=='Refused'and lastReply.Args[2].Reason==C.Reasons.EventEnded,'(the replies are the event-ended refusal)')
  -- Talking still works (the dialog opens, and says EVENT ENDED).
  R.advance(1.2);local n0=msgs(Z,'Open');prompt.Triggered:Fire(Z)
  local om=last(Z);check(msgs(Z,'Open')==n0+1 and om.Args[1]=='Open'and om.Args[2].VoidPacks==1 and om.Args[2].Delivered==2,'she still opens her dialog after the end (1 Void pack, 2 handed in)')
  -- The real LimitedEvent text format.
  check(Limited.Text(27*86400+4*3600+12*60+9)=='27d 04h 12m 09s'and Limited.Text(0)=='0d 00h 00m 00s'and Limited.Left(Limited.EndsAt+5)==0 and not Limited.Active(Limited.EndsAt)and Limited.Active(Limited.EndsAt-1),'LimitedEvent: "27d 04h 12m 09s", 0 at and after the end')
- R.clock=before;R.advance(0);R.advance(2)
+ R.clock=before;Gate.Cleanup(Z) -- (the clock only runs forward in the game: start the budget afresh after setting it back)
+ R.advance(2)
  ok=service:Give(Z);check(ok and count(Z,VERITY)==3 and count(Z,VOID)==0,'with the clock back before the end (the event running) the same player can hand in again')
 end
 -- A player who leaves between the click and the check is ignored.

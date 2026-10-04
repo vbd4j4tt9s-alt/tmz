@@ -50,6 +50,7 @@ C.GreetingVolume=.8
 C.GreetingRollOffMin=30;C.GreetingRollOffMax=140   -- studs: full volume inside the min, fading out (InverseTapered) to the max
 C.GreetingDistance=30              -- studs from her: coming this close greets you...
 C.GreetingCooldown=60              -- ...at most once a minute (a greeting from Talk counts as the last one)
+C.AnimateDistance=300             -- clients beyond this many studs from her leave her body alone (no turn / bob / swell writes)
 C.TalkPulse=.06                    -- how much she swells (fraction of her size) while the voice plays
 C.TalkPulseRate=18                 -- radians a second
 -- Security --------------------------------------------------------------------------------------------------------------
