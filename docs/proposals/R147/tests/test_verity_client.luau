@@ -331,7 +331,7 @@ local refVoidNames,refVerityNames={}, {};for _,p in ipairs(partsOf(refVoid))do r
 local voidParts=vv and partsOf(vv)or{};local veParts=ve and partsOf(ve)or{}
 local allVoid=#voidParts>0;for _,p in ipairs(voidParts)do if not refVoidNames[p.Name]then allVoid=false end end
 check(#voidParts>=#partsOf(refVoid)*.8 and #voidParts>100 and allVoid,'the Void picture is built from the real Void pack model ('..#voidParts..' of its '..#partsOf(refVoid)..' parts, all of them the model\'s own)')
-check(#veParts>=1 and ve:FindFirstChild('VerityCard',true)~=nil,'the Verity picture is built from the real Verity pack model (its VerityCard, '..#veParts..' part)')
+check(#veParts>=1 and ve:FindFirstChild('VerityPicture',true)~=nil,'the Verity picture is built from the real Verity pack model (the yellow pack with its smiley Decal, '..#veParts..' parts)') -- R148: the pack is the plain pack painted yellow
 local vd=ve and decalsOf(ve)or{};check(#vd==2 and vd[1].Texture==C.Image and vd[2].Texture==C.Image,'with Verity\'s smiley Decals on it (the pack art\'s two faces)')
 check(#voidParts~=#veParts,'(two different pictures: the Void pack is not the Verity pack)')
 local function key(variant)return Pictures.Key(F.tool(W,'x',{SeedPackTool=true,SeedInventoryId='k',Stage=7,BagVariant=variant,PackMutation='None'},W.workspace))end
