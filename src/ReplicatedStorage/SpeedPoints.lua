@@ -30,6 +30,28 @@ function P.Exact(v)
  local s=P.Normalize(v):reverse():gsub('(%d%d%d)','%1,'):reverse()
  return(s:gsub('^,',''))
 end
+-- R148 (owner: "the speed needed is in numbers, whole numbers and multiples of 5"): the keeper sign's number. `v` is
+-- the exact points needed (a decimal string, or a number). RoundUp2 rounds it UP to 2 significant figures (so it is never
+-- below the real need; values under 100 go up to the next multiple of 5), as exact decimal text of any size. NeedText
+-- writes that whole, with thousands separators and the largest suffix that keeps the number whole (K M B T Qa ... Dc):
+-- 3800 -> "3,800", 18000 -> "18K", 1.2M -> "1,200K", 2.6B -> "2,600M", 22B -> "22B"; "0" for nothing; "∞" from 10^36 on.
+function P.RoundUp2(v)
+ v=P.Normalize(v);local len=#v
+ if len<=2 then return tostring(math.ceil(tonumber(v)/5)*5)end
+ local lead=tonumber(v:sub(1,2));if v:sub(3):find('[1-9]')then lead+=1 end
+ local zeros=len-2
+ if lead>=100 then lead=10;zeros+=1 end
+ return tostring(lead)..string.rep('0',zeros)
+end
+local NEED_SUFFIXES={'K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'} -- 10^3 ... 10^33
+local function withCommas(digits)return(digits:reverse():gsub('(%d%d%d)','%1,'):reverse():gsub('^,',''))end
+function P.NeedText(v)
+ local r=P.RoundUp2(v);if #r>36 then return'∞'end
+ if #r<=4 then return withCommas(r)end -- below 10,000: in full
+ local zeros=#r-#(r:gsub('0+$',''))
+ local group=math.min(math.floor(zeros/3),#NEED_SUFFIXES)
+ return withCommas(r:sub(1,#r-3*group))..(NEED_SUFFIXES[group]or'')
+end
 function P.Compact(v)
  v=P.Normalize(v);if #v<7 then return v end
  local suffixes={'','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'}
