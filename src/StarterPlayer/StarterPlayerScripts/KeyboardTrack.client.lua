@@ -160,6 +160,8 @@ local function start()
  local layers={}
  local meshLayer
  local meshBound,plainBound=0,0
+ local progress=false                              -- some cell was bound or released this frame
+ local keptMesh,keptPlain=0,0                    -- cells held last frame only to avoid a gap: they do not count against the caps
  local function makeMeshPart(slot)
   local part=template and template:Clone()or Instance.new('Part')
   part.Name='Key';flat(part);part.Size=V3(K.KeySize(),C.KeyY,K.KeySize());part.Transparency=1;part.CFrame=CF(CX,F-200,0)
@@ -177,13 +179,14 @@ local function start()
   local L={I=j,M=pl.M,Kind=pl.Kind,Lv=H[pl.M],NCols=(COLS+pl.M-1)//pl.M,GapM=C.Gap*pl.M,
    Folder=pl.Kind=='plain'and sub('Blocks'..j,folder)or nil,
    Part={},SKey={},SW={},SD={},Free={},FreeN=0,Made=0,SlotOf={},Act={},ActPos={},
-   Blocked={},BlockedDirty=true,Pending=true,
+   Blocked={},BlockedDirty=true,Pending=true,PendingRel=false,Dirty=true,GateFrames=0,Kept=0,
    A=0,B=-1,CA=0,CB=-1,HasHole=false,HA=0,HB=-1,HCA=0,HCB=-1}
   if pl.Kind=='mesh'then L.Part=kPart;meshLayer=L end
   layers[j]=L
  end
 
  local function releaseCell(L,slot)
+  progress=true
   local key=L.SKey[slot]
   L.SlotOf[key]=nil;L.SKey[slot]=0
   listRemove(L.Act,L.ActPos,slot)
@@ -195,14 +198,15 @@ local function start()
  local function acquireCell(L,g,cg)
   local isMesh=L.Kind=='mesh'
   -- (until the keycap template is there the plain blocks also cover the area the keycaps will take, so they may use that share of the cap)
-  if isMesh then if meshBound>=tierCfg.Mesh then return false end
-  elseif plainBound>=tierCfg.Plain+(templateReady and 0 or tierCfg.Mesh)then return false end
+  if isMesh then if meshBound-keptMesh>=tierCfg.Mesh then return false end
+  elseif plainBound-keptPlain>=tierCfg.Plain+(templateReady and 0 or tierCfg.Mesh)then return false end
   local slot
   if L.FreeN>0 then slot=L.Free[L.FreeN];L.Free[L.FreeN]=nil;L.FreeN-=1
   else
    slot=L.Made+1;L.Made=slot
    if isMesh then makeMeshPart(slot)else L.Part[slot]=makePlainPart(L);L.SW[slot]=K.KeySize()*L.M;L.SD[slot]=K.KeySize()*L.M end
   end
+  progress=true
   local key=g*64+cg
   local lv,m=L.Lv,L.M
   local r0,r1=lv.R0[g],lv.R1[g]
@@ -223,27 +227,61 @@ local function start()
    local w=(c1-c0+1)*P-L.GapM;local d=(zmax-zmin)-L.GapM
    if abs(L.SW[slot]-w)>1e-6 or abs(L.SD[slot]-d)>1e-6 then L.SW[slot]=w;L.SD[slot]=d;part.Size=V3(w,C.BlockY,d)end
    plainBound+=1
-   stN+=1;stP[stN]=part;stC[stN]=CF(x,K.BlockCenterY(),z)
+   stN+=1;stP[stN]=part;stC[stN]=CF(x,K.BlockCenterY(L.I),z)
   end
   return true
  end
- -- Bring one layer in line with its window (release what left it, bind what entered it, nearest rows first).
- local function syncLayer(L,w,budget)
+ -- Window state of a layer for this frame (the plan: K.Windows).
+ local function loadWindow(L,w)
   local hole=w.HasHole
   local ha,hb,hca,hcb=0,-1,0,-1
   if hole then local h=w.Hole;ha,hb,hca,hcb=h.A,h.B,h.CA,h.CB end
-  local changed=L.BlockedDirty or L.A~=w.A or L.B~=w.B or L.CA~=w.CA or L.CB~=w.CB or L.HasHole~=hole or(hole and(L.HA~=ha or L.HB~=hb or L.HCA~=hca or L.HCB~=hcb))
-  if not changed and not L.Pending then return end
+  if L.BlockedDirty or L.A~=w.A or L.B~=w.B or L.CA~=w.CA or L.CB~=w.CB or L.HasHole~=hole or(hole and(L.HA~=ha or L.HB~=hb or L.HCA~=hca or L.HCB~=hcb))then L.Dirty=true end
   L.A,L.B,L.CA,L.CB,L.HasHole,L.HA,L.HB,L.HCA,L.HCB=w.A,w.B,w.CA,w.CB,hole,ha,hb,hca,hcb
   L.BlockedDirty=false
-  local a,b,ca,cb=w.A,w.B,w.CA,w.CB
-  local blocked,slotOf=L.Blocked,L.SlotOf
-  for i=#L.Act,1,-1 do
-   local slot=L.Act[i];local key=L.SKey[slot];local g=key//64;local cg=key%64
-   if g<a or g>b or cg<ca or cg>cb or(hole and g>=ha and g<=hb and cg>=hca and cg<=hcb)or blocked[key]then releaseCell(L,slot)end
+ end
+ -- Is the region of cell (g, cg) of layer j wholly drawn by bound cells of the finer layers? (cleared cells count as drawn: the gap is meant)
+ local function coveredBelow(j,g,cg)
+  local f=layers[j-1];if not f then return false end
+  local L=layers[j]
+  if f.M==L.M then
+   local key=g*64+cg
+   return f.SlotOf[key]~=nil or f.Blocked[key]==true or coveredBelow(j-1,g,cg)
   end
+  local ord=H.Ord[f.M];local lv=L.Lv
+  local o0,o1=ord[lv.R0[g]],ord[lv.R1[g]]
+  local c0,c1=(cg-1)*2+1,min(f.NCols,cg*2)
+  for gg=o0,o1 do for cc=c0,c1 do
+   local key=gg*64+cc
+   if not(f.SlotOf[key]~=nil or f.Blocked[key]==true or coveredBelow(j-1,gg,cc))then return false end
+  end end
+  return true
+ end
+ -- The cell of layer k (coarser than j) that holds cell (g, cg) of layer j.
+ local function aboveKey(j,g,cg,k)
+  local L=layers[j];local Lk=layers[k]
+  return H.Ord[Lk.M][L.Lv.R0[g]]*64+((cg-1)*L.M)//Lk.M+1
+ end
+ local function boundAbove(j,g,cg)
+  for k=j+1,#layers do
+   local Lk=layers[k];local key=aboveKey(j,g,cg,k)
+   if Lk.SlotOf[key]~=nil or Lk.Blocked[key]==true then return true end
+  end
+  return false
+ end
+ local function insideOuter(j,g,cg)
+  local n=#layers;if j>=n then return false end
+  local O=layers[n];local key=aboveKey(j,g,cg,n);local og,ocg=key//64,key%64
+  return og>=O.A and og<=O.B and ocg>=O.CA and ocg<=O.CB
+ end
+ -- Bind what the plan wants and the layer lacks, nearest rows first (budgeted). Cells are never left bare: a coarser cell stays until
+ -- the finer cells that replace it are bound, a finer cell stays until the coarser one that replaces it is (see releasePass).
+ local function acquirePass(L,budget)
   L.Pending=false
+  local a,b,ca,cb=L.A,L.B,L.CA,L.CB
   if b<a or cb<ca then return end
+  local hole=L.HasHole;local ha,hb,hca,hcb=L.HA,L.HB,L.HCA,L.HCB
+  local blocked,slotOf=L.Blocked,L.SlotOf
   local center=max(a,min(b,K.NearestOrd(H,L.M,focusRow)))
   local used=0
   for d=0,max(center-a,b-center)do
@@ -263,7 +301,33 @@ local function start()
    end
   end
  end
-
+ -- Release what the plan no longer wants - but only once the region is drawn some other way (a gap would show the dark bed). Two kinds:
+ --  * outside the layer's window (the runner moved on): kept until a coarser cell holds the region; cleared cells (holes, platforms) go at once;
+ --  * inside the window but under the finer layer's hole: kept until the finer cells that replace it are bound (they sit higher, so the overlap
+ --    never z-fights).
+ -- A cell stuck for GateStallFrames is released anyway.
+ local function releaseOutside(L)
+  local force=L.GateFrames>=C.GateStallFrames
+  local j=L.I
+  for i=#L.Act,1,-1 do
+   local slot=L.Act[i];local key=L.SKey[slot];local g=key//64;local cg=key%64
+   if L.Blocked[key]then releaseCell(L,slot)
+   elseif g<L.A or g>L.B or cg<L.CA or cg>L.CB then
+    if not force and insideOuter(j,g,cg)and not boundAbove(j,g,cg)then L.Kept+=1 else releaseCell(L,slot)end
+   end
+  end
+ end
+ local function releaseHole(L)
+  if not L.HasHole then return end
+  local force=L.GateFrames>=C.GateStallFrames
+  local j=L.I;local ha,hb,hca,hcb=L.HA,L.HB,L.HCA,L.HCB
+  for i=#L.Act,1,-1 do
+   local slot=L.Act[i];local key=L.SKey[slot];local g=key//64;local cg=key%64
+   if g>=ha and g<=hb and cg>=hca and cg<=hcb and g>=L.A and g<=L.B and cg>=L.CA and cg<=L.CB then
+    if force or coveredBelow(j,g,cg)then releaseCell(L,slot)else L.Kept+=1 end
+   end
+  end
+ end
  -- Spacebars: one cream bar per biome start, always present ------------------------------------------------------
  local bars=geo.Bars
  local cr,cg2,cb2=K.CreamRGB()
@@ -485,7 +549,24 @@ local function start()
   if not holesFolder then holesFolder=map:FindFirstChild('TrackHoles',true)end
   return holesFolder
  end
- local raised=setmetatable({},{__mode='k'})
+-- The hole parts were authored to sit a few hundredths above the floor; every part is lifted above the dark bed, once per PART (a part
+ -- streamed in again is a new instance at the server height). TrackHoleClient.grow tweens crumbs back to the frames it captured, which can
+ -- undo a lift for 0.3 s: a part found again at its server height is lifted again. Lifting is relative to the part's current position.
+ local liftBase,liftSet=setmetatable({},{__mode='k'}),setmetatable({},{__mode='k'})
+ local function liftPart(d)
+  if not d:IsA('BasePart')then return end
+  local y=d.Position.Y;local base=liftBase[d]
+  if not base then
+   liftBase[d]=y;liftSet[d]=y+C.BedRise;d.Position=d.Position+V3(0,C.BedRise,0)
+  elseif abs(y-liftSet[d])>1e-3 and abs(y-base)<1e-3 then
+   d.Position=d.Position+V3(0,C.BedRise,0)
+  end
+ end
+ local function liftAny(d)
+  if d:IsA('BasePart')then liftPart(d)
+  elseif d:IsA('Model')then for _,x in ipairs(d:GetDescendants())do liftPart(x)end end
+ end
+ local liftHook,liftHooked=nil,nil
  local function rebuildBlocked()
   for _,L in ipairs(layers)do
    local set={};local m=L.M;local ord=H.Ord[m]
@@ -514,16 +595,17 @@ local function start()
   local sig=0;local nh,np=0,0
   local f=findHoles()
   local holes={}
+  if f and f~=liftHooked then
+   -- parts that appear later (streamed in, rebuilt) are lifted at once, not on the next scan
+   if liftHook then liftHook:Disconnect()end
+   liftHooked=f;liftHook=f.DescendantAdded:Connect(liftAny);table.insert(conns,liftHook)
+  end
   if f then
    for _,model in ipairs(f:GetChildren())do
     local pit=model:FindFirstChild('Pit')
     if pit then
      holes[#holes+1]=pit
-     if not raised[model]then
-      -- the parts were authored to sit a few hundredths above the floor; lift them above the dark bed
-      raised[model]=true
-      for _,d in ipairs(model:GetDescendants())do if d:IsA('BasePart')then d.Position=d.Position+V3(0,C.BedRise,0)end end
-     end
+     for _,d in ipairs(model:GetDescendants())do liftPart(d)end
     end
    end
   end
@@ -574,7 +656,7 @@ local function start()
   local r=geo.RowOfZ(focusZ);focusRow=max(1,min(geo.Rows,r))
   focusCol=max(1,min(COLS,geo.ColOfX(focusX)))
  end
- local budgetMesh,budgetPlain,budgetCoarse=C.MaxReassignPerFrame.mesh,C.MaxReassignPerFrame.plain,C.MaxReassignPerFrame.coarse
+ local BM=C.MaxReassignPerFrame
  local function step(dt)
   now=clock();frameNo+=1;reduced=Gui.ReducedMotionEnabled==true
   updateFocus()
@@ -594,11 +676,34 @@ local function start()
    -- no keycaps yet: the plain layer next to them covers their area meanwhile
    wins[1].B=wins[1].A-1;if wins[2]then wins[2].HasHole=false end
   end
-  for j=1,#layers do
+  for j=1,#layers do loadWindow(layers[j],wins[j])end
+  -- cell bindings per layer this frame; a slower frame (more distance covered) gets proportionally more
+  local scale=min(2,max(1,dt*60))
+  local bMesh,bPlain,bCoarse=floor(BM.mesh*scale),floor(BM.plain*scale),floor(BM.coarse*scale)
+  local n=#layers
+  -- coarse to fine: a cell that left its window goes once the coarser layer holds its region (that layer was just served), freeing
+  -- room before the layer binds what entered; then fine to coarse: cells under a finer window go once the finer cells are bound
+  for j=n,1,-1 do
    local L=layers[j]
-   if L.Kind=='mesh'then if templateReady then syncLayer(L,wins[j],budgetMesh)end
-   else syncLayer(L,wins[j],L.M==1 and budgetPlain or budgetCoarse)end
+   if L.Kind~='mesh'or templateReady then
+    L.Kept=0
+    if L.Dirty or L.PendingRel then releaseOutside(L)end
+    if L.Dirty or L.Pending then acquirePass(L,L.Kind=='mesh'and bMesh or L.M==1 and bPlain or bCoarse)end
+   end
   end
+  keptMesh,keptPlain=0,0
+  for j=1,n do
+   local L=layers[j]
+   if L.Kind~='mesh'or templateReady then
+    if L.Dirty or L.PendingRel then releaseHole(L)end
+    if L.Kind=='mesh'then keptMesh+=L.Kept else keptPlain+=L.Kept end
+    L.PendingRel=L.Kept>0
+    L.Dirty=false
+   end
+  end
+  -- the stall valve: layers that keep cells while nothing at all is being bound or released are stuck (cap deadlock): after a while let go
+  for j=1,n do local L=layers[j];if L.PendingRel and not progress then L.GateFrames+=1 else L.GateFrames=0 end end
+  progress=false
   -- presses: the local runner every frame, everyone else from the last 30 Hz sample
   if tSample>=1/C.PlayerSampleHz then tSample=tSample%(1/C.PlayerSampleHz);sampleOthers()end
   if hasRoot and humRef and humRef.Health>0 and humRef.FloorMaterial~=AIR then

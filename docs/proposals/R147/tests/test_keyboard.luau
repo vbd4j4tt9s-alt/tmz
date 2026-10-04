@@ -127,7 +127,7 @@ check(seqOk,'every row of every biome reads as a contiguous stretch of its keybo
 check(K.Ease.QuadOut(0)==0 and K.Ease.QuadOut(1)==1 and K.Ease.QuadOut(.5)==.75 and K.Ease.Linear(.3)==.3,'ease: quad-out and linear')
 local peak=0;for i=0,100 do peak=math.max(peak,K.Ease.BackOut(i/100))end
 check(near(K.Ease.BackOut(0),0)and near(K.Ease.BackOut(1),1)and peak>1.05 and peak<1.2,'ease: back-out overshoots a little and settles at 1 (peak '..string.format('%.3f',peak)..')')
-check(near(K.KeyTop(0),4.45)and near(K.KeyTop(1),4.1)and near(K.KeyCenterY(0),4.45-1.3/2)and near(K.BlockCenterY(),4.45-.3),'key heights: rest top 4.45, pressed top 4.10')
+check(near(K.KeyTop(0),4.45)and near(K.KeyTop(1),4.1)and near(K.KeyCenterY(0),4.45-1.3/2)and near(K.BlockCenterY(2),4.45-.03-.3)and near(K.BlockCenterY(6),4.45-.15-.3),'key heights: rest top 4.45, pressed top 4.10; plain layers 2..6 sit 0.03 lower each (a finer block always wins an overlap)')
 check(K.KeeperFootprint(2,2)==1.5 and K.KeeperFootprint(10,12)==3 and K.KeeperFootprint(60,80)==6,'keeper footprint = clamp(0.3 * min extent, 1.5, 6)')
 local segs=K.Segments(g.Z0,g.KeyEndZ,1024);local contiguous=true;local total=0
 for i,s in ipairs(segs)do total+=s.Length;if s.Length>1024+1e-9 or(i>1 and not near(s.Z0,segs[i-1].Z1))then contiguous=false end end
@@ -315,10 +315,10 @@ local function coverIndex(list)
    local k=bx..':'..bz;local b=buckets[k];if not b then b={};buckets[k]=b end;b[#b+1]=rec
   end end
  end
- return function(x,z)
-  local b=buckets[floor(x/B)..':'..floor(z/B)];local n,first=0,nil
-  if b then for _,r in ipairs(b)do if x>r[1]+1e-6 and x<r[2]-1e-6 and z>r[3]+1e-6 and z<r[4]-1e-6 then n+=1;first=first or r[5]end end end
-  return n,first
+ return function(x,z,all)
+  local b=buckets[floor(x/B)..':'..floor(z/B)];local n,first=0,nil;local list=all and{}or nil
+  if b then for _,r in ipairs(b)do if x>r[1]+1e-6 and x<r[2]-1e-6 and z>r[3]+1e-6 and z<r[4]-1e-6 then n+=1;first=first or r[5];if list then list[#list+1]=r[5]end end end end
+  return n,first,list
  end
 end
 local function meshAt(row,col)
@@ -579,6 +579,70 @@ check(distinct>=4,'own click pitch varies between steps ('..distinct..' differen
 frames(40)
 coverageAt(z,'after the sprint')
 end
+-- 4b. fast runners never see bare floor: a coarse layer keeps a cell until the finer cells that replace it are bound, a finer layer keeps
+-- one until the coarser cell is, so the dark bed never shows around or ahead of the runner however fast he goes
+do
+ local rankOf={[1]=1,[2]=2,[4]=3,[8]=4,[16]=5}
+ local function rank(p)local m=tonumber(p.Name:match('^K(%d+)$'));return m and rankOf[m]or 0 end
+ local XS={-89.9,-71.3,-52.1,-33.7,-14.2,-.3,.3,13.9,31.1,49.9,68.3,89.9}
+ local summary={}
+ local base={mesh=bm.mesh,plain=bm.plain,coarse=bm.coarse};local totalDoubles=0
+ for _,cfg in ipairs({{300,60},{300,45},{500,60},{500,45},{1000,60},{1000,45},{500,60,'starved'}})do
+  local speed,fps,starved=cfg[1],cfg[2],cfg[3]
+  if starved then bm.mesh,bm.plain,bm.coarse=16,40,16 else bm.mesh,bm.plain,bm.coarse=base.mesh,base.plain,base.coarse end
+  hum.FloorMaterial=PLASTIC;put(cx(30),nil,cz(BR));frames(starved and 400 or 80)
+  local z=cz(BR);local bare,probes,doubles,badOrder=0,0,0,0
+  local overBudget,maxMesh,maxPlain,underNo,samples=0,0,0,0,0
+  local scale=math.min(2,math.max(1,60/fps))
+  local allowed={mesh=math.floor(bm.mesh*scale),K1=math.floor(bm.plain*scale),K2=math.floor(bm.coarse*scale),K4=math.floor(bm.coarse*scale),K8=math.floor(bm.coarse*scale),K16=math.floor(bm.coarse*scale)}
+  for f=1,fps*3 do
+   z+=speed/fps;put(cx(30),nil,z);resetWrites()
+   frames(1,1/fps)
+   for k,v in pairs(writes)do if v>allowed[k]then overBudget+=1 end end
+   if f%4==0 then
+    local list=shown();local cover=coverIndex(list);samples+=1
+    local m,p=0,0;for _,part in ipairs(list)do if part.Name=='Key'then m+=1 elseif part.Name:find('^K%d')then p+=1 end end
+    maxMesh=math.max(maxMesh,m);maxPlain=math.max(maxPlain,p)
+    local _,under=cover(cx(30),z);if not under or under.Name~='Key'then underNo+=1 end
+    local zz=z-45+.0123
+    while zz<=z+90 do
+     for _,x in ipairs(XS)do
+      local n,_,all=cover(x,zz,true);probes+=1
+      if n==0 then bare+=1
+      elseif n>1 then
+       doubles+=1;table.sort(all,function(a,b)return rank(a)<rank(b)end)
+       for i=2,#all do if rank(all[i-1])>=1 and rank(all[i])>rank(all[i-1])and top(all[i-1])<=top(all[i])+1e-9 then badOrder+=1 end end
+      end
+     end
+     zz+=1.7
+    end
+   end
+  end
+  totalDoubles+=doubles
+  summary[#summary+1]=('%d@%d%s: %d bare/%d probes, mesh<=%d, plain<=%d, no keycap under the runner in %d/%d'):format(speed,fps,starved and' starved'or'',bare,probes,maxMesh,maxPlain,underNo,samples)
+  check(bare==0,('%d studs/s at %d fps%s: no bare floor from 45 behind to 90 ahead of the runner, any frame (%d probes, %d bare)'):format(speed,fps,starved and' with the budgets cut to a tenth (the layers lag, the floor never shows)'or'',probes,bare))
+  if starved then check(maxMesh<=620,'(the starved run really lags: at most '..maxMesh..' of 676 keycaps ever drawn)')end
+  check(overBudget==0,('%d studs/s at %d fps: every layer binds at most its per-frame budget x min(2, dt*60)'):format(speed,fps))
+  check(maxMesh<=700 and maxPlain<=2500,('%d studs/s at %d fps: the caps hold while sprinting (%d keycaps, %d plain keys)'):format(speed,fps,maxMesh,maxPlain))
+  check(badOrder==0,('%d studs/s at %d fps: where two layers overlap for a frame the finer block is the higher one (%d overlaps)'):format(speed,fps,doubles))
+  if speed<=500 and fps>=60 and not starved then check(underNo<=samples*.1,('%d studs/s at %d fps: the keycaps keep up under the runner (%d of %d samples without)'):format(speed,fps,underNo,samples))end
+  frames(starved and 600 or 80);coverageAt(z,('after %d@%d'):format(speed,fps),300,600)
+ end
+ bm.mesh,bm.plain,bm.coarse=base.mesh,base.plain,base.coarse
+ print('sprints: '..table.concat(summary,' | ')..' | overlaps seen: '..totalDoubles)
+ check(totalDoubles>0,'(the sprints did exercise overlapping layers: '..totalDoubles..' probes with two blocks)')
+end
+-- the per-frame budgets are raised and scale with the frame time (a slower frame has more distance to cover), never beyond twice
+do
+ check(bm.mesh>=160 and bm.plain>=360 and bm.coarse>=100,'budgets: at least 160 keycaps, 360 plain keys, 100 coarse blocks per layer per frame')
+ local zs={2400,3300,4200,5100}
+ for i,dt in ipairs({1/60,1/45,1/30,1/15})do
+  hum.FloorMaterial=AIR;put(cx(30),nil,zs[i]);resetWrites();frames(1,dt)
+  local sc=math.min(2,math.max(1,dt*60))
+  check(writes.mesh==math.floor(bm.mesh*sc)and writes.K1==math.floor(bm.plain*sc)and writes.K2==math.floor(bm.coarse*sc),('a %.0f fps frame binds the full budget x %.2f: %d keycaps, %d plain keys, %d 2x2 blocks (got %d / %d / %d)'):format(1/dt,sc,math.floor(bm.mesh*sc),math.floor(bm.plain*sc),math.floor(bm.coarse*sc),writes.mesh,writes.K1,writes.K2))
+ end
+ frames(60)
+end
 -- 5. trips of 1000+ studs and back: nothing leaks, nothing exceeds the caps
 do
 put(cx(30),nil,cz(BR));frames(60)
@@ -607,6 +671,55 @@ local function allWrites()return writes.mesh+writes.K1+writes.K2+writes.K4+write
 for f=1,18 do local before=allWrites();frames(1);perFrame[f]=allWrites()-before end
 local mx=0;for _,v in ipairs(perFrame)do mx=math.max(mx,v)end
 check(mx<=bm.mesh+bm.plain+4*bm.coarse and perFrame[1]>0,'a teleport re-dresses the keys at a bounded rate per frame ('..table.concat(perFrame,',')..')')
+end
+-- a teleport (respawn, a teleport pad) never shows bare floor either: the cells that were there stay until the ones that replace them are bound
+do
+ local XS={-89.9,-71.3,-52.1,-33.7,-14.2,-.3,.3,13.9,31.1,49.9,68.3,89.9}
+ local allowed={mesh=bm.mesh,K1=bm.plain,K2=bm.coarse,K4=bm.coarse,K8=bm.coarse,K16=bm.coarse}
+ local function around(z)
+  local list=shown();local cover=coverIndex(list);local bare,dbl,m,p=0,0,0,0
+  for _,part in ipairs(list)do if part.Name=='Key'then m+=1 elseif part.Name:find('^K%d')then p+=1 end end
+  local zz=z-45+.0123
+  while zz<=z+90 do
+   for _,x in ipairs(XS)do local n=cover(x,zz,true);if n==0 then bare+=1 elseif n>1 then dbl+=1 end end
+   zz+=1.7
+  end
+  return bare,dbl,m,p
+ end
+ local function overBudget()for k,v in pairs(writes)do if v>allowed[k]then return true end end return false end
+ local summary={};local totalBare,totalOver,peakM,peakP,settleFrames=0,0,0,0,0
+ for _,jump in ipairs({260,400,700,1500,-260,-700})do
+  hum.FloorMaterial=PLASTIC;put(cx(30),nil,2400);frames(80)
+  local z1=2400+jump;put(cx(30),nil,z1)
+  local settled=nil
+  for f=1,10 do
+   resetWrites();frames(1)
+   if overBudget()then totalOver+=1 end
+   local bare,dbl,m,p=around(z1)
+   totalBare+=bare;peakM=math.max(peakM,m);peakP=math.max(peakP,p)
+   if dbl==0 and not settled then settled=f end
+  end
+  settleFrames=math.max(settleFrames,settled or 99)
+  summary[#summary+1]=('%+d: single cover after %s frames'):format(jump,tostring(settled))
+ end
+ print('teleports: '..table.concat(summary,' | ')..(' | peak %d keycaps, %d plain'):format(peakM,peakP))
+ check(totalBare==0,'teleports of 260 .. 1500 studs: no bare floor from 45 behind to 90 ahead of the runner on any of the next 10 frames ('..totalBare..' bare probes)')
+ check(totalOver==0,'teleports: every layer still binds at most its per-frame budget')
+ check(settleFrames<=8,'teleports: the overlap of old and new cells is gone within 8 frames ('..settleFrames..')')
+ check(peakM<=700 and peakP<=2500,('teleports: the caps hold while the old cells wait (%d keycaps, %d plain keys)'):format(peakM,peakP))
+ -- teleport pads back to back: a jump every 2 frames
+ hum.FloorMaterial=PLASTIC;put(cx(30),nil,2400);frames(80)
+ local seq={900,2900,1500,3600,600,2400,4100,1200,3300,2000,500,3900};local peakM2,peakP2=0,0
+ for i=1,#seq*2 do
+  local z=seq[(i-1)%#seq+1];put(cx(30),nil,z)
+  frames(1)
+  local m,p=0,0;for _,part in ipairs(shown())do if part.Name=='Key'then m+=1 elseif part.Name:find('^K%d')then p+=1 end end
+  peakM2=math.max(peakM2,m);peakP2=math.max(peakP2,p)
+ end
+ print(('rapid teleports: peak %d keycaps, %d plain'):format(peakM2,peakP2))
+ frames(40);coverageAt(seq[(#seq*2-1)%#seq+1],'after twenty-four teleports, one frame apart',300,600)
+ local m,p=counts()
+ check(m<=700 and p<=2500,('after rapid teleports the caps hold (%d keycaps, %d plain keys)'):format(m,p))
 end
 -- 6. other players
 do
@@ -682,7 +795,8 @@ local function dig(id,x,z)
  local m=R.new('Model');m.Name='TrackHole_'..id
  local pit=R.new('Part');pit.Name='Pit';pit.Size=V3(.08,3.4,3.4);pit.CFrame=CF(x,F+.04,z);pit.Parent=m
  local rim=R.new('Part');rim.Name='Rim';rim.Size=V3(.06,4,4);rim.CFrame=CF(x,F+.03,z);rim.Parent=m
- m.PrimaryPart=pit;m.Parent=holes;return m,pit,rim
+ local crumb=R.new('Part');crumb.Name='Crumb';crumb.Size=V3(.3,.3,.3);crumb.CFrame=CF(x+1.9,F+.1,z);crumb.Parent=m
+ m.PrimaryPart=pit;m.Parent=holes;return m,pit,rim,crumb
 end
 put(cx(30),nil,cz(BR));hum.FloorMaterial=PLASTIC;frames(40)
 local function coverAtPoint(x,z)local cover=coverIndex(shown());return cover(x,z)end
@@ -695,6 +809,29 @@ local hiddenAround=0;for _,d in ipairs({{-5.5,0},{5.5,0},{0,-5.5},{0,5.5}})do if
 check(hiddenAround==4,'only the cells next to the Pit are affected (the ones within 2 studs)')
 h1:Destroy();frames(30)
 check(coverAtPoint(hx,hzz)==1,'the keys come back when the hole is filled')
+-- the lift is per part: a part streamed in again is a new instance at the server height and is lifted at once; a crumb that
+-- TrackHoleClient.grow tweens back to the frame it captured before the lift is lifted again; both without touching server code
+do
+ local h5,pit5,rim5,crumb5=dig(5,hx,hzz);frames(2)
+ check(near(crumb5.CFrame.Position.Y,F+.1+C.BedRise,1e-6)and near(pit5.CFrame.Position.Y,F+.04+C.BedRise,1e-6),'every part of a hole (Pit, Rim, crumbs) is lifted by the bed height')
+ pit5:Destroy()
+ local pit5b=R.new('Part');pit5b.Name='Pit';pit5b.Size=V3(.08,3.4,3.4);pit5b.CFrame=CF(hx,F+.04,hzz);pit5b.Parent=h5
+ frames(1)
+ check(near(pit5b.CFrame.Position.Y,F+.04+C.BedRise,1e-6),'a hole part that streams in again (a new instance at the server height) is lifted within a frame')
+ local crumbB=R.new('Part');crumbB.Name='Crumb';crumbB.Size=V3(.3,.3,.3);crumbB.CFrame=CF(hx-1.9,F+.1,hzz);crumbB.Parent=h5;frames(1)
+ check(near(crumbB.CFrame.Position.Y,F+.1+C.BedRise,1e-6),'...also a streamed-in crumb')
+ -- grow(): the crumb jumps to the pit centre and tweens to the (unlifted) frame it captured: mid-tween it is left alone, afterwards lifted again
+ crumb5.Position=V3(hx,F+.35,hzz);frames(8)
+ check(near(crumb5.CFrame.Position.Y,F+.35,1e-6),'a crumb in mid-tween is not touched')
+ crumb5.Position=V3(hx+1.9,F+.1,hzz);frames(30)
+ check(near(crumb5.CFrame.Position.Y,F+.1+C.BedRise,1e-6),'a crumb the tween put back at the server height is lifted again')
+ check(near(pit5b.CFrame.Position.Y,F+.04+C.BedRise,1e-6)and near(crumb5.CFrame.Position.Y,F+.1+C.BedRise,1e-6),'parts already lifted are never lifted twice')
+ -- a whole hole rebuilt (the model streams out and in): lifted too
+ h5:Destroy();frames(5)
+ local h5c,pit5c=dig(6,hx,hzz);frames(1)
+ check(near(pit5c.CFrame.Position.Y,F+.04+C.BedRise,1e-6),'a rebuilt hole model is lifted')
+ h5c:Destroy();frames(30)
+end
 -- hole under the plain block layer, and far away under the coarse blocks
 local plainSpot={cx(30),cz(BR+19)}
 local h2=dig(2,plainSpot[1],plainSpot[2]);frames(30)

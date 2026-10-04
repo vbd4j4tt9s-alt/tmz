@@ -35,7 +35,11 @@ K.Config={
  ClickPitches={.96,1.01,.99,1.05,.97,1.03,1.0,1.06,.98,1.04},   -- own steps cycle through these (0.96 .. 1.06)
  ClickVolume=.8,
  TierHoldSeconds=3,                                 -- a ClientFxBudget tier change applies after it has held this long
- MaxReassignPerFrame={mesh=128,plain=256,coarse=96}, -- cells (re)bound per layer per frame (1000 studs/s = ~5.6 rows/frame)
+ -- cells bound per layer per frame, times min(2, dt * 60) (a slower frame has more distance to cover). 1000 studs/s at 60 fps is ~5.6 rows per
+ -- frame: 26 x 5.6 = 146 keycaps, 60 x 5.6 = 336 plain keys, 30 x 2.8 = 84 of the 2x2 blocks.
+ MaxReassignPerFrame={mesh=160,plain=360,coarse=120},
+ GateStallFrames=150,                               -- a cell kept only to avoid a gap is released anyway after this many frames
+ LayerDrop=.03,                                     -- each coarser layer's tops sit this much lower, so a finer block always wins an overlap
  MaxLegendChangesPerFrame=64,
 }
 local C=K.Config
@@ -74,22 +78,22 @@ K.Ease={
 K.Tiers={
  [3]={Mesh=700,Legends=150,Plain=2500,LegendRadius=20,Layers={
   {M=1, Kind='mesh', Cols=26,Back=9, Ahead=17},
-  {M=1, Kind='plain',Cols=60,Back=11,Ahead=21},
-  {M=2, Kind='plain',Cols=30,Back=10,Ahead=18},
+  {M=1, Kind='plain',Cols=56,Back=10,Ahead=19},
+  {M=2, Kind='plain',Cols=30,Back=9, Ahead=17},
   {M=4, Kind='plain',Cols=15,Back=10,Ahead=20},
   {M=8, Kind='plain',Cols=8, Back=14,Ahead=24},
   {M=16,Kind='plain',Cols=4, Back=20,Ahead=48}}},
  [2]={Mesh=450,Legends=100,Plain=1500,LegendRadius=16.5,Layers={
   {M=1, Kind='mesh', Cols=20,Back=7, Ahead=14},
-  {M=1, Kind='plain',Cols=38,Back=8, Ahead=15},
-  {M=2, Kind='plain',Cols=30,Back=8, Ahead=13},
+  {M=1, Kind='plain',Cols=36,Back=8, Ahead=14},
+  {M=2, Kind='plain',Cols=30,Back=6, Ahead=11},
   {M=4, Kind='plain',Cols=15,Back=8, Ahead=14},
   {M=8, Kind='plain',Cols=8, Back=10,Ahead=18},
   {M=16,Kind='plain',Cols=4, Back=14,Ahead=34}}},
  [1]={Mesh=250,Legends=60,Plain=800,LegendRadius=12.5,Layers={
   {M=1, Kind='mesh', Cols=14,Back=5, Ahead=11},
-  {M=1, Kind='plain',Cols=22,Back=4, Ahead=10},
-  {M=2, Kind='plain',Cols=30,Back=4, Ahead=7},
+  {M=1, Kind='plain',Cols=20,Back=4, Ahead=10},
+  {M=2, Kind='plain',Cols=30,Back=4, Ahead=6},
   {M=4, Kind='plain',Cols=15,Back=5, Ahead=9},
   {M=8, Kind='plain',Cols=8, Back=7, Ahead=12},
   {M=16,Kind='plain',Cols=4, Back=8, Ahead=22}}},
@@ -137,7 +141,9 @@ end
 -- Key heights: depth 0 = resting, 1 = pressed (BackOut may dip below 0 for a moment = the key springs past rest).
 function K.KeyTop(depth)return C.FloorTop+C.RestRise-(C.RestRise-C.PressedRise)*depth end
 function K.KeyCenterY(depth)return K.KeyTop(depth)-C.KeyY/2+C.TopOffset end
-function K.BlockCenterY()return C.FloorTop+C.RestRise-C.BlockY/2 end
+-- Plain blocks of layer i (2 = the plain keys at the keycap pitch, 3 .. 6 = 2x2 .. 16x16 blocks): finer layers sit a touch higher.
+function K.BlockTop(layer)return C.FloorTop+C.RestRise-C.LayerDrop*((layer or 2)-1)end
+function K.BlockCenterY(layer)return K.BlockTop(layer)-C.BlockY/2 end
 function K.KeySize()return C.Pitch-C.Gap end
 function K.KeeperFootprint(extentX,extentZ)
  return math.clamp(C.KeeperFootprintShare*min(extentX,extentZ),C.KeeperMinFootprint,C.KeeperMaxFootprint)
