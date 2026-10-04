@@ -122,6 +122,7 @@ local function runServer()
     local premium=require(modules.PremiumService).new(playerData,chestService,gamePasses)
     local social=require(modules.SocialService).new(playerData,notifications):Start() -- R140: friend boost, plant-ready notifications, daily rollover
     local mystery=require(modules.MysteryPackService).new(Config,playerData,baseService,chestService,notifications,mapService):Start() -- R141: daily mystery pack pedestal
+    local verity;do local ok,err=pcall(function()verity=require(modules.VerityService).new(Config,playerData,chestService,notifications,mapService):Start()end);if not ok then warn('[R147] Verity failed to start: '..tostring(err))end end -- R147: Verity NPC behind the market (a Void pack becomes a Verity pack)
 	require(modules.MovementGuard).Start(Config,playerData,baseService)
 	startupPhase = "connecting chase and training"
 	baseService:SetBusyChecker(function(player)
@@ -152,7 +153,7 @@ local function runServer()
 	local treadmillBonus = construct("TreadmillBonusService", TreadmillBonusService.new, Config, playerData, baseService, chestService, notifications)
 	treadmillBonus:Start()
 	-- R123: owner test commands reach these services through the chase service (ctx.Chase).
-	chaseService.TrackHoles=trackHoles;chaseService.Gifts=gifts;chaseService.TreadmillBonus=treadmillBonus;chaseService.Mystery=mystery
+	chaseService.TrackHoles=trackHoles;chaseService.Gifts=gifts;chaseService.TreadmillBonus=treadmillBonus;chaseService.Mystery=mystery;chaseService.Verity=verity
 	startupPhase = "starting autosave and resetting field"
 	playerData:StartAutosave()
 	mapService:ResetCourse()
