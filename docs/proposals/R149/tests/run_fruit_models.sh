@@ -59,6 +59,15 @@ python3 "$HERE/mkbundle_any.py" "$REPO/src/ReplicatedStorage" "$OUT/new/rs_bundl
  ApprovedPlantArt6Base="$B/ApprovedPlantArt6.lua" ApprovedPlantArtBase="$B/ApprovedPlantArt.lua" PlantArtForest149="$OUT/srcfb/src/ReplicatedStorage/PlantArtForest.lua" \
  PlantArtSnow149="$OUT/srcfb/src/ReplicatedStorage/PlantArtSnow.lua" PlantArtLava149="$OUT/srcfb/src/ReplicatedStorage/PlantArtLava.lua" \
  GardenVisuals="$REPO/src/StarterPlayer/StarterPlayerScripts/GardenVisuals.client.lua" >/dev/null
+# The fallback scenarios run the real GardenVisuals, which needs the checkout's own growth modules (the art comparisons above draw growth with
+# the BASE's PlantGrowth), so they get their own world with nothing swapped for PlantGrowth.
+rm -rf "$OUT/live";mkdir -p "$OUT/live";cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/fruit_mesh_mock.luau" "$OUT/live/"
+python3 "$HERE/mkbundle_any.py" "$REPO/src/ReplicatedStorage" "$OUT/live/rs_bundle.luau" \
+ PlantArtForestBase="$B/PlantArtForest.lua" PlantArtSnowBase="$B/PlantArtSnow.lua" PlantArtLavaBase="$B/PlantArtLava.lua" PlantArtCrystalBase="$B/PlantArtCrystal.lua" \
+ TreeReworkData2Base="$B/TreeReworkData2.lua" TreeReworkData4Base="$B/TreeReworkData4.lua" ApprovedPlantArt2Base="$B/ApprovedPlantArt2.lua" ApprovedPlantArt5Base="$B/ApprovedPlantArt5.lua" \
+ ApprovedPlantArt6Base="$B/ApprovedPlantArt6.lua" ApprovedPlantArtBase="$B/ApprovedPlantArt.lua" PlantArtForest149="$OUT/srcfb/src/ReplicatedStorage/PlantArtForest.lua" \
+ PlantArtSnow149="$OUT/srcfb/src/ReplicatedStorage/PlantArtSnow.lua" PlantArtLava149="$OUT/srcfb/src/ReplicatedStorage/PlantArtLava.lua" \
+ GardenVisuals="$REPO/src/StarterPlayer/StarterPlayerScripts/GardenVisuals.client.lua" >/dev/null
 echo "== regression diff against $BASE (every plant, every mode)"
 (cd "$OUT/base" && /opt/luau/luau dump_plants.luau > dump.txt 2> err.txt) || { tail -20 "$OUT/base/err.txt";exit 1; }
 (cd "$OUT/new" && /opt/luau/luau dump_plants.luau -a mesh > dump.txt 2> err.txt) || { tail -20 "$OUT/new/err.txt";exit 1; }
@@ -75,15 +84,15 @@ for m in parts fail;do
 done
 [ "$(grep -c '^WARN' "$OUT/new/dump_parts.txt")" = 0 ] && [ "$(grep -c '^WARN' "$OUT/new/dump_fail.txt")" = 1 ] || { echo "expected 0 warnings without a bake and exactly 1 when every bake fails";stop; }
 # --- 2. the tests ------------------------------------------------------------------------------------------------------------------------------------
-cp "$HERE/test_fruit_models.luau" "$HERE/test_fruit_mesh_fallback.luau" "$OUT/new/"
+cp "$HERE/test_fruit_models.luau" "$OUT/new/";cp "$HERE/test_fruit_mesh_fallback.luau" "$OUT/live/"
 echo "== test_fruit_models"
 (cd "$OUT/new" && timeout 1800 /opt/luau/luau test_fruit_models.luau > fruit.log 2> fruit.err) || { grep -v '^WARN\|^SCENE' "$OUT/new/fruit.log" | tail -40;tail -3 "$OUT/new/fruit.err";stop; }
 grep -v '^WARN\|^SCENE\|^INFO' "$OUT/new/fruit.log" | tail -${FRUIT_LINES:-1}
 grep '^INFO' "$OUT/new/fruit.log" || true
 echo "== test_fruit_mesh_fallback"
 for s in neutral every content server serverok garden;do
- (cd "$OUT/new" && timeout 900 /opt/luau/luau test_fruit_mesh_fallback.luau -a $s > fallback_$s.log 2>&1) || { grep -v '^WARN' "$OUT/new/fallback_$s.log" | tail -30;stop; }
- grep -v '^WARN' "$OUT/new/fallback_$s.log" | tail -1
+ (cd "$OUT/live" && timeout 900 /opt/luau/luau test_fruit_mesh_fallback.luau -a $s > fallback_$s.log 2>&1) || { grep -v '^WARN' "$OUT/live/fallback_$s.log" | tail -30;stop; }
+ grep -v '^WARN' "$OUT/live/fallback_$s.log" | tail -1
 done
 # --- 3. floating parts ------------------------------------------------------------------------------------------------------------------------------
 grep '^SCENE_PLANTS ' "$OUT/new/fruit.log" | sed 's/^SCENE_PLANTS //' > "$OUT/plants.json"
