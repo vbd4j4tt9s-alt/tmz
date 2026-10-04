@@ -292,6 +292,9 @@ function Visuals.Bounds(stage,variant,size)
     if variant=='EclipseReliquary'then
         return require(script.Parent.EclipsePackArt).Bounds(Rules.GetVariant(variant).BagScale*Rules.GetTheme(stage).Scale*Rules.SanitizePackSize(size))
     end
+    if variant==require(script.Parent.VerityCatalog).Variant then -- R147: same shape and size as the Void pack
+        return require(script.Parent.VerityPackArt).Bounds(Rules.GetVariant(variant).BagScale*Rules.GetTheme(stage).Scale*Rules.SanitizePackSize(size))
+    end
     if variant=='MechLimited'then
         return require(script.Parent.SpecialPackArt89).Bounds(variant,Rules.GetVariant(variant).BagScale*Rules.GetTheme(stage).Scale*Rules.SanitizePackSize(size))
     end

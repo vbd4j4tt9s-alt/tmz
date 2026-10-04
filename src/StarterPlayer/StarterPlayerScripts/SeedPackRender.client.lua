@@ -311,8 +311,11 @@ local function initialize(bag,r)
     r.Ready=true;r.Hidden=not r.Opening and (bag:GetAttribute('PackVisible')==false or bag:GetAttribute('RevealAt')~=nil)
     setVisible(r);return true
 end
+local VerityVariant=require(RS:WaitForChild('VerityCatalog')).Variant
 local function track(bag)
-    if bag:GetAttribute('BagVariant')=='EclipseReliquary'then return end
+    -- R147: the Verity pack, like the Void pack, has its own motion and fx (VoidPackFx via VeiledEventClient81): no generic rarity glints.
+    local v=bag:GetAttribute('BagVariant')
+    if v=='EclipseReliquary'or v==VerityVariant then return end
     if not bag:IsA('Model')or records[bag]then return end
     local r={Bag=bag,Connections={}};records[bag]=r
     local function visibility()

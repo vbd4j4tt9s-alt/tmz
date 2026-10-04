@@ -10,7 +10,9 @@ local C={Id='VeritySeed',Variant='VerityReliquary',PackStage=7,Stage=9,Biome='Ve
  Value=9e10,Seconds=14400,RegrowSeconds=1500,FruitCount=1,IndexFirst=1e11,IndexRepeat=2e10,HalfwayGems=10,CompletionGems=100,
  -- Optional image on the fruit (needs the image id behind the owner's Decal); nil = plain glossy ball.
  FaceImageId=nil,
- Palette={Ball=Color3.fromRGB(255,213,46),Gloss=Color3.fromRGB(255,252,232),LeafOuter=Color3.fromRGB(68,160,72),LeafInner=Color3.fromRGB(96,188,88)},
+ Palette={Ball=Color3.fromRGB(255,213,46),Gloss=Color3.fromRGB(255,252,232),LeafOuter=Color3.fromRGB(68,160,72),LeafInner=Color3.fromRGB(96,188,88),
+  -- The pack art (VerityPackArt) and its fx: warm accents around the gold ball and cream gloss.
+  Amber=Color3.fromRGB(255,170,30),Honey=Color3.fromRGB(255,236,150),Shade=Color3.fromRGB(112,70,6),White=Color3.fromRGB(255,255,248)},
 }
 function C.Is(id)return id==C.Id end
 function C.IsPack(variant)return variant==C.Variant end

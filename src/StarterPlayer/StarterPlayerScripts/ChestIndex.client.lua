@@ -58,7 +58,24 @@ local list=Instance.new('ScrollingFrame');list.Name='SeedCards';list.Position=UD
 local grid=Instance.new('UIGridLayout');grid.CellPadding=UDim2.fromOffset(12,12);grid.SortOrder=Enum.SortOrder.LayoutOrder;grid.Parent=list
 local status=text(panel,'Status','',UDim2.new(0,16,1,-30),UDim2.new(1,-32,0,24),14,Theme.Colors.Gold);status.Visible=false
 local selected=1;local busy=false;local claimedHere={};local halfClaimedHere={};local tabsByStage={};local cards={};local cardsById={};local render;local queued=false;local fillTween;local rewardTween
-local order={{1,'FOREST'},{6,'JUNGLE'},{2,'DESERT'},{3,'SNOW'},{5,'CRYSTAL'},{4,'LAVA'},{7,'STORM'},{8,'MECH'}}
+-- R147: the ninth category, VERITY (the Verity seed, stage 9), last. Its tab is gold with a small drawn gold ball (no raster icon);
+-- the rest keep their blue tabs and BiomeArtwork icons. The row scrolls sideways (as it already did for eight on small screens).
+local order={{1,'FOREST'},{6,'JUNGLE'},{2,'DESERT'},{3,'SNOW'},{5,'CRYSTAL'},{4,'LAVA'},{7,'STORM'},{8,'MECH'},{9,'VERITY'}}
+local tabColors={[9]={Base=Color3.fromRGB(255,196,40),Idle=Color3.fromRGB(222,160,20),Open=Color3.fromRGB(255,214,84)}}
+local function verityLogo(parent)
+ local P=require(RS.VerityCatalog).Palette
+ local f=Instance.new('Frame');f.Name='GeneratedVerity';f.BackgroundTransparency=1;f.Size=UDim2.fromScale(1,1);f.Active=false;f.Parent=parent
+ local function piece(name,x,y,w,h,color,rotation,stroke)
+  local p=Instance.new('Frame');p.Name=name;p.AnchorPoint=Vector2.new(.5,.5);p.Position=UDim2.fromScale(x,y);p.Size=UDim2.fromScale(w,h);p.BackgroundColor3=color;p.BorderSizePixel=0;p.Active=false;p.Rotation=rotation or 0;p.Parent=f
+  local c=Instance.new('UICorner');c.CornerRadius=UDim.new(.5,0);c.Parent=p
+  if stroke then local st=Instance.new('UIStroke');st.Color=stroke;st.Thickness=1.5;st.Parent=p end
+  return p
+ end
+ piece('LeafL',.27,.78,.36,.16,P.LeafOuter,-24,Color3.fromRGB(28,86,38));piece('LeafR',.73,.78,.36,.16,P.LeafOuter,24,Color3.fromRGB(28,86,38))
+ piece('LeafM',.5,.82,.26,.13,P.LeafInner,0,Color3.fromRGB(28,86,38))
+ piece('Ball',.5,.46,.64,.64,P.Ball,0,P.Shade);piece('Gloss',.36,.3,.2,.2,P.Gloss,0);piece('Glint',.3,.23,.08,.08,Color3.new(1,1,1),0)
+ return f
+end
 local function owned(folder,id)local f=player:FindFirstChild(folder);local v=f and f:FindFirstChild(id);return v and v.Value==true end
 local function amount(id)local f=player:FindFirstChild('DiscoveredSeeds');local v=f and f:FindFirstChild(id);return v and v:GetAttribute('RewardCash')or 0 end
 local function counts(stage)
@@ -95,7 +112,7 @@ end
 local alertTotal=0
 local function updateAlerts()
  local total=0
- for stage=1,8 do
+ for stage=1,9 do
   local n=waiting(stage);total+=n
   local t=tabsByStage[stage];if t then local dot=badge(t.Button,'RewardDot',14);dot.Position=UDim2.new(1,-6,0,6);dot.Visible=n>0;dot.Count.Text=''end
  end
@@ -134,11 +151,12 @@ local function claim(action,value)
  end)
 end
 for i,pair in ipairs(order)do
- local stage,name=pair[1],pair[2];local b=button(tabs,'Biome'..stage,'',UDim2.new(),UDim2.fromOffset(122,58),Color3.fromRGB(73,109,204));b.LayoutOrder=i
- local nameLabel=require(RS.BiomeArtwork).Attach(b,name:sub(1,1)..name:sub(2):lower());nameLabel.Name='BiomeLogo';nameLabel.Position=UDim2.fromOffset(12,1);nameLabel.Size=UDim2.fromOffset(44,44);b:SetAttribute('BiomeName',name)
+ local stage,name=pair[1],pair[2];local colors=tabColors[stage]
+ local b=button(tabs,'Biome'..stage,'',UDim2.new(),UDim2.fromOffset(122,58),colors and colors.Base or Color3.fromRGB(73,109,204));b.LayoutOrder=i
+ local nameLabel=colors and verityLogo(b)or require(RS.BiomeArtwork).Attach(b,name:sub(1,1)..name:sub(2):lower());nameLabel.Name='BiomeLogo';nameLabel.Position=UDim2.fromOffset(12,1);nameLabel.Size=UDim2.fromOffset(44,44);b:SetAttribute('BiomeName',name)
  local countLabel=text(b,'Count','0 / 0',UDim2.fromOffset(56,12),UDim2.new(1,-60,0,24),14)
  local tiny=Instance.new('Frame');tiny.Name='Fill';tiny.Position=UDim2.new(0,5,1,-9);tiny.Size=UDim2.new(0,0,0,5);tiny.BackgroundColor3=Theme.Colors.Mint;tiny.BorderSizePixel=0;tiny.Parent=b;Theme.Corner(tiny,3)
- tabsByStage[stage]={Button=b,Count=countLabel,Fill=tiny,Name=nameLabel}
+ tabsByStage[stage]={Button=b,Count=countLabel,Fill=tiny,Name=nameLabel,Idle=colors and colors.Idle or Color3.fromRGB(73,109,204),Open=colors and colors.Open or Color3.fromRGB(80,149,194)}
  b.Activated:Connect(function()selected=stage;list.CanvasPosition=Vector2.zero;if rewardTween then rewardTween:Cancel()end;bonusScale.Scale=1;middleScale.Scale=1;render()end)
 end
 local function resize()
@@ -242,7 +260,7 @@ render=function()
  local found,all=0,0
  for stage,t in pairs(tabsByStage)do
   local seeds,plants,total=counts(stage);local n=seeds+plants;local max=total*2;found+=n;all+=max
-  t.Count.Text=n..' / '..max;t.Fill.Size=UDim2.fromOffset(math.max(0,(t.Button.Size.X.Offset-10)*(max>0 and n/max or 0)),5);t.Button.BackgroundColor3=stage==selected and Color3.fromRGB(80,149,194)or Color3.fromRGB(73,109,204)
+  t.Count.Text=n..' / '..max;t.Fill.Size=UDim2.fromOffset(math.max(0,(t.Button.Size.X.Offset-10)*(max>0 and n/max or 0)),5);t.Button.BackgroundColor3=stage==selected and t.Open or t.Idle
   -- R137: the open biome gets a white ring.
   local ring=t.Button:FindFirstChild('BrightOutline');if ring then ring.Color=stage==selected and Color3.new(1,1,1)or Color3.fromRGB(12,17,38);ring.Thickness=stage==selected and 3 or 2 end
  end
@@ -292,7 +310,7 @@ end
 toggle.Activated:Connect(function()open(not panel.Visible)end);close.Activated:Connect(function()open(false)end);shade.Activated:Connect(function()open(false)end)
 watch(pg:GetAttributeChangedSignal('SeedMenu'),function()open(pg:GetAttribute('SeedMenu')=='Index')end)
 watch(player:GetAttributeChangedSignal('PremiumRevision'),queue)
-for stage=1,8 do
+for stage=1,9 do
  for _,prefix in ipairs({'IndexBiomeReward','IndexBiomeHalfReward','IndexBiomeBackpay'})do watch(player:GetAttributeChangedSignal(prefix..stage),queue)end
 end
 local observed=setmetatable({},{__mode='k'})

@@ -1,0 +1,76 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Verity pack preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of a dump_pack.luau scene (the Void pack and the Verity pack): Roblox parts as boxes / cylinders / balls, the stand-in
+// pouch body as a rounded box, neon as unlit colour (blended when translucent). No Roblox textures or Future lighting: a design preview.
+import * as THREE from 'three';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+// Roblox WedgePart: a right triangle in the YZ plane extruded along X. Tall edge at +Z (back), slope down to -Z (front).
+function wedgeGeometry(){
+  const g=new THREE.BufferGeometry();const A=[0,-.5,.5],B=[0,-.5,-.5],C=[0,.5,.5];
+  const v=[];const tri=(a,b,c)=>v.push(...a,...b,...c);
+  const L=p=>[-.5,p[1],p[2]],Rr=p=>[.5,p[1],p[2]];
+  tri(Rr(A),Rr(B),Rr(C));            // +X end cap
+  tri(L(A),L(C),L(B));               // -X end cap
+  tri(L(A),L(B),Rr(B));tri(L(A),Rr(B),Rr(A)); // bottom
+  tri(L(A),Rr(A),Rr(C));tri(L(A),Rr(C),L(C)); // back (+Z)
+  tri(L(B),L(C),Rr(C));tri(L(B),Rr(C),Rr(B)); // slope
+  g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.computeVertexNormals();return g;
+}
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+// A studio environment for the reflections of Metal (Gold) and Glass (Diamond): without one they render near black.
+const envTex=new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04).texture;
+const geoBox=new THREE.BoxGeometry(1,1,1),geoSphere=new THREE.SphereGeometry(.5,48,32),geoWedge=wedgeGeometry();
+// A Roblox Cylinder part runs along X (Size.X = length, Y / Z = diameter). The pouch: a rounded slab (radius .16 of the thin side).
+const geoCyl=new THREE.CylinderGeometry(.5,.5,1,48);geoCyl.rotateZ(Math.PI/2);
+const geoPouch=new RoundedBoxGeometry(1,1,1,6,.16);
+function groundTexture(){
+  const cv=document.createElement('canvas');cv.width=cv.height=256;const g=cv.getContext('2d');
+  g.fillStyle='#5fae4f';g.fillRect(0,0,256,256);g.fillStyle='rgba(0,0,0,.05)';g.fillRect(0,0,128,128);g.fillRect(128,128,128,128);
+  g.strokeStyle='rgba(255,255,255,.10)';g.lineWidth=4;g.strokeRect(0,0,256,256);
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(60,60);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+window.shoot=function(scene,W,H,opts){
+  opts=opts||{};
+  renderer.setSize(W,H);
+  const s=new THREE.Scene();s.background=new THREE.Color(opts.bg||0xa9d8f5);
+  s.add(new THREE.HemisphereLight(0xeaf6ff,0x5f8f55,1.25));
+  const v=scene.view;const T=new THREE.Vector3(...v.target);
+  const sun=new THREE.DirectionalLight(0xfff2dd,2.3);sun.position.set(T.x-30,T.y+60,T.z-45);sun.target.position.copy(T);
+  sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);const ex=v.dist*.5;Object.assign(sun.shadow.camera,{left:-ex,right:ex,top:ex,bottom:-ex,near:1,far:300});sun.shadow.bias=-.0006;
+  s.add(sun,sun.target);
+  if(!opts.noGround){
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(800,800),new THREE.MeshStandardMaterial({map:groundTexture(),roughness:.95}));
+    ground.rotation.x=-Math.PI/2;ground.position.y=-.02;ground.receiveShadow=true;s.add(ground);
+  }
+  for(const p of scene.parts){
+    if(p.t>=.995)continue;
+    const m=new THREE.Matrix4().set(p.r[0],p.r[1],p.r[2],p.p[0],p.r[3],p.r[4],p.r[5],p.p[1],p.r[6],p.r[7],p.r[8],p.p[2],0,0,0,1);
+    const geo=p.shape==='Ball'?geoSphere:p.shape==='Wedge'?geoWedge:p.shape==='Cylinder'?geoCyl:p.shape==='Pouch'?geoPouch:geoBox;
+    let mat;
+    if(p.material==='Neon')mat=new THREE.MeshBasicMaterial({color:col(p.color).multiplyScalar(1.05),transparent:p.t>0,opacity:1-p.t,toneMapped:false,depthWrite:p.t<.5});
+    else if(p.material==='Glass')mat=new THREE.MeshPhysicalMaterial({color:col(p.color),roughness:.06,metalness:0,transparent:true,opacity:Math.max(.25,1-p.t),depthWrite:false,clearcoat:1,envMap:envTex,envMapIntensity:.6});
+    else{
+      const metal=p.material==='Metal';
+      mat=new THREE.MeshStandardMaterial({color:col(p.color),roughness:metal?.3:Math.max(.25,.7-p.refl*1.8),metalness:metal?.85:Math.min(.25,p.refl),transparent:p.t>0,opacity:1-p.t,side:p.shape==='Wedge'?THREE.DoubleSide:THREE.FrontSide});
+      if(metal){mat.envMap=envTex;mat.envMapIntensity=.9}
+    }
+    const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;
+    mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(p.size[0],p.size[1],p.size[2]));
+    mesh.castShadow=p.material!=='Neon'&&p.t<.3;mesh.receiveShadow=p.material!=='Neon';s.add(mesh);
+  }
+  const az=v.az*Math.PI/180,el=v.el*Math.PI/180;
+  const cam=new THREE.PerspectiveCamera(v.fov,W/H,.05,500);
+  // Roblox front is -Z: the camera stands in front (negative Z) and a little to the side.
+  cam.position.set(T.x+Math.sin(az)*Math.cos(el)*v.dist,T.y+Math.sin(el)*v.dist,T.z-Math.cos(az)*Math.cos(el)*v.dist);cam.lookAt(T);
+  renderer.render(s,cam);return renderer.domElement.toDataURL('image/png');
+};
+window.ready=true;
+</script></body></html>

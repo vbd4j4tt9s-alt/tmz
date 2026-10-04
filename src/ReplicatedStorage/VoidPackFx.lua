@@ -14,12 +14,25 @@ X.Budget={
  Lights=1,                      -- one pulsing light in the whole scene (nearest pack, tier 3)
  EffectDistance=160,MotionDistance=850,SpinDistance=160,
 }
+-- R147: every colour / texture of the effect set. X.Void is the Void pack's (what this module always built); the Verity pack
+-- (same art, gold palette) takes VerityPackArt.Fx: gold sparkles and a warm light instead of the void haze and the violet glow.
+X.Void={
+ Haze={Texture=SMOKE,Colors={Color3.fromRGB(6,3,14),Color3.fromRGB(40,18,66)},Size={.6,1.5},Emission=0,Alpha=.30},
+ Nebula={Texture=SMOKE,Colors={Color3.fromRGB(255,90,210),Color3.fromRGB(80,170,255)},Size={.9,1.9},Emission=.7,Alpha=.62},
+ Stars={Texture=SPARK,Colors={Color3.fromRGB(255,255,255),Color3.fromRGB(150,232,255)},Size={.10,.03},Emission=1,Alpha=.15},
+ Debris=Color3.fromRGB(24,16,38),Comet=Color3.fromRGB(255,190,250),Trail={Color3.fromRGB(255,160,240),Color3.fromRGB(120,90,255)},
+ Fill=Color3.fromRGB(20,6,40),Outline=Color3.fromRGB(150,80,230),Light=Color3.fromRGB(170,90,255),
+}
+function X.PaletteFor(bag)
+ if bag:GetAttribute('BagVariant')==require(script.Parent.VerityCatalog).Variant then return require(script.Parent.VerityPackArt).Fx end
+ return X.Void
+end
 local function isFinite(n)return type(n)=='number'and n==n and math.abs(n)<math.huge end
 function X.Capture(bag)
  local root=bag.PrimaryPart
  if not root or not bag:GetAttribute('CompactPackReady')then return nil end
  local r={Bag=bag,Root=root,Scale=bag:GetAttribute('VisualScale')or 1,Origin=bag:GetAttribute('HoverOrigin')or root.CFrame,
-  Parts={},Spinners=0,Pulsers={},Anchored=root.Anchored}
+  Parts={},Spinners=0,Pulsers={},Anchored=root.Anchored,Palette=X.PaletteFor(bag)}
  for _,p in ipairs(bag:GetDescendants())do if p:IsA('BasePart')then
   local frame=p:GetAttribute('PackLocalFrame');if typeof(frame)~='CFrame'then frame=root.CFrame:ToObjectSpace(p.CFrame)end
   local e={Part=p,Frame=frame}
@@ -71,30 +84,31 @@ local function emitter(parent,name,texture,colors,size,rate,life,speed,emission,
 end
 -- Create (once) the effect set for one pack at the given tier.
 function X.Create(r,tier)
- local s=r.Scale;local folder=Instance.new('Folder');folder.Name='_VoidPackFx122'
+ local s=r.Scale;local pal=r.Palette or X.Void;local folder=Instance.new('Folder');folder.Name='_VoidPackFx122'
  local core=fxPart(folder,'VoidFxCore',V(.1,.1,.1),Color3.new(),Enum.Material.SmoothPlastic);core.Transparency=1
  local fx={Folder=folder,Core=core,Tier=tier,Debris={},Comets={}}
  local attach=Instance.new('Attachment');attach.Name='VoidFxEmit';attach.Parent=core
- -- Dark gravitational haze, a slow violet nebula swirl and falling star sparks.
- fx.Haze=emitter(attach,'VoidHaze',SMOKE,{Color3.fromRGB(6,3,14),Color3.fromRGB(40,18,66)},{.6*s,1.5*s},5,{.9,1.5},{.1,.35},0,.30)
- fx.Nebula=emitter(attach,'VoidNebulaSwirl',SMOKE,{Color3.fromRGB(255,90,210),Color3.fromRGB(80,170,255)},{.9*s,1.9*s},2.5,{1.6,2.4},{.05,.25},.7,.62)
- fx.Stars=emitter(attach,'VoidStarfall',SPARK,{Color3.fromRGB(255,255,255),Color3.fromRGB(150,232,255)},{.10*s,.03*s},4,{.6,1.1},{.2,.6},1,.15)
+ -- Dark gravitational haze, a slow violet nebula swirl and falling star sparks (Verity: gold dust, a gold swirl, cream sparkles).
+ local hz,nb,st=pal.Haze,pal.Nebula,pal.Stars
+ fx.Haze=emitter(attach,'VoidHaze',hz.Texture,hz.Colors,{hz.Size[1]*s,hz.Size[2]*s},5,{.9,1.5},{.1,.35},hz.Emission,hz.Alpha)
+ fx.Nebula=emitter(attach,'VoidNebulaSwirl',nb.Texture,nb.Colors,{nb.Size[1]*s,nb.Size[2]*s},2.5,{1.6,2.4},{.05,.25},nb.Emission,nb.Alpha)
+ fx.Stars=emitter(attach,'VoidStarfall',st.Texture,st.Colors,{st.Size[1]*s,st.Size[2]*s},4,{.6,1.1},{.2,.6},st.Emission,st.Alpha)
  for i=1,X.Budget.Debris[tier]or 0 do
   local size=(.10+.05*((i*37)%3))*s
-  fx.Debris[i]=fxPart(folder,'VoidDebris',V(size,size*.8,size*.9),Color3.fromRGB(24,16,38),Enum.Material.Slate)
+  fx.Debris[i]=fxPart(folder,'VoidDebris',V(size,size*.8,size*.9),pal.Debris,Enum.Material.Slate)
  end
  for i=1,X.Budget.Comets[tier]or 0 do
-  local comet=fxPart(folder,'VoidComet',V(.12,.12,.12)*s,Color3.fromRGB(255,190,250),Enum.Material.Neon,Enum.PartType.Ball)
+  local comet=fxPart(folder,'VoidComet',V(.12,.12,.12)*s,pal.Comet,Enum.Material.Neon,Enum.PartType.Ball)
   local a0=Instance.new('Attachment');a0.Position=V(0,.05*s,0);a0.Parent=comet
   local a1=Instance.new('Attachment');a1.Position=V(0,-.05*s,0);a1.Parent=comet
   local trail=Instance.new('Trail');trail.Attachment0=a0;trail.Attachment1=a1;trail.Lifetime=.35;trail.LightEmission=1;trail.FaceCamera=true
-  trail.Color=ColorSequence.new(Color3.fromRGB(255,160,240),Color3.fromRGB(120,90,255))
+  trail.Color=ColorSequence.new(pal.Trail[1],pal.Trail[2])
   trail.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.1),NumberSequenceKeypoint.new(1,1)});trail.Parent=comet
   fx.Comets[i]={Part=comet,Trail=trail}
  end
- local h=Instance.new('Highlight');h.Name='VoidDistortion';h.Adornee=r.Bag;h.FillColor=Color3.fromRGB(20,6,40);h.FillTransparency=.88
- h.OutlineColor=Color3.fromRGB(150,80,230);h.OutlineTransparency=.35;h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;fx.Highlight=h
- local light=Instance.new('PointLight');light.Name='VoidPulseLight';light.Color=Color3.fromRGB(170,90,255);light.Range=math.min(16,8*s);light.Brightness=0;light.Shadows=false;light.Enabled=false;light.Parent=core;fx.Light=light
+ local h=Instance.new('Highlight');h.Name='VoidDistortion';h.Adornee=r.Bag;h.FillColor=pal.Fill;h.FillTransparency=.88
+ h.OutlineColor=pal.Outline;h.OutlineTransparency=.35;h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;fx.Highlight=h
+ local light=Instance.new('PointLight');light.Name='VoidPulseLight';light.Color=pal.Light;light.Range=math.min(16,8*s);light.Brightness=0;light.Shadows=false;light.Enabled=false;light.Parent=core;fx.Light=light
  folder.Parent=workspace
  r.Fx=fx;return fx
 end

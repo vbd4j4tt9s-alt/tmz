@@ -12,7 +12,9 @@ local function watch(signal,fn)connections[#connections+1]=signal:Connect(fn)end
 local function keeper(model)if model:IsA('Model')then keepers[model]={At=-100}end end
 for _,m in ipairs(Tags:GetTagged('VeiledKeeper81'))do keeper(m)end
 watch(Tags:GetInstanceAddedSignal('VeiledKeeper81'),keeper);watch(Tags:GetInstanceRemovedSignal('VeiledKeeper81'),function(m)keepers[m]=nil end)
-local function track(bag)if bag:GetAttribute('BagVariant')=='EclipseReliquary'and not bags[bag]then bags[bag]={}end end
+-- R147: a carried Verity pack (the Void pack's shape in gold; none ever lies on the track) gets the same local motion and fx as a carried Void pack, in its own gold colours (VoidPackFx.PaletteFor).
+local VerityVariant=require(RS:WaitForChild('VerityCatalog')).Variant
+local function track(bag)local v=bag:GetAttribute('BagVariant');if(v=='EclipseReliquary'or v==VerityVariant)and not bags[bag]then bags[bag]={}end end
 local function remove(bag)local r=bags[bag];if r and r.Capture then PackFx.Clear(r.Capture)end;bags[bag]=nil end
 for _,bag in ipairs(Tags:GetTagged('BiomeSeedPackVisual'))do track(bag)end
 watch(Tags:GetInstanceAddedSignal('BiomeSeedPackVisual'),track);watch(Tags:GetInstanceRemovedSignal('BiomeSeedPackVisual'),remove)
