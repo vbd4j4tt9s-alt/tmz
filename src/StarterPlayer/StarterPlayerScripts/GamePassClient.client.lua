@@ -39,6 +39,15 @@ Art.Studs(body,10,30,C(30,31,40),.25)
 local page=Instance.new('ScrollingFrame');page.Name='Page';page.BackgroundTransparency=1;page.BorderSizePixel=0;page.ScrollBarThickness=6;page.ScrollBarImageColor3=C(200,204,220)
 page.ScrollingDirection=Enum.ScrollingDirection.Y;page.CanvasSize=UDim2.new();page.AutomaticCanvasSize=Enum.AutomaticSize.None;page.ElasticBehavior=Enum.ElasticBehavior.WhenScrollable;page.ZIndex=3;page.Parent=body
 local status=Art.Text(panel,'Status','',16,Theme.Colors.Mint);status.BackgroundTransparency=.15;status.BackgroundColor3=C(16,18,26);status.ZIndex=12;status.Visible=false;status.TextWrapped=true;Art.Corner(status,8)
+-- R148 (owner: "remove this line when purchasing"): the dark strip is only for something worth reading. No message, an empty one or
+-- a blank one (a prompt that merely opened has nothing to say) leaves it hidden, never an empty bar.
+local function setStatus(text)
+ text=type(text)=='string'and text or''
+ if text:match('^%s*$')then text=''end
+ status.Text=text;status.Visible=text~=''
+end
+-- Gem purchases the server announces (notice + chime + sparkles, PurchaseCelebration.client.lua): no KaChing on top of the chime.
+local celebrated={BuyPack=true,BuyBundle=true,BuyPerk=true,Convert=true}
 -- Quick-jump column outside the panel (a row above it in portrait).
 local jumpRoot=Art.Frame(gui,'JumpButtons',nil,1);jumpRoot.Visible=false;jumpRoot.ZIndex=2
 local SectionColor={Featured=C(255,170,40),Passes=C(255,226,40),Speed=C(70,222,255),Money=C(110,255,70),Gems=C(214,150,255)}
@@ -182,12 +191,12 @@ refresh=function()
 end
 local pendingState=false
 local function act(action,value,onDone)
- if busy then return end;busy=true;status.Text='';refresh()
+ if busy then return end;busy=true;setStatus('');refresh()
  task.spawn(function()
   local okay,result=pcall(request.InvokeServer,request,action,value);busy=false
   if not gui.Parent then return end
-  if okay and type(result)=='table'then if result.Gems~=nil then state=result end;status.Text=result.Message or'';if action~='State'and result.Success and action~='RobuxPack'and action~='RobuxBundle'and action~='RobuxGift'then Audio.Transaction('Buy')end
-  else status.Text='Please try again.'end;refresh()
+  if okay and type(result)=='table'then if result.Gems~=nil then state=result end;setStatus(result.Message);if action~='State'and result.Success and action~='RobuxPack'and action~='RobuxBundle'and action~='RobuxGift'and not celebrated[action]then Audio.Transaction('Buy')end
+  else setStatus('Please try again.')end;refresh()
   if onDone then onDone(okay and result or nil)end
   if pendingState and not busy then pendingState=false;if panel.Visible then act('State')end end
  end)
@@ -209,7 +218,7 @@ end
 local function count()local n=tonumber(quantity.Text);return n and n==n and n%1==0 and n>=1 and n<=9000 and n or nil end
 quantity:GetPropertyChangedSignal('Text'):Connect(function()local n=count();cost.Text=n and('Cost: '..Cash.Compact(n*Catalog.CashPerGem)..' Cash')or'Enter 1–9,000 Gems.'end)
 maxButton.Activated:Connect(function()local stats=player:FindFirstChild('ChestChaseStats');local cash=stats and stats:FindFirstChild('Cash');quantity.Text=tostring(math.min(9000,math.floor((cash and cash.Value or 0)/Catalog.CashPerGem)))end)
-convert.Activated:Connect(function()local n=count();if n then act('Convert',n)else status.Text='Enter a whole number of Gems.'end end)
+convert.Activated:Connect(function()local n=count();if n then act('Convert',n)else setStatus('Enter a whole number of Gems.')end end)
 -- Layout ----------------------------------------------------------------------------------------
 local function place(item,r,dx,dy)item.Position=UDim2.fromOffset(r.X+(dx or 0),r.Y+(dy or 0));item.Size=UDim2.fromOffset(r.W,r.H)end
 local function viewport()

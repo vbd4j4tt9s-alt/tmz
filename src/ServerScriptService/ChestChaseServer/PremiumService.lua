@@ -5,6 +5,12 @@ local Gifts=require(RS.PassGiftCatalog);local Routing=require(script.Parent.Prem
 -- R123: the R121 gift products and 10-minute boost were removed (GiftProducts / SpeedBoost deleted).
 local Service={};Service.__index=Service
 local MAX_RECEIPTS=20000
+-- R148: the "✅ Purchased: ...!" notice + PurchaseDone event. A missing or broken module only means no celebration; a purchase never depends on it.
+local function announcer(data)
+ local okay,made=pcall(function()return require(script.Parent.PurchaseAnnouncer).new(data)end)
+ if okay then return made end
+ warn('[R148] purchase feedback is unavailable: '..tostring(made));return nil
+end
 local function receiptSpace(state)
  local count=0;for _ in pairs(state.Receipts)do count+=1;if count>=MAX_RECEIPTS then return false end end;return true
 end
@@ -31,7 +37,7 @@ function Service:LoadProduct(id,publish,retryDelay)
 end
 function Service.new(data,chests,passes)
  local remote=Instance.new('RemoteFunction');remote.Name='PremiumRequest';remote.Parent=RS:WaitForChild('ChestChaseRemotes')
- local self=setmetatable({Data=data,Chests=chests,Passes=passes,Last={},Busy={},Product=nil,PackProducts={},Products={},GiftProducts={},Gifts=require(script.Parent.PassGiftService).new(data,passes),Remote=remote},Service)
+ local self=setmetatable({Data=data,Chests=chests,Passes=passes,Last={},Busy={},Unannounced={},Announcer=announcer(data),Product=nil,PackProducts={},Products={},GiftProducts={},Gifts=require(script.Parent.PassGiftService).new(data,passes),Remote=remote},Service)
  remote.OnServerInvoke=function(p,action,value)
   if not Gate.Allow(p,'PremiumRequest',action,value)then return {Success=false,Message='Please wait.'}end
   if not data:IsLoaded(p)then return {Success=false,Message='YOUR DATA IS LOADING'}end
@@ -99,7 +105,7 @@ function Service.new(data,chests,passes)
    local row=Pricing.Find(value);local info=row and self.Products[row.Key];local id=row and Pricing.ProductId(row)or 0
    local route,routed=Routing.Resolve(id)
    if row and route=='Bundle'and routed==row.Key and info and info.IsForSale~=false and data:CanReceiveBundle(p,row.Key)then
-    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=okay and'Complete the Roblox purchase prompt.'or'Purchase could not open.'
+    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Purchase could not open.'or nil -- R148: the opened prompt needs no status line
    else okay=false;message='THIS PURCHASE IS UNAVAILABLE'end
   elseif action=='GiftPass'then
    if type(value)=='table'then okay,message=self.Gifts:Send(p,value.Key,value.RecipientId,value.Payment)else okay=false;message='Choose a gift.'end
@@ -107,7 +113,7 @@ function Service.new(data,chests,passes)
    local pass=type(value)=='string'and Gifts.Pass(value);local info=pass and self.GiftProducts[value];local id=pass and Gifts.ProductId(value)or 0
    local route,routed=Routing.Resolve(id);local credits=data:GetPremium(p).GiftCredits
    if pass and route=='Gift'and routed==value and info and info.IsForSale~=false and(credits[value]or 0)<Gifts.MaxCredits then
-    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=okay and'Complete the Roblox purchase prompt.'or'Purchase could not open.'
+    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Purchase could not open.'or nil -- R148: the opened prompt needs no status line
    else okay=false;message='THIS GIFT PURCHASE IS UNAVAILABLE'end
   elseif action=='BuyPerk'then okay,message=data:BuyGemPerk(p,value);if okay then task.spawn(function()passes:Refresh(p)end)end
   elseif action=='RobuxPack'then
@@ -115,9 +121,19 @@ function Service.new(data,chests,passes)
    local entry=count and self:State(p).PackOffers[tostring(count)]
    local id=Catalog.ProductId(value);local route,routed=Routing.Resolve(id)
    if entry and entry.RobuxAvailable and route=='Mech'and routed==count and data:CanReceiveMechPacks(p,count)then
-    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=okay and'Complete the Roblox purchase prompt.'or'Purchase could not open.'
+    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Purchase could not open.'or nil -- R148: the opened prompt needs no status line
    else okay=false;message='THIS PURCHASE IS UNAVAILABLE'end
   else okay=false;message='UNKNOWN ACTION'end
+  -- R148: a gem purchase that went through gets the notice, chime and sparkles; their confirmation line is then redundant
+  -- (the "Collect your Gems / Cash." hints stay: they tell the buyer what to do next).
+  if okay==true then
+   if action=='BuyPack'then if self:Announce(p,'Pack',value)then message=nil end
+   elseif action=='BuyBundle'then
+    local row=Pricing.Find(type(value)=='table'and value.Key or value)
+    if row and self:Announce(p,'Bundle',row.Key)and row.Kind=='Speed'then message=nil end
+   elseif action=='BuyPerk'then if self:Announce(p,'Pass',value)then message=nil end
+   elseif action=='Convert'then self:Announce(p,'Gems',value)end
+  end
   local state=self:State(p);state.Success=okay==true;state.Message=message;return state
  end
  Market.ProcessReceipt=function(receipt)return self:ProcessReceipt(receipt)end
@@ -182,6 +198,9 @@ function Service:ProcessReceipt(receipt)
  local player=Players:GetPlayerByUserId(receipt.PlayerId)
  if not player or not self.Data:IsLoaded(player)or not self.Data.CanSave[player]or self.Busy[player]then return later end
  self.Busy[player]=true
+ -- R148: receipts granted in memory whose buyer has not been told yet (the save may fail and the retry finishes the job).
+ -- An entry is made once, when the grant happens, and removed when it is announced, so a duplicate never announces twice.
+ local owed=self.Unannounced[player];if not owed then owed={};self.Unannounced[player]=owed end
  local okay,decision=pcall(function()
   local state=self.Data:GetPremium(player)
   if not state.Receipts[receipt.PurchaseId]then
@@ -196,6 +215,7 @@ function Service:ProcessReceipt(receipt)
    if not granted then return later end
    -- Pack and receipt enter the same profile transaction. Never acknowledge before a successful save.
    state.Receipts[receipt.PurchaseId]=true;self.Data:MarkDirty(player);fresh=true
+   owed[receipt.PurchaseId]=mech and{'Pack',key}or bundle and{'Bundle',bundle}or{'Gift',key}
   end
   self.Data:WaitForSave(player,5)
   if not self.Data:Save(player,'PremiumProductReceipt',true)then return later end
@@ -204,10 +224,19 @@ function Service:ProcessReceipt(receipt)
   return Enum.ProductPurchaseDecision.PurchaseGranted
  end)
  self.Busy[player]=nil
- return okay and decision or later
+ local result=okay and decision or later
+ if result==Enum.ProductPurchaseDecision.PurchaseGranted then
+  local item=owed[receipt.PurchaseId]
+  if item then owed[receipt.PurchaseId]=nil;self:Announce(player,item[1],item[2])end
+ end
+ return result
+end
+-- R148: true when the buyer was sent PurchaseDone (and the notice).
+function Service:Announce(player,kind,arg)
+ return self.Announcer~=nil and self.Announcer:Announce(player,kind,arg)==true
 end
 function Service:Notify(player,message)
  local n=self.Data.Notifications;if n and player.Parent then pcall(n.Show,n,player,message,nil,4)end
 end
-function Service:Cleanup(player)self.Last[player]=nil;self.Gifts:Cleanup(player)end
+function Service:Cleanup(player)self.Last[player]=nil;self.Unannounced[player]=nil;self.Gifts:Cleanup(player)end
 return Service
