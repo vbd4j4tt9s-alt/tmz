@@ -78,7 +78,7 @@ local function cloneBag(bag)
   end
  end
  copy.Parent=workspace
- for _,p in ipairs(bag:GetDescendants())do if p:IsA('BasePart')then originals[p]=p.LocalTransparencyModifier;p.LocalTransparencyModifier=1 end end
+ for _,p in ipairs(bag:GetDescendants())do if p:IsA('BasePart')or p:IsA('Decal')then originals[p]=p.LocalTransparencyModifier;p.LocalTransparencyModifier=1 end end -- R147: a Decal (the Verity picture) too
 end
 local function pulse()
  if not active or active:GetAttribute('RevealAt')then return end

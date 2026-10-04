@@ -37,6 +37,27 @@ function groundTexture(){
   g.strokeStyle='rgba(255,255,255,.10)';g.lineWidth=4;g.strokeRect(0,0,256,256);
   const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(60,60);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
+// A STAND-IN for the owner's picture (three.js cannot fetch the Roblox image): a simple gold smiley and a label.
+function standIn(texId){
+  const cv=document.createElement('canvas');cv.width=cv.height=512;const g=cv.getContext('2d');
+  g.clearRect(0,0,512,512);
+  g.beginPath();g.arc(256,230,170,0,Math.PI*2);g.fillStyle='#ffd52e';g.fill();g.lineWidth=12;g.strokeStyle='#a56a00';g.stroke();
+  g.fillStyle='#5a3a00';g.beginPath();g.ellipse(200,190,17,30,0,0,Math.PI*2);g.fill();g.beginPath();g.ellipse(312,190,17,30,0,0,Math.PI*2);g.fill();
+  g.lineWidth=15;g.lineCap='round';g.beginPath();g.arc(256,244,92,.18*Math.PI,.82*Math.PI);g.stroke();
+  g.fillStyle='rgba(255,255,255,.55)';g.beginPath();g.ellipse(190,118,34,16,-.5,0,Math.PI*2);g.fill();
+  g.fillStyle='rgba(20,24,38,.82)';g.fillRect(24,424,464,76);g.fillStyle='#fff3c0';g.textAlign='center';
+  g.font='bold 25px sans-serif';g.fillText('your Verity picture goes here',256,455);g.font='21px sans-serif';g.fillText('('+texId+')',256,485);
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+// A few gold dots around the card: VoidPackFx's sparkle emitters (approximate; the real ones are particles and move).
+function sparkles(center,radius){
+  const pts=[];let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+  for(let i=0;i<70;i++){const a=rnd()*Math.PI*2,r=radius*(.62+.55*rnd()),z=(rnd()-.5)*1.1;pts.push(center.x+Math.cos(a)*r,center.y+Math.sin(a)*r,center.z+z)}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+  const cv=document.createElement('canvas');cv.width=cv.height=64;const c=cv.getContext('2d');const gr=c.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(255,250,215,1)');gr.addColorStop(.35,'rgba(255,214,70,.8)');gr.addColorStop(1,'rgba(255,200,40,0)');c.fillStyle=gr;c.fillRect(0,0,64,64);
+  return new THREE.Points(g,new THREE.PointsMaterial({map:new THREE.CanvasTexture(cv),size:.2,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,sizeAttenuation:true}));
+}
 window.shoot=function(scene,W,H,opts){
   opts=opts||{};
   renderer.setSize(W,H);
@@ -65,6 +86,15 @@ window.shoot=function(scene,W,H,opts){
     const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;
     mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(p.size[0],p.size[1],p.size[2]));
     mesh.castShadow=p.material!=='Neon'&&p.t<.3;mesh.receiveShadow=p.material!=='Neon';s.add(mesh);
+    // Decals: a plane on the face (Front = -Z, Back = +Z), tinted by the Decal's Color3, drawn at the Decal's own transparency (0).
+    for(const d of (p.decals||[])){
+      const front=d.face==='Front';const tex=standIn(d.tex);
+      const dm=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:tex,color:col(d.color),transparent:true,toneMapped:false,side:THREE.FrontSide}));
+      dm.matrixAutoUpdate=false;
+      const place=new THREE.Matrix4().makeTranslation(0,0,(front?-1:1)*(p.size[2]/2+.004)).multiply(new THREE.Matrix4().makeRotationY(front?Math.PI:0)).multiply(new THREE.Matrix4().makeScale(p.size[0],p.size[1],1));
+      dm.matrix.copy(m).multiply(place);s.add(dm);
+      if(front){const c=new THREE.Vector3(p.p[0],p.p[1],p.p[2]);s.add(sparkles(c,Math.max(p.size[0],p.size[1])*.62))}
+    }
   }
   const az=v.az*Math.PI/180,el=v.el*Math.PI/180;
   const cam=new THREE.PerspectiveCamera(v.fov,W/H,.05,500);

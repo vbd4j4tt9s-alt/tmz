@@ -20,13 +20,9 @@ A.Palette={
 A.Budget={MaxParts=190}
 local P=A.Palette
 local function lerp(a,b,t)return a:Lerp(b,t)end
--- R147: pal = a palette table with the same keys as A.Palette (VerityPackArt passes its gold one); nil = the Void palette, which
--- builds exactly what it always did. Specs are cached per palette; bounds never depend on colour.
-local specsBy={}
-function A.Specs(pal)
- pal=pal or A.Palette
- if specsBy[pal] then return specsBy[pal] end
- local P=pal
+local specs
+function A.Specs()
+ if specs then return specs end
  local out={};local body=Shared.BodyBounds()
  local function add(name,size,frame,color,material,shape,alpha)
   local s={Name=name,Size=size,Frame=frame,Color=color,Material=material or Enum.Material.Neon,Shape=shape,Transparency=alpha or 0}
@@ -120,7 +116,7 @@ function A.Specs(pal)
   local s=add('HaloDebris'..i,V(size,size*.8,size*.9),halo*CF(math.cos(a)*radius,math.sin(a)*radius,0)*CFrame.Angles(a,a*1.7,a*.6),P.Debris,Enum.Material.Slate)
   spin(s,halo,-.5)
  end
- specsBy[pal]=out;return out
+ specs=out;return out
 end
 -- Conservative bounds: the body plus every part corner, with spinning parts swept around their pivot.
 local unitBounds
@@ -146,9 +142,8 @@ function A.Bounds(scale)
  end
  local out={};for k,v in pairs(unitBounds)do out[k]=v*(scale or 1)end;return out
 end
-function A.Build(bag,pal)
+function A.Build(bag)
  if bag:GetAttribute('SpecialPackDesign89')then return true end
- local P=pal or A.Palette
  Renderer.BuildStandard(bag,Shared.TemplateKey)
  local root=bag.PrimaryPart;local folder=bag:FindFirstChild('PackGeometry');local scale=bag:GetAttribute('VisualScale')or 1
  for _,p in ipairs(folder:GetChildren())do if p:IsA('MeshPart')then
@@ -157,7 +152,7 @@ function A.Build(bag,pal)
  end end
  local giant=(bag:GetAttribute('PackSize')or 1)>10
  local count=bag:GetAttribute('CompactPackPartCount')or 10
- for _,s in ipairs(A.Specs(P))do
+ for _,s in ipairs(A.Specs())do
   local p=Instance.new('Part');p.Name=s.Name;p.Size=s.Size*scale
   local frame=CF(s.Frame.Position*scale)*s.Frame.Rotation;p.CFrame=root.CFrame*frame;p:SetAttribute('PackLocalFrame',frame)
   p.Color=s.Color;p.Material=s.Material;if s.Shape then p.Shape=s.Shape end;p.Transparency=s.Transparency or 0

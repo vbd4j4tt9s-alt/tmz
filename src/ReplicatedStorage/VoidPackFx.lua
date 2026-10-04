@@ -14,8 +14,9 @@ X.Budget={
  Lights=1,                      -- one pulsing light in the whole scene (nearest pack, tier 3)
  EffectDistance=160,MotionDistance=850,SpinDistance=160,
 }
--- R147: every colour / texture of the effect set. X.Void is the Void pack's (what this module always built); the Verity pack
--- (same art, gold palette) takes VerityPackArt.Fx: gold sparkles and a warm light instead of the void haze and the violet glow.
+-- R147: every colour / texture of the effect set. X.Void is the Void pack's (what this module always built); the Verity pack (its
+-- face picture) takes VerityPackArt.Fx: gold sparkles and a warm light instead of the void haze and the violet glow, and no orbiting
+-- debris, comets or outline (a palette without Debris / Comet / Fill has none of those).
 X.Void={
  Haze={Texture=SMOKE,Colors={Color3.fromRGB(6,3,14),Color3.fromRGB(40,18,66)},Size={.6,1.5},Emission=0,Alpha=.30},
  Nebula={Texture=SMOKE,Colors={Color3.fromRGB(255,90,210),Color3.fromRGB(80,170,255)},Size={.9,1.9},Emission=.7,Alpha=.62},
@@ -93,11 +94,11 @@ function X.Create(r,tier)
  fx.Haze=emitter(attach,'VoidHaze',hz.Texture,hz.Colors,{hz.Size[1]*s,hz.Size[2]*s},5,{.9,1.5},{.1,.35},hz.Emission,hz.Alpha)
  fx.Nebula=emitter(attach,'VoidNebulaSwirl',nb.Texture,nb.Colors,{nb.Size[1]*s,nb.Size[2]*s},2.5,{1.6,2.4},{.05,.25},nb.Emission,nb.Alpha)
  fx.Stars=emitter(attach,'VoidStarfall',st.Texture,st.Colors,{st.Size[1]*s,st.Size[2]*s},4,{.6,1.1},{.2,.6},st.Emission,st.Alpha)
- for i=1,X.Budget.Debris[tier]or 0 do
+ for i=1,pal.Debris and X.Budget.Debris[tier]or 0 do
   local size=(.10+.05*((i*37)%3))*s
   fx.Debris[i]=fxPart(folder,'VoidDebris',V(size,size*.8,size*.9),pal.Debris,Enum.Material.Slate)
  end
- for i=1,X.Budget.Comets[tier]or 0 do
+ for i=1,pal.Comet and X.Budget.Comets[tier]or 0 do
   local comet=fxPart(folder,'VoidComet',V(.12,.12,.12)*s,pal.Comet,Enum.Material.Neon,Enum.PartType.Ball)
   local a0=Instance.new('Attachment');a0.Position=V(0,.05*s,0);a0.Parent=comet
   local a1=Instance.new('Attachment');a1.Position=V(0,-.05*s,0);a1.Parent=comet
@@ -106,8 +107,10 @@ function X.Create(r,tier)
   trail.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.1),NumberSequenceKeypoint.new(1,1)});trail.Parent=comet
   fx.Comets[i]={Part=comet,Trail=trail}
  end
- local h=Instance.new('Highlight');h.Name='VoidDistortion';h.Adornee=r.Bag;h.FillColor=pal.Fill;h.FillTransparency=.88
- h.OutlineColor=pal.Outline;h.OutlineTransparency=.35;h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;fx.Highlight=h
+ if pal.Fill then
+  local h=Instance.new('Highlight');h.Name='VoidDistortion';h.Adornee=r.Bag;h.FillColor=pal.Fill;h.FillTransparency=.88
+  h.OutlineColor=pal.Outline;h.OutlineTransparency=.35;h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;fx.Highlight=h
+ end
  local light=Instance.new('PointLight');light.Name='VoidPulseLight';light.Color=pal.Light;light.Range=math.min(16,8*s);light.Brightness=0;light.Shadows=false;light.Enabled=false;light.Parent=core;fx.Light=light
  folder.Parent=workspace
  r.Fx=fx;return fx
@@ -126,7 +129,7 @@ function X.Step(r,now,frame,tier,reduced,lit,parts,frames)
  fx.Stars.Enabled=tier==3
  fx.Light.Enabled=lit and tier==3
  if fx.Light.Enabled then fx.Light.Brightness=reduced and 1.4 or 1.4+.8*math.sin(now*2.2)end
- fx.Highlight.OutlineTransparency=reduced and .4 or .3+.12*math.sin(now*1.6)
+ if fx.Highlight then fx.Highlight.OutlineTransparency=reduced and .4 or .3+.12*math.sin(now*1.6)end
  -- Orbiting debris on a tilted ring; frozen in place under Reduced Motion.
  local t=reduced and 0 or now
  local orbit=frame*CFrame.Angles(.35,0,.2)

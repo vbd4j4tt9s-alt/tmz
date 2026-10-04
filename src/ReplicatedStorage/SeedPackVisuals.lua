@@ -56,7 +56,7 @@ function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,pac
     local coating=Rules.PackMutations[mutation]
     if coating.Color then
         m:SetAttribute('PaperColor',coating.Color)
-        for _,p in ipairs(m:GetDescendants())do if p:IsA('BasePart')and p~=root then
+        for _,p in ipairs(m:GetDescendants())do if p:IsA('BasePart')and p~=root and not p:GetAttribute('CoatSkip')then -- R147: the Verity pack's face card keeps its picture
             -- Remove a mesh's appearance override so Roblox's real material shades it.
             for _,v in ipairs(p:GetChildren())do if v:IsA('SurfaceAppearance')then v:Destroy()end end
             p.Color=coating.Color;p.Material=coating.Material;p.MaterialVariant=''

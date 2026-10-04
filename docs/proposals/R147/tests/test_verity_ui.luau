@@ -3,14 +3,16 @@
 -- Roblox mock with the real SeedPackVisuals / SeedPackRenderer / EclipsePackArt / VerityPackArt / VoidPackFx / ItemPictures /
 -- VeiledEventClient81 / SeedPackRender / ChestIndex of this checkout. The comparison "before" modules are the base commit's
 -- (git show BASE:..., loaded as SeedPackVisualsBase / SeedPackRendererBase / EclipsePackArtBase / VoidPackFxBase / ChestIndexBase).
---  1. the Verity pack art: EclipsePackArt's parts in a gold / white palette (no purple, body 255,213,46), sized like the Void pack
---     (parts, bounds, extents, carry layout), on every path: world, dropped, carried, CarryBag, opening copy, inventory picture,
---     viewport; coats; a base record fell through to a plain Storm pack;
+--  1. the Verity pack art (owner: "VERITY PACK CAN JUST BE THE VERITY'S SMILING FACE"): one square, almost see-through card inside the
+--     Void pack's bounds with VerityConfig's picture as Decals on its front and back (Decals: SurfaceGuis do not render in the hotbar /
+--     Bag viewports); nothing else (no pouch, rings, runes, eye, halo, debris); Gold / Diamond coats tint the Decals and add a rim
+--     without painting the card; on every path: world, dropped, carried, CarryBag, opening copy, inventory picture, viewport;
 --  2. the Void pack, the Mech pack and the ordinary packs build part for part what the base commit built (and bound the same);
---  3. VoidPackFx: Void effects identical to the base's; Verity effects gold sparkles (no smoke, nothing purple), same budgets; the
---     real VeiledEventClient81 loop gives a carried Verity pack its own gold effects; SeedPackRender leaves it alone like the Void;
+--  3. VoidPackFx: Void effects identical to the base's; Verity effects gold sparkles and a warm light only (no smoke, debris, comets
+--     or outline, nothing purple); the real VeiledEventClient81 loop gives a carried Verity pack those; SeedPackRender leaves it alone;
+--     the opening scripts hide / fade its Decals too (they follow only their own properties);
 --  4. the Index: nine tabs, VERITY last and gold, its card, progress, the halfway / completion rewards from BalanceValues81, alerts,
---     tabs fitting and not overlapping from a 360 px phone to 1920x1080, and the existing tabs unchanged against the base's script.
+--     tabs fitting and not overlapping from a 360 px phone to 1920x1080, and the the Index unchanged against the base's script.
 local W=require('./world');local F=require('./fixtures');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -79,52 +81,35 @@ end
 local function warm(c)local r,g,b=rgb(c);return r>=g and g>=b end
 local function boundsLine(b)return ser(b)end
 
--- 1. The palette art, spec by spec ------------------------------------------------------------------------------------------------------
-local voidSpecs,baseSpecs,paintedSpecs=Eclipse.Specs(),EclipseBase.Specs(),VerityArt.Specs()
-check(#voidSpecs==#baseSpecs and #voidSpecs==#paintedSpecs and #voidSpecs>100,'the Verity art has the Void art\'s parts ('..#paintedSpecs..')')
+-- 0. The Void art module itself is the base commit's ---------------------------------------------------------------------------------------
+local voidSpecs,baseSpecs=Eclipse.Specs(),EclipseBase.Specs()
 do
- local same,why=true,nil
+ local same,why=#voidSpecs==#baseSpecs and #voidSpecs>100,nil
  for i,s in ipairs(voidSpecs)do
   local b=baseSpecs[i];local line=function(x)return table.concat({x.Name,ser(x.Size),ser(x.Frame),rgbKey(x.Color),x.Material.Name,tostring(x.Shape and x.Shape.Name),ser(x.Transparency),ser(x.Spin),ser(x.Pivot),ser(x.Pulse),ser(x.Phase)},'|')end
   if line(s)~=line(b)then same=false;why=line(s)..' vs '..line(b);break end
  end
- check(same,'EclipsePackArt.Specs() (the Void palette) is the base commit\'s, spec for spec'..(why and(': '..why)or''))
+ check(same,'EclipsePackArt.Specs() is the base commit\'s, spec for spec ('..#voidSpecs..' parts)'..(why and(': '..why)or''))
  local pal=true;for k,v in pairs(EclipseBase.Palette)do if rgbKey(Eclipse.Palette[k])~=rgbKey(v)then pal=false end end
  check(pal,'the Void palette values are unchanged')
- check(Eclipse.Specs()==Eclipse.Specs(Eclipse.Palette)and Eclipse.Specs()~=VerityArt.Specs(),'specs are cached per palette (the default one is the Void\'s)')
- check(VerityArt.Specs()==VerityArt.Specs(),'the Verity specs are cached too')
 end
+
+-- 1. The face card ----------------------------------------------------------------------------------------------------------------------
+local IMAGE='rbxassetid://102712963740896'
+local Config=W.module('VerityConfig')
+local Pic=W.module('HarvestGeometry')
+check(VerityArt.Image==IMAGE and Config.Image==IMAGE,'the picture is VerityConfig.Image, rbxassetid://102712963740896 (the NPC card\'s)')
+check(not W.B.VerityPackArt:find('102712963740896',1,true)and not W.B.VerityCatalog:find('102712963740896',1,true),'(source: the id is written once, in VerityConfig)')
+check(VerityArt.CardTransparency>=.9 and VerityArt.CardTransparency<.95,'the card is almost see-through, under the 0.95 "invisible" cut-off of the picture code ('..VerityArt.CardTransparency..')')
+check(colorIs(VerityArt.CoatTint.Gold,255,225,150)and colorIs(VerityArt.CoatTint.Diamond,200,235,255)and colorIs(VerityArt.Tint('None'),255,255,255),'coat tints: Gold 255,225,150, Diamond 200,235,255, plain white')
+local side1,b1=VerityArt.Side(),Eclipse.Bounds(1)
+check(side1>0 and side1<=2*b1.Radius and side1<=b1.MaxY-b1.MinY+1e-9 and near(side1,math.min(2*b1.Radius,b1.MaxY-b1.MinY),.01),('the card is as wide as the Void pack\'s bounds are wide or high, whichever is less (%.3f of %.3f x %.3f)'):format(side1,2*b1.Radius,b1.MaxY-b1.MinY))
+check(near(VerityArt.CentreY(),(b1.MaxY+b1.MinY)/2),'and centred in the height of those bounds')
 do
- -- Same shape: everything but the colour is the Void spec; the colour is the Verity palette entry standing in for the Void one.
- local map,clash={},false
- for k,v in pairs(Eclipse.Palette)do local key=rgbKey(v);if map[key]and map[key]~=rgbKey(VerityArt.Palette[k])then clash=true end;map[key]=rgbKey(VerityArt.Palette[k])end
- check(not clash,'(no two Void palette entries share a colour but not a Verity colour)')
- local geometry,colors=true,true
- for i,s in ipairs(voidSpecs)do
-  local p=paintedSpecs[i]
-  if s.Name~=p.Name or ser(s.Size)~=ser(p.Size)or ser(s.Frame)~=ser(p.Frame)or s.Material~=p.Material or s.Shape~=p.Shape or ser(s.Transparency)~=ser(p.Transparency)
-   or ser(s.Spin)~=ser(p.Spin)or ser(s.Pivot)~=ser(p.Pivot)or ser(s.Pulse)~=ser(p.Pulse)or ser(s.Phase)~=ser(p.Phase)then geometry=false end
-  -- exact palette entries map one to one; the gradients (galaxy arms, event horizon) are lerps between Verity palette entries
-  local function between(c,keys)
-   for _,ch in ipairs({'R','G','B'})do local lo,hi=2,-1;for _,k in ipairs(keys)do local v=VerityArt.Palette[k][ch];lo=math.min(lo,v);hi=math.max(hi,v)end;if c[ch]<lo-1e-6 or c[ch]>hi+1e-6 then return false end end
-   return true
-  end
-  if s.Name:find('^GalaxyArm')then if not between(p.Color,{'ArmInner','ArmMid','ArmOuter'})then colors=false end
-  elseif s.Name:find('^EventHorizon')then if not between(p.Color,{'Halo','HaloHot'})then colors=false end
-  elseif map[rgbKey(s.Color)]~=rgbKey(p.Color)then colors=false;print('  colour of '..s.Name..': '..rgbKey(s.Color)..' -> '..rgbKey(p.Color)..' expected '..tostring(map[rgbKey(s.Color)]))end
- end
- check(geometry,'the Verity parts are the Void parts: names, sizes, frames, materials, shapes, transparency, spin and pulse hints')
- check(colors,'and only the colours change, each through the palette')
- local missing=0;for k in pairs(Eclipse.Palette)do if VerityArt.Palette[k]==nil then missing+=1 end end
- check(missing==0,'the Verity palette has every key of the Void palette')
- local allWarm,anyBlue=true,false
- for k,v in pairs(VerityArt.Palette)do if not warm(v)then allWarm=false;print('  not warm: '..k)end;local r,_,b=rgb(v);if b>r then anyBlue=true end end
- check(allWarm and not anyBlue,'every Verity palette colour is warm (R >= G >= B): no purple, violet, blue or pink')
- check(colorIs(VerityArt.Palette.Body,255,213,46)and colorIs(Cat.Palette.Ball,255,213,46)and colorIs(Cat.Palette.Gloss,255,252,232),'the body is the Verity gold 255,213,46 (and the catalog\'s Ball / Gloss are as they were)')
- check(colorIs(Cat.Palette.LeafOuter,68,160,72)and colorIs(Cat.Palette.LeafInner,96,188,88),'(the catalog\'s leaf colours are as they were)')
- local cream=0;for _,v in pairs(VerityArt.Palette)do local r,g,b=rgb(v);if r>=250 and g>=240 and b>=190 then cream+=1 end end
- check(cream>=3,'cream / white highlights are used ('..cream..' palette entries)')
- check(VerityArt.Budget==Eclipse.Budget and #paintedSpecs<=VerityArt.Budget.MaxParts,'same part budget (<= '..Eclipse.Budget.MaxParts..')')
+ local fx=VerityArt.Fx;local allWarm=true
+ for _,k in ipairs({'Haze','Nebula','Stars'})do check(fx[k].Texture:find('sparkles_main')~=nil,'Fx.'..k..': a built-in sparkle texture');for _,c in ipairs(fx[k].Colors)do if not warm(c)then allWarm=false end end end
+ check(allWarm and warm(fx.Light),'every effect colour is warm gold / cream, nothing purple')
+ check(fx.Debris==nil and fx.Comet==nil and fx.Trail==nil and fx.Fill==nil and fx.Outline==nil,'no debris, comets or outline: the face is not surrounded by pieces')
 end
 check(near(Rules.GetVariant(VERITY).BagScale,Rules.GetVariant(VOID).BagScale)and Rules.DesignKey(7,VERITY)==Rules.DesignKey(7,VOID),'the Verity record has the Void pack\'s scale and design key')
 
@@ -141,53 +126,48 @@ local function inside(bag,b,label)
  end
  return check(worst<=1e-3,label..': all parts inside Bounds (worst overshoot '..string.format('%.4f',worst)..')')
 end
+local function decalsOf(inst)local out={};for _,d in ipairs(inst:GetDescendants())do if d:IsA('Decal')then out[#out+1]=d end end;return out end
 local voidBags,verityBags={},{}
 for _,case in ipairs({{1,'None'},{2.5,'Gold'},{25,'Diamond'},{.5,'None'}})do
  local size,coat=case[1],case[2];local label=('%sx %s'):format(size,coat)
  local void=bagAt(Visuals,10,7,VOID,size,coat);local vr=bagAt(Visuals,10,7,VERITY,size,coat)
- local pv,pr=parts(void),parts(vr)
+ local pr=parts(vr);local rims=coat=='None'and 0 or 4
  check(vr:GetAttribute('BagVariant')==VERITY and vr:GetAttribute('Stage')==7 and vr:GetAttribute('PackRarity')=='Verity'and vr:GetAttribute('PackRank')==7,label..': Verity record attributes (variant, stage 7, tier Verity, rank 7)')
- check(vr:GetAttribute('EclipsePack')==true and vr:GetAttribute('VoidDesignRevision')==122 and vr:GetAttribute('VerityPack')==true and void:GetAttribute('VerityPack')==nil,label..': built by the reliquary art, flagged VerityPack (the Void pack is not)')
- local keysV,keysR={},{};for k in pairs(void:GetAttributes())do keysV[k]=true end;for k in pairs(vr:GetAttributes())do keysR[k]=true end
- local extra,lost={},{};for k in pairs(keysR)do if not keysV[k]then extra[#extra+1]=k end end;for k in pairs(keysV)do if not keysR[k]then lost[#lost+1]=k end end
- check(#extra==1 and extra[1]=='VerityPack'and #lost==0,label..': the same attributes as the Void pack plus VerityPack ('..table.concat(extra,',')..' / lost '..table.concat(lost,',')..')')
- check(#pv==#pr,label..': same part count as the Void pack ('..#pr..')')
- local shape=#pv==#pr;local colorsOk=true;local warmOk=true
- for i=1,math.min(#pv,#pr)do
-  local a,b=pv[i],pr[i]
-  if a._class~=b._class or a.Name~=b.Name or ser(a.Size)~=ser(b.Size)or ser(a.CFrame)~=ser(b.CFrame)or a.Material~=b.Material and coat=='None'or ser(a.Transparency)~=ser(b.Transparency)then shape=false end
-  if coat=='None'then if a:IsA('MeshPart')then colorsOk=colorsOk and colorIs(b.Color,255,213,46)end;warmOk=warmOk and warm(b.Color)
-  else colorsOk=colorsOk and rgbKey(a.Color)==rgbKey(b.Color)end
+ check(vr:GetAttribute('VerityPack')==true and vr:GetAttribute('SpecialPackDesign89')==true and vr:GetAttribute('CompactPackReady')==true and vr:GetAttribute('EclipsePack')==nil,label..': built by the face-card art (VerityPack, not the reliquary)')
+ check(vr:GetAttribute('CompactPackPartCount')==#pr+1,label..': CompactPackPartCount counts every part ('..tostring(vr:GetAttribute('CompactPackPartCount'))..')')
+ check(coat=='None'and colorIs(vr:GetAttribute('PaperColor'),255,213,46)or coat~='None'and rgbKey(vr:GetAttribute('PaperColor'))==rgbKey(Rules.PackMutations[coat].Color),label..': PaperColor (the opening paper) is the Verity gold, or the coat\'s')
+ -- just the face: a card (and a rim for a coat), nothing else
+ check(#pr==1+rims,label..': one card'..(rims>0 and' and four rim bars'or'')..', nothing else ('..#pr..' parts; the Void pack has '..#parts(void)..')')
+ local stray=0;for _,p in ipairs(pr)do if p.Name~='VerityCard'and not p.Name:match('^VerityRim%d$')then stray+=1 end end
+ for _,d in ipairs(vr:GetDescendants())do if d:IsA('MeshPart')or d.Name=='BottomSeal'or d:GetAttribute('TearIndex')then stray+=1 end end
+ check(stray==0,label..': no pouch, seal, tear strips, rings, runes, eye, halo or debris')
+ local card=vr:FindFirstChild('VerityCard',true);local scale=vr:GetAttribute('VisualScale')
+ if check(card~=nil and card:IsA('Part'),label..': the VerityCard part')then
+  check(near(card.Size.X,VerityArt.Side()*scale,1e-6)and near(card.Size.Y,card.Size.X,1e-9),label..(': a square %.3f studs a side'):format(card.Size.X))
+  check(near(card.Size.Z,VerityArt.CardDepth*scale,1e-6)and card.Size.Z<card.Size.X*.05,label..': and thin ('..string.format('%.3f',card.Size.Z)..')')
+  check(near(card.Transparency,VerityArt.CardTransparency)and card.Transparency<.95,label..': almost see-through, still counted as visible by the picture code')
+  check(card.Material.Name=='SmoothPlastic'and card.Reflectance==0 and colorIs(card.Color,255,213,46)and card:GetAttribute('CoatSkip')==true,label..': the coat does not paint the card')
+  check((card.CFrame.Position-vr.PrimaryPart.CFrame.Position-V3(0,VerityArt.CentreY()*scale,0)).Magnitude<1e-6,label..': centred on the bounds, over the pack\'s root')
+  check(card.CanCollide==false and card.CanQuery==false and card.CanTouch==false and card.Massless and card.Anchored,label..': inert world part, anchored')
+  local ds=decalsOf(card);local front,back
+  for _,d in ipairs(ds)do if d.Face.Name=='Front'then front=d elseif d.Face.Name=='Back'then back=d end end
+  check(#ds==2 and front and back and #decalsOf(vr)==2,label..': exactly two Decals, on the front and the back face')
+  local tint=coat=='None'and{255,255,255}or coat=='Gold'and{255,225,150}or{200,235,255}
+  for _,d in ipairs({front,back})do
+   check(d.Texture==IMAGE and d.Transparency==0 and colorIs(d.Color3,tint[1],tint[2],tint[3]),label..': the '..d.Face.Name..' Decal: the Verity picture'..(coat=='None'and', untinted'or(', tinted for '..coat)))
+  end
  end
- check(shape,label..': part for part the Void pack\'s shape, size and place')
- if coat=='None'then
-  check(colorsOk,label..': the pouch body is gold 255,213,46')
-  check(warmOk,label..': every part is warm (no purple / blue anywhere)')
-  check(colorIs(vr:GetAttribute('PaperColor'),255,213,46),label..': PaperColor (the opening paper) is the gold')
-  local trimOk=true;for _,p in ipairs(vr:GetChildren())do if p.Name=='BottomSeal'or p:GetAttribute('TearIndex')then trimOk=trimOk and colorIs(p.Color,190,124,12)and p.Material.Name=='Metal'end end
-  check(trimOk,label..': seal and tear strip in the amber trim')
-  local byName={};for _,p in ipairs(pr)do byName[p.Name]=p end
-  check(colorIs(byName.VoidSingularityF.Color,112,70,6)and colorIs(byName.PhotonRingF1.Color,255,170,30)and colorIs(byName.PhotonRingF3.Color,255,255,248)and colorIs(byName.VoidPupilF.Color,255,252,232),label..': the dark amber core, the white-hot photon ring and the cream pupil')
- else
-  check(colorsOk,label..': the '..coat..' coat covers the whole Verity pack exactly as it does the Void pack')
- end
- local ev,er=extents(void),extents(vr)
- check(near(ev.X,er.X,1e-6)and near(ev.Y,er.Y,1e-6)and near(ev.Z,er.Z,1e-6),label..(': Verity pack is as big as the Void pack (%.2f x %.2f x %.2f)'):format(er.X,er.Y,er.Z))
- check(near(vr:GetAttribute('VisualScale'),void:GetAttribute('VisualScale')),label..': same VisualScale')
+ for _,p in ipairs(pr)do if p.Name:match('^VerityRim%d$')then
+  local c=Rules.PackMutations[coat];check(rgbKey(p.Color)==rgbKey(c.Color)and p.Material==c.Material,label..': '..p.Name..' is painted by the '..coat..' coat')
+  check(p.Transparency==(coat=='Diamond'and .10 or 0),label..': '..p.Name..' transparency')
+ end end
  local bv,br=Visuals.Bounds(7,VOID,size),Visuals.Bounds(7,VERITY,size)
  check(boundsLine(bv)==boundsLine(br)and br.Radius>0,label..': Visuals.Bounds is the Void pack\'s ('..string.format('R %.3f, Y %.3f..%.3f',br.Radius,br.MinY,br.MaxY)..')')
- inside(vr,br,label)
- local anchored=true;for _,p in ipairs(pr)do if not p.Anchored then anchored=false end end;check(anchored,label..': world parts anchored (a dropped pack is built the same way)')
- local up=0;for _,d in ipairs(vr:GetDescendants())do for _,k in ipairs({'TextureID','Texture','Image'})do local v=d._props[k];if type(v)=='string'and v:find('rbxassetid')then up+=1 end end end
- check(up==0,label..': no uploaded asset ids')
+ inside(vr,br,label);inside(vr,bv,label..' (the Void\'s)')
  check(W.CS:HasTag(vr,'BiomeSeedPackVisual'),label..': tagged BiomeSeedPackVisual (the effects owner finds it)')
+ local ids=0;for _,d in ipairs(vr:GetDescendants())do for _,k in ipairs({'TextureID','Texture','Image'})do local v=d._props[k];if type(v)=='string'and v:find('rbxassetid')and v~=IMAGE then ids+=1 end end end
+ check(ids==0,label..': no uploaded asset but the picture')
  voidBags[#voidBags+1]=void;verityBags[#verityBags+1]=vr
-end
--- The base commit had no art for the record: it fell through to an ordinary Storm pack.
-do
- local old=bagAt(VisualsBase,10,7,VERITY,1,'None');local void=bagAt(VisualsBase,10,7,VOID,1,'None')
- check(old:GetAttribute('EclipsePack')==nil and #parts(old)<#parts(void)/3,'(before: the base built a plain pouch for a VerityReliquary record: '..#parts(old)..' parts, no reliquary)')
- old:Destroy();void:Destroy()
 end
 -- Carried: welded to the character, CarryBag, the layout from the same bounds, the opening copy.
 local char=R.new('Model');char.Name='Carrier';char.Parent=W.workspace
@@ -196,24 +176,21 @@ local hrp=R.new('Part');hrp.Name='HumanoidRootPart';hrp.Size=V3(2,2,1);hrp.CFram
 local held=Visuals.Bag(CF(0,5,1),char,1,torso,7,VERITY,1,1,'None')
 do
  local welded=true;for _,p in ipairs(parts(held))do if p.Anchored or not p:FindFirstChildOfClass('WeldConstraint')then welded=false end end
- check(welded,'held: every part welded to the carrier')
- local voidHeld=Visuals.Bag(CF(0,5,1),char,1,torso,7,VOID,1,1,'None')
- check(#parts(held)==#parts(voidHeld),'held: as many parts as a held Void pack ('..#parts(held)..')')
- voidHeld:Destroy()
+ check(welded and #parts(held)==1,'held: the card is welded to the carrier')
  local ok,carry=pcall(Visuals.CarryBag,char,7,VERITY,1,1,'None');local okV,carryV=pcall(Visuals.CarryBag,char,7,VOID,1,1,'None')
  check(ok and carry and carry.Name=='CarriedSeed'and carry:GetAttribute('SeedPackCarry')==true and carry:GetAttribute('BagVariant')==VERITY,'CarryBag builds the carried Verity pack: '..tostring(carry))
- check(okV and carryV and #parts(carry)==#parts(carryV)and carry:GetAttribute('CarryRootOffset')~=nil and ser(carry:GetAttribute('CarryRootOffset'))==ser(carryV:GetAttribute('CarryRootOffset'))and near(carry:GetAttribute('CarryBackZ')or 0,carryV:GetAttribute('CarryBackZ')or 1e9)and near(carry:GetAttribute('CarryDisplayMultiplier'),carryV:GetAttribute('CarryDisplayMultiplier')),'the carry layout (offset, back Z, size) is the Void pack\'s')
- local grips=carry.PrimaryPart:FindFirstChild('LeftGrip')and carry.PrimaryPart:FindFirstChild('RightGrip')
- check(grips,'both hand grips exist')
+ check(okV and carryV and carry:GetAttribute('CarryRootOffset')~=nil and ser(carry:GetAttribute('CarryRootOffset'))==ser(carryV:GetAttribute('CarryRootOffset'))and near(carry:GetAttribute('CarryBackZ')or 0,carryV:GetAttribute('CarryBackZ')or 1e9)and near(carry:GetAttribute('CarryDisplayMultiplier'),carryV:GetAttribute('CarryDisplayMultiplier')),'the carry layout (offset, back Z, size) is the Void pack\'s')
+ check(carry.PrimaryPart:FindFirstChild('LeftGrip')and carry.PrimaryPart:FindFirstChild('RightGrip'),'both hand grips exist')
  local wcount=0;for _,d in ipairs(carry:GetDescendants())do if d:IsA('WeldConstraint')then wcount+=1 end end
- check(wcount==#parts(carry)+1,'every carried part is welded, and the root to the torso ('..wcount..' welds for '..#parts(carry)..' parts)')
+ check(wcount==#parts(carry)+1 and #decalsOf(carry)==2,'the carried card is welded (and the root to the torso); its two Decals came along ('..wcount..' welds)')
  carry:Destroy();carryV:Destroy()
+ -- the opening copy (SeedPackClient / PackOpeningFeedback clone the bag): the card and both Decals are there
  local copy=held:Clone();copy.Name='OpeningBag'
  for _,d in ipairs(copy:GetDescendants())do if d:IsA('WeldConstraint')then d:Destroy()elseif d:IsA('BasePart')then d.Anchored=true end end
- local names={};for _,p in ipairs(parts(copy))do names[p.Name]=true end;local all=true;for _,s in ipairs(paintedSpecs)do if not names[s.Name]then all=false end end
- check(all,'the opening copy keeps the whole design')
+ local cds=decalsOf(copy)
+ check(#cds==2 and cds[1].Texture==IMAGE and cds[2].Texture==IMAGE and copy:FindFirstChild('VerityCard',true)~=nil,'the opening copy keeps the card and its two Decals')
 end
--- Inventory / hotbar / Bag pictures (ItemPictures builds exactly Visuals.Bag) and a viewport preview.
+-- Inventory / hotbar / Bag pictures (ItemPictures builds exactly Visuals.Bag, into a ViewportFrame) and a viewport preview.
 do
  local P=W.module('ItemPictures')
  local tool=F.pack(W,W.workspace,7,VERITY,1,'None','Verity Pack')
@@ -221,21 +198,24 @@ do
  local gui=R.Instance.new('ScreenGui');gui.Name='Pictures';gui.Parent=pg
  local holder=R.new('Frame');holder.Size=R.UDim2.fromOffset(60,60);holder.Parent=gui;holder.AbsoluteSize=R.Vector2.new(60,60);holder.AbsolutePosition=R.Vector2.new(0,0)
  local voidTool=F.pack(W,W.workspace,7,VOID,1,'None','Void Pack');local holder2=R.new('Frame');holder2.Size=R.UDim2.fromOffset(60,60);holder2.Parent=gui;holder2.AbsoluteSize=R.Vector2.new(60,60);holder2.AbsolutePosition=R.Vector2.new(70,0)
- P.Show(holder,tool,1);P.Show(holder2,voidTool,1)
- for _=1,120 do W.frames(1)end
- local view=holder:FindFirstChild('ItemViewport');local view2=holder2:FindFirstChild('ItemViewport')
- check(view and view2,'both packs get their real 3D picture (hotbar / Bag slot)')
- local function stats(v)
-  local n,goldBody,purple=0,0,0
-  for _,d in ipairs(v:GetDescendants())do if d:IsA('BasePart')then n+=1;if d:IsA('MeshPart')and colorIs(d.Color,255,213,46)then goldBody+=1 end;local r,_,b=rgb(d.Color);if b>r then purple+=1 end end end
-  return n,goldBody,purple
- end
- local n,gold,purple=stats(view);local n2,_,purple2=stats(view2)
- check(n>100 and gold>=1 and purple==0,('the Verity picture is the gold pack: %d parts, %d gold body parts, %d purple'):format(n,gold,purple))
- check(n==n2 and purple2>0,'(the Void picture has the same parts, in purple: '..purple2..')')
+ local goldTool=F.pack(W,W.workspace,7,VERITY,1,'Gold','Gold Verity Pack');local holder3=R.new('Frame');holder3.Size=R.UDim2.fromOffset(60,60);holder3.Parent=gui;holder3.AbsoluteSize=R.Vector2.new(60,60);holder3.AbsolutePosition=R.Vector2.new(140,0)
+ P.Show(holder,tool,1);P.Show(holder2,voidTool,1);P.Show(holder3,goldTool,1)
+ for _=1,160 do W.frames(1)end
+ local view,view2,view3=holder:FindFirstChild('ItemViewport'),holder2:FindFirstChild('ItemViewport'),holder3:FindFirstChild('ItemViewport')
+ check(view and view2 and view3,'the Verity pack, a Gold Verity pack and a Void pack all get their real 3D picture (hotbar / Bag slot)')
+ local card=view and view:FindFirstChild('VerityCard',true)
+ check(card~=nil and #decalsOf(view)==2,'the Verity picture holds the card and both Decals (the picture code keeps a part under the 0.95 cut-off)')
+ for _,d in ipairs(view and decalsOf(view)or{})do check(d.Texture==IMAGE,'the viewport Decal shows the Verity picture ('..d.Face.Name..')')end
+ local model=card and card.Parent;while model and model.Parent~=view do model=model.Parent end
+ local center,size=Pic.Bounds(model or view)
+ check(card and size.X>=card.Size.X*.99 and size.X<=card.Size.X*1.05 and size.Y>=card.Size.Y*.99 and size.Y<=card.Size.Y*1.06 and size.Z<card.Size.X*.3,'the picture is framed on the card (the bounds the camera aims at are the card\'s, a little turned: '..string.format('%.2f x %.2f x %.2f',size.X,size.Y,size.Z)..')')
+ local gv=view3 and view3:FindFirstChild('VerityCard',true)
+ check(gv and #decalsOf(view3)==2 and colorIs(decalsOf(view3)[1].Color3,255,225,150),'a Gold pack\'s picture shows the tinted Decals')
+ local n2=0;for _,d in ipairs(view2 and view2:GetDescendants()or{})do if d:IsA('BasePart')then n2+=1 end end
+ check(n2>100,'(the Void picture is still its 100+ parts: '..n2..')')
  local wm=R.new('WorldModel');local vf=R.new('ViewportFrame');wm.Parent=vf
  local prev=Visuals.Bag(CF(0,0,0),wm,1,nil,7,VERITY,1,1,'None')
- check(#parts(prev)>#paintedSpecs and prev.Parent==wm,'a viewport preview (WorldModel parent) builds')
+ check(prev.Parent==wm and #parts(prev)==1 and #decalsOf(prev)==2,'a viewport preview (WorldModel parent) builds the card and its Decals')
 end
 
 -- 3. Everything that is not the Verity pack builds exactly what it did ------------------------------------------------------------------
@@ -289,7 +269,7 @@ do
  local cv,cb=PackFx.Capture(voidBag),PackFxBase.Capture(voidBag)
  check(cv.Palette==PackFx.Void and cv.Spinners==cb.Spinners and #cv.Pulsers==#cb.Pulsers and #cv.Parts==#cb.Parts,'Void capture: the Void fx palette, the same spinners / pulsers / parts as the base')
  local cr=PackFx.Capture(verityBag)
- check(cr.Palette==VerityArt.Fx and cr.Spinners==cv.Spinners and #cr.Pulsers==#cv.Pulsers and #cr.Parts==#cv.Parts,'Verity capture: the Verity fx palette; the same motion hints (spin / pulse) as the Void pack')
+ check(cr and cr.Palette==VerityArt.Fx and cr.Spinners==0 and #cr.Pulsers==0 and #cr.Parts==2,'Verity capture: the Verity fx palette; no spin / pulse hints (a card), its root and card')
  check(PackFx.PaletteFor(verityBag)==VerityArt.Fx and PackFx.PaletteFor(voidBag)==PackFx.Void and PackFx.PaletteFor(bagAt(Visuals,70,3,'Pack03',1,'None'))==PackFx.Void,'PaletteFor: Verity -> its own, everything else -> the Void set')
  for tier=1,3 do
   local a=fxFolderFor(PackFx,voidBag,tier);local b=fxFolderFor(PackFxBase,voidBag,tier)
@@ -305,41 +285,29 @@ do
   check(poses and same2 and colors,'tier '..tier..': Step and Pulse leave the Void effects exactly as the base does')
   PackFx.Clear(a);PackFxBase.Clear(b)
  end
- -- Verity: gold sparkles, no void haze.
- local counts={}
+ -- Verity: gold sparkles and a warm light, no void haze, no debris, comets or outline.
  for tier=1,3 do
-  local c=PackFx.Capture(verityBag);local fx=PackFx.Create(c,tier);local cvoid=PackFx.Capture(voidBag);local fv=PackFx.Create(cvoid,tier)
-  check(#fx.Debris==#fv.Debris and #fx.Comets==#fv.Comets and #fx.Debris==PackFx.Budget.Debris[tier]and #fx.Comets==PackFx.Budget.Comets[tier],'tier '..tier..': the Verity effects stay inside the same budget')
+  local c=PackFx.Capture(verityBag);local fx=PackFx.Create(c,tier)
+  check(#fx.Debris==0 and #fx.Comets==0 and fx.Highlight==nil,'tier '..tier..': no orbiting debris, no comets, no outline around the face')
   local sparkles,smoke=0,0
   for _,e in ipairs({fx.Haze,fx.Nebula,fx.Stars})do if e.Texture:find('sparkles_main')then sparkles+=1 end;if e.Texture:find('smoke')then smoke+=1 end end
   check(sparkles==3 and smoke==0,'tier '..tier..': three gold sparkle emitters, no smoke / void haze')
   local okColors=true;local bad=''
   local function seq(cs)if cs.A and cs.A.R then return{cs.A,cs.B}end;return{}end
   for _,e in ipairs({fx.Haze,fx.Nebula,fx.Stars})do for _,col in ipairs(seq(e.Color))do if not warm(col)then okColors=false;bad=e.Name end end end
-  for _,d in ipairs(fx.Debris)do if not warm(d.Color)then okColors=false;bad='debris'end end
-  for _,cm in ipairs(fx.Comets)do for _,col in ipairs(seq(cm.Trail.Color))do if not warm(col)then okColors=false;bad='trail'end end;if not warm(cm.Part.Color)then okColors=false;bad='comet'end end
-  if not warm(fx.Highlight.FillColor)or not warm(fx.Highlight.OutlineColor)or not warm(fx.Light.Color)then okColors=false;bad='highlight / light'end
+  if not warm(fx.Light.Color)then okColors=false;bad='light'end
   check(okColors,'tier '..tier..': every effect colour is warm gold / cream, nothing purple ('..bad..')')
-  check(colorIs(fx.Light.Color,255,196,70)and colorIs(fx.Highlight.OutlineColor,255,213,46),'tier '..tier..': a warm gold light and a gold outline')
-  check(fx.Folder.Name=='_VoidPackFx122'and fx.Nebula.Texture:match('^rbxasset://textures/')~=nil,'tier '..tier..': same folder name, built-in textures only')
+  check(colorIs(fx.Light.Color,255,196,70),'tier '..tier..': a warm gold light')
+  local others=0;for _,d in ipairs(fx.Folder:GetChildren())do if d.Name~='VoidFxCore'then others+=1 end end
+  check(others==0 and fx.Folder.Name=='_VoidPackFx122'and fx.Nebula.Texture:match('^rbxasset://textures/')~=nil,'tier '..tier..': the folder holds only the core with the emitters and the light; built-in textures only')
   local list,frames={},{};PackFx.Step(c,10,verityBag.PrimaryPart.CFrame,tier,false,true,list,frames)
-  check(fx.Light.Enabled==(tier==3)and fx.Nebula.Enabled==(tier>1)and fx.Stars.Enabled==(tier==3),'tier '..tier..': the same gating as the Void pack (light only at full quality)')
+  check(#list==1 and fx.Light.Enabled==(tier==3)and fx.Nebula.Enabled==(tier>1)and fx.Stars.Enabled==(tier==3),'tier '..tier..': the same gating as the Void pack (light only at full quality); only the core moves')
   local a,b={},{};local la,lb={},{}
   PackFx.Step(c,3,verityBag.PrimaryPart.CFrame,tier,true,false,la,a);PackFx.Step(c,7,verityBag.PrimaryPart.CFrame,tier,true,false,lb,b)
-  local still=true;for i=1,#a do if a[i].Position~=b[i].Position then still=false end end
-  check(still and not fx.Nebula.Enabled,'tier '..tier..': Reduced Motion freezes the orbits, no swirl')
-  PackFx.Pulse(c,1.234,false);PackFx.Clear(c);PackFx.Clear(cvoid)
-  local restored=true;for _,e in ipairs(c.Pulsers)do if e.Part.Color~=e.Color then restored=false end end
-  check(restored and fx.Folder.Parent==nil,'tier '..tier..': clearing removes the effects and restores the colours')
-  counts[tier]=#c.Pulsers
+  check(not fx.Nebula.Enabled,'tier '..tier..': Reduced Motion: no swirl')
+  PackFx.Pulse(c,1.234,false);PackFx.Clear(c)
+  check(fx.Folder.Parent==nil and c.Fx==nil,'tier '..tier..': clearing removes the effects')
  end
- -- the pulse lightens the gold towards white; never towards a hue
- local c=PackFx.Capture(verityBag);PackFx.Pulse(c,.9,false)
- local lighter=true;for _,e in ipairs(c.Pulsers)do local r0,g0,b0=rgb(e.Color);local r1,g1,b1=rgb(e.Part.Color);if r1<r0 or g1<g0 or b1<b0 or not warm(e.Part.Color)and warm(e.Color)then lighter=false end end
- PackFx.Restore(c);check(lighter and #c.Pulsers>0,'the heartbeat glow lightens the gold, never turns it a colour ('..#c.Pulsers..' pulsing parts)')
- local pa,pb={},{};local a,b={},{};PackFx.Pose(c,2,pa,a,true);PackFx.Pose(c,2,pb,b,false)
- local moved=0;for i,p in ipairs(pa)do if p:GetAttribute('VoidSpin')and a[i].Position~=b[i].Position then moved+=1 end end
- check(moved>0,'the Verity halo / galaxy spins near the camera too ('..moved..' parts)')
 end
 
 -- 5. The real client loops --------------------------------------------------------------------------------------------------------------
@@ -358,11 +326,22 @@ do
  W.frames(20,1/30)
  local folders={};for _,f in ipairs(W.workspace:GetChildren())do if f.Name=='_VoidPackFx122'then folders[#folders+1]=f end end
  check(#folders==2,'the real VeiledEventClient81 gives both a carried Verity pack and a carried Void pack effects ('..#folders..')')
- local gold,violet=0,0
+ local goldFx,voidFx
  for _,f in ipairs(folders)do
-  local h=f:FindFirstChild('VoidDistortion');if h and h.Adornee==verity and colorIs(h.OutlineColor,255,213,46)then gold+=1 end;if h and h.Adornee==void and colorIs(h.OutlineColor,150,80,230)then violet+=1 end
+  local h=f:FindFirstChild('VoidDistortion')
+  if h and h.Adornee==void and colorIs(h.OutlineColor,150,80,230)then voidFx=f elseif not h then goldFx=f end
  end
- check(gold==1 and violet==1,'the Verity pack\'s effects are gold, the Void pack\'s still violet')
+ check(voidFx~=nil and goldFx~=nil,'the Void pack\'s effects are still violet with their outline; the Verity pack\'s have no outline')
+ if goldFx then
+  local emitters,debris,comets,others=0,0,0,0
+  for _,d in ipairs(goldFx:GetDescendants())do
+   if d:IsA('ParticleEmitter')then emitters+=1;check(d.Texture:find('sparkles_main')~=nil,'a Verity emitter uses the sparkle texture')
+   elseif d.Name=='VoidDebris'then debris+=1 elseif d.Name=='VoidComet'then comets+=1 elseif d:IsA('BasePart')and d.Name~='VoidFxCore'then others+=1 end
+  end
+  local light=goldFx:FindFirstChild('VoidFxCore')and goldFx.VoidFxCore:FindFirstChild('VoidPulseLight')
+  check(emitters==3 and debris==0 and comets==0 and others==0,'the Verity effects: gold sparkle emitters only (3), no debris or comets ('..emitters..' / '..debris..' / '..comets..')')
+  check(light and colorIs(light.Color,255,196,70),'and the warm gold light')
+ end
  local lights=0;for _,f in ipairs(folders)do local core=f:FindFirstChild('VoidFxCore');local l=core and core:FindFirstChild('VoidPulseLight');if l and l.Enabled then lights+=1 end end
  check(lights==1,'one pulsing light in the scene')
  -- a non-reliquary pack is never tracked
@@ -391,6 +370,76 @@ do
 end
 -- Source wiring.
 check(W.B.SeedPackRenderer:find("VerityPackArt",1,true)~=nil and W.B.SeedPackVisuals:find("VerityPackArt",1,true)~=nil and W.B.VeiledEventClient81:find("VerityVariant",1,true)~=nil,'(source: renderer, bounds and the effects owner all route the Verity variant)')
+
+-- 5b. The opening. A Decal follows only its own properties, not its part's: the two scripts that hide the carried pack (the click copy,
+-- the tear) and fade its copy treat the picture's Decals like parts. The real scripts on the mock, with a carried Verity pack.
+do
+ local noop=function()end
+ function R.Inst:Play()end;function R.Inst:Stop()end;function R.Inst:Pause()end
+ W.service('Debris').AddItem=noop;W.service('ContentProvider').PreloadAsync=noop
+ function Players.GetPlayers()return{player}end;Players.PlayerRemoving=R.signal()
+ player.CharacterAdded=R.signal();player.CharacterRemoving=R.signal()
+ local binds={};function W.Run.BindToRenderStep(_,name,_,fn)binds[name]=fn end;function W.Run.UnbindFromRenderStep(_,name)binds[name]=nil end
+ W.Run.PreAnimation=R.signal()
+ W.stub('SeedCarryPose',{new=function()return{Reset=noop,IsReady=function()return true end,Apply=noop}end})
+ W.stub('RarityRevealAudio',{Preload=noop,Stop=noop,Begin=noop,Burst=noop,Update=noop})
+ W.stub('RarityRevealScreen',{Create=function()return setmetatable({},{__index=function()return noop end})end})
+ local me=R.new('Model');me.Name='Tester';me.Parent=W.workspace;player.Character=me
+ local t2=R.new('Part');t2.Name='UpperTorso';t2.Size=V3(2,2,1);t2.CFrame=CF(0,5,0);t2.Anchored=false;t2.Parent=me
+ local h2=R.new('Part');h2.Name='HumanoidRootPart';h2.Size=V3(2,2,1);h2.CFrame=CF(0,4,0);h2.Parent=me
+ local hum=R.new('Humanoid');hum.Health=100;hum.Parent=me
+ local art=R.new('Folder');art.Name='SeedArt';art.Parent=remotes
+ local seeds=R.new('Folder');seeds.Name='Seeds';seeds.Parent=art
+ local cat=R.new('Folder');cat.Name='SeedCatalog';cat.Parent=remotes
+ local def=R.new('Folder');def.Name='SunflowerSeed';def:SetAttribute('DisplayName','Sunflower Seed');def.Parent=cat
+ local seedModel=Visuals.Seed({Id='SunflowerSeed'},1,CF(0,0,0),nil,1,nil,'None');seedModel.Name='SunflowerSeed';seedModel.Parent=seeds
+ local function zero(model)for _,d in ipairs(model:GetDescendants())do if d:IsA('BasePart')or d:IsA('Decal')then d.LocalTransparencyModifier=0 end end end
+ local function cardDecals(model)local c=model:FindFirstChild('VerityCard',true);return c,c and decalsOf(c)or{}end
+ -- (a) PackOpeningFeedback: clicking the held pack shakes a copy and hides the real one
+ local sc1=R.new('LocalScript');sc1.Name='PackOpeningFeedback'
+ local okA,errA=pcall(W.load,'PackOpeningFeedback',sc1)
+ if check(okA,'the real PackOpeningFeedback loads on the mock: '..tostring(errA))then
+  local tool=F.tool(W,'Verity Pack',{SeedPackTool=true,SeedInventoryId='v1',BagVariant=VERITY,Stage=7},nil);tool.Activated=R.signal();tool.Parent=me
+  local carry=Visuals.CarryBag(me,7,VERITY,1,1,'None');zero(carry)
+  binds.ChestChasePackPresentation();tool.Activated:Fire();binds.ChestChasePackPresentation()
+  local copy=W.workspace:FindFirstChild('_LocalClickingPack')
+  local card,ds=cardDecals(carry)
+  check(copy~=nil and copy:FindFirstChild('VerityCard',true)~=nil and #decalsOf(copy)==2,'clicking the held Verity pack makes the shaking copy with the card and both Decals')
+  check(card and card.LocalTransparencyModifier==1 and #ds==2 and ds[1].LocalTransparencyModifier==1 and ds[2].LocalTransparencyModifier==1,'and hides the real pack: the card and both of its Decals')
+  local shown=true;for _,d in ipairs(copy and decalsOf(copy)or{})do if(d.LocalTransparencyModifier or 0)~=0 then shown=false end end
+  check(shown,'while the copy\'s Decals stay shown')
+  tool.Parent=nil;binds.ChestChasePackPresentation()
+  check(W.workspace:FindFirstChild('_LocalClickingPack')==nil and card.LocalTransparencyModifier==0 and ds[1].LocalTransparencyModifier==0 and ds[2].LocalTransparencyModifier==0,'putting the pack away drops the copy and shows the real card and Decals again')
+  carry:Destroy();sc1.Destroying:Fire()
+ end
+ -- (b) SeedPackClient: the tear. The copy is the card and its Decals; the real pack is hidden; the copy fades out with the wrapper.
+ local sc2=R.new('LocalScript');sc2.Name='SeedPackClient'
+ local okB,errB=pcall(W.load,'SeedPackClient',sc2)
+ if check(okB,'the real SeedPackClient loads on the mock: '..tostring(errB))then
+  local carry=Visuals.CarryBag(me,7,VERITY,1,1,'None');zero(carry);W.frames(10,1/30)
+  carry:SetAttribute('RevealSeedId','SunflowerSeed');carry:SetAttribute('RevealAt',W.workspace:GetServerTimeNow())
+  local card,ds=cardDecals(carry)
+  local function copyDecals()
+   local effects=W.workspace:FindFirstChild('_LocalSeedPackEffects');local reveal=effects and effects:FindFirstChild('SeedReveal');local copy=reveal and reveal:FindFirstChild('OpeningBag')
+   return copy,copy and decalsOf(copy)or{}
+  end
+  local okRun,errRun=pcall(W.frames,3,1/30)
+  check(okRun,'the reveal runs without an error: '..tostring(errRun))
+  local copy,cds=copyDecals()
+  check(copy~=nil and copy:FindFirstChild('VerityCard',true)~=nil and #cds==2,'the tear works on a copy of the Verity pack: the card and both Decals')
+  check(card.LocalTransparencyModifier==1 and ds[1].LocalTransparencyModifier==1 and ds[2].LocalTransparencyModifier==1,'the real pack (card and both Decals) is hidden while the copy plays')
+  check(cds[1]and cds[1].Transparency==0 and cds[2].Transparency==0,'the picture is fully visible while the paper tears')
+  W.frames(24,1/30);copy,cds=copyDecals()
+  check(cds[1]and cds[1].Transparency>0 and cds[1].Transparency<1 and near(cds[1].Transparency,cds[2].Transparency),'the picture fades out with the wrapper ('..(cds[1]and string.format('%.2f',cds[1].Transparency)or'-')..')')
+  W.frames(24,1/30);copy,cds=copyDecals()
+  check(cds[1]and cds[1].Transparency==1 and cds[2].Transparency==1,'and is gone before the seed rises')
+  W.frames(120,1/30);copy=copyDecals()
+  check(copy==nil,'the copy is released when the reveal ends')
+  carry:Destroy();sc2.Destroying:Fire()
+ end
+ check((W.B.SeedPackClient:find('p:IsA("Decal")',1,true))~=nil and W.B.SeedPackClient:find('record.DecalFade',1,true)~=nil and(W.B.PackOpeningFeedback:find("p:IsA('Decal')",1,true))~=nil,'(source: both scripts name the Decal)')
+ art:Destroy();cat:Destroy();player.Character=nil;me:Destroy()
+end
 
 -- 6. The Index --------------------------------------------------------------------------------------------------------------------------
 local catalog=R.new('Folder');catalog.Name='SeedCatalog';catalog.Parent=remotes
@@ -434,7 +483,7 @@ local function frames(n)
  end
 end
 local function resize(w,h)screen=R.Vector2.new(w,h);frames(4)end
-local STAGES={1,6,2,3,5,4,7,8,9}
+local STAGES={1,6,2,3,5,4,7,8}
 local NAMES={[1]='FOREST',[6]='JUNGLE',[2]='DESERT',[3]='SNOW',[5]='CRYSTAL',[4]='LAVA',[7]='STORM',[8]='MECH',[9]='VERITY'}
 local function loadIndex(name)
  local s=R.new('LocalScript');s.Name='ChestIndex';W.load(name,s);frames(5);pg:SetAttribute('SeedMenu',nil);frames(2);pg:SetAttribute('SeedMenu','Index');frames(20)
@@ -473,7 +522,7 @@ local function record(gui)
 end
 resize(1280,720)
 local oldGui=loadIndex('ChestIndexBase')
-check(oldGui and oldGui:FindFirstChild('Biome8',true)~=nil and tabOf(oldGui,9)==nil,'(the base Index script has eight tabs and no tab 9)')
+check(oldGui and oldGui:FindFirstChild('Biome8',true)~=nil and tabOf(oldGui,9)~=nil,'(the base Index script already has the VERITY tab: this release leaves the Index as it was)')
 local oldTotal=oldGui:FindFirstChild('TotalFound',true).Count.Text:gsub('%s+',' ')
 local before=record(oldGui)
 local gui=loadIndex('ChestIndex')
@@ -526,7 +575,7 @@ check(bonus:GetAttribute('RewardGems')==Tuning.CompletionGems[9]and Tuning.Compl
 check(not mid.Active and not bonus.Active,'neither is claimable yet')
 check(not src:find('%f[%d]100%f[%D]')and src:find('tuning.CompletionGems[selected]',1,true)and src:find('tuning.HalfwayGems',1,true),'(source: the Index script hard-codes neither reward: it reads BalanceValues81 for the selected category)')
 local wasTotal=gui:FindFirstChild('TotalFound',true).Count.Text:gsub('%s+',' ')
-check(wasTotal==oldTotal:gsub('/ (%d+)',function(n)return'/ '..(tonumber(n)+2)end),'FOUND counts the Verity seed and its plant too ('..oldTotal..' -> '..wasTotal..')')
+check(wasTotal==oldTotal and wasTotal:find('/ 104'),'FOUND counts the Verity seed and its plant too, as in the base ('..oldTotal..' -> '..wasTotal..')')
 -- find the seed: halfway (seed + plant = 2 of 2 half is >= 1 of 1 total)
 found(seedsFolder,'VeritySeed');frames(6)
 card=listFrame:FindFirstChild('VeritySeed')
@@ -546,7 +595,7 @@ check(listFrame:FindFirstChild('VeritySeed'):FindFirstChild('Reward').Text:find(
 player:SetAttribute('IndexBiomeBackpay9',100);frames(6);check(bonus:GetAttribute('RewardGems')==100,'backpay on category 9 is shown through the same attribute listeners')
 player:SetAttribute('IndexBiomeBackpay9',nil);frames(3)
 -- 6e. screens
-print(('Verity pack: %d parts (Void pack %d); palette %d colours; effects compared at 3 tiers'):format(#paintedSpecs,#voidSpecs,(function()local n=0;for _ in pairs(VerityArt.Palette)do n+=1 end;return n end)()))
+print(('Verity pack: a %.2f-stud card with 2 Decals (the Void pack has %d parts); effects compared at 3 tiers'):format(VerityArt.Side(),#voidSpecs))
 print('tab row (strip width / canvas width) by screen:')
 local NOTE={}
 for _,sz in ipairs(SIZES)do
@@ -592,7 +641,7 @@ for _,sz in ipairs(SIZES)do
   compared+=1
  end
 end
-check(sameTabs,'tabs 1..8: size, colour, ring, icon, count and children identical to the base script on every screen ('..compared..' tab states)')
+check(sameTabs,'tabs 1..8 (the ones whose state the test does not change): size, colour, ring, icon, count and children identical to the base script on every screen ('..compared..' tab states)')
 check(samePanels,'the open panel for each of the eight (progress, bar, rewards, cards, header) identical to the base script')
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

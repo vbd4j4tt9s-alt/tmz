@@ -72,10 +72,13 @@ local function beginReveal(record,at,seedId,now)
     record.FlapFrames={};record.BagTransparency={}
     local bagFrame=record.Bag.PrimaryPart.CFrame
     for _,p in ipairs(record.Bag:GetDescendants())do
-        if p:IsA("BasePart") then p.LocalTransparencyModifier=1;table.insert(record.Hidden,p)end
+        -- R147: a Decal (the Verity pack's picture) follows only its own properties, so it is hidden here like a part.
+        if p:IsA("BasePart")or p:IsA("Decal") then p.LocalTransparencyModifier=1;table.insert(record.Hidden,p)end
     end
+    record.DecalFade={}
     for _,p in ipairs(copy:GetDescendants())do
-        if p:IsA("BasePart") then record.FlapFrames[p]=bagFrame:ToObjectSpace(p.CFrame);record.BagTransparency[p]=p.Transparency end
+        if p:IsA("BasePart") then record.FlapFrames[p]=bagFrame:ToObjectSpace(p.CFrame);record.BagTransparency[p]=p.Transparency
+        elseif p:IsA("Decal") then record.DecalFade[p]=p.Transparency end -- R147: the picture fades with the wrapper
     end
     local paper=record.Bag:GetAttribute("PaperColor")or Color3.fromRGB(192,148,94)
     record.Mouth=cosmeticPart("Opened paper mouth",effect,Color3.fromRGB(35,25,22),Vector3.new(1.7,.025,.03))
@@ -156,6 +159,7 @@ local function renderReveal(record,now)
             p.Transparency=record.BagTransparency[p]+(1-record.BagTransparency[p])*math.max(wrapperFade,peel*.92)
         else p.CFrame=wrapperRoot*localFrame;p.Transparency=record.BagTransparency[p]+(1-record.BagTransparency[p])*wrapperFade end
     end
+    for d,base in pairs(record.DecalFade or{})do d.Transparency=base+(1-base)*wrapperFade end
     record.Mouth.Size=Vector3.new(math.max(.001,1.68*progress*s),.025*s,math.max(.001,.3*progress*s))
     record.Mouth.CFrame=wrapperRoot*CFrame.new((progress-1)*.84*s,mouth+.015*s,0)
     record.Mouth.Transparency=progress==0 and 1 or wrapperFade
