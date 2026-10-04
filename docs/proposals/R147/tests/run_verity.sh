@@ -1,14 +1,17 @@
 #!/bin/sh
 # Usage: sh run_verity.sh [scratch dir]. R147 Verity NPC checks on the Roblox mock with the real scripts:
-#  test_verity.luau        - the real VerityService / VerityConfig / SecurityGate / PlayerDataService: the model built at her
-#                            spot (dais, collision pillar, card with the picture on both faces, neon ring + light, name sign,
-#                            Talk prompt), the Open message, the hand-in (one Void record and its Tool -> one Verity pack
-#                            through a stubbed ChestService:ConvertVoidPack, Count saved / loaded), the pick order, and every
-#                            refusal (no Void pack, too far, no body, carrying / running / queued / ragdolled, mid-opening,
-#                            spam, data not loaded / not saving, ConvertVoidPack missing / failing / throwing).
-#  test_verity_client.luau - the real VerityClient: the card turning to the camera, the ! / ? marker, the dialog states
-#                            (Open / Done / Refused), the GIVE button only with a Void tool, SeedMenu set and cleared,
-#                            and the window fitting phones and computers.
+#  test_verity.luau        - the real VerityService / VerityConfig / SecurityGate / PlayerDataService: the model built behind the market
+#                            (R148: a solid yellow Ball with her smiley as Decals on its Front and Back faces, on a dais; its position
+#                            checked against the REAL MarketLayout's footprint, the lobby bounds, the bases and the spawn), the Open
+#                            message, the hand-in (one Void record and its Tool -> one Verity pack through a stubbed
+#                            ChestService:ConvertVoidPack, Count saved / loaded), the pick order, and every refusal (no Void pack, too
+#                            far, no body, carrying / running / queued / ragdolled, mid-opening, spam, data not loaded / not saving,
+#                            ConvertVoidPack missing / failing / throwing).
+#  test_verity_client.luau - the real VerityClient with the real ItemPictures / SeedPackVisuals / AudioMixer: her body turning to the
+#                            camera, bobbing and swelling, the ! / ? marker in her name sign, her greeting voice (Talk, proximity +
+#                            cooldown, no overlap, Effects volume, load failure), the dialog states (Open / Done / Refused), the
+#                            portrait, the Void -> Verity pack pictures built from the real pack models, the GIVE button only with a
+#                            Void tool, SeedMenu set and cleared, and the window fitting 13 screen sizes from 360x600 to 1920x1080.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT/srv" "$OUT/cl"

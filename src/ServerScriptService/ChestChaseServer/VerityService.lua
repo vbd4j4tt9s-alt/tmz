@@ -1,17 +1,19 @@
 -- R147 (owner: "Verity NPC is a quest giver: it tells players to steal a pack from The Darkened one and give it to the
--- Verity NPC. The Verity NPC will be behind the market and it will be big."): Verity stands on a dais behind the market
--- as a big picture card. Talk to her (E) and she asks for a Void Pack (the one The Darkened guards at the end of Storm
--- Peaks); hand one in and ChestService:ConvertVoidPack turns it, in place, into a Verity Pack. One Verity Pack for every
--- Void Pack: repeatable, no daily cap. The server owns everything: the client only sends 'Give' (no arguments).
---  * Model: workspace.ChestChaseMap.EconomyHub.VerityNPC (Persistent): a stone and gold dais (solid), an invisible
---    collision pillar at her feet, the card (the owner's picture on both faces), a neon ring + light, a VERITY name sign
---    and the "Talk" prompt. An old workspace.Verity placeholder part is left alone (the installer retires it).
+-- Verity NPC. The Verity NPC will be behind the market and it will be big."): Verity stands on a dais behind the market.
+-- Talk to her (E) and she asks for a Void Pack (the one The Darkened guards at the end of Storm Peaks); hand one in and
+-- ChestService:ConvertVoidPack turns it, in place, into a Verity Pack. One Verity Pack for every Void Pack: repeatable, no
+-- daily cap. The server owns everything: the client only sends 'Give' (no arguments).
+-- R148 (owner's play test + "Verity should be a big yellow sphere"): she is the old Verity part made big, a solid yellow
+-- SPHERE with her smiley as a Decal on its Front and Back faces, behind the market (VerityConfig.Position).
+--  * Model: workspace.ChestChaseMap.EconomyHub.VerityNPC (Persistent): a stone and gold dais (solid), the Body (a Ball Part,
+--    yellow, solid: it collides as a sphere), a neon ring, a light above her, a "VERITY" name sign with the quest marker's
+--    room above it, and the "Talk" prompt. An old workspace.Verity placeholder part is left alone (the installer retires it).
 --  * Remote ChestChaseRemotes.VerityQuest. Server -> client: 'Open' {VoidPacks, Delivered, RewardText, EventActive?,
 --    NextAt?}, 'Done' {Delivered, RecordId}, 'Refused' {Reason}. Client -> server: 'Give' only.
 --  * Saved: Premium.Verity = {Count = Void Packs handed in}, read defensively (anything odd reads as 0).
 --  * The hand-in never yields between checking and committing, so a replay or a double click cannot convert twice.
 -- NOTE: MapService binds WalkthroughProps90 to the map, which makes every part under EconomyHub walk-through a moment
--- after it appears. The dais and the collision pillar must stay solid, so they put CanCollide back whenever it is cleared.
+-- after it appears. The dais and the Body must stay solid, so they put CanCollide back whenever it is cleared.
 local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local C=require(RS.VerityConfig)
 local V={};V.__index=V
@@ -45,51 +47,45 @@ function V:_mapRoot()
  local map=self.Map;local root=map and map.MapRoot
  return root or workspace:FindFirstChild('ChestChaseMap')
 end
-function V:_face(card,face,name)
- local gui=Instance.new('SurfaceGui');gui.Name=name;gui.Face=face;gui.Adornee=card;gui.LightInfluence=.2;gui.AlwaysOnTop=false
- gui.SizingMode=Enum.SurfaceGuiSizingMode.FixedSize
- gui.CanvasSize=Vector2.new(math.floor(C.CardWidth*C.CardPixelsPerStud),math.floor(C.CardHeight*C.CardPixelsPerStud))
- gui.ResetOnSpawn=false;gui.Parent=card
- local image=Instance.new('ImageLabel');image.Name='Picture';image.BackgroundTransparency=1;image.BorderSizePixel=0
- image.Size=UDim2.fromScale(1,1);image.Image=C.Image;image.ScaleType=Enum.ScaleType.Fit;image.Parent=gui
- return gui
-end
 function V:_build(hub)
  for _,old in ipairs(hub:GetChildren())do if old.Name==C.ModelName then old:Destroy()end end
  local model=Instance.new('Model');model.Name=C.ModelName;model.ModelStreamingMode=Enum.ModelStreamingMode.Persistent
  model:SetAttribute('VerityNPC',C.Version)
  local floor=C.Position;local daisTop=floor+Vector3.new(0,C.DaisHeight,0)
  local stone,gold,dark=RGB(96,90,112),RGB(255,206,64),RGB(44,38,64)
- -- The dais: stone, with a gold rim at its foot and a gold inlay on top.
+ -- The dais: stone, with a gold rim at its foot, a glowing neon ring and a dark inlay on top.
  local dais=disc(model,'Dais',C.DaisHeight,C.DaisDiameter,CFrame.new(floor+Vector3.new(0,C.DaisHeight/2,0)),stone,Enum.Material.Slate,true)
  keepSolid(dais)
  disc(model,'Dais rim',.3,C.DaisDiameter+.8,CFrame.new(floor+Vector3.new(0,.15,0)),gold,Enum.Material.SmoothPlastic)
- -- Neon ring on the top face: a glowing band around a dark inlay.
  local ring=disc(model,'Glow ring',.22,C.RingDiameter,CFrame.new(daisTop+Vector3.new(0,.11,0)),C.RingColor,Enum.Material.Neon);ring.Transparency=.1
  disc(model,'Inlay',.26,C.RingDiameter-1.2,CFrame.new(daisTop+Vector3.new(0,.13,0)),dark,Enum.Material.Slate)
- local light=Instance.new('PointLight');light.Name='Glow';light.Color=C.LightColor;light.Range=C.LightRange;light.Brightness=C.LightBrightness;light.Shadows=false;light.Parent=ring
- -- An invisible pillar at her feet so nobody walks through the card.
- local pillar=disc(model,'Collision',C.CollisionHeight,C.CollisionDiameter,CFrame.new(daisTop+Vector3.new(0,C.CollisionHeight/2,0)),dark,Enum.Material.SmoothPlastic,true)
- pillar.Transparency=1;pillar.CanQuery=false;keepSolid(pillar)
- -- The card: the owner's picture on both faces (Fit keeps its own aspect).
- local middle=daisTop+Vector3.new(0,C.FootOffset+C.CardHeight/2,0)
- local card=part(model,'Card',Vector3.new(C.CardWidth,C.CardHeight,C.CardThickness),CFrame.lookAt(middle,middle+C.Facing),Color3.new(1,1,1))
- card.Transparency=1;card.CastShadow=false
- self:_face(card,Enum.NormalId.Front,'FrontPicture');self:_face(card,Enum.NormalId.Back,'BackPicture')
- -- "VERITY" above the card.
- local sign=Instance.new('BillboardGui');sign.Name='NameSign';sign.Adornee=card;sign.Size=UDim2.fromOffset(240,64);sign.StudsOffsetWorldSpace=Vector3.new(0,C.CardHeight/2+C.NameHeight,0)
- sign.AlwaysOnTop=false;sign.MaxDistance=300;sign.LightInfluence=0;sign.ResetOnSpawn=false;sign.Parent=card
- local label=Instance.new('TextLabel');label.Name='Name';label.BackgroundTransparency=1;label.Size=UDim2.fromScale(1,1);label.Font=Enum.Font.FredokaOne
- label.Text=C.Name;label.TextScaled=true;label.TextColor3=gold;label.TextStrokeColor3=RGB(30,20,60);label.TextStrokeTransparency=.05;label.Parent=sign
- -- The prompt sits on a small invisible anchor at chest height.
- local anchor=part(model,'PromptAnchor',Vector3.new(.5,.5,.5),CFrame.new(daisTop+Vector3.new(0,3.5,0)),dark);anchor.Transparency=1
+ -- Verity: a solid yellow ball with her smiley on the front (Decals project onto a ball) and the back. The Ball is the
+ -- collider too: players walk up to its curve and stop. (A Ball part is always as wide as it is tall.)
+ local size=C.BodySize;local middle=daisTop+Vector3.new(0,C.FootOffset+size/2,0)
+ local body=part(model,'Body',Vector3.new(size,size,size),CFrame.lookAt(middle,middle+C.Facing),C.BodyColor,Enum.Material.SmoothPlastic,true)
+ body.Shape=Enum.PartType.Ball;body.CastShadow=true;body:SetAttribute('Diameter',size);keepSolid(body)
+ for _,face in ipairs(C.BodyFaces)do
+  local decal=Instance.new('Decal');decal.Name='Face'..face;decal.Face=Enum.NormalId[face];decal.Texture=C.Image;decal.Color3=Color3.new(1,1,1);decal.Transparency=0;decal.Parent=body
+ end
+ CS:AddTag(body,'GiantVisualPart') -- the camera right up against her fades her (GiantVisualSafety), like the giant plants
+ -- A light above her, so the ground and her top glow.
+ local lightHolder=part(model,'LightAnchor',Vector3.new(.5,.5,.5),CFrame.new(middle+Vector3.new(0,size/2+C.LightHeight,0)),dark);lightHolder.Transparency=1
+ local light=Instance.new('PointLight');light.Name='Glow';light.Color=C.LightColor;light.Range=C.LightRange;light.Brightness=C.LightBrightness;light.Shadows=false;light.Parent=lightHolder
+ -- "VERITY" over her head; the client puts the "!" / "?" marker in the empty top part of the same sign (no overlap at any distance).
+ local sign=Instance.new('BillboardGui');sign.Name='NameSign';sign.Adornee=body;sign.Size=UDim2.fromOffset(C.NameSize.W,C.NameSize.H)
+ sign.StudsOffsetWorldSpace=Vector3.new(0,size/2+C.NameHeight,0)
+ sign.AlwaysOnTop=false;sign.MaxDistance=C.NameMaxDistance;sign.LightInfluence=0;sign.ResetOnSpawn=false;sign.Parent=body
+ local label=Instance.new('TextLabel');label.Name='Name';label.BackgroundTransparency=1;label.AnchorPoint=Vector2.new(.5,1);label.Position=UDim2.fromScale(.5,1);label.Size=UDim2.fromScale(1,.46)
+ label.Font=Enum.Font.FredokaOne;label.Text=C.Name;label.TextScaled=true;label.TextColor3=gold;label.TextStrokeColor3=RGB(30,20,60);label.TextStrokeTransparency=.05;label.Parent=sign
+ -- The prompt sits on a small invisible anchor on her axis, low in the sphere.
+ local anchor=part(model,'PromptAnchor',Vector3.new(.5,.5,.5),CFrame.new(daisTop+Vector3.new(0,C.PromptHeight,0)),dark);anchor.Transparency=1
  local prompt=Instance.new('ProximityPrompt');prompt.Name='Talk';prompt.ActionText=C.PromptActionText;prompt.ObjectText=C.PromptObjectText
  prompt.HoldDuration=C.PromptHold;prompt.MaxActivationDistance=C.PromptDistance;prompt.RequiresLineOfSight=false;prompt.Enabled=true;prompt.Parent=anchor
  prompt.Triggered:Connect(function(player)self:Talk(player)end)
  model.PrimaryPart=dais
  model.Parent=hub
  CS:AddTag(model,C.Tag)
- self.Model=model;self.Card=card;self.Prompt=prompt
+ self.Model=model;self.Body=body;self.Prompt=prompt
  return model
 end
 -- Saved counter ------------------------------------------------------------------------------------------------------------

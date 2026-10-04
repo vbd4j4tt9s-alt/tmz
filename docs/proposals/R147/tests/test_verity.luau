@@ -9,6 +9,10 @@
 -- order (equipped Void tool, else the oldest), and every refusal: no Void pack, too far, no body, carrying / running /
 -- queued / ragdolled, mid-opening, rate-limited spam, data not loaded / not saving, ConvertVoidPack missing, failing or
 -- throwing (everything unchanged), plus a few hostile remote calls.
+-- R148 (owner's play test: she was invisible and in front of the market; "Verity should be a big yellow sphere"): the body is a
+-- solid yellow Ball (Color 255,255,0, SmoothPlastic, 22 studs) with her smiley as Decals on its Front and Back faces, on a
+-- 28 stud dais BEHIND the market; the position is checked against the REAL MarketLayout's footprint (porch, produce stands,
+-- Fruit of the Hour pedestal, fast-travel marker), the lobby bounds, the bases and the spawn.
 local W=require('./world');local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -89,7 +93,7 @@ local function makePlayer(name)
  Data:PreparePlayer(p);assert(Data:Load(p),'load '..name)
  return p
 end
-local STAND=R.Vector3.new(0,7,-200)
+local STAND=R.Vector3.new(0,7,-318) -- 24 studs in front of her (the market side)
 local function spawn(p,x,y,z)
  local c=R.new('Model');c.Name=p.Name;local h=R.new('Humanoid');h.Name='Humanoid';h.Health=100;h.Parent=c
  local r=R.new('Part');r.Name='HumanoidRootPart';r.CFrame=R.CFrame.new(x or STAND.X,y or STAND.Y,z or STAND.Z);r.Parent=c;c.Parent=W.workspace;p.Character=c;return c,r
@@ -113,12 +117,45 @@ local Verity=server('VerityService')
 local service=Verity.new(Config,Data,Chests,Notes,Map)
 -- 1. The numbers and the gate -------------------------------------------------------------------------------------------
 check(C.Image=='rbxassetid://102712963740896','the owner\'s Verity picture');
-check(C.Position==R.Vector3.new(0,4,-222)and C.Facing==R.Vector3.new(0,0,1),'behind the market at (0, 4, -222), facing +Z')
-check(C.CardWidth==24 and C.CardHeight==34 and C.FootOffset~=nil,'CardWidth 24 / CardHeight 34 / FootOffset exposed to tune')
+check(C.Position==R.Vector3.new(0,4,-340)and C.Facing==R.Vector3.new(0,0,1),'behind the market at (0, 4, -340), facing +Z')
+check(C.BodySize==22 and C.FootOffset~=nil and C.DaisDiameter==28 and C.DaisHeight==1.2,'BodySize 22 / FootOffset / DaisDiameter 28 exposed to tune')
+check(C.BodyColor.R==1 and C.BodyColor.G==1 and C.BodyColor.B==0,'the yellow (255, 255, 0)')
 check(C.Quest=='Steal a Void Pack from The Darkened One at the end of Storm Peaks and bring it to me. I\'ll give you a Verity Pack!','the quest text')
-check(C.GiveDistance==30 and C.PromptDistance==20 and C.VoidVariant==VOID,'30 stud hand-in range, 20 stud prompt, Void = EclipseReliquary')
+check(C.GiveDistance==38 and C.PromptDistance==26 and C.VoidVariant==VOID,'38 stud hand-in range, 26 stud prompt, Void = EclipseReliquary')
+check(C.GreetingSoundId=='rbxassetid://123997993114202','the owner\'s greeting voice id in VerityConfig.GreetingSoundId')
 local gateSrc=W.B.SecurityGate
 check(gateSrc:find('VerityTalk={Rate=1,Burst=3}',1,true)and gateSrc:find('VerityGive={Rate=1,Burst=2}',1,true),'SecurityGate has the VerityTalk and VerityGive policies')
+-- The market as built by the real MarketLayout (every part of it, before its showcase fills in), measured on a probe map.
+local footprint
+do
+ local V3=R.Vector3.new
+ R.Vector3.FromNormalId=R.Vector3.FromNormalId or function(n)
+  local name=type(n)=='table'and n.Name or tostring(n):match('(%a+)$')
+  return({Front=V3(0,0,-1),Back=V3(0,0,1),Left=V3(-1,0,0),Right=V3(1,0,0),Top=V3(0,1,0),Bottom=V3(0,-1,0)})[name]
+ end
+ W.env.Vector3=R.Vector3
+ local probe=R.new('Folder');probe.Name='MarketProbe';probe.Parent=W.workspace
+ local probeHub=R.new('Folder');probeHub.Name='EconomyHub';probeHub.Parent=probe
+ for _,n in ipairs({'BuyStation','SellStation'})do local st=R.new('Part');st.Name=n;st.Parent=probeHub end
+ local Market=server('MarketLayout')
+ local realWarn=W.env.warn;W.env.warn=function()end
+ local ok,err=pcall(Market.Apply,probe)
+ check(ok,'the real MarketLayout builds on the probe map: '..tostring(err))
+ local lo,hi=R.Vector3.new(1e9,1e9,1e9),R.Vector3.new(-1e9,-1e9,-1e9);local n=0
+ for _,d in ipairs(probeHub:GetDescendants())do if d:IsA('BasePart')then
+  local r=d.CFrame.R;local sz=d.Size;local c=d.CFrame.Position
+  local hx=(math.abs(r[1][1])*sz.X+math.abs(r[1][2])*sz.Y+math.abs(r[1][3])*sz.Z)/2
+  local hy=(math.abs(r[2][1])*sz.X+math.abs(r[2][2])*sz.Y+math.abs(r[2][3])*sz.Z)/2
+  local hz=(math.abs(r[3][1])*sz.X+math.abs(r[3][2])*sz.Y+math.abs(r[3][3])*sz.Z)/2
+  lo=V3(math.min(lo.X,c.X-hx),math.min(lo.Y,c.Y-hy),math.min(lo.Z,c.Z-hz));hi=V3(math.max(hi.X,c.X+hx),math.max(hi.Y,c.Y+hy),math.max(hi.Z,c.Z+hz));n+=1
+ end end
+ R.advance(.2);W.env.warn=realWarn;probe:Destroy()
+ footprint={Lo=lo,Hi=hi,Parts=n}
+ check(n>150,'(the market has '..n..' parts here)')
+ check(math.abs((lo.X+hi.X)/2)<1 and hi.X-lo.X>48 and hi.X-lo.X<60,('the market is about 54 studs wide, centred on x 0: %.1f .. %.1f'):format(lo.X,hi.X))
+ check(hi.Z>-250 and hi.Z<-245 and lo.Z<-290 and lo.Z>-310,('its depth runs z %.1f (the side facing the spawn) to %.1f (porch, string lights, fast-travel marker)'):format(hi.Z,lo.Z))
+ check(hi.Y>31 and hi.Y<33,('and its roof ridge is at y %.1f'):format(hi.Y))
+end
 -- 2. Start builds her ------------------------------------------------------------------------------------------------------
 check(hub:FindFirstChild('VerityNPC')==nil and remotes:FindFirstChild('VerityQuest')==nil,'nothing exists before Start')
 check(service:Start()==service,'Start returns the service')
@@ -127,28 +164,53 @@ check(model and model:IsA('Model')and model.ModelStreamingMode==R.Enum.ModelStre
 check(model and W.CS:HasTag(model,'VerityNPC')and model:GetAttribute('VerityNPC')==C.Version,'tagged VerityNPC for the client')
 local remote=remotes:FindFirstChild('VerityQuest')
 check(remote and remote:IsA('RemoteEvent'),'ChestChaseRemotes.VerityQuest is a RemoteEvent')
-local dais=model:FindFirstChild('Dais');local pillar=model:FindFirstChild('Collision');local card=model:FindFirstChild('Card')
-check(dais and dais.Shape==R.Enum.PartType.Cylinder and dais.Size.Y==16 and dais.Size.Z==16 and dais.Size.X==1.2 and dais.CanCollide==true and dais.Anchored,'the dais: a solid stone cylinder, diameter 16, 1.2 high')
-check(dais and dais.Position.X==0 and dais.Position.Z==-222 and math.abs(dais.Position.Y-4.6)<1e-6,'standing on the floor at (0, 4, -222)')
+local dais=model:FindFirstChild('Dais');local body=model:FindFirstChild('Body')
+check(dais and dais.Shape==R.Enum.PartType.Cylinder and dais.Size.Y==28 and dais.Size.Z==28 and dais.Size.X==1.2 and dais.CanCollide==true and dais.Anchored,'the dais: a solid stone cylinder, diameter 28, 1.2 high')
+check(dais and dais.Position.X==0 and dais.Position.Z==-340 and math.abs(dais.Position.Y-4.6)<1e-6,'standing on the floor at (0, 4, -340)')
 check(model:FindFirstChild('Dais rim')and model:FindFirstChild('Inlay'),'with a gold rim and an inlay')
-check(pillar and pillar.Size.X==14 and pillar.Size.Y==7 and pillar.Size.Z==7 and pillar.CanCollide==true and pillar.Transparency==1 and pillar.Shape==R.Enum.PartType.Cylinder,'the invisible collision pillar: diameter 7, 14 high, solid')
-check(pillar and pillar.Position.X==0 and pillar.Position.Z==-222 and math.abs(pillar.Position.Y-(5.2+7))<1e-6,'at her feet (on top of the dais)')
-check(card and card.Size.X==24 and card.Size.Y==34 and not card.CanCollide and card.Anchored,'the card: 24 x 34, not solid')
-check(card and math.abs(card.Position.Y+card.Size.Y/2-39.2)<1e-6 and math.abs(card.Position.Y-card.Size.Y/2-5.2)<1e-6,'its top is at y 39.2 (over the market roof) and it stands on the dais')
-check(card and card.Position.X==0 and card.Position.Z==-222,'centred on her spot')
-local look=card and card.CFrame.LookVector
-check(look and math.abs(look.X)<1e-6 and math.abs(look.Z-1)<1e-6,'its front faces +Z')
-for _,spec in ipairs({{'FrontPicture',R.Enum.NormalId.Front},{'BackPicture',R.Enum.NormalId.Back}})do
- local gui=card and card:FindFirstChild(spec[1]);local image=gui and gui:FindFirstChild('Picture')
- check(gui and gui:IsA('SurfaceGui')and gui.Face==spec[2]and gui.LightInfluence==.2,spec[1]..': a SurfaceGui on that face, LightInfluence .2')
- check(image and image:IsA('ImageLabel')and image.Image=='rbxassetid://102712963740896'and image.ScaleType==R.Enum.ScaleType.Fit and image.BackgroundTransparency==1,spec[1]..': the picture, ScaleType Fit')
-end
-local ring=model:FindFirstChild('Glow ring');local light=ring and ring:FindFirstChild('Glow')
-check(ring and ring.Material==R.Enum.Material.Neon and light and light:IsA('PointLight'),'a neon ring with a PointLight')
-local sign=card and card:FindFirstChild('NameSign');local nameLabel=sign and sign:FindFirstChild('Name')
-check(sign and sign:IsA('BillboardGui')and nameLabel and nameLabel.Text=='VERITY','a VERITY name sign (BillboardGui)')
+check(model:FindFirstChild('Card')==nil and model:FindFirstChild('Collision')==nil,'the see-through card and the collision pillar of R147 are gone')
+check(body and body:IsA('Part')and body.Shape==R.Enum.PartType.Ball,'Verity\'s Body is a Part with Shape = Ball')
+check(body and body.Size.X==22 and body.Size.Y==22 and body.Size.Z==22,'22 studs across')
+check(body and math.floor(body.Color.R*255+.5)==255 and math.floor(body.Color.G*255+.5)==255 and math.floor(body.Color.B*255+.5)==0,'solid yellow: Color (255, 255, 0)')
+check(body and body.Material==R.Enum.Material.SmoothPlastic and body.Transparency==0 and body.Anchored,'SmoothPlastic, not see-through, anchored')
+check(body and body.CanCollide==true,'solid (she collides as a sphere)')
+check(body and body.Position.X==0 and body.Position.Z==-340 and math.abs(body.Position.Y-(5.2+.25+11))<1e-6,'centred over the dais, a quarter stud above it (y 16.45, her top at 27.45, under the market ridge)')
+local look=body and body.CFrame.LookVector
+check(look and math.abs(look.X)<1e-6 and math.abs(look.Z-1)<1e-6,'her front faces +Z (toward the market)')
+local decals={};for _,d in ipairs(body and body:GetChildren()or{})do if d:IsA('Decal')then decals[#decals+1]=d end end
+check(#decals==2,'two Decals on the body ('..#decals..')')
+local faces={};for _,d in ipairs(decals)do faces[d.Face.Name]=d;check(d.Texture=='rbxassetid://102712963740896'and d.Transparency==0,'Decal '..d.Name..': the owner\'s smiley, opaque')end
+check(faces.Front and faces.Back and not faces.Left and not faces.Right,'on the Front and Back faces')
+check(body and W.CS:HasTag(body,'GiantVisualPart'),'tagged GiantVisualPart (the camera right up against her fades her)')
+local ring=model:FindFirstChild('Glow ring');local lightAnchor=model:FindFirstChild('LightAnchor');local light=lightAnchor and lightAnchor:FindFirstChild('Glow')
+check(ring and ring.Material==R.Enum.Material.Neon,'a neon ring on the dais')
+check(light and light:IsA('PointLight')and lightAnchor.Position.Y>body.Position.Y+11 and light.Range<=60,'a PointLight above her')
+local sign=body and body:FindFirstChild('NameSign');local nameLabel=sign and sign:FindFirstChild('Name')
+check(sign and sign:IsA('BillboardGui')and sign.Adornee==body and nameLabel and nameLabel.Text=='VERITY','a VERITY name sign (BillboardGui on her body)')
+check(C.NameHeight>=5 and sign and math.abs(sign.StudsOffsetWorldSpace.Y-(11+C.NameHeight))<1e-6 and nameLabel.Position.Y.Scale==1 and nameLabel.Size.Y.Scale<.6,'above her head, the name in its lower part (room above it for the client\'s marker)')
 local prompt=model:FindFirstChild('Talk',true)
-check(prompt and prompt:IsA('ProximityPrompt')and prompt.ActionText=='Talk'and prompt.HoldDuration==0 and prompt.MaxActivationDistance==20 and prompt.RequiresLineOfSight==false and prompt.Enabled,'ProximityPrompt "Talk": hold 0, 20 studs, no line of sight needed')
+check(prompt and prompt:IsA('ProximityPrompt')and prompt.ActionText=='Talk'and prompt.HoldDuration==0 and prompt.MaxActivationDistance==26 and prompt.RequiresLineOfSight==false and prompt.Enabled,'ProximityPrompt "Talk": hold 0, 26 studs, no line of sight needed')
+-- Where she stands, against the real market and the lobby.
+do
+ local fp=footprint;local c=C.Position;local radius=C.DaisDiameter/2
+ local dx0,dx1,dz0,dz1=c.X-radius,c.X+radius,c.Z-radius,c.Z+radius
+ local function gap(ax0,ax1,az0,az1)local gx=math.max(ax0-dx1,dx0-ax1,0);local gz=math.max(az0-dz1,dz0-az1,0);return math.sqrt(gx*gx+gz*gz)end
+ check(gap(fp.Lo.X,fp.Hi.X,fp.Lo.Z,fp.Hi.Z)>=20,('her dais (z %.0f .. %.0f) is at least 20 studs clear of every market part (porch / stands / pedestal / fast-travel marker): %.1f'):format(dz0,dz1,gap(fp.Lo.X,fp.Hi.X,fp.Lo.Z,fp.Hi.Z)))
+ check(dz1<fp.Lo.Z and c.Z<fp.Lo.Z,'she is behind the market, seen from the spawn: the whole dais is beyond its far edge (z '..string.format('%.1f',fp.Lo.Z)..')')
+ check(fp.Lo.X<=0 and fp.Hi.X>=0 and c.X==0,'the market stands between the spawn (0, -141) and her on the line x = 0')
+ local toSpawn=R.Vector3.new(0,0,-141)-c;local f=C.Facing
+ check(f.Z>0 and (toSpawn.Z>0),'she faces +Z, toward the market and the spawn side, the way players come round to her')
+ check(body.Position.Y+11<fp.Hi.Y,'her top (y '..string.format('%.1f',body.Position.Y+11)..') is under the market\'s ridge (y '..string.format('%.1f',fp.Hi.Y)..'): big, but it does not dwarf it')
+ check(body.Size.X>=18 and body.Size.X<=22,'between 18 and 22 studs across')
+ -- The lobby (Workspace.ChestChaseMap.Lobby.LobbyFloor x -340..340, z -623..-99; walls at +-337.5 / -620.5) and the bases (Bases: 1/2 z -240..-121, 3/4 z -417..-299 at |x| 145..326, 5/6 z -603..-422 at |x| 15..133).
+ check(dx0>-330 and dx1<330 and dz0>-615 and dz1<-110,'inside the lobby walls')
+ local bases={{-326,-145,-417,-299},{145,326,-417,-299},{-133,-15,-603,-422},{15,133,-603,-422},{-326,-145,-240,-121},{145,326,-240,-121}}
+ local worst=1e9;for _,b in ipairs(bases)do worst=math.min(worst,gap(b[1],b[2],b[3],b[4]))end
+ check(worst>=40,'at least 40 studs from every base ('..string.format('%.0f',worst)..')')
+ check(math.sqrt((c.X-0)^2+(c.Z+141)^2)>150,'far from the spawn (so she does not crowd arriving players)')
+ -- The way to her: round the market's sides (it is 54 wide; the next obstacles are the bases 145 studs out).
+ check(fp.Hi.X<60 and 145-fp.Hi.X>80,'plenty of walkway round the market ('..string.format('%.0f',145-fp.Hi.X)..' studs between its side and the bases)')
+end
 check(placeholder.Parent==W.workspace and placeholder.Color.R==1,'the old workspace.Verity placeholder is left alone')
 -- Start twice: still one of everything, and one handler.
 service:Start()
@@ -160,8 +222,8 @@ check(models==1 and remoteCount==1 and hub:FindFirstChild('VerityNPC')==model an
 do
  local Walk=W.module('WalkthroughProps90');Walk.Apply(mapRoot)
  R.advance(.1)
- check(dais.CanCollide==true and pillar.CanCollide==true,'WalkthroughProps90 (applied to the whole map) cannot make the dais or the pillar walk-through')
- check(card.CanCollide==false and ring.CanCollide==false,'(the other parts stay decor)')
+ check(dais.CanCollide==true and body.CanCollide==true,'WalkthroughProps90 (applied to the whole map) cannot make the dais or her body walk-through')
+ check(ring.CanCollide==false and model:FindFirstChild('Dais rim').CanCollide==false,'(the other parts stay decor)')
 end
 -- 3. Talking: the Open message ---------------------------------------------------------------------------------------------
 local A=makePlayer('Ava');spawn(A)
@@ -271,12 +333,12 @@ do
  local E=makePlayer('Eve');spawn(E);addPack(E,'Pack01',1);addPack(E,'Pack03',3);for _,rec in ipairs(Data:GetChestRecords(E))do toolFor(rec,bag(E))end
  refusal('no Void pack (only other packs)',E,C.Reasons.NoVoid)
  local ev=void(E,2);toolFor(ev[1],bag(E));toolFor(ev[2],bag(E))
- -- Range: 30 studs from the top of the dais.
+ -- Range: 38 studs from the top of the dais.
  local _,root=E.Character,E.Character.HumanoidRootPart
- refusal('too far',E,C.Reasons.TooFar,function()root.CFrame=R.CFrame.new(0,7,-190)end,function()root.CFrame=R.CFrame.new(STAND.X,STAND.Y,STAND.Z)end)
- refusal('far to the side',E,C.Reasons.TooFar,function()root.CFrame=R.CFrame.new(45,7,-222)end,function()root.CFrame=R.CFrame.new(STAND.X,STAND.Y,STAND.Z)end)
- root.CFrame=R.CFrame.new(0,7,-193) -- 29 studs: inside
- check((root.Position-service:Center()).Magnitude<30,'(29 studs is inside the range)')
+ refusal('too far',E,C.Reasons.TooFar,function()root.CFrame=R.CFrame.new(0,7,-296)end,function()root.CFrame=R.CFrame.new(STAND.X,STAND.Y,STAND.Z)end)
+ refusal('far to the side',E,C.Reasons.TooFar,function()root.CFrame=R.CFrame.new(60,7,-340)end,function()root.CFrame=R.CFrame.new(STAND.X,STAND.Y,STAND.Z)end)
+ root.CFrame=R.CFrame.new(0,7,-303) -- 37 studs: inside
+ check((root.Position-service:Center()).Magnitude<38,'(37 studs is inside the range)')
  root.CFrame=R.CFrame.new(STAND.X,STAND.Y,STAND.Z)
  refusal('no character',E,C.Reasons.Moment,function()E.Character=nil end,function()E.Character=root.Parent end)
  refusal('dead',E,C.Reasons.Moment,function()root.Parent.Humanoid.Health=0 end,function()root.Parent.Humanoid.Health=100 end)
@@ -284,7 +346,7 @@ do
   refusal(row[1],E,C.Reasons[row[2]],function()E:SetAttribute(row[1],true)end,function()E:SetAttribute(row[1],nil)end)
  end
  -- Range is checked before the busy states.
- E:SetAttribute('ChestChaseSeedCarrying',true);root.CFrame=R.CFrame.new(0,7,-150)
+ E:SetAttribute('ChestChaseSeedCarrying',true);root.CFrame=R.CFrame.new(0,7,-250)
  refusal('too far AND carrying: range first',E,C.Reasons.TooFar,nil,function()E:SetAttribute('ChestChaseSeedCarrying',nil);root.CFrame=R.CFrame.new(STAND.X,STAND.Y,STAND.Z)end)
  -- Mid-opening.
  local heldTool=hasTool(E,ev[1].Id)and bag(E):FindFirstChild(ev[1].Id)
@@ -337,7 +399,7 @@ do
  check(#inbox(K)-before==2 and msgs(K,'Done')==2 and msgs(K,'Refused')==0,'the other 4 are dropped without an answer')
  R.advance(1.05);remote.OnServerEvent:Fire(K,'Give');check(count(K,VERITY)==3,'a second later one more goes through')
  -- Refusals do not use up the budget: the player can still hand in right after being told "come closer".
- local L=makePlayer('Lou');local _,root=spawn(L,0,7,-150);void(L,1)
+ local L=makePlayer('Lou');local _,root=spawn(L,0,7,-250);void(L,1)
  for _=1,5 do remote.OnServerEvent:Fire(L,'Give')end
  check(msgs(L,'Refused')==5,'five refusals for being too far are all answered')
  root.CFrame=R.CFrame.new(STAND.X,STAND.Y,STAND.Z);remote.OnServerEvent:Fire(L,'Give')
