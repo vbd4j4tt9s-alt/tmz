@@ -85,10 +85,21 @@ local function stagesOf(key)return tabStages[key]or{key}end
 local function tabOf(stage)for key,list in pairs(tabStages)do if table.find(list,stage)then return key end end;return stage end
 local function owned(folder,id)local f=player:FindFirstChild(folder);local v=f and f:FindFirstChild(id);return v and v.Value==true end
 local function amount(id)local f=player:FindFirstChild('DiscoveredSeeds');local v=f and f:FindFirstChild(id);return v and v:GetAttribute('RewardCash')or 0 end
-local function counts(stage)
+local NewInR149=require(RS.SeedPackRules).NewInR149 -- R148: the roster change's new seeds (Desert's Aloe and Sand Fruit)
+local function counts(stage,beforeR149)
  local seeds,plants,total=0,0,0
- for _,entry in ipairs(catalog:GetChildren())do local id=entry:GetAttribute('SeedId');if entry:GetAttribute('Stage')==stage and type(id)=='string'and id~=''then total+=1;if owned('DiscoveredSeeds',id)then seeds+=1 end;if owned('DiscoveredPlants',id)then plants+=1 end end end
+ for _,entry in ipairs(catalog:GetChildren())do local id=entry:GetAttribute('SeedId');if entry:GetAttribute('Stage')==stage and type(id)=='string'and id~=''and not(beforeR149 and NewInR149[id])then total+=1;if owned('DiscoveredSeeds',id)then seeds+=1 end;if owned('DiscoveredPlants',id)then plants+=1 end end end
  return seeds,plants,total
+end
+-- R148: the halfway / completion milestones, also reached with the roster before this release (PremiumProgress:IndexMilestone):
+-- Desert's Index grew from 5 to 7 seeds, and a milestone already reached stays claimable.
+local function milestones(stage)
+ local half,full=false,false
+ for _,before in ipairs({false,true})do
+  local seeds,plants,total=counts(stage,before)
+  if total>0 then half=half or seeds+plants>=total;full=full or(seeds==total and plants==total)end
+ end
+ return half,full
 end
 -- R148: a tab's counts: a LIMITED tab adds its two categories (so 6 Mech seeds + the Verity seed = 14 to find, as 7 x 2 on any other tab).
 local function tabCounts(key)
@@ -103,8 +114,7 @@ local function rewardState(stage)
  local halfTaken=halfClaimedHere[stage]or player:GetAttribute('IndexBiomeHalfReward'..stage)==true
  local taken=claimedHere[stage]or player:GetAttribute('IndexBiomeReward'..stage)==true
  local backpay=player:GetAttribute('IndexBiomeBackpay'..stage)or 0
- local complete=total>0 and seeds==total and plants==total
- local halfway=total>0 and(seeds+plants)>=total
+ local halfway,complete=milestones(stage)
  return{Seeds=seeds,Plants=plants,Total=total,HalfGems=tuning.HalfwayGems,Gems=backpay>0 and backpay or tuning.CompletionGems[stage]or 0,HalfTaken=halfTaken==true,Taken=taken==true,
   HalfReady=halfway and not halfTaken,EndReady=complete and not taken,-- Preserve already-earned backpay without lighting an incomplete endpoint.
   EndClaimable=(complete or backpay>0)and not taken}
@@ -130,8 +140,9 @@ local function waiting(stage)
   local halfTaken=halfClaimedHere[stage]or player:GetAttribute('IndexBiomeHalfReward'..stage)==true
   local taken=claimedHere[stage]or player:GetAttribute('IndexBiomeReward'..stage)==true
   local backpay=player:GetAttribute('IndexBiomeBackpay'..stage)or 0
-  if seeds+plants>=total and not halfTaken then n+=1 end
-  if((seeds==total and plants==total)or backpay>0)and not taken then n+=1 end
+  local half,full=milestones(stage)
+  if half and not halfTaken then n+=1 end
+  if(full or backpay>0)and not taken then n+=1 end
  end
  return n
 end

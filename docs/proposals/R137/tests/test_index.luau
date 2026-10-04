@@ -55,7 +55,7 @@ moon.Activated:Fire();W.frames(3)
 check(calls[1]and calls[1][1]=='ClaimSeed'and calls[1][2]=='MooncapSeed','clicking it claims')
 local totalText=gui:FindFirstChild('TotalFound',true)
 local total=totalText and totalText.Count.Text:gsub('%s+',' ')or'' -- (the mock's text fitter adds line breaks)
-check(total=='FOUND 6 / 90','the header shows everything found ('..total..')')
+check(total=='FOUND 6 / 94','the header shows everything found ('..total..')') -- R148: 94 = 47 seeds x 2 (Desert grew by Aloe and Sand Fruit; it was 90)
 local forest=gui:FindFirstChild('Biome1',true);local jungle=gui:FindFirstChild('Biome6',true)
 local ring=forest.BrightOutline.Color
 check(ring.R==1 and ring.G==1 and ring.B==1 and forest.BrightOutline.Thickness==3 and jungle.BrightOutline.Thickness==2,'the open biome tab is ringed in white')

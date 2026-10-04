@@ -136,5 +136,9 @@ end
 for id,seconds in pairs(require(script.Parent.EconomyBalance90).RegrowSeconds)do Catalog[id].RegrowSeconds=seconds end
 -- R125: slower growth above Uncommon (up to 4 h for King); Forest, Common, Uncommon and Mech plants unchanged.
 require(script.Parent.GrowthPace125).Apply(Catalog)
+-- R148 (owner): the Aloe and the Sand Fruit palm are new, Fire Pepper is Lava's Mythic and Moon Melon Crystal's Legendary. Their
+-- numbers are final as written and applied AFTER the pacing (Roster149=true keeps the pacing off them; pacing them would re-spread
+-- every Rare / Legendary / Mythic plant's time and value). Roster149.ApplyPlants also gives Fire Pepper its x2 metadata.
+require(script.Parent.Roster149).ApplyPlants(Catalog)
 return Catalog
 

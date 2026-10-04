@@ -30,5 +30,8 @@ do
  T.SeedValues[V.Id]=V.Value;T.IndexFirst[V.Id]=V.IndexFirst;T.IndexRepeat[V.Id]=V.IndexRepeat
  T.CompletionGems[V.Stage]=V.CompletionGems
 end
+-- R148: first / repeat index cash of the roster change's seeds (Aloe, Sand Fruit, Fire Pepper, Moon Melon). The new ids are NOT added
+-- to T.SeedValues: the PlantCatalog loop over it asserts that a plant exists at that point (Roster149.ApplyPlants runs after it).
+require(script.Parent.Roster149).ApplyBalance(T)
 T.Version=91
 return T

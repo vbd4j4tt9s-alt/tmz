@@ -16,7 +16,9 @@ function T.Grant(data,player,selector,requester)
  if selector=='mech'then for _,s in ipairs(require(RS.MechCatalog).Seeds)do table.insert(selected,Packs.SeedDesignById[s.Id])end end
  -- R147: rarepacks verity = one TEST Verity pack that reveals the Verity seed (a Verity pack, stage 7; the seed lands in Index category 9).
  if selector=='verity'then table.insert(selected,Packs.SeedDesignById[Verity.Id])end
- if #selected==0 then return false,'Use /test rarepacks [mech|verity|legendary|mythic|secret|cosmic|king].'end
+ -- R148: rarepacks roster = four TEST packs that reveal the roster change's seeds (Fire Pepper, Moon Melon, Aloe, Sand Fruit).
+ if selector=='roster'then for _,id in ipairs({'FirePepperSeed','MoonflowerSeed','DesertAloeSeed','SandFruitSeed'})do table.insert(selected,Packs.SeedDesignById[id])end end
+ if #selected==0 then return false,'Use /test rarepacks [mech|verity|roster|legendary|mythic|secret|cosmic|king].'end
  local records=data:GetChestRecords(player)
  if #records+#selected>data.Config.MaxSavedChests then return false,'Inventory full. Make space first.'end
  local pending={};local serial=player:GetAttribute('ChestInventorySerial')or 0

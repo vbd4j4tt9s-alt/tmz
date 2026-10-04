@@ -455,8 +455,9 @@ function Config.Validate()
 		assert(totalChance == 100, string.format("Stage %d reward chances must total 100", stage))
 
 		local seedCatalog = Config.SeedCatalogByStage[stage]
-		assert(type(seedCatalog) == "table" and #seedCatalog == 8,
-			string.format("Stage %d must define exactly eight seeds", stage))
+		-- R148: Desert (stage 2) also holds the Aloe and the Sand Fruit in its save slots 9 and 10.
+		assert(type(seedCatalog) == "table" and (#seedCatalog == 8 or (stage == 2 and #seedCatalog == 10)),
+			string.format("Stage %d must define exactly eight seeds (Desert ten)", stage))
 		for _, seed in ipairs(seedCatalog) do
 			assert(type(seed.Id) == "string" and seed.Id ~= "", "Seed Id cannot be empty")
 			assert(not seenSeedIds[seed.Id] or (Config.StageSeedPools and Config.StageSeedPools[stage] and seedCatalog == Config.SeedCatalogByStage[Config.StageSeedPools[stage]]), "Duplicate seed Id: " .. seed.Id)
@@ -741,7 +742,9 @@ function Config.Validate()
 end
 -- R67 tuning does not migrate or reset saved points, crops, wallets or ownership.
 local balance=require(game:GetService('ReplicatedStorage').BalanceRules)
-Config.Version='V150 R147';Config.ProfileVersion=21;Config.SpeedMilestones=balance.SpeedMilestones
+-- R148: ProfileVersion 22 (the roster change: pack OddsVersion 149 is unknown to an older server, which would re-save such a pack as
+-- a legacy-odds pack for good); a version-22 save is refused by an older server, which leaves it unchanged.
+Config.Version='V151 R148';Config.ProfileVersion=22;Config.SpeedMilestones=balance.SpeedMilestones
 Config.MaxTrainedSpeed=nil;Config.MaxWalkSpeed=nil;Config.TrainingPointsPerSecond=100
 for i,tier in ipairs(Config.TreadmillTiers)do tier.Multiplier=balance.TrainingTiers[i]end
 for _,product in ipairs(Config.ShopCatalog.Trails)do product.SpeedMultiplier=balance.TrailMultipliers[product.Id]or product.SpeedMultiplier;product.Description=''end

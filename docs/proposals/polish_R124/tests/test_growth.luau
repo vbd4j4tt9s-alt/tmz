@@ -5,6 +5,10 @@ local W=require('./world');local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
 W.stub('GrowthPace125',{Apply=function(c)return c end}) -- load the catalog as it was before R125
+-- R148: and without the seed roster change. Roster149.ApplyPlants runs AFTER the pacing and its plants (Aloe, Sand Fruit, Fire Pepper,
+-- Moon Melon) are exempt from it, so the pacing rules below are checked on the plants the real pipeline paces (Fire Pepper and Moon
+-- Melon still Rare, as the pacing sees them); test_roster.luau checks the roster plants' final numbers and that the pacing leaves them alone.
+local Roster=W.module('Roster149');Roster.ApplyPlants=function()end;Roster.ApplyBalance=function()end
 local C=W.module('PlantCatalog')
 local orig={}
 local function income(d)local t=d.Regrows==false and d.Seconds or d.RegrowSeconds or d.Seconds;return d.Value*(d.FruitCount or 1)/t end -- uncapped

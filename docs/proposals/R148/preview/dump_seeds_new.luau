@@ -1,0 +1,83 @@
+--!nocheck
+-- R148 preview dump (not a test): builds the roster change's seeds and plants with the REAL SeedPackVisuals / PlantVisuals / PlantGrowth /
+-- DesertPlantArt149 / ApprovedPlantArt on the Roblox mock and prints one JSON scene per panel for render_seeds_new.mjs ("SCENE <name> <json>").
+-- Panels: for the Aloe and the Sand Fruit the seed, the plant growing (50%), fully grown and one harvested fruit; for Fire Pepper the new Mythic
+-- seed and the plant before (the base commit's art) and after (x2). Fire Pepper's baked meshes live in ServerStorage, not in this repo, so its
+-- plant is drawn from the art specs (each "ApprovedMesh" as a stand-in ellipsoid of its bounding box): the SIZE is what the preview shows.
+local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
+-- Mock gaps (Roblox does these natively): a full lookAt with an up vector, CFrame.fromMatrix.
+R.CFrame.lookAt=function(p,t,up)
+ local f=(t-p).Unit;local u0=up or V3(0,1,0)
+ if math.abs(f.X*u0.X+f.Y*u0.Y+f.Z*u0.Z)>.999 then u0=math.abs(f.Y)>.9 and V3(0,0,1)or V3(0,1,0)end
+ local r=f:Cross(u0).Unit;local u=r:Cross(f)
+ return R.CFrame.new(p.X,p.Y,p.Z,r.X,u.X,-f.X,r.Y,u.Y,-f.Y,r.Z,u.Z,-f.Z)
+end
+R.CFrame.fromMatrix=function(p,x,y,z)z=z or x:Cross(y);return R.CFrame.new(p.X,p.Y,p.Z,x.X,y.X,z.X,x.Y,y.Y,z.Y,x.Z,y.Z,z.Z)end
+W.env.CFrame=R.CFrame
+local Catalog=W.module('PlantCatalog');local Visuals=W.module('PlantVisuals');local SeedVisuals=W.module('SeedPackVisuals');local Approved=W.module('ApprovedPlantArt')
+local OldApproved=W.module('ApprovedPlantArtBase')
+local function n(v)return string.format('%.4f',v)end
+local function c3(c)return string.format('[%d,%d,%d]',math.floor(c.R*255+.5),math.floor(c.G*255+.5),math.floor(c.B*255+.5))end
+local function enumName(e)if type(e)=='table'and e.Name then return e.Name end;return tostring(e)end
+local function dumpModel(model,out)
+ for _,c in ipairs(model:GetDescendants())do if c:IsA('BasePart')and(c.Transparency or 0)<.995 then
+  local cf=c.CFrame;local r=cf.R;local p=cf.Position;local s=c.Size
+  local shape=c.ClassName=='WedgePart'and'Wedge'or c.ClassName=='CornerWedgePart'and'Corner'or(c.Shape and enumName(c.Shape))or'Block'
+  local mesh=c:FindFirstChildOfClass('SpecialMesh')
+  if mesh and enumName(mesh.MeshType)=='Sphere'then shape='Ball';local m=mesh.Scale;s=V3(s.X*m.X,s.Y*m.Y,s.Z*m.Z)end
+  table.insert(out,string.format('{"name":"%s","shape":"%s","size":[%s,%s,%s],"p":[%s,%s,%s],"r":[%s,%s,%s,%s,%s,%s,%s,%s,%s],"color":%s,"material":"%s","t":%s,"refl":%s}',
+   c.Name,shape,n(s.X),n(s.Y),n(s.Z),n(p.X),n(p.Y),n(p.Z),n(r[1][1]),n(r[1][2]),n(r[1][3]),n(r[2][1]),n(r[2][2]),n(r[2][3]),n(r[3][1]),n(r[3][2]),n(r[3][3]),
+   c3(c.Color),enumName(c.Material),n(c.Transparency or 0),n(c.Reflectance or 0)))
+ end end
+end
+local function emit(name,model,view)
+ local parts={};dumpModel(model,parts)
+ print(string.format('SCENE %s {"parts":[%s],"view":%s}',name,table.concat(parts,','),view))
+end
+-- An art spec list (RarityRework / ApprovedMesh): every spec a part; a baked mesh becomes a stand-in "Mesh" (an ellipsoid of its bounding box).
+-- Leaves whose colour is baked into their texture (white spec colour) are drawn green. `shift` moves the plant along X (before / after side by side).
+local function specParts(specs,shift,out)
+ for _,s in ipairs(specs)do
+  local c=s.c;local k=s.k
+  if s.s=='ApprovedMesh'and k[1]==255 and k[2]==255 and k[3]==255 then k=(s.f:lower():find('pepper')and not s.f:lower():find('sepal'))and{204,52,36}or{74,140,64}end
+  local shape=s.s=='ApprovedMesh'and'Mesh'or s.s
+  table.insert(out,string.format('{"name":"%s","shape":"%s","size":[%s,%s,%s],"p":[%s,%s,%s],"r":[%s,%s,%s,%s,%s,%s,%s,%s,%s],"color":[%d,%d,%d],"material":"%s","t":0,"refl":0}',
+   s.f,shape,n(s.z[1]),n(s.z[2]),n(s.z[3]),n(c[1]+shift),n(c[2]),n(c[3]),n(c[4]),n(c[5]),n(c[6]),n(c[7]),n(c[8]),n(c[9]),n(c[10]),n(c[11]),n(c[12]),k[1],k[2],k[3],s.m or'SmoothPlastic'))
+ end
+end
+local holder=R.new('Model');holder.Parent=W.workspace
+local origin=CF(0,0,0)
+local function crop(id,extra)
+ local def=Catalog[id]
+ local c={Id='preview-'..id,SeedId=id,PlantedAt=0,MatureAt=def.Seconds,ReadyAt=def.Seconds,PlantScale=1,SeedScale=1,Mutation='None',HarvestCycle=0,PickedMask=0,TraitVersion=1}
+ for k,v in pairs(extra or{})do c[k]=v end;return c
+end
+local seedView='{"target":[0,1.1,0],"dist":9,"az":-28,"el":12,"fov":30}'
+-- Aloe
+emit('seed_aloe',SeedVisuals.Seed({Id='DesertAloeSeed'},1,CF(0,0,0),holder,1,nil,'None'),seedView)
+local aloeView=function(y,d)return string.format('{"target":[0,%s,0],"dist":%s,"az":-28,"el":14,"fov":30}',y,d)end
+emit('aloe_growing',Visuals.BuildGrowing('DesertAloeSeed',origin,crop('DesertAloeSeed'),.5*Catalog.DesertAloeSeed.Seconds),aloeView(4.2,31))
+emit('aloe_grown',Visuals.Build('DesertAloeSeed',origin,crop('DesertAloeSeed'),4,math.huge),aloeView(4.2,31))
+local aloeFruit=Visuals.BuildSelectedFruit('DesertAloeSeed',origin,crop('DesertAloeSeed'),{[1]=true},math.huge)
+local ac=Catalog.DesertAloeSeed.FruitCenters[1]
+emit('aloe_fruit',aloeFruit,string.format('{"target":[%s,%s,%s],"dist":15,"az":-28,"el":10,"fov":30}',ac[1],ac[2],ac[3]))
+-- Sand Fruit
+emit('seed_sand',SeedVisuals.Seed({Id='SandFruitSeed'},1,CF(0,0,0),holder,1,nil,'None'),seedView)
+local palmView=function(y,d)return string.format('{"target":[0.5,%s,0],"dist":%s,"az":-28,"el":10,"fov":30}',y,d)end
+emit('sand_growing',Visuals.BuildGrowing('SandFruitSeed',origin,crop('SandFruitSeed'),.5*Catalog.SandFruitSeed.Seconds),palmView(7.2,37))
+emit('sand_grown',Visuals.Build('SandFruitSeed',origin,crop('SandFruitSeed'),4,math.huge),palmView(7.2,37))
+emit('sand_crown',Visuals.Build('SandFruitSeed',origin,crop('SandFruitSeed'),4,math.huge),'{"target":[1.1,10.2,0],"dist":17,"az":-28,"el":12,"fov":30}') -- (a close-up of the crown and its bunches; not in the sheet)
+local sandFruit=Visuals.BuildSelectedFruit('SandFruitSeed',origin,crop('SandFruitSeed'),{[1]=true},math.huge)
+local sc=Catalog.SandFruitSeed.FruitCenters[1]
+emit('sand_fruit',sandFruit,string.format('{"target":[%s,%s,%s],"dist":9,"az":-28,"el":8,"fov":30}',sc[1],sc[2],sc[3]))
+-- Fire Pepper: the new Mythic seed, the plant before (base art) and after (x2), and both side by side to scale.
+emit('seed_fire',SeedVisuals.Seed({Id='FirePepperSeed'},1,CF(0,0,0),holder,1,nil,'None'),seedView)
+local function emitSpecs(name,specLists,view)
+ local out={};for _,e in ipairs(specLists)do specParts(e[1],e[2],out)end
+ print(string.format('SCENE %s {"parts":[%s],"view":%s}',name,table.concat(out,','),view))
+end
+local before,after=OldApproved.Get('FirePepperSeed'),Approved.Get('FirePepperSeed')
+emitSpecs('fire_before',{{before.Specs,0}},'{"target":[0,3.1,0],"dist":21,"az":-28,"el":10,"fov":30}')
+emitSpecs('fire_after',{{after.Specs,0}},'{"target":[0,6.2,0],"dist":42,"az":-28,"el":10,"fov":30}')
+emitSpecs('fire_both',{{before.Specs,-7},{after.Specs,5}},'{"target":[-1,6.2,0],"dist":42,"az":-12,"el":8,"fov":30}')
+print('INFO '..string.format('fire before H %.3f R %.3f, after H %.3f R %.3f; aloe H %.3f R %.3f; sand H %.3f R %.3f',before.Height,before.Radius,after.Height,after.Radius,Catalog.DesertAloeSeed.Height,Catalog.DesertAloeSeed.Radius,Catalog.SandFruitSeed.Height,Catalog.SandFruitSeed.Radius))

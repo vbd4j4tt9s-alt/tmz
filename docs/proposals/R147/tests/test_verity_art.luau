@@ -374,7 +374,7 @@ do
   return out
  end
  local compared,partsTotal=0,0
- for _,id in ipairs({'SunflowerSeed','AppleSeed','MoonflowerSeed','PlasmaPepperSeed','SolarStarfruitSeed','FirePepperSeed'})do
+ for _,id in ipairs({'SunflowerSeed','AppleSeed','MoonflowerSeed','PlasmaPepperSeed','SolarStarfruitSeed'})do -- R148: Fire Pepper is x2 now (checked in R148/tests/test_roster_art.luau)
   local d=Catalog[id]
   if d then
    local c={Id='old-'..id,SeedId=id,PlantedAt=0,MatureAt=d.Seconds,ReadyAt=d.Seconds,PlantScale=1.3,SeedScale=1,Mutation='None',HarvestCycle=0,PickedMask=0,TraitVersion=1}

@@ -205,15 +205,27 @@ function P.Attach(Data)
   local state=self:GetPremium(player);if state.Plants[id]then return false end
   state.Plants[id]=true;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true
  end
- function Data:IndexProgress(player,stage)
+ -- R148: beforeR149 = count the roster before Desert's Aloe and Sand Fruit (PackRules.NewInR149 left out).
+ function Data:IndexProgress(player,stage,beforeR149)
   local pool=PackRules.ObtainablePool(self.Config,stage)or{};local folder=self:GetOrCreateDiscoveredSeeds(player);local state=self:GetPremium(player)
-  local seeds,plants=0,0
-  for _,seed in ipairs(pool)do local v=folder:FindFirstChild(seed.Id);if v and v.Value then seeds+=1 end;if state.Plants[seed.Id]then plants+=1 end end
-  return seeds,plants,#pool
+  local seeds,plants,total=0,0,0
+  for _,seed in ipairs(pool)do
+   if not(beforeR149 and PackRules.NewInR149[seed.Id])then
+    total+=1;local v=folder:FindFirstChild(seed.Id);if v and v.Value then seeds+=1 end;if state.Plants[seed.Id]then plants+=1 end
+   end
+  end
+  return seeds,plants,total
  end
- function Data:BiomeComplete(player,stage)
-  local seeds,plants,total=self:IndexProgress(player,stage);return total>0 and seeds==total and plants==total
+ -- R148: a milestone reached with the roster before this release stays claimable (Desert's Index grew from 5 to 7 seeds), so an
+ -- unclaimed halfway / completion reward is never taken away. ChestIndex shows the same rule.
+ function Data:IndexMilestone(player,stage,full)
+  for _,before in ipairs({false,true})do
+   local seeds,plants,total=self:IndexProgress(player,stage,before)
+   if total>0 and(full and seeds==total and plants==total or not full and seeds+plants>=total)then return true end
+  end
+  return false
  end
+ function Data:BiomeComplete(player,stage)return self:IndexMilestone(player,stage,true)end
  function Data:RefreshBiomeRewards(player)
   -- Mature crops and owned harvests are evidence of an adult plant on migration/rejoin.
   if not self:IsLoaded(player)then return end
@@ -251,8 +263,7 @@ function P.Attach(Data)
   if not self:IsLoaded(player)or not integer(stage,1,9)then return false,'INVALID BIOME'end
   local state=self:GetPremium(player);local key=tostring(stage)
   if(state.BiomeHalfRewards or{})[key]then return false,'ALREADY CLAIMED'end
-  local seeds,plants,total=self:IndexProgress(player,stage)
-  if total<=0 or seeds+plants<total then return false,'REACH HALF OF THIS INDEX'end
+  if not self:IndexMilestone(player,stage,false)then return false,'REACH HALF OF THIS INDEX'end
   local amount=T.HalfwayGems
   local okay,why=self:QueueCurrency(player,amount,'Gems');if not okay then return false,why end
   state.BiomeHalfRewards=state.BiomeHalfRewards or{};state.BiomeHalfRewards[key]=true

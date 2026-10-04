@@ -51,6 +51,7 @@
 | `verity 1 @name` | R147 Verity Pack(s), 1–20 (Verity seed 1/100, then the Void pack's odds without the King seeds) |
 | `rarepacks @name` | 5 TEST packs that reveal Legendary, Mythic, Secret, Cosmic and King |
 | `rarepacks mech @name` / `rarepacks king @name` / `rarepacks verity @name` | TEST packs: the six Mech designs, one King, or a Verity Pack that reveals the Verity seed |
+| `rarepacks roster @name` | R148 four TEST packs that reveal Fire Pepper (Mythic), Moon Melon (Legendary), Aloe (Rare) and Sand Fruit (Legendary) |
 | `seeds snow @name`, `seeds all @name`, `seeds verity @name` | Every seed of a biome, every seed in the game, or the Verity seed |
 | `give big diamond apple seed to @name` | One seed by plant name. `big`/`giant` and `gold`/`diamond` are optional |
 | `take apple seeds from @name` | Remove seeds |

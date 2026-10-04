@@ -9,7 +9,8 @@ local function hash(id)
 end
 local Mech=require(RS:WaitForChild('MechArt'))
 local Verity=require(RS:WaitForChild('VerityPlantArt'))
-function Art.Has(id)return Verity.Is(id)or Mech.Get(id)~=nil or Rarity.Has(id)or Trees.Has(id)or Index[id]~=nil end
+local Desert149=require(RS:WaitForChild('DesertPlantArt149')) -- R148: the Aloe and the Sand Fruit palm
+function Art.Has(id)return Verity.Is(id)or Desert149.Is(id)or Mech.Get(id)~=nil or Rarity.Has(id)or Trees.Has(id)or Index[id]~=nil end
 function Art.Key(id,crop)
  if require(RS.HologramProjection).Is(id)then return require(RS.HologramProjection).Key(id,crop)end
  if Rarity.Has(id)then return Rarity.Key(id)end
@@ -21,12 +22,24 @@ function Art.Key(id,crop)
 end
 function Art.Get(id,crop)
  if Verity.Is(id)then return Verity.Get(id)end
+ if Desert149.Is(id)then return Desert149.Get(id)end
  local mech=Mech.Get(id);if mech then return require(RS.HologramForms).Get(id,mech,crop)end
  if Rarity.Has(id)then return Rarity.Get(id)end
  if Trees.Has(id)then return Trees.Get(id,crop)end
  if not Index[id]then return nil end
  if not loaded[id]then
   loaded[id]=require(RS:WaitForChild(Index[id]))
+  if id=='FirePepperSeed'then
+   -- R148 (owner): the Mythic Fire Pepper is twice as big, peppers included (Roster149.FirePepperArtScale). Uniform: the lowest
+   -- pepper hangs 2.57 studs under its socket, so scaling the fruit more than the plant would bury it.
+   local f=require(RS:WaitForChild('Roster149')).FirePepperArtScale
+   local scaled={};for i,source in ipairs(loaded[id])do
+    local d=table.clone(source);d.Specs={};d.Sockets={};d.FruitCenters={};d.FruitRadii={};d.Height*=f;d.Radius*=f
+    for j,s in ipairs(source.Specs)do local p=table.clone(s);p.z=table.clone(s.z);p.c=table.clone(s.c);for axis=1,3 do p.z[axis]*=f;p.c[axis]*=f end;d.Specs[j]=p end
+    for _,field in ipairs({'Sockets','FruitCenters'})do for j,p in ipairs(source[field])do d[field][j]={p[1]*f,p[2]*f,p[3]*f}end end
+    for j,r in ipairs(source.FruitRadii)do d.FruitRadii[j]=r*f end;scaled[i]=d
+   end;loaded[id]=scaled
+  end
   if id=='CactusSeed'or id=='AgaveSeed'then
    -- Enlarge the stem/shoulders 3x; fruit grows 2x around its relocated shoulder socket.
    local scaled={}

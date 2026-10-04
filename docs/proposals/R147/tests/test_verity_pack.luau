@@ -141,7 +141,7 @@ check(spec and spec.rarity=='King'and spec.stage==9 and spec.SaveStage==9 and sp
  and spec.ink=='fff8d0'and spec.pattern=='None'and spec.addition=='none'and spec.name=='Verity','the seed design spec')
 check(Rules.SeedDesigns[#Rules.SeedDesigns]==spec and Rules.GetRarity('VeritySeed')=='King'and not Rules.IsRetired('VeritySeed'),'it follows the Mech specs; rarity King; not retired')
 local count=0;for _,s in ipairs(Rules.SeedDesigns)do if s.id=='VeritySeed'then count+=1 end end
-check(count==1 and #Rules.SeedDesigns==52,'exactly one Verity design (52 designs = 45 biome + 6 Mech + Verity)')
+check(count==1 and #Rules.SeedDesigns==54,'exactly one Verity design (54 designs = 47 biome + 6 Mech + Verity; R148 added Aloe and Sand Fruit)')
 check(Rules.ObtainableStage('VeritySeed')==9,'obtain stage 9')
 local seedDef,seedStage,seedIndex=Config.GetSeedById('VeritySeed')
 check(seedDef and seedDef.Name=='Verity Seed'and seedStage==9 and seedIndex==1,'the catalog seed: Verity Seed at stage 9 index 1')
@@ -164,13 +164,16 @@ local now0={};for line in PlantsBefore:gmatch('[^\n]+')do local id,sec,reg,val,r
 local changed,total={},0
 for id,row in pairs(now0)do total+=1;local d=Config.GardenPlants[id]
  if not d or d.Seconds~=row[1]or d.RegrowSeconds~=row[2]or d.Value~=row[3]or d.Rarity~=row[4]then changed[#changed+1]=id end end
-check(total==62 and #changed==0,('all %d plants that existed before keep Seconds / RegrowSeconds / Value / Rarity (%s)'):format(total,table.concat(changed,', ')))
+table.sort(changed)
+-- R148: the roster change promoted Fire Pepper (Rare -> Mythic) and Moon Melon (Rare -> Legendary): they, and only they, differ (test_roster.luau checks the new numbers)
+check(total==62 and table.concat(changed,',')=='FirePepperSeed,MoonflowerSeed',('the 62 plants that existed before keep Seconds / RegrowSeconds / Value / Rarity, except the two promoted seeds (%s)'):format(table.concat(changed,', ')))
 local nPlants=0;for _ in pairs(Config.GardenPlants)do nPlants+=1 end
-check(nPlants==63,'63 plants: the 62 old ones and the Verity plant')
+check(nPlants==65,'65 plants: the 62 old ones, the Verity plant and (R148) Aloe and Sand Fruit')
 local P2=Config.GardenPlants.PulsarStarfruitSeed;local S2=Config.GardenPlants.SolarStarfruitSeed;local M2=Config.GardenPlants.PrismMonarchSeed
 check(P2.Seconds==14400 and P2.Value==9e10 and S2.Seconds==10800 and M2.Seconds==14000,'King plants: Pulsar 14400 s / 9e10, Solar 10800 s, Prism Monarch 14000 s')
 local cands=Hour.Candidates();local plain=table.concat(cands,',')
-check(#cands==51 and plain==FohBefore and not table.find(cands,'VeritySeed'),'Fruit of the Hour: still the same 51 candidates (no Verity)')
+local fohNow={};for id in FohBefore:gmatch('[^,]+')do fohNow[#fohNow+1]=id end;fohNow[#fohNow+1]='DesertAloeSeed';fohNow[#fohNow+1]='SandFruitSeed';table.sort(fohNow)
+check(#cands==53 and plain==table.concat(fohNow,',')and not table.find(cands,'VeritySeed'),'Fruit of the Hour: the same candidates plus (R148) Aloe and Sand Fruit = 53 (no Verity)')
 local seenVerity=false;for h=0,24*500 do if Hour.At(h*3600).SeedId=='VeritySeed'then seenVerity=true end end
 check(not seenVerity,'and 500 days of hourly picks never choose the Verity fruit')
 
@@ -318,7 +321,7 @@ check(converted~=nil,'Void -> Verity works ('..tostring(why)..')')
 check(newIndex==oldIndex and #Data:GetChestRecords(A)==count0,'it takes the same slot in the bag ('..tostring(oldIndex)..' -> '..tostring(newIndex)..'); the bag count is unchanged')
 check(converted.Id~=oldId and converted.Id==string.format('%d_%d',A.UserId,serial0+1)and converted.ChestNumber==serial0+1 and A:GetAttribute('ChestInventorySerial')==serial0+1,'a new Id from the serial ('..tostring(converted.Id)..'), serial +1')
 check(find(A,oldId)==nil and Data:HasChest(A,converted.Id)and not Data:HasChest(A,oldId),'the old Id is gone')
-check(converted.Kind=='Pack'and converted.BagVariant=='VerityReliquary'and converted.Stage==7 and converted.OddsVersion==Rules.OddsVersion and converted.OddsVersion==137,'a Verity pack: stage 7, odds version '..tostring(converted.OddsVersion))
+check(converted.Kind=='Pack'and converted.BagVariant=='VerityReliquary'and converted.Stage==7 and converted.OddsVersion==Rules.OddsVersion,'a Verity pack: stage 7, odds version '..tostring(converted.OddsVersion))
 check(converted.PackSize==3.5 and converted.PackMutation=='Gold'and converted.Weather=='Drippy+Frosted'and converted.WeatherCheckedEvent=='12:Drippy'and converted.PaidRandom==true,'size, coat, weather, weather check and the paid flag are kept')
 check(converted.SeedScale==Rules.NewSeedScale(7,'VerityReliquary',3.5)and converted.AccentColor==void1.AccentColor and converted.RateBoost==nil,'seed scale from the Verity variant, accent colour kept, no rate boost')
 check(Data.StudioPackRewards[A][oldId]==nil and Data.StudioPackRewards[A][void2.Id]=='StarfruitSeed','an owner-test guarantee on the old pack is cleared (and only that one)')
@@ -357,15 +360,15 @@ end
 do
 local saved=Data:_buildSaveData(A)
 local row;for _,r in ipairs(saved.Seeds)do if r.Id==converted.Id then row=r end end
-check(row and row.BagVariant=='VerityReliquary'and row.Stage==7 and row.PackSize==3.5 and row.PackMutation=='Gold'and row.Weather=='Drippy+Frosted'and row.OddsVersion==137 and row.PaidRandom==true and row.Kind=='Pack','the saved row keeps the variant, size, coat, weather, odds version and paid flag')
+check(row and row.BagVariant=='VerityReliquary'and row.Stage==7 and row.PackSize==3.5 and row.PackMutation=='Gold'and row.Weather=='Drippy+Frosted'and row.OddsVersion==Rules.OddsVersion and row.PaidRandom==true and row.Kind=='Pack','the saved row keeps the variant, size, coat, weather, odds version and paid flag')
 local back=Data:_canonicalizeSeedRecord(Data:_decodeSavedSeedRecord(A,row,1))
-check(back.BagVariant=='VerityReliquary'and back.Stage==7 and back.OddsVersion==137 and back.PackSize==3.5 and back.SeedScale==converted.SeedScale,'it decodes back as a Verity pack (not Standard)')
+check(back.BagVariant=='VerityReliquary'and back.Stage==7 and back.OddsVersion==Rules.OddsVersion and back.PackSize==3.5 and back.SeedScale==converted.SeedScale,'it decodes back as a Verity pack (not Standard)')
 check(Data:Save(A,'test',true),'real save')
 local Data2=PDS.new(Config,Map,Notes)
 local A2=makePlayer(701,'Ava',Data2)
 local reloaded;for _,r in ipairs(Data2:GetChestRecords(A2))do if r.Id==converted.Id then reloaded=r end end
 local verityCount=0;for _,r in ipairs(Data2:GetChestRecords(A2))do if r.BagVariant=='VerityReliquary'then verityCount+=1 end end
-check(reloaded and reloaded.BagVariant=='VerityReliquary'and reloaded.OddsVersion==137 and reloaded.PackMutation=='Gold'and reloaded.Weather=='Drippy+Frosted'and verityCount==2,'a real save and load keeps both Verity packs')
+check(reloaded and reloaded.BagVariant=='VerityReliquary'and reloaded.OddsVersion==Rules.OddsVersion and reloaded.PackMutation=='Gold'and reloaded.Weather=='Drippy+Frosted'and verityCount==2,'a real save and load keeps both Verity packs')
 end
 -- Gifts.
 local Gifts=server('FruitGiftService')
@@ -373,7 +376,7 @@ local Bn=makePlayer(704,'Bea')
 Bn:SetAttribute('PaidTradingAllowed',true);Bn:SetAttribute('PaidRandomAllowed',true)
 local giftRow=Data:SerializeSeedRecord(converted)
 local decoded=Data:DecodeGiftedSeed(Bn,giftRow)
-check(decoded and decoded.BagVariant=='VerityReliquary'and decoded.Stage==7 and decoded.Kind=='Pack'and decoded.OddsVersion==137 and decoded.PackSize==3.5,'a gifted Verity pack decodes as a Verity pack')
+check(decoded and decoded.BagVariant=='VerityReliquary'and decoded.Stage==7 and decoded.Kind=='Pack'and decoded.OddsVersion==Rules.OddsVersion and decoded.PackSize==3.5,'a gifted Verity pack decodes as a Verity pack')
 local synced=0;local giver={Data=Data,Chests={SyncTools=function()synced+=1 end}}
 local staged=table.clone(giftRow);staged.Id='gift-verity-pack'
 local gotOk,res=pcall(Gifts._receiveSeed,giver,Bn,Data.Gardens[Bn]or{},{},'gift-v1',{Seed=staged})

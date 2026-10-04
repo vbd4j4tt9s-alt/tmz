@@ -294,6 +294,40 @@ Sig.AshRoseSeed={Pattern='None',Draw=function(k)
   k.anim(onSurface(k,'Ember crack',crack,.008,.045,k.ink,Enum.Material.Neon),'Pulse')
  end
 end}
+-- R148 (owner): Desert's Aloe (Rare) and Sand Fruit (Legendary), and Fire Pepper now Mythic.
+S.Shapes.DesertAloeSeed='Pointed';S.Shapes.SandFruitSeed='Round'
+Sig.DesertAloeSeed={Draw=function(k) -- three fleshy blue-green aloe blades on top and a red-orange flower spike
+ local y=k.H-.03
+ for _,t in ipairs({-.6,0,.6})do
+  local dir=k.V(math.sin(t)*.75,1,math.cos(t)*.15)
+  k.lay('Aloe blade',k.V(math.sin(t)*.06,y,0)+dir.Unit*.2,dir,.46-math.abs(t)*.12,.15,.08,k.RGB(88,150,128))
+ end
+ k.line('Aloe flower stalk',k.V(.04,y,0),k.V(.12,y+.62,0),.05,k.RGB(126,146,100))
+ for j=0,3 do k.oval('Aloe floret',k.V(.1+.03*(j%2),y+.36+j*.08,-.03),k.V(.07,.13,.07),j<2 and k.RGB(236,96,48)or k.RGB(250,170,70))end
+end}
+Sig.SandFruitSeed={Pattern='None',Draw=function(k) -- dune ripples on the skin, a tiny palm crown on top, two twinkling sand sparkles
+ for i,y in ipairs({.24,-.02,-.28})do
+  local pts={};for j=0,10 do pts[#pts+1]={-1.1+j*.22,y+math.sin(j*.8+i)*.05}end
+  onSurface(k,'Dune ripple',pts,.012,.04,k.ink)
+ end
+ local y=k.H-.03
+ k.line('Palm trunk',k.V(0,y,0),k.V(.04,y+.22,0),.07,k.RGB(140,104,64))
+ ring3(5,function(t)local dir=k.V(math.sin(t),.25,math.cos(t));k.lay('Palm frond',k.V(.04,y+.23,0)+dir.Unit*.16,dir,.34,.13,.05,k.RGB(96,156,74))end)
+ for _,v in ipairs({{-.3,.1},{.28,-.16}})do
+  local z=(k.front(v[1],v[2])or-.3)-.02
+  k.anim(k.oval('Sand sparkle',k.V(v[1],v[2],z),k.V(.07,.07,.04),k.RGB(255,240,180),nil,Enum.Material.Neon),'Twinkle')
+ end
+end}
+Sig.FirePepperSeed={Draw=function(k) -- Mythic: a curled green stem cap and three flickering flame wisps on its shoulders
+ local y=k.H-.04
+ ring3(4,function(t)local dir=k.V(math.sin(t),-.3,math.cos(t));k.lay('Pepper calyx',k.V(0,y,0)+dir.Unit*.12,dir,.26,.12,.05,k.RGB(70,130,60))end)
+ k.path('Pepper stem',{k.V(0,y,0),k.V(.04,y+.16,0),k.V(.13,y+.24,0),k.V(.2,y+.2,0)},.06,k.RGB(70,130,60))
+ local cx,hw=k.span(y-.12)
+ for i,f in ipairs({-.6,0,.6})do
+  local tall=i==2 and .1 or 0
+  k.anim(k.oval('Flame wisp',k.V(cx+f*hw,y-.02+.17+tall/2,.04),k.V(.12,.34+tall,.08),i==2 and k.RGB(255,215,80)or k.RGB(255,140,40),CFrame.Angles(0,0,-f*.5),Enum.Material.Neon),'Flicker')
+ end
+end}
 function S.Get(id)return Sig[id]end
 function S.Shape(id)return S.Shapes[id]or'Oval'end
 return S

@@ -9,12 +9,51 @@ not committed) with the real modules:
 - The new seeds build with 0 of 48 floating (R134 checker).
 - The R137 and R147 suites pass after the test edits in §6.3.
 - 1M `math.random` rolls with v149 packs match the §4 tables: Aloe 12.56%, Sand Fruit 1.116%, Fire Pepper 0.125%,
-  Moon Melon 0.663%. A banked v137 Lava pack still gives Fire Pepper 33.1%, now labelled Mythic.
+  Moon Melon 0.663%. (Plan default, superseded by owner decision 1: a banked v137 Lava pack now gives Fire Pepper 0.125%, labelled Mythic.)
 
 The reference code in Appendix A is the code that was run.
 
 Owner request: Lava Fire Pepper becomes Mythic (bigger peppers, more cash). Crystal Moon Melon becomes Legendary. Desert
 gets a Legendary "Sand Fruit" palm and a Rare "Aloe". Check the other biomes for gaps.
+
+## Owner decisions and implementation notes (shipped as R148). Where they differ they OVERRIDE the plan text below
+
+The release ships as **R148**; the identifiers keep the plan's "149" (`OddsVersion` 149, `Roster149`, `DesertPlantArt149`, `NewInR149`, ...).
+
+**1. No windfall for banked packs.** `Roster149.RarityBefore = {}` (the plan's owner option). A pack banked before the update rolls Fire Pepper /
+Moon Melon at their NEW tiers (Mythic / Legendary), exactly like a new pack. Banked Desert packs still never give the Aloe or the Sand Fruit.
+Checked against the base commit by `tests/run_roster.sh` (every odds version none / 81 / 112 / 137, 9 pack variants, 6 luck levels, with and without the 2x boost):
+- **Byte-identical**: every Forest, Desert, Snow, Jungle and Storm pack (2,160 of 3,024 odds rows), every Void / Mech / Verity row, every seeded roll of those biomes.
+- **Changed**: only Lava and Crystal packs (864 rows). Fire Pepper / Moon Melon now sit in their new tier, so the seeds that shared their old Rare tier split it
+  between two instead of three, and a Mythic pack's floor is now the Legendary. A banked 137 pack (every pack made since R137) now rolls exactly like a new 149 pack
+  (same roster there). Percent per seed, boots x1, before -> after, Common / Uncommon / Rare / Epic / Legendary / Mythic pack:
+
+  | Banked 137 pack | Common | Uncommon | Rare | Epic | Legendary | Mythic |
+  |---|---|---|---|---|---|---|
+  | Lava: Fire Pepper | 33.05 -> 0.125 | 32.77 -> 0.3125 | 32.12 -> 0.833 | 28.82 -> 4 | 27.80 -> 10 | 0 -> 16 |
+  | Lava: Ember Pumpkin / Ash Tomato (each) | 33.05 -> 49.52 | 32.77 -> 49.00 | 32.12 -> 47.77 | 28.82 -> 41.23 | 27.80 -> 36.70 | 0 |
+  | Lava: Lava Lotus | 0.833 (same) | 1.667 (same) | 3.571 (same) | 13.33 (same) | 16 (same) | 97.98 -> 81.98 |
+  | Crystal: Moon Melon | 33.30 -> 0.667 | 33.24 -> 1.333 | 33.09 -> 2.857 | 32.15 -> 11.11 | 30.35 -> 13.33 | 28.22 -> 84.65 |
+  | Crystal: Amethyst Grape / Prism Pepper (each) | 33.30 -> 49.61 | 33.24 -> 49.20 | 33.09 -> 48.21 | 32.15 -> 42.68 | 30.35 -> 38.86 | 28.22 -> 0 |
+
+  In 137 packs only the promoted seed, its old tier-mates and (Mythic pack) Lava Lotus move; in 112 packs the Mythic tier moves too (Diamond Vine in a Common Crystal pack 3.83 -> 0.5);
+  the Secret / Cosmic / King seeds do not move in either. Banked 112 / 81 / no-version packs use their own older tier math and re-split
+  the same way (Fire Pepper in a Common Lava pack: 32.2 -> 0.5 (v112), 31.3 -> 1.3 (v81), 25 -> 5.9 (none)); in those old versions the other seeds of the
+  biome also move a little because their weights are normalised (e.g. Obsidian Maw in a Common v81 Lava pack 1.8 -> 0.5).
+- The hold tooltip of a banked 137 Lava pack reads "Fire Pepper Seed: 1/800" (it read 1/3 under the plan's default); `Rules.GetRarity` needs no pre-R149 mapping.
+
+**2. The Rare Aloe out-earns the Uncommon Prickly Pear.** Aloe `Value = 10,000,000` (the plan's rule alone gave 7,680,000; 9,900,000 is the least that passes).
+Derived: 2.04e8 per hour (Prickly Pear 2.00e8, Iceberry 2.73e8, Sand Fruit 2.50e8: every ladder below still increases), Index cash 10,000,000 first / 2,000,000 repeat.
+
+**3. Found while implementing** (not owner decisions):
+- The Sand Fruit's bunch stalks start inside the crown heart and end inside their fruits (the plan's art left every bunch's fruit 0.09 studs off its stalk, which the
+  R134 check_floating run on the plant scene flagged). Fruit centres are at y 9.82 instead of 9.59; Height / Radius are unchanged.
+- `ChestIndex.client.lua` had moved on since the plan was written (`rewardState`); A.7 is applied to the current file.
+- Existing tests that needed edits beyond section 6.3: `R137/tests/test_packs.luau` (Lava / Crystal rows are no longer the approved 137 model's; the Desert rows are
+  checked at version 137 explicitly), `R137/tests/test_index.luau` (header total 94), `polish_R124/tests/test_growth.luau` (loads the catalog without the roster change,
+  because the roster plants are written after the pacing and exempt from it) and `R147/tests/test_verity_art.luau`.
+- The Aloe seed is the tallest seed in the game (3.34 studs high; the next is 3.12): a pointed body plus its flower spike.
+- `docs/proposals/R148/tests/` (run_roster.sh, dump_roster.luau, check_roster_diff.py, test_roster.luau, test_roster_art.luau) and `preview/` + `seeds_new.png` hold the tests and the preview.
 
 ---
 
@@ -25,7 +64,7 @@ gets a Legendary "Sand Fruit" palm and a Rare "Aloe". Check the other biomes for
 | D1 | **New ids** `DesertAloeSeed` (Rare, name "Aloe") and `SandFruitSeed` (Legendary, name "Sand Fruit") in Desert save slots **9 and 10**. Slots 1–8 keep their ids, the retired ones included. Retired `AloeSeed` / `DesertRoseSeed` / `AgaveSeed` / `SunKingPalmSeed` are never reused. |
 | D2 | **Promotions** `FirePepperSeed` → Mythic and `MoonflowerSeed` → Legendary. Ids, names and **FruitCount stay** (4 and 2). FruitCount must stay: a saved crop's `FruitStates` are validated against it, and changing it makes `DecodeGarden` reject the player's whole garden ("Invalid plant traits"). |
 | D3 | All plant numbers are written **after** `GrowthPace125.Apply`, in a new `Roster149.ApplyPlants`, and are flagged `Roster149=true` (exempt from pacing). **Do not** put the promoted or new plants through the pacing. Moon Melon is the Rare group's slowest raw entry (840 s → 1800 s). Taking it out of that group, or adding seeds outside the group's raw range, re-spreads the time and value of **every** Rare/Legendary/Mythic plant in the game. |
-| D4 | **New `OddsVersion` 149** for every pack made from now on. It uses PackOdds137's frozen numbers over today's roster. **Packs already banked keep their exact per-seed odds** (owner rule since R112/R137): they roll the roster they were made with. That means no Aloe or Sand Fruit, and Fire Pepper / Moon Melon stay in their Rare tier. The seed they hand out is today's seed, so the reveal shows the new rarity. No PackOdds table changes. |
+| D4 | **New `OddsVersion` 149** for every pack made from now on. It uses PackOdds137's frozen numbers over today's roster. **Packs already banked keep their exact per-seed odds** (owner rule since R112/R137): they roll the roster they were made with. That means no Aloe or Sand Fruit. ~~Fire Pepper / Moon Melon stay in their Rare tier~~ (owner decision 1: they roll at their NEW tiers). The seed they hand out is today's seed, so the reveal shows the new rarity. No PackOdds table changes. |
 | D5 | **ProfileVersion 21 → 22.** An old server would read OddsVersion 149 as invalid → `nil` and re-save the pack as a legacy-odds pack for good. The R147 precedent, where Verity packs became Standard packs on an old server, is the same failure. |
 | D6 | **Index safety**: claimed rewards stay claimed (no duplicates). Desert grows from 5 to 7 entries, so a halfway or completion milestone reached with the **old 5-seed roster** stays claimable on both server and client, and nothing is taken away. |
 | D7 | Void, Verity, Mech, Fruit of the Hour rules, Market, PackOdds81/112/137, BalanceRules and VoidPackOdds85 are unchanged. Fruit of the Hour automatically gains the 2 new fruits (51 → 53). |
@@ -107,9 +146,8 @@ Grow times sit between the neighbouring biomes:
 - **Planted crops** keep their `PlantedAt`/`MatureAt`/`ReadyAt`. Every fruit picked from now on is priced at the new Value, because `PlantRules.Fruit` reads `definition.Value` ("current growing plants earn current rates"). Each regrow after the update uses the new RegrowSeconds: slower, but more per hour. They show at ×2 size immediately. `FruitCount` is unchanged, so every saved garden still loads.
 - **Harvested fruit** already in the bag keeps its saved `Value` and shows the new rarity label.
 - **Index**: ids are unchanged, so discovered seeds and plants stay discovered and pending seed rewards stay as they are. Future pulls pay the new first/repeat cash. The Lava and Crystal Index membership is unchanged (7 each), so their milestones are unaffected.
-- **Banked packs** (made before the update) keep their exact odds (D4). For a Lava or Crystal pack that means Fire Pepper / Moon Melon at ~1/3 (its old Rare-tier share), now handed out as a Mythic or Legendary.
-  - This is a one-off windfall bounded by banked packs and garden space.
-  - **Owner option**: `Roster149.RarityBefore={}` (one line) makes banked Lava/Crystal packs roll them at their new tiers instead (Fire Pepper 1/800 in a Common Lava pack). Banked Desert packs still never give the new seeds.
+- **Banked packs** (made before the update): owner decision 1 (top of this file). They roll Fire Pepper / Moon Melon at their NEW tiers (Fire Pepper 1/800 in a Common Lava pack, no windfall);
+  the plan's default (~1/3, handed out as a Mythic or Legendary) is not used. Banked Desert packs never give the new seeds.
 
 ---
 
@@ -125,21 +163,21 @@ Grow times sit between the neighbouring biomes:
 | Tree / Mode | false / repeat | **true** (solid trunk, climbable like Apple/Cocoa) / repeat |
 | FruitCount | 3 | 4 |
 | First grow / regrow | 960 s / 530 s | 2760 s / 1520 s |
-| Value per fruit | 7,680,000 | 26,400,000 |
-| Income / h | 1.56e8 | 2.50e8 |
-| Index cash first / repeat | 7,680,000 / 1,536,000 | 26,400,000 / 5,280,000 |
+| Value per fruit | **10,000,000** (owner; the rule gave 7,680,000) | 26,400,000 |
+| Income / h | **2.04e8** (the rule: 1.56e8) | 2.50e8 |
+| Index cash first / repeat | **10,000,000 / 2,000,000** | 26,400,000 / 5,280,000 |
 | Art bounds (Height / Radius) | 8.243 / 5.211 | 14.182 / 7.252 |
 | Spec parts / detail cost | 96 / 97 | 99 / 100 |
 | Index chip (Common pack) | 1/8 | 1/90 |
 
 How the numbers were set:
 - Aloe grows between Jungle's Rares (900 s) and Snow's Iceberry (1060 s).
-- Rare row: Venom/Lantern 3.05e7 < **Aloe 1.56e8** < Iceberry 2.73e8 < Ember/Ash 6.2e8 < Amethyst 1.22e9 < Spark 2.94e9.
-- Desert ladder: **Aloe 1.56e8** < **Sand Fruit 2.50e8** < Dune Lotus 3.47e8 < Dune Starfruit 1.25e9 < Mirage Fig 3.76e9 < Solar 3.13e10.
+- Rare row: Venom/Lantern 3.05e7 < **Aloe 2.04e8** < Iceberry 2.73e8 < Ember/Ash 6.2e8 < Amethyst 1.22e9 < Spark 2.94e9.
+- Desert ladder: **Aloe 2.04e8** < **Sand Fruit 2.50e8** < Dune Lotus 3.47e8 < Dune Starfruit 1.25e9 < Mirage Fig 3.76e9 < Solar 3.13e10.
 - Index cash for a new seed = one base fruit; the repeat amount is 1/5 of it, like every seed.
 
-Note: the Aloe earns a bit less per hour than Prickly Pear (2.0e8). Prickly Pear is an Uncommon, which R125 does not slow down. This is the same pattern the game already has: Iceberry vs Snow Melon (0.79) and Venom vs Pineapple (0.77). Aloe vs Prickly Pear is 0.78.
-- If the owner wants the Aloe above Prickly Pear: Value 9,900,000 (2.0e8/h) or more.
+Note (owner decision 2): the plan's rule left the Aloe a little below Prickly Pear (2.0e8/h; an Uncommon, which R125 does not slow down: the same pattern as Iceberry vs Snow Melon and
+Venom vs Pineapple). The owner wants the Rare Aloe above it, so its fruit is worth 10,000,000: 2.04e8 per hour, 1.02x Prickly Pear.
 
 Retired-id hygiene: the retired Uncommon `AloeSeed`, which old players may still hold, would show as a second "Aloe Seed". It gets the display name **"Aloe Sprout"**. This is display only: `SeedDesignById.AloeSeed.name`, plant `Name`/`HarvestName`. Its id, value and timings are unchanged.
 
@@ -166,12 +204,12 @@ How each kind of pack rolls:
 - The Void/Verity pools (Secret/Cosmic/King + Mech) are unchanged because no new seed is Secret+.
 - **Banked world packs** (OddsVersion 137 / 112 / 81 / none) roll inside a "pre-R149 roster" scope (Appendix A.1):
   - the new seeds are filtered out of `ObtainablePool`;
-  - `GetRarity` returns Rare for Fire Pepper / Moon Melon;
-  - the rarity the roll returns is mapped back to the seed's rarity today (so the reveal and the record say Mythic/Legendary).
+  - `GetRarity` returns the plan's pre-R149 rarity (Rare) for Fire Pepper / Moon Melon only while `Roster149.RarityBefore` lists them; it is EMPTY (owner decision 1), so they keep their new tiers;
+  - the rarity the roll returns is the seed's rarity today (so the reveal and the record say Mythic/Legendary).
 
 **Hold tooltip** (`ChestService:_holdPack`, `record.OddsVersion or 0`) needs no change and stays correct:
 - A 149 Lava pack shows Fire Pepper 1/800.
-- A banked 137 Lava pack shows Fire Pepper 1/3 — what it will really roll.
+- A banked 137 Lava pack shows Fire Pepper 1/800 (owner decision 1; it would have been 1/3) — what it will really roll.
 - Banked Desert packs list no Aloe or Sand Fruit (their odds are 0, so the row is skipped).
 - **Index chips** (`BaseChance` = Pack01, current version) read: Aloe 1/8, Sand Fruit 1/90, Fire Pepper 1/800, Moon Melon 1/150. Prickly Pear goes from 1/1 to 1/1.2; Lava and Crystal Rares go from 1/3 to 1/2.
 
@@ -334,11 +372,12 @@ Final studs, no scale factor.
 - Extracts the base with `git -C "$REPO" archive 9c9797e src | tar -x -C "$OUT/base"`.
 - Copies `treadmill_bonus_R123/tests/mkbundle.py` + `world.luau` into the same relative layout under `$OUT/base` and under the checkout, and bundles both.
 - Runs `dump_roster.luau` (A.9) on both and diffs the output. **Only these lines may differ**:
-  - `PLANT AloeSeed` (name only)
+  - `PLANT AloeSeed` (name only; `BASE` = the commit before the change, default `cba4032`, not `9c9797e`: R148 had moved on)
   - `PLANT FirePepperSeed` and `PLANT MoonflowerSeed`
   - added `PLANT DesertAloeSeed` and `PLANT SandFruitSeed`
   - `VOID 149` (the base reads 149 as unknown)
-  - `ROLL` lines, where only the labels `FirePepperSeed:Rare→Mythic` and `MoonflowerSeed:Rare→Legendary` may change; counts stay identical
+  - `ODDS` and `ROLL` lines of **Lava (4) and Crystal (5) only** (owner decision 1); every other line, for every banked version, must be identical. The dump runs all 7 stages; the checker also requires that
+    the Secret / Cosmic / King seeds do not move in 112 / 137 packs, no banked roll ever gives a new seed, and promoted seeds carry their new label
   - `FOH` (51 → 53)
 - Then runs the two tests below.
 
@@ -361,10 +400,10 @@ Final studs, no scale factor.
    - Every v149 row of the §4 tables (1e-9); stages 1/3/6/7 at 149 equal 137.
    - `OddsVersion==149`, `ValidOddsVersion(149)`, and a v150 pack decodes as nil.
    - Void/Verity/Mech identical across nil/0/81/112/137/149; Void 149 = Void 137.
-   - Hold tooltip via the real `ChestService:_holdPack` rows: a 149 Lava pack has "Fire Pepper Seed: 1/800"; a 137 Lava pack has "1/3"; a 137 Desert pack has no Aloe or Sand Fruit row.
+   - Hold tooltip via the real `ChestService:_holdPack` rows: a 149 Lava pack has "Fire Pepper Seed: 1/800"; a 137 Lava pack also has "Fire Pepper Seed: 1/800" (owner decision 1); a 137 Desert pack has no Aloe or Sand Fruit row.
    - 1,000,000 `math.random` rolls:
      - 149 Desert Pack01: Aloe 12.5 ± 0.2%, Sand Fruit 1.11 ± 0.05%.
-     - 137 Lava Pack01: Fire Pepper ≈ 33% and its returned rarity is "Mythic".
+     - 137 Lava Pack01: Fire Pepper 0.125 ± 0.02% (it was ≈ 33%) and its returned rarity is "Mythic"; 137 Crystal Pack01: Moon Melon 0.667 ± 0.04%, "Legendary".
      - 200,000 legacy Desert rolls at luck 5e7 never give a new seed.
 4. **Save / load / gift** (real PlayerDataService):
    - A 149 pack keeps 149 through save/load and gift.
@@ -408,7 +447,7 @@ Each edit below was checked on the prototype.
   - L173: `#cands==53` and `plain` = `FohBefore` plus `DesertAloeSeed,SandFruitSeed` (sorted).
   - L321, L360, L362, L368, L376: the converted Verity pack's version `137` → `Rules.OddsVersion`. Leave the explicit `OddsVersion=137` AddChest calls alone.
 - **`R137/tests/test_packs.luau`** (41 checks, 0 failures after these edits):
-  - `tiers(odds)` uses `Rules.RarityBeforeR149[id] or Rules.GetRarity(id)`.
+  - `tiers(odds)` uses `Rules.RarityBeforeR149[id] or Rules.GetRarity(id)` (an empty map: today's rarity); the Lava / Crystal rows of the approved model are skipped (30 of 42 rows are compared).
   - L44: `Rules.OddsVersion==149`.
   - L47 and L51: pass version `137` explicitly.
   - L78: also `Rules.ValidOddsVersion(149)`.
@@ -425,7 +464,7 @@ Each edit below was checked on the prototype.
 - Gifts staged by a new server and opened on an old one could lose OddsVersion 149 (it becomes legacy odds). Shutting down all servers removes this case.
 - **FruitCount invariant** (D2) and **pacing order** (D3) are the two ways to corrupt data or the economy. Both are covered by tests §6.2 (2) and (4).
 - **Fruit of the Hour** reshuffles its hourly schedule once at the update (the pick depends on the list length). This is cosmetic.
-- **Windfall** from banked Lava/Crystal packs (§2). Owner toggle: `Roster149.RarityBefore`.
+- **No windfall** from banked Lava/Crystal packs (owner decision 1); they re-split with the new tiers (table at the top). Toggle: `Roster149.RarityBefore`.
 - **Index**: no duplicate claims, nothing lost (D6). Desert's Index shows 7 entries; players who already claimed see their claim as done.
 
 ---
@@ -442,19 +481,20 @@ for _,spec in ipairs(Roster149.Designs)do table.insert(Rules.SeedDesigns,table.c
 ```
 Insert after the R37 loop (`for id,rarity in pairs({SolarStarfruitSeed='King',...})do ... end`):
 ```lua
--- R149 (owner): Fire Pepper is Lava's Mythic and Moon Melon Crystal's Legendary (packs made before R149 still roll them as
--- Rares: see the R149 odds block). The retired Uncommon AloeSeed gets a distinct display name; its id never changes.
+-- R148 (owner): Fire Pepper is Lava's Mythic and Moon Melon Crystal's Legendary in every pack, banked ones included
+-- (Roster149.RarityBefore is empty; see the odds block). The retired Uncommon AloeSeed gets a distinct display name; its id never changes.
 for id,rarity in pairs(Roster149.Promote)do Rules.SeedRarityById[id]=rarity;Rules.SeedDesignById[id].rarity=rarity end
 Rules.SeedDesignById.FirePepperSeed.design='red to orange, cream pepper flecks, a curled green stem cap and three flickering flame wisps'
 Rules.SeedDesignById.AloeSeed.name='Aloe Sprout'
 ```
 Insert between the R137 block (ends after `Rules.Roll=function ... N137.Roll(...) end`) and `-- R147 (owner): the Verity pack. The OUTERMOST wrapper`:
 ```lua
--- R149 (owner, roster change): new world/event packs carry OddsVersion 149 = PackOdds137's numbers over today's roster
--- (Desert Aloe Rare + Sand Fruit Legendary, Fire Pepper Mythic, Moon Melon Legendary). A pack made before R149 (OddsVersion
--- 137, 112, 81 or none) keeps the roster it was made with: the two new seeds are not in it and Fire Pepper / Moon Melon stay
--- in its Rare tier, so its per-seed odds are exactly as before (what it rolls is today's seed, so the reveal shows its
--- rarity today). Void, Mech and Verity packs are untouched (Verity's wrapper stays outermost).
+-- R148 (owner, roster change): new world/event packs carry OddsVersion 149 = PackOdds137's numbers over today's roster
+-- (Desert Aloe Rare + Sand Fruit Legendary, Fire Pepper Mythic, Moon Melon Legendary). A pack made before this release
+-- (OddsVersion 137, 112, 81 or none) rolls the roster it was made with, minus the two new seeds. OWNER (no windfall): Fire Pepper
+-- and Moon Melon keep their NEW tiers in banked Lava / Crystal packs (Roster149.RarityBefore is empty), so they are rare there
+-- and the seeds that shared their old Rare tier split it between fewer seeds. Every other biome, Void, Mech and Verity are as before
+-- (Verity's wrapper stays outermost). The final text of this block is in src/ReplicatedStorage/SeedPackRules.lua.
 Rules.NewInR149=Roster149.New
 Rules.RarityBeforeR149=Roster149.RarityBefore
 Rules.OddsVersion=149
@@ -513,10 +553,10 @@ Why this is safe:
 local R={Version=149}
 -- Seeds added in R149: packs made before R149 (OddsVersion 137 / 112 / 81 / none) never roll them.
 R.New={DesertAloeSeed=true,SandFruitSeed=true}
--- The promoted seeds' rarity now, and the rarity packs made before R149 still roll them at. Owner option: R.RarityBefore={}
--- makes banked Lava / Crystal packs roll Fire Pepper / Moon Melon at their new tiers instead (Desert stays as before).
+-- The promoted seeds' rarity now, and the rarity packs made before R149 roll them at. OWNER: R.RarityBefore is EMPTY, so banked Lava /
+-- Crystal packs roll Fire Pepper / Moon Melon at their new tiers (the plan's default kept them Rare; Desert stays as before).
 R.Promote={FirePepperSeed='Mythic',MoonflowerSeed='Legendary'}
-R.RarityBefore={FirePepperSeed='Rare',MoonflowerSeed='Rare'}
+R.RarityBefore={} -- OWNER: banked packs follow the new tiers (the plan's default was {FirePepperSeed='Rare',MoonflowerSeed='Rare'})
 -- SeedPackRules.SeedDesigns rows. Desert save slots 9 and 10 (slots 1-8 keep their ids, retired ones included).
 R.Designs={
  {biome='Desert',index=9,name='Aloe',rarity='Rare',design='sea green to pale sage, cream leaf spots, three fleshy aloe blades and a red-orange flower spike',
@@ -528,14 +568,14 @@ R.Designs={
 -- Rule (EconomyBalance90 + GrowthPace125): income/s = biome base x tier, halved by the R125 pacing; value per fruit =
 -- income x RegrowSeconds / FruitCount. Bases: Desert 34760, Lava 137578, Crystal 272073; tiers Rare 2.5, Legendary 4, Mythic 7.
 R.Plants={
- DesertAloeSeed={Name='Aloe',HarvestName='Aloe bloom',Rarity='Rare',Rank=3,Tree=false,FruitCount=3,Seconds=960,RegrowSeconds=530,Value=7680000},        -- 1.56e8/h
+ DesertAloeSeed={Name='Aloe',HarvestName='Aloe bloom',Rarity='Rare',Rank=3,Tree=false,FruitCount=3,Seconds=960,RegrowSeconds=530,Value=10000000},       -- 2.04e8/h (OWNER: out-earns Prickly Pear; the rule gave 7680000)
  SandFruitSeed={Name='Sand Fruit',HarvestName='Sand fruit',Rarity='Legendary',Rank=4,Tree=true,FruitCount=4,Seconds=2760,RegrowSeconds=1520,Value=26400000}, -- 2.50e8/h
  FirePepperSeed={Rarity='Mythic',Rank=5,Seconds=4300,RegrowSeconds=2370,Value=285000000},  -- 1.73e9/h (FruitCount stays 4: saved crops depend on it)
  MoonflowerSeed={Rarity='Legendary',Rank=4,Seconds=3400,RegrowSeconds=1870,Value=509000000}, -- 1.96e9/h (FruitCount stays 2)
 }
 -- Index cash {first, repeat}. New seeds: one base fruit / a fifth of it. Promoted seeds: the old amounts x new / old fruit value
 -- (the EconomyBalance90.Apply convention).
-R.Index={DesertAloeSeed={7680000,1536000},SandFruitSeed={26400000,5280000},FirePepperSeed={360000000,72000000},MoonflowerSeed={475000000,95000000}}
+R.Index={DesertAloeSeed={10000000,2000000},SandFruitSeed={26400000,5280000},FirePepperSeed={360000000,72000000},MoonflowerSeed={475000000,95000000}}
 R.FirePepperArtScale=2 -- the Fire Pepper plant and its peppers: art, sockets, fruit centres, radii and bounds
 function R.ApplyBalance(T)
  for id,cash in pairs(R.Index)do T.IndexFirst[id]=cash[1];T.IndexRepeat[id]=cash[2]end
@@ -715,8 +755,9 @@ local function palm()
   local a=math.rad(22.5+(g-1)*90);local out=V(math.cos(a),0,-math.sin(a))
   local socket=crown+out*.95-V(0,.6,0)
   local tip=socket+(out*.5-up*.78).Unit*.9
-  b.rod(socket,tip,.18,{140,110,60},nil,g,'Fruit','Sand fruit stalk')
-  local center=tip-V(0,.45,0)
+  -- R134 floating check: the stalk starts INSIDE the crown heart and its tip ends inside the three fruits (centres .47 from it, radius .525)
+  b.rod(crown+out*.45-V(0,.3,0),tip,.18,{140,110,60},nil,g,'Fruit','Sand fruit stalk')
+  local center=tip-V(0,.22,0)
   for j=0,2 do
    local ja=a+math.rad(j*120+60);local o=V(math.cos(ja),0,-math.sin(ja))
    local p=center+o*.42-V(0,.05*j,0)
