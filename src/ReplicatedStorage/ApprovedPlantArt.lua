@@ -3,7 +3,7 @@ local RS=game:GetService('ReplicatedStorage')
 local Index=require(RS:WaitForChild('ApprovedPlantIndex'))
 local Trees=require(RS:WaitForChild('TreeReworkArt'))
 local Rarity=require(RS:WaitForChild('RarityPlantArt'))
-local Art={};local loaded,variants={},{}
+local Art={};local loaded,variants,designCount={},{},{}
 local function hash(id)
  local h=137;for i=1,#id do h=(h*33+string.byte(id,i))%2147483647 end;return h
 end
@@ -28,7 +28,10 @@ function Art.Key(id,crop)
  local h=crop and crop.Id and hash(tostring(crop.Id))or 0
  -- (the design is part of the key: 4 designs are not decided by the jitter number h%10 the way an approved plant's 2 are)
  if Desert149.Is(id)then return id..':d'..tostring(designOf(id,h,Desert149.DesignCount))..':'..tostring(h%10)end
- return id..':'..tostring(h%10)
+ -- R149: approved plants pick the design by h%#designs (designOf) and the size / turn jitter by h%10. When 10 is not a multiple of the
+ -- design count (the Ash Tomato has 4) the jitter alone no longer names the design, so the key carries it too; 1, 2 and 5 designs keep their old keys.
+ local n=designCount[id];if not n then n=#require(RS:WaitForChild(Index[id]));designCount[id]=n end
+ return id..':'..tostring(h%10)..(10%n~=0 and('d'..tostring(h%n))or'')
 end
 function Art.Get(id,crop)
  if Verity.Is(id)then return Verity.Get(id)end

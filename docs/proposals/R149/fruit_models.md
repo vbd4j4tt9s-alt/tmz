@@ -1,5 +1,10 @@
 # R149 proposal: cocoa-pod / pepper style for the other fruits
 
+> **Status: Phase 1 built in R149** (owner: "they all work except for Lantern Fern ... and Tomato: make growth variations", then "keep Amethyst Grape" and "Ash Tomato also keeps").
+> Built: Watermelon, Snow Melon, Apple, Elderbloom's apple, Ember Pumpkin, Prickly Pear, Blueberry, Iceberry; Ash Tomato gets 3 variations of its current look; Lantern Fern and
+> Amethyst Grape are untouched. See `docs/releases/R149_fruit_models.md`, `fruit_models_built.png` (the real modules, before | after), `tests/run_fruit_models.sh` and `tools/`.
+> The text below is the original proposal.
+
 Design only. No gameplay `src/` changes. Base: `ca381f2` (R148 head, with the owner's R148 art feedback).
 
 Owner: *"look at the cocoa pod and pepper models, see if we could incorporate the same type of models and renders to other fruits to
