@@ -17,6 +17,7 @@ function M.Diameter(f)return Art.SeedBall+(Art.Ball-Art.SeedBall)*smooth(f)end
 function M.LeafFactor(body,index)return smooth((body-.02-.03*(index%4))/.45)end
 -- Where the ball sits: 0 = on the soil, 1 = on the leaf ring (first growth only; later it is always on the ring).
 function M.Lift(body)return body>=1 and 1 or smooth(body/.33)end
+local function decals(p)local out={};for _,d in ipairs(p:GetChildren())do if d:IsA('Decal')then out[#out+1]=d end end;return out end
 function M.Capture(model,id,def,crop,origin,sockets)
  local art=Art.Get(id)
  local state={Verity=true,Model=model,Id=id,Def=def,Origin=origin,Parts={},Buds={},Sprout={},Sockets=sockets,Scale=Rules.Scale(crop.PlantScale)}
@@ -26,7 +27,7 @@ function M.Capture(model,id,def,crop,origin,sockets)
    local g=p:GetAttribute('GrowthGroup')or 0;local index=p:GetAttribute('ArtSpecIndex')or 1
    local spec=art.Specs[index];local base=g==0 and spec and spec.base
    table.insert(state.Parts,{Part=p,Frame=origin:ToObjectSpace(p.CFrame),Size=p.Size,Alpha=p.Transparency,Query=p.CanQuery,Group=g,Index=index,
-    Base=base and Vector3.new(base[1],base[2],base[3])*state.Scale or nil,Face=p:FindFirstChildOfClass('Decal')})
+    Base=base and Vector3.new(base[1],base[2],base[3])*state.Scale or nil,Faces=decals(p)})
   end
  end
  return state
@@ -61,7 +62,7 @@ function M.Apply(state,crop,now,progress)
   p.CFrame=state.Origin*(CFrame.new(pos)*r.Frame.Rotation)
   p.Transparency=alpha;p.CanCollide=false
   p.CanQuery=r.Group>0 and ready[r.Group]==true and not hidden and r.Query or false
-  if r.Face then r.Face.Transparency=(hidden or alpha>=1)and 1 or 0 end
+  for _,d in ipairs(r.Faces)do d.Transparency=(hidden or alpha>=1)and 1 or 0 end -- Verity's face (front and back) goes with its ball
  end end
  return body,fruit[1]or 0
 end

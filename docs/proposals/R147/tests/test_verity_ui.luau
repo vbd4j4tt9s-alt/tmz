@@ -102,7 +102,7 @@ local Config=W.module('VerityConfig')
 local Pic=W.module('HarvestGeometry')
 local KEY=Rules.DesignKey(7,VERITY)
 check(VerityArt.Image==IMAGE and Config.Image==IMAGE,'the picture is VerityConfig.Image, rbxassetid://102712963740896 (the NPC card\'s)')
-check(not W.B.VerityPackArt:find('102712963740896',1,true)and not W.B.VerityCatalog:find('102712963740896',1,true),'(source: the id is written once, in VerityConfig)')
+check(not W.B.VerityPackArt:find('102712963740896',1,true)and W.B.VerityCatalog:find("FaceImageId='rbxassetid://102712963740896'",1,true)~=nil,'(source: the pack art takes the id from VerityConfig; VerityCatalog holds it as the FaceImageId literal for the ball, test_verity_art keeps the two equal)')
 check(colorIs(VerityArt.Yellow,255,255,0)and select(3,rgb(VerityArt.Dark))==0 and select(1,rgb(VerityArt.Dark))>180 and warm(VerityArt.Dark),'yellow 255,255,0, and a slightly darker yellow for the trims')
 do
  local fx=VerityArt.Fx;local allWarm=true

@@ -112,7 +112,8 @@ local function beginReveal(record,at,seedId,now)
     text.TextXAlignment=Enum.TextXAlignment.Center;text.TextYAlignment=Enum.TextYAlignment.Center;
     text.Font=Enum.Font.FredokaOne;text.TextSize=18;text.TextColor3=rarity.Color;text.TextStrokeTransparency=.2;text.Parent=label
     for _,p in ipairs(seed:GetDescendants())do
-        if p:IsA("BasePart")then table.insert(record.SeedParts,p);p.LocalTransparencyModifier=1
+        -- R148: a Decal (Verity's face on her seed) follows only its own properties, so the reveal hides and fades it like a part.
+        if p:IsA("BasePart")or p:IsA("Decal")then table.insert(record.SeedParts,p);p.LocalTransparencyModifier=1
         elseif p:IsA("ParticleEmitter")or p:IsA("PointLight")or p:IsA("BillboardGui")or p:IsA("Highlight")then
             p.Enabled=false;table.insert(record.SeedEffects,p)
             if p:IsA("ParticleEmitter")then p:Clear()end

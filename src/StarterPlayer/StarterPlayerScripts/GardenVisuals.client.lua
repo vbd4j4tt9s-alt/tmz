@@ -39,7 +39,8 @@ local function resetPetals(r)
  r.Floating=nil;r.PetalsMoving=false
 end
 local function hidePart(p,hidden)
- if p:IsA('BasePart')then p.LocalTransparencyModifier=hidden and 1 or 0 end
+ -- R148: a Decal (Verity's face on her ball) ignores its part's modifier, so it is hidden with its part.
+ if p:IsA('BasePart')or p:IsA('Decal')then p.LocalTransparencyModifier=hidden and 1 or 0 end
 end
 local function hideSupports(item,r,hidden)
  local key=hidden and(r.AppliedModeKey or'full')or'none'

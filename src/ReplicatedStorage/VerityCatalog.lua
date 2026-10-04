@@ -8,8 +8,10 @@ local C={Id='VeritySeed',Variant='VerityReliquary',PackStage=7,Stage=9,Biome='Ve
  VerityChance=.01,
  -- Economy (owner default: a bit above the best King plant; one fruit at the per-fruit cap, quick regrow).
  Value=9e10,Seconds=14400,RegrowSeconds=1500,FruitCount=1,IndexFirst=1e11,IndexRepeat=2e10,HalfwayGems=10,CompletionGems=100,
- -- Optional image on the fruit (needs the image id behind the owner's Decal); nil = plain glossy ball.
- FaceImageId=nil,
+ -- R148 (owner: "the exact same smile that Verity has" on the seed, the fruit and the plant): Verity's smiley, a black line
+ -- drawing on a transparent background, as a Decal (front and back) on the yellow ball. A literal, equal to VerityConfig.Image
+ -- (VerityConfig requires this module, so it cannot be required from here); the test keeps the two equal.
+ FaceImageId='rbxassetid://102712963740896',
  Palette={Ball=Color3.fromRGB(255,213,46),Gloss=Color3.fromRGB(255,252,232),LeafOuter=Color3.fromRGB(68,160,72),LeafInner=Color3.fromRGB(96,188,88),
   -- The pack art (VerityPackArt) and its fx: warm accents around the gold ball and cream gloss.
   Amber=Color3.fromRGB(255,170,30),Honey=Color3.fromRGB(255,236,150),Shade=Color3.fromRGB(112,70,6),White=Color3.fromRGB(255,255,248)},

@@ -7,7 +7,7 @@ set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 BASE=${VERITY_BASE:-5752986}
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
-cp "$REPO/tools/tests/roblox.luau" "$REPO/docs/proposals/inventory_R113/tests/world.luau" "$HERE/test_verity_art.luau" "$OUT/"
+cp "$REPO/tools/tests/roblox.luau" "$REPO/docs/proposals/inventory_R113/tests/world.luau" "$REPO/docs/proposals/inventory_R113/tests/fixtures.luau" "$HERE/test_verity_art.luau" "$OUT/"
 git -C "$REPO" show "$BASE:src/ReplicatedStorage/PlantVisuals.lua" | sed -e "s/WaitForChild('PlantGrowth')/WaitForChild('PlantGrowthBase')/" -e "s/WaitForChild('ApprovedPlantArt')/WaitForChild('ApprovedPlantArtBase')/" > "$OUT/PlantVisualsBase.lua"
 git -C "$REPO" show "$BASE:src/ReplicatedStorage/PlantGrowth.lua" > "$OUT/PlantGrowthBase.lua"
 git -C "$REPO" show "$BASE:src/ReplicatedStorage/ApprovedPlantArt.lua" > "$OUT/ApprovedPlantArtBase.lua"

@@ -29,13 +29,19 @@ def panel(name, caption, sub, size):
     d.text((w // 2, img.height + 42), sub, font=font(18, False), fill=(205, 222, 210), anchor='ma')
     return tile
 
+NOTE = ('STAND-IN smiley: two oval eyes + a wide smile drawn here. The game puts Verity\'s own picture (rbxassetid://102712963740896) '
+        'on the ball as a Decal, front and back, unaltered.')
+
 def sheet(tiles, gap=10, title=None):
     top = 64 if title else 0
+    foot = 40
     W = sum(t.width for t in tiles) + gap * (len(tiles) + 1)
-    H = max(t.height for t in tiles) + gap * 2 + top
+    H = max(t.height for t in tiles) + gap * 2 + top + foot
     s = Image.new('RGB', (W, H), (10, 20, 15))
+    d = ImageDraw.Draw(s)
     if title:
-        ImageDraw.Draw(s).text((W // 2, 18), title, font=font(30), fill=(255, 255, 255), anchor='ma')
+        d.text((W // 2, 18), title, font=font(30), fill=(255, 255, 255), anchor='ma')
+    d.text((W // 2, H - foot + 8), NOTE, font=font(16, False), fill=(255, 214, 120), anchor='ma')
     x = gap
     for t in tiles:
         s.paste(t, (x, top + gap))
@@ -43,11 +49,11 @@ def sheet(tiles, gap=10, title=None):
     return s
 
 # The seed shot is a close-up (the seed is 1.3 studs; the plant frames are 84 studs away).
-main = [panel('seed_None', 'Verity seed', 'a small glossy ball, 1.3 studs (close-up)', (450, 675)),
+main = [panel('seed_None', 'Verity seed', 'a small yellow ball with her face, 1.3 studs', (450, 675)),
         panel('plant_033', 'Growing: 33%', 'ball 6.6 studs, leaves 77%', (450, 675)),
         panel('plant_066', 'Growing: 66%', 'ball 16.4 studs', (450, 675)),
         panel('plant_100', 'Fully grown: 100%', 'ball 22 studs, leaves at its bottom', (450, 675))]
-sheet(main, title='Verity: the seed grows into a giant Verity fruit (three.js preview of the real parts)').save(out + '/verity_plant.png')
+sheet(main, title='Verity: the seed is a small Verity ball; it grows into a giant one (three.js preview of the real parts)').save(out + '/verity_plant.png')
 
 stages = [('plant_000', '0%', 'ball 1.3'), ('plant_010', '10%', 'ball 1.9'), ('plant_020', '20%', 'ball 3.4'), ('plant_033', '33%', 'ball 6.6'),
           ('plant_045', '45%', 'ball 10.1'), ('plant_066', '66%', 'ball 16.4'), ('plant_085', '85%', 'ball 20.7'), ('plant_100', '100%', 'ball 22')]

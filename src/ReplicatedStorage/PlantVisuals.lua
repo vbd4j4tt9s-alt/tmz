@@ -237,7 +237,7 @@ function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,grow
   if s._ArtIndex then item:SetAttribute('ArtSpecIndex',s._ArtIndex)end
   if mutation~='None'then item.Reflectance=mutation=='Gold'and .20 or .16 end
   if s.rf and mutation=='None'then item.Reflectance=s.rf end -- R147: authored shine (Verity)
-  if s.face then local face=Instance.new('Decal');face.Name='VerityFace';face.Texture=s.face;face.Face=Enum.NormalId.Front;face.Parent=item end
+  if s.face then require(RS:WaitForChild('VerityPlantArt')).AddFace(item,s.face)end -- R148: Verity's face, front and back
   first=first or item;return item
  end
  local function sculptedLeaf(z,at,name,distant)

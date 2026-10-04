@@ -1,8 +1,8 @@
 -- R147 (owner): the Verity seed and plant art. "The Verity seed is just a small Verity ball which players can plant into
 -- the ground; the ball grows into a giant Verity fruit which is just a ball, with leaves at its bottom."
---  * BuildSeed: the loose seed, one small glossy ball (SeedPackVisuals.Seed calls it for VeritySeed).
+--  * BuildSeed: the loose seed, one small yellow ball with Verity's face (SeedPackVisuals.Seed calls it for VeritySeed).
 --  * Get: the plant art in the RarityRework spec format PlantVisuals reads (ApprovedPlantArt.Get calls it): 14 leaves
---    (group 0) and the fruit (group 1: the ball and its gloss). VerityGrowth then grows the ball from seed size to its
+--    (group 0) and the fruit (group 1: the yellow ball with Verity's face, R148, and its small gloss). VerityGrowth grows the ball from seed size to its
 --    full size on the leaf ring. The full-size art is built once; sockets / centres / radii / height / radius live here
 --    so the catalog entry can stay a plain copy of them.
 -- No requires except VerityCatalog, so ApprovedPlantArt and SeedPackVisuals can load it without a cycle.
@@ -27,6 +27,18 @@ local function texture(id)
  return tostring(id)
 end
 A.FaceTexture=function()return texture(Cat.FaceImageId)end
+-- R148 (owner: "the exact same smile that Verity has" on the seed, the fruit and the plant): the face is Verity's own picture, used
+-- unaltered (white Decal colour, no tint), on the ball's front and on its back (held items, hotbar pictures and the garden are seen
+-- from either side). A Decal on a Ball part scales with the part, so it follows the growth by itself.
+function A.AddFace(part,image)
+ for _,side in ipairs({{'VerityBallFace',Enum.NormalId.Front},{'VerityBallFaceBack',Enum.NormalId.Back}})do
+  local d=Instance.new('Decal');d.Name=side[1];d.Texture=image;d.Face=side[2];d.Color3=Color3.new(1,1,1);d.Transparency=0;d.Parent=part
+ end
+end
+-- Verity's own yellow (her body, SmoothPlastic): the seed is literally a small Verity ball.
+A.Yellow=Color3.fromRGB(255,255,0)
+-- The gloss sits on the shoulders of the ball (90 degrees from the front and the back), where it can never cover the face.
+A.GlossDirections={{-.5,.86,0},{.5,.86,0}}
 
 -- Leaf spec: LeafBlade size {width,length,thickness}. The blade's length runs along local Y, its width along X and its
 -- thin side along Z (PlantVisuals.sculptedLeaf), so after tipping it outward by `elevation` a quarter turn about its own
@@ -56,21 +68,22 @@ function A.Get(id)
  if built and builtFace==face then return built end
  builtFace=face
  local P=Cat.Palette
- local outer,inner,ball,gloss=rgb(P.LeafOuter),rgb(P.LeafInner),rgb(P.Ball),rgb(P.Gloss)
+ local outer,inner,ball,gloss=rgb(P.LeafOuter),rgb(P.LeafInner),rgb(A.Yellow),rgb(P.Gloss)
  local specs={}
  local function add(s)s._ArtIndex=#specs+1;specs[#specs+1]=s end
  -- Leaves first (group 0): a ring of 8 long outer leaves (low, wide spread) with 6 shorter, steeper ones between them.
  -- The ball (Ø22, bottom at y 1.6) is round: a leaf steeper than ~30 degrees would sink into it, so they stay below it.
  for k=0,A.OuterLeaves-1 do add(leaf(k*math.rad(360/A.OuterLeaves),math.rad(A.OuterElevation),2.0,.5,{3.4,9,.35},outer,'Verity leaf'))end
  for k=0,A.InnerLeaves-1 do add(leaf(math.rad(22.5)+k*math.rad(360/A.InnerLeaves),math.rad(A.InnerElevation),1.2,.8,{2.6,6,.3},inner,'Verity leaf'))end
- -- The fruit (group 1): a plain ball, two gloss patches (upper front-left and upper back-right, so it shines from
- -- every side) with a small hot spot on each. The ball is a true sphere; the patches are flattened ellipsoids.
+ -- The fruit (group 1): Verity's yellow ball with her face on its front and back, and two small gloss patches on its upper
+ -- left and right shoulders with a hot spot on each (clear of the face). The ball is a true sphere; the patches are flattened
+ -- ellipsoids.
  add({s='Sphere',z={A.Ball,A.Ball,A.Ball},c={A.Center[1],A.Center[2],A.Center[3],1,0,0,0,1,0,0,0,1},k=ball,m='SmoothPlastic',t=0,g=1,r='Fruit',
   f='Verity fruit',rf=.18,face=face})
- for _,sign in ipairs({-1,1})do
-  local dir=V(.42*sign,.62,.66*sign)
-  add(lens(dir,10.75,{6.4,4.2,.8},gloss,.55,'Verity gloss'))
-  add(lens(dir,11,{2,1.4,.4},gloss,.2,'Verity glint',-.07,.06))
+ for _,d in ipairs(A.GlossDirections)do
+  local dir=V(d[1],d[2],d[3])
+  add(lens(dir,10.75,{5,3,.7},gloss,.55,'Verity gloss'))
+  add(lens(dir,11,{1.6,1.1,.35},gloss,.2,'Verity glint',-.07,.06))
  end
  built={Specs=specs,Sockets={{A.Socket[1],A.Socket[2],A.Socket[3]}},FruitCenters={{A.Center[1],A.Center[2],A.Center[3]}},FruitRadii={A.Ball/2},
   Height=A.Height,Radius=A.Radius,RarityRework=true,Verity=true}
@@ -94,12 +107,12 @@ function A.BuildSeed(origin,scale,weldRoot)
  root.Anchored=anchored;root.Massless=true;root.CanCollide=false;root.CanTouch=false;root.CanQuery=false;root.Parent=model;model.PrimaryPart=root
  local function weld(p)if not anchored then local w=Instance.new('WeldConstraint');w.Part0=weldRoot;w.Part1=p;w.Parent=p end end
  weld(root)
- local body=part('Verity seed',A.SeedBall,origin,P.Ball,Enum.Material.SmoothPlastic,0,.2)
+ local body=part('Verity seed',A.SeedBall,origin,A.Yellow,Enum.Material.SmoothPlastic,0,.2)
  local face=A.FaceTexture()
- if face then local d=Instance.new('Decal');d.Name='VerityFace';d.Texture=face;d.Face=Enum.NormalId.Front;d.Parent=body end
- -- A soft gloss ball and a bright glint on the upper front-left (the front is -Z).
- local g=part('Verity gloss',.45,origin*CF(-.25*scale,.32*scale,-.38*scale),P.Gloss,Enum.Material.Neon,.35,0)
- local glint=part('Verity glint',.16,origin*CF(-.33*scale,.42*scale,-.47*scale),P.Gloss,Enum.Material.Neon,.05,0)
+ if face then A.AddFace(body,face)end
+ -- A soft gloss ball and a bright glint on the upper left shoulder (the front is -Z; the face is on the front and the back).
+ local g=part('Verity gloss',.45,origin*CF(-.30*scale,.516*scale,0),P.Gloss,Enum.Material.Neon,.35,0)
+ local glint=part('Verity glint',.16,origin*CF(-.385*scale,.662*scale,0),P.Gloss,Enum.Material.Neon,.05,0)
  g:SetAttribute('VerityDecor',true);glint:SetAttribute('VerityDecor',true) -- hidden under a Gold / Diamond coat (SeedPackVisuals)
  for _,p in ipairs({body,g,glint})do weld(p)end
  if scale>10 then for _,p in ipairs({body,g,glint})do game:GetService('CollectionService'):AddTag(p,'GiantVisualPart')end end

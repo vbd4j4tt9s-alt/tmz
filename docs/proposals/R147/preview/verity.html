@@ -33,6 +33,24 @@ function groundTexture(){
   g.strokeStyle='rgba(255,255,255,.10)';g.lineWidth=4;g.strokeRect(0,0,256,256);
   const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(60,60);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
+// STAND-IN for Verity's picture (the Roblox image cannot be fetched here): two oval eyes and a wide smile, black lines, on the front
+// (-Z) and the back (+Z) of a ball part, in the part's own frame; the real Decal is projected onto the ball the same way.
+function standInFace(p,m){
+  const R=p.size[0]/2;const g=new THREE.Group();g.matrixAutoUpdate=false;g.matrix.copy(m);
+  const black=new THREE.MeshBasicMaterial({color:0x101010});
+  const onSphere=(x,y,side)=>new THREE.Vector3(x,y,side*Math.sqrt(Math.max(0,R*R-x*x-y*y))*1.004);
+  for(const side of [-1,1]){
+    for(const ex of [-1,1]){
+      const pos=onSphere(ex*.24*R,.2*R,side);
+      const eye=new THREE.Mesh(new THREE.SphereGeometry(1,24,16),black);
+      eye.scale.set(.075*R,.14*R,.02*R);eye.position.copy(pos);
+      eye.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),pos.clone().normalize());g.add(eye);
+    }
+    const pts=[];for(let i=0;i<=24;i++){const t=-1+2*i/24;pts.push(onSphere(.5*R*t,-.42*R+.27*R*t*t,side));}
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),48,.022*R,8),black));
+  }
+  return g;
+}
 window.shoot=function(scene,W,H,opts){
   opts=opts||{};
   renderer.setSize(W,H);
@@ -61,6 +79,7 @@ window.shoot=function(scene,W,H,opts){
     const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;
     mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(p.size[0],p.size[1],p.size[2]));
     mesh.castShadow=p.material!=='Neon'&&p.t<.3;mesh.receiveShadow=p.material!=='Neon';s.add(mesh);
+    if(p.face&&p.shape==='Ball')s.add(standInFace(p,m)); // a Decal ignores the part's transparency: Glass keeps its face
   }
   const az=v.az*Math.PI/180,el=v.el*Math.PI/180;
   const cam=new THREE.PerspectiveCamera(v.fov,W/H,.05,500);
