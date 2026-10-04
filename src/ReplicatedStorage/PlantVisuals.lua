@@ -9,6 +9,9 @@ local SupportArt=require(RS:WaitForChild('PlantSupportArt'))
 local Growth=require(RS:WaitForChild('PlantGrowth'))
 local Approved=require(RS:WaitForChild('ApprovedPlantArt'))
 local ApprovedMeshes=require(RS:WaitForChild('ApprovedPlantMeshes'))
+-- R149: the Watermelon / Snow Melon / Ember Pumpkin mesh bodies are generated and baked by FruitMeshes149 (same Get / Status contract)
+local FruitMeshes=require(RS:WaitForChild('FruitMeshes149'))
+local function meshes(key)return FruitMeshes.Owns(key)and FruitMeshes or ApprovedMeshes end
 local SurfaceStyle=require(RS:WaitForChild('PlantSurfaceStyle'))
 local styledApproved={}
 local boundedOrders=setmetatable({},{__mode='k'})
@@ -17,7 +20,7 @@ local function remember(cache,key,value)
  if not cache[key]then table.insert(order,key);if #order>64 then cache[table.remove(order,1)]=nil end end
  cache[key]=value;return value
 end
-local function styleKey(id,crop)return Approved.Key(id,crop)..SurfaceStyle.Key(id,crop)end
+local function styleKey(id,crop)return Approved.Key(id,crop)..SurfaceStyle.Key(id,crop)..FruitMeshes.Suffix(id)end
 local function fruitTrait(crop,index,def)
  local item=crop._VisualHarvest
  if item and item.Index==index then return {Scale=item.Scale,Mutation=item.Mutation,Value=0}end
@@ -85,7 +88,8 @@ function Visuals.Specs(id,crop)
   result=require(RS:WaitForChild('ElderAppleArt')).Convert({Specs=result,Sockets=def.Sockets}).Specs
   for index,spec in ipairs(result)do spec._ArtIndex=index end
  end
- result=SurfaceStyle.Apply(id,def,result,crop);return remember(sizedSpecs,key,result)
+ -- R149: one baked mesh body per fruit for the FruitMeshes149 seeds (the part-built fruit if the bake failed)
+ result=FruitMeshes.Art(id,SurfaceStyle.Apply(id,def,result,crop));return remember(sizedSpecs,key,result)
 end
 
 local leafRanges={SunflowerSeed={6,9},SunflowerBloomSeed={2,4},BananaSeed={2,4},PineappleSeed={2,4},MonsteraSeed={2,4},LanternFernSeed={3,5},TigerOrchidSeed={2,4},AloeSeed={8,12},DatePalmSeed={5,7},SunKingPalmSeed={5,7},SnowdropSeed={6,9},FrostFernSeed={3,5},WinterPineSeed={2,4},CrystalLilySeed={5,7},SilentFrostbellSeed={2,4},PolarStarbloomSeed={2,4},FirePepperSeed={2,4},EmberBloomSeed={6,9},AshRoseSeed={6,9},LavaLotusSeed={5,7},SupernovaBloomSeed={2,4},AmethystSeed={2,4},PrismOrchidSeed={2,4},MoonflowerSeed={6,9},DiamondVineSeed={2,4},HollowGeodeSeed={7,10},OrbitLotusSeed={5,7},SparkReedSeed={2,4},ThunderTulipSeed={2,4},VoltOrchidSeed={2,4},TempestLotusSeed={5,7},BlackoutBloomSeed={2,4},StaticGrassSeed={2,4}}
@@ -216,8 +220,11 @@ function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,grow
  local function p(name,z,f,shape)
   local item
   if s.mesh then
-   item=ApprovedMeshes.Get(s.mesh,mutation~='None'):Clone();item.Name=s.f or name;item.Size=z;item.CFrame=f;item.Color=color;item.Material=mat;item.Transparency=alpha
-   item.Anchored=true;item.CanCollide=solid==true;item.CanQuery=solid==true;item.CanTouch=false;item.CastShadow=false;item.Parent=parent
+   local template=meshes(s.mesh).Get(s.mesh,mutation~='None')
+   if template then
+    item=template:Clone();item.Name=s.f or name;item.Size=z;item.CFrame=f;item.Color=color;item.Material=mat;item.Transparency=alpha
+    item.Anchored=true;item.CanCollide=solid==true;item.CanQuery=solid==true;item.CanTouch=false;item.CastShadow=false;item.Parent=parent
+   else item=make(parent,s.f or name,z,f,s.fk and mutation=='None'and Color3.fromRGB(table.unpack(s.fk))or color,mat,alpha,'Ball',solid)end -- R149: a fruit mesh whose bake just failed (server)
   else item=make(parent,s.f or name,z,f,color,mat,alpha,shape,solid)end
   if scale>10 then game:GetService('CollectionService'):AddTag(item,'GiantVisualPart')end
   if s.shaded then item:SetAttribute('PlantSurfaceShading',true)end
@@ -438,7 +445,7 @@ function Visuals.DetailReady(id,crop,selected)
   local neutral=Rules.Mutation(mutation)~='None';local key=spec.mesh..(neutral and'_Neutral'or'')
   if not checked[key]then
    checked[key]=true
-   local state,message=ApprovedMeshes.Status(spec.mesh,neutral)
+   local state,message=meshes(spec.mesh).Status(spec.mesh,neutral)
    if state~='Ready'then return false,key,message end
   end
  end

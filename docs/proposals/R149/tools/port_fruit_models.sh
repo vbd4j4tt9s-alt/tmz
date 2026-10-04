@@ -1,10 +1,12 @@
 #!/bin/sh
 # Usage: sh port_fruit_models.sh [scratch dir]   (needs /opt/luau/luau and python3)
-# Regenerates the seven redesigned fruit in the art modules from FruitDesigns149.luau, reading the modules from the BASE commit
+# Regenerates the redesigned fruit in the art modules from FruitDesigns149.luau, reading the modules from the BASE commit
 # (PORT_BASE, default 38b1afa = the R149 proposal commit, the last commit before the port) and writing the edited ones into this
 # checkout's src/. Idempotent: the result does not depend on what src/ holds now.
-#   TreeReworkData2 (Apple), TreeReworkData4 (Elderbloom's apple), ApprovedPlantArt6 (Prickly Pear, both designs),
-#   PlantArtForest (Watermelon, Blueberry), PlantArtSnow (Snow Melon, Iceberry), PlantArtLava (Ember Pumpkin).
+#   TreeReworkData2 (Apple), TreeReworkData4 (Elderbloom's apple), PlantArtForest (Watermelon, Blueberry), PlantArtSnow (Snow Melon, Iceberry),
+#   PlantArtLava (Ember Pumpkin). The Prickly Pear (ApprovedPlantArt6) is no longer ported: the owner kept it as it is.
+# The Watermelon / Snow Melon / Ember Pumpkin part-built fruit written here are what FruitMeshes149 folds into one baked mesh body at run
+# time (and what a server whose bake fails keeps showing).
 # Lantern Fern, Amethyst Grape and the Ash Tomato's look are not touched; the Ash Tomato gains three variations of its current art
 # (gen_ash_tomato_variants.luau: ApprovedPlantArt5 keeps its design byte for byte and gets designs 2-4).
 set -e

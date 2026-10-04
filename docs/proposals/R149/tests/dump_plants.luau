@@ -7,6 +7,10 @@
 --  * every fruit's harvest item (the hotbar / Bag / Index model) plain, Gold, Diamond and with weather; its far proxy; its prompt
 --    position, reach and socket; the distant supports; the detail cost.
 -- Output: "<plant>\t<crop>\t<mode>\t<digest>\t<parts>". A baked mesh part is a stub (ApprovedPlantMeshes lives in ServerStorage).
+-- R149 fruit meshes (FruitMeshes149, only in trees that have it): `luau dump_plants.luau -a mesh|parts|fail`. mesh (the default): the server bake
+-- runs first on the mock AssetService (fruit_mesh_mock.luau), so the Watermelon / Snow Melon / Ember Pumpkin get their mesh bodies; parts: no
+-- bake ran (no template folder: the part-built fruit); fail: the bake runs and fails (no EditableMesh: every key Failed, the part-built fruit).
+local MODE=... or 'mesh'
 local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 R.CFrame.lookAt=function(p,t,up)
  local f=(t-p).Unit;local u0=up or V3(0,1,0)
@@ -19,6 +23,10 @@ W.env.CFrame=R.CFrame
 local Meshes=W.module('ApprovedPlantMeshes')
 Meshes.Get=function(key)return {Clone=function()local p=R.new('Part');p:SetAttribute('ApprovedMesh',key);return p end}end
 Meshes.Status=function()return 'Ready'end
+if W.RS:FindFirstChild('FruitMeshes149')and MODE~='parts'then
+ local Mock=require('./fruit_mesh_mock');Mock.install(W,{Missing=MODE=='fail'})
+ local ready=Mock.prepare(W);assert(ready==(MODE=='mesh'),'fruit mesh bake: '..tostring(ready)..' in mode '..MODE)
+end
 local Catalog=W.module('PlantCatalog');local Visuals=W.module('PlantVisuals');local Harvest=W.module('HarvestPresentation');local Approved=W.module('ApprovedPlantArt')
 local ids={};for id in pairs(Catalog)do if type(id)=='string'and type(Catalog[id])=='table'and Catalog[id].FruitCount then ids[#ids+1]=id end end
 table.sort(ids)

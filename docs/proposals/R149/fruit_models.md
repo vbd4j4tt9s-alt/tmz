@@ -1,8 +1,16 @@
 # R149 proposal: cocoa-pod / pepper style for the other fruits
 
 > **Status: Phase 1 built in R149** (owner: "they all work except for Lantern Fern ... and Tomato: make growth variations", then "keep Amethyst Grape" and "Ash Tomato also keeps").
-> Built: Watermelon, Snow Melon, Apple, Elderbloom's apple, Ember Pumpkin, Prickly Pear, Blueberry, Iceberry; Ash Tomato gets 3 variations of its current look; Lantern Fern and
+> Built: Watermelon, Snow Melon, Apple, Elderbloom's apple, Ember Pumpkin, Blueberry, Iceberry; Ash Tomato gets 3 variations of its current look; Lantern Fern and
 > Amethyst Grape are untouched. See `docs/releases/R149_fruit_models.md`, `fruit_models_built.png` (the real modules, before | after), `tests/run_fruit_models.sh` and `tools/`.
+>
+> **Then, after `fruit_models_built.png`** (owner: "keep prickly pear as it is and for the melons and pumpkins bake the meshes in"):
+> - the **Prickly Pear is back to its current look** (`ApprovedPlantArt6` byte for byte the live one; its column in `fruit_models_built.png` is superseded);
+> - **Phase 2 for the Watermelon, Snow Melon and Ember Pumpkin is built in R149**: one baked mesh body per fruit (+ stem, tendril / curl, leaf, gloss), generated in Luau
+>   by the new `ReplicatedStorage/FruitMeshes149` (parametric lathes, no shipped vertex data), baked at server start through the same EditableMesh -> MeshPart route, with
+>   its own template folder; `ApprovedPlantMeshes` and its place-only index / data are not touched (the "5-line index merge" below was not needed). A failed bake keeps
+>   the part-built fruit. Picture: `fruit_meshes.png`; preview `preview/run_mesh_preview.sh`.
+>
 > The text below is the original proposal.
 
 Design only. No gameplay `src/` changes. Base: `ca381f2` (R148 head, with the owner's R148 art feedback).

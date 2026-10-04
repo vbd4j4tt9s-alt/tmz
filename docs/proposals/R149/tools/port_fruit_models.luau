@@ -119,7 +119,9 @@ tree('TreeReworkData2',D.Apple,'Canopy apple',{'Apple hanging stem'},2.3)
 tree('TreeReworkData4',D.ElderApple,'Elder apple',{},1.035)
 
 -- Prickly Pear (ApprovedPlantArt6, two designs): authored at half size around the socket ---------------------------------------------------
-do
+-- NOT ported any more: after fruit_models_built.png the owner said "keep prickly pear as it is", so ApprovedPlantArt6 stays the base's.
+-- The block is kept: flip the `if` to bring the R149 barrel back.
+if false then
  local designs=W.module('ApprovedPlantArt6');local next_=0
  for _,d in ipairs(designs)do next_=math.max(next_,maxIndex(d.Specs))end
  for di,d in ipairs(designs)do

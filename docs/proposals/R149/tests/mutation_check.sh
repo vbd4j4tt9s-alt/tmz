@@ -5,7 +5,13 @@
 #  M2 the Watermelon's gloss patch is no longer decor (it would stay on Gold / Diamond coats);
 #  M3 Lantern Fern's art changes by one colour (the owner said to leave it);
 #  M4 the Blueberry's stalklets are named 'Berry pedicel' (a connector: the hotbar picture would lose them and the berries float);
-#  M5 Art.Get always takes design 1 (the Ash Tomato's variations would never show).
+#  M5 Art.Get always takes design 1 (the Ash Tomato's variations would never show; the pattern follows the merged designOf line);
+#  M6 the "_Neutral" twin keeps the fruit's vertex colours (a Gold / Diamond coat would be tinted green / orange);
+#  M7 PlantVisuals sends every mesh key to ApprovedPlantMeshes (the melon / pumpkin keys would never find their templates);
+#  M8 the Prickly Pear's art changes by one colour (the owner said to keep it as it is);
+#  M9 a failed bake no longer switches the seed back to its part-built fruit;
+#  M10 the pumpkin's gloss patch is not moved out (its fuller lobes would bury it);
+#  M11 the spec cache key forgets the fruit-mesh suffix (specs cached before the bake would hide the meshes all session).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 S=${1:-$(mktemp -d)};mkdir -p "$S"
@@ -26,5 +32,11 @@ mutant M1 src/ReplicatedStorage/ApprovedPlantArt.lua "s/(10%n~=0 and('d'..tostri
 mutant M2 src/ReplicatedStorage/PlantArtForest.lua '0,/,decor=true}/s//}/' 'exactly the gloss patch / glints are decor'
 mutant M3 src/ReplicatedStorage/ApprovedPlantArt2.lua '0,/\["Height"\]=/s//["Height"]=1+/' "Lantern Fern's art"
 mutant M4 src/ReplicatedStorage/PlantArtForest.lua '0,/f="Berry stalklet"/s//f="Berry pedicel"/' 'hotbar picture of fruit 1 has 18 parts'
-mutant M5 src/ReplicatedStorage/ApprovedPlantArt.lua 's/local source=loaded\[id\]\[h%#loaded\[id\]+1\]/local source=loaded[id][1]/' 'all four designs are used'
+mutant M5 src/ReplicatedStorage/ApprovedPlantArt.lua 's/local source=loaded\[id\]\[designOf(id,h,#loaded\[id\])\]/local source=loaded[id][1]/' 'all four designs are used'
+mutant M6 src/ReplicatedStorage/FruitMeshes149.lua 's/c\[i\]=editable:AddColor(neutral and white or /c[i]=editable:AddColor(/' 'every vertex colour is white'
+mutant M7 src/ReplicatedStorage/PlantVisuals.lua 's/return FruitMeshes.Owns(key)and FruitMeshes or ApprovedMeshes end/return ApprovedMeshes end/' 'one MeshPart from the'
+mutant M8 src/ReplicatedStorage/ApprovedPlantArt6.lua '0,/\["k"\]={65,143,69}/s//["k"]={66,143,69}/' "Prickly Pear's art"
+mutant M9 src/ReplicatedStorage/FruitMeshes149.lua "s/ if a=='Failed'or b=='Failed'then final\[id\]=false;return false end//" 'shows its R149 part-built fruit'
+mutant M10 src/ReplicatedStorage/FruitMeshes149.lua 's/,GlossOut=1.1}/}/' 'the gloss patch lies on the mesh surface'
+mutant M11 src/ReplicatedStorage/PlantVisuals.lua 's/\.\.SurfaceStyle\.Key(id,crop)\.\.FruitMeshes\.Suffix(id)end/..SurfaceStyle.Key(id,crop)end/' 'folded into one mesh spec'
 echo "all mutants killed"
