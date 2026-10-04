@@ -12,11 +12,16 @@ local function boost()
  local b=player:GetAttribute('FriendSpeedBoost')
  return type(b)=='number'and b==b and math.clamp(b,1,D.MaxMultiplier())or 1
 end
--- Speed points needed to be faster than a keeper running at `speed` (0 = everyone already is).
-local function needed(speed)
+-- Speed points needed to be faster than a keeper running at `speed`, as label text (nil = everyone already is).
+-- R147: written out with %.0f (tostring of a big number can come out in e-notation); past what a double holds, from
+-- PointsText. Past 1e36 points (beyond the Speed number names; The Darkened's 600 needs about 10^1011) the label says
+-- TOO FAST instead of an absurd number.
+local function needText(speed)
  local walk=speed/boost()
- if walk<Progress.Speed(0)then return 0 end
- return Progress.PointsFor(walk)+1
+ if walk<Progress.Speed(0)then return nil end
+ local n=Progress.PointsFor(walk)
+ if n>=1e36 then return'TOO FAST'end
+ return Points.Compact(n<1e15 and string.format('%.0f',n+1)or Progress.PointsText(walk))
 end
 local function build(model)
  local gui=Instance.new('BillboardGui');gui.Name='SpeedReq';gui.Size=UDim2.fromOffset(150,50);gui.LightInfluence=0;gui.MaxDistance=220
@@ -35,9 +40,9 @@ local function paint(entry)
  local escape=tonumber(entry.Model:GetAttribute('KeeperEscapeSpeed'))
  if not escape then entry.Gui.Enabled=false;return end
  local mine=tonumber(player:GetAttribute('PhysicalWalkSpeed'))or Progress.Speed(0)*boost()
- local fast=mine>escape;local need=needed(escape)
+ local fast=mine>escape;local need=needText(escape)
  local pill=entry.Gui.Pill;local color=fast and GREEN or RED
- pill.Value.Text='⚡ '..(need<=0 and'ANY'or Points.Compact(tostring(need)))..(fast and'  ✓'or'')
+ pill.Value.Text='⚡ '..(need or'ANY')..(fast and'  ✓'or'')
  pill.Value.TextColor3=color;pill.Edge.Color=color;entry.Gui.Enabled=true
 end
 -- Over the head: the top of the keeper's bounding box, measured once (keepers keep their size).

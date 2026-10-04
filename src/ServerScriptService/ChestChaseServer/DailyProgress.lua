@@ -31,7 +31,7 @@ function T.Attach(Data)
    local stage=D.SeedPackStages[PackRandom:NextInteger(1,#D.SeedPackStages)]
    local variant=PackRules.RollVariant(PackRandom:NextNumber())
    if not D.SeedPackVariants[variant]or type(self.Config.SeedCatalogByStage)~='table'or not self.Config.SeedCatalogByStage[stage]then return nil,'DAILY PACK POOL IS UNAVAILABLE'end
-   pack={Stage=stage,BagVariant=variant,PackSize=PackRules.RollPackSize(PackRandom:NextNumber()),PackMutation='None'}
+   pack={Stage=stage,BagVariant=variant,PackSize=PackRules.RollPackSize(PackRandom:NextNumber()),PackMutation='None',OddsVersion=PackRules.OddsVersion} -- R147: current odds (without it AddChest stored the legacy 81 table)
   end
   local okay,result,why=pcall(function()
    if mech then return self:GrantMechPacks(player,false,1)end

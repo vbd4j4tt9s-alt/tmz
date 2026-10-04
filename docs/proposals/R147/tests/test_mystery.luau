@@ -145,6 +145,9 @@ local function footprint(model,pad)
  return {X0=x0,X1=x1,Z0=z0,Z1=z1}
 end
 local function overlap(a,b)return a.X0<b.X1 and a.X1>b.X0 and a.Z0<b.Z1 and a.Z1>b.Z0 end
+-- The neighbours the pedestal has to keep clear of, as the real layout code builds them.
+check(W.B.WorldDesign:find("pad.CFrame*CF(side*49,1,74)",1,true)and W.B.WorldDesign:find("'Tool box',V(7,3,5)",1,true)and W.B.WorldDesign:find("'Box rim',V(7.5,.5,5.5)",1,true),'(WorldDesign still puts a 7x5 tool box with a 7.5x5.5 rim at X=+-49, Z=74)')
+check(W.B.GardenBaseLayout:find("'Treadmill apron',Vector3.new(17,.18,22),cf*CFrame.new(-34,ground+.09,75)",1,true)~=nil and W.B.BiomeVisuals:find('pad.CFrame*CF(-34,pad.Size.Y/2+.90,75)',1,true)~=nil,'(GardenBaseLayout / BiomeVisuals still put the treadmill and its apron at X -34, Z 75)')
 local treadmill=footprint(rec1.Model.TreadmillArtV131,rec1.Pad)
 local tm=(treadmill.X0+treadmill.X1)/2
 for _,rec in ipairs({rec1,rec2})do
@@ -152,9 +155,9 @@ for _,rec in ipairs({rec1,rec2})do
  local c=pad.CFrame:PointToObjectSpace(anchor.Position)
  check(near(c.X,34,1e-6)and near(c.Z,75,1e-6)and near(c.Y,pad.Size.Y/2+9.3,1e-6),('base %d: the pack hovers at pad-space X 34, Z 75 (got %.2f, %.2f, %.2f), also on a rotated pad'):format(rec.Index,c.X,c.Y,c.Z))
  local fp=footprint(ped(rec),pad)
- check(fp.X0>21+1 and fp.X1<45.5-1,('base %d: the plinth spans X %.1f..%.1f: clear of the entrance aisle (|X|<21) and of the tool box (X 45.5..52.5)'):format(rec.Index,fp.X0,fp.X1))
- check(not overlap(fp,{X0=45.5,X1=52.5,Z0=71.5,Z1=76.5})and not overlap(fp,{X0=-52.5,X1=-45.5,Z0=71.5,Z1=76.5}),'not over a 7x5 tool box at X=+-49, Z=74')
- check(not overlap(fp,{X0=-47.4,X1=-20.6,Z0=65.2,Z1=84.8}),'not over the treadmill footprint (X -47.4..-20.6, Z 65.2..84.8)')
+ check(fp.X0>21+1 and fp.X1<45.25-1,('base %d: the plinth spans X %.1f..%.1f: clear of the entrance aisle (|X|<21) and of the tool boxes (X 45.25..52.75)'):format(rec.Index,fp.X0,fp.X1))
+ check(not overlap(fp,{X0=45.25,X1=52.75,Z0=71.25,Z1=76.75})and not overlap(fp,{X0=-52.75,X1=-45.25,Z0=71.25,Z1=76.75}),'not over a tool box (7.5x5.5 with its rim, at X=+-49, Z=74)')
+ check(not overlap(fp,{X0=-47.4,X1=-20.6,Z0=65.2,Z1=84.8})and not overlap(fp,{X0=-42.5,X1=-25.5,Z0=64,Z1=86}),'not over the treadmill footprint (X -47.4..-20.6, Z 65.2..84.8) or its apron')
  local plinth=ped(rec):FindFirstChild('Plinth');local pc=pad.CFrame:PointToObjectSpace(plinth.Position)
  check(fp.Z0>=65 and fp.Z1<=85 and near(pc.Y-plinth.Size.Y/2,pad.Size.Y/2,1e-6),'inside the treadmill\'s Z band, the plinth standing on the pad')
 end
@@ -222,11 +225,13 @@ check(stripped and textured==0,'no SurfaceAppearance / Decal / Texture / particl
 check(not W.CS:HasTag(sil,'BiomeSeedPackVisual'),'not tagged as a track pack (the renderer and highlights leave it alone)')
 check(sil:GetAttribute('BagVariant')=='Pack01'and sil:GetAttribute('Stage')==1 and sil:GetAttribute('PackRarity')=='Common','its attributes are the plain biome pack, so nothing gives the rarity away')
 check(sil:GetAttribute('MysteryOrigin')~=nil,'MysteryOrigin is set for the client\'s spin')
-play(5)
+Data.Dirty[A]=false;play(14)
+check(Data.Dirty[A]~=true and Data:GetPremium(A).Mystery.Seconds==14,'14 s of play counted, not flagged for saving yet')
+play(1)
+check(Data.Dirty[A]==true,'every 15 s of play the profile is flagged for saving (so a crash loses at most 15 s)')
 check(attr(rec1,'UnlockAt')==t0+900,'UnlockAt does not creep while counting (the client counts down to it)')
-check(Data:GetPremium(A).Mystery.Seconds==5,'5 s of play counted')
 -- Ben joins 2 minutes later (a different base).
-play(115)
+play(105)
 S:Setup(B);local t1=math.floor(R.clock)
 check(attr(rec2,'State')=='Locked'and attr(rec2,'OwnerUserId')==702 and attr(rec2,'UnlockAt')==t1+900 and attr(rec2,'OwnerName')=='Ben D'and pack(rec2)~=nil,'Ben (joined 2 min later): his own pedestal, his own 15 minutes')
 check(attr(rec1,'OwnerUserId')==701,'and Ava\'s is untouched')
@@ -465,6 +470,14 @@ check(bag(A3)==bagO+1 and okc and out:find('taken today',1,true),'taken: '..tost
 okc,out=Owner.Execute(ctx,A3,'mystery',{'ready'})
 check(okc and out:find('locked',1,true)and out:find('0:03 to go',1,true)and attr(rec1,'State')=='Locked'and attr(rec1,'Variant')==nil,'mystery ready after taking it: a second pack on the same day (Claimed cleared)')
 play(3);check(attr(rec1,'State')=='Ready','(unlocks again)')
+-- `mystery ready` on a pack that is already unlocked and not taken: back to locked, the rarity secret again, then a new roll.
+local oldVariant=attr(rec1,'Variant');S.Random={NextNumber=function()return .99 end}
+okc,out=Owner.Execute(ctx,A3,'mystery',{'ready'})
+check(okc and out:find('locked',1,true)and attr(rec1,'State')=='Locked'and attr(rec1,'Variant')==nil and attr(rec1,'UnlockAt')==math.floor(R.clock)+3,'mystery ready on an unlocked pack: Locked again, no variant published, UnlockAt in 3 s: '..tostring(out))
+check(pack(rec1):GetAttribute('BagVariant')=='Pack01'and pack(rec1):GetAttribute('PackRarity')=='Common','(the pedestal shows the plain silhouette again, not the old rarity)')
+play(3)
+check(attr(rec1,'State')=='Ready'and attr(rec1,'Variant')=='Pack06'and oldVariant=='Pack04','and 3 s later it rolls again (Pack06 for the 0.99 draw; it was Pack04)')
+S.Random={NextNumber=function()return .8 end}
 local bagN2=bag(A3);syncF=syncs(A3)
 okc,out=Owner.Execute(ctx,A3,'mystery',{'next'})
 check(okc and out:find('locked',1,true)and bag(A3)==bagN2+1 and syncs(A3)==syncF+1,'mystery next: a new day: the untaken pack goes into the Bag and a new locked one starts: '..tostring(out))
@@ -519,6 +532,9 @@ for stage=1,7 do
  if Pursuit.Speed(nil,nil,400,stage)<=escape then pursuitOk=false end
 end
 check(pursuitOk,'KeeperPursuit.Speed never drops below EscapeSpeed (flat up to 35 studs, then rising with the gap): a faster runner always pulls away')
+local speedOk=true;for stage=1,7 do if Config.GetGuardianChaseSpeed({},500,5,stage,0)~=Pursuit.EscapeSpeed(stage)then speedOk=false end end
+check(speedOk,'the real chase speed next to a runner (Config.GetGuardianChaseSpeed) is exactly the label\'s EscapeSpeed')
+check(W.B.ConcurrentKeeperService:find('RouteBalance83).EventSpeed',1,true)~=nil,'The Darkened chases at RouteBalance83.EventSpeed (the 600 on its label)')
 local seeds7=Balance.KeeperSpeeds
 check(seeds7[1][1]==20 and seeds7[7][1]==330,'(the numbers come from BalanceValues81.KeeperSpeeds / RouteBalance83)')
 -- The Darkened (VeiledEvent81).
