@@ -106,7 +106,7 @@ end
 function V:Delivered(player)return self:State(player).Count end
 -- Records ------------------------------------------------------------------------------------------------------------------
 local function isVoid(record)
- return type(record)=='table'and record.Kind=='Pack'and record.BagVariant==C.VoidVariant and type(record.Id)=='string'
+ return type(record)=='table'and record.Kind=='Pack'and record.BagVariant==C.VoidVariant and record.Stage==7 and type(record.Id)=='string'
 end
 function V:CountVoid(player)
  local n=0;for _,record in ipairs(self.Data:GetChestRecords(player))do if isVoid(record)then n+=1 end end;return n

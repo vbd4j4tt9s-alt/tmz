@@ -95,7 +95,6 @@ local function start()
   local part=template and template:Clone()or Instance.new('Part')
   part.Name='Key';part.Anchored=true;part.CanCollide=false;part.CanQuery=false;part.CanTouch=false;part.CastShadow=false
   part.Size=V3(C.KeyX,C.KeyY,C.KeyZ);part.Transparency=1;part.CFrame=CF(CX,F-200,0)
-  if part:IsA('MeshPart')then part.CollisionFidelity=Enum.CollisionFidelity.Box end
   for _,d in ipairs(part:GetDescendants())do if d:IsA('BaseScript')or d:IsA('Sound')then d:Destroy()end end
   local gui=part:FindFirstChildWhichIsA('SurfaceGui')
   if not gui then

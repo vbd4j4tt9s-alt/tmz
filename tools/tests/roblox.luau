@@ -104,7 +104,9 @@ instMeta.__index=function(o,k)
  if o._class=='Part'or o._class=='MeshPart'then if k=='Position'then return o._props.CFrame.Position end end
  return nil
 end
+local scriptLocked={CollisionFidelity=true,RenderFidelity=true} -- R147: Studio/plugin-only on Roblox; a game script that writes one errors
 instMeta.__newindex=function(o,k,v)
+ if scriptLocked[k]then error('The current thread cannot set \''..k..'\' (lacking capability Plugin)',2)end
  if k=='Parent'then
   if o._parent then local list=o._parent._children;for i,c in ipairs(list)do if c==o then table.remove(list,i);break end end;o._parent.ChildRemoved:Fire(o)end
   o._parent=v;if v then table.insert(v._children,o);v.ChildAdded:Fire(o);local a=v;while a do a.DescendantAdded:Fire(o);a=a._parent end end
