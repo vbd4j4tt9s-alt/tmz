@@ -8,7 +8,7 @@ local SizeRandom=Random.new()
 local function integer(n,lo,hi)return type(n)=='number'and n==n and n%1==0 and n>=lo and n<=hi end
 local function copy(t)local out={};for k,v in pairs(t)do out[k]=type(v)=='table'and copy(v)or v end;return out end
 function P.Decode(saved)
- if saved==nil then return {Version=2,BalanceVersion81=81,IndexRewardVersion=104,BiomeBackpay81={},BiomeHalfRewards={},Gems=0,Entitlements={},Biomes={},Receipts={},Plants={},SeedRewards={},Settings=require(RS.SettingsConfig).Read()}end
+ if saved==nil then return {Version=2,BalanceVersion81=81,IndexRewardVersion=104,BiomeBackpay81={},BiomeHalfRewards={},OldRoster148={},Gems=0,Entitlements={},Biomes={},Receipts={},Plants={},SeedRewards={},Settings=require(RS.SettingsConfig).Read()}end
  if type(saved)~='table'or (saved.Version~=1 and saved.Version~=2) or not integer(saved.Gems,0,Catalog.MaxGems)then return nil end
  for _,key in ipairs({'Entitlements','Biomes','Receipts'})do
   if type(saved[key])~='table'then return nil end
@@ -52,7 +52,28 @@ function P.Decode(saved)
    for key in pairs(result.Biomes)do result.BiomeBackpay81[key]=math.max(0,(T.LegacyCompletionGems[tonumber(key)]or 5)-5)end
    result.BalanceVersion81=81
   end
+  -- R148: the Index milestones (halfway / complete) a player had already reached under the roster before the Aloe and the Sand Fruit joined Desert's
+  -- Index. Recorded once, on the first load after the roster change (nil until then); a new player starts with none. Anything unreadable counts as not
+  -- recorded yet, and only the categories the roster change touched can hold a flag.
+  if result.OldRoster148~=nil then
+   local clean;if type(result.OldRoster148)=='table'then
+    clean={Half={},Full={}}
+    for _,kind in ipairs({'Half','Full'})do
+     if type(result.OldRoster148[kind])=='table'then for key,value in pairs(result.OldRoster148[kind])do
+      local stage=type(key)=='string'and tonumber(key)
+      if value==true and integer(stage,1,9)and key==tostring(stage)and P.RosterChangeStages()[stage]then clean[kind][key]=true end
+     end end
+    end
+   end
+   result.OldRoster148=clean
+  end
   result.Settings=require(RS.SettingsConfig).Read(result.Settings);result.Version=2;return result
+end
+-- R148: the Index categories whose roster grew (the stages of PackRules.NewInR149), as a set.
+local rosterStages
+function P.RosterChangeStages()
+ if not rosterStages then rosterStages={};for id in pairs(PackRules.NewInR149)do local stage=PackRules.ObtainableStage(id);if stage then rosterStages[stage]=true end end end
+ return rosterStages
 end
 function P.Attach(Data)
  function Data:GetPremium(player)
@@ -69,6 +90,10 @@ function P.Attach(Data)
    player:SetAttribute('IndexBiomeReward'..i,state.Biomes[tostring(i)]==true and pending==0)
    player:SetAttribute('IndexBiomeHalfReward'..i,(state.BiomeHalfRewards or{})[tostring(i)]==true)
    player:SetAttribute('IndexBiomeBackpay'..i,pending)
+   -- R148: the milestones already met under the old roster (ChestIndex ORs them with the live ones, as IndexMilestone does)
+   local old=state.OldRoster148 or{}
+   player:SetAttribute('IndexOldHalf'..i,(old.Half or{})[tostring(i)]==true)
+   player:SetAttribute('IndexOldFull'..i,(old.Full or{})[tostring(i)]==true)
   end
   self:PublishIndex(player)
   player:SetAttribute('PremiumRevision',(player:GetAttribute('PremiumRevision')or 0)+1)
@@ -216,14 +241,26 @@ function P.Attach(Data)
   end
   return seeds,plants,total
  end
- -- R148: a milestone reached with the roster before this release stays claimable (Desert's Index grew from 5 to 7 seeds), so an
- -- unclaimed halfway / completion reward is never taken away. ChestIndex shows the same rule.
- function Data:IndexMilestone(player,stage,full)
-  for _,before in ipairs({false,true})do
-   local seeds,plants,total=self:IndexProgress(player,stage,before)
-   if total>0 and(full and seeds==total and plants==total or not full and seeds+plants>=total)then return true end
+ -- R148: Desert's Index grew from 5 to 7 seeds. A player who had ALREADY reached a halfway / completion milestone with the old roster keeps it
+ -- (an unclaimed reward is never taken away): SettleOldRoster148 records those once, on the first load after the roster change, and a milestone is
+ -- the live one OR that saved flag. Everyone else (new players, and old players who had not got there) needs the full seven. ChestIndex shows the
+ -- same rule from the published IndexOldHalf<stage> / IndexOldFull<stage> attributes.
+ function Data:SettleOldRoster148(player)
+  local state=self:GetPremium(player);if state.OldRoster148~=nil then return false end
+  local old={Half={},Full={}}
+  for stage in pairs(P.RosterChangeStages())do
+   local seeds,plants,total=self:IndexProgress(player,stage,true)
+   if total>0 and seeds+plants>=total then old.Half[tostring(stage)]=true end
+   if total>0 and seeds==total and plants==total then old.Full[tostring(stage)]=true end
   end
-  return false
+  state.OldRoster148=old;return true
+ end
+ function Data:IndexMilestone(player,stage,full)
+  local seeds,plants,total=self:IndexProgress(player,stage)
+  if total>0 and(full and seeds==total and plants==total or not full and seeds+plants>=total)then return true end
+  local state=self:GetPremium(player)
+  if state.OldRoster148==nil then self:SettleOldRoster148(player)end -- (the load already did; this only covers a state that never went through it)
+  return((state.OldRoster148 or{})[full and'Full'or'Half']or{})[tostring(stage)]==true
  end
  function Data:BiomeComplete(player,stage)return self:IndexMilestone(player,stage,true)end
  function Data:RefreshBiomeRewards(player)

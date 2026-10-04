@@ -169,9 +169,8 @@ end
 for id,rarity in pairs({SolarStarfruitSeed='King',MirageFigSeed='Cosmic',StarfruitSeed='Secret',PulsarStarfruitSeed='King',StormSovereignSeed='Cosmic'})do
  Rules.SeedRarityById[id]=rarity;Rules.SeedDesignById[id].rarity=rarity
 end
--- R148 (owner): Fire Pepper is Lava's Mythic and Moon Melon Crystal's Legendary in every pack, banked ones included
--- (Roster149.RarityBefore is empty; see the R148 odds block). The retired Uncommon AloeSeed gets a distinct display name; its id
--- never changes.
+-- R148 (owner): Fire Pepper is Lava's Mythic and Moon Melon Crystal's Legendary in every NEW pack. (Packs banked before the update cannot
+-- roll either seed at all; see the R148 odds block.) The retired Uncommon AloeSeed gets a distinct display name; its id never changes.
 for id,rarity in pairs(Roster149.Promote)do Rules.SeedRarityById[id]=rarity;Rules.SeedDesignById[id].rarity=rarity end
 Rules.SeedDesignById.FirePepperSeed.design='red to orange, cream pepper flecks, a curled green stem cap and three flickering flame wisps'
 Rules.SeedDesignById.AloeSeed.name='Aloe Sprout'
@@ -369,6 +368,21 @@ function Rules.RewardPool(config,stage,variant)
  if variant=='EclipseReliquary'then local _,all=require(script.Parent.VoidPackOdds85).Pools(config,Rules);return all end
  return Rules.ObtainablePool(config,stage)
 end
+-- R148: the seeds a pack can roll (odds above 0) in a stable reading order for hold tooltips and the owner's `odds` command: rarity rank (commonest
+-- first), then name. (Catalog order is save-slot order, which put the two new Desert seeds after the retired ones.) The special packs (Void, Verity,
+-- Limited Mech) keep their own pool order: the Verity pack's tooltip lists the Verity seed first (R147).
+function Rules.OddsRows(config,stage,variant,odds)
+ local rows={}
+ for _,seed in ipairs(Rules.RewardPool(config,stage,variant)or{})do if(odds[seed.Id]or 0)>0 then rows[#rows+1]=seed end end
+ if variant=='EclipseReliquary'or variant=='MechLimited'or variant==Verity.Variant then return rows end
+ local function rank(seed)local _,style=Rules.GetRarity(seed.Id);return style and style.Rank or 0 end
+ table.sort(rows,function(a,b)
+  local ra,rb=rank(a),rank(b);if ra~=rb then return ra<rb end
+  if a.Name~=b.Name then return a.Name<b.Name end
+  return a.Id<b.Id
+ end)
+ return rows
+end
 function Rules.SeedOdds(config,stage,variantKey,luck,version)
  if variantKey=='EclipseReliquary'then return stage==7 and require(script.Parent.VoidPackOdds85).Odds(config,Rules)or{}end
  if stage==8 or(version~=nil and version~=81)or(not approved.SeedWeights[variantKey]and variantKey~='EclipseReliquary')then return oldOdds(config,stage,variantKey,luck)end
@@ -458,17 +472,18 @@ end
 
 -- R148 (owner, roster change): new world/event packs carry OddsVersion 149 = PackOdds137's numbers over today's roster
 -- (Desert Aloe Rare + Sand Fruit Legendary, Fire Pepper Mythic, Moon Melon Legendary). A pack made before this release
--- (OddsVersion 137, 112, 81 or none) rolls the roster it was made with, minus the two new seeds: Aloe and Sand Fruit are not in it,
--- so a banked Desert pack never gives them, and every Forest / Desert / Snow / Jungle / Storm / Void / Mech / Verity odd is exactly
--- as before. Owner decision (no windfall): Fire Pepper and Moon Melon keep their NEW tiers in banked Lava / Crystal packs
--- (Roster149.RarityBefore is empty), so they are rare there (Fire Pepper 1/800 in a Common pack) and the seeds that shared their old
--- Rare tier share it out between fewer seeds. Void, Mech and Verity packs are untouched (Verity's wrapper stays outermost).
+-- (OddsVersion 137, 112, 81 or none) rolls the roster it was made with: the two new seeds are not in it, and neither are the two promoted
+-- seeds. Owner decision (no windfall): a banked pack cannot roll Fire Pepper or Moon Melon at all, not even at their new, rarer tiers, so
+-- nobody opens an old pack to a Mythic. Every seed outside their old Rare tier keeps exactly the odds it had before (the empty Mythic /
+-- Legendary tier hands up as it always did); the seeds that shared the old Rare tier absorb the promoted seed's share. Every Forest /
+-- Desert / Snow / Jungle / Storm / Void / Mech / Verity odd is as before. Void, Mech and Verity packs are untouched (Verity's wrapper
+-- stays outermost).
 Rules.NewInR149=Roster149.New
-Rules.RarityBeforeR149=Roster149.RarityBefore
+Rules.PromotedInR149=Roster149.Promote
 Rules.OddsVersion=149
 Rules.OddsVersions[149]=true
 local rollPre149,oddsPre149=Rules.Roll,Rules.SeedOdds
-local livePool,liveRarity=Rules.ObtainablePool,Rules.GetRarity
+local livePool=Rules.ObtainablePool
 local legacyDepth=0 -- > 0 only while a pre-R148 world pack is rolled or priced (never yields)
 local legacyPools=setmetatable({},{__mode='k'})
 function Rules.ObtainablePool(config,stage)
@@ -476,14 +491,9 @@ function Rules.ObtainablePool(config,stage)
  if legacyDepth==0 or not pool then return pool end
  local byStage=legacyPools[config];if not byStage then byStage={};legacyPools[config]=byStage end
  if not byStage[stage]then
-  local out={};for _,seed in ipairs(pool)do if not Roster149.New[seed.Id]then out[#out+1]=seed end end;byStage[stage]=out
+  local out={};for _,seed in ipairs(pool)do if not Roster149.New[seed.Id]and not Roster149.Promote[seed.Id]then out[#out+1]=seed end end;byStage[stage]=out
  end
  return byStage[stage]
-end
-function Rules.GetRarity(seedId)
- local old=legacyDepth>0 and Roster149.RarityBefore[seedId]
- if old then return old,Rules.Rarities[old]end
- return liveRarity(seedId)
 end
 local function worldPack(stage,variantKey)return type(stage)=='number'and stage>=1 and stage<=7 and variantKey~='EclipseReliquary'and variantKey~='MechLimited'end
 local function legacy(fn,...)
@@ -502,8 +512,7 @@ end
 Rules.Roll=function(config,stage,draw,luck,variantKey,version,boost)
  if version==149 then return rollPre149(config,stage,draw,luck,variantKey,N137.Version,boost)end
  if worldPack(stage,variantKey)then
-  local seed=legacy(rollPre149,config,stage,draw,luck,variantKey,version,boost)
-  return seed,seed and(liveRarity(seed.Id))
+  return legacy(rollPre149,config,stage,draw,luck,variantKey,version,boost)
  end
  return rollPre149(config,stage,draw,luck,variantKey,version,boost)
 end

@@ -9,7 +9,7 @@ local function hash(id)
 end
 local Mech=require(RS:WaitForChild('MechArt'))
 local Verity=require(RS:WaitForChild('VerityPlantArt'))
-local Desert149=require(RS:WaitForChild('DesertPlantArt149')) -- R148: the Aloe and the Sand Fruit palm
+local Desert149=require(RS:WaitForChild('DesertPlantArt149')) -- R148: the Aloe and the Sand Fruit cactus
 function Art.Has(id)return Verity.Is(id)or Desert149.Is(id)or Mech.Get(id)~=nil or Rarity.Has(id)or Trees.Has(id)or Index[id]~=nil end
 function Art.Key(id,crop)
  if require(RS.HologramProjection).Is(id)then return require(RS.HologramProjection).Key(id,crop)end

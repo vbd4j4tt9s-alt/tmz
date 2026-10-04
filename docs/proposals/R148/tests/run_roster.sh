@@ -3,12 +3,15 @@
 # this checkout: Desert's Rare Aloe and Legendary Sand Fruit, Fire Pepper Mythic (twice the size), Moon Melon Legendary.
 #  1. Regression diff: dump_roster.luau runs on the BASE (the commit before the change: ROSTER_BASE, default cba4032) and on this checkout;
 #     check_roster_diff.py allows ONLY: the 4 plants (Aloe Sprout's display name, Fire Pepper, Moon Melon, the 2 new ones), the Lava /
-#     Crystal rows of banked packs (owner decision: banked packs roll Fire Pepper / Moon Melon at their NEW tiers, so no windfall),
-#     VOID 149 and the Fruit of the Hour list (51 -> 53). Everything else (every other biome's banked odds for every odds version, size
-#     variant, luck level and boost, the Void / Mech / Verity odds, every seeded roll) must be byte-identical.
-#  2. test_roster.luau     - server world: constants, catalog, plants, odds, banked packs, save / load / gift, Index, commands, Fruit of the Hour.
-#  3. test_roster_art.luau - client world: the new plants and the x2 Fire Pepper in every build mode, seeds, effects, the Index and ChestIndex.
-#                            Its plant scene goes through check_floating.py (R134): no floating part in any plant.
+#     Crystal rows of banked packs (owner decision, no windfall: a banked pack cannot roll Fire Pepper or Moon Melon at all, so in those rows
+#     ONLY the seeds of their old Rare tier may differ, and they absorb the share; all banked versions nil / 0 / 81 / 112 / 137 x Small /
+#     Standard / Grand / Pack01-06), VOID 149 and the Fruit of the Hour list (51 -> 53). Everything else (every other biome's banked odds,
+#     every other seed in those rows, the Void / Mech / Verity odds, every seeded roll) must be byte-identical.
+#  2. test_roster.luau     - server world: constants, catalog, plants, odds, banked packs, hold tooltips and `odds` (sorted), save / load / gift,
+#                            Index (old-roster milestones only through the saved flag), commands, Fruit of the Hour.
+#  3. test_roster_art.luau - client world: the new plants and the x2 Fire Pepper in every build mode, seeds, effects, the Index and ChestIndex,
+#                            and GardenVisuals' effect slots (by rarity rank, then distance). Its plant scene goes through check_floating.py
+#                            (R134): no floating part in any plant.
 # ROSTER_KEEP_GOING=1 runs every stage even after a failure (the exit status is still non-zero).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -42,8 +45,8 @@ cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/test_roster_ar
 git -C "$REPO" show "$BASE:src/ReplicatedStorage/PlantVisuals.lua" | sed -e "s/WaitForChild('PlantGrowth')/WaitForChild('PlantGrowthBase')/" -e "s/WaitForChild('ApprovedPlantArt')/WaitForChild('ApprovedPlantArtBase')/" > PlantVisualsBase.lua
 git -C "$REPO" show "$BASE:src/ReplicatedStorage/PlantGrowth.lua" > PlantGrowthBase.lua
 git -C "$REPO" show "$BASE:src/ReplicatedStorage/ApprovedPlantArt.lua" > ApprovedPlantArtBase.lua
-# (ChestIndex = the real client script the test drives)
-python3 "$REPO/docs/proposals/R147/tests/mkbundle_verity.py" rs_bundle.luau PlantVisualsBase=PlantVisualsBase.lua PlantGrowthBase=PlantGrowthBase.lua ApprovedPlantArtBase=ApprovedPlantArtBase.lua ChestIndex="$REPO/src/StarterPlayer/StarterPlayerScripts/ChestIndex.client.lua" >/dev/null
+# (ChestIndex and GardenVisuals = the real client scripts the test drives)
+python3 "$REPO/docs/proposals/R147/tests/mkbundle_verity.py" rs_bundle.luau PlantVisualsBase=PlantVisualsBase.lua PlantGrowthBase=PlantGrowthBase.lua ApprovedPlantArtBase=ApprovedPlantArtBase.lua ChestIndex="$REPO/src/StarterPlayer/StarterPlayerScripts/ChestIndex.client.lua" GardenVisuals="$REPO/src/StarterPlayer/StarterPlayerScripts/GardenVisuals.client.lua" >/dev/null
 echo "== test_roster_art"
 timeout 900 /opt/luau/luau test_roster_art.luau > art.log 2>&1 || { grep -v '^WARN\|^SCENE' art.log | tail -40;stop; }
 grep -v '^WARN\|^SCENE' art.log | tail -${ART_LINES:-1}

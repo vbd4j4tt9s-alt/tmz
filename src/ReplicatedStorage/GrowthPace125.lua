@@ -11,8 +11,9 @@ G.MaxValue=9e10
 G.Bands={Rare={900,1800},Epic={1800,2700},Legendary={2700,3600},Mythic={3600,5400},Secret={7200,9000},Cosmic={9000,10800},King={10800,14400}}
 function G.Exempt(def)
  -- R147: the Verity plant (VerityCatalog) is final as written: 4 h, regrow 1500 s, 9e10 (the per-fruit cap).
- -- R148: so are the plants of the roster change (Roster149: Aloe, Sand Fruit, Fire Pepper, Moon Melon).
- return def.Stage==1 or def.Mech==true or def.Verity==true or def.Roster149==true or G.Bands[def.Rarity]==nil
+ -- (R148: the plants of the roster change are final as written too, but not through this test: PlantCatalog applies Roster149 AFTER this
+ -- pacing, which overwrites Fire Pepper's and Moon Melon's paced numbers and adds Aloe and Sand Fruit unpaced. That ordering is the safeguard.)
+ return def.Stage==1 or def.Mech==true or def.Verity==true or G.Bands[def.Rarity]==nil
 end
 local function round(v,unit)return math.floor(v/unit+.5)*unit end
 local applied=setmetatable({},{__mode='k'}) -- catalogs already paced (no marker key inside the catalog)

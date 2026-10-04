@@ -2,17 +2,19 @@
 -- R148 (owner): the seed roster change, data + server side, on the Roblox mock with the real modules (SeedPackRules, Roster149,
 -- DesertPlantArt149, PlantCatalog, GrowthPace125, BalanceValues81, FruitOfHour, Config, PlayerDataService, PremiumProgress, ChestService,
 -- OwnerUpdateCommands82, StudioTestCommands, RarePackTests, StudioTestHelp):
---  Desert gets a Rare "Aloe" (DesertAloeSeed) and a Legendary "Sand Fruit" palm (SandFruitSeed); Fire Pepper becomes Lava's Mythic (x2 size,
---  more cash); Moon Melon becomes Crystal's Legendary. Owner decisions on top of the plan: banked packs get NO windfall (Fire Pepper / Moon Melon
---  follow their new tiers in every pack: Roster149.RarityBefore is empty) and the Rare Aloe out-earns the Uncommon Prickly Pear (Value 1.0e7).
+--  Desert gets a Rare "Aloe" (DesertAloeSeed) and a Legendary "Sand Fruit" round cactus (SandFruitSeed); Fire Pepper becomes Lava's Mythic (x2 size,
+--  more cash); Moon Melon becomes Crystal's Legendary. Owner decisions on top of the plan: banked packs get NO windfall (a pack made before
+--  the update cannot roll Fire Pepper or Moon Melon at all: the seeds of their old Rare tier absorb the share) and the Rare Aloe out-earns the
+--  Uncommon Prickly Pear (Value 1.0e7).
 --  1. constants and catalogs: 54 designs (Verity last), the two specs, the promoted rarities, Desert's 10 save slots / 7 obtainable seeds,
 --     retired ids still decode, "Aloe Sprout", Config.Validate, ProfileVersion 22;
 --  2. the plants: the exact numbers (and the pacing leaves them alone), Fire Pepper exactly x2, geometry = DesertPlantArt149, ladders;
---  3. odds: every v149 row of the plan's tables, 137 = 149 where the roster is the same, Void / Verity / Mech unchanged, banked packs (Desert
---     never gives the new seeds; Lava / Crystal follow the new tiers), the hold tooltip, 1M Monte Carlo rolls;
+--  3. odds: every v149 row of the plan's tables, 137 = 149 where the roster is the same, Void / Verity / Mech unchanged, banked packs (none rolls a new
+--     or a promoted seed; their old tier-mates absorb the share), the hold tooltip (sorted by rarity, then name), 1M Monte Carlo rolls;
 --  4. PlayerDataService: save / load / gift of 149 packs and the new seeds, planting and harvesting them, a Fire Pepper crop saved under the
 --     old catalog, ProfileVersion 22 and a version-23 save;
---  5. the Index: first / repeat cash, BaseChance, milestones with the old 5-seed Desert roster (nothing taken away, nothing claimed twice);
+--  5. the Index: first / repeat cash, BaseChance, milestones: a player who had reached one under the old 5-seed Desert roster keeps it (a saved flag), a new
+--     player needs all seven seeds, nothing is claimed twice;
 --  6. the owner commands (rarepacks roster, seed, seeds, odds) and the help row;
 --  7. Fruit of the Hour: 53 candidates.
 local W=require('./world');local R=W.R
@@ -58,15 +60,16 @@ do
 check(#Rules.SeedDesigns==54 and Rules.SeedDesigns[#Rules.SeedDesigns].id=='VeritySeed','54 designs = 47 biome + 6 Mech + Verity, Verity still last')
 local aloe,sand=Rules.SeedDesignById.DesertAloeSeed,Rules.SeedDesignById.SandFruitSeed
 check(aloe and aloe.stage==2 and aloe.SaveStage==2 and aloe.index==9 and aloe.biome=='Desert'and aloe.rarity=='Rare'and aloe.name=='Aloe'and aloe.pattern=='Dots'
- and aloe.top=='5d9f8c'and aloe.bottom=='c3dcc0'and aloe.ink=='f2f6e6'and aloe.addition=='none','the Aloe spec: Desert save slot 9, Rare, "Aloe", sea green / pale sage / cream, Dots')
-check(sand and sand.stage==2 and sand.SaveStage==2 and sand.index==10 and sand.biome=='Desert'and sand.rarity=='Legendary'and sand.name=='Sand Fruit'and sand.pattern=='Stripes'
- and sand.top=='d6a35c'and sand.bottom=='f6e3b4'and sand.ink=='a8733c'and sand.addition=='none','the Sand Fruit spec: Desert save slot 10, Legendary, "Sand Fruit", sand gold / warm cream, Stripes')
+ and aloe.top=='4a9e88'and aloe.bottom=='c3dcc0'and aloe.ink=='f2f6e6'and aloe.addition=='none','the Aloe spec: Desert save slot 9, Rare, "Aloe", rich sea green / pale sage / cream, Dots')
+check(sand and sand.stage==2 and sand.SaveStage==2 and sand.index==10 and sand.biome=='Desert'and sand.rarity=='Legendary'and sand.name=='Sand Fruit'and sand.pattern=='Specks'
+ and sand.top=='d6a35c'and sand.bottom=='f6e3b4'and sand.ink=='a8733c'and sand.addition=='none','the Sand Fruit spec: Desert save slot 10, Legendary, "Sand Fruit", sand gold / warm cream, sandy Specks')
 check(Rules.SeedRarityById.DesertAloeSeed=='Rare'and Rules.SeedRarityById.SandFruitSeed=='Legendary'and Rules.GetRarity('DesertAloeSeed')=='Rare'and Rules.GetRarity('SandFruitSeed')=='Legendary','GetRarity: Aloe Rare, Sand Fruit Legendary')
 check(Rules.GetRarity('FirePepperSeed')=='Mythic'and Rules.GetRarity('MoonflowerSeed')=='Legendary'and Rules.SeedRarityById.FirePepperSeed=='Mythic'and Rules.SeedRarityById.MoonflowerSeed=='Legendary'
  and Rules.SeedDesignById.FirePepperSeed.rarity=='Mythic'and Rules.SeedDesignById.MoonflowerSeed.rarity=='Legendary','GetRarity: Fire Pepper Mythic, Moon Melon Legendary (the design rows follow)')
 check(Rules.SeedDesignById.FirePepperSeed.design:find('flame wisps',1,true)~=nil and Rules.SeedDesignById.FirePepperSeed.top=='c63929'and Rules.SeedDesignById.FirePepperSeed.bottom=='ffb45b'and Rules.SeedDesignById.FirePepperSeed.ink=='ffedac'
  and Rules.SeedDesignById.FirePepperSeed.pattern=='Specks','Fire Pepper keeps its colours and pattern; its design text mentions the flame wisps')
-check(Rules.NewInR149.DesertAloeSeed==true and Rules.NewInR149.SandFruitSeed==true and next(Rules.RarityBeforeR149)==nil,'Rules.NewInR149 = the two new seeds; Rules.RarityBeforeR149 is EMPTY (owner: no windfall for banked packs)')
+check(Rules.NewInR149.DesertAloeSeed==true and Rules.NewInR149.SandFruitSeed==true and Rules.PromotedInR149.FirePepperSeed=='Mythic'and Rules.PromotedInR149.MoonflowerSeed=='Legendary'and Rules.RarityBeforeR149==nil,
+ 'Rules.NewInR149 = the two new seeds; Rules.PromotedInR149 = Fire Pepper (Mythic) and Moon Melon (Legendary); no per-version rarity table (owner: banked packs cannot roll the promoted seeds at all)')
 -- Retired ids keep their identity and still decode.
 for _,id in ipairs({'AgaveSeed','DesertRoseSeed','AloeSeed','SunKingPalmSeed'})do
  check(Rules.IsRetired(id)==true and Config.GetSeedById(id)~=nil,id..' is still retired and still decodes (GetSeedById)')
@@ -101,18 +104,20 @@ do
 local a,s,f,m=P.DesertAloeSeed,P.SandFruitSeed,P.FirePepperSeed,P.MoonflowerSeed
 check(a and a.Name=='Aloe'and a.HarvestName=='Aloe bloom'and a.Biome=='Desert'and a.Stage==2 and a.Rarity=='Rare'and a.Rank==3 and a.Tree==false and a.Mode=='repeat'and a.FruitCount==3
  and a.Seconds==960 and a.RegrowSeconds==530 and a.Value==10000000 and a.Roster149==true and a.BaseScale==1,'Aloe: Rare, 3 flower spikes, 960 s / regrow 530 s, 10,000,000 per fruit, flagged Roster149')
-check(s and s.Name=='Sand Fruit'and s.HarvestName=='Sand fruit'and s.Biome=='Desert'and s.Stage==2 and s.Rarity=='Legendary'and s.Rank==4 and s.Tree==true and s.Mode=='repeat'and s.FruitCount==4
- and s.Seconds==2760 and s.RegrowSeconds==1520 and s.Value==26400000 and s.Roster149==true and s.BaseScale==1,'Sand Fruit: Legendary palm tree, 4 bunches, 2760 s / regrow 1520 s, 26,400,000 per bunch')
+check(s and s.Name=='Sand Fruit'and s.HarvestName=='Sand fruit'and s.Biome=='Desert'and s.Stage==2 and s.Rarity=='Legendary'and s.Rank==4 and s.Tree==false and s.Mode=='repeat'and s.FruitCount==4
+ and s.Seconds==2760 and s.RegrowSeconds==1520 and s.Value==26400000 and s.Roster149==true and s.BaseScale==1,'Sand Fruit: Legendary round cactus (not a tree: no trunk collision), 4 sand fruits, 2760 s / regrow 1520 s, 26,400,000 per fruit')
 check(f.Rarity=='Mythic'and f.Rank==5 and f.Seconds==4300 and f.RegrowSeconds==2370 and f.Value==285000000 and f.FruitCount==4 and f.Roster149==true and f.Name=='Fire Pepper'and f.HarvestName=='Fire pepper',
  'Fire Pepper: Mythic, 4300 s / regrow 2370 s, 285,000,000, FruitCount stays 4 (a saved crop validates its FruitStates against it)')
 check(m.Rarity=='Legendary'and m.Rank==4 and m.Seconds==3400 and m.RegrowSeconds==1870 and m.Value==509000000 and m.FruitCount==2 and m.Roster149==true and m.Name=='Moon Melon',
  'Moon Melon: Legendary, 3400 s / regrow 1870 s, 509,000,000, FruitCount stays 2')
 for _,id in ipairs({'DesertAloeSeed','SandFruitSeed','FirePepperSeed','MoonflowerSeed'})do
  local d=P[id]
- check(Pace.Exempt(d)==true and d.BaseSeconds==nil and d.GrowthFactor==nil,id..': GrowthPace125 leaves it alone (no BaseSeconds / GrowthFactor)')
+ check(d.BaseSeconds==nil and d.GrowthFactor==nil,id..': no pacing marks (BaseSeconds / GrowthFactor): its numbers are Roster149\'s final ones, written after GrowthPace125')
  check(d.FruitCount==#d.Sockets and #d.FruitCenters==d.FruitCount and #d.FruitRadii==d.FruitCount,id..': sockets, fruit centres and radii match FruitCount')
 end
--- The Roster149 flag does not leak: every other paced plant still has its pacing marks.
+-- The ORDER keeps the pacing off them (PlantCatalog applies Roster149 after GrowthPace125; the Roster149 flag is not an exemption any more):
+-- every other paced plant still has its pacing marks, and GrowthPace125.Exempt does not look at the flag.
+check(Pace.Exempt({Rarity='Rare',Roster149=true})==false,'GrowthPace125.Exempt ignores the Roster149 flag (the dead exemption is gone)')
 local pacedOk,paced=true,0
 for id,d in pairs(P)do if type(d)=='table'and d.Roster149~=true and d.BaseSeconds~=nil then paced+=1;if d.GrowthFactor==nil then pacedOk=false end end end
 check(pacedOk and paced==38,'the other 38 paced plants keep their pacing marks ('..paced..')')
@@ -135,8 +140,8 @@ for _,id in ipairs({'DesertAloeSeed','SandFruitSeed'})do
  for i=1,d.FruitCount do for k=1,3 do sameGeo=sameGeo and near(d.Sockets[i][k],art.Sockets[i][k],1e-12)and near(d.FruitCenters[i][k],art.FruitCenters[i][k],1e-12)end;sameGeo=sameGeo and d.FruitRadii[i]==art.FruitRadii[i]end
  check(sameGeo,id..': Height / Radius / Sockets / FruitCenters / FruitRadii equal DesertPlantArt149')
 end
-check(near(a.Height,8.243,1e-9)and near(a.Radius,5.211,1e-9)and near(s.Height,14.182,1e-9)and near(s.Radius,7.252,1e-9),'art bounds: Aloe 8.243 / 5.211, Sand Fruit 14.182 / 7.252')
-check(#Art.Get('DesertAloeSeed').Specs==96 and #Art.Get('SandFruitSeed').Specs==99,'96 and 99 art parts')
+check(near(a.Height,8.261,1e-9)and near(a.Radius,5.211,1e-9)and near(s.Height,10.607,1e-9)and near(s.Radius,6.777,1e-9),'art bounds: Aloe 8.261 / 5.211, Sand Fruit 10.607 / 6.777')
+check(#Art.Get('DesertAloeSeed').Specs==127 and #Art.Get('SandFruitSeed').Specs==95,'127 and 95 art parts')
 -- Saving rules: integers, within the per-fruit cap, times within a day.
 for _,id in ipairs({'DesertAloeSeed','SandFruitSeed','FirePepperSeed','MoonflowerSeed'})do
  local d=P[id]
@@ -203,12 +208,12 @@ for _,st in ipairs({1,2,3,4,5,6,7})do for _,pack in ipairs(PACKS)do for _,luck i
  if not equalOdds(Rules.SeedOdds(Config,st,pack,luck,149,boost==2 and 2 or nil),Rules.SeedOdds(Config,st,pack,luck,nil,boost==2 and 2 or nil))then same=false end
 end end end end
 check(same,'odds with no version = odds at 149 (the Index chips and the hold tooltip read "current")')
--- A 149 pack = a 137 pack wherever the roster is the same (Forest, Snow, Jungle, Storm, and Lava / Crystal: only Desert grew).
+-- A 149 pack = a 137 pack wherever the roster is the same (Forest, Snow, Jungle, Storm). Desert grew; Lava and Crystal promoted a seed.
 local eq137,diffs=true,{}
-for _,st in ipairs({1,3,4,5,6,7})do for _,pack in ipairs(PACKS)do for _,luck in ipairs({1,50,1e6,5e7})do for _,boost in ipairs({0,2})do
+for _,st in ipairs({1,3,6,7})do for _,pack in ipairs(PACKS)do for _,luck in ipairs({1,50,1e6,5e7})do for _,boost in ipairs({0,2})do
  if not equalOdds(Rules.SeedOdds(Config,st,pack,luck,149,boost==2 and 2 or nil),Rules.SeedOdds(Config,st,pack,luck,137,boost==2 and 2 or nil))then eq137=false;diffs[#diffs+1]=st..'/'..pack end
 end end end end
-check(eq137,'stages 1 / 3 / 4 / 5 / 6 / 7 at 149 equal 137 (the roster is the same there: a banked Lava / Crystal pack = a new one) '..table.concat(diffs,' '))
+check(eq137,'stages 1 / 3 / 6 / 7 at 149 equal 137 (the roster is the same there) '..table.concat(diffs,' '))
 local deserts=true
 for _,pack in ipairs(PACKS)do local old=Rules.SeedOdds(Config,2,pack,1,137);if old.DesertAloeSeed~=nil or old.SandFruitSeed~=nil then deserts=false end end
 check(deserts,'a banked 137 Desert pack lists no Aloe and no Sand Fruit')
@@ -234,47 +239,47 @@ local leaked=false;for _,seed in ipairs(voidAll or voidPool or{})do if seed.Id==
 check(not leaked,'the Void pool never contains the four roster seeds')
 end
 
--- Banked Lava / Crystal packs (owner: NO windfall): the promoted seeds follow their NEW tiers, in every odds version and pack.
+-- Banked Lava / Crystal packs (owner: NO windfall): a pack made before the update cannot roll Fire Pepper or Moon Melon at all. The seeds of their old
+-- Rare tier absorb the share; every other seed keeps exactly the odds it had (the regression diff against the base commit proves it for every version,
+-- variant, luck level and boost; here the numbers are pinned).
 do
--- Pinned numbers (percent, boots x1): a Common Lava pack's Fire Pepper and a Common Crystal pack's Moon Melon, per odds version, now and (in
--- brackets) before the roster change, when they were Rares sharing their tier three ways. Version 137 = 149; the older versions use their own tier math.
-local pinned={[0]={5.88235294118,22.3529411765},[81]={1.3,4},[112]={.5,3.33333333333},[137]={.125,.666666666667}}
+-- Pinned (percent, luck 1, boots x1): the old Rare tier's seeds in a Common pack of each banked odds version, before the update and now.
+local pinned={ -- {Ember/Ash before, now, Amethyst/Prism Orchid before, now}
+ [0]={25,37.5,30.3030303030,45.4545454545},[81]={31.3333333333,47,31.3333333333,47},[112]={32.2188555555,48.3282833333,32.0521888889,48.0782833333},[137]={33.0521888889,49.5782833333,33.2966333333,49.9449499999}}
 for _,ver in ipairs({0,81,112,137})do
- local common=Rules.SeedOdds(Config,4,'Pack01',1,ver);local melonCommon=Rules.SeedOdds(Config,5,'Pack01',1,ver)
- check(near(common.FirePepperSeed,pinned[ver][1],1e-9)and near(melonCommon.MoonflowerSeed,pinned[ver][2],1e-9)and common.FirePepperSeed<common.EmberBloomSeed and melonCommon.MoonflowerSeed<melonCommon.AmethystSeed,
-  ('banked %d Common packs: Fire Pepper %.4g%% and Moon Melon %.4g%% (they were ~25-33%% as Rares), rarer than the Rares'):format(ver,common.FirePepperSeed or 0,melonCommon.MoonflowerSeed or 0))
+ local lava=Rules.SeedOdds(Config,4,'Pack01',1,ver);local crystal=Rules.SeedOdds(Config,5,'Pack01',1,ver);local want=pinned[ver]
+ check(lava.FirePepperSeed==nil and crystal.MoonflowerSeed==nil and near(lava.EmberBloomSeed,want[2],1e-9)and near(lava.AshRoseSeed,want[2],1e-9)and near(crystal.AmethystSeed,want[4],1e-9)and near(crystal.PrismOrchidSeed,want[4],1e-9),
+  ('banked %d Common packs: no Fire Pepper, no Moon Melon; Ember / Ash %.4f%% (was %.4f%%), Amethyst / Orchid %.4f%% (was %.4f%%)'):format(ver,lava.EmberBloomSeed or 0,want[1],crystal.AmethystSeed or 0,want[3]))
 end
--- Version 137 (every pack made since R137): Fire Pepper 1/800 in a Common Lava pack, Moon Melon 1/150 in a Common Crystal pack, as a new pack.
 local lavaCommon,crystalCommon=Rules.SeedOdds(Config,4,'Pack01',1,137),Rules.SeedOdds(Config,5,'Pack01',1,137)
-check(near(lavaCommon.FirePepperSeed,.125,1e-12)and near(crystalCommon.MoonflowerSeed,.666666666667,1e-9)and Odds.Format(lavaCommon.FirePepperSeed)=='1/800'and Odds.Format(crystalCommon.MoonflowerSeed)=='1/150',
- 'banked 137 Common packs: Fire Pepper 1/800 (Lava), Moon Melon 1/150 (Crystal)')
--- The seeds that shared the old Rare tier split it in two (49.5158% instead of 33.0522%), the seeds above are untouched.
-check(near(lavaCommon.EmberBloomSeed,49.5157833333,1e-9)and near(lavaCommon.AshRoseSeed,49.5157833333,1e-9)and near(lavaCommon.LavaLotusSeed,.833333333333,1e-9)and lavaCommon.ObsidianMawSeed==.01 and near(lavaCommon.SupernovaBloomSeed,1e-4,1e-12),
- 'banked 137 Lava Common pack: Ember / Ash 49.5158% each (the Rare tier now has two seeds), Lava Lotus, Obsidian, Boom Bloom as before')
+check(near(lavaCommon.LavaLotusSeed,.833333333333,1e-9)and lavaCommon.ObsidianMawSeed==.01 and near(lavaCommon.SupernovaBloomSeed,1e-4,1e-12)and near(lavaCommon.EmberEmperorSeed,1e-10,1e-12)
+ and near(crystalCommon.DiamondVineSeed,.1,1e-9)and crystalCommon.HollowGeodeSeed==.01 and near(crystalCommon.OrbitLotusSeed,1e-4,1e-12)and near(crystalCommon.PrismMonarchSeed,1e-10,1e-12),
+ 'banked 137 Common packs: every seed above the old Rare tier (Lava Lotus, Obsidian, Boom Bloom, Ember Emperor; Diamond Vine, Geode, Orbit Lotus, Monarch) has exactly the odds it had')
+-- A banked Mythic pack: Crystal = the old numbers with Moon Melon taken out; Lava (where Fire Pepper was never in a Mythic pack) is exactly as it was.
 local lavaMythic=Rules.SeedOdds(Config,4,'Pack06',1,137);local crystalMythic=Rules.SeedOdds(Config,5,'Pack06',1,137)
-check(near(lavaMythic.FirePepperSeed,16,1e-9)and near(lavaMythic.LavaLotusSeed,81.98,1e-9)and lavaMythic.EmberBloomSeed==nil and near(crystalMythic.MoonflowerSeed,84.6467,5e-6)and crystalMythic.AmethystSeed==nil,
- 'banked 137 Mythic packs: Lava = Fire Pepper 16% + Lava Lotus 81.98%; Crystal = Moon Melon 84.65% (the Rares are no longer the floor)')
--- Rolls say Mythic / Legendary for them (the reveal and the record show the new rarity).
-local _,rar=Rules.Roll(Config,4,drawConstant(.9999),1,'Pack06',137)
-check(rar~=nil,'(a banked Mythic Lava pack rolls)')
-local gotFire,gotMelon=false,false
-for step=0,2000 do
- local d=step/2000
- local seed,rarity=Rules.Roll(Config,4,drawConstant(d),1,'Pack06',137);if seed and seed.Id=='FirePepperSeed'then gotFire=true;if rarity~='Mythic'then gotFire=false;break end end
-end
-for step=0,2000 do
- local d=step/2000
- local seed,rarity=Rules.Roll(Config,5,drawConstant(d),1,'Pack06',137);if seed and seed.Id=='MoonflowerSeed'then gotMelon=true;if rarity~='Legendary'then gotMelon=false;break end end
-end
-check(gotFire and gotMelon,'a banked Mythic Lava pack reveals Fire Pepper as "Mythic"; a banked Mythic Crystal pack reveals Moon Melon as "Legendary"')
--- Everything older than 149 in every other biome is untouched (the regression diff checks all of it against the base commit; here the Desert case).
-for _,version in ipairs({0,81,112,137})do
- local ver=version
- for _,pack in ipairs({'Pack01','Pack04','Pack06','Small','Standard','Grand'})do
-  local odds=Rules.SeedOdds(Config,2,pack,50,version)
-  check(odds.DesertAloeSeed==nil and odds.SandFruitSeed==nil,'banked '..tostring(ver)..' Desert '..pack..': no Aloe, no Sand Fruit')
+check(lavaMythic.FirePepperSeed==nil and near(lavaMythic.LavaLotusSeed,97.97999998,1e-9)and near(lavaMythic.ObsidianMawSeed,2,1e-12)and near(crystalMythic.AmethystSeed,42.3233333233,1e-9)and near(crystalMythic.PrismOrchidSeed,42.3233333233,1e-9)
+ and near(crystalMythic.DiamondVineSeed,13.3333333333,1e-9)and crystalMythic.MoonflowerSeed==nil,
+ 'banked 137 Mythic packs: Lava as before (97.98% Lava Lotus), Crystal Amethyst / Orchid 42.3233% (was 28.2156%) without Moon Melon')
+-- Every banked version x variant x luck x boost: no promoted or new seed, adds up to 100%.
+local bad={}
+for _,st in ipairs({4,5})do for _,ver in ipairs({0,81,112,137})do for _,pack in ipairs({'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06','Small','Standard','Grand'})do for _,luck in ipairs({1,50,1e6,5e7})do for _,boost in ipairs({0,2})do
+ local odds=Rules.SeedOdds(Config,st,pack,luck,ver,boost==2 and 2 or nil);local sum=0;for _,p in pairs(odds)do sum+=p end
+ if odds.FirePepperSeed~=nil or odds.MoonflowerSeed~=nil or odds.DesertAloeSeed~=nil or odds.SandFruitSeed~=nil or not near(sum,100,1e-9)then bad[#bad+1]=st..'/'..ver..'/'..pack..'/'..luck..'/'..boost end
+end end end end end
+check(#bad==0,'every banked Lava / Crystal row (4 versions x 9 variants x 4 luck x 2 boosts): no Fire Pepper, no Moon Melon, no new seed, 100% ('..table.concat(bad,' ',1,math.min(#bad,4))..')')
+-- No banked roll ever gives a promoted or new seed, at any draw, version or variant.
+local leaked={}
+for _,st in ipairs({2,4,5})do for _,ver in ipairs({'nil',0,81,112,137})do for _,pack in ipairs({'Pack01','Pack03','Pack06'})do
+ for step=0,2000 do
+  local seed,label=Rules.Roll(Config,st,drawConstant(step/2000),1,pack,ver~='nil'and ver or nil)
+  if seed and(seed.Id=='FirePepperSeed'or seed.Id=='MoonflowerSeed'or seed.Id=='DesertAloeSeed'or seed.Id=='SandFruitSeed')then leaked[#leaked+1]=st..'/'..tostring(ver)..'/'..pack..'/'..seed.Id end
+  if seed and label~=Rules.GetRarity(seed.Id)then leaked[#leaked+1]='label '..seed.Id end
  end
-end
+end end end
+check(#leaked==0,'banked rolls (Desert, Lava, Crystal x versions none / 0 / 81 / 112 / 137 x Pack01 / 03 / 06 x 2001 draws): never a promoted or new seed, labels as the live rarity ('..table.concat(leaked,' ',1,math.min(#leaked,3))..')')
+-- The live roster still has them (the legacy scope is closed again), and a new (149) pack has them at the new tiers.
+check(Rules.SeedOdds(Config,4,'Pack06',1,149).FirePepperSeed==16 and relnear(Rules.SeedOdds(Config,5,'Pack06',1,149).MoonflowerSeed,84.6467,5e-6)and Rules.GetRarity('FirePepperSeed')=='Mythic'and Rules.GetRarity('MoonflowerSeed')=='Legendary',
+ 'a new (149) Mythic pack still has Fire Pepper 16% / Moon Melon 84.65%, after all those banked ones (Mythic / Legendary)')
 end
 
 -- Monte Carlo: the real rolls follow the tables. 1,000,000 math.random rolls each.
@@ -293,10 +298,11 @@ local c149,l149=sample(2,'Pack01',149)
 check(math.abs(c149.DesertAloeSeed/N*100-12.5)<.2 and math.abs(c149.SandFruitSeed/N*100-1.11111)<.05,('149 Desert Common pack, 1M rolls: Aloe %.3f%% (12.5), Sand Fruit %.3f%% (1.111)'):format(c149.DesertAloeSeed/N*100,c149.SandFruitSeed/N*100))
 check(l149['DesertAloeSeed:Rare']and l149['SandFruitSeed:Legendary']and l149['CactusSeed:Uncommon']and l149['DatePalmSeed:Mythic'],'... the rolls come back labelled Rare / Legendary / Uncommon / Mythic')
 local cLava,lLava=sample(4,'Pack01',137)
-check(math.abs(cLava.FirePepperSeed/N*100-.125)<.02 and math.abs(cLava.EmberBloomSeed/N*100-49.5158)<.4 and lLava['FirePepperSeed:Mythic']and not lLava['FirePepperSeed:Rare'],
- ('banked 137 Lava Common pack, 1M rolls: Fire Pepper %.4f%% (0.125, was 33%%), labelled Mythic; Ember %.2f%% (49.52)'):format(cLava.FirePepperSeed/N*100,cLava.EmberBloomSeed/N*100))
+check((cLava.FirePepperSeed or 0)==0 and math.abs(cLava.EmberBloomSeed/N*100-49.5783)<.4 and math.abs(cLava.AshRoseSeed/N*100-49.5783)<.4 and lLava['EmberBloomSeed:Rare']and not lLava['FirePepperSeed:Mythic']and not lLava['FirePepperSeed:Rare'],
+ ('banked 137 Lava Common pack, 1M rolls: no Fire Pepper (was 33%%), Ember %.2f%% (49.58)'):format(cLava.EmberBloomSeed/N*100))
 local cCr,lCr=sample(5,'Pack01',137)
-check(math.abs(cCr.MoonflowerSeed/N*100-.6667)<.04 and lCr['MoonflowerSeed:Legendary']and not lCr['MoonflowerSeed:Rare'],('banked 137 Crystal Common pack, 1M rolls: Moon Melon %.4f%% (0.667, was 33%%), labelled Legendary'):format(cCr.MoonflowerSeed/N*100))
+check((cCr.MoonflowerSeed or 0)==0 and math.abs(cCr.AmethystSeed/N*100-49.9449)<.4 and lCr['AmethystSeed:Rare']and not lCr['MoonflowerSeed:Legendary']and not lCr['MoonflowerSeed:Rare'],
+ ('banked 137 Crystal Common pack, 1M rolls: no Moon Melon (was 33%%), Amethyst %.2f%% (49.94)'):format(cCr.AmethystSeed/N*100))
 -- A pack with no odds version (made before R81) and the old ones never give a new seed, even with the best boots.
 local leak=0
 for _,version in ipairs({'nil',0,81,112,137})do
@@ -354,16 +360,37 @@ lava0.OddsVersion=nil -- (a pack saved before odds versions existed has none; Ad
 local desert149,desert137,desert112=addPack(D,2,'Pack01',149),addPack(D,2,'Pack01',137),addPack(D,2,'Pack01',112)
 local crystal149=addPack(D,5,'Pack01',149)
 check(lava149.OddsVersion==149 and lava137.OddsVersion==137 and lava0.OddsVersion==nil and desert112.OddsVersion==112,'AddChest keeps the odds version it is given (149 / 137 / none / 112)')
-local function row(rows,name)for _,l in ipairs(rows)do if l:sub(1,#name+1)==name..':'then return l end end end
+local function row(rows,name)for _,l in ipairs(rows)do if l:sub(1,#name+1)==name..':'then return l end end;return nil end
 local r1=tipOf(D,lava149);local r2=tipOf(D,lava137)
 check(row(r1,'Fire Pepper Seed')=='Fire Pepper Seed: 1/800','a 149 Lava Common pack\'s tooltip: "'..tostring(row(r1,'Fire Pepper Seed'))..'"')
-check(row(r2,'Fire Pepper Seed')=='Fire Pepper Seed: 1/800','a banked 137 Lava Common pack\'s tooltip says 1/800 too (OWNER: no windfall; it was 1/3): "'..tostring(row(r2,'Fire Pepper Seed'))..'"')
-check(row(r2,'Ember Pumpkin Seed')==nil or row(r2,'Ember Pumpkin Seed')==row(r1,'Ember Pumpkin Seed'),'(and the 137 tooltip lists the same Lava rows as the 149 one)')
+check(row(r2,'Fire Pepper Seed')==nil,'a banked 137 Lava Common pack\'s tooltip has NO Fire Pepper row (OWNER: no windfall; it was 1/3): "'..tostring(row(r2,'Fire Pepper Seed'))..'"')
+local r0=tipOf(D,lava0)
+check(row(r0,'Fire Pepper Seed')==nil and row(r0,'Ember Pumpkin Seed')~=nil,'... nor has a pack with no odds version (read as 0)')
+local tipSeedNames={};for stage=1,7 do for _,seed in ipairs(Rules.ObtainablePool(Config,stage))do tipSeedNames[seed.Name]=seed.Id end end
+local function sortedTip(rows,label)
+ local lastRank,lastName=0,'';local ok,why=true,''
+ for i=2,#rows do
+  local name=rows[i]:match('^(.-): ');local id=tipSeedNames[name];local style;if id then style=select(2,Rules.GetRarity(id))end
+  if not id then ok=false;why='unknown row '..rows[i]
+  elseif style.Rank<lastRank or(style.Rank==lastRank and name<lastName)then ok=false;why=rows[i]..' after '..lastName end
+  lastRank,lastName=style and style.Rank or 0,name
+ end
+ check(ok and #rows>2,'hold tooltip rows are sorted by rarity rank, then name: '..label..' ('..why..')')
+end
+sortedTip(r1,'149 Lava Common');sortedTip(r2,'banked 137 Lava Common')
 local rc=tipOf(D,crystal149)
 check(row(rc,'Moon Melon Seed')=='Moon Melon Seed: 1/150','a 149 Crystal Common pack\'s tooltip: Moon Melon 1/150 ("'..tostring(row(rc,'Moon Melon Seed'))..'")')
+local crystal137=addPack(D,5,'Pack01',137);local crystal112=addPack(D,5,'Pack01',112)
+check(row(tipOf(D,crystal137),'Moon Melon Seed')==nil and row(tipOf(D,crystal112),'Moon Melon Seed')==nil and row(tipOf(D,crystal137),'Amethyst Grape Seed')~=nil,'banked 137 / 112 Crystal packs list no Moon Melon')
 local d149=tipOf(D,desert149);local d137=tipOf(D,desert137);local d112=tipOf(D,desert112)
 check(row(d149,'Aloe Seed')=='Aloe Seed: 1/8'and row(d149,'Sand Fruit Seed')=='Sand Fruit Seed: 1/90','a 149 Desert Common pack lists "Aloe Seed: 1/8" and "Sand Fruit Seed: 1/90"')
 check(row(d137,'Aloe Seed')==nil and row(d137,'Sand Fruit Seed')==nil and row(d112,'Aloe Seed')==nil and row(d112,'Sand Fruit Seed')==nil and row(d137,'Prickly Pear Seed')=='Prickly Pear Seed: 1/1','banked 137 / 112 Desert packs list no Aloe and no Sand Fruit (their odds are 0, the row is skipped)')
+sortedTip(d149,'149 Desert Common');sortedTip(d137,'banked 137 Desert Common')
+do
+ -- ... and the Aloe (Rare) sits between the Uncommon Prickly Pear and the Legendary Sand Fruit, which comes before the Mythic Date Palm
+ local at={};for i,l in ipairs(d149)do at[l:match('^(.-): ')or l]=i end
+ check(at['Prickly Pear Seed']<at['Aloe Seed']and at['Aloe Seed']<at['Sand Fruit Seed']and at['Sand Fruit Seed']<at['Dune Lotus Seed'],'the 149 Desert tooltip reads Prickly Pear, Aloe, Sand Fruit, Dune Lotus (rarity order, not save-slot order)')
+end
 check(d149[1]==d137[1]and d149[1]=='Common Desert Pack'or d149[1]==d137[1],'(the pack label is the same)')
 local d149Rare=addPack(D,2,'Pack03',149)
 local rr=tipOf(D,d149Rare)
@@ -429,15 +456,15 @@ check(okG and resG==true and got(Data,Bn,'gift-sand-seed')and got(Data,Bn,'gift-
 -- An unknown future odds version (150) is not valid, and the row decodes without it (legacy odds).
 local futurePack=Data:_decodeSavedSeedRecord(A,{Id='701_future',Kind='Pack',Stage=2,BagVariant='Pack04',OddsVersion=150,PackSize=1,ChestNumber=90},90)
 check(futurePack and futurePack.OddsVersion==nil and futurePack.Kind=='Pack','a v150 pack decodes with no odds version (what an older server would do to a 149 pack: hence ProfileVersion 22)')
--- Banked packs open as today's seeds: a banked 137 Lava Mythic pack gives Fire Pepper labelled Mythic.
-local pickFire
-for step=0,4000 do local d=step/4000;local seed=Rules.Roll(Config,4,drawConstant(d),1,'Pack06',137);if seed and seed.Id=='FirePepperSeed'then pickFire=d;break end end
-local opened=pickFire and Data:OpenSeedPack(A,p137.Id,drawConstant(pickFire))
-check(opened and opened.SeedId=='FirePepperSeed'and opened.Rarity=='Mythic'and opened.Stage==4,'opening a banked 137 Mythic Lava pack with the right draw reveals Fire Pepper as a Mythic')
-local pickMelon
-for step=0,4000 do local d=step/4000;local seed=Rules.Roll(Config,5,drawConstant(d),1,'Pack06',137);if seed and seed.Id=='MoonflowerSeed'then pickMelon=d;break end end
-local pm=addPack(A,5,'Pack06',137);local openedM=pickMelon and Data:OpenSeedPack(A,pm.Id,drawConstant(pickMelon))
-check(openedM and openedM.SeedId=='MoonflowerSeed'and openedM.Rarity=='Legendary'and openedM.Stage==5,'... a banked 137 Mythic Crystal pack reveals Moon Melon as a Legendary')
+-- Banked packs cannot give the promoted seeds: a banked 137 Mythic Lava / Crystal pack opens to something else, at every draw.
+local bankedFire,bankedMelon=0,0
+for step=0,200 do
+ local d=step/200
+ local pf=addPack(A,4,'Pack06',137);local of=Data:OpenSeedPack(A,pf.Id,drawConstant(d));if of and of.SeedId=='FirePepperSeed'then bankedFire+=1 end
+ local pm=addPack(A,5,'Pack06',137);local om=Data:OpenSeedPack(A,pm.Id,drawConstant(d));if om and om.SeedId=='MoonflowerSeed'then bankedMelon+=1 end
+ local pc=addPack(A,4,'Pack01',137);local oc=Data:OpenSeedPack(A,pc.Id,drawConstant(d));if oc and oc.SeedId=='FirePepperSeed'then bankedFire+=1 end
+end
+check(bankedFire==0 and bankedMelon==0,'opening 201 banked 137 Mythic and Common Lava packs and 201 Crystal ones, one per draw: never Fire Pepper, never Moon Melon')
 local pd=addPack(A,2,'Pack06',137);local openedD=Data:OpenSeedPack(A,pd.Id,drawConstant(.5))
 check(openedD and openedD.SeedId~='DesertAloeSeed'and openedD.SeedId~='SandFruitSeed','a banked Desert pack never opens to a new seed')
 
@@ -528,42 +555,105 @@ for _,id in ipairs({'DesertAloeSeed','SandFruitSeed','FirePepperSeed','Moonflowe
  local r2=Data:GetPremium(E).SeedRewards[id]
  check(r1==first and r2==first+repeats,('%s: the first pull pays %d, a repeat adds %d (%s -> %s)'):format(id,first,repeats,tostring(r1),tostring(r2)))
 end
--- Milestones. Desert's old roster was five seeds; it is seven now.
+-- Milestones. Desert's old roster was five seeds; it is seven now. A milestone reached with the OLD roster stays claimable ONLY for a player who had
+-- already reached it before the update: the server records that once, on the first load after it (Premium.OldRoster148, saved, published as
+-- IndexOldHalf2 / IndexOldFull2). Everyone else, new players and old players who had not got there, needs the live seven.
 local OLD5={'CactusSeed','DatePalmSeed','MirageFigSeed','SolarStarfruitSeed','StarfruitSeed'}
-local function discover(player,id,adult)Data:MarkSeedDiscovered(player,id,true);if adult then Data:MarkAdultDiscovered(player,id)end end
-local F=makePlayer(721,'Fay')
-for i=1,2 do discover(F,OLD5[i],true)end
-local s,p,t=Data:IndexProgress(F,2);local so,po,to=Data:IndexProgress(F,2,true)
+local function discoverOn(data,player,id,adult)data:MarkSeedDiscovered(player,id,true);if adult then data:MarkAdultDiscovered(player,id)end end
+local function discover(player,id,adult)discoverOn(Data,player,id,adult)end
+local function savedRow(userId)local row;for _,store in pairs(stores)do for k,v in pairs(store.Data)do if type(v)=='table'and v.Version and k:find(tostring(userId),1,true)then row=v end end end;return row end
+-- A player whose profile was saved BEFORE the roster change (so it has no OldRoster148) with the first n old Desert seeds found and grown, loading it
+-- for the first time now. mutate(row) may change the saved row first (e.g. mark a reward claimed).
+local function oldPlayer(userId,name,n,mutate)
+ local d0=PDS.new(Config,Map,Notes);local p0=makePlayer(userId,name,d0)
+ for i=1,n do discoverOn(d0,p0,OLD5[i],true)end
+ check(d0:Save(p0,'pre-R148',true),name..': saved before the roster change')
+ local row=savedRow(userId);row.Premium.OldRoster148=nil;if mutate then mutate(row)end
+ local d1=PDS.new(Config,Map,Notes);local p1=makePlayer(userId,name,d1)
+ return d1,p1,row
+end
+local function pendingGems(data,player)local gems={};for _,rc in ipairs(data.Gardens[player].PendingSales or{})do if rc.Currency=='Gems'then gems[#gems+1]=rc.Amount end end;return table.concat(gems,',')end
+-- (1) Fay: 2 of the old 5 before the update (nothing reached under either roster).
+local dF,F=oldPlayer(751,'Fay',2)
+local recF=dF:GetPremium(F).OldRoster148
+check(type(recF)=='table'and next(recF.Half)==nil and next(recF.Full)==nil and F:GetAttribute('IndexOldHalf2')==false and F:GetAttribute('IndexOldFull2')==false,'the first load after the update records the old milestones: Fay (2 of 5) had reached none')
+check(dF.Dirty[F]==true,'... and the profile is marked for saving because of it')
+local s,p,t=dF:IndexProgress(F,2);local so,po,to=dF:IndexProgress(F,2,true)
 check(s==2 and p==2 and t==7 and so==2 and po==2 and to==5,'IndexProgress: live total 7, the old roster (beforeR149) total 5')
-check(not Data:IndexMilestone(F,2,false)and not Data:IndexMilestone(F,2,true),'old 2/5 (2 seeds + 2 plants): no halfway, no completion')
-local okH,whyH=Data:ClaimIndexBiomeHalf(F,2);local okC,whyC=Data:ClaimIndexBiome(F,2)
+check(not dF:IndexMilestone(F,2,false)and not dF:IndexMilestone(F,2,true),'Fay, 2 of 5 found and grown: no halfway, no completion')
+local okH,whyH=dF:ClaimIndexBiomeHalf(F,2);local okC,whyC=dF:ClaimIndexBiome(F,2)
 check(not okH and whyH=='REACH HALF OF THIS INDEX'and not okC and whyC=='COLLECT EACH SEED AND GROW EACH PLANT','... and both claims are refused ('..tostring(whyH)..' / '..tostring(whyC)..')')
-discover(F,OLD5[3],true)
-check(Data:IndexMilestone(F,2,false)and not Data:IndexMilestone(F,2,true),'old 3/5 (3 seeds + 3 plants = 6 of 10 points): the halfway reward only (live roster: 6 of 14 is not half)')
-local h1,h1why=Data:ClaimIndexBiomeHalf(F,2);local h2,h2why=Data:ClaimIndexBiomeHalf(F,2)
+discoverOn(dF,F,OLD5[3],true)
+check(not dF:IndexMilestone(F,2,false),'she finds a third old seed AFTER the update: 6 of 14 points is not halfway (the old 6 of 10 would have been, but she had not reached it before: no fallback)')
+discoverOn(dF,F,OLD5[4],true)
+check(dF:IndexMilestone(F,2,false)and not dF:IndexMilestone(F,2,true),'a fourth: 8 of 14 is halfway under the live roster')
+discoverOn(dF,F,OLD5[5],true)
+check(not dF:IndexMilestone(F,2,true)and not dF:BiomeComplete(F,2)and not select(1,dF:ClaimIndexBiome(F,2)),'all five old seeds found after the update: NOT complete (the Aloe and the Sand Fruit are missing; no old-roster fallback for her)')
+discoverOn(dF,F,'DesertAloeSeed',true);discoverOn(dF,F,'SandFruitSeed',true)
+check(dF:IndexMilestone(F,2,true)and dF:BiomeComplete(F,2)and select(1,dF:ClaimIndexBiome(F,2)),'... all seven found and grown: complete, and the completion reward claims')
+-- (2) Gil: 3 of the old 5 before the update = halfway reached (unclaimed), not complete.
+local dG,G=oldPlayer(752,'Gil',3)
+local recG=dG:GetPremium(G).OldRoster148
+check(recG.Half['2']==true and recG.Full['2']==nil and G:GetAttribute('IndexOldHalf2')==true and G:GetAttribute('IndexOldFull2')==false,'Gil (3 of 5, saved before the update): halfway recorded, completion not (published as IndexOldHalf2)')
+check(dG:IndexMilestone(G,2,false)and not dG:IndexMilestone(G,2,true),'... so the halfway reward stays claimable (live 3+3 of 14 is not halfway) and the completion does not')
+local h1,h1why=dG:ClaimIndexBiomeHalf(G,2);local h2,h2why=dG:ClaimIndexBiomeHalf(G,2)
 check(h1 and not h2 and h2why=='ALREADY CLAIMED','the halfway reward claims once, the second claim says ALREADY CLAIMED ('..tostring(h2why)..')')
-check(not select(1,Data:ClaimIndexBiome(F,2)),'(completion is still refused at 3/5)')
-discover(F,OLD5[4],true);discover(F,OLD5[5],true)
-check(Data:IndexMilestone(F,2,true)and Data:BiomeComplete(F,2),'old 5/5: complete under the old roster, so BiomeComplete is true (no reward is taken away)')
-local c1,c1why=Data:ClaimIndexBiome(F,2);local c2,c2why=Data:ClaimIndexBiome(F,2)
-check(c1 and not c2 and c2why=='ALREADY CLAIMED'and F:GetAttribute('IndexBiomeReward2')==true and F:GetAttribute('IndexBiomeHalfReward2')==true,'the completion reward claims once, then ALREADY CLAIMED; the attributes follow ('..tostring(c2why)..')')
-local gems={};for _,rc in ipairs(Data.Gardens[F].PendingSales or{})do if rc.Currency=='Gems'then gems[#gems+1]=rc.Amount end end
-check(table.concat(gems,',')=='10,20','the Gems: 10 (halfway) and 20 (completion) once each ('..table.concat(gems,',')..')')
--- A player who claimed before the update cannot claim again, whatever they have found.
-local G=makePlayer(722,'Gus')
-Data:GetPremium(G).Biomes['2']=true;Data:GetPremium(G).BiomeHalfRewards=Data:GetPremium(G).BiomeHalfRewards or{};Data:GetPremium(G).BiomeHalfRewards['2']=true
-for _,id in ipairs(OLD5)do discover(G,id,true)end
-local g1,g1why=Data:ClaimIndexBiomeHalf(G,2);local g2,g2why=Data:ClaimIndexBiome(G,2)
-check(not g1 and g1why=='ALREADY CLAIMED'and not g2 and g2why=='ALREADY CLAIMED','a player who claimed both rewards before the update gets ALREADY CLAIMED (no duplicate)')
--- A new player with the two new seeds only has nothing; finding all 7 (seeds and plants) completes the live roster.
-local H=makePlayer(723,'Hal')
-discover(H,'DesertAloeSeed',true);discover(H,'SandFruitSeed',true)
-check(not Data:IndexMilestone(H,2,false)and not Data:IndexMilestone(H,2,true),'only the Aloe and the Sand Fruit (found and grown): 4 of 14 points, nothing to claim')
-for _,id in ipairs({'CactusSeed','DatePalmSeed'})do discover(H,id,true)end
-check(Data:IndexMilestone(H,2,false)and not Data:IndexMilestone(H,2,true)and not Data:BiomeComplete(H,2),'... four seeds + four plants = 8 of 14: halfway')
-for _,id in ipairs({'MirageFigSeed','SolarStarfruitSeed','StarfruitSeed'})do discover(H,id,true)end
-local sH,pH,tH=Data:IndexProgress(H,2)
-check(sH==7 and pH==7 and tH==7 and Data:BiomeComplete(H,2),'all seven Desert seeds and plants: complete (7 / 7)')
+check(not select(1,dG:ClaimIndexBiome(G,2)),'(completion is still refused)')
+discoverOn(dG,G,OLD5[4],true);discoverOn(dG,G,OLD5[5],true)
+check(not dG:IndexMilestone(G,2,true)and not select(1,dG:ClaimIndexBiome(G,2)),'the other two old seeds found after the update: still not complete (the flag only ever covers what was reached before)')
+-- The flag is saved and survives a real save and load (and is not recomputed).
+check(dG:Save(G,'flag',true),'(saved)')
+local rowG=savedRow(752)
+check(type(rowG.Premium.OldRoster148)=='table'and rowG.Premium.OldRoster148.Half['2']==true,'the saved profile holds Premium.OldRoster148 ({Half={["2"]=true}})')
+local dG2=PDS.new(Config,Map,Notes);local G2=makePlayer(752,'Gil',dG2)
+check(dG2:GetPremium(G2).OldRoster148.Half['2']==true and dG2:IndexMilestone(G2,2,false)and G2:GetAttribute('IndexOldHalf2')==true,'... and a fresh load keeps it')
+-- (3) Hana: all five old seeds before the update (complete, nothing claimed): both rewards stay claimable, once each.
+local dH,H=oldPlayer(753,'Hana',5)
+local recH=dH:GetPremium(H).OldRoster148
+check(recH.Half['2']==true and recH.Full['2']==true and H:GetAttribute('IndexOldFull2')==true,'Hana (5 of 5 before the update): halfway and completion recorded')
+check(dH:IndexMilestone(H,2,true)and dH:BiomeComplete(H,2),'old 5/5: complete, so BiomeComplete is true (no reward is taken away)')
+local hh,hhWhy=dH:ClaimIndexBiomeHalf(H,2)
+local c1,c1why=dH:ClaimIndexBiome(H,2);local c2,c2why=dH:ClaimIndexBiome(H,2)
+check(hh and c1 and not c2 and c2why=='ALREADY CLAIMED'and H:GetAttribute('IndexBiomeReward2')==true and H:GetAttribute('IndexBiomeHalfReward2')==true,'both rewards claim once, then ALREADY CLAIMED; the claimed attributes follow ('..tostring(c2why)..')')
+check(pendingGems(dH,H)=='10,20','the Gems: 10 (halfway) and 20 (completion) once each ('..pendingGems(dH,H)..')')
+discoverOn(dH,H,'DesertAloeSeed',true);discoverOn(dH,H,'SandFruitSeed',true)
+check(not select(1,dH:ClaimIndexBiome(H,2))and not select(1,dH:ClaimIndexBiomeHalf(H,2))and pendingGems(dH,H)=='10,20','finding the two new seeds later pays nothing more')
+-- (4) A player who claimed both before the update cannot claim again, whatever they have found.
+local dI,I=oldPlayer(754,'Ian',5,function(row)row.Premium.Biomes['2']=true;row.Premium.BiomeHalfRewards=row.Premium.BiomeHalfRewards or{};row.Premium.BiomeHalfRewards['2']=true end)
+local g1,g1why=dI:ClaimIndexBiomeHalf(I,2);local g2,g2why=dI:ClaimIndexBiome(I,2)
+check(not g1 and g1why=='ALREADY CLAIMED'and not g2 and g2why=='ALREADY CLAIMED'and pendingGems(dI,I)=='','a player who claimed both rewards before the update gets ALREADY CLAIMED (no duplicate)')
+-- (5) A new player (created after the update): nothing is recorded, and they need the seven.
+local N5=makePlayer(755,'Nia')
+local recN=Data:GetPremium(N5).OldRoster148
+check(type(recN)=='table'and next(recN)==nil and N5:GetAttribute('IndexOldHalf2')==false and N5:GetAttribute('IndexOldFull2')==false,'a new player starts with an empty record (no old-roster milestones: settled, nothing to carry over)')
+for _,id in ipairs(OLD5)do discover(N5,id,true)end
+check(Data:IndexMilestone(N5,2,false)and not Data:IndexMilestone(N5,2,true)and not Data:BiomeComplete(N5,2),'a new player with the five old Desert seeds found and grown: halfway (10 of 14), NOT complete')
+local nc,ncWhy=Data:ClaimIndexBiome(N5,2)
+check(not nc and ncWhy=='COLLECT EACH SEED AND GROW EACH PLANT','... and the completion claim is refused: a new player needs all seven ('..tostring(ncWhy)..')')
+discover(N5,'DesertAloeSeed',true)
+check(not Data:IndexMilestone(N5,2,true),'six of seven: still not complete')
+discover(N5,'SandFruitSeed',true)
+local sN,pN,tN=Data:IndexProgress(N5,2)
+check(sN==7 and pN==7 and tN==7 and Data:BiomeComplete(N5,2)and select(1,Data:ClaimIndexBiome(N5,2)),'all seven Desert seeds found and grown: complete (7 / 7) and the reward claims')
+-- Only the Aloe and the Sand Fruit: nothing to claim.
+local H2=makePlayer(756,'Hal')
+discover(H2,'DesertAloeSeed',true);discover(H2,'SandFruitSeed',true)
+check(not Data:IndexMilestone(H2,2,false)and not Data:IndexMilestone(H2,2,true),'only the Aloe and the Sand Fruit (found and grown): 4 of 14 points, nothing to claim')
+-- (6) Decode sanitises the record; Decode(nil) is "settled, nothing".
+do
+ local PP=server('PremiumProgress')
+ local function deepCopy(t)if type(t)~='table'then return t end;local o={};for k,v in pairs(t)do o[k]=deepCopy(v)end;return o end
+ local base=deepCopy(Data:GetPremium(H2));base.OldRoster148=nil
+ local function decoded(rec)local x=deepCopy(base);x.OldRoster148=rec;return PP.Decode(x)end
+ check(next(PP.Decode(nil).OldRoster148)==nil and PP.Decode(nil).OldRoster148~=nil,'Decode(nil): an empty record (a new player; nothing is settled later)')
+ check(PP.Decode(base)~=nil and PP.Decode(base).OldRoster148==nil,'Decode of a profile saved before the update: no record yet (the load settles it)')
+ check(decoded('junk').OldRoster148==nil and decoded(5).OldRoster148==nil,'a record that is not a table is treated as not recorded yet')
+ local kept=decoded({Half={['2']=true,['9']=true,['x']=true,['0']=true,['3']=false,['5']='yes'},Full={['2']=1,['3']=true},Extra=true}).OldRoster148
+ local halves=0;for _ in pairs(kept.Half)do halves+=1 end;local fulls=0;for _ in pairs(kept.Full)do fulls+=1 end
+ check(kept.Half['2']==true and halves==1 and fulls==0 and kept.Extra==nil,'a record keeps only Desert\'s true flags: other stages, bad keys, non-true values and extra fields are dropped')
+ check(decoded({Half={['2']=true},Full={['2']=true}}).OldRoster148.Full['2']==true,'a good record round-trips')
+ check(PP.RosterChangeStages()[2]==true and next(PP.RosterChangeStages(),2)==nil,'the roster change touched Desert (stage 2) only')
+end
 -- Lava and Crystal: the Index membership is unchanged (7 each), so their milestones are as before.
 local L=makePlayer(724,'Lin')
 local lavaSeeds,crystalSeeds={'FirePepperSeed','EmberBloomSeed','AshRoseSeed','LavaLotusSeed','ObsidianMawSeed','SupernovaBloomSeed','EmberEmperorSeed'},{'AmethystSeed','PrismOrchidSeed','MoonflowerSeed','DiamondVineSeed','HollowGeodeSeed','OrbitLotusSeed','PrismMonarchSeed'}
@@ -621,6 +711,22 @@ local okOdds,textOdds=X.Execute(ctx,C,'odds',{'desert','rare'})
 check(okOdds and textOdds:find('Aloe Seed: 1/3',1,true)~=nil and textOdds:find('Prickly Pear Seed: 1/2',1,true)~=nil and textOdds:find('Sand Fruit Seed:',1,true)~=nil,'odds desert rare shows "Aloe Seed: 1/3" (1/2.5, whole numbers under a million) and the Sand Fruit ('..tostring(textOdds):gsub('\n',' | ')..')')
 local okL,textL=X.Execute(ctx,C,'odds',{'lava','common'})
 check(okL and textL:find('Fire Pepper Seed: 1/800',1,true)~=nil,'odds lava common: Fire Pepper 1/800')
+-- R148: the rows of `odds` are sorted by rarity rank (commonest first), then name.
+local function ordered(text)
+ local names={};for stage=1,7 do for _,seed in ipairs(Rules.ObtainablePool(Config,stage))do names[seed.Name]=seed.Id end end
+ local lastRank,lastName,rows=0,'',0
+ for line in text:gmatch('[^\n]+')do
+  local name=line:match('^(.-): ')
+  if name and names[name]then
+   rows+=1;local _,style=Rules.GetRarity(names[name])
+   if style.Rank<lastRank or(style.Rank==lastRank and name<lastName)then return false,rows end
+   lastRank,lastName=style.Rank,name
+  end
+ end
+ return rows>2,rows
+end
+local okO1,n1=ordered(textL);local okO2,n2=ordered(textOdds);local _,textStorm=X.Execute(ctx,C,'odds',{'storm','mythic'});local okO3,n3=ordered(textStorm)
+check(okO1 and okO2 and okO3,('`odds` rows are sorted by rarity rank, then name (lava common %d rows, desert rare %d, storm mythic %d)'):format(n1,n2,n3))
 Run.IsStudio=function()return false end
 check(Config.GetSeedById('DesertAloeSeed')and ctx.Data==Data,'(commands ran on the real modules)')
 end

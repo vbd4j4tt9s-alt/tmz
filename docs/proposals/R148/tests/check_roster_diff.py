@@ -1,17 +1,19 @@
 """R148 roster change: compares dump_roster.luau run on the BASE and on the CHANGE.
 Usage: python3 check_roster_diff.py base_dump.txt new_dump.txt
-Owner decision (no windfall): packs banked before the update roll Fire Pepper / Moon Melon at their NEW tiers, so only the Lava (4) and
-Crystal (5) rows of banked packs may change; everything else (Forest, Desert, Snow, Jungle, Storm, Void, Mech, Verity, every size variant,
-every odds version 0 / 81 / 112 / 137, every luck level, with and without the 2x boost, every seeded roll) must be byte-identical.
-Prints a summary and exits 1 on any violation."""
+Owner decision (no windfall): a pack banked before the update (OddsVersion none / 0 / 81 / 112 / 137) cannot roll Fire Pepper or Moon Melon at all.
+So in every banked row, for every version and every variant (Small / Standard / Grand / Pack01-06), every luck level and with and without the 2x
+boost, ONLY the seeds that shared a tier with a promoted seed may differ: the promoted seed itself (it drops to 0) and the seeds of its old Rare tier
+(they absorb its share). Every other seed's odds must be byte-identical, and so must every other stage, the Void / Mech / Verity odds (Void 149 =
+Void 137), and every seeded roll outside Lava and Crystal. Prints a summary and exits 1 on any violation."""
 import sys
 
 NEW_IDS = {'DesertAloeSeed', 'SandFruitSeed'}
 PROMOTED = {'FirePepperSeed': 'Mythic', 'MoonflowerSeed': 'Legendary'}
-# Seeds whose odds may change in a banked Lava / Crystal PACK (Pack01-06) of version 112 / 137: the promoted seed and the seeds that
-# share a tier with it (its old Rare tier, its new tier). Secret / Cosmic / King seeds must not move.
-SHARE = {'4': {'FirePepperSeed', 'EmberBloomSeed', 'AshRoseSeed', 'LavaLotusSeed'},
-         '5': {'MoonflowerSeed', 'AmethystSeed', 'PrismOrchidSeed', 'DiamondVineSeed'}}
+# The only banked rows that may change: Lava (4) and Crystal (5). A promoted seed drops out of them; its old tier-mates (the seeds of its old Rare tier)
+# absorb its share, so nothing outside {promoted seed} + {old tier-mates} may move.
+TIER_MATES = {'4': {'EmberBloomSeed', 'AshRoseSeed', 'LavaLotusSeed'},
+              '5': {'AmethystSeed', 'PrismOrchidSeed', 'DiamondVineSeed'}}
+PROMOTED_IN = {'4': 'FirePepperSeed', '5': 'MoonflowerSeed'}
 fails = []
 notes = []
 
@@ -93,7 +95,7 @@ def odds_rows(rows):
         d = {}
         for kv in p[6:]:
             k, v = kv.split('=')
-            d[k] = float(v)
+            d[k] = v  # the exact %.12g text: "byte-identical" means the same text
         out[tuple(p[1:6])] = (l, d)
     return out
 
@@ -101,25 +103,42 @@ def odds_rows(rows):
 ob, on = odds_rows(B['ODDS']), odds_rows(N['ODDS'])
 if ob.keys() != on.keys():
     fail('ODDS rows differ in number')
-same = other = 0
+versions = sorted({k[2] for k in ob})
+variants = sorted({k[1] for k in ob})
+if versions != ['v0', 'v112', 'v137', 'v81'] or variants != ['Grand', 'Pack01', 'Pack02', 'Pack03', 'Pack04', 'Pack05', 'Pack06', 'Small', 'Standard']:
+    fail('the dump must cover every banked version and variant: %s %s' % (versions, variants))
+same = resplit = 0
 changed_rows = {}
 for key in ob:
-    stage, variant, ver = key[0], key[1], key[2]
+    stage = key[0]
     if ob[key][0] == on[key][0]:
         same += 1
         continue
-    if stage not in ('4', '5'):
+    if stage not in TIER_MATES:
         fail('ODDS %s changed but only Lava (4) and Crystal (5) may' % ' '.join(key))
         continue
-    other += 1
+    resplit += 1
     changed_rows[key] = (ob[key][1], on[key][1])
-    ids = set(ob[key][1]) | set(on[key][1])
-    moved = {i for i in ids if abs(ob[key][1].get(i, 0) - on[key][1].get(i, 0)) > 1e-12}
-    if NEW_IDS & ids:
+    a, b = ob[key][1], on[key][1]
+    if NEW_IDS & set(b):
         fail('a banked pack row lists a new seed: %s' % ' '.join(key))
-    if variant.startswith('Pack') and ver in ('v112', 'v137') and not moved <= SHARE[stage]:
-        fail('ODDS %s: a Secret / Cosmic / King seed moved %s' % (' '.join(key), sorted(moved - SHARE[stage])))
-notes.append('ODDS rows: %d identical (every stage but Lava / Crystal, all 4 banked versions x 9 variants x 6 luck x 2 boost), %d Lava / Crystal rows re-split' % (same, other))
+    promoted = PROMOTED_IN[stage]
+    if promoted in b:
+        fail('ODDS %s: a banked pack still rolls %s' % (' '.join(key), promoted))
+    if promoted not in a:
+        fail('ODDS %s: the base row did not list %s (the check is out of date)' % (' '.join(key), promoted))
+    allowed = TIER_MATES[stage] | {promoted}
+    moved = {i for i in set(a) | set(b) if a.get(i) != b.get(i)}
+    if not moved <= allowed:
+        fail('ODDS %s: a seed that is not a tier-mate of %s moved: %s' % (' '.join(key), promoted, sorted(moved - allowed)))
+    mates_before = sum(float(a.get(i, 0)) for i in allowed)
+    mates_after = sum(float(b.get(i, 0)) for i in allowed)
+    if abs(mates_before - mates_after) > 1e-9:
+        fail('ODDS %s: the tier-mates did not absorb the whole share (%.12g -> %.12g)' % (' '.join(key), mates_before, mates_after))
+    for i in TIER_MATES[stage]:
+        if float(b.get(i, 0)) < float(a.get(i, 0)) - 1e-12:
+            fail('ODDS %s: tier-mate %s lost share' % (' '.join(key), i))
+notes.append('ODDS rows: %d identical, %d Lava / Crystal rows changed (%d banked versions x %d variants x 6 luck levels x 2 boosts x 7 stages in all): in each the promoted seed is gone, only its old tier-mates moved, and they absorbed its whole share' % (same, resplit, len(versions), len(variants)))
 
 # --- Void / Verity / Mech -------------------------------------------------------------------------------------------------
 for kind in ('VOID', 'VERITY', 'MECH'):
@@ -149,26 +168,32 @@ def rolls(rows):
 
 
 rb, rn = rolls(B['ROLL']), rolls(N['ROLL'])
+if rb.keys() != rn.keys() or not any(k[0] == 'nil' for k in rb):
+    fail('ROLL rows: different keys, or no pack without a saved odds version (nil)')
 rsame = 0
+
+
+def label(d):
+    return {k.split(':', 1)[0]: k.split(':', 1)[1] for k in d}
+
+
 for key in rb:
     stage = key[1]
     if sum(rb[key][1].values()) != sum(rn[key][1].values()):
         fail('ROLL %s: different number of rolls' % ' '.join(key))
     for k in rn[key][1]:
         sid = k.split(':')[0]
-        if sid in NEW_IDS:
+        if sid in NEW_IDS or sid in PROMOTED:
             fail('ROLL %s: a banked pack rolled %s' % (' '.join(key), sid))
-        if sid in PROMOTED and k.split(':')[1] != PROMOTED[sid]:
-            fail('ROLL %s: %s must be labelled %s' % (' '.join(key), sid, PROMOTED[sid]))
+    lb, ln = label(rb[key][1]), label(rn[key][1])
+    for sid in ln:
+        if sid in lb and lb[sid] != ln[sid]:
+            fail('ROLL %s: %s changed its label %s -> %s' % (' '.join(key), sid, lb[sid], ln[sid]))
     if rb[key][0] == rn[key][0]:
         rsame += 1
-    elif stage not in ('4', '5'):
+    elif stage not in TIER_MATES:
         fail('ROLL %s changed but only Lava (4) and Crystal (5) may' % ' '.join(key))
-    else:
-        for k in rb[key][1]:
-            if k.split(':')[0] in PROMOTED and k.split(':')[1] != 'Rare':
-                fail('ROLL %s: the base labelled a promoted seed %s' % (' '.join(key), k))
-notes.append('ROLL lines: %d of %d identical (all of Forest / Desert / Snow / Jungle / Storm); the Lava / Crystal ones re-split; promoted seeds carry their new label' % (rsame, len(rb)))
+notes.append('ROLL lines (versions nil / 81 / 112 / 137, stages 1-7, Pack01 / 04 / 06): %d of %d identical; the Lava / Crystal ones lost the promoted seed; no banked roll ever gave a new or promoted seed' % (rsame, len(rb)))
 
 # --- Fruit of the Hour ----------------------------------------------------------------------------------------------------
 fb, fn = B['FOH'][0].split(' '), N['FOH'][0].split(' ')
@@ -177,14 +202,16 @@ if int(fb[1]) != 51 or int(fn[1]) != 53 or set(cn) != set(cb) | NEW_IDS or len(c
     fail('Fruit of the Hour: %s -> %s' % (fb[1], fn[1]))
 notes.append('Fruit of the Hour: %s -> %s candidates (+ the two new fruits)' % (fb[1], fn[1]))
 
-# --- what banked Lava / Crystal packs do now (v137 = the current odds) -----------------------------------------------------
-print('banked Lava / Crystal packs (odds version 137, boots x1), % before -> after:')
+# --- what banked Lava / Crystal packs do now (v137 = the current odds before this release) ---------------------------------------
+print('banked Lava / Crystal packs (odds version 137, luck 1, no boost), % before -> after:')
 for stage, name in (('4', 'Lava'), ('5', 'Crystal')):
     for variant in ('Pack01', 'Pack03', 'Pack06'):
-        key = (stage, variant, 'v137', 'L1', 'B0')
-        a, b = changed_rows[key]
-        moved = sorted(i for i in set(a) | set(b) if abs(a.get(i, 0) - b.get(i, 0)) > 1e-12)
-        print('  %-7s %-6s %s' % (name, variant, '  '.join('%s %.4g -> %.4g' % (i.replace('Seed', ''), a.get(i, 0), b.get(i, 0)) for i in moved)))
+        if (stage, variant, 'v137', 'L1', 'B0') not in changed_rows:
+            print('  %-7s %-6s unchanged (the promoted seed was never in this pack)' % (name, variant))
+            continue
+        a, b = changed_rows[(stage, variant, 'v137', 'L1', 'B0')]
+        moved = sorted(i for i in set(a) | set(b) if a.get(i) != b.get(i))
+        print('  %-7s %-6s %s' % (name, variant, '  '.join('%s %.4g -> %.4g' % (i.replace('Seed', ''), float(a.get(i, 0)), float(b.get(i, 0))) for i in moved)))
 for n in notes:
     print(n)
 if fails:

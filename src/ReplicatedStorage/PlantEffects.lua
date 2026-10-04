@@ -31,6 +31,19 @@ function Effects.Profile(def,id)
  return nil
 end
 local palette={RainbowGeode=Color3.fromRGB(190,203,255),Moon=Color3.fromRGB(184,226,255),DuneStar=Color3.fromRGB(255,220,105),Ancient=Color3.fromRGB(173,232,149),Supernova=Color3.fromRGB(255,198,101),Magma=Color3.fromRGB(255,115,55),Frost=Color3.fromRGB(164,232,251),Ash=Color3.fromRGB(170,161,149),Ember=Color3.fromRGB(255,151,67),Crystal=Color3.fromRGB(193,158,255),Storm=Color3.fromRGB(122,227,242),Spore=Color3.fromRGB(127,255,212),Venom=Color3.fromRGB(158,224,90),Firefly=Color3.fromRGB(255,211,105),Mirage=Color3.fromRGB(241,184,233),Solar=Color3.fromRGB(255,205,88)}
+-- R148: every plant of rank 4 or more (Legendary and up) wears a Highlight as its rarity aura, and Roblox draws at most 31 Highlights in all (the plant
+-- selection view, pack previews and the weather glow use some too). The scheduler already allows only four effect plants (two in low mode, which makes no
+-- aura), but it used to hand the slots out nearest-first, so a few near Legendary or Mythic plants could crowd out a King, Cosmic or Secret plant standing
+-- a little further off. Slots now go by rarity rank first (higher first), then distance, then a stable key; callers pass only the plants that qualify.
+function Effects.GrantSlots(entries,cap)
+ table.sort(entries,function(a,b)
+  if a.FxRank~=b.FxRank then return a.FxRank>b.FxRank end
+  if a.Distance~=b.Distance then return a.Distance<b.Distance end
+  return a.SortKey<b.SortKey
+ end)
+ for i,entry in ipairs(entries)do entry.FxGranted=i<=cap end
+ return math.min(#entries,cap)
+end
 function Effects.Create(item,r,def,crop,at,mode)
  if require(RS.HologramProjection).Is(crop.SeedId)then return end
  local style=PackRules.Rarities[def.Rarity];local profile=Effects.Profile(def,crop.SeedId)

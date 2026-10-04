@@ -135,7 +135,7 @@ function X.Execute(ctx,p,action,a)
   else st=stage(a[1]);key=variant(a[2]);luck=tonumber(a[3]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>3 then return false,'Use odds <biome> <tier> [luck].'end end
   if not st or st>=8 or not key or not luck or luck~=luck or luck<1 or luck>T.MaxLuck then return false,'Use odds storm mythic [1–'..T.MaxLuck..'], odds event or odds verity.'end
   local lines={key=='EclipseReliquary'and 'Void Pack | all regular Secret/Cosmic/King seeds | 1/200 normal Mech roll | luck does not affect this pack' or key=='VerityReliquary'and 'Verity Pack | Verity seed 1/100, then the Void pack without its King seeds (1/200 Mech roll without the Crowncore Tree) | luck does not affect this pack' or ctx.Config.BiomeNames[st]..' | '..Packs.GetPackTier(key).Name..' | luck '..luck};local odds=Packs.SeedOdds(ctx.Config,st,key,luck,Packs.OddsVersion)
-  for _,seed in ipairs(Packs.RewardPool(ctx.Config,st,key))do local n=odds[seed.Id]or 0;if n>0 then table.insert(lines,seed.Name..': '..require(RS.OddsText85).Format(n))end end
+  for _,seed in ipairs(Packs.OddsRows(ctx.Config,st,key,odds))do table.insert(lines,seed.Name..': '..require(RS.OddsText85).Format(odds[seed.Id]))end -- R148: by rarity rank, then name
   return true,table.concat(lines,'\n')
  elseif action=='pity'then
   local cycle=integer(a[1],0,1000000);if #a~=1 or not cycle then return false,'Use pity <completed reset number>.'end

@@ -33,9 +33,7 @@ do local inew=R.Instance.new;R.Instance.new=function(class,parent)local o=inew(c
 local Config=server('Config')
 local Rules=W.module('SeedPackRules');local Pity=W.module('PackSizePity');local O137=W.module('PackOdds137')
 local expected=require('./expected')
--- R148: the rarity a pack made before the roster change rolls a seed at (Rules.RarityBeforeR149 is empty by the owner's decision: Fire Pepper and
--- Moon Melon follow their new tiers in every pack, so this is today's rarity).
-local function tiers(odds)local t={};for id,p in pairs(odds or{})do local r=Rules.RarityBeforeR149[id]or Rules.GetRarity(id);t[r]=(t[r]or 0)+p/100 end;return t end
+local function tiers(odds)local t={};for id,p in pairs(odds or{})do local r=Rules.GetRarity(id);t[r]=(t[r]or 0)+p/100 end;return t end
 local function same(a,b)
  for _,k in ipairs({'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'})do
   if math.abs((a[k]or 0)-(b[k]or 0))>1e-12 then return false,k end
@@ -44,19 +42,16 @@ local function same(a,b)
 end
 -- 1. Odds 137 ---------------------------------------------------------------------------------------------------
 -- R148: new packs carry odds version 149 = this model's numbers (PackOdds137) over today's roster; a pack banked at 137 rolls the roster it was made with
--- (no Aloe / Sand Fruit), so the 137 rows below are the approved proposal's. Lava (4) and Crystal (5) are the exception: the roster change promoted
--- Fire Pepper to Mythic and Moon Melon to Legendary (owner: banked packs follow the new tiers too), so the proposal's tier table no longer
--- describes them; test_roster.luau checks their new rows exactly.
+-- (no Aloe / Sand Fruit, and, by the owner's no-windfall decision, no promoted Fire Pepper / Moon Melon: the seeds of their old Rare tier absorb the
+-- share, so every TIER's chance is exactly the approved proposal's, Lava and Crystal included; test_roster.luau checks the per-seed rows).
 check(Rules.OddsVersion==149 and Rules.ValidOddsVersion(137),'new packs carry odds version 149 (PackOdds137\'s numbers over today\'s roster)')
 local wrong,rows={},0
 for _,e in ipairs(expected.new)do
- if e.Stage~=4 and e.Stage~=5 then
-  rows+=1
-  local ok,k=same(tiers(Rules.SeedOdds(Config,e.Stage,e.Pack,1,137)),e.Odds)
-  if not ok then wrong[#wrong+1]=e.Stage..'/'..e.Pack..' '..k end
- end
+ rows+=1
+ local ok,k=same(tiers(Rules.SeedOdds(Config,e.Stage,e.Pack,1,137)),e.Odds)
+ if not ok then wrong[#wrong+1]=e.Stage..'/'..e.Pack..' '..k end
 end
-check(rows==30 and #wrong==0,'all 30 biome x pack odds (not Lava / Crystal) match the approved proposal ('..table.concat(wrong,', ')..')')
+check(rows==42 and #wrong==0,'all 42 biome x pack odds (banked, odds version 137) match the approved proposal ('..table.concat(wrong,', ')..')')
 local function oneIn(stage,pack,tier)local p=tiers(Rules.SeedOdds(Config,stage,pack,1,137))[tier]or 0;return p>0 and 1/p or 0 end
 check(math.abs(oneIn(1,'Pack01','Legendary')-60)<1e-6 and math.abs(oneIn(1,'Pack01','Mythic')-400)<1e-6,'Forest Common pack: Legendary 1/60, Mythic 1/400 (was 1/30, 1/200)')
 check(math.abs(oneIn(7,'Pack01','Legendary')-180)<1e-6 and math.abs(oneIn(7,'Pack01','Mythic')-1200)<1e-6,'Storm Peaks Common pack: Legendary 1/180, Mythic 1/1200')
@@ -77,15 +72,15 @@ check(math.abs(sum-1)<1e-9 and lucky.Legendary>1/180 and lucky.Mythic>1/1200,'bo
 -- 2. Old packs ----------------------------------------------------------------------------------------------------
 wrong={};rows=0
 for _,e in ipairs(expected.now)do
- if e.Stage~=4 and e.Stage~=5 then -- R148: Lava / Crystal re-split with Fire Pepper / Moon Melon at their new tiers (test_roster.luau)
-  rows+=1
-  local ok,k=same(tiers(Rules.SeedOdds(Config,e.Stage,e.Pack,1,112)),e.Odds)
-  if not ok then wrong[#wrong+1]=e.Stage..'/'..e.Pack..' '..k end
- end
+ rows+=1
+ local ok,k=same(tiers(Rules.SeedOdds(Config,e.Stage,e.Pack,1,112)),e.Odds)
+ if not ok then wrong[#wrong+1]=e.Stage..'/'..e.Pack..' '..k end
 end
-check(rows==30 and #wrong==0,'version-112 packs keep exactly their old odds, Lava / Crystal aside ('..table.concat(wrong,', ')..')')
--- R148: the two promoted seeds, in a Common pack of the version everyone has today (137 = 149): Fire Pepper Mythic 1/800, Moon Melon Legendary 1/150
-check(math.abs(oneIn(4,'Pack01','Mythic')-800)<1e-6 and math.abs(oneIn(5,'Pack01','Legendary')-150)<1e-6,'Lava Common pack: Mythic 1/800 (Fire Pepper); Crystal Common pack: Legendary 1/150 (Moon Melon)')
+check(rows==42 and #wrong==0,'version-112 packs keep exactly their old odds, all 42 rows ('..table.concat(wrong,', ')..')')
+-- R148: the two promoted seeds, in a NEW pack (no version = the current 149): Fire Pepper Mythic 1/800, Moon Melon Legendary 1/150. Banked ones cannot roll them.
+local function oneInNow(stage,pack,tier)local p=tiers(Rules.SeedOdds(Config,stage,pack,1))[tier]or 0;return p>0 and 1/p or 0 end
+check(math.abs(oneInNow(4,'Pack01','Mythic')-800)<1e-6 and math.abs(oneInNow(5,'Pack01','Legendary')-150)<1e-6,'new Lava Common pack: Mythic 1/800 (Fire Pepper); new Crystal Common pack: Legendary 1/150 (Moon Melon)')
+check(Rules.SeedOdds(Config,4,'Pack01',1,137).FirePepperSeed==nil and Rules.SeedOdds(Config,5,'Pack01',1,137).MoonflowerSeed==nil,'banked 137 packs: no Fire Pepper, no Moon Melon')
 local function equal(a,b)for k,v in pairs(a)do if math.abs((b[k]or 0)-v)>1e-12 then return false end end;for k in pairs(b)do if a[k]==nil then return false end end;return true end
 check(equal(Rules.SeedOdds(Config,7,'EclipseReliquary',1,137),Rules.SeedOdds(Config,7,'EclipseReliquary',1,112)),'Void pack odds unchanged')
 check(equal(Rules.SeedOdds(Config,8,'MechLimited',1,81),Rules.SeedOdds(Config,8,'MechLimited',1,81))and next(Rules.SeedOdds(Config,8,'MechLimited',1,81))~=nil,'Mech pack odds unchanged')

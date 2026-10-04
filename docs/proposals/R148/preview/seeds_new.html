@@ -34,6 +34,13 @@ function groundTexture(){
   g.strokeStyle='rgba(255,255,255,.10)';g.lineWidth=4;g.strokeRect(0,0,256,256);
   const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(60,60);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
+// Enum.Material.Sand: a rough, grainy surface (a noise bump map; Roblox draws its own sand texture).
+let sandMap=null;
+function sandTex(){
+  if(sandMap)return sandMap;const cv=document.createElement('canvas');cv.width=cv.height=128;const g=cv.getContext('2d');
+  const d=g.createImageData(128,128);for(let i=0;i<d.data.length;i+=4){const v=90+Math.random()*165;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255;}
+  g.putImageData(d,0,0);sandMap=new THREE.CanvasTexture(cv);sandMap.wrapS=sandMap.wrapT=THREE.RepeatWrapping;sandMap.repeat.set(3,3);return sandMap;
+}
 window.shoot=function(scene,W,H,opts){
   opts=opts||{};
   renderer.setSize(W,H);
@@ -53,6 +60,7 @@ window.shoot=function(scene,W,H,opts){
     const geo=(p.shape==='Ball'||p.shape==='Mesh')?geoSphere:p.shape==='Wedge'?geoWedge:p.shape==='Cylinder'?geoCyl:geoBox;
     let mat;
     if(p.material==='Neon')mat=new THREE.MeshBasicMaterial({color:col(p.color).multiplyScalar(1.05),transparent:p.t>0,opacity:1-p.t,toneMapped:false,depthWrite:p.t<.5});
+    else if(p.material==='Sand')mat=new THREE.MeshStandardMaterial({color:col(p.color),roughness:1,metalness:0,bumpMap:sandTex(),bumpScale:2.4});
     else if(p.material==='Glass')mat=new THREE.MeshPhysicalMaterial({color:col(p.color),roughness:.06,metalness:0,transparent:true,opacity:Math.max(.25,1-p.t),depthWrite:false,clearcoat:1,envMap:envTex,envMapIntensity:.6});
     else{
       const metal=p.material==='Metal';

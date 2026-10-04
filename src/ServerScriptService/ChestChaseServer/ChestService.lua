@@ -989,8 +989,8 @@ function ChestService:_holdPack(player,tool)
         -- R139 (owner): the free starter pack's 2x luck is secret, so its tooltip shows the plain pack odds.
         local odds=PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,player:GetAttribute('ChestLuckMultiplier'),record.OddsVersion or 0)
         local rows={PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)}
-        for _,seed in ipairs(PackRules.RewardPool(self.Config,record.Stage,record.BagVariant)or{})do
-            if(odds[seed.Id]or 0)>0 then table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))end
+        for _,seed in ipairs(PackRules.OddsRows(self.Config,record.Stage,record.BagVariant,odds))do -- R148: by rarity rank, then name
+            table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))
         end
         tool.ToolTip=table.concat(rows,'\n')
     end

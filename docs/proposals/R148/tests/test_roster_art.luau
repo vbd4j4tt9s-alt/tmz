@@ -1,16 +1,19 @@
 --!nocheck
 -- R148 (owner): the art of the seed roster change on the Roblox mock with the REAL modules (DesertPlantArt149, ApprovedPlantArt, PlantVisuals,
 -- PlantGrowth, PlantEffects, SeedPackVisuals, SeedSignatures, ChestIndex): Desert's Rare Aloe (blue-green rosette, three red-orange flower spikes)
--- and Legendary Sand Fruit palm (leaning palm, four bunches of sand-gold fruit), and the Mythic Fire Pepper at twice the size.
---  1. the art lists: the 96 / 99 parts, every group present, roles, nothing under the soil, sockets / centres / radii / Height / Radius = the catalog;
---  2. every build mode: ripe, growing at body .1 / .5 / .9, one harvest item per group, the distant supports (the palm's trunk collides), the
+-- and Legendary Sand Fruit (a ROUND barrel cactus built from the game's own cactus pieces, four lumpy Enum.Material.Sand fruits growing out of
+-- its shoulders), and the Mythic Fire Pepper at twice the size.
+--  1. the art lists: the 127 / 95 parts, every group present, roles, nothing under the soil, sockets / centres / radii / Height / Radius = the catalog;
+--  2. every build mode: ripe, growing at body .1 / .5 / .9, one harvest item per group, the distant supports (no collision: a cactus is not a tree), the
 --     harvested fruit, and no floating part anywhere (the scene goes through check_floating.py, R134);
 --  3. Fire Pepper: every spec of the base's art x2 (position and size; rotation untouched), for every crop variant; Prism Pepper unchanged;
 --  4. existing plants unchanged against the base commit's pipeline (PlantVisualsBase / PlantGrowthBase / ApprovedPlantArtBase, from git);
---  5. the three seeds (42 / 69 / 46 parts; Twinkle x2 on the Sand Fruit, Flicker x3 on Fire Pepper, nothing on the Rare Aloe);
+--  5. the three seeds (48 / 58 / 46 parts; Twinkle x2 on the Sand Fruit, Flicker x3 on Fire Pepper, nothing on the Rare Aloe);
 --  6. the rarity effects (aura on the Sand Fruit, Moon Melon, Fire Pepper; none on the Aloe);
---  7. the Index: the Desert tab shows seven cards in rarity order; a player complete under the old 5-seed Desert roster sees the reward dot and
---     lit claim buttons, and a claimed reward stays claimed.
+--  7. the Index: the Desert tab shows seven cards in rarity order; the old 5-seed roster counts ONLY through the server's saved flags
+--     (IndexOldHalf2 / IndexOldFull2): without them five of seven is halfway and not complete, with them an old completer sees the reward dot and
+--     lit claim buttons, and a claimed reward stays claimed;
+--  8. the effect slots (every plant of rank 4+ wears a Highlight aura; Roblox draws 31 in all): by rarity rank first, then distance.
 -- It prints one JSON scene (SCENE ...) of every plant model for check_floating.py (run_roster.sh).
 local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 -- Mock gaps (Roblox does these natively): a full lookAt with an up vector, CFrame.fromMatrix.
@@ -47,7 +50,7 @@ end
 local function specExtent(s)local c,z=s.c,s.z;local ey=(math.abs(c[7])*z[1]+math.abs(c[8])*z[2]+math.abs(c[9])*z[3])/2;return c[2]-ey,c[2]+ey end
 
 -- 1. The art lists --------------------------------------------------------------------------------------------------------------------------
-local want={DesertAloeSeed={specs=96,groups={[0]=63,11,11,11},cost=97,height=8.243,radius=5.211},SandFruitSeed={specs=99,groups={[0]=67,8,8,8,8},cost=100,height=14.182,radius=7.252}}
+local want={DesertAloeSeed={specs=127,groups={[0]=49,26,26,26},cost=128,height=8.261,radius=5.211},SandFruitSeed={specs=95,groups={[0]=79,4,4,4,4},cost=96,height=10.607,radius=6.777}}
 for _,id in ipairs(IDS)do
  local w=want[id];local def=Catalog[id];local art=Approved.Get(id)
  check(Approved.Has(id)==true and Art.Is(id)==true and Art.Get(id)==art and art.RarityRework==true,id..': ApprovedPlantArt routes to DesertPlantArt149 (a RarityRework spec list)')
@@ -85,41 +88,63 @@ for _,id in ipairs(IDS)do
   if hits==0 then near_=false end
  end
  check(near_,id..': every group\'s parts stay within 2.2 fruit radii of its fruit centre (so the harvest glints and picking sit on the fruit)')
- check(neon==(id=='SandFruitSeed'and 4 or 0),id..': '..neon..' Neon parts ('..(id=='SandFruitSeed'and'the four sand sparkles'or'none')..')')
+ check(neon==0,id..': no Neon part (the sand fruit is textured by Enum.Material.Sand, the aloe is plain)')
 end
 -- Colours and shapes of the design.
+-- The existing pieces the cactus is built from, read from the game's own art (so the test follows them if they change).
+local function piece(art,name)for _,sp in ipairs(art.Specs or art[1]and art[1].Specs or{})do if sp.f==name then return sp end end end
+local ExistingStem=piece(W.module('ApprovedPlantArt6'),'Rectangular cactus stem');local ExistingRib=piece(W.module('AgaveSeedArt45'),'Cactus rib')
+local ExistingSpine=piece(W.module('AgaveSeedArt45'),'Ivory spine');local ExistingAttach=piece(W.module('ApprovedPlantArt6'),'Upper surface fruit attachment')
 do
- local a=Approved.Get('DesertAloeSeed');local heart,leaves,spots,teeth,stalks,florets,buds=0,0,0,0,0,{},0
+ check(ExistingStem and ExistingRib and ExistingSpine and ExistingAttach,'(the existing cactus art is there: the Prickly Pear stem, the Crown Cactus rib and ivory spine, the Prickly Pear fruit attachment)')
+ local a=Approved.Get('DesertAloeSeed');local heart,leaves,spots,teeth,stalks,buds=0,0,0,0,0,0;local perSpike={};local leafColours={}
  for _,s in ipairs(a.Specs)do
-  if s.f=='Rosette heart'then heart+=1;check(kIs(s.k,98,150,128)and s.s=='Ball','Aloe: the rosette heart is a blue-green Ball (98,150,128)')end
-  if s.f=='Aloe leaf'then leaves+=1;check(s.s=='Wedge'and s.r=='Leaf'and s.g==0,'Aloe: leaves are Wedge pairs in the body')end
-  if s.f=='Aloe leaf spot'then spots+=1;check(kIs(s.k,204,228,214),'Aloe: cream leaf spots (204,228,214)')end
-  if s.f=='Aloe leaf tooth'then teeth+=1;check(kIs(s.k,176,120,96),'Aloe: red-brown teeth (176,120,96)')end
-  if s.f=='Aloe flower stalk'then stalks+=1;check(s.s=='Cylinder'and s.r=='Fruit'and s.g>=1 and s.g<=3 and kIs(s.k,126,146,100),'Aloe: each flower stalk is a Fruit-role Cylinder (not Stem: a held spike must keep its florets)')end
-  if s.f=='Aloe floret'then local key=table.concat(s.k,',');florets[key]=(florets[key]or 0)+1 end
+  if s.f=='Rosette heart'then heart+=1;check(kIs(s.k,48,134,114)and s.s=='Ball','Aloe: the rosette heart is a rich blue-green Ball (48,134,114)')end
+  if s.f=='Aloe leaf'then leaves+=1;leafColours[table.concat(s.k,',')]=true;check(s.s=='Wedge'and s.r=='Leaf'and s.g==0,'Aloe: leaves are Wedge pairs in the body')end
+  if s.f=='Aloe leaf spot'then spots+=1;check(kIs(s.k,214,236,222),'Aloe: cream leaf spots (214,236,222)')end
+  if s.f=='Aloe leaf tooth'then teeth+=1;check(kIs(s.k,200,92,60),'Aloe: red-brown teeth (200,92,60)')end
+  if s.f=='Aloe flower stalk'then stalks+=1;check(s.s=='Cylinder'and s.r=='Fruit'and s.g>=1 and s.g<=3 and kIs(s.k,112,150,92),'Aloe: each flower stalk is a Fruit-role Cylinder (not Stem: a held spike must keep its florets)')end
+  if s.f=='Aloe floret'then perSpike[s.g]=perSpike[s.g]or{};table.insert(perSpike[s.g],s.k)end
   if s.f=='Aloe bud tip'then buds+=1 end
   check(s.m=='SmoothPlastic'and s.tx==nil,'Aloe: SmoothPlastic, no textures')
  end
- check(heart==1 and leaves==34 and spots==14 and teeth==14 and stalks==3 and buds==3,('Aloe: 1 heart, 34 leaf wedges (17 leaves), 14 spots, 14 teeth, 3 stalks, 3 bud tips (%d %d %d %d %d %d)'):format(heart,leaves,spots,teeth,stalks,buds))
- check((florets['236,96,48']or 0)==12 and(florets['250,150,60']or 0)==9 and(florets['240,196,92']or 0)==6,'Aloe: 27 florets, red-orange 12 / orange 9 / gold 6 (4 + 3 + 2 on each of the 3 spikes)')
- local p=Approved.Get('SandFruitSeed');local trunk,rings,fronds,tips,fruits,ripples,sparks,boots,toes=0,0,0,0,0,0,0,0,0
- for _,s in ipairs(p.Specs)do
-  if s.f=='Palm trunk'then trunk+=1;check(s.m=='Wood'and s.s=='Cylinder'and s.r=='Stem'and(kIs(s.k,150,110,70)or kIs(s.k,136,99,62)),'Palm: trunk segments are Wood Cylinders, two alternating browns')end
-  if s.f=='Palm trunk ring'then rings+=1;check(s.m=='Wood'and kIs(s.k,112,80,50),'Palm: darker Wood rings at the joints')end
-  if s.f=='Palm frond'then fronds+=1 end
-  if s.f=='Palm frond tip'then tips+=1 end
-  if s.f=='Dry frond boot'then boots+=1 end
-  if s.f=='Palm root toe'then toes+=1;check(s.s=='Wedge'and s.m=='Wood','Palm: root toes are Wood Wedges')end
-  if s.f=='Sand fruit'then fruits+=1;check(s.s=='Sphere'and s.r=='Fruit'and s.g>=1 and s.g<=4 and(kIs(s.k,222,182,112)or kIs(s.k,214,170,98)or kIs(s.k,230,192,124))and near(s.z[1],1.05)and near(s.z[2],1.05),'Palm: sand fruits are Sphere 1.05 in three sand golds')end
-  if s.f=='Sand fruit ripple'then ripples+=1;check(kIs(s.k,184,138,78),'Palm: a darker dune-ripple band on each fruit')end
-  if s.f=='Sand sparkle'then sparks+=1;check(s.m=='Neon'and kIs(s.k,255,236,170)and near(s.z[1],.18),'Palm: the sand sparkles are Neon (255,236,170)')end
+ check(heart==1 and leaves==34 and spots==7 and teeth==7 and stalks==3 and buds==3,('Aloe: 1 heart, 34 leaf wedges (17 leaves), 7 spots, 7 teeth, 3 stalks, 3 bud tips (%d %d %d %d %d %d)'):format(heart,leaves,spots,teeth,stalks,buds))
+ check(leafColours['42,124,110']and leafColours['56,142,124']and leafColours['64,160,138']and leafColours['80,178,152'],'Aloe: richer blue-green leaves (42,124,110 ... 80,178,152)')
+ -- OWNER (R148 feedback): many more florets on each spike, full and vibrant: 24 per spike (it was 9), red at the bottom grading to yellow at the tip
+ local dense=true
+ for g=1,3 do
+  local list=perSpike[g]or{};if #list~=24 then dense=false;continue end
+  local lo,hi=list[1],list[#list]
+  check(lo[1]>=220 and lo[2]<=60 and lo[3]<=40,'Aloe spike '..g..': the lowest floret is a deep red ('..table.concat(lo,',')..')')
+  check(hi[1]==255 and hi[2]>=215 and hi[3]>=80,'Aloe spike '..g..': the top floret is yellow ('..table.concat(hi,',')..')')
+  local warm,graded=true,true
+  for i,k in ipairs(list)do if k[1]<220 or k[3]>110 then warm=false end;if i>1 and k[2]<list[i-1][2]then graded=false end end
+  check(warm and graded,'Aloe spike '..g..': every floret is saturated (red >= 220, blue <= 110) and the green only rises up the spike')
  end
- check(trunk==5 and rings==5 and fronds==16 and tips==16 and boots==8 and toes==3 and fruits==12 and ripples==12 and sparks==4,('Palm: 5 trunk segments + 5 rings, 8 fronds (16 + 16 blades), 8 boot blades, 3 toes, 12 fruits + 12 ripples, 4 sparkles (%d %d %d %d %d %d %d %d %d)'):format(trunk,rings,fronds,tips,boots,toes,fruits,ripples,sparks))
- -- the palm leans: the crown sits to the +X side of the root, and every bunch hangs below the crown
- local crownX,crownY;for _,s in ipairs(p.Specs)do if s.f=='Palm crown heart'then crownX,crownY=s.c[1],s.c[2]end end
- check(near(crownX,1.1,1e-9)and near(crownY,11.4,1e-9),'Palm: the crown leans to x 1.1 at y 11.4')
- local under=true;for g=1,4 do if p.Sockets[g][2]>=crownY or p.FruitCenters[g][2]>=crownY-1 then under=false end end
- check(under and near(p.Sockets[1][2],10.8,1e-9)and near(p.FruitCenters[1][2],9.8223,.001)and p.FruitRadii[1]==1.05,'Palm: the four bunches hang under the crown (sockets y 10.8, fruit centres y 9.82, radius 1.05)')
+ check(dense,'Aloe: 24 florets on every one of the three spikes (72 in all)')
+ local p=Approved.Get('SandFruitSeed');local count={}
+ for _,s in ipairs(p.Specs)do
+  count[s.f]=(count[s.f]or 0)+1
+  if s.f=='Cactus body'then check(s.s=='Ball'and s.r=='Stem'and s.g==0 and kIs(s.k,ExistingStem.k[1],ExistingStem.k[2],ExistingStem.k[3])and s.m==ExistingStem.m and near(s.z[1],10.8)and near(s.z[2],9.4)and near(s.z[3],10.8)and near(s.c[2],4.7),'Cactus: a round Ball body 10.8 x 9.4 x 10.8 standing on the soil, in the Prickly Pear\'s own stem green')end
+  if s.f=='Cactus pup'then check(s.s=='Ball'and kIs(s.k,ExistingStem.k[1],ExistingStem.k[2],ExistingStem.k[3]),'Cactus: the pups are round too, the same green')end
+  if s.f=='Cactus rib'then check(s.s=='Cylinder'and s.r=='Stem'and s.g==0 and kIs(s.k,ExistingRib.k[1],ExistingRib.k[2],ExistingRib.k[3])and s.m==ExistingRib.m,'Cactus: ribs are the Crown Cactus\' rib colour and material')end
+  if s.f=='Ivory spine'then check(s.s=='Wedge'and s.r=='Stem'and kIs(s.k,ExistingSpine.k[1],ExistingSpine.k[2],ExistingSpine.k[3])and s.m==ExistingSpine.m and near(s.z[1],ExistingSpine.z[1]*1.5)and near(s.z[2],ExistingSpine.z[2]*1.5),'Cactus: ivory spines are the Crown Cactus\' Wedge (colour, material, shape), 1.5x for this body')end
+  if s.f=='Fruit stem'then check(s.s=='Cylinder'and s.r=='Fruit'and s.g>=1 and s.g<=4 and kIs(s.k,ExistingAttach.k[1],ExistingAttach.k[2],ExistingAttach.k[3]),'Cactus: each fruit hangs on the Prickly Pear\'s fruit-attachment green')end
+  if s.f=='Sand fruit'then check(s.s=='Ball'and s.r=='Fruit'and s.g>=1 and s.g<=4 and s.m=='Sand'and s.k[1]>=210 and s.k[2]>=175 and s.k[3]>=105 and s.k[3]<=150 and(s.z[1]~=s.z[2]or s.z[2]~=s.z[3])and s.z[2]<s.z[1],'Sand fruit: a squashed Ball in Enum.Material.Sand and a sand colour ('..table.concat(s.k,',')..')')end
+  if s.f=='Sand fruit lump'or s.f=='Sand fruit nub'then check(s.s=='Ball'and s.r=='Fruit'and s.m=='Sand','Sand fruit: the lump and the nub are Sand too')end
+ end
+ check(count['Cactus body']==1 and count['Cactus pup']==2 and count['Cactus rib']==40 and count['Ivory spine']==36 and count['Fruit stem']==4 and count['Sand fruit']==4 and count['Sand fruit lump']==4 and count['Sand fruit nub']==4,
+  ('Cactus: 1 body, 2 pups, 40 ribs (8 x 5), 36 ivory spines, and 4 x (stem, sand fruit, lump, nub) (%s)'):format(table.concat((function()local o={};for k,v in pairs(count)do o[#o+1]=k..'='..v end;table.sort(o);return o end)(),' ')))
+ -- the fruits grow out of the shoulders: sockets on the body's surface, centres just outside it on the upper half, between the ribs
+ local onSurface,onShoulder=true,true
+ for g=1,4 do
+  local so,ce=p.Sockets[g],p.FruitCenters[g]
+  local e=(so[1]/5.4)^2+((so[2]-4.7)/4.7)^2+(so[3]/5.4)^2
+  if math.abs(e-1)>1e-6 then onSurface=false end
+  local d=math.sqrt((ce[1]-so[1])^2+(ce[2]-so[2])^2+(ce[3]-so[3])^2)
+  if not(near(d,.92,.01)and ce[2]>4.7+2.5)then onShoulder=false end
+ end
+ check(onSurface and onShoulder and p.FruitRadii[1]==1.15,'Cactus: the four sockets are on the body\'s surface, the fruit centres .92 outside it on the upper half, radius 1.15')
 end
 
 -- 2. Every build mode ------------------------------------------------------------------------------------------------------------------------
@@ -136,14 +161,14 @@ local function addScene(label,model)
 end
 for _,id in ipairs(IDS)do
  local def=Catalog[id];local w=want[id];local art=Approved.Get(id)
- check(PG.Profile(id,def)==(id=='SandFruitSeed'and'Tree'or'Bush'),id..': grows with the '..(id=='SandFruitSeed'and'Tree'or'Bush')..' profile (generic growth: no per-stage art is needed)')
+ check(PG.Profile(id,def)=='Bush',id..': grows with the Bush profile (generic growth: no per-stage art is needed)')
  -- ripe
  local m=Visuals.Build(id,origin,crop(id),4,math.huge)
  local base=m:FindFirstChild('PlantBase');local kids={}
  for g=1,def.FruitCount do kids[g]=m:FindFirstChild('Harvest_'..g)end
  local counts={};for g=1,def.FruitCount do local n=0;if kids[g]then for _,d in ipairs(kids[g]:GetDescendants())do if d:IsA('BasePart')then n+=1 end end end;counts[g]=n end
  local baseCount=0;for _,d in ipairs(base:GetDescendants())do if d:IsA('BasePart')then baseCount+=1 end end
- check(baseCount==w.groups[0]and table.concat(counts,',')==(id=='DesertAloeSeed'and'11,11,11'or'8,8,8,8'),id..': ripe: PlantBase '..w.groups[0]..' parts and one Harvest_N model per fruit group ('..table.concat(counts,'/')..')')
+ check(baseCount==w.groups[0]and table.concat(counts,',')==(id=='DesertAloeSeed'and'26,26,26'or'4,4,4,4'),id..': ripe: PlantBase '..w.groups[0]..' parts and one Harvest_N model per fruit group ('..table.concat(counts,'/')..')')
  check(#parts(m)==w.specs and #parts(m,true)==w.specs,id..': ripe: all '..w.specs..' parts built and visible')
  local queryOk=true;for g=1,def.FruitCount do for _,d in ipairs(kids[g]:GetDescendants())do if d:IsA('BasePart')and not d.CanQuery then queryOk=false end end end
  for _,d in ipairs(base:GetDescendants())do if d:IsA('BasePart')and d.CanQuery then queryOk=false end end
@@ -160,7 +185,7 @@ for _,id in ipairs(IDS)do
   if ghi<lastTop-1e-6 then monotonic=false end;lastTop=ghi
   lines[#lines+1]=('%d%%: %d visible, top %.2f'):format(f*100,#vis,ghi)
   check(glo>=-.0501,('%s growing %d%%: nothing under the soil (%.4f)'):format(id,f*100,glo))
-  check(#parts(g)<=125,('%s growing %d%%: %d parts in all (the %d art parts plus the generic growth pieces)'):format(id,f*100,#parts(g),w.specs))
+  check(#parts(g)<=w.specs+20,('%s growing %d%%: %d parts in all (the %d art parts plus the generic growth pieces)'):format(id,f*100,#parts(g),w.specs))
   if f==0 then check(#vis==1,id..': 0%: only the new seed shows ('..#vis..')')end
   if f==.1 then check(fruitVisible==0 and ghi<1,id..': 10%: a sprout, no fruit yet (top '..ghi..')')end
   if f==.5 then check(ghi<w.height*.75,id..': 50%: still growing (top '..ghi..' of '..w.height..')')end
@@ -177,18 +202,20 @@ for _,id in ipairs(IDS)do
   for _,d in ipairs(ps)do local gAttr=d.Parent and d.Parent:GetAttribute('HarvestIndex');if gAttr~=g then ok=false end end
   check(ok,id..': harvest item '..g..': '..w.groups[g]..' parts, all from group '..g)
   local detached=Visuals.BuildSelectedFruit(id,origin,crop(id,{_DetachedHarvest=true}),{[g]=true},math.huge)
-  check(#parts(detached)==w.groups[g],id..': harvest item '..g..' (detached, as held in the hand): no part dropped (the stalk is a Fruit part, not a Stem)')
-  local specOk=true;for _,s in ipairs(art.Specs)do if s.g==g and not Visuals.HarvestSpec(id,s)then specOk=false end end
-  check(specOk,id..': HarvestSpec keeps every part of group '..g)
-  if g==1 or g==def.FruitCount then addScene(id..' harvest item '..g,item)end
+  -- held in the hand: the Aloe keeps its whole spike (its stalk is a Fruit part, not a Stem); the sand fruit drops only its green attachment
+  -- ('Fruit stem' is one of the game's connector names), leaving the sand ball with its lump and nub: "harvested fruit = that sand ball"
+  local keep=id=='SandFruitSeed'and w.groups[g]-1 or w.groups[g]
+  check(#parts(detached)==keep,id..': harvest item '..g..' (detached, as held in the hand): '..keep..' parts'..(id=='SandFruitSeed'and' (the sand ball, its lump and its nub)'or' (nothing dropped)'))
+  local specOk=true;for _,s in ipairs(art.Specs)do if s.g==g and not Visuals.HarvestSpec(id,s)and s.f~='Fruit stem'then specOk=false end end
+  check(specOk,id..': HarvestSpec keeps every part of group '..g..(id=='SandFruitSeed'and' except the attachment'or''))
+  if g==1 or g==def.FruitCount then addScene(id..' harvest item '..g,item);addScene(id..' held item '..g,detached)end
  end
- -- distant supports: the body only; the palm's trunk collides (cost 14 within the 24 budget), the Aloe has no collision
+ -- distant supports: the body only; nothing collides (neither is a tree: a cactus never blocks planting)
  local sup=R.new('Model');Visuals.Supports(id,origin,crop(id),4,sup)
  local sp,collide,collideCost=parts(sup),0,0
  for _,d in ipairs(sp)do if d.CanCollide then collide+=1;collideCost+=1 end end
  check(#sp==w.groups[0],id..': supports: the '..w.groups[0]..' body parts ('..#sp..')')
- if id=='SandFruitSeed'then check(collide==14 and collideCost<=24,id..': supports: the 14 trunk / root parts collide, within the 24-cost budget ('..collide..')')
- else check(collide==0,id..': supports: nothing collides (not a tree)')end
+ check(collide==0 and Catalog[id].Tree==false,id..': supports: nothing collides (not a tree)')
  local grow=R.new('Model');Visuals.GrowingSupports(id,origin,crop(id),1,grow,.5*def.Seconds)
  check(#parts(grow)>0,id..': the distant growing path builds ('..#parts(grow)..' parts)')
  -- a scaled plant (PlantScale 2) scales every part and keeps the ground
@@ -295,7 +322,7 @@ do
   return hi[1]-lo[1],hi[2]-lo[2],hi[3]-lo[3]
  end
  local function anim(m,kind)local n=0;for _,d in ipairs(m:GetDescendants())do if d:IsA('BasePart')and d:GetAttribute('SeedAnim')==kind then n+=1 end end;return n end
- local expect={DesertAloeSeed={42,'Rare',0,0},SandFruitSeed={69,'Legendary',2,0},FirePepperSeed={46,'Mythic',0,3}}
+ local expect={DesertAloeSeed={48,'Rare',0,0},SandFruitSeed={58,'Legendary',2,0},FirePepperSeed={46,'Mythic',0,3}}
  local fx=R.new('Folder');fx.Parent=W.workspace
  for _,id in ipairs({'DesertAloeSeed','SandFruitSeed','FirePepperSeed'})do
   local e=expect[id]
@@ -318,7 +345,7 @@ do
   end
  end
  check(Sigs.Shape('DesertAloeSeed')=='Pointed'and Sigs.Shape('SandFruitSeed')=='Round'and Sigs.Shape('FirePepperSeed')=='Bean','seed bodies: Aloe Pointed, Sand Fruit Round, Fire Pepper Bean (unchanged)')
- check(Sigs.Get('DesertAloeSeed')and Sigs.Get('SandFruitSeed')and Sigs.Get('SandFruitSeed').Pattern=='None'and Sigs.Get('FirePepperSeed'),'signatures: Aloe, Sand Fruit (its Stripes pattern is replaced by its ripple lines), Fire Pepper')
+ check(Sigs.Get('DesertAloeSeed')and Sigs.Get('SandFruitSeed')and Sigs.Get('SandFruitSeed').Pattern==nil and Sigs.Get('FirePepperSeed'),'signatures: Aloe, Sand Fruit (sandy Specks pattern + grains), Fire Pepper')
  -- coats and a held build
  for _,coat in ipairs({'Gold','Diamond'})do for _,id in ipairs({'DesertAloeSeed','SandFruitSeed','FirePepperSeed'})do
   local ok=pcall(SeedVisuals.Seed,{Id=id},1,CF(0,0,0),holder,1,nil,coat);check(ok,id..': the '..coat..' coat builds')
@@ -373,15 +400,16 @@ do
  local seeds=R.new('Folder');seeds.Name='DiscoveredSeeds';seeds.Parent=player
  local plants=R.new('Folder');plants.Name='DiscoveredPlants';plants.Parent=player
  local function found(folder,id)local v=R.new('BoolValue');v.Name=id;v.Value=true;v.Parent=folder end
- -- A player who completed the OLD five-seed Desert (every seed found and grown) and has claimed nothing.
+ -- A player with the five seeds of the OLD Desert found and grown, who has claimed nothing. What the old roster counts for is the server's call: a new
+ -- player, or an old one who had not got there, has no IndexOldHalf2 / IndexOldFull2; an old completer has both (set below).
  for _,id in ipairs({'CactusSeed','DatePalmSeed','MirageFigSeed','SolarStarfruitSeed','StarfruitSeed'})do found(seeds,id);found(plants,id)end
  local s=R.new('LocalScript');s.Name='ChestIndex';W.load('ChestIndex',s)
  W.frames(10)
  local gui=pg:FindFirstChild('ChestIndexGui');local toggle=pg:FindFirstChild('IndexButton',true)
  local desert=gui:FindFirstChild('Biome2',true);local forest=gui:FindFirstChild('Biome1',true)
  local function shown(b)return b and b.Visible and b.Count.Text or nil end
- check(desert and desert:FindFirstChild('RewardDot')and desert.RewardDot.Visible and not(forest:FindFirstChild('RewardDot')and forest.RewardDot.Visible),'old 5/5 Desert: the Desert tab has its reward dot (Forest has none)')
- check(shown(toggle:FindFirstChild('RewardBadge'))=='2','INDEX shows 2: the halfway gems and the completion gems of the old roster ('..tostring(shown(toggle:FindFirstChild('RewardBadge')))..')')
+ check(desert and desert:FindFirstChild('RewardDot')and desert.RewardDot.Visible and not(forest:FindFirstChild('RewardDot')and forest.RewardDot.Visible),'5 of 7 Desert seeds (no old-roster flags): the Desert tab has its reward dot for the halfway reward (Forest has none)')
+ check(shown(toggle:FindFirstChild('RewardBadge'))=='1','INDEX shows 1: the halfway gems only, NOT the completion (a player without the server\'s flag needs all seven) ('..tostring(shown(toggle:FindFirstChild('RewardBadge')))..')')
  pg:SetAttribute('SeedMenu','Index');W.frames(20)
  desert.Activated:Fire();W.frames(10)
  local list=gui:FindFirstChild('SeedCards',true)
@@ -400,7 +428,16 @@ do
  check(list.DesertAloeSeed.RarityChip.Rarity.Text=='RARE'and list.SandFruitSeed.RarityChip.Rarity.Text=='LEGENDARY','Aloe RARE, Sand Fruit LEGENDARY')
  check(list.DesertAloeSeed:FindFirstChild('Name').Text=='???'and list.SandFruitSeed:FindFirstChild('Name').Text=='???','the new seeds start as ??? until found')
  local middle=gui:FindFirstChild('MiddleGem',true);local endGem=gui:FindFirstChild('GemReward',true)
- check(middle:GetAttribute('RewardReady')==true and middle.Active and endGem:GetAttribute('RewardReady')==true and endGem.Active,'old 5/5 Desert: both claim gems are lit and can be pressed (nothing is taken away)')
+ check(middle:GetAttribute('RewardReady')==true and middle.Active and endGem:GetAttribute('RewardReady')==false and not endGem.Active,'5 of 7, no flags: the halfway gem is lit, the completion gem is not')
+ -- The server records an old completer (it had reached both milestones with the old roster, before the update) and publishes the flags.
+ player:SetAttribute('IndexOldHalf2',true);W.frames(5)
+ check(shown(toggle.RewardBadge)=='1'and endGem:GetAttribute('RewardReady')==false,'IndexOldHalf2 alone adds nothing here (the halfway reward is already lit by the live count)')
+ player:SetAttribute('IndexOldFull2',true);W.frames(5)
+ check(shown(toggle.RewardBadge)=='2'and desert.RewardDot.Visible,'an old completer (IndexOldHalf2 + IndexOldFull2): INDEX shows 2 ('..tostring(shown(toggle.RewardBadge))..')')
+ check(middle:GetAttribute('RewardReady')==true and middle.Active and endGem:GetAttribute('RewardReady')==true and endGem.Active,'old 5/5 Desert, recorded by the server: both claim gems are lit and can be pressed (nothing is taken away)')
+ player:SetAttribute('IndexOldFull2',false);W.frames(5)
+ check(shown(toggle.RewardBadge)=='1'and endGem:GetAttribute('RewardReady')==false,'the completion flag withdrawn: the completion gem goes dark again (the flag, not the old roster, decides)')
+ player:SetAttribute('IndexOldFull2',true);W.frames(5)
  check(gui:FindFirstChild('Progress',true)==nil or true,'(the bar counts the live roster: 5 of 7 seeds, 5 of 7 plants)')
  local progress;for _,d in ipairs(gui:GetDescendants())do if d:IsA('TextLabel')and d.Text:find('SEEDS')and d.Text:find('PLANTS')then progress=d.Text end end
  check(progress and progress:find('5/7 SEEDS',1,true)and progress:find('5/7 PLANTS',1,true),'the progress text reads the live roster: '..tostring(progress))
@@ -414,6 +451,67 @@ do
  check(not toggle.RewardBadge.Visible and not desert.RewardDot.Visible and middle:GetAttribute('RewardClaimed')==true and endGem:GetAttribute('RewardClaimed')==true,'both claimed: no badge, no dot, both gems show claimed')
  -- A player who claimed before the update: found five of the old seeds, claimed both: nothing lights up.
  check(middle:GetAttribute('RewardReady')==false and endGem:GetAttribute('RewardReady')==false,'a claimed reward does not light up again (no duplicate claim) although 5 / 7 is not complete now')
+end
+
+-- 8. Effect slots ---------------------------------------------------------------------------------------------------------------------------------
+-- Every plant of rank 4+ (Legendary and up) wears a Highlight as its rarity aura, and Roblox draws at most 31 Highlights in all. GardenVisuals lets four
+-- plants carry effects (two in low mode, which makes no aura): by rarity rank first, then distance, so a King / Cosmic / Secret plant is never crowded
+-- out by nearer Legendary or Mythic ones (it used to be nearest-first).
+do
+ local function slot(key,rank,distance)return{SortKey=key,FxRank=rank,Distance=distance}end
+ local function granted(list,cap)local n=Effects.GrantSlots(list,cap);local got={};for _,e in ipairs(list)do if e.FxGranted then got[#got+1]=e.SortKey end end;table.sort(got);return n,table.concat(got,',')end
+ local function mixed()return{slot('a',4,5),slot('b',5,6),slot('c',4,7),slot('d',5,8),slot('e',8,60),slot('f',7,50),slot('g',6,70),slot('h',4,1)}end
+ local n,got=granted(mixed(),4)
+ check(n==4 and got=='b,e,f,g','GrantSlots, 4 slots: King, Cosmic and Secret first (however far), then the nearest Mythic; the nearer Legendary and Mythic plants wait ('..got..')')
+ n,got=granted(mixed(),2);check(n==2 and got=='e,f','GrantSlots, 2 slots (low mode): King and Cosmic ('..got..')')
+ n,got=granted({slot('x',5,10),slot('w',5,10)},1);check(n==1 and got=='w','GrantSlots: equal rank and distance, the stable key decides')
+ n,got=granted({slot('a',4,9),slot('b',4,3)},4);check(n==2 and got=='a,b','GrantSlots: fewer plants than slots, all granted')
+ n,got=granted({slot('a',4,9),slot('b',4,3),slot('c',4,6)},1);check(n==1 and got=='b','GrantSlots: the same rank goes nearest first')
+ n,got=granted({},4);check(n==0 and got=='','GrantSlots: no plants, nothing granted')
+ -- The real scheduler (GardenVisuals) on a garden: five Legendary plants near the camera, a King, a Cosmic and a Secret plant further off.
+ local waiting={}
+ local realWait,realAdvance=R.task.wait,R.advance
+ local mainThread=coroutine.running()
+ R.task.wait=function(t)if coroutine.running()==mainThread then return t or 0 end;table.insert(waiting,{At=R.clock+(t or 0),Co=coroutine.running()});return coroutine.yield()end -- (the mock's returns at once; here a spawned loop really waits)
+ R.advance=function(dt)realAdvance(dt);local due,keep={},{};for _,w in ipairs(waiting)do if w.At<=R.clock then due[#due+1]=w else keep[#keep+1]=w end end;waiting=keep;for _,w in ipairs(due)do local ok,e=coroutine.resume(w.Co,dt);if not ok then error(e,0)end end end
+ local Players=W.service('Players');local player=Players.LocalPlayer
+ player:SetAttribute('ChestChaseCommandsAllowed',true)
+ local camera=W.workspace.CurrentCamera;camera.CFrame=R.CFrame.lookAt(V3(0,12,-30),V3(0,4,0))
+ local map=R.new('Folder');map.Name='ChestChaseMap';map.Parent=W.workspace
+ local made=0
+ local function plant(id,x,z)
+  made+=1;local m=R.new('Model');m.Name='Crop_'..made;local now=math.floor(W.workspace:GetServerTimeNow())
+  for k,v in pairs({GardenPlantV141=true,CropId='c'..made,SeedId=id,GrowthStage=4,PlantScale=1,SeedScale=1,Mutation='None',Weather='None',PlantedAt=now-100000,MatureAt=now-90000,ReadyAt=now-90000,HarvestCycle=0,PickedMask=0,FruitReady=true,FruitGrowing=false,FruitRevision=1})do m:SetAttribute(k,v)end
+  local a=R.new('Part');a.Name='CropAnchor';a.CFrame=CF(x,0,z);a.Parent=m;m.Parent=map;return m
+ end
+ local near={};for i,at in ipairs({{0,-14},{5,-6},{-5,2},{6,10},{-6,18}})do near[i]=plant('SunflowerBloomSeed',at[1],at[2])end -- (the camera stands at z = -30, looking in +z)
+ local king,cosmic,secret=plant('SolarStarfruitSeed',-25,28),plant('StormSovereignSeed',25,30),plant('StarfruitSeed',0,40)
+ check(Catalog.SunflowerBloomSeed.Rank==4 and Catalog.SolarStarfruitSeed.Rank==8 and Catalog.StormSovereignSeed.Rank==7 and Catalog.StarfruitSeed.Rank==6,'(the scene: Legendary x5 near, King, Cosmic and Secret further away)')
+ local gv=R.new('LocalScript');gv.Name='GardenVisuals';gv.Parent=player
+ local okGV,errGV=pcall(W.load,'GardenVisuals',gv)
+ check(okGV,'GardenVisuals loads in the test world ('..tostring(errGV)..')')
+ W.frames(240)
+ local function aura(m)local fx=m:FindFirstChild('PlantRarityEffects');return fx and fx:FindFirstChild('Rarity aura')end
+ local function effects(m)return m:FindFirstChild('PlantRarityEffects')end
+ local function highlights()local c=0;for _,d in ipairs(map:GetDescendants())do if d.Name=='Rarity aura'and d:IsA('Highlight')then c+=1 end end;return c end
+ local builtAll=true;for _,m in ipairs({near[1],near[2],near[3],near[4],near[5],king,cosmic,secret})do if not m:FindFirstChild('LocalPlantArt')then builtAll=false end end
+ check(builtAll,'all eight plants are built in detail')
+ check(aura(king)and aura(cosmic)and aura(secret)and effects(king):GetAttribute('AuraRank')==8 and effects(cosmic):GetAttribute('AuraRank')==7 and effects(secret):GetAttribute('AuraRank')==6,
+  'King, Cosmic and Secret (further from the camera) all wear their aura although five nearer Legendary plants are on screen')
+ local nearHave=0;for _,m in ipairs(near)do if aura(m)then nearHave+=1 end end
+ check(nearHave==1 and aura(near[1]),'... and the fourth slot goes to the NEAREST Legendary plant, the other four wait ('..nearHave..' of 5)')
+ check(player:GetAttribute('PlantEffectModels')==4 and highlights()==4,'four effect plants and four Highlights in all, well under the 31 Roblox draws ('..tostring(player:GetAttribute('PlantEffectModels'))..' / '..highlights()..')')
+ -- Low mode: two slots, no aura at all; the two highest ranks keep theirs.
+ player:SetAttribute('StudioPlantEffects','low');W.frames(120)
+ check(player:GetAttribute('PlantEffectModels')==2 and effects(king)and effects(cosmic)and not effects(secret)and highlights()==0,'low mode: two effect plants, King and Cosmic, and no Highlight ('..tostring(player:GetAttribute('PlantEffectModels'))..' / '..highlights()..')')
+ player:SetAttribute('StudioPlantEffects','off');W.frames(120)
+ check(player:GetAttribute('PlantEffectModels')==0 and highlights()==0 and not effects(king),'effects off: none')
+ player:SetAttribute('StudioPlantEffects','normal');W.frames(240)
+ check(aura(king)and aura(cosmic)and aura(secret)and highlights()==4,'back to normal: the same four auras')
+ -- A King plant that only comes into range later still takes a slot from the Legendary plant that had it.
+ local late=plant('PulsarStarfruitSeed',20,35);W.frames(240)
+ check(aura(late)and effects(late):GetAttribute('AuraRank')==8 and not aura(near[1])and highlights()==4,'a second King plant that appears later takes the slot of the nearest Legendary plant ('..tostring(highlights())..' Highlights)')
+ R.task.wait=realWait;R.advance=realAdvance
 end
 
 print(('%d checks, %d failures'):format(checks,fails))

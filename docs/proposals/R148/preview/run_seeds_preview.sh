@@ -1,7 +1,7 @@
 #!/bin/sh
 # Usage: sh run_seeds_preview.sh <scratch dir> [out dir, default docs/proposals/R148]. Renders seeds_new.png: for the Aloe (Desert, Rare) and the Sand Fruit
-# palm (Desert, Legendary) the seed, the plant growing (50%), fully grown and one harvested fruit; for Fire Pepper (Lava, now Mythic) the new seed and
-# the plant before / after the x2 size bump. dump_seeds_new.luau builds the seeds and plants with the REAL modules of this checkout on the Roblox mock
+# round cactus (Desert, Legendary) the seed, the plant growing (50%), fully grown and one harvested fruit; for Fire Pepper (Lava, now Mythic) the new seed and
+# the plant before / after the x2 size bump (it already reuses the existing red pepper model at x2). dump_seeds_new.luau builds the seeds and plants with the REAL modules of this checkout on the Roblox mock
 # and prints the parts; render_seeds_new.mjs draws them with three.js (headless Chromium via playwright, swiftshader); make_seeds_sheet.py (Pillow)
 # composes the sheet. Needs /opt/luau, python3 + Pillow, node + playwright (global) and `npm install three@0.169.0` (done here).
 # Approximate: boxes / wedges / balls / cylinders with plain materials, no Roblox textures or Future lighting; Fire Pepper's baked meshes (ServerStorage,

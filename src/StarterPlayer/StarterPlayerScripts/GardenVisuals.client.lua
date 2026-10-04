@@ -344,14 +344,24 @@ task.spawn(function()
    table.sort(list,function(a,b)if a.Distance~=b.Distance then return a.Distance<b.Distance end;if a.Score~=b.Score then return a.Score<b.Score end;return a.SortKey<b.SortKey end)
    local cost,count,fx,live,triangles=0,0,0,0,0
    local active,pending={},{}
+   -- R148: effect slots (each Legendary-and-up plant's aura is a Highlight, and Roblox draws at most 31) go by rarity rank first, then distance.
+   local fxCandidates={}
+   for _,entry in ipairs(list)do
+    local item=entry.Item;local seed=item:GetAttribute('SeedId');local def=Catalog[seed]
+    local eligible=Effects.Profile(def,seed)~=nil or PackRules.Rarities[def.Rarity].Rank>=4 or item:GetAttribute('Mutation')~='None'
+    entry.FxGranted=false
+    if entry.DetailMode~=nil and eligible and(item:GetAttribute('FruitReady')==true or(item:GetAttribute('GrowthStage')==4 and Trees.Has(seed)and entry.DetailMode~='fruit'))and mode~='off'and(entry.Distance<75 or motionVisible(entry,75,160))then
+     entry.FxRank=PackRules.Rarities[def.Rarity].Rank;table.insert(fxCandidates,entry)
+    end
+   end
+   Effects.GrantSlots(fxCandidates,mode=='low'and 2 or 4)
    for _,entry in ipairs(list)do
     local item,r=entry.Item,entry.Record
     local detail=entry.DetailMode~=nil
     if detail then cost+=entry.Cost;count+=1;triangles+=Visuals.Metadata(item:GetAttribute('SeedId')).MeshTriangles end
     local mask=0;if entry.Selected then for index in pairs(entry.Selected)do mask+=2^(index-1)end end
     r.DetailMode=entry.DetailMode;r.Selected=entry.Selected;r.DesiredModeKey=(entry.DetailMode or'none')..':'..mask
-    local def=Catalog[item:GetAttribute('SeedId')];local eligible=Effects.Profile(def,item:GetAttribute('SeedId'))~=nil or PackRules.Rarities[def.Rarity].Rank>=4 or item:GetAttribute('Mutation')~='None'
-    local effects=detail and eligible and(item:GetAttribute('FruitReady')==true or(item:GetAttribute('GrowthStage')==4 and Trees.Has(item:GetAttribute('SeedId'))and entry.DetailMode~='fruit'))and mode~='off'and fx<(mode=='low'and 2 or 4)and(entry.Distance<75 or motionVisible(entry,75,160))
+    local effects=entry.FxGranted==true
     if effects then fx+=1 end
     if r.Effects and(not effects or r.Mode~=mode)then clearEffects(r);r.FxKey=nil end
     r.WantDetail=detail;r.WantEffects=effects;r.Mode=mode

@@ -85,20 +85,18 @@ local function stagesOf(key)return tabStages[key]or{key}end
 local function tabOf(stage)for key,list in pairs(tabStages)do if table.find(list,stage)then return key end end;return stage end
 local function owned(folder,id)local f=player:FindFirstChild(folder);local v=f and f:FindFirstChild(id);return v and v.Value==true end
 local function amount(id)local f=player:FindFirstChild('DiscoveredSeeds');local v=f and f:FindFirstChild(id);return v and v:GetAttribute('RewardCash')or 0 end
-local NewInR149=require(RS.SeedPackRules).NewInR149 -- R148: the roster change's new seeds (Desert's Aloe and Sand Fruit)
-local function counts(stage,beforeR149)
+local function counts(stage)
  local seeds,plants,total=0,0,0
- for _,entry in ipairs(catalog:GetChildren())do local id=entry:GetAttribute('SeedId');if entry:GetAttribute('Stage')==stage and type(id)=='string'and id~=''and not(beforeR149 and NewInR149[id])then total+=1;if owned('DiscoveredSeeds',id)then seeds+=1 end;if owned('DiscoveredPlants',id)then plants+=1 end end end
+ for _,entry in ipairs(catalog:GetChildren())do local id=entry:GetAttribute('SeedId');if entry:GetAttribute('Stage')==stage and type(id)=='string'and id~=''then total+=1;if owned('DiscoveredSeeds',id)then seeds+=1 end;if owned('DiscoveredPlants',id)then plants+=1 end end end
  return seeds,plants,total
 end
--- R148: the halfway / completion milestones, also reached with the roster before this release (PremiumProgress:IndexMilestone):
--- Desert's Index grew from 5 to 7 seeds, and a milestone already reached stays claimable.
+-- R148: the halfway / completion milestones (PremiumProgress:IndexMilestone). Desert's Index grew from 5 to 7 seeds: a player who had ALREADY
+-- reached a milestone with the old roster keeps it, which the server recorded once (published as IndexOldHalf<stage> / IndexOldFull<stage>);
+-- everyone else needs the full roster. The live count is never computed against the old roster here.
 local function milestones(stage)
- local half,full=false,false
- for _,before in ipairs({false,true})do
-  local seeds,plants,total=counts(stage,before)
-  if total>0 then half=half or seeds+plants>=total;full=full or(seeds==total and plants==total)end
- end
+ local seeds,plants,total=counts(stage)
+ local half=total>0 and seeds+plants>=total or player:GetAttribute('IndexOldHalf'..stage)==true
+ local full=total>0 and(seeds==total and plants==total)or player:GetAttribute('IndexOldFull'..stage)==true
  return half,full
 end
 -- R148: a tab's counts: a LIMITED tab adds its two categories (so 6 Mech seeds + the Verity seed = 14 to find, as 7 x 2 on any other tab).
@@ -445,7 +443,7 @@ toggle.Activated:Connect(function()open(not panel.Visible)end);close.Activated:C
 watch(pg:GetAttributeChangedSignal('SeedMenu'),function()open(pg:GetAttribute('SeedMenu')=='Index')end)
 watch(player:GetAttributeChangedSignal('PremiumRevision'),queue)
 for stage=1,9 do
- for _,prefix in ipairs({'IndexBiomeReward','IndexBiomeHalfReward','IndexBiomeBackpay'})do watch(player:GetAttributeChangedSignal(prefix..stage),queue)end
+ for _,prefix in ipairs({'IndexBiomeReward','IndexBiomeHalfReward','IndexBiomeBackpay','IndexOldHalf','IndexOldFull'})do watch(player:GetAttributeChangedSignal(prefix..stage),queue)end
 end
 local observed=setmetatable({},{__mode='k'})
 local function observeDiscovery(x)

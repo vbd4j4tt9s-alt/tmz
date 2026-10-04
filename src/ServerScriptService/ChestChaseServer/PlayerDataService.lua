@@ -1086,8 +1086,10 @@ function PlayerDataService:Load(player)
 	player:SetAttribute("DataStatus", "Loaded")
 	self.Loaded[player] = true
 	self.CanSave[player] = true
+    local oldRosterSettled=self:SettleOldRoster148(player) -- R148: which Index milestones were met before the Aloe and the Sand Fruit joined Desert (saved below)
     self:PublishPremium(player);self:PublishTutorial(player)
 	self.Dirty[player] = storedData == nil
+		or oldRosterSettled
 		or discoveryMigrationNeeded
 		or speedMigrationNeeded
         or (type(storedData)=="table" and (storedData.SpeedExact==nil or type(storedData.Premium)~='table' or storedData.Premium.BalanceVersion81~=81))

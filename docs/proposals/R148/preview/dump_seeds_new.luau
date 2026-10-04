@@ -56,20 +56,21 @@ local seedView='{"target":[0,1.1,0],"dist":9,"az":-28,"el":12,"fov":30}'
 -- Aloe
 emit('seed_aloe',SeedVisuals.Seed({Id='DesertAloeSeed'},1,CF(0,0,0),holder,1,nil,'None'),seedView)
 local aloeView=function(y,d)return string.format('{"target":[0,%s,0],"dist":%s,"az":-28,"el":14,"fov":30}',y,d)end
-emit('aloe_growing',Visuals.BuildGrowing('DesertAloeSeed',origin,crop('DesertAloeSeed'),.5*Catalog.DesertAloeSeed.Seconds),aloeView(4.2,31))
-emit('aloe_grown',Visuals.Build('DesertAloeSeed',origin,crop('DesertAloeSeed'),4,math.huge),aloeView(4.2,31))
-local aloeFruit=Visuals.BuildSelectedFruit('DesertAloeSeed',origin,crop('DesertAloeSeed'),{[1]=true},math.huge)
+emit('aloe_growing',Visuals.BuildGrowing('DesertAloeSeed',origin,crop('DesertAloeSeed'),.5*Catalog.DesertAloeSeed.Seconds),aloeView(4.2,34))
+emit('aloe_grown',Visuals.Build('DesertAloeSeed',origin,crop('DesertAloeSeed'),4,math.huge),aloeView(4.2,34))
+-- (a harvested fruit is built like the game's HarvestPresentation does: a detached item, which drops connectors such as the Sand Fruit's 'Fruit stem')
+local aloeFruit=Visuals.Build('DesertAloeSeed',origin,crop('DesertAloeSeed',{_DetachedHarvest=true}),4,math.huge,1)
 local ac=Catalog.DesertAloeSeed.FruitCenters[1]
 emit('aloe_fruit',aloeFruit,string.format('{"target":[%s,%s,%s],"dist":15,"az":-28,"el":10,"fov":30}',ac[1],ac[2],ac[3]))
 -- Sand Fruit
 emit('seed_sand',SeedVisuals.Seed({Id='SandFruitSeed'},1,CF(0,0,0),holder,1,nil,'None'),seedView)
-local palmView=function(y,d)return string.format('{"target":[0.5,%s,0],"dist":%s,"az":-28,"el":10,"fov":30}',y,d)end
-emit('sand_growing',Visuals.BuildGrowing('SandFruitSeed',origin,crop('SandFruitSeed'),.5*Catalog.SandFruitSeed.Seconds),palmView(7.2,37))
-emit('sand_grown',Visuals.Build('SandFruitSeed',origin,crop('SandFruitSeed'),4,math.huge),palmView(7.2,37))
-emit('sand_crown',Visuals.Build('SandFruitSeed',origin,crop('SandFruitSeed'),4,math.huge),'{"target":[1.1,10.2,0],"dist":17,"az":-28,"el":12,"fov":30}') -- (a close-up of the crown and its bunches; not in the sheet)
-local sandFruit=Visuals.BuildSelectedFruit('SandFruitSeed',origin,crop('SandFruitSeed'),{[1]=true},math.huge)
+local cactusView=function(y,d)return string.format('{"target":[0,%s,0],"dist":%s,"az":-28,"el":14,"fov":30}',y,d)end
+emit('sand_growing',Visuals.BuildGrowing('SandFruitSeed',origin,crop('SandFruitSeed'),.5*Catalog.SandFruitSeed.Seconds),cactusView(5.4,44))
+emit('sand_grown',Visuals.Build('SandFruitSeed',origin,crop('SandFruitSeed'),4,math.huge),cactusView(5.4,44))
+emit('sand_close',Visuals.Build('SandFruitSeed',origin,crop('SandFruitSeed'),4,math.huge),'{"target":[0,6.4,0],"dist":17,"az":-28,"el":24,"fov":30}') -- (a close-up of the shoulders and the fruit; not in the sheet)
+local sandFruit=Visuals.Build('SandFruitSeed',origin,crop('SandFruitSeed',{_DetachedHarvest=true}),4,math.huge,1)
 local sc=Catalog.SandFruitSeed.FruitCenters[1]
-emit('sand_fruit',sandFruit,string.format('{"target":[%s,%s,%s],"dist":9,"az":-28,"el":8,"fov":30}',sc[1],sc[2],sc[3]))
+emit('sand_fruit',sandFruit,string.format('{"target":[%s,%s,%s],"dist":8,"az":-28,"el":8,"fov":30}',sc[1],sc[2],sc[3]))
 -- Fire Pepper: the new Mythic seed, the plant before (base art) and after (x2), and both side by side to scale.
 emit('seed_fire',SeedVisuals.Seed({Id='FirePepperSeed'},1,CF(0,0,0),holder,1,nil,'None'),seedView)
 local function emitSpecs(name,specLists,view)

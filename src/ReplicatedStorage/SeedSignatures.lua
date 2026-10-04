@@ -296,23 +296,27 @@ Sig.AshRoseSeed={Pattern='None',Draw=function(k)
 end}
 -- R148 (owner): Desert's Aloe (Rare) and Sand Fruit (Legendary), and Fire Pepper now Mythic.
 S.Shapes.DesertAloeSeed='Pointed';S.Shapes.SandFruitSeed='Round'
-Sig.DesertAloeSeed={Draw=function(k) -- three fleshy blue-green aloe blades on top and a red-orange flower spike
+Sig.DesertAloeSeed={Draw=function(k) -- three fleshy blue-green aloe blades on top and a full red-orange flower spike (ten florets, red grading to yellow)
  local y=k.H-.03
  for _,t in ipairs({-.6,0,.6})do
   local dir=k.V(math.sin(t)*.75,1,math.cos(t)*.15)
-  k.lay('Aloe blade',k.V(math.sin(t)*.06,y,0)+dir.Unit*.2,dir,.46-math.abs(t)*.12,.15,.08,k.RGB(88,150,128))
+  k.lay('Aloe blade',k.V(math.sin(t)*.06,y,0)+dir.Unit*.2,dir,.46-math.abs(t)*.12,.15,.08,k.RGB(46,134,114))
  end
- k.line('Aloe flower stalk',k.V(.04,y,0),k.V(.12,y+.62,0),.05,k.RGB(126,146,100))
- for j=0,3 do k.oval('Aloe floret',k.V(.1+.03*(j%2),y+.36+j*.08,-.03),k.V(.07,.13,.07),j<2 and k.RGB(236,96,48)or k.RGB(250,170,70))end
+ k.line('Aloe flower stalk',k.V(.04,y,0),k.V(.12,y+.66,0),.05,k.RGB(112,150,92))
+ local grade={{226,44,30},{248,84,30},{255,140,36},{255,200,66}}
+ for j=0,9 do
+  local f=.28+.72*j/9;local c=grade[math.min(4,1+math.floor(j/10*4))]
+  k.oval('Aloe floret',k.V(.04+.08*f+.04*(j%2*2-1),y+.66*f,-.03*(j%2*2-1)),k.V(.075,.14,.075),k.RGB(c[1],c[2],c[3]))
+ end
 end}
-Sig.SandFruitSeed={Pattern='None',Draw=function(k) -- dune ripples on the skin, a tiny palm crown on top, two twinkling sand sparkles
- for i,y in ipairs({.24,-.02,-.28})do
-  local pts={};for j=0,10 do pts[#pts+1]={-1.1+j*.22,y+math.sin(j*.8+i)*.05}end
-  onSurface(k,'Dune ripple',pts,.012,.04,k.ink)
+Sig.SandFruitSeed={Draw=function(k) -- a sandy round seed: sand grains on the skin, a tiny round cactus on top, two twinkling sand sparkles
+ for i=0,13 do
+  local a=i*2.399;local y=-.5+((i*37)%100)/100*.95
+  k.oval('Sand grain',k.surface(a,y,.012),k.V(.08+.025*(i%3),.06,.08),i%2==0 and k.RGB(184,136,80)or k.RGB(244,222,168),nil,Enum.Material.Sand)
  end
  local y=k.H-.03
- k.line('Palm trunk',k.V(0,y,0),k.V(.04,y+.22,0),.07,k.RGB(140,104,64))
- ring3(5,function(t)local dir=k.V(math.sin(t),.25,math.cos(t));k.lay('Palm frond',k.V(.04,y+.23,0)+dir.Unit*.16,dir,.34,.13,.05,k.RGB(96,156,74))end)
+ k.oval('Cactus nub',k.V(0,y+.1,0),k.V(.44,.34,.44),k.RGB(65,143,69))
+ ring3(5,function(t)local dir=k.V(math.sin(t),.9,math.cos(t));k.lay('Cactus spine',k.V(0,y+.2,0)+dir.Unit*.15,dir,.22,.05,.03,k.RGB(235,225,170))end)
  for _,v in ipairs({{-.3,.1},{.28,-.16}})do
   local z=(k.front(v[1],v[2])or-.3)-.02
   k.anim(k.oval('Sand sparkle',k.V(v[1],v[2],z),k.V(.07,.07,.04),k.RGB(255,240,180),nil,Enum.Material.Neon),'Twinkle')

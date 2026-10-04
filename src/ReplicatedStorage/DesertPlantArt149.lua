@@ -1,9 +1,12 @@
 -- R148 (owner): plant art of Desert's two new seeds, in the RarityRework spec format PlantVisuals reads (like VerityPlantArt).
---  * DesertAloeSeed (Rare, "Aloe"): a blue-green rosette of thick pointed leaves (pale spots, red-brown teeth) with three tall
---    red-orange flower spikes. Each spike is one fruit (group 1-3); harvesting it leaves the rosette.
---  * SandFruitSeed (Legendary, "Sand Fruit"): a leaning desert palm (ringed trunk, eight arching fronds) with four bunches of
---    three round sand-gold fruits under the crown. Each bunch is one fruit (group 1-4).
--- Built once per id; numbers are studs at PlantScale 1. No requires (ApprovedPlantArt and Roster149 load it).
+--  * DesertAloeSeed (Rare, "Aloe"): a rich blue-green rosette of thick pointed leaves (pale spots, red-brown teeth) with three tall,
+--    DENSE red-orange flower spikes (24 hanging florets on each, red at the bottom grading to yellow tips). Each spike is one fruit
+--    (group 1-3); harvesting it leaves the rosette.
+--  * SandFruitSeed (Legendary, "Sand Fruit"): a ROUND (barrel) cactus built from the game's own cactus vocabulary: the Prickly Pear's stem
+--    green, the Crown Cactus' ribs and ivory spines, the Prickly Pear's fruit attachment. Four sand fruits grow out of its shoulders:
+--    each a slightly lumpy, squashed ball in Enum.Material.Sand with a tiny nub. Each fruit is one fruit (group 1-4).
+-- The cactus colours / sizes are read from those existing art modules when they are there (their constants below are the same values).
+-- Built once per id; numbers are studs at PlantScale 1. Nothing is required at load time (ApprovedPlantArt and Roster149 load this module).
 local A={}
 local V,CF=Vector3.new,CFrame.new
 A.AloeScale=1.5
@@ -50,12 +53,12 @@ end
 -- Aloe ----------------------------------------------------------------------------------------------------------------
 local function aloe()
  local S=A.AloeScale;local b=new();local up=V(0,1,0)
- b.ball('Ball',V(0,.35,0)*S,{1.1*S,.7*S,1.1*S},{98,150,128},nil,0,'Stem','Rosette heart')
+ b.ball('Ball',V(0,.35,0)*S,{1.1*S,.7*S,1.1*S},{48,134,114},nil,0,'Stem','Rosette heart')
  -- three rings: count, first yaw (deg), base radius, base y, elevation (deg), length, width, thickness, two colours, outer?
  local rings={
-  {7,0,.35,.25,28,3.4,.9,.42,{88,140,122},{100,154,134},true},
-  {6,25.7,.25,.35,48,3.0,.8,.40,{100,156,138},{112,168,148},false},
-  {4,45,.12,.45,68,2.4,.65,.36,{116,172,152},{128,184,160},false},
+  {7,0,.35,.25,28,3.4,.9,.42,{42,124,110},{56,142,124},true},
+  {6,25.7,.25,.35,48,3.0,.8,.40,{52,142,124},{66,160,140},false},
+  {4,45,.12,.45,68,2.4,.65,.36,{64,160,138},{80,178,152},false},
  }
  for _,r in ipairs(rings)do
   for k=0,r[1]-1 do
@@ -64,108 +67,125 @@ local function aloe()
    local base=(out*r[3]+V(0,r[4],0))*S
    local L=b.blade(base,dir,n,r[6]*S,r[7]*S,r[8]*S,r[9],r[10],0,'Leaf','Aloe leaf')
    if r[11]then
-    -- outer leaves: two pale spots on the upper face and one red-brown tooth on each margin (halfway up)
-    for _,s in ipairs({.3,.55})do
-     local w=r[7]*(1-s)
-     b.ball('Ball',(L*CF((r[8]/2+.01)*S,s*r[6]*S,(s<.4 and -1 or 1)*w*.22*S)).Position,{.04*S,.24*S,.15*S},{204,228,214},nil,0,'Leaf','Aloe leaf spot',L.Rotation)
-    end
-    for _,side in ipairs({-1,1})do
+    -- outer leaves: a pale spot on the upper face and one red-brown tooth on one margin (halfway up; alternating sides)
+    local w=r[7]*(1-.4)
+    b.ball('Ball',(L*CF((r[8]/2+.01)*S,.4*r[6]*S,(k%2==0 and -1 or 1)*w*.22*S)).Position,{.04*S,.24*S,.15*S},{214,236,222},nil,0,'Leaf','Aloe leaf spot',L.Rotation)
+    do
      -- a thin spike leaning out of the margin toward the tip
-     local s=.5;local w=r[7]*(1-s)
+     local side=k%2==0 and 1 or -1;local s=.5;local w2=r[7]*(1-s)
      local spike=L:VectorToWorldSpace(V(0,.6,side)).Unit
-     local root=(L*CF(0,s*r[6]*S,side*w/2*S)).Position
-     b.add({s='Ball',z={.06*S,.24*S,.06*S},c=comps(along(root+spike*.1*S,spike,up)),k={176,120,96},m='SmoothPlastic',t=0,g=0,r='Leaf',f='Aloe leaf tooth'})
+     local root=(L*CF(0,s*r[6]*S,side*w2/2*S)).Position
+     b.add({s='Ball',z={.06*S,.24*S,.06*S},c=comps(along(root+spike*.1*S,spike,up)),k={200,92,60},m='SmoothPlastic',t=0,g=0,r='Leaf',f='Aloe leaf tooth'})
     end
    end
   end
  end
- -- three flower spikes (groups 1-3): a stalk from the heart, tilted 10 degrees out, with 9 tubular florets on its top 40%
+ -- three flower spikes (groups 1-3): a stalk from the heart, tilted 10 degrees out, with FLORETS tubular florets filling its top 62%
  local spikes={{15,4.6},{135,4.0},{255,3.5}}
+ -- Dense spikes, vibrant colours: the florets grade from deep red at the bottom through red-orange and orange to yellow at the tip.
+ local FLORETS=24
+ local stops={{226,44,30},{248,84,30},{255,138,36},{255,196,64},{255,226,92}}
+ local function grade(t)local x=t*(#stops-1);local i=math.min(#stops-2,math.floor(x));local f=x-i;local a,c=stops[i+1],stops[i+2];return{math.floor(a[1]+(c[1]-a[1])*f+.5),math.floor(a[2]+(c[2]-a[2])*f+.5),math.floor(a[3]+(c[3]-a[3])*f+.5)}end
  local art={Sockets={},FruitCenters={},FruitRadii={}}
  for g,sp in ipairs(spikes)do
   local a=math.rad(sp[1]);local out=V(math.cos(a),0,-math.sin(a));local tilt=math.rad(10)
   local dir=(up*math.cos(tilt)+out*math.sin(tilt)).Unit
   local socket=(out*.15+V(0,.7,0))*S;local len=sp[2]*S;local tip=socket+dir*len
-  b.rod(socket,tip,.16*S,{126,146,100},nil,g,'Fruit','Aloe flower stalk')
-  for i=0,8 do
-   local f=.6+.4*i/9;local yaw=math.rad(sp[1]+i*137.5);local o=V(math.cos(yaw),0,-math.sin(yaw))
+  b.rod(socket,tip,.18*S,{112,150,92},nil,g,'Fruit','Aloe flower stalk')
+  for i=0,FLORETS-1 do
+   local f=.38+.60*i/(FLORETS-1);local yaw=math.rad(sp[1]+i*137.5);local o=V(math.cos(yaw),0,-math.sin(yaw))
    local at=socket+dir*(len*f)+o*.12*S
    local hang=(o*math.cos(math.rad(-30))+up*math.sin(math.rad(-30))).Unit -- florets hang 30 degrees below level
-   local color=i<4 and{236,96,48}or i<7 and{250,150,60}or{240,196,92}
-   b.add({s='Ball',z={.16*S,.42*S,.16*S},c=comps(along(at+hang*.18*S,hang,up)),k=color,m='SmoothPlastic',t=0,g=g,r='Fruit',f='Aloe floret'})
+   local color=grade(i/(FLORETS-1))
+   b.add({s='Ball',z={.19*S,.44*S,.19*S},c=comps(along(at+hang*.18*S,hang,up)),k=color,m='SmoothPlastic',t=0,g=g,r='Fruit',f='Aloe floret'})
   end
-  b.ball('Ball',tip+dir*.1*S,{.18*S,.3*S,.18*S},{226,206,110},nil,g,'Fruit','Aloe bud tip',along(V(),dir,V(1,0,0)).Rotation)
-  local center=socket+dir*(len*.8)
+  b.ball('Ball',tip+dir*.1*S,{.2*S,.32*S,.2*S},{238,218,96},nil,g,'Fruit','Aloe bud tip',along(V(),dir,V(1,0,0)).Rotation)
+  local center=socket+dir*(len*.7)
   art.Sockets[g]={socket.X,socket.Y,socket.Z};art.FruitCenters[g]={center.X,center.Y,center.Z};art.FruitRadii[g]=len*.3
  end
  art.Specs=b.Specs;art.RarityRework=true;bounds(art);return art
 end
--- Sand Fruit palm --------------------------------------------------------------------------------------------------
-local function palm()
+-- Sand Fruit: a round cactus ---------------------------------------------------------------------------------------
+-- A part of an existing art module (by its name) as a template: its colour / material / size, so this plant uses the game's own cactus
+-- pieces. If the module or the piece is missing (a stripped place), the constants given are used (they are those pieces' values).
+local function template(module,name,fallback)
+ local ok,art=pcall(function()return require(script.Parent[module])end)
+ if ok and type(art)=='table'then
+  for _,spec in ipairs(art.Specs or art[1]and art[1].Specs or{})do if spec.f==name then return{k=spec.k,m=spec.m,z=spec.z}end end
+ end
+ return fallback
+end
+local function cactus()
  local b=new();local up=V(0,1,0)
- -- root flare and trunk: 5 segments leaning toward +X, darker rings at the joints
- b.rod(V(0,0,0),V(0,.6,0),2.0,{128,94,58},'Wood',0,'Stem','Palm root flare')
- for k=0,2 do
-  local a=math.rad(30+k*120);local out=V(math.cos(a),0,-math.sin(a))
-  b.add({s='Wedge',z={.35,.5,.9},c=comps(along(out*1.05+V(0,.25,0),up,out)*CFrame.Angles(0,math.pi/2,0)),k={120,88,54},m='Wood',t=0,g=0,r='Stem',f='Palm root toe'})
+ -- the existing cactus pieces: Prickly Pear stem green, Crown Cactus rib and ivory spine, Prickly Pear fruit attachment
+ local stem=template('ApprovedPlantArt6','Rectangular cactus stem',{k={65,143,69},m='SmoothPlastic'})
+ local rib=template('AgaveSeedArt45','Cactus rib',{k={83,153,107},m='SmoothPlastic',z={21,.34,.34}})
+ local spine=template('AgaveSeedArt45','Ivory spine',{k={235,225,170},m='SmoothPlastic',z={.18,.7,.4}})
+ local attach=template('ApprovedPlantArt6','Upper surface fruit attachment',{k={98,143,65},m='SmoothPlastic'})
+ -- the body: a squat ball (radii RX x RY x RX) standing on the soil
+ local RX,RY=5.4,4.7;local CY=RY
+ local big=1.5 -- the spines are scaled up with the body (the Prickly Pear's are x3 on its pads)
+ local function surface(lat,yaw)
+  local cl,sl=math.cos(lat),math.sin(lat)
+  local p=V(RX*cl*math.cos(yaw),CY+RY*sl,RX*cl*math.sin(yaw))
+  return p,V(p.X/(RX*RX),(p.Y-CY)/(RY*RY),p.Z/(RX*RX)).Unit
  end
- local joints={V(0,0,0),V(.05,2.2,0),V(.2,4.4,0),V(.45,6.6,0),V(.75,8.8,0),V(1.1,11.0,0)}
- local diam={1.45,1.35,1.25,1.15,1.05}
- for i=1,5 do
-  b.rod(joints[i],joints[i+1],diam[i],i%2==1 and{150,110,70}or{136,99,62},'Wood',0,'Stem','Palm trunk')
-  local d=(joints[i+1]-joints[i]).Unit
-  b.rod(joints[i+1]-d*.11,joints[i+1]+d*.11,diam[i]+.25,{112,80,50},'Wood',0,'Stem','Palm trunk ring')
- end
- local crown=V(1.1,11.4,0)
- b.ball('Ball',crown,{1.7,1.3,1.7},{108,130,60},nil,0,'Leaf','Palm crown heart')
- -- four dried frond boots under the crown
- for k=0,3 do
-  local a=math.rad(45+k*90);local out=V(math.cos(a),0,-math.sin(a))
-  b.blade(crown+out*.45-V(0,.55,0),(out*.8-up*.6).Unit,up,1.1,.55,.18,{170,130,80},{158,120,72},0,'Leaf','Dry frond boot')
- end
- -- eight fronds: a rising inner blade with a rachis, then a drooping outer blade
- for k=0,7 do
-  local a=math.rad(k*45+(k%2)*6);local out=V(math.cos(a),0,-math.sin(a))
-  local e1,e2=math.rad(k%2==0 and 25 or 18),math.rad(-25)
-  local d1=out*math.cos(e1)+up*math.sin(e1);local d2=out*math.cos(e2)+up*math.sin(e2)
-  local t=V(math.sin(a),0,math.cos(a))
-  local base=crown+out*.5
-  b.rod(base,base+d1*3.0,.14,{120,150,70},nil,0,'Leaf','Palm frond rachis')
-  b.blade(base,d1,t:Cross(d1),3.0,1.5,.12,{86,150,72},{98,164,80},0,'Leaf','Palm frond')
-  b.blade(base+d1*3.0,d2,t:Cross(d2),3.2,1.2,.12,{98,160,76},{124,160,82},0,'Leaf','Palm frond tip')
- end
- -- two young fronds standing up in the middle
- for k=0,1 do
-  local a=math.rad(90+k*180);local out=V(math.cos(a),0,-math.sin(a));local e=math.rad(65)
-  local d=out*math.cos(e)+up*math.sin(e);local t=V(math.sin(a),0,math.cos(a))
-  b.blade(crown+V(0,.4,0),d,t:Cross(d),2.6,1.0,.12,{112,176,86},{124,186,94},0,'Leaf','Young palm frond')
- end
- -- four bunches (groups 1-4) between the fronds: a stalk and three round sand fruits, each with a dune-ripple band
- local art={Sockets={},FruitCenters={},FruitRadii={}}
- local skins={{222,182,112},{214,170,98},{230,192,124}}
- for g=1,4 do
-  local a=math.rad(22.5+(g-1)*90);local out=V(math.cos(a),0,-math.sin(a))
-  local socket=crown+out*.95-V(0,.6,0)
-  local tip=socket+(out*.5-up*.78).Unit*.9
-  -- R134 floating check: the stalk starts INSIDE the crown heart (it is the bunch's stem, taken from the crown with the bunch) and its tip
-  -- ends inside the three fruits (their centres are .47 from it, the fruit radius .525), so nothing in a bunch hangs loose.
-  b.rod(crown+out*.45-V(0,.3,0),tip,.18,{140,110,60},nil,g,'Fruit','Sand fruit stalk')
-  local center=tip-V(0,.22,0)
+ b.ball('Ball',V(0,CY,0),{2*RX,2*RY,2*RX},stem.k,stem.m,0,'Stem','Cactus body')
+ -- two pups at the foot (small round cacti), each with ivory spines
+ for k,pup in ipairs({{V(-4.3,1.5,1.2),3.2,2.8},{V(3.4,1.3,-3.4),2.8,2.5}})do
+  b.ball('Ball',pup[1],{pup[2],pup[3],pup[2]},stem.k,stem.m,0,'Stem','Cactus pup')
   for j=0,2 do
-   local ja=a+math.rad(j*120+60);local o=V(math.cos(ja),0,-math.sin(ja))
-   local p=center+o*.42-V(0,.05*j,0)
-   b.ball('Sphere',p,{1.05,1.05,1.05},skins[j+1],nil,g,'Fruit','Sand fruit')
-   b.ball('Ball',p+V(0,.08,0),{1.1,.16,1.1},{184,138,78},nil,g,'Fruit','Sand fruit ripple',CFrame.Angles(.18,0,.1))
+   local a=math.rad(k*70+j*120);local out=V(math.cos(a),.55,math.sin(a)).Unit
+   local base=pup[1]+V(out.X*pup[2]*.46,out.Y*pup[3]*.46,out.Z*pup[2]*.46)
+   b.add({s='Wedge',z={spine.z[1]*big,spine.z[2]*big,spine.z[3]*big},c=comps(along(base+out*.3*big,out,V(math.sin(a),0,-math.cos(a)))),k=spine.k,m=spine.m,t=0,g=0,r='Stem',f='Ivory spine'})
   end
-  b.ball('Ball',center+V(math.cos(a)*.42,.42,-math.sin(a)*.42),{.18,.18,.18},{255,236,170},'Neon',g,'Fruit','Sand sparkle')
-  art.Sockets[g]={socket.X,socket.Y,socket.Z};art.FruitCenters[g]={center.X,center.Y,center.Z};art.FruitRadii[g]=1.05
+ end
+ -- eight ribs from the foot to the crown, five raised pieces each (the Crown Cactus' rib, bent round the ball: short enough that the
+ -- chord between two ends stays on the surface)
+ local lats={-56,-31,-6,19,44,68}
+ local ribWidth=rib.z[2]*1.25
+ local function spineAt(p,n,dir,tangent,part)
+  b.add({s='Wedge',z={spine.z[1]*big,spine.z[2]*big,spine.z[3]*big},c=comps(along(p+dir*.3*big,dir,tangent)),k=spine.k,m=spine.m,t=0,g=0,r='Stem',f='Ivory spine'})
+ end
+ for r=0,7 do
+  local yaw=math.rad(r*45)
+  for i=1,#lats-1 do
+   local p1,n1=surface(math.rad(lats[i]),yaw);local p2,n2=surface(math.rad(lats[i+1]),yaw)
+   b.rod(p1+n1*.1,p2+n2*.1,ribWidth,rib.k,rib.m,0,'Stem','Cactus rib')
+  end
+  -- ivory spines at three areoles on every rib, leaning outward and a little up
+  for _,lat in ipairs({-20+r%2*12,10+r%2*10,40+r%2*8})do
+   local p,n=surface(math.rad(lat),yaw);spineAt(p,n,(n*.85+up*.25).Unit,V(-math.sin(yaw),0,math.cos(yaw)))
+  end
+ end
+ -- a crown of six ivory spines on the very top, fanning outward
+ for j=0,5 do
+  local a=math.rad(j*60+15);local p,n=surface(math.rad(80),a);local out=V(math.cos(a),0,math.sin(a))
+  spineAt(p,n,(n*.6+out*.7+up*.2).Unit,V(-math.sin(a),0,math.cos(a)))
+ end
+ -- four sand fruits (groups 1-4) growing out of the shoulders, between the ribs: a short green attachment, a squashed Sand ball, a lump
+ -- on one side and a tiny nub on top, so each is slightly irregular. Fruit radius ~1.1.
+ local art={Sockets={},FruitCenters={},FruitRadii={}}
+ local sands={{226,194,128},{216,183,118},{232,202,138},{221,188,123}}
+ local lumps={{206,172,106},{212,178,112},{200,166,102},{210,176,110}}
+ for g=1,4 do
+  local yaw=math.rad(22.5+(g-1)*90);local lat=math.rad(g%2==1 and 46 or 38)
+  local p,n=surface(lat,yaw);local tangent=V(-math.sin(yaw),0,math.cos(yaw))
+  local center=p+n*.92
+  b.rod(p-n*.3,center-n*.2,.5,attach.k,attach.m,g,'Fruit','Fruit stem')
+  local frame=along(center,n,tangent)
+  b.add({s='Ball',z={2.4,2.0,2.2},c=comps(frame*CFrame.Angles(0,.5*g,.12*(g%2==0 and 1 or -1))),k=sands[g],m='Sand',t=0,g=g,r='Fruit',f='Sand fruit'})
+  local side=(tangent*math.cos(g*1.7)+n:Cross(tangent)*math.sin(g*1.7)).Unit
+  b.add({s='Ball',z={1.3,1.1,1.25},c=comps(CF(center+side*.62-n*.12)*frame.Rotation),k=lumps[g],m='Sand',t=0,g=g,r='Fruit',f='Sand fruit lump'})
+  b.add({s='Ball',z={.5,.56,.5},c=comps(CF(center+n*.95-side*.12)*frame.Rotation),k={236,210,150},m='Sand',t=0,g=g,r='Fruit',f='Sand fruit nub'})
+  art.Sockets[g]={p.X,p.Y,p.Z};art.FruitCenters[g]={center.X,center.Y,center.Z};art.FruitRadii[g]=1.15
  end
  art.Specs=b.Specs;art.RarityRework=true;bounds(art);return art
 end
 local built={}
 function A.Get(id)
  if not A.Is(id)then return nil end
- if not built[id]then built[id]=id=='DesertAloeSeed'and aloe()or palm()end
+ if not built[id]then built[id]=id=='DesertAloeSeed'and aloe()or cactus()end
  return built[id]
 end
 return A
