@@ -59,6 +59,6 @@ check(total=='FOUND 6 / 90','the header shows everything found ('..total..')')
 local forest=gui:FindFirstChild('Biome1',true);local jungle=gui:FindFirstChild('Biome6',true)
 local ring=forest.BrightOutline.Color
 check(ring.R==1 and ring.G==1 and ring.B==1 and forest.BrightOutline.Thickness==3 and jungle.BrightOutline.Thickness==2,'the open biome tab is ringed in white')
-check(W.B.ChestIndex:find('Bright.Card(card,Theme.Rarity(rarity).Accent,selected==8,rarity)',1,true)~=nil,'cards keep their rarity border')
+check(W.B.ChestIndex:find('Bright.Card(card,Theme.Rarity(rarity).Accent,stage==8,rarity)',1,true)~=nil,'cards keep their rarity border') -- (R148: stage==8, the Mech seeds, keep their limited card inside the LIMITED tab)
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

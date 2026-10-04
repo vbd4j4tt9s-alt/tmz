@@ -17,7 +17,7 @@ end
 local Theme=W.module('GardenTheme');local Borders=W.module('GardenCardMotion')
 check(Theme.Icon==nil and Theme.Badge==nil,'GardenTheme.Icon/Badge removed (no remaining callers)')
 check(W.B.PlantInspection:find('Theme.CardBorder(harvest,rarity)',1,true)~=nil,'plant inspection harvest panel uses the rarity border')
-check(W.B.ChestIndex:find('Bright.Card(card,Theme.Rarity(rarity).Accent,selected==8,rarity)',1,true)~=nil,'index cards use the rarity border')
+check(W.B.ChestIndex:find('Bright.Card(card,Theme.Rarity(rarity).Accent,stage==8,rarity)',1,true)~=nil,'index cards use the rarity border') -- (R148: stage==8, the Mech seeds, keep their limited card inside the LIMITED tab)
 
 -- 2. Each rarity gets its own, distinct border.
 local Players=W.service('Players');local player=R.new('Player');player.Name='Tester';player.Parent=Players;Players.LocalPlayer=player
