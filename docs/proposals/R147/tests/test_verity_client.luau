@@ -3,8 +3,12 @@
 -- AudioMixer and GardenTheme / BrightUI of this checkout.
 --  * Her body (a big yellow Ball with her smiley) turns to face the camera on this client (all four sides and the diagonals,
 --    never tilted), bobs a little, swells while her voice plays; nothing of that under ReducedMotion.
---  * The marker in her name sign is "!" until a Void Pack Tool (SeedPackTool + BagVariant EclipseReliquary, in the Backpack or the
---    Character) shows up, then a bouncing gold "?" (and back).
+--  * The marker in her name sign is "!" until she has been talked to (the dialog opened once: gone for the rest of the session, back
+--    in a new session), a bouncing gold "?" while a Void Pack Tool (SeedPackTool + BagVariant EclipseReliquary, in the Backpack or the
+--    Character) is held; never both once the limited event is over. The sign is one studs-sized BillboardGui: marker row, gap, name,
+--    event timer row (rows that cannot overlap, also while the marker bounces, she bobs and swells), offset in camera space.
+--  * The limited event (LimitedEvent, EndsAt 2026-11-01 00:00 UTC, the server's clock): "EVENT ENDS IN 27d 04h 12m 09s" in the dialog
+--    (ticking every second while it is open) and under her name; after the end EVENT ENDED, GIVE disabled, no marker.
 --  * Her greeting (VerityConfig.GreetingSoundId): plays from her body when the dialog opens with Talk, and once when you first come
 --    within 30 studs (at most once a minute; a Talk greeting counts); never two copies at once; routed to the Effects group and
 --    skipped with Effects at 0; a failed asset load is warned about once and skipped.
@@ -67,8 +71,13 @@ local hub=R.new('Folder');hub.Name='EconomyHub';hub.Parent=map
 local model=R.new('Model');model.Name='VerityNPC';model.Parent=hub
 local bodyAt=V3(0,16.45,-340)
 local body=R.new('Part');body.Name='Body';body.Shape=R.Enum.PartType.Ball;body.Size=V3(22,22,22);body.CFrame=R.CFrame.lookAt(bodyAt,bodyAt+V3(0,0,1));body.Anchored=true;body.Color=R.Color3.fromRGB(255,255,0);body.Parent=model
-local sign=R.new('BillboardGui');sign.Name='NameSign';sign.Adornee=body;sign.Size=R.UDim2.fromOffset(240,120);sign.StudsOffsetWorldSpace=V3(0,11+C.NameHeight,0);sign.Parent=body
-local nameLabel=R.new('TextLabel');nameLabel.Name='Name';nameLabel.Text='VERITY';nameLabel.Parent=sign
+local S=C.Sign
+local function buildSign()
+ local sg=R.new('BillboardGui');sg.Name='NameSign';sg.Adornee=body;sg.Size=R.UDim2.new(S.W,0,S.H,0);sg.StudsOffset=V3(0,11+S.Gap+S.H/2,0);sg.StudsOffsetWorldSpace=V3(0,0,0);sg.Parent=body
+ local nl=R.new('TextLabel');nl.Name='Name';nl.Text='VERITY';nl.Position=R.UDim2.new(0,0,S.Name.Top/S.H,0);nl.Size=R.UDim2.new(1,0,S.Name.Height/S.H,0);nl.Parent=sg
+ return sg,nl
+end
+local sign,nameLabel=buildSign()
 local homeCFrame=body.CFrame
 W.CS:AddTag(model,'VerityNPC')
 local camera=W.workspace.CurrentCamera
@@ -101,6 +110,8 @@ local function server(kind,payload)remote.OnClientEvent:Fire(kind,payload);frame
 local function load(label)
  local sc=R.new('LocalScript');sc.Name='VerityClient';local ok,err=pcall(W.load,'VerityClient',sc);check(ok,label..' loads: '..tostring(err));return sc
 end
+local Limited=W.module('LimitedEvent');local START_LEFT=27*86400+4*3600+12*60+9
+R.clock=Limited.EndsAt-START_LEFT -- 27 days, 4 h, 12 min, 9 s before the end of the event
 local sc=load('VerityClient')
 -- 1. Her body turns to the camera around Y only (all the way round), bobs, and rests where the server put her ----------------------
 frames(5)
@@ -132,31 +143,45 @@ W.Gui.ReducedMotionEnabled=false;frames(100)
 check(near(lookOf().X,1,.03),'with motion on again she turns to the camera')
 aim(0,20,-300);frames(100)
 -- 2. The marker, in the same sign as her name -------------------------------------------------------------------------------------
-local mark=sign:FindFirstChild('Mark')
-check(mark and mark:IsA('TextLabel')and mark.Text=='!'and mark.TextColor3.R==1 and mark.TextColor3.G==1,'a "!" in her name sign')
-check(mark and mark.Position.Y.Scale<.5 and nameLabel.Text=='VERITY','above her name (one sign: they can never overlap)')
-check(sign.StudsOffsetWorldSpace.Y>=11+5,'the sign hangs well clear above her top (it is a constant size on screen, so a ball far away would hide a low one)')
-local function bounced()local lo2,hi2=1e9,-1e9;for _=1,60 do frames(1);local y=mark.Position.Y.Offset;lo2=math.min(lo2,y);hi2=math.max(hi2,y)end;return hi2-lo2 end
+local mark=sign:FindFirstChild('Mark');local timerLabel=sign:FindFirstChild('Timer')
+check(mark and mark:IsA('TextLabel')and mark.Text=='!'and mark.Visible and mark.TextColor3.R==1 and mark.TextColor3.G==1,'a "!" in her name sign')
+-- Rows in studs: the marker (resting on the bottom of its row, bouncing up), the name, the timer: never overlapping.
+local function rows()
+ local H=S.H;local gh=mark.Size.Y.Scale*H;local bottom=mark.Position.Y.Scale*H
+ return {Mark={Top=bottom-gh,Bottom=bottom},Name={Top=nameLabel.Position.Y.Scale*H,Bottom=(nameLabel.Position.Y.Scale+nameLabel.Size.Y.Scale)*H},
+  Timer={Top=timerLabel.Position.Y.Scale*H,Bottom=(timerLabel.Position.Y.Scale+timerLabel.Size.Y.Scale)*H}}
+end
+local function clear(r)return r.Name.Top-r.Mark.Bottom,r.Timer.Top-r.Name.Bottom,r.Mark.Top end
+local g1,g2,top=clear(rows())
+check(g1>=1 and g2>=.4 and top>=-1e-6 and rows().Timer.Bottom<=S.H+1e-6,string.format('the marker, the name and the timer are separate rows: gaps %.1f and %.1f studs, all inside the sign (%.1f high)',g1,g2,S.H))
+check(timerLabel and timerLabel:IsA('TextLabel')and timerLabel.Position.Y.Scale*S.H>=nameLabel.Position.Y.Scale*S.H+nameLabel.Size.Y.Scale*S.H,'the event timer is a small line under her name')
+check(mark.AnchorPoint.Y==1 and near(rows().Mark.Bottom,S.Mark.Top+S.Mark.Height,1e-6),'the glyph rests on the bottom of its row, so it bounces up (away from the name)')
+local function bounced()local lo2,hi2=1e9,-1e9;for _=1,60 do frames(1);local y=mark.Position.Y.Scale*S.H;lo2=math.min(lo2,y);hi2=math.max(hi2,y)end;return hi2-lo2 end
 check(sign:GetAttribute('Bounce')==false and bounced()<1e-6,'"!" stands still')
 local plain=F.tool(W,'Forest Seed Pack',{SeedPackTool=true,SeedInventoryId='p1',BagVariant='Pack01',Stage=1},backpack);frames(2)
 local notPack=F.tool(W,'Odd tool',{BagVariant='EclipseReliquary',SeedInventoryId='x'},backpack);frames(2)
 check(mark.Text=='!','other packs (and a Tool without SeedPackTool) do not count')
 local voidTool=F.tool(W,'Void Pack',{SeedPackTool=true,SeedInventoryId='v1',BagVariant='EclipseReliquary',Stage=7},backpack);frames(2)
 check(mark.Text=='?'and mark.TextColor3.R==1 and mark.TextColor3.G>.7 and mark.TextColor3.B<.4 and sign:GetAttribute('Bounce')==true,'a Void Pack Tool appears in the Backpack: a gold "?"')
-check(bounced()>8,'the "?" bounces')
+check(bounced()>1.1 and bounced()<=S.Mark.Bounce+1e-6,'the "?" bounces (up to '..S.Mark.Bounce..' studs)')
+do -- the bounce never reaches the name or leaves its row, in any frame
+ local worst,topWorst=1e9,1e9
+ for _=1,150 do frames(1);local g,_,t=clear(rows());worst=math.min(worst,g);topWorst=math.min(topWorst,t)end
+ check(worst>=1 and topWorst>=-1e-6,string.format('while the "?" bounces it keeps at least %.1f studs from the name and stays inside the sign',worst))
+end
 voidTool.Parent=character;frames(2)
 check(mark.Text=='?','still "?" while it is held (Character)')
 voidTool.Parent=backpack;frames(2)
 W.Gui.ReducedMotionEnabled=true;frames(3)
 check(mark.Text=='?'and bounced()<1e-6,'ReducedMotion: the "?" stays but does not bounce')
 W.Gui.ReducedMotionEnabled=false;frames(3)
-check(bounced()>8,'(and bounces again with motion on)')
+check(bounced()>1.1,'(and bounces again with motion on)')
 local second=F.tool(W,'Void Pack',{SeedPackTool=true,SeedInventoryId='v2',BagVariant='EclipseReliquary',Stage=7},backpack);frames(2)
 voidTool:Destroy();frames(2)
 check(mark.Text=='?','two Void Packs, one goes: still "?"')
 second:Destroy();frames(2)
 check(mark.Text=='!'and sign:GetAttribute('Bounce')==false,'the last one goes: back to "!"')
-check(mark.Position.Y.Scale==.27 and mark.Position.Y.Offset==0,'(and the marker is back at rest)')
+check(near(rows().Mark.Bottom,S.Mark.Top+S.Mark.Height,1e-6),'(and the marker is back at rest)')
 do
  local late=F.tool(W,'Void Pack',{SeedPackTool=true,SeedInventoryId='v3',Stage=7},backpack);frames(2)
  check(mark.Text=='!','(no BagVariant yet: no "?")')
@@ -169,6 +194,14 @@ do
  check(mark.Text=='?','a new Backpack after respawn is watched');backpack=fresh
  for _,t in ipairs(fresh:GetChildren())do t:Destroy()end;frames(2);check(mark.Text=='!','(and back to "!")')
 end
+-- The timer line under her name: "EVENT ENDS IN 27d 04h 12m 09s" on the server's clock, ticking every second.
+check(timerLabel.Text:find('^EVENT ENDS IN %d+d %d%dh %d%dm %d%ds$')~=nil,'the timer line reads like "EVENT ENDS IN 27d 04h 12m 09s": '..timerLabel.Text)
+do
+ local left0=Limited.Left(W.workspace:GetServerTimeNow())
+ check(timerLabel.Text=='EVENT ENDS IN '..Limited.Text(left0),'(and it is LimitedEvent\'s text for the time left: '..left0..' s)')
+ local before=timerLabel.Text;R.advance(1.05);frames(2)
+ check(timerLabel.Text~=before and timerLabel.Text=='EVENT ENDS IN '..Limited.Text(Limited.Left(W.workspace:GetServerTimeNow())),'it ticks: a second later '..timerLabel.Text)
+end
 -- 3. Her voice ----------------------------------------------------------------------------------------------------------------------
 local function greetings()local n=0;for _,e in ipairs(soundLog)do if e.Sound.Name=='VerityGreeting'then n+=1 end end;return n end
 local function voiceSound()return body:FindFirstChild('VerityGreeting')end
@@ -176,18 +209,21 @@ check(C.GreetingSoundId=='rbxassetid://123997993114202','the owner\'s greeting i
 check(greetings()==0 and voiceSound()==nil,'(nothing has played yet: she was far away and no one talked to her)')
 standAt(0,7,-150);frames(40);check(greetings()==0,'far away (190 studs): no greeting')
 -- Open with Talk plays it, from her body.
+check(mark.Visible and mark.Text=='!','(before anyone talked to her the "!" is showing)')
 local nextAt=R.clock+754
 server('Open',{VoidPacks=0,Delivered=3,RewardText='1 VOID PACK = 1 VERITY PACK',EventActive=false,NextAt=nextAt})
 local s=voiceSound()
+check(not mark.Visible and sign:GetAttribute('MarkerShown')==false,'she has been talked to: the "!" is gone')
 check(greetings()==1 and s and s:IsA('Sound')and s.Parent==body,'opening her dialog with Talk plays her greeting (once), from her body')
 check(s and s.SoundId=='rbxassetid://123997993114202'and near(s.Volume,C.GreetingVolume),'rbxassetid://123997993114202 at the configured volume')
 check(s and s.RollOffMode==R.Enum.RollOffMode.InverseTapered and s.RollOffMinDistance==30 and s.RollOffMaxDistance==140 and s.Looped==false,'3D: InverseTapered roll-off from 30 to 140 studs')
 check(s and s.SoundGroup==Mixer.Group('Effects'),'routed to the Effects sound group (the player\'s Effects volume applies)')
 check(preloadCalls==1,'the asset was asked for once, before she needed it')
 -- She swells while it plays, and settles after.
-local big=0;for _=1,40 do frames(1);big=math.max(big,body.Size.X)end
+local big,clearance=0,1e9;for _=1,40 do frames(1);big=math.max(big,body.Size.X);clearance=math.min(clearance,(sign.StudsOffset.Y-sign.Size.Y.Scale/2)-body.Size.X/2)end
 check(big>22*1.03 and big<=22*(1+C.TalkPulse)+1e-6,string.format('a talking pulse while the voice plays: she swells up to %.2f (22 at rest)',big))
 check(near(body.CFrame.Position.Y-body.Size.X/2,5.2+.25,.3),'(she grows upward from the dais, she does not sink into it)')
+check(clearance>=.3,string.format('while she swells (and bobs) the sign\'s bottom edge stays at least %.2f studs above her top, from any camera angle (camera-space offset)',clearance))
 -- No overlap: more Talks while it plays do not start a second copy.
 server('Open',{VoidPacks=0,Delivered=3});frames(20);server('Open',{VoidPacks=0,Delivered=3})
 check(greetings()==1 and maxOverlap==1,'opening the dialog again while she is talking does not play a second copy (most heard at once: '..maxOverlap..')')
@@ -243,9 +279,31 @@ server('Open',{VoidPacks=0,Delivered=3});local swell=0;for _=1,40 do frames(1);s
 check(greetings()==g0+2 and swell==22,'ReducedMotion: she still greets, without the swelling pulse')
 panel.Header.Close.Activated:Fire();frames(2);R.advance(4);frames(30)
 W.Gui.ReducedMotionEnabled=false;frames(3)
+-- 3b. The "!" stays gone for the rest of this session (a rejoin = a new copy of the script shows it again); the "?" is a separate cue ---------
+do
+do local lo3=1e9;for _=1,200 do frames(1);lo3=math.min(lo3,(sign.StudsOffset.Y-sign.Size.Y.Scale/2)-body.Size.X/2)end;check(lo3>=.3,string.format('and through a whole bob cycle: %.2f studs',lo3))end
+ check(not mark.Visible,'(the "!" is still gone after the voice and the proximity greetings)')
+ R.advance(5);frames(30);check(not mark.Visible and sign:GetAttribute('MarkerShown')==false,'it does not come back by itself (time passing, the once-a-second recount)')
+ server('Done',{Delivered=9});server('Refused',{Reason='COME CLOSER TO VERITY'});panel.Header.Close.Activated:Fire();frames(2);plays={}
+ check(not mark.Visible,'nor after a hand-in, a refusal or closing the window')
+ local vt=F.tool(W,'Void Pack',{SeedPackTool=true,SeedInventoryId='t1',BagVariant='EclipseReliquary',Stage=7},backpack);frames(2)
+ check(mark.Visible and mark.Text=='?'and sign:GetAttribute('Bounce')==true and bounced()>1.1,'but a Void Pack still brings the bouncing "?" (a different cue)')
+ local g,_,t=clear(rows());check(g>=1 and t>=-1e-6,'(the "?" keeps its gap to the name too: '..string.format('%.1f',g)..' studs)')
+ vt:Destroy();frames(2)
+ check(not mark.Visible and sign:GetAttribute('Bounce')==false,'the Void Pack goes: nothing (not the "!" again)')
+ -- She streams out and in (the model is removed and added again): the session still remembers.
+ W.CS:RemoveTag(model,'VerityNPC');frames(2)
+ check(sign:FindFirstChild('Mark')==nil and sign:FindFirstChild('Timer')==nil,'(streamed out: her marker and timer go)')
+ W.CS:AddTag(model,'VerityNPC');frames(3)
+ mark=sign:FindFirstChild('Mark');timerLabel=sign:FindFirstChild('Timer')
+ check(mark and not mark.Visible and timerLabel and timerLabel.Text:find('^EVENT ENDS IN '),'streamed back in: still no "!" (the session remembers), the timer is back')
+ -- A respawn (new Backpack and Character) does not bring it back either.
+ backpack:Destroy();local fresh=R.new('Backpack');fresh.Parent=player;frames(2);backpack=fresh;check(not mark.Visible,'a respawn does not bring it back')
+end
 -- 4. The dialog -----------------------------------------------------------------------------------------------------------------------
 local gBefore=greetings()
 server('Refused',{Reason='YOUR DATA IS STILL LOADING'})
+local eventTimer=panel.EventTimer
 local quest,eventLine,voidChip,doneChip,rewardLine,status,give,closeButton=panel.QuestText,panel.EventLine,panel.VoidChip,panel.DeliveredChip,panel.Exchange.RewardLine,panel.Status,panel.GiveButton,panel.CloseButton
 check(panel.Visible and pg:GetAttribute('SeedMenu')=='Verity','a refusal while closed opens the window (SeedMenu = Verity)')
 check(status.Text=='YOUR DATA IS STILL LOADING'and not give.Active,'it shows the reason, GIVE disabled')
@@ -260,6 +318,15 @@ check(quest:GetAttribute('FullText')==C.Quest and not quest:GetAttribute('TextSh
 check(panel.Header.Title.Text:find('VERITY',1,true),'titled VERITY')
 check(voidChip.Count.Text=='0'and doneChip.Count.Text=='3'and voidChip.Caption.Text:find('VOID',1,true)and doneChip.Caption.Text:find('HANDED',1,true),'chips: 0 Void packs, 3 handed in')
 check(rewardLine:GetAttribute('FullText')=='1 VOID PACK = 1 VERITY PACK','the reward line from the server, in the exchange row')
+do
+ local expected='EVENT ENDS IN '..Limited.Text(Limited.Left(W.workspace:GetServerTimeNow()))
+ check(eventTimer.Visible and eventTimer.Text==expected and eventTimer.Text:find('^EVENT ENDS IN %d+d %d%dh %d%dm %d%ds$')~=nil,'the dialog shows "'..eventTimer.Text..'" (LimitedEvent\'s text on the server clock)')
+ check(eventTimer.TextColor3.R>.9 and eventTimer.TextColor3.G>.8,'in the event\'s gold')
+ local t0=eventTimer.Text;R.advance(2.05);frames(2)
+ check(eventTimer.Text~=t0 and eventTimer.Text=='EVENT ENDS IN '..Limited.Text(Limited.Left(W.workspace:GetServerTimeNow())),'it ticks every second while the window is open: '..t0..' -> '..eventTimer.Text)
+ nextAt=R.clock+754
+ server('Open',{VoidPacks=0,Delivered=3,RewardText='1 VOID PACK = 1 VERITY PACK',EventActive=false,NextAt=nextAt})
+end
 do local m0,s0=eventLine.Text:match('ARRIVES IN (%d+)m (%d+)s');local left0=m0 and tonumber(m0)*60+tonumber(s0)or -1
  check(eventLine.Visible and left0>=752 and left0<=754,'The Darkened\'s countdown (12m 34s, a moment ago): '..eventLine.Text)end
 check(give.Active==false and give.Interactable==false and give.Caption.Text=='GIVE VOID PACK','no Void pack: GIVE VOID PACK is disabled')
@@ -343,7 +410,7 @@ local vr,er=rect(voidHolder),rect(verityHolder)
 check(vr.W==vr.H and er.W==er.H and vr.W>=40 and not overlap(vr,er)and rect(arrow).X>=vr.X+vr.W-1 and rect(arrow).X+rect(arrow).W<=er.X+1,'two square pictures with the arrow between them: '..vr.W..' px each')
 -- 6. The window fits phones and computers ------------------------------------------------------------------------------------------------
 local function itemsOf()
- local out={{'quest',quest},{'chips-void',voidChip},{'chips-done',doneChip},{'void picture',voidHolder},{'arrow',arrow},{'verity picture',verityHolder},{'reward',rewardLine},{'status',status},{'give',give},{'close',closeButton}}
+ local out={{'quest',quest},{'timer',eventTimer},{'chips-void',voidChip},{'chips-done',doneChip},{'void picture',voidHolder},{'arrow',arrow},{'verity picture',verityHolder},{'reward',rewardLine},{'status',status},{'give',give},{'close',closeButton}}
  if eventLine.Visible then table.insert(out,2,{'event',eventLine})end
  return out
 end
@@ -372,7 +439,7 @@ for _,sz in ipairs({{1920,1080},{1280,720},{1024,768},{844,390},{780,360},{667,3
   pic='portrait '..bb.W..' px'
  else pic='portrait hidden'end
  local hdr=rect(panel.Header.Close);if hdr.X+hdr.W>P.X+P.W+1 or hdr.W<30 then good=false;why=why..' X button off or small'end
- for _,label in ipairs({quest,eventLine,rewardLine,status,voidChip.Count,doneChip.Count,voidChip.Caption,doneChip.Caption,give.Caption,closeButton.Caption})do
+ for _,label in ipairs({quest,eventTimer,eventLine,rewardLine,status,voidChip.Count,doneChip.Count,voidChip.Caption,doneChip.Caption,give.Caption,closeButton.Caption})do
   if label:GetAttribute('TextShortened')then good=false;why=why..' text cut: '..tostring(label.Name)..' ("'..label.Text..'")'end
  end
  check(good,('window fits %dx%d (panel %dx%d, %s, packs %d px)%s'):format(sz[1],sz[2],P.W,P.H,pic,rect(voidHolder).W,why))
@@ -393,9 +460,16 @@ check(ok2,'nothing runs (or errors) after it is torn down')
 preloadMode='fail';preloadCalls=0;local warns0=W.warns or 0;local count0=greetings()
 local sc2=load('a second VerityClient (greeting asset fails to load)');frames(5)
 local gui2=pg:FindFirstChild('VerityGui');local panel2=gui2 and gui2.VerityPanel
+do
+ local mark2=sign:FindFirstChild('Mark')
+ check(mark2 and mark2~=mark and mark2.Visible and mark2.Text=='!','a new session (a rejoin: a fresh copy of the script): the "!" shows again')
+ server('Refused',{Reason='YOUR DATA IS STILL LOADING'});check(mark2.Visible,'a refusal is not "talking to her": the "!" stays')
+ panel2.Header.Close.Activated:Fire();frames(2)
+end
 standAt(0,7,-318);R.advance(70);frames(40)
 local okOpen=pcall(function()server('Open',{VoidPacks=1,Delivered=0});R.advance(5);server('Open',{VoidPacks=1,Delivered=0})end)
 check(okOpen and panel2.Visible,'a greeting asset that fails to load does not break her dialog')
+check(not sign:FindFirstChild('Mark').Visible,'(and opening it hid the "!" in this session)')
 check(greetings()==count0 and #(function()local out={};for _,e in ipairs(soundLog)do out[#out+1]=e end;return out end)()==count0,'nothing is played')
 check((W.warns or 0)==warns0+1,'and it is warned about exactly once ('..((W.warns or 0)-warns0)..' warnings)')
 check(near(body.Size.X,22,1e-6),'(and she does not swell for a voice that never plays)')
@@ -407,5 +481,40 @@ local gui3=pg:FindFirstChild('VerityGui')
 local ok3=pcall(function()server('Open',{VoidPacks=1,Delivered=0});R.advance(5);server('Open',{VoidPacks=1,Delivered=0})end)
 check(ok3 and gui3.VerityPanel.Visible and (W.warns or 0)==warns0+1,'a Sound that errors on Play is skipped without breaking the dialog, warned once ('..((W.warns or 0)-warns0)..')')
 playMode=nil;gui3:Destroy();frames(3)
+-- 8. The event ends ----------------------------------------------------------------------------------------------------------------
+do
+ preloadMode='ok';playMode=nil
+ R.clock=Limited.EndsAt-2
+ local sc4=load('a fourth VerityClient (2 s before the end of the event)');frames(5)
+ local gui4=pg:FindFirstChild('VerityGui');local panel4=gui4.VerityPanel
+ local mk=sign:FindFirstChild('Mark');local tl=sign:FindFirstChild('Timer')
+ check(mk.Visible and mk.Text=='!'and tl.Text=='EVENT ENDS IN 0d 00h 00m 02s','2 s before the end: the "!" shows and the sign says "'..tl.Text..'"')
+ server('Open',{VoidPacks=2,Delivered=4})
+ local et,gb,gc=panel4.EventTimer,panel4.GiveButton,panel4.GiveButton.Caption
+ check(et.Text=='EVENT ENDS IN 0d 00h 00m 02s'and gb.Active and gc.Text=='GIVE VOID PACK','the dialog says "'..et.Text..'" and GIVE VOID PACK works')
+ local vt=F.tool(W,'Void Pack',{SeedPackTool=true,SeedInventoryId='e1',BagVariant='EclipseReliquary',Stage=7},backpack);frames(2)
+ check(mk.Visible and mk.Text=='?','(with a Void Pack she shows the "?")')
+ R.advance(1.1);frames(2)
+ check(et.Text=='EVENT ENDS IN 0d 00h 00m 01s'and tl.Text=='EVENT ENDS IN 0d 00h 00m 01s','one second later: '..et.Text)
+ R.advance(1.1);frames(3) -- the end has passed
+ check(et.Text==C.Event.Ended and et.TextColor3.R>.9 and et.TextColor3.G<.5,'the event ends while the window is open: "'..et.Text..'", in red')
+ check(not gb.Active and not gb.Interactable and gc.Text==C.Event.Ended,'GIVE is disabled (it says EVENT ENDED) even with Void Packs')
+ check(tl.Text==C.Event.Ended and tl.TextColor3.R>.9 and tl.TextColor3.G<.5,'her sign says EVENT ENDED too')
+ check(not mk.Visible and sign:GetAttribute('Bounce')==false,'and neither the "!" nor the "?" shows (with a Void Pack in the Bag)')
+ local n0=#fired;gb.Activated:Fire();frames(2);check(#fired==n0,'clicking GIVE sends nothing')
+ server('Open',{VoidPacks=2,Delivered=4})
+ check(not gb.Active and et.Text==C.Event.Ended and panel4.VoidChip.Count.Text=='2','a fresh Open after the end: 2 Void Packs counted, GIVE still disabled, "EVENT ENDED"')
+ server('Refused',{Reason=C.Reasons.EventEnded});check(panel4.Status.Text=='THE VERITY EVENT HAS ENDED','the server\'s refusal text is shown: '..panel4.Status.Text)
+ vt:Destroy();frames(2);gui4:Destroy();frames(3)
+ -- A session that starts after the end: the "!" never shows.
+ local sc5=load('a fifth VerityClient (after the end)');frames(5)
+ local gui5=pg:FindFirstChild('VerityGui');local mk5=sign:FindFirstChild('Mark');local tl5=sign:FindFirstChild('Timer')
+ check(not mk5.Visible and tl5.Text==C.Event.Ended,'a session after the end: no "!", the sign says EVENT ENDED')
+ R.advance(5);frames(30);check(not mk5.Visible,'(and it never comes back)')
+ server('Open',{VoidPacks=0,Delivered=0});check(gui5.VerityPanel.EventTimer.Text==C.Event.Ended and not gui5.VerityPanel.GiveButton.Active,'her dialog says EVENT ENDED, GIVE disabled')
+ -- Phones: the ended window fits too.
+ resize(360,640);check(not gui5.VerityPanel.EventTimer:GetAttribute('TextShortened'),'EVENT ENDED fits a phone');resize(1280,720)
+ gui5:Destroy();frames(3)
+end
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

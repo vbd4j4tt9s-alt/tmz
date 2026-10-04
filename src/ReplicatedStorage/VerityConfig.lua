@@ -13,8 +13,9 @@
 --    Her dais (28 across) is centred at (0, 4, -340): 33 studs clear of the market's porch and 24 of the pedestal, 68 from the
 --    next base, facing +Z (toward the market and the way players walk round it to reach her). Players come round the market's
 --    sides (it is 54 studs wide; the lobby is 680 wide) and reach her from the market side.
---  * Tune in Studio: BodySize (the sphere's diameter), FootOffset, Position, DaisDiameter, NameHeight, light range / brightness.
+--  * Tune in Studio: BodySize (the sphere's diameter), FootOffset, Position, DaisDiameter, Sign (its size and gap), light range / brightness.
 local Catalog=require(script.Parent.VerityCatalog)
+local Limited=require(script.Parent.LimitedEvent)
 local C={Version=148}
 C.Name='VERITY'
 C.ModelName='VerityNPC'
@@ -32,9 +33,14 @@ C.DaisDiameter=28;C.DaisHeight=1.2
 C.RingDiameter=26.4;C.RingColor=Color3.fromRGB(255,206,64)
 C.LightColor=Color3.fromRGB(255,235,140);C.LightRange=56;C.LightBrightness=1.2
 C.LightHeight=5                    -- studs above the sphere's top
-C.NameHeight=6.5                   -- studs from the top of the sphere to the middle of the name sign (the quest marker sits in it); the sign is a
-                                   -- constant size on screen, so it needs room above the ball to stay clear of it from far away
-C.NameSize={W=240,H=120}           -- pixels; "VERITY" fills the lower part, the "!" / "?" the upper
+-- Her sign (one BillboardGui over her head, sized in STUDS so it scales with her): from the top, the quest marker ("!" / "?"), a
+-- gap, her name, a small line with the event timer. Rows are in studs inside the sign (Top, Height); they cannot overlap, so
+-- the marker, the name and the timer keep their gaps at every distance. The sign is offset in CAMERA space (StudsOffset, not
+-- world space) so its bottom edge stays Gap studs above her top edge as seen from any camera angle.
+C.Sign={W=32,H=15.5,Gap=1.6,
+ Mark={Top=0,Height=7,Glyph=5.4,Bounce=1.6},   -- the "!" / "?" glyph rests at the bottom of its row and bounces up by Bounce
+ Name={Top=8.2,Height=4.5},
+ Timer={Top=13.3,Height=2.2}}
 C.NameMaxDistance=300
 C.PromptActionText='Talk';C.PromptObjectText='Verity';C.PromptDistance=26;C.PromptHold=0
 C.PromptHeight=3                   -- studs above the dais (the prompt hangs inside the sphere's lower half)
@@ -47,6 +53,11 @@ C.GreetingCooldown=60              -- ...at most once a minute (a greeting from 
 C.TalkPulse=.06                    -- how much she swells (fraction of her size) while the voice plays
 C.TalkPulseRate=18                 -- radians a second
 -- Security --------------------------------------------------------------------------------------------------------------
+-- The limited event (R148 owner: "place a timer ... 27 days, hrs, mins, s ... same for the event for Verity"): LimitedEvent.EndsAt
+-- (UTC) is shared with the Index LIMITED tab. After it Verity takes nothing: the server refuses, the dialog says EVENT ENDED, the "!" is gone.
+C.EventEndsAt=Limited.EndsAt
+C.Event={Prefix='EVENT ENDS IN ',Ended='EVENT ENDED'}
+C.EventColor=Color3.fromRGB(255,236,150)
 C.GiveDistance=38                  -- the server's own range check for the hand-in (the prompt itself reaches 26)
 C.MaxDelivered=1e9                 -- saved counter ceiling (anything larger in a save is clamped)
 C.VoidVariant='EclipseReliquary';C.VerityVariant=Catalog.Variant;C.PackStage=Catalog.PackStage
@@ -69,5 +80,6 @@ C.Reasons={
  NoVoid='YOU NEED A VOID PACK',
  NotReady='VERITY IS NOT READY',
  Failed='VERITY COULD NOT TAKE IT. TRY AGAIN',
+ EventEnded='THE VERITY EVENT HAS ENDED',
 }
 return C

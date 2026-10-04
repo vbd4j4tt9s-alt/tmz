@@ -74,9 +74,14 @@ local function walk(o)
     elseif g.ClassName=='Decal'then
      table.insert(decals,string.format('{"face":%s,"texture":%s}',q(enumName(g.Face)),q(g.Texture)))
     elseif g.ClassName=='BillboardGui'then
-     local o2=g.StudsOffsetWorldSpace or V3(0,0,0);local lines={}
-     for _,t in ipairs(g:GetChildren())do if t.ClassName=='TextLabel'then table.insert(lines,string.format('{"text":%s,"color":%s}',q(t.Text),c3(t.TextColor3)))end end
-     table.insert(signs,string.format('{"p":[%s,%s,%s],"lines":[%s],"mark":"!"}',n(p.X+o2.X),n(p.Y+o2.Y),n(p.Z+o2.Z),table.concat(lines,',')))
+     -- The sign is sized in studs and offset in camera space (here: straight up, the preview cameras look level); the client adds the
+     -- "!" row and the event timer row (VerityConfig.Sign), which are drawn here with the same rows.
+     local o2=g.StudsOffset or V3(0,0,0);local S=C.Sign;local name,nameColor='?',nil
+     for _,t in ipairs(g:GetChildren())do if t.ClassName=='TextLabel'then name=t.Text;nameColor=t.TextColor3 end end
+     local L=W.module('LimitedEvent')
+     table.insert(signs,string.format('{"p":[%s,%s,%s],"w":%s,"h":%s,"name":%s,"nameColor":%s,"mark":"!","timer":%s,"rows":{"mark":[%s,%s],"name":[%s,%s],"timer":[%s,%s]}}',
+      n(p.X+o2.X),n(p.Y+o2.Y),n(p.Z+o2.Z),n(S.W),n(S.H),q(name),c3(nameColor),q('EVENT ENDS IN '..L.Text(27*86400+4*3600+12*60+9)),
+      n(S.Mark.Top),n(S.Mark.Top+S.Mark.Height),n(S.Name.Top),n(S.Name.Top+S.Name.Height),n(S.Timer.Top),n(S.Timer.Top+S.Timer.Height)))
     end
    end
    for _,l in ipairs(c:GetChildren())do if l.ClassName=='PointLight'then table.insert(lights,string.format('{"p":[%s,%s,%s],"color":%s,"range":%s}',n(p.X),n(p.Y),n(p.Z),c3(l.Color),n(l.Range or 10)))end end

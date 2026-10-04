@@ -65,11 +65,17 @@ function decalBall(color,decals){
   g.putImageData(img,0,0);const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t;
 }
 function signSprite(sign){
-  const cv=document.createElement('canvas');cv.width=480;cv.height=240;const g=cv.getContext('2d');g.textAlign='center';g.textBaseline='middle';
-  g.font='900 130px "Arial Rounded MT Bold","DejaVu Sans",sans-serif';g.lineWidth=14;g.strokeStyle='rgba(40,22,70,1)';g.strokeText(sign.mark,240,62);g.fillStyle='#fff';g.fillText(sign.mark,240,62);
-  for(const l of sign.lines){g.font='900 100px "Arial Rounded MT Bold","DejaVu Sans",sans-serif';g.lineWidth=12;g.strokeStyle='rgba(30,20,60,.95)';g.strokeText(l.text,240,178);g.fillStyle=`rgb(${l.color[0]},${l.color[1]},${l.color[2]})`;g.fillText(l.text,240,178);}
+  // One studs-sized sign: the "!" row on top, a gap, the name, the event timer line (rows from VerityConfig.Sign).
+  const PX=22;const cw=Math.round(sign.w*PX),ch=Math.round(sign.h*PX);
+  const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;const g=cv.getContext('2d');g.textAlign='center';g.textBaseline='middle';
+  const row=(r,text,color,fill,k)=>{const y0=r[0]*PX,y1=r[1]*PX,h=y1-y0;let size=h*k;g.font=`900 ${size}px "Arial Rounded MT Bold","DejaVu Sans",sans-serif`;
+    while(size>6&&g.measureText(text).width>cw*.98){size*=.94;g.font=`900 ${size}px "Arial Rounded MT Bold","DejaVu Sans",sans-serif`;}
+    g.lineWidth=Math.max(2,size*.12);g.strokeStyle='rgba(40,22,70,1)';g.strokeText(text,cw/2,(y0+y1)/2);g.fillStyle=fill;g.fillText(text,cw/2,(y0+y1)/2);};
+  row([sign.rows.mark[0]+1.6,sign.rows.mark[1]],sign.mark,'#fff','#fff',.95);
+  row(sign.rows.name,sign.name,`rgb(${sign.nameColor[0]},${sign.nameColor[1]},${sign.nameColor[2]})`,`rgb(${sign.nameColor[0]},${sign.nameColor[1]},${sign.nameColor[2]})`,.95);
+  row(sign.rows.timer,sign.timer,'#ffec96','#ffec96',.95);
   const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;
-  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false,toneMapped:false}));s.position.set(...sign.p);s.scale.set(13,6.5,1);return s;
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false,toneMapped:false}));s.position.set(...sign.p);s.scale.set(sign.w,sign.h,1);return s;
 }
 // A Roblox-sized avatar (about 5 studs tall) for scale.
 function person(x,y,z,shirt){

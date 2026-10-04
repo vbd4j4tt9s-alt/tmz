@@ -15,7 +15,7 @@
 -- NOTE: MapService binds WalkthroughProps90 to the map, which makes every part under EconomyHub walk-through a moment
 -- after it appears. The dais and the Body must stay solid, so they put CanCollide back whenever it is cleared.
 local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
-local C=require(RS.VerityConfig)
+local C=require(RS.VerityConfig);local Limited=require(RS.LimitedEvent)
 local V={};V.__index=V
 local RGB=Color3.fromRGB
 local R=C.Reasons
@@ -71,11 +71,13 @@ function V:_build(hub)
  -- A light above her, so the ground and her top glow.
  local lightHolder=part(model,'LightAnchor',Vector3.new(.5,.5,.5),CFrame.new(middle+Vector3.new(0,size/2+C.LightHeight,0)),dark);lightHolder.Transparency=1
  local light=Instance.new('PointLight');light.Name='Glow';light.Color=C.LightColor;light.Range=C.LightRange;light.Brightness=C.LightBrightness;light.Shadows=false;light.Parent=lightHolder
- -- "VERITY" over her head; the client puts the "!" / "?" marker in the empty top part of the same sign (no overlap at any distance).
- local sign=Instance.new('BillboardGui');sign.Name='NameSign';sign.Adornee=body;sign.Size=UDim2.fromOffset(C.NameSize.W,C.NameSize.H)
- sign.StudsOffsetWorldSpace=Vector3.new(0,size/2+C.NameHeight,0)
+ -- One sign over her head, in studs (see VerityConfig.Sign): the client puts the "!" / "?" marker in its top row and the event timer
+ -- in its bottom row; the name is here. Camera-space offset: its bottom edge is Gap studs above her top edge from any angle.
+ local S=C.Sign
+ local sign=Instance.new('BillboardGui');sign.Name='NameSign';sign.Adornee=body;sign.Size=UDim2.fromScale(S.W,S.H)
+ sign.StudsOffset=Vector3.new(0,size/2+S.Gap+S.H/2,0);sign.StudsOffsetWorldSpace=Vector3.new(0,0,0)
  sign.AlwaysOnTop=false;sign.MaxDistance=C.NameMaxDistance;sign.LightInfluence=0;sign.ResetOnSpawn=false;sign.Parent=body
- local label=Instance.new('TextLabel');label.Name='Name';label.BackgroundTransparency=1;label.AnchorPoint=Vector2.new(.5,1);label.Position=UDim2.fromScale(.5,1);label.Size=UDim2.fromScale(1,.46)
+ local label=Instance.new('TextLabel');label.Name='Name';label.BackgroundTransparency=1;label.Position=UDim2.fromScale(0,S.Name.Top/S.H);label.Size=UDim2.fromScale(1,S.Name.Height/S.H)
  label.Font=Enum.Font.FredokaOne;label.Text=C.Name;label.TextScaled=true;label.TextColor3=gold;label.TextStrokeColor3=RGB(30,20,60);label.TextStrokeTransparency=.05;label.Parent=sign
  -- The prompt sits on a small invisible anchor on her axis, low in the sphere.
  local anchor=part(model,'PromptAnchor',Vector3.new(.5,.5,.5),CFrame.new(daisTop+Vector3.new(0,C.PromptHeight,0)),dark);anchor.Transparency=1
@@ -166,9 +168,11 @@ function V:_openingBlocks(player,record)
  return record~=nil and tool~=nil and tool:GetAttribute('SeedInventoryId')==record.Id and(tonumber(opening.Clicks)or 0)>0
 end
 -- Returns true and the new Verity record, or false and the reason (also sent to the player as 'Refused').
--- Validation order: data / save, range, busy, opening, rate limit, ChestService ready, owns a Void pack. Nothing yields.
+-- Validation order: event running, data / save, range, busy, opening, rate limit, ChestService ready, owns a Void pack. Nothing yields.
 function V:Give(player,...)
  if not player or not player.Parent then return false end
+ -- The limited event is over: she takes nothing (the clock is the server's, UTC).
+ if not Limited.Active(os.time())then return self:_refuse(player,R.EventEnded)end
  local data=self.Data
  if not data:IsLoaded(player)then return self:_refuse(player,R.Loading)end
  if not data.CanSave[player]then return self:_refuse(player,R.CannotSave)end

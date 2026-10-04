@@ -13,7 +13,11 @@
 -- solid yellow Ball (Color 255,255,0, SmoothPlastic, 22 studs) with her smiley as Decals on its Front and Back faces, on a
 -- 28 stud dais BEHIND the market; the position is checked against the REAL MarketLayout's footprint (porch, produce stands,
 -- Fruit of the Hour pedestal, fast-travel marker), the lobby bounds, the bases and the spawn.
+-- R148 follow-up: her sign is one studs-sized BillboardGui (marker row, gap, name, event timer row: rows that cannot overlap, offset
+-- in camera space so it clears her top from any angle, also while she bobs and swells); and the limited event (LimitedEvent.EndsAt,
+-- 2026-11-01 00:00 UTC): once it is over the server refuses every hand-in ("THE VERITY EVENT HAS ENDED") before anything else.
 local W=require('./world');local R=W.R
+local function near(a,b,tol)return type(a)=='number'and type(b)=='number'and math.abs(a-b)<=(tol or 1e-6)end
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
 local RS=W.RS
@@ -187,7 +191,21 @@ check(ring and ring.Material==R.Enum.Material.Neon,'a neon ring on the dais')
 check(light and light:IsA('PointLight')and lightAnchor.Position.Y>body.Position.Y+11 and light.Range<=60,'a PointLight above her')
 local sign=body and body:FindFirstChild('NameSign');local nameLabel=sign and sign:FindFirstChild('Name')
 check(sign and sign:IsA('BillboardGui')and sign.Adornee==body and nameLabel and nameLabel.Text=='VERITY','a VERITY name sign (BillboardGui on her body)')
-check(C.NameHeight>=5 and sign and math.abs(sign.StudsOffsetWorldSpace.Y-(11+C.NameHeight))<1e-6 and nameLabel.Position.Y.Scale==1 and nameLabel.Size.Y.Scale<.6,'above her head, the name in its lower part (room above it for the client\'s marker)')
+do -- her sign: rows in studs that cannot overlap, clear of her at every camera angle and while she bobs and swells
+ local S=C.Sign;local sw,sh=sign.Size.X.Scale,sign.Size.Y.Scale
+ check(sw==S.W and sh==S.H and sign.Size.X.Offset==0 and sign.Size.Y.Offset==0,'the sign is sized in studs ('..sw..' x '..sh..'), so it scales with her')
+ local nameTop,nameH=nameLabel.Position.Y.Scale*sh,nameLabel.Size.Y.Scale*sh
+ check(near(nameTop,S.Name.Top)and near(nameH,S.Name.Height)and nameLabel.Position.X.Scale==0 and nameLabel.Size.X.Scale==1,'the name row: '..string.format('%.1f .. %.1f',nameTop,nameTop+nameH)..' studs down the sign')
+ local markEnd=S.Mark.Top+S.Mark.Height;local timerTop=S.Timer.Top
+ check(markEnd+1>=0 and nameTop-markEnd>=1,string.format('a gap of %.1f studs between the marker row and the name',nameTop-markEnd))
+ check(timerTop-(nameTop+nameH)>=.4 and timerTop+S.Timer.Height<=sh+1e-6,string.format('and %.1f studs between the name and the timer row, which ends inside the sign',timerTop-(nameTop+nameH)))
+ check(S.Mark.Glyph+S.Mark.Bounce<=S.Mark.Height+1e-6,'the "!" / "?" glyph (rests on the bottom of its row) bounces up inside the row, never down toward the name')
+ check(sign.StudsOffsetWorldSpace.X==0 and sign.StudsOffsetWorldSpace.Y==0 and sign.StudsOffsetWorldSpace.Z==0,'no world-space offset (it would drop into her at steep camera angles)')
+ local bottom=sign.StudsOffset.Y-sh/2 -- camera-space studs from her middle to the sign's bottom edge
+ check(near(bottom,11+S.Gap,1e-6),'camera-space offset: the sign\'s bottom edge is '..S.Gap..' studs above her silhouette top ('..string.format('%.2f',bottom)..' from her middle, she is 11 studs in radius)')
+ check(bottom-(11*(1+C.TalkPulse)+C.FootOffset)>=.3,'it still clears her when she swells with her voice and bobs: '..string.format('%.2f',bottom-(11*(1+C.TalkPulse)+C.FootOffset))..' studs to spare')
+ check(sign.AlwaysOnTop==false and sign.MaxDistance>=200,'(depth-tested, visible from far away)')
+end
 local prompt=model:FindFirstChild('Talk',true)
 check(prompt and prompt:IsA('ProximityPrompt')and prompt.ActionText=='Talk'and prompt.HoldDuration==0 and prompt.MaxActivationDistance==26 and prompt.RequiresLineOfSight==false and prompt.Enabled,'ProximityPrompt "Talk": hold 0, 26 studs, no line of sight needed')
 -- Where she stands, against the real market and the lobby.
@@ -414,6 +432,38 @@ do
  check(#convertCalls==0 and count(M2,VOID)==3 and #inbox(M2)==0,'unknown actions and malformed arguments do nothing (no conversion, no answer)')
  R.advance(2) -- (the two hostile Gives above used up the burst, as they should)
  remote.OnServerEvent:Fire(M2,'Give','extra-but-harmless');check(count(M2,VERITY)==1,'harmless extra arguments are ignored, the hand-in itself is the same')
+end
+-- The limited event is over: every hand-in is refused first (LimitedEvent.EndsAt, 2026-11-01 00:00 UTC, on the server's clock).
+do
+ local Limited=W.module('LimitedEvent')
+ check(Limited.EndsAt==1793491200 and C.EventEndsAt==Limited.EndsAt and C.Reasons.EventEnded=='THE VERITY EVENT HAS ENDED','the event ends at LimitedEvent.EndsAt (2026-11-01 00:00 UTC) and the refusal reads "THE VERITY EVENT HAS ENDED"')
+ local before=R.clock
+ local Z=makePlayer('Zed');spawn(Z);local zv=void(Z,3);for _,rec in ipairs(Data:GetChestRecords(Z))do toolFor(rec,bag(Z))end
+ R.clock=Limited.EndsAt-3
+ local ok=service:Give(Z);check(ok and count(Z,VERITY)==1,'3 seconds before the end it still works (one Void pack handed in)')
+ R.advance(1.2);R.clock=Limited.EndsAt-1;R.advance(0)
+ ok=service:Give(Z);check(ok and count(Z,VERITY)==2,'one second before the end it still works')
+ R.clock=Limited.EndsAt
+ refusal('the event has ended (exactly at the end)',Z,C.Reasons.EventEnded)
+ R.clock=Limited.EndsAt+86400*40
+ refusal('the event ended 40 days ago',Z,C.Reasons.EventEnded)
+ check(count(Z,VOID)==1 and count(Z,VERITY)==2 and service:Delivered(Z)==2,'(nothing was taken: 1 Void pack left, 2 Verity packs, 2 handed in)')
+ -- It is checked before everything else (not just before the Void-pack lookup): data not loaded, far away, carrying, no pack at all.
+ refusal('ended, and too far away',Z,C.Reasons.EventEnded,function()Z.Character.HumanoidRootPart.CFrame=R.CFrame.new(0,7,-100)end,function()Z.Character.HumanoidRootPart.CFrame=R.CFrame.new(STAND.X,STAND.Y,STAND.Z)end)
+ refusal('ended, and carrying a stolen pack',Z,C.Reasons.EventEnded,function()Z:SetAttribute('ChestChaseSeedCarrying',true)end,function()Z:SetAttribute('ChestChaseSeedCarrying',nil)end)
+ refusal('ended, and the data is not loaded',Z,C.Reasons.EventEnded,function()Data.Loaded[Z]=false end,function()Data.Loaded[Z]=true end)
+ local Y=makePlayer('Yan');spawn(Y)
+ refusal('ended, and no Void pack at all',Y,C.Reasons.EventEnded)
+ -- Spam after the end: refused (never converted), still rate limited like any hand-in.
+ convertCalls={};for _=1,6 do remote.OnServerEvent:Fire(Z,'Give')end
+ check(#convertCalls==0 and count(Z,VOID)==1 and count(Z,VERITY)==2,'six quick Gives after the end convert nothing')
+ -- Talking still works (the dialog opens, and says EVENT ENDED).
+ R.advance(1.2);local n0=msgs(Z,'Open');prompt.Triggered:Fire(Z)
+ local om=last(Z);check(msgs(Z,'Open')==n0+1 and om.Args[1]=='Open'and om.Args[2].VoidPacks==1 and om.Args[2].Delivered==2,'she still opens her dialog after the end (1 Void pack, 2 handed in)')
+ -- The real LimitedEvent text format.
+ check(Limited.Text(27*86400+4*3600+12*60+9)=='27d 04h 12m 09s'and Limited.Text(0)=='0d 00h 00m 00s'and Limited.Left(Limited.EndsAt+5)==0 and not Limited.Active(Limited.EndsAt)and Limited.Active(Limited.EndsAt-1),'LimitedEvent: "27d 04h 12m 09s", 0 at and after the end')
+ R.clock=before;R.advance(0);R.advance(2)
+ ok=service:Give(Z);check(ok and count(Z,VERITY)==3 and count(Z,VOID)==0,'with the clock back before the end (the event running) the same player can hand in again')
 end
 -- A player who leaves between the click and the check is ignored.
 do

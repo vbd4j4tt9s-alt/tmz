@@ -3,8 +3,10 @@
 -- R148 (owner's play test, "Verity should be a big yellow sphere", and her greeting voice):
 --  * Her Body (a big yellow ball with her smiley as a Decal) turns to face the camera on this client, bobs a little, and swells
 --    while she talks (all of it cosmetic and local; none with ReducedMotion).
---  * A marker over her head, in the same sign as her name: a "!" normally, a bouncing gold "?" while you carry a Void Pack
---    (a Backpack / Character Tool with SeedPackTool and BagVariant 'EclipseReliquary').
+--  * A marker over her head, in the same sign as her name (marker row, a gap, the name, the event timer: rows that cannot overlap):
+--    a "!" until you have opened her dialog once (then it is gone for the rest of this session; a rejoin shows it again), a bouncing
+--    gold "?" while you carry a Void Pack (a Backpack / Character Tool with SeedPackTool and BagVariant 'EclipseReliquary').
+--    Once the limited event is over (LimitedEvent) neither shows, her timer line says EVENT ENDED and she takes nothing.
 --  * Her greeting (VerityConfig.GreetingSoundId) plays from her body, 3D, through the Effects volume setting: when you open her
 --    dialog with Talk, and once when you first come within GreetingDistance of her (at most once a minute; a Talk greeting counts).
 --    Never two copies at once; an asset that fails to load is warned about once and skipped.
@@ -19,6 +21,7 @@ local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local
 local C=require(RS:WaitForChild('VerityConfig'));local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI);local Audio=require(RS.InteractionAudio)
 local Pictures;pcall(function()Pictures=require(RS.ItemPictures)end)
 local Mixer;pcall(function()Mixer=require(RS.AudioMixer)end)
+local Limited=require(RS:WaitForChild('LimitedEvent'))
 local RGB=Color3.fromRGB
 local GOLD,MINT,SKY,RED,VIOLET=RGB(255,206,64),RGB(110,226,96),RGB(86,182,255),RGB(255,96,96),RGB(190,140,255)
 local connections={};local function watch(signal,fn)local c=signal:Connect(fn);connections[#connections+1]=c;return c end
@@ -44,6 +47,13 @@ local function countVoidTools()
  return n
 end
 local function wrap(angle)return(angle+math.pi)%(math.pi*2)-math.pi end
+-- The limited event, on the SERVER's clock ("EVENT ENDS IN 27d 04h 12m 09s"); after EndsAt it is over.
+local function eventLive()return Limited.Active(workspace:GetServerTimeNow())end
+local function eventTimerText()
+ if eventLive()then return C.Event.Prefix..Limited.Text(Limited.Left(workspace:GetServerTimeNow())),true end
+ return C.Event.Ended,false
+end
+local talked=false -- opened her dialog this session: the "!" is gone until the next session
 -- Her voice -------------------------------------------------------------------------------------------------------------------
 -- One Sound on her body (3D, rolled off by distance, routed to the Effects group so the player's Effects volume applies).
 local voice={Playing=false,Until=0,LastAt=-math.huge,Failed=false,Warned=false,Sound=nil,Checked=false,Plays=0}
@@ -89,13 +99,24 @@ local function greet(kind)
  return true
 end
 -- Her body and the marker ---------------------------------------------------------------------------------------------------------
-local MARK_REST=UDim2.fromScale(.5,.27)
+local S=C.Sign
+local MARK_BASE=(S.Mark.Top+S.Mark.Height)/S.H     -- the glyph rests on the bottom of its row
+local MARK_BOUNCE=S.Mark.Bounce/S.H
+local function markAt(lift)return UDim2.fromScale(.5,MARK_BASE-lift)end
+local function refreshTimer()
+ local e=entry;if not e or not e.Timer.Parent then return end
+ local text,live=eventTimerText();e.Timer.Text=text;e.Timer.TextColor3=live and C.EventColor or RED
+end
 local function refreshMarker()
  local e=entry;if not e or not e.Mark.Parent then return end
- local has=countVoidTools()>0
- e.Mark.Text=has and'?'or'!';e.Mark.TextColor3=has and GOLD or Color3.new(1,1,1)
- e.Sign:SetAttribute('Bounce',has);e.Sign:SetAttribute('HasVoidPack',has);e.Has=has
- if not has then e.Mark.Position=MARK_REST end
+ local has=countVoidTools()>0;local live=eventLive()
+ -- "?" while you hold a Void Pack; "!" until you have talked to her; nothing once the event is over.
+ local shown=live and(has or not talked)
+ e.Mark.Visible=shown;e.Mark.Text=has and'?'or'!';e.Mark.TextColor3=has and GOLD or Color3.new(1,1,1)
+ e.Has=shown and has
+ e.Sign:SetAttribute('Bounce',e.Has);e.Sign:SetAttribute('HasVoidPack',has);e.Sign:SetAttribute('MarkerShown',shown)
+ if not e.Has then e.Mark.Position=markAt(0)end
+ refreshTimer()
 end
 local function build(model,body)
  local sign=body:FindFirstChild('NameSign')
@@ -103,10 +124,13 @@ local function build(model,body)
   local waiting;waiting=body.ChildAdded:Connect(function(child)if child.Name=='NameSign'then waiting:Disconnect();if model.Parent and not entry then build(model,body)end end end)
   connections[#connections+1]=waiting;return
  end
- local mark=new('TextLabel',{Name='Mark',BackgroundTransparency=1,AnchorPoint=Vector2.new(.5,.5),Position=MARK_REST,Size=UDim2.fromScale(.5,.54),Font=Enum.Font.FredokaOne,TextScaled=true,
+ -- The marker row (above the name, with the glyph at the bottom so it can bounce up inside the row) and the timer row (under it).
+ local mark=new('TextLabel',{Name='Mark',BackgroundTransparency=1,AnchorPoint=Vector2.new(.5,1),Position=markAt(0),Size=UDim2.fromScale(.4,S.Mark.Glyph/S.H),Font=Enum.Font.FredokaOne,TextScaled=true,
   Text='!',TextColor3=Color3.new(1,1,1),TextStrokeColor3=RGB(40,22,70),TextStrokeTransparency=0},sign)
+ local timer=new('TextLabel',{Name='Timer',BackgroundTransparency=1,Position=UDim2.fromScale(0,S.Timer.Top/S.H),Size=UDim2.fromScale(1,S.Timer.Height/S.H),Font=Enum.Font.FredokaOne,TextScaled=true,
+  Text='',TextColor3=C.EventColor,TextStrokeColor3=RGB(30,20,60),TextStrokeTransparency=.1},sign)
  local look=body.CFrame.LookVector;local yaw=math.atan2(-look.X,-look.Z)
- entry={Model=model,Body=body,Sign=sign,Mark=mark,Home=body.CFrame,Base=body.Position,Size=body.Size.X,Yaw=yaw,Yaw0=yaw,Has=false,Moved=false,Talk=0,Scale=1,Poll=1,Near=nil}
+ entry={Model=model,Body=body,Sign=sign,Mark=mark,Timer=timer,Home=body.CFrame,Base=body.Position,Size=body.Size.X,Yaw=yaw,Yaw0=yaw,Has=false,Moved=false,Talk=0,Scale=1,Poll=1,Near=nil}
  refreshMarker()
 end
 local function attach(model)
@@ -120,6 +144,7 @@ end
 local function detach(model)
  if entry and entry.Model==model then
   if entry.Mark then entry.Mark:Destroy()end
+  if entry.Timer then entry.Timer:Destroy()end
   if voice.Sound then voice.Sound:Destroy();voice.Sound=nil;voice.Checked=false;voice.Playing=false end
   entry=nil
  end
@@ -151,7 +176,7 @@ watch(Run.RenderStepped,function(dt)
  if GuiService.ReducedMotionEnabled then
   if e.Moved then -- back to how the server placed her
    e.Moved=false;e.Yaw=e.Yaw0;e.Talk=0;e.Scale=1;e.Body.Size=Vector3.new(e.Size,e.Size,e.Size);e.Body.CFrame=e.Home
-   if e.Mark.Parent then e.Mark.Position=MARK_REST end
+   if e.Mark.Parent then e.Mark.Position=markAt(0)end
   end
   return
  end
@@ -170,7 +195,7 @@ watch(Run.RenderStepped,function(dt)
  if scale~=e.Scale then e.Scale=scale;local d=e.Size*scale;e.Body.Size=Vector3.new(d,d,d)end
  local lift=e.Size*(scale-1)/2
  e.Body.CFrame=CFrame.new(e.Base+Vector3.new(0,math.sin(now*1.4)*C.FootOffset+lift,0))*CFrame.Angles(0,e.Yaw,0);e.Moved=true
- if e.Has and e.Mark.Parent then e.Mark.Position=UDim2.new(.5,0,.27,-math.abs(math.sin(now*4.2))*14)end
+ if e.Has and e.Mark.Parent then e.Mark.Position=markAt(math.abs(math.sin(now*4.2))*MARK_BOUNCE)end
 end)
 -- Re-count the Void Tools whenever Tools come and go in the Backpack or the Character (and once a second, in case an
 -- attribute arrives late). A new Backpack / Character (respawn) is picked up as it appears.
@@ -202,6 +227,7 @@ local ball=new('Frame',{Name='Ball',AnchorPoint=Vector2.new(.5,.5),BackgroundCol
 Bright.Gradient(ball,RGB(255,255,170),RGB(255,232,0),55);ball.BackgroundColor3=Color3.new(1,1,1);stroke(ball,RGB(255,180,40),3)
 new('ImageLabel',{Name='Picture',BackgroundTransparency=1,AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromScale(.86,.86),Image=C.Image,ScaleType=Enum.ScaleType.Fit},ball)
 local quest=text(panel,'QuestText',C.Quest,20);quest.TextXAlignment=Enum.TextXAlignment.Left;quest.TextYAlignment=Enum.TextYAlignment.Center
+local eventTimer=text(panel,'EventTimer','',16,C.EventColor)
 local eventLine=text(panel,'EventLine','',16,VIOLET)
 local function chip(name,color)
  local f=new('Frame',{Name=name,BackgroundColor3=Theme.Colors.Card,BorderSizePixel=0},panel);Theme.Corner(f,10);stroke(f,color,2)
@@ -247,11 +273,12 @@ local function layout()
  daisShadow.Size=UDim2.fromOffset(math.floor(ballSize*.8),math.max(8,math.floor(ballSize*.12)));daisShadow.Position=UDim2.new(.5,0,.5,math.floor(ballSize*.5))
  local cx=pad+(showPortrait and pw+pad or 0);local cw=W-cx-pad
  local gap=short and 6 or 10
- local eventH=short and 20 or 24;local chipH=short and 34 or 54;local exH=short and 46 or 66;local statusH=short and 18 or 24;local buttonH=short and 38 or 52
- local questH=math.max(40,bodyH-(eventH+chipH+exH+statusH+buttonH)-gap*5)
+ local eventH=short and 17 or 24;local timerH=short and 17 or 24;local chipH=short and 32 or 54;local exH=short and 44 or 66;local statusH=short and 17 or 24;local buttonH=short and 36 or 52
+ local questH=math.max(short and 30 or 40,bodyH-(eventH+timerH+chipH+exH+statusH+buttonH)-gap*6)
  local y=top
- quest.Position=UDim2.fromOffset(cx,y);quest.Size=UDim2.fromOffset(cw,questH);quest.TextSize=short and 16 or 20;y+=questH+gap
- eventLine.Position=UDim2.fromOffset(cx,y);eventLine.Size=UDim2.fromOffset(cw,eventH);eventLine.TextSize=short and 13 or 16;y+=eventH+gap
+ quest.Position=UDim2.fromOffset(cx,y);quest.Size=UDim2.fromOffset(cw,questH);quest.TextSize=short and 15 or 20;y+=questH+gap
+ eventTimer.Position=UDim2.fromOffset(cx,y);eventTimer.Size=UDim2.fromOffset(cw,timerH);eventTimer.TextSize=short and 13 or 16;y+=timerH+gap
+ eventLine.Position=UDim2.fromOffset(cx,y);eventLine.Size=UDim2.fromOffset(cw,eventH);eventLine.TextSize=short and 12 or 16;y+=eventH+gap
  local chipW=math.floor((cw-gap)/2)
  for i,spec in ipairs({{voidChip,voidCaption,voidCount},{doneChip,doneCaption,doneCount}})do
   spec[1].Position=UDim2.fromOffset(cx+(i-1)*(chipW+gap),y);spec[1].Size=UDim2.fromOffset(chipW,chipH)
@@ -292,11 +319,12 @@ local function render()
  if pulse then pulse:Cancel();pulse=nil end;give.Pulse.Scale=1
  voidCount.Text=state.Known and tostring(state.VoidPacks)or'-';doneCount.Text=state.Known and tostring(state.Delivered)or'-'
  rewardLine.Text=state.RewardText or C.RewardText
+ local timerText,live=eventTimerText();eventTimer.Text=timerText;eventTimer.TextColor3=live and C.EventColor or RED;state.Live=live
  local line,color=eventText();eventLine.Text=line;eventLine.TextColor3=color;eventLine.Visible=line~=''
- local can=state.Known and state.VoidPacks>0 and not busy
+ local can=state.Known and state.VoidPacks>0 and not busy and live
  give.Active=can;give.Interactable=can;give.AutoButtonColor=can;give:SetAttribute('Enabled',can)
  tint(give,can and GOLD or RGB(96,104,140))
- giveCaption.Text=busy and'HANDING IT OVER...'or'GIVE VOID PACK'
+ giveCaption.Text=not live and C.Event.Ended or busy and'HANDING IT OVER...'or'GIVE VOID PACK'
  if can and not GuiService.ReducedMotionEnabled then
   pulse=Tween:Create(give.Pulse,TweenInfo.new(.7,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,-1,true),{Scale=1.05});pulse:Play()
  end
@@ -320,6 +348,8 @@ local function open()
   local function tick()
    if not panel.Visible or not gui.Parent then ticking=false;return end
    local line,color=eventText();eventLine.Text=line;eventLine.TextColor3=color;eventLine.Visible=line~=''
+   local timerText,live=eventTimerText();eventTimer.Text=timerText;eventTimer.TextColor3=live and C.EventColor or RED
+   if live~=state.Live then render()end -- the event ended while the window was open
    task.delay(1,tick)
   end
   task.delay(1,tick)
@@ -337,6 +367,7 @@ local function onServer(kind,payload)
   state.EventActive=type(payload.EventActive)=='boolean'and payload.EventActive or nil
   state.NextAt=type(payload.NextAt)=='number'and payload.NextAt==payload.NextAt and payload.NextAt or nil
   setBusy(false);say('')
+  talked=true;refreshMarker() -- she has been talked to: the "!" is gone for the rest of this session
   open()
   greet('talk')
  elseif kind=='Done'then
@@ -371,6 +402,7 @@ gui.Destroying:Connect(function()
  if Pictures then pcall(Pictures.Clear,voidHolder);pcall(Pictures.Clear,verityHolder)end
  if entry then
   if entry.Mark then entry.Mark:Destroy()end
+  if entry.Timer then entry.Timer:Destroy()end
   if entry.Moved and entry.Body.Parent then entry.Body.Size=Vector3.new(entry.Size,entry.Size,entry.Size);entry.Body.CFrame=entry.Home end -- leave her as the server placed her
   if voice.Sound then voice.Sound:Destroy();voice.Sound=nil end
   entry=nil
