@@ -38,7 +38,7 @@ function G.Sway(id,def,crop,time)
  local h=math.max(1,def.Height*(crop.PlantScale or 1));local hash=0
  for i=1,#tostring(crop.Id or id)do hash=(hash*31+string.byte(tostring(crop.Id or id),i))%997 end
  -- Keep giant trees visually aligned with their static climbing surfaces and fruit prompts.
- if id=='StarfruitSeed'or def.Mech then return CFrame.new()end
+ if id=='StarfruitSeed'or def.Mech or def.Verity then return CFrame.new()end
  local flower=flowers[id]==true;local a=math.min(flower and .044 or def.Tree and .005 or .009,(flower and .68 or .10)/h)
  return CFrame.Angles((math.sin(time*.83+hash)*.82+math.sin(time*1.31+hash*.3)*.18)*a,0,math.sin(time*.64+hash*.7)*a*.70)
 end
@@ -50,6 +50,7 @@ end
 local green=Color3.fromRGB(83,157,64)
 function G.Capture(model,id,def,crop,origin,sockets)
  if def.Mech then return require(script.Parent.MechGrowth).Capture(model,id,def,crop,origin,sockets)end
+ if def.Verity then return require(script.Parent.VerityGrowth).Capture(model,id,def,crop,origin,sockets)end
  local state={Model=model,Id=id,Def=def,Origin=origin,Parts={},Buds={},Profile=G.Profile(id,def)}
  local groupBounds={}
  for _,p in ipairs(model:GetDescendants())do if p:IsA('BasePart')and p.Transparency<.95 then
@@ -82,6 +83,7 @@ function G.Capture(model,id,def,crop,origin,sockets)
 end
 function G.Apply(state,crop,now)
  if state.Mech then return require(script.Parent.MechGrowth).Apply(state,crop,now,G.Progress)end
+ if state.Verity then return require(script.Parent.VerityGrowth).Apply(state,crop,now,G.Progress)end
  local body,fruit=G.Progress(crop,state.Def,now)
  local scale=body>=1 and 1 or ease(.025,1,body)^(state.Profile=='Tree'and(.84+growthSeed(crop)*.12)or state.Profile=='Vine'and(.68+growthSeed(crop)*.10)or(.73+growthSeed(crop)*.14))
  local alive=body>.028

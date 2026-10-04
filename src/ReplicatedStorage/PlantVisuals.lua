@@ -190,6 +190,7 @@ end
 local function make(parent,name,size,cf,color,material,transparency,shape,solid)
  local part=Instance.new(shape=='Wedge'and 'WedgePart'or shape=='Corner'and 'CornerWedgePart'or 'Part');part.Name=name
  if shape=='Cylinder'then part.Shape=Enum.PartType.Cylinder end
+ if shape=='Sphere'then part.Shape=Enum.PartType.Ball end -- R147: a true ball (shape 'Ball' is a stretchable SpecialMesh sphere)
  part.Size=V(math.max(.01,size.X),math.max(.01,size.Y),math.max(.01,size.Z));part.CFrame=cf
  part.Color=color;part.Material=material;part.Transparency=transparency
  part.Anchored=true;part.CanCollide=solid==true;part.CanTouch=false;part.CanQuery=solid==true
@@ -210,6 +211,7 @@ function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,grow
  local alpha=s.t;mutation=Rules.Mutation(mutation)
  if mutation=='Gold'then color=Color3.fromRGB(232,172+(s.k[2]%22),57);mat=Enum.Material.Metal;alpha=0
  elseif mutation=='Diamond'then color=Color3.fromRGB(188+(s.k[1]%50),238,255);mat=Enum.Material.Glass;alpha=.18 end
+ if s.decor and mutation~='None'then alpha=1 end -- R147: gloss patches are for the plain coat; Gold / Diamond shine themselves
  local first
  local function p(name,z,f,shape)
   local item
@@ -234,6 +236,8 @@ function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,grow
   if s.f then item:SetAttribute('HarvestFeature',s.f)end
   if s._ArtIndex then item:SetAttribute('ArtSpecIndex',s._ArtIndex)end
   if mutation~='None'then item.Reflectance=mutation=='Gold'and .20 or .16 end
+  if s.rf and mutation=='None'then item.Reflectance=s.rf end -- R147: authored shine (Verity)
+  if s.face then local face=Instance.new('Decal');face.Name='VerityFace';face.Texture=s.face;face.Face=Enum.NormalId.Front;face.Parent=item end
   first=first or item;return item
  end
  local function sculptedLeaf(z,at,name,distant)
@@ -349,6 +353,7 @@ function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,grow
    p('Crystal facet',V(size.Z,size.Y*.5,size.X*.5),cf*CF(x*size.X*.25,y*size.Y*.25,0)*CFrame.Angles(0,0,y==1 and 0 or math.pi)*CFrame.Angles(0,turn,0),'Wedge')
   end end
  elseif s.s=='Wedge'then p(s.r,size,cf,'Wedge')
+ elseif s.s=='Sphere'then p(s.f,size,cf,'Sphere')
  else p(s.r,size,cf,(s.s=='Ball'or s.s=='Leaf')and 'Ball'or 'Block') end
  if first and s.tx and not solid then
   local z=first.Size;local at=first.CFrame;local surface=s.tx

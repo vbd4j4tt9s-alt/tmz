@@ -8,7 +8,8 @@ local function hash(id)
  local h=137;for i=1,#id do h=(h*33+string.byte(id,i))%2147483647 end;return h
 end
 local Mech=require(RS:WaitForChild('MechArt'))
-function Art.Has(id)return Mech.Get(id)~=nil or Rarity.Has(id)or Trees.Has(id)or Index[id]~=nil end
+local Verity=require(RS:WaitForChild('VerityPlantArt'))
+function Art.Has(id)return Verity.Is(id)or Mech.Get(id)~=nil or Rarity.Has(id)or Trees.Has(id)or Index[id]~=nil end
 function Art.Key(id,crop)
  if require(RS.HologramProjection).Is(id)then return require(RS.HologramProjection).Key(id,crop)end
  if Rarity.Has(id)then return Rarity.Key(id)end
@@ -19,6 +20,7 @@ function Art.Key(id,crop)
  return id..':'..tostring(h%10)
 end
 function Art.Get(id,crop)
+ if Verity.Is(id)then return Verity.Get(id)end
  local mech=Mech.Get(id);if mech then return require(RS.HologramForms).Get(id,mech,crop)end
  if Rarity.Has(id)then return Rarity.Get(id)end
  if Trees.Has(id)then return Trees.Get(id,crop)end
