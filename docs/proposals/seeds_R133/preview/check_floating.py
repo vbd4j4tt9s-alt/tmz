@@ -61,6 +61,8 @@ def check(parts, tol):
             if inside(parts[j], pts[i], tol).any() or inside(parts[i], pts[j], tol).any():
                 parent[find(i)] = find(j)
     body = {find(i) for i, p in enumerate(parts) if p['name'] == 'Gradient'}
+    if not body:  # R147: a seed without gradient slices (the Verity ball): its biggest part is the body
+        big = max(range(n), key=lambda i: parts[i]['size'][0] * parts[i]['size'][1] * parts[i]['size'][2]); body = {find(big)}
     return [p for i, p in enumerate(parts) if find(i) not in body]
 
 if __name__ == '__main__':
