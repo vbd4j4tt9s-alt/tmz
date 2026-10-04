@@ -1,0 +1,46 @@
+#!/bin/sh
+# Usage: sh run_tiger_gear.sh [scratch dir] [--mutations]. R149 snow tiger gear checks on the Roblox mock with the REAL modules of this
+# checkout (KeeperAccents, BeastPose, KeeperSignatureStrike, KeeperAttackPose, KeeperPolish, KeeperRigConfig and the BeastAnimation
+# client script); needs /opt/luau and python3. "Other keepers unchanged" compares KeeperAccents against the base commit's
+# (git show BASE:..., loaded as KeeperAccentsBase). With --mutations it also breaks the module five ways and expects the test to notice.
+#  test_tiger_gear.luau - the gear exists only on the Snow keeper (38 parts, other keepers part-for-part identical to the base), each
+#                         part follows exactly its own limb through sleep / idle / gait / a pounce in the real BeastAnimation, is
+#                         non-colliding / non-queryable / massless / anchored, silver + sapphire colours and materials, the part budget,
+#                         the rig-scale following, the LOD (studs + facets hidden far away and in low graphics), cleanup.
+#  static checks        - no hit / reach / rig module changed against BASE and no server script requires KeeperAccents.
+set -e
+HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
+BASE=${TIGER_BASE:-d3c621d}
+OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
+S=$REPO/src
+echo "== static checks"
+# Reach, contact, pose and rig data must be byte-identical to the base: the gear changes no hitbox and no animation.
+FROZEN="src/ReplicatedStorage/KeeperRigConfig.lua src/ReplicatedStorage/KeeperUpgradeData.lua src/ReplicatedStorage/BeastPose.lua src/ReplicatedStorage/KeeperAttackPose.lua src/ReplicatedStorage/KeeperSignatureStrike.lua src/ReplicatedStorage/KeeperStrikeFrames.lua src/ReplicatedStorage/KeeperCombat.lua src/ReplicatedStorage/KeeperPolish.lua src/ReplicatedStorage/KeeperUpgradePose.lua src/ReplicatedStorage/KeeperMotion.lua src/ServerScriptService/ChestChaseServer/KeeperContact.lua src/ServerScriptService/ChestChaseServer/ChaseService.lua src/ServerScriptService/ChestChaseServer/ConcurrentKeeperService.lua src/ServerScriptService/ChestChaseServer/BeastModels.lua src/ServerScriptService/ChestChaseServer/KeeperUpgradeArt.lua"
+if git -C "$REPO" diff --quiet "$BASE" -- $FROZEN; then echo "ok: reach / contact / pose / rig modules unchanged against $BASE"; else echo "FAIL: a frozen keeper module changed:";git -C "$REPO" diff --name-only "$BASE" -- $FROZEN;exit 1; fi
+if grep -rIl "KeeperAccents" "$S/ServerScriptService" >/dev/null 2>&1; then echo "FAIL: a server script requires KeeperAccents";exit 1; else echo "ok: no server script requires KeeperAccents (the gear is client only)"; fi
+/opt/luau/luau-compile --binary "$S/ReplicatedStorage/KeeperAccents.lua" >/dev/null && /opt/luau/luau-compile --binary "$S/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua" >/dev/null && echo "ok: luau-compile clean"
+cp "$REPO/tools/tests/roblox.luau" "$REPO/docs/proposals/inventory_R113/tests/world.luau" "$REPO/docs/proposals/inventory_R113/tests/fixtures.luau" "$HERE/test_tiger_gear.luau" "$OUT/"
+git -C "$REPO" show "$BASE:src/ReplicatedStorage/KeeperAccents.lua" > "$OUT/KeeperAccentsBase.lua"
+bundle(){ # $1 = KeeperAccents source to test
+ python3 "$REPO/docs/proposals/R147/tests/mkbundle_verity.py" "$OUT/rs_bundle.luau" KeeperAccents="$1" KeeperAccentsBase="$OUT/KeeperAccentsBase.lua" BeastAnimation="$S/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua" >/dev/null
+}
+bundle "$S/ReplicatedStorage/KeeperAccents.lua"
+cd "$OUT"
+echo "== test_tiger_gear";/opt/luau/luau test_tiger_gear.luau > test_tiger_gear.log 2>&1 || { grep -v '^WARN' test_tiger_gear.log | tail -60;exit 1; }
+grep -v '^WARN' test_tiger_gear.log
+if [ "$2" = "--mutations" ]; then
+ echo "== mutation checks (each break must make the test fail)"
+ mutate(){ # $1 = name, $2 = sed expression
+  mkdir -p "$OUT/mut_$1";sed "$2" "$S/ReplicatedStorage/KeeperAccents.lua" > "$OUT/mut_$1/KeeperAccents.lua"
+  if cmp -s "$OUT/mut_$1/KeeperAccents.lua" "$S/ReplicatedStorage/KeeperAccents.lua"; then echo "BAD MUTATION $1: the sed changed nothing";exit 1; fi
+  bundle "$OUT/mut_$1/KeeperAccents.lua";cd "$OUT"
+  if /opt/luau/luau test_tiger_gear.luau > "mut_$1.log" 2>&1; then echo "MUTATION $1 SURVIVED (test passed)";exit 1; fi
+  echo "killed $1: $(grep -c '^FAIL' "mut_$1.log") failing checks, e.g. $(grep -m1 '^FAIL' "mut_$1.log")"
+ }
+ mutate pauldron_on_body "s/plate('Pauldron'..tag,(side<0 and'Left'or'Right')..'FrontLeg'/plate('Pauldron'..tag,'Body'/"
+ mutate collidable "s/p.CanCollide=false;p.CanQuery=false/p.CanCollide=not s.Gear;p.CanQuery=false/"
+ mutate gear_on_snake "s/A.Gear={\[3\]=tigerGear()}/A.Gear={[3]=tigerGear(),[2]=tigerGear()}/"
+ mutate no_scale "s/local k=rigScale(model,stage)/local k=1/"
+ mutate no_lod "s/if s.Detail then\$/if false then/"
+ mutate sapphire_colour "s/SAPPHIRE,FACET=rgb(30,80,200),rgb(90,150,255)/SAPPHIRE,FACET=rgb(200,30,30),rgb(90,150,255)/"
+fi

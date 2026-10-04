@@ -192,7 +192,8 @@ local render=Run.RenderStepped:Connect(function(dt)
    if (p.TreeRest or p.IdleRest)and p.Part.Size~=size then p.Part.Size=size end
    if p.Eye and p.LastEyeAwake~=motion.Awake then eyes(p.Part,p.EyeColor,motion.Awake,p.TreeRest~=nil);p.LastEyeAwake=motion.Awake end
   end end
-  Accents.Pose(r.Accents,target,motion.Frame,motion.Awake,now,hunting and not asleep,moveParts,moveFrames)
+  -- R149: the snow tiger's gear studs and facets are LOD pieces (hidden beyond Accents.DetailRange and in low graphics).
+  Accents.Pose(r.Accents,target,motion.Frame,motion.Awake,now,hunting and not asleep,moveParts,moveFrames,distance,low)
  end
  if #moveParts>0 then workspace:BulkMoveTo(moveParts,moveFrames,Enum.BulkMoveMode.FireCFrameChanged)end
 end)
