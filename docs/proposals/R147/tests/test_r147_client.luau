@@ -35,7 +35,7 @@ local early,earlyAnchor,earlyPrompt=pedestal('Early',{State='Empty'})
 local ms=R.new('LocalScript');ms.Name='MysteryPackClient'
 local ok,err=pcall(W.load,'MysteryPackClient',ms);check(ok,'MysteryPackClient loads: '..tostring(err))
 local g=label(early)
-check(g~=nil and g:IsA('BillboardGui')and g.Adornee==earlyAnchor and g.MaxDistance==160 and g.AlwaysOnTop==false and g.LightInfluence==0,'a pedestal that was already there gets its label (BillboardGui "MysteryLabel" on the pack anchor)')
+check(g~=nil and g:IsA('BillboardGui')and g.Adornee==earlyAnchor and g.MaxDistance==90 and g.AlwaysOnTop==false and g.LightInfluence==0,'a pedestal that was already there gets its label (BillboardGui "MysteryLabel" on the pack anchor)')
 check(g.Enabled==false and earlyPrompt.Enabled==false,'Empty: the label is off and the prompt is disabled')
 check(g.Title and g.Status and g.Bar and g.Bar.Fill,'the label has Title, Status and a Bar with a Fill')
 local mine,mineAnchor,minePrompt=pedestal('Mine',{State='Empty'})
@@ -147,6 +147,76 @@ W.workspace.CurrentCamera.CFrame=R.CFrame.new(0,20,-30)
 W.Gui.ReducedMotionEnabled=true;pk:PivotTo(R.CFrame.new(0,9,0));W.Run.RenderStepped:Fire(1/60)
 check(near(pk:GetPivot().Position.Y,9,1e-9),'with reduced motion nothing spins')
 W.Gui.ReducedMotionEnabled=false
+-- R148 (owner: "make sure that the bar is on top of the pack and it doesn't enlarge and obscure everything when far away"):
+-- the label is a sign in the world (Size in studs, so it shrinks with distance and stops growing up close) that hangs clearly
+-- ABOVE the pack at every bob phase.
+do
+ local function pxPerStud(d)return 720/(2*d*math.tan(math.rad(35)))end -- a 70 degree view on a 720 px tall screen
+ local AY=9
+ local lab,labAnchor=pedestal('LabelAbove',{State='Locked',OwnerUserId=77,OwnerName='Tester',UnlockAt=R.clock+400})
+ labAnchor.CFrame=R.CFrame.new(0,AY,0)
+ local lholder=R.new('Model');lholder.Name='MysteryPack';lholder.Parent=lab
+ local lpack=R.new('Model');lpack.Name='SeedPacket';lpack:SetAttribute('MysteryOrigin',R.CFrame.new(0,AY,0));lpack.Parent=lholder
+ local function buildPack(up,down) -- a pack whose root is at its centre, `up` studs of it above and `down` below
+  for _,c in ipairs(lpack:GetChildren())do c:Destroy()end
+  local root=R.new('Part');root.Name='PackRoot';root.Size=R.Vector3.new(1,1,1);root.CFrame=R.CFrame.new(0,AY,0);root.Transparency=1;root.Parent=lpack;lpack.PrimaryPart=root
+  local body=R.new('Part');body.Name='Body';body.Size=R.Vector3.new(3.4,up+down,.2);body.CFrame=R.CFrame.new(0,AY+(up-down)/2,0);body.Parent=lpack
+ end
+ local g=label(lab)
+ local function bottomY(gui)return AY+gui.StudsOffsetWorldSpace.Y-gui.Size.Y.Scale/2 end
+ local function topY(gui)return AY+gui.StudsOffsetWorldSpace.Y+gui.Size.Y.Scale/2 end
+ -- Size: studs, not pixels.
+ check(g.Size.X.Offset==0 and g.Size.Y.Offset==0 and g.Size.X.Scale>=8 and g.Size.X.Scale<=12 and g.Size.Y.Scale>=3 and g.Size.Y.Scale<=4.5,'[size] the label is sized in studs (about 10 x 3.6), not in pixels: it shrinks with distance like a sign ('..tostring(g.Size.X.Scale)..' x '..tostring(g.Size.Y.Scale)..' studs)')
+ check(g.StudsOffset==nil or(g.StudsOffset.X==0 and g.StudsOffset.Y==0 and g.StudsOffset.Z==0),'(placed in world space, not relative to the camera)')
+ check(g.Size.Y.Scale*.34*pxPerStud(30)>=12 and g.Size.Y.Scale*.34*pxPerStud(20)>=12 and g.Size.Y.Scale*.34*pxPerStud(40)>=9,'[size] it reads at 20-40 studs: the title is 12+ px tall at 20 and 30 studs, still 9+ px at 40')
+ check(g.Size.Y.Scale*pxPerStud(90)/720<.1 and g.Size.X.Scale*pxPerStud(90)/1280<.06 and g.Size.Y.Scale*pxPerStud(120)/720<.08,'[size] from far away it is small: at 90 studs under 10% of the screen height and 6% of the width (it never covers the screen)')
+ local near0=g.DistanceLowerLimit or 0
+ check(near0>=12 and near0<=30 and g.Size.Y.Scale*pxPerStud(near0)/720<=.2 and g.Size.X.Scale*pxPerStud(near0)/1280<=.3,'[size] up close it stops growing (DistanceLowerLimit '..tostring(g.DistanceLowerLimit)..': at most 20% of the screen height there)')
+ check(g.MaxDistance==120 and label(other).MaxDistance==90 and label(early).MaxDistance==90,'[size] it shows up to 90 studs away, 120 over your own pedestal')
+ other:SetAttribute('OwnerUserId',77);check(label(other).MaxDistance==120,'(the longer range follows the owner)');other:SetAttribute('OwnerUserId',999);check(label(other).MaxDistance==90,'(and goes back)')
+ -- Above the pack: the bottom edge clears the pack's top at its highest bob, for every bob phase and camera angle.
+ buildPack(2.5,2.5);adv(1)
+ local MINGAP=.5
+ local topMax=AY+2.5+.35
+ check(bottomY(g)>=topMax+MINGAP,'[above] the label\'s bottom edge ('..string.format('%.2f',bottomY(g))..') is clear of the pack\'s top at its highest bob ('..string.format('%.2f',topMax)..') by at least half a stud')
+ check(near(topY(g)-bottomY(g),g.Size.Y.Scale,1e-9)and bottomY(g)<topMax+4,'(and close above it, not floating far away)')
+ local worst=math.huge;local phases=0
+ W.workspace.CurrentCamera.CFrame=R.CFrame.new(0,20,-30)
+ local saved=R.clock
+ for k=0,47 do
+  R.clock=saved+k*(2*math.pi/1.6)/48;W.Run.RenderStepped:Fire(1/60)
+  local packTop=lpack:GetPivot().Position.Y+2.5 -- (the pack's real top now: the script bobbed its pivot)
+  worst=math.min(worst,bottomY(g)-packTop);phases+=1
+ end
+ R.clock=saved
+ check(phases==48 and worst>=MINGAP,'[above] at every one of 48 bob phases over a full bob the pack\'s top stays under the label by at least half a stud (closest: '..string.format('%.2f',worst)..')')
+ local angleOk=true
+ for pitch=-85,85,5 do -- a camera looking up or down at the sign: its lowest point is centre - half height x cos(pitch)
+  local lowest=AY+g.StudsOffsetWorldSpace.Y-g.Size.Y.Scale/2*math.cos(math.rad(pitch))
+  if lowest<topMax+MINGAP then angleOk=false end
+ end
+ check(angleOk,'[above] and from every camera pitch (-85 .. +85 degrees) no part of the sign dips to the pack\'s top')
+ -- A bigger pack lifts it; a smaller one lets it come down; no pack at all (taken): the default height.
+ local before=g.StudsOffsetWorldSpace.Y
+ buildPack(4.2,2.5);adv(1)
+ check(bottomY(g)>=AY+4.2+.35+MINGAP and g.StudsOffsetWorldSpace.Y>before,'[above] a taller pack (4.2 studs up) lifts the label above its top too ('..string.format('%.2f',bottomY(g))..' over '..string.format('%.2f',AY+4.2+.35)..')')
+ buildPack(1.6,1.6);adv(1)
+ check(bottomY(g)>=AY+1.6+.35+MINGAP and g.StudsOffsetWorldSpace.Y<before,'[above] a smaller pack lets it come down, still clear above it')
+ lholder:ClearAllChildren();adv(1)
+ check(bottomY(g)>=AY+3.2+.35+MINGAP-1e-6,'[above] with no pack on the pedestal (taken / not arrived) it hangs at the default height, above the biggest packs')
+ -- The real flow: the pack of a Ready pedestal arrives later than its State, and is swapped for a bigger one.
+ lab:SetAttribute('UnlockAt',nil);lab:SetAttribute('Variant','Pack03');lab:SetAttribute('State','Ready')
+ local newPack=R.new('Model');newPack.Name='SeedPacket';newPack:SetAttribute('MysteryOrigin',R.CFrame.new(0,AY,0));newPack.Parent=lholder
+ local r2=R.new('Part');r2.Name='PackRoot';r2.Size=R.Vector3.new(1,1,1);r2.CFrame=R.CFrame.new(0,AY,0);r2.Parent=newPack;newPack.PrimaryPart=r2
+ local b2=R.new('Part');b2.Name='Body';b2.Size=R.Vector3.new(3.4,6.4,.2);b2.CFrame=R.CFrame.new(0,AY+1.5,0);b2.Parent=newPack -- (up 4.7)
+ adv(1)
+ check(bottomY(g)>=AY+4.7+.35+MINGAP,'[above] a Ready pack that arrives after the State attribute: the label rises over it within half a second')
+ -- The label's own parts and every state keep the same stud size.
+ lab:SetAttribute('NextAt',R.clock+100);lab:SetAttribute('State','Claimed');lholder:ClearAllChildren();adv(1)
+ check(g.Size.Y.Scale==3.6 and g.Size.X.Scale==10 and bottomY(g)>=AY+3.2+.35+MINGAP-1e-6,'the same size and height in every state (Claimed: no pack, the default height)')
+ CS:RemoveTag(lab,'MysteryPedestal')
+end
+adv(2)
 -- Reduced motion: the burst ring does not tween (the sparks still show).
 W.Gui.ReducedMotionEnabled=true;local b4=bursts()
 mine:SetAttribute('UnlockAt',nil);mine:SetAttribute('State','Ready')

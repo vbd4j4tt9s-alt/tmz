@@ -8,6 +8,11 @@
 -- and again if they come back as new instances), and a pedestal that goes away is forgotten, so a streamed-back copy
 -- starts clean. The server enables the Take prompt only while the pack is Ready; this switches it off for everyone but
 -- the owner, again after any change the server makes to it.
+-- R148 (owner: "the bar is on top of the pack and it enlarges and obscures everything when far away"): the label is a
+-- sign in the world, not a fixed pixel size. Its Size is in studs, so it shrinks with distance (it can never cover the
+-- screen from far away) and stops growing up close (DistanceLowerLimit); it shows up to 90 studs away, 120 over your own
+-- pedestal. It hangs clearly ABOVE the pack: its bottom edge sits a gap over the top of the pack at its highest bob,
+-- measured from the pack's own parts (a bigger pack lifts it), so nothing of it overlaps the spinning pack.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local Run=game:GetService('RunService');local Tween=game:GetService('TweenService');local GuiService=game:GetService('GuiService')
 local player=Players.LocalPlayer
@@ -16,6 +21,12 @@ local Audio;pcall(function()Audio=require(RS.InteractionAudio)end)
 local RGB=Color3.fromRGB
 local VIOLET,GOLD,MINT=RGB(190,140,255),RGB(255,214,90),RGB(120,236,110)
 local entries={}
+local LABEL_W,LABEL_H=10,3.6 -- studs: reads at about 20-40 studs, about 1/12 of the screen height at 40 studs
+local NEAR=18 -- (studs) closer than this the label stops growing
+local FAR,FAR_MINE=90,120 -- how far away it shows
+local BOB=.35 -- the pack's bob (the spin below)
+local GAP=.9 -- clear space between the pack's top at its highest bob and the label's bottom edge
+local DEFAULT_TOP=3.2 -- the pack's top above its centre when there is no pack to measure (about the biggest the packs get)
 local function now()return workspace:GetServerTimeNow()end
 local function label(parent,name,y,h,color)
  local t=Instance.new('TextLabel');t.Name=name;t.BackgroundTransparency=1;t.Position=UDim2.fromScale(0,y);t.Size=UDim2.fromScale(1,h)
@@ -23,8 +34,8 @@ local function label(parent,name,y,h,color)
  return t
 end
 local function build(model)
- local gui=Instance.new('BillboardGui');gui.Name='MysteryLabel';gui.Size=UDim2.fromOffset(230,96);gui.StudsOffset=Vector3.new(0,4.3,0)
- gui.MaxDistance=160;gui.LightInfluence=0;gui.AlwaysOnTop=false;gui.ResetOnSpawn=false;gui.Enabled=false
+ local gui=Instance.new('BillboardGui');gui.Name='MysteryLabel';gui.Size=UDim2.fromScale(LABEL_W,LABEL_H);gui.StudsOffsetWorldSpace=Vector3.new(0,DEFAULT_TOP+BOB+GAP+LABEL_H/2,0)
+ gui.DistanceLowerLimit=NEAR;gui.MaxDistance=FAR;gui.LightInfluence=0;gui.AlwaysOnTop=false;gui.ResetOnSpawn=false;gui.Enabled=false
  local title=label(gui,'Title',0,.34,VIOLET)
  local status=label(gui,'Status',.36,.36)
  local bar=Instance.new('Frame');bar.Name='Bar';bar.AnchorPoint=Vector2.new(.5,0);bar.Position=UDim2.fromScale(.5,.8);bar.Size=UDim2.fromScale(.72,.14)
@@ -59,10 +70,24 @@ local function applyPrompt(entry)
  local m=entry.Model;local want=m:GetAttribute('OwnerUserId')==player.UserId and(m:GetAttribute('State')or'Empty')=='Ready'
  if prompt.Enabled~=want then prompt.Enabled=want end
 end
+-- Hangs the label above the pack: studs from the pack's centre to the top of its parts (its root stays at the centre however
+-- it bobs and turns), or a default when the pack is not there (taken / still arriving).
+local function packTop(pack)
+ local root=pack.PrimaryPart;local origin=pack:GetAttribute('MysteryOrigin')
+ local ref=root and root.Position.Y or origin and origin.Position.Y
+ local ok,box,size=pcall(pack.GetBoundingBox,pack)
+ if ok and ref and size.Y>0 then return math.max(0,box.Position.Y+size.Y/2-ref)end
+end
+local function place(entry)
+ local holder=entry.Model:FindFirstChild('MysteryPack');local pack=holder and holder:FindFirstChildWhichIsA('Model')
+ local top=pack and packTop(pack)or DEFAULT_TOP
+ local y=top+BOB+GAP+LABEL_H/2
+ local at=entry.Gui.StudsOffsetWorldSpace;if at.Y~=y then entry.Gui.StudsOffsetWorldSpace=Vector3.new(0,y,0)end
+end
 local function update(entry)
  local m=entry.Model;local state=m:GetAttribute('State')or'Empty';local mine=m:GetAttribute('OwnerUserId')==player.UserId
- local gui=entry.Gui;gui.Enabled=state~='Empty'
- applyPrompt(entry)
+ local gui=entry.Gui;gui.Enabled=state~='Empty';gui.MaxDistance=mine and FAR_MINE or FAR
+ applyPrompt(entry);if state~='Empty'then place(entry)end
  if state=='Empty'then entry.State=state;return end
  local owner=mine and'YOUR'or(tostring(m:GetAttribute('OwnerName')or'?'):upper().."'S")
  local bar,fill=gui.Bar,gui.Bar.Fill
@@ -127,7 +152,8 @@ local function tick()
  if not alive then return end
  for model,entry in pairs(entries)do
   if not model.Parent then remove(model) -- (streamed out without a tag signal: its streamed-back copy is a new instance)
-  elseif entry.State=='Locked'or entry.State=='Claimed'then update(entry)end
+  elseif entry.State=='Locked'or entry.State=='Claimed'then update(entry)
+  elseif entry.State=='Ready'then place(entry)end -- (a pack that arrived or changed: keep the label above it)
  end
  task.delay(.5,tick)
 end
@@ -141,7 +167,7 @@ local spin=Run.RenderStepped:Connect(function()
   local holder=entry.Model:FindFirstChild('MysteryPack');local pack=holder and holder:FindFirstChildWhichIsA('Model')
   local origin=pack and pack:GetAttribute('MysteryOrigin')
   if origin and(origin.Position-at).Magnitude<130 then
-   pack:PivotTo(origin*CFrame.new(0,math.sin(t*1.6)*.35,0)*CFrame.Angles(0,t*.8%(math.pi*2),0))
+   pack:PivotTo(origin*CFrame.new(0,math.sin(t*1.6)*BOB,0)*CFrame.Angles(0,t*.8%(math.pi*2),0))
   end
  end
 end)
