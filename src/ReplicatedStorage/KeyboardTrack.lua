@@ -16,11 +16,12 @@ K.Config={
  FloorTop=4.0,RestRise=.8,PressedRise=.15,         -- key top above the floor: resting / pressed
  TopOffset=0,                                       -- studs added to a key's centre height (mesh top alignment fudge, tune in Studio)
  PressSeconds=.06,ReleaseSeconds=.14,               -- quad-out down, back-out up
- BedWidth=50,BedRise=.05,BedThickness=.3,BedMaxLength=1024,BedColor={86,52,34},
+ -- the bed top sits just above the floor but clearly below a shovel hole's Rim (+0.06) and Pit (+0.08) tops, so the hole shows without z-fighting
+ BedWidth=50,BedRise=.01,BedThickness=.3,BedMaxLength=1024,BedColor={86,52,34},
  RailColor={62,36,24},RailWidth=1.2,RailHeight=1.0,RailX=25.6,
  StripSize={47.5,.6,7.5},                           -- far rows: one thin slab per row (top = rest top)
  NearRadius={[1]=80,[2]=120,[3]=160},               -- by ClientFxBudget tier
- LegendRadius=56,MaxNear=240,
+ LegendRadius=56,MaxNear=240,TierHoldSeconds=3,   -- a ClientFxBudget tier change applies after it has held this long
  StripChunk=16,BuildRadius=1100,FreeRadius=1300,
  MaxReassignPerFrame=64,MaxStripsPerFrame=16,
  PlayerFootprint=1.6,PlayerFeetReach=3,PlayerRootToFeet=3, -- half-size of a runner's footprint; other players press while their feet (root - 3) are within 3 studs of the floor

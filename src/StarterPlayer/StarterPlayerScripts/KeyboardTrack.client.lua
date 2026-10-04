@@ -5,10 +5,11 @@
 --  * Far rows: one thin candy slab per row, built in chunks of 16 rows near the camera and freed when far.
 --  * Near rows (a window around the runner; 80/120/160 studs by ClientFxBudget tier): pooled keycap MeshParts cloned from
 --    ReplicatedStorage.R142Keycap, in a ring buffer (row r lives in slot r mod rows-in-window), 64 reassignments per frame.
---    The far slab of a row is hidden while the row has keys.
+--    The far slab of a row is hidden while the row has keys. A tier change applies after it has held 3 s and only adds / removes the
+--    outer rows (a row keeps its ring slot, row mod 40).
 --  * Presses: the local character every frame (Humanoid.FloorMaterial ~= Air), other players and keepers at 30 Hz. The union of
 --    pressed keys is diffed with the last frame; only the changing keys animate (quad-out down, back-out up) via BulkMoveTo.
---  * Shovel holes: keys within 2 studs of a hole's Pit hide while it exists. Clicks: 10 pooled Sounds, rate limited.
+--  * Shovel holes: keys within 2 studs of a hole's Pit hide while it exists; beyond the near window the far strip of that row hides. Clicks: 10 pooled Sounds, rate limited.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Gui=game:GetService('GuiService');local CS=game:GetService('CollectionService');local Content=game:GetService('ContentProvider')
 local K=require(RS:WaitForChild('KeyboardTrack'))
@@ -19,7 +20,7 @@ local V3,V2,CF=Vector3.new,Vector2.new,CFrame.new
 local floor,min,max,abs=math.floor,math.min,math.max,math.abs
 local clock=os.clock
 local COLS,P,F=C.Columns,C.Pitch,C.FloorTop
-local NRMAX=floor(C.MaxNear/COLS)
+local RING=floor(C.MaxNear/COLS)                 -- ring slots (rows of keys that can exist at once); a row always keeps its slot, row % RING
 local AIR=Enum.Material.Air
 
 local function optional(name)
@@ -70,9 +71,10 @@ local function start()
  local focusX,focusZ,hasRoot=CX,0,false
  local charRef,rootRef,humRef
  local now,frameNo,reduced=clock(),0,false
- local NR=0                                   -- rows in the near window (0 = not read yet)
+ local NR=0                                   -- rows in the near window now (<= RING; 0 = not read yet)
+ local wantNR,wantSince=0,0                   -- the tier's window size and since when it has held (debounce)
  local ringRow={}                             -- ring slot -> the row bound to it (0 = none)
- for s=1,NRMAX do ringRow[s]=0 end
+ for s=1,RING do ringRow[s]=0 end
  -- per key (index = (ring slot-1)*6 + column)
  local keyPart,keyGui,keyLabel,keyCanvas={},{},{},{}
  local keyRow,keyX,keyZ,keyDepth={},{},{},{}
@@ -82,7 +84,8 @@ local function start()
  local downList,animList,moveList={},{},{}
  local moveN=0;local moveParts,moveCFs={},{}
  local strips,chunks={},{}
- local holeHidden={};local holeSig=nil;local holesFolder=nil
+ local holeHidden,holeRows={},{}                -- keys hidden by shovel holes (row*8+col) / rows that contain a hole
+ local holeSig=nil;local holesFolder=nil
  local legendDirty=true
  local templateReady=false;local template=nil
  -- other players / keepers (sampled at 30 Hz): cells they press
@@ -147,8 +150,10 @@ local function start()
  -- Far strips ----------------------------------------------------------------------------------------------------
  local CH=C.StripChunk
  local function stripOf(row)return(row-1)//CH end
- local function setStripHidden(row,hidden)
-  local s=strips[row];if s then s.Transparency=hidden and 1 or 0 end
+ -- A row's far strip is hidden while the row has keys, and while a shovel hole is in it (the strip would cover the Pit).
+ local function stripHiddenFor(row)return holeRows[row]==true or ringRow[row%RING+1]==row end
+ local function refreshStrip(row)
+  local s=strips[row];if s then s.Transparency=stripHiddenFor(row)and 1 or 0 end
  end
  local function buildChunk(c)
   local first=c*CH+1;local last=min(rows,first+CH-1)
@@ -157,7 +162,7 @@ local function start()
    local style=K.RowStyle(row,rowStage[row]or 0,spaceRow[row]~=nil)
    local z=Z0+(row-.5)*P
    local s=block('Strip',V3(C.StripSize[1],C.StripSize[2],C.StripSize[3]),CF(CX,F+C.RestRise-C.StripSize[2]/2,z),style.RGB,stripFolder)
-   s.Transparency=(NR>0 and ringRow[row%NR+1]==row)and 1 or 0
+   s.Transparency=stripHiddenFor(row)and 1 or 0
    strips[row]=s;list[#list+1]=s
   end
   chunks[c]={First=first,Last=last,Parts=list}
@@ -204,9 +209,9 @@ local function start()
   if not on then clearKeyState(idx);queueMove(idx);legendDirty=true end
  end
  local function bindRow(row)
-  local s=row%NR+1;local old=ringRow[s]
-  if old~=0 and old~=row then setStripHidden(old,false)end
+  local s=row%RING+1;local old=ringRow[s]
   ringRow[s]=row
+  if old~=0 and old~=row then refreshStrip(old)end
   local space=spaceRow[row]~=nil
   local style=K.RowStyle(row,rowStage[row]or 0,space)
   local z=Z0+(row-.5)*P;local base=(s-1)*COLS
@@ -228,20 +233,17 @@ local function start()
    keyShown[idx]=on;part.Transparency=on and 0 or 1
    queueMove(idx)
   end
-  setStripHidden(row,true);legendDirty=true
+  refreshStrip(row);legendDirty=true
  end
- local function unbindAll()
-  for s=1,NRMAX do
-   local row=ringRow[s]
-   if row~=0 then
-    setStripHidden(row,false);ringRow[s]=0
-    for col=1,COLS do
-     local idx=(s-1)*COLS+col
-     if keyPart[idx]then
-      clearKeyState(idx);keyRow[idx]=0;keyShown[idx]=false;keyPart[idx].Transparency=1
-      if keyLegend[idx]then keyGui[idx].Enabled=false;keyLegend[idx]=false end
-     end
-    end
+ local function unbindSlot(s)
+  local row=ringRow[s]
+  if row==0 then return end
+  ringRow[s]=0;refreshStrip(row);legendDirty=true
+  for col=1,COLS do
+   local idx=(s-1)*COLS+col
+   if keyPart[idx]then
+    clearKeyState(idx);keyRow[idx]=0;keyShown[idx]=false;keyPart[idx].Transparency=1
+    if keyLegend[idx]then keyGui[idx].Enabled=false;keyLegend[idx]=false end
    end
   end
  end
@@ -254,18 +256,21 @@ local function start()
   for k=0,NR do
    for sign=1,(k==0 and 1 or 2)do
     local row=sign==1 and mid+k or mid-k
-    if row>=rA and row<=rB and ringRow[row%NR+1]~=row then
-     if budget<COLS then return end
-     bindRow(row);budget-=COLS
-    end
+    if row>=rA and row<=rB and ringRow[row%RING+1]~=row and budget>=COLS then bindRow(row);budget-=COLS end
    end
+  end
+  -- rows that fell out of the window (the runner moved on, or a lower tier shrank it) give their keys back; the slots
+  -- of rows that stay are never touched, so a tier change only adds or removes the outer rows
+  for s=1,RING do
+   local row=ringRow[s]
+   if row~=0 and(row<rA or row>rB)then unbindSlot(s)end
   end
  end
  -- Legends: only keys near the runner carry their letter (SurfaceGui enabled).
  local LR2=C.LegendRadius*C.LegendRadius
  local function legendPass()
   legendDirty=false
-  for s=1,NR do
+  for s=1,RING do
    local row=ringRow[s]
    if row~=0 then
     for col=1,COLS do
@@ -346,7 +351,7 @@ local function start()
  end
  local function cellIdx(row,col)
   if NR==0 then return 0 end
-  local s=row%NR+1
+  local s=row%RING+1
   if ringRow[s]~=row then return 0 end
   if spaceRow[row]then col=1 end
   local idx=(s-1)*COLS+col
@@ -445,18 +450,24 @@ local function start()
   end
   if sig==holeSig then return end
   holeSig=sig
-  local hidden={};local R=C.HoleReach
+  local hidden,hiddenRows={},{};local R=C.HoleReach
   if pits then
    for _,pos in ipairs(pits)do
     local c1,c2,r1,r2=geo.CellRange(pos.X-R,pos.X+R,pos.Z-R,pos.Z+R)
-    for r=r1,r2 do for c=c1,c2 do hidden[r*8+c]=true end end
+    if c1<=c2 then
+     for r=r1,r2 do hiddenRows[r]=true;for c=c1,c2 do hidden[r*8+c]=true end end
+    end
    end
   end
-  holeHidden=hidden
-  for s=1,NR do
+  local oldRows=holeRows
+  holeHidden,holeRows=hidden,hiddenRows
+  -- near rows: their keys hide; every other row: its far strip hides (it would cover the Pit); both come back with the hole
+  for s=1,RING do
    local row=ringRow[s]
    if row~=0 then for col=1,COLS do setShown((s-1)*COLS+col,wantShown(row,col))end end
   end
+  for row in pairs(oldRows)do refreshStrip(row)end
+  for row in pairs(hiddenRows)do refreshStrip(row)end
  end
 
  -- Frame ---------------------------------------------------------------------------------------------------------
@@ -483,7 +494,10 @@ local function start()
   if NR==0 or tNear>=.5 then
    tNear=0
    local want=K.NearRows(Fx and Fx.Get()or 3)
-   if want~=NR then unbindAll();NR=want;legendDirty=true end
+   if NR==0 then NR=want;wantNR=want;wantSince=now
+   elseif want~=wantNR then wantNR=want;wantSince=now end
+   -- a tier change only applies once it has held for a few seconds (a device bouncing between tiers must not flicker)
+   if wantNR~=NR and now-wantSince>=C.TierHoldSeconds then NR=wantNR;legendDirty=true end
   end
   if tHole>=.25 then tHole=0;scanHoles()end
   if tKeeper>=2 then tKeeper=0;scanKeepers()end

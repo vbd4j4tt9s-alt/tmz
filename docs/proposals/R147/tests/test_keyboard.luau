@@ -18,7 +18,7 @@ local ATTR={BiomeTrackEndZ=5980,BiomeStartZ_1=-100,BiomeEndZ_1=80,BiomeStartZ_6=
 local F=C.FloorTop
 check(C.Pitch==8 and C.Columns==6 and C.KeyX==7.5 and C.KeyY==3.42 and C.KeyZ==7.5,'config: pitch 8, 6 columns, key 7.5 x 3.42 x 7.5')
 check(F==4.0 and near(F+C.RestRise,4.8)and near(F+C.PressedRise,4.15)and C.PressSeconds==.06 and C.ReleaseSeconds==.14,'config: floor 4.0, rest top +0.8, pressed top +0.15, press .06 s, release .14 s')
-check(C.BedWidth==50 and C.BedColor[1]==86 and C.BedColor[2]==52 and C.BedColor[3]==34 and near(C.BedRise,.05)and C.RailColor[1]==62 and C.RailX==25.6 and C.RailWidth==1.2 and C.RailHeight==1.0,'config: bed 50 wide chocolate top +0.05, rails dark chocolate 1.2 x 1.0 at x = +-25.6')
+check(C.BedWidth==50 and C.BedColor[1]==86 and C.BedColor[2]==52 and C.BedColor[3]==34 and C.BedRise<=.01 and C.BedRise>0 and C.RailColor[1]==62 and C.RailX==25.6 and C.RailWidth==1.2 and C.RailHeight==1.0,'config: bed 50 wide chocolate top at most +0.01, rails dark chocolate 1.2 x 1.0 at x = +-25.6')
 check(C.NearRadius[3]==160 and C.NearRadius[2]==120 and C.NearRadius[1]==80 and C.LegendRadius==56 and C.StripChunk==16 and C.BuildRadius==1100 and C.FreeRadius==1300 and C.MaxNear==240 and C.TopOffset==0,'config: radii 160/120/80, legends 56, strips in 16-row chunks (build 1100 / free 1300), 240 near keys, TopOffset 0')
 check(C.StripSize[1]==47.5 and C.StripSize[2]==.6 and C.StripSize[3]==7.5,'config: far strip 47.5 x 0.6 x 7.5')
 check(C.OwnClicksPerSecond==12 and C.OtherClicksPerSecond==8 and C.OtherClickRange==90 and C.KeeperPitch==.7 and #C.ClickSoundIds==3 and C.ClickSoundIds[1]==113108830240353 and C.ClickSoundIds[2]==88838553648526 and C.ClickSoundIds[3]==96591611478915,'config: click ids, 12/s own, 8/s others within 90, keepers pitch 0.7')
@@ -212,14 +212,17 @@ check(#shown()>=230,'the pooled keys are visible (the two spacebar rows hide fiv
 local bedParts,railParts,bedLen,railOk,bedOk={},{},0,true,true
 for _,p in ipairs(bed:GetChildren())do
  if p.Name:find('^Bed')then bedParts[#bedParts+1]=p;bedLen+=p.Size.Z
-  if p.Size.Z>1024+1e-6 or p.Size.X~=50 or not near(p.CFrame.Position.Y+p.Size.Y/2,F+.05)then bedOk=false end
+  if p.Size.Z>1024+1e-6 or p.Size.X~=50 or not near(p.CFrame.Position.Y+p.Size.Y/2,F+C.BedRise)then bedOk=false end
   local c=p.Color;if math.abs(c.R*255-86)>.5 or math.abs(c.G*255-52)>.5 or math.abs(c.B*255-34)>.5 then bedOk=false end
  elseif p.Name:find('^Rail')then railParts[#railParts+1]=p
   if p.Size.X~=1.2 or p.Size.Y~=1.0 or p.Size.Z>1024+1e-6 or not(near(math.abs(p.CFrame.Position.X),25.6))then railOk=false end
   local c=p.Color;if math.abs(c.R*255-62)>.5 or math.abs(c.G*255-36)>.5 or math.abs(c.B*255-24)>.5 then railOk=false end
  end
 end
-check(#bedParts==6 and bedOk and near(bedLen,5952),'chocolate bed: 6 segments of <= 1024 studs, 50 wide, top at floor + 0.05 (got '..#bedParts..' segments, '..bedLen..' studs)')
+check(#bedParts==6 and bedOk and near(bedLen,5952),'chocolate bed: 6 segments of <= 1024 studs, 50 wide, top at floor + BedRise (got '..#bedParts..' segments, '..bedLen..' studs)')
+local RIM_TOP,PIT_TOP=F+.06,F+.08 -- TrackHoleService: Rim .06 thick, Pit .08 thick, both resting on the floor
+local bedTop=bedParts[1].CFrame.Position.Y+bedParts[1].Size.Y/2
+check(bedTop>F and bedTop<=RIM_TOP-.04 and bedTop<=PIT_TOP-.06,'z-fighting: the bed top (+'..string.format('%.3f',bedTop-F)..') sits clearly below the hole Rim (+0.06) and Pit (+0.08) tops')
 check(#railParts==12 and railOk,'dark chocolate rails: 1.2 x 1.0 at x = +-25.6 in the same segments')
 -- far strips
 local stripCount=#strips:GetChildren();local stripOk=true
@@ -453,13 +456,53 @@ put(60,nil,0);frames(5)
 h1:Destroy();h2:Destroy();frames(30)
 check(keyAt(20,4)~=nil and keyAt(19,3)~=nil and near(topOf(20,4),F+C.RestRise,1e-6),'the keys come back at rest when the holes are filled')
 check(holes:GetChildren()[1]==nil,'(holes gone)')
+-- 8b. holes beyond the near window: the far strip of their row must not cover the Pit
+put(60,nil,0);frames(20)
+check(stripAt(100)~=nil and stripAt(100).Transparency==0,'(row 100 is far from the runner: its strip is shown)')
+local far1=dig(11,4,g.Z0+99.5*8);frames(30)
+check(stripAt(100).Transparency==1 and stripAt(99).Transparency==0 and stripAt(101).Transparency==0,'a hole beyond the near window hides the far strip of its row (and only that row)')
+far1:Destroy();frames(30)
+check(stripAt(100).Transparency==0,'...and the strip comes back when the hole is filled')
+local off=dig(15,40,g.Z0+99.5*8);frames(30)
+check(stripAt(100).Transparency==0 and stripAt(99).Transparency==0,'a hole off the keyboard (pack spots, x = 40) hides no strip');off:Destroy();frames(10)
+-- a hole in a chunk that is not built yet: the strip is born hidden
+local far2=dig(12,4,g.Z0+359.5*8);frames(10);check(stripAt(360)==nil,'(row 360 has no strip yet)')
+put(60,nil,2200);frames(100)
+check(stripAt(360)~=nil and stripAt(360).Transparency==1 and stripAt(361)~=nil and stripAt(361).Transparency==0,'a far strip built over an existing hole is created hidden')
+far2:Destroy();frames(30);check(stripAt(360).Transparency==0,'...and restored when it is filled')
+-- a hole that was in the window when its keys went away keeps its strip hidden; filled while keys cover it, the strip is restored on unbind
+put(60,nil,0);frames(120)
+local near1=dig(13,4,hz);frames(30)
+check(keyAt(20,4)==nil,'(the key over the hole is hidden)')
+put(60,nil,1000);frames(120)
+check(stripAt(20)~=nil and stripAt(20).Transparency==1,'the window moved on: the hole is still under a hidden strip')
+near1:Destroy();frames(30)
+check(stripAt(20).Transparency==0,'...and the strip is restored when the hole is filled')
+put(60,nil,0);frames(120)
+local near2=dig(14,4,hz);frames(30);near2:Destroy();frames(30)
+check(keyAt(20,4)~=nil and stripAt(20).Transparency==1,'a hole filled while its row has keys: the strip stays hidden under them')
+put(60,nil,1000);frames(120)
+check(stripAt(20).Transparency==0,'...and shows once the keys have moved on')
+put(60,nil,0);frames(120)
 -- holes under far strips never touch real parts
 check(floor.Transparency==0,'the real floor is still untouched')
--- 9. tiers
-player:SetAttribute('FastMode',true);frames(45)
-check(#shown()<=20*6 and #shown()>=60,'FastMode: a smaller near window (20 rows = '..#shown()..' keys)')
-player:SetAttribute('FastMode',false);frames(60)
-check(#shown()>=200 and #keyParts()<=240,'back to the full window (240 keys)')
+-- 9. tiers: a change applies only after it has held a few seconds, and only adds / removes the outer rows
+put(60,nil,0);frames(60)
+local p12,p30=keyAt(12,3),keyAt(30,3);local fullCount=#shown()
+check(p12~=nil and p30~=nil and fullCount==230,'(full window before the flip: '..fullCount..' keys)')
+colorWrites=0
+player:SetAttribute('FastMode',true);frames(60 * 2)
+check(#shown()==fullCount and colorWrites==0,'FastMode for 2 s: nothing changes yet (a tier must hold ~3 s)')
+player:SetAttribute('FastMode',false);frames(60 * 5)
+check(#shown()==fullCount and colorWrites==0 and keyAt(12,3)==p12,'a tier that flips back before 3 s never changed anything')
+player:SetAttribute('FastMode',true);frames(60 * 4)
+check(#shown()==20*6 and #shown()<=120,'FastMode held: a smaller near window (20 rows = '..#shown()..' keys)')
+check(colorWrites==0 and keyAt(12,3)==p12 and near(top(p12),F+C.RestRise,1e-6) and keyAt(30,3)==nil,'shrinking only removes the outer rows: rows that stay keep their keys untouched (0 reassignments, got '..colorWrites..')')
+check(stripAt(30)~=nil and stripAt(30).Transparency==0 and stripAt(12).Transparency==1,'the removed rows show their far strip, the kept rows keep theirs hidden')
+colorWrites=0
+player:SetAttribute('FastMode',false);frames(60 * 4)
+check(#shown()==fullCount and #keyParts()<=240,'back to the full window (240 keys)')
+check(colorWrites==20*6 and keyAt(12,3)==p12,'growing only dresses the 20 new rows ('..colorWrites..' reassignments), rows that stay are untouched')
 -- 10. spacebar rows: one big key
 put(-4,nil,g.Z0+22.5*8);hum.FloorMaterial=PLASTIC;frames(40)
 local jungle=nil;for _,p in ipairs(keyParts())do if p.Size.X>40 and near(p.CFrame.Position.Z,g.Z0+22.5*8,.01)then jungle=p end end
