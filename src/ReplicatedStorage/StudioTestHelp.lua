@@ -83,6 +83,9 @@ return {
  {'/test gifts @username','Gifts this player sent that are still finishing.'},
  {'/test gifts recover @username','Finish stuck gifts now (normally automatic within a minute).'},
 
+ {'— VERITY\'S VOICE —',''},
+ {'/test verityvoice 2.1 0.3','server: Find where "Hello, my name is Verity" ends by ear. verityvoice <end seconds> [start seconds] sets the cut for this server and plays it for you at once (from anywhere); verityvoice alone plays it again and prints the numbers; verityvoice reset goes back to VerityConfig. Copy the final numbers into VerityConfig.GreetingStart / GreetingEnd.'},
+
  {'— CHECKS & SETTINGS —',''},
  {'/test economy','server: Upgrade prices, fruit value range and cash cap.'},
  {'/test mechshop','server: Mech pack prices and product setup.'},

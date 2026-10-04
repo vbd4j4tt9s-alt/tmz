@@ -10,6 +10,6 @@ function T.Split(text)
 end
 function T.IsGlobal(text)
  local s=text:lower():gsub('^/cctest%s+',''):gsub('^/test%s+',''):gsub('^%s*','')
- return s=='collisions'or s=='economy'or s:match('^weather')~=nil or s=='mechshop' or s:match('^eventpack')~=nil or s:match('^keepersmack')~=nil or s:match('^clearinventory')~=nil or s:match('^cleargarden')~=nil or s:match('^refreshpacks')~=nil or s:match('^fruithour')~=nil or s:match('^refreshcycle')~=nil or s=='admins'or s:match('^holes')~=nil or s=='event'or s:match('^event%s+spawn')~=nil or s:match('^event%s+clear')~=nil
+ return s=='collisions'or s=='economy'or s:match('^weather')~=nil or s=='mechshop' or s:match('^eventpack')~=nil or s:match('^keepersmack')~=nil or s:match('^clearinventory')~=nil or s:match('^cleargarden')~=nil or s:match('^refreshpacks')~=nil or s:match('^fruithour')~=nil or s:match('^refreshcycle')~=nil or s=='admins'or s:match('^verityvoice')~=nil or s:match('^holes')~=nil or s=='event'or s:match('^event%s+spawn')~=nil or s:match('^event%s+clear')~=nil
 end
 return T

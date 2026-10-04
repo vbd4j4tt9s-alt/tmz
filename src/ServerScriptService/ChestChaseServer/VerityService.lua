@@ -12,10 +12,15 @@
 --    NextAt?}, 'Done' {Delivered, RecordId}, 'Refused' {Reason}. Client -> server: 'Give' only.
 --  * Saved: Premium.Verity = {Count = Void Packs handed in}, read defensively (anything odd reads as 0).
 --  * The hand-in never yields between checking and committing, so a replay or a double click cannot convert twice.
+-- R149: her greeting is cut to "Hello, my name is Verity" (VerityConfig.GreetingStart / GreetingEnd). The owner finds the right end by ear
+-- with /test verityvoice <end> [start]: VoiceRegion / SetVoiceRegion / PlayVoice below keep that live value on her model as the attributes
+-- VerityVoiceStart / VerityVoiceEnd (clients read them each time she speaks, so everyone in the server hears the new cut) and send the
+-- caller a 'Greet' message ({Start, End}) so the cut plays for them at once, from anywhere in the server. Nothing is saved: a new server
+-- uses the numbers in VerityConfig. Server -> client: 'Greet' {Start, End} joins 'Open', 'Done', 'Refused'.
 -- NOTE: MapService binds WalkthroughProps90 to the map, which makes every part under EconomyHub walk-through a moment
 -- after it appears. The dais and the Body must stay solid, so they put CanCollide back whenever it is cleared.
 local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
-local C=require(RS.VerityConfig);local Limited=require(RS.LimitedEvent)
+local C=require(RS.VerityConfig);local Limited=require(RS.LimitedEvent);local Voice=require(RS.VerityVoice)
 local V={};V.__index=V
 local RGB=Color3.fromRGB
 local R=C.Reasons
@@ -151,6 +156,27 @@ end
 function V:Talk(player)
  if not player or not player.Parent or not require(script.Parent.SecurityGate).Allow(player,'VerityTalk')then return false end
  return self:Open(player)
+end
+-- Her greeting's cut (owner test command) --------------------------------------------------------------------------------------------
+-- The cut in force: (start, stop, overridden). The owner's live values when set, else VerityConfig's.
+function V:VoiceRegion()
+ local model=self.Model
+ local a,b=model and model:GetAttribute('VerityVoiceStart'),model and model:GetAttribute('VerityVoiceEnd')
+ if Voice.Finite(a)and Voice.Finite(b)then local start,stop=Voice.Region(C,a,b,0);return start,stop,true end
+ local start,stop=Voice.Region(C,nil,nil,0);return start,stop,false
+end
+-- start, stop = seconds into the clip (made safe by VerityVoice.Region); nil, nil goes back to VerityConfig. False when she is not built.
+function V:SetVoiceRegion(start,stop)
+ local model=self.Model;if not model or not model.Parent then return false end
+ if start==nil and stop==nil then model:SetAttribute('VerityVoiceStart',nil);model:SetAttribute('VerityVoiceEnd',nil);return true end
+ if not Voice.Finite(start)or not Voice.Finite(stop)then return false end
+ local a,b=Voice.Region(C,start,stop,0)
+ model:SetAttribute('VerityVoiceStart',a);model:SetAttribute('VerityVoiceEnd',b);return true
+end
+-- Play the cut in force for this one player, now (their client plays it flat, so it is heard from anywhere). True when it was sent.
+function V:PlayVoice(player)
+ if not self.Remote or not player or not player.Parent then return false end
+ local start,stop=self:VoiceRegion();self.Remote:FireClient(player,'Greet',{Start=start,End=stop});return true
 end
 -- The hand-in -------------------------------------------------------------------------------------------------------------------
 local function body(player)

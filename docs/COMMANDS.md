@@ -108,6 +108,11 @@
 | `gifts @name` | Gifts they sent that are still finishing |
 | `gifts recover @name` | Finish stuck gifts now (normally automatic within a minute) |
 
+## Verity's voice
+| Command | What it does |
+|---|---|
+| `verityvoice 2.1`, `verityvoice 2.1 0.3` (server) | R149: find where "Hello, my name is Verity" ends by ear. `verityvoice <end> [start]` (seconds into the audio) sets the cut for this server and plays it for you at once, from anywhere (no @name). Run it again with a new end until it stops right after "Verity". `verityvoice` alone plays it again and prints the numbers in force; `verityvoice reset` goes back to the config. Nothing is saved: write the final numbers into `ReplicatedStorage.VerityConfig` (`GreetingStart`, `GreetingEnd`) and publish |
+
 ## Checks
 `economy`, `mechshop`, `voidcheck`, `collisions` (server), `perf`, `effects low|normal|off`.
 

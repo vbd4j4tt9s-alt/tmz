@@ -3,7 +3,7 @@ local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Packs=require(RS.SeedPackRules);local T=require(RS.BalanceValues81)
 local State=require(script.Parent.OwnerTestState82)
-local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true,daily=true,mystery=true,verity=true}}
+local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true,daily=true,mystery=true,verity=true,verityvoice=true}}
 local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8,verity=9}
 local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary',verity='VerityReliquary'}
 local function integer(s,lo,hi)local n=tonumber(s);return n and n==n and n%1==0 and n>=lo and n<=hi and n or nil end
@@ -40,6 +40,34 @@ function X.Execute(ctx,p,action,a)
   if #a~=0 then return false,'Use collisions.'end
   local count=require(RS.WalkthroughProps90).Apply(map)
   return true,'Walk-through props checked: '..count..' parts. Plants, floors and boundaries retained; leaderboard scrolling and market prompts stay active.'
+ end
+ if action=='verityvoice'then
+  -- R149 owner tool: find where "Hello, my name is Verity" ends by ear. verityvoice <end> [start] (seconds into the clip) sets the cut for this
+  -- whole server and plays it for you at once (from anywhere); verityvoice alone plays it again with the current values and prints them;
+  -- verityvoice reset goes back to VerityConfig. Nothing is saved: copy the numbers into ReplicatedStorage.VerityConfig (GreetingStart / GreetingEnd).
+  local svc=ctx.Chase and ctx.Chase.Verity
+  if not svc or type(svc.VoiceRegion)~='function'or not svc.Model then return false,'Verity is not in this server.'end
+  local Voice=require(RS.VerityVoice)
+  local function say(start,stop,custom)
+   local function n(v)return tostring(math.floor(v*1000+.5)/1000)end
+   return ('Verity\'s greeting plays %.2f s to %.2f s of the clip (%.2f s long)%s. In ReplicatedStorage.VerityConfig set GreetingStart=%s and GreetingEnd=%s once it sounds right.'):format(start,stop,stop-start,custom and' (set by this command, for this server only)'or' (from VerityConfig)',n(start),n(stop))
+  end
+  if #a==1 and tostring(a[1]):lower()=='reset'then
+   svc:SetVoiceRegion(nil,nil);svc:PlayVoice(p);local start,stop,custom=svc:VoiceRegion()
+   return true,'Back to VerityConfig. Playing it for you. '..say(start,stop,custom)
+  end
+  if #a>2 then return false,'Use verityvoice [end seconds] [start seconds], or verityvoice reset.'end
+  if #a>=1 then
+   local stop=tonumber(a[1]);local start
+   if a[2]~=nil then start=tonumber(a[2])else start=(svc:VoiceRegion())end
+   if not Voice.Finite(stop)or not Voice.Finite(start)then return false,'Use verityvoice [end seconds] [start seconds]: both are numbers of seconds into the clip (for example verityvoice 2.1, or verityvoice 2.1 0.3).'end
+   if start<0 or stop>Voice.MaxSeconds then return false,'The start must be 0 or more and the end at most '..Voice.MaxSeconds..' seconds.'end
+   if stop-start<Voice.MinLength-1e-9 then return false,'The end must be at least '..Voice.MinLength..' s after the start (start '..start..' s, end '..stop..' s).'end
+   if not svc:SetVoiceRegion(start,stop)then return false,'Verity is not in this server.'end
+  end
+  svc:PlayVoice(p)
+  local start,stop,custom=svc:VoiceRegion()
+  return true,'Playing it for you now. '..say(start,stop,custom)
  end
  if action=='weather'then
   local kind=({rain='Rain',thunder='Thunderstorm',thunderstorm='Thunderstorm',blizzard='Blizzard',clear='Clear'})[a[1]]

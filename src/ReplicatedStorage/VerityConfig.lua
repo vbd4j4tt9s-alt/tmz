@@ -14,9 +14,17 @@
 --    next base, facing +Z (toward the market and the way players walk round it to reach her). Players come round the market's
 --    sides (it is 54 studs wide; the lobby is 680 wide) and reach her from the market side.
 --  * Tune in Studio: BodySize (the sphere's diameter), FootOffset, Position, DaisDiameter, Sign (its size and gap), light range / brightness.
+-- R149 (owner: "sync verity's voice and cut the audio to only hello my name verity and also change the picture of verity to its 3d model
+-- talking and remove the event ends thing"):
+--  * Her greeting plays only the part of the clip that says "Hello, my name is Verity": GreetingStart .. GreetingEnd (seconds into the
+--    audio), as the Sound's PlaybackRegion, with a short fade at the end so the cut does not click. The two numbers below are GUESSES:
+--    find the real end by ear in Studio / a live server with  /test verityvoice <end> [start]  (it plays the cut for you at once), then
+--    write the numbers here.
+--  * Her mouth follows the loudness of the voice (Lip, Mouth: see VerityVoice.lua), in the world and in the window's 3D portrait (Portrait).
+--  * The dialog no longer shows "EVENT ENDS IN ..." (the event still ends: Event.Ended, EventEndsAt and the server's refusal are unchanged).
 local Catalog=require(script.Parent.VerityCatalog)
 local Limited=require(script.Parent.LimitedEvent)
-local C={Version=148}
+local C={Version=149}
 C.Name='VERITY'
 C.ModelName='VerityNPC'
 C.Tag='VerityNPC'
@@ -47,15 +55,38 @@ C.PromptHeight=3                   -- studs above the dais (the prompt hangs ins
 -- Voice (owner: "123997993114202 is the audio id for Verity's greetings") -------------------------------------------------
 C.GreetingSoundId='rbxassetid://123997993114202'
 C.GreetingVolume=.8
+-- TUNE IN STUDIO: where "Hello, my name is Verity" starts and ends inside the clip, in seconds (the clip could not be listened to when
+-- these were written: 0 .. 1.9 is a guess). Run  /test verityvoice <end> [start]  until it stops right after "Verity", then put the numbers here.
+C.GreetingStart=0
+C.GreetingEnd=1.9
+C.GreetingFade=.08                 -- seconds: her volume ramps to 0 over the last stretch of the cut, so it does not click
 C.GreetingRollOffMin=30;C.GreetingRollOffMax=140   -- studs: full volume inside the min, fading out (InverseTapered) to the max
 C.GreetingDistance=30              -- studs from her: coming this close greets you...
 C.GreetingCooldown=60              -- ...at most once a minute (a greeting from Talk counts as the last one)
 C.AnimateDistance=300             -- clients beyond this many studs from her leave her body alone (no turn / bob / swell writes)
-C.TalkPulse=.06                    -- how much she swells (fraction of her size) while the voice plays
-C.TalkPulseRate=18                 -- radians a second
+C.TalkPulse=.06                    -- how much she swells (fraction of her size) at the loudest moment of the voice
+-- Lip sync (VerityVoice.Step): the client reads the greeting's PlaybackLoudness each frame while she talks, smooths it (fast opening, slower
+-- closing) and drives her mouth and her swelling with it. Heard: raw loudness that counts as "the sound is really playing"; Floor: the
+-- loudness (of 0..1000) that counts as fully open until a louder syllable is heard (the peak then adapts and decays by PeakDecay a second);
+-- Gate: quieter than this fraction of the peak closes the mouth; Curve < 1 opens it a little wider on quiet vowels; Attack / Release: how fast
+-- it opens / closes (per second). If no loudness is ever heard (a sound the engine cannot measure) a plain talking rhythm (Rhythm syllables a
+-- second) runs for the length of the cut instead, starting FallbackAfter seconds in.
+C.Lip={Heard=2,Floor=60,Gate=.08,Curve=.75,Attack=40,Release=14,PeakDecay=.5,FallbackAfter=.3,Rhythm=3.4}
+-- Her open mouth: a dark oval on the front of the ball, sitting inside her smile. Sizes are fractions of her diameter; Y is how far below her
+-- centre the oval is centred; Width / Height are at full open (Widen: it gets a little wider as it opens); Depth: how thick the dome is; Show: the
+-- opening below which no mouth is drawn (the smile picture alone is her closed mouth). The defaults come from the owner's screenshot of the
+-- smiley (taken in the window, where the picture is .86 of the ball; she wears it across the whole 22 stud face): the eyes are .18 .. .07 of her
+-- diameter above her centre, the smile runs from .055 above it (its ends, +-.27 across) to .13 below it (its middle). TUNE IN STUDIO against her
+-- real face (run /test verityvoice and look at her).
+C.Mouth={Y=-.04,Width=.28,Height=.12,Depth=.035,Widen=.12,Show=.06,Color=Color3.fromRGB(34,8,14)}
+-- The window's 3D portrait: a yellow ball with the same smiley in a ViewportFrame. Size: the ball's diameter in the viewport (studs, any scale);
+-- Fov: the portrait camera's field of view; Fill: how much of the viewport the ball fills at rest (the rest is room for the swell and the bob);
+-- Bob: how far it bobs (fraction of its size).
+C.Portrait={Size=10,Fov=30,Fill=.88,Bob=.03}
 -- Security --------------------------------------------------------------------------------------------------------------
 -- The limited event (R148 owner: "place a timer ... 27 days, hrs, mins, s ... same for the event for Verity"): LimitedEvent.EndsAt
--- (UTC) is shared with the Index LIMITED tab. After it Verity takes nothing: the server refuses, the dialog says EVENT ENDED, the "!" is gone.
+-- (UTC) is shared with the Index LIMITED tab. After it Verity takes nothing: the server refuses, the GIVE button says EVENT ENDED, the "!" is
+-- gone and her sign says EVENT ENDED. (R149: the dialog has no countdown line any more; her sign and the Index LIMITED tab keep theirs.)
 C.EventEndsAt=Limited.EndsAt
 C.Event={Prefix='EVENT ENDS IN ',Ended='EVENT ENDED'}
 C.EventColor=Color3.fromRGB(255,236,150)

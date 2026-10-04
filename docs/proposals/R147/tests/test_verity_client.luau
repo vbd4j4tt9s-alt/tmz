@@ -7,16 +7,19 @@
 --    in a new session), a bouncing gold "?" while a Void Pack Tool (SeedPackTool + BagVariant EclipseReliquary, in the Backpack or the
 --    Character) is held; never both once the limited event is over. The sign is one studs-sized BillboardGui: marker row, gap, name,
 --    event timer row (rows that cannot overlap, also while the marker bounces, she bobs and swells), offset in camera space.
---  * The limited event (LimitedEvent, EndsAt 2026-11-01 00:00 UTC, the server's clock): "EVENT ENDS IN 27d 04h 12m 09s" in the dialog
---    (ticking every second while it is open) and under her name; after the end EVENT ENDED, GIVE disabled, no marker.
+--  * The limited event (LimitedEvent, EndsAt 2026-11-01 00:00 UTC, the server's clock): "EVENT ENDS IN 27d 04h 12m 09s" under her name
+--    (ticking every second); after the end EVENT ENDED, GIVE disabled, no marker. R149: NOT in the dialog any more (owner: "remove the event
+--    ends thing"): no such line anywhere in her window, and no empty row where it was.
 --  * Her greeting (VerityConfig.GreetingSoundId): plays from her body when the dialog opens with Talk, and once when you first come
 --    within 30 studs (at most once a minute; a Talk greeting counts); never two copies at once; routed to the Effects group and
 --    skipped with Effects at 0; a failed asset load is warned about once and skipped.
---  * The dialog (Open / Done / Refused from a fake server): her quest text, her portrait (a yellow ball with the smiley), the Void Pack
---    count, what has been handed in, The Darkened's countdown, the exchange as the game's real 3D pack pictures (Void Pack -> Verity
---    Pack, the same pictures as the hotbar), GIVE VOID PACK enabled only with a pack (one 'Give' per click, locked while it waits and
---    unlocked by an answer or after 4 s), the thank-you sound, the refusal reason, SeedMenu = 'Verity' set and cleared, hostile
---    payloads, and the window fitting phones and computers with every text shown in full.
+--  * The dialog (Open / Done / Refused from a fake server): her quest text, her portrait (R149: her 3D model, a ViewportFrame with the yellow
+--    ball and the smiley; the lip sync is in docs/proposals/R149/tests/test_verity_lipsync.luau), the Void Pack count, what has been handed
+--    in, The Darkened's countdown, the exchange as the game's real 3D pack pictures (Void Pack -> Verity Pack, the same pictures as the
+--    hotbar), GIVE VOID PACK enabled only with a pack (one 'Give' per click, locked while it waits and unlocked by an answer or after 4 s),
+--    the thank-you sound, the refusal reason, SeedMenu = 'Verity' set and cleared, hostile payloads, and the window fitting phones and
+--    computers with every text shown in full (R149: the quest sentence at a readable size, in at most 5 lines, measured with a font 15%
+--    wider than the mock's usual one, on the first Open and on every later one, and no empty row anywhere).
 local W=require('./world');local F=require('./fixtures');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -31,6 +34,8 @@ end
 R.CFrame.fromMatrix=function(p,x,y,z)z=z or x:Cross(y);return R.CFrame.new(p.X,p.Y,p.Z,x.X,y.X,z.X,x.Y,y.Y,z.Y,x.Z,y.Z,z.Z)end
 W.env.CFrame=R.CFrame
 F.packAssets(W)
+-- R149: text is measured with a font 15% wider than the shared mock's (.52 em a character; bold capitals run wider in Fredoka), so what fits here fits with room to spare.
+W.service('TextService').GetTextSize=function(_,t,size,_,bounds)return R.Vector2.new(math.min(bounds.X,utf8.len(t)*size*.6),size*1.2)end
 -- Sounds: every Sound knows when it is playing (3.2 s long), and a log keeps every Play and the most copies heard at once.
 local soundLog,playing,maxOverlap,playMode={},0,0,nil
 do local inew=R.Instance.new;R.Instance.new=function(class,parent)local o=inew(class,parent)
@@ -336,7 +341,6 @@ end
 -- 4. The dialog -----------------------------------------------------------------------------------------------------------------------
 local gBefore=greetings()
 server('Refused',{Reason='YOUR DATA IS STILL LOADING'})
-local eventTimer=panel.EventTimer
 local quest,eventLine,voidChip,doneChip,rewardLine,status,give,closeButton=panel.QuestText,panel.EventLine,panel.VoidChip,panel.DeliveredChip,panel.Exchange.RewardLine,panel.Status,panel.GiveButton,panel.CloseButton
 check(panel.Visible and pg:GetAttribute('SeedMenu')=='Verity','a refusal while closed opens the window (SeedMenu = Verity)')
 check(status.Text=='YOUR DATA IS STILL LOADING'and not give.Active,'it shows the reason, GIVE disabled')
@@ -351,12 +355,19 @@ check(quest:GetAttribute('FullText')==C.Quest and not quest:GetAttribute('TextSh
 check(panel.Header.Title.Text:find('VERITY',1,true),'titled VERITY')
 check(voidChip.Count.Text=='0'and doneChip.Count.Text=='3'and voidChip.Caption.Text:find('VOID',1,true)and doneChip.Caption.Text:find('HANDED',1,true),'chips: 0 Void packs, 3 handed in')
 check(rewardLine:GetAttribute('FullText')=='1 VOID PACK = 1 VERITY PACK','the reward line from the server, in the exchange row')
-do
- local expected='EVENT ENDS IN '..Limited.Text(Limited.Left(W.workspace:GetServerTimeNow()))
- check(eventTimer.Visible and eventTimer.Text==expected and eventTimer.Text:find('^EVENT ENDS IN %d+d %d%dh %d%dm %d%ds$')~=nil,'the dialog shows "'..eventTimer.Text..'" (LimitedEvent\'s text on the server clock)')
- check(eventTimer.TextColor3.R>.9 and eventTimer.TextColor3.G>.8,'in the event\'s gold')
- local t0=eventTimer.Text;R.advance(2.05);frames(2)
- check(eventTimer.Text~=t0 and eventTimer.Text=='EVENT ENDS IN '..Limited.Text(Limited.Left(W.workspace:GetServerTimeNow())),'it ticks every second while the window is open: '..t0..' -> '..eventTimer.Text)
+local function eventEndsLines(root) -- every label of her window that says (or would say, in full) "EVENT ENDS ..."
+ local found={};for _,d in ipairs((root or panel):GetDescendants())do
+  if d:IsA('TextLabel')or d:IsA('TextButton')then
+   local full=d:GetAttribute('FullText')
+   if d.Text:find('EVENT ENDS',1,true)or(type(full)=='string'and full:find('EVENT ENDS',1,true))then found[#found+1]=d.Name..': '..d.Text end
+  end
+ end;return found
+end
+do -- R149 (owner: "remove the event ends thing"): her window has no "EVENT ENDS IN ..." line; the event itself still ends (section 8)
+ local found=eventEndsLines()
+ check(panel:FindFirstChild('EventTimer')==nil and #found==0,'her window has no "EVENT ENDS IN" line anywhere ('..table.concat(found,' | ')..')')
+ R.advance(2.05);frames(2)
+ check(#eventEndsLines()==0,'(nor does one appear later while the window is open)')
  nextAt=R.clock+754
  server('Open',{VoidPacks=0,Delivered=3,RewardText='1 VOID PACK = 1 VERITY PACK',EventActive=false,NextAt=nextAt})
 end
@@ -409,15 +420,28 @@ check(panel.Visible and pg:GetAttribute('SeedMenu')=='Verity','opening while ano
 pg:SetAttribute('SeedMenu','Index');frames(2)
 check(not panel.Visible and pg:GetAttribute('SeedMenu')=='Index','another menu opening closes hers and leaves its SeedMenu alone')
 pg:SetAttribute('SeedMenu',nil);frames(2)
--- 5. Verity herself in the window, and the exchange as real pack pictures ------------------------------------------------------------
-server('Open',{VoidPacks=2,Delivered=7,EventActive=true})
-local portrait=panel.Portrait;local ball=portrait.Ball;local picture=ball.Picture
-check(portrait.Visible and ball:IsA('Frame'),'the portrait is a round yellow frame (a ball), not a bare line drawing on navy')
-local corner=ball:FindFirstChildOfClass('UICorner');check(corner and corner.CornerRadius.Scale==.5,'perfectly round (UICorner 50%)')
-local grad=ball:FindFirstChild('BrightFill');local function warmYellow(c)return c.R>.95 and c.G>.85 and c.B<.75 end
-check(grad and warmYellow(grad.Color.A)and warmYellow(grad.Color.B),'filled with Verity\'s yellow')
-check(picture:IsA('ImageLabel')and picture.Image==C.Image and picture.ScaleType==R.Enum.ScaleType.Fit and picture.BackgroundTransparency==1,'her smiley (VerityConfig.Image, ScaleType Fit) on top of the ball')
-local br=rect(ball);check(math.abs(br.W-br.H)<1 and br.W>100,'the ball is a circle ('..br.W..' x '..br.H..')')
+-- 5. Verity herself in the window (R149: her 3D model in a ViewportFrame), and the exchange as real pack pictures ---------------------------------
+server('Open',{VoidPacks=2,Delivered=7,EventActive=true});frames(4)
+local portrait=panel.Portrait;local view=portrait:FindFirstChild('Model')
+check(portrait.Visible and view and view:IsA('ViewportFrame'),'the portrait is a ViewportFrame (her 3D model), not a flat picture')
+check(portrait:FindFirstChild('Ball')==nil and portrait:FindFirstChild('Picture',true)==nil and #(function()local out={};for _,d in ipairs(portrait:GetDescendants())do if d:IsA('ImageLabel')then out[#out+1]=d end end;return out end)()==0,'(no flat ball frame and no flat ImageLabel picture left in it)')
+local pcam=view and view.CurrentCamera;check(pcam and pcam:IsA('Camera')and pcam.Parent==view,'the ViewportFrame has its own Camera (CurrentCamera set)')
+local pmodel=view and view:FindFirstChild('VerityPortrait');local pball=pmodel and pmodel:FindFirstChild('Body')
+check(pball and pball:IsA('BasePart')and pball.Shape==R.Enum.PartType.Ball,'her model is in it: a Ball part')
+check(pball and pball.Color==C.BodyColor and pball.Material==R.Enum.Material.SmoothPlastic,'yellow SmoothPlastic, like the ball in the world (VerityConfig.BodyColor)')
+local pdecal=pball and pball:FindFirstChildOfClass('Decal')
+check(pdecal and pdecal.Texture==C.Image and pdecal.Face==R.Enum.NormalId.Front,'with her smiley (VerityConfig.Image) as a Decal on its Front face')
+check(pball and pcam and pball.CFrame.Position.Magnitude<=C.Portrait.Bob*C.Portrait.Size+1e-6 and pcam.CFrame.Position.Z<0 and pcam.CFrame.LookVector.Z>.99,'the camera looks at the ball from the front (her face looks toward -Z, the camera is on that side)')
+local lookFrom=pcam and (pball.CFrame.Position-pcam.CFrame.Position).Unit;check(lookFrom and math.abs(lookFrom.X)<.05 and lookFrom.Z>.99,'straight at it, so her face is toward the camera')
+local vr,pr=rect(view),rect(portrait);check(math.abs(vr.W-vr.H)<1 and vr.W>80 and vr.X>=pr.X and vr.Y>=pr.Y and vr.X+vr.W<=pr.X+pr.W and vr.Y+vr.H<=pr.Y+pr.H,'the viewport is a square inside the portrait frame ('..vr.W..' px)')
+check(portrait:FindFirstChildOfClass('UICorner')~=nil and portrait:FindFirstChildOfClass('UIStroke')~=nil and portrait.BackgroundColor3==W.module('GardenTheme').Colors.Inset,'the panel keeps its look: rounded, a gold border, the inset colour')
+check(view.BackgroundTransparency==1 and portrait:FindFirstChild('Dais')~=nil,'(and the gold dais under her shows through the transparent viewport)')
+-- It bobs gently while the window is open (the ball moves a little, the camera does not).
+do
+ local lo,hi=1e9,-1e9;local camAt=pcam.CFrame.Position
+ for _=1,240 do frames(1);local y=pball.CFrame.Position.Y;lo=math.min(lo,y);hi=math.max(hi,y)end
+ check(hi-lo>.15*C.Portrait.Bob*C.Portrait.Size and hi-lo<=2*C.Portrait.Bob*C.Portrait.Size+1e-6 and pcam.CFrame.Position==camAt,string.format('the portrait ball bobs gently (%.2f of %d studs) and the camera stays put',hi-lo,C.Portrait.Size))
+end
 -- The pictures are the game's 3D packs (ItemPictures into ViewportFrames), the same ones the hotbar uses.
 local exchange=panel.Exchange;local voidHolder,verityHolder,arrow=exchange.VoidPack,exchange.VerityPack,exchange.Arrow
 check(voidHolder and verityHolder and arrow and arrow.Text=='➜','the exchange row: a Void pack picture, an arrow, a Verity pack picture')
@@ -443,41 +467,79 @@ local vr,er=rect(voidHolder),rect(verityHolder)
 check(vr.W==vr.H and er.W==er.H and vr.W>=40 and not overlap(vr,er)and rect(arrow).X>=vr.X+vr.W-1 and rect(arrow).X+rect(arrow).W<=er.X+1,'two square pictures with the arrow between them: '..vr.W..' px each')
 -- 6. The window fits phones and computers ------------------------------------------------------------------------------------------------
 local function itemsOf()
- local out={{'quest',quest},{'timer',eventTimer},{'chips-void',voidChip},{'chips-done',doneChip},{'void picture',voidHolder},{'arrow',arrow},{'verity picture',verityHolder},{'reward',rewardLine},{'status',status},{'give',give},{'close',closeButton}}
+ local out={{'quest',quest},{'chips-void',voidChip},{'chips-done',doneChip},{'void picture',voidHolder},{'arrow',arrow},{'verity picture',verityHolder},{'reward',rewardLine},{'status',status},{'give',give},{'close',closeButton}}
  if eventLine.Visible then table.insert(out,2,{'event',eventLine})end
  return out
 end
-for _,sz in ipairs({{1920,1080},{1280,720},{1024,768},{844,390},{780,360},{667,340},{667,375},{430,932},{390,844},{390,760},{375,667},{360,640},{360,600}})do
- resize(sz[1],sz[2]);server('Done',{Delivered=8});server('Open',{VoidPacks=2,Delivered=7,EventActive=true});frames(4)
- local P=rect(panel);local good,why=true,''
- local items=itemsOf()
- for i,a in ipairs(items)do
-  local r=rect(a[2])
-  if r.X<P.X-1 or r.Y<P.Y-1 or r.X+r.W>P.X+P.W+1 or r.Y+r.H>P.Y+P.H+1 then good=false;why=why..(' %s outside the panel'):format(a[1])end
-  if r.W<24 or r.H<16 then good=false;why=why..(' %s too small (%dx%d)'):format(a[1],r.W,r.H)end
-  for j=i+1,#items do if overlap(r,rect(items[j][2]))then good=false;why=why..(' %s/%s overlap'):format(a[1],items[j][1])end end
- end
- for _,a in ipairs({{'give',give},{'close',closeButton}})do local r=rect(a[2]);if r.H<36 or r.W<80 then good=false;why=why..' '..a[1]..' is hard to tap'end end
- for _,a in ipairs({{'void picture',voidHolder},{'verity picture',verityHolder}})do local r=rect(a[2]);if r.W<40 or r.H<40 then good=false;why=why..' '..a[1]..' too small to read ('..r.W..')'end end
- local row=rect(exchange);local inRow=true
- for _,a in ipairs({voidHolder,arrow,verityHolder,rewardLine})do local r=rect(a);if r.X<row.X-1 or r.X+r.W>row.X+row.W+1 or r.Y<row.Y-1 or r.Y+r.H>row.Y+row.H+1 then inRow=false end end
- if not inRow then good=false;why=why..' exchange row content outside the row'end
- local pr=rect(portrait);local pic=''
- if portrait.Visible then
-  local bb=rect(ball)
-  if pr.X<P.X-1 or pr.Y<P.Y-1 or pr.X+pr.W>P.X+P.W+1 or pr.Y+pr.H>P.Y+P.H+1 then good=false;why=why..' portrait outside'end
-  if bb.X<pr.X or bb.Y<pr.Y or bb.X+bb.W>pr.X+pr.W or bb.Y+bb.H>pr.Y+pr.H then good=false;why=why..' ball outside its frame'end
-  if math.abs(bb.W-bb.H)>1 or bb.W<80 then good=false;why=why..' ball not round / too small'end
-  for _,a in ipairs(items)do if overlap(pr,rect(a[2]))then good=false;why=why..' portrait overlaps '..a[1]end end
-  pic='portrait '..bb.W..' px'
- else pic='portrait hidden'end
- local hdr=rect(panel.Header.Close);if hdr.X+hdr.W>P.X+P.W+1 or hdr.W<30 then good=false;why=why..' X button off or small'end
- for _,label in ipairs({quest,eventTimer,eventLine,rewardLine,status,voidChip.Count,doneChip.Count,voidChip.Caption,doneChip.Caption,give.Caption,closeButton.Caption})do
-  if label:GetAttribute('TextShortened')then good=false;why=why..' text cut: '..tostring(label.Name)..' ("'..label.Text..'")'end
- end
- check(good,('window fits %dx%d (panel %dx%d, %s, packs %d px)%s'):format(sz[1],sz[2],P.W,P.H,pic,rect(voidHolder).W,why))
- pg:SetAttribute('SeedMenu',nil);frames(1)
+local TextS=W.service('TextService')
+-- R149: the quest sentence as the engine would draw it: the text on screen (the fitter's own line breaks) is the whole sentence, at a readable
+-- size, in at most 5 lines (a phone's 314 px column), every line inside the box's width and all of them inside its height (measured with the wider font, 1.15 x the size a line: the fitter's own rule).
+local function questProblems(label,minSize)
+ local abs=label.AbsoluteSize;local lines={};for line in (label.Text..'\n'):gmatch('(.-)\n')do lines[#lines+1]=line end
+ local size=label.TextSize;local widest=0
+ for _,line in ipairs(lines)do widest=math.max(widest,TextS:GetTextSize(line,size,label.Font,R.Vector2.new(1e5,1e5)).X)end
+ local why=''
+ if table.concat(lines,' ')~=C.Quest then why=why..' not the whole sentence ("'..table.concat(lines,' ')..'")'end
+ if label:GetAttribute('TextShortened')then why=why..' TextShortened'end
+ if size<minSize then why=why..' font '..size..' < '..minSize end
+ if #lines>5 then why=why..' '..#lines..' lines'end
+ if widest>abs.X-4+1e-6 then why=why..(' a line is %d px in a %d px box'):format(widest,abs.X)end
+ if #lines*size*1.15>abs.Y+1e-6 then why=why..(' %d lines of %d px need %d px, the box is %d'):format(#lines,size,#lines*size*1.15,abs.Y)end
+ return why,#lines,size
 end
+local sizes={{1920,1080},{1280,720},{1024,768},{844,390},{780,360},{667,340},{667,375},{430,932},{390,844},{390,760},{375,667},{360,640},{360,600}}
+local worstSize,worstLines=99,0
+for _,sz in ipairs(sizes)do
+ for _,variant in ipairs({{'with The Darkened\'s line',{VoidPacks=2,Delivered=7,EventActive=true}},{'without it',{VoidPacks=2,Delivered=7}}})do
+  resize(sz[1],sz[2]);server('Done',{Delivered=8});server('Open',variant[2]);frames(4)
+  local P=rect(panel);local good,why=true,''
+  local short=P.H<380
+  local items=itemsOf()
+  check(eventLine.Visible==(variant[2].EventActive==true),'(the Darkened line shows only when there is something to say)')
+  for i,a in ipairs(items)do
+   local r=rect(a[2])
+   if r.X<P.X-1 or r.Y<P.Y-1 or r.X+r.W>P.X+P.W+1 or r.Y+r.H>P.Y+P.H+1 then good=false;why=why..(' %s outside the panel'):format(a[1])end
+   if r.W<24 or r.H<16 then good=false;why=why..(' %s too small (%dx%d)'):format(a[1],r.W,r.H)end
+   for j=i+1,#items do if overlap(r,rect(items[j][2]))then good=false;why=why..(' %s/%s overlap'):format(a[1],items[j][1])end end
+  end
+  for _,a in ipairs({{'give',give},{'close',closeButton}})do local r=rect(a[2]);if r.H<36 or r.W<80 then good=false;why=why..' '..a[1]..' is hard to tap'end end
+  for _,a in ipairs({{'void picture',voidHolder},{'verity picture',verityHolder}})do local r=rect(a[2]);if r.W<40 or r.H<40 then good=false;why=why..' '..a[1]..' too small to read ('..r.W..')'end end
+  local row=rect(exchange);local inRow=true
+  for _,a in ipairs({voidHolder,arrow,verityHolder,rewardLine})do local r=rect(a);if r.X<row.X-1 or r.X+r.W>row.X+row.W+1 or r.Y<row.Y-1 or r.Y+r.H>row.Y+row.H+1 then inRow=false end end
+  if not inRow then good=false;why=why..' exchange row content outside the row'end
+  local pr=rect(portrait);local pic=''
+  if portrait.Visible then
+   local bb=rect(view)
+   if pr.X<P.X-1 or pr.Y<P.Y-1 or pr.X+pr.W>P.X+P.W+1 or pr.Y+pr.H>P.Y+P.H+1 then good=false;why=why..' portrait outside'end
+   if bb.X<pr.X or bb.Y<pr.Y or bb.X+bb.W>pr.X+pr.W or bb.Y+bb.H>pr.Y+pr.H then good=false;why=why..' 3D model viewport outside its frame'end
+   if math.abs(bb.W-bb.H)>1 or bb.W<80 then good=false;why=why..' viewport not square / too small'end
+   for _,a in ipairs(items)do if overlap(pr,rect(a[2]))then good=false;why=why..' portrait overlaps '..a[1]end end
+   if not(view.Parent==portrait and view:FindFirstChild('VerityPortrait'))then good=false;why=why..' portrait model missing'end
+   pic='portrait '..bb.W..' px'
+  else pic='portrait hidden';if view:FindFirstChild('VerityPortrait')then good=false;why=why..' a hidden portrait still holds its model'end end
+  local hdr=rect(panel.Header.Close);if hdr.X+hdr.W>P.X+P.W+1 or hdr.W<30 then good=false;why=why..' X button off or small'end
+  for _,label in ipairs({eventLine,rewardLine,status,voidChip.Count,doneChip.Count,voidChip.Caption,doneChip.Caption,give.Caption,closeButton.Caption})do
+   if label:GetAttribute('TextShortened')then good=false;why=why..' text cut: '..tostring(label.Name)..' ("'..label.Text..'")'end
+  end
+  -- The quest sentence (R149: it was cut off with "..." in the owner's window): in full and readable, on the first Open and on every later one.
+  local qwhy,qlines,qsize=questProblems(quest,short and 12 or 14)
+  worstSize=math.min(worstSize,qsize);worstLines=math.max(worstLines,qlines)
+  if qwhy~=''then good=false;why=why..' QUEST:'..qwhy end
+  server('Open',variant[2]);frames(2);server('Open',variant[2]);frames(2)
+  local qwhy2=questProblems(quest,short and 12 or 14)
+  if qwhy2~=''then good=false;why=why..' QUEST after reopening:'..qwhy2 end
+  -- No empty room: the rows run from the header to the bottom edge with one gap between each.
+  local rows={quest,voidChip,exchange,status,give}
+  if eventLine.Visible then table.insert(rows,2,eventLine)end
+  local headH=rect(panel.Header).H;local gapWant=short and 6 or 10
+  if math.abs((rect(quest).Y-P.Y)-(headH+12))>1 then good=false;why=why..' the first row is not right under the header'end
+  for i=1,#rows-1 do local a,b=rect(rows[i]),rect(rows[i+1]);if math.abs((b.Y-(a.Y+a.H))-gapWant)>1 then good=false;why=why..(' gap %d is %d px, not %d'):format(i,b.Y-(a.Y+a.H),gapWant)end end
+  local last=rect(rows[#rows]);if math.abs((P.Y+P.H)-(last.Y+last.H)-12)>1 then good=false;why=why..' the last row is not at the bottom'end
+  check(good,('window fits %dx%d %s (panel %dx%d, %s, packs %d px, quest %d px in %d lines)%s'):format(sz[1],sz[2],variant[1],P.W,P.H,pic,rect(voidHolder).W,qsize,qlines,why))
+  pg:SetAttribute('SeedMenu',nil);frames(1)
+ end
+end
+print(('(the quest sentence: at worst %d px in %d lines)'):format(worstSize,worstLines))
 resize(1280,720)
 server('Open',{VoidPacks=1,Delivered=0});resize(360,640)
 for _,reason in pairs(C.Reasons)do
@@ -523,20 +585,19 @@ do
  local mk=sign:FindFirstChild('Mark');local tl=sign:FindFirstChild('Timer')
  check(mk.Visible and mk.Text=='!'and tl.Text=='EVENT ENDS IN 0d 00h 00m 02s','2 s before the end: the "!" shows and the sign says "'..tl.Text..'"')
  server('Open',{VoidPacks=2,Delivered=4})
- local et,gb,gc=panel4.EventTimer,panel4.GiveButton,panel4.GiveButton.Caption
- check(et.Text=='EVENT ENDS IN 0d 00h 00m 02s'and gb.Active and gc.Text=='GIVE VOID PACK','the dialog says "'..et.Text..'" and GIVE VOID PACK works')
+ local gb,gc=panel4.GiveButton,panel4.GiveButton.Caption
+ check(#eventEndsLines(panel4)==0 and gb.Active and gc.Text=='GIVE VOID PACK','2 s before the end the dialog has no countdown (R149) and GIVE VOID PACK works')
  local vt=F.tool(W,'Void Pack',{SeedPackTool=true,SeedInventoryId='e1',BagVariant='EclipseReliquary',Stage=7},backpack);frames(2)
  check(mk.Visible and mk.Text=='?','(with a Void Pack she shows the "?")')
  R.advance(1.1);frames(2)
- check(et.Text=='EVENT ENDS IN 0d 00h 00m 01s'and tl.Text=='EVENT ENDS IN 0d 00h 00m 01s','one second later: '..et.Text)
+ check(#eventEndsLines(panel4)==0 and tl.Text=='EVENT ENDS IN 0d 00h 00m 01s','one second later her sign says "'..tl.Text..'" and the dialog still has no countdown')
  R.advance(1.1);frames(3) -- the end has passed
- check(et.Text==C.Event.Ended and et.TextColor3.R>.9 and et.TextColor3.G<.5,'the event ends while the window is open: "'..et.Text..'", in red')
- check(not gb.Active and not gb.Interactable and gc.Text==C.Event.Ended,'GIVE is disabled (it says EVENT ENDED) even with Void Packs')
+ check(not gb.Active and not gb.Interactable and gc.Text==C.Event.Ended and #eventEndsLines(panel4)==0,'the event ends while the window is open: GIVE is disabled and says "'..gc.Text..'" even with Void Packs')
  check(tl.Text==C.Event.Ended and tl.TextColor3.R>.9 and tl.TextColor3.G<.5,'her sign says EVENT ENDED too')
  check(not mk.Visible and sign:GetAttribute('Bounce')==false,'and neither the "!" nor the "?" shows (with a Void Pack in the Bag)')
  local n0=#fired;gb.Activated:Fire();frames(2);check(#fired==n0,'clicking GIVE sends nothing')
  server('Open',{VoidPacks=2,Delivered=4})
- check(not gb.Active and et.Text==C.Event.Ended and panel4.VoidChip.Count.Text=='2','a fresh Open after the end: 2 Void Packs counted, GIVE still disabled, "EVENT ENDED"')
+ check(not gb.Active and gc.Text==C.Event.Ended and panel4.VoidChip.Count.Text=='2','a fresh Open after the end: 2 Void Packs counted, GIVE still disabled, "EVENT ENDED"')
  server('Refused',{Reason=C.Reasons.EventEnded});check(panel4.Status.Text=='THE VERITY EVENT HAS ENDED','the server\'s refusal text is shown: '..panel4.Status.Text)
  vt:Destroy();frames(2);gui4:Destroy();frames(3)
  -- A session that starts after the end: the "!" never shows.
@@ -544,9 +605,9 @@ do
  local gui5=pg:FindFirstChild('VerityGui');local mk5=sign:FindFirstChild('Mark');local tl5=sign:FindFirstChild('Timer')
  check(not mk5.Visible and tl5.Text==C.Event.Ended,'a session after the end: no "!", the sign says EVENT ENDED')
  R.advance(5);frames(30);check(not mk5.Visible,'(and it never comes back)')
- server('Open',{VoidPacks=0,Delivered=0});check(gui5.VerityPanel.EventTimer.Text==C.Event.Ended and not gui5.VerityPanel.GiveButton.Active,'her dialog says EVENT ENDED, GIVE disabled')
+ server('Open',{VoidPacks=0,Delivered=0});check(gui5.VerityPanel.GiveButton.Caption.Text==C.Event.Ended and not gui5.VerityPanel.GiveButton.Active,'her dialog says EVENT ENDED on the GIVE button, which is disabled')
  -- Phones: the ended window fits too.
- resize(360,640);check(not gui5.VerityPanel.EventTimer:GetAttribute('TextShortened'),'EVENT ENDED fits a phone');resize(1280,720)
+ resize(360,640);check(not gui5.VerityPanel.GiveButton.Caption:GetAttribute('TextShortened'),'EVENT ENDED fits the GIVE button on a phone');resize(1280,720)
  gui5:Destroy();frames(3)
 end
 print(('%d checks, %d failures'):format(checks,fails))

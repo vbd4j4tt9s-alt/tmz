@@ -10,8 +10,10 @@
 #  test_verity_client.luau - the real VerityClient with the real ItemPictures / SeedPackVisuals / AudioMixer: her body turning to the
 #                            camera, bobbing and swelling, the ! / ? marker in her name sign, her greeting voice (Talk, proximity +
 #                            cooldown, no overlap, Effects volume, load failure), the dialog states (Open / Done / Refused), the
-#                            portrait, the Void -> Verity pack pictures built from the real pack models, the GIVE button only with a
-#                            Void tool, SeedMenu set and cleared, and the window fitting 13 screen sizes from 360x600 to 1920x1080.
+#                            portrait (R149: her 3D model in a ViewportFrame; no "EVENT ENDS" line; the quest sentence in full), the Void -> Verity
+#                            pack pictures built from the real pack models, the GIVE button only with a Void tool, SeedMenu set and cleared, and
+#                            the window fitting 13 screen sizes from 360x600 to 1920x1080 (R149: with and without The Darkened's line, on every Open).
+#                            The greeting's cut and the lip sync are tested in docs/proposals/R149/tests (run_verity.sh there runs both).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT/srv" "$OUT/cl"

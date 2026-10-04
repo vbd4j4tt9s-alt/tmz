@@ -14,14 +14,26 @@
 --    have, how many you handed in, when The Darkened is here / comes, the exchange as pictures (Void Pack -> Verity Pack, the
 --    game's own 3D pack pictures, like the hotbar) and the GIVE VOID PACK button (only with a Void Pack).
 --    'Done' = thanks + a sound, 'Refused' = the reason. PlayerGui.SeedMenu = 'Verity' while it is open.
+-- R149 (owner: "sync verity's voice and cut the audio to only hello my name verity and also change the picture of verity to its 3d model
+-- talking and remove the event ends thing"):
+--  * Her greeting plays ONLY "Hello, my name is Verity": the Sound's PlaybackRegion is VerityConfig.GreetingStart .. GreetingEnd (or the
+--    owner's live /test verityvoice values, read from her model's VerityVoiceStart / VerityVoiceEnd attributes each time she speaks), with a
+--    short fade at the end. All three ways she speaks (Talk, coming close, the owner's test) go through the same startVoice.
+--  * Lip sync: while the voice plays, the Sound's PlaybackLoudness (smoothed, normalised: VerityVoice.Step) opens her mouth (a dark oval on
+--    her face, sized by the loudness) and swells her; a plain talking rhythm runs if the engine reports no loudness. Only while she talks:
+--    nothing per frame at rest, none beyond AnimateDistance (the window's portrait still follows while it is open), none with ReducedMotion.
+--  * The window's portrait is her 3D model (the same yellow ball and smiley, in a ViewportFrame) bobbing and talking with the same lip sync;
+--    it exists only while the window is open. The window no longer shows the "EVENT ENDS IN ..." line (her sign and the Index keep theirs),
+--    and her quest sentence gets the room it needs (every label is fitted by GardenTextFit, which layout() no longer overrides).
 -- The server owns every rule; this only sends 'Give' (no arguments) and shows what it is told.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local Run=game:GetService('RunService');local Tween=game:GetService('TweenService');local GuiService=game:GetService('GuiService')
+local SoundService=game:GetService('SoundService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local remotes=RS:WaitForChild('ChestChaseRemotes')
 local C=require(RS:WaitForChild('VerityConfig'));local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI);local Audio=require(RS.InteractionAudio)
 local Pictures;pcall(function()Pictures=require(RS.ItemPictures)end)
 local Mixer;pcall(function()Mixer=require(RS.AudioMixer)end)
-local Limited=require(RS:WaitForChild('LimitedEvent'))
+local Limited=require(RS:WaitForChild('LimitedEvent'));local VerityVoice=require(RS:WaitForChild('VerityVoice'));local Fit=require(RS:WaitForChild('GardenTextFit'))
 local RGB=Color3.fromRGB
 local GOLD,MINT,SKY,RED,VIOLET=RGB(255,206,64),RGB(110,226,96),RGB(86,182,255),RGB(255,96,96),RGB(190,140,255)
 local connections={};local function watch(signal,fn)local c=signal:Connect(fn);connections[#connections+1]=c;return c end
@@ -56,20 +68,28 @@ end
 local talked=false -- opened her dialog this session: the "!" is gone until the next session
 -- Her voice -------------------------------------------------------------------------------------------------------------------
 -- One Sound on her body (3D, rolled off by distance, routed to the Effects group so the player's Effects volume applies).
-local voice={Playing=false,Until=0,LastAt=-math.huge,Failed=false,Warned=false,Sound=nil,Checked=false,Plays=0}
+-- R149: it plays ONLY "Hello, my name is Verity": the part of the clip from Start to Stop seconds (VerityConfig.GreetingStart / GreetingEnd,
+-- or the owner's live values on her model), as the Sound's PlaybackRegion. Every greeting starts in startVoice, so every one is cut the same
+-- way. Her volume is faded over the last GreetingFade seconds (voiceTick, from the Sound's own TimePosition) so the cut does not click, and
+-- voice.Until ends it by timer even if the engine did not honour the region. A greeting asked for before the clip has loaded waits for it
+-- (up to 3 s) rather than being timed by a clock that started before the audio did.
+local voice={Playing=false,Until=0,LastAt=-math.huge,Failed=false,Warned=false,Sound=nil,Checked=false,Plays=0,Start=0,Stop=0,StartedAt=0,Gain=1,
+ Lip=VerityVoice.NewLip(C.Lip),Waiting=nil,RegionWarned=false}
 local entry=nil
 local function failVoice(why)
  voice.Failed=true
  if not voice.Warned then voice.Warned=true;warn('[R148] Verity\'s greeting could not be loaded ('..tostring(C.GreetingSoundId)..'): '..tostring(why))end
 end
-local function voiceSound(e)
+-- flat: the owner's test plays it as a plain 2D sound (SoundService), so it is heard from anywhere in the server, not only near her.
+local function voiceSound(e,flat)
+ local parent=flat and SoundService or e.Body
  local s=voice.Sound
- if s and s.Parent==e.Body then return s end
- if s then s:Destroy();voice.Sound=nil;voice.Checked=false end
+ if s and s.Parent==parent then return s end
+ if s then s:Destroy();voice.Sound=nil;voice.Checked=false;voice.Playing=false end
  s=new('Sound',{Name='VerityGreeting',SoundId=C.GreetingSoundId,Volume=C.GreetingVolume,Looped=false,RollOffMode=Enum.RollOffMode.InverseTapered,
-  RollOffMinDistance=C.GreetingRollOffMin,RollOffMaxDistance=C.GreetingRollOffMax},e.Body)
+  RollOffMinDistance=C.GreetingRollOffMin,RollOffMaxDistance=C.GreetingRollOffMax},parent)
  if Mixer then pcall(Mixer.Route,s,'Effects')end
- watch(s.Ended,function()voice.Playing=false end)
+ watch(s.Ended,function()if voice.Sound==s then voice.Playing=false;voice.Gain=1;pcall(function()s.Volume=C.GreetingVolume end)end end) -- (the engine ended it: undo the fade)
  voice.Sound=s
  -- Ask for the asset now so a bad id is found (and warned about once) before anyone waits for her to speak.
  if not voice.Checked then
@@ -84,28 +104,98 @@ local function voiceSound(e)
  end
  return s
 end
--- True while a greeting is playing (the Sound's Ended clears it; a copy that never ends is given up on after its length + .5 s, or 8 s).
+-- True while a greeting is playing (the Sound's Ended clears it; one that never ends is given up on half a second after its cut should have).
 local function speaking()return voice.Playing and os.clock()<voice.Until end
--- kind: 'talk' (her dialog opened) or 'near' (you came close). Returns true when she started speaking.
-local function greet(kind)
+-- Stop it now (restoring the volume the fade lowered).
+local function finishVoice()
+ local s=voice.Sound
+ if s and s.Parent then pcall(function()if s.IsPlaying then s:Stop()end;s.Volume=C.GreetingVolume end)end
+ voice.Playing=false;voice.Gain=1
+end
+-- Every frame while a greeting plays (audio, so never skipped for ReducedMotion or her distance): the fade-out, and the end.
+local function voiceTick()
+ local s=voice.Sound
+ if not s or not s.Parent then voice.Playing=false;return end
+ local now=os.clock();local age=now-voice.StartedAt;local position=s.TimePosition
+ if now>=voice.Until or(age>.15 and position>=voice.Stop-.004)or(age>.3 and not s.IsPlaying)then finishVoice();return end
+ local gain=VerityVoice.Fade(position,voice.Stop,C.GreetingFade)
+ if gain~=voice.Gain then voice.Gain=gain;s.Volume=C.GreetingVolume*gain end
+end
+-- The cut in force: the owner's live values on her model if both are there, else VerityConfig (made safe, and kept inside the clip once its length is known).
+local function regionNow(e,s,override)
+ local a,b
+ if override then a,b=override.Start,override.End end
+ if not(VerityVoice.Finite(a)and VerityVoice.Finite(b))then a,b=e.Model:GetAttribute('VerityVoiceStart'),e.Model:GetAttribute('VerityVoiceEnd')end
+ return VerityVoice.Region(C,a,b,s.TimeLength)
+end
+local function startVoice(e,s,kind,override)
+ local start,stop=regionNow(e,s,override)
+ local okRegion=pcall(function()s.PlaybackRegionsEnabled=true;s.PlaybackRegion=NumberRange.new(start,stop)end)
+ if not okRegion and not voice.RegionWarned then voice.RegionWarned=true;warn('[R149] Verity\'s greeting could not be cut with PlaybackRegion; a timer cuts it instead')end
+ local ok=pcall(function()s.Volume=C.GreetingVolume;s.TimePosition=start;s:Play()end)
+ if not ok then failVoice('Play failed');return false end
+ local now=os.clock()
+ voice.Playing=true;voice.Start=start;voice.Stop=stop;voice.StartedAt=now;voice.Until=now+(stop-start)+.5;voice.LastAt=now;voice.Plays+=1;voice.Kind=kind;voice.Gain=1
+ VerityVoice.Begin(voice.Lip,C.Lip)
+ return true
+end
+-- kind: 'talk' (her dialog opened), 'near' (you came close) or 'test' (the owner's /test verityvoice: override = {Start, End}, replays at once, flat).
+-- Returns true when she started speaking (false when it was skipped, or is waiting for the clip to load).
+local function greet(kind,override)
  local e=entry;if not e or not e.Body.Parent or voice.Failed then return false end
  if Mixer and Mixer.Get('Effects')==0 then return false end -- the player turned effects off: no voice, no swelling
- local now=os.clock()
- if speaking()then return false end -- never two copies at once
- local s=voiceSound(e);if not s or voice.Failed then return false end
- local ok=pcall(function()s.TimePosition=0;s:Play()end)
- if not ok then failVoice('Play failed');return false end
- voice.Playing=true;voice.Until=now+((s.TimeLength or 0)>0 and s.TimeLength+.5 or 8);voice.LastAt=now;voice.Plays+=1;voice.Kind=kind
- return true
+ if speaking()then
+  if not override then return false end -- never two copies at once (only the owner's test restarts it)
+  finishVoice()
+ end
+ local s=voiceSound(e,override~=nil);if not s or voice.Failed then return false end
+ if s.IsLoaded==false and not((s.TimeLength or 0)>0)then -- (an unloaded Sound has no length yet)
+  if voice.Waiting then return false end
+  local ticket={};voice.Waiting=ticket
+  local c;c=s.Loaded:Connect(function()
+   c:Disconnect()
+   if voice.Waiting~=ticket then return end
+   voice.Waiting=nil
+   if entry==e and e.Body.Parent and s.Parent and not speaking()and not voice.Failed then startVoice(e,s,kind,override)end
+  end)
+  connections[#connections+1]=c
+  task.delay(3,function()if voice.Waiting==ticket then voice.Waiting=nil;c:Disconnect()end end)
+  return false
+ end
+ return startVoice(e,s,kind,override)
 end
 -- Her body and the marker ---------------------------------------------------------------------------------------------------------
 local S=C.Sign
 local MARK_BASE=(S.Mark.Top+S.Mark.Height)/S.H     -- the glyph rests on the bottom of its row
 local MARK_BOUNCE=S.Mark.Bounce/S.H
 local function markAt(lift)return UDim2.fromScale(.5,MARK_BASE-lift)end
+-- Her open mouth (R149): a flat dark oval (a block Part with a Sphere SpecialMesh: three independent sizes) on the front of her ball, sized by
+-- the lip sync (VerityVoice.MouthPose). Made the first time she talks, in the world and in the window's portrait; only in the workspace / the
+-- viewport while it is open (no mouth: her smile picture is her closed mouth). Local to this client; never written when she is not talking.
+local function makeMouth(name)
+ local m=new('Part',{Name=name,Anchored=true,CanCollide=false,CanQuery=false,CanTouch=false,CastShadow=false,Massless=true,Color=C.Mouth.Color,
+  Material=Enum.Material.SmoothPlastic,Size=Vector3.new(1,1,1)})
+ new('SpecialMesh',{MeshType=Enum.MeshType.Sphere},m)
+ return m
+end
+local function hideMouth(e)
+ if not e.MouthShown then return end
+ e.MouthShown=false;if e.Mouth then e.Mouth.Parent=nil end
+end
+-- bodyCF: where her ball is this frame (the CFrame written to her Body); diameter: its size now (swelling included).
+local function showMouth(e,bodyCF,diameter,level)
+ local pose=VerityVoice.MouthPose(C,diameter,level)
+ if not pose then hideMouth(e);return end
+ local m=e.Mouth
+ if not m then m=makeMouth('VerityMouth');CS:AddTag(m,'GiantVisualPart');e.Mouth=m end -- (the camera right up against her fades it with her body)
+ m.Size=Vector3.new(pose.W,pose.H,pose.D);m.CFrame=bodyCF*CFrame.new(0,pose.Y,pose.Z)
+ if m.Parent~=e.Model then m.Parent=e.Model end
+ e.MouthShown=true
+end
 local function settle(e) -- back to how the server placed her (one write, only if she had been moved)
+ hideMouth(e)
  if not e.Moved then return end
- e.Moved=false;e.Yaw=e.Yaw0;e.Talk=0;e.Scale=1;e.LastY=nil;e.LastYaw=nil;e.LastScale=nil
+ e.Moved=false;e.Yaw=e.Yaw0;e.Scale=1;e.LastY=nil;e.LastYaw=nil;e.LastScale=nil
  e.Body.Size=Vector3.new(e.Size,e.Size,e.Size);e.Body.CFrame=e.Home
  if e.Mark.Parent then e.Mark.Position=markAt(0)end
 end
@@ -136,7 +226,7 @@ local function build(model,body)
  local timer=new('TextLabel',{Name='Timer',BackgroundTransparency=1,Position=UDim2.fromScale(0,S.Timer.Top/S.H),Size=UDim2.fromScale(1,S.Timer.Height/S.H),Font=Enum.Font.FredokaOne,TextScaled=true,
   Text='',TextColor3=C.EventColor,TextStrokeColor3=RGB(30,20,60),TextStrokeTransparency=.1},sign)
  local look=body.CFrame.LookVector;local yaw=math.atan2(-look.X,-look.Z)
- entry={Model=model,Body=body,Sign=sign,Mark=mark,Timer=timer,Home=body.CFrame,Base=body.Position,Size=body.Size.X,Yaw=yaw,Yaw0=yaw,Has=false,Moved=false,Talk=0,Scale=1,Poll=1,Near=nil}
+ entry={Model=model,Body=body,Sign=sign,Mark=mark,Timer=timer,Home=body.CFrame,Base=body.Position,Size=body.Size.X,Yaw=yaw,Yaw0=yaw,Has=false,Moved=false,Scale=1,Poll=1,Near=nil,Mouth=nil,MouthShown=false}
  refreshMarker()
 end
 local function attach(model)
@@ -152,7 +242,9 @@ local function detach(model)
   if entry.Body.Parent then settle(entry)end -- leave her as the server placed her (the next entry reads that as home)
   if entry.Mark then entry.Mark:Destroy()end
   if entry.Timer then entry.Timer:Destroy()end
+  if entry.Mouth then entry.Mouth:Destroy()end
   if voice.Sound then voice.Sound:Destroy();voice.Sound=nil;voice.Checked=false;voice.Playing=false end
+  voice.Waiting=nil;voice.Lip.Level=0
   entry=nil
  end
 end
@@ -162,29 +254,51 @@ do -- (the model may already be in the map without the tag having replicated yet
  local map=workspace:FindFirstChild('ChestChaseMap');local hub=map and map:FindFirstChild('EconomyHub');local model=hub and hub:FindFirstChild(C.ModelName)
  if model then attach(model)end
 end
--- Each frame: turn to the camera, bob, swell while she talks, bounce the "?"; four times a second, greet whoever came close.
+-- Each frame: turn to the camera, bob, swell and open her mouth while she talks (R149: with the loudness of her voice), bounce the "?"; four
+-- times a second, greet whoever came close.
 -- Her Body is a big collidable, queryable anchored ball, so it is only written to when it matters: not at all while the camera is
 -- beyond VerityConfig.AnimateDistance (she is set back to how the server placed her once, then left alone; her sign is not drawn
 -- that far either) and not on a frame where nothing about her pose changed. Coming back, she picks up again from the rest pose.
 local function playerRoot()
  local character=player.Character;return character and character:FindFirstChild('HumanoidRootPart')
 end
+-- The portrait in her window (built further down, only while the window is open); declared here because the frame loop drives it.
+local P={Model=nil}
+local portraitFrame
 watch(Run.RenderStepped,function(dt)
- local e=entry;if not e or not e.Body.Parent then return end
  dt=math.min(dt or 1/60,.1)
- -- Proximity greeting: only on coming within range (not while standing there), at most once a GreetingCooldown.
- e.Poll+=dt
- if e.Poll>=.25 then
-  e.Poll=0
-  local root=playerRoot()
-  if root then
-   local near=(root.Position-e.Base).Magnitude<=C.GreetingDistance
-   if near and e.Near~=true and os.clock()-voice.LastAt>=C.GreetingCooldown then greet('near')end
-   e.Near=near
+ if voice.Playing then voiceTick()end -- audio, not animation: the fade-out and the end are never skipped
+ local e=entry;local live=e~=nil and e.Body.Parent~=nil
+ local reduced=GuiService.ReducedMotionEnabled
+ local camera=workspace.CurrentCamera
+ if live then
+  -- Proximity greeting: only on coming within range (not while standing there), at most once a GreetingCooldown.
+  e.Poll+=dt
+  if e.Poll>=.25 then
+   e.Poll=0
+   local root=playerRoot()
+   if root then
+    local near=(root.Position-e.Base).Magnitude<=C.GreetingDistance
+    if near and e.Near~=true and os.clock()-voice.LastAt>=C.GreetingCooldown then greet('near')end
+    e.Near=near
+   end
   end
  end
- local camera=workspace.CurrentCamera
- if GuiService.ReducedMotionEnabled or(camera and(camera.CFrame.Position-e.Base).Magnitude>C.AnimateDistance)then settle(e);return end
+ local worldOn=live and not reduced and not(camera and(camera.CFrame.Position-e.Base).Magnitude>C.AnimateDistance)
+ local portraitOn=P.Model~=nil and not reduced
+ -- Lip sync (R149): her mouth level this frame, from the voice's loudness. Only while she talks (and the mouth is still closing after it) and
+ -- only if someone can see it: her body within AnimateDistance, or the window's portrait while it is open. Otherwise nothing is read or written.
+ local lip=voice.Lip
+ if worldOn or portraitOn then
+  local talking=speaking()
+  if talking or lip.Level>0 then
+   local sound=voice.Sound
+   VerityVoice.Step(lip,C.Lip,talking and sound and sound.PlaybackLoudness or 0,dt,talking)
+  end
+ elseif lip.Level>0 then lip.Level=0 end
+ if portraitOn or P.Model then portraitFrame(reduced)end
+ if not live then return end
+ if not worldOn then settle(e);return end
  local now=os.clock()
  if camera then
   local to=camera.CFrame.Position-e.Base;local flat=math.sqrt(to.X*to.X+to.Z*to.Z)
@@ -192,10 +306,9 @@ watch(Run.RenderStepped,function(dt)
    local target=math.atan2(-to.X,-to.Z);e.Yaw=e.Yaw+wrap(target-e.Yaw)*(1-math.exp(-8*dt))
   end
  end
- -- Swelling while the voice plays (smoothed in and out); she grows upward from the dais.
- local want=speaking()and 1 or 0
- e.Talk+=(want-e.Talk)*(1-math.exp(-10*dt));if want==0 and e.Talk<.002 then e.Talk=0 end
- local scale=1+C.TalkPulse*e.Talk*(.5+.5*math.sin(now*C.TalkPulseRate))
+ -- Swelling with the voice (the lip level: smoothed in and out); she grows upward from the dais.
+ local level=lip.Level
+ local scale=1+C.TalkPulse*level
  if scale~=e.Scale then e.Scale=scale;local d=e.Size*scale;e.Body.Size=Vector3.new(d,d,d);e.Moved=true end
  local lift=e.Size*(scale-1)/2
  local y=e.Base.Y+math.sin(now*1.4)*C.FootOffset+lift
@@ -203,6 +316,7 @@ watch(Run.RenderStepped,function(dt)
   e.LastY=y;e.LastYaw=e.Yaw;e.Moved=true
   e.Body.CFrame=CFrame.new(e.Base.X,y,e.Base.Z)*CFrame.Angles(0,e.Yaw,0)
  end
+ if level>0 or e.MouthShown then showMouth(e,CFrame.new(e.Base.X,y,e.Base.Z)*CFrame.Angles(0,e.Yaw,0),e.Size*scale,level)end
  if e.Has and e.Mark.Parent then e.Mark.Position=markAt(math.abs(math.sin(now*4.2))*MARK_BOUNCE)end
 end)
 -- Re-count the Void Tools whenever Tools come and go in the Backpack or the Character (and once a second, in case an
@@ -228,14 +342,55 @@ new('UISizeConstraint',{MaxSize=Vector2.new(660,450)},panel)
 local header=new('Frame',{Name='Header',Size=UDim2.new(1,0,0,56),BorderSizePixel=0},panel);Bright.Header(header)
 local title=text(header,'Title','🌟 VERITY',28);title.TextXAlignment=Enum.TextXAlignment.Left;title.Position=UDim2.fromOffset(18,2);title.Size=UDim2.new(1,-84,1,-4)
 local closeX=new('TextButton',{Name='Close',Text='X',Position=UDim2.new(1,-52,0,7),Size=UDim2.fromOffset(42,42),BorderSizePixel=0,TextSize=20},header);Bright.Button(closeX,RGB(255,61,85))
--- Verity herself: a big yellow ball with her smiley, standing on a little gold dais (a round frame with the picture on top).
+-- Verity herself (R149): her 3D model in a ViewportFrame (the same yellow ball and smiley as in the world), bobbing and talking with the same lip
+-- sync, standing on a little gold dais (a flat oval behind it). The model exists only while the window is open and the portrait is shown.
 local portrait=new('Frame',{Name='Portrait',BackgroundColor3=Theme.Colors.Inset,BorderSizePixel=0},panel);Theme.Corner(portrait,12);stroke(portrait,GOLD,2)
 local daisShadow=new('Frame',{Name='Dais',AnchorPoint=Vector2.new(.5,.5),BackgroundColor3=GOLD,BackgroundTransparency=.35,BorderSizePixel=0},portrait);Theme.Corner(daisShadow,40)
-local ball=new('Frame',{Name='Ball',AnchorPoint=Vector2.new(.5,.5),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0},portrait);new('UICorner',{CornerRadius=UDim.new(.5,0)},ball)
-Bright.Gradient(ball,RGB(255,255,170),RGB(255,232,0),55);ball.BackgroundColor3=Color3.new(1,1,1);stroke(ball,RGB(255,180,40),3)
-new('ImageLabel',{Name='Picture',BackgroundTransparency=1,AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromScale(.86,.86),Image=C.Image,ScaleType=Enum.ScaleType.Fit},ball)
+local view=new('ViewportFrame',{Name='Model',AnchorPoint=Vector2.new(.5,.5),BackgroundTransparency=1,BorderSizePixel=0,Ambient=RGB(195,195,185),LightColor=RGB(255,247,228),
+ LightDirection=Vector3.new(-.45,-.8,1)},portrait)
+local portraitCamera=new('Camera',{Name='PortraitCamera',FieldOfView=C.Portrait.Fov},view);view.CurrentCamera=portraitCamera
+-- The camera looks at the ball (centred on the origin, her face toward -Z) from straight in front; the viewport is square, so the ball fills
+-- C.Portrait.Fill of it at rest (room is left for the swell and the bob).
+do
+ local half=math.tan(math.rad(C.Portrait.Fov)/2)
+ local distance=C.Portrait.Size/2/(half*C.Portrait.Fill)
+ portraitCamera.CFrame=CFrame.lookAt(Vector3.new(0,0,-distance),Vector3.new(0,0,0))
+end
+local function buildPortrait()
+ if P.Model then return end
+ local D=C.Portrait.Size
+ local model=new('Model',{Name='VerityPortrait'},view)
+ local ball=new('Part',{Name='Body',Shape=Enum.PartType.Ball,Size=Vector3.new(D,D,D),CFrame=CFrame.new(0,0,0),Anchored=true,CanCollide=false,CanQuery=false,CanTouch=false,
+  CastShadow=false,Color=C.BodyColor,Material=Enum.Material.SmoothPlastic},model)
+ new('Decal',{Name='FaceFront',Face=Enum.NormalId.Front,Texture=C.Image,Color3=Color3.new(1,1,1)},ball)
+ P.Model,P.Body,P.Mouth,P.MouthShown,P.Scale,P.Still=model,ball,makeMouth('VerityPortraitMouth'),false,1,nil
+ portraitFrame(GuiService.ReducedMotionEnabled)
+end
+local function dropPortrait()
+ if not P.Model then return end
+ P.Model:Destroy();if P.Mouth then P.Mouth:Destroy()end
+ P.Model,P.Body,P.Mouth,P.MouthShown=nil,nil,nil,false
+end
+-- One frame of the portrait (only while it exists): the ball bobs, swells and opens its mouth with the lip level. still (ReducedMotion): the rest pose, once.
+portraitFrame=function(still)
+ local ball=P.Body;if not ball then return end
+ if still then
+  if P.Still then return end
+  P.Still=true
+ else P.Still=false end
+ local D=C.Portrait.Size;local level=still and 0 or voice.Lip.Level
+ local scale=1+C.TalkPulse*level
+ local cf=CFrame.new(0,still and 0 or math.sin(os.clock()*1.4)*C.Portrait.Bob*D,0)
+ if scale~=P.Scale then P.Scale=scale;ball.Size=Vector3.new(D*scale,D*scale,D*scale)end
+ ball.CFrame=cf
+ local pose=VerityVoice.MouthPose(C,D*scale,level)
+ if pose then
+  local m=P.Mouth;m.Size=Vector3.new(pose.W,pose.H,pose.D);m.CFrame=cf*CFrame.new(0,pose.Y,pose.Z)
+  if m.Parent~=P.Model then m.Parent=P.Model end
+  P.MouthShown=true
+ elseif P.MouthShown then P.MouthShown=false;P.Mouth.Parent=nil end
+end
 local quest=text(panel,'QuestText',C.Quest,20);quest.TextXAlignment=Enum.TextXAlignment.Left;quest.TextYAlignment=Enum.TextYAlignment.Center
-local eventTimer=text(panel,'EventTimer','',16,C.EventColor)
 local eventLine=text(panel,'EventLine','',16,VIOLET)
 local function chip(name,color)
  local f=new('Frame',{Name=name,BackgroundColor3=Theme.Colors.Card,BorderSizePixel=0},panel);Theme.Corner(f,10);stroke(f,color,2)
@@ -268,45 +423,54 @@ local closeButton=new('TextButton',{Name='CloseButton',Text='',BorderSizePixel=0
 local closeCaption=text(closeButton,'Caption','CLOSE',20);closeCaption.Size=UDim2.new(1,-8,1,0);closeCaption.Position=UDim2.fromOffset(4,0);closeCaption.ZIndex=12
 local function tint(button,color)Bright.Gradient(button,color:Lerp(Color3.new(1,1,1),.24),color:Lerp(Color3.new(),.12),90)end
 -- Layout (pixels from the panel's real size, so phones and computers both fit) ---------------------------------------------------
+-- Every label is sized through GardenTextFit (fit): it picks the largest font up to `size` whose wrapped text fits the label's box, and only then
+-- shortens it. (Before R149 layout() wrote TextSize itself after the fitter had chosen one, so on the second layout the quest sentence kept the
+-- full-size font in a box it no longer fitted and the engine cut it off with "...".)
+local function fit(label,size,minimum)Fit.Attach(label,size,minimum or 8)end
 local function layout()
  local size=panel.AbsoluteSize;local W,H=size.X,size.Y;if W<=0 or H<=0 then return end
  local short=H<380
- local headH=short and 46 or 56;header.Size=UDim2.new(1,0,0,headH);title.TextSize=short and 22 or 28
+ local headH=short and 46 or 56;header.Size=UDim2.new(1,0,0,headH);fit(title,short and 22 or 28)
  closeX.Position=UDim2.new(1,-(headH-6)-6,0,3);closeX.Size=UDim2.fromOffset(headH-6,headH-6)
  local pad=12;local top=headH+pad;local bodyH=H-top-pad
  local showPortrait=W>=560 and H>=330
  local pw=showPortrait and math.min(bodyH,math.floor(W*.34))or 0
  portrait.Visible=showPortrait;portrait.Position=UDim2.fromOffset(pad,top);portrait.Size=UDim2.fromOffset(pw,bodyH)
- local ballSize=math.max(0,pw-24);ball.Size=UDim2.fromOffset(ballSize,ballSize);ball.Position=UDim2.new(.5,0,.5,-math.floor(ballSize*.04))
+ local side=math.max(0,pw-16);local ballSize=math.floor(side*C.Portrait.Fill)
+ view.Size=UDim2.fromOffset(side,side);view.Position=UDim2.new(.5,0,.5,-math.floor(ballSize*.04))
  daisShadow.Size=UDim2.fromOffset(math.floor(ballSize*.8),math.max(8,math.floor(ballSize*.12)));daisShadow.Position=UDim2.new(.5,0,.5,math.floor(ballSize*.5))
+ if panel.Visible and showPortrait then buildPortrait()else dropPortrait()end
  local cx=pad+(showPortrait and pw+pad or 0);local cw=W-cx-pad
  local gap=short and 6 or 10
- local eventH=short and 17 or 24;local timerH=short and 17 or 24;local chipH=short and 32 or 54;local exH=short and 44 or 66;local statusH=short and 17 or 24;local buttonH=short and 36 or 52
- local questH=math.max(short and 30 or 40,bodyH-(eventH+timerH+chipH+exH+statusH+buttonH)-gap*6)
+ local eventH=short and 17 or 24;local chipH=short and 32 or 54;local exH=short and 44 or 66;local statusH=short and 17 or 24;local buttonH=short and 36 or 52
+ -- No empty row: when The Darkened's line has nothing to say its room goes to the quest sentence.
+ local eventRow=eventLine.Visible and eventH+gap or 0
+ local questH=math.max(short and 30 or 40,bodyH-(eventRow+chipH+exH+statusH+buttonH)-gap*4)
  local y=top
- quest.Position=UDim2.fromOffset(cx,y);quest.Size=UDim2.fromOffset(cw,questH);quest.TextSize=short and 15 or 20;y+=questH+gap
- eventTimer.Position=UDim2.fromOffset(cx,y);eventTimer.Size=UDim2.fromOffset(cw,timerH);eventTimer.TextSize=short and 13 or 16;y+=timerH+gap
- eventLine.Position=UDim2.fromOffset(cx,y);eventLine.Size=UDim2.fromOffset(cw,eventH);eventLine.TextSize=short and 12 or 16;y+=eventH+gap
+ quest.Position=UDim2.fromOffset(cx,y);quest.Size=UDim2.fromOffset(cw,questH);fit(quest,short and 15 or cw<380 and 18 or 20,11);y+=questH+gap
+ if eventLine.Visible then
+  eventLine.Position=UDim2.fromOffset(cx,y);eventLine.Size=UDim2.fromOffset(cw,eventH);fit(eventLine,short and 12 or 16);y+=eventH+gap
+ end
  local chipW=math.floor((cw-gap)/2)
  for i,spec in ipairs({{voidChip,voidCaption,voidCount},{doneChip,doneCaption,doneCount}})do
   spec[1].Position=UDim2.fromOffset(cx+(i-1)*(chipW+gap),y);spec[1].Size=UDim2.fromOffset(chipW,chipH)
-  spec[2].Position=UDim2.fromOffset(4,2);spec[2].Size=UDim2.new(1,-8,0,math.floor(chipH*.38));spec[2].TextSize=short and 10 or 12
-  spec[3].Position=UDim2.fromOffset(4,math.floor(chipH*.4));spec[3].Size=UDim2.new(1,-8,0,math.floor(chipH*.58));spec[3].TextSize=short and 16 or 24
+  spec[2].Position=UDim2.fromOffset(4,2);spec[2].Size=UDim2.new(1,-8,0,math.floor(chipH*.38));fit(spec[2],short and 10 or 12)
+  spec[3].Position=UDim2.fromOffset(4,math.floor(chipH*.4));spec[3].Size=UDim2.new(1,-8,0,math.floor(chipH*.58));fit(spec[3],short and 16 or 24)
  end
  y+=chipH+gap
  -- The exchange row: two square pack pictures with an arrow between, then the rule in words.
  exchange.Position=UDim2.fromOffset(cx,y);exchange.Size=UDim2.fromOffset(cw,exH)
  local arrowW=math.max(28,math.floor(exH*.5));local pic=math.min(exH,math.floor((cw-arrowW-12-90)/2))
  voidHolder.Position=UDim2.fromOffset(0,math.floor((exH-pic)/2));voidHolder.Size=UDim2.fromOffset(pic,pic)
- arrow.Position=UDim2.fromOffset(pic+4,0);arrow.Size=UDim2.fromOffset(arrowW,exH);arrow.TextSize=short and 22 or 30
+ arrow.Position=UDim2.fromOffset(pic+4,0);arrow.Size=UDim2.fromOffset(arrowW,exH);fit(arrow,short and 22 or 30)
  verityHolder.Position=UDim2.fromOffset(pic+arrowW+8,math.floor((exH-pic)/2));verityHolder.Size=UDim2.fromOffset(pic,pic)
  local rx=pic*2+arrowW+8+10
- rewardLine.Position=UDim2.fromOffset(rx,0);rewardLine.Size=UDim2.fromOffset(math.max(10,cw-rx),exH);rewardLine.TextSize=short and 13 or 16
+ rewardLine.Position=UDim2.fromOffset(rx,0);rewardLine.Size=UDim2.fromOffset(math.max(10,cw-rx),exH);fit(rewardLine,short and 13 or 16)
  y+=exH+gap
- status.Position=UDim2.fromOffset(cx,y);status.Size=UDim2.fromOffset(cw,statusH);status.TextSize=short and 13 or 16;y+=statusH+gap
+ status.Position=UDim2.fromOffset(cx,y);status.Size=UDim2.fromOffset(cw,statusH);fit(status,short and 13 or 16);y+=statusH+gap
  local giveW=math.floor((cw-gap)*.62)
- give.Position=UDim2.fromOffset(cx,y);give.Size=UDim2.fromOffset(giveW,buttonH);giveCaption.TextSize=short and 16 or 22
- closeButton.Position=UDim2.fromOffset(cx+giveW+gap,y);closeButton.Size=UDim2.fromOffset(cw-giveW-gap,buttonH);closeCaption.TextSize=short and 15 or 20
+ give.Position=UDim2.fromOffset(cx,y);give.Size=UDim2.fromOffset(giveW,buttonH);fit(giveCaption,short and 16 or 22)
+ closeButton.Position=UDim2.fromOffset(cx+giveW+gap,y);closeButton.Size=UDim2.fromOffset(cw-giveW-gap,buttonH);fit(closeCaption,short and 15 or 20)
 end
 watch(panel:GetPropertyChangedSignal('AbsoluteSize'),layout)
 -- State ------------------------------------------------------------------------------------------------------------------------
@@ -327,7 +491,7 @@ local function render()
  if pulse then pulse:Cancel();pulse=nil end;give.Pulse.Scale=1
  voidCount.Text=state.Known and tostring(state.VoidPacks)or'-';doneCount.Text=state.Known and tostring(state.Delivered)or'-'
  rewardLine.Text=state.RewardText or C.RewardText
- local timerText,live=eventTimerText();eventTimer.Text=timerText;eventTimer.TextColor3=live and C.EventColor or RED;state.Live=live
+ local live=eventLive();state.Live=live -- (R149: no "EVENT ENDS IN ..." line here; after the end the GIVE button says EVENT ENDED)
  local line,color=eventText();eventLine.Text=line;eventLine.TextColor3=color;eventLine.Visible=line~=''
  local can=state.Known and state.VoidPacks>0 and not busy and live
  give.Active=can;give.Interactable=can;give.AutoButtonColor=can;give:SetAttribute('Enabled',can)
@@ -355,16 +519,21 @@ local function open()
  if not ticking then ticking=true
   local function tick()
    if not panel.Visible or not gui.Parent then ticking=false;return end
+   local was=eventLine.Visible
    local line,color=eventText();eventLine.Text=line;eventLine.TextColor3=color;eventLine.Visible=line~=''
-   local timerText,live=eventTimerText();eventTimer.Text=timerText;eventTimer.TextColor3=live and C.EventColor or RED
-   if live~=state.Live then render()end -- the event ended while the window was open
+   if eventLive()~=state.Live then render() -- the event ended while the window was open
+   elseif eventLine.Visible~=was then layout()end -- (its row appears / goes: the quest sentence gives it room)
    task.delay(1,tick)
   end
   task.delay(1,tick)
  end
 end
-local function close()
+local function hidePanel()
  panel.Visible=false;shade.Visible=false;if pulse then pulse:Cancel();pulse=nil end
+ dropPortrait() -- (her 3D model lives only while the window is open)
+end
+local function close()
+ hidePanel()
  if pg:GetAttribute('SeedMenu')=='Verity'then pg:SetAttribute('SeedMenu',nil)end
 end
 local function onServer(kind,payload)
@@ -378,6 +547,11 @@ local function onServer(kind,payload)
   talked=true;refreshMarker() -- she has been talked to: the "!" is gone for the rest of this session
   open()
   greet('talk')
+ elseif kind=='Greet'then
+  -- The owner's /test verityvoice: play her cut now (the numbers come with the message; a bad pair falls back to her model's / the config's).
+  local a,b=payload.Start,payload.End
+  if not(VerityVoice.Finite(a)and VerityVoice.Finite(b))then a,b=nil,nil end
+  greet('test',{Start=a,End=b})
  elseif kind=='Done'then
   setBusy(false)
   state.Delivered=number(payload.Delivered)or state.Delivered+1;state.VoidPacks=math.max(0,state.VoidPacks-1)
@@ -401,18 +575,21 @@ task.spawn(function()
 end)
 closeX.Activated:Connect(close);closeButton.Activated:Connect(close);shade.Activated:Connect(close)
 watch(pg:GetAttributeChangedSignal('SeedMenu'),function()
- if panel.Visible and pg:GetAttribute('SeedMenu')~='Verity'then panel.Visible=false;shade.Visible=false;if pulse then pulse:Cancel();pulse=nil end end
+ if panel.Visible and pg:GetAttribute('SeedMenu')~='Verity'then hidePanel()end
 end)
 render()
 gui.Destroying:Connect(function()
  alive=false;if pulse then pulse:Cancel()end
  for _,c in ipairs(connections)do c:Disconnect()end
+ dropPortrait()
  if Pictures then pcall(Pictures.Clear,voidHolder);pcall(Pictures.Clear,verityHolder)end
  if entry then
   if entry.Mark then entry.Mark:Destroy()end
   if entry.Timer then entry.Timer:Destroy()end
   if entry.Body.Parent then settle(entry)end -- leave her as the server placed her
+  if entry.Mouth then entry.Mouth:Destroy()end
   if voice.Sound then voice.Sound:Destroy();voice.Sound=nil end
+  voice.Playing=false;voice.Waiting=nil;voice.Lip.Level=0
   entry=nil
  end
 end)
