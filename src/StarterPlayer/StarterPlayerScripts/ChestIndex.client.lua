@@ -233,7 +233,7 @@ local function makeCard(entry,index)
  if reward>0 then
   local claimPill=pill(card,'ClaimPill',UDim2.new(0,7,1,-29),UDim2.new(1,-14,0,23),Color3.new(1,1,1),0,Color3.fromRGB(110,64,6))
   Bright.Gradient(claimPill,Color3.fromRGB(255,232,112),Color3.fromRGB(242,164,34),90)
-  caption=text(claimPill,'Reward','CLAIM $'..Cash.Compact(reward),UDim2.fromScale(0,0),UDim2.fromScale(1,1),14,Color3.fromRGB(70,38,6));caption.TextStrokeTransparency=1
+  caption=text(claimPill,'Reward','CLAIM $'..require(RS.OddsText85).Whole(reward),UDim2.fromScale(0,0),UDim2.fromScale(1,1),14,Color3.fromRGB(70,38,6));caption.TextStrokeTransparency=1
  else
   caption=text(card,'Reward',adultKnown and'★ COMPLETE'or'',UDim2.new(0,5,1,-28),UDim2.new(1,-10,0,22),13,Theme.Colors.Mint)
  end

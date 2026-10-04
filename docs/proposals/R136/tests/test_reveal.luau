@@ -57,12 +57,12 @@ check(myth.Style.Color~=leg.Style.Color,'Legendary gold, Mythic pink-violet')
 leg:Destroy();check(leg.Folder.Parent==nil,'destroyed with the reveal')
 -- 3. Odds read 1/N ------------------------------------------------------------------------------------------------
 local O=W.module('OddsText85')
-local cases={{1755016/5475495*100,'1/3.1'},{23/600*100,'1/26'},{100/30,'1/30'},{.01,'1/10000'},{100,'1/1'},{50,'1/2'},{12,'1/8.3'},{5.98e-8,'1/1.67B'},{0,'—'}}
+local cases={{1755016/5475495*100,'1/3'},{23/600*100,'1/26'},{100/30,'1/30'},{.01,'1/10K'},{100/1250,'1/1,250'},{100/240000,'1/240K'},{100,'1/1'},{50,'1/2'},{12,'1/8'},{100/6.3,'1/6'},{100/6.7,'1/7'},{5.98e-8,'1/1,670M'},{100/16.7e9,'1/17B'},{100/1.25e6,'1/1,250K'},{100/2.4e6,'1/2,400K'},{0,'—'}} -- R148: whole numbers only
 local wrong={}
 for _,c in ipairs(cases)do local got=O.Format(c[1]);if got~=c[2]then wrong[#wrong+1]=('%s gave %s (want %s)'):format(tostring(c[1]),got,c[2])end end
 check(#wrong==0,'odds read 1/N: '..table.concat(wrong,'; '))
 local fractions=0
-for i=1,2000 do local p=100/(1+i*3.37);local got=O.Format(p);if not got:match('^1/[%d%.]+[KMBTQa]*$')then fractions+=1 end end
+for i=1,2000 do local p=100/(1+i*3.37);local got=O.Format(p);if not got:match('^1/[%d,]+[KMBTQa]*$')then fractions+=1 end end -- R148: no decimal point
 check(fractions==0,'2000 chances all read 1/N ('..fractions..' do not)')
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end
