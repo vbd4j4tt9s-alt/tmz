@@ -7,6 +7,10 @@
 -- treadmill, for the pedestal's clearance), the owner command `mystery`, and the keeper tagging (ChaseService
 -- _preparePersistentGuardian, VeiledEvent81 EnsureGuardian, KeeperPursuit.EscapeSpeed). DataStores are in memory;
 -- BaseService / ChestService are stand-ins (GetPlayerBase / SyncTools); mock time = os.time (R.clock).
+-- Review fixes (section 15 and the checks marked [streaming] / [prompt] / [drift]): the pedestal is a Persistent model and
+-- its Take prompt is Enabled only while the pack is Ready; a pack that does not fit in a full Bag at midnight is owed
+-- (saved, at most 3, granted once when there is room) while today's 15 minutes run; UnlockAt is republished when the
+-- countdown drifts after a server hitch.
 local W=require('./world');local F=require('./fixtures');local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -74,6 +78,27 @@ check(badVariant and M.Read({Stage=7,Variant='EclipseReliquary'}).Variant=='Ecli
 check(M.Read({Claimed=true}).Claimed==false and M.Read({Stage=2,Variant='Pack02',Claimed='yes'}).Claimed==false and M.Read({Stage=2,Variant='Pack02',Claimed=true}).Claimed==true,'"taken" only counts for a pack that was unlocked (has a stage) and only for true')
 check(not M.Unlocked({Seconds=900})and M.Unlocked({Seconds=900,Stage=1,Variant='Pack02'})and not M.Unlocked({Seconds=899,Stage=1,Variant='Pack02'}),'unlocked = 900 s and a rolled pack')
 check(M.Left({Seconds=0})==900 and M.Left({Seconds=898.5})==1.5 and M.Left({Seconds=900})==0,'time left')
+-- Owed packs (a full Bag at midnight): sanitized like the rest, never paying out anything odd.
+check(M.MaxOwed==3 and M.DriftSeconds==2,'at most 3 owed packs; UnlockAt drift tolerance 2 s')
+check(type(fresh.Owed)=='table'and #fresh.Owed==0 and#M.Read({Day=5,Seconds=900,Stage=2,Variant='Pack05',Claimed=false}).Owed==0,'a save from before Owed existed reads with an empty owed list (everything else as before)')
+do
+ local old=M.Read({Day=19999,Seconds=900,Stage=2,Variant='Pack05',Claimed=false})
+ check(old.Day==19999 and old.Seconds==900 and old.Stage==2 and old.Variant=='Pack05'and old.Claimed==false and M.Unlocked(old),'(and an old unlocked, untaken pack is still read as one)')
+ local o=M.Read({Day=20001,Seconds=3,Owed={{Day=20000,Stage=3,Variant='Pack04'},{Day=19999,Stage=7,Variant='EclipseReliquary',Extra=1}}})
+ check(#o.Owed==2 and o.Owed[1].Day==20000 and o.Owed[1].Stage==3 and o.Owed[1].Variant=='Pack04'and o.Owed[2].Variant=='EclipseReliquary'and o.Owed[2].Extra==nil,'a good owed list is kept in order, as copies with only Day / Stage / Variant')
+ local src={Owed={{Day=1,Stage=2,Variant='Pack02'}}};local c=M.Read(src);check(c.Owed~=src.Owed and c.Owed[1]~=src.Owed[1],'(copies, not the saved tables)')
+ local five={Owed={}};for i=1,5 do five.Owed[i]={Day=100+i,Stage=2,Variant='Pack03'}end
+ local f=M.Read(five);check(#f.Owed==3 and f.Owed[1].Day==101 and f.Owed[2].Day==102 and f.Owed[3].Day==103,'more than 3: the 3 oldest are kept')
+ local big={Owed={}};for i=1,5000 do big.Owed[i]={Day=i,Stage=1,Variant='Pack02'}end
+ check(#M.Read(big).Owed==3,'a huge list is cut to 3 without walking it all')
+ local junk={Owed={'x',5,true,{},{Day='a',Stage=2,Variant='Pack02'},{Day=3,Stage=0,Variant='Pack02'},{Day=3,Stage=8,Variant='Pack02'},{Day=3,Stage=1.5,Variant='Pack02'},{Day=3,Stage=2,Variant='Pack01'},{Day=3,Stage=2,Variant='Mech'},{Day=3,Stage=2,Variant=5},{Day=1.5,Stage=2,Variant='Pack02'},{Day=0/0,Stage=2,Variant='Pack02'},{Day=2e9,Stage=2,Variant='Pack02'},{Day=-2,Stage=2,Variant='Pack02'}}}
+ check(#M.Read(junk).Owed==0,'odd entries (not tables, bad day / stage / variant, Common) are dropped: they never pay out')
+ local mixed=M.Read({Owed={{Day=1,Stage=2,Variant='Pack02'},'x',{Day=2,Stage=99,Variant='Pack02'},{Day=3,Stage=4,Variant='Pack05'}}})
+ check(#mixed.Owed==2 and mixed.Owed[1].Day==1 and mixed.Owed[2].Day==3,'good entries around bad ones are kept')
+ local dup=M.Read({Owed={{Day=7,Stage=2,Variant='Pack02'},{Day=7,Stage=3,Variant='Pack03'},{Day=8,Stage=3,Variant='Pack03'}}})
+ check(#dup.Owed==2 and dup.Owed[1].Stage==2 and dup.Owed[2].Day==8,'one owed pack per day (a second entry for the same day is dropped)')
+ for _,bad in ipairs({'x',5,true,{Owed='x'},{Owed=5},{Owed=true}})do check(#M.Read(type(bad)=='table'and bad or{Owed=bad}).Owed==0,'a non-list Owed ('..tostring(type(bad))..') reads as empty')end
+end
 -- Rolls.
 local draws=0;local function fixed(u)return function()draws+=1;return u end end
 local bins={{.0,'Pack02'},{.449,'Pack02'},{.451,'Pack03'},{.749,'Pack03'},{.751,'Pack04'},{.919,'Pack04'},{.921,'Pack05'},{.979,'Pack05'},{.981,'Pack06'},{.998,'Pack06'},{.9991,'EclipseReliquary'},{1,'EclipseReliquary'}}
@@ -133,6 +158,9 @@ check(attr(rec1,'State')=='Empty'and attr(rec1,'OwnerUserId')==nil and attr(rec1
 check(pack(rec1)==nil and ped(rec1):FindFirstChild('MysteryPack')==nil,'no pack on an empty pedestal')
 local pr=prompt(rec1)
 check(pr.Name=='TakeMysteryPack'and pr.ActionText=='Take'and pr.ObjectText=='Mystery Pack'and pr.HoldDuration==.5 and pr.MaxActivationDistance==12 and pr.Parent==S.Pedestals[rec1].Anchor,'the ProximityPrompt "TakeMysteryPack" (hold 0.5 s, 12 studs) sits on the pack anchor')
+check(ped(rec1).ModelStreamingMode==R.Enum.ModelStreamingMode.Persistent and ped(rec2).ModelStreamingMode==R.Enum.ModelStreamingMode.Persistent,'[streaming] each pedestal Model is Persistent (it never streams out, so clients never hold stale or late copies)')
+check(ped(rec1).ModelStreamingMode~=R.Enum.ModelStreamingMode.Default and ped(rec1).ModelStreamingMode~=R.Enum.ModelStreamingMode.Atomic,'[streaming] (not Default, not Atomic)')
+check(pr.Enabled==false and prompt(rec2).Enabled==false,'[prompt] built Enabled=false: nobody sees a Take prompt on an empty pedestal')
 -- The real treadmill, to measure the empty corner.
 local okT,errT=pcall(function()return server('BiomeVisuals').BuildTreadmillV131(rec1.Model,1)end)
 check(okT,'the real treadmill builds on the mock pad: '..tostring(errT))
@@ -172,6 +200,7 @@ local count=0;for _,c in ipairs(rec1.Model:GetChildren())do if c.Name=='MysteryP
 check(count==1,'rebuilding replaces the pedestal (never two)')
 local before=S.Pedestals[rec2].Model;before:Destroy()
 check(S:Pedestal(rec2)~=nil and ped(rec2)~=before and ped(rec2).Parent==rec2.Model,'a destroyed pedestal is rebuilt')
+check(ped(rec2).ModelStreamingMode==R.Enum.ModelStreamingMode.Persistent and prompt(rec2).Enabled==false and W.CS:HasTag(ped(rec2),'MysteryPedestal'),'[streaming] [prompt] and the rebuilt one is Persistent, tagged, prompt off')
 -- No owner: Step / Publish / Claim do nothing and do not fail.
 check(select(2,pcall(function()S:Step(1);S:Step(1)end))==nil and attr(rec1,'State')=='Empty','Step with nobody home does nothing')
 
@@ -198,6 +227,7 @@ S:Setup(A)
 check(attr(rec1,'State')=='Locked'and attr(rec1,'OwnerUserId')==701 and attr(rec1,'OwnerName')=='Ava D','joining: State Locked, OwnerUserId and the display name')
 check(attr(rec1,'UnlockAt')==t0+900 and attr(rec1,'NextAt')==(DAY0+1)*86400 and attr(rec1,'Stage')==1,('UnlockAt = now + 15 min (%s), NextAt = the next UTC midnight, Stage = the Forest treadmill'):format(tostring(attr(rec1,'UnlockAt'))))
 check(attr(rec1,'Variant')==nil,'the variant is not published while locked (the rarity stays secret)')
+check(prompt(rec1).Enabled==false,'[prompt] Locked: the server keeps the Take prompt off, for everyone')
 check(S.Owner[A]==rec1 and attr(rec2,'State')=='Empty','only the joined player\'s pedestal woke up')
 local st=Data:GetPremium(A).Mystery
 check(st and st.Day==DAY0 and st.Seconds==0 and st.Claimed==false and st.Stage==nil,'saved state: today, 0 s, nothing rolled yet')
@@ -253,6 +283,7 @@ local stageA=attr(rec1,'Stage');local variantA=attr(rec1,'Variant')
 check(stageA==Config.TreadmillTiers[Data:GetTreadmillData(A).Tier].Stage and stageA==1,'the pack is the best treadmill\'s biome (Forest)')
 check(variantA=='Pack03'and variantA~='Pack01'and table.find(M.Order,variantA)~=nil,'its rarity is one of the six, rolled at that moment (Pack03 for the 0.5 draw)')
 check(attr(rec1,'UnlockAt')==nil and attr(rec1,'OwnerUserId')==701,'UnlockAt is cleared once ready')
+check(prompt(rec1).Enabled==true and prompt(rec2).Enabled==false,'[prompt] Ready: the server turns Ava\'s Take prompt on (Ben\'s locked one stays off)')
 local stA=Data:GetPremium(A).Mystery
 check(stA.Seconds==900 and stA.Stage==stageA and stA.Variant==variantA and stA.Claimed==false and M.Unlocked(stA),'the saved state holds the rolled pack, not taken yet')
 local noteA=notes(A,noteFrom)
@@ -289,6 +320,7 @@ check(rec and rec.SeedScale==Rules.NewSeedScale(rec.Stage,rec.BagVariant,rec.Pac
 check(syncs(A)==syncBefore+1,'ChestService:SyncTools ran once (the hotbar shows the pack)')
 check(attr(rec1,'State')=='Claimed'and attr(rec1,'Variant')==variantA and attr(rec1,'UnlockAt')==nil,'the pedestal says Claimed (variant kept, no UnlockAt)')
 check(pack(rec1)==nil,'and the pack is gone from the pedestal')
+check(prompt(rec1).Enabled==false,'[prompt] Claimed: the prompt is off again')
 check(Data:GetPremium(A).Mystery.Claimed==true,'saved as taken')
 local note,noteRow=lastNote(A)
 check(note and note:find('MYSTERY PACK',1,true)and note:find('Rare',1,true)and note:find('Forest',1,true),'the notice names the rarity and biome: '..tostring(note))
@@ -305,8 +337,10 @@ Data.AddChest=nil
 local save=Data:_buildSaveData(A)
 local ms=save.Premium and save.Premium.Mystery
 check(type(ms)=='table'and ms.Day==DAY0 and ms.Seconds==900 and ms.Stage==stageA and ms.Variant==variantA and ms.Claimed==true,'the save row has Premium.Mystery {Day, Seconds, Stage, Variant, Claimed}')
-local plain=true;for k,v in pairs(ms or{})do local t=type(v);if not(t=='number'or t=='string'or t=='boolean')then plain=false end end
-check(plain,'only plain values (DataStore safe)')
+local plain=true;for k,v in pairs(ms or{})do local t=type(v);if k=='Owed'then
+  if t~='table'then plain=false else for _,e in ipairs(v)do for _,x in pairs(e)do local xt=type(x);if not(xt=='number'or xt=='string')then plain=false end end end end
+ elseif not(t=='number'or t=='string'or t=='boolean')then plain=false end end
+check(plain and ms.Owed~=nil and#ms.Owed==0,'only plain values (DataStore safe; Owed is a list of {Day, Stage, Variant}, empty here)')
 local P=server('PremiumProgress');local decoded=P.Decode(save.Premium)
 check(decoded and decoded.Mystery and decoded.Mystery.Day==DAY0 and decoded.Mystery.Claimed==true and decoded.Mystery.Variant==variantA,'Premium.Decode keeps it')
 local back=M.Read(decoded and decoded.Mystery)
@@ -354,11 +388,13 @@ S.Random={NextNumber=function()return .9995 end}
 play(900-benSeconds-1)
 check(attr(rec2,'State')=='Ready'and attr(rec2,'Variant')=='EclipseReliquary'and attr(rec2,'Stage')==7,'a 0.1% roll is the Void pack, forced to stage 7 though the treadmill is Lava')
 check(pack(rec2):GetAttribute('BagVariant')=='EclipseReliquary'and pack(rec2):GetAttribute('Stage')==7,'and the pack on the pedestal is the Void pack')
+check(prompt(rec2).Enabled==true and prompt(rec1).Enabled==false,'[prompt] Ben\'s pedestal is Ready: his prompt is on (Ava\'s taken one is off)')
 local vBag=bag(B2);local bigB=Data:GetPackLuck(B2).Big
 R.advance(1);prompt(rec2).Triggered:Fire(B2)
 local vrec=Data:GetChestRecords(B2)[bag(B2)]
 check(bag(B2)==vBag+1 and vrec.Stage==7 and vrec.BagVariant=='EclipseReliquary'and vrec.OddsVersion==Rules.OddsVersion,'Ben takes a Void pack (stage 7)')
 check(Data:GetPackLuck(B2).Big==bigB and attr(rec2,'State')=='Claimed','a Void pack does not move the size pity (it never counts)')
+check(prompt(rec2).Enabled==false,'[prompt] and off once he took it')
 -- Rejoin after taking it: still taken, no second pack.
 local A2,savedA=rejoin(A,rec1);local bagA=bag(A2)
 check(savedA==true and bag(A2)==packsA+1,'Ava leaves and comes back: her profile has the Bag pack ('..bag(A2)..' packs)')
@@ -373,6 +409,7 @@ local st8=Data:GetPremium(A2).Mystery
 check(st8.Day==DAY0+1 and today()==DAY0+1 and st8.Claimed==false and st8.Stage==nil and st8.Seconds==1,'saved: the new day, not taken, nothing rolled, the clock restarted (1 s)')
 check(bag(A2)==bagA,'a pack that was taken yesterday gives nothing again')
 check(pack(rec1)~=nil and pack(rec1):GetAttribute('BagVariant')=='Pack01','a silhouette is back on the pedestal')
+check(prompt(rec1).Enabled==false,'[prompt] the new day\'s locked pack: prompt off')
 S.Random={NextNumber=function()return .1 end}
 play(899)
 check(attr(rec1,'State')=='Ready'and attr(rec1,'Variant')=='Pack02','a new day, a new pack after 900 s (Pack02 for the 0.1 draw)')
@@ -408,19 +445,27 @@ local fn=notes(A3,noteF)
 check(#fn==1 and fn[1]:find('FULL',1,true),'and the player is told why: '..tostring(fn[1]))
 Config.MaxSavedChests=cap;R.advance(1);local took=S:Claim(A3,rec1)
 check(took==true and bag(A3)==fullBag+1 and attr(rec1,'State')=='Claimed','after making room the same pack can be taken')
--- ...and across midnight.
+-- ...and across midnight: it is owed (kept), today's pack starts as normal.
 nextDay();S.Random={NextNumber=function()return .5 end};play(899)
 local fullStage,fullVariant=attr(rec1,'Stage'),attr(rec1,'Variant')
 check(attr(rec1,'State')=='Ready'and fullVariant=='Pack03','(a new day, Ready again)')
+check(prompt(rec1).Enabled==true,'[prompt] (Ready: the prompt is on)')
 Config.MaxSavedChests=bag(A3);local bagBefore=bag(A3);noteF=#shown+1;syncF=syncs(A3)
-nextDay();for _=1,5 do S:Step(1)end
-check(bag(A3)==bagBefore and attr(rec1,'State')=='Ready'and attr(rec1,'Variant')==fullVariant and attr(rec1,'Stage')==fullStage,'next day with a full Bag: nothing is lost and it stays Ready (the old pack, not replaced)')
-local stale=Data:GetPremium(A3).Mystery
-check(stale.Day==today()-1 and stale.Claimed==false and M.Unlocked(stale)and #notes(A3,noteF)==0 and syncs(A3)==syncF,'its saved state is still yesterday\'s unlocked pack, and the retries make no noise')
+nextDay();play(5)
+local owedNow=Data:GetPremium(A3).Mystery
+check(bag(A3)==bagBefore and attr(rec1,'State')=='Locked'and attr(rec1,'Variant')==nil and owedNow.Day==today()and owedNow.Claimed==false and owedNow.Stage==nil,'next day with a full Bag: nothing is lost or added, and today\'s pack starts fresh (Locked, nothing rolled)')
+check(#owedNow.Owed==1 and owedNow.Owed[1].Day==today()-1 and owedNow.Owed[1].Variant==fullVariant and owedNow.Owed[1].Stage==fullStage,'yesterday\'s unlocked pack is on the saved owed list (the very pack: '..tostring(fullVariant)..', stage '..tostring(fullStage)..')')
+check(owedNow.Seconds==6 and near(attr(rec1,'UnlockAt')-W.workspace:GetServerTimeNow(),894,1.01),'today\'s 15 minutes run: '..tostring(owedNow.Seconds)..' s counted, 894 s to go on the countdown')
+local fn2=notes(A3,noteF)
+check(#fn2==1 and fn2[1]:find('Make room',1,true)and fn2[1]:find('1 mystery pack waiting',1,true)and syncs(A3)==syncF,'the player is told once: '..tostring(fn2[1])..' (and the retries make no more noise)')
+check(prompt(rec1).Enabled==false,'[prompt] (locked again: off)')
 Config.MaxSavedChests=cap
 S:Step(1)
-check(bag(A3)==bagBefore+1 and Data:GetChestRecords(A3)[bag(A3)].BagVariant==fullVariant and Data:GetChestRecords(A3)[bag(A3)].Stage==fullStage,'once there is room it goes into the Bag by itself')
-check(attr(rec1,'State')=='Locked'and Data:GetPremium(A3).Mystery.Claimed==false and Data:GetPremium(A3).Mystery.Day==today(),'and the new day begins')
+check(bag(A3)==bagBefore+1 and Data:GetChestRecords(A3)[bag(A3)].BagVariant==fullVariant and Data:GetChestRecords(A3)[bag(A3)].Stage==fullStage,'once there is room the owed pack goes into the Bag by itself')
+check(#Data:GetPremium(A3).Mystery.Owed==0 and attr(rec1,'State')=='Locked'and Data:GetPremium(A3).Mystery.Claimed==false and Data:GetPremium(A3).Mystery.Day==today(),'and it leaves the list; today\'s pack goes on')
+local fn3=notes(A3,noteF);check(#fn3==2 and fn3[2]:find('waiting',1,true)and fn3[2]:find('Mystery Pack',1,true)and fn3[2]:find('Rare',1,true),'with a notice: '..tostring(fn3[2]))
+for _=1,5 do S:Step(1)end
+check(bag(A3)==bagBefore+1,'and it is not given again')
 -- The size pity reaches the mystery pack through {Luck=true}.
 S.Random={NextNumber=function()return .5 end};play(899)
 Data:LoadPackLuck(A3,{Big=29,Giant=0})
@@ -436,6 +481,27 @@ Run.Heartbeat:Fire(.4);check(Data:GetPremium(A3).Mystery.Seconds==sec0+1,'(0.4 s
 Run.Heartbeat:Fire(.7);check(near(Data:GetPremium(A3).Mystery.Seconds,sec0+2.1,1e-9),'(0.4 + 0.7 s: counted together, 1.1 s)')
 local sec1=Data:GetPremium(A3).Mystery.Seconds;Run.Heartbeat:Fire(30)
 check(near(Data:GetPremium(A3).Mystery.Seconds,sec1+5,1e-9),'a 30 s server hitch credits at most 5 s')
+-- 11b. [drift] UnlockAt follows the real countdown: left alone while the clock runs, written again when it drifts ------------------
+do
+ local m3=ped(rec1);S:Publish(A3,true)
+ local writes=0;local conn=m3:GetAttributeChangedSignal('UnlockAt'):Connect(function()writes+=1 end)
+ local function shown()return attr(rec1,'UnlockAt')-W.workspace:GetServerTimeNow()end
+ local function left()return M.Left(Data:GetPremium(A3).Mystery)end
+ local at0=attr(rec1,'UnlockAt')
+ check(near(shown(),left(),1.01),'[drift] a forced publish: UnlockAt = now + time left ('..tostring(shown())..' s)')
+ play(60)
+ check(writes==0 and attr(rec1,'UnlockAt')==at0,'[drift] 60 s of normal play: UnlockAt is not written again (no attribute spam)')
+ for _=1,2 do R.advance(2);S:Step(1)end -- (the clock moves 2 s, 1 s is counted: 1 s, then 2 s behind)
+ check(writes==0 and near(shown(),left()-2,1.01),'[drift] up to 2 s behind: still not written (the countdown is '..tostring(left()-shown())..' s short)')
+ R.advance(2);S:Step(1)
+ check(writes==1 and near(shown(),left(),1.01),'[drift] more than 2 s behind: written once, and the countdown shows the time that is really left')
+ local counted=Data:GetPremium(A3).Mystery.Seconds;writes=0
+ R.advance(30);Run.Heartbeat:Fire(30) -- a 30 s server hitch: 5 s are counted
+ check(near(Data:GetPremium(A3).Mystery.Seconds,counted+5,1e-9)and writes==1 and near(shown(),left(),1.01)and shown()>0,'[drift] after a 30 s hitch (5 s counted): UnlockAt is republished at once, so the countdown cannot reach 0:00 before the pack unlocks ('..tostring(shown())..' s left)')
+ play(30)
+ check(writes==1 and near(shown(),left(),1.01),'[drift] and it stays put again afterwards')
+ conn:Disconnect()
+end
 -- 12. Unusual owners -------------------------------------------------------------------------------------------------------------
 local C=makePlayer(703,'Cai')
 S:Setup(C)
@@ -549,6 +615,111 @@ check(again3==guardian,'EnsureGuardian reuses the live keeper')
 guardian:Destroy();local g2=Veiled.EnsureGuardian(eventSelf)
 check(g2~=nil and g2~=guardian and g2:GetAttribute('KeeperEscapeSpeed')==600 and W.CS:HasTag(g2,'BiomeKeeper'),'a new keeper after it despawns is stamped and tagged again')
 check(Veiled.EnsureGuardian({Home=nil,Folder=evFolder})==nil,'(no Home: no keeper)')
+
+-- 15. A full Bag at midnight: the unlocked pack is owed (saved), today's timer runs, nothing is lost or given twice -------------------
+;(function() -- (a function of its own: the main chunk is out of local slots)
+ local rec3=baseOf(3,R.CFrame.new(400,5,400));Map.BaseRecords[3]=rec3
+ local Dee=makePlayer(706,'Dee');baseOfUser[706]=rec3
+ local ROOM=Config.MaxSavedChests
+ local PERSISTENT=R.Enum.ModelStreamingMode.Persistent
+ local function owedOf(p)return Data:GetPremium(p).Mystery.Owed end
+ local function owedKey(p)local t={};for _,e in ipairs(owedOf(p))do t[#t+1]=e.Variant end;return table.concat(t,',')end
+ local function roll(u)S.Random={NextNumber=function()return u end}end
+ local function readyBy(u)roll(u);local n=0;while attr(rec3,'State')~='Ready'and n<1000 do play(1);n+=1 end;return n<1000 end
+ local function waiting(p,from)local n=0;for _,t in ipairs(notes(p,from))do if t:find('Make room',1,true)then n+=1 end end;return n end
+ local function bagFrom(p,first)local t={};for i=first,bag(p)do local r=Data:GetChestRecords(p)[i];t[#t+1]=r.BagVariant..':'..r.Stage end;table.sort(t);return table.concat(t,' ')end
+ roll(.5);S:Setup(Dee)
+ check(ped(rec3)~=nil and ped(rec3).ModelStreamingMode==PERSISTENT and W.CS:HasTag(ped(rec3),'MysteryPedestal')and attr(rec3,'State')=='Locked'and prompt(rec3).Enabled==false,'[streaming] [prompt] a pedestal built after Start (for a base that was added later) is Persistent too, Locked with the prompt off')
+ check(readyBy(.5)and attr(rec3,'Variant')=='Pack03'and prompt(rec3).Enabled==true,'[prompt] (Dee: Ready after 15 minutes, the prompt is on)')
+ local gone=ped(rec3);gone:Destroy();S:Publish(Dee,true)
+ check(ped(rec3)~=gone and ped(rec3).ModelStreamingMode==PERSISTENT and attr(rec3,'State')=='Ready'and attr(rec3,'OwnerUserId')==706 and prompt(rec3).Enabled==true and pack(rec3)~=nil,'[streaming] [prompt] a pedestal that was destroyed and rebuilt while Ready: Persistent, the owner, the real pack, prompt on straight away')
+ local bag0=bag(Dee);Config.MaxSavedChests=bag0;local from1=#shown+1;local sync0=syncs(Dee)
+ -- Day 1: midnight comes with an unlocked pack and a full Bag.
+ nextDay();play(5)
+ local d1=Data:GetPremium(Dee).Mystery
+ check(bag(Dee)==bag0 and syncs(Dee)==sync0,'[owed] a full Bag at midnight with an unlocked pack: nothing is added (and nothing is lost: see below)')
+ check(#d1.Owed==1 and owedKey(Dee)=='Pack03'and d1.Owed[1].Stage==1 and d1.Owed[1].Day==today()-1,'[owed] the very pack is on the saved owed list (Pack03, Forest, from yesterday)')
+ check(d1.Day==today()and d1.Claimed==false and d1.Stage==nil and d1.Seconds==6 and attr(rec3,'State')=='Locked'and near(attr(rec3,'UnlockAt')-W.workspace:GetServerTimeNow(),894,1.01),'[owed] today starts fresh and its 15 minutes run: 6 s counted, 894 s on the countdown (the old pack no longer blocks it)')
+ check(prompt(rec3).Enabled==false and pack(rec3)~=nil and pack(rec3):GetAttribute('BagVariant')=='Pack01','[prompt] the pedestal is a locked silhouette again, prompt off')
+ local n1=notes(Dee,from1)
+ check(#n1==1 and n1[1]:find('Make room: 1 mystery pack waiting',1,true),'[owed] the player is told once: '..tostring(n1[1]))
+ -- Days 2 and 3: the same again; the list grows oldest first.
+ check(readyBy(.8)and attr(rec3,'Variant')=='Pack04','(day 2: Ready, Pack04)')
+ nextDay();play(1)
+ check(owedKey(Dee)=='Pack03,Pack04'and bag(Dee)==bag0 and Data:GetPremium(Dee).Mystery.Seconds==2,'[owed] day 2: two owed, oldest first, and today\'s clock is running')
+ check(readyBy(.1)and attr(rec3,'Variant')=='Pack02','(day 3: Ready, Pack02)')
+ nextDay();play(1)
+ check(owedKey(Dee)=='Pack03,Pack04,Pack02'and bag(Dee)==bag0,'[owed] day 3: three owed (the cap)')
+ check(waiting(Dee,from1)==1,'[owed] no more notices: told once this session, not once a day')
+ -- Day 4: three are already owed: the fourth pack is not dropped, it stays on the pedestal.
+ check(readyBy(.99)and attr(rec3,'Variant')=='Pack06','(day 4: Ready, Pack06)')
+ nextDay();play(3)
+ local stuck=Data:GetPremium(Dee).Mystery
+ check(owedKey(Dee)=='Pack03,Pack04,Pack02'and bag(Dee)==bag0 and stuck.Day==today()-1 and stuck.Claimed==false and M.Unlocked(stuck)and stuck.Variant=='Pack06'and attr(rec3,'State')=='Ready'and attr(rec3,'Variant')=='Pack06','[owed] with 3 already owed and a full Bag, a fourth pack is never dropped: it stays Ready on the pedestal (the owed list is capped at 3)')
+ R.advance(1);local refusedTake=S:Claim(Dee,rec3)
+ check(refusedTake==false and bag(Dee)==bag0 and owedKey(Dee)=='Pack03,Pack04,Pack02'and waiting(Dee,from1)==1,'[owed] taking it with a full Bag is refused as before; nothing changes')
+ -- Leaving and coming back (saved and loaded): the owed list survives, nothing is added to a full Bag.
+ local Dee2=rejoin(Dee,rec3)
+ check(attr(rec3,'State')=='Empty'and attr(rec3,'OwnerUserId')==nil and prompt(rec3).Enabled==false and pack(rec3)==nil,'[prompt] Dee leaves while her pack is Ready: the pedestal goes Empty and the server turns the prompt off')
+ check(owedKey(Dee2)=='Pack03,Pack04,Pack02'and bag(Dee2)==bag0,'[owed] saved and loaded with the profile: the same 3 owed packs in the same order, nothing added')
+ local sv=Data:_buildSaveData(Dee2).Premium.Mystery
+ check(type(sv.Owed)=='table'and#sv.Owed==3 and sv.Owed[1].Variant=='Pack03'and sv.Owed[1].Stage==1 and type(sv.Owed[1].Day)=='number'and sv.Owed[3].Variant=='Pack02','[owed] the save row holds Owed = {{Day, Stage, Variant}, ...}')
+ local from2=#shown+1;S:Setup(Dee2);play(2)
+ check(waiting(Dee2,from2)==1 and lastNote(Dee2):find('3 mystery packs waiting',1,true),'[owed] a new session: told once more ('..tostring(lastNote(Dee2))..')')
+ check(attr(rec3,'State')=='Ready'and attr(rec3,'Variant')=='Pack06'and bag(Dee2)==bag0,'(the pack that stayed on the pedestal is back, Ready)')
+ -- Room for one: exactly one pack goes in.
+ Config.MaxSavedChests=bag0+1;play(1)
+ local pend=#owedOf(Dee2)+(attr(rec3,'State')=='Ready'and 1 or 0)
+ check(bag(Dee2)==bag0+1 and pend==3 and waiting(Dee2,from2)==1,'[owed] room for one pack: exactly one goes in (3 are still waiting), no new notice')
+ local Dee3=rejoin(Dee2,rec3)
+ check(bag(Dee3)==bag0+1 and #owedOf(Dee3)==#owedOf(Dee2)and#owedOf(Dee3)>=2,'[owed] saved and loaded again: no pack is repeated, none is lost')
+ -- Room for two more at Setup: they go in as the player arrives.
+ Config.MaxSavedChests=bag(Dee3)+2;local waitingBefore=#owedOf(Dee3);S:Setup(Dee3)
+ check(bag(Dee3)==bag0+3 and #owedOf(Dee3)==math.max(0,waitingBefore-2),'[owed] Setup grants owed packs when there is room (2 more)')
+ -- A claim of today's pack with room for two: today's and the last owed one.
+ check(readyBy(.5)and attr(rec3,'Variant')=='Pack03','(Ready again)')
+ Config.MaxSavedChests=bag(Dee3)+2;R.advance(1)
+ local pendingNow=#owedOf(Dee3);local tookIt=S:Claim(Dee3,rec3)
+ check(tookIt==true and bag(Dee3)==bag0+3+1+pendingNow and #owedOf(Dee3)==0,'[owed] taking today\'s pack also pays the owed one that was waiting ('..tostring(bag(Dee3)-bag0)..' packs in all)')
+ for _=1,10 do play(1)end
+ local expected={'Pack02:1','Pack03:1','Pack03:1','Pack04:1','Pack06:1'};table.sort(expected)
+ check(bag(Dee3)==bag0+5 and bagFrom(Dee3,bag0+1)==table.concat(expected,' '),'[owed] in the end: exactly the 5 packs Dee earned (4 days of Pack03 / Pack04 / Pack02 / Pack06 + today\'s Pack03), each once: '..bagFrom(Dee3,bag0+1))
+ local Dee4=rejoin(Dee3,rec3);Config.MaxSavedChests=ROOM;S:Setup(Dee4);play(5)
+ check(bag(Dee4)==bag0+5 and #owedOf(Dee4)==0 and attr(rec3,'State')=='Claimed','[owed] after a save and load: nothing more is given (still 5, nothing owed, today\'s taken)')
+ -- A save from before Owed existed, with an unlocked pack from yesterday and a full Bag.
+ Config.MaxSavedChests=bag(Dee4)
+ Data:GetPremium(Dee4).Mystery={Day=today()-1,Seconds=900,Stage=2,Variant='Pack05',Claimed=false}
+ play(1)
+ check(owedKey(Dee4)=='Pack05'and bag(Dee4)==bag0+5 and Data:GetPremium(Dee4).Mystery.Day==today()and attr(rec3,'State')=='Locked','[owed] an old-shape save (no Owed) with an unlocked pack and a full Bag loads fine: the pack is owed, today starts')
+ Config.MaxSavedChests=ROOM;play(1)
+ local last=Data:GetChestRecords(Dee4)[bag(Dee4)]
+ check(bag(Dee4)==bag0+6 and last.BagVariant=='Pack05'and last.Stage==2 and #owedOf(Dee4)==0,'[owed] and it goes in when there is room')
+ -- Odd data never pays out; a long list keeps the oldest 3.
+ local bagJ=bag(Dee4);local secJ=Data:GetPremium(Dee4).Mystery.Seconds
+ Data:GetPremium(Dee4).Mystery={Day=today(),Seconds=secJ,Owed={{Day=1,Stage=99,Variant='Pack03'},{Day=2,Stage=2,Variant='Nope'},'x',5,{Day=3,Stage=3,Variant='Pack01'},{Day=4,Stage=3,Variant='EclipseReliquary',Extra='x'}}}
+ play(2)
+ check(bag(Dee4)==bagJ+1 and Data:GetChestRecords(Dee4)[bag(Dee4)].BagVariant=='EclipseReliquary'and #owedOf(Dee4)==0 and Data:GetPremium(Dee4).Mystery.Seconds>=secJ+2,'[owed] odd owed entries (stage 99, a made-up variant, Common, not tables) never pay out: only the one good entry did')
+ local bagK=bag(Dee4)
+ Data:GetPremium(Dee4).Mystery={Day=today(),Seconds=5,Owed={{Day=1,Stage=2,Variant='Pack02'},{Day=2,Stage=3,Variant='Pack03'},{Day=3,Stage=4,Variant='Pack04'},{Day=4,Stage=5,Variant='Pack05'},{Day=5,Stage=6,Variant='Pack06'}}}
+ play(1)
+ check(bag(Dee4)==bagK+3 and bagFrom(Dee4,bagK+1)=='Pack02:2 Pack03:3 Pack04:4','[owed] a saved list longer than 3 pays only the 3 oldest ('..bagFrom(Dee4,bagK+1)..')')
+ -- The owner command with an owed pack.
+ Config.MaxSavedChests=bag(Dee4);local bagO2=bag(Dee4)
+ local okc,out=Owner.Execute(ctx,Dee4,'mystery',{'ready'})
+ play(3)
+ check(attr(rec3,'State')=='Ready','(mystery ready: unlocked)')
+ okc,out=Owner.Execute(ctx,Dee4,'mystery',{'next'})
+ check(okc and out:find('locked',1,true)and out:find('1 owed',1,true)and #owedOf(Dee4)==1 and bag(Dee4)==bagO2,'[owed] mystery next with a full Bag: the pack is owed and the command says so: '..tostring(out))
+ okc,out=Owner.Execute(ctx,Dee4,'mystery',{'reset'})
+ check(okc and out:find('15:00 to go',1,true)and out:find('1 owed',1,true)and #owedOf(Dee4)==1 and Data:GetPremium(Dee4).Mystery.Seconds==0,'[owed] mystery reset restarts today\'s pack but keeps the owed one: '..tostring(out))
+ okc,out=Owner.Execute(ctx,Dee4,'mystery',{})
+ check(okc and out:find('1 owed',1,true),'mystery (no argument) reports it too')
+ Config.MaxSavedChests=ROOM;play(1)
+ check(bag(Dee4)==bagO2+1 and #owedOf(Dee4)==0,'(and it goes in when there is room)')
+ okc,out=Owner.Execute(ctx,Dee4,'mystery',{})
+ check(okc and not out:find('owed',1,true),'with nothing owed the command says nothing about it')
+ Config.MaxSavedChests=ROOM
+end)()
 
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

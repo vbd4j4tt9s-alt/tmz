@@ -3,6 +3,11 @@
 -- bar, ✨ UNLOCKED / TAKE IT, ✓ taken and the time to the next one), the take prompt (only its owner sees it, only once
 -- unlocked), a burst when yours unlocks and a slow spin on the pack. The server (MysteryPackService) owns everything
 -- else; this reads the pedestal's attributes.
+-- The place uses StreamingEnabled: the pedestals are Persistent models, but nothing here counts on that. A pedestal is
+-- found by its tag whenever it appears (no waiting for its parts: PackAnchor and the prompt are linked as they arrive,
+-- and again if they come back as new instances), and a pedestal that goes away is forgotten, so a streamed-back copy
+-- starts clean. The server enables the Take prompt only while the pack is Ready; this switches it off for everyone but
+-- the owner, again after any change the server makes to it.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local Run=game:GetService('RunService');local Tween=game:GetService('TweenService');local GuiService=game:GetService('GuiService')
 local player=Players.LocalPlayer
@@ -17,8 +22,8 @@ local function label(parent,name,y,h,color)
  t.Font=Enum.Font.FredokaOne;t.TextScaled=true;t.TextColor3=color or Color3.new(1,1,1);t.TextStrokeTransparency=.15;t.TextStrokeColor3=RGB(10,8,22);t.Text='';t.Parent=parent
  return t
 end
-local function build(model,anchor)
- local gui=Instance.new('BillboardGui');gui.Name='MysteryLabel';gui.Adornee=anchor;gui.Size=UDim2.fromOffset(230,96);gui.StudsOffset=Vector3.new(0,4.3,0)
+local function build(model)
+ local gui=Instance.new('BillboardGui');gui.Name='MysteryLabel';gui.Size=UDim2.fromOffset(230,96);gui.StudsOffset=Vector3.new(0,4.3,0)
  gui.MaxDistance=160;gui.LightInfluence=0;gui.AlwaysOnTop=false;gui.ResetOnSpawn=false;gui.Enabled=false
  local title=label(gui,'Title',0,.34,VIOLET)
  local status=label(gui,'Status',.36,.36)
@@ -48,10 +53,16 @@ local function burst(anchor,color,big)
  game:GetService('Debris'):AddItem(ring,1.4)
  if Audio then pcall(Audio.Play,big and'GemClaim'or'Bubble04')end
 end
+-- Only the owner sees the Take prompt, and only while the pack is Ready (the server's value is overridden here).
+local function applyPrompt(entry)
+ local prompt=entry.Prompt;if not prompt then return end
+ local m=entry.Model;local want=m:GetAttribute('OwnerUserId')==player.UserId and(m:GetAttribute('State')or'Empty')=='Ready'
+ if prompt.Enabled~=want then prompt.Enabled=want end
+end
 local function update(entry)
  local m=entry.Model;local state=m:GetAttribute('State')or'Empty';local mine=m:GetAttribute('OwnerUserId')==player.UserId
  local gui=entry.Gui;gui.Enabled=state~='Empty'
- if entry.Prompt then entry.Prompt.Enabled=mine and state=='Ready'end
+ applyPrompt(entry)
  if state=='Empty'then entry.State=state;return end
  local owner=mine and'YOUR'or(tostring(m:GetAttribute('OwnerName')or'?'):upper().."'S")
  local bar,fill=gui.Bar,gui.Bar.Fill
@@ -75,30 +86,49 @@ local function update(entry)
  end
  entry.State=state
 end
-local function add(model)
- if entries[model]or not model:IsA('Model')then return end
- local anchor=model:FindFirstChild('PackAnchor')or model:WaitForChild('PackAnchor',10)
- if not anchor or not model.Parent then return end
- local entry={Model=model,Anchor=anchor,Prompt=anchor:FindFirstChild('TakeMysteryPack'),Links={}}
- entry.Gui=build(model,anchor);entries[model]=entry
- for _,key in ipairs({'State','OwnerUserId','OwnerName','UnlockAt','NextAt'})do
-  entry.Links[#entry.Links+1]=model:GetAttributeChangedSignal(key):Connect(function()update(entry)end)
+local function unlinkPrompt(entry)
+ if entry.PromptLink then entry.PromptLink:Disconnect();entry.PromptLink=nil end
+ entry.Prompt=nil
+end
+-- (Re)finds the anchor and the prompt in the model: they can arrive late, or come back as new instances.
+local function relink(entry)
+ local anchor=entry.Model:FindFirstChild('PackAnchor');if anchor and not anchor:IsA('BasePart')then anchor=nil end
+ if anchor~=entry.Anchor then entry.Anchor=anchor;entry.Gui.Adornee=anchor end
+ local prompt=anchor and anchor:FindFirstChild('TakeMysteryPack')
+ if prompt~=entry.Prompt then
+  unlinkPrompt(entry);entry.Prompt=prompt
+  if prompt then entry.PromptLink=prompt:GetPropertyChangedSignal('Enabled'):Connect(function()applyPrompt(entry)end)end
  end
- entry.Links[#entry.Links+1]=anchor.ChildAdded:Connect(function(child)if child.Name=='TakeMysteryPack'then entry.Prompt=child;update(entry)end end)
  update(entry)
 end
 local function remove(model)
  local entry=entries[model];if not entry then return end;entries[model]=nil
- for _,c in ipairs(entry.Links)do c:Disconnect()end;if entry.Gui then entry.Gui:Destroy()end
+ for _,c in ipairs(entry.Links)do c:Disconnect()end;unlinkPrompt(entry);if entry.Gui then entry.Gui:Destroy()end
 end
-for _,m in ipairs(CS:GetTagged('MysteryPedestal'))do task.spawn(add,m)end
-local added=CS:GetInstanceAddedSignal('MysteryPedestal'):Connect(function(m)task.spawn(add,m)end)
+local function add(model)
+ if entries[model]or not model:IsA('Model')then return end
+ local entry={Model=model,Links={}};entry.Gui=build(model);entries[model]=entry
+ for _,key in ipairs({'State','OwnerUserId','OwnerName','UnlockAt','NextAt'})do
+  entry.Links[#entry.Links+1]=model:GetAttributeChangedSignal(key):Connect(function()update(entry)end)
+ end
+ entry.Links[#entry.Links+1]=model.DescendantAdded:Connect(function(d)if d.Name=='PackAnchor'or d.Name=='TakeMysteryPack'then relink(entry)end end)
+ entry.Links[#entry.Links+1]=model.DescendantRemoving:Connect(function(d)
+  if d==entry.Anchor then entry.Anchor=nil;entry.Gui.Adornee=nil;unlinkPrompt(entry)elseif d==entry.Prompt then unlinkPrompt(entry)end
+ end)
+ entry.Links[#entry.Links+1]=model.AncestryChanged:Connect(function()if not model:IsDescendantOf(workspace)then remove(model)end end)
+ relink(entry)
+end
+for _,m in ipairs(CS:GetTagged('MysteryPedestal'))do add(m)end
+local added=CS:GetInstanceAddedSignal('MysteryPedestal'):Connect(add)
 local removed=CS:GetInstanceRemovedSignal('MysteryPedestal'):Connect(remove)
 -- The countdowns tick twice a second.
 local alive=true
 local function tick()
  if not alive then return end
- for _,entry in pairs(entries)do if entry.State=='Locked'or entry.State=='Claimed'then update(entry)end end
+ for model,entry in pairs(entries)do
+  if not model.Parent then remove(model) -- (streamed out without a tag signal: its streamed-back copy is a new instance)
+  elseif entry.State=='Locked'or entry.State=='Claimed'then update(entry)end
+ end
  task.delay(.5,tick)
 end
 task.delay(.5,tick)

@@ -152,6 +152,91 @@ W.Gui.ReducedMotionEnabled=true;local b4=bursts()
 mine:SetAttribute('UnlockAt',nil);mine:SetAttribute('State','Ready')
 check(bursts()==b4+1 and lastBurst().Transparency==1,'reduced motion: the ring is invisible (no tween), the burst still happens')
 W.Gui.ReducedMotionEnabled=false
+-- Streaming (the place uses StreamingEnabled): pedestals and their parts arrive late and can come back as new instances; only the
+-- owner ever sees an enabled Take prompt (the server enables it while the pack is Ready, for every client).
+do
+ local function bare(name,attrs) -- a pedestal Model as a streaming client first sees it: tagged and in the world, but without its parts yet
+  local m=R.new('Model');m.Name=name
+  for k,v in pairs(attrs or{})do m:SetAttribute(k,v)end
+  m.Parent=workspace;CS:AddTag(m,'MysteryPedestal');return m
+ end
+ local function addAnchor(m)local a=R.new('Part');a.Name='PackAnchor';a.Size=R.Vector3.new(1,1,1);a.CFrame=R.CFrame.new(0,9,0);a.Parent=m;return a end
+ local function addPrompt(a,enabled)local pr=R.new('ProximityPrompt');pr.Name='TakeMysteryPack';pr.Enabled=enabled;pr.Parent=a;return pr end
+ adv(2);local b0=bursts()
+ -- A pedestal whose PackAnchor has not streamed in: it gets its label at once and never gives up waiting (no one-shot 10 s wait).
+ local lateM=bare('LateAnchor',{State='Ready',OwnerUserId=999,OwnerName='Zed',Variant='Pack02',Stage=1})
+ local lg=label(lateM)
+ check(lg~=nil and lg.Enabled==true and lg.Adornee==nil and lg.Title.Text=="✨ ZED'S MYSTERY PACK"and lg.Status.Text=='UNLOCKED!','[streaming] a pedestal without its PackAnchor yet already has its label (up to date, nothing to adorn)')
+ adv(12)
+ check(label(lateM)==lg and lg.Parent==lateM,'[streaming] 12 s later (past the old 10 s wait) it is still there, still waiting for the parts')
+ lateM:SetAttribute('State','Locked');lateM:SetAttribute('UnlockAt',R.clock+300)
+ check(lg.Status.Text=='🔒 5:00','[streaming] and it follows the attributes meanwhile ('..lg.Status.Text..')')
+ lateM:SetAttribute('UnlockAt',nil);lateM:SetAttribute('State','Ready')
+ local la=addAnchor(lateM)
+ check(lg.Adornee==la,'[streaming] the PackAnchor streams in late: the label is attached to it')
+ local lp=addPrompt(la,true)
+ check(lp.Enabled==false,'[streaming] [prompt] the Take prompt arrives (the server has it on, Ready): off for me, it is not my pedestal')
+ lp.Enabled=true;check(lp.Enabled==false,'[prompt] and when the server changes it again it is switched off again')
+ -- Mine, parts arriving late: no burst for a pack that was already Ready; the prompt works.
+ local mineLate=bare('LateMine',{State='Locked',OwnerUserId=77,OwnerName='Tester',UnlockAt=R.clock+60})
+ mineLate:SetAttribute('UnlockAt',nil);mineLate:SetAttribute('Variant','Pack03');mineLate:SetAttribute('State','Ready')
+ local ma=addAnchor(mineLate);local mp=addPrompt(ma,false)
+ check(label(mineLate).Adornee==ma and mp.Enabled==true and bursts()==b0,'[streaming] mine, Ready, parts arriving late: label on the anchor, the prompt is on for me, no burst (the anchor was not there when it unlocked)')
+ mineLate:SetAttribute('State','Claimed');check(mp.Enabled==false and bursts()==b0+1 and lastBurst().Position.Y==9,'(and taking it turns the prompt off and bursts around the new anchor)')
+ adv(2)
+ -- Non-owners never see an enabled prompt, whatever the server does to it.
+ local nm=bare('NonOwner',{State='Empty'});local na=addAnchor(nm);local np=addPrompt(na,true)
+ check(np.Enabled==false,'[prompt] a non-owner\'s prompt that arrives enabled is switched off at once')
+ local allOff=true;local seen={}
+ for _,owner in ipairs({false,999})do
+  for _,st in ipairs({'Empty','Locked','Ready','Claimed','Ready','Empty'})do
+   nm:SetAttribute('OwnerUserId',owner or nil);nm:SetAttribute('State',st)
+   np.Enabled=true -- (the server's value reaching this client: it is Enabled while Ready)
+   if np.Enabled~=false then allOff=false;seen[#seen+1]=tostring(owner)..'/'..st end
+  end
+ end
+ check(allOff,'[prompt] a non-owner (nobody / someone else) never has an enabled prompt in any state, after every server-side Enabled change '..table.concat(seen,' '))
+ -- The owner: on only while Ready, whatever the server wrote.
+ nm:SetAttribute('OwnerUserId',77);local ownerOk=true
+ for _,case in ipairs({{'Empty',false},{'Locked',false},{'Ready',true},{'Claimed',false},{'Ready',true}})do
+  nm:SetAttribute('State',case[1]);np.Enabled=true;if np.Enabled~=case[2]then ownerOk=false end
+  np.Enabled=false;if np.Enabled~=case[2]then ownerOk=false end
+ end
+ check(ownerOk,'[prompt] for the owner it is on only while Ready, even if the server\'s value is wrong for a moment')
+ -- Re-streamed: the same pedestal comes back as a NEW instance. The old one is forgotten, the new one gets a fresh label, prompt and burst state.
+ local old=bare('Restream',{State='Ready',OwnerUserId=77,OwnerName='Tester',Variant='Pack03',Stage=1});local oa=addAnchor(old);local op=addPrompt(oa,true)
+ local oldLabel=label(old);local oldStatus=oldLabel.Status
+ check(oldLabel~=nil and oldLabel.Adornee==oa and op.Enabled==true,'(a pedestal of mine, Ready, with its parts)')
+ local b1=bursts();old.Parent=nil -- streamed out
+ check(oldLabel.Parent==nil and bursts()==b1,'[streaming] a pedestal that streams out loses its label (nothing stale is kept)')
+ old:SetAttribute('State','Locked');check(oldStatus.Text=='UNLOCKED! TAKE IT 🎁','(and the old instance is not updated any more)')
+ local nu=bare('Restream',{State='Ready',OwnerUserId=77,OwnerName='Tester',Variant='Pack03',Stage=1});local na2=addAnchor(nu);local np2=addPrompt(na2,true)
+ local nl=label(nu)
+ check(nl~=nil and nl~=oldLabel and nl.Adornee==na2 and nl.Status.Text=='UNLOCKED! TAKE IT 🎁'and np2.Enabled==true and bursts()==b1,'[streaming] it comes back as a new instance: a label of its own on the new anchor, the prompt on for me, no burst for a pack that was already Ready')
+ nu:SetAttribute('State','Claimed')
+ check(nl.Title.Text=='✓ TAKEN TODAY'and np2.Enabled==false and bursts()==b1+1 and rgb(lastBurst().Color,120,236,110),'[streaming] and the new instance works like any other (taking it: mint burst, prompt off)')
+ adv(2)
+ -- Re-streamed again as Locked: its countdown runs on the new instance after a long time in the world.
+ CS:RemoveTag(nu,'MysteryPedestal')
+ adv(3000)
+ local again=bare('Restream',{State='Locked',OwnerUserId=77,OwnerName='Tester',UnlockAt=R.clock+120,Stage=1});local aa=addAnchor(again);addPrompt(aa,true)
+ check(label(again).Status.Text=='🔒 2:00'and label(again).Adornee==aa,'[streaming] 50 minutes later a streamed-back pedestal shows its countdown (🔒 2:00)')
+ adv(60);check(label(again).Status.Text=='🔒 1:00','[streaming] and it ticks on the new instance ('..label(again).Status.Text..')')
+ -- The anchor and prompt come back as new instances inside a model that stayed.
+ local keep=bare('PartsBack',{State='Ready',OwnerUserId=999,OwnerName='Yan'});local ka=addAnchor(keep);local kp=addPrompt(ka,true)
+ check(kp.Enabled==false and label(keep).Adornee==ka,'(a pedestal of Yan\'s with its parts: prompt off for me)')
+ ka.Parent=nil
+ local ka2=addAnchor(keep);local kp2=addPrompt(ka2,true)
+ check(label(keep).Adornee==ka2 and kp2.Enabled==false,'[streaming] [prompt] parts that come back as new instances are picked up: the label moves to the new anchor and the new prompt is switched off')
+ kp2.Enabled=true;check(kp2.Enabled==false,'[prompt] and it is watched: the next server change is overridden too')
+ kp.Enabled=true;check(kp.Enabled==true,'(the old prompt is no longer watched)')
+ -- Moving a pedestal inside the world keeps its label; only leaving the world removes it.
+ local folder=R.new('Folder');folder.Parent=workspace;local g0=label(keep);keep.Parent=folder
+ check(label(keep)==g0 and g0.Parent==keep,'a pedestal reparented inside the workspace keeps its label')
+ keep.Parent=nil;check(g0.Parent==nil,'(and loses it when it leaves the workspace)')
+ -- Everything left from this block goes away with its tag.
+ for _,m in ipairs({lateM,mineLate,nm,again})do CS:RemoveTag(m,'MysteryPedestal')end
+end
 -- Removing the tag removes the label.
 local g3=label(late);CS:RemoveTag(late,'MysteryPedestal')
 check(g3.Parent==nil,'a pedestal that loses its tag loses its label')

@@ -4,9 +4,14 @@
 -- entrance corner opposite the treadmill (MysteryPackRules.Offset). While its owner plays, today's time counts up
 -- (saved, so rejoining keeps it); at 15 minutes the black silhouette turns into the real pack (best treadmill's biome,
 -- never Common) and the owner takes it with the prompt. A new day brings a new mystery pack; an unlocked pack that was
--- not taken goes straight into the Bag on the next visit. Numbers: ReplicatedStorage.MysteryPackRules.
+-- not taken goes straight into the Bag on the next visit. With a full Bag it waits in a small saved "owed" list (never
+-- lost, never twice), today's pack starts as normal, and the owed packs go in whenever there is room.
+-- Numbers: ReplicatedStorage.MysteryPackRules.
 -- The pedestal model's attributes are all the client needs: OwnerUserId, OwnerName, State (Empty / Locked / Ready /
 -- Claimed), UnlockAt (server time), NextAt (next UTC midnight), Stage, Variant (only once unlocked).
+-- The model streams in Persistent mode (the place uses StreamingEnabled: another base's pedestal must not stream out
+-- and come back as new instances), and the Take prompt is only Enabled while the pack is Ready; each client also turns
+-- it off locally for everyone but the owner.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local CS=game:GetService('CollectionService')
 local M=require(RS.MysteryPackRules);local PackRules=require(RS.SeedPackRules)
@@ -14,7 +19,7 @@ local S={};S.__index=S
 local RGB=Color3.fromRGB
 local SILHOUETTE=RGB(10,9,16)
 function S.new(config,data,bases,chests,notes,map)
- return setmetatable({Config=config,Data=data,Bases=bases,Chests=chests,Notes=notes,Map=map or bases and bases.Map,Pedestals={},Owner={},Unsaved={},LastClaim={},
+ return setmetatable({Config=config,Data=data,Bases=bases,Chests=chests,Notes=notes,Map=map or bases and bases.Map,Pedestals={},Owner={},Unsaved={},LastClaim={},Told={},
   Random=Random.new(),Acc=0},S)
 end
 local function part(parent,name,size,frame,color,material,collide)
@@ -32,6 +37,7 @@ function S:_build(record)
  if not pad then return nil end
  local old=record.Model:FindFirstChild('MysteryPedestal');if old then old:Destroy()end
  local m=Instance.new('Model');m.Name='MysteryPedestal';m:SetAttribute('MysteryPedestal',M.Version);m:SetAttribute('State','Empty')
+ m.ModelStreamingMode=Enum.ModelStreamingMode.Persistent -- (StreamingEnabled: never streamed out, so no stale or late client copies)
  local o=pad.CFrame*CFrame.new(M.Offset.X,pad.Size.Y/2,M.Offset.Z)
  local stone,violet,gold=RGB(62,55,88),RGB(104,82,168),RGB(255,198,72)
  part(m,'Plinth',Vector3.new(8,1,8),o*CFrame.new(0,.5,0),stone,Enum.Material.Slate,true)
@@ -44,7 +50,7 @@ function S:_build(record)
  local anchor=part(m,'PackAnchor',Vector3.new(1,1,1),o*CFrame.new(0,9.3,0),Color3.new());anchor.Transparency=1
  local light=Instance.new('PointLight');light.Name='Glow';light.Color=RGB(170,110,255);light.Range=14;light.Brightness=1.6;light.Shadows=false;light.Parent=anchor
  local prompt=Instance.new('ProximityPrompt');prompt.Name='TakeMysteryPack';prompt.ActionText='Take';prompt.ObjectText='Mystery Pack'
- prompt.HoldDuration=.5;prompt.MaxActivationDistance=12;prompt.RequiresLineOfSight=false;prompt.Enabled=true;prompt.Parent=anchor
+ prompt.HoldDuration=.5;prompt.MaxActivationDistance=12;prompt.RequiresLineOfSight=false;prompt.Enabled=false;prompt.Parent=anchor -- (Publish turns it on while the pack is Ready)
  prompt.Triggered:Connect(function(player)self:Claim(player,record)end)
  m.PrimaryPart=anchor;m.Parent=record.Model
  CS:AddTag(m,'MysteryPedestal')
@@ -83,34 +89,69 @@ function S:_look(p,state,stage,variant)
   end
  end
 end
--- Saved state for today (rolls over at midnight UTC; yesterday's unlocked-but-not-taken pack goes into the Bag).
--- Returns the state and whether a new day just started.
+-- The saved state, sanitized (and stored back, so the caller works on the live table).
+function S:_read(player)
+ local premium=self.Data:GetPremium(player);local state=M.Read(premium.Mystery);premium.Mystery=state
+ return state
+end
+-- Saved state for today (rolls over at midnight UTC; yesterday's unlocked-but-not-taken pack goes into the Bag, or into the
+-- owed list when the Bag is full). Returns the state and whether a new day just started.
 function S:State(player)
- local premium=self.Data:GetPremium(player);local state=M.Read(premium.Mystery);local day=M.Day(os.time())
- premium.Mystery=state
+ local state=self:_read(player);local day=M.Day(os.time())
  if state.Day==day then return state,false end
  if M.Unlocked(state)and not state.Claimed then
-  if not self:_grant(player,state,true)then return state,false end -- a full Bag: it stays on the pedestal until taken
+  if not self:_grant(player,state,true)then
+   -- A full Bag: it is owed (one per day, oldest first) and today's pack starts as normal. Only when the owed list is
+   -- full too does it stay on the pedestal until taken (nothing is ever dropped).
+   if #state.Owed>=M.MaxOwed then return state,false end
+   state.Owed[#state.Owed+1]={Day=state.Day,Stage=state.Stage,Variant=state.Variant}
+  end
  end
- state={Day=day,Seconds=0,Claimed=false};premium.Mystery=state;self.Data:MarkDirty(player)
+ state={Day=day,Seconds=0,Claimed=false,Owed=state.Owed};self.Data:GetPremium(player).Mystery=state;self.Data:MarkDirty(player)
  return state,true
 end
 function S:_stage(player)
  return M.Stage(self.Config.TreadmillTiers,self.Data:GetTreadmillData(player).Tier)
 end
+-- Puts the pack in the Bag: the record, or nil and why. Does not yield, so the caller can record that it is gone straight after.
+function S:_give(player,pack)
+ return self.Data:AddChest(player,{Stage=pack.Stage,BagVariant=pack.Variant,PackSize=1,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion},{Luck=true})
+end
+-- The hotbar and the notice. how: nil = taken now, true = yesterday's pack, 'owed' = a pack that waited for room.
+function S:_announce(player,pack,record,how)
+ pcall(function()self.Chests:SyncTools(player)end)
+ local tier=PackRules.GetPackTier(pack.Variant);local label=PackRules.PackLabel(pack.Stage,pack.Variant,record.PackSize,'None')
+ if self.Notes then pcall(function()
+  local text=how=='owed'and('🎁 A waiting Mystery Pack went into your Bag: '..tier.Name..' '..label..'!')
+   or how and('🎁 Yesterday\'s Mystery Pack went into your Bag: '..tier.Name..' '..label..'!')or('🎁 MYSTERY PACK: '..tier.Name..' '..label..'!')
+  self.Notes:Show(player,text,tier.Color or RGB(255,214,90),5)
+ end)end
+end
 function S:_grant(player,state,carried)
- local record,why=self.Data:AddChest(player,{Stage=state.Stage,BagVariant=state.Variant,PackSize=1,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion},{Luck=true})
+ local record,why=self:_give(player,state)
  if not record then
   if self.Notes and not carried then pcall(function()self.Notes:Show(player,'🎒 '..tostring(why or'Make room in your Bag first.'),RGB(255,190,90),4)end)end
   return false
  end
  state.Claimed=true;self.Data:MarkDirty(player);self.Data:QueueGardenSave(player)
- pcall(function()self.Chests:SyncTools(player)end)
- local tier=PackRules.GetPackTier(state.Variant);local label=PackRules.PackLabel(state.Stage,state.Variant,record.PackSize,'None')
- if self.Notes then pcall(function()
-  self.Notes:Show(player,carried and('🎁 Yesterday\'s Mystery Pack went into your Bag: '..tier.Name..' '..label..'!')or('🎁 MYSTERY PACK: '..tier.Name..' '..label..'!'),tier.Color or RGB(255,214,90),5)
- end)end
+ self:_announce(player,state,record,carried)
  return true,record
+end
+-- Packs that did not fit in the Bag go in as soon as there is room (oldest first). The pack leaves the list in the same
+-- breath as it enters the Bag (nothing between the two can yield), so a save never has both and never neither; the list is
+-- read afresh each round. Tells the player (once per session) when some are still waiting.
+function S:_payOwed(player)
+ while true do
+  local owed=self:_read(player).Owed;local pack=owed[1];if not pack then return end
+  local record=self:_give(player,pack);if not record then break end
+  table.remove(owed,1);self.Data:MarkDirty(player);self.Data:QueueGardenSave(player)
+  self:_announce(player,pack,record,'owed')
+ end
+ local waiting=#self:_read(player).Owed
+ if waiting>0 and not self.Told[player]and self.Notes then
+  self.Told[player]=true
+  pcall(function()self.Notes:Show(player,'🎁 Make room: '..waiting..' mystery pack'..(waiting==1 and''or's')..' waiting',RGB(255,190,90),6)end)
+ end
 end
 function S:Publish(player,force)
  local record=self.Owner[player];if not record then return end
@@ -121,7 +162,13 @@ function S:Publish(player,force)
  local function set(k,v)if m:GetAttribute(k)~=v then m:SetAttribute(k,v)end end
  set('OwnerUserId',player.UserId);set('OwnerName',player.DisplayName);set('State',status);set('Stage',stage)
  set('Variant',status~='Locked'and state.Variant or nil);set('NextAt',M.NextDay(os.time()))
- if force or status~='Locked'then set('UnlockAt',status=='Locked'and math.floor(workspace:GetServerTimeNow()+M.Left(state))or nil)end
+ if status=='Locked'then
+  -- The client counts down to UnlockAt. It stays put while the clock runs, and is written again only when it drifts
+  -- (a server hitch counts at most 5 s a tick, so the pack unlocks later than the clock said).
+  local want=math.floor(workspace:GetServerTimeNow()+M.Left(state));local have=m:GetAttribute('UnlockAt')
+  if force or type(have)~='number'or math.abs(have-want)>M.DriftSeconds then set('UnlockAt',want)end
+ else set('UnlockAt',nil)end
+ if p.Prompt.Enabled~=(status=='Ready')then p.Prompt.Enabled=status=='Ready'end -- (only a pack that can be taken shows a prompt)
  self:_look(p,status,stage,state.Variant)
 end
 function S:Unlock(player,state)
@@ -140,6 +187,7 @@ function S:Claim(player,record)
  if state.Claimed or not M.Unlocked(state)then return false,'LOCKED'end
  local ok=self:_grant(player,state,false)
  self:Publish(player,true)
+ self:_payOwed(player)
  return ok
 end
 function S:Setup(player)
@@ -147,15 +195,16 @@ function S:Setup(player)
  local record=self.Bases and self.Bases:GetPlayerBase(player);if not record then return end
  self.Owner[player]=record;self.Unsaved[player]=0
  self:Publish(player,true)
+ self:_payOwed(player)
 end
 function S:Leaving(player)
  local record=self.Owner[player];self.Owner[player]=nil
  if self.Unsaved[player]and self.Unsaved[player]>0 then pcall(function()self.Data:MarkDirty(player)end)end
- self.Unsaved[player]=nil;self.LastClaim[player]=nil
+ self.Unsaved[player]=nil;self.LastClaim[player]=nil;self.Told[player]=nil
  local p=record and self.Pedestals[record]
  if p and p.Model.Parent then
   for _,k in ipairs({'OwnerUserId','OwnerName','UnlockAt','Variant'})do p.Model:SetAttribute(k,nil)end
-  p.Model:SetAttribute('State','Empty');self:_look(p,'Empty')
+  p.Model:SetAttribute('State','Empty');p.Prompt.Enabled=false;self:_look(p,'Empty')
  end
 end
 -- Once a second: count each owner's time, unlock at 15 minutes, roll over at midnight UTC.
@@ -164,8 +213,10 @@ function S:Step(dt)
  local step=math.min(self.Acc,5);self.Acc=0
  for player,record in pairs(self.Owner)do
   if not player.Parent or not self.Data:IsLoaded(player)then continue end
-  local state,newDay=self:State(player)
-  if newDay then self:Publish(player,true);state=self:State(player)end -- (Publish re-reads the saved state: count on the live table, not the stale one)
+  local _,newDay=self:State(player)
+  if newDay then self:Publish(player,true)end
+  self:_payOwed(player) -- (owed packs go in as soon as there is room)
+  local state=self:State(player) -- (Publish and _payOwed re-read the saved state: count on the live table, not an earlier one)
   if not state.Claimed and not M.Unlocked(state)then
    state.Seconds=math.min(M.UnlockSeconds,state.Seconds+step)
    self.Unsaved[player]=(self.Unsaved[player]or 0)+step

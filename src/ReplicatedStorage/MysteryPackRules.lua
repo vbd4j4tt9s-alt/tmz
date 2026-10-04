@@ -4,8 +4,12 @@
 --  * Time in the game today counts (UTC days, like the DAILY window), across rejoins; 15 minutes unlocks today's pack.
 --  * The biome is the player's best treadmill's biome (Trail Runner = Forest ... Thunder Runner = Storm), decided when
 --    it unlocks. The rarity is never Common (it is a daily treat): the odds below, rolled at the same moment.
---  * An unlocked pack that was not taken before midnight is added to the Bag on the next visit (never lost).
-local M={UnlockSeconds=15*60,SaveEvery=15,Version=141}
+--  * An unlocked pack that was not taken before midnight is added to the Bag on the next visit (never lost). If the Bag is
+--    full then, it waits in a small saved "owed" list (MaxOwed) and goes in as soon as there is room; today's pack and its
+--    15 minutes start fresh either way.
+--  * UnlockAt (server time) is published again when the countdown the client shows drifts more than DriftSeconds from the
+--    real one (a server hitch counts at most 5 s per tick).
+local M={UnlockSeconds=15*60,SaveEvery=15,Version=141,MaxOwed=3,DriftSeconds=2}
 M.Order={'Pack02','Pack03','Pack04','Pack05','Pack06','EclipseReliquary'}
 M.Odds={Pack02=.45,Pack03=.30,Pack04=.17,Pack05=.06,Pack06=.019,EclipseReliquary=.001}
 M.Void={Variant='EclipseReliquary',Stage=7}
@@ -30,14 +34,26 @@ function M.Roll(stage,draw)
  return {Stage=stage,Variant=variant}
 end
 -- Saved state: Day (UTC day it is for), Seconds (time in game that day), Stage / Variant (set when it unlocks),
--- Claimed. Anything odd resets to a fresh, empty state; it never pays out.
+-- Claimed, and Owed: up to MaxOwed unlocked packs from earlier days that did not fit in a full Bag, oldest first, each
+-- {Day, Stage, Variant} (one per day). Saves from before Owed existed read with an empty list. Anything odd resets to a
+-- fresh, empty state (a bad Owed entry is dropped); it never pays out.
 function M.Read(v)
- local out={Day=-1,Seconds=0,Claimed=false}
+ local out={Day=-1,Seconds=0,Claimed=false,Owed={}}
  if type(v)~='table'then return out end
  if integer(v.Day,-1,1e7)then out.Day=v.Day end
  if type(v.Seconds)=='number'and v.Seconds==v.Seconds then out.Seconds=math.clamp(v.Seconds,0,M.UnlockSeconds)end
  if integer(v.Stage,1,7)and valid[v.Variant]then out.Stage=v.Stage;out.Variant=v.Variant end
  out.Claimed=v.Claimed==true and out.Stage~=nil
+ if type(v.Owed)=='table'then
+  local seen={}
+  for i=1,math.min(#v.Owed,16)do -- (the oldest MaxOwed good ones are kept)
+   local e=v.Owed[i]
+   if type(e)=='table'and integer(e.Day,-1,1e7)and integer(e.Stage,1,7)and valid[e.Variant]and not seen[e.Day]then
+    seen[e.Day]=true;out.Owed[#out.Owed+1]={Day=e.Day,Stage=e.Stage,Variant=e.Variant}
+    if #out.Owed>=M.MaxOwed then break end
+   end
+  end
+ end
  return out
 end
 function M.Unlocked(state)return state.Seconds>=M.UnlockSeconds and state.Stage~=nil end

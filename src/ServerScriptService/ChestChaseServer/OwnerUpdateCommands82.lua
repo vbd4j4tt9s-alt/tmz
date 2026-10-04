@@ -178,11 +178,11 @@ function X.Execute(ctx,p,action,a)
   local premium=data:GetPremium(p)
   if sub=='ready'then local st=svc:State(p);if st.Claimed then st.Claimed=false;st.Stage=nil;st.Variant=nil end;st.Seconds=M.UnlockSeconds-3
   elseif sub=='next'then local st=svc:State(p);st.Day=st.Day-1;premium.Mystery=st
-  elseif sub=='reset'then premium.Mystery=nil end
+  elseif sub=='reset'then premium.Mystery={Owed=M.Read(premium.Mystery).Owed} end -- (today's pack starts over; packs owed from earlier days are real and stay)
   if sub~=''then svc:Publish(p,true);save(ctx,p)end
   local st=svc:State(p)
   local status=st.Claimed and'taken today'or M.Unlocked(st)and('ready: '..st.Variant..' stage '..st.Stage)or('locked, '..M.Clock(M.Left(st))..' to go')
-  return true,p.Name..': mystery pack '..status..' | pedestal '..(svc.Owner[p]and'in their base'or'not assigned')
+  return true,p.Name..': mystery pack '..status..(#st.Owed>0 and(' | '..#st.Owed..' owed (Bag was full)')or'')..' | pedestal '..(svc.Owner[p]and'in their base'or'not assigned')
  elseif action=='refreshcycle'then
   local cycle=integer(a[1],1,1000000);if #a~=1 or not cycle then return false,'Use refreshcycle <completed reset to test>.'end
   if ctx.Map.Refreshing then return false,'Refresh already running.'end
