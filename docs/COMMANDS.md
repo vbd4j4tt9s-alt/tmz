@@ -1,4 +1,4 @@
-# Test commands and tools (R140)
+# Test commands and tools (R147)
 
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
@@ -48,13 +48,15 @@
 | `packset storm @name` | One pack of each tier from a biome |
 | `pack storm 6 @name` | One pack. Optional extras in order: size, `none`/`gold`/`diamond`, count |
 | `void 1 @name` | Void Pack(s), 1–20 |
+| `verity 1 @name` | R147 Verity Pack(s), 1–20 (Verity seed 1/100, then the Void pack's odds without the King seeds) |
 | `rarepacks @name` | 5 TEST packs that reveal Legendary, Mythic, Secret, Cosmic and King |
-| `rarepacks mech @name` / `rarepacks king @name` | TEST packs: the six Mech designs, or one King |
-| `seeds snow @name`, `seeds all @name` | Every seed of a biome, or every seed in the game |
+| `rarepacks mech @name` / `rarepacks king @name` / `rarepacks verity @name` | TEST packs: the six Mech designs, one King, or a Verity Pack that reveals the Verity seed |
+| `seeds snow @name`, `seeds all @name`, `seeds verity @name` | Every seed of a biome, every seed in the game, or the Verity seed |
 | `give big diamond apple seed to @name` | One seed by plant name. `big`/`giant` and `gold`/`diamond` are optional |
 | `take apple seeds from @name` | Remove seeds |
-| `catalog storm`, `odds storm mythic 1`, `odds event` | Seed list and real odds |
-| `indexinfo storm @name` / `claimindex storm @name` | Index rewards |
+| `catalog storm`, `odds storm mythic 1`, `odds event`, `odds verity` | Seed list and real odds (`odds verity` = the Verity Pack) |
+| `indexinfo storm @name` / `claimindex storm @name` | Index rewards (`verity` = the R147 VERITY tab) |
+| `mystery @name`, `mystery ready`, `mystery next`, `mystery reset` | R147 base mystery pack: show the state (and packs owed to a full Bag); unlock in 3 s; pretend a new day; start over (owed packs are kept) |
 
 ## Garden
 | Command | What it does |
