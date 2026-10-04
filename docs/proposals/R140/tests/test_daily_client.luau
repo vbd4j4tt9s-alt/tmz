@@ -4,7 +4,7 @@
 -- TRACK in the top bar row on every screen (or just under it on very narrow ones), never over BASE / TRACK or off
 -- screen; the badge counts what is waiting; the DAILY window shows the week and the quests, claims through
 -- PremiumRequest 'Daily' (a fake server here), fits phones and computers; it opens by itself once when a login reward
--- waits (after the tutorial); INVITE prompts Roblox's invite; the friend chip shows the boost; the plant-ready opt-in
+-- waits (after the tutorial); INVITE prompts Roblox's invite; the friend chip shows the boost (R149: a speed GAIN boost, not a walk speed one); the plant-ready opt-in
 -- is asked once, after planting, only when the owner has set notifications up.
 local W=require('./world');local F=require('./fixtures');local R=W.R
 local fails,checks=0,0
@@ -177,6 +177,8 @@ check(not panel.Visible,'only once a session')
 -- 6. Invite.
 invite.Activated:Fire();R.advance(.1);frames(1)
 check(#invites==1 and type(invites[1])~='string'and invites[1].PromptMessage~=nil,'INVITE opens Roblox\'s invite prompt (with our message)')
+check(type(invites[1])~='string'and invites[1].PromptMessage:find('speed gain',1,true)and not invites[1].PromptMessage:lower():find('faster',1,true)and #invites[1].PromptMessage<=60,'(R149: the message is about faster speed gains, short: '..tostring(invites[1].PromptMessage)..')')
+check(tostring(invite:GetAttribute('AccessibleLabel')):find('+10% speed gain',1,true)~=nil,'(and so is the INVITE tooltip: '..tostring(invite:GetAttribute('AccessibleLabel'))..')')
 canInvite=false;invite.Activated:Fire();R.advance(.1);frames(1)
 check(#invites==1 and invite.InviteHint.Visible and invite.InviteHint.Text:find('not available',1,true),'where invites are off it says so')
 R.advance(3);frames(1);check(not invite.InviteHint.Visible,'(the hint goes away)')
@@ -184,6 +186,7 @@ R.advance(3);frames(1);check(not invite.InviteHint.Visible,'(the hint goes away)
 player:SetAttribute('FriendsInServer',2);player:SetAttribute('FriendSpeedBoost',1.2);frames(2)
 local chip=invite:FindFirstChild('Boost')
 check(chip and chip.Visible and chip.Text=='+20%','2 friends here: a +20% chip on INVITE')
+check(tostring(invite:GetAttribute('AccessibleLabel')):find('2 here: +20% speed gain',1,true)~=nil,'(the tooltip says "+20% speed gain": '..tostring(invite:GetAttribute('AccessibleLabel'))..')')
 player:SetAttribute('FriendsInServer',0);player:SetAttribute('FriendSpeedBoost',1);frames(2)
 check(not chip.Visible,'no friends: no chip')
 -- 8. Plant-ready opt-in.

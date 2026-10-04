@@ -13,7 +13,7 @@
 #                           re-streamed pedestals / parts, non-owners never see an enabled prompt), KeeperSpeedLabels (the
 #                           "SPEED NEEDED" pill, R148: a small fixed 104x36 sign, the points needed rounded up to 2 significant
 #                           figures as whole multiples of 5 - 3,800 / 18K / 1,200K / 22B -, "0" for nothing, "∞" for The Darkened; colours,
-#                           friend boost) and
+#                           R149: the friend boost no longer changes the numbers) and
 #                           Progression81.PointsFor / PointsText against Progression81.Speed over BalanceValues81.PointCurve.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)

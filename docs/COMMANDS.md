@@ -29,7 +29,7 @@
 | `treadmill 7 @name` | Treadmill tier 1–7 (Forest … Storm) |
 | `boots 5 @name`, `trail 6 @name`, `fence 7 @name` | Unlock and equip upgrades |
 | `bundle SpeedSmall @name` | Give a shop bundle with no purchase |
-| `training @name` | Treadmill gain per second and physical speed |
+| `training @name` | Treadmill gain per second (machine x friends) and physical speed |
 | `gardenbonus @name`, `cashoffers @name` | Garden bonuses; cash bundle amounts |
 
 ## Movement
@@ -227,5 +227,5 @@ listed separately any more because each one is the same as a command above.
    - 🎁 DAILY and 👥 INVITE sit right of TRACK in the top bar (phone too). DAILY's red number = login reward + finished quests.
    - After the tutorial the week opens by itself: claim day 1 (Gems float in). `daily next` → claim day 2; `daily week` → claim day 7 = a Mech pack in the Bag (rainbow ring).
    - Steal and bank 3 packs: ✅ QUEST DONE notice, CLAIM in QUESTS gives 💎5. `daily done` finishes all three.
-   - Live server with a friend: both get a "Friend boost" notice, INVITE shows +10% / +20%, and you run faster. INVITE opens Roblox's invite screen.
+   - Live server with a friend: both get a "Friend boost" notice, INVITE shows +10% / +20%, and treadmill training gives you that much more speed per second (R149: your running speed itself is not boosted; bought speed and bonus rolls are not either). `training` shows the "friends x1.2" part. INVITE opens Roblox's invite screen.
    - "Your plant is ready" needs the one-time setup in `docs/releases/R140.md` (notification string id on SocialService.MessageId, API key secret `PlantReadyKey`, HTTP on).

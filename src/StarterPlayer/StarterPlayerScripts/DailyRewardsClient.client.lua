@@ -44,7 +44,7 @@ local function topButton(name,emoji,caption,color,label)
  return b
 end
 local dailyButton=topButton('DailyButton','🎁','DAILY',RGB(255,150,48),'Daily rewards and quests')
-local inviteButton=topButton('InviteButton','👥','INVITE',RGB(64,170,255),'Invite friends. Each friend here makes you faster')
+local inviteButton=topButton('InviteButton','👥','INVITE',RGB(64,170,255),'Invite friends. Each friend here: +'..math.floor(D.FriendBoostPerFriend*100+.5)..'% speed gain')
 local function mount()
  local tb=pg:FindFirstChild('TravelButtons');local icons=tb and tb:FindFirstChild('TopIcons')
  if tb and not icons then tb.ChildAdded:Once(function()task.defer(mount)end)end
@@ -312,7 +312,7 @@ local function autoOpen()
  end)
 end
 for _,key in ipairs({'DailyLoginReady','TutorialDone'})do watch(player:GetAttributeChangedSignal(key),autoOpen)end
--- Invite + friend boost --------------------------------------------------------------------------------------------
+-- Invite + friend boost (R149: friends speed up the speed GAINED from training, not the walk speed) --------------------
 local inviteHint=text(inviteButton,'InviteHint','',14,Theme.Colors.Muted);inviteHint.Visible=false;inviteHint.BackgroundTransparency=.15;inviteHint.BackgroundColor3=Theme.Colors.Panel;inviteHint.ZIndex=30;Theme.Corner(inviteHint,8)
 inviteHint.AnchorPoint=Vector2.new(.5,0);inviteHint.Position=UDim2.new(.5,0,1,6);inviteHint.Size=UDim2.fromOffset(230,26)
 local function hint(message)
@@ -323,7 +323,7 @@ inviteButton.Activated:Connect(function()
  task.spawn(function()
   local ok,can=pcall(SocialService.CanSendGameInviteAsync,SocialService,player)
   if not ok or not can then hint('Invites are not available here');return end
-  local options;pcall(function()options=Instance.new('ExperienceInviteOptions');options.PromptMessage='Friends here make you faster! 👥'end)
+  local options;pcall(function()options=Instance.new('ExperienceInviteOptions');options.PromptMessage='Friends here boost your speed gain! 👥'end)
   if not pcall(SocialService.PromptGameInvite,SocialService,player,options)then pcall(SocialService.PromptGameInvite,SocialService,player)end
  end)
 end)
@@ -336,7 +336,7 @@ local function friendChip()
  end
  local before=chip.Visible and chip.Text or''
  chip.Visible=n>0;chip.Text='+'..math.floor((boost-1)*100+.5)..'%'
- inviteButton:SetAttribute('AccessibleLabel',n>0 and('Invite friends. '..n..' here: +'..math.floor((boost-1)*100+.5)..'% speed')or'Invite friends. Each friend here makes you faster')
+ inviteButton:SetAttribute('AccessibleLabel',n>0 and('Invite friends. '..n..' here: +'..math.floor((boost-1)*100+.5)..'% speed gain')or'Invite friends. Each friend here: +'..math.floor(D.FriendBoostPerFriend*100+.5)..'% speed gain')
  if chip.Visible and chip.Text~=before then pop(chip)end
 end
 for _,key in ipairs({'FriendsInServer','FriendSpeedBoost'})do watch(player:GetAttributeChangedSignal(key),friendChip)end

@@ -1,28 +1,24 @@
 -- R141 (owner: "add a speed req on top of every keeper's head"): a label over every keeper (each biome's keeper and
 -- The Darkened) with the Speed it takes to outrun it, in the same Speed numbers as the HUD. Green ✓ when you are
 -- already faster, red when not. The server stamps each keeper with KeeperEscapeSpeed (the walk speed it chases at
--- while close; KeeperPursuit.EscapeSpeed) and tags it BiomeKeeper; the friend speed boost is included.
+-- while close; KeeperPursuit.EscapeSpeed) and tags it BiomeKeeper. R149: the friend boost only speeds up the speed you GAIN
+-- from training, never how fast you run, so the number needed does not depend on it.
 -- R148 (owner: "the indicator is too big; the speed needed must be whole numbers and multiples of 5"): a small sign of a
 -- fixed size (never grown for big keepers) that always shows a number: the points needed rounded UP to 2 significant
 -- figures (SpeedPoints.NeedText: "510", "3,800", "18K", "1,200K", "22B"), "0" when nothing is needed, "∞" when it is out
 -- of reach (The Darkened).
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local player=Players.LocalPlayer
-local Progress=require(RS:WaitForChild('Progression81'));local Points=require(RS:WaitForChild('SpeedPoints'));local D=require(RS:WaitForChild('DailyRewards'))
+local Progress=require(RS:WaitForChild('Progression81'));local Points=require(RS:WaitForChild('SpeedPoints'))
 local RGB=Color3.fromRGB
 local GREEN,RED=RGB(110,236,96),RGB(255,86,86)
 local labels={}
-local function boost()
- local b=player:GetAttribute('FriendSpeedBoost')
- return type(b)=='number'and b==b and math.clamp(b,1,D.MaxMultiplier())or 1
-end
 -- Speed points needed to be faster than a keeper running at `speed`, as the sign's number. You must be strictly faster,
 -- so the need is PointsFor + 1 (exact decimal text: PointsFor is a double, and The Darkened's 600 takes 10^1011 points),
 -- rounded up to 2 significant figures. Nothing is needed below the new-runner speed: "0".
 local function needText(speed)
- local walk=speed/boost()
- if walk<Progress.Speed(0)then return'0'end
- return Points.NeedText(Points.Add(Progress.PointsText(walk),'1'))
+ if speed<Progress.Speed(0)then return'0'end
+ return Points.NeedText(Points.Add(Progress.PointsText(speed),'1'))
 end
 local function build(model)
  local gui=Instance.new('BillboardGui');gui.Name='SpeedReq';gui.Size=UDim2.fromOffset(104,36);gui.LightInfluence=0;gui.MaxDistance=160
@@ -40,7 +36,7 @@ end
 local function paint(entry)
  local escape=tonumber(entry.Model:GetAttribute('KeeperEscapeSpeed'))
  if not escape then entry.Gui.Enabled=false;return end
- local mine=tonumber(player:GetAttribute('PhysicalWalkSpeed'))or Progress.Speed(0)*boost()
+ local mine=tonumber(player:GetAttribute('PhysicalWalkSpeed'))or Progress.Speed(0)
  local fast=mine>escape;local need=needText(escape)
  local pill=entry.Gui.Pill;local color=fast and GREEN or RED
  pill.Value.Text='⚡ '..need..(fast and'  ✓'or'')
@@ -71,5 +67,5 @@ end
 local function repaint()for _,entry in pairs(labels)do paint(entry)end end
 for _,m in ipairs(CS:GetTagged('BiomeKeeper'))do add(m)end
 local added=CS:GetInstanceAddedSignal('BiomeKeeper'):Connect(add);local removed=CS:GetInstanceRemovedSignal('BiomeKeeper'):Connect(remove)
-local a=player:GetAttributeChangedSignal('PhysicalWalkSpeed'):Connect(repaint);local b=player:GetAttributeChangedSignal('FriendSpeedBoost'):Connect(repaint)
-script.Destroying:Connect(function()added:Disconnect();removed:Disconnect();a:Disconnect();b:Disconnect();for m in pairs(labels)do remove(m)end end)
+local a=player:GetAttributeChangedSignal('PhysicalWalkSpeed'):Connect(repaint)
+script.Destroying:Connect(function()added:Disconnect();removed:Disconnect();a:Disconnect();for m in pairs(labels)do remove(m)end end)

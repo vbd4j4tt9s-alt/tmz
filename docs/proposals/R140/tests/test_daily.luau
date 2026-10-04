@@ -4,8 +4,8 @@
 -- owner's live numbers (R141 DailyRewards/DailyProgress: login days 1-4 = a random seed pack, day 5 = 2 Gems, day 6 =
 -- 3 Gems, day 7 = 1 Mech pack; quests pay 2 Gems each, capped at 6 Gems a day, R140-era claims count 5): the real
 -- PlayerDataService (DailyProgress, AddChest, GrantMechPacks, OpenSeedPack, save rows), ChestService.Bank,
--- SocialService (friend boost, the shared plant-ready queue, the day rollover), Config.GetPlayerWalkSpeed and the
--- owner's daily command. MemoryStore and the Open Cloud call are faked; mock time = os.time.
+-- SocialService (friend boost, the shared plant-ready queue, the day rollover), Config.GetPlayerWalkSpeed (R149: x1, the
+-- boost now multiplies the speed gained in BaseService:_updateTrainingPlayer), MovementGuard and the owner's daily command. MemoryStore and the Open Cloud call are faked; mock time = os.time.
 local W=require('./world');local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -260,7 +260,7 @@ Data:GetPremium(A).Daily={Login={Step=99},Quests={Day=D.Day(R.clock),Progress={5
 local kept=Data:DailyState(A)
 check(kept.Quests[1].Progress==0 and kept.Quests[2].Progress==0 and kept.Quests[1].Claimed and kept.Quests[2].Claimed and kept.Quests[3].Claimed,'claim markers are kept (a claim is never undone), progress is reset')
 check(not Data:ClaimDailyQuest(A,1)and #pendingGems(A)==g99 and kept.QuestGemsGranted==15,'no payout from them, and R140-era claims count 5 each (15) toward the cap')
--- 6. Friend boost.
+-- 6. Friend boost (R149: it speeds up the speed GAINED from treadmill training, not the walk speed).
 local Social=server('SocialService');local social=Social.new(Data,Notes)
 local friends={['501:502']=true,['501:503']=true}
 local function fr(a,b)local x,y=math.min(a,b),math.max(a,b);return friends[x..':'..y]==true end
@@ -268,17 +268,95 @@ local B=makePlayer(502,'Ben');local C=makePlayer(503,'Cai')
 for _,p in ipairs({A,B,C})do function p.IsFriendsWith(self,id)return fr(self.UserId,id)end end
 shown={}
 social:Setup(A);social:Setup(B);social:Setup(C);R.advance(.1)
-check(A:GetAttribute('FriendsInServer')==2 and math.abs(A:GetAttribute('FriendSpeedBoost')-1.2)<1e-9,'Ava has 2 friends here: +20% speed')
+check(A:GetAttribute('FriendsInServer')==2 and math.abs(A:GetAttribute('FriendSpeedBoost')-1.2)<1e-9,'Ava has 2 friends here: +20% speed gain')
 check(B:GetAttribute('FriendsInServer')==1 and math.abs(B:GetAttribute('FriendSpeedBoost')-1.1)<1e-9 and C:GetAttribute('FriendsInServer')==1,'Ben and Cai (not friends with each other): +10% each')
-local told=false;for _,s in ipairs(shown)do if s.P==A and s.Text:find('Cai is here',1,true)and s.Text:find('+20%',1,true)then told=true end end
-check(told,'Ava is told when a friend joins (+20%)')
+local told=false;for _,s in ipairs(shown)do if s.P==A and s.Text:find('Cai is here',1,true)and s.Text:find('+20% speed gain',1,true)then told=true end end
+check(told,'Ava is told when a friend joins (+20% speed gain)')
 local stat=Data:GetOrCreateSpeedValue(A).Value
 local base=Config.GetWalkSpeed(stat)
-check(math.abs(Config.GetPlayerWalkSpeed(A,stat)-base*1.2)<1e-6,('her walk speed is 1.2x (%.2f -> %.2f)'):format(base,Config.GetPlayerWalkSpeed(A,stat)))
-A:SetAttribute('FriendSpeedBoost',5);check(math.abs(Config.GetPlayerWalkSpeed(A,stat)-base*D.MaxMultiplier())<1e-6,'never more than +30% whatever the attribute says')
-A:SetAttribute('FriendSpeedBoost',0/0);check(Config.GetPlayerWalkSpeed(A,stat)==base,'a bad value means no boost')
+-- R149 (owner: "the speed boost should only apply to the speed gain, not how fast the player goes"): the friend boost no longer
+-- touches the walk speed at all; it multiplies the speed points EARNED from treadmill training (and nothing else).
+check(Config.GetPlayerWalkSpeed(A,stat)==base,('with 2 friends her walk speed is unchanged, x1 (%.2f -> %.2f)'):format(base,Config.GetPlayerWalkSpeed(A,stat)))
+A:SetAttribute('FriendSpeedBoost',5);check(Config.GetPlayerWalkSpeed(A,stat)==base,'whatever the attribute says, the walk speed stays x1')
+A:SetAttribute('FriendSpeedBoost',0/0);check(Config.GetPlayerWalkSpeed(A,stat)==base,'(a bad value changes nothing either)')
+A:SetAttribute('FriendSpeedBoost',1.2)
 check(math.abs(D.FriendMultiplier(9)-1.3)<1e-9 and D.FriendMultiplier(0)==1,'up to 3 friends count (+30%)')
-local mg=W.B.MovementGuard;check(mg:find('GetPlayerWalkSpeed',1,true),'the movement guard uses the same boosted speed (no false alarms)')
+check(not W.B.Config:find('FriendSpeedBoost',1,true)and not W.B.MovementGuard:find('FriendSpeedBoost',1,true),'Config and MovementGuard no longer read the friend boost')
+-- MovementGuard: its speed budget comes from the plain walk speed (the same number with or without friends).
+do
+ local MG=server('MovementGuard');MG.Config=Config;MG.Data=Data;MG.Bases={TrainingSessions={}}
+ local Motion=W.module('RunnerMotion')
+ local mc=R.new('Model');local mh=R.new('Humanoid');mh.Parent=mc;local mr=R.new('Part');mr.Name='HumanoidRootPart';mr.Parent=mc;A.Character=mc
+ local budgets={}
+ for _,boost in ipairs({1,1.2,1.3})do A:SetAttribute('FriendSpeedBoost',boost);MG.Reset(A);budgets[#budgets+1]=MG.Records[A]and MG.Records[A].Budget end
+ check(budgets[1]~=nil and budgets[1]==Motion.Burst(Motion.AtPosition(base,mr.Position))and budgets[2]==budgets[1]and budgets[3]==budgets[1],'MovementGuard budgets from the plain speed ('..tostring(budgets[1])..' = '..tostring(budgets[2])..' = '..tostring(budgets[3])..')')
+ MG.Records[A]=nil;A.Character=nil;A:SetAttribute('FriendSpeedBoost',1.2)
+end
+-- The treadmill: BaseService:_updateTrainingPlayer (real) with a stand-in "self" around the real PlayerDataService / Config.
+do
+ local Base=server('BaseService')
+ local char=R.new('Model');local hum=R.new('Humanoid');hum.Parent=char;hum.Health=100;hum.Sit=false;hum.PlatformStand=false;hum.Jump=false;hum.WalkSpeed=16
+ local root=R.new('Part');root.Name='HumanoidRootPart';root.Parent=char;root.Anchored=true
+ local belt=R.new('Part');belt.Name='Belt';belt.Parent=R.new('Folder')
+ local record={Treadmill=belt};local fired={}
+ local stand=setmetatable({Config=Config,PlayerData=Data,TrainingSessions={},TrainingTime={},TrainingGainRemainder={},TrainingMustLeave={},TrainingCooldown={},
+  BusyChecker=function()return false end,GetPlayerBase=function()return record end,SpeedGainRemote={FireAllClients=function(_,...)fired[#fired+1]={...}end}},{__index=Base})
+ A.Character=char
+ local mult=stand:GetTreadmillMultiplier(A);local per=Config.TrainingPointsPerSecond
+ local function session()return{Character=char,Humanoid=hum,Root=root,Treadmill=belt,Record=record,Target=root.CFrame,BeltCFrame=belt.CFrame,Connections={},TutorialTrained=true,AnimationSpeed=Config.TreadmillAnimationSpeed}end
+ -- Train for `seconds` in one-tick steps from a clean slate with the attribute set to `boost`; returns the points gained.
+ local function train(seconds,boost,step)
+  A:SetAttribute('FriendSpeedBoost',boost);Data:GetOrCreateSpeedValue(A).Value=stat
+  stand.TrainingSessions[A]=session();stand.TrainingTime[A]=0;stand.TrainingGainRemainder[A]=0;fired={}
+  local dt=step or Config.TrainingInterval;local n=math.floor(seconds/dt+.5)
+  for _=1,n do stand:_updateTrainingPlayer(A,dt)end
+  stand.TrainingSessions[A]=nil
+  return tonumber(Data:GetOrCreateSpeedValue(A).Value)-tonumber(stat)
+ end
+ local function expect(f,seconds)return math.floor(per*mult*f*seconds/5+1e-9)*5 end
+ local g0=train(60,1);check(g0>0 and g0==expect(1,60),('no friends: 60 s of training = %d points (x%.2f machine, %d/s base)'):format(g0,mult,per))
+ local g1=train(60,D.FriendMultiplier(1));check(g1==expect(1.1,60),'1 friend: the gain is x1.1 ('..g1..' vs '..g0..')')
+ local g2=train(60,D.FriendMultiplier(2));check(g2==expect(1.2,60),'2 friends: the gain is x1.2 ('..g2..')')
+ local g3=train(60,D.FriendMultiplier(3));check(g3==expect(1.3,60),'3 friends: the gain is x1.3 ('..g3..')')
+ check(g1>g0 and g2>g1 and g3>g2 and g3%5==0 and g2%5==0 and g1%5==0,'(each friend gains more, always whole multiples of 5)')
+ check(train(60,5)==g3,'capped at +30% whatever the attribute says (5 -> the 3-friend gain)')
+ check(train(60,0/0)==g0 and train(60,.2)==g0 and train(60,-3)==g0 and train(60,math.huge)==g3 and train(60,'x')==g0,'a bad / below-1 attribute gives no boost')
+ -- The remainder is exact: one tick at a time and a different step size give the same total, and fractions carry over.
+ check(train(60,1.1,1/60)==g1,'splitting the time into smaller steps never changes the total (+10%)')
+ check(train(.5,1.3)==expect(1.3,.5)and train(1,1.3)==expect(1.3,1),'short sessions keep the fraction (0.5 s and 1 s at +30%)')
+ do
+  stand.TrainingSessions[A]=session();stand.TrainingTime[A]=0;stand.TrainingGainRemainder[A]=0;A:SetAttribute('FriendSpeedBoost',1.3);Data:GetOrCreateSpeedValue(A).Value=stat;fired={}
+  local bad=0
+  for i=1,36 do stand:_updateTrainingPlayer(A,Config.TrainingInterval)
+   local paid=tonumber(Data:GetOrCreateSpeedValue(A).Value)-tonumber(stat);if paid~=expect(1.3,i*Config.TrainingInterval)then bad+=1 end end
+  check(bad==0 and #fired>0,'tick by tick (36 ticks at +30%) the running total is always the whole 5s of the exact amount; the remainder carries over ('..bad..' off)')
+  local popupSum=0;for _,f in ipairs(fired)do popupSum+=f[2]end
+  check(popupSum==expect(1.3,6),'the gain popups add up to what was paid ('..popupSum..')')
+  stand.TrainingSessions[A]=nil
+ end
+ -- The HUD number and the popups.
+ stand.TrainingSessions[A]=session();stand.TrainingTime[A]=0;stand.TrainingGainRemainder[A]=0;A:SetAttribute('FriendSpeedBoost',1.2)
+ stand:_updateTrainingPlayer(A,Config.TrainingInterval)
+ check(math.abs(A:GetAttribute('TreadmillGainPerSecond')-per*mult*1.2)<1e-6,'TreadmillGainPerSecond (the HUD) includes the friend boost: '..tostring(A:GetAttribute('TreadmillGainPerSecond')))
+ check(A:GetAttribute('TreadmillAnimationRate')==nil or A:GetAttribute('TreadmillAnimationRate')==Config.TreadmillAnimationSpeed,'the treadmill animation speed is not boosted')
+ check(stand:_getTreadmillAnimationSpeed(mult*1.3)==stand:_getTreadmillAnimationSpeed(mult)and stand.TrainingSessions[A].AnimationSpeed==Config.TreadmillAnimationSpeed,'(same animation speed with and without friends)')
+ A:SetAttribute('FriendSpeedBoost',1);stand:_updateTrainingPlayer(A,Config.TrainingInterval)
+ check(math.abs(A:GetAttribute('TreadmillGainPerSecond')-per*mult)<1e-6,'the HUD number drops back when the friend leaves')
+ stand.TrainingSessions[A]=nil;A:SetAttribute('TreadmillGainPerSecond',nil)
+ -- The owner's `training` readout shows the friend part and the real total (read-only; it changes nothing).
+ do
+  A:SetAttribute('FriendSpeedBoost',1.3)
+  local okc,text=server('OwnerUpdateCommands82').Execute({Map={MapRoot={}},Chase={Event81={}},Data=Data,Config=Config,Bases=stand},A,'training',{})
+  check(okc==true and type(text)=='string'and text:find('friends x1.3',1,true)and text:find('total '..(per*mult*1.3)..'/s',1,true),'owner "training" shows friends x1.3 and the total '..(per*mult*1.3)..'/s ('..tostring(text)..')')
+ end
+ -- Purchases are not boosted.
+ A:SetAttribute('FriendSpeedBoost',D.MaxMultiplier());Data:GetOrCreateSpeedValue(A).Value=stat
+ local row=W.module('PremiumPricing').Find('SpeedSmall')
+ check(Data:GrantPremiumBundle(A,'SpeedSmall')and tonumber(Data:GetOrCreateSpeedValue(A).Value)-tonumber(stat)==row.Amount,'a bought Speed bundle pays exactly its amount even with 3 friends here ('..row.Amount..')')
+ -- Walk speed from the points earned is still the plain curve.
+ local earned=Data:GetOrCreateSpeedValue(A).Value;check(Config.GetPlayerWalkSpeed(A,earned)==Config.GetWalkSpeed(earned),'walk speed after training = the speed curve at the points, x1')
+ Data:GetOrCreateSpeedValue(A).Value=stat;A:SetAttribute('FriendSpeedBoost',1.2);A.Character=nil;A:SetAttribute('PhysicalWalkSpeed',nil)
+end
 social:Leaving(B);present[502]=nil
 check(A:GetAttribute('FriendsInServer')==1 and math.abs(A:GetAttribute('FriendSpeedBoost')-1.1)<1e-9,'Ben leaves: Ava drops to +10%')
 -- 7. "Your plant is ready".

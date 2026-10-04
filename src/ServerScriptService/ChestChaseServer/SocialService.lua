@@ -1,7 +1,7 @@
 -- R140 (owner: "speed boost for friends in the server and an invite button", "the your plant is ready thing"):
---  * Friend boost: every Roblox friend in the same server adds DailyRewards.FriendBoostPerFriend walk speed (up to
---    FriendBoostMaxFriends). The server sets FriendsInServer / FriendSpeedBoost; Config.GetPlayerWalkSpeed applies it,
---    so movement, runs, the keepers' cap and MovementGuard all agree.
+--  * Friend boost: every Roblox friend in the same server adds DailyRewards.FriendBoostPerFriend to the speed GAINED
+--    from treadmill training (up to FriendBoostMaxFriends). The server sets FriendsInServer / FriendSpeedBoost;
+--    BaseService:GetFriendGainMultiplier applies it (R149: it no longer touches the walk speed).
 --  * "Your plant is ready": when a player leaves with a plant still growing, the time its first fruit is ready goes
 --    into a MemoryStore queue shared by every server; whichever server is running then sends the Roblox experience
 --    notification. Nothing happens until the owner sets this module's MessageId attribute (the notification string's
@@ -49,12 +49,12 @@ function S:FriendJoined(player)
   if other~=player and self:_isFriend(other,player)then
    local n=self:Recount(other)
    if self.Notifications then pcall(function()
-    self.Notifications:Show(other,'👥 '..player.DisplayName..' is here! Friend boost: +'..math.floor((D.FriendMultiplier(n)-1)*100+.5)..'% speed',Color3.fromRGB(120,220,255),5)
+    self.Notifications:Show(other,'👥 '..player.DisplayName..' is here! Friend boost: +'..math.floor((D.FriendMultiplier(n)-1)*100+.5)..'% speed gain',Color3.fromRGB(120,220,255),5)
    end)end
   end
  end
  if mine>0 and self.Notifications then pcall(function()
-  self.Notifications:Show(player,'👥 '..mine..(mine==1 and' friend'or' friends')..' here! Friend boost: +'..math.floor((D.FriendMultiplier(mine)-1)*100+.5)..'% speed',Color3.fromRGB(120,220,255),5)
+  self.Notifications:Show(player,'👥 '..mine..(mine==1 and' friend'or' friends')..' here! Friend boost: +'..math.floor((D.FriendMultiplier(mine)-1)*100+.5)..'% speed gain',Color3.fromRGB(120,220,255),5)
  end)end
 end
 function S:FriendLeft(player)

@@ -3,11 +3,11 @@
 #  (updated for the live R141 numbers: login days 1-4 = random seed pack, day 5 = 2 Gems, day 6 = 3 Gems, day 7 = Mech
 #  pack; quests 2 Gems each, 6 Gems a day cap, claims need data.CanSave)
 #  test_daily.luau        - login week (day 7 = Mech pack), daily quests (2 Gems each) with the real PlayerDataService,
-#                           ChestService.Bank and OpenSeedPack; save/load; the friend speed boost (SocialService +
-#                           Config.GetPlayerWalkSpeed); the shared "your plant is ready" queue and the Open Cloud call
+#                           ChestService.Bank and OpenSeedPack; save/load; the friend boost (SocialService; R149: the walk
+#                           speed stays x1, BaseService treadmill gain x1.1 / x1.2 / x1.3, purchases not boosted, MovementGuard); the shared "your plant is ready" queue and the Open Cloud call
 #                           (faked MemoryStore / HttpService); the midnight rollover; the owner's daily command.
 #  test_daily_client.luau - the real TravelButtons + DailyRewardsClient: DAILY / INVITE in the top bar row on many
-#                           screens, the window (LOGIN week, QUESTS), claims, badges, auto-open, invite, friend chip,
+#                           screens, the window (LOGIN week, QUESTS), claims, badges, auto-open, invite (R149 wording: speed gain), friend chip,
 #                           the notification opt-in.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)

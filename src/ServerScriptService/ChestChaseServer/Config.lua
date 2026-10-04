@@ -302,11 +302,9 @@ function Config.GetPlayerWalkSpeed(player,speedStat)
     if game:GetService('RunService'):IsStudio()and type(override)=='number'and override==override and math.abs(override)<math.huge then
         return math.clamp(override,Config.BaseWalkSpeed,500)
     end
-    -- R140: friends in the same server (SocialService sets FriendSpeedBoost; DailyRewards has the numbers).
-    local boost=player and player:GetAttribute('FriendSpeedBoost')
-    local D=require(game:GetService('ReplicatedStorage').DailyRewards)
-    boost=type(boost)=='number'and boost==boost and math.clamp(boost,1,D.MaxMultiplier())or 1
-    return Config.GetWalkSpeed(speedStat)*boost
+    -- R149: walk speed depends on speed points only. The friend boost (R140) now speeds up the speed GAIN from
+    -- training instead (BaseService:GetFriendGainMultiplier), never how fast the player runs.
+    return Config.GetWalkSpeed(speedStat)
 end
 
 function Config.NormalizeSpeedStat(value)

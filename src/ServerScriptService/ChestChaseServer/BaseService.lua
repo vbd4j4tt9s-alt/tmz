@@ -472,7 +472,9 @@ function BaseService:_updateTrainingPlayer(player, deltaTime)
 	local multiplier = self:GetTreadmillMultiplier(player)
 	if multiplier ~= multiplier or multiplier == math.huge then multiplier = 1 end
 	multiplier = math.max(1, multiplier)
-	local gainRate = self.Config.TrainingPointsPerSecond * multiplier
+	-- R149: friends in the server speed up the speed GAINED here (not the walk speed, and not the treadmill animation).
+	local gainMultiplier = multiplier * self:GetFriendGainMultiplier(player)
+	local gainRate = self.Config.TrainingPointsPerSecond * gainMultiplier
 	if player:GetAttribute("TreadmillGainPerSecond") ~= gainRate then player:SetAttribute("TreadmillGainPerSecond", gainRate) end
 	local animationSpeed = self:_getTreadmillAnimationSpeed(multiplier)
 	local previousAnimationSpeed = session.AnimationSpeed or animationSpeed
@@ -486,7 +488,7 @@ function BaseService:_updateTrainingPlayer(player, deltaTime)
         if session.TutorialSeconds>=3 then session.TutorialTrained=true;self.PlayerData:TutorialEvent(player,'Train')end
     end
 	local speed = self.PlayerData:GetOrCreateSpeedValue(player)
-	local gain, ticks = self:_collectTreadmillGain(player, deltaTime, multiplier)
+	local gain, ticks = self:_collectTreadmillGain(player, deltaTime, gainMultiplier)
 	if gain <= 0 then return end
 	local actualGain = self.PlayerData:AddSpeed(player,gain)
 	self:_applyPhysicalSpeed(player, humanoid, speed.Value)
@@ -524,6 +526,16 @@ function BaseService:StartTraining()
 	end)
 	print(self.Config.TreadmillsEnabled == false and "[V114] Training paused; movement stabilization active."
         or "[V0.50] Treadmill training loaded.")
+end
+
+-- R149 (owner: "the speed boost should only apply to the speed gain, not how fast the player goes"): the friend boost
+-- (SocialService sets FriendSpeedBoost; DailyRewards has the numbers: +10% per friend, 3 friends at most) multiplies the
+-- speed points earned from treadmill training, 1 .. DailyRewards.MaxMultiplier() whatever the attribute says. Bought
+-- speed, gifts, owner commands and treadmill bonus rolls never go through here.
+function BaseService:GetFriendGainMultiplier(player)
+    local boost=player and player:GetAttribute('FriendSpeedBoost')
+    return type(boost)=='number'and boost==boost
+        and math.clamp(boost,1,require(ReplicatedStorage.DailyRewards).MaxMultiplier())or 1
 end
 
 function BaseService:GetTreadmillMultiplier(player)
