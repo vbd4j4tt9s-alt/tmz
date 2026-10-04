@@ -59,10 +59,11 @@ check(v.Z>0 and v.Z<60,'velocity smoothed ('..v.Z..')')
 Field.Track(s,V3(0,0,500),1/60);check(s.Velocity.Magnitude==0,'teleport resets the velocity')
 local l1,c1=Field.Lead(24,55,true);check(math.abs(l1-24/55)<1e-9 and c1==Field.FallMaxLead,'rain lead = fall time')
 sc.Destroying:Fire();check(W.workspace:FindFirstChild('_BiomeWeatherV105')==nil,'teardown removes the box')
--- WorldEvents (global rain / blizzard): same fix, checked in the source.
-do local text=W.B.WorldEvents
- check(text:find('emitter.LockedToPart=false',1,true)~=nil and text:find('emitter.LockedToPart=true',1,true)==nil,'global rain/snow not locked to the box')
- check(text:find('Run.RenderStepped:Connect',1,true)~=nil and text:find('Field.Target',1,true)~=nil,'global precipitation box follows every frame with a lead')
+-- Global rain / blizzard: R149 replaced WorldEvents' camera-following box with world-fixed tiles (WeatherWorld149.client.lua, tests in
+-- docs/proposals/R149/tests); the R128 rule (not locked, nothing dragged along) holds there, checked in the source.
+do local text=W.B.WeatherWorld149
+ check(text:find('e.LockedToPart=false',1,true)~=nil and text:find('LockedToPart=true',1,true)==nil,'global rain/snow tiles are not locked to their part')
+ check(W.B.WorldEvents:find('Field.Target',1,true)==nil and text:find('RenderStepped',1,true)==nil and text:find('Field.Target',1,true)==nil,'no camera-following precipitation box any more (R149: tiles are fixed in the world)')
 end
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

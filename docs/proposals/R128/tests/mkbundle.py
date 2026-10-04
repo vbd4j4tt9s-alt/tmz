@@ -6,6 +6,7 @@ src = os.path.normpath(os.path.join(here, '../../../../src'))
 pairs = [(f[:-4], src + '/ReplicatedStorage/' + f) for f in sorted(os.listdir(src + '/ReplicatedStorage')) if f.endswith('.lua')]
 for n in ('BiomeWeather', 'ItemCosmetics', 'SeedPackRender', 'WorldEvents'):
     pairs.append((n, src + '/StarterPlayer/StarterPlayerScripts/' + n + '.client.lua'))
+pairs.append(('WeatherWorld149', src + '/StarterPlayer/StarterPlayerScripts/WeatherWorld149.client.lua'))  # R149: the global rain / snow tiles
 parts = ['return {']
 for name, path in pairs:
     s = open(path, 'rb').read().decode('utf-8')

@@ -1,6 +1,7 @@
 --!nocheck
 -- R129 (owner): weather is a base-area thing. Real WorldEvents (global rain / snow / storm), BiomeMood palette,
--- BiomeWeather (biome particles) and BiomePresentation source on the Roblox mock:
+-- BiomeWeather (biome particles) and BiomePresentation source on the Roblox mock (R149: the rain / snow is now the world-fixed tiles of
+-- WeatherWorld149.client.lua, WorldEvents keeps the clouds, notices and lightning):
 --  * in the base the rain keeps falling whatever the camera does (no "roof" cut) and the clouds turn dark;
 --  * on the track there is no weather effect at all, and the biome's own particles keep running;
 --  * clouds and lighting come back exactly when the weather ends.
@@ -26,41 +27,45 @@ function terrain.FindFirstChildOfClass(self,c)for _,x in ipairs(self:GetChildren
 W.service('ContentProvider').PreloadAsync=function()end
 local cam=W.workspace.CurrentCamera;cam.CFrame=CF(0,14,-75)
 W.RS:SetAttribute('GlobalWeather','Clear')
-W.load('WorldEvents',R.new('LocalScript'))
-local folder=W.workspace:FindFirstChild('_GlobalWeatherR59');local rain=folder and folder:FindFirstChildWhichIsA('Part',true)
-local emitter;for _,d in ipairs(folder:GetDescendants())do if d.ClassName=='ParticleEmitter'and d.Name=='Precipitation'then emitter=d end end
-check(emitter~=nil,'precipitation emitter exists')
+W.load('WorldEvents',R.new('LocalScript'));W.load('WeatherWorld',R.new('LocalScript'))
+-- the precipitation emitters: one per pooled world tile
+local function tilesOn()
+ local n,locked=0,true;local f=W.workspace:FindFirstChild('_WeatherWorldR149');local sky=f and f:FindFirstChild('Sky tiles')
+ if sky then for _,p in ipairs(sky:GetChildren())do local e=p:FindFirstChildWhichIsA('ParticleEmitter');if e and e.Enabled==true and e.Rate>0 then n+=1;if e.LockedToPart~=false then locked=false end end end end
+ return n,locked
+end
+check(W.workspace:FindFirstChild('_WeatherWorldR149')~=nil,'precipitation tiles folder exists')
 local function frames(sec)W.frames(math.floor(sec*60+.5),1/60)end
 -- 1. Rain in the base: falling, world-space, clouds darken
 W.RS:SetAttribute('GlobalWeather','Rain');frames(.5)
-check(emitter.Enabled==true and emitter.LockedToPart==false,'rain falls in the base (world-space)')
+check(tilesOn()>0 and select(2,tilesOn()),'rain falls in the base (world-space)')
 -- Camera passes under a roof: the rain keeps falling (the old camera roof check is gone)
 local roof=R.new('Part');roof.Size=V3(200,2,200);roof.CFrame=CF(0,40,-75);roof.Anchored=true;roof.Parent=W.workspace
 for i=1,40 do cam.CFrame=CF(math.sin(i)*8,14,-75+i*.2);W.frames(1,1/60)end
-check(emitter.Enabled==true,'turning the camera / passing under things never stops the rain')
+check(tilesOn()>0,'turning the camera / passing under things never stops the rain')
 frames(6)
 check(clouds.Cover>.8 and clouds.Density>.75,('clouds thicken (%.2f cover, %.2f density)'):format(clouds.Cover,clouds.Density))
 check(clouds.Color.R<.5 and clouds.Color.G<.5,'clouds turn dark grey')
 check(clouds.Enabled==true,'cloud Enabled left to RefreshSky')
 -- 2. On the track: no weather effect at all
 hrp.CFrame=CF(0,5,120);cam.CFrame=CF(0,14,105);frames(.5)
-check(emitter.Enabled==false,'no rain on the track')
+check(tilesOn()==0,'no rain on the track')
 frames(8)
 check(math.abs(clouds.Cover-.35)<.01 and math.abs(clouds.Density-.25)<.01,'clouds clear while on the track')
 -- Back to the base: rain again
 hrp.CFrame=CF(0,5,-60);cam.CFrame=CF(0,14,-75);frames(.5)
-check(emitter.Enabled==true,'rain again back in the base')
+check(tilesOn()>0,'rain again back in the base')
 -- 3. Thunderstorm lightning only in the base
 W.RS:SetAttribute('GlobalWeather','Thunderstorm');frames(1)
-check(emitter.Enabled==true,'storm rain in the base')
+check(tilesOn()>0,'storm rain in the base')
 hrp.CFrame=CF(0,5,120);frames(1)
 local flash=W.service('Lighting'):FindFirstChild('DistantThunderGlow')
-check(emitter.Enabled==false and(not flash or flash.Enabled==false),'no storm rain or lightning flash on the track')
+check(tilesOn()==0 and(not flash or flash.Enabled==false),'no storm rain or lightning flash on the track')
 -- 4. Weather ends: clouds back exactly
 hrp.CFrame=CF(0,5,-60);frames(4)
 W.RS:SetAttribute('GlobalWeather','Clear');frames(10)
 check(clouds.Cover==.35 and clouds.Density==.25 and clouds.Color.R==1,'clouds restored exactly after the weather')
-check(emitter.Enabled==false,'no precipitation when clear')
+check(tilesOn()==0,'no precipitation when clear')
 -- 5. A place without clouds gets a temporary cloud layer, removed afterwards
 clouds:Destroy();W.RS:SetAttribute('GlobalWeather','Blizzard');frames(6)
 local made=terrain:FindFirstChild('WeatherClouds')
