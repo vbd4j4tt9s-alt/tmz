@@ -1,7 +1,7 @@
 -- R140 (owner: "speed boost for friends in the server and an invite button", "the your plant is ready thing"):
 --  * Friend boost: every Roblox friend in the same server adds DailyRewards.FriendBoostPerFriend to the speed GAINED
 --    from treadmill training (up to FriendBoostMaxFriends). The server sets FriendsInServer / FriendSpeedBoost;
---    BaseService:GetFriendGainMultiplier applies it (R149: it no longer touches the walk speed).
+--    BaseService:GetFriendGainMultiplier applies it (R148: it no longer touches the walk speed).
 --  * "Your plant is ready": when a player leaves with a plant still growing, the time its first fruit is ready goes
 --    into a MemoryStore queue shared by every server; whichever server is running then sends the Roblox experience
 --    notification. Nothing happens until the owner sets this module's MessageId attribute (the notification string's

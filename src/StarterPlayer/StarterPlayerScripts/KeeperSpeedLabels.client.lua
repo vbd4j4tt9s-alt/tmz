@@ -1,7 +1,7 @@
 -- R141 (owner: "add a speed req on top of every keeper's head"): a label over every keeper (each biome's keeper and
 -- The Darkened) with the Speed it takes to outrun it, in the same Speed numbers as the HUD. Green ✓ when you are
 -- already faster, red when not. The server stamps each keeper with KeeperEscapeSpeed (the walk speed it chases at
--- while close; KeeperPursuit.EscapeSpeed) and tags it BiomeKeeper. R149: the friend boost only speeds up the speed you GAIN
+-- while close; KeeperPursuit.EscapeSpeed) and tags it BiomeKeeper. R148: the friend boost only speeds up the speed you GAIN
 -- from training, never how fast you run, so the number needed does not depend on it.
 -- R148 (owner: "the indicator is too big; the speed needed must be whole numbers and multiples of 5"): a small sign of a
 -- fixed size (never grown for big keepers) that always shows a number: the points needed rounded UP to 2 significant

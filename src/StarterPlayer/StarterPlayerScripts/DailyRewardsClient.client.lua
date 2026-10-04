@@ -312,7 +312,7 @@ local function autoOpen()
  end)
 end
 for _,key in ipairs({'DailyLoginReady','TutorialDone'})do watch(player:GetAttributeChangedSignal(key),autoOpen)end
--- Invite + friend boost (R149: friends speed up the speed GAINED from training, not the walk speed) --------------------
+-- Invite + friend boost (R148: friends speed up the speed GAINED from training, not the walk speed) --------------------
 local inviteHint=text(inviteButton,'InviteHint','',14,Theme.Colors.Muted);inviteHint.Visible=false;inviteHint.BackgroundTransparency=.15;inviteHint.BackgroundColor3=Theme.Colors.Panel;inviteHint.ZIndex=30;Theme.Corner(inviteHint,8)
 inviteHint.AnchorPoint=Vector2.new(.5,0);inviteHint.Position=UDim2.new(.5,0,1,6);inviteHint.Size=UDim2.fromOffset(230,26)
 local function hint(message)

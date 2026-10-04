@@ -302,7 +302,7 @@ function Config.GetPlayerWalkSpeed(player,speedStat)
     if game:GetService('RunService'):IsStudio()and type(override)=='number'and override==override and math.abs(override)<math.huge then
         return math.clamp(override,Config.BaseWalkSpeed,500)
     end
-    -- R149: walk speed depends on speed points only. The friend boost (R140) now speeds up the speed GAIN from
+    -- R148: walk speed depends on speed points only. The friend boost (R140) now speeds up the speed GAIN from
     -- training instead (BaseService:GetFriendGainMultiplier), never how fast the player runs.
     return Config.GetWalkSpeed(speedStat)
 end

@@ -16,7 +16,7 @@ D.Quests={
  {Key='Harvest',Goal=5,Text='Pick 5 fruit',Icon='🍎'},
  {Key='Sell',Goal=5,Text='Sell 5 fruit',Icon='💰'},
 }
--- Every friend in the same server adds 10% to the speed gained from training (R149: not the walk speed), up to 3 friends (+30%).
+-- Every friend in the same server adds 10% to the speed gained from training (R148: not the walk speed), up to 3 friends (+30%).
 D.FriendBoostPerFriend=.10;D.FriendBoostMaxFriends=3
 local function integer(n,lo,hi)return type(n)=='number'and n==n and n%1==0 and n>=lo and n<=hi end
 function D.Day(t)return math.floor((t or os.time())/86400)end

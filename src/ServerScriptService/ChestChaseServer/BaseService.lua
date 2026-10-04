@@ -472,7 +472,7 @@ function BaseService:_updateTrainingPlayer(player, deltaTime)
 	local multiplier = self:GetTreadmillMultiplier(player)
 	if multiplier ~= multiplier or multiplier == math.huge then multiplier = 1 end
 	multiplier = math.max(1, multiplier)
-	-- R149: friends in the server speed up the speed GAINED here (not the walk speed, and not the treadmill animation).
+	-- R148: friends in the server speed up the speed GAINED here (not the walk speed, and not the treadmill animation).
 	local gainMultiplier = multiplier * self:GetFriendGainMultiplier(player)
 	local gainRate = self.Config.TrainingPointsPerSecond * gainMultiplier
 	if player:GetAttribute("TreadmillGainPerSecond") ~= gainRate then player:SetAttribute("TreadmillGainPerSecond", gainRate) end
@@ -528,7 +528,7 @@ function BaseService:StartTraining()
         or "[V0.50] Treadmill training loaded.")
 end
 
--- R149 (owner: "the speed boost should only apply to the speed gain, not how fast the player goes"): the friend boost
+-- R148 (owner: "the speed boost should only apply to the speed gain, not how fast the player goes"): the friend boost
 -- (SocialService sets FriendSpeedBoost; DailyRewards has the numbers: +10% per friend, 3 friends at most) multiplies the
 -- speed points earned from treadmill training, 1 .. DailyRewards.MaxMultiplier() whatever the attribute says. Bought
 -- speed, gifts, owner commands and treadmill bonus rolls never go through here.
@@ -553,7 +553,7 @@ function BaseService:TreadmillSnapshot(player,message)
             Unlocked=true,Owned=i<=data.Tier}
     end
     return {Tier=data.Tier,Skin=data.Skin,Tiers=tiers,Cash=self.PlayerData:GetCash(player),
-        Rate=self.Config.TrainingPointsPerSecond*self:GetTreadmillMultiplier(player),Message=message}
+        Rate=self.Config.TrainingPointsPerSecond*self:GetTreadmillMultiplier(player)*self:GetFriendGainMultiplier(player),Message=message} -- R148: the friend boost is part of the gain
 end
 function BaseService:CanManageTreadmill(player)
     local record=self:GetPlayerBase(player)

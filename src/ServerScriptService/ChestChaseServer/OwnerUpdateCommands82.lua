@@ -127,7 +127,7 @@ function X.Execute(ctx,p,action,a)
  elseif action=='training'then
   if #a~=0 then return false,'Use training [@username].'end
   local points=data:GetOrCreateSpeedValue(p).Value
-  return true,'Treadmill only | base '..ctx.Config.TrainingPointsPerSecond..'/s | multiplier '..ctx.Bases:GetTreadmillMultiplier(p)..' | friends x'..ctx.Bases:GetFriendGainMultiplier(p)..' | total '..(ctx.Config.TrainingPointsPerSecond*ctx.Bases:GetTreadmillMultiplier(p)*ctx.Bases:GetFriendGainMultiplier(p))..'/s | training '..tostring(p:GetAttribute('TreadmillTraining')==true)..' | physical '..string.format('%.2f',ctx.Config.GetPlayerWalkSpeed(p,points))..' | points '..points
+  return true,'Treadmill only | base '..ctx.Config.TrainingPointsPerSecond..'/s | multiplier '..ctx.Bases:GetTreadmillMultiplier(p)..' | friends x'..string.format('%g',math.floor(ctx.Bases:GetFriendGainMultiplier(p)*100+.5)/100)..' | total '..string.format('%g',math.floor(ctx.Config.TrainingPointsPerSecond*ctx.Bases:GetTreadmillMultiplier(p)*ctx.Bases:GetFriendGainMultiplier(p)*100+.5)/100)..'/s | training '..tostring(p:GetAttribute('TreadmillTraining')==true)..' | physical '..string.format('%.2f',ctx.Config.GetPlayerWalkSpeed(p,points))..' | points '..points
  elseif action=='odds'then
   local st,key,luck
   if a[1]=='event'or a[1]=='eclipse'then st=7;key='EclipseReliquary';luck=tonumber(a[2]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>2 then return false,'Use odds event [luck].'end

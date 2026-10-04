@@ -49,7 +49,7 @@ local function hideSupports(item,r,hidden)
  local solid=item:FindFirstChild('SolidPlant');if solid then for _,p in ipairs(solid:GetDescendants())do hidePart(p,full)end end
  local growing=item:FindFirstChild('GrowingFruit');if growing then for _,p in ipairs(growing:GetDescendants())do hidePart(p,full)end end
  local fruit=item:FindFirstChild('FruitPrompts');if fruit then for _,p in ipairs(fruit:GetDescendants())do
-  if p:IsA('BasePart')then
+  if p:IsA('BasePart')or p:IsA('Decal')then -- R148: the Verity proxy ball's face Decals hide with it
    local index=p:GetAttribute('HarvestIndex');local group=p.Parent
    while not index and group and group~=fruit do index=group:GetAttribute('HarvestIndex')or tonumber(group.Name:match('^Harvest_(%d+)$'));group=group.Parent end
    hidePart(p,full or(hidden and r.Selection and r.Selection[index]==true))
