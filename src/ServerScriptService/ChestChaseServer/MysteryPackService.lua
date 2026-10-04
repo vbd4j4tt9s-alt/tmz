@@ -165,7 +165,7 @@ function S:Step(dt)
  for player,record in pairs(self.Owner)do
   if not player.Parent or not self.Data:IsLoaded(player)then continue end
   local state,newDay=self:State(player)
-  if newDay then self:Publish(player,true)end
+  if newDay then self:Publish(player,true);state=self:State(player)end -- (Publish re-reads the saved state: count on the live table, not the stale one)
   if not state.Claimed and not M.Unlocked(state)then
    state.Seconds=math.min(M.UnlockSeconds,state.Seconds+step)
    self.Unsaved[player]=(self.Unsaved[player]or 0)+step

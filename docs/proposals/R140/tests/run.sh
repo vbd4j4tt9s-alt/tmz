@@ -1,6 +1,8 @@
 #!/bin/sh
 # Usage: sh run.sh [scratch dir]. R140 checks on the Roblox mock with the real scripts:
-#  test_daily.luau        - login week (day 7 = Mech pack), daily quests (5 Gems each) with the real PlayerDataService,
+#  (updated for the live R141 numbers: login days 1-4 = random seed pack, day 5 = 2 Gems, day 6 = 3 Gems, day 7 = Mech
+#  pack; quests 2 Gems each, 6 Gems a day cap, claims need data.CanSave)
+#  test_daily.luau        - login week (day 7 = Mech pack), daily quests (2 Gems each) with the real PlayerDataService,
 #                           ChestService.Bank and OpenSeedPack; save/load; the friend speed boost (SocialService +
 #                           Config.GetPlayerWalkSpeed); the shared "your plant is ready" queue and the Open Cloud call
 #                           (faked MemoryStore / HttpService); the midnight rollover; the owner's daily command.

@@ -100,6 +100,7 @@ local bag0=#records
 local ok,msg,info=Data:ClaimDailyLogin(A)
 local rec1=records[bag0+1]
 check(ok and info.Day==1 and info.Reward.SeedPack==1 and #records==bag0+1 and #pendingGems(A)==0,'day 1: a random seed pack in the Bag, no Gems: '..tostring(msg))
+-- NOTE (reported, not asserted): GrantDailyPack builds the pack without OddsVersion, so AddChest stores the legacy 81.
 check(isDailyPack(rec1),'the pack: stage 1-7, a Pack01-06 variant, a rolled size, no mutation, not a paid item ('..tostring(rec1 and rec1.Stage)..', '..tostring(rec1 and rec1.BagVariant)..', x'..tostring(rec1 and rec1.PackSize)..')')
 check(addCalls==1 and lastAdd.Options==nil and luckCalls==0 and lastAdd.Chest.PackSize==rec1.PackSize,'no luck / pity roll: AddChest gets no options and the size is the plain roll')
 check(A:GetAttribute('DailyLoginReady')==false and A:GetAttribute('DailyLoginStep')==1,'the badge clears after claiming')
@@ -247,6 +248,7 @@ local save=Data:_buildSaveData(A)
 check(save.Premium and type(save.Premium.Daily)=='table'and save.Premium.Daily.Login.Step>=1 and save.Premium.Daily.Quests.Progress[1]==2,'login week and quest progress are saved')
 local P=server('PremiumProgress')
 local decoded=P.Decode(save.Premium);check(decoded and decoded.Daily and decoded.Daily.Quests.Progress[1]==2,'and load back')
+check(save.Premium.Daily.Quests.RewardVersion==D.RewardVersion and save.Premium.Daily.Quests.GemsGranted==0 and decoded.Daily.Quests.GemsGranted==0 and decoded.Daily.Quests.RewardVersion==D.RewardVersion,'the daily Gem accounting (RewardVersion, GemsGranted) is saved and loads back')
 local broken=table.clone(save.Premium);broken.Daily={Login={Step=99,Day='x'},Quests='nope'}
 local bd=P.Decode(broken);check(bd~=nil,'a broken Daily entry does not stop the profile loading')
 Data:GetPremium(A).Daily={Login={Step=99},Quests={Day=D.Day(R.clock),Progress={50,-1,'x'},Claimed={false,false,false}}}

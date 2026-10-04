@@ -17,7 +17,8 @@ function M.Day(t)return math.floor((t or os.time())/86400)end
 function M.NextDay(t)return(M.Day(t)+1)*86400 end
 -- The biome of the best treadmill owned (Config.TreadmillTiers in machine order).
 function M.Stage(tiers,level)
- level=math.clamp(math.floor(tonumber(level)or 1),1,#tiers)
+ level=tonumber(level)or 1;if level~=level then level=1 end
+ level=math.clamp(math.floor(level),1,#tiers)
  local st=tiers[level].Stage;return integer(st,1,7)and st or 1
 end
 function M.Roll(stage,draw)

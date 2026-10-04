@@ -1,5 +1,6 @@
 --!nocheck
--- R140: the real TravelButtons + DailyRewardsClient on the mock. The 🎁 DAILY and 👥 INVITE squares sit right of
+-- R140 (updated for the live R141 numbers: days 1-4 RANDOM PACK, day 5 +2, day 6 +3, day 7 MECH PACK; quests 2 Gems
+-- each, "DAILY LIMIT" for blocked ones): the real TravelButtons + DailyRewardsClient on the mock. The 🎁 DAILY and 👥 INVITE squares sit right of
 -- TRACK in the top bar row on every screen (or just under it on very narrow ones), never over BASE / TRACK or off
 -- screen; the badge counts what is waiting; the DAILY window shows the week and the quests, claims through
 -- PremiumRequest 'Daily' (a fake server here), fits phones and computers; it opens by itself once when a login reward
@@ -15,7 +16,7 @@ local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=W.
 for _,n in ipairs({'RequestBaseTeleport','RequestTrackTeleport'})do local e=R.new('RemoteEvent');e.Name=n;e.Parent=remotes end
 local D=W.module('DailyRewards')
 -- A fake server for PremiumRequest 'Daily' (the real one is tested in test_daily.luau).
-local srv={Step=0,Ready=true,Quests={{Key='Steal',Text='Steal 3 packs',Icon='🎒',Goal=3,Progress=3,Claimed=false,Gems=5},{Key='Plant',Text='Plant 3 seeds',Icon='🌱',Goal=3,Progress=1,Claimed=false,Gems=5},{Key='Sell',Text='Sell 5 fruit',Icon='💰',Goal=5,Progress=0,Claimed=false,Gems=5}}}
+local srv={Step=0,Ready=true,Quests={{Key='Steal',Text='Steal 3 packs',Icon='🎒',Goal=3,Progress=3,Claimed=false,Gems=2},{Key='Plant',Text='Plant 3 seeds',Icon='🌱',Goal=3,Progress=1,Claimed=false,Gems=2},{Key='Sell',Text='Sell 5 fruit',Icon='💰',Goal=5,Progress=0,Claimed=false,Gems=2}}}
 local calls={}
 local function stateNow()
  return {Success=true,Login={Ready=srv.Ready,Next=srv.Ready and srv.Step+1 or srv.Step,Claimed=srv.Step},Quests=srv.Quests,ResetIn=5*3600+12*60,Day=1}
@@ -104,8 +105,9 @@ check(login.Visible and not quests.Visible,'the LOGIN tab first (a login reward 
 local cards={};for d=1,7 do cards[d]=login:FindFirstChild('Day'..d)end
 check(#cards==7,'seven day cards')
 check(cards[1].Today.Visible and not cards[2].Today.Visible,'day 1 is marked TODAY')
-check(cards[7].Amount.Text=='MECH PACK'and cards[1].Amount.Text=='+5'and cards[3].Amount.Text=='+10','rewards: +5 … +15 Gems, day 7 MECH PACK')
-check(login.Note.Text:find('MECH PACK',1,true),'the note says day 7 is a free Mech pack')
+check(cards[7].Amount.Text=='MECH PACK'and cards[1].Amount.Text=='RANDOM PACK'and cards[4].Amount.Text=='RANDOM PACK'and cards[5].Amount.Text=='+2'and cards[6].Amount.Text=='+3','rewards: days 1-4 RANDOM PACK, +2, +3 Gems, day 7 MECH PACK')
+check(cards[2].Amount.Text=='RANDOM PACK'and cards[3].Amount.Text=='RANDOM PACK','(days 2 and 3 too)')
+check(login.Note.Text:find('MECH',1,true)and login.Note.Text:find('random packs',1,true)and login.Note.Text:find('2 + 3 gems',1,true),'the note: 4 random packs, then 2 + 3 gems, day 7 = MECH: '..login.Note.Text)
 check(login.ClaimButton.Caption.Text=='CLAIM DAY 1!','the big button: CLAIM DAY 1!')
 login.ClaimButton.Activated:Fire();frames(5)
 check(calls[#calls][1]=='Daily'and calls[#calls][2]=='ClaimLogin','claiming asks the server')
@@ -122,11 +124,20 @@ local rows={};for i=1,3 do rows[i]=quests:FindFirstChild('Quest'..i)end
 check(rows[1].Task.Text=='Steal 3 packs'and rows[1].IconBack.Icon.Text=='🎒'and rows[1].Bar.Count.Text=='3 / 3','quest 1: 🎒 Steal 3 packs 3 / 3')
 check(rows[2].Bar.Count.Text=='1 / 3'and math.abs(rows[2].Bar.Fill.Size.X.Scale-1/3)<1e-6,'quest 2 shows 1 / 3 with a third of the bar')
 check(rows[1].Claim.Visible and not rows[2].Claim.Visible and not rows[3].Claim.Visible,'only finished quests have CLAIM')
-check(rows[1].Reward.Amount.Text=='5','each pays 💎 5')
+check(rows[1].Reward.Amount.Text=='2'and rows[2].Reward.Amount.Text=='2'and rows[3].Reward.Amount.Text=='2','each pays 💎 2')
 check(quests.Reset.Text:find('NEW QUESTS IN 5h',1,true),'the reset countdown: '..quests.Reset.Text)
 rows[1].Claim.Activated:Fire();frames(5)
 check(type(calls[#calls][2])=='table'and calls[#calls][2].Quest==1,'claiming quest 1')
 check(not rows[1].Claim.Visible and rows[1].Done.Visible,'then it says ✓ DONE')
+-- The daily Gem cap: a finished quest that would go over it shows DAILY LIMIT instead of CLAIM.
+srv.Quests[2].Progress=3;srv.Quests[2].Blocked=true;srv.Quests[3].Progress=2;srv.Quests[3].Blocked=true
+player:SetAttribute('DailyRevision',(player:GetAttribute('DailyRevision')or 0)+1);panel.LoginTab.Activated:Fire();panel.QuestsTab.Activated:Fire();frames(5)
+check(not rows[2].Claim.Visible and rows[2].Done.Visible and rows[2].Done.Text=='DAILY LIMIT','a finished but blocked quest: no CLAIM, DAILY LIMIT')
+check(not rows[3].Claim.Visible and rows[3].Done.Visible and rows[3].Done.Text=='DAILY LIMIT','a blocked quest that is not finished yet says DAILY LIMIT too (no more Gems today)')
+check(rows[1].Done.Visible and rows[1].Done.Text=='✓ DONE','a claimed quest still says ✓ DONE')
+srv.Quests[2].Blocked=nil;srv.Quests[3].Blocked=nil;srv.Quests[2].Progress=1;srv.Quests[3].Progress=0
+player:SetAttribute('DailyRevision',(player:GetAttribute('DailyRevision')or 0)+1);panel.LoginTab.Activated:Fire();panel.QuestsTab.Activated:Fire();frames(5)
+check(not rows[3].Done.Visible and not rows[3].Claim.Visible and not rows[2].Done.Visible and not rows[2].Claim.Visible,'without the limit an unfinished quest shows neither CLAIM nor DONE')
 -- Close.
 panel.Header.Close.Activated:Fire();frames(3)
 check(not panel.Visible and pg:GetAttribute('SeedMenu')==nil and icons.Visible,'X closes it and the top bar buttons come back')
