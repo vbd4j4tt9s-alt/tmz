@@ -135,7 +135,6 @@ local function runServer()
     require(ReplicatedStorage.GardenTypography).Apply(mapService.MapRoot)
 	startupPhase = "starting ChaseService"
 	chaseService:Start()
-    require(modules.KeyboardServer143).Start(mapService,chaseService) -- R142: after all layout and keeper initialization
 	stormService:Start()
 	-- R122: shovel holes on the track (only pack carriers fall in).
 	local TrackHoleService = loadModule("TrackHoleService", {"new","Start","Request","Step","ClearAll","CleanupPlayer"})
