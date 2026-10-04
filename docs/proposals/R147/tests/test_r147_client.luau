@@ -389,8 +389,9 @@ check(near(midLog,(141+226)/2,1e-6)and near(midLin,88+(141-88)*((21500000/2-1500
 
 -- 3. KeeperSpeedLabels ------------------------------------------------------------------------------------------------------
 -- R148 (owner: "the indicator is too big; make sure the speed needed is in numbers (must be whole numbers and multiples of
--- 5)"): a small fixed-size sign that always shows a whole number: the points needed (strictly faster: PointsFor + 1) rounded
--- UP to 2 significant figures (under 100: the next multiple of 5), written whole with the largest suffix that keeps it whole.
+-- 5)"; then "B or mil can have decimal points"): a small fixed-size sign that always shows a number: the points needed
+-- (strictly faster: PointsFor + 1) rounded UP to 2 significant figures (under 100: the next multiple of 5). Under a million
+-- it is whole (3,800 / 18K / 540K); from a million up it may have one decimal and the plain suffix (1.2M, 16M, 2.6B, 22B).
 local GREEN,RED=function(c)return rgb(c,110,236,96)end,function(c)return rgb(c,255,86,86)end
 local function keeper(name,escape,y,height)
  local m=R.new('Model');m.Name=name
@@ -408,16 +409,22 @@ do
  for _,c in ipairs(cases)do local got=rt(c[1]);if got~=c[2]then ok=false;d[#d+1]=tostring(c[1])..' -> '..got..' (want '..c[2]..')'end end
  check(ok,'RoundUp2 rounds up to 2 significant figures (under 100: the next multiple of 5): 1 -> 5, 96 -> 100, 101 -> 110, 3751 -> 3800, 501 -> 510, 99,999 -> 100,000'..(#d>0 and(': '..table.concat(d,'; '))or''))
  check(rt('3751')=='3800'and rt('00000451')=='460'and rt('1'..string.rep('0',34)..'1')=='11'..string.rep('0',34)and rt(string.rep('9',36))=='1'..string.rep('0',36)and rt(nil)=='0'and rt(-5)=='0'and rt(0/0)=='0'and rt('x')=='0','RoundUp2 also takes exact decimal text of any size (and nonsense reads as 0)')
- local texts={{0,'0'},{1,'5'},{5,'5'},{100,'100'},{501,'510'},{3751,'3,800'},{9999,'10K'},{9500,'9,500'},{10000,'10K'},{10001,'11K'},{17401,'18K'},{45901,'46K'},{91501,'92K'},{203638,'210K'},{538183,'540K'},{999999,'1M'},{1000000,'1M'},{1000001,'1,100K'},
-  {1165456,'1,200K'},{2896228,'2,900K'},{7084907,'7,100K'},{2000000,'2M'},{15462266,'16M'},{24212979,'25M'},{44354655,'45M'},{153658835,'160M'},{368389545,'370M'},{682127276,'690M'},{999999999,'1B'},{1000000000,'1B'},
-  {2538961247,'2,600M'},{7094390884,'7,100M'},{21171107576,'22B'},{100000000001,'110B'},{1e12,'1T'},{1e12+1,'1,100B'},{1e15,'1Qa'},{2.6e15,'2,600T'}}
+ local texts={{0,'0'},{1,'5'},{5,'5'},{100,'100'},{501,'510'},{3751,'3,800'},{9999,'10K'},{9500,'9,500'},{10000,'10K'},{10001,'11K'},{17401,'18K'},{45901,'46K'},{91501,'92K'},{99999,'100K'},{203638,'210K'},{538183,'540K'},{990000,'990K'},
+  {999000,'1M'},{999999,'1M'},{1000000,'1M'},{1000001,'1.1M'},{1165456,'1.2M'},{2896228,'2.9M'},{7084907,'7.1M'},{2000000,'2M'},{15462266,'16M'},{24212979,'25M'},{44354655,'45M'},{153658835,'160M'},{368389545,'370M'},{682127276,'690M'},
+  {999999999,'1B'},{1000000000,'1B'},{1100000001,'1.2B'},{2538961247,'2.6B'},{7094390884,'7.1B'},{21171107576,'22B'},{100000000001,'110B'},{1e12,'1T'},{1e12+1,'1.1T'},{1e15,'1Qa'},{2.6e15,'2.6Qa'},{1e15+1,'1.1Qa'}}
  local okT=true;local dT={}
  for _,c in ipairs(texts)do local got=Points.NeedText(c[1]);if got~=c[2]then okT=false;dT[#dT+1]=tostring(c[1])..' -> '..got..' (want '..c[2]..')'end end
- check(okT,'NeedText: whole numbers, thousands separators, the largest suffix that keeps it whole (3,800 / 18K / 1,200K / 16M / 2,600M / 22B), no decimals'..(#dT>0 and(': '..table.concat(dT,'; '))or''))
- check(Points.NeedText('1'..string.rep('0',33))=='1Dc'and Points.NeedText('26'..string.rep('0',33))=='26Dc'and Points.NeedText('99'..string.rep('0',34))=='990Dc'and Points.NeedText('1'..string.rep('0',32))=='100No','the biggest names go up to Dc (10^33): 1Dc, 26Dc, 990Dc, 100No')
+ check(okT,'NeedText: whole under a million (3,800 / 18K / 540K, thousands separators below 10,000), from a million up the 2-figure value with at most one decimal and the plain suffix (1.2M / 16M / 2.6B / 22B / 1.1T)'..(#dT>0 and(': '..table.concat(dT,'; '))or''))
+ check(Points.NeedText('1'..string.rep('0',33))=='1Dc'and Points.NeedText('26'..string.rep('0',33))=='26Dc'and Points.NeedText('26'..string.rep('0',32))=='2.6Dc'and Points.NeedText('99'..string.rep('0',34))=='990Dc'and Points.NeedText('1'..string.rep('0',32))=='100No'and Points.NeedText('15'..string.rep('0',29))=='1.5No'and Points.NeedText('15'..string.rep('0',30))=='15No','the biggest names go up to Dc (10^33): 1Dc, 2.6Dc, 26Dc, 990Dc, 100No, 1.5No')
  check(Points.NeedText('1'..string.rep('0',36))=='∞'and Points.NeedText('5'..string.rep('0',1011))=='∞'and Points.NeedText('9'..string.rep('9',35))=='∞','from 10^36 on (past the names, or past 10^36 after rounding up) it is "∞"')
- local noDots=true;for _,c in ipairs(texts)do local t=Points.NeedText(c[1]);if t:find('[%.e]')then noDots=false end end
- check(noDots and Points.NeedText(0)=='0','never a decimal point or e-notation; nothing needed is "0"')
+ local shapeT=true;for _,c in ipairs(texts)do
+  local t=Points.NeedText(c[1])
+  if t:find('e')or t:find(',%d%d%d%a')then shapeT=false end -- (no e-notation, no "1,200K")
+  local dots=select(2,t:gsub('%.',''))
+  if dots>1 or(dots==1 and not t:find('^%d%.%d%a+$'))then shapeT=false end -- (one decimal, after a single digit, with a suffix)
+  if c[1]<999000 and dots>0 then shapeT=false end -- (whole below a million)
+ end
+ check(shapeT and Points.NeedText(0)=='0','never e-notation; no decimal point below a million, at most one (after a single digit) from a million up; nothing needed is "0"')
 end
 local keepers={}
 local pre=keeper('Forest',20);keepers[1]=pre
@@ -438,8 +445,8 @@ check(value.Text=='⚡ 0  ✓'and GREEN(value.TextColor3)and GREEN(edge.Color),'
 local Route=W.module('RouteBalance83')
 local expected={
  {'Forest',1,{20,23,26},{'0','0','510'}},{'Jungle',6,{32,37,42},{'3,800','18K','46K'}},{'Desert',2,{50,57,65},{'92K','210K','540K'}},
- {'Snow',3,{80,92,104},{'1,200K','2,900K','7,100K'}},{'Lava',4,{128,147,166},{'16M','25M','45M'}},{'Crystal',5,{205,236,266},{'160M','370M','690M'}},
- {'Storm',7,{330,379,429},{'2,600M','7,100M','22B'}}}
+ {'Snow',3,{80,92,104},{'1.2M','2.9M','7.1M'}},{'Lava',4,{128,147,166},{'16M','25M','45M'}},{'Crystal',5,{205,236,266},{'160M','370M','690M'}},
+ {'Storm',7,{330,379,429},{'2.6B','7.1B','22B'}}}
 local realOk=true
 for _,row in ipairs(expected)do for i,e in ipairs(row[3])do if Route.KeeperSpeeds[row[2]][i]~=e then realOk=false end end end
 check(realOk,'(the speeds below are the live RouteBalance83.KeeperSpeeds: 20 23 26 / 32 37 42 / 50 57 65 / 80 92 104 / 128 147 166 / 205 236 266 / 330 379 429)')
@@ -454,7 +461,7 @@ for _,row in ipairs(expected)do for i,e in ipairs(row[3])do
  local t=vtext(bySpeed[e]);local want='⚡ '..row[4][i]..(e<24 and'  ✓'or'')
  if t~=want then textsOk=false;diag[#diag+1]=row[1]..' '..e..' '..t..' (want '..want..')'end
 end end
-check(textsOk,'at walk speed 24, all 21 keepers: Forest 0 / 0 / 510, Jungle 3,800 / 18K / 46K, Desert 92K / 210K / 540K, Snow 1,200K / 2,900K / 7,100K, Lava 16M / 25M / 45M, Crystal 160M / 370M / 690M, Storm 2,600M / 7,100M / 22B'..(#diag>0 and(': '..table.concat(diag,'; '))or''))
+check(textsOk,'at walk speed 24, all 21 keepers: Forest 0 / 0 / 510, Jungle 3,800 / 18K / 46K, Desert 92K / 210K / 540K, Snow 1.2M / 2.9M / 7.1M, Lava 16M / 25M / 45M, Crystal 160M / 370M / 690M, Storm 2.6B / 7.1B / 22B'..(#diag>0 and(': '..table.concat(diag,'; '))or''))
 check(RED(vcolor(bySpeed[32]))and RED(vcolor(bySpeed[330]))and GREEN(vcolor(bySpeed[20]))and GREEN(vcolor(bySpeed[23])),'red when the keeper is faster than me, green when I am faster')
 local _,_,edgeJ=pill(bySpeed[32]);check(RED(edgeJ.Color),'(the outline follows)')
 check(not vtext(bySpeed[32]):find('✓',1,true),'no ✓ while the keeper is faster')
@@ -463,7 +470,7 @@ player:SetAttribute('PhysicalWalkSpeed',31);check(GREEN(vcolor(bySpeed[20]))and 
 player:SetAttribute('PhysicalWalkSpeed',32);check(RED(vcolor(bySpeed[32]))and not vtext(bySpeed[32]):find('✓',1,true),'exactly 32: not faster (it takes MORE than the keeper)')
 player:SetAttribute('PhysicalWalkSpeed',32.01);check(GREEN(vcolor(bySpeed[32]))and vtext(bySpeed[32])=='⚡ 3,800  ✓','32.01: green with ✓ (the number stays the points needed)')
 player:SetAttribute('PhysicalWalkSpeed',51);check(GREEN(vcolor(bySpeed[50]))and vtext(bySpeed[50])=='⚡ 92K  ✓'and RED(vcolor(bySpeed[80])),'51 beats the Desert keeper (50), not the Snow one (80)')
-player:SetAttribute('PhysicalWalkSpeed',331);check(GREEN(vcolor(bySpeed[330]))and vtext(bySpeed[330])=='⚡ 2,600M  ✓','331 beats the Storm keeper')
+player:SetAttribute('PhysicalWalkSpeed',331);check(GREEN(vcolor(bySpeed[330]))and vtext(bySpeed[330])=='⚡ 2.6B  ✓','331 beats the Storm keeper')
 player:SetAttribute('PhysicalWalkSpeed',nil);check(vtext(bySpeed[32])=='⚡ 3,800'and RED(vcolor(bySpeed[32]))and GREEN(vcolor(bySpeed[20])),'no PhysicalWalkSpeed attribute: treated as a new runner (24)')
 player:SetAttribute('PhysicalWalkSpeed','fast');check(GREEN(vcolor(bySpeed[20]))and RED(vcolor(bySpeed[32])),'(a text value too)')
 player:SetAttribute('PhysicalWalkSpeed',24)
@@ -476,17 +483,26 @@ end
 local function refCommas(v)local s=string.format('%.0f',v):reverse():gsub('(%d%d%d)','%1,'):reverse();return(s:gsub('^,',''))end
 local function refText(v)
  if v<10000 then return refCommas(v)end
- for _,s in ipairs({{1e15,'Qa'},{1e12,'T'},{1e9,'B'},{1e6,'M'},{1e3,'K'}})do if v%s[1]==0 then return refCommas(v/s[1])..s[2]end end
+ if v<1e6 then return string.format('%.0f',v/1e3)..'K'end
+ for _,s in ipairs({{1e15,'Qa'},{1e12,'T'},{1e9,'B'},{1e6,'M'}})do
+  if v>=s[1]then local q=string.format('%.1f',v/s[1]);return(q:gsub('%.0$',''))..s[2]end
+ end
 end
--- Reading a sign's text back: the number it shows (a whole number of points) and whether it is complete.
+-- Reading a sign's text back: the number of points it shows, or nil when the text is not in the allowed shape: whole under a
+-- million (commas only below 10,000, otherwise 1-3 digits and K), from a million up 1-3 digits with at most one non-zero
+-- decimal and M / B / T / Qa ... (never "1,200K", never ".0", never e-notation).
 local MULT={K=1e3,M=1e6,B=1e9,T=1e12,Qa=1e15,Qi=1e18,Sx=1e21,Sp=1e24,Oc=1e27,No=1e30,Dc=1e33}
 local function shownValue(t)
  local body=plain(t):gsub('^⚡ ','')
- if body=='∞'then return math.huge,'∞'end
- local digits,suffix=body:match('^([%d,]+)(%a*)$');if not digits then return nil,body end
+ if body=='∞'then return math.huge,'∞',0 end
+ local digits,dot,dec,suffix=body:match('^([%d,]+)(%.?)(%d*)(%a*)$');if not digits then return nil,body end
  local whole=tonumber((digits:gsub(',','')))
  if not whole or digits~=refCommas(whole)then return nil,body end -- (separators only between thousands)
- return whole*(suffix==''and 1 or MULT[suffix]or 0/0),body
+ if suffix==''then if dot~=''or whole>=10000 then return nil,body end return whole,body,0 end
+ local mult=MULT[suffix];if not mult or digits:find(',',1,true)or #digits>3 or whole<1 then return nil,body end
+ if dot~=''and(#dec~=1 or dec=='0'or mult<1e6)then return nil,body end
+ if dot==''and dec~=''then return nil,body end
+ return(whole*10+(tonumber(dec)or 0))*(mult/10),body,#dec
 end
 -- Friend boost (R149: the boost speeds up the speed GAINED from training, never how fast you run, so the number needed
 -- does not depend on it at all: whatever FriendSpeedBoost says, the signs are the same).
@@ -500,8 +516,8 @@ local function texts(b)
 end
 local function core(list)local pick={};for _,i in ipairs({1,4,7,10,13,16,19})do pick[#pick+1]=plain(list[i])end;return table.concat(pick,' | ')end
 local base=texts(nil)
-check(core(base)=='⚡ 0 | ⚡ 3,800 | ⚡ 92K | ⚡ 1,200K | ⚡ 16M | ⚡ 160M | ⚡ 2,600M','no friends (the first keeper of each biome): 0, 3,800, 92K, 1,200K, 16M, 160M, 2,600M')
-check(core(texts(1))==core(base)and core(texts(1.1))==core(base)and core(texts(1.2))==core(base)and core(texts(1.3))==core(base),'friends do not change a single number: +10% / +20% / +30% give the same 0, 3,800, 92K, 1,200K, 16M, 160M, 2,600M ('..core(texts(1.3))..')')
+check(core(base)=='⚡ 0 | ⚡ 3,800 | ⚡ 92K | ⚡ 1.2M | ⚡ 16M | ⚡ 160M | ⚡ 2.6B','no friends (the first keeper of each biome): 0, 3,800, 92K, 1.2M, 16M, 160M, 2.6B')
+check(core(texts(1))==core(base)and core(texts(1.1))==core(base)and core(texts(1.2))==core(base)and core(texts(1.3))==core(base),'friends do not change a single number: +10% / +20% / +30% give the same 0, 3,800, 92K, 1.2M, 16M, 160M, 2.6B ('..core(texts(1.3))..')')
 -- Every sign is a whole number, a multiple of 5, never below the true need (strictly faster) and at most about 10% above it,
 -- equal to the independent reference, and that many points really do beat the keeper (the plain speed curve, no boost).
 local formulaOk,pointsOk,shapeOk,tightOk,sameOk=true,true,true,true,true;local fd={}
@@ -511,8 +527,8 @@ for _,boost in ipairs({1,1.05,1.1,1.15,1.2,1.25,1.3,5,.5})do
  for i,e in ipairs(escapes)do
   if row[i]~=base[i]then sameOk=false;fd[#fd+1]='changed '..e..'/'..boost..' '..row[i]..' vs '..base[i]end
   local t=plain(row[i]);checked+=1
-  local v,body=shownValue(row[i])
-  if not v or v~=v or v%5~=0 or v~=math.floor(v)or t:find('[%.e]')or t:find('ANY',1,true)or t:find('TOO FAST',1,true)then shapeOk=false;fd[#fd+1]='shape '..e..'/'..boost..' '..row[i]end
+  local v,body,decimals=shownValue(row[i])
+  if not v or v~=v or v%5~=0 or v~=math.floor(v)or t:find('e')or(v<1e6 and decimals~=0)or decimals>1 or t:find('ANY',1,true)or t:find('TOO FAST',1,true)then shapeOk=false;fd[#fd+1]='shape '..e..'/'..boost..' '..row[i]end
   if e<24 then if t~='⚡ 0'then formulaOk=false;fd[#fd+1]='0 '..e..'/'..boost..' '..row[i]end
   else
    local n=Progress.PointsFor(e)+1
@@ -524,8 +540,8 @@ for _,boost in ipairs({1,1.05,1.1,1.15,1.2,1.25,1.3,5,.5})do
  end
 end
 check(sameOk,'every sign is identical with FriendSpeedBoost at 1 / 1.05 / 1.1 / 1.15 / 1.2 / 1.25 / 1.3 / 5 / 0.5 ('..checked..' keeper / attribute combinations)'..(#fd>0 and(': '..table.concat(fd,'; '))or''))
-check(shapeOk,'all '..checked..' keeper / boost signs are a whole number, a multiple of 5, no decimals / e-notation, never "ANY" / "TOO FAST"')
-check(formulaOk,'and each equals the reference (PointsFor(escape) + 1 rounded up to 2 significant figures, written whole), "0" below 24 ('..checked..' combinations)')
+check(shapeOk,'all '..checked..' keeper / attribute signs read a whole multiple of 5 points: whole under a million, at most one decimal from a million up (1.2M is 1,200,000), never e-notation, never "ANY" / "TOO FAST"'..(#fd>0 and(': '..table.concat(fd,'; '))or''))
+check(formulaOk,'and each equals the reference (PointsFor(escape) + 1 rounded up to 2 significant figures, written as above), "0" below 24 ('..checked..' combinations)')
 check(pointsOk,'and each is never below the true need, and that many points really beat the keeper (no boost counted)')
 check(tightOk,'and at most 10% above the true need (+4 under 100)')
 check(plain(texts(1.2)[7])=='⚡ 92K'and plain(texts(1.2)[7])=='⚡ '..refText(refRound(Progress.PointsFor(50)+1)),'(+20% friends, Desert keeper 50: still 91,501 points, rounded up to 92K)')
@@ -545,13 +561,13 @@ end
 do
  math.randomseed(148);local bad={};local n0=0
  for _=1,400 do
-  local e=24+math.random()*476;local k=keeper('Rnd',e,10,6);local t=vtext(k);local v=shownValue(t)
+  local e=24+math.random()*476;local k=keeper('Rnd',e,10,6);local t=vtext(k);local v,_,decimals=shownValue(t)
   local n=Progress.PointsFor(e)+1;n0+=1
-  local ok=v and v==math.floor(v)and v%5==0 and v>=n and(n>=100 and v<=n*1.1 or n<100 and v<=n+4)and not t:find('[%.e]')and plain(t)=='⚡ '..refText(refRound(n))
+  local ok=v and v==math.floor(v)and v%5==0 and v>=n and(n>=100 and v<=n*1.1 or n<100 and v<=n+4)and not t:find('e')and(v>=1e6 or decimals==0)and plain(t)=='⚡ '..refText(refRound(n))
   if not ok and #bad<5 then bad[#bad+1]=string.format('%.4f -> %s (need %.0f)',e,t,n)end
   CS:RemoveTag(k,'BiomeKeeper');k:Destroy()
  end
- check(#bad==0,'400 random keeper speeds (24 .. 500): each sign is whole, a multiple of 5, between the true need and 10% above it'..(#bad>0 and(': '..table.concat(bad,'; '))or''))
+ check(#bad==0,'400 random keeper speeds (24 .. 500): each sign is a multiple of 5, whole under a million and at most one decimal from a million up, between the true need and 10% above it'..(#bad>0 and(': '..table.concat(bad,'; '))or''))
 end
 -- The new-runner threshold: below 24 nothing is needed ("0"); exactly 24 needs a single point, shown as 5.
 local e23,e24,e2401=keeper('Edge23',23.9,10,6),keeper('Edge24',24,10,6),keeper('Edge2401',24.01,10,6)
@@ -584,20 +600,20 @@ check(Progress.PointsText(600)==('1'..string.rep('0',1011)),'(PointsText(600) is
 -- Needs above a quadrillion points (speed above ~500.4) are still numbers, written with a big suffix, never 0.
 local huge=keeper('Huge',500.45)
 local ht=vtext(huge)
-check(ht~='⚡ 0'and shownValue(ht)>=1e15 and not ht:find('[%.e]'),'a 500.45 keeper needs thousands of trillions of points: a whole number with a big name, not 0 ('..ht..')')
+check(ht~='⚡ 0'and shownValue(ht)>=1e15 and not ht:find('e'),'a 500.45 keeper needs thousands of trillions of points: a number with a big name (at most one decimal), not 0 ('..ht..')')
 do
  local exact=Points.Add(Progress.PointsText(500.45),'1');local want=Points.NeedText(exact);local v=shownValue(ht)
  check(ht=='⚡ '..want and v>=tonumber(exact)*(1-1e-12)and v<=tonumber(exact)*1.1 and v%5==0,'(from the exact decimal text, not tostring: '..ht..')')
 end
--- Edge: whole numbers only, from the first keeper on to the biggest number the names reach.
+-- Edge: from the first keeper on to the biggest number the names reach.
 do
  local ok=true;local d={}
  for _,s in ipairs({500.1,500.3,500.49,500.5})do
   local k=keeper('Far'..s,s,10,6);local t=vtext(k);local v=shownValue(t)
-  if not v or v~=math.floor(v)or t:find('[%.e]')then ok=false;d[#d+1]=s..' '..t end
+  if not v or v~=math.floor(v)or t:find('e')then ok=false;d[#d+1]=s..' '..t end
   CS:RemoveTag(k,'BiomeKeeper');k:Destroy()
  end
- check(ok,'out past 500 the sign is still a whole number with a name suffix, or ∞ when there is no name for it'..(#d>0 and(': '..table.concat(d,'; '))or''))
+ check(ok,'out past 500 the sign is still a number of points with a name suffix (at most one decimal), or ∞ when there is no name for it'..(#d>0 and(': '..table.concat(d,'; '))or''))
 end
 -- A keeper without the attribute gets no label until it has one.
 local plainK=keeper('Plain',nil);local gp=pill(plainK)
