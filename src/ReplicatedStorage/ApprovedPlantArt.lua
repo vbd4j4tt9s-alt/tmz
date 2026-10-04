@@ -10,25 +10,34 @@ end
 local Mech=require(RS:WaitForChild('MechArt'))
 local Verity=require(RS:WaitForChild('VerityPlantArt'))
 local Desert149=require(RS:WaitForChild('DesertPlantArt149')) -- R148: the Aloe and the Sand Fruit cactus
+-- R148: the Desert Aloe and Sand Fruit have four designs each, picked per crop like the approved plants' (hash of the crop id, then a small size / turn jitter).
+local function multi(id)return Index[id]~=nil or Desert149.Is(id)end
+-- The design a crop with hash h shows. The approved plants use h % count (their two designs follow the size digit h % 10); the Desert plants' four designs
+-- use the digits above it, so every design comes with every size / turn jitter.
+local function designOf(id,h,count)
+ if Desert149.Is(id)then return math.floor(h/10)%count+1 end
+ return h%count+1
+end
 function Art.Has(id)return Verity.Is(id)or Desert149.Is(id)or Mech.Get(id)~=nil or Rarity.Has(id)or Trees.Has(id)or Index[id]~=nil end
 function Art.Key(id,crop)
  if require(RS.HologramProjection).Is(id)then return require(RS.HologramProjection).Key(id,crop)end
  if Rarity.Has(id)then return Rarity.Key(id)end
  if Trees.Has(id)then return Trees.Key(id,crop)end
- if not Index[id]then return id end
+ if not multi(id)then return id end
  if not crop or not crop.Id or crop.Id=='preview'then return id..':base'end
  local h=crop and crop.Id and hash(tostring(crop.Id))or 0
+ -- (the design is part of the key: 4 designs are not decided by the jitter number h%10 the way an approved plant's 2 are)
+ if Desert149.Is(id)then return id..':d'..tostring(designOf(id,h,Desert149.DesignCount))..':'..tostring(h%10)end
  return id..':'..tostring(h%10)
 end
 function Art.Get(id,crop)
  if Verity.Is(id)then return Verity.Get(id)end
- if Desert149.Is(id)then return Desert149.Get(id)end
  local mech=Mech.Get(id);if mech then return require(RS.HologramForms).Get(id,mech,crop)end
  if Rarity.Has(id)then return Rarity.Get(id)end
  if Trees.Has(id)then return Trees.Get(id,crop)end
- if not Index[id]then return nil end
+ if not multi(id)then return nil end
  if not loaded[id]then
-  loaded[id]=require(RS:WaitForChild(Index[id]))
+  loaded[id]=Desert149.Is(id)and Desert149.Designs(id)or require(RS:WaitForChild(Index[id]))
   if id=='FirePepperSeed'then
    -- R148 (owner): the Mythic Fire Pepper is twice as big, peppers included (Roster149.FirePepperArtScale). Uniform: the lowest
    -- pepper hangs 2.57 studs under its socket, so scaling the fruit more than the plant would bury it.
@@ -69,10 +78,10 @@ function Art.Get(id,crop)
  end
  if not crop or not crop.Id or crop.Id=='preview'then return loaded[id][1]end
  local key=Art.Key(id,crop);if variants[key]then return variants[key]end
- local h=hash(tostring(crop.Id));local source=loaded[id][h%#loaded[id]+1]
+ local h=hash(tostring(crop.Id));local source=loaded[id][designOf(id,h,#loaded[id])]
  local shape=math.floor((h%10)/2)-2;local amount=1+shape*.01
  local turn=CFrame.Angles(0,shape*.04,0)
- local d={Specs={},Sockets={},FruitCenters={},FruitRadii={},Height=source.Height*amount,Radius=source.Radius*amount}
+ local d={Specs={},Sockets={},FruitCenters={},FruitRadii={},Height=source.Height*amount,Radius=source.Radius*amount,RarityRework=source.RarityRework}
  for i,s in ipairs(source.Specs)do
   local p=table.clone(s);local at=CFrame.new(table.unpack(s.c));local cf=CFrame.new(turn:VectorToWorldSpace(at.Position)*amount)*turn*at.Rotation
   if s.mawFrame then local f=CFrame.new(table.unpack(s.mawFrame));p.mawFrame={(CFrame.new(turn:VectorToWorldSpace(f.Position)*amount)*turn*f.Rotation):GetComponents()}end
@@ -83,5 +92,11 @@ function Art.Get(id,crop)
  end end
  for i,r in ipairs(source.FruitRadii)do d.FruitRadii[i]=r*amount end
  variants[key]=d;return d
+end
+-- Which of an id's designs a crop shows (1 for a preview / no crop): the same hash Get uses. Tests and previews read it.
+function Art.Design(id,crop)
+ if not multi(id)or not crop or not crop.Id or crop.Id=='preview'then return 1 end
+ Art.Get(id)
+ return designOf(id,hash(tostring(crop.Id)),#loaded[id])
 end
 return Art

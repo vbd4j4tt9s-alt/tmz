@@ -11,7 +11,7 @@ await page.goto(`http://localhost:${server.address().port}/seeds_new.html`);awai
 for(const line of fs.readFileSync(path.join(dir,'scenes.txt'),'utf8').split('\n')){
   const m=line.match(/^SCENE (\S+) (.*)$/);if(!m)continue;
   const scene=JSON.parse(m[2]);const seed=m[1].startsWith('seed');
-  const url=await page.evaluate(([s,w,h,o])=>window.shoot(s,w,h,o),[scene,600,900,seed?{bg:0xcfe8f7,noGround:true}:{}]);
+  const url=await page.evaluate(([s,w,h,o])=>window.shoot(s,w,h,o),[scene,...(scene.size||[600,900]),seed?{bg:0xcfe8f7,noGround:true}:{}]);
   fs.writeFileSync(path.join(out,m[1]+'.png'),Buffer.from(url.split(',')[1],'base64'));console.log('wrote',m[1]);
 }
 await browser.close();server.close();

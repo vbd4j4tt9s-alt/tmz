@@ -37,10 +37,12 @@ local function scaled(points,f)local out={};for i,p in ipairs(points)do out[i]={
 function R.ApplyPlants(catalog)
  local Art=require(script.Parent.DesertPlantArt149)
  for _,spec in ipairs(R.Designs)do
-  local n=R.Plants[spec.id];local art=Art.Get(spec.id)
+  -- Four designs each (DesertPlantArt149): the sockets are design 1's (a crop's own come from its design, ApprovedPlantArt), the bounds the biggest design's with the
+  -- approved plants' 5% margin for the size jitter.
+  local n=R.Plants[spec.id];local art=Art.Get(spec.id);local height,radius=Art.Bounds(spec.id)
   catalog[spec.id]={Id=spec.id,Name=n.Name,Biome='Desert',Stage=2,Rarity=n.Rarity,Rank=n.Rank,Tree=n.Tree,Mode='repeat',HarvestName=n.HarvestName,
    FruitCount=n.FruitCount,Roster149=true,Sockets=scaled(art.Sockets,1),FruitCenters=scaled(art.FruitCenters,1),FruitRadii=table.clone(art.FruitRadii),
-   Height=art.Height,Radius=art.Radius,BaseScale=1,AuthoredHeight=art.Height,Seconds=n.Seconds,RegrowSeconds=n.RegrowSeconds,Value=n.Value}
+   Height=height,Radius=radius,BaseScale=1,AuthoredHeight=height,Seconds=n.Seconds,RegrowSeconds=n.RegrowSeconds,Value=n.Value}
  end
  for id in pairs(R.Promote)do
   local d,n=catalog[id],R.Plants[id]

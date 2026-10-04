@@ -2,8 +2,9 @@
 -- R148 (owner): the art of the seed roster change on the Roblox mock with the REAL modules (DesertPlantArt149, ApprovedPlantArt, PlantVisuals,
 -- PlantGrowth, PlantEffects, SeedPackVisuals, SeedSignatures, ChestIndex): Desert's Rare Aloe (blue-green rosette, three red-orange flower spikes)
 -- and Legendary Sand Fruit (a ROUND barrel cactus built from the game's own cactus pieces, four lumpy Enum.Material.Sand fruits growing out of
--- its shoulders), and the Mythic Fire Pepper at twice the size.
---  1. the art lists: the 127 / 95 parts, every group present, roles, nothing under the soil, sockets / centres / radii / Height / Radius = the catalog;
+-- its shoulders), the Mythic Fire Pepper at twice the size, and the growth variations: the Aloe and the Sand Fruit each have FOUR designs, picked per
+-- crop by a hash of its id (ApprovedPlantArt) plus the usual size / turn jitter, like the approved plants (Fire Pepper keeps its own, at x2).
+--  1. the art lists, for each of the 4 designs of both plants: the part counts (Aloe 127 / 128 / 126 / 124, Sand Fruit 95 / 88 / 100 / 94), every group present, roles, nothing under the soil, sockets / centres / radii / Height / Radius = the catalog;
 --  2. every build mode: ripe, growing at body .1 / .5 / .9, one harvest item per group, the distant supports (no collision: a cactus is not a tree), the
 --     harvested fruit, and no floating part anywhere (the scene goes through check_floating.py, R134);
 --  3. Fire Pepper: every spec of the base's art x2 (position and size; rotation untouched), for every crop variant; Prism Pepper unchanged;
@@ -13,6 +14,8 @@
 --  7. the Index: the Desert tab shows seven cards in rarity order; the old 5-seed roster counts ONLY through the server's saved flags
 --     (IndexOldHalf2 / IndexOldFull2): without them five of seven is halfway and not complete, with them an old completer sees the reward dot and
 --     lit claim buttons, and a claimed reward stays claimed;
+--  2b. the variants per crop: determinism (the same crop id always shows the same design, everywhere), the spread over many crop ids, the jitter, the
+--     catalog's bounds, harvest positions, regrow of every fruit of every design at several fractions, and Fire Pepper's x2 variants;
 --  8. the effect slots (every plant of rank 4+ wears a Highlight aura; Roblox draws 31 in all): by rarity rank first, then distance.
 -- It prints one JSON scene (SCENE ...) of every plant model for check_floating.py (run_roster.sh).
 local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -41,6 +44,21 @@ local function crop(id,extra)
  local c={Id='roster-'..id,SeedId=id,PlantedAt=0,MatureAt=def.Seconds,ReadyAt=def.Seconds,PlantScale=1,SeedScale=1,Mutation='None',HarvestCycle=0,PickedMask=0,TraitVersion=1}
  for k,v in pairs(extra or{})do c[k]=v end;return c
 end
+-- Which design / size jitter a crop id gets is decided by ApprovedPlantArt.Key (":d<design>:<jitter digit>"); the tests look crop ids up through it.
+local function keyOf(id,cid)local d,j=Approved.Key(id,{Id=cid}):match(':d(%d):(%d)$');return tonumber(d),tonumber(j)end
+local picked={}
+-- a crop id of design `design` whose jitter digit is `jitter` (4 and 5 mean no size change and no turn) and whose fruits are all at the plain size (the fruit size is a
+-- per-crop trait, PlantRules.Fruit: a lucky crop's fruits are bigger, which would move the highest point)
+local function pick(id,design,jitter)
+ local slot=id..'/'..design..'/'..tostring(jitter);if picked[slot]then return picked[slot]end
+ for n=1,20000 do local cid='pick'..n;local d,j=keyOf(id,cid)
+  if d==design and(jitter==nil or j==jitter)then
+   local plain=true;local c=crop(id,{Id=cid});for g=1,Catalog[id].FruitCount do if Rules.Fruit(c,g,Catalog[id]).Scale~=1 then plain=false end end
+   if plain then picked[slot]=cid;return cid end
+  end
+ end
+ error('no crop id for '..slot)
+end
 local function parts(model,visibleOnly)local out={};for _,d in ipairs(model:GetDescendants())do if d:IsA('BasePart')and d.Name~='VisualPivot'and(not visibleOnly or d.Transparency<1)then out[#out+1]=d end end;return out end
 -- The lowest and highest point of a part in the plant's frame (a rotated box's real extent).
 local function extent(d)
@@ -50,45 +68,67 @@ end
 local function specExtent(s)local c,z=s.c,s.z;local ey=(math.abs(c[7])*z[1]+math.abs(c[8])*z[2]+math.abs(c[9])*z[3])/2;return c[2]-ey,c[2]+ey end
 
 -- 1. The art lists --------------------------------------------------------------------------------------------------------------------------
-local want={DesertAloeSeed={specs=127,groups={[0]=49,26,26,26},cost=128,height=8.261,radius=5.211},SandFruitSeed={specs=95,groups={[0]=79,4,4,4,4},cost=96,height=10.607,radius=6.777}}
+local want={
+ DesertAloeSeed={{specs=127,groups={[0]=49,26,26,26},height=8.261,radius=5.211},{specs=128,groups={[0]=47,27,27,27},height=9.822,radius=5.485},
+  {specs=126,groups={[0]=57,23,23,23},height=7.096,radius=5.169},{specs=124,groups={[0]=49,25,25,25},height=8.742,radius=5.271}},
+ SandFruitSeed={{specs=95,groups={[0]=79,4,4,4,4},height=10.607,radius=6.777},{specs=88,groups={[0]=72,4,4,4,4},height=13.979,radius=5.417},
+  {specs=100,groups={[0]=84,4,4,4,4},height=9.079,radius=8.075},{specs=94,groups={[0]=78,4,4,4,4},height=12.238,radius=6.614}}}
+for _,id in ipairs(IDS)do for d=1,4 do want[id][d].cost=want[id][d].specs+1 end end
+local function digestOf(art)
+ local out={}
+ for _,s in ipairs(art.Specs)do out[#out+1]=table.concat({s.s,s.f,s.g,s.r,s.m,table.concat(s.k,','),string.format('%.4f,%.4f,%.4f',s.z[1],s.z[2],s.z[3]),string.format('%.4f,%.4f,%.4f',s.c[1],s.c[2],s.c[3])},'|')end
+ return table.concat(out,'\n')
+end
 for _,id in ipairs(IDS)do
- local w=want[id];local def=Catalog[id];local art=Approved.Get(id)
- check(Approved.Has(id)==true and Art.Is(id)==true and Art.Get(id)==art and art.RarityRework==true,id..': ApprovedPlantArt routes to DesertPlantArt149 (a RarityRework spec list)')
- check(#art.Specs==w.specs,id..': '..w.specs..' art parts ('..#art.Specs..')')
- local groups,okShape,okRole,okNums,lowest,neon,cost={},true,true,true,math.huge,0,0
- for i,s in ipairs(art.Specs)do
-  groups[s.g]=(groups[s.g]or 0)+1;cost+=Visuals.PartCost(s)
-  if not(s.s=='Wedge'or s.s=='Ball'or s.s=='Cylinder'or s.s=='Sphere')then okShape=false end
-  if s.g==0 then if not(s.r=='Leaf'or s.r=='Stem')then okRole=false end else if s.r~='Fruit'then okRole=false end end
-  if #s.c~=12 or #s.z~=3 or #s.k~=3 or s.p~=1 or s._ArtIndex~=i or type(s.m)~='string'or type(s.f)~='string'then okNums=false end
-  for _,v in ipairs(s.c)do if v~=v or math.abs(v)==math.huge then okNums=false end end
-  for _,v in ipairs(s.z)do if v~=v or v<=0 then okNums=false end end
-  local lo=specExtent(s);lowest=math.min(lowest,lo);if s.m=='Neon'then neon+=1 end
+ local def=Catalog[id];local designs=Art.Designs(id);local digests={}
+ check(#designs==4 and Art.DesignCount==4 and Approved.Has(id)==true and Art.Is(id)==true and Art.Get(id)==designs[1]and Approved.Get(id)==designs[1]and Approved.Design(id)==1,
+  id..': four designs; ApprovedPlantArt routes to DesertPlantArt149; design 1 is the base design (what a preview / a crop without an id shows)')
+ for d=1,4 do
+  local w=want[id][d];local art=designs[d];local tag=id..' design '..d
+  check(art.RarityRework==true,tag..': a RarityRework spec list')
+  check(#art.Specs==w.specs and #art.Specs<=130,tag..': '..w.specs..' art parts, at most 130 ('..#art.Specs..')')
+  local groups,okShape,okRole,okNums,lowest,neon,cost={},true,true,true,math.huge,0,0
+  for i,s in ipairs(art.Specs)do
+   groups[s.g]=(groups[s.g]or 0)+1;cost+=Visuals.PartCost(s)
+   if not(s.s=='Wedge'or s.s=='Ball'or s.s=='Cylinder'or s.s=='Sphere')then okShape=false end
+   if s.g==0 then if not(s.r=='Leaf'or s.r=='Stem')then okRole=false end else if s.r~='Fruit'then okRole=false end end
+   if #s.c~=12 or #s.z~=3 or #s.k~=3 or s.p~=1 or s._ArtIndex~=i or type(s.m)~='string'or type(s.f)~='string'then okNums=false end
+   for _,v in ipairs(s.c)do if v~=v or math.abs(v)==math.huge then okNums=false end end
+   for _,v in ipairs(s.z)do if v~=v or v<=0 then okNums=false end end
+   local lo=specExtent(s);lowest=math.min(lowest,lo);if s.m=='Neon'then neon+=1 end
+  end
+  check(okShape and okRole and okNums,tag..': every part has a known shape, a role (body Leaf / Stem, fruit groups Fruit), 12 + 3 + 3 numbers, p = 1')
+  local counts={};for g=0,def.FruitCount do counts[#counts+1]=groups[g]or 0 end
+  local wantCounts={};for g=0,def.FruitCount do wantCounts[#wantCounts+1]=w.groups[g]end
+  check(table.concat(counts,',')==table.concat(wantCounts,',')and groups[def.FruitCount+1]==nil,tag..': groups 0..'..def.FruitCount..' hold '..table.concat(counts,' / ')..' parts: FruitCount '..def.FruitCount..' kept, no stray group')
+  check(lowest>=-.05,('%s: nothing below the soil (lowest %.4f)'):format(tag,lowest))
+  check(cost==w.specs and Visuals.Metadata(id,crop(id,{Id=pick(id,d,4)})).Cost==w.cost,tag..': detail cost '..w.cost..' = one per part plus the plant itself (PlantDetailPlanner screen budget is 1400)')
+  check(near(art.Height,w.height,1e-9)and near(art.Radius,w.radius,1e-9),tag..': Height '..w.height..' / Radius '..w.radius)
+  check(#art.Sockets==def.FruitCount and #art.FruitCenters==def.FruitCount and #art.FruitRadii==def.FruitCount,tag..': its own Sockets / FruitCenters / FruitRadii, one per fruit')
+  -- the farthest reach of the parts is the Radius, the highest point the Height (each design's bounds are its own)
+  local top,reach=-math.huge,0
+  for _,s in ipairs(art.Specs)do local _,hi=specExtent(s);top=math.max(top,hi);local ex=(math.abs(s.c[4])*s.z[1]+math.abs(s.c[5])*s.z[2]+math.abs(s.c[6])*s.z[3])/2;local ez=(math.abs(s.c[10])*s.z[1]+math.abs(s.c[11])*s.z[2]+math.abs(s.c[12])*s.z[3])/2
+   reach=math.max(reach,math.sqrt(s.c[1]^2+s.c[3]^2)+math.max(ex,ez))end
+  check(near(top,art.Height,.001)and near(reach,art.Radius,.001),('%s: the highest point %.3f and the widest reach %.3f are the Height and Radius'):format(tag,top,reach))
+  -- every fruit group keeps its parts around its own fruit centre (the group is what a harvest picks up)
+  local near_=true
+  for g=1,def.FruitCount do
+   local c=V3(table.unpack(art.FruitCenters[g]));local rad=art.FruitRadii[g]
+   local hits=0;for _,s in ipairs(art.Specs)do if s.g==g then hits+=1;local dd=(V3(s.c[1],s.c[2],s.c[3])-c).Magnitude;if dd>rad*2.2 then near_=false end end end
+   if hits==0 then near_=false end
+  end
+  check(near_,tag..': every group\'s parts stay within 2.2 fruit radii of its fruit centre (so the harvest glints and picking sit on the fruit)')
+  check(neon==0,tag..': no Neon part (the sand fruit is textured by Enum.Material.Sand, the aloe is plain)')
+  digests[#digests+1]=digestOf(art)
  end
- check(okShape and okRole and okNums,id..': every part has a known shape, a role (body Leaf / Stem, fruit groups Fruit), 12 + 3 + 3 numbers, p = 1')
- local counts={};for g=0,def.FruitCount do counts[#counts+1]=groups[g]or 0 end
- local wantCounts={};for g=0,def.FruitCount do wantCounts[#wantCounts+1]=w.groups[g]end
- check(table.concat(counts,',')==table.concat(wantCounts,',')and groups[def.FruitCount+1]==nil,id..': groups 0..'..def.FruitCount..' hold '..table.concat(counts,' / ')..' parts, no stray group')
- check(lowest>=-.05,('%s: nothing below the soil (lowest %.4f)'):format(id,lowest))
- check(cost==w.specs and Visuals.Metadata(id,crop(id)).Cost==w.cost,id..': detail cost '..w.cost..' = one per part plus the plant itself (PlantDetailPlanner screen budget is 1400)')
- check(near(art.Height,w.height,1e-9)and near(art.Radius,w.radius,1e-9)and near(def.Height,art.Height,1e-12)and near(def.Radius,art.Radius,1e-12),id..': Height '..w.height..' / Radius '..w.radius..' = the catalog')
- local meta=true
+ local distinct=true;for a=1,4 do for b=a+1,4 do if digests[a]==digests[b]then distinct=false end end end
+ check(distinct,id..': the four designs are different (no two share a part list)')
+ -- the catalog: the sockets are design 1's; the bounds are the biggest design's with the approved plants' 5% margin (Fire Pepper: 6.009 x 1.05 x 2)
+ local maxH,maxR=0,0;for _,a in ipairs(designs)do maxH=math.max(maxH,a.Height);maxR=math.max(maxR,a.Radius)end
+ check(near(def.Height,maxH*1.05,1e-9)and near(def.Radius,maxR*1.05,1e-9)and def.AuthoredHeight==def.Height,('%s: catalog Height %.3f / Radius %.3f = the biggest design x 1.05 (%.3f / %.3f)'):format(id,def.Height,def.Radius,maxH,maxR))
+ local meta=true;local art=designs[1]
  for i=1,def.FruitCount do for k=1,3 do meta=meta and near(def.Sockets[i][k],art.Sockets[i][k],1e-12)and near(def.FruitCenters[i][k],art.FruitCenters[i][k],1e-12)end;meta=meta and def.FruitRadii[i]==art.FruitRadii[i]end
- check(meta and #art.Sockets==def.FruitCount and #art.FruitCenters==def.FruitCount and #art.FruitRadii==def.FruitCount,id..': Sockets / FruitCenters / FruitRadii = the catalog, one per fruit')
- -- the farthest reach of the parts is the Radius, the highest point the Height (the catalog's bounds are the art's own)
- local top,reach=-math.huge,0
- for _,s in ipairs(art.Specs)do local _,hi=specExtent(s);top=math.max(top,hi);local ex=(math.abs(s.c[4])*s.z[1]+math.abs(s.c[5])*s.z[2]+math.abs(s.c[6])*s.z[3])/2;local ez=(math.abs(s.c[10])*s.z[1]+math.abs(s.c[11])*s.z[2]+math.abs(s.c[12])*s.z[3])/2
-  reach=math.max(reach,math.sqrt(s.c[1]^2+s.c[3]^2)+math.max(ex,ez))end
- check(near(top,art.Height,.001)and near(reach,art.Radius,.001),('%s: the highest point %.3f and the widest reach %.3f are the Height and Radius'):format(id,top,reach))
- -- every fruit group keeps its parts around its own socket (the group is what a harvest picks up)
- local near_=true
- for g=1,def.FruitCount do
-  local c=V3(table.unpack(art.FruitCenters[g]));local rad=art.FruitRadii[g]
-  local hits=0;for _,s in ipairs(art.Specs)do if s.g==g then hits+=1;local d=(V3(s.c[1],s.c[2],s.c[3])-c).Magnitude;if d>rad*2.2 then near_=false end end end
-  if hits==0 then near_=false end
- end
- check(near_,id..': every group\'s parts stay within 2.2 fruit radii of its fruit centre (so the harvest glints and picking sit on the fruit)')
- check(neon==0,id..': no Neon part (the sand fruit is textured by Enum.Material.Sand, the aloe is plain)')
+ check(meta and #def.Sockets==def.FruitCount,id..': the catalog\'s Sockets / FruitCenters / FruitRadii are design 1\'s, one per fruit')
 end
 -- Colours and shapes of the design.
 -- The existing pieces the cactus is built from, read from the game's own art (so the test follows them if they change).
@@ -159,23 +199,24 @@ local function addScene(label,model)
    n4(sz.X),n4(sz.Y),n4(sz.Z),n4(p.X),n4(p.Y),n4(p.Z),n4(r[1][1]),n4(r[1][2]),n4(r[1][3]),n4(r[2][1]),n4(r[2][2]),n4(r[2][3]),n4(r[3][1]),n4(r[3][2]),n4(r[3][3]),n4(c.Transparency or 0))
  end end
 end
-for _,id in ipairs(IDS)do
- local def=Catalog[id];local w=want[id];local art=Approved.Get(id)
- check(PG.Profile(id,def)=='Bush',id..': grows with the Bush profile (generic growth: no per-stage art is needed)')
+for _,id in ipairs(IDS)do for d=1,4 do
+ local def=Catalog[id];local w=want[id][d];local art=Art.Designs(id)[d];local cid=pick(id,d,4);local tag=id..' design '..d
+ local crop=function(i,extra)local e=table.clone(extra or{});e.Id=e.Id or cid;return crop(i,e)end -- (this design's crop: no size change, no turn)
+ check(PG.Profile(id,def)=='Bush',tag..': grows with the Bush profile (generic growth: no per-stage art is needed)')
  -- ripe
  local m=Visuals.Build(id,origin,crop(id),4,math.huge)
  local base=m:FindFirstChild('PlantBase');local kids={}
  for g=1,def.FruitCount do kids[g]=m:FindFirstChild('Harvest_'..g)end
  local counts={};for g=1,def.FruitCount do local n=0;if kids[g]then for _,d in ipairs(kids[g]:GetDescendants())do if d:IsA('BasePart')then n+=1 end end end;counts[g]=n end
  local baseCount=0;for _,d in ipairs(base:GetDescendants())do if d:IsA('BasePart')then baseCount+=1 end end
- check(baseCount==w.groups[0]and table.concat(counts,',')==(id=='DesertAloeSeed'and'26,26,26'or'4,4,4,4'),id..': ripe: PlantBase '..w.groups[0]..' parts and one Harvest_N model per fruit group ('..table.concat(counts,'/')..')')
- check(#parts(m)==w.specs and #parts(m,true)==w.specs,id..': ripe: all '..w.specs..' parts built and visible')
+ check(baseCount==w.groups[0]and table.concat(counts,',')==(id=='DesertAloeSeed'and(w.groups[1]..','..w.groups[2]..','..w.groups[3])or'4,4,4,4'),tag..': ripe: PlantBase '..w.groups[0]..' parts and one Harvest_N model per fruit group ('..table.concat(counts,'/')..')')
+ check(#parts(m)==w.specs and #parts(m,true)==w.specs,tag..': ripe: all '..w.specs..' parts built and visible')
  local queryOk=true;for g=1,def.FruitCount do for _,d in ipairs(kids[g]:GetDescendants())do if d:IsA('BasePart')and not d.CanQuery then queryOk=false end end end
  for _,d in ipairs(base:GetDescendants())do if d:IsA('BasePart')and d.CanQuery then queryOk=false end end
- check(queryOk,id..': ripe: every fruit part can be queried (harvest prompt), no body part can')
+ check(queryOk,tag..': ripe: every fruit part can be queried (harvest prompt), no body part can')
  local lo,hi=math.huge,-math.huge;for _,d in ipairs(parts(m))do local a,b=extent(d);lo=math.min(lo,a);hi=math.max(hi,b)end
- check(lo>=-.0501 and near(hi,w.height,.002),('%s: ripe: lowest %.4f (no part under the soil), highest %.3f = Height'):format(id,lo,hi))
- addScene(id..' ripe',m)
+ check(lo>=-.0501 and near(hi,w.height,.002),('%s: ripe: lowest %.4f (no part under the soil), highest %.3f = Height'):format(tag,lo,hi))
+ addScene(tag..' ripe',m)
  -- growing at body .1 / .5 / .9 (and the ends): grows monotonically, fruit appears after the body, the finished plant is the ripe one
  local lastTop,monotonic=-1,true;local lines={}
  for _,f in ipairs({0,.1,.3,.5,.7,.9,1})do
@@ -184,50 +225,248 @@ for _,id in ipairs(IDS)do
   for _,d in ipairs(vis)do local a,b=extent(d);glo=math.min(glo,a);ghi=math.max(ghi,b);if d.Parent and d.Parent.Name:find('Harvest_')then fruitVisible+=1 end end
   if ghi<lastTop-1e-6 then monotonic=false end;lastTop=ghi
   lines[#lines+1]=('%d%%: %d visible, top %.2f'):format(f*100,#vis,ghi)
-  check(glo>=-.0501,('%s growing %d%%: nothing under the soil (%.4f)'):format(id,f*100,glo))
-  check(#parts(g)<=w.specs+20,('%s growing %d%%: %d parts in all (the %d art parts plus the generic growth pieces)'):format(id,f*100,#parts(g),w.specs))
-  if f==0 then check(#vis==1,id..': 0%: only the new seed shows ('..#vis..')')end
-  if f==.1 then check(fruitVisible==0 and ghi<1,id..': 10%: a sprout, no fruit yet (top '..ghi..')')end
-  if f==.5 then check(ghi<w.height*.75,id..': 50%: still growing (top '..ghi..' of '..w.height..')')end
-  if f==.9 then check(fruitVisible>0 and ghi>w.height*.5,id..': 90%: the fruit is showing, the body nearly done (top '..ghi..')')end
-  if f==1 then check(#vis==w.specs and near(ghi,w.height,.002),id..': 100%: the whole '..w.specs..'-part plant, Height '..w.height)end
-  if f==.3 or f==.7 then addScene(id..' growing '..f*100 ..'%',g)end
+  check(glo>=-.0501,('%s growing %d%%: nothing under the soil (%.4f)'):format(tag,f*100,glo))
+  check(#parts(g)<=w.specs+20,('%s growing %d%%: %d parts in all (the %d art parts plus the generic growth pieces)'):format(tag,f*100,#parts(g),w.specs))
+  if f==0 then check(#vis==1,tag..': 0%: only the new seed shows ('..#vis..')')end
+  if f==.1 then check(fruitVisible==0 and ghi<1,tag..': 10%: a sprout, no fruit yet (top '..ghi..')')end
+  if f==.5 then check(ghi<w.height*.75,tag..': 50%: still growing (top '..ghi..' of '..w.height..')')end
+  if f==.9 then check(fruitVisible>0 and ghi>w.height*.5,tag..': 90%: the fruit is showing, the body nearly done (top '..ghi..')')end
+  if f==1 then check(#vis==w.specs and near(ghi,w.height,.002),tag..': 100%: the whole '..w.specs..'-part plant, Height '..w.height)end
+  if f==.3 or f==.7 then addScene(tag..' growing '..f*100 ..'%',g)end
  end
- print(id..' growth: '..table.concat(lines,' | '))
- check(monotonic,id..': the plant only ever gets taller as it grows')
+ print(tag..' growth: '..table.concat(lines,' | '))
+ check(monotonic,tag..': the plant only ever gets taller as it grows')
  -- the harvest of one group: a stalk with its fruits, never the body
  for g=1,def.FruitCount do
   local item=Visuals.BuildSelectedFruit(id,origin,crop(id),{[g]=true},math.huge)
   local ps=parts(item);local ok=#ps==w.groups[g]
   for _,d in ipairs(ps)do local gAttr=d.Parent and d.Parent:GetAttribute('HarvestIndex');if gAttr~=g then ok=false end end
-  check(ok,id..': harvest item '..g..': '..w.groups[g]..' parts, all from group '..g)
+  check(ok,tag..': harvest item '..g..': '..w.groups[g]..' parts, all from group '..g)
   local detached=Visuals.BuildSelectedFruit(id,origin,crop(id,{_DetachedHarvest=true}),{[g]=true},math.huge)
   -- held in the hand: the Aloe keeps its whole spike (its stalk is a Fruit part, not a Stem); the sand fruit drops only its green attachment
   -- ('Fruit stem' is one of the game's connector names), leaving the sand ball with its lump and nub: "harvested fruit = that sand ball"
   local keep=id=='SandFruitSeed'and w.groups[g]-1 or w.groups[g]
-  check(#parts(detached)==keep,id..': harvest item '..g..' (detached, as held in the hand): '..keep..' parts'..(id=='SandFruitSeed'and' (the sand ball, its lump and its nub)'or' (nothing dropped)'))
+  check(#parts(detached)==keep,tag..': harvest item '..g..' (detached, as held in the hand): '..keep..' parts'..(id=='SandFruitSeed'and' (the sand ball, its lump and its nub)'or' (nothing dropped)'))
   local specOk=true;for _,s in ipairs(art.Specs)do if s.g==g and not Visuals.HarvestSpec(id,s)and s.f~='Fruit stem'then specOk=false end end
-  check(specOk,id..': HarvestSpec keeps every part of group '..g..(id=='SandFruitSeed'and' except the attachment'or''))
-  if g==1 or g==def.FruitCount then addScene(id..' harvest item '..g,item);addScene(id..' held item '..g,detached)end
+  check(specOk,tag..': HarvestSpec keeps every part of group '..g..(id=='SandFruitSeed'and' except the attachment'or''))
+  if g==1 or g==def.FruitCount then addScene(tag..' harvest item '..g,item);addScene(tag..' held item '..g,detached)end
  end
  -- distant supports: the body only; nothing collides (neither is a tree: a cactus never blocks planting)
  local sup=R.new('Model');Visuals.Supports(id,origin,crop(id),4,sup)
  local sp,collide,collideCost=parts(sup),0,0
  for _,d in ipairs(sp)do if d.CanCollide then collide+=1;collideCost+=1 end end
- check(#sp==w.groups[0],id..': supports: the '..w.groups[0]..' body parts ('..#sp..')')
- check(collide==0 and Catalog[id].Tree==false,id..': supports: nothing collides (not a tree)')
+ check(#sp==w.groups[0],tag..': supports: the '..w.groups[0]..' body parts ('..#sp..')')
+ check(collide==0 and Catalog[id].Tree==false,tag..': supports: nothing collides (not a tree)')
  local grow=R.new('Model');Visuals.GrowingSupports(id,origin,crop(id),1,grow,.5*def.Seconds)
- check(#parts(grow)>0,id..': the distant growing path builds ('..#parts(grow)..' parts)')
+ check(#parts(grow)>0,tag..': the distant growing path builds ('..#parts(grow)..' parts)')
  -- a scaled plant (PlantScale 2) scales every part and keeps the ground
  local big=Visuals.Build(id,origin,crop(id,{PlantScale=2}),4,math.huge);local blo,bhi=math.huge,-math.huge
  for _,d in ipairs(parts(big))do local a,b=extent(d);blo=math.min(blo,a);bhi=math.max(bhi,b)end
- check(blo>=-.1 and bhi>w.height*1.8,('%s: PlantScale 2: nothing under the soil, %.2f high'):format(id,bhi))
+ check(blo>=-.1 and bhi>w.height*1.8,('%s: PlantScale 2: nothing under the soil, %.2f high'):format(tag,bhi))
  -- the coats
  for _,coat in ipairs({'Gold','Diamond'})do
   local cm=Visuals.Build(id,origin,crop(id,{Mutation=coat}),4,math.huge)
-  check(#parts(cm)==w.specs,id..': '..coat..' coat builds all parts')
+  check(#parts(cm)==w.specs,tag..': '..coat..' coat builds all parts')
+ end
+end end
+-- 2b. The variants per crop -----------------------------------------------------------------------------------------------------------------------
+-- Owner: "make growth variations in all of them". Like the approved plants, ApprovedPlantArt gives every crop one of the designs by a hash of its crop id and
+-- then a small size / turn jitter (+-2%, +-4.6 degrees); Fire Pepper has one design (at x2) and the same ten jitters.
+do
+ local designs={DesertAloeSeed=Art.Designs('DesertAloeSeed'),SandFruitSeed=Art.Designs('SandFruitSeed')}
+ local function count(art,name)local n=0;for _,s in ipairs(art.Specs)do if s.f==name then n+=1 end end;return n end
+ local function same(list,want,tol)if #list~=#want then return false end;for i=1,#want do if math.abs(list[i]-want[i])>(tol or 1e-6)then return false end end;return true end
+ -- (a) what differs between the Aloe's designs: leaves, spots and teeth, spikes (florets, height, lean, where they stand), colour balance
+ local aloe={}
+ for d,art in ipairs(designs.DesertAloeSeed)do
+  local f={leaves=count(art,'Aloe leaf')/2,spots=count(art,'Aloe leaf spot'),teeth=count(art,'Aloe leaf tooth'),florets={0,0,0},stalks={},lean={},yaw={},greens=0,n=0}
+  for _,s in ipairs(art.Specs)do
+   if s.f=='Aloe floret'then f.florets[s.g]+=1;f.greens+=s.k[2];f.n+=1 end
+   if s.f=='Aloe flower stalk'then f.stalks[s.g]=s.z[2];f.lean[s.g]=math.deg(math.acos(s.c[8]))end
+   if s.f=='Rosette heart'then f.heart=table.concat(s.k,',')end
+  end
+  f.meanGreen=f.greens/f.n
+  for g=1,3 do local so=art.Sockets[g];f.yaw[g]=math.deg(math.atan2(so[3],so[1]))%360 end
+  aloe[d]=f
+ end
+ check(aloe[1].leaves==17 and aloe[2].leaves==14 and aloe[3].leaves==20 and aloe[4].leaves==15,'Aloe designs: 17 / 14 / 20 / 15 leaves (the rosette\'s fullness)')
+ check(aloe[1].spots==7 and aloe[2].spots==12 and aloe[3].spots==8 and aloe[4].spots==12 and aloe[1].teeth==7 and aloe[2].teeth==6 and aloe[3].teeth==8 and aloe[4].teeth==6,'Aloe designs: the leaf spot / tooth patterns differ (7+7, 12+6, 8+8, 12+6)')
+ local densities={24,25,21,23};local denseOk=true
+ for d=1,4 do for g=1,3 do if aloe[d].florets[g]~=densities[d]then denseOk=false end end end
+ check(denseOk,'Aloe designs: 24 / 25 / 21 / 23 florets on every spike (floret density)')
+ check(same(aloe[1].stalks,{6.9,6.0,5.25})and same(aloe[2].stalks,{8.4,7.35,6.45})and same(aloe[3].stalks,{5.4,4.8,5.85})and same(aloe[4].stalks,{7.5,4.8,6.3}),'Aloe designs: the three spikes have different heights in each design')
+ check(same(aloe[1].lean,{10,10,10},.01)and same(aloe[2].lean,{5,7,4},.01)and same(aloe[3].lean,{20,22,16},.01)and same(aloe[4].lean,{14,24,8},.01),'Aloe designs: the spikes lean 10 / 5-7 / 16-22 / 8-24 degrees')
+ local function gaps(y)local a={y[1],y[2],y[3]};table.sort(a);return{a[2]-a[1],a[3]-a[2],360-a[3]+a[1]}end
+ local g1,g4=gaps(aloe[1].yaw),gaps(aloe[4].yaw);table.sort(g4)
+ check(same(gaps(aloe[1].yaw),{120,120,120},.01)and same(gaps(aloe[2].yaw),{120,120,120},.01)and g4[1]<60 and g4[3]>150,'Aloe designs: the spikes stand evenly round the heart in designs 1-3 and bunched to one side in design 4')
+ check(aloe[3].meanGreen<aloe[1].meanGreen and aloe[1].meanGreen<aloe[2].meanGreen and aloe[2].meanGreen<aloe[4].meanGreen,('Aloe designs: the colour balance runs ember (%.0f) < red-to-yellow (%.0f) < sunset (%.0f) < golden (%.0f) by the mean green of the florets'):format(aloe[3].meanGreen,aloe[1].meanGreen,aloe[2].meanGreen,aloe[4].meanGreen))
+ local hearts={};for d=1,4 do hearts[aloe[d].heart]=true end;local nh=0;for _ in pairs(hearts)do nh+=1 end
+ check(nh==4,'Aloe designs: four different heart colours')
+ -- (b) the Sand Fruit's designs: barrel height / width, 7-9 ribs, spine density, 0-3 pups, the fruits' positions and sizes
+ local sand={}
+ for d,art in ipairs(designs.SandFruitSeed)do
+  local f={ribs=count(art,'Cactus rib')/5,spines=count(art,'Ivory spine'),pups=count(art,'Cactus pup'),sizes={},lats={}}
+  for _,s in ipairs(art.Specs)do if s.f=='Cactus body'then f.RX=s.z[1]/2;f.RY=s.z[2]/2 end end
+  for g=1,4 do
+   for _,s in ipairs(art.Specs)do if s.f=='Sand fruit'and s.g==g then f.sizes[g]=s.z[1]/2.4 end end
+   local so=art.Sockets[g];f.lats[g]=math.deg(math.asin((so[2]-f.RY)/f.RY))
+  end
+  sand[d]=f
+ end
+ check(same({sand[1].RX,sand[2].RX,sand[3].RX,sand[4].RX},{5.4,4.4,6.4,5.0})and same({sand[1].RY,sand[2].RY,sand[3].RY,sand[4].RY},{4.7,6.2,3.9,5.4}),'Sand Fruit designs: the barrel is 5.4 x 4.7 / 4.4 x 6.2 (tall) / 6.4 x 3.9 (squat) / 5.0 x 5.4')
+ check(sand[1].ribs==8 and sand[2].ribs==9 and sand[3].ribs==7 and sand[4].ribs==9,'Sand Fruit designs: 8 / 9 / 7 / 9 ribs (7 to 9)')
+ check(sand[1].spines==36 and sand[2].spines==25 and sand[3].spines==45 and sand[4].spines==32,'Sand Fruit designs: 36 / 25 / 45 / 32 ivory spines (sparse to dense)')
+ check(sand[1].pups==2 and sand[2].pups==1 and sand[3].pups==3 and sand[4].pups==0,'Sand Fruit designs: 2 / 1 / 3 / 0 pups (0 to 3)')
+ check(same(sand[1].sizes,{1,1,1,1})and same(sand[2].sizes,{1,.9,1.05,.85})and same(sand[3].sizes,{1.1,1.1,1.1,1.1})and same(sand[4].sizes,{1.1,.9,1,.85}),'Sand Fruit designs: the four fruits\' sizes differ (even, graded, big, uneven)')
+ check(same(sand[1].lats,{46,38,46,38},.01)and same(sand[2].lats,{58,50,58,50},.01)and same(sand[3].lats,{34,40,34,40},.01)and same(sand[4].lats,{40,56,36,64},.01),'Sand Fruit designs: the fruits sit at latitude 46/38, 58/50, 34/40 and 40/56/36/64 degrees (shoulders to near the top)')
+ -- every design's fruits grow out of ITS body: sockets on the body's own surface, between its ribs, centres .92 x size outside it, radius 1.15 x size
+ for d,art in ipairs(designs.SandFruitSeed)do
+  local f=sand[d];local onSurface,between,offset=true,true,true;local spacing=360/f.ribs
+  for g=1,4 do
+   local so,ce=art.Sockets[g],art.FruitCenters[g]
+   local e=(so[1]/f.RX)^2+((so[2]-f.RY)/f.RY)^2+(so[3]/f.RX)^2
+   if math.abs(e-1)>1e-6 then onSurface=false end
+   local yaw=math.deg(math.atan2(so[3],so[1]))%360;local into=(yaw/spacing)%1
+   if math.abs(into-.5)>.01 then between=false end
+   local dist=math.sqrt((ce[1]-so[1])^2+(ce[2]-so[2])^2+(ce[3]-so[3])^2)
+   if not(near(dist,.92*f.sizes[g],.01)and near(art.FruitRadii[g],1.15*f.sizes[g],1e-9))then offset=false end
+  end
+  check(onSurface and between and offset,'Sand Fruit design '..d..': the four sockets are on its own body\'s surface, between two ribs, with centres .92 x size outside and radius 1.15 x size')
+ end
+ for d,art in ipairs(designs.DesertAloeSeed)do
+  local ok=true
+  for g=1,3 do
+   local so=art.Sockets[g]
+   if not(near(so[2],1.05,1e-9)and math.sqrt(so[1]^2+so[3]^2)<=.34)then ok=false end -- (on top of the heart, within .22 x 1.5 of its axis)
+   local ce=art.FruitCenters[g];local stalk;for _,s in ipairs(art.Specs)do if s.f=='Aloe flower stalk'and s.g==g then stalk=s end end
+   local axis=V3(stalk.c[5],stalk.c[8],stalk.c[11]);local along=(V3(ce[1]-so[1],ce[2]-so[2],ce[3]-so[3]))
+   if along.Magnitude<.5*stalk.z[2]or(along.Unit-axis).Magnitude>1e-6 or not near(art.FruitRadii[g],.3*stalk.z[2],1e-9)then ok=false end
+  end
+  check(ok,'Aloe design '..d..': each spike\'s socket is on top of the heart and its fruit centre on the spike, 70% up, radius .3 x its length')
+ end
+
+ -- (c) determinism: the design and jitter come from the crop id alone, by a pure hash (so the server, every client, the far proxy and the harvest prompts agree)
+ local function hash(id)local h=137;for i=1,#id do h=(h*33+string.byte(id,i))%2147483647 end;return h end
+ local ids={};for n=1,4000 do ids[n]=('%d_%d'):format(100000+n*37%9973,n)end
+ for _,id in ipairs(IDS)do
+  local pure,stable=true,true
+  for _,cid in ipairs(ids)do
+   local d,j=keyOf(id,cid);local h=hash(cid)
+   if d~=math.floor(h/10)%4+1 or j~=h%10 or Approved.Design(id,{Id=cid})~=d then pure=false end
+  end
+  for n=1,300 do
+   local cid=ids[n];local a=Approved.Get(id,{Id=cid})
+   local b=Approved.Get(id,crop(id,{Id=cid,PlantScale=1.7,SeedScale=.6,Mutation='Gold',PickedMask=3,HarvestCycle=2,Weather='None'}));local c=Approved.Get(id,{Id=cid})
+   if a~=b or a~=c or Approved.Key(id,{Id=cid})~=Approved.Key(id,crop(id,{Id=cid,PlantScale=1.7,Mutation='Gold'}))then stable=false end
+  end
+  check(pure,id..': 4000 crop ids: the design is hash(id) // 10 % 4 + 1 and the jitter hash(id) % 10, nothing else (a pure function of the id)')
+  check(stable,id..': the same crop id always gets the same art whatever the crop\'s size, coat, picks, cycle or weather')
+  -- (d) spread: every design about a quarter, every design / jitter pair used
+  local per,pairsSeen,np={0,0,0,0},{},0
+  for _,cid in ipairs(ids)do local d,j=keyOf(id,cid);per[d]+=1;if not pairsSeen[d..'/'..j]then pairsSeen[d..'/'..j]=true;np+=1 end end
+  check(per[1]>=900 and per[1]<=1100 and per[2]>=900 and per[2]<=1100 and per[3]>=900 and per[3]<=1100 and per[4]>=900 and per[4]<=1100,id..': 4000 crop ids spread over the designs '..table.concat(per,' / ')..' (each about a quarter)')
+  check(np==40,id..': all 4 designs x 10 sizes / turns are used ('..np..' of 40 art keys)')
+  -- no id, a preview or an unknown crop shape: the base design, so nothing that already exists breaks
+  check(Approved.Get(id)==Art.Designs(id)[1]and Approved.Get(id,{})==Art.Designs(id)[1]and Approved.Get(id,{Id='preview'})==Art.Designs(id)[1]and Approved.Key(id)==id..':base'and Approved.Get(id,{Id=''})~=nil and Approved.Get(id,{Id=12345})~=nil,
+   id..': a call with no crop, no crop id or a preview shows design 1; an empty or a numeric id still works')
+ end
+ -- (e) the size / turn jitter: +-2% size, +-4.6 degrees turn about the vertical, the plant's own numbers scaled with it
+ for _,id in ipairs(IDS)do
+  local def=Catalog[id];local okJit=true;local maxHeight,maxRadius=0,0
+  for d=1,4 do
+   local base=Art.Designs(id)[d]
+   for j=0,9 do
+    local cid=pick(id,d,j);local art=Approved.Get(id,{Id=cid});local amount=1+(math.floor(j/2)-2)*.01
+    local ok=near(art.Height,base.Height*amount,1e-9)and near(art.Radius,base.Radius*amount,1e-9)and #art.Specs==#base.Specs and art.RarityRework==true and #art.Sockets==def.FruitCount
+    for g=1,def.FruitCount do
+     local a,b=base.Sockets[g],art.Sockets[g]
+     if not near(math.sqrt(b[1]^2+b[2]^2+b[3]^2),amount*math.sqrt(a[1]^2+a[2]^2+a[3]^2),1e-9)or not near(b[2],a[2]*amount,1e-9)then ok=false end
+     if not near(art.FruitRadii[g],base.FruitRadii[g]*amount,1e-9)then ok=false end
+    end
+    if not ok then okJit=false end
+    maxHeight=math.max(maxHeight,art.Height);maxRadius=math.max(maxRadius,art.Radius)
+   end
+  end
+  check(okJit,id..': every design x every jitter (40 art keys): size x 0.98..1.02, sockets / fruit radii / bounds follow, the part list is the design\'s')
+  check(maxHeight<=def.Height and maxRadius<=def.Radius,('%s: the catalog\'s Height %.3f / Radius %.3f cover every crop (largest %.3f / %.3f)'):format(id,def.Height,def.Radius,maxHeight,maxRadius))
+ end
+
+ -- (f) per design (and a few jitters): harvest positions, reach, the far proxies and the growing fruit
+ for _,id in ipairs(IDS)do
+  local def=Catalog[id]
+  for d=1,4 do for _,j in ipairs({4,0,9})do
+   local cid=pick(id,d,j);local tag=id..' design '..d..' jitter '..j;local art=Approved.Get(id,{Id=cid})
+   local cr=crop(id,{Id=cid})
+   local ok,reachOk=true,true;local reach0
+   for g=1,def.FruitCount do
+    local trait=Rules.Fruit(cr,g,def);local so,ce=V3(table.unpack(art.Sockets[g])),V3(table.unpack(art.FruitCenters[g]))
+    local want=so+(ce-so)*trait.Scale;local got=Visuals.FruitPosition(cr,def,g)
+    if(got-want).Magnitude>1e-9 or(Visuals.AuthoredSocket(id,cr,g)-so).Magnitude>1e-9 or(Visuals.FruitSocket(cr,def,g)-so).Magnitude>1e-9 then ok=false end
+    local extra=Visuals.FruitReach(cr,def,g)-art.FruitRadii[g]*trait.Scale
+    if reach0==nil then reach0=extra elseif math.abs(extra-reach0)>1e-9 then reachOk=false end
+   end
+   check(ok and reachOk,tag..': the harvest position, authored socket and reach come from this crop\'s own design (what the server and the prompts use)')
+   -- the distant fruit proxies: each fruit's group, whole
+   local meta=Visuals.Metadata(id,cr);local proxyOk=true
+   for g=1,def.FruitCount do
+    local group=R.new('Folder');Visuals.FruitProxy(group,id,cr,g,origin)
+    local n=0;for _,x in ipairs(group:GetDescendants())do if x:IsA('BasePart')then n+=1 end end
+    if n~=#(meta.Groups[g]or{})or n~=want[id][d].groups[g]then proxyOk=false end
+   end
+   check(proxyOk,tag..': the far proxy of every fruit has all the fruit\'s parts ('..want[id][d].groups[1]..' / ...)')
+  end end
+  -- growing fruit (regrow) of every fruit of every design, at several fractions: nothing appears before the bud, the fruit grows out of ITS socket to the full size
+  for d=1,4 do
+   local cid=pick(id,d,4);local art=Art.Designs(id)[d];local now=5e6;local duration=def.RegrowSeconds
+   for g=1,def.FruitCount do
+    local lastVisible,monotonic,lastReach=-1,true,-1;local ends={}
+    for _,f in ipairs({0,.05,.1,.3,.5,.7,.9,1})do
+     local cr=crop(id,{Id=cid,PlantedAt=now-def.Seconds*3,MatureAt=now-def.Seconds*2,ReadyAt=now-def.Seconds*2,HarvestCycle=1})
+     cr.FruitStates={};for i=1,def.FruitCount do cr.FruitStates[tostring(i)]={ReadyAt=now+(i==g and duration*(1-f)or-5),Cycle=1,Duration=duration}end
+     local source=table.clone(cr);source.ReadyAt=0
+     local item=Visuals.Build(id,origin,source,4,math.huge,g);local child=item:FindFirstChild('Harvest_'..g)
+     Visuals.BeginGrowth(child,id,cr,origin);Visuals.UpdateGrowth(child,cr,now)
+     local visible,reach=0,0;local so=V3(table.unpack(art.Sockets[g]))
+     for _,x in ipairs(child:GetDescendants())do if x:IsA('BasePart')and x.Transparency<1 and not x:GetAttribute('GrowthTemporary')then visible+=1;reach=math.max(reach,(x.CFrame.Position-so).Magnitude)end end
+     if visible<lastVisible then monotonic=false end;lastVisible=visible
+     if reach<lastReach-1e-6 then monotonic=false end;lastReach=reach
+     ends[f]={visible=visible,reach=reach};if f==1 then ends.scale=Rules.Fruit(cr,g,def).Scale end -- (the fruit's own size trait of this crop and cycle)
+     Visuals.EndGrowth(child,cr,now+duration)
+    end
+    local full=0;local sockets=V3(table.unpack(art.Sockets[g]))
+    for _,s in ipairs(art.Specs)do if s.g==g then full=math.max(full,(V3(s.c[1],s.c[2],s.c[3])-sockets).Magnitude)end end
+    full*=ends.scale
+    check(ends[0].visible==0 and ends[1].visible==want[id][d].groups[g]and monotonic and ends[.5].reach<ends[1].reach and near(ends[1].reach,full,1e-5),
+     ('%s design %d fruit %d regrow: 0 parts at 0%%, %d at 100%%, never fewer or farther out as it grows, the full size reaches the design\'s own parts (reach %.2f at 50%%, %.2f at 100%%)'):format(id,d,g,ends[1].visible,ends[.5].reach,ends[1].reach))
+   end
+  end
+ end
+ -- the whole plant at the extreme jitters, in the floating check's scene as well (ripe, growing, and one harvest item)
+ for _,id in ipairs(IDS)do for d=1,4 do for _,j in ipairs({0,9})do
+  local cid=pick(id,d,j);local def=Catalog[id]
+  local m=Visuals.Build(id,origin,crop(id,{Id=cid}),4,math.huge)
+  check(#parts(m)==want[id][d].specs,id..' design '..d..' jitter '..j..': ripe, all '..want[id][d].specs..' parts built')
+  addScene(id..' design '..d..' jitter '..j..' ripe',m)
+  addScene(id..' design '..d..' jitter '..j..' growing',Visuals.BuildGrowing(id,origin,crop(id,{Id=cid}),.6*def.Seconds))
+  addScene(id..' design '..d..' jitter '..j..' harvest item 2',Visuals.BuildSelectedFruit(id,origin,crop(id,{Id=cid,_DetachedHarvest=true}),{[2]=true},math.huge))
+ end end end
+
+ -- (g) Fire Pepper: one design (at x2) and the ten size / turn jitters, as before
+ do
+  local id='FirePepperSeed';local keys,nk={},0
+  for _,cid in ipairs(ids)do local k=Approved.Key(id,{Id=cid});if not keys[k]then keys[k]=true;nk+=1 end end
+  local twice=true
+  for n=1,200 do
+   local c=crop(id,{Id=ids[n]});local a,b=OldApproved.Get(id,c),Approved.Get(id,c)
+   if #a.Specs~=#b.Specs or not near(a.Height*2,b.Height,1e-9)or not near(a.Radius*2,b.Radius,1e-9)then twice=false end
+   for i,s in ipairs(a.Specs)do local t=b.Specs[i];for k=1,3 do if not near(s.z[k]*2,t.z[k],1e-9)or not near(s.c[k]*2,t.c[k],1e-9)then twice=false end end end
+   for i=1,#a.Sockets do for k=1,3 do if not near(a.Sockets[i][k]*2,b.Sockets[i][k],1e-9)or not near(a.FruitCenters[i][k]*2,b.FruitCenters[i][k],1e-9)then twice=false end end;if not near(a.FruitRadii[i]*2,b.FruitRadii[i],1e-9)then twice=false end end
+  end
+  check(nk==10 and twice,'Fire Pepper: 4000 crop ids give 10 art keys (one design, ten size / turn jitters), and for 200 of them every spec, socket, centre, radius and bound is exactly x2 of the base\'s variant')
+  check(Approved.Design(id,{Id=ids[1]})==1,'Fire Pepper: one design')
  end
 end
+
 print('SCENE {"parts":['..table.concat(scene,',')..'],"labels":['..(function()local o={};for i,l in ipairs(labels)do o[i]=('{"text":"%s"}'):format(l)end;return table.concat(o,',')end)()..']}')
 
 -- 3. Fire Pepper x2 ---------------------------------------------------------------------------------------------------------------------------

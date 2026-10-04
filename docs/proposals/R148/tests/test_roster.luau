@@ -133,14 +133,18 @@ check(approvedCatalog.FirePepperSeed and approvedCatalog.FirePepperSeed.Height~=
  'ApprovedPlantCatalog.FirePepperSeed still has the base size (the plant catalog got its own x2 copy)')
 local pp=P.PrismOrchidSeed
 check(near(pp.Height,approvedCatalog.PrismOrchidSeed.Height,1e-9)and pp.Rarity=='Rare'and pp.Value==76179861,'Prism Pepper (same meshes, other module) is not scaled')
--- New plants' geometry = DesertPlantArt149.
+-- New plants' geometry = DesertPlantArt149: the sockets are design 1's (a crop's own come from its design); the bounds are the biggest of the four designs x 1.05,
+-- the margin the approved plants' bounds carry for the per-crop size jitter (Fire Pepper: 6.009 x 1.05 x 2).
 for _,id in ipairs({'DesertAloeSeed','SandFruitSeed'})do
- local d,art=P[id],Art.Get(id)
- local sameGeo=near(d.Height,art.Height,1e-12)and near(d.Radius,art.Radius,1e-12)and d.AuthoredHeight==art.Height
+ local d,art=P[id],Art.Get(id);local maxH,maxR=0,0
+ for _,design in ipairs(Art.Designs(id))do maxH=math.max(maxH,design.Height);maxR=math.max(maxR,design.Radius)end
+ local sameGeo=#Art.Designs(id)==4 and near(d.Height,maxH*1.05,1e-12)and near(d.Radius,maxR*1.05,1e-12)and d.AuthoredHeight==d.Height
  for i=1,d.FruitCount do for k=1,3 do sameGeo=sameGeo and near(d.Sockets[i][k],art.Sockets[i][k],1e-12)and near(d.FruitCenters[i][k],art.FruitCenters[i][k],1e-12)end;sameGeo=sameGeo and d.FruitRadii[i]==art.FruitRadii[i]end
- check(sameGeo,id..': Height / Radius / Sockets / FruitCenters / FruitRadii equal DesertPlantArt149')
+ check(sameGeo,id..': 4 designs; Height / Radius = the biggest design x 1.05; Sockets / FruitCenters / FruitRadii = design 1\'s (DesertPlantArt149)')
 end
-check(near(a.Height,8.261,1e-9)and near(a.Radius,5.211,1e-9)and near(s.Height,10.607,1e-9)and near(s.Radius,6.777,1e-9),'art bounds: Aloe 8.261 / 5.211, Sand Fruit 10.607 / 6.777')
+local aloe1,sand1=Art.Get('DesertAloeSeed'),Art.Get('SandFruitSeed')
+check(near(aloe1.Height,8.261,1e-9)and near(aloe1.Radius,5.211,1e-9)and near(sand1.Height,10.607,1e-9)and near(sand1.Radius,6.777,1e-9),'design 1 bounds: Aloe 8.261 / 5.211, Sand Fruit 10.607 / 6.777 (the base designs)')
+check(near(a.Height,9.822*1.05,1e-9)and near(a.Radius,5.485*1.05,1e-9)and near(s.Height,13.979*1.05,1e-9)and near(s.Radius,8.075*1.05,1e-9),'catalog bounds: Aloe 10.313 / 5.759 (the tall design x 1.05), Sand Fruit 14.678 / 8.479 (the tall and the squat design x 1.05)')
 check(#Art.Get('DesertAloeSeed').Specs==127 and #Art.Get('SandFruitSeed').Specs==95,'127 and 95 art parts')
 -- Saving rules: integers, within the per-fruit cap, times within a day.
 for _,id in ipairs({'DesertAloeSeed','SandFruitSeed','FirePepperSeed','MoonflowerSeed'})do

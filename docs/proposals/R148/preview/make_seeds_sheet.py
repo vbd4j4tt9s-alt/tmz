@@ -53,8 +53,8 @@ def panel(name, caption, sub, size):
 NOTE = ('Approximate (three.js, plain materials, no Roblox textures or lighting). The Fire Pepper plant already reuses the game\'s existing red pepper model, at twice the size '
         '(the art\'s positions and sizes doubled); its baked meshes are not in the repo, so this preview draws stand-in ellipsoids of their bounding boxes and only its SIZE is shown. '
         'The Sand Fruit cactus is built from the game\'s own cactus pieces (the Prickly Pear\'s stem green, the Crown Cactus\' ribs and ivory spines); its fruits use Enum.Material.Sand, drawn here as a matt sand colour. '
-        'Each plant is framed to fill its picture; the last Fire Pepper panel shows both at one scale.')
-TW, TH = 300, 450
+        'Each plant is framed to fill its picture; the last Fire Pepper panel shows both at one scale. Fire Pepper keeps its single art (x2) with the same ten small size / turn variants (about 2%): too small to draw.')
+TW, TH, GAP = 300, 450, 8
 rows = [
     ('ALOE  |  Desert, Rare  |  1.0e7 per spike, 3 spikes, 960 s / regrow 530 s',
      [panel('seed_aloe', 'Seed', 'blue-green blades and a red-to-yellow flower spike', (TW, TH)),
@@ -66,13 +66,17 @@ rows = [
       panel('sand_growing', 'Growing: 50%', 'round cactus first, fruits later', (TW, TH)),
       panel('sand_grown', 'Grown', '95 parts, a round cactus 10.6 studs high', (TW, TH)),
       panel('sand_fruit', 'Harvested fruit', 'one fruit: a lumpy sand-textured ball', (TW, TH))]),
+    ('ALOE VARIATIONS  |  four designs picked by the crop id, fully grown',
+     [panel('aloe_variants', 'classic  |  tall  |  wide  |  windswept', '127 / 128 / 126 / 124 parts: 14-20 leaves, 21-25 florets a spike, spikes of other heights, leans and places, other spot patterns and colour balance', (4 * TW + 3 * GAP, 338))]),
+    ('SAND FRUIT VARIATIONS  |  four designs picked by the crop id, fully grown',
+     [panel('sand_variants', 'barrel  |  tall  |  squat  |  ribbed', '95 / 88 / 100 / 94 parts: 7-9 ribs, 0-3 pups, sparse to dense spines, barrels of other heights and widths, fruits at other places and sizes', (4 * TW + 3 * GAP, 338))]),
     ('FIRE PEPPER  |  Lava, now Mythic  |  285M per pepper, 4 peppers, 4300 s / regrow 2370 s',
      [panel('seed_fire', 'Seed (Mythic)', 'green calyx, curled stem, 3 flickering flames', (TW, TH)),
       panel('fire_before', 'Before', 'Rare: 6 studs high', (TW, TH)),
       panel('fire_after', 'After', 'Mythic: the same model x2 (12 studs)', (TW, TH)),
       panel('fire_both', 'Before | After', 'same scale; stand-in shapes, size only', (TW, TH))]),
 ]
-GAP, HEAD, TITLE = 8, 44, 64
+HEAD, TITLE = 44, 64
 tw = max(sum(t.width for t in r[1]) + GAP * (len(r[1]) + 1) for r in rows)
 rowh = [max(t.height for t in r[1]) for r in rows]
 noteLines = wrap(NOTE, font(14, False), tw - 40)

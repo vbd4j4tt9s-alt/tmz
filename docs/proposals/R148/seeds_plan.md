@@ -55,6 +55,17 @@ with slight shape" and, for the Aloe, "increase the amount of ticks on the stick
 - **Aloe: much denser and more vibrant.** 24 florets on each spike (it was 9), saturated red at the bottom grading through orange to yellow at the tip, richer blue-green leaves, 127 parts.
 - **Fire Pepper art is unchanged** (the existing red pepper model x2). The preview draws stand-ins for its baked meshes, which are not in the repo.
 
+**3b. Growth variations (owner, last request on the seeds): four designs of each new plant**, picked per crop like the approved plants' (`ApprovedPlantArt` keeps a list per id; a crop's design is
+`hash(crop.Id) // 10 % 4 + 1`, its size / turn jitter `hash % 10`, as `Art.Key` / `Art.Get` already do for the approved plants; the key carries the design).
+- **Aloe** (`DesertPlantArt149`, parameter tables): classic (17 leaves, 24 florets, red to yellow), tall (14 long leaves, 25 florets, slim upright spikes, sunset colours), wide (20 broad leaves, 21 florets, short outward-leaning spikes, red-heavy),
+  windswept (15 leaves, 23 florets, three spikes bunched to one side at different heights and leans, golden); each also has its own leaf spot / tooth pattern and heart colour. 127 / 128 / 126 / 124 parts.
+- **Sand Fruit**: barrel (5.4 x 4.7, 8 ribs, 2 pups), tall (4.4 x 6.2, 9 ribs, sparse spines, 1 pup, fruits high on the shoulders), squat (6.4 x 3.9, 7 ribs, dense spines, 3 pups, big low fruits), ribbed (5.0 x 5.4, 9 ribs, no pups, fruits scattered unevenly, one near
+  the top). 95 / 88 / 100 / 94 parts. Each design has its own sockets (on its own body's surface, between its ribs), fruit centres, radii and bounds; FruitCount stays 3 / 4.
+- The catalog's `Height` / `Radius` are the biggest design's x 1.05 (the margin the approved plants carry for the size jitter: Fire Pepper 6.009 x 1.05 x 2), its sockets design 1's. Design 1 is what a preview / a crop without an id shows, and is exactly the art described below.
+- Fire Pepper is unchanged: one design at x2 with the ten size / turn jitters.
+- Tests (`test_roster_art.luau`): every design's parts, groups, bounds, sockets vs fruit, 0 floating (the R134 scene now holds every design, jitter, growth stage and harvest item), growth at seven fractions and the regrow of every fruit of every design, determinism (a pure hash of the crop id),
+  the spread over 4000 crop ids, the jitter, harvest positions and far proxies.
+
 **4. The Index fallback applies only to players who had already reached the milestone.** Desert's Index grew from 5 to 7 seeds. On the first load after the update the server records which Desert milestones
 (halfway / complete) the player had already met with the old 5 seeds (`Premium.OldRoster148`, saved, sanitised on decode; a new player starts with an empty record) and publishes them as `IndexOldHalf2` / `IndexOldFull2`;
 `IndexMilestone` and `ChestIndex` use "the live milestone OR that flag". A new player, or an old one who had not got there, needs the live seven. Claimed rewards stay claimed, so nothing pays twice.
@@ -291,6 +302,8 @@ Other notes:
 ---
 
 ## 5. Art direction (for the art coder)
+
+The tables below describe design 1 of each plant (the base design); the other three designs of each are listed in decision 3b.
 
 ### 5.1 Style read from the approved specs
 - **Dune Lotus** (`DatePalmSeedArt45`, 137 parts) and **Lava Lotus** (125): a basal leaf ring made of **two-tone Wedge pairs**, one per leaf, the two halves a shade apart for shading. Flower = stacked Wedge petals plus a few Neon Corner "hearts". SmoothPlastic, no textures.

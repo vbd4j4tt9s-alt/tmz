@@ -20,6 +20,10 @@ Two new ModuleScripts (`ReplicatedStorage/Roster149`, `ReplicatedStorage/DesertP
 | Index cash first / repeat | 10,000,000 / 2,000,000 | 26,400,000 / 5,280,000 |
 | Chance in a Common Desert pack | 1/8 | 1/90 |
 
+- **Growth variations (4 designs each).** Like the other plants, every planted Aloe and Sand Fruit shows one of four designs, chosen by its crop id (so it is always the same one, on every client, in the far view and for the harvest prompts), plus a small size / turn variation (+-2%).
+  Aloes: 14 to 20 leaves, other leaf lengths and leans, other rosette spreads, spikes of other heights, leans and places (one design bunches them to one side), 21 to 25 florets a spike with a red-heavy, balanced, sunset or golden colour balance, other spot patterns.
+  Sand Fruits: a round barrel, a tall one, a squat one and a ribbed one: 7 to 9 ribs, sparse to dense spines, 0 to 3 pups, and four fruits at other places on the shoulders and top and in other sizes.
+  Every design keeps 3 / 4 fruits, has its own sockets and bounds, and is 124 to 128 / 88 to 100 parts. The catalog's Height / Radius are the biggest design's with the usual 5% margin (Aloe 10.3 / 5.8, Sand Fruit 14.7 / 8.5). Fire Pepper keeps its one design (at x2) with its ten small size / turn variations.
 - The Aloe earns 2.04e8 per hour: a little more than the Uncommon Prickly Pear (2.00e8), less than Iceberry and the Sand Fruit.
 - The old Uncommon "Aloe" seed (retired, some players hold one) is now called **Aloe Sprout**.
 

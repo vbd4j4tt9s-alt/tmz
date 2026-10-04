@@ -9,7 +9,8 @@
 #     every other seed in those rows, the Void / Mech / Verity odds, every seeded roll) must be byte-identical.
 #  2. test_roster.luau     - server world: constants, catalog, plants, odds, banked packs, hold tooltips and `odds` (sorted), save / load / gift,
 #                            Index (old-roster milestones only through the saved flag), commands, Fruit of the Hour.
-#  3. test_roster_art.luau - client world: the new plants and the x2 Fire Pepper in every build mode, seeds, effects, the Index and ChestIndex,
+#  3. test_roster_art.luau - client world: the new plants (4 designs each: parts, bounds, sockets, determinism, spread, jitter, growth and regrow) and the
+#                            x2 Fire Pepper in every build mode, seeds, effects, the Index and ChestIndex,
 #                            and GardenVisuals' effect slots (by rarity rank, then distance). Its plant scene goes through check_floating.py
 #                            (R134): no floating part in any plant.
 # ROSTER_KEEP_GOING=1 runs every stage even after a failure (the exit status is still non-zero).

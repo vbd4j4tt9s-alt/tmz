@@ -71,6 +71,26 @@ emit('sand_close',Visuals.Build('SandFruitSeed',origin,crop('SandFruitSeed'),4,m
 local sandFruit=Visuals.Build('SandFruitSeed',origin,crop('SandFruitSeed',{_DetachedHarvest=true}),4,math.huge,1)
 local sc=Catalog.SandFruitSeed.FruitCenters[1]
 emit('sand_fruit',sandFruit,string.format('{"target":[%s,%s,%s],"dist":8,"az":-28,"el":8,"fov":30}',sc[1],sc[2],sc[3]))
+-- Growth variations: the four designs of each plant side by side, fully grown (a crop gets its design from a hash of its crop id, ApprovedPlantArt). Each is a crop id
+-- of that design with no size / turn jitter and plain-sized fruit, found through ApprovedPlantArt.Key itself. (The renderer mirrors X: design 1 is placed at +X so that it
+-- appears on the left.)
+local Rules=W.module('PlantRules')
+local function designCrop(id,design)
+ for n=1,20000 do
+  local cid='pv'..n;local d,j=Approved.Key(id,{Id=cid}):match(':d(%d):(%d)$')
+  if tonumber(d)==design and(tonumber(j)==4 or tonumber(j)==5)then
+   local c=crop(id,{Id=cid});local plain=true;for g=1,Catalog[id].FruitCount do if Rules.Fruit(c,g,Catalog[id]).Scale~=1 then plain=false end end
+   if plain then return c end
+  end
+ end
+end
+local function lineup(name,id,spacing,view)
+ local out={}
+ for d=1,4 do dumpModel(Visuals.Build(id,CF((2.5-d)*spacing,0,0),designCrop(id,d),4,math.huge),out)end
+ print(string.format('SCENE %s {"parts":[%s],"view":%s,"size":[1200,330]}',name,table.concat(out,','),view))
+end
+lineup('aloe_variants','DesertAloeSeed',12,'{"target":[0,4.8,0],"dist":28,"az":-6,"el":11,"fov":30}')
+lineup('sand_variants','SandFruitSeed',17.5,'{"target":[0,6.8,0],"dist":38,"az":-6,"el":11,"fov":30}')
 -- Fire Pepper: the new Mythic seed, the plant before (base art) and after (x2), and both side by side to scale.
 emit('seed_fire',SeedVisuals.Seed({Id='FirePepperSeed'},1,CF(0,0,0),holder,1,nil,'None'),seedView)
 local function emitSpecs(name,specLists,view)
