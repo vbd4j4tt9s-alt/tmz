@@ -1,9 +1,10 @@
 #!/bin/sh
-# Usage: sh run_keyboard.sh [scratch dir]. R147 candy keyboard runway on the Roblox mock with the real scripts:
-#  test_keyboard.luau - KeyboardTrack.lua (rows, grid edges, palette / legend cycling, spacebar rows, determinism, easing, limiter)
-#                       and the real KeyboardTrack.client.lua (client only: no remotes; non-collidable parts; part budget that does not
-#                       grow after 1000+ stud trips; keys go down under the character and come back; other players and keepers press;
-#                       shovel-hole Pits hide nearby keys; rate-limited clicks; reduced motion; tiers; spacebar rows; fallback; teardown).
+# Usage: sh run_keyboard.sh [scratch dir]. R148 candy keyboard runway (this suite kept its R147 location) on the Roblox mock with the real scripts:
+#  test_keyboard.luau - KeyboardTrack.lua (60-column / pitch-3 grid, per-biome grids and spacebars, zones and shades, legend order, hierarchy,
+#                       LOD windows: budgets, no overlap, no gaps over every position of the track, tiers 3/2/1) and the real
+#                       KeyboardTrack.client.lua (client only, no remotes: full-width / full-length coverage, upright legends reading left ->
+#                       right for a +Z runner, spacebar label, zone colours without bands, presses / clicks, other players, keepers,
+#                       shovel holes near and far, pack platforms, tier changes, 1000 studs/s, reduced motion, teardown, fallbacks).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT/cl"
