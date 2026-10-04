@@ -115,6 +115,9 @@ local function cardKey(c)
  for _,d in ipairs(c:GetDescendants())do
   -- (a King card's glow core breathes with the card scheduler, so its transparency is not part of the comparison)
   local t=d._props.Text;local a=d.Name~='Core'and d._props.BackgroundTransparency or nil
+  -- (R148 follow-up: the CLAIM pill's amount is written by OddsText85.Whole now, "$4,800" where the R147 script wrote "$4800": the amount is
+  -- compared separately below, everything else of the pill - and of the card - is still compared)
+  if type(t)=='string'and t:find('^CLAIM %$')then t='CLAIM $#'end
   out[#out+1]=d._class..':'..d.Name..':'..(t and tostring(t)or'')..':'..(a and string.format('%.2f',a)or'')..':'..(d._props.BackgroundColor3 and rgbKey(d._props.BackgroundColor3)or'')
  end
  return table.concat(out,'|')
@@ -332,6 +335,9 @@ for _,old in ipairs(oldCards)do
 end
 check(sameCards,'every card is what it was on the old MECH / VERITY tab (rarity border or limited card, rarity and odds chips, name, SEED / GROWN, CLAIM pill)')
 local claimPill=byName[MECH[4]]:FindFirstChild('ClaimPill');check(claimPill and claimPill.Reward.Text:find('^CLAIM %$'),'a Mech seed with a cash reward shows its CLAIM pill here too')
+local Odds=W.module('OddsText85')
+local pillsOk=true;for _,pair in ipairs({{MECH[4],4800},{'VeritySeed',9000}})do local pill=byName[pair[1]]:FindFirstChild('ClaimPill');if not(pill and pill.Reward.Text=='CLAIM $'..Odds.Whole(pair[2]))then pillsOk=false;print('  pill text: '..tostring(pill and pill.Reward.Text))end end
+check(pillsOk and Odds.Whole(4800)=='4,800','the CLAIM amounts are OddsText85.Whole of the reward ("CLAIM $4,800", "CLAIM $9,000"): whole numbers under a million, as the owner asked')
 calls={};byName[MECH[4]].Activated:Fire();frames(3)
 check(calls[1]and calls[1][1]=='ClaimSeed'and calls[1][2]==MECH[4],'and clicking it claims that seed (ClaimSeed)')
 check(indexBadge()==oldBadgeCash,'the INDEX badge counts the same rewards as before for this state ('..indexBadge()..' vs '..oldBadgeCash..')')
