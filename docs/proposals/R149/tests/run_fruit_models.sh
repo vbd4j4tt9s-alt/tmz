@@ -1,7 +1,7 @@
 #!/bin/sh
 # Usage: sh run_fruit_models.sh [scratch dir]   (needs /opt/luau/luau, python3 + numpy)
-# R149 fruit models on the Roblox mock with the REAL modules of this checkout, proved against the BASE commit (FRUIT_BASE, default 0b08836 = the branch commit just before the redesigns were merged; 38b1afa in the agent worktree) =
-# proposal commit, the last one before the redesigns):
+# R149 fruit models on the Roblox mock with the REAL modules of this checkout, proved against the BASE commit (FRUIT_BASE, default 0b08836 = the branch commit just before the redesigns were merged; it was 38b1afa, the R149
+# proposal commit, in the agent worktree):
 #  0. files: only the 8 art / key modules below differ from the base under src/ (Lantern Fern's ApprovedPlantArt2, PlantArtCrystal (Amethyst Grape),
 #     PlantGrowth, GardenVisuals, PlantVisuals, the R148 seeds, Verity ... are byte for byte the base's);
 #  1. regression diff: dump_plants.luau runs on the BASE and on this checkout (every plant of the catalog, 2 crops each, 8 for the Ash Tomato and the
