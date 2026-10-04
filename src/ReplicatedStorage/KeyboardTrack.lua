@@ -1,66 +1,90 @@
--- R148 (owner playtest of R147): the candy keyboard runway covers the whole track floor, edge to edge, the way the reference game
--- ("+1 Speed Keyboard Escape (Candy & Chocolate)") looks: small, tightly packed keys with a letter on each near key, one colour family
--- per biome in a few shades picked per key. Pure config + grid maths for the client script KeyboardTrack.client.lua: no instances, no
--- Roblox services, no randomness (every colour, letter and cell is a function of the grid position, so every client builds the same).
+-- R149 (owner playtest of R148: "the keyboard tiles are way too small and not tall enough also there are rendering issues ... the same
+-- result as the keyboard asmr game where the keyboard tiles are visible from a really long range and it has a really consistent look
+-- overall"; "the keyboard is also not consistent with its noise and also keyboard colouring should match their biome").
+-- Pure config + grid maths for the client script KeyboardTrack.client.lua: no instances, no Roblox services, no randomness (every colour,
+-- letter and cell is a function of the grid position, so every client builds the same keyboard).
 --
---  GRID  pitch 3 (see Config.Pitch), 60 columns across the 180-wide floor (x = centre +-90), column 1 on the +X edge so that a runner
---        heading +Z (+X is on his LEFT) reads the keys left -> right: Q W E R T Y ... Rows run from the first biome's start to
---        BiomeTrackEndZ - 120 (The Darkened's arena keeps its ground). Every biome has its own grid origin: its first rows start exactly on
---        its BiomeStartZ_n (a biome's row pitch is its length / whole rows, about 3), and its first SpaceRows rows are one cream spacebar.
---  LOD   the client draws the grid in layers around the runner: near keycap MeshParts (legend, press, click), then plain block keys at
---        the same pitch, then plain blocks covering 2x2, 4x4, 8x8 and 16x16 keys (same zone colours, gaps scale with the block). Layers are
---        rectangles; a layer leaves out the cells the finer layer covers, aligned to its own cell boundaries (K.Hierarchy / K.Windows).
-local K={Version=148}
+--  GRID   22 big keys across the 180-wide floor (pitch 180/22 = 8.18 studs, ~2.7x R148), column 1 on the +X edge so that a runner heading +Z
+--         (+X is on his LEFT) reads Q W E R T Y ... left -> right. Rows run from the first biome's start to BiomeTrackEndZ - 120 (The
+--         Darkened's arena keeps its ground). Every biome has its own grid: its first row starts exactly on its BiomeStartZ_n (row pitch =
+--         its length / whole rows, 8.17 .. 8.23) and that first row is one cream spacebar with the biome's name.
+--  LOOK   ONE look at every distance: every key is the same keycap (ReplicatedStorage.R142Keycap, kept at its own 10.55 x 6.39 proportions
+--         so it stays a chunky keycap) in its biome's colours, standing 2.15 studs proud of a sunken bed of the biome's darker grout colour.
+--         The key tops sit just above the real floor (runners and keepers stand on them, nothing collides); the real track floor is hidden
+--         for this client only (LocalTransparencyModifier), so nothing is ever coplanar with it. No coarse / flat far layers: the keys are
+--         built in whole rows around the runner (up to ~1000 studs ahead on tier 3) and recycled. Only what nobody can see at that range
+--         drops with distance: the letters (they fade out ~150 studs ahead) and the press animation (other runners / keepers far away).
+--  SOUND  one click recording, one pitch band, the same volume rule for every key; every runner (you, each player, each keeper) gets his
+--         own steady cadence (at most one click per ClickGap seconds) - no shared budget that starves some presses, no stacked bursts.
+local K={Version=149}
 local floor,ceil,max,min=math.floor,math.ceil,math.max,math.min
 local C3=Color3.fromRGB
 
 K.Config={
- Pitch=3,Gap=.28,FieldWidth=180,CenterX=0,
+ Pitch=180/22,Gap=.5,FieldWidth=180,CenterX=0,           -- 22 keys of 8.18 studs across the 180 floor; Gap = grout between two key boxes
  EndMargin=120,DefaultEndZ=1445,DefaultStartZ=-100,
- SpaceRows=3,                                       -- a biome's spacebar is this many rows deep (a bigger label)
- KeyY=1.3,BlockY=.6,                                -- keycap mesh height (template proportions) / plain block thickness
- FloorTop=4.0,RestRise=.45,PressedRise=.1,          -- key top above the floor: resting / pressed
- TopOffset=0,                                       -- studs added to a mesh key's centre height (mesh top alignment fudge, tune in Studio)
- PressSeconds=.06,ReleaseSeconds=.14,               -- quad-out down, back-out up
- -- The dark bed under the keys (the gaps between keys, no grass). It sits clearly above the real floor so the two never z-fight; the
- -- client lifts shovel-hole parts by the same amount (they were authored to sit a few hundredths above the floor).
- BedRise=.1,BedThickness=.4,BedMaxLength=1024,BedColor={44,27,20},
- PlayerFootprint=1.2,PlayerFeetReach=3,PlayerRootToFeet=3, -- half-size of a runner's footprint; other players press while their feet (root - 3) are within 3 studs of the floor
- HoleReach=2,                                       -- keys within this many studs of a shovel hole's Pit hide while it exists
- PlatformClearance=.5,                              -- pack platforms: keys within the platform radius + this are left out (fine layers only)
+ SpaceRows=1,                                             -- a biome's spacebar is its first row (one big key, full width)
+ TemplateSize={10.55,6.39,10.55},                         -- the R142Keycap mesh's own size (its proportions are kept: KeyY = KeySize * 6.39 / 10.55)
+ KeyY=(180/22-.5)*6.39/10.55,                             -- 4.65: the keycap's full height; the lower ~2.5 studs sit below the bed, out of sight
+ FloorTop=4.0,RestRise=.55,PressedRise=.08,               -- key top above the floor: resting / pressed (feet stand at the floor top)
+ TopOffset=0,                                             -- studs added to a mesh key's centre height (mesh top alignment fudge, tune in Studio)
+ UseKeycapMesh=true,                                      -- false = every key is a plain block (same size / colours) if the mesh costs too much on phones
+ BedDepth=1.6,BedThickness=1,BedMaxLength=1024,           -- the grout bed's top is BedDepth below the floor top: resting keys stand 2.15 proud
+ RimWidth=.65,RimInset=.05,RimDrop=.02,                   -- the frame closing the keyboard's sides / ends (its top just under the floor top)
+ PressSeconds=.07,ReleaseSeconds=.16,                     -- quad-out down, back-out up
+ HoleLift=.57,                                            -- shovel-hole parts (authored a few hundredths above the floor) are lifted onto the key tops
+ HoleReach=2,                                             -- keys within this many studs of a hole's Pit stay up (unpressable) while it exists
+ PlatformClearance=.3,                                    -- keys under a pack platform (radius + this) are held down: the platform shows on them
+ PlayerFootprint=1.2,PlayerFeetReach=3,PlayerRootToFeet=3,-- half-size of a runner's footprint; others press while their feet are within 3 studs of the floor
  KeeperMinFootprint=1.5,KeeperMaxFootprint=6,KeeperFootprintShare=.3,
- PlayerSampleHz=30,KeeperPitch=.7,
- OwnClicksPerSecond=12,OtherClicksPerSecond=8,OtherClickRange=90,
- ClickSoundIds={113108830240353,88838553648526,96591611478915},
- ClickPitches={.96,1.01,.99,1.05,.97,1.03,1.0,1.06,.98,1.04},   -- own steps cycle through these (0.96 .. 1.06)
- ClickVolume=.8,
- TierHoldSeconds=3,                                 -- a ClientFxBudget tier change applies after it has held this long
- -- cells bound per layer per frame, times min(2, dt * 60) (a slower frame has more distance to cover). 1000 studs/s at 60 fps is ~5.6 rows per
- -- frame: 26 x 5.6 = 146 keycaps, 60 x 5.6 = 336 plain keys, 30 x 2.8 = 84 of the 2x2 blocks.
- MaxReassignPerFrame={mesh=160,plain=360,coarse=120},
- GateStallFrames=150,                               -- a cell kept only to avoid a gap is released anyway after this many frames
- LayerDrop=.03,                                     -- each coarser layer's tops sit this much lower, so a finer block always wins an overlap
- MaxLegendChangesPerFrame=64,
+ PlayerSampleHz=30,
+ -- clicks: ONE recording (the first id; the other two R147 recordings are kept for reference only), a narrow pitch band, one volume
+ -- rule (3D roll-off from the key) for every presser, and a steady per-presser cadence.
+ ClickSoundIds={113108830240353,88838553648526,96591611478915},ClickSoundId=113108830240353,
+ ClickPitches={.98,1.01,.99,1.02,1.0},                    -- each presser cycles through these (0.98 .. 1.02)
+ KeeperPitch=.94,                                         -- keepers: the same click, a touch deeper
+ ClickVolume=.8,ClickRollOffMin=16,ClickRollOffMax=90,ClickRange=90,ClickVoices=12,
+ ClickGap=1/12,                                           -- per presser: at most one click every 1/12 s, evenly spaced while sprinting
+ TierHoldSeconds=3,                                       -- a ClientFxBudget tier change applies after it has held this long
+ TeleportBurst=4,                                         -- keys dressed in a frame where the rows around the runner are missing (a teleport) or the
+                                                          -- window just turned round: x Bind
+ FacingThreshold=.25,FacingHoldSeconds=.2,                -- the long side of the window follows the camera along the track (runners carry packs back
+                                                          -- to base facing -Z): it turns once the camera's LookVector.Z passes +-0.25 for 0.2 s
+ -- letters: PixelsPerStud on every letter SurfaceGui (TextHeight * PixelsPerStud = TextSize <= 100), Lift = strip above the resting key
+ -- tops, KeysPerStrip = letters per SurfaceGui (a half row), MaxDistance = the guis' own render limit, RowsPerFrame = rows of letters dressed per frame
+ Legend={PixelsPerStud=16,TextHeight=4.6,Lift=.03,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=8},
+ SpacebarPixelsPerStud=10,
+ GroundScanSeconds=2,
 }
 local C=K.Config
 K.StageCount=7
 -- Stable stage ids (not track order): Forest 1, Desert 2, Snow 3, Lava 4, Crystal 5, Jungle 6, Storm Peaks 7.
 -- The map may override a name with a BiomeName_<id> attribute.
 K.BiomeNames={[1]='Forest',[2]='Desert',[3]='Snow',[4]='Lava',[5]='Crystal',[6]='Jungle',[7]='Storm Peaks'}
--- One colour family per biome, four shades; a key's shade is a hash of its cell (never a per-row cycle). Ink = legend colour.
+-- R149 (owner: "keyboard colouring should match their biome"): each biome's keys take that biome's own colours, four shades per biome;
+-- a key's shade is a hash of its cell (never a per-row cycle). Sources (the biome data in this repo):
+--  Forest  grass ground 82,180,87 (the map's BiomeGround_1, as sampled by the R143 keyboard), Trail Runner trim 106,195,101, pack trim 108,135,61
+--  Jungle  ground 78,133,62, Vine Runner trim 51,190,127 (jungle teal), pack body 114,143,65: deep greens and lime
+--  Desert  ground 224,188,103, pack stone 200,164,109, Dune Runner 251,202,130 / 232,141,90: sand and tan
+--  Snow    ground 176,194,204 (BiomeVisuals), drifts 198,212,220, ice 111,171,192, Glacier Runner 135,203,234: white and ice blue
+--  Lava    basalt ground 56,57,66 (BiomeVisuals), magma 223,66,13 / 246,119,28, channels 189,59,21, pack trim 177,66,42: dark red / orange
+--  Crystal ground 94,78,123 (BiomeVisuals), prisms 113,76,166 .. 204,178,237, Prism Runner 217,181,250: purple / pink
+--  Storm   slate ground 88,111,144, pack body 105,113,146, violet trim 173,150,220: dark grey / blue-violet
+-- Bed = the grout between the keys (a darker tone of the same biome). Ink = the letter colour on a dark shade, InkLight on the others
+-- (K.InkRGB picks whichever reads better on each shade; every pair is >= 3.5:1, most >= 4.5:1).
 K.Zones={
- [1]={Name='Forest',Family='mint',Shades={{176,244,218},{112,224,186},{72,198,158},{140,232,202}},Ink={34,86,66}},
- [6]={Name='Jungle',Family='pistachio',Shades={{200,238,130},{154,214,92},{218,244,160},{112,186,72}},Ink={54,86,26}},
- [2]={Name='Desert',Family='caramel',Shades={{240,180,112},{255,208,160},{208,142,80},{248,192,132}},Ink={96,54,24}},
- [3]={Name='Snow',Family='vanilla',Shades={{255,240,200},{205,230,255},{236,244,255},{184,214,244}},Ink={84,76,96}},
- [4]={Name='Lava',Family='strawberry',Shades={{255,120,150},{232,72,104},{255,150,170},{196,48,84}},Ink={255,238,230}},
- [5]={Name='Crystal',Family='pink-purple',Shades={{255,160,228},{184,136,255},{226,120,246},{246,180,255}},Ink={84,40,110}},
- [7]={Name='Storm Peaks',Family='chocolate',Shades={{104,64,46},{130,84,58},{84,52,36},{150,100,70}},Ink={252,236,214}},
+ [1]={Name='Forest',Family='grass green',Shades={{96,186,90},{130,204,102},{74,156,72},{164,218,120}},Bed={46,104,46},Ink={16,48,20},InkLight={244,252,232}},
+ [6]={Name='Jungle',Family='deep green / lime',Shades={{66,124,58},{98,156,66},{150,198,72},{44,146,100}},Bed={36,82,40},Ink={14,40,18},InkLight={240,252,224}},
+ [2]={Name='Desert',Family='sand / tan',Shades={{228,192,112},{244,216,152},{206,164,100},{236,178,112}},Bed={150,112,64},Ink={84,50,20},InkLight={255,248,230}},
+ [3]={Name='Snow',Family='white / ice blue',Shades={{238,244,248},{206,224,236},{170,208,232},{222,234,242}},Bed={124,154,176},Ink={40,72,104},InkLight={255,255,255}},
+ [4]={Name='Lava',Family='dark red / orange',Shades={{150,36,28},{198,58,26},{236,108,34},{112,30,30}},Bed={62,42,44},Ink={54,14,8},InkLight={255,232,196}},
+ [5]={Name='Crystal',Family='purple / pink',Shades={{150,108,208},{190,156,236},{118,80,170},{222,156,226}},Bed={80,58,118},Ink={46,22,78},InkLight={252,244,255}},
+ [7]={Name='Storm Peaks',Family='storm grey / blue-violet',Shades={{84,98,128},{108,118,156},{130,122,178},{68,76,100}},Bed={46,52,68},Ink={18,20,34},InkLight={246,242,255}},
 }
-K.Fallback={Name='Track',Family='cream',Shades={{255,214,180},{255,226,200},{240,198,166},{250,208,176}},Ink={84,48,33}}
+K.Fallback={Name='Track',Family='cream',Shades={{255,214,180},{255,226,200},{240,198,166},{250,208,176}},Bed={120,88,70},Ink={84,48,33},InkLight={255,250,240}}
 K.Cream={255,250,236}                                -- the spacebar
 K.CreamInk={84,48,33}
--- Legend rows: a runner reads each row left -> right in keyboard order (the string repeats across the 40 columns).
+-- Legend rows: a runner reads each row left -> right in keyboard order (the string repeats across the columns).
 K.LegendRows={'QWERTYUIOP','ASDFGHJKL','ZXCVBNM','1234567890'}
 K.JitterAmount=.04
 
@@ -71,32 +95,16 @@ K.Ease={
  BackOut=function(t)local c1=1.70158;local c3=c1+1;local u=t-1;return 1+c3*u*u*u+c1*u*u end,
 }
 
--- Level of detail per ClientFxBudget tier (3 best .. 1 lowest). Layers run finest -> coarsest. M = how many keys a block spans (1, 2,
--- 4, 8, 16). Cols = columns of that layer's cells (full width = 40 / M); Back / Ahead = cells (rows of that layer) behind / ahead of the
--- runner, the runner's own cell counting as Ahead. Mesh = near keycap MeshParts (press, legend); Legends = lit SurfaceGuis within
--- LegendRadius; Plain = all block parts together. The caps are asserted by the tests over every position of the track.
+-- Per ClientFxBudget tier (3 best .. 1 lowest; phones start on 2). Rows of keys around the runner (all columns, all the same keycap):
+-- Back / Ahead = key rows behind / ahead of the runner's row, Hyst = extra rows kept before a row is recycled (no flicker at the window
+-- edge), Bind = keys dressed per frame (x min(2, dt * 60)). Letters: LegendAhead / LegendBehind rows carry their letters, the farthest
+-- LegendFade rows fade out; LegendRadius = the letters under and around the runner's feet are always shown (other effects keep clear of
+-- that radius, e.g. the Snow-biome dust). PressRange = other runners / keepers farther than this (along the track) press nothing.
+-- KeyLegends = pooled letters for keys that are down (a key's letter rides with it while it moves).
 K.Tiers={
- [3]={Mesh=700,Legends=150,Plain=2500,LegendRadius=20,Layers={
-  {M=1, Kind='mesh', Cols=26,Back=9, Ahead=17},
-  {M=1, Kind='plain',Cols=56,Back=10,Ahead=19},
-  {M=2, Kind='plain',Cols=30,Back=9, Ahead=17},
-  {M=4, Kind='plain',Cols=15,Back=10,Ahead=20},
-  {M=8, Kind='plain',Cols=8, Back=14,Ahead=24},
-  {M=16,Kind='plain',Cols=4, Back=20,Ahead=48}}},
- [2]={Mesh=450,Legends=100,Plain=1500,LegendRadius=16.5,Layers={
-  {M=1, Kind='mesh', Cols=20,Back=7, Ahead=14},
-  {M=1, Kind='plain',Cols=36,Back=8, Ahead=14},
-  {M=2, Kind='plain',Cols=30,Back=6, Ahead=11},
-  {M=4, Kind='plain',Cols=15,Back=8, Ahead=14},
-  {M=8, Kind='plain',Cols=8, Back=10,Ahead=18},
-  {M=16,Kind='plain',Cols=4, Back=14,Ahead=34}}},
- [1]={Mesh=250,Legends=60,Plain=800,LegendRadius=12.5,Layers={
-  {M=1, Kind='mesh', Cols=14,Back=5, Ahead=11},
-  {M=1, Kind='plain',Cols=20,Back=4, Ahead=10},
-  {M=2, Kind='plain',Cols=30,Back=4, Ahead=6},
-  {M=4, Kind='plain',Cols=15,Back=5, Ahead=9},
-  {M=8, Kind='plain',Cols=8, Back=7, Ahead=12},
-  {M=16,Kind='plain',Cols=4, Back=8, Ahead=22}}},
+ [3]={Back=12,Ahead=122,Hyst=4,Bind=264,LegendBehind=2,LegendAhead=18,LegendFade=4,LegendRadius=24,PressRange=260,KeyLegends=48},
+ [2]={Back=8,Ahead=76,Hyst=2,Bind=198,LegendBehind=2,LegendAhead=12,LegendFade=3,LegendRadius=20,PressRange=200,KeyLegends=32},
+ [1]={Back=5,Ahead=46,Hyst=2,Bind=132,LegendBehind=1,LegendAhead=7,LegendFade=2,LegendRadius=16,PressRange=150,KeyLegends=16},
 }
 function K.Tier(tier)return K.Tiers[tier]or K.Tiers[3]end
 
@@ -109,7 +117,12 @@ local function hash(a,b,c)
 end
 K.Hash=hash
 
--- Zone of a stage id; shade index 1..4 of a block (stage, first row, first column, M) - a hash of the cell, never the row alone.
+-- Colour maths (sRGB relative luminance and the WCAG contrast ratio).
+local function lin(c)c=c/255;if c<=.04045 then return c/12.92 end;return((c+.055)/1.055)^2.4 end
+function K.Luminance(rgb)return .2126*lin(rgb[1])+.7152*lin(rgb[2])+.0722*lin(rgb[3])end
+function K.Contrast(a,b)local la,lb=K.Luminance(a),K.Luminance(b);if la<lb then la,lb=lb,la end;return(la+.05)/(lb+.05)end
+
+-- Zone of a stage id; shade index 1..4 of a key (stage, row, column) - a hash of the cell, never the row alone.
 function K.Zone(stage)return K.Zones[stage]or K.Fallback end
 function K.ShadeIndex(stage,row,col,m)
  local z=K.Zone(stage)
@@ -125,8 +138,24 @@ function K.CellRGB(stage,row,col,m)
  return min(255,floor(s[1]*j+.5)),min(255,floor(s[2]*j+.5)),min(255,floor(s[3]*j+.5))
 end
 function K.CellColor(stage,row,col,m)local r,g,b=K.CellRGB(stage,row,col,m);return C3(r,g,b)end
--- Legend ink for a key colour: the zone's ink (dark chocolate on light zones, cream on dark ones).
-function K.InkRGB(stage)local z=K.Zone(stage);return z.Ink[1],z.Ink[2],z.Ink[3]end
+-- Letter ink for a shade: the zone's dark ink or its light ink, whichever contrasts more with that shade (cached per zone and shade).
+local inkCache={}
+function K.ShadeInk(stage,shade)
+ local z=K.Zone(stage);local key=z
+ local cache=inkCache[key];if not cache then cache={};inkCache[key]=cache end
+ local ink=cache[shade]
+ if not ink then
+  local s=z.Shades[shade]or z.Shades[1]
+  ink=K.Contrast(s,z.Ink)>=K.Contrast(s,z.InkLight)and z.Ink or z.InkLight
+  cache[shade]=ink
+ end
+ return ink
+end
+function K.InkRGB(stage,row,col)
+ local ink=K.ShadeInk(stage,row and col and K.ShadeIndex(stage,row,col,1)or 1)
+ return ink[1],ink[2],ink[3]
+end
+function K.BedRGB(stage)local b=K.Zone(stage).Bed;return b[1],b[2],b[3]end
 function K.CreamRGB()return K.Cream[1],K.Cream[2],K.Cream[3]end
 -- The letter on a key, by fine row and column (column 1 is the +X edge = a heading-+Z runner's left): each keyboard row repeats
 -- left -> right, and the start drifts every four rows so the letters do not line up in columns.
@@ -138,13 +167,11 @@ function K.Legend(row,col)
  return line:sub(i,i)
 end
 
--- Key heights: depth 0 = resting, 1 = pressed (BackOut may dip below 0 for a moment = the key springs past rest).
+-- Heights: depth 0 = resting, 1 = pressed (BackOut may dip below 0 for a moment = the key springs past rest).
 function K.KeyTop(depth)return C.FloorTop+C.RestRise-(C.RestRise-C.PressedRise)*depth end
 function K.KeyCenterY(depth)return K.KeyTop(depth)-C.KeyY/2+C.TopOffset end
--- Plain blocks of layer i (2 = the plain keys at the keycap pitch, 3 .. 6 = 2x2 .. 16x16 blocks): finer layers sit a touch higher.
-function K.BlockTop(layer)return C.FloorTop+C.RestRise-C.LayerDrop*((layer or 2)-1)end
-function K.BlockCenterY(layer)return K.BlockTop(layer)-C.BlockY/2 end
-function K.KeySize()return C.Pitch-C.Gap end
+function K.BedTop()return C.FloorTop-C.BedDepth end
+function K.KeySize(pitch)return(pitch or C.Pitch)-C.Gap end
 function K.KeeperFootprint(extentX,extentZ)
  return math.clamp(C.KeeperFootprintShare*min(extentX,extentZ),C.KeeperMinFootprint,C.KeeperMaxFootprint)
 end
@@ -162,12 +189,12 @@ function K.BiomeAt(z,attrs)
  return 0,nil
 end
 
--- Geometry(attrs, centerX, fieldWidth): the whole grid for this map. Fields: Pitch, Cols, HalfWidth, CenterX, Z0 (start of the first
--- biome), KeyEndZ (BiomeTrackEndZ - 120), Rows (all fine rows, spacebars included), Segs (one per biome, sorted by start: {Id, Name,
--- StartZ, EndZ, Rows, FirstRow, LastRow, RowPitch, SpaceLast, KeyFirst}), RowSeg[row], RowStage[row], Bars (one spacebar per biome:
--- {Seg, Stage, Name, Row0, Row1, Z0, Z1}), BarOfRow[row]. Helpers (call with a dot): ColCenter(col), ColOfX(x), RowZ(row) -> zmin,zmax,
--- RowOfZ(z), CellCenter(row,col) -> x,z, CellRange(xmin,xmax,zmin,zmax) -> c1,c2,r1,r2 (no allocation; empty when c1>c2 or r1>r2),
--- CellsInRect(...) -> list of {row=,col=}, BiomeAt(z).
+-- Geometry(attrs, centerX, fieldWidth): the whole grid for this map. Fields: Pitch (= fieldWidth / Cols exactly, so the keys run edge to
+-- edge), Cols, HalfWidth, CenterX, Z0 (start of the first biome), KeyEndZ (BiomeTrackEndZ - 120), Rows (all rows, spacebars included),
+-- Segs (one per biome, sorted by start: {Id, Name, StartZ, EndZ, Rows, FirstRow, LastRow, RowPitch, SpaceLast, KeyFirst}), RowSeg[row],
+-- RowStage[row], Bars (one spacebar per biome: {Seg, Stage, Name, Row0, Row1, Z0, Z1}), BarOfRow[row]. Helpers (call with a dot):
+-- ColCenter(col), ColOfX(x), RowZ(row) -> zmin,zmax, RowOfZ(z), CellCenter(row,col) -> x,z, CellRange(xmin,xmax,zmin,zmax) -> c1,c2,r1,r2
+-- (no allocation; empty when c1>c2 or r1>r2), CellsInRect(...) -> list of {row=,col=}, BiomeAt(z).
 function K.Geometry(attrs,centerX,fieldWidth)
  attrs=type(attrs)=='table'and attrs or {}
  centerX=type(centerX)=='number'and centerX or C.CenterX
@@ -183,7 +210,7 @@ function K.Geometry(attrs,centerX,fieldWidth)
  table.sort(stages,function(p,q)return p.StartZ<q.StartZ end)
  local endZ=attrs.BiomeTrackEndZ
  if type(endZ)~='number'then endZ=#stages>0 and stages[#stages].EndZ or C.DefaultEndZ end
- local P=C.Pitch;local cols=max(1,floor(fieldWidth/P+.5));local half=cols*P/2
+ local cols=max(1,floor(fieldWidth/C.Pitch+.5));local P=fieldWidth/cols;local half=fieldWidth/2
  local z0=#stages>0 and stages[1].StartZ or C.DefaultStartZ
  local keyEnd=endZ-C.EndMargin
  local g={Pitch=P,Cols=cols,HalfWidth=half,CenterX=centerX,Z0=z0,EndZ=endZ,KeyEndZ=keyEnd,Segs={},RowSeg={},RowStage={},Bars={},BarOfRow={}}
@@ -191,7 +218,7 @@ function K.Geometry(attrs,centerX,fieldWidth)
  if #stages==0 then stages[1]={Id=0,StartZ=z0,EndZ=endZ,Name='Track'}end
  for i,s in ipairs(stages)do
   local a=s.StartZ;local b=stages[i+1]and stages[i+1].StartZ or keyEnd;b=min(b,keyEnd)
-  if b-a>=P*(C.SpaceRows+1)then
+  if b-a>=P*(C.SpaceRows+1)*.75 then
    local n=max(C.SpaceRows+1,floor((b-a)/P+.5));local p=(b-a)/n
    local seg={Id=s.Id,Name=s.Name,StartZ=a,EndZ=b,Rows=n,FirstRow=rows+1,LastRow=rows+n,RowPitch=p,SpaceLast=rows+C.SpaceRows,KeyFirst=rows+C.SpaceRows+1}
    g.Segs[#g.Segs+1]=seg;local si=#g.Segs
@@ -206,14 +233,15 @@ function K.Geometry(attrs,centerX,fieldWidth)
  local segs=g.Segs
  local left=centerX+half   -- column 1's outer edge (+X side)
  function g.ColCenter(col)return left-(col-.5)*P end
- function g.ColOfX(x)return floor((left-x)/P)+1 end
+ -- (a 1e-10 row nudge: z = StartZ + k * RowPitch must land in row k + 1 although the division may round just below k)
+ function g.ColOfX(x)return floor((left-x)/P+1e-10)+1 end
  function g.RowZ(row)
   local s=segs[g.RowSeg[row]];if not s then return nil end
   local a=s.StartZ+(row-s.FirstRow)*s.RowPitch;return a,a+s.RowPitch
  end
  function g.RowOfZ(z)
   if rows==0 or z<z0 then return 0 end
-  for i=1,#segs do local s=segs[i];if z<s.EndZ then return s.FirstRow+floor((z-s.StartZ)/s.RowPitch)end end
+  for i=1,#segs do local s=segs[i];if z<s.EndZ then return s.FirstRow+floor((z-s.StartZ)/s.RowPitch+1e-10)end end
   return rows+1
  end
  function g.CellCenter(row,col)
@@ -224,7 +252,7 @@ function K.Geometry(attrs,centerX,fieldWidth)
   if xmax<xmin then xmin,xmax=xmax,xmin end
   if zmax<zmin then zmin,zmax=zmax,zmin end
   -- Open intervals: a rect that only touches a cell edge does not claim the neighbour (a degenerate rect = one point).
-  local c1=floor((left-xmax)/P)+1;local c2=xmax>xmin and ceil((left-xmin)/P)or c1
+  local c1=floor((left-xmax)/P+1e-10)+1;local c2=xmax>xmin and ceil((left-xmin)/P-1e-10)or c1
   local r1=g.RowOfZ(zmin);local r2=zmax>zmin and g.RowOfZ(zmax-1e-9)or r1
   return max(c1,1),min(c2,cols),max(r1,1),min(r2,rows)
  end
@@ -240,115 +268,39 @@ function K.Geometry(attrs,centerX,fieldWidth)
  return g
 end
 
--- Hierarchy(geo): the key rows (spacebars excluded) grouped for each LOD layer. Level M (1, 2, 4, 8, 16) cuts every biome's key rows into
--- groups of M consecutive rows (the last may be shorter); a group of level 2M is exactly two consecutive groups of level M (so every
--- coarse boundary is also a fine boundary). H[M] = {Count, R0[g], R1[g] (first / last fine row), Seg[g]}, H.Ord[M][row] = the group of
--- a fine row (nil for spacebar rows). Groups are numbered in track order, 1 .. Count.
-function K.Hierarchy(geo)
- local H={Levels={1,2,4,8,16},Ord={}}
- local level16={}
- for si,s in ipairs(geo.Segs)do
-  local r=s.KeyFirst
-  while r<=s.LastRow do local r1=min(s.LastRow,r+15);level16[#level16+1]={r,r1,si};r=r1+1 end
- end
- local cur=level16
- local list={[16]=level16}
- for _,m in ipairs({8,4,2,1})do
-  local nextList={}
-  for _,gr in ipairs(cur)do
-   local r0,r1=gr[1],gr[2]
-   nextList[#nextList+1]={r0,min(r1,r0+m-1),gr[3]}
-   if r0+m<=r1 then nextList[#nextList+1]={r0+m,r1,gr[3]}end
-  end
-  list[m]=nextList;cur=nextList
- end
- for _,m in ipairs(H.Levels)do
-  local lv={M=m,Count=#list[m],R0={},R1={},Seg={}};local ord={}
-  for i,gr in ipairs(list[m])do
-   lv.R0[i]=gr[1];lv.R1[i]=gr[2];lv.Seg[i]=gr[3]
-   for r=gr[1],gr[2]do ord[r]=i end
-  end
-  H[m]=lv;H.Ord[m]=ord
- end
- return H
+-- The rows of keys around a focus row (spacebar rows included: the bars are always drawn, the client skips them). facing = +1 when the
+-- camera looks toward +Z (into the biomes), -1 toward -Z (back to base): Ahead rows lie that way, Back rows the other. Returns ra, rb (rows
+-- wanted) and ka, kb (rows kept: a bound row outside ka .. kb is recycled), all clamped to 1 .. Rows.
+function K.KeyWindow(geo,tier,focusRow,facing)
+ local t=K.Tier(tier);local n=geo.Rows
+ local f=max(1,min(n,focusRow))
+ local lo,hi=t.Back,t.Ahead;if facing==-1 then lo,hi=hi,lo end
+ return max(1,f-lo),min(n,f+hi),max(1,f-lo-t.Hyst),min(n,f+hi+t.Hyst)
+end
+-- Most keys a tier ever has bound at once: the kept window (wanted rows + hysteresis on both sides) times the columns.
+function K.KeyCap(tier,cols)local t=K.Tier(tier);return(t.Back+t.Ahead+1+2*t.Hyst)*cols end
+-- Rows whose letters are shown (facing as for KeyWindow), and the letters' transparency at a row d rows ahead of the runner in the
+-- facing direction (0 = solid; the farthest LegendFade rows fade out; behind the runner they stay solid).
+function K.LegendWindow(geo,tier,focusRow,facing)
+ local t=K.Tier(tier);local n=geo.Rows;local f=max(1,min(n,focusRow))
+ local lo,hi=t.LegendBehind,t.LegendAhead;if facing==-1 then lo,hi=hi,lo end
+ return max(1,f-lo),min(n,f+hi)
+end
+-- Which way the window should face for a camera LookVector.Z (keeps `current` inside the dead zone).
+function K.Facing(lookZ,current)
+ if type(lookZ)~='number'or lookZ~=lookZ then return current or 1 end
+ if lookZ>C.FacingThreshold then return 1 elseif lookZ< -C.FacingThreshold then return -1 end
+ return current or 1
+end
+function K.LegendAlpha(tier,d)
+ local t=K.Tier(tier)
+ local start=t.LegendAhead-t.LegendFade
+ if d<=start then return 0 end
+ if d>t.LegendAhead then return 1 end
+ return(d-start)/(t.LegendFade+1)
 end
 
--- The ordinal of the group at level m nearest a fine row (a spacebar row maps to the next key row, outside the track to the ends).
-function K.NearestOrd(H,m,row)
- local lv=H[m];if lv.Count==0 then return 0 end
- local ord=H.Ord[m]
- if row<=lv.R0[1]then return 1 end
- if row>=lv.R1[lv.Count]then return lv.Count end
- local o=ord[row]
- if o then return o end
- for d=1,C.SpaceRows+2 do o=ord[row+d];if o then return o end end
- return lv.Count
-end
-
--- Windows(geo, H, tier, focusRow, focusCol): the LOD rectangles around a focus. One entry per layer (finest first):
--- {M, Kind, A, B, CA, CB (group / column ranges of that layer, empty when A>B), Hole = {A, B, CA, CB} in this layer's units or nil}.
--- Each layer's window is snapped to the cell boundaries of the next coarser layer, so a coarse cell is either wholly drawn by the
--- finer layer or not at all (no overlap, no sliver).
-function K.Windows(geo,H,tier,focusRow,focusCol,out)
- local plan=K.Tier(tier).Layers;local n=#plan
- out=out or {}
- local cols=geo.Cols
- for j=1,n do
-  local pl=plan[j];local m=pl.M;local lv=H[m];local ncols=(cols+m-1)//m
-  local w=out[j];if not w then w={};out[j]=w end
-  w.M=m;w.Kind=pl.Kind;w.Hole=w.Hole or{};w.HasHole=false
-  local center=K.NearestOrd(H,m,focusRow)
-  local a=max(1,center-pl.Back);local b=min(lv.Count,center+pl.Ahead-1)
-  local fc=(max(1,min(cols,focusCol))-1)//m+1
-  local ca=max(1,fc-(pl.Cols-1)//2);local cb=min(ncols,ca+min(pl.Cols,ncols)-1);ca=max(1,cb-min(pl.Cols,ncols)+1)
-  local nextM=plan[j+1]and plan[j+1].M or m
-  if nextM>m and b>=a then
-   local cl=H[nextM];local o=H.Ord[nextM]
-   a=H.Ord[m][cl.R0[o[lv.R0[a]]]];b=H.Ord[m][cl.R1[o[lv.R1[b]]]]
-   local r=nextM//m
-   ca=((ca-1)//r)*r+1;cb=min(ncols,((cb-1)//r+1)*r)
-  end
-  w.A,w.B,w.CA,w.CB=a,b,ca,cb
-  w.Cols=ncols
- end
- -- a finer window never reaches outside the next coarser one (coarse edges are fine edges, so the snapping survives)
- for j=n-1,1,-1 do
-  local w,c=out[j],out[j+1]
-  if c.B>=c.A and c.CB>=c.CA and w.B>=w.A then
-   local m,cm=w.M,c.M
-   local lo=H.Ord[m][H[cm].R0[c.A]];local hi=H.Ord[m][H[cm].R1[c.B]]
-   if lo and hi then w.A=max(w.A,lo);w.B=min(w.B,hi)end
-   w.CA=max(w.CA,((c.CA-1)*cm)//m+1);w.CB=min(w.CB,(min(cols,c.CB*cm)-1)//m+1)
-  end
- end
- -- holes: the finer layer's window in this layer's units
- for j=2,n do
-  local w,f=out[j],out[j-1]
-  if f.B>=f.A and f.CB>=f.CA and w.B>=w.A then
-   local fm,m=f.M,w.M;local flv=H[fm]
-   local r0,r1=flv.R0[f.A],flv.R1[f.B]
-   local h=w.Hole;h.A=H.Ord[m][r0];h.B=H.Ord[m][r1]
-   h.CA=((f.CA-1)*fm)//m+1;h.CB=((f.CB*fm)-1)//m+1
-   w.HasHole=h.A~=nil and h.B~=nil
-  end
- end
- for j=n+1,#out do out[j]=nil end
- return out
-end
-
--- Cells a window draws (rect minus hole).
-function K.WindowCount(w)
- if w.B<w.A or w.CB<w.CA then return 0 end
- local total=(w.B-w.A+1)*(w.CB-w.CA+1)
- if w.HasHole then
-  local h=w.Hole;local ra,rb=max(w.A,h.A),min(w.B,h.B);local ca,cb=max(w.CA,h.CA),min(w.CB,h.CB)
-  if rb>=ra and cb>=ca then total-=(rb-ra+1)*(cb-ca+1)end
- end
- return total
-end
-
--- Bed / rail segments: the track length cut into pieces of at most BedMaxLength studs.
--- Returns a list of {Z0=,Z1=,Centre=,Length=}.
+-- Bed / rail segments: a length cut into pieces of at most BedMaxLength studs. Returns a list of {Z0=,Z1=,Centre=,Length=}.
 function K.Segments(zFrom,zTo,maxLength)
  maxLength=maxLength or C.BedMaxLength
  local out={};local length=zTo-zFrom
@@ -360,19 +312,33 @@ function K.Segments(zFrom,zTo,maxLength)
  end
  return out
 end
-
--- Sliding-window limiter: at most `count` events in any `window` seconds (default 1).
-function K.NewLimiter(count,window)
- local times={};for i=1,count do times[i]=-math.huge end
- return {N=count,Times=times,Head=1,Window=window or 1}
+-- Rect minus rect (axis aligned, {x0,x1,z0,z1}): up to four pieces of `a` outside `b` (front, back, then the two sides between them).
+function K.RectMinus(a,b)
+ local out={}
+ local ax0,ax1,az0,az1=a[1],a[2],a[3],a[4];local bx0,bx1,bz0,bz1=b[1],b[2],b[3],b[4]
+ if bx1<=ax0 or bx0>=ax1 or bz1<=az0 or bz0>=az1 then out[1]={ax0,ax1,az0,az1};return out end
+ if bz0>az0 then out[#out+1]={ax0,ax1,az0,bz0}end
+ if bz1<az1 then out[#out+1]={ax0,ax1,bz1,az1}end
+ local mz0,mz1=max(az0,bz0),min(az1,bz1)
+ if bx0>ax0 then out[#out+1]={ax0,bx0,mz0,mz1}end
+ if bx1<ax1 then out[#out+1]={bx1,ax1,mz0,mz1}end
+ return out
 end
-function K.Allow(limiter,now)
- local oldest=limiter.Times[limiter.Head]
- if now-oldest>=limiter.Window then
-  limiter.Times[limiter.Head]=now;limiter.Head=limiter.Head%limiter.N+1
-  return true
- end
- return false
+
+-- Click cadence, one gate per presser (you, each other player, each keeper): Allow(gate, now) is true at most once per ClickGap seconds.
+-- While a presser keeps pressing (a sprint) the allowed clicks stay evenly spaced (the next slot is the last slot + gap, not "now + gap",
+-- so frame timing does not make the rhythm drift or bunch); after a pause the gate opens at once.
+function K.NewCadence(gap)return {Gap=gap or C.ClickGap,Next=-math.huge}end
+function K.Allow(gate,now)
+ if now+1e-9<gate.Next then return false end
+ local slot=gate.Next+gate.Gap
+ gate.Next=(now-gate.Next<gate.Gap)and slot or now+gate.Gap
+ return true
+end
+-- The pitch of a presser's n-th click: players cycle through ClickPitches, keepers use KeeperPitch.
+function K.ClickPitch(kind,n)
+ if kind==3 then return C.KeeperPitch end
+ local list=C.ClickPitches;return list[(n-1)%#list+1]
 end
 
 return K

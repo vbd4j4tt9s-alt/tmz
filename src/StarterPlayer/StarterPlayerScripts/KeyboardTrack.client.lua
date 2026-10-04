@@ -1,21 +1,26 @@
--- R148 (owner playtest of R147): the candy keyboard runway covers the whole track floor, edge to edge, like the reference game
--- ("+1 Speed Keyboard Escape (Candy & Chocolate)"): small tightly packed keys, a letter on every near key, one colour family per biome
--- in four shades picked per key. Client only: no remotes, no server code, nothing collides or can be queried, the real floor is never
--- touched or hidden (the keys and a dark bed sit on top of it). The grid, colours, windows and budgets come from
--- ReplicatedStorage.KeyboardTrack (pure, tested over every position of the track).
---  * Layers around the runner, finest first: (0) keycap MeshParts cloned from ReplicatedStorage.R142Keycap (press, click, legend),
---    (1) plain block keys at the same pitch, (2..4) plain blocks covering 2x2, 4x4 and 8x8 keys with proportionally wider dark gaps.
---    Each layer is a rectangle (full width for the plain ones); a layer leaves out the cells the finer layer covers, snapped to its own
---    cell boundaries, so there is no overlap and no sliver. Cells are bound / released from free-lists (a moving window only touches the
---    cells that enter or leave) and every layer has its own per-frame budget; a ClientFxBudget tier change resizes the windows after it
---    has held 3 s and again only adds / removes the outer cells.
---  * Spacebars: one cream bar per biome start (the biome's first two rows, full width), always present, labelled with the biome name.
---  * Orientation: legends (and the spacebar label) are rotated 180 degrees on the Top face so a runner heading +Z reads them upright,
---    and column 1 is the +X edge so the keys read left -> right (Q W E R T Y ...).
---  * Presses: the local character every frame (Humanoid.FloorMaterial ~= Air), other players and keepers at 30 Hz. The union of pressed
---    keys is diffed with the last frame; only the changing keys animate (quad-out down, back-out up) via BulkMoveTo.
---  * Shovel holes: cells within 2 studs of a hole's Pit are left out at every layer while it exists (the hole parts are lifted by the
---    bed height so they sit above the dark bed); pack platforms clear the fine cells under them. Clicks: 10 pooled Sounds, rate limited.
+-- R149 (owner playtest of R148: keys "way too small and not tall enough", "rendering issues", wants "the keyboard tiles visible from a
+-- really long range" with "a really consistent look overall", the click "consistent with its noise", the colours matching each biome).
+-- Client only: no remotes, no server code, nothing collides or can be queried. Grid, colours, windows and budgets come from
+-- ReplicatedStorage.KeyboardTrack (pure, tested).
+--  * ONE look at every distance: every key is the same keycap (a clone of ReplicatedStorage.R142Keycap at its own proportions, 7.7 studs
+--    wide; plain blocks only while that template has not replicated yet, swapped in place once it has) in its biome's colours. There are no
+--    coarse / flat far layers any more: whole rows of keys are dressed around the runner (12 rows behind .. 122 ahead on tier 3, ~1000 studs)
+--    from a recycled pool, nearest rows first, and a row is only recycled a few rows past the window edge (hysteresis).
+--  * Depth: the key tops stand just above the real floor (runners and keepers stand on them); the keys reach down past a sunken grout bed
+--    (the biome's darker colour) so every key shows 2.15 studs of side. The real track floor (BiomeGround_n) is hidden for this client only
+--    (LocalTransparencyModifier, restored on teardown) so no surface is ever coplanar with it; the parts of a floor the keyboard does not
+--    cover (The Darkened's arena) are drawn by local copies. A low rim closes the keyboard's sides and ends.
+--  * Letters: one SurfaceGui per half row (11 letters) on an invisible strip just above the resting key tops, upright for a +Z runner and in
+--    keyboard order left -> right (column 1 = +X edge, labels turned 180 degrees). Rows of letters reach ~150 studs ahead and fade out over
+--    their last rows. A key that is down carries its own letter (a pooled SurfaceGui) while it moves, then gives it back to its strip.
+--  * Spacebars: one cream bar per biome start (the biome's first row, full width), always present, labelled with the biome name.
+--  * Presses: the local character every frame (Humanoid.FloorMaterial ~= Air), other players and keepers at 30 Hz within PressRange. The union
+--    of pressed keys is diffed with the last frame; only the changing keys animate (quad-out down, back-out up) via BulkMoveTo.
+--  * Shovel holes: lifted onto the key tops (every part, once per part, streamed-in parts too); the keys under a hole stay up. Pack platforms
+--    hold the keys under them down (silently), so the platform shows on them.
+--  * Clicks: one recording, pitch 0.98 .. 1.02 (keepers 0.94), the same volume rule for all (3D roll-off from the key), a steady cadence per
+--    presser (K.Allow: at most one click per 1/12 s each, evenly spaced while sprinting) and a voice pool that reuses the oldest voice; no
+--    shared budget that drops some runners' clicks. Effects volume 0 (Settings) = silent.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Gui=game:GetService('GuiService');local CS=game:GetService('CollectionService');local Content=game:GetService('ContentProvider')
 local K=require(RS:WaitForChild('KeyboardTrack'))
@@ -23,11 +28,11 @@ local C=K.Config
 local player=Players.LocalPlayer
 local map=workspace:WaitForChild('ChestChaseMap')
 local V3,V2,CF=Vector3.new,Vector2.new,CFrame.new
-local floor,min,max,abs=math.floor,math.min,math.max,math.abs
+local floor,min,max,abs,ceil=math.floor,math.min,math.max,math.abs,math.ceil
 local clock=os.clock
 local F=C.FloorTop
 local AIR=Enum.Material.Air
-local BARBASE=1000                                   -- press index of spacebar i = BARBASE + i (mesh keys use their slot number)
+local BARBASE=100000                                 -- press index of spacebar i = BARBASE + i (keys use their slot number)
 
 local function optional(name)
  local m=RS:FindFirstChild(name);if not m then return nil end
@@ -36,9 +41,20 @@ end
 local Fx,Mixer,Dash=optional('ClientFxBudget'),optional('AudioMixer'),optional('KeeperRecoveryDash')
 
 local conns={};local folder;local started=false;local stopped=false
+local hidden={}                                      -- real floor part -> {Faces = {decals / textures}, Patches = {local copies}}
+local function restoreGround()
+ for part,rec in pairs(hidden)do
+  pcall(function()part.LocalTransparencyModifier=0 end)
+  for _,d in ipairs(rec.Faces)do pcall(function()d.LocalTransparencyModifier=0 end)end
+ end
+ table.clear(hidden)
+end
+local unlift=nil                                     -- puts lifted shovel-hole parts back at their server height (set by start)
 local function cleanup()
  stopped=true
  for _,c in ipairs(conns)do c:Disconnect()end;table.clear(conns)
+ restoreGround()
+ if unlift then pcall(unlift);unlift=nil end
  if folder then folder:Destroy();folder=nil end
 end
 
@@ -47,29 +63,127 @@ local function start()
  local Motion=RS:FindFirstChild('RunnerMotion')
  local centerX=Motion and Motion:GetAttribute('TrackCenterX')
  local geo=K.Geometry(map:GetAttributes(),type(centerX)=='number'and centerX or nil)
- if geo.Rows<1 then warn('[R148] keyboard: the map has no track rows');return end
- local H=K.Hierarchy(geo)
- local CX,COLS,P=geo.CenterX,geo.Cols,geo.Pitch
- local LEFT=CX+geo.HalfWidth                          -- the +X edge: column 1 is here, columns count toward -X
+ if geo.Rows<1 then warn('[R149] keyboard: the map has no track rows');return end
+ local CX,COLS,P,HALF=geo.CenterX,geo.Cols,geo.Pitch,geo.HalfWidth
+ local LEFT=CX+HALF                                   -- the +X edge: column 1 is here, columns count toward -X
+ local KW=P-C.Gap                                     -- key width / depth (square keycaps)
  local rowStage,barOfRow=geo.RowStage,geo.BarOfRow
- local ord1=H.Ord[1]
+ local BED=K.BedTop()
 
  folder=Instance.new('Folder');folder.Name='KeyboardTrackVisuals';folder.Parent=workspace
- local function sub(name,parent)local f=Instance.new('Folder');f.Name=name;f.Parent=parent or folder;return f end
- local bedFolder,keyFolder,soundFolder,legendHolder=sub('Bed'),sub('Keys'),sub('Sounds'),sub('Legends')
+ local function sub(name)local f=Instance.new('Folder');f.Name=name;f.Parent=folder;return f end
+ local bedFolder,keyFolder,legendFolder,soundFolder,groundFolder=sub('Bed'),sub('Keys'),sub('Legends'),sub('Sounds'),sub('Ground')
  local function flat(p)
   p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false
   p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth
  end
- local function block(name,size,cframe,rgb,parent)
-  local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=cframe;p.Color=Color3.fromRGB(rgb[1],rgb[2],rgb[3])
+ local function block(name,size,cframe,r,g,b,parent)
+  local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=cframe;p.Color=Color3.fromRGB(r,g,b)
   p.Material=Enum.Material.SmoothPlastic;flat(p);p.Parent=parent;return p
  end
 
- -- The dark bed under the keys: the gaps between them, no grass. A few long pieces over the whole key area, clearly above the floor.
- for i,seg in ipairs(K.Segments(geo.Z0,geo.KeyEndZ,C.BedMaxLength))do
-  block('Bed'..i,V3(geo.HalfWidth*2,C.BedThickness,seg.Length),CF(CX,F+C.BedRise-C.BedThickness/2,seg.Centre),C.BedColor,bedFolder)
+ -- The sunken grout bed (each biome's own darker colour) and the rim that closes the keyboard's sides and ends -----------------------
+ do
+ local rimTop=F-C.RimDrop;local rimBottom=BED-C.BedThickness-.1
+ local rimH=rimTop-rimBottom;local rimY=(rimTop+rimBottom)/2;local rimX=HALF-C.RimInset+C.RimWidth/2
+ for _,seg in ipairs(geo.Segs)do
+  local r,g,b=K.BedRGB(seg.Id)
+  for _,piece in ipairs(K.Segments(seg.StartZ,seg.EndZ,C.BedMaxLength))do
+   block('Bed',V3(HALF*2,C.BedThickness,piece.Length),CF(CX,BED-C.BedThickness/2,piece.Centre),r,g,b,bedFolder)
+   for side=-1,1,2 do block('Rim',V3(C.RimWidth,rimH,piece.Length),CF(CX+side*rimX,rimY,piece.Centre),r,g,b,bedFolder)end
+  end
  end
+ do
+  local first,last=geo.Segs[1],geo.Segs[#geo.Segs]
+  local w=2*(HALF-C.RimInset+C.RimWidth)
+  local r,g,b=K.BedRGB(first.Id)
+  block('RimEnd',V3(w,rimH,C.RimWidth),CF(CX,rimY,geo.Z0+C.RimInset-C.RimWidth/2),r,g,b,bedFolder)
+  r,g,b=K.BedRGB(last.Id)
+  block('RimEnd',V3(w,rimH,C.RimWidth),CF(CX,rimY,last.EndZ-C.RimInset+C.RimWidth/2),r,g,b,bedFolder)
+ end
+ end
+
+ -- The real floor: hidden for this client under the keyboard; the rest of a floor part is drawn by a local copy ------------------------
+ local scanGround
+ do
+ local keyRect={CX-HALF,CX+HALF,geo.Z0,geo.Segs[#geo.Segs].EndZ}
+ local function extents(part)
+  local cf,s=part.CFrame,part.Size
+  local r,u,l=cf.RightVector,cf.UpVector,cf.LookVector
+  local hx=abs(r.X)*s.X/2+abs(u.X)*s.Y/2+abs(l.X)*s.Z/2
+  local hy=abs(r.Y)*s.X/2+abs(u.Y)*s.Y/2+abs(l.Y)*s.Z/2
+  local hz=abs(r.Z)*s.X/2+abs(u.Z)*s.Y/2+abs(l.Z)*s.Z/2
+  local p=cf.Position
+  return p.X-hx,p.X+hx,p.Y-hy,p.Y+hy,p.Z-hz,p.Z+hz
+ end
+ local function makePatch(part,rect,y0,y1)
+  local p
+  if part.Archivable then local ok,c=pcall(part.Clone,part);if ok and typeof(c)=='Instance'then p=c end end
+  if p then
+   for _,d in ipairs(p:GetDescendants())do
+    if d:IsA('Decal')then d.LocalTransparencyModifier=0 elseif not d:IsA('SurfaceAppearance')then d:Destroy()end
+   end
+  else
+   p=Instance.new('Part');p.Color=part.Color;p.Material=part.Material;p.Reflectance=part.Reflectance;p.Transparency=part.Transparency
+   pcall(function()p.MaterialVariant=part.MaterialVariant end)
+  end
+  -- a local copy must not pass for the floor: no tags, no attributes (other scripts look floors up by tag / attribute / name)
+  pcall(function()for _,t in ipairs(CS:GetTags(p))do CS:RemoveTag(p,t)end end)
+  pcall(function()for k in pairs(p:GetAttributes())do p:SetAttribute(k,nil)end end)
+  p.Name='GroundPatch';flat(p);p.LocalTransparencyModifier=0
+  p.Size=V3(rect[2]-rect[1],y1-y0,rect[4]-rect[3]);p.CFrame=CF((rect[1]+rect[2])/2,(y0+y1)/2,(rect[3]+rect[4])/2)
+  p.Parent=groundFolder
+  return p
+ end
+ local function hideFaces(part,rec)
+  for _,d in ipairs(part:GetChildren())do
+   if d:IsA('Decal')and d.LocalTransparencyModifier~=1 then
+    d.LocalTransparencyModifier=1
+    if not table.find(rec.Faces,d)then rec.Faces[#rec.Faces+1]=d end
+   end
+  end
+ end
+ local function hideGround(part)
+  if stopped or hidden[part]or not part:IsA('BasePart')or not part.Name:match('^BiomeGround_%d')then return end
+  if abs(part.CFrame.UpVector.Y)<.99 then return end
+  local x0,x1,y0,y1,z0,z1=extents(part)
+  if abs(y1-F)>.6 then return end                      -- not the track floor at the keyboard's height
+  if x1<=keyRect[1]or x0>=keyRect[2]or z1<=keyRect[3]or z0>=keyRect[4]then return end
+  local rec={Faces={},Patches={}}
+  for _,rect in ipairs(K.RectMinus({x0,x1,z0,z1},keyRect))do
+   if rect[2]-rect[1]>.01 and rect[4]-rect[3]>.01 then rec.Patches[#rec.Patches+1]=makePatch(part,rect,y0,y1)end
+  end
+  hidden[part]=rec
+  part.LocalTransparencyModifier=1
+  hideFaces(part,rec)
+  -- a texture / decal that streams in after its floor is hidden at once too (a Decal ignores its part's modifier)
+  rec.Conn=part.ChildAdded:Connect(function(d)if hidden[part]==rec then hideFaces(part,rec)end end);table.insert(conns,rec.Conn)
+ end
+ local hooked=setmetatable({},{__mode='k'})
+ local function hook(container)
+  if hooked[container]then return end;hooked[container]=true
+  table.insert(conns,container.ChildAdded:Connect(function(c)hideGround(c)end))
+ end
+ function scanGround()
+  for part,rec in pairs(hidden)do
+   if not part.Parent then
+    for _,p in ipairs(rec.Patches)do p:Destroy()end;hidden[part]=nil
+    if rec.Conn then rec.Conn:Disconnect()end
+   else
+    if part.LocalTransparencyModifier~=1 then part.LocalTransparencyModifier=1 end
+    hideFaces(part,rec)
+   end
+  end
+  for _,c in ipairs(map:GetChildren())do hideGround(c)end
+  local obby=map:FindFirstChild('Obby');local biomes=obby and obby:FindFirstChild('Biomes')
+  if biomes then
+   if not hooked[biomes]then hooked[biomes]=true;table.insert(conns,biomes.ChildAdded:Connect(function(m)hook(m);for _,c in ipairs(m:GetChildren())do hideGround(c)end end))end
+   for _,m in ipairs(biomes:GetChildren())do hook(m);for _,c in ipairs(m:GetChildren())do hideGround(c)end end
+  end
+ end
+ hook(map)
+ end
+ scanGround()
 
  -- State -----------------------------------------------------------------------------------------------------
  local focusX,focusZ,hasRoot=CX,geo.Z0,false
@@ -78,19 +192,24 @@ local function start()
  local now,frameNo,reduced=clock(),0,false
  local tier,wantTier,wantSince=0,0,0
  local tierCfg=K.Tier(3)
- local wins={}
- local templateReady=false;local template=nil;local legendProto=nil
- -- press state per index (mesh slot or BARBASE + bar): part, centre, depth 0..1, height fudge, dress frame
- local kPart,kX,kZ,kDepth,kOff,kFresh={},{},{},{},{},{}
+ local template=nil;local templateReady=false
+ -- per key slot (and BARBASE + bar): part, centre, depth 0..1, height fudge, dress frame, cell
+ local kPart,kX,kZ,kDepth,kOff,kFresh,kKey,kRow,kCol={},{},{},{},{},{},{},{},{}
+ local slotOf={}                                     -- cell key (row * 64 + col) -> slot
+ local freeSlots,freeN,made=table.create(256),0,0
+ local plainSlot={}                                  -- slots whose part is a plain block (template not there yet)
+ local rowBound,boundRows,boundRowPos={},{},{}
+ local boundKeys=0
  local downPos,animPos,animT0,animFrom,animTo,animDur={},{},{},{},{},{}
  local stampAt,moveMark={},{}
  local downList,animList,moveList={},{},{}
  local moveN=0;local moveParts,moveCFs={},{}
- local stN=0;local stP,stC={},{}                      -- static moves (plain blocks)
- local oRow,oCol,oKind,oX,oZ,oN={},{},{},{},{},0       -- cells other players / keepers press (30 Hz)
+ local oRow,oCol,oKind,oWho,oX,oZ,oN={},{},{},{},{},{},0 -- cells other players / keepers press (30 Hz)
  local keepers={}
- local holeRects,platRects={},{};local clearSig=nil;local holesFolder=nil
- local barHidden={}
+ local holeCell,platCell,platList={},{},{};local barHole,barPlat={},{}
+ local holeRects,platRects,clearSig,holesFolder={},{},nil,nil
+ local windowDirty,pendingBind,pendingLegend=true,false,false
+ local facing,facingWant,facingSince,turnBurst=1,1,0,false        -- the window's long side: +1 = toward +Z, -1 = toward -Z (see K.Facing)
 
  -- Lists with O(1) removal --------------------------------------------------------------------------------------
  local function listAdd(list,pos,idx)local n=#list+1;list[n]=idx;pos[idx]=n end
@@ -102,19 +221,13 @@ local function start()
   if moveMark[idx]~=frameNo then moveMark[idx]=frameNo;moveN+=1;moveList[moveN]=idx end
  end
  local function flushMoves()
-  if moveN>0 then
-   for i=1,moveN do
-    local idx=moveList[i];moveParts[i]=kPart[idx];moveCFs[i]=CF(kX[idx],K.KeyTop(kDepth[idx])-C.KeyY/2+kOff[idx],kZ[idx])
-   end
-   for i=#moveParts,moveN+1,-1 do moveParts[i]=nil;moveCFs[i]=nil end
-   workspace:BulkMoveTo(moveParts,moveCFs,Enum.BulkMoveMode.FireCFrameChanged)
-   moveN=0
+  if moveN==0 then return end
+  for i=1,moveN do
+   local idx=moveList[i];moveParts[i]=kPart[idx];moveCFs[i]=CF(kX[idx],K.KeyTop(kDepth[idx])-C.KeyY/2+kOff[idx],kZ[idx])
   end
-  if stN>0 then
-   for i=#stP,stN+1,-1 do stP[i]=nil;stC[i]=nil end
-   workspace:BulkMoveTo(stP,stC,Enum.BulkMoveMode.FireCFrameChanged)
-   stN=0
-  end
+  for i=#moveParts,moveN+1,-1 do moveParts[i]=nil;moveCFs[i]=nil end
+  workspace:BulkMoveTo(moveParts,moveCFs,Enum.BulkMoveMode.FireCFrameChanged)
+  moveN=0
  end
  local function clearKeyState(idx)
   if downPos[idx]then listRemove(downList,downPos,idx)end
@@ -122,319 +235,290 @@ local function start()
   kDepth[idx]=0
  end
 
- -- Legends (a pool of SurfaceGuis lent to the keys nearest the runner) ------------------------------------------
- local inkColor={}
- for stage,z in pairs(K.Zones)do inkColor[stage]=Color3.fromRGB(z.Ink[1],z.Ink[2],z.Ink[3])end
- inkColor[0]=Color3.fromRGB(K.Fallback.Ink[1],K.Fallback.Ink[2],K.Fallback.Ink[3])
+ -- Letters ----------------------------------------------------------------------------------------------------------
+ local LG=C.Legend;local PPS=LG.PixelsPerStud;local TEXT=min(100,floor(LG.TextHeight*PPS+.5))
+ local FONT=Enum.Font[LG.Font]
+ local SPAN=LG.KeysPerStrip;local STRIPS=ceil(COLS/SPAN)
+ local inkCache={}
+ local function inkColor(stage,row,col)
+  local ink=K.ShadeInk(stage,K.ShadeIndex(stage,row,col,1))
+  local c=inkCache[ink];if not c then c=Color3.fromRGB(ink[1],ink[2],ink[3]);inkCache[ink]=c end
+  return c
+ end
  local creamInk=Color3.fromRGB(K.CreamInk[1],K.CreamInk[2],K.CreamInk[3])
- -- Text sits on the Top face with its up toward -Z and its reading direction toward +X; turning it half a way round (about the label's
- -- centre) makes it upright for a runner facing +Z, reading toward -X = his right.
- local function upright(label)
-  label.AnchorPoint=V2(.5,.5);label.Position=UDim2.fromScale(.5,.5);label.Rotation=180
+ -- Text sits on the Top face with its up toward -Z and its reading direction toward +X; turned half a way round (about the label's
+ -- centre) it is upright for a runner facing +Z, reading toward -X = his right.
+ local function letterLabel(parent)
+  local l=Instance.new('TextLabel');l.Name='Letter';l.BackgroundTransparency=1;l.BorderSizePixel=0;l.AnchorPoint=V2(.5,.5)
+  l.Rotation=180;l.Font=FONT;l.TextScaled=false;l.TextSize=TEXT;l.TextStrokeTransparency=1;l.Parent=parent
+  return l
  end
- local function newLegendGui()
-  local gui=legendProto and legendProto:Clone()
-  if not gui then
-   gui=Instance.new('SurfaceGui');gui.Name='KeyLegend';gui.Face=Enum.NormalId.Top;gui.LightInfluence=0;gui.AlwaysOnTop=false
-   gui.SizingMode=Enum.SurfaceGuiSizingMode.FixedSize;gui.CanvasSize=V2(256,256)
-  end
-  local label=gui:FindFirstChildWhichIsA('TextLabel',true)
-  if not label then
-   label=Instance.new('TextLabel');label.Name='Letter';label.BackgroundTransparency=1;label.BorderSizePixel=0
-   label.Size=UDim2.fromScale(1,1);label.Font=Enum.Font.FredokaOne;label.TextScaled=true;label.TextStrokeTransparency=1;label.Parent=gui
-  end
-  upright(label);gui.Enabled=true;gui.Parent=legendHolder
-  return {Gui=gui,Label=label,Slot=0,Key=0}
+ local function letterGui(name,parent)
+  local gui=Instance.new('SurfaceGui');gui.Name=name;gui.Face=Enum.NormalId.Top;gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud
+  gui.PixelsPerStud=PPS;gui.LightInfluence=0;gui.AlwaysOnTop=false;pcall(function()gui.MaxDistance=LG.MaxDistance end);gui.Parent=parent
+  return gui
  end
- local legendFree,legendFreeN,legendMade={},0,0
- local legendList,legendPos,legendOf={},{},{}        -- active entries; entry -> position; mesh slot -> entry
- local function dropLegend(slot)
-  local e=legendOf[slot];if not e then return end
-  legendOf[slot]=nil;listRemove(legendList,legendPos,e)
-  e.Gui.Parent=legendHolder;e.Slot=0;e.Key=0
-  legendFreeN+=1;legendFree[legendFreeN]=e
+ local stripFree,stripFreeN={},0
+ local stripsOfRow,stripRows,stripRowPos={},{},{}
+ local function newStrip()
+  local p=Instance.new('Part');p.Name='LegendStrip';flat(p);p.Transparency=1;p.Size=V3(1,.05,1);p.CFrame=CF(CX,F-200,0);p.Parent=legendFolder
+  local gui=letterGui('Letters',p)
+  local labels={}
+  for i=1,SPAN do local l=letterLabel(gui);l.Size=UDim2.fromOffset(KW*PPS,KW*PPS);labels[i]=l end
+  return {Part=p,Gui=gui,Labels=labels,W=0,D=0,Alpha=-1}
+ end
+ local keyLegendOf={}                                -- slot -> pooled per-key letter while the key is down
+ local function labelShown(row,col)
+  local key=row*64+col
+  if holeCell[key]or platCell[key]then return false end
+  local s=slotOf[key];if not s then return false end
+  if keyLegendOf[s]or kDepth[s]~=0 or animPos[s]then return false end
+  return true
+ end
+ local function setLabel(row,col,shown)
+  local list=stripsOfRow[row];if not list then return end
+  local k=(col-1)//SPAN+1;local st=list[k];if not st then return end
+  local l=st.Labels[col-(k-1)*SPAN]
+  if l.Visible~=shown then l.Visible=shown end
+ end
+ local labelMarks,labelMarkN,labelMarkAt={},0,{}
+ local function markLabel(slot)
+  if slot>=BARBASE or labelMarkAt[slot]==frameNo then return end
+  labelMarkAt[slot]=frameNo;labelMarkN+=1;labelMarks[labelMarkN]=slot
+ end
+ local function flushLabels()
+  for i=1,labelMarkN do
+   local s=labelMarks[i];local key=kKey[s]
+   if key and key>0 then local row,col=key//64,key%64;setLabel(row,col,labelShown(row,col))end
+   labelMarks[i]=nil
+  end
+  labelMarkN=0
+ end
+ local function stripAlpha(st,a)
+  if st.Alpha==a then return end
+  st.Alpha=a
+  for _,l in ipairs(st.Labels)do l.TextTransparency=a end
+ end
+ local function bindStrips(row)
+  local za,zb=geo.RowZ(row);local d=zb-za;local z=(za+zb)/2;local stage=rowStage[row]
+  local y=K.KeyTop(0)+(template and C.TopOffset or 0)+LG.Lift-.025
+  local list={}
+  for k=1,STRIPS do
+   local st
+   if stripFreeN>0 then st=stripFree[stripFreeN];stripFree[stripFreeN]=nil;stripFreeN-=1 else st=newStrip()end
+   local c0=(k-1)*SPAN+1;local c1=min(COLS,k*SPAN)
+   local w=(c1-c0+1)*P;local xMin=LEFT-c1*P
+   if abs(st.W-w)>1e-6 or abs(st.D-d)>1e-6 then st.W=w;st.D=d;st.Part.Size=V3(w,.05,d)end
+   st.Part.CFrame=CF(xMin+w/2,y,z)
+   for i=1,SPAN do
+    local l=st.Labels[i];local c=c0+i-1
+    if c<=c1 then
+     local x=(LEFT-(c-.5)*P)-xMin
+     l.Position=UDim2.fromOffset(x*PPS,d/2*PPS)
+     l.Text=K.Legend(row,c);l.TextColor3=inkColor(stage,row,c)
+     l.Visible=labelShown(row,c)
+    else l.Visible=false end
+   end
+   st.Alpha=-1;stripAlpha(st,K.LegendAlpha(tier,(row-focusRow)*facing))
+   list[k]=st
+  end
+  stripsOfRow[row]=list;listAdd(stripRows,stripRowPos,row)
+ end
+ local function releaseStrips(row)
+  local list=stripsOfRow[row];if not list then return end
+  for _,st in ipairs(list)do st.Part.CFrame=CF(CX,F-200,0);stripFreeN+=1;stripFree[stripFreeN]=st end
+  stripsOfRow[row]=nil;listRemove(stripRows,stripRowPos,row)
+ end
+ -- per-key letters (a key that is down keeps its letter while it moves)
+ local klFree,klFreeN,klMade={},0,0
+ local klList,klPos,klStamp={},{},{}
+ local function newKeyLegend()
+  local gui=letterGui('KeyLegend',legendFolder)
+  local l=letterLabel(gui);l.Position=UDim2.fromScale(.5,.5);l.Size=UDim2.fromScale(1,1)
+  return {Gui=gui,Label=l,Slot=0}
+ end
+ local function dropKeyLegend(slot)
+  local e=keyLegendOf[slot];if not e then return end
+  keyLegendOf[slot]=nil;listRemove(klList,klPos,e)
+  e.Gui.Parent=legendFolder;e.Slot=0
+  klFreeN+=1;klFree[klFreeN]=e
+  markLabel(slot)
  end
 
- -- Layers ----------------------------------------------------------------------------------------------------------
- local maxPlan=K.Tier(3).Layers
- local layers={}
- local meshLayer
- local meshBound,plainBound=0,0
- local progress=false                              -- some cell was bound or released this frame
- local keptMesh,keptPlain=0,0                    -- cells held last frame only to avoid a gap: they do not count against the caps
- local function makeMeshPart(slot)
-  local part=template and template:Clone()or Instance.new('Part')
-  part.Name='Key';flat(part);part.Size=V3(K.KeySize(),C.KeyY,K.KeySize());part.Transparency=1;part.CFrame=CF(CX,F-200,0)
-  for _,d in ipairs(part:GetDescendants())do if d:IsA('BaseScript')or d:IsA('Sound')or d:IsA('SurfaceGui')then d:Destroy()end end
+ -- Keys ---------------------------------------------------------------------------------------------------------------
+ local function stripPart(part)
+  for _,d in ipairs(part:GetDescendants())do if d:IsA('BaseScript')or d:IsA('Sound')or d:IsA('SurfaceGui')or d:IsA('Decal')then d:Destroy()end end
+ end
+ local function newKeyPart()
+  local part
+  if template then local ok,c=pcall(template.Clone,template);if ok and typeof(c)=='Instance'and c:IsA('BasePart')then part=c end end
+  local mesh=part~=nil
+  if not part then part=Instance.new('Part');part.Material=Enum.Material.SmoothPlastic end
+  part.Name='Key';flat(part);part.Size=V3(KW,C.KeyY,KW);part.Transparency=1;part.CFrame=CF(CX,F-200,0)
+  if mesh then stripPart(part)end
   part.Parent=keyFolder
-  kPart[slot]=part;kX[slot]=CX;kZ[slot]=0;kDepth[slot]=0;kOff[slot]=C.TopOffset;kFresh[slot]=0
-  return part
+  return part,mesh
  end
- local function makePlainPart(L)
-  local p=Instance.new('Part');p.Name='K'..L.M;p.Size=V3(K.KeySize()*L.M,C.BlockY,K.KeySize()*L.M);p.Transparency=1
-  p.Material=Enum.Material.SmoothPlastic;flat(p);p.CFrame=CF(CX,F-200,0);p.Parent=L.Folder
-  return p
+ local function takeSlot()
+  if freeN>0 then local s=freeSlots[freeN];freeSlots[freeN]=nil;freeN-=1;return s end
+  made+=1;local s=made
+  local part,mesh=newKeyPart()
+  kPart[s]=part;plainSlot[s]=(not mesh)or nil;kOff[s]=mesh and C.TopOffset or 0;kDepth[s]=0;kFresh[s]=0;kKey[s]=0
+  return s
  end
- for j,pl in ipairs(maxPlan)do
-  local L={I=j,M=pl.M,Kind=pl.Kind,Lv=H[pl.M],NCols=(COLS+pl.M-1)//pl.M,GapM=C.Gap*pl.M,
-   Folder=pl.Kind=='plain'and sub('Blocks'..j,folder)or nil,
-   Part={},SKey={},SW={},SD={},Free={},FreeN=0,Made=0,SlotOf={},Act={},ActPos={},
-   Blocked={},BlockedDirty=true,Pending=true,PendingRel=false,Dirty=true,GateFrames=0,Kept=0,
-   A=0,B=-1,CA=0,CB=-1,HasHole=false,HA=0,HB=-1,HCA=0,HCB=-1}
-  if pl.Kind=='mesh'then L.Part=kPart;meshLayer=L end
-  layers[j]=L
- end
-
- local function releaseCell(L,slot)
-  progress=true
-  local key=L.SKey[slot]
-  L.SlotOf[key]=nil;L.SKey[slot]=0
-  listRemove(L.Act,L.ActPos,slot)
-  L.Part[slot].Transparency=1
-  L.FreeN+=1;L.Free[L.FreeN]=slot
-  if L.Kind=='mesh'then dropLegend(slot);clearKeyState(slot);meshBound-=1 else plainBound-=1 end
- end
- -- Bind cell (group g, column group cg) of layer L: position, size, colour.
- local function acquireCell(L,g,cg)
-  local isMesh=L.Kind=='mesh'
-  -- (until the keycap template is there the plain blocks also cover the area the keycaps will take, so they may use that share of the cap)
-  if isMesh then if meshBound-keptMesh>=tierCfg.Mesh then return false end
-  elseif plainBound-keptPlain>=tierCfg.Plain+(templateReady and 0 or tierCfg.Mesh)then return false end
-  local slot
-  if L.FreeN>0 then slot=L.Free[L.FreeN];L.Free[L.FreeN]=nil;L.FreeN-=1
-  else
-   slot=L.Made+1;L.Made=slot
-   if isMesh then makeMeshPart(slot)else L.Part[slot]=makePlainPart(L);L.SW[slot]=K.KeySize()*L.M;L.SD[slot]=K.KeySize()*L.M end
+ local function bindRow(row)
+  local stage=rowStage[row];local za,zb=geo.RowZ(row);local z=(za+zb)/2
+  for col=1,COLS do
+   local s=takeSlot();local key=row*64+col
+   slotOf[key]=s;kKey[s]=key;kRow[s]=row;kCol[s]=col
+   kX[s]=LEFT-(col-.5)*P;kZ[s]=z;kDepth[s]=0;kFresh[s]=frameNo
+   local part=kPart[s];part.Color=K.CellColor(stage,row,col,1);part.Transparency=0
+   queueMove(s)
   end
-  progress=true
-  local key=g*64+cg
-  local lv,m=L.Lv,L.M
-  local r0,r1=lv.R0[g],lv.R1[g]
-  local zmin=geo.RowZ(r0);local _,zmax=geo.RowZ(r1)
-  local c0=(cg-1)*m+1;local c1=min(COLS,cg*m)
-  local x=LEFT-((c0-1)+(c1-c0+1)/2)*P
-  local z=(zmin+zmax)/2
-  local part=L.Part[slot]
-  L.SlotOf[key]=slot;L.SKey[slot]=key;listAdd(L.Act,L.ActPos,slot)
-  -- a block takes the colour of its first key (row r0, column c0): when a layer hands a cell to a finer one a quarter of the area keeps
-  -- its colour, so the swap is hard to see, yet far blocks keep the full spread of shades (no averaging into flat bands)
-  part.Color=K.CellColor(rowStage[r0],r0,c0,1)
-  part.Transparency=0
-  if isMesh then
-   kX[slot]=x;kZ[slot]=z;kDepth[slot]=0;kFresh[slot]=frameNo;meshBound+=1
-   queueMove(slot)
-  else
-   local w=(c1-c0+1)*P-L.GapM;local d=(zmax-zmin)-L.GapM
-   if abs(L.SW[slot]-w)>1e-6 or abs(L.SD[slot]-d)>1e-6 then L.SW[slot]=w;L.SD[slot]=d;part.Size=V3(w,C.BlockY,d)end
-   plainBound+=1
-   stN+=1;stP[stN]=part;stC[stN]=CF(x,K.BlockCenterY(L.I),z)
+  rowBound[row]=true;listAdd(boundRows,boundRowPos,row);boundKeys+=COLS
+ end
+ local function releaseRow(row)
+  releaseStrips(row)
+  for col=1,COLS do
+   local key=row*64+col;local s=slotOf[key]
+   if s then
+    dropKeyLegend(s);clearKeyState(s)
+    slotOf[key]=nil;kKey[s]=0;kPart[s].Transparency=1
+    freeN+=1;freeSlots[freeN]=s
+   end
   end
+  rowBound[row]=nil;listRemove(boundRows,boundRowPos,row);boundKeys-=COLS
+ end
+ -- swap a plain block for a keycap in place (the template replicated after the keys were dressed)
+ local function swapSlot(s)
+  local old=kPart[s];local part,mesh=newKeyPart();if not mesh then part:Destroy();return false end
+  part.Color=old.Color;part.Transparency=old.Transparency
+  kPart[s]=part;kOff[s]=C.TopOffset;plainSlot[s]=nil
+  local e=keyLegendOf[s];if e then e.Gui.Parent=part end
+  if old.Transparency<1 then queueMove(s)end
+  old:Destroy()
   return true
  end
- -- Window state of a layer for this frame (the plan: K.Windows).
- local function loadWindow(L,w)
-  local hole=w.HasHole
-  local ha,hb,hca,hcb=0,-1,0,-1
-  if hole then local h=w.Hole;ha,hb,hca,hcb=h.A,h.B,h.CA,h.CB end
-  if L.BlockedDirty or L.A~=w.A or L.B~=w.B or L.CA~=w.CA or L.CB~=w.CB or L.HasHole~=hole or(hole and(L.HA~=ha or L.HB~=hb or L.HCA~=hca or L.HCB~=hcb))then L.Dirty=true end
-  L.A,L.B,L.CA,L.CB,L.HasHole,L.HA,L.HB,L.HCA,L.HCB=w.A,w.B,w.CA,w.CB,hole,ha,hb,hca,hcb
-  L.BlockedDirty=false
- end
- -- Is the region of cell (g, cg) of layer j wholly drawn by bound cells of the finer layers? (cleared cells count as drawn: the gap is meant)
- local function coveredBelow(j,g,cg)
-  local f=layers[j-1];if not f then return false end
-  local L=layers[j]
-  if f.M==L.M then
-   local key=g*64+cg
-   return f.SlotOf[key]~=nil or f.Blocked[key]==true or coveredBelow(j-1,g,cg)
+ -- The window of rows: recycle the rows past it (with hysteresis), dress the missing ones nearest first, within the budgets.
+ local function windowPass(dt)
+  local wa,wb,ka,kb=K.KeyWindow(geo,tier,focusRow,facing)
+  local scale=min(2,max(1,dt*60))
+  -- after a teleport (respawn, a pad) the rows right around the runner are missing, after the window turned round its long side is:
+  -- catch up with 4x the budget until they are there
+  local burst=turnBurst
+  for r=max(wa,focusRow-2),min(wb,focusRow+2)do if not rowBound[r]and not barOfRow[r]then burst=true;break end end
+  local budget=floor(tierCfg.Bind*scale*(burst and C.TeleportBurst or 1));local relBudget=budget*4
+  local released=0
+  for i=#boundRows,1,-1 do
+   local r=boundRows[i]
+   if(r<ka or r>kb)and released<relBudget then releaseRow(r);released+=COLS end
   end
-  local ord=H.Ord[f.M];local lv=L.Lv
-  local o0,o1=ord[lv.R0[g]],ord[lv.R1[g]]
-  local c0,c1=(cg-1)*2+1,min(f.NCols,cg*2)
-  for gg=o0,o1 do for cc=c0,c1 do
-   local key=gg*64+cc
-   if not(f.SlotOf[key]~=nil or f.Blocked[key]==true or coveredBelow(j-1,gg,cc))then return false end
-  end end
-  return true
- end
- -- The cell of layer k (coarser than j) that holds cell (g, cg) of layer j.
- local function aboveKey(j,g,cg,k)
-  local L=layers[j];local Lk=layers[k]
-  return H.Ord[Lk.M][L.Lv.R0[g]]*64+((cg-1)*L.M)//Lk.M+1
- end
- local function boundAbove(j,g,cg)
-  for k=j+1,#layers do
-   local Lk=layers[k];local key=aboveKey(j,g,cg,k)
-   if Lk.SlotOf[key]~=nil or Lk.Blocked[key]==true then return true end
-  end
-  return false
- end
- local function insideOuter(j,g,cg)
-  local n=#layers;if j>=n then return false end
-  local O=layers[n];local key=aboveKey(j,g,cg,n);local og,ocg=key//64,key%64
-  return og>=O.A and og<=O.B and ocg>=O.CA and ocg<=O.CB
- end
- -- Bind what the plan wants and the layer lacks, nearest rows first (budgeted). Cells are never left bare: a coarser cell stays until
- -- the finer cells that replace it are bound, a finer cell stays until the coarser one that replaces it is (see releasePass).
- local function acquirePass(L,budget)
-  L.Pending=false
-  local a,b,ca,cb=L.A,L.B,L.CA,L.CB
-  if b<a or cb<ca then return end
-  local hole=L.HasHole;local ha,hb,hca,hcb=L.HA,L.HB,L.HCA,L.HCB
-  local blocked,slotOf=L.Blocked,L.SlotOf
-  local center=max(a,min(b,K.NearestOrd(H,L.M,focusRow)))
-  local used=0
-  for d=0,max(center-a,b-center)do
-   for sign=1,(d==0 and 1 or 2)do
-    local g=sign==1 and center+d or center-d
-    if g>=a and g<=b then
-     local holeRow=hole and g>=ha and g<=hb
-     for cg=ca,cb do
-      if not(holeRow and cg>=hca and cg<=hcb)then
-       local key=g*64+cg
-       if not slotOf[key]and not blocked[key]then
-        if used<budget and acquireCell(L,g,cg)then used+=1 else L.Pending=true end
-       end
-      end
-     end
+  local cap=K.KeyCap(tier,COLS);local used=0;local pending=false
+  for d=0,max(focusRow-wa,wb-focusRow)do
+   for pass=1,(d==0 and 1 or 2)do
+    local r=pass==1 and focusRow+d or focusRow-d
+    if r>=wa and r<=wb and not rowBound[r]and not barOfRow[r]then
+     if used+COLS<=max(budget,COLS)and boundKeys+COLS<=cap then bindRow(r);used+=COLS else pending=true end
     end
    end
   end
+  if not pending then turnBurst=false end
+  return pending or released>=relBudget
  end
- -- Release what the plan no longer wants - but only once the region is drawn some other way (a gap would show the dark bed). Two kinds:
- --  * outside the layer's window (the runner moved on): kept until a coarser cell holds the region; cleared cells (holes, platforms) go at once;
- --  * inside the window but under the finer layer's hole: kept until the finer cells that replace it are bound (they sit higher, so the overlap
- --    never z-fights).
- -- A cell stuck for GateStallFrames is released anyway.
- local function releaseOutside(L)
-  local force=L.GateFrames>=C.GateStallFrames
-  local j=L.I
-  for i=#L.Act,1,-1 do
-   local slot=L.Act[i];local key=L.SKey[slot];local g=key//64;local cg=key%64
-   if L.Blocked[key]then releaseCell(L,slot)
-   elseif g<L.A or g>L.B or cg<L.CA or cg>L.CB then
-    if not force and insideOuter(j,g,cg)and not boundAbove(j,g,cg)then L.Kept+=1 else releaseCell(L,slot)end
+ local function legendWindowPass()
+  local la,lb=K.LegendWindow(geo,tier,focusRow,facing)
+  for i=#stripRows,1,-1 do
+   local r=stripRows[i]
+   if r<la-1 or r>lb+1 or not rowBound[r]then releaseStrips(r)end
+  end
+  local n,pending=0,false
+  for d=0,max(focusRow-la,lb-focusRow)do
+   for pass=1,(d==0 and 1 or 2)do
+    local r=pass==1 and focusRow+d or focusRow-d
+    if r>=la and r<=lb and rowBound[r]and not stripsOfRow[r]then
+     if n<LG.RowsPerFrame then bindStrips(r);n+=1 else pending=true end
+    end
    end
   end
- end
- local function releaseHole(L)
-  if not L.HasHole then return end
-  local force=L.GateFrames>=C.GateStallFrames
-  local j=L.I;local ha,hb,hca,hcb=L.HA,L.HB,L.HCA,L.HCB
-  for i=#L.Act,1,-1 do
-   local slot=L.Act[i];local key=L.SKey[slot];local g=key//64;local cg=key%64
-   if g>=ha and g<=hb and cg>=hca and cg<=hcb and g>=L.A and g<=L.B and cg>=L.CA and cg<=L.CB then
-    if force or coveredBelow(j,g,cg)then releaseCell(L,slot)else L.Kept+=1 end
-   end
+  for _,r in ipairs(stripRows)do
+   local a=K.LegendAlpha(tier,(r-focusRow)*facing)
+   for _,st in ipairs(stripsOfRow[r])do stripAlpha(st,a)end
   end
+  return pending
  end
+
  -- Spacebars: one cream bar per biome start, always present ------------------------------------------------------
  local bars=geo.Bars
- local cr,cg2,cb2=K.CreamRGB()
- local function makeBar(i,bar)
+ do
+ local cr,cg,cb=K.CreamRGB()
+ for i,bar in ipairs(bars)do
   local depth=(bar.Z1-bar.Z0)-C.Gap
-  local p=Instance.new('Part');p.Name='Spacebar';p.Size=V3(geo.HalfWidth*2-C.Gap,C.KeyY,depth);p.Color=Color3.fromRGB(cr,cg2,cb2)
+  local p=Instance.new('Part');p.Name='Spacebar';p.Size=V3(HALF*2-C.Gap,C.KeyY,depth);p.Color=Color3.fromRGB(cr,cg,cb)
   p.Material=Enum.Material.SmoothPlastic;flat(p);p.CFrame=CF(CX,F-200,0);p.Parent=keyFolder
   local gui=Instance.new('SurfaceGui');gui.Name='SpacebarLegend';gui.Face=Enum.NormalId.Top;gui.LightInfluence=0;gui.AlwaysOnTop=false
-  gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud;gui.PixelsPerStud=8;gui.Parent=p
+  gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud;gui.PixelsPerStud=C.SpacebarPixelsPerStud;gui.Parent=p
   local label=Instance.new('TextLabel');label.Name='Biome';label.BackgroundTransparency=1;label.BorderSizePixel=0
-  label.Size=UDim2.fromScale(1,1);label.Font=Enum.Font.FredokaOne;label.TextScaled=true;label.TextStrokeTransparency=1
-  label.Text=string.upper(bar.Name);label.TextColor3=creamInk;upright(label);label.Parent=gui
+  label.AnchorPoint=V2(.5,.5);label.Position=UDim2.fromScale(.5,.5);label.Size=UDim2.fromScale(1,.9);label.Rotation=180
+  label.Font=FONT;label.TextScaled=true;label.TextStrokeTransparency=1;label.Text=string.upper(bar.Name);label.TextColor3=creamInk;label.Parent=gui
   local idx=BARBASE+i
   kPart[idx]=p;kX[idx]=CX;kZ[idx]=(bar.Z0+bar.Z1)/2;kDepth[idx]=0;kOff[idx]=0;kFresh[idx]=0
-  barHidden[i]=false
   queueMove(idx);p.Transparency=0
  end
- for i,bar in ipairs(bars)do makeBar(i,bar)end
- local function setBarHidden(i,hidden)
-  if barHidden[i]==hidden then return end
-  barHidden[i]=hidden;kPart[BARBASE+i].Transparency=hidden and 1 or 0
-  local gui=kPart[BARBASE+i]:FindFirstChildWhichIsA('SurfaceGui');if gui then gui.Enabled=not hidden end
-  if hidden then clearKeyState(BARBASE+i);queueMove(BARBASE+i)end
  end
 
  -- Template (the keycap mesh) ------------------------------------------------------------------------------------
  task.spawn(function()
-  local found=RS:FindFirstChild('R142Keycap')
-  if not found then local ok,t=pcall(function()return RS:WaitForChild('R142Keycap',30)end);if ok and typeof(t)=='Instance'then found=t end end
+  local found=C.UseKeycapMesh~=false and RS:FindFirstChild('R142Keycap')or nil
+  if not found and C.UseKeycapMesh~=false then local ok,t=pcall(function()return RS:WaitForChild('R142Keycap',30)end);if ok and typeof(t)=='Instance'then found=t end end
   if stopped then return end
-  template=found;legendProto=found and found:FindFirstChildWhichIsA('SurfaceGui')or nil;templateReady=true
-  if not found then warn('[R148] keyboard: ReplicatedStorage.R142Keycap is missing; using plain blocks for the near keys')end
- end)
-
- -- Legend pass: the keys nearest the runner carry their letter (a pooled SurfaceGui is lent to each) ---------------
- local function legendPass()
-  local radius=tierCfg.LegendRadius;local r2=radius*radius;local hold=(radius+P)*(radius+P)
-  local L=meshLayer
-  for i=#legendList,1,-1 do
-   local e=legendList[i];local slot=e.Slot
-   local dx,dz=kX[slot]-focusX,kZ[slot]-focusZ
-   local d2=dx*dx+dz*dz
-   -- a little hysteresis; a smaller tier (fewer legends, smaller radius) drops everything outside its radius at once
-   if d2>hold or(d2>r2 and #legendList>tierCfg.Legends)then dropLegend(slot)end
+  if found and found:IsA('BasePart')then
+   -- a template that cannot be cloned (Archivable off) is no template: the keys stay plain blocks instead of being swapped every frame
+   local ok,c=pcall(found.Clone,found)
+   if ok and typeof(c)=='Instance'then c:Destroy();template=found end
   end
-  local w=wins[1]
-  if not w or w.B<w.A or not templateReady then return end
-  local lv=H[1];local center=K.NearestOrd(H,1,focusRow);local reach=math.ceil(radius/P)+1
-  local ga,gb=max(w.A,center-reach),min(w.B,center+reach)
-  local ca,cb=max(w.CA,focusCol-reach),min(w.CB,focusCol+reach)
-  local changes=0
-  for g=ga,gb do
-   for c=ca,cb do
-    local slot=L.SlotOf[g*64+c]
-    if slot and not legendOf[slot]then
-     local dx,dz=kX[slot]-focusX,kZ[slot]-focusZ
-     if dx*dx+dz*dz<=r2 then
-      local e
-      if legendFreeN>0 then e=legendFree[legendFreeN];legendFree[legendFreeN]=nil;legendFreeN-=1
-      elseif legendMade<tierCfg.Legends then legendMade+=1;e=newLegendGui()end
-      if not e then return end
-      if #legendList>=tierCfg.Legends then legendFreeN+=1;legendFree[legendFreeN]=e;return end
-      local row=lv.R0[g]
-      e.Slot=slot;e.Key=g*64+c;legendOf[slot]=e;listAdd(legendList,legendPos,e)
-      e.Label.Text=K.Legend(row,c);e.Label.TextColor3=inkColor[rowStage[row]]or inkColor[0]
-      e.Gui.Parent=kPart[slot]
-      changes+=1
-      if changes>=C.MaxLegendChangesPerFrame then return end
-     end
-    end
-   end
+  templateReady=true
+  if not template and C.UseKeycapMesh~=false then warn('[R149] keyboard: ReplicatedStorage.R142Keycap is missing; the keys are plain blocks')end
+ end)
+ local function swapPass()
+  local n=0
+  for s=1,made do
+   if plainSlot[s]then if not swapSlot(s)then return end;n+=1;if n>=tierCfg.Bind then return end end
   end
  end
 
- -- Clicks ---------------------------------------------------------------------------------------------------------
- local ownLimit,otherLimit=K.NewLimiter(C.OwnClicksPerSecond),K.NewLimiter(C.OtherClicksPerSecond)
- local sounds={};local soundNext=1;local pitchN=0
- local OR2=C.OtherClickRange*C.OtherClickRange
- for i=1,10 do
+ -- Clicks -----------------------------------------------------------------------------------------------------------
+ local click
+ do
+ local voices={};local voiceNext=1
+ local RANGE2=C.ClickRange*C.ClickRange
+ for i=1,C.ClickVoices do
   local anchor=Instance.new('Part');flat(anchor);anchor.Name='KeyClick';anchor.Size=V3(.2,.2,.2);anchor.Transparency=1;anchor.Parent=soundFolder
-  local sound=Instance.new('Sound');sound.Name='KeyClickSound';sound.SoundId='rbxassetid://'..tostring(C.ClickSoundIds[(i-1)%#C.ClickSoundIds+1])
-  sound.Volume=C.ClickVolume;sound.RollOffMode=Enum.RollOffMode.InverseTapered;sound.RollOffMinDistance=14;sound.RollOffMaxDistance=90
+  local sound=Instance.new('Sound');sound.Name='KeyClickSound';sound.SoundId='rbxassetid://'..tostring(C.ClickSoundId)
+  sound.Volume=C.ClickVolume;sound.RollOffMode=Enum.RollOffMode.InverseTapered;sound.RollOffMinDistance=C.ClickRollOffMin;sound.RollOffMaxDistance=C.ClickRollOffMax
   sound.Parent=anchor
   if Mixer and type(Mixer.Route)=='function'then pcall(Mixer.Route,sound,'Effects')end
-  sounds[i]={Part=anchor,Sound=sound}
+  voices[i]={Part=anchor,Sound=sound}
  end
- task.spawn(function()
-  local list={};for _,e in ipairs(sounds)do list[#list+1]=e.Sound end
-  pcall(function()Content:PreloadAsync(list)end)
- end)
- local function click(kind,x,z)
+ task.spawn(function()pcall(function()Content:PreloadAsync({voices[1].Sound})end)end)
+ local ownGate=K.NewCadence(C.ClickGap)
+ local gates=setmetatable({},{__mode='k'})          -- presser (a Player or a keeper Model) -> its own cadence
+ function click(kind,who,x,z)
   if Mixer and type(Mixer.Get)=='function'and Mixer.Get('Effects')==0 then return end
-  local own=kind==1
-  if not own then local dx,dz=x-focusX,z-focusZ;if dx*dx+dz*dz>OR2 then return end end
-  if not K.Allow(own and ownLimit or otherLimit,now)then return end
-  -- next idle Sound in round-robin order (so the three recordings alternate), else steal the oldest
-  local pick
-  for i=0,#sounds-1 do
-   local at=(soundNext-1+i)%#sounds+1
-   if not sounds[at].Sound.Playing then pick=sounds[at];soundNext=at%#sounds+1;break end
+  if kind~=1 then local dx,dz=x-focusX,z-focusZ;if dx*dx+dz*dz>RANGE2 then return end end
+  local gate=ownGate
+  if kind~=1 then
+   if who==nil then return end
+   gate=gates[who];if not gate then gate=K.NewCadence(C.ClickGap);gates[who]=gate end
   end
-  if not pick then pick=sounds[soundNext];soundNext=soundNext%#sounds+1;pick.Sound:Stop()end
-  pitchN=pitchN%#C.ClickPitches+1
-  pick.Part.CFrame=CF(x,F+1,z)
-  pick.Sound.PlaybackSpeed=kind==3 and C.KeeperPitch or C.ClickPitches[pitchN]
-  pick.Sound.Volume=own and C.ClickVolume or C.ClickVolume*.6
-  pick.Sound.TimePosition=0;pick.Sound:Play()
+  if not K.Allow(gate,now)then return end
+  gate.N=(gate.N or 0)+1
+  -- strict rotation: the voice reused is always the one started longest ago (all voices play the same recording)
+  local v=voices[voiceNext];voiceNext=voiceNext%#voices+1
+  if v.Sound.Playing then v.Sound:Stop()end
+  v.Part.CFrame=CF(x,F+1,z)
+  v.Sound.PlaybackSpeed=K.ClickPitch(kind,gate.N);v.Sound.Volume=C.ClickVolume
+  v.Sound.TimePosition=0;v.Sound:Play()
+ end
  end
 
  -- Presses --------------------------------------------------------------------------------------------------------
@@ -444,34 +528,37 @@ local function start()
   animDur[idx]=to==1 and max(C.PressSeconds*span,.015)or max(C.ReleaseSeconds*max(span,.35),.04)
   if not animPos[idx]then listAdd(animList,animPos,idx)end
  end
- local function pressKey(idx,kind,px,pz)
+ -- kind: 1 = you, 2 = another player, 3 = a keeper, 0 = a pack platform (silent); who = the presser (gate key); px, pz = where he stands
+ local function pressKey(idx,kind,who,px,pz)
   listAdd(downList,downPos,idx)
-  if kFresh[idx]==frameNo then
-   -- a key dressed this very frame under a standing runner: down at once and silent (a tier change must not click 700 times)
+  markLabel(idx)
+  if kFresh[idx]==frameNo or kind==0 then
+   -- a key dressed this very frame under a standing runner (or under a platform): down at once and silent
    if animPos[idx]then listRemove(animList,animPos,idx)end
    kDepth[idx]=1;queueMove(idx)
   else
    startAnim(idx,1) -- Reduced Motion: animate() finishes it in the same frame
-   if idx>=BARBASE then click(kind,px,pz)else click(kind,kX[idx],kZ[idx])end
+   if idx>=BARBASE then click(kind,who,px,pz)else click(kind,who,kX[idx],kZ[idx])end
   end
  end
  local function releaseKey(idx)
   listRemove(downList,downPos,idx)
   startAnim(idx,0)
  end
- local function touch(idx,kind,px,pz)
+ local function touch(idx,kind,who,px,pz)
   if stampAt[idx]==frameNo then return end
   stampAt[idx]=frameNo
-  if not downPos[idx]then pressKey(idx,kind,px,pz)end
+  if not downPos[idx]then pressKey(idx,kind,who,px,pz)end
  end
- -- A fine cell (row, column) is pressed by `kind`; px, pz = where the presser stands.
- local function pressCell(row,col,kind,px,pz)
+ -- A cell (row, column) is pressed by `kind` / `who`; px, pz = where the presser stands. Keys under a shovel hole stay up.
+ local function pressCell(row,col,kind,who,px,pz)
   local bar=barOfRow[row]
   if bar then
-   if not barHidden[bar]then touch(BARBASE+bar,kind,px,pz)end
+   if not barHole[bar]then touch(BARBASE+bar,kind,who,px,pz)end
   else
-   local g=ord1[row]
-   if g then local slot=meshLayer.SlotOf[g*64+col];if slot then touch(slot,kind,px,pz)end end
+   local key=row*64+col
+   if holeCell[key]then return end
+   local slot=slotOf[key];if slot then touch(slot,kind,who,px,pz)end
   end
  end
  local function animate()
@@ -480,17 +567,40 @@ local function start()
    local idx=animList[i]
    local to=animTo[idx]
    local t=(now-animT0[idx])/animDur[idx]
-   if t>=1 or reduced then kDepth[idx]=to;listRemove(animList,animPos,idx)
+   if t>=1 or reduced then kDepth[idx]=to;listRemove(animList,animPos,idx);if to==0 then markLabel(idx)end
    else kDepth[idx]=animFrom[idx]+(to-animFrom[idx])*(to==1 and ease.QuadOut(t)or ease.BackOut(t))end
    queueMove(idx)
   end
  end
+ -- letters riding on keys that are down (within the rows that show letters), given back once the key is up again
+ local klA,klB,klLimit=1,0,0
+ local function wantKeyLegend(idx)
+  if idx>=BARBASE then return end
+  local key=kKey[idx];if not key or key==0 then return end
+  local row=key//64
+  if row<klA or row>klB or not stripsOfRow[row]or holeCell[key]or platCell[key]then return end
+  klStamp[idx]=frameNo
+  if keyLegendOf[idx]or #klList>=klLimit then return end
+  local e
+  if klFreeN>0 then e=klFree[klFreeN];klFree[klFreeN]=nil;klFreeN-=1 else klMade+=1;e=newKeyLegend()end
+  local col=key%64
+  e.Slot=idx;e.Label.Text=K.Legend(row,col);e.Label.TextColor3=inkColor(rowStage[row],row,col)
+  e.Label.TextTransparency=K.LegendAlpha(tier,(row-focusRow)*facing)
+  e.Gui.Parent=kPart[idx];keyLegendOf[idx]=e;listAdd(klList,klPos,e)
+  markLabel(idx)
+ end
+ local function keyLegendPass()
+  klA,klB=K.LegendWindow(geo,tier,focusRow,facing);klLimit=tierCfg.KeyLegends
+  for _,idx in ipairs(downList)do wantKeyLegend(idx)end
+  for _,idx in ipairs(animList)do wantKeyLegend(idx)end
+  for i=#klList,1,-1 do local e=klList[i];if klStamp[e.Slot]~=frameNo or #klList>klLimit then dropKeyLegend(e.Slot)end end
+ end
 
  -- Other players and keepers (30 Hz) ------------------------------------------------------------------------------
- local function addFootprint(x,z,half,kind)
+ local function addFootprint(x,z,half,kind,who)
   local c1,c2,r1,r2=geo.CellRange(x-half,x+half,z-half,z+half)
   for r=r1,r2 do for c=c1,c2 do
-   if oN<512 then oN+=1;oRow[oN]=r;oCol[oN]=c;oKind[oN]=kind;oX[oN]=x;oZ[oN]=z end
+   if oN<512 then oN+=1;oRow[oN]=r;oCol[oN]=c;oKind[oN]=kind;oWho[oN]=who;oX[oN]=x;oZ[oN]=z end
   end end
  end
  local function refreshKeeper(model,rec)
@@ -510,15 +620,16 @@ local function start()
   for model,rec in pairs(keepers)do if not model:IsDescendantOf(workspace)then keepers[model]=nil else refreshKeeper(model,rec)end end
  end
  local function sampleOthers()
+  for i=1,oN do oWho[i]=nil end
   oN=0
-  local range=tierCfg.Layers[1].Ahead*P+60
+  local range=tierCfg.PressRange
   for _,p in ipairs(Players:GetPlayers())do
    if p~=player then
     local char=p.Character
     local root=char and char:FindFirstChild('HumanoidRootPart');local hum=char and char:FindFirstChildOfClass('Humanoid')
     if root and hum and hum.Health>0 then
      local pos=root.Position
-     if abs(pos.Z-focusZ)<=range and pos.Y-C.PlayerRootToFeet<=F+C.PlayerFeetReach then addFootprint(pos.X,pos.Z,C.PlayerFootprint,2)end
+     if abs(pos.Z-focusZ)<=range and pos.Y-C.PlayerRootToFeet<=F+C.PlayerFeetReach then addFootprint(pos.X,pos.Z,C.PlayerFootprint,2,p)end
     end
    end
   end
@@ -533,14 +644,16 @@ local function start()
       local ok,f=pcall(Dash.VisualFrame,model,serverNow,frame);if ok and typeof(f)=='CFrame'then frame=f end
      end
      local pos=frame.Position
-     if abs(pos.Z-focusZ)<=range+200 and pos.Y-rec.ExtY*.5<=F+C.PlayerFeetReach then addFootprint(pos.X,pos.Z,rec.Half,3)end
+     if abs(pos.Z-focusZ)<=range and pos.Y-rec.ExtY*.5<=F+C.PlayerFeetReach then addFootprint(pos.X,pos.Z,rec.Half,3,model)end
     end
    end
   end
  end
 
- -- Clearances: shovel holes (every layer) and pack platforms (fine layers) leave their cells out ------------------
+ -- Clearances: shovel holes (keys stay up, the hole parts lie on them) and pack platforms (keys held down) -------------------
  -- TrackHoleService: Folder 'TrackHoles' in the map's _GameplayRuntime, a Model per hole with a 'Pit' part (+ Rim, crumbs).
+ local scanClearances
+ do
  local function findHoles()
   if holesFolder and holesFolder:IsDescendantOf(workspace)then return holesFolder end
   local runtime=map:FindFirstChild('_GameplayRuntime')
@@ -549,17 +662,23 @@ local function start()
   if not holesFolder then holesFolder=map:FindFirstChild('TrackHoles',true)end
   return holesFolder
  end
--- The hole parts were authored to sit a few hundredths above the floor; every part is lifted above the dark bed, once per PART (a part
+ -- The hole parts were authored a few hundredths above the floor; every part is lifted onto the resting key tops, once per PART (a part
  -- streamed in again is a new instance at the server height). TrackHoleClient.grow tweens crumbs back to the frames it captured, which can
  -- undo a lift for 0.3 s: a part found again at its server height is lifted again. Lifting is relative to the part's current position.
  local liftBase,liftSet=setmetatable({},{__mode='k'}),setmetatable({},{__mode='k'})
+ local LIFT=V3(0,C.HoleLift,0)
  local function liftPart(d)
   if not d:IsA('BasePart')then return end
   local y=d.Position.Y;local base=liftBase[d]
   if not base then
-   liftBase[d]=y;liftSet[d]=y+C.BedRise;d.Position=d.Position+V3(0,C.BedRise,0)
+   liftBase[d]=y;liftSet[d]=y+C.HoleLift;d.Position=d.Position+LIFT
   elseif abs(y-liftSet[d])>1e-3 and abs(y-base)<1e-3 then
-   d.Position=d.Position+V3(0,C.BedRise,0)
+   d.Position=d.Position+LIFT
+  end
+ end
+ unlift=function()
+  for d,y in pairs(liftSet)do
+   if d.Parent and abs(d.Position.Y-y)<1e-3 then d.Position=d.Position-LIFT end
   end
  end
  local function liftAny(d)
@@ -567,31 +686,26 @@ local function start()
   elseif d:IsA('Model')then for _,x in ipairs(d:GetDescendants())do liftPart(x)end end
  end
  local liftHook,liftHooked=nil,nil
- local function rebuildBlocked()
-  for _,L in ipairs(layers)do
-   local set={};local m=L.M;local ord=H.Ord[m]
-   local function mark(rect)
-    local c1,c2,r1,r2=geo.CellRange(rect[1],rect[2],rect[3],rect[4])
-    if c1>c2 then return end
-    for r=r1,r2 do
-     local g=ord[r]
-     if g then for cg=(c1-1)//m+1,(c2-1)//m+1 do set[g*64+cg]=true end end
-    end
-   end
-   for _,rect in ipairs(holeRects)do mark(rect)end
-   if m==1 then for _,rect in ipairs(platRects)do mark(rect)end end
-   L.Blocked=set;L.BlockedDirty=true
-  end
-  for i,bar in ipairs(bars)do
-   local hide=false
-   for _,rect in ipairs(holeRects)do
-    local c1,c2,r1,r2=geo.CellRange(rect[1],rect[2],rect[3],rect[4])
-    if c1<=c2 and r2>=bar.Row0 and r1<=bar.Row1 then hide=true;break end
-   end
-   setBarHidden(i,hide)
+ local function markRects(rects,set,list)
+  for _,rect in ipairs(rects)do
+   local c1,c2,r1,r2=geo.CellRange(rect[1],rect[2],rect[3],rect[4])
+   for r=r1,r2 do if not barOfRow[r]then for c=c1,c2 do local key=r*64+c;if not set[key]then set[key]=true;if list then list[#list+1]=key end end end end end
   end
  end
- local function scanClearances()
+ local function barTouched(rects,bar)
+  for _,rect in ipairs(rects)do
+   local c1,c2,r1,r2=geo.CellRange(rect[1],rect[2],rect[3],rect[4])
+   if c1<=c2 and r2>=bar.Row0 and r1<=bar.Row1 then return true end
+  end
+  return false
+ end
+ local function rebuildClearances()
+  holeCell,platCell,platList={},{},{}
+  markRects(holeRects,holeCell,nil);markRects(platRects,platCell,platList)
+  for i,bar in ipairs(bars)do barHole[i]=barTouched(holeRects,bar);barPlat[i]=not barHole[i]and barTouched(platRects,bar)end
+  for _,r in ipairs(stripRows)do for c=1,COLS do setLabel(r,c,labelShown(r,c))end end
+ end
+ function scanClearances()
   local sig=0;local nh,np=0,0
   local f=findHoles()
   local holes={}
@@ -634,11 +748,12 @@ local function start()
   sig=sig*7+nh*1000+np
   if sig==clearSig then return end
   clearSig=sig;holeRects,platRects=newHoles,newPlat
-  rebuildBlocked()
+  rebuildClearances()
+ end
  end
 
  -- Frame ---------------------------------------------------------------------------------------------------------
- local tTier,tClear,tKeeper,tSample=0,0,0,0
+ local T={Tier=0,Clear=0,Keeper=0,Sample=0,Ground=0}   -- timers
  local function updateFocus()
   local char=player.Character
   if char~=charRef then charRef=char;rootRef=nil;humRef=nil end
@@ -653,68 +768,54 @@ local function start()
    local cam=workspace.CurrentCamera
    if cam then local p=(cam.Focus or cam.CFrame).Position;focusX,focusZ=p.X,p.Z end
   end
-  local r=geo.RowOfZ(focusZ);focusRow=max(1,min(geo.Rows,r))
+  local r=geo.RowOfZ(focusZ);r=max(1,min(geo.Rows,r))
+  if r~=focusRow then focusRow=r;windowDirty=true end
+  -- the window's long side follows the camera (a dead zone around sideways, and the turn must hold a moment)
+  local cam=workspace.CurrentCamera
+  if cam then
+   local want=K.Facing(cam.CFrame.LookVector.Z,facingWant)
+   if frameNo==1 then facing=want end                -- the first window already faces the camera's way
+   if want~=facingWant then facingWant=want;facingSince=now end
+   if facingWant~=facing and now-facingSince>=C.FacingHoldSeconds then facing=facingWant;windowDirty=true;turnBurst=true end
+  end
   focusCol=max(1,min(COLS,geo.ColOfX(focusX)))
  end
- local BM=C.MaxReassignPerFrame
  local function step(dt)
   now=clock();frameNo+=1;reduced=Gui.ReducedMotionEnabled==true
   updateFocus()
-  tTier+=dt;tClear+=dt;tKeeper+=dt;tSample+=dt
-  if tier==0 or tTier>=.5 then
-   tTier=0
+  T.Tier+=dt;T.Clear+=dt;T.Keeper+=dt;T.Sample+=dt;T.Ground+=dt
+  if tier==0 or T.Tier>=.5 then
+   T.Tier=0
    local want=Fx and Fx.Get()or 3
-   if tier==0 then tier=want;wantTier=want;wantSince=now;tierCfg=K.Tier(tier)
+   if tier==0 then tier=want;wantTier=want;wantSince=now;tierCfg=K.Tier(tier);windowDirty=true
    elseif want~=wantTier then wantTier=want;wantSince=now end
    -- a tier change only applies once it has held for a few seconds (a device bouncing between tiers must not flicker)
-   if wantTier~=tier and now-wantSince>=C.TierHoldSeconds then tier=wantTier;tierCfg=K.Tier(tier)end
+   if wantTier~=tier and now-wantSince>=C.TierHoldSeconds then tier=wantTier;tierCfg=K.Tier(tier);windowDirty=true end
   end
-  if tClear>=.25 then tClear=0;scanClearances()end
-  if tKeeper>=2 then tKeeper=0;scanKeepers()end
-  K.Windows(geo,H,tier,focusRow,focusCol,wins)
-  if not templateReady then
-   -- no keycaps yet: the plain layer next to them covers their area meanwhile
-   wins[1].B=wins[1].A-1;if wins[2]then wins[2].HasHole=false end
+  if T.Clear>=.25 then T.Clear=0;scanClearances()end
+  if T.Keeper>=2 then T.Keeper=0;scanKeepers()end
+  if T.Ground>=C.GroundScanSeconds then T.Ground=0;scanGround()end
+  if templateReady and template and next(plainSlot)then swapPass()end
+  if windowDirty or pendingBind or pendingLegend then
+   local dirty=windowDirty or pendingBind
+   windowDirty=false
+   if dirty then pendingBind=windowPass(dt)end
+   pendingLegend=legendWindowPass()
   end
-  for j=1,#layers do loadWindow(layers[j],wins[j])end
-  -- cell bindings per layer this frame; a slower frame (more distance covered) gets proportionally more
-  local scale=min(2,max(1,dt*60))
-  local bMesh,bPlain,bCoarse=floor(BM.mesh*scale),floor(BM.plain*scale),floor(BM.coarse*scale)
-  local n=#layers
-  -- coarse to fine: a cell that left its window goes once the coarser layer holds its region (that layer was just served), freeing
-  -- room before the layer binds what entered; then fine to coarse: cells under a finer window go once the finer cells are bound
-  for j=n,1,-1 do
-   local L=layers[j]
-   if L.Kind~='mesh'or templateReady then
-    L.Kept=0
-    if L.Dirty or L.PendingRel then releaseOutside(L)end
-    if L.Dirty or L.Pending then acquirePass(L,L.Kind=='mesh'and bMesh or L.M==1 and bPlain or bCoarse)end
-   end
-  end
-  keptMesh,keptPlain=0,0
-  for j=1,n do
-   local L=layers[j]
-   if L.Kind~='mesh'or templateReady then
-    if L.Dirty or L.PendingRel then releaseHole(L)end
-    if L.Kind=='mesh'then keptMesh+=L.Kept else keptPlain+=L.Kept end
-    L.PendingRel=L.Kept>0
-    L.Dirty=false
-   end
-  end
-  -- the stall valve: layers that keep cells while nothing at all is being bound or released are stuck (cap deadlock): after a while let go
-  for j=1,n do local L=layers[j];if L.PendingRel and not progress then L.GateFrames+=1 else L.GateFrames=0 end end
-  progress=false
-  -- presses: the local runner every frame, everyone else from the last 30 Hz sample
-  if tSample>=1/C.PlayerSampleHz then tSample=tSample%(1/C.PlayerSampleHz);sampleOthers()end
+  -- presses: the local runner every frame, everyone else from the last 30 Hz sample, pack platforms hold their keys down
+  if T.Sample>=1/C.PlayerSampleHz then T.Sample=T.Sample%(1/C.PlayerSampleHz);sampleOthers()end
   if hasRoot and humRef and humRef.Health>0 and humRef.FloorMaterial~=AIR then
    local p=rootRef.Position;local half=C.PlayerFootprint
    local c1,c2,r1,r2=geo.CellRange(p.X-half,p.X+half,p.Z-half,p.Z+half)
-   for r=r1,r2 do for c=c1,c2 do pressCell(r,c,1,p.X,p.Z)end end
+   for r=r1,r2 do for c=c1,c2 do pressCell(r,c,1,nil,p.X,p.Z)end end
   end
-  for i=1,oN do pressCell(oRow[i],oCol[i],oKind[i],oX[i],oZ[i])end
+  for i=1,oN do pressCell(oRow[i],oCol[i],oKind[i],oWho[i],oX[i],oZ[i])end
+  for _,key in ipairs(platList)do local s=slotOf[key];if s then touch(s,0,nil,kX[s],kZ[s])end end
+  for i in ipairs(bars)do if barPlat[i]then touch(BARBASE+i,0,nil,CX,kZ[BARBASE+i])end end
   for i=#downList,1,-1 do local idx=downList[i];if stampAt[idx]~=frameNo then releaseKey(idx)end end
   animate()
-  legendPass()
+  keyLegendPass()
+  flushLabels()
   flushMoves()
  end
  table.insert(conns,Run.RenderStepped:Connect(step))
