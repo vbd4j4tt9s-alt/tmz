@@ -23,6 +23,33 @@ local function world(mutate)
   for i=1,#parts-1 do parent=parent:FindFirstChild(parts[i])or(function()local f=new(i==1 and parts[i]or'Folder');f.Name=parts[i];f.Parent=parent;return f end)()end
   if not s.New then local item=new(s.Class);item.Name=parts[#parts];item.Source=mutate and mutate(s)or s.Before;item.Parent=parent;items[s.Path]=item end
  end
+ -- Objects the update retires (D.Retire, name arrays): built the way the live place has them, scripts with mixed Disabled states.
+ -- A name with '/' is ONE instance name; a decoy folder chain (Keycap > Keyboard) next to it must never be touched.
+ local retired,decoys={},{}
+ local function child(parent,name,class)
+  local c=parent:FindFirstChild(name);if c then return c end
+  c=new(class or'Folder');c.Name=name;c.Parent=parent;return c
+ end
+ for i,names in ipairs(D.Retire)do
+  local parent=game:FindFirstChild(names[1])or service(names[1])
+  for k=2,#names-1 do parent=child(parent,names[k])end
+  local leaf=names[#names]
+  local class=leaf:find('State$')and'RemoteEvent'or leaf:find('Boot')and'LocalScript'or leaf:find('Server')and'Script'
+   or(leaf:find('Core')or leaf:find('Scene')or leaf:find('Client'))and'ModuleScript'or leaf=='Verity'and'Part'or'Folder'
+  local item=new(class);item.Name=leaf
+  if item:IsA('BaseScript')then item.Disabled=(i%2==0)end
+  if class=='Folder'then
+   for j=1,3 do
+    local sub=new(j==1 and'Model'or'Folder');sub.Name='Sub'..j;sub.Parent=item
+    local s=new(j==2 and'LocalScript'or'Script');s.Name='Inner'..j;s.Disabled=(j~=2);s.Parent=sub
+   end
+  end
+  item.Parent=parent;retired[i]=item
+  if leaf:find('/',1,true)then
+   local d=parent;for _,part in ipairs(string.split(leaf,'/'))do d=child(d,part)end
+   decoys[#decoys+1]={Item=d,Parent=d.Parent}
+  end
+ end
  -- Look scripts up by path each time: added scripts appear and disappear.
  setmetatable(items,{__index=function(_,path)local item=game;for n in string.gmatch(path,'[^/]+')do item=item and item:FindFirstChild(n)end;return item end})
  local env
@@ -34,7 +61,7 @@ local function world(mutate)
  local printed={}
  env=setmetatable({game=game,Instance=R.Instance,require=req,print=function(...)printed[#printed+1]=table.concat({...},' ')end,task=R.task},{__index=_G})
  local function run(text)local fn=assert(loadstring(text,'=paste'));setfenv(fn,setmetatable({},{__index=env}));return pcall(fn)end
- return {Game=game,Items=items,Run=run,Printed=printed,Storage=service('ServerStorage'),SetRunning=function(v)running=v end,Req=req}
+ return {Game=game,Items=items,Run=run,Printed=printed,Storage=service('ServerStorage'),SetRunning=function(v)running=v end,Req=req,Retired=retired,Decoys=decoys}
 end
 local function all(w,key)
  for _,s in ipairs(D.Scripts)do
@@ -98,5 +125,150 @@ if hasNew then
  ok,err=w4.Run(D.PASTE);check(not ok and tostring(err):find('already exists',1,true)~=nil,'name clash refused: '..tostring(err))
  check(w4.Storage:FindFirstChild(BACKUP)==nil,'no backup after clash')
  print('added-script paths covered')
+end
+-- 9) Retired objects: moved into the backup and back, all-or-nothing. Needs the retire list the installer was built with.
+if #D.Retire<3 then print('retire checks skipped: no retire list in the bundle (pass the --retire file to installer_testdata.py)')
+else
+ local function show(names)local out={};for i,n in ipairs(names)do out[#out+1]=n:match('^[%a_][%w_]*$')and(i>1 and'.'..n or n)or('["'..n..'"]')end;return table.concat(out)end
+ local function scriptsOf(item)local list=item:IsA('BaseScript')and{item}or{};for _,d in ipairs(item:GetDescendants())do if d:IsA('BaseScript')then list[#list+1]=d end end;return list end
+ -- What each retired object looked like before the install.
+ local function snapshot(w)
+  local snap={}
+  for i,item in pairs(w.Retired)do
+   local flags={};for _,s in ipairs(scriptsOf(item))do flags[s]=s.Disabled==true end
+   snap[i]={Item=item,Parent=item.Parent,Name=item.Name,Flags=flags,Children=#item:GetDescendants()}
+  end
+  return snap
+ end
+ local function restored(snap)
+  for i,e in pairs(snap)do
+   local it=e.Item
+   if it.Parent~=e.Parent or it.Name~=e.Name or #it:GetDescendants()~=e.Children then return false,i end
+   for s,flag in pairs(e.Flags)do if (s.Disabled==true)~=flag then return false,i end end
+  end
+  return true
+ end
+ local function parked(snap,backup)
+  for i,e in pairs(snap)do
+   local it=e.Item;local p=it.Parent
+   if not(p and p.Name=='Parked'and p.Parent and p.Parent.Parent==backup:FindFirstChild('Retired'))or it.Name~=e.Name then return false,i end
+   for s in pairs(e.Flags)do if s.Disabled~=true then return false,i end end
+   for _,c in ipairs(e.Parent:GetChildren())do if c==it then return false,i end end
+  end
+  return true
+ end
+ local function parkedEmpty(backup)for _,e in ipairs(backup.Retired:GetChildren())do if e:FindFirstChild('Parked')and #e.Parked:GetChildren()>0 then return false end end;return true end
+ local function decoysIntact(w)for _,d in ipairs(w.Decoys)do if d.Item.Parent~=d.Parent then return false end end;return true end
+ local function failParent(pred)
+  local real=R.instMeta.__newindex
+  R.instMeta.__newindex=function(o,k,v)if k=='Parent'and pred(o,v)then error('simulated move failure')end;return real(o,k,v)end
+  return function()R.instMeta.__newindex=real end
+ end
+ local function printed(w)return table.concat(w.Printed,'\n')end
+ local slash;for i,names in ipairs(D.Retire)do for _,n in ipairs(names)do if n:find('/',1,true)then slash=i end end end
+ check(slash~=nil and #D.Retire>0,'retire list has a name containing a slash')
+
+ -- 9a) Install retires everything; undo / redo / undo round trip.
+ local rw=world();local snap=snapshot(rw);local sawTrue,sawFalse=false,false
+ for _,e in pairs(snap)do for _,flag in pairs(e.Flags)do if flag then sawTrue=true else sawFalse=true end end end
+ check(sawTrue and sawFalse and #rw.Decoys>0,'retire test data has Disabled=true and false scripts and a slash decoy')
+ ok,err=rw.Run(D.PASTE);check(ok,'retire: paste runs: '..tostring(err))
+ local rb=rw.Storage:FindFirstChild(BACKUP)
+ check(rb~=nil and parked(snap,rb),'retire: every object is parked in the backup with its scripts Disabled')
+ check(all(rw,'After'),'retire: scripts are patched in the same install')
+ check(rb and #rb.Retired:GetChildren()==#D.Retire and rb:GetAttribute('RetireCount')==#D.Retire,'retire: one backup entry per path')
+ check(decoysIntact(rw),'retire: a name with a slash retires that one object, not Keycap > Keyboard')
+ for i,names in ipairs(D.Retire)do check(printed(rw):find('Retired '..show(names)..' (',1,true)~=nil,'retire: prints Retired '..show(names))end
+ check(rb and rb:GetAttribute('State')=='Installed','retire: state Installed')
+ local rinst=rw.Req(rb.Installer)
+ ok,err=rw.Run(D.PASTE);check(ok and parked(snap,rb),'retire: pasting again changes nothing')
+ ok,err=pcall(rinst,'undo');check(ok,'retire: undo ok: '..tostring(err))
+ check(restored(snap),'retire: undo restores every object to its exact parent, name, children and Disabled state')
+ check(all(rw,'Before')and parkedEmpty(rb),'retire: undo restores scripts and empties the backup')
+ check(decoysIntact(rw),'retire: decoys untouched by undo')
+ check(printed(rw):find('Restored '..show(D.Retire[slash])..' (',1,true)~=nil,'retire: undo prints what it restored')
+ ok,err=pcall(rinst,'undo');check(ok and restored(snap),'retire: double undo ok')
+ ok,err=pcall(rinst,'install');check(ok and parked(snap,rb)and all(rw,'After'),'retire: redo parks them again: '..tostring(err))
+ ok,err=pcall(rinst,'undo');check(ok and restored(snap)and all(rw,'Before'),'retire: second undo restores again: '..tostring(err))
+ -- Play running refuses without moving anything.
+ rw.SetRunning(true);ok,err=pcall(rinst,'install');check(not ok and restored(snap)and parkedEmpty(rb),'retire: refuses during Play');rw.SetRunning(false)
+
+ -- 9b) A missing object is skipped and reported; the rest is retired and restored.
+ local mw=world();local goneIndex=2;local gone=mw.Retired[goneIndex];gone.Parent=nil;mw.Retired[goneIndex]=nil
+ local msnap=snapshot(mw)
+ ok,err=mw.Run(D.PASTE);check(ok,'retire: paste with a missing object runs: '..tostring(err))
+ local mb=mw.Storage:FindFirstChild(BACKUP)
+ check(mb and parked(msnap,mb)and all(mw,'After'),'retire: the objects that exist are retired')
+ check(printed(mw):find('Skipped '..show(D.Retire[goneIndex])..' (not found',1,true)~=nil,'retire: missing object reported as skipped')
+ check(gone.Parent==nil and #mb.Retired:GetChildren()==#D.Retire,'retire: the missing one is not recreated')
+ local minst=mw.Req(mb.Installer)
+ ok,err=pcall(minst,'undo');check(ok and restored(msnap)and all(mw,'Before')and gone.Parent==nil,'retire: undo with a skipped object: '..tostring(err))
+ ok,err=pcall(minst,'install');check(ok and parked(msnap,mb),'retire: redo with a skipped object: '..tostring(err))
+ -- an object that vanished from the backup itself (deleted while parked) is skipped on undo, the others still come back
+ local entry=mb.Retired:FindFirstChild('03');local lost=entry and entry.Target.Value
+ if entry then entry.Target.Value=nil;msnap[3]=nil end
+ ok,err=pcall(minst,'undo');check(ok and restored(msnap)and all(mw,'Before'),'retire: undo skips an object deleted from the backup: '..tostring(err))
+ check(printed(mw):find('Skipped '..show(D.Retire[3])..' (deleted',1,true)~=nil,'retire: ...and says so')
+ -- nothing exists at all
+ local nw=world();for _,item in pairs(nw.Retired)do item.Parent=nil end
+ ok,err=nw.Run(D.PASTE);check(ok and all(nw,'After'),'retire: every object missing still installs the scripts: '..tostring(err))
+ local skippedCount=0;for _ in printed(nw):gmatch('Skipped ')do skippedCount+=1 end
+ check(skippedCount==#D.Retire,'retire: every missing object reported ('..skippedCount..')')
+
+ -- 9c) Two siblings with the same name: refused before anything changes.
+ for _,k in ipairs({1,math.min(5,#D.Retire)})do
+  local aw=world();local asnap=snapshot(aw)
+  local twin=R.new(aw.Retired[k].ClassName);twin.Name=aw.Retired[k].Name;twin.Parent=aw.Retired[k].Parent
+  ok,err=aw.Run(D.PASTE)
+  check(not ok and tostring(err):find('Ambiguous',1,true)~=nil and tostring(err):find('Nothing changed',1,true)~=nil,'retire: ambiguous '..show(D.Retire[k])..' refused: '..tostring(err))
+  check(aw.Storage:FindFirstChild(BACKUP)==nil,'retire: no backup after an ambiguous path')
+  check(restored(asnap)and twin.Parent==asnap[k].Parent and all(aw,'Before'),'retire: nothing moved or written after an ambiguous path')
+ end
+ -- ...also when the second sibling shows up before a redo
+ do
+  local ow=world();local osnap=snapshot(ow);ok,err=ow.Run(D.PASTE);local ob=ow.Storage:FindFirstChild(BACKUP);local oi=ow.Req(ob.Installer)
+  ok,err=pcall(oi,'undo');check(ok and restored(osnap),'retire: ambiguity setup undo')
+  local twin=R.new(ow.Retired[2].ClassName);twin.Name=ow.Retired[2].Name;twin.Parent=ow.Retired[2].Parent
+  ok,err=pcall(oi,'install');check(not ok and tostring(err):find('Ambiguous',1,true)~=nil,'retire: redo refused when a twin appeared: '..tostring(err))
+  check(restored(osnap)and all(ow,'Before')and parkedEmpty(ob),'retire: nothing moved by the refused redo')
+ end
+
+ -- 9d) Failure in the middle of the install: no object stays moved, no script stays disabled.
+ local fw=world();local fsnap=snapshot(fw);local victim=fw.Retired[math.min(5,#D.Retire)]
+ local heal=failParent(function(o,v)return o==victim and v~=nil and v.Name=='Parked'end)
+ ok,err=fw.Run(D.PASTE);heal()
+ check(not ok and tostring(err):find('rolled back',1,true)~=nil,'retire: failed move reports rollback: '..tostring(err))
+ local fb=fw.Storage:FindFirstChild(BACKUP)
+ check(restored(fsnap)and parkedEmpty(fb)and all(fw,'Before')and decoysIntact(fw),'retire: failed move leaves every object, Disabled state and script as before')
+ check(fb:GetAttribute('State')=='RolledBack','retire: state RolledBack')
+ ok,err=fw.Run(D.PASTE);check(ok and parked(fsnap,fb)and all(fw,'After'),'retire: pasting again after the failure installs everything: '..tostring(err))
+ -- the failure comes after every object was moved (a script write fails): they all come back
+ local sw=world();local ssnap=snapshot(sw)
+ local sEditor=sw.Game:GetService('ScriptEditorService');local sReal=sEditor.UpdateSourceAsync
+ sEditor.UpdateSourceAsync=function(self,item,fn)error('simulated write failure')end
+ ok,err=sw.Run(D.PASTE);sEditor.UpdateSourceAsync=sReal
+ local sb=sw.Storage:FindFirstChild(BACKUP)
+ check(not ok and tostring(err):find('rolled back',1,true)~=nil,'retire: failed write after the moves reports rollback')
+ check(restored(ssnap)and parkedEmpty(sb)and all(sw,'Before'),'retire: failed write moves every object back and re-enables its scripts')
+ -- a failure while undoing: everything stays installed
+ local uw=world();local usnap=snapshot(uw);uw.Run(D.PASTE);local ub=uw.Storage:FindFirstChild(BACKUP);local ui=uw.Req(ub.Installer)
+ local uvictim=uw.Retired[math.min(4,#D.Retire)]
+ heal=failParent(function(o,v)return o==uvictim and v~=nil and v.Name~='Parked'end)
+ ok,err=pcall(ui,'undo');heal()
+ check(not ok and tostring(err):find('rolled back',1,true)~=nil,'retire: failed undo reports rollback: '..tostring(err))
+ check(parked(usnap,ub)and all(uw,'After'),'retire: failed undo leaves every object parked and every script as installed')
+ ok,err=pcall(ui,'undo');check(ok and restored(usnap)and all(uw,'Before'),'retire: undo works once the failure is gone: '..tostring(err))
+
+ -- 9e) Undo refuses, changing nothing, when the place no longer matches.
+ local cw=world();local csnap=snapshot(cw);cw.Run(D.PASTE);local cb=cw.Storage:FindFirstChild(BACKUP);local ci=cw.Req(cb.Installer)
+ local cv=cw.Retired[3];local clash=R.new('Folder');clash.Name=cv.Name;clash.Parent=csnap[3].Parent
+ ok,err=pcall(ci,'undo');check(not ok and tostring(err):find('already exists',1,true)~=nil,'retire: undo refused when the name is taken: '..tostring(err))
+ check(parked(csnap,cb)and all(cw,'After'),'retire: ...and nothing moved')
+ clash.Parent=nil
+ local hand=cw.Retired[4];hand.Parent=cw.Game:GetService('Workspace')
+ ok,err=pcall(ci,'undo');check(not ok and tostring(err):find('moved',1,true)~=nil,'retire: undo refused when a parked object was moved by hand: '..tostring(err))
+ check(all(cw,'After')and cv.Parent.Name=='Parked','retire: ...and nothing else moved')
+ hand.Parent=cb.Retired:FindFirstChild('04').Parked
+ ok,err=pcall(ci,'undo');check(ok and restored(csnap)and all(cw,'Before'),'retire: undo works once it matches again: '..tostring(err))
 end
 print(('%d checks, %d failures'):format(checks,fails))

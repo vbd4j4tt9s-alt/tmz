@@ -44,9 +44,28 @@ local function sha256(text)
     end
     local out={};for _,v in ipairs(h)do out[#out+1]=string.format('%08x',v)end;return table.concat(out)
 end
+-- Retire paths are arrays of names (a name may contain '/'), never '/'-joined strings.
+local function display(names)
+    local out={}
+    for i,name in ipairs(names)do out[#out+1]=name:match('^[%a_][%w_]*$')and(i>1 and'.'..name or name)or('["'..name..'"]')end
+    return table.concat(out)
+end
+-- Walks the names down from game. nil when something on the way is missing; refuses when a name matches several siblings.
+local function findPath(names)
+    local item=game
+    for _,name in ipairs(names)do
+        local found,count=nil,0
+        for _,child in ipairs(item:GetChildren())do if child.Name==name then found=child;count+=1 end end
+        assert(count<2,'__TAG__ Ambiguous: '..count..' objects are named "'..name..'" in '..item:GetFullName()..' (looking for '..display(names)..'). Nothing changed.')
+        if count==0 then return nil end
+        item=found
+    end
+    return item
+end
 
 -- @@SPLIT@@
 local sourceSpecs=__SPECS__
+local retireList=__RETIRE__
 -- Local source-only transaction; no map, asset, ID or gameplay-data edits.
 local package=script.Parent
 local function unique(parent,name)
@@ -71,9 +90,30 @@ return function(mode)
   end)
   assert(read(item)==after,'__TAG__ Write did not persist: '..item:GetFullName())
  end
- local folder=unique(package,'Sources');local sources={};local specs={};local seen={}
+ local folder=unique(package,'Sources');local sources={};local specs={};local seen={};local skipped={}
  for _,spec in ipairs(sourceSpecs)do specs[spec.Path]=spec end
  assert(#folder:GetChildren()==#sourceSpecs and package:GetAttribute('SourceCount')==#sourceSpecs,'__TAG__ Incomplete backup.')
+ -- Retired objects: installed = parked in the backup (Retired/NN/Parked), undone = back at their original parent.
+ -- Entries come first so they are moved first and, on a failure, put back last.
+ if #retireList>0 then
+  local rfolder=unique(package,'Retired');local seenIndex={}
+  assert(#rfolder:GetChildren()==#retireList and package:GetAttribute('RetireCount')==#retireList,'__TAG__ Incomplete backup (retired objects).')
+  for _,entry in ipairs(rfolder:GetChildren())do
+   local index=entry:GetAttribute('Index');local names=retireList[index]
+   assert(names and not seenIndex[index],'__TAG__ Invalid or duplicated backup entry (retired objects).');seenIndex[index]=true
+   if entry:GetAttribute('Missing')then skipped[#skipped+1]={Names=names,Why='not found when the backup was made'}
+   else
+    local target=unique(entry,'Target');local parked=unique(entry,'Parked');local list=unique(entry,'Scripts')
+    assert(target:IsA('ObjectValue')and parked:IsA('Folder')and list:IsA('Folder'),'__TAG__ Damaged retire backup: '..display(names))
+    if target.Value==nil then skipped[#skipped+1]={Names=names,Why='deleted since the backup was made'}
+    else
+     local c={Retire=true,Item=target.Value,Entry=entry,Parked=parked,Names=names,Name=names[#names],ParentNames=table.move(names,1,#names-1,1,{}),Scripts={}}
+     for _,v in ipairs(list:GetChildren())do if v.Value~=nil then c.Scripts[#c.Scripts+1]={Item=v.Value,Disabled=v:GetAttribute('Disabled')==true}end end
+     sources[#sources+1]=c
+    end
+   end
+  end
+ end
  for _,entry in ipairs(folder:GetChildren())do
   local path=entry:GetAttribute('Path');local spec=specs[path]
   assert(spec and not seen[path],'__TAG__ Invalid or duplicated backup entry.');seen[path]=true
@@ -94,7 +134,28 @@ return function(mode)
  end
  local from,to=mode=='install'and'Before'or'After',mode=='install'and'After'or'Before'
  -- Added scripts: 'Before' means parked in the backup, 'After' means in place. Their source never changes.
+ -- Retired objects: 'Before' = at the original parent under the original name, 'After' = parked in the backup.
+ local function home(c)
+  local parent=findPath(c.ParentNames)
+  assert(parent~=nil,'__TAG__ The original parent of '..display(c.Names)..' no longer exists; nothing changed.')
+  return parent
+ end
+ local function destination(c)
+  local parent=home(c)
+  for _,other in ipairs(parent:GetChildren())do assert(other==c.Item or other.Name~=c.Name,'__TAG__ Something named '..c.Name..' already exists in '..parent:GetFullName()..'; nothing changed.')end
+  return parent
+ end
  local function state(c)
+  if c.Retire then
+   if c.Item.Parent==c.Parked then return'After'end
+   local parent=home(c);local same=0
+   for _,other in ipairs(parent:GetChildren())do if other.Name==c.Name then same+=1 end end
+   if c.Item.Parent==parent and c.Item.Name==c.Name then
+    assert(same==1,'__TAG__ Ambiguous: '..same..' objects are named '..c.Name..' in '..parent:GetFullName()..'; nothing changed.')
+    return'Before'
+   end
+   error('__TAG__ Retired object was moved or renamed; nothing changed: '..display(c.Names))
+  end
   if c.New then
    assert(read(c.Item)==c.After,'__TAG__ Added script has later edits; nothing changed: '..c.Item:GetFullName())
    if c.Item.Parent==c.Home then return'After'elseif c.Item.Parent==c.Entry then return'Before'end
@@ -105,6 +166,20 @@ return function(mode)
   error('__TAG__ Source has later edits; nothing changed: '..c.Item:GetFullName())
  end
  local function put(c,where)
+  if c.Retire then
+   -- Idempotent, so a rollback can run it on a half-done object. Scripts are switched off before they leave and back on after they return.
+   if where=='After'then
+    for _,s in ipairs(c.Scripts)do s.Item.Disabled=true end
+    c.Item.Parent=c.Parked
+   else
+    local parent=destination(c)
+    c.Item.Name=c.Name;c.Item.Parent=parent
+    for _,s in ipairs(c.Scripts)do s.Item.Disabled=s.Disabled end
+   end
+   assert(state(c)==where,'__TAG__ Move did not persist: '..display(c.Names))
+   for _,s in ipairs(c.Scripts)do assert((s.Item.Disabled==true)==(where=='After'or s.Disabled),'__TAG__ Disabled state did not persist: '..s.Item:GetFullName())end
+   return
+  end
   if c.New then
    if where=='After'then
     for _,other in ipairs(c.Home:GetChildren())do assert(other==c.Item or other.Name~=c.Name,'__TAG__ Something named '..c.Name..' already exists in '..c.Home:GetFullName())end
@@ -118,8 +193,11 @@ return function(mode)
   local current=state(c)
   if current==from then fromCount+=1 else toCount+=1 end
  end
+ local function reportSkipped()for _,s in ipairs(skipped)do print('__TAG__ Skipped '..display(s.Names)..' ('..s.Why..').')end end
+ if #sources==0 then reportSkipped();print('__TAG__ Nothing to '..mode..'.');return end
  if toCount==#sources then print('__TAG__ Already '..(mode=='install'and'installed.'or'undone.'));return end
- assert(fromCount==#sources and toCount==0,'__TAG__ Mixed script versions; nothing changed.')
+ assert(fromCount==#sources and toCount==0,'__TAG__ Mixed script versions or retired objects; nothing changed.')
+ if mode=='undo'then for _,c in ipairs(sources)do if c.Retire then destination(c)end end end
  -- R124: Play started while scripts are still being written copies a half-installed place; say so up front.
  print(mode=='install'and'__TAG__ Installing... do not press Play until it says Installed.'or'__TAG__ Undoing... do not press Play until it says Undone.')
  local attempted={}
@@ -134,7 +212,7 @@ return function(mode)
   local errors={}
   for i=#attempted,1,-1 do
    local c=attempted[i]
-   local ok,err=pcall(function()if state(c)==to then put(c,from)end end)
+   local ok,err=pcall(function()if c.Retire or state(c)==to then put(c,from)end end)
    if not ok then errors[#errors+1]=tostring(err)end
   end
   package:SetAttribute('State',#errors==0 and'RolledBack'or'RestoreIncomplete')
@@ -142,6 +220,12 @@ return function(mode)
   error('__TAG__ Installation stopped; its source writes were rolled back: '..tostring(why))
  end
  package:SetAttribute('State',mode=='install'and'Installed'or'Undone')
+ for _,c in ipairs(sources)do
+  if c.Retire then
+   print('__TAG__ '..(mode=='install'and'Retired 'or'Restored ')..display(c.Names)..' ('..c.Item.ClassName..(#c.Scripts>0 and', '..#c.Scripts..' script(s) '..(mode=='install'and'disabled'or'set back to their original Disabled state')or'')..')')
+  end
+ end
+ reportSkipped()
  pcall(function()game:GetService('ChangeHistoryService'):SetWaypoint('__RELEASE__ '..mode)end)
  print(mode=='install'and'__TAG__ Installed. Save, then start a NEW Play session.'or'__TAG__ Undone; previous scripts restored. Save, then start a NEW Play session.')
 end
