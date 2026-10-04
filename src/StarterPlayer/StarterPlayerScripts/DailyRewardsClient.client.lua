@@ -1,8 +1,5 @@
--- R140 (owner: "daily login rewards, per week, at the end players get 1 mech pack", "daily quests like steal 3 packs,
--- that quest gives 5 gems", "speed boost for friends in the server and an invite button", "the your plant is ready
--- thing"): the 🎁 DAILY and 👥 INVITE buttons in the top bar row (slots made by TravelButtons), the DAILY window (LOGIN
--- week and QUESTS tabs), the friend boost chip and the plant-ready notification opt-in. The server owns every number
--- (PremiumRequest 'Daily'); this script only shows them.
+-- R141: daily login pack/gem rewards and two-gem daily quests.
+-- The existing DAILY/INVITE UI, friend chip and plant-ready opt-in use server state.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Tween=game:GetService('TweenService')
 local GuiService=game:GetService('GuiService');local SocialService=game:GetService('SocialService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local remotes=RS:WaitForChild('ChestChaseRemotes')
@@ -78,7 +75,7 @@ end
 local pages={Login=new('Frame',{Name='LoginPage',BackgroundTransparency=1},panel),Quests=new('Frame',{Name='QuestsPage',BackgroundTransparency=1,Visible=false},panel)}
 local status=text(panel,'Status','',15,Theme.Colors.Gold);status.Visible=false
 -- LOGIN page: the week as seven cards (day 7 is the wide Mech pack card) and one big CLAIM button.
-local loginNote=text(pages.Login,'Note','Come back every day! DAY 7 = FREE MECH PACK 🤖',17,Theme.Colors.Muted)
+local loginNote=text(pages.Login,'Note','4 random packs, then 2 + 3 gems. DAY 7 = MECH 🤖',17,Theme.Colors.Muted)
 local days={}
 for d=1,#D.Login do
  local reward=D.Login[d];local big=reward.MechPack~=nil
@@ -87,15 +84,13 @@ for d=1,#D.Login do
  local edge=stroke(card,big and RGB(196,150,255)or Theme.Colors.Line,2);edge.Name='Edge'
  local dayText=text(card,'DayLabel','DAY '..d,15);dayText.ZIndex=4
  local art=new('Frame',{Name='Art',BackgroundTransparency=1,ZIndex=3},card)
- if reward.Pack then
-  local e=text(art,'Emoji','🎒',30);e.Size=UDim2.fromScale(1,1);e.TextScaled=true
- elseif reward.MechPack then
+ if reward.MechPack or reward.SeedPack then
   local shown=false
   if Pictures then
-   local proxy=Instance.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',8);proxy:SetAttribute('BagVariant','MechLimited');proxy:SetAttribute('PackMutation','None')
+   local proxy=Instance.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',reward.MechPack and 8 or 1);proxy:SetAttribute('BagVariant',reward.MechPack and 'MechLimited'or 'Pack01');proxy:SetAttribute('PackMutation','None')
    shown=pcall(Pictures.Show,art,proxy,2)
   end
-  if not shown then local e=text(art,'Emoji','🤖',30);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
+  if not shown then local e=text(art,'Emoji',reward.MechPack and '🤖'or '🎒',30);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
  else
   local holder=new('CanvasGroup',{Name='Gem',BackgroundTransparency=1,Size=UDim2.fromScale(1,1)},art)
   local ok=pcall(function()require(RS.GemIcon).new(holder)end)
@@ -112,7 +107,7 @@ end
 local claimButton=new('TextButton',{Name='ClaimButton',Text='',BorderSizePixel=0},pages.Login);Bright.Button(claimButton,GOLD)
 local claimText=text(claimButton,'Caption','',22);claimText.Size=UDim2.new(1,-16,1,0);claimText.Position=UDim2.fromOffset(8,0);claimText.ZIndex=12
 new('UIScale',{Name='Pulse'},claimButton)
--- QUESTS page: three rows (icon, task, progress bar, 💎 reward and a CLAIM button) and the time until the new quests.
+-- QUESTS page: three rows (icon, task, progress bar, 💎5 and a CLAIM button) and the time until the new quests.
 local questTitle=text(pages.Quests,'Title','DAILY QUESTS',20);questTitle.TextXAlignment=Enum.TextXAlignment.Left
 local questReset=text(pages.Quests,'Reset','',15,Theme.Colors.Muted);questReset.TextXAlignment=Enum.TextXAlignment.Right
 local rows={}
@@ -234,10 +229,11 @@ local function render()
   if q then
    local complete=q.Progress>=q.Goal
    r.Icon.Text=q.Icon;r.Task.Text=q.Text;r.Count.Text=q.Progress..' / '..q.Goal;r.Fill.Size=UDim2.fromScale(math.clamp(q.Progress/q.Goal,0,1),1)
-   r.Claim.Visible=complete and not q.Claimed;r.Done.Visible=q.Claimed;r.Done.Text='✓ DONE'
-   r.Edge.Color=complete and not q.Claimed and GOLD or Theme.Colors.Line;r.Row.BackgroundColor3=q.Claimed and Theme.Colors.Inset or Theme.Colors.Card
-   if complete and not q.Claimed then pulse(r.Claim.Pulse,'Scale',1,1.06)end
-   if not complete then r.Done.Visible=false end
+   r.Claim.Visible=complete and not q.Claimed and not q.Blocked;r.Done.Visible=q.Claimed or q.Blocked;r.Done.Text=q.Claimed and '✓ DONE'or 'DAILY LIMIT'
+   r.Gems.Text=tostring(q.Gems)
+   r.Edge.Color=complete and not q.Claimed and not q.Blocked and GOLD or Theme.Colors.Line;r.Row.BackgroundColor3=q.Claimed and Theme.Colors.Inset or Theme.Colors.Card
+   if complete and not q.Claimed and not q.Blocked then pulse(r.Claim.Pulse,'Scale',1,1.06)end
+   if not complete and not q.Blocked then r.Done.Visible=false end
   end
  end
  layout()

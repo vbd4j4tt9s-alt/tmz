@@ -121,7 +121,6 @@ local function runServer()
 	local gamePasses=require(modules.GamePassService).new(playerData,baseService,chestService)
     local premium=require(modules.PremiumService).new(playerData,chestService,gamePasses)
     local social=require(modules.SocialService).new(playerData,notifications):Start() -- R140: friend boost, plant-ready notifications, daily rollover
-    local mystery=require(modules.MysteryPackService).new(Config,playerData,baseService,chestService,notifications,mapService):Start() -- R141: daily mystery pack pedestal
 	require(modules.MovementGuard).Start(Config,playerData,baseService)
 	startupPhase = "connecting chase and training"
 	baseService:SetBusyChecker(function(player)
@@ -135,6 +134,7 @@ local function runServer()
     require(ReplicatedStorage.GardenTypography).Apply(mapService.MapRoot)
 	startupPhase = "starting ChaseService"
 	chaseService:Start()
+    require(modules.KeyboardServer143).Start(mapService,chaseService) -- R142: after all layout and keeper initialization
 	stormService:Start()
 	-- R122: shovel holes on the track (only pack carriers fall in).
 	local TrackHoleService = loadModule("TrackHoleService", {"new","Start","Request","Step","ClearAll","CleanupPlayer"})
@@ -152,7 +152,7 @@ local function runServer()
 	local treadmillBonus = construct("TreadmillBonusService", TreadmillBonusService.new, Config, playerData, baseService, chestService, notifications)
 	treadmillBonus:Start()
 	-- R123: owner test commands reach these services through the chase service (ctx.Chase).
-	chaseService.TrackHoles=trackHoles;chaseService.Gifts=gifts;chaseService.TreadmillBonus=treadmillBonus;chaseService.Mystery=mystery
+	chaseService.TrackHoles=trackHoles;chaseService.Gifts=gifts;chaseService.TreadmillBonus=treadmillBonus
 	startupPhase = "starting autosave and resetting field"
 	playerData:StartAutosave()
 	mapService:ResetCourse()
@@ -210,7 +210,6 @@ local function runServer()
         task.spawn(function()gifts:Recover(player)end)
         treadmillBonus:Setup(player)
         social:Setup(player)
-        mystery:Setup(player)
 		if player.Character then
 			task.spawn(setupCharacter, player.Character)
 		end
@@ -228,7 +227,6 @@ local function runServer()
         treadmillBonus:Cleanup(player)
         premium:Cleanup(player)
         social:Leaving(player) -- (reads the garden, so before the profile is finalized; never yields)
-        mystery:Leaving(player)
 		playerData:FinalizePlayer(player, "PlayerRemoving")
 		trackHoles:CleanupPlayer(player)
 		chaseService:CleanupPlayer(player)

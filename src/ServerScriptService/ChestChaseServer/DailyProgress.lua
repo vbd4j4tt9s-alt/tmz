@@ -1,18 +1,59 @@
--- R140 (owner): weekly login rewards (day 7 = a Mech pack) and daily quests (Gems each: DailyRewards.QuestGems), saved in the premium
--- profile as Daily={Login={Step,Day},Quests={Day,Progress,Claimed}}. Every change here is a non-yielding profile
--- transaction, so a claim can never pay twice. The numbers live in ReplicatedStorage.DailyRewards.
+-- R141: daily claims stay in the existing Premium.Daily profile. Grants and
+-- claim markers commit without yielding, using existing inventory/currency APIs.
+-- R140 claimed quests retain their flags and count as 5 gems for today's cap.
 local RS=game:GetService('ReplicatedStorage')
 local D=require(RS.DailyRewards)
+local PackRules=require(RS.SeedPackRules)
+local PackRandom=Random.new() -- server only; no client reward/roll input
 local T={}
 function T.Attach(Data)
  local function today()return D.Day(os.time())end
+ -- A downstream notification hook can throw after an existing grant API commits.
+ -- Recognize the exact one appended reward so retry cannot duplicate that grant.
+ -- Dependencies must remain non-yielding, like the existing R140 claim contract.
+ function Data:QueueDailyGems(player,amount)
+  local garden=self.Gardens[player]
+  if not garden then return false,'YOUR GARDEN IS LOADING'end
+  local before=#(garden.PendingSales or{})
+  local okay,result,why=pcall(self.QueueCurrency,self,player,amount,'Gems')
+  local pending=garden.PendingSales or{};local receipt=pending[before+1]
+  if #pending==before+1 and type(receipt)=='table'and type(receipt.Id)=='string'and receipt.Currency=='Gems'and receipt.Amount==amount then
+   return true
+  end
+  if not okay then warn('[R141 daily gems] '..tostring(result));return false,'GEMS COULD NOT BE ADDED; PLEASE RETRY'end
+  return false,why or 'GEMS COULD NOT BE ADDED; PLEASE RETRY'
+ end
+ function Data:GrantDailyPack(player,mech)
+  local records=self:GetChestRecords(player);local before=#records
+  if before>=self.Config.MaxSavedChests then return nil,'MAKE ROOM FOR 1 PACK'end
+  local pack
+  if not mech then
+   local stage=D.SeedPackStages[PackRandom:NextInteger(1,#D.SeedPackStages)]
+   local variant=PackRules.RollVariant(PackRandom:NextNumber())
+   if not D.SeedPackVariants[variant]or type(self.Config.SeedCatalogByStage)~='table'or not self.Config.SeedCatalogByStage[stage]then return nil,'DAILY PACK POOL IS UNAVAILABLE'end
+   pack={Stage=stage,BagVariant=variant,PackSize=PackRules.RollPackSize(PackRandom:NextNumber()),PackMutation='None'}
+  end
+  local okay,result,why=pcall(function()
+   if mech then return self:GrantMechPacks(player,false,1)end
+   return self:AddChest(player,pack) -- no paid flag, no added luck/pity roll
+  end)
+  local added=records[before+1]
+  local expectedStage=mech and 8 or pack.Stage
+  local expectedVariant=mech and 'MechLimited'or pack.BagVariant
+  if #records==before+1 and type(added)=='table'and type(added.Id)=='string'and added.Kind=='Pack'and added.Stage==expectedStage and added.BagVariant==expectedVariant then
+   -- Inventory is the commit point, including a throw in a later display hook.
+   return added
+  end
+  if not okay then warn('[R141 daily pack] '..tostring(result));return nil,'PACK COULD NOT BE ADDED; PLEASE RETRY'end
+  return nil,why or 'PACK COULD NOT BE ADDED; PLEASE RETRY'
+ end
  function Data:DailyData(player)
   local premium=self:GetPremium(player)
   if type(premium.Daily)~='table'then premium.Daily={}end
   local daily=premium.Daily;local day=today()
   daily.Login=D.ReadLogin(daily.Login)
   local quests=D.ReadQuests(daily.Quests,day,player.UserId)
-  daily.Quests={Day=quests.Day,Progress=quests.Progress,Claimed=quests.Claimed}
+  daily.Quests={Day=quests.Day,Progress=quests.Progress,Claimed=quests.Claimed,RewardVersion=quests.RewardVersion,GemsGranted=quests.GemsGranted}
   return daily,quests,day
  end
  -- Attributes the HUD badge and the panel read: a login claim waiting, quests ready to claim, the day they are for.
@@ -27,31 +68,22 @@ function T.Attach(Data)
   if not self:IsLoaded(player)then return {Success=false,Message='YOUR DATA IS LOADING'}end
   local daily,quests,day=self:DailyData(player);local login=D.LoginStatus(daily.Login,day);local rows={}
   for i,q in ipairs(quests.Keys)do local spec=D.Quests[q]
-   rows[i]={Key=spec.Key,Text=spec.Text,Icon=spec.Icon,Goal=spec.Goal,Progress=quests.Progress[i],Claimed=quests.Claimed[i],Gems=D.QuestGems}
+   rows[i]={Key=spec.Key,Text=spec.Text,Icon=spec.Icon,Goal=spec.Goal,Progress=quests.Progress[i],Claimed=quests.Claimed[i],Gems=D.QuestGems,Blocked=not quests.Claimed[i]and D.QuestBlocked(quests)}
   end
-  return {Success=true,Login=login,Quests=rows,ResetIn=D.SecondsLeft(os.time()),Day=day}
+  return {Success=true,Login=login,Quests=rows,ResetIn=D.SecondsLeft(os.time()),Day=day,QuestGemsGranted=quests.GemsGranted,QuestGemCap=D.QuestGemCap}
  end
  function Data:ClaimDailyLogin(player)
   if not self:IsLoaded(player)then return false,'YOUR DATA IS LOADING'end
+  if not self.CanSave[player]then return false,'REWARDS ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE'end
   local daily,_,day=self:DailyData(player);local login=D.LoginStatus(daily.Login,day)
   if not login.Ready then return false,'COME BACK TOMORROW FOR DAY '..(login.Claimed%#D.Login+1)end
   local reward=D.Login[login.Next];local message
-  if reward.MechPack then
-   local records,why=self:GrantMechPacks(player,false,reward.MechPack)
-   if not records then return false,why end
-   message='🤖 FREE MECH PACK! Check your Bag!'
-  elseif reward.Pack then
-   -- R141: a random seed pack, rolled like a treadmill bonus roll (an earned pack: it goes through the size luck).
-   local Bonus=require(RS.TreadmillBonusRules);local PackRules=require(RS.SeedPackRules)
-   self.DailyRandom=self.DailyRandom or Random.new()
-   local pick=Bonus.RollPack(Bonus.PoolStages(self.Config.TreadmillTiers,self:GetTreadmillData(player).Tier),function()return self.DailyRandom:NextNumber()end)
-   if not pick then return false,'TRY AGAIN'end
-   local record,why=self:AddChest(player,{Stage=pick.Stage,BagVariant=pick.Variant,PackSize=1,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion},{Luck=true})
+  if reward.SeedPack or reward.MechPack then
+   local record,why=self:GrantDailyPack(player,reward.MechPack~=nil)
    if not record then return false,why end
-   local tier=PackRules.GetPackTier(pick.Variant)
-   message='🎒 '..tier.Name..' '..PackRules.PackLabel(pick.Stage,pick.Variant,record.PackSize,'None')..'! Check your Bag!'
+   message=reward.MechPack and '🤖 FREE MECH PACK! Check your Bag!'or '🎒 RANDOM SEED PACK! Check your Bag!'
   else
-   local okay,why=self:QueueCurrency(player,reward.Gems,'Gems');if not okay then return false,why end
+   local okay,why=self:QueueDailyGems(player,reward.Gems);if not okay then return false,why end
    message='Collect your Gems.'
   end
   daily.Login={Step=login.Next,Day=day}
@@ -60,12 +92,15 @@ function T.Attach(Data)
  end
  function Data:ClaimDailyQuest(player,index)
   if not self:IsLoaded(player)then return false,'YOUR DATA IS LOADING'end
+  if not self.CanSave[player]then return false,'REWARDS ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE'end
   local daily,quests=self:DailyData(player)
   if type(index)~='number'or index%1~=0 or not quests.Keys[index]then return false,'INVALID QUEST'end
   if quests.Claimed[index]then return false,'ALREADY CLAIMED'end
   if quests.Progress[index]<D.Quests[quests.Keys[index]].Goal then return false,'FINISH THE QUEST FIRST'end
-  local okay,why=self:QueueCurrency(player,D.QuestGems,'Gems');if not okay then return false,why end
+  if D.QuestBlocked(quests)then return false,'DAILY QUEST GEM LIMIT REACHED; TRY AFTER THE UTC RESET'end
+  local okay,why=self:QueueDailyGems(player,D.QuestGems);if not okay then return false,why end
   daily.Quests.Claimed[index]=true
+  daily.Quests.GemsGranted=quests.GemsGranted+D.QuestGems
   self:MarkDirty(player);self:QueueGardenSave(player);self:PublishDaily(player)
   return true,'Collect your Gems.'
  end

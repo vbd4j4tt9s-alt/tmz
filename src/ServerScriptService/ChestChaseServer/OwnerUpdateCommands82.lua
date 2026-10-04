@@ -3,7 +3,7 @@ local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Packs=require(RS.SeedPackRules);local T=require(RS.BalanceValues81)
 local State=require(script.Parent.OwnerTestState82)
-local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true,daily=true,mystery=true}}
+local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true,daily=true}}
 local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8}
 local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary'}
 local function integer(s,lo,hi)local n=tonumber(s);return n and n==n and n%1==0 and n>=lo and n<=hi and n or nil end
@@ -168,20 +168,6 @@ function X.Execute(ctx,p,action,a)
   local state=data:DailyState(p);local rows={}
   for _,q in ipairs(state.Quests)do rows[#rows+1]=q.Text..' '..q.Progress..'/'..q.Goal..(q.Claimed and' ✓'or'')end
   return true,p.Name..': login day '..state.Login.Claimed..'/7 claimed'..(state.Login.Ready and(', day '..state.Login.Next..' ready')or', next tomorrow')..' | '..table.concat(rows,' | ')..' | new day in '..D.Countdown(state.ResetIn)
- elseif action=='mystery'then
-  -- R141 owner test of the base's mystery pack without waiting 15 minutes or for midnight UTC:
-  -- mystery [@name] | mystery ready (unlocks in 3 s) | mystery next (a new day) | mystery reset.
-  local svc=ctx.Chase and ctx.Chase.Mystery;if not svc then return false,'The mystery pack service is not running.'end
-  local M=require(RS.MysteryPackRules);local sub=tostring(a[1]or''):lower()
-  if #a>1 or(sub~=''and sub~='ready'and sub~='next'and sub~='reset')then return false,'Use mystery [ready|next|reset] @username.'end
-  local premium=data:GetPremium(p)
-  if sub=='ready'then local st=svc:State(p);if st.Claimed then st.Claimed=false;st.Stage=nil;st.Variant=nil end;st.Seconds=M.UnlockSeconds-3
-  elseif sub=='next'then local st=svc:State(p);st.Day=st.Day-1;premium.Mystery=st
-  elseif sub=='reset'then premium.Mystery=nil end
-  if sub~=''then svc:Publish(p,true);save(ctx,p)end
-  local st=svc:State(p)
-  local status=st.Claimed and'taken today'or M.Unlocked(st)and('ready: '..st.Variant..' stage '..st.Stage)or('locked, '..M.Clock(M.Left(st))..' to go')
-  return true,p.Name..': mystery pack '..status..' | pedestal '..(svc.Owner[p]and'in their base'or'not assigned')
  elseif action=='refreshcycle'then
   local cycle=integer(a[1],1,1000000);if #a~=1 or not cycle then return false,'Use refreshcycle <completed reset to test>.'end
   if ctx.Map.Refreshing then return false,'Refresh already running.'end

@@ -1,16 +1,13 @@
--- R140 (owner: "daily login rewards, it will be per week and at the end players get 1 mech pack ... daily quests like
--- steal 3 packs, simple as that, that quest gives 5 gems ... speed boost for friends in the server"): the numbers and
--- the pure rules, shared by the server (DailyProgress, SocialService) and the client (DailyRewardsClient).
--- Days are UTC days, so everyone's new day starts at the same moment.
+-- R141: server-authoritative weekly login rewards and 2-gem daily quests.
+-- UTC days; missed days pause the week. Existing claims are never replaced.
 local D={}
 -- One week of login rewards: one claim per day; after day 7 the week starts again at day 1.
--- R141 (owner: "day 5 and 6 can be 2 and 3 gems, then for day 1 to 4 it is a random seed pack"): Pack = one random
--- seed pack, rolled like a treadmill bonus roll (a biome your treadmills unlock, the bonus roll's rarity odds).
-D.Login={{Pack=1},{Pack=1},{Pack=1},{Pack=1},{Gems=2},{Gems=3},{MechPack=1}}
+D.Login={{SeedPack=1},{SeedPack=1},{SeedPack=1},{SeedPack=1},{Gems=2},{Gems=3},{MechPack=1}}
+D.SeedPackStages={1,2,3,4,5,6,7}
+D.SeedPackVariants={Pack01=true,Pack02=true,Pack03=true,Pack04=true,Pack05=true,Pack06=true}
 -- false: a missed day only pauses the week (you continue where you left off). true: a missed day restarts it at day 1.
 D.ResetIfMissed=false
--- R141 (owner: "daily quests gems are reduced to a max of 6 gems daily"): 3 quests x 2 Gems.
-D.QuestGems=2;D.QuestsPerDay=3
+D.QuestGems=2;D.QuestsPerDay=3;D.QuestGemCap=6;D.RewardVersion=141
 -- Quest 1 is always the steal quest; the other two are picked from the rest, fixed for each player and day.
 D.Quests={
  {Key='Steal',Goal=3,Text='Steal 3 packs',Icon='🎒'},
@@ -48,17 +45,27 @@ end
 -- Saved quest state for one day: which quests, how far, which were claimed. Another day starts fresh.
 function D.ReadQuests(v,day,userId)
  local keys=D.QuestKeys(userId,day)
- local fresh={Day=day,Keys=keys,Progress={},Claimed={}}
+ local fresh={Day=day,Keys=keys,Progress={},Claimed={},RewardVersion=D.RewardVersion,GemsGranted=0}
  for i=1,#keys do fresh.Progress[i]=0;fresh.Claimed[i]=false end
- if type(v)~='table'or v.Day~=day or type(v.Progress)~='table'or type(v.Claimed)~='table'then return fresh end
+ if type(v)~='table'or v.Day~=day then return fresh end
+ local progress=type(v.Progress)=='table'and v.Progress or{}
+ local claimed=type(v.Claimed)=='table'and v.Claimed or{}
+ local count=0
  for i,q in ipairs(keys)do
-  local goal=D.Quests[q].Goal;local p=v.Progress[i]
+  local goal=D.Quests[q].Goal;local p=progress[i]
   fresh.Progress[i]=integer(p,0,goal)and p or 0
-  fresh.Claimed[i]=v.Claimed[i]==true and fresh.Progress[i]>=goal
+  fresh.Claimed[i]=claimed[i]==true
+  if fresh.Claimed[i]then count+=1 end
  end
+ -- Missing/old version: every preserved claim was worth 5 in R140. Conservative
+ -- accounting also covers an R141 -> R140 -> R141 code rollback that stripped fields.
+ local minimum=count*(v.RewardVersion==D.RewardVersion and D.QuestGems or 5)
+ fresh.GemsGranted=math.max(minimum,integer(v.GemsGranted,0,1e7)and v.GemsGranted or 0)
  return fresh
 end
+function D.QuestBlocked(state)return state.GemsGranted+D.QuestGems>D.QuestGemCap end
 function D.QuestsReady(state)
+ if D.QuestBlocked(state)then return 0 end
  local n=0;for i,q in ipairs(state.Keys)do if not state.Claimed[i]and state.Progress[i]>=D.Quests[q].Goal then n+=1 end end;return n
 end
 function D.FriendMultiplier(count)
@@ -66,8 +73,8 @@ function D.FriendMultiplier(count)
 end
 function D.MaxMultiplier()return 1+D.FriendBoostMaxFriends*D.FriendBoostPerFriend end
 function D.RewardText(reward)
+ if reward.SeedPack then return 'RANDOM PACK'end
  if reward.MechPack then return reward.MechPack==1 and'MECH PACK'or reward.MechPack..' MECH PACKS'end
- if reward.Pack then return reward.Pack==1 and'SEED PACK'or reward.Pack..' SEED PACKS'end
  return '+'..reward.Gems
 end
 function D.Countdown(seconds)

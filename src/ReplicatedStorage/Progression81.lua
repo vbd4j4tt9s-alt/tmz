@@ -17,18 +17,6 @@ local function curveSpeed(points,knots,tail,logarithmic)
  return last[2]
 end
 function R.Speed(points)return curveSpeed(points,T.PointCurve,T.SpeedTailPerDecade,true)end
--- R141: the fewest Speed points whose walk speed reaches `speed` (the inverse of R.Speed), as a number.
-function R.PointsFor(speed)
- local knots=T.PointCurve;speed=tonumber(speed)or 0
- if speed<=knots[1][2]then return 0 end
- for i=2,#knots do local a,b=knots[i-1],knots[i]
-  if speed<=b[2]then
-   local t=(speed-a[2])/(b[2]-a[2])
-   return math.ceil(a[1]>=2000000 and a[1]*(b[1]/a[1])^t or a[1]+(b[1]-a[1])*t)
-  end
- end
- local last=knots[#knots];return math.ceil(last[1]*10^((speed-last[2])/T.SpeedTailPerDecade))
-end
 function R.PointsAt(speed)
  if speed<=24 then return '0'end
  for i=2,#migrationCurve do
