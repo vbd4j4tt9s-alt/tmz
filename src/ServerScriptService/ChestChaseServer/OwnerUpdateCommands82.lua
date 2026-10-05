@@ -31,7 +31,10 @@ X.Actions.plantnotify=true
 X.Actions.packshape=true
 -- R151: hubtrees: the owner's studded tree models (HubTreeLoader151): which load route worked per id, scripts removed, each tier's plan.
 X.Actions.hubtrees=true
+-- R152: keepermodels [off|auto]: the baked rev 6 keeper models (KeeperMeshCommand152): bake status, which model each keeper shows, a switch back.
+X.Actions.keepermodels=true
 function X.Execute(ctx,p,action,a)
+ if action=='keepermodels'then return require(script.Parent.KeeperMeshCommand152).Execute(ctx,p,a)end
  if action=='hubtrees'then return require(script.Parent.HubTreeLoader151).Command(ctx,p,a)end
  if action=='rarepull'or action=='raresound'then return require(script.Parent.RarePullTestCommands).Execute(ctx,p,action,a)end
  if action=='plantnotify'then return require(script.Parent.SocialService).Command(ctx,p,a)end

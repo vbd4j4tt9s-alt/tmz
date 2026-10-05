@@ -110,8 +110,12 @@ local function rigScale(model,stage)
  local k=longest/ref;if math.abs(k-1)<.02 then return 1 end
  return math.clamp(k,.25,8)
 end
-function A.new(model,stage)
+-- R152: the baked rev 6 models (variant 'R152') carry the golem's rune and mushrooms, the snow keeper's spines and armour, the knight's
+-- shards and the colossus's cloud in their meshes; only the snake's rattle stays an accent on them.
+A.Kept152={[2]=true}
+function A.new(model,stage,variant)
  local specs,gear=A.Specs[stage],A.Gear[stage]
+ if variant=='R152'then gear=nil;if not A.Kept152[stage]then specs=nil end end
  if not specs and not gear then return nil end
  local folder=Instance.new('Folder');folder.Name='KeeperAccentsLocal'
  local k=rigScale(model,stage)

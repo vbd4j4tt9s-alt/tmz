@@ -200,8 +200,8 @@ function M.Apply(stage,frames,now,started,lead)
  return out
 end
 -- Client strike frames (replaces KeeperStrikeFrames.Frames on the client only); same idle base as the server.
-function M.Frames(stage,now,started,lead)
- return M.Apply(stage,Pose.Frames(stage,now,1,0,0,0,0,0),now,started,lead)
+function M.Frames(stage,now,started,lead,variant)
+ return M.Apply(stage,Pose.Frames(stage,now,1,0,0,0,0,0,variant),now,started,lead)
 end
 
 -- The Veiled One: rides VeiledKeeper81's joint chain (its K.Frames, used by the server, is unchanged).

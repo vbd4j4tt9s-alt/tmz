@@ -7,6 +7,8 @@ task.spawn(function()local ok,why=pcall(function()return require(RS:WaitForChild
 -- R151: the pack shape variations (PackShapes151) bake lazily at each design's first pack; loading the module now publishes ReplicatedStorage.PackShapeTemplates151 (the
 -- status and the owner's /test packshape switches) before any client looks for them.
 task.spawn(function()local ok,why=pcall(function()return require(RS:WaitForChild('PackShapes151'))end);if not ok then warn('[R151 pack shapes] '..tostring(why))end end)
+-- R152: the new keeper models bake alongside (KeeperMeshes152; a keeper keeps today's model until its own is ready, or if it fails).
+task.spawn(function()local ok,why=pcall(function()require(script.Parent:WaitForChild('ChestChaseServer'):WaitForChild('KeeperMeshes152')).Start()end);if not ok then warn('[R152 keeper models] '..tostring(why))end end)
 local ok,ready,errors=pcall(function()return require(RS:WaitForChild('ApprovedPlantMeshes')).Prepare()end)
 if not ok then warn('[R50 plants] '..tostring(ready))
 elseif not ready then

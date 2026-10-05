@@ -73,7 +73,10 @@ end
 function E:EnsureGuardian()
  if not self.Home or not self.Folder or not self.Folder.Parent then return nil end
  if not self.Guardian or not self.Guardian.Parent then
-  self.Guardian=Art.Build(self.Home,self.Folder)
+  -- R152: the baked rev 6 Darkened when its template is ready (KeeperMeshes152), else today's blocks; a spawn never waits for the bake.
+  local okMeshes,Meshes=pcall(require,script.Parent:FindFirstChild('KeeperMeshes152'))
+  local meshes=okMeshes and Meshes.Wanted(0)and Meshes.DarkenedParts()or nil
+  self.Guardian=Art.Build(self.Home,self.Folder,meshes)
   -- R141: The Darkened runs at a fixed speed; its label shows the Speed that outruns it.
   if self.Guardian then
    self.Guardian:SetAttribute('KeeperEscapeSpeed',require(game:GetService('ReplicatedStorage').RouteBalance83).EventSpeed)

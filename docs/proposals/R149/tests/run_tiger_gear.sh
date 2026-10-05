@@ -15,8 +15,12 @@ OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
 S=$REPO/src
 echo "== static checks"
 # Reach, contact, pose and rig data must be byte-identical to the base: the gear changes no hitbox and no animation.
-FROZEN="src/ReplicatedStorage/KeeperRigConfig.lua src/ReplicatedStorage/KeeperUpgradeData.lua src/ReplicatedStorage/BeastPose.lua src/ReplicatedStorage/KeeperAttackPose.lua src/ReplicatedStorage/KeeperSignatureStrike.lua src/ReplicatedStorage/KeeperStrikeFrames.lua src/ReplicatedStorage/KeeperCombat.lua src/ReplicatedStorage/KeeperPolish.lua src/ReplicatedStorage/KeeperUpgradePose.lua src/ReplicatedStorage/KeeperMotion.lua src/ServerScriptService/ChestChaseServer/KeeperContact.lua src/ServerScriptService/ChestChaseServer/ConcurrentKeeperService.lua src/ServerScriptService/ChestChaseServer/BeastModels.lua src/ServerScriptService/ChestChaseServer/KeeperUpgradeArt.lua"
-if git -C "$REPO" diff --quiet "$BASE" -- $FROZEN; then echo "ok: reach / contact / pose / rig modules unchanged against $BASE"; else echo "FAIL: a frozen keeper module changed:";git -C "$REPO" diff --name-only "$BASE" -- $FROZEN;exit 1; fi
+# R152 (the baked rev 6 keeper models) changed BeastPose, KeeperUpgradePose, KeeperStrikeFrames, KeeperSignatureStrike (an optional variant
+# argument: the new models' floor samples), KeeperContact (face / cosmetic parts never hit) and BeastModels (the baked build); with no variant
+# they give today's frames, contact parts and rigs exactly: docs/proposals/R152/tests/run_keepers.sh checks that against the base. The rest stay frozen here.
+FROZEN="src/ReplicatedStorage/KeeperRigConfig.lua src/ReplicatedStorage/KeeperUpgradeData.lua src/ReplicatedStorage/KeeperAttackPose.lua src/ReplicatedStorage/KeeperCombat.lua src/ReplicatedStorage/KeeperPolish.lua src/ReplicatedStorage/KeeperMotion.lua src/ServerScriptService/ChestChaseServer/ConcurrentKeeperService.lua src/ServerScriptService/ChestChaseServer/KeeperUpgradeArt.lua"
+if git -C "$REPO" diff --quiet "$BASE" -- $FROZEN; then echo "ok: reach / contact / pose / rig modules unchanged against $BASE (R152's variant-aware ones: run_keepers.sh)"; else echo "FAIL: a frozen keeper module changed:";git -C "$REPO" diff --name-only "$BASE" -- $FROZEN;exit 1; fi
+[ -f "$REPO/docs/proposals/R152/tests/run_keepers.sh" ] || { echo "FAIL: R152 changed keeper pose / contact modules without its legacy-equivalence suite";exit 1; }
 # R151 (pack shapes): ChaseService passes a carried / dropped pack's chip-bag shape (chest.PackShape) to the three places that build the pack. Those three arguments are the only
 # difference allowed: with them taken out the file is byte-identical to the base (no chase, hit, reach or keeper line changed).
 CS=src/ServerScriptService/ChestChaseServer/ChaseService.lua
