@@ -21,7 +21,7 @@ local function rootPart(model,origin,weldRoot)
     return p
 end
 -- Solid server-authored geometry stays visible independently of client animation.
--- R151: `defaultShape` (true): the pouch is the design's own mesh with no shape variation (the Index's pictures); anything else is the pack as it is in the game.
+-- R151: `defaultShape` (true): the pouch is the design's own mesh with no shape variation (a picture flagged DefaultPackShape); anything else is the pack as it is in the game.
 function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation,displaySize,defaultShape)
     local variant=Rules.GetVariant(variantKey);local theme=Rules.GetTheme(stage)
     packSize=Rules.SanitizePackSize(packSize);mutation=Rules.MutationKey(mutation)

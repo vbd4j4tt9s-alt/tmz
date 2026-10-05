@@ -1,13 +1,15 @@
 --!nocheck
--- R151 (owner: "R151 adds random chip-bag shape variations per pack; the Index must not use them ... the Index always requests the default shape"): the Index's pack pictures on the Roblox mock with
--- the REAL ItemPictures, SeedPackVisuals, SeedPackRenderer, VerityPackArt, VerityPouch151, PackShapes151 and IndexPacksView151, the REAL pack templates of the owner's place (42 designs,
--- pack_templates.luau) and the EditableMesh mock (pouch_mock.luau), with the shape variations ON (auto: every design has its own).
---  1. the 42 designs  a picture asked for with the Index's proxy (IndexPacksView151.PictureProxy: DefaultPackShape) is built from the design's OWN mesh: every MeshPart has the template's MeshId and Size and
---                     is not a baked mesh, no variation was requested (PackShapes151 stays Idle for every design), no EditableMesh was created; the same design asked for as a hotbar / Bag picture IS reshaped (the control)
---  2. modes           the owner's /test packshape (off, auto, forced 1..6) changes nothing in an Index picture; it changes the other pictures
+-- R151 (owner: "... shapes for visual representation ... can just use the default pack shape", with the R151 shape variations in the game): the DEFAULT-pouch plumbing of the pack pictures on the Roblox mock with
+-- the REAL ItemPictures, SeedPackVisuals, SeedPackRenderer, VerityPackArt, VerityPouch151 and PackShapes151, the REAL pack templates of the owner's place (42 designs, pack_templates.luau)
+-- and the EditableMesh mock (pouch_mock.luau), with the shape variations ON (auto: every design has its own). A picture whose proxy carries the attribute DefaultPackShape (nothing in the
+-- game sets it yet: a picture that must show the plain pouch, e.g. a catalogue or a shop, sets it) is the plain pouch; every other picture keeps its shape.
+--  1. the 42 designs  a picture asked for with a DefaultPackShape proxy is built from the design's OWN mesh: every MeshPart has the template's MeshId and Size and is not a baked mesh, no
+--                     variation was requested (PackShapes151 stays Idle for every design), no EditableMesh was created; the same design asked for as a hotbar / Bag picture IS reshaped (the control)
+--  2. modes           the owner's /test packshape (off, auto, forced 1..6) changes nothing in such a picture; it changes the other pictures
 --  3. the other packs the Void and the Mech pack share their one look with the hotbar (no second template)
---  4. Verity          the server's pouch carries Storm_02's variation; the client bakes its own plain copy for the Index (once, waits like any picture, the EditableMesh destroyed, every vertex colour white, no vertex
---                     moved); with the variations off the server's pouch is already plain (no client bake); a denied bake falls back to the server's pouch; the world's pack and the hotbar's picture keep the shaped one
+--  4. Verity          the server's pouch carries Storm_02's variation; the client bakes its own plain copy for a flagged picture (once, waits like any picture, the EditableMesh destroyed, every vertex
+--                     colour white, no vertex moved); with the variations off the server's pouch is already plain (no client bake); a denied bake falls back to the server's pouch; the world's pack
+--                     and the hotbar's picture keep the shaped one
 --  5. the build path  SeedPackVisuals.Bag(..., defaultShape) marks the bag; SeedPackRenderer never asks PackShapes151 for a marked bag; nothing else about a pack changes
 local H=require('./pack_world');local W,R,F=H.W,H.R,H.F;local V3,CF=R.Vector3.new,R.CFrame.new
 local Mock=require('./pouch_mock')(W)
@@ -19,7 +21,7 @@ local function server()Run.IsServer=function()return true end;Run.IsClient=funct
 local function client()Run.IsServer=function()return false end;Run.IsClient=function()return true end end
 server()
 local Shapes=W.module('PackShapes151');local Pouch=W.module('VerityPouch151');local Rules=H.Rules;local Visuals=H.Visuals
-local Pic=W.module('ItemPictures');local View=W.module('IndexPacksView151')
+local Pic=W.module('ItemPictures')
 local assets=W.RS.SeedPackMeshAssets
 for _,model in ipairs(assets:GetChildren())do for _,p in ipairs(model:GetChildren())do p.MeshSize=p.Size end end -- (the place's templates have a MeshSize; the generated ones do not)
 local function folder()return W.RS:FindFirstChild(Shapes.Folder)end
@@ -42,8 +44,8 @@ local function proxyOf(stage,variant,plain)
  if plain then f:SetAttribute('DefaultPackShape',true)end
  return f
 end
--- the Index's own proxy for a pack (what IndexPacksView151 hands ItemPictures)
-local function indexProxy(stage,variant)return View.PictureProxy({Stage=stage,Variant=variant})end
+-- a picture that must show the default pouch: the ordinary proxy, flagged DefaultPackShape
+local function indexProxy(stage,variant)return proxyOf(stage,variant,true)end
 -- how many vertices a baked mesh has moved from where the template put them (0 = the plain pouch, > 0 = a shape variation was applied)
 local function moved(mesh)if not mesh then return -1 end;local n=0;for i,p in ipairs(mesh._pos)do if(p-mesh._init[i]).Magnitude>1e-9 then n+=1 end end;return n end
 local DESIGNS={}
@@ -52,7 +54,7 @@ local function scaleOf(d)return Rules.GetVariant(d.Variant).BagScale*Rules.GetTh
 -- 1. the 42 designs, shape variations on --------------------------------------------------------------------------------------------------------------------
 do
  fresh();client()
- check(Shapes.Mode()=='auto','the shape variations are ON (auto: every design has its own) while the Index pictures are made')
+ check(Shapes.Mode()=='auto','the shape variations are ON (auto: every design has its own) while the flagged pictures are made')
  local byKey={}
  for _,d in ipairs(DESIGNS)do local h=holder();byKey[d.Key]=h;Pic.Show(h,indexProxy(d.Stage,d.Variant),2)end
  frames(400)
@@ -71,7 +73,7 @@ do
   end
   if Shapes.State(d.Key)~='Idle'then requested+=1 end
  end
- check(drawn==42,'all 42 Index pictures are drawn ('..drawn..')')
+ check(drawn==42,'all 42 flagged pictures are drawn ('..drawn..')')
  check(own==42,'every one is built from the design\'s OWN mesh parts: the template\'s MeshId and Size x the pack scale, part for part ('..own..' of 42)')
  check(baked==0,'no picture part is a baked / reshaped mesh ('..baked..')')
  check(Mock.created==0 and Mock.calls==0 and Mock.baked==0,'no EditableMesh was created, none loaded, nothing baked ('..Mock.created..' / '..Mock.calls..' / '..Mock.baked..')')
@@ -93,7 +95,7 @@ do
   local base=Mock.created -- (the owner's command also re-bakes the Verity pouch: not ours)
   local h=holder();Pic.Show(h,indexProxy(1,'Pack03'),2);frames(150)
   local m=view(h)and meshes(view(h))[1]
-  check(m and m.MeshId==tpl.MeshId and m.Baked==nil and near(m.Size.X,want.X,1e-5)and near(m.Size.Z,want.Z,1e-5),'/test packshape '..tostring(mode)..': the Index\'s Forest_03 is still the design\'s own mesh (MeshId '..tostring(m and m.MeshId)..')')
+  check(m and m.MeshId==tpl.MeshId and m.Baked==nil and near(m.Size.X,want.X,1e-5)and near(m.Size.Z,want.Z,1e-5),'/test packshape '..tostring(mode)..': the flagged Forest_03 is still the design\'s own mesh (MeshId '..tostring(m and m.MeshId)..')')
   check(Mock.created==base and Shapes.Status().Requested==0 and Shapes.Status().Pending==0,'... nothing was baked for it and PackShapes151 was not asked for the design ('..(Mock.created-base)..' baked, '..Shapes.Status().Requested..' asked)')
  end
  -- the other pictures do follow the mode (so the test above is not vacuous)
@@ -109,8 +111,8 @@ do
  local a,b,c,d=holder(),holder(),holder(),holder()
  Pic.Show(a,indexProxy(7,'EclipseReliquary'),2);Pic.Show(b,proxyOf(7,'EclipseReliquary',false),1);Pic.Show(c,indexProxy(8,'MechLimited'),2);Pic.Show(d,proxyOf(8,'MechLimited',false),1)
  frames(200)
- check(view(a)and view(b)and view(c)and view(d),'the Void and the Mech pack are drawn in the Index and in the hotbar')
- check(Pic.Key(indexProxy(7,'EclipseReliquary'))==Pic.Key(proxyOf(7,'EclipseReliquary',false))and Pic.Key(indexProxy(8,'MechLimited'))==Pic.Key(proxyOf(8,'MechLimited',false)),'the Void and the Mech pack have no shape variation, so the Index and the hotbar share ONE look (one template, not two)')
+ check(view(a)and view(b)and view(c)and view(d),'the Void and the Mech pack are drawn flagged and in the hotbar')
+ check(Pic.Key(indexProxy(7,'EclipseReliquary'))==Pic.Key(proxyOf(7,'EclipseReliquary',false))and Pic.Key(indexProxy(8,'MechLimited'))==Pic.Key(proxyOf(8,'MechLimited',false)),'the Void and the Mech pack have no shape variation, so a flagged picture and the hotbar share ONE look (one template, not two)')
  check(Pic.Stats().Templates==2,'... two templates for the four pictures ('..Pic.Stats().Templates..')')
  check(Mock.created==0,'... and no mesh was baked for either')
 end
@@ -127,13 +129,13 @@ do
  local createdServer=Mock.created
  client();Mock.slow=true
  local h=holder();Pic.Show(h,indexProxy(7,VERITY),2);frames(150)
- check(view(h)==nil and Pouch.PlainState(KEY)=='Loading','the Index\'s Verity picture waits for the client\'s plain bake ("still loading", retried): no picture, nothing cached meanwhile')
+ check(view(h)==nil and Pouch.PlainState(KEY)=='Loading','the flagged Verity picture waits for the client\'s plain bake ("still loading", retried): no picture, nothing cached meanwhile')
  while Mock.resume()do end
  check(Pouch.PlainState(KEY)=='Ready','the plain bake finishes')
  frames(400)
  local plainMesh=Mock.meshes[#Mock.meshes]
  local m=pouchOf(h)
- check(m and m.Baked==plainMesh and plainMesh~=shapedMesh and moved(plainMesh)==0,'the Index\'s Verity pouch is the client\'s PLAIN mesh: no vertex moved ('..moved(plainMesh)..'), not the server\'s shaped one')
+ check(m and m.Baked==plainMesh and plainMesh~=shapedMesh and moved(plainMesh)==0,'the flagged Verity pouch is the client\'s PLAIN mesh: no vertex moved ('..moved(plainMesh)..'), not the server\'s shaped one')
  check(m and decals(m)==2 and m.Color.R==1 and m.Color.G==1 and m.Color.B==0,'... pure yellow with Verity\'s face as two Decals, like the pack in the game')
  check(Mock.created==createdServer+1 and Mock.alive==0,'the client made ONE EditableMesh for it and destroyed it ('..(Mock.created-createdServer)..' made, '..Mock.alive..' alive)')
  local plainModel=Pouch.PlainTemplate(KEY);check(plainModel and plainModel:GetAttribute('PackShape')==0 and plainModel:GetAttribute('Neutral')==true and plainModel.Parent==nil,'the plain copy is a neutral model with PackShape 0, kept in memory (not in the world)')
@@ -145,7 +147,7 @@ do
  -- the world's Verity pack and the hotbar's picture keep the shaped pouch
  server();local bag=H.ground(7,VERITY,1,'None');client()
  local wp;for _,p in ipairs(bag:GetDescendants())do if p.Name=='ApprovedMesh01'and p:IsA('MeshPart')then wp=p end end
- check(wp and wp.Baked==shapedMesh,'the Verity pack in the world is still the server\'s shaped pouch (the Index change touches no other pack)')
+ check(wp and wp.Baked==shapedMesh,'the Verity pack in the world is still the server\'s shaped pouch (the flag touches no other pack)')
  local h3=holder();Pic.Show(h3,proxyOf(7,VERITY,false),1);frames(300)
  local hm=pouchOf(h3);check(hm and hm.Baked==shapedMesh,'the hotbar\'s Verity picture is the shaped pouch too')
  Mock.slow=false
@@ -154,12 +156,12 @@ do
  local plainServer=Mock.meshes[#Mock.meshes];local before=Mock.created
  local h4=holder();Pic.Show(h4,indexProxy(7,VERITY),2);frames(300)
  local m4=pouchOf(h4)
- check(m4 and m4.Baked==plainServer and moved(plainServer)==0 and Mock.created==before and Pouch.PlainState(KEY)=='Ready','variations off: the server\'s pouch is plain already, the Index uses it, no client bake')
- -- a denied client bake: the Index keeps the server's pouch
+ check(m4 and m4.Baked==plainServer and moved(plainServer)==0 and Mock.created==before and Pouch.PlainState(KEY)=='Ready','variations off: the server\'s pouch is plain already, the flagged picture uses it, no client bake')
+ -- a denied client bake: a flagged picture keeps the server's pouch
  fresh();server();dropVerity();Pouch.Prepare();local shaped2=Mock.meshes[#Mock.meshes];client();Mock.mode='denied'
  local h5=holder();Pic.Show(h5,indexProxy(7,VERITY),2);frames(400)
  local m5=pouchOf(h5)
- check(Pouch.PlainState(KEY)=='Off'and m5 and m5.Baked==shaped2 and decals(m5)==2,'a denied bake: the plain state is Off and the Index shows the server\'s own pouch (still the real pouch, not the sachet) ('..tostring(Pouch.PlainState(KEY))..', picture '..tostring(m5~=nil)..', same mesh '..tostring(m5 and m5.Baked==shaped2)..')')
+ check(Pouch.PlainState(KEY)=='Off'and m5 and m5.Baked==shaped2 and decals(m5)==2,'a denied bake: the plain state is Off and the flagged picture shows the server\'s own pouch (still the real pouch, not the sachet) ('..tostring(Pouch.PlainState(KEY))..', picture '..tostring(m5~=nil)..', same mesh '..tostring(m5 and m5.Baked==shaped2)..')')
  Mock.mode='ok'
  -- no server pouch at all: the sachet, as before
  fresh();server();dropVerity();client()
@@ -181,10 +183,8 @@ do
  local mesh=function(b)local pg=b:FindFirstChild('PackGeometry');return pg and pg:FindFirstChild('ApprovedMesh01')end
  check(mesh(marked)and mesh(marked).MeshId==assets.Forest_04.ApprovedMesh01.MeshId and mesh(marked).Baked==nil,'the marked bag is the design\'s own mesh')
  Shapes.ForBuild=base
- -- the source of the Index never names a shape
+ -- the renderer's one door to the shape code
  local src=require('./rs_bundle')
- check(not src.IndexPacksView151:find('PackShapes151')and not src.IndexPackData151:find('PackShapes151'),'IndexPacksView151 / IndexPackData151 never mention PackShapes151: nothing for a variation to come in through')
- check(src.IndexPacksView151:find("SetAttribute%('DefaultPackShape',true%)")~=nil,'IndexPacksView151 marks every picture proxy DefaultPackShape')
  local _,n=src.SeedPackRenderer:gsub('PackShapes151','');check(n==2,'SeedPackRenderer still reaches PackShapes151 from the ordinary build only (the comment and the call: '..n..' mentions)')
 end
 gui:Destroy()

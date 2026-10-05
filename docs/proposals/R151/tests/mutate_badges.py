@@ -1,6 +1,6 @@
-"""R151: breaks a COPY of the Index PACKS / badge code in one specific way, so run_index_packs.sh --mutations can prove the suites notice it.
-Usage: python3 mutate_indexpacks.py <src dir (a COPY: it is edited in place)> <mutation name | list | suite NAME>
-`suite NAME` prints which suite is meant to catch it (data, ui, shape, badge, daily)."""
+"""R151: breaks a COPY of the notification badge / default pack shape code in one specific way, so run_badges.sh --mutations can prove the suites notice it.
+Usage: python3 mutate_badges.py <src dir (a COPY: it is edited in place)> <mutation name | list | suite NAME>
+`suite NAME` prints which suite is meant to catch it (shape, badge, daily)."""
 import os
 import sys
 
@@ -36,26 +36,14 @@ M = {
     'reduced_ignored': ('badge', 'NotifyBadge151.lua', 'if Gui.ReducedMotionEnabled then\n  local scale=b:FindFirstChildOfClass', 'if false then\n  local scale=b:FindFirstChildOfClass'),
     # switching Reduced Motion on does not stop the pulses that are running
     'reduced_keeps_pulse': ('badge', 'NotifyBadge151.lua', 'if Gui.ReducedMotionEnabled then for badge in pairs(pulses)do stop(badge)end end', 'if false then for badge in pairs(pulses)do stop(badge)end end'),
-    # the Index's pictures are not marked DefaultPackShape
-    'no_default_flag': ('shape', 'IndexPacksView151.lua', "f:SetAttribute('DefaultPackShape',true)", "f:SetAttribute('DefaultPackShape',false)"),
+    # SeedPackVisuals.Bag does not mark the bag DefaultPackShape (the flag is lost between the picture and the renderer)
+    'no_default_flag': ('shape', 'SeedPackVisuals.lua', "if defaultShape==true then m:SetAttribute('DefaultPackShape',true) end", "if false then m:SetAttribute('DefaultPackShape',true) end"),
     # SeedPackRenderer asks for a shape variation even for a marked bag
     'renderer_ignores_flag': ('shape', 'SeedPackRenderer.lua', "bag:GetAttribute('DefaultPackShape')~=true and require(script.Parent.PackShapes151).ForBuild(key) or nil", 'require(script.Parent.PackShapes151).ForBuild(key)'),
     # the Index's look has no key of its own: it shares the hotbar's shaped template
     'no_plain_key': ('shape', 'ItemPictures.lua', "..(plain and'|Plain'or'')", "..''"),
     # the Verity pack's Index picture is the server's shaped pouch
     'verity_ignores_flag': ('shape', 'VerityPackArt.lua', "if bag:GetAttribute('DefaultPackShape')==true then", 'if false then'),
-    # the odds are the boosted ones (a hidden mechanic leaks into the list)
-    'boosted_odds': ('data', 'IndexPackData151.lua', 'local odds=Rules.SeedOdds(cfg,stage,variant,1,version) -- luck 1', 'local odds=Rules.SeedOdds(cfg,stage,variant,1,version,2) -- luck 1'),
-    # the spawn rates typed in instead of read from the weights
-    'spawn_typed_in': ('data', 'IndexPackData151.lua', 'spawn[key]=100*Rules.Variants[key].SpawnWeight/weight', "spawn[key]=({Pack01=40,Pack02=30,Pack03=15,Pack04=8,Pack05=5,Pack06=2})[key]"),
-    # a spawn rate in percent, not 1/N
-    'percent_text': ('data', 'IndexPackData151.lua', 'Spawn={Percent=spawn[variant],Text=Odds.Format(spawn[variant])', 'Spawn={Percent=spawn[variant],Text=Odds.Percent(spawn[variant])'),
-    # a word about a hidden mechanic in a card
-    'pity_text': ('data', 'IndexPackData151.lua', "Of='of packs on its track'", "Of='of packs on its track (pity helps)'"),
-    # a legacy sack listed
-    'legacy_listed': ('data', 'IndexPackData151.lua', 'for _,variant in ipairs(Rules.VariantOrder)do\n   local e=track(', "for _,variant in ipairs({'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06','Small'})do\n   local e=track("),
-    # every card is built at once
-    'eager_build': ('ui', 'IndexPacksView151.lua', 'PerPass=3,Margin=160', 'PerPass=3,Margin=1e9'),
 }
 if name == 'list':
     print(' '.join(M))

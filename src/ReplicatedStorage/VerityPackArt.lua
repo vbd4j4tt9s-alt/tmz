@@ -158,7 +158,7 @@ function A.Build(bag,isValid)
   -- the picture never settles on the wrong shape. A server (a held pack) does not wait: it uses the sachet for that one pack.
   if Run:IsClient()and not Run:IsServer()then error('Verity pouch is still loading',0)end
  elseif state=='Ready'then
-  -- R151: a bag flagged DefaultPackShape (the Index's picture) wants the pouch WITHOUT Storm_02's shape variation: the client bakes its own plain copy (VerityPouch151.RequestPlain), a
+  -- R151: a bag flagged DefaultPackShape (a picture that must show the plain pouch) wants the pouch WITHOUT Storm_02's shape variation: the client bakes its own plain copy (VerityPouch151.RequestPlain), a
   -- picture waits for it like it waits for the server's, and if that bake cannot be done the picture uses the pouch the server baked (the pack as it is in the game).
   local template
   if bag:GetAttribute('DefaultPackShape')==true then

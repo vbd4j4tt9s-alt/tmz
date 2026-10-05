@@ -164,8 +164,8 @@ function M.Rebake()
  f:SetAttribute('Finished',false);f:SetAttribute('Ready',false);f:SetAttribute('Failed',false);f:SetAttribute('Key',nil);f:SetAttribute('Reason',nil)
  return M.Prepare()
 end
--- R151 (owner: the Index draws every pack in the DEFAULT shape): the pouch the server bakes above carries Storm_02's shape variation (the Model's PackShape attribute is the
--- variation's id, 0 = none). The Index's Verity picture (a bag flagged DefaultPackShape, VerityPackArt) wants the plain pouch, so a CLIENT bakes its own copy of the
+-- R151 (owner: pictures can "just use the default pack shape"): the pouch the server bakes above carries Storm_02's shape variation (the Model's PackShape attribute is the
+-- variation's id, 0 = none). A Verity picture flagged DefaultPackShape (VerityPackArt) wants the plain pouch, so a CLIENT bakes its own copy of the
 -- neutral pouch WITHOUT the variation, once, the first time something asks (the same bake as the server's, run by `bake` with no shape). Nothing here runs unless a
 -- plain pouch is asked for, and nothing the server does changes. PlainState: 'Ready' (the server's pouch already is plain, or the client's copy is baked), 'Loading'
 -- (being baked), 'Idle' (not asked yet: RequestPlain starts it), 'Off' (this server bakes no pouch / the bake failed: the caller uses the server's pouch, as before).
@@ -206,7 +206,7 @@ function M.RequestPlain(key)
   if job.Cancelled then if ok and result then pcall(function()result:Destroy()end)end;return end
   plainJob=nil
   if ok then plain={Key=key,Model=result}
-  else plainFailure={Key=key,Reason=tostring(result):match('^[^\n]*')or'?'};if Run:IsStudio()then warn('[R151 Verity pouch] the Index keeps the in-game pouch: '..plainFailure.Reason)end end
+  else plainFailure={Key=key,Reason=tostring(result):match('^[^\n]*')or'?'};if Run:IsStudio()then warn('[R151 Verity pouch] a plain-pouch picture keeps the in-game pouch: '..plainFailure.Reason)end end
  end)
  return M.PlainState(key)
 end

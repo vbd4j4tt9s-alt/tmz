@@ -32,7 +32,7 @@ function P.Key(tool)
  if not tool then return nil end
  if tool:GetAttribute('SeedPackTool')then
   local stage=tonumber(tool:GetAttribute('Stage'))or 1;local variant=tool:GetAttribute('BagVariant')or'Standard';local mutation=mutationKey(tool:GetAttribute('PackMutation'))
-  -- R151 (owner: the Index draws every pack in the DEFAULT shape, never a shape variation): a tool / proxy with DefaultPackShape asks for the plain pouch. Its own look (key
+  -- R151 (owner: pictures can "just use the default pack shape", never a shape variation): a tool / proxy with DefaultPackShape asks for the plain pouch (nothing sets it yet; a catalogue or shop picture would). Its own look (key
   -- suffix |Plain) for the designs the variations touch; the Void and the Mech pack have no variation, so they share the ordinary look (one template, not two).
   local plain=tool:GetAttribute('DefaultPackShape')==true and variant~='EclipseReliquary'and variant~='MechLimited'
   return table.concat({'Pack',stage,variant,mutation},'|')..(plain and'|Plain'or''),{Kind='Pack',Stage=stage,Variant=variant,Mutation=mutation,Plain=plain or nil}

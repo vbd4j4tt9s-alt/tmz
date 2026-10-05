@@ -1,9 +1,9 @@
 --!nocheck
 -- R151: the DAILY button's and DAILY tabs' red badges are the SAME component as the Index's (NotifyBadge151; DailyRewardsClient carried an identical copy of the R138 badge). The real TravelButtons +
--- DailyRewardsClient on the Roblox mock with the layout engine of layout_indexpacks.luau (the fake server of the R140 client test): the badge counts what is waiting ("3", "9+"), is the polished badge
+-- DailyRewardsClient on the Roblox mock with the layout engine of layout_badges.luau (the fake server of the R140 client test): the badge counts what is waiting ("3", "9+"), is the polished badge
 -- (revision 151, circle, gradient, ring, shadow, centred count), is not clipped by anything on nine screens, the tab dots sit inside their tabs, and Reduced Motion stops the pulse.
 local W=require('./world');local F=require('./fixtures');local R=W.R
-local L=require('./layout_indexpacks')(R)
+local L=require('./layout_badges')(R)
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
 local function near(a,b,tol)return type(a)=='number'and type(b)=='number'and math.abs(a-b)<=(tol or 1e-6)end

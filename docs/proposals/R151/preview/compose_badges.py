@@ -1,8 +1,8 @@
-"""R151 Index preview sheet: docs/proposals/R151/index_packs.png = the PACKS tab on a desktop and on a phone, and the notification badge before (R150) and after, zoomed.
-Usage: python3 compose_index_packs.py <scratch dir with the JSONs + pics/> <out png>
-Inputs (written by run_index_packs_preview.sh): desktop_top.json, desktop_special.json, phone_top.json, phone_open.json, badge_before.json / badge_after.json (JSON_NAV + JSON_GUI lines in
-badge_<x>.out), pics/Pic_<pack>.png. The GUI JSON is the REAL ChestIndex tree under the Roblox mock, drawn by the R137 renderer (render_index.py) with Pillow.
-APPROXIMATE: DejaVu Sans Bold stands in for Fredoka, no real font metrics, the pack pictures are three.js stand-ins (plain materials, the pouch meshes are rounded boxes), not Studio."""
+"""R151 badge preview sheet: docs/proposals/R151/index_badges.png = the Index (desktop and phone) as it opens, and the notification badge before (R150) and after, zoomed.
+Usage: python3 compose_badges.py <scratch dir with the JSONs> <out png>
+Inputs (written by run_badges_preview.sh): badge_<before|after>_nav.json and badge_<x>_gui.json (JSON_NAV + JSON_GUI of the 390x844 scene), desktop_after_gui.json (the 1280x1000 scene).
+The GUI JSON is the REAL ChestIndex tree under the Roblox mock, drawn by the R137 renderer (render_index.py) with Pillow.
+APPROXIMATE: DejaVu Sans Bold stands in for Fredoka, no real font metrics. Not a Studio screenshot."""
 import json
 import os
 import subprocess
@@ -29,7 +29,7 @@ open(FIXED, 'w', encoding='utf-8').write(open(RENDER, encoding='utf-8').read().r
 
 
 def render(json_file, png, k, crop=None):
-    env = dict(os.environ, IMGDIR=os.path.join(S, 'pics'))
+    env = dict(os.environ, IMGDIR=S)
     args = [sys.executable, FIXED, json_file, png, str(k), '%d,%d,%d' % BG]
     if crop:
         args.append(','.join(str(v) for v in crop))
@@ -56,10 +56,10 @@ def clean(path):  # the renderer's font has no emoji
     return out
 
 
-# --- the PACKS tab -------------------------------------------------------------------------------------------------------------------------------------------
+# --- the Index as it opens (the badge's place in it) ---------------------------------------------------------------------------------------------------------
 shots = {}
-for name, k in (('desktop_top', 1.0), ('desktop_special', 1.0), ('phone_top', 1.45), ('phone_open', 1.45)):
-    path = os.path.join(S, name + '.json')
+for name, src, k in (('desktop', 'desktop_after_gui.json', 1.0), ('phone', 'badge_after_gui.json', 1.45)):
+    path = os.path.join(S, src)
     shots[name] = render(clean(path), os.path.join(S, name + '.png'), k, [v for v in panel_crop(path)])
 
 # --- the badge, before and after --------------------------------------------------------------------------------------------------------------------------------------
@@ -100,29 +100,22 @@ after_a, after_b, after_c = badge_crops('after')
 
 # --- the sheet ------------------------------------------------------------------------------------------------------------------------------------------------------------
 pad = 28
-left_w = shots['desktop_top'].width
-right_w = shots['phone_top'].width + shots['phone_open'].width + 20
-col_h = max(shots['desktop_top'].height + shots['desktop_special'].height + 90, shots['phone_top'].height + 60)
 badge_w = before_a.width + after_a.width + before_b.width + after_b.width + before_c.width + after_c.width + 5 * 24 + 60
-W_ = max(pad * 2 + left_w + 60 + right_w, badge_w + pad * 2)
-H_ = 150 + col_h + 90 + max(before_a.height, before_b.height, before_c.height) + 150
+top_w = shots['desktop'].width + 40 + shots['phone'].width
+top_h = max(shots['desktop'].height, shots['phone'].height)
+W_ = max(pad * 2 + top_w, badge_w + pad * 2)
+H_ = 110 + 30 + top_h + 36 + 70 + max(before_a.height, before_b.height, before_c.height) + 60
 sheet = Image.new('RGB', (W_, H_), (12, 16, 28))
 d = ImageDraw.Draw(sheet)
-d.text((pad, 18), 'R151: the Index PACKS tab and the polished notification badge', font=font(34), fill=(255, 226, 96))
-d.text((pad, 66), 'APPROXIMATE: the real ChestIndex tree under the Roblox mock, drawn with Pillow (DejaVu stands in for Fredoka); the pack pictures are three.js stand-ins of the DEFAULT pouch', font=font(17), fill=(205, 215, 240))
-d.text((pad, 92), '(plain materials, the pouch meshes are rounded boxes, no Roblox textures). Not a Studio screenshot.', font=font(17), fill=(205, 215, 240))
-y0 = 140
-d.text((pad, y0), 'DESKTOP 1280x1000: PACKS tab, top of the list', font=font(19), fill=(150, 255, 110))
-sheet.paste(shots['desktop_top'], (pad, y0 + 30))
-y1 = y0 + 30 + shots['desktop_top'].height + 20
-d.text((pad, y1), 'DESKTOP: SPECIAL PACKS (HOW YOU GET IT)', font=font(19), fill=(150, 255, 110))
-sheet.paste(shots['desktop_special'], (pad, y1 + 30))
-x1 = pad + left_w + 60
-d.text((x1, y0), 'PHONE 390x844 (portrait)', font=font(19), fill=(150, 255, 110))
-sheet.paste(shots['phone_top'], (x1, y0 + 30))
-d.text((x1 + shots['phone_top'].width + 20, y0), 'a card tapped open: EVERY SEED', font=font(19), fill=(150, 255, 110))
-sheet.paste(shots['phone_open'], (x1 + shots['phone_top'].width + 20, y0 + 30))
-y2 = max(y1 + 30 + shots['desktop_special'].height, y0 + 30 + shots['phone_top'].height) + 36
+d.text((pad, 18), 'R151: the polished Index notification badge', font=font(34), fill=(255, 226, 96))
+d.text((pad, 66), 'APPROXIMATE: the real ChestIndex tree under the Roblox mock, drawn with Pillow (DejaVu stands in for Fredoka). Not a Studio screenshot.', font=font(17), fill=(205, 215, 240))
+y0 = 110
+d.text((pad, y0), 'DESKTOP 1280x1000: the Index as it opens (a red dot on the Forest tab)', font=font(19), fill=(150, 255, 110))
+sheet.paste(shots['desktop'], (pad, y0 + 30))
+x1 = pad + shots['desktop'].width + 40
+d.text((x1, y0), 'PHONE 390x844', font=font(19), fill=(150, 255, 110))
+sheet.paste(shots['phone'], (x1, y0 + 30))
+y2 = y0 + 30 + top_h + 36
 d.text((pad, y2), 'NOTIFICATION BADGE, zoomed 5x.  Yellow dashes = the edge of what clips it.', font=font(24), fill=(255, 226, 96))
 x = pad
 y3 = y2 + 70

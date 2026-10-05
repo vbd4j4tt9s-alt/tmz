@@ -1,5 +1,5 @@
 --!nocheck
--- R151 Index tests: a small layout engine for the Roblox mock (which only stores properties). local L=require('./layout_indexpacks')(R)
+-- R151 badge tests: a small layout engine for the Roblox mock (which only stores properties). local L=require('./layout_badges')(R)
 -- L.lay(gui, w, h)  writes AbsoluteSize / AbsolutePosition on every GuiObject under a ScreenGui from Position / Size / AnchorPoint, UISizeConstraint, UIAspectRatioConstraint,
 --                   UIListLayout (Horizontal / Vertical, Padding, LayoutOrder, hidden children left out) and ScrollingFrame (children are placed against the canvas and moved by
 --                   CanvasPosition; an AutomaticCanvasSize of X / Y takes the size of the list's content). UIGridLayout and UIScale are NOT emulated (a UIScale is read by hand).

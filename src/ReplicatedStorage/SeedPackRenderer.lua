@@ -22,7 +22,7 @@ function Renderer.Build(bag,isValid)
     -- R151: an ordinary design's pouch takes its shape variation (PackShapes151): the reshaped template when it is baked, else (variations off, a failed bake, a
     -- client that is not ready) nil, i.e. the place's own mesh. The Void, the Mech, the special packs and the Verity pack never come through here.
     if bag:GetAttribute('CompactPackReady') and bag:FindFirstChild('PackGeometry') then return true end
-    -- (a bag flagged DefaultPackShape, which the Index's pictures are, is built from the design's own mesh: no variation is asked for, nothing is baked)
+    -- (a bag flagged DefaultPackShape, a picture that must show the plain pouch, is built from the design's own mesh: no variation is asked for, nothing is baked)
     local key=bag:GetAttribute('PackArtKey')or''
     return Renderer.BuildStandard(bag,key,isValid,bag:GetAttribute('DefaultPackShape')~=true and require(script.Parent.PackShapes151).ForBuild(key) or nil)
 end

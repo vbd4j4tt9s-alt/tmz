@@ -1,7 +1,7 @@
 --!nocheck
 -- R151 (owner: "the notification for the index, the red circle and the +, has to be polished as it looks really low quality and cut out wrongly"): the Index's red
 -- notification badge on the Roblox mock, with the REAL ChestIndex, HudLayout, NotifyBadge151 and DailyRewardsClient of this checkout (MODE 'after') or the R150 ChestIndex +
--- HudLayout from git (MODE 'before': proves the root cause, the old badge IS cut by the wheel's CanvasGroup and by the tab row). run_index_packs.sh runs both.
+-- HudLayout from git (MODE 'before': proves the root cause, the old badge IS cut by the wheel's CanvasGroup and by the tab row). run_badges.sh runs both.
 --  1. the polished badge: a square holder (UIAspectRatioConstraint 1) with a PERFECT circle (UICorner 1,0) in a bright red gradient with a white ring that stays inside the holder,
 --     a soft two-layer drop shadow behind it, and the count (FredokaOne, white, TextScaled inside a size constraint, centred on the disc): "!", the count, "9+" past nine, nothing for a dot
 --  2. NOT CLIPPED: on every screen from a 360 px phone to 1920x1080 the badge's outermost reach (ring, shadow, the pop's biggest size, the pulse's halo) stays inside every ancestor that
@@ -11,7 +11,7 @@
 --  4. one component: the INDEX count, the MENU "!", the tab dots and the DAILY badges are all NotifyBadge151; the old badge code is gone from both scripts
 --  5. motion: a pop-in when it appears, a short pop when the count goes up, a gentle pulse while it shows; none of it with Reduced Motion (also when that is switched on mid-pulse)
 local W=require('./world');local R=W.R
-local L=require('./layout_indexpacks')(R)
+local L=require('./layout_badges')(R)
 local after=MODE~='before'
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -55,7 +55,7 @@ local function alertBadge()return hub:FindFirstChild('IndexRewardAlert')end
 local function dotOf(key)local t=gui:FindFirstChild('Biome'..key,true);return t and t:FindFirstChild('RewardDot'),t end
 local function visibleText(b)return b and b.Visible and b.Count.Text or nil end
 check(visibleText(indexBadge())=='2'and visibleText(alertBadge())=='!','the INDEX button counts 2 and the MENU button shows "!" ('..tostring(visibleText(indexBadge()))..' / '..tostring(visibleText(alertBadge()))..')')
--- Geometry of what a badge draws (layout_indexpacks.luau: the holder, the soft shadow and the shadow at the pop's biggest scale, or at rest with the pulse's halo at its biggest; the R150
+-- Geometry of what a badge draws (layout_badges.luau: the holder, the soft shadow and the shadow at the pop's biggest scale, or at rest with the pulse's halo at its biggest; the R150
 -- badge: its frame plus its UIStroke ring)
 local function reach(b)return L.badgeReach(Badge,b)end
 local overshoot=L.overshoot

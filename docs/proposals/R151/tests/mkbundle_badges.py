@@ -1,8 +1,7 @@
-"""R151 Index PACKS tab / notification badge tests: bundle every ReplicatedStorage module and every ChestChaseServer module of THIS checkout (resolved from this
+"""R151 notification badge / default pack shape tests: bundle every ReplicatedStorage module and every ChestChaseServer module of THIS checkout (resolved from this
 file's location, or from SRC_DIR when given) into OUT/rs_bundle.luau for the Roblox mock (tools/tests/roblox.luau + docs/proposals/inventory_R113/tests/world.luau),
-plus the client scripts the tests load (ChestIndex, DailyRewardsClient), and write OUT/srv_names.luau (the server module names, moved under
-ServerScriptService.ChestChaseServer by test_indexpacks_data.luau, which runs the REAL server Config and roll code).
-Usage: python3 mkbundle_indexpacks.py OUT_DIR [SRC_DIR] [Name=path ...]
+plus the client scripts the tests load (ChestIndex, DailyRewardsClient, TravelButtons), and write OUT/srv_names.luau (the server module names).
+Usage: python3 mkbundle_badges.py OUT_DIR [SRC_DIR] [Name=path ...]
 Extra Name=path pairs add or override a module (the "before" side of a comparison: ChestIndex / HudLayout from the base commit; a mutated copy of a module)."""
 import os
 import sys

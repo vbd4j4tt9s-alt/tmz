@@ -2,14 +2,13 @@
 -- R137 (owner: "polish up the index"): cards with a rarity chip and a 1/N odds chip, a soft rarity glow and pedestal
 -- behind a bigger model, the name under it, SEED / GROWN check chips and a gold CLAIM pill; cards sorted Common to
 -- King; the selected biome tab is ringed; the header shows everything found so far.
--- R151 (owner: "add a pack index in the index ... and polish the notification badge"): a PACKS tab (IndexPackData151 / IndexPacksView151: every pack, its spawn rate, its
--- drop rates, where it comes from, pictured in the default pouch) and ONE polished badge for every Index alert (NotifyBadge151; the old one was cut off by the
--- wheel's CanvasGroup, see HudLayout).
+-- R151 (owner: "the notification for index ... has to be polished at it looks really low quality and cut out wrongly"): ONE polished badge for every Index alert
+-- (NotifyBadge151; the old one was cut off by the wheel's CanvasGroup, see HudLayout).
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Tween=game:GetService('TweenService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local remotes=RS:WaitForChild('ChestChaseRemotes')
 local catalog=remotes:WaitForChild('SeedCatalog');local request=remotes:WaitForChild('PremiumRequest')
 local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI);local Art=require(RS.HudArtwork);local Preview=require(RS.CollectionViewport);local Cash=require(RS.CashNumbers)
-local Audio=require(RS.InteractionAudio);local Gui=game:GetService('GuiService');local Badge=require(RS.NotifyBadge151);local Pictures=require(RS.ItemPictures)
+local Audio=require(RS.InteractionAudio);local Gui=game:GetService('GuiService');local Badge=require(RS.NotifyBadge151)
 local old=pg:FindFirstChild('ChestIndexGui');if old then old:Destroy()end
 local gui=Instance.new('ScreenGui');gui.Name='ChestIndexGui';gui.ResetOnSpawn=false;gui.DisplayOrder=40;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
 local connections={};local function watch(signal,fn)local c=signal:Connect(fn);table.insert(connections,c);return c end
@@ -71,9 +70,6 @@ end
 local rowsFrame=Instance.new('Frame');rowsFrame.Name='LimitedRewards';rowsFrame.BackgroundTransparency=1;rowsFrame.BorderSizePixel=0;rowsFrame.Visible=false;rowsFrame.Parent=panel
 local list=Instance.new('ScrollingFrame');list.Name='SeedCards';list.Position=UDim2.fromOffset(13,244);list.Size=UDim2.new(1,-26,1,-281);list.BackgroundTransparency=1;list.BorderSizePixel=0;list.CanvasSize=UDim2.new();list.AutomaticCanvasSize=Enum.AutomaticSize.Y;list.ScrollBarThickness=5;list.ClipsDescendants=true;list.Parent=panel
 local grid=Instance.new('UIGridLayout');grid.CellPadding=UDim2.fromOffset(12,12);grid.SortOrder=Enum.SortOrder.LayoutOrder;grid.Parent=list
--- R151: the PACKS tab's list (the same place and look as the seed cards' list; explicit offsets, its own cards: IndexPacksView151)
-local packList=Instance.new('ScrollingFrame');packList.Name='PackCards';packList.Position=list.Position;packList.Size=list.Size;packList.BackgroundTransparency=1;packList.BorderSizePixel=0;packList.CanvasSize=UDim2.new();packList.AutomaticCanvasSize=Enum.AutomaticSize.None
-packList.ScrollingDirection=Enum.ScrollingDirection.Y;packList.ScrollBarThickness=5;packList.ClipsDescendants=true;packList.Visible=false;packList.Parent=panel
 local status=text(panel,'Status','',UDim2.new(0,16,1,-30),UDim2.new(1,-32,0,24),14,Theme.Colors.Gold);status.Visible=false
 local selected=1;local busy=false;local claimedHere={};local halfClaimedHere={};local tabsByKey={};local cards={};local cardsById={};local render;local queued=false;local fillTween;local rewardTween
 -- R148 (owner: "this index section should also be combined and named LIMITED"): MECH (category 8, the Mech seeds) and VERITY (category 9, the Verity
@@ -82,11 +78,9 @@ local selected=1;local busy=false;local claimedHere={};local halfClaimedHere={};
 -- bar and claim gems. The tab counts both together the way every tab counts: seeds + plants found, out of two per seed.
 -- A tab key is a biome's stage number, or LIMITED, which lists categories 8 then 9 (the Mech seeds, then the Verity seed).
 local LIMITED='Limited'
-local PACKS='Packs' -- R151: the packs tab (last): a list of packs, not seeds, so it has no counts, rewards or milestones
 local tabStages={[LIMITED]={8,9}}
-local order={{1,'FOREST'},{6,'JUNGLE'},{2,'DESERT'},{3,'SNOW'},{5,'CRYSTAL'},{4,'LAVA'},{7,'STORM'},{LIMITED,'LIMITED'},{PACKS,'PACKS'}}
-local tabColors={[LIMITED]={Base=Color3.fromRGB(190,120,255),Idle=Color3.fromRGB(150,92,235),Open=Color3.fromRGB(176,120,255)}, -- a violet tab to go with the gold-and-purple icon
- [PACKS]={Base=Color3.fromRGB(236,150,64),Idle=Color3.fromRGB(207,118,46),Open=Color3.fromRGB(236,150,64)}} -- R151: a warm orange tab for the packs
+local order={{1,'FOREST'},{6,'JUNGLE'},{2,'DESERT'},{3,'SNOW'},{5,'CRYSTAL'},{4,'LAVA'},{7,'STORM'},{LIMITED,'LIMITED'}}
+local tabColors={[LIMITED]={Base=Color3.fromRGB(190,120,255),Idle=Color3.fromRGB(150,92,235),Open=Color3.fromRGB(176,120,255)}} -- a violet tab to go with the gold-and-purple icon
 local rowDefs={{8,'MECH SET'},{9,'VERITY'}};local rowList={}
 local function stagesOf(key)return tabStages[key]or{key}end
 local function tabOf(stage)for key,list in pairs(tabStages)do if table.find(list,stage)then return key end end;return stage end
@@ -151,7 +145,7 @@ local function updateAlerts()
  local grew=total>alertTotal
  -- R148: a tab's dot is its categories together: LIMITED lights up for a reward of either MECH SET (8) or VERITY (9).
  -- R151: a dot sits fully INSIDE its tab (overhang -3): the tab row is a ScrollingFrame, which clips at its edge, and the old dot hung out of the tab's top and was cut there.
- for key,t in pairs(tabsByKey)do if not t.Packs then Badge.Set(Badge.Make(t.Button,'RewardDot',14,-3),'',(perTab[key]or 0)>0,false)end end
+ for key,t in pairs(tabsByKey)do Badge.Set(Badge.Make(t.Button,'RewardDot',14,-3),'',(perTab[key]or 0)>0,false)end
  -- The INDEX button's count: 6 px of the badge hang past the button's corner; the wheel's CanvasGroup (HudLayout) keeps NotifyBadge151.Margin around the button, which holds it.
  -- R150 review: the badge pops SILENTLY (as in R149). A chime here fired the moment the server opened a pack (OpenSeedPack commits the seed's reward at once), before the reveal shows the seed.
  Badge.Set(Badge.Make(toggle,'RewardBadge',24,6),Badge.Text(total),total>0,grew)
@@ -277,30 +271,13 @@ local function layoutRows(compact,tight,y)
  end
  return height
 end
--- R151: the PACKS tab's data and list, made the first time the tab is opened (a pcall: if anything about it fails the seed Index still works).
-local packsView
-local function ensurePacks()
- if packsView then return packsView end
- local ok,made=pcall(function()
-  local stages={};for _,pair in ipairs(order)do if type(pair[1])=='number'then stages[#stages+1]=pair[1]end end
-  return require(RS.IndexPacksView151).new(packList,{Data=require(RS.IndexPackData151).Build{Order=stages},Pictures=Pictures})
- end)
- if ok then packsView=made else warn('[R151 Index] the PACKS tab could not be built: '..tostring(made))end
- return packsView
-end
 for i,pair in ipairs(order)do
  local key,name=pair[1],pair[2];local colors=tabColors[key]
- local b=button(tabs,'Biome'..key,'',UDim2.new(),UDim2.fromOffset(122,58),colors and colors.Base or Color3.fromRGB(73,109,204));b.LayoutOrder=key==PACKS and 0 or i -- (R151: PACKS stands first in the row: the row scrolls sideways, and a tab at its far end would not be found)
- local nameLabel
- if key==PACKS then
-  -- R151: the tab's icon is a pack (the default pouch, drawn by ItemPictures like every pack picture; only built while the tab is on screen)
-  nameLabel=Instance.new('Frame');nameLabel.BackgroundTransparency=1;nameLabel.BorderSizePixel=0;nameLabel.Active=false;nameLabel.Parent=b
-  pcall(require(RS.IndexPacksView151).ShowPicture,Pictures,nameLabel,{Stage=1,Variant='Pack03'},0)
- else nameLabel=require(RS.BiomeArtwork).Attach(b,name:sub(1,1)..name:sub(2):lower())end
- nameLabel.Name='BiomeLogo';nameLabel.Position=UDim2.fromOffset(12,1);nameLabel.Size=UDim2.fromOffset(44,44);b:SetAttribute('BiomeName',name)
- local countLabel=text(b,'Count',key==PACKS and'PACKS'or'0 / 0',UDim2.fromOffset(56,12),UDim2.new(1,-60,0,24),14)
+ local b=button(tabs,'Biome'..key,'',UDim2.new(),UDim2.fromOffset(122,58),colors and colors.Base or Color3.fromRGB(73,109,204));b.LayoutOrder=i
+ local nameLabel=require(RS.BiomeArtwork).Attach(b,name:sub(1,1)..name:sub(2):lower());nameLabel.Name='BiomeLogo';nameLabel.Position=UDim2.fromOffset(12,1);nameLabel.Size=UDim2.fromOffset(44,44);b:SetAttribute('BiomeName',name)
+ local countLabel=text(b,'Count','0 / 0',UDim2.fromOffset(56,12),UDim2.new(1,-60,0,24),14)
  local tiny=Instance.new('Frame');tiny.Name='Fill';tiny.Position=UDim2.new(0,5,1,-9);tiny.Size=UDim2.new(0,0,0,5);tiny.BackgroundColor3=Theme.Colors.Mint;tiny.BorderSizePixel=0;tiny.Parent=b;Theme.Corner(tiny,3)
- tiny.Visible=key~=PACKS;tabsByKey[key]={Button=b,Packs=key==PACKS,Count=countLabel,Fill=tiny,Name=nameLabel,Idle=colors and colors.Idle or Color3.fromRGB(73,109,204),Open=colors and colors.Open or Color3.fromRGB(80,149,194)}
+ tabsByKey[key]={Button=b,Count=countLabel,Fill=tiny,Name=nameLabel,Idle=colors and colors.Idle or Color3.fromRGB(73,109,204),Open=colors and colors.Open or Color3.fromRGB(80,149,194)}
  if key==LIMITED then
   -- R148: the tab says what it is and how long is left ("LIMITED 27d"), under the count; it needs the tab's full height, so compact tabs leave it out.
   local note=text(b,'TabNote','',UDim2.fromOffset(56,36),UDim2.new(1,-60,0,12),10,Theme.Colors.Gold);note.TextWrapped=false;note.TextScaled=true
@@ -325,11 +302,8 @@ local function resize()
  local listY=barY+barH/2+gemSize/2+28;local footer=compact and 24 or 37
  -- R148: on the LIMITED tab the single bar gives way to the two reward rows (MECH SET, VERITY); the cards start below them.
  local limited=tabStages[selected]~=nil
- -- R151: on the PACKS tab the progress line becomes a one-line key (SPAWN / DROPS) and the bar is gone; the pack list starts right under it.
- local packs=selected==PACKS
- progress.Visible=not limited;bar.Visible=not limited and not packs;rowsFrame.Visible=limited
+ progress.Visible=not limited;bar.Visible=not limited;rowsFrame.Visible=limited
  if limited then listY=progressY+layoutRows(compact,tight,progressY)+(compact and 6 or 12)end
- if packs then listY=progressY+progressH+(compact and 4 or 8)end
  header.Size=UDim2.new(1,0,0,headerH);title.TextSize=compact and(tight and 22 or 26)or 30
  total.Size=UDim2.fromOffset(compact and 150 or 190,compact and headerH-12 or 36);total.Position=UDim2.new(1,-(compact and headerH or 66),.5,0);totalText.TextSize=compact and 13 or 16;total.Visible=panelWidth>=420
  local closeSize=compact and(tight and 32 or 36)or 44
@@ -353,8 +327,6 @@ local function resize()
  status.Position=UDim2.new(0,16,1,compact and -22 or -30);status.Size=UDim2.new(1,-32,0,compact and 18 or 24);status.TextSize=compact and 12 or 14
  local w=math.max(120,panelWidth-34);local columns=w>=780 and 5 or w>=600 and 4 or w>=430 and 3 or 2
  grid.CellSize=UDim2.fromOffset(math.floor((w-(columns-1)*12)/columns),223)
- list.Visible=not packs;packList.Position=list.Position;packList.Size=list.Size;packList.Visible=packs
- if packs then local view=ensurePacks();if view then view:Layout(w)end end
 end
 watch(gui:GetPropertyChangedSignal('AbsoluteSize'),resize)
 watch(list:GetPropertyChangedSignal('AbsoluteSize'),resize)
@@ -425,22 +397,19 @@ render=function()
  local found,all=0,0
  for key,t in pairs(tabsByKey)do
   local seeds,plants,total=tabCounts(key);local n=seeds+plants;local max=total*2;found+=n;all+=max
-  if not t.Packs then t.Count.Text=n..' / '..max;t.Fill.Size=UDim2.fromOffset(math.max(0,(t.Button.Size.X.Offset-10)*(max>0 and n/max or 0)),5)end
-  t.Button.BackgroundColor3=key==selected and t.Open or t.Idle
+  t.Count.Text=n..' / '..max;t.Fill.Size=UDim2.fromOffset(math.max(0,(t.Button.Size.X.Offset-10)*(max>0 and n/max or 0)),5);t.Button.BackgroundColor3=key==selected and t.Open or t.Idle
   -- R137: the open biome gets a white ring.
   local ring=t.Button:FindFirstChild('BrightOutline');if ring then ring.Color=key==selected and Color3.new(1,1,1)or Color3.fromRGB(12,17,38);ring.Thickness=key==selected and 3 or 2 end
  end
  totalText.Text='FOUND '..found..' / '..all
  local seeds,plants,total=tabCounts(selected)
- progress.Text=selected==PACKS and'SPAWN = track chance  •  DROPS = seed chances'or seeds..'/'..total..' SEEDS  •  '..plants..'/'..total..' PLANTS'
+ progress.Text=seeds..'/'..total..' SEEDS  •  '..plants..'/'..total..' PLANTS'
  if fillTween then fillTween:Cancel()end
  fillTween=Tween:Create(fill,TweenInfo.new(Gui.ReducedMotionEnabled and 0 or .22),{Size=UDim2.fromScale(total>0 and math.clamp((seeds+plants)/(total*2),0,1)or 0,1)});fillTween:Play()
- if tabStages[selected]or selected==PACKS then
+ if tabStages[selected]then
   -- R148: LIMITED: the two reward rows stand in for the bar (hidden, and its gems inert); each row holds its own category's rewards.
-  -- R151: PACKS: no bar and no rewards at all (its gems are inert too).
   midGem.Button.Active=false;midGem.Button.Interactable=false;endGem.Button.Active=false;endGem.Button.Interactable=false
-  middle:SetAttribute('RewardReady',false);bonus:SetAttribute('RewardReady',false)
-  if selected~=PACKS then renderRows();updateTimer()end
+  middle:SetAttribute('RewardReady',false);bonus:SetAttribute('RewardReady',false);renderRows();updateTimer()
  else
   local st=rewardState(selected)
   paintGem(midGem,st.HalfGems,st.HalfTaken,st.HalfReady,st.HalfReady and not busy)
@@ -488,5 +457,5 @@ watch(player.DescendantAdded,observeDiscovery)
 for _,name in ipairs({'DiscoveredSeeds','DiscoveredPlants'})do local folder=player:FindFirstChild(name);if folder then observeDiscovery(folder)end end
 -- R138: the MENU button is built by HudLayout (maybe after this script); badge it once it exists.
 watch(pg.ChildAdded,function(child)if child.Name=='GardenNavigation'then queue()end end)
-gui.Destroying:Connect(function()if packsView then packsView:Destroy()end;if fillTween then fillTween:Cancel()end;if rewardTween then rewardTween:Cancel()end;for _,c in ipairs(connections)do c:Disconnect()end end)
+gui.Destroying:Connect(function()if fillTween then fillTween:Cancel()end;if rewardTween then rewardTween:Cancel()end;for _,c in ipairs(connections)do c:Disconnect()end end)
 resize()
