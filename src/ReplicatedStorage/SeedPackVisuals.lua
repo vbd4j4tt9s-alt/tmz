@@ -38,6 +38,10 @@ function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,pac
             origin*CFrame.new((-1.9/2+(i-.5)*1.9/8)*scale,1.11*scale,0),seal,visualWeldRoot)
         strip:SetAttribute("TearIndex",i);strip:SetAttribute("TearCount",8)
     end
+    -- R151: GiantVisualSafety fades every GiantVisualPart near the camera, and SeedPackRenderer / VerityPackArt / EclipsePackArt / SpecialPackArt89 tag
+    -- the pouch's parts for a giant (> 10x) pack, but the seal and the 8 tear strips (built here) were never tagged: close to a giant pack the pouch
+    -- faded away and nine solid bars stayed behind in the air. They fade with the rest now.
+    if packSize>10 then for _,p in ipairs(m:GetChildren())do if p:IsA('BasePart')and p~=root then game:GetService('CollectionService'):AddTag(p,'GiantVisualPart')end end end
     for _,side in ipairs({-1,1}) do
         local grip=Instance.new("Attachment");grip.Name=side<0 and "LeftGrip" or "RightGrip"
         grip.CFrame=CFrame.new(Vector3.new(side*.73,-.30,.12)*scale);grip.Parent=root
@@ -359,11 +363,12 @@ function Visuals.Platform(origin,stage,variant,size)
  if theme.Moss then
   for i,a in ipairs({.6,3.5,4.4})do
    local offset=Vector3.new(math.cos(a),0,math.sin(a))*d.Radius*.72
-   disk('MossPatch',d.Radius*(i==1 and .22 or .15),.022,top,theme.Moss,Enum.Material.Grass,offset,.72)
+   -- R151: .028 thick (was .022): a patch's top stood .018 over the pad's top face, inside the .02 band where two same-way faces can flicker at a distance (tools/zfight.py); .021 now
+   disk('MossPatch',d.Radius*(i==1 and .22 or .15),.028,top,theme.Moss,Enum.Material.Grass,offset,.72)
   end
  end
  if theme.Ice then
-  local ice=disk('IceGlaze',d.Radius*.95,.024,top,Color3.fromRGB(207,244,255),Enum.Material.Glass)
+  local ice=disk('IceGlaze',d.Radius*.95,.030,top,Color3.fromRGB(207,244,255),Enum.Material.Glass) -- R151: .030 thick (was .024), its top .022 over the pad's, like the moss
   ice.Transparency=.28;ice.Reflectance=.12
  end
  local color=theme.Vein or theme.Stone:Lerp(Color3.new(),.25)

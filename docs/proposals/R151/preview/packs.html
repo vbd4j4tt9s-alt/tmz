@@ -1,0 +1,124 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Pack models preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of a dump_packs.luau scene (the real parts the real modules build on the Roblox mock, in the pack's own frame / pack scale):
+// Roblox parts as boxes / cylinders / balls, every MeshPart as a STAND-IN rounded pouch of its Size box (the approved pouch meshes are uploaded
+// assets, not available offline: their silhouettes and prints are NOT drawn - the thin outline is the Size box the checks use). No Roblox textures or
+// Future lighting: a design preview, not a Studio screenshot.
+import * as THREE from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+const envTex=new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04).texture;
+const geoBox=new THREE.BoxGeometry(1,1,1);
+const geoCyl=new THREE.CylinderGeometry(.5,.5,1,48);geoCyl.rotateZ(Math.PI/2); // a Roblox Cylinder part runs along X
+const geoBall=new THREE.SphereGeometry(.5,24,16);
+const geoPouch=new RoundedBoxGeometry(1,1,1,6,.14);
+const edges=new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1));
+// Verity's picture is a thin black smiley (two dots and a smile) on a transparent background: a STAND-IN (the Roblox image cannot be fetched here).
+function standIn(){
+  const cv=document.createElement('canvas');cv.width=cv.height=512;const g=cv.getContext('2d');
+  g.clearRect(0,0,512,512);g.strokeStyle='#111';g.fillStyle='#111';g.lineCap='round';
+  g.beginPath();g.ellipse(176,200,22,34,0,0,Math.PI*2);g.fill();g.beginPath();g.ellipse(336,200,22,34,0,0,Math.PI*2);g.fill();
+  g.lineWidth=20;g.beginPath();g.arc(256,236,150,.2*Math.PI,.8*Math.PI);g.stroke();
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t;
+}
+const faceTex=standIn();
+const PAPER=[196,150,98];
+function meshColor(p,scene){ // stand-in colour of a MeshPart: its material says what layer it is
+  switch(p.material){
+    case'Neon':return{color:[150,235,255],emissive:[40,120,150],opacity:.55};
+    case'Glass':return{color:[185,225,245],opacity:.45};
+    case'Metal':return{color:[190,196,206],metal:true,opacity:1};
+    default:return{color:scene.paper||PAPER,opacity:1};
+  }
+}
+const rot=p=>p._r||(p._r=p.r.flat());
+function bounds(parts){
+  const lo=[1e9,1e9,1e9],hi=[-1e9,-1e9,-1e9];
+  for(const p of parts){
+    if(p.t>=.995)continue;
+    for(const x of[-.5,.5])for(const y of[-.5,.5])for(const z of[-.5,.5]){
+      const v=[x*p.size[0],y*p.size[1],z*p.size[2]];
+      const r=rot(p);const w=[0,1,2].map(i=>r[i*3]*v[0]+r[i*3+1]*v[1]+r[i*3+2]*v[2]+p.p[i]);
+      for(let i=0;i<3;i++){lo[i]=Math.min(lo[i],w[i]);hi[i]=Math.max(hi[i],w[i])}
+    }
+  }
+  return{lo,hi};
+}
+// opts: {az, el, fov, bg, ortho (a close-up with no perspective: exact distances), fit:'all'|'body', only:[part names (a trailing * = prefix)], zoom:[x,y,z,halfHeight] (a close-up), fade (a GiantVisualSafety fade for the tagged parts, 0..1), marks:[part names], outline}
+window.shoot=function(scene,W,H,opts){
+  opts=opts||{};renderer.setSize(W,H);
+  const s=new THREE.Scene();s.background=new THREE.Color(opts.bg!==undefined?opts.bg:0xdfe9f2);
+  s.add(new THREE.HemisphereLight(0xeaf6ff,0x7f9a78,1.25));
+  const sun=new THREE.DirectionalLight(0xfff2dd,2.0);sun.position.set(-3,6,-8);s.add(sun);
+  const fill=new THREE.DirectionalLight(0xfff2dd,1.3);fill.position.set(4,3,8);s.add(fill);
+  const fit=opts.fit==='body'?scene.parts.filter(p=>p.name==='ApprovedMesh01'||p.name==='VerityFace'||p.name==='BiomeStone'):scene.parts.filter(p=>!p.fx||opts.fit!=='nofx');
+  const b=bounds(fit.length?fit:scene.parts);
+  const T=new THREE.Vector3((b.lo[0]+b.hi[0])/2,(b.lo[1]+b.hi[1])/2,(b.lo[2]+b.hi[2])/2);
+  const radius=Math.hypot(b.hi[0]-b.lo[0],b.hi[1]-b.lo[1])/2;
+  const fov=opts.fov||28;
+  let dist=radius/Math.sin(fov*Math.PI/360)*1.04;
+  let target=T;
+  if(opts.zoom){target=new THREE.Vector3(opts.zoom[0],opts.zoom[1],opts.zoom[2]);dist=opts.ortho?8:opts.zoom[3]/Math.tan(fov*Math.PI/360)}
+  const meshes=[];
+  for(const p of scene.parts){
+    if(p.t>=.995)continue;
+    if(opts.only&&!opts.only.some(n=>n.endsWith('*')?p.name.startsWith(n.slice(0,-1)):p.name===n))continue;
+    const r=rot(p);const m=new THREE.Matrix4().set(r[0],r[1],r[2],p.p[0],r[3],r[4],r[5],p.p[1],r[6],r[7],r[8],p.p[2],0,0,0,1);
+    const isMesh=p.shape==='Mesh';
+    const geo=isMesh?geoPouch:p.shape==='Cylinder'?geoCyl:p.shape==='Ball'?geoBall:geoBox;
+    const look=isMesh?meshColor(p,scene):{color:p.color,opacity:1,metal:p.material==='Metal'};
+    let opacity=(look.opacity===undefined?1:look.opacity)*(1-p.t);
+    if(opts.fade&&p.giant)opacity*=(1-opts.fade);
+    if(opacity<=.01)continue;
+    const neon=p.material==='Neon';
+    const mat=new THREE.MeshStandardMaterial({color:col(look.color),roughness:look.metal?.3:Math.max(.35,.75-(p.refl||0)),metalness:look.metal?.8:0,transparent:opacity<.995,opacity,depthWrite:opacity>.9,
+      emissive:neon&&!isMesh?col(p.color):look.emissive?col(look.emissive):0x000000,emissiveIntensity:neon&&!isMesh?.9:.6});
+    if(look.metal){mat.envMap=envTex;mat.envMapIntensity=.9}
+    const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;
+    mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(p.size[0],p.size[1],p.size[2]));s.add(mesh);meshes.push(mesh);
+    if(isMesh&&opts.outline!==false){
+      const e=new THREE.LineSegments(edges,new THREE.LineBasicMaterial({color:0x3b5a73,transparent:true,opacity:.55*(opts.fade&&p.giant?1-opts.fade:1)}));e.matrixAutoUpdate=false;e.matrix.copy(mesh.matrix);s.add(e);
+    }
+    for(const d of(p.faces||[])){
+      if(d.kind!=='Decal')continue;
+      const front=d.face==='Front';
+      const dm=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:faceTex,transparent:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+      dm.matrixAutoUpdate=false;
+      const place=new THREE.Matrix4().makeTranslation(0,0,(front?-1:1)*(p.size[2]/2+.0015)).multiply(new THREE.Matrix4().makeRotationY(front?Math.PI:0)).multiply(new THREE.Matrix4().makeScale(p.size[0],p.size[1],1));
+      dm.matrix.copy(m).multiply(place);s.add(dm);
+    }
+  }
+  const az=(opts.az||0)*Math.PI/180,el=(opts.el===undefined?5:opts.el)*Math.PI/180;
+  const cam=opts.ortho?new THREE.OrthographicCamera(-opts.zoom[3]*W/H,opts.zoom[3]*W/H,opts.zoom[3],-opts.zoom[3],.01,200):new THREE.PerspectiveCamera(fov,W/H,.01,200);
+  // Roblox's front is -Z: the camera stands in front (negative Z), az turns it round the pack
+  cam.position.set(target.x+Math.sin(az)*Math.cos(el)*dist,target.y+Math.sin(el)*dist,target.z-Math.cos(az)*Math.cos(el)*dist);cam.lookAt(target);
+  renderer.render(s,cam);
+  // the screen rectangles of the parts named in opts.marks (for the circles of the contact sheet): [x0,y0,x1,y1] in pixels
+  const marks={};
+  if(opts.marks){
+    cam.updateMatrixWorld();
+    for(const name of opts.marks){
+      let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,found=false;
+      for(const p of scene.parts){
+        if(p.name!==name&&!(name.endsWith('*')&&p.name.startsWith(name.slice(0,-1))))continue;
+        found=true;
+        for(const x of[-.5,.5])for(const y of[-.5,.5])for(const z of[-.5,.5]){
+          const v=[x*p.size[0],y*p.size[1],z*p.size[2]];
+          const r=rot(p);const w=new THREE.Vector3(...[0,1,2].map(i=>r[i*3]*v[0]+r[i*3+1]*v[1]+r[i*3+2]*v[2]+p.p[i])).project(cam);
+          const px=(w.x+1)/2*W,py=(1-w.y)/2*H;x0=Math.min(x0,px);y0=Math.min(y0,py);x1=Math.max(x1,px);y1=Math.max(y1,py);
+        }
+      }
+      if(found)marks[name]=[x0,y0,x1,y1];
+    }
+  }
+  return{url:renderer.domElement.toDataURL('image/png'),marks};
+};
+window.ready=true;
+</script></body></html>

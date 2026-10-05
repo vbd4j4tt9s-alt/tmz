@@ -81,13 +81,16 @@ function A.Specs()
    pulse(segment('VoidIris'..tag..i,base*CF(0,0,-.036),V(math.cos(a)*.20,math.sin(a)*.20,0),V(math.cos(b)*.20,math.sin(b)*.20,0),.024,.01,P.Iris),.4,.2)
   end
   -- Star field: three four-point stars and four specks; they twinkle.
+  -- R151: the stars, specks and rune strokes sat .031 in front of the pouch's front face (thin blocks .016 out, .01 deep, away from the nebula
+  -- discs that reach to .016); they are backed now: the same front face (.021 out), but .026 deep, so they reach .015 from the pouch like the
+  -- discs do (nothing floating off the surface; the front looks exactly as before).
   for i,star in ipairs({{-.66,.50,.13,P.Star},{.60,-.40,.11,P.StarCyan},{.12,.80,.09,P.StarPink}})do
-   local at=base*CF(star[1],star[2],-.016)
-   pulse(add('StarV'..tag..i,V(.022,star[3],.01),at,star[4]),.6,i*1.7)
-   pulse(add('StarH'..tag..i,V(star[3]*.62,.022,.01),at,star[4]),.6,i*1.7)
+   local at=base*CF(star[1],star[2],-.008)
+   pulse(add('StarV'..tag..i,V(.022,star[3],.026),at,star[4]),.6,i*1.7)
+   pulse(add('StarH'..tag..i,V(star[3]*.62,.022,.026),at,star[4]),.6,i*1.7)
   end
   for i,speck in ipairs({{-.42,-.58},{.70,.30},{-.74,-.12},{.36,-.80}})do
-   pulse(add('StarSpeck'..tag..i,V(.035,.035,.01),base*CF(speck[1],speck[2],-.016)*CFrame.Angles(0,0,math.pi/4),i%2==0 and P.StarCyan or P.Star),.7,i*2.3)
+   pulse(add('StarSpeck'..tag..i,V(.035,.035,.026),base*CF(speck[1],speck[2],-.008)*CFrame.Angles(0,0,math.pi/4),i%2==0 and P.StarCyan or P.Star),.7,i*2.3)
   end
   -- Four rune sigils in the corners (three strokes each); they flicker.
   local runes={
@@ -97,7 +100,7 @@ function A.Specs()
    {V(.60,-.80,0),{{V(-.05,.09,0),V(-.05,-.09,0)},{V(-.05,.09,0),V(.06,.02,0)},{V(.06,.02,0),V(-.05,-.02,0)}}},
   }
   for r,rune in ipairs(runes)do for k,stroke in ipairs(rune[2])do
-   pulse(segment('RuneSigil'..tag..r..'_'..k,base*CF(rune[1]+V(0,0,-.016)),stroke[1],stroke[2],.022,.01,P.Rune),.5,r*1.3)
+   pulse(segment('RuneSigil'..tag..r..'_'..k,base*CF(rune[1]+V(0,0,-.008)),stroke[1],stroke[2],.022,.026,P.Rune),.5,r*1.3)
   end end
  end
  -- Event-horizon halo around the whole pack: a tilted circle, so spinning never changes its outline.

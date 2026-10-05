@@ -25,6 +25,8 @@ show src/ReplicatedStorage/SeedPackRenderer.lua | sed -e "s/script.Parent.Eclips
 show src/ReplicatedStorage/EclipsePackArt.lua | sed -e "s/script.Parent.SeedPackRenderer/script.Parent.SeedPackRendererBase/g" > "$OUT/EclipsePackArtBase.lua"
 show src/ReplicatedStorage/VoidPackFx.lua > "$OUT/VoidPackFxBase.lua"
 show src/ReplicatedStorage/VerityPackArt.lua > "$OUT/VerityPackArtBase.lua"
+# R151: the base copies carry the three documented R151 pack fixes (giant packs' seal / strips tagged, the Void's print backed, the pads' moss / ice thicker), so "identical" still means "nothing else changed"
+python3 "$HERE/../../R151/tests/rebase_r151.py" "$OUT/SeedPackVisualsBase.lua" "$OUT/EclipsePackArtBase.lua" >/dev/null
 bundle(){ # $1 = the VerityPackArt source to test
  python3 "$HERE/../../R147/tests/mkbundle_verity.py" "$OUT/rs_bundle.luau" VerityPackArt="$1" SeedPackVisualsBase="$OUT/SeedPackVisualsBase.lua" SeedPackRendererBase="$OUT/SeedPackRendererBase.lua" \
   EclipsePackArtBase="$OUT/EclipsePackArtBase.lua" VoidPackFxBase="$OUT/VoidPackFxBase.lua" VerityPackArtBase="$OUT/VerityPackArtBase.lua" \
