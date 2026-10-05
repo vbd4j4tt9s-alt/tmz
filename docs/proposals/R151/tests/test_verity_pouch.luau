@@ -30,6 +30,7 @@ local Run=W.Run
 local function server()Run.IsServer=function()return true end;Run.IsClient=function()return false end end
 local function client()Run.IsServer=function()return false end;Run.IsClient=function()return true end end
 server() -- (before the first require of VerityPouch151: a server creates its folder when the module loads)
+W.module('PackShapes151').Config.Enabled=false -- (this suite is about the neutral pouch alone: the pack shape variations have test_pack_shapes.luau)
 local Pouch=W.module('VerityPouch151');local Art=W.module('VerityPackArt');local Visuals=H.Visuals;local Rules=H.Rules;local Config=W.module('VerityConfig')
 local VERITY,KEY,IMAGE=H.VERITY,'Storm_02','rbxassetid://102712963740896'
 local ORIGINAL_ID='rbxassetid://75504658868908'

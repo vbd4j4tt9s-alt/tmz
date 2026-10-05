@@ -58,7 +58,9 @@ local function sizeOf(part)
  return nil
 end
 -- One neutral MeshPart from one template MeshPart. Errors (the caller pcalls) with a reason; destroys the EditableMesh on every path.
-local function bake(source)
+-- `shape` ({Id, Box}, optional): the Storm_02 pack shape variation (PackShapes151), applied to the same vertices so the Verity pack is the same shape as every
+-- other pack of this design.
+local function bake(source,shape)
  local Assets=game:GetService('AssetService');local editable,part
  local ok,why=xpcall(function()
   local id=source.MeshId
@@ -73,25 +75,44 @@ local function bake(source)
    local k=editable:GetColor(c)
    assert(k.R>.999 and k.G>.999 and k.B>.999,'a vertex colour is not white after the bake')
   end
+  local info
+  if shape then
+   local okShape,res=pcall(require(script.Parent.PackShapes151).Deform,editable,vertices,source,shape.Box,shape.Id)
+   if not okShape then error('SHAPE: '..tostring(res),0)end -- (Prepare then makes the neutral pouch without the variation)
+   info=res
+  end
   local result,content=Assets:CreateDataModelContentAsync(Content.fromObject(editable))
   assert(result==Enum.CreateContentResult.Success,'could not bake the pouch mesh: '..tostring(result))
   part=Assets:CreateMeshPartAsync(content,{CollisionFidelity=Enum.CollisionFidelity.Box,RenderFidelity=Enum.RenderFidelity.Precise})
   assert(part,'no MeshPart for the baked pouch')
   -- the baked mesh must be the same mesh: its own (unscaled) size has to match the original's, or the Size below would stretch it differently
-  local a,b=sizeOf(part),sizeOf(source)
+  local a,b=sizeOf(part),info and info.Extent or sizeOf(source)
   if a and b then
    for _,axis in ipairs({'X','Y','Z'})do assert(math.abs(a[axis]-b[axis])<=M.SizeTolerance*b[axis]+1e-4,'the baked pouch is not the original mesh ('..axis..' '..a[axis]..' vs '..b[axis]..')')end
   end
-  part.Name=source.Name;part.Size=source.Size;part.Color=WHITE;part.Material=Enum.Material.SmoothPlastic;part.TextureID=''
+  part.Name=source.Name;part.Size=info and info.Size or source.Size;part.Color=WHITE;part.Material=Enum.Material.SmoothPlastic;part.TextureID=''
   part.Anchored=true;part.CanCollide=false;part.CanTouch=false;part.CanQuery=false;part.CastShadow=false
-  part:SetAttribute('PackLocalFrame',source:GetAttribute('PackLocalFrame'))
-  part:SetAttribute('NeutralOf',id);part:SetAttribute('VertexCount',#vertices);part:SetAttribute('ColorCount',#colors)
+  part:SetAttribute('PackLocalFrame',info and info.Frame or source:GetAttribute('PackLocalFrame'))
+  part:SetAttribute('NeutralOf',id);part:SetAttribute('VertexCount',#vertices);part:SetAttribute('ColorCount',#colors);part:SetAttribute('Variation',shape and shape.Id or 0)
  end,debug.traceback)
  if editable then pcall(function()editable:Destroy()end)end
  if not ok then if part then pcall(function()part:Destroy()end)end;error(tostring(why),0)end
  return part
 end
 local preparing=false
+local watching
+-- The Model of `sources` baked neutral (and reshaped when `shape` is given), parented to the folder, and the attributes that say it is ready.
+local function build(f,key,template,sources,shape,made)
+ local model=Instance.new('Model');model.Name=key;made[#made+1]=model
+ model:SetAttribute('MeshBakeVersion',template:GetAttribute('MeshBakeVersion'));model:SetAttribute('MeshCount',#sources)
+ local vertices=0
+ for _,source in ipairs(sources)do
+  local part=bake(source,shape);part.Parent=model;vertices+=part:GetAttribute('VertexCount')or 0
+ end
+ model:SetAttribute('Neutral',true);model:SetAttribute('PackShape',shape and shape.Id or 0)
+ model.Parent=f -- the Model first, then the attributes that say it is ready: a client never sees Ready without it
+ f:SetAttribute('Key',key);f:SetAttribute('VertexCount',vertices);f:SetAttribute('MeshCount',#sources);f:SetAttribute('PackShape',shape and shape.Id or 0)
+end
 -- Server only. Bakes the Verity design's pouch once per server (later calls wait for the first and return its answer); returns true when ready.
 function M.Prepare()
  assert(Run:IsServer(),'The Verity pouch is baked on the server.')
@@ -100,20 +121,24 @@ function M.Prepare()
  if f:GetAttribute('Finished')==true then return f:GetAttribute('Ready')==true end
  preparing=true;local started=os.clock();local key=M.Key();local made={}
  local ok,why=pcall(function()
+  local Shapes=require(script.Parent.PackShapes151)
   local template=require(script.Parent.SeedPackRenderer).GetGeometry(key)
   assert(template,'the template '..key..' is not in SeedPackMeshAssets')
   local sources={};for _,p in ipairs(template:GetChildren())do if p:IsA('MeshPart')then sources[#sources+1]=p end end
   assert(#sources>0 and #sources==template:GetAttribute('MeshCount'),'the template '..key..' is not a complete pack template')
   table.sort(sources,function(x,y)return x.Name<y.Name end)
-  local model=Instance.new('Model');model.Name=key;made[#made+1]=model
-  model:SetAttribute('MeshBakeVersion',template:GetAttribute('MeshBakeVersion'));model:SetAttribute('MeshCount',#sources)
-  local vertices=0
-  for _,source in ipairs(sources)do
-   local part=bake(source);part.Parent=model;vertices+=part:GetAttribute('VertexCount')or 0
+  -- R151 (pack shape variations): the Verity pack is the Storm_02 pouch, so it takes Storm_02's variation too (PackShapes151.VariationOf; none when they are off)
+  local id=Shapes.VariationOf(key);local shape
+  if id then local okBox,box=pcall(Shapes.DesignBox,sources);if okBox then shape={Id=id,Box=box}end end
+  f:SetAttribute('ShapeFailure',nil)
+  local okBuild,whyBuild=pcall(build,f,key,template,sources,shape,made)
+  if not okBuild and shape and tostring(whyBuild):find('SHAPE: ',1,true)then
+   -- the variation could not be applied (the EditableMesh API refused a position): the neutral pouch without it is still the real pouch
+   for _,m in ipairs(made)do pcall(function()m:Destroy()end)end;made={}
+   f:SetAttribute('ShapeFailure',tostring(whyBuild):match('SHAPE: ([^\n]*)'))
+   okBuild,whyBuild=pcall(build,f,key,template,sources,nil,made)
   end
-  model:SetAttribute('Neutral',true)
-  model.Parent=f -- the Model first, then the attributes that say it is ready: a client never sees Ready without it
-  f:SetAttribute('Key',key);f:SetAttribute('VertexCount',vertices);f:SetAttribute('MeshCount',#sources)
+  if not okBuild then error(whyBuild,0)end
  end)
  f:SetAttribute('BakeSeconds',os.clock()-started)
  if ok then f:SetAttribute('Ready',true);f:SetAttribute('Failed',false);f:SetAttribute('Finished',true)
@@ -123,6 +148,20 @@ function M.Prepare()
   warn('[R151 Verity pouch] the Verity pack keeps its plain-parts sachet. '..tostring(why):match('^[^\n]*'))
  end
  preparing=false
+ if not watching then
+  -- the owner's /test packshape changed the variation: make the neutral pouch again so the Verity pack follows its design
+  watching=true;require(script.Parent.PackShapes151).OnChanged(function()if Run:IsServer()then M.Rebake()end end)
+ end
  return ok
+end
+-- Server only: forget the baked pouch and bake it again (the pack shape mode changed). Packs built meanwhile use the sachet or the old pouch.
+function M.Rebake()
+ assert(Run:IsServer(),'The Verity pouch is baked on the server.')
+ local f=folder()
+ while preparing do task.wait()end
+ if f:GetAttribute('Finished')~=true then return M.Prepare()end
+ for _,c in ipairs(f:GetChildren())do c:Destroy()end
+ f:SetAttribute('Finished',false);f:SetAttribute('Ready',false);f:SetAttribute('Failed',false);f:SetAttribute('Key',nil);f:SetAttribute('Reason',nil)
+ return M.Prepare()
 end
 return M

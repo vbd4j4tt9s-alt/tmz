@@ -15,6 +15,9 @@
 #  4. run_verity_pouch.sh    (R151 follow-up: the Verity pack is the REAL chip-bag pouch in pure yellow, baked at runtime; the sachet is the fallback) - the
 #                            EditableMesh bake on a mock with a switch for every failure, the pouch pack in every context, the sachet fallback, no leaks,
 #                            and every other pack identical with the pouch ready and without it.
+#  5. run_pack_shapes.sh     (R151 follow-up: chip-bag shape variations designed in Blender, applied at run time to the owner's own pouch meshes) - the field against
+#                            the Blender design's samples, one fixed variation per design name, the EditableMesh bake (every vertex moved, y and the crimps exactly
+#                            where they were, <= 5% outward, colours / UVs kept), every context identical, the fallbacks, the switches and /test packshape.
 #  --mutations   breaks the pack code 13 ways (an unwelded strip, an anchored held part, an unwelded root, the giant tags, a wrong PackLocalFrame, a size
 #                jump between contexts, a part count, a Mech motor, a floating seal, a z-fighting duplicate, a weather part, an unwelded Verity block, a
 #                Void star off the face) and expects the audit to notice each one.
@@ -62,6 +65,9 @@ fi
 
 echo "== the Verity pouch (VerityPouch151): runtime bake, pouch pack, sachet fallback"
 if [ "$MUT" = 1 ];then sh "$HERE/run_verity_pouch.sh" "$OUT/pouch" --mutations;else sh "$HERE/run_verity_pouch.sh" "$OUT/pouch";fi
+
+echo "== the pack shape variations (PackShapes151): the Blender field, the run-time bake, every context, the fallbacks, the switches"
+if [ "$MUT" = 1 ];then sh "$HERE/run_pack_shapes.sh" "$OUT/shapes" --mutations;else sh "$HERE/run_pack_shapes.sh" "$OUT/shapes";fi
 
 if [ "$MUT" = 1 ];then
  echo "== mutations: the audit must notice each broken copy of the pack code"

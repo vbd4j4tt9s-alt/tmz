@@ -107,8 +107,17 @@ local function toolModel(spec,work)
  end
  return model
 end
+local shapeHooked
 local function build(spec,work)
  if spec.Kind=='Pack'then
+  -- R151: an ordinary design's picture is drawn from its reshaped pouch (PackShapes151), which this client bakes at the first use of the design. The build runs in a
+  -- coroutine the picture queue resumes by hand, so it never yields: while the bake is running the build errors "still loading" and is retried in a moment.
+  local v=spec.Variant
+  if v~='EclipseReliquary'and v~='MechLimited'and v~=require(RS:WaitForChild('VerityCatalog')).Variant then
+   local Shapes=require(RS:WaitForChild('PackShapes151'))
+   if not shapeHooked then shapeHooked=true;Shapes.OnChanged(function()P.Reset();P.Hurry()end)end -- (the owner's /test packshape: every picture is drawn again)
+   if Shapes.Pending(require(RS:WaitForChild('SeedPackRules')).DesignKey(spec.Stage,v))then error('Pack shape is still loading',0)end
+  end
   return require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.Angles(0,.22,-.025),nil,1,nil,spec.Stage,spec.Variant,1,1,spec.Mutation)
  elseif spec.Kind=='Seed'then
   local ok,model=pcall(require(RS:WaitForChild('SeedPackVisuals')).Seed,{Id=spec.Id},nil,CFrame.new(),nil,1,nil,spec.Mutation)

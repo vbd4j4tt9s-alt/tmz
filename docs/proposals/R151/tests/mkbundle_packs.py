@@ -20,7 +20,7 @@ for name in ('SeedPackRender', 'SeedPackClient', 'GiantVisualSafety', 'PackOpeni
     if os.path.exists(path):
         pairs[name] = path
 server = os.path.join(src, 'ServerScriptService', 'ChestChaseServer')
-for name in ('MysteryPackService', 'PackPlacement'):
+for name in ('MysteryPackService', 'PackPlacement', 'PackShapeCommand151'):
     path = os.path.join(server, name + '.lua')
     if os.path.exists(path):
         pairs[name] = path
