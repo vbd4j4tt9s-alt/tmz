@@ -59,10 +59,19 @@ K.Config={
  ClickVolume=.8,ClickRollOffMin=16,ClickRollOffMax=90,ClickRange=90,ClickVoices=12,
  ClickGap=1/12,                                           -- per presser: at most one click every 1/12 s, evenly spaced while sprinting
  TierHoldSeconds=3,                                       -- a ClientFxBudget tier change applies after it has held this long
- TeleportBurst=4,                                         -- keys dressed (and released) in a frame where the rows around the runner are missing (a
-                                                          -- teleport): x Bind. A camera turn gets no burst (it is spread over ~8 frames, R149 review)
- FacingThreshold=.25,FacingHoldSeconds=.2,                -- the long side of the window follows the camera along the track (runners carry packs back
-                                                          -- to base facing -Z): it turns once the camera's LookVector.Z passes +-0.25 for 0.2 s
+ TeleportBurst=4,                                         -- the far rows of a window whose rows around the runner were missing (a teleport) are
+                                                          -- dressed at x this Bind; the near zone itself is always dressed at once (below)
+ -- R151 (owner: "keys present on the right of the track but a large area ... shows flat floor with no keys"; on a phone "almost no keys around
+ -- the player"): the window's long side used to follow only the camera's LookVector.Z with a +-0.25 dead zone that KEPT the old way - a camera
+ -- looking across the track (or down at the runner, on a portrait phone) after a run back to base still had its long side behind it and only
+ -- Back rows (5 .. 12 = 41 .. 98 studs) where it looked: bare bed beyond. Now the camera's HEADING (its look direction flattened) picks one of
+ -- three ways: along the track +Z / -Z (heading within ~41 degrees of the axis: the long side that way) or ACROSS it (heading within ~57 degrees
+ -- of sideways, or straight down: a symmetric window, Side rows each way). Between those bands the current way is kept (no flicker), and a
+ -- change holds FacingHoldSeconds. Every way keeps the NEAR zone (Near rows each side of the runner) and the near zone is dressed in the same
+ -- frame whatever the budget (a teleport, a respawn, a tier change); the far rows that are still being dressed show a flat stand-in in the
+ -- biome's key colour (Filler) instead of bare bed.
+ FacingAlong=.75,FacingAcross=.55,FacingHoldSeconds=.2,    -- |heading.Z| >= FacingAlong: along the track; <= FacingAcross: across it
+ FillerDrop=.08,FillerSlabs=8,                            -- the stand-in's top lies FillerDrop under the resting key tops; at most this many slabs
  CameraAbove=.6,                                          -- the camera never sinks under (resting key top + this = 5.8): the real floor is hidden, so it no
                                                           -- longer stops the default camera (Popper) from dropping into the keys / under the bed
  -- letters: PixelsPerStud on every letter SurfaceGui (TextHeight * PixelsPerStud = TextSize <= 100), Margin = the strip's top above the VISIBLE top of
@@ -114,15 +123,17 @@ K.Ease={
 }
 
 -- Per ClientFxBudget tier (3 best .. 1 lowest; phones start on 2). Rows of keys around the runner (all columns, all the same keycap):
--- Back / Ahead = key rows behind / ahead of the runner's row, Hyst = extra rows kept before a row is recycled (no flicker at the window
+-- Back / Ahead = key rows behind / ahead of the runner's row along the camera's way (R151: Back is also the NEAR zone, dressed at once and
+-- never missing, 114 / 90 / 65 studs each side on tier 3 / 2 / 1; a camera looking across the track gets Side = (Back + Ahead) / 2 rows each
+-- way, the same number of keys), Hyst = extra rows kept before a row is recycled (no flicker at the window
 -- edge), Bind = keys dressed per frame (x min(2, dt * 60)). Letters: LegendAhead / LegendBehind rows carry their letters, the farthest
 -- LegendFade rows fade out; LegendRadius = the letters under and around the runner's feet are always shown (other effects keep clear of
 -- that radius, e.g. the Snow-biome dust). PressRange = other runners / keepers farther than this (along the track) press nothing.
 -- KeyLegends = pooled letters for keys that are down (a key's letter rides with it while it moves).
 K.Tiers={
- [3]={Back=12,Ahead=122,Hyst=4,Bind=264,LegendBehind=2,LegendAhead=18,LegendFade=4,LegendRadius=24,PressRange=260,KeyLegends=48},
- [2]={Back=8,Ahead=76,Hyst=2,Bind=198,LegendBehind=2,LegendAhead=12,LegendFade=3,LegendRadius=20,PressRange=200,KeyLegends=32},
- [1]={Back=5,Ahead=46,Hyst=2,Bind=132,LegendBehind=1,LegendAhead=7,LegendFade=2,LegendRadius=16,PressRange=150,KeyLegends=16},
+ [3]={Back=14,Ahead=122,Hyst=4,Bind=264,LegendBehind=2,LegendAhead=18,LegendFade=4,LegendRadius=24,PressRange=260,KeyLegends=48},
+ [2]={Back=11,Ahead=74,Hyst=2,Bind=198,LegendBehind=2,LegendAhead=12,LegendFade=3,LegendRadius=20,PressRange=200,KeyLegends=32},
+ [1]={Back=8,Ahead=45,Hyst=1,Bind=132,LegendBehind=1,LegendAhead=7,LegendFade=2,LegendRadius=16,PressRange=150,KeyLegends=16},
 }
 function K.Tier(tier)return K.Tiers[tier]or K.Tiers[3]end
 
@@ -318,34 +329,51 @@ function K.Geometry(attrs,centerX,fieldWidth)
 end
 
 -- The rows of keys around a focus row (spacebar rows included: the bars are always drawn, the client skips them). facing = +1 when the
--- camera looks toward +Z (into the biomes), -1 toward -Z (back to base): Ahead rows lie that way, Back rows the other. Returns ra, rb (rows
--- wanted) and ka, kb (rows kept: a bound row outside ka .. kb is recycled), all clamped to 1 .. Rows.
+-- camera looks toward +Z (into the biomes), -1 toward -Z (back to base): Ahead rows lie that way, Back rows the other; 0 (R151) when it looks
+-- across the track or straight down: Side rows each way. Returns ra, rb (rows wanted) and ka, kb (rows kept: a bound row outside ka .. kb is
+-- recycled), all clamped to 1 .. Rows.
+function K.Side(tier)local t=K.Tier(tier);return(t.Back+t.Ahead)//2 end
+function K.Near(tier)return K.Tier(tier).Back end
 function K.KeyWindow(geo,tier,focusRow,facing)
  local t=K.Tier(tier);local n=geo.Rows
  local f=max(1,min(n,focusRow))
- local lo,hi=t.Back,t.Ahead;if facing==-1 then lo,hi=hi,lo end
+ local lo,hi=t.Back,t.Ahead
+ if facing==-1 then lo,hi=hi,lo elseif facing==0 then lo=K.Side(tier);hi=lo end
  return max(1,f-lo),min(n,f+hi),max(1,f-lo-t.Hyst),min(n,f+hi+t.Hyst)
 end
 -- Most keys a tier ever has bound at once: the kept window (wanted rows + hysteresis on both sides) times the columns.
 function K.KeyCap(tier,cols)local t=K.Tier(tier);return(t.Back+t.Ahead+1+2*t.Hyst)*cols end
--- Rows whose letters are shown (facing as for KeyWindow), and the letters' transparency at a row d rows ahead of the runner in the
--- facing direction (0 = solid; the farthest LegendFade rows fade out; behind the runner they stay solid).
+-- Rows whose letters are shown (facing as for KeyWindow; across the track: half the letter rows each way), and the letters' transparency at a
+-- row d rows from the runner (d = row - focusRow, signed; 0 = solid; the farthest LegendFade rows fade out; behind the runner they stay
+-- solid). Called with facing nil, d counts rows ahead in the window's way (R149 callers).
+function K.LegendSide(tier)local t=K.Tier(tier);return max(t.LegendBehind,ceil((t.LegendBehind+t.LegendAhead)/2))end
 function K.LegendWindow(geo,tier,focusRow,facing)
  local t=K.Tier(tier);local n=geo.Rows;local f=max(1,min(n,focusRow))
- local lo,hi=t.LegendBehind,t.LegendAhead;if facing==-1 then lo,hi=hi,lo end
+ local lo,hi=t.LegendBehind,t.LegendAhead
+ if facing==-1 then lo,hi=hi,lo elseif facing==0 then lo=K.LegendSide(tier);hi=lo end
  return max(1,f-lo),min(n,f+hi)
 end
--- Which way the window should face for a camera LookVector.Z (keeps `current` inside the dead zone).
-function K.Facing(lookZ,current)
+-- Which way the window should face for the camera's look direction (lookZ, and lookX when known: its heading along the track is then
+-- lookZ / |(lookX, lookZ)|; a camera looking straight down has no heading = across). Keeps `current` between the two bands.
+function K.Facing(lookZ,current,lookX)
  if type(lookZ)~='number'or lookZ~=lookZ then return current or 1 end
- if lookZ>C.FacingThreshold then return 1 elseif lookZ< -C.FacingThreshold then return -1 end
+ local h=lookZ
+ if type(lookX)=='number'and lookX==lookX then
+  local l=math.sqrt(lookX*lookX+lookZ*lookZ)
+  if l<.1 then return 0 end
+  h=lookZ/l
+ end
+ if h>=C.FacingAlong then return 1 elseif h<=-C.FacingAlong then return -1 end
+ if math.abs(h)<=C.FacingAcross then return 0 end
  return current or 1
 end
-function K.LegendAlpha(tier,d)
+function K.LegendAlpha(tier,d,facing)
  local t=K.Tier(tier)
- local start=t.LegendAhead-t.LegendFade
+ local ahead=t.LegendAhead
+ if facing==0 then d=math.abs(d);ahead=K.LegendSide(tier)elseif facing then d*=facing end
+ local start=ahead-t.LegendFade
  if d<=start then return 0 end
- if d>t.LegendAhead then return 1 end
+ if d>ahead then return 1 end
  return(d-start)/(t.LegendFade+1)
 end
 

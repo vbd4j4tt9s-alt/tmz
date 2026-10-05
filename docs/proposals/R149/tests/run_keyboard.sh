@@ -21,6 +21,10 @@
 # Top-face SurfaceGui canvas (x -> world -Z, y -> world +X: the owner's screenshots show R149 put every label but one off the canvas), turned 270 degrees,
 # every key of every bound row has a visible label over it in every biome / tier / with plain-block keys; the spacebar name runs across the track; strips
 # and pressed-key letters follow the key top measured from the keycap template (a taller mesh); 15 new mutations.
+# R151 performance patch (owner's screenshots: a large area near the player with no keys, "almost no keys" on a phone): the window follows the camera's
+# heading (along +Z / -Z, or symmetric when it looks across / down), the NEAR zone (114 / 90 / 65 studs each side) is dressed in the same frame and never
+# missing (section 5d: teleports into every biome, sprints to 2,000 studs/s, tiers 3 / 2 / 1 at 60 and 30 fps, every camera way), far rows still
+# waiting show a flat stand-in in the biome's key colour; 4 new mutations.
 # The R148 suite (docs/proposals/R147/tests/test_keyboard.luau) tested the retired layered design; its runner now runs this suite.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -79,7 +83,7 @@ mutate "one click budget shared by every presser" $S "  local gate=ownGate
 mutate "keys under a hole can be pressed (the hole floats)" $S "   if holeCell[key]then return end" "   if false then return end"
 mutate "letters turned 180 degrees (the R149 orientation: a quarter turn off on the real Top-face canvas)" $S "  l.Rotation=ROT;l.Font=FONT" "  l.Rotation=180;l.Font=FONT"
 mutate "the bed sits at the floor plane (z-fighting)" $R " BedDepth=1.6," " BedDepth=0,"
-mutate "short range (the far keys stop at 330 studs)" $R "[3]={Back=12,Ahead=122," "[3]={Back=12,Ahead=40,"
+mutate "short range (the far keys stop at 330 studs)" $R "[3]={Back=14,Ahead=122," "[3]={Back=14,Ahead=40,"
 mutate "Lava keys back to candy strawberry" $R "Shades={{150,36,28},{198,58,26},{236,108,34},{112,30,30}}" "Shades={{255,120,150},{232,72,104},{255,150,170},{196,48,84}}"
 mutate "three alternating click recordings" $S "sound.SoundId='rbxassetid://'..tostring(C.ClickSoundId)" "sound.SoundId='rbxassetid://'..tostring(C.ClickSoundIds[(i-1)%3+1])"
 # R149 performance patch (review part 1)
@@ -133,5 +137,10 @@ mutate "any ray answer counts, not only the probe's" $S "     if hit and hit.Ins
 mutate "the measured excess is not capped" $R " return min(extra,C.Legend.MaxExtra)" " return extra"
 mutate "the strips are coplanar with the key tops (no margin)" $R "Margin=.04,MaxExtra" "Margin=0,MaxExtra"
 mutate "the canvas of a Top face is width x depth (R149)" $R "function K.TopCanvas(sizeX,sizeZ,pps)return sizeZ*pps,sizeX*pps end" "function K.TopCanvas(sizeX,sizeZ,pps)return sizeX*pps,sizeZ*pps end"
+# R151 performance patch: the near zone is never missing
+mutate "no across way (a camera looking across / down keeps its long side behind it: the owner's bare floor)" $R "if math.abs(h)<=C.FacingAcross then return 0 end" ""
+mutate "the R149 near zone on tier 1 (Back 5 = 41 studs)" $R "[1]={Back=8,Ahead=45,Hyst=1," "[1]={Back=5,Ahead=48,Hyst=1,"
+mutate "no stand-ins (bare bed while the far rows wait)" $S "  if Fill.Update(wa,wb)>0 then pending=true end" ""
+mutate "the stand-ins reach the key-top plane (z-fighting)" $R "FillerDrop=.08," "FillerDrop=0,"
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]

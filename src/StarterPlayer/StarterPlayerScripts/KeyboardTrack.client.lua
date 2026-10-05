@@ -388,7 +388,7 @@ local function start()
      local vis=labelShown(row,c);if st.Vis[i]~=vis then st.Vis[i]=vis;l.Visible=vis end
     elseif st.Vis[i]~=false then st.Vis[i]=false;l.Visible=false end
    end
-   stripAlpha(st,K.LegendAlpha(tier,(row-focusRow)*facing)) -- (st.Alpha is kept across rows: only a changed fade is written)
+   stripAlpha(st,K.LegendAlpha(tier,row-focusRow,facing)) -- (st.Alpha is kept across rows: only a changed fade is written)
    list[k]=st
   end
   stripsOfRow[row]=list;listAdd(stripRows,stripRowPos,row)
@@ -500,25 +500,99 @@ local function start()
   old:Destroy()
   return true
  end
- -- The window of rows: recycle the rows past it (with hysteresis), dress the missing ones nearest first, within the budgets.
- local function windowPass(dt)
+ -- Stand-ins (R151): while far rows of the wanted window wait for their keys (a camera turn spreads them over a few frames, a teleport's far
+ -- side too), each run of them is covered by one flat slab in the biome's mean key colour, its top FillerDrop under the resting key tops,
+ -- instead of showing the bare bed. A slab only covers rows with no keys (nothing is ever coplanar with a key top) and is moved / resized
+ -- only when its run changes; spare slabs are parked out of sight.
+ local Fill={} -- (in a table: start() is near the 200-locals limit)
+ do
+ local fillers,fillerMade={},0
+ local FILL_TOP=K.KeyTop(0)-C.FillerDrop;local FILL_BOTTOM=BED+.02
+ local fillColor={}
+ local function fillerColorOf(stage)
+  local c=fillColor[stage]
+  if not c then
+   local z=K.Zone(stage);local r,g,b=0,0,0
+   for _,s in ipairs(z.Shades)do r+=s[1];g+=s[2];b+=s[3]end
+   local n=#z.Shades;c=Color3.fromRGB(floor(r/n+.5),floor(g/n+.5),floor(b/n+.5));fillColor[stage]=c
+  end
+  return c
+ end
+ local function placeFiller(i,z0,z1,stage)
+  local f=fillers[i]
+  if not f then
+   local p=Instance.new('Part');p.Name='KeyFiller';flat(p);p.Material=Enum.Material.SmoothPlastic;p.Transparency=1;p.CFrame=CF(CX,F-200,0);p.Parent=keyFolder
+   fillerMade+=1;f={Part=p,Z0=nil,Z1=nil,Stage=nil,On=false};fillers[i]=f
+  end
+  if f.Z0~=z0 or f.Z1~=z1 then
+   f.Z0,f.Z1=z0,z1
+   f.Part.Size=V3(HALF*2,FILL_TOP-FILL_BOTTOM,z1-z0);f.Part.CFrame=CF(CX,(FILL_TOP+FILL_BOTTOM)/2,(z0+z1)/2)
+  end
+  if f.Stage~=stage then f.Stage=stage;f.Part.Color=fillerColorOf(stage)end
+  if not f.On then f.On=true;f.Part.Transparency=0 end
+ end
+ local function parkFiller(i)
+  local f=fillers[i]
+  if f and f.On then f.On=false;f.Z0=nil;f.Part.Transparency=1;f.Part.CFrame=CF(CX,F-200,0)end
+ end
+ function Fill.Update(wa,wb)
+  local n=0;local r=wa
+  while r<=wb do
+   if not rowBound[r]and not barOfRow[r]then
+    local r0,seg=r,geo.RowSeg[r]
+    while r<wb and not rowBound[r+1]and not barOfRow[r+1]and geo.RowSeg[r+1]==seg do r+=1 end
+    if n<C.FillerSlabs then n+=1;local z0=geo.RowZ(r0);local _,z1=geo.RowZ(r);placeFiller(n,z0,z1,rowStage[r0])end
+   end
+   r+=1
+  end
+  for i=n+1,fillerMade do parkFiller(i)end
+  return n
+ end
+ end
+ -- The window of rows (R151): recycle the rows past it (with hysteresis); dress the NEAR zone (K.Near rows each side of the runner) in this
+ -- very frame whatever the budget - if the cap is reached, the bound rows farthest from the runner make room; then the rest of the window
+ -- nearest first within the budget (the tier's Bind x min(2, dt x 60), x TeleportBurst after a teleport, plus twice the rows the runner
+ -- crossed since the last pass, so a sprint at any speed never falls behind). A camera turn only moves the far side (the near zone is the
+ -- same both ways): it stays spread over a few frames, the stand-ins covering what waits.
+ local windowPass
+ do
+ local lastPassRow=nil
+ local function releaseFarthest(na,nb)
+  local best,bd=nil,-1
+  for _,r in ipairs(boundRows)do
+   if r<na or r>nb then local d=math.abs(r-focusRow);if d>bd then best,bd=r,d end end
+  end
+  if not best then return false end
+  releaseRow(best);return true
+ end
+ function windowPass(dt)
   local wa,wb,ka,kb=K.KeyWindow(geo,tier,focusRow,facing)
+  local near=K.Near(tier);local na,nb=max(1,focusRow-near),min(geo.Rows,focusRow+near)
   local scale=min(2,max(1,dt*60))
-  -- after a teleport (respawn, a pad) the rows right around the runner are missing: catch up with 4x the budget until they are there.
-  -- A window that turned round (the camera swung to the other way) gets no burst: its long side is dressed nearest first within the
-  -- normal budget (about 8 frames) and the rows it no longer needs are released at the same rate - one hitch of thousands of writes
-  -- on a phone (where the Follow camera turns on every pack carry) became a few cheap frames.
+  -- after a teleport (respawn, a pad) the rows right around the runner were missing: the far side catches up at TeleportBurst x the budget
   local burst=false
-  for r=max(wa,focusRow-2),min(wb,focusRow+2)do if not rowBound[r]and not barOfRow[r]then burst=true;break end end
-  local budget=floor(tierCfg.Bind*scale*(burst and C.TeleportBurst or 1));local relBudget=budget
+  for r=na,nb do if not rowBound[r]and not barOfRow[r]then burst=true;break end end
+  local moved=lastPassRow and math.abs(focusRow-lastPassRow)or 0;lastPassRow=focusRow
+  local budget=floor(tierCfg.Bind*scale*(burst and C.TeleportBurst or 1))+(burst and 0 or min(2*moved,16)*COLS);local relBudget=budget
   local released=0
   for i=#boundRows,1,-1 do
    local r=boundRows[i]
    if(r<ka or r>kb)and released<relBudget then releaseRow(r);released+=COLS end
   end
   local cap=K.KeyCap(tier,COLS);local used=0;local pending=false
-  for d=0,max(focusRow-wa,wb-focusRow)do
+  -- 1. the near zone, now
+  for d=0,near do
    for pass=1,(d==0 and 1 or 2)do
+    local r=pass==1 and focusRow+d or focusRow-d
+    if r>=na and r<=nb and not rowBound[r]and not barOfRow[r]then
+     while boundKeys+COLS>cap and releaseFarthest(na,nb)do released+=COLS end
+     bindRow(r);used+=COLS
+    end
+   end
+  end
+  -- 2. the rest of the window, nearest first, within the budget
+  for d=near+1,max(focusRow-wa,wb-focusRow)do
+   for pass=1,2 do
     local r=pass==1 and focusRow+d or focusRow-d
     if r>=wa and r<=wb and not rowBound[r]and not barOfRow[r]then
      if used+COLS<=max(budget,COLS)and boundKeys+COLS<=cap then bindRow(r);used+=COLS else pending=true end
@@ -531,7 +605,9 @@ local function start()
    if kKey[slot]==0 and shown[slot]then shown[slot]=nil;kPart[slot].Transparency=1 end
   end
   hideN=0
+  if Fill.Update(wa,wb)>0 then pending=true end
   return pending or released>=relBudget
+ end
  end
  local function legendWindowPass()
   local la,lb=K.LegendWindow(geo,tier,focusRow,facing)
@@ -549,7 +625,7 @@ local function start()
    end
   end
   for _,r in ipairs(stripRows)do
-   local a=K.LegendAlpha(tier,(r-focusRow)*facing)
+   local a=K.LegendAlpha(tier,r-focusRow,facing)
    for _,st in ipairs(stripsOfRow[r])do stripAlpha(st,a)end
   end
   -- park the strips no row took again: moved away, and neither drawn nor rendered (their gui is off until they are bound again; a parked
@@ -777,7 +853,7 @@ local function start()
   if klFreeN>0 then e=klFree[klFreeN];klFree[klFreeN]=nil;klFreeN-=1 else klMade+=1;e=newKeyLegend()end
   local col=key%64
   e.Slot=idx;e.Label.Text=K.Legend(row,col);e.Label.TextColor3=inkColor(rowStage[row],row,col)
-  e.Label.TextTransparency=K.LegendAlpha(tier,(row-focusRow)*facing)
+  e.Label.TextTransparency=K.LegendAlpha(tier,row-focusRow,facing)
   e.Gui.Parent=kPart[idx];keyLegendOf[idx]=e;listAdd(klList,klPos,e)
   markLabel(idx)
  end
@@ -962,10 +1038,10 @@ local function start()
   end
   local r=geo.RowOfZ(focusZ);r=max(1,min(geo.Rows,r))
   if r~=focusRow then focusRow=r;windowDirty=true end
-  -- the window's long side follows the camera (a dead zone around sideways, and the turn must hold a moment)
+  -- the window follows the camera: its long side along the track either way, or a symmetric window when it looks across (R151; a change holds a moment)
   local cam=workspace.CurrentCamera
   if cam then
-   local want=K.Facing(cam.CFrame.LookVector.Z,facingWant)
+   local look=cam.CFrame.LookVector;local want=K.Facing(look.Z,facingWant,look.X)
    if frameNo==1 then facing=want end                -- the first window already faces the camera's way
    if want~=facingWant then facingWant=want;facingSince=now end
    if facingWant~=facing and now-facingSince>=C.FacingHoldSeconds then facing=facingWant;windowDirty=true end

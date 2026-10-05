@@ -241,20 +241,27 @@ check(#rm2==4 and near(area,200*100-180*60),'RectMinus: a wider, longer floor le
 check(#K.RectMinus({0,10,0,10},{20,30,0,10})==1 and #K.RectMinus({0,10,0,10},{-5,15,-5,15})==0,'RectMinus: disjoint = whole rect, covered = nothing')
 -- windows per tier: one representation, long range, caps
 local capOk=true
-for tier,want in pairs({[3]={990,3200,140},[2]={600,2000,95},[1]={370,1250,55}})do
+for tier,want in pairs({[3]={990,3200,140},[2]={600,2000,95},[1]={365,1250,55}})do
  local t=K.Tier(tier)
  if t.Ahead*P<want[1]or K.KeyCap(tier,22)>want[2]or t.LegendAhead*P<want[3]then capOk=false end
  local ra,rb,ka,kb=K.KeyWindow(g,tier,300)
  if ra~=300-t.Back or rb~=300+t.Ahead or ka~=ra-t.Hyst or kb~=rb+t.Hyst then capOk=false end
  if K.KeyCap(tier,22)~=(t.Back+t.Ahead+1+2*t.Hyst)*22 then capOk=false end
 end
-check(capOk,'tiers: keys reach >= 990 / 600 / 370 studs ahead (tier 3 / 2 / 1) with at most 3200 / 2000 / 1250 keys; letters >= 140 / 95 / 55 studs ahead')
-local a1,b1=K.KeyWindow(g,3,1);local a2,b2=K.KeyWindow(g,3,728);check(a1==1 and b2==728 and b1==123 and a2==716,'KeyWindow clamps to the track')
+check(capOk,'tiers: keys reach >= 990 / 600 / 365 studs ahead (tier 3 / 2 / 1) with at most 3200 / 2000 / 1250 keys; letters >= 140 / 95 / 55 studs ahead')
+-- R151: the near zone (Back rows) is at least 60 studs each side on every tier (it was 41 on tier 1, 65 on tier 2)
+check(K.Near(3)*P>=110 and K.Near(2)*P>=85 and K.Near(1)*P>=60 and K.Near(1)==K.Tier(1).Back,('R151 near zone: %.0f / %.0f / %.0f studs each side (tier 3 / 2 / 1)'):format(K.Near(3)*P,K.Near(2)*P,K.Near(1)*P))
+do local ok=true;for t=1,3 do local a,b=K.KeyWindow(g,t,300,0);local s=K.Side(t);if a~=300-s or b~=300+s or 2*s>K.Tier(t).Back+K.Tier(t).Ahead or s<K.Near(t)then ok=false end end
+ check(ok,'R151 KeyWindow across the track (facing 0): Side rows each way, never more keys than along it, never less than the near zone')end
+local a1,b1=K.KeyWindow(g,3,1);local a2,b2=K.KeyWindow(g,3,728);check(a1==1 and b2==728 and b1==123 and a2==728-K.Tier(3).Back,'KeyWindow clamps to the track')
 do
  local t=K.Tier(3);local ra,rb,ka,kb=K.KeyWindow(g,3,400,-1)
  check(ra==400-t.Ahead and rb==400+t.Back and ka==ra-t.Hyst and kb==rb+t.Hyst,'KeyWindow facing -Z (a runner carrying a pack back to base): the long side lies toward -Z')
  local la,lb=K.LegendWindow(g,3,400,-1);check(la==400-t.LegendAhead and lb==400+t.LegendBehind,'LegendWindow follows the facing too')
- check(K.Facing(.9,1)==1 and K.Facing(-.9,1)==-1 and K.Facing(.1,-1)==-1 and K.Facing(-.1,1)==1 and K.Facing(0/0,-1)==-1 and K.Facing(.26,-1)==1,'Facing: +-0.25 dead zone around sideways keeps the current way')
+ -- R151: three ways - along +Z, along -Z, across (sideways or straight down: symmetric); between the bands the current way is kept
+check(K.Facing(.9,1)==1 and K.Facing(-.9,1)==-1 and K.Facing(.1,-1)==0 and K.Facing(-.1,1)==0 and K.Facing(0/0,-1)==-1 and K.Facing(.65,-1)==-1 and K.Facing(.65,0)==0
+ and K.Facing(.8,0)==1 and K.Facing(0,1,0)==0 and K.Facing(-.3,1,.05)==-1 and K.Facing(.3,-1,.9)==0,
+ 'Facing (R151): along the track by the camera\'s heading (+-41 deg), across it within +-57 deg of sideways or looking straight down; between, the current way')
 end
 check(K.LegendAlpha(3,0)==0 and K.LegendAlpha(3,-2)==0 and K.LegendAlpha(3,14)==0 and K.LegendAlpha(3,15)>0 and K.LegendAlpha(3,18)<1 and K.LegendAlpha(3,19)==1,'letters fade over their last 4 rows (tier 3: solid to 14 rows ahead, gone after 18)')
 local fadeUp=true;for d=14,18 do if K.LegendAlpha(3,d+1)<K.LegendAlpha(3,d)then fadeUp=false end end;check(fadeUp,'...monotonically')
@@ -1010,11 +1017,12 @@ do
  hum.FloorMaterial=AIR;put(cx(11),F+9,2400);frames(60)
  local function reach()local lo,hi=1e9,-1e9;for _,p in ipairs(keyParts())do local z=p.CFrame.Position.Z;lo=min(lo,z);hi=max(hi,z)end;return 2400-lo,hi-2400 end
  local behind,ahead=reach()
- check(ahead>=990 and behind<=12*P+4*P+P,('facing +Z: keys reach %.0f studs ahead, %.0f behind'):format(ahead,behind))
+ local B3=K.Tier(3).Back;local S3=K.Side(3)
+ check(ahead>=990 and behind<=B3*P+4*P+P,('facing +Z: keys reach %.0f studs ahead, %.0f behind'):format(ahead,behind))
  look(0,100);frames(30);local b2,a2=reach()
- check(near(b2,behind,1e-6)and near(a2,ahead,1e-6),'looking sideways (inside the dead zone) changes nothing')
- look(-100);frames(6);local b3=reach()
- check(near(b3,behind,1e-6),'a glance back shorter than the hold (0.2 s) changes nothing')
+ check(b2>=S3*P-P and a2>=S3*P-P and b2<=(S3+5)*P and a2<=(S3+5)*P,('R151: looking across the track: keys reach %.0f / %.0f studs each way (Side %d rows)'):format(b2,a2,S3))
+ look(-100);frames(6);local b3,a3=reach()
+ check(near(b3,b2,1e-6)and near(a3,a2,1e-6),'a glance back shorter than the hold (0.2 s) changes nothing')
  look(100);frames(30);look(-100)
  local over,settled=0,nil;resetWrites()
  for f=1,60 do
@@ -1023,7 +1031,7 @@ do
   local bb,aa=reach();if not settled and bb>=990 then settled=f end
  end
  local bk,ak=reach()
- check(bk>=990 and ak<=12*P+4*P+P,('after turning round (camera toward -Z): keys reach %.0f studs toward -Z, %.0f toward +Z'):format(bk,ak))
+ check(bk>=990 and ak<=B3*P+4*P+P,('after turning round (camera toward -Z): keys reach %.0f studs toward -Z, %.0f toward +Z'):format(bk,ak))
  -- R149 review part 1: a turn is not a burst any more (it was 4x the budget in two frames); it is dressed nearest first at the normal rate
  local holdFrames=math.ceil(C.FacingHoldSeconds*60)+1;local rowsPerFrame=floor(K.Tier(3).Bind/22)
  check(settled and settled<=holdFrames+math.ceil(K.Tier(3).Ahead/rowsPerFrame)+2,('...the long side is rebuilt within the 0.2 s hold + %d rows a frame (%s frames)'):format(rowsPerFrame,tostring(settled)))
@@ -1064,6 +1072,92 @@ do
  local a,b=K.KeyWindow(g,2,g.RowOfZ(2400),-1);coverage(a,b,'tier 2, facing -Z after the turn')
  look(100);frames(60*2);local a2,b2=K.KeyWindow(g,2,g.RowOfZ(2400),1);coverage(a2,b2,'tier 2, turned back')
  fxTier=3;frames(60*5)
+end
+
+-- 5d. R151 (owner: "keys present on the right of the track but a large area on the left near the player shows flat floor with no keys"; on a phone
+-- "almost no keys around the player"). The keys of the NEAR zone (K.Near rows each side of the runner, every column) must be there EVERY frame:
+-- sprints up to 2,000 studs/s, teleports into every biome, phones (tier 2) and FastMode (tier 1) at 30 fps, the camera looking along, across or
+-- straight down; and every other row of the wanted window holds its keys or the flat stand-in (KeyFiller), never bare bed.
+do
+ local function nearMissing(fr,tierN)
+  local idx=keyIndex();local n=0;local nz=K.Near(tierN)
+  for r=max(1,fr-nz),min(g.Rows,fr+nz)do if not g.BarOfRow[r]then for c=1,22 do local e=idx[r*64+c];if not e or e[1]~=1 then n+=1 end end end end
+  return n
+ end
+ local function fillers()
+  local t={};for _,p in ipairs(keysF:GetChildren())do if p.Name=='KeyFiller'and p.Transparency==0 then local z,h=p.CFrame.Position.Z,p.Size.Z/2;t[#t+1]={z-h,z+h,p}end end;return t
+ end
+ -- rows of a..b with neither keys (all 22) nor a stand-in over them
+ local function bare(a,b)
+  local idx=keyIndex();local f=fillers();local n=0
+  for r=max(1,a),min(g.Rows,b)do if not g.BarOfRow[r]then
+   local keys=0;for c=1,22,7 do local e=idx[r*64+c];if e and e[1]==1 then keys+=1 end end
+   if keys<4 then
+    local za,zb=g.RowZ(r);local covered=false
+    for _,s in ipairs(f)do if s[1]<=za+1e-6 and s[2]>=zb-1e-6 then covered=true end end
+    if not covered then n+=1 end
+   end
+  end end
+  return n
+ end
+ local heads={{'+Z',function(z)look(100)end},{'-Z',function(z)look(-100)end},{'across +X',function(z)look(0,100)end},{'across -X',function(z)look(0,-100)end},
+  {'down',function(z)camera.CFrame=R.CFrame.lookAt(V3(0,60,z),V3(0,0,z+.01))end},{'shallow +Z after a run back',function(z)look(-100);frames(20);camera.CFrame=R.CFrame.lookAt(V3(-40,20,z),V3(60,14,z+30))end}}
+ local worstNear,worstBare,cases,frameAudits=0,0,0,0
+ local lines={}
+ for _,tierN in ipairs({3,2,1})do
+  fxTier=tierN;hum.FloorMaterial=AIR;put(cx(11),F+9,2400);look(100);frames(60*4) -- (the tier change holds 3 s)
+  for _,fps in ipairs({60,30})do
+   local dt=1/fps
+   for _,h in ipairs(heads)do
+    -- teleport into the middle of every biome: the near zone is complete on the very first frame
+    for _,seg in ipairs(g.Segs)do
+     local z=(seg.StartZ+seg.EndZ)/2;put(cx(11),F+9,z);h[2](z);frames(1,dt)
+     local m=nearMissing(g.RowOfZ(z),tierN);worstNear=max(worstNear,m);cases+=1
+     if m>0 then lines[#lines+1]=('tier %d %d fps %s teleport to %s: %d near keys missing'):format(tierN,fps,h[1],seg.Name,m)end
+    end
+    -- sprint: 141 (Lava speeds), 500, 1,000 and 2,000 studs/s for a second each, auditing every frame; after the hold, every wanted row
+    -- carries keys or a stand-in
+    local z=1300
+    for _,speed in ipairs({141,500,1000,2000})do
+     for f=1,fps do
+      z+=speed*dt;if z>5600 then z=-60 end
+      put(cx(11),F+9,z);if h[1]=='down'then h[2](z)end;frames(1,dt)
+      local fr=g.RowOfZ(z);local m=nearMissing(fr,tierN);worstNear=max(worstNear,m);frameAudits+=1
+      if m>0 and #lines<12 then lines[#lines+1]=('tier %d %d fps %s %d studs/s: %d near keys missing'):format(tierN,fps,h[1],speed,m)end
+     end
+    end
+    frames(math.ceil(fps*.5),dt)
+    local fr=g.RowOfZ(z)
+    local wa,wb=K.KeyWindow(g,tierN,fr,h[1]=='+Z'and 1 or h[1]=='-Z'and-1 or(h[1]:find('shallow')and 0)or 0)
+    local nb=bare(wa,wb);worstBare=max(worstBare,nb)
+    if nb>0 and #lines<12 then lines[#lines+1]=('tier %d %d fps %s: %d rows of the window bare'):format(tierN,fps,h[1],nb)end
+   end
+  end
+ end
+ for _,l in ipairs(lines)do print('  '..l)end
+ check(worstNear==0,('R151: the near zone is never missing a key: %d teleports into every biome and %d sprint frames (141 .. 2,000 studs/s), tiers 3 / 2 / 1, 60 and 30 fps, camera along / across / down (worst %d)'):format(cases,frameAudits,worstNear))
+ check(worstBare==0,('R151: half a second later every row of the wanted window holds keys or the stand-in, for every camera way (worst %d bare rows)'):format(worstBare))
+ -- the owner's case: back from a run to base (facing -Z), the camera then looks across the track a little toward +Z: the long side used to stay
+ -- behind (only Back rows where he looked); now the window is symmetric and the far side fills nearest first under stand-ins
+ fxTier=2;put(cx(11),F+9,2400);look(-100);frames(60*4)
+ camera.CFrame=R.CFrame.lookAt(V3(-40,20,2400),V3(60,14,2430)) -- heading ~0.29 toward +Z: across
+ local fr=g.RowOfZ(2400);local S2=K.Side(2);local seenBare=0;local maxFill=0
+ for f=1,40 do
+  frames(1,1/30)
+  if f>math.ceil(C.FacingHoldSeconds*30)+1 then seenBare=max(seenBare,bare(fr-S2,fr+S2))end
+  maxFill=max(maxFill,#fillers())
+ end
+ local lo,hi=1e9,-1e9;for _,p in ipairs(keyParts())do local z=p.CFrame.Position.Z;lo=min(lo,z);hi=max(hi,z)end
+ check(hi-2400>=(S2-1)*P and 2400-lo>=(S2-1)*P,('R151 (the owner\'s screenshot): looking across after a run back, keys reach %.0f studs toward +Z and %.0f toward -Z (Side %d rows); before R151 only %d rows toward +Z'):format(hi-2400,2400-lo,S2,8))
+ check(seenBare==0,'...and while the far side fills no row of the window is bare (stand-ins cover what waits): '..seenBare)
+ check(maxFill>0 and maxFill<=C.FillerSlabs,('...stand-ins were used (%d slabs at most, budget %d)'):format(maxFill,C.FillerSlabs))
+ frames(60)
+ check(#fillers()==0,'...and parked once every row has its keys')
+ -- a stand-in never shares a plane with a key top and sits under the resting tops
+ local fl=nil;for _,p in ipairs(keysF:GetChildren())do if p.Name=='KeyFiller'then fl=p end end
+ check(fl~=nil and near(fl.Size.Y,K.KeyTop(0)-C.FillerDrop-(K.BedTop()+.02),1e-6)and C.FillerDrop>=.04 and C.FillerDrop<=.2,
+  ('a stand-in reaches from the bed to %.2f under the resting key tops (.04 .. .2: never coplanar with a key top, never above one)'):format(C.FillerDrop))
+ fxTier=3;look(100);put(cx(11),F+9,2400);frames(60*4)
 end
 -- 6. other players
 do
