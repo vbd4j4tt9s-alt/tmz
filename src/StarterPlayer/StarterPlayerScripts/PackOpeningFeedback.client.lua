@@ -147,7 +147,9 @@ Run:BindToRenderStep('ChestChasePackCameraReset',Enum.RenderPriority.Camera.Valu
 local function presentation()
  local char=player.Character;local bag=char and char:FindFirstChild('CarriedSeed')
  local tool=char and char:FindFirstChildOfClass('Tool')
- if bag and bag:GetAttribute('SeedPackCarry')and tool and tool:GetAttribute('SeedPackTool')then
+ -- (R152: a pack whose reveal has begun keeps it when the tool is put away: the hotbar switched on the frame of the last click used to
+ -- drop the reveal before it was ever started)
+ if bag and bag:GetAttribute('SeedPackCarry')and(tool and tool:GetAttribute('SeedPackTool')or bag:GetAttribute('RevealAt'))then
   if active~=bag then clear();active=bag end
  elseif active then clear()end
  local now=os.clock()

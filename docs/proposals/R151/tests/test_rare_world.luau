@@ -118,20 +118,23 @@ for rank=6,8 do
  reset();cam.CFrame=CF(0,6,20)
  local bag=reveal(oc,rank);local t0=R.clock;local tl=L.WorldTimeline(rank);local dur=Rules.GetRevealDuration(names[rank])
  local who=Players:GetPlayerFromCharacter(oc)
- local early,pillar,ring,aura,stageSeen,cinematic=false,false,false,false,false,false
+ local early,pillar,ring,aura,stageSeen,cinematic=false,false,false,false,false,false;local landedAt
  X.run(dur-.05,1/30,function(now)
   local t=now-t0;local e=World.Get(who)
   if W.workspace:FindFirstChild('_RarePullStage')then stageSeen=true end
   if M.Active()then cinematic=true end
   if e then
-   if t<tl.Burst-.03 and e.Pillar.Transparency<1 then early=true end
-   if t>tl.Burst+.3 and t<tl.Burst+1 and e.Pillar.Transparency<.8 then pillar=true end
-   if t>tl.Burst+.3 and t<tl.Burst+.8 then for _,s in ipairs(e.Ring)do if s.Transparency<.9 then ring=true end end end
+   -- (R152: the pillar is the sky beam of RarePullFx: it slams down in its last Descent seconds and lands on the burst)
+   if t<tl.Burst-e.Beam.Descent-.03 and e.Beam:Visible()then early=true end
+   if e.Beam.Landed and not landedAt then landedAt=t end
+   if t>tl.Burst+.3 and t<tl.Burst+1 and e.Beam:Visible()then pillar=true end
+   if t>tl.Burst+.3 and t<tl.Burst+.8 then for _,s in ipairs(e.Beam.Ring)do if s.Transparency<.9 then ring=true end end end
   end
  end)
  local e=World.Get(who)
  check(e~=nil,names[rank]..': onlookers get the world effect')
- check(not early and pillar,names[rank]..': a light pillar shoots up on the burst ('..tl.Burst..' s), not before')
+ check(not early and pillar,names[rank]..': the sky beam comes down for the burst ('..tl.Burst..' s), not before')
+ check(landedAt and landedAt>=tl.Burst-.001 and landedAt<tl.Burst+1/30+.001,names[rank]..': and lands on it ('..tostring(landedAt)..' s)')
  check(ring,names[rank]..': a shockwave ring on the ground')
  check(not stageSeen and not cinematic,names[rank]..': onlookers never get the story scene (no hidden stage, no camera)')
  bag:Destroy();X.run(1)
@@ -154,7 +157,7 @@ end
 do -- phone / low quality: fewer pieces
  reset();cam.CFrame=CF(0,6,20);X.lowFx=true
  local bag=reveal(oc,7);local who=Players:GetPlayerFromCharacter(oc);X.run(.1)
- local e=World.Get(who);check(e.Lite and #e.Motes<=6 and #e.Ring<=12,'low quality: fewer motes and ring pieces')
+ local e=World.Get(who);check(e.Lite and #e.Motes<=6 and #e.Beam.Ring<=12 and #e.Beam.Streaks<=1 and e.Beam.Haze==nil,'low quality: fewer motes, ring pieces and beam layers')
  bag:Destroy();World.Clear();X.lowFx=false
 end
 do -- below Secret: no pillar from this module; the R136 / R138 flourish at the new burst
@@ -162,11 +165,11 @@ do -- below Secret: no pillar from this module; the R136 / R138 flourish at the 
  local bag=reveal(oc,5);local who=Players:GetPlayerFromCharacter(oc);local t0=R.clock
  local pillarAt
  X.run(2,1/30,function(now)
-  local o=opening();local f=o and o:FindFirstChild('RevealFlourish',true);local p=f and f:FindFirstChild('Light pillar')
-  if p and p.Transparency<1 and not pillarAt then pillarAt=now-t0 end
+  local o=opening();local f=o and o:FindFirstChild('RevealFlourish',true);local p=f and f:FindFirstChild('Light pillar');local core=p and p:FindFirstChild('Beam core')
+  if core and core.Enabled and not pillarAt then pillarAt=now-t0 end
  end)
  check(World.Get(who)==nil,'Mythic: no Secret+ world effect')
- check(pillarAt and near(pillarAt,L.BurstAt(5),.07),'Mythic: its pillar bursts with the seed at the end of the new suspense ('..tostring(pillarAt)..' s)')
+ check(pillarAt and near(pillarAt,L.BurstAt(5)-.12,.07),'Mythic: its beam comes down onto the seed\'s burst at the end of the new suspense ('..tostring(pillarAt)..' s)')
  bag:Destroy()
 end
 do -- the R150 onlooker impact still plays once for a Secret+ pull

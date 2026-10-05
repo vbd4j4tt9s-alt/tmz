@@ -15,7 +15,16 @@
 -- Secret <= 80 (55); at most 4 lights; CastShadow off; nothing is touched after Destroy().
 local RS=game:GetService('ReplicatedStorage')
 local Rules=require(script.Parent.RarePullRules)
+local Fx=require(script.Parent.RarePullFx)
+local Art=require(script.Parent.RarePullArt)
 local S={}
+-- R152 (owner: "planets have to look good by texturing", "improve look on the beam and assets used in the animations"): the same stages,
+-- dressed better. Images drawn on the client (RarePullArt, ready a while after the client starts) where they help: textured planets with
+-- atmospheres and a ring, nebula clouds and a star map in deep space, a glowing rune circle under the Secret pack, the throne room's carpet,
+-- banners, stained glass and damask walls, a soft halo behind every seed. Without those images (not drawn yet, EditableImage off, low
+-- quality) each piece keeps a dressed fallback of plain parts (a textured material, an atmosphere shell). The King's carry / crown beams are
+-- the layered beam of RarePullFx in gold; every hit is a layered burst (flash, sparks, smoke: RarePullFx.Burst); the pack has a rim of light.
+S.ArtNames={[6]={'runes','glow','halo'},[7]={'planet_gas','planet_rock','planet_ring','nebula_rose','nebula_blue','starmap','glow','halo'},[8]={'carpet','banner','glass','damask','glow','halo'}}
 local V,CF,ANG=Vector3.new,CFrame.new,CFrame.Angles
 local C=Color3.fromRGB
 local NEON,SMOOTH,METAL,MARBLE,FABRIC,WOOD=Enum.Material.Neon,Enum.Material.SmoothPlastic,Enum.Material.Metal,Enum.Material.Marble,Enum.Material.Fabric,Enum.Material.Wood
@@ -33,6 +42,45 @@ end
 function Scene:Place(p,cf)p.CFrame=self.Origin*cf end
 function Scene:Light(parent,color,brightness,range)
  local l=Instance.new('PointLight');l.Color=color;l.Brightness=brightness;l.Range=range;l.Shadows=false;l.Parent=parent;self.Lights+=1;return l
+end
+-- An image drawn by RarePullArt, if it is ready (nil otherwise: the caller keeps its fallback).
+function Scene:Art(name)
+ if self.NoArt then return nil end
+ local state,content=Art.Get(name)
+ if state=='ready'then return content end
+ return nil
+end
+-- A camera-facing image (BillboardGui, unlit) of `size` studs on `parent` (it follows it), or nil when the image is not ready.
+function Scene:Billboard(parent,size,name,color,z)
+ local content=self:Art(name);if not content then return nil end
+ local g=Instance.new('BillboardGui');g.Name='Art '..name;g.Size=UDim2.fromScale(size,size);g.LightInfluence=0;g.AlwaysOnTop=false;g.ResetOnSpawn=false
+ pcall(function()g.MaxDistance=1e5 end)
+ local img=Instance.new('ImageLabel');img.Name='Image';img.BackgroundTransparency=1;img.Size=UDim2.fromScale(1,1);img.ImageColor3=color or C(255,255,255);img.ZIndex=z or 1
+ local ok=pcall(function()img.ImageContent=content end)
+ if not ok then g:Destroy();img:Destroy();return nil end
+ img:SetAttribute('RarePullArt',name);img.Parent=g;g.Parent=parent;self.Images+=1
+ return {Gui=g,Image=img}
+end
+-- An image on a face of a part: unlit (a SurfaceGui: glass, runes, stars) or lit (a Decal / tiled Texture), or nil when not ready.
+function Scene:FaceArt(target,face,name,opts)
+ opts=opts or{}
+ local content=self:Art(name);if not content then return nil end
+ if opts.Unlit then
+  local g=Instance.new('SurfaceGui');g.Name='Art '..name;g.Face=face;g.LightInfluence=0;g.AlwaysOnTop=false;g.ResetOnSpawn=false
+  pcall(function()g.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud;g.PixelsPerStud=opts.PixelsPerStud or 20 end)
+  local img=Instance.new('ImageLabel');img.Name='Image';img.BackgroundTransparency=1;img.Size=UDim2.fromScale(1,1);img.ImageColor3=opts.Color or C(255,255,255)
+  if opts.Tile then img.ScaleType=Enum.ScaleType.Tile;img.TileSize=UDim2.fromOffset(opts.Tile,opts.Tile)end
+  local ok=pcall(function()img.ImageContent=content end)
+  if not ok then g:Destroy();img:Destroy();return nil end
+  img:SetAttribute('RarePullArt',name);img.Parent=g;g.Parent=target;self.Images+=1
+  return {Gui=g,Image=img}
+ end
+ local d=Instance.new(opts.StudsPerTile and'Texture'or'Decal');d.Name='Art '..name;d.Face=face
+ if opts.StudsPerTile then d.StudsPerTileU=opts.StudsPerTile[1];d.StudsPerTileV=opts.StudsPerTile[2]end
+ local ok=pcall(function()d.TextureContent=content end)
+ if not ok then d:Destroy();return nil end
+ d:SetAttribute('RarePullArt',name);d.Parent=target;self.Images+=1
+ return {Decal=d}
 end
 function Scene:Emitter(parent,props)
  local e=Instance.new('ParticleEmitter');e.Texture=SPARK;e.LightEmission=1;e.LightInfluence=0;e.Enabled=false
@@ -98,8 +146,10 @@ end
 function S.Build(rank,opts)
  opts=opts or{}
  local folder=Instance.new('Folder');folder.Name='_RarePullStage'
- local self=setmetatable({Rank=rank,Folder=folder,Origin=CF(opts.Origin or Rules.StageOrigin),Count=0,Lights=0,Lite=opts.Lite==true,Reduced=opts.Reduced==true,Fx={}},Scene)
+ local self=setmetatable({Rank=rank,Folder=folder,Origin=CF(opts.Origin or Rules.StageOrigin),Count=0,Lights=0,Images=0,Lite=opts.Lite==true,Reduced=opts.Reduced==true,Fx={},
+  NoArt=opts.NoArt==true or not Art.Allowed(),FxTier=opts.FxTier or(opts.Lite and math.min(2,Fx.Tier())or Fx.Tier())},Scene)
  local tier=Rules.Tier(rank)
+ pcall(Art.Request,S.ArtNames[rank]or{}) -- (drawn now if they were not yet: ready for the next scene)
  -- the stars
  if opts.Pack then
   local pack=opts.Pack;pack.Parent=folder
@@ -122,6 +172,19 @@ function S.Build(rank,opts)
  self.KeyLight=self:Light(self.Key,C(255,246,232),0,11)
  self.FlashPart=self:Part('Burst light',V(.1,.1,.1),CF(0,-60,0),tier.Glow,SMOOTH,1)
  self.FlashLight=self:Light(self.FlashPart,tier.Theme or tier.Glow,0,24)
+ -- the hit: a layered burst at the pack (flash, sparks, a puff of smoke) in the tier's colours
+ self.Burst=Fx.Burst({Parent=folder,Host=self.FlashPart,Name='Pack burst',Color=tier.Theme or tier.Hint,Glow=tier.Glow,Size=rank==8 and 1.25 or 1.1,Tier=self.FxTier})
+ -- the seed's halo: a soft ring and glow behind it, in the tier's colours, following it (images; without them, none)
+ if opts.Seed then
+  self.HaloAnchor=self:Part('Seed halo',V(.1,.1,.1),CF(0,-60,0),tier.Glow,SMOOTH,1)
+  self.SeedGlow=self:Billboard(self.HaloAnchor,Rules.SeedHeroSize*3.2,'glow',tier.Theme or tier.Glow,1)
+  self.SeedHalo=self:Billboard(self.HaloAnchor,Rules.SeedHeroSize*2.1,'halo',tier.Glow,2)
+ end
+ -- a rim of light around the pack until it bursts (not on low quality / phones)
+ if self.Pack and not self.Lite then
+  local h=Instance.new('Highlight');h.Name='Pack rim';h.Adornee=self.Pack;h.FillTransparency=1;h.OutlineColor=tier.Theme or tier.Glow;h.OutlineTransparency=.45
+  h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;self.PackRim=h
+ end
  if rank==6 then self:_void()elseif rank==7 then self:_space()else self:_throne()end
  folder.Parent=opts.Parent or workspace
  return self
@@ -131,9 +194,16 @@ function Scene:_void()
  local lite=self.Lite;local violet=C(150,80,255);local pale=C(232,210,255)
  self:Box(70,70,34,0,C(10,6,16),C(5,3,10),Enum.Material.Glass,SMOOTH)
  local pack=Rules.Points[6].Pack
- for i=1,(lite and 4 or 8)do
-  local a=(i-1)/(lite and 4 or 8)*math.pi
-  self:Part('Floor seam',V(40,.04,.08),CF(pack.X,.02,pack.Z)*ANG(0,a,0),C(110,50,190),NEON,.62)
+ -- the seal under the pack: a glowing rune circle on the black glass that turns slowly and flares as the lock opens (an image; without it,
+ -- the neon seams of R151)
+ local seal=self:Art('runes')and self:Part('Rune circle',V(16,.04,16),CF(pack.X,.03,pack.Z),C(8,4,14),SMOOTH,0)
+ self.Runes=seal and self:FaceArt(seal,Enum.NormalId.Top,'runes',{Unlit=true,Color=C(186,130,255),PixelsPerStud=16})
+ if seal and not self.Runes then seal:Destroy();self.Count-=1 end
+ if not self.Runes then
+  for i=1,(lite and 4 or 8)do
+   local a=(i-1)/(lite and 4 or 8)*math.pi
+   self:Part('Floor seam',V(40,.04,.08),CF(pack.X,.02,pack.Z)*ANG(0,a,0),C(110,50,190),NEON,.62)
+  end
  end
  local disc=self:Part('Rim glow',V(.1,5,5),CF(pack.X,.04,pack.Z)*ANG(0,0,math.pi/2),violet,NEON,.55,CYL)
  self.Rim=self:Light(disc,violet,1.6,13)
@@ -142,10 +212,19 @@ function Scene:_void()
   Speed=NumberRange.new(.2,.6),Size=NumberSequence.new(8,13),Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.4,.84),NumberSequenceKeypoint.new(1,1)}),Enabled=true})
  pcall(function()self.Fog:Emit(lite and 6 or 14)end)
  local n=lite and 6 or 8
- self.Plates={};self.Bolts={}
+ self.Plates={};self.Bolts={};self.Inlays={}
  for i=1,n do
+  -- (R152: a dark iron plate with a violet inlay along its face that lights up as the lock opens)
   self.Plates[i]=self:Part('Lock plate',V(1.1,.55,.18),CF(0,-60,0),C(34,26,48),METAL,1)
   self.Bolts[i]=self:Part('Lock bolt',V(.22,.22,.22),CF(0,-60,0),violet,NEON,1,BALL)
+  if not lite then -- (a lit strip on its face: a SurfaceGui, no extra part)
+   local g=Instance.new('SurfaceGui');g.Name='Plate inlay';g.Face=Enum.NormalId.Back;g.LightInfluence=0;g.ResetOnSpawn=false;g.CanvasSize=Vector2.new(110,55)
+   local f=Instance.new('Frame');f.Name='Strip';f.AnchorPoint=Vector2.new(.5,.5);f.Position=UDim2.fromScale(.5,.5);f.Size=UDim2.fromScale(.74,.16);f.BorderSizePixel=0
+   f.BackgroundColor3=violet;f.BackgroundTransparency=1;f.Parent=g
+   local cr=Instance.new('UICorner');cr.CornerRadius=UDim.new(.5,0);cr.Parent=f
+   local gr=Instance.new('UIGradient');gr.Color=ColorSequence.new(violet,pale);gr.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.5),NumberSequenceKeypoint.new(.5,0),NumberSequenceKeypoint.new(1,.5)});gr.Parent=f
+   g.Parent=self.Plates[i];self.Inlays[i]=f
+  end
  end
  self.Cracks={}
  local crackSpecs={{-.25,.35,.9,-.9},{.2,.1,1.1,.7},{-.05,-.35,.8,.2},{.35,-.2,.6,-1.2},{-.4,-.1,.55,1.1},{.05,.55,.5,-.3},{-.1,-.65,.6,1.4}}
@@ -168,16 +247,37 @@ function Scene:_space()
  pcall(function()self.Starfield:Emit(lite and 90 or 220)end)
  local stars={{-30,22,-55},{24,30,-60},{-12,40,-58},{36,12,-50},{-44,8,-48},{10,48,-62},{-22,-6,-55},{42,34,-40}}
  for i=1,(lite and 4 or 8)do local s=stars[i];self:Part('Bright star',V(.5,.5,.5),CF(s[1],s[2],s[3]),C(255,255,255),NEON,0,BALL)end
+ -- the star map on the far walls and the ceiling (unlit, tiled; without the image, the particle starfield alone)
+ local box=self.Folder
+ for _,w in ipairs({{'Wall back',Enum.NormalId.Back},{'Wall left',Enum.NormalId.Right},{'Wall right',Enum.NormalId.Left},{'Ceiling',Enum.NormalId.Bottom}})do
+  local wall=box:FindFirstChild(w[1]);if wall then self:FaceArt(wall,w[2],'starmap',{Unlit=true,PixelsPerStud=6,Tile=180,Color=C(220,225,255)})end
+ end
  self.Nebula={}
- local neb={{C(255,90,200),-18,18,-62,34},{C(120,90,255),14,26,-66,40},{C(60,200,255),-2,10,-70,46},{C(255,140,90),26,4,-64,26},{C(150,60,220),-30,34,-60,30}}
- self.NebulaBase={}
- for i=1,(lite and 3 or 5)do local n=neb[i];self.Nebula[i]=self:Part('Nebula',V(.3,n[5],n[5]),CF(n[2],n[3],n[4])*ANG(0,math.pi/2,0)*ANG(0,0,0),n[1],NEON,.88,CYL);self.NebulaBase[i]=self.Nebula[i].CFrame end
+ -- nebulae: clouds of gas drawn on the client, turning very slowly (without the images: the soft neon discs of R151)
+ local neb={{C(255,90,200),-18,18,-62,34,'nebula_rose'},{C(120,90,255),14,26,-66,40,'nebula_blue'},{C(60,200,255),-2,10,-70,46,'nebula_blue'},{C(255,140,90),26,4,-64,26,'nebula_rose'},{C(150,60,220),-30,34,-60,30,'nebula_rose'}}
+ self.NebulaBase={};self.NebulaArt={}
+ for i=1,(lite and 3 or 5)do
+  local n=neb[i]
+  self.Nebula[i]=self:Part('Nebula',V(.3,n[5],n[5]),CF(n[2],n[3],n[4])*ANG(0,math.pi/2,0)*ANG(0,0,0),n[1],NEON,.88,CYL);self.NebulaBase[i]=self.Nebula[i].CFrame
+  local art=self:Billboard(self.Nebula[i],n[5]*1.35,n[6],n[1]:Lerp(C(255,255,255),.25))
+  if art then self.Nebula[i].Transparency=1;art.Image.ImageTransparency=.12;self.NebulaArt[i]=art end
+ end
  self.Planets={}
- local specs={{1.4,C(255,150,110),5.2,.35,true},{2.0,C(110,170,255),7.4,-.25,false},{1.1,C(200,140,255),9.6,.5,true}}
+ -- textured planets: a lit sphere drawn on the client (its image is the planet and its atmosphere rim; the third is ringed). Without the
+ -- images: a ball of a material with its own texture, a soft atmosphere shell, and the neon ring
+ local specs={{1.4,'planet_rock',C(150,160,182),Enum.Material.Slate,5.2,.35,false,C(150,190,255),.74},{2.0,'planet_gas',C(228,150,92),Enum.Material.Sand,7.4,-.25,false,C(255,200,140),.74},
+  {1.1,'planet_ring',C(190,215,240),Enum.Material.Glacier,9.6,.5,true,C(170,220,255),.42}}
  for i,s in ipairs(specs)do
-  local body=self:Part('Planet',V(s[1],s[1],s[1]),CF(0,-60,0),s[2],SMOOTH,0,BALL)
-  local ring=s[5]and self:Part('Planet ring',V(.06,s[1]*2.1,s[1]*2.1),CF(0,-60,0),s[2]:Lerp(C(255,255,255),.4),NEON,.45,CYL)or nil
-  self.Planets[i]={Body=body,Ring=ring,Radius=s[3],Tilt=s[4],Phase=i*2.2}
+  local size=s[1]
+  local body=self:Part('Planet',V(size,size,size),CF(0,-60,0),s[3],s[4],0,BALL)
+  local art=self:Billboard(body,size/s[9],s[2])
+  local shell,ring
+  if art then body.Transparency=1
+  else
+   shell=self:Part('Planet atmosphere',V(size*1.16,size*1.16,size*1.16),CF(0,-60,0),s[8],NEON,.84,BALL)
+   if s[7]then ring=self:Part('Planet ring',V(.06,size*2.1,size*2.1),CF(0,-60,0),s[3]:Lerp(C(255,255,255),.4),NEON,.45,CYL)end
+  end
+  self.Planets[i]={Body=body,Art=art,Shell=shell,Ring=ring,Radius=s[5],Tilt=s[6],Phase=i*2.2}
  end
  self.Galaxy={}
  for arm=1,2 do for j=1,(lite and 7 or 12)do
@@ -199,8 +299,13 @@ function Scene:_throne()
  local lite=self.Lite
  local gold,deepGold,crimson,cream,stone=C(255,200,72),C(196,132,32),C(170,22,40),C(238,226,200),C(214,200,176)
  self:Box(30,48,24,11,C(232,222,204),cream,MARBLE,SMOOTH)
- -- floor trim and carpet
- self:Part('Carpet',V(4.2,.08,38),CF(0,.04,15.5),crimson,FABRIC)
+ -- (R152) damask on the walls (tiled; without the image, the plain cream walls)
+ for _,w in ipairs({{'Wall back',Enum.NormalId.Back},{'Wall left',Enum.NormalId.Right},{'Wall right',Enum.NormalId.Left}})do
+  local wall=self.Folder:FindFirstChild(w[1]);if wall then self:FaceArt(wall,w[2],'damask',{StudsPerTile={5,5}})end
+ end
+ -- floor trim and carpet (R152: woven with gold borders and a running diamond; without the image, plain crimson)
+ local carpet=self:Part('Carpet',V(4.2,.08,38),CF(0,.04,15.5),crimson,FABRIC)
+ self:FaceArt(carpet,Enum.NormalId.Top,'carpet',{StudsPerTile={4.2,8.4}})
  self:Part('Carpet edge',V(.22,.1,38),CF(-2.2,.05,15.5),gold,METAL);self:Part('Carpet edge',V(.22,.1,38),CF(2.2,.05,15.5),gold,METAL)
  -- wainscot trims
  for _,x in ipairs({-14.4,14.4})do
@@ -214,14 +319,16 @@ function Scene:_throne()
   self:Part('Pillar capital',V(2.4,.8,2.4),CF(x,19.2,z),stone,MARBLE)
   self:Part('Gold collar',V(.3,1.75,1.75),CF(x,3,z)*ANG(0,0,math.pi/2),gold,METAL,0,CYL)
   local side=x<0 and 1 or -1
-  self:Part('Banner',V(.1,7,2.2),CF(x+side*.9,13,z),crimson,FABRIC)
+  local banner=self:Part('Banner',V(.1,7,2.2),CF(x+side*.9,13,z),crimson,FABRIC)
+  self:FaceArt(banner,side>0 and Enum.NormalId.Right or Enum.NormalId.Left,'banner')
   self:Part('Banner rod',V(.2,.2,2.8),CF(x+side*.92,16.6,z),gold,METAL)
   if not lite then self:Part('Banner crown',V(.14,.8,1),CF(x+side*.95,13.6,z),gold,NEON,.15)end
  end end
  -- windows with slanting light shafts
  local wz=lite and{20,2}or{20,11,2}
  for _,x in ipairs({-14.3,14.3})do for _,z in ipairs(wz)do
-  self:Part('Window',V(.2,6,2.4),CF(x,12,z),C(255,236,190),NEON,.12)
+  local window=self:Part('Window',V(.2,6,2.4),CF(x,12,z),C(255,236,190),NEON,.12)
+  self:FaceArt(window,x<0 and Enum.NormalId.Right or Enum.NormalId.Left,'glass',{Unlit=true,PixelsPerStud=24})
   if not lite then self:Part('Window frame',V(.3,.3,2.8),CF(x,15.1,z),gold,METAL)end
   local inward=x<0 and 1 or -1
   self:Part('Light shaft',V(.4,20,3),CF(x+inward*6,6,z)*ANG(0,0,inward*.62),C(255,240,200),NEON,.9)
@@ -270,10 +377,14 @@ function Scene:_throne()
   local flag=self:Part('Trumpet banner',V(.06,.9,1.1),CF(0,-60,0),crimson,FABRIC)
   self.Trumpets[#self.Trumpets+1]={Tube=tube,Bell=bell,Flag=flag,X=x}
  end
- -- the beams: carrying the pack in, and over the throne for the crown
- self.CarryBeam=self:Part('Carry beam',V(30,3,3),CF(0,-60,0)*ANG(0,0,math.pi/2),C(255,240,200),NEON,1,CYL)
- self.CrownBeam=self:Part('Crown beam',V(20,3.2,3.2),CF(pk.X,pk.Y+10,pk.Z)*ANG(0,0,math.pi/2),C(255,240,200),NEON,1,CYL)
- self.BeamLight=self:Light(self.CrownBeam,C(255,226,160),0,18)
+ -- the beams (R152: the layered beam of RarePullFx in gold, coming down from the ceiling): one carries the pack in, following it down the
+ -- carpet; one crowns it on the throne (it has the light)
+ local tl=Rules.Timeline(8,self.Reduced and'Calm'or'Full')
+ self.CarryBeam=Fx.Beam({Parent=self.Folder,Name='Carry beam',Ground=self.Origin.Position,Height=20,Width=2.4,Color=gold,Glow=C(255,244,214),Arrive='fade',
+  Land=tl.SceneIn,Hold=math.max(.1,tl.Land+.3-tl.SceneIn),Fade=.4,Impact=false,Light=false,Tier=self.FxTier,Reduced=self.Reduced})
+ self.CrownBeam=Fx.Beam({Parent=self.Folder,Name='Crown beam',Ground=(self.Origin*CF(pk.X,pk.Y-Rules.PackHeroHeight*.5,pk.Z)).Position,Height=19,Width=2.7,Color=gold,Glow=C(255,246,220),Arrive='fade',
+  Land=tl.CrownStart+.4,Hold=tl.Climax+.6-(tl.CrownStart+.4),Fade=1.2,Impact=false,Light=true,Tier=self.FxTier,Reduced=self.Reduced})
+ self.BeamLight=self.CrownBeam.Light;self.Lights+=1
  -- the crown: band, points with jewels
  self.Crown={}
  local seg=lite and 6 or 8
@@ -317,6 +428,12 @@ function Scene:_placeSeed(pos,alpha,t)
  else
   self:Place(self.Key,CF(pos+V(0,1.2,3.2)));self.KeyLight.Brightness=1.8*alpha
  end
+ -- the halo behind the seed (it follows it)
+ if self.HaloAnchor then
+  self:Place(self.HaloAnchor,CF(pos-V(0,0,1.1))) -- (just behind the seed: its glow never lies over the seed itself)
+  if self.SeedGlow then self.SeedGlow.Image.ImageTransparency=1-.5*alpha end
+  if self.SeedHalo then self.SeedHalo.Image.ImageTransparency=1-.7*alpha;self.SeedHalo.Image.Rotation=self.Reduced and 0 or t*25 end
+ end
 end
 function Scene:Update(t,tl)
  if self.Destroyed then return end
@@ -328,6 +445,8 @@ function Scene:Update(t,tl)
  local burst=t-tl.Climax
  self:Place(self.FlashPart,CF(pos))
  self.FlashLight.Brightness=burst>=0 and 6*math.max(0,1-burst/.6)or 0
+ if burst<0 then self.Burst:Place(self.Origin*CF(pos))elseif not self.Burst.Fired then self.Burst:Fire(self.Origin*CF(pos))end
+ if self.PackRim then self.PackRim.Enabled=burst<0 and alpha>.05 end
  if rank==6 then self:_updateVoid(t,tl,pos,burst)elseif rank==7 then self:_updateSpace(t,tl,pos,burst,spos,glow)else self:_updateThrone(t,tl,pos,burst,spos)end
 end
 function Scene:_updateVoid(t,tl,pos,burst)
@@ -368,6 +487,18 @@ function Scene:_updateVoid(t,tl,pos,burst)
  self:PlaceRing(self.Wave,pos,.6+wk*(self.Reduced and 2 or 7),.18*(1-wk)+.02,burst<0 and 1 or .15+.85*wk)
  self.Wisps.Enabled=burst>=0 and t<tl.FloatEnd
  self.Rim.Brightness=1.2+(t>=tl.Unlock and t<tl.Climax and 1.5*clamp01((t-tl.Unlock)/.5)or 0)
+ -- the rune circle turns slowly, brightens as the lock opens, flares on the hit and dims as the seed takes over
+ local open=clamp01((t-tl.Unlock)/math.max(.05,tl.Silence-tl.Unlock))
+ if self.Runes then
+  local img=self.Runes.Image;img.Rotation=self.Reduced and 0 or t*4
+  local glow=.42+.4*open+(burst>=0 and .18*math.max(0,1-burst/.6)or 0)
+  if burst>=0 then glow*=1-.55*clamp01((burst-.5)/1.2)end
+  img.ImageTransparency=1-glow
+ end
+ for i,inlay in pairs(self.Inlays or{})do
+  local plate=self.Plates[i]
+  if plate then inlay.BackgroundTransparency=math.max(plate.Transparency,.6-.55*open)end
+ end
 end
 function Scene:_updateSpace(t,tl,pos,burst,spos,glow)
  for i,p in ipairs(self.Planets)do
@@ -381,8 +512,10 @@ function Scene:_updateSpace(t,tl,pos,burst,spos,glow)
   local r=p.Radius*(1+1.5*out)
   local c=pos+V(math.cos(a)*r,math.sin(a)*r*.35+math.sin(a)*p.Tilt*r*.3,-math.sin(a)*r*.6-1)
   self:Place(p.Body,CF(c))
-  p.Body.Transparency=clamp01(out*1.4)
-  if p.Ring then self:Place(p.Ring,CF(c)*ANG(.4,0,math.pi/2+.3));p.Ring.Transparency=math.max(.45,clamp01(out*1.4))end
+  local fade=clamp01(out*1.4)
+  if p.Art then p.Art.Image.ImageTransparency=fade else p.Body.Transparency=fade end
+  if p.Shell then self:Place(p.Shell,CF(c));p.Shell.Transparency=.84+.16*fade end
+  if p.Ring then self:Place(p.Ring,CF(c)*ANG(.4,0,math.pi/2+.3));p.Ring.Transparency=math.max(.45,fade)end
  end
  local g=clamp01((t-tl.SpinUp)/.6);local suck=clamp01((t-tl.Implode)/math.max(.05,tl.Silence-tl.Implode))
  local n=#self.Galaxy/2
@@ -402,14 +535,12 @@ function Scene:_updateSpace(t,tl,pos,burst,spos,glow)
  self.Trail.Enabled=burst>=0 and glow>.05 and not self.Reduced
  -- (R152: turned by the clock, not by a fixed step per frame: at 240 fps the nebulae spun four times as fast as at 60)
  for i,n2 in ipairs(self.Nebula)do if not self.Reduced then n2.CFrame=self.NebulaBase[i]*ANG(.03*i*t,0,0)end end
+ for i,a in pairs(self.NebulaArt or{})do a.Image.Rotation=self.Reduced and 0 or t*(1.5+i*.4)end -- (the clouds turn very slowly, by the clock)
 end
 function Scene:_updateThrone(t,tl,pos,burst,spos)
  -- the carry beam follows the pack down the carpet
- local carrying=t>=tl.SceneIn and t<tl.Land+.3
- self:Place(self.CarryBeam,CF(pos.X,pos.Y+15,pos.Z)*ANG(0,0,math.pi/2))
- self.CarryBeam.Transparency=carrying and .86+.1*clamp01((t-tl.Land)/.3)or 1
- local beam=t>=tl.CrownStart and(t<tl.Climax and clamp01((t-tl.CrownStart)/.4)or 1-clamp01((t-tl.Climax-.6)/1.2))or 0
- self.CrownBeam.Transparency=1-beam*.16;self.BeamLight.Brightness=beam*1.6+(burst>=0 and burst<.5 and 3*(1-burst/.5)or 0)
+ self.CarryBeam:Update(t,(self.Origin*CF(pos-V(0,Rules.PackHeroHeight*.5,0))).Position)
+ self.CrownBeam:Update(t)
  -- trumpets raise and sound at the fanfare
  local raise=clamp01((t-tl.Fanfare+.35)/.35)
  for _,tr in ipairs(self.Trumpets)do

@@ -284,6 +284,22 @@ L.Shots={
   Calm={K('SceneIn',0,V(2.2,6.4,4.2),V(0,5.2,-4.6),52,true),K('Climax',0,V(0,7.1,4.0),V(0,6.9,-2.8),50,true)}},
 }
 local function keyTime(tl,k)return(tl[k.Beat]or 0)+(k.Offset or 0)end
+-- (R152: one flowing path through the keys - a Hermite curve whose speed carries on through each key - instead of easing to a stop at every
+-- key and setting off again: the camera no longer halts on each beat. It still eases out of the first key and into the last, and comes to
+-- rest before a cut. Tangents: the neighbours' difference over their time span, so it never overshoots far.)
+local function slope(keys,tl,i,field)
+ local k,prev,nxt=keys[i],keys[i-1],keys[i+1]
+ if not prev or not nxt or k.Cut or nxt.Cut then return nil end
+ local span=keyTime(tl,nxt)-keyTime(tl,prev);if span<1e-3 then return nil end
+ return(nxt[field]-prev[field])/span
+end
+local function hermite(p0,p1,m0,m1,u,span)
+ local u2,u3=u*u,u*u*u
+ local v=p0*(2*u3-3*u2+1)+p1*(3*u2-2*u3)
+ if m0 then v=v+m0*((u3-2*u2+u)*span)end
+ if m1 then v=v+m1*((u3-u2)*span)end
+ return v
+end
 -- Eye, target (stage-local Vector3) and FieldOfView at time t.
 local function keyedShot(rank,tl,t)
  local keys=L.Shots[rank][tl.Variant=='Calm'and'Calm'or'Full']
@@ -293,8 +309,9 @@ local function keyedShot(rank,tl,t)
   local a,b=keys[i],keys[i+1];local ta,tb=keyTime(tl,a),keyTime(tl,b)
   if t<tb then
    if b.Cut then return a.Eye,a.Target,a.Fov end
-   local u=smooth((t-ta)/math.max(1e-3,tb-ta))
-   return a.Eye:Lerp(b.Eye,u),a.Target:Lerp(b.Target,u),a.Fov+(b.Fov-a.Fov)*u
+   local span=math.max(1e-3,tb-ta);local u=clamp01((t-ta)/span)
+   return hermite(a.Eye,b.Eye,slope(keys,tl,i,'Eye'),slope(keys,tl,i+1,'Eye'),u,span),hermite(a.Target,b.Target,slope(keys,tl,i,'Target'),slope(keys,tl,i+1,'Target'),u,span),
+    hermite(a.Fov,b.Fov,slope(keys,tl,i,'Fov'),slope(keys,tl,i+1,'Fov'),u,span)
   end
  end
  local last=keys[#keys];return last.Eye,last.Target,last.Fov
@@ -323,6 +340,9 @@ L.Points={
  [8]={Pack=V(0,4.6,-4.6),Enter=V(0,5.6,22),Seed0=V(0,7.4,-4.6),Seed1=V(0,6.3,-1.0)},
 }
 local function jitter(t,seed)return math.sin(t*61+seed)*math.sin(t*23+seed*2.3)end
+-- (R152: a pack's shake swells in over `fadeIn` and settles over the last .06 s before it ends: it used to start at full strength, the pack
+-- jumping a few hundredths of a stud on the first frame, and snap still on the last)
+local function swell(t,from,to,fadeIn)return smooth((t-from)/fadeIn)*smooth((to-t)/.06)end
 -- Returns position, yaw, roll, alpha (1 = visible) and a shake amount for the pack.
 function L.PackPose(rank,tl,t)
  local P=L.Points[rank];local pos=P.Pack;local yaw=0;local roll=0;local alpha=1;local shake=0
@@ -330,14 +350,14 @@ function L.PackPose(rank,tl,t)
  if rank==6 then
   pos=pos+V(0,.08*math.sin(t*1.6),0);yaw=math.sin(t*.45)*.3
   for _,g in ipairs({'Glitch1','Glitch2'})do local a=t-(tl[g]or -9);if a>=0 and a<.22 then pos=pos+V(jitter(t,1)*.14,jitter(t,2)*.06,0);roll=jitter(t,3)*.08 end end
-  if t>=tl.Unlock and t<tl.Silence then shake=.03+.07*clamp01((t-tl.Unlock)/(tl.Silence-tl.Unlock))end
+  if t>=tl.Unlock and t<tl.Silence then shake=(.03+.07*clamp01((t-tl.Unlock)/(tl.Silence-tl.Unlock)))*swell(t,tl.Unlock,tl.Silence,.1)end
  elseif rank==7 then
   local d=easeOut((t-tl.SceneIn)/math.max(.01,tl.Drift-tl.SceneIn))
   pos=(P.Drift and tl.Drift>tl.SceneIn)and P.Drift:Lerp(P.Pack,d)or P.Pack
   local spin=.5+13.5*easeIn((t-tl.SpinUp)/math.max(.01,tl.Implode-tl.SpinUp))
   yaw=t*.5+(t>tl.SpinUp and(t-tl.SpinUp)*spin*.5 or 0);roll=math.sin(t*.3)*.3
   if t>=tl.Implode then alpha=math.min(alpha,1-clamp01((t-tl.Implode)/math.max(.01,tl.Silence-tl.Implode)))end
-  if t>=tl.SpinUp and t<tl.Silence then shake=.02+.05*clamp01((t-tl.SpinUp)/(tl.Silence-tl.SpinUp))end
+  if t>=tl.SpinUp and t<tl.Silence then shake=(.02+.05*clamp01((t-tl.SpinUp)/(tl.Silence-tl.SpinUp)))*swell(t,tl.SpinUp,tl.Silence,.1)end
  else
   if tl.Land>tl.SceneIn then
    local g=smooth((t-tl.SceneIn)/math.max(.01,tl.Glide-tl.SceneIn))
@@ -346,7 +366,7 @@ function L.PackPose(rank,tl,t)
    -- (R152: set down with a smooth curve; the ease-out started at full speed the frame the glide had stopped)
    if t>=tl.Glide then pos=above:Lerp(P.Pack,smooth((t-tl.Glide)/math.max(.01,tl.Land-tl.Glide)))end
   end
-  if t>=tl.CrownOn and t<tl.Silence then shake=.02+.09*easeIn((t-tl.CrownOn)/(tl.Silence-tl.CrownOn))end
+  if t>=tl.CrownOn and t<tl.Silence then shake=(.02+.09*easeIn((t-tl.CrownOn)/(tl.Silence-tl.CrownOn)))*swell(t,tl.CrownOn,tl.Silence,.08)end
  end
  return pos,yaw,roll,alpha,shake
 end
@@ -360,7 +380,7 @@ function L.SeedPose(rank,tl,t,still)
  if rank==7 then
   local k=clamp01((t-tl.Climax)/math.max(.01,tl.StarIn-tl.Climax))
   if t<tl.StarIn then
-   local e=smooth(k);pos=P.Pack:Lerp(P.Seed0,e)+V(0,math.sin(k*math.pi)*.25,0);glow=1-e
+   local e=smooth(k);pos=P.Pack:Lerp(P.Seed0,e)+V(0,math.sin(k*math.pi)^2*.25,0);glow=1-e -- (R152: an arc that also arrives at rest: sin² not sin)
   else pos=P.Seed0 end
  else
   local from=P.Pack

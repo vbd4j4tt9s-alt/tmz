@@ -59,8 +59,14 @@ function M.SeedInfo(seedId,tool)
 end
 function M.SeedModel(seedId,mutation)
  local r=remotes();local art=r and r:FindFirstChild('SeedArt');local seeds=art and art:FindFirstChild('Seeds');local template=seeds and seeds:FindFirstChild(seedId)
- if not template then return nil end
- local seed=template:Clone();seed.Name='RarePullSeed';seed:SetAttribute('SeedMotionManaged',true)
+ local seed
+ if template then seed=template:Clone()
+ else -- (R152: not published (yet): built here with the same art code, so the card / scene still shows the seed)
+  local ok,m=pcall(function()return require(RS.SeedPackVisuals).Seed({Id=seedId},1,CFrame.new(),nil,1,nil,'None')end)
+  if not ok or typeof(m)~='Instance'then return nil end
+  seed=m
+ end
+ seed.Name='RarePullSeed';seed:SetAttribute('SeedMotionManaged',true)
  for _,tag in ipairs(Collection:GetTags(seed))do Collection:RemoveTag(seed,tag)end
  pcall(function()require(RS.PlantVisuals).Coat(seed,mutation)end)
  for _,d in ipairs(seed:GetDescendants())do
@@ -335,7 +341,10 @@ function M._start(info)
  -- audio (every slot was preloaded when the client started: Bind)
  local slots={};local seen={};for _,c in ipairs(run.Cues)do if not seen[c.Slot]then seen[c.Slot]=true;slots[#slots+1]=c.Slot end end
  pcall(Audio.Preload,slots)
- local okA=pcall(Audio.Begin,run.Cues,run.Clock(),run.TL.Length);run.Audio=okA
+ -- (R152: the sounds belong to this run even when their first frame failed - the sheet is set and plays on - so its end always stops them;
+ -- an error there used to leave them playing after the reveal)
+ local okA,errA=pcall(Audio.Begin,run.Cues,run.Clock(),run.TL.Length);run.Audio=true
+ if not okA then warn('[RarePull] sounds: '..tostring(errA))end
  -- the hit and the moment the seed is shown, for the announcements
  local climax=run.Kind=='Ladder'and run.TL.Burst or run.TL.Climax
  local now=workspace:GetServerTimeNow();local t=run.Clock()
@@ -385,10 +394,15 @@ end
 -- Every frame -------------------------------------------------------------------------------------------------------------------------
 -- R152: one failing piece (the card, the grade, the stage, a sound) is switched off for the rest of the presentation and logged once;
 -- the reveal plays on and ends on its own clock. Only the camera / timeline failing ends it (cleanly, restoring everything).
+-- (R152: a piece that fails once skips that frame only; one failing three frames in a row is left out for the rest of the reveal. A single
+-- bad frame used to freeze the card for the whole reveal.)
 local function part(run,name,fn,...)
- if run.Broken and run.Broken[name]then return end
+ local n=run.Broken and run.Broken[name]
+ if n and n>=3 then return end
  local ok,err=pcall(fn,...)
- if not ok then run.Broken=run.Broken or{};run.Broken[name]=true;warn('[RarePull] '..name..' failed, the reveal goes on without it: '..tostring(err))end
+ if ok then if n then run.Broken[name]=nil end;return end
+ run.Broken=run.Broken or{};n=(n or 0)+1;run.Broken[name]=n
+ if n==1 then warn('[RarePull] '..name..' failed (the frame goes on without it): '..tostring(err))elseif n==3 then warn('[RarePull] '..name..' keeps failing, the reveal goes on without it')end
 end
 M.Part=part
 local function shake(run,t)
@@ -482,8 +496,13 @@ function M._stepScene(run,pg,t,tl,tier,cam)
  end
  if run.InStage then
   -- (the stage is the picture itself: if it fails the scene cuts back to the world and the result card shows what was pulled)
+  -- (R152: a single bad frame is skipped; three in a row and it cuts back to the world)
   local okS,errS=pcall(run.Scene.Update,run.Scene,t,tl)
-  if not okS then warn('[RarePull] stage: '..tostring(errS));finish(run,'error');return end
+  if okS then run.StageErrors=nil
+  else
+   run.StageErrors=(run.StageErrors or 0)+1;if run.StageErrors==1 then warn('[RarePull] stage: '..tostring(errS))end
+   if run.StageErrors>=3 then finish(run,'error');return end
+  end
   local eye,target,fov=Rules.Shot(run.Rank,run.Variant,t,tl)
   local origin=run.Scene.Origin
   local cf=origin*CFrame.lookAt(eye,target)*shake(run,t)
@@ -545,6 +564,7 @@ end
 function M.Bind(scriptInstance)
  local player=lp();if not player then return end
  pcall(Audio.Preload) -- R152: every reveal sound loads now, long before the first pack is opened (it used to load as the reveal began)
+ pcall(function()require(script.Parent.RarePullArt).Warm()end) -- R152: and the images of the story scenes are drawn a while later
  local conns={}
  conns[#conns+1]=player:GetAttributeChangedSignal('RarePullPreview'):Connect(function()
   local v=player:GetAttribute('RarePullPreview');if type(v)~='string'then return end

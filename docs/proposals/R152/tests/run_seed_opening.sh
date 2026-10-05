@@ -9,6 +9,14 @@
 #                               on the silence, at 30 / 60 / 144 fps, every tier and presentation; nothing outlives its presentation; skip /
 #                               abort / death / the script destroyed clean up; two fast openings hand over; the music duck; cold files; the
 #                               chat line after the puller's seed.
+#  test_seed_fx.luau          - the look: the client-drawn images (sizes, the same every time, see-through, seamless tiles, drawn a slice
+#                               at a time, none on low quality); the stages with and without them (budgets, fallbacks); every beam /
+#                               emitter / light / image anchored to its subject; the sky beam (slam, landing on its beat, ground impact,
+#                               tiers); clean-up on skip / close / a second pack; smoothness at 30 and 60 fps (no pop, no kink, the same
+#                               picture at both); particle and layer budgets per tier.
+#  test_seed_stress.luau      - reliability: the real client scripts, a slow join, then 240 random openings (every tier, seed, pack,
+#                               device; fast second packs, deaths + respawns, the tool put away, errors injected in each step): every
+#                               one produces its reveal and ends clean; nothing leaks.
 # "all" (default) also runs the suites that touch the same files: R151 run_rare_pull.sh (only), R150 run_sfx.sh, R138, R151 run_announce.sh,
 # R150 test_packs (in run_sfx.sh), R147 Verity UI and R149 Verity pack.
 set -e
@@ -24,7 +32,7 @@ INV=$P/inventory_R113/tests
 cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$P/R150/tests/sfx_env.luau" "$P/R151/tests/rare_env.luau" "$HERE"/*.luau "$OUT/cl/"
 python3 "$P/R151/tests/mkbundle_rare.py" "$OUT/cl" all-client >/dev/null
 cd "$OUT/cl"
-for t in test_seed_sync test_seed_loudness;do
+for t in test_seed_sync test_seed_loudness test_seed_fx test_seed_stress;do
  [ -f $t.luau ] || continue
  echo "== $t"
  timeout 1800 /opt/luau/luau $t.luau > $t.log 2>&1 || { grep -v '^WARN' $t.log | tail -40;exit 1; }

@@ -11,6 +11,18 @@
 -- and phone keep the same framing (RarePullRules.Layout); ReducedMotion: no float, spin, jitter or moving motes; lite: fewer pieces.
 local RS=game:GetService('ReplicatedStorage')
 local Rules=require(script.Parent.RarePullRules)
+-- R152 (owner: "improve look on ... the card, the seed display"): a soft glow and, from Legendary up, a turning halo ring behind the seed,
+-- and the Cosmic title's planets, drawn on the client (RarePullArt: the same images the story scenes use); the R151 shapes otherwise.
+local Art do local ok,m=pcall(require,script.Parent.RarePullArt);Art=ok and m or nil end
+local function artImage(parent,name,props)
+ if not Art then return nil end
+ local state,content=Art.Get(name);if state~='ready'then return nil end
+ local img=Instance.new('ImageLabel');img.BackgroundTransparency=1;img.BorderSizePixel=0;img.Active=false
+ for k,v in pairs(props)do img[k]=v end
+ local ok=pcall(function()img.ImageContent=content end)
+ if not ok then img:Destroy();return nil end
+ img:SetAttribute('RarePullArt',name);img.Parent=parent;return img
+end
 local Card={};Card.__index=Card
 local C=Color3.fromRGB;local WHITE=C(255,255,255);local BLACK=C(0,0,0)
 local function new(class,props,parent)
@@ -94,9 +106,20 @@ function Card.Create(gui,kind,opts)
   local view=new('ViewportFrame',{Name='Seed',BackgroundTransparency=1,AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,L.Seed.Y),Size=UDim2.fromScale(L.Seed.H,L.Seed.H),
    ImageTransparency=1,ZIndex=6,Ambient=C(170,170,182),LightColor=C(255,250,240),LightDirection=Vector3.new(-.6,-1,-.8),Visible=false},root)
   new('UIAspectRatioConstraint',{AspectRatio=1,DominantAxis=Enum.DominantAxis.Height},view)
-  local glow=frame(root,'Seed glow',tier.Glow,5,{Position=UDim2.fromScale(.5,L.Seed.Y),Size=UDim2.fromScale(L.Seed.H*1.05,L.Seed.H*1.05),BackgroundTransparency=1,Visible=false})
-  round(glow);new('UIAspectRatioConstraint',{AspectRatio=1,DominantAxis=Enum.DominantAxis.Height},glow) -- (sized by the screen height, like the seed)
-  new('UIGradient',{Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.35),NumberSequenceKeypoint.new(1,1)})},glow)
+  local glow=artImage(root,'glow',{Name='Seed glow',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,L.Seed.Y),Size=UDim2.fromScale(L.Seed.H*1.5,L.Seed.H*1.5),
+   ImageColor3=tier.Glow,ImageTransparency=1,ZIndex=5,Visible=false})
+  if glow then self.GlowIsImage=true
+  else
+   glow=frame(root,'Seed glow',tier.Glow,5,{Position=UDim2.fromScale(.5,L.Seed.Y),Size=UDim2.fromScale(L.Seed.H*1.05,L.Seed.H*1.05),BackgroundTransparency=1,Visible=false})
+   round(glow)
+   new('UIGradient',{Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.35),NumberSequenceKeypoint.new(1,1)})},glow)
+  end
+  new('UIAspectRatioConstraint',{AspectRatio=1,DominantAxis=Enum.DominantAxis.Height},glow) -- (sized by the screen height, like the seed)
+  if rank>=4 then
+   self.SeedHalo=artImage(root,'halo',{Name='Seed halo',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,L.Seed.Y),Size=UDim2.fromScale(L.Seed.H*1.25,L.Seed.H*1.25),
+    ImageColor3=(tier.Theme or tier.Hint):Lerp(WHITE,.25),ImageTransparency=1,ZIndex=5,Visible=false})
+   if self.SeedHalo then new('UIAspectRatioConstraint',{AspectRatio=1,DominantAxis=Enum.DominantAxis.Height},self.SeedHalo)end
+  end
   self.View=view;self.SeedGlow=glow
   local cam=Instance.new('Camera');cam.Name='Seed camera';cam.FieldOfView=30;cam.Parent=view;view.CurrentCamera=cam;self.ViewCamera=cam
   self.ViewScale=new('UIScale',{Scale=1},view)
@@ -120,10 +143,15 @@ function Card.Create(gui,kind,opts)
   for i=1,(self.Lite and 4 or 7)do
    local s=frame(root,'Title star '..i,WHITE,13,{Size=UDim2.fromScale(.012,.012),Rotation=45,Visible=false,BackgroundTransparency=0});new('UIAspectRatioConstraint',{AspectRatio=1},s);self.Stars[i]=s
   end
-  self.Planets={}
+  self.Planets={};self.PlanetImages={}
   for i,c in ipairs({C(255,170,120),C(140,200,255)})do
-   local p=round(frame(root,'Title planet '..i,c,13,{Size=UDim2.fromScale(.022+.008*i,.022+.008*i),Visible=false,BackgroundTransparency=0}));new('UIAspectRatioConstraint',{AspectRatio=1},p)
-   local ringF=frame(p,'Ring',WHITE,13,{Size=UDim2.fromScale(1.9,.35),BackgroundTransparency=1,Rotation=-18});round(ringF);new('UIStroke',{Color=WHITE,Thickness=1.5,Transparency=.35},ringF)
+   local size=.022+.008*i
+   local p=artImage(root,i==1 and'planet_gas'or'planet_ring',{Name='Title planet '..i,AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromScale(size*(i==1 and 1.35 or 2.4),size*(i==1 and 1.35 or 2.4)),ZIndex=13,Visible=false})
+   if p then new('UIAspectRatioConstraint',{AspectRatio=1},p);self.PlanetImages[i]=true
+   else
+    p=round(frame(root,'Title planet '..i,c,13,{Size=UDim2.fromScale(size,size),Visible=false,BackgroundTransparency=0}));new('UIAspectRatioConstraint',{AspectRatio=1},p)
+    local ringF=frame(p,'Ring',WHITE,13,{Size=UDim2.fromScale(1.9,.35),BackgroundTransparency=1,Rotation=-18});round(ringF);new('UIStroke',{Color=WHITE,Thickness=1.5,Transparency=.35},ringF)
+   end
    self.Planets[i]=p
   end
  else
@@ -247,7 +275,8 @@ function Card:_dress(t,since,alpha)
   end
   for i,p in ipairs(self.Planets)do
    local a=(self.Reduced and 0 or t*(.9+.3*i))+i*math.pi;p.Visible=alpha>.01
-   p.Position=UDim2.fromScale(.5+math.cos(a)*.21,y+math.sin(a)*L.Title.H*.55);p.BackgroundTransparency=1-alpha
+   p.Position=UDim2.fromScale(.5+math.cos(a)*.21,y+math.sin(a)*L.Title.H*.55)
+   if self.PlanetImages[i]then p.ImageTransparency=1-alpha else p.BackgroundTransparency=1-alpha end
    p.ZIndex=math.sin(a)>0 and 13 or 9
   end
  end
@@ -261,12 +290,14 @@ function Card:_seed(t,appear,floatEnd,outAt,goneAt)
  if not self.View then return end
  local out=1-clamp01((t-outAt)/math.max(.01,goneAt-outAt))
  local shown=t>=appear and out>0
- self.View.Visible=shown;self.SeedGlow.Visible=shown
+ self.View.Visible=shown;self.SeedGlow.Visible=shown;if self.SeedHalo then self.SeedHalo.Visible=shown end
  if not shown then return end
  local k=clamp01((t-appear)/.2);local f=clamp01((t-appear)/math.max(.05,floatEnd-appear))
  local y=self.Layout.Seed.Y+(self.Reduced and 0 or(-.03+.06*Rules.Smooth(f))-.03*Rules.EaseIn(1-out))
  self.View.Position=UDim2.fromScale(.5,y);self.SeedGlow.Position=self.View.Position
- self.View.ImageTransparency=1-k*out;self.SeedGlow.BackgroundTransparency=1-.55*k*out
+ self.View.ImageTransparency=1-k*out
+ if self.GlowIsImage then self.SeedGlow.ImageTransparency=1-.6*k*out else self.SeedGlow.BackgroundTransparency=1-.55*k*out end
+ if self.SeedHalo then self.SeedHalo.Position=self.View.Position;self.SeedHalo.ImageTransparency=1-.65*k*out;self.SeedHalo.Rotation=self.Reduced and 0 or t*30 end
  self.ViewScale.Scale=self.Reduced and 1 or .6+.4*(1-(1-k)^3)
  if self.SeedModel and self.SeedBase then
   local yaw=Rules.SeedYaw(t,self.Reduced)

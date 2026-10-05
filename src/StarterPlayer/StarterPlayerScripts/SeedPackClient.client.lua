@@ -74,11 +74,29 @@ local function cosmeticPart(name,parent,color,size)
     p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=false
     p.Material=Enum.Material.Neon;p.Transparency=1;p.Parent=parent;return p
 end
-local function beginReveal(record,at,seedId,now)
-    local seeds=library:FindFirstChild("Seeds")
+-- R152 (owner: "sometimes the animation not playing"): the published art and catalog are looked up again for each reveal (one rebuilt on
+-- the server left this client holding a destroyed folder, and no pack opened visibly again), and a seed missing from them (not there yet,
+-- left out of the catalog) is built here with the same art code (SeedPackVisuals.Seed) instead of its reveal never starting.
+local function seedTemplate(seedId)
+    local lib=remotes:FindFirstChild("SeedArt")or library
+    local seeds=lib and lib:FindFirstChild("Seeds")
     local template=seeds and seeds:FindFirstChild(seedId)
-    local definition=catalog:FindFirstChild(seedId)
-    if not template or not definition or not record.Bag.PrimaryPart then return end
+    if template then return template,false end
+    local ok,model=pcall(Visuals.Seed,{Id=seedId},1,CFrame.new(),nil,1,nil,"None")
+    if ok and typeof(model)=="Instance" then return model,true end
+    return nil,false
+end
+local function seedName(seedId)
+    local cat=remotes:FindFirstChild("SeedCatalog")or catalog
+    local definition=cat and cat:FindFirstChild(seedId)
+    local name=definition and definition:GetAttribute("DisplayName")
+    if not name then local spec=Rules.SeedDesignById and Rules.SeedDesignById[seedId];name=spec and spec.name end
+    return name or "Seed"
+end
+local function beginReveal(record,at,seedId,now)
+    if not record.Bag.PrimaryPart then return end
+    local template,built=seedTemplate(seedId)
+    if not template then return end
     local name,rarity=Rules.GetRarity(seedId)
     record.RarityRank=rarity.Rank;record.RarityName=name
     record.Duration=record.Bag:GetAttribute("RevealDuration") or Rules.GetRevealDuration(name)
@@ -120,7 +138,7 @@ local function beginReveal(record,at,seedId,now)
         local scrap=cosmeticPart("Paper scrap",effect,paper,Vector3.new(.07,.11,.02));scrap.Material=Enum.Material.SmoothPlastic
         record.Scraps[i]=scrap
     end
-    local seed=template:Clone();seed.Name="RewardSeed"
+    local seed=built and template or template:Clone();seed.Name="RewardSeed"
     seed:SetAttribute("SeedMotionManaged",true);CollectionService:RemoveTag(seed,Rules.SeedMotion.Tag)
     require(ReplicatedStorage:WaitForChild("PlantVisuals")).Coat(seed,record.Bag:GetAttribute("PackMutation"))
     seed.Parent=effect;record.Seed=seed
@@ -138,7 +156,7 @@ local function beginReveal(record,at,seedId,now)
     label.AlwaysOnTop=false;label.MaxDistance=65;label.Parent=seed.PrimaryPart
     local text=Instance.new("TextLabel");text.Size=UDim2.fromScale(1,1);text.BackgroundTransparency=1
     TextFit.Attach(text,16,9)
-    text.Text=(definition:GetAttribute("DisplayName")or "Seed").."\n"..require(ReplicatedStorage.NoticeCopy83).Rarity(name)
+    text.Text=seedName(seedId).."\n"..require(ReplicatedStorage.NoticeCopy83).Rarity(name)
     text.TextXAlignment=Enum.TextXAlignment.Center;text.TextYAlignment=Enum.TextYAlignment.Center;
     text.Font=Enum.Font.FredokaOne;text.TextSize=18;text.TextColor3=rarity.Color;text.TextStrokeTransparency=.2;text.Parent=label
     for _,p in ipairs(seed:GetDescendants())do
@@ -154,8 +172,9 @@ local function beginReveal(record,at,seedId,now)
     for i=1,count do record.Celestial[i]=cosmeticPart("Rarity light",effect,rarity.Color,Vector3.one*.08)end
     if rarity.Rank>=3 then record.SeedMotion=Visuals.CreateSeedMotion(seed,effect,true)end
     -- R136: Legendary / Mythic pulls get a charge-up and a burst (pillar, shockwave, sparkles, sound for onlookers).
-    record.Flourish=require(ReplicatedStorage:WaitForChild("RevealFlourish")).Create(effect,rarity.Rank,record.Bag:GetAttribute("VisualScale")or 1)
     local lowFx=false;pcall(function()lowFx=require(ReplicatedStorage.ClientFxBudget).Low()end)
+    -- (R152: the pack's own seam glow is there, so the flourish adds none at the mouth; its beam follows the effects budget)
+    record.Flourish=require(ReplicatedStorage:WaitForChild("RevealFlourish")).Create(effect,rarity.Rank,record.Bag:GetAttribute("VisualScale")or 1,{Suspense=true,Tier=lowFx and 1 or nil})
     record.Suspense=Suspense.Create(effect,rarity.Rank,record.Bag:GetAttribute("VisualScale")or 1,record.Quick,lowFx);record.Suspense:SetPack(copy)
     if rarity.Rank>=6 and RareWorld then
         local owner=ownerOf(record.Bag.Parent)
@@ -436,7 +455,8 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
             end
             if record.Effect then
                 local ok,err=pcall(renderReveal,record,now)
-                if not ok then
+                if ok then record.RenderErrors=nil -- (one bad frame is skipped; three in a row and this reveal is let go)
+                else
                     record.RenderErrors=(record.RenderErrors or 0)+1
                     if record.RenderErrors==1 then warn("[SeedPackClient] reveal frame failed: "..tostring(err))end
                     if record.RenderErrors>=3 then record.FailedAt=at;pcall(destroyEffect,record)end
