@@ -124,7 +124,8 @@ function A.Build(base,level)
  for _,sign in ipairs({-1,1})do for i=1,#zs-1 do span(V(sign*side,0,zs[i]),V(sign*side,0,zs[i+1]))end end
  for i=0,5 do span(V(-side+i*side/3,0,back),V(-side+(i+1)*side/3,0,back))end
  for _,sign in ipairs({-1,1})do span(V(sign*side,0,front),V(sign*(side+16)/2,0,front));span(V(sign*(side+16)/2,0,front),V(sign*16,0,front))end
- -- The 32-stud opening has no arch, tall posts, beam, name board or roof.
+ -- The 32-stud opening itself stays clear (no posts, beam or roof inside it). R151 (owner approved): HubDecor151 stands a name arch
+ -- just outside it - two posts beside the opening and a beam 14 studs over the pad with the owner's name.
  ownerBadge(base,root,pad,front)
  -- Compact framed plaque mounted on the entrance's right fence span.
  local boardFrame=CF(35,5.6,front-1.3)*CFrame.Angles(math.rad(10),math.pi,0)

@@ -24,7 +24,7 @@ for(const spec of specs){
     fs.writeFileSync(path.join(out,`${name}_${v.name}.png`),Buffer.from(url.split(',')[1],'base64'));
     console.log('wrote',name,v.name,((Date.now()-t0)/1000).toFixed(1)+'s');
   }
-  if((!only||only.includes('plan'))&&(!sceneViews||sceneViews.includes('plan'))){
+  if(V.plan&&(!only||only.includes('plan'))&&(!sceneViews||sceneViews.includes('plan'))){
     const p=V.plan;
     const url=await page.evaluate(([p])=>window.shoot(window.__scene,p.w,p.h,{ortho:p.ortho,shadowAt:[p.ortho[0],4,p.ortho[1]],shadowExtent:420,clip:[-420,420,-700,-60]}),[p]);
     fs.writeFileSync(path.join(out,`${name}_plan.png`),Buffer.from(url.split(',')[1],'base64'));console.log('wrote',name,'plan');

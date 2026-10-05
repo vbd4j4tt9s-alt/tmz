@@ -130,6 +130,8 @@ function MapService.new(config)
 	self.ChestsFolder = self.SeedsFolder -- legacy server alias; never player-facing
 	require(script.Parent.MarketLayout).Apply(mapRoot)
  require(game:GetService('ReplicatedStorage').WalkthroughProps90).Bind(mapRoot)
+ -- R151 Seed Festival Square: the dressed hub walls, murals, track gate, streets and base arches (the client adds trees and props).
+ do local ok,err=pcall(function()require(script.Parent.HubDecor151).Apply(mapRoot)end);if not ok then warn('[R151] Hub dressing skipped: '..tostring(err))end end
 	self.EconomyHub = requireChild(config, mapRoot, "EconomyHub", "Folder")
 	self.BuyStation = requireChild(config, self.EconomyHub, "BuyStation", "BasePart")
 	self.SellStation = requireChild(config, self.EconomyHub, "SellStation", "BasePart")

@@ -9,7 +9,8 @@
 -- (text drawn on faces), point lights and particle emitters.
 -- Globals (set by the runner): REDESIGN (bool), PHASE (1 = the server half only, 2 = + the client "life" layer), WALL ('tall' = the dressed
 -- 48-stud wall | 'low' = owner option: 30-stud visible wall + skyline), SLOTS (draw the reserved future slots as ghosts), OWNERS (base index ->
--- display name, for the name banners), RUNNER = {x, z}.
+-- display name, for the name banners), RUNNER = {x, z}. BUILT = true: the real R151 src (HubDecor151 via MapService + HubLife151.client) instead
+-- of the scratch builder; CLIENT_TIER (1..3) for the client.
 local Z=require('./zfight_world');local W=Z.W;local R=Z.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local RS=W.RS
 local Run=W.service('RunService');Run.IsServer=function()return true end;Run.IsClient=function()return false end;Run.IsStudio=function()return false end
@@ -97,7 +98,7 @@ local pg=R.new('PlayerGui');pg.Name='PlayerGui';pg.Parent=player
 function W.workspace.BulkMoveTo(_,parts,cfs)for i,p in ipairs(parts)do p.CFrame=cfs[i]end end
 function R.Inst.Play()end;function R.Inst.Stop()end
 W.service('ContentProvider').PreloadAsync=function()end
-W.stub('ClientFxBudget',{Get=function()return 3 end,Low=function()return false end})
+W.stub('ClientFxBudget',{Get=function()return CLIENT_TIER or 3 end,Low=function()return(CLIENT_TIER or 3)==1 end})
 local RUNNER=RUNNER or{0,-60}
 local model=R.new('Model');model.Name='Tester'
 local root=R.new('Part');root.Name='HumanoidRootPart';root.Size=V3(2,2,1);root.Transparency=1;root.Parent=model
@@ -107,6 +108,16 @@ step('KeyboardTrack.client',function()local sc=R.new('LocalScript');sc.Name='Key
 -- the test player is just faster than the Jungle keeper (so the gate shows Forest and Jungle ticked on his screen)
 pcall(function()player:SetAttribute('PhysicalWalkSpeed',W.module('KeeperPursuit').EscapeSpeed(6)+.5)end)
 if REDESIGN and Dress and(PHASE or 2)>=2 then step('HubDressing151 (client)',function()Dress.BuildClient(map,{Wall=WALL or'tall',Player=player,Slots=SLOTS});W.frames(5)end)end
+-- BUILT: the real R151 code of this checkout (MapService already ran HubDecor151); the real client script builds the life layer, with every
+-- detail level shown (renders look from many places).
+if BUILT and(PHASE or 2)>=2 then step('HubLife151.client',function()
+ local sc=R.new('LocalScript');sc.Name='HubLife151';sc:SetAttribute('R151TestHook',true);sc.Parent=player:FindFirstChild('PlayerGui')
+ local api=W.load('HubLife151Client',sc);assert(api,'no test hook')
+ assert(api.Build(),'HubLife151 build failed')
+ api.Near.detail=1e6;api.Near.fine=1e6;api.ApplyLod();api.ApplyKeys();api.ApplySigns()
+ if NIGHT then for _,l in ipairs(api.State.Ctx.Lights)do l.Enabled=true end end
+ BUILT_API=api
+end)end
 model.Parent=nil -- (the test runner's invisible root is not drawn anyway)
 -- Dump ---------------------------------------------------------------------------------------------------------------------------------
 local playable={}

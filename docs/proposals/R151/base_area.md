@@ -2,6 +2,8 @@
 
 Design proposal with renders. **Nothing in `src/` was changed**, and no installer was made. A coder builds it after you approve.
 
+> **Update (5 Oct 2026): approved and built.** You said *"i like this design and polish the trees, give them more variety and the stuff and everything"*. Phase 1 and Phase 2 are now in `src/`, with much more variety than the proposal. See **§8 As built** and the `base_area_built_*.png` pictures. The sections below are the original proposal, kept as written.
+
 Your question (5 Oct 2026): *"I also want you to take a look at a redesign of the base area and the walls what can we add to liven up the base area"*.
 
 **How to read this**
@@ -398,3 +400,147 @@ Known preview limits:
    - The 163 findings on the whole map are the pre-existing ones: keyboard, market fruit art and track meshes, the same before and after.
    - Getting to zero took fixes during design: arch footings against fence foundations, curb ends, bench legs, snow caps on the mural mountains, and the tower bottoms.
 4. **Render.** `preview/render_base_area.mjs` draws `preview/base_area_views.json`'s cameras with three.js (`preview/base_area.html`) in headless Chromium (swiftshader). `preview/make_base_area_sheets.py` writes the PNGs.
+
+---
+
+## 8. As built (R151 implementation)
+
+You approved theme A (Seed Festival Square), the dressed 48-stud walls, base arches with "NAME'S BASE", and speeds on the gate keys. You also asked for much more variety in the trees and props. This section records what was built. It describes the code in this checkout.
+
+### Pictures (the real `src` builders, preview renderer)
+| Picture | What it shows |
+|---|---|
+| `base_area_built_spawn.png` … `_avenue.png` | The proposal's cameras, plus a new avenue view. Each sheet has TODAY (before R151) and the LOW TIER (phones on low or FastMode) small, and AS BUILT (desktop tier) large. Sheets: spawn, street, entrance, walls, backwall, gate, aerial, avenue. |
+| `base_area_built_darkened.png` | The lamps switched on in The Darkened's blackout. |
+| `base_area_built_variety.png` | 14 close-ups of the tree and prop variety: oaks, blossoms, fruit trees, poplars, Desert and Lava gardens, the Snow lane, the fountain, a bed, the market square, two murals, the gate keys with green ticks, and a free base's arch. |
+| `base_area_built_plan.png` | The built hub from above, with zones and the part budget the tests counted. |
+
+The pictures are still previews, not Roblox screenshots: no Roblox lighting, PBR materials, bloom or Fredoka font. The approved pack mesh isn't available offline, so the fountain shows its part-built fallback pack.
+
+### Files
+| File | What |
+|---|---|
+| `src/ReplicatedStorage/HubDecorKit151.lua` (new) | Shared kit: palette, the 7 biomes in track order, wall-section frames, mural / banner / pilaster / gate positions, the reserved corners, the streets, a deterministic RNG and part constructors (anchored, no touch / query). |
+| `src/ServerScriptService/ChestChaseServer/HubDecor151.lua` (new) | **Phase 1**, server-built once: `Workspace.ChestChaseMap.HubDecor151`. `Apply(map)` can be called twice (it rebuilds cleanly). |
+| `src/ServerScriptService/ChestChaseServer/MapService.lua` | **One hook**, after `WalkthroughProps90.Bind`: `pcall(HubDecor151.Apply, mapRoot)`. On failure it warns `[R151] Hub dressing skipped` and the game carries on. |
+| `src/ReplicatedStorage/HubLifeArt151.lua` (new) | **Phase 2** builders and the layout: the tree species, props, fountain, LOD cells. |
+| `src/StarterPlayer/StarterPlayerScripts/HubLife151.client.lua` (new) | **Phase 2** client: builds `workspace.HubLife151`, then handles detail by distance, ambience, lamps, gate-key ticks, signposts, sound zones, streaming and teardown. |
+| `src/ServerScriptService/ChestChaseServer/GardenFenceArt.lua` | Comment only. The old "no arch" note now says the arch stands just outside the opening (choice 4). |
+| `src/MANIFEST.tsv` | 4 new rows. |
+
+### What was built
+- **Walls (server, Persistent):**
+  - The 5 saved wall parts keep their CFrame, Size, CanCollide and opacity. They're restyled to cream Plaster, with the old colour and material kept as attributes. The 13 old timber strips are hidden.
+  - Added: stone plinth and cap, a gold string course, a clipped hedge, and pilasters on stone bases.
+  - The pilasters carry topiary balls or two-tier topiary.
+  - Four corner towers stand at the outer corners, outside the reserved display corners.
+  - Wall lanterns are on the client.
+- **7 murals (server, Persistent):** a relief scene of about 30 pieces per biome, in track order (Forest, Jungle, Desert, Snow, Lava, Crystal, Storm Peaks). Each has a gold frame, a plaque with the number and name, and a number keycap.
+- **6 wall banners:** in the base colours, with a stripe, a swallowtail and the base number.
+- **Track gate (server, Persistent):**
+  - Two towers, which are **the only parts that collide**. Each has a plinth, bands, a roof and a finial.
+  - A beam with trim and a cornice, the crest and the "THE TRACK" sign, and 7 flags.
+  - **7 keycaps** (the `R142Keycap` model), each showing its keeper's speed (`KeeperPursuit.EscapeSpeed`, the Progression81 / SpeedPoints text).
+- **Streets (server):**
+  - The run-up's seven biome lanes, the front, side and south streets, the avenue and the brick market square.
+  - The stage circle, the fountain plaza and the corner circles.
+  - Base spurs with curbs in the base colour and a welcome mat.
+  - Garden walks and nooks with edging, the back lane, and curbs.
+- **Base arches (server):** one per base, just outside the 32-stud opening.
+  - Two posts on footings with bands, balls and pennants.
+  - A name beam 14+ studs over the pad. Outside it reads "BEN'S BASE", or "FREE BASE" for an empty base; inside it reads "BASE 1".
+  - A number medallion.
+  - The name follows `BaseOwnerDisplayName`: HubDecor151 listens to it directly.
+- **Trees, 58, with deterministic per-tree variation** (scale, lean, turn, shade, crown layering):
+  - 14 round oaks in 3 sizes;
+  - 8 poplars and cypresses;
+  - 8 blossoms (pink, white, lilac) with falling petals near the camera;
+  - 8 fruit trees (apple, orange, lemon, plum);
+  - 6 pines with snow rims on the Snow lane;
+  - 5 palms and 4 cacti (saguaro, barrel) in the Desert garden;
+  - 5 ember trees and 4 glowing basalt rocks in the Lava garden.
+- **Props:**
+  - 16 bushes (garden, desert and ember kinds), and potted topiary cones and balls.
+  - Mixed flower beds (warm and cool mixes, three heights).
+  - 26 lamps (18 posts, 4 doubles, 4 bollards; 8 with a real light) and 14 wall lanterns.
+  - 13 benches (wood, garden, stone) and 2 signposts listing the owners.
+  - 6 bunting strings, crossed over the avenue and strung to the market's eaves.
+  - Grass patches, pebbles, flower verges at the bases, 12 butterflies.
+  - **The Seed Fountain:** bowls, a jet, water arcs, ripples and sparkles. A `SeedPackVisuals.Bag` pack sits on the jet, with a part-built fallback.
+- **Client behaviour:**
+  - **Device tier:** read from `ClientFxBudget` (FastMode gives tier 1).
+    - Tier 1 builds only the core level: trunks, main crowns, lamps, benches, beds, the fountain.
+    - Tier 2 adds the detail level.
+    - Tier 3 (desktop) adds the fine level.
+  - **Detail by distance:** per-100-stud cells, checked every 0.5 s.
+    - Detail shows within 230 studs (160 on tier 2). Fine detail shows within 130 studs.
+    - Everything is hidden when the camera is far down the track.
+  - **Ambience:** one RenderStepped handler (butterflies via `BulkMoveTo`, the jet, the pack and the ripples). It's connected **only** on tier 2+, with Reduced Motion off, within 150 studs of the fountain or a butterfly. Reduced Motion also stops the particles.
+  - **Lamps:** they switch on when The Darkened dims the hub (`EnvironmentLighting.Level` > 0.3) or in Rain / Thunderstorm.
+  - **Gate keys:** a key turns green with a tick, on that player's screen only, once their `PhysicalWalkSpeed` beats that keeper's speed.
+  - **Sound zones:** birds on the lawns, a crystal shimmer and a lava rumble. They use the `BiomeMood` audio ids through `AudioMixer` (Ambience).
+  - **Streaming and teardown:** if `HubDecor151` goes, the props go; when it comes back, the client rebuilds. Destroying the script removes everything.
+
+### Part budget (counted by the tests)
+| | Parts |
+|---|---|
+| **Server, Phase 1** | **725**: Walls 203, Murals 256, Base arches 96, Paths 76, Gate 52, Banners 42 |
+| Client tier 1 (phones on low, FastMode) | 435 (core) |
+| Client tier 2 | 435 core + 664 detail = 1,099 built; on a phone at the front street, 696 visible (435 + 261) |
+| Client tier 3 (desktop) | 1,150 built (+51 fine); visible at the front street 435 + 456 + 30, at the fountain 435 + 471 + 13 |
+| Lights | 8 PointLights, no shadows, on only in the dark |
+
+This is more than the proposal (527 + 609), because you asked for more variety. The extra Phase 1 parts are the richer murals, more curbs and edging, banner swallowtails and the corner towers. The extra Phase 2 parts are the 15+ tree kinds and the fountain. Detail by distance keeps phones near the proposal's numbers.
+
+### Changes from the proposal
+- The gate-key ticks and the sound zones live in `HubLife151.client.lua`. There is no separate `HubGateKeys151` script, and `KeeperSpeedLabels` and `BiomeMood` are not edited.
+- The arch names come from HubDecor151's own listener. GardenFenceArt has only the comment change.
+- The corner towers moved to the outer corners, so the two reserved back corners stay empty for the R151 displays.
+- The client builds everything unparented in one pass, then parents it once. It does not build in chunks over several frames.
+- No `Config` version bump and no installer. The installer is built separately and ships only scripts.
+
+### Tests
+`sh docs/proposals/R151/tests/run_base_area.sh [scratch dir] [place.rbxl]`
+- `test_base_area.luau`: **60 passed, 0 failed.** It runs the real MapService plus the client on your place in the R149 mock and checks:
+  - the walls are unchanged and only the towers collide;
+  - clearances against every gameplay object (base plots and pads, openings, treadmills, pedestals, spawns, the safe line, market, Verity, leaderboards, track);
+  - the reserved corners are empty, and the arch and gate clearances hold;
+  - keeper speeds on the keys, and the green tick for each player;
+  - owner names on the arches and signposts;
+  - the part budget for each tier, detail by distance, FastMode, ambience only when near, and Reduced Motion;
+  - lamps in The Darkened and in storms;
+  - sound zones, streaming and teardown;
+  - variety: 15+ tree kinds, no two crowns identical, the same trees on every client.
+- **Z-fighting:**
+  - The R151 scene check on the full built hub, client props included: **no finding with an R151 part.** The 163 whole-map findings are pre-existing and the same before and after.
+  - `R149/tests/run_zfight.sh … 3484f31`: **PASS** (0 of ours).
+- **Other suites rerun**, all passing:
+
+| Suite | Result |
+|---|---|
+| R132 market | 45 + 14 |
+| R135 market | 57 |
+| R149 market | 6 |
+| R147 `run.sh` | 285 + 187 |
+| R147 Verity | 185 + 242 |
+| R149 Verity | 185 + 242 |
+| R150 pedestal | 57, fx 156, z-fight PASS |
+| R147 keyboard | 385 |
+| R149 keyboard | 385 |
+| holes_R122 | 106 + 79 |
+| veiled_R122 | 128 + 73 + 46 |
+| wall_notifier | 168 |
+
+- **Pictures:** `sh docs/proposals/R151/preview/run_base_area_built_preview.sh <scratch dir>`. Set `BUDGET=<test dir>/test.log` to print the budget on the plan.
+
+### Check in Studio before shipping (the mock can't show these)
+1. **Plaster over the walls' existing faint texture** (6372755229): check the cream on one wall. The fallback is SmoothPlastic.
+2. **SurfaceGui labels:** check `MaxDistance` and the legibility of the gate keys, arch names and plaques on a phone.
+3. **`R142Keycap` orientation** on the gate and mural keycaps: the legend must face the hub.
+4. **The fountain pack** (`SeedPackVisuals.Bag`, Pack06) with the real mesh. The previews show the fallback.
+5. **Sounds:** asset permissions for the bird, crystal and rumble ids, and their volume through `AudioMixer`.
+6. **Device performance:**
+   - the MicroProfiler on a low phone: the one-pass client build hitch, and the 0.5 s LOD tick;
+   - streaming of the Persistent wall, mural and gate models.
+7. **Lamps in a real Darkened blackout and in a Thunderstorm.**
+8. The gate towers' collision against fast runners at the gate.

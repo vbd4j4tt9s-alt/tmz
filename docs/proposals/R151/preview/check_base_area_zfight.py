@@ -12,8 +12,11 @@ import zfight as Z  # noqa: E402
 RESTYLED = ('ChestChaseWalls/', 'GardenHubDesign/')
 
 
+MARKS = ('R151HubDressing', '/HubDecor151/', 'HubLife151/')  # the scratch builder's folder; the built server / client folders
+
+
 def ours(f):
-    return 'R151HubDressing' in f['pathA'] or 'R151HubDressing' in f['pathB']
+    return any(m in f['pathA'] or m in f['pathB'] for m in MARKS)
 
 
 def touches_restyled(f):
@@ -45,7 +48,7 @@ def main():
         restyled = [f for f in fs if touches_restyled(f) and not ours(f)]
         akeys = collections.Counter(key(f) for f in fs)
         new = [f for f in fs if akeys[key(f)] > bkeys.get(key(f), 0)]
-        r151 = sum(1 for p in parts if 'R151HubDressing' in p.path)
+        r151 = sum(1 for p in parts if any(m in p.path for m in MARKS))
         print('AFTER  %s: %d parts (%d R151), %d counted findings; with an R151 part: %d; on a restyled wall part: %d; new vs before: %d; '
               'strict rule (reported, not counted) with an R151 part: %d'
               % (os.path.basename(a), len(parts), r151, len(fs), len(mine), len(restyled), len(new), sum(1 for f in strict if ours(f))))

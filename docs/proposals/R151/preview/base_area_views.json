@@ -219,6 +219,37 @@
    "fogFar": 2600
   },
   {
+   "name": "avenue",
+   "title": "Down the avenue to the market",
+   "caption": "From the front street down the avenue. TODAY: grass and the market's back wall. AS BUILT: the paved avenue with curbs, blossom trees and potted topiary at its mouth, lamps, crossed bunting, flower beds, the brick market square with its lamps and planters, and the stage and fountain beyond.",
+   "fov": 62,
+   "pos": [
+    -4,
+    13,
+    -168
+   ],
+   "look": [
+    0,
+    10,
+    -272
+   ],
+   "avatars": [
+    [
+     3,
+     4.2,
+     -180,
+     3.0,
+     13775418
+    ]
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -230
+   ],
+   "shadowExtent": 120
+  },
+  {
    "name": "darkened",
    "title": "When the lights go out",
    "caption": "There is no day/night yet, but The Darkened's arrival (and storms) darkens the hub. The R151 lamps (22 posts; 8 carry a real PointLight) and the 14 wall lanterns glow, so the streets stay readable; with a future hub day/night (benchmark M4) the same lamps become night lamps. (Approximate: the real blackout is darker past a short distance.)",
