@@ -134,7 +134,9 @@ local function sizeSnapshots(gui)
    tabOf(gui,key).Activated:Fire();frames(4)
    local lines={};local b=tabOf(gui,key)
    lines[#lines+1]=table.concat({tostring(b.Size.X.Offset),tostring(b.Size.Y.Offset),tostring(b.LayoutOrder),rgbKey(b.BackgroundColor3),tostring(b:GetAttribute('BiomeName'))},'|')
-   for _,c in ipairs(b:GetChildren())do lines[#lines+1]=c._class..':'..c.Name..':'..(c._props.Size and u2(c._props.Size)or'')..':'..(c._props.Position and u2(c._props.Position)or'')..':'..tostring(c._props.Text or'')..':'..tostring(c._props.Visible)end
+   -- R151: the tab's red dot is NotifyBadge151 now (a polished badge that sits fully inside its tab, size and position on purpose different from the R138 dot's): it is compared by
+   -- name and visibility; test_index_packs.luau (docs/proposals/R151/tests) holds its geometry
+   for _,c in ipairs(b:GetChildren())do local dot=c.Name=='RewardDot';lines[#lines+1]=c._class..':'..c.Name..':'..(not dot and c._props.Size and u2(c._props.Size)or'')..':'..(not dot and c._props.Position and u2(c._props.Position)or'')..':'..tostring(c._props.Text or'')..':'..tostring(c._props.Visible)end
    for _,n in ipairs({'Progress','CompletionBar','SeedCards','Header','Title','BiomeProgress','MiddleGem','GemReward'})do
     local o=gui:FindFirstChild(n,true);lines[#lines+1]=n..'='..(o and(u2(o.Size)..'|'..u2(o.Position)..'|'..tostring(o._props.Text or'')..'|'..tostring(o._props.Visible))or'-')
    end
@@ -259,7 +261,8 @@ end
 bindNew()
 check(gui and gui~=oldGui and gui.Parent==pg,'the new Index loads (and replaces the old gui)')
 -- 1. tabs ---------------------------------------------------------------------------------------------------------------------------------------
-local list={};for _,c in ipairs(tabs:GetChildren())do if c:IsA('TextButton')then list[#list+1]=c end end
+-- R151: the PACKS tab (BiomePacks, LayoutOrder 0: first in the row; docs/proposals/R151/tests/run_index_packs.sh) is a ninth button of the row; this suite is about the eight SEED tabs.
+local list={};for _,c in ipairs(tabs:GetChildren())do if c:IsA('TextButton')and c.Name~='BiomePacks'then list[#list+1]=c end end
 table.sort(list,function(a,b)return a.LayoutOrder<b.LayoutOrder end)
 local names,order={},{};for _,b in ipairs(list)do names[#names+1]=b:GetAttribute('BiomeName');order[#order+1]=b.Name end
 check(#list==8,'eight tabs ('..#list..')')
@@ -271,7 +274,7 @@ local layoutOk=true;for i,b in ipairs(list)do if b.LayoutOrder~=i then layoutOk=
 check(layout and layout.FillDirection.Name=='Horizontal'and layout.SortOrder.Name=='LayoutOrder'and layout.Padding.Offset==8,'the row is one horizontal UIListLayout in LayoutOrder, 8 px apart (as before)')
 check(tabs:IsA('ScrollingFrame')and tabs.ScrollingDirection.Name=='X'and tabs.AutomaticCanvasSize.Name=='X','the row scrolls sideways with an automatic canvas (LIMITED, last, stays reachable on a phone)')
 local orderLine=src:match('local order=[^\n]*')or''
-check(orderLine:find("{7,'STORM'},{LIMITED,'LIMITED'}}",1,true)~=nil and not orderLine:find('MECH',1,true)and not orderLine:find('VERITY',1,true),"(source: the tab list ends {LIMITED,'LIMITED'} and names no MECH / VERITY tab)")
+check(orderLine:find("{7,'STORM'},{LIMITED,'LIMITED'}",1,true)~=nil and not orderLine:find('MECH',1,true)and not orderLine:find('VERITY',1,true),"(source: the seed tabs end {LIMITED,'LIMITED'} (R151: then {PACKS,'PACKS'}) and name no MECH / VERITY tab)")
 local _,loops=src:gsub('for stage=1,9 do','')
 check(loops>=2,'(source: the stage loops still run to 9, so the reward attributes of categories 8 and 9 are listened to and counted for the alerts) ('..loops..')')
 local logo=lt and lt:FindFirstChild('BiomeLogo')
@@ -488,7 +491,7 @@ bindNew();setLeft(LEFT);frames(4)
 print('tab row and LIMITED panel by screen (strip / canvas of the tab row; rows block height; cards start y new / old MECH tab; card list height):')
 for _,sz in ipairs(SIZES)do
  local w,h=sz[1],sz[2];resize(w,h);lt.Activated:Fire();frames(3)
- local strip=tabs.AbsoluteSize;local buttons={};for _,b in ipairs(tabs:GetChildren())do if b:IsA('TextButton')then buttons[#buttons+1]=b end end
+ local strip=tabs.AbsoluteSize;local buttons={};for _,b in ipairs(tabs:GetChildren())do if b:IsA('TextButton')and b.Name~='BiomePacks'then buttons[#buttons+1]=b end end -- (R151: the PACKS tab is the ninth)
  table.sort(buttons,function(a,b)return a.LayoutOrder<b.LayoutOrder end)
  local x,overlap,sameSize,fitsHeight,contentOk,prevRight=0,false,true,true,true,-1e9;local pad=layout.Padding.Offset
  local limitedLeft,limitedRight

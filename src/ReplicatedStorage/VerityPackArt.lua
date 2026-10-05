@@ -158,7 +158,14 @@ function A.Build(bag,isValid)
   -- the picture never settles on the wrong shape. A server (a held pack) does not wait: it uses the sachet for that one pack.
   if Run:IsClient()and not Run:IsServer()then error('Verity pouch is still loading',0)end
  elseif state=='Ready'then
-  local template=Pouch.Template(key)
+  -- R151: a bag flagged DefaultPackShape (the Index's picture) wants the pouch WITHOUT Storm_02's shape variation: the client bakes its own plain copy (VerityPouch151.RequestPlain), a
+  -- picture waits for it like it waits for the server's, and if that bake cannot be done the picture uses the pouch the server baked (the pack as it is in the game).
+  local template
+  if bag:GetAttribute('DefaultPackShape')==true then
+   local plain=Pouch.RequestPlain(key)
+   if plain=='Loading'and Run:IsClient()and not Run:IsServer()then error('Verity pouch is still loading',0)end
+   template=plain=='Ready'and Pouch.PlainTemplate(key)or Pouch.Template(key)
+  else template=Pouch.Template(key)end
   if template then
    local ok,built=pcall(buildPouch,bag,isValid,key,template)
    if ok then return built end

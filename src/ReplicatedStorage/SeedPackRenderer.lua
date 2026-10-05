@@ -22,8 +22,9 @@ function Renderer.Build(bag,isValid)
     -- R151: an ordinary design's pouch takes its shape variation (PackShapes151): the reshaped template when it is baked, else (variations off, a failed bake, a
     -- client that is not ready) nil, i.e. the place's own mesh. The Void, the Mech, the special packs and the Verity pack never come through here.
     if bag:GetAttribute('CompactPackReady') and bag:FindFirstChild('PackGeometry') then return true end
+    -- (a bag flagged DefaultPackShape, which the Index's pictures are, is built from the design's own mesh: no variation is asked for, nothing is baked)
     local key=bag:GetAttribute('PackArtKey')or''
-    return Renderer.BuildStandard(bag,key,isValid,require(script.Parent.PackShapes151).ForBuild(key))
+    return Renderer.BuildStandard(bag,key,isValid,bag:GetAttribute('DefaultPackShape')~=true and require(script.Parent.PackShapes151).ForBuild(key) or nil)
 end
 -- R151: `template` (optional) is a template Model to build from instead of the place's own (VerityPackArt passes the neutral Verity pouch, a clone of
 -- Storm_02 with white vertex colours); everything else is the same code, so such a pack is built exactly like a plain one.

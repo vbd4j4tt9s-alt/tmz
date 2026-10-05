@@ -164,4 +164,62 @@ function M.Rebake()
  f:SetAttribute('Finished',false);f:SetAttribute('Ready',false);f:SetAttribute('Failed',false);f:SetAttribute('Key',nil);f:SetAttribute('Reason',nil)
  return M.Prepare()
 end
+-- R151 (owner: the Index draws every pack in the DEFAULT shape): the pouch the server bakes above carries Storm_02's shape variation (the Model's PackShape attribute is the
+-- variation's id, 0 = none). The Index's Verity picture (a bag flagged DefaultPackShape, VerityPackArt) wants the plain pouch, so a CLIENT bakes its own copy of the
+-- neutral pouch WITHOUT the variation, once, the first time something asks (the same bake as the server's, run by `bake` with no shape). Nothing here runs unless a
+-- plain pouch is asked for, and nothing the server does changes. PlainState: 'Ready' (the server's pouch already is plain, or the client's copy is baked), 'Loading'
+-- (being baked), 'Idle' (not asked yet: RequestPlain starts it), 'Off' (this server bakes no pouch / the bake failed: the caller uses the server's pouch, as before).
+local plain,plainJob,plainFailure
+local function plainModel(key)
+ local template=require(script.Parent.SeedPackRenderer).GetGeometry(key);assert(template,'the template '..key..' is not in SeedPackMeshAssets')
+ local sources={};for _,p in ipairs(template:GetChildren())do if p:IsA('MeshPart')then sources[#sources+1]=p end end
+ assert(#sources>0 and #sources==template:GetAttribute('MeshCount'),'the template '..key..' is not a complete pack template')
+ table.sort(sources,function(x,y)return x.Name<y.Name end)
+ local model=Instance.new('Model');model.Name=key
+ model:SetAttribute('MeshBakeVersion',template:GetAttribute('MeshBakeVersion'));model:SetAttribute('MeshCount',#sources)
+ local ok,why=pcall(function()for _,source in ipairs(sources)do bake(source,nil).Parent=model end end)
+ if not ok then pcall(function()model:Destroy()end);error(tostring(why),0)end
+ model:SetAttribute('Neutral',true);model:SetAttribute('PackShape',0)
+ return model
+end
+function M.PlainState(key)
+ local state,why=M.State(key)
+ if state=='Off'then return'Off',why end
+ local f=RS:FindFirstChild(M.Folder)
+ if state=='Ready'and f and(tonumber(f:GetAttribute('PackShape'))or 0)==0 then return'Ready','server' end
+ if plain and plain.Key==key then return'Ready','client' end
+ if plainFailure and plainFailure.Key==key then return'Off',plainFailure.Reason end
+ if plainJob then
+  if os.clock()-plainJob.At>M.LoadingSeconds then plainFailure={Key=plainJob.Key,Reason='the plain pouch bake did not finish in '..M.LoadingSeconds..' s'};plainJob.Cancelled=true;plainJob=nil;return'Off',plainFailure.Reason end
+  return'Loading'
+ end
+ if state=='Loading'then return'Loading'end
+ return'Idle'
+end
+-- Starts the client's plain bake (once); returns PlainState.
+function M.RequestPlain(key)
+ local state=M.PlainState(key)
+ if state~='Idle'then return state end
+ local job={Key=key,At=os.clock()};plainJob=job
+ task.spawn(function()
+  local ok,result=xpcall(plainModel,debug.traceback,key)
+  if job.Cancelled then if ok and result then pcall(function()result:Destroy()end)end;return end
+  plainJob=nil
+  if ok then plain={Key=key,Model=result}
+  else plainFailure={Key=key,Reason=tostring(result):match('^[^\n]*')or'?'};if Run:IsStudio()then warn('[R151 Verity pouch] the Index keeps the in-game pouch: '..plainFailure.Reason)end end
+ end)
+ return M.PlainState(key)
+end
+-- The plain neutral pouch of `key` (a Model like Template's), or nil.
+function M.PlainTemplate(key)
+ local state,source=M.PlainState(key)
+ if state~='Ready'then return nil end
+ if source=='server'then return M.Template(key)end
+ return plain.Model
+end
+-- Tests / tools: forget the client's plain pouch.
+function M.ResetPlain()
+ if plain then pcall(function()plain.Model:Destroy()end)end
+ plain,plainJob,plainFailure=nil,nil,nil
+end
 return M

@@ -8,7 +8,7 @@ local D=require(RS:WaitForChild('DailyRewards'));local Theme=require(RS.GardenTh
 local Fit=require(RS.GardenTextFit);local Audio=require(RS.InteractionAudio)
 local Pictures;pcall(function()Pictures=require(RS.ItemPictures)end)
 local RGB=Color3.fromRGB
-local GOLD,MINT,SKY,GRAPE,RED=RGB(255,206,64),RGB(110,226,96),RGB(86,182,255),RGB(150,96,255),RGB(255,58,72)
+local GOLD,MINT,SKY,GRAPE=RGB(255,206,64),RGB(110,226,96),RGB(86,182,255),RGB(150,96,255)
 local old=pg:FindFirstChild('DailyRewardsGui');if old then old:Destroy()end
 local gui=Instance.new('ScreenGui');gui.Name='DailyRewardsGui';gui.ResetOnSpawn=false;gui.DisplayOrder=41;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
 local connections={};local function watch(signal,fn)local c=signal:Connect(fn);connections[#connections+1]=c;return c end
@@ -18,16 +18,8 @@ local function text(parent,name,value,size,color)
  Bright.Text(t,size or 16,color);return t
 end
 local function stroke(parent,color,thickness)return new('UIStroke',{Color=color,Thickness=thickness or 2,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},parent)end
-local function badge(parent,name,size,color)
- local b=parent:FindFirstChild(name)
- if not b then
-  b=new('Frame',{Name=name,AnchorPoint=Vector2.new(.5,.5),BackgroundColor3=color or RED,BorderSizePixel=0,ZIndex=20,Visible=false},parent);Theme.Corner(b,size)
-  stroke(b,Color3.new(1,1,1),2)
-  new('TextLabel',{Name='Count',BackgroundTransparency=1,Size=UDim2.fromScale(1,1),Font=Enum.Font.FredokaOne,TextScaled=true,TextColor3=Color3.new(1,1,1),ZIndex=21,Text=''},b)
-  new('UIScale',{},b)
- end
- b.Size=UDim2.fromOffset(size,size);return b
-end
+-- R151: the DAILY button / tab badges are NotifyBadge151, the same component as the Index's (this script carried an identical copy of the R138 badge).
+local Badge=require(RS.NotifyBadge151)
 -- Recolour a BrightUI button (its gradient), e.g. the CLAIM button going grey while it waits for tomorrow.
 local function tint(button,color)Bright.Gradient(button,color:Lerp(Color3.new(1,1,1),.24),color:Lerp(Color3.new(),.12),90)end
 local function pop(o,from)
@@ -242,10 +234,11 @@ end
 local function updateBadges()
  local loginReady=player:GetAttribute('DailyLoginReady')==true;local quests=tonumber(player:GetAttribute('DailyQuestsReady'))or 0
  local n=(loginReady and 1 or 0)+quests
- local b=badge(dailyButton,'RewardBadge',20);b.Position=UDim2.new(1,-4,0,4);local before=b.Visible and tonumber(b.Count.Text)or 0
- b.Visible=n>0;b.Count.Text=n>9 and'9+'or tostring(n);if n>before then pop(b)end
- local dl=badge(tabs.Login,'RewardDot',14);dl.Position=UDim2.new(1,-6,0,6);dl.Visible=loginReady
- local dq=badge(tabs.Quests,'RewardDot',14);dq.Position=UDim2.new(1,-6,0,6);dq.Visible=quests>0
+ -- (overhang 1: the DAILY button sits 4 px under the top of the screen, which cuts off whatever hangs past it)
+ local b=Badge.Make(dailyButton,'RewardBadge',20,1);local before=b.Visible and tonumber(b.Count.Text)or 0
+ Badge.Set(b,Badge.Text(n),n>0,n>before)
+ Badge.Set(Badge.Make(tabs.Login,'RewardDot',14,-3),'',loginReady,false)
+ Badge.Set(Badge.Make(tabs.Quests,'RewardDot',14,-3),'',quests>0,false)
 end
 local function fetch()
  task.spawn(function()

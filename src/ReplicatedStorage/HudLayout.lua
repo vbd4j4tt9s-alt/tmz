@@ -290,10 +290,15 @@ function L.Watch(gui,callback)
  connections[#connections+1]=gui.Destroying:Connect(stop);watchControls();camera();return stop
 end
 local navigation
+-- R151 (owner: the Index's red notification badge "cut out wrongly"): each wheel option sits in a CanvasGroup (MenuOption<i>), and a CanvasGroup clips everything
+-- past its edge. The group used to be the button + 4 px on every side, but the badge on the INDEX button hangs 6 px past the button's corner (plus its ring): its top
+-- and right were sliced off flat. The group now keeps NotifyBadge151.Margin (12 px, which a badge's Extent never exceeds) around the button; the button itself does not move.
+local okBadge,NotifyBadge=pcall(function()return require(script.Parent.NotifyBadge151)end) -- (a partial bundle of a test may not have it: 12 is its Margin)
+local PAD=okBadge and NotifyBadge.Margin or 12
 local function menuPixels(value,size)return math.floor(value*size/48+.5)end
 local function styleOption(button,size)
  local captionHeight=menuPixels(14,size);local captionFont=menuPixels(9,size)
- button.AnchorPoint=Vector2.zero;button.Position=UDim2.fromOffset(4,4);button.Size=UDim2.fromOffset(size,size)
+ button.AnchorPoint=Vector2.zero;button.Position=UDim2.fromOffset(PAD,PAD);button.Size=UDim2.fromOffset(size,size)
  for _,child in ipairs(button:GetChildren())do
   if child.Name=='Caption'then
    child.Position=UDim2.new(0,0,1,-captionHeight);child.Size=UDim2.new(1,0,0,captionHeight);child.TextSize=captionFont;child.TextXAlignment=Enum.TextXAlignment.Center;child.ZIndex=5
@@ -322,7 +327,7 @@ local function createNavigation(pg)
  end
  local function position(entry,opened)
   local m=state.Metrics;local at=m.MenuOffsets[entry.Index];local x,y=at.X,at.Y
-  return UDim2.new(0,m.MenuX+(m.MenuSize-m.MenuOptionSize)/2-4+(opened and x or 0),.5,(m.MenuShiftY or 0)-m.MenuOptionSize/2-4+(opened and y or 0))
+  return UDim2.new(0,m.MenuX+(m.MenuSize-m.MenuOptionSize)/2-PAD+(opened and x or 0),.5,(m.MenuShiftY or 0)-m.MenuOptionSize/2-PAD+(opened and y or 0))
  end
  local function animate(entry,instant)
   cancel(entry);local shown=state.Open and pg:GetAttribute('SeedMenu')==nil
@@ -358,7 +363,7 @@ local function createNavigation(pg)
   for i=0,3 do local tile=glyph:FindFirstChild('Tile'..i);tile.Size=UDim2.fromOffset(menuPixels(8,size),menuPixels(8,size));tile.Position=UDim2.fromOffset(menuPixels(i%2*14,size),menuPixels(math.floor(i/2)*14,size))end
   caption.Position=UDim2.new(0,0,1,-captionHeight);caption.Size=UDim2.new(1,0,0,captionHeight);caption.TextSize=menuPixels(10,size)
   require(script.Parent.GardenTextFit).Attach(caption,menuPixels(10,size),menuPixels(9,size))
-  for _,entry in pairs(state.Entries)do entry.Group.Size=UDim2.fromOffset(m.MenuOptionSize+8,m.MenuOptionSize+8);styleOption(entry.Button,m.MenuOptionSize)end
+  for _,entry in pairs(state.Entries)do entry.Group.Size=UDim2.fromOffset(m.MenuOptionSize+PAD*2,m.MenuOptionSize+PAD*2);styleOption(entry.Button,m.MenuOptionSize)end
   state:SetOpen(state.Open,true)
  end
  state.StopLayout=L.Watch(gui,layout)
@@ -381,7 +386,7 @@ function L.Navigation(button,index)
  local state=navigation;local previous=state.Entries[index]
  if previous and previous.Button==button then return previous.Remove end
  if previous then previous.Remove(true)end
- local group=Instance.new('CanvasGroup');group.Name='MenuOption'..index;group.BackgroundTransparency=1;group.Size=UDim2.fromOffset(state.Metrics.MenuOptionSize+8,state.Metrics.MenuOptionSize+8);group.GroupTransparency=1;group.Visible=false;group.ZIndex=2;group.Parent=state.Gui
+ local group=Instance.new('CanvasGroup');group.Name='MenuOption'..index;group.BackgroundTransparency=1;group.Size=UDim2.fromOffset(state.Metrics.MenuOptionSize+PAD*2,state.Metrics.MenuOptionSize+PAD*2);group.GroupTransparency=1;group.Visible=false;group.ZIndex=2;group.Parent=state.Gui
  local entry={Index=index,Button=button,Group=group,Connections={},Tweens={}};state.Entries[index]=entry;button:SetAttribute('ButtonSound',false);button.Parent=group
  function entry.Remove(replacing)
   if entry.Removed then return end;entry.Removed=true

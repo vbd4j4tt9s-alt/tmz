@@ -32,7 +32,10 @@ function P.Key(tool)
  if not tool then return nil end
  if tool:GetAttribute('SeedPackTool')then
   local stage=tonumber(tool:GetAttribute('Stage'))or 1;local variant=tool:GetAttribute('BagVariant')or'Standard';local mutation=mutationKey(tool:GetAttribute('PackMutation'))
-  return table.concat({'Pack',stage,variant,mutation},'|'),{Kind='Pack',Stage=stage,Variant=variant,Mutation=mutation}
+  -- R151 (owner: the Index draws every pack in the DEFAULT shape, never a shape variation): a tool / proxy with DefaultPackShape asks for the plain pouch. Its own look (key
+  -- suffix |Plain) for the designs the variations touch; the Void and the Mech pack have no variation, so they share the ordinary look (one template, not two).
+  local plain=tool:GetAttribute('DefaultPackShape')==true and variant~='EclipseReliquary'and variant~='MechLimited'
+  return table.concat({'Pack',stage,variant,mutation},'|')..(plain and'|Plain'or''),{Kind='Pack',Stage=stage,Variant=variant,Mutation=mutation,Plain=plain or nil}
  end
  if tool:GetAttribute('GardenSeed')then
   local id=tool:GetAttribute('SeedId')or'';local mutation=mutationKey(tool:GetAttribute('Mutation'))
@@ -113,12 +116,12 @@ local function build(spec,work)
   -- R151: an ordinary design's picture is drawn from its reshaped pouch (PackShapes151), which this client bakes at the first use of the design. The build runs in a
   -- coroutine the picture queue resumes by hand, so it never yields: while the bake is running the build errors "still loading" and is retried in a moment.
   local v=spec.Variant
-  if v~='EclipseReliquary'and v~='MechLimited'and v~=require(RS:WaitForChild('VerityCatalog')).Variant then
+  if not spec.Plain and v~='EclipseReliquary'and v~='MechLimited'and v~=require(RS:WaitForChild('VerityCatalog')).Variant then
    local Shapes=require(RS:WaitForChild('PackShapes151'))
    if not shapeHooked then shapeHooked=true;Shapes.OnChanged(function()P.Reset();P.Hurry()end)end -- (the owner's /test packshape: every picture is drawn again)
    if Shapes.Pending(require(RS:WaitForChild('SeedPackRules')).DesignKey(spec.Stage,v))then error('Pack shape is still loading',0)end
   end
-  return require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.Angles(0,.22,-.025),nil,1,nil,spec.Stage,spec.Variant,1,1,spec.Mutation)
+  return require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.Angles(0,.22,-.025),nil,1,nil,spec.Stage,spec.Variant,1,1,spec.Mutation,nil,spec.Plain)
  elseif spec.Kind=='Seed'then
   local ok,model=pcall(require(RS:WaitForChild('SeedPackVisuals')).Seed,{Id=spec.Id},nil,CFrame.new(),nil,1,nil,spec.Mutation)
   if ok and model then return model end

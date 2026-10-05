@@ -21,7 +21,8 @@ local function rootPart(model,origin,weldRoot)
     return p
 end
 -- Solid server-authored geometry stays visible independently of client animation.
-function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation,displaySize)
+-- R151: `defaultShape` (true): the pouch is the design's own mesh with no shape variation (the Index's pictures); anything else is the pack as it is in the game.
+function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation,displaySize,defaultShape)
     local variant=Rules.GetVariant(variantKey);local theme=Rules.GetTheme(stage)
     packSize=Rules.SanitizePackSize(packSize);mutation=Rules.MutationKey(mutation)
     scale=(scale or 1)*variant.BagScale*theme.Scale*(displaySize or packSize)
@@ -49,6 +50,7 @@ function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,pac
     m:SetAttribute("SeedArtVersion",123);m:SetAttribute("VisualScale",scale);m:SetAttribute("TearLipY",1.11)
     m:SetAttribute("Stage",stage or 1);m:SetAttribute("BagVariant",Rules.VariantKey(variantKey))
     m:SetAttribute("PackArtKey",Rules.DesignKey(stage,variantKey));m:SetAttribute("PackVisible",true)
+    if defaultShape==true then m:SetAttribute('DefaultPackShape',true) end
     m:SetAttribute("SeedScale",Rules.SanitizeSeedScale(seedScale));m:SetAttribute("PaperColor",theme.Body)
     m:SetAttribute("BiomeMark",theme.Mark)
     local tier,rank=Rules.GetPackTier(variantKey)
