@@ -10,6 +10,8 @@
 --  * Text         the three chat lines (a pull here, a pull in another server, a record) and their colours.
 --  * Chat limit   at most ChatBurst lines per ChatWindow seconds on one client.
 --  * Payload      the compact form sent through MessagingService (1 kB limit) and its freshness rule.
+--  * Timing       RevealDelay: when a line about a pull may go out, so it never reaches the puller before THEIR reveal has shown the seed (derived from RarePullRules, the
+--                 tables the puller's client plays: one source of truth). RecordScope: who hears a hub record (this server, every server, or nobody).
 local Packs=require(script.Parent.SeedPackRules)
 local Names=require(script.Parent.GardenDisplayNames)
 local Verity=require(script.Parent.VerityCatalog)
@@ -28,9 +30,12 @@ R.Defaults={
  SeenMax=256,SeenSeconds=300, -- remembered message ids (dedupe)
  SubscribeRetrySeconds=5,SubscribeRetryMax=120,
  MaxNameLength=24,
+ RevealMargin=.5,        -- seconds after the puller's reveal has shown the seed before the line goes out (network jitter, a frame or two, time to read the card)
+ RecordLag=.4,           -- a record line follows the pull line of the same pull by this much (the pull line first)
 }
 R.Limits={ChatBurst={1,30},ChatWindow={1,60},PublishGapSeconds={1,60},MaxPending={1,20},MaxBytes={200,980},
- StaleSeconds={5,600},FutureSeconds={0,300},ReceiveMaxPerMinute={1,60},SeenMax={16,2048},SeenSeconds={30,3600},SubscribeRetrySeconds={1,60},SubscribeRetryMax={5,600},MaxNameLength={8,40}}
+ StaleSeconds={5,600},FutureSeconds={0,300},ReceiveMaxPerMinute={1,60},SeenMax={16,2048},SeenSeconds={30,3600},SubscribeRetrySeconds={1,60},SubscribeRetryMax={5,600},MaxNameLength={8,40},
+ RevealMargin={0,5},RecordLag={0,5}}
 function R.Setting(name)
  local default=R.Defaults[name];local value=script:GetAttribute(name)
  if type(default)=='string'then return(type(value)=='string'and Packs.Rarities[value]~=nil)and value or default end
@@ -54,6 +59,39 @@ R.Gold=Color3.fromRGB(255,213,74)   -- other servers (the chat line)
 R.Amber=Color3.fromRGB(255,184,48)  -- records
 function R.Hex(color)
  return string.format('#%02X%02X%02X',math.floor(color.R*255+.5),math.floor(color.G*255+.5),math.floor(color.B*255+.5))
+end
+
+-- Timing ------------------------------------------------------------------------------------------------------------------------------------------
+-- A line about a pull must not reach the PULLER before their own reveal has shown the seed, and nobody else gets it earlier than that either. RevealDelay(rarity) = seconds from
+-- the moment the server opens the pack (PlayerDataService:OpenSeedPack, the same moment as RevealAt: no yield lies between) until the line may go out:
+-- RarePullRules.LatestSeedShown(rank) (the ladder card for Common..Mythic, the story scene for Secret / Cosmic / King, whichever presentation the puller's client picks: those are
+-- the very tables the client plays) plus RevealMargin. A skipped reveal only shows the seed sooner, so the normal time is still after it. If RarePullRules cannot load, the old
+-- reveal length (SeedPackRules.GetRevealDuration) is what the client plays too (its fallback presentation), so that is used.
+local okReveal,Reveal=pcall(require,script.Parent.RarePullRules)
+function R.RevealDelay(rarity)
+ local style=type(rarity)=='string'and Packs.Rarities[rarity]
+ local rank=style and style.Rank or 1 -- (an unknown rarity is never announced; this only keeps the function total)
+ local shown
+ if okReveal and type(Reveal)=='table'and Reveal.LatestSeedShown then
+  local ok,t=pcall(Reveal.LatestSeedShown,rank);shown=ok and type(t)=='number'and t==t and t or nil
+ end
+ if not shown then local ok,t=pcall(Packs.GetRevealDuration,rarity);shown=ok and type(t)=='number'and t or 5 end
+ return shown+R.Setting('RevealMargin')
+end
+
+-- Who hears a hub record (BEST PULL / BIGGEST FRUIT) ----------------------------------------------------------------------------------------------
+-- Returns 'Global' (this server and every other), 'InServer' (this server), or nil (nobody: the hub display changes, the chat says nothing). rarity = the rarity of the seed
+-- the record is about (nil when it names none).
+--  * BestPull is a pull: the pull's own rarity decides with the same thresholds as the pull line: GlobalMinRarity and above everywhere (Secret, Cosmic, King), InServerMinRarity and
+--    above in this server (Legendary, Mythic), below that nothing (the first Commons of a day only move the display).
+--  * any other record (BiggestFruit): this server, never the others; a fruit's weight has no pull rarity.
+--  * a BestPull that names no seed (the owner's `announce record`): this server.
+function R.RecordScope(record,rarity)
+ if record~='BestPull'then return'InServer'end
+ if rarity==nil then return'InServer'end
+ if R.Qualifies('Global',rarity)then return'Global'end
+ if R.Qualifies('InServer',rarity)then return'InServer'end
+ return nil
 end
 
 -- Seeds and names -----------------------------------------------------------------------------------------------------------------------------
@@ -170,14 +208,15 @@ function R.ChatAllowed(log,now)
 end
 
 -- Payload (MessagingService) ---------------------------------------------------------------------------------------------------------------------------
--- A pull as it travels: short keys. Odds go as a whole number (the N of 1/N). (The rarity travels as a label only; a receiver always re-reads it from its own catalog.)
+-- A pull (or a record) as it travels: short keys. Odds go as a whole number (the N of 1/N). (The rarity travels as a label only; a receiver always re-reads it from its own
+-- catalog.) k = the record key of a Record (BestPull ...): present only for a record, so a receiver tells the two apart.
 function R.Compact(e)
- return {i=e.Id,u=e.UserId,n=e.Name,s=e.SeedId,r=e.Rarity,o=e.Odds and math.floor(e.Odds+.5)or nil}
+ return {i=e.Id,u=e.UserId,n=e.Name,s=e.SeedId,r=e.Rarity,o=e.Odds and math.floor(e.Odds+.5)or nil,k=e.Kind=='Record'and e.Record or nil}
 end
--- The fields table for R.Event('Global', ...) from one compact entry (nil when it is not a table).
+-- The fields table for R.Event('Global' | 'Record', ...) from one compact entry (nil when it is not a table). A Record key is read as a string only.
 function R.Expand(t)
  if type(t)~='table'then return nil end
- return {Id=t.i,UserId=t.u,Name=t.n,SeedId=t.s,Odds=t.o}
+ return {Id=t.i,UserId=t.u,Name=t.n,SeedId=t.s,Odds=t.o,Record=type(t.k)=='string'and t.k or nil}
 end
 -- The longest prefix of list (events) whose message fits MaxBytes. encode = HttpService.JSONEncode (a function taking the table).
 -- Returns the message text and how many events it carries (0 when even one does not fit).

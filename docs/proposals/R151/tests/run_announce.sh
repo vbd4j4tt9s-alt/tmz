@@ -6,16 +6,19 @@
 #                     user of MessagingService, no client -> server remote exists, every owner-command path that makes a pack marks it TestGrant, the list of files that add packs is
 #                     the known one, every script compiles, the new scripts are in src/MANIFEST.tsv, ProfileVersion is still 22.
 #  test_rules       - thresholds (Legendary in the server, Secret and above across servers, attribute overrides), event sanitising (names, ellipsis, odds, ids), the three chat lines and their
-#                     colours, rich text well formed and escaped for every seed and kind, the old-chat plain line, the chat rate limit, the 1 kB payload, freshness, no banner rule left.
-#  test_server      - the real PlayerDataService:OpenSeedPack hook: a real open of a Legendary+ seed is announced after its reveal (to everybody in the server), TEST guaranteed reveals, gifted /
+#                     colours, rich text well formed and escaped for every seed and kind, the old-chat plain line, the chat rate limit, the 1 kB payload (a pull and a hub record), freshness,
+#                     no banner rule left; RevealDelay per rarity (= the latest moment the puller's client shows the seed, RarePullRules, + the margin) and RecordScope (who hears a hub record).
+#  test_server      - the real PlayerDataService:OpenSeedPack hook: a real open of a Legendary+ seed is announced once the PULLER's reveal has shown the seed (to everybody in the server;
+#                     timing per rarity, the other servers never earlier, a leaving puller releases it, every presentation / skip), TEST guaranteed reveals, gifted /
 #                     granted seeds never are; OWNER-MADE PACKS never are: every command path (/test pack, packset, void, eclipse, verity, rarepacks x5, mystery ready, daily week, bonus
 #                     roll / ready / progress) through the real StudioTestCommands.Execute, with a control for each that the same pack from a real source IS announced (Robux Mech pack, normal
 #                     track pack, normal mystery / daily / bonus pack, Void -> Verity); TestGrant saved, reloaded, gifted, kept through the Verity conversion, and an R150 server loading and
 #                     re-saving it (from the git history); MessagingService mock: publish limits (1 per 5 s, coalescing, 1 kB), dedupe, stale drop, failure + retry, subscription retry,
-#                     the origin server not double-showing, the per-player "other servers" setting, the receive limit, malformed messages; records; owner commands.
+#                     the origin server not double-showing, the per-player "other servers" setting, the receive limit, malformed messages; hub records (scope per rarity, AfterReveal, private To,
+#                     what other servers accept); owner commands.
 #  test_client      - the real PullAnnouncerClient: chat only (no ScreenGui, no Instance, no tween, no per-frame code, no sound, no picture, no PlayerGui attribute), one correctly coloured line
 #                     per event (rarity colour / gold / amber), once per id, the 8 lines per 10 s limit, rich-text escaping and long names, the old chat fallback (never both chats), hostile
-#                     payloads, teardown.
+#                     payloads, teardown, the puller's own line held until their own hit (RarePullClimaxAt) on a slow device.
 #  test_settings    - SettingsConfig (booleans, a saved false stays false), the saved toggle (PlayerDataService save / load, PremiumService SetSetting), the announcer honouring it: it gates
 #                     the 🌐 chat lines from other servers and never the lines of this server.
 #  test_settings_client - SettingsClient's row (On / Off, saved as a boolean, retried, the other rows untouched).

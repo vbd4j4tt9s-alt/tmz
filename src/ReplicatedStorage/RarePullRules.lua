@@ -192,6 +192,28 @@ function L.Timeline(rank,variant)
  if variant=='InPlace'then return L.InPlace(rank)elseif variant=='Result'then return L.InPlace(rank,true)end
  local base=L.Scenes[rank][variant=='Calm'and'Calm'or'Full'];local out=table.clone(base);out.Variant=variant=='Calm'and'Calm'or'Full';return out
 end
+-- When the opener's own screen has SHOWN the seed -------------------------------------------------------------------------------------------
+-- For the pull announcements (PullAnnounceRules.RevealDelay, used by the server): seconds after the server's RevealAt at which the opener's reveal has shown the seed - its
+-- rarity title and the seed on screen AND "1 in N" slammed, the card's last beat. Common..Mythic (the ladder): the card's Odds slam; the story scenes: the latest of Climax, Rise
+-- and Odds of the variant. A chat line about the pull must not reach the puller before this. Every presentation reads the tables above, so this follows them by itself.
+L.StoryVariants={'Full','Calm','InPlace'} -- the three presentations that run on the reveal's clock ('Result' is a cut-short scene: its card starts at the cut, see below)
+function L.SeedShown(rank,variant,quick)
+ rank=math.clamp(math.floor(tonumber(rank)or 1),1,8)
+ if rank<=5 then local card=L.CardTimeline(rank,quick==true);return math.max(card.Burst,card.Odds)end
+ local tl=L.Timeline(rank,variant)
+ return math.max(tl.Climax,tl.Rise or 0,tl.Odds or 0)
+end
+-- What a SERVER can rely on. It never sees which presentation the opener's client chose (that depends on a safety snapshot only the client has: a keeper near, a menu, reduced
+-- motion ...) nor whether the reveal was quick (packs opened back to back), nor a skip (a skip only brings the hit EARLIER), so it takes the latest of them: the normal ladder card,
+-- and for the story scenes the latest of Full / Calm / InPlace. A story scene that is cut short ('Result': danger, moved, camera) shows its result card at the cut, which is before
+-- the scene's hit, plus the card's own .35 s: never later than the Full scene's own seed-shown time.
+function L.LatestSeedShown(rank)
+ rank=math.clamp(math.floor(tonumber(rank)or 1),1,8)
+ if rank<=5 then return L.SeedShown(rank,nil,false)end
+ local latest=0
+ for _,variant in ipairs(L.StoryVariants)do latest=math.max(latest,L.SeedShown(rank,variant))end
+ return latest
+end
 -- Camera keys per scene (stage-local, studs; FieldOfView is vertical, like Roblox). A key's time is a beat name plus an offset; Cut=true
 -- switches at that time instead of blending (ReducedMotion uses cuts only: no camera moves).
 local K=function(beat,offset,eye,target,fov,cut)return {Beat=beat,Offset=offset,Eye=eye,Target=target,Fov=fov,Cut=cut}end

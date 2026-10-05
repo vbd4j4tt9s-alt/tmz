@@ -7,12 +7,15 @@
 #  test_hub_rules.luau   - the ranking (rarity, then smaller chance, then bigger weight, then earlier: a strict total order), the exclusions' building blocks (record cleaning), the UTC day,
 #                          the fruit rotation (one fruit a day, no quick repeats, only weighted fruit), the sign texts, the layout numbers;
 #  test_hub_store.luau   - the MemoryStore wrapper against a mock of the shared backend: compare-and-set races, expiry, quota / throttle / errors (backoff, budget), pcall everywhere;
-#  test_hub_service.luau - the service: events, ranking across servers (two servers on one backend), polling with jitter, one write per gap, the day rollover, the notices,
-#                          the owner tools, fallback to the server's own best, a champion change rebuilds once;
+#  test_hub_service.luau - the service: events, ranking across servers (two servers on one backend), polling with jitter, one write per gap, the day rollover, the record line
+#                          (ONE PullAnnouncer.Announce, no notice of its own, AfterReveal for a pull, the chime in step, private owner tests), the owner tools, fallback to the server's
+#                          own best, a champion change rebuilds once;
 #  test_hub_avatar.luau  - the avatar: description cache, rig build, pose, scale, anchored / inert, no name or health bar, the blocky fallback, user ids that are not users;
 #  test_hub_art.luau     - the frame and the giant item (cap 150 parts, 8-12 studs tall, rarity colours), the layout against the map's pieces, collisions, sizes;
 #  test_hub_client.luau  - the client: near / far, motion only near, reduced motion, quality tiers, streaming, the pop and the sound, nothing per frame when far;
-#  test_hub_hooks.luau   - how it is wired into the game: the pack-opened hook, TEST packs and owner grants never count, the harvest hook, the owner commands;
+#  test_hub_hooks.luau   - how it is wired into the game: the pack-opened hook, TEST packs and owner grants never count, the harvest hook, the owner commands; and the REAL PullAnnouncer
+#                          behind the real hub: a real Mythic / Secret open says the pull line then the record line only after the puller's reveal (other servers too), no hub notice,
+#                          owner test packs / bestpull / bigfruit never speak to the server, a leaving puller, a fruit record, a preview day;
 #  check_hub_scene.py    - the displays in the FINISHED hub of the owner's place file (build_hub_scenes.sh): the R149 z-fight detector finds nothing on the frame, nothing overlaps
 #                          the map, 40+ studs from every other piece, each sign faces the market and is in plain view from the spawns, part counts (needs the place file; skipped without).
 # The older suites that touch the changed files, and R149's whole-map z-fight check (R149/tests/run_zfight.sh), are run by their own scripts.
@@ -30,7 +33,7 @@ prep() { # $1 = src dir, $2 = work dir (the suites on the R150 pedestal world)
 }
 prep_hooks() { # the hook suite runs on the R123 world (the real PlayerDataService / ChestService need its Config fixtures)
  mkdir -p "$2"
- cp "$REPO/tools/tests/roblox.luau" "$REPO/docs/proposals/treadmill_bonus_R123/tests/world.luau" "$HERE/test_hub_hooks.luau" "$2/"
+ cp "$REPO/tools/tests/roblox.luau" "$REPO/docs/proposals/treadmill_bonus_R123/tests/world.luau" "$HERE/test_hub_hooks.luau" "$HERE/announce_env.luau" "$2/"
  python3 "$HERE/bundle_hub.py" "$1" "$2" >/dev/null
 }
 suite() { # $1 = work dir, $2 = test, $3 = log
@@ -129,7 +132,14 @@ mutate "the request budget is not kept" $ST "if #self.Calls>=Rules.RequestsPerMi
 mutate "a store error escapes (no pcall)" $ST "local ok,a,b=pcall(fn,map)" "local ok,a,b=true,fn(map)" store
 mutate "a TEST pack counts" $SV "if info.Test==true then return false,'test pack'end" "" service
 mutate "an owner-granted seed counts" $SV "if self.Tainted[player]then return false,'owner-granted'end" "" service
-mutate "a Common pull gets a notice" $SV "if kind=='Pull'and not rec.Test and rec.Rank<Rules.NoticeMinRank then return false end" "" service
+mutate "a pull record is announced before the puller's reveal" $SV "elseif kind=='Pull'then spec.AfterReveal=true end" "elseif false then spec.AfterReveal=true end" service
+mutate "an owner's bestpull is announced to the whole server" $SV "  spec.To=player" "  spec.To=nil" service
+mutate "a preview day announces its records" $SV " if self:_preview()then return false end" "" service
+mutate "the hub shows a notice of its own again" $SV " self:_celebrate(kind,rec,wait,spec.To)" " pcall(function()self.Notes:Show(player,'x',nil,5)end);self:_celebrate(kind,rec,wait,spec.To)" service
+mutate "the chime plays before the line" $SV "if type(wait)=='number'and wait>0 then task.delay(wait,fire)else fire()end" "fire()" service
+mutate "a refused record uses up the gap" $SV " local called,ok,wait=pcall(self.Announce,spec)" " self.LastNotice[kind]=now;local called,ok,wait=pcall(self.Announce,spec)" service
+mutate "an announcer that throws breaks the event" $SV " local called,ok,wait=pcall(self.Announce,spec)" " local called,ok,wait=true,self.Announce(spec)" service
+mutate "an owner-made (TestGrant) pack counts as a real pull" ServerScriptService/ChestChaseServer/PlayerDataService.lua "Test=testSeed~=nil or pack.TestGrant==true" "Test=testSeed~=nil" hooks
 mutate "the display is rebuilt on every refresh" $SV "if key==self.Shown[kind]and not force then return false end" "" service
 mutate "a stale item build is not dropped" $SV "function S:_stale(kind,gen)return self.Dead or self.Gen[kind]~=gen end" "function S:_stale(kind,gen)return self.Dead end" service
 mutate "the shared board is read at every step" $SV "self.NextPoll=now+Rules.PollSeconds+self.Random:NextNumber()*Rules.PollJitter" "self.NextPoll=now" service

@@ -26,8 +26,7 @@ R.RetryBase=5                     -- after a failed request the next attempt wai
 R.RetryMax=300                    -- ... never longer than this
 R.ThrottledWait=90                -- after a "throttled / quota" error the wait is at least this
 R.RequestsPerMinute=12            -- this server's own cap (the experience's MemoryStore quota is 1000 + 100 per player a minute)
-R.NoticeMinRank=3                 -- a "took BEST PULL TODAY" notice needs at least a Rare (the first Commons of a day only move the display)
-R.NoticeGap=8                     -- seconds between two notices of one kind in one server
+R.NoticeGap=8                     -- seconds between two record chat lines of one kind in one server (the display still changes; WHICH records get a line is PullAnnounceRules.RecordScope)
 R.MaxFruitRank=5                  -- fruit types in the daily rotation: up to Mythic (raise to 8 to include Secret / Cosmic / King plants)
 R.MinFruitKg=.5                   -- a plant whose fruit weighs less than this at size 1 has no meaningful weight: never the fruit of the day
 R.NameLength=24
@@ -230,8 +229,6 @@ end
 function R.OddsText(percent)return require(script.Parent.OddsText85).Format(percent)end
 local COAT={Gold='Gold',Diamond='Diamond'}
 function R.PullName(rec)return rec.Rarity..' '..rec.Seed end
-function R.PullNotice(rec)return '🏆 '..rec.Name..' took BEST PULL TODAY with a '..R.PullName(rec)..'!'end
-function R.FruitNotice(rec,fruitName)return R.Emoji(rec.Id)..' '..rec.Name..' took BIGGEST '..string.upper(fruitName)..' TODAY with '..R.KgText(rec.Kg)..'!'end
 -- The words of a fruit's special looks: "Gold", "Diamond", a weather ("Drippy"), both ("Gold · Drippy"), or ''.
 function R.FruitTraits(rec)
  local words={}

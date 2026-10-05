@@ -253,10 +253,9 @@ do
  local rec=pull({Name='Jess',Seed='Fire Pepper',Rarity='Mythic',Odds=.125})
  check(Rules.PullName(rec)=='Mythic Fire Pepper','the line reads "Mythic Fire Pepper"')
  check(Rules.OddsText(.125)=='1/800'and Rules.OddsText(.125)==Odds.Format(.125),'the chance reads 1/800 (OddsText85, the game\'s format)')
- check(Rules.PullNotice(rec)=='🏆 Jess took BEST PULL TODAY with a Mythic Fire Pepper!','the notice is "🏆 Name took BEST PULL TODAY with a Mythic Fire Pepper!"')
+ check(Rules.PullNotice==nil and Rules.FruitNotice==nil and Rules.NoticeMinRank==nil and Rules.NoticeGap==8,'the hub keeps no notice text and no notice rank of its own any more (the record line is PullAnnouncer\'s, in chat; only the 8 s gap between two lines of one board stays)')
  local fr=fruit({Name='Sam',Scale=2.5})
  check(Rules.KgText(12.4)=='12.4 kg'and Rules.KgText(.5)=='0.5 kg'and Rules.KgText(1250)=='1,250 kg'and Rules.KgText(999.96)=='1000.0 kg'and Rules.KgText(0)==''and Rules.KgText(0/0)=='','weights read "12.4 kg", "1,250 kg"')
- check(Rules.FruitNotice(fr,'Watermelon')=='🍉 Sam took BIGGEST WATERMELON TODAY with '..Rules.KgText(fr.Kg)..'!','the fruit notice names the fruit and the weight')
  check(Rules.Emoji('SunflowerSeed')=='🍉'and Rules.Emoji('NoSuchSeed')=='🌱','🍉 for the watermelon, 🌱 for an unknown plant')
  local t=Rules.SignText('Pull',rec,nil,18720)
  check(t.State=='Champion'and t.Rows.Title.Text=='🏆 BEST PULL TODAY'and t.Rows.Name.Text=='Jess'and t.Rows.Line.Text=='Mythic Fire Pepper'and t.Rows.Odds.Text=='1/800'and t.Rows.Footer.Text=='New board in 5h 12m',

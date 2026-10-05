@@ -194,7 +194,7 @@ end
 for _,model in ipairs(CS:GetTagged(Rules.Tag))do task.spawn(register,model)end
 CS:GetInstanceAddedSignal(Rules.Tag):Connect(function(model)task.spawn(register,model)end)
 CS:GetInstanceRemovedSignal(Rules.Tag):Connect(forget)
--- The celebration sound: someone in this server took a top spot (the server also posted the notice).
+-- The celebration sound: someone in this server took a top spot (the server asks for it in step with the record's chat line: after the puller's own reveal).
 task.spawn(function()
  local remotes=RS:WaitForChild('ChestChaseRemotes',30);local remote=remotes and remotes:WaitForChild('HubDisplayCelebrate',30)
  if not remote then return end

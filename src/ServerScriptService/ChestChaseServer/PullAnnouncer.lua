@@ -3,19 +3,26 @@
 -- (the remote below is server -> client only), display names come from Roblox (already filtered, and cleaned again in PullAnnounceRules.Clean) and no player-typed text is
 -- ever sent.
 --  * A real pack open (PlayerDataService:OpenSeedPack calls OnOpened) whose seed is at least InServerMinRarity (Legendary) is sent to everyone in THIS server once the
---    puller's reveal has finished (ALL players get it then: the puller's own line must not come before their reveal ends, and one rule for everybody is simpler than two).
+--    PULLER's reveal has shown the seed (ALL players get it then: the puller's own line must not come before their reveal shows it, and one rule for everybody is simpler than
+--    two). "Shown" is the climax / seed-landing of their cinematic plus a small margin: PullAnnounceRules.RevealDelay, derived from RarePullRules, the very tables the puller's
+--    client plays (Secret / Cosmic / King story scenes, the Common..Mythic seed card), whichever presentation their client picks. A skipped reveal shows the seed sooner, so the
+--    line still goes out at that normal time (clients never tell the server anything: a client-claimed skip would be input we cannot trust, and it could only make the line late
+--    by a few seconds, never early). If the puller LEAVES before then, nobody's reveal is left to spoil: it goes out at once (a server closing with its last player keeps it).
 --    Never announced: a pack an owner / admin command created (marked TestGrant=true on the pack record when it was made: /test pack, packset, void, verity,
 --    rarepacks, and the packs that mystery / daily / bonus commands cause), a TEST guaranteed reveal (/test rarepacks), a seed that was given or granted and anything that
 --    is not a pack open. Real purchases (Robux Mech / Verity packs) and normal gameplay packs are announced.
 --  * At least GlobalMinRarity (Secret: Secret, Cosmic, King and above) it is also published to the OTHER servers through MessagingService (topic
---    PullAnnounce151). Publishing is limited to one message per PublishGapSeconds per server (pulls wait and travel together, 1 kB at most, a failed publish
+--    PullAnnounce151), at the same moment (after the puller's reveal), never earlier. Publishing is limited to one message per PublishGapSeconds per server (pulls wait and travel together, 1 kB at most, a failed publish
 --    is retried a few times while it is still fresh). A receiving server drops its own messages (the origin shows the in-server version), repeats, anything
 --    older than StaleSeconds and anything over its per-minute limit, re-derives the rarity from its own seed catalog, and only sends it on to players who
 --    have "Announcements from other servers" on (SettingsConfig.GlobalAnnouncements: it gates the 🌐 chat lines). The subscription is retried until it works.
---  * PullAnnouncer.Announce({Kind='Record', Player=player, Record='BestPull', SeedId=..}) writes a record line ("🏆 Name took BEST PULL TODAY!") for this server:
---    the hook for the hub displays. Record keys are letters only; the title comes from PullAnnounceRules.Records.
+--  * PullAnnouncer.Announce({Kind='Record', Player=player, Record='BestPull', SeedId=.., AfterReveal=true}) writes a record line ("🏆 Name took BEST PULL TODAY!"): the hook
+--    HubDisplayService uses when someone takes over a hub board (its own notice is gone: one message, in chat). Record keys are letters only; the title comes from
+--    PullAnnounceRules.Records. WHO hears it is PullAnnounceRules.RecordScope (a BestPull of Secret or above: every server; Legendary / Mythic: this server; a lower one: nobody;
+--    BiggestFruit: this server), unless the caller passes Scope. AfterReveal=true (the record comes from a pack open) waits like the pull line does, plus RecordLag so the pull line
+--    comes first. To=player makes the line private (the owner's bestpull / bigfruit tests: only their target sees it, never the server and never other servers).
 --  * Owner test: /test announce <seed> [@name], /test announce global <seed> [here] and /test announce record [bestpull|biggestfruit] [seed] (these ARE announcements on
---    purpose: they exist to look at the chat lines).
+--    purpose: they exist to look at the chat lines, at once, and a record here stays in this server).
 local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Rules=require(RS:WaitForChild('PullAnnounceRules'))
@@ -43,6 +50,7 @@ function A.new(opts)
  self.Short=tostring(self.JobId):gsub('[^%w]',''):sub(1,8)
  self.Serial=0
  self.Pending={};self.LastPublish=-math.huge;self.Timer=false;self.Publishing=false
+ self.Waiting={} -- lines waiting for a puller's reveal: {Player, Done, Go}
  self.Seen={};self.SeenOrder={};self.Received={}
  self.Stats={Published=0,PublishFailed=0,Dropped=0,Received=0,Shown=0,SubscribeFailed=0,Origin=0,Stale=0,Repeat=0,Limited=0,Bad=0}
  if opts.Remote then self.Remote=opts.Remote
@@ -178,13 +186,17 @@ function A:_onMessage(message)
   if not Rules.Fresh(data.t,now)or(message.Sent~=nil and not Rules.Fresh(message.Sent,now))then self.Stats.Stale+=1;return end
   for index,entry in ipairs(data.p)do
    if index>6 then break end
-   local fields=Rules.Expand(entry);local e=fields and Rules.Event('Global',fields)
-   -- the rarity is the one of THIS server's catalog: an unknown seed is dropped, a seed below the global threshold is dropped
-   if not e or not e.Id or not Rules.Qualifies('Global',e.Rarity)then self.Stats.Bad+=1
+   local fields=Rules.Expand(entry)
+   local record=fields~=nil and fields.Record~=nil -- (a hub record of another server travels with its key; a pull does not)
+   local e=fields and Rules.Event(record and'Record'or'Global',fields)
+   -- the rarity is the one of THIS server's catalog: an unknown seed is dropped, a seed below the global threshold is dropped, and so is a record that is not for every server
+   local travels=e and(record and Rules.RecordScope(e.Record,e.Rarity)=='Global'or not record and Rules.Qualifies('Global',e.Rarity))
+   if not e or not e.Id or not travels then self.Stats.Bad+=1
    elseif self:_seen(data.j..':'..e.Id)then self.Stats.Repeat+=1
    elseif not self:_room()then self.Stats.Limited+=1
    else
-    e.Kind='Global';self.Stats.Received+=1
+    if not record then e.Kind='Global'end
+    self.Stats.Received+=1
     self:_broadcast(e,function(p)return self:_wants(p)end);shown+=1
    end
   end
@@ -209,18 +221,24 @@ end
 function A:Run()
  if self.Started then return self end;self.Started=true
  task.spawn(function()self:_subscribe(1)end)
+ -- a puller who leaves has no reveal left to spoil: their waiting lines go out at once
+ local ok,connection=pcall(function()return self.Players.PlayerRemoving:Connect(function(player)self:_released(player)end)end)
+ if ok then self.LeaveConnection=connection end
  return self
 end
 function A:Destroy()
  self.Stopped=true
  if self.Connection then pcall(function()self.Connection:Disconnect()end);self.Connection=nil end
- table.clear(self.Pending)
+ if self.LeaveConnection then pcall(function()self.LeaveConnection:Disconnect()end);self.LeaveConnection=nil end
+ for entry in pairs(self.Waiting)do entry.Done=true end
+ table.clear(self.Waiting);table.clear(self.Pending)
 end
 
 -- Pulls --------------------------------------------------------------------------------------------------------------------------------------------
 -- Called (through PullAnnouncer.OnOpened) by PlayerDataService:OpenSeedPack right after a pack was opened and its seed saved. pack = the pack record that was opened, reward = the seed
 -- record, wasTest = an owner TEST guaranteed reveal (/test rarepacks). A pack that an owner / admin command created carries TestGrant=true on its record (set when the command made it,
--- saved with the pack, kept through gifts and the Void -> Verity conversion): it is never announced either. Returns true when something was scheduled, else false and the reason.
+-- saved with the pack, kept through gifts and the Void -> Verity conversion): it is never announced either. Returns true and the seconds the line waits when something was
+-- scheduled, else false and the reason.
 function A:Pulled(player,pack,reward,wasTest)
  if wasTest then return false,'test pack'end
  if type(reward)~='table'or type(pack)~='table'or not player then return false,'not a pack open'end
@@ -235,16 +253,41 @@ function A:Pulled(player,pack,reward,wasTest)
  if not e then return false,why end
  -- the rarity read from the catalog must be the rarity that was rolled (a seed whose catalog entry differs is not announced)
  if e.Rarity~=rarity then return false,'rarity mismatch'end
- -- after the reveal, for everybody: the pulling player's screen is still playing the pack opening until then
- local ok,delay=pcall(Packs.GetRevealDuration,rarity)
- task.delay(ok and type(delay)=='number'and delay or 5,function()
+ -- after the puller's reveal has shown the seed, for everybody (in the server and, publishing, the other servers): their screen is still playing it until then
+ local wait=self:_afterReveal(player,rarity,0,function()
   if inServer then self:_broadcast(e)end
   if global then self:_queue(e)end
  end)
- return true
+ return true,wait
 end
 
--- Public API for other server code (the hub displays): {Kind='Record', Player=player | Name=,UserId=, Record='BestPull', SeedId=?, Odds=?}.
+-- Waiting for a reveal --------------------------------------------------------------------------------------------------------------------------
+-- Runs fn once the puller's reveal has shown the seed: PullAnnounceRules.RevealDelay(rarity) seconds from now (plus lag). A skip changes nothing here (see the header: the seed is
+-- shown sooner, so this time is still after it). If the puller leaves first (PlayerRemoving, wired in Run) fn runs at once. Returns the seconds it waits.
+function A:_afterReveal(player,rarity,lag,fn)
+ local wait=Rules.RevealDelay(rarity)+(tonumber(lag)or 0)
+ local entry={Player=player,Done=false}
+ entry.Go=function()
+  if entry.Done then return end
+  entry.Done=true;self.Waiting[entry]=nil
+  local ok,err=pcall(fn);if not ok then self.Warn('[R151] A pull announcement could not be sent: '..tostring(err))end
+ end
+ self.Waiting[entry]=true
+ task.delay(wait,entry.Go)
+ return wait
+end
+-- The player is leaving: whatever waited for their reveal goes out now.
+function A:_released(player)
+ local due={};for entry in pairs(self.Waiting)do if entry.Player==player then due[#due+1]=entry end end
+ for _,entry in ipairs(due)do entry.Go()end
+end
+
+-- Public API for other server code (the hub displays): {Kind='Record', Player=player | Name=,UserId=, Record='BestPull', SeedId=?, Odds=?, AfterReveal=?, Scope=?, To=?}.
+--  * Kind='Record' goes where PullAnnounceRules.RecordScope says (this server, every server, or nobody: then false, 'below the threshold') unless Scope = 'InServer' | 'Global'.
+--  * AfterReveal=true: the line comes from a pack open whose reveal is playing on the puller's screen (SeedId = the seed): it waits like the pull line (PullAnnounceRules.RevealDelay,
+--    a record plus RecordLag so the pull line comes first) and goes out at once if the puller (Player) leaves first. Without it the line goes out now.
+--  * To=player: only that player is told, in this server only (an owner's bestpull / bigfruit test), now.
+-- Returns true and the seconds until it goes out (0 = now), or false and the reason.
 function A:Send(spec)
  if type(spec)~='table'then return false,'spec'end
  local kind=spec.Kind
@@ -254,7 +297,23 @@ function A:Send(spec)
  if p then name=(type(p.DisplayName)=='string'and p.DisplayName~='')and p.DisplayName or p.Name;uid=p.UserId end
  local fields={Name=name,UserId=uid,Id=self:_id(),SeedId=spec.SeedId,Odds=spec.Odds,Record=spec.Record,At=self.Time()}
  local e,why=Rules.Event(kind,fields);if not e then return false,why end
- self:_broadcast(e);return true
+ local global=false
+ if kind=='Record'then
+  local scope=spec.Scope
+  if scope~='InServer'and scope~='Global'then scope=Rules.RecordScope(e.Record,e.Rarity)end
+  if scope==nil then return false,'below the threshold'end
+  global=scope=='Global'
+ end
+ local only=spec.To
+ if only then global=false end
+ local function deliver()
+  self:_broadcast(e,only and function(player)return player==only end or nil)
+  if global then self:_queue(e)end
+ end
+ if spec.AfterReveal==true and not only and e.Rarity then
+  return true,self:_afterReveal(p,e.Rarity,kind=='Record'and Rules.Setting('RecordLag')or 0,deliver)
+ end
+ deliver();return true,0
 end
 
 -- Owner test commands -------------------------------------------------------------------------------------------------------------------------------
@@ -291,7 +350,7 @@ function A:RunCommand(ctx,p,a)
   elseif first=='biggestfruit'or first=='fruit'then record='BiggestFruit';table.remove(words,1)end
   local spec=#words>0 and findSeed(table.concat(words,' '))
   if#words>0 and not spec then return false,'Unknown seed. See /test catalog all.'end
-  local ok,why=self:Send({Kind='Record',Player=p,Record=record,SeedId=spec and spec.id or nil,Odds=spec and ctx and ctx.Config and defaultOdds(ctx.Config,spec)or nil})
+  local ok,why=self:Send({Kind='Record',Player=p,Record=record,SeedId=spec and spec.id or nil,Odds=spec and ctx and ctx.Config and defaultOdds(ctx.Config,spec)or nil,Scope='InServer'})
   return ok,ok and('Record chat line sent to this server: '..name..' took '..Rules.RecordTitle(record)..'.')or('Not sent: '..tostring(why))
  end
  local here=false

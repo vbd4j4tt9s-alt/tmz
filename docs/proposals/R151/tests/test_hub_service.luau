@@ -5,13 +5,14 @@
 --  1. start: both displays built, the first day set up, the fruit of the day = HubDisplayRules.FruitForDay;
 --  2. events: a real pull is ranked and shown (sign, accent, item and avatar requested once), odds = the pack's own SeedOdds; TEST packs, owner-granted players and injected
 --     tests are not counted; a worse pull / fruit only moves nothing; fruit of another type ignored;
---  3. notices: text, everyone in the server, the celebration remote, the Rare minimum, the gap, no notice for another server's champion;
+--  3. the record line: ONE announcement through PullAnnouncer.Announce (a stand-in that decides like the real one; the real one is in test_hub_hooks), no notice of the hub's
+--     own, a pull record AfterReveal and the chime in step with it, a fruit record at once, the gap, nothing for another server's champion or a preview day, an announcer that fails;
 --  4. the day: midnight clears both boards and changes the fruit; an event right after midnight counts for the new day; boards are by day in the store;
 --  5. cross-server: A writes (about 3 s later), B reads (within 45-60 s) and shows it with a pop but no notice; races between two servers; the better one wins everywhere;
 --  6. polling and writes: the interval and jitter, how many requests an hour costs, writes are coalesced;
 --  7. failures: MemoryStore down -> this server's own best, keeps trying with backoff, catches up; throttled; recovered;
 --  8. a champion change rebuilds the item and the avatar once (a stale build is dropped, an identical record rebuilds nothing);
---  9. owner tools: bestpull / bigfruit (this server only, `share`), reset, day preview (no store traffic), status text.
+--  9. owner tools: bestpull / bigfruit (this server only, `share`; announced PRIVATELY to the target), reset, day preview (no store traffic), status text.
 local HH=require('./hub_harness');local H=HH.H;local W,R=H.W,H.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -53,6 +54,23 @@ local function fakeAvatars()
  function V:Place()V.Placed+=1;return true end
  return V
 end
+-- A stand-in for PullAnnouncer.Announce that decides like the real one where it matters here (PullAnnounceRules.RecordScope: a BestPull below Legendary is refused; a pull
+-- record AfterReveal waits RevealDelay + RecordLag) and records every call, every accepted one and every wait.
+local Announce=W.module('PullAnnounceRules')
+local function fakeAnnouncer()
+ local F={Calls={},Sent={},Waits={}}
+ function F.Announce(spec)
+  F.Calls[#F.Calls+1]=spec
+  local info=spec.SeedId and Announce.SeedInfo(spec.SeedId)
+  local scope=spec.Scope or Announce.RecordScope(spec.Record,info and info.Rarity)
+  if scope==nil then return false,'below the threshold'end
+  local wait=0
+  if spec.AfterReveal and not spec.To and info then wait=Announce.RevealDelay(info.Rarity)+Announce.Setting('RecordLag')end
+  F.Sent[#F.Sent+1]=spec;F.Waits[#F.Waits+1]=wait
+  return true,wait
+ end
+ return F
+end
 -- one "server" ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 local function notes()
  local N={Shown={}}
@@ -61,7 +79,7 @@ local function notes()
 end
 local function makeServer(backend,opts)
  opts=opts or{}
- local s={Clock=opts.Clock or HH.clock(T0),Art=fakeArt(),Avatars=fakeAvatars(),Notes=notes()}
+ local s={Clock=opts.Clock or HH.clock(T0),Art=fakeArt(),Avatars=fakeAvatars(),Notes=notes(),Announcer=fakeAnnouncer()}
  s.Backend=backend
  s.Svc=HH.memoryService(backend)
  s.Store=Store.new({Service=s.Svc,Clock=s.Clock.now})
@@ -71,7 +89,7 @@ local function makeServer(backend,opts)
  local lobby=R.new('Folder');lobby.Name='Lobby';lobby.Parent=folder
  local floor=R.new('Part');floor.Name='LobbyFloor';floor.Size=V3(680,1,524);floor.CFrame=CF(0,3.5,-361);floor.Parent=lobby
  s.Map={MapRoot=folder}
- s.Service=Service.new(Config,{},s.Notes,s.Map,{Clock=s.Clock.now,Time=s.Clock.time,Store=s.Store,Art=s.Art,Avatars=s.Avatars,FruitList=list,NoLoop=true,Random=rng})
+ s.Service=Service.new(Config,{},s.Notes,s.Map,{Clock=s.Clock.now,Time=s.Clock.time,Store=s.Store,Art=s.Art,Avatars=s.Avatars,FruitList=list,NoLoop=true,Random=rng,Announce=s.Announcer.Announce})
  return s
 end
 local function pull(over)
@@ -178,8 +196,9 @@ do
  check(not f1,'p3 is tainted: still refused')
 end
 
--- 3. Notices -------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- 3. The record line: ONE chat line through PullAnnouncer, never a notice of the hub's own -----------------------------------------------------------------------------------
 do
+ R.advance(60) -- (the chimes the earlier sections' pulls scheduled play out first, so they are not counted below)
  local backend=HH.backend();A=makeServer(backend);backend.Now=function()return A.Clock.t end
  A.Service:Start()
  local svc=A.Service
@@ -187,46 +206,63 @@ do
  local remote=remotes:FindFirstChild('HubDisplayCelebrate')
  local fired={}
  check(remote and remote:IsA('RemoteEvent'),'the celebration remote ChestChaseRemotes.HubDisplayCelebrate exists')
- remote.FireClient=function(_,player,payload)fired[#fired+1]={Player=player,Payload=payload}end
+ remote.FireClient=function(_,player,payload)fired[#fired+1]={Player=player,Payload=payload,At=R.clock}end
  local q1=HH.player(21,'Zed')
- local n0=#A.Notes.Shown
+ local n0=#A.Notes.Shown;local everyone=#H.players
+ local t0=R.clock
  svc:NotePull(q1,reward('FirePepperSeed','Mythic'),info())
- local shown=A.Notes.Shown
- local mine={};for i=n0+1,#shown do mine[#mine+1]=shown[i]end
- local everyone=#H.players
- check(#mine==everyone,'the notice goes to every player in the server ('..#mine..' of '..everyone..')')
- check(mine[1].Text=='🏆 Zed took BEST PULL TODAY with a Mythic Fire Pepper!','the notice reads "🏆 Zed took BEST PULL TODAY with a Mythic Fire Pepper!"')
- check(mine[1].Seconds==5 and mine[1].Color.R and math.abs(mine[1].Color.R*255-Rules.RarityColor('Mythic')[1])<1,'shown for 5 s in the rarity\'s colour')
- check(#fired==everyone and fired[1].Payload.Kind=='Pull'and fired[1].Payload.Name=='Zed','and the celebration remote is fired for each (the client plays the game\'s GemClaim chime)')
- -- the gap
+ check(#A.Notes.Shown==n0,'a new Best Pull shows NO notice of the hub\'s own (the old banner is gone: no second message next to the chat line)')
+ local spec=A.Announcer.Calls[1]
+ check(#A.Announcer.Calls==1 and spec.Kind=='Record'and spec.Record=='BestPull'and spec.Player==q1 and spec.SeedId=='FirePepperSeed'and spec.AfterReveal==true and spec.To==nil and spec.Scope==nil,'it is announced ONCE through PullAnnouncer.Announce: {Kind=Record, Record=BestPull, Player=the puller, SeedId, AfterReveal=true} and the scope is the rules\' (none given)')
+ local wait=A.Announcer.Waits[1]
+ check(math.abs(wait-(Announce.RevealDelay('Mythic')+Announce.Setting('RecordLag')))<1e-9,'a record that comes from a pull waits for the puller\'s reveal (RevealDelay of a Mythic + the record lag = '..string.format('%.2f',wait)..' s)')
+ check(#fired==0,'the celebration chime has not played yet (the puller\'s reveal is still playing)')
+ R.advance(wait-.05);check(#fired==0,'... nor just before the line')
+ R.advance(.1)
+ check(#fired==everyone and fired[1].Payload.Kind=='Pull'and fired[1].Payload.Name=='Zed','in step with the line the chime goes to everyone in the server ('..#fired..' of '..everyone..'; the client plays the game\'s GemClaim)')
+ -- the gap: a second champion within 8 s: the display changes, no second announcement
  svc:NotePull(q1,reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01'}))
- check(#A.Notes.Shown==n0+everyone,'a second champion within 8 s: the display changes, no second notice')
+ check(#A.Announcer.Calls==1,'a second champion within 8 s: the display changes, no second announcement')
  check(svc:Snapshot().Pull.Record.Rarity=='King','(the display did change)')
  A.Clock.advance(9)
  svc:NotePull(q1,reward('SolarStarfruitSeed','King',{SeedScale=5}),info({Stage=2,Variant='Pack01'}))
- check(#A.Notes.Shown==n0+2*everyone,'after the gap the next champion is announced again')
- -- a Common never makes a notice
+ check(#A.Announcer.Calls==2 and#A.Announcer.Sent==2,'after the gap the next champion is announced again')
+ check(#A.Notes.Shown==n0,'(and still no notice of the hub\'s own)')
+ -- the announcer decides who hears it (PullAnnounceRules.RecordScope): a Common takes the spot silently, and so does anything below Legendary
  local backend2=HH.backend();local B=makeServer(backend2);backend2.Now=function()return B.Clock.t end;B.Service:Start()
- local m0=#B.Notes.Shown
- B.Service:NotePull(q1,reward('SunflowerSeed','Common'),info({Stage=1,Variant='Pack01'}))
- check(B.Service:Snapshot().Pull.Record.Rarity=='Common'and #B.Notes.Shown==m0,'a Common pull takes the spot silently (the display changes, nobody is told)')
- B.Service:NotePull(q1,reward('AppleSeed','Rare'),info({Stage=1,Variant='Pack01'}))
- check(#B.Notes.Shown==m0+everyone,'a Rare is announced (the minimum rank is Rare)')
- -- fruit notice
+ local q2=HH.player(22,'Yan')
+ B.Service:NotePull(q2,reward('SunflowerSeed','Common'),info({Stage=1,Variant='Pack01'}))
+ check(B.Service:Snapshot().Pull.Record.Rarity=='Common'and#B.Announcer.Sent==0 and#B.Notes.Shown==0,'a Common pull takes the spot silently (the display changes; the announcer says nobody hears it)')
+ B.Service:NotePull(q2,reward('AppleSeed','Rare'),info({Stage=1,Variant='Pack01'}))
+ check(B.Service:Snapshot().Pull.Record.Rarity=='Rare'and#B.Announcer.Sent==0,'a Rare is silent too: chat records start at Legendary (PullAnnounceRules.InServerMinRarity), not at the hub\'s old Rare notice')
+ B.Service:NotePull(q2,reward('FirePepperSeed','Mythic'),info({Stage=4,Variant='Pack01'}))
+ check(#B.Announcer.Sent==1 and B.Announcer.Sent[1].SeedId=='FirePepperSeed','a Mythic right after is announced (a refused record does not use up the gap)')
+ -- the fruit record: this server, at once (a harvest has no reveal)
  local fid=B.Service.Board.FruitId
- B.Service:NoteHarvest(q1,{SeedId=fid,FruitScale=5.5,Mutation='None'})
- local last=B.Notes.Shown[#B.Notes.Shown]
- local rec=B.Service:Snapshot().Fruit.Record
- check(last.Text==Rules.FruitNotice(rec,B.Service:FruitName(fid))and last.Text:find('took BIGGEST',1,true)and last.Text:find('kg',1,true),'the fruit notice: "<emoji> Zed took BIGGEST <FRUIT> TODAY with 12.4 kg!" ('..last.Text..')')
- -- a champion from another server: shown with a pop but no notice
+ B.Service:NoteHarvest(q2,{SeedId=fid,FruitScale=5.5,Mutation='None'})
+ local last=B.Announcer.Sent[#B.Announcer.Sent]
+ check(last.Record=='BiggestFruit'and last.Kind=='Record'and last.Player==q2 and last.AfterReveal==nil and last.To==nil,'a biggest-fruit record: BiggestFruit, the picker, no reveal to wait for ('..tostring(last.Record)..')')
+ check(B.Announcer.Waits[#B.Announcer.Waits]==0 and#B.Notes.Shown==0,'... it goes out at once and the hub shows no notice')
+ -- a champion from another server: shown with a pop but nothing announced here (the origin server said it)
  local backend3=HH.backend();local S1=makeServer(backend3,{Seed=3});local S2=makeServer(backend3,{Seed=9})
  backend3.Now=function()return S1.Clock.t end
  S1.Service:Start();S2.Service:Start()
  S1.Service:NotePull(q1,reward('FirePepperSeed','Mythic'),info())
  step(S1,5)
- local seen=#S2.Notes.Shown
+ local seen=#S2.Announcer.Calls
  step(S2,70)
- check(S2.Service:Snapshot().Pull.Record and S2.Service:Snapshot().Pull.Source=='Remote'and #S2.Notes.Shown==seen,'a champion that came from another server updates the display with no notice on this one')
+ check(S2.Service:Snapshot().Pull.Record and S2.Service:Snapshot().Pull.Source=='Remote'and#S2.Announcer.Calls==seen and#S2.Notes.Shown==0,'a champion that came from another server updates the display and announces nothing on this one')
+ -- the announcer failing or missing never breaks an event
+ local backend4=HH.backend();local C=makeServer(backend4);C.Service.Announce=function()error('announcer exploded')end;C.Service:Start()
+ local okC,resC=C.Service:NotePull(q1,reward('FirePepperSeed','Mythic'),info())
+ check(okC==true and resC=='took'and C.Service:Snapshot().Pull.Record.Name=='Zed','an announcer that throws: the pull is still counted and shown')
+ C.Service.Announce=function()return false,'no announcer'end;C.Clock.advance(9)
+ check(C.Service:NotePull(q1,reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01'}))and#C.Notes.Shown==0,'an announcer that says no: still counted, still no hub notice')
+ -- a preview of another day announces nothing (nothing about it is real)
+ local backend5=HH.backend();local P5=makeServer(backend5);P5.Service:Start();P5.Service:SetDayOffset(1)
+ P5.Service:NotePull(q1,reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01'}))
+ P5.Service:NoteHarvest(q1,{SeedId=P5.Service.Board.FruitId,FruitScale=9,Mutation='None'})
+ check(P5.Service:Snapshot().Pull.Record and P5.Service:Snapshot().Fruit.Record and#P5.Announcer.Calls==0,'while previewing another day a real pull and a real harvest are recorded but announce nothing')
 end
 
 -- 4. The day -------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -285,7 +321,7 @@ do
  local snapB=SB.Service:Snapshot()
  check(snapB.Pull.Record.Name=='Ava'and snapB.Pull.Source=='Remote'and not snapB.Pull.Unsynced,'as the shared (Remote) champion, nothing to write back')
  check(SB.Art.Built.Pull.Text.Rows.Name.Text=='Ava'and SB.Art.Built.Pull.Model:GetAttribute('Rev')==2 and SB.Avatars.Builds[#SB.Avatars.Builds].Uid==41,'B\'s display now shows Ava with her avatar and pops (Rev + 1)')
- check(#SB.Notes.Shown==0,'B posted no notice (it happened in server A)')
+ check(#SB.Notes.Shown==0 and#SB.Announcer.Calls==0,'B posted no notice and announced nothing (it happened in server A)')
  -- B takes the spot with a better pull
  SB.Service:NotePull(pb,reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01'}))
  check(SB.Art.Built.Pull.Text.Rows.Name.Text=='Bo','B\'s own King shows at once on B')
@@ -293,8 +329,7 @@ do
  cb.advance(5);SB.Service:Step();ca.advance(5)
  for _=1,14 do ca.advance(5);SA.Service:Step()end
  check(SA.Service:Snapshot().Pull.Record.Name=='Bo'and SA.Art.Built.Pull.Text.Rows.Name.Text=='Bo','within a minute A shows Bo\'s King too')
- local told={};for _,n in ipairs(SA.Notes.Shown)do told[n.Text:match('^%S+ (%S+)')]=true end
- check(told.Ava and not told.Bo,'A only ever told its own players about Ava, never about Bo (his King came from another server)')
+ check(#SA.Announcer.Calls==1 and SA.Announcer.Calls[1].Player==pa and#SA.Notes.Shown==0,'A only ever announced its own pull (Ava), never Bo\'s King that came from another server')
  -- a worse pull on A afterwards changes nothing and writes nothing
  local updates=backend.Calls.Update
  SA.Service:NotePull(pa,reward('AppleSeed','Rare'),info({Stage=1,Variant='Pack01'}))
@@ -444,6 +479,7 @@ do
  local S=makeServer(backend,{Clock=ca,Seed=5});S.Service:Start()
  local svc=S.Service
  local q=HH.player(81,'Ivy');local r=HH.player(82,'Jay')
+ local chime={};remotes:FindFirstChild('HubDisplayCelebrate').FireClient=function(_,player)chime[#chime+1]=player end
  check(svc:FindSeed('FirePepperSeed')and svc:FindSeed('fire pepper')and svc:FindSeed('Fire  Pepper')and svc:FindSeed('FIREPEPPERSEED')and svc:FindSeed('Fire Pepper').id=='FirePepperSeed'and not svc:FindSeed('nonsense')and not svc:FindSeed(''),'a seed is found by id or by plant name, any case or spacing')
  check(svc:FindSeed('worldroot')~=nil,'(and by the game\'s display name: Ancient Worldroot is "Worldroot")')
  local ok,msg=svc:InjectPull(q,'fire pepper')
@@ -451,18 +487,25 @@ do
  local snap=svc:Snapshot()
  check(snap.Pull.Record.Name=='Ivy'and snap.Pull.Source=='Test'and not snap.Pull.Unsynced,'it shows (as a Test record) and is never unsynced')
  step(S,15);check(backend.Calls.Update==0,'a test pull is never written to the shared store')
- check(#S.Notes.Shown>=1,'the owner sees the notice of a test (the display and the sound are testable)')
+ check(#S.Notes.Shown==0,'a test shows no hub notice either')
+ local sp=S.Announcer.Calls[#S.Announcer.Calls]
+ check(#S.Announcer.Calls==1 and sp.Record=='BestPull'and sp.To==q and sp.Player==q and sp.AfterReveal==nil,'a test (bestpull) is announced PRIVATELY: To = its target only, now: never the server, never another server')
+ check(#chime==1 and chime[1]==q,'... and so is the chime: only the target hears it ('..#chime..' of '..#H.players..' players)')
  local ok2,msg2=svc:InjectPull(q,'nonsense');check(not ok2 and msg2:find('Unknown seed',1,true),'an unknown seed is refused with a hint')
  local ok3=svc:InjectPull(q,'sunflower')
  check(not ok3,'a worse pull than what the board holds is refused')
  local ok4,msg4=svc:InjectPull(r,'solar starfruit',true)
  check(ok4 and msg4:find('(shared)',1,true),'bestpull ... share is written like a real one')
+ local sp4=S.Announcer.Calls[#S.Announcer.Calls]
+ check(#S.Announcer.Calls==2 and sp4.To==r and sp4.Player==r and sp4.AfterReveal==nil,'... yet its announcement is still private to the target: a test never talks to the server, shared or not')
  step(S,10);check(backend.Calls.Update>=1 and backend.peek(Rules.StoreName,'d'..DAY).pull.Name=='Jay','and reaches the store')
  -- bigfruit
  local fid=svc.Board.FruitId;local base=Weight.Base('Fruit',fid)
  local okF,msgF=svc:InjectFruit(q,12.4)
  check(okF and svc:Snapshot().Fruit.Record and math.abs(svc:Snapshot().Fruit.Record.Kg-math.clamp(12.4/base,.35,50)*base)<1e-9,'bigfruit 12.4: a fruit of today\'s type ('..tostring(msgF)..')')
  check(svc:Snapshot().Fruit.Source=='Test','as a Test record')
+ local spF=S.Announcer.Calls[#S.Announcer.Calls]
+ check(spF.Record=='BiggestFruit'and spF.To==q and spF.Player==q,'a bigfruit test is announced privately to its target too')
  check(not svc:InjectFruit(q,'x')and not svc:InjectFruit(q,-3)and not svc:InjectFruit(q,0/0)and not svc:InjectFruit(q,0),'a bad weight is refused')
  local okG,msgG=svc:InjectFruit(r,60,'Gold')
  check(okG and svc:Snapshot().Fruit.Record.Coat=='Gold','bigfruit with a gold coat')

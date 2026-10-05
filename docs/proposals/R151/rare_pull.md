@@ -170,7 +170,16 @@ To audition in Studio: `/test raresound KingFanfare` (one slot), `/test rarepull
 
 ## 6. For the R151 pull announcements (the other agent's PullAnnouncer)
 
-The puller's client sets `LocalPlayer` attributes while a reveal runs: `RarePullCinematic` = `Ladder` / `Scene` / `InPlace` / `Result`, and `RarePullClimaxAt` = the server time of the hit (updated on a skip), cleared when it ends. **The banner for the puller's own pull should wait until `workspace:GetServerTimeNow() >= RarePullClimaxAt`** (a Scene hides every ScreenGui added while it runs anyway and shows them at Back); **other players can be told at once**. The all-server shout for Secret+ is unaffected.
+The puller's client sets `LocalPlayer` attributes while a reveal runs: `RarePullCinematic` = `Ladder` / `Scene` / `InPlace` / `Result`, and `RarePullClimaxAt` = the server time of the hit (updated on a skip), cleared when it ends.
+
+**How the announcements use it (integration round).** The pull announcements are chat lines only (`PullAnnouncer`), and nobody gets the line before the PULLER's reveal has shown the seed, so the server derives when from the very tables this client plays: `PullAnnounceRules.RevealDelay(rarity)` = `RarePullRules.LatestSeedShown(rank)` + a 0.5 s margin. `LatestSeedShown` is "the seed is on the puller's screen and its `1 in N` has landed", per presentation: Common..Mythic the card's `Odds` slam (`CardTimeline`); the story scenes the latest of `Climax`, `Rise` and `Odds`. The server cannot see which presentation the client picks (Full / Calm / InPlace depend on a safety snapshot only the client has, a quick ladder reveal on the previous reveal), so it takes the latest of them. A skip only brings the hit sooner, a cut-short scene (`Result`) shows its card before the hit, so the normal time is always after the seed. Seconds after the open:
+
+| Rarity | Common | Uncommon | Rare | Legendary | Mythic | Secret | Cosmic | King |
+|---|---|---|---|---|---|---|---|---|
+| seed shown (latest presentation) | 0.93 | 1.11 | 1.34 | 1.67 | 1.90 | 4.15 | 5.30 | 6.15 |
+| the line (in-server Legendary+, all servers Secret+) | not announced | not announced | not announced | 2.17 | 2.40 | 4.65 | 5.80 | 6.65 |
+
+(`test_rare_cinematic` plays every presentation of every rarity frame by frame and reads off when the title and the seed's name are fully on screen: the line always comes after, e.g. Secret Full name at 4.33 s, line 4.65 s; a skipped scene shows it much earlier.) If the puller leaves first the line goes out at once; the client holds a line about its OWN player until `RarePullClimaxAt` + the margin as a safety net for a slow device. A hub record that comes from a pull (`Best Pull`) follows the pull line by 0.4 s.
 
 ## 7. What changed
 

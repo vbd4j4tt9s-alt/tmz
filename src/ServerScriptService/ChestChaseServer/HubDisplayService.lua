@@ -9,7 +9,11 @@
 --    fails the server keeps its own board and keeps trying (the store backs off; see HubDisplayStore).
 --  * Shows them: HubDisplayArt builds the two stages in the hub's empty back corners; on a change this writes the sign, the colours, a new giant item and the champion's avatar
 --    (HubDisplayAvatar), each built once per champion (a generation number drops a build that a newer champion overtook), and bumps the display's `Rev` attribute so every
---    client pops it. When someone takes the top spot in THIS server, everyone in this server gets a notice and a celebration sound (a Remote the client plays GemClaim for).
+--    client pops it. When someone takes the top spot in THIS server it is announced in CHAT, through PullAnnouncer.Announce({Kind='Record', ...}) (the owner: pull announcements
+--    only in chat): who hears it is PullAnnounceRules.RecordScope (a Secret+ best pull every server, Legendary / Mythic this server, lower nothing; a fruit record this server);
+--    a record that comes from a pack open waits until the puller's reveal has shown the seed (AfterReveal), like the pull line; there is no notice banner of its own any more (it
+--    would be a second message). The celebration chime (a Remote the client plays GemClaim for) goes out in step with the line. An owner's test (bestpull / bigfruit) is told to its
+--    target only, and nothing is announced while previewing another day.
 --  * UTC midnight (the daily rewards' day) clears both boards; the fruit of the day is HubDisplayRules.FruitForDay.
 -- No per-frame work: one loop wakes every 5 s, does a few integer comparisons, and only touches MemoryStore when a timer is due.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage')
@@ -20,7 +24,6 @@ local Store=require(script.Parent.HubDisplayStore)
 local Art=require(script.Parent.HubDisplayArt)
 local Avatar=require(script.Parent.HubDisplayAvatar)
 local S={};S.__index=S
-local RGB=Color3.fromRGB
 S.LoopSeconds=5
 S.RemoteName='HubDisplayCelebrate'
 local KINDS={'Pull','Fruit'}
@@ -29,7 +32,8 @@ local function guard(label,fn,...)
  if not ok then warn('[R151] '..label..': '..tostring(result))end
  return ok,result
 end
--- opts (all optional; the tests pass fakes): Clock (seconds for timers, default os.clock), Time (Unix seconds, default os.time), Store, Avatars, Art, FruitList, Random.
+-- opts (all optional; the tests pass fakes): Clock (seconds for timers, default os.clock), Time (Unix seconds, default os.time), Store, Avatars, Art, FruitList, Random,
+-- Announce (function(spec) -> ok, seconds: default PullAnnouncer.Announce). `notes` (the notice feed) is kept for the signature only: nothing is shown through it any more.
 function S.new(config,data,notes,map,opts)
  opts=opts or{}
  local clock=opts.Clock or os.clock
@@ -38,6 +42,11 @@ function S.new(config,data,notes,map,opts)
   Displays={},DayOffset=0,Tainted=setmetatable({},{__mode='k'}),Shown={Pull=nil,Fruit=nil},Gen={Pull=0,Fruit=0},Rev={Pull=0,Fruit=0},
   NextPoll=0,NextWrite=0,Blocked={Pull=0,Fruit=0},LastNotice={Pull=-1e9,Fruit=-1e9},Events={Pull=0,Fruit=0},Dead=false,Built={Pull=nil,Fruit=nil},
   Random=opts.Random or Random.new()},S)
+ self.Announce=opts.Announce or function(spec)
+  local ok,announcer=pcall(require,script.Parent.PullAnnouncer)
+  if not ok or type(announcer)~='table'then return false,'announcer'end
+  return announcer.Announce(spec)
+ end
  self.FruitList=opts.FruitList
  return self
 end
@@ -121,7 +130,7 @@ end
 function S:NoteOwnerGrant(player)if player then self.Tainted[player]=true end end
 local function wholeNumber(n)return type(n)=='number'and n==n and n%1==0 end
 -- A pack was opened: reward = the record OpenSeedPack made (SeedId, SeedName, Rarity, SeedScale, PackMutation), info = {Stage, Variant, Version, Boost, Luck, Test} of the PACK it
--- came from. Never throws, never yields. Returns true when the pull was counted.
+-- came from (Test = a guaranteed TEST reveal or an owner-made TestGrant pack). Never throws, never yields. Returns true when the pull was counted.
 function S:NotePull(player,reward,info)
  if self.Dead or type(reward)~='table'or typeof(player)~='Instance'then return false end
  info=type(info)=='table'and info or{}
@@ -135,7 +144,7 @@ function S:NotePull(player,reward,info)
  local rec=Rules.CleanPull({Uid=player.UserId,Name=player.DisplayName,Id=reward.SeedId,Seed=Rules.SeedLabel(reward.SeedId,reward.SeedName),Rarity=reward.Rarity,
   Odds=odds,Scale=reward.SeedScale,Coat=reward.PackMutation,At=self:Now()})
  if not rec then return false,'bad pull'end
- return self:_event('Pull',rec)
+ return self:_event('Pull',rec,{Player=player})
 end
 -- A fruit was picked by hand: harvest = the record HarvestPlant made (SeedId, FruitScale, Mutation, Weather).
 function S:NoteHarvest(player,harvest)
@@ -146,31 +155,54 @@ function S:NoteHarvest(player,harvest)
  local rec=Rules.CleanFruit({Uid=player.UserId,Name=player.DisplayName,Id=harvest.SeedId,Scale=harvest.FruitScale or harvest.PlantScale or 1,Coat=harvest.Mutation,
   Weather=harvest.Weather,At=self:Now()})
  if not rec then return false,'bad fruit'end
- return self:_event('Fruit',rec)
+ return self:_event('Fruit',rec,{Player=player})
 end
-function S:_event(kind,rec)
+-- who = {Player = whose it is, Injected = an owner's test (bestpull / bigfruit)}: only used to word and aim the announcement.
+function S:_event(kind,rec,who)
  local result=self.Board:Offer(kind,rec)
  if result=='ignored'then return false end
  self.Events[kind]+=1
  if result=='took'then
   self:_refresh(kind)
-  self:_announce(kind,rec)
+  self:_announce(kind,rec,who)
  end
  return true,result
 end
--- The notice and the celebration sound for everyone in this server.
-function S:_announce(kind,rec)
- if kind=='Pull'and not rec.Test and rec.Rank<Rules.NoticeMinRank then return false end
+-- Someone took the top spot of a board in THIS server: ONE chat line through PullAnnouncer (and the celebration chime in step with it). Not announced:
+--  * while previewing another day (nothing about a preview is real);
+--  * a second record of the same board within NoticeGap seconds (the display still changes);
+--  * a record PullAnnounceRules.RecordScope gives no scope (a pull below Legendary): PullAnnouncer says no, and so does this.
+-- A real pull waits until the puller's reveal has shown the seed (AfterReveal; a harvest has no reveal); the scope (this server / every server) is the rules'. An owner's test is
+-- private: only its target gets the line and the chime (To), never the server and never another server, whether it is shared or not.
+function S:_announce(kind,rec,who)
+ if self:_preview()then return false end
  local now=self.Clock()
  if now-self.LastNotice[kind]<Rules.NoticeGap then return false end
+ local player=who and typeof(who.Player)=='Instance'and who.Player or nil
+ local spec={Kind='Record',Record=kind=='Pull'and'BestPull'or'BiggestFruit',SeedId=PackRules.SeedDesignById[rec.Id]and rec.Id or nil}
+ if player then spec.Player=player else spec.Name=rec.Name;spec.UserId=rec.Uid end
+ local private=who~=nil and who.Injected==true
+ if private then
+  if not player then return false end
+  spec.To=player
+ elseif kind=='Pull'then spec.AfterReveal=true end
+ local called,ok,wait=pcall(self.Announce,spec)
+ if not called then warn('[R151] Hub record announcement: '..tostring(ok));return false end
+ if not ok then return false end
  self.LastNotice[kind]=now
- local text=kind=='Pull'and Rules.PullNotice(rec)or Rules.FruitNotice(rec,self:FruitName(rec.Id))
- local accent=kind=='Pull'and Rules.RarityColor(rec.Rarity)or{255,214,90}
- for _,p in ipairs(Players:GetPlayers())do
-  if self.Notes then pcall(function()self.Notes:Show(p,text,RGB(accent[1],accent[2],accent[3]),5)end)end
-  if self.Remote then pcall(function()self.Remote:FireClient(p,{Kind=kind,Name=rec.Name})end)end
- end
+ self:_celebrate(kind,rec,wait,spec.To)
  return true
+end
+-- The chime: every player in this server (only `only` for a test), `wait` seconds from now (the line's own wait).
+function S:_celebrate(kind,rec,wait,only)
+ local remote=self.Remote;if not remote then return end
+ local function fire()
+  if self.Dead then return end
+  for _,p in ipairs(Players:GetPlayers())do
+   if not only or p==only then pcall(function()remote:FireClient(p,{Kind=kind,Name=rec.Name})end)end
+  end
+ end
+ if type(wait)=='number'and wait>0 then task.delay(wait,fire)else fire()end
 end
 -- Shared store -----------------------------------------------------------------------------------------------------------------------------------------------
 function S:_preview()return self.DayOffset~=0 end
@@ -296,7 +328,7 @@ function S:InjectPull(player,seedQuery,share)
  if type(odds)~='number'or odds<=0 then local style=PackRules.Rarities[rarity];odds=style and style.Weight or 1 end
  local rec=Rules.CleanPull({Uid=player.UserId,Name=player.DisplayName,Id=spec.id,Seed=Rules.SeedLabel(spec.id,spec.name),Rarity=rarity,Odds=odds,Scale=1,Coat='None',At=self:Now(),Test=not share})
  if not rec then return false,'Could not make that pull.'end
- local ok,result=self:_event('Pull',rec)
+ local ok,result=self:_event('Pull',rec,{Player=player,Injected=true})
  if not ok then return false,'Not better than what this server already holds for today.'end
  return true,('%s: %s %s, %s%s'):format(player.Name,rec.Rarity,rec.Seed,Rules.OddsText(rec.Odds),share and' (shared)'or' (this server only)')..(result=='took'and''or' - recorded, but someone\'s is better')
 end
@@ -309,7 +341,7 @@ function S:InjectFruit(player,kg,coat,share)
  local scale=math.clamp(kg/base,.35,50)
  local rec=Rules.CleanFruit({Uid=player.UserId,Name=player.DisplayName,Id=id,Scale=scale,Coat=coat or'None',Weather='None',At=self:Now(),Test=not share})
  if not rec then return false,'Could not make that fruit.'end
- local ok,result=self:_event('Fruit',rec)
+ local ok,result=self:_event('Fruit',rec,{Player=player,Injected=true})
  if not ok then return false,'Not heavier than what this server already holds for today.'end
  return true,('%s: %s %s, %s%s'):format(player.Name,rec.Coat~='None'and rec.Coat..' 'or'',self:FruitName(id),Rules.KgText(rec.Kg),share and' (shared)'or' (this server only)')..(result=='took'and''or' - recorded, but someone\'s is heavier')
 end

@@ -9,6 +9,9 @@
 --  5. escaping: markup in a name or a record key never reaches the chat as a tag; a very long name is cut and the line stays one well formed run
 --  6. the old chat (no RBXGeneral, or writing failed): one plain coloured line, never two lines (not both chats), nothing throws when there is no chat at all
 --  7. hostile payloads (wrong types, unknown seeds and kinds, no id), the rarity claimed by a payload is ignored (the catalog decides), teardown
+--  8. the puller's own screen: a line about THIS player that arrives before their cinematic's hit (LocalPlayer attribute RarePullClimaxAt) + the margin waits for it; lines about
+--     other players, from other servers, with no cinematic running or after the hit are never held; a skip (the attribute moves earlier) shortens the wait; nothing is held longer
+--     than 8 s; a held line is still written once, rate limited, and never after teardown
 local UW=require('./ui_world');local W,R=UW.W,UW.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -228,6 +231,52 @@ do
  check(UW.live(ctx.Remote.OnClientEvent)==0,'destroying the script removes the remote listener')
  local before=#chatLog;local ok=pcall(send,pull(KING));check(ok and#chatLog==before,'an event after teardown is ignored')
  check(UW.frameListeners()==0,'(nothing left running)')
+ ctx.Remote:Destroy();ctx=nil
+end
+
+-- 8. the puller's own screen -------------------------------------------------------------------------------------------------------------------------------
+do
+ boot()
+ local margin=Rules.Setting('RevealMargin')
+ local function hit(inSeconds)me:SetAttribute('RarePullClimaxAt',W.workspace:GetServerTimeNow()+inSeconds)end
+ -- no cinematic running: at once (the server's timing is the only one)
+ me:SetAttribute('RarePullClimaxAt',nil)
+ send(pull(KING,{UserId=me.UserId,Name='Me D'}));check(#chatLog==1,'no cinematic running: your own line is written at once')
+ seconds(11)
+ -- a cinematic whose hit is 2 s away: your own line waits for it plus the margin
+ hit(2);local t0=R.clock
+ send(pull(MYTH,{UserId=me.UserId,Name='Me D'}))
+ check(#chatLog==1,'your hit is 2 s away: your own line is not written yet')
+ seconds(2+margin-.3);check(#chatLog==1,'... not at your hit either, nor just before the margin is over')
+ seconds(.5);check(#chatLog==2 and chatLog[2].Text:find('Me D',1,true)~=nil,'... it is written once your hit + the margin has passed ('..string.format('%.2f',R.clock-t0)..' s)')
+ seconds(10);check(#chatLog==2,'... exactly once')
+ -- other players, other servers, a record about you, the hit already past
+ seconds(11)
+ hit(5);local n=#chatLog
+ send(pull(LEG,{UserId=555,Name='Someone'}));check(#chatLog==n+1,'a line about SOMEONE ELSE is never held (their reveal is their own)')
+ send(pull(SEC,{Kind='Global',UserId=me.UserId,Odds=1000}));check(#chatLog==n+2,'a line from another server is never held')
+ send({Kind='Record',Id='own-rec',UserId=me.UserId,Name='Me D',Record='BestPull',SeedId=KING});check(#chatLog==n+2,'a record about YOU is held like your pull line')
+ seconds(5+margin+.2);check(#chatLog==n+3 and chatLog[#chatLog].Text:find('took BEST PULL TODAY',1,true)~=nil,'... and is written after your hit')
+ seconds(11);hit(-3)
+ send(pull(KING,{UserId=me.UserId,Name='Me D'}));check(#chatLog==n+4,'your hit is already past (a margin ago): written at once')
+ -- a skip moves the hit earlier: the wait follows the attribute at the moment the line arrives
+ seconds(11);hit(.2);local m=#chatLog
+ send(pull(COS,{UserId=me.UserId,Name='Me D'}));seconds(.1);check(#chatLog==m,'(held)')
+ seconds(.2+margin);check(#chatLog==m+1,'a hit that is only .2 s away holds the line .2 s + the margin')
+ -- never held longer than 8 s, whatever the attribute says
+ seconds(11);me:SetAttribute('RarePullClimaxAt',W.workspace:GetServerTimeNow()+1e6);local k=#chatLog
+ send(pull(KING,{UserId=me.UserId,Name='Me D'}));seconds(7.9);check(#chatLog==k,'a hit a million seconds away: still held at 7.9 s')
+ seconds(.3);check(#chatLog==k+1,'... but written at 8 s (nothing is held longer)')
+ -- bad attribute values do not hold anything
+ for _,bad in ipairs({'soon',0/0,true})do me:SetAttribute('RarePullClimaxAt',bad);local c=#chatLog;seconds(11);send(pull(KING,{UserId=me.UserId,Name='Me D'}));check(#chatLog==c+1,'an attribute that is not a number ('..tostring(bad)..') holds nothing')end
+ me:SetAttribute('RarePullClimaxAt',nil)
+ -- the held line is rate limited when it is written (not when it arrived) and teardown cancels it
+ seconds(11);boot()
+ hit(1);for i=1,3 do send(pull(LEG,{UserId=me.UserId,Name='Me D'}))end;check(#chatLog==0,'three own lines held')
+ seconds(1+margin+.3);check(#chatLog==3,'... all three are written afterwards')
+ seconds(11);hit(3);send(pull(KING,{UserId=me.UserId,Name='Me D'}));ctx.Script:Destroy();seconds(5)
+ check(#chatLog==3,'a line that was held when the script was destroyed is never written')
+ me:SetAttribute('RarePullClimaxAt',nil)
  ctx.Remote:Destroy();ctx=nil
 end
 

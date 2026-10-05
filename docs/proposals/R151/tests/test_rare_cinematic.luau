@@ -389,5 +389,81 @@ do -- the bonus-roll hook: a Secret result's sting is one-shot and on Effects
  E.resetPlays();check(Audio.Sting(6)==true and Audio.Sting(5)==false,'the bonus roll Secret sting')
  local g=voices('SecretGlitch_1')[1];check(g and g.IsPlaying and g.SoundGroup==effects,'the sting plays on Effects');Audio.Stop()
 end
+-- 7. the pull announcement's timing: the server's PullAnnounceRules.RevealDelay against what this REAL cinematic shows the puller ---------------------------------------
+-- The chat line about a pull must never reach the puller before THEIR reveal has shown the seed. The server waits RevealDelay(rarity) after the open (derived from RarePullRules);
+-- here every presentation the client can pick is played frame by frame and the moments the puller really sees are read off the screen: the rarity title, the seed's name fully faded
+-- in, and the cinematic's own RarePullClimaxAt attribute. All must come before the line (the margin is what is left).
+do
+ local Announce=W.module('PullAnnounceRules');local Packs=W.module('SeedPackRules')
+ local margin=Announce.Setting('RevealMargin')
+ local rows={}
+ -- plays `seconds` of the presentation that `run` started at server time t0; returns {Title, Name, Climax} in seconds after the open (nil when never shown)
+ local function watch(run,t0,seconds,during)
+  local out={Climax=X.player:GetAttribute('RarePullClimaxAt')and X.player:GetAttribute('RarePullClimaxAt')-t0 or nil}
+  X.run(seconds,1/30,function(now)
+   local t=now-t0
+   local gui=X.pg:FindFirstChild('RarePullReveal')
+   if gui then
+    local title,name=X.find(gui,'Title'),X.find(gui,'Seed name')
+    if title and not out.Title and title.TextTransparency<.5 then out.Title=t end
+    if name and not out.Name and name.TextTransparency<=.15 then out.Name=t end
+   end
+   if during then during(t)end
+  end)
+  return out
+ end
+ local function verify(tag,rank,out)
+  local delay=Announce.RevealDelay(names[rank])
+  check(out.Title~=nil and out.Name~=nil,tag..': the title and the seed\'s name were both shown')
+  if out.Title and out.Name then
+   check(out.Name<=delay-.1,tag..': the seed\'s name is fully in at '..string.format('%.2f',out.Name)..' s, the line comes at '..string.format('%.2f',delay)..' s (slack '..string.format('%.2f',delay-out.Name)..' s)')
+   check(out.Title<out.Name+1e-9 and out.Title<delay-margin+1/30,tag..': the title ('..string.format('%.2f',out.Title)..' s) is shown well before it')
+  end
+  if out.Climax then check(out.Climax<=delay-margin+1e-6,tag..': the hit (RarePullClimaxAt) is at '..string.format('%.2f',out.Climax)..' s, at least the margin before the line') end
+  rows[#rows+1]=string.format('%s/%s title %.2f name %.2f hit %s',names[rank],tag:match('%((.-)%)')or tag,out.Title or -1,out.Name or -1,out.Climax and string.format('%.2f',out.Climax)or'-')
+ end
+ -- the ladder (Common..Mythic), normal and quick
+ for rank=1,5 do
+  reset();local run,bag=start(rank);local t0=R.clock
+  check(run.Kind=='Ladder'and not run.Quick,names[rank]..' (card): a normal seed card')
+  verify(names[rank]..' (card)',rank,watch(run,t0,run.TL.Length+.4));bag:Destroy()
+  if rank>=2 then
+   reset();local first,bag1=start(1);X.run(first.TL.Length+.2)
+   local second,bag2=start(rank);local t1=R.clock
+   check(second.Quick,names[rank]..' (quick): a quick reveal')
+   verify(names[rank]..' (quick)',rank,watch(second,t1,second.TL.Length+.4));bag1:Destroy();bag2:Destroy()
+  end
+ end
+ -- the story scenes: every presentation
+ for rank=6,8 do
+  reset();local run=start(rank);local t0=R.clock
+  check(run.Kind=='Scene'and run.Variant=='Full',names[rank]..' (Full): the full scene')
+  verify(names[rank]..' (Full)',rank,watch(run,t0,run.TL.Length+.4))
+  reset();W.Gui.ReducedMotionEnabled=true
+  run=start(rank);t0=R.clock
+  check(run.Kind=='Scene'and run.Variant=='Calm',names[rank]..' (Calm): the calm scene (ReducedMotion)')
+  verify(names[rank]..' (Calm)',rank,watch(run,t0,run.TL.Length+.4))
+  reset();X.keeper(V3(25,3,100),{})
+  run=start(rank);t0=R.clock
+  check(run.Kind=='InPlace',names[rank]..' (InPlace): the in-place version (a keeper is near)')
+  verify(names[rank]..' (InPlace)',rank,watch(run,t0,run.TL.Length+.4))
+  -- a scene cut short before its hit shows the result card at once: still before the line
+  reset();run=start(rank);t0=R.clock;local tl=run.TL
+  X.run(tl.SceneIn+.6)
+  X.keeper(V3(10,3,170),{TargetUserId=7,GuardianBehavior='CHASING'})
+  verify(names[rank]..' (Result)',rank,watch(run,t0,8))
+  -- a skip at the first moment it is allowed, then the second skip to the way out: the seed is shown sooner, the line still comes later
+  reset();run=start(rank);t0=R.clock;tl=run.TL
+  local hitBefore=X.player:GetAttribute('RarePullClimaxAt')-t0
+  local skipped,out_hit=false,nil
+  local out=watch(run,t0,tl.Length+.4,function(t)
+   if not skipped and t>=tl.SkipFrom+.05 then skipped=true;M.Skip();out_hit=X.player:GetAttribute('RarePullClimaxAt')-t0 end
+  end)
+  check(skipped and out_hit and out_hit<hitBefore and out_hit<=Announce.RevealDelay(names[rank])-margin,names[rank]..' (Skip): a skip moves the hit EARLIER ('..string.format('%.2f',hitBefore)..' -> '..string.format('%.2f',out_hit or -1)..' s), never later than the line')
+  check(out.Name and out.Name<Announce.RevealDelay(names[rank])-1,names[rank]..' (Skip): a skipped puller has the seed on screen well before the line ('..string.format('%.2f',out.Name or -1)..' s vs '..string.format('%.2f',Announce.RevealDelay(names[rank]))..' s)')
+ end
+ reset()
+ print('puller sees the seed (seconds after the open): '..table.concat(rows,' | '))
+end
 print(('R151 cinematic checks %d, fails %d'):format(checks,fails))
 if fails>0 then error('failures')end

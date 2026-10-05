@@ -9,6 +9,9 @@
 --     successful Harvest (and only for a harvest); an owner's `harvestall` (data:HarvestPlant directly) never reaches the hook;
 --  4. the owner commands: bestpull / bigfruit / hubdisplays (status, reset, day +/-N): arguments, usage errors, targets, `share`, the server-wide ones refuse @name, strangers are
 --     refused; the F4 help and docs/COMMANDS.md list them;
+--  5. records in chat: the REAL PullAnnouncer behind the REAL hub: a real Mythic / Secret open that takes the Best Pull says the pull line and then the record line only after the
+--     puller's reveal has shown the seed (this server; Secret+ the other servers too), no hub notice, owner test packs and bestpull / bigfruit tests never speak to the server,
+--     a leaving puller releases both lines, a fruit record is at once, the gap, a preview day is silent;
 --  (the files themselves - the main script's wiring, the manifest, the docs - are checked by run_hub_displays.sh)
 local W=require('./world');local R=W.R
 local fails,checks=0,0
@@ -253,6 +256,188 @@ do
  local Help=W.module('StudioTestHelp');local has={}
  for _,e in ipairs(Help)do for _,k in ipairs({'bestpull','bigfruit','hubdisplays'})do if e[1]:find('/test '..k,1,true)then has[k]=e end end end
  check(has.bestpull and has.bigfruit and has.hubdisplays and has.hubdisplays[2]:find('day +1',1,true)and has.bestpull[2]:find('share',1,true),'the F4 help lists bestpull, bigfruit and hubdisplays (day +1, share)')
+end
+
+-- 5. Records in chat: the REAL PullAnnouncer behind the REAL hub (no stand-ins between them) ------------------------------------------------------------------------------------
+-- A pack opened for real takes the Best Pull: the pull line (Legendary and above) and the record line go out only after the PULLER's reveal has shown the seed, in the right scope,
+-- and the hub shows no notice of its own. Owner test packs and test commands never speak to the server. Every time below is read off the mock clock.
+local E=require('./announce_env')
+do
+ local Announcer=server('PullAnnouncer');local AnnounceRules=W.module('PullAnnounceRules');local Reveal=W.module('RarePullRules')
+ local httpMock=E.http();Http.JSONEncode=httpMock.JSONEncode;Http.JSONDecode=httpMock.JSONDecode
+ local function unix()return 1700000000+math.floor(R.clock)end
+ local bus=E.bus(function()return R.clock end,unix)
+ local function sinkOf()
+  local remote=R.new('RemoteEvent');remote.Name='PullAnnounce151';local log={}
+  remote.FireClient=function(_,p,payload)log[#log+1]={Player=p,Payload=payload,At=R.clock}end
+  return remote,log
+ end
+ local sinkA,logA=sinkOf();local sinkB,logB=sinkOf()
+ local far=R.new('Player');far.Name='Far';far.DisplayName='Far';far.UserId=991
+ local srvA=Announcer.new({Data=Data,Players=Players,Http=Http,Messaging=bus:Server('A'),Remote=sinkA,Clock=function()return R.clock end,Time=unix,JobId='hub-A-0000',Warn=function()end})
+ local srvB=Announcer.new({Data=nil,Players={GetPlayers=function()return {far}end},Http=Http,Messaging=bus:Server('B'),Remote=sinkB,Clock=function()return R.clock end,Time=unix,JobId='hub-B-0000',Warn=function()end})
+ Announcer.Instance=srvA;srvA:Run();srvB:Run()
+ -- a draw that rolls the wanted rarity from a real pack (the roll is the game's own; only the dice are fixed)
+ local found={}
+ local function findDraw(rarity)
+  if found[rarity]then return table.unpack(found[rarity])end
+  local variants={'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06','EclipseReliquary'}
+  local draws={0,1e-12,1e-9,1e-6,1e-4,.001,.005,.01,.02,.05,.1,.2,.3,.4,.5,.6,.7,.8,.9,.95,.99,.999,.99999,.9999999}
+  for _,stage in ipairs({7,4,5,3,2,6,1})do for _,variant in ipairs(variants)do for _,d in ipairs(draws)do
+   local ok,seed,r=pcall(Rules.Roll,Config,stage,drawConstant(d),1,variant,Rules.OddsVersion)
+   if ok and seed and r==rarity and(variant~='EclipseReliquary'or stage==7)then found[rarity]={stage,variant,d};return stage,variant,d end
+  end end end
+ end
+ local function openReal(player,rarity,pack)
+  local stage,variant,d=findDraw(rarity)
+  pack=pack or addPack(player,stage,variant)
+  return Data:OpenSeedPack(player,pack.Id,drawConstant(d)),pack
+ end
+ local chimes={};local celebrate=RS.ChestChaseRemotes:FindFirstChild('HubDisplayCelebrate')
+ celebrate.FireClient=function(_,p,payload)chimes[#chimes+1]={Player=p,Payload=payload,At=R.clock}end
+ local function fresh()
+  hub:Reset();hubClock.t+=30;R.advance(40);table.clear(logA);table.clear(logB);table.clear(told);table.clear(chimes)
+  return bus:Count('A')
+ end
+ local function distinct(log) -- the distinct announcements in a sink: {Kind, Record, At (first), Players (how many got it), UserId}
+  local seen,out={},{}
+  for _,l in ipairs(log)do
+   local e=seen[l.Payload.Id]
+   if not e then e={Kind=l.Payload.Kind,Record=l.Payload.Record,At=l.At,Players=0,UserId=l.Payload.UserId,Id=l.Payload.Id};seen[l.Payload.Id]=e;out[#out+1]=e end
+   e.Players+=1
+  end
+  return out
+ end
+ local function step(limit,fn)local n=0;while n<limit/.01 do R.advance(.01);n+=1;if fn()then return true end end;return false end
+ local function hubNotices()local n=0;for _,t in ipairs(told)do if tostring(t.Text):find('took BEST',1,true)or tostring(t.Text):find('took BIGGEST',1,true)then n+=1 end end;return n end
+ local owner=makePlayer(110,'Olive');owners[owner]=true;local target=makePlayer(111,'Tess')
+ local everyone=#Players:GetPlayers()
+
+ -- a. a real Mythic open that takes the Best Pull: the pull line, then the record line, after the puller's reveal; this server only
+ do
+  local published=fresh();local t0=R.clock
+  local ava=A
+  local reward=openReal(ava,'Mythic')
+  check(reward and reward.Rarity=='Mythic'and hub:Snapshot().Pull.Record and hub:Snapshot().Pull.Record.Name=='Ava','a real Mythic open takes the Best Pull ('..tostring(reward and reward.SeedId)..')')
+  check(#logA==0 and hubNotices()==0,'nothing at the moment of the open: no chat line, no hub notice (the puller\'s reveal is just starting)')
+  step(12,function()return false end)
+  local lines=distinct(logA)
+  check(#lines==2 and lines[1].Kind=='Pull'and lines[2].Kind=='Record'and lines[2].Record=='BestPull'and lines[1].UserId==101 and lines[2].UserId==101,'two chat lines: the pull line, then the record line ("took BEST PULL TODAY"), both about Ava')
+  check(lines[1].Players==everyone and lines[2].Players==everyone,'each goes to every player in the server ('..lines[1].Players..' and '..lines[2].Players..' of '..everyone..')')
+  local delay=AnnounceRules.RevealDelay('Mythic')
+  check(math.abs(lines[1].At-t0-delay)<=.011,'the pull line at RevealDelay ('..string.format('%.2f',lines[1].At-t0)..' s, RevealDelay '..string.format('%.2f',delay)..' s)')
+  check(math.abs(lines[2].At-t0-(delay+AnnounceRules.Setting('RecordLag')))<=.011,'the record line RecordLag later ('..string.format('%.2f',lines[2].At-t0)..' s): after the puller\'s seed is shown on every presentation ('..string.format('%.2f',Reveal.LatestSeedShown(5))..' s)')
+  check(lines[1].At-t0>=Reveal.LatestSeedShown(5)and lines[2].At-t0>=Reveal.LatestSeedShown(5),'neither comes before the seed card has shown the seed')
+  check(hubNotices()==0,'the hub showed no notice of its own: ONE message per event, in chat')
+  check(bus:Count('A')==published and#logB==0,'a Mythic record stays in this server (Secret and above travel)')
+  check(#chimes>=everyone and chimes[#chimes].At-t0>=delay,'the hub\'s chime is in step with the lines, not at the open')
+  table.clear(chimes)
+ end
+
+ -- b. a real Secret open: both lines in this server and in the other servers, never before the puller's seed is shown there either
+ do
+  local published=fresh();local t0=R.clock
+  local bo=Bo
+  local reward=openReal(bo,'Secret')
+  check(reward and reward.Rarity=='Secret'and hub:Snapshot().Pull.Record and hub:Snapshot().Pull.Record.Name=='Bo','a real Secret open takes the Best Pull')
+  step(14,function()return false end)
+  local lines=distinct(logA);local far_=distinct(logB)
+  local delay=AnnounceRules.RevealDelay('Secret')
+  check(#lines==2 and lines[1].Kind=='Pull'and lines[2].Kind=='Record'and math.abs(lines[1].At-t0-delay)<=.011,'this server: the pull line at '..string.format('%.2f',delay)..' s, then the record line')
+  check(bus:Count('A')>=published+1 and bus:Count('A')<=published+2,'published to the other servers ('..(bus:Count('A')-published)..' message(s))')
+  local firstPublish=bus.Log[published+1]
+  check(firstPublish and firstPublish.At-t0>=Reveal.LatestSeedShown(6)and math.abs(firstPublish.At-t0-delay)<=.011,'the first publish is at that same moment ('..string.format('%.2f',firstPublish and firstPublish.At-t0 or -1)..' s), never before the Full scene has shown the seed')
+  check(#far_==2 and far_[1].Kind=='Global'and far_[2].Kind=='Record'and far_[1].At-t0>=Reveal.LatestSeedShown(6)and far_[2].At-t0>=far_[1].At-t0,'the other server shows 🌐 the pull line, then the record line, none before the puller\'s seed is shown ('..string.format('%.2f',far_[1]and far_[1].At-t0 or -1)..' s, '..string.format('%.2f',far_[2]and far_[2].At-t0 or -1)..' s)')
+  check(far_[2]and logB[#logB].Payload.Record=='BestPull'and logB[#logB].Payload.Name=='Bo','... the record line names Bo and BestPull')
+  check(hubNotices()==0,'and no hub notice')
+ end
+
+ -- c. owner test packs never announce, never count: a TestGrant pack, a guaranteed-reveal pack (/test rarepacks)
+ do
+  local published=fresh()
+  local stage,variant,d=findDraw('Secret')
+  local marked=Data:AddChest(Bo,{Stage=stage,BagVariant=variant,PackSize=1,PackMutation='None',OddsVersion=Rules.OddsVersion},{TestGrant=true})
+  local reward=openReal(Bo,'Secret',marked)
+  step(14,function()return false end)
+  check(reward and reward.Rarity=='Secret'and hub:Snapshot().Pull.Record==nil,'an opened TestGrant pack (a Secret) does not take the Best Pull')
+  check(#logA==0 and#logB==0 and bus:Count('A')==published and hubNotices()==0,'... and nothing is said anywhere: no pull line, no record line, nothing published, no notice')
+  Run.IsStudio=function()return true end
+  local okRare=RPT.Grant(Data,Bo,'king',Bo)
+  Run.IsStudio=function()return false end
+  local testPack;for _,r in ipairs(Data:GetChestRecords(Bo))do if r.Kind=='Pack'and RPT.Expected(Data,Bo,r.Id)then testPack=r end end
+  local opened=testPack and Data:OpenSeedPack(Bo,testPack.Id,drawConstant(.5))
+  step(14,function()return false end)
+  check(okRare and opened and opened.Rarity=='King'and hub:Snapshot().Pull.Record==nil and#logA==0 and#logB==0 and bus:Count('A')==published,'a /test rarepacks King: not counted, nothing said')
+  -- a TestGrant pack that an owner made and a player opens later in another session (no taint in memory): still never a record
+  hub.Tainted=setmetatable({},{__mode='k'})
+  local again=Data:AddChest(Di,{Stage=stage,BagVariant=variant,PackSize=1,PackMutation='None',OddsVersion=Rules.OddsVersion},{TestGrant=true})
+  openReal(Di,'Secret',again);step(14,function()return false end)
+  check(hub:Snapshot().Pull.Record==nil and#logA==0 and bus:Count('A')==published,'a TestGrant pack opened with no owner taint on the player (a pack kept from an earlier session, or gifted) is still not a record')
+ end
+
+ -- d. an owner's bestpull / bigfruit test: private to the target, never to the server, never to other servers (shared or not)
+ do
+  local published=fresh()
+  local function run(text)Run.IsStudio=function()return true end;local ok,msg=Cmd.Execute(ctx,owner,text);Run.IsStudio=function()return false end;return ok,msg end
+  local ok,msg=run('/test bestpull solar starfruit')
+  step(14,function()return false end)
+  check(ok and hub:Snapshot().Pull.Source=='Test','/test bestpull solar starfruit takes the display ('..tostring(msg)..')')
+  check(#logA==1 and logA[1].Player==owner and logA[1].Payload.Kind=='Record'and logA[1].At-R.clock<1,'... and the record line goes to the owner (the target) alone: '..#logA..' line(s)')
+  check(bus:Count('A')==published and#logB==0 and hubNotices()==0,'... never to the other servers and no hub notice')
+  local onlyOwner=true;for _,c in ipairs(chimes)do if c.Player~=owner then onlyOwner=false end end
+  check(#chimes>=1 and onlyOwner,'the chime is private too (only the owner hears it)')
+  table.clear(logA);table.clear(chimes);hub:Reset();hubClock.t+=30
+  local ok2=run('/test bestpull solar starfruit share @Tess');step(14,function()return false end)
+  check(ok2 and#logA==1 and logA[1].Player==target and bus:Count('A')==published and#logB==0,'bestpull ... share: it reaches the shared board like a real record, yet its chat line is private to the target (Tess)')
+  table.clear(logA);hub:Reset();hubClock.t+=30
+  local ok3=run('/test bigfruit 12.4');step(14,function()return false end)
+  check(ok3 and#logA==1 and logA[1].Player==owner and logA[1].Payload.Record=='BiggestFruit'and bus:Count('A')==published,'bigfruit: private to the target too')
+  table.clear(logA);hubClock.t+=30
+  local ok4=run('/test hubdisplays day +1');local ok5=run('/test hubdisplays reset');local ok6=run('/test hubdisplays day 0')
+  step(14,function()return false end)
+  check(ok4 and ok5 and ok6 and#logA==0 and bus:Count('A')==published,'hubdisplays (status / reset / day) never say anything in chat')
+ end
+
+ -- e. a preview day announces no record (the pull line itself is a real pull announcement and is unaffected)
+ do
+  local published=fresh()
+  hub:SetDayOffset(1)
+  local reward=openReal(Cy,'Legendary');step(14,function()return false end)
+  hub:SetDayOffset(0)
+  local lines=distinct(logA)
+  check(reward and#lines==1 and lines[1].Kind=='Pull'and hubNotices()==0,'previewing another day: the real pull is announced as a pull, but no record line is ('..#lines..' line)')
+ end
+
+ -- f. the puller leaves during the reveal: both lines go out at once, in this server and (Secret+) to the others
+ do
+  local published=fresh();local t0=R.clock
+  local ed=makePlayer(180,'Eli')
+  local reward=openReal(ed,'Secret')
+  step(.5,function()return false end)
+  check(#logA==0,'(0.5 s into the reveal: nothing yet)')
+  present[ed.UserId]=nil;Players.PlayerRemoving:Fire(ed)
+  local leftAt=R.clock-t0
+  local lines=distinct(logA)
+  check(reward and#lines==2 and lines[1].At-t0<=leftAt+1e-9 and lines[2].At-t0<=leftAt+1e-9,'the puller leaves: the pull line and the record line go out at once ('..#lines..' lines at '..string.format('%.2f',lines[1]and lines[1].At-t0 or -1)..' s)')
+  check(bus:Count('A')>=published+1 and bus.Log[published+1].At-t0<=leftAt+1e-9,'... and the pull is published at once too (the record follows with the next publish)')
+  local n=#logA;step(14,function()return false end)
+  check(#logA==n,'... and nothing is said again at the normal time')
+ end
+
+ -- g. a fruit record: this server at once (nothing to wait for), never published; the gap between two records of one board
+ do
+  local published=fresh()
+  local fid=hub.Board.FruitId
+  check(hub:NoteHarvest(Di,{SeedId=fid,FruitScale=3,Mutation='None',Weather='None'}),'a real harvest of today\'s fruit takes the Biggest Fruit')
+  local lines=distinct(logA)
+  check(#lines==1 and lines[1].Kind=='Record'and lines[1].Record=='BiggestFruit'and lines[1].Players==everyone and lines[1].At==R.clock,'one record line, to everyone in this server, at once')
+  check(bus:Count('A')==published and#logB==0 and hubNotices()==0,'a fruit record never leaves this server, and shows no hub notice')
+  hub:NoteHarvest(Di,{SeedId=fid,FruitScale=6,Mutation='None',Weather='None'});step(2,function()return false end)
+  check(#distinct(logA)==1,'a heavier fruit within 8 s: the display changes, no second line (the gap)')
+  hubClock.t+=9;hub:NoteHarvest(Di,{SeedId=fid,FruitScale=9,Mutation='None',Weather='None'})
+  check(#distinct(logA)==2,'after the gap the next record is announced again')
+ end
+ srvA:Destroy();srvB:Destroy();Announcer.Instance=nil
 end
 
 print(string.format('%d checks, %d failures',checks,fails))

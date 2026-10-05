@@ -16,6 +16,7 @@ CLIENT = S + '/StarterPlayer/StarterPlayerScripts/PullAnnouncerClient.client.lua
 PDS = SS + 'PlayerDataService.lua'
 CFG = S + '/ReplicatedStorage/SettingsConfig.lua'
 TESTPACKS = SS + 'OwnerTestPacks.lua'
+RARE = S + '/ReplicatedStorage/RarePullRules.lua'
 OWNER = SS + 'OwnerUpdateCommands82.lua'
 
 MUTATIONS = [
@@ -24,7 +25,7 @@ MUTATIONS = [
     ('TEST guaranteed reveals announce', SERVER, " if wasTest then return false,'test pack'end\n", "\n", 'test_server'),
     ('packs marked TestGrant announce', SERVER, " if pack.TestGrant==true then return false,'test pack'end\n", "\n", 'test_server'),
     ('hook ignores the TEST flag', PDS, "OnOpened(player,pack,reward,testSeed~=nil)", "OnOpened(player,pack,reward,false)", 'test_server'),
-    ('no reveal delay', SERVER, "task.delay(ok and type(delay)=='number'and delay or 5,function()", "task.delay(0,function()", 'test_server'),
+    ('no reveal delay', SERVER, " local wait=Rules.RevealDelay(rarity)+(tonumber(lag)or 0)", " local wait=0", 'test_server'),
     ('Legendary also goes global', RULES, "GlobalMinRarity='Secret',", "GlobalMinRarity='Legendary',", 'test_rules'),
     ('Mythic below the in-server threshold', RULES, "InServerMinRarity='Legendary',", "InServerMinRarity='Mythic',", 'test_rules'),
     # --- owner-made packs are marked (each command path) ---------------------------------------------------------------------------------------------------------
@@ -58,6 +59,26 @@ MUTATIONS = [
     ('subscription never retried', SERVER, "task.delay(wait,function()self:_subscribe(attempt+1)end)", "", 'test_server'),
     ('rarity trusted from the message', RULES, " e.SeedId,e.SeedName,e.Rarity=info.Id,info.Name,info.Rarity", " e.SeedId,e.SeedName,e.Rarity=info.Id,info.Name,fields.Rarity or info.Rarity", 'test_rules'),
     ('every player is sent each line twice', SERVER, "   if pcall(self.Remote.FireClient,self.Remote,p,payload)then sent+=1 end", "   pcall(self.Remote.FireClient,self.Remote,p,payload);if pcall(self.Remote.FireClient,self.Remote,p,payload)then sent+=1 end", 'test_server'),
+    # --- [timing] the line waits for the PULLER's reveal (one source of truth: RarePullRules) -------------------------------------------------------------------------
+    ('[timing] the delay is the old server reveal length', RULES, " if okReveal and type(Reveal)=='table'and Reveal.LatestSeedShown then", " if false then", 'test_server'),
+    ('[timing] the delay has no margin', RULES, " return shown+R.Setting('RevealMargin')", " return shown", 'test_server'),
+    ('[timing] the delay takes the quick ladder', RARE, " if rank<=5 then return L.SeedShown(rank,nil,false)end", " if rank<=5 then return L.SeedShown(rank,nil,true)end", 'test_server'),
+    ('[timing] the delay takes only the Calm scene', RARE, "latest=math.max(latest,L.SeedShown(rank,variant))", "latest=L.SeedShown(rank,'Calm')", 'test_server'),
+    ('[timing] the seed counts as shown at the hit, not the "1 in N"', RARE, " return math.max(tl.Climax,tl.Rise or 0,tl.Odds or 0)", " return tl.Climax", 'test_server'),
+    ('[timing] a leaving puller does not release the line', SERVER, "self.Players.PlayerRemoving:Connect(function(player)self:_released(player)end)", "self.Players.PlayerRemoving:Connect(function(player)end)", 'test_server'),
+    ('[timing] a line is not cancelled by Destroy', SERVER, " for entry in pairs(self.Waiting)do entry.Done=true end\n", "\n", 'test_server'),
+    ('[timing] the puller\'s own line is not held on their screen', CLIENT, " local wait=holdFor(e)", " local wait=0", 'test_client'),
+    ('[timing] a held line is written after teardown', CLIENT, "task.delay(wait,function()if not dead then chat(e)end end)", "task.delay(wait,function()chat(e)end)", 'test_client'),
+    ('[timing] a held line can wait forever', CLIENT, "local HOLD_MAX=8", "local HOLD_MAX=1e9", 'test_client'),
+    # --- [records] hub records through the announcer ------------------------------------------------------------------------------------------------------------------
+    ('[records] a fruit record travels to every server when its seed is Secret+', RULES, " if record~='BestPull'then return'InServer'end", " if false then return'InServer'end", 'test_server'),
+    ('[records] a record below the threshold is announced', RULES, " if R.Qualifies('InServer',rarity)then return'InServer'end\n return nil", " if R.Qualifies('InServer',rarity)then return'InServer'end\n return'InServer'", 'test_rules'),
+    ('[records] a Secret+ record stays at home', RULES, " if R.Qualifies('Global',rarity)then return'Global'end", " if false then return'Global'end", 'test_rules'),
+    ('[records] a record travels without its key', RULES, "k=e.Kind=='Record'and e.Record or nil", "k=nil", 'test_server'),
+    ('[records] another server accepts any record', SERVER, "   local travels=e and(record and Rules.RecordScope(e.Record,e.Rarity)=='Global'or not record and Rules.Qualifies('Global',e.Rarity))", "   local travels=e", 'test_server'),
+    ('[records] a private record is broadcast', SERVER, "  self:_broadcast(e,only and function(player)return player==only end or nil)", "  self:_broadcast(e)", 'test_server'),
+    ('[records] AfterReveal is ignored', SERVER, " if spec.AfterReveal==true and not only and e.Rarity then", " if false then", 'test_server'),
+    ('[records] the record line has no lag behind the pull line', RULES, " RecordLag=.4, ", " RecordLag=0, ", 'test_rules'),
     # --- settings -------------------------------------------------------------------------------------------------------------------------------------------------
     ('setting ignored for other servers', SERVER, "return not(type(settings)=='table'and settings.GlobalAnnouncements==false)", "return true", 'test_settings'),
     ('a saved false turns back on', CFG, "if type(saved)=='table'and C.Valid(k,saved[k])then out[k]=saved[k]else out[k]=v end", "out[k]=type(saved)=='table'and C.Valid(k,saved[k])and saved[k]or v", 'test_settings'),

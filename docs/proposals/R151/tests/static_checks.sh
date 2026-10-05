@@ -24,9 +24,15 @@ echo "ok: chat only: no PullBannerBottom anywhere; the client has no Gui, sound,
 # 3. the open of a real pack is the ONLY caller of the announcer's pull hook, and it is told whether the pack was a TEST pack
 grep -q "OnOpened(player,pack,reward,testSeed~=nil)" "$SS/PlayerDataService.lua" || fail "the hook must pass testSeed~=nil as wasTest"
 grep -q "pack.TestGrant==true" "$SS/PullAnnouncer.lua" || fail "PullAnnouncer:Pulled must refuse a pack whose record has TestGrant"
-n=$(grep -rn "PullAnnouncer" "$S" --include=*.lua | grep -v "PullAnnouncer.lua:" | grep -v "PullAnnouncerClient.client.lua:" | grep -v "PullAnnounceRules.lua:" | grep -v "OwnerTestPacks.lua:" | wc -l)
-[ "$n" = 4 ] || fail "PullAnnouncer is referenced from $n other lines (expected 4: PlayerDataService, ChestChaseServerMain, OwnerUpdateCommands82 and the comment in SettingsConfig)"
-echo "ok: PullAnnouncer is reached from PlayerDataService:OpenSeedPack, the server main script and the owner commands only; it refuses TestGrant packs"
+n=$(grep -rn "PullAnnouncer" "$S" --include=*.lua | grep -v "PullAnnouncer.lua:" | grep -v "PullAnnouncerClient.client.lua:" | grep -v "PullAnnounceRules.lua:" | grep -v "OwnerTestPacks.lua:" | grep -v "HubDisplayService.lua:" | wc -l)
+[ "$n" = 4 ] || fail "PullAnnouncer is referenced from $n other lines (expected 4: PlayerDataService, ChestChaseServerMain, OwnerUpdateCommands82 and the comment in SettingsConfig; the hub's own use is checked in 6)"
+grep -q "Test=testSeed~=nil or pack.TestGrant==true" "$SS/PlayerDataService.lua" || fail "the hub's pack-opened hook must be told about owner-made (TestGrant) packs too"
+echo "ok: PullAnnouncer is reached from PlayerDataService:OpenSeedPack, the server main script, the owner commands and the hub's record call only; it refuses TestGrant packs; the hub is told about them too"
+# 3b. when a line may go out is derived from the tables the PULLER's client plays (one source of truth): the announcer asks PullAnnounceRules.RevealDelay, which reads RarePullRules
+if grep -n "GetRevealDuration" "$SS/PullAnnouncer.lua" | grep -v "^[0-9]*:--"; then fail "PullAnnouncer must not time its lines by the old server reveal length (SeedPackRules.GetRevealDuration)"; fi
+grep -q "Rules.RevealDelay(rarity)" "$SS/PullAnnouncer.lua" && grep -q "Reveal.LatestSeedShown" "$RS/PullAnnounceRules.lua" && grep -q "function L.LatestSeedShown" "$RS/RarePullRules.lua" || fail "the announcer's delay must be PullAnnounceRules.RevealDelay -> RarePullRules.LatestSeedShown"
+grep -q "PlayerRemoving" "$SS/PullAnnouncer.lua" || fail "a puller who leaves must release their waiting lines (PlayerRemoving)"
+echo "ok: the announcer times its lines by PullAnnounceRules.RevealDelay -> RarePullRules.LatestSeedShown (the tables the client plays), not by the old reveal length; a leaving puller releases them"
 for f in RarePackTests StudioSeedCommands StudioTestCommands FruitGiftService PassGiftService MysteryPackService TreadmillBonusService DailyProgress OwnerUpdateCommands82; do
  if [ "$f" != OwnerUpdateCommands82 ] && grep -q "PullAnnouncer" "$SS/$f.lua"; then fail "$f (a TEST pack, gift or grant path) must not announce"; fi
 done
@@ -61,14 +67,17 @@ if grep -n "FireServer\|InvokeServer" "$C/PullAnnouncerClient.client.lua"; then 
 if grep -n "DisplaySystemMessage\|SendAsync" "$SS/PullAnnouncer.lua" | grep -v "^[0-9]*:--"; then fail "chat lines are made on the client"; fi
 grep -q "DisplaySystemMessage" "$C/PullAnnouncerClient.client.lua" && grep -q "RBXGeneral" "$C/PullAnnouncerClient.client.lua" && grep -q "ChatMakeSystemMessage" "$C/PullAnnouncerClient.client.lua" || fail "the client writes RBXGeneral:DisplaySystemMessage with the old chat as the fallback"
 echo "ok: the remote is server -> client only; the announcer reads no chat and no client message; the client writes RBXGeneral (old chat as a fallback)"
-# 6. the hub displays are not built here: nothing but the API and the test command produce a Record
-r=$(grep -rln "Kind='Record'" "$S" --include=*.lua | wc -l)
-[ "$r" = 0 ] || [ "$r" = 1 ] || fail "records are made by the announcer's own command only (found $r files)"
-echo "ok: no hub-display code was added (the record line is only an API plus the owner command)"
+# 6. hub records: only the announcer's own command and HubDisplayService make a Record; the hub has no notice of its own any more (ONE message, in chat), and says whose test it is
+r=$(grep -rln "Kind='Record'" "$S" --include=*.lua | xargs -n1 basename | sort | tr '\n' ' ')
+[ "$r" = "HubDisplayService.lua PullAnnouncer.lua " ] || fail "records are made by the announcer's own command and HubDisplayService only (found [$r])"
+if grep -n "Notes:Show\|self\.Notes\|PullNotice\|FruitNotice\|NoticeMinRank" "$SS/HubDisplayService.lua" "$RS/HubDisplayRules.lua" | grep -v ":[0-9]*:--"; then fail "the hub must not keep a notice of its own (it would be a second message next to the chat line)"; fi
+grep -q "announcer.Announce(spec)" "$SS/HubDisplayService.lua" && grep -q "spec.AfterReveal=true" "$SS/HubDisplayService.lua" && grep -q "spec.To=player" "$SS/HubDisplayService.lua" || fail "HubDisplayService must announce through PullAnnouncer.Announce, a pull record AfterReveal and an owner's test To its target only"
+echo "ok: hub records go through PullAnnouncer.Announce (a pull record after the reveal, an owner's test private); the hub keeps no notice of its own"
 # 7. every script compiles, and the manifest lists the new ones
 for f in "$RS/PullAnnounceRules.lua" "$SS/PullAnnouncer.lua" "$SS/OwnerTestPacks.lua" "$C/PullAnnouncerClient.client.lua" "$RS/SettingsConfig.lua" "$C/SettingsClient.client.lua" "$C/HudNotices.client.lua" \
  "$SS/PlayerDataService.lua" "$SS/OwnerUpdateCommands82.lua" "$SS/StudioTestCommands.lua" "$SS/RarePackTests.lua" "$SS/MysteryPackService.lua" "$SS/DailyProgress.lua" "$SS/TreadmillBonusService.lua" \
- "$SS/VeiledEvent81.lua" "$SS/ChestService.lua" "$RS/StudioTestHelp.lua" "$S/ServerScriptService/ChestChaseServerMain.server.lua"; do
+ "$SS/VeiledEvent81.lua" "$SS/ChestService.lua" "$RS/StudioTestHelp.lua" "$S/ServerScriptService/ChestChaseServerMain.server.lua" \
+ "$RS/RarePullRules.lua" "$SS/HubDisplayService.lua" "$RS/HubDisplayRules.lua"; do
  /opt/luau/luau-compile --null "$f" >/dev/null 2>&1 || fail "$f does not compile"
 done
 for f in ReplicatedStorage/PullAnnounceRules.lua ServerScriptService/ChestChaseServer/PullAnnouncer.lua ServerScriptService/ChestChaseServer/OwnerTestPacks.lua StarterPlayer/StarterPlayerScripts/PullAnnouncerClient.client.lua; do

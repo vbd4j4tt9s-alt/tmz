@@ -5,7 +5,8 @@
 --  2. events: every field sanitised (control and direction characters, long names with an ellipsis, odds, record keys), the rarity ALWAYS from the catalog
 --  3. text: the three chat lines (a pull here, a pull in another server, a record), their colours, the rich text of every line well formed and escaped,
 --     the old-chat plain line, the rate limit, and that nothing of the banner (queue, layout, sparkles, sound cues, size, coat) is left in the rules
---  4. the payload: compact / expand round trip, the 1 kB batch, freshness (stale and future messages)
+--  4. the payload: compact / expand round trip (a pull and a hub record), the 1 kB batch, freshness (stale and future messages)
+--  5. timing: RevealDelay per rarity = the latest moment the puller's client shows the seed (RarePullRules) + the margin; RecordScope: who hears a hub record
 local W=require('./world');local R=W.R;local E=require('./announce_env')
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -237,6 +238,59 @@ do
  check(Rules.Fresh(now+30,now)==true and Rules.Fresh(now+31,now)==false,'... and a clock at most 30 s ahead is accepted')
  check(Rules.Fresh(now,now)==true and Rules.Fresh(nil,now)==false and Rules.Fresh('5',now)==false and Rules.Fresh(0/0,now)==false,'now is fresh; nil, a string and NaN are not')
  Mod:SetAttribute('StaleSeconds',10);check(Rules.Fresh(now-11,now)==false and Rules.Fresh(now-10,now)==true,'StaleSeconds is a tunable');reset()
+end
+
+-- 6. timing and the scope of a hub record --------------------------------------------------------------------------------------------------------------------------
+do
+ local Reveal=W.module('RarePullRules')
+ check(Rules.Defaults.RevealMargin==.5 and Rules.Defaults.RecordLag==.4 and Rules.Setting('RevealMargin')==.5 and Rules.Setting('RecordLag')==.4,'the defaults: a .5 s margin after the seed is shown, a .4 s lag of the record line behind the pull line')
+ local table_={}
+ for rank,name in ipairs(Packs.RarityOrder)do
+  local want=Reveal.LatestSeedShown(rank)+.5
+  check(math.abs(Rules.RevealDelay(name)-want)<1e-9,name..': RevealDelay = RarePullRules.LatestSeedShown('..rank..') + the margin = '..string.format('%.2f',want)..' s')
+  table_[#table_+1]=name..' '..string.format('%.2f',Rules.RevealDelay(name))
+  if rank>1 then check(Rules.RevealDelay(name)>Rules.RevealDelay(Packs.RarityOrder[rank-1]),name..': waits longer than the rarity below it (a longer reveal for a rarer seed)')end
+ end
+ print('RevealDelay: '..table.concat(table_,'  '))
+ -- the ladder (Common..Mythic): the card's "1 in N" slam; the story scenes: the latest of the hit, the rise and the "1 in N" over Full / Calm / InPlace
+ for rank=1,5 do local c=Reveal.CardTimeline(rank,false);check(Reveal.SeedShown(rank,nil,false)==math.max(c.Burst,c.Odds)and Reveal.SeedShown(rank,nil,true)<=Reveal.SeedShown(rank,nil,false),Packs.RarityOrder[rank]..': SeedShown is the card\'s slam; a quick reveal shows it sooner')end
+ for rank=6,8 do
+  local full,calm,inplace=Reveal.SeedShown(rank,'Full'),Reveal.SeedShown(rank,'Calm'),Reveal.SeedShown(rank,'InPlace')
+  check(full>calm and full>inplace and Reveal.LatestSeedShown(rank)==math.max(full,calm,inplace),Packs.RarityOrder[rank]..': the Full scene is the latest of the three ('..string.format('%.2f / %.2f / %.2f',full,calm,inplace)..' s): the server waits for it')
+  local tl=Reveal.Timeline(rank,'Full')
+  check(Reveal.SeedShown(rank,'Full')>=tl.Climax and Reveal.SeedShown(rank,'Full')>=tl.Rise and Reveal.SeedShown(rank,'Full')>=tl.Odds,Packs.RarityOrder[rank]..': ... never before the hit, the rise or the odds slam')
+ end
+ -- follows the tables: if a scene gets longer the delay does (one source of truth)
+ local before=Rules.RevealDelay('Secret');local scenes=Reveal.Scenes[6].Full;local old=scenes.Odds
+ scenes.Odds=old+3;check(math.abs(Rules.RevealDelay('Secret')-(before+3))<1e-9,'a Secret scene whose "1 in N" lands 3 s later makes the delay 3 s longer (it reads the client\'s tables)');scenes.Odds=old
+ check(Rules.RevealDelay('Secret')==before,'... and back')
+ -- the margin and its limits
+ Mod:SetAttribute('RevealMargin',0);check(Rules.RevealDelay('King')==Reveal.LatestSeedShown(8),'RevealMargin 0 is allowed');reset()
+ Mod:SetAttribute('RevealMargin',-1);Mod:SetAttribute('RecordLag',99)
+ check(Rules.Setting('RevealMargin')==.5 and Rules.Setting('RecordLag')==.4,'a negative margin and a lag over 5 s are ignored');reset()
+ -- a rarity RarePullRules cannot judge falls back to the old reveal length
+ check(Rules.RevealDelay('Mythic')>0 and Rules.RevealDelay('Banana')==Rules.RevealDelay('Common'),'an unknown rarity is handled')
+end
+do
+ -- who hears a hub record
+ local want={Common=nil,Uncommon=nil,Rare=nil,Legendary='InServer',Mythic='InServer',Secret='Global',Cosmic='Global',King='Global'}
+ for _,name in ipairs(Packs.RarityOrder)do
+  check(Rules.RecordScope('BestPull',name)==want[name],'a BestPull record of a '..name..' seed: '..tostring(want[name]or'nobody'))
+  check(Rules.RecordScope('BiggestFruit',name)=='InServer'and Rules.RecordScope('LongestFruit',name)=='InServer','a fruit (or any other) record about a '..name..' seed: this server')
+ end
+ check(Rules.RecordScope('BestPull',nil)=='InServer'and Rules.RecordScope('BiggestFruit',nil)=='InServer'and Rules.RecordScope(nil,nil)=='InServer','a record that names no seed: this server')
+ check(Rules.RecordScope('BestPull','Banana')==nil,'a BestPull of an unknown rarity is nobody\'s business')
+ Mod:SetAttribute('GlobalMinRarity','Cosmic');check(Rules.RecordScope('BestPull','Secret')=='InServer'and Rules.RecordScope('BestPull','Cosmic')=='Global','GlobalMinRarity moves the line: Secret stays at home, Cosmic travels');reset()
+ Mod:SetAttribute('InServerMinRarity','Mythic');check(Rules.RecordScope('BestPull','Legendary')==nil and Rules.RecordScope('BestPull','Mythic')=='InServer','InServerMinRarity moves it too: a Legendary record is silent, a Mythic one is told here');reset()
+ -- a record travels with its key
+ local e=Rules.Event('Record',{Name='Ann',UserId=77,Id='ab12cd34-9',SeedId=KING.id,Record='BestPull'})
+ local c=Rules.Compact(e)
+ check(c.k=='BestPull'and c.s==KING.id and c.i=='ab12cd34-9','a record\'s compact form carries its key (k)')
+ local back=Rules.Event('Record',Rules.Expand(c))
+ check(back and back.Kind=='Record'and back.Record=='BestPull'and back.Rarity=='King'and back.Name=='Ann'and back.Id=='ab12cd34-9','compact -> expand -> record round trip (the rarity from this catalog)')
+ check(Rules.Compact(Rules.Event('Pull',{Name='Ann',Id='x-2',SeedId='FirePepperSeed'})).k==nil and Rules.Compact(Rules.Event('Global',{Name='Ann',Id='x-3',SeedId='FirePepperSeed'})).k==nil,'a pull carries no key')
+ check(Rules.Expand({i='q',k=5}).Record==nil and Rules.Expand({i='q',k={}}).Record==nil and Rules.Expand({i='q',k='BestPull'}).Record=='BestPull','a key that is not a string is not read')
+ local text,count=Rules.Batch({e},'job',5,E.encode);check(text~=nil and count==1 and#text<300,'a record fits a message easily ('..tostring(text and#text)..' bytes)')
 end
 
 print(('R151 rules: %d checks, %d fails'):format(checks,fails))

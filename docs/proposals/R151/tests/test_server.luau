@@ -1,14 +1,18 @@
 --!nocheck
 -- R151 pull announcements, part 2: the SERVER half on the Roblox mock with the REAL modules (PullAnnouncer, PullAnnounceRules, PlayerDataService, RarePackTests,
 -- SeedPackRules, Config, OwnerUpdateCommands82, StudioTestHelp) and a MessagingService bus (announce_env.luau):
---  1. the hook: PlayerDataService:OpenSeedPack of a real pack announces a Legendary+ seed AFTER its reveal; a TEST pack (/test rarepacks), a given / granted seed,
---     a Common pull and a changed threshold announce nothing; the odds are the pack's own; the pull is still announced when the puller has left
+--  1. the hook: PlayerDataService:OpenSeedPack of a real pack announces a Legendary+ seed once the PULLER's reveal has shown the seed (PullAnnounceRules.RevealDelay, from
+--     RarePullRules); a TEST pack (/test rarepacks), a given / granted seed, a Common pull and a changed threshold announce nothing; the odds are the pack's own; the pull is
+--     still announced when the puller has left (at once, there is no reveal left to spoil)
+--  1a. timing per rarity: the line goes out at exactly that delay (to the puller and everybody else alike, never earlier), the publish to the other servers and the line the other
+--     servers show come after it too; for every presentation the client can pick (Full / Calm / InPlace, quick) the delay is after the seed is shown; a leaving puller releases it
 --  2. publishing: a Secret+ pull goes to the other servers; at most one publish per 5 s per server, pulls coalesce into one message under 1 kB, the pending list is
 --     capped, a failed publish is retried (then dropped), a stale pull is never sent; Legendary / Mythic stay in the server
 --  3. receiving: the origin server drops its own message (it shows the in-server version only), repeats, stale and future messages, an over-limit flood, malformed
 --     messages and messages whose seed is unknown or below the threshold; the rarity is the local catalog's; only players with "Announcements from other servers" on
 --  4. the subscription is retried with a growing wait until it works
---  5. records: PullAnnouncer.Announce({Kind='Record'...}); owner commands: announce <seed>, announce global <seed> [here], announce record
+--  5. records: PullAnnouncer.Announce({Kind='Record'...}): the scope (RecordScope: this server / every server / nobody), AfterReveal, To (private), the cross-server record, the
+--     timing next to the pull line; owner commands: announce <seed>, announce global <seed> [here], announce record
 --  6. trust: no client -> server remote exists, nothing a player types is broadcast
 local W=require('./world');local R=W.R;local E=require('./announce_env')
 local fails,checks=0,0
@@ -104,13 +108,14 @@ local function openReal(player,rarity)
  return Data:OpenSeedPack(player,pack.Id,drawConstant(d)),pack
 end
 local function settle(seconds)R.advance(seconds or 10)end
-local function duration(rarity)return Packs.GetRevealDuration(rarity)end
+local Reveal=W.module('RarePullRules')
+local function waitFor(rarity)return Rules.RevealDelay(rarity)end -- the line goes out this long after the open (the puller's reveal has shown the seed, plus the margin)
 do
  -- a real Legendary open
  local reward,pack=openReal(Ann,'Legendary')
  check(reward and reward.Rarity=='Legendary','a real Legendary open: '..tostring(reward and reward.SeedId))
- check(#sinkLog==0,'nothing is shown at the moment of the open (the reveal is still playing)')
- R.advance(duration('Legendary')-.2);check(#sinkLog==0,'... nor just before the reveal ends ('..string.format('%.2f',duration('Legendary'))..' s)')
+ check(#sinkLog==0,'nothing is shown at the moment of the open (the puller\'s reveal is just starting)')
+ R.advance(waitFor('Legendary')-.2);check(#sinkLog==0,'... nor just before the puller\'s reveal has shown the seed ('..string.format('%.2f',waitFor('Legendary'))..' s)')
  R.advance(.3)
  local pulls=ofKind(sinkLog,'Pull')
  check(#pulls==2 and#toPlayer(sinkLog,Ann)==1 and#toPlayer(sinkLog,Bob)==1,'once it has ended every player in the server is sent one Pull (the puller and the other player)')
@@ -122,14 +127,14 @@ do
  check(bus:Count('A')==0,'a Legendary pull is NOT sent to other servers (Secret and above only)')
  table.clear(sinkLog)
  -- a Mythic open the same way
- local mythic=openReal(Bob,'Mythic');settle(duration('Mythic')+.5)
+ local mythic=openReal(Bob,'Mythic');settle(waitFor('Mythic')+.5)
  check(mythic.Rarity=='Mythic'and#ofKind(sinkLog,'Pull')==2 and bus:Count('A')==0,'a real Mythic open: shown to both players, not published')
  table.clear(sinkLog)
  -- Common: nothing at all
  local pc=addPack(Ann,commonStage,commonVariant);local rc=Data:OpenSeedPack(Ann,pc.Id,drawConstant(commonDraw));settle(15)
  check(rc.Rarity=='Common'and#sinkLog==0 and#A.Pending==0,'a Common open announces nothing')
  -- the reveal delay grows with the rarity (the puller\'s screen is busy until then)
- check(duration('Mythic')>duration('Legendary')and duration('King')>duration('Secret'),'the wait follows the reveal length (Legendary '..string.format('%.1f',duration('Legendary'))..' s ... King '..string.format('%.1f',duration('King'))..' s)')
+ check(waitFor('Mythic')>waitFor('Legendary')and waitFor('King')>waitFor('Cosmic')and waitFor('Cosmic')>waitFor('Secret')and waitFor('Secret')>waitFor('Mythic'),'the wait follows the puller\'s reveal (Legendary '..string.format('%.2f',waitFor('Legendary'))..' s ... King '..string.format('%.2f',waitFor('King'))..' s)')
 end
 
 -- TEST packs and granted seeds never announce
@@ -164,7 +169,7 @@ end
 -- a real open still works right after the tests (the TEST override did not stick)
 do
  table.clear(sinkLog)
- local reward=openReal(Ann,'Secret');settle(duration('Secret')+.5)
+ local reward=openReal(Ann,'Secret');settle(waitFor('Secret')+.5)
  check(reward.Rarity=='Secret'and#ofKind(sinkLog,'Pull')==2,'a real Secret open right after TEST packs is announced in the server')
  check(bus:Count('A')==1,'... and published once to the other servers')
  local m=bus.Log[#bus.Log]
@@ -176,7 +181,7 @@ do
  table.clear(sinkLog)
  local reward2=openReal(Bob,'Legendary')
  present[Bob.UserId]=nil;Bob.Parent=nil
- settle(duration('Legendary')+.5)
+ settle(waitFor('Legendary')+.5)
  check(reward2.Rarity=='Legendary'and#ofKind(sinkLog,'Pull')==1 and sinkLog[1].Player==Ann,'a puller who leaves during the reveal is still announced (to the players that are left)')
  present[Bob.UserId]=Bob;Bob.Parent=Players
  -- a changed threshold
@@ -192,6 +197,124 @@ do
  -- the module-level hook the data service calls
  check(Announcer.OnOpened(Ann,{},{Rarity='Common',SeedId='SunflowerSeed'},false)==false,'the module function OnOpened works through the running instance')
 end
+
+-- 1a. timing per rarity: the line goes out only after the PULLER's reveal has shown the seed ---------------------------------------------------------------------------
+-- A second server (B) listens on the same bus: when it shows the other-server line is the cross-server timing. Every step below is .01 s, so the times are exact.
+local zed=newPlayer(951,'Zed',nil)
+local SinkB,logB=remoteLog()
+local B=Announcer.new({Data=nil,Players={GetPlayers=function()return {zed}end},Http=Http,Messaging=bus:Server('B'),Remote=SinkB,Clock=function()return R.clock end,Time=unix,JobId='job-B-0000',Warn=function()end})
+B:Run()
+local timing={}
+-- the latest moment ANY presentation the puller's client can pick shows the seed, read straight from the client's own tables (not through the function under test)
+local function shownByTables(rank)
+ if rank<=5 then local c=Reveal.CardTimeline(rank,false);return math.max(c.Burst,c.Odds)end
+ local latest=0
+ for _,tl in ipairs({Reveal.Scenes[rank].Full,Reveal.Scenes[rank].Calm,Reveal.InPlace(rank)})do latest=math.max(latest,tl.Climax,tl.Rise or 0,tl.Odds or 0)end
+ return latest
+end
+local function runUntil(limit,fn)local n=0;while n<limit/.01 do R.advance(.01);n+=1;if fn()then return true end end;return false end
+do
+ for _,rarity in ipairs({'Legendary','Mythic','Secret','Cosmic','King'})do
+  local rank=Packs.Rarities[rarity].Rank
+  R.advance(30);table.clear(sinkLog);table.clear(logB)
+  local published=bus:Count('A')
+  local t0=R.clock
+  local reward=openReal(Ann,rarity)
+  check(reward and reward.Rarity==rarity,rarity..': a real open ('..tostring(reward and reward.SeedId)..')')
+  local want=shownByTables(rank)+Rules.Defaults.RevealMargin
+  runUntil(20,function()return#sinkLog>=2 end)
+  local annAt,bobAt=toPlayer(sinkLog,Ann)[1],toPlayer(sinkLog,Bob)[1]
+  local first=sinkLog[1]
+  check(first and annAt and bobAt,rarity..': the puller and the other player both get the line')
+  local at=first and first.At-t0 or -1
+  timing[#timing+1]={rarity,at}
+  check(math.abs(at-Rules.RevealDelay(rarity))<=.011,rarity..': the line goes out at exactly RevealDelay ('..string.format('%.2f',at)..' s after the open, RevealDelay '..string.format('%.2f',Rules.RevealDelay(rarity))..' s)')
+  check(at>=want-1e-9 and at<=want+.011,rarity..': ... = the latest seed-shown moment of the client\'s tables + the margin ('..string.format('%.2f',want)..' s)')
+  check(annAt and bobAt and annAt.At==bobAt.At and annAt.At>=t0+want-1e-9,rarity..': the puller and everybody else get it at the same moment, never before the puller\'s seed is shown')
+  -- after the hit of every presentation the client can pick (the seed is already on the puller's screen), still while the scene / card is on screen
+  local early=true
+  if rank<=5 then
+   for _,quick in ipairs({false,true})do local c=Reveal.CardTimeline(rank,quick);if at<c.Burst or at<c.Odds then early=false end end
+   check(early and at<=Reveal.CardTimeline(rank,false).Length,rarity..': after the seed card\'s hit and "1 in N" (quick or not), before the card is gone ('..string.format('%.2f',Reveal.CardTimeline(rank,false).Length)..' s)')
+  else
+   for _,variant in ipairs({'Full','Calm','InPlace'})do local tl=Reveal.Timeline(rank,variant);if at<tl.Climax or at<tl.Odds or at<(tl.Rise or 0)then early=false end end
+   local full=Reveal.Timeline(rank,'Full')
+   check(early,rarity..': after the hit, the rise and the "1 in N" of the Full, Calm and InPlace scenes')
+   check(at<=full.Back,rarity..': ... and before the Full scene hands the world back ('..string.format('%.2f',full.Back)..' s)')
+   check(at>full.Climax+.35,rarity..': ... later than a cut-short scene\'s result card (a danger cut shows it before the hit, plus .35 s)')
+  end
+  -- the other servers
+  if Rules.Qualifies('Global',rarity)then
+   check(bus:Count('A')==published+1,rarity..': published once')
+   local m=bus.Log[#bus.Log]
+   check(m and math.abs((m.At-t0)-at)<=.011 and m.At-t0>=want-1e-9,rarity..': the publish is at the same moment, not before the puller\'s seed is shown ('..string.format('%.2f',m and m.At-t0 or -1)..' s)')
+   check(#logB==1 and logB[1].Payload.Kind=='Global'and logB[1].At-t0>=want-1e-9,rarity..': server B shows its other-server line then, never earlier ('..string.format('%.2f',logB[1]and logB[1].At-t0 or -1)..' s)')
+  else
+   check(bus:Count('A')==published and#logB==0,rarity..': stays in this server: nothing published, nothing in B')
+  end
+ end
+ local row={};for _,t in ipairs(timing)do row[#row+1]=t[1]..' '..string.format('%.2f',t[2])end
+ print('timing (seconds after the open): '..table.concat(row,'  '))
+end
+-- every presentation the client can pick shows the seed before the line (a table check; the real cinematic is played in test_rare_cinematic)
+do
+ for rank=1,8 do
+  local name=Packs.RarityOrder[rank]
+  local at=Rules.RevealDelay(name)
+  local ok=true
+  if rank<=5 then for _,quick in ipairs({false,true})do if Reveal.SeedShown(rank,nil,quick)+Rules.Defaults.RevealMargin>at+1e-9 then ok=false end end
+  else for _,variant in ipairs(Reveal.StoryVariants)do if Reveal.SeedShown(rank,variant)+Rules.Defaults.RevealMargin>at+1e-9 then ok=false end end end
+  check(ok,name..': RevealDelay is not before the seed is shown in any presentation (+ the margin)')
+ end
+ -- a skip only brings the hit sooner: the server cannot hear of it and posts at the normal time, which is still after the skipped seed
+ for rank=6,8 do
+  local name=Packs.RarityOrder[rank];local tl=Reveal.Timeline(rank,'Full')
+  local skipped=tl.SkipFrom+(tl.Odds-(tl.Climax-.02)) -- skipped at the first moment it is allowed: the "1 in N" lands this long after the skip
+  check(skipped<Rules.RevealDelay(name),name..': a skipped scene shows the seed earlier ('..string.format('%.2f',skipped)..' s) than the line comes ('..string.format('%.2f',Rules.RevealDelay(name))..' s)')
+ end
+ -- the margin and the unknown-rarity fallbacks
+ Mod:SetAttribute('RevealMargin',2);check(math.abs(Rules.RevealDelay('King')-(Reveal.LatestSeedShown(8)+2))<1e-9,'RevealMargin is a tunable');reset()
+ Mod:SetAttribute('RevealMargin',99);check(Rules.Setting('RevealMargin')==.5,'a margin outside 0..5 s is ignored');reset()
+ check(Rules.RevealDelay('Banana')==Rules.RevealDelay('Common')and Rules.RevealDelay(nil)==Rules.RevealDelay('Common')and Rules.RevealDelay(5)>0,'an unknown rarity still gets a delay (and is never announced anyway)')
+ Packs.Rarities.Mythical={Rank=9,Weight=.001,Color=R.Color3.fromRGB(255,255,255)}
+ check(Rules.RevealDelay('Mythical')==Rules.RevealDelay('King'),'a rarity above King waits like King (the longest scene)');Packs.Rarities.Mythical=nil
+end
+-- the puller leaves before the line is due: it goes out at once, once; another player leaving changes nothing
+do
+ for _,rarity in ipairs({'Legendary','Secret'})do
+  R.advance(30);table.clear(sinkLog);table.clear(logB)
+  local published=bus:Count('A');local t0=R.clock
+  local reward=openReal(Bob,rarity)
+  runUntil(.6,function()return false end)
+  check(#sinkLog==0 and reward.Rarity==rarity,rarity..': 0.6 s into the reveal nothing has been said')
+  present[Bob.UserId]=nil;Bob.Parent=nil;Players.PlayerRemoving:Fire(Bob)
+  local leftAt=R.clock-t0
+  local told=toPlayer(sinkLog,Ann)
+  check(#told==1 and told[1].At-t0<=leftAt+1e-9 and told[1].Payload.Kind=='Pull'and told[1].Payload.UserId==702,rarity..': the puller leaves: the line goes out at once ('..string.format('%.2f',told[1]and told[1].At-t0 or -1)..' s, not at '..string.format('%.2f',waitFor(rarity))..' s)')
+  if Rules.Qualifies('Global',rarity)then
+   check(bus:Count('A')==published+1 and bus.Log[#bus.Log].At-t0<=leftAt+1e-9 and#logB==1,rarity..': ... and it is published to the other servers at once too')
+  end
+  local n=#sinkLog;R.advance(waitFor(rarity)+10)
+  check(#sinkLog==n and bus:Count('A')==published+(Rules.Qualifies('Global',rarity)and 1 or 0),rarity..': ... and not said again at the normal time')
+  present[Bob.UserId]=Bob;Bob.Parent=Players
+ end
+ -- someone ELSE leaves: the line still waits for the puller's reveal
+ R.advance(30);table.clear(sinkLog);local t0=R.clock
+ openReal(Ann,'Mythic');runUntil(.5,function()return false end)
+ present[Bob.UserId]=nil;Bob.Parent=nil;Players.PlayerRemoving:Fire(Bob)
+ check(#sinkLog==0,'another player leaving does not release the puller\'s line')
+ runUntil(10,function()return#sinkLog>=1 end)
+ check(#toPlayer(sinkLog,Ann)==1 and math.abs(sinkLog[1].At-t0-waitFor('Mythic'))<=.02,'... it goes out at the normal time ('..string.format('%.2f',sinkLog[1]and sinkLog[1].At-t0 or -1)..' s) to the players still there')
+ present[Bob.UserId]=Bob;Bob.Parent=Players
+ -- Destroy cancels what is waiting
+ local SinkD,logD=remoteLog();local D=Announcer.new({Data=Data,Players=Players,Http=Http,Remote=SinkD,Clock=function()return R.clock end,Time=unix,JobId='job-D-0000',Warn=function()end});D:Run()
+ local stage,variant,draw=findDraw('Mythic')
+ local pack=addPack(Ann,stage,variant)
+ local rw=Data:OpenSeedPack(Ann,pack.Id,drawConstant(draw))
+ D:Pulled(Ann,pack,rw,false);D:Destroy();R.advance(20)
+ check(rw~=nil and#logD==0,'an announcer that is destroyed while a line waits sends nothing')
+end
+B:Destroy()
 
 -- 1b. packs an owner / admin command made are TEST packs (TestGrant on the record): never announced, in the server or to other servers; the same packs from real sources are -----
 -- Every command goes through the REAL StudioTestCommands.Execute (what /test and F4 call), so the Normalize / Targeting / OwnerUpdateCommands82 routing is the game's own.
@@ -315,7 +438,7 @@ do
  local st2=Mystery:State(Ann);Mystery:Unlock(Ann,st2);Mystery:Claim(Ann,pedestal)
  local packs2=packsOf(Ann)
  check(#packs2==1 and packs2[1].TestGrant==nil,'a later mystery pack (no command) is a normal pack')
- local _,loudCount=openAll(Ann);settle(duration('King')+1)
+ local _,loudCount=openAll(Ann);settle(waitFor('King')+1)
  check(loudCount==1 and#ofKind(sinkLog,'Pull')>=1,'... and opening it IS announced')
  -- mystery next: a new day for the target; the arm must not survive for the new day's pack
  emptyBag(Ann);Data:GetPremium(Ann).Mystery=nil;R.clock+=86400*2;Mystery:State(Ann)
@@ -340,7 +463,7 @@ do
  local day=D.Day(os.time());local daily=Data:DailyData(Ann);daily.Login={Step=#D.Login-1,Day=day-1}
  local claimed2=Data:ClaimDailyLogin(Ann);local packs2=packsOf(Ann)
  check(claimed2==true and#packs2==1 and packs2[1].BagVariant=='MechLimited'and packs2[1].TestGrant==nil,'the next day 7 Mech pack (no command) is a normal pack')
- local _,loudCount=openAll(Ann);settle(duration('King')+1)
+ local _,loudCount=openAll(Ann);settle(waitFor('King')+1)
  check(loudCount==1 and#ofKind(sinkLog,'Pull')>=1,'... and opening it IS announced (Mech seeds are Legendary and above)')
  -- daily done (quests, gems only) arms nothing
  TestPacks.Disarm(Ann,'Daily');command(Ann,'/test daily done');check(not TestPacks.Armed(Ann,'Daily'),'/test daily done (gems only) arms nothing')
@@ -363,7 +486,7 @@ do
  check(r1.Ok and r2.Ok and#packsOf(Ann)==2 and packsOf(Ann)[1].TestGrant==true and packsOf(Ann)[2].TestGrant==true and not TestPacks.Armed(Ann,'Bonus'),'the two rolls of "bonus ready 2" are TEST packs and the arm is used up')
  Bonus:GrantReady(Ann,1);R.advance(2);local r3=Bonus:Roll(Ann)
  check(r3.Ok and#packsOf(Ann)==3 and packsOf(Ann)[3].TestGrant==nil,'a third roll (a natural one) is a normal pack')
- local opened,loudCount=openAll(Ann);settle(duration('King')+1)
+ local opened,loudCount=openAll(Ann);settle(waitFor('King')+1)
  check(opened==3 and count(spy.Reasons,'test pack')==2 and count(spy.Reasons,'announced')==1,'of the three opens two are refused as test packs and the normal one is announced ('..table.concat(spy.Reasons,',')..')')
  -- bonus progress: one roll afterwards
  emptyBag(Ann);command(Ann,'/test bonus progress 5:50');check(TestPacks.Armed(Ann,'Bonus'),'/test bonus progress arms the source for one roll')
@@ -375,7 +498,7 @@ do
  emptyBag(Ann);table.clear(sinkLog);watch()
  local packs=Data:GrantMechPacks(Ann,true,1)
  check(packs and#packs==1 and packs[1].TestGrant==nil and packs[1].PaidRandom==true,'a bought Mech pack (GrantMechPacks, the Robux / gems path) carries no mark')
- local reward=Data:OpenSeedPack(Ann,packs[1].Id,drawConstant(.5));settle(duration(reward.Rarity)+1)
+ local reward=Data:OpenSeedPack(Ann,packs[1].Id,drawConstant(.5));settle(waitFor(reward.Rarity)+1)
  check(reward and#ofKind(sinkLog,'Pull')==2 and spy.Reasons[1]=='announced','... and opening it IS announced ('..tostring(reward and reward.Rarity)..')')
  -- a normal pack banked from the track
  emptyBag(Ann);table.clear(sinkLog);spy.Reasons={}
@@ -383,7 +506,7 @@ do
  local banked=Chests.Bank({PlayerData=Data,SyncTools=function()end},Ann,{Stage=7,BagVariant='Pack06',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
  local testBanked=Chests.Bank({PlayerData=Data,SyncTools=function()end},Ann,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion,TestGrant=true})
  check(banked and banked.TestGrant==nil and testBanked and testBanked.TestGrant==true,'ChestService:Bank: a normal world pack carries no mark; a world pack of an owner-forced event (TestGrant on the world pack) is a TEST pack')
- local d=loud(banked,Ann);Data:OpenSeedPack(Ann,banked.Id,drawConstant(d));settle(duration('King')+1)
+ local d=loud(banked,Ann);Data:OpenSeedPack(Ann,banked.Id,drawConstant(d));settle(waitFor('King')+1)
  check(#ofKind(sinkLog,'Pull')>=1 and spy.Reasons[1]=='announced','a normal banked pack IS announced')
  table.clear(sinkLog);Data:OpenSeedPack(Ann,testBanked.Id,drawConstant(.5));settle(30)
  check(#sinkLog==0 and spy.Reasons[2]=='test pack','... the forced-event world pack is not')
@@ -393,7 +516,7 @@ do
  local voidTest=Data:AddChest(Ann,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{TestGrant=true})
  local vReal=Data:ConvertVoidPack(Ann,voidReal.Id);local vTest=Data:ConvertVoidPack(Ann,voidTest.Id)
  check(vReal and vReal.TestGrant==nil and vTest and vTest.TestGrant==true and vTest.BagVariant==vReal.BagVariant,'a Void pack turned into a Verity pack keeps its mark (marked stays marked, a normal one stays normal)')
- spy.Reasons={};Data:OpenSeedPack(Ann,vReal.Id,drawConstant(0));settle(duration('King')+1)
+ spy.Reasons={};Data:OpenSeedPack(Ann,vReal.Id,drawConstant(0));settle(waitFor('King')+1)
  check(#ofKind(sinkLog,'Pull')>=1 and spy.Reasons[1]=='announced','a normal Verity pack IS announced (the Verity seed)')
  table.clear(sinkLog);Data:OpenSeedPack(Ann,vTest.Id,drawConstant(0));settle(30)
  check(#sinkLog==0 and spy.Reasons[2]=='test pack','... a test Verity pack is not')
@@ -713,6 +836,94 @@ do
  -- the help rows and the docs
  local Help=W.module('StudioTestHelp');local rows=0;for _,row in ipairs(Help)do if row[1]:find('/test announce',1,true)then rows+=1 end end
  check(rows==3,'three /test announce rows in the in-game command list ('..rows..')')
+end
+
+-- 5b. hub records: who hears them (PullAnnounceRules.RecordScope), when (AfterReveal), private owner tests (To), what other servers accept -------------------------------------------
+do
+ local previousInstance=Announcer.Instance
+ local b=E.bus(function()return R.clock end,unix)
+ local sA,logA,listA=fresh('RA',{Bus=b});local sB,logB,listB=fresh('RB',{Bus=b})
+ local pa,pa2,pb=newPlayer(961,'Rec',nil),newPlayer(963,'Rec2',nil),newPlayer(962,'Far',nil)
+ listA[1],listA[2]=pa,pa2;listB[1]=pb;sA:Run();sB:Run()
+ Announcer.Instance=sA
+ local function ids(log)local out={};for _,l in ipairs(log)do out[#out+1]=l.Payload.Kind..':'..tostring(l.Payload.Record)end;return table.concat(out,',')end
+ -- BestPull: the pull's own rarity decides, with the pull line's thresholds
+ local expected={Common='nothing',Uncommon='nothing',Rare='nothing',Legendary='server',Mythic='server',Secret='everywhere',Cosmic='everywhere',King='everywhere'}
+ for _,rarity in ipairs(Packs.RarityOrder)do
+  R.advance(6);table.clear(logA);table.clear(logB);local published=b:Count('RA')
+  local spec=firstOf(rarity)
+  local ok,why=Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=spec.id})
+  local want=expected[rarity]
+  check(Rules.RecordScope('BestPull',rarity)==({nothing=nil,server='InServer',everywhere='Global'})[want],rarity..': RecordScope(BestPull) = '..want)
+  if want=='nothing'then
+   check(ok==false and why=='below the threshold'and#logA==0 and b:Count('RA')==published and next(sA.Waiting)==nil,rarity..': a BestPull record is not announced (below Legendary: the display changes, chat says nothing)')
+  else
+   check(ok==true and#logA==2 and logA[1].Payload.Kind=='Record'and logA[1].Payload.Record=='BestPull'and logA[1].Payload.SeedId==spec.id and logA[1].Payload.Name=='Rec','a '..rarity..' BestPull record: both players of this server get the record line now ('..ids(logA)..')')
+   check(b:Count('RA')==published+(want=='everywhere'and 1 or 0),rarity..': '..(want=='everywhere'and'published to the other servers'or'not published (this server only)'))
+   if want=='everywhere'then
+    local m=E.decode(b.Log[#b.Log].Message)
+    check(#m.p==1 and m.p[1].k=='BestPull'and m.p[1].s==spec.id and m.p[1].n=='Rec'and m.p[1].r==rarity,rarity..': the message carries the record key (k = BestPull), not a pull')
+    check(#logB==1 and logB[1].Player==pb and logB[1].Payload.Kind=='Record'and logB[1].Payload.Record=='BestPull'and logB[1].Payload.SeedId==spec.id and logB[1].Payload.Name=='Rec'and logB[1].Payload.Rarity==nil,rarity..': the other server shows the record line to its player ('..ids(logB)..')')
+   else check(#logB==0,rarity..': nothing in the other server')end
+  end
+ end
+ -- every other record: this server, never the others (a fruit's weight has no pull rarity; a record that names no seed has none to judge)
+ R.advance(6);table.clear(logA);table.clear(logB);local published=b:Count('RA')
+ check(Announcer.Announce({Kind='Record',Player=pa,Record='BiggestFruit',SeedId=firstOf('Common').id})==true and#logA==2 and b:Count('RA')==published,'BiggestFruit with a Common seed: told in this server (never silent), never to the others')
+ table.clear(logA);check(Announcer.Announce({Kind='Record',Player=pa,Record='BiggestFruit',SeedId=firstOf('King').id})==true and#logA==2 and b:Count('RA')==published and#logB==0,'... even with a King seed: a fruit record stays in this server')
+ table.clear(logA);check(Announcer.Announce({Kind='Record',Player=pa,Record='BestPull'})==true and#logA==2 and b:Count('RA')==published,'a BestPull that names no seed: this server only')
+ table.clear(logA);check(Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('King').id,Scope='InServer'})==true and#logA==2 and b:Count('RA')==published and#logB==0,'Scope = InServer keeps even a King record in this server (what the owner\'s `announce record` does)')
+ table.clear(logA);check(Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('Rare').id,Scope='InServer'})==true and#logA==2,'... and an explicit scope overrides the threshold')
+ -- an explicit Global scope for a record the rules keep at home is dropped by the receiver
+ R.advance(6);table.clear(logA);table.clear(logB);local bad0=sB.Stats.Bad
+ check(Announcer.Announce({Kind='Record',Player=pa,Record='BiggestFruit',SeedId=firstOf('Mythic').id,Scope='Global'})==true and#logA==2,'Scope = Global is honoured by the sender (this server shows it, and publishes)')
+ check(#logB==0 and sB.Stats.Bad==bad0+1,'... but another server shows only records its own rules send everywhere: a BiggestFruit record is dropped there')
+ -- private: To = the player (an owner's bestpull / bigfruit test): only that player, only this server, at once
+ R.advance(6);table.clear(logA);table.clear(logB);published=b:Count('RA')
+ local okTo,waitTo=Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('King').id,To=pa,AfterReveal=true})
+ check(okTo==true and waitTo==0 and#logA==1 and logA[1].Player==pa and b:Count('RA')==published and#logB==0,'To = the player: only they get the line, at once (no wait), never another player, never another server')
+ -- AfterReveal: a record that comes from a pack open waits for the puller's reveal, then goes out in this server and (Secret+) to the others
+ for _,rarity in ipairs({'Mythic','Secret','King'})do
+  R.advance(30);table.clear(logA);table.clear(logB);published=b:Count('RA');local t0=R.clock
+  local spec=firstOf(rarity)
+  local ok,wait=Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=spec.id,AfterReveal=true})
+  local lag=Rules.Defaults.RecordLag
+  check(ok==true and math.abs(wait-(Rules.RevealDelay(rarity)+lag))<1e-9 and#logA==0 and b:Count('RA')==published,rarity..': AfterReveal: nothing at once; it waits RevealDelay + RecordLag ('..string.format('%.2f',wait or -1)..' s)')
+  runUntil(20,function()return#logA>=2 end)
+  check(#logA==2 and math.abs(logA[1].At-t0-wait)<=.011,rarity..': the record line goes out then ('..string.format('%.2f',logA[1]and logA[1].At-t0 or -1)..' s), after the pull line\'s time ('..string.format('%.2f',Rules.RevealDelay(rarity))..' s)')
+  if Rules.Qualifies('Global',rarity)then
+   check(b:Count('RA')==published+1 and b.Log[#b.Log].At-t0>=Rules.RevealDelay(rarity)-1e-9 and#logB==1 and logB[1].At-t0>=Rules.RevealDelay(rarity)-1e-9,rarity..': the other servers get it then too, never before the puller\'s seed is shown')
+  else check(b:Count('RA')==published and#logB==0,rarity..': this server only')end
+ end
+ -- the puller leaves: released at once; a record below the threshold does not wait at all
+ R.advance(30);table.clear(logA);table.clear(logB);published=b:Count('RA');local t0=R.clock
+ Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('Secret').id,AfterReveal=true})
+ runUntil(.7,function()return false end)
+ check(#logA==0,'(0.7 s into the reveal: nothing yet)')
+ table.remove(listA,1);sA:_released(pa) -- (pa is gone from the list; the real PlayerRemoving of the main announcer is tested in 1a)
+ check(#logA==1 and logA[1].Player==pa2 and logA[1].At-t0<1 and b:Count('RA')==published+1 and#logB==1,'the puller leaves: the record line goes out at once, in this server and to the others')
+ local n=#logA;R.advance(30);check(#logA==n and b:Count('RA')==published+1,'... and not again at the normal time')
+ local rare=Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('Rare').id,AfterReveal=true})
+ check(rare==false and next(sA.Waiting)==nil,'a Rare record from a pull is refused at once: nothing is left waiting')
+ -- what another server accepts
+ local function packet(entry)return {Data=E.encode({v=1,j='far-away',t=unix(),p={entry}}),Sent=unix()}end
+ local sC,logC,listC=fresh('RC',{Bus=nil});listC[1]=newPlayer(971,'Cee',nil);local bad1=sC.Stats.Bad
+ local kingId,commonId=firstOf('King').id,firstOf('Common').id
+ sC:_onMessage(packet({i='f1',u=1,n='Evil',s=commonId,k='BestPull'}))
+ sC:_onMessage(packet({i='f2',u=1,n='Evil',s=kingId,k='BiggestFruit'}))
+ sC:_onMessage(packet({i='f3',u=1,n='Evil',s=kingId,k='<b>x</b>'}))
+ sC:_onMessage(packet({i='f4',u=1,n='Evil',k='BestPull'}))
+ check(#logC==0 and sC.Stats.Bad==bad1+4,'forged records are dropped: a BestPull of a Common seed, a fruit record, a record key with markup, a record without a seed ('..(sC.Stats.Bad-bad1)..' counted)')
+ sC:_onMessage(packet({i='f5',u=1,n='Real',s=kingId,k='BestPull'}))
+ check(#logC==1 and logC[1].Payload.Kind=='Record'and logC[1].Payload.Record=='BestPull'and logC[1].Payload.Name=='Real','a King BestPull record from another server is shown (the rarity from THIS server\'s catalog)')
+ sC:_onMessage(packet({i='f5',u=1,n='Real',s=kingId,k='BestPull'}))
+ check(#logC==1 and sC.Stats.Repeat==1,'... once (a repeat is dropped)')
+ sC:_onMessage(packet({i='f6',u=1,n='Pat',s=kingId,k=5}))
+ check(#logC==2 and logC[2].Payload.Kind=='Global','a record key that is not a string is no record: it reads as the pull it also could be')
+ sC.Data={IsLoaded=function()return true end,GetPremium=function()return {Settings={GlobalAnnouncements=false}}end}
+ sC:_onMessage(packet({i='f7',u=1,n='Real',s=kingId,k='BestPull'}))
+ check(#logC==2,'a player who switched "Announcements from other servers" off does not get another server\'s record line either')
+ sA:Destroy();sB:Destroy();Announcer.Instance=previousInstance
 end
 
 -- 6. trust ---------------------------------------------------------------------------------------------------------------------------------------

@@ -7,8 +7,10 @@
 --                waits for the remote.
 --  * Once        an announcement id is remembered (the last 128), so the same line never shows twice on one client; at most ChatBurst lines per ChatWindow seconds.
 --  * Old chat    only when there is no RBXGeneral channel (the legacy chat) or writing to it failed: the same sentence as a plain coloured line (SetCore ChatMakeSystemMessage).
--- Timing is the server's: it sends everyone in the server the line once the puller's reveal has finished.
-local RS=game:GetService('ReplicatedStorage');local StarterGui=game:GetService('StarterGui')
+--  * Timing      is the server's: it sends everyone the line once the PULLER's reveal has shown the seed (PullAnnounceRules.RevealDelay, from the tables this client plays its reveal
+--                with). The one thing added here is a safety net for the puller's own screen: a line about THIS player that arrives before their cinematic's hit (the attribute
+--                RarePullClimaxAt, kept up to date by RarePullCinematic, also on a skip) plus the margin waits for it, so a slow device never shows the result in chat first.
+local RS=game:GetService('ReplicatedStorage');local StarterGui=game:GetService('StarterGui');local Players=game:GetService('Players')
 local Rules=require(RS:WaitForChild('PullAnnounceRules'))
 local folder=RS:WaitForChild('ChestChaseRemotes',120);local remote=folder and folder:WaitForChild(Rules.RemoteName,120)
 if not remote then return end
@@ -38,11 +40,21 @@ local function chat(e)
  end
  pcall(function()StarterGui:SetCore('ChatMakeSystemMessage',{Text=Rules.Plain(e),Color=Rules.ChatColor(e),Font=Enum.Font.GothamBold,FontSize=Enum.FontSize.Size18})end)
 end
+-- Seconds a line about this very player waits for their own reveal (0 = none: someone else's line, a line from another server, no cinematic running, or its hit has passed).
+local HOLD_MAX=8
+local function holdFor(e)
+ local me=Players.LocalPlayer
+ if not me or e.Kind=='Global'or e.UserId~=me.UserId then return 0 end
+ local at=me:GetAttribute('RarePullClimaxAt')
+ if type(at)~='number'or at~=at then return 0 end
+ return math.clamp(at+Rules.Setting('RevealMargin')-workspace:GetServerTimeNow(),0,HOLD_MAX)
+end
 local function receive(payload)
  if dead or type(payload)~='table'then return end
  local e=Rules.Event(payload.Kind,payload)
  if not e or not e.Id or not remember(e.Id)then return end
- chat(e)
+ local wait=holdFor(e)
+ if wait>0 then task.delay(wait,function()if not dead then chat(e)end end)else chat(e)end
 end
 connection=remote.OnClientEvent:Connect(receive)
 script.Destroying:Connect(function()
