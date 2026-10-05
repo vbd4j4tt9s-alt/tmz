@@ -7,7 +7,7 @@
 --  * a wall behind the front MARKET sign, no inside-facing MARKET lettering,
 --  * lamps hang from a ceiling beam, string lights hang on a wire between the porch posts, stands are solid steps,
 --  * pots, crates and a barrel at the back, all resting on the deck,
---  * the Fruit of the Hour floats higher (bigger fruit) above a soft projector beam.
+--  * the Fruit of the Hour floats higher (bigger fruit); R152: with no translucent tube around it (the R133 projector beam is gone).
 local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 require('./mockfix')(W)
 R.Vector3.FromNormalId=R.Vector3.FromNormalId or function(n)
@@ -150,8 +150,20 @@ for _,d in ipairs(ped and ped:GetDescendants()or{})do if d:IsA('BasePart')then
 end end
 check(discs==0,'no discs or rings on the pedestal')
 check(anchor and highest<anchor.Position.Y-1.5,('a 4.2-stud fruit floats clear of the pedestal (top %.2f, fruit centre %.2f)'):format(highest,anchor and anchor.Position.Y or 0))
-local pbeam=ped and ped:FindFirstChild('Projector beam')
-check(pbeam and pbeam.Transparency>=.8 and math.abs(bottom(pbeam)-(C.Y+5.04))<.05,'a soft projector beam rises from the cradle')
+-- R152 (owner: "remove this hollow cylinder at the fruit of the hour place"): no translucent tube / beam stands around the fruit any more;
+-- the cradle's glow plate and prongs (R132 parts) and the fruit's light stay.
+check(ped and ped:FindFirstChild('Projector beam')==nil,'R152: no projector beam / hollow tube on the pedestal')
+local tubes=0
+for _,d in ipairs(ped and ped:GetDescendants()or{})do if d:IsA('BasePart')and d.Shape==R.Enum.PartType.Cylinder and d.Transparency>0 and d.Transparency<1 then tubes+=1 end end
+check(tubes==0,'R152: no see-through cylinder anywhere on the pedestal ('..tubes..')')
+local glow=ped and ped:FindFirstChild('Cradle glow')
+check(glow~=nil and #ped:GetChildren()>0,'R152: the cradle glow plate stays')
+local prongs=0;for _,d in ipairs(ped and ped:GetChildren()or{})do if d.Name=='Cradle prong'then prongs+=1 end end
+check(prongs==4,'R152: the four cradle prongs stay ('..prongs..')')
+-- nothing sits coplanar with the glow plate's top face (the old tube's bottom cap did: z-fighting)
+local zf=0
+for _,d in ipairs(ped and ped:GetChildren()or{})do if d:IsA('BasePart')and d~=glow and glow and math.abs(bottom(d)-top(glow))<.01 and d.Transparency<1 then zf+=1 end end
+check(zf==0,'R152: no part rests on the glow plate\'s top face ('..zf..')')
 
 -- Showcase ------------------------------------------------------------------------------------------------------
 R.advance(.1)

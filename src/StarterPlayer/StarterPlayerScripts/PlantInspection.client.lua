@@ -2,7 +2,7 @@
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Input=game:GetService('UserInputService');local Prompts=game:GetService('ProximityPromptService')
 local Names=require(RS:WaitForChild('GardenDisplayNames'));local Theme=require(RS:WaitForChild('GardenTheme'));local Catalog=require(RS:WaitForChild('PlantCatalog'));local Growth=require(RS:WaitForChild('PlantGrowth'))
-local Rules=require(RS:WaitForChild('PlantRules'));local Traits=require(RS.ItemTraitNames);local Audio=require(RS:WaitForChild('InteractionAudio'))
+local Rules=require(RS:WaitForChild('PlantRules'));local Traits=require(RS.ItemTraitNames) -- (R152: selecting a plant is silent; R150 clicked Bubble04 for it)
 local fruitTarget=require(RS:WaitForChild('FruitCursorTarget')).new();local touchPointer;local overHarvest=false
 local Picker=require(RS:WaitForChild('PlantShovelPicker'));local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
 local picker,releasePicker=Picker.Acquire(workspace:WaitForChild('ChestChaseMap'))
@@ -123,7 +123,6 @@ local function selectAt(pointer)
  if not valid(target)then clearSelection();return end
  local anchor=target:FindFirstChild('CropAnchor')or target.PrimaryPart
  if not anchor then clearSelection();return end
- if target~=selected then Audio.Play('Bubble04')end -- R150: selecting a different plant (click, tap or L3) clicks; re-picking the same one stays quiet
  selected=target;selectedAnchor=anchor;local id=target:GetAttribute('SeedId');local def=Catalog[id]
  nameLabel.Text=Names.Plant(id,def.Name);Theme.RarityText(nameLabel,def.Rarity,14);plantTraitLabel(target)
  -- Compact centered title, lettering only (R123: rarity emblems removed).
