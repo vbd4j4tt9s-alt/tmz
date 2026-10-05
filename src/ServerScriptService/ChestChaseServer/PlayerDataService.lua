@@ -16,7 +16,7 @@ local VerityReasons = require(game:GetService("ReplicatedStorage"):WaitForChild(
 local PackShapes = require(game:GetService("ReplicatedStorage"):WaitForChild("PackShapes151")) -- R151: a pack's chip-bag shape (an optional field of its record)
 -- R151: the optional PackShape of a saved / gifted Pack row: 1-6, or nil (absent, 0, or anything else = the default shape).
 local function savedPackShape(row)
-	if row.Kind ~= "Pack" then return nil end
+	if row.Kind ~= "Pack" or not PackShapes.Applies(PackRules.VariantKey(row.BagVariant)) then return nil end -- R152: the Verity pack (flat pouch) and the Void / Mech never carry a shape, whatever an older record says
 	local shape = PackShapes.Sanitize(row.PackShape)
 	return shape > 0 and shape or nil
 end
@@ -472,7 +472,6 @@ function PlayerDataService:ConvertVoidPack(player, inventoryId)
 			SeedScale = PackRules.NewSeedScale(VerityCatalog.PackStage, VerityCatalog.Variant, size),
 			TestGrant = pack.TestGrant == true or nil, -- R151: an owner-made Void pack stays a test pack as a Verity pack
 		}
-		do local shape = PackShapes.Roll(VerityCatalog.Variant);if shape then record.PackShape = shape end end -- R151: the Verity pack rolls its own chip-bag shape (a Void pack has none)
 		records[index] = record
 		local tests = self.StudioPackRewards and self.StudioPackRewards[player]
 		if tests then tests[pack.Id] = nil end -- an owner-test guarantee on the old pack does not carry over
