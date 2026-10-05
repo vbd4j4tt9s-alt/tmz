@@ -28,6 +28,9 @@
 --  * The window's portrait is her 3D model (the same yellow ball and smiley, in a ViewportFrame) bobbing, swelling and bouncing with the same level;
 --    it exists only while the window is open. The window no longer shows the "EVENT ENDS IN ..." line (her sign and the Index keep theirs),
 --    and her quest sentence gets the room it needs (every label is fitted by GardenTextFit, which layout() no longer overrides).
+-- R152 (owner: "add more personality to the texts above"): her texts are in her voice and all of them come from VerityConfig (Quest, RewardText, Thanks,
+--  Reasons, Dialog, Hint, Event). New: the status line is no longer empty after an Open; until the server answers a hand-in it says what to do next (C.Hint:
+--  you carry a Void Pack / none and The Darkened is here / none and it is not / the event is over). The thanks and the refusals replace it, as before.
 -- The server owns every rule; this only sends 'Give' (no arguments) and shows what it is told.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local Run=game:GetService('RunService');local Tween=game:GetService('TweenService');local GuiService=game:GetService('GuiService')
@@ -375,8 +378,8 @@ local function chip(name,color)
  local f=new('Frame',{Name=name,BackgroundColor3=Theme.Colors.Card,BorderSizePixel=0},panel);Theme.Corner(f,10);stroke(f,color,2)
  local caption=text(f,'Caption','',13,Theme.Colors.Muted);local value=text(f,'Count','0',22,color);return f,caption,value
 end
-local voidChip,voidCaption,voidCount=chip('VoidChip',VIOLET);voidCaption.Text='VOID PACKS YOU HAVE'
-local doneChip,doneCaption,doneCount=chip('DeliveredChip',GOLD);doneCaption.Text='HANDED IN'
+local voidChip,voidCaption,voidCount=chip('VoidChip',VIOLET);voidCaption.Text=C.Dialog.VoidChip
+local doneChip,doneCaption,doneCount=chip('DeliveredChip',GOLD);doneCaption.Text=C.Dialog.DoneChip
 -- The exchange as pictures: [Void Pack] -> [Verity Pack] and "1 VOID PACK = 1 VERITY PACK" (real 3D pack pictures, like the hotbar).
 local exchange=new('Frame',{Name='Exchange',BackgroundTransparency=1,BorderSizePixel=0},panel)
 local function packHolder(name,color)
@@ -396,10 +399,10 @@ end
 showPack(voidHolder,C.VoidVariant,'🌑');showPack(verityHolder,C.VerityVariant,'🌟')
 local status=text(panel,'Status','',16,MINT)
 local give=new('TextButton',{Name='GiveButton',Text='',BorderSizePixel=0},panel);Bright.Button(give,GOLD)
-local giveCaption=text(give,'Caption','GIVE VOID PACK',22);giveCaption.Size=UDim2.new(1,-16,1,0);giveCaption.Position=UDim2.fromOffset(8,0);giveCaption.ZIndex=12
+local giveCaption=text(give,'Caption',C.Dialog.Give,22);giveCaption.Size=UDim2.new(1,-16,1,0);giveCaption.Position=UDim2.fromOffset(8,0);giveCaption.ZIndex=12
 new('UIScale',{Name='Pulse'},give)
 local closeButton=new('TextButton',{Name='CloseButton',Text='',BorderSizePixel=0},panel);Bright.Button(closeButton,RGB(92,128,255))
-local closeCaption=text(closeButton,'Caption','CLOSE',20);closeCaption.Size=UDim2.new(1,-8,1,0);closeCaption.Position=UDim2.fromOffset(4,0);closeCaption.ZIndex=12
+local closeCaption=text(closeButton,'Caption',C.Dialog.Close,20);closeCaption.Size=UDim2.new(1,-8,1,0);closeCaption.Position=UDim2.fromOffset(4,0);closeCaption.ZIndex=12
 local function tint(button,color)Bright.Gradient(button,color:Lerp(Color3.new(1,1,1),.24),color:Lerp(Color3.new(),.12),90)end
 -- Layout (pixels from the panel's real size, so phones and computers both fit) ---------------------------------------------------
 -- Every label is sized through GardenTextFit (fit): it picks the largest font up to `size` whose wrapped text fits the label's box, and only then
@@ -458,31 +461,43 @@ local busy=false;local busySerial=0
 local pulse
 local function number(v)return type(v)=='number'and v==v and v>=0 and math.min(math.floor(v),1e9)or nil end
 local function eventText()
- if state.EventActive==true then return'🌑 THE DARKENED IS HERE NOW!',VIOLET end
+ if state.EventActive==true then return C.Dialog.Here,VIOLET end
  if state.NextAt then
   local left=state.NextAt-workspace:GetServerTimeNow()
-  if left>0 then return'🌑 THE DARKENED ARRIVES IN '..countdown(left),SKY end
-  return'🌑 THE DARKENED IS ARRIVING...',SKY
+  if left>0 then return C.Dialog.Next..countdown(left),SKY end
+  return C.Dialog.Arriving,SKY
  end
  return'',VIOLET
+end
+-- The status line: the server's last answer (the thanks, or the reason for a refusal: message = {Text,Good}) until the next Open; with none, a hint
+-- about what to do next (R152: C.Hint), by what you carry. Nothing while the hand-in waits for the server.
+local message=nil
+local function hint()
+ if not state.Known or busy then return'',MINT end
+ if not state.Live then return C.Hint.Over,Theme.Colors.Muted end
+ if state.VoidPacks>0 then return C.Hint.Have,MINT end
+ if state.EventActive==true then return C.Hint.Here,GOLD end
+ return C.Hint.Wait,Theme.Colors.Muted
 end
 local function render()
  if pulse then pulse:Cancel();pulse=nil end;give.Pulse.Scale=1
  voidCount.Text=state.Known and tostring(state.VoidPacks)or'-';doneCount.Text=state.Known and tostring(state.Delivered)or'-'
  rewardLine.Text=state.RewardText or C.RewardText
- local live=eventLive();state.Live=live -- (R149: no "EVENT ENDS IN ..." line here; after the end the GIVE button says EVENT ENDED)
+ local live=eventLive();state.Live=live -- (R149: no "EVENT ENDS IN ..." line here; after the end the GIVE button says C.Event.Ended)
  local line,color=eventText();eventLine.Text=line;eventLine.TextColor3=color;eventLine.Visible=line~=''
  local can=state.Known and state.VoidPacks>0 and not busy and live
  give.Active=can;give.Interactable=can;give.AutoButtonColor=can;give:SetAttribute('Enabled',can)
  tint(give,can and GOLD or RGB(96,104,140))
- giveCaption.Text=not live and C.Event.Ended or busy and'HANDING IT OVER...'or'GIVE VOID PACK'
+ giveCaption.Text=not live and C.Event.Ended or busy and C.Dialog.Busy or C.Dialog.Give
+ if message then status.Text=message.Text;status.TextColor3=message.Good and MINT or RED
+ else local hintLine,hintColor=hint();status.Text=hintLine;status.TextColor3=hintColor end
  if can and not GuiService.ReducedMotionEnabled then
   pulse=Tween:Create(give.Pulse,TweenInfo.new(.7,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,-1,true),{Scale=1.05});pulse:Play()
  end
  layout()
 end
-local function say(message,good)
- status.Text=message or'';status.TextColor3=good and MINT or RED
+local function say(text,good) -- (always followed by a render, which draws it)
+ message=text and text~=''and{Text=text,Good=good}or nil
 end
 local function setBusy(value)
  busy=value;busySerial+=1

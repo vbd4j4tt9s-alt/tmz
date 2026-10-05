@@ -336,6 +336,8 @@ for _,id in ipairs(refusals)do local r,why2=Data:ConvertVoidPack(A,id);if r~=nil
 for _,bad in ipairs({5,true,{}})do local r=Data:ConvertVoidPack(A,bad);if r~=nil then allRefused=false end end
 local r3=Data:ConvertVoidPack(A,nil);if r3~=nil then allRefused=false end
 check(allRefused,'Pack06, Mech, Verity, unknown, empty and non-string ids are all refused with a reason ('..reasons[1]..' | '..reasons[3]..' | '..reasons[6]..')')
+-- R152: the reasons are in Verity's voice (they reach her window as they are): not a Void pack / not in the bag any more / not an id at all
+check(reasons[1]=='ONLY A VOID PACK WORKS FOR ME!'and reasons[2]=='ONLY A VOID PACK WORKS FOR ME!'and reasons[6]=='THAT PACK LEFT YOUR BAG! TRY AGAIN'and reasons[8]=='HMM, I CAN\'T USE THAT PACK','the reasons: "'..reasons[1]..'" / "'..reasons[6]..'" / "'..reasons[8]..'"')
 check(snapshotBag()==before and find(A,pack6.Id)==pack6,'...and nothing changed (bag order, serial and revision all the same)')
 local seedRec={Id='701_seedfix',Kind='Seed',BagVariant='EclipseReliquary',Stage=7,ChestNumber=900,SeedId='MirageFigSeed',SeedName='Mirage Fig Seed',SeedEmoji='x',ChestName='x',AccentColor=R.Color3.new(1,1,1),PackSize=1,PackMutation='None',SeedScale=1}
 table.insert(Data:GetChestRecords(A),seedRec)
@@ -345,7 +347,8 @@ local odd=Data:AddChest(A,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,Pack
 check(Data:ConvertVoidPack(A,odd.Id)==nil and odd.BagVariant=='EclipseReliquary'and odd.Stage==3,'a "Void" record that is not stage 7 is refused')
 Data:RemoveChest(A,odd.Id)
 local B0=makePlayer(702,'Ben');Data.Loaded[B0]=nil
-check(Data:ConvertVoidPack(B0,void2.Id)==nil and find(A,void2.Id)==void2,'a player whose data is not loaded gets nothing');Data.Loaded[B0]=true
+check(Data:ConvertVoidPack(B0,void2.Id)==nil and find(A,void2.Id)==void2,'a player whose data is not loaded gets nothing')
+check(select(2,Data:ConvertVoidPack(B0,void2.Id))=='HOLD ON, YOUR DATA IS LOADING!','(R152: "HOLD ON, YOUR DATA IS LOADING!")');Data.Loaded[B0]=true
 end
 -- It works with a full bag.
 do
@@ -493,7 +496,7 @@ local r2=Chests.ConvertVoidPack(fake,D)
 check(r2 and r2.PackSize==4 and select(2,find(D,r2.Id))==4,'no id, a Void pack in the hand: that one is converted (not the first in the bag)')
 check(toolFor(D,r2.Id)~=nil and toolFor(D,dv2.Id)==nil,'and its Tool is rebuilt')
 local r3,why3=Chests.ConvertVoidPack(fake,D)
-check(r3==nil and why3=='YOU HAVE NO VOID PACK TO GIVE','no Void pack left: refused ('..tostring(why3)..')')
+check(r3==nil and why3=='NO VOID PACK YET! GO STEAL ONE!','no Void pack left: refused, in Verity\'s voice ('..tostring(why3)..')') -- R152
 -- With an id: the pack the NPC names.
 local dv3=Data:AddChest(D,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='Diamond',OddsVersion=137})
 local dv4=Data:AddChest(D,{Stage=7,BagVariant='EclipseReliquary',PackSize=1.5,PackMutation='None',OddsVersion=137})
@@ -520,6 +523,7 @@ local opening={Tool=committedTool,Character=char,Connections={},Bag=bag2,Committ
 fake.Openings[D]=opening
 local rCom,whyCom=Chests.ConvertVoidPack(fake,D,dv5.Id)
 check(rCom==nil and find(D,dv5.Id)==dv5 and dv5.BagVariant=='EclipseReliquary'and fake.Openings[D]==opening and not bag2._destroyed and committedTool.Parent~=nil,'a committed opening of that pack is refused and nothing changes ('..tostring(whyCom)..')')
+check(whyCom=='PLEASE FINISH OPENING THAT PACK!','(R152: the reason is Verity\'s)')
 local rCom2=Chests.ConvertVoidPack(fake,D)
 check(rCom2==nil and find(D,dv5.Id)==dv5,'(also without an id: the committed pack is the one that would be picked)')
 fake.Openings[D]=nil
