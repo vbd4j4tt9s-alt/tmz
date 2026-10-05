@@ -117,6 +117,14 @@ The two giant displays in the hub's back corners: **BEST PULL TODAY** (the +X co
 | `bonus progress 5:50 @name` | Saved treadmill time (max 6:00). 5:50 means a roll after 10 more seconds on the treadmill |
 | `bonus roll @name` | Use a ready roll for them now, with no animation |
 
+## R151 reveals, pack shapes, hub trees
+| Command | What it does |
+|---|---|
+| `rarepull king @name` (`cosmic`, `secret`, `common`..`mythic`) | Play a pull reveal with a demo seed; nothing is granted |
+| `raresound KingFanfare @name` | Play one reveal sound slot alone (RarePullSounds), to audition an id |
+| `packshape` / `packshape 3` / `packshape off` / `packshape auto` | Chip-bag shapes: status / every NEW pack rolls shape 3 / every pack shown in the default shape / normal random rolls |
+| `hubtrees` (server) | How each studded tree model loaded (by id or placed by hand), scripts and fruit removed, part counts, which device tiers use it |
+
 ## Pull announcements (R151, chat only)
 Pull announcements are chat lines only: no banner, no sound, no picture. In this server a Legendary or better pull is a line in the pull's rarity colour (`🌟 Name pulled a MYTHIC Fire Pepper! (1/800)`); a Secret or better pull is also sent to the other servers, where it is a gold line (`🌐 Name pulled a SECRET Void Seed (1/1,000)!`). A record is an amber line (`🏆 Name took BEST PULL TODAY!`). The line comes after the PULLER's reveal has shown the seed, for everybody (the puller included): about 2.2 s after the open for a Legendary, 2.4 s Mythic, 4.7 s Secret, 5.8 s Cosmic, 6.7 s King (the climax / seed landing of their cinematic plus half a second, read from the same tables the client plays; a skipped reveal still gets the line at that time; a puller who leaves releases it at once). A Secret or better pull reaches the other servers at that same moment, never earlier. **Hub records** (a new BEST PULL TODAY / BIGGEST FRUIT TODAY) are announced the same way and are the hub's ONLY message (its old notice is gone): a BEST PULL of a Secret or better seed goes to every server, Legendary / Mythic to this server, anything lower only changes the display; BIGGEST FRUIT stays in this server; a record from a pack open follows the pull line by 0.4 s. Owner test packs (`TestGrant`, `/test rarepacks`) and the owner's `bestpull` / `bigfruit` tests never announce to other players, and nothing is announced while `hubdisplays day +1` previews another day.
 
