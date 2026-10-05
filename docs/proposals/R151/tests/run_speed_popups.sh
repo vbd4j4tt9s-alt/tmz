@@ -6,7 +6,7 @@
 #                      Config.TreadmillPopupLifetime and the SpeedGainPopup remote are untouched; SpeedPopupStyle is in src/MANIFEST.tsv (sorted); TreadmillFx is untouched by this
 #                      round; no model names in the new files; every script compiles.
 #  test_speed_popups_style  - the pure curves at sample times against the numbers measured in the reference clip (pop, fling, hold, fade, life), retire, plans (7 shuffled
-#                      slots), caps per tier (own 8 / 6 / 4, others 3 / 2 / 1), Reduced Motion, splitting an award (exact sum, every share >= 1, 12 a second), spacing, units,
+#                      slots), caps per tier (own 8 / 6 / 4, others 3 / 2 / 1), Reduced Motion, splitting an award (exact sum, every share >= 1, 10 a second at the 1/5 s step), spacing, units,
 #                      bad numbers, the formatted text unchanged, our colours / font / bolt unchanged, the approved numbers.
 #  test_speed_popups_client - the real client: pooling and the one updater, the curves read off the real frames, caps per tier (and FastMode = tier 1), the split sum, other
 #                      players (range, caps, not split), Reduced Motion, a player leaving or resetting, hostile events, units, colours, the belt arrows, and no leak / no churn after

@@ -124,7 +124,7 @@ for _,amount in ipairs({1,2,3,7,99,4200,123457,999999999})do
 end
 check(Style.Split(5,2)[1]==3 and Style.Split(5,2)[2]==2,'the extra points go to the first shares')
 check(Style.Cadence.SplitTo==2,'the owner chose "proposed + split": 2 popups per tick by default')
-check(Style.SplitFor(true,false)==2,'the local player at full motion: 2 shares per tick (12 a second at the 1/6 s tick)')
+check(Style.SplitFor(true,false)==2,'the local player at full motion: 2 shares per tick (10 a second at the 1/5 s tick, the clip\'s 10)')
 check(Style.SplitFor(false,false)==1 and Style.SplitFor(true,true)==1 and Style.SplitFor(false,true)==1,'other players and Reduced Motion are not split')
 do local keep=Style.Cadence.SplitTo
  Style.Cadence.SplitTo=nil;check(Style.SplitFor(true,false)==1,'SplitTo nil = off')
@@ -137,17 +137,18 @@ check(Style.Shares(4200,3,2)==6 and Style.Shares(4200,10,2)==12 and Style.Shares
 check(Style.Shares(4200,99,4)==12 and Style.Shares(4200,0,2)==2 and Style.Shares(4200,-3,2)==2,'shares: ticks are clamped to 1..10')
 check(Style.Shares(0,1,2)==0 and Style.Shares(0.5,1,2)==0 and Style.Shares(-1,1,2)==0 and Style.Shares(0/0,1,2)==0 and Style.Shares('x',1,2)==0 and Style.Shares(nil,1,2)==0,'shares: nothing below 1 point')
 check(Style.Shares(4200,0/0,0/0)==1 and Style.Shares(4200,'a','b')==1 and Style.Shares(4200,math.huge,math.huge)==1,'shares: bad ticks / split count as 1')
--- 12 a second: 2 shares per 1/6 s tick spaced 1/12 s
-check(near(Style.Spacing(1/6,2,2),1/12),'spacing: two shares share one 1/6 s tick (1/12 s apart)')
-check(near(Style.Spacing(1/6,1,1),1/6),'spacing: one popup per tick, a tick apart')
-check(near(Style.Spacing(1/6,2,12),1/12) and near(Style.Spacing(1/6,2,20),1/20),'spacing: the whole burst fits in one second')
-check(near(Style.Spacing(0,2,2),0.05) and near(Style.Spacing(9,1,1),1) and near(Style.Spacing(nil,2,2),1/12) and near(Style.Spacing(0/0,2,2),1/12),'spacing: the interval is clamped to 0.1 .. 1 s, a bad one is the default 1/6 s')
-do -- 6 ticks a second x 2 shares: a popup every 1/12 s for the whole run
- local starts={};for tick=0,5 do for j=0,1 do starts[#starts+1]=tick/6+j*Style.Spacing(1/6,2,2)end end
- local even=true;for i=2,#starts do if not near(starts[i]-starts[i-1],1/12,1e-9)then even=false end end
- check(even and #starts==12,'a steady run: a popup every 1/12 s, 12 in the first second')
+-- R151 treadmill polish: the server's step is 1/5 s (Config.TrainingInterval, was 1/6): 10 a second, 2 shares per 1/5 s tick spaced 1/10 s
+check(near(Style.Spacing(1/5,2,2),1/10),'spacing: two shares share one 1/5 s tick (1/10 s apart)')
+check(near(Style.Spacing(1/5,1,1),1/5),'spacing: one popup per tick, a tick apart')
+check(near(Style.Spacing(1/5,2,12),1/12) and near(Style.Spacing(1/5,2,20),1/20),'spacing: the whole burst fits in one second')
+check(near(Style.Spacing(1/6,2,2),1/12),'spacing: an older server\'s 1/6 s tick still splits evenly (1/12 s)')
+check(near(Style.Spacing(0,2,2),0.05) and near(Style.Spacing(9,1,1),1) and near(Style.Spacing(nil,2,2),1/10) and near(Style.Spacing(0/0,2,2),1/10),'spacing: the interval is clamped to 0.1 .. 1 s, a bad one is the default 1/5 s')
+do -- 5 ticks a second x 2 shares: a popup every 1/10 s for the whole run (the reference clip's 10 a second)
+ local starts={};for tick=0,4 do for j=0,1 do starts[#starts+1]=tick/5+j*Style.Spacing(1/5,2,2)end end
+ local even=true;for i=2,#starts do if not near(starts[i]-starts[i-1],1/10,1e-9)then even=false end end
+ check(even and #starts==10,'a steady run: a popup every 1/10 s, 10 in the first second')
  local alive=0;for i=1,#starts do if 1.0-starts[i]<Style.Life then alive+=1 end end
- check(alive==8 or alive==7,'a steady run keeps about 7.8 alive at once ('..alive..')')
+ check(alive==7 or alive==6,'a steady run keeps about 6.5 alive at once, under the tier-3 cap of 8 ('..alive..')')
 end
 
 -- 9. the text of an amount: unchanged from the R114 formatGain ----------------------------------------------------------------------------------------

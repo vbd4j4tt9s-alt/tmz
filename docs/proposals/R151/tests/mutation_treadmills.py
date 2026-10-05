@@ -9,7 +9,7 @@ MUTS = [
     ('label never hides', 'src/ReplicatedStorage/TreadmillFx.lua', "    local hide=self:OwnerTraining(record)", "    local hide=false"),
     ('a dress part answers raycasts', 'src/ServerScriptService/ChestChaseServer/BiomeVisuals.lua', "local v=part(dm,name,size,origin*frame,color,material,class);v.CastShadow=false;return v", "local v=part(dm,name,size,origin*frame,color,material,class);v.CastShadow=false;v.CanQuery=true;return v"),
     ('flow pieces kept', 'src/ServerScriptService/ChestChaseServer/BiomeVisuals.lua', "if v:IsA('BasePart')and v:GetAttribute('TrackMotion')=='Flow'then v:Destroy();retired+=1 end", "if false then retired+=1 end"),
-    ('L1 multiplier back to 1', 'src/ReplicatedStorage/BalanceValues81.lua', 'T.MachineMultipliers={1.2,', 'T.MachineMultipliers={1,'),
+    ('step back to 1/6 s', 'src/ServerScriptService/ChestChaseServer/Config.lua', 'Config.TrainingInterval = 1 / 5', 'Config.TrainingInterval = 1 / 6'),
     ('formatter old boundary', 'src/ReplicatedStorage/SpeedPopupStyle.lua', "if (tonumber(text) or 0) < 1e3 or i == #units then", "if true then"),
     ('light cap ignored', 'src/ServerScriptService/ChestChaseServer/BiomeVisuals.lua', "            if room<=0 then return end", "            if false then return end"),
     ('a pattern drifts', 'src/ReplicatedStorage/TreadmillBeltArt151.lua', "for _,p in ipairs(pads)do ring(c,p[1],p[2],5.5,1.3,5,110)", "for _,p in ipairs(pads)do ring(c,p[1],p[2],5.6,1.3,5,110)"),

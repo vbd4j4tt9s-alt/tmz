@@ -1,7 +1,7 @@
 --!nocheck
 -- R151 speed popups on the Roblox mock with the REAL SpeedGainPopup.client.lua + SpeedPopupStyle (+ the V134 belt arrows that share the script):
 --  pooling and the one updater, the curves at sample times (pop, fling, hold, fade, life), the per-tier caps (own / others, FastMode = tier 1), splitting an award
---  (the sum is exact, 12 a second), Reduced Motion, other players (range, caps, not split), a player leaving or resetting, hostile events, the units, our colours /
+--  (the sum is exact, 10 a second at the server's 1/5 s step), Reduced Motion, other players (range, caps, not split), a player leaving or resetting, hostile events, the units, our colours /
 --  font / bolt unchanged, no leak after 10,000 awards, and the belt arrows still working.
 -- Run from a scratch folder holding roblox.luau, world.luau (R123), speed_popups_world.luau and rs_bundle.luau (run_speed_popups.sh does it).
 local PW=require('./speed_popups_world');local W,R=PW.W,PW.R
@@ -29,7 +29,7 @@ check(#PW.fields(pg)==0,'nothing is built before the first popup (no field, no f
 local created0=#R.created
 
 -- 1. the first award --------------------------------------------------------------------------------------------------------------------------------------
-C.fire(me,4200,1,1/6)
+C.fire(me,4200,1,1/5)
 check(PW.live(Run.RenderStepped)==1,'an award connects the one updater')
 check(PW.visibleAll(pg)==0,'nothing shows before the first frame')
 PW.frames(1,0)
@@ -45,9 +45,9 @@ check(r.Text=='+2.1K','an award of 4200 is shown as two shares of 2.1K ('..r.Tex
 check(near(r.Scale,0.45,1e-6) and r.Alpha==1,'born at 0.45 size, opaque ('..r.Scale..')')
 check(math.abs(r.X)<=Style.Spawn.Jitter+1e-6 and near(r.Y,-Style.Spawn.Lift,1e-6),'born at the head (within '..Style.Spawn.Jitter..' px, '..Style.Spawn.Lift..' px up): '..r.X..', '..r.Y)
 PW.frames(4,1/120)
-check(#PW.visible(field)==1,'the second share is not there before 1/12 s')
+check(#PW.visible(field)==1,'the second share is not there before 1/10 s')
 PW.frames(10,1/120)
-check(#PW.visible(field)==2,'the second share shows after 1/12 s (12 a second)')
+check(#PW.visible(field)==2,'the second share shows after 1/10 s (10 a second)')
 check(#amounts==2 and amounts[1]==2100 and amounts[2]==2100 and sum(amounts)==4200,'the two shares add up to the award')
 settle()
 check(PW.visibleAll(pg)==0 and PW.live(Run.RenderStepped)==0,'done: all popups hidden, the updater disconnected')
@@ -58,7 +58,7 @@ check(#PW.frameList(field)==poolSize and #R.created-created0==1+7*poolSize,'the 
 -- 2. the curves at sample times ----------------------------------------------------------------------------------------------------------------------------
 do
  for i=#amounts,1,-1 do amounts[i]=nil end
- C.fire(me,4200,1,1/6)
+ C.fire(me,4200,1,1/5)
  PW.frames(1,0)
  local f=PW.fields(pg)[1];local A=PW.visible(f)[1]
  local rows={};local secondAt
@@ -101,28 +101,28 @@ do
  check(holdMove<=0.06,'hold: it rests from 0.4 s to 0.5 s ('..holdMove..' px)')
  check(peak>1.05 and peak<1.10 and peakAt>=0.12 and peakAt<=0.2,'pop: peaks at '..string.format('%.3f',peak)..' at '..string.format('%.3f',peakAt)..' s (the clip: ~1.06 at ~0.13 s)')
  check(near(rows[0].r.Scale,0.45) and near(rows[34].r.Scale,1,0.0025) and near(rows[70].r.Scale,1,0.0025),'size: 0.45 at birth, back to 1 from 0.28 s')
- check(secondAt and secondAt>=0.075 and secondAt<=0.1,'the second share is born at 1/12 s ('..tostring(secondAt)..')')
+ check(secondAt and secondAt>=0.09 and secondAt<=0.12,'the second share is born at 1/10 s ('..tostring(secondAt)..')')
  check(rows[10].r.Alpha==1 and rows[76].visible==true and rows[76].r.Alpha<0.3 and rows[76].r.Alpha>0,'it is still there, nearly clear, just before 0.65 s')
  settle()
 end
 
 -- 3. units: the sizes follow the screen height ---------------------------------------------------------------------------------------------------------------
 for _,case in ipairs({{360,0.8},{720,0.8},{1080,1},{1296,1.2},{2160,1.35}})do
- PW.view(case[1]);C.fire(me,1000,1,1/6);PW.frames(1,0)
+ PW.view(case[1]);C.fire(me,1000,1,1/5);PW.frames(1,0)
  local f=PW.fields(pg)[1];local r=PW.read(PW.visible(f)[1])
  check(near(r.Scale,0.45*case[2],1e-6) and near(r.Y,-Style.Spawn.Lift*case[2],1e-6),'unit at '..case[1]..' px high: '..case[2]..' (size '..r.Scale..', offset '..r.Y..')')
  settle()
 end
 PW.view(1080)
 
--- 4. caps per tier: own (split, 12 a second) and others (not split, 6 a second); FastMode is tier 1 ---------------------------------------------------------
+-- 4. caps per tier: own (split, 10 a second) and others (not split, 5 a second) at the server's 1/5 s step; FastMode is tier 1 ---------------------------------------------------------
 local other=PW.newPlayer('Other',{Pos=V3(12,3,8)})
 local lastAlphaOfHidden={}
 local function stream(player,seconds,cap)
  local n=math.floor(seconds*60+.5);local maxVisible,maxPool=0,0;local prev={};local worstVanish=0;local opaqueMax=0
  local f0=nil
  for f=0,n-1 do
-  if f%10==0 then C.fire(player,4200,1,1/6)end
+  if f%12==0 then C.fire(player,4200,1,1/5)end
   PW.frames(1,1/60)
   local field=PW.fieldOf(pg,head(player))
   if field then
@@ -154,10 +154,10 @@ for _,case in ipairs({{1,4,1},{2,6,2},{3,8,3}})do
  check(maxPool<=poolSize,'tier '..tier..' own: the pooled field holds at most '..poolSize..' frames, never more ('..maxPool..')')
  local cap=Style.Cap(tier,true,false)
  if tier<3 then check(maxVisible>=cap and maxVisible<=cap+Style.Field.Spare,'tier '..tier..' own: the cap binds, '..cap..' alive (+ the ones fading out): '..maxVisible)
- else check(maxVisible>=7 and maxVisible<=cap+Style.Field.Spare,'tier 3 own: about 7.8 alive at 12 a second, at most '..(cap+2)..': '..maxVisible)end
+ else check(maxVisible>=6 and maxVisible<=cap+Style.Field.Spare,'tier 3 own: about 6.5 alive at 10 a second, at most '..(cap+2)..': '..maxVisible)end
  check(opaqueMax<=cap+1,'tier '..tier..' own: never more than cap (+1 on the frame that replaces one) fully opaque: '..opaqueMax)
  check(worstVanish<=0.45,'tier '..tier..' own: nothing vanishes while opaque, the cap fades the oldest in 0.08 s (last alpha seen '..string.format('%.2f',worstVanish)..')')
- check(#amounts-before>=44 and #amounts-before<=50,'tier '..tier..' own: 12 popups a second (2 per 1/6 s tick): '..(#amounts-before)..' in 4 s')
+ check(#amounts-before>=38 and #amounts-before<=42,'tier '..tier..' own: 10 popups a second (2 per 1/5 s tick): '..(#amounts-before)..' in 4 s')
  settle()
  -- others
  before=#amounts
@@ -165,7 +165,7 @@ for _,case in ipairs({{1,4,1},{2,6,2},{3,8,3}})do
  local ocap=Style.Cap(tier,false,false)
  check(ocap==otherCap and mp<=Style.Cap(3,true,false)+Style.Field.Spare,'tier '..tier..' other: the field (a pooled one, maybe built for the local player) never holds more than '..(Style.Cap(3,true,false)+Style.Field.Spare)..' frames ('..mp..')')
  check(mv>=ocap and mv<=ocap+Style.Field.Spare,'tier '..tier..' other: '..ocap..' alive (+ fading): '..mv)
- check(#amounts-before>=22 and #amounts-before<=26,'tier '..tier..' other: NOT split, 6 popups a second: '..(#amounts-before)..' in 4 s')
+ check(#amounts-before>=18 and #amounts-before<=22,'tier '..tier..' other: NOT split, 5 popups a second: '..(#amounts-before)..' in 4 s')
  settle()
 end
 -- FastMode is tier 1 whatever the governor says
@@ -198,43 +198,43 @@ local function shown(player,amount,ticks,interval)
 end
 for _,case in ipairs({{1,1},{2,1},{3,1},{4200,1},{100001,1},{5,3},{3,5},{123457,10},{7,10},{999999999,1},{1000000000,1},{4200,2},{4200,1,0.1},{4200,1,1},{9,1,0.5}})do
  local amount,ticks,interval=case[1],case[2],case[3]
- local list=shown(me,amount,ticks,interval or 1/6)
+ local list=shown(me,amount,ticks,interval or 1/5)
  local expect=math.max(1,math.min(amount,(ticks)*2,12))
  local minShare=math.huge;for _,v in ipairs(list)do minShare=math.min(minShare,v)end
  check(sum(list)==amount and #list==expect and minShare>=1,'own '..amount..' x'..ticks..' ticks: '..#list..' shares (expected '..expect..') add up to '..sum(list)..', smallest '..tostring(minShare))
 end
 for _,case in ipairs({{4200,1},{5,3},{123457,10},{1,1}})do
- local list=shown(other,case[1],case[2],1/6)
+ local list=shown(other,case[1],case[2],1/5)
  local expect=math.max(1,math.min(case[1],case[2],12))
  check(sum(list)==case[1] and #list==expect,'other '..case[1]..' x'..case[2]..' ticks: not split, '..#list..' popups (expected '..expect..'), sum '..sum(list))
 end
-check(#shown(me,0.5,1,1/6)==0 and #shown(me,0,1,1/6)==0 and #shown(me,-3,1,1/6)==0,'less than 1 point: nothing')
-do local list=shown(me,4200.9,1,1/6);check(sum(list)==4200,'a fractional award counts its whole points')end
+check(#shown(me,0.5,1,1/5)==0 and #shown(me,0,1,1/5)==0 and #shown(me,-3,1,1/5)==0,'less than 1 point: nothing')
+do local list=shown(me,4200.9,1,1/5);check(sum(list)==4200,'a fractional award counts its whole points')end
 
--- 6. the stream is even: a popup every 1/12 s -------------------------------------------------------------------------------------------------------------------
+-- 6. the stream is even: a popup every 1/10 s -------------------------------------------------------------------------------------------------------------------
 do
  for i=#amounts,1,-1 do amounts[i]=nil end
  local birth={}
  for f=0,119 do
-  if f%10==0 then C.fire(me,4200,1,1/6)end
+  if f%12==0 then C.fire(me,4200,1,1/5)end
   PW.frames(1,1/60)
   birth[#birth+1]=#amounts
  end
- check(birth[#birth]==24,'two seconds: 24 popups spawned, 12 a second ('..birth[#birth]..')')
+ check(birth[#birth]==20,'two seconds: 20 popups spawned, 10 a second ('..birth[#birth]..')')
  local evenGaps=true
  local prevCount=0
  for f=1,#birth do
   local d=birth[f]-prevCount
-  if d>1 then evenGaps=false end -- never two in one 1/60 s frame (they are 1/12 s apart)
+  if d>1 then evenGaps=false end -- never two in one 1/60 s frame (they are 1/10 s apart)
   prevCount=birth[f]
  end
- check(evenGaps,'never two popups born in the same frame (they are 1/12 s apart)')
+ check(evenGaps,'never two popups born in the same frame (they are 1/10 s apart)')
  settle()
 end
 
 -- 7. z order: the newest is drawn on top ---------------------------------------------------------------------------------------------------------------------------
 do
- C.fire(me,4200,1,1/6);PW.frames(1,0)
+ C.fire(me,4200,1,1/5);PW.frames(1,0)
  local older=PW.visible(PW.fieldOf(pg,head(me)))[1]
  PW.seconds(0.3,1/120)
  local list=PW.visible(PW.fieldOf(pg,head(me)))
@@ -248,7 +248,7 @@ end
 W.Gui.ReducedMotionEnabled=true
 do
  for i=#amounts,1,-1 do amounts[i]=nil end
- C.fire(me,4200,1,1/6);PW.frames(1,0)
+ C.fire(me,4200,1,1/5);PW.frames(1,0)
  local f=PW.fieldOf(pg,head(me));local A=PW.visible(f)[1]
  check(A~=nil and #amounts==1 and amounts[1]==4200,'reduced: one popup per award, with the whole number (no split): '..#amounts)
  local rows={};local x0
@@ -275,11 +275,11 @@ do
  check(first.Alpha==0 and first.Scale==1,'reduced: born clear at full size (no pop)')
  check(near(rows[40].r.Alpha,1,1e-6) and rows[78].v==true and rows[78].r.Alpha<0.5,'reduced: fully opaque from 0.08 s, fading from 0.45 s')
  settle()
- -- caps: own 4 / others 1 at any tier, 6 popups a second
+ -- caps: own 4 / others 1 at any tier, 5 popups a second
  before=#amounts
  local mv=stream(me,4,4)
  check(mv<=4+Style.Field.Spare and mv>=3,'reduced: own cap 4 ('..mv..')')
- check(#amounts-before>=22 and #amounts-before<=26,'reduced: 6 a second, not split ('..(#amounts-before)..')')
+ check(#amounts-before>=18 and #amounts-before<=22,'reduced: 5 a second, not split ('..(#amounts-before)..')')
  settle()
  local ov=stream(other,3,1)
  check(ov<=1+Style.Field.Spare,'reduced: others cap 1 ('..ov..')')
@@ -287,7 +287,7 @@ do
  -- alternate sides
  local sides={}
  for i=1,4 do
-  C.fire(me,100,1,1/6);PW.frames(1,0)
+  C.fire(me,100,1,1/5);PW.frames(1,0)
   local newest;for _,fr in ipairs(PW.visible(PW.fieldOf(pg,head(me))))do if not newest or fr.ZIndex>newest.ZIndex then newest=fr end end
   sides[#sides+1]=PW.read(newest).X;PW.seconds(0.2,1/60)
  end
@@ -299,33 +299,33 @@ W.Gui.ReducedMotionEnabled=false
 -- 9. other players: range, training, hidden when far ----------------------------------------------------------------------------------------------------
 do
  local far=PW.newPlayer('Far',{Pos=V3(0,3,300)})
- C.fire(far,4200,1,1/6);PW.seconds(0.5,1/60)
+ C.fire(far,4200,1,1/5);PW.seconds(0.5,1/60)
  check(PW.fieldOf(pg,head(far))==nil and PW.visibleAll(pg)==0,'another player 330 studs away: nothing is drawn or built')
  local near1=PW.newPlayer('Near',{Pos=V3(0,3,60)})
- C.fire(near1,4200,1,1/6);PW.frames(2,1/60)
+ C.fire(near1,4200,1,1/5);PW.frames(2,1/60)
  local f=PW.fieldOf(pg,head(near1))
  check(f~=nil and #PW.visible(f)==1,'another player in range: one popup per award')
  settle()
  -- cutoff: camera at (0,20,-30); a head 100 studs away or more is not shown
  local edge=PW.newPlayer('Edge',{Pos=V3(0,3,68)}) -- head at (0,4.5,68): 99.2 from the camera
  local edgeDist=(W.workspace.CurrentCamera.CFrame.Position-head(edge).Position).Magnitude
- C.fire(edge,4200,1,1/6);PW.frames(2,1/60)
+ C.fire(edge,4200,1,1/5);PW.frames(2,1/60)
  check(edgeDist<100 and PW.fieldOf(pg,head(edge))~=nil,'a head '..string.format('%.1f',edgeDist)..' studs away is shown')
  settle()
  local past=PW.newPlayer('Past',{Pos=V3(0,3,72)}) -- 103.2
  local pastDist=(W.workspace.CurrentCamera.CFrame.Position-head(past).Position).Magnitude
- C.fire(past,4200,1,1/6);PW.frames(2,1/60)
+ C.fire(past,4200,1,1/5);PW.frames(2,1/60)
  check(pastDist>100 and PW.fieldOf(pg,head(past))==nil,'a head '..string.format('%.1f',pastDist)..' studs away is not')
  -- not on the treadmill (any more): not shown
  near1:SetAttribute('TreadmillTraining',false)
- C.fire(near1,4200,1,1/6);PW.seconds(0.4,1/60)
+ C.fire(near1,4200,1,1/5);PW.seconds(0.4,1/60)
  check(PW.fieldOf(pg,head(near1))==nil,'a player that is not training shows nothing')
  near1:SetAttribute('TreadmillTraining',true)
  -- the camera moves away: an award is dropped; the billboard also hides itself past 100 studs (MaxDistance)
  W.workspace.CurrentCamera.CFrame=R.CFrame.new(0,20,-200)
- C.fire(other,4200,1,1/6);PW.seconds(0.4,1/60)
+ C.fire(other,4200,1,1/5);PW.seconds(0.4,1/60)
  check(PW.fieldOf(pg,head(other))==nil,'the camera is far from the head: dropped at once')
- C.fire(me,4200,1,1/6);PW.seconds(0.4,1/60)
+ C.fire(me,4200,1,1/5);PW.seconds(0.4,1/60)
  check(PW.fieldOf(pg,head(me))==nil,'(the same rule for the local player: nothing is drawn 200 studs away)')
  W.workspace.CurrentCamera.CFrame=R.CFrame.new(0,20,-30)
  settle()
@@ -335,7 +335,7 @@ end
 -- 10. a player leaves or resets -------------------------------------------------------------------------------------------------------------------------------
 do
  local leaver=PW.newPlayer('Leaver',{Pos=V3(6,3,6)})
- for f=0,29 do if f%10==0 then C.fire(leaver,4200,1,1/6)end;PW.frames(1,1/60)end
+ for f=0,29 do if f%12==0 then C.fire(leaver,4200,1,1/5)end;PW.frames(1,1/60)end
  local lf=PW.fieldOf(pg,head(leaver))
  check(lf~=nil and #PW.visible(lf)>=2,'leaver: popups are showing')
  local enabledBefore=PW.enabledFields(pg)
@@ -343,21 +343,21 @@ do
  check(#PW.visible(lf)==0 and lf.Enabled==false and lf.Adornee==nil,'leaver: at the moment of leaving every popup is hidden and the field is parked')
  check(PW.enabledFields(pg)==enabledBefore-1,'leaver: no field of theirs is left on')
  local created=#R.created
- C.fire(leaver,4200,1,1/6);PW.seconds(0.4,1/60)
+ C.fire(leaver,4200,1,1/5);PW.seconds(0.4,1/60)
  check(PW.fieldOf(pg,head(leaver))==nil and #R.created==created,'leaver: a late award for a player who left builds nothing')
  settle()
  -- a reset: the old character is replaced
  local resetter=PW.newPlayer('Resetter',{Pos=V3(-6,3,6)})
  local oldChar=resetter.Character
- for f=0,29 do if f%10==0 then C.fire(resetter,4200,1,1/6)end;PW.frames(1,1/60)end
+ for f=0,29 do if f%12==0 then C.fire(resetter,4200,1,1/5)end;PW.frames(1,1/60)end
  local rf=PW.fieldOf(pg,head(resetter))
  check(rf~=nil and #PW.visible(rf)>=2,'reset: popups are showing before the reset')
  local newChar,newHead=PW.spawnCharacter(resetter,V3(-6,3,6))
  PW.frames(1,1/60)
  check(#PW.visible(rf)==0 and rf.Enabled==false,'reset: the next frame hides the old character\'s popups and parks the field')
- C.fire(resetter,4200,1,1/6,oldChar);PW.seconds(0.4,1/60)
+ C.fire(resetter,4200,1,1/5,oldChar);PW.seconds(0.4,1/60)
  check(PW.visibleAll(pg)==0,'reset: an award earned by the OLD character shows nothing')
- C.fire(resetter,4200,1,1/6,newChar);PW.frames(2,1/60)
+ C.fire(resetter,4200,1,1/5,newChar);PW.frames(2,1/60)
  local nf=PW.fieldOf(pg,newHead)
  check(nf~=nil and #PW.visible(nf)==1 and nf.Adornee==newHead,'reset: the new character\'s award shows on the new head')
  -- the old character is still around for a moment after a reset (Roblox removes it later): its award shows nothing either
@@ -367,9 +367,9 @@ do
   local replacement=R.new('Model');replacement.Parent=W.workspace
   local rh=R.new('Part');rh.Name='Head';rh.Position=V3(4,4.5,4);rh.Parent=replacement
   stale.Character=replacement -- oldModel is intact, with its Head, still in the workspace
-  C.fire(stale,4200,1,1/6,oldModel);PW.seconds(0.4,1/60)
+  C.fire(stale,4200,1,1/5,oldModel);PW.seconds(0.4,1/60)
   check(PW.fieldOf(pg,oldModel:FindFirstChild('Head'))==nil and PW.fieldOf(pg,rh)==nil,'reset: an award earned by the old character (still in the world) shows nothing')
-  C.fire(stale,4200,1,1/6,replacement);PW.frames(2,1/60)
+  C.fire(stale,4200,1,1/5,replacement);PW.frames(2,1/60)
   check(PW.fieldOf(pg,rh)~=nil,'reset: the replacement character\'s award does')
   settle();PW.leave(stale)
  end
@@ -382,7 +382,7 @@ do
  PW.leave(resetter)
  -- training stops in the middle of a burst: the queued shares are dropped, the shown ones finish
  for i=#amounts,1,-1 do amounts[i]=nil end
- C.fire(me,100000,10,1/6) -- 12 shares over a second
+ C.fire(me,100000,10,1/5) -- 12 shares over a second
  PW.seconds(0.2,1/60)
  local sofar=#amounts
  me:SetAttribute('TreadmillTraining',false)
@@ -391,16 +391,16 @@ do
  check(PW.visibleAll(pg)==0 and PW.live(Run.RenderStepped)==0,'stopping: the shown ones finished and the updater is off')
  me:SetAttribute('TreadmillTraining',true)
  -- a burst of 10 ticks: 12 popups over a second, every share counted, the cap respected
- local list=shown(me,100000,10,1/6)
+ local list=shown(me,100000,10,1/5)
  check(#list==12 and sum(list)==100000,'a lag burst of 10 ticks: 12 popups, sum exact')
  -- the player's own character reset
  local c0=me.Character
- C.fire(me,4200,1,1/6);PW.seconds(0.2,1/60)
+ C.fire(me,4200,1,1/5);PW.seconds(0.2,1/60)
  local mf=PW.fieldOf(pg,head(me));check(mf~=nil and #PW.visible(mf)>=1,'own reset: popups are showing')
  local nc,nh=PW.spawnCharacter(me,V3(0,3,0));PW.frames(1,1/60)
  check(PW.visibleAll(pg)==0,'own reset: gone with the old character')
- C.fire(me,4200,1,1/6,c0);PW.seconds(0.3,1/60);check(PW.visibleAll(pg)==0,'own reset: an old-character award shows nothing')
- C.fire(me,4200,1,1/6,nc);PW.frames(2,1/60);check(PW.visibleAll(pg)>=1 and PW.fieldOf(pg,nh)~=nil,'own reset: the new character\'s award shows')
+ C.fire(me,4200,1,1/5,c0);PW.seconds(0.3,1/60);check(PW.visibleAll(pg)==0,'own reset: an old-character award shows nothing')
+ C.fire(me,4200,1,1/5,nc);PW.frames(2,1/60);check(PW.visibleAll(pg)>=1 and PW.fieldOf(pg,nh)~=nil,'own reset: the new character\'s award shows')
  settle()
 end
 
@@ -410,13 +410,13 @@ do
  local part=R.new('Part')
  local bad={{nil,100},{'Me',100},{part,100},{me,'100'},{me,nil},{me,-5},{me,0},{me,0/0},{me,math.huge},{me,1000000001},{me,{}},{me,true},{me,0.9}}
  for _,b in ipairs(bad)do
-  local good,err=pcall(C.fire,b[1],b[2],1,1/6)
+  local good,err=pcall(C.fire,b[1],b[2],1,1/5)
   if not good then ok=false;print('error: '..tostring(err))end
  end
  PW.seconds(0.5,1/60)
  check(ok,'bad arguments raise no error')
  check(PW.visibleAll(pg)==0,'bad arguments show nothing')
- for _,t in ipairs({{1e9,'x',nil},{1e9,0/0,1/6},{1e9,1/0,1/6},{1e9,-5,1/6},{1e9,1,'x'},{1e9,1,0/0},{1e9,1,-1},{1e9,1,1/0},{1e9,{},{}}})do
+ for _,t in ipairs({{1e9,'x',nil},{1e9,0/0,1/5},{1e9,1/0,1/5},{1e9,-5,1/5},{1e9,1,'x'},{1e9,1,0/0},{1e9,1,-1},{1e9,1,1/0},{1e9,{},{}}})do
   for i=#amounts,1,-1 do amounts[i]=nil end
   local good,err=pcall(C.fire,me,1000000000,t[2],t[3])
   PW.seconds(1.6,1/60)
@@ -424,13 +424,13 @@ do
   settle()
  end
  local stranger=R.new('Player');stranger.Name='NoCharacter'
- check(pcall(C.fire,stranger,100,1,1/6) and pcall(C.fire,me,100,1,1/6,'not a model') and pcall(C.fire,me,100,1,1/6,part),'a player without a character, a string or a part as the character: no error')
+ check(pcall(C.fire,stranger,100,1,1/5) and pcall(C.fire,me,100,1,1/5,'not a model') and pcall(C.fire,me,100,1,1/5,part),'a player without a character, a string or a part as the character: no error')
  PW.seconds(0.4,1/60)
  check(PW.visibleAll(pg)==0,'... and nothing shows')
  -- a character without a head
  local headless=PW.newPlayer('Headless',{Pos=V3(3,3,3)})
  headless.Character:FindFirstChild('Head'):Destroy()
- C.fire(headless,4200,1,1/6);PW.seconds(0.4,1/60)
+ C.fire(headless,4200,1,1/5);PW.seconds(0.4,1/60)
  check(PW.visibleAll(pg)==0,'a character without a head shows nothing')
  PW.leave(headless)
  settle()
@@ -438,7 +438,7 @@ end
 
 -- 12. our colours, font and bolt: unchanged -------------------------------------------------------------------------------------------------------------
 do
- C.fire(me,4200,1,1/6);PW.seconds(0.2,1/60)
+ C.fire(me,4200,1,1/5);PW.seconds(0.2,1/60)
  local frames=0;local ok={Bolt=true,Text=true,Stroke=true,Misc=true}
  local function rgb(c,r,g,b)return near(c.R,r/255,1e-9) and near(c.G,g/255,1e-9) and near(c.B,b/255,1e-9)end
  for _,field in ipairs(PW.fields(pg))do for _,fr in ipairs(PW.frameList(field))do
@@ -494,7 +494,7 @@ end
 do
  -- warm up: the pools are built (own + other, full caps)
  PW.Tier=3
- for f=0,299 do if f%10==0 then C.fire(me,4200,1,1/6);C.fire(other,4200,1,1/6)end;PW.frames(1,1/60)end
+ for f=0,299 do if f%12==0 then C.fire(me,4200,1,1/5);C.fire(other,4200,1,1/5)end;PW.frames(1,1/60)end
  settle()
  local created1,destroyed1,tweens1,scheduled1=#R.created,PW.destroyed,PW.tweens,PW.scheduled
  collectgarbage();collectgarbage()
@@ -502,9 +502,9 @@ do
  local seenFrames={};local maxOwn,maxOther,maxRender=0,0,0
  local N=10000
  for award=1,N do
-  C.fire(me,4200,1,1/6);C.fire(other,4200,1,1/6)
+  C.fire(me,4200,1,1/5);C.fire(other,4200,1,1/5)
   for i=#amounts,1,-1 do amounts[i]=nil end -- (the test's own record)
-  for f=1,10 do
+  for f=1,12 do
    PW.frames(1,1/60)
    maxRender=math.max(maxRender,PW.live(Run.RenderStepped))
   end
@@ -530,7 +530,7 @@ do
  check(#PW.fields(pg)<=Style.Field.FreeFields+1,'fields kept: '..#PW.fields(pg)..' (<= '..(Style.Field.FreeFields)..' idle ones)')
  -- start / stop 200 times: still no churn
  local c2,d2=#R.created,PW.destroyed
- for i=1,200 do C.fire(me,4200,1,1/6);PW.seconds(0.9,1/30)end
+ for i=1,200 do C.fire(me,4200,1,1/5);PW.seconds(0.9,1/30)end
  check(#R.created==c2 and PW.destroyed==d2,'200 runs started and stopped: no Instance built or destroyed')
  check(PW.live(Run.RenderStepped)==0,'... and the updater is off again')
 end

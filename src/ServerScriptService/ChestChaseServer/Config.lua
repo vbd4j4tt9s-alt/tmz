@@ -109,7 +109,10 @@ Config.TreadmillTiers = {
  {Biome="Storm",Stage=7,Name="Thunder Runner",Cost=140000,Multiplier=10},
 }
 
-Config.TrainingInterval = 1 / 6
+-- R151 (owner: "adjust the steps per second on top of the treadmill to multples of 5"): one training step every 1/5 s (was 1/6). The points
+-- per second are unchanged (TrainingPointsPerSecond x the machine multiplier); each step is now 100 x 1/5 = 20 x the multiplier, a whole
+-- multiple of 5 at every level (+20, +80, +400, +2K, +12K, +80K, +600K): what the treadmill's "+N/step" label shows is the real award.
+Config.TrainingInterval = 1 / 5
 Config.TrainingPointsPerSecond = 50
 Config.TreadmillAnimationSpeed = 2.5
 Config.TreadmillRunAnimationR15 = "rbxassetid://507767714"

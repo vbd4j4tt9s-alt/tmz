@@ -60,8 +60,8 @@ end
 -- upgrade sign and the popups always match.
 function L.Format(n)return Style.FormatGain(n)end
 -- One training step = one server tick (Config.TrainingInterval) of this machine on its own: points per second x interval x the machine multiplier
--- (the same for everyone: no trail, pass or friends). R151: BalanceValues81.MachineMultipliers make it a round multiple of 5 at every level, and
--- the server awards exactly that (Config.GetTrainingAward pays whole fives). nil when a number is missing.
+-- (the same for everyone: no trail, pass or friends). R151: with the 1/5 s step it is 20 x the multiplier, a round multiple of 5 at every level,
+-- and the server awards exactly that (Config.GetTrainingAward pays whole fives). nil when a number is missing.
 function L.StepGain(pointsPerSecond,interval,multiplier)
  local a,b,c=tonumber(pointsPerSecond),tonumber(interval),tonumber(multiplier)
  if not(a and b and c)or a~=a or b~=b or c~=c then return nil end

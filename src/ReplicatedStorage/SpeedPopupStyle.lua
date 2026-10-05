@@ -45,8 +45,9 @@ S.Reduced = {FadeIn = 0.08, Rise = 72, RiseTime = 0.70, FadeStart = 0.45, FadeLe
 S.Caps = {[3] = {Own = 8, Others = 3}, [2] = {Own = 6, Others = 2}, [1] = {Own = 4, Others = 1}}
 S.ReducedCaps = {Own = 4, Others = 1}
 S.MaxDistance = 100
--- Cadence: the video spawns one popup every 0.10 s, the server awards one tick every 1/6 s (Config.TrainingInterval). SplitTo = how many popups ONE tick of
--- the local player's own award is shown as (equal shares, the sum kept exactly, never below 1 point each): 2 = 12 a second like the clip's 10. Other players'
+-- Cadence: the video spawns one popup every 0.10 s, the server awards one tick every 1/5 s (Config.TrainingInterval; 1/6 s before the R151 treadmill
+-- polish). SplitTo = how many popups ONE tick of the local player's own award is shown as (equal shares, the sum kept exactly, never below 1 point each):
+-- 2 = 10 a second, exactly the clip's 10 (12 a second at the old 1/6 s tick). Other players'
 -- popups and Reduced Motion are never split (their caps are lower; fewer popups is calmer). nil or 1 = off. MaxShares bounds one award event
 -- (a lag burst of up to 10 ticks).
 S.Cadence = {SplitTo = 2, MaxShares = 12, MaxTicks = 10, MinInterval = 0.1, MaxInterval = 1, MaxPending = 36}
@@ -192,7 +193,7 @@ end
 -- Seconds between the popups of one award event: one tick's interval (clamped 0.1 .. 1 s) shared by `split` popups, and the whole burst within one second.
 function S.Spacing(interval, split, shares)
 	local c = S.Cadence
-	interval = clamp(num(interval, 1 / 6), c.MinInterval, c.MaxInterval)
+	interval = clamp(num(interval, 1 / 5), c.MinInterval, c.MaxInterval) -- (a missing interval: Config.TrainingInterval's 1/5 s)
 	return math.min(interval / math.max(1, num(split, 1)), 1 / math.max(1, num(shares, 1)))
 end
 

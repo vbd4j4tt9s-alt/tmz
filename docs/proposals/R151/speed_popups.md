@@ -3,6 +3,8 @@
 > **Implemented** (owner: "proposed + split"). The proposal below was built as written, with these decisions:
 > - `src/ReplicatedStorage/SpeedPopupStyle.lua` (new, in `src/MANIFEST.tsv`): every tunable number and the pure curves. `Cadence.SplitTo = 2` is the number of
 >   popups one server tick is shown as for the local player (equal shares, the sum exact, each at least 1 point): 12 a second at the 1/6 s tick.
+>   **R151 treadmill polish:** the server's training step is now 1/5 s (`Config.TrainingInterval`; the points per second are unchanged), so it is **10 a second**,
+>   exactly the clip's measured 10, about 6.5 alive at once (cap 8); other players' and Reduced Motion popups are 5 a second. The motion is unchanged.
 > - `src/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua`: the popup half is rewritten (the V134 belt arrows half is byte for byte unchanged).
 >   Per player that has popups one pooled fixed-pixel `BillboardGui` (adorned to the head, `MaxDistance` 100) holds `cap + 2` pooled popup frames, built whole at first use;
 >   ONE `RenderStepped` updater for everybody, connected only while a popup is alive or queued; no `TweenService`, no `task.delay`, no Instance made or destroyed once the pool exists.

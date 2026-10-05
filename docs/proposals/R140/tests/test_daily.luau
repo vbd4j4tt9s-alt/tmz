@@ -323,7 +323,9 @@ do
  check(train(60,0/0)==g0 and train(60,.2)==g0 and train(60,-3)==g0 and train(60,math.huge)==g3 and train(60,'x')==g0,'a bad / below-1 attribute gives no boost')
  -- The remainder is exact: one tick at a time and a different step size give the same total, and fractions carry over.
  check(train(60,1.1,1/60)==g1,'splitting the time into smaller steps never changes the total (+10%)')
- check(train(.5,1.3)==expect(1.3,.5)and train(1,1.3)==expect(1.3,1),'short sessions keep the fraction (0.5 s and 1 s at +30%)')
+ -- (R151: whole training steps, whatever Config.TrainingInterval is: 0.5 s was 3 steps of 1/6 s; with 1/5 s it is 0.6 s = 3 steps)
+ do local dt=Config.TrainingInterval;local half,one=math.floor(.5/dt+.5)*dt,math.floor(1/dt+.5)*dt
+  check(train(half,1.3)==expect(1.3,half)and train(one,1.3)==expect(1.3,one),'short sessions keep the fraction (about 0.5 s and 1 s at +30%)')end
  do
   stand.TrainingSessions[A]=session();stand.TrainingTime[A]=0;stand.TrainingGainRemainder[A]=0;A:SetAttribute('FriendSpeedBoost',1.3);Data:GetOrCreateSpeedValue(A).Value=stat;fired={}
   local bad=0
@@ -331,7 +333,7 @@ do
    local paid=tonumber(Data:GetOrCreateSpeedValue(A).Value)-tonumber(stat);if paid~=expect(1.3,i*Config.TrainingInterval)then bad+=1 end end
   check(bad==0 and #fired>0,'tick by tick (36 ticks at +30%) the running total is always the whole 5s of the exact amount; the remainder carries over ('..bad..' off)')
   local popupSum=0;for _,f in ipairs(fired)do popupSum+=f[2]end
-  check(popupSum==expect(1.3,6),'the gain popups add up to what was paid ('..popupSum..')')
+  check(popupSum==expect(1.3,36*Config.TrainingInterval),'the gain popups add up to what was paid ('..popupSum..')')
   stand.TrainingSessions[A]=nil
  end
  -- The HUD number and the popups.

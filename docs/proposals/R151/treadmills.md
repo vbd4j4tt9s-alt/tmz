@@ -14,43 +14,51 @@
 ## As built
 
 ### The "+N/step" numbers: round, and real
-Each level's own gain per training step is now a round multiple of 5:
-- **Rule:** round to the nearest round value, but round **up** wherever the nearest would lose more than about 3%.
-- **Same for everyone:** the label shows 100 points/s × 1/6 s × the machine's multiplier.
-- **Real:** the server pays exactly that number every step (whole fives, as before). The label is the real award, not a rounded display.
+Every level's gain per training step is now a round multiple of 5. **The economy is unchanged.**
 
-| Level | Biome | Per step before | Per step now | Change | Machine multiplier before → now |
+**How:**
+- The training step is now **1/5 s** instead of 1/6 s (`Config.TrainingInterval`).
+- Points per second stay exactly the same: 100/s × the machine multiplier.
+- The machine multipliers are untouched: 1, 4, 20, 100, 600, 4,000, 30,000. So the HUD chips (×1, ×4, ×2 with the pass …) read as before.
+- Each step is now 100 × 1/5 = **20 × the multiplier**.
+- The server pays exactly that every step (whole fives, as before). The label is the real award, not a rounded display.
+
+| Level | Biome | Per step before (1/6 s) | Per step now (1/5 s) | Steps per second | Speed per second (unchanged) |
 |---|---|---|---|---|---|
-| 1 | Forest | +16.7 (shown +17) | **+20** | +20% (up: +15 would lose 10%) | 1 → 1.2 |
-| 2 | Jungle | +66.7 (+67) | **+65** | −2.5% | 4 → 3.9 |
-| 3 | Desert | +333.3 (+333) | **+335** | +0.5% | 20 → 20.1 |
-| 4 | Snow | +1,666.7 (+1.7K) | **+2K** | +20% (up: +1.5K would lose 10%) | 100 → 120 |
-| 5 | Lava | +10K | **+10K** | 0 | 600 → 600 |
-| 6 | Crystal | +66.7K | **+65K** | −2.5% | 4,000 → 3,900 |
-| 7 | Storm | +500K | **+500K** | 0 | 30,000 → 30,000 |
+| 1 | Forest | +16.7 (paid as +15, +15, +20 …) | **+20** | 6 → 5 | 100 |
+| 2 | Jungle | +66.7 (paid as +65, +65, +70 …) | **+80** | 6 → 5 | 400 |
+| 3 | Desert | +333.3 (paid as +330, +335, +335 …) | **+400** | 6 → 5 | 2,000 |
+| 4 | Snow | +1,666.7 (shown +1.7K) | **+2K** | 6 → 5 | 10,000 |
+| 5 | Lava | +10K | **+12K** | 6 → 5 | 60,000 |
+| 6 | Crystal | +66.7K | **+80K** | 6 → 5 | 400,000 |
+| 7 | Storm | +500K | **+600K** | 6 → 5 | 3,000,000 |
 
-**Where this lives:** `BalanceValues81.MachineMultipliers`, the one table every machine multiplier comes from.
+**What reads the step (`Config.TrainingInterval`), checked:**
+- **`BaseService` training:**
+  - it counts whole steps from real time and pays `Config.GetTrainingAward` per step;
+  - the points per second are unchanged;
+  - the 600-step and 60-second tests show it.
+- **The speed popups:**
+  - the remote sends the step length, and the client shows each of your steps as 2 halves;
+  - that is now **10 popups a second**, exactly the reference clip's 10 (12 before);
+  - about 6.5 are on screen at once, under the cap of 8;
+  - other players' popups and Reduced Motion are 5 a second;
+  - the motion is unchanged;
+  - `SpeedPopupStyle` changed only its default step (1/5 s) and a comment.
+- **The treadmill label and the upgrade sign** show 100 × the step × the multiplier.
 
-**What else reads these multipliers, checked:**
-- the server's training gain, through `BaseService` and `BalanceRules.Training`;
-- the HUD's speed-boost chip (`WorldStatusHud`, "×1.2" etc.):
-  - at level 1 it now shows **×1.2**;
-  - before, a level-1 player with no trail saw no chip, because ×1 is hidden;
-- the treadmill snapshot.
+**Time-based, so unchanged:**
+- the "Train" tutorial step (3 seconds on the belt);
+- the bonus-roll gift timer (`TreadmillBonusService` counts seconds);
+- the run animation rate;
+- the belt and chevron motion (`TreadmillFx`, `SpeedGainPopup`'s belt half);
+- the HUD's `PointsPerSecond` (100 × the boosts);
+- the owner's `treadmill` status command (per second).
 
-**What does not read them:**
-- the upgrade costs (`MachineCosts`);
-- the bonus-roll timer and pool (`TreadmillBonusRules`);
-- the R150 bonus UI copy;
-- the keeper speeds.
-
-All of these are unchanged.
-
-**Tests:**
-- Every suite that touches them was re-run green (list below).
-- The new suite checks:
-  - each level's award over 600 steps;
-  - the rounding rule.
+**Nothing else reads it:**
+- daily quests (Steal / Open / Plant / Pick / Sell) do not count training steps;
+- there is no step or click sound;
+- offline and garden code do not train.
 
 ### Numbers of 1,000 or more read as K / M / B / T
 `SpeedPopupStyle.FormatGain`, the speed-popup text, now picks its unit **after** rounding:
@@ -89,7 +97,7 @@ Say if you want any of these changed too.
   - hides your own label while you train on your machine.
 - **`GardenUpgradeService`** adds the studded sign beside the Treadmill floor button and a neon rim round that button. The button, its prompt and its click detector are unchanged.
 - **`BaseService`** passes the machine level to the builder: one line.
-- **`BalanceValues81`**: the multipliers in the table above.
+- **`Config.TrainingInterval`**: 1/6 → 1/5 s (the table above). The machine multipliers (`BalanceValues81`) are unchanged.
 - **`SpeedPopupStyle.FormatGain`**: the unit boundaries above.
 - **`src/MANIFEST.tsv`**: the two new modules.
 
@@ -111,12 +119,12 @@ Say if you want any of these changed too.
 | Level | Grade | Parts before → now | New / retired | Real lights (cap) | New emitters / beams | Belt layers | Label |
 |---|---|---|---|---|---|---|---|
 | 1 Forest | low | 127 → 166 | +39 / −0 | 2 → 3 (3) | 2 / 0 | 1 | +20/step |
-| 2 Jungle | low | 186 → 226 | +40 / −0 | 2 → 3 (3) | 2 / 0 | 1 | +65/step |
-| 3 Desert | mid | 202 → 223 | +43 / −22 | 1 → 3 (5) | 2 / 2 | 2 | +335/step |
+| 2 Jungle | low | 186 → 226 | +40 / −0 | 2 → 3 (3) | 2 / 0 | 1 | +80/step |
+| 3 Desert | mid | 202 → 223 | +43 / −22 | 1 → 3 (5) | 2 / 2 | 2 | +400/step |
 | 4 Snow | mid | 212 → 240 | +36 / −8 | 1 → 3 (5) | 2 / 2 | 2 | +2K/step |
-| 5 Lava | mid | 217 → 232 | +35 / −20 | 4 → 4 (5) | 0 / 2 | 2 | +10K/step |
-| 6 Crystal | top | 223 → 250 | +43 / −16 | 4 → 6 (6) | 2 / 2 | 3 | +65K/step |
-| 7 Storm | top | 240 → 256 | +34 / −18 | 5 → 5 (6) | 0 / 2 | 3 | +500K/step |
+| 5 Lava | mid | 217 → 232 | +35 / −20 | 4 → 4 (5) | 0 / 2 | 2 | +12K/step |
+| 6 Crystal | top | 223 → 250 | +43 / −16 | 4 → 6 (6) | 2 / 2 | 3 | +80K/step |
+| 7 Storm | top | 240 → 256 | +34 / −18 | 5 → 5 (6) | 0 / 2 | 3 | +600K/step |
 
 **Budget limits and other costs:**
 - **Budgets:** new parts at most 44 (low) and 50 (mid / top). The whole machine stays at 260 parts or fewer (the R117 limit).
@@ -138,12 +146,12 @@ Say if you want any of these changed too.
    - The corner lamps' particles and lights are off far away, in FastMode and on low graphics.
    - In The Darkened and under Cloudy skies the entry glow lights the apron.
 7. **Upgrades.** Buy an upgrade: the machine, its label and the sign change level together.
-8. **HUD.** A new player at level 1 sees the speed chip **×1.2**. Before, ×1 was hidden.
+8. **Popups.** While you train, about 10 popups a second (each step shown as two halves), the same feel as the reference clip.
 
 ### Tests
 `sh docs/proposals/R151/tests/run_treadmills.sh [scratch] [place.rbxl] [all | mutate]` runs:
 - static checks;
-- `test_treadmills151.luau`: 241 checks on the real code;
+- `test_treadmills151.luau`: 243 checks on the real code;
 - the belt images: the game's patterns equal the PNGs byte for byte;
 - the owner's place: every level before vs after, 63 checks, including z-fighting and clearance;
 - the R117 treadmill suite, unchanged: 532 checks.

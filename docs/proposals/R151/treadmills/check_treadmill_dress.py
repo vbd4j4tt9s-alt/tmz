@@ -3,7 +3,7 @@ after = this checkout, with the R151 dressing in BiomeVisuals and the sign in Ga
   * the training belt (size, CFrame, CanCollide) is identical before and after; no part of the treadmill art or of the sign collides or
     answers raycasts (CanCollide / CanQuery false: the step detection only ever sees the belt);
   * new parts within the per-grade budget (TreadmillLook151.Grades), real lights of the whole machine within the per-grade cap;
-  * the "+N/step" label = the round per-step gain of the level (100 points/s x 1/6 s x BalanceValues81.MachineMultipliers), popup format;
+  * the "+N/step" label = the per-step gain of the level (100 points/s x Config.TrainingInterval 1/5 s x the machine multiplier), popup format;
   * z-fighting: the R149 detector (docs/proposals/R149/tools/zfight.py, same rules as run_zfight.sh) on the whole base, before vs after:
     no counted finding involves a new part (TreadmillDress151, the sign / button rim parts), and no counted finding is new.
 Usage: python3 check_treadmill_dress.py <scenes dir with before.txt / after.txt> <repo>   (exit 1 on any failure)"""
@@ -13,7 +13,7 @@ scenes, repo = sys.argv[1], sys.argv[2]
 sys.path.insert(0, os.path.join(repo, 'docs', 'proposals', 'R149', 'tools'))
 import zfight as Z  # noqa: E402
 
-LABELS = ['+20/step', '+65/step', '+335/step', '+2K/step', '+10K/step', '+65K/step', '+500K/step']  # R151: round per-step gains (BalanceValues81)
+LABELS = ['+20/step', '+80/step', '+400/step', '+2K/step', '+12K/step', '+80K/step', '+600K/step']  # R151: 100 points/s x 1/5 s x the multiplier
 GRADE = ['low', 'low', 'mid', 'mid', 'mid', 'top', 'top']
 BUDGET = {'low': 44, 'mid': 50, 'top': 50}  # TreadmillLook151.Grades
 CAP = {'low': 3, 'mid': 5, 'top': 6}

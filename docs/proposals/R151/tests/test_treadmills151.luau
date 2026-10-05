@@ -44,36 +44,32 @@ end
 local function parts(root)local out={};for _,d in ipairs(root:GetDescendants())do if d:IsA('BasePart')then out[#out+1]=d end end;return out end
 local function count(root,f)local n=0;for _,d in ipairs(root:GetDescendants())do if f(d)then n+=1 end end;return n end
 local LIGHT={PointLight=true,SpotLight=true,SurfaceLight=true}
-local EXPECT={'+20/step','+65/step','+335/step','+2K/step','+10K/step','+65K/step','+500K/step'}
-local OLD_MULT={1,4,20,100,600,4000,30000} -- BalanceValues81.MachineMultipliers before R151
+local EXPECT={'+20/step','+80/step','+400/step','+2K/step','+12K/step','+80K/step','+600K/step'}
+local OLD_MULT={1,4,20,100,600,4000,30000} -- BalanceValues81.MachineMultipliers (unchanged by R151)
 
--- 1. The "+N/step" numbers: round multiples of 5, the real award, the rounding rule, one formatter ---------------------------------------------
+-- 1. The "+N/step" numbers: round multiples of 5 and the real award, by a 1/5 s step; the economy (points per second, multipliers) unchanged --------
 do
- local function allowed(v) -- "round": below 1,000 a multiple of 5; in K / M: 1, 1.5, 2 ... under 10 of the unit, a multiple of 5 from 10 up
-  if v<1000 then return v%5==0 end
-  local u=v>=1e6 and 1e6 or 1e3;local m=v/u
-  if m<10 then return near(m*2,math.floor(m*2+.5),1e-9)end
-  return near(m%5,0,1e-9)
- end
+ check('the training step is 1/5 s (Config.TrainingInterval)',near(Config.TrainingInterval,.2,1e-12))
+ local mult=true;for level=1,7 do if Config.TreadmillTiers[level].Multiplier~=OLD_MULT[level]then mult=false end end
+ check('the machine multipliers are exactly as before R151 ({1,4,20,100,600,4000,30000}: the HUD chips and the economy unchanged)',mult)
  local rows={}
  for level=1,7 do
   local tier=Config.TreadmillTiers[level]
   local gain=Look.StepGain(Config.TrainingPointsPerSecond,Config.TrainingInterval,tier.Multiplier)
   local old=100/6*OLD_MULT[level]
-  -- nearest round value; UP when the nearest would lose more than ~3 %
-  local below,above=nil,nil
-  for v=5,2e6,5 do if allowed(v)then if v<=old+1e-9 then below=v elseif not above then above=v;break end end end
-  local pick=below and above and((old-below<=above-old)and below or above)or above
-  if pick<old*.97 then pick=above end
   check(('level %d: the per-step gain is a whole multiple of 5 (%s)'):format(level,tostring(gain)),near(gain,math.floor(gain+.5),1e-6)and math.floor(gain+.5)%5==0)
-  check(('level %d: %.4g -> %s is the nearest round value, never more than 3%% down (%s)'):format(level,old,Look.Format(pick),Look.Format(gain)),near(gain,pick,1e-6))
   check(('level %d: label %s'):format(level,EXPECT[level]),Look.LabelText(gain)==EXPECT[level],Look.LabelText(gain))
   -- the server pays exactly that (Config.GetTrainingAward pays whole fives and carries the rest): 1 tick, and 600 ticks in a row
   local award,rest=Config.GetTrainingAward(0,tier.Multiplier,1)
   local sum,carry=0,0;for _=1,600 do local a;a,carry=Config.GetTrainingAward(carry,tier.Multiplier,1);sum+=a end
   check(('level %d: one training step awards exactly %d (rest %.2g), 600 steps award 600 x it (%d)'):format(level,award,rest,sum),
    near(award,gain,1e-6)and rest<1e-6 and near(sum,600*gain,1e-6))
-  rows[#rows+1]=('L%d %s -> %s (%+.1f%%) machine x%s'):format(level,Look.Format(old),Look.Format(gain),(gain/old-1)*100,tostring(tier.Multiplier))
+  -- points per second are what they were: 100 x the multiplier, through the real BaseService tick counter over 60 s of 60 fps frames
+  local Bases=server('BaseService');local fake={TrainingTime={},TrainingGainRemainder={},Config=Config};local pl={}
+  local total,steps=0,0;for _=1,3600 do local g,t=Bases._collectTreadmillGain(fake,pl,1/60,tier.Multiplier);total+=g;steps+=t end
+  check(('level %d: 60 s of training pay %s = 100/s x %d x 60 (as before R151), in %d steps of %s'):format(level,Look.Format(total),OLD_MULT[level],steps,Look.Format(gain)),
+   near(total,100*OLD_MULT[level]*60,1e-6)and steps==300)
+  rows[#rows+1]=('L%d %s -> %s per step, %s/s'):format(level,Look.Format(old),Look.Format(gain),Look.Format(gain*5))
  end
  print('GAINS '..table.concat(rows,' | '))
  local same=true

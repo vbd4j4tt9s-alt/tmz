@@ -3,7 +3,7 @@
 # R151 treadmill polish (owner: "works we can implement the treadmill polishes"; "adjust the steps per second on top of the treadmill to multples of 5";
 # "for numnbers obvere 1000 it willl be read as 1k"), on the Roblox mock (/opt/luau/luau, tools/tests/roblox.luau via the R149 zfight_world):
 #  static              - the new / changed scripts compile; TreadmillLook151 and TreadmillBeltArt151 are in src/MANIFEST.tsv (sorted); the speed popup code is
-#                        untouched (SpeedGainPopup.client.lua as at 19d05d4, SpeedPopupStyle changed only inside FormatGain); no model names in the new files.
+#                        untouched (SpeedGainPopup.client.lua as at 19d05d4; SpeedPopupStyle: only FormatGain, the default 1/5 s step and comments); no model names.
 #  test_treadmills151  - the REAL BiomeVisuals / TreadmillFx / TreadmillBeltArt151 / GardenUpgradeService / Config: every skin x level builds; every part of the
 #                        machine keeps its size, place, colour and material (only the per-part flow pieces are retired, the chevrons stay); the training belt
 #                        (running surface + step detection), the prompt and badge unchanged; nothing in the art or the sign collides, answers raycasts or
@@ -20,7 +20,7 @@
 #  R117 treadmills     - the R117 tier suite, unchanged (it bundles BiomeVisuals without ReplicatedStorage: the machine undressed, exactly as before).
 # "all" also runs the suites that must stay green: R150 run_all.sh (bonus UI + R123 treadmill bonus + R128 / R129 / R137 / R138), R150 run_sfx.sh and
 # run_pedestal.sh, R151 run_base_area.sh, run_speed_popups.sh and run_cloudy.sh, R149 run_zfight.sh. "mutate" runs mutation_treadmills.py: 12
-# deliberate breakages of a copy of src/ (scroll speed, label hide, a solid part, kept flow pieces, a multiplier, the formatter, the light cap, an image,
+# deliberate breakages of a copy of src/ (scroll speed, label hide, a solid part, kept flow pieces, the step length, the formatter, the light cap, an image,
 # the grid fallback, the sign colour, scrolling far away, the belt collider), each of which must make the suite fail.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -40,17 +40,22 @@ tail -n +2 "$S/MANIFEST.tsv" | cut -f2 > "$OUT/manifest_paths.txt";LC_ALL=C sort
 if git -C "$REPO" rev-parse -q --verify $BASE >/dev/null 2>&1;then
  git -C "$REPO" diff --quiet $BASE -- "$S/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua" "$S/StarterPlayer/StarterPlayerScripts/TreadmillAnimation.client.lua" || fail "the popup script / treadmill animation changed"
  git -C "$REPO" show $BASE:src/ReplicatedStorage/SpeedPopupStyle.lua > "$OUT/style_base.lua"
- python3 - "$OUT/style_base.lua" "$S/ReplicatedStorage/SpeedPopupStyle.lua" <<'EOF' || fail "SpeedPopupStyle changed outside FormatGain"
+ python3 - "$OUT/style_base.lua" "$S/ReplicatedStorage/SpeedPopupStyle.lua" <<'EOF' || fail "SpeedPopupStyle changed outside FormatGain and the 1/5 s step"
 import re, sys
 def strip(path):
     s = open(path, encoding='utf-8').read()
     a = s.index('function S.FormatGain(amount)'); b = s.index('\nend\n', a) + 5
-    head = s[:a].rstrip('\n').split('\n')
-    while head and head[-1].startswith('--'): head.pop()   # the comment above FormatGain may change too
-    return '\n'.join(head) + s[b:]
+    s = s[:a] + s[b:]                                             # FormatGain itself (the owner's K / M request)
+    s = s.replace('num(interval, 1 / 6)', 'num(interval, STEP)').replace('num(interval, 1 / 5)', 'num(interval, STEP)')   # the default step: 1/6 -> 1/5 s
+    out = []
+    for line in s.split('\n'):
+        line = re.sub(r'\s*--.*$', '', line)                      # comments may change (the cadence note: 10 a second at the 1/5 s step)
+        if line.strip():
+            out.append(line)
+    return '\n'.join(out)
 sys.exit(0 if strip(sys.argv[1]) == strip(sys.argv[2]) else 1)
 EOF
- echo "ok: SpeedGainPopup.client.lua and TreadmillAnimation.client.lua as at $BASE; SpeedPopupStyle changed only inside FormatGain"
+ echo "ok: SpeedGainPopup.client.lua and TreadmillAnimation.client.lua as at $BASE; SpeedPopupStyle changed only in FormatGain, the default step (1/5 s) and comments"
 fi
 if grep -niE "claude|opus|sonnet|haiku|anthropic|gpt" $NEW "$HERE/test_treadmills151.luau" "$HERE/check_belt_images.py" "$HERE/mutation_treadmills.py" "$P/R151/treadmills.md" "$P/R151/treadmills/"*.luau "$P/R151/treadmills/"*.py "$P/R151/treadmills/"*.mjs "$P/R151/treadmills/"*.html;then fail "a model name in the treadmill files";fi
 echo "ok: everything compiles, the two modules are in src/MANIFEST.tsv (sorted), no model names"
