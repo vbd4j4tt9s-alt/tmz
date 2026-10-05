@@ -1,16 +1,16 @@
 --!nocheck
--- R151 (owner: "... shapes for visual representation ... can just use the default pack shape", with the R151 shape variations in the game): the DEFAULT-pouch plumbing of the pack pictures on the Roblox mock with
--- the REAL ItemPictures, SeedPackVisuals, SeedPackRenderer, VerityPackArt, VerityPouch151 and PackShapes151, the REAL pack templates of the owner's place (42 designs, pack_templates.luau)
--- and the EditableMesh mock (pouch_mock.luau), with the shape variations ON (auto: every design has its own). A picture whose proxy carries the attribute DefaultPackShape (nothing in the
--- game sets it yet: a picture that must show the plain pouch, e.g. a catalogue or a shop, sets it) is the plain pouch; every other picture keeps its shape.
+-- R151 (owner: "R151 adds random chip-bag shape variations per pack ... shapes for visual representation can just use the default pack shape"): the DEFAULT-pouch plumbing of the pack pictures
+-- on the Roblox mock with the REAL ItemPictures, SeedPackVisuals, SeedPackRenderer, VerityPackArt, VerityPouch151 and PackShapes151, the REAL pack templates of the owner's place (42 designs,
+-- pack_templates.luau) and the EditableMesh mock (pouch_mock.luau), with the shape variations ON (auto: every new pack rolls one). A picture whose proxy carries the attribute DefaultPackShape (the
+-- catalogue, shop and reward pictures set it) is the default pouch WHATEVER a pack rolled; a pack that rolled a shape (PackShape) is drawn in it everywhere else.
 --  1. the 42 designs  a picture asked for with a DefaultPackShape proxy is built from the design's OWN mesh: every MeshPart has the template's MeshId and Size and is not a baked mesh, no
---                     variation was requested (PackShapes151 stays Idle for every design), no EditableMesh was created; the same design asked for as a hotbar / Bag picture IS reshaped (the control)
+--                     variation was requested (PackShapes151 asked for nothing), no EditableMesh was created; the same design asked for as a hotbar / Bag picture of a pack that rolled a shape IS reshaped (the control)
 --  2. modes           the owner's /test packshape (off, auto, forced 1..6) changes nothing in such a picture; it changes the other pictures
 --  3. the other packs the Void and the Mech pack share their one look with the hotbar (no second template)
---  4. Verity          the server's pouch carries Storm_02's variation; the client bakes its own plain copy for a flagged picture (once, waits like any picture, the EditableMesh destroyed, every vertex
---                     colour white, no vertex moved); with the variations off the server's pouch is already plain (no client bake); a denied bake falls back to the server's pouch; the world's pack
---                     and the hotbar's picture keep the shaped one
---  5. the build path  SeedPackVisuals.Bag(..., defaultShape) marks the bag; SeedPackRenderer never asks PackShapes151 for a marked bag; nothing else about a pack changes
+--  4. Verity          the server's neutral pouch is the default shape, so the flagged picture is the server's mesh at once (no client bake); a hotbar picture of a Verity pack that rolled a shape is its own neutral pair;
+--                     the safety net: a server whose pouch carries a variation (the folder's PackShape) makes the client bake its own plain copy (once, waits like any picture, the EditableMesh destroyed, every
+--                     vertex colour white, no vertex moved); a denied bake falls back to the server's pouch; the world's pack and the hotbar's picture keep the shaped one
+--  5. the build path  SeedPackVisuals.Bag(..., defaultShape, shape) marks the bag and drops the shape; SeedPackRenderer never asks PackShapes151 for a marked bag; nothing else about a pack changes
 local H=require('./pack_world');local W,R,F=H.W,H.R,H.F;local V3,CF=R.Vector3.new,R.CFrame.new
 local Mock=require('./pouch_mock')(W)
 local fails,checks=0,0
@@ -39,12 +39,14 @@ end
 local function view(h)return h:FindFirstChild('ItemViewport')end
 local function meshes(v)local out={};for _,d in ipairs(v:GetDescendants())do if d:IsA('MeshPart')then out[#out+1]=d end end;table.sort(out,function(a,b)return a.Name<b.Name end);return out end
 local function frames(n)for _=1,n do W.frames(1)end end
-local function proxyOf(stage,variant,plain)
+-- a tool / proxy of a pack: `plain` = flagged DefaultPackShape, `shape` = the pack's own roll (PackShape)
+local function proxyOf(stage,variant,plain,shape)
  local f=R.new('Folder');f:SetAttribute('SeedPackTool',true);f:SetAttribute('Stage',stage);f:SetAttribute('BagVariant',variant);f:SetAttribute('PackMutation','None')
  if plain then f:SetAttribute('DefaultPackShape',true)end
+ if shape then f:SetAttribute('PackShape',shape)end
  return f
 end
--- a picture that must show the default pouch: the ordinary proxy, flagged DefaultPackShape
+-- a picture that must show the default pouch: the ordinary proxy, flagged DefaultPackShape (the catalogue, shop and reward pictures)
 local function indexProxy(stage,variant)return proxyOf(stage,variant,true)end
 -- how many vertices a baked mesh has moved from where the template put them (0 = the plain pouch, > 0 = a shape variation was applied)
 local function moved(mesh)if not mesh then return -1 end;local n=0;for i,p in ipairs(mesh._pos)do if(p-mesh._init[i]).Magnitude>1e-9 then n+=1 end end;return n end
@@ -58,7 +60,7 @@ do
  local byKey={}
  for _,d in ipairs(DESIGNS)do local h=holder();byKey[d.Key]=h;Pic.Show(h,indexProxy(d.Stage,d.Variant),2)end
  frames(400)
- local drawn,own,baked,requested=0,0,0,0
+ local drawn,own,baked=0,0,0
  for _,d in ipairs(DESIGNS)do
   local v=view(byKey[d.Key])
   if v then
@@ -71,21 +73,19 @@ do
    end
    if same then own+=1 end
   end
-  if Shapes.State(d.Key)~='Idle'then requested+=1 end
  end
  check(drawn==42,'all 42 flagged pictures are drawn ('..drawn..')')
  check(own==42,'every one is built from the design\'s OWN mesh parts: the template\'s MeshId and Size x the pack scale, part for part ('..own..' of 42)')
  check(baked==0,'no picture part is a baked / reshaped mesh ('..baked..')')
  check(Mock.created==0 and Mock.calls==0 and Mock.baked==0,'no EditableMesh was created, none loaded, nothing baked ('..Mock.created..' / '..Mock.calls..' / '..Mock.baked..')')
- check(requested==0,'PackShapes151 was never asked for any of the 42 designs: every design is still Idle ('..requested..' asked)')
  local st=Shapes.Status();check(st.Requested==0 and st.Pending==0,'PackShapes151.Status: nothing requested, nothing pending ('..st.Requested..' / '..st.Pending..')')
  -- the control: the SAME design asked for as an ordinary (hotbar / Bag) picture is reshaped
  local before=Mock.created
- local c=holder();Pic.Show(c,proxyOf(1,'Pack02',false),2)
+ local c=holder();Pic.Show(c,proxyOf(1,'Pack02',false,3),2)
  frames(200);while Mock.resume()do end;frames(300)
  local cv=view(c);local cm=cv and meshes(cv)[1]
- check(Mock.created>before and Shapes.State('Forest_02')=='Ready'and cm and cm.MeshId==''and moved(cm.Baked)>0,'(control) a hotbar / Bag picture of Forest_02 IS reshaped: PackShapes151 baked it and moved '..moved(cm and cm.Baked)..' vertices')
- check(Pic.Key(proxyOf(1,'Pack02',true))~=Pic.Key(proxyOf(1,'Pack02',false)),'(and its look has its own cache key: |Plain)')
+ check(Mock.created>before and Shapes.State('Forest_02',3)=='Ready'and cm and cm.MeshId==''and moved(cm.Baked)>0,'(control) a hotbar / Bag picture of a Forest_02 pack that rolled 3 IS reshaped: PackShapes151 baked it and moved '..moved(cm and cm.Baked)..' vertices')
+ check(Pic.Key(proxyOf(1,'Pack02',true))=='Pack|1|Pack02|None|Plain'and Pic.Key(proxyOf(1,'Pack02',true,3))=='Pack|1|Pack02|None|Plain'and Pic.Key(proxyOf(1,'Pack02',false,3))=='Pack|1|Pack02|None|3','(and the flagged look has its own cache key, |Plain, whatever the roll; the rolled pack has the shape in its key)')
 end
 -- 2. modes ---------------------------------------------------------------------------------------------------------------------------------------------------------
 do
@@ -100,9 +100,9 @@ do
  end
  -- the other pictures do follow the mode (so the test above is not vacuous)
  fresh();server();Shapes.SetMode(2);client()
- local h=holder();Pic.Show(h,proxyOf(1,'Pack03',false),2);frames(150);while Mock.resume()do end;frames(300)
+ local h=holder();Pic.Show(h,proxyOf(1,'Pack03',false,2),2);frames(150);while Mock.resume()do end;frames(300)
  local m=view(h)and meshes(view(h))[1]
- check(m and m.MeshId==''and moved(m.Baked)>0,'(control) with variation 2 forced, the ordinary picture of Forest_03 is the baked, reshaped pouch')
+ check(m and m.MeshId==''and moved(m.Baked)>0,'(control) the ordinary picture of a Forest_03 pack that rolled 2 is the baked, reshaped pouch')
  fresh();server();Shapes.SetMode('auto');client()
 end
 -- 3. the other packs ----------------------------------------------------------------------------------------------------------------------------------------------
@@ -121,44 +121,54 @@ do
  local KEY='Storm_02';local VERITY=H.VERITY;local tpl=assets[KEY].ApprovedMesh01
  local function pouchOf(h)local v=view(h);if not v then return nil end;for _,m in ipairs(meshes(v))do if m.Name=='ApprovedMesh01'then return m end end end
  local function decals(m)local n=0;for _,d in ipairs(m:GetChildren())do if d:IsA('Decal')then n+=1 end end;return n end
- -- the server bakes the Verity pouch in Storm_02's variation
+ -- the server's neutral pouch is the DEFAULT shape (the shaped neutral pouch of a pack's roll is a PackShapes151 pair)
  fresh();server();dropVerity();Pouch.Prepare()
- local f=vfolder();local shaped=f and f:FindFirstChild(KEY)
- check(f and f:GetAttribute('Ready')==true and shaped and shaped:GetAttribute('PackShape')==Shapes.Assign(KEY)and Shapes.Assign(KEY)~=0,'(setup) the server\'s Verity pouch carries Storm_02\'s variation ('..tostring(shaped and shaped:GetAttribute('PackShape'))..')')
- local shapedMesh=Mock.meshes[#Mock.meshes];check(moved(shapedMesh)>0,'... its vertices were moved ('..moved(shapedMesh)..' of '..#shapedMesh._pos..')')
+ local f=vfolder();local made=f and f:FindFirstChild(KEY)
+ check(f and f:GetAttribute('Ready')==true and made and made:GetAttribute('PackShape')==nil and f:GetAttribute('PackShape')==nil,'(setup) the server\'s Verity pouch is the default neutral pouch: it carries no variation')
+ local serverMesh=Mock.meshes[#Mock.meshes];check(moved(serverMesh)==0,'... no vertex of it was moved ('..moved(serverMesh)..' of '..#serverMesh._pos..')')
  local createdServer=Mock.created
+ client()
+ local h=holder();Pic.Show(h,indexProxy(7,VERITY),2);frames(300)
+ local m=pouchOf(h)
+ check(Pouch.PlainState(KEY)=='Ready'and select(2,Pouch.PlainState(KEY))=='server','the flagged Verity picture: the plain pouch is the server\'s own, at once (PlainState Ready / server)')
+ check(m and m.Baked==serverMesh and moved(m.Baked)==0,'the flagged Verity pouch is the server\'s default neutral mesh: no vertex moved')
+ check(m and decals(m)==2 and m.Color.R==1 and m.Color.G==1 and m.Color.B==0,'... pure yellow with Verity\'s face as two Decals, like the pack in the game')
+ check(Mock.created==createdServer and Mock.alive==0 and Shapes.Status().Requested==0,'no EditableMesh was made for it on the client and PackShapes151 was not asked ('..(Mock.created-createdServer)..' made)')
+ local calls=Mock.calls;local h2=holder();Pic.Show(h2,indexProxy(7,VERITY),2);frames(200)
+ check(view(h2)and Mock.calls==calls,'a second Verity card asks again: nothing is baked')
+ -- a hotbar picture of a Verity pack that rolled 2: its own neutral pair; a flagged picture stays the default
+ Mock.slow=true
+ local hs=holder();Pic.Show(hs,proxyOf(7,VERITY,false,2),1);frames(150)
+ check(view(hs)==nil and Shapes.State(KEY,2,true)=='Loading','a hotbar picture of a Verity pack that rolled 2 waits for its neutral pair ("still loading")')
+ while Mock.resume()do end;Mock.slow=false;frames(400)
+ local sm=pouchOf(hs)
+ check(sm and sm.MeshId==''and sm.Baked~=serverMesh and moved(sm.Baked)>0 and decals(sm)==2,'... then it is the SHAPED neutral pouch with Verity\'s face ('..moved(sm and sm.Baked)..' vertices moved)')
+ check(pouchOf(h)and pouchOf(h).Baked==serverMesh,'the flagged Verity picture is still the default pouch')
+ -- the world's Verity pack that rolled 2, once its pair is baked, is shaped; flagged it is not
+ server();local bag=H.ground(7,VERITY,1,'None',nil,2);client()
+ local wp;for _,p in ipairs(bag:GetDescendants())do if p.Name=='ApprovedMesh01'and p:IsA('MeshPart')then wp=p end end
+ check(wp and wp.Baked==sm.Baked and bag:GetAttribute('PackShapeShown')==2,'the Verity pack in the world that rolled 2 is the shaped neutral pouch (the flag touches no other pack)')
+ -- the safety net: a server whose neutral pouch carries a variation (the folder's PackShape): the client bakes its own default copy for a flagged picture, once
+ fresh();server();dropVerity();Pouch.Prepare();local shapedServer=Mock.meshes[#Mock.meshes];vfolder():SetAttribute('PackShape',3);local before=Mock.created
  client();Mock.slow=true
- local h=holder();Pic.Show(h,indexProxy(7,VERITY),2);frames(150)
- check(view(h)==nil and Pouch.PlainState(KEY)=='Loading','the flagged Verity picture waits for the client\'s plain bake ("still loading", retried): no picture, nothing cached meanwhile')
+ local h3=holder();Pic.Show(h3,indexProxy(7,VERITY),2);frames(150)
+ check(view(h3)==nil and Pouch.PlainState(KEY)=='Loading','a server whose pouch carries a variation: the flagged Verity picture waits for the client\'s plain bake ("still loading", retried): no picture, nothing cached meanwhile')
  while Mock.resume()do end
  check(Pouch.PlainState(KEY)=='Ready','the plain bake finishes')
  frames(400)
  local plainMesh=Mock.meshes[#Mock.meshes]
- local m=pouchOf(h)
- check(m and m.Baked==plainMesh and plainMesh~=shapedMesh and moved(plainMesh)==0,'the flagged Verity pouch is the client\'s PLAIN mesh: no vertex moved ('..moved(plainMesh)..'), not the server\'s shaped one')
- check(m and decals(m)==2 and m.Color.R==1 and m.Color.G==1 and m.Color.B==0,'... pure yellow with Verity\'s face as two Decals, like the pack in the game')
- check(Mock.created==createdServer+1 and Mock.alive==0,'the client made ONE EditableMesh for it and destroyed it ('..(Mock.created-createdServer)..' made, '..Mock.alive..' alive)')
+ local m3=pouchOf(h3)
+ check(m3 and m3.Baked==plainMesh and plainMesh~=shapedServer and moved(plainMesh)==0,'the flagged Verity pouch is the client\'s PLAIN mesh: no vertex moved ('..moved(plainMesh)..'), not the server\'s shaped one')
+ check(m3 and decals(m3)==2 and m3.Color.R==1 and m3.Color.G==1 and m3.Color.B==0,'... pure yellow with Verity\'s face as two Decals, like the pack in the game')
+ check(Mock.created==before+1 and Mock.alive==0,'the client made ONE EditableMesh for it and destroyed it ('..(Mock.created-before)..' made, '..Mock.alive..' alive)')
  local plainModel=Pouch.PlainTemplate(KEY);check(plainModel and plainModel:GetAttribute('PackShape')==0 and plainModel:GetAttribute('Neutral')==true and plainModel.Parent==nil,'the plain copy is a neutral model with PackShape 0, kept in memory (not in the world)')
  check(Mock.colorsAtBake[#Mock.colorsAtBake]==0,'every vertex colour was white when it was baked')
  check(Mock.uris[#Mock.uris]==tpl.MeshId,'the mesh loaded is the live template\'s MeshId (never a literal)')
- -- asked again: no second bake
- local calls=Mock.calls;local h2=holder();Pic.Show(h2,indexProxy(7,VERITY),2);frames(200)
- check(view(h2)and Mock.calls==calls,'a second Verity card asks again: no second bake')
- -- the world's Verity pack and the hotbar's picture keep the shaped pouch
- server();local bag=H.ground(7,VERITY,1,'None');client()
- local wp;for _,p in ipairs(bag:GetDescendants())do if p.Name=='ApprovedMesh01'and p:IsA('MeshPart')then wp=p end end
- check(wp and wp.Baked==shapedMesh,'the Verity pack in the world is still the server\'s shaped pouch (the flag touches no other pack)')
- local h3=holder();Pic.Show(h3,proxyOf(7,VERITY,false),1);frames(300)
- local hm=pouchOf(h3);check(hm and hm.Baked==shapedMesh,'the hotbar\'s Verity picture is the shaped pouch too')
+ local calls3=Mock.calls;local h4=holder();Pic.Show(h4,indexProxy(7,VERITY),2);frames(200)
+ check(view(h4)and Mock.calls==calls3,'a second Verity card asks again: no second bake')
  Mock.slow=false
- -- the variations off: the server's pouch is already plain, the client bakes nothing
- fresh();server();Shapes.Config.Enabled=false;dropVerity();Pouch.Prepare();client()
- local plainServer=Mock.meshes[#Mock.meshes];local before=Mock.created
- local h4=holder();Pic.Show(h4,indexProxy(7,VERITY),2);frames(300)
- local m4=pouchOf(h4)
- check(m4 and m4.Baked==plainServer and moved(plainServer)==0 and Mock.created==before and Pouch.PlainState(KEY)=='Ready','variations off: the server\'s pouch is plain already, the flagged picture uses it, no client bake')
  -- a denied client bake: a flagged picture keeps the server's pouch
- fresh();server();dropVerity();Pouch.Prepare();local shaped2=Mock.meshes[#Mock.meshes];client();Mock.mode='denied'
+ fresh();server();dropVerity();Pouch.Prepare();local shaped2=Mock.meshes[#Mock.meshes];vfolder():SetAttribute('PackShape',3);client();Mock.mode='denied'
  local h5=holder();Pic.Show(h5,indexProxy(7,VERITY),2);frames(400)
  local m5=pouchOf(h5)
  check(Pouch.PlainState(KEY)=='Off'and m5 and m5.Baked==shaped2 and decals(m5)==2,'a denied bake: the plain state is Off and the flagged picture shows the server\'s own pouch (still the real pouch, not the sachet) ('..tostring(Pouch.PlainState(KEY))..', picture '..tostring(m5~=nil)..', same mesh '..tostring(m5 and m5.Baked==shaped2)..')')
@@ -168,24 +178,34 @@ do
  local h6=holder();Pic.Show(h6,indexProxy(7,VERITY),2);frames(200)
  check(view(h6)and pouchOf(h6)==nil,'a server that bakes no pouch: the sachet, as for every Verity picture')
  fresh();server();dropVerity();Pouch.Prepare();client()
+ bag:Destroy()
 end
 -- 5. the build path ---------------------------------------------------------------------------------------------------------------------------------------------------
 do
  fresh();server()
- local calls=0;local base=Shapes.ForBuild
- Shapes.ForBuild=function(key)calls+=1;return base(key)end
+ local calls=0;local base=Shapes.ForBag
+ Shapes.ForBag=function(...)calls+=1;return base(...)end
  local marked=Visuals.Bag(CF(0,0,0),nil,1,nil,1,'Pack04',1,1,'None',nil,true)
  check(marked:GetAttribute('DefaultPackShape')==true and calls==0,'SeedPackVisuals.Bag(..., defaultShape) marks the bag and never asks PackShapes151 for a shape ('..calls..' calls)')
+ local both=Visuals.Bag(CF(0,0,0),nil,1,nil,1,'Pack04',1,1,'None',nil,true,3)
+ check(both:GetAttribute('DefaultPackShape')==true and both:GetAttribute('PackShape')==nil and calls==0,'... also when it is given a shape: the flag wins, no roll is claimed ('..calls..' calls)')
+ local rolled=Visuals.Bag(CF(0,0,0),nil,1,nil,1,'Pack04',1,1,'None',nil,nil,3)
+ check(rolled:GetAttribute('DefaultPackShape')==nil and rolled:GetAttribute('PackShape')==3 and calls==1,'a bag that rolled 3 is not marked and does ask ('..calls..' call)')
  local plainBag=Visuals.Bag(CF(0,0,0),nil,1,nil,1,'Pack04',1,1,'None')
- check(plainBag:GetAttribute('DefaultPackShape')==nil and calls==1,'an ordinary bag is not marked and does ask ('..calls..' call)')
+ check(plainBag:GetAttribute('DefaultPackShape')==nil and plainBag:GetAttribute('PackShape')==nil and calls==1,'a bag with no shape is the default shape and asks nothing ('..calls..' calls)')
  local f=Visuals.Bag(CF(0,0,0),nil,1,nil,1,'Pack04',1,1,'None',nil,false)
  check(f:GetAttribute('DefaultPackShape')==nil,'defaultShape false / nil: not marked')
  local mesh=function(b)local pg=b:FindFirstChild('PackGeometry');return pg and pg:FindFirstChild('ApprovedMesh01')end
  check(mesh(marked)and mesh(marked).MeshId==assets.Forest_04.ApprovedMesh01.MeshId and mesh(marked).Baked==nil,'the marked bag is the design\'s own mesh')
- Shapes.ForBuild=base
+ -- the renderer honours the flag itself: a marked bag that also carries a roll (set by hand, the pair baked) is built from the design's own mesh
+ Shapes.Request('Forest_04',3)
+ local hand=Visuals.Bag(CF(0,0,0),nil,1,nil,1,'Pack04',1,1,'None',nil,true);hand:FindFirstChild('PackGeometry'):Destroy();hand:SetAttribute('CompactPackReady',nil);hand:SetAttribute('PackShape',3)
+ local before=calls;W.module('SeedPackRenderer').Build(hand,function()return true end)
+ check(calls==before and mesh(hand)and mesh(hand).MeshId==assets.Forest_04.ApprovedMesh01.MeshId,'SeedPackRenderer.Build on a marked bag that also says PackShape 3 (its pair baked): still the design\'s own mesh, nothing asked')
+ Shapes.ForBag=base
  -- the renderer's one door to the shape code
  local src=require('./rs_bundle')
- local _,n=src.SeedPackRenderer:gsub('PackShapes151','');check(n==2,'SeedPackRenderer still reaches PackShapes151 from the ordinary build only (the comment and the call: '..n..' mentions)')
+ local _,n=src.SeedPackRenderer:gsub('PackShapes151','');check(n==1,'SeedPackRenderer reaches PackShapes151 from the ordinary build only (the one call: '..n..' mention)')
 end
 gui:Destroy()
 print(('%d checks, %d failures'):format(checks,fails))

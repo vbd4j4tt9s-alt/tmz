@@ -323,7 +323,7 @@ local function plant(id,parent,origin,at,size,turn)
  return settle(model,origin,at,size,turn)
 end
 local function pack(spec,parent,origin,at,size,turn)
- local model=require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.new(),nil,1,nil,spec.Stage,spec.Variant,1,1,'None')
+ local model=require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.new(),nil,1,nil,spec.Stage,spec.Variant,1,1,'None',nil,true) -- R151: a market stall shows the DEFAULT pouch (never a pack's chip-bag shape roll)
  model.Name='Market seed pack';model.Parent=parent
  return settle(model,origin,at,size,turn)
 end

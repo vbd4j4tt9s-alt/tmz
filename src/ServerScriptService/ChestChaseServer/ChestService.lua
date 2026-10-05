@@ -6,6 +6,7 @@ local PackRules = require(ReplicatedStorage:WaitForChild("SeedPackRules"))
 local PackVisuals = require(ReplicatedStorage:WaitForChild("SeedPackVisuals"))
 
 local Weather=require(ReplicatedStorage.WeatherTraits);local FX=require(ReplicatedStorage.ItemEffectAnchor)
+local PackShapes=require(ReplicatedStorage.PackShapes151) -- R151: each pack rolls one of six chip-bag shapes and keeps it for life (PlayerDataService.AddChest, RefreshWorldPack)
 local ChestService = {}
 ChestService.__index = ChestService
 
@@ -271,8 +272,8 @@ function ChestService:BuildArtParts(specs, parent, origin, scale, anchored)
 	return parts, names
 end
 
-function ChestService:BuildSeedPacket(_seedId, origin, parent, scale, weldRoot,stage,variantKey,seedScale,packSize,mutation)
-    return PackVisuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation)
+function ChestService:BuildSeedPacket(_seedId, origin, parent, scale, weldRoot,stage,variantKey,seedScale,packSize,mutation,shape)
+    return PackVisuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation,nil,nil,shape) -- R151: shape = the pack's roll (nil = the default shape)
 end
 function ChestService:BuildLooseSeed(seedId,origin,parent,scale,weldRoot,mutation)
     local definition,_,index = self.Config.GetSeedById(seedId)
@@ -534,8 +535,10 @@ end
 
 -- rolledSize (R137): the size SkinWorldSeeds already rolled for this spot (after the hidden track pity); it is an
 -- ordinary roll, unlike testSize, so alerts and odds treat it as natural.
-function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,spawnOdds,rolledSize)
+-- rolledShape (R151): the chip-bag shape SkinWorldSeeds rolled for this spot (its pair is baked ahead of the refresh); a spawn without one (a forced test pack) rolls its own.
+function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,spawnOdds,rolledSize,rolledShape)
     seed.Prompt.MaxActivationDistance=24;seed.Prompt.RequiresLineOfSight=false
+    PackShapes.Unpin(seed) -- the slot's previous pack is gone
     seed.Weather='None';seed.WeatherCheckedEvent=nil;seed.Model:SetAttribute('WeatherTrait','None')
     local variant=forcedVariant or PackRules.RollVariant(self.PackRandom:NextNumber())
     local size=testSize and PackRules.SanitizePackSize(testSize)or rolledSize and PackRules.SanitizePackSize(rolledSize)or PackRules.RollPackSize(self.PackRandom:NextNumber())
@@ -544,6 +547,14 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
     -- Keep the rolled size: search forward into clear ground instead of shrinking it.
     local frame,bounds=self:FindPackPlacement(seed.PackHome,seed.Stage,variant,size,seed)
     local seedScale=PackRules.NewSeedScale(seed.Stage,variant,size)
+    -- R151: the pack's chip-bag shape, rolled once, kept for life. A pack that takes none (the Void, the Mech) has nil; a pack whose pair is not baked yet keeps the
+    -- default shape for life (0; Settle), so it never changes shape between the ground, the carry, a drop and the Bag. The seed table carries it (the carry clones it).
+    local shape
+    if PackShapes.Applies(variant)then
+        local design=PackRules.DesignKey(seed.Stage,variant)
+        shape=PackShapes.Settle(design,rolledShape~=nil and rolledShape or PackShapes.Roll(variant))
+        if shape==nil then shape=0 end -- (variations off: this pack is the default shape, also after they are switched on again)
+    end
     if not frame then
         seed.Generation=(seed.Generation or 0)+1
         self:SetWorldPackAvailable(seed,false)
@@ -552,7 +563,7 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
         return
     end
     -- Carry/drop records are independent copies; commit only after the complete visual is ready.
-    local packet=self:BuildSeedPacket(nil,frame,nil,nil,nil,seed.Stage,variant,seedScale,size,mutation)
+    local packet=self:BuildSeedPacket(nil,frame,nil,nil,nil,seed.Stage,variant,seedScale,size,mutation,shape)
     local platform=PackVisuals.Platform(frame,seed.Stage,variant,size)
     packet:SetAttribute("PackVisible",not self.Map.Refreshing)
     local oldPlatform=seed.Model:FindFirstChild('PackPlatform')
@@ -564,11 +575,13 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
     seed.Body.CFrame=frame
     seed.PackPosition=frame.Position;seed.PackRadius=bounds.Radius
     seed.PackSize=size;seed.PackMutation=mutation
+    seed.PackShape=shape -- R151
+    if shape and shape>0 then PackShapes.Pin(seed,PackRules.DesignKey(seed.Stage,variant),shape) end -- its pair stays baked while this pack can be stolen, dropped and carried
     seed.BagVariant=variant;seed.SeedScale=seedScale;seed.OddsVersion=PackRules.OddsVersion
     seed.Generation=(seed.Generation or 0)+1
     seed.Model:SetAttribute("SeedArtVersion",123)
     seed.Model:SetAttribute("BagVariant",variant);seed.Model:SetAttribute("SeedScale",seedScale)
-    seed.Model:SetAttribute('PackSize',size);seed.Model:SetAttribute('PackMutation',mutation)
+    seed.Model:SetAttribute('PackSize',size);seed.Model:SetAttribute('PackMutation',mutation);seed.Model:SetAttribute('PackShape',shape)
     -- The interaction sits at the reachable near edge, even on a ten-times pack.
     local promptAnchor=seed.Body:FindFirstChild('PackPickupPoint')or Instance.new('Attachment')
     promptAnchor.Name='PackPickupPoint'
@@ -588,7 +601,10 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
     local alert=require(ReplicatedStorage.RarePackRules).Message(seed.Stage,variant,size,mutation,odds)
     if alert and not seed.EventKeeper then alert.SpawnId=seed.Model.Name..':'..seed.Generation;alert.At=workspace:GetServerTimeNow();self.RarePackSpawn:FireAllClients(alert)end
 end
-function ChestService:SkinWorldSeeds(cycle)
+-- R151: the plan of one refresh: every spot's tier, size (after the hidden track pity) and chip-bag shape. The NEXT refresh's plan is made right after this one is
+-- applied and the pairs of its shapes are asked for at once, so they are baked long before the refresh (5 minutes, the closure is 10 s); a spawn whose pair is still
+-- not baked keeps the default shape for life (PackShapes.Settle). The first refresh of a server has no earlier plan: its packs are the default shape.
+function ChestService:PlanWorldPacks(cycle)
     local variants={}
     for i in ipairs(self.Map.Chests)do variants[i]=PackRules.RollVariant(self.PackRandom:NextNumber())end
     variants=require(ReplicatedStorage.PackSchedule81).Plan(cycle or 0,variants,function(a,b)return self.PackRandom:NextInteger(a,b)end)
@@ -598,12 +614,29 @@ function ChestService:SkinWorldSeeds(cycle)
     local Pity=require(ReplicatedStorage.PackSizePity)
     local sizes={};for i in ipairs(self.Map.Chests)do sizes[i]=PackRules.RollPackSize(self.PackRandom:NextNumber())end
     sizes=Pity.PlanTrack(self.TrackLuck,sizes,function()return self.PackRandom:NextNumber()end)
-    for i,seed in ipairs(self.Map.Chests)do self:RefreshWorldPack(seed,variants[i],nil,nil,odds[variants[i]],sizes[i])end
+    local shapes,wanted={},{}
+    for i,seed in ipairs(self.Map.Chests)do
+        shapes[i]=PackShapes.Roll(variants[i])
+        if shapes[i]then table.insert(wanted,{Key=PackRules.DesignKey(seed.Stage,variants[i]),Id=shapes[i]})end
+    end
+    pcall(PackShapes.Prefetch,wanted)
+    return {Cycle=cycle or 0,Variants=variants,Odds=odds,Sizes=sizes,Shapes=shapes}
+end
+function ChestService:SkinWorldSeeds(cycle)
+    local plan=self.WorldPlan
+    self.WorldPlan=nil
+    if not plan or plan.Cycle~=(cycle or 0)then plan=ChestService.PlanWorldPacks(self,cycle)end
+    local variants,odds,sizes=plan.Variants,plan.Odds,plan.Sizes
+    local Pity=require(ReplicatedStorage.PackSizePity)
+    for i,seed in ipairs(self.Map.Chests)do self:RefreshWorldPack(seed,variants[i],nil,nil,odds[variants[i]],sizes[i],plan.Shapes[i])end
     local biggest=0
     for _,seed in ipairs(self.Map.Chests)do
         if seed.Available and table.find(PackRules.VariantOrder,seed.BagVariant)then biggest=math.max(biggest,seed.PackSize or 1)end
     end
     self.TrackLuck=Pity.After(Pity.Track,self.TrackLuck,biggest)
+    -- the next refresh's plan (its shapes' pairs are baked while this refresh's packs are on the track)
+    local ok,upcoming=pcall(ChestService.PlanWorldPacks,self,(cycle or 0)+1)
+    if ok then self.WorldPlan=upcoming end
 end
 function ChestService:SetWorldPacksClosed(closed)
     for _,seed in ipairs(self.Map.Chests) do self:SetWorldPackAvailable(seed,seed.Available) end
@@ -1002,10 +1035,25 @@ function ChestService:_holdPack(player,tool)
         if backpack and tool.Parent==player.Character then tool.Parent=backpack end
         return
     end
+    -- R151: a pack with a chip-bag shape is put in the hand once its (design, variation) pair is baked: a short bounded wait BEFORE anything of the opening exists (the
+    -- checks run again after it), so the pack in the hand is the shape its picture shows. Past the wait it is built in the default shape this once (never yields).
+    local shape=tool:GetAttribute("PackShape")
+    if shape~=nil then
+        local design=PackRules.DesignKey(tool:GetAttribute("Stage"),tool:GetAttribute("BagVariant"))
+        local neutral=PackRules.VariantKey(tool:GetAttribute("BagVariant"))==require(ReplicatedStorage.VerityCatalog).Variant
+        if PackShapes.State(design,shape,neutral)~="Ready" then
+            pcall(PackShapes.Await,design,shape,neutral)
+            if self.Openings[player] or not self:_canOpenPack(player,tool) then
+                local backpack=player:FindFirstChildOfClass("Backpack")
+                if backpack and tool.Parent==player.Character then tool.Parent=backpack end
+                return
+            end
+        end
+    end
     local opening={Tool=tool,Character=player.Character,Connections={},Committed=false,Clicks=0,LastClick=-math.huge}
     self.Openings[player]=opening
     local ok,err=xpcall(function()
-        opening.Bag=PackVisuals.CarryBag(opening.Character,tool:GetAttribute("Stage"),tool:GetAttribute("BagVariant"),tool:GetAttribute("SeedScale"),tool:GetAttribute("PackSize"),tool:GetAttribute("PackMutation"))
+        opening.Bag=PackVisuals.CarryBag(opening.Character,tool:GetAttribute("Stage"),tool:GetAttribute("BagVariant"),tool:GetAttribute("SeedScale"),tool:GetAttribute("PackSize"),tool:GetAttribute("PackMutation"),shape)
         assert(opening.Bag,"Character torso is not ready")
         FX.Set(opening.Bag,tool:GetAttribute("Weather"),nil,tool:GetAttribute("PackSize"),2*(tool:GetAttribute("PackSize")or 1));opening.Bag:SetAttribute("Weather",tool:GetAttribute("Weather"))
         opening.Bag:SetAttribute("PackClickCount",0)
@@ -1076,6 +1124,7 @@ function ChestService:_createPackTool(record,backpack)
     tool:SetAttribute("Stage",record.Stage)
     tool:SetAttribute("BagVariant",PackRules.VariantKey(record.BagVariant))
     tool:SetAttribute("SeedScale",PackRules.SanitizeSeedScale(record.SeedScale))
+    local shape=PackShapes.Sanitize(record.PackShape);if shape>0 then tool:SetAttribute("PackShape",shape) end -- R151: the pack's own chip-bag shape (absent = the default: every record saved before it)
     tool.Equipped:Connect(function() self:_holdPack(player,tool) end)
     tool.Activated:Connect(function() self:_activatePack(player,tool) end)
     tool.Unequipped:Connect(function()

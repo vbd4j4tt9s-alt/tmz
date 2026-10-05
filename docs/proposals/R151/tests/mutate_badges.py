@@ -37,9 +37,9 @@ M = {
     # switching Reduced Motion on does not stop the pulses that are running
     'reduced_keeps_pulse': ('badge', 'NotifyBadge151.lua', 'if Gui.ReducedMotionEnabled then for badge in pairs(pulses)do stop(badge)end end', 'if false then for badge in pairs(pulses)do stop(badge)end end'),
     # SeedPackVisuals.Bag does not mark the bag DefaultPackShape (the flag is lost between the picture and the renderer)
-    'no_default_flag': ('shape', 'SeedPackVisuals.lua', "if defaultShape==true then m:SetAttribute('DefaultPackShape',true) end", "if false then m:SetAttribute('DefaultPackShape',true) end"),
+    'no_default_flag': ('shape', 'SeedPackVisuals.lua', "if defaultShape==true then m:SetAttribute('DefaultPackShape',true)\n    elseif", "if false then m:SetAttribute('DefaultPackShape',true)\n    elseif"),
     # SeedPackRenderer asks for a shape variation even for a marked bag
-    'renderer_ignores_flag': ('shape', 'SeedPackRenderer.lua', "bag:GetAttribute('DefaultPackShape')~=true and require(script.Parent.PackShapes151).ForBuild(key) or nil", 'require(script.Parent.PackShapes151).ForBuild(key)'),
+    'renderer_ignores_flag': ('shape', 'SeedPackRenderer.lua', "local shape=bag:GetAttribute('DefaultPackShape')~=true and bag:GetAttribute('PackShape')or nil", "local shape=bag:GetAttribute('PackShape')"),
     # the Index's look has no key of its own: it shares the hotbar's shaped template
     'no_plain_key': ('shape', 'ItemPictures.lua', "..(plain and'|Plain'or'')", "..''"),
     # the Verity pack's Index picture is the server's shaped pouch

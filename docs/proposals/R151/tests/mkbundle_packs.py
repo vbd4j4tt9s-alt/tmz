@@ -9,7 +9,7 @@ import sys
 out = sys.argv[1]
 here = os.path.dirname(os.path.abspath(__file__))
 src = os.path.normpath(sys.argv[2]) if len(sys.argv) > 2 and '=' not in sys.argv[2] else os.path.normpath(os.path.join(here, '../../../../src'))
-extra = [a for a in sys.argv[2:] if '=' in a]
+extra = [a for a in sys.argv[2:] if '=' in a]  # (Name=path pairs; --server adds the server modules)
 pairs = {}
 for f in sorted(os.listdir(os.path.join(src, 'ReplicatedStorage'))):
     if f.endswith('.lua'):
@@ -24,6 +24,14 @@ for name in ('MysteryPackService', 'PackPlacement', 'PackShapeCommand151'):
     path = os.path.join(server, name + '.lua')
     if os.path.exists(path):
         pairs[name] = path
+server_names = []
+if '--server' in sys.argv:
+    # R151 (pack shapes): every ChestChaseServer module too (the real PlayerDataService / ChestService / ChaseService / MysteryPackService ...), and OUT/srv_names.luau
+    # (their names, moved under ServerScriptService.ChestChaseServer by the test)
+    for f in sorted(os.listdir(server)):
+        if f.endswith('.lua') and not f.endswith('.server.lua'):
+            pairs[f[:-4]] = os.path.join(server, f)
+            server_names.append(f[:-4])
 for arg in extra:
     name, path = arg.split('=', 1)
     pairs[name] = path
@@ -38,4 +46,6 @@ for name, path in pairs.items():
 parts.append('}')
 os.makedirs(out, exist_ok=True)
 open(os.path.join(out, 'rs_bundle.luau'), 'w', encoding='utf-8').write('\n'.join(parts))
+if server_names:
+    open(os.path.join(out, 'srv_names.luau'), 'w').write('return {' + ','.join('"%s"' % n for n in server_names) + '}')
 print(len(pairs), 'modules')

@@ -27,6 +27,7 @@
 local Config=require(script.Parent.VerityConfig)
 local Renderer=require(script.Parent.SeedPackRenderer)
 local Pouch=require(script.Parent.VerityPouch151)
+local Shapes=require(script.Parent.PackShapes151)
 local Run=game:GetService('RunService')
 local V,CF=Vector3.new,CFrame.new
 local A={Image=Config.Image,Yellow=Color3.fromRGB(255,255,0),Revision=149,PouchRevision=151,
@@ -158,8 +159,9 @@ function A.Build(bag,isValid)
   -- the picture never settles on the wrong shape. A server (a held pack) does not wait: it uses the sachet for that one pack.
   if Run:IsClient()and not Run:IsServer()then error('Verity pouch is still loading',0)end
  elseif state=='Ready'then
-  -- R151: a bag flagged DefaultPackShape (a picture that must show the plain pouch) wants the pouch WITHOUT Storm_02's shape variation: the client bakes its own plain copy (VerityPouch151.RequestPlain), a
-  -- picture waits for it like it waits for the server's, and if that bake cannot be done the picture uses the pouch the server baked (the pack as it is in the game).
+  -- R151: a bag flagged DefaultPackShape (the catalogue / shop / reward pictures) wants the default pouch whatever its roll: VerityPouch151.RequestPlain / PlainTemplate (the
+  -- server's neutral pouch is the default shape already, so that is the pouch the server baked; a client bakes a plain copy only if the server's carries a variation). A
+  -- picture waits for it like it waits for the server's.
   local template
   if bag:GetAttribute('DefaultPackShape')==true then
    local plain=Pouch.RequestPlain(key)
@@ -167,6 +169,15 @@ function A.Build(bag,isValid)
    template=plain=='Ready'and Pouch.PlainTemplate(key)or Pouch.Template(key)
   else template=Pouch.Template(key)end
   if template then
+   -- R151 (owner: every pack spawns with one of the six chip-bag shapes): the Verity pack follows its own roll like the others. The server's neutral pouch above is the
+   -- default shape (always there, the fallback); the shaped neutral pouch of the roll is baked on each side like any (design, variation) pair (PackShapes151, `neutral`: every
+   -- vertex white). While that pair is not baked, or if it never is, the pack is the default neutral pouch (never yields; a picture on a client errors "still loading" and is retried).
+   -- A bag with no PackShape, or one flagged DefaultPackShape (which wins over a roll), is the default neutral pouch itself: ONE default shape in every context.
+   if bag:GetAttribute('DefaultPackShape')~=true and bag:GetAttribute('PackShape')~=nil then
+    local shaped,shown=Shapes.ForBag(key,bag:GetAttribute('PackShape'),true)
+    if shaped then template=shaped end
+    bag:SetAttribute('PackShapeShown',shown)
+   end
    local ok,built=pcall(buildPouch,bag,isValid,key,template)
    if ok then return built end
    -- nothing of the pouch may stay: the sachet builds on a clean pack

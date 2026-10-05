@@ -6,6 +6,7 @@
 --            dark colour survives) | 'content_fails' (CreateDataModelContentAsync does not succeed) | 'meshpart_fails' | 'size_mismatch' (the baked mesh is
 --            another size) | 'second_fails' (the 2nd mesh of a template cannot be loaded) | 'no_positions' (GetPosition / SetPosition are not there) |
 --            'no_normals' (the face / normal API is not there) | 'hang' (CreateEditableMeshAsync never returns)
+--   P.api(false) removes AssetService:CreateEditableMeshAsync altogether (a world without EditableMesh: an expected fallback, never a warning); P.api(true) puts it back (P.reset does)
 --   P.slow       true: CreateEditableMeshAsync and CreateDataModelContentAsync yield until P.resume() (a real download / bake); P.waiting = the yielded threads
 --   P.uris       the Content URIs asked for, in order            P.alive    EditableMeshes created and not yet destroyed (a leak if > 0 when idle)
 --   P.maxAlive   the most EditableMeshes alive at once            P.created  EditableMeshes created      P.baked  MeshParts made (P.bakedAlive: not destroyed)
@@ -73,6 +74,8 @@ return function(W)
   if P.slow then P.waiting[#P.waiting+1]=coroutine.running();coroutine.yield()end
   return mesh(content.Uri)
  end
+ local createEditable=AS.CreateEditableMeshAsync
+ function P.api(on)AS.CreateEditableMeshAsync=on and createEditable or nil end
  function P.resume()
   local co=table.remove(P.waiting,1);if co then local ok,e=coroutine.resume(co);if not ok then error(e,0)end;return true end
   return false
@@ -102,7 +105,7 @@ return function(W)
  -- Content / Enum for the module's globals
  W.env.Content={fromUri=function(u)return{__type='Content',Uri=u}end,fromAssetId=function(i)return{__type='Content',Uri='rbxassetid://'..tostring(i)}end,fromObject=function(o)return{__type='Content',Object=o}end}
  function P.reset()
-  P.mode='ok';P.slow=false;P.waiting={};P.uris={};P.alive=0;P.maxAlive=0;P.created=0;P.baked=0;P.bakedAlive=0;P.colorsAtBake={};P.calls=0;P.vertices=1800;P.meshes={}
+  P.api(true);P.mode='ok';P.slow=false;P.waiting={};P.uris={};P.alive=0;P.maxAlive=0;P.created=0;P.baked=0;P.bakedAlive=0;P.colorsAtBake={};P.calls=0;P.vertices=1800;P.meshes={}
   P.sets={Position=0,Normal=0,Color=0,ColorAlpha=0,UV=0}
  end
  return P

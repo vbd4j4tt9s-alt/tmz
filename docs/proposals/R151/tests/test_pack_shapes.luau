@@ -1,23 +1,24 @@
 --!nocheck
--- R151 (owner: "make pack shape variations in blender; the pack shape will still be a chip shape but will be slightly different"): PackShapes151 on the Roblox
--- mock with the REAL modules of this checkout, the REAL pack templates of the owner's place (pack_templates.luau: 42 designs, 115 MeshParts) and a mock of the
--- EditableMesh route whose meshes are lattices that fill each template part's Size box (pouch_mock.luau: every way the real route can fail).
---  1. the field     PackShapes151.Field against the Blender design's samples (pack_shape_samples.luau, written by blender/pack_shapes.py), and what every field promises:
---                   y never moves, the crimps (|v| >= .94) are untouched, nothing grows by more than 5%, each variation is visible, the six differ, symmetric
---  2. assignment    one variation per design NAME: deterministic (golden table), neighbouring tiers of a biome differ, every biome and the game use all six
---  3. the bake      loads the template's own MeshId, moves every vertex by the field (y and the crimp rows exactly where they were, <= 5% outward, the mesh's centre
---                   where it was), keeps colours and UVs (never set), updates the normals, ONE EditableMesh at a time and each destroyed, the same design once;
---                   all 42 designs: every box within +5% of today's, y / pivot / PackLocalFrame identical, Bounds identical
---  4. contexts      ground, held R15 / R6, CarryBag, picture, opening copy, market, mystery pedestal, viewport; sizes 1 / 25; None / Gold / Diamond: the same shaped pouch
---                   part for part; seal and strips exactly where today's are; the Void, the Mech and the sachet never reshaped
---  5. fallbacks     denied / no vertices / no positions / bake or MeshPart fails / size mismatch / too many vertices / memory cap / missing or incomplete template /
---                   the 2nd mesh fails (the 1st is destroyed) / a bake that never returns: that design keeps today's mesh, exactly, one warning, nothing leaked,
---                   the status folder says why, the others still bake
---  6. switches      Config.Enabled, Config.Force, the owner's attributes (SetMode off / auto / 1-6), listeners told, caches of another variation dropped, the
---                   /test packshape command
---  7. waiting       a server waits (bounded) for a design's first bake so every pack is the same; a client never waits (ItemPictures retries "still loading")
---  8. pictures      the real ItemPictures: still loading -> no picture, then the shaped pouch in the ViewportFrame; a mode change redraws
---  9. Verity        the Verity pouch is Storm_02's shape (same vertices moved), unshaped if the variation cannot be applied, re-baked when the mode changes
+-- R151 (owner: "make pack shape variations in blender", then "every pack can spawn with either of those variations ... shapes for visual representation in the index can just
+-- use the default pack shape"): PackShapes151 and its builders on the Roblox mock with the REAL modules of this checkout, the REAL pack templates of the owner's place
+-- (pack_templates.luau: 42 designs, 115 MeshParts) and a mock EditableMesh route whose meshes are lattices that fill each template part's Size box (pouch_mock.luau).
+-- Every pack ROLLS one of the six variations when it is made (a per-pack-instance field, PackShape) and keeps it for life; the Index / catalogues / shops show the default.
+--  1. the field      PackShapes151.Field against the Blender design's samples (pack_shape_samples.luau) and what every field promises (y fixed, crimps untouched, <= 5%)
+--  2. the roll       which variants take a shape, Sanitize, the dice -> variation mapping, the distribution (uniform), forced / off, the variants that take none
+--  3. the bake       one (design, variation) PAIR at a time: the template's own MeshId loaded, every vertex moved by the field (y and the crimp rows exactly where they
+--                    were, <= 5% outward), colours / UVs never set, normals turned, ONE EditableMesh alive at a time, destroyed; all 252 pairs (42 designs x 6)
+--  4. contexts       ground, held R15 / R6, CarryBag, picture, opening copy, market, mystery pedestal, viewport; sizes 1 / 25; None / Gold / Diamond: the same shaped pouch part
+--                    for part; seal and strips exactly the default pack's; no shape (the Index, the catalogues), shape 0 and 'off' = the default pack; the Void / Mech ignore it
+--  5. never yields   a build never waits: while a pair is being baked a server's pack is the default shape this once, a client's picture errors "still loading"; Settle keeps
+--                    a new pack's roll only when its pair is baked, else 0 for life; Await is bounded
+--  6. fallbacks      denied / no vertices / no positions / bake or MeshPart fails / size mismatch / too many vertices / missing or incomplete template / 2nd mesh fails / a bake
+--                    that never returns: the default pack, exactly, one warning, nothing leaked, STICKY (a later success does not flip it), other pairs still bake
+--  7. budget (LRU)   evicts the least recently used unpinned pair above the soft cap, honours the grace period and the pins, the idle sweep, the hard cap (a pair that does not
+--                    fit fails for good: stable), a rebake gives the same pack, built packs outlive their template, the accounting
+--  8. switches       off / auto / forced, the display flip drops the cache and tells the listeners, a forced number is only the roll of new packs, the status folder
+--  9. pictures       the real ItemPictures: the key carries the shape, two shapes = two pictures, the Index / sample / proxy pictures are the default, still loading -> retry,
+--                    a failed pair is a stable default picture, off / auto redraw
+-- 10. Verity         the neutral (white vertex colour) pair of the roll: yellow, two Decals, never yields, falls back to the default neutral pouch, and the default stays the server's
 local H=require('./pack_world');local W,R,F=H.W,H.R,H.F;local V3,CF=R.Vector3.new,R.CFrame.new
 local Mock=require('./pouch_mock')(W)
 local Samples=require('./pack_shape_samples')
@@ -30,17 +31,24 @@ local function inv(c)return c:Inverse()end
 local Run=W.Run
 local function server()Run.IsServer=function()return true end;Run.IsClient=function()return false end end
 local function client()Run.IsServer=function()return false end;Run.IsClient=function()return true end end
-server()
-local Shapes=W.module('PackShapes151');local Visuals=H.Visuals;local Rules=H.Rules
+server() -- (before the first require of PackShapes151 / VerityPouch151: a server creates its folder when the module loads)
+local Shapes=W.module('PackShapes151');local Pouch=W.module('VerityPouch151');local Visuals=H.Visuals;local Rules=H.Rules
+local VERITY=H.VERITY
 local warns=function()return W.warns or 0 end
 local function folder()return W.RS:FindFirstChild(Shapes.Folder)end
-local function fresh()Shapes.Reset();Mock.reset();Shapes.Config.Enabled=true;Shapes.Config.Force=nil;local f=folder();if f then f:SetAttribute('Off',nil);f:SetAttribute('Force',nil)end end
+local DEFAULTS={Enabled=true,Force=nil,LoadingSeconds=60,HoldWaitSeconds=2.5,MaxVertices=60000,MaxResidentVertices=400000,HardResidentVertices=600000,GraceSeconds=30,IdleSeconds=900,SweepSeconds=60}
+local function fresh()
+ Shapes.Reset();Mock.reset();Pouch.ResetPlain();for k,v in pairs(DEFAULTS)do Shapes.Config[k]=v end;Shapes.Config.Force=nil
+ local f=folder();if f then f:SetAttribute('Off',nil);f:SetAttribute('Force',nil)end
+ local v=W.RS:FindFirstChild(Pouch.Folder);if v then v:Destroy()end
+end
 local assets=W.RS.SeedPackMeshAssets
 for _,model in ipairs(assets:GetChildren())do for _,p in ipairs(model:GetChildren())do p.MeshSize=p.Size end end -- (the place's templates have a MeshSize; the generated ones do not)
 -- every design of the game, in the order stage x tier
 local DESIGNS={}
 for stage=1,7 do for tier=1,6 do DESIGNS[#DESIGNS+1]={Key=Rules.DesignKey(stage,string.format('Pack%02d',tier)),Stage=stage,Variant=string.format('Pack%02d',tier),Tier=tier,Biome=Rules.DesignBiomes[stage]}end end
 local function meshesOf(key)local l={};for _,p in ipairs(assets[key]:GetChildren())do if p:IsA('MeshPart')then l[#l+1]=p end end;table.sort(l,function(a,b)return a.Name<b.Name end);return l end
+local SINGLE={};for _,d in ipairs(DESIGNS)do if #meshesOf(d.Key)==1 then SINGLE[#SINGLE+1]=d end end -- (one MeshPart: a pair is one mesh)
 local function boxOf(parts)
  local lo,hi=V3(1e9,1e9,1e9),V3(-1e9,-1e9,-1e9)
  for _,p in ipairs(parts)do local f=p:GetAttribute('PackLocalFrame')
@@ -53,7 +61,7 @@ local function sig(bag)
  local root=bag.PrimaryPart;local scale=bag:GetAttribute('VisualScale')or 1;local out={}
  for _,p in ipairs(H.partsOf(bag,false))do
   local f=inv(root.CFrame)*p.CFrame
-  out[(p.Parent==bag and''or'PackGeometry/')..p.Name]={Size=p.Size/scale,Pos=f.Position/scale,Frame=f,Class=p._class}
+  out[(p.Parent==bag and''or'PackGeometry/')..p.Name]={Size=p.Size/scale,Pos=f.Position/scale,Frame=f,Class=p._class,MeshId=p._props.MeshId}
  end
  return out
 end
@@ -68,9 +76,14 @@ local function sameSig(a,b)
  for k in pairs(b)do if not a[k]then return false,'extra '..k end end
  return true
 end
-local function reasonOf(key)local _,why=Shapes.State(key);return tostring(why)end
-local function pouchSize(bag)local m=bag:FindFirstChild('ApprovedMesh01',true);return m and m.Size/(bag:GetAttribute('VisualScale')or 1)end
-local function todays(stage,variant,size,coat)fresh();Shapes.Config.Enabled=false;local b=H.ground(stage,variant,size,coat);local s=sig(b);b:Destroy();Shapes.Config.Enabled=true;Shapes.Reset();return s end
+local function rgb(c)return math.floor(c.R*255+.5),math.floor(c.G*255+.5),math.floor(c.B*255+.5)end
+local function sameColor(a,b)local r1,g1,b1=rgb(a);local r2,g2,b2=rgb(b);return r1==r2 and g1==g2 and b1==b2 end
+local function reasonOf(key,id,neutral)local _,why=Shapes.State(key,id,neutral);return tostring(why)end
+local function pouchOf(bag)return bag:FindFirstChild('ApprovedMesh01',true)end
+local function design(stage,variant)return Rules.DesignKey(stage,variant)end
+-- the default pack of a stage / variant: no shape at all (what the Index builds)
+local function defaultPack(stage,variant,size,coat)local b=H.ground(stage,variant,size or 1,coat or'None');local s=sig(b);b:Destroy();return s end
+local function bakeNow(key,id,neutral)Shapes.Request(key,id,neutral);return Shapes.State(key,id,neutral)end
 
 -- 1. The field ------------------------------------------------------------------------------------------------------------------------------------
 do
@@ -82,7 +95,7 @@ do
  check(#Samples==1386 and worst<1e-9,('PackShapes151.Field equals the Blender design (blender/pack_shapes.py) at all %d lattice samples (worst %.2g)'):format(#Samples,worst))
  check(Shapes.Count==6 and #Shapes.Names==6,'six variations, each with a name: '..table.concat(Shapes.Names,', '))
  for id=1,6 do
-  local yFixed,crimp,out,maxGrow,maxShrink,sym=true,true,true,0,0,true;local seen=0
+  local yFixed,crimp,maxGrow,maxShrink,sym=true,true,0,0,true
   for a=-40,40 do for b=-40,40 do for _,w in ipairs({-1,-.4,0,.4,1})do
    local u,v=a/40,b/40
    local x,y,z=Shapes.Field(id,u,v,w)
@@ -91,7 +104,6 @@ do
    local sx=u~=0 and x/u or 1;local sz=w~=0 and z/w or 1
    maxGrow=math.max(maxGrow,sx-1,sz-1);maxShrink=math.max(maxShrink,1-sx,1-sz)
    local x2,_,z2=Shapes.Field(id,-u,v,-w);if x2~=-x or z2~=-z then sym=false end
-   if math.abs(sx-1)>.001 or math.abs(sz-1)>.001 then seen+=1 end
   end end end
   check(yFixed,'variation '..id..' ('..Shapes.Names[id]..'): y never moves (the pivot and the bottom line stay)')
   check(crimp,'variation '..id..': the crimps (|v| >= .94: the seal and the 8 tear strips) are untouched, exactly')
@@ -106,37 +118,54 @@ do
  end end
 end
 
--- 2. Assignment -----------------------------------------------------------------------------------------------------------------------------------
+-- 2. The roll -------------------------------------------------------------------------------------------------------------------------------------
 do
- local golden={Forest='123456',Desert='234561',Snow='345612',Lava='456123',Crystal='612345',Jungle='456123',Storm='561234'} -- (the shipped assignment: it must never change)
- local byBiome,used={},{}
- for _,d in ipairs(DESIGNS)do byBiome[d.Biome]=byBiome[d.Biome]or{};byBiome[d.Biome][d.Tier]=Shapes.Assign(d.Key);used[Shapes.Assign(d.Key)]=true end
- local lines={}
- for stage=1,7 do
-  local biome=Rules.DesignBiomes[stage];local row=byBiome[biome]
-  local text=table.concat(row,'');lines[#lines+1]=biome..' '..text
-  check(text==golden[biome],biome..': tiers 1-6 have variations '..text..' (the golden table says '..golden[biome]..')')
-  local neighbours=true;for t=1,5 do if row[t]==row[t+1]then neighbours=false end end
-  check(neighbours,biome..': neighbouring tiers differ')
-  local all={};for _,v in ipairs(row)do all[v]=true end
-  check(#row==6 and all[1]and all[2]and all[3]and all[4]and all[5]and all[6],biome..': the six tiers use all six variations')
- end
- check(used[1]and used[2]and used[3]and used[4]and used[5]and used[6],'all six variations are in use across the 42 designs')
- local again=true;for _,d in ipairs(DESIGNS)do if Shapes.Assign(d.Key)~=Shapes.Assign(d.Key)then again=false end end
- check(again,'deterministic: the same name, the same variation, every call')
- check(Shapes.Assign('Forest_01')==1 and Shapes.Assign('Storm_02')==6,'Forest_01 is variation 1 and Storm_02 (the Verity pouch) variation 6')
- local odd=Shapes.Assign('Mystery');check(odd>=1 and odd<=6 and odd==Shapes.Assign('Mystery'),'a name that is not Biome_NN still gets one fixed variation ('..odd..')')
- check(Shapes.Assign(nil)>=1 and Shapes.Assign('')>=1,'nil / empty names do not error')
- print('assignment: '..table.concat(lines,' | '))
+ fresh()
+ for _,k in ipairs({'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06','Small','Standard','Grand',VERITY})do check(Shapes.Applies(k),k..' takes a shape (an ordinary biome pack, a legacy sack, the Verity pack)')end
+ for _,k in ipairs({'EclipseReliquary','MechLimited','Nope',''})do check(not Shapes.Applies(k),tostring(k)..' takes none (the Void, the Mech, an unknown variant)')end
+ check(not Shapes.Applies(nil)and not Shapes.Applies(3)and not Shapes.Applies({}),'nil / a number / a table take none')
+ for _,v in ipairs({0,'3',2.5,7,-1,0/0,math.huge,true,{},false})do check(Shapes.Sanitize(v)==0,'Sanitize('..tostring(v)..') is 0 (the default shape)')end
+ check(Shapes.Sanitize(nil)==0,'Sanitize(nil) is 0')
+ for i=1,6 do check(Shapes.Sanitize(i)==i,'Sanitize('..i..') is '..i)end
+ -- the dice
+ for k=0,5 do check(Shapes.Roll('Pack03',(k+.5)/6)==k+1,'a draw of '..string.format('%.3f',(k+.5)/6)..' is variation '..(k+1))end
+ check(Shapes.Roll('Pack01',0)==1 and Shapes.Roll('Pack01',1)==6 and Shapes.Roll('Pack01',1/6-1e-9)==1 and Shapes.Roll('Pack01',1/6)==2 and Shapes.Roll('Pack01',5/6-1e-9)==5 and Shapes.Roll('Pack01',5/6)==6,'the boundaries: 0 -> 1, 1/6 -> 2, 5/6 -> 6, 1 -> 6')
+ check(Shapes.Roll('Pack01',-5)==1 and Shapes.Roll('Pack01',7)==6,'a draw outside 0..1 is clamped')
+ -- the distribution: 120,000 low-discrepancy draws and 60,000 of the module's own dice
+ local counts={0,0,0,0,0,0}
+ for i=1,120000 do local id=Shapes.Roll('Pack04',(i*0.6180339887498949)%1);counts[id]+=1 end
+ local worst=0;for i=1,6 do worst=math.max(worst,math.abs(counts[i]-20000))end
+ check(worst<=30,'120,000 evenly spread draws fall 20,000 on each variation (worst off by '..worst..')')
+ local function rolledSum()local s=0;for _,v in ipairs(Shapes.Status().Rolled)do s+=v end;return s end
+ -- (the mock's Random is a small LCG: the dice are checked with a good generator behind the same Random.new() / NextNumber interface)
+ local mockRandom=W.env.Random;math.randomseed(20151)
+ W.env.Random={new=function()return{NextNumber=function()return math.random()end}end};Shapes.Reset()
+ local own={0,0,0,0,0,0};local n=60000;local sum0=rolledSum()
+ for _=1,n do local id=Shapes.Roll('Pack02');own[id]+=1 end
+ local counted=rolledSum()-sum0
+ W.env.Random=mockRandom;Shapes.Reset()
+ local worst2,low=0,1e9;for i=1,6 do worst2=math.max(worst2,math.abs(own[i]-n/6));low=math.min(low,own[i])end
+ check(low>0 and worst2<=420,('the roll\'s own dice: 60,000 rolls are uniform: %s (worst off by %d of %d expected; 4.6 sigma is 420)'):format(table.concat(own,' '),worst2,n/6))
+ check(counted==n,'the status counts every roll ('..counted..' of '..n..')')
+ -- not every variant, and the modes
+ check(Shapes.Roll('EclipseReliquary')==nil and Shapes.Roll('MechLimited')==nil and Shapes.Roll('Nope')==nil and Shapes.Roll(nil)==nil,'the Void, the Mech and unknown variants roll nothing')
+ server();Shapes.SetMode(4)
+ local all4=true;for _=1,200 do if Shapes.Roll('Pack02')~=4 then all4=false end end
+ check(all4 and Shapes.Roll('EclipseReliquary')==nil,'forced to 4: every new pack of a variant that takes one rolls 4; the Void still none')
+ Shapes.SetMode('off');check(Shapes.Roll('Pack02')==nil and Shapes.Roll('Pack02',.5)==nil,'off: nothing is rolled')
+ Shapes.SetMode('auto');check(Shapes.Roll('Pack02',.5)==4,'auto: dice again (.5 -> 4)')
+ -- the roll does not depend on the design or the stage
+ local per={}for _,k in ipairs({'Pack01','Pack06','Small'})do per[k]=Shapes.Roll(k,.3)end
+ check(per.Pack01==2 and per.Pack06==2 and per.Small==2,'the same draw is the same variation for every variant')
 end
 
--- 3. The bake -------------------------------------------------------------------------------------------------------------------------------------
--- Checks one baked design against its template: `meshes` = the mock EditableMeshes of this design in bake order (the template's parts sorted by name).
-local function geometry(key,id,meshes,label)
+-- 3. The bake of a pair ---------------------------------------------------------------------------------------------------------------------------
+-- Checks one baked pair against its template: `meshes` = the mock EditableMeshes of this pair in bake order (the template's parts sorted by name).
+local function geometry(key,id,meshes,label,neutral)
  local parts=meshesOf(key);local lo,hi=boxOf(parts);local c=(lo+hi)/2;local h=(hi-lo)/2
- local shaped={};for _,p in ipairs(Shapes.Template(key):GetChildren())do if p:IsA('MeshPart')then shaped[#shaped+1]=p end end;table.sort(shaped,function(a,b)return a.Name<b.Name end)
+ local shaped={};for _,p in ipairs(Shapes.Template(key,id,neutral):GetChildren())do if p:IsA('MeshPart')then shaped[#shaped+1]=p end end;table.sort(shaped,function(a,b)return a.Name<b.Name end)
  local ok,why=true,''
- local moved,total=0,0;local worstOut=-1;local worstY=0;local worstCrimp=0;local worstMid=0;local normalsOk=true
+ local moved,total=0,0;local worstOut=-1;local worstY=0;local worstCrimp=0;local worstMid=0;local normalsOk=true;local whiteOk=true
  for i,src in ipairs(parts)do
   local m=meshes[i];local frame=src:GetAttribute('PackLocalFrame')
   if not m then ok=false;why='no mesh '..i;break end
@@ -153,9 +182,11 @@ local function geometry(key,id,meshes,label)
    local vn=(q0.Y-c.Y)/h.Y
    if math.abs(vn)>=.94 then worstCrimp=math.max(worstCrimp,math.abs(q1.X-q0.X),math.abs(q1.Z-q0.Z))end
    worstOut=math.max(worstOut,math.abs(q1.X-c.X)/h.X-1,math.abs(q1.Z-c.Z)/h.Z-1)
-   -- the normals: unit, and turned by a little
    local n0=(m._init[v]-mid);n0=n0.Magnitude>1e-9 and n0.Unit or V3(0,0,1)
    local n1=m._normals[v];if not(near(n1.Magnitude,1,1e-6)and n1:Dot(n0)>.5)then normalsOk=false end
+   local col=m._colors[v];local isWhite=col.R>.999 and col.G>.999 and col.B>.999
+   if neutral and not isWhite then whiteOk=false end
+   if not neutral and col.R~=R.Color3.fromRGB(20+(v*37)%200,15+(v*11)%120,30+(v*53)%220).R then whiteOk=false end
   end
  end
  check(ok,label..': every mesh was loaded ('..why..')')
@@ -165,77 +196,75 @@ local function geometry(key,id,meshes,label)
  check(worstMid<2e-6,label..': each part\'s PackLocalFrame follows its mesh\'s bounding-box centre, so the vertices stay where the field put them ('..string.format('%.2g',worstMid)..')')
  check(moved/total>.1,label..string.format(': the field moved %d%% of the vertices',math.floor(moved/total*100)))
  check(normalsOk,label..': the normals are unit length and turned by less than 60 degrees')
+ check(whiteOk,label..(neutral and': every vertex colour is white'or': every vertex colour is what the print had'))
 end
-local function templateChecks(key,id,label)
- local model=Shapes.Template(key);local parts=meshesOf(key)
+local function templateChecks(key,id,label,neutral)
+ local model=Shapes.Template(key,id,neutral);local parts=meshesOf(key)
  if not check(model~=nil and model:IsA('Model')and model.Parent==nil and model.Name==key,label..': the shaped template is a Model of the design, kept in memory (never parented)')then return end
- check(model:GetAttribute('PackShape')==id and model:GetAttribute('MeshCount')==#parts and model:GetAttribute('MeshBakeVersion')==123,label..': it says its variation ('..tostring(model:GetAttribute('PackShape'))..') and keeps the template\'s MeshCount / MeshBakeVersion')
+ check(model:GetAttribute('PackShape')==id and model:GetAttribute('MeshCount')==#parts and model:GetAttribute('MeshBakeVersion')==123 and(model:GetAttribute('Neutral')==true)==(neutral==true),label..': it says its variation ('..tostring(model:GetAttribute('PackShape'))..') and keeps the template\'s MeshCount / MeshBakeVersion')
  local got={};for _,p in ipairs(model:GetChildren())do if p:IsA('MeshPart')then got[#got+1]=p end end;table.sort(got,function(a,b)return a.Name<b.Name end)
  local lo0,hi0=boxOf(parts)
- local same=#got==#parts;local worst=0;local yEq=true;local frames=true
+ local same=#got==#parts;local yEq=true;local frames=true;local scaleOk=true
  for i,p in ipairs(got)do local s=parts[i]
   if p.Name~=s.Name then same=false else
    local ratio=V3(p.Size.X/s.Size.X,p.Size.Y/s.Size.Y,p.Size.Z/s.Size.Z)
-   worst=math.max(worst,ratio.X-1,ratio.Z-1);if p.Size.Y~=s.Size.Y then yEq=false end
+   if p.Size.Y~=s.Size.Y then yEq=false end
    local f1,f2=p:GetAttribute('PackLocalFrame'),s:GetAttribute('PackLocalFrame');local d,r=cfDelta(f1,f2)
-   if math.abs(f1.Position.Y-f2.Position.Y)>1e-9 or r>1e-9 or d>.1 then frames=false end -- (same rotation; the centre moved sideways at most a little; never in y)
+   if math.abs(f1.Position.Y-f2.Position.Y)>1e-9 or r>1e-9 or d>.1 then frames=false end
    -- (a small part off the box's middle can change size by more than 5% of ITSELF: what is bounded is how far it moves inside the box, 5%, checked by `geometry`)
-   if p.Size.X-s.Size.X>.05*(hi0.X-lo0.X)+1e-9 or p.Size.Z-s.Size.Z>.05*(hi0.Z-lo0.Z)+1e-9 or ratio.X<.5 or ratio.Z<.5 then same=false;print('   '..label..' '..p.Name..' ratio '..tostring(ratio)) end
+   if p.Size.X-s.Size.X>.05*(hi0.X-lo0.X)+1e-9 or p.Size.Z-s.Size.Z>.05*(hi0.Z-lo0.Z)+1e-9 or ratio.X<.5 or ratio.Z<.5 then same=false end
    if p.Anchored~=true or p.CanCollide~=false or p.MeshId==s.MeshId then same=false end
+   for _,a in ipairs({'X','Y','Z'})do if not near(p.Size[a]/p.MeshSize[a],s.Size[a]/s.MeshSize[a],1e-6)then scaleOk=false end end
+   if neutral and not(p.Color.R==1 and p.Color.G==1 and p.Color.B==1 and p.Material.Name=='SmoothPlastic'and p.TextureID=='')then same=false end
   end
  end
  check(same,label..': the same MeshParts (names), each Size within 5% (of the design\'s width / depth) of the template\'s, anchored, a baked mesh (not the template\'s MeshId)')
  check(yEq and frames,label..': Size.Y is exactly the template\'s and every PackLocalFrame keeps its rotation (the 180 degree turn) and its height (the bottom line)')
- local scaleOk=true
- for i,p in ipairs(got)do local s=parts[i];for _,a in ipairs({'X','Y','Z'})do if not near(p.Size[a]/p.MeshSize[a],s.Size[a]/s.MeshSize[a],1e-6)then scaleOk=false end end end
  check(scaleOk,label..': the studs per mesh unit are the template\'s (the reshaped mesh is not stretched)')
- -- Bounds: inside today's box +-5%
  local lo,hi=boxOf(parts);local lo2,hi2=boxOf(got)
  local ext,ext2=hi-lo,hi2-lo2
  check(ext2.Y==ext.Y and lo2.Y==lo.Y and hi2.Y==hi.Y and ext2.X<=ext.X*1.0501 and ext2.Z<=ext.Z*1.0501 and ext2.X>=ext.X*.79 and ext2.Z>=ext.Z*.79,label..string.format(': the design\'s box: height and bottom / top exactly today\'s, width %.3f and depth %.3f of today\'s',ext2.X/ext.X,ext2.Z/ext.Z))
 end
 do
  fresh()
- local key='Lava_02';local parts=meshesOf(key);local id=Shapes.Assign(key)
+ local key='Lava_02';local parts=meshesOf(key);local id=3
  check(#parts==2,'(Lava_02 has two MeshParts, to test a design with more than one mesh)')
- check(Shapes.State(key)=='Idle'and Shapes.Template(key)==nil,'before a request: Idle, no template')
+ check(Shapes.State(key,id)=='Idle'and Shapes.Template(key,id)==nil,'before a request: Idle, no template')
+ check(Shapes.State(key,0)=='Off'and Shapes.State(key,nil)=='Off'and Shapes.State(key,9)=='Off','shape 0 / nil / 9 is the default: Off, nothing to bake')
  local calls=Mock.calls
- check(Shapes.Request(key)=='Ready','a request bakes the design (the mock answers at once): Ready')
+ check(Shapes.Request(key,id)=='Ready','a request bakes the pair (the mock answers at once): Ready')
  check(Mock.calls==calls+2 and Mock.created==2 and Mock.alive==0 and Mock.maxAlive==1 and Mock.baked==2 and Mock.bakedAlive==2,('two meshes loaded one after the other, both EditableMeshes destroyed (alive %d, most at once %d), both MeshParts kept'):format(Mock.alive,Mock.maxAlive))
  check(Mock.uris[1]==parts[1].MeshId and Mock.uris[2]==parts[2].MeshId,'the meshes loaded are the live template\'s own MeshIds, in part order ('..tostring(Mock.uris[1])..')')
- check(Mock.sets.Color==0 and Mock.sets.ColorAlpha==0 and Mock.sets.UV==0,'vertex colours and UVs are never set: the print stays')
- local intact=true;for _,m in ipairs(Mock.meshes)do for i,c in ipairs(m._colors)do if c.R~=R.Color3.fromRGB(20+(i*37)%200,15+(i*11)%120,30+(i*53)%220).R then intact=false end end end
- check(intact,'... and every vertex colour is what the print had')
+ check(Mock.sets.Color==0 and Mock.sets.ColorAlpha==0 and Mock.sets.UV==0,'vertex colours and UVs are never set for a printed pair: the print stays')
  check(Mock.sets.Position==2*Mock.vertices and Mock.sets.Normal>0,('every vertex of both meshes got a position (%d), and normals were set (%d)'):format(Mock.sets.Position,Mock.sets.Normal))
  geometry(key,id,Mock.meshes,'Lava_02 / variation '..id)
- templateChecks(key,id,'Lava_02')
+ templateChecks(key,id,'Lava_02 / '..id)
  local f=folder()
- check(f and f:GetAttribute('Ready')==true and f:GetAttribute('FailureCount')==0 and f:GetAttribute('BakedCount')==1 and f:GetAttribute('Requested')==1 and f:GetAttribute('Pending')==0 and f:GetAttribute('Vertices')==3600 and f:GetAttribute('Mode')=='auto','the status folder: Ready, FailureCount 0, BakedCount 1, Requested 1, Pending 0, 3600 vertices, mode auto')
- local c2=Mock.calls;Shapes.Request(key);Shapes.ForBuild(key);check(Mock.calls==c2,'a design is baked once')
- -- the id is READ from the template at run time, not written in the module
+ check(f and f:GetAttribute('Ready')==true and f:GetAttribute('FailureCount')==0 and f:GetAttribute('BakedCount')==1 and f:GetAttribute('Requested')==1 and f:GetAttribute('Pending')==0 and f:GetAttribute('Pairs')==1 and f:GetAttribute('Vertices')==3600 and f:GetAttribute('Mode')=='auto','the status folder: Ready, FailureCount 0, BakedCount 1, Requested 1, Pending 0, 1 pair, 3600 vertices, mode auto')
+ check(near(f:GetAttribute('Megabytes'),3600*48/1e6,.1),'... and an estimate of '..tostring(f:GetAttribute('Megabytes'))..' MB')
+ local c2=Mock.calls;Shapes.Request(key,id);Shapes.ForBag(key,id);check(Mock.calls==c2,'a pair is baked once')
+ check(Shapes.State(key,4)=='Idle','another variation of the same design is another pair')
  local src=W.B.PackShapes151
  check(not src:find('rbxassetid',1,true)and src:find('CreateEditableMeshAsync',1,true)and src:find('SetPosition',1,true)and src:find('CreateMeshPartAsync',1,true),'(source: no asset id in PackShapes151; it loads the template\'s MeshId with CreateEditableMeshAsync, moves vertices with SetPosition, bakes with CreateMeshPartAsync)')
- check(not src:find('SetColor',1,true)and not src:find('SetUV',1,true)and not src:find(':SetColorAlpha',1,true),'(source: it never sets a colour or a UV)')
+ check(not src:find('SetUV',1,true),'(source: it never sets a UV)')
 end
--- every design
+-- every pair of the game: 42 designs x 6 variations
 do
- fresh();local bad=0;local firstBad
- local before=Mock.created
- for _,d in ipairs(DESIGNS)do
-  local n=#meshesOf(d.Key);local startMesh=#Mock.meshes
-  Shapes.Request(d.Key)
-  if Shapes.State(d.Key)~='Ready'then bad+=1;firstBad=firstBad or d.Key end
+ fresh();Mock.vertices=300;local bad=0;local firstBad;local count=0
+ Shapes.Config.MaxResidentVertices=1e9;Shapes.Config.HardResidentVertices=1e9
+ for _,d in ipairs(DESIGNS)do for id=1,6 do
+  local startMesh=#Mock.meshes
+  if bakeNow(d.Key,id)~='Ready'then bad+=1;firstBad=firstBad or d.Key..'/'..id end
   local mine={};for i=startMesh+1,#Mock.meshes do mine[#mine+1]=Mock.meshes[i]end
-  geometry(d.Key,Shapes.Assign(d.Key),mine,d.Key)
-  templateChecks(d.Key,Shapes.Assign(d.Key),d.Key)
- end
- check(bad==0,'all 42 designs bake ('..bad..' did not'..(firstBad and(', first '..firstBad)or'')..')')
- check(Mock.created==115 and Mock.alive==0 and Mock.maxAlive==1 and Mock.bakedAlive==115,('115 meshes for 42 designs, one EditableMesh alive at a time (most %d), none left (%d)'):format(Mock.maxAlive,Mock.alive))
- local f=folder();check(f:GetAttribute('BakedCount')==42 and f:GetAttribute('FailureCount')==0 and f:GetAttribute('Ready')==true and f:GetAttribute('Vertices')==115*1800,'status: BakedCount 42, FailureCount 0, Ready, '..tostring(f:GetAttribute('Vertices'))..' vertices')
- -- Bounds are today's (Visuals.Bounds reads the place's own template) and the shaped pouch is inside them +5%: radius, bottom, top, measured the way Visuals.Bounds does
- local function extent(parts)
+  geometry(d.Key,id,mine,d.Key..'/'..id);templateChecks(d.Key,id,d.Key..'/'..id);count+=1
+ end end
+ check(bad==0 and count==252,'all 252 pairs (42 designs x 6 variations) bake ('..bad..' did not'..(firstBad and(', first '..firstBad)or'')..')')
+ check(Mock.created==115*6 and Mock.alive==0 and Mock.maxAlive==1 and Mock.bakedAlive==115*6,('690 meshes for 252 pairs, one EditableMesh alive at a time (most %d), none left (%d)'):format(Mock.maxAlive,Mock.alive))
+ local f=folder();check(f:GetAttribute('BakedCount')==252 and f:GetAttribute('FailureCount')==0 and f:GetAttribute('Pairs')==252 and f:GetAttribute('Vertices')==690*300,'status: BakedCount 252, FailureCount 0, 252 pairs, '..tostring(f:GetAttribute('Vertices'))..' vertices')
+ -- Bounds: Visuals.Bounds reads the place's own template and holds every shaped pouch to within 5%
+ local function extent(list)
   local r,minY,maxY=0,1e9,-1e9
-  for _,p in ipairs(parts)do local fr=p:GetAttribute('PackLocalFrame')
+  for _,p in ipairs(list)do local fr=p:GetAttribute('PackLocalFrame')
    for _,x in ipairs({-.5,.5})do for _,y in ipairs({-.5,.5})do for _,z in ipairs({-.5,.5})do
     local v=fr*V3(p.Size.X*x,p.Size.Y*y,p.Size.Z*z);r=math.max(r,V3(v.X,0,v.Z).Magnitude);minY=math.min(minY,v.Y);maxY=math.max(maxY,v.Y)
    end end end
@@ -243,315 +272,559 @@ do
   return r,minY,maxY
  end
  local holds,same,worst=true,true,0
- for _,d in ipairs(DESIGNS)do for _,size in ipairs({1,25})do
-  local scale=Rules.GetVariant(d.Variant).BagScale*Rules.GetTheme(d.Stage).Scale*Rules.SanitizePackSize(size)
-  local b=Visuals.Bounds(d.Stage,d.Variant,size)
-  local sp={};for _,p in ipairs(Shapes.Template(d.Key):GetChildren())do if p:IsA('MeshPart')then sp[#sp+1]=p end end
+ for _,d in ipairs(DESIGNS)do for id=1,6 do
+  local scale=Rules.GetVariant(d.Variant).BagScale*Rules.GetTheme(d.Stage).Scale
+  local b=Visuals.Bounds(d.Stage,d.Variant,1)
+  local sp={};for _,p in ipairs(Shapes.Template(d.Key,id):GetChildren())do if p:IsA('MeshPart')then sp[#sp+1]=p end end
   local r,minY,maxY=extent(sp);local r0,minY0,maxY0=extent(meshesOf(d.Key))
-  if r*scale>b.Radius*1.0501 or minY*scale<b.MinY-1e-9 or maxY*scale>b.MaxY+1e-9 then holds=false;print(('   Bounds %s %sx: shaped radius %.4f / Bounds %.4f'):format(d.Key,size,r*scale,b.Radius))end
-  if r>r0*1.0501 or minY~=minY0 or maxY~=maxY0 then same=false;print(('   %s: shaped radius %.4f, today %.4f; y %.4f..%.4f / %.4f..%.4f'):format(d.Key,r,r0,minY,maxY,minY0,maxY0))end
+  if r*scale>b.Radius*1.0501 or minY*scale<b.MinY-1e-9 or maxY*scale>b.MaxY+1e-9 then holds=false end
+  if r>r0*1.0501 or minY~=minY0 or maxY~=maxY0 then same=false end
   worst=math.max(worst,r/r0)
  end end
- check(holds,'Visuals.Bounds of every design (sizes 1 and 25; it reads the place\'s own template, unchanged) holds the shaped pouch to within 5%: radius, bottom, top')
- check(same,('the shaped pouch\'s radius is at most 5%% over today\'s (worst %.3f) and its bottom and top are exactly today\'s'):format(worst))
+ check(holds,'Visuals.Bounds of every design (it reads the place\'s own template, unchanged) holds every one of its six shaped pouches to within 5%: radius, bottom, top')
+ check(same,('every shaped pouch\'s radius is at most 5%% over today\'s (worst %.3f) and its bottom and top are exactly today\'s'):format(worst))
 end
 
 -- 4. Contexts -------------------------------------------------------------------------------------------------------------------------------------
-local function contexts(stage,variant,key,label)
- fresh();Shapes.Config.Enabled=false;local off=sig(H.ground(stage,variant,1,'None'));Shapes.Config.Enabled=true;Shapes.Reset()
- Shapes.Request(key);local id=Shapes.Assign(key);local shapedTpl=Shapes.Template(key);local calls=Mock.calls
+local function contexts(stage,variant,shape,label)
+ fresh();local key=design(stage,variant)
+ local off=defaultPack(stage,variant)
+ check(bakeNow(key,shape)=='Ready','('..label..': the pair is baked)')
+ local shapedTpl=Shapes.Template(key,shape);local calls=Mock.calls
  local reference
- local function compare(bag,name,ignoreScale)
+ local function compare(bag,name)
   local s=sig(bag);reference=reference or s
   local same,why=sameSig(s,reference);check(same,label..' '..name..': the same parts, sizes and positions as the ground pack'..(why and(' ('..why..')')or''))
+  check(bag:GetAttribute('PackShape')==shape and bag:GetAttribute('PackShapeShown')==shape,label..' '..name..': says its shape (PackShape '..tostring(bag:GetAttribute('PackShape'))..', shown '..tostring(bag:GetAttribute('PackShapeShown'))..')')
   return s
  end
  for _,coat in ipairs({'None','Gold','Diamond'})do for _,size in ipairs({1,25})do
-  local g=H.ground(stage,variant,size,coat);local s=compare(g,'ground '..size..'x '..coat)
-  local pouch=g:FindFirstChild('ApprovedMesh01',true)
-  local want=shapedTpl.ApprovedMesh01.Size
-  check(pouch and near(pouch.Size.X/(g:GetAttribute('VisualScale')),want.X,1e-6)and near(pouch.Size.Z/(g:GetAttribute('VisualScale')),want.Z,1e-6),label..' ground '..size..'x '..coat..': the pouch is the SHAPED mesh ('..tostring(pouch and pouch.Size/g:GetAttribute('VisualScale'))..')')
-  check(not sameSig(s,off)or id==0,label..': the shaped pack is not today\'s pack')
-  -- the seal and strips are exactly today's
+  local g=H.ground(stage,variant,size,coat,nil,shape);local s=compare(g,'ground '..size..'x '..coat)
+  local pouch=pouchOf(g);local scale=g:GetAttribute('VisualScale');local want=shapedTpl.ApprovedMesh01.Size
+  check(pouch and near(pouch.Size.X/scale,want.X,1e-6)and near(pouch.Size.Z/scale,want.Z,1e-6),label..' ground '..size..'x '..coat..': the pouch is the SHAPED mesh ('..tostring(pouch and pouch.Size/scale)..')')
+  check(pouch and pouch.MeshId=='' and assets[key]:GetChildren()[1].MeshId~='','(the pouch of the shaped pack is a baked mesh, not the place\'s own: '..label..')')
   local flush=true;for k,v in pairs(off)do if k:find('Seal')or k:find('TearStrip')then local x=s[k];if not x or(x.Pos-v.Pos).Magnitude>1e-9 or(x.Size-v.Size).Magnitude>1e-9 then flush=false end end end
-  check(flush,label..' ground '..size..'x '..coat..': the seal and the 8 tear strips are exactly where today\'s are')
+  check(flush,label..' ground '..size..'x '..coat..': the seal and the 8 tear strips are exactly where the default pack\'s are')
   local c=Rules.PackMutations[coat];if c.Color then local painted=true;for _,p in ipairs(H.partsOf(g,false))do if p.Color~=c.Color then painted=false end end;check(painted,label..' '..coat..': the coat paints the shaped pouch like any')end
   if size>10 then local tagged=0;for _,p in ipairs(H.partsOf(g,false))do if W.CS:HasTag(p,'GiantVisualPart')then tagged+=1 end end;check(tagged==#H.partsOf(g,false),label..': a giant: every part tagged GiantVisualPart')end
   g:Destroy()
  end end
  for _,rig in ipairs({'R15','R6'})do
-  local held,char=H.held(stage,variant,1,'None',rig);compare(held,'held '..rig);held:Destroy();char:Destroy()
+  local held,char=H.held(stage,variant,1,'None',rig,shape);compare(held,'held '..rig);held:Destroy();char:Destroy()
  end
- do local char=H.character('R15');local carry=Visuals.CarryBag(char,stage,variant,1,1,'None');compare(carry,'CarryBag');carry:Destroy();char:Destroy()end
- do local p=H.picture(stage,variant,1,'None');compare(p,'picture');local sp=H.sanitized(p);compare(sp,'sanitized picture');p:Destroy()end
- do local held,char=H.held(stage,variant,1,'None','R15');local copy=H.openingCopy(held);compare(copy,'opening copy');copy:Destroy();held:Destroy();char:Destroy()end
- do local m=H.market(stage,variant);compare(m,'market display');m:Destroy()end
- do local m,holder=H.mystery(stage,variant,false);local scale=m:GetAttribute('VisualScale');local want=shapedTpl.ApprovedMesh01.Size
-  local pouch=m:FindFirstChild('ApprovedMesh01',true);check(pouch and near(pouch.Size.X/scale,want.X,1e-6),label..' mystery pedestal (x1.7): the shaped pouch');compare(m,'mystery pedestal');holder:Destroy()end
- do local b,vf=H.viewport(stage,variant,1,'None');compare(b,'viewport');b:Destroy()end
+ do local char=H.character('R15');local carry=Visuals.CarryBag(char,stage,variant,1,1,'None',shape);compare(carry,'CarryBag');carry:Destroy();char:Destroy()end
+ do local p=H.picture(stage,variant,1,'None',shape);compare(p,'picture');local sp=H.sanitized(p);compare(sp,'sanitized picture');p:Destroy()end
+ do local held,char=H.held(stage,variant,1,'None','R15',shape);local copy=H.openingCopy(held);compare(copy,'opening copy');copy:Destroy();held:Destroy();char:Destroy()end
+ -- a catalogue / shop / reward picture, a market stall and a shop viewport are flagged DefaultPackShape: the default pack whatever a pack rolled; the flag wins over a shape
+ local function isDefault(b,what)check(b:GetAttribute('DefaultPackShape')==true and b:GetAttribute('PackShape')==nil and b:GetAttribute('PackShapeShown')==nil and sameSig(sig(b),off),label..' '..what..' (flagged DefaultPackShape, shape '..shape..' given): the default pack, no roll claimed')end
+ do local m=H.market(stage,variant,shape);isDefault(m,'market stall');m:Destroy()end
+ do local p=H.picture(stage,variant,1,'None',shape,true);isDefault(p,'catalogue / shop / reward picture');local sp=H.sanitized(p);check(sameSig(sig(sp),off),label..' ... and sanitised');p:Destroy()end
+ do local b,vf=H.viewport(stage,variant,1,'None',nil,shape,true);isDefault(b,'shop viewport');b:Destroy()end
+ do local m,holder=H.mystery(stage,variant,false,shape);local scale=m:GetAttribute('VisualScale');local want=shapedTpl.ApprovedMesh01.Size
+  local pouch=pouchOf(m);check(pouch and near(pouch.Size.X/scale,want.X,1e-6),label..' mystery pedestal (x1.7): the shaped pouch');compare(m,'mystery pedestal');holder:Destroy()end
+ do local b,vf=H.viewport(stage,variant,1,'None',nil,shape);compare(b,'viewport');b:Destroy()end
+ -- the locked silhouette is always the default plain pack
+ do local m,holder=H.mystery(stage,variant,true,shape);check(m:GetAttribute('PackShape')==nil,label..' mystery silhouette: no shape (every locked pedestal looks the same)');holder:Destroy()end
+ -- no shape (the Index, the catalogues), 0 and an invalid value are the default pack
+ for _,v in ipairs({0,9,'x'})do local b=H.ground(stage,variant,1,'None',nil,v);check(sameSig(sig(b),off),label..': a pack with shape '..tostring(v)..' is the default pack');b:Destroy()end
+ local plain=H.ground(stage,variant,1,'None');check(plain:GetAttribute('PackShape')==nil and plain:GetAttribute('PackShapeShown')==nil and sameSig(sig(plain),off),label..': no shape at all (the Index, a catalogue, a shop) is the default pack and carries no shape attribute');plain:Destroy()
  check(Mock.calls==calls,label..': building every context baked nothing more ('..(Mock.calls-calls)..' extra)')
  check(Mock.alive==0,label..': no EditableMesh left alive')
 end
-contexts(4,'Pack03','Lava_03','Lava_03 (variation '..Shapes.Assign('Lava_03')..')')
-contexts(1,'Pack02','Forest_02','Forest_02 (variation '..Shapes.Assign('Forest_02')..')')
--- the multi-mesh design (two MeshParts + Snow's 16): every part
+do -- the flag wins: a bag flagged DefaultPackShape asks PackShapes151 for nothing, whatever shape it is given (or already carries); an unflagged one asks
+ fresh();local asked=0;local base=Shapes.ForBag;Shapes.ForBag=function(...)asked+=1;return base(...)end
+ Shapes.Request('Forest_04',3)
+ local flagged=H.picture(1,'Pack04',1,'None',3,true)
+ check(flagged:GetAttribute('DefaultPackShape')==true and flagged:GetAttribute('PackShape')==nil and asked==0 and pouchOf(flagged).MeshId==assets.Forest_04.ApprovedMesh01.MeshId,'SeedPackVisuals.Bag(..., defaultShape, shape 3): flagged, no PackShape claimed, PackShapes151.ForBag never asked, the design\'s own mesh ('..asked..' asks)')
+ local free=H.picture(1,'Pack04',1,'None',3)
+ check(free:GetAttribute('PackShape')==3 and asked==1 and pouchOf(free).MeshId=='','the same bag unflagged does ask, and is the baked shape (control: '..asked..' ask)')
+ local both=H.picture(1,'Pack04',1,'None',nil,true);local pg=both:FindFirstChild('PackGeometry');pg:Destroy();both:SetAttribute('CompactPackReady',nil);both:SetAttribute('PackShape',3)
+ W.module('SeedPackRenderer').Build(both,function()return true end)
+ check(asked==1 and pouchOf(both)and pouchOf(both).MeshId==assets.Forest_04.ApprovedMesh01.MeshId,'SeedPackRenderer itself honours the flag: a flagged bag that also carries PackShape 3 is still built from the design\'s own mesh ('..asked..' asks)')
+ Shapes.ForBag=base;flagged:Destroy();free:Destroy();both:Destroy()
+ local fv=H.ground(1,'Pack02',1,'None',nil,3);check(fv:GetAttribute('DefaultPackShape')==nil,'an ordinary pack (the world, the hand) is never flagged');fv:Destroy()
+end
+contexts(4,'Pack03',3,'Lava_03 / 3')
+contexts(1,'Pack02',5,'Forest_02 / 5')
+contexts(7,'Pack06',6,'Storm_06 / 6')
+-- a multi-mesh design builds every shaped mesh
 do
- fresh();local key='Snow_06';Shapes.Request(key);local bag=H.ground(3,'Pack06',1,'None')
- local n=0;for _,p in ipairs(H.partsOf(bag,false))do if p:IsA('MeshPart')then n+=1 end end
- check(n==16 and bag:GetAttribute('PackArtKey')==key and bag:GetAttribute('VerityPack')==nil,'Snow_06 (16 MeshParts) builds all 16 shaped meshes')
- local shapedParts=0;for _,p in ipairs(Shapes.Template(key):GetChildren())do if p:IsA('MeshPart')and p:GetAttribute('Variation')==Shapes.Assign(key)then shapedParts+=1 end end
- check(shapedParts==16,'... each baked part says its variation ('..shapedParts..'/16)')
+ fresh();local key='Snow_06';bakeNow(key,2);local bag=H.ground(3,'Pack06',1,'None',nil,2)
+ local n,shapedParts=0,0;for _,p in ipairs(H.partsOf(bag,false))do if p:IsA('MeshPart')then n+=1;if p.MeshId==''then shapedParts+=1 end end end
+ check(n==16 and shapedParts==16 and bag:GetAttribute('PackArtKey')==key,'Snow_06 (16 MeshParts) builds all 16 shaped meshes ('..shapedParts..'/16 are baked meshes)')
  bag:Destroy()
 end
--- the special packs are never reshaped
+-- the special packs ignore a shape
 do
- local function build(label,stage,variant,size)Shapes.Config.Enabled=true;fresh();Shapes.Config.Enabled=true;local on=H.ground(stage,variant,size,'None');local s1=sig(on);local c1=Mock.calls
-  Shapes.Reset();Mock.reset();Shapes.Config.Enabled=false;local off=H.ground(stage,variant,size,'None');local s2=sig(off);Shapes.Config.Enabled=true
-  check(sameSig(s1,s2)and c1==0,label..': the same with the variations on and off, and no mesh loaded ('..c1..' calls)');on:Destroy();off:Destroy()end
- for _,size in ipairs({1,25})do
-  build('Void pack '..size..'x',1,H.VOID,size);build('Void pack (Storm) '..size..'x',7,H.VOID,size);build('Mech pack '..size..'x',8,H.MECH,size)
- end
- build('Verity sachet (no pouch baked)',7,H.VERITY,1)
- -- the Void's pouch is the place's own Forest_01 mesh
- fresh();local v=H.ground(1,H.VOID,1,'None');local m=v:FindFirstChild('ApprovedMesh01',true);check(m and m.MeshId==assets.Forest_01.ApprovedMesh01.MeshId,'the Void pack\'s pouch is the place\'s own Forest_01 mesh (MeshId '..tostring(m and m.MeshId)..')');v:Destroy()
+ for _,size in ipairs({1,25})do for _,spec in ipairs({{'Void',1,H.VOID},{'Void (Storm)',7,H.VOID},{'Mech',8,H.MECH}})do
+  fresh();local a=H.ground(spec[2],spec[3],size,'None',nil,4);local sa=sig(a);local calls=Mock.calls
+  local b=H.ground(spec[2],spec[3],size,'None');local sb=sig(b)
+  check(sameSig(sa,sb)and calls==0 and a:GetAttribute('PackShape')==nil,spec[1]..' pack '..size..'x ignores a shape: the same as without, no mesh loaded, no PackShape attribute');a:Destroy();b:Destroy()
+ end end
+ fresh();local v=H.ground(1,H.VOID,1,'None');local m=pouchOf(v);check(m and m.MeshId==assets.Forest_01.ApprovedMesh01.MeshId,'the Void pack\'s pouch is the place\'s own Forest_01 mesh');v:Destroy()
 end
 
--- 5. Fallbacks ------------------------------------------------------------------------------------------------------------------------------------
-local function fallback(label,key,stage,variant,setup,reasonPart)
- fresh();local today=todays(stage,variant,1,'None');fresh();local restore=setup and setup()
+-- 5. Never yields ---------------------------------------------------------------------------------------------------------------------------------
+do
+ local builders={};local realWait=R.task.wait
+ R.task.wait=function(t)if builders[coroutine.running()]then error('a pack build must never wait',2)end;return t or .03 end
+ local function build(fn)local out;local co=coroutine.create(function()out=fn()end);builders[co]=true;local ok,err=coroutine.resume(co);return ok,err,coroutine.status(co),out end
+ -- a server, a pair that is slow to bake
+ fresh();Mock.slow=true;server()
+ local ok,err,status,bag=build(function()return H.ground(1,'Pack02',1,'None',nil,3)end)
+ check(ok and status=='dead'and bag~=nil,'a server pack build never yields or errors while its pair is being baked ('..tostring(err)..')')
+ check(bag:GetAttribute('PackShape')==3 and bag:GetAttribute('PackShapeShown')==0 and pouchOf(bag).MeshId==assets.Forest_02.ApprovedMesh01.MeshId,'... the pack is the default shape this once, and still says its roll (3)')
+ check(Shapes.State('Forest_02',3)=='Loading'and #Mock.waiting==1,'... the pair is being baked (asked for by the build)')
+ local ok2,_,st2,bag2=build(function()return H.ground(1,'Pack02',1,'None',nil,3)end)
+ check(ok2 and st2=='dead'and bag2:GetAttribute('PackShapeShown')==0 and #Mock.waiting==1 and Mock.calls==1,'a second build while it loads: still the default, no second bake')
+ while Mock.resume()do end
+ check(Shapes.State('Forest_02',3)=='Ready','the bake finishes')
+ local ok3,_,_,bag3=build(function()return H.ground(1,'Pack02',1,'None',nil,3)end)
+ check(ok3 and bag3:GetAttribute('PackShapeShown')==3 and pouchOf(bag3).MeshId=='','the next build is the shaped pack (a baked mesh)')
+ for _,b in ipairs({bag,bag2,bag3})do b:Destroy()end
+ -- a client: the picture build errors "still loading" (ItemPictures retries) and draws nothing
+ fresh();Mock.slow=true;client()
+ local okc,errc=pcall(function()return H.picture(1,'Pack02',1,'None',3)end)
+ check(not okc and tostring(errc):find('still loading',1,true)~=nil,'a client\'s picture build errors "still loading" while its pair is baked: '..tostring(errc))
+ while Mock.resume()do end
+ local okd,pic=pcall(function()return H.picture(1,'Pack02',1,'None',3)end)
+ check(okd and pic:GetAttribute('PackShapeShown')==3,'... and draws the shaped pack once it is baked');if okd then pic:Destroy()end
+ server()
+ -- Settle: a new pack keeps its roll only when its pair is baked
+ fresh();Mock.slow=true
+ check(Shapes.Settle('Forest_02',3)==0,'Settle: a roll whose pair is cold is the default shape for life (0)')
+ check(Shapes.Status().Demoted==1,'... counted as Demoted')
+ check(Shapes.Settle('Forest_02',nil)==nil and Shapes.Settle('Forest_02',0)==0,'nil stays nil (a pack that takes none), 0 stays 0')
+ while Mock.resume()do end
+ check(Shapes.Settle('Forest_02',3)==3 and Shapes.Status().Demoted==1,'... and the roll once the pair is baked (the cold request started the bake)')
+ fresh();Mock.slow=false
+ check(Shapes.Settle('Forest_03',4)==4,'Settle with the mock answering at once: the roll is kept')
+ -- several pairs asked at once: ONE bake at a time (one EditableMesh alive), in the order asked, an urgent one in front of the queue
+ fresh();Mock.slow=true
+ Shapes.Request('Forest_02',3);Shapes.Request('Forest_03',3);Shapes.Request('Forest_04',3,false,true)
+ check(Shapes.State('Forest_02',3)=='Loading'and Shapes.State('Forest_03',3)=='Loading'and Shapes.State('Forest_04',3)=='Loading'and Shapes.Status().Pending==3,'three pairs asked at once: all Loading')
+ local order,seen={},{}
+ for _=1,60 do
+  Mock.resume()
+  for _,k in ipairs({'Forest_02','Forest_03','Forest_04'})do if not seen[k]and Shapes.State(k,3)=='Ready'then seen[k]=true;order[#order+1]=k end end
+ end
+ check(table.concat(order,',')=='Forest_02,Forest_04,Forest_03','they bake in the order asked, the urgent one in front of the queue ('..table.concat(order,',')..')')
+ check(Mock.maxAlive==1 and Mock.created==3 and Mock.alive==0,('... one EditableMesh alive at a time (most %d), all destroyed'):format(Mock.maxAlive))
+ Mock.slow=false
+ -- Await: bounded, yields
+ fresh();Mock.slow=true;server();R.task.wait=function(t)Mock.resume();R.advance(t or .03);return t or .03 end
+ local t0=R.clock;local ready=Shapes.Await('Forest_02',3,false)
+ check(ready==true and R.clock-t0<1,'Await waits for the bake and returns true when it is done ('..string.format('%.2f',R.clock-t0)..' s)')
+ fresh();Mock.mode='hang';R.task.wait=function(t)R.advance(t or .03);return t or .03 end
+ t0=R.clock;local ready2=Shapes.Await('Forest_02',3,false,1)
+ check(ready2==false and R.clock-t0>=1-1e-6 and R.clock-t0<1.5,'Await of a bake that never returns gives up after the time it was given ('..string.format('%.2f',R.clock-t0)..' s)')
+ check(Shapes.Await('Forest_02',0,false)==true,'Await of the default shape is immediate')
+ R.task.wait=realWait
+end
+
+-- 6. Fallbacks ------------------------------------------------------------------------------------------------------------------------------------
+local function fallback(label,stage,variant,shape,setup,reasonPart)
+ fresh();local key=design(stage,variant);local def=defaultPack(stage,variant);fresh();local restore=setup and setup()
  local w0=warns()
- local bag=H.ground(stage,variant,1,'None');local f=folder()
- local same,why=sameSig(sig(bag),today)
- check(same,label..': the pack is today\'s, exactly'..(why and(' ('..why..')')or''))
- check(Shapes.State(key)=='Off'and Shapes.Template(key)==nil and reasonOf(key):find(reasonPart,1,true)~=nil,label..': State is Off and the reason names it ('..reasonOf(key)..')')
+ local bag=H.ground(stage,variant,1,'None',nil,shape)
+ local same,why=sameSig(sig(bag),def)
+ check(same,label..': the pack is the default pack, exactly'..(why and(' ('..why..')')or''))
+ check(bag:GetAttribute('PackShape')==shape and bag:GetAttribute('PackShapeShown')==0,label..': it still says its roll; the shape shown is 0')
+ local s,why2=Shapes.State(key,shape)
+ check(s=='Off'and Shapes.Template(key,shape)==nil and tostring(why2):find(reasonPart,1,true)~=nil,label..': State is Off and the reason names it ('..tostring(why2)..')')
  check(Mock.alive==0 and Mock.bakedAlive==0,label..': nothing left over ('..Mock.alive..' EditableMesh, '..Mock.bakedAlive..' MeshPart)')
  check(warns()==w0+1,label..': exactly one warning ('..(warns()-w0)..')')
- check(f:GetAttribute('FailureCount')==1 and f:GetAttribute('Ready')==false and tostring(f:GetAttribute('LastFailure')):find(key,1,true)~=nil,label..': the status folder says FailureCount 1, not Ready, and which design ('..tostring(f:GetAttribute('LastFailure'))..')')
- local calls=Mock.calls;local again=H.ground(stage,variant,1,'None');check(Mock.calls==calls and warns()==w0+1,label..': a second pack does not try again, no second warning');again:Destroy()
+ local f=folder()
+ check(f:GetAttribute('FailureCount')==1 and f:GetAttribute('Ready')==false and tostring(f:GetAttribute('LastFailure')):find(key,1,true)~=nil,label..': the status folder says FailureCount 1, not Ready, and which pair ('..tostring(f:GetAttribute('LastFailure'))..')')
+ local calls=Mock.calls;local again=H.ground(stage,variant,1,'None',nil,shape)
+ check(Mock.calls==calls and warns()==w0+1 and sameSig(sig(again),def),label..': a second pack does not try again, no second warning, the same default pack');again:Destroy()
+ -- STICKY: the cause is gone, the pair stays the default (a fallback never flips to a shape later)
+ Mock.mode='ok';Mock.vertices=300
+ local later=H.ground(stage,variant,1,'None',nil,shape)
+ check(sameSig(sig(later),def)and Shapes.State(key,shape)=='Off','sticky: with the cause gone the pair still shows the default shape (no flip between shapes)');later:Destroy()
+ -- ... other pairs still bake
+ local other=shape%6+1;check(bakeNow(key,other)=='Ready',label..': another variation of the same design still bakes')
+ -- ... and a switch off / on forgets it (the owner fixed the permission)
+ server();Shapes.SetMode('off');Shapes.SetMode('auto')
+ check(Shapes.State(key,shape)=='Idle'and folder():GetAttribute('FailureCount')==0,label..': off / auto forgets failures: the pair may be tried again')
  bag:Destroy()
  if restore then restore()end
 end
-fallback('denied (no permission on the asset)','Forest_02',1,'Pack02',function()Mock.mode='denied'end,'no permission')
-fallback('a mesh with no vertices','Forest_02',1,'Pack02',function()Mock.mode='no_vertices'end,'no vertices')
-fallback('GetPosition / SetPosition missing','Forest_02',1,'Pack02',function()Mock.mode='no_positions'end,'not available')
-fallback('the bake does not succeed','Forest_02',1,'Pack02',function()Mock.mode='content_fails'end,'could not bake')
-fallback('CreateMeshPartAsync fails','Forest_02',1,'Pack02',function()Mock.mode='meshpart_fails'end,'out of mesh memory')
-fallback('another mesh size','Forest_02',1,'Pack02',function()Mock.mode='size_mismatch'end,'not the reshaped mesh')
-fallback('too many vertices','Forest_02',1,'Pack02',function()Mock.vertices=Shapes.Config.MaxVertices+1 end,'vertices')
-fallback('the memory cap','Forest_02',1,'Pack02',function()local old=Shapes.Config.MaxTotalVertices;Shapes.Config.MaxTotalVertices=1000;return function()Shapes.Config.MaxTotalVertices=old end end,'memory cap')
-do -- (a design with no template has no pack to build either: checked at the module)
- fresh();local m=assets.Forest_02;m.Name='Forest_02_gone';Shapes.Request('Forest_02');m.Name='Forest_02'
- check(Shapes.State('Forest_02')=='Off'and reasonOf('Forest_02'):find('not in SeedPackMeshAssets',1,true)~=nil and Mock.created==0,'the template is not in the place: that design keeps today\'s mesh (nothing to reshape), nothing loaded')
+fallback('denied (no permission on the asset)',1,'Pack02',3,function()Mock.mode='denied'end,'no permission')
+fallback('a mesh with no vertices',1,'Pack02',3,function()Mock.mode='no_vertices'end,'no vertices')
+fallback('GetPosition / SetPosition missing',1,'Pack02',3,function()Mock.mode='no_positions'end,'not available')
+fallback('the bake does not succeed',1,'Pack02',3,function()Mock.mode='content_fails'end,'could not bake')
+fallback('CreateMeshPartAsync fails',1,'Pack02',3,function()Mock.mode='meshpart_fails'end,'out of mesh memory')
+fallback('another mesh size',1,'Pack02',3,function()Mock.mode='size_mismatch'end,'not the reshaped mesh')
+fallback('too many vertices',1,'Pack02',3,function()Mock.vertices=Shapes.Config.MaxVertices+1 end,'vertices')
+fallback('the second mesh of a pair fails (the first is destroyed)',4,'Pack02',2,function()Mock.mode='second_fails'end,'second mesh')
+do -- a world WITHOUT the EditableMesh API (a test world, an old client): an expected fallback, so it is quiet; a real failure afterwards still warns once
+ fresh();local def=defaultPack(1,'Pack02');Mock.api(false);local w0=warns()
+ local bag=H.ground(1,'Pack02',1,'None',nil,3)
+ check(sameSig(sig(bag),def)and bag:GetAttribute('PackShapeShown')==0 and bag:GetAttribute('PackShape')==3,'no EditableMesh API: the pack is the default pack (it still says its roll)')
+ check(Shapes.State('Forest_02',3)=='Off'and reasonOf('Forest_02',3):find(Shapes.Unavailable,1,true)~=nil,'... State is Off, the reason says the API is not available ('..reasonOf('Forest_02',3)..')')
+ check(warns()==w0,'... and NO warning: an environment without EditableMesh is an expected fallback ('..(warns()-w0)..')')
+ check(folder():GetAttribute('FailureCount')==1 and folder():GetAttribute('Ready')==false and tostring(folder():GetAttribute('LastFailure')):find('not available',1,true)~=nil,'... the status folder still says it ('..tostring(folder():GetAttribute('LastFailure'))..')')
+ for _=1,3 do local again=H.ground(1,'Pack02',1,'None',nil,3);again:Destroy();local pic=H.picture(1,'Pack03',1,'None',2);pic:Destroy()end
+ check(warns()==w0 and Mock.created==0,'... building packs and pictures in it stays quiet and loads nothing ('..(warns()-w0)..' warnings)')
+ Mock.api(true);Mock.mode='denied';Shapes.Request('Forest_04',3);Mock.mode='ok'
+ check(warns()==w0+1 and Shapes.State('Forest_04',3)=='Off','a REAL failure (a denied asset) after that still warns, once ('..(warns()-w0)..')')
+ local v=Shapes.Request('Forest_05',3,true);check(v=='Ready','the quiet failure was not about the API being switched on later: other pairs bake once it is there')
 end
-fallback('the second mesh of a design fails (the first is destroyed)','Lava_02',4,'Pack02',function()Mock.mode='second_fails' end,'second mesh')
-do -- an incomplete template and a template with no PackLocalFrame
- fresh();local m=assets.Forest_02;m:SetAttribute('MeshCount',2);Shapes.Request('Forest_02')
- check(Shapes.State('Forest_02')=='Off'and reasonOf('Forest_02'):find('not a complete',1,true)~=nil and Mock.created==0,'an incomplete template (MeshCount 2, one mesh): that design keeps today\'s mesh, nothing is loaded')
+do -- a pair of a design with no template, an incomplete one, one with no PackLocalFrame
+ fresh();local m=assets.Forest_02;m.Name='Forest_02_gone';Shapes.Request('Forest_02',3);m.Name='Forest_02'
+ check(Shapes.State('Forest_02',3)=='Off'and reasonOf('Forest_02',3):find('not in SeedPackMeshAssets',1,true)~=nil and Mock.created==0,'the template is not in the place: that pair is the default shape, nothing loaded')
+ fresh();m:SetAttribute('MeshCount',2);Shapes.Request('Forest_02',3)
+ check(Shapes.State('Forest_02',3)=='Off'and reasonOf('Forest_02',3):find('not a complete',1,true)~=nil and Mock.created==0,'an incomplete template (MeshCount 2, one mesh): the default shape, nothing is loaded')
  m:SetAttribute('MeshCount',1)
- fresh();local p=assets.Forest_02.ApprovedMesh01;local frame=p:GetAttribute('PackLocalFrame');p:SetAttribute('PackLocalFrame',nil);Shapes.Request('Forest_02')
- check(Shapes.State('Forest_02')=='Off'and Mock.alive==0 and Mock.bakedAlive==0,'a mesh with no PackLocalFrame: today\'s mesh, nothing leaked');p:SetAttribute('PackLocalFrame',frame)
+ fresh();local p=assets.Forest_02.ApprovedMesh01;local frame=p:GetAttribute('PackLocalFrame');p:SetAttribute('PackLocalFrame',nil);Shapes.Request('Forest_02',3)
+ check(Shapes.State('Forest_02',3)=='Off'and Mock.alive==0 and Mock.bakedAlive==0,'a mesh with no PackLocalFrame: the default shape, nothing leaked');p:SetAttribute('PackLocalFrame',frame)
 end
-do -- one design failing does not stop the others
- fresh();Mock.mode='denied';Shapes.Request('Forest_02');Mock.mode='ok';Shapes.Request('Forest_03')
- check(Shapes.State('Forest_02')=='Off'and Shapes.State('Forest_03')=='Ready','a failed design does not stop the next one: Forest_02 Off, Forest_03 Ready')
+do -- one pair failing does not stop the next one
+ fresh();Mock.mode='denied';Shapes.Request('Forest_02',3);Mock.mode='ok';Shapes.Request('Forest_03',3)
+ check(Shapes.State('Forest_02',3)=='Off'and Shapes.State('Forest_03',3)=='Ready','a failed pair does not stop the next one: Forest_02/3 Off, Forest_03/3 Ready')
  local f=folder();check(f:GetAttribute('FailureCount')==1 and f:GetAttribute('BakedCount')==1 and f:GetAttribute('Ready')==false,'status: 1 failure, 1 baked, not Ready')
 end
-do -- a bake that never returns: given up on after LoadingSeconds, the queue goes on
- fresh();Mock.mode='hang';local w0=warns();Shapes.Request('Forest_02');Shapes.Request('Forest_03')
- check(Shapes.State('Forest_02')=='Loading'and Shapes.State('Forest_03')=='Loading','a bake that never returns stays Loading (and the next design waits behind it)')
+do -- a bake that never returns: given up on after LoadingSeconds, for good; the queue goes on
+ fresh();Mock.mode='hang';local w0=warns();Shapes.Request('Forest_02',3);Shapes.Request('Forest_03',3)
+ check(Shapes.State('Forest_02',3)=='Loading'and Shapes.State('Forest_03',3)=='Loading','a bake that never returns stays Loading (the next pair waits behind it)')
  R.advance(Shapes.Config.LoadingSeconds+1)
- check(Shapes.State('Forest_02')=='Off'and reasonOf('Forest_02'):find('did not finish',1,true)~=nil,'after '..Shapes.Config.LoadingSeconds..' s it is given up on: Off, "did not finish"')
- Mock.mode='ok';check(Shapes.State('Forest_03')=='Off','(the design queued behind it timed out too: it was asked at the same time)')
- Shapes.Request('Forest_04');check(Shapes.State('Forest_04')=='Ready','the queue is not blocked: the next design bakes ('..Shapes.State('Forest_04')..')')
- check(warns()==w0+1 or warns()==w0+2,'the timeouts warn once per session')
+ check(Shapes.State('Forest_02',3)=='Off'and reasonOf('Forest_02',3):find('did not finish',1,true)~=nil,'after '..Shapes.Config.LoadingSeconds..' s it is given up on: Off, "did not finish"')
+ Mock.mode='ok';check(Shapes.State('Forest_03',3)=='Off','(the pair queued behind it timed out too: it was asked at the same time)')
+ Shapes.Request('Forest_04',3);check(Shapes.State('Forest_04',3)=='Ready','the queue is not blocked: the next pair bakes ('..Shapes.State('Forest_04',3)..')')
+ check(Shapes.State('Forest_02',3)=='Off','... and the given-up pair stays the default: sticky')
+ check(warns()==w0+1,'the failures warn once per session ('..(warns()-w0)..')')
 end
 
--- 6. Switches -------------------------------------------------------------------------------------------------------------------------------------
+-- 7. Budget (LRU) ---------------------------------------------------------------------------------------------------------------------------------
 do
- fresh();Shapes.Config.Enabled=false
- local b=H.ground(1,'Pack02',1,'None');check(Mock.calls==0 and Shapes.State('Forest_02')=='Off'and Shapes.Mode()=='off','Config.Enabled = false: no mesh is loaded, every design keeps today\'s mesh, Mode off')
- b:Destroy();Shapes.Config.Enabled=true
- check(Shapes.Mode()=='auto','Config.Enabled = true: Mode auto')
- Shapes.Config.Force=3;check(Shapes.Mode()==3 and Shapes.VariationOf('Forest_02')==3 and Shapes.VariationOf('Storm_06')==3,'Config.Force = 3: every design takes variation 3');Shapes.Config.Force=nil
+ local V=300;local function pairs3()return SINGLE[1],SINGLE[2],SINGLE[3],SINGLE[4],SINGLE[5],SINGLE[6]end
+ local a,b,c,d,e,f=pairs3()
+ local function budget(soft,hard,grace)fresh();Mock.vertices=V;Shapes.Config.MaxResidentVertices=soft*V;Shapes.Config.HardResidentVertices=hard*V;Shapes.Config.GraceSeconds=grace end
+ local function state(x,id)return Shapes.State(x.Key,id or 1)end
+ local function bakeAt(x,id)local s=bakeNow(x.Key,id or 1);R.advance(1);return s end
+ -- LRU order (no grace)
+ budget(3,10,0)
+ bakeAt(a);bakeAt(b);bakeAt(c)
+ check(state(a)=='Ready'and state(b)=='Ready'and state(c)=='Ready'and Shapes.Status().Vertices==3*V,'budget 3 pairs: three baked, '..Shapes.Status().Vertices..' vertices resident')
+ bakeAt(d)
+ check(state(a)=='Idle'and state(b)=='Ready'and state(c)=='Ready'and state(d)=='Ready','a fourth evicts the LEAST recently used (a): a Idle (not failed), b c d Ready')
+ check(Shapes.Status().Vertices==3*V and Shapes.Status().Evicted==1 and Shapes.Status().Pairs==3,'... 3 pairs / '..Shapes.Status().Vertices..' vertices resident, 1 evicted')
+ Shapes.Template(b.Key,1);R.advance(1) -- b is used: the oldest is now c
+ bakeAt(e)
+ check(state(c)=='Idle'and state(b)=='Ready'and state(d)=='Ready'and state(e)=='Ready','a use renews a pair: after b is used the next eviction is c, not b')
+ check(Shapes.Status().Failures==0,'evictions are not failures')
+ -- an evicted pair is rebaked on demand and builds the same pack
+ budget(3,10,0)
+ local sa=H.ground(a.Stage,a.Variant,1,'None',nil,1);local before=sig(sa);sa:Destroy()
+ bakeAt(b);bakeAt(c);bakeAt(d)
+ check(state(a)=='Idle','(a was evicted)')
+ local meshesBefore=#Mock.meshes
+ local sb=H.ground(a.Stage,a.Variant,1,'None',nil,1)
+ check(sameSig(sig(sb),before)and sb:GetAttribute('PackShapeShown')==1 and #Mock.meshes==meshesBefore+1,'a pack of the evicted pair rebakes it (the mock answers at once) and is the same shaped pack as before the eviction')
+ -- a built pack outlives its template
+ local live=H.ground(b.Stage,b.Variant,1,'None',nil,1);local liveSig=sig(live);R.advance(1)
+ bakeAt(SINGLE[7]);bakeAt(SINGLE[8]);bakeAt(SINGLE[9])
+ check(state(b)=='Idle','(b was evicted: '..state(b)..')')
+ check(sameSig(sig(live),liveSig)and pouchOf(live)~=nil and pouchOf(live).MeshId=='','a built pack keeps its mesh when its template is evicted (the pack and its pouch are unchanged: '..tostring(pouchOf(live)and pouchOf(live).MeshId)..' '..tostring(live:GetAttribute('PackShapeShown'))..')')
+ live:Destroy();sb:Destroy()
+ -- grace: a pair used within the grace period is not evicted by the soft cap; the cap is soft
+ budget(3,10,30)
+ bakeAt(a);bakeAt(b);bakeAt(c);bakeAt(d)
+ check(state(a)=='Ready'and Shapes.Status().Vertices==4*V,'within the grace period nothing is evicted: the soft cap is exceeded (4 pairs resident)')
+ R.advance(31);bakeAt(e)
+ check(state(a)=='Idle'and state(b)=='Idle'and state(c)=='Ready'and state(d)=='Ready'and state(e)=='Ready'and Shapes.Status().Vertices==3*V,'after the grace period the least recently used go until there is room (a b evicted; c d e kept: '..Shapes.Status().Vertices..' vertices)')
+ -- pins
+ budget(3,10,0)
+ local owner={};bakeAt(a);Shapes.Pin(owner,a.Key,1);bakeAt(b);bakeAt(c);bakeAt(d);bakeAt(e)
+ check(state(a)=='Ready'and state(b)=='Idle'and state(c)=='Idle'and state(d)=='Ready'and state(e)=='Ready','a PINNED pair (the pair of a pack on the track) is never evicted, though it is the oldest: b and c go instead')
+ Shapes.Unpin(owner);bakeAt(f)
+ check(state(a)=='Idle','unpinned, it is evicted like any')
+ local o1,o2={}, {};budget(3,10,0);bakeAt(a);Shapes.Pin(o1,a.Key,1);Shapes.Pin(o2,a.Key,1);Shapes.Unpin(o1);bakeAt(b);bakeAt(c);bakeAt(d);bakeAt(e)
+ check(state(a)=='Ready','a pair pinned by two owners stays while either holds it');Shapes.Unpin(o2)
+ local o3={};budget(3,10,0);bakeAt(a);Shapes.Pin(o3,a.Key,1);Shapes.Pin(o3,b.Key,1);bakeAt(b);bakeAt(c);bakeAt(d);bakeAt(e)
+ check(state(a)=='Idle'and state(b)=='Ready','one owner holds one pair: pinning another moves the pin (a is free, b is held)')
+ -- idle sweep
+ budget(50,100,30)
+ bakeAt(a);bakeAt(b);local o4={};Shapes.Pin(o4,b.Key,1)
+ R.advance(Shapes.Config.IdleSeconds+Shapes.Config.SweepSeconds+1)
+ check(state(a)=='Idle'and state(b)=='Ready','a pair unused for '..Shapes.Config.IdleSeconds..' s is evicted by the sweep even below the cap; a pinned one stays')
+ check(Shapes.Status().Pairs==1 and Shapes.Status().Vertices==V and folder():GetAttribute('Pairs')==1 and folder():GetAttribute('Vertices')==V,'... the accounting and the status folder follow')
+ Shapes.Unpin(o4);R.advance(Shapes.Config.IdleSeconds+Shapes.Config.SweepSeconds+1)
+ check(Shapes.Status().Pairs==0 and Shapes.Status().Vertices==0,'unpinned and idle: everything is gone, 0 vertices')
+ -- the hard cap: a pair that does not fit fails FOR GOOD (stable), the rest is untouched
+ budget(2,3,30)
+ local pins={};local function pin(x,id)local o={};pins[#pins+1]=o;Shapes.Pin(o,x.Key,id or 1)end
+ bakeAt(a);pin(a);bakeAt(b);pin(b);bakeAt(c);pin(c)
+ local w0=warns()
+ check(Shapes.Request(d.Key,1)=='Off'and reasonOf(d.Key,1):find('over budget',1,true)~=nil,'at the hard cap with everything pinned a new pair does not fit: Off, "over budget" ('..reasonOf(d.Key,1)..')')
+ check(Mock.baked==3,'... refused by the pre-bake guard: no MeshPart was made for it ('..Mock.baked..' made for 3 pairs)')
+ check(state(a)=='Ready'and state(b)=='Ready'and state(c)=='Ready'and Shapes.Status().Vertices==3*V and Mock.bakedAlive==3 and Mock.alive==0,'... the pinned pairs are untouched and nothing is left over (3 pairs, '..Shapes.Status().Vertices..' vertices, no stray mesh)')
+ local pack=H.ground(d.Stage,d.Variant,1,'None',nil,1);check(sameSig(sig(pack),defaultPack(d.Stage,d.Variant))and pack:GetAttribute('PackShapeShown')==0,'... and a pack of that pair is the default pack');pack:Destroy()
+ for _,o in ipairs(pins)do Shapes.Unpin(o)end
+ check(Shapes.State(d.Key,1)=='Off','STABLE: with room available again the pair that did not fit stays the default (sticky), it does not appear later')
+ check(bakeNow(e.Key,1)=='Ready'and state(a)=='Idle','... a different pair now bakes by evicting what is idle (least recently used first)')
+ check(Shapes.Status().Failures==1 and warns()==w0+1,'one failure, one warning')
+ -- a pair that only turns out too big AFTER its bake (the guard let it start): everything left is pinned, so it is dropped and fails for good
+ budget(2,3.4,30)
+ local pins2={};local function pin2(x)local o={};pins2[#pins2+1]=o;Shapes.Pin(o,x.Key,1)end
+ bakeAt(a);pin2(a);bakeAt(b);pin2(b);bakeAt(c);pin2(c)
+ check(Shapes.Request(d.Key,1)=='Off'and reasonOf(d.Key,1):find('would be resident',1,true)~=nil,'a pair that does not fit once baked (the guard had let it start) and nothing unpinned to evict: dropped, Off ('..reasonOf(d.Key,1)..')')
+ check(state(a)=='Ready'and state(b)=='Ready'and state(c)=='Ready'and Shapes.Status().Vertices==3*V and Mock.bakedAlive==3 and Mock.alive==0 and Shapes.Status().Pairs==3,'... the three pinned pairs are untouched, the dropped pair left nothing behind ('..Shapes.Status().Vertices..' vertices, '..Mock.bakedAlive..' meshes)')
+ for _,o in ipairs(pins2)do Shapes.Unpin(o)end
+ -- the pre-bake guard evicts to make room (not a failure when something is evictable)
+ budget(2,2,0)
+ bakeAt(a);bakeAt(b)
+ check(bakeNow(c.Key,1)=='Ready'and state(a)=='Idle','at the hard cap with an idle pair: the idle pair goes and the new one bakes (no failure)')
+ -- accounting
+ budget(5,6,0);for i=1,5 do bakeAt(SINGLE[i])end
+ local sum=0;for i=1,5 do sum+=V end
+ check(Shapes.Status().Vertices==sum and near(Shapes.Status().Megabytes,sum*48/1e6,1e-9),'the accounting: '..Shapes.Status().Vertices..' vertices = '..string.format('%.3f',Shapes.Status().Megabytes)..' MB estimated')
+ -- a multi-mesh pair counts all its meshes
+ budget(50,100,0);Mock.vertices=V;bakeNow('Lava_02',1);check(Shapes.Status().Vertices==2*V,'a two-mesh pair counts 2 x '..V..' vertices ('..Shapes.Status().Vertices..')')
+ -- Reset gives everything back
+ Shapes.Reset();check(Shapes.Status().Vertices==0 and Shapes.Status().Pairs==0 and Mock.bakedAlive==0,'Reset frees every template')
+end
+
+-- 8. Switches -------------------------------------------------------------------------------------------------------------------------------------
+do
+ fresh();server()
+ local fired=0;local off=Shapes.OnChanged(function()fired+=1 end)
+ check(Shapes.Mode()=='auto'and Shapes.Display(),'auto: the shapes show')
+ Shapes.Config.Enabled=false;check(Shapes.Mode()=='off'and not Shapes.Display(),'Config.Enabled = false: Mode off');Shapes.Config.Enabled=true
+ Shapes.Config.Force=3;check(Shapes.Mode()==3,'Config.Force = 3: Mode 3');Shapes.Config.Force=nil
  Shapes.Config.Force=9;check(Shapes.Mode()=='auto','a Force outside 1-6 is ignored');Shapes.Config.Force=nil
- -- the owner's attributes
- local sigToday=todays(1,'Pack02',1,'None');fresh();server();local fired=0;local off=Shapes.OnChanged(function()fired+=1 end)
- check(Shapes.SetMode(3)==3 and folder():GetAttribute('Force')==3 and folder():GetAttribute('Off')==nil and Shapes.Mode()==3 and fired==1,'SetMode(3): the status folder says Force 3 (replicated to clients), Mode 3, the listeners were told once')
- Shapes.Request('Forest_02');local m=Shapes.Template('Forest_02')
- check(m and m:GetAttribute('PackShape')==3,'a forced variation is baked for any design (Forest_02 is variation 3 now, not '..Shapes.Assign('Forest_02')..')')
- local bag=H.ground(1,'Pack02',1,'None');local forced=sig(bag);bag:Destroy()
- Shapes.SetMode(5);check(fired==2 and Shapes.State('Forest_02')=='Idle'and m.Parent==nil and Mock.bakedAlive==Mock.baked-1,'SetMode(5): the variation-3 template is dropped (memory), the design is asked for again; listeners told')
- Shapes.Request('Forest_02');local bag5=H.ground(1,'Pack02',1,'None');check(not sameSig(sig(bag5),forced)and Shapes.Template('Forest_02'):GetAttribute('PackShape')==5,'variation 5 is a different shape from 3');bag5:Destroy()
- check(Shapes.SetMode('off')=='off'and folder():GetAttribute('Off')==true and folder():GetAttribute('Force')==nil and Shapes.State('Forest_02')=='Off'and fired==3,'SetMode(off): the status folder says Off, every design keeps today\'s mesh, listeners told')
- local calls=Mock.calls;local bagOff=H.ground(1,'Pack02',1,'None');check(sameSig(sig(bagOff),sigToday)and Mock.calls==calls,'... and a pack built now is today\'s pack, nothing loaded');bagOff:Destroy()
- check(Shapes.SetMode('auto')=='auto'and folder():GetAttribute('Off')==nil and folder():GetAttribute('Force')==nil and fired==4,'SetMode(auto): back to normal (a design its own variation)')
+ -- a forced number is only the roll of NEW packs: nothing built changes, nobody is told
+ bakeNow('Forest_02',3);local shaped=H.ground(1,'Pack02',1,'None',nil,3);local sSig=sig(shaped)
+ check(Shapes.SetMode(5)==5 and folder():GetAttribute('Force')==5 and folder():GetAttribute('Off')==nil and Shapes.Mode()==5 and fired==0,'SetMode(5): the status folder says Force 5, Mode 5; the listeners are NOT told (nothing visible changes)')
+ check(Shapes.Roll('Pack02')==5 and sameSig(sig(H.ground(1,'Pack02',1,'None',nil,3)),sSig)and Shapes.State('Forest_02',3)=='Ready','... new packs roll 5; a pack that rolled 3 is still 3 and its pair is still baked')
+ -- off: every pack is the default, the cache is dropped, the listeners are told once
+ check(Shapes.SetMode('off')=='off'and folder():GetAttribute('Off')==true and folder():GetAttribute('Force')==nil and fired==1,'SetMode(off): the status folder says Off, the listeners were told once')
+ check(Shapes.Status().Pairs==0 and Shapes.Status().Vertices==0 and Mock.bakedAlive==0,'... every template is dropped (memory back to 0)')
+ local calls=Mock.calls;local bagOff=H.ground(1,'Pack02',1,'None',nil,3)
+ check(sameSig(sig(bagOff),defaultPack(1,'Pack02'))and bagOff:GetAttribute('PackShape')==3 and bagOff:GetAttribute('PackShapeShown')==0 and Mock.calls==calls,'off: a pack that rolled 3 is built in the default shape, nothing is loaded; it keeps its roll');bagOff:Destroy()
+ check(Shapes.Roll('Pack02')==nil and Shapes.State('Forest_02',3)=='Off','off: nothing is rolled, State is Off')
+ check(Shapes.Settle('Forest_02',3)==0,'off: Settle keeps nothing (the default shape for life)')
+ check(Shapes.SetMode('auto')=='auto'and folder():GetAttribute('Off')==nil and fired==2,'SetMode(auto): back to normal; the listeners were told')
+ local again=H.ground(1,'Pack02',1,'None',nil,3);check(again:GetAttribute('PackShapeShown')==3 and sameSig(sig(again),sSig),'auto again: the pack that rolled 3 is its shape again (the pair is baked on demand)');again:Destroy()
  check(Shapes.SetMode('on')=='auto','"on" is auto too')
  local ok1=pcall(Shapes.SetMode,7);local ok2=pcall(Shapes.SetMode,0);local ok3=pcall(Shapes.SetMode,'purple');local ok4=pcall(Shapes.SetMode,2.5)
  check(not ok1 and not ok2 and not ok3 and not ok4 and Shapes.Mode()=='auto','7, 0, 2.5 and "purple" are refused, the mode stays')
  client();local okc=pcall(Shapes.SetMode,3);check(not okc,'SetMode is a server call: a client is refused');server()
- off()
- -- a mode change in the same mode does not notify
  local n=0;local off2=Shapes.OnChanged(function()n+=1 end);Shapes.SetMode('auto');Shapes.SetMode('auto');check(n==0,'setting the mode it already has notifies nobody');off2()
- -- failures are forgotten when the mode changes (the owner fixed the permission)
- fresh();Mock.mode='denied';Shapes.Request('Forest_02');check(Shapes.State('Forest_02')=='Off','(denied)');Mock.mode='ok';Shapes.SetMode(2);Shapes.SetMode('auto')
- check(Shapes.State('Forest_02')=='Idle'and folder():GetAttribute('FailureCount')==0,'a mode change forgets old failures: the design may be tried again')
- Shapes.Request('Forest_02');check(Shapes.State('Forest_02')=='Ready','... and bakes')
-end
-do -- the owner's /test packshape command
+ -- failures are forgotten when shapes are switched off and on (the owner fixed the permission)
+ fresh();Mock.mode='denied';Shapes.Request('Forest_02',3);check(Shapes.State('Forest_02',3)=='Off','(denied)');Mock.mode='ok';Shapes.SetMode('off');Shapes.SetMode('auto')
+ check(Shapes.State('Forest_02',3)=='Idle'and folder():GetAttribute('FailureCount')==0,'off / auto forgets old failures: the pair may be tried again')
+ Shapes.Request('Forest_02',3);check(Shapes.State('Forest_02',3)=='Ready','... and bakes')
+ off()
+ -- the status folder carries the new counters
+ fresh();Shapes.Request('Forest_02',3);Shapes.Request('Forest_02',4);Shapes.Settle('Forest_03',2)
+ local f=folder();check(f:GetAttribute('Pairs')==3 and f:GetAttribute('Evicted')==0 and f:GetAttribute('Demoted')==0 and f:GetAttribute('Mode')=='auto'and f:GetAttribute('Revision')==151,'the status folder: Pairs, Evicted, Demoted, Mode, Revision')
+ -- the owner's /test packshape command
  fresh()
  local X=W.module('PackShapeCommand151')
  local function run(...)return X.Execute({},{Name='Owner'},{...})end
- local ok,text=run();check(ok==true and text:find('on: each design',1,true)and text:find('Pillow',1,true),'/test packshape: the status ('..tostring(text):sub(1,60)..'...)')
- local rows=0;for _,biome in ipairs({'Forest','Desert','Snow','Lava','Crystal','Jungle','Storm'})do if text:find(biome..': %d %d %d %d %d %d')then rows+=1 end end
- check(rows==7,'... with the 6 variations of each of the 7 biomes ('..rows..' rows)')
- local ok3,t3=run('3');check(ok3 and t3:find('forced to variation 3 (Top-heavy)',1,true)==nil and t3:find('forced to variation 3',1,true)and Shapes.Mode()==3,'/test packshape 3: forced ('..tostring(t3):sub(1,50)..')')
+ local ok,text=run();check(ok==true and text:find('every new pack rolls one of the six',1,true)and text:find('Pillow',1,true)and text:find('Rolled this session',1,true),'/test packshape: the status ('..tostring(text):sub(1,60)..'...)')
+ local ok3,t3=run('3');check(ok3 and t3:find('forced to variation 3 (Pear)',1,true)and Shapes.Mode()==3 and Shapes.Roll('Pack01')==3,'/test packshape 3: new packs are forced ('..tostring(t3):sub(1,60)..')')
  local okOff,tOff=run('off');check(okOff and tOff:find('OFF',1,true)and Shapes.Mode()=='off','/test packshape off')
  local okA,tA=run('auto');check(okA and Shapes.Mode()=='auto','/test packshape auto')
  local okU,tU=run('Auto');check(okU and Shapes.Mode()=='auto','(case does not matter)')
  for _,bad in ipairs({'0','7','2.5','purple','-1'})do local okB,tB=run(bad);check(okB==false and tB:find('Use packshape',1,true)and Shapes.Mode()=='auto','/test packshape '..bad..' is refused with the usage')end
- local okM,tM=run('1','2');check(okM==false,'two arguments are refused')
- local m1=X.Execute({},{Name='Owner'},{'2'});check(Shapes.Mode()==2,'(mode 2)');Shapes.SetMode('auto')
+ local okM=run('1','2');check(okM==false,'two arguments are refused')
+ do local rolls={};for _=1,600 do rolls[#rolls+1]=Shapes.Roll('Pack03')end local _,t=run();check(t:find('Rolled this session: Pillow %d+, Hourglass %d+, Pear %d+, Top%-heavy %d+, Shoulders %d+, Flat %d+')~=nil,'the status lists how the rolls fell')end
 end
 
--- 7. Waiting --------------------------------------------------------------------------------------------------------------------------------------
+-- 9. Pictures (the real ItemPictures) -------------------------------------------------------------------------------------------------------------
 do
- local realWait=R.task.wait
- local function pump()R.task.wait=function(t)Mock.resume();R.advance(t or .03);return t or .03 end end
- -- a SERVER building a pack waits for the design's first bake, so every pack of the design is the same shape
- fresh();Mock.slow=true;server();pump()
- local built
- local co=coroutine.create(function()built=H.ground(1,'Pack02',1,'None')end)
- local okc,err=coroutine.resume(co);if not okc then print('ERR',err)end
- check(built~=nil and coroutine.status(co)=='dead','a server pack build waits for the bake and finishes ('..tostring(err)..')')
- local sz=pouchSize(built);local want=assets.Forest_02.ApprovedMesh01.Size
- local shapedSize=Shapes.Template('Forest_02')and Shapes.Template('Forest_02').ApprovedMesh01.Size
- check(built~=nil and Shapes.State('Forest_02')=='Ready'and sz~=nil and shapedSize~=nil and near(sz.Z,shapedSize.Z,1e-6)and not near(sz.Z,want.Z,1e-6),'... and the pack is the shaped one (depth '..tostring(sz and sz.Z)..' vs today '..tostring(want.Z)..')')
- check(built and built:FindFirstChild('ApprovedMesh01',true).MeshId=='','... built from the baked mesh, not the template\'s MeshId')
- if built then built:Destroy()end
- -- two designs asked at once, truly interleaved (the builders yield whenever they wait, the downloads finish one at a time): one EditableMesh alive at a time, in the order asked
- fresh();Mock.slow=true;local builders={}
- R.task.wait=function(t)if builders[coroutine.running()]then coroutine.yield()end;return t or .03 end -- (only a pack builder yields at a wait; the bake's own periodic wait just goes on)
- local order={};local a,b
- local c1=coroutine.create(function()a=H.ground(1,'Pack02',1,'None');order[#order+1]='Forest_02'end)
- local c2=coroutine.create(function()b=H.ground(1,'Pack03',1,'None');order[#order+1]='Forest_03'end)
- builders[c1]=true;builders[c2]=true
- for _=1,300 do
-  if coroutine.status(c1)=='suspended'then local ok,e=coroutine.resume(c1);if not ok then print('ERR c1',e)end end
-  if coroutine.status(c2)=='suspended'then local ok,e=coroutine.resume(c2);if not ok then print('ERR c2',e)end end
-  Mock.resume();R.advance(.03)
-  if coroutine.status(c1)=='dead'and coroutine.status(c2)=='dead'then break end
- end
- check(a~=nil and b~=nil and Mock.created==2 and Mock.alive==0,('two designs asked at the same time: both built, nothing left alive (created %d, alive %d)'):format(Mock.created,Mock.alive))
- check(Mock.maxAlive==1,('... one EditableMesh alive at a time (most %d)'):format(Mock.maxAlive))
- check(order[1]=='Forest_02'and order[2]=='Forest_03','... in the order they were asked ('..table.concat(order,', ')..')')
- if a then a:Destroy()end;if b then b:Destroy()end
- pump()
- -- a bake that never returns: the server gives up waiting after WaitSeconds and builds today's pack
- local sigToday=todays(1,'Pack02',1,'None');local sigToday3=todays(1,'Pack03',1,'None');fresh();Mock.mode='hang';pump();local t0=R.clock;local late
- local c3=coroutine.create(function()late=H.ground(1,'Pack02',1,'None')end);coroutine.resume(c3)
- local waited=R.clock-t0
- check(late~=nil and sameSig(sig(late),sigToday)and waited>=Shapes.Config.WaitSeconds-.1 and waited<=Shapes.Config.WaitSeconds+1,('a bake that never returns: the server waited %.0f s (the limit is %d) and built today\'s pack'):format(waited,Shapes.Config.WaitSeconds))
- check(Shapes.State('Forest_02')=='Loading','(the design is still Loading: a later pack of it would be shaped once the bake finishes)')
- if late then late:Destroy()end
- -- ... and the packs after it do not each wait that long behind the stuck bake: nothing is waited for while the same bake is current
- local t3=R.clock;local after;local c4=coroutine.create(function()after=H.ground(1,'Pack03',1,'None')end);coroutine.resume(c4)
- check(after~=nil and R.clock==t3 and sameSig(sig(after),sigToday3),'a stuck bake does not stall every later pack: the next design\'s pack was built at once ('..string.format('%.1f',R.clock-t3)..' s), today\'s')
- if after then after:Destroy()end
- R.task.wait=realWait
- -- a CLIENT never waits: today's pack at once, and the bake goes on
- fresh();Mock.slow=true;client();R.task.wait=function(t)R.advance(t or .03);return t or .03 end -- (a client that waited would show in the clock)
- local t1=R.clock;local cb=H.ground(1,'Pack02',1,'None');local t2=R.clock
- check(t1==t2 and Shapes.State('Forest_02')=='Loading','a client building a pack does not wait: no time passed, the bake is running ('..Shapes.State('Forest_02')..')')
- check(cb:FindFirstChild('ApprovedMesh01',true).MeshId==assets.Forest_02.ApprovedMesh01.MeshId,'... the pack is built from the place\'s own mesh meanwhile')
- while Mock.resume()do end
- check(Shapes.State('Forest_02')=='Ready','the bake finishes by itself ('..Shapes.State('Forest_02')..')')
- cb:Destroy()
- R.task.wait=realWait
- server()
-end
-
--- 8. Pictures (the real ItemPictures) -------------------------------------------------------------------------------------------------------------
-do
- fresh();client();Mock.slow=true
+ fresh();client()
  local Pic=W.module('ItemPictures')
  local gui=R.Instance.new('ScreenGui');gui.Name='Pictures';gui.Parent=H.pg
  local function holder(x)local h=R.new('Frame');h.Size=R.UDim2.fromOffset(60,60);h.Parent=gui;h.AbsoluteSize=R.Vector2.new(60,60);h.AbsolutePosition=R.Vector2.new(x,0);return h end
  local function view(h)return h:FindFirstChild('ItemViewport')end
  local function meshOf(v)for _,d in ipairs(v:GetDescendants())do if d:IsA('MeshPart')then return d end end end
+ local function settle(n)for _=1,n or 400 do W.frames(1)end end
+ local function tool(stage,variant,coat,shape,name)local t=F.pack(W,W.workspace,stage,variant,1,coat or'None',name or'Pack');if shape then t:SetAttribute('PackShape',shape)end;return t end
  local scale=Rules.GetVariant('Pack02').BagScale*Rules.GetTheme(1).Scale
- local tool=F.pack(W,W.workspace,1,'Pack02',1,'None','Forest Pack');local h1=holder(0)
- Pic.Show(h1,tool,1);for _=1,150 do W.frames(1)end
- check(view(h1)==nil and Shapes.State('Forest_02')=='Loading','(a) while the client\'s bake runs the picture waits ("still loading", retried): no picture, and nothing is cached in the meantime')
- while Mock.resume()do end
- check(Shapes.State('Forest_02')=='Ready','(b) the bake finishes')
- for _=1,300 do W.frames(1)end
+ -- the key and the spec
+ local k0,s0=Pic.Key(tool(1,'Pack02'));local k3,s3=Pic.Key(tool(1,'Pack02','None',3));local k4=Pic.Key(tool(1,'Pack02','None',4));local k9,s9=Pic.Key(tool(1,'Pack02','None',9));local kz=Pic.Key(tool(1,'Pack02','None',0))
+ check(k0=='Pack|1|Pack02|None'and s0.Shape==nil,'a tool without a shape: the old key and no Shape in its spec ('..k0..')')
+ check(k3=='Pack|1|Pack02|None|3'and s3.Shape==3 and k4=='Pack|1|Pack02|None|4','a tool with PackShape 3 / 4: the key carries the shape ('..k3..' / '..k4..'): two shapes are two pictures')
+ check(k9==k0 and kz==k0 and s9.Shape==nil,'PackShape 0 / 9 (invalid) is the default look: the same key as no shape')
+ local ks=Pic.SampleKey('All');check(ks=='Pack|1|Standard|None','the sample picture of a category tab is the default shape ('..ks..')')
+ -- (a) while the client's bake runs: nothing is drawn, nothing is cached
+ Mock.slow=true
+ local t1=tool(1,'Pack02','None',3);local h1=holder(0);Pic.Show(h1,t1,1);settle(150)
+ check(view(h1)==nil and Shapes.State('Forest_02',3)=='Loading','(a) while the client\'s bake runs the picture waits ("still loading", retried): no picture, nothing cached')
+ while Mock.resume()do end;settle(300)
  local v=view(h1)
- if check(v~=nil,'(b) ... and the picture draws on its own retry')then
-  local m=meshOf(v);local want=Shapes.Template('Forest_02').ApprovedMesh01.Size
-  check(m and near(m.Size.X,want.X*scale,1e-6)and near(m.Size.Z,want.Z*scale,1e-6)and m.MeshId=='','(b) the hotbar / Bag / Index picture is the SHAPED pouch (a baked MeshPart of the shaped Size '..tostring(m and m.Size)..')')
+ if check(v~=nil,'(b) the bake finishes and the picture draws on its own retry')then
+  local m=meshOf(v);local want=Shapes.Template('Forest_02',3).ApprovedMesh01.Size
+  check(m and near(m.Size.X,want.X*scale,1e-6)and near(m.Size.Z,want.Z*scale,1e-6)and m.MeshId=='','(b) the hotbar / Bag picture is the SHAPED pouch (a baked MeshPart of the shaped Size '..tostring(m and m.Size)..')')
  end
- -- an unrelated pack (the Void) draws at once, with no bake
- local calls=Mock.calls;local voidTool=F.pack(W,W.workspace,1,H.VOID,1,'None','Void Pack');local hv=holder(70);Pic.Show(hv,voidTool,1);for _=1,100 do W.frames(1)end
- check(view(hv)~=nil and Mock.calls==calls,'(c) a Void pack picture needs no bake and draws at once')
- -- a Gold picture of the same design: gold, same shape
- local goldTool=F.pack(W,W.workspace,1,'Pack02',1,'Gold','Gold Forest Pack');local hg=holder(140);Pic.Show(hg,goldTool,1);for _=1,100 do W.frames(1)end
- local gv=view(hg);local gm=gv and meshOf(gv)
- check(gm and near(gm.Size.X,Shapes.Template('Forest_02').ApprovedMesh01.Size.X*scale,1e-6)and gm.Color==Rules.PackMutations.Gold.Color,'(d) a Gold picture: the same shaped pouch, gold')
- -- (e) a failed bake: the picture is today's pouch
- fresh();Mock.mode='denied';client()
- local h5=holder(210);local tool3=F.pack(W,W.workspace,1,'Pack03',1,'None','Forest Pack 3');Pic.Show(h5,tool3,1);for _=1,400 do W.frames(1)end
- local v5=view(h5);local m5=v5 and meshOf(v5)
- check(m5 and m5.MeshId==assets.Forest_03.ApprovedMesh01.MeshId,'(e) after a failed bake the picture is today\'s pouch (the place\'s own mesh)')
- -- (f) a mode change redraws every picture (Forest_02 is variation 2, Hourglass: forced to 1, Pillow, its depth changes)
- fresh();Mock.reset();client();Pic.Reset()
- local h6=holder(280);Pic.Show(h6,tool,1);for _=1,300 do W.frames(1)end
- local first=view(h6)and meshOf(view(h6));local firstSize=first and first.Size
- server();Shapes.SetMode(1);client()
- for _=1,400 do W.frames(1)end
- local second=view(h6)and meshOf(view(h6))
- local want=Shapes.Template('Forest_02')
- check(first~=nil and second~=nil and second~=first and want and want:GetAttribute('PackShape')==1 and not near(second.Size.Z,firstSize.Z,1e-6)and near(second.Size.Z,want.ApprovedMesh01.Size.Z*scale,1e-6),'(f) /test packshape 1: every picture is drawn again, from the new variation (depth '..tostring(firstSize and firstSize.Z)..' -> '..tostring(second and second.Size.Z)..')')
- server();Shapes.SetMode('auto');Pic.Reset();gui:Destroy()
  Mock.slow=false
+ -- (c) the same pack in another shape is another picture; a stack never mixes (the key differs)
+ local t2=tool(1,'Pack02','None',6);local h2=holder(70);Pic.Show(h2,t2,1);settle(200)
+ local m2=view(h2)and meshOf(view(h2));local m1=view(h1)and meshOf(view(h1))
+ check(m1 and m2 and not near(m1.Size.Z,m2.Size.Z,1e-9)and near(m2.Size.Z,Shapes.Template('Forest_02',6).ApprovedMesh01.Size.Z*scale,1e-6),'(c) shape 6 (Flat) draws its own shape, a different depth from shape 3')
+ -- (d) the Index / a sample / a proxy pack (no PackShape) is the default shape, even beside shaped ones
+ local proxy=R.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',1);proxy:SetAttribute('BagVariant','Pack02');proxy:SetAttribute('PackMutation','None')
+ local h3=holder(140);Pic.Show(h3,proxy,1);settle(200)
+ local m3=view(h3)and meshOf(view(h3))
+ check(m3 and m3.MeshId==assets.Forest_02.ApprovedMesh01.MeshId and near(m3.Size.X,assets.Forest_02.ApprovedMesh01.Size.X*scale,1e-6),'(d) a catalogue / Index / shop picture (a tool with no shape) is the default pouch, the place\'s own mesh')
+ -- (d2) a proxy flagged DefaultPackShape (the catalogue, shop and reward pictures: VerityClient, DailyRewardsClient, TreadmillBonusClient) is the default pouch WHATEVER its PackShape says, has
+ -- its own look (|Plain) for the designs the variations touch, and never asks PackShapes151 for anything; the Void and the Mech pack share the ordinary look
+ do
+  local calls0=Mock.calls;local req0=Shapes.Status().Requested
+  local function flaggedProxy(stage,variant,shape)local f=R.new('Folder');f:SetAttribute('SeedPackTool',true);f:SetAttribute('Stage',stage);f:SetAttribute('BagVariant',variant);f:SetAttribute('PackMutation','None');f:SetAttribute('DefaultPackShape',true);if shape then f:SetAttribute('PackShape',shape)end;return f end
+  local fp=flaggedProxy(1,'Pack02',3);local kf,sf=Pic.Key(fp)
+  check(kf=='Pack|1|Pack02|None|Plain'and sf.Plain==true and sf.Shape==nil,'(d2) a flagged proxy that also says PackShape 3: the |Plain look, no Shape in its spec ('..kf..')')
+  check(kf~=Pic.Key(tool(1,'Pack02','None',3))and kf~=Pic.Key(tool(1,'Pack02')),'(d2) ... not the look of the pack that rolled 3, and a look of its own beside the shapeless pack\'s')
+  check(Pic.Key(flaggedProxy(7,'EclipseReliquary',2))=='Pack|7|EclipseReliquary|None'and Pic.Key(flaggedProxy(8,'MechLimited'))=='Pack|8|MechLimited|None','(d2) the Void and the Mech pack share the ordinary look (one template, not two)')
+  check(Pic.Key(flaggedProxy(7,VERITY))=='Pack|7|'..VERITY..'|None|Plain','(d2) the Verity pack has its |Plain look')
+  local hf=holder(560);Pic.Show(hf,fp,1);settle(200)
+  local mf=view(hf)and meshOf(view(hf))
+  check(mf and mf.MeshId==assets.Forest_02.ApprovedMesh01.MeshId and near(mf.Size.X,assets.Forest_02.ApprovedMesh01.Size.X*scale,1e-6),'(d2) the flagged picture is the default pouch, the place\'s own mesh, though the pair (Forest_02, 3) is baked and a hotbar picture of it is shaped')
+  local hg=holder(630);Pic.Show(hg,flaggedProxy(2,'Pack03',4),1);settle(200)
+  check(view(hg)~=nil and Shapes.State('Forest_03',4)=='Idle'and Mock.calls==calls0 and Shapes.Status().Requested==req0,'(d2) a flagged picture of a pair that is not baked asks for nothing: no bake, no request ('..(Mock.calls-calls0)..' loads, '..(Shapes.Status().Requested-req0)..' requests)')
+ end
+ local h4=holder(210);Pic.ShowSample(h4,'All',1);settle(200)
+ check(view(h4)~=nil and meshOf(view(h4))and meshOf(view(h4)):GetAttribute('Variation')==nil,'(d) the sample picture of a category tab is the default shape')
+ -- (e) Gold keeps the shape
+ local tg=tool(1,'Pack02','Gold',3,'Gold Pack');local h5=holder(280);Pic.Show(h5,tg,1);settle(200)
+ local gm=view(h5)and meshOf(view(h5))
+ check(gm and near(gm.Size.X,Shapes.Template('Forest_02',3).ApprovedMesh01.Size.X*scale,1e-6)and sameColor(gm.Color,Rules.PackMutations.Gold.Color),'(e) a Gold picture: the same shaped pouch, gold')
+ -- (f) a pair that cannot be baked: a STABLE default picture (the cause going away does not change it)
+ fresh();Mock.mode='denied';client();Pic.Reset()
+ local tf=tool(3,'Pack03','None',2,'Snow Pack');local h6=holder(350);Pic.Show(h6,tf,1);settle(400)
+ local mf=view(h6)and meshOf(view(h6))
+ local snowIds={};for _,p in ipairs(meshesOf('Snow_03'))do snowIds[p.MeshId]=true end
+ check(mf and snowIds[mf.MeshId]==true,'(f) after a failed bake the picture is the default pouch (the place\'s own mesh)')
+ Mock.mode='ok';Pic.Reset();local h7=holder(420);Pic.Show(h7,tf,1);settle(300)
+ local mf2=view(h7)and meshOf(view(h7))
+ check(mf2 and snowIds[mf2.MeshId]==true and Shapes.State('Snow_03',2)=='Off','(f) with the cause gone the picture is still the default: sticky, no flip between shapes')
+ -- (g) off / auto redraw every picture
+ fresh();Mock.reset();client();Pic.Reset()
+ local h8=holder(490);Pic.Show(h8,t1,1);settle(300)
+ local first=view(h8)and meshOf(view(h8));local firstMeshId=first and first.MeshId
+ server();Shapes.SetMode('off');client();settle(300)
+ local second=view(h8)and meshOf(view(h8))
+ check(first and firstMeshId==''and second and second.MeshId==assets.Forest_02.ApprovedMesh01.MeshId,'(g) /test packshape off: the picture is drawn again in the default shape')
+ server();Shapes.SetMode('auto');client();settle(300)
+ local third=view(h8)and meshOf(view(h8))
+ check(third and third.MeshId==''and near(third.Size.X,Shapes.Template('Forest_02',3).ApprovedMesh01.Size.X*scale,1e-6),'(g) /test packshape auto: shaped again')
+ server();Pic.Reset();gui:Destroy();Mock.slow=false
 end
 
--- 9. Verity ---------------------------------------------------------------------------------------------------------------------------------------
+-- 10. Verity --------------------------------------------------------------------------------------------------------------------------------------
 do
  fresh();server()
- local Pouch=W.module('VerityPouch151');local KEY='Storm_02'
- local function vfolder()return W.RS:FindFirstChild(Pouch.Folder)end
- local function dropV()local f=vfolder();if f then f:Destroy()end end
- dropV();Pouch.Prepare()
- local id=Shapes.Assign(KEY)
- -- the plain Storm_02 pack for comparison
- Shapes.Request(KEY);local plainTpl=Shapes.Template(KEY);local f=vfolder();local neutral=f:FindFirstChild(KEY)
- check(f:GetAttribute('Ready')==true and neutral and neutral:GetAttribute('PackShape')==id and f:GetAttribute('PackShape')==id and f:GetAttribute('ShapeFailure')==nil,'the Verity pouch carries Storm_02\'s variation ('..tostring(neutral and neutral:GetAttribute('PackShape'))..' = '..id..')')
- local vp,pp=neutral.ApprovedMesh01,plainTpl.ApprovedMesh01
- check(nearV(vp.Size,pp.Size,1e-9),'... the same Size as the plain Storm_02 pouch ('..tostring(vp.Size)..' / '..tostring(pp.Size)..')')
- -- the same vertices: the mock meshes of the Verity bake (first) and of the plain bake (second)
- local a,b=Mock.meshes[1],Mock.meshes[#Mock.meshes];local worst=0
- for i=1,#a._pos do worst=math.max(worst,(a._pos[i]-b._pos[i]).Magnitude)end
- check(#Mock.meshes==2 and worst<1e-9,'... moved the same vertices the same way (worst '..string.format('%.2g',worst)..')')
- local white=true;for _,c in ipairs(a._colors)do if not(c.R>.999 and c.G>.999 and c.B>.999)then white=false end end
- check(white and Mock.alive==0,'... with every vertex colour white, and nothing leaked')
- -- the Verity pack is the plain Storm_02 pack part for part
- local verity=H.ground(7,H.VERITY,1,'None');local plain=H.ground(7,'Standard',1,'None')
- local same,why=sameSig(sig(verity),sig(plain))
- check(verity:GetAttribute('VerityPouch')==true and same,'the Verity pack is the plain Storm_02 pack part for part, shaped like it'..(why and(' ('..why..')')or''))
- verity:Destroy();plain:Destroy()
- -- the variation cannot be applied: the neutral pouch is still baked, unshaped (and so is the plain Storm_02 pack: both fell back)
- dropV();fresh();Mock.mode='no_positions';Pouch.Prepare()
- local f2=vfolder();local n2=f2:FindFirstChild(KEY)
- check(f2:GetAttribute('Ready')==true and n2 and n2:GetAttribute('PackShape')==0 and tostring(f2:GetAttribute('ShapeFailure')):find('not available',1,true)~=nil,'if the variation cannot be applied the Verity pouch is baked without it (PackShape 0, ShapeFailure: '..tostring(f2:GetAttribute('ShapeFailure'))..')')
- check(nearV(n2.ApprovedMesh01.Size,assets[KEY].ApprovedMesh01.Size,1e-9)and Mock.alive==0,'... exactly the template\'s Size, nothing leaked')
- -- a mode change re-bakes it
- dropV();fresh();Mock.reset();Pouch.Prepare();local before=vfolder():FindFirstChild(KEY):GetAttribute('PackShape')
- Shapes.SetMode(2)
- local f3=vfolder();local n3=f3:FindFirstChild(KEY)
- check(before==id and f3:GetAttribute('Ready')==true and n3 and n3:GetAttribute('PackShape')==2 and f3:GetAttribute('PackShape')==2,'/test packshape 2 re-bakes the Verity pouch with variation 2 (was '..tostring(before)..')')
- Shapes.SetMode('off');local n4=vfolder():FindFirstChild(KEY)
- check(n4 and n4:GetAttribute('PackShape')==0 and nearV(n4.ApprovedMesh01.Size,assets[KEY].ApprovedMesh01.Size,1e-9),'... and with the variations off, the template\'s own shape (PackShape 0)')
- Shapes.SetMode('auto')
+ local KEY='Storm_02'
+ local function isYellow(c)return math.floor(c.R*255+.5)==255 and math.floor(c.G*255+.5)==255 and math.floor(c.B*255+.5)==0 end
+ local function decals(inst)local out={};for _,d in ipairs(inst:GetDescendants())do if d:IsA('Decal')then out[#out+1]=d end end;return out end
+ check(Pouch.Prepare()==true,'(the server\'s default neutral Verity pouch is baked)')
+ local default=H.ground(7,VERITY,1,'None');local defSig=sig(default)
+ check(default:GetAttribute('VerityPouch')==true and default:GetAttribute('PackShape')==nil,'a Verity pack with no shape is the default neutral pouch')
+ local calls=Mock.calls
+ -- the shaped neutral pair
+ local bag=H.ground(7,VERITY,1,'None',nil,3)
+ check(bag:GetAttribute('PackShape')==3 and bag:GetAttribute('PackShapeShown')==3 and bag:GetAttribute('VerityPouch')==true,'a Verity pack with a roll of 3 is the pouch in shape 3 (the pair was baked by the build)')
+ local pair=Shapes.Template(KEY,3,true);local pouch=pouchOf(bag);local scale=bag:GetAttribute('VisualScale')
+ check(pair~=nil and pair:GetAttribute('Neutral')==true and near(pouch.Size.X/scale,pair.ApprovedMesh01.Size.X,1e-6)and near(pouch.Size.Z/scale,pair.ApprovedMesh01.Size.Z,1e-6),'its pouch is the neutral pair\'s MeshPart ('..tostring(pouch.Size/scale)..')')
+ check(not sameSig(sig(bag),defSig),'... a different shape from the default Verity pouch')
+ check(Mock.colorsAtBake[#Mock.colorsAtBake]==0,'every vertex colour was white when the shaped neutral pair was baked')
+ check(isYellow(pouch.Color)and pouch.Material.Name=='SmoothPlastic'and pouch.TextureID==''and bag:GetAttribute('PaperColor').R==1,'the pouch is pure yellow 255,255,0 SmoothPlastic, no texture')
+ local ds=decals(bag);check(#ds==2 and #decals(pouch)==2 and ds[1].Face~=ds[2].Face,'Verity\'s face is two Decals on the shaped pouch (Front and Back)')
+ local flushOk=true;for k,v in pairs(defSig)do if k:find('Seal')or k:find('TearStrip')then local x=sig(bag)[k];if not x or(x.Pos-v.Pos).Magnitude>1e-9 then flushOk=false end end end
+ check(flushOk,'the seal and the tear strips are where the default Verity pack\'s are')
+ local plainStorm=H.ground(7,'Standard',1,'None',nil,3)
+ check(Shapes.Template(KEY,3,false)~=nil and Shapes.Template(KEY,3,false)~=pair,'the printed Storm_02 / 3 and the neutral Storm_02 / 3 are two different pairs')
+ -- every context
+ for _,rig in ipairs({'R15','R6'})do local held,char=H.held(7,VERITY,1,'None',rig,3);check(sameSig(sig(held),sig(bag))and held:GetAttribute('PackShapeShown')==3,'held '..rig..': the same shaped Verity pack');local copy=H.openingCopy(held);check(#decals(copy)==2 and pouchOf(copy)~=nil,'opening copy: the pouch with both Decals');copy:Destroy();held:Destroy();char:Destroy()end
+ for _,coat in ipairs({'Gold','Diamond'})do local g=H.ground(7,VERITY,1,coat,nil,3);local c=Rules.PackMutations[coat];check(sameColor(pouchOf(g).Color,c.Color)and #decals(g)==2 and decals(g)[1].Color3.R==1,'a '..coat..' Verity pack in shape 3: the coat paints the pouch, the Decals stay white');g:Destroy()end
+ local giant=H.ground(7,VERITY,25,'None',nil,3);local tagged=0;for _,p in ipairs(H.partsOf(giant,false))do if W.CS:HasTag(p,'GiantVisualPart')then tagged+=1 end end
+ check(tagged==10,'a 25x Verity pack in shape 3: the pouch, the seal and the 8 strips are GiantVisualParts ('..tagged..')');giant:Destroy()
+ -- never yields: a slow pair -> the default neutral pouch this once
+ fresh();server();Pouch.Prepare();Mock.slow=false
+ local builders={};local realWait=R.task.wait;R.task.wait=function(t)if builders[coroutine.running()]then error('a pack build must never wait',2)end;return t or .03 end
+ Mock.slow=true;local built;local co=coroutine.create(function()built=H.ground(7,VERITY,1,'None',nil,5)end);builders[co]=true;local ok,err=coroutine.resume(co)
+ check(ok and coroutine.status(co)=='dead'and built:GetAttribute('PackShapeShown')==0 and built:GetAttribute('VerityPouch')==true,'a Verity build never yields: while its neutral pair is baked it is the default neutral pouch ('..tostring(err)..')')
+ check(sameSig(sig(built),defSig),'... exactly the default Verity pack')
+ while Mock.resume()do end;R.task.wait=realWait;Mock.slow=false
+ local after=H.ground(7,VERITY,1,'None',nil,5);check(after:GetAttribute('PackShapeShown')==5,'... and shape 5 once it is baked');after:Destroy();built:Destroy()
+ -- a client picture waits for the pair
+ fresh();server();Pouch.Prepare();client();Mock.slow=true
+ local okc,errc=pcall(function()return H.picture(7,VERITY,1,'None',2)end)
+ check(not okc and tostring(errc):find('still loading',1,true)~=nil,'a client\'s Verity picture errors "still loading" while its neutral pair is baked ('..tostring(errc)..')')
+ while Mock.resume()do end;Mock.slow=false
+ local okp,pic=pcall(function()return H.picture(7,VERITY,1,'None',2)end);check(okp and pic:GetAttribute('PackShapeShown')==2,'... and draws the shaped pouch once it is baked');if okp then pic:Destroy()end
+ server()
+ -- a failed neutral pair: the default neutral pouch, sticky, and the default stays the server's
+ fresh();server();Pouch.Prepare();Mock.mode='denied'
+ local failedBag=H.ground(7,VERITY,1,'None',nil,4)
+ check(failedBag:GetAttribute('PackShapeShown')==0 and failedBag:GetAttribute('VerityPouch')==true and sameSig(sig(failedBag),defSig),'a denied neutral pair: the default neutral pouch, exactly')
+ Mock.mode='ok';local failed2=H.ground(7,VERITY,1,'None',nil,4);check(sameSig(sig(failed2),defSig)and Shapes.State(KEY,4,true)=='Off','sticky: with the cause gone it is still the default neutral pouch');failed2:Destroy();failedBag:Destroy()
+ -- the sachet when the server's own neutral pouch is not there (the shape is ignored)
+ fresh();server();local sachet=H.ground(7,VERITY,1,'None',nil,4)
+ check(sachet:GetAttribute('VerityPackDesign')==149 and sachet:FindFirstChild('VerityFace',true)~=nil and Mock.calls==0,'with no neutral pouch (a server that did not bake) the Verity pack is the R149 sachet whatever it rolled; nothing is loaded');sachet:Destroy()
+ -- off: the default neutral pouch
+ fresh();server();Pouch.Prepare();Shapes.SetMode('off')
+ local offBag=H.ground(7,VERITY,1,'None',nil,3);check(offBag:GetAttribute('PackShapeShown')==0 and sameSig(sig(offBag),defSig),'off: the default neutral Verity pouch');offBag:Destroy();Shapes.SetMode('auto')
+ default:Destroy();bag:Destroy();plainStorm:Destroy()
+ -- a bag flagged DefaultPackShape (a catalogue / shop / reward picture): the DEFAULT neutral pouch whatever it rolled. The server's neutral pouch is the default shape already, so
+ -- nothing is baked for it on a client (VerityPouch151.PlainState is 'Ready' from the server)
+ do
+  fresh();server();Pouch.Prepare();local serverMesh=Mock.meshes[#Mock.meshes];local made=Mock.created
+  local defaultBag=H.ground(7,VERITY,1,'None');local defaultSig=sig(defaultBag);defaultBag:Destroy()
+  Shapes.Request(KEY,3,true);made=Mock.created;local asked0=Shapes.Status().Requested -- (the neutral pair of shape 3 is baked: the control below follows its roll)
+  client();local state,src=Pouch.PlainState(KEY)
+  check(state=='Ready'and src=='server'and Pouch.PlainTemplate(KEY)==Pouch.Template(KEY)and Pouch.RequestPlain(KEY)=='Ready','VerityPouch151.PlainState: the server\'s neutral pouch is the default shape, so the plain pouch IS the server\'s ('..tostring(state)..' / '..tostring(src)..')')
+  local fb=H.picture(7,VERITY,1,'None',3,true)
+  check(fb:GetAttribute('DefaultPackShape')==true and fb:GetAttribute('PackShape')==nil and fb:GetAttribute('VerityPouch')==true and sameSig(sig(fb),defaultSig),'a flagged Verity picture that rolled 3 is the default neutral pouch, exactly')
+  local fm=pouchOf(fb)
+  check(fm and fm.Baked==serverMesh and #decals(fm)==2 and isYellow(fm.Color),'... the SERVER\'s baked mesh, pure yellow, Verity\'s face as two Decals')
+  check(Mock.created==made and Shapes.Status().Requested==asked0,'... no EditableMesh was made for it and PackShapes151 was not asked ('..(Mock.created-made)..' made, '..(Shapes.Status().Requested-asked0)..' asked)')
+  -- the Verity builder honours the flag itself: a flagged Verity bag that also carries PackShape 3 (its neutral pair baked) is still the default neutral pouch
+  local hand=H.picture(7,VERITY,1,'None',nil,true);hand:FindFirstChild('PackGeometry'):Destroy()
+  for _,a in ipairs({'CompactPackReady','CompactPackPartCount','VerityPack','VerityPouch'})do hand:SetAttribute(a,nil)end
+  hand:SetAttribute('PackShape',3);W.module('VerityPackArt').Build(hand,function()return true end)
+  check(pouchOf(hand)and pouchOf(hand).Baked==serverMesh and hand:GetAttribute('PackShapeShown')==nil,'VerityPackArt itself honours the flag: a flagged Verity bag that also says PackShape 3 is still the default neutral pouch');hand:Destroy()
+  local rolled=H.picture(7,VERITY,1,'None',3);check(rolled:GetAttribute('PackShape')==3 and rolled:GetAttribute('PackShapeShown')==3 and not sameSig(sig(rolled),defaultSig),'(control) the same picture unflagged follows its roll (shape 3)');rolled:Destroy();fb:Destroy()
+  -- the safety net: a server whose neutral pouch carries a variation (the folder's PackShape): the CLIENT bakes its own default copy, once, and waits like any picture
+  fresh();server();Pouch.Prepare();local sMesh=Mock.meshes[#Mock.meshes];made=Mock.created
+  local vf=W.RS:FindFirstChild(Pouch.Folder);vf:SetAttribute('PackShape',3)
+  client();Mock.slow=true
+  check(Pouch.PlainState(KEY)=='Idle','a server whose pouch carries a variation: the plain pouch is not there yet (Idle)')
+  local okc,errc=pcall(function()return H.picture(7,VERITY,1,'None',nil,true)end)
+  check(not okc and tostring(errc):find('still loading',1,true)~=nil and Pouch.PlainState(KEY)=='Loading','... a flagged picture asks for it and waits ("still loading", retried) ('..tostring(errc)..')')
+  while Mock.resume()do end;Mock.slow=false
+  local pst,psrc=Pouch.PlainState(KEY);local plainModel=Pouch.PlainTemplate(KEY);local plainMesh=Mock.meshes[#Mock.meshes]
+  check(pst=='Ready'and psrc=='client'and plainModel and plainModel:GetAttribute('PackShape')==0 and plainModel:GetAttribute('Neutral')==true and plainModel.Parent==nil,'the client\'s copy is baked and kept in memory (a neutral model with PackShape 0)')
+  local nmoved=0;for i,p in ipairs(plainMesh._pos)do if(p-plainMesh._init[i]).Magnitude>1e-9 then nmoved+=1 end end
+  check(nmoved==0 and plainMesh~=sMesh and Mock.created==made+1 and Mock.alive==0 and Mock.colorsAtBake[#Mock.colorsAtBake]==0,'... no vertex moved, white vertex colours, ONE EditableMesh made and destroyed ('..nmoved..' moved, '..(Mock.created-made)..' made)')
+  local fb2=H.picture(7,VERITY,1,'None',3,true);check(pouchOf(fb2)and pouchOf(fb2).Baked==plainMesh and fb2:GetAttribute('PackShape')==nil,'the flagged picture is the client\'s default copy, not the server\'s shaped one');fb2:Destroy()
+  local calls2=Mock.calls;local fb3=H.picture(7,VERITY,1,'None',nil,true);fb3:Destroy();check(Mock.calls==calls2,'asked again: no second bake')
+  do -- the same case through the real ItemPictures: its flagged proxy reaches the builder as the flag
+   local Pic=W.module('ItemPictures');Pic.Reset()
+   local gui=R.Instance.new('ScreenGui');gui.Parent=H.pg
+   local hh=R.new('Frame');hh.Size=R.UDim2.fromOffset(60,60);hh.Parent=gui;hh.AbsoluteSize=R.Vector2.new(60,60);hh.AbsolutePosition=R.Vector2.new(0,0)
+   local proxy=R.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',7);proxy:SetAttribute('BagVariant',VERITY);proxy:SetAttribute('PackMutation','None');proxy:SetAttribute('DefaultPackShape',true)
+   Pic.Show(hh,proxy,1);for _=1,300 do W.frames(1)end
+   local v=hh:FindFirstChild('ItemViewport');local pm;for _,d in ipairs(v and v:GetDescendants()or{})do if d:IsA('MeshPart')and d.Name=='ApprovedMesh01'then pm=d end end
+   check(pm and pm.Baked==plainMesh,'through the real ItemPictures a flagged Verity proxy is the client\'s default copy, not the server\'s shaped pouch')
+   Pic.Reset();gui:Destroy()
+  end
+  -- no EditableMesh API on the client: the expected fallback, quiet, the picture keeps the server\'s pouch
+  local wasStudio=Run.IsStudio;Run.IsStudio=function()return true end -- (the plain bake only warns in Studio)
+  Pouch.ResetPlain();Mock.api(false);local w0=warns()
+  local fb4;for _=1,3 do local okq,b=pcall(function()return H.picture(7,VERITY,1,'None',nil,true)end);if okq then fb4=b;break end;W.frames(1)end -- (a picture may wait one retry for the bake to fail)
+  check(fb4 and pouchOf(fb4)and pouchOf(fb4).Baked==sMesh and Pouch.PlainState(KEY)=='Off'and warns()==w0,'no EditableMesh API: the flagged picture keeps the server\'s pouch (still the real pouch, not the sachet), and it is QUIET ('..(warns()-w0)..' warnings)')
+  Mock.api(true);if fb4 then fb4:Destroy()end
+  Pouch.ResetPlain();Mock.mode='denied';local w1=warns()
+  local fb6;for _=1,3 do local okq,b=pcall(function()return H.picture(7,VERITY,1,'None',nil,true)end);if okq then fb6=b;break end;W.frames(1)end
+  check(Pouch.PlainState(KEY)=='Off'and warns()==w1+1,'a REAL plain-bake failure (a denied asset) still warns, once, in Studio ('..(warns()-w1)..')')
+  Mock.mode='ok';if fb6 then fb6:Destroy()end;Run.IsStudio=wasStudio
+  Pouch.ResetPlain();check(Pouch.PlainState(KEY)=='Idle','ResetPlain forgets the client\'s copy and a failure')
+ end
  check(Mock.alive==0,'(no EditableMesh left alive)')
 end
 

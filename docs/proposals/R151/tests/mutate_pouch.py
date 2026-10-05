@@ -33,6 +33,8 @@ M = {
     'client_does_not_wait': ('VerityPackArt.lua', "if Run:IsClient()and not Run:IsServer()then error('Verity pouch is still loading',0)end", ''),
     # a Verity pack of another design built from the pouch of Storm_02
     'wrong_design': ('VerityPouch151.lua', "if key~=nil and key~=name then return 'Off','only '..tostring(name)..' is baked'end", ''),
+    # a world without the EditableMesh API warns (a stray warning in every older suite)
+    'unavailable_warns': ('VerityPouch151.lua', "if not tostring(why):find('EditableMesh is not available in this environment',1,true)then warn(", "if true then warn("),
     # a failed bake that is not contained: the sachet fallback is gone (the pack build errors)
     'no_fallback': ('VerityPackArt.lua', "   local ok,built=pcall(buildPouch,bag,isValid,key,template)\n   if ok then return built end", "   return buildPouch(bag,isValid,key,template)"),
 }

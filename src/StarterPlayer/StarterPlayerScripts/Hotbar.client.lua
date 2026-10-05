@@ -226,7 +226,8 @@ end
 local function kind(tool)return tool:GetAttribute('HarvestItemTool')and'Fruit'or(tool:GetAttribute('GardenSeed')or tool:GetAttribute('SeedPackTool'))and'Seeds'or'Tools'end
 local function weighedName(tool)local kg=Weight.ToolText(tool);local name=Names.Tool(tool,Catalog);return kg~=''and name..' ('..kg..')'or name end
 -- R112: identical packs, seeds and fruit share one card/slot with a count; tools stay separate.
-local stackFields={Pack={'Stage','BagVariant','PackSize','PackMutation','Weather','SeedScale'},Seed={'SeedId','SeedScale','Mutation','Weather','Rarity'},
+local stackFields={Pack={'Stage','BagVariant','PackSize','PackMutation','Weather','SeedScale','PackShape'}, -- (R151: packs of different chip-bag shapes never share a card)
+ Seed={'SeedId','SeedScale','Mutation','Weather','Rarity'},
  Fruit={'SeedId','FruitScale','Mutation','Weather','SellValue','FruitName','FruitIndex','Rarity'}}
 local function stackKey(tool)
  local group=tool:GetAttribute('SeedPackTool')and'Pack'or tool:GetAttribute('GardenSeed')and'Seed'or tool:GetAttribute('HarvestItemTool')and'Fruit'

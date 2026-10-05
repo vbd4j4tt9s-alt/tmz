@@ -1,22 +1,12 @@
--- R151 owner control of the pack shape variations (PackShapes151), reached through /test and the F4 box (OwnerUpdateCommands82.Actions.packshape):
---   packshape           what is on: the mode, how many shapes are baked / failed, which variation each biome's tiers have
---   packshape <1-6>     every pack design takes that variation (the same one everywhere), to look at it
---   packshape off       every design keeps today's mesh
---   packshape auto      back to normal: each design its own variation (by its name)
--- It only sets the status folder's attributes (replicated to every client, which re-draw their pack pictures) and the server's own templates; nothing is saved.
--- Packs already in the world keep the shape they were built with: drop / pick up / buy a new one to see the change.
+-- R151 owner control of the chip-bag shape variations (PackShapes151), reached through /test and the F4 box (OwnerUpdateCommands82.Actions.packshape):
+--   packshape           status: the mode, what this server has baked / evicted / failed, how the rolls fell
+--   packshape <1-6>     every NEW pack (a track spawn, a bonus / daily / mystery pack, a test pack) rolls that variation, to look at it
+--   packshape off       every pack is shown in the default shape (the Index and the catalogues always are); packs keep the roll they have
+--   packshape auto      back to normal: every new pack rolls one of the six, uniformly
+-- It only sets the status folder's attributes (replicated to every client, which redraw their pack pictures when shapes are switched on or off); nothing is saved.
+-- A pack keeps its roll for life: packs already made keep theirs (a forced number is only for the packs made after it).
 local RS=game:GetService('ReplicatedStorage')
 local X={}
-local function lines(Shapes)
- local Rules=require(RS.SeedPackRules)
- local out={}
- for stage=1,7 do local biome=Rules.DesignBiomes[stage]
-  local row={}
-  for tier=1,6 do local key=string.format('%s_%02d',biome,tier);row[#row+1]=tostring(Shapes.VariationOf(key)or'-')end
-  out[#out+1]=biome..': '..table.concat(row,' ')
- end
- return out
-end
 function X.Execute(ctx,p,a)
  local Shapes=require(RS.PackShapes151)
  local word=a[1]and tostring(a[1]):lower()
@@ -28,12 +18,15 @@ function X.Execute(ctx,p,a)
   if not ok then return false,tostring(result)end
  end
  local s=Shapes.Status();local mode=Shapes.Mode()
- local head=mode=='off'and'Pack shape variations are OFF: every design keeps today\'s mesh.'
-  or type(mode)=='number'and('Every pack design is forced to variation '..mode..' ('..Shapes.Names[mode]..').')
-  or'Pack shape variations are on: each design has its own (by name).'
- local out={head,('This server: %d shapes baked, %d failed, %d being baked%s. Variations: %s.'):format(s.Baked,s.Failures,s.Pending,s.LastFailure and(' (last failure: '..s.LastFailure..')')or'',table.concat(Shapes.Names,', '))}
- for _,l in ipairs(lines(Shapes))do out[#out+1]=l end
- out[#out+1]='Packs already built keep their shape; new ones (pick up, drop, buy) and every picture use the new one.'
+ local head=mode=='off'and'Pack shape variations are OFF: every pack is shown in the default shape (packs keep the roll they have).'
+  or type(mode)=='number'and('New packs are forced to variation '..mode..' ('..Shapes.Names[mode]..'); packs already made keep theirs.')
+  or'Pack shape variations are on: every new pack rolls one of the six (uniformly) and keeps it for life.'
+ local rolled={};for i=1,Shapes.Count do rolled[i]=Shapes.Names[i]..' '..s.Rolled[i]end
+ local out={head,
+  ('This server: %d pairs baked (%.1f MB estimated, %d vertices), %d being baked, %d evicted, %d failed%s, %d new packs kept the default shape because their pair was not baked yet.'):format(
+   s.Pairs,s.Megabytes,s.Vertices,s.Pending,s.Evicted,s.Failures,s.LastFailure and(' (last failure: '..s.LastFailure..')')or'',s.Demoted),
+  'Rolled this session: '..table.concat(rolled,', ')..'.',
+  'Variations: '..table.concat(Shapes.Names,', ')..'. Packs made before this update, the Void, the Mech, the Index and every catalogue picture are the default shape.'}
  return true,table.concat(out,'\n')
 end
 return X

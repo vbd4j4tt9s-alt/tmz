@@ -26,7 +26,8 @@ function T.Grant(data,player,selector,requester)
   local seed=data.Config.GetSeedById(spec.id);if not seed then return false,'Seed catalog mismatch.'end
   serial+=1;table.insert(pending,{Id=Http:GenerateGUID(false),Kind='Pack',ChestNumber=serial,ChestName=seed.Name,
    Stage=Verity.Is(spec.id)and Verity.PackStage or spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,AccentColor=seed.Color,Rarity=spec.rarity,
-   SeedScale=1,OddsVersion=Verity.Is(spec.id)and Packs.OddsVersion or 81,BagVariant=Verity.Is(spec.id)and Verity.Variant or spec.stage==8 and'MechLimited'or'Pack06',PackSize=1,PackMutation='None',TestGrant=true}) -- R151: also marked on the record (never announced)
+   SeedScale=1,OddsVersion=Verity.Is(spec.id)and Packs.OddsVersion or 81,BagVariant=Verity.Is(spec.id)and Verity.Variant or spec.stage==8 and'MechLimited'or'Pack06',PackSize=1,PackMutation='None',TestGrant=true,
+   PackShape=require(game:GetService('ReplicatedStorage').PackShapes151).Roll(Verity.Is(spec.id)and Verity.Variant or spec.stage==8 and'MechLimited'or'Pack06')}) -- R151: also marked on the record (never announced); it rolls its chip-bag shape like any pack
  end
  data.StudioPackRewards=data.StudioPackRewards or setmetatable({},{__mode='k'})
  local overrides=data.StudioPackRewards[player]or{};data.StudioPackRewards[player]=overrides

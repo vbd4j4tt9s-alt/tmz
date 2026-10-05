@@ -18,12 +18,13 @@
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local CS=game:GetService('CollectionService')
 local M=require(RS.MysteryPackRules);local PackRules=require(RS.SeedPackRules);local Art=require(script.Parent.MysteryPedestalArt)
+local PackShapes=require(RS.PackShapes151) -- R151: every pack rolls one of six chip-bag shapes; the pedestal's Ready pack shows the one the owner will get
 local S={};S.__index=S
 local RGB=Color3.fromRGB
 local SILHOUETTE=RGB(10,9,16)
 function S.new(config,data,bases,chests,notes,map)
  return setmetatable({Config=config,Data=data,Bases=bases,Chests=chests,Notes=notes,Map=map or bases and bases.Map,Pedestals={},Owner={},Unsaved={},LastClaim={},Told={},
-  Random=Random.new(),Acc=0},S)
+  Random=Random.new(),Acc=0,Shapes=setmetatable({},{__mode='k'})},S)
 end
 local function part(parent,name,size,frame,color,material,collide)
  local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=frame;p.Color=color;p.Material=material or Enum.Material.SmoothPlastic
@@ -55,10 +56,26 @@ function S:Pedestal(record)
  if p and p.Model.Parent then return p end
  return self:_build(record)
 end
+-- R151: the chip-bag shape of today's mystery pack (rolled once per owner and pack, runtime only: it is rolled again if the owner rejoins before taking it): the pack on
+-- the pedestal is drawn in it and the pack the owner takes has it (_give), so what is on the pedestal is what goes in the Bag.
+function S:_shape(player,state)
+ local held=self.Shapes[player]
+ if held and held.Day==state.Day and held.Stage==state.Stage and held.Variant==state.Variant then return held.Shape end
+ local shape=PackShapes.Roll(state.Variant)
+ self.Shapes[player]={Day=state.Day,Stage=state.Stage,Variant=state.Variant,Shape=shape}
+ return shape
+end
 -- The pack on top: a black silhouette (that biome's plain pack shape, so it never gives the rarity away) until it
 -- unlocks, then the real pack. Nothing while claimed or without an owner.
-function S:_look(p,state,stage,variant)
- local key=state..':'..tostring(stage)..':'..tostring(variant)
+-- R151: the silhouette is always the default shape of the plain pack (a locked pedestal never shows the roll: every locked pedestal looks the same); the real pack is its roll
+-- once that pair is baked (asked for here; until then the default shape, then the shape: never back).
+function S:_look(p,state,stage,variant,shape)
+ local shown=0
+ if state=='Ready'and shape and shape>0 then
+  local design=PackRules.DesignKey(stage,variant)
+  if PackShapes.Request(design,shape,PackRules.VariantKey(variant)==require(RS.VerityCatalog).Variant)=='Ready'then shown=shape end
+ end
+ local key=state..':'..tostring(stage)..':'..tostring(variant)..':'..shown
  if p.Look==key then return end;p.Look=key
  local old=p.Model:FindFirstChild('MysteryPack');if old then old:Destroy()end
  Art.Tint(p.Art,state,state~='Empty'and stage or nil) -- (the biome's colours, and the lit parts for the state)
@@ -69,7 +86,7 @@ function S:_look(p,state,stage,variant)
  local holder=Instance.new('Model');holder.Name='MysteryPack';holder.Parent=p.Model
  local ok,pack=pcall(function()
   local Visuals=require(RS.SeedPackVisuals)
-  return Visuals.Bag(p.Anchor.CFrame,holder,1.7,nil,stage,state=='Ready'and variant or'Pack01',1,1,'None')
+  return Visuals.Bag(p.Anchor.CFrame,holder,1.7,nil,stage,state=='Ready'and variant or'Pack01',1,1,'None',nil,nil,state=='Ready'and shape or nil)
  end)
  if not ok or not pack then warn('[R141] Mystery pack art: '..tostring(pack));return end
  CS:RemoveTag(pack,'BiomeSeedPackVisual') -- not a track pack: the track renderer and highlights leave it alone
@@ -110,7 +127,11 @@ function S:_stage(player)
 end
 -- Puts the pack in the Bag: the record, or nil and why. Does not yield, so the caller can record that it is gone straight after.
 function S:_give(player,pack)
- local record,why=self.Data:AddChest(player,{Stage=pack.Stage,BagVariant=pack.Variant,PackSize=1,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion},{Luck=true})
+ -- R151: today's pack is given in the shape the pedestal showed; an owed pack of an earlier day (or a pack the pedestal never showed) rolls its own in AddChest
+ local held=self.Shapes[player];local shape
+ if held and held.Day==pack.Day and held.Stage==pack.Stage and held.Variant==pack.Variant then shape=held.Shape end
+ local record,why=self.Data:AddChest(player,{Stage=pack.Stage,BagVariant=pack.Variant,PackSize=1,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion,PackShape=shape},{Luck=true})
+ if record and held and held.Day==pack.Day then self.Shapes[player]=nil end
  pcall(function()require(script.Parent.OwnerTestPacks).Claim(player,'Mystery',record)end) -- R151: a pack that an owner "mystery" command made claimable is a TEST pack (never announced); marking never blocks a grant
  return record,why
 end
@@ -166,7 +187,7 @@ function S:Publish(player,force)
   if force or type(have)~='number'or math.abs(have-want)>M.DriftSeconds then set('UnlockAt',want)end
  else set('UnlockAt',nil)end
  if p.Prompt.Enabled~=(status=='Ready')then p.Prompt.Enabled=status=='Ready'end -- (only a pack that can be taken shows a prompt)
- self:_look(p,status,stage,state.Variant)
+ self:_look(p,status,stage,state.Variant,status=='Ready'and self:_shape(player,state)or nil)
 end
 function S:Unlock(player,state)
  state.Stage,state.Variant=nil,nil

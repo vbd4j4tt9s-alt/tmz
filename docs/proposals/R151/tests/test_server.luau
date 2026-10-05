@@ -573,11 +573,13 @@ do
   local before,after=rowOf(saved,pack.Id),rowOf(resaved,pack.Id)
   check(before and before.TestGrant==true and after and after.TestGrant==nil,'the R150 server writes the pack back WITHOUT the field (before: marked, after: not)')
   local same=after~=nil
-  if after then for k,v in pairs(before)do if k~='TestGrant'and after[k]~=v then same=false;print('differs after an R150 save:',k,tostring(v),tostring(after[k]))end end
+  -- (R151 pack shapes: PackShape is a second optional field of a pack record, rolled by AddChest; an R150 server drops it the same way, and the pack is the default shape there)
+  if after then for k,v in pairs(before)do if k~='TestGrant'and k~='PackShape'and after[k]~=v then same=false;print('differs after an R150 save:',k,tostring(v),tostring(after[k]))end end
    for k in pairs(after)do if before[k]==nil then same=false;print('new key after an R150 save:',k)end end end
-  check(same,'... and every other saved field of the pack is identical')
+  check(same,'... and every other saved field of the pack is identical (but the chip-bag shape, the other optional field: PackShape)')
+  check(before.PackShape~=nil and after.PackShape==nil,'... the R151 chip-bag shape is dropped the same way (before: '..tostring(before.PackShape)..', after: '..tostring(after.PackShape)..'): an older server shows the default shape')
   local keepBefore,keepAfter=rowOf(saved,keep.Id),rowOf(resaved,keep.Id)
-  local keepSame=keepAfter~=nil;if keepAfter then for k,v in pairs(keepBefore)do if keepAfter[k]~=v then keepSame=false end end end
+  local keepSame=keepAfter~=nil;if keepAfter then for k,v in pairs(keepBefore)do if k~='PackShape'and keepAfter[k]~=v then keepSame=false end end end
   check(keepSame,'a normal pack is saved identically by both versions')
   check(resaved.Version==saved.Version and resaved.Version==22,'the profile version is the same in both saves (22)')
   -- and R151 reads what R150 wrote

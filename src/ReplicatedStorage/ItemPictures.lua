@@ -28,14 +28,18 @@ local function fruitKey(id,index,crop)
  if ok and type(value)=='string'then art=value end
  return table.concat({'Fruit',id,index,crop.Mutation,art},'|'),{Kind='Fruit',Id=id,Index=index,Mutation=crop.Mutation,Crop=crop}
 end
+local Shapes
+local function shapes()Shapes=Shapes or require(RS:WaitForChild('PackShapes151'));return Shapes end
 function P.Key(tool)
  if not tool then return nil end
  if tool:GetAttribute('SeedPackTool')then
   local stage=tonumber(tool:GetAttribute('Stage'))or 1;local variant=tool:GetAttribute('BagVariant')or'Standard';local mutation=mutationKey(tool:GetAttribute('PackMutation'))
-  -- R151 (owner: pictures can "just use the default pack shape", never a shape variation): a tool / proxy with DefaultPackShape asks for the plain pouch (nothing sets it yet; a catalogue or shop picture would). Its own look (key
-  -- suffix |Plain) for the designs the variations touch; the Void and the Mech pack have no variation, so they share the ordinary look (one template, not two).
+  -- R151 (owner: the catalogue, shop and reward pictures draw every pack in the DEFAULT shape, never a shape variation): a tool / proxy with DefaultPackShape asks for the default
+  -- pouch whatever its roll. Its own look (key suffix |Plain) for the designs the variations touch; the Void and the Mech pack have no variation, so they share the ordinary look
+  -- (one template, not two). Any other pack's own chip-bag shape (PackShape, 0 = the default) is part of its look; a tool without it (a proxy, an old record) is the default shape.
   local plain=tool:GetAttribute('DefaultPackShape')==true and variant~='EclipseReliquary'and variant~='MechLimited'
-  return table.concat({'Pack',stage,variant,mutation},'|')..(plain and'|Plain'or''),{Kind='Pack',Stage=stage,Variant=variant,Mutation=mutation,Plain=plain or nil}
+  local shape=tool:GetAttribute('DefaultPackShape')==true and 0 or shapes().Sanitize(tool:GetAttribute('PackShape'))
+  return table.concat(shape>0 and{'Pack',stage,variant,mutation,shape}or{'Pack',stage,variant,mutation},'|')..(plain and'|Plain'or''),{Kind='Pack',Stage=stage,Variant=variant,Mutation=mutation,Plain=plain or nil,Shape=shape>0 and shape or nil}
  end
  if tool:GetAttribute('GardenSeed')then
   local id=tool:GetAttribute('SeedId')or'';local mutation=mutationKey(tool:GetAttribute('Mutation'))
@@ -113,15 +117,12 @@ end
 local shapeHooked
 local function build(spec,work)
  if spec.Kind=='Pack'then
-  -- R151: an ordinary design's picture is drawn from its reshaped pouch (PackShapes151), which this client bakes at the first use of the design. The build runs in a
-  -- coroutine the picture queue resumes by hand, so it never yields: while the bake is running the build errors "still loading" and is retried in a moment.
-  local v=spec.Variant
-  if not spec.Plain and v~='EclipseReliquary'and v~='MechLimited'and v~=require(RS:WaitForChild('VerityCatalog')).Variant then
-   local Shapes=require(RS:WaitForChild('PackShapes151'))
-   if not shapeHooked then shapeHooked=true;Shapes.OnChanged(function()P.Reset();P.Hurry()end)end -- (the owner's /test packshape: every picture is drawn again)
-   if Shapes.Pending(require(RS:WaitForChild('SeedPackRules')).DesignKey(spec.Stage,v))then error('Pack shape is still loading',0)end
-  end
-  return require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.Angles(0,.22,-.025),nil,1,nil,spec.Stage,spec.Variant,1,1,spec.Mutation,nil,spec.Plain)
+  -- R151: a hotbar / Bag picture of a pack shows the pack's own chip-bag shape (spec.Shape, from the tool's PackShape attribute); a picture flagged DefaultPackShape (spec.Plain:
+  -- the catalogue, shop and reward pictures) and one with no shape draw the default shape and never ask PackShapes151 for anything. SeedPackVisuals.Bag -> SeedPackRenderer /
+  -- VerityPackArt take the baked template of the (design, variation) pair; while this client's bake of it runs the build errors "still loading" (retried in a moment: nothing
+  -- is drawn, nothing cached). The owner's /test packshape off / auto flips whether shapes show: every picture is drawn again.
+  if not shapeHooked then shapeHooked=true;shapes().OnChanged(function()P.Reset();P.Hurry()end)end
+  return require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.Angles(0,.22,-.025),nil,1,nil,spec.Stage,spec.Variant,1,1,spec.Mutation,nil,spec.Plain,spec.Shape)
  elseif spec.Kind=='Seed'then
   local ok,model=pcall(require(RS:WaitForChild('SeedPackVisuals')).Seed,{Id=spec.Id},nil,CFrame.new(),nil,1,nil,spec.Mutation)
   if ok and model then return model end

@@ -69,19 +69,20 @@ local function mulv(cf,v)return cf*v end
 -- Contexts ---------------------------------------------------------------------------------------------------------------------------------------
 local ground_n=0
 -- on the ground (a world slot) / dropped: anchored, in the workspace.
-function H.ground(stage,variant,size,coat,parent)
+function H.ground(stage,variant,size,coat,parent,shape)
  ground_n+=1
- return H.Visuals.Bag(CF(10+ground_n%7*6,10,20+ground_n%5*6)*R.CFrame.Angles(0,.4,0),parent or W.workspace,1,nil,stage,variant,1,size,coat or'None')
+ return H.Visuals.Bag(CF(10+ground_n%7*6,10,20+ground_n%5*6)*R.CFrame.Angles(0,.4,0),parent or W.workspace,1,nil,stage,variant,1,size,coat or'None',nil,nil,shape)
 end
 -- held: CarryBag welded to the carrier's torso (what ChaseService / ChestService._holdPack build).
-function H.held(stage,variant,size,coat,kind)
+function H.held(stage,variant,size,coat,kind,shape)
  local char,hrp,torso=H.character(kind or'R15')
- local bag=H.Visuals.CarryBag(char,stage,variant,1,size,coat or'None')
+ local bag=H.Visuals.CarryBag(char,stage,variant,1,size,coat or'None',shape)
  return bag,char,hrp,torso
 end
 -- picture: what ItemPictures builds for a hotbar / Bag / Index / shop picture: a rotated, unparented bag.
-function H.picture(stage,variant,size,coat)
- return H.Visuals.Bag(R.CFrame.Angles(0,.22,-.025),nil,1,nil,stage,variant,1,size,coat or'None')
+-- `default` (true): the picture is flagged DefaultPackShape (a catalogue / shop / reward picture: ItemPictures spec.Plain), whatever `shape` says.
+function H.picture(stage,variant,size,coat,shape,default)
+ return H.Visuals.Bag(R.CFrame.Angles(0,.22,-.025),nil,1,nil,stage,variant,1,size,coat or'None',nil,default,shape)
 end
 -- the picture after ItemPictures' own sanitising (every tag removed, parts under .95 transparency destroyed, all anchored, joints destroyed):
 -- the same function as ItemPictures' local `sanitize` (kept in step with it by test_packs.luau's source check).
@@ -114,17 +115,18 @@ function H.openingCopy(bag)
 end
 -- market display: MarketLayout.settle's treatment (anchored, collision off, tags removed) and a pivot; the scale is a pure ScaleTo (rigid), which
 -- the checks apply as a factor.
-function H.market(stage,variant)
- local m=H.Visuals.Bag(CF(0,0,0),nil,1,nil,stage,variant,1,1,'None')
+-- (MarketLayout passes defaultShape: a stall shows the DEFAULT pouch, whatever a pack rolled; `shape` is only here to show that it is ignored)
+function H.market(stage,variant,shape)
+ local m=H.Visuals.Bag(CF(0,0,0),nil,1,nil,stage,variant,1,1,'None',nil,true,shape)
  for _,d in ipairs(m:GetDescendants())do if d:IsA('BasePart')then d.Anchored=true;d.CanCollide=false;d.CanTouch=false;d.CanQuery=false end end
  for _,d in ipairs({m,table.unpack(m:GetDescendants())})do for _,tag in ipairs(W.CS:GetTags(d))do W.CS:RemoveTag(d,tag)end end
  return m
 end
 -- mystery pedestal: the pack at scale 1.7 on the anchor; Locked = black silhouette (MysteryPackService._look), Ready = the real pack.
 local SILHOUETTE=R.Color3.fromRGB(8,8,12)
-function H.mystery(stage,variant,locked)
+function H.mystery(stage,variant,locked,shape)
  local holder=R.new('Model');holder.Name='MysteryPack';holder.Parent=W.workspace
- local pack=H.Visuals.Bag(CF(0,6,0),holder,1.7,nil,stage,locked and'Pack01'or variant,1,1,'None')
+ local pack=H.Visuals.Bag(CF(0,6,0),holder,1.7,nil,stage,locked and'Pack01'or variant,1,1,'None',nil,nil,not locked and shape or nil)
  W.CS:RemoveTag(pack,'BiomeSeedPackVisual');pack:SetAttribute('MysteryOrigin',CF(0,6,0))
  if locked then
   for _,d in ipairs(pack:GetDescendants())do
@@ -138,9 +140,9 @@ function H.mystery(stage,variant,locked)
  return pack,holder
 end
 -- title / mech preview: Bag(...) into a WorldModel of a ViewportFrame.
-function H.viewport(stage,variant,size,coat,origin)
+function H.viewport(stage,variant,size,coat,origin,shape,default)
  local vf=R.new('ViewportFrame');local wm=R.new('WorldModel');wm.Parent=vf
- local bag=H.Visuals.Bag(origin or R.CFrame.Angles(0,.15,-.12),wm,1,nil,stage,variant,1,size or 1,coat or'None')
+ local bag=H.Visuals.Bag(origin or R.CFrame.Angles(0,.15,-.12),wm,1,nil,stage,variant,1,size or 1,coat or'None',nil,default,shape)
  W.CS:RemoveTag(bag,'BiomeSeedPackVisual');bag:SetAttribute('WorldPack',false)
  return bag,vf
 end

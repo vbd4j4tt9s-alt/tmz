@@ -15,9 +15,11 @@
 #  4. run_verity_pouch.sh    (R151 follow-up: the Verity pack is the REAL chip-bag pouch in pure yellow, baked at runtime; the sachet is the fallback) - the
 #                            EditableMesh bake on a mock with a switch for every failure, the pouch pack in every context, the sachet fallback, no leaks,
 #                            and every other pack identical with the pouch ready and without it.
-#  5. run_pack_shapes.sh     (R151 follow-up: chip-bag shape variations designed in Blender, applied at run time to the owner's own pouch meshes) - the field against
-#                            the Blender design's samples, one fixed variation per design name, the EditableMesh bake (every vertex moved, y and the crimps exactly
-#                            where they were, <= 5% outward, colours / UVs kept), every context identical, the fallbacks, the switches and /test packshape.
+#  5. run_pack_shapes.sh     (R151 follow-up: chip-bag shape variations designed in Blender, applied at run time to the owner's own pouch meshes; every pack rolls
+#                            one of six and keeps it for life, the Index / catalogues use the default) - the field against the Blender design's samples, the roll and
+#                            its distribution, the bake of all 252 (design, variation) pairs, every context identical, builds that never yield, sticky fallbacks, the
+#                            LRU budget, the optional record field (save / load / old records), the spawn / carry / drop / bank / hand journey, the mystery pedestal,
+#                            the switches and /test packshape.
 #  --mutations   breaks the pack code 13 ways (an unwelded strip, an anchored held part, an unwelded root, the giant tags, a wrong PackLocalFrame, a size
 #                jump between contexts, a part count, a Mech motor, a floating seal, a z-fighting duplicate, a weather part, an unwelded Verity block, a
 #                Void star off the face) and expects the audit to notice each one.

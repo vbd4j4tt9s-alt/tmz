@@ -19,12 +19,19 @@ function Renderer.Build(bag,isValid)
         if bag:GetAttribute('CompactPackReady')then return true end
         return require(script.Parent.MechArt).Pack(bag)
     end
-    -- R151: an ordinary design's pouch takes its shape variation (PackShapes151): the reshaped template when it is baked, else (variations off, a failed bake, a
-    -- client that is not ready) nil, i.e. the place's own mesh. The Void, the Mech, the special packs and the Verity pack never come through here.
+    -- R151: an ordinary pack's pouch takes the shape variation the pack rolled (the attribute PackShape, set by SeedPackVisuals.Bag from the world pack / the item
+    -- record; absent = the place's own mesh): the baked template of its (design, variation) pair when it is ready, else the place's own. Never yields. The Void, the
+    -- Mech and the special packs never come through here; the Verity pack takes its roll in VerityPackArt.
+    -- (a bag flagged DefaultPackShape, which the catalogue / shop / reward pictures are, is built from the design's own mesh whatever it says: no variation is asked for, nothing is baked)
     if bag:GetAttribute('CompactPackReady') and bag:FindFirstChild('PackGeometry') then return true end
-    -- (a bag flagged DefaultPackShape, a picture that must show the plain pouch, is built from the design's own mesh: no variation is asked for, nothing is baked)
     local key=bag:GetAttribute('PackArtKey')or''
-    return Renderer.BuildStandard(bag,key,isValid,bag:GetAttribute('DefaultPackShape')~=true and require(script.Parent.PackShapes151).ForBuild(key) or nil)
+    local shape=bag:GetAttribute('DefaultPackShape')~=true and bag:GetAttribute('PackShape')or nil
+    local template
+    if shape~=nil then
+        local shown;template,shown=require(script.Parent.PackShapes151).ForBag(key,shape,false)
+        bag:SetAttribute('PackShapeShown',shown)
+    end
+    return Renderer.BuildStandard(bag,key,isValid,template)
 end
 -- R151: `template` (optional) is a template Model to build from instead of the place's own (VerityPackArt passes the neutral Verity pouch, a clone of
 -- Storm_02 with white vertex colours); everything else is the same code, so such a pack is built exactly like a plain one.

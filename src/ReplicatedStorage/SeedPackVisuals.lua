@@ -21,8 +21,10 @@ local function rootPart(model,origin,weldRoot)
     return p
 end
 -- Solid server-authored geometry stays visible independently of client animation.
--- R151: `defaultShape` (true): the pouch is the design's own mesh with no shape variation (a picture flagged DefaultPackShape); anything else is the pack as it is in the game.
-function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation,displaySize,defaultShape)
+-- R151: the chip-bag shape of the pouch. `defaultShape` (true): the design's own mesh with no shape variation, whatever `shape` says: what the catalogue, shop, reward and market
+-- pictures pass (the bag is flagged DefaultPackShape; ItemPictures and the renderers follow the flag). `shape` (optional, 0..6) is the pack's own variation
+-- (PackShapes151): the world pack's / the item record's PackShape. No shape (nil / 0) is the default shape too: ONE default shape for every context.
+function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation,displaySize,defaultShape,shape)
     local variant=Rules.GetVariant(variantKey);local theme=Rules.GetTheme(stage)
     packSize=Rules.SanitizePackSize(packSize);mutation=Rules.MutationKey(mutation)
     scale=(scale or 1)*variant.BagScale*theme.Scale*(displaySize or packSize)
@@ -50,7 +52,8 @@ function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,pac
     m:SetAttribute("SeedArtVersion",123);m:SetAttribute("VisualScale",scale);m:SetAttribute("TearLipY",1.11)
     m:SetAttribute("Stage",stage or 1);m:SetAttribute("BagVariant",Rules.VariantKey(variantKey))
     m:SetAttribute("PackArtKey",Rules.DesignKey(stage,variantKey));m:SetAttribute("PackVisible",true)
-    if defaultShape==true then m:SetAttribute('DefaultPackShape',true) end
+    if defaultShape==true then m:SetAttribute('DefaultPackShape',true)
+    elseif shape~=nil then local Shapes=require(script.Parent.PackShapes151);if Shapes.Applies(variantKey)then m:SetAttribute("PackShape",Shapes.Sanitize(shape))end end
     m:SetAttribute("SeedScale",Rules.SanitizeSeedScale(seedScale));m:SetAttribute("PaperColor",theme.Body)
     m:SetAttribute("BiomeMark",theme.Mark)
     local tier,rank=Rules.GetPackTier(variantKey)
@@ -275,11 +278,11 @@ function Visuals.CarryFrame(character,stage,variantKey,packSize)
     local torso,frame,avatar=Visuals.CarryLayout(character,stage,variantKey,packSize)
     return torso,frame,avatar
 end
-function Visuals.CarryBag(character,stage,variantKey,seedScale,packSize,mutation)
+function Visuals.CarryBag(character,stage,variantKey,seedScale,packSize,mutation,shape)
     local torso,frame,avatar,display,visual,info=Visuals.CarryLayout(character,stage,variantKey,packSize)
     if not torso then return nil end
     -- Base scale 1 exactly matches world/dropped geometry, regardless of avatar body size.
-    local m=Visuals.Bag(frame,character,1,torso,stage,variantKey,seedScale,packSize,mutation,display)
+    local m=Visuals.Bag(frame,character,1,torso,stage,variantKey,seedScale,packSize,mutation,display,nil,shape)
     m.Name='CarriedSeed';m:SetAttribute('SeedPackCarry',true);m:SetAttribute('AvatarScale',avatar)
     m:SetAttribute('CarryDisplayMultiplier',display)
     m:SetAttribute('CarryRootOffset',info.Offset);m:SetAttribute('CarryBackZ',info.BackZ)

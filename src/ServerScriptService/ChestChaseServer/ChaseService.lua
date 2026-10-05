@@ -221,7 +221,7 @@ function ChaseService:_createCarriedChest(character, _rootPart, chest)
     local humanoid=character:FindFirstChildOfClass("Humanoid")
     if humanoid then humanoid:UnequipTools() end
     local old=character:FindFirstChild("CarriedSeed");if old then old:Destroy() end
-    local model=require(ReplicatedStorage.SeedPackVisuals).CarryBag(character,chest.Stage,chest.BagVariant,chest.SeedScale,chest.PackSize,chest.PackMutation)
+    local model=require(ReplicatedStorage.SeedPackVisuals).CarryBag(character,chest.Stage,chest.BagVariant,chest.SeedScale,chest.PackSize,chest.PackMutation,chest.PackShape) -- R151: chest.PackShape = the pack's chip-bag shape (the world seed's roll, cloned with the seed)
     if model then require(ReplicatedStorage.ItemEffectAnchor).Set(model,chest.Weather,nil,chest.PackSize,2*(chest.PackSize or 1))end
     assert(model,"Character torso is not ready")
     model:SetAttribute("Stage",chest.Stage)
@@ -263,7 +263,7 @@ function ChaseService:_createDroppedChest(position, chest, dropToken)
 	model:SetAttribute("SeedName", "Seed Sack")
     model:SetAttribute("BagVariant",chest.BagVariant)
     model:SetAttribute("SeedScale",chest.SeedScale)
-    model:SetAttribute("PackSize",chest.PackSize);model:SetAttribute("PackMutation",chest.PackMutation)
+    model:SetAttribute("PackSize",chest.PackSize);model:SetAttribute("PackMutation",chest.PackMutation);model:SetAttribute("PackShape",chest.PackShape)
 	model.Parent = self.Map.RuntimeFolder
 
 	local body = self.Map:CreateRuntimePart({Name = "Body", Size = Vector3.new(0.2, 0.2, 0.2),
@@ -271,7 +271,7 @@ function ChaseService:_createDroppedChest(position, chest, dropToken)
 	body.Transparency = 1
 	body.CanTouch = false
 	body.CanQuery = false
-	local packet = self.Chests:BuildSeedPacket(nil,body.CFrame,model,nil,nil,chest.Stage,chest.BagVariant,chest.SeedScale,chest.PackSize,chest.PackMutation)
+	local packet = self.Chests:BuildSeedPacket(nil,body.CFrame,model,nil,nil,chest.Stage,chest.BagVariant,chest.SeedScale,chest.PackSize,chest.PackMutation,chest.PackShape)
     require(ReplicatedStorage.ItemEffectAnchor).Set(packet,chest.Weather,nil,chest.PackSize,2*(chest.PackSize or 1))
 	local latch = packet.PrimaryPart
 

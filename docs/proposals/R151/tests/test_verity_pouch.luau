@@ -131,6 +131,14 @@ failure('the second mesh of a template fails (the first is destroyed)',function(
  local m=assets[KEY];local extra=tpl:Clone();extra.Name='ApprovedMesh02';extra:SetAttribute('PackLocalFrame',tpl:GetAttribute('PackLocalFrame'));extra.MeshSize=tpl.Size;extra.Parent=m;m:SetAttribute('MeshCount',2);Mock.mode='second_fails'
  return function()extra:Destroy();m:SetAttribute('MeshCount',1)end
 end,'second mesh')
+do -- a world WITHOUT the EditableMesh API: an expected fallback (the sachet), so it is quiet; the folder still says why
+ dropFolder();Mock.reset();Mock.api(false);local w0=warns();local ok=Pouch.Prepare();local f=folder()
+ check(ok==false and f:GetAttribute('Failed')==true and f:GetAttribute('Finished')==true and tostring(f:GetAttribute('Reason')):find('is not available in this environment',1,true)~=nil,'no EditableMesh API: Prepare says no; the folder says Failed + why ('..tostring(f:GetAttribute('Reason'))..')')
+ check(warns()==w0,'... and NO warning: an environment without EditableMesh is an expected fallback ('..(warns()-w0)..')')
+ check(#f:GetChildren()==0 and Mock.created==0 and Pouch.State(KEY)=='Off','... nothing made, nothing loaded, State Off')
+ local pack=sachetPack();check(sameSig(sig(pack),sachetBase)and pack:GetAttribute('VerityPackDesign')==149 and pack:GetAttribute('VerityPouch')==nil,'... the Verity pack is the R149 sachet, unchanged');pack:Destroy()
+ Mock.api(true)
+end
 -- the good bake again for everything below
 dropFolder();Mock.reset()
 check(Pouch.Prepare()==true,'(the bake succeeds again with the mock back to normal)')

@@ -9,6 +9,8 @@ OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
 cp "$REPO/tools/tests/roblox.luau" "$REPO/docs/proposals/inventory_R113/tests/world.luau" "$HERE"/*.luau "$OUT/"
 SS=$REPO/src/ServerScriptService/ChestChaseServer
 git -C "$REPO" show 624da26:src/ServerScriptService/ChestChaseServer/MarketLayout.lua > "$OUT/MarketLayoutR131.lua"
-python3 "$REPO/docs/proposals/inventory_R113/tests/mkbundle.py" "$OUT/rs_bundle.luau" MarketLayout=$SS/MarketLayout.lua MarketLayoutR131="$OUT/MarketLayoutR131.lua" >/dev/null
+# (bundle THIS checkout's src, like R149's run_market.sh)
+sed "s#/home/user/tmz/src#$REPO/src#" "$REPO/docs/proposals/inventory_R113/tests/mkbundle.py" > "$OUT/mkbundle_here.py"
+python3 "$OUT/mkbundle_here.py" "$OUT/rs_bundle.luau" MarketLayout=$SS/MarketLayout.lua MarketLayoutR131="$OUT/MarketLayoutR131.lua" >/dev/null
 cd "$OUT"
 for t in test_*.luau;do echo "== $t";/opt/luau/luau "$t" > "$t.log" 2>&1 || { grep -v "pack mesh" "$t.log" | tail -25;exit 1; };tail -1 "$t.log";done
