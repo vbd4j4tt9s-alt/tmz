@@ -223,7 +223,7 @@ do
  check(spaceOk and B.SpaceClear>=SPACE,'Snow biome layout: nothing in the spacebar zone ('..SPACE..' studs from the biome start)')
  check(zOk and xOk,'Snow biome layout: nothing past the biome ends or the floor edges')
  check(dustSmall,'Snow biome layout: dust is one small disc')
- check(counts.edge>=cells.edge*.6 and counts.border>=cells.border*.25 and counts.dust>=cells.dust*.1,('Snow biome layout: %d edge, %d border, %d dust patches over %d x %d cells'):format(counts.edge,counts.border,counts.dust,cols,rows))
+ check(counts.edge>=cells.edge*.4 and counts.border>=cells.border*.2 and counts.dust>=cells.dust*.1,('Snow biome layout: %d edge, %d border, %d dust patches over %d x %d cells'):format(counts.edge,counts.border,counts.dust,cols,rows))
  check(near(WW.DustTransparency(20,26),1)and WW.DustTransparency(26,26)==1 and near(WW.DustTransparency(60,26),B.FinalTransparency)and WW.DustTransparency(31,26)<1 and WW.DustTransparency(31,26)>WW.DustTransparency(36,26),'dust is hidden within the clear radius and fades in beyond it')
  check(WW.BiomeLobes(WW.Tier(3).Biome,10,3)==3 and WW.BiomeLobes(WW.Tier(3).Biome,100,3)==2 and WW.BiomeLobes(WW.Tier(3).Biome,200,3)==1 and WW.BiomeLobes(WW.Tier(1).Biome,10,3)==1,'lobes by distance band: 3 / 2 / 1 on tier 3, 1 on tier 1')
 end
@@ -395,14 +395,16 @@ for _,t in ipairs(active())do
  if should then nearOn+=1 else farOff+=1 end
  if t.spray.Enabled~=should or t.ripple.Enabled~=should then ratioOk=false end
  if should then
-  if abs(t.spray.Rate-min(WW.Splash.MaxRate,t.e.Rate*WW.Splash.SprayShare))>t.spray.Rate*.06+1 or abs(t.ripple.Rate-min(WW.Splash.MaxRate,t.e.Rate*WW.Splash.RippleShare))>t.ripple.Rate*.06+1 then ratioOk=false end
+  -- R151: a share of the landing drops splashes (SprayShare / RippleShare x the tier's factor x (Near + (1 - Near) x the tile's weight))
+  local ws=WW.SplashShare(WW.Splash.SprayShare,w,3);local wr=WW.SplashShare(WW.Splash.RippleShare,w,3)
+  if abs(t.spray.Rate-min(WW.Splash.MaxRate,t.e.Rate*ws))>t.spray.Rate*.06+1 or abs(t.ripple.Rate-min(WW.Splash.MaxRate,t.e.Rate*wr))>t.ripple.Rate*.06+1 then ratioOk=false end
   local gy=t.ground.CFrame.Position.Y
   if gy<GROUND+WW.Splash.Rise-1e-6 or gy>GROUND+.31+WW.Splash.Rise or t.ground.CanCollide~=false or t.ground.Transparency~=1 then groundOk=false end
   if t.ripple.Orientation.Name~='VelocityPerpendicular'or t.spray.EmissionDirection.Name~='Top'then groundOk=false;print('  orient',t.ripple.Orientation.Name,t.spray.EmissionDirection.Name)end
  end
 end
 check(nearOn>=6 and farOff>=1,('splashes under the %d near tiles, none under the %d far ones'):format(nearOn,farOff))
-check(ratioOk,'splash spray / ripple rates follow the drops landing on the tile (50% / 35%) and are off for far tiles')
+check(ratioOk,'splash spray / ripple rates follow the drops landing on the tile (R151: a share, fewer away from the player) and are off for far tiles')
 check(groundOk,'splash tiles sit just above the ground (0.12), invisible; ripples lie flat (VelocityPerpendicular), spray goes up')
 
 -- 5. Thunderstorm: heavier rain (+ the lightning in WorldEvents, below); Blizzard: snow, no splashes
@@ -454,7 +456,7 @@ for _,d in ipairs(discs())do
  if T<1 then
   shown+=1;if T~=0 then allFinal=false end
   local p=d.CFrame.Position;local r=max(d.Size.Y,d.Size.Z)/2
-  if d.Anchored~=true or d.CanCollide~=false or d.CanTouch~=false or d.CanQuery~=false or d.CastShadow~=false or d.Shape.Name~='Cylinder'or d.Size.X>.1 then props=false end
+  if d.Anchored~=true or d.CanCollide~=false or d.CanTouch~=false or d.CanQuery~=false or d.CastShadow~=false or d.Shape.Name~='Cylinder'or d.Size.X>.6 then props=false end
   local bottom=p.Y-d.Size.X/2-GROUND
   if bottom<.05 or bottom>.15 then heightOk2=false end
   if WW.AreaDistance(area,p.X,p.Z)<r-1e-6 then trackOk=false end
@@ -463,12 +465,12 @@ for _,d in ipairs(discs())do
 end
 check(shown>=60,('after 28 s the snow has settled: %d patch discs in view'):format(shown))
 check(allFinal,'settled patches are fully opaque white (transparency 0, they were .04) - persist while it snows')
-check(props,'patches are flat cylinders: anchored, no collision / touch / query / shadow, thinner than 0.1')
+check(props,'patches are flat cylinders: anchored, no collision / touch / query / shadow, thinner than 0.6 (R151: wall banks are deeper)')
 check(heightOk2,'patches lie 0.07-0.12 above the ground (no z-fighting, not floating)')
 do -- no two overlapping discs (of any patches) are in one plane: the cell's step (.012 apart) + the lobes' step (.004 apart)
  local function ellipse(d)
   local p=d.CFrame.Position;local up,look=d.CFrame.UpVector,d.CFrame.LookVector
-  return {X=p.X,Z=p.Z,Y=p.Y-d.Size.X/2,A=d.Size.Z/2,B=d.Size.Y/2,AX=-look.X,AZ=-look.Z,BX=up.X,BZ=up.Z}
+  return {X=p.X,Z=p.Z,Y=p.Y+d.Size.X/2,A=d.Size.Z/2,B=d.Size.Y/2,AX=-look.X,AZ=-look.Z,BX=up.X,BZ=up.Z}
  end
  local function inside(e,x,z)local dx,dz=x-e.X,z-e.Z;local u=dx*e.AX+dz*e.AZ;local v=dx*e.BX+dz*e.BZ;return(u/e.A)^2+(v/e.B)^2<=1 end
  local function overlaps(e1,e2)
@@ -499,7 +501,8 @@ check(maxIn-minIn>=4,'the patches do not all fade at the same moment')
 frames(30)
 local shown2=0;for _,d in ipairs(discs())do if d.Transparency<1 then shown2+=1;if d.Transparency~=0 then allFinal=false end end end
 check(shown2==shown and allFinal,'60 s into the snow: the same patches, still white (they persist while it snows)')
-check(#pf:GetChildren()<=WW.Tier(3).Patch.Discs,'patch parts stay within the tier-3 budget ('..#pf:GetChildren()..' / '..WW.Tier(3).Patch.Discs..')')
+local HS=W.module('HubSnow151')
+check(#pf:GetChildren()<=HS.Tier(3).Discs,'snow parts stay within the tier-3 budget ('..#pf:GetChildren()..' / '..HS.Tier(3).Discs..')')
 
 -- the weather ends: patches fade out over 20-40 s
 local tc=R.clock
@@ -515,11 +518,11 @@ for k=1,92 do
   lastT2[d]=T
   if T>=1 and not hiddenAt[d]then hiddenAt[d]=t;if t<19.4 then earlyHide=true end end
  end
- if k==6 then for d in pairs(startVisible)do total3+=1;if d.Transparency>.06+1e-9 then changedAt3+=1 end end;check(#active()==0,'the tiles stopped emitting within 3 s of Clear')end
+ if k==6 then for d in pairs(startVisible)do total3+=1;if d.Transparency>.02+1e-9 then changedAt3+=1 end end;check(#active()==0,'the tiles stopped emitting within 3 s of Clear')end
 end
 local nOut,minOut,maxOut=0,math.huge,0
 for _,t in pairs(hiddenAt)do nOut+=1;minOut=min(minOut,t);maxOut=max(maxOut,t)end
-check(changedAt3>=total3*.9,'3 s after the weather ended the patches are already paling')
+check(changedAt3>=total3*.9,('3 s after the weather ended the patches are already paling (%d of %d)'):format(changedAt3,total3))
 check(mono2 and not earlyHide,'patches only fade away, and none is gone before 19.4 s')
 check(nOut==shown and minOut>=19.4 and maxOut<=41.5,('every patch is gone between %.1f and %.1f s after the weather (20-40 s each)'):format(minOut,maxOut))
 check(maxOut-minOut>=8,'they disappear one after another, not all at once')

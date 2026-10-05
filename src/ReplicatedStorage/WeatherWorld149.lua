@@ -15,7 +15,9 @@
 --          the sum of rate x lifetime never passes the cap.
 --  PATCHES snow patches are made of 1..3 overlapping flat ellipses (an irregular blob), laid out by hash per grid cell. Weather patches fade
 --          in over 10-20 s and out over 20-40 s (Level folds the weather's snow / no snow history, so a patch bound late is already right);
---          the Snow biome's patches are permanent (BiomeSpec).
+--          the Snow biome's patches are permanent (BiomeSpec). R151: the blizzard's snow is laid over the WHOLE hub by HubSnow151 (big drifts,
+--          one fixed layout); PatchSpec / Tiers[n].Patch below are the R149 radius patches, kept for reference and the R149 tests only. The
+--          fade history (Mark / Level / Prune) and PatchTransparency are what HubSnow151's drifts use.
 local W={Version=149}
 local floor,max,min,sqrt,sin,cos,tan,rad,pi=math.floor,math.max,math.min,math.sqrt,math.sin,math.cos,math.tan,math.rad,math.pi
 local C3=Color3.fromRGB
@@ -47,15 +49,24 @@ W.Kinds={
  Blizzard={Snow=true,Height=40,Speed=11,Gravity=0,WindX=2.6,WindZ=-.8,Gust=.4,Spread=6,Density=.2,
   Texture=sparkles,Color=C3(238,250,255),Size=.34,Emission=.24,Fade=.12,Splash=false},
 }
--- Ground impact (rain / thunder): a small spray of droplets and a flat ripple per landing drop, on a ground tile just above the floor.
-W.Splash={Rise=.12,SprayShare=.4,RippleShare=.3,MaxRate=260,SprayLife={.18,.3},RippleLife={.45,.6}}
+-- Ground impact (rain / thunder): a small spray of droplets and a flat ripple, on a ground tile just above the floor, for a SHARE of the
+-- landing drops. R151 (owner: "some of the droplets can have impact with the ground, not all"): the shares went .4 / .3 -> .2 / .14, and they
+-- thin out away from the player and on lower tiers (SplashShare: x Tier[tier], x (Near + (1 - Near) x the tile's weight)). The particle cap
+-- still reserves room for the old shares (BudgetSpray / BudgetRipple -> Profile.SplashFactor), so the falling rain is exactly as dense as
+-- before and the splashes simply take fewer particles.
+W.Splash={Rise=.12,SprayShare=.2,RippleShare=.14,BudgetSpray=.4,BudgetRipple=.3,MaxRate=260,SprayLife={.18,.3},RippleLife={.45,.6},
+ Tier={[3]=1,[2]=.75,[1]=.6},Near=.45}
+function W.SplashShare(share,weight,tier)
+ local S=W.Splash
+ return share*(S.Tier[tier]or S.Tier[1])*(S.Near+(1-S.Near)*max(0,min(1,weight or 1)))
+end
 W.MaxTileRate=480 -- no emitter is asked for more than this
 W.CapMargin=.975  -- rates are only rewritten when they moved by 2.5%; this keeps the stale ones under the cap
 
 -- Quality tiers (ClientFxBudget 3 best .. 1 lowest; FastMode = 1). R = tiles each side of the player's cell (2 -> 5x5, 1 -> 3x3), Tile =
 -- tile size, Cap = live particles (rate x lifetime, splashes too) over all tiles, Near / Far = distance (nearest point of a tile to the player) at which the
--- tile weight is 1 / MinWeight, SplashMin = lowest tile weight that gets ground splashes. Cap counts the splash particles as well. Patch = weather snow patches (Radius around the
--- player, Discs = pooled flat parts), Biome = permanent Snow-biome patches (Lobes by distance band: <Near, <Mid, farther; Dust = the
+-- tile weight is 1 / MinWeight, SplashMin = lowest tile weight that gets ground splashes. Cap counts the splash particles as well. Patch = R149 weather snow patches (Radius around the
+-- player, Discs = pooled flat parts; R151: the hub-wide drifts take their budgets from HubSnow151.Tiers), Biome = permanent Snow-biome patches (Lobes by distance band: <Near, <Mid, farther; Dust = the
 -- sparse dusting on the keys). Tier 2 (phones) Cap 900 (R149 review: 1300 was ~13x R148's camera bubble; ~40% fewer particles right around the
 -- player stay dense enough, the far tiles are the ones thinned).
 W.MinWeight=.1
@@ -93,7 +104,7 @@ function W.Profile(kind,tier,reduced)
  p.LifeAvg=(p.LifeMin+p.LifeMax)/2
  -- splash particles per live drop (spray + ripple lifetimes x their share of landing drops): the cap counts them too
  local sp=W.Splash
- p.SplashFactor=k.Splash and(sp.SprayShare*(sp.SprayLife[1]+sp.SprayLife[2])/2+sp.RippleShare*(sp.RippleLife[1]+sp.RippleLife[2])/2)/p.LifeAvg or 0
+ p.SplashFactor=k.Splash and(sp.BudgetSpray*(sp.SprayLife[1]+sp.SprayLife[2])/2+sp.BudgetRipple*(sp.RippleLife[1]+sp.RippleLife[2])/2)/p.LifeAvg or 0
  -- Largest sideways drift of a particle between birth and landing: wind (with the biggest gust) + the emission cone.
  local top=1+p.Gust;local l=p.LifeMax
  p.DriftX=.5*p.WindX*top*l*l;p.DriftZ=.5*p.WindZ*top*l*l
@@ -233,7 +244,7 @@ end
 function W.Level(ev,now,dIn,dOut)
  local level=0
  for k=1,ev.N do
-  local dt=max(0,(ev.T[k+1]or now)-ev.T[k])
+  local dt=max(0,(k<ev.N and ev.T[k+1]or now)-ev.T[k]) -- (R151: only the live entries - a pruned history leaves old times behind)
   if ev.Snow[k]then level=min(1,level+dt/dIn)else level=max(0,level-dt/dOut)end
  end
  return level
@@ -250,7 +261,7 @@ end
 -- Forget a finished event (everything faded out).
 function W.Prune(ev,now)
  local n=ev.N
- if n>0 and not ev.Snow[n]and now-ev.T[n]>=W.Patch.FadeOut[2]+1 then ev.N=0 end
+ if n>0 and not ev.Snow[n]and now-ev.T[n]>=W.Patch.FadeOut[2]+1 then ev.N=0;table.clear(ev.T);table.clear(ev.Snow)end
 end
 function W.Quant(t)return floor(t*50+.5)/50 end
 -- Transparency of a patch at a level: 1 (gone) .. FinalTransparency.
@@ -266,14 +277,23 @@ end
 -- all their lobes in one plane).
 function W.PatchLevel(i,j)return(i%2)+2*(j%2)end
 function W.PatchStep(i,j)return W.PatchLevel(i,j)*W.Patch.Step end
-function W.BiomeStep(i,j)return W.PatchLevel(i,j)*W.Biome.Step end
+-- (R151: an edge bank covers two rows - its level alternates with every bank, (i mod 2) + 2 ((j div 2) mod 2): two banks of one edge never share
+-- a plane; next to a border patch (the other column parity) never either)
+function W.BiomeStep(i,j,kind)
+ if kind=='edge'then return((i%2)+2*((j//2)%2))*W.Biome.Step end
+ return W.PatchLevel(i,j)*W.Biome.Step
+end
 
 -- Snow biome (permanent): cells of Cell studs from the biome's start, 12 columns across the floor. Edge columns at both sides get big
 -- drifts, the first / last BorderRows rows (past the spacebar) get patches over the whole width, the rest only a sparse dusting of small
 -- discs. Nothing in the spacebar zone (SpaceClear studs from the biome start) so its label stays clean, nothing past the biome's ends,
 -- nothing past the floor's edges.
-W.Biome={Cell=15,Half=90,EdgeCols=1,BorderRows=4,SpaceClear=12,EdgeChance=.85,BorderChance=.45,DustChance=.2,
- Edge={RMin=4.2,RMax=8.6},Border={RMin=3.5,RMax=7.4},Dust={RMin=.7,RMax=1.9},
+-- R151 (owner: "snow piles can be bigger and more combined so we don't have to deal with that much performance demand"): the edge drifts
+-- merge two rows into one longer bank along the floor's edge (every other row holds one, its lobes stretched EdgeStretch along the track,
+-- centred between its two rows), and the border patches take every other cell (a checkerboard) at BorderScale the size: about half the
+-- patches - and parts - of R149 for the same look (white drifts along the edges, blobs at the entry and exit of the snow).
+W.Biome={Cell=15,Half=90,EdgeCols=1,BorderRows=4,SpaceClear=12,EdgeChance=.9,BorderChance=.62,DustChance=.2,
+ Edge={RMin=4.2,RMax=8.6},Border={RMin=3.5,RMax=7.4},Dust={RMin=.7,RMax=1.9},EdgeStretch=1.75,BorderScale=1.35,
  Rise=.1,Thickness=.06,DustThickness=.04,FinalTransparency=0,DustClear=26,DustFade=10,FarScale=1.25,Step=.004}
 function W.BiomeCols()return floor(2*W.Biome.Half/W.Biome.Cell+.5)end
 function W.BiomeRows(z0,z1)return max(0,floor((z1-z0)/W.Biome.Cell))end
@@ -286,13 +306,30 @@ function W.BiomeSpec(i,j,z0,z1,cx,spec)
  if i<B.EdgeCols or i>=cols-B.EdgeCols then kind,chance,range='edge',B.EdgeChance,B.Edge
  elseif j<B.BorderRows or j>=rows-B.BorderRows then kind,chance,range='border',B.BorderChance,B.Border end
  spec.Kind=kind
+ if kind=='edge'and j%2==1 then return false end          -- (a bank covers rows j and j + 1)
+ if kind=='border'and(i+j)%2==1 then return false end      -- (a checkerboard of bigger blobs)
  if unit(i,j,31)>=chance then return false end
  local r=range.RMin+(range.RMax-range.RMin)*unit(i,j,32)
+ if kind=='border'then r*=B.BorderScale end
  if kind=='dust'then lobes(spec,i,j,35,r,1)else lobes(spec,i,j,35,r,3)end
  local x=cx-B.Half+(i+.5)*B.Cell+(unit(i,j,33)-.5)*B.Cell*.7
  local z=z0+(j+.5)*B.Cell+(unit(i,j,34)-.5)*B.Cell*.7
+ if kind=='edge'then
+  -- one bank along the edge: every lobe stretched along the track (its long axis turned within +-0.2 rad of Z), offsets stretched too
+  z=z0+(j+1)*B.Cell+(unit(i,j,34)-.5)*B.Cell*.4
+  local e=0
+  for k=1,spec.N do
+   local a,b=spec.LA[k],spec.LB[k]
+   spec.LA[k]=max(a,b)*B.EdgeStretch;spec.LB[k]=min(a,b)
+   spec.LY[k]=(unit(i,j,37+k)-.5)*.4
+   spec.LZ[k]*=B.EdgeStretch;spec.LX[k]*=.6
+   e=max(e,sqrt(spec.LX[k]^2+spec.LZ[k]^2)+spec.LA[k])
+  end
+  spec.Extent=e
+ end
  local e=spec.Extent
  x=min(max(x,cx-B.Half+e*.6),cx+B.Half-e*.6)
+ if kind=='edge'then x=min(max(x,cx-B.Half+spec.LB[1]*.6),cx+B.Half-spec.LB[1]*.6)end -- (a bank hugs the edge: its width, not its length, keeps it on the floor)
  if z-e<z0+B.SpaceClear or z+e>z1 then return false end
  spec.X,spec.Z=x,z
  spec.Shade=1+hash(i,j,36)%#W.Shades

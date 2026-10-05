@@ -170,7 +170,7 @@ local function bind(i,j)
   return true
  end
  local d=math.sqrt((s.X-fx)^2+(s.Z-fz)^2)
- rec.Key=key;rec.Step=W.BiomeStep(i,j);bound[key]=rec;boundN+=1;boundList[boundN]=rec;rec.Idx=boundN
+ rec.Key=key;rec.Step=W.BiomeStep(i,j,s.Kind);bound[key]=rec;boundN+=1;boundList[boundN]=rec;rec.Idx=boundN
  rec.T=s.Kind=='dust'and W.DustTransparency(d,clearRadius())or B.FinalTransparency
  local lobes=s.Kind=='dust'and 1 or W.BiomeLobes(cfg.Biome,d,s.N)
  if Patches.Fill(pool,rec,lobes,B.FarScale,patchY(rec),0)==0 then dropPatch(rec)end

@@ -78,6 +78,33 @@ function P.Fill(pool,rec,lobes,scale,y,lobeStep)
  rec.Lobes=rec.DiscN;rec.Y=y
  return rec.DiscN
 end
+-- R151 (hub drifts, HubSnow151): every disc of the record stands on the same bottom plane (bottom = the ground + Rise) and lobe k is
+-- Spec.LT[k] thick, so its top plane is its own (overlapping drifts get other thicknesses: no shared plane, no floating gap under a thick
+-- bank). scale stretches a lone lobe standing in for the blob. Only what changed is written: a disc that keeps its lobe, stretch and bottom
+-- is not touched (an LOD step from 4 lobes to 2 writes the two given back, nothing else; 1 -> 2 writes the main disc's size and the new one).
+function P.FillStack(pool,rec,lobes,scale,bottom)
+ local s=rec.Spec;lobes=math.min(lobes,s.N,pool.MaxLobes)
+ for k=rec.DiscN,lobes+1,-1 do giveDisc(pool,rec.Discs[k]);rec.Discs[k]=nil end
+ if rec.DiscN>lobes then rec.DiscN=lobes end
+ local drawn=rec.DiscN
+ for k=rec.DiscN+1,lobes do
+  local d=takeDisc(pool);if not d then break end
+  rec.Discs[k]=d;rec.DiscN=k
+ end
+ local f=(lobes==1 and s.N>1)and(scale or 1)or 1
+ local moved=rec.Y~=bottom
+ local color=W.Shades[s.Shade]or W.Shades[1]
+ for k=1,rec.DiscN do
+  if k>drawn or moved or(k==1 and rec.F~=f)then
+   local d=rec.Discs[k];local fk=k==1 and f or 1;local th=s.LT[k]
+   d.Size=V3(th,2*s.LB[k]*fk,2*s.LA[k]*fk)
+   d.CFrame=CF(s.X+s.LX[k],bottom+th/2,s.Z+s.LZ[k])*CFrame.Angles(0,s.LY[k],ROLL)
+   if k>drawn then d.Color=color;d.Transparency=rec.T end
+  end
+ end
+ rec.F=f;rec.Lobes=rec.DiscN;rec.Y=bottom
+ return rec.DiscN
+end
 -- Move a record's discs to another height (the keyboard appeared / went away under a permanent patch).
 function P.Lift(rec,y)
  if rec.Y==y then return end

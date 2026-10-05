@@ -85,7 +85,7 @@ mutate "Snow-biome patches cover shovel holes" $S/SnowBiome149.client.lua "if re
 mutate "a cell avoided for a hole goes on the permanent skip list" $S/SnowBiome149.client.lua "  if avoided then if avoidSkipN<4000 then avoidSkip[key]=true;avoidSkipN+=1 end
   elseif skipN<4000 then skip[key]=true;skipN+=1 end" "  if skipN<4000 then skip[key]=true;skipN+=1 end"
 mutate "the avoid list is not refreshed when packs / camps / holes change" $S/SnowBiome149.client.lua "  if newSig~=avoidSig then" "  if false then"
-mutate "a tier change cuts the weather fade-out" $S/WeatherWorld149.client.lua "if profile and shownKind~='Clear'then setKind(shownKind,now)end end" "if profile then setKind(kind,now)end end"
+mutate "a tier change cuts the weather fade-out" $S/WeatherWorld149.client.lua "   if profile and shownKind~='Clear'then setKind(shownKind,now)end" "   if profile then setKind(kind,now)end"
 mutate "a clear sky still raycasts and reads the area every step" $S/WeatherWorld149.client.lua " if kind=='Clear'and shownKind=='Clear'and blend<=0 and boundN==0 and not W.Active(events,now)then return end" " local _=0"
 mutate "the weather area is read again every step" $S/WeatherWorld149.client.lua " if map and areaDirty then" " if map then"
 echo "$caught of $total mutations caught"

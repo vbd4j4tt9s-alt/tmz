@@ -111,6 +111,7 @@ ModuleScript	ReplicatedStorage/HubAvatarPose	ReplicatedStorage/HubAvatarPose.lua
 ModuleScript	ReplicatedStorage/HubDecorKit151	ReplicatedStorage/HubDecorKit151.lua
 ModuleScript	ReplicatedStorage/HubDisplayRules	ReplicatedStorage/HubDisplayRules.lua
 ModuleScript	ReplicatedStorage/HubLifeArt151	ReplicatedStorage/HubLifeArt151.lua
+ModuleScript	ReplicatedStorage/HubSnow151	ReplicatedStorage/HubSnow151.lua
 ModuleScript	ReplicatedStorage/HudArtwork	ReplicatedStorage/HudArtwork.lua
 ModuleScript	ReplicatedStorage/HudIconData	ReplicatedStorage/HudIconData.lua
 ModuleScript	ReplicatedStorage/HudLayout	ReplicatedStorage/HudLayout.lua
