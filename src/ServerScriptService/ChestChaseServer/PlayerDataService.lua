@@ -413,6 +413,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         self:QueueGardenSave(player)
         self:TutorialEvent(player,'Seed')
         self:QuestEvent(player,'Open',1) -- R140 daily quest
+        pcall(function()require(script.Parent.PullAnnouncer).OnOpened(player,pack,reward,testSeed~=nil)end) -- R151: a real open of a Legendary+ seed is announced (a TEST pack never is)
         return reward
     end
     return nil, "THIS PACK IS NO LONGER IN YOUR INVENTORY"

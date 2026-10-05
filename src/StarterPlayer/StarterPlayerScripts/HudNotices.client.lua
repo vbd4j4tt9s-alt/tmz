@@ -38,6 +38,7 @@ local function update()
  if nav and nav.Visible then top=math.max(top,nav.AbsolutePosition.Y+nav.AbsoluteSize.Y)end
  -- R110: notices stack below the tutorial objective card while it is showing.
  top=math.max(top,tonumber(pg:GetAttribute('TutorialCardBottom'))or 0)
+ top=math.max(top,tonumber(pg:GetAttribute('PullBannerBottom'))or 0) -- R151: the pull announcement banner (PullAnnouncerClient) sits first; the rows stack below it while it shows
  local biome=object('BiomeEntryUI','BiomeTitle');local run=object('ChestRunAlertUI','RunWarning');local banner=object('ChestChaseBanner','Message')
  local feedback=object('ChestEconomyUI','GardenFeedback');local shovel=object('GardenShovelUI','ShovelFeedback')
  local flags={Biome=biome and biome.Visible,Run=run and run.Visible,Banner=textVisible(banner),Feedback=textVisible(feedback),Shovel=textVisible(shovel),Modal=pg:GetAttribute('SeedMenu')~=nil}

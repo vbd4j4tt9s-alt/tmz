@@ -123,6 +123,7 @@ local function runServer()
     local social=require(modules.SocialService).new(playerData,notifications):Start() -- R140: friend boost, plant-ready notifications, daily rollover
     local mystery=require(modules.MysteryPackService).new(Config,playerData,baseService,chestService,notifications,mapService):Start() -- R141: daily mystery pack pedestal
     local verity;do local ok,err=pcall(function()verity=require(modules.VerityService).new(Config,playerData,chestService,notifications,mapService):Start()end);if not ok then warn('[R147] Verity failed to start: '..tostring(err))end end -- R147: Verity NPC behind the market (a Void pack becomes a Verity pack)
+	do local ok,err=pcall(function()require(modules.PullAnnouncer).Start(playerData)end);if not ok then warn('[R151] Pull announcements failed to start: '..tostring(err))end end -- R151
 	require(modules.MovementGuard).Start(Config,playerData,baseService)
 	startupPhase = "connecting chase and training"
 	baseService:SetBusyChecker(function(player)

@@ -102,6 +102,14 @@
 | `bonus progress 5:50 @name` | Saved treadmill time (max 6:00). 5:50 means a roll after 10 more seconds on the treadmill |
 | `bonus roll @name` | Use a ready roll for them now, with no animation |
 
+## Pull announcements (R151)
+| Command | What it does |
+|---|---|
+| `announce firepepper @name` | The in-server banner + chat line for everyone in this server, as if `@name` had just pulled that seed. Any rarity works (a real pull needs Legendary or above). Seed = an id (`FirePepperSeed`) or the plant name; add `gold` or `diamond` for a coat |
+| `announce global firepepper @name` | Publish it to the OTHER servers (they show the small gold "in another server" banner and a gold chat line). It goes out within 5 s. This server is the origin and shows nothing |
+| `announce global firepepper here @name` | Same, and this server also shows the other-server version (the only way to see it with a single server, e.g. in Studio) |
+| `announce record @name` | The record banner ("took BEST PULL TODAY!") for the hub displays. `announce record fruit` = BIGGEST FRUIT TODAY; add a seed (`announce record bestpull moonmelon`) to put its picture on it |
+
 ## Gifts
 | Command | What it does |
 |---|---|
@@ -235,3 +243,10 @@ listed separately any more because each one is the same as a command above.
    - Steal and bank 3 packs: ✅ QUEST DONE notice, CLAIM in QUESTS gives 💎5. `daily done` finishes all three.
    - Live server with a friend: both get a "Friend boost" notice, INVITE shows +10% / +20%, and treadmill training gives you that much more speed per second (R149: your running speed itself is not boosted; bought speed and bonus rolls are not either). `training` shows the "friends x1.2" part. INVITE opens Roblox's invite screen.
    - "Your plant is ready" needs the one-time setup in `docs/releases/R140.md` (notification string id on SocialService.MessageId, API key secret `PlantReadyKey`, HTTP on).
+26. **R151 pull announcements:**
+   - `announce moonmelon @me`: a banner slides in at the top centre for about 4 s (your headshot, the seed picture, "Name pulled a LEGENDARY Moon Melon! (1/...)") and a coloured line appears in chat. Try `announce firepepper`, a Secret, a Cosmic and `verity`: the frame, the ribbon word, the sparkles and the sound grow with the rarity; a Common one (`announce sunflower`) still shows because it is a test.
+   - Run three or four `announce` commands quickly: they queue (at most 3 wait; the best rarity is kept and the banner says "+N more"). Open a menu or have a notice on screen: the notices move below the banner, nothing overlaps. Set Effects to 0 in Settings: the banner is silent. Turn on reduced motion in Roblox: no slide, no sparkles.
+   - A real pack open: a Legendary or better seed shows the banner AFTER the reveal ends (never before), also for the other players in the server. `rarepacks @me` TEST packs and gifted / granted seeds never announce.
+   - Two live servers (or Studio + a live server): `announce global obsidianmaw` (any Secret+ seed) from one: the other shows the small gold "in another server" banner and a gold chat line; the sender's own server does not. SETTINGS has "Announcements from other servers": switch it off and the next one is not shown to you (pulls in your own server still are). It is saved with your settings.
+   - `announce record` on a hub that is not built yet: just the banner. The hub-display code calls `require(...PullAnnouncer).Announce({Kind='Record', Player=player, Record='BestPull', SeedId=...})`.
+   - Tunables (Studio): set an attribute on `ReplicatedStorage.PullAnnounceRules`: `InServerMinRarity` (default Legendary), `GlobalMinRarity` (Secret), `BannerSeconds` (4), `MaxWaiting` (3), `PublishGapSeconds` (5), `ReceiveMaxPerMinute` (10).
