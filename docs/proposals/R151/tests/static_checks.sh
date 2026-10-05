@@ -9,7 +9,7 @@ count(){ grep -c "$1" "$2" || true; }
 [ "$(count PullAnnouncer "$SS/PlayerDataService.lua")" = 1 ] || fail "PlayerDataService must mention PullAnnouncer on exactly one line"
 [ "$(count PullAnnouncer "$S/ServerScriptService/ChestChaseServerMain.server.lua")" = 1 ] || fail "ChestChaseServerMain must mention PullAnnouncer on exactly one line"
 [ "$(count PullAnnouncer "$SS/OwnerUpdateCommands82.lua")" = 1 ] || fail "OwnerUpdateCommands82 must mention PullAnnouncer on exactly one line"
-grep -q "announce=true}}" "$SS/OwnerUpdateCommands82.lua" || fail "announce is not in OwnerUpdateCommands82.Actions"
+grep -qE "Actions=\{[^}]*announce=true" "$SS/OwnerUpdateCommands82.lua" || fail "announce is not in OwnerUpdateCommands82.Actions"
 [ "$(count PullBannerBottom "$C/HudNotices.client.lua")" = 1 ] || fail "HudNotices must read PullBannerBottom on exactly one line"
 echo "ok: the hooks are one line each (PlayerDataService, ChestChaseServerMain, OwnerUpdateCommands82 + its Actions entry, HudNotices)"
 # 2. the open of a real pack is the ONLY caller of the announcer's pull hook, and it is told whether the pack was a TEST pack
