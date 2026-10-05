@@ -1,269 +1,232 @@
-"""Bold, expressive cartoon faces with swappable states, built as raised mesh pieces on a keeper's head.
+"""Graphic keeper faces, revision 3: two faces per keeper, swapped by state.
 
-Static (always shown): eye whites in the head mesh, the glowing irises (the KeeperEyeGlow part), pupils and two white
-catchlights per eye. Per state (one small mesh part each, in the Head group, only one shown at a time): eyelids with a
-dark lash line, bold brows, the mouth (opening, teeth, fangs, tongue, lips), cheeks and extras (drool, smoke).
-Brows, lips and mouths are placed ON the head by casting rays at the skull mesh, so they always touch the head.
+  Chase   shown whenever the keeper is awake (guarding, chasing, attacking, after a catch): the fierce face. Glowing
+          angular eyes in dark sockets, heavy slanted brows, a roaring or snarling mouth with teeth and fangs.
+  Asleep  closed eyes, relaxed brows, a snoring or relaxed mouth (the big "Z" is an effect, not part of the face).
 
-Coordinates are Roblox rig space (face toward -Z). An eye's local frame: x across (the eye sits on side s = +1 / -1),
-y up, -z out of the face.
+Each face is a set of flat graphic shapes (not carved): every shape is a convex outline drawn in a face plane, projected
+onto the head's outermost surface along the face direction, raised a little above it and sunk into it, so it always
+touches the head (connectivity.py checks this). Per state the pieces go into two mesh parts in the Head group:
+  Head_Face_<State>   sockets, pupils, brows, mouth, teeth, closed-eye lines (the head's palette material)
+  Head_Eyes_<State>   the glowing eye shapes (a KeeperEyeGlow Neon part); only the Chase face has one
+The game would show the parts of the current state and hide the others (LocalTransparencyModifier).
+
+Coordinates are Roblox rig space (face toward -Z). A face frame is (c, n, up): c is a point inside the head, n the
+outward face direction; u runs to screen-right when you look at the face, v runs up.
 """
 import math
-from mathutils import Vector, Matrix
+from mathutils import Vector
 import kit
-from kit import Geo, blob, tube, rbox, spike, T, Rx, Ry, Rz
 
-STATES = ['Idle', 'Chase', 'Attack', 'Asleep', 'Gloat']
+STATES = ['Chase', 'Asleep']
+AWAKE = 'Chase'
+
+# outlines in eye-local units (x toward the outer corner, y up), scaled by the eye's (w, h)
+ANGRY_EYE = [(-0.5, -0.02), (-0.36, 0.14), (0.38, 0.5), (0.5, 0.3), (0.38, -0.28), (0.02, -0.5), (-0.32, -0.38)]
+LID_EYE = [(-0.5, 0.0), (-0.3, 0.32), (0.3, 0.36), (0.5, 0.05), (0.3, -0.3), (-0.3, -0.32)]
+SLIT = [(0.0, -0.46), (0.11, 0.0), (0.0, 0.46), (-0.11, 0.0)]
+DOT = [(math.cos(a) * 0.17, math.sin(a) * 0.24) for a in [i * math.pi / 3 + 0.3 for i in range(6)]]
+BROW = [(-0.55, -0.62), (0.58, -0.30), (0.62, 0.22), (-0.5, 0.62)]          # thick at the inner end
+MOUTHS = {
+    'roar': [(-0.5, 0.22), (-0.3, 0.5), (0.3, 0.5), (0.5, 0.22), (0.32, -0.38), (0.0, -0.5), (-0.32, -0.38)],
+    'snarl': [(-0.5, 0.12), (-0.36, 0.5), (0.36, 0.5), (0.5, 0.12), (0.36, -0.5), (-0.36, -0.5)],
+    'grin': [(-0.5, 0.5), (0.5, 0.5), (0.42, 0.05), (0.2, -0.42), (-0.2, -0.42), (-0.42, 0.05)],
+    'hiss': [(-0.5, 0.4), (0.5, 0.4), (0.3, -0.45), (-0.3, -0.45)],
+    'snore': [(math.cos(a) * 0.5, math.sin(a) * 0.5) for a in [i * math.pi / 4 for i in range(8)]],
+}
 
 
-def lid_cap(g, M, radii, h, t, u, upper, col, seg=18, rings=4, lash=None, lash_r=0.0):
-    """The part of the ellipsoid (a, b, c) above (upper) or below the plane y = h + t*x + u*z, closed flat along the cut,
-    plus an optional dark lash tube along the front of the cut edge."""
-    a, b, c = radii
+def hull2(pts):
+    """Convex hull of 2D points, counter-clockwise (monotone chain)."""
+    pts = sorted(set((round(p[0], 6), round(p[1], 6)) for p in pts))
+    if len(pts) <= 2:
+        return pts
 
-    def cut(th):
-        kk = t * a * math.cos(th) + u * c * math.sin(th)
-        lo, hi = -math.pi / 2, math.pi / 2
-        f = lambda p: b * math.sin(p) - (h + kk * math.cos(p))
-        if f(lo) > 0 or f(hi) < 0:
-            return None
-        for _ in range(40):
-            m = (lo + hi) / 2
-            if f(m) > 0:
-                hi = m
-            else:
-                lo = m
-        return (lo + hi) / 2
-    cuts = [cut(2 * math.pi * j / seg) for j in range(seg)]
-    if any(cp is None for cp in cuts):
-        return
-    verts, faces = [], []
-    pe = math.pi / 2 if upper else -math.pi / 2
-    for i in range(rings + 1):
-        for j in range(seg):
-            th = 2 * math.pi * j / seg
-            p = cuts[j] + (pe - cuts[j]) * (i / (rings + 1))
-            verts.append((a * math.cos(p) * math.cos(th), b * math.sin(p), c * math.cos(p) * math.sin(th)))
-    pole = len(verts)
-    verts.append((0, b if upper else -b, 0))
-    for i in range(rings):
-        for j in range(seg):
-            q = (j + 1) % seg
-            faces.append((i * seg + j, i * seg + q, (i + 1) * seg + q, (i + 1) * seg + j))
-    for j in range(seg):
-        faces.append((rings * seg + j, rings * seg + (j + 1) % seg, pole))
-    cen = Vector((0, 0, 0))
-    for j in range(seg):
-        cen += Vector(verts[j])
-    cen /= seg
-    ci = len(verts)
-    verts.append(tuple(cen))
-    for j in range(seg):
-        faces.append((ci, (j + 1) % seg, j))
-    g.add([(M @ Vector((p[0], p[1], p[2], 1))).xyz for p in verts], faces, col, True)
-    if lash:
-        pts = []
-        for j in range(13):
-            th = math.pi * (1.06 + 0.88 * j / 12)
-            p = cut(th)
-            if p is None:
-                continue
-            pts.append((M @ Vector((a * math.cos(p) * math.cos(th) * 1.01, b * math.sin(p), c * math.cos(p) * math.sin(th) * 1.01, 1))).xyz)
-        if len(pts) >= 2:
-            tube(g, pts, [lash_r] * len(pts), lash, seg=6, cap0='round', cap1='round', smooth=True)
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    lo, hi = [], []
+    for p in pts:
+        while len(lo) >= 2 and cross(lo[-2], lo[-1], p) <= 0:
+            lo.pop()
+        lo.append(p)
+    for p in reversed(pts):
+        while len(hi) >= 2 and cross(hi[-2], hi[-1], p) <= 0:
+            hi.pop()
+        hi.append(p)
+    return lo[:-1] + hi[:-1]
+
+
+def span_y(poly, x):
+    """(bottom, top) of a convex polygon at x."""
+    ys = []
+    n = len(poly)
+    for i in range(n):
+        (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % n]
+        if (x0 - x) * (x1 - x) <= 0 and x0 != x1:
+            ys.append(y0 + (y1 - y0) * (x - x0) / (x1 - x0))
+    return (min(ys), max(ys)) if ys else (0.0, 0.0)
 
 
 class Face:
-    """One keeper's face. skull: a Geo of the head surface the face sits on (for ray placement).
-    eyes: list of dict(E, r, s, yaw, pitch). mouth: dict(c = a point inside the head behind the mouth,
-    n = outward direction, up = up direction)."""
+    """skull: a Geo of the head surface the face is laid on. frames: name -> dict(c, n, up); 'face' is the default.
+    unit: the base thickness step in studs (about 1/12 of an eye's height)."""
 
-    def __init__(self, k, group, skull, eyes, lid_col, lash_col='lash', brow_col='brow', mouth=None, sclera='white',
-                 iris_r=0.70, iris_kind='eyes'):
-        self.k, self.group, self.skull = k, group, skull
+    def __init__(self, k, group, skull, frames, unit=0.08):
+        self.k, self.group = k, group
         self.bvh = skull.bvh()
-        self.eyes = eyes
-        self.lid_col, self.lash_col, self.brow_col = lid_col, lash_col, brow_col
-        self.mouth = mouth
-        self.sclera = sclera
-        self.iris_r = iris_r
-        self.iris_kind = iris_kind
+        self.frames = {}
+        for name, f in frames.items():
+            n = Vector(f['n']).normalized()
+            up = Vector(f.get('up', (0, 1, 0)))
+            up = (up - n * up.dot(n)).normalized()
+            self.frames[name] = (Vector(f['c']), n, up, up.cross(n).normalized())
+        self.unit = unit
 
-    def eyeM(self, e):
-        return T(e['E']) @ Ry(-e['s'] * e.get('yaw', 0.3)) @ Rx(e.get('pitch', 0.0)) @ Rz(e.get('roll', 0.0) * e['s'])
+    def g(self, state, kind='face'):
+        return self.k.g(self.group, kind, state)
 
-    # ------------------------------------------------------------------ static eye parts
-    def build_eyes(self, pupil=True, slit=False, catch=True):
-        head = self.k.g(self.group)
-        iris = self.k.g(self.group, self.iris_kind)
-        for e in self.eyes:
-            M = self.eyeM(e)
-            r = e['r']
-            ia, ib = r * self.iris_r, r * (self.iris_r + 0.06)
-            if self.sclera:
-                blob(head, (0, 0, 0), (r, r * 1.1, r * 0.62), self.sclera, M=M, seg=18, rings=11, smooth=True)
-            blob(iris, (0, 0, 0), (ia, ib, r * 0.30), 'iris', M=M @ T(0, 0, -r * 0.40), seg=18, rings=10, smooth=True)
+    # ------------------------------------------------------------------ the one primitive: a projected plate
+    def project(self, fr, u, v):
+        c, n, up, right = self.frames[fr]
+        o = c + right * u + up * v
+        hit = self.bvh.ray_cast(o + n * 60.0, -n)
+        if hit[0] is not None:
+            return hit[0]
+        near = self.bvh.find_nearest(o)          # off the edge of the head: snap to the closest surface point
+        return near[0] if near[0] is not None else o
 
-            def zs(x, y):
-                q = 1 - (x / ia) ** 2 - (y / ib) ** 2
-                return -(r * 0.40 + r * 0.30 * math.sqrt(max(0.0, q)))
-            if pupil:
-                if slit:
-                    blob(head, (0, 0, 0), (r * 0.15, r * 0.6, r * 0.12), 'pupil', M=M @ T(0, 0, zs(0, 0) + r * 0.07), seg=12, rings=8, smooth=True)
-                else:
-                    blob(head, (0, 0, 0), (r * 0.34, r * 0.40, r * 0.12), 'pupil', M=M @ T(0, -0.03 * r, zs(0, 0) + r * 0.07), seg=14, rings=8, smooth=True)
-            if catch:
-                x1, y1 = -0.28 * r, 0.30 * r
-                blob(head, (0, 0, 0), (r * 0.18, r * 0.18, r * 0.08), 'white', M=M @ T(x1, y1, zs(x1, y1) - r * 0.015), seg=10, rings=6, smooth=True)
-                x2, y2 = 0.22 * r, -0.22 * r
-                blob(head, (0, 0, 0), (r * 0.09, r * 0.09, r * 0.05), 'white', M=M @ T(x2, y2, zs(x2, y2) - r * 0.015), seg=8, rings=5, smooth=True)
-
-    # ------------------------------------------------------------------ per-state pieces
-    def g(self, state):
-        return self.k.g(self.group, 'face', state)
-
-    def lids(self, state, spec):
-        """spec per eye: dict(up=(h, t, u) or None, low=(h, t, u) or None) with h in units of r; t (x slope) is
-        mirrored per side so t > 0 lowers the inner corner (angry), u (z slope) curves the lid line."""
-        g = self.g(state)
-        for e, sp in zip(self.eyes, spec):
-            r = e['r']
-            M = self.eyeM(e)
-            radii = (r * 1.1, r * 1.2, r * 0.86)
-            if sp.get('up'):
-                h, t, u = sp['up']
-                lid_cap(g, M, radii, h * r, t * e['s'], u, True, self.lid_col, lash=self.lash_col, lash_r=0.08 * r)
-            if sp.get('low'):
-                h, t, u = sp['low']
-                lid_cap(g, M, radii, h * r, t * e['s'], u, False, self.lid_col,
-                        lash=self.lash_col if sp.get('lowlash') else None, lash_r=0.06 * r)
-
-    def _surface(self, origin, direction):
-        """The outermost surface point along the ray (cast back from far outside) and its outward normal."""
-        d = Vector(direction).normalized()
-        hit = self.bvh.ray_cast(Vector(origin) + d * 60.0, -d)
-        if hit[0] is None:
-            return None, None
-        n = hit[1] if hit[1].dot(d) > 0 else -hit[1]
-        return hit[0], n
-
-    def brows(self, state, spec, col=None):
-        """spec per eye (None = no brow): dict(dy, ang, dx, arch, len, thick, width) in units of r.
-        ang > 0 lowers the inner end (angry), ang < 0 raises it (worried / smug)."""
-        g = self.g(state)
-        for e, sp in zip(self.eyes, spec):
-            if sp is None:
-                continue
-            r = e['r']
-            M = self.eyeM(e)
-            ln = sp.get('len', 2.3)
-            n = 6
-            centre_in = (M @ Vector((0, 0, r * 1.8, 1))).xyz
-            rays = []
-            for i in range(n):
-                f = i / (n - 1) - 0.5
-                x = f * ln * r + sp.get('dx', 0) * r * e['s']
-                y = r * (1.3 + sp.get('dy', 0)) + math.tan(sp.get('ang', 0.3)) * (x - sp.get('dx', 0) * r * e['s']) * e['s']
-                y += sp.get('arch', 0.12) * r * (1 - 4 * f * f)
-                target = (M @ Vector((x, y, -r * 0.55, 1))).xyz
-                rays.append((centre_in, target - centre_in))
-            kit.stroke(g, self.bvh, rays, col or self.brow_col, sp.get('width', 0.42) * r, thick=sp.get('thick', 0.38) * r,
-                       seg=5, lift=0.02, outside=True)
-
-    def frame(self):
-        m = self.mouth
-        n = Vector(m['n']).normalized()
-        up = Vector(m['up'])
-        up = (up - n * up.dot(n)).normalized()
-        right = up.cross(n).normalized()
-        return n, up, right
-
-    def on_face(self, u, v):
-        n, up, right = self.frame()
-        o = Vector(self.mouth['c']) + right * u + up * v
-        p, nn = self._surface(o, n)
-        return p, nn, right, up
-
-    def mouth_line(self, state, pts, width, thick, col='mouth'):
-        """A drawn mouth line (smirk, frown, closed mouth) through (u, v) points, lying on the face."""
-        n, up, right = self.frame()
-        rays = [((Vector(self.mouth['c']) + right * u + up * v), n) for u, v in pts]
-        kit.stroke(self.g(state), self.bvh, rays, col, width, thick=thick, seg=6, lift=0.02, taper=True, outside=True)
-
-    def mouth_open(self, state, w, h, dv=0.0, du=0.0, shape='oval', teeth_up=0, teeth_low=0, tooth=0.18, tongue=True,
-                   col='mouthin', tooth_col='tooth', tongue_col='tongue', lip=None, fang=0.0, tilt=0.0, depth=0.5,
-                   lower_fang=0.0):
-        """An open mouth: a hollow (dark red inside) pressed half into the face, teeth along the edges, fangs, a tongue,
-        and an optional lip ring. shape: 'oval', 'D' (flat top: grin / laugh), 'Dinv' (flat bottom: frown / yell)."""
-        g = self.g(state)
-        p, nn, right, up = self.on_face(du, dv)
-        if p is None:
+    def plate(self, g, poly, col, thick, lift=0.0, sink=None, fr='face', res=None):
+        """A convex 2D outline (u, v) laid on the head: top at surface + lift + thick, bottom `sink` below the surface."""
+        poly = hull2(poly)
+        if len(poly) < 3:
             return
-        R = Matrix((right, up, nn)).transposed().to_4x4() @ Rz(tilt)
+        c, n, up, right = self.frames[fr]
+        sink = self.unit * 2.5 if sink is None else sink
+        res = res or max(0.25, self.unit * 4.5)
+        outline = []
+        for i in range(len(poly)):
+            a, b = Vector(poly[i]), Vector(poly[(i + 1) % len(poly)])
+            m = max(1, int(math.ceil((b - a).length / res)))
+            outline += [a + (b - a) * (j / m) for j in range(m)]
+        cen = sum(outline, Vector((0.0, 0.0))) / len(outline)
+        K = len(outline)
+        R = max(1, min(3, int(math.ceil(max((p - cen).length for p in outline) / res))))
+        grid = [cen] + [cen + (p - cen) * (r / R) for r in range(1, R + 1) for p in outline]
+        tops, bots = [], []
+        for q in grid:
+            p = self.project(fr, q.x, q.y)
+            tops.append(p + n * (lift + thick))
+            bots.append(p - n * sink)
+        N = len(grid)
 
-        def deform(q):
-            if shape == 'D' and q.y > 0:
-                return Vector((q.x, q.y * 0.2, q.z))
-            if shape == 'Dinv' and q.y < 0:
-                return Vector((q.x, q.y * 0.2, q.z))
-            return q
-        M = T(p) @ R
-        blob(g, (0, 0, 0), (w / 2, h / 2, depth), col, M=M, seg=18, rings=10, deform=deform, smooth=True)
-        top = h / 2 * (0.2 if shape == 'D' else 1.0)
-        bot = h / 2 * (0.2 if shape == 'Dinv' else 1.0)
+        def ix(r, kk):
+            return 0 if r == 0 else 1 + (r - 1) * K + (kk % K)
+        faces = []
+        for kk in range(K):
+            faces.append((ix(0, 0), ix(1, kk), ix(1, kk + 1)))
+            for r in range(1, R):
+                faces.append((ix(r, kk), ix(r + 1, kk), ix(r + 1, kk + 1), ix(r, kk + 1)))
+        bottom = [tuple(N + i for i in reversed(f)) for f in faces]
+        sides = [(ix(R, kk), N + ix(R, kk), N + ix(R, kk + 1), ix(R, kk + 1)) for kk in range(K)]
+        g.add(tops + bots, faces + bottom + sides, col, False)
 
-        def edge_y(x, row):
-            curved = (row == 'up' and shape != 'D') or (row == 'low' and shape != 'Dinv')
-            yy = (top if row == 'up' else bot)
-            if curved:
-                yy *= math.sqrt(max(0.0, 1 - (2 * x / w) ** 2))
-            return yy if row == 'up' else -yy
+    # ------------------------------------------------------------------ shape helpers
+    @staticmethod
+    def place(pts, cu, cv, s, ang=0.0, w=1.0, h=1.0, dx=0.0, dy=0.0):
+        """Eye-local outline -> face (u, v): scale, shift, rotate (ang > 0 raises the outer end), mirror for side s."""
+        ca, sa = math.cos(ang), math.sin(ang)
+        out = []
+        for x, y in pts:
+            x, y = x * w + dx, y * h + dy
+            xr, yr = x * ca - y * sa, x * sa + y * ca
+            out.append((cu + s * xr, cv + yr))
+        return out
+
+    # ------------------------------------------------------------------ eyes
+    def eye(self, state, cu, cv, w, h, s, slant=0.3, pupil='slit', pupil_dx=-0.06, socket='eyedark', pad=0.2, fr='face',
+            glow=True, col='iris'):
+        """A fierce glowing eye: dark socket, angular glowing shape (the Eyes part), slit or dot pupil."""
+        u = self.unit
+        fg = self.g(state)
+        if socket:
+            self.plate(fg, self.place(ANGRY_EYE, cu, cv, s, slant, w * (1 + pad), h * (1 + pad * 1.6)), socket, u * 1.0, fr=fr)
+        self.plate(self.g(state, 'eyes') if glow else fg, self.place(ANGRY_EYE, cu, cv, s, slant, w, h), col, u * 1.0, lift=u * 0.8, fr=fr)
+        if pupil:
+            shape = SLIT if pupil == 'slit' else DOT
+            self.plate(fg, self.place(shape, cu, cv, s, slant, w, h, dx=pupil_dx * w), 'pupil', u * 0.8, lift=u * 1.6, fr=fr)
+
+    def closed_eye(self, state, cu, cv, w, h, s, slant=0.0, lid='lid', line='lash', curve=0.22, fr='face'):
+        """Asleep: a lid shape in a darker head tone and a thick closed-eye line curving down (relaxed)."""
+        u = self.unit
+        fg = self.g(state)
+        if lid:
+            self.plate(fg, self.place(LID_EYE, cu, cv, s, slant, w * 1.05, h * 0.9), lid, u * 1.0, fr=fr)
+        pts = []
+        for i in range(7):
+            x = -0.5 + i / 6
+            pts.append((x, -curve * (1 - 4 * x * x)))
+        pts = self.place(pts, cu, cv, s, slant, w * 0.92, h)
+        c, n, up, right = self.frames[fr]
+        rays = [(c + right * a + up * b, n) for a, b in pts]
+        kit.stroke(fg, self.bvh, rays, line, max(0.05, h * 0.13), thick=u * 1.2, seg=5, lift=u * 1.0, outside=True)
+
+    def brow(self, state, cu, cv, w, h, s, slant=0.35, col='brow', fr='face', thick=None):
+        """A heavy angular brow slab, thicker at the inner end."""
+        u = self.unit
+        self.plate(self.g(state), self.place(BROW, cu, cv, s, slant, w, h), col, thick or u * 2.6, lift=u * 0.6, fr=fr)
+
+    # ------------------------------------------------------------------ mouths
+    def mouth(self, state, cu, cv, w, h, shape='roar', teeth_up=4, teeth_low=4, tooth_h=0.24, fang=0.0, lower_fang=0.0,
+              inside='mouthin', tooth='tooth', tongue='tongue', outline='lip', pad=0.1, gold=None, fr='face', tooth_w=None):
+        """An open graphic mouth: a dark outline, the inside, a tongue, triangle teeth along the top and bottom edges and
+        bigger fangs. gold: index of one top tooth drawn in 'goldtooth'."""
+        u = self.unit
+        fg = self.g(state)
+        base = [(x * w, y * h) for x, y in MOUTHS[shape]]
+        poly = [(cu + x, cv + y) for x, y in base]
+        if outline:
+            self.plate(fg, [(cu + x * (1 + pad), cv + y * (1 + pad * 2.2)) for x, y in base], outline, u * 0.8, fr=fr)
+        self.plate(fg, poly, inside, u * 0.8, lift=u * 0.4, fr=fr)
+        if tongue:
+            self.plate(fg, [(cu + x * w * 0.42, cv - h * 0.24 + y * h * 0.36) for x, y in MOUTHS['snore']], tongue, u * 0.6,
+                       lift=u * 1.0, fr=fr)
+        loc = [(x, y) for x, y in base]
+        tw = tooth_w or w * 0.8 / max(teeth_up, teeth_low, 1) * 0.8
+
+        def tri(x, y_base, length, width, down, col):
+            sg = -1 if down else 1
+            pts = [(cu + x - width / 2, cv + y_base - sg * u * 0.6), (cu + x + width / 2, cv + y_base - sg * u * 0.6),
+                   (cu + x, cv + y_base + sg * length)]
+            self.plate(fg, pts, col, u * 0.9, lift=u * 1.0, fr=fr)
         for row, cnt in (('up', teeth_up), ('low', teeth_low)):
             for i in range(cnt):
-                f = (i + 0.5) / cnt - 0.5
-                x = f * w * 0.8
-                y0 = edge_y(x, row)
-                sgn = -1 if row == 'up' else 1
-                c = (M @ Vector((x, y0 + sgn * tooth * 0.38, depth * 0.35, 1))).xyz
-                blob(g, (0, 0, 0), (tooth * 0.42, tooth * 0.6, tooth * 0.45), tooth_col, M=T(c) @ R, e1=0.6, e2=0.7, seg=8, rings=6)
-        if fang:
-            for sx in (-1, 1):
+                x = ((i + 0.5) / cnt - 0.5) * w * 0.78
+                lo, hi = span_y(loc, x)
+                col = 'goldtooth' if (gold is not None and row == 'up' and i == gold) else tooth
+                if row == 'up':
+                    tri(x, hi, tooth_h, tw, True, col)
+                else:
+                    tri(x, lo, tooth_h * 0.85, tw, False, col)
+        for sx in (-1, 1):
+            if fang:
                 x = sx * w * 0.3
-                y0 = edge_y(x, 'up')
-                c = (M @ Vector((x, y0 + tooth * 0.2, depth * 0.3, 1))).xyz
-                tip = (M @ Vector((x, y0 - fang, depth * 0.45, 1))).xyz
-                spike(g, c, tip, tooth * 0.55, tooth_col, seg=5, smooth=False)
-        if lower_fang:
-            for sx in (-1, 1):
+                tri(x, span_y(loc, x)[1], fang, tw * 1.35, True, tooth)
+            if lower_fang:
                 x = sx * w * 0.36
-                y0 = edge_y(x, 'low')
-                c = (M @ Vector((x, y0 - tooth * 0.2, depth * 0.3, 1))).xyz
-                tip = (M @ Vector((x, y0 + lower_fang, depth * 0.45, 1))).xyz
-                spike(g, c, tip, tooth * 0.5, tooth_col, seg=5, smooth=False)
-        if tongue:
-            c = (M @ Vector((w * 0.06, -bot * 0.5, depth * 0.45, 1))).xyz
-            blob(g, (0, 0, 0), (w * 0.24, h * 0.2, depth * 0.3), tongue_col, M=T(c) @ R, seg=12, rings=7, smooth=True)
-        if lip:
-            pts = []
-            for i in range(19):
-                a = 2 * math.pi * i / 18
-                q = deform(Vector((math.cos(a) * w / 2 * 1.02, math.sin(a) * h / 2 * 1.02, 0)))
-                q = (Rz(tilt) @ q.to_4d()).xyz
-                pts.append((du + q.x, dv + q.y))
-            self.mouth_line(state, pts, lip[0], lip[1], col=lip[2] if len(lip) > 2 else 'lip')
+                tri(x, span_y(loc, x)[0], lower_fang, tw * 1.25, False, tooth)
 
-    def cheek(self, state, u, v, rad, col):
-        g = self.g(state)
-        p, nn, right, up = self.on_face(u, v)
-        if p is None:
-            return
-        blob(g, p, (rad, rad * 0.75, rad * 0.5), col, M=Matrix((right, up, nn)).transposed().to_4x4(), seg=12, rings=7)
+    def line(self, state, pts, width, col='lip', fr='face', kind='face'):
+        """A drawn line on the face (a closed mouth, a crack) through (u, v) points; kind 'eyes' makes it glow."""
+        c, n, up, right = self.frames[fr]
+        rays = [(c + right * a + up * b, n) for a, b in pts]
+        kit.stroke(self.g(state, kind), self.bvh, rays, col, width, thick=self.unit * 1.2, seg=5, lift=self.unit * 0.3, outside=True)
 
-    def drool(self, state, u, v, length, col='drool'):
-        g = self.g(state)
-        p, nn, right, up = self.on_face(u, v)
-        if p is None:
-            return
-        pts = [p - nn * 0.08, p - up * length * 0.5 + nn * 0.04, p - up * length]
-        tube(g, pts, [length * 0.12, length * 0.1, length * 0.15], col, seg=8, cap0='round', cap1='round', smooth=True)
-        blob(g, p - up * length * 1.05, (length * 0.2, length * 0.26, length * 0.2), col, seg=10, rings=7, smooth=True)
+    def drool(self, state, cu, cv, length, col='drool', fr='face'):
+        w = length * 0.32
+        pts = [(cu - w * 0.35, cv), (cu + w * 0.35, cv), (cu + w * 0.5, cv - length * 0.8), (cu, cv - length),
+               (cu - w * 0.5, cv - length * 0.8)]
+        self.plate(self.g(state), pts, col, self.unit * 0.8, lift=self.unit * 1.0, fr=fr)
+
+    def mark(self, state, poly, col, fr='face', lift=None):
+        """A bold graphic marking (war paint, a scar, a cheek stripe) as one convex plate."""
+        self.plate(self.g(state), poly, col, self.unit * 0.7, lift=self.unit * 0.3 if lift is None else lift, fr=fr)

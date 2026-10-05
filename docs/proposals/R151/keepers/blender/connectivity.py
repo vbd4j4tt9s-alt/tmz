@@ -2,8 +2,8 @@
 frames), and require every mesh island to touch the rest of the keeper.
 
 Two islands are joined when their surfaces intersect, come within 0.02 studs, or one lies inside the other. The check
-runs on every visible piece of that pose: rig-group meshes, eyes, Neon accents, the face state shown in that pose
-(rest: all five at once) and the client accents that stay (the snake's rattle). Effects (fire, lightning, the sleep Z)
+runs on every visible piece of that pose: rig-group meshes, eyes, Neon accents, the face shown in that pose (awake or
+asleep; rest: both at once) and the client accents that stay (the snake's rattle). Effects (fire, lightning, the sleep Z)
 are not meshes and are skipped. The Storm Colossus's floating fists and shoulder rocks are allowed by the owner and are
 reported as "by design".
 
@@ -16,8 +16,7 @@ import bpy
 from mathutils import Matrix, Vector
 import kit, today, proposed, assemble, data
 
-POSE_STATE = [('rest', None), ('stand', 'Idle'), ('run', 'Chase'), ('cock', 'Attack'), ('strike', 'Attack'), ('sleep', 'Asleep'),
-              ('stand', 'Gloat')]
+POSE_STATE = [('rest', None), ('stand', 'Chase'), ('run', 'Chase'), ('cock', 'Chase'), ('strike', 'Chase'), ('sleep', 'Asleep')]
 RETAINED_ACCENTS = {2}
 
 
@@ -100,7 +99,7 @@ def run(pz_path, out=None, keepers=None):
             bpy.context.view_layer.update()
             n, comps = kit.connectivity(objs)
             by_design, bad = classify(k, comps)
-            label = '%s/%s' % (pose, state or 'all faces')
+            label = '%s/%s' % (pose, state or 'both faces')
             row[label] = {'components': n, 'by_design': len(by_design), 'floating': [c[:6] for c in bad]}
             print('%-16s %-18s islands=%4d  components=%2d  by_design=%d  floating=%d %s' % (
                 k.name, label, sum(len(c) for c in comps), n, len(by_design), len(bad), [c[:4] for c in bad][:4]), flush=True)

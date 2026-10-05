@@ -6,8 +6,8 @@ from today import Built
 from faces import STATES
 
 # colours that never get the stud pattern (eyes, mouths, teeth): they use a plain copy of the material
-NO_STUDS = {'white', 'pupil', 'eyedark', 'lash', 'mouthin', 'tooth', 'tongue', 'drool', 'goldtooth', 'zcol', 'zedge', 'flamein',
-            'boltin', 'lip', 'brow'}
+NO_STUDS = {'white', 'pupil', 'eyedark', 'eyedim', 'lash', 'mouthin', 'tooth', 'tongue', 'drool', 'goldtooth', 'zcol', 'zedge',
+            'flamein', 'boltin', 'lip', 'brow', 'recess', 'mark', 'metal', 'claw'}
 
 
 def build_proposed(k, coll, atlas_img=None, studs=True, fx=True):
@@ -49,7 +49,8 @@ def build_proposed(k, coll, atlas_img=None, studs=True, fx=True):
 
 
 def show_state(b, k, state, pose=None):
-    """Show exactly one face state (and the knight's matching eye piece); effects by state."""
+    """Show one face: 'Asleep', or the awake face ('Chase') for any other state. Effects by state."""
+    state = 'Asleep' if state == 'Asleep' else 'Chase'
     for ob in b.objects():
         kind, piece = ob.get('kind'), ob.get('piece', '')
         if kind == 'face' or (kind == 'eyes' and piece in STATES):
@@ -58,7 +59,7 @@ def show_state(b, k, state, pose=None):
             if piece == 'Z':
                 ob.hide_render = not (state == 'Asleep' and k.stage != 1)
             elif piece == 'Smoke':
-                ob.hide_render = state not in ('Idle', 'Asleep')
+                ob.hide_render = state != 'Asleep'
             else:
                 ob.hide_render = False
 

@@ -109,10 +109,19 @@ def _xf(M, p):
 
 
 DETAIL = float(os.environ.get('KEEPER_DETAIL', '1.0'))  # < 1 builds a lighter version (fewer segments) for tri estimates
-# R151 rev 2: the reference keepers are angular, faceted low-poly. FACET makes every primitive flat-shaded with fewer
-# segments unless a call asks for smooth=True explicitly (eyes stay smooth so they read as eyes).
+# R151 rev 3: the reference keepers are angular, chunky, faceted low-poly. FACET makes every primitive flat-shaded with
+# few segments unless a call asks for smooth=True explicitly. Blobs become chunky hewn blocks (a squarer superellipsoid,
+# flat planes facing front, every vertex pushed OUT by a small fixed random amount so the planes are irregular), and
+# round tube caps become chamfered ends. Pushing only outward keeps every contact the rev 2 shapes had.
 FACET = True
 FACET_SCALE = 0.62
+CHUNK_E = 0.55      # superellipsoid exponent cap: 1 = ellipsoid, 0.55 = chunky block with bevelled edges
+CHUNK_JITTER = 0.07  # up to 7 % outward per vertex
+
+
+def _hash01(i, c):
+    x = math.sin(i * 12.9898 + c[0] * 78.233 + c[1] * 37.719 + c[2] * 11.131) * 43758.5453
+    return x - math.floor(x)
 
 
 def _d(n, lo):
@@ -121,21 +130,30 @@ def _d(n, lo):
 
 def blob(g, c, r, col, e1=1.0, e2=1.0, seg=14, rings=9, M=None, smooth=None, deform=None):
     """Superellipsoid: e1 = e2 = 1 is an ellipsoid, small exponents give rounded boxes / pillows."""
+    chunky = False
     if smooth is None:
         smooth = not FACET
         if FACET:
             seg, rings = max(6, int(round(seg * FACET_SCALE))), max(4, int(round(rings * FACET_SCALE)))
+            seg += seg % 2
+            e1 = min(e1, CHUNK_E) if e1 <= 1 else e1
+            e2 = min(e2, CHUNK_E) if e2 <= 1 else e2
+            chunky = True
     seg, rings = _d(seg, 6), _d(rings, 4)
     verts = []
+    half = 0.5 if chunky else 0.0   # chunky: a flat plane (not an edge) faces front, back and the sides
     for i in range(1, rings):
         phi = -math.pi / 2 + math.pi * i / rings
         cp, sp = math.cos(phi), math.sin(phi)
         for j in range(seg):
-            th = 2 * math.pi * j / seg
+            th = 2 * math.pi * (j + half) / seg
             ct, st = math.cos(th), math.sin(th)
             verts.append([r[0] * spow(cp, e1) * spow(ct, e2), r[1] * spow(sp, e1), r[2] * spow(cp, e1) * spow(st, e2)])
     verts.append([0, -r[1], 0])
     verts.append([0, r[1], 0])
+    if chunky and CHUNK_JITTER:
+        cc = tuple(c) if not isinstance(c, Vector) else (c.x, c.y, c.z)
+        verts = [[q * (1 + CHUNK_JITTER * _hash01(i, cc)) for q in p] for i, p in enumerate(verts)]
     nr = rings - 1
     faces = []
     for i in range(nr - 1):
@@ -213,18 +231,18 @@ def tube(g, pts, radii, col, seg=10, cap0='round', cap1='round', smooth=None, up
         return out
 
     allr = []
+    chamfer = FACET and not smooth   # angular style: a round cap becomes a chamfered end (two rings, flat face)
+    cap_q = ((0.55, 0.82), (0.86, 0.45)) if chamfer else tuple((q, math.sin(math.acos(q)) * 0.9) for q in (0.35, 0.72, 0.93))
     if cap0 == 'round':
         p, t, s, u, (ra, rb_) = rings[0]
-        for q in (0.35, 0.72, 0.93):
-            ang = math.acos(q)
-            allr.append(('ring', ring(p - t * (max(ra, rb_) * math.sin(ang) * 0.9), s, u, ra * q, rb_ * q)))
+        for q, off in cap_q:
+            allr.append(('ring', ring(p - t * (max(ra, rb_) * off), s, u, ra * q, rb_ * q)))
     for p, t, s, u, (ra, rb_) in rings:
         allr.append(('ring', ring(p, s, u, max(ra, 1e-4), max(rb_, 1e-4))))
     if cap1 == 'round':
         p, t, s, u, (ra, rb_) = rings[-1]
-        for q in (0.93, 0.72, 0.35):
-            ang = math.acos(q)
-            allr.append(('ring', ring(p + t * (max(ra, rb_) * math.sin(ang) * 0.9), s, u, ra * q, rb_ * q)))
+        for q, off in reversed(cap_q):
+            allr.append(('ring', ring(p + t * (max(ra, rb_) * off), s, u, ra * q, rb_ * q)))
     for _, rr in allr:
         verts.extend(rr)
     nrings = len(allr)
@@ -238,7 +256,7 @@ def tube(g, pts, radii, col, seg=10, cap0='round', cap1='round', smooth=None, up
     p1, t1 = rings[-1][0], rings[-1][1]
     if cap0 in ('round', 'flat', 'point'):
         if cap0 == 'round':
-            tip = p0 - t0 * (max(rings[0][4]) * 0.95)
+            tip = p0 - t0 * (max(rings[0][4]) * (0.82 if chamfer else 0.95))
         else:
             tip = p0
         verts.append(tip)
@@ -247,7 +265,7 @@ def tube(g, pts, radii, col, seg=10, cap0='round', cap1='round', smooth=None, up
             faces.append((ci, (j + 1) % seg, j))
     if cap1 in ('round', 'flat', 'point'):
         if cap1 == 'round':
-            tip = p1 + t1 * (max(rings[-1][4]) * 0.95)
+            tip = p1 + t1 * (max(rings[-1][4]) * (0.82 if chamfer else 0.95))
         else:
             tip = p1
         verts.append(tip)
@@ -369,6 +387,32 @@ def box(g, c, size, col, M=None, smooth=False, wedge=False):
         faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
     M = T(c) @ (M or Matrix.Identity(4))
     g.add([_xf(M, p) for p in verts], faces, col, smooth)
+
+
+def cbox(g, c, size, col, bevel=0.2, top=1.0, bottom=1.0, M=None):
+    """A crisp chamfered block (rev 3): an octagon-section prism along Y with bevelled top and bottom edges.
+    bevel: the cut on every edge as a fraction of the smallest half-size; top / bottom scale the end faces (x and z),
+    so a block can taper (a chin, a waist); a pair (x, z) tapers each axis on its own. Always inside its size box."""
+    hx, hy, hz = size[0] / 2, size[1] / 2, size[2] / 2
+    b = bevel * min(hx, hy, hz)
+
+    def octa(ax, az, y):
+        bb = min(b, ax * 0.9, az * 0.9)
+        return [(ax, y, -(az - bb)), (ax, y, az - bb), (ax - bb, y, az), (-(ax - bb), y, az), (-ax, y, az - bb),
+                (-ax, y, -(az - bb)), (-(ax - bb), y, -az), (ax - bb, y, -az)]
+    tx, tz = top if isinstance(top, (tuple, list)) else (top, top)
+    bx, bz = bottom if isinstance(bottom, (tuple, list)) else (bottom, bottom)
+    rings = [octa((hx - b) * bx, (hz - b) * bz, -hy), octa(hx * bx, hz * bz, -hy + b),
+             octa(hx * tx, hz * tz, hy - b), octa((hx - b) * tx, (hz - b) * tz, hy)]
+    verts = [p for r in rings for p in r]
+    faces = []
+    for i in range(3):
+        for j in range(8):
+            faces.append((i * 8 + j, i * 8 + (j + 1) % 8, (i + 1) * 8 + (j + 1) % 8, (i + 1) * 8 + j))
+    faces.append(tuple(range(8)))
+    faces.append(tuple(range(24, 32)))
+    M = T(c) @ (M or Matrix.Identity(4))
+    g.add([_xf(M, p) for p in verts], faces, col, False)
 
 
 def cylinder_x(g, c, size, col, M=None, seg=16):

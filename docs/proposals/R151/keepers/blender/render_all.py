@@ -2,7 +2,7 @@
 
 Usage (bpy 4.5 Python):  python render_all.py -- POSES_JSON PANEL_DIR OUT_DIR [what ...]
   what: any of fbx sheets faces ba lineup (default: all). KEEPERS=1,6 limits the keepers, SAMPLES=24 sets samples,
-  SKIP_EXISTING=1 keeps panels already rendered.
+  SKIP_EXISTING=1 keeps panels already rendered, PANELS_ONLY=three_quarter,asleep renders only those sheet panels.
 Writes PANEL_DIR/*.png (raw renders), OUT_DIR/fbx/*.fbx + *_atlas.png + *.json, and PANEL_DIR/meta.json for
 compose_sheets.py.
 """
@@ -25,6 +25,7 @@ CFG, UPG, PZ = data.load_cfg(), data.load_upg(), data.load_poses(POSES)
 SAMPLES = int(os.environ.get('SAMPLES', '24'))
 KEEP = [int(x) for x in os.environ.get('KEEPERS', '').split(',') if x] or proposed.ORDER
 SKIP = os.environ.get('SKIP_EXISTING') == '1'
+ONLY = set(os.environ.get('PANELS_ONLY', '').split(',')) - {''}   # quick looks: render only these sheet panels
 GROUND = {1: (0.55, 0.74, 0.44), 6: (0.50, 0.70, 0.42), 2: (0.95, 0.84, 0.58), 3: (0.84, 0.90, 0.97), 4: (0.42, 0.38, 0.40),
           5: (0.78, 0.75, 0.92), 7: (0.58, 0.63, 0.74), 0: (0.45, 0.42, 0.55)}
 RETAINED_ACCENTS = {2}  # only the snake's rattle stays a client accent; the knight's orbiting shards and the colossus cloud are retired
@@ -51,7 +52,7 @@ def scene(st, ground=None):
     return sc
 
 
-def build(which, st, pose, coll, state='Idle'):
+def build(which, st, pose, coll, state='Chase'):
     """which: 'new' (proposed) or 'today'. Returns (Built, KeeperModel or None), posed, face state shown."""
     k = None
     if which == 'new':
@@ -101,10 +102,10 @@ def shoot(sc, objs, path, az, el, w, h, lens=50, margin=0.05):
     return cam
 
 
-PANEL_SET = [('front', 'stand', 'Idle', 0, 6), ('three_quarter', 'stand', 'Idle', 38, 12), ('side', 'stand', 'Idle', 90, 5),
-             ('back', 'stand', 'Idle', 180, 10), ('chase', 'run', 'Chase', 18, 3), ('windup', 'cock', 'Attack', 52, 8),
-             ('strike', 'strike', 'Attack', 62, 8), ('asleep', 'sleep', 'Asleep', 40, 20)]
-FACE_SET = [('Idle', 'stand'), ('Chase', 'run'), ('Attack', 'strike'), ('Asleep', 'sleep'), ('Gloat', 'stand')]
+PANEL_SET = [('front', 'stand', 'Chase', 0, 6), ('three_quarter', 'stand', 'Chase', 38, 12), ('side', 'stand', 'Chase', 90, 5),
+             ('back', 'stand', 'Chase', 180, 10), ('chase', 'run', 'Chase', 18, 3), ('windup', 'cock', 'Chase', 52, 8),
+             ('strike', 'strike', 'Chase', 62, 8), ('asleep', 'sleep', 'Asleep', 40, 20)]
+FACE_SET = [('Chase', 'run'), ('Asleep', 'sleep')]
 
 
 def keeper_sheets():
@@ -113,7 +114,7 @@ def keeper_sheets():
         key = k0.key
         for name, pose, state, az, el in PANEL_SET:
             path = os.path.join(PANELS, '%s_%s.png' % (key, name))
-            if SKIP and os.path.exists(path):
+            if (SKIP and os.path.exists(path)) or (ONLY and name not in ONLY):
                 continue
             sc = scene(st)
             b, k = build('new', st, pose, sc.collection, state)
@@ -134,9 +135,9 @@ def face_closeups():
             path = os.path.join(PANELS, 'face_%s_%s.png' % (k0.key, state))
             if SKIP and os.path.exists(path):
                 continue
-            if st in (1, 6, 0) and pose == 'sleep':
-                pose = 'stand'   # the golem sleeps as a tree (face hidden), the gorilla lies on its side and The Darkened
-                #                  curls up face-down: show the sleeping face upright
+            if pose == 'sleep':
+                pose = 'stand'   # show the sleeping face upright and from the front (the golem sleeps as a tree, the gorilla
+                #                  on its side, The Darkened face-down); each sheet's asleep panel shows the real sleep pose
             sc = scene(st)
             b, k = build('new', st, pose, sc.collection, state)
             for o in b.objects():
@@ -163,7 +164,7 @@ def before_after():
     for st in KEEP:
         sc = scene(st)
         bt, _ = build('today', st, 'stand', sc.collection)
-        bn, k = build('new', st, 'stand', sc.collection, 'Idle')
+        bn, k = build('new', st, 'stand', sc.collection, 'Chase')
         pl = kit.player_standin(sc.collection, x=0, y_b=0)
         mn, mx = kit.world_bounds(shown(bt) + shown(bn))
         pl.matrix_world = Matrix.Translation((mn.x - 3.5, mx.y - 1.0, 0)) @ Matrix.Translation(Vector(pl['rest_center']))
@@ -192,7 +193,7 @@ def lineup():
         cursor = 0.0
         info = []
         for st in proposed.ORDER:
-            b, k = build(which, st, 'stand', sc.collection, 'Idle')
+            b, k = build(which, st, 'stand', sc.collection, 'Chase')
             yaw = Matrix.Rotation(math.radians(-38), 4, 'Z')
             objs = b.objects()
             for o in objs:

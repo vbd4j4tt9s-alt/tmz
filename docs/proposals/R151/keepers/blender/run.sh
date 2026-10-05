@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rebuild the R151 keeper previews (rev 2: faces with five states, connectivity check, stud texture, effects).
+# Rebuild the R151 keeper previews (rev 3: chunky angular models, two faces each, connectivity check, studs, effects).
 # Usage: sh run.sh <scratch dir> <bpy python>
 #   <bpy python>: a Python with the bpy 4.5 module (Blender as a module); renders use Cycles on the CPU.
 # Steps: (1) dump the REAL pose frames + accent parts from the repo's Luau modules on the repo's Roblox mock,

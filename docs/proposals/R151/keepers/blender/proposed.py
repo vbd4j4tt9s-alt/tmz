@@ -1,30 +1,33 @@
-"""PROPOSED keepers, revision 2: following the owner's Steal an Egg screenshots.
+"""PROPOSED keepers, revision 3: following the owner's Steal an Egg screenshots and the rev 2 feedback.
 
-Style taken from the references: chunky, angular, faceted low-poly bodies (flat shading), shard-like fur and spike
-tufts, bold graphic markings, strong body / accent colour contrast, glowing eyes, the Roblox stud texture, big effects,
-a big stylised "Z" while asleep. Every keeper has a personality, an expressive face and five swappable face states
-(Idle, Chase, Attack, Asleep, Gloat). Every piece touches the body (checked by connectivity.py), except the Storm
-Colossus's floating fists and shoulder rocks, which the owner allowed as part of its design.
+Style: chunky, angular, faceted low-poly (flat shading, hewn block-like masses, chamfered limbs), shard-like fur and
+spikes, sharp claws and horns, bold graphic markings, deep colours, the Roblox stud texture, big effects, a big "Z"
+while asleep. Pivot joins are hidden inside the masses. Two faces per keeper (faces.py): Chase (fierce, shown whenever
+the keeper is awake) and Asleep. The Timber Golem and the Storm Colossus have no human face, only glowing eye slits and
+a crack; the Crystal Knight keeps a closed helm with glowing eyes; The Darkened keeps today's slim black head with its
+glowing line. Every piece touches the body (connectivity.py), except the Storm Colossus's floating fists, shoulder rocks
+and storm cores, which the owner allowed as part of its design.
 
 Mesh parts per keeper:
   <Group>                main mesh of a rig group (same groups and pivots the game animates today)
   <Group>_<Piece>        extra main pieces (golem pieces for its tree disguise, the Darkened's cosmetic cloak, ...)
-  <Group>_Eyes           the glowing irises (KeeperEyeGlow parts)
   <Group>_Glow           Neon accents (lava seams, sap cracks, crystal cores, lightning)
-  Head_Face_<State>      one per face state; the client shows exactly one (LocalTransparencyModifier)
-  Head_Eyes_<State>      the Crystal Knight's per-state glowing visor eyes (eyes-only expressions)
-Effects (fx kind: flames, lightning arcs, the sleep Z) are preview stand-ins for particles / beams, not meshes to upload.
+  Head_Face_<State>      the face shapes of one state (Chase, Asleep); the client shows one (LocalTransparencyModifier)
+  Head_Eyes_<State>      the glowing eyes of one state (a KeeperEyeGlow Neon part)
+Effects (fx kind: flames, lightning arcs, smoke, wisps, the sleep Z) are preview stand-ins for particles / beams /
+a billboard, not meshes to upload.
 """
 import math
 from mathutils import Vector, Matrix
 import kit
-from kit import Geo, Palette, blob, tube, rbox, horn, spike, crystal, membrane, bezier, shards, T, Rx, Ry, Rz, V
-from faces import Face, STATES
+from kit import Geo, Palette, blob, tube, rbox, horn, spike, crystal, membrane, bezier, shards, cbox, box, T, Rx, Ry, Rz, V
+from faces import Face, STATES, ANGRY_EYE
 
 WHITE = (0.98, 0.98, 0.97)
 PUPIL = (0.05, 0.05, 0.08)
-COMMON = {'white': WHITE, 'pupil': PUPIL, 'lash': (0.08, 0.06, 0.08), 'mouthin': (0.55, 0.06, 0.10), 'tongue': (0.95, 0.42, 0.50),
-          'tooth': (1.0, 0.98, 0.92), 'drool': (0.62, 0.86, 1.0), 'zcol': (0.30, 0.85, 1.0), 'zedge': (0.05, 0.22, 0.55)}
+COMMON = {'white': WHITE, 'pupil': PUPIL, 'lash': (0.06, 0.04, 0.06), 'mouthin': (0.40, 0.03, 0.06), 'tongue': (0.80, 0.22, 0.28),
+          'tooth': (1.0, 0.97, 0.88), 'drool': (0.62, 0.86, 1.0), 'zcol': (0.30, 0.85, 1.0), 'zedge': (0.05, 0.22, 0.55),
+          'lip': (0.06, 0.04, 0.05), 'eyedark': (0.05, 0.04, 0.05), 'eyedim': (0.16, 0.12, 0.08)}
 
 
 class KeeperModel:
@@ -44,8 +47,8 @@ class KeeperModel:
         self.cosmetic = set()
         self.floating = set()        # (group, piece) floating by design (Storm Colossus only)
         self.personality = ''
-        self.state_eyes = False      # Crystal Knight: per-state glowing eyes instead of face pieces
-        self.state_rgb = {}          # per-state eye colour / brightness (knight)
+        self.state_eyes = False      # Crystal Knight / The Darkened: glowing eyes (or line) per state, no face pieces
+        self.state_rgb = {}          # per-state eye colour / brightness
         self.fidget = ''
         self.fx_notes = ''
 
@@ -71,15 +74,16 @@ class KeeperModel:
         return sum(g.tris() for _, _, _, g in self.parts())
 
     def tris_visible(self):
-        """Triangles on screen at once: everything except the 4 hidden face / eye states."""
-        total = 0
-        seen_state = False
-        for group, kind, piece, g in self.parts():
-            if (kind == 'face' or (kind == 'eyes' and piece in STATES)):
-                if piece != 'Idle':
+        """Triangles on screen at once: everything but the face / eye parts of the other state (the larger state)."""
+        best = 0
+        for state in STATES:
+            total = 0
+            for group, kind, piece, g in self.parts():
+                if kind in ('face', 'eyes') and piece in STATES and piece != state:
                     continue
-            total += g.tris()
-        return total
+                total += g.tris()
+            best = max(best, total)
+        return best
 
     def transform(self, groups, M):
         """Re-pose rest geometry of whole groups (posture: a head held high, a tilted head)."""
@@ -94,8 +98,9 @@ def mirror(fn):
 
 
 def joint(g, p, r, col):
-    """A ball centred on a group's pivot: it stays put under any rotation about the pivot, so the parent can overlap it."""
-    blob(g, p, (r, r, r), col, seg=10, rings=7)
+    """A hidden core centred on a group's pivot: it stays put under any rotation about the pivot, so the parent always
+    overlaps it. Rev 3: a small hewn block in the limb's own colour, kept inside the masses."""
+    blob(g, p, (r * 0.9, r * 0.9, r * 0.9), col, seg=8, rings=5)
 
 
 def sleep_z(k, at, h=2.2, M=None):
@@ -138,11 +143,11 @@ def timber_golem():
     k = KeeperModel('timber_golem', 'Timber Golem', 1, {
         'bark': (0.47, 0.31, 0.19), 'bark2': (0.33, 0.21, 0.12), 'bark3': (0.62, 0.43, 0.26), 'moss': (0.40, 0.70, 0.25),
         'moss2': (0.28, 0.55, 0.18), 'leaf': (0.30, 0.66, 0.22), 'leaf2': (0.50, 0.80, 0.26), 'leaf3': (0.20, 0.48, 0.16),
-        'face': (0.78, 0.60, 0.40), 'brow': (0.36, 0.66, 0.20), 'mush': (0.90, 0.20, 0.16), 'spot': (1.0, 0.96, 0.88),
+        'mush': (0.80, 0.14, 0.10), 'spot': (1.0, 0.96, 0.88),
         'stem': (0.96, 0.90, 0.78), 'nest': (0.55, 0.38, 0.20), 'egg': (0.55, 0.85, 0.95), 'bird': (0.30, 0.60, 0.95),
-        'beak': (1.0, 0.65, 0.10), 'tooth': (0.93, 0.84, 0.62), 'lip': (0.30, 0.18, 0.10), 'eyedark': (0.12, 0.09, 0.06)},
+        'beak': (1.0, 0.65, 0.10), 'eyedark': (0.07, 0.05, 0.03), 'eyedim': (0.26, 0.20, 0.10)},
         glow={'*': (1.0, 0.72, 0.18)}, eye_rgb=(0.55, 1.0, 0.45))
-    k.personality = 'Grumpy old forest grump: hates being woken, glares from under mossy brows, a bird lives in his hair.'
+    k.personality = 'Grumpy old tree that hates being woken: a heavy, silent glare from two glowing slits; a bird lives in its crown.'
     k.fidget = 'Scratches his bark with the small arm; the bird in his crown hops and chirps; leaves drift down.'
     k.fx_notes = 'Falling leaves and drifting spores (ParticleEmitter); glowing sap drips from the cracks; dust burst on the hammer slam.'
     # Body: faceted barrel trunk, bark plates, glowing sap cracks, moss mantle, red mushrooms ---------------------------
@@ -169,27 +174,30 @@ def timber_golem():
         blob(body, (x, y, z), (r, 0.4, r), 'mush', seg=10, rings=5)
         blob(body, (x + s * 0.25, y + 0.32, z), (r * 0.18, r * 0.08, r * 0.18), 'spot', seg=6, rings=4)
         blob(body, (x - s * 0.1, y + 0.3, z + r * 0.45), (r * 0.14, r * 0.07, r * 0.14), 'spot', seg=6, rings=4)
-    # Head: stump head with a bold face; canopy with a bird's nest and mushrooms -------------------------------------
+    # Head: a living stump, not a human face: a bark ledge, two eye hollows, glowing slits when awake ----------------
     head = k.g('Head', 'main', 'Stump')
     stump = Geo('stump')
     blob(stump, (0, 12.4, -0.3), (2.85, 2.75, 2.65), 'bark', e1=0.6, e2=0.85, seg=14, rings=9)
     head.extend(stump)
-    blob(head, (0, 12.2, -2.35), (2.35, 1.95, 0.8), 'face', e1=0.6, e2=0.8, seg=12, rings=7)   # pale carved face plate
-    face_geo = Geo('faceplate')
-    blob(face_geo, (0, 12.2, -2.35), (2.35, 1.95, 0.8), 'face', e1=0.6, e2=0.8, seg=12, rings=7)
-    face_geo.extend(stump)
-    blob(head, (0, 12.15, -3.05), (0.45, 0.85, 0.5), 'bark3', seg=8, rings=5, M=Rx(0.2))   # knobbly nose
-    # old man's moss beard hanging from the chin (static)
-    for i, x in enumerate((-1.3, -0.45, 0.45, 1.3)):
-        shards(head, (x, 10.25, -2.3), (x * 0.15, -1, -0.25), 1.8 - abs(x) * 0.35, 0.8, 'moss', n=2, spread=0.25, seed=10 + i, sink=0.3)
+    sb = stump.bvh()
+    for i, a in enumerate((-160, -125, -95, -60, -30, 30, 60, 95, 125, 160, 200, 250, 290, 340)):   # bark grooves
+        th = math.radians(a)
+        rays = [((0, y, -0.3), (math.cos(th), 0.02 * math.sin(i + y), math.sin(th))) for y in (10.2, 11.4, 12.6, 13.8, 14.8)]
+        kit.stroke(head, sb, rays, 'bark2', 0.22, thick=0.14, seg=4)
+    blob(head, (0, 14.15, -2.05), (2.75, 0.7, 1.05), 'bark2', seg=10, rings=4)          # the heavy bark ledge over the eyes
+    for i, (x, z) in enumerate(((-2.0, -2.6), (-0.7, -3.0), (0.7, -3.0), (2.0, -2.6))):
+        shards(head, (x, 14.2, z), (x * 0.1, -1, -0.45), 1.25, 0.7, 'moss', n=2, spread=0.25, seed=10 + i, sink=0.45)   # moss hanging off it
     canopy = k.g('Head', 'main', 'Canopy')
     for (x, y, z, rx, ry, rz, c) in ((0, 17.0, 0.7, 6.0, 3.3, 5.4, 'leaf'), (-4.4, 15.6, 0.8, 3.0, 2.4, 3.3, 'leaf3'),
                                      (4.6, 15.8, 0.6, 3.0, 2.3, 3.3, 'leaf3'), (1.2, 19.4, 0.6, 3.8, 1.9, 3.3, 'leaf2'),
                                      (-1.9, 18.7, 2.2, 3.0, 1.8, 2.8, 'leaf2'), (0, 15.3, -3.1, 4.2, 1.5, 1.9, 'leaf3'),
                                      (0.6, 16.2, 4.4, 4.0, 2.0, 2.4, 'leaf3')):
-        blob(canopy, (x, y, z), (rx, ry, rz), c, seg=10, rings=6)
+        blob(canopy, (x, y, z), (rx, ry, rz), c, seg=6, rings=4)
     for i, (x, z) in enumerate(((-5.2, -1.0), (5.3, -0.5), (-3.5, 3.6), (3.8, 3.4), (0, -4.3), (-2.4, -3.6), (2.6, -3.7))):
         shards(canopy, (x, 15.2, z), (x * 0.18, -0.8, z * 0.18), 1.6, 1.0, 'leaf3', n=2, spread=0.4, seed=20 + i)
+    for i, (x, y, z) in enumerate(((-5.6, 16.6, 1.2), (5.7, 16.8, 0.8), (-2.8, 20.0, -1.0), (3.2, 19.8, -0.6), (0.4, 18.2, -4.6),
+                                   (-4.0, 18.0, 3.4), (4.2, 18.2, 3.0))):
+        shards(canopy, (x, y, z), (x * 0.2, 0.7, z * 0.15), 1.7, 1.1, 'leaf2' if i % 2 else 'leaf', n=3, spread=0.5, seed=50 + i, sink=0.5)
     mirror(lambda s: tube(canopy, [(s * 1.9, 14.3, 0.6), (s * 3.2, 16.4, 0.7), (s * 4.5, 17.8, 0.3)], [0.55, 0.4, 0.22], 'bark2', seg=6))
     # bird's nest on top with two eggs and a little blue bird
     tube(canopy, [Vector((math.cos(a) * 1.55, 21.05 + 0.12 * math.sin(3 * a), 0.4 + math.sin(a) * 1.55)) for a in [i * math.pi / 7 for i in range(15)]],
@@ -207,33 +215,16 @@ def timber_golem():
         tube(canopy, [(x, y - 0.8, z), (x, y, z)], [0.22, 0.2], 'stem', seg=6)
         blob(canopy, (x, y + 0.15, z), (r, 0.45, r), 'mush', seg=10, rings=5)
         blob(canopy, (x + r * 0.3, y + 0.5, z), (r * 0.2, r * 0.1, r * 0.2), 'spot', seg=6, rings=4)
-    # Face: amber-green glowing eyes on dark sockets, mossy brows, a grumpy wooden mouth --------------------------------
-    eyes = [dict(E=(s * 1.12, 12.75, -2.72), r=0.72, s=s, yaw=0.18, pitch=0.05) for s in (-1, 1)]
-    face = Face(k, 'Head', face_geo, eyes, lid_col='bark', brow_col='brow',
-                mouth=dict(c=(0, 10.95, -1.0), n=(0, -0.08, -1), up=(0, 1, 0)), sclera='white', iris_r=0.72)
-    face.build_eyes()
-    # Idle: grumpy, heavy half lids, one brow lower, down-turned mouth
-    face.lids('Idle', [dict(up=(0.32, 0.25, 0.0)), dict(up=(0.42, 0.1, 0.0))])
-    face.brows('Idle', [dict(dy=0.0, ang=0.28, len=2.6, thick=0.5, width=0.55), dict(dy=0.15, ang=0.12, len=2.6, thick=0.5, width=0.55)])
-    face.mouth_line('Idle', [(-1.15, -0.25), (-0.55, 0.05), (0.2, 0.1), (0.9, -0.05), (1.25, -0.35)], 0.22, 0.16, col='lip')
-    face.cheek('Idle', -1.3, 0.45, 0.45, 'face')
-    # Chase: angry, brows slammed down, teeth bared
-    face.lids('Chase', [dict(up=(0.42, 0.55, 0.0)), dict(up=(0.42, 0.55, 0.0))])
-    face.brows('Chase', [dict(dy=-0.05, ang=0.55, len=2.6, thick=0.55, width=0.55)] * 2)
-    face.mouth_open('Chase', 2.4, 0.95, dv=0.0, shape='Dinv', teeth_up=5, teeth_low=4, tooth=0.3, tongue=False, depth=0.45, lip=(0.12, 0.1, 'lip'))
-    # Attack: roar, eyes wide, brows up-angry
-    face.lids('Attack', [dict(up=(0.85, 0.3, 0.0)), dict(up=(0.85, 0.3, 0.0))])
-    face.brows('Attack', [dict(dy=0.15, ang=0.45, len=2.6, thick=0.55, width=0.55)] * 2)
-    face.mouth_open('Attack', 2.3, 1.55, dv=-0.15, shape='oval', teeth_up=5, teeth_low=4, tooth=0.3, depth=0.55, lip=(0.12, 0.1, 'lip'))
-    # Asleep: closed eyes, snoring "o" with a drool drop
-    face.lids('Asleep', [dict(up=(-0.05, 0.0, 0.35), low=(-0.05, 0.0, 0.35))] * 2)
-    face.brows('Asleep', [dict(dy=0.2, ang=-0.1, len=2.5, thick=0.5, width=0.55)] * 2)
-    face.mouth_open('Asleep', 0.75, 0.6, dv=0.0, du=0.25, shape='oval', tongue=False, depth=0.35)
-    face.drool('Asleep', 0.45, -0.25, 0.8)
-    # Gloat: smug ^ ^ eyes, lopsided toothy grin
-    face.lids('Gloat', [dict(up=(0.12, 0.0, -0.5), low=(0.12, 0.0, -0.5)), dict(up=(0.12, 0.0, -0.5), low=(0.12, 0.0, -0.5))])
-    face.brows('Gloat', [dict(dy=0.35, ang=-0.25, len=2.5, thick=0.5, width=0.55), dict(dy=0.1, ang=0.1, len=2.5, thick=0.5, width=0.55)])
-    face.mouth_open('Gloat', 2.3, 0.85, dv=0.0, shape='D', teeth_up=5, tooth=0.3, tongue=False, depth=0.45, tilt=0.12, lip=(0.12, 0.1, 'lip'))
+    # Face: no nose, brows, lips or teeth. Dark eye hollows in the bark (always there), glowing slits when awake, the
+    # slits dark when asleep (so the disguised tree shows no face), and a jagged crack for a mouth.
+    face = Face(k, 'Head', stump, {'face': dict(c=(0, 12.3, -0.3), n=(0, 0, -1))}, unit=0.1)
+    for s in (-1, 1):
+        face.plate(head, face.place(ANGRY_EYE, s * 1.12, 0.62, s, 0.32, 2.0, 1.15), 'eyedark', 0.08)            # hollows
+        face.plate(face.g('Chase', 'eyes'), face.place(ANGRY_EYE, s * 1.1, 0.6, s, 0.32, 1.55, 0.52), 'iris', 0.1, lift=0.08)
+        face.plate(face.g('Asleep'), face.place(ANGRY_EYE, s * 1.1, 0.5, s, 0.2, 1.4, 0.16), 'eyedim', 0.08, lift=0.08)
+    face.line('Chase', [(-1.45, -1.05), (-0.95, -1.4), (-0.5, -1.0), (0.0, -1.5), (0.5, -1.05), (0.95, -1.45), (1.4, -1.1)], 0.3,
+              col='eyedark')
+    face.line('Asleep', [(-1.0, -1.25), (-0.5, -1.35), (0.0, -1.22), (0.5, -1.35), (1.0, -1.25)], 0.1, col='eyedark')
     # Arms (LeftArm is +X): the left is a huge club log with a sprouting branch, the right is smaller -------------------
     for s, group, big in ((1, 'LeftArm', True), (-1, 'RightArm', False)):
         f = 1.0 if big else 0.82
@@ -281,11 +272,11 @@ def timber_golem():
 def jungle_king():
     k = KeeperModel('jungle_king', 'Jungle King', 6, {
         'fur': (0.13, 0.15, 0.25), 'fur2': (0.20, 0.23, 0.36), 'mask': (0.99, 0.88, 0.80), 'mask2': (0.93, 0.78, 0.70),
-        'gold': (1.0, 0.78, 0.12), 'gold2': (0.85, 0.58, 0.05), 'gem': (0.95, 0.12, 0.18), 'brow': (0.10, 0.11, 0.18),
-        'nostril': (0.35, 0.20, 0.22), 'knuckle': (0.88, 0.74, 0.66), 'lip': (0.45, 0.22, 0.25), 'eyedark': (0.10, 0.06, 0.08),
+        'gold': (1.0, 0.78, 0.12), 'gold2': (0.85, 0.58, 0.05), 'gem': (0.95, 0.12, 0.18), 'brow': (0.06, 0.07, 0.12),
+        'nostril': (0.30, 0.16, 0.18), 'knuckle': (0.88, 0.74, 0.66), 'eyedark': (0.06, 0.03, 0.05),
         'goldtooth': (1.0, 0.80, 0.15)},
         glow={'*': (1.0, 0.2, 0.15)}, eye_rgb=(1.0, 0.16, 0.12))
-    k.personality = 'Cocky show-off king: smirks with a gold tooth, chest puffed out, crown tilted, loves an audience.'
+    k.personality = 'Cocky, furious king: roars in your face, flashes a gold fang, crown tilted, chest out, loves an audience.'
     k.fidget = 'Beats his chest twice and adjusts his crown; flexes the gold-banded arm.'
     k.fx_notes = 'Chest-beat shockwave ring and dust (ParticleEmitter); falling leaves; red eye glow.'
     body = k.g('Body')
@@ -326,34 +317,18 @@ def jungle_king():
         b = Vector((math.cos(a) * 1.95, 11.35 + 0.25 * math.cos(a), -1.5 + math.sin(a) * 1.95))
         spike(head, b - Vector((0, 0.2, 0)), b + Vector((math.cos(a) * 0.25, 1.35 + 0.3 * (i % 2), math.sin(a) * 0.25)), 0.38, 'gold', seg=4)
     crystal(head, (0, 11.5, -3.35), (0, 0.15, -1), 0.42, 0.5, 'gem')
-    eyes = [dict(E=(s * 1.02, 9.3, -4.9), r=0.6, s=s, yaw=0.25, pitch=0.05) for s in (-1, 1)]
-    face = Face(k, 'Head', mask, eyes, lid_col='mask2', brow_col='brow', sclera='eyedark', iris_r=0.8,
-                mouth=dict(c=(0, 7.55, -3.6), n=(0, -0.05, -1), up=(0, 1, 0)))
-    face.build_eyes(pupil=False)
-    # Idle: cocky, one brow up, half-lidded, smirk with a gold tooth
-    face.lids('Idle', [dict(up=(0.35, 0.15, 0.0)), dict(up=(0.55, -0.1, 0.0))])
-    face.brows('Idle', [dict(dy=-0.05, ang=0.35, len=2.4, thick=0.55, width=0.6), dict(dy=0.45, ang=-0.2, len=2.4, thick=0.55, width=0.6)])
-    face.mouth_line('Idle', [(-1.0, 0.05), (-0.4, -0.05), (0.3, 0.05), (0.9, 0.35), (1.15, 0.45)], 0.18, 0.14, col='lip')
-    face.cheek('Idle', 0.95, 0.35, 0.42, 'mask2')
-    p, nn, right, up = face.on_face(0.45, 0.05)
-    blob(face.g('Idle'), p + nn * 0.02, (0.17, 0.24, 0.12), 'goldtooth', M=Matrix((right, up, nn)).transposed().to_4x4(), seg=6, rings=4)
-    # Chase: snarl, fangs
-    face.lids('Chase', [dict(up=(0.45, 0.6, 0.0))] * 2)
-    face.brows('Chase', [dict(dy=-0.1, ang=0.6, len=2.5, thick=0.6, width=0.6)] * 2)
-    face.mouth_open('Chase', 2.3, 1.0, dv=-0.1, shape='Dinv', teeth_up=4, teeth_low=4, tooth=0.26, fang=0.55, tongue=False, depth=0.45)
-    # Attack: huge roar (the reference's roaring mouth: fangs, red inside)
-    face.lids('Attack', [dict(up=(0.75, 0.45, 0.0))] * 2)
-    face.brows('Attack', [dict(dy=0.0, ang=0.55, len=2.5, thick=0.6, width=0.6)] * 2)
-    face.mouth_open('Attack', 2.5, 1.8, dv=-0.3, shape='oval', teeth_up=4, teeth_low=4, tooth=0.26, fang=0.75, lower_fang=0.5, depth=0.55)
-    # Asleep: closed eyes, mouth hanging open snoring, drool
-    face.lids('Asleep', [dict(up=(-0.05, 0.0, 0.35), low=(-0.05, 0.0, 0.35))] * 2)
-    face.brows('Asleep', [dict(dy=0.15, ang=-0.05, len=2.4, thick=0.5, width=0.55)] * 2)
-    face.mouth_open('Asleep', 1.5, 1.1, dv=-0.25, shape='oval', teeth_up=2, tooth=0.24, fang=0.4, depth=0.45)
-    face.drool('Asleep', -0.55, -0.85, 1.0)
-    # Gloat: laughing, eyes squeezed ^ ^
-    face.lids('Gloat', [dict(up=(0.12, 0.0, -0.5), low=(0.12, 0.0, -0.5))] * 2)
-    face.brows('Gloat', [dict(dy=0.35, ang=-0.15, len=2.4, thick=0.55, width=0.6)] * 2)
-    face.mouth_open('Gloat', 2.4, 1.35, dv=-0.2, shape='D', teeth_up=5, tooth=0.26, fang=0.4, depth=0.5)
+    face = Face(k, 'Head', mask, {'face': dict(c=(0, 7.55, -3.6), n=(0, -0.05, -1))}, unit=0.075)
+    # Chase (awake): the reference's look: red glowing angry eyes under heavy brows, a roaring mouth with fangs
+    for s in (-1, 1):
+        face.eye('Chase', s * 1.0, 1.72, 1.35, 0.85, s, slant=0.38, pupil=None, pad=0.24)
+        face.brow('Chase', s * 1.02, 2.38, 1.75, 0.6, s, slant=0.42)
+    face.mouth('Chase', 0.0, -0.22, 2.35, 1.4, 'roar', teeth_up=4, teeth_low=3, tooth_h=0.3, fang=0.62, lower_fang=0.42, gold=2)
+    # Asleep: closed eyes, relaxed brows, mouth hanging open snoring, drool
+    for s in (-1, 1):
+        face.closed_eye('Asleep', s * 1.0, 1.62, 1.3, 0.75, s, slant=-0.08, lid='mask2')
+        face.brow('Asleep', s * 1.02, 2.4, 1.6, 0.45, s, slant=-0.1)
+    face.mouth('Asleep', 0.3, -0.3, 0.85, 0.7, 'snore', teeth_up=0, teeth_low=0, tongue=None)
+    face.drool('Asleep', 0.55, -0.62, 0.9)
     # Jaw: cream chin with the lower canines
     jaw = k.g('Jaw')
     joint(jaw, (0, 7.15, -3.4), 0.55, 'mask2')
@@ -394,11 +369,11 @@ SNAKE_PIVOTS = [(0.0, -2.63, 0.6), (1.0, -2.75, 3.7), (3.15, -2.87, 6.7), (4.0, 
 
 def sand_snake():
     k = KeeperModel('sand_snake', 'Sand Snake', 2, {
-        'sand': (0.95, 0.76, 0.36), 'saddle': (0.45, 0.22, 0.10), 'rim': (1.0, 0.93, 0.66), 'belly': (1.0, 0.93, 0.72),
-        'hood': (0.93, 0.66, 0.28), 'mark': (0.40, 0.16, 0.08), 'horn': (0.40, 0.24, 0.14), 'brow': (0.42, 0.20, 0.10),
-        'nose': (0.35, 0.18, 0.08), 'lip': (0.55, 0.30, 0.12), 'spine': (0.80, 0.52, 0.20), 'eyedark': (0.98, 0.95, 0.80)},
+        'sand': (0.84, 0.56, 0.20), 'saddle': (0.26, 0.10, 0.04), 'rim': (0.96, 0.82, 0.50), 'belly': (0.95, 0.82, 0.55),
+        'hood': (0.74, 0.40, 0.12), 'mark': (0.22, 0.07, 0.03), 'horn': (0.22, 0.12, 0.06), 'brow': (0.25, 0.10, 0.04),
+        'nose': (0.20, 0.08, 0.03), 'spine': (0.45, 0.22, 0.07), 'eyedark': (0.12, 0.05, 0.02)},
         eye_rgb=(0.85, 0.95, 0.15))
-    k.personality = 'Sly, smug trickster: half-lidded eyes, a lopsided smirk, always looks like it knows something you do not.'
+    k.personality = 'Sly, venomous trickster: narrowed slit eyes, a hiss and two long fangs; strikes before you see it move.'
     k.fidget = 'Flicks its forked tongue, sways its head side to side, rattles the tail tip.'
     k.fx_notes = 'Sand swirl at the tail and a dust trail while chasing (ParticleEmitter); the rattle keeps its buzz.'
     radii = [1.55, 1.42, 1.28, 1.15, 1.0, 0.86, 0.72, 0.58, 0.45, 0.30]
@@ -450,34 +425,22 @@ def sand_snake():
     blob(skull, (0, 1.85, -6.85), (1.45, 0.92, 0.85), 'sand', seg=10, rings=6)
     head.extend(skull)
     blob(head, (0, 1.2, -5.6), (1.72, 0.42, 2.2), 'belly', seg=10, rings=5)
+    blob(skull, (0, 1.2, -5.6), (1.72, 0.42, 2.2), 'belly', seg=10, rings=5)       # the face is laid over the lip too
     mirror(lambda s: blob(head, (s * 0.4, 2.2, -7.5), (0.1, 0.07, 0.12), 'nose', seg=6, rings=4))
     mirror(lambda s: horn(head, (s * 1.1, 3.25, -5.5), (s * 1.4, 4.2, -5.1), (s * 1.75, 4.15, -4.3), 0.38, 'horn', seg=5))
     mirror(lambda s: spike(head, (s * 0.72, 1.4, -6.75), (s * 0.78, 0.45, -6.9), 0.17, 'tooth', seg=5))
-    eyes = [dict(E=(s * 1.28, 2.78, -6.0), r=0.66, s=s, yaw=0.42, pitch=0.12) for s in (-1, 1)]
-    face = Face(k, 'Head', skull, eyes, lid_col='sand', brow_col='brow', sclera='eyedark', iris_r=0.76,
-                mouth=dict(c=(0, 1.6, -5.6), n=(0, -0.1, -1), up=(0, 1, 0)))
-    face.build_eyes(slit=True)
-    # Idle: smug, heavy lids, one brow up, lopsided smirk
-    face.lids('Idle', [dict(up=(0.15, 0.1, 0.0)), dict(up=(0.32, -0.15, 0.0))])
-    face.brows('Idle', [dict(dy=-0.05, ang=0.2, len=2.2), dict(dy=0.4, ang=-0.35, len=2.2)])
-    face.mouth_line('Idle', [(-1.3, -0.25), (-0.6, -0.3), (0.2, -0.25), (0.9, -0.05), (1.3, 0.2)], 0.15, 0.12, col='lip')
-    # Chase: narrowed eyes, hiss with fangs
-    face.lids('Chase', [dict(up=(0.3, 0.55, 0.0), low=(-0.55, 0.0, 0.0))] * 2)
-    face.brows('Chase', [dict(dy=-0.05, ang=0.55, len=2.2)] * 2)
-    face.mouth_open('Chase', 1.8, 0.55, dv=-0.3, shape='Dinv', tooth=0.22, fang=0.45, tongue=True, depth=0.35)
-    # Attack: wide eyes, gaping mouth
-    face.lids('Attack', [dict(up=(0.85, 0.35, 0.0))] * 2)
-    face.brows('Attack', [dict(dy=0.15, ang=0.4, len=2.2)] * 2)
-    face.mouth_open('Attack', 2.2, 0.9, dv=-0.4, shape='oval', tooth=0.22, fang=0.6, depth=0.4)
-    # Asleep: closed eyes, lazy tongue
-    face.lids('Asleep', [dict(up=(-0.05, 0.0, 0.35), low=(-0.05, 0.0, 0.35))] * 2)
-    face.brows('Asleep', [dict(dy=0.1, ang=-0.1, len=2.1)] * 2)
-    face.mouth_line('Asleep', [(-1.2, -0.3), (-0.4, -0.38), (0.4, -0.38), (1.2, -0.3)], 0.12, 0.1, col='lip')
-    face.drool('Asleep', 0.6, -0.45, 0.6)
-    # Gloat: sly ^ ^ eyes, wide closed smile
-    face.lids('Gloat', [dict(up=(0.12, 0.0, -0.5), low=(0.12, 0.0, -0.5))] * 2)
-    face.brows('Gloat', [dict(dy=0.3, ang=-0.25, len=2.1), dict(dy=0.15, ang=0.0, len=2.1)])
-    face.mouth_line('Gloat', [(-1.4, 0.15), (-0.8, -0.3), (0.0, -0.45), (0.8, -0.3), (1.4, 0.2)], 0.17, 0.13, col='lip')
+    face = Face(k, 'Head', skull, {'face': dict(c=(0, 1.6, -5.6), n=(0, -0.1, -1)),
+                                   'eyes': dict(c=(0, 2.4, -5.2), n=(0, 0.25, -1))}, unit=0.06)
+    # Chase (awake): slit-pupil eyes narrowed under scaled brow ridges, a hissing mouth with two long fangs
+    for s in (-1, 1):
+        face.eye('Chase', s * 1.25, 0.15, 1.3, 0.78, s, slant=0.36, pupil='slit', pad=0.22, fr='eyes')
+        face.brow('Chase', s * 1.25, 0.72, 1.6, 0.5, s, slant=0.45, fr='eyes')
+    face.mouth('Chase', 0.0, -0.3, 1.9, 0.6, 'hiss', teeth_up=0, teeth_low=0, fang=0.55, tongue=None, tooth_w=0.3)
+    # Asleep: closed eyes, a lazy closed mouth
+    for s in (-1, 1):
+        face.closed_eye('Asleep', s * 1.25, 0.08, 1.25, 0.7, s, slant=-0.05, lid='hood', fr='eyes')
+        face.brow('Asleep', s * 1.25, 0.7, 1.45, 0.38, s, slant=-0.1, fr='eyes')
+    face.line('Asleep', [(-1.1, -0.28), (-0.4, -0.38), (0.4, -0.38), (1.1, -0.28)], 0.12)
     jaw = k.g('Jaw')
     joint(jaw, (0, 1.0, -2.1), 0.6, 'belly')
     blob(jaw, (0, 0.95, -5.0), (1.72, 0.4, 2.75), 'belly', seg=10, rings=5)
@@ -494,12 +457,12 @@ def sand_snake():
 # =========================================================================================== Stage 3: Ice Fang (Snow)
 def ice_fang():
     k = KeeperModel('ice_fang', 'Ice Fang', 3, {
-        'fur': (0.96, 0.97, 1.0), 'fur2': (0.82, 0.88, 0.96), 'mark': (0.10, 0.55, 0.95), 'mark2': (0.35, 0.80, 1.0),
-        'muzzle': (1.0, 1.0, 1.0), 'nose': (0.20, 0.35, 0.65), 'inner': (0.55, 0.80, 1.0), 'silver': (0.80, 0.83, 0.90),
-        'sapphire': (0.12, 0.32, 0.92), 'ice': (0.60, 0.90, 1.0), 'brow': (0.10, 0.45, 0.85), 'claw': (0.55, 0.85, 1.0),
-        'lip': (0.20, 0.40, 0.70), 'eyedark': (0.98, 0.99, 1.0)},
+        'fur': (0.93, 0.95, 0.99), 'fur2': (0.66, 0.74, 0.88), 'mark': (0.02, 0.26, 0.80), 'mark2': (0.10, 0.55, 0.95),
+        'muzzle': (0.97, 0.98, 1.0), 'nose': (0.06, 0.12, 0.35), 'inner': (0.30, 0.55, 0.90), 'silver': (0.50, 0.55, 0.66),
+        'sapphire': (0.06, 0.20, 0.80), 'ice': (0.30, 0.78, 1.0), 'brow': (0.03, 0.18, 0.55), 'claw': (0.30, 0.70, 1.0),
+        'eyedark': (0.03, 0.06, 0.18)},
         eye_rgb=(0.15, 0.75, 1.0))
-    k.personality = 'Proud, noble guardian: chin up, calm and composed, only bares its sabres when it means it.'
+    k.personality = 'Proud, cold hunter: chin up, icy glare, bares its sabres the moment it sees you.'
     k.fidget = 'Licks a paw, then raises its head and flicks the crystal tail.'
     k.fx_notes = 'Frost aura and snowflake sparkles (ParticleEmitter); icy breath puff on the roar.'
     body = k.g('Body')
@@ -543,6 +506,7 @@ def ice_fang():
     blob(skull, (0, 2.55, -9.45), (1.55, 1.1, 1.45), 'muzzle', seg=10, rings=6)
     head.extend(skull)
     mirror(lambda s: blob(head, (s * 0.62, 2.55, -10.55), (0.72, 0.62, 0.55), 'muzzle', seg=8, rings=5))
+    mirror(lambda s: blob(skull, (s * 0.62, 2.55, -10.55), (0.72, 0.62, 0.55), 'muzzle', seg=8, rings=5))   # face over the cheeks
     blob(head, (0, 3.3, -10.55), (0.55, 0.38, 0.42), 'nose', seg=8, rings=5)
     mirror(lambda s: spike(head, (s * 0.72, 2.2, -10.35), (s * 0.82, 0.55, -10.25), 0.27, 'tooth', seg=5))   # sabres
     mirror(lambda s: [shards(head, (s * 2.4, 2.6 + d, -6.0), (s * 1, -0.3 + d * 0.3, 0.6), 1.5, 0.9, 'fur', n=2, seed=170 + int(d * 10) + s)
@@ -560,30 +524,18 @@ def ice_fang():
         kit.stroke(head, hb, rays, 'mark', 0.22, thick=0.08, seg=4)
         rays = [((0, 3.2, -7.4), (s * 1.0, -0.2 - 0.1 * i, -0.3 + 0.2 * i)) for i in range(5)]
         kit.stroke(head, hb, rays, 'mark2', 0.2, thick=0.08, seg=4)
-    eyes = [dict(E=(s * 1.18, 4.0, -9.25), r=0.7, s=s, yaw=0.38, pitch=0.08) for s in (-1, 1)]
-    face = Face(k, 'Head', skull, eyes, lid_col='fur', brow_col='brow', sclera='eyedark', iris_r=0.74,
-                mouth=dict(c=(0, 2.1, -9.0), n=(0, -0.15, -1), up=(0, 1, 0)))
-    face.build_eyes()
-    # Idle: calm, composed, slight noble smile
-    face.lids('Idle', [dict(up=(0.45, -0.05, 0.0))] * 2)
-    face.brows('Idle', [dict(dy=0.15, ang=0.05, len=2.0, thick=0.4, width=0.45)] * 2)
-    face.mouth_line('Idle', [(-0.75, -0.05), (-0.3, -0.2), (0.0, -0.1), (0.3, -0.2), (0.75, -0.05)], 0.12, 0.09, col='lip')
-    # Chase: fierce
-    face.lids('Chase', [dict(up=(0.4, 0.55, 0.0))] * 2)
-    face.brows('Chase', [dict(dy=-0.05, ang=0.55, len=2.0, thick=0.45, width=0.45)] * 2)
-    face.mouth_open('Chase', 1.4, 0.6, dv=-0.35, shape='Dinv', teeth_low=3, tooth=0.18, tongue=False, depth=0.35)
-    # Attack: roar
-    face.lids('Attack', [dict(up=(0.85, 0.35, 0.0))] * 2)
-    face.brows('Attack', [dict(dy=0.1, ang=0.45, len=2.0, thick=0.45, width=0.45)] * 2)
-    face.mouth_open('Attack', 1.6, 1.0, dv=-0.45, shape='oval', teeth_low=3, tooth=0.18, depth=0.4)
-    # Asleep: peaceful closed eyes, tiny snore
-    face.lids('Asleep', [dict(up=(-0.05, 0.0, 0.35), low=(-0.05, 0.0, 0.35))] * 2)
-    face.brows('Asleep', [dict(dy=0.2, ang=-0.05, len=1.9, thick=0.4, width=0.45)] * 2)
-    face.mouth_open('Asleep', 0.45, 0.35, dv=-0.3, du=0.15, tongue=False, depth=0.25)
-    # Gloat: proud wink and a smug smile
-    face.lids('Gloat', [dict(up=(0.12, 0.0, -0.5), low=(0.12, 0.0, -0.5)), dict(up=(0.5, -0.1, 0.0))])
-    face.brows('Gloat', [dict(dy=0.2, ang=0.0, len=2.0, thick=0.4, width=0.45), dict(dy=0.45, ang=-0.25, len=2.0, thick=0.4, width=0.45)])
-    face.mouth_line('Gloat', [(-0.85, 0.0), (-0.3, -0.25), (0.3, -0.2), (0.85, 0.15)], 0.13, 0.1, col='lip')
+    face = Face(k, 'Head', skull, {'face': dict(c=(0, 2.1, -9.0), n=(0, -0.15, -1)),
+                                   'eyes': dict(c=(0, 3.9, -8.0), n=(0, 0.12, -1))}, unit=0.065)
+    # Chase (awake): icy slit-pupil eyes in dark sockets, heavy blue brows, a snarl between the sabres
+    for s in (-1, 1):
+        face.eye('Chase', s * 1.2, 0.18, 1.35, 0.8, s, slant=0.38, pupil='slit', pad=0.24, fr='eyes')
+        face.brow('Chase', s * 1.2, 0.8, 1.6, 0.48, s, slant=0.45, fr='eyes')
+    face.mouth('Chase', 0.0, -0.08, 1.75, 0.85, 'snarl', teeth_up=3, teeth_low=3, tooth_h=0.26)
+    # Asleep: closed eyes, relaxed brows, a small closed mouth
+    for s in (-1, 1):
+        face.closed_eye('Asleep', s * 1.2, 0.1, 1.3, 0.72, s, slant=-0.05, lid='fur2', fr='eyes')
+        face.brow('Asleep', s * 1.2, 0.78, 1.45, 0.38, s, slant=-0.1, fr='eyes')
+    face.line('Asleep', [(-0.6, -0.05), (-0.2, -0.15), (0.2, -0.15), (0.6, -0.05)], 0.1)
     jaw = k.g('Jaw')
     joint(jaw, (0, 2.0, -7.1), 0.6, 'muzzle')
     blob(jaw, (0, 1.85, -8.75), (1.35, 0.55, 1.45), 'muzzle', seg=10, rings=6)
@@ -597,7 +549,7 @@ def ice_fang():
         tube(g, [(x, 0.6, z0), (x + s * 0.05, -1.2, z0 - 0.15), (x, -2.9, z0 - 0.3)], [(1.22, 1.35), (1.08, 1.18), (1.1, 1.18)], 'fur', seg=10)
         blob(g, (x, -3.7, z0 - 0.75), (1.35, 0.9, 1.68), 'muzzle', e1=0.7, e2=0.8, seg=10, rings=6)
         for dx in (-0.62, 0, 0.62):
-            spike(g, (x + dx, -3.95, z0 - 2.0), (x + dx, -4.5, z0 - 2.5), 0.2, 'claw', seg=4)
+            spike(g, (x + dx, -3.95, z0 - 2.0), (x + dx * 1.1, -4.45, z0 - 2.95), 0.24, 'claw', seg=4)
         lb = Geo('legtmp')
         tube(lb, [(x, 0.6, z0), (x + s * 0.05, -1.2, z0 - 0.15), (x, -2.9, z0 - 0.3)], [(1.22, 1.35), (1.08, 1.18), (1.1, 1.18)], 'fur', seg=10)
         rays = [((x, -0.6, z0 - 0.15), (s * math.cos(a), 0.0, -math.sin(a))) for a in [math.radians(-50 + 18 * i) for i in range(8)]]
@@ -626,10 +578,10 @@ def lava_dragon():
     k = KeeperModel('lava_dragon', 'Lava Dragon', 4, {
         'plate': (0.17, 0.16, 0.19), 'plate2': (0.26, 0.24, 0.28), 'belly': (0.95, 0.55, 0.15), 'horn': (0.95, 0.88, 0.75),
         'spike': (0.20, 0.18, 0.21), 'wing': (0.22, 0.18, 0.22), 'wing2': (0.55, 0.16, 0.08), 'bone': (0.12, 0.11, 0.13),
-        'brow': (0.08, 0.07, 0.09), 'claw': (0.10, 0.09, 0.10), 'nostril': (0.05, 0.03, 0.03), 'lip': (0.40, 0.08, 0.05),
-        'eyedark': (0.10, 0.06, 0.05), 'smoke': (0.45, 0.42, 0.44), 'flame': (1.0, 0.55, 0.08), 'flamein': (1.0, 0.50, 0.08)},
+        'brow': (0.05, 0.04, 0.05), 'claw': (0.10, 0.09, 0.10), 'nostril': (0.05, 0.03, 0.03),
+        'eyedark': (0.04, 0.02, 0.02), 'smoke': (0.45, 0.42, 0.44), 'flame': (1.0, 0.55, 0.08), 'flamein': (1.0, 0.42, 0.04)},
         glow={'*': (1.0, 0.45, 0.06)}, eye_rgb=(1.0, 0.78, 0.10))
-    k.personality = 'Hot-headed: permanently furious, snorts smoke when annoyed, roars at the slightest thing.'
+    k.personality = 'Hot-headed and furious: glares, snarls fire, snorts smoke even in its sleep.'
     k.fidget = 'Snorts two smoke puffs, stomps a front foot, the back flames flare up.'
     k.fx_notes = 'Flames on every back spike and the tail tip, embers, nostril smoke (ParticleEmitter); fire breath glow on the roar.'
     body = k.g('Body')
@@ -679,33 +631,22 @@ def lava_dragon():
     hglow = k.g('Head', 'glow')
     hb = skull.bvh()
     mirror(lambda s: kit.stroke(hglow, hb, [((0, 7.2, -9.0), (s * 1, -0.2, 0.3 * j - 0.6)) for j in range(4)], 'iris', 0.18, thick=0.08, seg=4))
-    eyes = [dict(E=(s * 1.3, 8.15, -9.75), r=0.68, s=s, yaw=0.45, pitch=0.1) for s in (-1, 1)]
-    face = Face(k, 'Head', skull, eyes, lid_col='plate', brow_col='brow', sclera='eyedark', iris_r=0.8,
-                mouth=dict(c=(0, 6.3, -10.6), n=(0, -0.25, -1), up=(0, 1, 0)))
-    face.build_eyes(slit=True)
+    face = Face(k, 'Head', skull, {'face': dict(c=(0, 6.3, -10.6), n=(0, -0.25, -1)),
+                                   'eyes': dict(c=(0, 8.2, -8.4), n=(0, 0.3, -1))}, unit=0.07)
     smoke_fx = k.g('Head', 'fx', 'Smoke')
     mirror(lambda s: [blob(smoke_fx, (s * (0.85 + 0.45 * i), 7.5 + 0.3 * i, -13.55 - 0.6 * i), (0.2 + 0.07 * i,) * 3, 'smoke', seg=8, rings=5)
                       for i in range(3)])
-    # Idle: grumpy pout, furrowed brows
-    face.lids('Idle', [dict(up=(0.42, 0.45, 0.0))] * 2)
-    face.brows('Idle', [dict(dy=-0.05, ang=0.5, len=2.3, thick=0.55, width=0.55)] * 2)
-    face.mouth_line('Idle', [(-1.0, 0.15), (-0.4, -0.05), (0.3, -0.05), (1.0, 0.1)], 0.16, 0.12, col='lip')
-    # Chase: yelling
-    face.lids('Chase', [dict(up=(0.5, 0.6, 0.0))] * 2)
-    face.brows('Chase', [dict(dy=-0.1, ang=0.6, len=2.3, thick=0.6, width=0.55)] * 2)
-    face.mouth_open('Chase', 1.8, 0.8, dv=-0.15, shape='Dinv', teeth_up=4, tooth=0.22, tongue=False, depth=0.4)
-    # Attack: roar with fire inside
-    face.lids('Attack', [dict(up=(0.8, 0.4, 0.0))] * 2)
-    face.brows('Attack', [dict(dy=0.05, ang=0.5, len=2.3, thick=0.6, width=0.55)] * 2)
-    face.mouth_open('Attack', 2.0, 1.2, dv=-0.25, shape='oval', teeth_up=4, teeth_low=3, tooth=0.22, col='flamein', depth=0.45)
-    # Asleep: closed eyes, smoke puffs (fx)
-    face.lids('Asleep', [dict(up=(-0.05, 0.0, 0.35), low=(-0.05, 0.0, 0.35))] * 2)
-    face.brows('Asleep', [dict(dy=0.1, ang=0.2, len=2.2, thick=0.5, width=0.5)] * 2)
-    face.mouth_line('Asleep', [(-0.9, 0.1), (-0.3, -0.05), (0.3, -0.05), (0.9, 0.1)], 0.13, 0.1, col='lip')
-    # Gloat: toothy grin, smug squint
-    face.lids('Gloat', [dict(up=(0.3, 0.2, 0.0), low=(-0.25, 0.0, 0.0), lowlash=True)] * 2)
-    face.brows('Gloat', [dict(dy=0.15, ang=0.25, len=2.3, thick=0.55, width=0.55), dict(dy=0.35, ang=-0.1, len=2.3, thick=0.55, width=0.55)])
-    face.mouth_open('Gloat', 2.0, 0.7, dv=-0.1, shape='D', teeth_up=5, tooth=0.22, tongue=False, depth=0.4, tilt=-0.08)
+    # Chase (awake): furious slit-pupil eyes under black brow plates, a snarl glowing with fire inside
+    for s in (-1, 1):
+        face.eye('Chase', s * 1.25, -0.4, 1.35, 0.78, s, slant=0.42, pupil='slit', pad=0.24, fr='eyes')
+        face.brow('Chase', s * 1.25, 0.22, 1.7, 0.55, s, slant=0.5, fr='eyes')
+    face.mouth('Chase', 0.0, -0.2, 2.1, 0.75, 'snarl', teeth_up=4, teeth_low=3, tooth_h=0.24, fang=0.38, inside='flamein',
+               tongue=None)
+    # Asleep: closed eyes, still-grumpy brows, a closed mouth; smoke puffs (fx)
+    for s in (-1, 1):
+        face.closed_eye('Asleep', s * 1.25, -0.45, 1.3, 0.7, s, slant=0.05, lid='plate2', fr='eyes')
+        face.brow('Asleep', s * 1.25, 0.2, 1.55, 0.45, s, slant=0.2, fr='eyes')
+    face.line('Asleep', [(-0.9, -0.1), (-0.3, -0.22), (0.3, -0.22), (0.9, -0.1)], 0.12)
     jaw = k.g('Jaw')
     joint(jaw, (0, 5.5, -6.9), 1.0, 'plate2')
     blob(jaw, (0, 5.25, -9.8), (1.55, 0.6, 3.3), 'plate2', seg=12, rings=6)
@@ -727,7 +668,7 @@ def lava_dragon():
             fz = z - 1.1
         blob(g, (x, -4.15, fz), (1.15, 0.65, 1.45), 'plate2', e1=0.7, e2=0.8, seg=10, rings=5)
         for dx in (-0.55, 0, 0.55):
-            spike(g, (x + dx, -4.3, fz - 1.15), (x + dx * 1.1, -4.75, fz - 1.75), 0.22, 'claw', seg=4)
+            spike(g, (x + dx, -4.3, fz - 1.15), (x + dx * 1.15, -4.7, fz - 2.2), 0.26, 'claw', seg=4)
         lg = k.g(group, 'glow')
         blob(lg, (x + s * 0.9, 1.0 if front else 0.4, z), (0.35, 0.8, 0.5), 'iris', seg=6, rings=4)
     leg('LeftFrontLeg', -2.75, -3.0, True)
@@ -773,11 +714,11 @@ def lava_dragon():
 # =========================================================================================== Stage 5: Crystal Knight (Crystal)
 def crystal_knight():
     k = KeeperModel('crystal_knight', 'Crystal Knight', 5, {
-        'armor': (0.72, 0.74, 0.88), 'armor2': (0.90, 0.92, 0.98), 'under': (0.22, 0.17, 0.40), 'under2': (0.32, 0.25, 0.52),
-        'crystal': (0.66, 0.40, 1.0), 'crystal2': (0.86, 0.66, 1.0), 'trim': (0.95, 0.78, 0.25), 'grip': (0.20, 0.15, 0.32),
-        'recess': (0.06, 0.05, 0.12), 'blade': (0.82, 0.72, 1.0), 'tabard': (0.45, 0.20, 0.80), 'plume': (0.80, 0.30, 0.95)},
+        'armor': (0.40, 0.42, 0.56), 'armor2': (0.58, 0.60, 0.74), 'under': (0.12, 0.08, 0.24), 'under2': (0.20, 0.13, 0.36),
+        'crystal': (0.55, 0.22, 1.0), 'crystal2': (0.78, 0.52, 1.0), 'trim': (0.90, 0.68, 0.16), 'grip': (0.14, 0.09, 0.24),
+        'recess': (0.03, 0.02, 0.07), 'blade': (0.72, 0.58, 1.0), 'tabard': (0.30, 0.08, 0.60), 'plume': (0.65, 0.15, 0.90)},
         glow={'*': (0.74, 0.52, 1.0)}, eye_rgb=(0.85, 0.75, 1.0))
-    k.personality = 'Stern, by-the-book sentinel: stands to attention, sword upright, never lets anything slide.'
+    k.personality = 'Stern, merciless sentinel: stands to attention, sword ready, two burning slits in a closed helm.'
     k.fidget = 'Straightens up, taps the sword hilt twice, turns the helm left and right like a guard on patrol.'
     k.fx_notes = 'Crystal sparkle aura, a slash trail on the sword (Trail), crystal shards bursting on impact.'
     k.state_eyes = True
@@ -796,32 +737,25 @@ def crystal_knight():
     head = k.g('Head')
     blob(head, (0, 23.4, 0.0), (3.55, 3.7, 3.3), 'armor', e1=0.6, e2=0.8, seg=14, rings=8)
     blob(head, (0, 23.4, -2.6), (3.3, 3.2, 1.0), 'armor2', e1=0.45, e2=0.7, seg=12, rings=7)        # face plate
-    rbox(head, (0, 23.35, -3.35), (5.6, 0.95, 0.7), 'recess', round_=0.3)                            # visor slit
-    rbox(head, (0, 22.05, -3.42), (0.8, 2.0, 0.5), 'armor', round_=0.3)                               # nose guard
+    cbox(head, (0, 23.35, -3.35), (5.6, 0.95, 0.7), 'recess', bevel=0.3)                              # visor slit
+    cbox(head, (0, 22.05, -3.42), (0.8, 2.0, 0.5), 'armor', bevel=0.3, bottom=0.6)                     # nose guard
     for i in range(5):                                                                                  # breathing holes
         mirror(lambda s: blob(head, (s * (0.9 + 0.38 * i), 21.5 - 0.1 * i, -3.3 + 0.12 * i), (0.12, 0.12, 0.1), 'recess', seg=6, rings=4))
-    rbox(head, (0, 24.55, -3.25), (6.2, 0.65, 0.9), 'trim', round_=0.3)                              # gold brow band
+    cbox(head, (0, 24.55, -3.25), (6.2, 0.65, 0.9), 'trim', bevel=0.35)                               # gold brow band
     for i, (x, z, ax, h, r) in enumerate(((0, -1.6, (0, 1, 0.15), 3.6, 0.7), (0, -0.2, (0, 1, 0.45), 3.4, 0.62), (0, 1.2, (0, 1, 0.75), 2.8, 0.55),
                                            (0, 2.3, (0, 0.8, 1.0), 2.2, 0.45))):
         crystal(head, (x, 26.4 - 0.2 * i, z), ax, r, h, 'plume' if i % 2 else 'crystal')
     mirror(lambda s: crystal(head, (s * 3.3, 24.2, -0.5), (s * 1, 0.6, 0.2), 0.45, 1.5, 'crystal2'))
-    # eyes-only expressions: glowing shapes inside the visor slit, one piece per state ------------------------------
-    k.state_rgb = {'Idle': ((0.85, 0.75, 1.0), 2.4), 'Chase': ((1.0, 0.55, 0.95), 3.0), 'Attack': ((1.0, 0.92, 1.0), 4.5),
-                   'Asleep': ((0.45, 0.38, 0.65), 0.6), 'Gloat': ((0.85, 0.75, 1.0), 2.6)}
+    # two eye states inside the visor slit: fierce glowing slants awake, dim flat lines asleep ------------------------
+    k.state_rgb = {'Chase': ((1.0, 0.42, 0.95), 4.0), 'Asleep': ((0.40, 0.32, 0.62), 0.5)}
     y0, z0 = 23.35, -3.62
     for s in (-1, 1):
         x0 = s * 1.45
-        rbox(k.g('Head', 'eyes', 'Idle'), (x0, y0, z0), (1.5, 0.32, 0.3), 'iris', round_=0.4)                 # calm narrow bars
         g = k.g('Head', 'eyes', 'Chase')                                                                    # sharp angry slants
-        tube(g, [(x0 - s * 0.9, y0 - 0.25, z0), (x0 + s * 0.85, y0 + 0.28, z0)], [(0.2, 0.32), (0.06, 0.12)], 'iris', seg=4, cap0='round', cap1='point', smooth=False)
-        g = k.g('Head', 'eyes', 'Attack')                                                                   # wide, bright, flared
-        blob(g, (x0, y0, z0), (0.9, 0.44, 0.22), 'iris', seg=10, rings=6)
-        for a in (-0.5, 0.0, 0.5):
-            spike(g, (x0 + s * 0.6, y0 + a * 0.3, z0), (x0 + s * 1.35, y0 + a * 0.9, z0 - 0.05), 0.12, 'iris', seg=4)
+        tube(g, [(x0 - s * 0.95, y0 - 0.3, z0), (x0 + s * 0.92, y0 + 0.3, z0)], [(0.24, 0.36), (0.05, 0.1)], 'iris', seg=4,
+             cap0='flat', cap1='point', smooth=False)
         g = k.g('Head', 'eyes', 'Asleep')                                                                   # dim flat lines
-        rbox(g, (x0, y0 - 0.12, z0 + 0.05), (1.3, 0.1, 0.25), 'iris', round_=0.4)
-        g = k.g('Head', 'eyes', 'Gloat')                                                                    # happy ^ ^ arcs
-        tube(g, [(x0 - 0.7, y0 - 0.25, z0), (x0, y0 + 0.28, z0 - 0.03), (x0 + 0.7, y0 - 0.25, z0)], [0.13, 0.15, 0.13], 'iris', seg=6, cap0='round', cap1='round', smooth=True)
+        box(g, (x0, y0 - 0.12, z0 + 0.05), (1.3, 0.1, 0.25), 'iris')
     # Arms ------------------------------------------------------------------------------------------------------------
     for s, arm, fore in ((1, 'LeftArm', 'LeftForearm'), (-1, 'RightArm', 'RightForearm')):
         g = k.g(arm)
@@ -846,7 +780,7 @@ def crystal_knight():
     sw = k.g('Sword')
     tube(sw, [(-9.1, 3.9, -2.8), (-9.1, -0.1, -2.8)], [0.5, 0.5], 'grip', seg=6)
     blob(sw, (-9.1, 4.25, -2.8), (0.75, 0.6, 0.75), 'crystal2', seg=6, rings=4)
-    rbox(sw, (-9.1, -0.55, -2.8), (5.6, 0.95, 1.7), 'trim', round_=0.35)
+    cbox(sw, (-9.1, -0.55, -2.8), (5.6, 0.95, 1.7), 'trim', bevel=0.35)
     tube(sw, [(-9.1, -0.7, -2.8), (-9.1, -5.0, -2.8), (-9.1, -9.7, -2.8)], [(1.42, 0.42), (1.3, 0.38), (0.0, 0.0)], 'blade', seg=4,
          cap0='flat', cap1='none', smooth=False, up=Vector((0, 0, 1)))
     swg = k.g('Sword', 'glow')
@@ -858,11 +792,11 @@ def crystal_knight():
 # =========================================================================================== Stage 7: Storm Colossus (Storm)
 def storm_colossus():
     k = KeeperModel('storm_colossus', 'Storm Colossus', 7, {
-        'stone': (0.28, 0.32, 0.44), 'stone2': (0.20, 0.23, 0.33), 'stone3': (0.40, 0.46, 0.60), 'prong': (0.80, 0.62, 0.30),
-        'recess': (0.06, 0.07, 0.12), 'brow': (0.14, 0.16, 0.24), 'cloud': (0.50, 0.55, 0.66), 'cloud2': (0.36, 0.40, 0.52),
-        'lip': (0.10, 0.11, 0.18), 'tooth': (0.85, 0.88, 0.95), 'eyedark': (0.05, 0.06, 0.10), 'bolt': (0.65, 0.92, 1.0), 'boltin': (0.45, 0.85, 1.0)},
+        'stone': (0.19, 0.21, 0.29), 'stone2': (0.12, 0.13, 0.19), 'stone3': (0.29, 0.32, 0.42), 'prong': (0.75, 0.52, 0.22),
+        'recess': (0.04, 0.05, 0.08), 'cloud': (0.30, 0.33, 0.42), 'cloud2': (0.20, 0.22, 0.30),
+        'eyedark': (0.02, 0.03, 0.06), 'eyedim': (0.10, 0.14, 0.22), 'bolt': (0.65, 0.92, 1.0)},
         glow={'*': (0.55, 0.88, 1.0)}, eye_rgb=(0.55, 0.92, 1.0))
-    k.personality = 'Loud brute: shouts everything, huge underbite, laughs like thunder; fists float on storm power.'
+    k.personality = 'A walking storm of rock: no face, only two burning slits and a crackling jaw; fists float on storm power.'
     k.fidget = 'Punches its floating fists together (sparks), cracks its neck, the cloud mane rumbles.'
     k.fx_notes = 'Lightning arcs linking the floating fists and shoulder rocks to the body (Beams), crackling sparks, a rain cloud.'
     body = k.g('Body')
@@ -882,14 +816,16 @@ def storm_colossus():
                 ((-4.6, 21.0), (-3.5, 18.5), (-5.0, 16.5)), ((4.8, 20.5), (3.8, 18.0), (5.2, 15.6))):
         rays = [((0, 17.7, 0), (x, y - 17.7, -3.0)) for x, y in pts]
         kit.stroke(bglow, tb, rays, 'iris', 0.36, thick=0.16, seg=4, taper=True)
-    # Head: boulder head, heavy brow, huge underbite jaw, storm-cloud mane, copper lightning-rod horns -----------
-    head, iris = k.g('Head'), k.g('Head', 'eyes')
+    # Head: a boulder with a rock ledge, a huge jaw with rock tusks, storm-cloud mane, copper lightning-rod horns.
+    # No human face: two glowing eye slits under the ledge and a glowing crack across the jaw (dark when asleep).
+    head = k.g('Head')
     skull = Geo('skull')
     blob(skull, (0, 26.6, 0.0), (4.3, 3.55, 3.7), 'stone', e1=0.75, e2=0.85, seg=12, rings=7)
     blob(skull, (0, 24.6, -1.4), (3.8, 1.7, 2.7), 'stone3', e1=0.6, e2=0.8, seg=10, rings=6)           # big jaw
     head.extend(skull)
+    blob(head, (0, 28.1, -2.55), (4.0, 0.85, 1.4), 'stone2', seg=10, rings=4)                         # rock ledge over the eyes
     for i, x in enumerate((-2.2, 2.2)):
-        spike(head, (x, 25.0, -3.6), (x * 1.05, 26.9, -3.95), 0.42, 'tooth', seg=4)                    # underbite tusks
+        spike(head, (x, 25.0, -3.6), (x * 1.05, 27.0, -3.95), 0.48, 'stone3', seg=4)                  # rock tusks
     for i, (x, z, r) in enumerate(((0, 1.5, 2.6), (-2.6, 1.2, 2.0), (2.6, 1.0, 2.0), (0, 3.2, 1.8), (-1.6, 2.8, 1.5), (1.6, 2.9, 1.5))):
         blob(head, (x, 29.4 - 0.4 * abs(x) / 2.6, z), (r, r * 0.7, r), 'cloud' if i % 2 == 0 else 'cloud2', seg=8, rings=5)
     mirror(lambda s: tube(head, [(s * 2.6, 28.8, -0.5), (s * 3.6, 30.6, -0.2), (s * 3.9, 32.2, 0.2)], [0.32, 0.25, 0.18], 'prong', seg=5))
@@ -897,31 +833,14 @@ def storm_colossus():
     hb = skull.bvh()
     hglow = k.g('Head', 'glow')
     kit.stroke(hglow, hb, [((0, 26.6, 0), (0.3 * j - 0.6, 1.0, -0.6)) for j in range(4)], 'iris', 0.25, thick=0.1, seg=4)
-    eyes = [dict(E=(s * 1.6, 27.0, -3.2), r=0.82, s=s, yaw=0.2, pitch=0.05) for s in (-1, 1)]
-    face = Face(k, 'Head', skull, eyes, lid_col='stone', brow_col='brow', sclera='eyedark', iris_r=0.78,
-                mouth=dict(c=(0, 25.25, 0.0), n=(0, -0.05, -1), up=(0, 1, 0)))
-    face.build_eyes(pupil=False)
-    # Idle: grumpy frown
-    face.lids('Idle', [dict(up=(0.4, 0.35, 0.0))] * 2)
-    face.brows('Idle', [dict(dy=-0.05, ang=0.4, len=2.6, thick=0.6, width=0.6)] * 2)
-    face.mouth_line('Idle', [(-1.6, -0.55), (-0.8, -0.2), (0.0, -0.1), (0.8, -0.2), (1.6, -0.55)], 0.26, 0.18, col='lip')
-    # Chase: yelling
-    face.lids('Chase', [dict(up=(0.5, 0.6, 0.0))] * 2)
-    face.brows('Chase', [dict(dy=-0.1, ang=0.6, len=2.6, thick=0.65, width=0.6)] * 2)
-    face.mouth_open('Chase', 2.8, 1.3, dv=-0.2, shape='Dinv', teeth_low=5, tooth=0.35, tongue=False, depth=0.55, col='mouthin')
-    # Attack: thunder roar with lightning inside
-    face.lids('Attack', [dict(up=(0.85, 0.4, 0.0))] * 2)
-    face.brows('Attack', [dict(dy=0.1, ang=0.55, len=2.6, thick=0.65, width=0.6)] * 2)
-    face.mouth_open('Attack', 3.2, 2.0, dv=-0.35, shape='oval', teeth_up=5, teeth_low=5, tooth=0.35, col='boltin', depth=0.6)
-    # Asleep: snoring big mouth, drool
-    face.lids('Asleep', [dict(up=(-0.05, 0.0, 0.35), low=(-0.05, 0.0, 0.35))] * 2)
-    face.brows('Asleep', [dict(dy=0.15, ang=0.0, len=2.5, thick=0.55, width=0.55)] * 2)
-    face.mouth_open('Asleep', 1.6, 1.1, dv=-0.3, du=0.4, shape='oval', tongue=True, depth=0.45)
-    face.drool('Asleep', 1.1, -0.85, 1.3)
-    # Gloat: thunder laugh, eyes squeezed shut
-    face.lids('Gloat', [dict(up=(0.12, 0.0, -0.5), low=(0.12, 0.0, -0.5))] * 2)
-    face.brows('Gloat', [dict(dy=0.3, ang=-0.2, len=2.5, thick=0.6, width=0.6)] * 2)
-    face.mouth_open('Gloat', 3.0, 1.6, dv=-0.3, shape='D', teeth_up=6, tooth=0.35, depth=0.55)
+    face = Face(k, 'Head', skull, {'face': dict(c=(0, 26.0, 0.0), n=(0, 0, -1))}, unit=0.1)
+    for s in (-1, 1):
+        face.plate(head, face.place(ANGRY_EYE, s * 1.6, 0.82, s, 0.3, 2.4, 1.3), 'eyedark', 0.08)            # hollows
+        face.plate(face.g('Chase', 'eyes'), face.place(ANGRY_EYE, s * 1.58, 0.8, s, 0.3, 1.9, 0.6), 'iris', 0.1, lift=0.08)
+        face.plate(face.g('Asleep'), face.place(ANGRY_EYE, s * 1.58, 0.72, s, 0.2, 1.7, 0.18), 'eyedim', 0.08, lift=0.08)
+    face.line('Chase', [(-2.5, -1.2), (-1.7, -1.75), (-0.85, -1.25), (0.0, -1.85), (0.85, -1.25), (1.7, -1.75), (2.5, -1.2)],
+              0.42, col='iris', kind='eyes')
+    face.line('Asleep', [(-1.8, -1.45), (-0.9, -1.6), (0.0, -1.45), (0.9, -1.6), (1.8, -1.45)], 0.14, col='eyedark')
     # Arms: a shoulder rock and a big fist, both FLOATING by design, linked to the body by lightning --------------
     fx = k.g('Body', 'fx')
     for s, arm in ((1, 'LeftArm'), (-1, 'RightArm')):
@@ -934,7 +853,8 @@ def storm_colossus():
         for dx in (-2.1, -0.7, 0.7, 2.1):
             blob(fist, (s * 12.65 + dx, 8.3, -5.25), (0.85, 0.9, 0.75), 'stone3', seg=6, rings=4)
         ag = k.g(arm, 'glow')
-        blob(ag, (s * 12.4, 15.4, -0.5), (1.35, 1.35, 1.35), 'iris', seg=8, rings=6)          # the storm-core joint
+        crystal(ag, (s * 12.4, 15.35, -0.5), (0, 1, 0), 0.85, 1.0, 'iris', sides=4)           # the storm core: a crystal
+        crystal(ag, (s * 12.4, 15.55, -0.5), (0, -1, 0), 0.8, 0.65, 'iris', sides=4)          # floating between rock and fist
         k.floating |= {(arm, 'Rock'), (arm, 'Fist'), (arm, 'Glow')}
         afx = k.g(arm, 'fx')
         bolt(afx, (s * 7.2, 20.0, 0.0), (s * 8.6, 20.6, 0.2), 0.16, seed=1 + s)
@@ -946,112 +866,116 @@ def storm_colossus():
         blob(g, (s * 3.98, 3.3, 0.0), (2.75, 3.55, 3.05), 'stone', e1=0.7, e2=0.8, seg=10, rings=6)
         blob(g, (s * 3.98, -1.45, -2.2), (3.55, 1.7, 4.75), 'stone2', e1=0.6, e2=0.8, seg=10, rings=5)
         lg = k.g(leg, 'glow')
-        blob(lg, (s * 3.91, 7.0, -1.6), (1.0, 1.0, 1.0), 'iris', seg=8, rings=5)
+        crystal(lg, (s * 3.9, 5.6, -1.2), (s * 0.2, 0.5, -1), 0.6, 1.9, 'iris', sides=4)            # a storm shard in the hip
     sleep_z(k, (5.0, 34.0, -2.0), 3.2)
     return k
 
 
 # =========================================================================================== The Darkened (Void event keeper)
+def wisp(g, base, direction, length, width, seed=0):
+    """Void wisp stand-in (a ParticleEmitter in game): two thin curling purple tongues."""
+    import random
+    rnd = random.Random(seed)
+    d = Vector(direction).normalized()
+    for i in range(2):
+        off = Vector((rnd.uniform(-1, 1), rnd.uniform(-0.3, 0.3), rnd.uniform(-1, 1))) * width * 0.5
+        side = Vector((rnd.uniform(-1, 1), 0, rnd.uniform(-1, 1))) * length * 0.25
+        p0 = Vector(base) + off
+        tube(g, [p0, p0 + d * length * 0.5 + side, p0 + d * length + side * 0.2], [width * 0.35, width * 0.22, 0.0], 'wisp',
+             seg=5, cap0='round', cap1='point', smooth=True)
+
+
 def the_darkened():
-    """Group-local geometry (each group is placed at its frame; parts at frame * VeiledFrame). Body pieces stay inside
-    today's hit boxes; the hood, cloak and claws are cosmetic (VeiledCosmetic = true, never used for hits)."""
+    """Today's design, polished: the slim faceless black head with its one glowing line, crisp chamfered blocks where
+    today has plain blocks, angular cores instead of today's ball joints, metal ribs, a glowing chest slit, plus a
+    tattered cloak, long claws and void wisps. Group-local geometry (each group is placed at its frame; parts at
+    frame * VeiledFrame), at today's part positions and inside today's part sizes, so the hit boxes are unchanged; the
+    cloak, claws and ankle cores are cosmetic (never used for hits). Its two 'faces' are the line: bright awake, dim
+    asleep."""
     k = KeeperModel('the_darkened', 'The Darkened', 0, {
-        'cloth': (0.10, 0.08, 0.15), 'cloth2': (0.20, 0.14, 0.30), 'black': (0.04, 0.04, 0.07), 'mask': (0.94, 0.92, 0.98),
-        'mask2': (0.74, 0.70, 0.86), 'metal': (0.70, 0.58, 0.32), 'claw': (0.86, 0.84, 0.95), 'wrap': (0.26, 0.20, 0.36),
-        'brow': (0.30, 0.16, 0.50), 'lip': (0.20, 0.10, 0.30), 'eyedark': (0.04, 0.03, 0.06), 'mark': (0.55, 0.25, 0.85),
-        'mouthin': (0.12, 0.02, 0.20)},
-        glow={'*': (0.80, 0.55, 1.0)}, eye_rgb=(0.85, 0.55, 1.0), floor=-5.0, local=True)
-    k.personality = 'Creepy and silent: never speaks, tilts its head, stares; the smile is the scariest part.'
-    k.fidget = 'Slow head tilt to one side and back, long fingers drum the air, the cloak drifts.'
-    k.fx_notes = 'Purple void smoke aura and drifting motes (ParticleEmitter); eye glow trails (Trail) while chasing.'
+        'black': (0.035, 0.035, 0.05), 'black2': (0.075, 0.07, 0.10), 'cloth': (0.09, 0.07, 0.13), 'cloth2': (0.16, 0.10, 0.24),
+        'metal': (0.62, 0.52, 0.30), 'claw': (0.82, 0.80, 0.92), 'mark': (0.30, 0.10, 0.48), 'recess': (0.01, 0.0, 0.02),
+        'wisp': (0.55, 0.22, 0.95)},
+        glow={'*': (0.80, 0.42, 1.0)}, eye_rgb=(0.88, 0.45, 1.0), floor=-5.0, local=True)
+    k.personality = "Silent and wrong: today's faceless black head and its one glowing line; it never speaks, it tilts its head and stares."
+    k.fidget = 'A slow head tilt; the line flickers; long claws drum the air; the cloak tatters drift.'
+    k.fx_notes = 'Void-purple wisps from the cloak hem, hands and feet (ParticleEmitter); the line pulses (a slow brightness tween) and leaves a faint trail while chasing.'
+    k.state_eyes = True
+    k.state_rgb = {'Chase': ((0.90, 0.45, 1.0), 5.0), 'Asleep': ((0.30, 0.14, 0.42), 0.6)}
+    # Torso: today's broad chest as a crisp block, angular pauldrons for today's ball shoulders, metal ribs, the core slit
     t = k.g('Torso')
-    blob(t, (0, 0.1, 0), (2.7, 1.72, 1.18), 'cloth', e1=0.6, e2=0.8, seg=12, rings=7)
-    mirror(lambda s: blob(t, (s * 2.65, 0.95, 0), (0.8, 0.8, 0.9), 'cloth2', seg=8, rings=6))
-    for rib in (1, 2, 3):
-        mirror(lambda s: tube(t, [(s * 0.35, 1.25 - rib * 0.7, -1.0), (s * 1.3, 1.1 - rib * 0.7, -0.98), (s * 2.0, 1.0 - rib * 0.72, -0.72)],
-                              [0.1, 0.1, 0.06], 'metal', seg=5, cap0='round', cap1='point'))
-    cloak = k.g('Torso', 'main', 'Cloak')
+    cbox(t, (0, 0, 0), (5.5, 3.5, 2.4), 'cloth', bevel=0.3, bottom=(0.86, 1.0))
+    for s in (-1, 1):
+        cbox(t, (s * 2.65, 0.95, 0), (1.7, 1.7, 1.9), 'cloth2', bevel=0.35, top=0.8)
+        shards(t, (s * 3.0, 1.6, 0.0), (s * 0.7, 1, 0.1), 1.0, 0.7, 'cloth2', n=2, spread=0.3, seed=310 + s, sink=0.5)
+        for rib in (1, 2, 3):
+            box(t, (s * 1.25, 1.25 - rib * 0.7, -1.18), (2.1, 0.14, 0.16), 'metal', M=Rz(s * 0.13))
+    membrane(t, [(0, 1.5, -1.19), (0.22, 0.0, -1.19), (0, -1.5, -1.19), (-0.22, 0.0, -1.19)], 0.1, 'recess')
+    tg = k.g('Torso', 'glow')
+    membrane(tg, [(0, 1.38, -1.21), (0.1, 0.0, -1.21), (0, -1.38, -1.21), (-0.1, 0.0, -1.21)], 0.12, 'iris')
+    cloak = k.g('Torso', 'main', 'Cloak')                       # tattered cloak hanging from the shoulders (cosmetic)
     for i, x in enumerate((-2.9, -1.75, -0.6, 0.6, 1.75, 2.9)):
         ln = 8.2 + (1.4 if i % 2 else 0.0) - abs(x) * 0.3
         sp = 1.0 + abs(x) * 0.12
-        membrane(cloak, [(x * 0.9 - 0.7, 1.7, 1.0), (x * 0.9 + 0.7, 1.7, 1.0), (x * sp + 0.6, 1.7 - ln, 2.1 + 0.08 * ln),
-                         (x * sp, 1.7 - ln - 1.1, 2.15 + 0.08 * ln), (x * sp - 0.6, 1.7 - ln, 2.1 + 0.08 * ln)], 0.14,
-                 'cloth2' if i % 2 else 'cloth')
-    mirror(lambda s: blob(cloak, (s * 2.6, 1.7, 0.2), (1.2, 0.55, 1.25), 'cloth2', seg=10, rings=5))
+        z = 2.1 + 0.08 * ln
+        membrane(cloak, [(x * 0.9 - 0.7, 1.7, 1.0), (x * 0.9 + 0.7, 1.7, 1.0), (x * sp + 0.7, 1.7 - ln + 0.6, z),
+                         (x * sp + 0.35, 1.7 - ln - 0.5, z + 0.05), (x * sp, 1.7 - ln + 0.2, z), (x * sp - 0.3, 1.7 - ln - 1.2, z + 0.05),
+                         (x * sp - 0.7, 1.7 - ln + 0.4, z)], 0.14, 'cloth2' if i % 2 else 'cloth')
+    for s in (-1, 1):
+        cbox(cloak, (s * 2.55, 1.75, 0.35), (2.2, 0.9, 2.3), 'cloth2', bevel=0.3)
     for i, x in enumerate((-2.4, -1.2, 1.2, 2.4)):
-        shards(cloak, (x, 1.9, 0.6), (x * 0.4, 1, 0.3), 1.3, 0.8, 'cloth2', n=2, seed=300 + i)            # tattered collar shards
-    k.cosmetic |= {('Torso', 'Cloak'), ('Head', 'Hood'), ('LHand', 'Claws'), ('RHand', 'Claws'), ('LFoot', 'Ankle'), ('RFoot', 'Ankle')}
-    tg = k.g('Torso', 'glow')
-    membrane(tg, [(0.03, 1.35, -1.04), (0.2, 0.62, -1.04), (-0.04, 0.3, -1.04), (0.14, -0.55, -1.04), (-0.02, -1.32, -1.04),
-                  (-0.14, -0.48, -1.04), (0.08, -0.18, -1.04), (-0.16, 0.66, -1.04)], 0.22, 'iris')
-    w = k.g('Waist')
-    tube(w, [(0, -1.68, 0), (0, 0, 0), (0, 1.68, 0)], [(1.08, 0.74), (0.95, 0.66), (1.12, 0.78)], 'cloth', seg=10, cap0='flat', cap1='flat')
+        shards(cloak, (x, 1.9, 0.6), (x * 0.4, 1, 0.3), 1.4, 0.8, 'cloth2', n=2, seed=300 + i)            # tattered collar
+    fx = k.g('Torso', 'fx', 'Wisp')
+    for i, x in enumerate((-2.6, -0.6, 1.5, 3.0)):
+        wisp(fx, (x, -7.0 + (0.8 if i % 2 else 0.0), 2.7), (x * 0.05, 1, 0.3), 1.6, 0.45, seed=400 + i)
+    k.cosmetic |= {('Torso', 'Cloak'), ('LHand', 'Claws'), ('RHand', 'Claws'), ('LFoot', 'Ankle'), ('RFoot', 'Ankle')}
+    cbox(k.g('Waist'), (0, 0, 0), (2.35, 3.4, 1.65), 'cloth', bevel=0.3, top=1.0, bottom=0.92)
     h = k.g('Hip')
-    blob(h, (0, 0, 0), (1.32, 0.95, 0.88), 'cloth', e1=0.7, seg=10, rings=6)
-    mirror(lambda s: blob(h, (s * 0.95, -0.65, 0), (0.78, 0.78, 0.78), 'black', seg=8, rings=6))
-    n = k.g('Neck')
-    tube(n, [(0, -0.68, 0), (0, 0.68, 0)], [0.52, 0.44], 'black', seg=8, cap0='flat', cap1='flat')
-    hd, iris = k.g('Head'), k.g('Head', 'eyes')
-    skull = Geo('mask')
-    blob(skull, (0, 0, -0.1), (0.98, 1.45, 0.62), 'mask', e1=0.85, e2=0.9, seg=12, rings=8)
-    hd.extend(skull)
-    hb = skull.bvh()
-    for s in (-1, 1):   # void markings down the mask
-        kit.stroke(hd, hb, [((s * 0.2, 0.2 - 0.25 * j, 0.2), (s * 0.35, -0.05, -1)) for j in range(5)], 'mark', 0.07, thick=0.04, seg=4)
-    hglow = k.g('Head', 'glow')
-    kit.stroke(hglow, hb, [((0.0, 1.1 - 0.35 * j, 0.2), (0.02 * (-1) ** j, 0.0, -1)) for j in range(5)], 'iris', 0.06, thick=0.04, seg=4)
-    hood = k.g('Head', 'main', 'Hood')
-    blob(hood, (0, 0.45, 0.4), (1.8, 2.2, 1.6), 'cloth', e1=0.9, e2=0.9, seg=12, rings=7,
-         deform=lambda p: Vector((p.x, p.y, p.z if p.z > -0.6 else -0.6 + (p.z + 0.6) * 0.12)))
-    spike(hood, (0, 2.3, 0.6), (0, 3.4, 2.0), 0.75, 'cloth', seg=6)
-    mirror(lambda s: blob(hood, (s * 1.2, -1.5, 0.5), (0.9, 1.0, 1.0), 'cloth2', seg=8, rings=5))
-    eyes = [dict(E=(s * 0.43, 0.33, -0.56), r=0.27, s=s, yaw=0.15, pitch=0.0) for s in (-1, 1)]
-    face = Face(k, 'Head', skull, eyes, lid_col='mask', brow_col='brow', sclera='eyedark', iris_r=0.7,
-                mouth=dict(c=(0, -0.55, 0.0), n=(0, 0, -1), up=(0, 1, 0)))
-    face.build_eyes(pupil=True)
-    # Idle: blank stare, no mouth, one brow slightly raised (creepy calm)
-    face.lids('Idle', [dict(up=(0.55, 0.0, 0.0)), dict(up=(0.75, -0.15, 0.0))])
-    face.brows('Idle', [dict(dy=0.1, ang=0.0, len=2.0, thick=0.4, width=0.45), dict(dy=0.3, ang=-0.2, len=2.0, thick=0.4, width=0.45)])
-    face.mouth_line('Idle', [(-0.12, 0.0), (0.12, 0.0)], 0.04, 0.03, col='lip')
-    # Chase: wide staring eyes, pin pupils feel, a thin line mouth
-    face.lids('Chase', [dict(up=(0.9, 0.35, 0.0))] * 2)
-    face.brows('Chase', [dict(dy=0.0, ang=0.5, len=2.0, thick=0.45, width=0.45)] * 2)
-    face.mouth_line('Chase', [(-0.4, -0.05), (-0.1, 0.03), (0.15, -0.03), (0.4, 0.05)], 0.05, 0.04, col='lip')
-    # Attack: the mask splits into a jagged grin
-    face.lids('Attack', [dict(up=(0.9, 0.5, 0.0))] * 2)
-    face.brows('Attack', [dict(dy=0.0, ang=0.6, len=2.0, thick=0.45, width=0.45)] * 2)
-    face.mouth_open('Attack', 1.15, 0.45, dv=0.0, shape='D', teeth_up=6, teeth_low=6, tooth=0.11, tongue=False, depth=0.25)
-    # Asleep: eyes closed, mask calm
-    face.lids('Asleep', [dict(up=(-0.05, 0.0, 0.35), low=(-0.05, 0.0, 0.35))] * 2)
-    face.brows('Asleep', [dict(dy=0.15, ang=-0.1, len=1.9, thick=0.35, width=0.4)] * 2)
-    # Gloat: crescent eyes and a far-too-wide thin smile
-    face.lids('Gloat', [dict(up=(0.12, 0.0, -0.5), low=(0.12, 0.0, -0.5))] * 2)
-    face.brows('Gloat', [dict(dy=0.3, ang=-0.25, len=1.9, thick=0.4, width=0.45)] * 2)
-    face.mouth_line('Gloat', [(-0.75, 0.2), (-0.45, -0.05), (0.0, -0.15), (0.45, -0.05), (0.75, 0.2)], 0.06, 0.04, col='lip')
+    cbox(h, (0, 0, 0), (2.7, 2.0, 1.8), 'black', bevel=0.3)
+    for s in (-1, 1):
+        cbox(h, (s * 0.95, -0.65, 0), (1.45, 1.45, 1.45), 'black', bevel=0.4)                           # hip cores
+    cbox(k.g('Neck'), (0, 0, 0), (1.1, 1.4, 1.1), 'black', bevel=0.3, top=0.85)
+    # Head: today's slim black head, crisper (bevelled edges, a narrower chin) with the one glowing line --------------
+    hd = k.g('Head')
+    cbox(hd, (0, 0, 0), (2.0, 3.0, 1.48), 'black', bevel=0.28, bottom=(0.8, 1.0))
+    membrane(hd, [(0.02, 1.2, -0.735), (0.17, 0.0, -0.735), (0.02, -1.2, -0.735), (-0.13, 0.0, -0.735)], 0.08, 'recess')   # the cleft
+    for s in (-1, 1):                                                                                     # subtle markings
+        membrane(hd, [(s * 0.42, 1.38, -0.735), (s * 0.52, 1.38, -0.735), (s * 0.86, 0.72, -0.735), (s * 0.76, 0.72, -0.735)], 0.05, 'mark')
+        membrane(hd, [(s * 1.0, 1.05, 0.25), (s * 1.0, 1.05, 0.38), (s * 1.0, -0.55, -0.05), (s * 1.0, -0.55, -0.18)], 0.05, 'mark')
+    membrane(k.g('Head', 'eyes', 'Chase'), [(0.02, 1.08, -0.76), (0.1, 0.0, -0.76), (0.02, -1.08, -0.76), (-0.06, 0.0, -0.76)],
+             0.08, 'iris')                                                                                  # awake: bright line
+    membrane(k.g('Head', 'eyes', 'Asleep'), [(0.02, 0.95, -0.75), (0.05, 0.0, -0.75), (0.02, -0.95, -0.75), (-0.01, 0.0, -0.75)],
+             0.06, 'iris')                                                                                  # asleep: thin, dim
     for q, s in (('L', -1), ('R', 1)):
-        ua = k.g(q + 'UpperArm')
-        tube(ua, [(0, 1.62, 0), (0, -1.68, 0)], [(0.6, 0.64), (0.5, 0.55)], 'cloth', seg=8)
+        cbox(k.g(q + 'UpperArm'), (0, 0, 0), (1.25, 4.4, 1.35), 'cloth', bevel=0.3, bottom=0.88)
         fa = k.g(q + 'Forearm')
-        blob(fa, (0, 2.1, 0), (0.6, 0.6, 0.6), 'black', seg=8, rings=5)
-        tube(fa, [(0, 1.9, 0), (0, -1.62, 0)], [(0.5, 0.55), (0.42, 0.48)], 'wrap', seg=8)
-        tube(fa, [(0, -1.62, 0), (0, -1.78, 0)], [0.56, 0.56], 'metal', seg=8, cap0='flat', cap1='flat')
+        cbox(fa, (0, 2.1, 0), (1.15, 1.15, 1.15), 'black', bevel=0.4)                                      # elbow core
+        cbox(fa, (0, 0, 0), (1.05, 4.2, 1.15), 'black2', bevel=0.3, bottom=0.85)
+        box(fa, (0, -1.7, 0), (1.17, 0.18, 1.27), 'metal')
+        shards(fa, (s * 0.45, 0.6, 0.2), (s * 1, 0.3, 0.4), 0.9, 0.5, 'cloth2', n=2, spread=0.25, seed=330 + s, sink=0.55)
         hn = k.g(q + 'Hand')
-        blob(hn, (0, 0, 0), (0.62, 0.52, 0.4), 'black', seg=8, rings=5)
-        blob(hn, (0, 0.55, 0), (0.46, 0.3, 0.44), 'black', seg=6, rings=4)
+        cbox(hn, (0, 0, 0), (1.3, 1.1, 0.85), 'black', bevel=0.35)
+        cbox(hn, (0, 0.55, 0), (0.9, 0.6, 0.85), 'black', bevel=0.4)                                        # wrist core
+        for i in (1, 2, 3):
+            x = (i - 2) * 0.4
+            cbox(hn, (x, -1.12, 0), (0.25, 1.55, 0.3), 'black2', bevel=0.4, M=Rx(-0.06) @ Rz((i - 2) * 0.035))
         claws = k.g(q + 'Hand', 'main', 'Claws')
         for i in (1, 2, 3):
             x = (i - 2) * 0.4
-            horn(claws, (x, -0.3, 0), (x * 1.1, -1.4, -0.15), (x * 1.15, -2.2, -0.55), 0.13, 'claw', seg=4, n=4)
-        th = k.g(q + 'Thigh')
-        tube(th, [(0, 1.3, 0), (0, -1.42, 0)], [(0.68, 0.74), (0.55, 0.6)], 'cloth', seg=8)
+            horn(claws, (x * 1.02, -1.55, 0.0), (x * 1.12, -2.35, -0.12), (x * 1.22, -3.05, -0.6), 0.15, 'claw', seg=4, n=4)
+        cbox(k.g(q + 'Thigh'), (0, 0, 0), (1.4, 4.0, 1.55), 'cloth', bevel=0.3, bottom=0.88)
         sh = k.g(q + 'Shin')
-        blob(sh, (0, 1.8, 0), (0.62, 0.62, 0.62), 'black', seg=8, rings=5)
-        tube(sh, [(0, 1.6, 0), (0, -1.32, 0)], [(0.52, 0.58), (0.42, 0.48)], 'wrap', seg=8)
-        ankle = k.g(q + 'Foot', 'main', 'Ankle')            # cosmetic: keeps foot and shin joined when the knee folds
-        blob(ankle, (0, 0.35, 0.55), (0.5, 0.5, 0.5), 'black', seg=8, rings=5)
+        cbox(sh, (0, 1.8, 0), (1.2, 1.2, 1.2), 'black', bevel=0.4)                                          # knee core
+        cbox(sh, (0, 0, 0), (1.1, 3.6, 1.2), 'black2', bevel=0.3, bottom=0.85)
+        spike(sh, (0, 1.75, -0.4), (0, 2.25, -1.25), 0.32, 'black', seg=4)                                 # knee spike
+        cbox(k.g(q + 'Foot', 'main', 'Ankle'), (0, 0.35, 0.55), (1.0, 1.0, 1.0), 'black', bevel=0.4)      # cosmetic core
         ft = k.g(q + 'Foot')
-        blob(ft, (0, 0, 0.15), (0.68, 0.34, 1.1), 'black', e1=0.7, seg=8, rings=5,
-             deform=lambda p: Vector((p.x * (0.55 + 0.45 * min(1, (p.z + 1.1) / 1.2)), p.y, p.z)))
+        cbox(ft, (0, 0, 0.25), (1.4, 0.7, 2.1), 'black', bevel=0.35)
+        spike(ft, (0, -0.05, -0.6), (0, -0.2, -1.35), 0.42, 'black', seg=4)                                # pointed toe
+        fx = k.g(q + 'Foot', 'fx', 'Wisp')
+        wisp(fx, (0, -0.3, 0.3), (0, 1, 0.2), 1.2, 0.45, seed=420 + s)
+        fx = k.g(q + 'Hand', 'fx', 'Wisp')
+        wisp(fx, (0, -1.2, 0), (0, -1, -0.3), 1.0, 0.35, seed=440 + s)
     sleep_z(k, (0.9, 2.6, -0.5), 1.1)
     # posture: creepy head tilt
     k.transform(['Head'], Rz(0.14))

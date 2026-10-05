@@ -12,9 +12,8 @@ FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
 BOLD = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 INK, MUTED, PAPER = (28, 32, 40), (92, 98, 112), (247, 248, 250)
 NEW_C, OLD_C = (24, 120, 70), (150, 40, 40)
-STATES = ['Idle', 'Chase', 'Attack', 'Asleep', 'Gloat']
-STATE_LABEL = {'Idle': 'Idle / guarding', 'Chase': 'Spotted you / chase', 'Attack': 'Attack', 'Asleep': 'Asleep',
-               'Gloat': 'Caught you / gloat'}
+STATES = ['Chase', 'Asleep']
+STATE_LABEL = {'Chase': 'Awake / chase face', 'Asleep': 'Asleep face'}
 
 
 def font(size, bold=False):
@@ -29,14 +28,14 @@ TODAY_PARTS = {'timber_golem': '63 blocks + 3 accents', 'jungle_king': '23 mesh 
                'ice_fang': '21 mesh parts + 41 accent/armour parts', 'lava_dragon': '27 mesh parts', 'crystal_knight': '50 blocks + 3 accents',
                'storm_colossus': '30 blocks + 5 accents', 'the_darkened': '43 blocks'}
 REF = {
-    'timber_golem': 'From the references: angular faceted shapes, shard-like tufts (moss and leaves), bold glowing accents (sap cracks), studs. No sleep Z: he still sleeps disguised as a tree.',
+    'timber_golem': 'Owner note: not human-like. A living tree: no nose, brows or lips, just two glowing slits in dark hollows and a jagged crack; the slits go dark asleep, so the disguised tree shows no face. No sleep Z.',
     'jungle_king': 'Closest to the reference Jungle King: navy fur, spiky shoulder tufts, cream face mask and chest, gold crown and arm band, red glowing angry eyes, roaring mouth with fangs.',
     'sand_snake': 'From the references: faceted body, bold diamond markings (like the T-Rex stripes), spines, strong sand / brown contrast, studs.',
     'ice_fang': 'From the reference wolf (Mitsui): white body with bold swirl markings (ice blue instead of red), horns sweeping back (ice), spiky fur tufts, eye markings.',
     'lava_dragon': 'From the reference lava dragon: charcoal angular plates, flaming back spikes, orange lava seams, a flaming tail tip.',
-    'crystal_knight': 'Owner note: a closed helmet; only the glowing eyes in the visor change. Style from the references: faceted armour, studs, a bold crest.',
-    'storm_colossus': 'Owner note: floating pieces are fine here as part of the design, linked by lightning. Style: faceted rock, glowing cracks, big brute face.',
-    'the_darkened': 'From the references: faceted shards (cloak), a glowing aura idea, bold markings on the mask; creepy face states.',
+    'crystal_knight': 'Owner note: a closed helmet; only the glowing eyes in the visor change (fierce slants awake, dim lines asleep). Style from the references: faceted armour, studs, a bold crest.',
+    'storm_colossus': 'Owner notes: not human-like (glowing eye slits under a rock ledge, a glowing crack for a mouth); floating pieces are fine here as part of the design, linked by lightning.',
+    'the_darkened': 'Owner note: keep today\'s design. The same slim black head and glowing line, polished: crisp bevelled blocks, angular cores for the ball joints, a pulsing void slit, tattered cloak, claws, wisps.',
 }
 LABELS = [('front', 'Front'), ('three_quarter', 'Three-quarter'), ('side', 'Side'), ('back', 'Back'),
           ('chase', 'Chase (real run frame)'), ('windup', 'Attack wind-up (real frame)'), ('strike', 'Attack impact (real frame)'),
@@ -75,18 +74,19 @@ def keeper_sheet(key):
     d0 = ImageDraw.Draw(Image.new('RGB', (10, 10)))
     fnote = font(18)
     notes = ['Personality: ' + m['personality'], 'Idle fidget: ' + m['fidget'], 'Effects (particles in game): ' + m['fx'], REF[key]]
+    note_x = 12 + 2 * (fw + 12) + 20
     note_lines = []
     for n in notes:
-        note_lines += ['- ' + l if i == 0 else '  ' + l for i, l in enumerate(wrap(d0, n, fnote, W - 60))]
-    face_h = fw + 40
-    foot = 22 + 25 * len(note_lines) + 16
-    H = head + 2 * (ph + 12) + face_h + foot + 10
+        note_lines += ['- ' + l if i == 0 else '  ' + l for i, l in enumerate(wrap(d0, n, fnote, W - note_x - 30))]
+        note_lines.append('')
+    face_h = max(fw, 25 * len(note_lines)) + 40
+    H = head + 2 * (ph + 12) + face_h + 30
     img = Image.new('RGB', (W, H), PAPER)
     d = ImageDraw.Draw(img)
     d.text((24, 16), '%s  -  %s keeper' % (m['name'], m['biome']), font=font(34, True), fill=INK)
     tag(d, (W - 210, 24), 'PROPOSED', fill=(220, 242, 228), ink=NEW_C, f=font(20, True))
     d.text((24, 62), 'Real Blender model, Cycles render, studs on. Chase / attack / asleep use the game\'s own pose frames.', font=font(18), fill=MUTED)
-    d.text((24, 88), '%s triangles on screen (%s with all 5 face states)  |  %d mesh parts (today: %s)' % (
+    d.text((24, 88), '%s triangles on screen (%s with both faces)  |  %d mesh parts (today: %s)' % (
         format(m['tris_visible'], ','), format(m['tris'], ','), m['parts'], TODAY_PARTS[key]), font=font(18), fill=MUTED)
     d.text((24, 114), 'Moving groups (same names the game animates today): ' + ', '.join(m['groups']), font=font(15), fill=MUTED)
     for i, (name, label) in enumerate(LABELS):
@@ -96,47 +96,45 @@ def keeper_sheet(key):
         img.paste(p, (x, y))
         tag(d, (x + 12, y + 10), label, f=font(15, True))
     y = head + 2 * (ph + 12)
-    d.text((24, y + 4), 'Face states (swappable face pieces; one is shown at a time)', font=font(20, True), fill=INK)
+    d.text((24, y + 4), 'Two faces (swappable face pieces): awake / chase and asleep', font=font(20, True), fill=INK)
     y += 34
     for j, st in enumerate(STATES):
         p = Image.open(os.path.join(PANELS, 'face_%s_%s.png' % (key, st))).convert('RGB').resize((fw, fw), Image.LANCZOS)
         x = 12 + j * (fw + 12)
         img.paste(p, (x, y))
         tag(d, (x + 10, y + 10), STATE_LABEL[st], f=font(15, True))
-    y += fw + 18
+    yy = y + 6
     for l in note_lines:
-        d.text((30, y), l, font=fnote, fill=INK)
-        y += 25
+        d.text((note_x, yy), l, font=fnote, fill=INK)
+        yy += 25
     path = os.path.join(OUT, 'keeper_%s.png' % key)
     img.save(path, optimize=True)
     return path
 
 
 def faces_sheet():
-    fw = 300
-    left = 300
-    W = left + 5 * (fw + 10) + 20
-    head = 140
-    rowh = fw + 16
-    H = head + 8 * rowh + 40
+    """One row of the 8 keepers, each with its awake / chase face above its asleep face."""
+    fw = 270
+    left = 120
+    W = left + 8 * (fw + 10) + 14
+    head = 150
+    H = head + 2 * (fw + 10) + 60
     img = Image.new('RGB', (W, H), PAPER)
     d = ImageDraw.Draw(img)
-    d.text((24, 16), 'Keeper faces: five states each (close-ups, Cycles)', font=font(32, True), fill=INK)
-    d.text((24, 58), 'The Crystal Knight keeps a closed helmet: only his visor eyes change. The sleep "Z" is left out of the close-ups '
-                     '(it is in each keeper sheet\'s asleep view).', font=font(16), fill=MUTED)
-    d.text((24, 80), 'The Golem, the Jungle King and The Darkened are shown upright when asleep (in game the Golem sleeps as a tree, '
-                     'the Jungle King lies on its side, and The Darkened curls up face-down).', font=font(16), fill=MUTED)
-    for j, st in enumerate(STATES):
+    d.text((24, 16), 'Keeper faces: awake / chase vs asleep (close-ups, Cycles)', font=font(32, True), fill=INK)
+    d.text((24, 60), 'Two swappable face pieces per keeper. The Golem and the Colossus have no human face (glowing slits, a crack); the '
+                     'Knight keeps a closed helm; The Darkened keeps today\'s line.', font=font(16), fill=MUTED)
+    d.text((24, 82), 'The sleep "Z" is left out of the close-ups (it is in each keeper sheet\'s asleep view). Asleep faces are shown on the '
+                     'standing pose, from the front.', font=font(16), fill=MUTED)
+    for j, key in enumerate(ORDER):
         x = left + j * (fw + 10)
-        d.text((x + 6, head - 26), STATE_LABEL[st], font=font(17, True), fill=INK)
-    fn = font(15)
-    for i, key in enumerate(ORDER):
-        m = META[key]
-        y = head + i * rowh
-        d.text((20, y + 10), m['name'], font=font(20, True), fill=INK)
-        for li, line in enumerate(wrap(d, m['personality'], fn, left - 40)[:9]):
-            d.text((20, y + 42 + li * 20), line, font=fn, fill=MUTED)
-        for j, st in enumerate(STATES):
+        for li, line in enumerate(wrap(d, META[key]['name'], font(17, True), fw - 8)[:2]):
+            d.text((x + 4, head - 44 + li * 20), line, font=font(17, True), fill=INK)
+    for i, st in enumerate(STATES):
+        y = head + i * (fw + 10)
+        for li, line in enumerate(wrap(d, STATE_LABEL[st], font(16, True), left - 24)):
+            d.text((14, y + fw / 2 - 20 + li * 20), line, font=font(16, True), fill=INK)
+        for j, key in enumerate(ORDER):
             p = Image.open(os.path.join(PANELS, 'face_%s_%s.png' % (key, st))).convert('RGB').resize((fw, fw), Image.LANCZOS)
             img.paste(p, (left + j * (fw + 10), y))
     path = os.path.join(OUT, 'keepers_faces.png')
@@ -172,7 +170,7 @@ def before_after():
                 tag(d, (px + 10, y + 44), t, fill=(250, 228, 228), ink=OLD_C, f=font(14, True))
             else:
                 tag(d, (px + 10, y + 44), 'PROPOSED - %s tris on screen' % format(m['tris_visible'], ','), fill=(220, 242, 228), ink=NEW_C, f=font(14, True))
-    d.text((26, H - 50), 'Cycles renders of real Blender scenes, standing pose from the game\'s pose code, idle face. Proposed models shown with the stud texture.',
+    d.text((26, H - 50), 'Cycles renders of real Blender scenes, standing pose from the game\'s pose code, awake face. Proposed models shown with the stud texture.',
            font=font(15), fill=MUTED)
     path = os.path.join(OUT, 'keepers_before_after.png')
     img.save(path, optimize=True)
@@ -231,9 +229,9 @@ def lineup():
 
 if __name__ == '__main__':
     for key in ORDER:
-        if key in META and 'tris' in META[key] and os.path.exists(os.path.join(PANELS, 'face_%s_Gloat.png' % key)):
+        if key in META and 'tris' in META[key] and os.path.exists(os.path.join(PANELS, 'face_%s_Asleep.png' % key)):
             print(keeper_sheet(key))
-    if all(os.path.exists(os.path.join(PANELS, 'face_%s_Gloat.png' % k)) and k in META and 'personality' in META[k] for k in ORDER):
+    if all(os.path.exists(os.path.join(PANELS, 'face_%s_Asleep.png' % k)) and k in META and 'personality' in META[k] for k in ORDER):
         print(faces_sheet())
     if all(k in META and 'today_tris_standin' in META[k] for k in ORDER):
         print(before_after())
