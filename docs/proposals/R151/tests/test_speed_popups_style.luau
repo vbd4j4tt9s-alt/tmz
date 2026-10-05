@@ -157,12 +157,26 @@ local function oldFormatGain(amount)
  end
  return string.format('%.0f',amount)
 end
+-- R151 treadmill polish (owner: "for numnbers obvere 1000 it willl be read as 1k"): the old text everywhere EXCEPT where it read "1000" / "1000K"
+-- / "1000M" / "1000B" (the unit is now picked after rounding) or "0" for a positive amount below .5.
 local sameText=true
-for _,v in ipairs({1,9,10,99,100,999,1000,1049,1050,1500,2100,3500,4200,12000,99999,100000,999999,1e6,1.25e6,3.5e9,7e12,123456789012345})do
+for _,v in ipairs({1,9,10,99,100,999,1000,1049,1050,1500,2100,3500,4200,12000,99999,100000,999949,1e6,1.25e6,3.5e9,7e12,123456789012345})do
  if Style.FormatGain(v)~=oldFormatGain(v)then sameText=false;print('differs at '..v)end
 end
-check(sameText,'FormatGain gives the same text as the formatGain of SpeedGainPopup before R151')
+check(sameText,'FormatGain gives the same text as the formatGain of SpeedGainPopup before R151 away from the unit boundaries')
 check(Style.FormatGain(3500)=='3.5K' and Style.FormatGain(4200)=='4.2K' and Style.FormatGain(2100)=='2.1K' and Style.FormatGain(12000)=='12K' and Style.FormatGain(999)=='999','FormatGain: 3.5K, 4.2K, 12K, 999')
+do -- the boundaries: never "1000" of a unit, never "+0"
+ local want={[999.4]='999',[999.5]='1K',[999.6]='1K',[999.99]='1K',[1000]='1K',[999949]='999.9K',[999950]='1M',[999999]='1M',[1e6]='1M',
+  [999949999]='999.9M',[999950000]='1B',[999950001]='1B',[999999999]='1B',[1e9]='1B',[999950000000]='1T',[999999999999]='1T',[1e12]='1T',[2.5e15]='2500T',
+  [.4]='1',[.01]='1',[1]='1',[17]='17',[20]='20',[65]='65',[335]='335',[2000]='2K',[10000]='10K',[65000]='65K',[500000]='500K'}
+ local bad={}
+ for v,text in pairs(want)do if Style.FormatGain(v)~=text then bad[#bad+1]=v..' -> '..Style.FormatGain(v)..' (want '..text..')'end end
+ table.sort(bad);check(#bad==0,'FormatGain boundaries (999.6 -> 1K, 999,950 -> 1M, 999,950,000 -> 1B ..., a positive amount never "0"): '..table.concat(bad,'; '))
+ local thousand=0
+ for e=3,14 do for _,k in ipairs({.99949,.9995,.99951,.99999,1})do local t=Style.FormatGain(10^e*k);if t:match('^1000[KMBT]?$')and not t:match('T$')then thousand+=1;print('reads 1000: '..10^e*k..' -> '..t)end end end
+ check(thousand==0,'FormatGain: no amount reads "1000" of a unit')
+ check(Style.FormatGain(0)=='0'and Style.FormatGain(-3)=='-3','FormatGain: zero and negatives (never shown: the client only shows awards of 1 or more) stay as they were')
+end
 
 -- 10. our look is unchanged ----------------------------------------------------------------------------------------------------------------------------------
 local C=Style.Colors

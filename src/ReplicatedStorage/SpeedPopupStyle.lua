@@ -76,11 +76,21 @@ function S.Cap(tier, isOwn, reduced)
 end
 
 -- The text of an amount: 1,234 -> 1.2K, 3,500 -> 3.5K, 12,000 -> 12K, 1.5e6 -> 1.5M ... (K M B T), plain below 1,000.
+-- R151 (owner: "for numnbers obvere 1000 it willl be read as 1k"): the unit is picked AFTER rounding, so nothing reads "1000" or "1000K":
+-- 999.6 -> 1K, 999,950 -> 1M, 999,950,000 -> 1B, ... and a positive amount below 1 reads 1 (a gain never reads "+0"). Also used by the
+-- treadmill's "+N/step" label and upgrade sign (TreadmillLook151), so the three always match.
 function S.FormatGain(amount)
-	for _, unit in ipairs({{1e12, 'T'}, {1e9, 'B'}, {1e6, 'M'}, {1e3, 'K'}}) do
-		if amount >= unit[1] then return (string.format('%.1f', amount / unit[1]):gsub('%.0$', '')) .. unit[2] end
+	amount = tonumber(amount) or 0
+	if amount ~= amount then amount = 0 end
+	if amount > 0 and amount < 1 then amount = 1 end
+	local plain = string.format('%.0f', amount)
+	if amount < 1e3 and (tonumber(plain) or 0) < 1e3 then return plain end
+	local units = {{1e3, 'K'}, {1e6, 'M'}, {1e9, 'B'}, {1e12, 'T'}}
+	for i, unit in ipairs(units) do
+		local text = string.format('%.1f', amount / unit[1])
+		if (tonumber(text) or 0) < 1e3 or i == #units then return (text:gsub('%.0$', '')) .. unit[2] end
 	end
-	return string.format('%.0f', amount)
+	return plain
 end
 
 -- Ease curves (u in 0..1 -> 0..1).

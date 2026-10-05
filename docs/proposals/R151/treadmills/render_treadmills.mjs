@@ -1,5 +1,5 @@
 // Usage: node render_treadmills.mjs <dir with treadmills.html + node_modules/three> <scenes dir (before.txt, after.txt)> <out dir>
-// R151 treadmill look PROPOSAL: serves <dir> (plus the proposal's textures/) on localhost, opens treadmills.html in headless Chromium
+// R151 treadmill polish: serves <dir> (plus the belt images textures/) on localhost, opens treadmills.html in headless Chromium
 // (software WebGL via playwright) and writes <out>/<before|after>_L<n>_<view>.png for every scene and view (the same cameras before and
 // after), dusk variants of two views, and the belt animation frames <out>/gif_L<n>_<i>.png (20 frames at 12 fps: texture scroll, beam flow, chevrons).
 // ONLY=a,b limits the views; LEVELS=1,5 limits the levels.

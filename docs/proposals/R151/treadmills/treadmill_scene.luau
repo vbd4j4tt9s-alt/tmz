@@ -1,14 +1,14 @@
 --!nocheck
--- R151 treadmill look PROPOSAL (preview only, not a test and not game code): Base 1 of the owner's place (place_tree.luau from
+-- R151 treadmill polish preview (not a test and not game code): Base 1 of the owner's place (place_tree.luau from
 -- docs/proposals/R149/tools/rbxl_geom.py --tree) on the Roblox mock (docs/proposals/R149/tests/zfight_world.luau), after the REAL start-up
 -- builders (MapService.new, so the base's beds, apron and fence are there), the REAL treadmill (BiomeVisuals.BuildTreadmillV131) at each
--- level and the REAL upgrade buttons (GardenUpgradeService.Refresh with a stand-in player). DRESS = true adds the proposal prototype
--- (TreadmillDress151.luau, this folder) on top. The REAL client effects controller (TreadmillFx) then turns lights / particles / ribbons
+-- level and the REAL upgrade buttons (GardenUpgradeService.Refresh with a stand-in player), from whichever src tree was bundled: the base
+-- commit (BEFORE) or this checkout (AFTER, with the R151 dressing and sign). The REAL client effects controller (TreadmillFx) then turns lights / particles / ribbons
 -- on as a nearby player's screen would (desktop quality, someone training). Prints per level:
 --   "SCENE <before|after>_L<n> {json}"  parts (with textures), SurfaceGuis, BillboardGuis, beams, lights, emitters and the views (world)
 --   "ZSCENE <before|after>_L<n> {json}" the base's parts in the tools/zfight.py format (for the z-fighting check)
 --   "BUDGET <before|after> L<n> parts=.. lights=.. emitters=.. beams=.. textures=.. new=.. retired=.. collide=.. query=.. label=.."
--- Globals: DRESS (bool), LEVELS (list, default 1..7).
+-- Globals: WHICH ('before' | 'after': the scene names), LEVELS (list, default 1..7).
 local Z=require('./zfight_world');local W=Z.W;local R=Z.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local RS=W.RS
 local Run=W.service('RunService');Run.IsServer=function()return true end;Run.IsClient=function()return false end;Run.IsStudio=function()return false end
@@ -41,7 +41,6 @@ pcall(function()server('MapService').new(Config);R.advance(.1)end)
 local base
 for _,b in ipairs(map.Bases:GetChildren())do if b:GetAttribute('BaseIndex')==1 then base=b end end
 assert(base,'no Base 1')
-local Dress=DRESS and W.module('TreadmillDress151')or nil
 -- A stand-in owner for the real upgrade buttons (GardenUpgradeService.Refresh): rich, fence tier 1, treadmill tier = the level shown.
 local player=R.new('Player');player.Name='Ben';player.UserId=1001;player.Parent=Players
 local cash=R.new('NumberValue');cash.Value=9e15
@@ -185,37 +184,46 @@ local function viewsJson(origin)
 end
 
 local levels=LEVELS or{1,2,3,4,5,6,7}
-local which=DRESS and'after'or'before'
+local which=WHICH or'after'
+-- R151 client modules when this src has them (AFTER): the belt images are "drawn" by a stand-in EditableImage (the mock has none).
+local okLook,Look=pcall(function()return W.module('TreadmillLook151')end)
+local okBelt,BeltArt=pcall(function()return W.module('TreadmillBeltArt151')end)
+if okBelt and BeltArt then
+ BeltArt.Hooks.Create=function(w,h)return{Fake=true,W=w,H=h}end;BeltArt.Hooks.Content=function(o)return o end;BeltArt.Hooks.Spawn=function(f)f()end
+end
+base:SetAttribute('BaseOwnerUserId',2002) -- a visitor's view: the label shows (the runner view hides it like the owner's own screen)
 for _,level in ipairs(levels)do
  Art.BuildTreadmillV131(base,level)
  tread.Tier=level;tread.Skin=level
  Upgrade.Refresh(svc,player)
- local summary,sign
- if Dress then
-  summary=Dress.Apply(base,level,Config)
-  sign=Dress.Sign(base,level,Config,function(n)return'$'..Dress.Format(n)end)
- end
  local belt=base.Treadmill;local origin=belt._props.CFrame
  belt:SetAttribute('TrainingActive',true)
  -- the real client fx controller, desktop quality, camera 14 studs behind the runner
  camera.CFrame=CF((origin*V3(0,8,16)).X,(origin*V3(0,8,16)).Y,(origin*V3(0,8,16)).Z)
  local fx=Fx.new({Map=function()return map end,Camera=function()return camera end,Quality=function()return 3 end,Fast=function()return false end,
-  Reduced=function()return false end,Random=W.env.Random.new(3),Move=function(ps,cfs)for i,p in ipairs(ps)do p.CFrame=cfs[i]end end})
+  Reduced=function()return false end,Random=W.env.Random.new(3),Move=function(ps,cfs)for i,p in ipairs(ps)do p.CFrame=cfs[i]end end,
+  Look=okLook and Look or nil,Belt=okBelt and BeltArt or nil,UserId=function()return 1001 end,Publish=function()end})
  fx:Step(1.05);fx:Step(.05);fx:Step(.05)
- -- budgets: every BasePart of the treadmill art (+ the dressing), lights, emitters, beams, textures; collision / query of new parts
- local art=base.TreadmillArtV131
+ -- budgets: every BasePart of the treadmill art (with the R151 dressing), lights, emitters, beams, textures; collision / query
+ local art=base.TreadmillArtV131;local dress=art:FindFirstChild('TreadmillDress151')
  local counts={Parts=0,Lights=0,Emitters=0,Beams=0,Textures=0,Collide=0,Query=0}
  for _,v in ipairs(art:GetDescendants())do
   if v:IsA('BasePart')then counts.Parts+=1;if v.CanCollide then counts.Collide+=1 end;if v.CanQuery then counts.Query+=1 end
-  elseif v:IsA('Light')then counts.Lights+=1 elseif v._class=='ParticleEmitter'then counts.Emitters+=1 elseif v._class=='Beam'then counts.Beams+=1 elseif v._class=='Texture'then counts.Textures+=1 end
+  elseif v._class=='PointLight'then counts.Lights+=1 elseif v._class=='ParticleEmitter'then counts.Emitters+=1 elseif v._class=='Beam'then counts.Beams+=1 elseif v._class=='Texture'then counts.Textures+=1 end
  end
- local signParts=0;local sm=base:FindFirstChild('TreadmillUpgradeSign');if sm then for _,v in ipairs(sm:GetDescendants())do if v:IsA('BasePart')then signParts+=1;if v.CanCollide then counts.Collide+=1 end;if v.CanQuery then counts.Query+=1 end end end end
+ local new=0;if dress then for _,v in ipairs(dress:GetDescendants())do if v:IsA('BasePart')then new+=1 end end end
+ local function signPart(v)return v.Name:sub(1,5)=='Sign 'or v.Name=='Button rim glow'end
+ local signParts=0;local buttons=base:FindFirstChild('GardenUpgradeButtons')
+ if buttons then for _,v in ipairs(buttons:GetChildren())do if v:IsA('BasePart')and signPart(v)then signParts+=1;if v.CanCollide then counts.Collide+=1 end;if v.CanQuery then counts.Query+=1 end end end end
+ local label=dress and dress:GetAttribute('StepLabel')or'-'
  print(string.format('BUDGET %s L%d parts=%d lights=%d emitters=%d beams=%d textures=%d new=%d retired=%d sign=%d collide=%d query=%d label=%s belt=%s',which,level,counts.Parts,counts.Lights,counts.Emitters,counts.Beams,counts.Textures,
-  summary and summary.Parts or 0,summary and summary.Retired or 0,signParts,counts.Collide,counts.Query,summary and summary.Label or'-',tostring(belt.Size)..'@'..tostring(belt.Position)..' solid='..tostring(belt.CanCollide)))
+  new,dress and dress:GetAttribute('RetiredFlowParts')or 0,signParts,counts.Collide,counts.Query,label,tostring(belt.Size)..'@'..tostring(belt.Position)..' solid='..tostring(belt.CanCollide)))
  dumpScene(which..'_L'..level,origin,viewsJson(origin))
  -- z-fighting scene: the whole base (treadmill, dressing, sign, buttons, fence, beds, apron, pad)
- local zparts=Z.dump(base,function(p)local path=Z.path(p);if path:find('TreadmillDress',1,true)or path:find('TreadmillUpgradeSign',1,true)then return'r151treadmill'end;if path:find('TreadmillArtV131',1,true)then return'treadmill'end;return'base'end)
- local pad=base.Pad;local pc,ps=pad._props.CFrame.Position,pad._props.Size
+ local zparts=Z.dump(base,function(p)local path=Z.path(p)
+  if path:find('TreadmillDress151',1,true)or(path:find('GardenUpgradeButtons',1,true)and signPart(p))then return'r151treadmill'end
+  if path:find('TreadmillArtV131',1,true)then return'treadmill'end;return'base'end)
+ local pad=base.Pad;local pc=pad._props.CFrame.Position
  print('ZSCENE '..which..'_L'..level..' {"playable":[['..n4(pc.X-120)..','..n4(pc.Z-120)..','..n4(pc.X+120)..','..n4(pc.Z+120)..']],"parts":['..table.concat(zparts,',')..']}')
  belt:SetAttribute('TrainingActive',false)
  fx:Destroy()

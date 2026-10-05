@@ -1,7 +1,7 @@
-"""R151 treadmill look PROPOSAL: composes the renders of render_treadmills.mjs (Pillow).
+"""R151 treadmill polish: composes the renders of render_treadmills.mjs (Pillow).
 Usage: python3 make_treadmill_sheet.py <renders dir> <scenes dir> <out dir>
-Writes <out>/treadmills.png (low / mid / top, today vs proposal from the same cameras, plus close-ups), <out>/treadmills_all.png (all
-seven levels, today vs proposal) and <out>/treadmills_belt.gif (the belt animation of four levels)."""
+Writes <out>/treadmills.png (low / mid / top, today (19d05d4) vs as built (this checkout) from the same cameras, plus close-ups), <out>/treadmills_all.png (all
+seven levels, today vs as built) and <out>/treadmills_belt.gif (the belt animation of four levels)."""
 import os, re, sys
 from PIL import Image, ImageDraw, ImageFont
 
@@ -92,16 +92,16 @@ def cost(L):
 W = 1920
 pw, ph = 474, 267
 # ---------------------------------------------------------------------------------------------------------------- main sheet
-parts = [header(W, 'Treadmills: the same machines, with the reference details added (R151 proposal, preview only)', [
-    'Your treadmill code as it is today (left of each pair) and the same treadmill with the proposal on top (right), from the SAME camera, on Base 1 of your place.',
+parts = [header(W, 'Treadmills R151 as built: the same machines, with the reference details added', [
+    'Before R151 (left of each pair) and as built from the real game code (right), from the SAME camera, on Base 1 of your place. Numbers: round per-step gains.',
     'Kept: every frame, rail, front, console, chevron, the belt collider, the prompt and the badge (same parts, same places). Added: a moving textured belt, neon trims,',
     'studs, small corner lamps, a "+N/step" label and an upgrade sign. Approximate render (three.js): no Roblox lighting, bloom or Fredoka font; particles are dots.'])]
 for L, text in ((1, 'LOW'), (5, 'MID'), (7, 'TOP')):
     parts.append(band(W, 'Level %d  %s  (%s grade)  %s' % (L, BIOME[L - 1], GRADE[L - 1], budgets[('after', L)]['label']), cost(L)))
-    parts.append(row([panel('before_L%d_hero.png' % L, pw, ph, 'TODAY', TODAY), panel('after_L%d_hero.png' % L, pw, ph, 'PROPOSAL', NEW),
-                      panel('before_L%d_side.png' % L, pw, ph, 'TODAY  side', TODAY), panel('after_L%d_side.png' % L, pw, ph, 'PROPOSAL  side', NEW)], W))
+    parts.append(row([panel('before_L%d_hero.png' % L, pw, ph, 'BEFORE', TODAY), panel('after_L%d_hero.png' % L, pw, ph, 'R151', NEW),
+                      panel('before_L%d_side.png' % L, pw, ph, 'BEFORE  side', TODAY), panel('after_L%d_side.png' % L, pw, ph, 'R151  side', NEW)], W))
 cw, ch = 634, 357
-parts.append(band(W, 'Close-ups (proposal)', 'The belt moves with the chevrons (see treadmills_belt.gif); trims, studs and lamps are static parts; lights and particles only near the camera.'))
+parts.append(band(W, 'Close-ups (as built)', 'The belt moves with the chevrons (see treadmills_belt.gif); trims, studs and lamps are static parts; lights and particles only near the camera.'))
 parts.append(row([panel('after_L5_belt.png', cw, ch, 'BELT  Lava L5', NEW, 'cooling-lava plates + molten veins over the glowing belt; fire flow on the edges'),
                   panel('after_L4_belt.png', cw, ch, 'BELT  Snow L4', NEW, 'ice slats + cyan circuit lines; frost flow on the edges'),
                   panel('after_L7_belt.png', cw, ch, 'BELT  Storm L7', NEW, 'blue slats + yellow circuit + falling digits (3 layers at the top grade)')], W))
@@ -111,20 +111,20 @@ parts.append(row([panel('after_L1_corner.png', cw, ch, 'ACCENTS  Forest L1', NEW
 parts.append(row([panel('after_L6_label.png', cw, ch, 'LABEL  Crystal L6', NEW, '"+N/step" just above the existing front (no new structure)'),
                   panel('after_L3_sign.png', cw, ch, 'UPGRADE SIGN  L3', NEW, 'beside the unchanged floor button, in the next level\'s colours'),
                   panel('after_L7_runner.png', cw, ch, 'WHILE YOU RUN  Storm L7', NEW, 'your own label hides while you train (popups take over)')], W))
-parts.append(row([panel('before_L1_corner_dusk.png', cw, ch, 'TODAY  Forest L1, in the dark', TODAY),
-                  panel('after_L1_corner_dusk.png', cw, ch, 'PROPOSAL  Forest L1, in the dark', NEW, 'one new real light (entry glow); mid / top add a deck underglow'),
-                  panel('after_L5_hero_dusk.png', cw, ch, 'PROPOSAL  Lava L5, dark', NEW)], W))
+parts.append(row([panel('before_L1_corner_dusk.png', cw, ch, 'BEFORE  Forest L1, in the dark', TODAY),
+                  panel('after_L1_corner_dusk.png', cw, ch, 'R151  Forest L1, in the dark', NEW, 'one new real light (entry glow); mid / top add a deck underglow'),
+                  panel('after_L5_hero_dusk.png', cw, ch, 'R151  Lava L5, dark', NEW)], W))
 sheet = stack(parts, W)
 sheet.save(os.path.join(out, 'treadmills.png'), optimize=True)
 print('wrote treadmills.png', sheet.size)
 # ---------------------------------------------------------------------------------------------------------------- all seven levels
-parts = [header(W, 'All seven treadmill levels: today vs proposal (same cameras)', [
+parts = [header(W, 'All seven treadmill levels: before vs R151 as built (same cameras)', [
     'Each level is its own biome (Level 1 Forest ... Level 7 Storm). Low = levels 1-2, mid = 3-5, top = 6-7: higher levels get more belt layers, edge light flows,',
     'bumper glow lines, a deck underglow and (top) pulsing trims. Approximate render; see treadmills.md for the parts and lights of each level.'])]
 for L in range(1, 8):
     parts.append(band(W, 'Level %d  %s  (%s)  %s' % (L, BIOME[L - 1], GRADE[L - 1], budgets[('after', L)]['label']), cost(L)))
-    parts.append(row([panel('before_L%d_hero.png' % L, pw, ph, 'TODAY', TODAY), panel('after_L%d_hero.png' % L, pw, ph, 'PROPOSAL', NEW),
-                      panel('before_L%d_front.png' % L, pw, ph, 'TODAY  front', TODAY), panel('after_L%d_front.png' % L, pw, ph, 'PROPOSAL  front', NEW)], W))
+    parts.append(row([panel('before_L%d_hero.png' % L, pw, ph, 'BEFORE', TODAY), panel('after_L%d_hero.png' % L, pw, ph, 'R151', NEW),
+                      panel('before_L%d_front.png' % L, pw, ph, 'BEFORE  front', TODAY), panel('after_L%d_front.png' % L, pw, ph, 'R151  front', NEW)], W))
 sheet = stack(parts, W)
 sheet.save(os.path.join(out, 'treadmills_all.png'), optimize=True)
 print('wrote treadmills_all.png', sheet.size)

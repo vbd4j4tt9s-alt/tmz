@@ -570,7 +570,8 @@ function BaseService:RefreshTreadmill(player)
     local record=self:GetPlayerBase(player);if not record then return end
     self:StopTraining(player,false)
     local Art=require(script.Parent.BiomeVisuals)
-    local belt,prompt=Art.BuildTreadmillV131(record.Model,self.PlayerData:GetTreadmillData(player).Skin)
+    local data=self.PlayerData:GetTreadmillData(player)
+    local belt,prompt=Art.BuildTreadmillV131(record.Model,data.Skin,data.Tier) -- R151: the level sets the dressing grade and the "+N/step" label
     record.Treadmill=belt;prompt:SetAttribute('OwnerUserId',player.UserId)
     prompt.Enabled=false
     require(script.Parent.GardenUpgradeService).Refresh(self,player)

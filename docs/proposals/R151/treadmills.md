@@ -1,4 +1,165 @@
-# R151 proposal: the treadmills — same shape, new details
+# R151: the treadmills — same shape, new details
+
+> **Update (5 Oct 2026): approved and built.**
+> - You said *"works we can implement the treadmill polishes"*.
+> - Then *"adjust the steps per second on top of the treadmill to multples of 5 and also for the speed gain popup for numnbers obvere 1000 it willl be read as 1k"*.
+> - Your sub-choices were not answered, so the proposed defaults are used:
+>   - the label shows the machine's own gain, the same for everyone;
+>   - the belt runs forward with the arrows;
+>   - the upgrade sign is on;
+>   - the old moving belt pieces are retired.
+> - **§ As built** below says what changed. The pictures (`treadmills.png`, `treadmills_all.png`, `treadmills_belt.gif`) are now drawn from the real game code.
+> - The original proposal follows, kept as written. Its prototype (`treadmills/TreadmillDress151.luau`) is gone: the real code replaced it, and the preview tools now run the real `src/`.
+
+## As built
+
+### The "+N/step" numbers: round, and real
+Each level's own gain per training step is now a round multiple of 5:
+- **Rule:** round to the nearest round value, but round **up** wherever the nearest would lose more than about 3%.
+- **Same for everyone:** the label shows 100 points/s × 1/6 s × the machine's multiplier.
+- **Real:** the server pays exactly that number every step (whole fives, as before). The label is the real award, not a rounded display.
+
+| Level | Biome | Per step before | Per step now | Change | Machine multiplier before → now |
+|---|---|---|---|---|---|
+| 1 | Forest | +16.7 (shown +17) | **+20** | +20% (up: +15 would lose 10%) | 1 → 1.2 |
+| 2 | Jungle | +66.7 (+67) | **+65** | −2.5% | 4 → 3.9 |
+| 3 | Desert | +333.3 (+333) | **+335** | +0.5% | 20 → 20.1 |
+| 4 | Snow | +1,666.7 (+1.7K) | **+2K** | +20% (up: +1.5K would lose 10%) | 100 → 120 |
+| 5 | Lava | +10K | **+10K** | 0 | 600 → 600 |
+| 6 | Crystal | +66.7K | **+65K** | −2.5% | 4,000 → 3,900 |
+| 7 | Storm | +500K | **+500K** | 0 | 30,000 → 30,000 |
+
+**Where this lives:** `BalanceValues81.MachineMultipliers`, the one table every machine multiplier comes from.
+
+**What else reads these multipliers, checked:**
+- the server's training gain, through `BaseService` and `BalanceRules.Training`;
+- the HUD's speed-boost chip (`WorldStatusHud`, "×1.2" etc.):
+  - at level 1 it now shows **×1.2**;
+  - before, a level-1 player with no trail saw no chip, because ×1 is hidden;
+- the treadmill snapshot.
+
+**What does not read them:**
+- the upgrade costs (`MachineCosts`);
+- the bonus-roll timer and pool (`TreadmillBonusRules`);
+- the R150 bonus UI copy;
+- the keeper speeds.
+
+All of these are unchanged.
+
+**Tests:**
+- Every suite that touches them was re-run green (list below).
+- The new suite checks:
+  - each level's award over 600 steps;
+  - the rounding rule.
+
+### Numbers of 1,000 or more read as K / M / B / T
+`SpeedPopupStyle.FormatGain`, the speed-popup text, now picks its unit **after** rounding:
+- 999.6 reads **1K**, not "1000".
+- 999,950 reads **1M**, not "1000K".
+- The same holds at the B and T boundaries.
+- A positive amount below 1 reads **1**, so it never shows "+0".
+
+Everywhere else the text is exactly as before. Only `FormatGain` changed; the popup motion is untouched. The treadmill label and the upgrade sign use this same function, so all three always match.
+
+Other number displays that show a speed of 1,000 or more in full were left alone, because they are not speed gains:
+- **The HUD speed counter** (the wallet; `CashNumbers.Compact` → `SpeedPoints.Compact`) shows whole numbers below 1,000,000, e.g. 250000.
+- **The keeper "SPEED NEEDED" signs** (`SpeedPoints.NeedText`) write numbers below 10,000 in full with commas, e.g. 3,800. That is your R148 rule.
+- **The speed bundles' internal `Name`** is `+250000 SPEED` (`PremiumPricing`). The shop cards and the purchase announcement already show **+250K SPEED** (`PremiumBundleCard.AmountText`, `PurchaseAnnouncer`).
+
+Say if you want any of these changed too.
+
+### What was built (files)
+- **`ReplicatedStorage.TreadmillLook151`** (new) holds the config:
+  - per grade (low = levels 1–2, mid = 3–5, top = 6–7): belt layers, edge flows, bumper lines, underglow, pulse, stud spacing, the light cap and the part, emitter and beam budgets;
+  - per biome: belt layers (image, colour, transparency, tile size, speed), edge flow, trim colour, corner accent, particle and lamp colour;
+  - the uploaded-image overrides;
+  - the belt scroll speeds;
+  - the label formatter.
+- **`ReplicatedStorage.TreadmillBeltArt151`** (new) holds the five belt patterns and the code that puts each image on the belt. It tries three routes in order:
+  1. uploaded ids;
+  2. drawn on the client;
+  3. the grid texture.
+- **`BiomeVisuals.BuildTreadmillV131`** gains a dressing pass after the existing build:
+  - the belt texture layers, the edge light flows, neon trims, bumper studs, two corner accents with one particle each, a capped light or two, and the "+N/step" label;
+  - the old moving belt pieces are retired; the chevrons stay.
+  - Without `TreadmillLook151`, or if the pass fails, the machine is built exactly as before and the server warns once.
+- **`TreadmillFx`**:
+  - puts the belt images on;
+  - scrolls the belt textures with the arrows: 3.0 studs a second while training, 1.3 idle, × each layer's rate. They only move near the camera, on screen, and with motion allowed (not with Reduced Motion, low quality or FastMode);
+  - hides your own label while you train on your machine.
+- **`GardenUpgradeService`** adds the studded sign beside the Treadmill floor button and a neon rim round that button. The button, its prompt and its click detector are unchanged.
+- **`BaseService`** passes the machine level to the builder: one line.
+- **`BalanceValues81`**: the multipliers in the table above.
+- **`SpeedPopupStyle.FormatGain`**: the unit boundaries above.
+- **`src/MANIFEST.tsv`**: the two new modules.
+
+### Belt images: no upload needed
+- **How each client gets them:** it draws the five patterns once with `EditableImage` (`AssetService:CreateEditableImage` + `WritePixelsBuffer`) and applies them with `Content.fromObject`.
+  - **Cost:** about 0.7 MB in total, drawn a few milliseconds per frame.
+  - **Fallback:** if a client cannot (no image budget, or an older client), that layer uses your place's own grid texture (6372755229).
+- **How to check which route a client used:**
+  - each belt `Texture` carries `BeltRoute` = `generated`, `uploaded` or `grid`;
+  - the local player carries `TreadmillBeltTextures`, the routes in use, e.g. `generated`.
+- **Uploading instead (optional):**
+  1. The same five images are `docs/proposals/R151/treadmills/textures/*.png`. They are byte for byte what the game draws, and the tests check this.
+  2. Import them: Studio > View > Asset Manager > Bulk Import.
+  3. Paste each id into `TreadmillLook151.Images`, e.g. `slats='rbxassetid://123'`.
+  4. An uploaded id then wins on every client.
+
+### Budgets (measured on the mock, every level)
+
+| Level | Grade | Parts before → now | New / retired | Real lights (cap) | New emitters / beams | Belt layers | Label |
+|---|---|---|---|---|---|---|---|
+| 1 Forest | low | 127 → 166 | +39 / −0 | 2 → 3 (3) | 2 / 0 | 1 | +20/step |
+| 2 Jungle | low | 186 → 226 | +40 / −0 | 2 → 3 (3) | 2 / 0 | 1 | +65/step |
+| 3 Desert | mid | 202 → 223 | +43 / −22 | 1 → 3 (5) | 2 / 2 | 2 | +335/step |
+| 4 Snow | mid | 212 → 240 | +36 / −8 | 1 → 3 (5) | 2 / 2 | 2 | +2K/step |
+| 5 Lava | mid | 217 → 232 | +35 / −20 | 4 → 4 (5) | 0 / 2 | 2 | +10K/step |
+| 6 Crystal | top | 223 → 250 | +43 / −16 | 4 → 6 (6) | 2 / 2 | 3 | +65K/step |
+| 7 Storm | top | 240 → 256 | +34 / −18 | 5 → 5 (6) | 0 / 2 | 3 | +500K/step |
+
+**Budget limits and other costs:**
+- **Budgets:** new parts at most 44 (low) and 50 (mid / top). The whole machine stays at 260 parts or fewer (the R117 limit).
+- **Upgrade sign:** 16 parts per owned base.
+- **Per frame**, for each nearby treadmill: 1–3 texture offsets, plus today's 32 chevron pieces. That replaces 8–22 belt pieces that were moved one by one.
+- **Lights and particles:** near the camera only (R117 `TreadmillFx`).
+- **Collision:** nothing new collides, answers raycasts or touches.
+- **Z-fighting:** 0 (the R149 detector on Base 1 of your place, at every level).
+
+### Studio checklist
+1. **Belt direction.** Train on each level: the belt texture must run the same way as the arrows. If it runs backwards, set `TreadmillLook151.Scroll.Sign = -1`.
+2. **Edge light flows** (levels 3–7) run toward the front.
+3. **Image route.** In the client's Explorer, the local player shows `TreadmillBeltTextures = generated`. If it shows `grid`, the client had no image budget; the belt then shows the grid lines, and uploading the PNGs fixes it.
+4. **Lava belt (level 5).** The dark plates sit over the glowing belt, and the cracks glow. Check that the Neon bloom does not wash the plates out.
+5. **Label and sign:**
+   - The "+N/step" label is readable at 30–60 studs, gone past 90, and hidden on your own screen while you train.
+   - The sign beside the Treadmill button shows the next level and the price: green when you can afford it, red when not, MAX LEVEL at level 7.
+6. **Lights and particles:**
+   - The corner lamps' particles and lights are off far away, in FastMode and on low graphics.
+   - In The Darkened and under Cloudy skies the entry glow lights the apron.
+7. **Upgrades.** Buy an upgrade: the machine, its label and the sign change level together.
+8. **HUD.** A new player at level 1 sees the speed chip **×1.2**. Before, ×1 was hidden.
+
+### Tests
+`sh docs/proposals/R151/tests/run_treadmills.sh [scratch] [place.rbxl] [all | mutate]` runs:
+- static checks;
+- `test_treadmills151.luau`: 241 checks on the real code;
+- the belt images: the game's patterns equal the PNGs byte for byte;
+- the owner's place: every level before vs after, 63 checks, including z-fighting and clearance;
+- the R117 treadmill suite, unchanged: 532 checks.
+
+`mutate` also runs 12 deliberate breakages of a copy of `src/`; all 12 are caught.
+
+`all` also runs:
+- R150 `run_all.sh`, `run_sfx.sh` and `run_pedestal.sh`;
+- R151 `run_speed_popups.sh`, `run_cloudy.sh` and `run_base_area.sh`;
+- R149 `run_zfight.sh`.
+
+`run_speed_popups.sh` gained the formatter boundary checks.
+
+---
+
+# The approved proposal (kept as written)
 
 **This is a preview only.** Nothing in `src/` was changed. After you approve, a coder builds it.
 

@@ -1,6 +1,10 @@
 -- R117: client-only treadmill tier effects. The server (BiomeVisuals.BuildTreadmillV131) builds static parts plus
 -- DISABLED emitters, lights and beams tagged with attributes; this module turns them on and animates them only for
 -- treadmills that are near, on screen and allowed by ClientFxBudget / FastMode / ReducedMotion. Gameplay never reads it.
+-- R151 treadmill polish (TreadmillLook151): the belt's Texture layers (attribute BeltImage) get their image from TreadmillBeltArt151 once
+-- (uploaded id, else drawn with EditableImage, else the grid texture) and scroll with the chevrons (OffsetStudsV, TreadmillScroll x the belt
+-- speed: Look.Scroll) whenever the machine animates (near, on screen, motion allowed: none with Reduced Motion or on low quality / FastMode);
+-- the "+N/step" label (BillboardGui, attribute HideWhileOwnerTrains) hides while its base's owner (= the local player) trains on it.
 local Fx={}
 Fx.Version=117
 Fx.NEAR=110      -- emitters, lights and ribbons
@@ -8,6 +12,7 @@ Fx.ANIMATE=90    -- pulses, hue, orbiters and lightning arcs
 Fx.BURST=80      -- run-start burst
 Fx.SCAN=1        -- seconds between base scans
 Fx.CULL=.25      -- seconds between distance/visibility/budget decisions
+Fx.SCROLL={Training=3.0,Idle=1.3,Sign=1} -- R151: belt texture travel (studs/s) when TreadmillLook151 is not given
 
 -- quality: ClientFxBudget tier 1..3 (1 = low). FastMode forces low. ReducedMotion keeps lights and gentle particles
 -- but stops every moving/flashing effect.
@@ -28,7 +33,7 @@ function Fx.Visible(cameraFrame,position)
 end
 
 function Fx.Collect(art)
-    local lists={Emitters={},Bursts={},Lights={},Ribbons={},Arcs={},Pulse={},Spin={},Hue={},Cores={}}
+    local lists={Emitters={},Bursts={},Lights={},Ribbons={},Arcs={},Pulse={},Spin={},Hue={},Cores={},Textures={},Labels={}}
     for _,v in ipairs(art:GetDescendants())do
         local role=v:GetAttribute('TreadmillFx')
         if v:IsA('ParticleEmitter')and role then
@@ -39,6 +44,10 @@ function Fx.Collect(art)
             table.insert(lists.Ribbons,{Inst=v,Speed=v.TextureSpeed})
         elseif v:IsA('Beam')and role=='Arc'then
             table.insert(lists.Arcs,{Inst=v,Curve=tonumber(v:GetAttribute('TreadmillArcCurve'))or 1,Width=v.Width0,Next=0,Off=0})
+        elseif v.ClassName=='Texture'and v:GetAttribute('BeltImage')then
+            table.insert(lists.Textures,{Inst=v,Rate=tonumber(v:GetAttribute('TreadmillScroll'))or 0,Period=math.max(.01,tonumber(v.StudsPerTileV)or 1),Offset=tonumber(v.OffsetStudsV)or 0})
+        elseif v:IsA('BillboardGui')and v:GetAttribute('HideWhileOwnerTrains')then
+            table.insert(lists.Labels,{Inst=v})
         end
         if v:IsA('BasePart')then
             if v:GetAttribute('TreadmillPulse')then
@@ -62,7 +71,8 @@ local function set(inst,key,value)if inst[key]~=value then inst[key]=value end e
 
 local Controller={};Controller.__index=Controller
 -- env: {Map=function()->Folder?, Camera=function()->Camera?, Quality=function()->1..3, Fast=function()->bool,
---       Reduced=function()->bool, Random=Random?, Move=function(parts,frames)?}
+--       Reduced=function()->bool, Random=Random?, Move=function(parts,frames)?,
+--       R151 (optional): Look=TreadmillLook151, Belt=TreadmillBeltArt151, UserId=function()->number, Publish=function(routes)}
 function Fx.new(env)
     return setmetatable({Env=env,Records={},ScanClock=Fx.SCAN,CullClock=Fx.CULL,FrameClock=0,
         Random=env.Random or Random.new(),Policy=Fx.Policy(1,true,true)},Controller)
@@ -78,6 +88,7 @@ function Controller:Quiet(record,all)
         for _,e in ipairs(l.Emitters)do if e.Inst.Parent then set(e.Inst,'Enabled',false)end end
         for _,e in ipairs(l.Lights)do if e.Inst.Parent then set(e.Inst,'Enabled',false)end end
         for _,e in ipairs(l.Ribbons)do if e.Inst.Parent then set(e.Inst,'Enabled',false)end end
+        for _,e in ipairs(l.Labels)do if e.Inst.Parent then set(e.Inst,'Enabled',true)end end
     end
     if record.Animated then
         record.Animated=false
@@ -109,7 +120,7 @@ function Controller:Track(base)
         end))
     end
     -- Streaming adds/removes parts; only a changed model is rescanned.
-    if record.Dirty then record.Dirty=false;self:Quiet(record,false);record.Lists=Fx.Collect(art);self:Apply(record)end
+    if record.Dirty then record.Dirty=false;self:Quiet(record,false);record.Lists=Fx.Collect(art);self:Paint(record);self:Apply(record)end
 end
 function Controller:Scan()
     local seen={}
@@ -123,6 +134,23 @@ function Controller:Scan()
     for art,record in pairs(self.Records)do
         if not seen[art]or art.Parent==nil or record.Belt.Parent==nil then self:Release(record,art.Parent==nil);self.Records[art]=nil end
     end
+end
+-- R151: give every belt Texture its image (once per Texture instance; streamed-in copies are painted again from the cache).
+function Controller:Paint(record)
+    local belt,look=self.Env.Belt,self.Env.Look
+    if not(belt and look and record.Lists)then return end
+    for _,e in ipairs(record.Lists.Textures)do
+        if e.Inst.Parent and e.Inst:GetAttribute('BeltRoute')==nil then
+            local ok,why=pcall(belt.Paint,e.Inst,look,self.Env.Publish)
+            if not ok and not self.PaintWarned then self.PaintWarned=true;warn('[R151] Treadmill belt image: '..tostring(why))end
+        end
+    end
+end
+-- R151: is this machine's owner the local player, training on it right now?
+function Controller:OwnerTraining(record)
+    if not(record.Training and self.Env.UserId)then return false end
+    local base=record.Belt.Parent
+    return base~=nil and base:GetAttribute('BaseOwnerUserId')==self.Env.UserId()
 end
 function Controller:Burst(record)
     local policy=self.Policy
@@ -155,6 +183,8 @@ function Controller:Apply(record)
             set(v,'TextureSpeed',policy.Reduced and 0 or e.Speed)
         end
     end
+    local hide=self:OwnerTraining(record)
+    for _,e in ipairs(l.Labels)do if e.Inst.Parent then set(e.Inst,'Enabled',not hide)end end
     local animate=policy.Animate and record.Visible and record.Distance<=Fx.ANIMATE
     if not animate and record.Animated then self:Quiet(record,false)end
     record.Animated=animate
@@ -200,6 +230,15 @@ function Controller:Animate(record,dt)
             end
         end
         if #parts>0 then self.Env.Move(parts,frames)end
+    end
+    -- R151: the belt textures travel with the chevrons (studs per second x each layer's rate), wrapped at one tile.
+    if #l.Textures>0 then
+        local scroll=self.Env.Look and self.Env.Look.Scroll or Fx.SCROLL
+        local speed=(training and scroll.Training or scroll.Idle)*(scroll.Sign or 1)
+        for _,e in ipairs(l.Textures)do
+            local v=e.Inst
+            if v.Parent then e.Offset=(e.Offset+dt*speed*e.Rate)%e.Period;v.OffsetStudsV=e.Offset end
+        end
     end
     local arcOn=false
     for _,e in ipairs(l.Arcs)do
@@ -247,6 +286,12 @@ end
 function Fx.Start(player)
     local Run=game:GetService('RunService');local Gui=game:GetService('GuiService')
     local Budget=require(script.Parent:WaitForChild('ClientFxBudget'))
+    local function optional(name)
+        local ok,module=pcall(function()local m=script.Parent:WaitForChild(name,10);return m and require(m)end)
+        if not ok then warn('[R151] '..name..' unavailable: '..tostring(module))end
+        return ok and module or nil
+    end
+    local look,beltArt=optional('TreadmillLook151'),optional('TreadmillBeltArt151')
     local controller=Fx.new({
         Map=function()return workspace:FindFirstChild('ChestChaseMap')end,
         Camera=function()return workspace.CurrentCamera end,
@@ -254,6 +299,9 @@ function Fx.Start(player)
         Fast=function()return player:GetAttribute('FastMode')==true end,
         Reduced=function()local ok,value=pcall(function()return Gui.ReducedMotionEnabled end);return ok and value==true end,
         Move=function(parts,frames)workspace:BulkMoveTo(parts,frames,Enum.BulkMoveMode.FireCFrameChanged)end,
+        -- R151: the belt images and the label hide. A missing module only switches those off.
+        Look=look,Belt=beltArt,UserId=function()return player.UserId end,
+        Publish=function(routes)player:SetAttribute('TreadmillBeltTextures',routes)end,
     })
     local connection=Run.Heartbeat:Connect(function(dt)controller:Step(dt)end)
     return function()connection:Disconnect();controller:Destroy()end,controller

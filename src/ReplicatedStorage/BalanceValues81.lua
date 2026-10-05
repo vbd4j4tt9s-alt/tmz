@@ -8,7 +8,10 @@ T.SpeedTailPerDecade=.1 -- R88: 500 at 100B, only +0.1 per tenfold increase afte
 -- R112: need = keeper close speed x1.10 per biome (35/55/88/141/226/363). The first minute of training is
 -- front-loaded for new players: 26 at 5 s, 28 at 15 s, 31 at 30 s, 35 (Jungle) at 60 s on the first machine.
 T.PointCurve={{0,24},{500,26},{1500,28},{3000,31},{6000,35},{120000,55},{1500000,88},{20000000,141},{300000000,226},{5000000000,363},{100000000000,500}}
-T.MachineMultipliers={1,4,20,100,600,4000,30000}
+-- R151 (owner: "adjust the steps per second on top of the treadmill to multples of 5"): each machine's own gain per training step
+-- (100 points/s x 1/6 s x this) is a round multiple of 5, rounded to the nearest and UP where the nearest would lose more than ~3%:
+-- +16.7 -> +20, +66.7 -> +65, +333 -> +335, +1.7K -> +2K, +10K, +66.7K -> +65K, +500K (was {1,4,20,100,600,4000,30000}).
+T.MachineMultipliers={1.2,3.9,20.1,120,600,3900,30000}
 -- R112: displayed boot luck. PackOdds112 applies it per tier as luck^power (King full, Cosmic ^.40 ... Legendary ^.08).
 -- R112b: every boot x10 so Thunder Boots (x50M) see a King about 1 in 1,000 packs.
 T.BootLuck={50,500,20000,1000000,50000000}
