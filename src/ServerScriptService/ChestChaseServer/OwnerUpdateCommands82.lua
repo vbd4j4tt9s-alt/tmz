@@ -31,8 +31,11 @@ X.Actions.plantnotify=true
 X.Actions.packshape=true
 -- R151: hubtrees: the owner's studded tree models (HubTreeLoader151): which load route worked per id, scripts removed, each tier's plan.
 X.Actions.hubtrees=true
+-- R152: voidgift [reset me | left <n>]: the free Void Pack pedestal's status; the two edits are Studio only (VoidGiveaway152).
+X.Actions.voidgift=true
 function X.Execute(ctx,p,action,a)
  if action=='hubtrees'then return require(script.Parent.HubTreeLoader151).Command(ctx,p,a)end
+ if action=='voidgift'then return require(script.Parent.VoidGiveaway152).Command(ctx,p,a)end
  if action=='rarepull'or action=='raresound'then return require(script.Parent.RarePullTestCommands).Execute(ctx,p,action,a)end
  if action=='plantnotify'then return require(script.Parent.SocialService).Command(ctx,p,a)end
  if action=='packshape'then return require(script.Parent.PackShapeCommand151).Execute(ctx,p,a)end

@@ -143,6 +143,13 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 | `gifts @name` | Gifts they sent that are still finishing |
 | `gifts recover @name` | Finish stuck gifts now (normally automatic within a minute) |
 
+## Free Void Pack pedestal
+| Command | What it does |
+|---|---|
+| `voidgift` (server) | R152: the giveaway pedestal in the middle of the plaza: how many of the 500 are claimed and left, whether YOU have claimed (profile flag, the shared list, your state), which store this server uses (`DataStore` live, the Studio test store, or the in-memory counter when Studio has no API access), messages sent / received, and the pedestal (state, prompt). No @name |
+| `voidgift reset me` (server, **Studio only**) | Clears YOUR claim and your profile flag (the shared list loses you, the count goes down by one) so you can claim again. The pack you already got stays in your Bag (`clear packs` removes it). A live server refuses: it never changes the shared count |
+| `voidgift left 3` (server, **Studio only**) | Sets how many the pedestal shows as left (0 = ALL CLAIMED, 487 = a fresh start). Players already in the list keep their places, so the number cannot go above 500 minus them. Studio only; a live server refuses |
+
 ## Verity's voice
 | Command | What it does |
 |---|---|

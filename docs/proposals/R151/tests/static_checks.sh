@@ -53,15 +53,15 @@ for want in "options.TestGrant == true" "TestGrant = pack.TestGrant == true or n
  grep -q "$want" "$SS/PlayerDataService.lua" || fail "PlayerDataService: missing '$want' (AddChest option, Void -> Verity conversion, load, save)"
 done
 echo "ok: /test pack, rarepacks, packset, void / eclipse, verity, the mystery / daily / bonus commands, forced events and the pack record (add, save, load, Verity conversion) all handle TestGrant"
-# 4b. every place that adds a pack to a bag or builds a pack record is known: a NEW one must be classified (a real source that announces, or an owner command that marks its packs)
+# 4b. every place that adds a pack to a bag or builds a pack record is known: a NEW one must be classified (a real source that announces, or an owner command that marks its packs). R152: VoidGiveaway152 (the free Void Pack pedestal) is a REAL source: its pack is not TestGrant, so it announces when opened
 found=$(grep -rlE "AddChest\(|[ ,{]Kind *= *['\"]Pack['\"]|Kind=isPack and'Pack'" "$SS" --include=*.lua | xargs -n1 basename | sort | tr '\n' ' ')
-want="ChestService.lua DailyProgress.lua MysteryPackService.lua OwnerUpdateCommands82.lua PlayerDataService.lua PremiumProgress.lua RarePackTests.lua StudioTestCommands.lua TreadmillBonusService.lua TutorialProgress.lua VeiledEvent81.lua "
+want="ChestService.lua DailyProgress.lua MysteryPackService.lua OwnerUpdateCommands82.lua PlayerDataService.lua PremiumProgress.lua RarePackTests.lua StudioTestCommands.lua TreadmillBonusService.lua TutorialProgress.lua VeiledEvent81.lua VoidGiveaway152.lua "
 [ "$found" = "$want" ] || fail "the files that add packs changed: found [$found] expected [$want]. A new pack source must announce (a real one) or mark its packs TestGrant (an owner one); then add it here."
-echo "ok: the files that add or build packs are the known ones (ChestService, DailyProgress, MysteryPackService, OwnerUpdateCommands82, PlayerDataService, PremiumProgress, RarePackTests, StudioTestCommands, TreadmillBonusService, TutorialProgress, VeiledEvent81)"
+echo "ok: the files that add or build packs are the known ones (ChestService, DailyProgress, MysteryPackService, OwnerUpdateCommands82, PlayerDataService, PremiumProgress, RarePackTests, StudioTestCommands, TreadmillBonusService, TutorialProgress, VeiledEvent81, VoidGiveaway152)"
 # 5. MessagingService lives in the announcer alone; no client -> server channel; no player-typed text
-m=$(grep -rl "GetService('MessagingService')" "$S" --include=*.lua | wc -l)
-[ "$m" = 1 ] && grep -q "GetService('MessagingService')" "$SS/PullAnnouncer.lua" || fail "MessagingService must be used by PullAnnouncer only (found in $m scripts)"
-echo "ok: MessagingService is used by PullAnnouncer only"
+m=$(grep -rl "GetService('MessagingService')" "$S" --include=*.lua | xargs -n1 basename | sort | tr '\n' ' ')
+[ "$m" = "PullAnnouncer.lua VoidGiveaway152.lua " ] && grep -q "GetService('MessagingService')" "$SS/PullAnnouncer.lua" || fail "MessagingService must be used by PullAnnouncer and the R152 giveaway only (found in [$m])"
+echo "ok: MessagingService is used by PullAnnouncer (the announcements) and VoidGiveaway152 (the giveaway's count) only"
 if grep -n "OnServerEvent\|OnServerInvoke\|Chatted\|TextChatService" "$SS/PullAnnouncer.lua" | grep -v "^[0-9]*:--"; then fail "the announcer must not listen to clients or chat"; fi
 if grep -n "FireServer\|InvokeServer" "$C/PullAnnouncerClient.client.lua"; then fail "the announcer client must not call the server"; fi
 if grep -n "DisplaySystemMessage\|SendAsync" "$SS/PullAnnouncer.lua" | grep -v "^[0-9]*:--"; then fail "chat lines are made on the client"; fi
