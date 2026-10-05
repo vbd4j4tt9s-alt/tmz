@@ -415,6 +415,34 @@ def cbox(g, c, size, col, bevel=0.2, top=1.0, bottom=1.0, M=None):
     g.add([_xf(M, p) for p in verts], faces, col, False)
 
 
+# ---------------------------------------------------------------- rev 4: classic Roblox block-build helpers
+def frame_from(yaxis, side=None):
+    """Rotation (4x4) whose local Y is `yaxis`; local X lies as close as possible to `side` (default world X)."""
+    y = Vector(yaxis).normalized()
+    hint = Vector(side) if side is not None else Vector((1, 0, 0))
+    if abs(hint.normalized().dot(y)) > 0.95:
+        hint = Vector((0, 0, 1)) if abs(y.z) < 0.9 else Vector((1, 0, 0))
+    x = (hint - y * hint.dot(y)).normalized()
+    z = x.cross(y)
+    return Matrix(((x.x, y.x, z.x, 0), (x.y, y.y, z.y, 0), (x.z, y.z, z.z, 0), (0, 0, 0, 1)))
+
+
+def beam(g, a, b, w, d, col, bevel=0.15, side=None, ext=0.0, top=1.0, bottom=1.0):
+    """A chamfered block running from a to b (its local Y), section w (local X, near `side`) by d (local Z), lengthened
+    by `ext` past both ends. top / bottom taper the b / a ends (cbox). Returns the block's frame (T(centre) @ R), so
+    details can be placed in its local space."""
+    a, b = Vector(a), Vector(b)
+    R = frame_from(b - a, side)
+    c = (a + b) / 2
+    cbox(g, c, (w, (b - a).length + 2 * ext, d), col, bevel=bevel, top=top, bottom=bottom, M=R)
+    return T(c) @ R
+
+
+def cyl(g, a, b, r, col, seg=10):
+    """A Roblox cylinder from a to b (smooth sides, flat ends)."""
+    tube(g, [Vector(a), Vector(b)], [r, r], col, seg=seg, cap0='flat', cap1='flat', smooth=True)
+
+
 def cylinder_x(g, c, size, col, M=None, seg=16):
     """Roblox Cylinder part: axis along local X."""
     hx, ry, rz = size[0] / 2, size[1] / 2, size[2] / 2

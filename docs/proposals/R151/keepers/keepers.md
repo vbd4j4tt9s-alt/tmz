@@ -1,28 +1,41 @@
-# Keepers: improved 3D models, revision 3 (proposal, previews only)
+# Keepers: improved 3D models, revision 4 (proposal, previews only)
 
 **Status:** waiting for your OK. Nothing in the game's code (`src/`) has changed.
 
-Revision 3 follows your feedback on revision 2:
-- **Less bubbly.** The models are no longer soft, round and inflated:
-  - masses are chunky hewn blocks with flat, irregular planes and bevelled edges;
-  - limbs have chamfered ends;
-  - the pieces are shards, spikes, longer claws and sharp horns;
-  - colours are deeper, not pastel;
-  - joint cores are hidden inside the limbs, so no balls show.
-- **Two faces per keeper.** An awake / chase face, shown whenever the keeper is awake, and an asleep face. They replace
-  the five states.
-- **The Jungle King is the benchmark for attitude:** red angry eyes and a roaring mouth.
-- **Timber Golem and Storm Colossus:** not human-like. They have no nose, brows, lips or rows of teeth: just two
-  glowing slits and a crack. Asleep, the slits go dark, so the Golem still looks like a tree.
-- **Crystal Knight:** a closed helmet. Fierce glowing slants awake, dim lines asleep.
-- **The Darkened:** today's design is kept and polished: the same slim black head with its one glowing line, bright when
-  awake and dim when asleep.
-- **Still in place from rev 2:** the reference style, the stud texture, the big "Z", the effects and the one-piece check.
+Revision 4 follows your feedback on revision 3 and the reference images you sent:
+- **Roblox charm, clunkier bodies.** Every keeper except The Darkened is rebuilt as a classic Roblox block build:
+  - chunky blocks, wedges and cylinders with slightly bevelled edges, not hewn blobs;
+  - thick limbs, big heads, hands and paws;
+  - few small details, and the stud texture on the big faces.
+- **Faces redone.** The rev 3 faces were "stretched" and "off" because each shape was bent over the facets of an uneven
+  head. Now:
+  - every head has a flat face plane, the front of a block;
+  - every face shape is a flat decal laid on that plane, so nothing bends or stretches;
+  - the two eyes are one outline mirrored, so they are always the same size and shape, placed symmetrically;
+  - fewer, bolder shapes;
+  - still two states: fierce awake, eyes closed asleep.
+- **Ice Fang:** a fox head. It is streamlined, with a tapered pointed snout, big triangular ears, almond eyes and cheek
+  ruffs.
+- **Crystal Knight:** bulky, after your knight reference. It has:
+  - huge stacked pauldrons and ribbed arms;
+  - a great helm with a crest and a wing plume;
+  - a layered chest, a heavy belt and thick legs.
+- **Jungle King:** today's in-game gorilla, improved (your screenshots). Its colours, mask, yellow eyes, mossy
+  shoulders and hunched build are kept.
+- **Sand Snake:** today's in-game snake, improved (your screenshots). Its tan diamond back, viper head, yellow eyes and
+  rattle are kept.
+- **Lava Dragon:** after your two "Ice and Fire" fire-dragon references, built from cuboids.
+- **Timber Golem and Storm Colossus:** more blocky, stacked blocks and slabs, with the same simple glowing-slit faces.
+- **The Darkened:** unchanged from rev 3, as you asked. Its code is byte-for-byte the same; it is only re-rendered.
+- **Still in place:**
+  - the one-piece check, now passed by all eight in every pose;
+  - the game's real pose frames, unchanged group names and pivots;
+  - the big sleep "Z", the effects, the FBX export and the budgets.
 
 ## Look at these first
 1. `keepers_faces.png`: one row of all 8 keepers, each with its awake / chase face above its asleep face.
 2. `keepers_before_after.png`: every keeper today (left) and proposed (right), same camera and scale, with a 5-stud
-   player.
+   player. The gorilla's and the snake's "today" are now drawn from your screenshots (see section 5).
 3. `keepers_lineup.png`: all keepers in a row next to 5-stud players, today on top and proposed below, with a ruler in
    studs.
 4. One sheet per keeper:
@@ -34,94 +47,77 @@ Revision 3 follows your feedback on revision 2:
 These are real Blender models rendered in Cycles. The chase, attack and asleep views use the game's own pose frames for
 that keeper, so they also show that today's animation code moves the new models without changes.
 
-## 1. The references (your screenshots)
-I looked at your six screenshots. They are not added to the repo, because they are another game's images. This is what
-I saw:
+## 1. The references you sent for rev 4
+I looked at every image. None of them is added to the repo. This is what I took from each:
 
-| Reference | What it looks like |
-|---|---|
-| Mitsui (Japanese biome) | A white wolf / fox, curled up asleep. Angular white body with spiky white fur shards, bold red swirl markings on body and face, red horns sweeping back, pink cherry blossoms along the back, a glowing red eye with red eye markings, a pink lightning aura, and a big "Z". |
-| Jungle King (gorilla) | Towers over the player. Navy fur with the stud texture, huge spiky shoulder tufts, a cream face mask and chest with a jagged edge, a spiky gold crown with a gem, a gold arm band, red glowing angry eyes under heavy brows, and a wide roaring mouth with fangs and a red inside. It roars even asleep, with a big cyan "Z" in front of it. |
-| Lava dragon | Charcoal angular plates with studs, a row of flaming spikes along the back, orange lava blocks along the spine, and a flaming tail tip. Asleep, with a big "Z". |
-| T-Rex | Green with bold dark stripes, a cream belly, and an open toothy jaw. Asleep, with "ZZ". |
-| Moby (whale) | A white blocky whale with a dark square eye. Asleep, with a "Z". |
-| Winged angel / knight boss | Huge, split into white-gold and red-black halves, with glowing halo rings and fire effects. |
-
-What they share:
-- Chunky, angular, faceted low-poly shapes, not smooth blobs.
-- The Roblox stud texture on big surfaces.
-- Bold markings: swirls and stripes.
-- Strong contrast between body and accent colours.
-- Glowing eyes.
-- Big particle effects: fire, auras, lightning.
-- A big stylised "Z" over a sleeping keeper.
-- They are 3 to 6 times taller than the player.
-- Nothing floats except the effects.
-
-Earlier text research: a web search for "Mitsui" found nothing. The web pages and image hosts were blocked here
-(Roblox, YouTube, Fandom, guide sites). Search summaries name a "Kitsune" as the Cherry Blossom guardian, which may be
-the same fox-like keeper, but I cannot confirm that. Everything in the table above comes from your screenshots only.
-
-**What each of our keepers takes from which reference:**
-
-| Our keeper | Taken from | How |
+| Reference | What it shows | What I used |
 |---|---|---|
-| Jungle King | Jungle King (very close in spirit) | Navy fur, spiky shoulder tufts, cream face mask and jagged cream chest, spiky gold crown with a red gem, gold arm band, red glowing angry eyes, roaring mouth with fangs and a red inside. |
-| Lava Dragon | Lava dragon | Charcoal angular plates, glowing flaming spikes along the back (flame effects), orange lava seams, flaming tail tip. |
-| Ice Fang | Mitsui | The bold-marking idea in ice blue: swirls on shoulders and haunches, eye markings, ice-crystal horns sweeping back, spiky fur shards. Your silver-and-sapphire armour stays. |
-| Sand Snake | T-Rex | Bold dark diamond markings and a light belly, fangs, back spines. |
-| Timber Golem | Shared style | Hewn angular shapes, shard-like leaves and moss, glowing sap cracks, studs, glowing eyes. |
-| Storm Colossus | Angel boss | Big glowing effects (lightning links), a strong accent colour, floating parts as a design choice. |
-| Crystal Knight | Angel boss | A knight with a closed helm and a bold crest; glowing eyes only. |
-| The Darkened | Today's design | Today's slim black head and glowing line, polished with the shared style: crisp angular blocks, a shard cloak, an aura effect. |
+| Dragon 1 (a modelling-tool render, plain orange) | A blocky dragon in the "Ice and Fire" style, made only of cuboids. Huge spread wings: each is a thick angled arm beam and a fan of long rectangular finger struts from the wrist, with stepped membrane panels between them and small claw tips. A blocky head with a long square snout and a tall crown of swept-back horn and frill spikes. A short thick neck, a row of thin back spikes, a chunky low body and sturdy legs with separate stubby toe blocks. | The fanned strut wings with stepped membranes and claw tips, the head crown, the long square snout, the low chunky body and the toe blocks. |
+| Dragon 2 (described to me; not saved to disk) | An "Ice and Fire" fire dragon in flight, a Minecraft-style render. A long slim charcoal body and a long stepped neck. An open jaw with a red mouth and white block teeth, and a small yellow eye. Bone-tan horns, and a continuous row of tan spikes from the neck to the tip of a long tapering tail. Dark wing beams, lighter membranes with stripes along the fingers and tan claws. Lighter scale bands under the belly and neck. | The long stepped neck, the bone spike row from the neck to the tail tip, the long tail, the red mouth with white block teeth, the striped membranes, the bone claws and the lighter belly bands. |
+| Knight (a Blender viewport) | A bulky, R6-proportioned armoured knight, dark and aggressive. Huge layered pauldrons (stacked, angled slabs) wider than the torso. Thick arms with horizontal ribbed bands, and a skull ornament on the outer arm. A closed great helm with a vertical crest ridge and a feather / wing plume on one side. A chest plate with a centre ridge and layered plates, a heavy belt, skull ornaments on the thighs and chunky leg armour. | All of the bulk and layering. Crystal medallions replace the skulls; purple / lavender armour; glowing visor eyes; a crystal blade. |
+| Gorilla (3 in-game screenshots) | Today's Jungle King: dark brown shaggy fur in chunky low-poly masses, hunched on its knuckles. A grey-green face mask and chest plate, heavy brows, glowing yellow angled eyes and a dark mouth with small teeth. Green moss on the shoulders and upper arms; a broad back and thick arms. | Everything listed, kept and polished (section 2). |
+| Snake (3 in-game screenshots) | Today's Sand Snake: a long rattlesnake in tan / beige with a darker brown diamond pattern along the back. A wedge-shaped viper head with a yellow eye, a dark eye stripe and small golden horns over the eyes. A golden lower jaw, a red tongue, and a small rattle with a light tail tip. It rears up in an S-curve when chasing. | Everything listed, kept and polished (section 2). |
 
-## 2. Personality, faces and body, per keeper
+**Ice and Fire:**
+- The dragon follows the "Ice and Fire" fire-dragon style from your two images and from my general memory of that
+  mod. The web and image sites are blocked here, so I could not look up the mod itself.
+- It is our own model in that style, not a copy of the mod's assets.
+- If you want it closer, send more screenshots (side, front and top views help most).
+
+The rev 3 references (the six Steal an Egg screenshots) still set the general style: chunky shapes, studs, bold
+markings, glowing eyes, big effects and the big sleep "Z".
+
+## 2. Each keeper: personality, faces and body
 Every keeper has two faces:
 - **Awake / chase:** shown whenever it is awake (guarding, chasing, attacking, after a catch).
 - **Asleep.**
 
-| Keeper | Personality | Awake / chase face | Asleep face | Body, pose, details | Idle fidget (idea) | Effects (particles) |
-|---|---|---|---|---|---|---|
-| Timber Golem (Forest) | Grumpy old tree that hates being woken: a heavy, silent glare from two glowing slits; a bird lives in its crown. | Not human. Two glowing amber-green slits in dark bark hollows under a heavy mossy bark ledge, and a jagged dark crack. | The slits go dark and the crack thins, so the disguised tree shows no face. | Hewn bark trunk with grooves, glowing sap cracks, moss mantle, an angular leaf crown with leaf shards, a bird's nest with a blue bird, red mushrooms. **The left arm is a huge club log with a sprouting branch; the right arm is smaller.** Root-claw feet. Still sleeps disguised as a tree. | Scratches its bark with the small arm; the bird hops and chirps; leaves drift down. | Falling leaves, spores, sap drips, dust on the hammer slam. |
-| Jungle King (Jungle) | Cocky, furious king: roars in your face, flashes a gold fang, crown tilted, chest out, loves an audience. | **The benchmark.** Red glowing angry eyes in dark sockets, heavy dark brows, a roaring mouth with fangs, lower fangs, a red inside and one gold fang. | Closed eyes on cream lids, relaxed brows, mouth hanging open snoring, drool. | Navy fur, spiky shoulder tufts, cream mask and jagged chest, tilted gold crown with a red gem, gold arm band, chin up, chunky knuckle-walking arms. | Beats his chest twice and adjusts his crown. | Chest-beat shockwave, dust, leaves, red eye glow. |
-| Sand Snake (Desert) | Sly, venomous trickster: narrowed slit eyes, a hiss and two long fangs; strikes before you see it move. | Narrowed yellow slit-pupil eyes under scaled brow ridges, a hissing mouth with two long fangs, the forked tongue. | Closed eyes, relaxed brows, a closed mouth. | Deep ochre faceted body with dark diamond saddles, a hood with two big eye-spot markings, horns, spines along the back. | Flicks its tongue, sways its head, rattles the tail. | Sand swirl, dust trail. The rattle still buzzes. |
-| Ice Fang (Snow) | Proud, cold hunter: chin up, icy glare, bares its sabres the moment it sees you. | Icy cyan slit-pupil eyes in dark sockets, heavy blue brows, a snarl between the sabres. | Closed eyes, relaxed brows, a closed mouth. | Chin up, ice horns, bold deep-blue swirls and stripes, spiky ruff, steel armour with sapphires built in, crystal tail, long ice claws. | Licks a paw, then lifts its head and flicks the crystal tail. | Frost aura, snowflake sparkles, icy breath on the roar. |
-| Lava Dragon (Lava) | Hot-headed and furious: glares, snarls fire, snorts smoke even in its sleep. | Furious yellow slit-pupil eyes under black brow plates, a snarl with fangs and a fire-orange inside. | Closed eyes, still-grumpy brows, a closed mouth, smoke puffs. | Charcoal hewn plates, glowing flaming back spikes, lava seams and cheek cracks, bone horns, flaming tail tip, long claws. | Snorts two smoke puffs, stomps, the back flames flare. | Flames on spikes and tail, embers, nostril smoke. |
-| Crystal Knight (Crystal) | Stern, merciless sentinel: stands to attention, sword ready, two burning slits in a closed helm. | **Eyes only.** Two fierce glowing slants in the visor slit. | Two dim flat lines. | **Closed helmet, no face.** Steel-violet bevelled armour, tall crystal crest and plume, gold brow band, nose guard, breathing holes, tabard with a gold emblem, crystal pauldrons, crystal blade. | Straightens up, taps the hilt, turns the helm left and right like a guard on patrol. | Crystal sparkles, a sword slash trail, shards on impact. |
-| Storm Colossus (Storm) | A walking storm of rock: no face, only two burning slits and a crackling jaw; fists float on storm power. | Not human. Two glowing cyan slits in dark hollows under a rock ledge, and a glowing jagged crack across the jaw. | The slits and the crack go dark. | Dark storm rock, rock tusks, storm-cloud mane, copper lightning-rod horns, glowing lightning cracks, storm shards in the hips. **Floating shoulder rocks, fists and crystal storm cores (by design), linked by lightning.** | Punches its floating fists together (sparks), cracks its neck. | Lightning arcs between the body and the floating parts, sparks, a rain cloud. |
-| The Darkened (Void event) | Silent and wrong: today's faceless black head and its one glowing line; it never speaks, it tilts its head and stares. | **Today's head.** The one line glows bright void purple and pulses. | The line dims to a thin dark glow. | **Today's design, polished.** The same slim black head, proportions and part positions, with: crisp bevelled blocks for today's plain blocks; angular cores for today's ball joints; metal ribs; a glowing chest slit; angular pauldrons with shards; a tattered cloak; long claws; knee and toe spikes; subtle purple markings on the head. | A slow head tilt; the line flickers; long claws drum the air. | Void wisps from the cloak hem, hands and feet; the line pulses and leaves a faint trail while chasing. |
+| Keeper | Personality | Awake / chase face | Asleep face | Body, pose, details | Effects (particles) |
+|---|---|---|---|---|---|
+| Timber Golem (Forest) | Grumpy old tree that hates being woken; a bird lives in its crown. | Not human. Two glowing green slits in dark hollows under a heavy bark ledge, and a jagged dark crack. | The slits go dim and the crack thins, so the disguised tree shows no face. | **More blocky.** Two stacked trunk blocks, a moss slab with hanging moss, dark bark planks, glowing sap cracks and bracket fungi. A block stump head and a stepped crown of leaf blocks with a nest, eggs and a blue bird. **The left arm is a huge club block with a sprouting branch; the right is smaller.** Block feet with root toes. Still sleeps disguised as a tree. | Falling leaves, spores, sap drips, dust on the hammer slam. |
+| Jungle King (Jungle) | Grumpy jungle king: hunched on his knuckles, glares, roars in your face, wears a crown of moss. | Glowing yellow angry eyes in dark sockets on the flat grey-green mask, under a heavy V brow. A roaring mouth with teeth and fangs on the muzzle. | Closed eyes and a round snoring mouth. | **Today's gorilla, improved.** The same dark brown fur, grey-green mask and chest plate, yellow eyes, moss on the shoulders and upper arms, and hunched knuckle-walking build. Now chunky blocks with a broad back, vine bands on the forearms, leaf accents, grey-green knuckle pads, and a small moss crown with leaf points and one pink flower. | Chest-beat shockwave and dust, falling leaves, yellow eye glow. |
+| Sand Snake (Desert) | Sly desert rattler: rears up in an S, narrows its yellow eyes and flashes its fangs. | On each flat side of the head: a fierce yellow slit eye under a dark brow bar. The mouth opens red, with two white fangs. | A closed-eye line on each side; mouth closed. | **Today's snake, improved.** The same tan body with brown diamonds (tan centres) along the back and half-diamonds on the sides. The same wedge viper head with the dark eye stripe, small golden horns on the brow ridges, the golden lower jaw, the forked tongue and the rattle. Now chunkier block segments and a bigger, more readable head, with a brown chevron on top. | Sand swirl, dust trail; the rattle still buzzes. |
+| Ice Fang (Snow) | Proud, cold snow fox: chin up, sly icy glare, bares its sabres when it sees you. | Almond icy-cyan eyes with slit pupils, slanted blue brows, and a row of small teeth under the snout. | Closed eyes, relaxed brows. | **A fox head:** a streamlined head with a tapered pointed snout, big triangular ears with blue insides, almond eyes, white cheek ruffs and a blue bridge stripe. Still the Snow keeper: icy white and blue, bold blue stripes and cheek marks, the silver-and-sapphire saddle, collar and leg plates, two sabre fangs, ice-blue claws, and a bushy block tail ending in ice crystals. | Frost aura, snowflakes, icy breath on the snarl. |
+| Lava Dragon (Lava) | Hot-headed and furious: glares, snarls fire, snorts smoke even in its sleep. | Furious yellow slit-pupil eyes under angled brow blocks. The open jaw glows fire-orange between white block teeth. | Grumpy closed eyes; smoke puffs (effect). | **The "Ice and Fire" style in cuboids.** A low chunky charcoal body with dark red scale bands, glowing lava seams and orange belly plates. A long stepped neck and a long square snout with block teeth. A crown of swept bone horns, cheek frills and crest spikes. Bone spikes from the neck to the tail tip, several of them flaming. Sturdy legs with bone toe blocks, and a long tail ending in a glowing spade. **Wings:** a thick arm beam and a fan of five finger struts, with stepped, striped membranes and bone claw tips. | Flames on the back spikes and tail tip, embers, nostril smoke, fire glow in the jaw. |
+| Crystal Knight (Crystal) | Stern, merciless sentinel: plants his feet, sword ready, two burning slits in a closed great helm. | Two fierce glowing slants in the visor slit. | Two dim flat lines. | **Bulky, after your reference.** Three stacked, angled pauldron slabs per shoulder with crystals; ribbed upper arms with a crystal medallion; chunky ribbed gauntlets. A closed great helm with a crest ridge over the top and down the front, a crystal crest and a crystal wing plume. A layered chest with a centre ridge and a crystal core. A thick gorget, a heavy belt with a crystal buckle, tassets with crystal medallions, thick thighs with crystal medallions, knee plates, greaves and big boots. The crystal blade. | Crystal sparkles, a sword slash trail, shards on impact. |
+| Storm Colossus (Storm) | A walking storm of stacked rock: no face, only two burning slits and a crackling jaw; fists float on storm power. | Not human. Two glowing cyan slits in dark hollows under a rock ledge, and a glowing jagged crack across the jaw. | The slits go dim, the crack goes dark. | **More blocky:** a stacked rock torso, a mantle slab, pec slabs, block hips and rock shards. A block head with a protruding jaw, rock tusks, copper lightning-rod horns and a cloud mane of cloud blocks. **Floating shoulder rocks, fists (with copper bands) and crystal storm cores, by design**, linked by lightning. | Lightning arcs, sparks, a rain cloud. |
+| The Darkened (Void event) | Silent and wrong: today's faceless black head and its one glowing line. | The line glows bright void purple. | The line dims. | **Unchanged from rev 3.** | Void wisps; the line pulses. |
 
-## 3. How the two faces would work in Roblox
-**Route: two face parts per keeper, swapped by hiding one of them.** This is the same cheap swap as rev 2, but with two
-states instead of five.
+## 3. How the two faces work
+**The faces themselves:**
+- Every face is a set of flat plates on a flat face plane (the front of a block): the front of the head, the muzzle, or,
+  on the snake, the flat sides of its wedge head.
+- Each plate has an even thickness and is sunk into the head, so it always touches the head.
+- The eyes are one outline drawn once and mirrored, so both eyes have the same size and shape and sit symmetrically.
+- The awake face uses a few bold shapes: a dark socket, the glowing eye, a pupil, a brow bar, and a mouth with a few
+  big teeth. The asleep face is a thick closed-eye line and a small mouth.
+
+**In Roblox: two face parts per keeper, swapped by hiding one of them.**
 - **The parts:** each keeper's Head group has the parts of the awake face (`Head_Face_Chase`, plus `Head_Eyes_Chase`
-  for its glowing eyes) and the parts of the asleep face (`Head_Face_Asleep`, and `Head_Eyes_Asleep` where the asleep
-  eyes still glow dimly).
+  for its glowing eyes) and of the asleep face (`Head_Face_Asleep`, and `Head_Eyes_Asleep` where the asleep eyes still
+  glow dimly).
   - The Knight's and The Darkened's faces are glow parts only.
   - The Colossus's glowing slits and crack are in `Head_Eyes_Chase`.
 - **The rule:** asleep shows the asleep parts; any other state shows the awake parts. The client sets
   `LocalTransparencyModifier` to 0 on one set and 1 on the other. The game already uses this trick for the golem's
   eyes.
 - **Why this route:**
-  - It is instant and robust: no network traffic, no texture download, no pop-in.
-  - It is one yes / no test (asleep or not) instead of a table of five states.
-  - The faces are flat graphic shapes laid onto the head (not carved), so they stay sharp on a curved head.
-  - Decals would need images uploaded per keeper, which lie flat on curved heads and can show blank for a moment on
-    first use.
-- **The cost:** one hidden face set per keeper, kept in memory: 16 to 1,068 triangles. Roblox does not draw it.
+  - It is instant: no network traffic, no texture download, no pop-in.
+  - It is one yes / no test (asleep or not).
+  - Decals would need images uploaded per keeper and can show blank for a moment on first use.
+- **The cost:** one hidden face set per keeper, kept in memory: 16 to 152 triangles. Roblox does not draw it.
 
 Two small code changes would be needed: the face switch where the client knows the keeper is asleep (`BeastAnimation`),
 and a one-line skip in `KeeperContact` so face parts never count for hits.
 
-**Sleeping "Z":** make today's three small "z" labels into one big stylised cyan "Z" with a dark outline, like the
-references. This only changes the existing sleep labels, with no new asset. The Golem keeps no "Z", because it sleeps
-disguised as a tree. In the previews the "Z" is a stand-in mesh that is turned to face the camera before each render,
-as a BillboardGui does in game.
+**Sleeping "Z":** make today's three small "z" labels into one big stylised cyan "Z" with a dark outline. This only
+changes the existing sleep labels, with no new asset. The Golem keeps no "Z", because it sleeps disguised as a tree.
 
-**Stud texture (option):** the previews show it on. In Roblox it would be a stud normal map, either as a
-MaterialVariant or a SurfaceAppearance (1 tile = 1 stud). This needs a Studio test: on a MeshPart a texture follows the
-mesh's UVs, and today's UVs point at the colour palette, so the FBX may need a second UV layout. You can also leave the
-studs off.
+**Stud texture (option):**
+- The previews show it on. In Roblox it would be a stud normal map, either as a MaterialVariant or a SurfaceAppearance
+  (1 tile = 1 stud).
+- The block shapes suit it much better than rev 3's facets.
+- On a MeshPart a texture follows the mesh's UVs, so the FBX may need a second UV layout. A Studio test will tell.
 
 ## 4. No floating pieces (checked by script)
 `blender/connectivity.py` builds each keeper and finds every separate piece of mesh. It counts two pieces as joined if
@@ -140,70 +136,78 @@ Effects (fire, smoke, wisps, lightning, the "Z") are not meshes and are skipped.
 | Ice Fang | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
 | Lava Dragon | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
 | Crystal Knight | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
-| Storm Colossus | 1 + 6 by design | 1 + 6 by design | 1 + 6 by design | 1 + 5 by design | 1 + 6 by design | 1 + 6 by design | 0 failures. By design: 2 shoulder rocks, 2 fists, 2 crystal storm cores. In the wind-up the right shoulder rock touches the body. |
+| Storm Colossus | 1 + 6 by design | 1 + 6 by design | 1 + 6 by design | 1 + 4 by design | 1 + 6 by design | 1 + 6 by design | 0 failures. By design: 2 shoulder rocks, 2 fists, 2 crystal storm cores. In the wind-up, the left fist and the right shoulder rock touch the body. |
 | The Darkened | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
 
 (The numbers are connected pieces. "1" means everything touches.)
 
 How the pieces stay joined:
-- **Snake wind-up.** The game's coil lifts the head about 2.4 studs off the body. The neck has a root that runs down
-  into the first body segment. At rest it is hidden inside the body and under the floor; in the coil it spans the gap.
-- **Joints, hidden.** Each moving group has a core at its pivot, which stays in place however the group turns, and the
-  parent overlaps it. Rev 3 makes these cores small hewn blocks in the limb's own colour, kept inside the masses. The
-  Darkened's cores sit where today's ball joints are, at their size or smaller.
-- **Chunky shapes only grow.** The hewn planes push every point outward, never inward, so every contact the rounder rev 2
-  shapes had is kept.
-- **Faces.** Every face shape is laid onto the head's surface and goes into it, so it always touches the head.
-- **Small details.** Nostrils, teeth, horn bases, hood marks and ribs are sunk into the body. Painted bands are always
-  sunk into the surface.
-- **The Darkened's feet.** When its knees fold asleep, foot and shin would part. A cosmetic ankle core keeps them joined,
-  and its hit boxes stay as they are today.
-- **Accents.** The Knight's orbiting shards and the Colossus's floating cloud are retired: the crest and the cloud mane
-  replace them. The Snake's rattle is checked too and touches the tail.
+- **Joints.** Each moving group has a core cube centred on its pivot, which stays in place however the group turns,
+  and the parent overlaps it.
+  - Each cube is a little under its nominal size, so it never shares a face with a block of the same width.
+  - The knight's body has a hip block around both leg pivots, so the legs touch it at any swing.
+- **The dragon's wings.** Every finger strut starts inside the wrist block, every membrane runs through the struts on
+  its edges, and the wing's core cube sits in the body. They stay one piece in all poses.
+- **The snake.** Each segment has a core cube at its front pivot, inside the segment ahead. In the coil wind-up the head
+  lifts about 2.4 studs off the body; the neck's hidden root spans the gap. The rattle (today's accent) touches the
+  tail tip.
+- **Faces.** Every face plate is sunk into the head, and each plate on top of another is sunk through it.
+- **Accents.** The Knight's orbiting shards and the Colossus's floating cloud stay retired; the crest and the cloud
+  mane replace them.
 
-## 5. What stays the same
+## 5. What "today" shows
+- **Exact parts:** the Golem, Knight, Colossus and The Darkened are drawn from their native parts in the game's source.
+- **From your screenshots:** the Jungle King and the Sand Snake.
+  - Their uploaded meshes still can't be downloaded here, so the shapes are the hull of the game's own sample points,
+    plus their exact untextured details from `KeeperRigConfig`: the gorilla's mask, chest plate, yellow eye bar and arm
+    moss, and the snake's eye bar, brow and golden jaw.
+  - The colours now come from your screenshots: the gorilla's dark brown, and the snake's tan with a brown diamond
+    pattern.
+  - They are labelled "TODAY - from owner screenshots".
+- **Stand-ins:** Ice Fang and the Lava Dragon are still stand-ins (hull and assumed colour).
+
+## 6. What stays the same
 - Speed, strike distance and timing, and the catch rule.
 - Fling and ragdoll, sounds and voices.
 - Sleep and wake, and the golem's tree disguise.
 - Group names and pivots, so the existing animation code is unchanged.
-- The Darkened's look: its head, line, proportions and part positions are today's, and its body parts stay inside
-  today's hit boxes.
-- Sizes:
-  - Each group's new box is within about 1 stud of today's.
-  - The exceptions are crowns, crests, horns, back and shoulder spikes and the Colossus mantle, which reach up to about
-    4 studs further.
+- The Darkened, entirely (rev 3).
+- **Sizes:**
+  - Groups stay close to today's boxes.
+  - Crowns, crests, horns, ears, plumes, back spikes and the Colossus mantle reach further.
   - Every group's overshoot is listed in `fbx/keeper_<name>.json`.
-- Heights in the lineup (studs, today to proposed):
-  - Golem 25.5 to 26.9;
-  - Jungle King 15.6 to 17.4 (crown);
-  - Snake 8.1 to 10.8 (raised head and horns);
-  - Ice Fang 10.9 to 11.0;
-  - Dragon 18.8 to 19.7;
-  - Knight 34.0 to 34.0;
-  - Colossus 41.2 to 35.9 (today's floating cloud is retired);
-  - The Darkened 18.5 to 18.5 (rev 2's hood is gone; the head is today's).
+- **Heights in the lineup** (studs, today to proposed):
+  - Golem 25.5 to 28.6 (stepped crown and nest);
+  - Jungle King 15.6 to 17.3 (moss crown);
+  - Snake 8.1 to 9.6;
+  - Ice Fang 10.9 to 12.1 (ears);
+  - Dragon 18.8 to 19.0;
+  - Knight 34.0 to 35.0;
+  - Colossus 41.2 to 36.5 (today's floating cloud is retired);
+  - The Darkened 18.5 to 18.5 (unchanged).
 
-## 6. Phone cost
-| Keeper | Triangles on screen (lite build) | With both faces in memory | Mesh parts (today) |
+## 7. Phone cost
+| Keeper | Triangles on screen | With both faces in memory | Mesh parts (today) |
 |---|---|---|---|
-| Timber Golem | 6,794 (6,304) | 7,020 | 15 (63 blocks + 3) |
-| Jungle King | 5,100 (4,828) | 6,168 | 10 (23) |
-| Sand Snake | 4,912 (4,416) | 5,836 | 14 (17 + 3) |
-| Ice Fang | 6,022 (5,828) | 6,898 | 11 (21 + 41) |
-| Lava Dragon | 5,628 (5,400) | 6,504 | 20 (27) |
-| Crystal Knight | 2,660 (2,462) | 2,684 | 13 (50 + 3) |
-| Storm Colossus | 2,730 (2,650) | 2,956 | 16 (30 + 5) |
-| The Darkened | 3,172 (3,172) | 3,188 | 25 (43) |
+| Timber Golem | 4,524 | 4,596 | 16 (63 blocks + 3) |
+| Jungle King | 3,836 | 3,988 | 10 (23) |
+| Sand Snake | 5,384 | 5,480 | 14 (17 + 3) |
+| Ice Fang | 5,172 | 5,292 | 11 (21 + 41) |
+| Lava Dragon | 9,016 | 9,112 | 20 (27) |
+| Crystal Knight | 6,124 | 6,148 | 13 (50 + 3) |
+| Storm Colossus | 4,016 | 4,088 | 15 (30 + 5) |
+| The Darkened | 3,172 | 3,188 | 25 (43) |
 
-- **Target:** under 10,000 triangles on screen per keeper. All eight meet it, and rev 3 is lighter than rev 2 (which
-  was 3,506 to 9,028).
-- The largest single mesh is about 1,750 triangles; Roblox allows 20,000.
+- **Target:** under 10,000 triangles on screen per keeper. All eight meet it; the dragon, with its two big fanned wings,
+  is the heaviest.
+- The largest single mesh is 2,124 triangles (a dragon wing); Roblox allows 20,000.
 - One 256 x 256 palette texture per keeper.
-- **Parts:** fewer than today for every keeper. Rev 2 had 13 to 31 parts; rev 3 has 10 to 25.
-- **The lite build:** it now saves little (0 to 10 %), because the chunky shapes already use few segments.
+- **Parts:** fewer than today for every keeper, 10 to 25.
+- **The lite build** is no longer needed: block shapes have no segments to drop, so it saves nothing (1 % on the
+  Colossus).
 - Not measured on a device.
 
-## 7. How it would be implemented (after your OK)
+## 8. How it would be implemented (after your OK)
 **What you would do:**
 1. In Studio, import each `fbx/keeper_<name>.fbx` with the 3D Importer. Check the part sizes against
    `fbx/keeper_<name>.json` (1 unit = 1 stud, facing -Z), then upload.
@@ -227,27 +231,25 @@ How the pieces stay joined:
 8. Restyle the sleep "Z" and add the particle effects listed above.
 9. Run the keeper test suites. Then you check it in Studio.
 
-## 8. Risks
-- **The references are six screenshots.** I matched what they show. I made no other claims about the reference game.
-- **Today's images are partly stand-ins.** The snake, tiger, dragon and gorilla are drawn from the game's sample points
-  in an assumed colour, because their meshes can't be downloaded here. The golem, knight, colossus and The Darkened
-  are their exact parts.
+## 9. Risks
+- **The Ice and Fire dragon is from your two images and my memory of the mod.** I could not open the mod's pages
+  here.
+- **Today's images are partly stand-ins.** Ice Fang and the dragon are drawn from the game's sample points in an
+  assumed colour; the gorilla and the snake use the same shapes, coloured from your screenshots.
 - **Body-touch catches follow the new shapes.** Distance catches are unchanged.
 - **Untested in Studio:** the FBX import (it round-trips in Blender), vertex colours, how the stud texture tiles on a
   MeshPart, and how bright Neon looks.
-- **The lite build is not connectivity-checked.** Only the full build was checked; the lite build should be re-checked
-  if you choose it.
 - **One install.** The game only animates a keeper whose part count matches the config, so the models and the config
   must go in together.
 
-## 9. Choices for you
-- **A.** This style (chunky, angular, studs, bold markings) as shown, or the same models without the stud texture.
+## 10. Choices for you
+- **A.** Studs on, as shown, or the same models without the stud texture.
 - **B. Which keepers first:**
-  - Option 1: the Jungle King and the Lava Dragon. They are closest to your references.
+  - Option 1: the Jungle King and the Sand Snake (improvements of what is live).
   - Option 2: biome order, starting with Forest.
-- **C. Tiger armour:** built into the mesh, or kept as separate parts.
-- **D. The Colossus cloud:** a floating cloud above the head (by design), or the attached cloud mane shown.
-- **E. The Darkened:** the polished version shown, or leave it exactly as it is today.
+- **C. The dragon:** as shown, or send more "Ice and Fire" screenshots to match it more closely.
+- **D. Tiger armour:** built into the mesh, as shown, or kept as separate parts.
+- **E. The Colossus cloud:** the attached cloud mane shown, or a floating cloud above the head (by design).
 
 ## Files
 - **Previews:** `keepers_faces.png`, `keepers_before_after.png`, `keepers_lineup.png` and `keeper_<name>.png`.
@@ -261,8 +263,9 @@ How the pieces stay joined:
     - for each group: its bounds against today's, and its floor samples.
 - **In `blender/`:**
   - `proposed.py`: the eight models.
-  - `faces.py`: the two graphic faces.
-  - `kit.py`: shapes (hewn blocks, chamfered blocks), studs, the "Z", the connectivity graph and the render helpers.
+  - `faces.py`: the flat graphic faces.
+  - `kit.py`: shapes (blocks, beams, cylinders, chamfered blocks), studs, the "Z", the connectivity graph and the
+    render helpers.
   - `connectivity.py`: the no-floating-pieces check.
   - `assemble.py`, `render_all.py`, `compose_sheets.py`: building, rendering and laying out the previews.
   - `today.py`: today's keepers.
@@ -274,14 +277,16 @@ How the pieces stay joined:
 ## How this was made (what was run and what was reasoned)
 **Run:**
 - Blender 4.5 (the Python module) built every model by script and rendered every image in Cycles on the CPU.
-- The FBX files were exported and re-imported (`check_fbx.py`): every part came back, and the worst centre or size
-  difference against the manifests was under 0.0001 studs. The largest FBX is 302 KB, under the 5 MB limit.
+- The FBX files were exported and re-imported (`check_fbx.py`). Every part came back, and the worst centre or size difference against the manifests was under
+  0.0001 studs. The largest FBX is 258 KB, under the 5 MB limit.
 - The connectivity check (table above) ran on the final models, in the rest pose and every rendered pose.
 - The triangle counts (`tricount.py`) were taken for the full and lite builds.
 - The poses come from the game's own Luau modules (`BeastPose`, `KeeperSignatureStrike`, `VeiledKeeper81` and
   `KeeperAccents`), run on the repo's offline Roblox mock.
+- The Darkened's source section was checked to be byte-identical to rev 3.
 
 **Reasoned, not run:**
-- Matching the screenshots' style, and how "less bubbly" and "menacing" read.
+- Matching your reference images, and how "Roblox charm", "clunky" and "bulky" read.
+- The "Ice and Fire" look beyond your two images.
 - Studio import, the stud texture tiling and vertex colours.
 - The cost on phones.

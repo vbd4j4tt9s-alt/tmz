@@ -141,8 +141,8 @@ def face_closeups():
             sc = scene(st)
             b, k = build('new', st, pose, sc.collection, state)
             for o in b.objects():
-                if o.get('piece') == 'Z':
-                    o.hide_render = True   # close-ups are about the face; the sleep 'Z' is in each sheet's asleep view
+                if o.get('piece') in ('Z', 'Smoke'):
+                    o.hide_render = True   # close-ups are about the face; the sleep 'Z' and smoke are in each sheet's asleep view
             heads = [o for o in shown(b) if o.get('group') == 'Head' and o.get('kind') in ('eyes', 'face')]
             pts_e = kit.sample_points(heads, step=1)
             cen = sum(pts_e, Vector()) / len(pts_e)

@@ -6,7 +6,9 @@
 - Stages 2, 3, 4, 6 (Sand Snake, Ice Fang, Lava Dragon, Jungle King) are uploaded MeshParts whose mesh files cannot be
   downloaded here. They are STAND-INS: each rig group is the convex hull of that group's FloorSamples (points the game
   took from the real mesh), in an ASSUMED texture colour; the small untextured details (eyes, nose, teeth, vines) are
-  rounded boxes at their exact Center / Size from KeeperRigConfig.
+  rounded boxes at their exact Center / Size from KeeperRigConfig. For the Jungle King and the Sand Snake the texture
+  colours come from the owner's in-game screenshots (rev 4): the gorilla's dark brown fur, and the snake's tan with a
+  brown diamond-back pattern (a 45-degree checker, the closest a hull can carry).
 - Client accents (KeeperAccents: golem rune and mushrooms, snake rattle, the tiger's ice spines and R149 armour, knight
   shards, colossus cloud crown) are drawn from the real KeeperAccents output for the same pose.
 """
@@ -17,11 +19,34 @@ import kit
 from kit import Geo, Palette, rb
 
 ASSUMED = {  # texture colours are not readable here: assumed body colour per mesh keeper (labelled as such)
-    2: {'*': (0.80, 0.64, 0.40)},
+    2: {'*': (0.84, 0.74, 0.57)},               # from the owner's screenshots (+ the diamond pattern, below)
     3: {'*': (0.90, 0.92, 0.95)},
     4: {'*': (0.50, 0.15, 0.11), 'LeftWing': (0.36, 0.13, 0.11), 'RightWing': (0.36, 0.13, 0.11)},
-    6: {'*': (0.27, 0.28, 0.27)},
+    6: {'*': (0.21, 0.15, 0.11)},               # from the owner's screenshots
 }
+FROM_SCREENSHOTS = {2, 6}
+DIAMOND = ((0.84, 0.74, 0.57), (0.50, 0.34, 0.19))   # the snake's tan and brown, from the owner's screenshots
+
+
+def mat_diamond(name, a, b, size=1.7):
+    """A 45-degree checker in object space: tan and brown diamonds, like the snake's diamond-back texture."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes['Principled BSDF']
+    bsdf.inputs['Roughness'].default_value = 0.7
+    tc = nt.nodes.new('ShaderNodeTexCoord')
+    mp = nt.nodes.new('ShaderNodeMapping')
+    mp.inputs['Rotation'].default_value = (0.0, 0.0, math.pi / 4)
+    mp.inputs['Scale'].default_value = (1 / size, 1 / size, 1 / size)
+    ck = nt.nodes.new('ShaderNodeTexChecker')
+    ck.inputs['Scale'].default_value = 1.0
+    ck.inputs['Color1'].default_value = tuple(kit.srgb_to_lin(c) for c in a) + (1.0,)
+    ck.inputs['Color2'].default_value = tuple(kit.srgb_to_lin(c) for c in b) + (1.0,)
+    nt.links.new(tc.outputs['Object'], mp.inputs['Vector'])
+    nt.links.new(mp.outputs['Vector'], ck.inputs['Vector'])
+    nt.links.new(ck.outputs['Color'], bsdf.inputs['Base Color'])
+    return m
 
 # The Darkened's parts (VeiledKeeper81.Build): name, group, size, local frame (x, y, z, rx, ry, rz radians), colour, material, shape
 BLACK, CLOTH, METAL, GLOW = (11 / 255, 12 / 255, 19 / 255), (25 / 255, 21 / 255, 35 / 255), (157 / 255, 135 / 255, 93 / 255), (204 / 255, 173 / 255, 1.0)
@@ -151,7 +176,10 @@ def build_hull(stage, cfg, coll):
         ob = bpy.data.objects.new('%s_hull' % group, me)
         coll.objects.link(ob)
         rgb = cols.get(group, cols['*'])
-        me.materials.append(kit.mat_flat('hull', rgb, rough=0.7))
+        if stage == 2 and (group.startswith('Segment') or group == 'Head'):
+            me.materials.append(mat_diamond('hull_diamond', *DIAMOND))
+        else:
+            me.materials.append(kit.mat_flat('hull', rgb, rough=0.7))
         ob['rest_center'] = [0, 0, 0]
         b.add(group, ob)
     for p in rig['Parts']:

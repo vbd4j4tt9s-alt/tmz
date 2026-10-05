@@ -24,18 +24,19 @@ ORDER = ['timber_golem', 'jungle_king', 'sand_snake', 'ice_fang', 'lava_dragon',
 STAGE_OF = {1: 'timber_golem', 6: 'jungle_king', 2: 'sand_snake', 3: 'ice_fang', 4: 'lava_dragon', 5: 'crystal_knight',
             7: 'storm_colossus', 0: 'the_darkened'}
 NATIVE_TODAY = {'timber_golem', 'crystal_knight', 'storm_colossus', 'the_darkened'}
+FROM_SCREENSHOTS = {'jungle_king', 'sand_snake'}
 TODAY_PARTS = {'timber_golem': '63 blocks + 3 accents', 'jungle_king': '23 mesh parts', 'sand_snake': '17 mesh parts + 3 accents',
                'ice_fang': '21 mesh parts + 41 accent/armour parts', 'lava_dragon': '27 mesh parts', 'crystal_knight': '50 blocks + 3 accents',
                'storm_colossus': '30 blocks + 5 accents', 'the_darkened': '43 blocks'}
 REF = {
-    'timber_golem': 'Owner note: not human-like. A living tree: no nose, brows or lips, just two glowing slits in dark hollows and a jagged crack; the slits go dark asleep, so the disguised tree shows no face. No sleep Z.',
-    'jungle_king': 'Closest to the reference Jungle King: navy fur, spiky shoulder tufts, cream face mask and chest, gold crown and arm band, red glowing angry eyes, roaring mouth with fangs.',
-    'sand_snake': 'From the references: faceted body, bold diamond markings (like the T-Rex stripes), spines, strong sand / brown contrast, studs.',
-    'ice_fang': 'From the reference wolf (Mitsui): white body with bold swirl markings (ice blue instead of red), horns sweeping back (ice), spiky fur tufts, eye markings.',
-    'lava_dragon': 'From the reference lava dragon: charcoal angular plates, flaming back spikes, orange lava seams, a flaming tail tip.',
-    'crystal_knight': 'Owner note: a closed helmet; only the glowing eyes in the visor change (fierce slants awake, dim lines asleep). Style from the references: faceted armour, studs, a bold crest.',
-    'storm_colossus': 'Owner notes: not human-like (glowing eye slits under a rock ledge, a glowing crack for a mouth); floating pieces are fine here as part of the design, linked by lightning.',
-    'the_darkened': 'Owner note: keep today\'s design. The same slim black head and glowing line, polished: crisp bevelled blocks, angular cores for the ball joints, a pulsing void slit, tattered cloak, claws, wisps.',
+    'timber_golem': 'Owner notes: more blocky (stacked trunk blocks, a block stump, a stepped leaf crown) and not human-like: two glowing slits in dark hollows and a jagged crack; the slits go dark asleep, so the disguised tree shows no face. No sleep Z.',
+    'jungle_king': 'Owner note: improve today\'s in-game gorilla (owner screenshots). Kept: dark brown fur, the grey-green face mask and chest, glowing yellow eyes, mossy shoulders, the hunched knuckle-walking build. New: chunkier blocks, a clean flat-mask face, vine bands, a moss-and-leaf crown.',
+    'sand_snake': 'Owner note: improve today\'s in-game snake (owner screenshots). Kept: tan with the brown diamond back, the wedge viper head with yellow eyes and a dark eye stripe, golden brow horns, the golden lower jaw, the rattle. New: chunkier segments, a bigger head, a clean face on its flat sides.',
+    'ice_fang': 'Owner note: a fox head. Streamlined: a tapered pointed snout, big triangular ears, almond eyes, cheek ruffs. Still the Snow keeper: icy white and blue, bold blue markings, silver-and-sapphire armour, sabre fangs, a bushy tail of ice crystals.',
+    'lava_dragon': 'After the owner\'s two "Ice and Fire" fire-dragon references, in cuboids: a fan of finger struts with stepped membranes, a crown of swept horns and frills, a long stepped neck, bone spikes to the tail tip, sturdy legs with toe blocks. Lava colours.',
+    'crystal_knight': 'After the owner\'s bulky-knight reference: huge stacked pauldrons, ribbed arms, a great helm with a crest ridge and a wing plume, a layered chest with a centre ridge, a heavy belt, thick legs; crystal medallions in place of its skulls; glowing visor eyes.',
+    'storm_colossus': 'Owner notes: more blocky (stacked rock blocks and slabs); not human-like (glowing eye slits under a rock ledge, a glowing crack for a mouth); floating fists, shoulder rocks and storm cores, linked by lightning, are part of the design.',
+    'the_darkened': 'Owner note: keep it as it is. Unchanged from rev 3: today\'s slim black head and glowing line, polished (crisp bevelled blocks, angular cores for the ball joints, a pulsing void slit, tattered cloak, claws, wisps).',
 }
 LABELS = [('front', 'Front'), ('three_quarter', 'Three-quarter'), ('side', 'Side'), ('back', 'Back'),
           ('chase', 'Chase (real run frame)'), ('windup', 'Attack wind-up (real frame)'), ('strike', 'Attack impact (real frame)'),
@@ -122,8 +123,8 @@ def faces_sheet():
     img = Image.new('RGB', (W, H), PAPER)
     d = ImageDraw.Draw(img)
     d.text((24, 16), 'Keeper faces: awake / chase vs asleep (close-ups, Cycles)', font=font(32, True), fill=INK)
-    d.text((24, 60), 'Two swappable face pieces per keeper. The Golem and the Colossus have no human face (glowing slits, a crack); the '
-                     'Knight keeps a closed helm; The Darkened keeps today\'s line.', font=font(16), fill=MUTED)
+    d.text((24, 60), 'Two swappable face pieces per keeper, flat decals on a flat face plane. The Golem and the Colossus have no human face '
+                     '(glowing slits, a crack); the Knight keeps a closed helm; The Darkened keeps today\'s line.', font=font(16), fill=MUTED)
     d.text((24, 82), 'The sleep "Z" is left out of the close-ups (it is in each keeper sheet\'s asleep view). Asleep faces are shown on the '
                      'standing pose, from the front.', font=font(16), fill=MUTED)
     for j, key in enumerate(ORDER):
@@ -154,7 +155,7 @@ def before_after():
     d = ImageDraw.Draw(img)
     d.text((26, 16), 'Keepers: TODAY vs PROPOSED (same camera, same scale, 5-stud player for size)', font=font(28, True), fill=INK)
     d.text((26, 56), 'TODAY for the Golem, Knight, Colossus and The Darkened = their exact native parts (materials approximate).', font=font(17), fill=MUTED)
-    d.text((26, 80), 'TODAY for the Snake, Tiger, Dragon and Gorilla = STAND-INS: their uploaded meshes cannot be downloaded here, so each part is the hull of the game\'s own sample points, in an assumed colour.',
+    d.text((26, 80), 'TODAY for the Gorilla and Snake = the hull of the game\'s own sample points plus its exact details, coloured from the owner\'s screenshots; for the Tiger and Dragon = STAND-INS (same hulls, assumed colour).',
            font=font(15), fill=OLD_C)
     for i, key in enumerate(ORDER):
         m = META[key]
@@ -166,7 +167,7 @@ def before_after():
             px = x + j * (pw + 8)
             img.paste(p, (px, y + 34))
             if which == 'today':
-                t = 'TODAY - exact parts' if key in NATIVE_TODAY else 'TODAY - stand-in'
+                t = 'TODAY - exact parts' if key in NATIVE_TODAY else ('TODAY - from owner screenshots' if key in FROM_SCREENSHOTS else 'TODAY - stand-in')
                 tag(d, (px + 10, y + 44), t, fill=(250, 228, 228), ink=OLD_C, f=font(14, True))
             else:
                 tag(d, (px + 10, y + 44), 'PROPOSED - %s tris on screen' % format(m['tris_visible'], ','), fill=(220, 242, 228), ink=NEW_C, f=font(14, True))
@@ -199,7 +200,7 @@ def lineup():
            font=font(17), fill=MUTED)
     y = head
     for which, im, info in rows:
-        title = 'TODAY (Snake, Tiger, Dragon, Gorilla are stand-ins)' if which == 'today' else 'PROPOSED'
+        title = 'TODAY (Tiger, Dragon: stand-ins; Gorilla, Snake: from owner screenshots)' if which == 'today' else 'PROPOSED'
         tag(d, (24, y + 6), title, fill=(250, 228, 228) if which == 'today' else (220, 242, 228), ink=OLD_C if which == 'today' else NEW_C,
             f=font(18, True))
         y += 38
