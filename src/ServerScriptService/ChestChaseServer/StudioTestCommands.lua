@@ -98,6 +98,7 @@ function Commands.Normalize(text)
  return '/test '..phrase
 end
 
+local GrantsItems={seed=true,seeds=true,pack=true,plant=true,plants=true,rarepacks=true,packset=true,eclipse=true,void=true,verity=true}
 local function executeFor(ctx,player,text,requester)
  if not player or player.Parent~=Players or not ctx.Data:IsLoaded(player)then return false,'Wait for your player data to load.'end
  text=Commands.Normalize(text);if not text then return false,'Invalid command.'end
@@ -105,6 +106,8 @@ local function executeFor(ctx,player,text,requester)
  if a[1]~='/test'and a[1]~='/cctest'then return false,'Type help in the F4 command box.'end
  table.remove(a,1);local action=(table.remove(a,1)or'help'):lower()
  if action=='points'then action='speed'elseif action=='tp'then action='biome'end
+ -- R151: whatever an owner command just gave this player (packs, seeds, plants) is not counted for the hub's BEST PULL / BIGGEST FRUIT boards for the rest of this session.
+ if GrantsItems[action]then local hub=ctx.Chase and ctx.Chase.HubDisplays;if hub then pcall(hub.NoteOwnerGrant,hub,player)end end
  if UpdateCommands.Actions[action]then return UpdateCommands.Execute(ctx,player,action,a)end
  local function exact(min,max)return #a>=min and #a<=(max or min)end
  if action=='help'then

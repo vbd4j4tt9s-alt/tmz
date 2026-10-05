@@ -801,6 +801,8 @@ function ChestService:InteractGarden(player, action, payload)
 		success, result = self.PlayerData:HarvestPlant(player, slot, crop.Id, os.time(), payload.FruitIndex)
 	end
 	if not success then return reject(result) end
+	-- R151: a fruit picked by hand counts for the hub's BIGGEST FRUIT TODAY board (HubDisplayService.NoteHarvest; set by the main script). Owner test harvests (/test harvestall) do not come through here.
+	if action == "Harvest" and self.HarvestHook then pcall(self.HarvestHook, player, result) end
 	self.PlayerData:QueueGardenSave(player)
 	local refreshed, failure = pcall(function()
 		self:SyncTools(player)

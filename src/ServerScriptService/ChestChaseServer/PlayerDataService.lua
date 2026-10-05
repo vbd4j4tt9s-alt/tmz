@@ -414,6 +414,9 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         self:TutorialEvent(player,'Seed')
         self:QuestEvent(player,'Open',1) -- R140 daily quest
         pcall(function()require(script.Parent.PullAnnouncer).OnOpened(player,pack,reward,testSeed~=nil)end) -- R151: a real open of a Legendary+ seed is announced (a TEST pack never is)
+        -- R151: the hub's BEST PULL TODAY board (HubDisplayService.NotePull; set by the main script). It never yields or throws here; a TEST pack (/test rarepacks) is flagged so it is not counted.
+        local hook=self.OnPackOpened
+        if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=player:GetAttribute("ChestLuckMultiplier"),Test=testSeed~=nil}) end
         return reward
     end
     return nil, "THIS PACK IS NO LONGER IN YOUR INVENTORY"

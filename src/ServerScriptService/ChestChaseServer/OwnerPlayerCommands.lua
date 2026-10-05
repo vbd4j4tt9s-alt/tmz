@@ -96,6 +96,8 @@ function Admin.Execute(ctx,requester,command)
      if not reason then
       for _,record in ipairs(pending)do table.insert(records,record);data:MarkSeedDiscovered(p,record.SeedId,true)end
       p:SetAttribute('ChestInventorySerial',serial);count=#pending
+      -- R151: seeds an owner gave are not counted for the hub's BIGGEST FRUIT / BEST PULL boards (the rest of this session).
+      local hub=ctx.Chase and ctx.Chase.HubDisplays;if hub then pcall(hub.NoteOwnerGrant,hub,p)end
      end
     end
    elseif command.Operation=='take'then

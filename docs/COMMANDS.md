@@ -87,6 +87,16 @@
 | `keepersmack` (server) | Preview The Darkened's hit (hits nobody) |
 | `notice event @name` | Preview a notice (`event`, `legendary`, `mythic`, `giant`) |
 
+## Hub displays (R151)
+The two giant displays in the hub's back corners: **BEST PULL TODAY** (the +X corner, below Base_4) and **BIGGEST FRUIT TODAY** (the -X corner, below Base_3). They count real pack openings and hand-picked fruit across all servers (MemoryStore); `rarepacks` TEST packs, anything an owner command just gave that player (this server session) and the test commands below are never counted. Both reset at midnight UTC.
+| Command | What it does |
+|---|---|
+| `bestpull FirePepperSeed @name` | A test BEST PULL TODAY for that player: a seed id or a plant name (`fire pepper`), at its odds in its biome's Pack03. **This server only**; add `share` to write it to the shared board as well (to test MemoryStore: use `hubdisplays reset` afterwards) |
+| `bigfruit 12.4 @name` | A test BIGGEST FRUIT TODAY: a fruit of **today's** type weighing that many kg. `gold` / `diamond` add a coat, `share` writes the shared board. This server only unless shared |
+| `hubdisplays` (server) | Print the state: the day, the fruit of the day, the champions and where they came from (`Remote` = another server or the store, `Local` = this server, `Test` = injected), the shared board's health (failures, last error, retry time) and the part counts |
+| `hubdisplays reset` (server) | Empty both boards on this server and delete today's shared document. Other servers keep their own best and write it back at their next step: reset them too, or restart them |
+| `hubdisplays day +1` (server) | Preview tomorrow's fruit (`+2`, `+7`, `-1` too) on this server only; nothing is read or written to the shared board while previewing. `hubdisplays day 0` comes back |
+
 ## Shovel holes
 | Command | What it does |
 |---|---|

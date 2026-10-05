@@ -87,6 +87,11 @@ return {
  {'/test gifts @username','Gifts this player sent that are still finishing.'},
  {'/test gifts recover @username','Finish stuck gifts now (normally automatic within a minute).'},
 
+ {'— HUB DISPLAYS (R151) —',''},
+ {'/test bestpull FirePepperSeed @username','A test BEST PULL TODAY for that player: a seed id or plant name (fire pepper), at its odds in its biome\'s Pack03. Shows on this server only; add share to write it to the shared board too.'},
+ {'/test bigfruit 12.4 @username','A test BIGGEST FRUIT TODAY: a fruit of today\'s type weighing that many kg (gold or diamond for a coat, share to write the shared board). Shows on this server only unless shared.'},
+ {'/test hubdisplays','server: Both corner displays: the day, the fruit of the day, the champions and where they came from, the shared board\'s health and the part counts. hubdisplays reset empties both boards (this server and the shared one); hubdisplays day +1 previews tomorrow\'s fruit on this server (day 0 comes back).'},
+
  {'— VERITY\'S VOICE —',''},
  {'/test verityvoice 2.1 0.3','server: Find where "Hello, my name is Verity" ends by ear. verityvoice <end seconds> [start seconds] sets the cut for this server and plays it for you at once (from anywhere); verityvoice alone plays it again and prints the numbers; verityvoice reset goes back to VerityConfig. Copy the final numbers into VerityConfig.GreetingStart / GreetingEnd.'},
 

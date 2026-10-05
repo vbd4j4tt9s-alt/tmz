@@ -3,7 +3,7 @@ local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Packs=require(RS.SeedPackRules);local T=require(RS.BalanceValues81)
 local State=require(script.Parent.OwnerTestState82)
-local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true,daily=true,mystery=true,verity=true,verityvoice=true,announce=true}}
+local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true,daily=true,mystery=true,verity=true,verityvoice=true,announce=true,bestpull=true,bigfruit=true,hubdisplays=true}}
 local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8,verity=9}
 local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary',verity='VerityReliquary'}
 local function integer(s,lo,hi)local n=tonumber(s);return n and n==n and n%1==0 and n>=lo and n<=hi and n or nil end
@@ -212,6 +212,39 @@ function X.Execute(ctx,p,action,a)
   local st=svc:State(p)
   local status=st.Claimed and'taken today'or M.Unlocked(st)and('ready: '..st.Variant..' stage '..st.Stage)or('locked, '..M.Clock(M.Left(st))..' to go')
   return true,p.Name..': mystery pack '..status..(#st.Owed>0 and(' | '..#st.Owed..' owed (Bag was full)')or'')..' | pedestal '..(svc.Owner[p]and'in their base'or'not assigned')
+ elseif action=='bestpull'or action=='bigfruit'or action=='hubdisplays'then
+  -- R151 owner tools for the hub's two corner displays (HubDisplayService). bestpull <seed id or plant name> [share] [@name] = a test pull for that player (the seed's odds in
+  -- its biome's Pack03); bigfruit <kg> [gold|diamond] [share] [@name] = a test fruit of TODAY's type; both show on this server only unless `share`. hubdisplays = print the state;
+  -- hubdisplays reset = empty both boards (this server and the shared one); hubdisplays day +1 = preview tomorrow's fruit (this server only; day 0 comes back).
+  local hub=ctx.Chase and ctx.Chase.HubDisplays;if not hub then return false,'The hub displays are not running in this server.'end
+  if action=='hubdisplays'then
+   local sub=tostring(a[1]or''):lower()
+   if sub==''or sub=='status'then if #a>1 then return false,'Use hubdisplays [reset | day +1 | day 0].'end
+   elseif sub=='reset'then
+    if #a>1 then return false,'Use hubdisplays reset.'end
+    local removed=hub:Reset()
+    return true,'Both boards are empty for today on this server'..(removed and' and in the shared store'or'')..'. Other servers keep their own best until they are reset too.\n'..hub:StatusText()
+   elseif sub=='day'then
+    local n=({['0']=0,today=0,['+1']=1,['1']=1,tomorrow=1,['-1']=-1,yesterday=-1,['+2']=2,['2']=2,['+7']=7,['7']=7})[tostring(a[2]or''):lower()]
+    if #a~=2 or n==nil then return false,'Use hubdisplays day +1 (tomorrow\'s fruit), +2, +7, -1 or 0 (back to today).'end
+    hub:SetDayOffset(n)
+    return true,(n==0 and'Back to today.'or'Previewing day '..string.format('%+d',n)..' on this server only (nothing is shared while you preview). hubdisplays day 0 comes back.')..'\n'..hub:StatusText()
+   else return false,'Use hubdisplays [reset | day +1 | day 0].'end
+   return true,hub:StatusText()
+  end
+  local words,share,coat={},false,nil
+  for _,w in ipairs(a)do
+   local l=tostring(w):lower()
+   if l=='share'then share=true
+   elseif action=='bigfruit'and(l=='gold'or l=='diamond')then coat=l=='gold'and'Gold'or'Diamond'
+   else words[#words+1]=w end
+  end
+  if action=='bestpull'then
+   if #words==0 then return false,'Use bestpull <seed id or plant name> [share] @username.'end
+   return hub:InjectPull(p,table.concat(words,' '),share)
+  end
+  if #words~=1 then return false,'Use bigfruit <kg> [gold|diamond] [share] @username.'end
+  return hub:InjectFruit(p,words[1],coat,share)
  elseif action=='refreshcycle'then
   local cycle=integer(a[1],1,1000000);if #a~=1 or not cycle then return false,'Use refreshcycle <completed reset to test>.'end
   if ctx.Map.Refreshing then return false,'Refresh already running.'end

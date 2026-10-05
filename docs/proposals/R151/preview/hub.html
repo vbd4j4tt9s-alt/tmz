@@ -1,0 +1,121 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Hub displays preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of a hub_scenes.py scene: the hub's parts as Roblox shapes (block, wedge, corner wedge, ball / ellipsoid, cylinder along X), neon as unlit colour with a soft
+// glow, the two signs' SurfaceGui drawn on their boards (the layout of HubDisplayRules.Sign, the words the real service wrote), the avatar stand-in with a face, and a few
+// labels projected for the plan. A design preview: plain materials, no Roblox textures, no Future lighting, no client sparkles; the font is not Fredoka.
+import * as THREE from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+const envTex=new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04).texture;
+// ---- geometry (unit cube space, Roblox conventions) ----
+function solid(verts,faces){ // faces: arrays of vertex indices (convex, counter-clockwise from outside is fixed up against the centroid)
+  const pos=[];const cen=[0,0,0];for(const v of verts){cen[0]+=v[0]/verts.length;cen[1]+=v[1]/verts.length;cen[2]+=v[2]/verts.length}
+  for(const f of faces){for(let i=1;i<f.length-1;i++){
+    let a=verts[f[0]],b=verts[f[i]],c=verts[f[i+1]];
+    const n=[(b[1]-a[1])*(c[2]-a[2])-(b[2]-a[2])*(c[1]-a[1]),(b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2]),(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])];
+    const out=n[0]*(a[0]-cen[0])+n[1]*(a[1]-cen[1])+n[2]*(a[2]-cen[2]);
+    if(out<0){const t=b;b=c;c=t}
+    pos.push(...a,...b,...c)}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();return g;
+}
+const geoBox=new THREE.BoxGeometry(1,1,1),geoSphere=new THREE.SphereGeometry(.5,32,22),geoRound=new RoundedBoxGeometry(1,1,1,5,.22);
+const geoCyl=new THREE.CylinderGeometry(.5,.5,1,40);geoCyl.rotateZ(Math.PI/2);
+// a Roblox wedge: full bottom and back (+Z), the slope rises from the front-bottom edge to the back-top edge
+const geoWedge=solid([[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]],[[0,1,2,3],[3,2,5,4],[0,3,4],[1,5,2],[0,4,5,1]]);
+// a corner wedge: the bottom rectangle and an apex over its back-right corner
+const geoCorner=solid([[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5],[.5,.5,.5]],[[0,1,2,3],[3,2,4],[1,2,4],[0,1,4],[0,3,4]]);
+const GEO={K:geoBox,W:geoWedge,V:geoCorner,Y:geoCyl,O:geoSphere};
+const glowTex=(()=>{const cv=document.createElement('canvas');cv.width=cv.height=64;const c=cv.getContext('2d');const gr=c.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.3,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=gr;c.fillRect(0,0,64,64);return new THREE.CanvasTexture(cv)})();
+const ROUGH={W:.7,R:.28,S:.82,B:.9,D:.92,C:.85,M:.32,P:.55,A:.95,I:.25,G:.08};
+const matCache=new Map();
+function material(p){
+  const key=p.m+'|'+p.c.join(',')+'|'+(p.t||0);let m=matCache.get(key);if(m)return m;
+  const t=p.t||0;
+  if(p.m==='N')m=new THREE.MeshBasicMaterial({color:col(p.c).multiplyScalar(1.1),transparent:t>0,opacity:1-t,toneMapped:false,depthWrite:t<.5});
+  else if(p.m==='G'||p.m==='I')m=new THREE.MeshPhysicalMaterial({color:col(p.c),roughness:ROUGH[p.m],transparent:true,opacity:p.m==='I'?.9:Math.min(.55,1-t),clearcoat:1,envMap:envTex,envMapIntensity:.7,depthWrite:p.m==='I'});
+  else{
+    m=new THREE.MeshStandardMaterial({color:col(p.c),roughness:ROUGH[p.m]??.6,metalness:p.m==='M'?.75:0,transparent:t>0,opacity:1-t});
+    if(p.m==='M'){m.envMap=envTex;m.envMapIntensity=.9}
+  }
+  matCache.set(key,m);return m;
+}
+function glow(s,pos,color,size,opacity){
+  const m=new THREE.SpriteMaterial({map:glowTex,color:col(color),transparent:true,opacity,depthWrite:false,blending:THREE.AdditiveBlending});
+  const sp=new THREE.Sprite(m);sp.position.set(pos[0],pos[1],pos[2]);sp.scale.set(size,size,1);s.add(sp);
+}
+function rr(c,x,y,w,h,r){r=Math.min(r,w/2,h/2);c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+// The sign: HubDisplayArt's SurfaceGui (navy gradient, the ribbon behind the title in the champion's colour, five rows of Fredoka text that shrink to fit), as a texture.
+function signTexture(sg){
+  const [W,H]=sg.canvas;const cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');
+  const gr=c.createLinearGradient(0,0,0,H);gr.addColorStop(0,'rgb(46,54,98)');gr.addColorStop(1,'rgb(18,20,42)');c.fillStyle=gr;c.fillRect(0,0,W,H);
+  const rb=sg.ribbon;const rx=rb.x*W,ry=rb.y*H,rw=rb.w*W,rh=rb.h*H;
+  c.fillStyle=`rgb(${rb.bg.join(',')})`;rr(c,rx,ry,rw,rh,.28*Math.min(rw,rh));c.fill();
+  c.lineWidth=5;c.strokeStyle=`rgb(${rb.edge.join(',')})`;rr(c,rx,ry,rw,rh,.28*Math.min(rw,rh));c.stroke();
+  for(const l of sg.labels){
+    if(!l.text)continue;
+    let size=Math.min(l.max,l.h*.95);const font=s=>`bold ${s}px "DejaVu Sans","Noto Color Emoji",sans-serif`;
+    c.font=font(size);while(c.measureText(l.text).width>l.w&&size>8){size-=2;c.font=font(size)}
+    c.textAlign='center';c.textBaseline='middle';c.lineJoin='round';
+    const cx=l.x+l.w/2,cy=l.y+l.h/2+size*.04;
+    c.lineWidth=Math.max(3,size*.1);c.strokeStyle=`rgba(14,12,34,${1-l.strokeT})`;c.strokeText(l.text,cx,cy);
+    c.fillStyle=`rgb(${l.color.join(',')})`;c.fillText(l.text,cx,cy);
+  }
+  const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=8;return tex;
+}
+function skyTexture(){
+  const cv=document.createElement('canvas');cv.width=4;cv.height=256;const c=cv.getContext('2d');
+  const g=c.createLinearGradient(0,0,0,256);g.addColorStop(0,'#5a9ee0');g.addColorStop(.55,'#a9d4f4');g.addColorStop(1,'#dff0fb');c.fillStyle=g;c.fillRect(0,0,4,256);
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+let S=null,sun=null,CUR=null;
+window.setScene=function(scene){
+  CUR=scene;S=new THREE.Scene();S.background=skyTexture();
+  S.add(new THREE.HemisphereLight(0xeaf6ff,0x6a7a5a,1.2));
+  sun=new THREE.DirectionalLight(0xfff2dd,2.3);sun.castShadow=true;sun.shadow.mapSize.set(4096,4096);sun.shadow.bias=-.0005;sun.shadow.normalBias=.05;S.add(sun,sun.target);
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),new THREE.MeshStandardMaterial({color:0x5b7f4a,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=2.9;ground.receiveShadow=true;S.add(ground);
+  for(const p of scene.parts){
+    const r=p.r;const m=new THREE.Matrix4().set(r[0],r[1],r[2],p.p[0],r[3],r[4],r[5],p.p[1],r[6],r[7],r[8],p.p[2],0,0,0,1);
+    const neon=p.m==='N';const av=p.g==='av';
+    const geo=av&&p.k!=='O'?geoRound:GEO[p.k]||geoBox;
+    const mesh=new THREE.Mesh(geo,material(p));mesh.matrixAutoUpdate=false;
+    mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(p.s[0],p.s[1],p.s[2]));
+    mesh.castShadow=!neon&&(p.t||0)<.3&&p.g!=='halo';mesh.receiveShadow=!neon;S.add(mesh);
+    if(p.face){ // two eyes on the head's front (local -Z)
+      for(const sx of[-1,1]){const e=new THREE.Mesh(geoSphere,new THREE.MeshBasicMaterial({color:0x1a1420}));e.matrixAutoUpdate=false;
+        e.matrix.copy(m).multiply(new THREE.Matrix4().makeTranslation(sx*.17*p.s[0],.06*p.s[1],-.47*p.s[2])).multiply(new THREE.Matrix4().makeScale(.1*p.s[0],.13*p.s[1],.06*p.s[2]));S.add(e)}
+    }
+    if(neon&&(p.t||0)<.95&&(p.g==='hub'||p.g==='item')){const sz=Math.max(...p.s)*(p.k==='O'?1:1);if(sz<9)glow(S,p.p,p.c,Math.max(1.6,sz*2.6),.34*(1-(p.t||0)))}
+    if(p.g==='halo')glow(S,p.p,p.c,Math.max(...p.s)*1.5,.35);
+  }
+  for(const sg of scene.signs){ // the SurfaceGui on the board's Front face (local -Z), x running to the viewer's right
+    const b=sg.board;const r=b.r;
+    const bm=new THREE.Matrix4().set(r[0],r[1],r[2],b.p[0],r[3],r[4],r[5],b.p[1],r[6],r[7],r[8],b.p[2],0,0,0,1);
+    const plane=new THREE.Mesh(new THREE.PlaneGeometry(b.s[0],b.s[1]),new THREE.MeshBasicMaterial({map:signTexture(sg),toneMapped:false}));
+    plane.matrixAutoUpdate=false;
+    plane.matrix.copy(bm).multiply(new THREE.Matrix4().makeRotationY(Math.PI)).multiply(new THREE.Matrix4().makeTranslation(0,0,b.s[2]/2+.04));
+    S.add(plane);
+  }
+};
+window.shoot=function(v){
+  const Wd=v.w,Ht=v.h;renderer.setSize(Wd,Ht);
+  const T=new THREE.Vector3(...v.at),C=new THREE.Vector3(...v.cam),dist=C.distanceTo(T);
+  S.fog=v.plan?null:new THREE.Fog(0xcfe6f6,500,1700);
+  sun.position.set(T.x-35,T.y+95,T.z+55);sun.target.position.copy(T);
+  const ex=v.plan?420:Math.max(70,Math.min(dist*.55,150));
+  Object.assign(sun.shadow.camera,{left:-ex,right:ex,top:ex,bottom:-ex,near:1,far:v.plan?1400:320});sun.shadow.camera.updateProjectionMatrix();
+  const cam=new THREE.PerspectiveCamera(v.fov,Wd/Ht,.5,4000);cam.position.copy(C);if(v.up)cam.up.set(...v.up);cam.lookAt(T);cam.updateMatrixWorld();
+  renderer.render(S,cam);
+  const labels=(v.labels||[]).map(l=>{const q=new THREE.Vector3(...l.p).project(cam);return{text:l.text,x:(q.x*.5+.5)*Wd,y:(-q.y*.5+.5)*Ht}});
+  return{url:renderer.domElement.toDataURL('image/png'),labels};
+};
+window.states=null;window.ready=true;
+</script></body></html>
