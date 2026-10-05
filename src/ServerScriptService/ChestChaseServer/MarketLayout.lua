@@ -449,11 +449,13 @@ function M.Polish(model)
 end
 -- Fruit of the Hour pedestal: stone plinth, teal column, gold cradle; the fruit floats above the cradle (client:
 -- FruitOfHourDisplay builds it, spins it and shows the bonus). No discs or rings (owner: "remove the discs").
--- R133 (owner: "the fruit is not big enough"): the fruit floats higher and bigger, lit by a soft projector beam.
+-- R133 (owner: "the fruit is not big enough"): the fruit floats higher and bigger.
+-- R152 (owner: "remove this hollow cylinder at the fruit of the hour place"): the R133 translucent 'Projector beam' tube around the
+-- fruit is gone (the fruit's own PointLight lights it); the cradle glow plate and prongs stay (R132 parts, not for the tube).
 M.FruitHeight=8.4
 function M.Pedestal(parent,origin)
  local holder=Instance.new('Model');holder.Name='FruitOfTheHour';holder.Parent=parent
- local part,_,_,drum=maker(holder,origin*CFrame.new(M.FruitOfHour))
+ local part=maker(holder,origin*CFrame.new(M.FruitOfHour))
  part('Pedestal plinth',Vector3.new(6,.8,6),Vector3.new(0,.4,0),P.Stone,nil,true)
  part('Plinth trim',Vector3.new(6.2,.2,6.2),Vector3.new(0,.9,0),P.Gold)
  for _,x in ipairs({-2.7,2.7})do for _,z in ipairs({-2.7,2.7})do
@@ -471,7 +473,6 @@ function M.Pedestal(parent,origin)
   local a=i*math.pi/2+math.pi/4
   part('Cradle prong',Vector3.new(.22,1.7,.22),CFrame.new(math.cos(a)*1.15,5.65,math.sin(a)*1.15)*CFrame.Angles(0,-a,0)*CFrame.Angles(0,0,math.rad(-18)),P.GoldDeep)
  end
- local beam=drum('Projector beam',0,5.04,0,M.FruitHeight-5.04,1.7,{255,236,170},Enum.Material.Neon);beam.Transparency=.86;beam.CastShadow=false
  local plaque=part('Pedestal plaque',Vector3.new(3,.7,.1),Vector3.new(0,2.25,-1.98),{30,34,50})
  local gui=Instance.new('SurfaceGui');gui.Name='Lettering';gui.Face=Enum.NormalId.Front;gui.CanvasSize=Vector2.new(500,116);gui.LightInfluence=0;gui.Parent=plaque
  local t=Instance.new('TextLabel');t.Name='Line1';t.BackgroundTransparency=1;t.Size=UDim2.fromScale(1,1);t.Font=Enum.Font.FredokaOne;t.TextScaled=true

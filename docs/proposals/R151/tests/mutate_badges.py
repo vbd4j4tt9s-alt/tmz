@@ -42,8 +42,8 @@ M = {
     'renderer_ignores_flag': ('shape', 'SeedPackRenderer.lua', "local shape=bag:GetAttribute('DefaultPackShape')~=true and bag:GetAttribute('PackShape')or nil", "local shape=bag:GetAttribute('PackShape')"),
     # the Index's look has no key of its own: it shares the hotbar's shaped template
     'no_plain_key': ('shape', 'ItemPictures.lua', "..(plain and'|Plain'or'')", "..''"),
-    # the Verity pack's Index picture is the server's shaped pouch
-    'verity_ignores_flag': ('shape', 'VerityPackArt.lua', "if bag:GetAttribute('DefaultPackShape')==true then", 'if false then'),
+    # R152: the Verity pack takes a shape again (its Index / hotbar pictures and the world pack carry a PackShape)
+    'verity_shaped': ('shape', 'PackShapes151.lua', "or variantKey==require(script.Parent.VerityCatalog).Variant then return false end", " then return false end"),
 }
 if name == 'list':
     print(' '.join(M))

@@ -1,11 +1,11 @@
 -- R151 Seed Festival Square, client. Builds the hub's "life" on this screen (HubLifeArt151: trees, bushes, flower beds, lamps, benches,
--- signposts, bunting, the Seed Fountain, verges, wall lanterns, grass patches, pebbles, butterflies) once the server's
+-- bunting, verges, wall lanterns, grass patches, pebbles, butterflies) once the server's
 -- ChestChaseMap.HubDecor151 exists, and keeps it light:
 --  * detail by device tier (ClientFxBudget; FastMode = tier 1): tier 1 builds only the "core" level, tier 2 adds "detail", tier 3 "fine";
 --  * detail by distance, checked twice a second per 100-stud cell: "detail" within 230 studs (160 on tier 2, phones), "fine" within 130,
 --    everything hidden when
 --    the camera is far down the track (z > 320); hidden levels are unparented Folders (no per-part work);
---  * per-frame work only for the tiny ambience (butterflies, the fountain's jet / ripples / pack, petals and sparkles), and only while the
+--  * per-frame work only for the tiny ambience (butterflies and falling petals), and only while the
 --    camera is within 150 studs of it, at tier >= 2 and without Reduced Motion (Reduced Motion: everything stands still, no particles);
 --  * lamps with a PointLight switch on in the dark (The Darkened's blackout via EnvironmentLighting.Level, Rain / Thunderstorm);
 --  * R151 Cloudy (WeatherCycle151, the default sky's other half): as the sky dims the lamps and lanterns warm up and glow: every lamp head and wall lantern
@@ -13,7 +13,7 @@
 --    desktop / phone / FastMode; the dark and storms still switch on all 8 everywhere), and the market's warm lights (tagged WarmLight151) strengthen. All of it
 --    is steps taken from the half-second tick: no per-frame work, and no loop over the lamps unless a step changed;
 --  * the track gate's keys turn green with a tick for the biomes this player is already fast enough for (KeeperSpeedLabels' rule);
---  * signposts show the bases' owners; three quiet ambience layers near the gardens (existing BiomeMood sounds only);
+--  * three quiet ambience layers near the gardens (existing BiomeMood sounds only);
 --  * the owner's studded tree models (ReplicatedStorage.HubTreeTemplates151) take the leafy tree slots within the tier's part budget; the
 --    folder's TemplateParts / UsedFor / ScriptsRemoved attributes say what happened.
 -- Nothing here collides, can be touched or queried, or changes gameplay.
@@ -27,7 +27,7 @@ local V=Vector3.new
 local GREEN,WHITE=Color3.fromRGB(110,236,96),Color3.fromRGB(255,255,255)
 local NEAR={detail=230,detailPhone=160,fine=130};local AMBIENCE_RANGE=150;local FAR_TRACK_Z=320
 
-local state={Root=nil,Ctx=nil,Tier=nil,Clock=0,Ambience=nil,Dark=false,LastKeys={},LastSigns={},LightBase=setmetatable({},{__mode='k'}),HeadBase=setmetatable({},{__mode='k'})}
+local state={Root=nil,Ctx=nil,Tier=nil,Clock=0,Ambience=nil,Dark=false,LastKeys={},LightBase=setmetatable({},{__mode='k'}),HeadBase=setmetatable({},{__mode='k'})}
 local connections={}
 local function reduced()local ok,v=pcall(function()return GuiService.ReducedMotionEnabled end);return ok and v==true end
 local function tier()
@@ -35,15 +35,6 @@ local function tier()
  local ok,t=pcall(Budget.Get);return ok and math.clamp(tonumber(t)or 2,1,3)or 2
 end
 local function decor()return map:FindFirstChild(K.FolderName)end
-local function baseModel(i)
- local bases=map:FindFirstChild('Bases');if not bases then return nil end
- for _,b in ipairs(bases:GetChildren())do if b:GetAttribute('BaseIndex')==i then return b end end
- return nil
-end
-local function ownerName(i)
- local b=baseModel(i);local n=b and b:GetAttribute('BaseOwnerDisplayName')
- return(type(n)=='string'and n~='')and n or nil
-end
 local function readBases(dec)
  local out={}
  for i=1,6 do local f,s,c=dec:GetAttribute('Pad'..i),dec:GetAttribute('PadSize'..i),dec:GetAttribute('Color'..i)
@@ -68,7 +59,7 @@ local function applyLod()
  for _,pe in ipairs(ctx.Emitters)do local on=not rm and pe:IsDescendantOf(workspace);if pe.Enabled~=on then pe.Enabled=on end end
 end
 
--- Ambience: butterflies flutter and drift round their flowers; the fountain's jet pulses, its ripples spread, the pack turns --------------
+-- Ambience: butterflies flutter and drift round their flowers (R152: the Seed Fountain and its jet / ripples / pack are gone) -------------
 local function ambienceStep(dt)
  local ctx=state.Ctx;if not ctx then return end
  state.Clock+=dt;local c=state.Clock
@@ -82,18 +73,6 @@ local function ambienceStep(dt)
   parts[#parts+1]=b.Left;cfs[#cfs+1]=heading*CFrame.Angles(0,0,flap)*CFrame.new(-.5,0,0)
   parts[#parts+1]=b.Right;cfs[#cfs+1]=heading*CFrame.Angles(0,0,-flap)*CFrame.new(.5,0,0)
  end end
- local F=ctx.Fountain
- if F then
-  if F.Jet and F.JetBase then local k=1+math.sin(c*3)*.12;F.Jet.Size=V(F.JetSize.X*k,F.JetSize.Y,F.JetSize.Z);parts[#parts+1]=F.Jet;cfs[#cfs+1]=F.JetBase*CFrame.new((k-1)*F.JetSize.X/2,0,0)end
-  if F.Pack and F.PackBase then
-   local cf=F.PackBase*CFrame.new(0,math.sin(c*1.6)*.35,0)*CFrame.Angles(0,c*.5,0)
-   if F.Pack:IsA('Model')then F.Pack:PivotTo(cf)else parts[#parts+1]=F.Pack;cfs[#cfs+1]=cf end
-  end
-  for i,r in ipairs(F.Ripples)do if r:IsDescendantOf(workspace)then
-   local u=((c*.35)+(i-1)*.5)%1;local d=8+u*11
-   r.Size=V(r.Size.X,d,d);r.Transparency=.45+u*.55
-  end end
- end
  if #parts>0 then workspace:BulkMoveTo(parts,cfs,Enum.BulkMoveMode.FireCFrameChanged)end
 end
 local function setAmbience(on)
@@ -103,7 +82,6 @@ end
 local function ambienceWanted()
  local ctx=state.Ctx;if not ctx or tier()<2 or reduced()then return false end
  local p=cameraPos()
- if ctx.Fountain and(V(p.X,0,p.Z)-V(ctx.Fountain.Center.X,0,ctx.Fountain.Center.Z)).Magnitude<AMBIENCE_RANGE then return true end
  for _,b in ipairs(ctx.Butterflies)do if(p-b.Home).Magnitude<AMBIENCE_RANGE*.7 then return true end end
  return false
 end
@@ -201,15 +179,6 @@ local function applyKeys()
  end
 end
 
--- Signposts: the owners' names --------------------------------------------------------------------------------------------------------------
-local function applySigns()
- local ctx=state.Ctx;if not ctx then return end
- for _,s in ipairs(ctx.Signs)do
-  local text=(ownerName(s.Base)or('Base '..s.Base))..(s.Other and(' · '..(ownerName(s.Other)or('Base '..s.Other)))or'')
-  if s.Line.Text~=text then s.Line.Text=text end
- end
-end
-
 -- Ambience layers near the gardens (the existing BiomeMood loops, quietly, on the Ambience slider) ---------------------------------------------
 local sounds={}
 local ZONES={
@@ -269,7 +238,7 @@ local function build()
  local t=tier()
  state.TreeSig=treeSig()
  local infos,tsum,tf=treeTemplates()
- local ok,ctx=pcall(Art.Build,root,t,readBases(dec),ownerName,infos)
+ local ok,ctx=pcall(Art.Build,root,t,readBases(dec),infos)
  for _,i in ipairs(infos)do if i.Model then i.Model:Destroy()end end
  if not ok then warn('[R151] Hub life skipped: '..tostring(ctx));root:Destroy();return false end
  root:SetAttribute('Tier',t);root:SetAttribute('Core',ctx.Counts.core);root:SetAttribute('Detail',ctx.Counts.detail);root:SetAttribute('Fine',ctx.Counts.fine)
@@ -279,14 +248,14 @@ local function build()
  -- nothing in the square ever collides, whatever is added to it later (owner: "make sure they are collision is off")
  state.Guard=root.DescendantAdded:Connect(Trees.GuardSquare)
  state.Root=root;state.Ctx=ctx;state.Tier=t
- applyLod();applyLamps(true);applySigns()
+ applyLod();applyLamps(true)
  root.Parent=workspace -- (built unparented: one hand-over, no per-part streaming work)
  return true
 end
 
-local elapsed,slow,builtFor=0,0,nil
+local elapsed,builtFor=0,nil
 local function tick(dt)
- elapsed+=dt;slow+=dt
+ elapsed+=dt
  applySounds(dt)
  if elapsed<.5 then return end
  elapsed=0
@@ -298,7 +267,6 @@ local function tick(dt)
  local t=tier();if t>(state.Tier or 1)or treeSig()~=state.TreeSig then build()end
  applyLod();applyLamps(false);applyKeys()
  setAmbience(ambienceWanted())
- if slow>=1 then slow=0;applySigns()end
 end
 setupSounds()
 if Cycle then -- R151 Cloudy: the market's tagged warm lights (found now and as they stream in)
@@ -317,6 +285,6 @@ end)
 script:SetAttribute('R151Loaded',true)
 -- (the offline tests set R151TestHook on the script to drive it; in the game nothing is returned)
 if script:GetAttribute('R151TestHook')then
- return{State=state,Build=build,ApplyLod=applyLod,ApplyLamps=applyLamps,ApplyKeys=applyKeys,ApplySigns=applySigns,Tick=tick,AmbienceStep=ambienceStep,
+ return{State=state,Build=build,ApplyLod=applyLod,ApplyLamps=applyLamps,ApplyKeys=applyKeys,Tick=tick,AmbienceStep=ambienceStep,
   AmbienceWanted=ambienceWanted,Teardown=teardown,Sounds=sounds,Near=NEAR,ApplyWarm=applyWarm,Warm=warm}
 end

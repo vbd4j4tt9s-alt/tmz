@@ -1,46 +1,47 @@
--- R151: the shape of the two hub displays (HubDisplayService owns what they say and when). Both are the same stage, built from static anchored parts in the game's
--- chunky cartoon style (slate, gold trims, glowing gems: the R150 mystery pedestal's own art, MysteryPedestalArt, scaled up for the item's podium):
+-- R151 (rebuilt in R152): the shape of the two hub displays (HubDisplayService owns what they say and when). R152 (owner: "make sure that the avatar is sized up and dancing while the seed rotates around
+-- and the effects are actually on the seed not behind ... a billboard is not needed ... the same format and look as the fruit of the hour type pedestal"): a display is just
 --
---      [ crown ]                  front (what players see) is local -Z, toward the market; local +X is on the viewer's left
---   |  SIGN BOARD 48 x 20  |      the board stands on two slate posts with gold collars and a glowing gem on top; its words are a SurfaceGui (SignText)
---   |                      |
---        (halo)                  the halo disc, the gems and the ring on the podium wear the champion's colour (the rarity's, for a pull)
---    ITEM on a PODIUM   AVATAR   the giant item (cheap detail: <= 150 parts) stands on the podium; the champion's avatar on its own low plinth beside it
---   [========= stage =========]  slate stage with a gold skirt, one front step, and a wide apron
+--        [ label ]               the market's FRUIT OF THE HOUR pedestal (MarketLayout.Pedestal: stone plinth with a gold trim and four studs, teal column with its inlays and a plaque, gold band, stone
+--         ITEM  (turns)          capital, gold-deep top, four gold prongs: same shapes, same palette), built Scale times bigger, the winning seed / fruit floating over its prongs, and the champion's
+--   [plaque]   AVATAR (dances)   avatar, 25 studs tall, standing on the floor beside it. Front (what players see) is local -Z, toward the market; local +X is on the viewer's left.
+--   [=== pedestal ===]
 --
--- Space: everything stays inside the 60 x 36 apron (HubDisplayRules.Footprint) around the display's centre, and under 48 studs tall (the hub's walls). Collision: the apron,
--- stage, step, podium (its four solid pieces), avatar plinth and the posts are solid; everything else is for show (CanCollide / CanQuery off, CanTouch off).
--- Cost: about 100 static parts for the frame, one SurfaceGui, one PointLight, plus the item (<= ItemParts) and the avatar. Nothing is animated here: motion, sparkles and the
--- cheer are the client's (HubDisplayClient), only near the camera.
--- Rules for the parts: surfaces that face the same way are never within .02 stud of each other where they overlap (tools/zfight.py runs on the built scene in the tests).
+--  * No sign board, posts, stage slab, halo disc or plinth for the avatar, and NOT the Fruit of the Hour's hollow projector tube: only the pedestal, the item and the avatar.
+--  * Words, small like the Fruit of the Hour's: an engraved plaque on the column (SurfaceGui: a dark plate, gold lettering; the title, the winner, a line, the countdown) and a label over the
+--    item (BillboardGui: the title, the winner's name, the seed / fruit; HubDisplayRules.Plaque / Label / SignText).
+--  * The item (the game's own seed or fruit art, <= ItemParts parts) carries its effects: an invisible core part at its centre holds a PointLight (the champion's colour), and the client puts a sparkle
+--    emitter on the same core while it is near; the client turns the whole item (HubDisplayClient), so light and sparkles move with it. Nothing flat behind it.
+--  * Space: everything inside Rules.Layout.Footprint (36 x 24 studs half size) around the display's centre, under the hub walls' height. Collision: the plinth, column, capital and its top are solid;
+--    everything else (trims, inlays, plaque, prongs, the item, the avatar) is for show (CanCollide / CanQuery / CanTouch off).
+-- Cost: 17 static parts for the pedestal, one SurfaceGui, one BillboardGui, one light, plus the item (<= ItemParts) and the avatar (a rig, <= 10 accessories). Nothing is animated here: the turn, the
+-- sparkles and the cheer are the client's, only near the camera; the dance is the Animator's (HubDisplayAvatar.Animate).
+-- Rules for the parts: surfaces that face the same way are never within .02 stud of each other where they overlap (the tests check the frame itself and the finished hub with the R149 detector).
 local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local Rules=require(RS:WaitForChild('HubDisplayRules'))
-local PedestalArt=require(script.Parent.MysteryPedestalArt)
 local A={}
 local RGB=Color3.fromRGB
 local V3,CF=Vector3.new,CFrame.new
-local SLATE,SLATE2,GOLD,NAVY=RGB(105,117,106),RGB(124,136,125),RGB(255,198,72),RGB(24,28,54)
+-- the Fruit of the Hour pedestal's palette (MarketLayout.P) and its plaque's dark plate
+local STONE,TEAL,TEALD,GOLD,GOLDD,PLATE=RGB(232,224,206),RGB(36,141,144),RGB(22,92,108),RGB(247,209,119),RGB(241,187,78),RGB(30,34,50)
 local SILHOUETTE=RGB(10,9,16)
--- Local numbers (studs; origin = the centre of the stage on the floor, X to the viewer's left, Y up, Z away from the viewers).
+-- Local numbers (studs; origin = the display's centre on the floor, X to the viewer's left, Y up, Z away from the viewers). The pedestal's own numbers are MarketLayout.Pedestal's (its units) x Scale.
 A.Dim={
- Apron={X=60,Z=36,H=.4},Stage={X=54,Z=30,H=.8},StageTop=1.2,
- Step={X=20,Z=3,H=.4,Z0=-16.5},
- Podium={X=13,Z=-1,Scale=1.2},        -- the item's podium (MysteryPedestalArt x 1.2): its top glow ring is 6.41 x 1.2 above the stage
- Plinth={X=-13,Z=-1,D=9.6,H=1.0},     -- the avatar's low round plinth
- Board={W=Rules.Sign.BoardW,H=Rules.Sign.BoardH,Bottom=21,Z=11.5,Thick=1.2},
- PostX=25.8,PostD=2.4,PostTop=40,
- ItemGap=.5,                          -- the item's bottom floats this far over the podium's top
- Halo={D=16,Back=5},                  -- the halo disc behind the item
+ Scale=3.2,                                      -- the pedestal is the Fruit of the Hour's x 3.2: 19.8 wide, 15.9 tall
+ Pedestal={X=15},                                -- its centre (the viewer's left)
+ Avatar={X=-15},                                -- where the avatar's soles stand (on the floor; Rules.AvatarTurn turns it toward the pedestal)
+ Inlay={W=3.4,H=1.9},                            -- the column's front inlay, in pedestal units (wider than the market's 2.6 x 1.5: it frames the bigger plaque)
+ ItemTop=6.5,                                    -- the item's bottom floats over the prong tips: pedestal units
+ LabelGap=1.2,                                   -- from the item's top to the label's bottom (studs)
 }
-function A.PodiumTop()return A.Dim.StageTop+6.41*A.Dim.Podium.Scale end  -- (local Y of the glowing ring on top of the podium)
-function A.ItemBase()return A.PodiumTop()+A.Dim.ItemGap end              -- (local Y of the item's lowest point)
-function A.AvatarFeet()return A.Dim.StageTop+A.Dim.Plinth.H+.1 end        -- (local Y of the soles: on the plinth's glow pad)
+function A.CapitalTop()return 4.955*A.Dim.Scale end                    -- (local Y of the pedestal's top slab's top)
+function A.ItemBase()return A.Dim.ItemTop*A.Dim.Scale end              -- (local Y of the item's lowest point: just over the prongs' tips, 20.8)
+function A.AvatarFeet()return 0 end                                    -- (local Y of the soles: the floor)
 local function part(parent,name,size,frame,color,material,solid)
  local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=frame;p.Color=color;p.Material=material or Enum.Material.SmoothPlastic
  p.Anchored=true;p.CanCollide=solid==true;p.CanQuery=solid==true;p.CanTouch=false;p.CastShadow=solid==true
  p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=parent;return p
 end
--- A round part standing up (a Cylinder's axis is X): height first.
+-- A round part standing up (a Cylinder's axis is X): height first. (Only the gem stand-in uses one.)
 local function disc(parent,name,height,diameter,frame,color,material,solid)
  local p=part(parent,name,V3(height,diameter,diameter),frame*CFrame.Angles(0,0,math.pi/2),color,material,solid)
  p.Shape=Enum.PartType.Cylinder;return p
@@ -52,7 +53,7 @@ local function c3(t)return RGB(t[1],t[2],t[3])end
 -- The frame ------------------------------------------------------------------------------------------------------------------------------------------
 -- parent: where the display's Model goes. kind: 'Pull' | 'Fruit'. layout: HubDisplayRules.Layout. floorTop: the hub floor's top (world Y). Returns the display handle.
 function A.BuildFrame(parent,kind,layout,floorTop)
- local D=A.Dim
+ local D=A.Dim;local S=D.Scale
  local spot=(kind=='Fruit'and layout.Fruit or layout.Pull).Center
  local origin=V3(spot.X,floorTop,spot.Z)
  local F=CFrame.lookAt(origin,V3(layout.Target.X,floorTop,layout.Target.Z)) -- local -Z (the front) faces the market
@@ -60,129 +61,105 @@ function A.BuildFrame(parent,kind,layout,floorTop)
  local model=Instance.new('Model');model.Name=kind=='Fruit'and'BiggestFruitDisplay'or'BestPullDisplay'
  model.ModelStreamingMode=Enum.ModelStreamingMode.Persistent -- (StreamingEnabled: a landmark; it must be there from afar, never streamed out and back as new instances)
  model:SetAttribute('HubDisplay',Rules.Version);model:SetAttribute('Kind',kind);model:SetAttribute('State','Empty');model:SetAttribute('Rev',0)
- local d={Kind=kind,Model=model,F=F,Lit={},Ribbon=nil,Labels={}}
- -- the stage -------------------------------------------------------------------------------------------------------------------------------------
- local base=Instance.new('Folder');base.Name='Stage';base.Parent=model
- part(base,'Apron',V3(D.Apron.X,D.Apron.H,D.Apron.Z),L(0,D.Apron.H/2,0),SLATE,Enum.Material.Slate,true)
- part(base,'Stage',V3(D.Stage.X,D.Stage.H,D.Stage.Z),L(0,D.Apron.H+D.Stage.H/2,0),SLATE2,Enum.Material.Slate,true)
- part(base,'Stage skirt',V3(D.Stage.X+.8,.3,D.Stage.Z+.8),L(0,D.Apron.H+.15,0),GOLD)
- part(base,'Front step',V3(D.Step.X,D.Step.H,D.Step.Z),L(0,D.Apron.H+D.Step.H/2,D.Step.Z0),SLATE,Enum.Material.Slate,true)
- -- the item's podium: the R150 pedestal art, scaled up -------------------------------------------------------------------------------------------
- local podium=Instance.new('Model');podium.Name='Podium';podium.Parent=model
- local o=L(D.Podium.X,D.StageTop,D.Podium.Z)
- local art=PedestalArt.Build(podium,o)
- local pivot=part(podium,'PodiumPivot',V3(1,1,1),o,SLATE);pivot.Transparency=1
- podium.PrimaryPart=pivot
- podium:ScaleTo(D.Podium.Scale)
- d.Podium=podium;d.PodiumArt=art
- for _,p in ipairs(art.Lit)do d.Lit[#d.Lit+1]=p end
- -- the avatar's plinth ----------------------------------------------------------------------------------------------------------------------------
- local plinth=Instance.new('Folder');plinth.Name='AvatarPlinth';plinth.Parent=model
- local px,pz=D.Plinth.X,D.Plinth.Z
- disc(plinth,'Plinth skirt',.16,D.Plinth.D+.7,L(px,D.StageTop+.08,pz),GOLD)
- disc(plinth,'Plinth',D.Plinth.H,D.Plinth.D,L(px,D.StageTop+D.Plinth.H/2,pz),SLATE,Enum.Material.Slate,true)
- d.Lit[#d.Lit+1]=disc(plinth,'Plinth glow',.1,D.Plinth.D-1.2,L(px,D.StageTop+D.Plinth.H+.05,pz),GOLD,Enum.Material.Neon)
- -- the sign board, on two posts ---------------------------------------------------------------------------------------------------------------------
- local B=D.Board
- local back=Instance.new('Folder');back.Name='SignStand';back.Parent=model
- local boardMid=B.Bottom+B.H/2
- for _,side in ipairs({-1,1})do
-  local x=side*D.PostX
-  disc(back,'Post',D.PostTop-D.StageTop,D.PostD,L(x,D.StageTop+(D.PostTop-D.StageTop)/2,B.Z),SLATE,Enum.Material.Slate,true)
-  disc(back,'Post foot',.6,D.PostD+1,L(x,D.StageTop+.3,B.Z),GOLD)
-  disc(back,'Post collar',.5,D.PostD+.8,L(x,B.Bottom+.6,B.Z),GOLD)
-  disc(back,'Post collar',.5,D.PostD+.8,L(x,B.Bottom+B.H-.6,B.Z),GOLD)
-  disc(back,'Post cap',.5,D.PostD+1,L(x,D.PostTop+.25,B.Z),GOLD)
-  d.Lit[#d.Lit+1]=ball(back,'Post gem',2,L(x,D.PostTop+1.5,B.Z),GOLD,Enum.Material.Neon)
+ local d={Kind=kind,Model=model,F=F,Plate={},Tag={}}
+ -- the pedestal: MarketLayout.Pedestal's parts and palette (u = its units, x Scale), without its projector tube and its flat cradle glow ----------------------------------------------
+ local ped=Instance.new('Folder');ped.Name='Pedestal';ped.Parent=model
+ local px=D.Pedestal.X
+ local function u(name,w,h,l,x,y,z,color,solid,rot)return part(ped,name,V3(w*S,h*S,l*S),L(px+x*S,y*S,z*S)*(rot or CFrame.new()),color,nil,solid)end
+ u('Pedestal plinth',6,.8,6,0,.4,0,STONE,true)
+ u('Plinth trim',6.2,.2,6.2,0,.9,0,GOLD)
+ for _,x in ipairs({-2.7,2.7})do for _,z in ipairs({-2.7,2.7})do u('Plinth stud',.45,.45,.45,x,1.05,z,GOLDD,false,CFrame.Angles(0,math.rad(45),0))end end
+ u('Pedestal column',3.8,2.4,3.8,0,2.2,0,TEAL,true)
+ local I=D.Inlay
+ u('Column inlay',I.W,I.H,.08,0,2.2,-1.92,TEALD);u('Column inlay',I.W,I.H,.08,0,2.2,1.92,TEALD)
+ u('Column band',4.1,.25,4.1,0,3.5,0,GOLD)
+ u('Pedestal capital',3.4,1,3.4,0,4.1,0,STONE,true)
+ local top=u('Capital top',4,.35,4,0,4.78,0,GOLDD,true)
+ for i=0,3 do
+  local a=i*math.pi/2+math.pi/4
+  u('Cradle prong',.22,1.7,.22,math.cos(a)*1.15,5.65,math.sin(a)*1.15,GOLDD,false,CFrame.Angles(0,-a,0)*CFrame.Angles(0,0,math.rad(-18)))
  end
- part(back,'Sign frame',V3(B.W+1.2,B.H+1.6,B.Thick+.5),L(0,boardMid,B.Z+.5),GOLD)
- local board=part(back,'Sign board',V3(B.W,B.H,B.Thick),L(0,boardMid,B.Z),NAVY)
- d.Board=board
- -- the crown on the frame's top edge: a band and three jewels (the middle one a little higher); the top is 4.7 over the frame, under the hub walls
- local top=boardMid+(B.H+1.6)/2
- part(back,'Crown band',V3(16,1.2,B.Thick+.5),L(0,top+.6,B.Z+.5),GOLD)
- for i,x in ipairs({-5.5,0,5.5})do
-  local rise=i==2 and .8 or 0
-  d.Lit[#d.Lit+1]=part(back,'Crown jewel',V3(2.4,2.4,B.Thick),L(x,top+2.55+rise,B.Z+.5)*CFrame.Angles(0,0,math.pi/4),GOLD,Enum.Material.Neon)
- end
- -- the halo behind the item, and the item's light -------------------------------------------------------------------------------------------------
- local halo=part(model,'Halo',V3(.3,D.Halo.D,D.Halo.D),L(D.Podium.X,A.ItemBase()+Rules.ItemHeight/2,D.Podium.Z+D.Halo.Back)*CFrame.Angles(0,math.pi/2,0),GOLD,Enum.Material.Neon)
- halo.Shape=Enum.PartType.Cylinder;halo.Transparency=1 -- (a Cylinder's axis is X: the quarter turn about Y above points it at the viewers)
- d.Halo=halo
- local anchor=part(model,'ItemAnchor',V3(1,1,1),L(D.Podium.X,A.ItemBase()+Rules.ItemHeight/2,D.Podium.Z),GOLD);anchor.Transparency=1
- local light=Instance.new('PointLight');light.Name='Glow';light.Color=GOLD;light.Range=26;light.Brightness=1.1;light.Shadows=false;light.Enabled=false;light.Parent=anchor
- d.Anchor=anchor;d.Light=light
+ -- the plaque: a dark plate on the inlay's front (its back face on the inlay's front face), the engraved words a SurfaceGui
+ local P=Rules.Plaque
+ local plate=part(ped,'Pedestal plaque',V3(P.W,P.H,.2),L(px,2.2*S,-(1.96*S+.1)),PLATE)
+ d.Plaque=plate
+ A._buildPlaque(d,plate)
+ -- the label over the item (the item's top is ItemHeight over its bottom): a BillboardGui on the pedestal's top, lifted in world space
+ d.Top=top
+ A._buildLabel(d,top)
  -- slots for what changes ------------------------------------------------------------------------------------------------------------------------
  d.ItemFolder=Instance.new('Folder');d.ItemFolder.Name='Item';d.ItemFolder.Parent=model
  d.AvatarFolder=Instance.new('Folder');d.AvatarFolder.Name='Avatar';d.AvatarFolder.Parent=model
- d.ItemAt=L(D.Podium.X,A.ItemBase(),D.Podium.Z)   -- where the item's bottom centre goes (the display's own turn in it)
- d.FeetAt=L(D.Plinth.X,A.AvatarFeet(),D.Plinth.Z)  -- where the avatar's soles go
+ d.ItemAt=L(px,A.ItemBase(),0)                  -- where the item's bottom centre goes (the display's own turn in it)
+ d.FeetAt=L(D.Avatar.X,A.AvatarFeet(),0)        -- where the avatar's soles go
  model:SetAttribute('ItemCenter',(d.ItemAt*CF(0,Rules.ItemHeight/2,0)).Position)
- -- the sign's words ----------------------------------------------------------------------------------------------------------------------------------
- A._buildSign(d)
  model.Parent=parent
  CS:AddTag(model,Rules.Tag)
  return d
 end
--- The sign ---------------------------------------------------------------------------------------------------------------------------------------------
-function A._buildSign(d)
- local S=Rules.Sign
- local gui=Instance.new('SurfaceGui');gui.Name='Sign';gui.Face=Enum.NormalId.Front
+-- The words ----------------------------------------------------------------------------------------------------------------------------------------------
+-- The plaque: the Fruit of the Hour plaque's look (dark plate, Fredoka One in gold) with four rows: HubDisplayRules.Plaque.Rows.
+function A._buildPlaque(d,plate)
+ local S=Rules.Plaque
+ local gui=Instance.new('SurfaceGui');gui.Name='Lettering';gui.Face=Enum.NormalId.Front
  gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud;gui.PixelsPerStud=S.PixelsPerStud
  gui.LightInfluence=0;gui.AlwaysOnTop=false;gui.ResetOnSpawn=false
  pcall(function()gui.MaxDistance=S.MaxDistance end)
- gui.Parent=d.Board
+ gui.Parent=plate
  local W,H=S.Canvas.W,S.Canvas.H
- local bg=Instance.new('Frame');bg.Name='Background';bg.Size=UDim2.fromScale(1,1);bg.BackgroundColor3=NAVY;bg.BorderSizePixel=0;bg.Parent=gui
- local shade=Instance.new('UIGradient');shade.Color=ColorSequence.new(RGB(46,54,98),RGB(18,20,42));shade.Rotation=90;shade.Parent=bg
- local function box(row)return UDim2.fromScale(row.X/W,row.Y/H),UDim2.fromScale(row.W/W,row.H/H)end
- -- the ribbon behind the title: the champion's colour
- local ribbon=Instance.new('Frame');ribbon.Name='Ribbon';ribbon.BorderSizePixel=0;ribbon.BackgroundColor3=GOLD
- ribbon.Position=UDim2.fromScale(.02,.02);ribbon.Size=UDim2.fromScale(.96,(S.Rows.Title.H+10)/H);ribbon.Parent=bg
- local corner=Instance.new('UICorner');corner.CornerRadius=UDim.new(.28,0);corner.Parent=ribbon
- local edge=Instance.new('UIStroke');edge.Color=GOLD;edge.Thickness=5;edge.Parent=ribbon
- d.Ribbon=ribbon;d.RibbonEdge=edge
- for _,key in ipairs({'Title','Name','Line','Odds','Footer'})do
-  local row=S.Rows[key];local pos,size=box(row)
-  local label=Instance.new('TextLabel');label.Name=key;label.BackgroundTransparency=1;label.Position=pos;label.Size=size
-  label.Font=Enum.Font.FredokaOne;label.Text='';label.TextColor3=Color3.new(1,1,1);label.TextScaled=true
-  label.TextStrokeColor3=RGB(14,12,34);label.TextStrokeTransparency=key=='Footer'and .6 or .25;label.TextWrapped=false;label.ZIndex=2;label.Parent=bg
+ for _,key in ipairs({'Title','Name','Line','Footer'})do
+  local row=S.Rows[key]
+  local label=Instance.new('TextLabel');label.Name=key;label.BackgroundTransparency=1
+  label.Position=UDim2.fromScale(row.X/W,row.Y/H);label.Size=UDim2.fromScale(row.W/W,row.H/H)
+  label.Font=Enum.Font.FredokaOne;label.Text='';label.TextColor3=GOLD;label.TextScaled=true
+  label.TextStrokeColor3=RGB(14,12,34);label.TextStrokeTransparency=key=='Footer'and .6 or .35;label.TextWrapped=false;label.Parent=gui
   local fit=Instance.new('UITextSizeConstraint');fit.MaxTextSize=row.Max;fit.MinTextSize=8;fit.Parent=label
-  d.Labels[key]=label
+  d.Plate[key]=label
  end
  d.Gui=gui
 end
--- Writes the sign's words (HubDisplayRules.SignText) and the ribbon's colour.
-function A.SetSign(d,text)
- if not d or not d.Labels then return end
- for key,label in pairs(d.Labels)do
-  local row=text.Rows[key]
-  label.Text=row and row.Text or''
-  if row and row.Color then label.TextColor3=c3(row.Color)end
+-- The label: FruitOfHourDisplay's two-row label (white name over a coloured line), floating over the item, with the title above (rows in studs: HubDisplayRules.Label.Rows).
+function A._buildLabel(d,top)
+ local S=Rules.Label
+ local gui=Instance.new('BillboardGui');gui.Name='Label';gui.Size=UDim2.fromScale(S.W,S.H)
+ local itemTop=A.ItemBase()+Rules.ItemHeight
+ gui.StudsOffsetWorldSpace=V3(0,itemTop+A.Dim.LabelGap+S.H/2-4.78*A.Dim.Scale,0) -- (from the top slab's centre)
+ gui.LightInfluence=0;gui.AlwaysOnTop=false;gui.ResetOnSpawn=false
+ pcall(function()gui.MaxDistance=S.MaxDistance end)
+ gui.Adornee=top;gui.Parent=top
+ for _,key in ipairs({'Title','Name','Info'})do
+  local row=S.Rows[key]
+  local t=Instance.new('TextLabel');t.Name=key;t.Text='';t.BackgroundTransparency=1
+  t.Position=UDim2.fromScale(row.X/S.W,row.Y/S.H);t.Size=UDim2.fromScale(row.W/S.W,row.H/S.H)
+  t.Font=Enum.Font.FredokaOne;t.TextScaled=true;t.TextColor3=Color3.new(1,1,1);t.TextStrokeColor3=RGB(20,25,40);t.TextStrokeTransparency=.25;t.Parent=gui
+  d.Tag[key]=t
  end
- local accent=text.Accent or{255,214,90}
- if d.Ribbon then d.Ribbon.BackgroundColor3=c3(accent):Lerp(RGB(20,18,40),.62)end
- if d.RibbonEdge then d.RibbonEdge.Color=c3(accent)end
+ d.LabelGui=gui
+end
+-- Writes the words (HubDisplayRules.SignText) into the plaque and the label.
+function A.SetSign(d,text)
+ if not d or not d.Plate then return end
+ for _,pair in ipairs({{d.Plate,text.Plaque},{d.Tag,text.Label}})do
+  for key,label in pairs(pair[1])do
+   local row=pair[2]and pair[2][key]
+   label.Text=row and row.Text or''
+   if row and row.Color then label.TextColor3=c3(row.Color)end
+  end
+ end
  d.Model:SetAttribute('State',text.State or'Empty')
 end
--- Colours: the lit parts (podium ring and gems, post gems, plinth glow, crown jewels), the halo and the light wear `accent` ({r,g,b}); an empty display is calm (violet,
--- no halo, light off). stage: the biome whose colours the podium wears (the pulled seed's or the fruit's), nil = the violet default.
-function A.Tint(d,accent,state,stage)
+-- Colours: the item's light wears `accent` ({r,g,b}) and the client's sparkles read it (the model's Accent attribute); a calm display (nobody has taken the spot: state 'Empty') has
+-- its light off and no sparkles (the Calm attribute). The pedestal itself keeps the Fruit of the Hour's colours. (A 4th argument, the old biome stage, is ignored.)
+function A.Tint(d,accent,state)
  local color=c3(accent or{255,214,90})
- if state=='Empty'then
-  PedestalArt.Tint(d.PodiumArt,'Locked',nil)
-  for _,p in ipairs(d.Lit)do p.Color=RGB(176,118,255)end
-  d.Halo.Transparency=1;d.Light.Enabled=false
-  return
- end
- PedestalArt.Tint(d.PodiumArt,'Ready',stage)
- for _,p in ipairs(d.Lit)do p.Color=color;p.Material=Enum.Material.Neon;p.Transparency=0 end
- d.Halo.Color=color;d.Halo.Transparency=.8
- d.Light.Color=color;d.Light.Enabled=true
- d.Model:SetAttribute('Accent',color)
+ local calm=state=='Empty'
+ d.Model:SetAttribute('Calm',calm)
+ if not calm then d.Model:SetAttribute('Accent',color)end
+ local light=d.ItemFolder:FindFirstChild('Glow',true)
+ if light then light.Color=color;light.Enabled=not calm end
 end
--- The giant item ----------------------------------------------------------------------------------------------------------------------------------------
--- Static geometry only (the ItemPictures rule): no scripts, effects, lights, sounds, joints or tags; every part anchored and inert.
+-- The showcase item ---------------------------------------------------------------------------------------------------------------------------------------
+-- Static geometry only (the ItemPictures rule): no scripts, effects, lights, sounds, joints or tags; every part anchored and inert. (The one light is added below, on the item's own core.)
 local KEEP={DataModelMesh=true,SurfaceAppearance=true,Decal=true,Texture=true,Model=true,Folder=true}
 local function clean(model)
  for _,tag in ipairs(CS:GetTags(model))do CS:RemoveTag(model,tag)end
@@ -257,8 +234,9 @@ local function gemModel(accent)
  disc(m,'Ring',.3,4.4,CF(0,0,0)*CFrame.Angles(math.pi/2,0,0),GOLD)
  return m
 end
--- Builds the giant item for a spec and stands it on the podium. spec: {Kind='Seed'|'Fruit', Id=, Coat=, Mystery=, Accent=}. Returns the Model (parented to nothing), and
--- info {Parts=, Dropped=, Source='art'|'gem', Height=}. Never throws.
+-- Builds the showcase item for a spec and floats it over the pedestal's prongs. spec: {Kind='Seed'|'Fruit', Id=, Coat=, Mystery=, Accent=, Calm=}. Returns the Model (parented to nothing), and
+-- info {Parts=, Dropped=, Source='art'|'gem', Height=}. Never throws. The item carries its own effects: 'ItemCore', an invisible part at its centre (about 70% of its size), holds the
+-- PointLight 'Glow' (the accent colour; off when Calm) and is where the client's sparkles go: all of it turns with the item.
 function A.BuildItem(d,spec)
  local model;local source='art'
  local ok,built=pcall(function()
@@ -271,7 +249,7 @@ function A.BuildItem(d,spec)
   model=gemModel(spec.Accent);source='gem'
  end
  clean(model)
- local dropped=cap(model,Rules.ItemParts)
+ local dropped=cap(model,Rules.ItemParts-1) -- (one more part follows: the core)
  -- size: the tallest side is ItemHeight (a wide, flat plant by a bit less), and nothing wider than 14 studs
  local center,size=bounds(model)
  local tall=math.max(size.Y,.6*math.max(size.X,size.Z),.01)
@@ -285,6 +263,11 @@ function A.BuildItem(d,spec)
   p.CFrame=F*CF((cf.Position-bottom)*k)*cf.Rotation
   CS:AddTag(p,'GiantVisualPart') -- (the camera right up against it fades it: GiantVisualSafety, like the giant plants)
  end
+ -- the core: where the item's light and sparkles live (an invisible part in the item: whatever turns the item turns it)
+ local core=Instance.new('Part');core.Name='ItemCore';core.Size=V3(math.max(size.X*k*.7,1),math.max(size.Y*k*.7,1),math.max(size.Z*k*.7,1));core.CFrame=F*CF(0,size.Y*k/2,0)
+ core.Transparency=1;core.Anchored=true;core.CanCollide=false;core.CanQuery=false;core.CanTouch=false;core.CastShadow=false;core.Massless=true;core.Parent=model
+ local light=Instance.new('PointLight');light.Name='Glow';light.Color=c3(spec.Accent or{255,214,90});light.Brightness=1.6;light.Range=40;light.Shadows=false
+ light.Enabled=spec.Calm~=true;light.Parent=core
  model.Name='GiantItem';model.PrimaryPart=nil
  model.ModelStreamingMode=Enum.ModelStreamingMode.Persistent
  model:SetAttribute('Spin',true)

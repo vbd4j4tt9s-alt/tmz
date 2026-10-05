@@ -7,8 +7,8 @@
 --    displays always show the best of the three. Everything an event does here is instant and local; the shared store (HubDisplayStore, MemoryStore) is written about 3 s
 --    later (compare-and-set: only if better) and read about once a minute (45 s + 0..15 s of jitter), so the other servers' champions arrive within a minute. If the store
 --    fails the server keeps its own board and keeps trying (the store backs off; see HubDisplayStore).
---  * Shows them: HubDisplayArt builds the two stages in the hub's empty back corners; on a change this writes the sign, the colours, a new giant item and the champion's avatar
---    (HubDisplayAvatar), each built once per champion (a generation number drops a build that a newer champion overtook), and bumps the display's `Rev` attribute so every
+--  * Shows them: HubDisplayArt builds the two pedestals (the Fruit of the Hour's, bigger) in the hub's empty back corners; on a change this writes the words, the colours, a new showcase item
+--    and the champion's avatar (HubDisplayAvatar: 25 studs tall, dancing: Animate), each built once per champion (a generation number drops a build that a newer champion overtook), and bumps the display's `Rev` attribute so every
 --    client pops it. When someone takes the top spot in THIS server it is announced in CHAT, through PullAnnouncer.Announce({Kind='Record', ...}) (the owner: pull announcements
 --    only in chat): who hears it is PullAnnounceRules.RecordScope (a Secret+ best pull every server, Legendary / Mythic this server, lower nothing; a fruit record this server);
 --    a record that comes from a pack open waits until the puller's reveal has shown the seed (AfterReveal), like the pull line; there is no notice banner of its own any more (it
@@ -78,9 +78,8 @@ function S:_syncDay()
  return true
 end
 -- Showing --------------------------------------------------------------------------------------------------------------------------------------------------
-local function stageOf(id)local spec=id and PackRules.SeedDesignById[id];return spec and spec.stage or nil end
--- The display of a board shows its champion (or the empty state). Does nothing when what it shows is already right. The sign and colours change at once; the giant item and
--- the avatar are built in a task of their own (yields: meshes, the avatar service) and dropped if a newer champion arrived meanwhile.
+-- The display of a board shows its champion (or the empty state). Does nothing when what it shows is already right. The words and colours change at once; the showcase item and
+-- the avatar are built in a task of their own (yields: meshes, the avatar service, the dance loading) and dropped if a newer champion arrived meanwhile.
 function S:_refresh(kind,force)
  local d=self.Displays[kind];if not d then return false end
  local rec=self.Board:Best(kind)
@@ -94,22 +93,22 @@ function S:_refresh(kind,force)
  if kind=='Fruit'and fruitId then text.Accent=Rules.RarityColor(PackRules.SeedRarityById[fruitId]or'Common')end
  guard('sign',self.Art.SetSign,d,text)
  local calm=kind=='Pull'and rec==nil
- guard('tint',self.Art.Tint,d,text.Accent,calm and'Empty'or'Ready',stageOf(kind=='Pull'and rec and rec.Id or fruitId))
+ guard('tint',self.Art.Tint,d,text.Accent,calm and'Empty'or'Ready')
  local m=d.Model
  m:SetAttribute('FooterPrefix',kind=='Pull'and'New board in 'or'New fruit in ')
  m:SetAttribute('NextAt',Rules.NextAt(self.Board.Day or Rules.Day(now))-self.DayOffset*86400)
  m:SetAttribute('FruitId',fruitId);m:SetAttribute('Champion',rec and rec.Name or nil);m:SetAttribute('ChampionUserId',rec and rec.Uid or nil)
  m:SetAttribute('Rarity',rec and rec.Rarity or nil)
  self.Rev[kind]+=1;m:SetAttribute('Rev',self.Rev[kind]) -- (last: the client reads the rest when this changes)
- task.spawn(function()guard('visuals',self._visuals,self,kind,rec,gen,fruitId,text.Accent)end)
+ task.spawn(function()guard('visuals',self._visuals,self,kind,rec,gen,fruitId,text.Accent,calm)end)
  return true
 end
 function S:_stale(kind,gen)return self.Dead or self.Gen[kind]~=gen end
-function S:_visuals(kind,rec,gen,fruitId,accent)
+function S:_visuals(kind,rec,gen,fruitId,accent,calm)
  local d=self.Displays[kind];if not d then return end
  local spec
- if kind=='Pull'then spec={Kind='Seed',Id=rec and rec.Id or'SunflowerSeed',Coat=rec and rec.Coat or'None',Mystery=rec==nil,Accent=accent}
- else spec={Kind='Fruit',Id=fruitId,Coat=rec and rec.Coat or'None',Accent=accent}end
+ if kind=='Pull'then spec={Kind='Seed',Id=rec and rec.Id or'SunflowerSeed',Coat=rec and rec.Coat or'None',Mystery=rec==nil,Accent=accent,Calm=calm}
+ else spec={Kind='Fruit',Id=fruitId,Coat=rec and rec.Coat or'None',Accent=accent,Calm=calm}end
  if not spec.Id then self.Art.SetItem(d,nil);return end
  local model,info=self.Art.BuildItem(d,spec)
  if self:_stale(kind,gen)then if model then model:Destroy()end;return end
@@ -118,11 +117,21 @@ function S:_visuals(kind,rec,gen,fruitId,accent)
  local avatar,source
  if rec then avatar,source=self.Avatars:Build(rec.Uid)else avatar,source=self.Avatars:Build(0,{Silhouette=true})end
  if self:_stale(kind,gen)then if avatar then avatar:Destroy()end;return end
+ local mode='static'
  if avatar then
-  local placed=self.Avatars:Place(avatar,d.FeetAt,Rules.AvatarHeight,-.4)
-  if placed then self.Art.SetAvatar(d,avatar)else avatar:Destroy();self.Art.SetAvatar(d,nil)end
+  local placed=self.Avatars:Place(avatar,d.FeetAt,Rules.AvatarHeight,Rules.AvatarTurn)
+  if placed then
+   self.Art.SetAvatar(d,avatar)
+   -- in the world now: dance (the rig's Animator plays a default R15 dance; if it cannot, the static pose goes on instead). This waits for the dance to load, so look again afterwards.
+   if self.Avatars.Animate then
+    local okAnimate,result=pcall(self.Avatars.Animate,self.Avatars,avatar,rec and rec.Uid or 0)
+    if okAnimate then mode=result else warn('[R151] avatar animation: '..tostring(result))end
+   end
+   if self:_stale(kind,gen)then return end
+  else avatar:Destroy();self.Art.SetAvatar(d,nil)end
  end
  self.AvatarSource=self.AvatarSource or{};self.AvatarSource[kind]=source
+ self.AvatarMode=self.AvatarMode or{};self.AvatarMode[kind]=mode
  d.Model:SetAttribute('Built',(d.Model:GetAttribute('Built')or 0)+1)
 end
 -- Events -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -385,7 +394,7 @@ function S:StatusText()
   or('Shared board: %s, %d request%s, %s'):format(st.Failures==0 and'ok'or('FAILING x'..st.Failures..(st.Throttled and' (throttled)'or'')),st.Requests,st.Requests==1 and''or's',st.LastError and('last error: '..st.LastError..'; retry in '..math.ceil(st.RetryIn)..' s')or(st.LastOk and'last ok'or'not read yet'))
  for _,kind in ipairs(KINDS)do
   local d=self.Displays[kind]
-  if d then local n=self.Art.Counts(d);lines[#lines+1]=('%s display: %d frame parts, %d item parts, %d avatar parts (%s)'):format(kind,n.Frame,n.Item,n.Avatar,tostring(self.AvatarSource and self.AvatarSource[kind]or'-'))end
+  if d then local n=self.Art.Counts(d);lines[#lines+1]=('%s display: %d pedestal parts, %d item parts, %d avatar parts (%s, %s)'):format(kind,n.Frame,n.Item,n.Avatar,tostring(self.AvatarSource and self.AvatarSource[kind]or'-'),tostring(self.AvatarMode and self.AvatarMode[kind]or'-'))end
  end
  return table.concat(lines,'\n')
 end

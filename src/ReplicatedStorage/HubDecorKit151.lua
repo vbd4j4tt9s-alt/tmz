@@ -1,7 +1,7 @@
 -- R151 Seed Festival Square (owner approved the docs/proposals/R151/base_area.md design): the shared kit of the hub dressing.
--- Palette, biome list, the measured hub geometry (the saved walls' inner faces, mural / banner / pilaster spots, the track gate, the
--- reserved back corners), small part constructors and a deterministic random source. Used by the server (ChestChaseServer.HubDecor151:
--- walls, murals, gate, paths, base arches) and the client (HubLifeArt151 + HubLife151.client: trees and props). Pure: builds only what it
+-- Palette, biome list, the measured hub geometry (the saved walls' inner faces, pilaster / lantern spots, the track gate, the reserved
+-- back corners), small part constructors and a deterministic random source. Used by the server (ChestChaseServer.HubDecor151: walls,
+-- rook gate, paths) and the client (HubLifeArt151 + HubLife151.client: trees and props). R152: no murals, banners or base arches. Pure: builds only what it
 -- is asked to, never touches gameplay; every part it makes is Anchored with CanTouch / CanQuery off and CanCollide off unless asked.
 local RS=game:GetService('ReplicatedStorage')
 local K={}
@@ -43,20 +43,37 @@ function K.At(sec,s,y,d)return sec.o+sec.t*s+V(0,y,0)+sec.n*d end
 function K.SecFrame(sec,s,y,d)return CFrame.fromMatrix(K.At(sec,s,y,d),sec.t,V(0,1,0),sec.n)end
 function K.SOf(sec,w)if sec.t.X~=0 then return(w-sec.o.X)/sec.t.X end;return(w-sec.o.Z)/sec.t.Z end
 K.WallTop=51
--- Murals in track order, starting left of the gate (+X as you face the track) and coming back on its right.
-K.Murals={
- {Biome=1,Sec='FrontXPos',W=160},{Biome=2,Sec='FrontXPos',W=262},{Biome=3,Sec='SideXPos',W=-269},{Biome=4,Sec='Back',W=0},
- {Biome=5,Sec='SideXNeg',W=-269},{Biome=6,Sec='FrontXNeg',W=-262},{Biome=7,Sec='FrontXNeg',W=-160},
-}
-K.MuralW,K.MuralH,K.MuralY0=44,27,15
-K.Banners={{Base=1,Sec='SideXNeg',W=-180.5},{Base=3,Sec='SideXNeg',W=-358},{Base=2,Sec='SideXPos',W=-180.5},{Base=4,Sec='SideXPos',W=-358},
- {Base=5,Sec='Back',W=-74},{Base=6,Sec='Back',W=74}}
+-- R152: the wall top is a chess-rook battlement: one square merlon (Size x Size, the walls' own 5-stud thickness, flush with both faces) every
+-- ~10 studs round the whole top, a merlon on each outer corner (no tower, nothing higher), sitting on WallTop. Pilasters stop under it.
+K.Battlement={Size=5,Height=6}
+-- Where the merlons stand, as {Sec, S} (S along the section, the centre of the wall's thickness is 2.5 behind its inner face). Each run is evenly
+-- spaced between two fixed merlons: the corners (a merlon on each outer corner square) and, on the front walls, x = +-107.5 next to the gate
+-- towers: front 23 pitches of 10.0, sides 52 of 9.98, back 67 of 10.07. 218 merlons in all (4 corners, 46 front, 102 side, 66 back).
+function K.MerlonSpots()
+ local out={}
+ local function run(name,s0,s1,n,first,last)
+  for i=first,last do out[#out+1]={Sec=name,S=s0+(s1-s0)*i/n,I=i,Run=name}end
+ end
+ run('FrontXPos',-2.5,227.5,23,0,23);run('FrontXNeg',13.5,243.5,23,0,23)           -- 24 each: the corner (x = +-337.5) .. 107.5
+ run('SideXPos',-2.5,516.5,52,1,51);run('SideXNeg',-2.5,516.5,52,1,51)              -- 51 each between the two corners
+ run('Back',-2.5,672.5,67,0,67)                                                   -- 68: both back corners and the 66 between them
+ return out
+end
 K.Pilasters={
  FrontXNeg={-131.5,-188.5,-233.5,-290.5},FrontXPos={131.5,188.5,233.5,290.5},
  Back={-300,-240,-180,-120,-28.5,28.5,120,180,240,300},
  SideXNeg={-140,-214,-240.5,-297.5,-322,-394,-460,-530,-590},SideXPos={-140,-214,-240.5,-297.5,-322,-394,-460,-530,-590},
 }
-K.Gate={TowerX=99,TowerZ=-100,TowerD=16,BeamY0=44,BeamY1=56,KeyX={72,48,24,0,-24,-48,-72},FlagX={80,60,40,0,-40,-60,-80}}
+-- The track gate (R152: two chess-rook towers and a crenellated gatehouse). TowerD is the colliding shaft's lower diameter (its inner edge,
+-- 91.8, stays outside the 180-wide run-up); the stepped base reaches 17.4 (inner edge 90.3, as the R151 plinth did). The gatehouse wall runs
+-- BeamY0 .. BeamY1 between the towers; the keys hang over the opening in front of it.
+K.Gate={TowerX=99,TowerZ=-100,TowerD=14.4,BeamY0=44,BeamY1=58,KeyY=50,KeyX={72,48,24,0,-24,-48,-72}}
+-- The 14 wall lanterns (client): on the pilasters, 28.5 either side of the old mural spots.
+K.WallLanterns={
+ {Sec='FrontXPos',W=131.5},{Sec='FrontXPos',W=188.5},{Sec='FrontXPos',W=233.5},{Sec='FrontXPos',W=290.5},
+ {Sec='FrontXNeg',W=-131.5},{Sec='FrontXNeg',W=-188.5},{Sec='FrontXNeg',W=-233.5},{Sec='FrontXNeg',W=-290.5},
+ {Sec='SideXPos',W=-240.5},{Sec='SideXPos',W=-297.5},{Sec='SideXNeg',W=-240.5},{Sec='SideXNeg',W=-297.5},{Sec='Back',W=-28.5},{Sec='Back',W=28.5},
+}
 -- The two back corners are reserved for the R151 Best Pull / Biggest Fruit displays: nothing of the dressing may stand in them.
 K.Reserved={{X0=145,X1=335,Z0=-618,Z1=-420},{X0=-335,X1=-145,Z0=-618,Z1=-420}}
 function K.InReserved(x,z,margin)
@@ -69,6 +86,9 @@ K.Streets={
  {-90,90,-100.3,-152},{-127,127,-152,-166},{-127,-109,-166,-404},{109,127,-166,-404},{-127,127,-404,-418},{-12,12,-166,-232},{-52,52,-232,-312},
  {-312,-127,-262,-276},{127,312,-262,-276},{-6,6,-418,-594},
 }
+-- R152: open circles nothing of the dressing may stand in (x, z, radius): the old fountain spot, the south plaza's centre, where the free Void
+-- Pack giveaway pedestal goes. Plain paving only: no trees, benches, lamps, signs or flower beds (HubLifeArt151.Clear refuses it).
+K.Open={{0,-392,18}}
 K.Discs={{0,-340,30},{0,-392,21},{-118,-159,12},{118,-159,12},{-118,-411,12},{118,-411,12},{-312,-269,13},{312,-269,13},{0,-596,10}}
 
 -- Deterministic randomness: the same seed always gives the same props (every client sees the same square).

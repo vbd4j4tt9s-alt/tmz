@@ -1,5 +1,5 @@
-"""R151 preview: composes docs/proposals/R151/hub_displays.png from render_hub.mjs's images (Pillow).
-Usage: python3 make_sheet.py <render out dir> <scene dir (scene_champions.json, champions.steps)> <out.png>"""
+"""R151 preview (R152: the pedestal, the showcase item and the dancing giant): composes docs/proposals/R152/hub_displays.png from render_hub.mjs's images (Pillow).
+Usage: python3 make_hub_sheet.py <render out dir> <scene dir (scene_champions.json, champions.steps)> <out.png>"""
 import json, math, os, re, sys
 from PIL import Image, ImageDraw, ImageFont
 
@@ -38,30 +38,38 @@ for line in open(os.path.join(SC, 'champions.steps'), encoding='utf-8'):
         info[mm.group(1)] = tuple(int(x) for x in mm.groups()[1:])
 frames = meta('champions', 'plan')['frames']
 pc, fc = frames['Pull']['center'], frames['Fruit']['center']
+scene = json.load(open(os.path.join(SC, 'scene_champions.json'), encoding='utf-8'))['parts']
 
 
-def gap_to_map():
-    """The smallest plan gap (studs) between the displays and the map's own pieces (bases, fences, treadmills, pedestals, the market, Verity)."""
-    scene = json.load(open(os.path.join(SC, 'scene_champions.json'), encoding='utf-8'))['parts']
+def box(p):
+    r, s = p['r'], p['size']
+    e = [(abs(r[i][0]) * s[0] + abs(r[i][1]) * s[1] + abs(r[i][2]) * s[2]) / 2 for i in range(3)]
+    return (p['p'][0] - e[0], p['p'][0] + e[0], p['p'][1] - e[1], p['p'][1] + e[1], p['p'][2] - e[2], p['p'][2] + e[2])
 
-    def box(p):
-        r, s = p['r'], p['size']
-        e = [(abs(r[i][0]) * s[0] + abs(r[i][1]) * s[1] + abs(r[i][2]) * s[2]) / 2 for i in range(3)]
-        return (p['p'][0] - e[0], p['p'][0] + e[0], p['p'][2] - e[2], p['p'][2] + e[2])
-    mine = [box(p) for p in scene if 'HubDisplays151' in p['path']]
+
+def numbers():
+    """The pedestal's footprint and height, the avatar's height, and the smallest plan gap (studs) between the pull display and the map's own pieces."""
+    mine = [p for p in scene if 'BestPullDisplay' in p['path']]
+    ped = [p for p in mine if '/Pedestal/' in p['path']]
+    av = [p for p in mine if '/Avatar/' in p['path']]
+    trim = [p for p in ped if p['name'] == 'Plinth trim'][0]
+    head = [box(p) for p in av if p['name'] == 'Head']
+    feet = [box(p) for p in av if p['name'] in ('LeftFoot', 'RightFoot')]
+    prongs = max(box(p)[3] for p in ped) - 4
+    item_h = float(re.search(r'R\.ItemHeight=([\d.]+)', open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'src', 'ReplicatedStorage', 'HubDisplayRules.lua'), encoding='utf-8').read()).group(1))
+    lp = json.loads([l for l in open(os.path.join(SC, 'champions.steps'), encoding='utf-8') if l.startswith('HUBTEXT ')][0][len('HUBTEXT '):])['label']
+    label_top = lp['p'][1] + lp['h'] / 2 - 4
+    others = [p for p in scene if 'HubDisplays151' not in p['path'] and (p.get('area') or '') in ('bases', 'fence', 'treadmill', 'pedestal', 'shop', 'verity', 'hub')]
     best = 1e9
-    for p in scene:
-        if 'HubDisplays151' in p['path'] or (p.get('area') or '') not in ('bases', 'fence', 'treadmill', 'pedestal', 'shop', 'verity', 'hub'):
-            continue
+    for p in others:
         b = box(p)
-        for a in mine:
-            dx = max(a[0] - b[1], b[0] - a[1], 0.0)
-            dz = max(a[2] - b[3], b[2] - a[3], 0.0)
-            best = min(best, math.hypot(dx, dz))
-    return best
+        for q in mine:
+            a = box(q)
+            best = min(best, math.hypot(max(a[0] - b[1], b[0] - a[1], 0.0), max(a[4] - b[5], b[4] - a[5], 0.0)))
+    return {'plinth': max(trim['size'][0], trim['size'][2]), 'prongs': prongs, 'avatar': (max(b[3] for b in head) - min(b[2] for b in feet)) if head and feet else 0, 'item': item_h, 'gap': best, 'label': label_top}
 
 
-GAP = gap_to_map()
+N = numbers()
 rows = []   # (label, [tiles]) each tile (image, caption)
 
 
@@ -71,19 +79,25 @@ def tile(state, name, caption):
 
 banner = img('champions', 'banner')
 banner = banner.crop((0, 90, banner.width, banner.height - 110))   # (less sky, and the market's canopy under the camera cropped away)
-rows.append(('The two displays from above the hub (a champion on each)', [(banner, 'Best Pull Today (right) and Biggest Fruit Today (left) stand in the two empty back corners, signs turned to the market')]))
-rows.append(("From a player's base: Base 4's and Base 3's spawn", [
+rows.append(('The two displays from above the hub (a champion on each)', [(banner, 'Best Pull Today (right) and Biggest Fruit Today (left) stand in the two empty back corners, turned to the market')]))
+rows.append(("From a player's base, a champion on each: Base 4's and Base 3's spawn (about 170 studs)", [
     tile('champions', 'pull_wide', 'BEST PULL TODAY from Base 4 (%d studs)' % round(dist(meta('champions', 'pull_wide')))),
     tile('champions', 'fruit_wide', 'BIGGEST FRUIT TODAY from Base 3 (%d studs)' % round(dist(meta('champions', 'fruit_wide'))))]))
-rows.append(('Close up: a champion and his avatar beside the giant item', [
-    tile('champions', 'pull_close', 'the rarest seed pulled today: a giant Fire Pepper seed, its rarity colour, the puller beside it'),
-    tile('champions', 'fruit_close', "today's fruit (it changes every day): the heaviest one, with its coat")]))
-rows.append(('Podium, item and avatar', [
-    tile('champions', 'pull_detail', 'the R150 pedestal art scaled up, a rarity glow, the posed avatar on its own plinth'),
-    tile('champions', 'fruit_detail', 'the giant fruit on the same podium')]))
-rows.append(('Nobody has taken the spot yet', [
-    tile('empty', 'pull_close', 'BEST PULL TODAY: a mystery silhouette and "Open a pack to take the first spot!"'),
-    tile('empty', 'fruit_close', 'BIGGEST FRUIT: the fruit shown, "Harvest the biggest ... today to get here!"')]))
+rows.append(("From the same spawns, nobody has taken the spot yet", [
+    tile('empty', 'pull_wide', 'BEST PULL TODAY, empty: the black mystery seed and a black silhouette (static, the same giant size)'),
+    tile('empty', 'fruit_wide', 'BIGGEST FRUIT TODAY, empty: the fruit of the day, a black silhouette')]))
+rows.append(('Close up: the pedestal with its plaque, the seed and its label, the avatar beside it', [
+    tile('champions', 'pull_close', 'the rarest seed pulled today: it turns over the prongs, its light and sparkles on it'),
+    tile('champions', 'fruit_close', "today's fruit (it changes every day): the heaviest one, Gold coat")]))
+rows.append(('Close up, empty', [
+    tile('empty', 'pull_close', 'BEST PULL TODAY: "Nobody yet", "Open a pack!", the plaque says the same'),
+    tile('empty', 'fruit_close', 'BIGGEST FRUIT TODAY: "Today: ... Watermelon" under the title, "Harvest one to claim it!"')]))
+rows.append(('The pedestal and the plaque, three-quarter view', [
+    tile('champions', 'pull_detail', 'the Fruit of the Hour pedestal x 3.2: the plaque has the title, winner, rarity, countdown'),
+    tile('champions', 'fruit_detail', 'the same for the fruit: "Today: ... " is the fruit of the day')]))
+rows.append(('How big: a normal 5.3 stud player 32 studs in front of each stand', [
+    tile('champions', 'pull_scale', 'the avatar is %.0f studs tall (a normal one is 5.3: about 4.7 times), the pedestal %.0f studs (prongs)' % (N['avatar'], N['prongs'])),
+    tile('champions', 'fruit_scale', 'the showcase item is about %.0f studs, floating over the prongs' % N['item'])]))
 
 lab_font, cap_font = font(26, True), font(17)
 height = 150
@@ -95,9 +109,9 @@ sheet = Image.new('RGB', (W, height), BG)
 d = ImageDraw.Draw(sheet)
 # header
 d.rectangle((0, 0, W, 120), fill=(30, 33, 62))
-d.text((PAD + 12, 16), 'R151  Hub displays: BEST PULL TODAY and BIGGEST FRUIT TODAY', font=font(40, True), fill=INK)
-d.text((PAD + 12, 72), 'Two giant displays in the hub\'s two empty back corners: the rarest pull and the biggest fruit of the day across all servers, each with the player\'s own avatar beside it.', font=font(20), fill=SOFT)
-d.text((PAD + 12, 98), 'Approximate render (three.js): plain materials, no textures or Roblox lighting, the font is not Fredoka; the avatar is a stand-in rig, the real one is the player\'s own (Studio).', font=font(17), fill=(205, 170, 120))
+d.text((PAD + 12, 16), 'R152  Hub displays: a pedestal, a spinning showcase, a dancing giant', font=font(40, True), fill=INK)
+d.text((PAD + 12, 72), 'BEST PULL TODAY and BIGGEST FRUIT TODAY: the market\'s Fruit of the Hour pedestal built big, the winning seed / fruit turning over it, the champion\'s avatar 25 studs tall beside it.', font=font(20), fill=SOFT)
+d.text((PAD + 12, 98), 'Approximate render (three.js): plain materials, no Roblox textures or lighting, not the Fredoka font; the avatar is a stand-in rig in ONE frame of its dance (the real one dances), sparkles frozen.', font=font(17), fill=(205, 170, 120))
 y = 140
 
 
@@ -148,16 +162,16 @@ panel = [
     ('Where', True),
     ('BEST PULL TODAY: back right corner, centre x %+d, z %d (about 100 studs from the right and back walls).' % (round(pc[0]), round(pc[2])), False),
     ('BIGGEST FRUIT TODAY: back left corner, centre x %+d, z %d.' % (round(fc[0]), round(fc[2])), False),
-    ('Both face the market at the hub\'s middle: from every base\'s spawn, the market and Verity, the sign is turned toward the player.', False),
-    ('Nearest piece of the map: %.0f studs away (bases, fences, treadmills, pedestals, the market); nothing overlaps.' % GAP, False),
+    ('Both stay inside the corner HubDecorKit151 reserves (x 145 .. 335, z -618 .. -420, mirrored), 30+ studs from the walls, turned to the market.', False),
+    ('Nearest piece of the map: %.0f studs away (bases, fences, treadmills, pedestals, the market); nothing overlaps.' % N['gap'], False),
     ('', False),
     ('Size', True),
-    ('Sign board 48 x 20 studs, 35 studs up, text readable out to about 300 studs; the glowing giant item reads as a landmark from anywhere in the hub.', False),
-    ('Stage 60 x 36, the giant item 10 studs tall on a podium, the avatar 10.5 studs on its own plinth; the top of the crown 47 studs (the walls are 48).', False),
-    ('Parts: BEST PULL %d + %d item + %d avatar; BIGGEST FRUIT %d + %d + %d (frame + item + avatar; the cap is 150 for the item).' % (info['Pull'] + info['Fruit']), False),
+    ('Pedestal: the Fruit of the Hour\'s own parts x 3.2, a %.1f stud plinth, the prongs %.1f studs up. The showcase item about %.0f studs, floating over the prongs; the label over it ends %.0f studs up (the walls are 48).' % (N['plinth'], N['prongs'], N['item'], N['label']), False),
+    ('Avatar: %.1f studs tall, soles on the floor (a normal one is 5.3), Model:ScaleTo; it dances one of Roblox\'s three default R15 dances on its Animator (the static pose only if that cannot load).' % N['avatar'], False),
+    ('Parts: BEST PULL %d pedestal + %d item + %d avatar; BIGGEST FRUIT %d + %d + %d (the old display was 53 + 45 + 22 and 53 + 12 + 22; no board, posts, slab, halo or tube).' % (info['Pull'] + info['Fruit']), False),
     ('', False),
     ('Not drawn here', True),
-    ('The client\'s motion: the item\'s slow turn and sparkles, the avatar\'s cheer, the pop when a new champion arrives; the fruit art of the live game (baked meshes: a stand-in here).', False),
+    ('The client\'s motion: the item\'s slow turn and float, the sparkles circling it (a frozen frame is drawn), the dance itself (one frame is drawn), the burst on a new champion.', False),
 ]
 
 

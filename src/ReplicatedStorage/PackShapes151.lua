@@ -8,9 +8,9 @@
 --    untouched, so the pivot, the bottom line, the seal and the strips stay exactly where they are. Nothing grows by more than 5%.
 --  * THE ROLL. Every ordinary pack rolls one of the six variations (uniformly) the moment it is made and keeps it for life: a track spawn (ChestService.
 --    RefreshWorldPack), and every pack that goes straight into a Bag (PlayerDataService:AddChest: bonus rolls, daily rewards, the mystery pedestal, gifts, owner
---    commands, the Verity hand-in). It is stored as the attribute PackShape on the world pack and as the OPTIONAL field PackShape on the item record (like
+--    commands; the Verity pack takes none since R152). It is stored as the attribute PackShape on the world pack and as the OPTIONAL field PackShape on the item record (like
 --    TestGrant: ProfileVersion stays 22, an older server drops it). 0 / absent = the default shape (the place's own mesh): every record saved before this, the
---    Void, the Mech and the special packs. A pack that is stolen, dropped, picked up, banked, put in the hotbar, held or opened keeps its roll, so every
+--    Void, the Mech, the Verity and the special packs. A pack that is stolen, dropped, picked up, banked, put in the hotbar, held or opened keeps its roll, so every
 --    context builds the same shape. THE DEFAULT SHAPE has ONE mechanism: a pack with no / 0 PackShape, and the flag DefaultPackShape (SeedPackVisuals.Bag's
 --    `defaultShape`, ItemPictures' |Plain look, which wins over a roll): the Index, the catalogue, shop, reward and market pictures are flagged, so they are
 --    the default pouch whatever a pack rolled and never ask this module for anything.
@@ -20,8 +20,8 @@
 --    shows the default only until its pair is baked (the bake is asked for at once; a server waits for it briefly before it puts a pack in a hand): never back.
 --  * The bake (per side, lazily, ONE EditableMesh at a time): AssetService:CreateEditableMeshAsync(the template's own MeshId) -> SetPosition of every vertex
 --    (colours, UVs stay) -> CreateMeshPartAsync, then the EditableMesh is destroyed. The baked MeshPart replaces the template's inside a Model kept in memory (never
---    parented); SeedPackRenderer.Build clones it exactly like the place's own. `neutral` pairs (the Verity pouch) set every vertex colour white first.
---  * BUDGET (per side). 42 designs x 6 variations (+ 6 neutral Verity pouches) are far more than any one side needs at once, so the cache is an LRU over
+--    parented); SeedPackRenderer.Build clones it exactly like the place's own. `neutral` pairs (kept for the API; the Verity pack takes none since R152) set every vertex colour white first.
+--  * BUDGET (per side). 42 designs x 6 variations are far more than any one side needs at once, so the cache is an LRU over
 --    vertices: above Config.MaxResidentVertices the least recently used pairs that are not PINNED (the pairs of the packs on the track) and were not used in the
 --    last GraceSeconds are evicted; a pair unused for IdleSeconds goes too; nothing is baked above Config.HardResidentVertices. A pair that cannot be baked
 --    (no permission, no vertices, over budget, a time-out) is STICKY: that pair shows the default shape on that side until the mode changes, so a fallback
@@ -76,10 +76,11 @@ function M.Sanitize(v)
  if type(v)~='number'or v~=v or v%1~=0 or v<1 or v>M.Count then return 0 end
  return v
 end
--- Whether a pack of this variant key can have a variation: the ordinary biome packs (also the legacy Small / Standard / Grand) and the Verity pack (its
--- neutral pouch). The Void, the Mech and every special pack keep their own pouch.
+-- Whether a pack of this variant key can have a variation: the ordinary biome packs (also the legacy Small / Standard / Grand). The Void, the Mech, every special pack and, since
+-- R152 (owner: the Verity pack must be a clean FLAT pouch), the Verity pack keep their own pouch: Verity never rolls, never carries and never builds a shape (every roll, record
+-- field, world pack, picture and builder asks this first), so its flat pouch (VerityPouch151) is the same in every context.
 function M.Applies(variantKey)
- if type(variantKey)~='string'or variantKey=='EclipseReliquary'or variantKey=='MechLimited'then return false end
+ if type(variantKey)~='string'or variantKey=='EclipseReliquary'or variantKey=='MechLimited'or variantKey==require(script.Parent.VerityCatalog).Variant then return false end
  return require(script.Parent.SeedPackRules).Variants[variantKey]~=nil
 end
 local stats={Baked=0,Failures=0,Requested=0,Evicted=0,Demoted=0,Last=nil,Rolled={0,0,0,0,0,0}}

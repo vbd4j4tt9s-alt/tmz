@@ -7,6 +7,7 @@ local PackVisuals = require(ReplicatedStorage:WaitForChild("SeedPackVisuals"))
 
 local Weather=require(ReplicatedStorage.WeatherTraits);local FX=require(ReplicatedStorage.ItemEffectAnchor)
 local PackShapes=require(ReplicatedStorage.PackShapes151) -- R151: each pack rolls one of six chip-bag shapes and keeps it for life (PlayerDataService.AddChest, RefreshWorldPack)
+local VerityReasons=require(ReplicatedStorage.VerityConfig).Reasons -- R152: what Verity says when a hand-in is refused (ConvertVoidPack)
 local ChestService = {}
 ChestService.__index = ChestService
 
@@ -963,7 +964,7 @@ end
 -- and the reason with nothing changed. A pack whose opening is committed (the reveal is playing) is refused; an opening that
 -- has only been started (held, clicks) is finished first, then the Tool is rebuilt for the new pack.
 function ChestService:ConvertVoidPack(player, id)
-	if not player or not self.PlayerData:IsLoaded(player) then return nil, "YOUR DATA IS STILL LOADING" end
+	if not player or not self.PlayerData:IsLoaded(player) then return nil, VerityReasons.Loading end
 	if id == nil then
 		local character = player.Character
 		if character then
@@ -979,13 +980,13 @@ function ChestService:ConvertVoidPack(player, id)
 				if record.Kind == "Pack" and record.BagVariant == "EclipseReliquary" and record.Stage == 7 then id = record.Id; break end
 			end
 		end
-		if id == nil then return nil, "YOU HAVE NO VOID PACK TO GIVE" end
+		if id == nil then return nil, VerityReasons.NoVoid end
 	end
 	local target, reason = self.PlayerData:CheckVoidPack(player, id)
 	if not target then return nil, reason end
 	local opening = self.Openings[player]
 	if opening and opening.Tool and opening.Tool:GetAttribute("SeedInventoryId") == target.Id then
-		if opening.Committed then return nil, "WAIT FOR THAT PACK TO FINISH OPENING" end
+		if opening.Committed then return nil, VerityReasons.Opening end
 		self:_finishOpening(player, opening)
 	end
 	local record, why = self.PlayerData:ConvertVoidPack(player, target.Id)
@@ -1018,6 +1019,19 @@ function ChestService:_canOpenPack(player,tool)
         and not player:GetAttribute("GuardianFlingActive") and not player:GetAttribute("ChestChaseSeedCarrying")
         and not player:GetAttribute("ChestChaseRunActive") and not player:GetAttribute("ChestChaseQueued")
 end
+-- R152 (hotbar reliability): two ways a pack the player equipped was thrown back into the Backpack although nothing was wrong:
+--  * a quick unequip + re-equip while its chip-bag shape was loading starts a SECOND hold of the same pack; the first one to finish held it, the second saw
+--    that opening and bounced the pack out of the hand (R151 known issue). A hold for the pack that is already held does nothing now.
+--  * equipping pack B while pack A is in hand: if B.Equipped is handled before A.Unequipped has finished A's opening, B saw A's opening and bounced. An opening
+--    that is not committed and whose pack is no longer in the hand is stale: it is finished here, then B is held. (Committed openings, whose reveal is playing, still win.)
+-- Returns true when this pack is already the held one.
+local function settleHold(self,player,tool)
+    local existing=self.Openings[player]
+    if type(existing)~="table" then return false end
+    if existing.Tool==tool and tool.Parent==player.Character then return true end
+    if not existing.Committed and existing.Tool.Parent~=player.Character then ChestService._finishOpening(self,player,existing) end
+    return false
+end
 function ChestService:_holdPack(player,tool)
     local record
     for _,candidate in ipairs(self.PlayerData:GetChestRecords(player))do if candidate.Id==tool:GetAttribute('SeedInventoryId')then record=candidate;break end end
@@ -1030,6 +1044,7 @@ function ChestService:_holdPack(player,tool)
         end
         tool.ToolTip=table.concat(rows,'\n')
     end
+    if settleHold(self,player,tool) then return end
     if self.Openings[player] or not self:_canOpenPack(player,tool) then
         local backpack=player:FindFirstChildOfClass("Backpack")
         if backpack and tool.Parent==player.Character then tool.Parent=backpack end
@@ -1043,6 +1058,7 @@ function ChestService:_holdPack(player,tool)
         local neutral=PackRules.VariantKey(tool:GetAttribute("BagVariant"))==require(ReplicatedStorage.VerityCatalog).Variant
         if PackShapes.State(design,shape,neutral)~="Ready" then
             pcall(PackShapes.Await,design,shape,neutral)
+            if settleHold(self,player,tool) then return end -- (R152: a second hold of this very pack began while this one waited)
             if self.Openings[player] or not self:_canOpenPack(player,tool) then
                 local backpack=player:FindFirstChildOfClass("Backpack")
                 if backpack and tool.Parent==player.Character then tool.Parent=backpack end

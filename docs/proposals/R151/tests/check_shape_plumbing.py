@@ -4,8 +4,10 @@ Usage: python3 check_shape_plumbing.py <src dir>      exit 1 and a line per prob
   * PackShape (the whole word) is named by exactly the files that handle a pack's own shape: the builders, the world spawn / carry / drop / hold, the item record, the
     mystery pedestal, the hand-made test packs, the picture key and the hotbar stack key. A catalogue / shop / Index / "what's inside" / title / market script naming it
     would be showing a roll there (the owner: those use the default shape).
+  * R152: the Verity pack is NEVER shaped. VerityPackArt and VerityPouch151 name neither PackShape nor DefaultPackShape (nor require PackShapes151: the flat pouch is the same in
+    every context), and PackShapes151.Applies excludes the Verity variant (every roll, record field, world pack and builder asks it first)
   * DefaultPackShape (the flag that forces the default shape: the owner's catalogue / shop / reward pictures) is named by the mechanism (SeedPackVisuals, SeedPackRenderer,
-    ItemPictures, VerityPackArt, VerityPouch151, PackShapes151's header); the market stalls and the shop's Mech viewport pass it to SeedPackVisuals.Bag (the shop / catalogue
+    ItemPictures, PackShapes151's header); the market stalls and the shop's Mech viewport pass it to SeedPackVisuals.Bag (the shop / catalogue
     pictures); no builder of a real pack (world, hand, drop, hotbar, record, pedestal) names it. The reward panels' proxy packs (the Verity quest, the daily reward cards,
     the treadmill bonus cards) carry no PackShape either, which is the default shape too, and keep sharing the hotbar's default look
   * the hotbar's stack key includes it (packs of different shapes never share a card)
@@ -23,8 +25,6 @@ EXPECTED = {
     'ReplicatedStorage/PackShapes151.lua',          # (it names the attribute in its comments / the status)
     'ReplicatedStorage/SeedPackVisuals.lua',        # Bag / CarryBag: the shape argument -> the attribute
     'ReplicatedStorage/SeedPackRenderer.lua',       # reads it for the ordinary pouch
-    'ReplicatedStorage/VerityPackArt.lua',          # the Verity pack's own neutral pair
-    'ReplicatedStorage/VerityPouch151.lua',         # the server's neutral pouch is the default shape (the folder's PackShape says so); the client's plain copy
     'ReplicatedStorage/ItemPictures.lua',           # the picture key and spec of a hotbar / Bag tool
     'StarterPlayer/StarterPlayerScripts/Hotbar.client.lua',  # the stack key
     'ServerScriptService/ChestChaseServer/ChestService.lua',       # the world spawn, the tool, the hand
@@ -57,7 +57,7 @@ def read(rel):
 
 FLAG_MECHANISM = {
     'ReplicatedStorage/SeedPackVisuals.lua', 'ReplicatedStorage/SeedPackRenderer.lua', 'ReplicatedStorage/ItemPictures.lua',
-    'ReplicatedStorage/VerityPackArt.lua', 'ReplicatedStorage/VerityPouch151.lua', 'ReplicatedStorage/PackShapes151.lua',
+    'ReplicatedStorage/PackShapes151.lua',
 }
 flagged = set()
 for base, _, files in os.walk(src):
@@ -73,6 +73,15 @@ for rel, call in (('ServerScriptService/ChestChaseServer/MarketLayout.lua', "spe
         problems.append('%s must build its pack with defaultShape (SeedPackVisuals.Bag(..., nil, true))' % rel)
 
 
+for rel in ('ReplicatedStorage/VerityPackArt.lua', 'ReplicatedStorage/VerityPouch151.lua'):
+    if 'require(script.Parent.PackShapes151)' in read(rel) or 'GetAttribute(\'PackShape\')' in read(rel):
+        problems.append('%s must not use PackShapes151 or read a PackShape: the Verity pack is never shaped (R152)' % rel)
+shapes = read('ReplicatedStorage/PackShapes151.lua')
+if not re.search(r"function M\.Applies\(variantKey\)\n if [^\n]*variantKey==require\(script\.Parent\.VerityCatalog\)\.Variant then return false end", shapes):
+    problems.append('PackShapes151.Applies must exclude the Verity variant (VerityCatalog.Variant): the Verity pack is never shaped (R152)')
+pd0 = read('ServerScriptService/ChestChaseServer/PlayerDataService.lua')
+if 'PackShapes.Applies(PackRules.VariantKey(row.BagVariant))' not in pd0:
+    problems.append('PlayerDataService.savedPackShape must drop the shape of a pack that takes none (an older Verity record): PackShapes.Applies(PackRules.VariantKey(row.BagVariant))')
 hot = read('StarterPlayer/StarterPlayerScripts/Hotbar.client.lua')
 if not re.search(r"stackFields=\{Pack=\{[^}]*'PackShape'", hot):
     problems.append("Hotbar's stackFields.Pack lacks 'PackShape': packs of different shapes would share a card")

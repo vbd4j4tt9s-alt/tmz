@@ -3,8 +3,11 @@
 -- an Animate script, a Humanoid with a name and health bar to switch off):
 --  1. descriptions: asked for once per user id (cached, the oldest dropped past 12), a failure is remembered for a minute, a non-user id is never asked about;
 --  2. the rig: stripped (no scripts, at most 10 accessories), inert (no collision, no touch, no query), anchored at its root only (the limbs hang off their joints, which is what
---     lets a client pose them), name and health bar off, the static pose in the joints' C0 (replicates), nothing else changed;
---  3. standing: scaled so the BODY is 10.5 studs tall whatever the avatar's own height scale and hats, soles on the plinth, turned toward the item, at the display's spot;
+--     lets a client pose them), name and health bar off, no pose yet (R152: the dance comes first, the static pose is only the fallback), nothing else changed;
+--  3. standing: R152: scaled (Model:ScaleTo, about 4.7 times a normal avatar) so the BODY is 25 studs tall whatever the avatar's own height scale and hats, soles on the floor, turned
+--     toward the pedestal, at the display's spot;
+--  3b. dancing (R152): once in the world the rig's Animator plays one of Roblox's three default R15 dance emotes, looped (made when the rig has none, one load, a stable pick per user);
+--     when the dance cannot load, play or be asked for (never loads / does not play / throws) the static pose goes into the joints' C0 instead (and the humanoid stops); a blocky stand-in is 'static';
 --  4. failures: no description / no rig / the services throwing -> a blocky stand-in of the same height and pose, never an error; the silhouette is black and asks nobody;
 --  5. the pose maths: the static pose only touches joints a rig has, the cheer and the celebration stay within the limits for any time, boost and bad input.
 local HH=require('./hub_harness');local H=HH.H;local W,R=H.W,H.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -16,7 +19,7 @@ local Avatar=H.server('HubDisplayAvatar')
 HH.installPlayers()
 local Players=W.service('Players')
 local function new()return Avatar.new({Players=Players,Clock=HH.clock().now})end
-local function reset()HH.avatars.Describe=0;HH.avatars.Create=0;HH.avatars.Mode='ok';HH.avatars.Accessories=3;HH.avatars.Scale=1 end
+local function reset()HH.avatars.Describe=0;HH.avatars.Create=0;HH.avatars.Mode='ok';HH.avatars.Accessories=3;HH.avatars.Scale=1;HH.avatars.Dance={Mode='ok',Loads=0} end
 -- the angle of a rotation (from its trace) in radians
 local function angle(cf)local r=cf.R;local tr=r[1][1]+r[2][2]+r[3][3];return math.acos(math.clamp((tr-1)/2,-1,1))end
 local function bodyTopBottom(rig)
@@ -69,14 +72,11 @@ do
  check(loose==15,'the 15 limb parts are not anchored: they hang off the root through their Motor6Ds (a client can pose them)')
  local hum=rig:FindFirstChildOfClass('Humanoid')
  check(hum.DisplayDistanceType==R.Enum.HumanoidDisplayDistanceType.None and hum.HealthDisplayType==R.Enum.HumanoidHealthDisplayType.AlwaysOff and hum.NameDisplayDistance==0 and hum.HealthDisplayDistance==0,'no name above its head, no health bar')
- check(hum.RequiresNeck==false and hum.BreakJointsOnDeath==false and hum.EvaluateStateMachine==false,'the humanoid is inert (no neck needed, no state machine)')
- -- the static pose
- local rs=Pose.Joint(rig,'RightShoulder');local ls=Pose.Joint(rig,'LeftShoulder');local hip=Pose.Joint(rig,'RightHip')
- check(rs and angle(rs.C0)>1.5 and angle(rs.C0)<2.3,'the right arm is raised out (its C0 turned about 110 degrees)')
- check(ls and angle(ls.C0)<.6 and angle(ls.C0)>0,'the left arm hangs a little out')
- check(hip and angle(hip.C0)==0,'the legs are not touched')
+ check(hum.RequiresNeck==false and hum.BreakJointsOnDeath==false,'the humanoid is inert (no neck needed, does not break on death)')
+ -- no pose yet: the dance comes first (a dance on top of a posed C0 would be turned), the static pose is the fallback (3b)
  local touched=0;for _,d in ipairs(rig:GetDescendants())do if d:IsA('Motor6D')and angle(d.C0)>1e-9 then touched+=1 end end
- check(touched==6,'exactly the six joints of the static pose moved ('..touched..')')
+ check(touched==0,'Build leaves every joint at rest (the pose is only the fallback of the dance)')
+ check(rig:FindFirstChildOfClass('Humanoid').EvaluateStateMachine~=false,'its state machine is not switched off by Build (a dancing rig keeps it on)')
  check(Pose.Apply(R.new('Model'))==0 and Pose.Joint(rig,'NoSuchJoint')==nil,'a model without joints: the pose moves nothing and does not throw')
  -- the rig is not parented or placed by Build
  check(rig.Parent==nil,'Build returns an unparented model')
@@ -92,15 +92,18 @@ do
   check(A:Place(rig,feet,Rules.AvatarHeight,-.4),'placed')
   local lo,hi=bodyTopBottom(rig)
   check(near(hi-lo,Rules.AvatarHeight,.05),'an avatar of height scale '..scale..' stands '..Rules.AvatarHeight..' studs tall (body only): '..string.format('%.2f',hi-lo))
-  check(near(lo,10,.05),'its soles are at the plinth\'s height (y '..string.format('%.2f',lo)..')')
+  check(hi-lo>=22 and hi-lo<=28,'which is huge: 22 to 28 studs (a normal avatar is about 5.3)')
+  check(rig:GetScale()*scale>=4.2 and rig:GetScale()*scale<=5.2,'scaled with Model:ScaleTo about 4.7 times a normal avatar ('..string.format('%.2f',rig:GetScale())..' x its own height scale '..scale..')')
+  check(near(lo,10,.05),'its soles are at the feet spot\'s height (y '..string.format('%.2f',lo)..')')
   local root=rig.HumanoidRootPart.CFrame.Position
   check(near(root.X,100,.05)and near(root.Z,-50,.05),'at the display\'s spot')
  end
  local rig=A:Build(6001);local feet=CF(0,0,0)*R.CFrame.Angles(0,math.pi/2,0)
- A:Place(rig,feet,Rules.AvatarHeight,-.4)
+ A:Place(rig,feet,Rules.AvatarHeight,Rules.AvatarTurn)
  local look=rig.HumanoidRootPart.CFrame.LookVector
- local want=(feet*R.CFrame.Angles(0,-.4,0)).LookVector
- check(near(look.X,want.X,1e-6)and near(look.Z,want.Z,1e-6),'it faces the way the display faces, turned a little toward the item')
+ local want=(feet*R.CFrame.Angles(0,Rules.AvatarTurn,0)).LookVector
+ check(Rules.AvatarHeight==25 and Rules.AvatarTurn<0 and Rules.AvatarTurn>-.6,'the numbers: 25 studs tall, turned a little toward the pedestal')
+ check(near(look.X,want.X,1e-6)and near(look.Z,want.Z,1e-6),'it faces the way the display faces, turned a little toward the pedestal')
  -- a hat that is much taller than the head does not shrink the body
  HH.avatars.Accessories=0
  local plain=A:Build(6002);A:Place(plain,CF(0,0,0),Rules.AvatarHeight,0)
@@ -108,6 +111,51 @@ do
  A:Place(hatted,CF(0,0,0),Rules.AvatarHeight,0)
  local l1,h1=bodyTopBottom(plain);local l2,h2=bodyTopBottom(hatted)
  check(near(h1-l1,h2-l2,.05),'a tall hat does not shrink the body (the height is measured on the body parts alone)')
+end
+
+-- 3b. Dancing (R152) ------------------------------------------------------------------------------------------------------------------------------------------------------
+do
+ reset();local A=new()
+ local function stand(uid)local rig=A:Build(uid);A:Place(rig,CF(0,0,0),Rules.AvatarHeight,Rules.AvatarTurn);rig.Parent=W.workspace;return rig end
+ local ids={'rbxassetid://507771019','rbxassetid://507771955','rbxassetid://507772104'}
+ check(#Avatar.DanceIds==3 and Avatar.DanceIds[1]==ids[1]and Avatar.DanceIds[2]==ids[2]and Avatar.DanceIds[3]==ids[3],'the dances are Roblox\'s three default R15 dance emotes (507771019, 507771955, 507772104)')
+ local rig=stand(5001)
+ local mode=A:Animate(rig,5001)
+ local animator=rig:FindFirstChildOfClass('Humanoid'):FindFirstChildOfClass('Animator')
+ local track=HH.avatars.Dance.Last
+ check(mode=='dance'and rig:GetAttribute('AvatarMode')=='dance','a normal avatar dances (AvatarMode dance)')
+ check(animator~=nil and HH.avatars.Dance.Loads==1,'through an Animator on its Humanoid (made, the rig had none), one animation loaded')
+ check(track and track.Looped==true and track.IsPlaying==true and track.Plays==1 and track.Length>0,'a looped track that is playing')
+ local picked=track.Animation.AnimationId
+ check(picked==rig:GetAttribute('DanceId')and(picked==ids[1]or picked==ids[2]or picked==ids[3]),'it is one of the three ('..tostring(picked)..')')
+ local seen={};for uid=1,9 do HH.avatars.Dance.Loads=0;local r=stand(uid);A:Animate(r,uid);seen[HH.avatars.Dance.Last.Animation.AnimationId]=true end
+ local n=0;for _ in pairs(seen)do n+=1 end
+ check(n==3,'different champions get different dances (all three are used)')
+ local again=stand(5001);A:Animate(again,5001)
+ check(HH.avatars.Dance.Last.Animation.AnimationId==picked,'and the same champion always gets the same one')
+ local touched=0;for _,d in ipairs(rig:GetDescendants())do if d:IsA('Motor6D')and angle(d.C0)>1e-9 then touched+=1 end end
+ check(touched==0 and rig:FindFirstChildOfClass('Humanoid').EvaluateStateMachine~=false,'a dancing rig keeps its joints at rest (the animation moves them) and its humanoid running')
+ -- a rig that already has an Animator uses it
+ reset();local rig2=stand(5002);local own=R.new('Animator');own.Parent=rig2:FindFirstChildOfClass('Humanoid')
+ A:Animate(rig2,5002)
+ check(#rig2:FindFirstChildOfClass('Humanoid'):GetChildren()>=1 and #(function()local out={};for _,c in ipairs(rig2:FindFirstChildOfClass('Humanoid'):GetChildren())do if c:IsA('Animator')or c._class=='Animator'then out[#out+1]=c end end;return out end)()==1,'an Animator the rig already has is used (no second one)')
+ -- the fallbacks: the static pose goes in, the humanoid stops, the avatar is marked 'pose'
+ for _,failure in ipairs({'never loads','not playing','throws'})do
+  reset();HH.avatars.Dance.Mode=failure
+  local r=stand(5100);local m=A:Animate(r,5100)
+  local rs=Pose.Joint(r,'RightShoulder');local ls=Pose.Joint(r,'LeftShoulder');local hip=Pose.Joint(r,'RightHip')
+  check(m=='pose'and r:GetAttribute('AvatarMode')=='pose'and r:GetAttribute('DanceId')==nil,'a dance that '..failure..': the avatar falls back to the static pose')
+  check(rs and angle(rs.C0)>1.5 and angle(rs.C0)<2.3 and ls and angle(ls.C0)<.6 and angle(ls.C0)>0 and hip and angle(hip.C0)==0,'  right arm raised about 110 degrees, left hanging a little out, legs untouched')
+  local t=0;for _,d in ipairs(r:GetDescendants())do if d:IsA('Motor6D')and angle(d.C0)>1e-9 then t+=1 end end
+  check(t==6 and r:FindFirstChildOfClass('Humanoid').EvaluateStateMachine==false,'  exactly the six joints of the static pose moved, the humanoid is a statue')
+  local last=HH.avatars.Dance.Last
+  check(not last or not last.IsPlaying,'  and no track is left playing')
+ end
+ -- a rig that is not in the world yet cannot dance (an Animator plays only in the DataModel)
+ reset();local loose=A:Build(5200);A:Place(loose,CF(0,0,0),Rules.AvatarHeight,0)
+ check(A:Animate(loose,5200)=='pose','a rig that was never parented falls back to the pose rather than pretend to dance')
+ -- bad input never throws
+ check(A:Animate(nil)=='static'and A:Animate(5)=='static'and select(2,pcall(A.Animate,A,R.new('Model')))=='pose','nil, a number or a model without a humanoid: no error')
 end
 
 -- 4. Failures ------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -126,16 +174,20 @@ do
  local stand=A:Fallback(false)
  local n=0;for _,p in ipairs(stand:GetChildren())do if p:IsA('BasePart')then n+=1 end end
  check(n==6 and stand.PrimaryPart~=nil,'the stand-in is six blocks: two legs, torso, head, two arms')
- local placed=A:Place(stand,CF(10,5,10),Rules.AvatarHeight,-.4)
+ local placed=A:Place(stand,CF(10,5,10),Rules.AvatarHeight,Rules.AvatarTurn)
  local lo,hi=1e9,-1e9;for _,p in ipairs(stand:GetChildren())do if p:IsA('BasePart')then lo=math.min(lo,p.CFrame.Position.Y-p.Size.Y/2);hi=math.max(hi,p.CFrame.Position.Y+p.Size.Y/2)end end
  check(placed and near(lo,5,.05)and hi-lo>Rules.AvatarHeight*.9 and hi-lo<Rules.AvatarHeight*1.15,'the stand-in stands on the same spot at about the same height ('..string.format('%.2f',hi-lo)..')')
  local armUp=false;for _,p in ipairs(stand:GetChildren())do if p.Name=='RightArm'and p.CFrame.Position.Y>stand.PrimaryPart.CFrame.Position.Y and math.abs(p.CFrame.Position.X-stand.PrimaryPart.CFrame.Position.X)>3 then armUp=true end end
  check(armUp,'its right arm is raised out like the real pose')
+ check(A:Animate(stand)=='static'and stand:GetAttribute('AvatarMode')=='static'and HH.avatars.Dance.Loads==0,'a blocky stand-in is \'static\': nothing is loaded for it')
  local bads=0;for _,p in ipairs(stand:GetChildren())do if p:IsA('BasePart')and(p.CanCollide or p.CanTouch or p.CanQuery or not p.Anchored)then bads+=1 end end
  check(bads==0,'all anchored and inert')
  reset();local calls=HH.avatars.Describe
  local sil=A:Build(8000,{Silhouette=true})
  check(HH.avatars.Describe==calls and sil:GetAttribute('Fallback')and sil:GetAttribute('UserId')==nil,'the silhouette asks nobody and belongs to nobody')
+ A:Place(sil,CF(0,0,0),Rules.AvatarHeight,0)
+ local slo,shi=1e9,-1e9;for _,p in ipairs(sil:GetChildren())do if p:IsA('BasePart')then slo=math.min(slo,p.CFrame.Position.Y-p.Size.Y/2);shi=math.max(shi,p.CFrame.Position.Y+p.Size.Y/2)end end
+ check(shi-slo>=22 and shi-slo<=28.5 and A:Animate(sil)=='static','the empty-state silhouette is the same giant size ('..string.format('%.1f',shi-slo)..') and stays static')
  local dark=true;for _,p in ipairs(sil:GetChildren())do if p:IsA('BasePart')and(p.Color.R>.1 or p.Color.G>.1 or p.Color.B>.15)then dark=false end end
  check(dark,'and is black')
  -- the same champion again: the description is cached, a new rig is made
