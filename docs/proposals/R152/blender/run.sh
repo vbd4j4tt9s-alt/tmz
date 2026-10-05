@@ -6,7 +6,9 @@
 #            palette cells, flat / smooth, the convex hulls per rig group, the sleep Z), checking the winding and the colour formula's inputs;
 #        (2) floor_candidates.py + select_floor.luau (the game's own pose code on the repo's Roblox mock): pick the floor samples;
 #        (3) encode_meshes.py: write src/ServerScriptService/ChestChaseServer/KeeperMeshData152*.lua and src/ReplicatedStorage/KeeperRigConfig152.lua.
-# Then run docs/proposals/R152/tests/run_keepers.sh (and render_roundtrip.py for docs/proposals/R152/keepers_roundtrip.png).
+# Then run docs/proposals/R152/tests/run_keepers.sh <out>; for docs/proposals/R152/keepers_roundtrip.png:
+#   <bpy python> render_roundtrip.py -- <out>/obj/decoded.json <R151 poses.json (R151 run.sh step 1)> <panels>
+#   python3 compose_roundtrip.py <panels> ../keepers_roundtrip.png
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 S=${1:?scratch dir};PY=${2:?python with bpy}
