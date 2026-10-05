@@ -101,11 +101,24 @@ function K.Apply(model,now,frames)
  end
  for _,v in ipairs(parts)do if v.Part.Parent then v.Part.CFrame=frames[v.Group]*v.Frame end end
 end
-function K.Build(home,parent)
+-- R152: meshes = KeeperMeshes152.DarkenedParts() (the baked rev 6 Darkened, its polished parts on the same groups, offsets and sizes;
+-- VeiledEvent81 passes it when the template is ready), else today's blocks. Glow, face and cosmetic pieces never hit (VeiledCosmetic).
+function K.Build(home,parent,meshes)
  local m=Instance.new('Model');m.Name='TheVeiledOne';m.ModelStreamingMode=Enum.ModelStreamingMode.Persistent
  m:SetAttribute('KeeperClientAnimated',true);m:SetAttribute('VeiledKeeper81',true);m:SetAttribute('VeiledRigRevision',86);m:SetAttribute('GuardianBehavior','GUARDING');m:SetAttribute('Stage',7)
  local root=Instance.new('Part');root.Name='VeiledRoot';root.Size=V(2,2,2);root.Transparency=1;root.Anchored=true
  root.CanCollide=false;root.CanQuery=false;root.CanTouch=false;root.CFrame=home;root.Parent=m;m.PrimaryPart=root
+ if meshes then
+  m:SetAttribute('KeeperMeshVariant','R152')
+  for _,item in ipairs(meshes)do
+   local p,s=item.Part,item.Spec;local cosmetic=s.Cosmetic==true
+   p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=not cosmetic;p.Massless=true
+   p:SetAttribute('VeiledGroup',s.Group);p:SetAttribute('VeiledFrame',CF(item.Center or V(s.Center[1],s.Center[2],s.Center[3])));p:SetAttribute('VeiledCosmetic',cosmetic)
+   p.Parent=m
+  end
+  K.Apply(m,workspace:GetServerTimeNow());m.Parent=parent;game:GetService('CollectionService'):AddTag(m,'VeiledKeeper81');return m
+ end
+ m:SetAttribute('KeeperMeshVariant','Legacy')
  local function part(name,group,size,frame,color,material,shape,cosmetic)
   local p=Instance.new('Part');p.Name=name;p.Size=size;p.Color=color or black;p.Material=material or Enum.Material.SmoothPlastic
   p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=not cosmetic;p.Massless=true

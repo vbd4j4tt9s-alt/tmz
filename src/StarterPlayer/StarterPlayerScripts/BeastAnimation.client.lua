@@ -18,14 +18,28 @@ local Signature=require(Storage:WaitForChild('KeeperSignatureStrike'))
 local Combat=require(Storage.KeeperCombat)
 -- R113: client-only polish (look-at, wake roar, weight, follow-through, taunt), effects and accent parts.
 local Polish=require(Storage:WaitForChild('KeeperPolish'));local KFx=require(Storage:WaitForChild('KeeperFx'));local Accents=require(Storage:WaitForChild('KeeperAccents'))
+-- R152: a keeper built from the baked rev 6 model (BeastBody KeeperMeshVariant 'R152', VisualVersion 152) uses KeeperRigConfig152's parts and
+-- floor samples, and has two faces: the Asleep face parts show while it sleeps (GUARDING / SLEEPING), the Chase ones in every other state.
+local Config152=require(Storage:WaitForChild('KeeperRigConfig152'))
 local Players=game:GetService('Players')
 local records,watchers,pending={},{},{}
 local BLACK=Color3.new(0,0,0)
 local destroyed=false
-local function eyes(part,color,awake,tree)
- part.LocalTransparencyModifier=tree and 1-awake or 0
+local function eyes(part,color,awake,tree,hidden)
+ part.LocalTransparencyModifier=hidden and 1 or tree and 1-awake or 0
  part.Color=BLACK:Lerp(color,awake)
  part.Material=awake>.5 and Enum.Material.Neon or Enum.Material.SmoothPlastic
+end
+-- The face shown in this state: hides the other face's parts (eyes keep their wake glow; the golem's tree hides its awake face and glow).
+local function faces(r,asleep,awake)
+ r.FaceAsleep=asleep
+ for _,p in ipairs(r.Parts)do
+  if p.Face or p.TreeGlow then
+   local hidden=p.Face and(p.Face=='Asleep')~=asleep
+   if p.Eye then eyes(p.Part,p.EyeColor,awake,p.TreeRest~=nil,hidden);p.LastEyeAwake=awake
+   else p.Part.LocalTransparencyModifier=hidden and 1 or p.TreeGlow and 1-awake or 0 end
+  end
+ end
 end
 
 local function clear(model)
@@ -38,19 +52,23 @@ local function bind(model)
  local root=model:FindFirstChild('HumanoidRootPart');local rig=model:FindFirstChild('BeastBody')
  local stage=model:GetAttribute('CreatureStage') or model:GetAttribute('Stage')
  if not root or not rig or not Config[stage] or not Voices[stage] then return end
- local expectedVersion=(stage==1 or stage==5 or stage==7)and 59 or 99
+ local variant=rig:GetAttribute('KeeperMeshVariant')=='R152'and 'R152'or nil
+ local cfg=variant and Config152.Get(stage)or Config[stage]
+ local expectedVersion=variant and Config152.Version or(stage==1 or stage==5 or stage==7)and 59 or 99
  if rig:GetAttribute('VisualVersion')~=expectedVersion then return end
  if records[model] and records[model].Rig==rig then return end
  local parts={};local eyeColor
- for _,spec in ipairs(Config[stage].Parts) do
+ for _,spec in ipairs(cfg.Parts) do
   if spec.EyeGlow then eyeColor=Color3.new(table.unpack(spec.Color));break end
  end
  for _,part in ipairs(rig:GetDescendants()) do
   if part:IsA('BasePart') and part:GetAttribute('RestCFrame') then
-   table.insert(parts,{Part=part,Rest=part:GetAttribute('RestCFrame'),Group=part:GetAttribute('BeastGroup'),Size=part.Size,TreeRest=part:GetAttribute('TreeRestCFrame'),TreeSize=part:GetAttribute('TreeRestSize'),IdleRest=part:GetAttribute('IdleRestCFrame'),IdleSize=part:GetAttribute('IdleRestSize'),Eye=part:GetAttribute('KeeperEyeGlow')==true,EyeColor=eyeColor})
+   local tree=part:GetAttribute('TreeRestCFrame')
+   table.insert(parts,{Part=part,Rest=part:GetAttribute('RestCFrame'),Group=part:GetAttribute('BeastGroup'),Size=part.Size,TreeRest=tree,TreeSize=part:GetAttribute('TreeRestSize'),IdleRest=part:GetAttribute('IdleRestCFrame'),IdleSize=part:GetAttribute('IdleRestSize'),Eye=part:GetAttribute('KeeperEyeGlow')==true,EyeColor=eyeColor,
+    Face=part:GetAttribute('KeeperFaceState'),TreeGlow=tree~=nil and part:GetAttribute('KeeperMeshKind')=='glow'or nil})
   end
  end
- if #parts~=#Config[stage].Parts then return end -- wait for a complete streamed rig
+ if #parts~=#cfg.Parts then return end -- wait for a complete streamed rig
  clear(model)
  local voice=Voices[stage];local sound=Instance.new('Sound');sound.Name='KeeperVoiceLocal'
  local id,volume,pitch=Audio.Voice(stage,'Alert',model:GetAttribute('KeeperVoiceId'))
@@ -60,10 +78,11 @@ local function bind(model)
  local state=model:GetAttribute('GuardianBehavior') or 'GUARDING'
  local awake=(state=='GUARDING' or state=='SLEEPING') and 0 or 1
  for _,p in ipairs(parts) do if p.Eye then eyes(p.Part,p.EyeColor,awake,p.TreeRest~=nil) end end
- records[model]={Root=root,Rig=rig,Parts=parts,Stage=stage,Awake=awake,
+ records[model]={Root=root,Rig=rig,Parts=parts,Stage=stage,Awake=awake,Variant=variant,
   Last=root.Position,SampleTime=0,SampleTravel=0,ObservedSpeed=0,LastVoice=-100,Sound=sound,State=state,
-  Surge=stage==7 and Surge.New(model)or nil,Motion=Motion.new(root.CFrame,awake),Sleep=Sleep.new(root,stage,Config[stage]),
-  Polish=Polish.new(),Fx=KFx.new(root,stage),Accents=Accents.new(model,stage),PoseDt=0}
+  Surge=stage==7 and Surge.New(model,variant)or nil,Motion=Motion.new(root.CFrame,awake),Sleep=Sleep.new(root,stage,cfg),
+  Polish=Polish.new(),Fx=KFx.new(root,stage,cfg),Accents=Accents.new(model,stage,variant),PoseDt=0}
+ if variant then faces(records[model],awake==0,awake)end
 end
 local function schedule(model)
  if pending[model] then return end
@@ -109,6 +128,7 @@ local render=Run.RenderStepped:Connect(function(dt)
   if not model:IsDescendantOf(workspace) or r.Rig.Parent~=model or not r.Root.Parent then clear(model);continue end
   local state=model:GetAttribute('GuardianBehavior') or 'GUARDING'
   local asleep=state=='GUARDING' or state=='SLEEPING'
+  if r.Variant and r.FaceAsleep~=asleep then faces(r,asleep,r.Motion.Awake or 0)end
   local delta=r.Root.Position-r.Last;r.Last=r.Root.Position
   local travel=Vector3.new(delta.X,0,delta.Z).Magnitude
   r.SampleTime+=dt;r.SampleTravel+=travel<40 and travel or 0
@@ -157,14 +177,14 @@ local render=Run.RenderStepped:Connect(function(dt)
   if distance>160 then local _,seen=camera:WorldToViewportPoint(r.Root.Position);onScreen=seen end
   if not Budget.KeeperDue(distance,asleep,motion.Awake,onScreen,now,r.LastPose,Fx.Low())then continue end
   r.LastPose=now
-  local target=Pose.Frames(r.Stage,motion.Time,motion.Awake,motion.Moving,motion.Cycle,motion.Urgency,motion.Speed,motion.Turn)
+  local target=Pose.Frames(r.Stage,motion.Time,motion.Awake,motion.Moving,motion.Cycle,motion.Urgency,motion.Speed,motion.Turn,r.Variant)
   target=AttackPose.Apply(r.Stage,target,now,model:GetAttribute('KeeperAttackAt'))
   local attackAt=model:GetAttribute('KeeperAttackAt')
   -- R110: strike pose only while it is live. KeeperAttackAt outlives a miss, and the old 1.5 s
   -- window slid a chasing keeper in its idle pose on the raw, packet-stepped root.
   local windup=Combat.Get(r.Stage).Windup;local striking=false
   if attackAt and now>=attackAt and now-attackAt<windup+Combat.Recovery then
-   target=Signature.Frames(r.Stage,now,attackAt,r.AttackSeen and r.AttackSeen-attackAt);motion.Awake=1;striking=true
+   target=Signature.Frames(r.Stage,now,attackAt,r.AttackSeen and r.AttackSeen-attackAt,r.Variant);motion.Awake=1;striking=true
   end
   -- R113: taunt once after a landed catch; slam dust at the visual impact.
   local lastHit=model:GetAttribute('KeeperLastHitAt')
@@ -190,7 +210,8 @@ local render=Run.RenderStepped:Connect(function(dt)
    local pose,size=UpgradePose.PartPose(p.Rest,p.TreeRest or p.IdleRest,p.Size,p.TreeSize or p.IdleSize,target[p.Group],motion.Awake)
    table.insert(moveParts,p.Part);table.insert(moveFrames,motion.Frame*pose)
    if (p.TreeRest or p.IdleRest)and p.Part.Size~=size then p.Part.Size=size end
-   if p.Eye and p.LastEyeAwake~=motion.Awake then eyes(p.Part,p.EyeColor,motion.Awake,p.TreeRest~=nil);p.LastEyeAwake=motion.Awake end
+   if p.Eye and p.LastEyeAwake~=motion.Awake then eyes(p.Part,p.EyeColor,motion.Awake,p.TreeRest~=nil,p.Face and(p.Face=='Asleep')~=asleep);p.LastEyeAwake=motion.Awake
+   elseif p.TreeGlow and p.LastEyeAwake~=motion.Awake then p.Part.LocalTransparencyModifier=1-motion.Awake;p.LastEyeAwake=motion.Awake end
   end end
   -- R149: the snow tiger's gear studs and facets are LOD pieces (hidden beyond Accents.DetailRange and in low graphics).
   Accents.Pose(r.Accents,target,motion.Frame,motion.Awake,now,hunting and not asleep,moveParts,moveFrames,distance,low)

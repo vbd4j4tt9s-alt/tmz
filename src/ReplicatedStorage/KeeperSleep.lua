@@ -24,6 +24,26 @@ local function zzz(attachment, stage)
     gui.Parent = attachment
     return gui, labels
 end
+-- R152: the baked rev 6 keepers (a config with Z: KeeperRigConfig152) get the new sleep marker instead: one big stylised cyan "Z" with a
+-- dark outline and a small "z" up beside it, where the R151 sheets draw it (Z.Point, Head rest space; Z.Height studs). It bobs and breathes.
+Sleep.ZColor = Color3.fromRGB(77, 217, 255); Sleep.ZEdge = Color3.fromRGB(13, 56, 140)
+local function bigZ(attachment, height)
+    local gui = Instance.new('BillboardGui')
+    gui.Name = 'KeeperZzzLocal'; gui.Size = UDim2.fromScale(height * 1.15, height * 1.15); gui.LightInfluence = 0
+    gui.AlwaysOnTop = false; gui.MaxDistance = Sleep.ZzzDistance; gui.Enabled = false
+    local labels = {}
+    for i, spec in ipairs({{'Z', .30, .62, .62}, {'z', .80, .22, .36}}) do
+        local label = Instance.new('TextLabel')
+        label.Name = 'Z' .. i; label.BackgroundTransparency = 1; label.AnchorPoint = Vector2.new(.5, .5)
+        label.Position = UDim2.fromScale(spec[2], spec[3]); label.Size = UDim2.fromScale(spec[4], spec[4])
+        label.Font = Enum.Font.FredokaOne; label.TextScaled = true; label.Text = spec[1]
+        label.TextColor3 = Sleep.ZColor; label.TextStrokeColor3 = Sleep.ZEdge; label.TextStrokeTransparency = 0
+        local stroke = Instance.new('UIStroke'); stroke.Color = Sleep.ZEdge; stroke.Thickness = 3; stroke.Parent = label
+        label.Parent = gui; labels[i] = label
+    end
+    gui.Parent = attachment
+    return gui, labels
+end
 local audioState = 'cold'
 local function preload()
     if audioState ~= 'cold' then return end
@@ -65,9 +85,11 @@ function Sleep.new(root, _stage, config)
     local bounds = assert(config.Bounds.Head, 'Keeper head bounds required')
     local low, high = bounds[1], bounds[2]
     local gui, labels
-    if _stage ~= 1 then gui, labels = zzz(attachment, _stage) end
-    return setmetatable({Muted = _stage==1, Root = root, Attachment = attachment, Sound = sound, Playing = false, Zzz = gui, Labels = labels,
-        HeadPoint = Vector3.new((low[1] + high[1]) / 2, high[2] + 2, (low[3] + high[3]) / 2)}, Sleep)
+    local z = _stage ~= 1 and config.Z
+    if z then gui, labels = bigZ(attachment, z.Height)
+    elseif _stage ~= 1 then gui, labels = zzz(attachment, _stage) end
+    return setmetatable({Muted = _stage==1, Root = root, Attachment = attachment, Sound = sound, Playing = false, Zzz = gui, Labels = labels, Big = z and true or nil,
+        HeadPoint = z and Vector3.new(z.Point[1], z.Point[2], z.Point[3]) or Vector3.new((low[1] + high[1]) / 2, high[2] + 2, (low[3] + high[3]) / 2)}, Sleep)
 end
 -- Keep the existing BeastAnimation call signature; no second update owner.
 function Sleep:Update(asleep, distance, _now, headFrame, low)
@@ -79,7 +101,16 @@ function Sleep:Update(asleep, distance, _now, headFrame, low)
     if self.Zzz then
         local show = Sleep.ShowZzz and nearby and distance < Sleep.ZzzDistance and not low
         if self.Zzz.Enabled ~= show then self.Zzz.Enabled = show end
-        if show then
+        if show and self.Big then
+            local t = os.clock()
+            for i, label in ipairs(self.Labels) do
+                local w = t * 1.6 + i * 1.3
+                local s = (i == 1 and .62 or .36) * (1 + .06 * math.sin(w))
+                label.Size = UDim2.fromScale(s, s)
+                label.Position = UDim2.fromScale(i == 1 and .30 or .80, (i == 1 and .62 or .22) + .04 * math.sin(w * .7))
+                label.TextTransparency = .08 + .1 * (1 + math.sin(w)) / 2
+            end
+        elseif show then
             local t = os.clock()
             for i, label in ipairs(self.Labels) do
                 local u = (t * .38 + (i - 1) / 3) % 1

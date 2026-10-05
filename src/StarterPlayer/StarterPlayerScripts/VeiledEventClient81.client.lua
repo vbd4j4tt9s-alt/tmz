@@ -36,6 +36,12 @@ watch(Run.RenderStepped,function(dt)
  for m,r in pairs(keepers)do
   local root=m.PrimaryPart;if not m.Parent or not root then keepers[m]=nil;continue end
   local distance=(root.Position-origin).Magnitude;local period=distance<350 and 0 or distance<900 and .15 or 1
+  -- R152: the baked Darkened's two faces (its glowing line): Asleep while it sleeps (GUARDING / SLEEPING), Chase otherwise.
+  local state=m:GetAttribute('GuardianBehavior')or'GUARDING';local asleep=state=='GUARDING'or state=='SLEEPING'
+  if r.FaceAsleep~=asleep and m:GetAttribute('KeeperMeshVariant')=='R152'then
+   r.FaceAsleep=asleep
+   for _,p in ipairs(m:GetChildren())do local face=p:GetAttribute('KeeperFaceState');if face and p:IsA('BasePart')then p.LocalTransparencyModifier=(face=='Asleep')~=asleep and 1 or 0 end end
+  end
   -- R112-style lead: a late-seen attack plays its wind-up from where this client first saw it.
   local attackAt=m:GetAttribute('KeeperAttackAt');if attackAt~=r.AttackAt then r.AttackAt=attackAt;r.Seen=now end
   local striking=type(attackAt)=='number'and now>=attackAt and now-attackAt<Combat.Get(7).Windup+Combat.Recovery
