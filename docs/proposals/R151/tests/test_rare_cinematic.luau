@@ -318,7 +318,7 @@ do -- the owner's uploads: on the beat, from their measured lead-in; a pending s
  local run=start(8);local tl=run.TL;local t0=R.clock;X.run(tl.Climax+.2)
  local v=voices('Impact_1')[1];local log=v and v.PlayLog[#v.PlayLog]
  check(v and v.SoundId=='rbxassetid://133616032782359'and #Audio.Layers('Impact')==1,'Impact is the owner\'s "cinematic impact hit"')
- check(log and near(log.At-t0,tl.Climax,.05)and near(log.TimePosition-(log.At-t0-tl.Climax),.106,1e-3)and v.SoundGroup==effects,'it plays on the hit from its measured lead-in (.106 s, plus the frame it joined late), on Effects')
+ check(log and near(log.At-t0,tl.Climax,.05)and near(log.TimePosition,Sounds.Get('Impact').Hit-Audio.Attack,1e-3)and v.SoundGroup==effects,'it plays on the hit from just before its measured hit (R152: .100 s less the attack, on the frame of the hit), on Effects')
  local g=voices('GroundImpact_1')[1];local gl=g and g.PlayLog[#g.PlayLog]
  check(g and g.SoundId=='rbxassetid://130581466623902'and gl and near(gl.At-t0,tl.Climax,.05),'the owner\'s ground impact under it')
  local r=voices('Riser_1')[1];local rl=r and r.PlayLog[#r.PlayLog]
@@ -349,7 +349,7 @@ do -- the owner's uploads: on the beat, from their measured lead-in; a pending s
   'Secret: the owner\'s glitch on .25 s, both glitch beats and the hit ('..#starts..' plays)')
  check((glitchLen[2]or 9)<=.5 and(glitchLen[3]or 9)<=.55 and(glitchLen[4]or 0)>=1.0,'each glitch beat is a short burst, the hit a longer one ('..string.format('%.2f / %.2f / %.2f s',glitchLen[2]or-1,glitchLen[3]or-1,glitchLen[4]or-1)..')')
  local vault=voices('SecretVault_1')[1];local vl=vault and vault.PlayLog[#vault.PlayLog]
- check(vault and vault.SoundId=='rbxassetid://102739931931289'and vl and near(vl.At-t0,tl.Unlock,.05)and near(vl.TimePosition-(vl.At-t0-tl.Unlock),.040,.002),'Secret: the owner\'s vault door on the unlock, from its lead-in')
+ check(vault and vault.SoundId=='rbxassetid://102739931931289'and vl and near(vl.At-t0,tl.Unlock,.05)and near(vl.TimePosition,Sounds.Get('SecretVault').Hit-Audio.Attack,.002),'Secret: the owner\'s vault door on the unlock, its first clunk on the beat (R152: from its measured hit)')
  check(not vaultInSilence,'and it is silent in the silence before the hit')
  M.Abort('test')
  -- Cosmic: the owner's supernova boom is the hit (no Impact), its tail rings under the seed; the bed is a slice that leaves the silence clear
@@ -376,8 +376,9 @@ do -- the owner's uploads: on the beat, from their measured lead-in; a pending s
  check(fan and fan.SoundId=='rbxassetid://77199097157197'and #plays==2 and near(plays[1],tl.CrownOn,.05)and near(plays[2],tl.Climax,.05),
   'King: the owner\'s fanfare as the crown lands on the pack and again on the hit ('..table.concat((function()local o={};for _,p in ipairs(plays)do o[#o+1]=string.format('%.2f',p)end;return o end)(),', ')..')')
  check(not inSilence,'King: the fanfare drops out for the silence before the hit')
- local bell=voices('KingBell_1')[1];local bl=bell and bell.PlayLog[#bell.PlayLog]
- check(bell and bell.SoundId=='rbxassetid://110440649150958'and bl and near(bl.At-t0,tl.CrownOn,.05),'King: the owner\'s church bell as the crown settles')
+ local bell=voices('KingBell_1')[1];local bl=nil -- (R152: two voices per slot, the toll as the hall opens may still ring on the first)
+ for _,v in ipairs(voices('KingBell_1'))do for _,l in ipairs(v.PlayLog)do if near(l.At-t0,tl.CrownOn,.05)then bl=l end end end
+ check(bell and bell.SoundId=='rbxassetid://110440649150958'and bl,'King: the owner\'s church bell as the crown settles')
  local choir=voices('KingChoir_1')[1]
  check(choir and choir.SoundId=='rbxassetid://71607900050825'and choir.PlaybackRegionsEnabled and near(choir.PlaybackRegion.Max,6.0)and not choir.Looped,'King: the owner\'s choir plays a 6 s slice of its swell (not all 18 s, not looped)')
  M.Abort('test')

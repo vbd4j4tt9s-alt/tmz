@@ -170,7 +170,8 @@ function Scene:_space()
  for i=1,(lite and 4 or 8)do local s=stars[i];self:Part('Bright star',V(.5,.5,.5),CF(s[1],s[2],s[3]),C(255,255,255),NEON,0,BALL)end
  self.Nebula={}
  local neb={{C(255,90,200),-18,18,-62,34},{C(120,90,255),14,26,-66,40},{C(60,200,255),-2,10,-70,46},{C(255,140,90),26,4,-64,26},{C(150,60,220),-30,34,-60,30}}
- for i=1,(lite and 3 or 5)do local n=neb[i];self.Nebula[i]=self:Part('Nebula',V(.3,n[5],n[5]),CF(n[2],n[3],n[4])*ANG(0,math.pi/2,0)*ANG(0,0,0),n[1],NEON,.88,CYL)end
+ self.NebulaBase={}
+ for i=1,(lite and 3 or 5)do local n=neb[i];self.Nebula[i]=self:Part('Nebula',V(.3,n[5],n[5]),CF(n[2],n[3],n[4])*ANG(0,math.pi/2,0)*ANG(0,0,0),n[1],NEON,.88,CYL);self.NebulaBase[i]=self.Nebula[i].CFrame end
  self.Planets={}
  local specs={{1.4,C(255,150,110),5.2,.35,true},{2.0,C(110,170,255),7.4,-.25,false},{1.1,C(200,140,255),9.6,.5,true}}
  for i,s in ipairs(specs)do
@@ -332,7 +333,7 @@ end
 function Scene:_updateVoid(t,tl,pos,burst)
  local n=#self.Plates
  local lockIn=clamp01((t-tl.Lock)/.3);local open=clamp01((t-tl.Unlock)/math.max(.05,tl.Silence-tl.Unlock))
- local turns=0;for _,k in ipairs({0,.22,.44})do if t>=tl.Lock+k then turns+=1 end end
+ local turns=0;for _,k in ipairs(Rules.LockTurns)do if t>=tl.Lock+k and tl.Lock+k<tl.Unlock then turns+=1 end end -- (one click each: RarePullRules)
  local spin=turns*math.rad(15)+(self.Reduced and 0 or math.sin(t*2)*.02)
  for i=1,n do
   local a=(i-1)/n*math.pi*2+spin;local r=2.0+.7*open
@@ -399,7 +400,8 @@ function Scene:_updateSpace(t,tl,pos,burst,spos,glow)
  for i,w in ipairs(self.Waves)do local k=clamp01((burst-(i-1)*.15)/.8);self:PlaceRing(w,pos,.6+k*(self.Reduced and 3 or 10),.25*(1-k)+.03,(burst<(i-1)*.15)and 1 or .1+.9*k)end
  self.Star.Size=V(1,1,1)*(.5+1.6*glow);self:Place(self.Star,CF(spos));self.Star.Transparency=(burst<0 or glow<=.02)and 1 or .15+.6*(1-glow)
  self.Trail.Enabled=burst>=0 and glow>.05 and not self.Reduced
- for i,n2 in ipairs(self.Nebula)do if not self.Reduced then local cf=n2.CFrame;n2.CFrame=cf*ANG(.0005*i,0,0)end end
+ -- (R152: turned by the clock, not by a fixed step per frame: at 240 fps the nebulae spun four times as fast as at 60)
+ for i,n2 in ipairs(self.Nebula)do if not self.Reduced then n2.CFrame=self.NebulaBase[i]*ANG(.03*i*t,0,0)end end
 end
 function Scene:_updateThrone(t,tl,pos,burst,spos)
  -- the carry beam follows the pack down the carpet

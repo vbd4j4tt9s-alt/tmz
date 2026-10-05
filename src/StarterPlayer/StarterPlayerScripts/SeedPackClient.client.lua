@@ -10,11 +10,16 @@ local CollectionService=game:GetService("CollectionService")
 local Rules=require(ReplicatedStorage:WaitForChild("SeedPackRules"))
 local Visuals=require(ReplicatedStorage:WaitForChild("SeedPackVisuals"))
 local Pose=require(ReplicatedStorage:WaitForChild("SeedCarryPose"))
-local remotes=ReplicatedStorage:WaitForChild("ChestChaseRemotes",20)
-if not remotes then return end
-local library=remotes:WaitForChild("SeedArt",20)
-local catalog=remotes:WaitForChild("SeedCatalog",20)
-if not library or not catalog then return end
+-- R152 (owner: "sometimes the animation not playing"): a slow join used to give up after 20 s, and then no pack opened visibly in the
+-- world for the whole session; it waits for the published art instead (a warning every 30 s while it does).
+local function await(parent,name)
+    local found=parent:FindFirstChild(name)
+    while not found do found=parent:WaitForChild(name,30);if not found then warn("[SeedPackClient] still waiting for "..name)end end
+    return found
+end
+local remotes=await(ReplicatedStorage,"ChestChaseRemotes")
+local library=await(remotes,"SeedArt")
+local catalog=await(remotes,"SeedCatalog")
 local records={}
 local connections={}
 local lastHeavenlyAt=-math.huge
@@ -36,11 +41,15 @@ local ONLOOKER_RANGE=160
 local Ladder=require(ReplicatedStorage:WaitForChild("RarePullRules"))
 local Suspense=require(ReplicatedStorage:WaitForChild("PackSuspense"))
 local RareWorld do local ok,m=pcall(require,ReplicatedStorage:WaitForChild("RarePullWorld",10));RareWorld=ok and m or nil end
+if not RareWorld then task.spawn(function()local m=ReplicatedStorage:WaitForChild("RarePullWorld");local ok,w=pcall(require,m);if ok then RareWorld=w end end)end -- (R152: late, not never)
 local RareCinematic=nil
-local function cinematicOwnsCamera()
-    if RareCinematic==nil then local ok,m=pcall(require,ReplicatedStorage:FindFirstChild("RarePullCinematic"));RareCinematic=ok and m or false end
-    return RareCinematic and RareCinematic.OwnsCamera()==true
+local function cinematic()
+    if not RareCinematic then local ok,m=pcall(require,ReplicatedStorage:FindFirstChild("RarePullCinematic"));RareCinematic=ok and m or false end
+    return RareCinematic or nil
 end
+local function cinematicOwnsCamera()local c=cinematic();return c~=nil and c.OwnsCamera()==true end
+-- R152: the opener's own Secret / Cosmic / King reveal has its own hit and fanfare (the director); the old chord at the world burst stacked on it
+local function cinematicRunning()local c=cinematic();return c~=nil and c.Active()~=nil end
 local function reducedMotion()local ok,v=pcall(function()return game:GetService("GuiService").ReducedMotionEnabled end);return ok and v==true end
 local function ownerOf(character)for _,p in ipairs(Players:GetPlayers())do if p.Character==character then return p end end;return nil end
 local function destroyEffect(record)
@@ -51,7 +60,7 @@ local function destroyEffect(record)
     if record.Effect then record.Effect:Destroy();record.Effect=nil end
     for _,part in ipairs(record.Hidden or {}) do
         if part.Parent then
-            part.LocalTransparencyModifier=(record.Bag and record.Bag:GetAttribute("RevealAt"))and 1 or (part:GetAttribute("PackProxy")and record.Bag and record.Bag:GetAttribute("NativePackArtReady")and 1 or 0)
+            part.LocalTransparencyModifier=(record.Bag and record.Bag:GetAttribute("RevealAt")and not record.FailedAt)and 1 or (part:GetAttribute("PackProxy")and record.Bag and record.Bag:GetAttribute("NativePackArtReady")and 1 or 0)
         end
     end
     record.Hidden=nil
@@ -73,10 +82,11 @@ local function beginReveal(record,at,seedId,now)
     local name,rarity=Rules.GetRarity(seedId)
     record.RarityRank=rarity.Rank;record.RarityName=name
     record.Duration=record.Bag:GetAttribute("RevealDuration") or Rules.GetRevealDuration(name)
-    record.Quick=Ladder.IsQuick(record.Bag);record.BurstAt=Ladder.BurstAt(rarity.Rank,record.Quick)
+    local mine=Players.LocalPlayer and record.Bag.Parent==Players.LocalPlayer.Character
+    record.Quick=mine and Ladder.QuickFor(record.Bag)or Ladder.IsQuick(record.Bag);record.BurstAt=Ladder.BurstAt(rarity.Rank,record.Quick) -- R152: one decision per bag
     record.Hover=Ladder.Hover(rarity.Rank,record.BurstAt,record.Duration);record.TearTicks=Ladder.TearTicks(rarity.Rank,record.Quick);record.TickPlayed={[1]=true}
     record.HeavenlySounds={};record.HeavenlyStarted=false;record.Celestial={}
-    record.SeedVisible=nil;record.LastSeedScale=nil;record.SeedFullyGrown=nil;record.TearSound=nil
+    record.SeedVisible=nil;record.LastSeedScale=nil;record.SeedFullyGrown=nil;record.TearSound=nil;record.SlideFlight=nil;record.SlideWhooshDone=nil;record.SlideWhoosh=nil
     local effect=Instance.new("Model");effect.Name="SeedReveal";effect.Parent=effects
     record.Effect=effect;record.At=at;record.Hidden={};record.SeedParts={};record.SeedEffects={}
     local copy=record.Bag:Clone();copy.Name="OpeningBag";copy:SetAttribute("RevealAt",nil)
@@ -162,6 +172,20 @@ local function beginReveal(record,at,seedId,now)
         sound.TimePosition=require(ReplicatedStorage:WaitForChild("SoundTiming")).Offset(sound)+math.clamp(lag,0,.02);sound:Play();record.TearSound=sound
     end
 end
+-- R152: the world seed's flight into the hand (RarePullRules.HandFlight) with the whoosh entered so its swell (RarePullSounds.Flight)
+-- lands on the flight's fastest frame: {Start, Peak, Entry, Id, Pitch, Volume, Region} on the reveal's clock.
+local function slideFlight(record,revealStart)
+    if record.SlideFlight~=nil then return record.SlideFlight or nil end
+    local ok,f=pcall(function()
+        local def=require(ReplicatedStorage.RarePullSounds).Get("Flight")
+        if not def or not def.Id or not def.Swell then return false end
+        local flight=Ladder.HandFlight(revealStart,record.Hover)
+        local bound=def.Region and def.Region[1]or def.Start or 0
+        return {Start=flight.Peak-(def.Swell-bound)/flight.Pitch,Peak=flight.Peak,Entry=bound,Id=def.Id,Pitch=flight.Pitch,Volume=def.Volume*flight.Volume,Region=def.Region}
+    end)
+    record.SlideFlight=ok and f or false
+    return record.SlideFlight or nil
+end
 local function renderReveal(record,now)
     local bag=record.Bag;local t=now-record.At
     local s=bag:GetAttribute("VisualScale")or 1;local root=bag.PrimaryPart.CFrame
@@ -181,7 +205,8 @@ local function renderReveal(record,now)
     local ageFromTear=math.max(0,t-burstAt)
     local wrapperFade=math.clamp((ageFromTear-.2)/.6,0,1)
     local wobble=Ladder.Wobble(rank0,t,record.Quick,reducedMotion());wobble=CFrame.new(wobble.Position*s)*wobble.Rotation
-    local wrapperRoot=root*CFrame.new(0,-ageFromTear*.12*s,0)*wobble
+    -- (R152: the emptied wrapper starts to sink from rest, a^2/(a+.2), instead of at full speed on the burst frame)
+    local wrapperRoot=root*CFrame.new(0,-(ageFromTear*ageFromTear/(ageFromTear+.2))*.12*s,0)*wobble
     for p,localFrame in pairs(record.FlapFrames)do
         local index=p:GetAttribute("TearIndex")
         if index then
@@ -240,6 +265,26 @@ local function renderReveal(record,now)
     local seedFrame=centre*Rules.RevealPose(rank,age,ease)
     local owner=bag.Parent;local hand=owner and(owner:FindFirstChild('RightHand')or owner:FindFirstChild('Right Arm'))
     if hand then seedFrame=seedFrame:Lerp(hand.CFrame*CFrame.new(0,-.5,0),slide*slide*(3-2*slide))end
+    -- R152 (owner: "whoosh for the flying"): a soft whoosh at the seed as it flies into the hand, its swell on the slide's fastest frame
+    if hand and not record.SlideWhooshDone then
+        local f=slideFlight(record,revealStart)
+        if not f then record.SlideWhooshDone=true
+        elseif t>=f.Start then
+            record.SlideWhooshDone=true
+            if t-f.Start<.2 and record.Seed.PrimaryPart then
+                local sound=Instance.new("Sound");sound.Name="Seed flight";sound.SoundId=f.Id;sound.PlaybackSpeed=f.Pitch;sound.Volume=f.Volume
+                sound.RollOffMinDistance=6;sound.RollOffMaxDistance=48;sound.Parent=record.Seed.PrimaryPart
+                if f.Region then pcall(function()sound.PlaybackRegionsEnabled=true;sound.PlaybackRegion=NumberRange.new(f.Region[1],f.Region[2])end)end
+                pcall(function()require(ReplicatedStorage.AudioMixer).Route(sound,"Effects")end)
+                sound.TimePosition=f.Entry+(t-f.Start)*f.Pitch;sound:Play();record.SlideWhoosh=sound;record.SlideWhooshFlight=f
+            end
+        end
+    end
+    if record.SlideWhoosh then
+        local f=record.SlideWhooshFlight;local a=t-f.Peak
+        if a>.45 then record.SlideWhoosh:Stop();record.SlideWhoosh=nil
+        else record.SlideWhoosh.Volume=f.Volume*math.clamp(1-(a-.15)/.3,0,1)end
+    end
     record.Seed:PivotTo(seedFrame)
     local fade=math.clamp((slide-.85)/.15,0,1);local visible=t>=revealStart and fade<1
     for _,p in ipairs(record.SeedParts)do if p~=record.Seed.PrimaryPart then p.LocalTransparencyModifier=visible and fade or 1 end end
@@ -265,7 +310,7 @@ local function renderReveal(record,now)
             local camera=workspace.CurrentCamera;local at=record.Seed.PrimaryPart.Position
             if camera and (camera.CFrame.Position-at).Magnitude<=ONLOOKER_RANGE then LocalSfx.Play(OnlookerId,at,.3,rank==8 and .88 or 1,3)end
         end
-        if age<.4 and char and mine and now-lastHeavenlyAt>=Rules.RevealAudioCooldown then
+        if age<.4 and char and mine and now-lastHeavenlyAt>=Rules.RevealAudioCooldown and not(rank>=6 and cinematicRunning())then
             lastHeavenlyAt=now
             local pitches=rank==4 and {.5,.63,.75}or rank==6 and {.375,.5,.75}or rank>=7 and {.5,.75,1,1.25}or {.5,.75,.94}
             for i,pitch in ipairs(pitches)do
@@ -383,8 +428,20 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
         local camera=workspace.CurrentCamera
         local nearby=bag.Parent==Players.LocalPlayer.Character or not camera or (camera.CFrame.Position-bag.PrimaryPart.Position).Magnitude<math.max(120,(bag:GetAttribute('VisualScale')or 1)*5)
         if nearby and at and id and now-at<(bag:GetAttribute("RevealDuration") or Rules.RevealSeconds) then
-            if not record.Effect then beginReveal(record,at,id,now) end
-            if record.Effect then renderReveal(record,now) end
+            -- R152: one reveal that fails (a seed / pack this client cannot build, a part missing) is cleaned up and logged once, and the
+            -- pack itself is shown again; it no longer stops this loop, so every other pack keeps opening
+            if not record.Effect and record.FailedAt~=at then
+                local ok,err=pcall(beginReveal,record,at,id,now)
+                if not ok then record.FailedAt=at;pcall(destroyEffect,record);warn("[SeedPackClient] reveal could not start: "..tostring(err))end
+            end
+            if record.Effect then
+                local ok,err=pcall(renderReveal,record,now)
+                if not ok then
+                    record.RenderErrors=(record.RenderErrors or 0)+1
+                    if record.RenderErrors==1 then warn("[SeedPackClient] reveal frame failed: "..tostring(err))end
+                    if record.RenderErrors>=3 then record.FailedAt=at;pcall(destroyEffect,record)end
+                end
+            end
         elseif record.Effect then destroyEffect(record) end
     end
 end))

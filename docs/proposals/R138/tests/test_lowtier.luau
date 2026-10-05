@@ -34,6 +34,6 @@ check(results[3].Light>0 and results[2].Light==0,'only Rare flashes a little lig
 local big=F.Create(holder,5,1);check(big and not big.Style.Minor and big.Pillar~=nil,'Mythic keeps its full burst');big:Destroy()
 local src=W.B.PackOpeningFeedback or''
 check(src:find('if rank<=3 then',1,true)~=nil and src:find("rank==3 and 8 or rank==2 and 6 or 4",1,true)~=nil,'2D: 4 / 6 / 8 tiny sparkles pop out in the tier colour')
-check(src:find('revealAudio.Burst(rank,t)',1,true)~=nil,'2D: the low-tier sound plays when the seed pops out (late cues dropped)')
+check(src:find('revealAudio.Burst(rank,t,',1,true)~=nil,'2D: the low-tier sound plays when the seed pops out (late cues dropped; R152: its later notes on the reveal clock)')
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end
