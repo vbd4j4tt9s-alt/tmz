@@ -180,8 +180,13 @@ resize(1280,720)
 srv.Ready=true;player:SetAttribute('DailyLoginReady',false);frames(2)
 player:SetAttribute('DailyLoginReady',true);R.advance(4);frames(2)
 check(not panel.Visible,'not during the tutorial')
+-- R151: a returning player is on the title screen when the reward is published; it waits for the title screen to close.
+pg:SetAttribute('TitleActive',true)
 player:SetAttribute('TutorialDone',true);R.advance(3.2);frames(3)
-check(panel.Visible and login.Visible,'after the tutorial the week opens by itself')
+check(not panel.Visible,'not over the title screen')
+R.advance(30);frames(2);check(not panel.Visible,'(still waiting while the title screen is up)')
+pg:SetAttribute('TitleActive',nil);R.advance(3.2);frames(3)
+check(panel.Visible and login.Visible,'after the tutorial the week opens by itself (R151: once the title screen closes; it used to give up for the session)')
 panel.Header.Close.Activated:Fire();frames(2)
 player:SetAttribute('DailyLoginReady',false);frames(1);player:SetAttribute('DailyLoginReady',true);R.advance(4);frames(2)
 check(not panel.Visible,'only once a session')
@@ -203,10 +208,15 @@ check(not chip.Visible,'no friends: no chip')
 -- 8. Plant-ready opt-in.
 player:SetAttribute('PlantReadyAlerts',false);player:SetAttribute('SeedsPlanted',1);R.advance(3);frames(1)
 check(#optIns==0,'not asked while notifications are not set up')
-player:SetAttribute('PlantReadyAlerts',true);player:SetAttribute('SeedsPlanted',2);R.advance(1);frames(1)
+-- R151: a failed eligibility check (a web hiccup) is tried again at the next planting instead of giving up for the session.
+local canPrompt=ENS.CanPromptOptInAsync;ENS.CanPromptOptInAsync=function()error('HTTP 503',0)end
+player:SetAttribute('PlantReadyAlerts',true);player:SetAttribute('SeedsPlanted',2);R.advance(3);frames(1)
+check(#optIns==0,'the eligibility check failed: no prompt')
+ENS.CanPromptOptInAsync=canPrompt
+player:SetAttribute('SeedsPlanted',3);R.advance(1);frames(1)
 check(#optIns==0,'asked a moment after planting, not at once')
-R.advance(2);frames(1);check(#optIns==1,'then Roblox\'s notification opt-in is shown')
-player:SetAttribute('SeedsPlanted',3);R.advance(3);frames(1);check(#optIns==1,'only once a session')
+R.advance(2);frames(1);check(#optIns==1,'then Roblox\'s notification opt-in is shown (tried again after the failed check)')
+player:SetAttribute('SeedsPlanted',4);R.advance(3);frames(1);check(#optIns==1,'only once a session')
 -- 9. Teardown.
 sc.Destroying:Fire();gui:Destroy();frames(2)
 check(daily.Parent==nil and invite.Parent==nil,'the buttons go with the script')

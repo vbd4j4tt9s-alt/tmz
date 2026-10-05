@@ -59,6 +59,7 @@ return {
  {'/test pity 30','Preview what reset 30 guarantees. spawnodds shows normal slot chances.'},
  {'/test mystery @username','R141 base mystery pack. ready = unlocks in 3 s, next = pretend a new day, reset.'},
  {'/test daily @username','R140 login week + daily quests. next = pretend a new day, done = finish today\'s quests, week = next claim is day 7 (Mech pack), reset.'},
+ {'/test plantnotify','R151 offline "your plant is ready" notifier: setup check + queue + your cooldown. send = send you one now (Roblox: 1 a day), reset = clear your cooldown.'},
  {'/test packluck @username 29','Hidden big-pack luck (players never see it). 29 makes their next earned pack 5x+.'},
  {'/test routes','Biome lengths and keeper speeds.'},
  {'/test fling storm @username','Fling like a keeper (forest … storm, or darkened). Tests air time; nothing drops.'},

@@ -253,6 +253,9 @@ local function runServer()
 		speedBoard:Destroy()
 		playerData:Shutdown(Players:GetPlayers())
 	end)
+	-- R151: a closing server (update, shut down all servers) still queues every player's "your plant is ready"; its own
+	-- callback, so it runs beside the profile saves (Shutdown reads gardens that are finalizing, never yields them).
+	game:BindToClose(function()social:Shutdown(Players:GetPlayers())end)
 
 	ReplicatedStorage:SetAttribute("ChestChaseStartupState","Ready")
 	print(string.format("[%s] PASS - ChestChaseServerMain started; gameplay config %s.",

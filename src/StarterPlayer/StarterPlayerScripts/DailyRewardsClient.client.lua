@@ -305,14 +305,22 @@ watch(pg:GetAttributeChangedSignal('SeedMenu'),function()local want=pg:GetAttrib
 watch(player:GetAttributeChangedSignal('DailyRevision'),function()updateBadges();if panel.Visible then fetch()end end)
 for _,key in ipairs({'DailyLoginReady','DailyQuestsReady'})do watch(player:GetAttributeChangedSignal(key),updateBadges)end
 -- The week's card opens by itself once a session when a login reward is waiting (after the tutorial).
+-- R151: returning players are still on the title screen when their reward is published, and the 3 s check used to give up
+-- for the whole session there; now it waits for the title screen (or another menu) to close and tries again.
+local autoWaiting=false
 local function autoOpen()
- if openedAuto or player:GetAttribute('DailyLoginReady')~=true or player:GetAttribute('TutorialDone')~=true then return end
- openedAuto=true
+ if openedAuto or autoWaiting or player:GetAttribute('DailyLoginReady')~=true or player:GetAttribute('TutorialDone')~=true then return end
+ if pg:GetAttribute('SeedMenu')~=nil or pg:GetAttribute('TitleActive')==true then return end -- (tried again when they close)
+ autoWaiting=true
  task.delay(3,function()
-  if gui.Parent and not panel.Visible and pg:GetAttribute('SeedMenu')==nil and pg:GetAttribute('TitleActive')~=true and player:GetAttribute('DailyLoginReady')==true then open(true,'Login')end
+  autoWaiting=false
+  if openedAuto or not gui.Parent or player:GetAttribute('DailyLoginReady')~=true then return end
+  if panel.Visible then openedAuto=true;return end -- (they opened it themselves)
+  if pg:GetAttribute('SeedMenu')==nil and pg:GetAttribute('TitleActive')~=true then openedAuto=true;open(true,'Login')end
  end)
 end
 for _,key in ipairs({'DailyLoginReady','TutorialDone'})do watch(player:GetAttributeChangedSignal(key),autoOpen)end
+for _,key in ipairs({'TitleActive','SeedMenu'})do watch(pg:GetAttributeChangedSignal(key),autoOpen)end
 -- Invite + friend boost (R148: friends speed up the speed GAINED from training, not the walk speed) --------------------
 local inviteHint=text(inviteButton,'InviteHint','',14,Theme.Colors.Muted);inviteHint.Visible=false;inviteHint.BackgroundTransparency=.15;inviteHint.BackgroundColor3=Theme.Colors.Panel;inviteHint.ZIndex=30;Theme.Corner(inviteHint,8)
 inviteHint.AnchorPoint=Vector2.new(.5,0);inviteHint.Position=UDim2.new(.5,0,1,6);inviteHint.Size=UDim2.fromOffset(230,26)
@@ -349,7 +357,8 @@ watch(player:GetAttributeChangedSignal('SeedsPlanted'),function()
  task.delay(2.5,function()
   local okService,service=pcall(game.GetService,game,'ExperienceNotificationService');if not okService or not service then return end
   local ok,can=pcall(service.CanPromptOptInAsync,service)
-  if ok and can then pcall(service.PromptOptIn,service)end
+  if not ok then asked=false;return end -- R151: a failed check (web hiccup) is tried again at the next planting, not given up for the session
+  if can then pcall(service.PromptOptIn,service)end
  end)
 end)
 updateBadges();friendChip();autoOpen();layout()

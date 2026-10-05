@@ -76,6 +76,7 @@
 | `refreshcycle 30` (server) | Refresh into reset 30. Legendary every 5 resets, Mythic every 10, The Darkened every 3 |
 | `pity 30`, `spawnodds`, `routes` | Look at guarantees, spawn chances and keeper speeds |
 | `daily`, `daily next`, `daily done`, `daily week`, `daily reset` (`@name`) | R140 login week + daily quests: show the state; pretend a new day (login claim back, quests from 0); finish today's quests; make the next claim day 7 (Mech pack); start over |
+| `plantnotify`, `plantnotify send`, `plantnotify reset` | R151 offline "your plant is ready" notifier: what is missing from the setup (MessageId, HTTP, secret), the shared queue, your entry and cooldown, this server's counts; send you a notification now (Roblox delivers 1 a day, only if you opted in and are 13+); clear your cooldown |
 | `packluck`, `packluck 29 @name` | R137 hidden big-pack luck (players never see it): packs since a 5x+ / 10x+ and the track's refreshes; a number sets the 5x count (29 = next earned pack is 5x+) |
 | `fling storm @name` | Fling them like that biome's keeper (forest … storm, or `darkened`). Tests the air time; nothing drops |
 | `ragdoll 4 @name` | Knock them down for 0.5–10 s |

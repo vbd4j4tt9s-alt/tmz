@@ -25,8 +25,11 @@ end
 local function save(ctx,p)ctx.Data:MarkDirty(p);ctx.Data:QueueGardenSave(p)end
 -- R151: owner previews of the pull reveals and their sound slots (RarePullTestCommands).
 X.Actions.rarepull=true;X.Actions.raresound=true
+-- R151: plantnotify [status|send|reset]: the offline "your plant is ready" notifier's setup check, a test send to you, your cooldown reset (SocialService).
+X.Actions.plantnotify=true
 function X.Execute(ctx,p,action,a)
  if action=='rarepull'or action=='raresound'then return require(script.Parent.RarePullTestCommands).Execute(ctx,p,action,a)end
+ if action=='plantnotify'then return require(script.Parent.SocialService).Command(ctx,p,a)end
  local map=ctx.Map.MapRoot;local event=ctx.Chase.Event81;local data=ctx.Data
  if action=='void'then action='eclipse'end
  if action=='announce'then return require(script.Parent.PullAnnouncer).Command(ctx,p,a)end -- R151: announce <seed> | announce global <seed> | announce record
