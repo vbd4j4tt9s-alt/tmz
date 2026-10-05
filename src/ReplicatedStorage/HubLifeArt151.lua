@@ -56,7 +56,7 @@ end
 
 -- The builder context: parts go into per-cell level folders; levels above the tier are skipped -----------------------------------------------
 local function context(root,tier)
- local ctx={Root=root,Tier=tier,Cells={},Counts={core=0,detail=0,fine=0},Lights={},Emitters={},Butterflies={},Signs={},Lanterns={},Fountain=nil}
+ local ctx={Root=root,Tier=tier,Cells={},Counts={core=0,detail=0,fine=0},Lights={},LightAt={},Heads={},Emitters={},Butterflies={},Signs={},Lanterns={},Fountain=nil}
  function ctx.Folder(level,x,z)
   if A.LevelOf[level]>ctx.Tier then return nil end
   local cx,cz=math.floor(x/A.CellSize),math.floor(z/A.CellSize);local key=cx..':'..cz
@@ -241,12 +241,15 @@ function A.FlowerBed(ctx,x,z,r,set,top)
 end
 
 -- Lamps: post / double / bollard variants; 'lit' ones carry a PointLight the client turns on in the dark.
+-- R151 Cloudy (WeatherCycle151): every lamp head (ctx.Heads: all 30 neon lanterns, at every device tier) and every wall lantern (ctx.Lanterns) warms its colour
+-- with the sky; the lit lamps' real lights (ctx.Lights, in priority order, see A.OrderLights) switch on for it within the tier's cap.
 function A.Lamp(ctx,x,z,kind,lit,yaw)
  local metal,trim=P.Metal,P.Gold
  if kind=='bollard'then
   ctx.VCyl('core',x,z,'Bollard',1.4,FLOOR,FLOOR+3.4,x,z,metal,Mat.Metal)
   local glow=ctx.Part('core',x,z,'Lamp lantern',V(1.3,1.2,1.3),CF(x,FLOOR+4,z),{255,222,150},Mat.Neon,{shadow=false})
   ctx.Part('core',x,z,'Lamp cap',V(1.9,.4,1.9),CF(x,FLOOR+4.8,z),metal,Mat.Metal)
+  if glow then table.insert(ctx.Heads,glow)end
   return glow
  end
  ctx.VCyl('core',x,z,'Lamp base',1.8,FLOOR,FLOOR+1.4,x,z,metal,Mat.Metal)
@@ -254,7 +257,8 @@ function A.Lamp(ctx,x,z,kind,lit,yaw)
  ctx.VCyl('core',x,z,'Lamp pole',.7,FLOOR+1.4,FLOOR+12,x,z,metal,Mat.Metal)
  local glows={}
  local function lantern(c)
-  glows[#glows+1]=ctx.Part('core',x,z,'Lamp lantern',V(1.6,2,1.6),c,{255,222,150},Mat.Neon,{shadow=false})
+  local head=ctx.Part('core',x,z,'Lamp lantern',V(1.6,2,1.6),c,{255,222,150},Mat.Neon,{shadow=false})
+  glows[#glows+1]=head;if head then table.insert(ctx.Heads,head)end
   ctx.Part('core',x,z,'Lamp cap',V(2.4,.5,2.4),c*CF(0,1.25,0),metal,Mat.Metal)
  end
  if kind=='double'then
@@ -264,7 +268,7 @@ function A.Lamp(ctx,x,z,kind,lit,yaw)
  else lantern(CF(x,FLOOR+13,z))end
  if lit then for _,g in ipairs(glows)do
   local l=Instance.new('PointLight');l.Name='HubLampLight';l.Color=RGB(255,214,150);l.Range=22;l.Brightness=1.4;l.Shadows=false;l.Enabled=false;l.Parent=g
-  table.insert(ctx.Lights,l);break
+  table.insert(ctx.Lights,l);ctx.LightAt[l]={x,z};break
  end end
  return glows[1]
 end
@@ -458,6 +462,21 @@ A.Layout={
 A.LayoutFns={}
 local PATCH_COLOURS={{112,198,98},{70,150,74},{226,206,150},{90,78,80}}
 
+-- The lit lamps' real lights in priority order: mirror pairs (x, -x at the same z) side by side, the layout's order kept between pairs, so any even cap
+-- (HubLife151 caps them by device tier while only Cloudy asks) leaves the square symmetric and the street lamps first.
+function A.OrderLights(ctx)
+ local lights,order,taken=ctx.Lights,{},{}
+ for i,l in ipairs(lights)do if not taken[i]then
+  taken[i]=true;order[#order+1]=l
+  local a=ctx.LightAt[l]
+  for j=i+1,#lights do if not taken[j]then
+   local b=ctx.LightAt[lights[j]]
+   if a and b and math.abs(a[1]+b[1])<.01 and math.abs(a[2]-b[2])<.01 then taken[j]=true;order[#order+1]=lights[j];break end
+  end end
+ end end
+ ctx.Lights=order
+ return order
+end
 -- Build everything for a device tier (1..3). bases: {[i]={Frame=CFrame, Size=Vector3, Color=Color3}}; owners(i) -> name or nil.
 function A.Build(root,tier,bases,owners)
  local ctx=context(root,tier)
@@ -473,6 +492,7 @@ function A.Build(root,tier,bases,owners)
  for _,b in ipairs(L.beds)do A.FlowerBed(ctx,b[1],b[2],b[3],b[4],b[5])end
  for _,t in ipairs(L.topiary)do A.Topiary(ctx,t[1],t[2],t[3])end
  for _,l in ipairs(L.lamps)do A.Lamp(ctx,l[1],l[2],l[3],l[4],l[5])end
+ A.OrderLights(ctx)
  for _,b in ipairs(L.benches)do
   if #b==3 then -- around the fountain: face its middle
    local yaw=math.atan2(-b[1],-(b[2]+392));A.Bench(ctx,b[1],b[2],yaw+math.pi,b[3])

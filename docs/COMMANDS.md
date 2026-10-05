@@ -80,7 +80,11 @@
 | `packluck`, `packluck 29 @name` | R137 hidden big-pack luck (players never see it): packs since a 5x+ / 10x+ and the track's refreshes; a number sets the 5x count (29 = next earned pack is 5x+) |
 | `fling storm @name` | Fling them like that biome's keeper (forest … storm, or `darkened`). Tests the air time; nothing drops |
 | `ragdoll 4 @name` | Knock them down for 0.5–10 s |
-| `weather thunder` (server) | `clear`, `rain`, `thunder` or `blizzard`. Add `all` (e.g. `weather rain all`) to make every exposed pack, plant and fruit change: tests the R127 highlights |
+| `weather thunder` (server) | `clear`, `cloudy`, `rain`, `thunder` or `blizzard`. Add `all` (e.g. `weather rain all`) to make every exposed pack, plant and fruit change: tests the R127 highlights |
+| `weather cloudy` / `weather clear` (server) | R151 default sky: hold it Cloudy (dim, cool light, thicker grey clouds, warm lamps and lanterns) or Clear for 5 minutes (it arrives over 6 s; any event weather is cleared first), then the cycle goes on |
+| `weather cycle` (server) | Shows the default Clear / Cloudy cycle: the sky now and its fade, when it switches, whether a test holds it, and the event weather |
+| `weather cycle skip` (server) | Ends the current phase now: the other sky starts with its real 20 - 40 s fade (to watch the fade), then the cycle goes on from there |
+| `weather cycle auto` (server) | Releases any hold or skip: the real schedule again |
 | `event spawn` / `event clear` (server) | Spawn or remove The Darkened and its 2 Void Packs |
 | `event status` (server) | Packs left, unstolen refreshes (the packs reroll after 3) |
 | `event go @name` | Teleport next to a Void Pack |
@@ -265,3 +269,12 @@ listed separately any more because each one is the same as a command above.
    - `announce record` shows the record line to everyone in this server at once (it never goes to other servers). The hub displays call `require(...PullAnnouncer).Announce({Kind='Record', Player=player, Record='BestPull', SeedId=..., AfterReveal=true})`; `bestpull` / `bigfruit` tests show their line to their target only.
    - Tunables (Studio, attributes on `PullAnnounceRules`): `RevealMargin` (0.5 s after the seed is shown) and `RecordLag` (0.4 s) join the ones below.
    - Tunables (Studio): set an attribute on `ReplicatedStorage.PullAnnounceRules`: `InServerMinRarity` (default Legendary), `GlobalMinRarity` (Secret), `ChatBurst` / `ChatWindow` (8 lines per 10 s per player), `PublishGapSeconds` (5), `ReceiveMaxPerMinute` (10).
+27. **R151 Cloudy sky (the default weather alternates Clear and Cloudy):**
+   - Stand in the base. Wait for the cycle (about 8 minutes Clear, then about 6 minutes Cloudy) or type `weather cycle skip`: over 20 - 40 seconds the light dims, turns cooler and a little hazier, the clouds thicken and grey, the sun rays fade. No rain, no particles, no sound. Keepers, packs, the keyboard letters and the UI stay easy to read.
+   - As it dims the lamps and lanterns warm up and glow: every lamp head and wall lantern in the festival square turns amber, the lamps along the side streets (and the avenue and the market square on a desktop) cast a soft warm light on the ground, and the market's lanterns get a bit stronger and warmer. Phones light 4 lamps (the street ones), FastMode none (the heads still glow). `weather cycle skip` again fades it all back to Clear: the lights go off and every colour returns exactly.
+   - `weather cloudy` / `weather clear` hold the sky for 5 minutes (it arrives in 6 seconds; any rain / thunder / blizzard is cleared first). `weather cycle` prints the sky now, its fade, when it switches, whether a test holds it and the event weather. `weather cycle auto` goes back to the real schedule.
+   - `weather rain` (or `thunder`, `blizzard`) while it is cloudy: the storm looks exactly as before (it takes priority, Cloudy is not added); rain and thunder light all 8 lamps. When it ends the sky goes back to wherever the cycle is.
+   - Walk onto the track while it is cloudy: each biome keeps its own mood (Cloudy dims the base only; the owner can raise `Track` in `ReplicatedStorage.WeatherCycle151.Config` to dim the track too).
+   - `event spawn` while it is cloudy: the lights flicker out as before and come back to the Cloudy look. Open a Secret / Cosmic / King pull (`rarepacks @me`) while it is cloudy: the story scene is lit as it always was.
+   - Cloudy is not a mutation weather: it does not change packs, plants or fruit (`weather rain` is still the only 0.2%-per-minute roll), and the weather HUD only reads "Cloudy skies" in its accessibility label.
+   - Tunables (Studio): `ReplicatedStorage.WeatherCycle151` has `Config` (phase lengths, spread, fade range, test hold, `Track`), `Lamps` (when lamps start to glow, real lights per device tier, warm colour) and `Market`; the look itself is `BiomeMood.CloudyLook`.

@@ -5,6 +5,9 @@
 -- fruits that are already in the game"). Those models are built just after the market, each on its own, so one that
 -- cannot be built never stops the market.
 local M={Center=Vector3.new(0,4,-269.275)}
+-- R151 Cloudy sky (WeatherCycle151.Market.Tag): the market's warm lights are tagged so the client can warm and strengthen them while it is cloudy.
+local WARM_TAG='WarmLight151'
+local function warmTag(inst)game:GetService('CollectionService'):AddTag(inst,WARM_TAG)end
 M.FruitOfHour=Vector3.new(-20,0,-30)        -- pedestal centre: right of the arrival spot as you face the market
 function M.Apply(map)
  local hub=assert(map:FindFirstChild('EconomyHub'))
@@ -99,6 +102,7 @@ function M.Apply(map)
   for _,y in ipairs({7.5,8.5})do part('Lantern cap',Vector3.new(.9,.18,.9),Vector3.new(x,y,-9),darkWood)end
   for _,side in ipairs({-1,1})do part('Lantern frame',Vector3.new(.1,1,.76),Vector3.new(x+side*.38,8,-9),darkWood)end
   local lamp=Instance.new('PointLight');lamp.Color=Color3.fromRGB(255,213,146);lamp.Brightness=.55;lamp.Range=10;lamp.Shadows=false;lamp.Parent=glow
+  warmTag(lamp);warmTag(glow) -- R151: the Cloudy sky warms them (HubLife151.client)
  end
  -- R133 (owner: "make sure there is an actual wall behind the market sign"): a timber fascia fills the front between
  -- the corner posts, from the sign's bottom up to the porch header; the open front below it is unchanged.
@@ -397,6 +401,7 @@ function M.Polish(model)
   rod('Lamp cord',Vector3.new(x,18.7,3),Vector3.new(x,M.Showcase.LanternTop,3),.12,P.DarkWood)
   local holder=part('Lantern light',Vector3.new(.3,.3,.3),Vector3.new(x,M.Showcase.LanternTop-M.Showcase.LanternSize/2,3),{255,214,150});holder.Transparency=1
   local light=Instance.new('PointLight');light.Color=Color3.fromRGB(255,214,160);light.Brightness=.9;light.Range=18;light.Shadows=false;light.Parent=holder
+  warmTag(light)
  end
  -- Behind the market (owner: "the back looks plain"): pots with the game's plants, crates and a barrel on the deck.
  local backZ=17.1;local deckTop=.85
@@ -473,6 +478,7 @@ function M.Pedestal(parent,origin)
  t.Text='FRUIT OF THE HOUR';t.TextColor3=rgb(P.Gold);t.Parent=gui
  local anchor=part('FruitAnchor',Vector3.new(1,1,1),Vector3.new(0,M.FruitHeight,0),P.Gold);anchor.Transparency=1
  local light=Instance.new('PointLight');light.Name='FruitLight';light.Color=Color3.fromRGB(255,224,150);light.Brightness=1.4;light.Range=14;light.Shadows=false;light.Parent=anchor
+ warmTag(light)
  return holder,anchor
 end
 return M

@@ -20,7 +20,8 @@ function S.Read(storage,map,point,now)
  local global=storage:GetAttribute('GlobalWeather')or'Clear';if not W.Events[global]then global='Clear'end
  local kind=global~='Clear'and global or S.LocalWeather(map,point)
  local seconds=S.Seconds(storage:GetAttribute(global=='Clear'and'NextWeatherAt'or'WeatherEndsAt'),now)
- local weather={Kind=kind,Title=kind=='Clear'and'Clear skies'or kind,Caption=global=='Clear'and'Next weather'or'Ends in',Time=S.Clock(seconds),Progress=seconds and math.clamp(seconds/(global=='Clear'and W.Interval-W.Duration or W.Duration),0,1)or 0}
+ -- R151: the accessible label also names the default sky's other half (the row's picture and timer stay the event weather's)
+ local weather={Kind=kind,Title=kind=='Clear'and(storage:GetAttribute('AmbientSky')=='Cloudy'and'Cloudy skies'or'Clear skies')or kind,Caption=global=='Clear'and'Next weather'or'Ends in',Time=S.Clock(seconds),Progress=seconds and math.clamp(seconds/(global=='Clear'and W.Interval-W.Duration or W.Duration),0,1)or 0}
  local closed=map and map:GetAttribute('BiomesRefreshing')==true
  local nextReset=map and S.Seconds(map:GetAttribute('NextBiomeRefreshAt'),now)
  local left=closed and tonumber(map:GetAttribute('BiomeRefreshSeconds'))or nextReset

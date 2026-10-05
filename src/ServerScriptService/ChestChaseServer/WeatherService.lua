@@ -4,6 +4,8 @@
 local RS=game:GetService('ReplicatedStorage');local Players=game:GetService('Players');local Run=game:GetService('RunService')
 local W=require(RS.WeatherTraits);local Rules=require(RS.PlantRules);local Catalog=require(RS.PlantCatalog)
 local FX=require(RS.ItemEffectAnchor)
+-- R151: the default sky alternates Clear <-> Cloudy (WeatherCycle151). Ambient only: no mutation roll, GlobalWeather stays 'Clear' while it is cloudy.
+local Cycle=require(RS.WeatherCycle151)
 -- R127: a pack that adopts weather glows for everyone; plant/fruit notices carry which plant changed (MutationGlow127).
 local Glow=require(RS.MutationGlow127);local CS=game:GetService('CollectionService')
 local Service={};Service.__index=Service
@@ -15,7 +17,7 @@ function Service.new(data,chests)
  local remotes=RS:WaitForChild(chests.Config and chests.Config.RemoteFolderName or 'ChestChaseRemotes')
  local notice=remotes:FindFirstChild('WeatherAdopted')or Instance.new('RemoteEvent')
  notice.Name='WeatherAdopted';notice.Parent=remotes
- return setmetatable({Data=data,Chests=chests,Notice=notice,PackSeen=setmetatable({},{__mode='k'}),FruitSeen=setmetatable({},{__mode='k'}),PendingPacks={},Glows=setmetatable({},{__mode='k'}),NoticeSerial=0,Cycle=nil,Kind='Clear',Clock=0},Service)
+ return setmetatable({Data=data,Chests=chests,Notice=notice,PackSeen=setmetatable({},{__mode='k'}),FruitSeen=setmetatable({},{__mode='k'}),PendingPacks={},Glows=setmetatable({},{__mode='k'}),NoticeSerial=0,Cycle=nil,Kind='Clear',Clock=0,SkyClock=0,SkyShift=0,SkySerial=0},Service)
 end
 function Service:Minute(now)
  local _,_,ends=self:State(now)
@@ -152,9 +154,91 @@ function Service:Step(now)
  end
  self:FlushPacks();self:ExpireGlows()
 end
+-- R151 the default sky ---------------------------------------------------------------------------------------------------------------------
+-- The server owns the state: self.Sky = {Key, Kind, Since, Fade, From, Ends, Hold}, published as ReplicatedStorage.AmbientSkyState (one atomic string,
+-- WeatherCycle151.Pack) and the plain kind in AmbientSky. Clients turn it into a smooth level with the server clock (a late joiner is right, a skip or a
+-- test hold starts from the level the old state had reached, so nothing jumps). The schedule is WeatherCycle151.Segment(now + SkyShift): SkyShift is
+-- only ever set by '/test weather cycle skip'. Event weather is not consulted here: it takes priority on the client and the cycle keeps running.
+function Service:SkyWant(now)
+ local hold=self.SkyHold
+ if hold and now>=hold.Until then self.SkyHold=nil;hold=nil end
+ if hold then return'hold:'..hold.Serial,hold.Kind,hold.Start,hold.Until,hold.Fade,hold.From,true end
+ local shift=self.SkyShift or 0
+ local n,kind,start,finish,fade=Cycle.Segment(now+shift,self.SkyConfig)
+ return n..'@'..shift,kind,start-shift,finish-shift,fade,nil,false
+end
+local function publishSky(self,state)
+ self.Sky=state
+ RS:SetAttribute(Cycle.Attribute,Cycle.Pack(state.Kind,state.Since,state.Fade,state.From,state.Ends))
+ RS:SetAttribute(Cycle.KindAttribute,state.Kind)
+ RS:SetAttribute('AmbientSkyEndsAt',state.Ends)
+end
+-- Called every half second (Start): one pure schedule lookup, a write only when the segment changed. Returns true when it published a new state.
+function Service:StepSky(now)
+ now=now or workspace:GetServerTimeNow()
+ local key,kind,start,ends,fade,from,hold=self:SkyWant(now)
+ local cur=self.Sky
+ if cur and cur.Key==key then return false end
+ -- the new sky starts at its own boundary when that was just crossed (polling lag), else now (a hold began or ended, a skip, the schedule was shifted)
+ local since=start
+ if cur and(cur.Hold or not(start>cur.Since and start<=now and now-start<=5))then since=now end
+ if from==nil then from=cur and Cycle.LevelOf(cur,since)or(kind=='Cloudy'and 0 or 1)end
+ publishSky(self,{Key=key,Kind=kind,Since=since,Fade=fade,From=from,Ends=ends,Hold=hold})
+ return true
+end
+-- Owner test: keep the sky Clear / Cloudy for `seconds` (default Config.TestHold), arriving over `fade` seconds (default Config.TestFade).
+function Service:HoldSky(kind,now,seconds,fade)
+ if kind~='Clear'and kind~='Cloudy'then return false end
+ now=now or workspace:GetServerTimeNow()
+ local cfg=self.SkyConfig or Cycle.Config
+ self:StepSky(now)
+ self.SkySerial+=1
+ local cur=self.Sky
+ self.SkyHold={Serial=self.SkySerial,Kind=kind,Start=now,Until=now+(seconds or cfg.TestHold),Fade=fade or cfg.TestFade,From=cur and Cycle.LevelOf(cur,now)or(kind=='Cloudy'and 0 or 1)}
+ return self:StepSky(now)
+end
+-- Owner test: end the current phase now - the other sky starts (its real fade length), then the cycle goes on from there (a time shift on this server).
+function Service:SkipSky(now)
+ now=now or workspace:GetServerTimeNow()
+ self:StepSky(now)
+ local shown=self.Sky and self.Sky.Kind or'Clear'
+ self.SkyHold=nil
+ local n=Cycle.Segment(now+(self.SkyShift or 0),self.SkyConfig)
+ if Cycle.KindOf(n)==shown then n+=1 end -- (the natural phase is the one on show: the next one is the other sky)
+ self.SkyShift=Cycle.Boundary(n,self.SkyConfig)-now
+ self:StepSky(now)
+ return self.Sky
+end
+-- Owner test: back to the real schedule.
+function Service:ReleaseSky(now)
+ now=now or workspace:GetServerTimeNow()
+ self.SkyHold=nil;self.SkyShift=0
+ self:StepSky(now)
+ return self.Sky
+end
+local function minutes(seconds)seconds=math.max(0,math.floor(seconds+.5));return string.format('%d:%02d',math.floor(seconds/60),seconds%60)end
+-- A few lines for '/test weather cycle'.
+function Service:SkyReport(now)
+ now=now or workspace:GetServerTimeNow();self:StepSky(now)
+ local s=self.Sky
+ if not s then return{'The default sky has not started.'}end
+ local lines={};local level=Cycle.LevelOf(s,now);local fading=now-s.Since<s.Fade
+ local other=s.Kind=='Cloudy'and'Clear'or'Cloudy'
+ lines[#lines+1]=string.format('Default sky: %s%s, level %.2f (0 = Clear .. 1 = Cloudy); it started %s ago.',s.Kind,fading and string.format(' (fading in, %.0f s left)',s.Since+s.Fade-now)or'',level,minutes(now-s.Since))
+ lines[#lines+1]=string.format('%s: %s more, then %s%s.',s.Hold and'Held by a test'or'The cycle',minutes(s.Ends-now),other,s.Hold and' (then the cycle goes on)'or'')
+ local cfg=self.SkyConfig or Cycle.Config
+ lines[#lines+1]=string.format('Cycle: Clear about %s, Cloudy about %s, fades %d to %d s%s (ReplicatedStorage.WeatherCycle151.Config).',minutes(cfg.Clear.Seconds),minutes(cfg.Cloudy.Seconds),cfg.Fade[1],cfg.Fade[2],(self.SkyShift or 0)~=0 and', shifted by a skip'or'')
+ local kind,_,ends,nextAt=self:State(now)
+ lines[#lines+1]=W.Events[kind]and string.format('Event weather: %s, ends in %s (it takes priority: Cloudy is not applied meanwhile).',kind,minutes(ends-now))or string.format('Event weather: none, the next one in %s.',minutes(nextAt-now))
+ return lines
+end
+
 function Service:Start()
- self.Chests.Weather=self;self:Step(workspace:GetServerTimeNow())
- self.Connection=Run.Heartbeat:Connect(function(dt)self.Clock+=dt;if self.Clock>=5 then self.Clock=0;self:Step(workspace:GetServerTimeNow())end end)
+ self.Chests.Weather=self;self:Step(workspace:GetServerTimeNow());self:StepSky(workspace:GetServerTimeNow())
+ self.Connection=Run.Heartbeat:Connect(function(dt)
+  self.Clock+=dt;if self.Clock>=5 then self.Clock=0;self:Step(workspace:GetServerTimeNow())end
+  self.SkyClock+=dt;if self.SkyClock>=.5 then self.SkyClock=0;self:StepSky(workspace:GetServerTimeNow())end -- R151: one schedule lookup twice a second
+ end)
  -- Weather test requests pass through the owner/admin dispatcher in Studio and public servers.
 end
 return Service

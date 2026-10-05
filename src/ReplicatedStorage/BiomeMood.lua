@@ -28,9 +28,52 @@ function M.Stage(map,point,previous)
  end
  return 0
 end
-function M.Palette(stage,weather,low,refresh)
+-- R151 (owner: "make the other default weather cloudy where it just dims the lighting so that the lanterns around the map can create a warm
+-- ambience"): the Cloudy sky, the other half of the default weather (WeatherCycle151 alternates Clear <-> Cloudy). Like M.Dark it is a look any biome
+-- palette is blended toward by a level k (0..1), through the SAME mechanism as the rest (EnvironmentLighting writes the result; nothing else touches
+-- Lighting). It is only a dimmer, cooler, hazier day: no particles, no sun rays, bright enough to play (the keepers, the keyboard letters and the UI
+-- read as in a storm or better: Brightness 1.73 of 2.55 against the rain's 1.45 and the thunderstorm's 1.15). Numbers are scales / blends of the
+-- biome's own palette, so every biome keeps its mood (Forest greener, Desert warmer ...) just dimmer and greyer.
+M.CloudyLook={
+ Brightness=.68,                     -- x the palette's Lighting.Brightness (2.55 -> 1.73)
+ Exposure=-.135,                     -- added to ExposureCompensation (.015 -> -.12)
+ Ambient={C(104,118,148),.6},        -- Lighting.Ambient moves this share toward a cooler, dimmer grey-blue
+ OutdoorAmbient={C(136,152,184),.6},
+ Tint={C(226,235,250),.6},           -- ColorCorrection tint: cooler
+ Saturation=-.1,                     -- "slightly desaturated"
+ GradeBrightness=-.012,
+ Contrast=-.012,                     -- a flatter, softer light
+ AirColor={C(150,164,186),.75},      -- a darker, greyer sky (the Atmosphere is what colours the sky dome)
+ AirDecay={C(104,118,144),.75},
+ Density=.06,DensityMax=.3,          -- a gentle haze: denser, never more than .3
+ Haze=.55,
+ Bloom=1.15,                         -- the lamps' neon blooms a little more against the dimmer day
+ Clouds={Cover=.78,Density=.62,Color=C(172,178,192)}, -- the Terrain Clouds (WorldEvents): thicker, greyer (the storms: .86-.92 cover, dark grey)
+}
+-- Blend a palette (from Palette) toward the Cloudy look by k (0..1). k = 0 returns it untouched.
+function M.Overcast(out,k)
+ k=math.clamp(tonumber(k)or 0,0,1);if k<=0 then return out end
+ local L=M.CloudyLook
+ out.Light.Brightness*=1+(L.Brightness-1)*k
+ out.Light.ExposureCompensation+=L.Exposure*k
+ out.Light.Ambient=out.Light.Ambient:Lerp(L.Ambient[1],L.Ambient[2]*k)
+ out.Light.OutdoorAmbient=out.Light.OutdoorAmbient:Lerp(L.OutdoorAmbient[1],L.OutdoorAmbient[2]*k)
+ out.Grade.TintColor=out.Grade.TintColor:Lerp(L.Tint[1],L.Tint[2]*k)
+ out.Grade.Saturation+=L.Saturation*k;out.Grade.Brightness+=L.GradeBrightness*k;out.Grade.Contrast+=L.Contrast*k
+ out.Air.Color=out.Air.Color:Lerp(L.AirColor[1],L.AirColor[2]*k)
+ out.Air.Decay=out.Air.Decay:Lerp(L.AirDecay[1],L.AirDecay[2]*k)
+ out.Air.Density=math.max(out.Air.Density,math.min(L.DensityMax,out.Air.Density+L.Density*k))
+ out.Air.Haze+=L.Haze*k;out.Air.Glare*=1-k
+ out.Sun*=1-k
+ out.Bloom=(out.Bloom or 0)*(1+(L.Bloom-1)*k)
+ return out
+end
+-- cloud: the Cloudy level 0..1 (WeatherCycle151; the caller passes 0 while event weather is on, but event weather ignores it here too).
+function M.Palette(stage,weather,low,refresh,cloud)
  local p=M.Profiles[stage]or M.Profiles[0]
  local out={Light=table.clone(p.Light),Grade=table.clone(p.Grade),Air=table.clone(p.Air),Bloom=p.Bloom,Sun=.008}
+ local event=weather=='Rain'or weather=='Thunderstorm'or weather=='Blizzard'
+ if not event and cloud and cloud>0 then M.Overcast(out,cloud)end
  if weather=='Rain'or weather=='Thunderstorm'or weather=='Blizzard'then
   -- R129 (owner): a real overcast: the sky and the light go dark grey under the storm clouds (snow: pale grey).
   local snow=weather=='Blizzard';local storm=weather=='Thunderstorm'

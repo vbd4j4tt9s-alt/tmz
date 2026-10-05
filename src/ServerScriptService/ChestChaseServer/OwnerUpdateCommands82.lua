@@ -80,13 +80,16 @@ function X.Execute(ctx,p,action,a)
   return true,'Playing it for you now. '..say(start,stop,custom)
  end
  if action=='weather'then
+  -- R151: weather cloudy | weather cycle [skip|auto] (WeatherSkyCommand151); weather clear also holds the default sky Clear (below).
+  if a[1]=='cloudy'or a[1]=='cycle'then return require(script.Parent.WeatherSkyCommand151).Execute(ctx,p,a)end
   local kind=({rain='Rain',thunder='Thunderstorm',thunderstorm='Thunderstorm',blizzard='Blizzard',clear='Clear'})[a[1]]
   local all=a[2]=='all'and kind~='Clear'
-  if(#a~=1 and not all)or not kind then return false,'Use weather clear/rain/thunder/blizzard (add all to change every pack/plant/fruit). For local Snow, visit the Snow biome during clear weather.'end
+  if(#a~=1 and not all)or not kind then return false,'Use weather clear/cloudy/rain/thunder/blizzard (add all to change every pack/plant/fruit), or weather cycle [skip|auto] for the default Clear <-> Cloudy sky. For local Snow, visit the Snow biome during clear weather.'end
   local service=ctx.Chests.Weather;if not service then return false,'Weather is loading.'end
   local now=workspace:GetServerTimeNow();service.TestSerial=(service.TestSerial or 0)+1
   service.Override={Kind=kind,Cycle=-service.TestSerial,Until=now+require(RS.WeatherTraits).Duration,All=all};service:Step(now)
-  return true,'Server weather: '..kind..(all and' - every exposed pack, plant and fruit changes (R127 highlight test)'or'')..'. Normal weather resumes after this event.'
+  if kind=='Clear'and service.HoldSky then service:HoldSky('Clear',now)end -- R151: the default sky too (Clear, not Cloudy) for a few minutes
+  return true,'Server weather: '..kind..(all and' - every exposed pack, plant and fruit changes (R127 highlight test)'or'')..'. Normal weather resumes after this event.'..(kind=='Clear'and' The default sky is held Clear for a few minutes (weather cycle auto ends that).'or'')
  elseif action=='mechshop'then
   if #a~=0 then return false,'Use mechshop.'end
   local C=require(RS.MechCatalog);local lines={'Mech packs: select SINGLE / 5 PACKS / 10 PACKS in SHOP.'}

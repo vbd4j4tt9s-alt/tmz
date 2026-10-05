@@ -8,6 +8,10 @@
 --  * per-frame work only for the tiny ambience (butterflies, the fountain's jet / ripples / pack, petals and sparkles), and only while the
 --    camera is within 150 studs of it, at tier >= 2 and without Reduced Motion (Reduced Motion: everything stands still, no particles);
 --  * lamps with a PointLight switch on in the dark (The Darkened's blackout via EnvironmentLighting.Level, Rain / Thunderstorm);
+--  * R151 Cloudy (WeatherCycle151, the default sky's other half): as the sky dims the lamps and lanterns warm up and glow: every lamp head and wall lantern
+--    (neon, no light cost) shifts to a warm amber in a few colour steps, the lit lamps' real lights fade in within the device tier's cap (8 / 4 / 0 on
+--    desktop / phone / FastMode; the dark and storms still switch on all 8 everywhere), and the market's warm lights (tagged WarmLight151) strengthen. All of it
+--    is steps taken from the half-second tick: no per-frame work, and no loop over the lamps unless a step changed;
 --  * the track gate's keys turn green with a tick for the biomes this player is already fast enough for (KeeperSpeedLabels' rule);
 --  * signposts show the bases' owners; three quiet ambience layers near the gardens (existing BiomeMood sounds only).
 -- Nothing here collides, can be touched or queried, or changes gameplay.
@@ -21,7 +25,7 @@ local V=Vector3.new
 local GREEN,WHITE=Color3.fromRGB(110,236,96),Color3.fromRGB(255,255,255)
 local NEAR={detail=230,detailPhone=160,fine=130};local AMBIENCE_RANGE=150;local FAR_TRACK_Z=320
 
-local state={Root=nil,Ctx=nil,Tier=nil,Clock=0,Ambience=nil,Dark=false,LastKeys={},LastSigns={}}
+local state={Root=nil,Ctx=nil,Tier=nil,Clock=0,Ambience=nil,Dark=false,LastKeys={},LastSigns={},LightBase=setmetatable({},{__mode='k'}),HeadBase=setmetatable({},{__mode='k'})}
 local connections={}
 local function reduced()local ok,v=pcall(function()return GuiService.ReducedMotionEnabled end);return ok and v==true end
 local function tier()
@@ -102,17 +106,79 @@ local function ambienceWanted()
  return false
 end
 
--- Lamps in the dark --------------------------------------------------------------------------------------------------------------------------
+-- Lamps in the dark and under clouds ---------------------------------------------------------------------------------------------------------
 local Env;pcall(function()Env=require(RS:WaitForChild('EnvironmentLighting',5))end)
+local Cycle;pcall(function()Cycle=require(RS:WaitForChild('WeatherCycle151',5))end)
 local function isDark()
  local level=Env and tonumber(Env.Level)or 0
  local weather=RS:GetAttribute('GlobalWeather')
  return level>.3 or weather=='Rain'or weather=='Thunderstorm'
 end
+-- The Cloudy level the hub's lamps follow (0 in event weather: the storms have their own rules above).
+local function hubCloud()
+ if not Cycle then return 0 end
+ local level=Cycle.Read(RS,workspace:GetServerTimeNow())
+ return Cycle.Effective(level,0,RS:GetAttribute('GlobalWeather'),nil)
+end
+local function warmHead(part,share)
+ local base=state.HeadBase[part];if not base then base=part.Color;state.HeadBase[part]=base end
+ local c=share>0 and base:Lerp(Cycle.Lamps.Warm,share)or base
+ if part.Color~=c then part.Color=c end
+end
 local function applyLamps(force)
  local ctx=state.Ctx;if not ctx then return end
- local dark=isDark();if dark==state.Dark and not force then return end;state.Dark=dark
- for _,l in ipairs(ctx.Lights)do l.Enabled=dark end
+ local dark=isDark()
+ local t=tier();local strength=Cycle and Cycle.LampStrength(hubCloud())or 0
+ local q=Cycle and Cycle.Quant(strength,Cycle.Lamps.Steps)or 0
+ local hq=Cycle and Cycle.Quant(strength,Cycle.Lamps.HeadSteps[t]or Cycle.Lamps.HeadSteps[1])or 0
+ -- real lights: the dark switches on every one (as before R151); Cloudy only as many as the device tier allows
+ local cap=dark and #ctx.Lights or math.min(#ctx.Lights,Cycle and Cycle.RealLights(t)or 0)
+ local lightsChanged=force or dark~=state.Dark or q~=state.LampQ or cap~=state.LampCap
+ local headsChanged=force or hq~=state.HeadQ
+ if not lightsChanged and not headsChanged then return end
+ state.Dark=dark;state.LampQ=q;state.LampCap=cap;state.HeadQ=hq
+ if lightsChanged then
+  for i,l in ipairs(ctx.Lights)do
+   local base=state.LightBase[l];if not base then base=l.Brightness;state.LightBase[l]=base end
+   local on,b=false,base
+   if dark then on=true elseif i<=cap and q>0 then on=true;b=base*q end
+   if l.Enabled~=on then l.Enabled=on end
+   if l.Brightness~=b then l.Brightness=b end
+  end
+ end
+ if headsChanged and Cycle then
+  -- the neon heads of every lamp and every wall lantern warm up (a few steps over a fade; no light, so every tier does it)
+  local share=hq*Cycle.Lamps.WarmShare
+  for _,part in ipairs(ctx.Heads)do warmHead(part,share)end
+  for _,part in ipairs(ctx.Lanterns)do warmHead(part,share)end
+ end
+end
+-- The market's warm lights (MarketLayout tags the two porch lanterns' lights and heads, the three ceiling lantern lights and the Fruit of the Hour
+-- light WarmLight151): always on; under Cloudy they strengthen and warm a little (a few steps over a fade, the same strength as the lamps).
+local warm={Base=setmetatable({},{__mode='k'}),Q=nil}
+local function warmAdd(inst)
+ if not Cycle or warm.Base[inst]then return end
+ if inst:IsA('Light')then warm.Base[inst]={Brightness=inst.Brightness,Range=inst.Range,Color=inst.Color}
+ elseif inst:IsA('BasePart')then warm.Base[inst]={Color=inst.Color}end
+ warm.Q=nil
+end
+local function applyWarm(force)
+ if not Cycle then return end
+ local M=Cycle.Market
+ local q=Cycle.Quant(Cycle.LampStrength(hubCloud()),M.Steps)
+ if q==warm.Q and not force then return end
+ warm.Q=q
+ for inst,b in pairs(warm.Base)do
+  if inst.Parent then
+   local c=q>0 and b.Color:Lerp(M.Warm,M.WarmShare*q)or b.Color
+   if b.Brightness then
+    local v,r=b.Brightness*(1+M.Brightness*q),b.Range*(1+M.Range*q)
+    if inst.Brightness~=v then inst.Brightness=v end
+    if inst.Range~=r then inst.Range=r end
+   end
+   if inst.Color~=c then inst.Color=c end
+  end
+ end
 end
 
 -- Gate keys: a tick for the biomes this player is already faster than the keeper -------------------------------------------------------------
@@ -204,6 +270,7 @@ local function tick(dt)
  applySounds(dt)
  if elapsed<.5 then return end
  elapsed=0
+ applyWarm(false) -- (R151 Cloudy: the market's warm lights; they stand even when the festival square is not built)
  local dec=decor()
  if dec~=builtFor then builtFor=dec;build()end
  if not state.Ctx then return end
@@ -214,6 +281,12 @@ local function tick(dt)
  if slow>=1 then slow=0;applySigns()end
 end
 setupSounds()
+if Cycle then -- R151 Cloudy: the market's tagged warm lights (found now and as they stream in)
+ local CS=game:GetService('CollectionService');local tag=Cycle.Market.Tag
+ for _,inst in ipairs(CS:GetTagged(tag))do warmAdd(inst)end
+ connections[#connections+1]=CS:GetInstanceAddedSignal(tag):Connect(warmAdd)
+ connections[#connections+1]=CS:GetInstanceRemovedSignal(tag):Connect(function(inst)warm.Base[inst]=nil end)
+end
 connections[#connections+1]=Run.Heartbeat:Connect(tick)
 connections[#connections+1]=map.ChildRemoved:Connect(function(c)if c.Name==K.FolderName then builtFor=nil;teardown()end end)
 script.Destroying:Connect(function()
@@ -225,5 +298,5 @@ script:SetAttribute('R151Loaded',true)
 -- (the offline tests set R151TestHook on the script to drive it; in the game nothing is returned)
 if script:GetAttribute('R151TestHook')then
  return{State=state,Build=build,ApplyLod=applyLod,ApplyLamps=applyLamps,ApplyKeys=applyKeys,ApplySigns=applySigns,Tick=tick,AmbienceStep=ambienceStep,
-  AmbienceWanted=ambienceWanted,Teardown=teardown,Sounds=sounds,Near=NEAR}
+  AmbienceWanted=ambienceWanted,Teardown=teardown,Sounds=sounds,Near=NEAR,ApplyWarm=applyWarm,Warm=warm}
 end

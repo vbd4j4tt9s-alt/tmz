@@ -193,7 +193,7 @@ The five saved wall parts **keep their size, position and collision**. They stil
   - a faint crystal hum by the Crystal mural;
   - a faint rumble by the Lava garden's rocks.
   - There is no water loop among the existing sounds, so the fountain stays silent unless you add a library sound.
-- **Lamps in the dark.** There is no day/night yet. The client turns the lamp lights on whenever the lighting goes dark: The Darkened's blackout (`EnvironmentLighting.Level` > 0.3) or a Rain or Thunderstorm. See `base_area_darkened.png`. With a future hub day/night (benchmark M4) the same lamps become night lamps.
+- **Lamps in the dark.** There is no day/night yet. The client turns the lamp lights on whenever the lighting goes dark: The Darkened's blackout (`EnvironmentLighting.Level` > 0.3) or a Rain or Thunderstorm. See `base_area_darkened.png`. With a future hub day/night (benchmark M4) the same lamps become night lamps. (Update: the default sky now alternates Clear and Cloudy, and Cloudy also warms every lamp head and wall lantern and lights the lamps' real lights within a per-tier cap: 8 / 4 / 0 on desktop / phone / FastMode. See `cloudy.png`, `tests/run_cloudy.sh` and the R151 Cloudy item in `docs/COMMANDS.md`.)
 
 ### 2.4 Each base [O + I]
 

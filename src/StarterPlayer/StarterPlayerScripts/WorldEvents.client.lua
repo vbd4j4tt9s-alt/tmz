@@ -80,16 +80,20 @@ end
 -- Dark clouds: the place's own Terrain clouds are thickened and darkened while it rains / snows in the base (only
 -- Cover, Density and Color are touched; Enabled stays with RefreshSky). Without a cloud layer one is added for the
 -- weather and removed after. Values ease in and out and are restored exactly.
-local Clouds={Level=0,Kind='Rain'}
+-- R151: the Cloudy sky (WeatherCycle151, the other default weather) thickens and greys the same layer: Clouds.Step(kind, dt, ambient) with ambient =
+-- its level 0..1 (the caller passes 0 in event weather, on the track and during a track refresh). The storm blends over the Cloudy layer by its own
+-- Level, so an event starting or ending while it is cloudy crosses smoothly; with ambient 0 every value is exactly what it was before R151.
+local Clouds={Level=0,Kind='Rain',Ambient=0}
 Clouds.Targets={Rain={Cover=.86,Density=.82,Color=Color3.fromRGB(92,98,112)},Thunderstorm={Cover=.92,Density=.92,Color=Color3.fromRGB(60,64,78)},
  Blizzard={Cover=.88,Density=.75,Color=Color3.fromRGB(186,194,206)}}
-function Clouds.Step(kind,dt)
+function Clouds.Step(kind,dt,ambient)
+ ambient=ambient or 0;Clouds.Ambient=ambient
  local target=kind and 1 or 0;if kind then Clouds.Kind=kind end
  Clouds.Level=Clouds.Level+(target-Clouds.Level)*(1-math.exp(-(dt or 0)*1.5))
  if math.abs(Clouds.Level-target)<.01 then Clouds.Level=target end
  local terrain=workspace:FindFirstChildOfClass('Terrain');if not terrain then return end
  local c=Clouds.Object
- if Clouds.Level>0 and(not c or not c.Parent)then
+ if(Clouds.Level>0 or ambient>0)and(not c or not c.Parent)then
   c=terrain:FindFirstChildOfClass('Clouds')
   if c then Clouds.Saved={Cover=c.Cover,Density=c.Density,Color=c.Color};Clouds.Made=false
   else c=Instance.new('Clouds');c.Name='WeatherClouds';Clouds.Saved={Cover=0,Density=0,Color=Color3.fromRGB(255,255,255)};c.Cover=0;c.Density=0;c.Parent=terrain;Clouds.Made=true end
@@ -97,13 +101,29 @@ function Clouds.Step(kind,dt)
  end
  if not c or not Clouds.Saved then return end
  local base,goal,k=Clouds.Saved,Clouds.Targets[Clouds.Kind]or Clouds.Targets.Rain,Clouds.Level
- if k<=0 then
+ if k<=0 and ambient<=0 then
   if Clouds.Made then c:Destroy()else c.Cover=base.Cover;c.Density=base.Density;c.Color=base.Color end
   Clouds.Object=nil;Clouds.Saved=nil;return
  end
- c.Cover=base.Cover+(math.max(base.Cover,goal.Cover)-base.Cover)*k;c.Density=base.Density+(math.max(base.Density,goal.Density)-base.Density)*k
- c.Color=base.Color:Lerp(goal.Color,k)
+ local cover,density,color=base.Cover,base.Density,base.Color
+ if ambient>0 then
+  local look=Mood.CloudyLook.Clouds
+  cover=base.Cover+(math.max(base.Cover,look.Cover)-base.Cover)*ambient;density=base.Density+(math.max(base.Density,look.Density)-base.Density)*ambient
+  color=base.Color:Lerp(look.Color,ambient)
+ end
+ if k>0 then
+  cover=cover+(math.max(base.Cover,goal.Cover)-cover)*k;density=density+(math.max(base.Density,goal.Density)-density)*k
+  color=color:Lerp(goal.Color,k)
+ end
+ c.Cover=cover;c.Density=density;c.Color=color
 end
+-- R151: is the player in the base? (the Cloudy sky only dims the base; asked at most four times a second)
+local baseCheck={Age=1,Value=true}
+local function inBaseCached(dt)
+ baseCheck.Age+=dt;if baseCheck.Age>=.25 then baseCheck.Age=0;baseCheck.Value=inBase()end
+ return baseCheck.Value
+end
+local okCycle,Cycle=pcall(function()return require(RS.WeatherCycle151)end);if not okCycle then Cycle=nil end
 local function weather(kind)
  flash.Enabled=false
  if kind=='Clear'then return end
@@ -131,7 +151,14 @@ local tick=Run.Heartbeat:Connect(function(dt)
  if kind~=previousKind then weather(kind);previousKind=kind end
  local here=kind~='Clear'and inBase()
  -- R130: no weather clouds during a track refresh (the refresh sky is dark and cloudless).
- Clouds.Step(here and Lighting:GetAttribute('TrackRefreshActive')~=true and kind or nil,step)
+ local refreshing=Lighting:GetAttribute('TrackRefreshActive')==true
+ -- R151: the Cloudy sky's clouds: only in the base, never in event weather, a track refresh or a rare-pull story scene.
+ local ambient=0
+ if Cycle and kind=='Clear'and not refreshing then
+  local level=Cycle.Read(RS,now)
+  if level>0 and inBaseCached(step)then ambient=Cycle.Effective(level,0,kind,player:GetAttribute('RarePullCinematic'))end
+ end
+ Clouds.Step(here and not refreshing and kind or nil,step,ambient)
  -- On the track: no weather clouds, no lightning (the rain / snow tiles are WeatherWorld149's; drops already falling simply finish).
  if not camera or not here then clearStrike();return end
  local character=player.Character;local root=character and character:FindFirstChild('HumanoidRootPart')
