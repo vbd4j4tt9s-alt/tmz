@@ -96,6 +96,7 @@ assert s.count(old)>=1,'mutation target not found: '+old
 open(p,'w',encoding='utf-8').write(s.replace(old,new,1))
 PY
  if [ -n "$NEWONLY" ]&&[ "$PHASE" = old ];then return 0;fi # NEWONLY=1: only the R152 mutations
+ if [ -n "$OLDONLY" ]&&[ "$PHASE" = new ];then return 0;fi # OLDONLY=1: only the mutations before R152
  if [ -n "$ONLY" ]&&[ "$ONLY" != "$1" ];then return 0;fi # ONLY="<name>": just that mutation
  if [ -n "$DRY" ];then echo "target found: $1";return 0;fi # DRY=1: only check that every mutation target is still in the sources
  bundle "$M";total=$((total+1))

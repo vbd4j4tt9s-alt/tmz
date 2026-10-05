@@ -1462,8 +1462,8 @@ do
  -- a diamond pool (a square turned 45 degrees, half-diagonal 6) on (DR+4, 5): only its own cell; the axis-aligned box of the same part would reach the neighbours
  local c45=math.cos(math.rad(45));local s45=math.sin(math.rad(45));local half=6/math.sqrt(2)*2/ 2
  mk(scen,'Diamond pool',g.ColCenter(5),F+.2,cz(DR+4),12/math.sqrt(2)*1,.3,12/math.sqrt(2)*1,0,{c45,0,s45,0,1,0,-s45,0,c45})
- -- round pools: a ball (radius 5) and a standing disc (radius 5) on (DR+6, 5) and (DR+6, 12)
- local ball=mk(scen,'Round pool',g.ColCenter(5),F+.5,cz(DR+6),10,10,10);ball.Shape=R.Enum.PartType.Ball
+ -- round pools: a ball (radius 5.3: a box of that size would take the neighbours, a circle only 1 sample of one) and a standing disc (radius 5) on (DR+6, 5) and (DR+6, 12)
+ local ball=mk(scen,'Round pool',g.ColCenter(5),F+.5,cz(DR+6),10.6,10.6,10.6);ball.Shape=R.Enum.PartType.Ball
  local disc=mk(scen,'Disc pool',g.ColCenter(12),F+.2,cz(DR+6),.4,10,10,0,{0,-1,0,1,0,0,0,0,1});disc.Shape=R.Enum.PartType.Cylinder
  local res=S.Apply(synth,0)
  local cells=res and res.Cells or {}
@@ -1505,7 +1505,7 @@ do
  add(64,1,11)                                         -- the whole first half row: its strip is empty
  add(66,1,22)                                         -- a whole row: no keys, no strips
  add(68,5,7)                                          -- a gap in the middle of a half row: its letters are hidden
- add(R0+30,10,13);add(R0+32,1,6)                      -- far rows (far letters: trimmed / gap)
+ add(R0+50,10,13);add(R0+54,1,6)                      -- far rows (far letters: trimmed / gap); the stand-ins of a teleport reach them (they wait for their keys)
  local skipStr=K.EncodeSkip(skip,22,g.Rows,0)
  put(cx(11),F+9,cz(R0));frames(60)
  local keysBefore=#keyParts()
