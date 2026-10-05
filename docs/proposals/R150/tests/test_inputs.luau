@@ -3,8 +3,8 @@
 -- are replaced by recorders so each script's own calls are what is checked):
 --  1. TravelButtons: arriving after BASE / TRACK (FastTravelReadyAt rising to a future time) plays the whoosh once; join-time values, a draining
 --     cooldown and a refused press do not.
---  2. InteractionFeedback: an upgrade BOUGHT rings KaChing, a REFUSED one clicks Denied (server serials), the press keeps UpgradeClick; stepping onto a
---     treadmill clicks Equip once; holding E on a prompt clicks as the hold begins.
+--  2. InteractionFeedback: an upgrade BOUGHT rings KaChing, a REFUSED one clicks Denied (server serials), the press keeps UpgradeClick. R152: treadmills are
+--     silent (stepping on / off plays nothing; R150 clicked Equip) and holding E on a prompt no longer clicks as the hold begins (the finish has its own cue).
 --  3. BatClient: a swing is heard (a whoosh timed to meet the contact frame), a miss included; far swings and late echoes are handled.
 --  4. FruitGiftClient: the dialog opens / closes with MenuClick / MenuClose, Give sends with Bubble06, "Get closer" / "Hold the item" click Denied.
 --  5. GardenShovel: a removed plant is heard as the planting Dig layer at the plant, a refused removal clicks Denied, its buttons are silent themselves.
@@ -71,16 +71,14 @@ do
  check(rec.keys()=='UpgradeClick,Denied','a REFUSED upgrade clicks Denied (and never KaChing)')
  rec.clear();player:SetAttribute('UpgradePressSerial',3);player:SetAttribute('UpgradeBoughtSerial',2)
  check(rec.count('KaChing')==1 and rec.count('Denied')==0,'the next purchase: KaChing only')
- -- treadmill
- rec.clear();player:SetAttribute('TreadmillTraining',true);check(rec.keys()=='Equip','stepping onto a treadmill clicks Equip once')
- player:SetAttribute('TreadmillTraining',true);check(rec.count()==1,'(still on it: nothing)')
- player:SetAttribute('TreadmillTraining',false);check(rec.count()==1,'stepping off is silent')
- player:SetAttribute('TreadmillTraining',true);check(rec.count('Equip')==2,'stepping on again clicks again')
- -- hold E
+ -- treadmill (R152: silent: no Equip cue on stepping on, none on stepping off, none for the speed-gain popups' attribute churn)
+ rec.clear();player:SetAttribute('TreadmillTraining',true);check(rec.count()==0,'stepping onto a treadmill is silent ('..rec.keys()..')')
+ player:SetAttribute('TreadmillTraining',true);player:SetAttribute('TreadmillTraining',false);check(rec.count()==0,'stepping off is silent')
+ player:SetAttribute('TreadmillTraining',true);check(rec.count()==0,'stepping on again is silent too')
+ -- hold E (R152: no click as the hold begins, a hold or not)
  rec.clear()
  local p1=R.new('ProximityPrompt');p1.HoldDuration=1.5;local p2=R.new('ProximityPrompt');p2.HoldDuration=0
- Prompts.PromptButtonHoldBegan:Fire(p1);check(rec.keys()=='Bubble04','holding E on a prompt clicks as the hold begins')
- Prompts.PromptButtonHoldBegan:Fire(p2);check(rec.count()==1,'a prompt with no hold does not (it has its own cue)')
+ Prompts.PromptButtonHoldBegan:Fire(p1);Prompts.PromptButtonHoldBegan:Fire(p2);check(rec.count()==0,'holding E on a prompt plays nothing as the hold begins ('..rec.keys()..')')
  sc.Destroying:Fire()
 end
 
@@ -379,7 +377,7 @@ do
  end
 end
 
--- 10. PlantInspection: selecting a plant clicks -------------------------------------------------------------------------------------------------------------
+-- 10. PlantInspection: selecting a plant is silent (R152; R150 clicked Bubble04) -----------------------------------------------------------------------------------------------------------
 do
  local UIS=W.UIS
  local map=W.workspace:FindFirstChild('ChestChaseMap')
@@ -402,15 +400,15 @@ do
   local function pick(model,part)target,hitPart=model,part;R.advance(1);rec.clear();UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1},false);UIS.InputEnded:Fire({UserInputType=R.Enum.UserInputType.MouseButton1},false)end
   pick(plantA,partA)
   check(pg:GetAttribute('SelectedGardenCropId')=='cropA','(plant A is selected)')
-  check(rec.keys()=='Bubble04','clicking a plant selects it with one click ('..rec.keys()..')')
+  check(rec.count()==0,'clicking a plant selects it, silently ('..rec.keys()..')')
   pick(plantA,partA);check(rec.count()==0,'picking the same plant again is silent')
-  pick(plantB,partB);check(pg:GetAttribute('SelectedGardenCropId')=='cropB' and rec.keys()=='Bubble04','a different plant: a click again')
+  pick(plantB,partB);check(pg:GetAttribute('SelectedGardenCropId')=='cropB' and rec.count()==0,'a different plant: selected, silent')
   rec.clear();target=nil;hitPart=nil;R.advance(1);UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1},false);UIS.InputEnded:Fire({UserInputType=R.Enum.UserInputType.MouseButton1},false)
   check(rec.count()==0,'clicking empty ground (clearing the selection) is silent')
   -- the gamepad route (L3) and a touch tap select too
   rec.clear();target,hitPart=plantA,partA;R.advance(1)
   W.UIS.TouchTapInWorld:Fire(R.Vector2.new(100,100),false)
-  check(rec.keys()=='Bubble04','a tap on a plant selects it with a click')
+  check(pg:GetAttribute('SelectedGardenCropId')=='cropA' and rec.count()==0,'a tap on a plant selects it, silently ('..rec.keys()..')')
   sc.Destroying:Fire()
  end
 end

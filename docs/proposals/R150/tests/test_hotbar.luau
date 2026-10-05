@@ -1,10 +1,11 @@
 --!nocheck
--- R150 SFX fix round, part 2: the REAL Hotbar (with the real HarvestArrival) on the Roblox mock, InteractionAudio replaced by a recorder.
---  1. Equip: keys 1-0, gamepad L1 / R1, a slot click and a Bag card click all sound the Equip cue, once, on the frame the tool changes hands
---     (and the unequip too); the slot / card carry ButtonSound=false so the click is not two sounds; an empty slot keeps a plain click.
---  2. Equipping from the Bag closes the Bag quietly (MenuClose muted for a moment): one sound, not two. Closing the Bag by itself is left to
+-- R150 SFX fix round, part 2 (R152: the hotbar movement sounds are gone, so these now assert SILENCE): the REAL Hotbar (with the real HarvestArrival) on
+-- the Roblox mock, InteractionAudio replaced by a recorder.
+--  1. Equip: keys 1-0, gamepad L1 / R1, a slot click and a Bag card click equip / unequip and play NOTHING (R150 played the Equip cue); the slot / card
+--     carry ButtonSound=false so ButtonHighlights adds no click either; an empty slot is silent too. No hover event on a slot / card makes a sound.
+--  2. Equipping from the Bag closes the Bag quietly (MenuClose muted for a moment). Closing the Bag by itself is left to
 --     ButtonFeedback's SeedMenu rule (the Hotbar plays nothing for it).
---  3. Dragging a slot onto another clicks.
+--  3. Dragging a slot onto another moves it, silently.
 --  4. Harvest landing in the bag: the Bubble06 cue plays on the flash frame (HarvestArrival.Land), not when the server replies / the tool
 --     arrives; a failed request, a gift and a flight that is still in the air stay silent.
 local W=require('./world');local F=require('./fixtures');local E=require('./sfx_env')(W);local R=W.R
@@ -59,17 +60,17 @@ local NUM={'One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Zero'
 rec.clear();R.advance(1)
 key(NUM[appleSlot]);frames(1)
 check(held()==apple,'(the key equipped the apple)')
-check(rec.keys()=='Equip','key '..appleSlot..': one Equip cue ('..rec.keys()..')')
+check(rec.count()==0,'key '..appleSlot..': silent ('..rec.keys()..')')
 rec.clear();key(NUM[appleSlot]);frames(1)
-check(held()==nil and rec.keys()=='Equip','the same key again (unequip): one Equip cue too ('..rec.keys()..')')
-rec.clear();key(NUM[plumSlot]);frames(1);check(held()==plum and rec.keys()=='Equip','another slot: Equip')
+check(held()==nil and rec.count()==0,'the same key again (unequip): silent too ('..rec.keys()..')')
+rec.clear();key(NUM[plumSlot]);frames(1);check(held()==plum and rec.count()==0,'another slot: silent')
 rec.clear();key(NUM[plumSlot]);frames(1)
 -- gamepad L1 / R1 (ContextActionService)
 local cycle=W.actions['GardenHotbarCycle'];check(cycle~=nil,'the L1 / R1 action is bound')
 rec.clear();cycle('GardenHotbarCycle',R.Enum.UserInputState.Begin,{KeyCode=R.Enum.KeyCode.ButtonR1});frames(1)
-check(held()~=nil and rec.keys()=='Equip','R1: one Equip cue ('..rec.keys()..')')
+check(held()~=nil and rec.count()==0,'R1: equips, silent ('..rec.keys()..')')
 rec.clear();cycle('GardenHotbarCycle',R.Enum.UserInputState.Begin,{KeyCode=R.Enum.KeyCode.ButtonL1});frames(1)
-check(rec.keys()=='Equip','L1: one Equip cue ('..rec.keys()..')')
+check(held()~=nil and rec.count()==0,'L1: equips, silent ('..rec.keys()..')')
 rec.clear();cycle('GardenHotbarCycle',R.Enum.UserInputState.End,{KeyCode=R.Enum.KeyCode.ButtonL1})
 check(rec.count()==0,'releasing the shoulder button is silent')
 hum:UnequipTools();frames(1);rec.clear()
@@ -79,12 +80,15 @@ pg:SetAttribute('SeedMenu','Settings');key(NUM[appleSlot]);frames(1);check(rec.c
 rec.clear();key('Zero');frames(1);check(rec.count()==0,'a number key with nothing in that slot: silent (nothing happened)')
 -- slot click
 local s=dock['Slot'..appleSlot]
-check(s:GetAttribute('ButtonSound')==false,'a slot carries ButtonSound=false (the click is the Equip cue, not Bubble04 + Equip)')
+check(s:GetAttribute('ButtonSound')==false,'a slot carries ButtonSound=false (ButtonHighlights adds no Bubble04: the hotbar is silent)')
 rec.clear();s.Activated:Fire();frames(1)
-check(held()==apple and rec.keys()=='Equip','slot click: one Equip cue ('..rec.keys()..')')
+check(held()==apple and rec.count()==0,'slot click: equips, silent ('..rec.keys()..')')
 rec.clear();s.Activated:Fire();frames(1)
-check(held()==nil and rec.keys()=='Equip','slot click on the held item (unequip): one Equip cue')
-rec.clear();dock['Slot10'].Activated:Fire();frames(1);check(rec.keys()=='Bubble04','an empty slot keeps the plain click ('..rec.keys()..')')
+check(held()==nil and rec.count()==0,'slot click on the held item (unequip): silent')
+rec.clear();dock['Slot10'].Activated:Fire();frames(1);check(rec.count()==0 and held()==nil,'an empty slot: nothing happens, silent ('..rec.keys()..')')
+-- no hover sound: the owner's "no sound effect for the hotbar" (a mouse over a slot or a gamepad focus plays nothing)
+rec.clear();for i=1,10 do local b=dock['Slot'..i];b.MouseEnter:Fire();b.SelectionGained:Fire();b.MouseLeave:Fire();b.SelectionLost:Fire()end;frames(2)
+check(rec.count()==0,'hovering / focusing the slots plays nothing ('..rec.keys()..')')
 
 -- 2. the Bag -----------------------------------------------------------------------------------------------------------------------------------------
 local open=dock.OpenInventory
@@ -95,7 +99,7 @@ check(rec.count()==0,'opening the Bag: the Hotbar itself plays nothing (the Seed
 local cards={};for _,c in ipairs(panel.Items:GetChildren())do if c.Name=='Item'and c.Visible then cards[#cards+1]=c end end
 check(#cards>=3 and cards[1]:GetAttribute('ButtonSound')==false,'Bag cards carry ButtonSound=false too ('..#cards..' cards)')
 rec.clear();cards[1].Activated:Fire();frames(2)
-check(rec.keys()=='Equip' and rec.Muted.MenuClose==1,'equipping from the Bag: one Equip, and the Bag\'s own close is muted ('..rec.keys()..', muted '..tostring(rec.Muted.MenuClose)..')')
+check(held()~=nil and rec.count()==0 and rec.Muted.MenuClose==1,'equipping from the Bag: silent, and the Bag\'s own close is muted ('..rec.keys()..', muted '..tostring(rec.Muted.MenuClose)..')')
 check(not panel.Visible,'(the Bag closed)')
 rec.clear();hum:UnequipTools();frames(1)
 open.Activated:Fire();frames(5);rec.clear();key('Escape');frames(1)
@@ -114,7 +118,7 @@ do
  from.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,Position={X=fp.X,Y=fp.Y}})
  W.UIS.InputChanged:Fire({UserInputType=R.Enum.UserInputType.MouseMovement,Position={X=tp.X,Y=tp.Y}})
  W.UIS.InputEnded:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,Position={X=tp.X,Y=tp.Y}});frames(2)
- check(rec.keys()=='Bubble04','dragging an item onto another slot clicks once ('..rec.keys()..')')
+ check(rec.count()==0 and from.ItemName.Text==''and dock['Slot9'].ItemName.Text==Names.Tool(apple,Catalog),'dragging an item onto another slot moves it, silently ('..rec.keys()..')')
  rec.clear();R.advance(1)
  from.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,Position={X=fp.X,Y=fp.Y}})
  W.UIS.InputEnded:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,Position={X=fp.X,Y=fp.Y}});frames(1)
