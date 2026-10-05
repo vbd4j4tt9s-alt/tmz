@@ -1,203 +1,276 @@
-# Keepers: improved 3D models (proposal, previews only)
+# Keepers: improved 3D models, revision 2 (proposal, previews only)
 
 **Status:** waiting for your OK. Nothing in the game's code (`src/`) has changed.
 
+Revision 2 follows your feedback and your six Steal an Egg screenshots:
+- **Faces** now have life: eye whites, big glowing irises, pupils, white highlights, eyelids, brows and mouths.
+- **Five face states** per keeper, swapped by what the keeper is doing.
+- **A personality** per keeper, shown in its face and body.
+- **The reference style:** chunky, angular low-poly, studs, bold markings, big effects and a big "Z" when asleep.
+- **No floating pieces** except the Storm Colossus, which you allowed. This is checked automatically.
+- **The Crystal Knight** keeps a closed helmet: only his eyes change.
+
 ## Look at these first
-1. `keepers_before_after.png`: every keeper today (left) and proposed (right), same camera, same scale, with a 5-stud player.
-2. `keepers_lineup.png`: all keepers in a row next to a 5-stud player, today on top and proposed below, with a ruler in studs.
-3. One sheet per keeper (front, three-quarter, side, back, chase, attack wind-up, attack impact, asleep):
+1. `keepers_faces.png`: every keeper's face in all five states (idle, spotted you / chase, attack, asleep, caught you / gloat).
+2. `keepers_before_after.png`: every keeper today (left) and proposed (right), same camera and scale, with a 5-stud player.
+3. `keepers_lineup.png`: all keepers in a row next to 5-stud players, today on top, proposed below, ruler in studs.
+4. One sheet per keeper, with 8 views (front, three-quarter, side, back, chase, wind-up, impact, asleep) and its five
+   face states:
    `keeper_timber_golem.png`, `keeper_jungle_king.png`, `keeper_sand_snake.png`, `keeper_ice_fang.png`,
    `keeper_lava_dragon.png`, `keeper_crystal_knight.png`, `keeper_storm_colossus.png`, `keeper_the_darkened.png`.
 
-These are real Blender models rendered in Cycles. The chase, attack and asleep poses are not hand-posed. They are the
-exact frames the game's own pose code produces for that keeper, so the previews also show that today's animation code
-can move the new models without changes.
+These are real Blender models rendered in Cycles. The chase, attack and asleep views use the game's own pose frames for
+that keeper, so they also show that today's animation code moves the new models without changes.
 
-## 1. What "Steal an Egg" does well
+## 1. The references (your screenshots)
+I looked at your six screenshots. They are not added to the repo, because they are another game's images. This is what
+I saw:
 
-**What I could and could not see.** This environment blocks web pages and image hosts. I tried the Roblox game page,
-YouTube, the Fandom wiki and about ten guide sites, and every one was refused. The only thing that came through was
-the text of search-result summaries. **I did not see a single picture or video of Steal an Egg's guardians.** Everything
-in the "Inferred" paragraph below is my guess, not something I saw.
+| Reference | What it looks like |
+|---|---|
+| Mitsui (Japanese biome) | A white wolf / fox, curled up asleep. Angular white body with spiky white fur shards, bold red swirl markings on body and face, red horns sweeping back, pink cherry blossoms along the back, a glowing red eye with red eye markings, a pink lightning aura, and a big "Z". |
+| Jungle King (gorilla) | Towers over the player. Navy fur with the stud texture, huge spiky shoulder tufts, a cream face mask and chest with a jagged edge, a spiky gold crown with a gem, a gold arm band, red glowing angry eyes under heavy brows, and a wide roaring mouth with fangs and a red inside. It roars even asleep, with a big cyan "Z" in front of it. |
+| Lava dragon | Charcoal angular plates with studs, a row of flaming spikes along the back, orange lava blocks along the spine, and a flaming tail tip. Asleep, with a big "Z". |
+| T-Rex | Green with bold dark stripes, a cream belly, and an open toothy jaw. Asleep, with "ZZ". |
+| Moby (whale) | A white blocky whale with a dark square eye. Asleep, with a "Z". |
+| Winged angel / knight boss | Huge, split into white-gold and red-black halves, with glowing halo rings and fire effects. |
 
-What the sources say (text only):
-- Each biome has one guardian, and it is an animal that matches the biome: Chicken (Forest), Swan (Lake), Scorpion
-  (Desert), Tiger (Jungle), Yeti (Snow), Hellhound (Volcano), Moby (Abyss Ocean), T-Rex (Prehistoric), Dragon (Cosmic).
-  Later areas add an Oni Tiger (Cherry Blossom) and a King Gorilla boss (Titan Temple).
-- Picking up an egg wakes the guardian. It chases you until you reach your base or it catches you. A catch ragdolls you
-  and you drop the egg.
-- Guardians get faster in deeper biomes. One guide says the Yeti is "much bigger than the early-game guardians, so it is
-  easy to keep track of while running back, but harder to dodge". Chickens "patrol slowly and have a tiny radius".
-- Bosses such as the Gorilla King chase whoever holds a stolen egg, and their pathing breaks against tight walls.
+What they share:
+- Chunky, angular, faceted low-poly shapes, not smooth blobs.
+- The Roblox stud texture on big surfaces.
+- Bold markings: swirls and stripes.
+- Strong contrast between body and accent colours.
+- Glowing eyes.
+- Big particle effects: fire, auras, lightning.
+- A big stylised "Z" over a sleeping keeper.
+- They are 3 to 6 times taller than the player.
+- Nothing floats except the effects.
 
-Sources (search summaries only; the pages themselves were blocked):
-[games.gg biomes guide](https://games.gg/roblox/guides/steal-an-egg-biomes-guide/),
-[Eldorado biomes and guardians](https://www.eldorado.gg/blog/steal-an-egg/steal-an-egg-biomes-and-speed-requirements/),
-[stealaneggwiki.net zones](https://stealaneggwiki.net/zones),
-[steal-an-egg-game.wiki guardians](https://steal-an-egg-game.wiki/guide/guardians),
-[Sportskeeda biomes](https://www.sportskeeda.com/roblox-news/all-steal-an-egg-biomes),
-[Lolga biomes and guardians](https://www.lolga.com/news/all-steal-an-egg-biomes-zone-order-speed-requirements-guardians),
-[stealanegg.pro biomes](https://stealanegg.pro/locations/biomes),
-[Roonby glitch guide (Gorilla King)](https://roonby.com/2026/09/04/6-glitch-in-steal-an-egg-guide-is-it-true/),
-[Playgama game summary](https://playgama.com/game/steal-an-egg-grow-animals),
-[Roblox game page](https://www.roblox.com/games/107778070777162/Steal-An-Egg) and
-[Fandom T-Rex page](https://stealanegg.fandom.com/wiki/T-Rex) (both blocked). A search for the "Monsters Are Coming"
-update found only names (a Monster Egg with six monsters; the Gorilla King guards Titan Temple), not looks.
+Earlier text research: a web search for "Mitsui" found nothing. The web pages and image hosts were blocked here
+(Roblox, YouTube, Fandom, guide sites). Search summaries name a "Kitsune" as the Cherry Blossom guardian, which may be
+the same fox-like keeper, but I cannot confirm that. Everything in the table above comes from your screenshots only.
 
-**Inferred (not seen):** games in this "Steal a ..." family usually use chunky, rounded cartoon creatures with big heads,
-big eyes, bright flat colours and no outlines. The quote about the Yeti suggests the bigger guardians are made to be read
-at a glance while you run away. Please compare with the real game. If its guardians look different (for example blocky
-or realistic), tell me and I will change the style.
+**What each of our keepers takes from which reference:**
 
-What I took for our keepers:
-1. **One instantly recognisable creature per biome.** Ours already have this. Keep each one's identity.
-2. **Size grows with the biome.** Ours already do this. Keep today's sizes.
-3. **Read the face while running away.** When a keeper chases you, you mostly see its face. So the new models have big
-   heads, big glowing eyes, angry brows and open jaws.
-4. **Smooth, chunky shapes and a clean silhouette** instead of boxes, with bright two-tone biome colours.
+| Our keeper | Taken from | How |
+|---|---|---|
+| Jungle King | Jungle King (very close in spirit) | Navy fur, spiky shoulder tufts, cream face mask and jagged cream chest, spiky gold crown with a red gem, gold arm band, red glowing angry eyes, roaring mouth with fangs and a red inside. |
+| Lava Dragon | Lava dragon | Charcoal angular plates, glowing flaming spikes along the back (flame effects), orange lava seams, flaming tail tip. |
+| Ice Fang | Mitsui | The bold-marking idea in ice blue: swirls on shoulders and haunches, eye markings, ice-crystal horns sweeping back, spiky fur shards. Your silver-and-sapphire armour stays. |
+| Sand Snake | T-Rex | Bold dark diamond markings and a light belly, a toothy mouth, back spines. |
+| Timber Golem | Shared style | Angular shapes, shard-like leaves and moss, glowing sap cracks, studs, a bold face. |
+| Storm Colossus | Angel boss | Big glowing effects (lightning links), a strong accent colour, floating parts as a design choice. |
+| Crystal Knight | Angel boss | A knight with a closed helm and a bold crest; glowing eyes only. |
+| The Darkened | Shared style | Faceted shard cloak, bold markings on the mask, an aura effect. |
 
-## 2. Today's keepers (what I found in the code)
+## 2. Personality, faces and body, per keeper
+Every keeper has five face states:
+- idle / guarding;
+- spotted you / chase (angry);
+- attack (roar, yell);
+- asleep (closed eyes, drool or smoke);
+- caught you / gloat (laughing, smug).
 
-| Biome | Keeper | What it is | Built from | Height in the line-up (player = 5) |
-|---|---|---|---|---|
-| Forest | Timber Golem | tree golem that sleeps disguised as a tree | 63 native blocks and wedges + 3 accent parts | 26 studs (5x) |
-| Jungle | Jungle King | silverback gorilla | 23 uploaded MeshParts | 16 studs (3x) |
-| Desert | Sand Snake | 9-segment snake with a raised head and a tail rattle | 17 uploaded MeshParts + 3 accent parts | 8 tall, 35 long |
-| Snow | Ice Fang | sabre-tiger in silver-and-sapphire armour (R149) | 21 uploaded MeshParts + 41 accent and armour parts | 11 tall, 33 long |
-| Lava | Lava Dragon | winged dragon | 27 uploaded MeshParts (wings enlarged x1.35 by code) | 19 tall (wings up), 33 wide |
-| Crystal | Crystal Knight | armoured knight with a sword | 50 native blocks + 3 orbiting shards | 34 studs (7x) |
-| Storm | Storm Colossus | floating stone giant | 30 native blocks + a 5-puff cloud crown | 36 studs (41 with clouds) |
-| Void event | The Darkened | tall veiled figure | 43 native blocks | 19 studs |
+| Keeper | Personality | Face states | Body, pose, details | Idle fidget (idea) | Effects (particles) |
+|---|---|---|---|---|---|
+| Timber Golem (Forest) | Grumpy old forest grump: hates being woken, glares from under mossy brows, a bird lives in his hair. | Idle: heavy lids, one brow lower, frown. Chase: brows slammed down, wooden teeth bared. Attack: roar. Asleep: closed eyes, "o" mouth, sap drool. Gloat: lopsided toothy grin, squinting. | Bushy moss brows, moss beard, glowing sap cracks, red mushrooms, a bird's nest with eggs and a little blue bird on the crown. **The left arm is a huge club log with a sprouting branch; the right arm is smaller.** Still sleeps disguised as a tree. | Scratches his bark; the bird hops and chirps; leaves drift down. | Falling leaves, spores, sap drips, dust on the hammer slam. |
+| Jungle King (Jungle) | Cocky show-off king: smirks with a gold tooth, chest puffed out, crown tilted, loves an audience. | Idle: one brow up, half-lidded smirk, gold tooth. Chase: snarl with fangs. Attack: huge roar. Asleep: mouth hanging open, drool. Gloat: laughing, eyes squeezed shut. | Chin up, puffed pecs, tilted crown, gold arm band on one arm, spiky forearm tufts. | Beats his chest twice and adjusts his crown. | Chest-beat shockwave, dust, leaves, red eye glow. |
+| Sand Snake (Desert) | Sly, smug trickster: half-lidded eyes, a lopsided smirk, always looks like it knows something you do not. | Idle: heavy lids, one brow raised, smirk. Chase: narrowed eyes, hiss with fangs. Attack: wide eyes, gaping mouth. Asleep: closed eyes, lazy smile, drool. Gloat: sly closed-eye smile. | Head tilted, hood with two big eye-spot markings, horns, spines along the back. | Flicks its tongue, sways its head, rattles the tail. | Sand swirl, dust trail. The rattle still buzzes. |
+| Ice Fang (Snow) | Proud, noble guardian: chin up, calm and composed, only bares its sabres when it means it. | Idle: calm half lids, faint smile. Chase: fierce. Attack: roar. Asleep: peaceful closed eyes. Gloat: proud wink and smug smile. | Chin up, ice horns, bold ice-blue swirls and stripes, spiky ruff, armour built in. | Licks a paw, then lifts its head and flicks the crystal tail. | Frost aura, snowflake sparkles, icy breath on the roar. |
+| Lava Dragon (Lava) | Hot-headed: always furious, snorts smoke when annoyed, roars at the slightest thing. | Idle: furrowed brows, pout, smoke puffs. Chase: yelling. Attack: roar with a fire-orange mouth. Asleep: closed eyes, smoke. Gloat: toothy grin, squint. | Charcoal plates, glowing flaming back spikes, lava seams and cheek cracks, flaming tail tip. | Snorts two smoke puffs, stomps, the back flames flare. | Flames on spikes and tail, embers, nostril smoke. |
+| Crystal Knight (Crystal) | Stern, by-the-book sentinel: stands to attention, sword upright, never lets anything slide. | **Eyes only, glowing in the visor slit.** Idle: calm narrow bars. Chase: sharp angry slants. Attack: wide, bright, flared. Asleep: dim flat lines. Gloat: happy ^ ^ arcs. | **Closed helmet, no face.** Tall crystal crest and plume, gold brow band, nose guard, breathing holes, tabard with a gold emblem, crystal pauldrons, crystal blade. | Straightens up, taps the hilt, turns the helm left and right like a guard on patrol. | Crystal sparkles, a sword slash trail, shards on impact. |
+| Storm Colossus (Storm) | Loud brute: shouts everything, huge underbite, laughs like thunder; fists float on storm power. | Idle: grumpy frown. Chase: yelling. Attack: thunder roar, glowing blue mouth. Asleep: snoring, drool. Gloat: thunder laugh, eyes shut. | Huge jaw with tusks, storm-cloud mane, copper lightning-rod horns, glowing lightning cracks. **Floating shoulder rocks and fists (by design), linked by lightning.** | Punches its floating fists together (sparks), cracks its neck. | Lightning arcs between body and floating parts, sparks, a rain cloud. |
+| The Darkened (Void event) | Creepy and silent: never speaks, tilts its head, stares; the smile is the scariest part. | Idle: blank stare, tiny mouth. Chase: wide staring eyes. Attack: the mask splits into a jagged grin. Asleep: closed eyes. Gloat: crescent eyes, a far-too-wide smile. | Tilted head, hood, shard cloak, void markings and glowing cleft on the mask, long claws. | Slow head tilt, fingers drum the air, the cloak drifts. | Purple void smoke and motes, eye trails while chasing. |
 
-- The rig config still has the old Moss Boar, Crystal Beast and Storm Wing meshes for stages 1, 5 and 7. Since R38 the
-  game replaces those three with the golem, the knight and the colossus, so players never see those animals.
-- **How they move.** Keepers use no Humanoid animations and no Motor6Ds. Every part carries its group name (Head, Body,
-  Jaw, legs, arms, wings, tail, Segment1 to Segment9) and its rest position. Each frame the client works out one frame per
-  group (`BeastPose` / `KeeperUpgradePose`, then the attack, signature-strike and polish layers) and moves every part at
-  once (`BulkMoveTo`). The server poses the same groups (`KeeperStrikeFrames`) to test body contact. The Darkened works the
-  same way with its own 17 groups (`VeiledKeeper81`).
-- **How catches work.** A catch happens when the player is within the keeper's strike distance (`KeeperCombat`, not tied
-  to the model) or when a visible keeper part touches the player's body. Only the second rule depends on the model's shape.
+## 3. How the face states would work in Roblox
+**Route: one small face mesh per state, swapped by hiding the others.**
+- Each keeper's Head group gets 5 small MeshParts (`Head_Face_Idle` ... `Head_Face_Gloat`). Each one holds the
+  eyelids, brows, mouth and cheeks for that state.
+- The eye whites, irises and highlights stay on the head all the time.
+- The client shows exactly one face part by setting `LocalTransparencyModifier` to 0 on it and 1 on the others. This is
+  the same trick the game already uses for the golem's eyes.
 
-## 3. Per keeper: what changes and why
+Why this route:
+- **Instant and robust.** There is no network traffic, no texture download and no pop-in. It works with the Neon eyes.
+- **Faces stay 3D.** They keep their shape on a curved head.
+- **Why not decals or textures.** That needs 5 uploaded images per keeper, which lie flat on curved heads and can show
+  blank for a moment the first time they switch. Swapping a SurfaceAppearance costs more memory.
+- **The cost.** 4 hidden parts per keeper, kept in memory. Roblox does not draw them.
 
-All eight keep their creature, biome colours, role, groups and size. Triangle counts are for the whole keeper.
+When each state shows (taken from today's keeper states):
 
-| Keeper | What changes | Mesh parts (today) | Triangles |
-|---|---|---|---|
-| **Timber Golem** | Round barrel trunk with carved bark grooves. Big cloud-shaped leaf crown. Glowing green eyes in carved sockets, heavy brows and a jagged wooden grin. Log arms with root fingers, mushroom shelves and moss. **It still sleeps disguised as a tree:** each new piece follows today's tree pose. The chest rune and mushrooms (accent parts today) are now in the mesh. | 13 (63 + 3) | 10,844 |
-| **Jungle King** | Bigger head with a heavy V-shaped brow, glowing amber eyes, muzzle and fangs. Huge shaped arms with knuckle fists, a silver saddle on the back, a vine sash and vine bracers, and a gold leaf crown with a glowing orchid. | 9 (23) | 9,362 |
-| **Sand Snake** | Wide hood with spectacle marks, big amber slit eyes, little viper horns, fangs and a forked tongue. Thicker round body with a diamond saddle pattern on every segment. The rattle stays an accent, so it still buzzes. | 12 (17 + 3) | 9,210 |
-| **Ice Fang** | Rounder head with big ice-blue eyes, cheek ruffs, sabre fangs and ears. Crisp tiger stripes, thick legs and big paws with ice claws. **The R149 silver-and-sapphire armour** (helm and sapphire, collar, pauldrons, saddle) and the ice spines are now part of the mesh, which replaces 41 extra parts. | 9 (21 + 41) | 10,436 |
-| **Lava Dragon** | Big head with bone horns, glowing red slit eyes, a toothy jaw and glowing nostrils. Round body with gold belly plates. A glowing lava seam down the spine and a flame on the tail tip (Neon parts, like today's glow parts). Bat wings with bones and scalloped orange skin, at today's in-game wing size. | 14 (27) | 8,568 |
-| **Crystal Knight** | Rounded helm with a T-visor and two glowing eyes, a crystal crest, crystal clusters on the shoulders, and a glowing crystal heart in the chest. Crystal blade with a glowing core. The three orbiting shards stay. | 12 (50 + 3) | 7,088 |
-| **Storm Colossus** | Boulder body and head with an angry brow and glowing eyes, and a lightning bolt in the chest. Floating fists with glowing bands, glowing joints, and thunder prongs on the shoulders. The drifting cloud crown stays. | 12 (30 + 5) | 6,128 |
-| **The Darkened** | Pale mask with glowing violet eyes and the glowing cleft. A hood, a tattered cloak and long claws. **Hit shapes stay as they are:** each body piece fits inside the box of the part it replaces, and the hood, cloak and claws are cosmetic (never hit). | 24 (43) | 5,932 |
+| Keeper state | Face shown |
+|---|---|
+| sleeping / guarding | Asleep |
+| alerted, chasing, dashing | Chase |
+| attack window | Attack |
+| a landed catch (today's taunt window) | Gloat |
+| returning home | Idle |
 
-## 4. How it would be implemented
+Two small code changes would be needed: the face switch in `BeastAnimation`, and a one-line skip in `KeeperContact` so
+the face parts never count for hits. The Knight works the same way with five glowing eye parts. Asleep, the existing eye
+logic already dims them.
 
-**Built in Blender (done for the preview):**
-- One mesh per moving group, with the same group names and pivots the game uses today. Eyes are separate small parts with
-  the same flag as today (`KeeperEyeGlow`), so they still go dark while asleep and glow when awake. Glow pieces are
-  separate small parts that would use Neon.
-- Colours come from one tiny palette texture per keeper (256 x 256 px). Vertex colours are included too.
-- The models are sized to today's group boxes. Most groups stay within 1 stud of today's box. The few that go further
-  (up to 1.7 studs) are:
-  - the tiger's ice spines on its back;
-  - the gorilla's leaf crown;
-  - the dragon's tail spikes;
-  - the ends of three snake segments, which tuck into the next segment.
+**Sleeping "Z":** make today's three small "z" labels into one big stylised cyan "Z" with a dark outline, like the
+references. This only changes the existing sleep labels, with no new asset. The Golem keeps no "Z", because it sleeps
+disguised as a tree. In the previews the "Z" is a stand-in mesh that is turned to face the camera before each render,
+as a BillboardGui does in game.
 
-  The Darkened stays within 0.1 stud of today's boxes. Exact numbers per group are in `fbx/keeper_<name>.json`
-  ("Overshoot").
+**Stud texture (option):** the previews show it on. In Roblox it would be a stud normal map, either as a MaterialVariant
+or a SurfaceAppearance (1 tile = 1 stud). This needs a Studio test: on a MeshPart a texture follows the mesh's UVs, and
+today's UVs point at the colour palette, so the FBX may need a second UV layout. You can also leave the studs off.
 
-**What you would do:**
-1. In Studio, open the 3D Importer and import each `fbx/keeper_<name>.fbx`. Check that the parts come in at the sizes
-   listed in `fbx/keeper_<name>.json` (1 unit = 1 stud, facing -Z). Upload them.
-2. Put the eight imported models in ServerStorage (I will give the exact folder name), save, and send me the place file.
+## 4. No floating pieces (checked by script)
+`blender/connectivity.py` builds each keeper and finds every separate piece of mesh. It counts two pieces as joined if
+they touch, overlap, come within 0.02 studs, or one sits inside the other. Each keeper must be **one connected piece**.
+The check runs:
+- in the rest pose, with all five face states shown at once;
+- in every rendered pose (the game's real frames), with that pose's face state.
 
-**What I would do in the next release, after your OK:**
-1. Fill `KeeperRigConfig` with the new parts from the manifests: names, groups, centres, sizes, eye and glow flags, and
-   new floor sample points. Pivots stay the same.
-2. Make `BeastModels` use the new models for all seven stages. The golem, knight and colossus move from blocks to meshes.
-   Bump the visual version so keepers already placed in the world re-dress.
-3. Give the golem's pieces their tree pose. This is already worked out, because each piece follows one of today's parts.
-4. Retire the accents that are now in the meshes (the golem's rune and mushrooms, the tiger's spines and armour). Keep
-   the snake's rattle, the knight's shards and the colossus's clouds.
-5. Dragon: the new wings are already at in-game size, so remove the old x1.35 wing stretch for them.
-6. The Darkened: swap its blocks for the new mesh parts, using the same groups and offsets.
-7. Run the keeper test suites (strikes, contact, polish). Then you check them in Studio.
+Effects (fire, lightning, the "Z") are not meshes and are skipped.
+
+| Keeper | Rest (all faces) | Stand / idle | Chase | Wind-up | Impact | Asleep | Gloat | Floating pieces |
+|---|---|---|---|---|---|---|---|---|
+| Timber Golem | 1 | 1 | 1 | 1 | 1 | 1 (tree) | 1 | 0 |
+| Jungle King | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
+| Sand Snake | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
+| Ice Fang | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
+| Lava Dragon | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
+| Crystal Knight | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
+| Storm Colossus | 1 + 6 by design | 1 + 6 by design | 1 + 6 by design | 1 + 6 by design | 1 + 6 by design | 1 + 6 by design | 1 + 6 by design | 0 failures; 6 by design: 2 shoulder rocks, 2 fists, 2 storm-core orbs |
+| The Darkened | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
+
+(The numbers are connected pieces. "1" means everything touches.)
+
+How the gaps the check found were closed:
+- **Snake wind-up.** The game's coil lifts the head about 2.4 studs off the body. The neck now has a root that runs down
+  into the first body segment. At rest it is hidden inside the body and under the floor; in the coil it spans the gap.
+- **Joints.** Each moving group has a ball at its pivot, which stays in place however the group turns, and the parent
+  part overlaps it. This covers the dragon's wing shoulders, the jaw hinges, and the hips and shoulders of the golem,
+  knight and gorilla.
+- **Small details.** Nostrils, teeth, horn bases, hood marks, ribs and the chest crack were sunk into the body, and
+  painted bands are always sunk into the surface. The faceted shapes sit slightly inside the ideal curve, so details
+  placed on the curve were floating.
+- **The Darkened's feet.** When its knees fold asleep, foot and shin would part. A cosmetic ankle ball keeps them
+  joined, and its hit boxes stay as they are today.
+- **Accents.** The Knight's orbiting shards and the Colossus's floating cloud are retired: the crest and the cloud mane
+  replace them. The Snake's rattle is checked too and touches the tail.
 
 ## 5. What stays the same
-Speed, strike distance, strike timing, the catch rule, fling and ragdoll, sounds and voices, effects, sleep and wake,
-the golem's tree disguise, the animated accents (rattle, shards, clouds), names and speed signs.
+- Speed, strike distance and timing, and the catch rule.
+- Fling and ragdoll, sounds and voices.
+- Sleep and wake, and the golem's tree disguise.
+- Group names and pivots, so the existing animation code is unchanged.
+- Sizes: each part fits today's group boxes within about 1 stud. The exceptions are crowns, crests, horns and spikes on
+  top, listed per group in `fbx/keeper_<name>.json`. The Darkened's body pieces stay inside its hit boxes, and its new
+  hood, cloak, claws and ankles are cosmetic.
+- Heights in the lineup (studs, today to proposed):
+  - Golem 25.5 to 27.0;
+  - Jungle King 15.6 to 17.4 (crown);
+  - Snake 8.1 to 10.7 (raised head and horns);
+  - Ice Fang 10.9 to 10.9;
+  - Dragon 18.8 to 19.6;
+  - Knight 34.0 to 33.9;
+  - Colossus 41.1 to 35.8 (today's floating cloud is retired);
+  - The Darkened 18.5 to 20.4 (hood).
 
 ## 6. Phone cost
-| | Today | Proposed |
-|---|---|---|
-| Parts moved per keeper each frame (with accents) | 20 to 66 (golem 66, tiger 62, knight 53) | 9 to 24 (golem 13, tiger 9, knight 15) |
-| Triangles per keeper | unknown: the uploaded meshes cannot be read here | 5,900 to 10,800 |
-| Biggest single mesh | unknown | about 3,300 triangles (Roblox allows 20,000 per mesh) |
-| Textures | one texture per textured mesh | one 256 x 256 palette per keeper |
+| Keeper | Triangles on screen (lite build) | With all 5 face states in memory | Mesh parts (today) |
+|---|---|---|---|
+| Timber Golem | 9,028 (7,032) | 16,708 | 19 (63 blocks + 3) |
+| Jungle King | 5,866 (4,446) | 13,086 | 13 (23) |
+| Sand Snake | 6,090 (4,306) | 12,302 | 17 (17 + 3) |
+| Ice Fang | 7,254 (5,618) | 12,918 | 14 (21 + 41) |
+| Lava Dragon | 6,948 (5,324) | 13,608 | 23 (27) |
+| Crystal Knight | 3,506 (2,646) | 4,306 | 16 (50 + 3) |
+| Storm Colossus | 4,706 (3,498) | 11,918 | 20 (30 + 5) |
+| The Darkened | 5,844 (4,250) | 11,172 | 31 (43) |
 
-- **Target:** under 12,000 triangles per keeper. All eight meet it.
-- A **lite build** is ready if phones struggle. It uses the same shapes with fewer segments: about 2,300 to 5,600
-  triangles per keeper (`KEEPER_DETAIL=0.6` in the scripts).
-- Fewer parts per keeper means less work in the per-frame move. I have not measured this on a device.
+- **Target:** under 10,000 triangles on screen per keeper. All eight meet it.
+- The largest single mesh is about 2,400 triangles; Roblox allows 20,000.
+- One 256 x 256 palette texture per keeper.
+- Fewer parts than today for six of the eight keepers. The snake and the Darkened land about level.
+- Hidden face parts are not drawn, but they still move with the head. The client could skip moving hidden parts.
+- Not measured on a device.
 
-## 7. Risks
-- **The reference was not seen.** The style is my best reading of the genre. Please compare with the real game.
-- **Today's snake, tiger, dragon and gorilla are stand-ins** in the "before" images. Their meshes cannot be downloaded
-  here, so each part is drawn as the hull of the game's own sample points, in an assumed colour. Compare with Studio.
-- **Touch catches follow the new shapes.** Catches by distance do not change. Catches by body touch would use the new
-  shapes, which differ from today's boxes by up to about 1.7 studs in a few places. The tests and a Studio check would confirm this.
-- **Import.** I checked the FBX files by re-importing them in Blender: every part comes back at the listed size. I have
-  not tested them in Studio.
-- **Vertex colours.** I am not sure Roblox shows imported vertex colours, so the palette texture is the main colouring.
-- **Neon** looks brighter in Roblox than in these renders.
-- **Snake wind-up.** In the snake's wind-up frame the head and neck lift clear of the body. Today's snake does the same,
-  because it is the game's pose and not the model (I checked it with the stand-in). A small change to the snake's coil
-  could close the gap later. It is optional.
-- **Install together.** The game only animates a keeper whose part count matches the config. The models and the config
-  must go in together, in one install.
+## 7. How it would be implemented (after your OK)
+**What you would do:**
+1. In Studio, import each `fbx/keeper_<name>.fbx` with the 3D Importer. Check the part sizes against
+   `fbx/keeper_<name>.json` (1 unit = 1 stud, facing -Z), then upload.
+2. Put the eight models in ServerStorage (I will give the folder name), save, and send me the place.
 
-## 8. Choices for you
-- **A. Style:** chunky and rounded, as shown (my pick). Or tell me what the real Steal an Egg guardians look like and I
-  will match them.
-- **B. Detail:** full (5,900 to 10,800 triangles) or lite (2,300 to 5,600).
+**What I would do in the next release:**
+1. Fill `KeeperRigConfig` from the manifests: parts, groups, centres, sizes, eye, glow and face-state flags, and new
+   floor samples. Pivots stay unchanged.
+2. Make `BeastModels` use the new models for all seven stages, and bump the visual version.
+3. Add the face-state switch to `BeastAnimation`, and make `KeeperContact` skip face parts.
+4. Golem: give each piece its tree pose. This is already worked out from today's parts.
+5. Retire the accents that are now in the meshes or would float:
+   - the golem's rune and mushrooms;
+   - the tiger's spines and armour;
+   - the knight's shards;
+   - the colossus's cloud.
+
+   Keep the snake's rattle.
+6. Dragon: the wings are exported at in-game size, so remove the old x1.35 wing stretch.
+7. The Darkened: swap its blocks for the new parts, using the same groups and offsets.
+8. Restyle the sleep "Z" and add the particle effects listed above.
+9. Run the keeper test suites. Then you check it in Studio.
+
+## 8. Risks
+- **The references are six screenshots.** I matched what they show. I made no other claims about the reference game.
+- **Today's images are partly stand-ins.** The snake, tiger, dragon and gorilla are drawn from the game's sample points
+  in an assumed colour, because their meshes can't be downloaded here. The golem, knight, colossus and The Darkened
+  are their exact parts.
+- **Body-touch catches follow the new shapes.** Distance catches are unchanged.
+- **Untested in Studio:** the FBX import (it round-trips in Blender), vertex colours, how the stud texture tiles on a
+  MeshPart, and how bright Neon looks.
+- **The lite build is not connectivity-checked.** Only the full build was checked; the lite build should be re-checked
+  if you choose it.
+- **One install.** The game only animates a keeper whose part count matches the config, so the models and the config
+  must go in together.
+
+## 9. Choices for you
+- **A.** This style (faceted, studs, bold markings) as shown, or the same models without the stud texture.
+- **B.** Full detail, or the lite build.
 - **C. Which keepers first:**
-  - Option 1, the block-built ones: Golem, Knight, Colossus and The Darkened. Their "before" images are exact, so the
-    gain is easiest to judge.
-  - Option 2, early biomes first: Forest, then Jungle, then Desert. These are the keepers every player meets.
-- **D. Tiger armour:** baked into the mesh, as shown. Or keep it as separate parts so it can still be changed on its own.
-- **E. The Darkened:** include it, or leave it as it is.
+  - Option 1: the Jungle King and the Lava Dragon. They are closest to your references.
+  - Option 2: biome order, starting with Forest.
+- **D. Tiger armour:** built into the mesh, or kept as separate parts.
+- **E. The Colossus cloud:** a floating cloud above the head (by design), or the attached cloud mane shown.
+- **F. The Darkened:** include it, or leave it as it is.
 
 ## Files
-- `keepers_before_after.png`, `keepers_lineup.png`, `keeper_<name>.png`: the previews.
-- `fbx/keeper_<name>.fbx`: one per keeper. One mesh per part, placed on the rig, with the palette texture embedded.
-- `fbx/keeper_<name>_atlas.png`: the palette texture.
-- `fbx/keeper_<name>.json`: per part, its name, group, centre, size, triangles and flags. Per group, its new box against
-  today's box and new floor sample points.
-- `blender/`: the scripts.
-  - `kit.py`: shapes, palette, scene and render helpers.
+- **Previews:** `keepers_faces.png`, `keepers_before_after.png`, `keepers_lineup.png` and `keeper_<name>.png`.
+- **In `fbx/`:**
+  - `keeper_<name>.fbx`: one mesh per part, placed on the rig, including the five face states, with the palette texture
+    embedded. Effects are not included.
+  - `keeper_<name>_atlas.png`: the palette texture.
+  - `keeper_<name>.json`: for each part, its name, group, centre, size, triangles, eye, glow and face-state flags, the
+    golem's tree mapping, and the Darkened's cosmetic flags. For each group, its bounds against today's and its floor
+    samples.
+- **In `blender/`:**
   - `proposed.py`: the eight models.
+  - `faces.py`: eyes, lids, brows and mouths.
+  - `kit.py`: shapes, studs, the "Z", the connectivity graph and the render helpers.
+  - `connectivity.py`: the no-floating-pieces check.
+  - `assemble.py`, `render_all.py`, `compose_sheets.py`: building, rendering and laying out the previews.
   - `today.py`: today's keepers.
-  - `assemble.py`, `render_all.py`: the Blender run.
-  - `compose_sheets.py`: the layouts.
   - `dump_poses.luau`: the game's real pose frames.
-  - `data.py`, `luaparse.py`: read the game's Lua data.
-  - `check_fbx.py`: the FBX re-import check.
-  - `tricount.py`: the triangle counts.
+  - `data.py`, `luaparse.py`: reading the game's data.
+  - `check_fbx.py`, `tricount.py`: the FBX check and the triangle counts.
   - `run.sh`: rebuilds everything.
 
 ## How this was made (what was run and what was reasoned)
-- **Run:**
-  - Blender 4.5 (Python module) built every model by script, rendered every image in Cycles on the CPU, and exported
-    the FBX files.
-  - The game's own Luau modules (`BeastPose`, `KeeperSignatureStrike`, `VeiledKeeper81`, `KeeperAccents`) ran on the
-    repo's offline Roblox mock to produce the poses and accent parts.
-  - The FBX files were re-imported and checked against the manifests.
-- **Reasoned, not run:**
-  - The reference style, since no images were seen.
-  - How Studio's importer will treat the files.
-  - The phone cost, since nothing was measured on a device.
+**Run:**
+- Blender 4.5 (the Python module) built every model by script and rendered every image in Cycles on the CPU.
+- The FBX files were exported and re-imported (`check_fbx.py`): every part came back, and the worst centre or size
+  difference against the manifests was 0.0001 studs. The largest FBX is 544 KB, under the 5 MB limit.
+- The connectivity check (table above) ran on the rest pose and on every rendered pose.
+- The poses come from the game's own Luau modules (`BeastPose`, `KeeperSignatureStrike`, `VeiledKeeper81` and
+  `KeeperAccents`), run on the repo's offline Roblox mock.
+
+**Reasoned, not run:**
+- Matching the screenshots' style.
+- Studio import, the stud texture tiling and vertex colours.
+- The cost on phones.

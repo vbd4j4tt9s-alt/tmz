@@ -1,7 +1,7 @@
 """Lay the Cycles renders out as the proposal images (plain Python 3 + Pillow).
 
 Usage: python3 compose_sheets.py PANEL_DIR OUT_DIR
-Writes OUT_DIR/keeper_<name>.png, keepers_before_after.png, keepers_lineup.png.
+Writes OUT_DIR/keeper_<name>.png, keepers_faces.png, keepers_before_after.png, keepers_lineup.png.
 """
 import sys, os, json
 from PIL import Image, ImageDraw, ImageFont
@@ -12,6 +12,9 @@ FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
 BOLD = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 INK, MUTED, PAPER = (28, 32, 40), (92, 98, 112), (247, 248, 250)
 NEW_C, OLD_C = (24, 120, 70), (150, 40, 40)
+STATES = ['Idle', 'Chase', 'Attack', 'Asleep', 'Gloat']
+STATE_LABEL = {'Idle': 'Idle / guarding', 'Chase': 'Spotted you / chase', 'Attack': 'Attack', 'Asleep': 'Asleep',
+               'Gloat': 'Caught you / gloat'}
 
 
 def font(size, bold=False):
@@ -19,28 +22,21 @@ def font(size, bold=False):
 
 
 ORDER = ['timber_golem', 'jungle_king', 'sand_snake', 'ice_fang', 'lava_dragon', 'crystal_knight', 'storm_colossus', 'the_darkened']
+STAGE_OF = {1: 'timber_golem', 6: 'jungle_king', 2: 'sand_snake', 3: 'ice_fang', 4: 'lava_dragon', 5: 'crystal_knight',
+            7: 'storm_colossus', 0: 'the_darkened'}
 NATIVE_TODAY = {'timber_golem', 'crystal_knight', 'storm_colossus', 'the_darkened'}
 TODAY_PARTS = {'timber_golem': '63 blocks + 3 accents', 'jungle_king': '23 mesh parts', 'sand_snake': '17 mesh parts + 3 accents',
                'ice_fang': '21 mesh parts + 41 accent/armour parts', 'lava_dragon': '27 mesh parts', 'crystal_knight': '50 blocks + 3 accents',
                'storm_colossus': '30 blocks + 5 accents', 'the_darkened': '43 blocks'}
-NOTES = {
-    'timber_golem': ['Same tree golem, and it still sleeps disguised as a tree: each new piece follows today\'s tree pose.',
-                     'Round barrel trunk with carved bark grooves, a big cloud-shaped leaf crown, glowing green eyes in carved sockets and a jagged wooden grin.',
-                     'The chest rune and the mushrooms (extra accent parts today) are now part of the model.'],
-    'jungle_king': ['Same silverback gorilla king: a bigger head with a heavy angry brow, glowing amber eyes and fangs.',
-                    'Huge shaped arms with knuckle fists, a silver saddle on the back, a vine sash and vine bracers, and a gold leaf crown with a glowing orchid.'],
-    'sand_snake': ['Same desert viper: a raised neck and a wide hood with spectacle marks, big amber slit eyes, little horns, fangs and a forked tongue.',
-                   'A diamond saddle pattern runs down all 9 body segments. The tail rattle stays as it is (it still buzzes while it hunts).'],
-    'ice_fang': ['Same snow sabre-tiger, still in its silver-and-sapphire armour (helm, collar, pauldrons, saddle) with ice spines.',
-                 'The armour and spines are now part of the model (today they are 41 extra parts). Rounder head, big ice-blue eyes, cheek ruffs, sabre fangs, crisp stripes, thick legs and big paws.'],
-    'lava_dragon': ['Same lava dragon: a big head with bone horns, glowing red eyes and a toothy jaw; a round body with gold belly plates.',
-                    'Glowing lava spine, nostrils and tail flame (Neon parts, like today\'s glow parts). Bat wings with bones and scalloped orange skin, at today\'s in-game wing size.'],
-    'crystal_knight': ['Same crystal knight: a rounded helm with a T-visor and two glowing eyes, a crystal crest, crystal clusters on the shoulders and a glowing crystal heart.',
-                       'A crystal blade with a glowing core. The three orbiting crystal shards stay as they are.'],
-    'storm_colossus': ['Same floating storm colossus: a boulder body and head with an angry brow and glowing eyes, a lightning bolt in the chest.',
-                       'Floating fists with glowing bands, glowing joints, thunder prongs on the shoulders. The drifting storm-cloud crown stays as it is.'],
-    'the_darkened': ['Same tall veiled figure: a pale mask with glowing violet eyes and the glowing cleft, a hood, a tattered cloak and long claws.',
-                     'Hit shapes stay today\'s boxes: every body piece fits inside the box of the part it replaces. Hood, cloak and claws are cosmetic (never hit).'],
+REF = {
+    'timber_golem': 'From the references: angular faceted shapes, shard-like tufts (moss and leaves), bold glowing accents (sap cracks), studs. No sleep Z: he still sleeps disguised as a tree.',
+    'jungle_king': 'Closest to the reference Jungle King: navy fur, spiky shoulder tufts, cream face mask and chest, gold crown and arm band, red glowing angry eyes, roaring mouth with fangs.',
+    'sand_snake': 'From the references: faceted body, bold diamond markings (like the T-Rex stripes), spines, strong sand / brown contrast, studs.',
+    'ice_fang': 'From the reference wolf (Mitsui): white body with bold swirl markings (ice blue instead of red), horns sweeping back (ice), spiky fur tufts, eye markings.',
+    'lava_dragon': 'From the reference lava dragon: charcoal angular plates, flaming back spikes, orange lava seams, a flaming tail tip.',
+    'crystal_knight': 'Owner note: a closed helmet; only the glowing eyes in the visor change. Style from the references: faceted armour, studs, a bold crest.',
+    'storm_colossus': 'Owner note: floating pieces are fine here as part of the design, linked by lightning. Style: faceted rock, glowing cracks, big brute face.',
+    'the_darkened': 'From the references: faceted shards (cloak), a glowing aura idea, bold markings on the mask; creepy face states.',
 }
 LABELS = [('front', 'Front'), ('three_quarter', 'Three-quarter'), ('side', 'Side'), ('back', 'Back'),
           ('chase', 'Chase (real run frame)'), ('windup', 'Attack wind-up (real frame)'), ('strike', 'Attack impact (real frame)'),
@@ -72,44 +68,84 @@ def wrap(d, text, f, width):
 def keeper_sheet(key):
     m = META[key]
     pw, ph = 480, 360
-    cols, rows = 4, 2
+    fw = 384
+    cols = 4
     W = cols * pw + 5 * 12
-    head = 118
+    head = 150
     d0 = ImageDraw.Draw(Image.new('RGB', (10, 10)))
-    fnote = font(19)
+    fnote = font(18)
+    notes = ['Personality: ' + m['personality'], 'Idle fidget: ' + m['fidget'], 'Effects (particles in game): ' + m['fx'], REF[key]]
     note_lines = []
-    for n in NOTES[key]:
+    for n in notes:
         note_lines += ['- ' + l if i == 0 else '  ' + l for i, l in enumerate(wrap(d0, n, fnote, W - 60))]
-    foot = 30 + 27 * len(note_lines) + 16
-    H = head + rows * ph + 3 * 12 + foot
+    face_h = fw + 40
+    foot = 22 + 25 * len(note_lines) + 16
+    H = head + 2 * (ph + 12) + face_h + foot + 10
     img = Image.new('RGB', (W, H), PAPER)
     d = ImageDraw.Draw(img)
     d.text((24, 16), '%s  -  %s keeper' % (m['name'], m['biome']), font=font(34, True), fill=INK)
     tag(d, (W - 210, 24), 'PROPOSED', fill=(220, 242, 228), ink=NEW_C, f=font(20, True))
-    sub = ('Real Blender model, Cycles render. Poses use the game\'s own pose frames for this keeper.   '
-           '%s triangles  |  %d mesh parts (today: %s)' % (format(m['tris'], ','), m['parts'], TODAY_PARTS[key]))
-    d.text((24, 62), sub, font=font(18), fill=MUTED)
-    d.text((24, 88), 'Moving groups (same names the game animates today): ' + ', '.join(m['groups']), font=font(16), fill=MUTED)
+    d.text((24, 62), 'Real Blender model, Cycles render, studs on. Chase / attack / asleep use the game\'s own pose frames.', font=font(18), fill=MUTED)
+    d.text((24, 88), '%s triangles on screen (%s with all 5 face states)  |  %d mesh parts (today: %s)' % (
+        format(m['tris_visible'], ','), format(m['tris'], ','), m['parts'], TODAY_PARTS[key]), font=font(18), fill=MUTED)
+    d.text((24, 114), 'Moving groups (same names the game animates today): ' + ', '.join(m['groups']), font=font(15), fill=MUTED)
     for i, (name, label) in enumerate(LABELS):
         p = Image.open(os.path.join(PANELS, '%s_%s.png' % (key, name))).convert('RGB').resize((pw, ph), Image.LANCZOS)
         x = 12 + (i % cols) * (pw + 12)
         y = head + (i // cols) * (ph + 12)
         img.paste(p, (x, y))
         tag(d, (x + 12, y + 10), label, f=font(15, True))
-    y = head + rows * (ph + 12) + 14
-    d.text((24, y), 'What changes', font=font(20, True), fill=INK)
-    y += 30
+    y = head + 2 * (ph + 12)
+    d.text((24, y + 4), 'Face states (swappable face pieces; one is shown at a time)', font=font(20, True), fill=INK)
+    y += 34
+    for j, st in enumerate(STATES):
+        p = Image.open(os.path.join(PANELS, 'face_%s_%s.png' % (key, st))).convert('RGB').resize((fw, fw), Image.LANCZOS)
+        x = 12 + j * (fw + 12)
+        img.paste(p, (x, y))
+        tag(d, (x + 10, y + 10), STATE_LABEL[st], f=font(15, True))
+    y += fw + 18
     for l in note_lines:
         d.text((30, y), l, font=fnote, fill=INK)
-        y += 27
+        y += 25
     path = os.path.join(OUT, 'keeper_%s.png' % key)
     img.save(path, optimize=True)
     return path
 
 
+def faces_sheet():
+    fw = 300
+    left = 300
+    W = left + 5 * (fw + 10) + 20
+    head = 140
+    rowh = fw + 16
+    H = head + 8 * rowh + 40
+    img = Image.new('RGB', (W, H), PAPER)
+    d = ImageDraw.Draw(img)
+    d.text((24, 16), 'Keeper faces: five states each (close-ups, Cycles)', font=font(32, True), fill=INK)
+    d.text((24, 58), 'The Crystal Knight keeps a closed helmet: only his visor eyes change. The sleep "Z" is left out of the close-ups '
+                     '(it is in each keeper sheet\'s asleep view).', font=font(16), fill=MUTED)
+    d.text((24, 80), 'The Golem, the Jungle King and The Darkened are shown upright when asleep (in game the Golem sleeps as a tree, '
+                     'the Jungle King lies on its side, and The Darkened curls up face-down).', font=font(16), fill=MUTED)
+    for j, st in enumerate(STATES):
+        x = left + j * (fw + 10)
+        d.text((x + 6, head - 26), STATE_LABEL[st], font=font(17, True), fill=INK)
+    fn = font(15)
+    for i, key in enumerate(ORDER):
+        m = META[key]
+        y = head + i * rowh
+        d.text((20, y + 10), m['name'], font=font(20, True), fill=INK)
+        for li, line in enumerate(wrap(d, m['personality'], fn, left - 40)[:9]):
+            d.text((20, y + 42 + li * 20), line, font=fn, fill=MUTED)
+        for j, st in enumerate(STATES):
+            p = Image.open(os.path.join(PANELS, 'face_%s_%s.png' % (key, st))).convert('RGB').resize((fw, fw), Image.LANCZOS)
+            img.paste(p, (left + j * (fw + 10), y))
+    path = os.path.join(OUT, 'keepers_faces.png')
+    img.save(path, optimize=True)
+    return path
+
+
 def before_after():
-    pw, ph = 400, 314
-    gap = 14
+    pw, ph = 400, 315
     pairw = 2 * pw + 8
     cols = 2
     W = cols * pairw + (cols + 1) * 26
@@ -135,8 +171,8 @@ def before_after():
                 t = 'TODAY - exact parts' if key in NATIVE_TODAY else 'TODAY - stand-in'
                 tag(d, (px + 10, y + 44), t, fill=(250, 228, 228), ink=OLD_C, f=font(14, True))
             else:
-                tag(d, (px + 10, y + 44), 'PROPOSED - %s tris' % format(m['tris'], ','), fill=(220, 242, 228), ink=NEW_C, f=font(14, True))
-    d.text((26, H - 50), 'Cycles renders of real Blender scenes. Keepers in their standing pose from the game\'s pose code; accents shown where the game shows them.',
+                tag(d, (px + 10, y + 44), 'PROPOSED - %s tris on screen' % format(m['tris_visible'], ','), fill=(220, 242, 228), ink=NEW_C, f=font(14, True))
+    d.text((26, H - 50), 'Cycles renders of real Blender scenes, standing pose from the game\'s pose code, idle face. Proposed models shown with the stud texture.',
            font=font(15), fill=MUTED)
     path = os.path.join(OUT, 'keepers_before_after.png')
     img.save(path, optimize=True)
@@ -149,7 +185,7 @@ def lineup():
     for which in ('today', 'new'):
         info = META['lineup_%s' % which]
         im = Image.open(os.path.join(PANELS, 'lineup_%s.png' % which)).convert('RGB')
-        top = max(0, int(info['ground_y'] - 47 * info['px_per_stud']))  # crop the empty sky above 47 studs
+        top = max(0, int(info['ground_y'] - 47 * info['px_per_stud']))
         im = im.crop((0, top, im.width, im.height))
         info = dict(info, ground_y=info['ground_y'] - top)
         im = im.resize((int(im.width * scale), int(im.height * scale)), Image.LANCZOS)
@@ -182,12 +218,9 @@ def lineup():
             k += 1
         y += im.height + 4
         for it in info['items']:
-            key = ORDER[[1, 6, 2, 3, 4, 5, 7, 0].index(it['stage'])]
+            key = STAGE_OF[it['stage']]
             cx = 80 + (it['px0'] + it['px1']) / 2 * scale
-            name = META[key]['name']
-            t1 = name
-            t2 = '%.0f studs tall' % it['height']
-            for t, f, dy in ((t1, font(15, True), 0), (t2, font(14), 20)):
+            for t, f, dy in ((META[key]['name'], font(15, True), 0), ('%.0f studs tall' % it['height'], font(14), 20)):
                 tw = d.textlength(t, font=f)
                 d.text((cx - tw / 2, y + dy), t, font=f, fill=INK if dy == 0 else MUTED)
         y += lab
@@ -198,8 +231,10 @@ def lineup():
 
 if __name__ == '__main__':
     for key in ORDER:
-        if key in META and 'tris' in META[key]:
+        if key in META and 'tris' in META[key] and os.path.exists(os.path.join(PANELS, 'face_%s_Gloat.png' % key)):
             print(keeper_sheet(key))
+    if all(os.path.exists(os.path.join(PANELS, 'face_%s_Gloat.png' % k)) and k in META and 'personality' in META[k] for k in ORDER):
+        print(faces_sheet())
     if all(k in META and 'today_tris_standin' in META[k] for k in ORDER):
         print(before_after())
     if 'lineup_new' in META and 'lineup_today' in META:

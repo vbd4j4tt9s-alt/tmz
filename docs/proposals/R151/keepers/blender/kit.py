@@ -109,14 +109,22 @@ def _xf(M, p):
 
 
 DETAIL = float(os.environ.get('KEEPER_DETAIL', '1.0'))  # < 1 builds a lighter version (fewer segments) for tri estimates
+# R151 rev 2: the reference keepers are angular, faceted low-poly. FACET makes every primitive flat-shaded with fewer
+# segments unless a call asks for smooth=True explicitly (eyes stay smooth so they read as eyes).
+FACET = True
+FACET_SCALE = 0.62
 
 
 def _d(n, lo):
     return max(lo, int(round(n * DETAIL)))
 
 
-def blob(g, c, r, col, e1=1.0, e2=1.0, seg=14, rings=9, M=None, smooth=True, deform=None):
+def blob(g, c, r, col, e1=1.0, e2=1.0, seg=14, rings=9, M=None, smooth=None, deform=None):
     """Superellipsoid: e1 = e2 = 1 is an ellipsoid, small exponents give rounded boxes / pillows."""
+    if smooth is None:
+        smooth = not FACET
+        if FACET:
+            seg, rings = max(6, int(round(seg * FACET_SCALE))), max(4, int(round(rings * FACET_SCALE)))
     seg, rings = _d(seg, 6), _d(rings, 4)
     verts = []
     for i in range(1, rings):
@@ -172,11 +180,15 @@ def _frames(pts, up=Vector((0, 1, 0))):
     return frames
 
 
-def tube(g, pts, radii, col, seg=10, cap0='round', cap1='round', smooth=True, up=Vector((0, 1, 0)), twist=0.0, normals=None):
+def tube(g, pts, radii, col, seg=10, cap0='round', cap1='round', smooth=None, up=Vector((0, 1, 0)), twist=0.0, normals=None):
     """A tube through pts with per-point radius (float, or (side, up) for an elliptical section).
     Caps: 'round' (hemisphere), 'flat', 'none', or 'point' (closes to the axis).
     normals: optional per-point direction for the section's 'side' axis (used by surface strokes)."""
     pts = [Vector(p) for p in pts]
+    if smooth is None:
+        smooth = not FACET
+        if FACET and seg > 6:
+            seg = max(6, int(round(seg * FACET_SCALE)))
     if seg > 4:
         seg = _d(seg, 5)
     rad = [(r, r) if not isinstance(r, (tuple, list)) else tuple(r) for r in radii]
@@ -246,16 +258,22 @@ def tube(g, pts, radii, col, seg=10, cap0='round', cap1='round', smooth=True, up
     g.add(verts, faces, col, smooth)
 
 
-def stroke(g, bvh, rays, col, width, thick=0.12, taper=True, seg=6, lift=0.05):
+def stroke(g, bvh, rays, col, width, thick=0.12, taper=True, seg=6, lift=0.01, outside=False):
     """A painted-looking band lying on a surface: each ray (origin, direction) is cast at the target surface
-    (a Geo.bvh()); the hits are joined by a flat tube whose section lies along the surface."""
+    (a Geo.bvh()); the hits are joined by a flat tube whose section lies along the surface.
+    outside=True finds the OUTERMOST surface along the ray (cast back from far out), so overlapping shells (a face
+    plate on a head) do not catch the band on an inner surface."""
     pts, nrm = [], []
     for o, d in rays:
-        hit = bvh.ray_cast(Vector(o), Vector(d).normalized())
+        if outside:
+            dd = Vector(d).normalized()
+            hit = bvh.ray_cast(Vector(o) + dd * 60.0, -dd)
+        else:
+            hit = bvh.ray_cast(Vector(o), Vector(d).normalized())
         if hit[0] is None:
             continue
         nv = hit[1] if hit[1].dot(Vector(d)) > 0 else -hit[1]  # rays start inside: the outward normal faces along the ray
-        pts.append(hit[0] + nv * (thick * 0.5 + lift))
+        pts.append(hit[0] + nv * (thick * 0.25 + lift))  # sunk 0.75 x thick into the surface: always attached
         nrm.append(nv)
     if len(pts) < 2:
         return
@@ -265,6 +283,7 @@ def stroke(g, bvh, rays, col, width, thick=0.12, taper=True, seg=6, lift=0.05):
         f = math.sin(math.pi * (i + 0.5) / n) ** 0.5 if taper else 1.0
         radii.append((thick, max(0.03, width * f)))
     tube(g, pts, radii, col, seg=seg, cap0='point', cap1='point', normals=nrm)
+    return pts
 
 
 def bezier(p0, p1, p2, p3=None, n=8):
@@ -418,7 +437,7 @@ class Palette:
         return img
 
 
-def make_object(geo, pal, coll, y0, y1, mat=None, origin='bbox'):
+def make_object(geo, pal, coll, y0, y1, mat=None, origin='bbox', mat_index_fn=None):
     """Mesh object from a Geo: colour attribute 'Col' (shade by model height), UV 'Atlas' into the palette atlas,
     smooth flags, outward normals. The object origin is the bbox centre (the way Roblox recentres an imported mesh)."""
     me = bpy.data.meshes.new(geo.name)
@@ -435,6 +454,8 @@ def make_object(geo, pal, coll, y0, y1, mat=None, origin='bbox'):
             continue
         face.smooth = geo.fs[fi]
         key = geo.fc[fi]
+        if mat_index_fn:
+            face.material_index = mat_index_fn(key)
         k = pal.index(key)
         cx, cy = k % ATLAS_CELLS, k // ATLAS_CELLS
         r, g_, b = pal.rgb[key]
@@ -509,6 +530,23 @@ def mat_flat(name, rgb, rough=0.5, metallic=0.0, emit=0.0, alpha=1.0, transmissi
     if alpha < 1:
         bsdf.inputs['Alpha'].default_value = alpha
     _mats[key] = m
+    return m
+
+
+def mat_fx(name):
+    """Effects stand-in material (particles / beams / billboards in game): vertex colour, self-lit."""
+    if name in _mats:
+        return _mats[name]
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes['Principled BSDF']
+    attr = nt.nodes.new('ShaderNodeVertexColor')
+    attr.layer_name = 'Col'
+    nt.links.new(attr.outputs['Color'], bsdf.inputs['Base Color'])
+    nt.links.new(attr.outputs['Color'], bsdf.inputs['Emission Color'])
+    bsdf.inputs['Emission Strength'].default_value = 1.6
+    _mats[name] = m
     return m
 
 
@@ -690,6 +728,24 @@ def frame_points(sc, cam, pts, target, az, el, margin=0.06, w=None, h=None):
     return hi
 
 
+def billboard(sc, cam):
+    """Turn every shown sleep 'Z' to face the camera upright, as the game's BillboardGui does. Each Z object turns about
+    its own centre; it is built in its mesh space facing +Y (the keeper's front), upright along +Z. Returns True if any."""
+    R = cam.rotation_euler.to_matrix()
+    cx, cy, cz = R.col[0], R.col[1], R.col[2]
+    Rb = Matrix((-cx, cz, cy)).transposed().to_4x4()   # mesh -X -> screen right, mesh +Y -> toward the camera, +Z -> up
+    any_ = False
+    for ob in sc.collection.all_objects:
+        if ob.type != 'MESH' or ob.hide_render or ob.get('kind') != 'fx' or ob.get('piece') != 'Z':
+            continue
+        vs = ob.data.vertices
+        c = sum((v.co for v in vs), Vector()) / len(vs)
+        p = ob.matrix_world @ c
+        ob.matrix_world = Matrix.Translation(p) @ Rb @ Matrix.Translation(-c)
+        any_ = True
+    return any_
+
+
 def render(sc, path, w, h, samples=None):
     sc.render.resolution_x = w
     sc.render.resolution_y = h
@@ -716,3 +772,212 @@ def player_standin(coll, x=0.0, y_b=0.0, facing=0.0):
     ob = make_object(g, p, coll, 0, 5, mat_vcol('PlayerMat', rough=0.6))
     ob.matrix_world = Matrix.Translation((x, y_b, 0)) @ Matrix.Rotation(facing, 4, 'Z') @ Matrix.Translation(Vector(ob['rest_center']))
     return ob
+
+
+# ---------------------------------------------------------------- reference style helpers (rev 2)
+def shards(g, base, direction, length, width, col, n=4, spread=0.5, seed=0, sink=0.35):
+    """A tuft of flat-faced shard spikes (the reference's spiky fur / crystal tufts). The bases are sunk `sink` of
+    the length into the body along -direction, so every shard touches what it grows from."""
+    import random
+    rnd = random.Random(seed)
+    d = Vector(direction).normalized()
+    ref = Vector((0, 1, 0)) if abs(d.y) < 0.9 else Vector((1, 0, 0))
+    s = d.cross(ref).normalized()
+    u = s.cross(d).normalized()
+    base = Vector(base)
+    for i in range(n):
+        a = 2 * math.pi * i / n + rnd.uniform(-0.3, 0.3)
+        off = (s * math.cos(a) + u * math.sin(a)) * width * 0.45 * (0 if n == 1 else 1)
+        tip_dir = (d + (s * math.cos(a) + u * math.sin(a)) * spread * rnd.uniform(0.5, 1.0)).normalized()
+        ln = length * rnd.uniform(0.75, 1.1)
+        b = base + off - tip_dir * ln * sink
+        spike(g, b, b + tip_dir * ln * (1 + sink), width * rnd.uniform(0.38, 0.5), col, seg=4, smooth=False)
+
+
+def z_letter(g, c, h, col, edge_col, M=None):
+    """A chunky stylised 'Z' (the reference's sleep marker): an extruded Z with a darker, slightly larger slab behind."""
+    w, t = h * 0.8, h * 0.26
+    # the Z as three convex pieces: top bar, diagonal, bottom bar
+    pieces = [
+        [(-w / 2, h / 2), (w / 2, h / 2), (w / 2, h / 2 - t), (-w / 2, h / 2 - t)],
+        [(w / 2 - t * 1.25, h / 2 - t), (w / 2, h / 2 - t), (-w / 2 + t * 1.25, -h / 2 + t), (-w / 2, -h / 2 + t)],
+        [(-w / 2, -h / 2 + t), (w / 2, -h / 2 + t), (w / 2, -h / 2), (-w / 2, -h / 2)],
+    ]
+    # seen from the front (Roblox -Z) +X is on the left of the screen: mirror so the letter reads as 'Z', not 'S'
+    pieces = [[(-x, y) for x, y in reversed(poly)] for poly in pieces]
+    M = T(c) @ (M or Matrix.Identity(4))
+    for col_, sc_, dz, th in ((edge_col, 1.14, 0.1 * h, 0.14 * h), (col, 1.0, -0.02 * h, 0.2 * h)):
+        for poly in pieces:
+            n = len(poly)
+            verts = [(x * sc_, y * sc_, dz - th / 2) for x, y in poly] + [(x * sc_, y * sc_, dz + th / 2) for x, y in poly]
+            faces = [tuple(range(n)), tuple(range(2 * n - 1, n - 1, -1))]
+            for i in range(n):
+                j = (i + 1) % n
+                faces.append((i, i + n, j + n, j))
+            g.add([_xf(M, p) for p in verts], faces, col_, False)
+
+
+_stud_img = None
+
+
+def stud_image():
+    """A 1-stud tile of the classic Roblox stud look: a flat cell with a raised round stud (ring shadow + highlight)."""
+    global _stud_img
+    if _stud_img is not None:
+        try:
+            _stud_img.name
+            return _stud_img
+        except ReferenceError:  # the scene was reset
+            _stud_img = None
+    n = 64
+    img = bpy.data.images.new('StudTile', n, n, alpha=False, float_buffer=True)
+    px = []
+    for yy in range(n):
+        for xx in range(n):
+            dx, dy = (xx + 0.5) / n - 0.5, (yy + 0.5) / n - 0.5
+            d = math.sqrt(dx * dx + dy * dy)
+            if d < 0.27:
+                v = 0.62 + 0.08 * (dy > 0)
+            elif d < 0.33:
+                v = 0.42
+            else:
+                v = 0.52
+            px += [v, v, v, 1.0]
+    img.colorspace_settings.name = 'Non-Color'
+    img.pixels.foreach_set(px)
+    img.update()
+    img.pack()
+    _stud_img = img
+    return img
+
+
+def add_studs(mat, strength=0.7, scale=1.0, tint=0.5):
+    """Adds the stud pattern to a material: box-projected in object space (1 tile = 1 stud), as bump + a slight tint."""
+    nt = mat.node_tree
+    bsdf = nt.nodes['Principled BSDF']
+    tc = nt.nodes.new('ShaderNodeTexCoord')
+    mp = nt.nodes.new('ShaderNodeMapping')
+    mp.inputs['Scale'].default_value = (scale, scale, scale)
+    tex = nt.nodes.new('ShaderNodeTexImage')
+    tex.image = stud_image()
+    tex.projection = 'BOX'
+    tex.projection_blend = 0.25
+    tex.interpolation = 'Linear'
+    nt.links.new(tc.outputs['Object'], mp.inputs['Vector'])
+    nt.links.new(mp.outputs['Vector'], tex.inputs['Vector'])
+    bump = nt.nodes.new('ShaderNodeBump')
+    bump.inputs['Strength'].default_value = strength
+    bump.inputs['Distance'].default_value = 0.12
+    nt.links.new(tex.outputs['Color'], bump.inputs['Height'])
+    nt.links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
+    base_link = [l for l in nt.links if l.to_socket == bsdf.inputs['Base Color']]
+    if base_link:
+        src = base_link[0].from_socket
+        nt.links.remove(base_link[0])
+        mix = nt.nodes.new('ShaderNodeMix')
+        mix.data_type = 'RGBA'
+        mix.blend_type = 'MULTIPLY'
+        mix.inputs['Factor'].default_value = tint
+        nt.links.new(src, mix.inputs['A'])
+        nt.links.new(tex.outputs['Color'], mix.inputs['B'])
+        bright = nt.nodes.new('ShaderNodeMix')
+        bright.data_type = 'RGBA'
+        bright.blend_type = 'MULTIPLY'
+        bright.inputs['Factor'].default_value = 1.0
+        f = 1.0 / (1 - tint * 0.48)
+        bright.inputs['B'].default_value = (f, f, f, 1)
+        nt.links.new(mix.outputs['Result'], bright.inputs['A'])
+        nt.links.new(bright.outputs['Result'], bsdf.inputs['Base Color'])
+    return mat
+
+
+# ---------------------------------------------------------------- connectivity (no floating pieces)
+def islands(ob):
+    """World-space islands (loose parts) of a mesh object: list of (verts, faces)."""
+    me = ob.data
+    mw = ob.matrix_world
+    parent = list(range(len(me.vertices)))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    for e in me.edges:
+        a, b = find(e.vertices[0]), find(e.vertices[1])
+        if a != b:
+            parent[a] = b
+    groups = {}
+    for p in me.polygons:
+        groups.setdefault(find(p.vertices[0]), []).append(list(p.vertices))
+    out = []
+    for root, polys in groups.items():
+        idx = sorted({v for p in polys for v in p})
+        remap = {v: i for i, v in enumerate(idx)}
+        verts = [mw @ me.vertices[v].co for v in idx]
+        faces = [[remap[v] for v in p] for p in polys]
+        out.append((verts, faces))
+    return out
+
+
+DEBUG_AT = False
+
+
+def connectivity(objs, tol=0.02):
+    """Contact graph of every island of every object: two islands are joined if their surfaces intersect, come within
+    `tol` studs, or one lies inside the other. Returns (number of components, components as lists of island labels)."""
+    from mathutils.bvhtree import BVHTree
+    items = []
+    for ob in objs:
+        for i, (vs, fs) in enumerate(islands(ob)):
+            mn = Vector((min(v.x for v in vs), min(v.y for v in vs), min(v.z for v in vs)))
+            mx = Vector((max(v.x for v in vs), max(v.y for v in vs), max(v.z for v in vs)))
+            cen = (mn + mx) / 2
+            items.append({'label': '%s#%d' % (ob.name, i), 'at': (round(cen.x, 1), round(cen.z, 1), round(-cen.y, 1)), 'v': vs, 'f': fs, 'mn': mn, 'mx': mx,
+                          'bvh': BVHTree.FromPolygons([tuple(v) for v in vs], fs)})
+    n = len(items)
+    parent = list(range(n))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    def inside(a, b):
+        o = Vector(a['v'][0])
+        if any(o[k] < b['mn'][k] or o[k] > b['mx'][k] for k in range(3)):
+            return False
+        d = Vector((1, 0.0013, 0.0007)).normalized()
+        hits = 0
+        for _ in range(64):
+            loc, nrm, idx, dist = b['bvh'].ray_cast(o, d)
+            if loc is None:
+                break
+            hits += 1
+            o = loc + d * 1e-4
+        return hits % 2 == 1
+    for i in range(n):
+        A = items[i]
+        for j in range(i + 1, n):
+            B = items[j]
+            if any(A['mn'][k] > B['mx'][k] + tol or B['mn'][k] > A['mx'][k] + tol for k in range(3)):
+                continue
+            if find(i) == find(j):
+                continue
+            joined = bool(A['bvh'].overlap(B['bvh']))
+            if not joined:
+                small, big = (A, B) if len(A['v']) <= len(B['v']) else (B, A)
+                for v in small['v']:
+                    hit = big['bvh'].find_nearest(v, tol)
+                    if hit[0] is not None:
+                        joined = True
+                        break
+            if not joined:
+                joined = inside(A, B) or inside(B, A)
+            if joined:
+                parent[find(i)] = find(j)
+    comps = {}
+    for i in range(n):
+        comps.setdefault(find(i), []).append(items[i]['label'] + ('@%s,%s,%s' % items[i]['at'] if DEBUG_AT else ''))
+    return len(comps), sorted(comps.values(), key=len, reverse=True)
