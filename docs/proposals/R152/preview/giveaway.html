@@ -1,0 +1,147 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Void Pack giveaway preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of a giveaway_scenes.py scene: the hub's parts as Roblox shapes (block, wedge, corner wedge, ball, cylinder along X, the pack's stand-in Body as a rounded pouch), neon as
+// unlit colour with a soft glow, the pedestal's / the client's lights as point lights, particle emitters as clouds of sparkle dots, and the number's BillboardGui drawn like Roblox lays it
+// out (rounded pill, outline, title / number / note rows) as a camera-facing sprite sized in studs. A design preview: plain materials, no Roblox textures or Future lighting; the pack art
+// (approved meshes) is not available offline, so the pack's body is a stand-in pouch under the Void art's own parts; the font is not Fredoka.
+import * as THREE from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+const envTex=new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04).texture;
+function solid(verts,faces){
+  const pos=[];const cen=[0,0,0];for(const v of verts){cen[0]+=v[0]/verts.length;cen[1]+=v[1]/verts.length;cen[2]+=v[2]/verts.length}
+  for(const f of faces){for(let i=1;i<f.length-1;i++){
+    let a=verts[f[0]],b=verts[f[i]],c=verts[f[i+1]];
+    const n=[(b[1]-a[1])*(c[2]-a[2])-(b[2]-a[2])*(c[1]-a[1]),(b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2]),(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])];
+    const out=n[0]*(a[0]-cen[0])+n[1]*(a[1]-cen[1])+n[2]*(a[2]-cen[2]);
+    if(out<0){const t=b;b=c;c=t}
+    pos.push(...a,...b,...c)}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();return g;
+}
+const geoBox=new THREE.BoxGeometry(1,1,1),geoSphere=new THREE.SphereGeometry(.5,32,22),geoPouch=new RoundedBoxGeometry(1,1,1,6,.16);
+const geoCyl=new THREE.CylinderGeometry(.5,.5,1,48);geoCyl.rotateZ(Math.PI/2);
+const geoWedge=solid([[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]],[[0,1,2,3],[3,2,5,4],[0,3,4],[1,5,2],[0,4,5,1]]);
+const geoCorner=solid([[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5],[.5,.5,.5]],[[0,1,2,3],[3,2,4],[1,2,4],[0,1,4],[0,3,4]]);
+const GEO={K:geoBox,W:geoWedge,V:geoCorner,Y:geoCyl,O:geoSphere,P:geoPouch};
+const glowTex=(()=>{const cv=document.createElement('canvas');cv.width=cv.height=64;const c=cv.getContext('2d');const gr=c.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.3,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=gr;c.fillRect(0,0,64,64);return new THREE.CanvasTexture(cv)})();
+const ROUGH={W:.7,R:.28,S:.82,B:.9,D:.92,C:.85,M:.32,P:.55,A:.95,I:.25,G:.08};
+const matCache=new Map();
+function material(p){
+  const key=p.m+'|'+p.c.join(',')+'|'+(p.t||0);let m=matCache.get(key);if(m)return m;
+  const t=p.t||0;
+  if(p.m==='N')m=new THREE.MeshBasicMaterial({color:col(p.c).multiplyScalar(1.1),transparent:t>0,opacity:1-t,toneMapped:false,depthWrite:t<.5});
+  else if(p.m==='G'||p.m==='I')m=new THREE.MeshPhysicalMaterial({color:col(p.c),roughness:ROUGH[p.m],transparent:true,opacity:p.m==='I'?.9:Math.min(.55,1-t),clearcoat:1,envMap:envTex,envMapIntensity:.7,depthWrite:p.m==='I'});
+  else{
+    m=new THREE.MeshStandardMaterial({color:col(p.c),roughness:ROUGH[p.m]??.6,metalness:p.m==='M'?.75:0,transparent:t>0,opacity:1-t});
+    if(p.m==='M'){m.envMap=envTex;m.envMapIntensity=.9}
+  }
+  matCache.set(key,m);return m;
+}
+function glow(s,pos,color,size,opacity){
+  const m=new THREE.SpriteMaterial({map:glowTex,color:col(color),transparent:true,opacity,depthWrite:false,blending:THREE.AdditiveBlending});
+  const sp=new THREE.Sprite(m);sp.position.set(pos[0],pos[1],pos[2]);sp.scale.set(size,size,1);s.add(sp);
+}
+function rnd(seed){let s=seed;return()=>{s=(s*16807)%2147483647;return s/2147483647}}
+// The number: the BillboardGui's items drawn on a canvas (Roblox's layout: scale positions / sizes inside the gui's size in studs), shown as a camera-facing sprite.
+function guiSprite(g){
+  const PX=120;const W=Math.round(g.w*PX),H=Math.round(g.h*PX);
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');
+  const rgb=(a,al)=>`rgba(${a[0]},${a[1]},${a[2]},${al})`;
+  const items=g.items.slice().sort((a,b)=>a.z-b.z);
+  const box=it=>{const w=it.w*W,h=it.h*H;return {x:it.x*W-it.ax*w,y:it.y*H-it.ay*h,w,h}};
+  const rr=(x,y,w,h,r)=>{r=Math.min(r,w/2,h/2);c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()};
+  for(const it of items){
+    const b=box(it);
+    if(it.cls==='Frame'){
+      const radius=it.corner!=null?it.corner*Math.min(b.w,b.h):0;const a=1-it.bgT;
+      if(it.grad){const gr=c.createLinearGradient(0,b.y,0,b.y+b.h);
+        const k=v=>[Math.round(it.bg[0]*v[0]/255),Math.round(it.bg[1]*v[1]/255),Math.round(it.bg[2]*v[2]/255)];
+        gr.addColorStop(0,rgb(k(it.grad.a),a));gr.addColorStop(1,rgb(k(it.grad.b),a));c.fillStyle=gr}else c.fillStyle=rgb(it.bg,a);
+      rr(b.x,b.y,b.w,b.h,radius);c.fill();
+      if(it.stroke){c.lineWidth=it.stroke.w*2;c.strokeStyle=rgb(it.stroke.c,1-it.stroke.t);rr(b.x+1,b.y+1,b.w-2,b.h-2,radius);c.stroke()}
+    }else if(it.cls==='TextLabel'&&it.text){
+      let size=b.h*.9;const font=s=>`bold ${s}px "DejaVu Sans","Noto Color Emoji",sans-serif`;
+      c.font=font(size);while(c.measureText(it.text).width>b.w&&size>8){size-=2;c.font=font(size)}
+      c.textAlign='center';c.textBaseline='middle';
+      c.lineWidth=Math.max(2,size*.1);c.strokeStyle=rgb(it.tsc,.85);c.lineJoin='round';c.strokeText(it.text,b.x+b.w/2,b.y+b.h/2+size*.04);
+      c.fillStyle=rgb(it.tc,1);c.fillText(it.text,b.x+b.w/2,b.y+b.h/2+size*.04);
+    }
+  }
+  const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=8;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,toneMapped:false}));
+  sp.position.set(g.p[0],g.p[1],g.p[2]);sp.scale.set(g.w,g.h,1);return sp;
+}
+function skyTexture(dusk){
+  const cv=document.createElement('canvas');cv.width=4;cv.height=256;const c=cv.getContext('2d');
+  const g=c.createLinearGradient(0,0,0,256);
+  if(dusk){g.addColorStop(0,'#150f33');g.addColorStop(.55,'#3a2a66');g.addColorStop(1,'#8a5b9a')}
+  else{g.addColorStop(0,'#5a9ee0');g.addColorStop(.55,'#a9d4f4');g.addColorStop(1,'#dff0fb')}
+  c.fillStyle=g;c.fillRect(0,0,4,256);
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+let CUR=null;
+window.setScene=function(scene){CUR=scene};
+function build(scene,dusk,planView){
+  const S=new THREE.Scene();S.background=skyTexture(dusk);
+  S.add(new THREE.HemisphereLight(dusk?0x6a5aa8:0xeaf6ff,dusk?0x2a2440:0x6a7a5a,dusk?.55:1.2));
+  const sun=new THREE.DirectionalLight(dusk?0xb8a0ff:0xfff2dd,dusk?.7:2.3);sun.castShadow=true;sun.shadow.mapSize.set(4096,4096);sun.shadow.bias=-.0005;sun.shadow.normalBias=.05;S.add(sun,sun.target);
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),new THREE.MeshStandardMaterial({color:dusk?0x2a3a30:0x5b7f4a,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=2.9;ground.receiveShadow=true;S.add(ground);
+  for(const p of scene.parts){
+    const r=p.r;const m=new THREE.Matrix4().set(r[0],r[1],r[2],p.p[0],r[3],r[4],r[5],p.p[1],r[6],r[7],r[8],p.p[2],0,0,0,1);
+    const neon=p.m==='N';
+    const mesh=new THREE.Mesh(GEO[p.k]||geoBox,material(p));mesh.matrixAutoUpdate=false;
+    mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(p.s[0],p.s[1],p.s[2]));
+    mesh.castShadow=!neon&&(p.t||0)<.3&&p.g!=='pack';mesh.receiveShadow=!neon;S.add(mesh);
+    if(neon&&(p.t||0)<.95&&(p.g==='giveaway'||p.g==='pack')){const sz=Math.max(...p.s);if(sz<9)glow(S,p.p,p.c,p.g==='pack'?Math.max(.5,sz*1.5):Math.max(1.6,sz*2.6),(p.g==='pack'?(dusk?.16:.06):(dusk?.5:.3))*(1-(p.t||0)))}
+  }
+  for(const l of scene.lights||[]){
+    const pl=new THREE.PointLight(col(l.color),l.brightness*l.range*(dusk?3.2:1.4),l.range*1.8,1.4);pl.position.set(...l.p);S.add(pl);
+    glow(S,l.p,l.color,l.range*(dusk?.9:.55),(dusk?.35:.2)*Math.min(1.5,l.brightness));
+  }
+  const R=rnd(11);
+  for(const e of scene.emitters||[]){
+    const pts=[];const c=col(e.color);
+    if(e.kind==='steady'){const n=Math.min(90,Math.round(e.rate*e.life)*3);for(let i=0;i<n;i++){const u=R();pts.push(e.p[0]+(R()-.5)*e.size[0]*1.6,e.p[1]+(R()-.5)*3.2,e.p[2]+(R()-.5)*e.size[2]*1.6)}}
+    else{for(let i=0;i<e.count;i++){const th=R()*Math.PI*2,ph=Math.acos(2*R()-1),r=(.3+R()*.7)*e.speed*e.life*.7;pts.push(e.p[0]+Math.sin(ph)*Math.cos(th)*r,e.p[1]+Math.cos(ph)*r,e.p[2]+Math.sin(ph)*Math.sin(th)*r)}}
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+    S.add(new THREE.Points(g,new THREE.PointsMaterial({map:glowTex,color:c,size:e.kind==='burst'?.6:.55,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,sizeAttenuation:true})));
+  }
+  if(!planView)for(const g of scene.guis||[])S.add(guiSprite(g)); // (a plan from above would hide the pedestal under the camera-facing sign)
+  for(const q of scene.plaques||[]){ // SurfaceGui lettering on the plaque's Front face (local -Z)
+    const cv=document.createElement('canvas');cv.width=500;cv.height=200;const c=cv.getContext('2d');
+    let size=170;const font=s=>`bold ${s}px "DejaVu Sans",sans-serif`;c.font=font(size);while(c.measureText(q.text).width>470&&size>10){size-=4;c.font=font(size)}
+    c.textAlign='center';c.textBaseline='middle';c.lineJoin='round';c.lineWidth=Math.max(3,size*.12);c.strokeStyle=`rgba(${q.stroke.join(',')},.7)`;c.strokeText(q.text,250,104);
+    c.fillStyle=`rgb(${q.color.join(',')})`;c.fillText(q.text,250,104);
+    const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=8;
+    const r=q.r;const bm=new THREE.Matrix4().set(r[0],r[1],r[2],q.p[0],r[3],r[4],r[5],q.p[1],r[6],r[7],r[8],q.p[2],0,0,0,1);
+    const plane=new THREE.Mesh(new THREE.PlaneGeometry(q.s[0],q.s[1]),new THREE.MeshBasicMaterial({map:tex,transparent:true,toneMapped:false}));
+    plane.matrixAutoUpdate=false;plane.matrix.copy(bm).multiply(new THREE.Matrix4().makeRotationY(Math.PI)).multiply(new THREE.Matrix4().makeTranslation(0,0,q.s[2]/2+.02));S.add(plane);
+  }
+  return {S,sun};
+}
+window.shoot=function(v){
+  const Wd=v.w,Ht=v.h;renderer.setSize(Wd,Ht);renderer.toneMappingExposure=v.dusk?1.15:1.0;
+  const {S,sun}=build(CUR,!!v.dusk,!!v.plan);
+  const T=new THREE.Vector3(...v.at),C=new THREE.Vector3(...v.cam),dist=C.distanceTo(T);
+  S.fog=v.plan?null:new THREE.Fog(v.dusk?0x4a3a78:0xcfe6f6,v.dusk?220:500,v.dusk?900:1700);
+  sun.position.set(T.x-35,T.y+95,T.z+55);sun.target.position.copy(T);
+  const ex=v.plan?140:Math.max(40,Math.min(dist*.6,160));
+  Object.assign(sun.shadow.camera,{left:-ex,right:ex,top:ex,bottom:-ex,near:1,far:v.plan?1400:360});sun.shadow.camera.updateProjectionMatrix();
+  const cam=new THREE.PerspectiveCamera(v.fov,Wd/Ht,.3,4000);cam.position.copy(C);if(v.up)cam.up.set(...v.up);cam.lookAt(T);cam.updateMatrixWorld();
+  renderer.render(S,cam);
+  const labels=(v.labels||[]).map(l=>{const q=new THREE.Vector3(...l.p).project(cam);return{text:l.text,x:(q.x*.5+.5)*Wd,y:(-q.y*.5+.5)*Ht}});
+  const url=renderer.domElement.toDataURL('image/png');
+  S.traverse(o=>{if(o.isPoints&&o.geometry)o.geometry.dispose();if(o.isSprite&&o.material.map&&o.material.map!==glowTex)o.material.map.dispose()});
+  return{url,labels};
+};
+window.ready=true;
+</script></body></html>

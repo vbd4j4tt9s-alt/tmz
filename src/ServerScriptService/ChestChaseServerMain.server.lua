@@ -130,6 +130,8 @@ local function runServer()
 		playerData.OnPackOpened=function(player,reward,info)hubDisplays:NotePull(player,reward,info)end
 		chestService.HarvestHook=function(player,harvest)hubDisplays:NoteHarvest(player,harvest)end
 	end);if not ok then warn('[R151] Hub displays failed to start: '..tostring(err));hubDisplays=nil end end
+	-- R152: the free Void Pack pedestal in the middle of the plaza (500 claims across ALL servers: a DataStore key + MessagingService). A failure here never stops the server: no pedestal.
+	do local ok,err=pcall(function()require(modules.VoidGiveaway152).new(Config,playerData,chestService,notifications,mapService):Start()end);if not ok then warn('[R152] Void giveaway failed to start: '..tostring(err))end end
 	require(modules.MovementGuard).Start(Config,playerData,baseService)
 	startupPhase = "connecting chase and training"
 	baseService:SetBusyChecker(function(player)

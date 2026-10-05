@@ -33,9 +33,12 @@ X.Actions.packshape=true
 X.Actions.hubtrees=true
 -- R152: keepermodels [off|auto]: the baked rev 6 keeper models (KeeperMeshCommand152): bake status, which model each keeper shows, a switch back.
 X.Actions.keepermodels=true
+-- R152: voidgift [reset me | left <n>]: the free Void Pack pedestal's status; the two edits are Studio only (VoidGiveaway152).
+X.Actions.voidgift=true
 function X.Execute(ctx,p,action,a)
  if action=='keepermodels'then return require(script.Parent.KeeperMeshCommand152).Execute(ctx,p,a)end
  if action=='hubtrees'then return require(script.Parent.HubTreeLoader151).Command(ctx,p,a)end
+ if action=='voidgift'then return require(script.Parent.VoidGiveaway152).Command(ctx,p,a)end
  if action=='rarepull'or action=='raresound'then return require(script.Parent.RarePullTestCommands).Execute(ctx,p,action,a)end
  if action=='plantnotify'then return require(script.Parent.SocialService).Command(ctx,p,a)end
  if action=='packshape'then return require(script.Parent.PackShapeCommand151).Execute(ctx,p,a)end
