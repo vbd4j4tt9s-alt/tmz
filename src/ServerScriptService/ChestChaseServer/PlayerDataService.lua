@@ -1592,7 +1592,15 @@ function PlayerDataService:HarvestPlant(player, slot, expectedCropId, now, fruit
     harvest.Value = trait.Value
     table.insert(garden.Harvests, harvest)
     self:MarkAdultDiscovered(player,crop.SeedId)
-    if PlantRules.FinishFruit(crop,definition,fruitIndex,now,self:GetFenceTier(player))then table.remove(crops,cropIndex)end
+    if PlantRules.FinishFruit(crop,definition,fruitIndex,now,self:GetFenceTier(player))then
+     table.remove(crops,cropIndex)
+     -- R151: this harvest removed the plant (a single-harvest plant, or the last fruit of one that does not regrow). GardenPlantRuntime reads this when it takes the
+     -- plant's model out of the garden: the model stays for a beat, marked HarvestedBy / HarvestedIndex, so every client sees the fruit fly to the harvester (a shovel
+     -- removal never comes through here).
+     local marks=self.HarvestRemovals or{};self.HarvestRemovals=marks
+     marks[crop.Id]={Index=fruitIndex,By=player.UserId,At=os.clock()}
+     for id,mark in pairs(marks)do if os.clock()-mark.At>30 then marks[id]=nil end end
+    end
 	self:_gardenChanged(player)
 	self:TutorialEvent(player,'Harvest')
 	self:QuestEvent(player,'Harvest',1) -- R140 daily quest

@@ -5,13 +5,21 @@
 --           emitters (short bursts, never left running), only plants near the camera and on screen. Stepped inside GardenVisuals' 20 Hz animation step.
 --  Harvest  (owner: "it floats into the player and disappears after, and appears in the player's inventory") the picked fruit lifts off the plant and
 --           floats along a short smooth arc to the harvesting player's character (following them if they move), shrinking a little, then vanishes
---           when it reaches them; HarvestArrival tells the inventory (Hotbar), which shows the item and bumps its slot at that moment. It reuses the
---           fruit's OWN parts (no clone, no new part), moved through one batch for all flights, stepped by ONE call per frame (no connection per
---           fruit); at most 8 fly at once, the rest just vanish as before. Other players see the same flight (the harvest replicates as the plant's
---           attributes, so every client's GardenVisuals sees the fruit go) towards the harvester, who is the garden's owner.
--- Both are off with the player's reduced-motion setting, on the lowest quality tier and with the Studio effects switch off (then a harvested fruit
--- vanishes at once, as it did). Lantern Fern and Amethyst Grape, Mech holograms, Verity, the giant Dune Starfruit and the plants with their own
--- motion rigs are not touched. Nothing here runs for a plant that is out of range, and it switches itself off after 3 errors.
+--           when it reaches them; HarvestArrival tells the inventory (Hotbar), which shows the item and bumps its slot at that moment. It is moved
+--           through one batch for all flights, stepped by ONE call per frame (no connection per fruit). Other players see the same flight (the
+--           harvest replicates as the plant's attributes, so every client's GardenVisuals sees the fruit go) towards the harvester, who is the
+--           garden's owner.
+--           R151 (owner: "some plants and fruits dont float into the players inventory"): EVERY seed's fruit flies, by every harvest path.
+--             * what flies: the fruit's OWN parts (no clone, no new part) when the plant has no motion of its own that could fight the flight
+--               (M.OwnParts); a plant with its own rig or hologram (Mech, Verity, Lantern Fern, Amethyst Grape, Obsidian Maw, Frostbell, Orbit Lotus,
+--               Supernova, Dune Starfruit) or a picked fruit that has no model here (the detail planner left it out, or the plant's own model was
+--               removed with the harvest) flies as a detached copy built with PlantVisuals the way a regrown fruit is built; and a fruit that is too
+--               big for the flight budget (or when the budget is spent: a harvest of many at once) flies as ONE small ball in its colour. A harvested
+--               fruit therefore never just vanishes (it did for 14 seeds, for every fruit of more than 48 parts and for every single-harvest plant).
+--             * the cap is on the work (parts moved a frame), not on the plants: at most FlightMaxParts of one fruit, Flights / FlightParts / Tokens
+--               at once per quality tier. The lowest tier flies too (two at a time; no bounce, no glints).
+-- The ripe moment and the harvest flight are both off with the player's reduced-motion setting and with the Studio effects switch off (then a harvested
+-- fruit vanishes at once and the inventory is told at once). Nothing here runs for a plant that is out of range, and it switches itself off after 3 errors.
 local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Gui=game:GetService('GuiService')
@@ -31,20 +39,24 @@ M.Tuning={
  EmitterCount=4,CuedLimit=256,
  FlightMin=.40,FlightMax=.70,FlightPerStud=.012,    -- seconds: a short hop is quick, a long one (an observer watching from afar) never above FlightMax
  ArcPerStud=.35,ArcMin=.8,ArcMax=2.5,ShrinkTo=.55,  -- the arc's height (studs) and how small the fruit is on arrival
+ EndRadius=1.3,                               -- R151: a big fruit (a giant, Verity's 22-stud ball) arrives about this big (radius, studs), not at .55 of its size
  AimUp=.9,                                    -- studs above the HumanoidRootPart: the upper torso
- FlightMaxParts=48,                           -- a fruit of more parts than this just vanishes
- -- plants whose fruit or parts are moved by their own systems
+ FlightMaxParts=300,                          -- R151: the most parts of ONE fruit that fly as they are (the biggest fruit of the game, a Frost Fern, has up to ~220); a bigger one flies as a ball
+ ProxyWindow=.5,ProxyMax=2,                   -- R151: detached copies built at most ProxyMax in any ProxyWindow seconds (a harvest of many at once: the rest fly as balls)
+ TokenMin=.5,TokenMax=3,                      -- R151: a ball's diameter (studs)
+ -- plants whose fruit or parts are moved by their own systems: their ripe bounce is skipped and their picked fruit flies as a detached copy
  Skip={ObsidianMawSeed=true,SilentFrostbellSeed=true,OrbitLotusSeed=true,SupernovaBloomSeed=true,StarfruitSeed=true},
 }
--- Per quality tier (ClientFxBudget 1 = low .. 3 = high; graphics level 1-3 forces tier 1, 4-6 caps at tier 2): everything is off on tier 1.
+-- Per quality tier (ClientFxBudget 1 = low .. 3 = high; graphics level 1-3 forces tier 1, 4-6 caps at tier 2): the ripe moment is off on tier 1; the harvest flight
+-- of the player's OWN fruit is on at every tier (R151: it was off on tier 1), in a small size there.
 -- Pulses / PulseParts: fruit bouncing at once and the parts they move; Sparks: glints per cue; Flights / FlightParts: fruit flying at once and their parts;
--- Range: studs from the camera inside which an observed plant shows these moments.
+-- Tokens: balls flying at once (R151: a fruit over the budget); Range: studs from the camera inside which an observed plant shows these moments.
 M.Budgets={
- {Pulses=0,PulseParts=0,Sparks=0,Flights=0,FlightParts=0,Range=0},
- {Pulses=3,PulseParts=70,Sparks=3,Flights=5,FlightParts=120,Range=38},
- {Pulses=4,PulseParts=120,Sparks=4,Flights=8,FlightParts=200,Range=48},
+ {Pulses=0,PulseParts=0,Sparks=0,Flights=2,FlightParts=300,Tokens=4,Range=0},
+ {Pulses=3,PulseParts=70,Sparks=3,Flights=6,FlightParts=520,Tokens=10,Range=38},
+ {Pulses=4,PulseParts=120,Sparks=4,Flights=8,FlightParts=800,Tokens=16,Range=48},
 }
-M.Off=M.Budgets[1]
+M.Off={Pulses=0,PulseParts=0,Sparks=0,Flights=0,FlightParts=0,Tokens=0,Range=0} -- reduced motion / the Studio switch: nothing moves
 -- reduced = the player's reduced-motion setting, off = the Studio effects switch.
 function M.Budget(tier,reduced,off)
  if reduced or off then return M.Off end
@@ -66,18 +78,28 @@ function M.Bounce(t)
  if u<=0 or u>=1 then return 1 end
  return 1+T.RipeScale*math.sin(u*math.pi*3)*(1-u)^2
 end
--- Harvest flight at u = seconds / duration: how far along the way to the player (eased in and out), the arc (0 .. 1 .. 0) and the fruit's scale.
-function M.Flight(u)
+-- Harvest flight at u = seconds / duration: how far along the way to the player (eased in and out), the arc (0 .. 1 .. 0) and the fruit's scale
+-- (it ends at `shrink`, default Tuning.ShrinkTo).
+function M.Flight(u,shrink)
  u=math.clamp(u,0,1)
- return smooth(u),math.sin(u*math.pi),1-(1-M.Tuning.ShrinkTo)*smooth(u)
+ return smooth(u),math.sin(u*math.pi),1-(1-(shrink or M.Tuning.ShrinkTo))*smooth(u)
+end
+-- How small a fruit of this radius ends: .55 of its size, but a big one (a giant, Verity's ball) arrives about EndRadius big.
+function M.Shrink(radius)
+ local T=M.Tuning;return math.clamp(T.EndRadius/math.max(radius or 0,.01),.04,T.ShrinkTo)
 end
 function M.FlightSeconds(distance)
  local T=M.Tuning;return math.clamp(T.FlightMin+T.FlightPerStud*(tonumber(distance)or 0),T.FlightMin,T.FlightMax)
 end
+-- The plant's OWN parts may be moved by this module (the ripe bounce, and a harvest flight that reuses the fruit's own parts): not the plants whose
+-- parts move on their own (rigs, holograms) or are left exactly as they were drawn (Lantern Fern, Amethyst Grape).
 function M.Eligible(crop)
  local def=crop and Catalog[crop.SeedId]
  return def~=nil and not def.Mech and not def.Verity and not Growth.Frozen[crop.SeedId]and not M.Tuning.Skip[crop.SeedId]and not Hologram.Is(crop.SeedId)
 end
+M.OwnParts=M.Eligible
+-- R151: every seed's picked fruit flies (its own parts, a detached copy, or a ball: see the header).
+function M.CanFly(crop)return crop~=nil and Catalog[crop.SeedId]~=nil end
 local function sequence(a,b,c)
  if c then return NumberSequence.new({NumberSequenceKeypoint.new(0,a),NumberSequenceKeypoint.new(.6,b),NumberSequenceKeypoint.new(1,c)})end
  return NumberSequence.new(a,b)
@@ -89,7 +111,8 @@ function M.new(options)
  local old=parent:FindFirstChild('LocalPlantGrowthFx');if old then old:Destroy()end
  local folder=Instance.new('Folder');folder.Name='LocalPlantGrowthFx';folder.Parent=parent
  return setmetatable({Folder=folder,Writer=Batch.new(options.Root or workspace),Pulses={},Flights={},Emitters={},EmitterCursor=0,Cued={},CuedOrder={},CueTimes={},
-  NextCue=0,NextBudget=0,Mode='normal',Stats={Cues=0,Skipped=0,Bounces=0,Flights=0,Landed=0,Dropped=0,Failures=0}},D)
+  Flying={},Real=0,Tokens=0,ProxyTimes={},NextCue=0,NextBudget=0,Mode='normal',
+  Stats={Cues=0,Skipped=0,Bounces=0,Flights=0,Landed=0,Dropped=0,Failures=0,Own=0,Copies=0,Balls=0,Refused=0}},D)
 end
 -- Budget, reduced-motion flag and tier, refreshed a few times a second.
 function D:Budget()
@@ -128,19 +151,21 @@ function D:Burst(position,sparks,radius)
  local e=self:Emitter(position)
  e.Spark.Size=sequence(math.clamp(radius*.32,.14,.9),0);e.Spark.Speed=NumberRange.new(.6+radius*.3,1.6+radius*.6);e.Spark:Emit(sparks)
 end
--- Centre, radius and the visible parts of a fruit model, from its parts as they are now (world space).
+-- Centre, radius, the visible parts of a fruit model, from its parts as they are now (world space), and the colour of its biggest part (R151: a ball in that colour
+-- stands in for a fruit that cannot fly as it is).
 local function measure(model)
- local parts={};local lo,hi
+ local parts={};local lo,hi;local biggest,color=-1,nil
  for _,p in ipairs(model:GetDescendants())do if p:IsA('BasePart')and p.Transparency<.95 then
   table.insert(parts,p)
   local c=p.CFrame.Position;local h=p.Size*.5
   local a,b=c-h,c+h
   lo=lo and V(math.min(lo.X,a.X),math.min(lo.Y,a.Y),math.min(lo.Z,a.Z))or a
   hi=hi and V(math.max(hi.X,b.X),math.max(hi.Y,b.Y),math.max(hi.Z,b.Z))or b
+  local volume=p.Size.X*p.Size.Y*p.Size.Z;if volume>biggest then biggest=volume;color=p.Color end
  end end
- if not lo then return parts,nil,0 end
+ if not lo then return parts,nil,0,nil end
  local size=hi-lo
- return parts,(lo+hi)*.5,math.max(size.X,size.Y,size.Z)*.5
+ return parts,(lo+hi)*.5,math.max(size.X,size.Y,size.Z)*.5,color
 end
 local function activeParts(list)local n=0;for _,e in ipairs(list)do n+=#e.Parts end;return n end
 -- Who sees it: within the tier's range of the camera, and the plant on screen as far as the garden scheduler knows.
@@ -221,40 +246,108 @@ function D:Settle(r)
  end
 end
 -- Harvest ----------------------------------------------------------------------------------------------------------------------------------------
--- A ripe fruit model is about to be destroyed because it was picked. Returns true when the fruit flies to the harvester: its parts now belong to this
--- module (the caller must not destroy it); false = the caller destroys it as before (and the inventory is told at once).
-function D:Harvest(r,child,index,crop,item)
+local Visuals
+local function visuals()if not Visuals then Visuals=require(RS:WaitForChild('PlantVisuals'))end;return Visuals end
+local DEFAULT_BALL=Color3.fromRGB(255,214,90)
+-- A detached copy of a fruit that is being picked, standing where it hung on the plant (`origin` = the plant's frame): built the way GardenVisuals builds a
+-- regrown fruit (ripe, its own size and coat), so it looks like the fruit that was on the plant. `child` (the plant's own model of that fruit, when there is
+-- one) says which size and coat the picked fruit had: the saved crop already holds the NEXT roll of that slot. nil when it cannot be built.
+function D:Copy(crop,index,origin,child)
+ if not origin then return nil end
+ local clock=os.clock();local times=self.ProxyTimes
+ while #times>0 and clock-times[1]>M.Tuning.ProxyWindow do table.remove(times,1)end
+ if #times>=M.Tuning.ProxyMax then return nil end
+ table.insert(times,clock)
+ local ok,model=pcall(function()
+  local source=table.clone(crop);source.ReadyAt=0;source.PickedMask=bit32.band(source.PickedMask or 0,bit32.bnot(bit32.lshift(1,index-1)))
+  local scale=child and child:GetAttribute('FruitScale');local coat=child and child:GetAttribute('Mutation')
+  if scale then source._VisualHarvest={Index=index,Scale=scale,Mutation=coat or crop.Mutation or'None'}end
+  local art=visuals().Build(crop.SeedId,origin,source,4,math.huge,index)
+  local fruit=art:FindFirstChild('Harvest_'..index)
+  if fruit then fruit.Parent=nil end
+  art:Destroy()
+  return fruit
+ end)
+ if ok and model then return model end
+ return nil
+end
+-- One small ball in a fruit's colour: what flies when the fruit itself cannot (too many parts for the budget, a harvest of many at once, nothing to copy).
+local function ball(self,center,radius,color)
+ local T=M.Tuning;local d=math.clamp(radius*1.4,T.TokenMin,T.TokenMax)
+ local part=Instance.new('Part');part.Name='HarvestBall';part.Shape=Enum.PartType.Ball;part.Size=V(d,d,d);part.Color=color or DEFAULT_BALL;part.Material=Enum.Material.SmoothPlastic
+ part.Anchored=true;part.CanCollide=false;part.CanQuery=false;part.CanTouch=false;part.CastShadow=false;part.CFrame=CF(center);part.Parent=self.Folder
+ return part
+end
+-- A fruit is being picked. Returns true when it flies to the harvester and the flight owns `child` (the caller must not destroy it; a model this module does not
+-- use is destroyed here); false = nothing flies (the caller destroys `child` as before, and the inventory is told at once).
+--   r / child  the plant's record and its own model of that fruit (child may be nil: the detail planner left the fruit out, or the plant is already gone; r may
+--              be nil when the plant is gone and nothing of it is kept)
+--   origin     the plant's frame (a copy is built where the fruit hung); item: the plant's model (its GardenOwnerId says who harvests)
+function D:Harvest(r,child,index,crop,item,origin)
  local cropId=crop and crop.Id
- local function refuse()Arrival.Land(cropId,index);return false end
- if self.Dead or not M.Eligible(crop)then return refuse()end
+ local T=M.Tuning
+ local function refuse()Arrival.Land(cropId,index);self.Stats.Refused+=1;return false end
+ if self.Dead or not M.CanFly(crop)then return refuse()end
+ local key=tostring(cropId)..':'..tostring(index)
+ if self.Flying[key]then if child and child.Parent then child:Destroy()end;return true end -- (this pick is already on its way: the plant was seen twice)
  local budget=self:Budget()
- if budget.Flights<=0 or #self.Flights>=budget.Flights then self.Stats.Skipped+=1;return refuse()end
+ if budget.Flights<=0 then return refuse()end
  -- the harvester: the garden's owner (only the owner can pick a fruit)
  local ownerId=item and(item:GetAttribute('GardenOwnerId')or item.Parent and item.Parent:GetAttribute('GardenOwnerId'))
  local owner=ownerId and Players:GetPlayerByUserId(ownerId)
  local character=owner and owner.Character
  local root=character and character:FindFirstChild('HumanoidRootPart');local humanoid=character and character:FindFirstChildOfClass('Humanoid')
  if not root or not humanoid or humanoid.Health<=0 then return refuse()end
- local parts,center=measure(child)
- if not center or #parts==0 or #parts>M.Tuning.FlightMaxParts or activeParts(self.Flights)+#parts>budget.FlightParts then self.Stats.Skipped+=1;return refuse()end
- if owner~=Players.LocalPlayer and not self:Near(center,r,budget)then self.Stats.Skipped+=1;return refuse()end
- local aim=root.Position+V(0,M.Tuning.AimUp,0)
+ origin=origin or(r and r.Origin)
+ -- what flies: the fruit's own parts, or a copy of it (a plant with motion of its own, or no model of that fruit here)
+ local source,copied=child,false
+ if source and not M.OwnParts(crop)then
+  local trait=source;source=self:Copy(crop,index,origin,trait);copied=source~=nil
+  if child.Parent then child:Destroy()end
+ elseif not source then source=self:Copy(crop,index,origin,nil);copied=source~=nil end
+ local function drop()if source and source~=child then source:Destroy()end end -- (a copy this module built and does not use; the caller's own model stays its business)
+ local parts,center,radius,color
+ if source then parts,center,radius,color=measure(source)end
+ if not center then
+  -- nothing to measure: where the fruit hung on the plant
+  local def=Catalog[crop.SeedId]
+  if not origin or not def then drop();return refuse()end
+  local ok,at=pcall(function()return origin:PointToWorldSpace(visuals().FruitPosition(crop,def,index,workspace:GetServerTimeNow()))end) -- (a hologram's fruit moves with the time)
+  if not ok or at.X~=at.X or at.Y~=at.Y or at.Z~=at.Z then drop();return refuse()end
+  center=at;radius=(def.FruitRadii[index]or .5);parts={}
+ end
+ if owner~=Players.LocalPlayer and not self:Near(center,r,budget)then drop();self.Stats.Skipped+=1;return refuse()end
+ local aim=root.Position+V(0,T.AimUp,0)
  local distance=(aim-center).Magnitude
  local seconds=M.FlightSeconds(distance)
- child.Parent=self.Folder
- local flight={R=r,Model=child,Start=os.clock(),Seconds=seconds,Center=center,Root=root,Humanoid=humanoid,CropId=cropId,Index=index,Tick=0,
-  Arc=math.clamp(M.Tuning.ArcPerStud*distance,M.Tuning.ArcMin,M.Tuning.ArcMax),Parts={}}
- for _,p in ipairs(parts)do
-  p.CanQuery=false;p.CanTouch=false;p.CanCollide=false
-  local cf=p.CFrame
-  table.insert(flight.Parts,{Part=p,Size=p.Size,Off=cf.Position-center,Rot=cf.Rotation})
+ local asBall=#parts==0 or #parts>T.FlightMaxParts or self.Real>=budget.Flights or activeParts(self.Flights)+#parts>budget.FlightParts
+ local flight={R=r,Start=os.clock(),Seconds=seconds,Center=center,Root=root,Humanoid=humanoid,CropId=cropId,Index=index,Tick=0,Key=key,
+  Arc=math.clamp(T.ArcPerStud*distance,T.ArcMin,T.ArcMax),Parts={},Shrink=M.Shrink(radius)}
+ if asBall then
+  if self.Tokens>=budget.Tokens then drop();self.Stats.Skipped+=1;return refuse()end
+  drop();if child and child.Parent then child:Destroy()end -- (the ball flies instead of the model: this module owns the model now)
+  local part=ball(self,center,radius,color)
+  flight.Model=part;flight.Ball=true;flight.Shrink=math.min(flight.Shrink,T.ShrinkTo)
+  table.insert(flight.Parts,{Part=part,Size=part.Size,Off=V(0,0,0),Rot=CFrame.new().Rotation})
+  self.Tokens+=1;self.Stats.Balls+=1
+ else
+  source.Parent=self.Folder;flight.Model=source
+  for _,p in ipairs(parts)do
+   p.CanQuery=false;p.CanTouch=false;p.CanCollide=false
+   local cf=p.CFrame
+   table.insert(flight.Parts,{Part=p,Size=p.Size,Off=cf.Position-center,Rot=cf.Rotation})
+  end
+  self.Real+=1;if copied then self.Stats.Copies+=1 else self.Stats.Own+=1 end
  end
+ self.Flying[key]=true
  table.insert(self.Flights,flight);self.Stats.Flights+=1
  Arrival.Flying(cropId,index,seconds)
  return true
 end
 local function endFlight(self,flight,landed)
  flight.Model:Destroy()
+ if flight.Ball then self.Tokens=math.max(0,self.Tokens-1)else self.Real=math.max(0,self.Real-1)end
+ self.Flying[flight.Key]=nil
  if landed then self.Stats.Landed+=1 else self.Stats.Dropped+=1 end
  Arrival.Land(flight.CropId,flight.Index)
 end
@@ -273,7 +366,7 @@ function D:StepFrame()
     local u=(clock-f.Start)/f.Seconds
     if u>=1 then table.remove(flights,i);endFlight(self,f,true)
     else
-     local e,arc,scale=M.Flight(u)
+     local e,arc,scale=M.Flight(u,f.Shrink)
      local aim=root.Position+V(0,T.AimUp,0)
      local at=f.Center+(aim-f.Center)*e+V(0,f.Arc*arc,0)
      f.Tick+=1;local sizes=f.Tick%2==1

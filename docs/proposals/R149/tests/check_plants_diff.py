@@ -13,6 +13,10 @@ Default (against the commit before the redesigns). Allowed to differ (everything
     writes a twin "<mode>~np" of every Ash Tomato mode without those parts / specs; a mode may differ only when its twin is identical (so exactly the
     patch lines differ), and the patch touch-up must show (the specs and the built plant differ).
   * the Prickly Pear (CactusSeed) is back to its current look (owner): identical in every mode, all 8 sampled crops, both designs.
+R151 (owner: no white shine dots on fruit; the Verity fruit has one face): the gloss / glint parts of nine plants are gone (the Watermelon, Snow Melon, Ember Pumpkin, Apple, Elderbloom,
+  Blueberry, Iceberry, Moon Melon and Verity). In the default comparison the Moon Melon and Verity (not redesigned by R149) may differ in the art / plant / harvest / proxy / growth
+  / coat lines ONLY by those parts: a mode may differ only when its "~ng" twin (dump_plants.luau: the same mode without the shine parts / specs) is identical, and the specs must
+  show the removal; their catalog, key, prompt lines are identical. In --fallback the same rule holds for all nine (against the R149 part-built fruit, which had the gloss).
 --fallback: a server whose fruit-mesh bake fails (or never runs) must show exactly the R149 part-built fruit: every plant identical in every mode,
   the Watermelon / Snow Melon / Ember Pumpkin included; only the Prickly Pear may differ (R149 had redesigned it, this checkout reverts it), and
   for it only the art / plant / harvest lines (catalog, key, prompts, body-only parts identical); and the Ash Tomato's flat ash patches (all four
@@ -27,6 +31,8 @@ if FALLBACK:
 else:
     REDESIGNED = {'SunflowerSeed', 'SnowdropSeed', 'AppleSeed', 'ElderbloomSeed', 'EmberBloomSeed', 'BluebellSeed', 'IceberrySeed'}
 MUST_MATCH = ('catalog', 'key', 'prompt', 'bodyonly', 'supportsnoidx')
+GLOSS_ALL = {'SunflowerSeed', 'SnowdropSeed', 'EmberBloomSeed', 'AppleSeed', 'ElderbloomSeed', 'BluebellSeed', 'IceberrySeed', 'MoonflowerSeed', 'VeritySeed'}
+GLOSS_RULE = GLOSS_ALL if FALLBACK else {'MoonflowerSeed', 'VeritySeed'}
 
 
 def load(path):
@@ -49,6 +55,7 @@ def kind(mode):
 base, new = load(args[0]), load(args[1])
 bad, same, redesigned_same, redesigned_diff, plants = [], 0, 0, 0, set()
 ash = {}
+gloss = {}
 if set(base) != set(new):
     only = sorted(set(base) ^ set(new))[:10]
     bad.append('different line keys: %s' % only)
@@ -63,6 +70,12 @@ for key in sorted(set(base) & set(new)):
                 redesigned_same += 1
         else:
             redesigned_diff += (b != n)
+    elif plant in GLOSS_RULE:
+        if crop == '-':
+            if b != n:
+                bad.append('%s catalog row changed' % plant)
+        else:
+            gloss.setdefault((plant, crop), {})[mode] = (b, n)
     elif plant == 'AshRoseSeed':
         if crop == '-':
             if b != n:
@@ -101,9 +114,36 @@ def patch_rules(crop, modes, label):
     return differ
 
 
+def gloss_rules():
+    """The nine plants that lost their gloss / glints (R151): every mode that differs must have an identical "~ng" twin (the same mode without the shine parts), the
+    catalog / key / prompt lines are identical, and the removal must show in the specs. Returns (lines that differ, plants compared)."""
+    differ, seen = 0, set()
+    for (plant, crop), modes in sorted(gloss.items()):
+        seen.add(plant)
+        for mode, (b, n) in sorted(modes.items()):
+            if mode.endswith('~ng'):
+                if b != n:
+                    bad.append('%s %s %s changed beyond the removed shine parts' % (plant, crop, mode))
+            elif mode == 'key' or kind(mode) == 'prompt':
+                if b != n:
+                    bad.append('%s %s %s changed (must not)' % (plant, crop, mode))
+            elif b != n:
+                twin = modes.get(mode + '~ng')
+                if twin is None or twin[0] != twin[1]:
+                    bad.append('%s %s %s changed beyond the removed shine parts' % (plant, crop, mode))
+                else:
+                    differ += 1
+        if 'specs' in modes and modes['specs'][0] == modes['specs'][1]:
+            bad.append('%s %s: the shine parts were not removed (the specs are identical)' % (plant, crop))
+    for must in sorted(GLOSS_RULE):
+        if must not in seen:
+            bad.append('%s was not compared' % must)
+    return differ, len(seen)
+
+
 if FALLBACK:
-    for must in ('SunflowerSeed', 'SnowdropSeed', 'EmberBloomSeed'):
-        if must not in plants:
+    for must in ('CactusSeed',):
+        if not any(p == must for (p, c, m) in base):
             bad.append('%s was not compared' % must)
     ash_patch_lines = 0
     for crop, modes in sorted(ash.items()):
@@ -113,7 +153,9 @@ if FALLBACK:
     if len(ash) < 8:
         bad.append('AshRoseSeed was not compared in full (%d crops)' % len(ash))
     print('Ash Tomato: %d crops, %d patch-dependent lines differ (the flat ash patches only), everything else identical' % (len(ash), ash_patch_lines))
-    print('%d plants (%d lines) identical to the R149 part-built base, the Watermelon / Snow Melon / Ember Pumpkin included' % (len(plants), same))
+    gdiff, gplants = gloss_rules()
+    print('%d plants (%d lines) identical to the R149 part-built base; the %d plants that lost their gloss / glints (Watermelon, Snow Melon, Ember Pumpkin, Apple, Elderbloom, Blueberry, Iceberry, Moon Melon, Verity): %d lines differ, every one ONLY by the removed shine parts (the ~ng twins are identical)'
+          % (len(plants), same, gplants, gdiff))
     print('Prickly Pear: %d catalog / key / prompt / reach / socket / body-only lines identical, %d art / plant / harvest lines differ (back to its current look)'
           % (redesigned_same, redesigned_diff))
     if redesigned_diff == 0:
@@ -136,7 +178,9 @@ else:
     pear = sum(1 for (p, c, m) in base if p == 'CactusSeed')
     if 'CactusSeed' not in plants or pear < 8 * 4:
         bad.append('the Prickly Pear was not compared in full (%d lines)' % pear)
+    gdiff, gplants = gloss_rules()
     print('%d plants (%d lines) identical to the base, the Prickly Pear (%d lines, 8 crops) included, none changed: %s...' % (len(plants), same, pear, ', '.join(sorted(plants)[:6])))
+    print('Moon Melon and Verity (R151): %d lines differ, every one ONLY by the removed shine parts (the ~ng twins are identical)' % gdiff)
     print('7 redesigned fruit: %d catalog / key / prompt / reach / socket / body-only lines identical, %d art / plant / harvest lines differ' % (redesigned_same, redesigned_diff))
     print('Ash Tomato: crops per design %s; a design-1 crop is identical to the base in every mode but its flat ash patches (%d patch-dependent lines differ)'
           % ({('design %d' % (int(k) + 1)): len(v) for k, v in sorted(designs.items()) if k is not None}, ash_patch_lines))

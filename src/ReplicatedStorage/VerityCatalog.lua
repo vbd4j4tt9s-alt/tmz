@@ -9,11 +9,11 @@ local C={Id='VeritySeed',Variant='VerityReliquary',PackStage=7,Stage=9,Biome='Ve
  -- Economy (owner default: a bit above the best King plant; one fruit at the per-fruit cap, quick regrow).
  Value=9e10,Seconds=14400,RegrowSeconds=1500,FruitCount=1,IndexFirst=1e11,IndexRepeat=2e10,HalfwayGems=10,CompletionGems=100,
  -- R148 (owner: "the exact same smile that Verity has" on the seed, the fruit and the plant): Verity's smiley, a black line
- -- drawing on a transparent background, as a Decal (front and back) on the yellow ball. A literal, equal to VerityConfig.Image
+ -- drawing on a transparent background, as ONE Decal (R151: one face, no longer front and back) on the yellow ball. A literal, equal to VerityConfig.Image
  -- (VerityConfig requires this module, so it cannot be required from here); the test keeps the two equal.
  FaceImageId='rbxassetid://102712963740896',
- Palette={Ball=Color3.fromRGB(255,213,46),Gloss=Color3.fromRGB(255,252,232),LeafOuter=Color3.fromRGB(68,160,72),LeafInner=Color3.fromRGB(96,188,88),
-  -- Warm accents around the gold ball and cream gloss (the pack, R149, is plain 255,255,0 and uses none of these).
+ Palette={Ball=Color3.fromRGB(255,213,46),LeafOuter=Color3.fromRGB(68,160,72),LeafInner=Color3.fromRGB(96,188,88),
+  -- Warm accents around the gold ball (the pack, R149, is plain 255,255,0 and uses none of these).
   Amber=Color3.fromRGB(255,170,30),Honey=Color3.fromRGB(255,236,150),Shade=Color3.fromRGB(112,70,6),White=Color3.fromRGB(255,255,248)},
 }
 function C.Is(id)return id==C.Id end

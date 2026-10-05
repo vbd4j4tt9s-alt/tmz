@@ -75,10 +75,14 @@ function Visuals.Specs(id,crop)
  local key=styleKey(id,crop);if sizedSpecs[key]then return sizedSpecs[key]end
  local source=cache[def.ArtBiome or def.Biome][id];if not source then return nil end
  local scale=def.BaseScale or 1;local result={}
+ -- R151: a plant's list may carry `Skipped` (a set of positions): shine patches that were removed from it. The parts after a removed one keep the
+ -- _ArtIndex they had (growth timing, the position-based tints, crown variants), so removing a patch changes nothing else about the plant.
+ local skipped=source.Skipped;local at=0
  -- Scale each species once; saved PlantScale/FruitScale still apply independently.
  -- Keep raw authored descriptors immutable and preserve all grouping/materials.
  for index,original in ipairs(source)do
-  local spec=table.clone(original);spec._ArtIndex=index;spec.z=table.clone(original.z);spec.c=table.clone(original.c)
+  at+=1;while skipped and skipped[at]do at+=1 end
+  local spec=table.clone(original);spec._ArtIndex=at;spec.z=table.clone(original.z);spec.c=table.clone(original.c)
   for axis=1,3 do spec.z[axis]*=scale;spec.c[axis]*=scale end
   if spec.va then spec.va={spec.va[1]*scale,spec.va[2]*scale,spec.va[3]*scale}end
   if spec.bp then spec.bp={spec.bp[1]*scale,spec.bp[2]*scale,spec.bp[3]*scale}end
@@ -89,7 +93,7 @@ function Visuals.Specs(id,crop)
   for index,spec in ipairs(result)do spec._ArtIndex=index end
  end
  -- R149: one baked mesh body per fruit for the FruitMeshes149 seeds (the part-built fruit if the bake failed)
- result=FruitMeshes.Art(id,SurfaceStyle.Apply(id,def,result,crop));return remember(sizedSpecs,key,result)
+ result=FruitMeshes.Art(id,SurfaceStyle.Apply(id,def,result,crop,skipped));return remember(sizedSpecs,key,result)
 end
 
 local leafRanges={SunflowerSeed={6,9},SunflowerBloomSeed={2,4},BananaSeed={2,4},PineappleSeed={2,4},MonsteraSeed={2,4},LanternFernSeed={3,5},TigerOrchidSeed={2,4},AloeSeed={8,12},DatePalmSeed={5,7},SunKingPalmSeed={5,7},SnowdropSeed={6,9},FrostFernSeed={3,5},WinterPineSeed={2,4},CrystalLilySeed={5,7},SilentFrostbellSeed={2,4},PolarStarbloomSeed={2,4},FirePepperSeed={2,4},EmberBloomSeed={6,9},AshRoseSeed={6,9},LavaLotusSeed={5,7},SupernovaBloomSeed={2,4},AmethystSeed={2,4},PrismOrchidSeed={2,4},MoonflowerSeed={6,9},DiamondVineSeed={2,4},HollowGeodeSeed={7,10},OrbitLotusSeed={5,7},SparkReedSeed={2,4},ThunderTulipSeed={2,4},VoltOrchidSeed={2,4},TempestLotusSeed={5,7},BlackoutBloomSeed={2,4},StaticGrassSeed={2,4}}
@@ -207,7 +211,7 @@ local function make(parent,name,size,cf,color,material,transparency,shape,solid)
  end
  part.CastShadow=false;part.Parent=parent;return part
 end
-function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,growthVariant)
+function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,growthVariant,crop)
  local size=V(table.unpack(s.z))*scale;local cf=origin*frame(s.c,scale)
  local shift=positionOverride and(positionOverride-cf.Position)or V(0,0,0)
  if positionOverride then cf=CF(positionOverride)*cf.Rotation end
@@ -215,7 +219,6 @@ function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,grow
  local alpha=s.t;mutation=Rules.Mutation(mutation)
  if mutation=='Gold'then color=Color3.fromRGB(232,172+(s.k[2]%22),57);mat=Enum.Material.Metal;alpha=0
  elseif mutation=='Diamond'then color=Color3.fromRGB(188+(s.k[1]%50),238,255);mat=Enum.Material.Glass;alpha=.18 end
- if s.decor and mutation~='None'then alpha=1 end -- R147: gloss patches are for the plain coat; Gold / Diamond shine themselves
  local first
  local function p(name,z,f,shape)
   local item
@@ -244,7 +247,7 @@ function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,grow
   if s._ArtIndex then item:SetAttribute('ArtSpecIndex',s._ArtIndex)end
   if mutation~='None'then item.Reflectance=mutation=='Gold'and .20 or .16 end
   if s.rf and mutation=='None'then item.Reflectance=s.rf end -- R147: authored shine (Verity)
-  if s.face then require(RS:WaitForChild('VerityPlantArt')).AddFace(item,s.face)end -- R148: Verity's face, front and back
+  if s.face then local Verity=require(RS:WaitForChild('VerityPlantArt'));Verity.AddFace(item,s.face,Verity.FaceSide(crop))end -- R148: Verity's face; R151: one face (front for items, toward the path for the planted fruit)
   first=first or item;return item
  end
  local function sculptedLeaf(z,at,name,distant)
@@ -479,7 +482,7 @@ function Visuals.Build(id,origin,crop,stage,now,onlyFruit,work)
   local grow=stage==4 and 1 or ({.32,.65,1})[stage]
   local variant=(s.s=='Blob'or s.s=='Shrub')and Visuals.CrownVariant(crop.Id,s._ArtIndex or 1)or nil
   if work then work.BeforePart(Visuals.PartCost(s))end
-  Visuals.Part(target,s,origin,visualScale*grow,false,mutation,override,variant);any=true
+  Visuals.Part(target,s,origin,visualScale*grow,false,mutation,override,variant,crop);any=true
  end
  if not any and stage<4 then
   make(model,'Growing stem',V(.22,stage*.65,.22)*scale,origin*CF(0,stage*.325*scale,0),Color3.fromRGB(81,135,75),Enum.Material.SmoothPlastic,0,'Cylinder',false)
@@ -515,7 +518,7 @@ function Visuals.Supports(id,origin,crop,stage,parent,work)
   if collision then collisionCost+=cost end
   local variant=(spec.s=='Blob'or spec.s=='Shrub')and Visuals.CrownVariant(crop.Id,spec._ArtIndex or 1)or nil
   if work then work.BeforePart(cost)end
-  local part=Visuals.Part(parent,spec,origin,scale,collision,crop.Mutation,nil,variant)
+  local part=Visuals.Part(parent,spec,origin,scale,collision,crop.Mutation,nil,variant,crop)
   if def.Mode=='whole'then part:SetAttribute('HarvestIndex',1);part.CanQuery=true end
  end
  if layout then parent:SetAttribute('LeafCount',layout.Count)end
@@ -550,7 +553,7 @@ function Visuals.FruitProxy(parent,id,crop,index,origin,work)
   used+=cost
   local pos=V(s.c[1],s.c[2],s.c[3])
   if work then work.BeforePart(cost)end
-  local part=Visuals.Part(parent,s,origin,trait.Scale,false,trait.Mutation,origin:PointToWorldSpace(socket*scale+(pos-authored)*trait.Scale))
+  local part=Visuals.Part(parent,s,origin,trait.Scale,false,trait.Mutation,origin:PointToWorldSpace(socket*scale+(pos-authored)*trait.Scale),nil,crop)
   part:SetAttribute('FruitProxy',true)
  end
  -- Tag every wedge half/canopy piece so close detail can hide the complete proxy.

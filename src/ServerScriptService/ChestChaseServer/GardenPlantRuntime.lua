@@ -6,7 +6,7 @@ local Visuals=require(RS:WaitForChild('PlantVisuals'))
 local Access=require(RS:WaitForChild('PlantAccessRules'))
 local Weather=require(RS.WeatherTraits);local FX=require(RS.ItemEffectAnchor)
 local Hologram=require(RS.HologramProjection)
-local Runtime={}
+local Runtime={HarvestLinger=.35} -- (R151: seconds a plant that a harvest removed stays, marked, so the clients can fly its fruit)
 local ViewState=require(RS:WaitForChild('GardenViewState'))
 local counters={CropChecks=0,CropRefreshes=0,UnchangedSkipped=0,DescriptionUpdates=0}
 function Runtime.PerformanceStats()return table.clone(counters)end
@@ -219,7 +219,19 @@ function Runtime.Install(Service)
     describe(model,record,record.Key..':'..stage..':'..fruitKey..':'..tostring(regrowing))
     remember(record,crop,ownerId,now,def,stage,regrowing)
    end
-   for id,record in pairs(info.Rendered)do if not seen[id]then record.Model:Destroy();info.Rendered[id]=nil end end
+   for id,record in pairs(info.Rendered)do if not seen[id]then
+    local model=record.Model;info.Rendered[id]=nil
+    local marks=self.PlayerData and self.PlayerData.HarvestRemovals;local mark=marks and marks[id]
+    if mark and model.Parent then
+     -- R151: the harvest removed this plant. It stays for a beat, marked, so every client's GardenVisuals sees WHICH fruit was picked and by whom before the model goes
+     -- (a destroyed instance replicates only its removal) and flies it to the harvester; nothing can be picked from it or walked into in that beat.
+     marks[id]=nil
+     model:SetAttribute('HarvestedIndex',mark.Index);model:SetAttribute('HarvestedBy',mark.By)
+     local prompts=model:FindFirstChild('FruitPrompts');if prompts then prompts:Destroy()end
+     for _,part in ipairs(model:GetDescendants())do if part:IsA('BasePart')then part.CanCollide=false;part.CanQuery=false end end
+     task.delay(Runtime.HarvestLinger,function()if model.Parent then model:Destroy()end end)
+    else model:Destroy()end
+   end end
    info.Part:SetAttribute('GardenOwnerId',ownerId);info.Part:SetAttribute('GardenPlantCount',#crops)
   end
   -- End garden refresh.

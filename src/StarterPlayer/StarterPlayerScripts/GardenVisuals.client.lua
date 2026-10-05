@@ -77,6 +77,9 @@ local function hideSupports(item,r,hidden)
   end
  end end
 end
+local function data(item)
+ return require(RS.GardenViewState).Read(item)
+end
 local clearEffects=Effects.Clear
 local function clear(item,r,keepWork)
  if r.Maw then Maw.Reset(r.Maw,r.Origin);r.Maw=nil end
@@ -88,9 +91,65 @@ local function clear(item,r,keepWork)
  if r.Visual then r.Visual:Destroy();r.Visual=nil end
  r.Rig=nil;r.Pose=nil;r.QueuePose=false;r.Swaying=false;r.Key=nil;r.FruitKey=nil;r.FxKey=nil;hideSupports(item,r,false)
 end
+-- Every part of the plant goes back to rest (a sway, a bounce) and the plant's rigs let go of their parts: done before anything is rebuilt or captured (show), and
+-- before a fruit is lifted out of a plant's own model by a flight that does not come from a rebuild (R151 harvestedAway), so no rig keeps posing a part in the air.
+local function letGo(r)
+ if r.Rig or r.GrowthSway then
+  if r.Rig then animationBatch:Pose(r.Rig,r.Origin)end
+  if r.GrowthSway then growthStates(r,placeGrowth,nil,animationBatch)end
+  animationBatch:Flush();r.Swaying=false;r.GrowthSway=false
+ end
+ Anim:Settle(r)
+ if r.Maw then Maw.Reset(r.Maw,r.Origin);r.Maw=nil end
+ if r.Bells then Bells.Reset(r.Bells,r.Origin);r.Bells=nil end
+ r.Rig=nil;r.Pose=nil;r.QueuePose=false
+end
+-- R151 (owner: "some plants and fruits dont float into the players inventory"): every picked fruit flies, by every path (see PlantGrowthFx for what flies).
+-- launch: one fruit (index) of this plant is picked. child = the plant's own model of it (nil when there is none here). r = nil keeps the flight alive when the
+-- plant goes away (a harvest that removes the plant); with r, a plant that streams out takes its flights with it. Returns true when it flies.
+local function launch(item,r,crop,index,child)
+ if child and Growth.StateOf(child)~=nil then return false end -- (a fruit that is still growing cannot be picked)
+ local anchor=item:FindFirstChild('CropAnchor')
+ local origin=(r and r.Origin)or(anchor and anchor.CFrame)
+ return Anim:Harvest(r,child,index,crop,item,origin)
+end
+-- The plant is removed WITH a harvest: a single-harvest plant (the plant is the fruit) and the last fruit of a plant that does not regrow. The server marks it
+-- (HarvestedBy / HarvestedIndex, set before the model goes, so every client sees it); the harvester's own client also knows it asked (HarvestArrival). The fruit
+-- flies from the plant's own model while it is still here. Runs once per plant (r.HarvestFlown).
+local function harvestedAway(item,r)
+ if r.HarvestFlown then return end
+ local cropId=item:GetAttribute('CropId');local crop=data(item);local def=crop and Catalog[crop.SeedId];if not def then return end
+ local marked=item:GetAttribute('HarvestedBy')~=nil;local markIndex=item:GetAttribute('HarvestedIndex')
+ for index=1,def.FruitCount do
+  if Arrival.Pending(cropId,index)or(marked and(markIndex==nil or markIndex==index))then
+   if not r.HarvestFlown then
+    r.HarvestFlown=true
+    -- the plant is leaving: its rigs and effects let go of the parts first (nothing may pose a fruit that is in the air)
+    letGo(r);resetPetals(r);clearEffects(r);r.FxKey=nil
+   end
+   local child=r.Visual and r.Visual:FindFirstChild(harvestNames[index]or'Harvest_'..index)
+   if not launch(item,nil,crop,index,child)then Arrival.Land(cropId,index);if child and child.Parent then child:Destroy()end end
+  end
+ end
+end
+-- The plant has no model of its own here (the detail planner has not given it one, or it is still being built) when the harvester picks a fruit: the
+-- fruit flies as a copy built where it hung.
+local function pickedWithoutModel(item,r)
+ if r.Visual or r.Build then return end
+ local cropId=item:GetAttribute('CropId');local list=Arrival.PendingIndexes(cropId);if #list==0 then return end
+ local crop=data(item);local def=crop and Catalog[crop.SeedId];if not def then return end
+ local now=workspace:GetServerTimeNow()
+ for _,index in ipairs(list)do
+  if index<=def.FruitCount and(Rules.IsPicked(crop,index)or not Rules.FruitReady(crop,index,now))then
+   if not launch(item,r,crop,index,nil)then Arrival.Land(cropId,index)end
+  end
+ end
+end
 local function track(item,initial)
  if not item:IsA('Model')or not item:GetAttribute('GardenPlantV141')or tracked[item]then return end
  local r={};tracked[item]=r;Planting:Add(item,initial==true)
+ r.Marks=item:GetAttributeChangedSignal('HarvestedBy'):Connect(function()harvestedAway(item,r)end)
+ r.Revision=item:GetAttributeChangedSignal('FruitRevision'):Connect(function()pickedWithoutModel(item,r)end)
  r.Connection=item.DescendantAdded:Connect(function(p)
   -- Parent replication can arrive before FruitProxy/HarvestIndex attributes.
   -- Coalesce the whole support update instead of relying on those attributes at this event.
@@ -101,11 +160,13 @@ end
 for _,item in ipairs(map:GetDescendants())do track(item,true)end
 map.DescendantAdded:Connect(function(item)track(item,false)end)
 map.DescendantRemoving:Connect(function(item)
- local r=tracked[item];if r then tracked[item]=nil;r.Connection:Disconnect();clear(item,r);Planting:Remove(item);Arrival.LandCrop(item:GetAttribute('CropId')) end
+ local r=tracked[item]
+ if r then
+  tracked[item]=nil;r.Connection:Disconnect();r.Marks:Disconnect();r.Revision:Disconnect()
+  harvestedAway(item,r) -- R151: before the plant's own model goes (the fruit of a harvest that removes the plant flies on without it)
+  clear(item,r);Planting:Remove(item);Arrival.LandCrop(item:GetAttribute('CropId')) -- (the holds of fruit that is in the air stay until it lands)
+ end
 end)
-local function data(item)
- return require(RS.GardenViewState).Read(item)
-end
 -- Species effects and rarity auras are local, distance limited and tied to ripe harvests.
 local function effectKey(item,r,stage)
  if not r.WantEffects or stage~=4 or(not item:GetAttribute('FruitReady')and not Trees.Has(item:GetAttribute('SeedId')))then return nil end
@@ -124,13 +185,17 @@ local function syncFruit(item,r,crop,def,stage,at,work)
   local ripe=Rules.FruitReady(crop,index,now);local cycle=Rules.FruitCycle(crop,index)
   if child and(not visible or child:GetAttribute('FruitCycle')~=cycle)then
    -- R149 (#8): a ripe fruit that was picked floats to the harvester (its own parts, no clone); one that was still growing, or hidden by the detail
-   -- planner, just goes. Either way the inventory is told when the fruit has arrived or will not.
+   -- planner, just goes. Either way the inventory is told when the fruit has arrived or will not. R151: every seed's fruit flies (PlantGrowthFx:Harvest:
+   -- its own parts, or a copy for a plant with motion of its own, or a ball when the budget is spent).
    local flew=false
    if Rules.IsPicked(crop,index)or child:GetAttribute('FruitCycle')~=cycle then
-    flew=Growth.StateOf(child)==nil and Anim:Harvest(r,child,index,crop,item)
+    flew=launch(item,r,crop,index,child)
     if not flew then Arrival.Land(crop.Id,index)end
    end
    if not flew then child:Destroy()end;child=nil
+  elseif not child and Arrival.Pending(crop.Id,index)and(Rules.IsPicked(crop,index)or not ripe)then
+   -- R151: the harvester picked a fruit this plant has no model of here (the detail planner left it out): it flies as a copy built where it hung.
+   if not launch(item,r,crop,index,nil)then Arrival.Land(crop.Id,index)end
   end
   if visible and not child then
    local source=table.clone(crop);source.ReadyAt=0
@@ -192,15 +257,7 @@ local function show(item,r,work)
   r.BuiltStage=stage;r.JustMatured=not fruitOnly and wasStage~=nil and wasStage<4 and stage==4
  end
  -- Every part goes back to rest (and a bounce ends) before anything is rebuilt or captured, so a rig is only ever captured from the rest pose.
- if r.Rig or r.GrowthSway then
-  if r.Rig then animationBatch:Pose(r.Rig,r.Origin)end
-  if r.GrowthSway then growthStates(r,placeGrowth,nil,animationBatch)end
-  animationBatch:Flush();r.Swaying=false;r.GrowthSway=false
- end
- Anim:Settle(r)
- if r.Maw then Maw.Reset(r.Maw,r.Origin);r.Maw=nil end
- if r.Bells then Bells.Reset(r.Bells,r.Origin);r.Bells=nil end
- r.Rig=nil;r.Pose=nil
+ letGo(r)
  r.Crop=crop;r.Def=def;r.Origin=anchor.CFrame;r.Growing=stage<4 or not item:GetAttribute('FruitReady')or item:GetAttribute('FruitGrowing')==true
  syncFruit(item,r,crop,def,stage,anchor.CFrame,work)
  r.JustMatured=false

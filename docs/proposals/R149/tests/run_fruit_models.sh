@@ -2,6 +2,9 @@
 # Usage: sh run_fruit_models.sh [scratch dir]   (needs /opt/luau/luau, python3 + numpy)
 # R149 fruit models on the Roblox mock with the REAL modules of this checkout, proved against the BASE commit (FRUIT_BASE, default 0b08836 = the branch commit just before the redesigns were merged; it was 38b1afa, the R149
 # proposal commit, in the agent worktree) and against the R149 part-built fruit (FALLBACK_BASE, default 3484f31: the branch before the baked meshes):
+#  R151 (owner: no white shine dots on fruit, one Verity face): the shine parts of nine plants are gone (Watermelon, Snow Melon, Ember Pumpkin, Apple, Elderbloom, Blueberry,
+#     Iceberry, Moon Melon, Verity), so PlantArtCrystal / Desert / Jungle (dead fallback lists), PlantSurfaceStyle (it keeps the position-based tints of the parts after a
+#     removed one), VerityPlantArt and PlantVisuals (`Skipped`, the face side) differ too; the diffs below allow those plants to differ ONLY by the removed parts ("~ng" twins).
 #  0. files: among the PLANT-ART files only (every other R149 change - growth style, keyboard, Verity, z-fighting ... - has its own
 #     suite; growth is drawn with the BASE's PlantGrowth on every side, run_growth.sh covers the new one), only the art / key modules below, PlantVisuals (routes the fruit-mesh keys), the bootstrap (bakes them), the new FruitMeshes149 and
 #     src/MANIFEST.tsv differ from the base under src/ (the Prickly Pear's ApprovedPlantArt6, Lantern Fern's ApprovedPlantArt2, PlantArtCrystal
@@ -30,19 +33,24 @@ src/MANIFEST.tsv
 src/ReplicatedStorage/ApprovedPlantArt.lua
 src/ReplicatedStorage/ApprovedPlantArt5.lua
 src/ReplicatedStorage/FruitMeshes149.lua
+src/ReplicatedStorage/PlantArtCrystal.lua
+src/ReplicatedStorage/PlantArtDesert.lua
 src/ReplicatedStorage/PlantArtForest.lua
+src/ReplicatedStorage/PlantArtJungle.lua
 src/ReplicatedStorage/PlantArtLava.lua
 src/ReplicatedStorage/PlantArtSnow.lua
+src/ReplicatedStorage/PlantSurfaceStyle.lua
 src/ReplicatedStorage/PlantVisuals.lua
 src/ReplicatedStorage/TreeReworkData2.lua
 src/ReplicatedStorage/TreeReworkData4.lua
+src/ReplicatedStorage/VerityPlantArt.lua
 src/ServerScriptService/ApprovedPlantsBootstrap.server.lua
 EOF
 # Only plant-art files are this suite's business (the manifest too, for FruitMeshes149's row); other R149 work has its own suites.
 ART='/(ApprovedPlantArt[0-9]*|PlantArt[A-Za-z]*|TreeReworkData[0-9]*|TreeReworkArt|RarityPlantArt|PlantVisuals|ApprovedPlantMeshes|ApprovedPlantIndex|ApprovedPlantsBootstrap\.server|FruitMeshes149|DesertPlantArt149|VerityPlantArt|MechArt|HologramForms|PlantSupportArt[A-Za-z]*|PlantSurfaceStyle)\.lua$|/MANIFEST\.tsv$'
 { git -C "$REPO" diff --name-only "$BASE" -- src;git -C "$REPO" ls-files --others --exclude-standard -- src; } | grep -E "$ART" | LC_ALL=C sort -u > "$OUT/changed.txt"
 echo "== files against $BASE"
-if diff "$OUT/allowed.txt" "$OUT/changed.txt" > "$OUT/files.diff";then echo "only the 7 art / key modules, PlantVisuals, the bootstrap, FruitMeshes149 (new) and the manifest differ under src/ (Prickly Pear, Lantern Fern, Amethyst Grape, ApprovedPlantMeshes, PlantGrowth, GardenVisuals, the R148 seeds, Verity: byte for byte)"
+if diff "$OUT/allowed.txt" "$OUT/changed.txt" > "$OUT/files.diff";then echo "only the art / key modules (R149's 7; R151's shine removal: PlantArtCrystal / Desert / Jungle, PlantSurfaceStyle, VerityPlantArt), PlantVisuals, the bootstrap, FruitMeshes149 (new) and the manifest differ under src/ (Prickly Pear, Lantern Fern, Amethyst Grape, ApprovedPlantMeshes, PlantGrowth, GardenVisuals, the R148 seeds: byte for byte)"
 else echo "unexpected src/ changes:";cat "$OUT/files.diff";stop;fi
 grep -q 'ReplicatedStorage/FruitMeshes149	ReplicatedStorage/FruitMeshes149.lua' "$REPO/src/MANIFEST.tsv" || { echo "FruitMeshes149 is not in src/MANIFEST.tsv";stop; }
 # --- 1. worlds: the base commit, the R149 part-built commit and this checkout ---------------------------------------------------------------------

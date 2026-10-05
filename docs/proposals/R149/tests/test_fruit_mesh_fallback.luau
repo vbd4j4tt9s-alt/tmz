@@ -22,9 +22,9 @@ local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)
 local Meshes=W.module('ApprovedPlantMeshes')
 Meshes.Get=function(key)return {Clone=function()local p=R.new('Part');p:SetAttribute('ApprovedMesh',key);return p end}end
 Meshes.Status=function()return 'Ready'end
-local IDS={SunflowerSeed={Key='Watermelon149',Body='Melon body',Parts=12,Mesh=5,Tone={108,180,76},First='Melon rind'},
- SnowdropSeed={Key='SnowMelon149',Body='Snow melon body',Parts=13,Mesh=5,Tone={190,232,234},First='Snow melon rind'},
- EmberBloomSeed={Key='EmberPumpkin149',Body='Pumpkin body',Parts=25,Mesh=5,Tone={232,108,28},First='Pumpkin heart'}}
+local IDS={SunflowerSeed={Key='Watermelon149',Body='Melon body',Parts=11,Mesh=4,Tone={108,180,76},First='Melon rind'},
+ SnowdropSeed={Key='SnowMelon149',Body='Snow melon body',Parts=12,Mesh=4,Tone={190,232,234},First='Snow melon rind'},
+ EmberBloomSeed={Key='EmberPumpkin149',Body='Pumpkin body',Parts=24,Mesh=4,Tone={232,108,28},First='Pumpkin heart'}}
 local ORDER={'SunflowerSeed','SnowdropSeed','EmberBloomSeed'}
 local Harvest,Visuals,FM,Catalog
 local function load()Catalog=W.module('PlantCatalog');Visuals=W.module('PlantVisuals');Harvest=W.module('HarvestPresentation');FM=W.module('FruitMeshes149')end
@@ -88,7 +88,7 @@ elseif SCENARIO=='server'then
  if ok then
   local body;for _,p in ipairs(model:GetDescendants())do if p.Name=='Melon body'then body=p end end
   local n,mesh=visible(model)
-  check(body and body.ClassName=='Part'and body:FindFirstChildOfClass('SpecialMesh')~=nil and mesh==0 and n==5,'server: that one build draws the body as a plain ellipsoid ('..n..' parts)')
+  check(body and body.ClassName=='Part'and body:FindFirstChildOfClass('SpecialMesh')~=nil and mesh==0 and n==4,'server: that one build draws the body as a plain ellipsoid ('..n..' parts)')
   check(body and math.floor(body.Color.R*255+.5)==108 and math.floor(body.Color.G*255+.5)==180 and math.floor(body.Color.B*255+.5)==76,'server: in the Watermelon\'s rind colour')
  end
  check((W.warns or 0)==1,'server: logged once ('..tostring(W.warns)..')')
@@ -133,7 +133,7 @@ else
  local log=Mock.install(W)
  W.Run.IsServer=function()return true end;load()
  local n,mesh=visible(hotbar('EmberBloomSeed'))
- check(n==5 and mesh==1 and #log.Contents==6 and(W.warns or 0)==0,'server ok: the first build (e.g. the market at server start) bakes every key on demand and gets its mesh ('..#log.Contents..' bakes)')
+ check(n==4 and mesh==1 and #log.Contents==6 and(W.warns or 0)==0,'server ok: the first build (e.g. the market at server start) bakes every key on demand and gets its mesh ('..#log.Contents..' bakes)')
  check(FM.Prepare()==true and #log.Contents==6,'server ok: the bootstrap\'s Prepare afterwards bakes nothing more')
  for _,id in ipairs(ORDER)do meshBuilt(id,'server ok')end
  W.Run.IsServer=function()return false end

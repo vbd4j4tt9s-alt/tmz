@@ -1,13 +1,16 @@
 --!nocheck
 -- R149 growth style: #7 (ripe bounce + glints) and #8 (the picked fruit floats into the harvesting player; owner's change to the harvest pop) on the Roblox
 -- mock with the REAL PlantGrowthFx, HarvestArrival, PlantAnimationBatch, PlantGrowth and PlantCatalog:
---  1. the numbers: budgets per quality tier (everything off on the lowest tier, with reduced motion and with the Studio effects switch off), the bounce
---     curve (+10 %, back, settle at 0.8 s), the flight curve (eased, an arc, shrinks to 55 %), the flight time (0.4 - 0.7 s);
+--  1. the numbers: budgets per quality tier (the ripe moment is off on the lowest tier; R151: the harvest flight of the player's own fruit is not; everything is
+--     off with reduced motion and with the Studio effects switch off), the bounce curve (+10 %, back, settle at 0.8 s), the flight curve (eased, an arc, shrinks to
+--     55 %, a big fruit to about 1.3 studs), the flight time (0.4 - 0.7 s);
 --  2. ripe cues: once per ripening, at most 6 per 2 s over the whole garden, a gap between plants, the tier's number of bouncing fruit, at most 4 shared
 --     emitters, near-and-on-screen plants only, the excluded plants never; the bounce restores sizes and poses exactly (also when settled early);
 --  3. harvest flights: the fruit's OWN parts fly (no clone) to the harvester's character along an arc, follow it when it moves, shrink, vanish on arrival and
---     tell HarvestArrival; other players see the same flight to the garden owner; cap of 8 at once (parts too), cleanup when the harvester dies / leaves, when
---     the plant streams out, on Destroy: nothing is left in the world; no connection per fruit; Gold / Diamond / giant fruit keep their look.
+--     tell HarvestArrival; other players see the same flight to the garden owner; cap of 8 at once (parts too; R151: the rest fly as balls, up to 16, then
+--     vanish), cleanup when the harvester dies / leaves, when the plant streams out, on Destroy: nothing is left in the world; no connection per fruit; Gold /
+--     Diamond / giant fruit keep their look. R151: a fruit of up to 200 parts flies as it is, a bigger one as a ball; a plant with motion of its own (Lantern Fern,
+--     Amethyst Grape, ...) flies as a detached copy; (the whole-garden test is test_fruit_flight.luau: every seed, every path).
 local C=require('./growth_common');local W,R,V3,CF=C.W,C.R,C.V3,C.CF;local check,near=C.check,C.near
 local Catalog=C.Catalog
 local FxM=W.module('PlantGrowthFx');local Arrival=W.module('HarvestArrival');local Batch=W.module('PlantAnimationBatch')
@@ -51,7 +54,8 @@ local function count(root)return #root:GetDescendants()end
 do
  local B=FxM.Budget
  for tier=1,3 do check(B(tier,true,false)==FxM.Off and B(tier,false,true)==FxM.Off,'tier '..tier..': reduced motion and the Studio effects switch turn everything off')end
- check(B(1,false,false).Pulses==0 and B(1,false,false).Sparks==0 and B(1,false,false).Flights==0 and B(1,false,false).Range==0,'the lowest quality tier: no bounce, no glints, no flight')
+ check(B(1,false,false).Pulses==0 and B(1,false,false).Sparks==0 and B(1,false,false).Range==0,'the lowest quality tier: no bounce, no glints, nothing for observers')
+ check(B(1,false,false).Flights>=1 and B(1,false,false).Flights<=2 and B(1,false,false).Tokens>=1,'... but your own picked fruit still flies there (R151), in a small budget')
  check(B(2,false,false).Pulses>=1 and B(2,false,false).Flights>=1 and B(2,false,false).Flights<=8,'tier 2 (phones): reduced budgets')
  check(B(3,false,false).Pulses<=4 and B(3,false,false).Flights<=8 and B(3,false,false).Sparks<=4,'tier 3: at most 4 fruit bouncing, 8 flying, a few glints')
  check(B(2,false,false).Pulses<=B(3,false,false).Pulses and B(2,false,false).Flights<=B(3,false,false).Flights,'a phone never gets more than the best tier')
@@ -65,14 +69,17 @@ do
  check(crossings<=3,'Bounce: one bounce (+, -, +), never a loop ('..crossings..' phases)')
  -- the flight
  local e0,a0,s0=FxM.Flight(0);local e1,a1,s1=FxM.Flight(1);local em,am,sm=FxM.Flight(.5)
+ check(near(select(3,FxM.Flight(1,.2)),.2,1e-9)and FxM.Shrink(.5)==FxM.Tuning.ShrinkTo and near(FxM.Shrink(13),FxM.Tuning.EndRadius/13,1e-9)and FxM.Shrink(1e6)>=.04,'Flight(u,shrink): a small fruit ends at '..FxM.Tuning.ShrinkTo..', a big one (Verity\'s 13-stud ball) at about '..FxM.Tuning.EndRadius..' studs')
  check(e0==0 and e1==1 and a0==0 and near(a1,0,1e-9)and near(am,1,1e-9)and s0==1 and near(s1,FxM.Tuning.ShrinkTo,1e-9),'Flight: from 0 to 1, an arc that peaks in the middle, from full size to '..FxM.Tuning.ShrinkTo)
  local mono=true;local pe,ps=0,1;for i=0,100 do local e,_,s=FxM.Flight(i/100);if e<pe-1e-12 or s>ps+1e-12 then mono=false end;pe,ps=e,s end
  check(mono and em>.4 and em<.6,'Flight: the way grows and the size shrinks steadily, eased in and out')
  check(FxM.FlightSeconds(0)==.4 and FxM.FlightSeconds(5)>=.4 and FxM.FlightSeconds(5)<=.7 and FxM.FlightSeconds(500)==.7,'Flight takes 0.4 - 0.7 s (longer for a longer way)')
  check(FxM.Tuning.CueMax==6 and FxM.Tuning.CueWindow==2 and FxM.Tuning.EmitterCount==4,'limits: 6 cues per 2 s, 4 shared emitters')
- for _,id in ipairs({'LanternFernSeed','AmethystSeed','StarfruitSeed','ObsidianMawSeed','SilentFrostbellSeed','OrbitLotusSeed','SupernovaBloomSeed'})do check(not FxM.Eligible(C.crop(id)),id..' is never touched')end
+ for _,id in ipairs({'LanternFernSeed','AmethystSeed','StarfruitSeed','ObsidianMawSeed','SilentFrostbellSeed','OrbitLotusSeed','SupernovaBloomSeed'})do check(not FxM.Eligible(C.crop(id))and not FxM.OwnParts(C.crop(id))and FxM.CanFly(C.crop(id)),id..': its own parts are never moved (no ripe bounce, its picked fruit flies as a copy), but its fruit flies (R151)')end
  local mechId,verityId;for id,d in pairs(Catalog)do if type(d)=='table'then if d.Mech and not mechId then mechId=id end;if d.Verity and not verityId then verityId=id end end end
- check((not mechId or not FxM.Eligible(C.crop(mechId)))and(not verityId or not FxM.Eligible(C.crop(verityId))),'Mech holograms and Verity are never touched')
+ check((not mechId or(not FxM.Eligible(C.crop(mechId))and FxM.CanFly(C.crop(mechId))))and(not verityId or(not FxM.Eligible(C.crop(verityId))and FxM.CanFly(C.crop(verityId)))),'Mech holograms and Verity: their own parts are never moved, their picked fruit flies as a copy (R151)')
+ local everyone=true;for id,d in pairs(Catalog)do if type(d)=='table'and d.Seconds and not FxM.CanFly(C.crop(id))then everyone=false end end
+ check(everyone and not FxM.CanFly(nil)and not FxM.CanFly({SeedId='NoSuchSeed'}),'R151: CanFly is true for every seed of the catalog (and only for them)')
  check(FxM.Eligible(C.crop('AppleSeed'))and FxM.Eligible(C.crop('AshRoseSeed'))and FxM.Eligible(C.crop('SunflowerSeed')),'the Apple, the Ash Tomato and the Watermelon take part')
 end
 -- 2. ripe cues -------------------------------------------------------------------------------------------------------------------------------------
@@ -188,14 +195,29 @@ do
  check(#Run.Heartbeat._c==heartbeats,'no connection per fruit (the module has none; GardenVisuals steps it once a frame)')
  myRoot.CFrame=CF(0,3,0)
  -- the cap
- local accepted,refused=0,0;local flyers={}
- for i=1,12 do
+ local accepted,refused,real,balls=0,0,0,0;local flyers={}
+ for i=1,30 do
   local rr,cc,it=plant('AppleSeed',V3(i,0,4));local mm=fruit(V3(i,5,4),6);Arrival.Expect(cc.Id,1)
-  if fx:Harvest(rr,mm,1,cc,it)then accepted+=1;flyers[#flyers+1]=mm else refused+=1;check(mm.Parent==W.workspace and not Arrival.Pending(cc.Id,1),'a refused fruit is left to the caller and the inventory is told at once');mm:Destroy()end
+  if fx:Harvest(rr,mm,1,cc,it)then accepted+=1;if mm.Parent==fx.Folder then real+=1;flyers[#flyers+1]=mm else balls+=1;check(mm.Parent==nil,'a fruit that flies as a ball is not left on the plant (this module owns its model)')end
+  else refused+=1;check(mm.Parent==W.workspace and not Arrival.Pending(cc.Id,1),'a refused fruit is left to the caller and the inventory is told at once');mm:Destroy()end
  end
- check(accepted==8 and refused==4,('at most 8 fruit fly at once: %d fly, %d just vanish'):format(accepted,refused))
- -- a fruit of too many parts, and the part budget
- do local rr,cc,it=plant('AppleSeed',V3(0,0,4));local big=fruit(V3(0,5,4),60);Arrival.Expect(cc.Id,1);check(not fx:Harvest(rr,big,1,cc,it)and big.Parent~=fx.Folder,'a fruit of 60 parts just vanishes');big:Destroy()end
+ check(real==8 and balls==16 and refused==6 and fx.Real==8 and fx.Tokens==16,('at most 8 fruit fly as they are, the next 16 as balls, the rest just vanish and the inventory is told: %d + %d, %d vanish'):format(real,balls,refused))
+ -- (R151) a fruit of many parts flies as it is up to FlightMaxParts, a bigger one as a ball; the part budget decides too
+ do
+  fx:Destroy();fx=newFx();R.advance(5);flyers={}
+  local rr,cc,it=plant('AppleSeed',V3(0,0,4));local big=fruit(V3(0,5,4),60);Arrival.Expect(cc.Id,1);check(fx:Harvest(rr,big,1,cc,it)and big.Parent==fx.Folder and not fx.Flights[1].Ball,'a fruit of 60 parts flies as it is (R149 let it vanish)')
+  fx:Destroy();fx=newFx();R.advance(5)
+  local r2,c2,i2=plant('AppleSeed',V3(0,0,4));local huge=fruit(V3(0,5,4),FxM.Tuning.FlightMaxParts+1);Arrival.Expect(c2.Id,1)
+  check(fx:Harvest(r2,huge,1,c2,i2)and huge.Parent==nil and fx.Flights[1].Ball==true and #fx.Flights[1].Parts==1,'a fruit of more than '..FxM.Tuning.FlightMaxParts..' parts flies as ONE ball (its model is gone, nothing vanishes)')
+  fx:Destroy();fx=newFx();R.advance(5)
+  local sum=0;local flyers2={};local each=FxM.Budget(3,false,false).FlightParts/4
+  for i=1,5 do local rr3,cc3,it3=plant('AppleSeed',V3(i,0,4));local m3=fruit(V3(i,5,4),each);Arrival.Expect(cc3.Id,1);fx:Harvest(rr3,m3,1,cc3,it3);flyers2[#flyers2+1]=m3 end
+  local flyingAsModels=0;for _,m3 in ipairs(flyers2)do if m3.Parent==fx.Folder then flyingAsModels+=1;sum+=each end end
+  check(sum<=FxM.Budget(3,false,false).FlightParts and #fx.Flights==5 and flyingAsModels==4,('the part budget (%d) decides: of five %d-part fruit %d fly as models (%d parts), the fifth as a ball'):format(FxM.Budget(3,false,false).FlightParts,each,flyingAsModels,sum))
+  fx:Destroy();fx=newFx();R.advance(5);flyers={}
+  for i=1,3 do local r4,c4,i4=plant('AppleSeed',V3(i,0,4));local m4=fruit(V3(i,5,4),6);Arrival.Expect(c4.Id,1);if fx:Harvest(r4,m4,1,c4,i4)then flyers[#flyers+1]=m4 end end
+  check(#flyers==3 and #fx.Flights==3,'(three fruit in the air for the next checks)')
+ end
  -- cleanup: the harvester dies
  myHum.Health=0;R.advance(1/60);fx:StepFrame()
  check(#fx.Flights==0,'the harvester died: every flight is dropped')
@@ -223,19 +245,30 @@ do
  local rs,cs,is=plant('AppleSeed',V3(5,0,5));local ms=fruit(V3(5,5,5),5);Arrival.Expect(cs.Id,1);fx:Harvest(rs,ms,1,cs,is)
  fx:Clear(rs,true);check(#fx.Flights==1 and ms.Parent==fx.Folder,'a rebuild of the plant leaves a fruit in the air')
  fx:Clear(rs);check(#fx.Flights==0 and ms.Parent==nil and not Arrival.Pending(cs.Id,1),'a plant that streams out takes its flights with it, and the inventory is told')
- -- frozen plants never fly; modes
+ -- (R151) the plants whose own parts are never moved (Lantern Fern, Amethyst Grape, rigs, holograms, Verity): their picked fruit flies as a COPY built where it hung;
+ -- their own model is destroyed at once, as it always was (nothing of the plant's motion systems ever touches the flying parts)
  for _,id in ipairs({'LanternFernSeed','AmethystSeed'})do
-  local rf2,cf2,if2=plant(id,V3(0,0,4));local mf2=fruit(V3(0,5,4),5);Arrival.Expect(cf2.Id,1)
-  check(not fx:Harvest(rf2,mf2,1,cf2,if2)and not Arrival.Pending(cf2.Id,1),id..': the fruit vanishes as today and the inventory is not held');mf2:Destroy()
+  local rf2,cf2,if2=plant(id,V3(0,0,4));local mf2=fruit(V3(0,5,4),5);Arrival.Expect(cf2.Id,1);local before2=#fx.Flights
+  check(fx:Harvest(rf2,mf2,1,cf2,if2)==true and #fx.Flights==before2+1 and mf2.Parent==nil and Arrival.Pending(cf2.Id,1),id..': the picked fruit flies (a copy; its own model is destroyed here, not moved)')
+  local fl=fx.Flights[#fx.Flights];check(fl.Model.Parent==fx.Folder and fl.Model~=mf2 and #fl.Parts>=2 and not fl.Ball,id..': the flying copy is a fruit model of '..#fl.Parts..' parts in the effects folder')
+  check(fx.Stats.Copies>=1,'... counted as a copy')
  end
  Gui.ReducedMotionEnabled=true;R.advance(.3)
  local rr3,cc3,it3=plant('AppleSeed',V3(0,0,4));local m3=fruit(V3(0,5,4),5);Arrival.Expect(cc3.Id,1)
  check(not fx:Harvest(rr3,m3,1,cc3,it3)and not Arrival.Pending(cc3.Id,1),'reduced motion: the fruit vanishes as today and the inventory is told at once');m3:Destroy()
  Gui.ReducedMotionEnabled=false;R.advance(.3)
- fx:SetMode('low');R.advance(.3)
- local rr4,cc4,it4=plant('AppleSeed',V3(0,0,4));local m4=fruit(V3(0,5,4),5);Arrival.Expect(cc4.Id,1)
- check(not fx:Harvest(rr4,m4,1,cc4,it4)and not Arrival.Pending(cc4.Id,1),'low quality: the fruit vanishes as today');m4:Destroy()
- fx:SetMode('normal');R.advance(.3)
+ fx:Destroy()
+ do
+  local lowFx=newFx();lowFx:SetMode('low');R.advance(5)
+  local rr4,cc4,it4=plant('AppleSeed',V3(0,0,4));local m4=fruit(V3(0,5,4),5);Arrival.Expect(cc4.Id,1)
+  check(lowFx:Harvest(rr4,m4,1,cc4,it4)==true and Arrival.Pending(cc4.Id,1)and #lowFx.Flights==1,'low quality: your own fruit still flies (R149 let it vanish)')
+  local ro4,co4,io4=plant('AppleSeed',V3(18,0,2));io4:SetAttribute('GardenOwnerId',6);local mo4=fruit(V3(18,5,2),5)
+  check(lowFx:Harvest(ro4,mo4,1,co4,io4)==false,'... but another player\'s fruit (observers get no Range on the lowest tier) just goes');mo4:Destroy()
+  for i=1,3 do local rx,cx,ix=plant('AppleSeed',V3(i,0,4));local mx=fruit(V3(i,5,4),5);Arrival.Expect(cx.Id,1);lowFx:Harvest(rx,mx,1,cx,ix);if mx.Parent~=nil and mx.Parent~=lowFx.Folder then mx:Destroy()end end
+  check(lowFx.Real<=FxM.Budget(1,false,false).Flights and lowFx.Tokens<=FxM.Budget(1,false,false).Tokens,'... inside its own small budget ('..lowFx.Real..' models, '..lowFx.Tokens..' balls)')
+  lowFx:Destroy()
+ end
+ fx=newFx();R.advance(5)
  -- no leak: Destroy with fruit in the air
  local rl,cl,il=plant('AppleSeed',V3(4,0,4));local ml=fruit(V3(4,5,4),5);Arrival.Expect(cl.Id,1);fx:Harvest(rl,ml,1,cl,il)
  fx:Destroy();check(ml.Parent==nil and not Arrival.Pending(cl.Id,1) and W.workspace:FindFirstChild('LocalPlantGrowthFx')==nil,'Destroy with a fruit in the air: gone, inventory told, folder removed')
@@ -265,6 +298,11 @@ do
  Arrival.Expect('u4',1);Arrival.Expect('u4',2);Arrival.Expect('u5',1)
  Arrival.LandCrop('u4');check(not Arrival.Pending('u4',1)and not Arrival.Pending('u4',2)and Arrival.Pending('u5',1),'LandCrop releases every slot of that plant and no other')
  Arrival.Land('u5',1)
+ -- (R151) a harvest that removes the plant starts its flights first: LandCrop must not cancel a fruit that is in the air; PendingIndexes lists a crop's open holds
+ Arrival.Expect('w1',1);Arrival.Expect('w1',2);Arrival.Expect('w1',4);Arrival.Expect('w2',3);Arrival.Flying('w1',2,.5)
+ check(table.concat(Arrival.PendingIndexes('w1'),',')=='1,2,4' and table.concat(Arrival.PendingIndexes('w2'),',')=='3' and #Arrival.PendingIndexes('nobody')==0,'PendingIndexes: the open holds of one crop, sorted, and no other crop\'s')
+ Arrival.LandCrop('w1');check(not Arrival.Pending('w1',1)and not Arrival.Pending('w1',4)and Arrival.Pending('w1',2)and Arrival.Pending('w2',3),'LandCrop leaves a hold whose fruit is in the air (R151: the plant going away does not cancel its flight)')
+ Arrival.Land('w1',2);Arrival.Land('w2',3)
  -- the deadline: a hold nobody releases ends by itself (1.5 s), a flight extends it to its own length + a little
  log={};Arrival.Expect('late',1);R.advance(1.2);check(Arrival.Pending('late',1) and #log==0,'an unreleased hold is still there at 1.2 s')
  R.advance(.5);check(not Arrival.Pending('late',1) and #log==1 and log[1]=='late:1:cue','... and ends at its deadline (1.5 s), with a cue')

@@ -114,11 +114,11 @@ mutate "the sway budget is not respected" $G "windModels<6 and windParts+entry.C
       r.Pose=r.Origin*Growth.Sway(seed" test_growth_client
 mutate "reduced motion does not stop the growing sway" $G "if not reducedNow and r.Mode=='normal'and not r.FruitOnly and Growth.Sways" "if r.Mode=='normal'and not r.FruitOnly and Growth.Sways" test_growth_client
 mutate "no limit on ripe cues" $F "CueGap=.18,CueWindow=2,CueMax=6," "CueGap=0,CueWindow=2,CueMax=600," test_growth_fx
-mutate "no cap on flying fruit" $F "{Pulses=4,PulseParts=120,Sparks=4,Flights=8,FlightParts=200,Range=48}" "{Pulses=4,PulseParts=120,Sparks=4,Flights=80,FlightParts=2000,Range=48}" test_growth_fx
+mutate "no cap on flying fruit" $F "{Pulses=4,PulseParts=120,Sparks=4,Flights=8,FlightParts=800,Tokens=16,Range=48}" "{Pulses=4,PulseParts=120,Sparks=4,Flights=80,FlightParts=8000,Tokens=160,Range=48}" test_growth_fx
 mutate "reduced motion does not stop the effects" $F "if reduced or off then return M.Off end" "if false then return M.Off end" test_growth_fx test_growth_client
-mutate "a refused flight leaves the inventory held" $F "local function refuse()Arrival.Land(cropId,index);return false end" "local function refuse()return false end" test_growth_fx
+mutate "a refused flight leaves the inventory held" $F "local function refuse()Arrival.Land(cropId,index);self.Stats.Refused+=1;return false end" "local function refuse()self.Stats.Refused+=1;return false end" test_growth_fx
 mutate "the flight ignores a harvester that died" $F "if not f.Model.Parent or not root.Parent or f.Humanoid.Health<=0 then" "if not f.Model.Parent or not root.Parent then" test_growth_fx test_growth_client
-mutate "the fruit does not shrink on the way" $F "1-(1-M.Tuning.ShrinkTo)*smooth(u)" "1" test_growth_fx
+mutate "the fruit does not shrink on the way" $F "1-(1-(shrink or M.Tuning.ShrinkTo))*smooth(u)" "1" test_growth_fx
 mutate "the inventory shows the item before the fruit arrives" $H "if tool:IsA('Tool')and(seen[tool]or not Arrival.Holds(tool))then" "if tool:IsA('Tool')then" test_growth_hotbar
 mutate "a hold hides older fruit of the same plant and slot (they lose their hotbar slots)" $H "if tool:IsA('Tool')and(seen[tool]or not Arrival.Holds(tool))then" "if tool:IsA('Tool')and not Arrival.Holds(tool)then" test_growth_hotbar
 mutate "the arrival flash lands on any tool of that plant and slot" $H "local arrival=isNew and released[Arrival.ToolKey(tool)or'']" "local arrival=released[Arrival.ToolKey(tool)or'']" test_growth_hotbar
@@ -133,7 +133,7 @@ function Visuals.GrowingFruitSupports" test_growth_look
 mutate "a distant garden runs the leaf attachment pass" $D "crop.SeedId,crop,origin,PLAIN)" "crop.SeedId,crop,origin)" test_growth_look
 mutate "the near-detail build never yields in the leaf attachment pass" $P "if work and tests%LINK_YIELD==0 then work.BeforePart(1)end" "if false then work.BeforePart(1)end" test_growth_look
 mutate "BuildGrowing does not hand its work budget down" $V "origin,work and{Work=work}or nil)" "origin,nil)" test_growth_look
-mutate "the pumpkin grows tinted again (no neutral twin)" $FM "Tone={232,108,28},GlossOut=1.1,UnripeNeutral=true}" "Tone={232,108,28},GlossOut=1.1}" test_growth_unripe
+mutate "the pumpkin grows tinted again (no neutral twin)" $FM "Tone={232,108,28},UnripeNeutral=true}" "Tone={232,108,28}}" test_growth_unripe
 mutate "the baked pumpkin body shows while it is unripe" $P "elseif r.Held and not ripe then tr=1 end" "elseif false then tr=1 end" test_growth_unripe
 mutate "the twin stays visible at the ripe moment" $P "if r.Twin then if ripe then tr=1 end" "if r.Twin then if false then tr=1 end" test_growth_unripe
 mutate "EndGrowth leaves the twins in the plant" $V " if state.Twins then for _,p in ipairs(state.Twins)do p:Destroy()end end" " local _=state.Twins" test_growth_unripe

@@ -86,14 +86,12 @@ function Visuals.Seed(seed,index,origin,parent,scale,weldRoot,mutation)
   game:GetService('CollectionService'):AddTag(m,Rules.SeedMotion.Tag);return m
  end
  if require(script.Parent.VerityCatalog).Is(seed.Id)then
-  -- R147: the Verity seed is one small glossy ball (VerityPlantArt); coat, King sparkle and motion tag as for every seed.
+  -- R147: the Verity seed is one small ball with Verity's face (VerityPlantArt); coat, King sparkle and motion tag as for every seed.
   local Cat=require(script.Parent.VerityCatalog);scale=scale or 1
   local m=require(script.Parent.VerityPlantArt).BuildSeed(origin,scale,weldRoot)
   m:SetAttribute('SeedId',seed.Id);m:SetAttribute('SeedArtVersion',147);m:SetAttribute('Rarity',Cat.Rarity)
   m:SetAttribute('SeedVisualScale',scale);m:SetAttribute('SeedBiome',Cat.Biome);m.ModelStreamingMode=Enum.ModelStreamingMode.Atomic
   require(script.Parent.PlantVisuals).Coat(m,mutation)
-  -- Gold / Diamond shine themselves: the gloss and glint (like the plant's gloss patches) give way to the coat.
-  if m:GetAttribute('Mutation')~='None'then for _,p in ipairs(m:GetChildren())do if p:GetAttribute('VerityDecor')then p.Transparency=1 end end end
   local style=Rules.Rarities[Cat.Rarity]
   local glow=Instance.new("ParticleEmitter");glow.Name="SeedRaritySparkles"
   glow.Texture="rbxasset://textures/particles/sparkles_main.dds";glow.Color=ColorSequence.new(style.Color)

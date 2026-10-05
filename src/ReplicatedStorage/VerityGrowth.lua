@@ -62,7 +62,7 @@ function M.Apply(state,crop,now,progress)
   p.CFrame=state.Origin*(CFrame.new(pos)*r.Frame.Rotation)
   p.Transparency=alpha;p.CanCollide=false
   p.CanQuery=r.Group>0 and ready[r.Group]==true and not hidden and r.Query or false
-  for _,d in ipairs(r.Faces)do d.Transparency=(hidden or alpha>=1)and 1 or 0 end -- Verity's face (front and back) goes with its ball
+  for _,d in ipairs(r.Faces)do d.Transparency=(hidden or alpha>=1)and 1 or 0 end -- Verity's face goes with its ball
  end end
  return body,fruit[1]or 0
 end

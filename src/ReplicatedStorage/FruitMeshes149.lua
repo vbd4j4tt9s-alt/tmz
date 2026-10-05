@@ -1,6 +1,6 @@
 -- R149 (owner: "for the melons and pumpkins bake the meshes in"): the Watermelon, Snow Melon and Ember Pumpkin each get ONE baked,
 -- vertex-coloured mesh body (like the cocoa pod / Fire Pepper) in place of their 8 - 21 part-built body pieces; stem, tendril / curl,
--- leaf and the gloss patch stay parts. The meshes are generated here (parametric lathes: no vertex data is shipped), baked once per
+-- leaf stay parts (R151: the white gloss patch on them is gone). The meshes are generated here (parametric lathes: no vertex data is shipped), baked once per
 -- server with the same EditableMesh -> MeshPart route as ApprovedPlantMeshes (which is not touched), and kept in
 -- ReplicatedStorage.FruitMeshTemplates149 with a white-vertex `_Neutral` twin for Gold / Diamond coats. Clients only clone.
 -- PlantVisuals asks Art / Suffix which build a seed uses and routes these keys' Get / Status here (DetailReady keeps the server
@@ -9,8 +9,7 @@
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local M={Folder='FruitMeshTemplates149'}
 -- seed -> its mesh key, the fruit specs the mesh replaces, the spec whose frame (and, unless Fit='all', size) it takes, the body's name,
--- its main colour (a plain ellipsoid in that colour stands in on the server if a bake fails mid-build); GlossOut moves the gloss patch out
--- from the body's centre by that factor (the pumpkin's lobes are fuller than the ribs it sat in).
+-- its main colour (a plain ellipsoid in that colour stands in on the server if a bake fails mid-build).
 -- UnripeNeutral (R149 review part 2, finding 7): the vertex colours are far from green (orange), and a tint can only darken them, so the growing fruit
 -- would stay a dark orange. PlantGrowth.Capture gives every such fruit a temporary twin cloned from the white `_Neutral` template: while the fruit is unripe
 -- the twin is drawn in the same pale-green-to-ripe colour path as every other fruit (Tone is its ripe colour) and the baked body is hidden; at the ripe
@@ -18,7 +17,7 @@ local M={Folder='FruitMeshTemplates149'}
 M.Seeds={
  SunflowerSeed={Key='Watermelon149',Name='Melon body',Body='Melon rind',Replace={'Melon rind','Melon stripe band'},Tone={108,180,76}},
  SnowdropSeed={Key='SnowMelon149',Name='Snow melon body',Body='Snow melon rind',Replace={'Snow melon rind','Snow melon stripe band','Snow cap'},Tone={190,232,234}},
- EmberBloomSeed={Key='EmberPumpkin149',Name='Pumpkin body',Body='Pumpkin heart',Replace={'Pumpkin heart','Pumpkin rib','Ember groove'},Fit='all',Tone={232,108,28},GlossOut=1.1,UnripeNeutral=true},
+ EmberBloomSeed={Key='EmberPumpkin149',Name='Pumpkin body',Body='Pumpkin heart',Replace={'Pumpkin heart','Pumpkin rib','Ember groove'},Fit='all',Tone={232,108,28},UnripeNeutral=true},
 }
 M.Keys={'EmberPumpkin149','SnowMelon149','Watermelon149'}
 local owned={};for _,k in ipairs(M.Keys)do owned[k]=true end
@@ -231,7 +230,7 @@ local function body(cfg,source,g,replace)
 end
 -- The seed's styled spec list (PlantVisuals.Specs, after PlantSurfaceStyle: its index-based leaf tints and every _ArtIndex stay as in
 -- the part-built list): in each fruit group the replaced pieces become one mesh spec where the first of them stood (with its
--- _ArtIndex); every other spec (stems, leaf, gloss, the 'Fruit stem' connector, the plant) is the same table, in the same order.
+-- _ArtIndex); every other spec (stems, leaf, the 'Fruit stem' connector, the plant) is the same table, in the same order.
 function M.Art(id,source)
  local cfg=M.Seeds[id];if not cfg or not M.UsesMesh(id)then return source end
  local out=derived[source];if out then return out end
@@ -244,10 +243,6 @@ function M.Art(id,source)
     if not done[s.g]then derived[source]=source;return source end -- (an art list without the body piece: keep it part-built)
     table.insert(out,done[s.g])
    end
-  elseif s.g>0 and s.f=='Fruit gloss'and cfg.GlossOut and done[s.g]then
-   local b,k=done[s.g].c,cfg.GlossOut;local moved=table.clone(s);moved.c=table.clone(s.c)
-   for a=1,3 do moved.c[a]=b[a]+(s.c[a]-b[a])*k end
-   table.insert(out,moved)
   else table.insert(out,s)end
  end
  derived[source]=out;return out

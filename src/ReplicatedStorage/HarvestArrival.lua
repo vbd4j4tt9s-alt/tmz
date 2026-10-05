@@ -41,11 +41,19 @@ function A.Flying(cropId,index,seconds)
 end
 function A.Land(cropId,index)return release(key(cropId,index),true)end
 function A.Cancel(cropId,index)return release(key(cropId,index),false)end
--- The plant is gone (a whole-plant harvest removes it): nothing will fly for it.
+-- The plant is gone (R151: a harvest that removes the plant, and every plant that streams out, starts the flights it has before this): the holds of this crop whose
+-- fruit does not fly end now (nothing will fly for them). A fruit that is in the air keeps its hold until it lands: the plant going away does not cancel it.
 function A.LandCrop(cropId)
  local prefix=tostring(cropId)..':';local list={}
- for k in pairs(pending)do if string.sub(k,1,#prefix)==prefix then table.insert(list,k)end end
+ for k,entry in pairs(pending)do if string.sub(k,1,#prefix)==prefix and not entry.Flying then table.insert(list,k)end end
  for _,k in ipairs(list)do release(k,true)end
+end
+-- R151: the fruit slots of this crop that the harvester asked for and that have not landed yet (the garden scheduler flies them when the plant has no model of the
+-- fruit or is removed with the harvest). Sorted.
+function A.PendingIndexes(cropId)
+ local prefix=tostring(cropId)..':';local list={}
+ for k in pairs(pending)do if string.sub(k,1,#prefix)==prefix then local i=tonumber(string.sub(k,#prefix+1));if i then table.insert(list,i)end end end
+ table.sort(list);return list
 end
 function A.Holds(tool)
  if next(pending)==nil then return false end -- (nearly always: nothing to look up)

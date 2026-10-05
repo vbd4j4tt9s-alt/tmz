@@ -7,7 +7,9 @@
 --  3. #3 the seedling rises with the R112 dirt pile (the beat PlantingEffects reports);
 --  4. #7 a plant that matures bounces its fruit once (sizes restored exactly), glints, and a regrown fruit does too; reduced motion / low quality: nothing;
 --  5. #8 a picked fruit floats to its harvester: the fruit's own parts leave the plant, fly (every frame), vanish on arrival, HarvestArrival is told;
---     other players' gardens too; whole-plant harvests and out-of-range plants just vanish; cleanup on stream-out; no leak of parts or listeners;
+--     other players' gardens too; (R151: a harvest that removes the plant flies its fruit before the model goes - the owner's own request, or the server's
+--     HarvestedBy mark; a shovel removal flies nothing; the plants with motion of their own fly a copy; every seed and every path: test_fruit_flight.luau);
+--     out-of-range plants just vanish; cleanup on stream-out; no leak of parts or listeners;
 --  6. every plant of a garden that is streamed out and in again leaves nothing behind.
 local C=require('./growth_common');local W,R,V3,CF=C.W,C.R,C.V3,C.CF;local check,near=C.check,C.near
 local Catalog=C.Catalog;local Arrival=W.module('HarvestArrival')
@@ -284,19 +286,38 @@ do
  local up=false;for i=1,60*2 do W.frames(1);if #flyers()>0 and not up then up=true;remove(m6) end end
  run(.2)
  check(up and #flyers()==0 and not Arrival.Pending(c6,1),'a plant removed while its fruit flies: the fruit goes, the inventory is released')
- -- a whole-plant / last-fruit harvest removes the plant: the inventory is not held waiting for a flight
+ -- (R151) a harvest that removes the plant (a whole plant, the last fruit of one that does not regrow): the picked fruit flies from the plant's own model before it
+ -- goes, and the inventory is held until it lands. The harvester's own request is the evidence (HarvestArrival); a removal nobody asked for (the shovel) flies nothing.
  Arrival.Reset();events={}
+ Arrival.OnRelease(function(k,cue)events[#events+1]={k,cue,now()}end)
  local m7=plant(id,-6,10,{Frac=1});run(3);local c7=m7:GetAttribute('CropId');Arrival.Expect(c7,1);Arrival.Expect(c7,2)
- remove(m7);run(.1)
- check(not Arrival.Pending(c7,1)and not Arrival.Pending(c7,2),'the plant was removed by the harvest: nothing will fly, the inventory is released at once')
- -- the frozen plants: no flight, the fruit vanishes as today
+ local fruitBefore=art(m7)and art(m7):FindFirstChild('Harvest_1')
+ remove(m7);run(.05)
+ check(#flyers()==2 and Arrival.Pending(c7,1)and Arrival.Pending(c7,2)and #events==0,'the plant was removed by the harvest: both picked fruit fly on without it, the inventory is held until they land ('..#flyers()..' in the air)')
+ check(fruitBefore~=nil and fruitBefore.Parent~=nil and fruitBefore.Parent==fxFolder(),'... the plant\'s own fruit model flew (not a clone)')
+ run(1)
+ check(#flyers()==0 and not Arrival.Pending(c7,1)and not Arrival.Pending(c7,2)and #events==2 and events[1][2]==true and events[2][2]==true,'... and both landed with a cue ('..#events..' releases)')
  Arrival.Reset();events={}
+ local m7b=plant(id,-6,10,{Frac=1});run(3);local c7b=m7b:GetAttribute('CropId')
+ remove(m7b);run(1)
+ check(#flyers()==0 and not Arrival.Pending(c7b,1)and #events==0,'a plant removed with nobody having picked (the shovel): nothing flies, nothing is held')
+ -- the server's mark (HarvestedBy / HarvestedIndex, set before the model goes) is the evidence for everybody else: another player's last fruit flies to THEM
+ local m7c=plant(id,12,2,{Frac=1,Owner=6});run(4);local c7c=m7c:GetAttribute('CropId')
+ m7c:SetAttribute('HarvestedIndex',3);m7c:SetAttribute('HarvestedBy',6);run(.05)
+ local seen7=#flyers();local last7
+ for i=1,60 do W.frames(1);local fl=flyers();if #fl>0 then local ps=fl[1]:GetDescendants();for _,p in ipairs(ps)do if p:IsA('BasePart')then last7=p.CFrame.Position;break end end end end
+ remove(m7c);run(.2)
+ check(seen7==1 and last7~=nil and(last7-(otherRoot.Position+V3(0,.9,0))).Magnitude<2.5,('the server\'s mark makes the fruit of another player\'s plant fly to THEM (%d in the air) before the model is removed'):format(seen7))
+ check(#flyers()==0 and #events==0,'... once only (the removal that follows flies nothing more), and an observer\'s inventory is never held')
+ -- (R151) the plants with motion of their own fly too: Lantern Fern's picked fruit is a copy built where it hung
+ Arrival.Reset();events={}
+ Arrival.OnRelease(function(k,cue)events[#events+1]={k,cue,now()}end)
  local m8=plant('LanternFernSeed',-2,14,{Frac=1});run(4);local c8=m8:GetAttribute('CropId')
  local v8=art(m8);local fruit8=v8 and v8:FindFirstChild('Harvest_1')
  if fruit8 then
   Arrival.Expect(c8,1);local d8=Catalog.LanternFernSeed;local t8=now();regrowthAttrs(m8,1,t8+(d8.RegrowSeconds or d8.Seconds),1,d8.RegrowSeconds or d8.Seconds)
-  local any8=false;for i=1,60*2 do W.frames(1);if #flyers()>0 then any8=true end end
-  check(not any8 and not Arrival.Pending(c8,1),'Lantern Fern: the fruit vanishes as today, no flight, nothing held')
+  local any8=false;local landed8=false;for i=1,60*2 do W.frames(1);if #flyers()>0 then any8=true end;if #events>=1 then landed8=true end end
+  check(any8 and landed8 and events[1][2]==true and not Arrival.Pending(c8,1),'Lantern Fern: the picked fruit flies too (a copy; R149 let it vanish) and lands with a cue')
  else check(true,'(Lantern Fern has no fruit model at this range)')end
 end
 -- 5b. review part 2 (finding 11): a failing animation step does not leave Growth.Batch set (another script's UpdateGrowth in that frame would queue into the garden's batch)

@@ -528,7 +528,8 @@ do
   return out
  end
  local compared,total=0,0
- for _,id in ipairs({'SunflowerSeed','AppleSeed','MoonflowerSeed','PrismOrchidSeed','CactusSeed','DatePalmSeed','LavaLotusSeed','SolarStarfruitSeed','AncientWorldrootSeed'})do
+ -- R151: the Watermelon's art list now carries `Skipped` (the removed gloss positions), which the base commit's pipeline does not know, so the Clover stands in for it here
+ for _,id in ipairs({'CloverSeed','AppleSeed','MoonflowerSeed','PrismOrchidSeed','CactusSeed','DatePalmSeed','LavaLotusSeed','SolarStarfruitSeed','AncientWorldrootSeed'})do
   local d=Catalog[id]
   if d then
    local c={Id='old-'..id,SeedId=id,PlantedAt=0,MatureAt=d.Seconds,ReadyAt=d.Seconds,PlantScale=1.3,SeedScale=1,Mutation='None',HarvestCycle=0,PickedMask=0,TraitVersion=1}

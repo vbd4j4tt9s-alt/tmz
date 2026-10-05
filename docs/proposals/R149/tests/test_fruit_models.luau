@@ -7,7 +7,7 @@
 -- mock AssetService: fruit_mesh_mock.luau), Apple, Elderbloom's elder apple, Blueberry, Iceberry (part-built).
 -- Unchanged: the Prickly Pear (back to its current look), Lantern Fern, Amethyst Grape and the Ash Tomato's look (it gains three variations).
 --  0. before the bake: no template folder (the part-built fruit), a folder with nothing baked yet (Loading: DetailReady false, "still loading");
---  1. each redesigned fruit: the spec list (names, counts, shapes, materials, colours, Neon, decor), the hotbar picture's part count, where the body sits
+--  1. each redesigned fruit: the spec list (names, counts, shapes, materials, colours, Neon; R151: no gloss / glint patch, no decor), the hotbar picture's part count, where the body sits
 --     (the old body's centre), sockets / fruit centres / radii kept, connectors kept, canopy links of the berries, part budgets;
 --  2. every build mode: ripe, every growth stage, one harvest item per fruit, held in the hand, Gold / Diamond coats (per plant and per fruit), weather
 --     (the effect anchor and the real HarvestPresentation capture / step), the far proxy and DistantPlantView, the supports, Visuals.Part;
@@ -22,7 +22,7 @@
 --     (exactly the generated data, the white neutral twin, editables destroyed, yields, MeshPart settings, idempotent), the mesh specs (the
 --     part-built list with the replaced pieces folded into one body: same frame / bottom / _ArtIndex), every build (hotbar, coats, plant, proxy,
 --     growth), PlantVisuals' routing (the old ApprovedPlantMeshes keys untouched), a template that has not replicated yet, and the stem / leaf /
---     gloss against the mesh's real triangles.
+--     against the mesh's real triangles. R151 (owner: no white shine dots): the gloss patch / glints are gone from every one of these fruit.
 --  (Failures run in their own worlds: test_fruit_mesh_fallback.luau.)
 local W=require('./world');local F=require('./fixtures');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 R.CFrame.lookAt=function(p,t,up)
@@ -78,32 +78,40 @@ local function deepEqual(a,b)
  for k in pairs(b)do if a[k]==nil then return false end end
  return true
 end
+-- R151: a list without its shine parts (the names the owner's screenshots showed) and without the Skipped set that marks where they stood
+local SHINE_NAMES={['Fruit gloss']=true,['Berry glint']=true,['Moon glint']=true,['Verity gloss']=true,['Verity glint']=true,['Fruit shine']=true,['Pepper sheen']=true,['Fruit heart glint']=true}
+local function noShine(list)
+ if type(list)~='table'then return list end
+ local out={};for _,v in ipairs(list)do if not SHINE_NAMES[v.f]then table.insert(out,v)end end
+ for k,v in pairs(list)do if type(k)~='number'and k~='Skipped'then out[k]=v end end
+ return out
+end
 local function specsOf(id,cid)return Visuals.Specs(id,cid and crop(id,cid)or nil)end
 
 -- 1. The redesigned fruit ---------------------------------------------------------------------------------------------------------------------------
 -- body = the spec that is the fruit's body; old = (module list, how to read the old body's centre and half height in final studs)
 local WHITE={242,242,243} -- a mesh body's part colour: white with PlantSurfaceStyle's shade (the cocoa pod's), so the vertex colours show
 local FRUITS={
- {Id='SunflowerSeed',Name='Watermelon',Count=2,Body='Melon body',Ground=true,Hotbar={5,5},Plant=90,Mesh='Watermelon149',
-  Names={['Melon body']=1,['Melon stem']=1,['Melon tendril']=1,['Melon leaf']=1,['Fruit gloss']=1,['Fruit stem']=1},Keep={'Fruit stem'},Neon={['Fruit gloss']=1},
+ {Id='SunflowerSeed',Name='Watermelon',Count=2,Body='Melon body',Ground=true,Hotbar={4,4},Plant=88,Mesh='Watermelon149',
+  Names={['Melon body']=1,['Melon stem']=1,['Melon tendril']=1,['Melon leaf']=1,['Fruit stem']=1},Keep={'Fruit stem'},Neon={},
   Colours={['Melon body']=WHITE,['Melon stem']={86,128,58},['Melon leaf']={80,150,62}},Style=true},
- {Id='SnowdropSeed',Name='Snow Melon',Count=2,Body='Snow melon body',Ground=true,Hotbar={5,5},Plant=106,Mesh='SnowMelon149',
-  Names={['Snow melon body']=1,['Snow melon stem']=1,['Snow melon tendril']=1,['Snow melon leaf']=1,['Fruit gloss']=1,['Fruit stem']=1},Keep={'Fruit stem'},Neon={['Fruit gloss']=1},
+ {Id='SnowdropSeed',Name='Snow Melon',Count=2,Body='Snow melon body',Ground=true,Hotbar={4,4},Plant=104,Mesh='SnowMelon149',
+  Names={['Snow melon body']=1,['Snow melon stem']=1,['Snow melon tendril']=1,['Snow melon leaf']=1,['Fruit stem']=1},Keep={'Fruit stem'},Neon={},
   Colours={['Snow melon body']=WHITE,['Snow melon stem']={70,128,138}},Style=true},
- {Id='AppleSeed',Name='Apple',Count=4,Body='Apple body',Hotbar={8,8,8,8},Plant=83,
-  Names={['Apple body']=1,['Apple shoulder']=2,['Apple base tone']=1,['Apple dimple']=1,['Apple stem']=1,['Apple leaf']=1,['Fruit gloss']=1,['Apple hanging stem']=1},Keep={'Apple hanging stem'},Neon={['Fruit gloss']=1},
+ {Id='AppleSeed',Name='Apple',Count=4,Body='Apple body',Hotbar={7,7,7,7},Plant=79,
+  Names={['Apple body']=1,['Apple shoulder']=2,['Apple base tone']=1,['Apple dimple']=1,['Apple stem']=1,['Apple leaf']=1,['Apple hanging stem']=1},Keep={'Apple hanging stem'},Neon={},
   Colours={['Apple body']={206,36,46},['Apple base tone']={226,72,52},['Apple stem']={104,74,44},['Apple leaf']={78,152,60}},Style=false},
- {Id='ElderbloomSeed',Name='Elderbloom',Count=5,Body='Elder apple body',Hotbar={10,10,10,10,10},Plant=137,
-  Names={['Elder apple body']=1,['Elder apple shoulder']=2,['Elder apple base tone']=1,['Elder apple dimple']=1,['Elder apple stem']=1,['Elder apple leaf']=1,['Fruit gloss']=1,['Ancient apple rune']=1,['Ancient apple rune cross']=1},Keep={},
-  Neon={['Fruit gloss']=1,['Ancient apple rune']=1,['Ancient apple rune cross']=1},Colours={['Elder apple body']={112,164,92},['Elder apple base tone']={214,190,104},['Ancient apple rune']={255,225,138}},Style=false},
- {Id='EmberBloomSeed',Name='Ember Pumpkin',Count=2,Body='Pumpkin body',Ground=true,Hotbar={5,5},Plant=114,Mesh='EmberPumpkin149',
-  Names={['Pumpkin body']=1,['Pumpkin stem']=1,['Pumpkin stem curl']=1,['Pumpkin leaf']=1,['Fruit gloss']=1,['Fruit stem']=1},Keep={'Fruit stem'},Neon={['Fruit gloss']=1},
+ {Id='ElderbloomSeed',Name='Elderbloom',Count=5,Body='Elder apple body',Hotbar={9,9,9,9,9},Plant=132,
+  Names={['Elder apple body']=1,['Elder apple shoulder']=2,['Elder apple base tone']=1,['Elder apple dimple']=1,['Elder apple stem']=1,['Elder apple leaf']=1,['Ancient apple rune']=1,['Ancient apple rune cross']=1},Keep={},
+  Neon={['Ancient apple rune']=1,['Ancient apple rune cross']=1},Colours={['Elder apple body']={112,164,92},['Elder apple base tone']={214,190,104},['Ancient apple rune']={255,225,138}},Style=false},
+ {Id='EmberBloomSeed',Name='Ember Pumpkin',Count=2,Body='Pumpkin body',Ground=true,Hotbar={4,4},Plant=112,Mesh='EmberPumpkin149',
+  Names={['Pumpkin body']=1,['Pumpkin stem']=1,['Pumpkin stem curl']=1,['Pumpkin leaf']=1,['Fruit stem']=1},Keep={'Fruit stem'},Neon={},
   Colours={['Pumpkin body']=WHITE,['Pumpkin stem']={88,74,46}},Style=true},
- {Id='BluebellSeed',Name='Blueberry',Count=4,Body='Berry',Hotbar={18,18,18,18},Plant=94,
-  Names={['Berry']=3,['Berry bloom']=3,['Berry cap']=3,['Berry stalklet']=3,['Berry glint']=3,['Berry stem']=1,['Berry leaf']=2},Keep={},Neon={['Berry glint']=3},
+ {Id='BluebellSeed',Name='Blueberry',Count=4,Body='Berry',Hotbar={15,15,15,15},Plant=82,
+  Names={['Berry']=3,['Berry bloom']=3,['Berry cap']=3,['Berry stalklet']=3,['Berry stem']=1,['Berry leaf']=2},Keep={},Neon={},
   Colours={['Berry']={62,76,168},['Berry bloom']={152,170,224},['Berry cap']={30,36,90}},Translucent={['Berry bloom']=.5},Style=true},
- {Id='IceberrySeed',Name='Iceberry',Count=4,Body='Berry',Hotbar={18,18,18,18},Plant=94,
-  Names={['Berry']=3,['Berry bloom']=3,['Berry cap']=3,['Berry stalklet']=3,['Berry glint']=3,['Berry stem']=1,['Berry leaf']=2},Keep={},Neon={['Berry glint']=3},
+ {Id='IceberrySeed',Name='Iceberry',Count=4,Body='Berry',Hotbar={15,15,15,15},Plant=82,
+  Names={['Berry']=3,['Berry bloom']=3,['Berry cap']=3,['Berry stalklet']=3,['Berry stem']=1,['Berry leaf']=2},Keep={},Neon={},
   Colours={['Berry']={118,196,232},['Berry bloom']={236,250,255},['Berry cap']={60,120,160}},Translucent={['Berry bloom']=.5},Style=true},
 }
 -- old art (base commit): the list the fruit's groups came from, and the old body's name
@@ -128,9 +136,9 @@ local MUT_GOLD,MUT_DIAMOND='Gold','Diamond'
 
 -- 0. Before the bake, then the bake ------------------------------------------------------------------------------------------------------------------
 local MESHFRUIT={
- SunflowerSeed={Key='Watermelon149',Body='Melon body',Verts=258,Tris=512,Replaced={['Melon rind']=true,['Melon stripe band']=true},First='Melon rind',Parts=12,Plant=104},
- SnowdropSeed={Key='SnowMelon149',Body='Snow melon body',Verts=258,Tris=512,Replaced={['Snow melon rind']=true,['Snow melon stripe band']=true,['Snow cap']=true},First='Snow melon rind',Parts=13,Plant=122},
- EmberBloomSeed={Key='EmberPumpkin149',Body='Pumpkin body',Verts=242,Tris=480,Replaced={['Pumpkin heart']=true,['Pumpkin rib']=true,['Ember groove']=true},First='Pumpkin heart',Parts=25,Plant=154},
+ SunflowerSeed={Key='Watermelon149',Body='Melon body',Verts=258,Tris=512,Replaced={['Melon rind']=true,['Melon stripe band']=true},First='Melon rind',Parts=11,Plant=102},
+ SnowdropSeed={Key='SnowMelon149',Body='Snow melon body',Verts=258,Tris=512,Replaced={['Snow melon rind']=true,['Snow melon stripe band']=true,['Snow cap']=true},First='Snow melon rind',Parts=12,Plant=120},
+ EmberBloomSeed={Key='EmberPumpkin149',Body='Pumpkin body',Verts=242,Tris=480,Replaced={['Pumpkin heart']=true,['Pumpkin rib']=true,['Ember groove']=true},First='Pumpkin heart',Parts=24,Plant=152},
 }
 local MESHIDS={'SunflowerSeed','SnowdropSeed','EmberBloomSeed'}
 local partSpecs={} -- the part-built (R149) spec list of each, as a server without the bake builds it
@@ -194,13 +202,10 @@ for _,f in ipairs(FRUITS)do
  check(okMat,name..': SmoothPlastic (the Elder apple stem Wood), Neon only where designed')
  check(okNeon,name..': Neon parts '..tallyText(f.Neon)..' per fruit')
  check(okTx,name..': every Ball / Block is tx=smooth (no surface marks, and PlantSurfaceStyle\'s grain / speckle rules skip it)')
- -- gloss patches and glints are decor (hidden on Gold / Diamond)
- local decorOk=true
- for _,s in ipairs(specs)do if s.g>0 then
-  local should=s.f=='Fruit gloss'or s.f=='Berry glint'
-  if(s.decor==true)~=should then decorOk=false end
- end end
- check(decorOk,name..': exactly the gloss patch / glints are decor')
+ -- R151 (owner: no white shine dots on fruit): no gloss patch, glint, shine or sheen part, no decor spec, in any fruit group (the plant's whole list too)
+ local shineOk=true
+ for _,s in ipairs(specs)do local n=string.lower(s.f or'');if s.decor or n:find('gloss',1,true)or n:find('glint',1,true)or n:find('shine',1,true)or n:find('sheen',1,true)then shineOk=false;print('  '..name..': '..tostring(s.f))end end
+ check(shineOk,name..': no gloss / glint / shine / sheen part and no decor spec anywhere in the art list')
  -- 1b. colours: the design's own (PlantSurfaceStyle shifts a part <= 6 %)
  local colOk=true
  for _,s in ipairs(specs)do if s.g>0 and f.Colours[s.f]then
@@ -297,9 +302,9 @@ for _,id in ipairs({'BluebellSeed','IceberrySeed'})do
   for g=1,4 do
    local socket=Visuals.FruitSocket(c,Catalog[id],g);local ps=groupParts(model,g)
    local near_=math.huge;for _,p in ipairs(ps)do near_=math.min(near_,(p.Position-socket).Magnitude)end
-   if#ps~=18 or near_>1.2 then good=false end
+   if#ps~=15 or near_>1.2 then good=false end
   end
-  check(good,id..' '..cid..': 18 parts per cluster, within 1.2 studs of its crown-following socket')
+  check(good,id..' '..cid..': 15 parts per cluster (R151: the 3 berry glints are gone; was 18), within 1.2 studs of its crown-following socket')
  end
 end
 
@@ -613,7 +618,8 @@ do
   local new,old=W.module(e[1]),e[2]
   for seed,list in pairs(old)do
    local skip=false;for k=3,#e do if e[k]==seed then skip=true end end
-   if not skip then total+=1;if deepEqual(list,new[seed])then same+=1 else print('  '..e[1]..'.'..seed..' changed')end end
+   -- R151: the shine parts are gone from every list (the FirePepper's 'Pepper sheen', the Ember Emperor's 'Fruit shine' too); the rest of the list is the base's, part for part
+   if not skip then total+=1;if deepEqual(noShine(list),noShine(new[seed]))then same+=1 else print('  '..e[1]..'.'..seed..' changed')end end
   end
  end
  check(same==total and total>=15,'every other plant in PlantArtForest / PlantArtSnow / PlantArtLava is exactly the base\'s ('..same..' of '..total..')')
@@ -762,11 +768,7 @@ do
     if not seen[s.g]then seen[s.g]=true;j+=1;bodies[s.g]={specs[j],s};if not(specs[j]and specs[j].s=='ApprovedMesh')then same=false end end
    else
     j+=1;local want=s
-    local out=FM.Seeds[id].GlossOut
-    if out and s.f=='Fruit gloss'and s.g>0 then
-     -- the pumpkin's gloss patch moves out from the body's centre (its fuller lobes would cover it), nothing else about it changes
-     local b=bodies[s.g][1];want=table.clone(s);want.c=table.clone(s.c);for a=1,3 do want.c[a]=b.c[a]+(s.c[a]-b.c[a])*out end
-    end
+    check(FM.Seeds[id].GlossOut==nil and s.f~='Fruit gloss','(R151: the mesh seeds carry no GlossOut and their lists no gloss patch)')
     if not deepEqual(specs[j],want)then same=false end
    end
   end
@@ -838,8 +840,8 @@ do
   'a template that has not replicated yet: only the fruit that need it wait ("still loading"); the seed stays on its mesh build')
  t.Parent=folder
  check(Visuals.DetailReady('SunflowerSeed',crop('SunflowerSeed','lag',{_VisualHarvest={Index=1,Scale=1,Mutation='Gold'}}),{[1]=true})==true,'and it is ready once the template arrives')
- -- 8f. the stem, tendril / curl, leaf and gloss sit on the REAL mesh surface (the R134 check sees the mesh as its box): every small part touches
- -- the generated triangles (signed distance <= .03 studs) or a part that does; the gloss patch lies on the surface (its centre within .03)
+ -- 8f. the stem, tendril / curl and leaf sit on the REAL mesh surface (the R134 check sees the mesh as its box): every small part touches
+ -- the generated triangles (signed distance <= .03 studs) or a part that does (R151: there is no gloss patch any more)
  local function sub(a,b)return {a[1]-b[1],a[2]-b[2],a[3]-b[3]}end
  local function dot(a,b)return a[1]*b[1]+a[2]*b[2]+a[3]*b[3]end
  local function along(a,b,t)return {a[1]+b[1]*t,a[2]+b[2]*t,a[3]+b[3]*t}end
@@ -876,11 +878,10 @@ do
    end
    return best*sign
   end
-  local reached,glossOk,info={},true,{}
+  local reached={}
   for _,p in ipairs(small)do
    local m=math.huge;for _,pt in ipairs(samples(p))do m=math.min(m,signed(pt))end
    if m<=.03 then reached[p]=true end
-   if p.Name=='Fruit gloss'then local c=signed(samples(p)[1]);if math.abs(c)>.03 then glossOk=false end;info[#info+1]=('gloss %.3f'):format(c)end
   end
   local grew=true
   while grew do grew=false
@@ -892,8 +893,9 @@ do
    end end
   end
   local loose={};for _,p in ipairs(small)do if not reached[p]then loose[#loose+1]=p.Name end end
-  check(#loose==0 and #small==4,id..' fruit '..i..': stem, tendril / curl, leaf and gloss hang on the real mesh surface ('..(#loose>0 and'loose: '..table.concat(loose,', ')or'none loose')..')')
-  check(glossOk,id..' fruit '..i..': the gloss patch lies on the mesh surface ('..table.concat(info,' ')..')')
+  local noShine=true;for _,p in ipairs(small)do local n=string.lower(p.Name);if n:find('gloss',1,true)or n:find('glint',1,true)or n:find('shine',1,true)then noShine=false end end
+  check(#loose==0 and #small==3,id..' fruit '..i..': stem, tendril / curl and leaf hang on the real mesh surface ('..(#loose>0 and'loose: '..table.concat(loose,', ')or'none loose')..')')
+  check(noShine,id..' fruit '..i..': no gloss patch on the mesh (R151)')
  end end
  local tris=0;for _,id in ipairs(MESHIDS)do tris=math.max(tris,MESHFRUIT[id].Tris*Catalog[id].FruitCount)end
  print(('INFO phones: at most %d mesh triangles per plant (2 fruit); 6 templates of 242 - 258 vertices in all'):format(tris))
