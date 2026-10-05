@@ -7,6 +7,8 @@
 --  * every fruit's harvest item (the hotbar / Bag / Index model) plain, Gold, Diamond and with weather; its far proxy; its prompt
 --    position, reach and socket; the distant supports; the detail cost.
 -- Output: "<plant>\t<crop>\t<mode>\t<digest>\t<parts>". A baked mesh part is a stub (ApprovedPlantMeshes lives in ServerStorage).
+-- R149 review part 2 (finding 5): the Ash Tomato's "Flat ash patch" blocks were touched up (thicker, higher). Every mode of the Ash Tomato (except key and
+-- catalog) therefore has a twin "<mode>~np" computed WITHOUT those parts / specs, so check_plants_diff.py can allow exactly the patch lines to differ.
 -- R149 fruit meshes (FruitMeshes149, only in trees that have it): `luau dump_plants.luau -a mesh|parts|fail`. mesh (the default): the server bake
 -- runs first on the mock AssetService (fruit_mesh_mock.luau), so the Watermelon / Snow Melon / Ember Pumpkin get their mesh bodies; parts: no
 -- bake ran (no template folder: the part-built fruit); fail: the bake runs and fails (no EditableMesh: every key Failed, the part-built fruit).
@@ -48,9 +50,10 @@ local function ser(v,depth)
  return tostring(v)
 end
 local function enumName(e)if type(e)=='table'and e.Name then return e.Name end;return tostring(e)end
+local patchless=nil -- (set while a "~np" twin is computed: the name of the parts / specs that are left out)
 local function fingerprint(model,skipIndex)
  local out={};local count=0
- for _,c in ipairs(model:GetDescendants())do if c:IsA('BasePart')then
+ for _,c in ipairs(model:GetDescendants())do if c:IsA('BasePart')and not(patchless and c.Name==patchless)then
   count+=1
   local cf=c.CFrame;local r=cf.R;local p=cf.Position;local s=c.Size;local sm=c:FindFirstChildOfClass('SpecialMesh')
   local attrs={};for _,k in ipairs({'GrowthGroup','GrowthRole','GrowthForm',skipIndex and'-'or'ArtSpecIndex','HarvestFeature','HarvestIndex','FruitProxy','Mutation','ApprovedMesh','LeafVariantGroup','PlantSurfaceDetail','PlantSurfaceShading','FruitScale'})do local v=c:GetAttribute(k)if v~=nil then attrs[#attrs+1]=k..'='..tostring(v)end end
@@ -63,7 +66,12 @@ local function fingerprint(model,skipIndex)
 end
 local function emit(id,crop,mode,digest,count)print(table.concat({id,crop,mode,digest,tostring(count or 0)},'\t'))end
 local seenError={}
+local try0
 local function try(id,crop,mode,fn)
+ try0(id,crop,mode,fn)
+ if id=='AshRoseSeed'and crop~='-'and mode~='key'then patchless='Flat ash patch';try0(id,crop,mode..'~np',fn);patchless=nil end
+end
+function try0(id,crop,mode,fn)
  local ok,a,b=pcall(fn)
  if ok then emit(id,crop,mode,a,b)else
   emit(id,crop,mode,'ERR '..fnv(tostring(a)),0)
@@ -86,9 +94,9 @@ for _,id in ipairs(ids)do
   try(id,cn,'key',function()return tostring(Approved.Key(id,crop)),0 end)
   try(id,cn,'specs',function()
    local specs=Visuals.Specs(id,crop);if not specs then return 'nil',0 end
-   local o={};for i,s in ipairs(specs)do o[i]=ser(s,0)end
+   local o={};for _,s in ipairs(specs)do if not(patchless and s.f==patchless)then o[#o+1]=ser(s,0)end end
    local art=Approved.Get(id,crop);local meta=art and ser({art.Sockets,art.FruitCenters,art.FruitRadii,art.Height,art.Radius},0)or'-'
-   return fnv(table.concat(o,'\n')..meta),#specs
+   return fnv(table.concat(o,'\n')..meta),#o
   end)
   try(id,cn,'ripe',function()return fingerprint(Visuals.Build(id,origin,crop,4,math.huge))end)
   if ci<=2 then

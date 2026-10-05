@@ -108,5 +108,8 @@ mutate "a template that cannot clone is retried every frame" $S "  template=nil
   warn('[R149] keyboard: the keycap template stopped cloning; the keys stay plain blocks')" "  warn('[R149] keyboard: the keycap template stopped cloning; the keys stay plain blocks')"
 mutate "the template is cloned with its toolbox children" $S "then stripPart(c);template=c end" "then template=c end"
 mutate "connections of containers that left the game stay in the list" $S "   if not c.Connected or not container:IsDescendantOf(workspace)then c:Disconnect();watched[container]=nil end" "   local _=0"
+# R149 review part 2 (z-fighting touch-ups)
+mutate "the end rims are .02 under the lobby floor again (z-fighting)" $R "RimDrop=.04," "RimDrop=.02,"
+mutate "the lifted hole rim is .03 under the letter strips again (z-fighting)" $R " HoleLift=.59," " HoleLift=.57,"
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]

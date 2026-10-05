@@ -11,12 +11,15 @@
 #  M8 the Prickly Pear's art changes by one colour (the owner said to keep it as it is);
 #  M9 a failed bake no longer switches the seed back to its part-built fruit;
 #  M10 the pumpkin's gloss patch is not moved out (its fuller lobes would bury it);
-#  M11 the spec cache key forgets the fruit-mesh suffix (specs cached before the bake would hide the meshes all session).
+#  M11 the spec cache key forgets the fruit-mesh suffix (specs cached before the bake would hide the meshes all session);
+#  M12 the Ash Tomato's flat ash patches are .02 thinner again (review part 2, finding 5: no z-fighting with the tomato tops).
+# MUTANTS="M10 M12" runs only those.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 S=${1:-$(mktemp -d)};mkdir -p "$S"
 mutant(){ # name file sed-expression marker
  name=$1;file=$2;expr=$3;marker=$4
+ if [ -n "$MUTANTS" ] && ! echo " $MUTANTS " | grep -q " $name ";then return 0;fi
  rm -rf "$S/m";cp -a "$REPO" "$S/m"
  sed -i "$expr" "$S/m/$file"
  if cmp -s "$REPO/$file" "$S/m/$file";then echo "$name: the mutation did not change $file";exit 1;fi
@@ -37,6 +40,7 @@ mutant M6 src/ReplicatedStorage/FruitMeshes149.lua 's/c\[i\]=editable:AddColor(n
 mutant M7 src/ReplicatedStorage/PlantVisuals.lua 's/return FruitMeshes.Owns(key)and FruitMeshes or ApprovedMeshes end/return ApprovedMeshes end/' 'one MeshPart from the'
 mutant M8 src/ReplicatedStorage/ApprovedPlantArt6.lua '0,/\["k"\]={65,143,69}/s//["k"]={66,143,69}/' "Prickly Pear's art"
 mutant M9 src/ReplicatedStorage/FruitMeshes149.lua "s/ if a=='Failed'or b=='Failed'then final\[id\]=false;return false end//" 'shows its R149 part-built fruit'
-mutant M10 src/ReplicatedStorage/FruitMeshes149.lua 's/,GlossOut=1.1}/}/' 'the gloss patch lies on the mesh surface'
+mutant M10 src/ReplicatedStorage/FruitMeshes149.lua 's/,GlossOut=1.1,UnripeNeutral=true}/,UnripeNeutral=true}/' 'the gloss patch lies on the mesh surface'
 mutant M11 src/ReplicatedStorage/PlantVisuals.lua 's/\.\.SurfaceStyle\.Key(id,crop)\.\.FruitMeshes\.Suffix(id)end/..SurfaceStyle.Key(id,crop)end/' 'folded into one mesh spec'
+mutant M12 src/ReplicatedStorage/ApprovedPlantArt5.lua 's/0\.042437/0.022437/g' 'flat ash patches'
 echo "all mutants killed"

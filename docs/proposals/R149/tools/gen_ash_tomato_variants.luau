@@ -1,11 +1,15 @@
 --!nocheck
 -- R149 (owner: "Ash Tomato also keeps, make growth variations"): derives three more designs of the Ash Tomato from its CURRENT art
--- (ApprovedPlantArt5's one design, left byte for byte as it is) so ApprovedPlantArt.Get / .Key can pick one of four per crop. Same
+-- (ApprovedPlantArt5's one design, left as it is except the flat ash patches' touch-up, see below) so ApprovedPlantArt.Get / .Key can pick one of four per crop. Same
 -- FruitCount (4), same parts per fruit, same look: a variant only changes
 --   * the whole plant: mirror, overall size (<= the original), yaw, a slight lean;
 --   * the leaf arrangement: every leaf (4 wedges + a midrib) swings about the point where it meets its stem, and a few leaves are dropped;
 --   * each tomato: scale about its socket, a twist about the vertical axis through its socket, a shade of red;
 --   * the leaf shade.
+-- R149 review part 2 (finding 5): a "Flat ash patch" (3 on each tomato) ended .013 above its tomato's top, a near-coplanar pair (z-fighting). Every
+-- design now has the patches .02 thicker and .01 higher along their own up axis (their bottoms stay inside the tomato); in a variation both numbers are
+-- scaled by the design's scale. Design 1's own 12 patches get the same touch-up in gen_ash_tomato_variants.py (text edit, so the rest of design 1 stays
+-- byte for byte). The size / reach measured for Height and Radius is taken before the touch-up, so those stay the same ratio to the base's.
 -- Everything is a rigid move of a part about a point the part shares with its neighbour (or a uniform scale about a shared socket), so
 -- the plant stays in one piece (the R134 floating check runs on every variant in test_fruit_models.luau).
 -- Prints  VARIANT <n> <literal of one design>  (the file's own style, ["z"]={..},["c"]={..},...) for gen_ash_tomato_variants.py.
@@ -133,6 +137,10 @@ for n,v in ipairs(VARIANTS)do
   put(s,glob({s.c[1],s.c[2],s.c[3]}),globR(rotOf(s)));s.z={s.z[1]*v.scale,s.z[2]*v.scale,s.z[3]*v.scale}
  end
  local top,reach=extent(specs)
+ for _,s in ipairs(specs)do if s.f=='Flat ash patch'then
+  local up={s.c[5],s.c[8],s.c[11]} -- (column 2 of the rotation: the patch's own up axis)
+  s.z[2]+=.02*v.scale;for k=1,3 do s.c[k]+=.01*v.scale*up[k]end
+ end end
  for i,s in ipairs(specs)do s._ArtIndex=i end
  -- 3. sockets, fruit centres (the tomato scaled about its socket first), radii, size
  local sockets,centres,radii={},{},{}

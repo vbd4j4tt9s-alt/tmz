@@ -222,7 +222,7 @@ local function seat(model,center,bounds)
 end
 -- R149 (z-fighting): an upward flat face of a showcase model that lands within .025 of the top of a market part under or
 -- around it (a fruit's flat patch just above its step, a boxy fruit's top level with the next step) flickers against that
--- top. Sink the model just enough (at most .045) to tuck such faces under the top.
+-- top. Sink the model just enough (at most .07) to tuck such faces under the top.
 local function boxes(parts)
  local out={}
  for _,p in ipairs(parts)do
@@ -244,6 +244,17 @@ local function flatTops(p)
  end
  return tops
 end
+-- R149 review part 2 (finding 10): the market's own parts (everything outside the MarketShowcase folder, about 260 of the ~2,200 parts once the showcase is
+-- built) are boxed ONCE per build and kept for every showcase model, instead of walking and boxing the whole market for each of the ~70 models.
+local structureBoxes=setmetatable({},{__mode='k'})
+local function structureOf(show,market)
+ local list=structureBoxes[show];if list then return list end
+ list={}
+ for _,p in ipairs(market:GetDescendants())do
+  if p:IsA('BasePart')and p.Transparency<.95 and not p:IsDescendantOf(show)then list[#list+1]=boxes({p})[1]end
+ end
+ structureBoxes[show]=list;return list
+end
 local function clearTops(model)
  local market=model.Parent and model.Parent.Parent;if not market then return end
  local own={};for _,p in ipairs(model:GetDescendants())do if p:IsA('BasePart')and p.Transparency<.95 then own[#own+1]=p end end
@@ -251,12 +262,10 @@ local function clearTops(model)
  local lo,hi=mine[1].Lo,mine[1].Hi
  for _,b in ipairs(mine)do lo=Vector3.new(math.min(lo.X,b.Lo.X),math.min(lo.Y,b.Lo.Y),math.min(lo.Z,b.Lo.Z));hi=Vector3.new(math.max(hi.X,b.Hi.X),math.max(hi.Y,b.Hi.Y),math.max(hi.Z,b.Hi.Z))end
  local surfaces={}
- for _,p in ipairs(market:GetDescendants())do
-  if p:IsA('BasePart')and p.Transparency<.95 and not p:IsDescendantOf(model.Parent)then
-   local b=boxes({p})[1]
-   if b.Lo.X<=hi.X and b.Hi.X>=lo.X and b.Lo.Z<=hi.Z and b.Hi.Z>=lo.Z and b.Hi.Y>=lo.Y-.1 and b.Lo.Y<=hi.Y+.1 then
-    for _,t in ipairs(flatTops(p))do surfaces[#surfaces+1]=t end
-   end
+ for _,b in ipairs(structureOf(model.Parent,market))do
+  if b.Lo.X<=hi.X and b.Hi.X>=lo.X and b.Lo.Z<=hi.Z and b.Hi.Z>=lo.Z and b.Hi.Y>=lo.Y-.1 and b.Lo.Y<=hi.Y+.1 then
+   local tops=b.Tops;if not tops then tops=flatTops(b.Part);b.Tops=tops end
+   for _,t in ipairs(tops)do surfaces[#surfaces+1]=t end
   end
  end
  local tops={};for _,p in ipairs(own)do for _,t in ipairs(flatTops(p))do tops[#tops+1]=t end end
@@ -266,7 +275,7 @@ local function clearTops(model)
   for _,t in ipairs(tops)do for _,s in ipairs(surfaces)do if math.abs(t-sink-s)<.025 then clash=t-s;break end end;if clash then break end end
   if not clash then break end
   sink=clash+.026
-  if sink>.045 then return end
+  if sink>.07 then return end -- (R149 review part 2: was .045. The Ash Tomato's flat patch tops stand .033 over its tomato tops, so a fruit whose tomato top is near a stand step's top needs up to .056 to clear both)
  end
  if sink>0 then model:PivotTo(CFrame.new(0,-sink,0)*model:GetPivot())end
 end

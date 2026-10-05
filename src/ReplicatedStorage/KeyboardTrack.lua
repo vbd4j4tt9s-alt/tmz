@@ -30,9 +30,9 @@ K.Config={
  TopOffset=0,                                             -- studs added to a mesh key's centre height (mesh top alignment fudge, tune in Studio)
  UseKeycapMesh=true,                                      -- false = every key is a plain block (same size / colours) if the mesh costs too much on phones
  BedDepth=1.6,BedThickness=1,BedMaxLength=1024,           -- the grout bed's top is BedDepth below the floor top: resting keys stand 2.15 proud
- RimWidth=.65,RimInset=.05,RimDrop=.02,                   -- the frame closing the keyboard's sides / ends (its top just under the floor top)
+ RimWidth=.65,RimInset=.05,RimDrop=.04,                   -- the frame closing the keyboard's sides / ends (its top .04 under the floor top: clear of the lobby / arena floor, R149 review part 2)
  PressSeconds=.07,ReleaseSeconds=.16,                     -- quad-out down, back-out up
- HoleLift=.57,                                            -- shovel-hole parts (authored a few hundredths above the floor) are lifted onto the key tops
+ HoleLift=.59,                                            -- shovel-hole parts (authored a few hundredths above the floor) are lifted onto the key tops (+.04: the rim stays over the letter strips, R149 review part 2)
  HoleReach=2,                                             -- keys within this many studs of a hole's Pit stay up (unpressable) while it exists
  PlatformClearance=.3,                                    -- keys under a pack platform (radius + this) are held down: the platform shows on them
  PlayerFootprint=1.2,PlayerFeetReach=3,PlayerRootToFeet=3,-- half-size of a runner's footprint; others press while their feet are within 3 studs of the floor

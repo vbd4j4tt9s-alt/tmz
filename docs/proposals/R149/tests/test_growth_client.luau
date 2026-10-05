@@ -299,6 +299,23 @@ do
   check(not any8 and not Arrival.Pending(c8,1),'Lantern Fern: the fruit vanishes as today, no flight, nothing held')
  else check(true,'(Lantern Fern has no fruit model at this range)')end
 end
+-- 5b. review part 2 (finding 11): a failing animation step does not leave Growth.Batch set (another script's UpdateGrowth in that frame would queue into the garden's batch)
+do
+ local Visuals=W.module('PlantVisuals');local Growth=W.module('PlantGrowth')
+ local m=plant('CloverSeed',-9,-9,{Frac=.3,Seconds=200000});run(3);check(art(m)~=nil,'(a growing plant for the failing step)')
+ local realUpdate=Visuals.UpdateGrowth;local calls=0;local armed=true
+ Visuals.UpdateGrowth=function(...)calls+=1;if armed then error('growth step failed on purpose')end;return realUpdate(...)end
+ local stale,failed=0,0
+ for _=1,40 do
+  local ok=pcall(W.frames,1);if not ok then failed+=1 end
+  if Growth.Batch~=nil then stale+=1 end
+ end
+ armed=false;Visuals.UpdateGrowth=realUpdate
+ check(calls>=1,'(the failing step ran: '..calls..' calls)')
+ check(stale==0,'after a failed animation step Growth.Batch is reset in the same frame ('..stale..' frames ended with it still set)')
+ run(2);check(Growth.Batch==nil and art(m)~=nil,'the garden carries on after the failure')
+ remove(m)
+end
 -- 6. nothing is left behind after all of it -----------------------------------------------------------------------------------------------------------
 do
  for _,c in ipairs(map:GetChildren())do remove(c)end

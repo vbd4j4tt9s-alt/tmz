@@ -11,14 +11,21 @@ local M={Folder='FruitMeshTemplates149'}
 -- seed -> its mesh key, the fruit specs the mesh replaces, the spec whose frame (and, unless Fit='all', size) it takes, the body's name,
 -- its main colour (a plain ellipsoid in that colour stands in on the server if a bake fails mid-build); GlossOut moves the gloss patch out
 -- from the body's centre by that factor (the pumpkin's lobes are fuller than the ribs it sat in).
+-- UnripeNeutral (R149 review part 2, finding 7): the vertex colours are far from green (orange), and a tint can only darken them, so the growing fruit
+-- would stay a dark orange. PlantGrowth.Capture gives every such fruit a temporary twin cloned from the white `_Neutral` template: while the fruit is unripe
+-- the twin is drawn in the same pale-green-to-ripe colour path as every other fruit (Tone is its ripe colour) and the baked body is hidden; at the ripe
+-- moment (the real material switches on) the body shows and the twin hides; EndGrowth destroys the twin. The melons (green vertex colours) keep the tint.
 M.Seeds={
  SunflowerSeed={Key='Watermelon149',Name='Melon body',Body='Melon rind',Replace={'Melon rind','Melon stripe band'},Tone={108,180,76}},
  SnowdropSeed={Key='SnowMelon149',Name='Snow melon body',Body='Snow melon rind',Replace={'Snow melon rind','Snow melon stripe band','Snow cap'},Tone={190,232,234}},
- EmberBloomSeed={Key='EmberPumpkin149',Name='Pumpkin body',Body='Pumpkin heart',Replace={'Pumpkin heart','Pumpkin rib','Ember groove'},Fit='all',Tone={232,108,28},GlossOut=1.1},
+ EmberBloomSeed={Key='EmberPumpkin149',Name='Pumpkin body',Body='Pumpkin heart',Replace={'Pumpkin heart','Pumpkin rib','Ember groove'},Fit='all',Tone={232,108,28},GlossOut=1.1,UnripeNeutral=true},
 }
 M.Keys={'EmberPumpkin149','SnowMelon149','Watermelon149'}
 local owned={};for _,k in ipairs(M.Keys)do owned[k]=true end
 function M.Owns(key)return owned[key]==true end
+local byKey={};for _,cfg in pairs(M.Seeds)do byKey[cfg.Key]=cfg end
+-- The config of a mesh key (the coloured template, not its `_Neutral` twin) whose growing fruit is drawn from the neutral twin (PlantGrowth.Capture), or nil.
+function M.UnripeNeutral(key)local cfg=byKey[key];if cfg and cfg.UnripeNeutral then return cfg end;return nil end
 
 -- 1. The meshes ------------------------------------------------------------------------------------------------------------------
 local pi,sin,cos,abs,exp=math.pi,math.sin,math.cos,math.abs,math.exp

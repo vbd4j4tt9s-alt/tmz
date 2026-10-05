@@ -557,10 +557,12 @@ function Visuals.FruitProxy(parent,id,crop,index,origin,work)
  for _,p in ipairs(parent:GetDescendants())do if p:IsA('BasePart')and p.Transparency<.95 then p:SetAttribute('FruitProxy',true);p:SetAttribute('HarvestIndex',index);p.CanQuery=true end end
 end
 
-function Visuals.BeginGrowth(model,id,crop,origin)
+-- options (R149 review part 2, finding 2): {Plain=true} for a model nobody sees up close (the server's silhouettes, DistantPlantView): the leaves skip the
+-- contact pass and only appear in turn; {Work=work} for the near-detail build job: the pass yields through the job's budget.
+function Visuals.BeginGrowth(model,id,crop,origin,options)
  Visuals.EndGrowth(model)
  local sockets={};for i=1,Catalog[id].FruitCount do sockets[i]=Visuals.FruitSocket(crop,Catalog[id],i)end
- local state=Growth.Capture(model,id,Catalog[id],crop,origin,sockets);growthStates[model]=state
+ local state=Growth.Capture(model,id,Catalog[id],crop,origin,sockets,options);growthStates[model]=state
  state.Connection=model.Destroying:Connect(function()growthStates[model]=nil end)
  return state
 end
@@ -568,6 +570,7 @@ function Visuals.EndGrowth(model,crop,now)
  local state=growthStates[model];if not state then return end
  if crop then Growth.Apply(state,crop,math.max(now or 0,crop.ReadyAt or 0,crop.MatureAt or 0))end
  if state.Seed then state.Seed:Destroy()end;for _,p in ipairs(state.Sprout)do p:Destroy()end;for _,b in pairs(state.Buds)do b.Part:Destroy();b.Stem:Destroy()end
+ if state.Twins then for _,p in ipairs(state.Twins)do p:Destroy()end end
  if state.Connection then state.Connection:Disconnect()end;growthStates[model]=nil
 end
 function Visuals.UpdateGrowth(model,crop,now)
@@ -581,9 +584,10 @@ function Visuals.BuildGrowing(id,origin,crop,now,stage,work)
  end
  local ripe=table.clone(crop);ripe.ReadyAt=0
  local model=Visuals.Build(id,origin,ripe,4,math.huge,nil,work)
- Visuals.BeginGrowth(model,id,crop,origin);Visuals.UpdateGrowth(model,crop,now)
+ Visuals.BeginGrowth(model,id,crop,origin,work and{Work=work}or nil);Visuals.UpdateGrowth(model,crop,now)
  return model
 end
+local PLAIN={Plain=true} -- (the server's silhouettes: no leaf-attachment pass, see BeginGrowth)
 function Visuals.GrowingSupports(id,origin,crop,stage,parent,now)
  local def=Catalog[id];local ripe=table.clone(crop);ripe.ReadyAt=0
  Visuals.Supports(id,origin,ripe,4,parent)
@@ -593,7 +597,7 @@ function Visuals.GrowingSupports(id,origin,crop,stage,parent,now)
    Visuals.FruitProxy(group,id,ripe,index,origin)
   end
  end end
- Visuals.BeginGrowth(parent,id,crop,origin);Visuals.UpdateGrowth(parent,crop,now)
+ Visuals.BeginGrowth(parent,id,crop,origin,PLAIN);Visuals.UpdateGrowth(parent,crop,now)
 end
 function Visuals.GrowingFruitSupports(id,origin,crop,parent,now)
  local def=Catalog[id];local ripe=table.clone(crop);ripe.ReadyAt=0
@@ -601,7 +605,7 @@ function Visuals.GrowingFruitSupports(id,origin,crop,parent,now)
   local group=Instance.new('Folder');group.Name='GrowingHarvest_'..index;group.Parent=parent
   Visuals.FruitProxy(group,id,ripe,index,origin)
  end end
- Visuals.BeginGrowth(parent,id,crop,origin);Visuals.UpdateGrowth(parent,crop,now)
+ Visuals.BeginGrowth(parent,id,crop,origin,PLAIN);Visuals.UpdateGrowth(parent,crop,now)
 end
 
 -- Find an actual current sculpture surface from authored native bounds; never accept a client position.

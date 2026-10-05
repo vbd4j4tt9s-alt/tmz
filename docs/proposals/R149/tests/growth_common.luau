@@ -53,11 +53,11 @@ function C.crop(id,extra)
  for k,v in pairs(extra or{})do c[k]=v end;return c
 end
 -- A ripe model and its growth state, built by `Growth` (the base module or the new one) exactly as PlantVisuals.BuildGrowing does it.
-function C.grow(Growth,id,crop)
+function C.grow(Growth,id,crop,options)
  local def=C.Catalog[id];local ripe=table.clone(crop);ripe.ReadyAt=0
  local model=C.Visuals.Build(id,C.origin,ripe,4,math.huge,nil,nil);model.Parent=W.workspace
  local sockets={};for i=1,def.FruitCount do sockets[i]=C.Visuals.FruitSocket(crop,def,i)end
- return model,Growth.Capture(model,id,def,crop,C.origin,sockets)
+ return model,Growth.Capture(model,id,def,crop,C.origin,sockets,options)
 end
 -- A fruit model (Harvest_n of a mature plant) and its growth state, as syncFruit builds it for a regrowing fruit.
 function C.growFruit(Growth,id,crop,index)
@@ -99,5 +99,6 @@ function C.sameAs(a,b)return select(1,C.sameParts(a,b))end
 function C.finish(Growth,state,crop,now)
  Growth.Apply(state,crop,math.max(now or 0,crop.ReadyAt or 0,crop.MatureAt or 0))
  if state.Seed then state.Seed:Destroy()end;for _,p in ipairs(state.Sprout)do p:Destroy()end;for _,b in pairs(state.Buds)do b.Part:Destroy();b.Stem:Destroy()end
+ if state.Twins then for _,p in ipairs(state.Twins)do p:Destroy()end end
 end
 return C

@@ -9,10 +9,14 @@ Default (against the commit before the redesigns). Allowed to differ (everything
     group ('bodyonly', 'supportsnoidx': the art-list index of body specs behind a changed fruit moves, nothing else).
   * the Ash Tomato (AshRoseSeed): its look stays: a crop that lands on design 1 (key ending d0) must match the base in EVERY mode except the key
     (which gains the design suffix); the catalog row is identical; at least one of the sampled crops lands on each of the other 3 designs.
+    EXCEPT its 12 "Flat ash patch" blocks (review part 2, finding 5: .02 thicker, .01 higher, no z-fighting with the tomato top): dump_plants.luau
+    writes a twin "<mode>~np" of every Ash Tomato mode without those parts / specs; a mode may differ only when its twin is identical (so exactly the
+    patch lines differ), and the patch touch-up must show (the specs and the built plant differ).
   * the Prickly Pear (CactusSeed) is back to its current look (owner): identical in every mode, all 8 sampled crops, both designs.
 --fallback: a server whose fruit-mesh bake fails (or never runs) must show exactly the R149 part-built fruit: every plant identical in every mode,
   the Watermelon / Snow Melon / Ember Pumpkin included; only the Prickly Pear may differ (R149 had redesigned it, this checkout reverts it), and
-  for it only the art / plant / harvest lines (catalog, key, prompts, body-only parts identical).
+  for it only the art / plant / harvest lines (catalog, key, prompts, body-only parts identical); and the Ash Tomato's flat ash patches (all four
+  designs, same twin rule as above).
 Prints one summary line per group and 'only the allowed lines differ' when it holds (exit 0), else the offending lines (exit 1)."""
 import sys
 
@@ -59,7 +63,7 @@ for key in sorted(set(base) & set(new)):
                 redesigned_same += 1
         else:
             redesigned_diff += (b != n)
-    elif plant == 'AshRoseSeed' and not FALLBACK:
+    elif plant == 'AshRoseSeed':
         if crop == '-':
             if b != n:
                 bad.append('AshRoseSeed catalog row changed')
@@ -73,10 +77,42 @@ for key in sorted(set(base) & set(new)):
             bad.append('%s %s %s changed: %s -> %s' % (plant, crop, mode, b[0][:12], n[0][:12]))
     if b[0].startswith('ERR') or n[0].startswith('ERR'):
         bad.append('%s %s %s did not build (%s / %s)' % (plant, crop, mode, b[0], n[0]))
+
+
+def patch_rules(crop, modes, label):
+    """The Ash Tomato's flat ash patches may differ, nothing else: a mode may differ only when its '~np' twin (the same mode without the patch
+    parts / specs) is identical, and the twins themselves must be identical. Returns how many modes differ because of the patches."""
+    differ = 0
+    for mode, (b, n) in sorted(modes.items()):
+        if mode == 'key':
+            continue
+        if mode.endswith('~np'):
+            if b != n:
+                bad.append('AshRoseSeed %s %s (%s) changed beyond the flat ash patches' % (crop, mode, label))
+        elif b != n:
+            twin = modes.get(mode + '~np')
+            if twin is None or twin[0] != twin[1]:
+                bad.append('AshRoseSeed %s %s (%s) changed beyond the flat ash patches' % (crop, mode, label))
+            else:
+                differ += 1
+    for must in ('specs', 'ripe'):
+        if modes[must][0] == modes[must][1]:
+            bad.append('AshRoseSeed %s %s (%s): the flat ash patches were not touched up' % (crop, must, label))
+    return differ
+
+
 if FALLBACK:
-    for must in ('SunflowerSeed', 'SnowdropSeed', 'EmberBloomSeed', 'AshRoseSeed'):
+    for must in ('SunflowerSeed', 'SnowdropSeed', 'EmberBloomSeed'):
         if must not in plants:
             bad.append('%s was not compared' % must)
+    ash_patch_lines = 0
+    for crop, modes in sorted(ash.items()):
+        if modes['key'][0] != modes['key'][1]:
+            bad.append('AshRoseSeed %s key changed' % crop)
+        ash_patch_lines += patch_rules(crop, modes, 'all designs')
+    if len(ash) < 8:
+        bad.append('AshRoseSeed was not compared in full (%d crops)' % len(ash))
+    print('Ash Tomato: %d crops, %d patch-dependent lines differ (the flat ash patches only), everything else identical' % (len(ash), ash_patch_lines))
     print('%d plants (%d lines) identical to the R149 part-built base, the Watermelon / Snow Melon / Ember Pumpkin included' % (len(plants), same))
     print('Prickly Pear: %d catalog / key / prompt / reach / socket / body-only lines identical, %d art / plant / harvest lines differ (back to its current look)'
           % (redesigned_same, redesigned_diff))
@@ -84,14 +120,13 @@ if FALLBACK:
         bad.append('the Prickly Pear does not differ from the R149 redesign: was it reverted?')
 else:
     designs = {}
+    ash_patch_lines = 0
     for crop, modes in ash.items():
         keyn = modes['key'][1][0]
         d = keyn.rsplit('d', 1)[1] if 'd' in keyn.split(':')[-1] else None
         designs.setdefault(d, []).append(crop)
         if d == '0':
-            for mode, (b, n) in modes.items():
-                if mode != 'key' and b != n:
-                    bad.append('AshRoseSeed %s %s (design 1) changed: its look must stay' % (crop, mode))
+            ash_patch_lines += patch_rules(crop, modes, 'design 1')
         else:
             if modes['ripe'][0] == modes['ripe'][1]:
                 bad.append('AshRoseSeed %s (design %s) is not a variation' % (crop, d))
@@ -103,7 +138,8 @@ else:
         bad.append('the Prickly Pear was not compared in full (%d lines)' % pear)
     print('%d plants (%d lines) identical to the base, the Prickly Pear (%d lines, 8 crops) included, none changed: %s...' % (len(plants), same, pear, ', '.join(sorted(plants)[:6])))
     print('7 redesigned fruit: %d catalog / key / prompt / reach / socket / body-only lines identical, %d art / plant / harvest lines differ' % (redesigned_same, redesigned_diff))
-    print('Ash Tomato: crops per design %s; a design-1 crop is identical to the base in every mode' % {('design %d' % (int(k) + 1)): len(v) for k, v in sorted(designs.items()) if k is not None})
+    print('Ash Tomato: crops per design %s; a design-1 crop is identical to the base in every mode but its flat ash patches (%d patch-dependent lines differ)'
+          % ({('design %d' % (int(k) + 1)): len(v) for k, v in sorted(designs.items()) if k is not None}, ash_patch_lines))
 if bad:
     print('\n'.join(bad[:40]))
     sys.exit(1)

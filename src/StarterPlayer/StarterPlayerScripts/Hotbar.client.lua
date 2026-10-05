@@ -295,10 +295,12 @@ refresh=function()
  local items={};local containers={bag};if player.Character then table.insert(containers,player.Character)end
  local arrived;local clock=os.clock()
  for k,at in pairs(released)do if clock-at>6 then released[k]=nil end end
- for _,container in ipairs(containers)do for _,tool in ipairs(container:GetChildren())do if tool:IsA('Tool')and not Arrival.Holds(tool)then
-  if not seen[tool]then sequence+=1;seen[tool]=sequence end
+ for _,container in ipairs(containers)do for _,tool in ipairs(container:GetChildren())do if tool:IsA('Tool')and(seen[tool]or not Arrival.Holds(tool))then
+  -- (R149: only a tool that was never shown is held back; an older fruit of the same plant and slot keeps its place while the new one flies)
+  local isNew=not seen[tool]
+  if isNew then sequence+=1;seen[tool]=sequence end
   local key=stackKey(tool)or Info.Key(tool)or('tool-'..seen[tool]);notePack(tool,key)local order=tool:GetAttribute('GardenShovel')and-1 or seen[tool];local e=items[key]
-  local arrival=released[Arrival.ToolKey(tool)or'']
+  local arrival=isNew and released[Arrival.ToolKey(tool)or'']
   if arrival then released[Arrival.ToolKey(tool)]=nil;arrived=arrived or{};arrived[key]=true end
   if not e then items[key]={Tool=tool,Order=order,Count=1}
   else -- The equipped copy, else the oldest, represents a stack.

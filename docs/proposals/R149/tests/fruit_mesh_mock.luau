@@ -39,7 +39,11 @@ function M.install(W,opts)
  end
  AS.CreateMeshPartAsync=function(_,content,options)
   local p=R.new('MeshPart');p._props.MeshContent=content;p._props.Size=R.Vector3.new(1,1,1)
-  rawset(p,'_options',options);table.insert(log.Parts,p);return p
+  rawset(p,'_options',options);table.insert(log.Parts,p)
+  -- (the engine's Clone keeps a part's attributes: the baked template carries ApprovedMesh and every clone must too; the plain mock Clone drops them)
+  local plainClone=p.Clone
+  rawset(p,'Clone',function(self)local c=plainClone(self);for k,v in pairs(self._attrs)do c._attrs[k]=v end;return c end)
+  return p
  end
  W.env.Content={fromObject=function(o)return {Object=o}end}
  return log

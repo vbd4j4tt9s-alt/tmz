@@ -473,13 +473,51 @@ do
  check(ashKeys>=8,'the Ash Tomato\'s picture key tells the crop variants apart ('..ashKeys..' keys over 60 crops: 4 designs x the jitter)')
 end
 
--- 5. Ash Tomato: four designs (the first is the base's, byte for byte), picked per crop ------------------------------------------------------------------------
+-- 5. Ash Tomato: four designs (the first is the base's, except the flat ash patches' touch-up), picked per crop -------------------------------------------------
 do
  local id='AshRoseSeed';local def=Catalog[id]
  local raw=W.module('ApprovedPlantArt5');local base=Base.Ash
  check(#raw==4 and#base==1,'ApprovedPlantArt5 holds 4 designs (the base had 1)')
- check(deepEqual(raw[1],base[1]),'design 1 is the base\'s Ash Tomato exactly: specs, sockets, centres, radii, Height, Radius')
+ -- design 1 is the base's Ash Tomato exactly, except for its 12 "Flat ash patch" blocks (review part 2, finding 5: a patch's top lay .013 over its tomato's top, a
+ -- near-coplanar pair): each is .02 thicker and its centre .01 higher along its own up axis (column 2 of its rotation), so its bottom stays where it was
  local function bodyOf(design,g)for _,s in ipairs(design.Specs)do if s.g==g and s.f=='Squared ash tomato'then return s end end end
+ local patchesOk,patchCount=true,0
+ do
+  local bs,ds=base[1].Specs,raw[1].Specs;patchesOk=#bs==#ds
+  for i=1,math.min(#bs,#ds)do local o,s=bs[i],ds[i]
+   if o.f=='Flat ash patch'then
+    patchCount+=1;local up={o.c[5],o.c[8],o.c[11]}
+    local want={table.unpack(o.c)};for k=1,3 do want[k]+=.01*up[k]end
+    if not(math.abs(s.z[1]-o.z[1])<1e-9 and math.abs(s.z[2]-(o.z[2]+.02))<1e-9 and math.abs(s.z[3]-o.z[3])<1e-9)then patchesOk=false end
+    for k=1,12 do if math.abs(s.c[k]-want[k])>1e-9 then patchesOk=false end end
+    local rest,orest=table.clone(s),table.clone(o);rest.z,rest.c,orest.z,orest.c=nil,nil,nil,nil
+    if not deepEqual(rest,orest)then patchesOk=false end
+   elseif not deepEqual(s,o)then patchesOk=false end
+  end
+ end
+ check(patchesOk and patchCount==12,'design 1 is the base\'s Ash Tomato, spec by spec, except the 12 flat ash patches: .02 thicker, centre .01 higher along their up axis ('..patchCount..' patches)')
+ do local a,b=table.clone(raw[1]),table.clone(base[1]);a.Specs,b.Specs=nil,nil
+  check(deepEqual(a,b),'... sockets, centres, radii, Height and Radius are the base\'s exactly')
+  -- the margin in every design: along its own up axis (a patch and its tomato share their tilt) a patch's top lies over its tomato's top by .0131 x
+  -- (tomato scale) + .02 x (design scale) = .033 in design 1 and at least .028 in the variations (their tomatoes and the plant are scaled down); its bottom
+  -- still sits inside the tomato (the touch-up moves the top only)
+  local function upOf(s)return {s.c[5],s.c[8],s.c[11]}end
+  local function along(p,u)return p[1]*u[1]+p[2]*u[2]+p[3]*u[3]end
+  local worst,best,count,okAll=1,0,0,true
+  for di=1,4 do
+   for _,patch in ipairs(raw[di].Specs)do if patch.f=='Flat ash patch'then
+    local body=bodyOf(raw[di],patch.g);local u=upOf(patch);local ub=upOf(body);count+=1
+    if along(u,ub)<.999 then okAll=false end
+    local bodyTop=along({body.c[1],body.c[2],body.c[3]},u)+body.z[2]/2
+    local patchC=along({patch.c[1],patch.c[2],patch.c[3]},u)
+    local margin=patchC+patch.z[2]/2-bodyTop;local bottom=patchC-patch.z[2]/2
+    worst=math.min(worst,margin);best=math.max(best,margin)
+    if bottom>=bodyTop-.004 then okAll=false end
+    if di==1 and math.abs(margin-.0331)>.0004 then okAll=false end
+   end end
+  end
+  check(okAll and count==48 and worst>=.028 and best<=.0345,('every flat ash patch of every design (%d) stands %.4f - %.4f over its tomato\'s top along its up axis (was .0131), its bottom inside the tomato'):format(count,worst,best))
+ end
  local seenColours,seenHeights,seenSockets={},{},{}
  for di,d in ipairs(raw)do
   check(#d.Sockets==4 and#d.FruitCenters==4 and#d.FruitRadii==4,'design '..di..': 4 sockets / centres / radii (the same FruitCount)')

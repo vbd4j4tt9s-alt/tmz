@@ -5,7 +5,9 @@
 --  1. held while the flight lasts, shown at the arrival with one flash; the stack count only grows at the arrival;
 --  2. an item that nobody expected (a gift, a purchase) shows at once, without a flash; a failed request releases without a flash;
 --  3. a hold always ends (the deadline); an item without a visible slot flashes the Bag button; the Bag card flashes while the Bag is open;
---  4. the flash is a short fade driven by ONE RenderStepped connection that goes away when it is over; nothing is left connected when the script is destroyed.
+--  4. (review part 2, findings 1 + 8) the hold is for the NEW item only: older fruit of the same plant and fruit slot keep their hotbar slots and the selected
+--     label through a flight and after it, and the flash lands on the stack of the new item;
+--  5. the flash is a short fade driven by ONE RenderStepped connection that goes away when it is over; nothing is left connected when the script is destroyed.
 local W=require('./world');local F=require('./fixtures');local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -105,7 +107,41 @@ local bagItem=harvest('DragonfruitSeed','plant-B',1);Arrival.Expect('plant-B',1)
 local flashing=0;for _,c in ipairs(panel.Items:GetChildren())do if flashOf(c)and flashOf(c).BackgroundTransparency<1 then flashing+=1 end end
 check(flashing>=1,'with the Bag open the card of the arrived item flashes too ('..flashing..')')
 frames(40);open.Activated:Fire();frames(5)
--- 4. clean up --------------------------------------------------------------------------------------------------------------------------------------
+-- 4. an older fruit of the same plant and fruit slot keeps its place (the server stamps every harvest of a regrowing slot with the same SourceCropId + FruitIndex) -----
+for _,t in ipairs(bag:GetChildren())do if t:IsA('Tool')and not t:GetAttribute('GardenShovel')then t:Destroy()end end
+for _,t in ipairs(char:GetChildren())do if t:IsA('Tool')then t:Destroy()end end
+frames(10)
+local old1=harvest('AppleSeed','plant-R',1,1,700);old1.Parent=bag
+local old2=harvest('AppleSeed','plant-R',1,1.6,900);old2.Parent=bag
+frames(3)
+for i,k in ipairs({'BananaSeed','PineappleSeed','CactusSeed','AloeSeed','IceberrySeed','FirePepperSeed','SnowdropSeed','CloverSeed','StrawberrySeed','DragonfruitSeed','MonsteraSeed'})do
+ harvest(k,'plant-Y'..i,1,1+i*.1).Parent=bag -- (more stacks than the 9 slots: a slot that is freed would be taken by a bag item)
+end
+frames(10)
+local appleName=Names.Tool(old1,Catalog)
+local function appleSlots()local out={};for i=2,10 do local sl=dock['Slot'..i];if sl.Visible and sl.ItemName.Text==appleName then out[#out+1]=i end end;return out end
+local function names()local out={};for i=2,10 do out[#out+1]=dock['Slot'..i].ItemName.Text end;return table.concat(out,',')end
+local before=table.concat(appleSlots(),',');check(before=='2,3','(two apple stacks on slots 2 and 3, the bag fuller than the hotbar: '..before..')')
+local namesBefore=names()
+hum:EquipTool(old2);frames(5)
+local selected=dock.SelectedName.Text;check(selected:find(appleName,1,true)~=nil,'(the held apple is named under the hotbar: "'..selected..'")')
+local fresh=harvest('AppleSeed','plant-R',1,1.6,900) -- the new fruit of that plant and slot: the same stack as old2
+Arrival.Expect('plant-R',1);fresh.Parent=bag;frames(5)
+check(table.concat(appleSlots(),',')==before and names()==namesBefore,'a new fruit of the same plant and slot is held: every slot keeps its item ('..names()..')')
+check(dock.SelectedName.Text==selected,'... and the selected label stays')
+Arrival.Flying('plant-R',1,.6)
+local blank,moved=0,0
+for _=1,40 do frames(1,1/60);if dock.SelectedName.Text~=selected then blank+=1 end;if names()~=namesBefore then moved+=1 end end
+check(blank==0,'during the flight the selected label never blanks ('..blank..' frames)');check(moved==0,'... and no slot changes its item ('..moved..' frames)')
+local s2=dock.Slot3;check(s2.Count.Visible==false,'the new fruit is not counted before it arrives')
+Arrival.Land('plant-R',1);frames(1)
+check(table.concat(appleSlots(),',')==before and names()==namesBefore,'after landing the slots still hold the same items')
+check(dock.Slot3.Count.Visible and dock.Slot3.Count.Text=='x2','... the new fruit joined the stack it belongs to (x2)')
+check(dock.SelectedName.Text==selected,'... and the selected label is still the held apple')
+check(flashOf(dock.Slot3)~=nil and flashOf(dock.Slot3).BackgroundTransparency<.5,'the flash lands on the new item (its stack), ')
+check(flashOf(dock.Slot2)==nil or flashOf(dock.Slot2).BackgroundTransparency==1,'... not on the older stack of the same plant and slot')
+frames(40,1/60)
+-- 5. clean up --------------------------------------------------------------------------------------------------------------------------------------
 check(connected(W.Run.RenderStepped)==renderBefore,'no flash is left running')
 local listeners=0;for _ in ipairs({})do end
 scriptInst:Destroy();frames(2)

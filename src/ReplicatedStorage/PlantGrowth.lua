@@ -6,7 +6,8 @@ local Rules=require(game:GetService('ReplicatedStorage'):WaitForChild('PlantRule
 --  #2 every part keeps its grown pose (Home) so GardenVisuals can sway a growing plant through the animation batch (G.Place);
 --  #3 the seedling springs up and opens its leaves as the R112 dirt pile sinks (server-time driven, so every client agrees);
 --  #4 fast-start size curve (G.Shape);  #5 leaves keep their opacity and grow out of the point where they join the stem;
---  #6 fruit: pale green of its own colour pattern, plump + settle, bright ripening path, real material at the ripe moment.
+--  #6 fruit: pale green of its own colour pattern, plump + settle, bright ripening path, real material at the ripe moment (a baked fruit whose vertex
+--      colours are far from green, the Ember Pumpkin, grows as its white neutral twin and swaps to the baked body at that moment: addTwins).
 -- Lantern Fern and Amethyst Grape (G.Frozen) keep EXACTLY today's drawing (the 'classic' branch): only #1 applies to them.
 local G={};local V,CF=Vector3.new,CFrame.new
 local function unit(v)return math.clamp(v,0,1)end
@@ -136,38 +137,64 @@ local CONTACT=.04
 local function geometry(r,index)
  local f=r.Frame;local h=r.Size*.5;local c=r.Pos;local x,y,z=f.RightVector.Unit,f.UpVector.Unit,f.LookVector.Unit -- (unit axes: art rotations carry rounding)
  local hx,hy,hz=x*h.X,y*h.Y,z*h.Z
+ -- the box around the part in plant space (a pair whose boxes are further apart than CONTACT on any axis cannot touch: the pre-test of link)
+ local ex=math.abs(x.X)*h.X+math.abs(y.X)*h.Y+math.abs(z.X)*h.Z
+ local ey=math.abs(x.Y)*h.X+math.abs(y.Y)*h.Y+math.abs(z.Y)*h.Z
+ local ez=math.abs(x.Z)*h.X+math.abs(y.Z)*h.Y+math.abs(z.Z)*h.Z
  return {R=r,Idx=index,C=c,X=x,Y=y,Z=z,H=h,Rho=h.Magnitude,
-  -- the point itself, the 6 face centres and the 8 corners
-  S={c,c+hx,c-hx,c+hy,c-hy,c+hz,c-hz,c+hx+hy+hz,c+hx+hy-hz,c+hx-hy+hz,c+hx-hy-hz,c-hx+hy+hz,c-hx+hy-hz,c-hx-hy+hz,c-hx-hy-hz}}
+  Lx=c.X-ex,Ux=c.X+ex,Ly=c.Y-ey,Uy=c.Y+ey,Lz=c.Z-ez,Uz=c.Z+ez,
+  -- the point itself and the 8 corners (R149 review: 9 sample points, not 15)
+  S={c,c+hx+hy+hz,c+hx+hy-hz,c+hx-hy+hz,c+hx-hy-hz,c-hx+hy+hz,c-hx+hy-hz,c-hx-hy+hz,c-hx-hy-hz}}
 end
 local function boxGap(g,q) -- squared distance from a point to the box of a part
  local d=q-g.C;local h=g.H
  local x=math.max(math.abs(d:Dot(g.X))-h.X,0);local y=math.max(math.abs(d:Dot(g.Y))-h.Y,0);local z=math.max(math.abs(d:Dot(g.Z))-h.Z,0)
  return x*x+y*y+z*z
 end
-local function contact(a,b) -- the smallest squared gap between a's sample points and b's box, and b's sample points and a's box; and that point
+local function contact(a,b) -- the smallest squared gap between a's sample points and b's box, and b's sample points and a's box (0 ends the search)
+ local best=math.huge
+ for _,q in ipairs(a.S)do local d=boxGap(b,q);if d<best then if d==0 then return 0 end;best=d end end
+ for _,q in ipairs(b.S)do local d=boxGap(a,q);if d<best then if d==0 then return 0 end;best=d end end
+ return best
+end
+-- Where a leaf joins its parent (worked out once per leaf, after the parent was chosen): the first of the 15 points of both boxes (the centre, the 6 face
+-- centres, the 8 corners) with the smallest gap. The search above uses only 9 of them (centre + corners) to stay cheap, but a leaf grows out of the CENTRE OF ITS
+-- BASE FACE, which a corner would not give.
+local function fullPoints(g)
+ local c,h=g.C,g.H;local hx,hy,hz=g.X*h.X,g.Y*h.Y,g.Z*h.Z
+ return {c,c+hx,c-hx,c+hy,c-hy,c+hz,c-hz,c+hx+hy+hz,c+hx+hy-hz,c+hx-hy+hz,c+hx-hy-hz,c-hx+hy+hz,c-hx+hy-hz,c-hx-hy+hz,c-hx-hy-hz}
+end
+local function joint(a,b)
  local best,at=math.huge,nil
- for _,q in ipairs(a.S)do local d=boxGap(b,q);if d<best then best=d;at=q end end
- for _,q in ipairs(b.S)do local d=boxGap(a,q);if d<best then best=d;at=q end end
- return best,at
+ for _,q in ipairs(fullPoints(a))do local d=boxGap(b,q);if d<best then best=d;at=q;if d==0 then return at end end end
+ for _,q in ipairs(fullPoints(b))do local d=boxGap(a,q);if d<best then best=d;at=q;if d==0 then return at end end end
+ return at
 end
 local function leafStart(state,r,at,height,radius)
  local level=state.Profile=='Vine'and V(at.X,0,at.Z).Magnitude/radius or at.Y/height
  return T.LeafStart+T.LeafSpread*unit(level)+((r.Index*37)%11)/11*.03
 end
-local function link(state,height,radius)
- local geo={};local foliage={}
+-- options.Plain (a server silhouette, a distant garden: nobody sees a leaf grow out of its stem from there) and G.PlainLeaves plants: no contact tests, every
+-- leaf only appears in turn (LeafStart). options.Work (the near-detail build job): the pass yields through the job's budget every LINK_YIELD contact tests.
+local LINK_YIELD=32
+local function link(state,height,radius,options)
+ if(options and options.Plain)or G.PlainLeaves[state.Id]then
+  for _,r in ipairs(state.Parts)do if r.Foliage and not r.Fruit then r.LeafStart=leafStart(state,r,r.Pos,height,radius)end end
+  return
+ end
+ local geo={};local foliage={};local work=options and options.Work
  for _,r in ipairs(state.Parts)do if not r.Fruit then
   local g=geometry(r,#geo+1);geo[#geo+1]=g
   if r.Foliage then foliage[#foliage+1]=g else g.Rank=0 end
  end end
  if #foliage==0 then return end
- if G.PlainLeaves[state.Id]then for _,f in ipairs(foliage)do f.R.LeafStart=leafStart(state,f.R,f.R.Pos,height,radius)end;return end
  local tests=0
  for _,f in ipairs(foliage)do
   f.Near={}
-  for _,g in ipairs(geo)do if g~=f and(f.C-g.C).Magnitude<=f.Rho+g.Rho+CONTACT then
-   local d,at=contact(f,g);tests+=1;f.Near[#f.Near+1]={G=g,D=d,At=at}
+  local lx,ly,lz,ux,uy,uz=f.Lx-CONTACT,f.Ly-CONTACT,f.Lz-CONTACT,f.Ux+CONTACT,f.Uy+CONTACT,f.Uz+CONTACT
+  for _,g in ipairs(geo)do if g~=f and g.Ux>=lx and g.Lx<=ux and g.Uy>=ly and g.Ly<=uy and g.Uz>=lz and g.Lz<=uz then
+   f.Near[#f.Near+1]={G=g,D=contact(f,g)};tests+=1
+   if work and tests%LINK_YIELD==0 then work.BeforePart(1)end
   end end
  end
  G.Stats.LinkTests+=tests
@@ -182,7 +209,7 @@ local function link(state,height,radius)
    end
    if best then added[#added+1]={f,best}end
   end end
-  for _,a in ipairs(added)do local f,n=a[1],a[2];f.Rank=n.G.Rank+1;f.Parent=n.G;f.Attach=n.At;pending-=1 end
+  for _,a in ipairs(added)do local f,n=a[1],a[2];f.Rank=n.G.Rank+1;f.Parent=n.G;f.Attach=joint(f,n.G);pending-=1 end
   return #added>0
  end
  while pending>0 do
@@ -194,10 +221,10 @@ local function link(state,height,radius)
    local near,gap
    for _,g in ipairs(geo)do if g.Rank and g~=low then local d=(g.C-low.C).Magnitude-g.Rho;if not gap or d<gap then near,gap=g,d end end end
    if near then
-    local at,far=low.S[1],math.huge;for _,q in ipairs(low.S)do local d=(q-near.C).Magnitude;if d<far then at,far=q,d end end
+    local points=fullPoints(low);local at,far=points[1],math.huge;for _,q in ipairs(points)do local d=(q-near.C).Magnitude;if d<far then at,far=q,d end end
     low.Rank=near.Rank+1;low.Parent=near;low.Attach=at
    else
-    local at=low.S[1];for _,q in ipairs(low.S)do if q.Y<at.Y then at=q end end
+    local points=fullPoints(low);local at=points[1];for _,q in ipairs(points)do if q.Y<at.Y then at=q end end
     low.Rank=1;low.Attach=at
    end
    low.R.Free=true -- (it touches nothing in the mature plant: attached to the nearest part)
@@ -234,7 +261,45 @@ function G.StateOf(model)
  if state then registry[model]=nil end
  return nil
 end
-function G.Capture(model,id,def,crop,origin,sockets)
+-- R149 review part 2 (finding 7): a baked fruit whose vertex colours are far from green (FruitMeshes149 UnripeNeutral: the Ember Pumpkin) cannot grow pale
+-- green by tinting (a tint only darkens). Such a fruit gets a TWIN: a temporary part cloned from the white `_Neutral` template, drawn in the ordinary
+-- pale-green -> ripe colour path of the seed's tone while the fruit is unripe. The baked body stays where it is, hidden until the ripe moment (the same moment
+-- the real material switches on); there the twin hides and the body shows with exactly the writes it always had. Visuals.EndGrowth destroys the twins.
+-- No parenting changes at the ripe moment, one Transparency write on each of the two parts. Anything that goes wrong (a template that is still
+-- loading, a bake that failed) leaves the fruit as it was.
+local function unripeNeutral(key)
+ local ok,M=pcall(function()return require(script.Parent.FruitMeshes149)end)
+ if ok and type(M)=='table'and M.UnripeNeutral then return M.UnripeNeutral(key),M end
+ return nil
+end
+local function addTwins(state,crop)
+ if crop.Mutation~=nil and crop.Mutation~='None'then return end -- (a coated plant: its fruit grow from the neutral mesh already, in the coat's own colours)
+ local list
+ for _,r in ipairs(state.Parts)do if r.Fruit and r.Mesh then
+  local key=r.Part:GetAttribute('ApprovedMesh')
+  if type(key)=='string'then local cfg,M=unripeNeutral(key);if cfg then list=list or{};list[#list+1]={r,cfg,M,key}end end
+ end end
+ if not list then return end
+ state.Twins={}
+ for _,e in ipairs(list)do
+  local r,cfg,M,key=e[1],e[2],e[3],e[4];local p=r.Part
+  local ok,template=pcall(M.Get,key,true)
+  if ok and template then
+   local t=template:Clone();local tone=Color3.fromRGB(cfg.Tone[1],cfg.Tone[2],cfg.Tone[3])
+   t.Name='Growing fruit body';t.Anchored=true;t.CanCollide=false;t.CanTouch=false;t.CanQuery=false;t.CastShadow=p.CastShadow
+   t.Material=Enum.Material.SmoothPlastic;t.Color=tone;t.Size=p.Size;t.CFrame=p.CFrame;t.Transparency=1
+   t:SetAttribute('GrowthTemporary',true);t.Parent=p.Parent
+   local q={Part=t,Frame=r.Frame,Size=r.Size,Color=tone,Material=Enum.Material.SmoothPlastic,Alpha=r.Alpha,Query=false,Group=r.Group,Fruit=true,Foliage=false,
+    Index=r.Index,Pos=r.Pos,Rot=r.Rot,Gi=r.Gi,Anchor=r.Anchor,Mesh=false,Twin=true,
+    WS=t.Size,WT=1,WC=t.Color,WM=t.Material,WQ=false,WCol=false}
+   q.Ripe=green:Lerp(tone,1);q.Unripe=G.Unripe(tone);q.H0,q.S0,q.V0=toHSV(q.Unripe);q.H1,q.S1,q.V1=toHSV(tone)
+   q.Grey=q.S1<.08;q.DH=q.H1-q.H0;if q.DH>.5 then q.DH-=1 elseif q.DH<-.5 then q.DH+=1 end;q.VMin=math.min(q.V0,q.V1)
+   r.Held=true;table.insert(state.Parts,q);table.insert(state.Twins,t)
+  end
+ end
+ if #state.Twins==0 then state.Twins=nil end
+end
+function G.Capture(model,id,def,crop,origin,sockets,options)
  if def.Mech then return require(script.Parent.MechGrowth).Capture(model,id,def,crop,origin,sockets)end
  if def.Verity then return require(script.Parent.VerityGrowth).Capture(model,id,def,crop,origin,sockets)end
  local state={Model=model,Id=id,Def=def,Origin=origin,Parts={},Buds={},Profile=G.Profile(id,def),Frozen=G.Frozen[id]==true,
@@ -283,7 +348,10 @@ function G.Capture(model,id,def,crop,origin,sockets)
   state.Buds[i]={Part=bud,Stem=stem,Anchor=anchor,Socket=socket,PartT={WS=bud.Size,WT=1},StemT={WS=stem.Size,WT=1}}
  end
  for _,r in ipairs(state.Parts)do r.Anchor=state.Anchors[r.Group]end
- if not state.Frozen then link(state,height,radius)end
+ if not state.Frozen then
+  if id~='StarfruitSeed'then addTwins(state,crop)end
+  link(state,height,radius,options)
+ end
  state.GS=growthSeed(crop)
  registry[model]=state
  model.Destroying:Connect(function()if registry[model]==state then registry[model]=nil end end)
@@ -461,6 +529,8 @@ function G.Apply(state,crop,now)
    end
    local s0=r.Size;size=V(math.max(.01,s0.X*amount),math.max(.01,s0.Y*amount),math.max(.01,s0.Z*amount))
    local tr=alive and amount>.0001 and alpha or 1
+   -- a twin (see addTwins) shows while its fruit is unripe, the baked body it stands in for from the ripe moment on
+   if r.Twin then if ripe then tr=1 end elseif r.Held and not ripe then tr=1 end
    putPart(state,r,p,size,tr,color,material,ripe and body>=1 and r.Query or false,at,base)
   end
  end

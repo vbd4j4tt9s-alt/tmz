@@ -12,9 +12,14 @@
 #  test_growth_fx.luau     #7 ripe bounce + glints and #8 harvest flight: budgets per tier, limits, cleanup, no leaks, no connection per fruit;
 #  test_growth_client.luau the real GardenVisuals: sway budget, sprout with the dirt pile, bounce on maturing, flights to the harvester (own / other garden),
 #                          reduced motion, stream-out cleanup;
-#  test_growth_hotbar.luau the real Hotbar: a harvested item is held out of the inventory view until the fruit arrives, then its slot flashes;
+#  test_growth_hotbar.luau the real Hotbar: a harvested item is held out of the inventory view until the fruit arrives, then its slot flashes; (review part 2)
+#                          an older fruit of the same plant and slot keeps its slot and the selected label through a flight, the flash lands on the new item;
+#  test_growth_unripe.luau (review part 2, #7) the baked Ember Pumpkin grows pale green: its neutral twin while unripe, the baked body from the ripe moment, the
+#                          final ripe look identical (with the server bake on the mock);
 #  floating parts          the R134 check_floating.py over the plants at 25 / 50 / 75 %: no part floats that did not float in the base's drawing;
-#  write benchmark         bench_garden.luau on the base src and on this checkout: the property writes a second of one growing plant under the real scheduler.
+#  write benchmark         bench_garden.luau on the base src and on this checkout: the property writes a second of one growing plant under the real scheduler;
+#  capture benchmark       bench_capture.luau (review part 2, #5 leaf link): PlantGrowth.Capture of every plant, near detail (leaf attachment pass, yielding through the
+#                          build job's budget) and as a server silhouette / distant garden (no pass).
 # With "mutate" the suites run against deliberately broken copies of the sources: every mutation must make its test fail.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -26,11 +31,11 @@ git -C "$REPO" show "$BASE:src/ReplicatedStorage/PlantGrowth.lua" > "$OUT/PlantG
 # bundle <src tree> <world dir>: every ReplicatedStorage module of that tree + the base PlantGrowth + the client scripts the tests load
 bundle() {
  mkdir -p "$2"
- cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/growth_common.luau" "$HERE"/test_growth*.luau "$HERE/bench_garden.luau" "$2/"
+ cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/growth_common.luau" "$HERE/fruit_mesh_mock.luau" "$HERE"/test_growth*.luau "$HERE/bench_garden.luau" "$HERE/bench_capture.luau" "$2/"
  python3 "$HERE/mkbundle_any.py" "$1/ReplicatedStorage" "$2/rs_bundle.luau" PlantGrowthBase="$OUT/PlantGrowthBase.lua" \
   GardenVisuals="$1/$SP/GardenVisuals.client.lua" Hotbar="$1/$SP/Hotbar.client.lua" >/dev/null
 }
-TESTS="test_growth test_growth_writes test_growth_look test_growth_fx test_growth_client test_growth_hotbar"
+TESTS="test_growth test_growth_writes test_growth_look test_growth_fx test_growth_client test_growth_hotbar test_growth_unripe"
 runall() { # $1 = world dir, $2... = tests; prints the last line of each; non-zero when one fails
  d=$1;shift;rc=0
  for t in "$@"; do
@@ -68,6 +73,9 @@ for (pid, mode), v in b.items():
     tot_b = v['total']; tot_s = s['total']; tot_w = w['total']
     print('%-18s %5d %6d | %10.0f %10.0f | %10.0f %10.0f | %7.0f + %6.0f = %7.0f  (x%.1f; no sway x%.0f)' % (pid, v['parts'], v['seconds'], v['writes'], v['moves'], s['writes'], s['moves'], w['writes'], w['moves'], tot_w, tot_b / max(1, tot_w), tot_b / max(1, tot_s)))
 PY
+ echo "== capture benchmark: PlantGrowth.Capture of every plant on the mock (ms of CPU; near = leaf attachment pass, silhouette = server / distant garden)"
+ (cd "$OUT/new" && timeout 1800 /opt/luau/luau bench_capture.luau 2>&1 | grep '^CAPTURE' > capture.txt)
+ grep 'FrostFernSeed\|MonsteraSeed\|DesertAloeSeed\|^CAPTURE_TOTAL' "$OUT/new/capture.txt"
  exit 0
 fi
 # --- mutation checks: break one thing at a time in a copy of src; the named test must fail ----------------------------------------------------
@@ -98,12 +106,12 @@ mutate "the sprout ignores the pile's beat" $P "return crop.SproutAt or planted+
 mutate "the real material switches on early" $P "if not ripe then material=Enum.Material.SmoothPlastic end" "if f<.82 then material=Enum.Material.SmoothPlastic end" test_growth_look
 mutate "the final write keeps the sway pose" $P "if final and state.Pose then" "if false and state.Pose then" test_growth_look
 mutate "the sway budget is not respected" $G "windModels<6 and windParts+entry.Cost<=600 then
-      windParts+=entry.Cost;windModels+=1
-      if r.MotionDue then
-       r.Pose=r.Origin*Growth.Sway(seed" "true then
-      windParts+=entry.Cost;windModels+=1
-      if r.MotionDue then
-       r.Pose=r.Origin*Growth.Sway(seed" test_growth_client
+     windParts+=entry.Cost;windModels+=1
+     if r.MotionDue then
+      r.Pose=r.Origin*Growth.Sway(seed" "true then
+     windParts+=entry.Cost;windModels+=1
+     if r.MotionDue then
+      r.Pose=r.Origin*Growth.Sway(seed" test_growth_client
 mutate "reduced motion does not stop the growing sway" $G "if not reducedNow and r.Mode=='normal'and not r.FruitOnly and Growth.Sways" "if r.Mode=='normal'and not r.FruitOnly and Growth.Sways" test_growth_client
 mutate "no limit on ripe cues" $F "CueGap=.18,CueWindow=2,CueMax=6," "CueGap=0,CueWindow=2,CueMax=600," test_growth_fx
 mutate "no cap on flying fruit" $F "{Pulses=4,PulseParts=120,Sparks=4,Flights=8,FlightParts=200,Range=48}" "{Pulses=4,PulseParts=120,Sparks=4,Flights=80,FlightParts=2000,Range=48}" test_growth_fx
@@ -111,8 +119,29 @@ mutate "reduced motion does not stop the effects" $F "if reduced or off then ret
 mutate "a refused flight leaves the inventory held" $F "local function refuse()Arrival.Land(cropId,index);return false end" "local function refuse()return false end" test_growth_fx
 mutate "the flight ignores a harvester that died" $F "if not f.Model.Parent or not root.Parent or f.Humanoid.Health<=0 then" "if not f.Model.Parent or not root.Parent then" test_growth_fx test_growth_client
 mutate "the fruit does not shrink on the way" $F "1-(1-M.Tuning.ShrinkTo)*smooth(u)" "1" test_growth_fx
-mutate "the inventory shows the item before the fruit arrives" $H "if tool:IsA('Tool')and not Arrival.Holds(tool)then" "if tool:IsA('Tool')then" test_growth_hotbar
+mutate "the inventory shows the item before the fruit arrives" $H "if tool:IsA('Tool')and(seen[tool]or not Arrival.Holds(tool))then" "if tool:IsA('Tool')then" test_growth_hotbar
+mutate "a hold hides older fruit of the same plant and slot (they lose their hotbar slots)" $H "if tool:IsA('Tool')and(seen[tool]or not Arrival.Holds(tool))then" "if tool:IsA('Tool')and not Arrival.Holds(tool)then" test_growth_hotbar
+mutate "the arrival flash lands on any tool of that plant and slot" $H "local arrival=isNew and released[Arrival.ToolKey(tool)or'']" "local arrival=released[Arrival.ToolKey(tool)or'']" test_growth_hotbar
 mutate "no flash when the item arrives" $H "flashOf(b).BackgroundTransparency=.3;flashes[b]=os.clock()" "flashes[b]=nil" test_growth_hotbar
+# review part 2
+V=ReplicatedStorage/PlantVisuals.lua;D=ReplicatedStorage/DistantPlantView.lua;FM=ReplicatedStorage/FruitMeshes149.lua;AF=ReplicatedStorage/ApprovedFruitEffects.lua
+mutate "the server's silhouettes run the leaf attachment pass" $V "origin,PLAIN);Visuals.UpdateGrowth(parent,crop,now)
+end
+function Visuals.GrowingFruitSupports" "origin);Visuals.UpdateGrowth(parent,crop,now)
+end
+function Visuals.GrowingFruitSupports" test_growth_look
+mutate "a distant garden runs the leaf attachment pass" $D "crop.SeedId,crop,origin,PLAIN)" "crop.SeedId,crop,origin)" test_growth_look
+mutate "the near-detail build never yields in the leaf attachment pass" $P "if work and tests%LINK_YIELD==0 then work.BeforePart(1)end" "if false then work.BeforePart(1)end" test_growth_look
+mutate "BuildGrowing does not hand its work budget down" $V "origin,work and{Work=work}or nil)" "origin,nil)" test_growth_look
+mutate "the pumpkin grows tinted again (no neutral twin)" $FM "Tone={232,108,28},GlossOut=1.1,UnripeNeutral=true}" "Tone={232,108,28},GlossOut=1.1}" test_growth_unripe
+mutate "the baked pumpkin body shows while it is unripe" $P "elseif r.Held and not ripe then tr=1 end" "elseif false then tr=1 end" test_growth_unripe
+mutate "the twin stays visible at the ripe moment" $P "if r.Twin then if ripe then tr=1 end" "if r.Twin then if false then tr=1 end" test_growth_unripe
+mutate "EndGrowth leaves the twins in the plant" $V " if state.Twins then for _,p in ipairs(state.Twins)do p:Destroy()end end" " local _=state.Twins" test_growth_unripe
+mutate "a coated plant gets twins too" $P " if crop.Mutation~=nil and crop.Mutation~='None'then return end" " local _=crop" test_growth_unripe
+mutate "a flying Emberfruit snaps back to its plain look when the effect ends" $AF "if part.Parent and part:IsDescendantOf(model)then" "if part.Parent then" test_growth_fx
+mutate "a failed animation step leaves Growth.Batch set" $G " Growth.Batch=nil -- (also when the pass failed: another script's UpdateGrowth in this frame must not queue into the garden's batch, review part 2)
+ if not passOk then error(passWhy,0)end" " if not passOk then error(passWhy,0)end
+ Growth.Batch=nil" test_growth_client
 A=ReplicatedStorage/HarvestArrival.lua
 mutate "an unreleased inventory hold never ends" $A "if left>.01 then watch(k,entry,left)else release(k,true)end" "if left>.01 then watch(k,entry,left)end" test_growth_fx test_growth_hotbar
 mutate "a flight does not extend the inventory hold" $A "entry.Flying=true;entry.Due=os.clock()+seconds+A.Tuning.Margin" "entry.Flying=true" test_growth_fx

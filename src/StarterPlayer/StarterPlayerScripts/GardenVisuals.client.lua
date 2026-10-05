@@ -232,6 +232,44 @@ local function finishJob(job)
  if coroutine.status(job.Thread)~='dead'then coroutine.close(job.Thread)end
  job.Record.Build=nil;activeBuild=nil
 end
+-- R149: the growth / sway pass of the animation step. Its own function so the step can reset Growth.Batch whatever happens in it (review part 2).
+local function growthPass(now,reducedNow)
+ local windParts,windModels=0,0
+ for _,entry in ipairs(ordered)do
+  local r=entry.Record
+  if r.Visual and not r.Build and r.Crop and r.Origin then
+   if r.Growing then
+    -- R121: growth takes 70+ s. Plants within 75 studs keep the full 20 Hz; farther ones refresh at
+    -- 10 Hz (MotionDue) on screen and 2 Hz off screen. R149 (#1): a refresh rewrites a plant only when its growth moved by 1/600
+    -- (PlantGrowth.Apply), and only the properties that changed; its CFrames go through the animation batch.
+    local seed=r.Crop.SeedId
+    -- R149 (#3): a crop planted a moment ago follows its dirt pile (the pile starts after the plant shows up, so this is read until the seedling is up).
+    if r.Crop.PlantedAt and now-r.Crop.PlantedAt<8 then r.Crop.SproutAt=Planting:SinkTime(entry.Item)end
+    -- R149 (#2): growing and regrowing plants sway too, inside the same wind budget as ripe ones (6 plants / 600 parts). The pose is set first, so a
+    -- refresh below writes at it; the parts the growth states do not move (the rest of the plant) go through the rig.
+    if not reducedNow and r.Mode=='normal'and not r.FruitOnly and Growth.Sways(seed,r.Def)and not Hologram.Is(seed)and seed~='ObsidianMawSeed'and motionVisible(entry,65,220)and windModels<6 and windParts+entry.Cost<=600 then
+     windParts+=entry.Cost;windModels+=1
+     if r.MotionDue then
+      r.Pose=r.Origin*Growth.Sway(seed,r.Def,r.Crop,now)
+      if not r.Rig then local skip={};growthStates(r,collectGrowth,skip);r.Rig=Batch.Capture(r.Visual,r.Origin,skip)end
+      growthStates(r,placeGrowth,r.Pose,animationBatch);r.QueuePose=true;r.Swaying=true;r.GrowthSway=true
+     end
+    elseif r.Swaying or r.GrowthSway then
+     r.Pose=r.Origin;r.QueuePose=true;r.Swaying=false
+     if r.GrowthSway then growthStates(r,placeGrowth,nil,animationBatch);r.GrowthSway=false end
+    end
+    if entry.Distance<75 or(r.MotionDue and(entry.OnScreen or now>=(r.NextGrowthAt or 0)))then
+     r.NextGrowthAt=now+.5
+     Visuals.UpdateGrowth(r.Visual,r.Crop,now)
+     for index=1,r.Def.FruitCount do local child=r.Visual:FindFirstChild(harvestNames[index]or'Harvest_'..index);if child then Visuals.UpdateGrowth(child,r.Crop,now)end end
+    end
+   elseif not Hologram.Is(r.Crop.SeedId)and not r.FruitOnly and r.Crop.SeedId~='ObsidianMawSeed'and r.Mode=='normal'and motionVisible(entry,65,220) and windModels<6 and windParts+entry.Cost<=600 then
+    windParts+=entry.Cost;windModels+=1
+    if r.MotionDue then r.Pose=r.Origin*Growth.Sway(r.Crop.SeedId,r.Def,r.Crop,now);r.Rig=r.Rig or Batch.Capture(r.Visual,r.Origin);r.QueuePose=true;r.Swaying=true end
+   elseif r.Swaying then r.Pose=r.Origin;r.QueuePose=true;r.Swaying=false end
+  end
+ end
+end
 local animateClock=0;local frameAverage=1/60
 RunService.Heartbeat:Connect(function(dt)
  Growth.Batch=nil -- (R149: set only inside the animation step below; a step that failed must not leave it set)
@@ -279,44 +317,9 @@ RunService.Heartbeat:Connect(function(dt)
  end
  local reducedNow=Gui.ReducedMotionEnabled==true
  Growth.Batch=animationBatch -- R149: PlantGrowth.Apply queues its CFrames here (flushed below, one BulkMoveTo); every other caller writes directly
- do
-  local now=t;local windParts,windModels=0,0
-  for _,entry in ipairs(ordered)do
-   local r=entry.Record
-   if r.Visual and not r.Build and r.Crop and r.Origin then
-    if r.Growing then
-     -- R121: growth takes 70+ s. Plants within 75 studs keep the full 20 Hz; farther ones refresh at
-     -- 10 Hz (MotionDue) on screen and 2 Hz off screen. R149 (#1): a refresh rewrites a plant only when its growth moved by 1/600
-     -- (PlantGrowth.Apply), and only the properties that changed; its CFrames go through the animation batch.
-     local seed=r.Crop.SeedId
-     -- R149 (#3): a crop planted a moment ago follows its dirt pile (the pile starts after the plant shows up, so this is read until the seedling is up).
-     if r.Crop.PlantedAt and now-r.Crop.PlantedAt<8 then r.Crop.SproutAt=Planting:SinkTime(entry.Item)end
-     -- R149 (#2): growing and regrowing plants sway too, inside the same wind budget as ripe ones (6 plants / 600 parts). The pose is set first, so a
-     -- refresh below writes at it; the parts the growth states do not move (the rest of the plant) go through the rig.
-     if not reducedNow and r.Mode=='normal'and not r.FruitOnly and Growth.Sways(seed,r.Def)and not Hologram.Is(seed)and seed~='ObsidianMawSeed'and motionVisible(entry,65,220)and windModels<6 and windParts+entry.Cost<=600 then
-      windParts+=entry.Cost;windModels+=1
-      if r.MotionDue then
-       r.Pose=r.Origin*Growth.Sway(seed,r.Def,r.Crop,now)
-       if not r.Rig then local skip={};growthStates(r,collectGrowth,skip);r.Rig=Batch.Capture(r.Visual,r.Origin,skip)end
-       growthStates(r,placeGrowth,r.Pose,animationBatch);r.QueuePose=true;r.Swaying=true;r.GrowthSway=true
-      end
-     elseif r.Swaying or r.GrowthSway then
-      r.Pose=r.Origin;r.QueuePose=true;r.Swaying=false
-      if r.GrowthSway then growthStates(r,placeGrowth,nil,animationBatch);r.GrowthSway=false end
-     end
-     if entry.Distance<75 or(r.MotionDue and(entry.OnScreen or now>=(r.NextGrowthAt or 0)))then
-      r.NextGrowthAt=now+.5
-      Visuals.UpdateGrowth(r.Visual,r.Crop,now)
-      for index=1,r.Def.FruitCount do local child=r.Visual:FindFirstChild(harvestNames[index]or'Harvest_'..index);if child then Visuals.UpdateGrowth(child,r.Crop,now)end end
-     end
-    elseif not Hologram.Is(r.Crop.SeedId)and not r.FruitOnly and r.Crop.SeedId~='ObsidianMawSeed'and r.Mode=='normal'and motionVisible(entry,65,220) and windModels<6 and windParts+entry.Cost<=600 then
-     windParts+=entry.Cost;windModels+=1
-     if r.MotionDue then r.Pose=r.Origin*Growth.Sway(r.Crop.SeedId,r.Def,r.Crop,now);r.Rig=r.Rig or Batch.Capture(r.Visual,r.Origin);r.QueuePose=true;r.Swaying=true end
-    elseif r.Swaying then r.Pose=r.Origin;r.QueuePose=true;r.Swaying=false end
-   end
-  end
- end
- Growth.Batch=nil
+ local passOk,passWhy=pcall(growthPass,t,reducedNow)
+ Growth.Batch=nil -- (also when the pass failed: another script's UpdateGrowth in this frame must not queue into the garden's batch, review part 2)
+ if not passOk then error(passWhy,0)end
  Anim:StepBounces(animationBatch) -- R149 (#7): queued before the rigs are posed, which only fill the parts not queued yet
  local bellCount,petalModels,petalParts,mawCount=0,0,0,0
  for _,entry in ipairs(ordered)do

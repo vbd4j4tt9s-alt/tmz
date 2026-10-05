@@ -7,7 +7,9 @@
 --  3. #6 fruit: hidden until it swells, pale green of its own colour pattern, the bright ripening path, plump +5 % and settle, the real material only at the
 --     ripe moment (today: at 82 %), Gold and Diamond fruit unchanged, MeshPart fruit (vertex colours + Part.Color tint) with the same exact ends;
 --  4. #2 Place: a drawn plant moves to a pose through the batch and back; later writes keep that pose; the last write is at rest; the first pose is direct;
---  5. the registry (G.StateOf) has no leak; the scenes of every plant at 25 / 50 / 75 % go to check_floating.py (R134) in run_growth.sh.
+--  5. the registry (G.StateOf) has no leak; the scenes of every plant at 25 / 50 / 75 % go to check_floating.py (R134) in run_growth.sh;
+--  6. (review part 2, finding 2) the server's silhouettes and the distant gardens run no leaf attachment pass (Plain: the leaves only appear in turn, the end state
+--     is the same), the near-detail build yields through its job's budget once per 32 contact tests.
 local C=require('./growth_common');local W,R,V3,CF=C.W,C.R,C.V3,C.CF;local check,near=C.check,C.near
 local G,Base,Catalog,Rules=C.Growth,C.Base,C.Catalog,C.Rules;local T=G.Tuning
 local Batch=W.module('PlantAnimationBatch');local Enum,CFrame=R.Enum,R.CFrame
@@ -164,6 +166,53 @@ do
   check(st.Leaves==nil,'G.PlainLeaves: no attach tree');G.Apply(st,crop,Catalog.BananaSeed.Seconds*.3)
   local solid=true;for _,r in ipairs(st.Parts)do if r.Foliage and not r.Fruit then local t=r.Part.Transparency;if not(t==1 or t==r.Alpha)then solid=false end end end
   check(solid,'... and the leaves are still solid');G.PlainLeaves.BananaSeed=nil;m:Destroy()
+ end
+end
+-- review part 2 (finding 2): what nobody sees up close skips the leaf attachment pass (the server's silhouettes, the distant gardens); the near-detail build
+-- yields through its job's budget while it runs
+do
+ local Distant=W.module('DistantPlantView');local Visuals=C.Visuals
+ local noTests,noTree,starts,silhouettes,distant=true,true,true,0,0
+ for _,id in ipairs(ids)do if plain(id)and not G.Frozen[id]then
+  local d=Catalog[id];local crop=C.crop(id);local now=d.Seconds*.5
+  local before=G.Stats.LinkTests
+  local silhouette=R.new('Model');Visuals.GrowingSupports(id,C.origin,crop,2,silhouette,now) -- (the server: GrowingSupports -> BeginGrowth)
+  local st=G.StateOf(silhouette);if G.Stats.LinkTests~=before then noTests=false end
+  if st then
+   silhouettes+=1;if st.Leaves then noTree=false end
+   for _,r in ipairs(st.Parts)do if r.Foliage and not r.Fruit and type(r.LeafStart)~='number'then starts=false end end
+  end
+  Visuals.EndGrowth(silhouette);silhouette:Destroy()
+  before=G.Stats.LinkTests
+  local far,growing=Distant.Build(crop,C.origin,now) -- (a distant garden)
+  local fs=G.StateOf(far);if G.Stats.LinkTests~=before then noTests=false end
+  if fs then distant+=1;if fs.Leaves then noTree=false end end
+  far:Destroy()
+ end end
+ check(silhouettes>40 and distant>40,('(%d server silhouettes and %d distant plants were drawn)'):format(silhouettes,distant))
+ check(noTests,'a server silhouette and a distant plant run no contact test at all')
+ check(noTree and starts,'... their leaves have no attach tree, only a start (they appear in turn, solid)')
+ -- the end state does not depend on the pass
+ for _,id in ipairs({'AppleSeed','FrostFernSeed','SunflowerSeed','TempestLotusSeed'})do
+  local crop=C.crop(id)
+  local ma,sa=C.grow(G,id,crop,{Plain=true});C.finish(G,sa,crop);local a=C.snapshot(ma)
+  local mb,sb=C.grow(G,id,crop);C.finish(G,sb,crop);local b=C.snapshot(mb)
+  check(sa.Leaves==nil and sb.Leaves~=nil and C.sameAs(a,b),id..': a plain capture ends exactly where the full one does')
+  ma:Destroy();mb:Destroy()
+ end
+ do local crop=C.crop('FrostFernSeed');local m,st=C.grow(G,'FrostFernSeed',crop,{Plain=true});G.Apply(st,crop,Catalog.FrostFernSeed.Seconds*.1)
+  local solid,hidden,shown=true,0,0
+  for _,r in ipairs(st.Parts)do if r.Foliage and not r.Fruit then local t=r.Part.Transparency;if t==1 then hidden+=1 elseif t==r.Alpha then shown+=1 else solid=false end end end
+  check(solid and hidden>0 and shown>0,('a plain plant at 10 %%: the leaves that started are solid (%d), the others are still hidden (%d)'):format(shown,hidden));m:Destroy() end
+ -- the near-detail build: one BeforePart(1) per 32 contact tests, on top of what the parts cost
+ local function calls(f)local n=0;f({Model=function()end,BeforePart=function()n+=1 end});return n end
+ for _,id in ipairs({'FrostFernSeed','MonsteraSeed','AloeSeed','SunflowerSeed'})do
+  local d=Catalog[id];local crop=C.crop(id);local now=d.Seconds*.5;local ripe=table.clone(crop);ripe.ReadyAt=0
+  local build=calls(function(work)Visuals.Build(id,C.origin,ripe,4,math.huge,nil,work):Destroy()end)
+  local before=G.Stats.LinkTests
+  local grow=calls(function(work)local m=Visuals.BuildGrowing(id,C.origin,crop,now,2,work);Visuals.EndGrowth(m);m:Destroy()end)
+  local tests=G.Stats.LinkTests-before
+  check(tests>400 and grow-build==tests//32,('%s: the near-detail build yields once per 32 contact tests (%d tests, %d extra yields)'):format(id,tests,grow-build))
  end
 end
 -- 3. #6 fruit ------------------------------------------------------------------------------------------------------------------------------------------

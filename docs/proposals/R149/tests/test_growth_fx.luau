@@ -275,4 +275,28 @@ do
  Arrival.Reset();check(not Arrival.Pending('g',1)and Arrival.Holds(tool('g',1))==false,'Reset clears everything')
  Arrival.Expect('r',1);Arrival.Reset();R.advance(2);check(not Arrival.Pending('r',1),'a timer that outlives a Reset releases nothing (and does not error)')
 end
+-- 4. review part 2 (finding 11): a picked Emberfruit / Fig fruit keeps its Neon coat while it flies; the plant's other fruit are restored as before ------------
+do
+ local Effects=W.module('ApprovedFruitEffects');local Enum=R.Enum
+ for _,style in ipairs({'EmberLava','FigMagic'})do
+  local model=R.new('Model');model.Parent=W.workspace
+  local plain=R.Color3.fromRGB(120,60,40)
+  local function group(index)
+   local g=R.new('Model');g.Name='Harvest_'..index;g:SetAttribute('Mutation','None')
+   local core=R.new('Part');core.Name=style=='FigMagic'and'Fig pear body'or'Emberfruit core';core.Size=V3(1,1,1);core.Color=plain;core.Material=Enum.Material.SmoothPlastic;core.Parent=g
+   if style=='FigMagic'then local w=R.new('Part');w.Name='Fig rosy window';w.Size=V3(.4,.4,.4);w.Color=plain;w.Material=Enum.Material.SmoothPlastic;w.Parent=g end
+   g.Parent=model;return g,style=='FigMagic'and g:FindFirstChild('Fig rosy window')or core
+  end
+  local g1,coated1=group(1);local g2,coated2=group(2)
+  local cleanup=Effects.Start(model,style,nil,false,{Manual=true})
+  check(coated1.Material==Enum.Material.Neon and coated2.Material==Enum.Material.Neon,style..': both fruit are coated Neon while the effect runs')
+  -- the first fruit is picked and flies: it leaves the plant (PlantGrowthFx parents it to its own folder)
+  local flying=R.new('Folder');flying.Parent=W.workspace;g1.Parent=flying
+  local flyingColour=coated1.Color
+  cleanup()
+  check(coated1.Material==Enum.Material.Neon and coated1.Color==flyingColour,style..': the flying fruit keeps its Neon coat and colour when the effect ends (no snap mid-flight)')
+  check(coated2.Material==Enum.Material.SmoothPlastic and coated2.Color==plain,style..': a fruit that stays on the plant is restored to its plain look')
+  model:Destroy();flying:Destroy()
+ end
+end
 C.done('growth fx')

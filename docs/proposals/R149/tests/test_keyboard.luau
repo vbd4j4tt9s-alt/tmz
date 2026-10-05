@@ -51,7 +51,7 @@ check(near(KW,7.6818,1e-3)and near(C.KeyY/KW,6.39/10.55,1e-6),'keys are 7.68 stu
 check(near(K.KeyTop(0),F+.55)and near(K.KeyTop(1),F+.08)and near(K.BedTop(),F-1.6),'heights: resting tops 0.55 above the floor, pressed 0.08 above it, the grout bed 1.6 below it')
 check(near(K.KeyTop(0)-K.BedTop(),2.15)and K.KeyTop(0)-K.BedTop()>=1.5 and K.KeyTop(0)-K.BedTop()<=3,'a resting key stands 2.15 studs proud of the bed (tall sides, owner: "not tall enough")')
 check(K.KeyTop(0)-C.KeyY<K.BedTop()-1 and K.KeyTop(1.15)-C.KeyY<K.BedTop()-1,'a key\'s bottom stays well under the bed even pressed past its travel (its foot never shows)')
-check(C.PressSeconds==.07 and C.ReleaseSeconds==.16 and near(C.HoleLift,C.RestRise+.02),'press .07 s, release .16 s; hole parts are lifted onto the resting key tops (+.02)')
+check(C.PressSeconds==.07 and C.ReleaseSeconds==.16 and near(C.HoleLift,C.RestRise+.04),'press .07 s, release .16 s; hole parts are lifted onto the resting key tops (+.04: the rim stays over the letter strips)')
 check(C.ClickSoundId==113108830240353 and C.ClickSoundIds[1]==C.ClickSoundId and near(C.ClickGap,1/12)and C.KeeperPitch>=.9 and C.KeeperPitch<1 and C.ClickVoices>=10,'clicks: one recording, at most one click per 1/12 s per presser, keepers a touch deeper (0.94), a pool of '..C.ClickVoices..' voices')
 local pitchOk=#C.ClickPitches>=3;for _,p in ipairs(C.ClickPitches)do if p<.98 or p>1.02 then pitchOk=false end end
 check(pitchOk,'click pitch varies only a little: 0.98 .. 1.02')
@@ -461,7 +461,7 @@ do
  local x0,x1,z0,z1=KS.Rect()
  check(near(x0,g.CenterX-g.HalfWidth)and near(x1,g.CenterX+g.HalfWidth)and near(z0,g.Z0)and near(z1,g.KeyEndZ),'effects: the helper covers the rectangle the keys cover (x '..tostring(x0)..' .. '..tostring(x1)..', z '..tostring(z0)..' .. '..tostring(z1)..')')
  check(KS.Lift(x1+1,kpz,F)==0 and KS.Lift(kpx,g.KeyEndZ+5,F)==0 and KS.Lift(kpx,g.Z0-5,F)==0 and KS.Lift(kpx,kpz,K.KeyTop(0)+1)==0,'effects: no lift beside the keys, in the arena, before the first biome, or for a surface already above the key tops')
- check(near(KS.Lift(kpx,kpz,F),C.HoleLift-.02),'effects: the same rise the shovel holes are lifted by (HoleLift - .02 of authored clearance)')
+ check(near(KS.Lift(kpx,kpz,F),C.HoleLift-.04),'effects: the same rise the shovel holes are lifted by (HoleLift - .04: the authored clearance and the lift that keeps the hole rim over the letters)')
 end
 -- bed and rims: each biome's grout colour, sunken
 local bedParts,bedLen,bedOk,rimOk,rims,ends={},0,true,true,0,0
@@ -481,6 +481,7 @@ end
 local zLo,zHi=1e9,-1e9;for _,p in ipairs(bedParts)do zLo=min(zLo,p.CFrame.Position.Z-p.Size.Z/2);zHi=max(zHi,p.CFrame.Position.Z+p.Size.Z/2)end
 check(bedOk and near(bedLen,5960)and near(zLo,-100,1e-6)and near(zHi,5860,1e-6),'the grout bed: per biome, in its own darker colour, pieces <= 1024 studs, 180 wide, 1.6 below the floor, from the track start to the arena ('..#bedParts..' pieces)')
 check(rimOk and rims==2*#bedParts and ends==2,'a rim closes both sides (from under the bed to just below the floor top) and both ends of the keyboard')
+check(C.RimDrop>=.04-1e-9 and near(F-.04-(F-C.RimDrop),C.RimDrop-.04)and 4.0-(F-C.RimDrop)>=.04-1e-9,'z-fighting (review part 2): the rim top is at least .04 under the floor top, so the end rims clear the lobby floor and the arena ground patch (both top at 4.00)')
 -- no z-fighting: every horizontal surface the keyboard shows is clear of the (hidden) floor plane and of every other one it touches
 local planes={}
 for _,p in ipairs(vis:GetDescendants())do
@@ -1011,6 +1012,10 @@ check(keyAt(HR,HC)~=nil and near(topOf(HR,HC),K.KeyTop(0),1e-6),'a hole leaves i
 check(near(pit1.CFrame.Position.Y,F+.04+C.HoleLift,1e-6)and near(rim1.CFrame.Position.Y,F+.03+C.HoleLift,1e-6),'the hole parts are lifted onto the key tops')
 local rimBottom=rim1.CFrame.Position.Y-.03;local rimTop=rim1.CFrame.Position.Y+.03;local pitTop=pit1.CFrame.Position.Y+.04
 check(rimBottom>=K.KeyTop(0)+.015 and rimTop-K.KeyTop(0)>=.06 and pitTop-K.KeyTop(0)>=.08,'z-fighting: the Rim / Pit tops are 0.08 / 0.10 above the key top (no shared plane)')
+do -- (TrackHoleService: Rim .04 thick at +.02, Pit .08 thick at +.04 above the floor; the letter strips lie at the key top + Legend.Lift)
+ local stripTop=K.KeyTop(0)+LT.Lift
+ check((F+.02+C.HoleLift+.02)-stripTop>=.05-1e-9 and (F+.04+C.HoleLift+.04)-stripTop>=.08-1e-9,'z-fighting (review part 2): a lifted hole\'s Rim top stands .05 and its Pit top .09 above the letter strips (the Rim was .03 under them at HoleLift .57)')
+end
 local sl=nil
 for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 and g.RowOfZ(st.CFrame.Position.Z)==HR then
  for _,l in ipairs(st:FindFirstChildWhichIsA('SurfaceGui'):GetChildren())do if l._class=='TextLabel'and g.ColOfX(st.CFrame.Position.X-st.Size.X/2+l.Position.X.Offset/LT.PixelsPerStud)==HC and l.Text==K.Legend(HR,HC)then sl=l end end end end
