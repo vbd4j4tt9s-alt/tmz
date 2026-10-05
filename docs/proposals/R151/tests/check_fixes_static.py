@@ -24,7 +24,7 @@ changed += subprocess.run(['git', '-C', repo, 'ls-files', '--others', '--exclude
 compiled = 0
 for rel in sorted(set(changed)):
     if rel.endswith('.lua'):
-        r = subprocess.run(['/opt/luau/luau-compile', '--text', os.path.join(repo, rel)], capture_output=True, text=True)
+        r = subprocess.run(['/opt/luau/luau-compile', '--text', os.path.join(repo, rel)], capture_output=True, text=True, errors='replace')
         compiled += 1
         if r.returncode != 0:
             bad.append('does not compile: %s %s' % (rel, r.stderr.strip()[:200]))
