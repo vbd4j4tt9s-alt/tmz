@@ -3,6 +3,8 @@
 Design proposal with renders. **Nothing in `src/` was changed**, and no installer was made. A coder builds it after you approve.
 
 > **Update (5 Oct 2026): approved and built.** You said *"i like this design and polish the trees, give them more variety and the stuff and everything"*. Phase 1 and Phase 2 are now in `src/`, with much more variety than the proposal. See **§8 As built** and the `base_area_built_*.png` pictures. The sections below are the original proposal, kept as written.
+>
+> **Update 2: studded trees.** You sent two Creator Store trees and said *"make sure they are studded"* and *"make sure they are collision is off"*. See **§9 Studded trees**, which also has the steps for you in Studio.
 
 Your question (5 Oct 2026): *"I also want you to take a look at a redesign of the base area and the walls what can we add to liven up the base area"*.
 
@@ -451,7 +453,7 @@ The pictures are still previews, not Roblox screenshots: no Roblox lighting, PBR
   - A name beam 14+ studs over the pad. Outside it reads "BEN'S BASE", or "FREE BASE" for an empty base; inside it reads "BASE 1".
   - A number medallion.
   - The name follows `BaseOwnerDisplayName`: HubDecor151 listens to it directly.
-- **Trees, 58, with deterministic per-tree variation** (scale, lean, turn, shade, crown layering):
+- **Trees, 58, with deterministic per-tree variation** (scale, lean, turn, shade, crown layering). Since §9 they are all studded blocks, and your tree models can take the leafy slots:
   - 14 round oaks in 3 sizes;
   - 8 poplars and cypresses;
   - 8 blossoms (pink, white, lilac) with falling petals near the camera;
@@ -544,3 +546,176 @@ This is more than the proposal (527 + 609), because you asked for more variety. 
    - streaming of the Persistent wall, mural and gate models.
 7. **Lamps in a real Darkened blackout and in a Thunderstorm.**
 8. The gate towers' collision against fast runners at the gate.
+
+---
+
+## 9. Studded trees (your tree models)
+
+You sent two Creator Store trees and three requests:
+- *"tress can also use this"* (17280628013, "studded-tree") and *"https://create.roblox.com/store/asset/16637971059/Stud-Tree"*;
+- *"there are diufferenty variations of trees that we can use make sure bthey are studded"*;
+- *"make sure they are collision is off as we dont want players jumping around bugging with it in highspeeds"*.
+
+This section records what was built for them. The Roblox site is blocked here, so I could not see or download either model. Everything was built and tested with **stand-in** studded trees that I made, and the pictures show those stand-ins.
+
+### What it does
+- **Every tree is studded, with or without your models.**
+  - The part-built trees, bushes and topiary are now **Plastic blocks with Studs on the face that points up and Inlet underneath.**
+  - This is the classic Roblox look, and the one your place's own track trees use. The place file has 470 such parts, for example `Old oak grove/Oak/Leaf crown`.
+  - Stud surfaces show on block faces, so the round crowns became clusters of turned blocks.
+  - Each block of a tree keeps its top and bottom off the planes of that tree's other blocks, so nothing flickers.
+  - The species, sizes, colours, positions and per-tree variety are unchanged.
+  - This costs no extra parts, textures or uploads.
+- **Your models take the leafy slots:** the 14 oaks, 8 blossoms and 8 fruit trees (30 slots).
+  - Each slot gets its own clone, fitted to the slot by its bounding box: `Model:ScaleTo` to the slot's height (13 to 23 studs), never wider than the slot's crown.
+  - Each clone gets its own turn and a lean of up to 3 degrees. It stands on the floor, sunk 0.3 studs.
+  - The leaves take the slot's colour:
+    - oaks and fruit trees get one of six greens, each part keeping its own light or dark;
+    - blossoms get pink, white or lilac.
+  - Fruit trees keep their fruit as my parts, set into the clone's crown. Blossoms keep their falling petals.
+  - With several models, they are spread over the slots by a hash, so every player sees the same square.
+- **Which trees, and why:**
+  - Oaks, blossoms and fruit trees have round crowns, which a tree model fits.
+  - Poplars stay part-built: they are tall columns, and uniform scaling can't make a column out of a round tree. They also keep the variety.
+  - Pines (Snow lane), palms and cacti (Desert garden), ember trees and glowing rocks (Lava garden) are themed shapes, so they stay part-built. They are studded too.
+  - A model whose leaves cannot be recoloured (a textured MeshPart or a SurfaceAppearance) is not used for blossoms, because they would be green.
+- **Loading, once per server at start** (`ChestChaseServer.HubTreeLoader151`, spawned by `HubDecor151.Apply`):
+  1. `AssetService:LoadAssetAsync(id)` for each id in `HubDecorKit151.TreeAssetIds = {16637971059, 17280628013}`. It loads free Creator Store models when the game allows third-party assets. Roblox returns them sandboxed, so their scripts cannot run.
+  2. If that is refused or errors: `InsertService:LoadAsset(id)`. This works for models the game's owner has in their inventory.
+  3. If both fail: whatever tree models you placed in the folder by hand.
+  4. If there are none: the part-built studded trees.
+  - Each result is parked as `ReplicatedStorage.HubTreeTemplates151.Asset<id>`, where every client picks it up.
+  - The log gets one line per id, for example `[R151 trees] 16637971059 "Stud Tree": loaded by AssetService:LoadAssetAsync (12 parts, 0 scripts removed)`, or `... not loaded (AssetService: ...; InsertService: ...)`.
+  - The folder carries these attributes: `Route<id>` (AssetService / InsertService / failed), `ScriptsRemoved`, `Loaded`, `Manual` and `Ready`.
+- **Safety: no physics, no code.**
+  - Everything that isn't geometry is deleted from loaded and hand-placed models. That covers every Script, LocalScript and ModuleScript (counted and logged), plus welds, joints, constraints, sounds, lights, particles, prompts, click detectors and values.
+  - Every BasePart, nested and MeshParts included, is set to **Anchored, CanCollide off, CanTouch off, CanQuery off**, with the Default collision group.
+  - The client never clones your originals into the world. It clones a private, cleaned copy.
+  - It locks every clone again. It also guards the whole square (`DescendantAdded`), so anything added to it later is locked and loses any script.
+  - The only parts that collide in the hub dressing are still the two gate towers and your saved walls. Nothing else can be stood on or snag a fast runner.
+- **Cost:** the part count is measured once, when the models are collected (`HubDecorKit151.TreeBudget`).
+
+| Device tier | Most parts in one clone | Most parts in all clones together |
+|---|---|---|
+| 1: phones on low, FastMode | 6 | 90 |
+| 2: phones | 16 | 300 |
+| 3: desktop | 40 | 600 |
+
+  - A model bigger than a tier's per-tree limit is not used on that tier. That tier's slots keep the part-built studded trees.
+  - When the total is reached, the remaining slots stay part-built. Slots are filled in layout order, so the welcome lawns by the gate come first.
+  - A model over 400 parts is never used.
+  - A part-built tree costs about 2 core parts and 5 detail parts, so a clone of up to 16 parts is a fair swap on phones.
+  - Clones sit in the always-shown core level: a tree must not disappear at a distance.
+  - Clone parts of 2 studs or more cast shadows on tiers 2 and 3. Small bits and tier 1 cast none.
+  - What happened on your screen is in `workspace.HubLife151`'s attributes:
+    - `TemplateParts`, for example `StandInStudTree 9, StandInStudTree2 12`;
+    - `UsedFor`, for example `30 of 30 leafy trees (oak 14, blossom 8, fruit 8), 321 parts; tier 3: one tree up to 40 parts, 600 in all`;
+    - `ScriptsRemoved`.
+- **Broken or missing models:**
+  - An empty model, a script, a part with an impossible size, or a model that cannot be copied is reported in `TemplateParts` and skipped.
+  - If a clone cannot be scaled or placed, that one slot falls back to its part-built tree, so there is never a gap.
+  - With no folder, or an empty one, nothing changes from the part-built studded trees.
+- **New models are picked up without a restart:** each client rebuilds the square when the folder's contents change.
+
+### Your steps in Studio (one of A, B or C)
+**A. Recommended: allow third-party assets (one setting).**
+1. Open the place in Studio and go to **Home → Game Settings → Security**.
+2. Turn on **"Allow Loading Third Party Assets"** and click **Save**. This is `AssetService.AllowInsertFreeAssets`, which only Studio can set.
+3. Publish.
+4. Every server then loads both trees at start, and you do nothing else.
+
+**B. Alternative: own the models.**
+1. While logged in as the game's owner, open both Creator Store pages: https://create.roblox.com/store/asset/16637971059 and https://create.roblox.com/store/asset/17280628013.
+2. Click **Get Model** on each, so they're in your inventory.
+3. `InsertService:LoadAsset` then loads them.
+4. If the game belongs to a group, the group must own the models, so A is simpler.
+
+**C. Last resort, and the way to add more variations: place them by hand.**
+1. In Studio open **View → Toolbox → Creator Store (Models)**. Search for "Stud Tree" or "studded tree", or paste the id, and click the model to insert it into the Workspace.
+2. If Studio warns that it contains scripts, that's fine: the game deletes them. You can also delete them yourself in the Explorer.
+3. In the Explorer, in **ReplicatedStorage**, add a **Folder** named exactly **`HubTreeTemplates151`** (it may already be there from a test run).
+4. Drag the tree model into that folder.
+5. Rename it to anything you like, for example `StuddedTree` or `StudTree`. Names only set the order.
+6. The model should stand upright with its trunk at the bottom. Its size and position don't matter.
+7. Every model in the folder is one more variation: drop in as many studded trees as you like and the game spreads them over the slots.
+8. To add more ids instead (route A or B), add them to `TreeAssetIds` in `ReplicatedStorage.HubDecorKit151`.
+
+**Check that it worked:**
+- Type **`/test hubtrees`** in chat or in the F4 box. It shows:
+  - how each id loaded: `16637971059: AssetService`, `InsertService` or `failed (why)`;
+  - how many models were placed by hand;
+  - how many scripts were removed;
+  - each model's part count;
+  - which trees each device tier uses.
+- On your own screen, look at **Workspace → HubLife151 → Attributes**: `TemplateParts`, `UsedFor` and `ScriptsRemoved`.
+- The Output shows the `[R151 trees] ...` lines.
+
+### Pictures
+- `base_area_built_studded.png`:
+  - **left**, the leafy trees with two **STAND-IN** studded tree models (`preview/standin_tree.luau`, 9 and 12 parts). They are made here and are **not your Creator Store trees**.
+  - **right**, the same views with no models: the part-built studded trees.
+  - also: the studded desert, lava and snow gardens, and phones on low.
+  - The preview draws the stud pattern itself, and Roblox's own stud texture will look a little different.
+- The other `base_area_built_*.png` sheets now show the part-built studded trees.
+
+### Files
+| File | What |
+|---|---|
+| `src/ReplicatedStorage/HubStudTrees151.lua` (new) | Sanitize, Lock, Guard / GuardSquare, Prepare, Collect, Plan, Describe, Place, LeafBox. The module is named so it doesn't clash with the folder `HubTreeTemplates151`. |
+| `src/ServerScriptService/ChestChaseServer/HubTreeLoader151.lua` (new) | The loader (routes, logging, attributes, folder guard) and `/test hubtrees`. |
+| `src/ReplicatedStorage/HubDecorKit151.lua` | `TreeAssetIds`, `TreeFolder`, `TreeBudget`; `K.Studs` and the `studs` option of `K.Part`. |
+| `src/ReplicatedStorage/HubLifeArt151.lua` | The studded block trees, bushes and topiary; `A.TemplateTree`, `A.TreeSlots`; `A.Build(..., templates)`. |
+| `src/StarterPlayer/StarterPlayerScripts/HubLife151.client.lua` | A small hook: collect the models, pass them to `Build`, set the attributes, guard the square, rebuild when the folder changes. Lamps and weather are untouched, for the Cloudy-weather merge. |
+| `src/ServerScriptService/ChestChaseServer/HubDecor151.lua` | One line: spawn the loader. |
+| `OwnerUpdateCommands82.lua`, `StudioTestHelp.lua` | `/test hubtrees` (one action, one dispatch line, one help row). |
+| `src/MANIFEST.tsv` | 2 new rows. |
+
+### Tests
+**`sh docs/proposals/R151/tests/run_hub_trees.sh [dir] [mutate]`** (fast, no place file needed): **49 passed, 0 failed checks.**
+- **Load routes:** AssetService works; it is refused and InsertService works; both fail, or AssetService has no `LoadAssetAsync`; the hand-placed fallback; an asset with no parts.
+- **Scripts:** stripped and counted, including in models added later.
+- **Collision:** the four properties checked on every descendant of every tree: loaded, hand-placed, the clones, the part-built fallback, bushes and topiary.
+- **The square's guard:**
+  - parts and models added later are locked;
+  - signs, lamp lights and particles survive level-of-detail changes.
+- **Models:** templates of 5, 14, 30 and 60 parts; broken ones (empty, a script, NaN size); the budget per tier; textured models kept out of blossom slots.
+- **Spread and fit:** models spread by hash and deterministic; fit (height, width, grounded, on the slot); leaf colours; fruit; each clone with its own turn.
+- **Folder changes:**
+  - a model added later is picked up;
+  - nothing changes while the folder stays the same;
+  - a missing or empty folder, or broken models only, leaves the part-built studded trees;
+  - a model that cannot be placed falls back to the part-built tree in that slot.
+- **Other:** the `/test hubtrees` text; studs on every part-built tree, bush and topiary part, always on the up face, Plastic.
+
+**`mutate`: 20 of 20 mutations caught.** The breaks include:
+- turning **CanCollide back on** (on the clones, and on the part-built trees);
+- leaving parts touchable or queryable, or unanchored;
+- keeping scripts;
+- removing the client's or the loader's guard, or making the square's guard strict;
+- dropping the per-tree or the total budget;
+- skipping either load route;
+- not scaling or not grounding the clones;
+- not recolouring the leaves, or letting blossoms take textured models;
+- leaving a gap when a clone can't be placed;
+- part-built trees without studs, or studs on the wrong face;
+- no rebuild when the folder changes.
+
+**`run_base_area.sh`:** **66 passed, 0 failed**, now also with the stand-in models:
+- desktop: 30 clones;
+- every part locked;
+- clearances against every gameplay object;
+- the reserved corners empty;
+- budgets with the models: tier 1 = 435, tier 2 = 1,257, tier 3 = 1,317 (caps 500 / 1,300 / 1,600).
+
+The z-fighting scene check passes **both** with the part-built studded trees and with the stand-in models (0 counted findings with an R151 part), and R149 `run_zfight.sh` passes.
+
+**Budgets without models:** tier 1 = 435, tier 2 = 1,114, tier 3 = 1,165 parts. The studded blocks replace the balls one for one, apart from a few small extras.
+
+### Check in Studio
+1. **The two real models.**
+   - Their look after recolouring: a model whose leaves are textured MeshParts keeps its own colours and skips blossom slots.
+   - Their fit: a model with a flat base or grass plate gets that plate sunk to the floor's height. Check that it doesn't flicker with the floor, and delete the plate from the model if it does.
+   - Their part counts: `/test hubtrees` shows which tiers use them.
+2. **Route A or B really loading** (Output and `/test hubtrees`). `LoadAssetAsync` is new API; if it's missing, route B or C still works.
+3. **The stud look on the block trees** in real lighting, next to the track's own studded trees. Roblox draws Studs on Plastic block faces.
+4. **The client rebuild** when the models arrive a moment after a player joins: it should happen once.

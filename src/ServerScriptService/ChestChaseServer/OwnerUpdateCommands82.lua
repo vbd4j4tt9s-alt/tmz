@@ -29,7 +29,10 @@ X.Actions.rarepull=true;X.Actions.raresound=true
 X.Actions.plantnotify=true
 -- R151: owner control of the chip-bag shape variations (PackShapeCommand151): packshape <1-6|off|auto>.
 X.Actions.packshape=true
+-- R151: hubtrees: the owner's studded tree models (HubTreeLoader151): which load route worked per id, scripts removed, each tier's plan.
+X.Actions.hubtrees=true
 function X.Execute(ctx,p,action,a)
+ if action=='hubtrees'then return require(script.Parent.HubTreeLoader151).Command(ctx,p,a)end
  if action=='rarepull'or action=='raresound'then return require(script.Parent.RarePullTestCommands).Execute(ctx,p,action,a)end
  if action=='plantnotify'then return require(script.Parent.SocialService).Command(ctx,p,a)end
  if action=='packshape'then return require(script.Parent.PackShapeCommand151).Execute(ctx,p,a)end

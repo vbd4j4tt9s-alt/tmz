@@ -389,6 +389,8 @@ function M.Apply(map)
  for _,b in pairs(bases)do
   connections[#connections+1]=b.Model:GetAttributeChangedSignal('BaseOwnerDisplayName'):Connect(function()M.UpdateOwnerNames(root,map)end)
  end
+ -- the owner's studded tree models (loaded once per server; the clients use them as tree templates)
+ task.spawn(function()local ok,err=pcall(function()require(script.Parent.HubTreeLoader151).Run()end);if not ok then warn('[R151 trees] '..tostring(err))end end)
  return root
 end
 return M

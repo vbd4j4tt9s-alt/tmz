@@ -357,5 +357,39 @@ do
  sc:Destroy();check('teardown: destroying the script removes everything',W.workspace:FindFirstChild('HubLife151')==nil and not api.State.Ambience)
 end
 
+-- 15. the owner's studded tree models (a STAND-IN pair: the real ones cannot be downloaded here) -------------------------------------------------
+do
+ -- (Clone copies attributes on Roblox; the shared mock does not)
+ local rawClone=R.Inst.Clone;R.Inst.Clone=function(self)local c=rawClone(self);c._attrs=table.clone(self._attrs);return c end
+ local Kit=W.module('HubDecorKit151')
+ local tf=RS:FindFirstChild(Kit.TreeFolder)
+ check('trees: the server made ReplicatedStorage.HubTreeTemplates151 and tried both ids (offline: failed) - the part-built studded trees stand',
+  tf~=nil and tf:GetAttribute('Ready')==true and tf:GetAttribute('Route16637971059')=='failed'and tf:GetAttribute('Route17280628013')=='failed')
+ require('./standin_tree')(R,tf)
+ local totals={}
+ for _,t in ipairs({1,2,3})do
+  budget.Tier=t;local api2,sc2=load();tick(1)
+  local life2=W.workspace:FindFirstChild('HubLife151')
+  local ctx=api2.State.Ctx;local n=0
+  for _,d in ipairs(life2:GetDescendants())do if d.Name=='Studded tree'then n+=1 end end
+  totals[t]=ctx.Counts.core+ctx.Counts.detail+ctx.Counts.fine
+  print(string.format('BUDGET with the stand-in tree models, tier %d: %d clones, core %d, detail %d, fine %d, total %d (%s)',t,n,ctx.Counts.core,ctx.Counts.detail,ctx.Counts.fine,totals[t],tostring(life2:GetAttribute('UsedFor'))))
+  if t==3 then
+   api2.Near.detail=1e6;api2.Near.fine=1e6;api2.ApplyLod()
+   local all=partsUnder(life2);local bad={}
+   for _,p in ipairs(all)do if p._props.Anchored~=true or p._props.CanCollide~=false or p._props.CanTouch~=false or p._props.CanQuery~=false then bad[#bad+1]=path(p)end end
+   check('trees: desktop - the leafy slots take the stand-in models ('..n..' clones)',n==30,n)
+   check('trees: every part of the square with the models anchored, never collides, CanTouch / CanQuery off',#bad==0,first(bad))
+   local c=clashes(all,function(p,g)return g.Name=='market'and(p.Name=='Bunting line'or p.Name=='Pennant')end)
+   check('trees: clearances with the models (base plots / pads / openings / treadmills / pedestals / spawns / safe line / market / Verity / leaderboards / track)',#c==0,first(c))
+   local k=inCorners(all);check('trees: reserved corners stay empty with the models',#k==0,first(k))
+  end
+  sc2:Destroy()
+ end
+ check('trees: budgets with the models - tier 1 <= 500, tier 2 <= 1300, tier 3 <= 1600',totals[1]<=500 and totals[2]<=1300 and totals[3]<=1600,totals[1]..' / '..totals[2]..' / '..totals[3])
+ for _,c in ipairs(tf:GetChildren())do c:Destroy()end
+ budget.Tier=3
+end
+
 print(string.format('R151 base area: %d passed, %d failed',passed,failed))
 if failed>0 then error('R151 base area: '..failed..' failed')end

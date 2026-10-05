@@ -13,7 +13,9 @@
 --    desktop / phone / FastMode; the dark and storms still switch on all 8 everywhere), and the market's warm lights (tagged WarmLight151) strengthen. All of it
 --    is steps taken from the half-second tick: no per-frame work, and no loop over the lamps unless a step changed;
 --  * the track gate's keys turn green with a tick for the biomes this player is already fast enough for (KeeperSpeedLabels' rule);
---  * signposts show the bases' owners; three quiet ambience layers near the gardens (existing BiomeMood sounds only).
+--  * signposts show the bases' owners; three quiet ambience layers near the gardens (existing BiomeMood sounds only);
+--  * the owner's studded tree models (ReplicatedStorage.HubTreeTemplates151) take the leafy tree slots within the tier's part budget; the
+--    folder's TemplateParts / UsedFor / ScriptsRemoved attributes say what happened.
 -- Nothing here collides, can be touched or queried, or changes gameplay.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local GuiService=game:GetService('GuiService');local SoundService=game:GetService('SoundService')
@@ -247,17 +249,35 @@ end
 -- Build / rebuild -------------------------------------------------------------------------------------------------------------------------------
 local function teardown()
  setAmbience(false)
+ if state.Guard then state.Guard:Disconnect();state.Guard=nil end
  if state.Root then state.Root:Destroy()end
  state.Root=nil;state.Ctx=nil;state.LastKeys={}
+end
+-- The owner's studded tree models (ReplicatedStorage.HubTreeTemplates151; HubStudTrees151 makes safe private copies: no scripts, no
+-- collision). treeSig changes when the folder does, and the square is rebuilt with them.
+local Trees=require(RS:WaitForChild('HubStudTrees151'))
+local function treeSig()local f=RS:FindFirstChild(K.TreeFolder);return f and(#f:GetChildren()..':'..tostring(f:GetAttribute('Ready')))or'none'end
+local function treeTemplates()
+ local f=RS:FindFirstChild(K.TreeFolder);local infos,sum=Trees.Collect(f)
+ if sum.ScriptsRemoved>0 and sum.ScriptsRemoved~=state.ScriptsLogged then state.ScriptsLogged=sum.ScriptsRemoved;print(string.format('[R151 trees] removed %d script(s) from the tree models on this screen',sum.ScriptsRemoved))end
+ return infos,sum,f
 end
 local function build()
  local dec=decor();if not dec then teardown();return false end
  teardown()
  local root=Instance.new('Folder');root.Name='HubLife151'
  local t=tier()
- local ok,ctx=pcall(Art.Build,root,t,readBases(dec),ownerName)
+ state.TreeSig=treeSig()
+ local infos,tsum,tf=treeTemplates()
+ local ok,ctx=pcall(Art.Build,root,t,readBases(dec),ownerName,infos)
+ for _,i in ipairs(infos)do if i.Model then i.Model:Destroy()end end
  if not ok then warn('[R151] Hub life skipped: '..tostring(ctx));root:Destroy();return false end
  root:SetAttribute('Tier',t);root:SetAttribute('Core',ctx.Counts.core);root:SetAttribute('Detail',ctx.Counts.detail);root:SetAttribute('Fine',ctx.Counts.fine)
+ local parts,used=Trees.Describe(infos,ctx.TreePlan)
+ root:SetAttribute('TemplateParts',parts);root:SetAttribute('UsedFor',used)
+ root:SetAttribute('ScriptsRemoved',(tf and tf:GetAttribute('ScriptsRemoved')or 0)+tsum.ScriptsRemoved)
+ -- nothing in the square ever collides, whatever is added to it later (owner: "make sure they are collision is off")
+ state.Guard=root.DescendantAdded:Connect(Trees.GuardSquare)
  state.Root=root;state.Ctx=ctx;state.Tier=t
  applyLod();applyLamps(true);applySigns()
  root.Parent=workspace -- (built unparented: one hand-over, no per-part streaming work)
@@ -275,7 +295,7 @@ local function tick(dt)
  if dec~=builtFor then builtFor=dec;build()end
  if not state.Ctx then return end
  -- the device got faster (or FastMode was switched off): build the extra levels once
- local t=tier();if t>(state.Tier or 1)then build()end
+ local t=tier();if t>(state.Tier or 1)or treeSig()~=state.TreeSig then build()end
  applyLod();applyLamps(false);applyKeys()
  setAmbience(ambienceWanted())
  if slow>=1 then slow=0;applySigns()end

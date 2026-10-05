@@ -105,6 +105,7 @@ return {
  {'/test mechshop','server: Mech pack prices and product setup.'},
  {'/test voidcheck','Check the Void Pack odds add up. Grants nothing.'},
  {'/test collisions','server: Re-apply walk-through decorations.'},
+ {'/test hubtrees','server: R151 hub trees: how each studded tree model loaded (by id or placed by hand), scripts removed, part counts, which trees each device tier uses.'},
  {'/test perf','Toggle the performance display.'},
  {'/test effects low','Plant effects: normal, low or off.'},
 }

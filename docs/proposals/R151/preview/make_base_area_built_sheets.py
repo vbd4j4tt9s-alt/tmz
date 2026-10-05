@@ -4,7 +4,9 @@ Usage: python3 make_base_area_built_sheets.py <render out dir> <views.json> <var
                                  AS BUILT (this checkout, desktop tier) large; the proposal's cameras
   base_area_built_darkened.png   the lamps in the dark (The Darkened's blackout)
   base_area_built_plan.png       the built hub from above with its zones
-  base_area_built_variety.png    close-ups of the tree and prop variety"""
+  base_area_built_variety.png    close-ups of the tree and prop variety
+  base_area_built_studded.png    (env STUDDED_VIEWS=<base_area_studded_views.json>) the studded trees: with two STAND-IN tree models in
+                                 ReplicatedStorage.HubTreeTemplates151 (not the owner's) next to the part-built studded trees"""
 import json, os, sys
 from PIL import Image, ImageDraw, ImageFont
 
@@ -61,7 +63,7 @@ CAPTIONS = {
  'walls': "The east wall at the end of the Desert garden. AS BUILT: the saved wall part (same size, place, collision) in cream plaster with a stone plinth and cap, a gold string course, pilasters on stone bases with topiary balls and two-tier topiary, a clipped hedge, wall lanterns, the DESERT mural (3 of 7, a richer relief), palms, cacti and the garden nook.",
  'backwall': "From the south street down the back lane between Base 5 and Base 6. AS BUILT: pines with snow rims along the lane, the lane's curbs, the SNOW mural (4 of 7) with a snowman, base banners 5 and 6.",
  'gate': "From the front street. AS BUILT: the keyboard arch with one key per biome and that keeper's speed (Forest 0 ... Storm Peaks 2.6B); this player is faster than the Jungle keeper, so Forest and Jungle are ticked green on HIS screen only. Seven flags, THE TRACK crest, the seven biome lanes of the run-up, potted topiary and the signpost.",
- 'aerial': "AS BUILT: the dressed walls with towers, murals and banners; the ring of streets with curbs and edging past every base; the market square, stage circle and Seed Fountain; 60 trees of 15+ kinds, bushes, topiary, beds, lamps, benches, bunting, grass patches. The two back corners stay empty for the R151 Best Pull / Biggest Fruit displays.",
+ 'aerial': "AS BUILT: the dressed walls with towers, murals and banners; the ring of streets with curbs and edging past every base; the market square, stage circle and Seed Fountain; 58 studded trees of 15+ kinds, bushes, topiary, beds, lamps, benches, bunting, grass patches. The two back corners stay empty for the R151 Best Pull / Biggest Fruit displays.",
  'avenue': "Down the avenue from the front street. AS BUILT: curbs, blossom trees and potted topiary at the avenue's mouth, lamps with crossed bunting, flower beds and benches on the lawns, poplars by the side streets, the brick market square with double lamps, planters and bunting to the market's eaves.",
  'darkened': "There is no day/night yet; The Darkened's arrival (and Rain / Thunderstorm) darkens the hub. AS BUILT: 8 lamps carry a real light that the client switches on in the dark (22 lamp posts and 4 bollards all have neon lanterns, plus 14 wall lanterns), so the streets stay readable. (Approximate: the real blackout is darker past a short distance.)",
 }
@@ -80,7 +82,8 @@ for v in V['views']:
 gap = 14; pw, ph = 720, 405; cols = 2; rows = (len(VV['views']) + cols - 1) // cols
 W = cols * pw + (cols + 1) * gap
 lines = wrap(ImageDraw.Draw(Image.new('RGB', (W, 10))), 'Every tree and prop gets its own deterministic variation from its kind and position (scale, lean, turn, '
-             'colour shade, crown layering), so every client builds the same square and no two trees are clones. Close-ups of the real '
+             'colour shade, crown layering), so every client builds the same square and no two trees are clones. Trees, bushes and topiary '
+             'are studded Plastic blocks (Studs on top, like the place\'s own track trees; owner: "make sure they are studded"). Close-ups of the real '
              'HubLifeArt151 / HubDecor151 output on the owner\'s place (preview renderer, not Roblox).', W - 2 * gap, T2)
 top = 64 + 24 * len(lines); H = top + rows * (ph + gap)
 im = Image.new('RGB', (W, H), BG); d = ImageDraw.Draw(im)
@@ -90,6 +93,33 @@ for k, v in enumerate(VV['views']):
     x = gap + (k % cols) * (pw + gap); y = top + (k // cols) * (ph + gap)
     paste(im, d, os.path.join(OUT, 'built_%s.png' % v['name']), x, y, pw, ph, v['title'], (30, 34, 44))
 im.save(os.path.join(DOCS, 'base_area_built_variety.png'), optimize=True); print('wrote base_area_built_variety.png', im.size)
+
+# studded trees: STAND-IN tree models (left) next to the part-built studded trees (right)
+STUD = os.environ.get('STUDDED_VIEWS')
+if STUD and os.path.exists(STUD):
+    SV = {v['name']: v for v in json.load(open(STUD))['views']}
+    STAND, PART = (170, 70, 30), (40, 110, 140)
+    rows = [[('trees', 's_oaks'), ('built', 's_oaks')], [('trees', 's_blossoms'), ('built', 's_blossoms')], [('trees', 's_fruit'), ('built', 's_fruit')],
+            [('trees', 's_close'), ('built', 's_close')], [('trees', 's_avenue'), ('built', 's_avenue')], [('built', 'p_desert'), ('built', 'p_lava')],
+            [('built', 'p_snow'), ('tier1', 's_avenue')]]
+    gap = 14; pw, ph = 720, 405; cols = 2
+    W = cols * pw + (cols + 1) * gap
+    intro = ('Owner: "there are different variations of trees that we can use make sure they are studded". LEFT: the leafy trees (oaks, blossoms, '
+             'fruit trees) with two STAND-IN studded tree models in ReplicatedStorage.HubTreeTemplates151 - made here, NOT the owner\'s Creator Store '
+             'trees (16637971059, 17280628013), which cannot be downloaded offline: each slot gets a clone fitted to its size, turned, leaned, its '
+             'leaves in the slot\'s colour, fruit set in. RIGHT: no models (until they load, or on phones on low): the part-built studded trees. '
+             'Pines, palms, cacti and ember trees are always part-built and studded. Preview renderer with a drawn stud pattern, not Roblox.')
+    lines = wrap(ImageDraw.Draw(Image.new('RGB', (W, 10))), intro, W - 2 * gap, T2)
+    top = 64 + 24 * len(lines); H = top + len(rows) * (ph + gap)
+    im = Image.new('RGB', (W, H), BG); d = ImageDraw.Draw(im)
+    d.text((gap, 14), 'Studded trees: STAND-IN models vs the part-built studded trees', font=T1, fill=INK)
+    for i, line in enumerate(lines): d.text((gap, 56 + 24 * i), line, font=T2, fill=SUB)
+    for r, row in enumerate(rows):
+        for c, (scene, view) in enumerate(row):
+            x = gap + c * (pw + gap); y = top + r * (ph + gap)
+            label = ('STAND-IN MODELS: ' if scene == 'trees' else 'PHONES ON LOW (tier 1, part-built): ' if scene == 'tier1' else 'PART-BUILT: ') + SV[view]['title']
+            paste(im, d, os.path.join(OUT, '%s_%s.png' % (scene, view)), x, y, pw, ph, label, STAND if scene == 'trees' else PART)
+    im.save(os.path.join(DOCS, 'base_area_built_studded.png'), optimize=True); print('wrote base_area_built_studded.png', im.size)
 
 # plan
 cx, cz, hw, hh = V['plan']['ortho']; PW, PH = V['plan']['w'], V['plan']['h']

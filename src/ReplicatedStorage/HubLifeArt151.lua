@@ -3,6 +3,8 @@
 -- Owner (approving the design): "polish the trees, give them more variety and the stuff and everything". So every prop comes in species /
 -- variants, and each instance gets its own deterministic variation (scale, lean, turn, colour shade, canopy layering) from a seed made of
 -- its kind and position: every client builds the same square, and no two trees look cloned.
+-- Owner (R151, later): "make sure they are studded" - the trees, bushes and topiary are studded Plastic blocks, and the owner's studded tree
+-- models (ReplicatedStorage.HubTreeTemplates151) take the leafy slots when they are there (HubStudTrees151).
 -- Detail levels (A.Build puts every part in a per-cell Folder of its level, the client shows / hides those Folders by distance):
 --   core    silhouettes seen from anywhere: trunks and main crowns, lamps, benches, signposts, the fountain, grass patches
 --   detail  within ~230 studs and device tier >= 2: extra crown layers, fruit, flowers, pots, pebbles, bunting, wall lanterns
@@ -11,6 +13,7 @@
 -- back corners (R151 displays) - A.Clear(x, z, r) checks it.
 local RS=game:GetService('ReplicatedStorage')
 local K=require(RS:WaitForChild('HubDecorKit151'))
+local Trees=require(RS:WaitForChild('HubStudTrees151'))
 local A={}
 local V,CF,RGB=Vector3.new,CFrame.new,Color3.fromRGB
 local Mat=Enum.Material
@@ -56,7 +59,7 @@ end
 
 -- The builder context: parts go into per-cell level folders; levels above the tier are skipped -----------------------------------------------
 local function context(root,tier)
- local ctx={Root=root,Tier=tier,Cells={},Counts={core=0,detail=0,fine=0},Lights={},LightAt={},Heads={},Emitters={},Butterflies={},Signs={},Lanterns={},Fountain=nil}
+ local ctx={Root=root,Tier=tier,Cells={},Counts={core=0,detail=0,fine=0},Lights={},LightAt={},Heads={},Emitters={},Butterflies={},Signs={},Lanterns={},Fountain=nil,Templated={},TemplateParts=0}
  function ctx.Folder(level,x,z)
   if A.LevelOf[level]>ctx.Tier then return nil end
   local cx,cz=math.floor(x/A.CellSize),math.floor(z/A.CellSize);local key=cx..':'..cz
@@ -84,119 +87,161 @@ local function pick(rng,list)return list[math.floor(rng(1,#list+.999))]end
 local function shade(c,rng,k)k=k or 10;local d=rng(-k,k);return{math.clamp(c[1]+d,0,255),math.clamp(c[2]+d,0,255),math.clamp(c[3]+d*.6,0,255)}end
 
 -- Trees ---------------------------------------------------------------------------------------------------------------------------------------
--- A leaning trunk: returns the CFrame at its top so crowns follow the lean.
+-- Owner (R151): "make sure they are studded". Every part-built tree, bush and topiary is made of Plastic blocks with Studs on top and Inlet
+-- underneath - the classic Roblox look of the place's own track trees (Plastic blocks with Studs) and of the owner's studded tree models.
+-- Stud surfaces show on block faces, so crowns are clusters of turned blocks. Each block of a tree keeps its top and bottom off the planes of
+-- the tree's other blocks (freeY: coplanar faces would flicker). The owner's tree models replace the leafy trees (oaks, blossoms, fruit
+-- trees) when ReplicatedStorage.HubTreeTemplates151 has them (A.TemplateTree, HubStudTrees151).
+local function block(ctx,level,x,z,name,size,cf,color)return ctx.Part(level,x,z,name,size,cf,color,Mat.Plastic,{studs=true})end
+local function turned(pos,yaw)return CF(pos)*CFrame.Angles(0,yaw,0)end
+-- y for a block of height h whose top / bottom stay .09 off every plane already used by this tree (bottoms under the floor are hidden).
+local function freeY(pl,y,h)
+ for _=1,40 do
+  local clash=false
+  for _,p in ipairs(pl)do if math.abs(y+h/2-p)<.09 or(y-h/2>FLOOR-.02 and math.abs(y-h/2-p)<.09)then clash=true;break end end
+  if not clash then break end
+  y+=.13
+ end
+ pl[#pl+1]=y+h/2;if y-h/2>FLOOR-.02 then pl[#pl+1]=y-h/2 end
+ return y
+end
+-- A crown block (square, its own turn); returns the part (nil when the level is not built here) and its CFrame.
+local function crown(ctx,pl,x,z,level,name,w,h,pos,yaw,color)
+ local cf=turned(V(pos.X,freeY(pl,pos.Y,h),pos.Z),yaw)
+ return block(ctx,level,x,z,name,V(w,h,w),cf,color),cf
+end
+-- A square beam between two points (palm trunks, cactus arms, branches), a little longer so the joints overlap.
+local function beam(ctx,level,x,z,name,a,b,d,color)
+ local mid=(a+b)/2
+ return block(ctx,level,x,z,name,V(d,d,(b-a).Magnitude+.6),CFrame.lookAt(mid,b),color)
+end
+-- A leaning square trunk: returns the CFrame at its top so crowns follow the lean.
 local function trunk(ctx,x,z,rng,d,h,color,level)
  local lean=CFrame.Angles(math.rad(rng(-6,6)),rng(0,math.pi*2),math.rad(rng(-6,6)))
  local base=CF(x,FLOOR,z)*lean
- ctx.Cyl(level or'core',x,z,'Tree trunk',d,h+.2,base*CF(0,h/2-.1,0),color,Mat.Wood)
+ block(ctx,level or'core',x,z,'Tree trunk',V(d*.85,h+.3,d*.85),base*CF(0,h/2-.15,0),color)
  return base*CF(0,h,0)
 end
-local function crown(ctx,x,z,level,name,d,pos,color,mat)return ctx.Ball(level,x,z,name,d,pos,color,mat or Mat.Grass)end
--- Round oak: S / M / L, 3-5 layered crown balls in neighbouring greens, a root flare.
-function A.Oak(ctx,x,z,size)
- local rng=K.Rng('oak'..size..x..z);local s=({S=.75,M=1,L=1.3})[size]*rng(.9,1.12)
- local g=pick(rng,GREENS);local top=trunk(ctx,x,z,rng,1.9*s,8.5*s,pick(rng,BARKS))
- ctx.VCyl('detail',x,z,'Root flare',3*s,FLOOR-.1,FLOOR+1.1*s,x,z,P.WoodDark,Mat.Wood)
- crown(ctx,x,z,'core','Tree crown',11*s,(top*CF(0,3.4*s,0)).Position,shade(g,rng))
- local n=math.floor(rng(2,4.99))
- for i=1,n do local a=i/n*math.pi*2+rng(0,1)
-  crown(ctx,x,z,'detail','Tree crown',rng(6,8.5)*s,(top*CF(math.cos(a)*4.2*s,rng(1,5)*s,math.sin(a)*4.2*s)).Position,shade(pick(rng,GREENS),rng))
- end
- crown(ctx,x,z,'detail','Tree crown top',rng(5.5,7)*s,(top*CF(rng(-1.5,1.5)*s,7.6*s,rng(-1.5,1.5)*s)).Position,shade(g,rng,16))
-end
--- Tall poplar / cypress: a slim trunk and a column of tapering balls.
-function A.Poplar(ctx,x,z)
- local rng=K.Rng('poplar'..x..z);local s=rng(.85,1.15);local g=pick(rng,DARK_GREENS)
- local top=trunk(ctx,x,z,rng,1.1*s,3.5*s,pick(rng,BARKS))
- local ds={6.4,5.8,5,4,2.8};local y=1.8*s
- for i,d in ipairs(ds)do
-  crown(ctx,x,z,i<=2 and'core'or'detail','Poplar crown',d*s,(top*CF(0,y,0)).Position,shade(g,rng,8))
-  y+=d*s*.62
- end
-end
--- Blossom trees in pink / white / lilac with a couple of green leaf tufts and falling petals.
-function A.Blossom(ctx,x,z,colour)
- local rng=K.Rng('blossom'..colour..x..z);local s=rng(.85,1.1);local pal=BLOSSOMS[colour]
- local top=trunk(ctx,x,z,rng,1.6*s,8*s,{110,78,60})
- local main=crown(ctx,x,z,'core','Blossom crown',10.5*s,(top*CF(0,3*s,0)).Position,shade(pick(rng,pal),rng,6),Mat.SmoothPlastic)
- for i=1,3 do local a=i*2.1+rng(0,1)
-  crown(ctx,x,z,'detail','Blossom crown',rng(5.5,7.5)*s,(top*CF(math.cos(a)*4*s,rng(1.5,4.5)*s,math.sin(a)*4*s)).Position,shade(pick(rng,pal),rng,6),Mat.SmoothPlastic)
- end
- crown(ctx,x,z,'detail','Leaf tuft',3.6*s,(top*CF(rng(-3,3)*s,-.4*s,rng(-3,3)*s)).Position,pick(rng,GREENS))
- local host=ctx.Part('fine',x,z,'Petal source',V(6*s,.2,6*s),CF((top*CF(0,1.5*s,0)).Position),{255,255,255},Mat.SmoothPlastic,{t=1,shadow=false})
+local function yawOf(rng)return rng(0,math.pi/2)end
+local function petals(ctx,x,z,at,w,pal)
+ local host=ctx.Part('fine',x,z,'Petal source',V(w,.2,w),CF(at),{255,255,255},Mat.SmoothPlastic,{t=1,shadow=false})
  if host then
   local pe=Instance.new('ParticleEmitter');pe.Name='Falling petals';pe.Rate=1.5;pe.Lifetime=NumberRange.new(5,7);pe.Speed=NumberRange.new(.3,.8)
   pe.Acceleration=V(0,-.5,0);pe.Color=ColorSequence.new(K.C(pal[1]));pe.Size=NumberSequence.new(.35);pe.LightEmission=.1;pe.Rotation=NumberRange.new(0,360);pe.RotSpeed=NumberRange.new(-60,60)
   pe.Enabled=false;pe.Parent=host;table.insert(ctx.Emitters,pe)
  end
- return main
 end
--- Fruit trees: a smaller round crown with fruit just showing on its surface.
-function A.FruitTree(ctx,x,z,fruit)
- local rng=K.Rng('fruit'..fruit..x..z);local s=rng(.8,1)
- local top=trunk(ctx,x,z,rng,1.6*s,6.5*s,pick(rng,BARKS))
- local c=(top*CF(0,3*s,0)).Position;local d=9.5*s
- crown(ctx,x,z,'core','Tree crown',d,c,shade(pick(rng,GREENS),rng))
- crown(ctx,x,z,'detail','Tree crown',6*s,c+V(rng(-2,2)*s,3.4*s,rng(-2,2)*s),shade(pick(rng,GREENS),rng))
- local n=math.floor(rng(4,6.99))
- for i=1,n do local a=i/n*math.pi*2+rng(0,.6);local e=rng(-.35,.55)
-  local dir=V(math.cos(a)*math.cos(e),math.sin(e),math.sin(a)*math.cos(e))
-  ctx.Ball('detail',x,z,'Fruit',rng(1.1,1.5)*s,c+dir*(d/2+.15),FRUITS[fruit],Mat.SmoothPlastic)
+-- Round oak: S / M / L, a big crown block with 2-4 side blocks and a top block in neighbouring greens, a root flare.
+function A.Oak(ctx,x,z,size)
+ local rng=K.Rng('oak'..size..x..z);local s=({S=.75,M=1,L=1.3})[size]*rng(.9,1.12);local pl={}
+ local g=pick(rng,GREENS);local top=trunk(ctx,x,z,rng,1.9*s,8.5*s,pick(rng,BARKS))
+ block(ctx,'detail',x,z,'Root flare',V(2.8*s,1.2*s,2.8*s),turned(V(x,FLOOR-.25+.6*s,z),yawOf(rng)),P.WoodDark)
+ crown(ctx,pl,x,z,'core','Tree crown',9*s,6.4*s,(top*CF(0,3.2*s,0)).Position,yawOf(rng),shade(g,rng))
+ local n=math.floor(rng(2,4.99))
+ for i=1,n do local a=i/n*math.pi*2+rng(0,1)
+  crown(ctx,pl,x,z,'detail','Tree crown',rng(5.2,7)*s,rng(3.6,4.8)*s,(top*CF(math.cos(a)*4.2*s,rng(1,4.4)*s,math.sin(a)*4.2*s)).Position,yawOf(rng),shade(pick(rng,GREENS),rng))
  end
+ crown(ctx,pl,x,z,'detail','Tree crown top',rng(4.8,6.2)*s,rng(3,3.8)*s,(top*CF(rng(-1.5,1.5)*s,7*s,rng(-1.5,1.5)*s)).Position,yawOf(rng),shade(g,rng,16))
 end
--- Pines for the Snow lane: 3-4 tapered tiers, snow on the tips.
-function A.Pine(ctx,x,z,s)
- local rng=K.Rng('pine'..x..z);s=(s or 1)*rng(.85,1.15);local g=pick(rng,DARK_GREENS)
- ctx.VCyl('core',x,z,'Pine trunk',1.3*s,FLOOR,FLOOR+3.6*s,x,z,P.WoodDark,Mat.Wood)
- local tiers=rng()<.5 and 3 or 4;local y=FLOOR+3*s
- for i=1,tiers do local d=(9.4-i*(tiers==3 and 2 or 1.6))*s;local h=3.4*s
-  ctx.VCyl(i<=2 and'core'or'detail',x,z,'Pine tier',d,y,y+h,x,z,shade(g,rng,6),Mat.Grass)
-  if i>1 then ctx.VCyl('detail',x,z,'Snow rim',d*.86,y+h,y+h+.3,x,z,{246,250,255},Mat.Snow)end
+-- Tall poplar / cypress: a slim trunk and a column of tapering blocks, each turned 45 degrees from the one below.
+function A.Poplar(ctx,x,z)
+ local rng=K.Rng('poplar'..x..z);local s=rng(.85,1.15);local g=pick(rng,DARK_GREENS);local pl={}
+ local top=trunk(ctx,x,z,rng,1.1*s,3.5*s,pick(rng,BARKS))
+ local ds={6.4,5.8,5,4,2.8};local y=1.8*s;local yaw=yawOf(rng)
+ for i,d in ipairs(ds)do local h=d*.72*s
+  crown(ctx,pl,x,z,i<=2 and'core'or'detail','Poplar crown',d*.84*s,h,(top*CF(0,y,0)).Position,yaw+i*math.pi/4,shade(g,rng,8))
   y+=h*.8
  end
- ctx.Ball('detail',x,z,'Pine snow',2.4*s,V(x,y+1.6*s,z),{246,250,255},Mat.Snow)
 end
--- Palms for the Desert garden: a curving trunk, drooping leaves, coconuts.
+-- Blossom trees in pink / white / lilac with a green leaf tuft and falling petals.
+function A.Blossom(ctx,x,z,colour)
+ local rng=K.Rng('blossom'..colour..x..z);local s=rng(.85,1.1);local pal=BLOSSOMS[colour];local pl={}
+ local top=trunk(ctx,x,z,rng,1.6*s,8*s,{110,78,60})
+ local main=crown(ctx,pl,x,z,'core','Blossom crown',8.8*s,6*s,(top*CF(0,3*s,0)).Position,yawOf(rng),shade(pick(rng,pal),rng,6))
+ for i=1,3 do local a=i*2.1+rng(0,1)
+  crown(ctx,pl,x,z,'detail','Blossom crown',rng(4.8,6.4)*s,rng(3.2,4.2)*s,(top*CF(math.cos(a)*4*s,rng(1.5,4.5)*s,math.sin(a)*4*s)).Position,yawOf(rng),shade(pick(rng,pal),rng,6))
+ end
+ crown(ctx,pl,x,z,'detail','Leaf tuft',3.2*s,2.2*s,(top*CF(rng(-3,3)*s,-.4*s,rng(-3,3)*s)).Position,yawOf(rng),pick(rng,GREENS))
+ petals(ctx,x,z,(top*CF(0,1.5*s,0)).Position,6*s,pal)
+ return main
+end
+-- Fruit trees: a crown block with a top block, fruit set into its sides.
+function A.FruitTree(ctx,x,z,fruit)
+ local rng=K.Rng('fruit'..fruit..x..z);local s=rng(.8,1);local pl={}
+ local top=trunk(ctx,x,z,rng,1.6*s,6.5*s,pick(rng,BARKS))
+ local w,h=8.4*s,6.6*s
+ local _,cf=crown(ctx,pl,x,z,'core','Tree crown',w,h,(top*CF(0,3*s,0)).Position,yawOf(rng),shade(pick(rng,GREENS),rng))
+ crown(ctx,pl,x,z,'detail','Tree crown',5.2*s,3.2*s,cf.Position+V(rng(-1.5,1.5)*s,h/2+1.1*s,rng(-1.5,1.5)*s),yawOf(rng),shade(pick(rng,GREENS),rng))
+ local n=math.floor(rng(4,6.99))
+ local faces={V(1,0,0),V(-1,0,0),V(0,0,1),V(0,0,-1)}
+ for i=1,n do local f=faces[(i-1)%4+1];local along=rng(-.34,.34)*w;local up=rng(-.3,.32)*h
+  local lp=f*(w/2)+V(math.abs(f.X)<.5 and along or 0,up,math.abs(f.Z)<.5 and along or 0)
+  ctx.Ball('detail',x,z,'Fruit',rng(1.1,1.5)*s,cf*lp,FRUITS[fruit],Mat.SmoothPlastic)
+ end
+end
+-- Pines for the Snow lane: 3-4 square tiers, each turned 45 degrees, snow on their tops.
+function A.Pine(ctx,x,z,s)
+ local rng=K.Rng('pine'..x..z);s=(s or 1)*rng(.85,1.15);local g=pick(rng,DARK_GREENS);local pl={}
+ local yaw=yawOf(rng)
+ block(ctx,'core',x,z,'Pine trunk',V(1.2*s,3.6*s+.3,1.2*s),turned(V(x,FLOOR-.3+(3.6*s+.3)/2,z),yaw),P.WoodDark)
+ local tiers=rng()<.5 and 3 or 4;local y=FLOOR+3*s
+ for i=1,tiers do local d=(9.4-i*(tiers==3 and 2 or 1.6))*s*.84;local h=3*s;local ty=yaw+i*math.pi/4
+  local cy=freeY(pl,y+h/2,h)
+  block(ctx,i<=2 and'core'or'detail',x,z,'Pine tier',V(d,h,d),turned(V(x,cy,z),ty),shade(g,rng,6))
+  if i>1 then -- snow on the tier's top (its underside just inside the tier)
+   block(ctx,'detail',x,z,'Snow rim',V(d*.82,.34,d*.82),turned(V(x,cy+h/2+.13,z),ty),{246,250,255})
+   pl[#pl+1]=cy+h/2+.3
+  end
+  y+=h*.8
+ end
+ local sy=freeY(pl,y+1.2*s,2*s)
+ block(ctx,'detail',x,z,'Pine snow',V(1.9*s,2*s,1.9*s),turned(V(x,sy,z),yaw),{246,250,255})
+end
+-- Palms for the Desert garden: a curving trunk of square segments, drooping leaves, coconuts.
 function A.Palm(ctx,x,z)
  local rng=K.Rng('palm'..x..z);local s=rng(.85,1.15);local a=rng(0,math.pi*2)
- local lean=V(math.cos(a),0,math.sin(a))*rng(.8,1.5)*s;local base=V(x,FLOOR,z);local prev=base
+ local lean=V(math.cos(a),0,math.sin(a))*rng(.8,1.5)*s;local base=V(x,FLOOR-.3,z);local prev=base
  for k=1,3 do local nxt=base+lean*(k*k*.45)+V(0,k*4.3*s,0)
-  ctx.Rod(k==1 and'core'or'core',x,z,'Palm trunk',prev,nxt,(1.5-k*.15)*s,{150,112,72},Mat.Wood,{shadow=true});prev=nxt
+  beam(ctx,'core',x,z,'Palm trunk',prev,nxt,(1.4-k*.15)*s,{150,112,72});prev=nxt
  end
  local crownAt=prev;local n=math.floor(rng(6,8.99))
  for i=1,n do local ang=i/n*math.pi*2+rng(0,.4);local reach=rng(5.5,7)*s
   local tip=crownAt+V(math.cos(ang)*reach,-rng(2,3.4)*s,math.sin(ang)*reach)
-  ctx.Part(i<=4 and'core'or'detail',x,z,'Palm leaf',V(reach+1,.35,rng(1.7,2.3)*s),CFrame.lookAt((crownAt+tip)/2,tip)*CFrame.Angles(0,math.pi/2,0),shade({60,150,72},rng,14),Mat.Grass)
+  ctx.Part(i<=4 and'core'or'detail',x,z,'Palm leaf',V(reach+1,.35,rng(1.7,2.3)*s),CFrame.lookAt((crownAt+tip)/2,tip)*CFrame.Angles(0,math.pi/2,0),shade({60,150,72},rng,14),Mat.Plastic,{studs=true})
  end
  for i=1,math.floor(rng(2,3.99))do ctx.Ball('detail',x,z,'Coconut',1.3*s,crownAt+V(rng(-.8,.8),-1.1,rng(-.8,.8)),{120,84,52})end
 end
 -- Cacti: a saguaro with one or two arms, or a barrel cactus; flowers on top.
 function A.Cactus(ctx,x,z,kind)
- local rng=K.Rng('cactus'..kind..x..z);local s=rng(.85,1.2);local g=shade({86,160,74},rng,12)
+ local rng=K.Rng('cactus'..kind..x..z);local s=rng(.85,1.2);local g=shade({86,160,74},rng,12);local yaw=yawOf(rng);local pl={}
  if kind=='barrel'then
-  ctx.Ball('core',x,z,'Barrel cactus',3.2*s,V(x,FLOOR+1.2*s,z),g,Mat.Grass)
-  ctx.Ball('detail',x,z,'Cactus flower',1.1*s,V(x,FLOOR+2.8*s,z),pick(rng,FLOWERS.desert))
+  block(ctx,'core',x,z,'Barrel cactus',V(3*s,2.6*s,3*s),turned(V(x,FLOOR-.2+1.3*s,z),yaw),g)
+  ctx.Ball('detail',x,z,'Cactus flower',1.1*s,V(x,FLOOR-.2+2.6*s+.25,z),pick(rng,FLOWERS.desert))
   return
  end
  local h=rng(6,8.5)*s
- ctx.VCyl('core',x,z,'Cactus',2.2*s,FLOOR,FLOOR+h,x,z,g,Mat.Grass);ctx.Ball('core',x,z,'Cactus top',2.2*s,V(x,FLOOR+h,z),g,Mat.Grass)
+ block(ctx,'core',x,z,'Cactus',V(2*s,h+.2,2*s),turned(V(x,FLOOR-.2+(h+.2)/2,z),yaw),g);pl[#pl+1]=FLOOR+h
+ local cy=freeY(pl,FLOOR+h+.3*s,1.2*s)
+ block(ctx,'core',x,z,'Cactus top',V(1.5*s,1.2*s,1.5*s),turned(V(x,cy,z),yaw+math.pi/4),g)
  local arms=rng()<.5 and 1 or 2;local a=rng(0,math.pi*2)
- for i=1,arms do local ang=a+(i-1)*math.pi;local dx,dz=math.cos(ang)*1.9*s,math.sin(ang)*1.9*s;local y0=FLOOR+rng(2.4,3.6)*s
-  ctx.Rod('detail',x,z,'Cactus arm',V(x,y0,z),V(x+dx,y0,z+dz),1.3*s,g,Mat.Grass,{shadow=true})
-  ctx.VCyl('detail',x,z,'Cactus arm',1.4*s,y0,y0+rng(2,3.2)*s,x+dx,z+dz,g,Mat.Grass)
+ for i=1,arms do local ang=a+(i-1)*math.pi;local dx,dz=math.cos(ang)*1.9*s,math.sin(ang)*1.9*s
+  local y0=freeY(pl,FLOOR+rng(2.4,3.6)*s,1.2*s)
+  beam(ctx,'detail',x,z,'Cactus arm',V(x,y0,z),V(x+dx,y0,z+dz),1.2*s,g)
+  local ah=rng(2,3.2)*s;local ay=freeY(pl,y0-.4*s+ah/2,ah)
+  block(ctx,'detail',x,z,'Cactus arm',V(1.3*s,ah,1.3*s),turned(V(x+dx,ay,z+dz),ang),g)
  end
- ctx.Ball('detail',x,z,'Cactus flower',1*s,V(x,FLOOR+h+1,z),pick(rng,FLOWERS.desert))
+ ctx.Ball('detail',x,z,'Cactus flower',1*s,V(x,cy+.6*s+.3,z),pick(rng,FLOWERS.desert))
 end
--- Ember trees for the Lava garden: charred leaning trunks, smouldering crowns with a few glowing embers.
+-- Ember trees for the Lava garden: charred leaning trunks, smouldering crown blocks with a few glowing embers.
 function A.EmberTree(ctx,x,z)
- local rng=K.Rng('ember'..x..z);local s=rng(.8,1.1)
+ local rng=K.Rng('ember'..x..z);local s=rng(.8,1.1);local pl={}
  local top=trunk(ctx,x,z,rng,1.8*s,8*s,{58,44,44})
- local c=(top*CF(0,2.6*s,0)).Position
- crown(ctx,x,z,'core','Ember crown',9.5*s,c,pick(rng,EMBERS),Mat.SmoothPlastic)
+ local _,cf=crown(ctx,pl,x,z,'core','Ember crown',8*s,6*s,(top*CF(0,2.6*s,0)).Position,yawOf(rng),pick(rng,EMBERS))
+ local c=cf.Position
  for i=1,2 do local a=i*2.6+rng(0,1)
-  crown(ctx,x,z,'detail','Ember crown',rng(5,7)*s,c+V(math.cos(a)*3.6*s,rng(.5,3)*s,math.sin(a)*3.6*s),pick(rng,EMBERS),Mat.SmoothPlastic)
+  crown(ctx,pl,x,z,'detail','Ember crown',rng(4.4,6)*s,rng(3,4)*s,c+V(math.cos(a)*3.6*s,rng(.5,3)*s,math.sin(a)*3.6*s),yawOf(rng),pick(rng,EMBERS))
  end
- ctx.Rod('detail',x,z,'Charred branch',(top*CF(0,-2*s,0)).Position,(top*CF(4*s,1*s,1*s)).Position,.7*s,{58,44,44},Mat.Wood)
+ beam(ctx,'detail',x,z,'Charred branch',(top*CF(0,-2*s,0)).Position,(top*CF(4*s,1*s,1*s)).Position,.7*s,{58,44,44})
  for i=1,3 do ctx.Ball('detail',x,z,'Ember',rng(.8,1.2),c+V(rng(-4,4)*s,rng(-3.5,-2)*s,rng(-4,4)*s),{255,170,60},Mat.Neon)end
 end
 function A.GlowRock(ctx,x,z)
@@ -205,25 +250,45 @@ function A.GlowRock(ctx,x,z)
  ctx.Ball('detail',x,z,'Basalt rock',2.4*s,V(x+2.2*s,FLOOR+.3*s,z+.8*s),shade({76,62,70},rng,8),Mat.Basalt)
  ctx.Ball('detail',x,z,'Ember glow',1.5*s,V(x+1.1*s,FLOOR+2.1*s,z-.4*s),{255,140,40},Mat.Neon)
 end
--- Bushes and topiary.
+-- The owner's studded tree model in a leafy slot (HubStudTrees151.Place: fitted, turned, leaned, grounded, leaves in the slot's colour);
+-- fruit trees keep their fruit (parts set into the clone's crown), blossoms their petals. nil when the clone cannot be placed.
+function A.TemplateTree(ctx,x,z,kind,variant,info)
+ local f=ctx.Folder('core',x,z);if not f then return nil end
+ local rng=K.Rng('leaf'..kind..tostring(variant)..x..z)
+ local leaf=kind=='blossom'and shade(pick(rng,BLOSSOMS[variant]or BLOSSOMS.pink),rng,6)or shade(pick(rng,GREENS),rng)
+ local m=Trees.Place(info,{Kind=kind,Variant=variant,X=x,Z=z},{Floor=FLOOR,Leaf=leaf,Shadows=ctx.Tier>=2})
+ if not m then return nil end
+ m.Name='Studded tree';m:SetAttribute('Template',info.Name);m.Parent=f
+ ctx.Counts.core+=info.Parts;ctx.Templated[kind]=(ctx.Templated[kind]or 0)+1;ctx.TemplateParts+=info.Parts
+ local c,size=Trees.LeafBox(m)
+ if kind=='fruit'and c then
+  local n=math.floor(rng(4,6.99))
+  for i=1,n do local a=i/n*math.pi*2+rng(0,.6);local e=rng(-.3,.5)
+   local dir=V(math.cos(a)*math.cos(e),math.sin(e),math.sin(a)*math.cos(e))
+   ctx.Ball('detail',x,z,'Fruit',rng(1.1,1.5),c+V(dir.X*size.X,dir.Y*size.Y,dir.Z*size.Z)*.46,FRUITS[variant]or FRUITS.apple,Mat.SmoothPlastic)
+  end
+ elseif kind=='blossom'and c then petals(ctx,x,z,c+V(0,-size.Y*.2,0),math.min(size.X,size.Z)*.6,BLOSSOMS[variant]or BLOSSOMS.pink)end
+ return m
+end
+-- Bushes and topiary (studded blocks too).
 function A.Bush(ctx,x,z,palette)
- local rng=K.Rng('bush'..x..z);local s=rng(.8,1.25);local g=pick(rng,palette or GREENS)
- ctx.Ball('core',x,z,'Bush',4.4*s,V(x,FLOOR+1.2*s,z),shade(g,rng),Mat.Grass)
- for i=1,math.floor(rng(1,2.99))do local a=rng(0,math.pi*2)
-  ctx.Ball('detail',x,z,'Bush',rng(2.6,3.6)*s,V(x+math.cos(a)*2*s,FLOOR+.9*s,z+math.sin(a)*2*s),shade(g,rng,14),Mat.Grass)
+ local rng=K.Rng('bush'..x..z);local s=rng(.8,1.25);local g=pick(rng,palette or GREENS);local pl={}
+ crown(ctx,pl,x,z,'core','Bush',4*s,2.6*s,V(x,FLOOR-.2+1.3*s,z),yawOf(rng),shade(g,rng))
+ for i=1,math.floor(rng(1,2.99))do local a=rng(0,math.pi*2);local h=rng(1.6,2.2)*s
+  crown(ctx,pl,x,z,'detail','Bush',rng(2.4,3.2)*s,h,V(x+math.cos(a)*2*s,FLOOR-.2+h/2,z+math.sin(a)*2*s),yawOf(rng),shade(g,rng,14))
  end
 end
 function A.Topiary(ctx,x,z,kind,potColor)
- local rng=K.Rng('topiary'..kind..x..z);local s=rng(.9,1.1);local g=pick(rng,DARK_GREENS)
+ local rng=K.Rng('topiary'..kind..x..z);local s=rng(.9,1.1);local g=pick(rng,DARK_GREENS);local yaw=yawOf(rng)
  local pot=potColor or pick(rng,{{214,142,110},{236,220,190},{52,168,160}})
  ctx.VCyl('detail',x,z,'Topiary pot',2.6*s,FLOOR,FLOOR+1.8*s,x,z,pot,Mat.SmoothPlastic)
  ctx.VCyl('detail',x,z,'Topiary pot rim',3*s,FLOOR+1.8*s,FLOOR+2.2*s,x,z,P.Gold,Mat.SmoothPlastic)
  if kind=='cone'then
   local y=FLOOR+2.2*s
-  for i,d in ipairs({2.8,2.1,1.4})do ctx.VCyl('detail',x,z,'Topiary cone',d*s,y,y+1.5*s,x,z,shade(g,rng,6),Mat.Grass);y+=1.5*s end
+  for i,d in ipairs({2.5,1.9,1.25})do block(ctx,'detail',x,z,'Topiary cone',V(d*s,1.5*s,d*s),turned(V(x,y+.75*s,z),yaw+i*math.pi/4),shade(g,rng,6));y+=1.5*s end
  else
-  ctx.VCyl('detail',x,z,'Topiary stem',.35*s,FLOOR+2.2*s,FLOOR+4.6*s,x,z,P.WoodDark,Mat.Wood)
-  ctx.Ball('detail',x,z,'Topiary ball',2.8*s,V(x,FLOOR+5.6*s,z),shade(g,rng,6),Mat.Grass)
+  block(ctx,'detail',x,z,'Topiary stem',V(.4*s,2.6*s,.4*s),turned(V(x,FLOOR+3.3*s,z),yaw),P.WoodDark)
+  block(ctx,'detail',x,z,'Topiary ball',V(2.4*s,2.4*s,2.4*s),turned(V(x,FLOOR+5.6*s,z),yaw+math.pi/4),shade(g,rng,6))
  end
 end
 
@@ -460,6 +525,12 @@ A.Layout={
  butterflies={{60,8,-196},{-60,9,-198},{36,7,-252},{-36,8,-300},{118,8,-161},{-118,7,-409},{8,9,-380},{20,10,-372},{312,8,-266},{-312,8,-272},{0,7,-592},{90,9,-240}},
 }
 A.LayoutFns={}
+-- The tree slots in layout order (HubStudTrees151.Plan fills the leafy ones with the owner's models in this order).
+function A.TreeSlots()
+ local out={}
+ for i,t in ipairs(A.Layout.trees)do out[#out+1]={Index=i,Kind=t[1],X=t[2],Z=t[3],Variant=t[4]}end
+ return out
+end
 local PATCH_COLOURS={{112,198,98},{70,150,74},{226,206,150},{90,78,80}}
 
 -- The lit lamps' real lights in priority order: mirror pairs (x, -x at the same z) side by side, the layout's order kept between pairs, so any even cap
@@ -477,14 +548,17 @@ function A.OrderLights(ctx)
  ctx.Lights=order
  return order
 end
--- Build everything for a device tier (1..3). bases: {[i]={Frame=CFrame, Size=Vector3, Color=Color3}}; owners(i) -> name or nil.
-function A.Build(root,tier,bases,owners)
+-- Build everything for a device tier (1..3). bases: {[i]={Frame=CFrame, Size=Vector3, Color=Color3}}; owners(i) -> name or nil;
+-- templates: HubStudTrees151.Collect's list (the owner's studded tree models; nil or empty = the part-built studded trees).
+function A.Build(root,tier,bases,owners,templates)
  local ctx=context(root,tier)
  ctx.Bases=bases
  local L=A.Layout
- for _,t in ipairs(L.trees)do
+ local plan,sum=Trees.Plan(templates or{},tier,A.TreeSlots())
+ for i,t in ipairs(L.trees)do
   local kind,x,z=t[1],t[2],t[3]
-  if kind=='oak'then A.Oak(ctx,x,z,t[4])elseif kind=='poplar'then A.Poplar(ctx,x,z)elseif kind=='blossom'then A.Blossom(ctx,x,z,t[4])
+  if plan[i]and A.TemplateTree(ctx,x,z,kind,t[4],plan[i])then -- (the owner's model)
+  elseif kind=='oak'then A.Oak(ctx,x,z,t[4])elseif kind=='poplar'then A.Poplar(ctx,x,z)elseif kind=='blossom'then A.Blossom(ctx,x,z,t[4])
   elseif kind=='fruit'then A.FruitTree(ctx,x,z,t[4])elseif kind=='pine'then A.Pine(ctx,x,z,t[4])elseif kind=='palm'then A.Palm(ctx,x,z)
   elseif kind=='cactus'then A.Cactus(ctx,x,z,t[4])elseif kind=='ember'then A.EmberTree(ctx,x,z)elseif kind=='rock'then A.GlowRock(ctx,x,z)end
  end
@@ -528,6 +602,9 @@ function A.Build(root,tier,bases,owners)
  local wings={{255,140,60},{255,230,90},{120,200,255},{240,130,230},{255,255,255}}
  for k,p in ipairs(L.butterflies)do A.Butterfly(ctx,p[1],p[2],p[3],wings[(k-1)%#wings+1],k)end
  for _,cell in pairs(ctx.Cells)do cell.Center=cell.N>0 and cell.Sum/cell.N or V(0,0,0)end
+ -- what was really placed (a clone that could not be placed fell back to the part-built tree)
+ local used=0;for _,n in pairs(ctx.Templated)do used+=n end
+ sum.Used,sum.ByKind,sum.Parts=used,ctx.Templated,ctx.TemplateParts;ctx.TreePlan=sum
  return ctx
 end
 return A

@@ -56,26 +56,36 @@ const TEX={
 TEX.Sandstone=TEX.Sand;TEX.Basalt=TEX.Slate;TEX.Ground=TEX.Grass;TEX.LeafyGrass=TEX.Grass;TEX.SmoothPlastic=null;TEX.Concrete=TEX.Plaster;TEX.Pavement=TEX.Plaster;TEX.Rock=TEX.Slate;
 TEX.Limestone=TEX.Plaster;TEX.Granite=TEX.Slate;TEX.Marble=TEX.Plaster;TEX.Ice=null;TEX.Glass=null;TEX.CrackedLava=TEX.Slate;TEX.DiamondPlate=TEX.Metal;
 const matCache={};
-function stdMaterial(m){
-  const key='std:'+m;if(matCache[key])return matCache[key];
+// studs: the classic Roblox Studs surface (one stud per square stud of the part's own face, lit top-left, shaded bottom-right) on the face
+// that points up; it fades out with distance like a mip-mapped texture.
+function stdMaterial(m,studs){
+  const key='std:'+m+(studs?':studs':'');if(matCache[key])return matCache[key];
   const rough={Metal:.35,SmoothPlastic:.5,Plastic:.62,Glass:.1,Ice:.2,Marble:.3,Snow:.8}[m]??.88;
   const mat=new THREE.MeshStandardMaterial({roughness:rough,metalness:m==='Metal'?.45:0});
   const t=TEX[m];
-  if(t){mat.onBeforeCompile=sh=>{
-    sh.uniforms.detailMap={value:t[0]};sh.uniforms.detailScale={value:1/t[1]};
-    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN;')
+  if(t||studs){mat.onBeforeCompile=sh=>{
+    sh.uniforms.detailMap={value:t?t[0]:TEX.Plastic[0]};sh.uniforms.detailScale={value:t?1/t[1]:1/8};sh.uniforms.detailMix={value:t?.85:0};
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN;varying vec3 vLS;varying vec3 vLN;')
      .replace('#include <worldpos_vertex>',`#include <worldpos_vertex>
-      vec4 r151p=vec4(transformed,1.0);vec3 r151n=objectNormal;
+      vec4 r151p=vec4(transformed,1.0);vec3 r151n=objectNormal;vec3 r151s=vec3(1.0);
       #ifdef USE_INSTANCING
-       r151p=instanceMatrix*r151p;r151n=mat3(instanceMatrix)*r151n;
+       r151p=instanceMatrix*r151p;r151n=mat3(instanceMatrix)*r151n;r151s=vec3(length(instanceMatrix[0].xyz),length(instanceMatrix[1].xyz),length(instanceMatrix[2].xyz));
       #endif
+      vLS=transformed*r151s;vLN=objectNormal;
       r151p=modelMatrix*r151p;vWP=r151p.xyz;vWN=normalize(mat3(modelMatrix)*r151n);`);
-    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN;uniform sampler2D detailMap;uniform float detailScale;')
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN;varying vec3 vLS;varying vec3 vLN;uniform sampler2D detailMap;uniform float detailScale;uniform float detailMix;')
      .replace('#include <map_fragment>',`#include <map_fragment>
       vec3 bw=pow(abs(normalize(vWN)),vec3(4.0));bw/=(bw.x+bw.y+bw.z);
       vec3 det=texture2D(detailMap,vWP.zy*detailScale).rgb*bw.x+texture2D(detailMap,vWP.xz*detailScale).rgb*bw.y+texture2D(detailMap,vWP.xy*detailScale).rgb*bw.z;
-      diffuseColor.rgb*=mix(vec3(1.0),det*2.0,0.85);`);
-  };mat.customProgramCacheKey=()=>'r151:'+m;}
+      diffuseColor.rgb*=mix(vec3(1.0),det*2.0,detailMix);
+      ${studs?`if(normalize(vWN).y>0.55){
+        vec3 an=abs(vLN);vec2 uv=(an.x>an.y&&an.x>an.z)?vLS.yz:((an.y>an.z)?vLS.xz:vLS.xy);
+        vec2 f=fract(uv)-0.5;float d=length(f);float fw=fwidth(uv.x)+fwidth(uv.y);float k=1.0-smoothstep(.3,.9,fw);
+        float inside=1.0-smoothstep(.29,.33,d);float edge=smoothstep(.17,.31,d)*inside;float outline=(1.0-smoothstep(.33,.42,d))*(1.0-inside);
+        float l=dot(normalize(f+1e-4),vec2(-.71,.71));
+        diffuseColor.rgb*=mix(1.0,1.0+inside*.06+edge*.5*l-outline*.3*(.6-.4*l),k);
+      }`:''}`);
+  };mat.customProgramCacheKey=()=>'r151:'+m+(studs?':studs':'');}
   return matCache[key]=mat;
 }
 const glowTex=(()=>{const cv=document.createElement('canvas');cv.width=cv.height=64;const c=cv.getContext('2d');const gr=c.createRadialGradient(32,32,0,32,32,32);
@@ -167,8 +177,9 @@ window.shoot=function(scene,W,H,view){
     if(/Seed pack \(stand-in\)/.test(p.name))geo='box';
     const m=p.material;let kind;
     if(m==='Neon')kind='neon';else if(m==='Glass'||m==='Ice'||m==='ForceField')kind='glass';else if(eff>.02)kind='trans';else kind='std:'+m;
-    const key=geo+'|'+kind+(kind==='trans'?'|'+eff.toFixed(1):'');
-    if(!groups.has(key))groups.set(key,{geo,kind,eff,list:[]});groups.get(key).list.push(p);
+    const studs=!!p.studs&&kind.startsWith('std:');
+    const key=geo+'|'+kind+(kind==='trans'?'|'+eff.toFixed(1):'')+(studs?'|studs':'');
+    if(!groups.has(key))groups.set(key,{geo,kind,eff,studs,list:[]});groups.get(key).list.push(p);
   }
   const m4=new THREE.Matrix4(),sc=new THREE.Matrix4();
   for(const g of groups.values()){
@@ -176,7 +187,7 @@ window.shoot=function(scene,W,H,view){
     if(g.kind==='neon')mat=new THREE.MeshBasicMaterial({toneMapped:false});
     else if(g.kind==='glass')mat=new THREE.MeshPhysicalMaterial({roughness:.08,transparent:true,opacity:.62,clearcoat:1,depthWrite:false});
     else if(g.kind==='trans')mat=new THREE.MeshStandardMaterial({roughness:.6,transparent:true,opacity:Math.max(.12,1-g.eff),depthWrite:false});
-    else mat=stdMaterial(g.kind.slice(4));
+    else mat=stdMaterial(g.kind.slice(4),g.studs);
     const im=new THREE.InstancedMesh(G[g.geo],mat,g.list.length);
     g.list.forEach((p,i)=>{
       const r=p.r;m4.set(r[0][0],r[0][1],r[0][2],p.p[0],r[1][0],r[1][1],r[1][2],p.p[1],r[2][0],r[2][1],r[2][2],p.p[2],0,0,0,1);

@@ -81,9 +81,30 @@ function K.Rng(seed)
  end
 end
 
+-- Studded trees (owner: "tress can also use this" / "there are different variations of trees that we can use make sure they are studded"):
+-- the Creator Store models the server loads at start (ChestChaseServer.HubTreeLoader151) into ReplicatedStorage.HubTreeTemplates151, where
+-- the owner can also drop any tree model by hand. Add more asset ids here; every model in the folder becomes one more variation.
+K.TreeAssetIds={16637971059,17280628013} -- "Stud-Tree", "studded-tree"
+K.TreeFolder='HubTreeTemplates151'
+-- What a template tree may cost (HubStudTrees151.Plan): a clone with more than PerTree parts is not used on that device tier, and all
+-- clones together add at most Total parts (the slots are filled in the layout's order: the welcome lawns by the gate first). The part-built
+-- tree a clone replaces costs 2 core + about 5 detail parts. Tier 1 = phones on low / FastMode, 2 = phones, 3 = desktop.
+K.TreeBudget={PerTree={[1]=6,[2]=16,[3]=40},Total={[1]=90,[2]=300,[3]=600},MaxParts=400,Kinds={oak=true,blossom=true,fruit=true}}
+
 -- Part constructors -----------------------------------------------------------------------------------------------------------------------
 K.Made=0
 local UPRIGHT=CFrame.Angles(0,0,math.pi/2) -- a Cylinder's axis is its X: this stands it up
+-- The classic Roblox stud look, as the place's own track trees have it (Plastic blocks with Studs on top, Inlet underneath): Studs on the
+-- face that points up, Inlet on the one that points down, whatever the part's turn (an upright cylinder's top is its Right face).
+local FACE_PAIRS={{'RightSurface','LeftSurface'},{'TopSurface','BottomSurface'},{'BackSurface','FrontSurface'}}
+function K.Studs(p)
+ local c=p.CFrame;local up={c.RightVector.Y,c.UpVector.Y,-c.LookVector.Y}
+ local best=1;for i=2,3 do if math.abs(up[i])>math.abs(up[best])then best=i end end
+ local top,bottom=FACE_PAIRS[best][1],FACE_PAIRS[best][2];if up[best]<0 then top,bottom=bottom,top end
+ for _,pair in ipairs(FACE_PAIRS)do p[pair[1]]=Enum.SurfaceType.Smooth;p[pair[2]]=Enum.SurfaceType.Smooth end
+ p[top]=Enum.SurfaceType.Studs;p[bottom]=Enum.SurfaceType.Inlet;p.Material=Mat.Plastic
+ return top
+end
 function K.Part(parent,name,size,cf,color,mat,o)
  o=o or{}
  local p=Instance.new(o.class or'Part')
@@ -92,6 +113,7 @@ function K.Part(parent,name,size,cf,color,mat,o)
  p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth
  if o.shape then p.Shape=o.shape end
  if o.t then p.Transparency=o.t end
+ if o.studs then K.Studs(p)end
  p.Parent=parent;K.Made+=1
  return p
 end

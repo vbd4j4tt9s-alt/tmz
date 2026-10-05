@@ -10,7 +10,8 @@
 -- Globals (set by the runner): REDESIGN (bool), PHASE (1 = the server half only, 2 = + the client "life" layer), WALL ('tall' = the dressed
 -- 48-stud wall | 'low' = owner option: 30-stud visible wall + skyline), SLOTS (draw the reserved future slots as ghosts), OWNERS (base index ->
 -- display name, for the name banners), RUNNER = {x, z}. BUILT = true: the real R151 src (HubDecor151 via MapService + HubLife151.client) instead
--- of the scratch builder; CLIENT_TIER (1..3) for the client.
+-- of the scratch builder; CLIENT_TIER (1..3) for the client. STANDIN = true: two STAND-IN studded tree models (standin_tree.luau, not the
+-- owner's Creator Store trees, which cannot be downloaded here) in ReplicatedStorage.HubTreeTemplates151 before the client builds.
 local Z=require('./zfight_world');local W=Z.W;local R=Z.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local RS=W.RS
 local Run=W.service('RunService');Run.IsServer=function()return true end;Run.IsClient=function()return false end;Run.IsStudio=function()return false end
@@ -110,6 +111,12 @@ pcall(function()player:SetAttribute('PhysicalWalkSpeed',W.module('KeeperPursuit'
 if REDESIGN and Dress and(PHASE or 2)>=2 then step('HubDressing151 (client)',function()Dress.BuildClient(map,{Wall=WALL or'tall',Player=player,Slots=SLOTS});W.frames(5)end)end
 -- BUILT: the real R151 code of this checkout (MapService already ran HubDecor151); the real client script builds the life layer, with every
 -- detail level shown (renders look from many places).
+if BUILT and STANDIN then step('stand-in tree models',function()
+ local raw=R.Inst.Clone;R.Inst.Clone=function(self)local c=raw(self);c._attrs=table.clone(self._attrs);return c end -- (Roblox's Clone keeps attributes)
+ local Kit=W.module('HubDecorKit151');local f=RS:FindFirstChild(Kit.TreeFolder)
+ if not f then f=R.new('Folder');f.Name=Kit.TreeFolder;f.Parent=RS end
+ require('./standin_tree')(R,f)
+end)end
 if BUILT and(PHASE or 2)>=2 then step('HubLife151.client',function()
  local sc=R.new('LocalScript');sc.Name='HubLife151';sc:SetAttribute('R151TestHook',true);sc.Parent=player:FindFirstChild('PlayerGui')
  local api=W.load('HubLife151Client',sc);assert(api,'no test hook')
@@ -141,6 +148,22 @@ local function n4(v)return string.format('%.4f',v)end
 local function q(s)return'"'..tostring(s):gsub('\\','\\\\'):gsub('"','\\"'):gsub('\n','\\n')..'"'end
 local function enumName(e)if e==nil then return nil end;if type(e)=='table'and e.Name then return e.Name end;local s=tostring(e);return s:match('([%w_]+)$')or s end
 local function rgb(c)if not c then return'[255,255,255]'end;return string.format('[%d,%d,%d]',math.floor(c.R*255+.5),math.floor(c.G*255+.5),math.floor(c.B*255+.5))end
+-- R151 studded trees: which face of each dumped part carries Studs (the renderer draws the classic stud pattern there); the same walk and
+-- filter as Z.dump, so the i-th visible part is parts[i].
+do local i=0;local SURF={'TopSurface','BottomSurface','LeftSurface','RightSurface','FrontSurface','BackSurface'}
+ local function walk(o)
+  for _,c in ipairs(o._children)do
+   local decorated=false
+   for _,d in ipairs(c._children)do if(d._class=='SurfaceGui'and d._props.Enabled~=false)or d._class=='Decal'or d._class=='Texture'then decorated=true end end
+   if c:IsA('BasePart')and((c._props.Transparency or 0)<1 or decorated)and c._props.CFrame and c._props.Size then
+    i+=1
+    for _,k in ipairs(SURF)do if enumName(c._props[k])=='Studs'then parts[i]=parts[i]:sub(1,-2)..',"studs":"'..(k:gsub('Surface',''))..'"}';break end end
+   end
+   walk(c)
+  end
+ end
+ walk(W.workspace)
+end
 local function partOf(o)local x=o;while x do if x:IsA('BasePart')and x._props.CFrame then return x end;x=x._parent end;return nil end
 local function frameJson(part)
  local cf=part._props.CFrame;local r=cf.R;local p=cf.Position;local s=part._props.Size
