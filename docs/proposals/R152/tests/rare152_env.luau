@@ -64,6 +64,12 @@ return function(W,E,F,X)
   return x+(y-x)*f
  end
  Y.AssumedLoudness=-16 -- (LUFS) the game's own short sounds (heartbeat, rumble, whoosh, ping...) were never available to measure
+ Y.AssumedPeak=-6 -- (dBFS) and their sample peaks
+ -- the sample peak of a file within 25 ms of a position (dBFS)
+ function Y.filePeak(id,pos)
+  local l=Y.ById[id];if not l or not l.Peaks then return Y.AssumedPeak end
+  local i=math.floor(pos/Levels.Step+.5)+1;return l.Peaks[math.clamp(i,1,#l.Peaks)]
+ end
  -- what one voice adds: its file's loudness at that point plus its gain in dB
  function Y.voiceLoudness(v)
   if v.Gain<=1e-4 then return -99 end

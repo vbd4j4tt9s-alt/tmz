@@ -1,6 +1,9 @@
 #!/bin/sh
 # Usage: sh run_seed_opening.sh [scratch dir] [only|all]. R152 seed (pack) opening polish, on the Roblox mock (/opt/luau/luau) with the REAL
 # modules / scripts of this checkout (docs/proposals/R152/seed_opening.md):
+#  test_seed_loudness.luau    - loudness: every presentation played and what is heard added up frame by frame (the owner's files measured:
+#                               sound_levels.luau): the mix, any single sound, whooshes, beds and the sample peak under their caps, the hit
+#                               the loudest moment, the ladder growing with the tier, the voice cap, every presentation quieter than R151.
 #  test_seed_sync.luau        - sync and clean-up: the sounds load when the client starts; every hit heard within 1/60 s of the frame that
 #                               shows its beat (measured hits and lead-ins), whooshes swelling on each flight's fastest frame, risers ending
 #                               on the silence, at 30 / 60 / 144 fps, every tier and presentation; nothing outlives its presentation; skip /
@@ -21,7 +24,7 @@ INV=$P/inventory_R113/tests
 cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$P/R150/tests/sfx_env.luau" "$P/R151/tests/rare_env.luau" "$HERE"/*.luau "$OUT/cl/"
 python3 "$P/R151/tests/mkbundle_rare.py" "$OUT/cl" all-client >/dev/null
 cd "$OUT/cl"
-for t in test_seed_sync;do
+for t in test_seed_sync test_seed_loudness;do
  [ -f $t.luau ] || continue
  echo "== $t"
  timeout 1800 /opt/luau/luau $t.luau > $t.log 2>&1 || { grep -v '^WARN' $t.log | tail -40;exit 1; }

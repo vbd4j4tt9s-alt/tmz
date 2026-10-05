@@ -32,7 +32,7 @@ A.Fallback={
  Sparkle={{Id=PING,Volume=.07,Pitch=2.0},{Id=PING,Volume=.06,Pitch=1.5,Delay=.09},{Id=PING,Volume=.05,Pitch=2.52,Delay=.18}},
  PackShake={{Id=TEAR,Volume=.22,Pitch=1.35}},
  PackBurst={{Id=TEAR,Volume=.4,Pitch=.85},{Id=POP,Volume=.16,Pitch=1.1}},
- Heartbeat={{Id=HEART,Volume=.3,Pitch=.9,Length=.55}},
+ Heartbeat={{Id=HEART,Volume=.25,Pitch=.9,Length=.55}},
  Flight={{Id=WHOOSH,Volume=.08,Pitch=1,Swell=.70}}, -- (the R150 whoosh; its swell assumed .26 s after its .44 s lead-in)
  AuraHum={{Id=HUM,Volume=.06,Pitch=1.2,Loop=true}},
  KingChoir={{Id=HUM,Volume=.2,Pitch=.667,Loop=true},{Id=HUM,Volume=.1,Pitch=1.0,Loop=true}},

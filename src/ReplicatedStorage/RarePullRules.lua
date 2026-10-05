@@ -465,9 +465,9 @@ function L.Flights(kind,rank,tl)
  local out={}
  local function fly(name,from,to,peak,pitch,volume)if from and to and to>from+.05 then out[#out+1]={Name=name,From=from,To=to,Peak=peak or(from+to)/2,Pitch=pitch,Volume=volume}end end
  if kind=='Ladder'then
-  fly('Card float',tl.Burst,tl.FloatEnd,nil,1.55+.04*rank,.55)
+  fly('Card float',tl.Burst,tl.FloatEnd,nil,1.55+.04*rank,.3)
  elseif kind=='InPlace'or kind=='Result'then
-  fly('Card float',tl.Climax,tl.FloatEnd,nil,1.5,.55)
+  fly('Card float',tl.Climax,tl.FloatEnd,nil,1.5,.35)
  elseif tl.Variant=='Calm'then
   if rank==7 then for i,p in ipairs({1.38,1.46,1.55})do local at=tl['Align'..i];fly('Planet '..i,at-.6,at,at-.3,p,.45)end end
  else
@@ -500,7 +500,7 @@ function L.LadderCues(rank,quick)
  for i,p in ipairs(L.Pulses(rank,quick))do out[#out+1]=cue(p,'PackShake',{Pitch=.95+.07*i+.02*rank,Volume=.5+.5*i/#L.Pulses(rank,quick)})end
  if rank>=4 then out[#out+1]=cue(burst*.25,'Riser',{Until=burst-.08,Volume=rank==4 and .7 or .85})end
  if rank>=5 and not quick then out[#out+1]=cue(burst-.42,'SuckIn',{Until=burst-.08,Volume=.75})end
- out[#out+1]=cue(burst,'PackBurst',{Pitch=1.15-.05*rank,Volume=.55+.07*rank})
+ out[#out+1]=cue(burst,'PackBurst',{Pitch=1.15-.05*rank,Volume=.68+.09*rank}) -- (R152: the burst is the loudest moment, even for Common; it grows with the tier)
  if rank>=4 then out[#out+1]=cue(burst,'GroundImpact',{Volume=rank==4 and .8 or .65})end -- the smaller hit (Legendary), under the big one (Mythic)
  if rank>=5 then out[#out+1]=cue(burst,'Impact',{Volume=.6})end
  out[#out+1]=cue(card.Odds,'TitleSlam',{Pitch=1.15-.04*rank,Volume=.45+.08*rank})
@@ -518,7 +518,7 @@ function L.SceneCues(rank,tl)
    add(0,rank==8 and'KingChoir'or rank==7 and'CosmicPad'or'SecretDrone',{Until=tl.Silence,FadeIn=.3,FadeOut=.08,Volume=.7})
    add(math.max(0,tl.Climax-1.1),'Riser',{Until=tl.Silence,Volume=.8});add(tl.SuckIn,'SuckIn',{Until=tl.Silence,Volume=.7})
   end
-  add(tl.Climax,'PackBurst');if rank~=7 then add(tl.Climax,'Impact')end;add(tl.Climax,'GroundImpact',{Volume=.6})
+  add(tl.Climax,'PackBurst',{Volume=.7});if rank~=7 then add(tl.Climax,'Impact')end;add(tl.Climax,'GroundImpact',{Volume=.6})
   add(tl.Climax,rank==8 and'KingFanfare'or rank==7 and'CosmicBoom'or'SecretGlitch',rank==6 and{Until=tl.Climax+1.2,FadeOut=.3}or nil)
   add(tl.Odds,'TitleSlam');add(tl.Odds+.15,'Sparkle')
  elseif rank==6 then
@@ -531,7 +531,7 @@ function L.SceneCues(rank,tl)
   for i,k in ipairs(L.LockTurns)do if tl.Lock+k<tl.Unlock then add(tl.Lock+k,'PackShake',{Pitch=.65+.05*i})end end
   add(tl.Unlock,'SecretVault',{Until=tl.Silence,FadeOut=.12})
   add(tl.Shudder,'PackShake',{Pitch=1.1});add(tl.Lock,'Riser',{Until=tl.Silence});add(tl.SuckIn,'SuckIn',{Until=tl.Silence})
-  add(tl.Climax,'Impact');add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst');add(tl.Climax,'SecretGlitch',{Pitch=.7,Volume=1.3,Until=tl.Climax+1.2,FadeOut=.3})
+  add(tl.Climax,'Impact');add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst',{Volume=.7});add(tl.Climax,'SecretGlitch',{Pitch=.7,Volume=.9,Until=tl.Climax+1.2,FadeOut=.3})
   add(tl.Odds,'TitleSlam');add(tl.Rise+.1,'Sparkle');add((tl.Rise+tl.FloatEnd)/2,'Sparkle',{Pitch=.9})
   add(tl.FloatEnd,'Sparkle',{Pitch=.75,Volume=.7}) -- (R152) the seed has floated down and settles
  elseif rank==7 then
@@ -559,7 +559,7 @@ function L.SceneCues(rank,tl)
   add(tl.Fanfare,'KingFanfare',{Until=tl.Silence,FadeOut=.08});add(tl.CrownOn,'KingBell')
   add(tl.CrownOn+.05,'PackShake',{Pitch=.9});add(tl.CrownOn+.25,'PackShake',{Pitch=1.05});add(math.max(tl.CrownStart,tl.Silence-1.45),'Riser',{Until=tl.Silence})
   add(tl.SuckIn,'SuckIn',{Until=tl.Silence})
-  add(tl.Climax,'Impact');add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst');add(tl.Climax,'KingFanfare',{Until=tl.Back,FadeOut=.6})
+  add(tl.Climax,'Impact');add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst',{Volume=.7});add(tl.Climax,'KingFanfare',{Until=tl.Back,FadeOut=.6,Volume=.85})
   add(tl.Odds,'TitleSlam');add(tl.Rise+.25,'Sparkle');add((tl.Rise+tl.FloatEnd)/2,'Sparkle',{Pitch=.9})
   add(tl.FloatEnd,'KingBell',{Pitch=1.5,Volume=.4})
  end
