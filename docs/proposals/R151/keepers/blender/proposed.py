@@ -474,11 +474,12 @@ def sand_snake():
 
 # =========================================================================================== Stage 3: Ice Fang (Snow)
 def ice_fang():
-    """Rev 5: a snow fox, improved. A clean fox head held up on a neck: a compact cranium, a tapered pointed white
-    snout, big triangular ears with blue tips, white cheek ruffs, almond eyes with a dark eyeliner flick, a sapphire on
-    the brow, sabre fangs. A fox body: a deep chest with a white ruff, a slim waist, round haunches, blue-grey socks,
-    big paws with ice claws, and a huge bushy tail with a white tip and ice crystals. Icy white and blue, a few bold
-    blue bands, the silver-and-sapphire collar, saddle and shoulder plates."""
+    """Rev 6: a snow fox with a chunky, powerful body. The rev 5 fox head (held up on a neck: a compact cranium, a
+    tapered pointed white snout, big triangular ears with blue tips, white cheek ruffs, almond eyes with a dark
+    eyeliner flick, a sapphire on the brow, sabre fangs) and the huge bushy crystal-tipped tail, on a thick, sturdy
+    body: a broad deep chest with a big white ruff, a thick barrel torso, heavy haunches and thick legs with big paws,
+    in the clunky style of the other keepers. Icy white and blue, a few bold blue bands, the silver-and-sapphire
+    collar, saddle and shoulder plates."""
     k = KeeperModel('ice_fang', 'Ice Fang', 3, {
         'fur': (0.94, 0.96, 1.0), 'fur2': (0.70, 0.79, 0.93), 'mark': (0.10, 0.36, 0.88), 'mark2': (0.30, 0.66, 1.0),
         'muzzle': (1.0, 1.0, 1.0), 'nose': (0.06, 0.10, 0.30), 'inner': (0.50, 0.72, 1.0), 'silver': (0.58, 0.63, 0.74),
@@ -486,29 +487,30 @@ def ice_fang():
         'eyedark': (0.03, 0.06, 0.18), 'lash': (0.04, 0.10, 0.32)},
         eye_rgb=(0.15, 0.85, 1.0))
     k.personality = 'Proud, cold snow fox: head high, sly icy glare, bares its sabres the moment it sees you.'
-    k.fidget = 'Licks a paw, swivels its big ears, sweeps the huge crystal-tipped tail around its feet.'
+    k.fidget = 'Licks a big paw, swivels its ears, plants its heavy forepaws and sweeps the huge crystal-tipped tail around them.'
     k.fx_notes = 'Frost aura and snowflake sparkles (ParticleEmitter); icy breath puff on the snarl; ice glint on the tail crystals.'
     body = k.g('Body')
-    cbox(body, (0, 2.9, -1.7), (5.4, 5.2, 5.2), 'fur', bevel=0.12)                 # deep chest  y 0.3..5.5, z -4.3..0.9
-    cbox(body, (0, 3.3, 4.0), (4.4, 3.4, 7.6), 'fur', bevel=0.12)                  # slim waist  y 1.6..5.0
-    cbox(body, (0, 3.0, 9.4), (5.2, 4.6, 4.6), 'fur', bevel=0.12)                  # haunches    y 0.7..5.3, z 7.1..11.7
-    cbox(body, (0, 2.6, -4.55), (4.6, 3.8, 1.0), 'muzzle', bevel=0.2)              # white chest ruff
+    cbox(body, (0, 2.7, -1.6), (7.0, 6.4, 5.8), 'fur', bevel=0.12)                 # broad deep chest  y -0.5..5.9, z -4.5..1.3
+    cbox(body, (0, 3.0, 4.2), (6.4, 5.4, 7.6), 'fur', bevel=0.12)                  # thick barrel torso  y 0.3..5.7
+    cbox(body, (0, 2.9, 9.4), (6.8, 5.8, 4.8), 'fur', bevel=0.12)                  # heavy haunches  y 0.0..5.8, z 7.0..11.8
+    cbox(body, (0, 2.5, -4.75), (6.0, 4.6, 1.0), 'muzzle', bevel=0.2)              # big white chest ruff
     for s in (-1, 0, 1):
-        beam(body, (s * 1.3, 1.4, -4.7), (s * 1.1, -0.1, -4.5), 1.5, 0.8, 'muzzle', top=0.15, side=(1, 0, 0))   # ruff points
-    for z, w in ((3.2, 0.9), (5.4, 0.9), (9.0, 1.0)):                               # a few bold blue bands over the back
-        cbox(body, (0, 0, 0), (w, 0.2, 4.6 if z < 7 else 5.4), 'mark', bevel=0.2, M=T(0, 5.0 if z < 7 else 5.3, z) @ Ry(math.pi / 2))
+        beam(body, (s * 1.8, 0.8, -4.9), (s * 1.5, -0.9, -4.7), 1.8, 0.9, 'muzzle', top=0.15, side=(1, 0, 0))   # ruff points
+    for z, w in ((3.0, 1.0), (5.6, 1.0), (9.0, 1.1)):                               # a few bold blue bands over the back
+        top, half = (5.75, 3.22) if z < 7 else (5.85, 3.42)
+        cbox(body, (0, 0, 0), (w, 0.2, half * 2 - 0.4), 'mark', bevel=0.2, M=T(0, top, z) @ Ry(math.pi / 2))
         for s in (-1, 1):
-            box(body, (s * (2.22 if z < 7 else 2.62), 4.1 if z < 7 else 4.3, z), (0.12, 1.6, w), 'mark')
-    cbox(body, (0, 5.1, 2.5), (3.4, 0.45, 2.4), 'silver', bevel=0.2)               # saddle plate with a sapphire
-    cbox(body, (0, 5.45, 2.5), (0.9, 0.7, 0.9), 'sapphire', bevel=0.2, M=Ry(math.pi / 4))
-    cbox(body, (0, 4.6, -4.35), (4.4, 0.6, 1.0), 'silver', bevel=0.2)              # collar with three sapphires
-    for x in (-1.3, 0.0, 1.3):
-        cbox(body, (x, 4.6, -4.9), (0.55, 0.55, 0.3), 'sapphire', bevel=0.2, M=Rz(math.pi / 4))
-    crystal(body, (0, 5.2, 7.6), (0, 1, 0.4), 0.45, 1.3, 'ice', sides=4)
+            box(body, (s * half, top - 1.0, z), (0.12, 1.8, w), 'mark')
+    cbox(body, (0, 5.85, 2.6), (3.8, 0.45, 2.6), 'silver', bevel=0.2)              # saddle plate with a sapphire
+    cbox(body, (0, 6.2, 2.6), (1.0, 0.7, 1.0), 'sapphire', bevel=0.2, M=Ry(math.pi / 4))
+    cbox(body, (0, 5.0, -4.6), (5.8, 0.7, 1.0), 'silver', bevel=0.2)               # collar with three sapphires
+    for x in (-1.6, 0.0, 1.6):
+        cbox(body, (x, 5.0, -5.15), (0.6, 0.6, 0.3), 'sapphire', bevel=0.2, M=Rz(math.pi / 4))
+    crystal(body, (0, 5.9, 7.6), (0, 1, 0.4), 0.5, 1.4, 'ice', sides=4)
     # Head: a neck held up, a compact cranium, a tapered snout, big ears, cheek ruffs ----------------------------------
     head = k.g('Head')
     joint(head, (0, 2.4, -3.7), 2.6, 'fur')
-    beam(head, (0, 2.6, -3.5), (0, 4.4, -5.6), 3.0, 2.8, 'fur', side=(1, 0, 0), ext=0.5)      # the neck, rising forward
+    beam(head, (0, 2.6, -3.5), (0, 4.4, -5.6), 3.8, 3.4, 'fur', side=(1, 0, 0), ext=0.5)      # a thick neck, rising forward
     cbox(head, (0, 2.9, -6.6), (3.0, 1.6, 2.6), 'muzzle', bevel=0.2)                          # white throat (holds the jaw)
     cbox(head, (0, 4.8, -6.6), (4.2, 3.4, 3.2), 'fur', bevel=0.12)                            # cranium y 3.1..6.5, face z -8.2
     sa, sb = Vector((0, 3.85, -8.0)), Vector((0, 3.5, -10.9))
@@ -547,21 +549,22 @@ def ice_fang():
         g = k.g(group)
         if front:
             z0 = -2.5
-            joint(g, (x, 2.3, z0), 2.2, 'fur')
-            cbox(g, (x, 0.9, z0 - 0.1), (2.2, 3.6, 2.6), 'fur', bevel=0.12)                   # y -0.9..2.7
-            cbox(g, (x, -2.1, z0 - 0.2), (1.8, 2.8, 2.0), 'fur2', bevel=0.12)                 # blue-grey sock
-            cbox(g, (x + s * 0.35, 2.3, z0 - 0.1), (2.6, 1.4, 3.0), 'silver', bevel=0.2)      # shoulder plate
-            cbox(g, (x + s * 1.66, 2.3, z0 - 0.1), (0.3, 0.7, 0.7), 'sapphire', bevel=0.2, M=Rx(math.pi / 4))
+            joint(g, (x, 2.3, z0), 2.4, 'fur')
+            cbox(g, (x + s * 0.35, 0.9, z0 - 0.1), (3.0, 3.8, 3.2), 'fur', bevel=0.12)        # thick foreleg y -1.0..2.8
+            cbox(g, (x + s * 0.35, -2.1, z0 - 0.2), (2.6, 2.8, 2.8), 'fur2', bevel=0.12)      # blue-grey sock
+            cbox(g, (x + s * 0.9, 2.4, z0 - 0.1), (3.2, 1.5, 3.6), 'silver', bevel=0.2)       # shoulder plate
+            cbox(g, (x + s * 2.52, 2.4, z0 - 0.1), (0.3, 0.8, 0.8), 'sapphire', bevel=0.2, M=Rx(math.pi / 4))
             pz = z0 - 0.7
         else:
             z0 = 10.0
-            joint(g, (x, 1.85, z0), 2.4, 'fur')
-            cbox(g, (x, 1.2, z0 - 0.1), (2.6, 3.6, 3.6), 'fur', bevel=0.12)                   # round thigh y -0.6..3.0
-            beam(g, (x, -0.3, z0 + 0.6), (x, -3.1, z0 - 0.1), 1.8, 2.0, 'fur2', ext=0.3)      # sock, angled at the hock
+            joint(g, (x, 1.85, z0), 2.6, 'fur')
+            cbox(g, (x + s * 0.4, 1.0, z0 - 0.1), (3.4, 4.2, 4.4), 'fur', bevel=0.12)         # heavy thigh y -1.1..3.1
+            beam(g, (x + s * 0.4, -0.6, z0 + 0.6), (x + s * 0.4, -3.1, z0 - 0.1), 2.6, 2.8, 'fur2', ext=0.3)   # sock, angled at the hock
             pz = z0 - 0.7
-        cbox(g, (x, -3.55, pz), (2.4, 0.9, 3.0), 'muzzle', bevel=0.15)                         # big paw
-        for dx in (-0.7, 0.0, 0.7):
-            beam(g, (x + dx, -3.6, pz - 1.3), (x + dx * 1.1, -3.95, pz - 2.1), 0.4, 0.4, 'claw', top=0.2)
+        px = x + s * (0.35 if front else 0.4)
+        cbox(g, (px, -3.5, pz), (3.2, 1.0, 3.6), 'muzzle', bevel=0.15)                        # big paw  y -4.0..-3.0
+        for dx in (-0.95, 0.0, 0.95):
+            beam(g, (px + dx, -3.55, pz - 1.6), (px + dx * 1.1, -3.95, pz - 2.4), 0.5, 0.5, 'claw', top=0.2)
     leg('LeftFrontLeg', -2.15, True)
     leg('RightFrontLeg', 2.15, True)
     leg('LeftBackLeg', -2.2, False)
@@ -849,100 +852,182 @@ def crystal_knight():
 
 
 # =========================================================================================== Stage 7: Storm Colossus (Storm)
+def rock(g, c, size, col, seed=0, tilt=0.1, bevel=0.3):
+    """A rugged boulder: a heavily chamfered block, a little tilted and tapered at random (seeded)."""
+    import random
+    r = random.Random(seed)
+    M = Rx(r.uniform(-tilt, tilt)) @ Ry(r.uniform(-tilt, tilt)) @ Rz(r.uniform(-tilt, tilt))
+    top = (r.uniform(0.78, 0.95), r.uniform(0.78, 0.95))
+    bot = (r.uniform(0.88, 1.0), r.uniform(0.88, 1.0))
+    cbox(g, c, size, col, bevel=bevel, top=top, bottom=bot, M=M)
+
+
+def crack(g, pts, n, width, depth, col):
+    """A glowing storm crack lying on a plane with normal n: plain blocks (12 triangles each) through the points."""
+    for a, b in zip(pts, pts[1:]):
+        a, b = Vector(a), Vector(b)
+        R = kit.frame_from(b - a, n)
+        box(g, (a + b) / 2, (depth, (b - a).length + width * 0.84, width), col, M=R)
+
+
 def storm_colossus():
-    """Rev 5: TODAY's in-game Storm Colossus, improved. Today's native parts (KeeperUpgradeData) are rebuilt at their
-    exact size, rest frame and colour as crisp bevelled blocks and wedges: the dark slate core and chest mantle with
-    the lightning bolt, the floating tilted shoulder rocks with their V-shaped thunder prongs, the floating heavy fists
-    with glowing bands, the glowing charged joints between, the suspended shins with charged knees and wedge feet, and
-    today's storm-cloud crown floating over the head (block clouds). Improvements: a clean block head (today's
-    forward-sloping top kept as a crest) with a dark visor, two glowing slits and a glowing crack; storm-glow veins on
-    the chest; charged hip cores over the knees; knuckle and toe blocks. Floating by design: the shoulder rocks,
-    fists, charged joints, the suspended legs and the cloud crown (as today), linked by lightning."""
+    """Rev 6: a STONE COLOSSUS on today's identity. Today's slate colours, chest lightning bolt, tilted floating
+    shoulder rocks with their V-shaped thunder prongs, charged joints, floating heavy fists with glowing bands and the
+    floating storm-cloud crown, rebuilt as an ancient giant: rugged stacked boulders and rock slabs, a broad craggy
+    chest and shoulders, huge stone fists, pillar legs on great stone feet, cracks glowing with storm energy, moss and
+    lichen, a carved rune belt, a craggy brow over glowing-slit eyes, a jagged stone crown, and lightning around the
+    head. Floating by design: the shoulder rocks, charged joints, fists and the cloud crown."""
     k = KeeperModel('storm_colossus', 'Storm Colossus', 7, {
-        'slate': (0.18, 0.20, 0.26), 'slate2': (0.26, 0.29, 0.38), 'slate3': (0.36, 0.40, 0.50), 'prong': (0.60, 0.65, 0.75),
-        'visor': (0.08, 0.09, 0.13), 'cloud': (0.27, 0.30, 0.36), 'cloud2': (0.32, 0.35, 0.42), 'cloud3': (0.24, 0.26, 0.32),
-        'eyedark': (0.02, 0.03, 0.06), 'eyedim': (0.18, 0.24, 0.32), 'bolt': (0.72, 0.87, 1.0)},
-        glow={'*': (0.72, 0.87, 1.0)}, eye_rgb=(0.72, 0.87, 1.0))
-    k.personality = 'A walking storm of slate: no face, only two burning slits and a crackling jaw; fists, shoulders and legs hang on storm power under its own thundercloud.'
-    k.fidget = 'Punches its floating fists together (sparks), cracks its neck, the cloud crown rumbles and flickers.'
-    k.fx_notes = 'Lightning arcs linking every floating piece to the body (Beams), crackling sparks, flashes inside the cloud crown, rain under it.'
-    for p in native(7):
-        n, grp = p['Name'], p['Group']
-        if n in ('Head', 'Lightning eye'):
-            continue                                                       # the head and eyes are rebuilt (below)
-        if grp == 'Body':
-            if n == 'Lightning core':
-                nat(k.g('Body', 'glow'), p, 'iris')
-            else:
-                nat(k.g('Body'), p, 'slate' if n == 'Obsidian core' else 'slate2')
-        elif grp in ('LeftArm', 'RightArm'):
-            if n in ('Charged joint', 'Fist band'):
-                nat(k.g(grp, 'glow'), p, 'iris')
-            elif n == 'Heavy fist':
-                nat(k.g(grp, 'main', 'Fist'), p, 'slate')
-            else:
-                nat(k.g(grp, 'main', 'Rock'), p, 'prong' if n == 'Thunder prong' else 'slate2')
-        elif grp in ('LeftLeg', 'RightLeg'):
-            if n == 'Charged knee':
-                nat(k.g(grp, 'glow'), p, 'iris')
-            else:
-                nat(k.g(grp), p, 'slate2' if n == 'Suspended shin' else 'slate')
-        elif n == 'Face shadow':
-            nat(k.g('Head'), p, 'visor')
-    for s, arm in ((1, 'LeftArm'), (-1, 'RightArm')):
-        k.floating |= {(arm, 'Rock'), (arm, 'Fist'), (arm, 'Glow')}
-    for leg in ('LeftLeg', 'RightLeg'):
-        k.floating |= {(leg, None), (leg, 'Glow')}
-    k.floating |= {('Head', 'Cloud')}
-    # Body: storm-glow veins branching off today's lightning bolt; charged hip cores over the knees ------------------
-    bglow = k.g('Body', 'glow')
-    band(bglow, [(0.6, 21.4, -4.62), (2.0, 22.2, -4.62), (3.4, 21.5, -4.62), (4.6, 22.4, -4.62)], (0, 0, -1), 0.26, 0.16, 'iris')
-    band(bglow, [(-0.9, 15.2, -4.62), (-2.4, 14.4, -4.62), (-3.6, 15.1, -4.62), (-5.0, 14.2, -4.62)], (0, 0, -1), 0.26, 0.16, 'iris')
-    band(bglow, [(-0.8, 19.6, -4.62), (-2.0, 19.0, -4.62), (-2.8, 19.8, -4.62)], (0, 0, -1), 0.22, 0.16, 'iris')
+        'slate': (0.18, 0.20, 0.26), 'slate2': (0.26, 0.29, 0.38), 'slate3': (0.36, 0.40, 0.50), 'rune': (0.44, 0.48, 0.58),
+        'prong': (0.60, 0.65, 0.75), 'visor': (0.06, 0.07, 0.10), 'moss': (0.31, 0.47, 0.27), 'lichen': (0.62, 0.68, 0.45),
+        'cloud': (0.27, 0.30, 0.36), 'cloud2': (0.32, 0.35, 0.42), 'cloud3': (0.24, 0.26, 0.32),
+        'eyedark': (0.02, 0.03, 0.06), 'eyedim': (0.18, 0.26, 0.34), 'bolt': (0.60, 0.92, 1.0)},
+        glow={'*': (0.48, 0.90, 1.0)}, eye_rgb=(0.55, 0.93, 1.0))
+    k.personality = 'An ancient stone giant that woke up inside a thunderstorm: two burning slits under a craggy brow, a crackling jaw, fists and shoulders hanging on storm power.'
+    k.fidget = 'Grinds its stone fists together (sparks and grit), cracks its neck like falling rock, the cloud crown rumbles and flashes.'
+    k.fx_notes = 'Lightning arcs from the cloud crown to the stone spires and between the floating pieces (Beams), cracks pulsing with storm light, falling grit and pebbles on each step, rain under the cloud.'
+    body = k.g('Body')
+    bg = k.g('Body', 'glow')
+    # Body: a slate core under a broad craggy chest of boulders and slabs ----------------------------------------------
+    cbox(body, (0, 17.8, 0.0), (14.6, 13.0, 8.6), 'slate', bevel=0.12)                 # core  y 11.3..24.3, front z -4.3
     for s in (-1, 1):
-        cbox(bglow, (s * 3.9, 10.7, 0.0), (1.5, 1.5, 1.5), 'iris', bevel=0.2, M=Ry(math.pi / 4))
-    # Head: a block head with today's forward-sloping top as a crest, today's face shadow as a dark visor ------------
+        cbox(body, (s * 4.2, 20.3, -4.6), (6.2, 5.6, 2.2), 'slate3', bevel=0.3, top=(0.88, 1.0))  # pec boulders, front z -5.7
+        cbox(body, (s * 3.6, 15.6, -4.5), (5.0, 3.6, 1.8), 'slate2', bevel=0.3, bottom=(0.9, 1.0))  # abdomen slabs
+        rock(body, (s * 7.0, 17.0, -1.0), (2.4, 9.0, 6.6), 'slate2', seed=14 + s, tilt=0.05)      # flank slabs
+        rock(body, (s * 6.4, 23.9, 0.2), (6.0, 4.0, 8.0), 'slate3', seed=16 + s, tilt=0.08)       # shoulder boulders
+        box(body, (s * 6.4, 25.95, 0.6), (4.0, 0.2, 4.6), 'moss')                                 # moss on the shoulders
+        box(body, (s * 6.9, 25.98, -1.6), (2.0, 0.2, 1.6), 'lichen')
+        for (dx, h, dz) in ((1.0, 4.2, 2.2), (-1.4, 3.2, 3.0)):                                    # stone spires behind
+            beam(body, (s * (6.0 + dx), 24.6, dz), (s * (6.6 + dx * 1.3), 24.6 + h, dz + 0.9), 1.8, 1.8, 'slate3', top=0.15)
+    for s in (-1, 1):
+        rock(body, (s * 7.9, 21.0, -1.6), (2.8, 3.4, 3.6), 'slate3', seed=90 + s, tilt=0.15)     # rugged boulders on the flanks
+        rock(body, (s * 7.6, 13.6, -0.6), (2.6, 3.0, 3.4), 'slate2', seed=92 + s, tilt=0.15)
+        rock(body, (s * 5.4, 9.0, -1.8), (3.0, 2.6, 3.0), 'slate2', seed=94 + s, tilt=0.15)      # hip boulders
+        rock(body, (s * 3.8, 18.6, 5.2), (4.6, 4.2, 2.2), 'slate3', seed=96 + s, tilt=0.12)      # back boulders
+        rock(body, (s * 2.2, 13.8, 5.0), (3.8, 3.2, 1.8), 'slate', seed=98 + s, tilt=0.12)
+        for (x, h) in ((1.8, 1.6), (4.0, 1.0), (6.2, 2.0)):                                       # moss hanging over the shoulders
+            box(body, (s * x, 25.8 - h / 2, -4.0), (0.9, h, 0.3), 'moss')
+        box(body, (s * 2.6, 18.9, -5.75), (1.2, 0.9, 0.1), 'lichen')                              # lichen spots on the chest
+        box(body, (s * 5.6, 21.6, -5.75), (0.8, 0.7, 0.1), 'lichen')
+        box(body, (s * 5.2, 14.6, -5.42), (1.0, 0.8, 0.1), 'moss')
+    rock(body, (0, 23.2, 5.0), (6.0, 3.0, 2.0), 'slate', seed=99, tilt=0.12)
+    box(body, (0, 24.75, 5.0), (3.6, 0.2, 1.6), 'moss')
+    rock(body, (0, 25.0, 1.6), (8.0, 2.4, 6.6), 'slate2', seed=20, tilt=0.05)                     # mantle slab behind the head
+    rock(body, (0, 19.6, 4.6), (11.0, 8.0, 1.8), 'slate2', seed=21, tilt=0.04)                    # back slab
+    box(body, (2.6, 26.25, 2.4), (2.6, 0.2, 2.2), 'moss')
+    # today's lightning bolt down the chest, now a deep glowing crack between the pec boulders, with branches
+    crack(bg, [(0.3, 23.6, -4.42), (-0.5, 21.6, -4.42), (0.5, 19.8, -4.42), (-0.4, 17.8, -4.42), (0.4, 15.6, -4.42), (-0.2, 13.4, -4.42)],
+         (0, 0, -1), 0.55, 0.3, 'iris')
+    for s in (-1, 1):
+        crack(bg, [(s * 1.4, 21.4, -5.72), (s * 2.6, 20.6, -5.72), (s * 3.2, 21.6, -5.72), (s * 4.6, 20.4, -5.72)], (0, 0, -1), 0.3, 0.2, 'iris')
+        crack(bg, [(s * 6.0, 18.6, -4.32), (s * 5.4, 17.2, -4.32), (s * 6.2, 15.8, -4.32)], (0, 0, -1), 0.28, 0.2, 'iris')
+    # an ancient carved rune belt, the glyphs glowing; hips of stacked stone ------------------------------------------
+    cbox(body, (0, 11.4, -0.1), (13.4, 2.2, 9.0), 'rune', bevel=0.15)                       # y 10.3..12.5, front z -4.6
+    for i, x in enumerate((-5.0, -2.5, 0.0, 2.5, 5.0)):
+        box(body, (x, 11.4, -4.62), (1.6, 1.7, 0.1), 'slate')                                # carved glyph panels
+        g = [((0, 0.6), (0, -0.6)), ((-0.45, 0.45), (0.45, -0.45)), ((-0.45, -0.1), (0.45, -0.1))][i % 3]
+        beam(bg, (x + g[0][0], 11.4 + g[0][1], -4.72), (x + g[1][0], 11.4 + g[1][1], -4.72), 0.24, 0.16, 'iris', side=(0, 0, 1))
+        beam(bg, (x - 0.4, 11.4 + 0.55 * (1 if i % 2 else -1), -4.72), (x + 0.4, 11.4 + 0.55 * (1 if i % 2 else -1), -4.72), 0.22, 0.16,
+             'iris', side=(0, 0, 1))
+    rock(body, (0, 9.2, 0.0), (11.0, 3.6, 7.4), 'slate', seed=22, tilt=0.03)                # hips   y 7.4..11.0
+    # Head: a rugged stone head, a dark visor with the face, a craggy brow, cheek boulders, a jagged stone crown -------
     head = k.g('Head')
-    joint(head, (0, 23.54, 0), 3.6, 'slate')
-    cbox(head, (0, 26.0, 0.0), (9.35, 6.1, 7.82), 'slate2', bevel=0.1)            # y 22.95..29.05, front z -3.91
-    box(head, (0, 29.9, 0.4), (9.35, 1.8, 7.0), 'slate2', wedge=True)              # today's sloped top, as a crest
-    cbox(head, (0, 28.55, -4.05), (8.7, 0.9, 1.0), 'slate3', bevel=0.15)          # rock brow ledge over the visor
-    cbox(head, (0, 23.7, -4.0), (6.0, 1.2, 0.8), 'slate3', bevel=0.15)            # a heavy chin
+    joint(head, (0, 23.54, 0), 4.0, 'slate')
+    cbox(head, (0, 27.2, -0.2), (8.6, 6.4, 7.6), 'slate2', bevel=0.12)                      # y 24.0..30.4, front z -4.0
+    cbox(head, (0, 26.8, -4.1), (6.8, 3.8, 0.5), 'visor', bevel=0.15)                       # the dark visor, plane z -4.35
     for s in (-1, 1):
-        cbox(head, (s * 4.75, 26.2, -1.0), (0.5, 4.0, 4.4), 'slate3', bevel=0.15)   # cheek plates
-    face = FlatFace(k, 'Head', {'face': dict(c=(0, 27.04, -4.25), n=(0, 0, -1))}, unit=0.08)   # the visor front
+        rock(head, (s * 2.4, 29.2, -4.4), (4.0, 1.5, 2.0), 'slate3', seed=30 + s, tilt=0.02)    # craggy brow
+        cbox(head, (s * 2.3, 29.0, -4.5), (3.8, 1.2, 1.6), 'slate3', bevel=0.25, M=Rz(s * 0.2))
+        rock(head, (s * 4.4, 26.6, -2.0), (1.8, 4.6, 4.4), 'slate3', seed=32 + s, tilt=0.06)    # cheek boulders
+        rock(head, (s * 2.9, 24.4, -3.8), (2.6, 1.6, 1.8), 'slate3', seed=34 + s, tilt=0.06)    # jaw boulders
+    rock(head, (0, 29.4, -4.4), (2.2, 1.2, 1.8), 'slate3', seed=36, tilt=0.02)
     for s in (-1, 1):
-        face.plate(face.g('Chase', 'eyes'), place(SLOT, s * 2.05, 0.3, s, 0.0, 2.9, 0.78), 'iris', 1)
-        face.plate(face.g('Asleep'), place(SQUARE, s * 2.05, 0.1, s, 0.0, 2.5, 0.18), 'eyedim', 1)
-    face.line('Chase', [(-2.6, -0.75), (-1.73, -1.12), (-0.87, -0.75), (0.0, -1.14), (0.87, -0.75), (1.73, -1.12), (2.6, -0.75)], 0.3,
+        rock(head, (s * 3.2, 28.4, 3.4), (2.8, 3.0, 2.0), 'slate3', seed=37 + s, tilt=0.12)    # boulders on the back of the head
+        box(head, (s * 1.6, 29.55, -5.15), (0.7, 1.0, 0.25), 'moss')                            # moss dripping from the brow
+        box(head, (s * 3.4, 29.35, -5.05), (0.6, 1.4, 0.25), 'moss')
+    box(head, (-1.6, 30.45, 0.8), (3.0, 0.2, 2.6), 'moss')
+    box(head, (2.2, 30.45, -1.2), (1.8, 0.2, 1.6), 'lichen')
+    for (b, t, w) in (((0, 30.0, 0.4), (0, 33.0, 0.9), 1.8), ((-2.6, 29.8, -0.4), (-3.4, 32.4, 0.0), 1.5),
+                      ((2.6, 29.8, -0.4), (3.4, 32.4, 0.0), 1.5), ((-1.6, 30.0, 2.2), (-2.0, 32.2, 2.8), 1.2),
+                      ((1.6, 30.0, 2.2), (2.0, 32.2, 2.8), 1.2), ((-3.6, 29.6, 1.8), (-4.8, 31.4, 2.4), 1.0),
+                      ((3.6, 29.6, 1.8), (4.8, 31.4, 2.4), 1.0)):
+        beam(head, b, t, w, w, 'slate3', top=0.12, ext=0.2)                                 # the jagged stone crown
+    hg = k.g('Head', 'glow')
+    for s in (-1, 1):
+        crack(hg, [(s * 4.31, 29.2, 1.6), (s * 4.31, 28.0, 2.4), (s * 4.31, 26.6, 1.4)], (s, 0, 0), 0.24, 0.2, 'iris')
+    face = FlatFace(k, 'Head', {'face': dict(c=(0, 26.8, -4.35), n=(0, 0, -1))}, unit=0.08)
+    for s in (-1, 1):
+        face.plate(face.g('Chase', 'eyes'), place(SLOT, s * 1.75, 0.55, s, 0.0, 2.6, 0.8), 'iris', 1)
+        face.plate(face.g('Asleep'), place(SQUARE, s * 1.75, 0.35, s, 0.0, 2.3, 0.18), 'eyedim', 1)
+    face.line('Chase', [(-2.5, -0.9), (-1.67, -1.32), (-0.83, -0.9), (0.0, -1.34), (0.83, -0.9), (1.67, -1.32), (2.5, -0.9)], 0.32,
               col='iris', kind='eyes')
-    # Today's storm-cloud crown, floating over the head: chunky cloud blocks where today's five cloud balls are --------
+    face.line('Asleep', [(-1.9, -1.1), (-0.95, -1.25), (0.0, -1.1), (0.95, -1.25), (1.9, -1.1)], 0.14, col='eyedark')
+    # Today's storm-cloud crown, floating over the spires, with lightning hanging from it -----------------------------
     cloud = k.g('Head', 'main', 'Cloud')
     for (x, y, z, sx, sy, sz, c) in ((-4.99, 32.58, 0.97, 8.6, 4.6, 7.6, 'cloud'), (5.09, 32.96, -0.62, 8.0, 4.4, 7.2, 'cloud2'),
                                      (-0.3, 34.44, 0.06, 10.0, 5.4, 8.8, 'cloud3'), (-2.23, 32.57, -3.07, 6.4, 3.6, 5.6, 'cloud2'),
                                      (2.74, 32.38, 3.41, 6.8, 3.6, 6.0, 'cloud')):
-        cbox(cloud, (x, y + 0.8, z), (sx * 0.86, sy * 0.8, sz * 0.86), c, bevel=0.3)     # floats clear of the crest
-    hfx = k.g('Head', 'fx')                                                       # storm flashes in the cloud (effect)
-    bolt(hfx, (-5.6, 29.2, 2.0), (-5.0, 30.6, 1.6), 0.14, seed=11)
-    bolt(hfx, (5.4, 29.6, 1.4), (5.0, 31.0, 1.0), 0.14, seed=12)
-    # Arms: knuckle blocks on today's heavy fists ----------------------------------------------------------------------
-    fx = k.g('Body', 'fx')
+        cbox(cloud, (x, y + 2.2, z), (sx * 0.86, sy * 0.8, sz * 0.86), c, bevel=0.3)
+    cg = k.g('Head', 'glow', 'Cloud')
+    for (x, z, seed) in ((-6.2, 1.2, 0), (5.8, -1.6, 1)):
+        y0 = 33.6
+        crack(cg, [(x, y0 + 0.6, z), (x + 0.5, y0 - 0.5, z), (x - 0.2, y0 - 1.3, z), (x + 0.4, y0 - 2.2, z)], (0, 0, -1), 0.28, 0.28, 'iris')
+    k.floating |= {('Head', 'Cloud'), ('Head', 'Glow_Cloud')}
+    hfx = k.g('Head', 'fx')
+    bolt(hfx, (-0.2, 32.9, 0.6), (0.0, 33.4, 0.8), 0.14, seed=11)
+    bolt(hfx, (-3.2, 31.6, 0.2), (-3.8, 32.9, 0.6), 0.14, seed=12)
+    bolt(hfx, (3.4, 31.6, 0.2), (4.0, 33.0, -0.2), 0.14, seed=13)
+    # Arms: today's tilted floating shoulder rocks with V-prongs, charged joints and huge floating stone fists ----------
+    for p in native(7):
+        if p['Group'] in ('LeftArm', 'RightArm') and p['Name'] in ('Thunder prong', 'Charged joint', 'Fist band'):
+            if p['Name'] == 'Thunder prong':
+                nat(k.g(p['Group'], 'main', 'Rock'), p, 'prong')
+            else:
+                nat(k.g(p['Group'], 'glow'), p, 'iris')
     for s, arm in ((1, 'LeftArm'), (-1, 'RightArm')):
-        fist = k.g(arm, 'main', 'Fist')
-        for dx in (-2.7, -0.9, 0.9, 2.7):
-            cbox(fist, (s * 12.65 + dx, 7.6 - 0.14 * dx * s, -6.25), (1.6, 2.0, 0.9), 'slate3', bevel=0.2)
+        r = k.g(arm, 'main', 'Rock')
+        tilt = Rz(-s * 0.35)
+        cbox(r, (0, 0, 0), (8.2, 8.8, 9.8), 'slate2', bevel=0.3, top=(0.88, 1.0), M=T(s * 11.56, 20.65, 0.0) @ tilt)
+        rock(r, (s * 12.6, 24.2, 1.4), (4.4, 2.4, 4.6), 'slate3', seed=40 + s, tilt=0.12)
+        rock(r, (s * 10.6, 23.6, -2.6), (3.6, 2.2, 3.4), 'slate3', seed=42 + s, tilt=0.12)
+        box(r, (0, 0, 0), (4.6, 0.2, 5.0), 'moss', M=T(s * 11.0, 25.05, 0.6) @ tilt)
+        ag = k.g(arm, 'glow')
+        crack(ag, [(s * 9.6, 24.0, -4.96), (s * 10.8, 22.6, -4.96), (s * 10.2, 21.2, -4.96), (s * 11.6, 19.6, -4.96)], (0, 0, -1), 0.26, 0.2, 'iris')
+        f = k.g(arm, 'main', 'Fist')
+        cbox(f, (s * 12.65, 9.9, -1.4), (9.4, 9.8, 9.8), 'slate', bevel=0.2)               # y 5.0..14.8, front z -6.3
+        for i, dx in enumerate((-3.3, -1.1, 1.1, 3.3)):
+            rock(f, (s * 12.65 + dx, 7.6, -6.4), (2.2, 3.0, 2.0), 'slate2', seed=50 + i + 10 * s, tilt=0.06)   # knuckle boulders
+        rock(f, (s * (12.65 - 4.6), 9.4, -3.2), (2.0, 4.2, 3.6), 'slate2', seed=60 + s, tilt=0.06)                 # thumb
+        rock(f, (s * 12.4, 15.0, -0.8), (6.2, 1.6, 6.6), 'slate2', seed=62 + s, tilt=0.05)                        # wrist slab
+        box(f, (s * 12.4, 15.85, -0.4), (3.6, 0.2, 3.8), 'lichen')
+        rock(f, (s * 15.6, 11.0, -0.4), (2.4, 4.0, 4.4), 'slate2', seed=64 + s, tilt=0.12)                        # outer boulder
+        rock(f, (s * 12.9, 12.8, 3.6), (4.6, 3.4, 1.8), 'slate3', seed=66 + s, tilt=0.12)                         # back boulder
+        box(f, (s * 14.2, 10.4, -6.32), (1.2, 0.9, 0.1), 'lichen')
+        crack(ag, [(s * 10.8, 13.8, -6.32), (s * 12.0, 12.6, -6.32), (s * 11.4, 11.6, -6.32)], (0, 0, -1), 0.26, 0.2, 'iris')
+        k.floating |= {(arm, 'Rock'), (arm, 'Fist'), (arm, 'Glow')}
         afx = k.g(arm, 'fx')
-        bolt(afx, (s * 8.0, 20.0, 0.0), (s * 8.9, 20.6, 0.2), 0.16, seed=1 + s)
-        bolt(afx, (s * 12.4, 16.8, -0.5), (s * 12.0, 18.4, -0.3), 0.16, seed=3 + s)
-        bolt(afx, (s * 12.4, 13.9, -0.6), (s * 12.5, 14.7, -0.6), 0.16, seed=5 + s)
-    # Legs: toe blocks on today's wedge feet, a slate plate on each shin; lightning from the hip cores to the knees ----
+        bolt(afx, (s * 8.2, 20.0, 0.0), (s * 8.9, 20.6, 0.2), 0.16, seed=1 + s)
+        bolt(afx, (s * 12.4, 16.9, -0.5), (s * 12.0, 18.6, -0.3), 0.16, seed=3 + s)
+        bolt(afx, (s * 12.4, 13.9, -0.6), (s * 12.5, 15.4, -0.6), 0.16, seed=5 + s)
+    # Legs: stone pillars (a thigh boulder, a charged knee, a shin pillar) on great stone feet --------------------------
     for s, leg in ((1, 'LeftLeg'), (-1, 'RightLeg')):
         g = k.g(leg)
-        for dx in (-2.4, 0.0, 2.4):
-            cbox(g, (s * 3.98 + dx, -2.75, -6.45), (1.7, 0.9, 1.3), 'slate3', bevel=0.2)
-        lfx = k.g(leg, 'fx')
-        bolt(lfx, (s * 3.9, 9.9, 0.0), (s * 3.91, 8.7, 0.0), 0.16, seed=7 + s)
-    sleep_z(k, (6.0, 38.5, -2.0), 3.2)
+        joint(g, (s * 3.74, 6.54, 0.0), 4.4, 'slate')
+        cbox(g, (s * 4.0, 5.2, 0.0), (6.2, 5.0, 6.6), 'slate', bevel=0.3, top=(0.9, 1.0))       # thigh   y 2.7..7.7, front z -3.3
+        cbox(g, (s * 4.0, 0.0, -0.4), (5.6, 4.6, 6.0), 'slate2', bevel=0.2)                      # shin pillar y -2.3..2.3
+        cbox(g, (s * 4.0, 1.0, -0.4), (6.0, 0.8, 6.4), 'rune', bevel=0.2)                        # a carved band
+        cbox(g, (s * 4.1, -3.0, -1.6), (7.4, 2.0, 9.2), 'slate', bevel=0.2)                      # foot    y -4.0..-2.0
+        for i, dx in enumerate((-2.4, 0.0, 2.4)):
+            rock(g, (s * 4.1 + dx, -3.1, -6.3), (2.0, 1.6, 1.8), 'slate2', seed=80 + i + 10 * s, tilt=0.06)   # toe boulders
+        box(g, (s * 4.0, 7.75, 1.2), (3.4, 0.2, 3.0), 'moss')
+        rock(g, (s * 6.9, 5.0, 0.4), (1.6, 3.4, 3.6), 'slate2', seed=74 + s, tilt=0.15)          # outer thigh boulder
+        rock(g, (s * 4.0, 2.9, -3.6), (3.6, 1.6, 1.0), 'slate3', seed=76 + s, tilt=0.08)         # knee cap
+        box(g, (s * 3.0, -0.6, -3.42), (0.8, 0.7, 0.1), 'lichen')
+        lg = k.g(leg, 'glow')
+        cbox(lg, (s * 4.0, 2.55, -0.4), (3.2, 1.0, 3.2), 'iris', bevel=0.2)                      # the charged knee
+        crack(lg, [(s * 3.0, 6.8, -3.32), (s * 4.2, 5.6, -3.32), (s * 3.6, 4.2, -3.32)], (0, 0, -1), 0.26, 0.2, 'iris')
+        crack(lg, [(s * 4.8, 1.8, -3.42), (s * 3.8, 0.4, -3.42), (s * 4.6, -1.2, -3.42)], (0, 0, -1), 0.24, 0.2, 'iris')
+    sleep_z(k, (6.0, 40.5, -2.0), 3.2)
     return k
 
 

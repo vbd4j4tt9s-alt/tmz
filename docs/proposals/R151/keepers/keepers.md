@@ -1,35 +1,35 @@
-# Keepers: improved 3D models, revision 5 (proposal, previews only)
+# Keepers: improved 3D models, revision 6 (proposal, previews only)
 
 **Status:** waiting for your OK. Nothing in the game's code (`src/`) has changed.
 
-Revision 5 follows your feedback on revision 4:
-- **Timber Golem and Storm Colossus: today's designs, improved** (as with the snake and the gorilla).
-  - Every one of today's native parts is rebuilt at its exact size, position and colour as a crisp bevelled block or
-    wedge, so the silhouette and identity stay.
-  - On top: a clean glowing-slit creature face (awake and asleep), a few tasteful details (moss, bark grooves, a bird's
-    nest; storm-glow veins), and the studs.
-  - The Colossus keeps today's floating pieces, including its floating cloud crown.
-- **Ice Fang: improved.**
-  - A cleaner fox head, held up on a neck.
-  - Better body proportions: a deep chest, a slim waist and round haunches.
-  - Blue-grey socks, and a huge bushy tail with a white tip and ice crystals.
-- **Lava Dragon: a longer body.**
-  - The torso is now 14.4 studs long (it was 10.6), to fit the long neck, tail and big wings, as in the "Ice and Fire"
-    proportions.
-  - The tail moves back with it; everything else stays.
-- **Crystal Knight: a real knight's longsword, not a dagger.**
-  - A long, straight, double-edged blade of 15 studs, longer than his leg, with a short point.
-  - A wide gold crossguard with down-turned crystal quillons, a wrapped grip and a gold pommel with a crystal.
-  - A glowing crystal fuller. His bulk stays as in rev 4.
-- **Frozen:** the Sand Snake and the Jungle King (your OK on rev 4), and The Darkened. Their code is byte-for-byte the
-  same as rev 4; they are only re-rendered.
-- **Still in place:** the two faces, the one-piece check, the game's real pose frames, unchanged group names and pivots,
-  the big sleep "Z", the effects, the FBX export and the budgets.
+Revision 6 follows your feedback on revision 5:
+- **Ice Fang: a thicker, sturdier body.**
+  - A broad, deep chest with a big white ruff, a thick barrel torso and heavy haunches: about 7 studs wide, was 4.4
+    to 5.4.
+  - A thicker neck, and thick legs with big paws and bigger ice claws, in the clunky style of the other keepers.
+  - The rev 5 fox head and the huge crystal-tipped tail stay.
+- **Storm Colossus: an actual stone giant.** It is built on today's identity: its slate colours, the chest lightning
+  bolt, the tilted shoulder rocks with V-shaped thunder prongs, the charged joints, the banded fists and the floating
+  storm-cloud crown. Now it is an ancient colossus:
+  - rugged stacked boulders and rock slabs, a broad craggy chest and shoulders with stone spires, and huge stone fists
+    with knuckle, thumb and back boulders;
+  - pillar legs: a thigh boulder, a glowing charged knee, a shin pillar with a carved band, and a great stone foot
+    with toe boulders;
+  - cracks glowing with storm energy across the chest, shoulders, fists and legs, with today's bolt as the big central
+    crack;
+  - moss and lichen on the shoulders, brow, fists and thighs, with moss hanging over the edges;
+  - a carved rune belt with glowing glyphs;
+  - a craggy brow over the glowing-slit eyes, a jagged stone crown, and today's cloud crown floating above it, with
+    lightning hanging from the cloud and arcing to the spires.
+- **Unchanged from rev 5:** the Timber Golem, Lava Dragon and Crystal Knight. **Frozen:** the Sand Snake, the Jungle
+  King and The Darkened. Their code is byte-for-byte the same, so their sheets and FBX files are unchanged.
+- **Still in place:** the two faces, the one-piece check, the game's real pose frames, unchanged group names and pivots
+  (the hitbox groups), the big sleep "Z", the effects, the FBX export and the budgets.
 
 ## Look at these first
 1. `keepers_faces.png`: one row of all 8 keepers, each with its awake / chase face above its asleep face.
 2. `keepers_before_after.png`: every keeper today (left) and proposed (right), same camera and scale, with a 5-stud
-   player. For the Golem and the Colossus the two sides now share the same parts; compare the finish, faces and details.
+   player. The Golem's two sides share the same parts; the Colossus is today's design grown into a stone giant.
 3. `keepers_lineup.png`: all keepers in a row next to 5-stud players, today on top and proposed below, with a ruler in
    studs.
 4. One sheet per keeper:
@@ -65,10 +65,10 @@ Every keeper has two faces:
 | Timber Golem (Forest) | Grumpy old tree that hates being woken: a heavy, silent glare from under its leafy hood; a bird nests on top. | Today's hollow face, now clean: two glowing green slits and a glowing jagged crack, under today's heavy brows (now angled into a scowl). | The slits dim to thin lines and the crack goes out. Asleep it still turns into a tree with the face hidden, as today. | **Today's golem, improved.** All of today's parts as crisp bevelled blocks and wedges, in today's colours: the brown trunk with its split-bark beard, the moss shoulders, the big green stepped leaf hood with its slopes, the stump head with broken-crown wedges and crown branches, the block arms with dark root knuckles, leafy shoulder tiers and boughs, and the wide root legs with wedge feet and toes. New on top: today's green chest rune as a glowing rune in a dark knothole, today's orange mushrooms, moss drips and tufts, bark grooves and bands, a few bright leaf cubes, and a little bird's nest with a blue bird on the hood. | Falling leaves, spores, the rune pulses, dust on the hammer slam. |
 | Jungle King (Jungle) | *Frozen (rev 4).* | | | | |
 | Sand Snake (Desert) | *Frozen (rev 4).* | | | | |
-| Ice Fang (Snow) | Proud, cold snow fox: head high, sly icy glare, bares its sabres when it sees you. | Almond icy-cyan eyes with slit pupils and dark eyeliner flicks, slanted blue lid lines, and small teeth under the snout. | Closed eyes; the flicks stay. | **Improved.** The head is held up on a neck and is cleaner: a compact cranium, a tapered pointed white snout, big triangular ears with blue inner ears and blue tips, white cheek ruffs, a small blue forehead diamond and a sapphire, and two sabre fangs (the rev 4 bridge stripe and cheek bars are gone). The body is fox-shaped: a deep chest with a white ruff, a slim waist, round haunches, a few bold blue bands, the silver-and-sapphire collar, saddle and shoulder plates, blue-grey socks, big paws with ice claws, and a huge bushy tail with a white tip and ice crystals. | Frost aura, snowflakes, icy breath on the snarl. |
+| Ice Fang (Snow) | Proud, cold snow fox: head high, sly icy glare, bares its sabres when it sees you. | Almond icy-cyan eyes with slit pupils and dark eyeliner flicks, slanted blue lid lines, and small teeth under the snout. | Closed eyes; the flicks stay. | **Rev 6: a sturdy body.** The rev 5 fox head is kept: held up on a now thicker neck, with a compact cranium, a tapered pointed white snout, big triangular ears with blue tips, white cheek ruffs, a blue forehead diamond and a sapphire, and two sabre fangs. The body is now chunky and powerful: a broad, deep chest with a big white ruff, a thick barrel torso and heavy haunches (about 7 studs wide), a few bold blue bands, the silver-and-sapphire collar, saddle and shoulder plates. Thick legs with blue-grey socks, big paws with bigger ice claws, and the huge bushy tail with a white tip and ice crystals. | Frost aura, snowflakes, icy breath on the snarl. |
 | Lava Dragon (Lava) | Hot-headed and furious: glares, snarls fire, snorts smoke even in its sleep. | As rev 4. | As rev 4. | **A longer body.** The torso now runs 14.4 studs (was 10.6): the chest reaches further forward and the hips further back over the tail root, so the long neck, long tail and big wings sit in proportion. It has one more scale band, more belly plates and a longer row of back spikes (12, with 6 flaming). The tail moves back with the body (a hidden tail root spans the gap). Everything else as rev 4. | As rev 4. |
 | Crystal Knight (Crystal) | Stern, merciless sentinel: plants his feet, longsword ready. | As rev 4. | As rev 4. | **A real knight's longsword.** A straight, double-edged blade 15 studs long (his leg is about 12.7) with bright edges and a glowing crystal fuller, ending in a short point instead of the rev 4 dagger taper. A wide gold crossguard with down-turned quillons tipped with crystals, a blade collar, a wrapped grip and a gold pommel with a crystal. His bulk is as in rev 4. | Crystal sparkles, a sword slash trail, shards on impact. |
-| Storm Colossus (Storm) | A walking storm of slate: no face, only two burning slits and a crackling jaw; fists, shoulders and legs hang on storm power under its own thundercloud. | Two glowing slits and a glowing jagged crack on a dark visor (today's face shadow), under a rock brow. | The slits dim, the crack goes dark. | **Today's colossus, improved.** All of today's parts as crisp bevelled blocks and wedges, in today's colours: the dark slate core with the chest mantle and the glowing lightning bolt; the tilted shoulder rocks with V-shaped thunder prongs; the heavy fists with glowing bands; the glowing charged joints; the suspended shins with charged knees and wedge feet. Today's storm-cloud crown floats over the head as chunky cloud blocks. Improved: today's sloping wedge head is now a clean block head with the slope kept as a crest, a rock brow, cheek plates and a heavy chin. New: storm-glow veins off the bolt, charged hip cores over the knees, knuckle and toe blocks. | Lightning arcs linking the floating pieces, sparks, flashes in the cloud crown, rain. |
+| Storm Colossus (Storm) | An ancient stone giant that woke up inside a thunderstorm: two burning slits under a craggy brow, a crackling jaw, fists and shoulders hanging on storm power. | Two glowing slits and a glowing jagged crack on a dark visor, under a craggy brow of boulders. | The slits dim, the crack goes dark. | **Rev 6: a stone colossus on today's identity.** Today's slate colours, chest bolt, tilted shoulder rocks with V-shaped thunder prongs, charged joints, glowing fist bands and floating cloud crown, now as an ancient giant. A slate core under a broad craggy chest of weathered boulders and slabs, with shoulder boulders and stone spires, flank, hip and back boulders. Huge stone fists with knuckle, thumb, outer and back boulders. Pillar legs: a thigh boulder, a glowing charged knee, a shin pillar with a carved band and a knee cap, and a great stone foot with toe boulders. Cracks glowing with storm energy (today's bolt is the big central crack), moss and lichen with moss hanging over the shoulders and brow, a carved rune belt with glowing glyphs, a rugged head with cheek and jaw boulders, a jagged stone crown, and today's cloud crown floating above it, with lightning hanging from the cloud. | Lightning arcing from the cloud to the spires and between the pieces, cracks pulsing with storm light, grit falling on each step, rain. |
 | The Darkened (Void event) | *Unchanged (rev 3).* | | | | |
 
 ## 3. How the two faces work
@@ -118,16 +118,16 @@ Effects (fire, smoke, wisps, lightning, the "Z") are not meshes and are skipped.
 | Ice Fang | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
 | Lava Dragon | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
 | Crystal Knight | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
-| Storm Colossus | 1 + 5 by design | 1 + 5 by design | 1 + 5 by design | 1 + 2 by design | 1 + 1 by design | 1 + 5 by design | 0 failures (see below). |
+| Storm Colossus | 1 + 1 by design | 1 + 1 by design | 1 + 1 by design | 1 + 1 by design | 1 + 1 by design | 1 + 1 by design | 0 failures. By design: the floating cloud crown (with its hanging lightning). |
 | The Darkened | 1 | 1 | 1 | 1 | 1 | 1 | 0 |
 
 (The numbers are connected pieces. "1" means everything touches.)
 
-**The Colossus's by-design pieces:**
-- What floats is what floats today: the two suspended legs, the two charged knees above them, and the cloud crown.
-- In the wind-up and the impact, some of these swing into the body.
-- Today's shoulder rocks, charged joints and fists touch one another and the body, as in today's parts, so they count
-  as one piece with it.
+**The Colossus's by-design piece:**
+- Only the cloud crown floats, over the stone spires, as it does today.
+- Today's shoulder rocks, charged joints and fists touch one another and the body, as in today's parts.
+- The new pillar legs stand on their joints, so they are one piece with it.
+- Every glowing crack lies on a flat face of its stone, so none floats off.
 
 How the pieces stay joined:
 - **Joints.** Each moving group has a core cube centred on its pivot, which stays in place however the group turns,
@@ -157,9 +157,10 @@ How the pieces stay joined:
 - The Darkened, the Jungle King and the Sand Snake, entirely.
 - **Sizes:**
   - Groups stay close to today's boxes.
-  - The golem and the colossus are today's parts, so their sizes are today's, apart from the small additions.
-  - The longer dragon body and tail, the knight's longsword, Ice Fang's ears and tail, crowns, crests and spikes reach
-    further.
+  - The golem is today's parts, so its size is today's, apart from the small additions.
+  - The colossus keeps today's footprint and height; its boulders and spires reach a little further.
+  - These reach further: the longer dragon body and tail, the knight's longsword, Ice Fang's wider body, ears and tail,
+    and the crowns, crests and spikes.
   - Every group's overshoot is listed in `fbx/keeper_<name>.json`.
 - **Heights in the lineup** (studs, today to proposed):
   - Golem 25.5 to 27.8 (the bird on the hood);
@@ -168,7 +169,7 @@ How the pieces stay joined:
   - Ice Fang 10.9 to 13.3 (head held up, ears);
   - Dragon 18.8 to 19.0;
   - Knight 34.0 to 35.0;
-  - Colossus 41.2 to 40.6 (today's cloud crown kept);
+  - Colossus 41.2 to 42.8 (today's cloud crown kept, floating over the stone crown);
   - The Darkened 18.5 to 18.5 (unchanged).
 - **Asleep, the longsword's point goes into the floor.** Today's sleep pose holds the sword point-down, with the tip
   just touching the ground (+0.07 studs). The longer blade goes about 6 studs further, so it looks planted in the
@@ -186,7 +187,7 @@ How the pieces stay joined:
 | Ice Fang | 4,952 | 5,048 | 11 (21 + 41) |
 | Lava Dragon | 9,688 | 9,784 | 20 (27) |
 | Crystal Knight | 6,832 | 6,856 | 15 (50 + 3) |
-| Storm Colossus | 3,044 | 3,068 | 16 (30 + 5) |
+| Storm Colossus | 7,984 | 8,056 | 18 (30 + 5) |
 | The Darkened | 3,172 | 3,188 | 25 (43) |
 
 - **Target:** under 10,000 triangles on screen per keeper. All eight meet it; the dragon, with its two big fanned wings
@@ -269,16 +270,17 @@ How the pieces stay joined:
 **Run:**
 - Blender 4.5 (the Python module) built every model by script and rendered every image in Cycles on the CPU.
 - The FBX files were exported and re-imported (`check_fbx.py`). Every part came back, and the worst centre or size difference against the manifests was at
-  most 0.0001 studs. The largest FBX is 267 KB, under the 5 MB limit.
+  most 0.0001 studs. The largest FBX is 271 KB (the Colossus), under the 5 MB limit.
 - The connectivity check (table above) ran on the final models, in the rest pose and every rendered pose.
 - The triangle counts were taken with `tricount.py`.
-- The knight's lowest sword point was measured in every pose, today's sword against the new one.
+- The knight's lowest sword point was measured in every pose (rev 5), today's sword against the new one.
 - The poses come from the game's own Luau modules (`BeastPose`, `KeeperSignatureStrike`, `VeiledKeeper81` and
   `KeeperAccents`), run on the repo's offline Roblox mock.
-- The frozen sections (Jungle King, Sand Snake, The Darkened) were checked to be byte-identical to rev 4.
+- The unchanged sections (Timber Golem, Lava Dragon, Crystal Knight) were checked to be byte-identical to rev 5, and
+  the frozen ones (Jungle King, Sand Snake, The Darkened) to rev 4.
 
 **Reasoned, not run:**
-- How "improved but the same identity", "cleaner fox" and "proper longsword" read.
+- How "a sturdy fox" and "an ancient stone giant" read.
 - The "Ice and Fire" look beyond your two images.
 - Studio import, the stud texture tiling and vertex colours.
 - The cost on phones.
