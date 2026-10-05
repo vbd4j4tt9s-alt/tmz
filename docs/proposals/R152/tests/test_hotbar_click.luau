@@ -235,5 +235,32 @@ check(nonSilent==0 and rec.count()==0,'no sound for any hotbar gesture, hover or
 local made=0;for _,s in ipairs(E.sounds)do if s.Plays>0 then made+=1 end end
 check(made==0,'the Hotbar plays no Sound instance ('..made..')')
 
+-- 7. one odd item or picture never freezes the hotbar ---------------------------------------------------------------------------------------------------
+do
+ local Arrival=W.module('HarvestArrival');local Pictures=W.module('ItemPictures')
+ local realHolds,realShow,realPrefetch=Arrival.Holds,Pictures.Show,Pictures.Prefetch
+ local warns,byLabel=0,{};local realWarn=W.env.warn;W.env.warn=function(msg)msg=tostring(msg);if msg:find('[R152] Hotbar',1,true)then warns+=1;byLabel[msg:match('Hotbar: (.-) skipped')or msg]=(byLabel[msg:match('Hotbar: (.-) skipped')or msg]or 0)+1 end end
+ Arrival.Holds=function(tool)if tool.Name=='PoisonItem'then error('boom: an item whose hold check raises')end;return realHolds(tool)end
+ Pictures.Show=function(parent,tool,size,...)if tool and tool.Name=='PoisonPic'then error('boom: a picture that raises')end;return realShow(parent,tool,size,...)end
+ local prefetches=0;Pictures.Prefetch=function(...)prefetches+=1;if prefetches<=2 then error('boom: the picture cache')end;return realPrefetch(...)end
+ reset();hum:UnequipTools();frames(3)
+ local poison=harvest('PeachSeed','plant-P');poison.Name='PoisonItem';poison.Parent=bag
+ local orange=harvest('OrangeSeed','plant-O');orange.Parent=bag;frames(10)
+ local s,i=slotOf(orange)
+ check(s~=nil,'an item whose check raises does not stop the next item from reaching the hotbar')
+ if s then reset();gesture(s,{at(s)},'activated first');check(acts==1 and held()==orange,'... and that item equips on the first click ('..acts..')')end
+ check(byLabel['an item']==1,'the failing item is warned once ('..tostring(byLabel['an item'])..')');local w0=warns
+ for k=1,5 do local f=harvest('LimeSeed','plant-L'..k);f.Parent=bag;frames(3)end
+ check(byLabel['an item']==1,'repeated refreshes do not repeat the warning ('..tostring(byLabel['an item'])..')')
+ local pic=harvest('FigSeed','plant-F');pic.Name='PoisonPic';pic.Parent=bag
+ local lemon=harvest('MangoSeed','plant-M');lemon.Parent=bag;frames(10)
+ local s2=slotOf(lemon)
+ check(s2~=nil,'a slot whose picture raises does not stop the other slots from updating')
+ if s2 then reset();hum:UnequipTools();frames(2);reset();gesture(s2,{at(s2)},'release first');check(acts==1 and held()==lemon,'... and its item equips on the first click')end
+ check(prefetches>=3 and byLabel['the picture cache']==1 and byLabel['a slot']==1,'(the picture cache raised twice and recovered, each kind of failure warned once: '..prefetches..' calls, '..tostring(byLabel['the picture cache'])..' / '..tostring(byLabel['a slot'])..')')
+ Arrival.Holds,Pictures.Show,Pictures.Prefetch=realHolds,realShow,realPrefetch;W.env.warn=realWarn
+ poison:Destroy();pic:Destroy();frames(5)
+end
+
 print(('R152 hotbar click checks %d, fails %d'):format(checks,fails))
 if fails>0 then error('failures')end

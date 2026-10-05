@@ -70,6 +70,10 @@ local rarityMenu=Instance.new('Frame');rarityMenu.Name='RarityOptions';rarityMen
 local rarityCategory='All'
 local slots={};local rows={};local category='All';local visibleSlots=10;local sequence=0;local seen=setmetatable({},{__mode='k'});local toolConns={};local characterConns={};local allConns={};local queued=false;local drag;local selectedKey
 local refresh,renderRows,layout
+-- R152 (reliability): one odd tool or picture must never freeze the hotbar (an error inside refresh left every later slot, the Bag and new items stale, so
+-- clicks went to things that no longer matched). Each item and each slot is guarded; the first failure of a kind is warned once.
+local warned={}
+local function guard(label,fn,...)local ok,err=pcall(fn,...);if not ok and not warned[label]then warned[label]=true;warn('[R152] Hotbar: '..label..' skipped: '..tostring(err))end;return ok end
 -- R139 (owner: "new packs will be highlighted temporarily in the inventory, a rainbow border, temporary, fades after
 -- a while"): a pack that arrives while you play (not the ones you had when you joined) gets a spinning rainbow ring on
 -- its hotbar slot and Bag card. It waits until you can see it, stays 4 s, then fades out over 2 s.
@@ -172,9 +176,14 @@ end
 -- R152 (owner: "hot bar movements ... no sound effect"): the hotbar is silent. Equipping (keys 1-0, L1 / R1, a slot, a Bag card), unequipping,
 -- an empty slot and moving an item between slots play nothing (R150 clicked Equip / Bubble04 for them). Equipping from the Bag closes it
 -- without MenuClose, so that is silent too.
+-- R152: a slot can point at a tool that is gone (picked up, replaced by the server, destroyed with a Backpack the frame before): the press is resolved against
+-- what exists NOW (refresh first), never sent to a dead tool, so the first click lands on the item the slot shows.
+local function alive(tool)local at=tool.Parent;return at~=nil and(at==player.Character or(at:IsA('Backpack')and at.Parent==player))end
 local function equip(key)
- local e=State.Items[key];local char=player.Character;local humanoid=char and char:FindFirstChildOfClass('Humanoid')
- if not e or not humanoid or humanoid.Health<=0 then return end
+ local e=State.Items[key]
+ if not e or not alive(e.Tool)then refresh();e=State.Items[key] end
+ local char=player.Character;local humanoid=char and char:FindFirstChildOfClass('Humanoid')
+ if not e or not alive(e.Tool)or not humanoid or humanoid.Health<=0 then return end
  if e.Tool.Parent==char then humanoid:UnequipTools();selectedKey=nil else
   State:Ensure(key,visibleSlots);humanoid:EquipTool(e.Tool);selectedKey=key
  end
@@ -208,7 +217,7 @@ local function click(b,act) -- runs act() once for this press; the second caller
 end
 local function beginDrag(button0,key,input,slot,act)
  if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
-  drag={Key=key,Slot=slot,Button=button0,Act=act,Start=Vector2.new(input.Position.X,input.Position.Y),Input=input,Moved=false,ScrollY=button0:IsDescendantOf(scroll)and scroll.CanvasPosition.Y or nil}
+  drag={Key=key,Slot=slot,Button=button0,Act=act,Kind=input.UserInputType,At=os.clock(),Start=Vector2.new(input.Position.X,input.Position.Y),Input=input,Moved=false,ScrollY=button0:IsDescendantOf(scroll)and scroll.CanvasPosition.Y or nil}
   presses[button0]=drag
  end
 end
@@ -331,7 +340,8 @@ refresh=function()
  local items={};local containers={bag};if player.Character then table.insert(containers,player.Character)end
  local arrived;local clock=os.clock()
  for k,at in pairs(released)do if clock-at>6 then released[k]=nil end end
- for _,container in ipairs(containers)do for _,tool in ipairs(container:GetChildren())do if tool:IsA('Tool')and(seen[tool]or not Arrival.Holds(tool))then
+ local function take(tool)
+  if not tool:IsA('Tool')or not(seen[tool]or not Arrival.Holds(tool))then return end
   -- (R149: only a tool that was never shown is held back; an older fruit of the same plant and slot keeps its place while the new one flies)
   local isNew=not seen[tool]
   if isNew then sequence+=1;seen[tool]=sequence end
@@ -345,26 +355,27 @@ refresh=function()
   end
   if tool.Parent==player.Character then selectedKey=key end
   if not toolConns[tool]then toolConns[tool]=watchTool(tool,function()refresh()end)end
- end end end
+ end
+ for _,container in ipairs(containers)do for _,tool in ipairs(container:GetChildren())do guard('an item',take,tool)end end
  for tool,c in pairs(toolConns)do if tool.Parent~=bag and tool.Parent~=player.Character then c:Disconnect();toolConns[tool]=nil end end
  State:Reconcile(items);listDirty=true
  -- R113: build every look in the bag ahead of time (time-sliced), in inventory order.
  local ordered={};for _,e in pairs(items)do table.insert(ordered,e)end;table.sort(ordered,function(a,b)return a.Order<b.Order end)
- for i,e in ipairs(ordered)do ordered[i]=e.Tool end;Pictures.Prefetch(ordered)
+ for i,e in ipairs(ordered)do ordered[i]=e.Tool end;guard('the picture cache',Pictures.Prefetch,ordered)
  local active=selectedKey and items[selectedKey];if not active or active.Tool.Parent~=player.Character then selectedKey=nil end
  local selectedTool=selectedKey and items[selectedKey].Tool
  selectedLabel.Text=selectedTool and weighedName(selectedTool)or''
  selectedTraits.Text=selectedTool and traits(selectedTool)or'';Traits.Style(selectedTraits,Traits.Tool(selectedTool))
  decorate(selectedLabel,selectedTool,14)
- for i,b in ipairs(slots)do
+ for i,b in ipairs(slots)do guard('a slot',function()
   local e=items[State.Slots[i]];local tool=e and e.Tool
   b.ItemName.Text=tool and Names.Tool(tool,Catalog)or'';tint(b.ItemName,tool and rarity(tool)or'Common')
   b.ItemWeight.Text=tool and Weight.ToolText(tool)or'';Traits.Style(b.ItemWeight,Traits.Tool(tool))
   local count=e and e.Count or 0;b.Count.Text='x'..count;b.Count.Visible=count>1;Pictures.Show(b.Picture,tool,1)
   rarityBorder(b,tool);b:SetAttribute('Selected',e~=nil and tool.Parent==player.Character);b.BackgroundTransparency=e and .10 or .50
   paintGlow(b,e and State.Slots[i]or nil)
- end
- renderRows()
+ end)end
+ guard('the Bag',renderRows)
  if arrived then
   -- R150: the "it landed in your bag" cue belongs to this flash (the fruit's arrival), not to the server reply that lifted it off.
   Audio.Play('Bubble06')
@@ -531,19 +542,21 @@ connect(scroll:GetPropertyChangedSignal('CanvasPosition'),function()Pictures.Hur
 connect(pg:GetAttributeChangedSignal('SeedMenu'),function()dock.Visible=(pg:GetAttribute('SeedMenu')==nil or pg:GetAttribute('SeedMenu')=='Inventory');if panel.Visible and pg:GetAttribute('SeedMenu')~='Inventory'then toggle(false)end end)
 connect(Input.InputChanged,function(input)
  if not drag then return end
- if input.UserInputType==Enum.UserInputType.MouseMovement or input==drag.Input then
+ if drag.Kind==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseMovement or input==drag.Input then
   local p=Vector2.new(input.Position.X,input.Position.Y);if(p-drag.Start).Magnitude>12 then drag.Moved=true end
  end
 end)
 connect(Input.InputEnded,function(input)
- if not drag or not(input.UserInputType==Enum.UserInputType.MouseButton1 or input==drag.Input)then return end
+ -- (a press ends with ITS OWN release: a touch with that touch, a mouse press with the mouse button; a touch the system cancelled never ends, and a later
+ --  unrelated mouse release must not be taken for its end)
+ if not drag or not(drag.Kind==Enum.UserInputType.Touch and input==drag.Input or drag.Kind==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1)then return end
  local d=drag;drag=nil
  -- InputObject.Position and AbsolutePosition already share CoreUISafeInsets coordinates.
- local p=Vector2.new(input.Position.X,input.Position.Y);local to=d.Moved and slotAt(p)
+ local p=Vector2.new(input.Position.X,input.Position.Y);local to=(d.Moved or(p-d.Start).Magnitude>12)and slotAt(p) -- (a quick flick may report no move on the way: the release position counts)
  if to and to~=d.Slot then -- ended on ANOTHER slot: a drop (it can never also be a click on the pressed button)
   d.Done=os.clock()
   if State:Place(d.Key,to)then refresh()end
- elseif not d.Done and over(d.Button,p)and(d.Slot and State.Slots[d.Slot]or d.Button:GetAttribute('InventoryKey'))==d.Key and(not d.ScrollY or scroll.CanvasPosition.Y==d.ScrollY)then
+ elseif not d.Done and os.clock()-d.At<6 and over(d.Button,p)and(d.Slot and State.Slots[d.Slot]or d.Button:GetAttribute('InventoryKey'))==d.Key and(not d.ScrollY or scroll.CanvasPosition.Y==d.ScrollY)then
   click(d.Button,d.Act) -- ended on the pressed button: a click, even a rolled / slid one (its Activated may not come, or come after this)
  end
 end)

@@ -38,22 +38,36 @@ Nothing here is changed. Tell me which to drop.
 - **In files I was told not to touch**: the pack-click Bubble04 per accepted click (`PackOpeningFeedback:93`), the hub display chime (`HubDisplayClient:203`), the keeper pings and voices (`KeeperNearAlarm`, `Keeper*`).
 - Kept on purpose: purchases, steals / catches, keeper hits, rewards and claims, notifications, weather, music, the keyboard clicks, and the pack opening / pull reveal.
 
-## 3. Hotbar: "i have to click twice"
+## 3. Hotbar reliability: one press, one equip
 
-I could not play-test in Studio. This is from reading the code and from the mock; each cause below fails the new test on the R151 `Hotbar` (24 failed checks) and passes now.
+Owner: "players have to click on something multiple times to equip it". I could not play-test in Studio, so this is from tracing the whole path (click / tap / key -> `Hotbar.client.lua` -> `Humanoid:EquipTool` or `UnequipTools` -> server `Tool.Equipped` -> `ChestService:_holdPack` -> character) and from the mock. Each cause below fails a new test on the R151 code and passes now. Not mine, done by the coordinator: the load failure (InteractionAudio requiring SoundTiming before it replicates) and moving the CoreGui Backpack disable.
 
-**Cause.** R112-R151 treated any press that moved more than 12 px as a **drag**. A drag ignored the button's `Activated` for 0.2 s, then dropped the item on the slot under the pointer. For a press that stayed on its own slot (a phone tap that rolls, a trackpad click that slides, a Bag-card tap the scroll frame half-takes) that drop moved nothing, so the click did nothing and you had to click again. Other ways a first try was lost:
-- a drop that landed in the 6 px gap between slots, or a few px above or below the bar, landed nowhere;
-- after any drag, the next click on a slot was ignored for 0.2 s;
-- number keys did nothing while the Bag was open until you closed it.
+**Client (`Hotbar.client.lua`)**
 
-Whether the click or the release arrives first is up to the engine; the old code only worked in one order.
+| # | Cause | Fix |
+|---|---|---|
+| 1 | Any press that moved over 12 px was a **drag**: it ignored `Activated` for 0.2 s, then dropped the item on the slot under the pointer. A press that stayed on its own slot (a phone tap that rolls, a trackpad click that slides, a Bag-card tap) moved nothing, so the click did nothing. It only worked when the engine delivered `Activated` before the release. | A press is a drop only when it **ends on another slot**. Ending on the pressed button is a click however far it wandered. |
+| 2 | `Activated` can be missing (a wobbly tap in the Bag's scroll frame) or late. | The click runs **once per press**: `Activated` and the release both ask, the first wins (tested in all three orders, mouse and touch). A Bag card the grid scrolled under the finger is a scroll, not a click. |
+| 3 | A drop in the 6 px gap, at the bar's edge, or after a fast flick (the engine reported only press and release) landed nowhere. | The nearest slot within 4 px takes the drop; the release position counts when no move was reported. |
+| 4 | After every drag the next click was ignored for 0.2 s. | The lock-out is gone. |
+| 5 | A slot pointing at a tool that no longer exists (picked up, replaced, destroyed with the Backpack on respawn, the frame before the refresh) sent `EquipTool` to a dead tool: nothing happened. | `equip` resolves against what exists now (refresh first) and never calls a dead tool. |
+| 6 | A touch the system cancelled never ends. A later mouse release was taken for its end and clicked the old slot. | A press ends only with its own release (touch with that touch, mouse with the mouse button); the click fallback is limited to 6 s. |
+| 7 | Number keys did nothing while the Bag was open. | They equip (and close the Bag); other menus still block them. |
+| 8 | One odd item or picture that raised inside `refresh` left every later slot, the Bag and new items stale, so clicks hit things that no longer matched. | Each item, each slot, the Bag grid and the picture cache are guarded: the failure is skipped and warned once (`[R152] Hotbar: ... skipped`). |
 
-**Fix** (`Hotbar.client.lua`):
-- A press is a **drop only when it ends on another slot**. Ending on the pressed button is a click however far it wandered. A Bag card the grid scrolled under the finger is a scroll, not a click.
-- The click runs **once per press**: `Activated` and the release both ask, the first wins (Activated first, release first, or no Activated at all).
-- A drop lands on the **nearest slot within 4 px** of a slot, gap and edges included. The 0.2 s lock-out is gone. The shovel slot still refuses a drop, with no side effects.
-- A number key equips while the Bag is open (other menus still block it).
+**Server (`ChestService:_holdPack`)** threw a held pack back into the Backpack although nothing was wrong:
+
+| # | Cause | Fix |
+|---|---|---|
+| 9 | A quick unequip + re-equip while the pack's chip-bag shape was loading (R151 known issue, up to 2.5 s) started a second hold of the same pack. The first finished and held it; the second saw that opening and bounced the pack out of the hand. | A hold for the pack that is already held does nothing. |
+| 10 | Equipping pack B while pack A is in hand: if B's `Equipped` is handled before A's `Unequipped` has finished A's opening, B saw A's opening and bounced. | A's stale opening (not committed, pack no longer in hand) is finished, then B is held. A committed opening (reveal playing) still wins. |
+
+**Left as it is (by design or out of scope), so the owner knows:**
+- A pack cannot be held while carrying a stolen pack, running a chase, or while another pack's reveal is playing; it goes back to the Backpack with no message. A short notice there would make it clear.
+- The first equip of a pack whose shape is not baked yet shows nothing in the hand for up to 2.5 s (R151 design), so a second click unequips it. Building the default shape at once and swapping when baked would fix it.
+- Clicking the held item unequips it (toggle), as in Roblox's own hotbar.
+- Planting consumes the held seed; the next seed of the stack needs a click.
+- After a respawn the hotbar is empty for about 0.3 s until the server hands the tools back, and the slot order restarts in arrival order.
 
 ## 4. Fruit of the Hour
 
@@ -76,8 +90,10 @@ What I found in `BackgroundMusic`:
 ## 6. Tests
 
 `docs/proposals/R152/tests/run.sh` (picked up by `tools/tests/run_all_suites.sh`):
-- `test_hotbar_click`: one press is one action (equip, unequip, move) for mouse and touch, in all three event orders; rolled clicks; first-try drops (empty, swap, gap, edges, shovel slot); the Bag; number keys; silence.
+- `test_hotbar_click`: one press is one action (equip, unequip, move) for mouse and touch, in all three event orders; rolled clicks; first-try drops (empty, swap, gap, edges, shovel slot); the Bag; number keys; silence; one failing item or picture does not freeze the hotbar.
+- `test_hotbar_stress`: a seeded random run (600 steps, about 2300 checks): clicks and taps (clean, rolled, flicked), keys, L1 / R1, slot moves, Bag opens, card clicks and drops, items added and removed (also the frame before a click), the held item destroyed, cancelled presses and respawns. Every action must take effect exactly once, never on a dead tool, and the hotbar must equal a model of what the player did; a probe click every 20 steps proves nothing is stuck. I also ran 12 other seeds of 900-1500 steps: all pass. An optional `stress_cfg.luau` returning `{Seed=,N=}` next to the test runs other seeds.
+- `test_hold_race`: the server half on R151's pack harness (causes 9 and 10, plus what must not change: a committed opening, R139's fake, carrying).
 - `test_silence`: treadmills silent; the treadmill client scripts make no Sound; InteractionFeedback keeps its real cues.
 - `test_chase_trim`: the special track gets 22 s .. end regions (also when created later, id set later, length arriving later); other music untouched; with the real `BackgroundMusic` running a secret keeper chase the position never drops below 0:22.
-- `sh run.sh <dir> mutate` runs the click test on the R151 Hotbar and expects it to fail.
+- `sh run.sh <dir> mutate` runs the click test, the stress test and the hold-race test on the R151 code and expects each to fail (24, 25 and 5 failed checks).
 - Updated expectations: R150 `test_hotbar` / `test_inputs` now assert silence; R135 `test_market` asserts no tube and keeps the plate and prongs.
