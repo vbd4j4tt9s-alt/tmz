@@ -4,7 +4,7 @@
 --  1. the roll       PlayerDataService:AddChest rolls (uniform) for a pack made straight into a Bag (bonus rolls, daily rewards, gifts, owner commands ...), keeps the
 --                    roll a world pack brought (0 = the default, kept for life), takes none for the Void / the Mech, a forced / off mode, an explicit shape for a Void is ignored
 --  2. the record     the OPTIONAL PackShape field: serialised, decoded, saved and loaded through the DataStore, gifted; ProfileVersion stays 22; records saved before it are the
---                    default shape; garbage is the default shape; a Seed never carries one; the Verity hand-in rolls its own
+--                    default shape; garbage is the default shape; a Seed never carries one; the Verity pack takes none (R152: its flat pouch), also from an older record and a gift
 --  3. the world      ChestService:RefreshWorldPack rolls once, builds the pack in it, stores it on the seed and the model, pins its pair; a pair not baked yet keeps the default
 --                    for life; the Void takes none; SkinWorldSeeds plans the NEXT refresh ahead and asks for its pairs to be baked; distribution over the track
 --  4. the journey    steal (the carried clone), carry, drop, pick up again, bank, tool, held, opening copy: the same shape in every context; the tool carries PackShape; the
@@ -119,7 +119,9 @@ do
   check(low>0 and worst<=55,('900 AddChest rolls are uniform: %s (worst off by %d of 150 expected; 4.6 sigma is 53)'):format(table.concat(counts,' '),worst))
  end)
  -- every variant that takes one
- for _,variant in ipairs({'Pack01','Pack06','Small','Standard','Grand',H.VERITY})do local r=pack(A,variant==H.VERITY and 7 or 1,variant);check(r.PackShape~=nil,variant..' pack: rolls a shape')end
+ for _,variant in ipairs({'Pack01','Pack06','Small','Standard','Grand'})do local r=pack(A,1,variant);check(r.PackShape~=nil,variant..' pack: rolls a shape')end
+ -- R152: the Verity pack takes none (its flat pouch), even when it is handed one
+ do local r=pack(A,7,H.VERITY);check(r.PackShape==nil,'VerityReliquary pack: no shape (R152: its flat pouch is the same everywhere)');local r2=pack(A,7,H.VERITY,{PackShape=4});check(r2.PackShape==nil,'... and a shape handed to it is dropped')end
  for _,variant in ipairs({'EclipseReliquary','MechLimited'})do
   local r=pack(A,variant=='MechLimited'and 8 or 7,variant);check(r.PackShape==nil,variant..' pack: no shape (the Void and the Mech keep their own pouch)')
   local r2=pack(A,variant=='MechLimited'and 8 or 7,variant,{PackShape=3});check(r2.PackShape==nil,variant..' pack given a shape anyway: ignored')
@@ -172,10 +174,17 @@ do
  local theirs={};for _,r in ipairs(Data2:GetChestRecords(P2))do theirs[r.Id]=r.PackShape or 0 end
  local same,count=true,0;for id,s in pairs(mine)do count+=1;if theirs[id]~=s then same=false end end
  check(loaded and count==#Data:GetChestRecords(P)and same,'save / load through the DataStore: every pack keeps its shape ('..count..' packs; '..table.concat((function()local o={};for id,s in pairs(mine)do o[#o+1]=s end;table.sort(o);return o end)(),',')..')')
- -- the Verity hand-in: the Verity pack rolls its own
+ -- the Verity hand-in: the Verity pack takes none (R152: its flat pouch)
  local voidRec=pack(P,7,'EclipseReliquary');local verity=Data:ConvertVoidPack(P,voidRec.Id)
- check(verity and verity.BagVariant==H.VERITY and verity.PackShape~=nil and verity.PackShape>=1 and verity.PackShape<=6,'the Verity hand-in: the Verity pack rolls its own shape ('..tostring(verity and verity.PackShape)..'); the Void pack had none')
+ check(verity and verity.BagVariant==H.VERITY and verity.PackShape==nil,'the Verity hand-in: the Verity pack rolls no shape ('..tostring(verity and verity.PackShape)..'); the Void pack had none')
  Shapes.SetMode('off');local voidRec2=pack(P,7,'EclipseReliquary');local verity2=Data:ConvertVoidPack(P,voidRec2.Id);check(verity2 and verity2.PackShape==nil,'off: the Verity pack rolls nothing');Shapes.SetMode('auto')
+ -- an OLDER Verity record (saved by R151, which rolled one for it) loses its shape on load and on a gift; the same row of an ordinary pack keeps it
+ do
+  local old=Data:SerializeSeedRecord(rec);old.Id='303_95';old.BagVariant=H.VERITY;old.Stage=7;old.PackShape=5
+  local loadedOld=Data:_decodeSavedSeedRecord(P,old,95);check(loadedOld.PackShape==nil and loadedOld.BagVariant==H.VERITY,'an older Verity record that says PackShape 5 loads as the flat pouch (no shape)')
+  local giftedOld=Data:DecodeGiftedSeed(makePlayer(305,'Eli'),old);check(giftedOld and giftedOld.PackShape==nil,'... and arrives as a gift without one')
+  local ordinary=table.clone(old);ordinary.BagVariant='Pack04';ordinary.Stage=2;local keep=Data:_decodeSavedSeedRecord(P,ordinary,95);check(keep.PackShape==5,'(control) the same row of an ordinary pack keeps its shape 5')
+ end
 end
 
 -- 3. The world (ChestService:RefreshWorldPack, SkinWorldSeeds) ---------------------------------------------------------------------------------------
@@ -204,6 +213,9 @@ do
  -- the Void takes none
  chests:RefreshWorldPack(seed,'EclipseReliquary',nil,nil,1,1)
  check(seed.PackShape==nil and seed.Model:GetAttribute('PackShape')==nil and packetOf(seed):GetAttribute('PackShape')==nil,'a Void pack on the track: no shape (the seed and the model are cleared)')
+ -- the Verity pack takes none either (R152: its flat pouch), even when a roll is handed to the spawn
+ local asked0=Shapes.Status().Requested;local vseed=makeSeed(7,1);chests:RefreshWorldPack(vseed,H.VERITY,nil,nil,1,1,3)
+ check(vseed.PackShape==nil and vseed.Model:GetAttribute('PackShape')==nil and packetOf(vseed):GetAttribute('PackShape')==nil and Shapes.Status().Requested==asked0,'a Verity pack on the track: no shape (the seed, the model and the pack), even when a roll is handed to the spawn; no pair was requested')
  -- a pair that is not baked yet: the default shape for life
  fresh();Mock.slow=true
  chests:RefreshWorldPack(seed,'Pack02',nil,nil,1,1,3)

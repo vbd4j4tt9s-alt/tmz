@@ -18,7 +18,7 @@
 --  8. switches       off / auto / forced, the display flip drops the cache and tells the listeners, a forced number is only the roll of new packs, the status folder
 --  9. pictures       the real ItemPictures: the key carries the shape, two shapes = two pictures, the Index / sample / proxy pictures are the default, still loading -> retry,
 --                    a failed pair is a stable default picture, off / auto redraw
--- 10. Verity         the neutral (white vertex colour) pair of the roll: yellow, two Decals, never yields, falls back to the default neutral pouch, and the default stays the server's
+-- 10. Verity         (R152) NEVER shaped: Applies excludes it, it never rolls, carries or bakes a pair, and every context builds the one flat pouch of VerityPouch151 whatever a record, a flag or a stale attribute says
 local H=require('./pack_world');local W,R,F=H.W,H.R,H.F;local V3,CF=R.Vector3.new,R.CFrame.new
 local Mock=require('./pouch_mock')(W)
 local Samples=require('./pack_shape_samples')
@@ -38,7 +38,7 @@ local warns=function()return W.warns or 0 end
 local function folder()return W.RS:FindFirstChild(Shapes.Folder)end
 local DEFAULTS={Enabled=true,Force=nil,LoadingSeconds=60,HoldWaitSeconds=2.5,MaxVertices=60000,MaxResidentVertices=400000,HardResidentVertices=600000,GraceSeconds=30,IdleSeconds=900,SweepSeconds=60}
 local function fresh()
- Shapes.Reset();Mock.reset();Pouch.ResetPlain();for k,v in pairs(DEFAULTS)do Shapes.Config[k]=v end;Shapes.Config.Force=nil
+ Shapes.Reset();Mock.reset();for k,v in pairs(DEFAULTS)do Shapes.Config[k]=v end;Shapes.Config.Force=nil
  local f=folder();if f then f:SetAttribute('Off',nil);f:SetAttribute('Force',nil)end
  local v=W.RS:FindFirstChild(Pouch.Folder);if v then v:Destroy()end
 end
@@ -121,8 +121,8 @@ end
 -- 2. The roll -------------------------------------------------------------------------------------------------------------------------------------
 do
  fresh()
- for _,k in ipairs({'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06','Small','Standard','Grand',VERITY})do check(Shapes.Applies(k),k..' takes a shape (an ordinary biome pack, a legacy sack, the Verity pack)')end
- for _,k in ipairs({'EclipseReliquary','MechLimited','Nope',''})do check(not Shapes.Applies(k),tostring(k)..' takes none (the Void, the Mech, an unknown variant)')end
+ for _,k in ipairs({'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06','Small','Standard','Grand'})do check(Shapes.Applies(k),k..' takes a shape (an ordinary biome pack, a legacy sack)')end
+ for _,k in ipairs({'EclipseReliquary','MechLimited',VERITY,'Nope',''})do check(not Shapes.Applies(k),tostring(k)..' takes none (the Void, the Mech, the Verity pack (R152: its flat pouch), an unknown variant)')end
  check(not Shapes.Applies(nil)and not Shapes.Applies(3)and not Shapes.Applies({}),'nil / a number / a table take none')
  for _,v in ipairs({0,'3',2.5,7,-1,0/0,math.huge,true,{},false})do check(Shapes.Sanitize(v)==0,'Sanitize('..tostring(v)..') is 0 (the default shape)')end
  check(Shapes.Sanitize(nil)==0,'Sanitize(nil) is 0')
@@ -715,116 +715,61 @@ do
  server();Pic.Reset();gui:Destroy();Mock.slow=false
 end
 
--- 10. Verity --------------------------------------------------------------------------------------------------------------------------------------
+-- 10. Verity: NEVER shaped (R152) -----------------------------------------------------------------------------------------------------------------------
+-- The Verity pack is one clean FLAT pouch (VerityPouch151, generated), the same in every context: no roll, no record field, no baked pair, whatever any attribute says.
 do
  fresh();server()
  local KEY='Storm_02'
- local function isYellow(c)return math.floor(c.R*255+.5)==255 and math.floor(c.G*255+.5)==255 and math.floor(c.B*255+.5)==0 end
  local function decals(inst)local out={};for _,d in ipairs(inst:GetDescendants())do if d:IsA('Decal')then out[#out+1]=d end end;return out end
- check(Pouch.Prepare()==true,'(the server\'s default neutral Verity pouch is baked)')
- local default=H.ground(7,VERITY,1,'None');local defSig=sig(default)
- check(default:GetAttribute('VerityPouch')==true and default:GetAttribute('PackShape')==nil,'a Verity pack with no shape is the default neutral pouch')
- local calls=Mock.calls
- -- the shaped neutral pair
- local bag=H.ground(7,VERITY,1,'None',nil,3)
- check(bag:GetAttribute('PackShape')==3 and bag:GetAttribute('PackShapeShown')==3 and bag:GetAttribute('VerityPouch')==true,'a Verity pack with a roll of 3 is the pouch in shape 3 (the pair was baked by the build)')
- local pair=Shapes.Template(KEY,3,true);local pouch=pouchOf(bag);local scale=bag:GetAttribute('VisualScale')
- check(pair~=nil and pair:GetAttribute('Neutral')==true and near(pouch.Size.X/scale,pair.ApprovedMesh01.Size.X,1e-6)and near(pouch.Size.Z/scale,pair.ApprovedMesh01.Size.Z,1e-6),'its pouch is the neutral pair\'s MeshPart ('..tostring(pouch.Size/scale)..')')
- check(not sameSig(sig(bag),defSig),'... a different shape from the default Verity pouch')
- check(Mock.colorsAtBake[#Mock.colorsAtBake]==0,'every vertex colour was white when the shaped neutral pair was baked')
- check(isYellow(pouch.Color)and pouch.Material.Name=='SmoothPlastic'and pouch.TextureID==''and bag:GetAttribute('PaperColor').R==1,'the pouch is pure yellow 255,255,0 SmoothPlastic, no texture')
- local ds=decals(bag);check(#ds==2 and #decals(pouch)==2 and ds[1].Face~=ds[2].Face,'Verity\'s face is two Decals on the shaped pouch (Front and Back)')
- local flushOk=true;for k,v in pairs(defSig)do if k:find('Seal')or k:find('TearStrip')then local x=sig(bag)[k];if not x or(x.Pos-v.Pos).Magnitude>1e-9 then flushOk=false end end end
- check(flushOk,'the seal and the tear strips are where the default Verity pack\'s are')
- local plainStorm=H.ground(7,'Standard',1,'None',nil,3)
- check(Shapes.Template(KEY,3,false)~=nil and Shapes.Template(KEY,3,false)~=pair,'the printed Storm_02 / 3 and the neutral Storm_02 / 3 are two different pairs')
- -- every context
- for _,rig in ipairs({'R15','R6'})do local held,char=H.held(7,VERITY,1,'None',rig,3);check(sameSig(sig(held),sig(bag))and held:GetAttribute('PackShapeShown')==3,'held '..rig..': the same shaped Verity pack');local copy=H.openingCopy(held);check(#decals(copy)==2 and pouchOf(copy)~=nil,'opening copy: the pouch with both Decals');copy:Destroy();held:Destroy();char:Destroy()end
- for _,coat in ipairs({'Gold','Diamond'})do local g=H.ground(7,VERITY,1,coat,nil,3);local c=Rules.PackMutations[coat];check(sameColor(pouchOf(g).Color,c.Color)and #decals(g)==2 and decals(g)[1].Color3.R==1,'a '..coat..' Verity pack in shape 3: the coat paints the pouch, the Decals stay white');g:Destroy()end
- local giant=H.ground(7,VERITY,25,'None',nil,3);local tagged=0;for _,p in ipairs(H.partsOf(giant,false))do if W.CS:HasTag(p,'GiantVisualPart')then tagged+=1 end end
- check(tagged==10,'a 25x Verity pack in shape 3: the pouch, the seal and the 8 strips are GiantVisualParts ('..tagged..')');giant:Destroy()
- -- never yields: a slow pair -> the default neutral pouch this once
- fresh();server();Pouch.Prepare();Mock.slow=false
- local builders={};local realWait=R.task.wait;R.task.wait=function(t)if builders[coroutine.running()]then error('a pack build must never wait',2)end;return t or .03 end
- Mock.slow=true;local built;local co=coroutine.create(function()built=H.ground(7,VERITY,1,'None',nil,5)end);builders[co]=true;local ok,err=coroutine.resume(co)
- check(ok and coroutine.status(co)=='dead'and built:GetAttribute('PackShapeShown')==0 and built:GetAttribute('VerityPouch')==true,'a Verity build never yields: while its neutral pair is baked it is the default neutral pouch ('..tostring(err)..')')
- check(sameSig(sig(built),defSig),'... exactly the default Verity pack')
- while Mock.resume()do end;R.task.wait=realWait;Mock.slow=false
- local after=H.ground(7,VERITY,1,'None',nil,5);check(after:GetAttribute('PackShapeShown')==5,'... and shape 5 once it is baked');after:Destroy();built:Destroy()
- -- a client picture waits for the pair
- fresh();server();Pouch.Prepare();client();Mock.slow=true
- local okc,errc=pcall(function()return H.picture(7,VERITY,1,'None',2)end)
- check(not okc and tostring(errc):find('still loading',1,true)~=nil,'a client\'s Verity picture errors "still loading" while its neutral pair is baked ('..tostring(errc)..')')
- while Mock.resume()do end;Mock.slow=false
- local okp,pic=pcall(function()return H.picture(7,VERITY,1,'None',2)end);check(okp and pic:GetAttribute('PackShapeShown')==2,'... and draws the shaped pouch once it is baked');if okp then pic:Destroy()end
- server()
- -- a failed neutral pair: the default neutral pouch, sticky, and the default stays the server's
- fresh();server();Pouch.Prepare();Mock.mode='denied'
- local failedBag=H.ground(7,VERITY,1,'None',nil,4)
- check(failedBag:GetAttribute('PackShapeShown')==0 and failedBag:GetAttribute('VerityPouch')==true and sameSig(sig(failedBag),defSig),'a denied neutral pair: the default neutral pouch, exactly')
- Mock.mode='ok';local failed2=H.ground(7,VERITY,1,'None',nil,4);check(sameSig(sig(failed2),defSig)and Shapes.State(KEY,4,true)=='Off','sticky: with the cause gone it is still the default neutral pouch');failed2:Destroy();failedBag:Destroy()
- -- the sachet when the server's own neutral pouch is not there (the shape is ignored)
- fresh();server();local sachet=H.ground(7,VERITY,1,'None',nil,4)
- check(sachet:GetAttribute('VerityPackDesign')==149 and sachet:FindFirstChild('VerityFace',true)~=nil and Mock.calls==0,'with no neutral pouch (a server that did not bake) the Verity pack is the R149 sachet whatever it rolled; nothing is loaded');sachet:Destroy()
- -- off: the default neutral pouch
- fresh();server();Pouch.Prepare();Shapes.SetMode('off')
- local offBag=H.ground(7,VERITY,1,'None',nil,3);check(offBag:GetAttribute('PackShapeShown')==0 and sameSig(sig(offBag),defSig),'off: the default neutral Verity pouch');offBag:Destroy();Shapes.SetMode('auto')
- default:Destroy();bag:Destroy();plainStorm:Destroy()
- -- a bag flagged DefaultPackShape (a catalogue / shop / reward picture): the DEFAULT neutral pouch whatever it rolled. The server's neutral pouch is the default shape already, so
- -- nothing is baked for it on a client (VerityPouch151.PlainState is 'Ready' from the server)
- do
-  fresh();server();Pouch.Prepare();local serverMesh=Mock.meshes[#Mock.meshes];local made=Mock.created
-  local defaultBag=H.ground(7,VERITY,1,'None');local defaultSig=sig(defaultBag);defaultBag:Destroy()
-  Shapes.Request(KEY,3,true);made=Mock.created;local asked0=Shapes.Status().Requested -- (the neutral pair of shape 3 is baked: the control below follows its roll)
-  client();local state,src=Pouch.PlainState(KEY)
-  check(state=='Ready'and src=='server'and Pouch.PlainTemplate(KEY)==Pouch.Template(KEY)and Pouch.RequestPlain(KEY)=='Ready','VerityPouch151.PlainState: the server\'s neutral pouch is the default shape, so the plain pouch IS the server\'s ('..tostring(state)..' / '..tostring(src)..')')
-  local fb=H.picture(7,VERITY,1,'None',3,true)
-  check(fb:GetAttribute('DefaultPackShape')==true and fb:GetAttribute('PackShape')==nil and fb:GetAttribute('VerityPouch')==true and sameSig(sig(fb),defaultSig),'a flagged Verity picture that rolled 3 is the default neutral pouch, exactly')
-  local fm=pouchOf(fb)
-  check(fm and fm.Baked==serverMesh and #decals(fm)==2 and isYellow(fm.Color),'... the SERVER\'s baked mesh, pure yellow, Verity\'s face as two Decals')
-  check(Mock.created==made and Shapes.Status().Requested==asked0,'... no EditableMesh was made for it and PackShapes151 was not asked ('..(Mock.created-made)..' made, '..(Shapes.Status().Requested-asked0)..' asked)')
-  -- the Verity builder honours the flag itself: a flagged Verity bag that also carries PackShape 3 (its neutral pair baked) is still the default neutral pouch
-  local hand=H.picture(7,VERITY,1,'None',nil,true);hand:FindFirstChild('PackGeometry'):Destroy()
-  for _,a in ipairs({'CompactPackReady','CompactPackPartCount','VerityPack','VerityPouch'})do hand:SetAttribute(a,nil)end
-  hand:SetAttribute('PackShape',3);W.module('VerityPackArt').Build(hand,function()return true end)
-  check(pouchOf(hand)and pouchOf(hand).Baked==serverMesh and hand:GetAttribute('PackShapeShown')==nil,'VerityPackArt itself honours the flag: a flagged Verity bag that also says PackShape 3 is still the default neutral pouch');hand:Destroy()
-  local rolled=H.picture(7,VERITY,1,'None',3);check(rolled:GetAttribute('PackShape')==3 and rolled:GetAttribute('PackShapeShown')==3 and not sameSig(sig(rolled),defaultSig),'(control) the same picture unflagged follows its roll (shape 3)');rolled:Destroy();fb:Destroy()
-  -- the safety net: a server whose neutral pouch carries a variation (the folder's PackShape): the CLIENT bakes its own default copy, once, and waits like any picture
-  fresh();server();Pouch.Prepare();local sMesh=Mock.meshes[#Mock.meshes];made=Mock.created
-  local vf=W.RS:FindFirstChild(Pouch.Folder);vf:SetAttribute('PackShape',3)
-  client();Mock.slow=true
-  check(Pouch.PlainState(KEY)=='Idle','a server whose pouch carries a variation: the plain pouch is not there yet (Idle)')
-  local okc,errc=pcall(function()return H.picture(7,VERITY,1,'None',nil,true)end)
-  check(not okc and tostring(errc):find('still loading',1,true)~=nil and Pouch.PlainState(KEY)=='Loading','... a flagged picture asks for it and waits ("still loading", retried) ('..tostring(errc)..')')
-  while Mock.resume()do end;Mock.slow=false
-  local pst,psrc=Pouch.PlainState(KEY);local plainModel=Pouch.PlainTemplate(KEY);local plainMesh=Mock.meshes[#Mock.meshes]
-  check(pst=='Ready'and psrc=='client'and plainModel and plainModel:GetAttribute('PackShape')==0 and plainModel:GetAttribute('Neutral')==true and plainModel.Parent==nil,'the client\'s copy is baked and kept in memory (a neutral model with PackShape 0)')
-  local nmoved=0;for i,p in ipairs(plainMesh._pos)do if(p-plainMesh._init[i]).Magnitude>1e-9 then nmoved+=1 end end
-  check(nmoved==0 and plainMesh~=sMesh and Mock.created==made+1 and Mock.alive==0 and Mock.colorsAtBake[#Mock.colorsAtBake]==0,'... no vertex moved, white vertex colours, ONE EditableMesh made and destroyed ('..nmoved..' moved, '..(Mock.created-made)..' made)')
-  local fb2=H.picture(7,VERITY,1,'None',3,true);check(pouchOf(fb2)and pouchOf(fb2).Baked==plainMesh and fb2:GetAttribute('PackShape')==nil,'the flagged picture is the client\'s default copy, not the server\'s shaped one');fb2:Destroy()
-  local calls2=Mock.calls;local fb3=H.picture(7,VERITY,1,'None',nil,true);fb3:Destroy();check(Mock.calls==calls2,'asked again: no second bake')
-  do -- the same case through the real ItemPictures: its flagged proxy reaches the builder as the flag
-   local Pic=W.module('ItemPictures');Pic.Reset()
-   local gui=R.Instance.new('ScreenGui');gui.Parent=H.pg
-   local hh=R.new('Frame');hh.Size=R.UDim2.fromOffset(60,60);hh.Parent=gui;hh.AbsoluteSize=R.Vector2.new(60,60);hh.AbsolutePosition=R.Vector2.new(0,0)
-   local proxy=R.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',7);proxy:SetAttribute('BagVariant',VERITY);proxy:SetAttribute('PackMutation','None');proxy:SetAttribute('DefaultPackShape',true)
-   Pic.Show(hh,proxy,1);for _=1,300 do W.frames(1)end
-   local v=hh:FindFirstChild('ItemViewport');local pm;for _,d in ipairs(v and v:GetDescendants()or{})do if d:IsA('MeshPart')and d.Name=='ApprovedMesh01'then pm=d end end
-   check(pm and pm.Baked==plainMesh,'through the real ItemPictures a flagged Verity proxy is the client\'s default copy, not the server\'s shaped pouch')
-   Pic.Reset();gui:Destroy()
-  end
-  -- no EditableMesh API on the client: the expected fallback, quiet, the picture keeps the server\'s pouch
-  local wasStudio=Run.IsStudio;Run.IsStudio=function()return true end -- (the plain bake only warns in Studio)
-  Pouch.ResetPlain();Mock.api(false);local w0=warns()
-  local fb4;for _=1,3 do local okq,b=pcall(function()return H.picture(7,VERITY,1,'None',nil,true)end);if okq then fb4=b;break end;W.frames(1)end -- (a picture may wait one retry for the bake to fail)
-  check(fb4 and pouchOf(fb4)and pouchOf(fb4).Baked==sMesh and Pouch.PlainState(KEY)=='Off'and warns()==w0,'no EditableMesh API: the flagged picture keeps the server\'s pouch (still the real pouch, not the sachet), and it is QUIET ('..(warns()-w0)..' warnings)')
-  Mock.api(true);if fb4 then fb4:Destroy()end
-  Pouch.ResetPlain();Mock.mode='denied';local w1=warns()
-  local fb6;for _=1,3 do local okq,b=pcall(function()return H.picture(7,VERITY,1,'None',nil,true)end);if okq then fb6=b;break end;W.frames(1)end
-  check(Pouch.PlainState(KEY)=='Off'and warns()==w1+1,'a REAL plain-bake failure (a denied asset) still warns, once, in Studio ('..(warns()-w1)..')')
-  Mock.mode='ok';if fb6 then fb6:Destroy()end;Run.IsStudio=wasStudio
-  Pouch.ResetPlain();check(Pouch.PlainState(KEY)=='Idle','ResetPlain forgets the client\'s copy and a failure')
+ check(Pouch.Prepare()==true,'(the server\'s flat Verity pouch is made)')
+ local made0=Mock.created;local calls0=Mock.calls
+ local default=H.ground(7,VERITY,1,'None');local defSig=sig(default);local defMesh=pouchOf(default)
+ check(default:GetAttribute('VerityPouch')==true and default:GetAttribute('PackShape')==nil and defMesh and defMesh:GetAttribute('Flat')~=false,'a Verity pack with no shape is the flat pouch')
+ check(Shapes.Applies(VERITY)==false and Shapes.Applies('Pack06')==true and Shapes.Applies('Standard')==true,'PackShapes151.Applies: the Verity pack takes no shape; the ordinary packs do')
+ -- the roll: never, in any mode, with any dice
+ local rolled=0
+ for k=0,100 do if Shapes.Roll(VERITY,k/100)~=nil then rolled+=1 end end
+ for _,mode in ipairs({1,2,3,4,5,6,'auto'})do Shapes.SetMode(mode);if Shapes.Roll(VERITY)~=nil then rolled+=1 end;if Shapes.Roll(VERITY,.5)~=nil then rolled+=1 end end
+ Shapes.SetMode('auto')
+ check(rolled==0,'a Verity pack never rolls a shape (101 dice, every forced number, auto): '..rolled..' rolls')
+ check(Shapes.Status().Rolled[1]+Shapes.Status().Rolled[2]+Shapes.Status().Rolled[3]+Shapes.Status().Rolled[4]+Shapes.Status().Rolled[5]+Shapes.Status().Rolled[6]==0,'... and the roll statistics never saw one')
+ -- handed a shape anyway (an older record, a world pack, a hand, a picture, a market stall, the pedestal, a viewport): the same flat pouch, no PackShape on it
+ for shape=1,6 do
+  local viaBuilder=H.ground(7,VERITY,1,'None',nil,shape)
+  check(viaBuilder:GetAttribute('PackShape')==nil and viaBuilder:GetAttribute('PackShapeShown')==nil and sameSig(sig(viaBuilder),defSig),'a Verity pack handed shape '..shape..' is the same flat pouch, with no PackShape')
+  local stale=Visuals.Bag(CF(0,0,0),nil,1,nil,7,'Standard',1,1,'None');stale:SetAttribute('BagVariant',VERITY)
+  for _,d in ipairs(stale:GetChildren())do if d.Name=='PackGeometry'then d:Destroy()end end
+  for _,a in ipairs({'CompactPackReady','CompactPackPartCount'})do stale:SetAttribute(a,nil)end
+  stale:SetAttribute('PackShape',shape);W.module('VerityPackArt').Build(stale,function()return true end)
+  check(pouchOf(stale)and pouchOf(stale):GetAttribute('Flat')~=false and stale:GetAttribute('PackShapeShown')==nil and stale:GetAttribute('VerityPouch')==true and #decals(stale)==2,'a Verity bag that itself says PackShape '..shape..' (a stale attribute) is built as the flat pouch: ignored')
+  local pic=H.picture(7,VERITY,1,'None',shape);check(pic:GetAttribute('PackShape')==nil and sameSig(sig(pic),sig(H.picture(7,VERITY,1,'None'))),'a hotbar / Bag picture of a Verity pack that rolled '..shape..' is the flat pouch');pic:Destroy()
+  local flagged=H.picture(7,VERITY,1,'None',shape,true);check(flagged:GetAttribute('DefaultPackShape')==true and sameSig(sig(flagged),sig(H.picture(7,VERITY,1,'None'))),'a flagged (shop / Index / dialog) picture is the flat pouch too');flagged:Destroy()
+  viaBuilder:Destroy();stale:Destroy()
  end
+ for _,rig in ipairs({'R15','R6'})do
+  local held,char=H.held(7,VERITY,1,'None',rig,3);local plainHeld,char2=H.held(7,VERITY,1,'None',rig)
+  check(held:GetAttribute('PackShape')==nil and sameSig(sig(held),sig(plainHeld)),'held '..rig..': handed shape 3 it is the flat pouch');local copy=H.openingCopy(held);check(#decals(copy)==2 and pouchOf(copy)~=nil,'opening copy: the flat pouch with both Decals');copy:Destroy();held:Destroy();char:Destroy();plainHeld:Destroy();char2:Destroy()
+ end
+ local market=H.market(7,VERITY,5);check(pouchOf(market)~=nil and #decals(market)==2 and market:GetAttribute('PackShape')==nil,'the market / shop stall picture is the flat pouch with both Decals');market:Destroy()
+ local mystery,holder=H.mystery(7,VERITY,false,3);check(mystery:GetAttribute('PackShape')==nil and mystery:GetAttribute('VerityPouch')==true,'the mystery pedestal\'s Ready Verity pack is the flat pouch');holder:Destroy()
+ for _,coat in ipairs({'Gold','Diamond'})do local g=H.ground(7,VERITY,1,coat,nil,3);local c=Rules.PackMutations[coat];check(sameColor(pouchOf(g).Color,c.Color)and #decals(g)==2 and decals(g)[1].Color3.R==1,'a '..coat..' Verity pack handed shape 3: the coat paints the pouch, the Decals stay white');g:Destroy()end
+ local giant=H.ground(7,VERITY,25,'None',nil,3);local tagged=0;for _,p in ipairs(H.partsOf(giant,false))do if W.CS:HasTag(p,'GiantVisualPart')then tagged+=1 end end
+ check(tagged==10,'a 25x Verity pack handed shape 3: the pouch, the seal and the 8 strips are GiantVisualParts ('..tagged..')');giant:Destroy()
+ -- nothing of PackShapes151 was ever used for it
+ check(Shapes.Status().Requested==0 and Shapes.Status().Baked==0 and Shapes.Status().Pairs==0 and Shapes.State(KEY,3,true)=='Idle'and Shapes.State(KEY,5,false)=='Idle','PackShapes151 was never asked for a pair for any of it (0 requested, 0 baked)')
+ check(Mock.created==made0 and Mock.calls==calls0,'no EditableMesh was made for any of it ('..(Mock.created-made0)..' made, '..(Mock.calls-calls0)..' calls)')
+ -- never waits for a shape, never errors "still loading" because of one: a client picture of a Verity pack that rolled 2 draws at once
+ client();local okc,errc=pcall(function()return H.picture(7,VERITY,1,'None',2)end)
+ check(okc,'a client\'s Verity picture that carries a shape draws at once: no "still loading" for a shape that does not exist ('..tostring(errc)..')');if okc then errc:Destroy()end
+ server()
+ -- the switches change nothing for it
+ Shapes.SetMode('off');local offBag=H.ground(7,VERITY,1,'None',nil,3);check(sameSig(sig(offBag),defSig),'/test packshape off: the same flat pouch');offBag:Destroy();Shapes.SetMode('auto')
+ -- no flat pouch (a server that did not make it): the R149 sachet whatever it was handed; nothing is loaded
+ fresh();server();local calls1=Mock.calls;local sachet=H.ground(7,VERITY,1,'None',nil,4)
+ check(sachet:GetAttribute('VerityPackDesign')==149 and sachet:FindFirstChild('VerityFace',true)~=nil and Mock.calls==calls1,'with no flat pouch (a server that did not make it) the Verity pack is the R149 sachet whatever it was handed; nothing is loaded');sachet:Destroy()
+ -- (control) an ordinary pack of the same stage still takes its shape
+ local ord=H.ground(7,'Pack06',1,'None',nil,3);check(ord:GetAttribute('PackShape')==3,'(control) an ordinary pack still carries its shape');ord:Destroy()
+ default:Destroy()
  check(Mock.alive==0,'(no EditableMesh left alive)')
 end
 
