@@ -121,7 +121,7 @@ if BUILT and(PHASE or 2)>=2 then step('HubLife151.client',function()
  local sc=R.new('LocalScript');sc.Name='HubLife151';sc:SetAttribute('R151TestHook',true);sc.Parent=player:FindFirstChild('PlayerGui')
  local api=W.load('HubLife151Client',sc);assert(api,'no test hook')
  assert(api.Build(),'HubLife151 build failed')
- api.Near.detail=1e6;api.Near.fine=1e6;api.ApplyLod();api.ApplyKeys();api.ApplySigns()
+ api.Near.detail=1e6;api.Near.fine=1e6;api.ApplyLod();api.ApplyKeys()
  if NIGHT then for _,l in ipairs(api.State.Ctx.Lights)do l.Enabled=true end end
  BUILT_API=api
 end)end

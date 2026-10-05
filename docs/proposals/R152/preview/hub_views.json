@@ -1,0 +1,27 @@
+{
+ "note": "Cameras for R152's before / after hub previews (render_base_area.mjs of R151). pos / look are world studs (the track runs to +Z; hub floor top y = 4); fov is the vertical field of view. avatars: [x, y, z, yaw, shirt colour].",
+ "views": [
+  {"name": "aerial", "title": "The hub from above", "fov": 62, "pos": [0, 255, 40], "look": [0, 0, -330], "shadowAt": [0, 4, -300], "shadowExtent": 400,
+   "caption": "The whole base area. AFTER: a chess-rook battlement round every wall, a rook tower on each side of the track gate, no corner towers, no fountain, a third of the trees, no signposts, banners, murals or base arches."},
+  {"name": "gate", "title": "The track gate (rook towers)", "fov": 66, "pos": [0, 20, -215], "look": [0, 42, -100], "shadowAt": [0, 4, -140], "shadowExtent": 170,
+   "avatars": [[-28, 4.2, -170, 3.14, 4245975]],
+   "caption": "From the hub: two chess-rook towers (stepped round base, tapering shaft, gold ring, collar, flared crown with eight merlons) and a crenellated gatehouse between them with the sign on its raised keep and the seven biome keys hanging in front. No red crest, no flags."},
+  {"name": "rook", "title": "A rook tower up close", "fov": 50, "pos": [52, 30, -212], "look": [99, 41, -100], "shadowAt": [100, 4, -125], "shadowExtent": 110,
+   "avatars": [[78, 4.2, -160, 3.14, 13775418]],
+   "caption": "The east tower from the hub side: a wide round stepped base, a shaft that tapers a little with two arrow slits, a gold ring where the wall's string course runs, a stone collar, a flared crown and eight square merlons; the wall's battlement runs up to it on the left, the gatehouse's on the right."},
+  {"name": "corner", "title": "A wall corner", "fov": 55, "pos": [283, 22, -168], "look": [335, 48, -104], "shadowAt": [310, 4, -130], "shadowExtent": 90,
+   "avatars": [[300, 4.2, -150, 2.0, 4245975]],
+   "caption": "The front-east corner: the battlement runs round it, one square merlon on the corner, nothing higher (no tower, no cone roof). The pilasters end under it with stone caps."},
+  {"name": "run", "title": "A straight run of wall", "fov": 56, "pos": [250, 20, -300], "look": [335, 45, -390], "shadowAt": [300, 4, -340], "shadowExtent": 110,
+   "caption": "The east wall: square merlons every ten studs, the same size and rhythm all the way round, pilasters and lanterns under them."},
+  {"name": "plaza", "title": "The old fountain spot", "fov": 62, "pos": [24, 13, -362], "look": [0, 8, -394], "shadowAt": [0, 4, -388], "shadowExtent": 90,
+   "caption": "The south plaza where the Seed Fountain stood: a clean open paved circle, no benches, no spouts, nothing to look at but the lawn and the stage behind."},
+  {"name": "entrance", "title": "At a base entrance", "fov": 60, "pos": [-98, 12, -366], "look": [-150, 13, -357], "shadowAt": [-140, 4, -358], "shadowExtent": 90,
+   "avatars": [[-116, 4.2, -352, 1.9, 13775418]],
+   "caption": "Base 3 from the west street: the street, curbs, spur and welcome mat stay; the arch, posts, name beam, medallion, pennants and potted topiary are gone."},
+  {"name": "spawn", "title": "Leaving a base", "fov": 64, "pos": [-184, 13.5, -183], "look": [-40, 10, -205], "shadowAt": [-110, 4, -205], "shadowExtent": 160,
+   "avatars": [[-170, 5, -181, -1.57, 13775418]],
+   "caption": "What a player sees leaving Base 1: the open paved street, a few trees at the edges, the avenue, and the rook towers of the gate to the right."}
+ ],
+ "plan": {"ortho": [0, -361, 350, 275], "w": 1400, "h": 1100}
+}
