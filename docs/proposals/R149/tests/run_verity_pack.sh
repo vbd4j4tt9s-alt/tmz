@@ -11,6 +11,8 @@
 #                          nothing in front of it, no step to the body (side view), in every context (ground, carried, hotbar / Bag
 #                          picture, ViewportFrame, the real ItemPictures, opening copy, giant, tiny, Gold / Diamond coat); no effects;
 #                          every other pack identical to the base.
+#                          (R151: these run with no neutral pouch template, so they check the sachet, the fallback. The real pouch has its own
+#                          suite, ../../R151/tests/run_verity_pouch.sh, run at the end.)
 #  --mutations           - also breaks VerityPackArt six ways (the R148 art, a darker seal, a floating face plate, an emitter, a tinted Decal,
 #                          an extra mesh) and expects the test to notice each one.
 set -e
@@ -56,3 +58,6 @@ PY
   if timeout 600 /opt/luau/luau test_verity_pack.luau > "mut_$m.log" 2>&1; then echo "FAIL: mutant $m was NOT noticed";exit 1;else echo "ok: mutant $m noticed ($(grep -c '^FAIL' "mut_$m.log") failed checks)";fi
  done
 fi
+# R151: the Verity pack is the real chip-bag pouch in pure yellow when the server's runtime bake (VerityPouch151) succeeded; everything above runs with NO neutral
+# template, i.e. it checks the R149 sachet, which is the fallback. The pouch path and its failure modes have their own suite.
+echo "== R151: the real pouch (VerityPouch151) and the sachet as the fallback";sh "$HERE/../../R151/tests/run_verity_pouch.sh" "$(pwd)/pouch" ${2:+"$2"}

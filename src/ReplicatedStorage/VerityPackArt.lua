@@ -18,10 +18,18 @@
 --    its own properties: SeedPackClient / PackOpeningFeedback / GiantVisualSafety hide and fade it like a part.
 --  * Every part is 255,255,0 SmoothPlastic (the seal and the tear strips too). A Gold / Diamond coat paints it like any other pack
 --    (SeedPackVisuals: every part takes the coat's colour and material, a Diamond one at .10 transparency); the Decal stays white on top.
+-- R151 (owner: the REAL standard pouch shape, pure yellow, made at runtime): when VerityPouch151 has baked the neutral copy of the Verity design's pouch
+-- (the Storm_02 mesh with every vertex colour white), the pack is that pouch: built by the plain pack's own builder (SeedPackRenderer.BuildStandard: the
+-- same MeshPart size, PackLocalFrame, pivot, Bounds, welds, tags; the seal and the 8 tear strips of SeedPackVisuals), every part 255,255,0 SmoothPlastic,
+-- and Verity's face as a Decal on the pouch's own Front and Back (a Decal on a MeshPart follows its surface: nothing stands off it). No effect of any
+-- kind. If the bake failed, was denied, did not match, never ran, or a client asks before it is ready on a server that is still baking (ItemPictures
+-- retries on 'still loading'), the pack is the R149 sachet described above, unchanged (A.BuildSachet).
 local Config=require(script.Parent.VerityConfig)
 local Renderer=require(script.Parent.SeedPackRenderer)
+local Pouch=require(script.Parent.VerityPouch151)
+local Run=game:GetService('RunService')
 local V,CF=Vector3.new,CFrame.new
-local A={Image=Config.Image,Yellow=Color3.fromRGB(255,255,0),Revision=149,
+local A={Image=Config.Image,Yellow=Color3.fromRGB(255,255,0),Revision=149,PouchRevision=151,
  -- The sachet's thickness as a share of the plain pouch's front-to-back size, and the share of the height its square face block may take.
  DepthShare=.56,FaceHeightShare=.9,
  -- The blocks above / below the face block reach this far under it and sit this far behind its surface (so the face block alone is the
@@ -77,7 +85,7 @@ function A.Layout(key)
 end
 -- The face block's side at scale 1.
 function A.FaceSide(key)local _,m=A.Layout(key);return m.Face end
-function A.Build(bag,isValid)
+function A.BuildSachet(bag,isValid)
  if bag:GetAttribute('VerityPack')then return true end
  local key=bag:GetAttribute('PackArtKey')or''
  local root=bag.PrimaryPart;assert(root,'[R149] The Verity pack needs its root part.')
@@ -115,5 +123,51 @@ function A.Build(bag,isValid)
  bag:SetAttribute('PaperColor',A.Yellow);bag:SetAttribute('PreserveTextStyle',true)
  bag:SetAttribute('VerityPack',true);bag:SetAttribute('VerityPackDesign',A.Revision)
  return true
+end
+-- R151: the pouch build. Returns true (built), false (invalidated: nothing is left) or errors (the caller cleans up and uses the sachet).
+local function buildPouch(bag,isValid,key,template)
+ local root=bag.PrimaryPart;assert(root,'[R151] The Verity pack needs its root part.')
+ if not Renderer.BuildStandard(bag,key,isValid,template)then return false end
+ local folder=bag:FindFirstChild('PackGeometry');assert(folder,'[R151] the pouch has no PackGeometry')
+ local pouch,faces
+ for _,p in ipairs(folder:GetChildren())do if p:IsA('MeshPart')then
+  p.Color=A.Yellow;p.Material=Enum.Material.SmoothPlastic;p.Reflectance=0;p.Transparency=0;p.TextureID=''
+  for _,v in ipairs(p:GetChildren())do if v:IsA('SurfaceAppearance')then v:Destroy()end end
+  if not pouch or p.Name=='ApprovedMesh01'then pouch=p end
+ end end
+ assert(pouch,'[R151] the neutral template has no MeshPart')
+ -- Verity's picture, as it is, white (untinted), on the pouch's own Front and Back faces (the template turns the pouch 180 degrees about Y in its
+ -- PackLocalFrame, so the part's Front is the pack's back and the other way round: every face reads the right way up from outside either way).
+ for _,side in ipairs({Enum.NormalId.Front,Enum.NormalId.Back})do
+  local d=Instance.new('Decal');d.Name='VerityPicture';d.Face=side;d.Texture=A.Image;d.Color3=Color3.new(1,1,1);d.Transparency=0;d.Parent=pouch
+ end
+ -- The seal and the tear strips of the ordinary pack: the same yellow.
+ for _,p in ipairs(bag:GetChildren())do if p:IsA('BasePart')and(p.Name=='BottomSeal'or p:GetAttribute('TearIndex'))then
+  p.Color=A.Yellow;p.Material=Enum.Material.SmoothPlastic;p.Reflectance=0
+ end end
+ bag:SetAttribute('PaperColor',A.Yellow);bag:SetAttribute('PreserveTextStyle',true)
+ bag:SetAttribute('VerityPack',true);bag:SetAttribute('VerityPackDesign',A.PouchRevision);bag:SetAttribute('VerityPouch',true)
+ return true
+end
+function A.Build(bag,isValid)
+ if bag:GetAttribute('VerityPack')then return true end
+ local key=bag:GetAttribute('PackArtKey')or''
+ local state=Pouch.State(key)
+ if state=='Loading'then
+  -- A client built before the server finished baking: ItemPictures retries a build that errors with 'still loading' (and caches nothing), so
+  -- the picture never settles on the wrong shape. A server (a held pack) does not wait: it uses the sachet for that one pack.
+  if Run:IsClient()and not Run:IsServer()then error('Verity pouch is still loading',0)end
+ elseif state=='Ready'then
+  local template=Pouch.Template(key)
+  if template then
+   local ok,built=pcall(buildPouch,bag,isValid,key,template)
+   if ok then return built end
+   -- nothing of the pouch may stay: the sachet builds on a clean pack
+   local folder=bag:FindFirstChild('PackGeometry');if folder then folder:Destroy()end
+   bag:SetAttribute('CompactPackReady',nil);bag:SetAttribute('CompactPackPartCount',nil);bag:SetAttribute('VerityPack',nil);bag:SetAttribute('VerityPouch',nil)
+   if Run:IsStudio()then warn('[R151] Verity pouch build failed, using the sachet: '..tostring(built))end
+  end
+ end
+ return A.BuildSachet(bag,isValid)
 end
 return A

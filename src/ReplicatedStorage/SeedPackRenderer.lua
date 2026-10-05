@@ -21,10 +21,12 @@ function Renderer.Build(bag,isValid)
     end
     return Renderer.BuildStandard(bag,bag:GetAttribute('PackArtKey')or'',isValid)
 end
-function Renderer.BuildStandard(bag,key,isValid)
+-- R151: `template` (optional) is a template Model to build from instead of the place's own (VerityPackArt passes the neutral Verity pouch, a clone of
+-- Storm_02 with white vertex colours); everything else is the same code, so such a pack is built exactly like a plain one.
+function Renderer.BuildStandard(bag,key,isValid,template)
     if bag:GetAttribute('CompactPackReady') and bag:FindFirstChild('PackGeometry') then return true end
     local root=bag.PrimaryPart
-    local template=Renderer.GetGeometry(key)
+    template=template or Renderer.GetGeometry(key)
     assert(root and template,'[V123] Missing approved pack mesh. Finish the V123 installer in Edit mode first.')
     local folder=Instance.new('Folder');folder.Name='PackGeometry'
     local scale=bag:GetAttribute('VisualScale') or 1

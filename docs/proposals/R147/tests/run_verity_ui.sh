@@ -14,6 +14,8 @@ show(){ git -C "$REPO" show "$BASE:$1"; }
 show src/ReplicatedStorage/SeedPackVisuals.lua | sed -e "s/script.Parent.SeedPackRenderer/script.Parent.SeedPackRendererBase/g" -e "s/script.Parent.EclipsePackArt/script.Parent.EclipsePackArtBase/g" > "$OUT/SeedPackVisualsBase.lua"
 show src/ReplicatedStorage/SeedPackRenderer.lua | sed -e "s/script.Parent.EclipsePackArt/script.Parent.EclipsePackArtBase/g" > "$OUT/SeedPackRendererBase.lua"
 show src/ReplicatedStorage/EclipsePackArt.lua | sed -e "s/script.Parent.SeedPackRenderer/script.Parent.SeedPackRendererBase/g" > "$OUT/EclipsePackArtBase.lua"
+# R151: the base copies carry the three documented R151 pack fixes (giant packs' seal / strips tagged, the Void's print backed, the pads' moss / ice thicker), so "nothing existing changed" still means nothing else changed
+python3 "$HERE/../../R151/tests/rebase_r151.py" "$OUT/SeedPackVisualsBase.lua" "$OUT/EclipsePackArtBase.lua" >/dev/null
 show src/ReplicatedStorage/VoidPackFx.lua > "$OUT/VoidPackFxBase.lua"
 show src/StarterPlayer/StarterPlayerScripts/ChestIndex.client.lua > "$OUT/ChestIndexBase.lua"
 # (the R113 bundler has this checkout's path hard-coded: point it at this worktree's src)

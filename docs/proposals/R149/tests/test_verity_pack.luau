@@ -93,6 +93,8 @@ check(VerityArt.Dark==nil and VerityArt.Fx==nil and VerityArt.Side==nil and Veri
 check(VerityArt.Revision==149,'the art revision is 149')
 do
  local src=W.B.VerityPackArt;local bad={}
+ -- (R151: below buildPouch the module holds the real-pouch build, which uses the standard pack's mesh on purpose; this checks the R149 sachet, the fallback)
+ local cut=src:find('local function buildPouch',1,true);if cut then src=src:sub(1,cut-1)end
  for _,word in ipairs({'SurfaceGui','ParticleEmitter','PointLight','Highlight','Sparkles','Beam','Trail',"Instance.new('MeshPart')",'TextureID','SurfaceAppearance','BuildStandard','214,190','Neon','Glass'})do if src:find(word,1,true)then
   -- (the header comment may name the old design: look at the code lines only)
   for line in src:gmatch('[^\n]+')do if not line:match('^%s*%-%-')and line:find(word,1,true)then bad[#bad+1]=word end end

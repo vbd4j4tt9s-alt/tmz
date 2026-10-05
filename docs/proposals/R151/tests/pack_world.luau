@@ -242,4 +242,45 @@ function H.scene(bag,label,includeRoot)
  local paper=bag:GetAttribute('PaperColor')
  return{label=label,scale=scale,parts=parts,paper=paper and R.typeof(paper)=='Color3'and c255(paper)or nil,attrs={Stage=bag:GetAttribute('Stage'),Variant=bag:GetAttribute('BagVariant'),Key=bag:GetAttribute('PackArtKey'),Size=bag:GetAttribute('PackSize')}}
 end
+-- Fingerprint (R151): one line per instance with every property that decides how it looks and whether it stays in place; used by fingerprint_packs.luau and
+-- test_verity_pouch.luau to prove a change touched nothing else.
+local function n(v)local s=string.format('%.5f',v);if s=='-0.00000'then s='0.00000'end;return s end -- (a tiny negative is the same place as zero: the world origin of a pack changes the sign of the rounding noise)
+local function ser(v)
+ local t=type(v)
+ if t=='number'then return n(v)elseif t~='table'then return tostring(v)end
+ if v._class then return'<'..v._class..':'..tostring(v._props.Name)..'>'end
+ if v.__type=='Vector3'then return'('..n(v.X)..','..n(v.Y)..','..n(v.Z)..')'end
+ if v.__type=='Color3'then return'c'..math.floor(v.R*255+.5)..','..math.floor(v.G*255+.5)..','..math.floor(v.B*255+.5)end
+ if v.__type=='CFrame'then local r=v.R;return'cf('..n(v.Position.X)..','..n(v.Position.Y)..','..n(v.Position.Z)..';'..n(r[1][1])..','..n(r[1][2])..','..n(r[1][3])..','..n(r[2][1])..','..n(r[2][2])..','..n(r[2][3])..','..n(r[3][1])..','..n(r[3][2])..','..n(r[3][3])..')'end
+ if v.__type=='EnumItem'then return v.Name end
+ return'{...}'
+end
+function H.lines(bag)
+ local root=bag.PrimaryPart;local scale=bag:GetAttribute('VisualScale')or 1;local rootInv=inv(root.CFrame)
+ local out={}
+ local function rel(cf)local f=rootInv*cf;return CF(f.Position.X/scale,f.Position.Y/scale,f.Position.Z/scale)*f.Rotation end
+ for _,d in ipairs(bag:GetDescendants())do
+  local row={d._class,d.Name,'parent='..d.Parent.Name}
+  if d:IsA('BasePart')then
+   row[#row+1]='size='..ser(d.Size/scale);row[#row+1]='at='..ser(rel(d.CFrame));row[#row+1]='color='..ser(d.Color);row[#row+1]='mat='..ser(d.Material)
+   row[#row+1]='t='..n(d.Transparency);row[#row+1]='refl='..n(d.Reflectance or 0);row[#row+1]='anch='..tostring(d.Anchored);row[#row+1]='massless='..tostring(d.Massless)
+   row[#row+1]='coll='..tostring(d.CanCollide)..tostring(d.CanTouch)..tostring(d.CanQuery)
+   if d._class=='Part'and d.Shape then row[#row+1]='shape='..ser(d.Shape)end
+   if d:IsA('MeshPart')then row[#row+1]='mesh='..tostring(d.MeshId)..'/'..tostring(d.TextureID)end
+   local tags=W.CS:GetTags(d);table.sort(tags);if#tags>0 then row[#row+1]='tags='..table.concat(tags,'+')end
+  elseif d:IsA('WeldConstraint')then row[#row+1]='joins='..tostring(d.Part0 and d.Part0.Name)..'>'..tostring(d.Part1 and d.Part1.Name)..' enabled='..tostring(d.Enabled)
+  elseif d:IsA('Motor6D')then row[#row+1]='joins='..tostring(d.Part0 and d.Part0.Name)..'>'..tostring(d.Part1 and d.Part1.Name)..' C0='..ser(d.C0)..' C1='..ser(d.C1)
+  elseif d:IsA('Decal')then row[#row+1]='face='..ser(d.Face)..' tex='..tostring(d.Texture)..' t='..n(d.Transparency)..' c='..ser(d.Color3)
+  elseif d:IsA('Attachment')then row[#row+1]='cf='..ser(d.CFrame)end
+  local keys={};for k in pairs(d:GetAttributes())do keys[#keys+1]=k end;table.sort(keys)
+  for _,k in ipairs(keys)do local v=d:GetAttribute(k);if k~='HoverOrigin'and k~='HoverPhase'and k~='CarryRootOffset'and k~='MysteryOrigin'then row[#row+1]='@'..k..'='..ser(v)end end
+  out[#out+1]='  '..table.concat(row,'|')
+ end
+ local keys={};for k in pairs(bag:GetAttributes())do keys[#keys+1]=k end;table.sort(keys)
+ local top={};for _,k in ipairs(keys)do if k~='HoverOrigin'and k~='HoverPhase'and k~='CarryRootOffset'and k~='MysteryOrigin'then top[#top+1]='@'..k..'='..ser(bag:GetAttribute(k))end end
+ local tags=W.CS:GetTags(bag);table.sort(tags)
+ table.insert(out,1,'  MODEL|'..table.concat(top,'|')..'|tags='..table.concat(tags,'+'))
+ return out
+end
+
 return H

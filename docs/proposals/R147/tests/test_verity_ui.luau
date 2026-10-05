@@ -187,7 +187,7 @@ for _,case in ipairs({{1,'None'},{2.5,'Gold'},{25,'Diamond'},{.5,'None'}})do
  local br=Visuals.Bounds(7,VERITY,size);inside(vr,br,label,0)
  check(boundsLine(br)==boundsLine(Visuals.Bounds(7,'Standard',size)),label..': Bounds are the plain pack\'s ('..string.format('R %.3f, Y %.3f..%.3f',br.Radius,br.MinY,br.MaxY)..')')
  check(W.CS:HasTag(vr,'BiomeSeedPackVisual'),label..': tagged BiomeSeedPackVisual (the effects owner finds it)')
- if size>10 then local tagged=0;for _,p in ipairs(pr)do if W.CS:HasTag(p,'GiantVisualPart')then tagged+=1 end end;check(tagged==#pr-9,label..': a giant pack\'s pouch parts (the face block with the picture too) are GiantVisualParts (the camera fade reaches the picture)')end
+ if size>10 then local tagged=0;for _,p in ipairs(pr)do if W.CS:HasTag(p,'GiantVisualPart')then tagged+=1 end end;check(tagged==#pr,label..': a giant pack\'s pouch parts (the face block with the picture too) are GiantVisualParts (the camera fade reaches the picture; R151: the seal and the 8 tear strips too, they were the 9 left out)')end
  local ids=0;for _,d in ipairs(vr:GetDescendants())do for _,k in ipairs({'TextureID','Texture','Image'})do local v=d._props[k];if type(v)=='string'and v:find('rbxassetid')and v~=IMAGE then ids+=1 end end end
  check(ids==0,label..': no uploaded asset but the picture')
  plain:Destroy()

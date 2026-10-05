@@ -38,9 +38,9 @@ function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,pac
             origin*CFrame.new((-1.9/2+(i-.5)*1.9/8)*scale,1.11*scale,0),seal,visualWeldRoot)
         strip:SetAttribute("TearIndex",i);strip:SetAttribute("TearCount",8)
     end
-    -- R151: GiantVisualSafety fades every GiantVisualPart near the camera, and SeedPackRenderer / VerityPackArt / EclipsePackArt / SpecialPackArt89 tag
-    -- the pouch's parts for a giant (> 10x) pack, but the seal and the 8 tear strips (built here) were never tagged: close to a giant pack the pouch
-    -- faded away and nine solid bars stayed behind in the air. They fade with the rest now.
+    -- R151: GiantVisualSafety fades every GiantVisualPart near the camera, and the pouch's own builders (SeedPackRenderer, EclipsePackArt, SpecialPackArt89
+    -- and the Verity pack's) tag the pouch's parts for a giant (> 10x) pack, but the seal and the 8 tear strips (built here) were never tagged: close to a
+    -- giant pack the pouch faded away and nine solid bars stayed behind in the air. They fade with the rest now.
     if packSize>10 then for _,p in ipairs(m:GetChildren())do if p:IsA('BasePart')and p~=root then game:GetService('CollectionService'):AddTag(p,'GiantVisualPart')end end end
     for _,side in ipairs({-1,1}) do
         local grip=Instance.new("Attachment");grip.Name=side<0 and "LeftGrip" or "RightGrip"

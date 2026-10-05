@@ -9,16 +9,20 @@
 #                            the REAL SeedPackRender hovering the anchored ones), the same pack in every context, giants, weather, pads, special packs.
 #  2. dump_packs.luau + check_packs.py   the geometry of every distinct design (42 + Void + Mech + Verity + the 7 pads): FLOATING parts (every part touches
 #                            the body through touching parts) and Z-FIGHTING (tools/zfight.py; mesh-box pairs are listed, not counted).
-#  3. fingerprint_packs.luau + compare_fingerprints.py   BEFORE (the base commit, default c1e8829 = R150 + the R151 research) against AFTER: every
-#                            property of every part of 1,500+ packs; only the documented fixes may differ.
+#  3. fingerprint_packs.luau + compare_fingerprints.py   BEFORE (the base commit, default b196944 = the R151 pack audit as merged) against AFTER: every
+#                            property of every part of 1,500+ packs; NOTHING may differ (the Verity pouch work changes no other pack, and with no baked pouch
+#                            the Verity pack is the unchanged R149 sachet). `--base c1e8829` (R150 + the research) reproduces the audit's own three fixes.
+#  4. run_verity_pouch.sh    (R151 follow-up: the Verity pack is the REAL chip-bag pouch in pure yellow, baked at runtime; the sachet is the fallback) - the
+#                            EditableMesh bake on a mock with a switch for every failure, the pouch pack in every context, the sachet fallback, no leaks,
+#                            and every other pack identical with the pouch ready and without it.
 #  --mutations   breaks the pack code 13 ways (an unwelded strip, an anchored held part, an unwelded root, the giant tags, a wrong PackLocalFrame, a size
 #                jump between contexts, a part count, a Mech motor, a floating seal, a z-fighting duplicate, a weather part, an unwelded Verity block, a
 #                Void star off the face) and expects the audit to notice each one.
-#  --suites      also runs the existing suites that touch packs (R149 / R147 Verity pack, R147 Verity art, veiled R122, R137, R138, R148 index / purchase /
+#  --suites      also runs the existing suites that touch packs (R149 / R147 Verity pack, R147 Verity art / UI, veiled R122, R137, R138, R148 index / purchase /
 #                roster, R150, R149 run_all) and prints their counts.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
-OUT=$(mktemp -d);BASE=${PACKS_BASE:-c1e8829};MUT=0;SUITES=0
+OUT=$(mktemp -d);BASE=${PACKS_BASE:-b196944};MUT=0;SUITES=0
 if [ -n "$1" ] && [ "${1#--}" = "$1" ];then OUT=$1;shift;fi
 mkdir -p "$OUT"
 while [ $# -gt 0 ];do case "$1" in --mutations) MUT=1;; --suites) SUITES=1;; --base) shift;BASE=$1;; esac;shift;done
@@ -47,9 +51,17 @@ stage "$OUT/before";bundle "$OUT/before" "$OUT/base_src/src"
 (cd "$OUT/after" && timeout 900 $LUAU fingerprint_packs.luau > fp.txt 2>&1)
 wait
 grep '^COUNT' "$OUT/before/fp.txt" "$OUT/after/fp.txt"
-# only the documented fixes may differ: the giant tags on the seal / tear strips (SeedPackVisuals), the Void's stars / specks / rune strokes backed onto
-# the pouch (EclipsePackArt) and the moss patches / ice glaze of the pads made .006 thicker (SeedPackVisuals.Platform)
-python3 "$HERE/compare_fingerprints.py" "$OUT/before/fp.txt" "$OUT/after/fp.txt" --expect-only '^Part (BottomSeal|TearStripN): tags' '^Part (StarV|StarH|StarSpeck)[FB]N: ' '^Part RuneSigil[FB]N_N: ' '^Part (MossPatch|IceGlaze): size  \[pad\]'
+# against the audit's merge nothing may differ. Against the pre-audit base only the audit's documented fixes may: the giant tags on the seal / tear strips
+# (SeedPackVisuals), the Void's stars / specks / rune strokes backed onto the pouch (EclipsePackArt) and the moss patches / ice glaze of the pads made .006 thicker
+# (SeedPackVisuals.Platform)
+if [ "$BASE" = "c1e8829" ];then
+ python3 "$HERE/compare_fingerprints.py" "$OUT/before/fp.txt" "$OUT/after/fp.txt" --expect-only '^Part (BottomSeal|TearStripN): tags' '^Part (StarV|StarH|StarSpeck)[FB]N: ' '^Part RuneSigil[FB]N_N: ' '^Part (MossPatch|IceGlaze): size  \[pad\]'
+else
+ python3 "$HERE/compare_fingerprints.py" "$OUT/before/fp.txt" "$OUT/after/fp.txt" --expect-only '(?!)'
+fi
+
+echo "== the Verity pouch (VerityPouch151): runtime bake, pouch pack, sachet fallback"
+if [ "$MUT" = 1 ];then sh "$HERE/run_verity_pouch.sh" "$OUT/pouch" --mutations;else sh "$HERE/run_verity_pouch.sh" "$OUT/pouch";fi
 
 if [ "$MUT" = 1 ];then
  echo "== mutations: the audit must notice each broken copy of the pack code"
@@ -73,7 +85,7 @@ if [ "$SUITES" = 1 ];then
  P=$REPO/docs/proposals
  for s in "R149 Verity pack:$P/R149/tests/run_verity_pack.sh" "R147 Verity pack:$P/R147/tests/run_verity_pack.sh" "R147 Verity art:$P/R147/tests/run_verity_art.sh" \
           "veiled R122:$P/veiled_R122/tests/run.sh" "R137:$P/R137/tests/run.sh" "R138:$P/R138/tests/run.sh" "R148 index limited:$P/R148/tests/run_index_limited.sh" \
-          "R148 purchase:$P/R148/tests/run_purchase.sh" "R148 roster:$P/R148/tests/run_roster.sh" "R150:$P/R150/tests/run_all.sh" "R149 run_all:$P/R149/tests/run_all.sh";do
+"R147 Verity UI:$P/R147/tests/run_verity_ui.sh" "R148 purchase:$P/R148/tests/run_purchase.sh" "R148 roster:$P/R148/tests/run_roster.sh" "R150:$P/R150/tests/run_all.sh" "R149 run_all:$P/R149/tests/run_all.sh";do
   label=${s%%:*};script=${s#*:}
   dir=$OUT/suite_$(echo "$label" | tr ' ' '_')
   if sh "$script" "$dir" > "$dir.log" 2>&1;then echo "ok:   $label ($(grep -E '[0-9]+ checks, [0-9]+ failures|checks [0-9]+, fails|ALL PASS|suites passed' "$dir.log" | tr '\n' ';' | cut -c1-200))";else echo "FAIL: $label";tail -20 "$dir.log";exit 1;fi
