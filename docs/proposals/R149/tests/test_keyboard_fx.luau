@@ -1,5 +1,5 @@
 --!nocheck
--- R149 (the new keyboard's resting key tops stand 0.55 above the floor and the real floor is hidden locally): effects that were authored at
+-- R149 (the new keyboard's resting key tops stand above the floor - 0.55 in R149, 1.2 since R151's deeper press - and the real floor is hidden locally): effects that were authored at
 -- floor level must show ON TOP of the keyboard. The real KeyboardTrack.client.lua next to the real StormWeather.client.lua (lightning warning
 -- ring, impact ring, ground flash, bolt end), the real TrackHoleClient.client.lua (shovel dirt bursts: Dig / Cover / Trap) and the real
 -- ReplicatedStorage.KeyboardSurface149 helper, on the Roblox mock:
@@ -137,7 +137,7 @@ end
 local vis=workspace:FindFirstChild('KeyboardTrackVisuals')
 check(vis~=nil and vis:FindFirstChild('Keys')~=nil and ground.LocalTransparencyModifier==1,'the keyboard is up around the runner and the real Storm floor is hidden')
 local RISE=K.KeyTop(0)-F
-check(near(RISE,C.RestRise)and RISE>.5,'the resting key tops are '..string.format('%.2f',RISE)..' above the floor')
+check(near(RISE,C.RestRise)and near(RISE,1.2),'the resting key tops are '..string.format('%.2f',RISE)..' above the floor (R151: 1.2, a press travels 1.15; effects lift by whatever the rise is)')
 local X,Z=10,5030
 local keyTop=keyTopNear(X,Z)
 check(keyTop~=nil and near(keyTop,K.KeyTop(0)),'the dressed key under the test spot has its top at K.KeyTop(0) ('..tostring(keyTop)..')')

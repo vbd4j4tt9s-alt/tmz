@@ -1,4 +1,4 @@
-"""R149 Verity mutation checks: python3 mutate_verity.py REPO SCRATCH
+"""R149 Verity mutation checks (R151: the mouth mutations became bounce / cut mutations): python3 mutate_verity.py REPO SCRATCH
 Breaks one thing at a time in a copy of REPO/src, bundles the copy the way run_verity.sh does and runs the suite that must notice. Every mutation
 must make its suite fail ("caught"); the exit status is non-zero if one survives. Suites: lipsync (R149 client), client (R147 client / dialog), voice (R149 server)."""
 import os, shutil, subprocess, sys
@@ -28,14 +28,22 @@ MUTATIONS = [
     ('lipsync', 'a clip that is not loaded is played at once', CLIENT, "if s.IsLoaded==false and not((s.TimeLength or 0)>0)then", "if false then"),
     ('lipsync', 'the owner\'s test message is ignored', CLIENT, "greet('test',{Start=a,End=b})", "do end"),
     ('lipsync', 'the owner\'s test plays 3D from her body, not flat', CLIENT, "local s=voiceSound(e,override~=nil)", "local s=voiceSound(e,false)"),
-    ('lipsync', 'lip sync ignores the loudness', CLIENT, "talking and sound and sound.PlaybackLoudness or 0,dt,talking)", "0,dt,talking)"),
-    ('lipsync', 'the mouth does not close when the sound stops', VOICE, "lip.Level=lip.Level*math.exp(-cfg.Release*dt)", "lip.Level=lip.Level"),
-    ('lipsync', 'the lip level is stepped when nothing talks', CLIENT, "if talking or lip.Level>0 then", "if true then"),
-    ('lipsync', 'her body animates (and the mouth is made) beyond AnimateDistance', CLIENT, "and not(camera and(camera.CFrame.Position-e.Base).Magnitude>C.AnimateDistance)", ""),
-    ('lipsync', 'ReducedMotion does not stop the mouth', CLIENT, "local reduced=GuiService.ReducedMotionEnabled\n local camera=workspace.CurrentCamera", "local reduced=false\n local camera=workspace.CurrentCamera"),
+    ('lipsync', 'the voice level ignores the loudness', CLIENT, "talking and sound and sound.PlaybackLoudness or 0,dt,talking)", "0,dt,talking)"),
+    ('lipsync', 'the voice level does not fall when the sound stops (she keeps bouncing)', VOICE, "lip.Level=lip.Level*math.exp(-cfg.Release*dt)", "lip.Level=lip.Level"),
+    ('lipsync', 'the voice level is stepped when nothing talks', CLIENT, "if talking or lip.Level>0 then", "if true then"),
+    ('lipsync', 'her body bounces beyond AnimateDistance', CLIENT, "and not(camera and(camera.CFrame.Position-e.Base).Magnitude>C.AnimateDistance)", ""),
+    ('lipsync', 'ReducedMotion does not stop the bounce', CLIENT, "local reduced=GuiService.ReducedMotionEnabled\n local camera=workspace.CurrentCamera", "local reduced=false\n local camera=workspace.CurrentCamera"),
     ('lipsync', 'the portrait model is kept after the window closes', CLIENT, " dropPortrait() -- (her 3D model lives only while the window is open)", " -- kept"),
-    ('lipsync', 'the portrait is not driven by the lip sync', CLIENT, "if portraitOn or P.Model then portraitFrame(reduced)end", "if false then end"),
-    ('lipsync', 'the mouth leaves her face (wrong depth)', VOICE, "Z=-z}", "Z=-z*.5}"),
+    ('lipsync', 'the portrait is not driven by the voice level', CLIENT, "if portraitOn or P.Model then portraitFrame(reduced)end", "if false then end"),
+    # R151: the bounce (no mouth) and the longer cut
+    ('lipsync', 'she only swells: no hop on the syllables', VOICE, "Rise=diameter*(scale-1)/2+diameter*cfg.TalkBounce*level}", "Rise=diameter*(scale-1)/2}"),
+    ('lipsync', 'the hop sinks her into the dais', VOICE, "Rise=diameter*(scale-1)/2+diameter*cfg.TalkBounce*level}", "Rise=diameter*(scale-1)/2-diameter*cfg.TalkBounce*level}"),
+    ('lipsync', 'her body in the world does not bounce', CLIENT, " local y=e.Base.Y+math.sin(now*1.4)*C.FootOffset+pose.Rise", " local y=e.Base.Y+math.sin(now*1.4)*C.FootOffset+e.Size*(scale-1)/2"),
+    ('lipsync', 'the portrait ball does not bounce', CLIENT, " ball.CFrame=CFrame.new(0,(still and 0 or math.sin(os.clock()*1.4)*C.Portrait.Bob*D)+pose.Rise,0)", " ball.CFrame=CFrame.new(0,(still and 0 or math.sin(os.clock()*1.4)*C.Portrait.Bob*D),0)"),
+    ('lipsync', 'the greeting is cut at 1.9 again (at \"Ver\")', CONFIG, "C.GreetingEnd=2.35", "C.GreetingEnd=1.9"),
+    ('voice', 'the greeting is cut at 1.9 again (at \"Ver\")', CONFIG, "C.GreetingEnd=2.35", "C.GreetingEnd=1.9"),
+    ('voice', 'a broken config falls back to the old 1.9 cut', VOICE, "M.Default={Start=0,Stop=2.35}", "M.Default={Start=0,Stop=1.9}"),
+    ('voice', 'the portrait viewport clips the loudest bounce', CONFIG, "C.Portrait={Size=10,Fov=30,Fill=.75,Bob=.03}", "C.Portrait={Size=10,Fov=30,Fill=.88,Bob=.03}"),
     ('lipsync', 'no talking rhythm when no loudness is reported', VOICE, "elseif lip.Age>=cfg.FallbackAfter then", "elseif false then"),
     ('client', 'layout overrides the fitted font of the quest sentence (the cut-off "...")', CLIENT, "fit(quest,short and 15 or cw<380 and 18 or 20,11);y+=questH+gap", "quest.TextSize=short and 15 or 20;y+=questH+gap"),
     ('client', 'the quest sentence loses the room the event line gave up', CLIENT, "local questH=math.max(short and 30 or 40,bodyH-(eventRow+chipH+exH+statusH+buttonH)-gap*4)", "local questH=math.max(short and 30 or 40,bodyH-(eventRow+chipH+exH+statusH+buttonH)-gap*4-40)"),

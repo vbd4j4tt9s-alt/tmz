@@ -26,6 +26,13 @@
 --  REMOVED (the layered design is gone): K.Hierarchy / K.Windows / K.WindowCount / K.NearestOrd checks, plain / 2x2 .. 16x16 block layers,
 --   "finer block higher" overlap ordering, per-layer bind budgets, "676 keycaps in a 26 x 26 window", "2000+ studs of coarse blocks";
 --   replaced by: one key representation everywhere, row windows per tier (~1000 / 620 / 380 studs ahead), caps, nearest-first binding.
+-- CHANGED by R151 (owner playtest of R149 / R150: "doesn't push down far enough", "the words are missing, they only appear if under my foot",
+--  spacebar names "parallel to the safe zone and horizontal"): resting tops 1.2 above the floor, pressed .05 (1.15 of travel, was .47); a runner's
+--  footprint reaches PressLead seconds ahead; the Top-face SurfaceGui frame is canvas x -> world -Z, canvas y -> world +X (R149 assumed x -> +X: only
+--  one label per strip was inside its canvas, every letter a quarter turn off, the spacebar name along the track) so every label sits at (row
+--  centre, key centre) of the real canvas and turns 270 degrees; strips / pressed-key letters follow the key top MEASURED from the keycap template
+--  (a taller-than-configured mesh); the old strip checks were rewritten on that frame (section 1d adds: every key of a bound row has a visible
+--  label over it, in every biome, both half rows, with the plain-block fallback too, and the spacebar name across the track).
 -- ADDED by the R149 performance patch (docs/proposals/R149/review_part1.md, fix round A): the camera clamp (1b), the hide-last start-up (1c, 15), no
 -- turn burst on a phone with the measured worst frame (5c), unchanged letter values / single key Transparency writes / parked strips off (4c), the
 -- stripped template (before 'parts:'), the connection list (11b), the swapPass fallback (13b), the failing start-up / frame step (15).
@@ -48,15 +55,18 @@ local F=C.FloorTop
 local KW=K.KeySize()
 check(near(C.Pitch,180/22)and C.FieldWidth==180 and C.Gap==.5 and C.SpaceRows==1,'config: 22 keys across the 180 floor (pitch 8.18, 2.7x R148), grout gap .5, the spacebar is one row')
 check(near(KW,7.6818,1e-3)and near(C.KeyY/KW,6.39/10.55,1e-6),'keys are 7.68 studs square and keep the R142Keycap proportions (height / width = 6.39 / 10.55: KeyY '..string.format('%.2f',C.KeyY)..')')
-check(near(K.KeyTop(0),F+.55)and near(K.KeyTop(1),F+.08)and near(K.BedTop(),F-1.6),'heights: resting tops 0.55 above the floor, pressed 0.08 above it, the grout bed 1.6 below it')
-check(near(K.KeyTop(0)-K.BedTop(),2.15)and K.KeyTop(0)-K.BedTop()>=1.5 and K.KeyTop(0)-K.BedTop()<=3,'a resting key stands 2.15 studs proud of the bed (tall sides, owner: "not tall enough")')
+check(near(K.KeyTop(0),F+1.2)and near(K.KeyTop(1),F+.05)and near(K.BedTop(),F-1.6),'heights: resting tops 1.2 above the floor, pressed .05 above it (feet stand at the floor top), the grout bed 1.6 below it')
+check(near(K.PressTravel(),1.15)and K.PressTravel()>=1 and K.PressTravel()<=1.2,'a press travels 1.15 studs (owner R151: "it doesn\'t push down far enough"; the reference game ~1 - 1.2; was .47)')
+check(near(K.KeyTop(0)-K.BedTop(),2.8)and near(K.KeyTop(1)-K.BedTop(),1.65)and K.KeyTop(1)-K.BedTop()>=1.5,'a resting key stands 2.8 studs proud of the bed, a pressed one still 1.65 (it stays a visible key, not a hole)')
 check(K.KeyTop(0)-C.KeyY<K.BedTop()-1 and K.KeyTop(1.15)-C.KeyY<K.BedTop()-1,'a key\'s bottom stays well under the bed even pressed past its travel (its foot never shows)')
-check(C.PressSeconds==.07 and C.ReleaseSeconds==.16 and near(C.HoleLift,C.RestRise+.04),'press .07 s, release .16 s; hole parts are lifted onto the resting key tops (+.04: the rim stays over the letter strips)')
+check(C.PressSeconds==.06 and C.ReleaseSeconds==.2 and near(C.HoleLift,C.RestRise+.06),'press .06 s (snappy), release .2 s with a back-out spring; hole parts are lifted onto the resting key tops (+.06: the rim stays over the letter strips)')
+check(near(C.PressLead,.06)and C.PressLeadMax>=3 and C.PressLeadMax<=6,'the runner\'s footprint reaches .06 s of his velocity ahead, at most '..C.PressLeadMax..' studs')
 check(C.ClickSoundId==113108830240353 and C.ClickSoundIds[1]==C.ClickSoundId and near(C.ClickGap,1/12)and C.KeeperPitch>=.9 and C.KeeperPitch<1 and C.ClickVoices>=10,'clicks: one recording, at most one click per 1/12 s per presser, keepers a touch deeper (0.94), a pool of '..C.ClickVoices..' voices')
 local pitchOk=#C.ClickPitches>=3;for _,p in ipairs(C.ClickPitches)do if p<.98 or p>1.02 then pitchOk=false end end
 check(pitchOk,'click pitch varies only a little: 0.98 .. 1.02')
 check(C.ClickRollOffMin>=10 and C.ClickRollOffMax==C.ClickRange and C.ClickVolume==.8,'one volume rule for every click: volume .8 with a 3D roll-off to the 90-stud range')
 local LT=C.Legend
+check(LT.Margin>=.03 and LT.Margin<=.05 and LT.Rotation==270 and LT.MaxExtra>=1,'letter strips stand .03 - .05 above the measured resting key top (Margin '..LT.Margin..'), labels turn 270 degrees')
 check(LT.TextHeight*LT.PixelsPerStud<=100 and LT.TextHeight>=4 and LT.KeysPerStrip==11,'letters 4.6 studs tall (TextSize '..LT.TextHeight*LT.PixelsPerStud..' <= 100), 11 per SurfaceGui (half a row)')
 
 local g=K.Geometry(ATTR,0)
@@ -218,7 +228,7 @@ check(seqOk,'every row reads as a contiguous stretch of its keyboard row, left -
 check(K.Ease.QuadOut(0)==0 and K.Ease.QuadOut(1)==1 and K.Ease.QuadOut(.5)==.75 and K.Ease.Linear(.3)==.3,'ease: quad-out and linear')
 local peak=0;for i=0,100 do peak=max(peak,K.Ease.BackOut(i/100))end
 check(near(K.Ease.BackOut(0),0)and near(K.Ease.BackOut(1),1)and peak>1.05 and peak<1.2,'ease: back-out overshoots a little and settles at 1 (peak '..string.format('%.3f',peak)..')')
-check(near(K.KeyCenterY(0),F+.55-C.KeyY/2),'KeyCenterY = resting top - half the key height')
+check(near(K.KeyCenterY(0),F+1.2-C.KeyY/2),'KeyCenterY = resting top - half the key height')
 check(K.KeeperFootprint(2,2)==1.5 and K.KeeperFootprint(10,12)==3 and K.KeeperFootprint(60,80)==6,'keeper footprint = clamp(0.3 * min extent, 1.5, 6)')
 local segs=K.Segments(g.Z0,g.KeyEndZ,1024);local contiguous=true;local total=0
 for i,s in ipairs(segs)do total+=s.Length;if s.Length>1024+1e-9 or(i>1 and not near(s.Z0,segs[i-1].Z1))then contiguous=false end end
@@ -263,6 +273,25 @@ do
  local slow=K.NewCadence(1/12);local ns=0;for i=0,9 do if K.Allow(slow,i*.3)then ns+=1 end end
  check(ns==10,'a runner pressing a new key every 0.3 s gets every click (no drop-outs below the cadence)')
  check(K.ClickPitch(3,5)==C.KeeperPitch and K.ClickPitch(1,1)==C.ClickPitches[1]and K.ClickPitch(2,#C.ClickPitches+1)==C.ClickPitches[1],'click pitch: players cycle the narrow band, keepers use their pitch')
+end
+-- R151: the Top-face SurfaceGui frame (canvas x -> world -Z, canvas y -> world +X; measured from the owner's live screenshots of R149) and the measured key top
+do
+ local cw,ch=K.TopCanvas(90,8.18,16)
+ check(near(cw,8.18*16)and near(ch,90*16),'K.TopCanvas: a Top-face canvas is (Size.Z x Size.X) * PixelsPerStud: a 90 x 8.18 strip is 131 x 1440 px, not 1440 x 131')
+ local px,py=K.TopPoint(10,100,90,8.18,16,10-45+4.09,100)
+ check(near(px,4.09*16,1e-6)and near(py,4.09*16,1e-6),'K.TopPoint: the key centre at the strip\'s -X end is canvas (65, 65): x = half the row depth, y = half a key from the top')
+ px,py=K.TopPoint(10,100,90,8.18,16,10+45-4.09,100)
+ check(near(px,4.09*16,1e-6)and near(py,(90-4.09)*16,1e-6),'...and at its +X end canvas y runs to 1374 (a label there is inside a 1440 px tall canvas, but was far outside a 131 px wide one)')
+ local wx,wz=K.TopWorld(10,100,90,8.18,16,px,py);check(near(wx,10+45-4.09,1e-9)and near(wz,100,1e-9),'K.TopWorld is the inverse of K.TopPoint')
+ local rx,rz=K.TopReading(0);local ux,uz=K.TopUp(0)
+ check(near(rx,0,1e-9)and near(rz,-1,1e-9)and near(ux,-1,1e-9)and near(uz,0,1e-9),'an unrotated label reads toward -Z with its up toward -X (the owner saw the spacebar name running along the track)')
+ rx,rz=K.TopReading(C.Legend.Rotation);ux,uz=K.TopUp(C.Legend.Rotation)
+ check(C.Legend.Rotation==270 and near(rx,-1,1e-9)and near(rz,0,1e-9)and near(ux,0,1e-9)and near(uz,1,1e-9),'Legend.Rotation 270: reads toward -X (a runner heading +Z has +X on his left, so this is left -> right) with its up toward +Z (upright)')
+ -- the measured key top
+ check(K.TopExtra(C.KeyY,C.KeyY,0,5,{})==0 and K.TopExtra(C.KeyY,nil,nil,nil,nil)==0 and K.TopExtra(C.KeyY,0/0,0/0,5,{0/0})==0,'TopExtra: nothing measured, or nothing above the configured top = 0 (NaN / nil are safe)')
+ check(near(K.TopExtra(C.KeyY,C.KeyY+.6,0,5,{}),.3,1e-9)and near(K.TopExtra(C.KeyY,C.KeyY,.25,5,{}),.25,1e-9)and near(K.TopExtra(C.KeyY,C.KeyY,0,5,{5.1,5.35,4.9}),.35,1e-9),'TopExtra: a bigger Size.Y reading (half the difference), a mesh offset, a ray hit above the configured top: the biggest wins')
+ check(K.TopExtra(C.KeyY,C.KeyY,0,5,{4.8,4.5})==0 and K.TopExtra(C.KeyY,C.KeyY,0,5,{5.003})==0,'TopExtra: hits below the configured top (a dished top, the middle of a dome) or within .005 add nothing')
+ check(K.TopExtra(C.KeyY,C.KeyY,0,5,{9})==C.Legend.MaxExtra and C.Legend.MaxExtra==1.5,'TopExtra: capped at Legend.MaxExtra (1.5): a bad measurement cannot fling the letters away')
 end
 end
 -- ======================================================================================================================
@@ -413,6 +442,58 @@ local function coverage(ra,rb,label)
 end
 local function windowRows(z,tier)local fr=max(1,min(g.Rows,g.RowOfZ(z)));local a,b=K.KeyWindow(g,tier or 3,fr);return a,b,fr end
 
+-- The Top-face SurfaceGui frame on Roblox, written out here independently of the module (R151, measured from the owner's live screenshots of R149:
+-- the "S" and "V" he saw were the labels of column 11 = the one label per strip inside its canvas, and the spacebar name ran along the track):
+-- canvas x -> world -Z, canvas y -> world +X, so a Top-face canvas in PixelsPerStud mode is (Size.Z x Size.X) * pps. An unrotated label reads along
+-- -Z with its up toward -X; GuiObject.Rotation turns it clockwise.
+local function canvasOf(part,pps)return part.Size.Z*pps,part.Size.X*pps end
+local function worldOf(part,px,py,pps)local p=part.CFrame.Position;return p.X-part.Size.X/2+py/pps,p.Z+part.Size.Z/2-px/pps end
+local function readsAlong(deg)local r=math.rad(deg);return math.sin(r),-math.cos(r)end
+local function upOf(deg)local r=math.rad(deg);return -math.cos(r),-math.sin(r)end
+-- R151: every key of every row that carries letters has exactly ONE visible label over it: the label lies completely inside its strip's canvas, sits on
+-- the key's centre, reads upright (toward -X, up toward +Z), is that key's legend, and its strip's top stands above the key's top by at least
+-- `extra` (the measured excess of the mesh over the configured top) + Legend.Margin. Returns the numbers for the message.
+local function labelAudit(legendFolder,keysFolder,extra,label,minRows)
+ local keyTop={}
+ for _,p in ipairs(keysFolder:GetChildren())do
+  if p.Name=='Key'and p.Transparency==0 then
+   local pos=p.CFrame.Position;keyTop[g.RowOfZ(pos.Z)*64+g.ColOfX(pos.X)]=pos.Y+p.Size.Y/2 -- the key's visible top (a mesh key's centre carries TopOffset)
+  end
+ end
+ local perRow,bad,labels,off,stripsN={}, {pos=0,canvas=0,text=0,upright=0,above=0,nokey=0,gui=0},0,0,0
+ for _,st in ipairs(legendFolder:GetChildren())do
+  if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 then
+   stripsN+=1
+   local gui=st:FindFirstChildWhichIsA('SurfaceGui');local cw,ch=canvasOf(st,LT.PixelsPerStud)
+   if gui.Enabled==false or gui.Face~=R.Enum.NormalId.Top or gui.AlwaysOnTop~=false or gui.LightInfluence~=0 then bad.gui+=1 end
+   for _,l in ipairs(gui:GetChildren())do
+    if l._class=='TextLabel'then
+     if not l.Visible then off+=1 else
+      labels+=1
+      local px,py=l.Position.X.Offset,l.Position.Y.Offset;local hw,hh=l.Size.X.Offset/2,l.Size.Y.Offset/2
+      local wx,wz=worldOf(st,px,py,LT.PixelsPerStud);local row,col=g.RowOfZ(wz),g.ColOfX(wx);local cxk,czk=g.CellCenter(row,col)
+      perRow[row]=perRow[row]or{};perRow[row][col]=(perRow[row][col]or 0)+1
+      if px-hw<-1e-6 or px+hw>cw+1e-6 or py-hh<-1e-6 or py+hh>ch+1e-6 then bad.canvas+=1 end
+      if not cxk or abs(cxk-wx)>1e-6 or abs(czk-wz)>1e-6 then bad.pos+=1 end
+      if l.Text~=K.Legend(row,col)then bad.text+=1 end
+      local rx,rz=readsAlong(l.Rotation);local ux,uz=upOf(l.Rotation)
+      if not(near(rx,-1,1e-9)and near(rz,0,1e-9)and near(ux,0,1e-9)and near(uz,1,1e-9))then bad.upright+=1 end
+      local kt=keyTop[row*64+col]
+      if not kt then bad.nokey+=1 elseif st.CFrame.Position.Y+st.Size.Y/2<kt+extra+LT.Margin-1e-6 then bad.above+=1 end
+     end
+    end
+   end
+  end
+ end
+ local rowsN,missing=0,0
+ for _,cols in pairs(perRow)do rowsN+=1;for c=1,22 do if cols[c]~=1 then missing+=1 end end end
+ local ok=rowsN>=(minRows or 15)and missing==0 and labels==rowsN*22 and off==0
+ for _,v in pairs(bad)do if v~=0 then ok=false end end
+ check(ok,('%s: every key of %d letter rows (%d strips) has exactly one visible label over it (%d labels, %d missing / doubled, %d hidden; off-canvas %d, off-centre %d, wrong legend %d, not upright %d, not above the key top %d, no key %d, gui settings %d)'):format(
+  label,rowsN,stripsN,labels,missing,off,bad.canvas,bad.pos,bad.text,bad.upright,bad.above,bad.nokey,bad.gui))
+ return rowsN,labels
+end
+
 -- 1. what was built
 do
 local badParts,partCount=0,0
@@ -454,7 +535,7 @@ for _,p in ipairs(keys)do local pos=p.CFrame.Position;local col,row=g.ColOfX(pos
  if abs(p.Color.R-want.R)>1e-9 or abs(p.Color.G-want.G)>1e-9 or abs(p.Color.B-want.B)>1e-9 then colourOk=false end end
 check(colourOk,'every key has its cell\'s biome colour (K.CellColor), near and far alike')
 local restOk=true;for _,p in ipairs(keys)do if not near(top(p),K.KeyTop(0),1e-6)then restOk=false end end
-check(restOk,'every resting key top is at the floor + 0.55 (near and far alike)')
+check(restOk,'every resting key top is at the floor + 1.2 (near and far alike)')
 -- effects authored at floor level (Storm lightning rings, shovel dirt: test_keyboard_fx.luau) read the key tops through KeyboardSurface149
 do
  local KS=W.module('KeyboardSurface149');local kp=keys[#keys//2];local kpx,kpz=kp.CFrame.Position.X,kp.CFrame.Position.Z
@@ -463,7 +544,7 @@ do
  local x0,x1,z0,z1=KS.Rect()
  check(near(x0,g.CenterX-g.HalfWidth)and near(x1,g.CenterX+g.HalfWidth)and near(z0,g.Z0)and near(z1,g.KeyEndZ),'effects: the helper covers the rectangle the keys cover (x '..tostring(x0)..' .. '..tostring(x1)..', z '..tostring(z0)..' .. '..tostring(z1)..')')
  check(KS.Lift(x1+1,kpz,F)==0 and KS.Lift(kpx,g.KeyEndZ+5,F)==0 and KS.Lift(kpx,g.Z0-5,F)==0 and KS.Lift(kpx,kpz,K.KeyTop(0)+1)==0,'effects: no lift beside the keys, in the arena, before the first biome, or for a surface already above the key tops')
- check(near(KS.Lift(kpx,kpz,F),C.HoleLift-.04),'effects: the same rise the shovel holes are lifted by (HoleLift - .04: the authored clearance and the lift that keeps the hole rim over the letters)')
+ check(near(KS.Lift(kpx,kpz,F),C.HoleLift-.06),'effects: the same rise the shovel holes are lifted by (HoleLift - .06: the authored clearance and the lift that keeps the hole rim over the letters)')
 end
 -- bed and rims: each biome's grout colour, sunken
 local bedParts,bedLen,bedOk,rimOk,rims,ends={},0,true,true,0,0
@@ -492,7 +573,7 @@ end
 local nearFloor=0;local list={};for y in pairs(planes)do list[#list+1]=y;if abs(y-F)<.015 then nearFloor+=1 end end
 table.sort(list)
 check(nearFloor==0 and #list>=3,'no visible keyboard surface lies within 0.015 of the floor plane (planes: '..table.concat(list,', ')..')')
-check(planes[floor(K.KeyTop(0)*1000+.5)/1000]and planes[floor(K.BedTop()*1000+.5)/1000]and K.KeyTop(0)-F>=.5 and F-K.BedTop()>=1.5,'key tops 0.55 above and the bed 1.6 below the floor: nothing is coplanar with it')
+check(planes[floor(K.KeyTop(0)*1000+.5)/1000]and planes[floor(K.BedTop()*1000+.5)/1000]and K.KeyTop(0)-F>=1 and F-K.BedTop()>=1.5,'key tops 1.2 above and the bed 1.6 below the floor: nothing is coplanar with it')
 -- neighbouring keys never overlap (no shared faces): gaps of >= 0.45 between key boxes in both directions
 local gapOk=true;local z1,z2=cz(BR),cz(BR+1)
 local kA,kB,kC=keyAt(BR,5),keyAt(BR,6),keyAt(BR+1,5)
@@ -503,36 +584,45 @@ check(gapOk,'neighbouring keys are 0.5 apart: no overlapping or touching faces')
 local strips={};for _,p in ipairs(legF:GetChildren())do if p.Name=='LegendStrip'and p.CFrame.Position.Y>0 then strips[#strips+1]=p end end
 local la,lb=K.LegendWindow(g,3,fr);local letterRows=0;for r=la,lb do if not g.BarOfRow[r]then letterRows+=1 end end
 check(#strips==2*letterRows,('letters: two strips (11 letters each) per row from %d behind to %d ahead (%d strips for %d rows)'):format(fr-la,lb-fr,#strips,letterRows))
-local stripOk,orderOk,inkOk2,posOk,yOk=true,true,true,true,true
+local stripOk,orderOk,inkOk2,posOk,yOk,inCanvas,faceOk,shownN=true,true,true,true,true,true,true,0
 local rowsSeen={}
 for _,st in ipairs(strips)do
  local gui=st:FindFirstChildWhichIsA('SurfaceGui');local pos=st.CFrame.Position
+ -- the SurfaceGui settings of a strip: Top face, PixelsPerStud sizing at 16, no lighting, never on top of everything, a render limit, on while bound
  if not gui or gui.Face~=R.Enum.NormalId.Top or gui.SizingMode~=R.Enum.SurfaceGuiSizingMode.PixelsPerStud or gui.PixelsPerStud~=LT.PixelsPerStud or st.Transparency~=1 then stripOk=false end
- if not near(pos.Y+st.Size.Y/2,K.KeyTop(0)+LT.Lift,1e-6)then yOk=false end
+ if not gui or gui.LightInfluence~=0 or gui.AlwaysOnTop~=false or gui.MaxDistance~=LT.MaxDistance or gui.Enabled==false then faceOk=false end
+ if not near(pos.Y+st.Size.Y/2,K.KeyTop(0)+LT.Margin,1e-6)then yOk=false end
  local row=g.RowOfZ(pos.Z);rowsSeen[row]=(rowsSeen[row]or 0)+1
- local xMin=pos.X-st.Size.X/2
+ local cw,ch=canvasOf(st,LT.PixelsPerStud)
  for _,l in ipairs(gui:GetChildren())do
   if l._class=='TextLabel'and l.Visible then
-   -- canvas x -> world +X, canvas y -> world +Z (Top face, up toward -Z)
-   local wx=xMin+l.Position.X.Offset/LT.PixelsPerStud;local wz=pos.Z-st.Size.Z/2+l.Position.Y.Offset/LT.PixelsPerStud
+   shownN+=1
+   local px,py=l.Position.X.Offset,l.Position.Y.Offset;local hw,hh=l.Size.X.Offset/2,l.Size.Y.Offset/2
+   -- the label's whole box lies inside the canvas (a label outside the canvas is not drawn: R149's bug)
+   if px-hw<-1e-6 or px+hw>cw+1e-6 or py-hh<-1e-6 or py+hh>ch+1e-6 then inCanvas=false end
+   local wx,wz=worldOf(st,px,py,LT.PixelsPerStud)
    local col=g.ColOfX(wx);local x,z=g.CellCenter(row,col)
    if abs(x-wx)>1e-6 or abs(z-wz)>1e-6 then posOk=false end
-   if l.Text~=K.Legend(row,col)or l.Rotation~=180 or l.AnchorPoint.X~=.5 or l.TextSize~=floor(LT.TextHeight*LT.PixelsPerStud+.5)then orderOk=false end
+   local rx,rz=readsAlong(l.Rotation);local ux,uz=upOf(l.Rotation)
+   if l.Text~=K.Legend(row,col)or not(near(rx,-1,1e-9)and near(rz,0,1e-9)and near(ux,0,1e-9)and near(uz,1,1e-9))or l.AnchorPoint.X~=.5 or l.TextSize~=floor(LT.TextHeight*LT.PixelsPerStud+.5)then orderOk=false end
    local ink=K.ShadeInk(g.RowStage[row],K.ShadeIndex(g.RowStage[row],row,col,1))
    if abs(l.TextColor3.R*255-ink[1])>.5 or abs(l.TextColor3.G*255-ink[2])>.5 then inkOk2=false end
   end
  end
 end
-check(stripOk and yOk,'strips: invisible parts 0.03 above the resting key tops, a Top-face SurfaceGui at 16 px / stud each')
-check(posOk,'every letter sits exactly on its key\'s centre')
-check(orderOk,'every letter is its key\'s legend, turned 180 degrees about its centre (upright for a runner facing +Z), 4.6 studs tall')
+check(stripOk and yOk,'strips: invisible parts whose top stands .04 above the resting key tops, a Top-face SurfaceGui at 16 px / stud each')
+check(faceOk,'strip SurfaceGuis: LightInfluence 0, AlwaysOnTop false (the keys in front hide the letters behind them), MaxDistance 420, Enabled while bound')
+check(shownN==#strips*11,'every label of every bound strip is visible ('..shownN..' of '..(#strips*11)..')')
+check(inCanvas,'every label lies completely inside its strip\'s Top-face canvas (depth x width in pixels: x toward -Z, y toward +X): none is left off the canvas')
+check(posOk,'every letter sits exactly on its key\'s centre (canvas x = half the row depth, canvas y = the key\'s distance from the strip\'s -X end)')
+check(orderOk,'every letter is its key\'s legend, turned 270 degrees about its centre (reads toward -X = a +Z runner\'s right, its up toward +Z), 4.6 studs tall')
 check(inkOk2,'every letter has its key shade\'s ink')
 -- a runner reads his row left -> right in keyboard order
 local function lettersInRow(row)
  local out={}
  for _,st in ipairs(strips)do if g.RowOfZ(st.CFrame.Position.Z)==row then
-  local gui=st:FindFirstChildWhichIsA('SurfaceGui');local xMin=st.CFrame.Position.X-st.Size.X/2
-  for _,l in ipairs(gui:GetChildren())do if l._class=='TextLabel'and l.Visible then out[#out+1]={X=xMin+l.Position.X.Offset/LT.PixelsPerStud,T=l.Text}end end
+  local gui=st:FindFirstChildWhichIsA('SurfaceGui')
+  for _,l in ipairs(gui:GetChildren())do if l._class=='TextLabel'and l.Visible then out[#out+1]={X=(worldOf(st,l.Position.X.Offset,l.Position.Y.Offset,LT.PixelsPerStud)),T=l.Text}end end
  end end
  table.sort(out,function(a,b)return a.X>b.X end) -- +X is a +Z runner's left: descending x = left -> right
  local t={};for _,e in ipairs(out)do t[#t+1]=e.T end;return table.concat(t)
@@ -552,7 +642,19 @@ local bar3=barPart(3)
 check(bar3~=nil and near(bar3.Size.X,180-C.Gap,.001)and bar3.Transparency==0,'the Desert spacebar spans the whole floor (180 - gap)')
 check(bar3 and near(bar3.CFrame.Position.Z-bar3.Size.Z/2-C.Gap/2,530,1e-6)and near(bar3.Size.Z+C.Gap,g.Segs[3].RowPitch,1e-6)and near(bar3.Size.Y,C.KeyY),'...parallel to the entrance: it starts exactly at z 530, one row deep, as tall as the keys')
 local bgui=bar3 and bar3:FindFirstChildWhichIsA('SurfaceGui');local blabel=bgui and bgui:FindFirstChildWhichIsA('TextLabel',true)
-check(blabel and blabel.Text=='DESERT'and blabel.Rotation==180 and blabel.AnchorPoint.X==.5 and bgui.Face==R.Enum.NormalId.Top and bgui.Enabled~=false,'its label reads DESERT, Top face turned 180 degrees = upright for a runner arriving at the biome')
+check(blabel and blabel.Text=='DESERT'and blabel.Rotation==270 and blabel.AnchorPoint.X==.5 and bgui.Face==R.Enum.NormalId.Top and bgui.Enabled~=false,'its label reads DESERT on the Top face, turned 270 degrees like every letter')
+do -- R151 (owner: "the forest, desert named tiles must also be parallel to the safe zone and horizontal"): the name runs ACROSS the track
+ local bpps=C.SpacebarPixelsPerStud;local cw,ch=canvasOf(bar3,bpps)
+ local lw=blabel.Size.X.Scale*cw+blabel.Size.X.Offset;local lh=blabel.Size.Y.Scale*ch+blabel.Size.Y.Offset
+ local rx,rz=readsAlong(blabel.Rotation);local ux,uz=upOf(blabel.Rotation)
+ check(near(rx,-1,1e-9)and near(rz,0,1e-9),'the spacebar name reads along X (across the track, parallel to the SAFE ZONE line), toward -X = a runner heading +Z\'s right')
+ check(near(ux,0,1e-9)and near(uz,1,1e-9),'...with its up toward +Z: upright for a runner approaching from the start')
+ -- the label\'s own width runs along the canvas\' long side (world X after the turn), its height along the short one (world Z): the canvas is depth x width
+ check(near(cw,bar3.Size.Z*bpps)and near(ch,bar3.Size.X*bpps)and ch>cw*10,'the spacebar canvas is '..string.format('%.0f x %.0f',cw,ch)..' px: 7.7 studs deep, 179.5 wide')
+ check(lw>=ch*.8 and lw<=ch and lh>=cw*.8 and lh<=cw,('the label fills the bar after the turn: %.0f px along the bar (of %.0f), %.0f px across it (of %.0f)'):format(lw,ch,lh,cw))
+ check(blabel.TextScaled==true and near(blabel.Position.X.Scale,.5)and near(blabel.Position.Y.Scale,.5)and blabel.AnchorPoint.Y==.5,'...centred on the bar, TextScaled to the bar\'s depth')
+ local cx0,cz0=worldOf(bar3,cw/2,ch/2,bpps);check(near(cx0,bar3.CFrame.Position.X,1e-6)and near(cz0,bar3.CFrame.Position.Z,1e-6),'the canvas centre is the bar\'s centre (the name sits in the middle of the track)')
+end
 check(bar3 and abs(bar3.Color.R*255-K.Cream[1])<.5 and abs(bar3.Color.G*255-K.Cream[2])<.5 and near(top(bar3),K.KeyTop(0),1e-6),'the spacebar is cream at rest height')
 local barsAll=0;for _,p in ipairs(keysF:GetChildren())do if p.Name=='Spacebar'and p.Transparency==0 then barsAll+=1 end end
 check(barsAll==7,'all seven spacebars are always there (biome names readable on arrival from any distance)')
@@ -604,19 +706,19 @@ do
  local bound=W.rsBound['KeyboardCameraFloor']
  check(bound~=nil and bound.Prio==R.Enum.RenderPriority.Camera.Value+1,'the camera clamp is a render step bound right after the camera module (priority Camera + 1) once the keyboard is built')
  local MINY=K.KeyTop(0)+C.CameraAbove
- check(near(C.CameraAbove,.6)and near(MINY,5.15),'the clamp keeps the camera at least 0.6 above the resting key tops (5.15)')
+ check(near(C.CameraAbove,.6)and near(MINY,5.8),'the clamp keeps the camera at least 0.6 above the resting key tops (5.8)')
  camera.CameraType=CAM.Custom;camera.Focus=nil
  local function aim(x,y,z)camera.CFrame=R.CFrame.lookAt(V3(x,y,z),V3(x+7,y+30,z+60))end
  local function sample(x,y,z,focus)aim(x,y,z);camera.Focus=focus;local look=camera.CFrame.LookVector;frames(1);local p=camera.CFrame.Position;return p,look,camera.CFrame.LookVector end
  local zk=cz(BR)
  local p,l0,l1=sample(0,2.5,zk,CF(0,10,zk+10))
- check(near(p.Y,MINY,1e-9)and near(p.X,0,1e-9)and near(p.Z,zk,1e-9),'a camera that sank between the keys (y 2.5) is lifted to 0.6 above the key tops (5.15), x / z untouched')
+ check(near(p.Y,MINY,1e-9)and near(p.X,0,1e-9)and near(p.Z,zk,1e-9),'a camera that sank between the keys (y 2.5) is lifted to 0.6 above the key tops (5.8), x / z untouched')
  check(near(l1.X,l0.X,1e-9)and near(l1.Y,l0.Y,1e-9)and near(l1.Z,l0.Z,1e-9),'...by translation only: its look direction is the same')
  p=sample(30,.5,zk,CF(30,10,zk+10))
  check(near(p.Y,MINY,1e-9),'a camera under the bed (y 0.5, looking up at its underside) is lifted too')
  resetAll();p=sample(0,MINY,zk,CF(0,12,zk));local atRest=writes.cam
  p=sample(0,MINY+.01,zk,CF(0,12,zk));p=sample(0,10,zk,CF(0,12,zk));p=sample(0,20,zk,CF(0,22,zk))
- check(atRest==1 and writes.cam==4,'a camera at or above 5.15 is never written (only the test\'s own CFrame writes: '..writes.cam..')')
+ check(atRest==1 and writes.cam==4,'a camera at or above 5.8 is never written (only the test\'s own CFrame writes: '..writes.cam..')')
  check(sample(0,3,5900,CF(0,12,5890)).Y==MINY or near(sample(0,3,5900,CF(0,12,5890)).Y,MINY,1e-9),'the arena copy (z 5860 .. 5980, no keys) has the same floor for the camera')
  check(near(sample(200,2,zk,CF(200,12,zk)).Y,2,1e-9)and near(sample(-91.5,2,zk,CF(0,12,zk)).Y,MINY,1e-9),'beside the field (x 200) the camera is left alone; 1.5 studs off the edge it is still lifted')
  check(near(sample(0,2,-300,CF(0,12,-300)).Y,2,1e-9)and near(sample(0,2,6100,CF(0,12,6100)).Y,2,1e-9),'before the first biome (the lobby) and past the arena the camera is left alone')
@@ -637,25 +739,54 @@ end
 -- 1c. the real floor is hidden last (finding 9): at the end of start(), after everything that can fail, not before the keys / bed / sounds exist
 check(hideSeen~=nil and hideSeen.Bed>0 and hideSeen.Spacebar==7 and hideSeen.KeyClick==C.ClickVoices,('the real floor is hidden at the very end of start(): the bed (%d pieces), 7 spacebars and %d click voices already existed'):format(hideSeen and hideSeen.Bed or 0,hideSeen and hideSeen.KeyClick or 0))
 
+-- 1d. R151 (owner: "the words are missing, they only appear if under my foot"): in EVERY biome, at the start of its keys and in its middle, every key of every
+-- row that carries letters has a visible label over it, in both half rows (columns 1 .. 11 and 12 .. 22), not just the one column that happened to sit
+-- inside the canvas; and the mesh keys' tops are where the strips expect them.
+do
+ for _,seg in ipairs(g.Segs)do
+  for _,off in ipairs({22,seg.Rows//2})do
+   local z=select(1,g.RowZ(seg.FirstRow+min(off,seg.Rows-1)))+1
+   put(cx(11),nil,z);frames(45)
+   labelAudit(legF,keysF,0,seg.Name..' (row '..(seg.FirstRow+min(off,seg.Rows-1))..')')
+  end
+ end
+ put(cx(11),nil,cz(BR));frames(45)
+ -- the tiers: fewer rows, the same completeness (tier 1: a phone)
+ fxTier=1;frames(60*4);labelAudit(legF,keysF,0,'tier 1',8);fxTier=3;frames(60*4)
+ -- the key-top measurement is published for Studio's Explorer
+ check(vis:GetAttribute('KeyTopConfigured')==K.KeyTop(0)and vis:GetAttribute('KeyTopExtra')==0 and near(vis:GetAttribute('LegendTop'),K.KeyTop(0)+LT.Margin,1e-9),'the keyboard folder publishes KeyTopConfigured / KeyTopExtra (0: nothing to add for a mesh whose top is the configured one) / LegendTop for Studio\'s Explorer')
+end
+
 -- 2. a runner presses a key and releases it
 local R10,C20=BR,9
 do
 plays={};hum.FloorMaterial=PLASTIC;put(cx(C20),nil,cz(R10));frames(3)
 check(topOf(R10,C20)and topOf(R10,C20)<K.KeyTop(0)-.1,'a key goes down under the runner (mid-press)')
 frames(8)
-check(near(topOf(R10,C20),K.KeyTop(1),1e-6),'...to the pressed height (top = floor + 0.08, got '..tostring(topOf(R10,C20))..')')
+check(near(topOf(R10,C20),K.KeyTop(1),1e-6),'...to the pressed height (top = floor + 0.05: level with his feet, got '..tostring(topOf(R10,C20))..')')
 check(near(topOf(R10,C20+1),K.KeyTop(0),1e-6)and near(topOf(R10+1,C20),K.KeyTop(0),1e-6)and near(topOf(R10-1,C20),K.KeyTop(0),1e-6),'its neighbours stay up')
+do -- R151: the press is clearly visible (>= 1 stud of travel) and the feet stay planted
+ local feetY=root.CFrame.Position.Y-C.PlayerRootToFeet
+ check(K.KeyTop(0)-topOf(R10,C20)>=1.1 and K.KeyTop(0)-topOf(R10,C20)<=1.2,'the key travels 1.15 studs under his foot ('..string.format('%.3f',K.KeyTop(0)-topOf(R10,C20))..'; was .47)')
+ check(topOf(R10,C20)>=feetY-1e-9 and topOf(R10,C20)-feetY<=.1,'feet stay planted: the pressed key top is level with the soles (the real floor top, +'..string.format('%.2f',topOf(R10,C20)-feetY)..'), never under them (no hovering) nor above them (no sinking)')
+ check(K.KeyTop(0)-feetY>=1.1,'the keys around him stand 1.2 above his soles at rest: a pressed key is a clear dent in the keyboard')
+end
 check(#plays==1 and plays[1].Id=='rbxassetid://113108830240353','one click played for the one key ('..#plays..')')
 check(plays[1]and plays[1].Speed>=.98 and plays[1].Speed<=1.02 and plays[1].Volume==C.ClickVolume,'own click: pitch within 0.98 .. 1.02, volume .8')
 check(plays[1]and plays[1].Group and plays[1].Group.Name=='GardenEffects','clicks go through the Effects sound group (AudioMixer.Route)')
 check(plays[1]and near(plays[1].Pos.X,cx(C20),.01)and near(plays[1].Pos.Z,cz(R10),.01)and plays[1].Min==C.ClickRollOffMin and plays[1].Max==C.ClickRollOffMax,'the click is played at the key, with the one roll-off rule')
 -- the pressed key carries its letter; the strip's label for it is hidden meanwhile
 local kp=keyAt(R10,C20);local kgui=kp and kp:FindFirstChildWhichIsA('SurfaceGui');local klabel=kgui and kgui:FindFirstChildWhichIsA('TextLabel')
-check(kgui and kgui.Face==R.Enum.NormalId.Top and klabel and klabel.Text==K.Legend(R10,C20)and klabel.Rotation==180 and klabel.TextSize==floor(LT.TextHeight*LT.PixelsPerStud+.5),'a key that is down carries its own letter (same size, upright) while it moves')
+check(kgui and kgui.Face==R.Enum.NormalId.Top and klabel and klabel.Text==K.Legend(R10,C20)and klabel.Rotation==270 and klabel.TextSize==floor(LT.TextHeight*LT.PixelsPerStud+.5),'a key that is down carries its own letter (same size, turned 270 degrees = upright for a +Z runner) while it moves')
 local function stripLabel(row,col)
  for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 and g.RowOfZ(st.CFrame.Position.Z)==row then
-  local gui=st:FindFirstChildWhichIsA('SurfaceGui');local xMin=st.CFrame.Position.X-st.Size.X/2
-  for _,l in ipairs(gui:GetChildren())do if l._class=='TextLabel'and l.Text~=''and g.ColOfX(xMin+l.Position.X.Offset/LT.PixelsPerStud)==col and(xMin+l.Position.X.Offset/LT.PixelsPerStud)<xMin+st.Size.X then return l end end
+  local gui=st:FindFirstChildWhichIsA('SurfaceGui')
+  for _,l in ipairs(gui:GetChildren())do
+   if l._class=='TextLabel'and l.Text~=''then
+    local wx=worldOf(st,l.Position.X.Offset,l.Position.Y.Offset,LT.PixelsPerStud)
+    if g.ColOfX(wx)==col and wx<st.CFrame.Position.X+st.Size.X/2 and wx>st.CFrame.Position.X-st.Size.X/2 then return l end
+   end
+  end
  end end
 end
 local sl=stripLabel(R10,C20)
@@ -687,8 +818,26 @@ check(cornerDown==4 and #plays==1,'standing on a corner presses the 4 keys under
 put(cx(C20)+20,nil,cz(R10))
 local maxTop=0
 for _=1,15 do frames(1);local t=topOf(R10,C20);if t then maxTop=max(maxTop,t)end end
-check(maxTop>K.KeyTop(0)+.01,'release springs a little past rest (back-out, max '..string.format('%.3f',maxTop)..')')
+check(maxTop-K.KeyTop(0)>=.06 and maxTop-K.KeyTop(0)<=.3,'release springs a little past rest (back-out: +'..string.format('%.3f',maxTop-K.KeyTop(0))..' of the 1.15 travel)')
 frames(10);check(near(topOf(R10,C20),K.KeyTop(0),1e-6),'...and settles at rest')
+do -- R151: the key ahead is down when the foot gets there (the footprint covers PressLead seconds of the runner's velocity in front of it)
+ local zEdge=select(2,g.RowZ(R10))
+ local function downRows(v)
+  put(cx(C20)+30,nil,cz(R10));root.AssemblyLinearVelocity=V3(0,0,0);frames(14) -- everything up
+  put(cx(C20),nil,zEdge-1.6);root.AssemblyLinearVelocity=v;frames(12)
+  local t={};for dr=-1,3 do t[dr]=near(topOf(R10+dr,C20),K.KeyTop(1),1e-6)end
+  return t
+ end
+ local still=downRows(V3(0,0,0))
+ check(still[0]and not still[1]and not still[-1],'standing 1.6 studs short of the next row: only his own key is down (the +-1.2 footprint does not reach it)')
+ local fast=downRows(V3(0,0,40))
+ check(fast[0]and fast[1]and not fast[2]and not fast[-1],'running at 40 studs/s (+2.4 studs of lead) the key in front goes down early, the key behind is not extended')
+ local faster=downRows(V3(0,0,1000))
+ check(faster[1]and not faster[2]and not faster[3],'at 1000 studs/s the lead is capped at '..C.PressLeadMax..' studs: no run of keys goes down ahead of him')
+ local side=downRows(V3(300,0,0))
+ check(side[0]and not side[1],'the lead follows the velocity: sideways speed presses the neighbouring column, not the next row')
+ root.AssemblyLinearVelocity=V3(0,0,0);put(cx(C20)+30,nil,cz(R10));frames(14)
+end
 put(cx(C20),nil,cz(R10));frames(10);check(near(topOf(R10,C20),K.KeyTop(1),1e-6),'back on a key: pressed')
 hum.FloorMaterial=AIR;put(cx(C20),F+7,cz(R10));frames(14)
 check(near(topOf(R10,C20),K.KeyTop(0),1e-6),'in the air the key is up (FloorMaterial == Air)')
@@ -1023,13 +1172,13 @@ check(keyAt(HR,HC)~=nil and near(topOf(HR,HC),K.KeyTop(0),1e-6),'a hole leaves i
 check(near(pit1.CFrame.Position.Y,F+.04+C.HoleLift,1e-6)and near(rim1.CFrame.Position.Y,F+.03+C.HoleLift,1e-6),'the hole parts are lifted onto the key tops')
 local rimBottom=rim1.CFrame.Position.Y-.03;local rimTop=rim1.CFrame.Position.Y+.03;local pitTop=pit1.CFrame.Position.Y+.04
 check(rimBottom>=K.KeyTop(0)+.015 and rimTop-K.KeyTop(0)>=.06 and pitTop-K.KeyTop(0)>=.08,'z-fighting: the Rim / Pit tops are 0.08 / 0.10 above the key top (no shared plane)')
-do -- (TrackHoleService: Rim .04 thick at +.02, Pit .08 thick at +.04 above the floor; the letter strips lie at the key top + Legend.Lift)
- local stripTop=K.KeyTop(0)+LT.Lift
- check((F+.02+C.HoleLift+.02)-stripTop>=.05-1e-9 and (F+.04+C.HoleLift+.04)-stripTop>=.08-1e-9,'z-fighting (review part 2): a lifted hole\'s Rim top stands .05 and its Pit top .09 above the letter strips (the Rim was .03 under them at HoleLift .57)')
+do -- (TrackHoleService: Rim .04 thick at +.02, Pit .08 thick at +.04 above the floor; the letter strips' tops lie at the key top + Legend.Margin .04)
+ local stripTop=K.KeyTop(0)+LT.Margin
+ check((F+.02+C.HoleLift+.02)-stripTop>=.05-1e-9 and (F+.04+C.HoleLift+.04)-stripTop>=.08-1e-9,'z-fighting (review part 2): a lifted hole\'s Rim top stands .06 and its Pit top .10 above the letter strips (R151: HoleLift = RestRise + .06 keeps the same clearance over the .04 strips)')
 end
 local sl=nil
 for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 and g.RowOfZ(st.CFrame.Position.Z)==HR then
- for _,l in ipairs(st:FindFirstChildWhichIsA('SurfaceGui'):GetChildren())do if l._class=='TextLabel'and g.ColOfX(st.CFrame.Position.X-st.Size.X/2+l.Position.X.Offset/LT.PixelsPerStud)==HC and l.Text==K.Legend(HR,HC)then sl=l end end end end
+ for _,l in ipairs(st:FindFirstChildWhichIsA('SurfaceGui'):GetChildren())do if l._class=='TextLabel'and g.ColOfX((worldOf(st,l.Position.X.Offset,l.Position.Y.Offset,LT.PixelsPerStud)))==HC and l.Text==K.Legend(HR,HC)then sl=l end end end end
 check(sl and sl.Visible==false,'the letter of the key under a hole is hidden (the hole covers it)')
 plays={};put(hx,nil,hzz);frames(12)
 check(near(topOf(HR,HC),K.KeyTop(0),1e-6)and #plays==0,'stepping on the hole does not press its key (the hole would float above a pressed key)')
@@ -1199,7 +1348,64 @@ do
  local visM=workspace:FindFirstChild('KeyboardTrackVisuals');local plainM,meshM=0,0
  for _,p in ipairs(visM.Keys:GetChildren())do if p.Name=='Key'and p.Transparency==0 then if p._class=='Part'and near(p.Size.X,KW)and near(p.Size.Y,C.KeyY)then plainM+=1 else meshM+=1 end end end
  check(plainM>2500 and meshM==0,'UseKeycapMesh = false: every key is the same plain block ('..plainM..'), the template is not used')
+ -- R151: the block keys' letters too: a block's top is exactly the configured top, every key of the bound rows has its label over it
+ hum.FloorMaterial=AIR;frames(30)
+ labelAudit(visM.Legends,visM.Keys,0,'UseKeycapMesh = false (plain blocks)')
+ check(visM:GetAttribute('KeyTopExtra')==0 and visM:FindFirstChild('KeyProbe')==nil,'plain blocks: no mesh to measure, no probe, KeyTopExtra 0')
+ hum.FloorMaterial=PLASTIC
  scM.Destroying:Fire();frames(2);C.UseKeycapMesh=true;template.Parent=nil
+end
+-- 12c. R151: a keycap mesh whose VISIBLE top stands higher than the configured key top (domed / taller than Size says). A probe key (a clone of the template, parked
+-- far off the track, queryable only for the instant of the rays) measures it; the letter strips and the per-key letters follow, so no letter can end up inside a keycap.
+do
+ template.Parent=RS
+ local sawQueryable,casts=false,0
+ local function scenario(name,want,frames_,setup,afterCheck)
+  setup()
+  local scT=R.new('LocalScript');scT.Name='KeyboardTrack';W.load('KeyboardTrackClient',scT)
+  hum.FloorMaterial=AIR;put(cx(11),nil,cz(BR));frames(frames_)
+  local visT=workspace:FindFirstChild('KeyboardTrackVisuals')
+  check(visT~=nil and near(visT:GetAttribute('KeyTopExtra')or-1,want,1e-9)and near(visT:GetAttribute('LegendTop')or-1,K.KeyTop(0)+(visT.Keys:FindFirstChild('Key')and visT.Keys.Key._class=='MeshPart'and C.TopOffset or 0)+want+LT.Margin,1e-9),('%s: the measured excess is %.2f (KeyTopExtra %s, LegendTop %s)'):format(name,want,tostring(visT and visT:GetAttribute('KeyTopExtra')),tostring(visT and visT:GetAttribute('LegendTop'))))
+  check(visT:FindFirstChild('KeyProbe')==nil,name..': the probe key is gone once measured')
+  labelAudit(visT.Legends,visT.Keys,want,name)
+  if afterCheck then afterCheck(visT)end
+  scT.Destroying:Fire();frames(2)
+  workspace.Raycast=nil
+  for _,d in ipairs(template:GetChildren())do if d._class=='SpecialMesh'then d:Destroy()end end
+ end
+ local function dome(extraCentre,extraEdge,instanceOverride)
+  return function(_,origin,dir,params)
+   casts+=1
+   local probe=params.FilterDescendantsInstances[1]
+   if probe.CanQuery==true then sawQueryable=true end
+   local pos=probe.CFrame.Position
+   local topCfg=pos.Y+probe.Size.Y/2
+   local centre=abs(origin.X-pos.X)<1e-6 and abs(origin.Z-pos.Z)<1e-6
+   return{Instance=instanceOverride or probe,Position=V3(origin.X,topCfg+(centre and extraCentre or extraEdge),origin.Z)}
+  end
+ end
+ scenario('domed mesh (rays hit .3 above the configured top in the middle, .1 at the edges)',.3,90,function()workspace.Raycast=dome(.3,.1)end,function(visT)
+  check(sawQueryable and casts>=9,'the probe was queryable while it was cast at ('..casts..' rays: centre, edge middles, corners)')
+  -- a pressed key's own letter is offset toward the camera by the same amount, so it clears the mesh too
+  hum.FloorMaterial=PLASTIC;put(cx(9),nil,cz(BR));frames(10)
+  local kp=nil;for _,p in ipairs(visT.Keys:GetChildren())do if p.Name=='Key'and p.Transparency==0 then local pos=p.CFrame.Position;if g.RowOfZ(pos.Z)==BR and g.ColOfX(pos.X)==9 then kp=p end end end
+  local kg=kp and kp:FindFirstChildWhichIsA('SurfaceGui')
+  check(kg and near(kg.ZOffset,.3+LT.Margin,1e-9),'a pressed key\'s own letter is drawn .34 toward the camera (ZOffset), clearing the taller mesh ('..tostring(kg and kg.ZOffset)..')')
+  hum.FloorMaterial=AIR;put(cx(11),nil,cz(BR));frames(20)
+  local tops={};for _,st in ipairs(visT.Legends:GetChildren())do if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 then tops[#tops+1]=st.CFrame.Position.Y+st.Size.Y/2 end end
+  local minTop=1e9;for _,y in ipairs(tops)do minTop=min(minTop,y)end
+  check(#tops>=30 and near(minTop,K.KeyTop(0)+.3+LT.Margin,1e-6),'...and every strip stands .3 + .04 above the configured resting top ('..string.format('%.3f',minTop-K.KeyTop(0))..')')
+ end)
+ scenario('a ray that answers with something else (not the probe)',0,60*4,function()workspace.Raycast=dome(.3,.3,workspace)end)
+ scenario('an absurd hit 4 studs up is capped at Legend.MaxExtra',1.5,90,function()workspace.Raycast=dome(4,4)end)
+ scenario('a rays-only failure (the cast throws)',0,60*4,function()workspace.Raycast=function()error('injected: raycast failed')end end)
+ scenario('a SpecialMesh offset .25 on the template, no raycast API',.25,90,function()
+  workspace.Raycast=nil
+  local sm=R.new('SpecialMesh');sm.Name='Mesh';sm.MeshType=R.Enum.MeshType.FileMesh;sm.Offset=V3(0,.25,0);sm.Scale=V3(1,1,1);sm.Parent=template
+ end)
+ scenario('a mesh whose top is the configured one, no raycast API',0,45,function()workspace.Raycast=nil end)
+ scenario('TopOffset tuned to .1 in Studio (the mesh keys stand .1 higher), no raycast API',0,45,function()workspace.Raycast=nil;C.TopOffset=.1 end,function()C.TopOffset=0 end)
+ template.Parent=nil
 end
 -- 13. the keycap template is still loading: plain blocks meanwhile, swapped in place for keycaps when it arrives (no gap)
 do

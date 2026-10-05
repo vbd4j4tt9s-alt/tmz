@@ -229,7 +229,10 @@ check(preloadCalls==1,'the asset was asked for once, before she needed it')
 -- She swells while it plays, and settles after.
 local big,clearance=0,1e9;for _=1,40 do frames(1);big=math.max(big,body.Size.X);clearance=math.min(clearance,(sign.StudsOffset.Y-sign.Size.Y.Scale/2)-body.Size.X/2)end
 check(big>22*1.03 and big<=22*(1+C.TalkPulse)+1e-6,string.format('a talking pulse while the voice plays: she swells up to %.2f (22 at rest)',big))
-check(near(body.CFrame.Position.Y-body.Size.X/2,5.2+.25,.3),'(she grows upward from the dais, she does not sink into it)')
+do -- R151: she grows upward from the dais (her bottom never sinks into it) and hops by TalkBounce of her size on top of that
+ local bottom=body.CFrame.Position.Y-body.Size.X/2
+ check(bottom>=5.2+.25-.3 and bottom<=5.2+.25+.3+22*C.TalkBounce,'(she grows upward from the dais, she does not sink into it; her bottom only leaves it by the hop: '..string.format('%.2f',bottom-5.2-.25)..' of at most '..string.format('%.2f',22*C.TalkBounce)..')')
+end
 check(clearance>=.3,string.format('while she swells (and bobs) the sign\'s bottom edge stays at least %.2f studs above her top, from any camera angle (camera-space offset)',clearance))
 -- No overlap: more Talks while it plays do not start a second copy.
 server('Open',{VoidPacks=0,Delivered=3});frames(20);server('Open',{VoidPacks=0,Delivered=3})
@@ -444,7 +447,7 @@ check(view.BackgroundTransparency==1 and portrait:FindFirstChild('Dais')~=nil,'(
 do
  local lo,hi=1e9,-1e9;local camAt=pcam.CFrame.Position
  for _=1,240 do frames(1);local y=pball.CFrame.Position.Y;lo=math.min(lo,y);hi=math.max(hi,y)end
- check(hi-lo>.15*C.Portrait.Bob*C.Portrait.Size and hi-lo<=2*C.Portrait.Bob*C.Portrait.Size+1e-6 and pcam.CFrame.Position==camAt,string.format('the portrait ball bobs gently (%.2f of %d studs) and the camera stays put',hi-lo,C.Portrait.Size))
+ check(hi-lo>.15*C.Portrait.Bob*C.Portrait.Size and hi-lo<=2*C.Portrait.Bob*C.Portrait.Size+C.Portrait.Size*(C.TalkBounce+C.TalkPulse/2)+1e-6 and pcam.CFrame.Position==camAt,string.format('the portrait ball bobs gently and bounces with her voice (%.2f of %d studs; R151: the window opening greets, so the hop is in it) and the camera stays put',hi-lo,C.Portrait.Size))
 end
 -- The pictures are the game's 3D packs (ItemPictures into ViewportFrames), the same ones the hotbar uses.
 local exchange=panel.Exchange;local voidHolder,verityHolder,arrow=exchange.VoidPack,exchange.VerityPack,exchange.Arrow

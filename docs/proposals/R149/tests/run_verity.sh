@@ -1,13 +1,15 @@
 #!/bin/sh
-# Usage: sh run_verity.sh [scratch dir] [all|mutate]. R149 Verity checks (greeting cut to "Hello, my name is Verity", lip sync, the 3D portrait in her
-# window, no "EVENT ENDS" line, the owner's /test verityvoice) on the Roblox mock with the REAL scripts of this checkout; needs /opt/luau and python3.
-#  test_verity_voice.luau   - VerityVoice (pure maths: the cut, the fade, the lip sync, the mouth), VerityConfig, the real VerityService (the live cut on
+# Usage: sh run_verity.sh [scratch dir] [all|mutate]. R149 Verity checks (greeting cut to "Hello, my name is Verity", the voice-driven motion, the 3D portrait
+# in her window, no "EVENT ENDS" line, the owner's /test verityvoice) on the Roblox mock with the REAL scripts of this checkout; needs /opt/luau and python3.
+# R151: the mouth oval is gone (she swells AND bounces with the voice level; VerityVoice.Pose) and the cut ends at GreetingEnd 2.35 (was 1.9: "Ver").
+#  test_verity_voice.luau   - VerityVoice (pure maths: the cut, the fade, the voice level, the bounce pose), VerityConfig, the real VerityService (the live cut on
 #                             her model, the 'Greet' message), the real owner command `verityvoice <end> [start]` / `verityvoice` / `verityvoice reset`
 #                             (OwnerUpdateCommands82 and the dispatcher: no @target, every bad input refused), the help row.
-#  test_verity_lipsync.luau - the real VerityClient with a Sound that behaves like the engine's: PlaybackRegion on EVERY greeting, the end of the cut, the
-#                             fade, a refused region, a clip that is not loaded yet, the lip sync in the world (loudness drives a mouth, pauses close it,
-#                             it stops with the sound, a rhythm if no loudness is reported), no work idle / far / ReducedMotion / Effects 0, and the
-#                             window's ViewportFrame portrait with the same lip sync, built when the window opens and destroyed when it closes.
+#  test_verity_lipsync.luau - the real VerityClient with a Sound that behaves like the engine's: PlaybackRegion on EVERY greeting, the end of the cut (the
+#                             syllables of "Verity" after 1.9 s are played now), the fade, a refused region, a clip that is not loaded yet, the voice level
+#                             in the world (loudness drives a hop and a swell, pauses bring her down, she settles with the sound, a rhythm if no loudness
+#                             is reported, no mouth at any frame), no work idle / far / ReducedMotion / Effects 0, and the window's ViewportFrame portrait
+#                             with the same bounce, built when the window opens and destroyed when it closes.
 #  then the R147 client / server suites (run_verity.sh: the dialog without the EVENT ENDS line, the 3D portrait, the quest sentence in full at 13 screen
 #  sizes, no empty row) and static checks on the docs.
 # "all" also runs every other Verity suite (R147 pack / UI / art, R148 LIMITED Index and roster).

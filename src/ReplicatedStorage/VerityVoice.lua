@@ -1,20 +1,21 @@
 -- R149 (owner: "sync verity's voice and cut the audio to only hello my name verity"): the numbers behind Verity's greeting, with no
--- instances in it, so the client (VerityClient: plays the cut, drives her mouth), the server (VerityService and the owner command
+-- instances in it, so the client (VerityClient: plays the cut, drives her swell and bounce), the server (VerityService and the owner command
 -- /test verityvoice) and the tests all use the same rules.
 --  * Region: which part of the clip plays (VerityConfig.GreetingStart / GreetingEnd, or the owner's live override), made safe.
 --  * Fade: the volume ramp over the last stretch of the cut, so stopping the sound does not click.
---  * NewLip / Begin / Step: lip sync. The smoothed, normalised loudness of the voice (0 = closed, 1 = wide open).
---  * MouthPose: size and place of her open mouth (a dark oval) on a ball of a given diameter.
+--  * NewLip / Begin / Step: the smoothed, normalised loudness of the voice (0 = silent, 1 = the loudest syllable).
+--  * Pose: her size and her rise on a ball of a given diameter at a given level: she swells (TalkPulse) and hops (TalkBounce).
+-- R151 (owner: "the Verity mouth thing can be removed and the ball can just bounce"): the mouth oval (MouthPose) is gone; Pose is the bounce.
 local M={}
 M.MinLength=.1      -- the shortest cut there can be (seconds)
 M.MaxSeconds=60     -- the longest start / end the owner command accepts (the clip is far shorter)
-M.Default={Start=0,Stop=1.9}
+M.Default={Start=0,Stop=2.35}
 
 local function finite(v)return type(v)=='number'and v==v and v>-math.huge and v<math.huge end
 M.Finite=finite
 
 -- (start, stop) in seconds into the clip. A pair of numbers (the owner's live values) wins over the config; anything that is not a
--- pair of finite numbers falls back to VerityConfig.GreetingStart / GreetingEnd, and those fall back to 0 .. 1.9 if they are broken.
+-- pair of finite numbers falls back to VerityConfig.GreetingStart / GreetingEnd, and those fall back to 0 .. 2.35 if they are broken.
 -- length: the clip's TimeLength once it is known (0 / nil before it loads): the cut never runs past it.
 function M.Region(config,a,b,length)
  local start,stop
@@ -32,16 +33,16 @@ function M.Fade(position,stop,fade)
  return math.clamp((stop-position)/fade,0,1)
 end
 
--- Lip sync -----------------------------------------------------------------------------------------------------------------------------
+-- Voice level (named "lip" from the mouth it used to drive) -------------------------------------------------------------------------------
 function M.NewLip(cfg)return{Level=0,Peak=cfg.Floor,Seen=false,Age=0}end
--- A new playing of the clip: forget what was heard last time (the mouth itself keeps its Level and closes smoothly).
+-- A new playing of the clip: forget what was heard last time (the level itself keeps its value and falls smoothly).
 function M.Begin(lip,cfg)lip.Peak=cfg.Floor;lip.Seen=false;lip.Age=0 end
 -- One frame. loudness: the Sound's PlaybackLoudness (0..1000; nil / NaN read as 0). playing: the voice is being played right now.
--- Returns the new Level (also stored in lip.Level): 0 = mouth closed, 1 = wide open.
+-- Returns the new Level (also stored in lip.Level): 0 = silent, 1 = the loudest syllable.
 --  * Real loudness is normalised to the loudest syllable heard in this playing (never below cfg.Floor), gated and curved.
---  * Until any loudness has been heard, and for cfg.FallbackAfter seconds, the mouth stays shut; after that a talking rhythm runs (the
+--  * Until any loudness has been heard, and for cfg.FallbackAfter seconds, the level stays 0; after that a talking rhythm runs (the
 --    engine could not measure the sound: not loaded, muted by the platform...) for as long as `playing` lasts.
---  * Opening is fast (cfg.Attack a second), closing slower (cfg.Release); once the voice has stopped it closes smoothly and snaps to exactly
+--  * Rising is fast (cfg.Attack a second), falling slower (cfg.Release); once the voice has stopped it falls smoothly and snaps to exactly
 --    0 below .004, so whatever the Level drives goes back to rest exactly.
 function M.Step(lip,cfg,loudness,dt,playing)
  dt=finite(dt)and math.clamp(dt,0,.1)or 1/60
@@ -70,17 +71,13 @@ function M.Step(lip,cfg,loudness,dt,playing)
  return lip.Level
 end
 
--- Her open mouth on a ball of diameter D (any scale): a flat dark oval (a block Part with a Sphere SpecialMesh, so its three sizes are
--- independent) whose centre sits on the ball's surface at height cfg.Mouth.Y * D below her centre. level: 0..1 from Step.
--- Returns {W,H,D} (the oval's size) and {Y,Z} (its centre in the ball's own frame: her face looks along -Z), or nil when level is below
--- cfg.Mouth.Show (draw nothing: the smile picture is her closed mouth).
-function M.MouthPose(cfg,diameter,level)
- local m=cfg.Mouth
- if not finite(level)or level<m.Show then return nil end
- level=math.min(level,1)
- local y=diameter*m.Y;local r=diameter/2
- local z=math.sqrt(math.max(r*r-y*y,0)) -- how far out the ball's surface is at that height
- return {W=diameter*m.Width*(1+m.Widen*level),H=diameter*m.Height*level,D=diameter*m.Depth,Y=y,Z=-z}
+-- Her body on a ball of diameter D (any scale) at voice level `level` (0..1 from Step; NaN / nil / negative read as 0, above 1 as 1):
+-- Scale: 1 + cfg.TalkPulse * level; Size = D * Scale; Rise = how far her CENTRE stands above its rest height: she swells upward from where her
+-- bottom rests (D * (Scale - 1) / 2) and hops by cfg.TalkBounce * D * level on top of that. Returns {Scale=, Size=, Rise=}.
+function M.Pose(cfg,diameter,level)
+ level=finite(level)and math.clamp(level,0,1)or 0
+ local scale=1+cfg.TalkPulse*level
+ return {Scale=scale,Size=diameter*scale,Rise=diameter*(scale-1)/2+diameter*cfg.TalkBounce*level}
 end
 
 return M

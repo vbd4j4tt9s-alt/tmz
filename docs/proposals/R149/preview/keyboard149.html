@@ -6,9 +6,10 @@
 <script type="module">
 // Approximate render of a dump_keyboard149.luau scene (R148 "before" or R149 "after"): Roblox parts as boxes, keycap MeshParts as square
 // frustums with a lighter dished top (the R142Keycap mesh is not available outside Roblox: a stand-in with its proportions), floors unless the
-// keyboard hides them for this client, and every SurfaceGui painted onto its part's Top face the way Roblox lays it out (canvas x -> +X,
-// canvas y -> +Z, labels turned by GuiObject.Rotation about their centre). Grass banks outside the 180-wide track, a light haze like the
-// game's Atmosphere. Plain lighting, no Roblox materials: a design preview, not a screenshot.
+// keyboard hides them for this client, and every SurfaceGui painted onto its part's Top face the way Roblox lays it out (R151: canvas x -> world
+// -Z, canvas y -> world +X, so the canvas is depth x width; labels turned by GuiObject.Rotation about their centre. R149's version of this file drew
+// canvas x -> +X and canvas y -> +Z, which is why it never showed the missing letters). Grass banks outside the 180-wide track, a light haze like
+// the game's Atmosphere. Plain lighting, no Roblox materials: a design preview, not a screenshot.
 import * as THREE from 'three';
 const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;document.body.appendChild(renderer.domElement);
@@ -74,8 +75,11 @@ window.shoot=function(scene,W,H,view){
   // SurfaceGuis on Top faces
   for(const gui of scene.guis){
     const mat=new THREE.MeshBasicMaterial({map:guiTexture(gui),transparent:true,depthWrite:false,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
-    const plane=new THREE.Mesh(new THREE.PlaneGeometry(gui.w,gui.d),mat);
-    plane.rotation.x=-Math.PI/2;plane.position.set(gui.p[0],gui.p[1]+.01,gui.p[2]);s.add(plane);
+    // the canvas is (depth x width): its x axis (reading direction) toward world -Z, its y axis (down) toward world +X; the plane's local x / y are the
+    // texture's right / up, so local x -> -Z, local y (up) -> -X, normal -> +Y
+    const plane=new THREE.Mesh(new THREE.PlaneGeometry(gui.d,gui.w),mat);
+    plane.matrix.makeBasis(new THREE.Vector3(0,0,-1),new THREE.Vector3(-1,0,0),new THREE.Vector3(0,1,0));plane.matrixAutoUpdate=false;
+    plane.matrix.setPosition(gui.p[0],gui.p[1]+.01,gui.p[2]);s.add(plane);
   }
   if(view.avatar)s.add(avatar(scene.runner[0],scene.runner[1],scene.runner[2]));
   const cam=new THREE.PerspectiveCamera(view.fov,W/H,.1,6000);

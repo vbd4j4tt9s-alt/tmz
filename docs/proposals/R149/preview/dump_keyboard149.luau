@@ -5,9 +5,12 @@
 --  parts  every visible keyboard part (name, class, size, centre, colour) and the real floors (with their LocalTransparencyModifier: a
 --         floor the keyboard hides for this client is not drawn);
 --  guis   every SurfaceGui that is on a part (its face size, canvas size, labels: text, centre / size in canvas pixels, rotation, ink,
---         transparency, text size or TextScaled), so the renderer can paint the letters where Roblox would;
+--         transparency, text size or TextScaled), so the renderer can paint the letters where Roblox would. R151: a Top-face canvas is
+--         (Size.Z x Size.X) * PixelsPerStud (canvas x toward world -Z, canvas y toward +X), which is how the real engine lays it out (the owner's
+--         screenshots of R149 prove it); R149's version of this file drew x -> +X and so hid the bug it was meant to show;
 --  runner the local runner (on the ground: the key under him is down).
--- Scenes: the runner 60 studs before the Desert spacebar (Jungle), in Snow 150 studs before Lava (the long view), and in Crystal.
+-- Scenes: the runner 60 studs before the Desert spacebar (Jungle), in Snow 150 studs before Lava (the long view), in Crystal, and (R151) on the
+-- Forest spacebar at the start of the track (the owner's screenshot of the name running along the track).
 local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local workspace=W.workspace
 local K=W.module('KeyboardTrack');local C=K.Config;local F=C.FloorTop
@@ -57,7 +60,7 @@ local function dump(name,rx,rz)
  local function addGui(gui,p)
   local pos=p.CFrame.Position;local w,d=p.Size.X,p.Size.Z
   local cw,ch
-  if gui.SizingMode==R.Enum.SurfaceGuiSizingMode.PixelsPerStud then cw,ch=w*gui.PixelsPerStud,d*gui.PixelsPerStud
+  if gui.SizingMode==R.Enum.SurfaceGuiSizingMode.PixelsPerStud then cw,ch=d*gui.PixelsPerStud,w*gui.PixelsPerStud
   else local cs=gui.CanvasSize;cw,ch=cs and cs.X or 800,cs and cs.Y or 600 end
   local labels={}
   for _,l in ipairs(gui:GetDescendants())do
@@ -89,3 +92,4 @@ local mid=2 -- the same spot for both versions
 dump('jungle',mid,470)
 dump('snow',mid,1880)
 dump('crystal',mid,3500)
+dump('forest',mid,-96)

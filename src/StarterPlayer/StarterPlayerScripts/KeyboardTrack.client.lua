@@ -1,3 +1,13 @@
+-- R151 (owner playtest of R149 / R150): "it doesn't push down far enough", "the words are missing, they only appear if under my foot", "the
+-- forest, desert named tiles must also be parallel to the safe zone and horizontal":
+--  * the press travels 1.15 studs (resting top floor + 1.2, pressed floor + .05: level with the planted feet) and the runner's footprint reaches
+--    PressLead seconds ahead along his velocity, so the key in front is down when the foot gets there;
+--  * LETTERS: a Top-face SurfaceGui is laid out with its x axis toward world -Z and its y axis toward world +X (K.TopCanvas / K.TopPoint). R149's
+--    strips assumed x -> +X: each strip's canvas was 131 px wide, its labels sat at x offsets up to 1374 px, so only the one label inside the
+--    canvas showed (the owner saw a single line of letters) and every letter was a quarter turn off; the spacebar name ran along the track.
+--    Labels now sit at (row centre, key centre) on the real canvas and turn 270 degrees (upright, left -> right for a +Z runner); the spacebar
+--    name is one wide label turned the same way, across the track. The strips and the pressed keys' own letters also stand Legend.Margin above the
+--    key top measured from the keycap template (not just the configured one), and a plain-block key has no mesh to measure.
 -- R149 (owner playtest of R148: keys "way too small and not tall enough", "rendering issues", wants "the keyboard tiles visible from a
 -- really long range" with "a really consistent look overall", the click "consistent with its noise", the colours matching each biome).
 -- Client only: no remotes, no server code, nothing collides or can be queried. Grid, colours, windows and budgets come from
@@ -6,13 +16,13 @@
 --    wide; plain blocks only while that template has not replicated yet, swapped in place once it has) in its biome's colours. There are no
 --    coarse / flat far layers any more: whole rows of keys are dressed around the runner (12 rows behind .. 122 ahead on tier 3, ~1000 studs)
 --    from a recycled pool, nearest rows first, and a row is only recycled a few rows past the window edge (hysteresis).
---  * Depth: the key tops stand just above the real floor (runners and keepers stand on them); the keys reach down past a sunken grout bed
---    (the biome's darker colour) so every key shows 2.15 studs of side. The real track floor (BiomeGround_n) is hidden for this client only
+--  * Depth: the pressed key tops stand just above the real floor (runners and keepers stand on them); the keys reach down past a sunken grout bed
+--    (the biome's darker colour) so every key shows 2.8 studs of side at rest. The real track floor (BiomeGround_n) is hidden for this client only
 --    (LocalTransparencyModifier, restored on teardown) so no surface is ever coplanar with it; the parts of a floor the keyboard does not
 --    cover (The Darkened's arena) are drawn by local copies. A low rim closes the keyboard's sides and ends.
 --  * Letters: one SurfaceGui per half row (11 letters) on an invisible strip just above the resting key tops, upright for a +Z runner and in
---    keyboard order left -> right (column 1 = +X edge, labels turned 180 degrees). Rows of letters reach ~150 studs ahead and fade out over
---    their last rows. A key that is down carries its own letter (a pooled SurfaceGui) while it moves, then gives it back to its strip.
+--    keyboard order left -> right (column 1 = +X edge, labels turned 270 degrees on the Top-face canvas). Rows of letters reach ~150 studs ahead
+--    and fade out over their last rows. A key that is down carries its own letter (a pooled SurfaceGui) while it moves, then gives it back to its strip.
 --  * Spacebars: one cream bar per biome start (the biome's first row, full width), always present, labelled with the biome name.
 --  * Presses: the local character every frame (Humanoid.FloorMaterial ~= Air), other players and keepers at 30 Hz within PressRange. The union
 --    of pressed keys is diffed with the last frame; only the changing keys animate (quad-out down, back-out up) via BulkMoveTo.
@@ -285,13 +295,17 @@ local function start()
   return c
  end
  local creamInk=Color3.fromRGB(K.CreamInk[1],K.CreamInk[2],K.CreamInk[3])
- -- Text sits on the Top face with its up toward -Z and its reading direction toward +X; turned half a way round (about the label's
- -- centre) it is upright for a runner facing +Z, reading toward -X = his right.
+ -- The Top face's canvas (K.TopCanvas / K.TopPoint, R151): x toward world -Z, y toward world +X. An unrotated label reads toward -Z with its up
+ -- toward -X; turned 270 degrees (clockwise, about the label's centre) it reads toward -X = a +Z runner's right with its up toward +Z.
+ local ROT=LG.Rotation
  local function letterLabel(parent)
   local l=Instance.new('TextLabel');l.Name='Letter';l.BackgroundTransparency=1;l.BorderSizePixel=0;l.AnchorPoint=V2(.5,.5)
-  l.Rotation=180;l.Font=FONT;l.TextScaled=false;l.TextSize=TEXT;l.TextStrokeTransparency=1;l.Parent=parent
+  l.Rotation=ROT;l.Font=FONT;l.TextScaled=false;l.TextSize=TEXT;l.TextStrokeTransparency=1;l.Parent=parent
   return l
  end
+ -- topExtra: how far the keycap mesh's visible top stands above the configured key top (measured once the template is there, see measureKeyTop).
+ -- A letter strip is lifted by it; a pooled per-key letter, which rides on the key's own face, is offset toward the camera by it (ZOffset).
+ local topExtra=0
  local function letterGui(name,parent)
   local gui=Instance.new('SurfaceGui');gui.Name=name;gui.Face=Enum.NormalId.Top;gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud
   gui.PixelsPerStud=PPS;gui.LightInfluence=0;gui.AlwaysOnTop=false;pcall(function()gui.MaxDistance=LG.MaxDistance end);gui.Parent=parent
@@ -303,13 +317,17 @@ local function start()
  for k=1,STRIPS do stripFree[k]={};stripFreeN[k]=0 end
  local parkList,parkN={},0
  local stripsOfRow,stripRows,stripRowPos={},{},{}
+ local STRIP_H=.05                                   -- the strip is a thin plate; its top face carries the SurfaceGui
+ -- the strip's centre height: its top face stands Legend.Margin above the visible top of a resting key (a mesh key's top is KeyTop + TopOffset + the measured excess)
+ local function visibleRestTop()return K.KeyTop(0)+(template and C.TopOffset or 0)+topExtra end
+ local function stripCentreY()return visibleRestTop()+LG.Margin-STRIP_H/2 end
  local function newStrip(k)
-  local p=Instance.new('Part');p.Name='LegendStrip';flat(p);p.Transparency=1;p.Size=V3(1,.05,1);p.CFrame=CF(CX,F-200,0);p.Parent=legendFolder
+  local p=Instance.new('Part');p.Name='LegendStrip';flat(p);p.Transparency=1;p.Size=V3(1,STRIP_H,1);p.CFrame=CF(CX,F-200,0);p.Parent=legendFolder
   local gui=letterGui('Letters',p)
   local labels={}
   for i=1,SPAN do local l=letterLabel(gui);l.Size=UDim2.fromOffset(KW*PPS,KW*PPS);labels[i]=l end
   -- the last value written to each label (a TextLabel change re-renders the whole 1440 x 131 px SurfaceGui: unchanged values are never written)
-  return {Part=p,Gui=gui,Labels=labels,K=k,W=0,D=0,Alpha=-1,On=true,Free=false,Parked=false,PX={},PY={},Tx={},Ink={},Vis={true,true,true,true,true,true,true,true,true,true,true}}
+  return {Part=p,Gui=gui,Labels=labels,K=k,W=0,D=0,X=0,Z=0,Alpha=-1,On=true,Free=false,Parked=false,PX={},PY={},Tx={},Ink={},Vis={true,true,true,true,true,true,true,true,true,true,true}}
  end
  local keyLegendOf={}                                -- slot -> pooled per-key letter while the key is down
  local function labelShown(row,col)
@@ -345,7 +363,7 @@ local function start()
  end
  local function bindStrips(row)
   local za,zb=geo.RowZ(row);local d=zb-za;local z=(za+zb)/2;local stage=rowStage[row]
-  local y=K.KeyTop(0)+(template and C.TopOffset or 0)+LG.Lift-.025
+  local y=stripCentreY()
   local list={}
   for k=1,STRIPS do
    local st
@@ -354,14 +372,16 @@ local function start()
    st.Free=false;st.Parked=false
    local c0=(k-1)*SPAN+1;local c1=min(COLS,k*SPAN)
    local w=(c1-c0+1)*P;local xMin=LEFT-c1*P
-   if abs(st.W-w)>1e-6 or abs(st.D-d)>1e-6 then st.W=w;st.D=d;st.Part.Size=V3(w,.05,d)end
-   st.Part.CFrame=CF(xMin+w/2,y,z)
+   if abs(st.W-w)>1e-6 or abs(st.D-d)>1e-6 then st.W=w;st.D=d;st.Part.Size=V3(w,STRIP_H,d)end
+   st.X,st.Z=xMin+w/2,z
+   st.Part.CFrame=CF(st.X,y,z)
    if not st.On then st.On=true;st.Gui.Enabled=true end
-   local py=d/2*PPS
+   -- canvas (K.TopPoint): x runs toward -Z, so every label of the strip sits at the row's centre, x = d / 2; y runs toward +X from the strip's -X end
+   local px=d/2*PPS
    for i=1,SPAN do
     local l=st.Labels[i];local c=c0+i-1
     if c<=c1 then
-     local px=((LEFT-(c-.5)*P)-xMin)*PPS
+     local _,py=K.TopPoint(st.X,z,w,d,PPS,LEFT-(c-.5)*P,z)
      if st.PX[i]~=px or st.PY[i]~=py then st.PX[i]=px;st.PY[i]=py;l.Position=UDim2.fromOffset(px,py)end
      local text=K.Legend(row,c);if st.Tx[i]~=text then st.Tx[i]=text;l.Text=text end
      local ink=inkColor(stage,row,c);if st.Ink[i]~=ink then st.Ink[i]=ink;l.TextColor3=ink end
@@ -384,10 +404,27 @@ local function start()
  -- per-key letters (a key that is down keeps its letter while it moves)
  local klFree,klFreeN,klMade={},0,0
  local klList,klPos,klStamp={},{},{}
+ local klAll={}                                       -- every pooled per-key letter ever made (applyTopExtra reaches the idle ones too)
+ local function keyLegendOffset(gui)
+  -- a letter on a key's own face is exactly at the configured top; when the mesh stands higher it is drawn that much toward the camera
+  if topExtra>0 then pcall(function()gui.ZOffset=topExtra+LG.Margin end)end
+ end
  local function newKeyLegend()
   local gui=letterGui('KeyLegend',legendFolder)
   local l=letterLabel(gui);l.Position=UDim2.fromScale(.5,.5);l.Size=UDim2.fromScale(1,1)
-  return {Gui=gui,Label=l,Slot=0}
+  keyLegendOffset(gui)
+  local e={Gui=gui,Label=l,Slot=0};klAll[#klAll+1]=e
+  return e
+ end
+ -- The keycap's visible top was measured (once, after the template arrived): lift every bound strip, offset every per-key letter.
+ local function applyTopExtra(extra)
+  if extra==topExtra then return end
+  topExtra=extra
+  local y=stripCentreY()
+  for _,r in ipairs(stripRows)do
+   for _,st in ipairs(stripsOfRow[r])do st.Part.CFrame=CF(st.X,y,st.Z)end
+  end
+  for _,e in ipairs(klAll)do keyLegendOffset(e.Gui)end
  end
  local function dropKeyLegend(slot)
   local e=keyLegendOf[slot];if not e then return end
@@ -534,17 +571,87 @@ local function start()
  local cr,cg,cb=K.CreamRGB()
  for i,bar in ipairs(bars)do
   local depth=(bar.Z1-bar.Z0)-C.Gap
-  local p=Instance.new('Part');p.Name='Spacebar';p.Size=V3(HALF*2-C.Gap,C.KeyY,depth);p.Color=Color3.fromRGB(cr,cg,cb)
+  local width=HALF*2-C.Gap
+  local p=Instance.new('Part');p.Name='Spacebar';p.Size=V3(width,C.KeyY,depth);p.Color=Color3.fromRGB(cr,cg,cb)
   p.Material=Enum.Material.SmoothPlastic;flat(p);p.CFrame=CF(CX,F-200,0);p.Parent=keyFolder
   local gui=Instance.new('SurfaceGui');gui.Name='SpacebarLegend';gui.Face=Enum.NormalId.Top;gui.LightInfluence=0;gui.AlwaysOnTop=false
   gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud;gui.PixelsPerStud=C.SpacebarPixelsPerStud;pcall(function()gui.MaxDistance=C.SpacebarMaxDistance end);gui.Parent=p
+  -- The Top face's canvas is depth x width (x toward -Z, y toward +X: K.TopCanvas), so the name is ONE label before the turn .9 of the canvas' long
+  -- side wide (X scale = width / depth * .9 of the short x axis) and .9 of its short side high (Y scale = depth / width * .9 of the long y axis),
+  -- turned 270 degrees like every letter: it then reads across the track (toward -X), parallel to the SAFE ZONE line, upright for a runner
+  -- approaching from the start. TextScaled fills the label's height (.9 of the bar's depth) with the biome name.
   local label=Instance.new('TextLabel');label.Name='Biome';label.BackgroundTransparency=1;label.BorderSizePixel=0
-  label.AnchorPoint=V2(.5,.5);label.Position=UDim2.fromScale(.5,.5);label.Size=UDim2.fromScale(1,.9);label.Rotation=180
+  label.AnchorPoint=V2(.5,.5);label.Position=UDim2.fromScale(.5,.5);label.Size=UDim2.fromScale(width/depth*.9,depth/width*.9);label.Rotation=ROT
   label.Font=FONT;label.TextScaled=true;label.TextStrokeTransparency=1;label.Text=string.upper(bar.Name);label.TextColor3=creamInk;label.Parent=gui
   local idx=BARBASE+i
   kPart[idx]=p;kX[idx]=CX;kZ[idx]=(bar.Z0+bar.Z1)/2;kDepth[idx]=0;kOff[idx]=0;kFresh[idx]=0
   queueMove(idx);p.Transparency=0
  end
+ end
+
+ -- The visible top of the keycap mesh (R151) ---------------------------------------------------------------------
+ -- A probe key (a clone of the template dressed like a resting key, parked far off the track, invisible, queryable only for the instant of a
+ -- ray) says how far the mesh's top stands above the configured key top: its Size.Y reading, a SpecialMesh child's offset / scale, and downward
+ -- rays over its top face (centre, edge middles, corners; a RaycastParams include list holds only the probe, so nothing else can answer). The
+ -- mesh's collision shape may not be there on the first frame: the rays are repeated every half second for up to 3 s. K.TopExtra combines them
+ -- (>= 0, capped); the letter strips and the per-key letters follow it (applyTopExtra). The result is published on the keyboard folder
+ -- (KeyTopConfigured / KeyTopExtra / LegendTop attributes) so Studio's Explorer shows what was measured.
+ local function publishTop()
+  if folder then
+   folder:SetAttribute('KeyTopConfigured',K.KeyTop(0));folder:SetAttribute('KeyTopExtra',topExtra);folder:SetAttribute('LegendTop',visibleRestTop()+LG.Margin)
+  end
+ end
+ local function measureKeyTop()
+  local probe=cloneKeycap();if not probe then return end
+  local restCentre=K.KeyTop(0)-C.KeyY/2+C.TopOffset
+  local px,pz=CX,geo.Z0-1500
+  probe.Name='KeyProbe';flat(probe);probe.Size=V3(KW,C.KeyY,KW);probe.Transparency=1;probe.CFrame=CF(px,restCentre,pz);probe.Parent=folder
+  local cfgTop=restCentre+C.KeyY/2                    -- the probe's own configured top (a resting mesh key's: KeyTop + TopOffset)
+  local canCast=type(workspace.Raycast)=='function'
+  local tries=0
+  local function cast()
+   local hits={}
+   if not canCast then return hits end
+   pcall(function()
+    local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Include;params.FilterDescendantsInstances={probe}
+    probe.CanQuery=true
+    local o=cfgTop+LG.MaxExtra+1;local len=C.KeyY+LG.MaxExtra+2
+    for _,u in ipairs({-.4,0,.4})do for _,v in ipairs({-.4,0,.4})do
+     local hit=workspace:Raycast(V3(px+u*KW,o,pz+v*KW),V3(0,-len,0),params)
+     if hit and hit.Instance==probe then hits[#hits+1]=hit.Position.Y end
+    end end
+   end)
+   pcall(function()probe.CanQuery=false end)
+   return hits
+  end
+  local function meshExtra()
+   local extra=0
+   for _,d in ipairs(probe:GetChildren())do
+    if d:IsA('SpecialMesh')then
+     local off=d.Offset.Y;local up=0
+     if d.MeshType~=Enum.MeshType.FileMesh then up=C.KeyY*(d.Scale.Y-1)/2 end -- a block-type mesh scales with the part; a file mesh's own size is unknown
+     extra=max(extra,off+max(0,up))
+    end
+   end
+   return extra
+  end
+  local function finish(hits)
+   local okSize,sizeY=pcall(function()return probe.Size.Y end)
+   local okMesh,me=pcall(meshExtra)
+   probe:Destroy()
+   if not okSize then sizeY=nil end
+   if not okMesh then me=0 end
+   local ok,extra=pcall(K.TopExtra,C.KeyY,sizeY,me,cfgTop,hits)
+   if stopped then return end
+   applyTopExtra(ok and extra or 0);publishTop()
+  end
+  local function poll()
+   if stopped or not probe.Parent then return end
+   tries+=1
+   local hits=cast()
+   if #hits>0 or not canCast or tries>=6 then finish(hits)else task.delay(.5,poll)end
+  end
+  poll()
  end
 
  -- Template (the keycap mesh) ------------------------------------------------------------------------------------
@@ -561,6 +668,7 @@ local function start()
   end
   templateReady=true
   if not template and C.UseKeycapMesh~=false then warn('[R149] keyboard: ReplicatedStorage.R142Keycap is missing; the keys are plain blocks')end
+  if template then pcall(measureKeyTop)end
  end)
  local function swapPass()
   local n=0
@@ -890,7 +998,17 @@ local function start()
   if T.Sample>=1/C.PlayerSampleHz then T.Sample=T.Sample%(1/C.PlayerSampleHz);sampleOthers()end
   if hasRoot and humRef and humRef.Health>0 and humRef.FloorMaterial~=AIR then
    local p=rootRef.Position;local half=C.PlayerFootprint
-   local c1,c2,r1,r2=geo.CellRange(p.X-half,p.X+half,p.Z-half,p.Z+half)
+   local x0,x1,z0,z1=p.X-half,p.X+half,p.Z-half,p.Z+half
+   -- R151: the key ahead must be down when the foot gets there (the press takes PressSeconds): the footprint also covers PressLead seconds of
+   -- the runner's velocity in front of it (never behind: the keys he leaves go up as before)
+   local vel=rootRef.AssemblyLinearVelocity
+   if typeof(vel)=='Vector3'then
+    local lead,cap=C.PressLead,C.PressLeadMax
+    local lx=math.clamp(vel.X*lead,-cap,cap);local lz=math.clamp(vel.Z*lead,-cap,cap)
+    if lx>0 then x1+=lx else x0+=lx end
+    if lz>0 then z1+=lz else z0+=lz end
+   end
+   local c1,c2,r1,r2=geo.CellRange(x0,x1,z0,z1)
    for r=r1,r2 do for c=c1,c2 do pressCell(r,c,1,nil,p.X,p.Z)end end
   end
   for i=1,oN do pressCell(oRow[i],oCol[i],oKind[i],oWho[i],oX[i],oZ[i])end
@@ -925,6 +1043,7 @@ local function start()
 
  -- Everything that can fail is above this line. Only now does the real floor go: a client whose start-up failed half way keeps a visible
  -- floor (and the pcall around start() restores it for good).
+ publishTop()
  scanKeepers()
  table.insert(conns,CS:GetInstanceAddedSignal('BiomeKeeper'):Connect(addKeeper))
  armGround()

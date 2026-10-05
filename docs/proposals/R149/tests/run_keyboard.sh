@@ -16,6 +16,11 @@
 #                       off, spacebar labels have a render limit, the stripped template is cloned (no per-key children), a template that stops
 #                       cloning falls back once, the floor is hidden last and given back when start() or the frame step fails, the connection
 #                       list does not grow with streaming.
+# R151 (owner: "doesn't push down far enough", "the words are missing", spacebar names "parallel to the safe zone and horizontal"): resting key tops 1.2
+# above the floor, pressed .05 (1.15 of travel, feet planted on the pressed key), the runner's footprint leads his velocity; letters laid out on the REAL
+# Top-face SurfaceGui canvas (x -> world -Z, y -> world +X: the owner's screenshots show R149 put every label but one off the canvas), turned 270 degrees,
+# every key of every bound row has a visible label over it in every biome / tier / with plain-block keys; the spacebar name runs across the track; strips
+# and pressed-key letters follow the key top measured from the keycap template (a taller mesh); 15 new mutations.
 # The R148 suite (docs/proposals/R147/tests/test_keyboard.luau) tested the retired layered design; its runner now runs this suite.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -72,7 +77,7 @@ mutate "one click budget shared by every presser" $S "  local gate=ownGate
   if kind~=1 then" "  local gate=ownGate
   if false then"
 mutate "keys under a hole can be pressed (the hole floats)" $S "   if holeCell[key]then return end" "   if false then return end"
-mutate "letters upside down for a +Z runner" $S "  l.Rotation=180;l.Font=FONT" "  l.Rotation=0;l.Font=FONT"
+mutate "letters turned 180 degrees (the R149 orientation: a quarter turn off on the real Top-face canvas)" $S "  l.Rotation=ROT;l.Font=FONT" "  l.Rotation=180;l.Font=FONT"
 mutate "the bed sits at the floor plane (z-fighting)" $R " BedDepth=1.6," " BedDepth=0,"
 mutate "short range (the far keys stop at 330 studs)" $R "[3]={Back=12,Ahead=122," "[3]={Back=12,Ahead=40,"
 mutate "Lava keys back to candy strawberry" $R "Shades={{150,36,28},{198,58,26},{236,108,34},{112,30,30}}" "Shades={{255,120,150},{232,72,104},{255,150,170},{196,48,84}}"
@@ -110,6 +115,23 @@ mutate "the template is cloned with its toolbox children" $S "then stripPart(c);
 mutate "connections of containers that left the game stay in the list" $S "   if not c.Connected or not container:IsDescendantOf(workspace)then c:Disconnect();watched[container]=nil end" "   local _=0"
 # R149 review part 2 (z-fighting touch-ups)
 mutate "the end rims are .02 under the lobby floor again (z-fighting)" $R "RimDrop=.04," "RimDrop=.02,"
-mutate "the lifted hole rim is .03 under the letter strips again (z-fighting)" $R " HoleLift=.59," " HoleLift=.57,"
+mutate "the lifted hole rim is coplanar with the letter strips (z-fighting)" $R " HoleLift=REST+.06," " HoleLift=REST,"
+# R151: key press depth, the Top-face frame of the letters and the spacebar name, the measured key top
+mutate "the press travels .47 again (resting top .55 above the floor)" $R "local REST=1.2 " "local REST=.55 "
+mutate "pressed keys sink under the soles (feet hover over them)" $R "PressedRise=.05," "PressedRise=-.6,"
+mutate "the footprint has no lead (the key ahead is late)" $S "    local lx=math.clamp(vel.X*lead,-cap,cap);local lz=math.clamp(vel.Z*lead,-cap,cap)" "    local lx,lz=0,0"
+mutate "the footprint lead is not capped" $S "    local lx=math.clamp(vel.X*lead,-cap,cap);local lz=math.clamp(vel.Z*lead,-cap,cap)" "    local lx,lz=vel.X*lead,vel.Z*lead"
+mutate "letters placed in the R149 frame (canvas x toward +X: all but one label off the canvas)" $S "     local _,py=K.TopPoint(st.X,z,w,d,PPS,LEFT-(c-.5)*P,z)" "     local px,py=((LEFT-(c-.5)*P)-xMin)*PPS,d/2*PPS"
+mutate "the spacebar name is one canvas wide again (it runs along the track)" $S "label.Size=UDim2.fromScale(width/depth*.9,depth/width*.9)" "label.Size=UDim2.fromScale(1,.9)"
+mutate "the spacebar name is turned 180 degrees (along the track)" $S "label.Rotation=ROT" "label.Rotation=180"
+mutate "the strips ignore the measured key top" $S "(template and C.TopOffset or 0)+topExtra end" "(template and C.TopOffset or 0) end"
+mutate "the strips ignore a tuned TopOffset (the mesh keys stand higher than the letters)" $S "K.KeyTop(0)+(template and C.TopOffset or 0)+topExtra end" "K.KeyTop(0)+topExtra end"
+mutate "a pressed key's own letter is not offset by the measured excess" $S "  if topExtra>0 then pcall(function()gui.ZOffset=topExtra+LG.Margin end)end" "  local _=0"
+mutate "the probe key is left in the world" $S "   local okMesh,me=pcall(meshExtra)
+   probe:Destroy()" "   local okMesh,me=pcall(meshExtra)"
+mutate "any ray answer counts, not only the probe's" $S "     if hit and hit.Instance==probe then" "     if hit then"
+mutate "the measured excess is not capped" $R " return min(extra,C.Legend.MaxExtra)" " return extra"
+mutate "the strips are coplanar with the key tops (no margin)" $R "Margin=.04,MaxExtra" "Margin=0,MaxExtra"
+mutate "the canvas of a Top face is width x depth (R149)" $R "function K.TopCanvas(sizeX,sizeZ,pps)return sizeZ*pps,sizeX*pps end" "function K.TopCanvas(sizeX,sizeZ,pps)return sizeX*pps,sizeZ*pps end"
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]

@@ -1,5 +1,5 @@
 -- R149: where the keyboard's key tops are, for client effects that were authored at floor level (the Storm lightning warning / impact
--- rings, the shovel dirt bursts). KeyboardTrack.client draws every key with its resting top K.Config.RestRise (0.55) ABOVE the floor top and
+-- rings, the shovel dirt bursts). KeyboardTrack.client draws every key with its resting top K.Config.RestRise (1.2 since R151's deeper press; 0.55 before) ABOVE the floor top and
 -- hides the real floor for this client, so anything left at floor height is under the keys and cannot be seen.
 --   KeyboardSurface149.Lift(x, z, floorY) = studs to raise a floor-level effect at (x, z) so it sits on the resting key tops: the key top
 --   minus floorY where the keyboard is drawn there, else 0 (no keyboard, off the track, The Darkened's arena, after teardown). The effect keeps

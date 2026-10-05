@@ -4,7 +4,8 @@
 --
 -- THE KEYBOARD (R149, KeyboardTrack.client.lua) covers the whole 180-wide floor edge to edge (from the first biome's start to BiomeTrackEndZ
 -- - 120): big keycaps with ONE look at every distance (no coarse / flat layers) standing on a sunken bed of grout, resting key tops at
--- K.KeyTop(0) = floor top + RestRise (4.0 + 0.55 = 4.55; 0.08 above the floor while pressed), the real floor hidden for this client. There
+-- K.KeyTop(0) = floor top + RestRise (4.0 + 1.2 = 5.2 since R151; a pressed key goes down to 0.05 above the floor, so a runner on a patch stands knee-deep in
+-- it: the patch stays at the resting height while the key under his feet sinks), the real floor hidden for this client. There
 -- is no bare snow floor left to lay patches on, so:
 --  * the patches sit ABOVE the resting key tops (K.KeyTop(0) + Rise + half the patch thickness): never coplanar with a key, the bed or the
 --    floor, so nothing z-fights; a pressed key only sinks away from under a patch;

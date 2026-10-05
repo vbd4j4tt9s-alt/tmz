@@ -105,6 +105,7 @@ check(clear,'no patch face is coplanar with a key, block, bed or floor surface (
 local expectY=K.KeyTop(0)+B.Rise
 local yOk=true;for _,d in ipairs(vis)do local bottom=d.CFrame.Position.Y-d.Size.X/2;if bottom<expectY-1e-6 or bottom>expectY+.012 then yOk=false end end
 check(yOk,('patches rest on the resting key tops (%.2f) plus %.2f'):format(K.KeyTop(0),B.Rise))
+check(near(K.KeyTop(0),F+1.2)and yOk,'R151: the patches follow the deeper keyboard: key tops at the floor + 1.2, the patches (opaque, flat) above them, read live from K.KeyTop(0)')
 check(next(workspace:FindFirstChild('KeyboardTrackVisuals'):GetChildren())~=nil and#keyboard:GetDescendants()>0 and not keyboard:FindFirstChild('Snow patch',true),'the keyboard\'s own folder is untouched: patches live in their own folder')
 
 -- 2. Expected set: replicate the layout + LOD + dust rule + avoid zones from the pure module and compare disc counts

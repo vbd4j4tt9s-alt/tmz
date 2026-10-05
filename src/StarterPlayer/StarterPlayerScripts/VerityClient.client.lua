@@ -14,15 +14,18 @@
 --    have, how many you handed in, when The Darkened is here / comes, the exchange as pictures (Void Pack -> Verity Pack, the
 --    game's own 3D pack pictures, like the hotbar) and the GIVE VOID PACK button (only with a Void Pack).
 --    'Done' = thanks + a sound, 'Refused' = the reason. PlayerGui.SeedMenu = 'Verity' while it is open.
+-- R151 (owner's play test of R150: "the Verity mouth thing can be removed and the ball can just bounce. For the audio it cuts off at 'Ver'"): the dark
+-- mouth oval is gone (world and portrait); the voice level drives a BOUNCE and the swell: she hops by TalkBounce of her size on every syllable and swells by
+-- TalkPulse, both from VerityVoice.Pose. The greeting's cut ends at VerityConfig.GreetingEnd 2.35 (was 1.9, which stopped inside "Verity").
 -- R149 (owner: "sync verity's voice and cut the audio to only hello my name verity and also change the picture of verity to its 3d model
 -- talking and remove the event ends thing"):
 --  * Her greeting plays ONLY "Hello, my name is Verity": the Sound's PlaybackRegion is VerityConfig.GreetingStart .. GreetingEnd (or the
 --    owner's live /test verityvoice values, read from her model's VerityVoiceStart / VerityVoiceEnd attributes each time she speaks), with a
 --    short fade at the end. All three ways she speaks (Talk, coming close, the owner's test) go through the same startVoice.
---  * Lip sync: while the voice plays, the Sound's PlaybackLoudness (smoothed, normalised: VerityVoice.Step) opens her mouth (a dark oval on
---    her face, sized by the loudness) and swells her; a plain talking rhythm runs if the engine reports no loudness. Only while she talks:
---    nothing per frame at rest, none beyond AnimateDistance (the window's portrait still follows while it is open), none with ReducedMotion.
---  * The window's portrait is her 3D model (the same yellow ball and smiley, in a ViewportFrame) bobbing and talking with the same lip sync;
+--  * Voice level: while the voice plays, the Sound's PlaybackLoudness (smoothed, normalised: VerityVoice.Step) swells her and bounces her (R151: no
+--    mouth any more); a plain talking rhythm runs if the engine reports no loudness. Only while she talks: nothing per frame at rest, none beyond
+--    AnimateDistance (the window's portrait still follows while it is open), none with ReducedMotion.
+--  * The window's portrait is her 3D model (the same yellow ball and smiley, in a ViewportFrame) bobbing, swelling and bouncing with the same level;
 --    it exists only while the window is open. The window no longer shows the "EVENT ENDS IN ..." line (her sign and the Index keep theirs),
 --    and her quest sentence gets the room it needs (every label is fitted by GardenTextFit, which layout() no longer overrides).
 -- The server owns every rule; this only sends 'Give' (no arguments) and shows what it is told.
@@ -157,7 +160,7 @@ local function greet(kind,override)
    c:Disconnect()
    if voice.Waiting~=ticket then return end
    voice.Waiting=nil
-   -- R150: too late is no greeting. (Her mouth follows the sound, so it was never out of step, but "Hello, my name is Verity" seconds after
+   -- R150: too late is no greeting. (Her bounce follows the sound, so it was never out of step, but "Hello, my name is Verity" seconds after
    -- the window opened, or after you walked past, is a bug.) A 'talk' greeting also needs her window to still be open.
    if os.clock()-askedAt>GREETING_MAX_WAIT then return end
    if kind=='talk'and not voice.PanelOpen()then return end
@@ -174,31 +177,7 @@ local S=C.Sign
 local MARK_BASE=(S.Mark.Top+S.Mark.Height)/S.H     -- the glyph rests on the bottom of its row
 local MARK_BOUNCE=S.Mark.Bounce/S.H
 local function markAt(lift)return UDim2.fromScale(.5,MARK_BASE-lift)end
--- Her open mouth (R149): a flat dark oval (a block Part with a Sphere SpecialMesh: three independent sizes) on the front of her ball, sized by
--- the lip sync (VerityVoice.MouthPose). Made the first time she talks, in the world and in the window's portrait; only in the workspace / the
--- viewport while it is open (no mouth: her smile picture is her closed mouth). Local to this client; never written when she is not talking.
-local function makeMouth(name)
- local m=new('Part',{Name=name,Anchored=true,CanCollide=false,CanQuery=false,CanTouch=false,CastShadow=false,Massless=true,Color=C.Mouth.Color,
-  Material=Enum.Material.SmoothPlastic,Size=Vector3.new(1,1,1)})
- new('SpecialMesh',{MeshType=Enum.MeshType.Sphere},m)
- return m
-end
-local function hideMouth(e)
- if not e.MouthShown then return end
- e.MouthShown=false;if e.Mouth then e.Mouth.Parent=nil end
-end
--- bodyCF: where her ball is this frame (the CFrame written to her Body); diameter: its size now (swelling included).
-local function showMouth(e,bodyCF,diameter,level)
- local pose=VerityVoice.MouthPose(C,diameter,level)
- if not pose then hideMouth(e);return end
- local m=e.Mouth
- if not m then m=makeMouth('VerityMouth');CS:AddTag(m,'GiantVisualPart');e.Mouth=m end -- (the camera right up against her fades it with her body)
- m.Size=Vector3.new(pose.W,pose.H,pose.D);m.CFrame=bodyCF*CFrame.new(0,pose.Y,pose.Z)
- if m.Parent~=e.Model then m.Parent=e.Model end
- e.MouthShown=true
-end
 local function settle(e) -- back to how the server placed her (one write, only if she had been moved)
- hideMouth(e)
  if not e.Moved then return end
  e.Moved=false;e.Yaw=e.Yaw0;e.Scale=1;e.LastY=nil;e.LastYaw=nil;e.LastScale=nil
  e.Body.Size=Vector3.new(e.Size,e.Size,e.Size);e.Body.CFrame=e.Home
@@ -231,7 +210,7 @@ local function build(model,body)
  local timer=new('TextLabel',{Name='Timer',BackgroundTransparency=1,Position=UDim2.fromScale(0,S.Timer.Top/S.H),Size=UDim2.fromScale(1,S.Timer.Height/S.H),Font=Enum.Font.FredokaOne,TextScaled=true,
   Text='',TextColor3=C.EventColor,TextStrokeColor3=RGB(30,20,60),TextStrokeTransparency=.1},sign)
  local look=body.CFrame.LookVector;local yaw=math.atan2(-look.X,-look.Z)
- entry={Model=model,Body=body,Sign=sign,Mark=mark,Timer=timer,Home=body.CFrame,Base=body.Position,Size=body.Size.X,Yaw=yaw,Yaw0=yaw,Has=false,Moved=false,Scale=1,Poll=1,Near=nil,Mouth=nil,MouthShown=false}
+ entry={Model=model,Body=body,Sign=sign,Mark=mark,Timer=timer,Home=body.CFrame,Base=body.Position,Size=body.Size.X,Yaw=yaw,Yaw0=yaw,Has=false,Moved=false,Scale=1,Poll=1,Near=nil}
  refreshMarker()
  -- R150: make her voice's Sound now (the asset is requested while she is merely in view), so the first greeting is not waiting for a download.
  pcall(voiceSound,entry,false)
@@ -249,7 +228,6 @@ local function detach(model)
   if entry.Body.Parent then settle(entry)end -- leave her as the server placed her (the next entry reads that as home)
   if entry.Mark then entry.Mark:Destroy()end
   if entry.Timer then entry.Timer:Destroy()end
-  if entry.Mouth then entry.Mouth:Destroy()end
   if voice.Sound then voice.Sound:Destroy();voice.Sound=nil;voice.Checked=false;voice.Playing=false end
   voice.Waiting=nil;voice.Lip.Level=0
   entry=nil
@@ -261,7 +239,7 @@ do -- (the model may already be in the map without the tag having replicated yet
  local map=workspace:FindFirstChild('ChestChaseMap');local hub=map and map:FindFirstChild('EconomyHub');local model=hub and hub:FindFirstChild(C.ModelName)
  if model then attach(model)end
 end
--- Each frame: turn to the camera, bob, swell and open her mouth while she talks (R149: with the loudness of her voice), bounce the "?"; four
+-- Each frame: turn to the camera, bob, swell and bounce while she talks (with the loudness of her voice), bounce the "?"; four
 -- times a second, greet whoever came close.
 -- Her Body is a big collidable, queryable anchored ball, so it is only written to when it matters: not at all while the camera is
 -- beyond VerityConfig.AnimateDistance (she is set back to how the server placed her once, then left alone; her sign is not drawn
@@ -293,8 +271,8 @@ watch(Run.RenderStepped,function(dt)
  end
  local worldOn=live and not reduced and not(camera and(camera.CFrame.Position-e.Base).Magnitude>C.AnimateDistance)
  local portraitOn=P.Model~=nil and not reduced
- -- Lip sync (R149): her mouth level this frame, from the voice's loudness. Only while she talks (and the mouth is still closing after it) and
- -- only if someone can see it: her body within AnimateDistance, or the window's portrait while it is open. Otherwise nothing is read or written.
+ -- Voice level (R149, bounce since R151): this frame's level, from the voice's loudness. Only while she talks (and the level is still falling after it)
+ -- and only if someone can see it: her body within AnimateDistance, or the window's portrait while it is open. Otherwise nothing is read or written.
  local lip=voice.Lip
  if worldOn or portraitOn then
   local talking=speaking()
@@ -313,17 +291,15 @@ watch(Run.RenderStepped,function(dt)
    local target=math.atan2(-to.X,-to.Z);e.Yaw=e.Yaw+wrap(target-e.Yaw)*(1-math.exp(-8*dt))
   end
  end
- -- Swelling with the voice (the lip level: smoothed in and out); she grows upward from the dais.
- local level=lip.Level
- local scale=1+C.TalkPulse*level
- if scale~=e.Scale then e.Scale=scale;local d=e.Size*scale;e.Body.Size=Vector3.new(d,d,d);e.Moved=true end
- local lift=e.Size*(scale-1)/2
- local y=e.Base.Y+math.sin(now*1.4)*C.FootOffset+lift
+ -- Swelling and bouncing with the voice (the level: smoothed in and out): she grows upward from the dais and hops by TalkBounce of her size.
+ local pose=VerityVoice.Pose(C,e.Size,lip.Level)
+ local scale=pose.Scale
+ if scale~=e.Scale then e.Scale=scale;local d=pose.Size;e.Body.Size=Vector3.new(d,d,d);e.Moved=true end
+ local y=e.Base.Y+math.sin(now*1.4)*C.FootOffset+pose.Rise
  if not e.LastY or math.abs(y-e.LastY)>1e-3 or math.abs(wrap(e.Yaw-e.LastYaw))>1e-4 then -- nothing changed: no write
   e.LastY=y;e.LastYaw=e.Yaw;e.Moved=true
   e.Body.CFrame=CFrame.new(e.Base.X,y,e.Base.Z)*CFrame.Angles(0,e.Yaw,0)
  end
- if level>0 or e.MouthShown then showMouth(e,CFrame.new(e.Base.X,y,e.Base.Z)*CFrame.Angles(0,e.Yaw,0),e.Size*scale,level)end
  if e.Has and e.Mark.Parent then e.Mark.Position=markAt(math.abs(math.sin(now*4.2))*MARK_BOUNCE)end
 end)
 -- Re-count the Void Tools whenever Tools come and go in the Backpack or the Character (and once a second, in case an
@@ -350,15 +326,15 @@ new('UISizeConstraint',{MaxSize=Vector2.new(660,450)},panel)
 local header=new('Frame',{Name='Header',Size=UDim2.new(1,0,0,56),BorderSizePixel=0},panel);Bright.Header(header)
 local title=text(header,'Title','🌟 VERITY',28);title.TextXAlignment=Enum.TextXAlignment.Left;title.Position=UDim2.fromOffset(18,2);title.Size=UDim2.new(1,-84,1,-4)
 local closeX=new('TextButton',{Name='Close',Text='X',Position=UDim2.new(1,-52,0,7),Size=UDim2.fromOffset(42,42),BorderSizePixel=0,TextSize=20},header);Bright.Button(closeX,RGB(255,61,85))
--- Verity herself (R149): her 3D model in a ViewportFrame (the same yellow ball and smiley as in the world), bobbing and talking with the same lip
--- sync, standing on a little gold dais (a flat oval behind it). The model exists only while the window is open and the portrait is shown.
+-- Verity herself (R149): her 3D model in a ViewportFrame (the same yellow ball and smiley as in the world), bobbing, swelling and bouncing with the same
+-- voice level, standing on a little gold dais (a flat oval behind it). The model exists only while the window is open and the portrait is shown.
 local portrait=new('Frame',{Name='Portrait',BackgroundColor3=Theme.Colors.Inset,BorderSizePixel=0},panel);Theme.Corner(portrait,12);stroke(portrait,GOLD,2)
 local daisShadow=new('Frame',{Name='Dais',AnchorPoint=Vector2.new(.5,.5),BackgroundColor3=GOLD,BackgroundTransparency=.35,BorderSizePixel=0},portrait);Theme.Corner(daisShadow,40)
 local view=new('ViewportFrame',{Name='Model',AnchorPoint=Vector2.new(.5,.5),BackgroundTransparency=1,BorderSizePixel=0,Ambient=RGB(195,195,185),LightColor=RGB(255,247,228),
  LightDirection=Vector3.new(-.45,-.8,1)},portrait)
 local portraitCamera=new('Camera',{Name='PortraitCamera',FieldOfView=C.Portrait.Fov},view);view.CurrentCamera=portraitCamera
 -- The camera looks at the ball (centred on the origin, her face toward -Z) from straight in front; the viewport is square, so the ball fills
--- C.Portrait.Fill of it at rest (room is left for the swell and the bob).
+-- C.Portrait.Fill of it at rest (room is left for the swell, the bounce and the bob).
 do
  local half=math.tan(math.rad(C.Portrait.Fov)/2)
  local distance=C.Portrait.Size/2/(half*C.Portrait.Fill)
@@ -371,15 +347,16 @@ local function buildPortrait()
  local ball=new('Part',{Name='Body',Shape=Enum.PartType.Ball,Size=Vector3.new(D,D,D),CFrame=CFrame.new(0,0,0),Anchored=true,CanCollide=false,CanQuery=false,CanTouch=false,
   CastShadow=false,Color=C.BodyColor,Material=Enum.Material.SmoothPlastic},model)
  new('Decal',{Name='FaceFront',Face=Enum.NormalId.Front,Texture=C.Image,Color3=Color3.new(1,1,1)},ball)
- P.Model,P.Body,P.Mouth,P.MouthShown,P.Scale,P.Still=model,ball,makeMouth('VerityPortraitMouth'),false,1,nil
+ P.Model,P.Body,P.Scale,P.Still=model,ball,1,nil
  portraitFrame(GuiService.ReducedMotionEnabled)
 end
 local function dropPortrait()
  if not P.Model then return end
- P.Model:Destroy();if P.Mouth then P.Mouth:Destroy()end
- P.Model,P.Body,P.Mouth,P.MouthShown=nil,nil,nil,false
+ P.Model:Destroy()
+ P.Model,P.Body=nil,nil
 end
--- One frame of the portrait (only while it exists): the ball bobs, swells and opens its mouth with the lip level. still (ReducedMotion): the rest pose, once.
+-- One frame of the portrait (only while it exists): the ball bobs, swells and bounces with the voice level (its bottom stays where it rests, like her body in
+-- the world). still (ReducedMotion): the rest pose, once.
 portraitFrame=function(still)
  local ball=P.Body;if not ball then return end
  if still then
@@ -387,16 +364,10 @@ portraitFrame=function(still)
   P.Still=true
  else P.Still=false end
  local D=C.Portrait.Size;local level=still and 0 or voice.Lip.Level
- local scale=1+C.TalkPulse*level
- local cf=CFrame.new(0,still and 0 or math.sin(os.clock()*1.4)*C.Portrait.Bob*D,0)
- if scale~=P.Scale then P.Scale=scale;ball.Size=Vector3.new(D*scale,D*scale,D*scale)end
- ball.CFrame=cf
- local pose=VerityVoice.MouthPose(C,D*scale,level)
- if pose then
-  local m=P.Mouth;m.Size=Vector3.new(pose.W,pose.H,pose.D);m.CFrame=cf*CFrame.new(0,pose.Y,pose.Z)
-  if m.Parent~=P.Model then m.Parent=P.Model end
-  P.MouthShown=true
- elseif P.MouthShown then P.MouthShown=false;P.Mouth.Parent=nil end
+ local pose=VerityVoice.Pose(C,D,level)
+ local scale=pose.Scale
+ if scale~=P.Scale then P.Scale=scale;ball.Size=Vector3.new(pose.Size,pose.Size,pose.Size)end
+ ball.CFrame=CFrame.new(0,(still and 0 or math.sin(os.clock()*1.4)*C.Portrait.Bob*D)+pose.Rise,0)
 end
 local quest=text(panel,'QuestText',C.Quest,20);quest.TextXAlignment=Enum.TextXAlignment.Left;quest.TextYAlignment=Enum.TextYAlignment.Center
 local eventLine=text(panel,'EventLine','',16,VIOLET)
@@ -596,7 +567,6 @@ gui.Destroying:Connect(function()
   if entry.Mark then entry.Mark:Destroy()end
   if entry.Timer then entry.Timer:Destroy()end
   if entry.Body.Parent then settle(entry)end -- leave her as the server placed her
-  if entry.Mouth then entry.Mouth:Destroy()end
   if voice.Sound then voice.Sound:Destroy();voice.Sound=nil end
   voice.Playing=false;voice.Waiting=nil;voice.Lip.Level=0
   entry=nil

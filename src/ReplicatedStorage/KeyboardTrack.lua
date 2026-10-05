@@ -1,6 +1,17 @@
 -- R149 (owner playtest of R148: "the keyboard tiles are way too small and not tall enough also there are rendering issues ... the same
 -- result as the keyboard asmr game where the keyboard tiles are visible from a really long range and it has a really consistent look
 -- overall"; "the keyboard is also not consistent with its noise and also keyboard colouring should match their biome").
+-- R151 (owner playtest of R149 / R150: "it doesn't push down far enough and also the words are missing, they only appear if under my foot, and
+-- also the forest, desert named tiles must also be parallel to the safe zone and horizontal"):
+--  * PRESS: a resting key top stands RestRise 1.2 above the floor top, a pressed one PressedRise .05 above it: 1.15 studs of travel (was .47).
+--    Runners and keepers stand on the real (hidden) floor at the floor top, so the key under their feet goes down to the floor and the feet
+--    stay planted on it; a runner's footprint also reaches PressLead seconds ahead along his velocity, so the key in front is already down
+--    when the foot gets there. Release springs back past rest (back-out) and settles.
+--  * LETTERS: Roblox lays a SurfaceGui on a part's TOP face out with its x axis toward world -Z and its y axis (down) toward world +X (not
+--    x -> +X, y -> +Z as R147 - R150 assumed). Every letter strip was therefore a canvas of (depth x width) = 131 x 1440 px whose labels sat at
+--    x offsets up to 1374: only the one label inside the 131 px survived (column 11 / 22 of each row: the owner saw "S", "V" ... in a single
+--    line of keys), every label was turned a quarter too far, and the spacebar's name ran ALONG the track. K.TopCanvas / K.TopPoint /
+--    Legend.Rotation below are that frame; the letters turn by 270 degrees to read upright (left -> right) for a runner heading +Z.
 -- Pure config + grid maths for the client script KeyboardTrack.client.lua: no instances, no Roblox services, no randomness (every colour,
 -- letter and cell is a function of the grid position, so every client builds the same keyboard).
 --
@@ -9,30 +20,32 @@
 --         Darkened's arena keeps its ground). Every biome has its own grid: its first row starts exactly on its BiomeStartZ_n (row pitch =
 --         its length / whole rows, 8.17 .. 8.23) and that first row is one cream spacebar with the biome's name.
 --  LOOK   ONE look at every distance: every key is the same keycap (ReplicatedStorage.R142Keycap, kept at its own 10.55 x 6.39 proportions
---         so it stays a chunky keycap) in its biome's colours, standing 2.15 studs proud of a sunken bed of the biome's darker grout colour.
---         The key tops sit just above the real floor (runners and keepers stand on them, nothing collides); the real track floor is hidden
---         for this client only (LocalTransparencyModifier), so nothing is ever coplanar with it. No coarse / flat far layers: the keys are
---         built in whole rows around the runner (up to ~1000 studs ahead on tier 3) and recycled. Only what nobody can see at that range
+--         so it stays a chunky keycap) in its biome's colours, standing 2.8 studs proud of a sunken bed of the biome's darker grout colour.
+--         The pressed key tops sit just above the real floor (runners and keepers stand on them, nothing collides); the real track floor is
+--         hidden for this client only (LocalTransparencyModifier), so nothing is ever coplanar with it. No coarse / flat far layers: the keys
+--         are built in whole rows around the runner (up to ~1000 studs ahead on tier 3) and recycled. Only what nobody can see at that range
 --         drops with distance: the letters (they fade out ~150 studs ahead) and the press animation (other runners / keepers far away).
 --  SOUND  one click recording, one pitch band, the same volume rule for every key; every runner (you, each player, each keeper) gets his
 --         own steady cadence (at most one click per ClickGap seconds) - no shared budget that starves some presses, no stacked bursts.
-local K={Version=149}
+local K={Version=151}
 local floor,ceil,max,min=math.floor,math.ceil,math.max,math.min
 local C3=Color3.fromRGB
 
+local REST=1.2                                                 -- resting key top above the floor top (the press travels REST - PressedRise)
 K.Config={
  Pitch=180/22,Gap=.5,FieldWidth=180,CenterX=0,           -- 22 keys of 8.18 studs across the 180 floor; Gap = grout between two key boxes
  EndMargin=120,DefaultEndZ=1445,DefaultStartZ=-100,
  SpaceRows=1,                                             -- a biome's spacebar is its first row (one big key, full width)
  TemplateSize={10.55,6.39,10.55},                         -- the R142Keycap mesh's own size (its proportions are kept: KeyY = KeySize * 6.39 / 10.55)
  KeyY=(180/22-.5)*6.39/10.55,                             -- 4.65: the keycap's full height; the lower ~2.5 studs sit below the bed, out of sight
- FloorTop=4.0,RestRise=.55,PressedRise=.08,               -- key top above the floor: resting / pressed (feet stand at the floor top)
+ FloorTop=4.0,RestRise=REST,PressedRise=.05,              -- key top above the floor: resting / pressed (feet stand at the floor top, so a pressed key is level with them)
  TopOffset=0,                                             -- studs added to a mesh key's centre height (mesh top alignment fudge, tune in Studio)
  UseKeycapMesh=true,                                      -- false = every key is a plain block (same size / colours) if the mesh costs too much on phones
- BedDepth=1.6,BedThickness=1,BedMaxLength=1024,           -- the grout bed's top is BedDepth below the floor top: resting keys stand 2.15 proud
+ BedDepth=1.6,BedThickness=1,BedMaxLength=1024,           -- the grout bed's top is BedDepth below the floor top: resting keys stand 2.8 proud, pressed ones 1.65
  RimWidth=.65,RimInset=.05,RimDrop=.04,                   -- the frame closing the keyboard's sides / ends (its top .04 under the floor top: clear of the lobby / arena floor, R149 review part 2)
- PressSeconds=.07,ReleaseSeconds=.16,                     -- quad-out down, back-out up
- HoleLift=.59,                                            -- shovel-hole parts (authored a few hundredths above the floor) are lifted onto the key tops (+.04: the rim stays over the letter strips, R149 review part 2)
+ PressSeconds=.06,ReleaseSeconds=.2,                      -- quad-out down (snappy), back-out up (springs ~10% of the travel past rest, then settles)
+ PressLead=.06,PressLeadMax=4,                            -- the local runner's footprint also covers this many seconds of his velocity ahead (at most PressLeadMax studs): the key in front is down when the foot arrives
+ HoleLift=REST+.06,                                       -- shovel-hole parts (authored a few hundredths above the floor) are lifted onto the key tops (+.06: the rim stays over the letter strips, R149 review part 2 / R151)
  HoleReach=2,                                             -- keys within this many studs of a hole's Pit stay up (unpressable) while it exists
  PlatformClearance=.3,                                    -- keys under a pack platform (radius + this) are held down: the platform shows on them
  PlayerFootprint=1.2,PlayerFeetReach=3,PlayerRootToFeet=3,-- half-size of a runner's footprint; others press while their feet are within 3 studs of the floor
@@ -50,12 +63,14 @@ K.Config={
                                                           -- teleport): x Bind. A camera turn gets no burst (it is spread over ~8 frames, R149 review)
  FacingThreshold=.25,FacingHoldSeconds=.2,                -- the long side of the window follows the camera along the track (runners carry packs back
                                                           -- to base facing -Z): it turns once the camera's LookVector.Z passes +-0.25 for 0.2 s
- CameraAbove=.6,                                          -- the camera never sinks under (resting key top + this): the real floor is hidden, so it no
+ CameraAbove=.6,                                          -- the camera never sinks under (resting key top + this = 5.8): the real floor is hidden, so it no
                                                           -- longer stops the default camera (Popper) from dropping into the keys / under the bed
- -- letters: PixelsPerStud on every letter SurfaceGui (TextHeight * PixelsPerStud = TextSize <= 100), Lift = strip above the resting key
- -- tops, KeysPerStrip = letters per SurfaceGui (a half row), MaxDistance = the guis' own render limit, RowsPerFrame = rows of letters dressed per
- -- frame (4, so a camera turn spreads the letters over several frames). The spacebars' biome names are big: they get their own render limit.
- Legend={PixelsPerStud=16,TextHeight=4.6,Lift=.03,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4},
+ -- letters: PixelsPerStud on every letter SurfaceGui (TextHeight * PixelsPerStud = TextSize <= 100), Margin = the strip's top above the VISIBLE top of
+ -- a resting key (the client measures that top from the keycap template: Legend.MaxExtra caps what a measurement may add), Rotation = the label's
+ -- turn on the Top-face canvas (270: upright, reading left -> right for a runner heading +Z), KeysPerStrip = letters per SurfaceGui (a half row),
+ -- MaxDistance = the guis' own render limit, RowsPerFrame = rows of letters dressed per frame (4, so a camera turn spreads the letters over several
+ -- frames). The spacebars' biome names are big: they get their own render limit.
+ Legend={PixelsPerStud=16,TextHeight=4.6,Margin=.04,MaxExtra=1.5,Rotation=270,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4},
  SpacebarPixelsPerStud=10,SpacebarMaxDistance=800,
  GroundScanSeconds=2,
 }
@@ -173,7 +188,38 @@ end
 -- Heights: depth 0 = resting, 1 = pressed (BackOut may dip below 0 for a moment = the key springs past rest).
 function K.KeyTop(depth)return C.FloorTop+C.RestRise-(C.RestRise-C.PressedRise)*depth end
 function K.KeyCenterY(depth)return K.KeyTop(depth)-C.KeyY/2+C.TopOffset end
+function K.PressTravel()return C.RestRise-C.PressedRise end
 function K.BedTop()return C.FloorTop-C.BedDepth end
+
+-- The Top-face SurfaceGui frame (R151, measured from the owner's live screenshots of R149): on a part with no rotation the canvas x axis (reading
+-- direction of an unrotated label) points toward world -Z and the canvas y axis (down the canvas) toward world +X; the canvas is therefore
+-- (Size.Z x Size.X) * PixelsPerStud, not (Size.X x Size.Z). A label turned by GuiObject.Rotation = a degrees (clockwise) reads along
+-- (sin a, -cos a) in world (x, z) and has its up toward (-cos a, -sin a): a = 270 reads toward -X (a +Z runner's right) with its up toward +Z.
+--   K.TopCanvas(sizeX, sizeZ, pps)               -> canvas width, height (pixels)
+--   K.TopPoint(cx, cz, sizeX, sizeZ, pps, wx, wz) -> canvas x, y (pixels) of the world point (wx, wz) on the Top face of a part centred at (cx, cz)
+--   K.TopWorld(cx, cz, sizeX, sizeZ, pps, px, py) -> the inverse: world x, z of canvas point (px, py)
+--   K.TopReading(a)                              -> (x, z) world direction a label turned by a degrees reads along; K.TopUp(a) its up direction
+function K.TopCanvas(sizeX,sizeZ,pps)return sizeZ*pps,sizeX*pps end
+function K.TopPoint(cx,cz,sizeX,sizeZ,pps,wx,wz)return(cz+sizeZ/2-wz)*pps,(wx-(cx-sizeX/2))*pps end
+function K.TopWorld(cx,cz,sizeX,sizeZ,pps,px,py)return cx-sizeX/2+py/pps,cz+sizeZ/2-px/pps end
+function K.TopReading(a)local r=math.rad(a);return math.sin(r),-math.cos(r)end
+function K.TopUp(a)local r=math.rad(a);return-math.cos(r),-math.sin(r)end
+
+-- How far the VISIBLE top of a key stands above the configured one (studs, >= 0), from what the client could measure on a clone of the keycap
+-- template sized like a key: sizeY = that clone's Size.Y (the engine may not give back what was asked), meshExtra = what a SpecialMesh child
+-- adds above the part's top (its Offset.Y plus any scale above 1), hits = heights of downward ray hits on the clone's top (absolute Y, may be
+-- empty) with probeTop = the configured top of the clone at the time. The biggest of the three wins, capped at Legend.MaxExtra: a bad
+-- measurement can never fling the letters away.
+function K.TopExtra(keyY,sizeY,meshExtra,probeTop,hits)
+ local extra=0
+ if type(sizeY)=='number'and sizeY==sizeY and sizeY>keyY then extra=max(extra,(sizeY-keyY)/2)end
+ if type(meshExtra)=='number'and meshExtra==meshExtra then extra=max(extra,meshExtra)end
+ if type(hits)=='table'and type(probeTop)=='number'then
+  for _,y in ipairs(hits)do if type(y)=='number'and y==y then extra=max(extra,y-probeTop)end end
+ end
+ if extra<.005 then return 0 end
+ return min(extra,C.Legend.MaxExtra)
+end
 function K.KeySize(pitch)return(pitch or C.Pitch)-C.Gap end
 function K.KeeperFootprint(extentX,extentZ)
  return math.clamp(C.KeeperFootprintShare*min(extentX,extentZ),C.KeeperMinFootprint,C.KeeperMaxFootprint)
