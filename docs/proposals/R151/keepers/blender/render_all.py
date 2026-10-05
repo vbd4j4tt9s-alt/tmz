@@ -311,6 +311,8 @@ def manifest(k, b, st, fbx):
             entry['TreeFollows'] = k.tree_map.get(key)
         if st == 0:
             entry['Cosmetic'] = (ob['group'], piece or None) in k.cosmetic or kind in ('glow', 'face')
+        elif (ob['group'], piece or None) in k.cosmetic:
+            entry['Cosmetic'] = True     # e.g. the Crystal Knight's sword point beyond today's reach: never used for hits
         if (ob['group'], piece or None) in k.floating or (ob['group'], kind.capitalize()) in k.floating:
             entry['FloatingByDesign'] = True
         parts.append(entry)

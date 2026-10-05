@@ -153,114 +153,121 @@ def bolt(g, a, b, r, seed=0, kinks=5):
 
 
 # =========================================================================================== Stage 1: Timber Golem (Forest)
+_UPG = None
+
+
+def native(stage):
+    """Today's native parts of a keeper (KeeperUpgradeData): name, group, size, rest frame, shape, colour."""
+    global _UPG
+    if _UPG is None:
+        import data
+        _UPG = data.load_upg()
+    return _UPG[str(stage)]['Parts']
+
+
+def nat(g, p, col, bevel=0.1, grow=(0, 0, 0), M2=None):
+    """One of today's native parts, rebuilt at its exact rest frame and size: a Block as a crisp chamfered block, a
+    Wedge as a wedge. grow adds to its size (chunkier); M2 is an extra local transform (a tilt)."""
+    M = kit.cf_matrix(p['Rest']) @ (M2 or Matrix.Identity(4))
+    size = [s + d for s, d in zip(p['Size'], grow)]
+    if p['Shape'] == 'Wedge':
+        box(g, (0, 0, 0), size, col, M=M, wedge=True)
+    else:
+        cbox(g, (0, 0, 0), size, col, bevel=bevel, M=M)
+
+
 def timber_golem():
+    """Rev 5: TODAY's in-game Timber Golem, improved. Every one of today's native parts (KeeperUpgradeData) is rebuilt
+    at its exact size, rest frame and colour as a crisp bevelled block or wedge: the brown trunk with its split-bark
+    beard, the moss shoulders, the big green stepped leaf hood, the stump head with its hollow face and heavy brows,
+    the block arms with dark root knuckles and leafy shoulder tiers, the wide root legs. Improvements: a clean
+    glowing-slit face, today's green chest rune as a glowing rune in a knothole, today's orange mushrooms, moss drips
+    and tufts, bark bands, a few bright leaf cubes and a little bird's nest on the hood. The pieces follow today's
+    tree-disguise moves exactly (each piece groups parts that share one TreeRest move)."""
     k = KeeperModel('timber_golem', 'Timber Golem', 1, {
-        'bark': (0.47, 0.31, 0.19), 'bark2': (0.33, 0.21, 0.12), 'bark3': (0.62, 0.43, 0.26), 'moss': (0.40, 0.70, 0.25),
-        'moss2': (0.28, 0.55, 0.18), 'leaf': (0.30, 0.66, 0.22), 'leaf2': (0.50, 0.80, 0.26), 'leaf3': (0.20, 0.48, 0.16),
-        'mush': (0.80, 0.14, 0.10), 'spot': (1.0, 0.96, 0.88), 'stem': (0.96, 0.90, 0.78), 'nest': (0.55, 0.38, 0.20),
+        'bark': (0.42, 0.30, 0.19), 'bark2': (0.33, 0.23, 0.14), 'ridge': (0.50, 0.36, 0.23), 'brow': (0.36, 0.24, 0.15),
+        'knuckle': (0.18, 0.13, 0.11), 'moss': (0.30, 0.55, 0.24), 'moss2': (0.24, 0.47, 0.19), 'leaf': (0.24, 0.46, 0.22),
+        'leaf2': (0.30, 0.55, 0.24), 'leaf3': (0.35, 0.59, 0.26), 'leaf4': (0.45, 0.70, 0.30), 'hollow': (0.18, 0.13, 0.11),
+        'mush': (0.93, 0.58, 0.24), 'mush2': (0.97, 0.75, 0.38), 'spot': (1.0, 0.95, 0.85), 'nest': (0.55, 0.38, 0.20),
         'egg': (0.55, 0.85, 0.95), 'bird': (0.30, 0.60, 0.95), 'beak': (1.0, 0.65, 0.10), 'eyedark': (0.07, 0.05, 0.03),
-        'eyedim': (0.26, 0.20, 0.10)},
-        glow={'*': (1.0, 0.72, 0.18)}, eye_rgb=(0.55, 1.0, 0.45))
-    k.personality = 'Grumpy old tree that hates being woken: a heavy, silent glare from two glowing slits; a bird lives in its crown.'
-    k.fidget = 'Scratches his bark with the small arm; the bird in his crown hops and chirps; leaves drift down.'
-    k.fx_notes = 'Falling leaves and drifting spores (ParticleEmitter); glowing sap drips from the cracks; dust burst on the hammer slam.'
-    # Body: two stacked trunk blocks, a moss slab, dark bark planks, glowing sap cracks, bracket mushrooms -------------
-    body = k.g('Body')
-    cbox(body, (0, 4.2, 0), (7.6, 4.8, 5.4), 'bark', bevel=0.12)              # lower trunk  y 1.8..6.6, front z -2.7
-    cbox(body, (0, 8.2, 0), (8.6, 3.8, 5.8), 'bark', bevel=0.12)              # upper trunk  y 6.3..10.1, front z -2.9
-    cbox(body, (0, 10.2, 0.1), (9.0, 0.9, 6.2), 'moss', bevel=0.15)           # moss slab    y 9.75..10.65
-    for x, h in ((-3.1, 1.6), (-1.0, 1.0), (1.4, 1.9), (3.3, 1.2)):
-        box(body, (x, 10.05 - h / 2, -3.0), (0.9, h, 0.35), 'moss2')         # moss hanging over the front edge
-    for x in (-2.6, -0.7):
-        box(body, (x, 4.2, -2.75), (0.7, 4.4, 0.3), 'bark2')                 # dark bark planks
-    for s in (-1, 1):
-        for z in (-1.4, 1.2):
-            box(body, (s * 3.85, 4.2, z), (0.3, 4.2, 0.7), 'bark2')
-    sap = k.g('Body', 'glow')
-    band(sap, [(1.6, 6.0, -2.75), (2.3, 4.9, -2.75), (1.7, 3.9, -2.75), (2.5, 2.6, -2.75)], (0, 0, -1), 0.3, 0.26, 'iris')
-    band(sap, [(-1.9, 9.3, -2.95), (-1.3, 8.2, -2.95), (-2.0, 7.2, -2.95)], (0, 0, -1), 0.26, 0.26, 'iris')
-    for (x, y, z, w, d) in ((4.6, 7.6, -0.8, 1.4, 2.0), (4.5, 6.8, 0.9, 1.1, 1.5), (-4.25, 4.6, 0.6, 1.3, 1.8)):
-        s = 1 if x > 0 else -1
-        cbox(body, (x, y, z), (w, 0.5, d), 'mush', bevel=0.25)               # bracket fungi on the bark
-        box(body, (x + s * 0.2, y + 0.27, z - d * 0.2), (0.32, 0.1, 0.32), 'spot')
-        box(body, (x - s * 0.15, y + 0.27, z + d * 0.22), (0.26, 0.1, 0.26), 'spot')
-    # Head: a block stump with a heavy bark ledge; a stacked block leaf crown with a bird's nest -----------------------
-    stump = k.g('Head', 'main', 'Stump')
-    cbox(stump, (0, 13.0, -0.2), (5.8, 5.4, 5.4), 'bark', bevel=0.12)        # y 10.3..15.7, face plane z -2.9
-    cbox(stump, (0, 10.6, 0), (3.0, 1.6, 3.0), 'bark2', bevel=0.2)           # neck core at the pivot
-    cbox(stump, (0, 14.9, -3.25), (6.4, 1.0, 1.6), 'bark2', bevel=0.15)      # heavy bark ledge over the eyes
-    box(stump, (0, 15.5, -3.2), (6.2, 0.3, 1.4), 'moss')
-    for x, h in ((-2.65, 1.1), (2.55, 0.8)):
-        box(stump, (x, 14.6 - h / 2, -3.9), (0.6, h, 0.3), 'moss2')
-    for s in (-1, 1):
-        for z in (-1.2, 1.0):
-            box(stump, (s * 2.95, 12.8, z), (0.3, 4.0, 0.6), 'bark2')
-    can = k.g('Head', 'main', 'Canopy')
-    cbox(can, (0, 15.5, 0.4), (11.4, 0.8, 9.6), 'leaf3', bevel=0.2)
-    cbox(can, (0, 17.2, 0.4), (12.4, 2.8, 10.6), 'leaf', bevel=0.12)
-    cbox(can, (0.4, 19.6, 0.6), (9.4, 2.4, 8.4), 'leaf2', bevel=0.12)
-    cbox(can, (-0.4, 21.5, 0.2), (5.4, 1.8, 5.0), 'leaf', bevel=0.12)
-    for (x, y, z, sx, sy, sz, c) in ((6.5, 16.6, -1.2, 2.6, 2.4, 2.6, 'leaf3'), (-6.5, 17.0, 1.6, 2.4, 2.2, 2.4, 'leaf3'),
-                                     (-4.4, 19.4, -2.6, 2.2, 2.0, 2.2, 'leaf'), (3.8, 20.0, 3.0, 2.2, 1.8, 2.2, 'leaf'),
-                                     (0.8, 16.4, -5.4, 2.6, 2.0, 1.6, 'leaf3'), (-3.2, 16.2, -5.2, 2.0, 1.6, 1.4, 'leaf2')):
-        cbox(can, (x, y, z), (sx, sy, sz), c, bevel=0.15)
-    cbox(can, (1.0, 22.75, 0.6), (3.0, 0.9, 3.0), 'nest', bevel=0.3)         # bird's nest, two eggs, a little blue bird
-    cbox(can, (0.5, 23.35, 1.1), (0.6, 0.7, 0.6), 'egg', bevel=0.3)
-    cbox(can, (1.25, 23.35, 1.4), (0.55, 0.65, 0.55), 'egg', bevel=0.3)
-    cbox(can, (1.4, 23.55, -0.2), (0.9, 0.8, 1.2), 'bird', bevel=0.25)
-    cbox(can, (1.4, 24.25, -0.6), (0.75, 0.7, 0.75), 'bird', bevel=0.25)
-    box(can, (1.4, 24.15, -1.1), (0.3, 0.22, 0.4), 'beak')
-    for x in (1.2, 1.6):
-        box(can, (x, 24.38, -0.98), (0.1, 0.12, 0.04), 'pupil')
-    box(can, (1.4, 23.75, 0.55), (0.5, 0.18, 0.6), 'bird')
-    box(can, (-3.4, 21.15, -2.4), (0.4, 0.8, 0.4), 'stem')                   # a red toadstool on the crown
-    cbox(can, (-3.4, 21.6, -2.4), (1.4, 0.5, 1.4), 'mush', bevel=0.25)
-    box(can, (-3.2, 21.87, -2.6), (0.3, 0.08, 0.3), 'spot')
-    # Face: no nose, brows, lips or teeth. Dark eye hollows (always), glowing slits awake, dim slits asleep (the
-    # disguised tree shows no face), and a jagged crack for a mouth.
-    face = FlatFace(k, 'Head', {'face': dict(c=(0, 13.0, -2.9), n=(0, 0, -1))}, unit=0.1)
-    for s in (-1, 1):
-        face.plate(k.g('Head'), place(SLOT, s * 1.25, 0.55, s, 0.0, 2.1, 1.2), 'eyedark', 0)
-        face.plate(face.g('Chase', 'eyes'), place(SLOT, s * 1.25, 0.47, s, 0.0, 1.6, 0.62), 'iris', 1)
-        face.plate(face.g('Asleep'), place(SQUARE, s * 1.25, 0.25, s, 0.0, 1.5, 0.16), 'eyedim', 1)
-    face.line('Chase', [(-1.6, -1.2), (-1.05, -1.62), (-0.52, -1.18), (0.0, -1.66), (0.52, -1.18), (1.05, -1.62), (1.6, -1.2)], 0.32,
-              col='eyedark')
-    face.line('Asleep', [(-1.2, -1.4), (-0.6, -1.52), (0.0, -1.4), (0.6, -1.52), (1.2, -1.4)], 0.14, col='eyedark')
-    # Arms (LeftArm is +X): the left is a huge club log with a sprouting branch, the right is smaller -------------------
-    for s, group, big in ((1, 'LeftArm', True), (-1, 'RightArm', False)):
-        f = 1.0 if big else 0.8
-        up = k.g(group, 'main', 'Upper')
-        joint(up, (s * 4.81, 8.95, 0), 2.8, 'bark2')
-        sx = s * (4.4 + 1.9 * f)
-        cbox(up, (sx, 8.7, 0), (3.8 * f, 4.0 * f, 4.4 * f), 'bark', bevel=0.12)
-        top = 8.7 + 2.0 * f
-        cbox(up, (sx, top + 0.2, 0), (4.2 * f, 0.7, 4.8 * f), 'moss', bevel=0.15)
-        box(up, (sx + s * 0.6, top - 0.2, -2.4 * f - 0.1), (0.8, 1.0, 0.3), 'moss2')
-        fist = k.g(group, 'main', 'Fist')
-        fx_ = s * (4.4 + 2.2 * f)
-        cbox(fist, (fx_, 5.0, -0.3), (3.2 * f, 4.4, 3.4 * f), 'bark', bevel=0.12)
-        cbox(fist, (fx_, 1.9, -0.6), (4.6 * f, 3.4 * f, 4.8 * f), 'bark2', bevel=0.12)
-        for dx in (-1.3, 0.0, 1.3):
-            cbox(fist, (fx_ + dx * f, 1.0, -0.6 - 2.4 * f - 0.3), (1.0 * f, 1.0 * f, 1.2 * f), 'bark3', bevel=0.2)
-        if big:   # a living branch sprouting from the club arm, with a leaf block
-            beam(fist, (s * 8.6, 3.0, -0.6), (s * 9.7, 6.2, -0.6), 0.6, 0.6, 'bark2', ext=0.2)
-            cbox(fist, (s * 9.9, 6.8, -0.6), (1.6, 1.2, 1.4), 'leaf2', bevel=0.15)
+        'eyedim': (0.20, 0.36, 0.26)},
+        glow={'*': (0.51, 0.96, 0.64)}, eye_rgb=(0.51, 0.96, 0.64))
+    k.personality = 'Grumpy old tree that hates being woken: a heavy, silent glare from two glowing slits under its leafy hood; a bird nests on top.'
+    k.fidget = 'Scratches its bark with a root knuckle; the chest rune pulses; the bird hops on the hood; leaves drift down.'
+    k.fx_notes = 'Falling leaves and drifting spores (ParticleEmitter); the chest rune pulses (a brightness tween); dust burst on the hammer slam.'
+    leafs = {(0.24, 0.46, 0.22): 'leaf', (0.30, 0.55, 0.24): 'leaf2', (0.35, 0.59, 0.26): 'leaf3'}
+    for p in native(1):
+        n, grp = p['Name'], p['Group']
+        if n == 'Glowing slit':
+            continue                                                      # replaced by the face (below)
+        if grp == 'Body':
+            nat(k.g('Body'), p, {'Root torso': 'bark', 'Moss shoulders': 'moss'}.get(n, 'ridge'),
+                grow=(0.2, 0.3, 0.2) if n == 'Moss shoulders' else (0, 0, 0))
+        elif grp == 'Head':
+            if n.startswith('Oak'):
+                nat(k.g('Head', 'main', 'Canopy'), p, leafs[tuple(round(c, 2) for c in p['Color'])], bevel=0.08)
+            elif n == 'Heavy brow':
+                s = 1 if p['Rest'][0] > 0 else -1
+                nat(k.g('Head', 'main', 'Stump'), p, 'brow', grow=(0.2, 0.1, 0.1), M2=Rz(s * 0.22))   # angled: a scowl
+            else:
+                nat(k.g('Head', 'main', 'Stump'), p, {'Hollow face': 'hollow', 'Jaw': 'brow'}.get(n, 'bark'))
+        elif grp in ('LeftArm', 'RightArm'):
+            piece = {'Heavy forearm': 'Fist', 'Root knuckle': 'Fist', 'Oak shoulder tier': 'Tier'}.get(n, 'Upper')
+            col = {'Moss plate': 'moss', 'Root knuckle': 'knuckle', 'Oak shoulder tier': 'leaf2'}.get(n, 'bark')
+            nat(k.g(grp, 'main', piece), p, col, grow=(0.15, 0.2, 0.15) if n == 'Moss plate' else (0, 0, 0))
         else:
-            cbox(fist, (s * 7.7, 5.4, -0.3), (1.0, 0.45, 1.6), 'mush', bevel=0.25)
-            box(fist, (s * 7.85, 5.67, -0.6), (0.3, 0.1, 0.3), 'spot')
-        tier = k.g(group, 'main', 'Tier')
-        tx = s * (4.4 + 2.5 * f)
-        beam(tier, (sx, top - 0.4, 0.3), (tx, top + 1.3, 0.6), 0.8, 0.8, 'bark2', ext=0.2)
-        cbox(tier, (tx, top + 1.0, 0.6), (4.6 * f, 1.4, 4.4 * f), 'leaf', bevel=0.12)
-        cbox(tier, (tx + s * 0.3, top + 2.0, 0.6), (3.0 * f, 1.0, 2.8 * f), 'leaf2', bevel=0.12)
-    for s, group in ((1, 'LeftLeg'), (-1, 'RightLeg')):
-        g = k.g(group)
-        joint(g, (s * 2.035, 1.735, 0), 2.6, 'bark2')
-        cbox(g, (s * 2.2, -0.6, -0.2), (3.2, 4.2, 3.4), 'bark', bevel=0.12)
-        cbox(g, (s * 2.3, -3.25, -0.8), (3.8, 1.5, 4.8), 'bark2', bevel=0.12)
-        for dx in (-1.2, 0.0, 1.2):
-            cbox(g, (s * 2.3 + dx, -3.5, -3.55), (1.0, 1.0, 1.2), 'bark3', bevel=0.2)
-    sleep_z(k, (3.2, 25.5, -1.0), 2.6)
+            nat(k.g(grp), p, 'bark')
+    # Body details: a knothole with today's green rune (glowing), moss drips and tufts, today's orange mushrooms ------
+    body = k.g('Body')
+    box(body, (0, 6.4, -2.6), (1.0, 2.6, 0.3), 'hollow')                                  # the knothole between the bark plates
+    rune = k.g('Body', 'glow')
+    cbox(rune, (0, 7.1, -2.78), (0.62, 0.62, 0.3), 'iris', bevel=0.2, M=Rz(math.pi / 4))
+    cbox(rune, (0, 5.95, -2.78), (0.26, 1.3, 0.3), 'iris', bevel=0.2)
+    for s in (-1, 1):
+        beam(rune, (0, 6.2, -2.78), (s * 0.3, 5.75, -2.78), 0.22, 0.3, 'iris', side=(0, 0, 1))
+    for x, h in ((-3.5, 1.1), (-2.2, 0.7), (-0.7, 1.4), (1.4, 0.9), (3.4, 1.3)):
+        box(body, (x, 9.3 - h / 2, -2.86), (0.8, h, 0.3), 'moss2')                        # moss dripping over the front
+    for x, z in ((-2.8, 1.6), (-0.6, -1.6), (2.2, 2.0)):
+        cbox(body, (x, 10.55, z), (1.2, 0.6, 1.2), 'moss2', bevel=0.25)                    # moss tufts on the shoulders
+    for (x, y, z, w, h, c) in ((2.9, 10.45, -1.2, 1.6, 0.55, 'mush'), (3.4, 10.05, 0.4, 1.1, 0.4, 'mush2')):   # today's mushrooms
+        cbox(body, (x, y, z), (w, h, w), c, bevel=0.3)
+        box(body, (x + 0.25, y + h / 2 + 0.02, z - 0.2), (0.28, 0.06, 0.28), 'spot')
+    for s in (-1, 1):
+        for z in (-1.2, 1.2):
+            box(body, (s * 3.95, 5.4, z), (0.16, 6.2, 0.45), 'bark2')                      # bark grooves on the sides (torso x +-3.885)
+    # Head: today's hollow face, now a clean creature face; a bird's nest and bright leaf cubes on the hood --------------
+    joint(k.g('Head', 'main', 'Stump'), (0, 10.985, 0), 2.6, 'bark')
+    can = k.g('Head', 'main', 'Canopy')
+    for (x, y, z, sz, c) in ((-6.7, 14.8, -2.6, 1.7, 'leaf4'), (6.8, 15.2, 2.4, 1.6, 'leaf4'), (3.4, 20.0, -2.6, 1.5, 'leaf4'),
+                             (-3.0, 18.9, 3.6, 1.6, 'leaf3'), (-6.2, 17.4, 2.8, 1.4, 'leaf3'), (5.6, 18.3, -1.6, 1.4, 'leaf4')):
+        cbox(can, (x, y, z), (sz, sz * 0.85, sz), c, bevel=0.15)
+    nest = Vector((0.9, 21.9, 1.3))
+    cbox(can, nest, (2.6, 0.9, 2.6), 'nest', bevel=0.3)
+    cbox(can, nest + Vector((-0.5, 0.6, 0.5)), (0.6, 0.7, 0.6), 'egg', bevel=0.3)
+    cbox(can, nest + Vector((0.25, 0.6, 0.8)), (0.55, 0.65, 0.55), 'egg', bevel=0.3)
+    cbox(can, nest + Vector((0.4, 0.8, -0.5)), (0.9, 0.8, 1.2), 'bird', bevel=0.25)
+    cbox(can, nest + Vector((0.4, 1.5, -0.9)), (0.75, 0.7, 0.75), 'bird', bevel=0.25)
+    box(can, nest + Vector((0.4, 1.4, -1.4)), (0.3, 0.22, 0.4), 'beak')
+    for dx in (0.2, 0.6):
+        box(can, nest + Vector((dx, 1.63, -1.28)), (0.1, 0.12, 0.04), 'pupil')
+    face = FlatFace(k, 'Head', {'face': dict(c=(0, 11.91, -2.67), n=(0, 0, -1))}, unit=0.06)    # the hollow face plane
+    for s in (-1, 1):
+        face.plate(face.g('Chase', 'eyes'), place(SLOT, s * 1.18, 0.18, s, 0.0, 1.75, 0.58), 'iris', 1)
+        face.plate(face.g('Asleep'), place(SQUARE, s * 1.18, 0.1, s, 0.0, 1.5, 0.14), 'eyedim', 1)
+    face.line('Chase', [(-1.45, -0.72), (-0.97, -0.98), (-0.48, -0.7), (0.0, -1.0), (0.48, -0.7), (0.97, -0.98), (1.45, -0.72)], 0.2,
+              col='iris', kind='eyes')
+    # Arms: joint cores, a dark bark band on each forearm, a leaf sprout on each shoulder bough --------------------------
+    for s, grp in ((1, 'LeftArm'), (-1, 'RightArm')):
+        joint(k.g(grp, 'main', 'Upper'), (s * 4.81, 8.95, 0), 2.6, 'bark')
+        cbox(k.g(grp, 'main', 'Fist'), (s * 5.88, 5.6, -0.37), (4.62, 0.45, 4.43), 'bark2', bevel=0.15)
+        cbox(k.g(grp, 'main', 'Upper'), (s * 7.03, 14.3, 0.93), (1.5, 1.2, 1.5), 'leaf4', bevel=0.2)
+        cbox(k.g(grp, 'main', 'Upper'), (s * 5.2, 10.85, -0.9), (1.2, 0.55, 1.2), 'moss2', bevel=0.25)
+    for s, grp in ((1, 'LeftLeg'), (-1, 'RightLeg')):
+        g = k.g(grp)
+        joint(g, (s * 2.035, 1.735, 0), 2.6, 'bark')
+        for x in (0.9, 2.3, 3.7):
+            box(g, (s * x, -0.95, -1.66), (0.35, 2.6, 0.12), 'bark2')                       # bark grooves on the leg front
+    sleep_z(k, (3.2, 23.5, -1.0), 2.6)
     k.tree_map = {('Body', None): 'Root torso', ('Head', 'Stump'): 'Stump head', ('Head', 'Canopy'): 'Oak Leaf crown',
                   ('LeftArm', 'Upper'): 'Heavy shoulder', ('LeftArm', 'Fist'): 'Heavy forearm', ('LeftArm', 'Tier'): 'Oak shoulder tier',
                   ('RightArm', 'Upper'): 'Heavy shoulder', ('RightArm', 'Fist'): 'Heavy forearm', ('RightArm', 'Tier'): 'Oak shoulder tier',
@@ -467,110 +474,108 @@ def sand_snake():
 
 # =========================================================================================== Stage 3: Ice Fang (Snow)
 def ice_fang():
-    """A snow fox keeper: a sleek FOX head (tapered pointed snout, big triangular ears, almond eyes, cheek ruffs) on
-    a chunky block body; icy white and blue with bold blue markings, silver-and-sapphire armour, sabre fangs, a bushy
-    block tail ending in ice crystals."""
+    """Rev 5: a snow fox, improved. A clean fox head held up on a neck: a compact cranium, a tapered pointed white
+    snout, big triangular ears with blue tips, white cheek ruffs, almond eyes with a dark eyeliner flick, a sapphire on
+    the brow, sabre fangs. A fox body: a deep chest with a white ruff, a slim waist, round haunches, blue-grey socks,
+    big paws with ice claws, and a huge bushy tail with a white tip and ice crystals. Icy white and blue, a few bold
+    blue bands, the silver-and-sapphire collar, saddle and shoulder plates."""
     k = KeeperModel('ice_fang', 'Ice Fang', 3, {
-        'fur': (0.93, 0.95, 0.99), 'fur2': (0.70, 0.78, 0.90), 'mark': (0.06, 0.30, 0.85), 'mark2': (0.20, 0.60, 0.98),
-        'muzzle': (0.99, 0.99, 1.0), 'nose': (0.06, 0.10, 0.30), 'inner': (0.42, 0.64, 0.96), 'silver': (0.56, 0.61, 0.72),
-        'sapphire': (0.10, 0.26, 0.86), 'ice': (0.45, 0.85, 1.0), 'brow': (0.03, 0.14, 0.48), 'claw': (0.35, 0.75, 1.0),
+        'fur': (0.94, 0.96, 1.0), 'fur2': (0.70, 0.79, 0.93), 'mark': (0.10, 0.36, 0.88), 'mark2': (0.30, 0.66, 1.0),
+        'muzzle': (1.0, 1.0, 1.0), 'nose': (0.06, 0.10, 0.30), 'inner': (0.50, 0.72, 1.0), 'silver': (0.58, 0.63, 0.74),
+        'sapphire': (0.10, 0.26, 0.86), 'ice': (0.45, 0.85, 1.0), 'claw': (0.35, 0.75, 1.0), 'brow': (0.03, 0.14, 0.48),
         'eyedark': (0.03, 0.06, 0.18), 'lash': (0.04, 0.10, 0.32)},
         eye_rgb=(0.15, 0.85, 1.0))
-    k.personality = 'Proud, cold snow fox: chin up, sly icy glare, bares its sabres the moment it sees you.'
-    k.fidget = 'Licks a paw, swivels its big ears, flicks the bushy crystal tail.'
+    k.personality = 'Proud, cold snow fox: head high, sly icy glare, bares its sabres the moment it sees you.'
+    k.fidget = 'Licks a paw, swivels its big ears, sweeps the huge crystal-tipped tail around its feet.'
     k.fx_notes = 'Frost aura and snowflake sparkles (ParticleEmitter); icy breath puff on the snarl; ice glint on the tail crystals.'
     body = k.g('Body')
-    cbox(body, (0, 2.6, -1.8), (5.4, 4.8, 5.0), 'fur', bevel=0.12)           # chest   y 0.2..5.0
-    cbox(body, (0, 2.5, 4.2), (5.0, 4.2, 8.0), 'fur', bevel=0.12)            # torso
-    cbox(body, (0, 2.6, 9.6), (5.4, 4.4, 3.8), 'fur', bevel=0.12)            # haunches
-    cbox(body, (0, 0.6, 4.2), (4.2, 0.8, 10.0), 'fur2', bevel=0.2)           # belly
-    cbox(body, (0, 2.2, -4.4), (5.0, 3.6, 1.4), 'muzzle', bevel=0.2)         # white chest ruff
-    for s in (-1, 1):
-        beam(body, (s * 2.0, 1.6, -4.6), (s * 3.0, 0.6, -3.6), 1.4, 1.0, 'muzzle', top=0.2, side=(0, 1, 0))
-    for z in (2.0, 4.2, 6.4):                                                # bold blue stripes over the back
-        box(body, (0, 4.62, z), (5.04, 0.14, 0.75), 'mark')
+    cbox(body, (0, 2.9, -1.7), (5.4, 5.2, 5.2), 'fur', bevel=0.12)                 # deep chest  y 0.3..5.5, z -4.3..0.9
+    cbox(body, (0, 3.3, 4.0), (4.4, 3.4, 7.6), 'fur', bevel=0.12)                  # slim waist  y 1.6..5.0
+    cbox(body, (0, 3.0, 9.4), (5.2, 4.6, 4.6), 'fur', bevel=0.12)                  # haunches    y 0.7..5.3, z 7.1..11.7
+    cbox(body, (0, 2.6, -4.55), (4.6, 3.8, 1.0), 'muzzle', bevel=0.2)              # white chest ruff
+    for s in (-1, 0, 1):
+        beam(body, (s * 1.3, 1.4, -4.7), (s * 1.1, -0.1, -4.5), 1.5, 0.8, 'muzzle', top=0.15, side=(1, 0, 0))   # ruff points
+    for z, w in ((3.2, 0.9), (5.4, 0.9), (9.0, 1.0)):                               # a few bold blue bands over the back
+        cbox(body, (0, 0, 0), (w, 0.2, 4.6 if z < 7 else 5.4), 'mark', bevel=0.2, M=T(0, 5.0 if z < 7 else 5.3, z) @ Ry(math.pi / 2))
         for s in (-1, 1):
-            box(body, (s * 2.52, 3.75, z + 0.25), (0.14, 1.9, 0.75), 'mark', M=Rx(0.35))
-    for s in (-1, 1):
-        box(body, (s * 2.72, 3.2, 9.2), (0.14, 2.2, 0.8), 'mark', M=Rx(-0.3))
-    cbox(body, (0, 4.75, 4.4), (3.6, 0.5, 3.4), 'silver', bevel=0.2)         # saddle plate with a sapphire
-    cbox(body, (0, 5.2, 4.4), (1.0, 0.8, 1.0), 'sapphire', bevel=0.2, M=Ry(math.pi / 4))
-    cbox(body, (0, 4.05, -4.6), (4.6, 0.6, 1.0), 'silver', bevel=0.2)        # collar with three sapphires
+            box(body, (s * (2.22 if z < 7 else 2.62), 4.1 if z < 7 else 4.3, z), (0.12, 1.6, w), 'mark')
+    cbox(body, (0, 5.1, 2.5), (3.4, 0.45, 2.4), 'silver', bevel=0.2)               # saddle plate with a sapphire
+    cbox(body, (0, 5.45, 2.5), (0.9, 0.7, 0.9), 'sapphire', bevel=0.2, M=Ry(math.pi / 4))
+    cbox(body, (0, 4.6, -4.35), (4.4, 0.6, 1.0), 'silver', bevel=0.2)              # collar with three sapphires
     for x in (-1.3, 0.0, 1.3):
-        cbox(body, (x, 4.05, -5.15), (0.6, 0.6, 0.3), 'sapphire', bevel=0.2, M=Rz(math.pi / 4))
-    for z, h in ((1.0, 1.6), (7.4, 1.4)):
-        crystal(body, (0, 4.4, z), (0, 1, 0.4), 0.5, h, 'ice', sides=4)
-    # Head: the fox head ---------------------------------------------------------------------------------------------
+        cbox(body, (x, 4.6, -4.9), (0.55, 0.55, 0.3), 'sapphire', bevel=0.2, M=Rz(math.pi / 4))
+    crystal(body, (0, 5.2, 7.6), (0, 1, 0.4), 0.45, 1.3, 'ice', sides=4)
+    # Head: a neck held up, a compact cranium, a tapered snout, big ears, cheek ruffs ----------------------------------
     head = k.g('Head')
-    joint(head, (0, 2.8, -4.4), 2.6, 'fur')
-    cbox(head, (0, 3.9, -6.6), (4.6, 3.6, 3.4), 'fur', bevel=0.12)           # cranium: y 2.1..5.7, face plane z -8.3
-    sa, sb = Vector((0, 2.9, -8.0)), Vector((0, 2.65, -11.0))                 # tapered pointed snout
-    beam(head, sa, sb, 2.6, 1.7, 'muzzle', side=(1, 0, 0), top=(0.4, 0.5), bevel=0.15)
-    beam(head, (0, 3.78, -8.1), (0, 3.2, -10.5), 0.5, 0.14, 'mark2', side=(1, 0, 0), bevel=0.12)   # blue bridge stripe
-    cbox(head, (0, 3.0, -11.05), (0.95, 0.7, 0.6), 'nose', bevel=0.25)
+    joint(head, (0, 2.4, -3.7), 2.6, 'fur')
+    beam(head, (0, 2.6, -3.5), (0, 4.4, -5.6), 3.0, 2.8, 'fur', side=(1, 0, 0), ext=0.5)      # the neck, rising forward
+    cbox(head, (0, 2.9, -6.6), (3.0, 1.6, 2.6), 'muzzle', bevel=0.2)                          # white throat (holds the jaw)
+    cbox(head, (0, 4.8, -6.6), (4.2, 3.4, 3.2), 'fur', bevel=0.12)                            # cranium y 3.1..6.5, face z -8.2
+    sa, sb = Vector((0, 3.85, -8.0)), Vector((0, 3.5, -10.9))
+    beam(head, sa, sb, 2.5, 1.6, 'muzzle', side=(1, 0, 0), top=(0.42, 0.6), bevel=0.15)       # tapered pointed snout
+    cbox(head, (0, 3.72, -10.95), (0.9, 0.66, 0.55), 'nose', bevel=0.25)
     for s in (-1, 1):
-        beam(head, (s * 2.0, 2.7, -7.2), (s * 3.1, 2.1, -5.6), 1.4, 1.0, 'muzzle', top=0.15)   # cheek ruffs
-        beam(head, (s * 2.0, 3.5, -6.6), (s * 2.9, 3.4, -5.2), 1.0, 0.8, 'muzzle', top=0.15)
-        beam(head, (s * 1.45, 5.3, -6.0), (s * 1.8, 8.0, -5.5), 1.9, 0.8, 'fur', top=0.06)     # big triangular ears
-        beam(head, (s * 1.45, 5.6, -6.42), (s * 1.75, 7.4, -6.0), 1.0, 0.2, 'inner', top=0.06)
-        beam(head, (s * 0.75, 2.25, -9.6), (s * 0.8, 0.9, -9.8), 0.36, 0.36, 'tooth', top=0.15)  # sabre fangs
-    crystal(head, (0, 5.6, -7.6), (0, 1, -0.35), 0.35, 0.9, 'sapphire', sides=4)
-    face = FlatFace(k, 'Head', {'face': dict(c=(0, 3.9, -8.3), n=(0, 0, -1))}, unit=0.065)
+        beam(head, (s * 1.8, 3.8, -7.3), (s * 3.2, 3.1, -6.0), 1.6, 1.0, 'muzzle', top=0.12)     # cheek ruffs
+        beam(head, (s * 1.35, 6.1, -6.3), (s * 1.95, 9.2, -5.9), 2.0, 0.8, 'fur', top=0.06)      # big triangular ears
+        beam(head, (s * 1.36, 6.4, -6.72), (s * 1.88, 8.5, -6.3), 1.1, 0.2, 'inner', top=0.06)
+        beam(head, (s * 1.82, 8.4, -5.95), (s * 1.95, 9.22, -5.9), 0.95, 0.85, 'mark', top=0.06)  # blue ear tips
+        beam(head, (s * 0.72, 3.2, -9.7), (s * 0.78, 1.9, -9.9), 0.36, 0.36, 'tooth', top=0.15)  # sabre fangs
+    crystal(head, (0, 6.3, -7.6), (0, 1, -0.5), 0.35, 0.9, 'sapphire', sides=4)               # the brow sapphire
+    face = FlatFace(k, 'Head', {'face': dict(c=(0, 4.8, -8.2), n=(0, 0, -1))}, unit=0.065)
     main = k.g('Head')
-    face.plate(main, [(0, 0.95), (0.28, 1.25), (0, 1.6), (-0.28, 1.25)], 'mark', 0)                    # forehead diamond
+    face.plate(main, [(0, 1.05), (0.24, 1.3), (0, 1.58), (-0.24, 1.3)], 'mark', 0)            # small forehead diamond
     for s in (-1, 1):
-        face.bar(main, (s * 1.55, -0.12), (s * 2.1, 0.2), 0.22, 'mark')                                  # cheek marks
-        face.bar(main, (s * 1.55, -0.55), (s * 2.1, -0.25), 0.22, 'mark')
-    # Chase: almond icy eyes with slit pupils, slanted blue brows, a row of teeth under the snout
-    face.eye('Chase', 1.12, 0.78, 1.45, 0.72, shape=ALMOND, pupil=SLIT, pupil_w=0.85)
-    face.brow('Chase', 1.05, 1.45, 1.4, 0.3, slant=0.38)
+        face.bar(main, (s * 1.62, 0.62), (s * 2.0, 0.92), 0.2, 'brow')                          # eyeliner flicks
+    # Chase: almond icy eyes with slit pupils under a slanted lid line, small teeth under the snout
+    face.eye('Chase', 1.0, 0.45, 1.4, 0.72, shape=ALMOND, pupil=SLIT, pupil_w=0.85)
+    face.brow('Chase', 0.95, 1.0, 1.3, 0.24, slant=0.4)
     fc = face.g('Chase')
     for s in (-1, 1):
-        for t in (0.15, 0.38, 0.8):
+        for t in (0.2, 0.5):
             p = lerp(sa, sb, t)
-            hw = 1.3 * (1 - 0.6 * t)
-            hh = 0.85 * (1 - 0.5 * t)
-            beam(fc, (s * (hw - 0.12), p.y - hh + 0.12, p.z), (s * (hw - 0.12), p.y - hh - 0.32, p.z), 0.24, 0.24, 'tooth', top=0.15)
-    # Asleep: closed eyes, relaxed brows
-    face.closed_eye('Asleep', 1.12, 0.72, 1.3, width=0.18, curve=0.16)
-    face.brow('Asleep', 1.05, 1.42, 1.3, 0.22, slant=-0.08)
+            hw = 1.25 * (1 - 0.58 * t)
+            hh = 0.8 * (1 - 0.4 * t)
+            beam(fc, (s * (hw - 0.12), p.y - hh + 0.12, p.z), (s * (hw - 0.12), p.y - hh - 0.3, p.z), 0.24, 0.24, 'tooth', top=0.15)
+    # Asleep: closed eyes, a relaxed lid line
+    face.closed_eye('Asleep', 1.0, 0.4, 1.25, width=0.18, curve=0.16)
     jaw = k.g('Jaw')
-    joint(jaw, (0, 2.0, -7.3), 1.4, 'muzzle')
-    beam(jaw, (0, 1.85, -7.4), (0, 1.95, -10.4), 1.9, 0.8, 'muzzle', side=(1, 0, 0), top=(0.6, 0.8))
-    def leg(group, x, z0, front):
+    joint(jaw, (0, 2.0, -7.1), 1.3, 'muzzle')
+    cbox(jaw, (0, 2.5, -7.4), (1.8, 1.2, 1.4), 'muzzle', bevel=0.2)                          # hinge block
+    beam(jaw, (0, 2.85, -7.6), (0, 2.95, -10.4), 1.9, 0.8, 'muzzle', side=(1, 0, 0), top=(0.6, 0.8))
+    def leg(group, x, front):
         s = 1 if x > 0 else -1
         g = k.g(group)
         if front:
-            joint(g, (x, 2.3, -2.5), 2.2, 'fur')
-            cbox(g, (x, 0.6, z0 - 0.1), (2.2, 3.6, 2.6), 'fur', bevel=0.12)
-            cbox(g, (x, -2.2, z0 - 0.3), (1.9, 2.6, 2.1), 'fur', bevel=0.12)
-            cbox(g, (x, -0.6, z0 - 0.1), (2.3, 0.4, 2.7), 'mark', bevel=0.12)
-            cbox(g, (x + s * 0.35, 2.1, z0 - 0.1), (2.6, 1.4, 3.0), 'silver', bevel=0.2)          # pauldron
-            cbox(g, (x + s * 1.66, 2.1, z0 - 0.1), (0.3, 0.7, 0.7), 'sapphire', bevel=0.2, M=Rx(math.pi / 4))
-            pz = z0 - 0.8
+            z0 = -2.5
+            joint(g, (x, 2.3, z0), 2.2, 'fur')
+            cbox(g, (x, 0.9, z0 - 0.1), (2.2, 3.6, 2.6), 'fur', bevel=0.12)                   # y -0.9..2.7
+            cbox(g, (x, -2.1, z0 - 0.2), (1.8, 2.8, 2.0), 'fur2', bevel=0.12)                 # blue-grey sock
+            cbox(g, (x + s * 0.35, 2.3, z0 - 0.1), (2.6, 1.4, 3.0), 'silver', bevel=0.2)      # shoulder plate
+            cbox(g, (x + s * 1.66, 2.3, z0 - 0.1), (0.3, 0.7, 0.7), 'sapphire', bevel=0.2, M=Rx(math.pi / 4))
+            pz = z0 - 0.7
         else:
-            joint(g, (x, 1.85, 10.0), 2.4, 'fur')
-            cbox(g, (x, 1.0, 9.9), (2.4, 3.4, 3.2), 'fur', bevel=0.12)
-            cbox(g, (x, -2.0, 10.2), (1.9, 3.0, 2.0), 'fur', bevel=0.12)
-            cbox(g, (x, -0.9, 10.2), (2.0, 0.4, 2.1), 'mark', bevel=0.12)
-            pz = 9.5
-        cbox(g, (x, -3.55, pz), (2.4, 0.9, 3.0), 'muzzle', bevel=0.15)                              # big paw
+            z0 = 10.0
+            joint(g, (x, 1.85, z0), 2.4, 'fur')
+            cbox(g, (x, 1.2, z0 - 0.1), (2.6, 3.6, 3.6), 'fur', bevel=0.12)                   # round thigh y -0.6..3.0
+            beam(g, (x, -0.3, z0 + 0.6), (x, -3.1, z0 - 0.1), 1.8, 2.0, 'fur2', ext=0.3)      # sock, angled at the hock
+            pz = z0 - 0.7
+        cbox(g, (x, -3.55, pz), (2.4, 0.9, 3.0), 'muzzle', bevel=0.15)                         # big paw
         for dx in (-0.7, 0.0, 0.7):
             beam(g, (x + dx, -3.6, pz - 1.3), (x + dx * 1.1, -3.95, pz - 2.1), 0.4, 0.4, 'claw', top=0.2)
-    leg('LeftFrontLeg', -2.15, -2.5, True)
-    leg('RightFrontLeg', 2.15, -2.5, True)
-    leg('LeftBackLeg', -2.2, 10.0, False)
-    leg('RightBackLeg', 2.2, 10.0, False)
-    tail = k.g('Tail')
+    leg('LeftFrontLeg', -2.15, True)
+    leg('RightFrontLeg', 2.15, True)
+    leg('LeftBackLeg', -2.2, False)
+    leg('RightBackLeg', 2.2, False)
+    tail = k.g('Tail')                                                                         # a huge bushy fox tail
     joint(tail, (0, 1.7, 11.65), 2.2, 'fur')
-    tp = [Vector(p) for p in ((0, 2.2, 11.2), (0.5, 2.7, 13.8), (1.4, 3.1, 16.6), (2.4, 3.1, 19.4), (3.0, 2.9, 21.4))]
-    for i, (a, b, sz) in enumerate(zip(tp, tp[1:], (1.6, 2.4, 2.8, 2.2))):
-        beam(tail, a, b, sz, sz * 1.1, 'fur', side=(0, 1, 0), ext=0.45)
-        if i in (1, 2):
-            beam(tail, lerp(a, b, 0.55), lerp(a, b, 0.75), sz * 1.05, sz * 1.15, 'mark', side=(0, 1, 0))
-    for i, (d, h) in enumerate((((0.2, 0.6, 1), 1.6), ((0.7, 0.1, 1), 1.3), ((-0.2, 0.2, 1), 1.2), ((0.3, -0.4, 1), 1.0))):
+    tp = [Vector(p) for p in ((0, 2.6, 11.3), (0.4, 3.6, 13.8), (1.2, 4.6, 16.4), (2.2, 5.0, 19.0), (3.0, 4.8, 21.2))]
+    for i, (a, b, sz) in enumerate(zip(tp, tp[1:], (2.0, 3.0, 3.6, 3.0))):
+        beam(tail, a, b, sz, sz * 1.1, 'muzzle' if i == 3 else 'fur', side=(0, 1, 0), ext=0.5)
+        if i == 2:
+            beam(tail, lerp(a, b, 0.62), lerp(a, b, 0.82), sz * 1.05, sz * 1.15, 'mark', side=(0, 1, 0))
+    for (d, h) in (((0.3, 0.5, 1), 1.6), ((0.8, 0.0, 1), 1.3), ((-0.2, 0.2, 1), 1.2), ((0.3, -0.4, 1), 1.0)):
         crystal(tail, tp[-1] + Vector((0, 0, -0.3)), d, 0.45, h, 'ice', sides=4)
-    sleep_z(k, (2.0, 9.0, -8.0), 1.9)
+    sleep_z(k, (2.0, 10.2, -8.0), 1.9)
     return k
 
 
@@ -592,24 +597,25 @@ def lava_dragon():
     k.fidget = 'Snorts two smoke puffs, stomps a front foot, stretches the wing fans, the back flames flare up.'
     k.fx_notes = 'Flames on the back spikes and the tail tip, embers, nostril smoke (ParticleEmitter); fire glow in the open jaw.'
     body = k.g('Body')
-    cbox(body, (0, 2.0, 1.4), (6.0, 4.4, 9.6), 'plate', bevel=0.12)             # torso  y -0.2..4.2, z -3.4..6.2
-    cbox(body, (0, 2.4, -2.8), (5.6, 4.6, 3.2), 'plate', bevel=0.12)            # chest  y 0.1..4.7
+    cbox(body, (0, 2.0, 1.8), (6.0, 4.4, 14.4), 'plate', bevel=0.12)            # rev 5: a longer torso  y -0.2..4.2, z -5.4..9.0
+    cbox(body, (0, 2.5, -3.8), (5.8, 4.8, 3.2), 'plate', bevel=0.12)            # chest  y 0.1..4.9, z -5.4..-2.2
+    cbox(body, (0, 2.2, 7.6), (5.6, 4.2, 3.0), 'plate', bevel=0.12)             # hips over the tail root
     bglow = k.g('Body', 'glow')
-    for z in (-0.4, 2.4, 5.0):                                                   # dark red scale bands, lava seams at their edges
+    for z in (-2.6, 0.4, 3.4, 6.4):                                              # dark red scale bands, lava seams at their edges
         cbox(body, (0, 2.0, z), (6.16, 4.56, 1.1), 'plate2', bevel=0.12)
         for dz in (-0.62, 0.62):
             box(bglow, (0, 4.25, z + dz), (5.2, 0.14, 0.16), 'iris')
             for s in (-1, 1):
                 box(bglow, (s * 3.03, 2.0, z + dz), (0.14, 3.4, 0.16), 'iris')
-    box(bglow, (0, 4.27, 1.4), (0.45, 0.14, 9.0), 'iris')                      # the seam along the spine
-    for z in (-3.6, -2.0, -0.4, 1.2, 2.8, 4.4):                                 # orange belly plates
+    box(bglow, (0, 4.27, 1.8), (0.45, 0.14, 13.6), 'iris')                     # the seam along the spine
+    for z in (-4.6, -3.0, -1.4, 0.2, 1.8, 3.4, 5.0, 6.6, 8.2):                 # orange belly plates
         cbox(body, (0, -0.3, z), (4.2, 0.45, 1.4), 'belly', bevel=0.2)
     fx = k.g('Body', 'fx')
-    for i, z in enumerate((-3.4, -2.2, -1.0, 0.2, 1.4, 2.6, 3.8, 5.0)):         # bone back spikes, some flaming
+    for i, z in enumerate((-4.6, -3.4, -2.2, -1.0, 0.2, 1.4, 2.6, 3.8, 5.0, 6.2, 7.4, 8.6)):   # bone back spikes, some flaming
         hgt = 1.9 if i % 2 == 0 else 1.5
-        top_y = (4.6 if z < -1.2 else 4.1)
+        top_y = (4.8 if z < -2.2 else 4.1)
         beam(body, (0, top_y - 0.3, z), (0, top_y + hgt, z + 0.9), 0.35, 1.0, 'bone', side=(1, 0, 0), top=0.12)
-        if i in (1, 3, 5, 7):
+        if i in (1, 3, 5, 7, 9, 11):
             flame(fx, (0, top_y + hgt, z + 0.9), (0, 1, 0.3), 1.6, 0.8, seed=i)
     # Head: a long stepped neck, a block skull, a long square snout, a crown of swept horns and frills ------------------
     head = k.g('Head')
@@ -681,7 +687,8 @@ def lava_dragon():
     # Tail: long tapering block segments in alternating scale bands, bone spikes, a glowing spade tip -----------------
     tail = k.g('Tail')
     joint(tail, (0, 0.5, 6.55), 2.6, 'plate')
-    tp = [Vector(p) for p in ((0, 1.6, 5.6), (0.2, 1.2, 8.8), (0.9, 0.8, 11.8), (2.0, 0.7, 14.6), (3.2, 0.8, 17.2), (4.2, 1.0, 19.4))]
+    beam(tail, (0, 0.6, 6.55), (0, 1.6, 8.6), 2.8, 3.0, 'plate')                 # tail root, inside the body at rest
+    tp = [Vector(p) for p in ((0, 1.6, 8.6), (0.2, 1.2, 11.8), (0.9, 0.8, 14.8), (2.0, 0.7, 17.6), (3.2, 0.8, 20.2), (4.2, 1.0, 22.4))]
     sizes = [(3.0, 3.4), (2.6, 2.9), (2.1, 2.4), (1.7, 1.9), (1.3, 1.4)]
     for i, (a, b, (hh, ww)) in enumerate(zip(tp, tp[1:], sizes)):
         Mt = beam(tail, a, b, hh, ww, 'plate' if i % 2 == 0 else 'plate2', side=(0, 1, 0), ext=0.35, top=0.85)
@@ -812,95 +819,130 @@ def crystal_knight():
         cbox(g, (s * 3.5, -0.2, -0.4), (4.8, 4.4, 5.0), 'armor2', bevel=0.12)
         cbox(g, (s * 3.5, 0.6, -0.4), (5.2, 0.6, 5.4), 'armor', bevel=0.15)
         cbox(g, (s * 3.6, -3.1, -1.1), (5.4, 1.8, 7.2), 'armor', bevel=0.12)
+    # Rev 5: a real knight's longsword (not a dagger): a long straight double-edged blade, longer than his leg, with a
+    # short point; a wide crossguard with down-turned crystal quillons; a wrapped grip; a gold pommel with a crystal.
     sw = k.g('Sword')
-    cbox(sw, (-9.1, 1.9, -2.8), (0.9, 4.0, 0.9), 'grip', bevel=0.2)
-    cbox(sw, (-9.1, 4.3, -2.8), (1.3, 1.0, 1.3), 'crystal2', bevel=0.25)
-    cbox(sw, (-9.1, -0.5, -2.8), (5.8, 0.9, 1.6), 'trim', bevel=0.2)
+    cbox(sw, (-9.1, 1.9, -2.8), (0.9, 4.2, 0.9), 'grip', bevel=0.2)                # grip   y -0.2..4.0
+    for y in (0.5, 1.5, 2.5, 3.4):
+        cbox(sw, (-9.1, y, -2.8), (1.02, 0.28, 1.02), 'under', bevel=0.25)        # leather wraps
+    cbox(sw, (-9.1, 4.45, -2.8), (1.6, 1.2, 1.6), 'gold', bevel=0.3)               # pommel
+    cbox(sw, (-9.1, 4.45, -3.62), (0.7, 0.7, 0.2), 'crystal', bevel=0.2, M=Rz(math.pi / 4))
+    cbox(sw, (-9.1, -0.45, -2.8), (7.0, 0.9, 1.4), 'gold', bevel=0.2)              # crossguard y -0.9..0.0
     for s in (-1, 1):
-        cbox(sw, (-9.1 + s * 3.0, -0.5, -2.8), (0.9, 0.9, 0.9), 'crystal', bevel=0.2, M=Rz(math.pi / 4))
-    cbox(sw, (-9.1, -4.9, -2.8), (2.4, 8.0, 0.7), 'blade', bevel=0.15, bottom=(0.08, 0.5))
-    cbox(k.g('Sword', 'glow'), (-9.1, -4.5, -2.8), (0.6, 6.8, 0.8), 'iris', bevel=0.2, bottom=(0.2, 1.0))
+        beam(sw, (-9.1 + s * 3.2, -0.45, -2.8), (-9.1 + s * 3.75, -1.6, -2.8), 0.85, 1.2, 'gold', side=(0, 0, 1), ext=0.2)   # quillons
+        cbox(sw, (-9.1 + s * 3.8, -1.85, -2.8), (0.8, 0.8, 0.8), 'crystal', bevel=0.2, M=Rz(math.pi / 4))
+    cbox(sw, (-9.1, -1.25, -2.8), (2.5, 0.7, 0.9), 'gold', bevel=0.2)              # blade collar
+    # The blade in two parts: Sword reaches exactly as far as today's sword (y -9.9), so hits are unchanged; the
+    # longer part, Sword_Point, is cosmetic (KeeperContact skips it, like the face parts).
+    cbox(sw, (-9.1, -5.45, -2.8), (2.1, 8.9, 0.55), 'blade', bevel=0.2)            # straight blade  y -9.9..-1.0
+    pt = k.g('Sword', 'main', 'Point')
+    cbox(pt, (-9.1, -11.95, -2.8), (2.1, 4.3, 0.55), 'blade', bevel=0.2)           # y -14.1..-9.8
+    cbox(pt, (-9.1, -15.05, -2.8), (2.1, 2.0, 0.55), 'blade', bevel=0.2, bottom=(0.06, 0.5))   # the point  y -16.05..-14.05
+    for s in (-1, 1):
+        box(sw, (-9.1 + s * 0.9, -5.5, -2.8), (0.3, 8.6, 0.6), 'trim')             # two bright edges: double-edged
+        box(pt, (-9.1 + s * 0.9, -11.9, -2.8), (0.3, 4.2, 0.6), 'trim')
+    cbox(k.g('Sword', 'glow'), (-9.1, -5.55, -2.8), (0.55, 8.5, 0.65), 'iris', bevel=0.2)         # glowing crystal fuller
+    cbox(k.g('Sword', 'glow', 'Point'), (-9.1, -11.3, -2.8), (0.55, 3.2, 0.65), 'iris', bevel=0.2)
+    k.cosmetic |= {('Sword', 'Point')}
     sleep_z(k, (3.8, 32.5, -2.5), 3.0)
     return k
 
 
 # =========================================================================================== Stage 7: Storm Colossus (Storm)
 def storm_colossus():
+    """Rev 5: TODAY's in-game Storm Colossus, improved. Today's native parts (KeeperUpgradeData) are rebuilt at their
+    exact size, rest frame and colour as crisp bevelled blocks and wedges: the dark slate core and chest mantle with
+    the lightning bolt, the floating tilted shoulder rocks with their V-shaped thunder prongs, the floating heavy fists
+    with glowing bands, the glowing charged joints between, the suspended shins with charged knees and wedge feet, and
+    today's storm-cloud crown floating over the head (block clouds). Improvements: a clean block head (today's
+    forward-sloping top kept as a crest) with a dark visor, two glowing slits and a glowing crack; storm-glow veins on
+    the chest; charged hip cores over the knees; knuckle and toe blocks. Floating by design: the shoulder rocks,
+    fists, charged joints, the suspended legs and the cloud crown (as today), linked by lightning."""
     k = KeeperModel('storm_colossus', 'Storm Colossus', 7, {
-        'stone': (0.19, 0.21, 0.29), 'stone2': (0.12, 0.13, 0.19), 'stone3': (0.29, 0.32, 0.42), 'prong': (0.75, 0.52, 0.22),
-        'recess': (0.04, 0.05, 0.08), 'cloud': (0.36, 0.39, 0.48), 'cloud2': (0.24, 0.26, 0.34),
-        'eyedark': (0.02, 0.03, 0.06), 'eyedim': (0.10, 0.14, 0.22), 'bolt': (0.65, 0.92, 1.0)},
-        glow={'*': (0.55, 0.88, 1.0)}, eye_rgb=(0.55, 0.92, 1.0))
-    k.personality = 'A walking storm of stacked rock: no face, only two burning slits and a crackling jaw; fists float on storm power.'
-    k.fidget = 'Punches its floating fists together (sparks), cracks its neck, the cloud mane rumbles.'
-    k.fx_notes = 'Lightning arcs linking the floating fists and shoulder rocks to the body (Beams), crackling sparks, a rain cloud.'
-    body = k.g('Body')
-    cbox(body, (0, 17.6, 0.0), (14.4, 10.0, 8.4), 'stone', bevel=0.1)          # torso  y 12.6..22.6, front z -4.2
-    cbox(body, (0, 23.0, -0.4), (16.6, 2.4, 8.8), 'stone2', bevel=0.1)         # mantle slab
-    for s in (-1, 1):
-        cbox(body, (s * 3.4, 19.4, -4.5), (6.0, 4.6, 0.8), 'stone3', bevel=0.12)   # pec slabs
-    cbox(body, (0, 14.6, -4.4), (8.0, 2.6, 0.6), 'stone3', bevel=0.15)
-    cbox(body, (0, 10.6, 0.0), (10.8, 4.4, 7.0), 'stone2', bevel=0.1)          # hips   y 8.4..12.8
+        'slate': (0.18, 0.20, 0.26), 'slate2': (0.26, 0.29, 0.38), 'slate3': (0.36, 0.40, 0.50), 'prong': (0.60, 0.65, 0.75),
+        'visor': (0.08, 0.09, 0.13), 'cloud': (0.27, 0.30, 0.36), 'cloud2': (0.32, 0.35, 0.42), 'cloud3': (0.24, 0.26, 0.32),
+        'eyedark': (0.02, 0.03, 0.06), 'eyedim': (0.18, 0.24, 0.32), 'bolt': (0.72, 0.87, 1.0)},
+        glow={'*': (0.72, 0.87, 1.0)}, eye_rgb=(0.72, 0.87, 1.0))
+    k.personality = 'A walking storm of slate: no face, only two burning slits and a crackling jaw; fists, shoulders and legs hang on storm power under its own thundercloud.'
+    k.fidget = 'Punches its floating fists together (sparks), cracks its neck, the cloud crown rumbles and flickers.'
+    k.fx_notes = 'Lightning arcs linking every floating piece to the body (Beams), crackling sparks, flashes inside the cloud crown, rain under it.'
+    for p in native(7):
+        n, grp = p['Name'], p['Group']
+        if n in ('Head', 'Lightning eye'):
+            continue                                                       # the head and eyes are rebuilt (below)
+        if grp == 'Body':
+            if n == 'Lightning core':
+                nat(k.g('Body', 'glow'), p, 'iris')
+            else:
+                nat(k.g('Body'), p, 'slate' if n == 'Obsidian core' else 'slate2')
+        elif grp in ('LeftArm', 'RightArm'):
+            if n in ('Charged joint', 'Fist band'):
+                nat(k.g(grp, 'glow'), p, 'iris')
+            elif n == 'Heavy fist':
+                nat(k.g(grp, 'main', 'Fist'), p, 'slate')
+            else:
+                nat(k.g(grp, 'main', 'Rock'), p, 'prong' if n == 'Thunder prong' else 'slate2')
+        elif grp in ('LeftLeg', 'RightLeg'):
+            if n == 'Charged knee':
+                nat(k.g(grp, 'glow'), p, 'iris')
+            else:
+                nat(k.g(grp), p, 'slate2' if n == 'Suspended shin' else 'slate')
+        elif n == 'Face shadow':
+            nat(k.g('Head'), p, 'visor')
+    for s, arm in ((1, 'LeftArm'), (-1, 'RightArm')):
+        k.floating |= {(arm, 'Rock'), (arm, 'Fist'), (arm, 'Glow')}
+    for leg in ('LeftLeg', 'RightLeg'):
+        k.floating |= {(leg, None), (leg, 'Glow')}
+    k.floating |= {('Head', 'Cloud')}
+    # Body: storm-glow veins branching off today's lightning bolt; charged hip cores over the knees ------------------
     bglow = k.g('Body', 'glow')
+    band(bglow, [(0.6, 21.4, -4.62), (2.0, 22.2, -4.62), (3.4, 21.5, -4.62), (4.6, 22.4, -4.62)], (0, 0, -1), 0.26, 0.16, 'iris')
+    band(bglow, [(-0.9, 15.2, -4.62), (-2.4, 14.4, -4.62), (-3.6, 15.1, -4.62), (-5.0, 14.2, -4.62)], (0, 0, -1), 0.26, 0.16, 'iris')
+    band(bglow, [(-0.8, 19.6, -4.62), (-2.0, 19.0, -4.62), (-2.8, 19.8, -4.62)], (0, 0, -1), 0.22, 0.16, 'iris')
     for s in (-1, 1):
-        band(bglow, [(s * 1.6, 21.2, -4.95), (s * 2.8, 20.0, -4.95), (s * 2.2, 18.9, -4.95), (s * 4.4, 17.6, -4.95)], (0, 0, -1), 0.34, 0.24, 'iris')
-    band(bglow, [(-1.8, 15.6, -4.75), (-0.4, 14.6, -4.75), (-1.2, 13.6, -4.75), (0.6, 12.9, -4.6)], (0, 0, -1), 0.3, 0.3, 'iris')
-    for (x, z, h) in ((-5.6, 1.4, 2.6), (5.2, 1.8, 2.4), (-2.0, 2.8, 2.0), (2.4, -0.2, 2.2)):
-        beam(body, (x, 23.6, z), (x * 1.08, 23.6 + h, z + 0.5), 1.6, 1.6, 'stone3', top=0.15)     # rock shards on the mantle
-    for s in (-1, 1):
-        cbox(body, (s * 6.2, 24.6, 1.2), (3.0, 1.8, 2.8), 'cloud', bevel=0.25)                       # storm clouds on the shoulders
-        cbox(body, (s * 7.2, 25.2, 0.0), (2.2, 1.6, 2.2), 'cloud2', bevel=0.25)
-    # Head: a big block with a rock ledge and a protruding jaw, rock tusks, copper lightning-rod horns, a cloud mane.
-    # No human face: two glowing eye slits in dark hollows and a glowing crack across the jaw (dark when asleep).
+        cbox(bglow, (s * 3.9, 10.7, 0.0), (1.5, 1.5, 1.5), 'iris', bevel=0.2, M=Ry(math.pi / 4))
+    # Head: a block head with today's forward-sloping top as a crest, today's face shadow as a dark visor ------------
     head = k.g('Head')
-    cbox(head, (0, 27.0, -0.3), (8.0, 6.2, 7.0), 'stone', bevel=0.1)          # y 23.9..30.1, face plane z -3.8
-    cbox(head, (0, 24.6, -1.4), (7.4, 2.0, 5.6), 'stone3', bevel=0.12)        # jaw: plane z -4.2
-    cbox(head, (0, 29.0, -4.1), (8.4, 1.2, 1.4), 'stone2', bevel=0.15)        # rock ledge over the eyes
+    joint(head, (0, 23.54, 0), 3.6, 'slate')
+    cbox(head, (0, 26.0, 0.0), (9.35, 6.1, 7.82), 'slate2', bevel=0.1)            # y 22.95..29.05, front z -3.91
+    box(head, (0, 29.9, 0.4), (9.35, 1.8, 7.0), 'slate2', wedge=True)              # today's sloped top, as a crest
+    cbox(head, (0, 28.55, -4.05), (8.7, 0.9, 1.0), 'slate3', bevel=0.15)          # rock brow ledge over the visor
+    cbox(head, (0, 23.7, -4.0), (6.0, 1.2, 0.8), 'slate3', bevel=0.15)            # a heavy chin
     for s in (-1, 1):
-        beam(head, (s * 3.2, 24.8, -4.1), (s * 3.35, 27.6, -4.5), 0.9, 0.9, 'stone3', top=0.15)   # rock tusks
-        cyl(head, (s * 2.8, 29.8, 0.4), (s * 3.6, 32.6, 0.8), 0.35, 'prong')                       # lightning rods
-        cbox(head, (s * 3.65, 32.8, 0.82), (0.8, 0.8, 0.8), 'prong', bevel=0.25)
-    for (x, y, z, sx, sy, sz, c) in ((0, 30.4, 1.4, 6.0, 1.6, 4.0, 'cloud'), (-2.4, 31.0, 2.2, 2.6, 1.6, 2.6, 'cloud2'),
-                                     (2.2, 31.2, 0.8, 2.8, 1.8, 2.8, 'cloud'), (0, 31.6, 2.6, 2.4, 1.4, 2.2, 'cloud2')):
-        cbox(head, (x, y, z), (sx, sy, sz), c, bevel=0.25)
-    face = FlatFace(k, 'Head', {'eyes': dict(c=(0, 27.0, -3.8), n=(0, 0, -1)), 'mouth': dict(c=(0, 24.6, -4.2), n=(0, 0, -1))}, unit=0.1)
+        cbox(head, (s * 4.75, 26.2, -1.0), (0.5, 4.0, 4.4), 'slate3', bevel=0.15)   # cheek plates
+    face = FlatFace(k, 'Head', {'face': dict(c=(0, 27.04, -4.25), n=(0, 0, -1))}, unit=0.08)   # the visor front
     for s in (-1, 1):
-        face.plate(head, place(SLOT, s * 1.5, 0.45, s, 0.0, 2.4, 1.2), 'eyedark', 0, fr='eyes')
-        face.plate(face.g('Chase', 'eyes'), place(SLOT, s * 1.5, 0.38, s, 0.0, 1.9, 0.56), 'iris', 1, fr='eyes')
-        face.plate(face.g('Asleep'), place(SQUARE, s * 1.5, 0.15, s, 0.0, 1.7, 0.16), 'eyedim', 1, fr='eyes')
-    face.line('Chase', [(-2.6, 0.1), (-1.75, -0.38), (-0.88, 0.12), (0.0, -0.4), (0.88, 0.12), (1.75, -0.38), (2.6, 0.1)], 0.42,
-              col='iris', fr='mouth', kind='eyes')
-    face.line('Asleep', [(-1.9, -0.1), (-0.95, -0.25), (0.0, -0.1), (0.95, -0.25), (1.9, -0.1)], 0.14, col='eyedark', fr='mouth')
-    # Arms: a shoulder rock and a big fist, both FLOATING by design, with a storm core between, linked by lightning ---
+        face.plate(face.g('Chase', 'eyes'), place(SLOT, s * 2.05, 0.3, s, 0.0, 2.9, 0.78), 'iris', 1)
+        face.plate(face.g('Asleep'), place(SQUARE, s * 2.05, 0.1, s, 0.0, 2.5, 0.18), 'eyedim', 1)
+    face.line('Chase', [(-2.6, -0.75), (-1.73, -1.12), (-0.87, -0.75), (0.0, -1.14), (0.87, -0.75), (1.73, -1.12), (2.6, -0.75)], 0.3,
+              col='iris', kind='eyes')
+    # Today's storm-cloud crown, floating over the head: chunky cloud blocks where today's five cloud balls are --------
+    cloud = k.g('Head', 'main', 'Cloud')
+    for (x, y, z, sx, sy, sz, c) in ((-4.99, 32.58, 0.97, 8.6, 4.6, 7.6, 'cloud'), (5.09, 32.96, -0.62, 8.0, 4.4, 7.2, 'cloud2'),
+                                     (-0.3, 34.44, 0.06, 10.0, 5.4, 8.8, 'cloud3'), (-2.23, 32.57, -3.07, 6.4, 3.6, 5.6, 'cloud2'),
+                                     (2.74, 32.38, 3.41, 6.8, 3.6, 6.0, 'cloud')):
+        cbox(cloud, (x, y + 0.8, z), (sx * 0.86, sy * 0.8, sz * 0.86), c, bevel=0.3)     # floats clear of the crest
+    hfx = k.g('Head', 'fx')                                                       # storm flashes in the cloud (effect)
+    bolt(hfx, (-5.6, 29.2, 2.0), (-5.0, 30.6, 1.6), 0.14, seed=11)
+    bolt(hfx, (5.4, 29.6, 1.4), (5.0, 31.0, 1.0), 0.14, seed=12)
+    # Arms: knuckle blocks on today's heavy fists ----------------------------------------------------------------------
     fx = k.g('Body', 'fx')
     for s, arm in ((1, 'LeftArm'), (-1, 'RightArm')):
-        rock = k.g(arm, 'main', 'Rock')
-        cbox(rock, (s * 12.0, 21.4, 0.0), (6.0, 5.4, 7.2), 'stone', bevel=0.1)
-        cbox(rock, (s * 12.4, 24.4, 0.4), (4.4, 1.2, 5.4), 'stone3', bevel=0.12)
-        beam(rock, (s * 11.4, 24.6, -0.6), (s * 11.8, 27.4, -0.4), 1.4, 1.4, 'stone3', top=0.15)
-        beam(rock, (s * 13.4, 24.6, 1.2), (s * 14.2, 26.6, 1.4), 1.2, 1.2, 'stone3', top=0.15)
         fist = k.g(arm, 'main', 'Fist')
-        cbox(fist, (s * 12.6, 10.2, -1.2), (7.0, 7.4, 7.6), 'stone2', bevel=0.1)
-        cbox(fist, (s * 12.6, 12.9, -1.2), (7.3, 1.0, 7.9), 'prong', bevel=0.15)
-        for dx in (-2.4, -0.8, 0.8, 2.4):
-            cbox(fist, (s * 12.6 + dx, 8.4, -5.1), (1.5, 1.6, 1.0), 'stone3', bevel=0.2)
-        ag = k.g(arm, 'glow')
-        crystal(ag, (s * 12.4, 15.35, -0.5), (0, 1, 0), 0.85, 1.0, 'iris', sides=4)           # the storm core: a crystal
-        crystal(ag, (s * 12.4, 15.55, -0.5), (0, -1, 0), 0.8, 0.65, 'iris', sides=4)          # floating between rock and fist
-        k.floating |= {(arm, 'Rock'), (arm, 'Fist'), (arm, 'Glow')}
+        for dx in (-2.7, -0.9, 0.9, 2.7):
+            cbox(fist, (s * 12.65 + dx, 7.6 - 0.14 * dx * s, -6.25), (1.6, 2.0, 0.9), 'slate3', bevel=0.2)
         afx = k.g(arm, 'fx')
-        bolt(afx, (s * 8.3, 20.0, 0.0), (s * 9.0, 20.6, 0.2), 0.16, seed=1 + s)
-        bolt(afx, (s * 12.0, 16.6, -0.4), (s * 11.9, 18.7, -0.2), 0.16, seed=3 + s)
-        bolt(afx, (s * 12.4, 14.1, -0.6), (s * 12.5, 13.9, -0.8), 0.16, seed=5 + s)
+        bolt(afx, (s * 8.0, 20.0, 0.0), (s * 8.9, 20.6, 0.2), 0.16, seed=1 + s)
+        bolt(afx, (s * 12.4, 16.8, -0.5), (s * 12.0, 18.4, -0.3), 0.16, seed=3 + s)
+        bolt(afx, (s * 12.4, 13.9, -0.6), (s * 12.5, 14.7, -0.6), 0.16, seed=5 + s)
+    # Legs: toe blocks on today's wedge feet, a slate plate on each shin; lightning from the hip cores to the knees ----
     for s, leg in ((1, 'LeftLeg'), (-1, 'RightLeg')):
         g = k.g(leg)
-        joint(g, (s * 3.74, 6.54, 0.0), 4.4, 'stone2')
-        cbox(g, (s * 3.9, 4.0, 0.0), (5.6, 5.0, 5.8), 'stone', bevel=0.1)
-        cbox(g, (s * 4.0, 0.4, -0.4), (5.0, 3.4, 5.4), 'stone2', bevel=0.1)
-        cbox(g, (s * 4.1, -2.3, -1.8), (6.4, 2.0, 8.0), 'stone', bevel=0.1)
-        lg = k.g(leg, 'glow')
-        crystal(lg, (s * 4.0, 4.4, -2.7), (0, 0.4, -1), 0.6, 1.4, 'iris', sides=4)            # a storm shard in the thigh
-    sleep_z(k, (5.0, 35.0, -2.0), 3.2)
+        for dx in (-2.4, 0.0, 2.4):
+            cbox(g, (s * 3.98 + dx, -2.75, -6.45), (1.7, 0.9, 1.3), 'slate3', bevel=0.2)
+        lfx = k.g(leg, 'fx')
+        bolt(lfx, (s * 3.9, 9.9, 0.0), (s * 3.91, 8.7, 0.0), 0.16, seed=7 + s)
+    sleep_z(k, (6.0, 38.5, -2.0), 3.2)
     return k
 
 

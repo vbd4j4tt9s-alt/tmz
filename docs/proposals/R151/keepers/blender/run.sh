@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rebuild the R151 keeper previews (rev 4: classic Roblox block builds, flat two-state faces, connectivity check, studs, effects).
+# Rebuild the R151 keeper previews (rev 5: block builds; golem and colossus from their native parts; flat two-state faces; connectivity check, studs, effects).
 # Usage: sh run.sh <scratch dir> <bpy python>
 #   <bpy python>: a Python with the bpy 4.5 module (Blender as a module); renders use Cycles on the CPU.
 # Steps: (1) dump the REAL pose frames + accent parts from the repo's Luau modules on the repo's Roblox mock,
