@@ -25,13 +25,14 @@ local PEACEFUL_PLAYLIST = {
 
 -- APMOfficial / Bruno Jose Marc Le Roux: Playful Chase (92-second version).
 -- Creator Store identity checked 2026-09-17; experience audio permissions still apply.
+-- R151 (owner): the keeper chase theme is the owner's uploaded "kulakovka-gta" track.
 local CHASE_TRACK = {
-	Name = "Playful Chase",
-	SoundId = "rbxassetid://1839530854",
+	Name = "GTA Chase",
+	SoundId = "rbxassetid://90864299965930",
 }
 
--- Creator Store: APMOfficial Chaser, a tense percussion/electronic chase score.
-local SPECIAL_TRACK={Name='Chaser',SoundId='rbxassetid://9042664292'}
+-- R151 (owner): The Darkened's (secret keeper) chase theme is the owner's uploaded "tunetank-intense" track.
+local SPECIAL_TRACK={Name='Intense',SoundId='rbxassetid://127003062753525'}
 -- Recovered from the pre-R73 BiomeAmbience source: the original track-entry music.
 local SCENIC_TRACK={Name='Nature Inspiration',SoundId='rbxassetid://96110001912212'}
 local SCENIC_VOLUME=.055
