@@ -11,6 +11,8 @@ local Style=W.module('TreadmillBonusStyle')
 local button,bar,overlay,hud=C.Button,C.Bar,C.Overlay,C.Hud
 local face=button.Face
 local function frames(n)UW.frames(n,1/60)end
+-- R150 review: how often the Denied cue was asked for since C.Played had `from` entries (every flashMessage = one refusal; nothing else plays Denied here)
+local function denied(from)local n=0;for i=from+1,#C.Played do if C.Played[i]=='Denied'then n+=1 end end;return n end
 local function secs(s)UW.seconds(s,1/60)end
 UW.frames(3,1/60)
 local baseHud,baseOverlay,baseBar=UW.count(hud),UW.count(overlay),UW.count(bar)
@@ -44,8 +46,10 @@ check(face.Sub.Text:find('^NEXT 0:')~=nil,'31 s left is still NEXT')
 -- tapping while charging asks nothing of the server
 local before=C.Invoked
 C.set('DueAt',R.clock+200);frames(20)
+local d1=#C.Played
 button.Activated:Fire()
 check(C.Invoked==before and overlay.Enabled==false,'charging: a tap does not call the server and opens nothing')
+check(denied(d1)==1,'R150 review: charging: the tap that says "NEXT IN m:ss" clicks Denied once ('..denied(d1)..')')
 check(face.Sub.Text:find('^NEXT IN 3:')~=nil,'charging: a tap says when: '..face.Sub.Text)
 check(UW.frameListeners()>=1,'the little "no" nudge runs for a moment')
 secs(3);check(face.Sub.Text:find('^NEXT 3:')~=nil and face.Position.X.Offset==0 and face.Position.Y.Offset==0,'the message clears after ~2.5 s and the face is back in place')
@@ -117,7 +121,9 @@ d0=UW.delays;secs(10);check(UW.delays==d0 and UW.frameListeners()==0,'...and not
 -- refusal on the button
 C.set('Ready',1);frames(2)
 C.Reply={Error='SEED BAG FULL! Make room - your roll stays ready.',Ready=1}
+local d2=#C.Played
 button.Activated:Fire()
+check(denied(d2)==1,'R150 review: a server refusal ("SEED BAG FULL!") clicks Denied once ('..denied(d2)..')')
 check(face.Sub.Text=='BAG FULL!' and #face.Sub.Text<=15,'refusal: short copy on the button ('..face.Sub.Text..')')
 check(button:GetAttribute('AccessibleLabel'):find('SEED BAG FULL')~=nil,'refusal: the full text goes to the accessibility label')
 check(overlay.Enabled==false,'refusal: no roll window')
@@ -222,6 +228,7 @@ local ovBase=UW.count(overlay)
 for _,case in ipairs(cases)do
  local style=Style.Reveal(case.Rarity);local tierName,tierColor=Rules.Tier(case.Variant)
  local special=Rules.Special[case.Rarity]==true
+ local dRoll=#C.Played
  openRoll(case,0)
  local tag=case.Rarity
  check(overlay.Enabled==true and C.Invoked>0,tag..': the roll window opens')
@@ -262,7 +269,7 @@ for _,case in ipairs(cases)do
   check(rays.ZIndex>5 and rays.ZIndex<winner.ZIndex and winner.ZIndex==8,tag..': rays sit above the other cards and below the winner')
   check(near(rays.Position.X.Offset,(Rules.Strip.Win-1)*Rules.Strip.Pitch+Rules.Strip.CardWidth/2),tag..': rays centred on the winning card')
  end
- local fxCount=#overlay.Fx:GetChildren()
+ local fxCount=#panel.Fx:GetChildren()
  check(fxCount==style.Sparkles+style.Confetti,tag..': sparkles '..style.Sparkles..' + confetti '..style.Confetti..' = '..fxCount)
  check(winner:FindFirstChild('ShinePane')~=nil,tag..': a soft shine sweeps the winner')
  if special then check(winner:FindFirstChild('BorderGlow')~=nil,tag..': special: border light-up still there')else check(winner:FindFirstChild('BorderGlow')==nil,tag..': no border light-up for '..tag)end
@@ -270,15 +277,17 @@ for _,case in ipairs(cases)do
  local r1=rays and rays.Rotation or 0;secs(.5);local r2=rays and rays.Rotation or 0
  check(r2~=r1,tag..': the rays turn slowly ('..r1..' -> '..r2..')')
  secs(2)
- check(#overlay.Fx:GetChildren()==0,tag..': confetti and sparkles are gone after ~2 s')
+ check(#panel.Fx:GetChildren()==0,tag..': confetti and sparkles are gone after ~2 s')
  check(winner:FindFirstChild('ShinePane')==nil,tag..': the shine pane is removed after its sweep')
  check(UW.frameListeners()==1,tag..': after the reveal only the ambient animator runs ('..UW.frameListeners()..')')
+ check(denied(dRoll)==0,tag..': R150 review: a roll that starts, spins and reveals never clicks Denied ('..denied(dRoll)..')')
  panel.Actions.Close.Activated:Fire()
  check(overlay.Enabled==false and UW.frameListeners()==0,tag..': closed: no listener left')
  check(UW.count(overlay)==ovBase,tag..': closed: the overlay is back to its bare size ('..UW.count(overlay)..' vs '..ovBase..')')
  secs(2);check(UW.activeTweens()<=1,tag..': no tween left running ('..UW.activeTweens()..')')
 end
 -- Skip, roll again, close mid-way ----------------------------------------------------------------------------------------
+local dAgain=#C.Played
 openRoll(cases[5],1)
 frames(30);panel.Actions.Skip.Activated:Fire()
 check(panel.Actions.Close.Visible and panel.Word.Text=='LEGENDARY!' and panel.Actions.Again.Visible,'Skip jumps to the reveal; ROLL AGAIN shows with one ready')
@@ -286,9 +295,10 @@ check(panel.Actions.Again.Face.Label.Text=='ROLL AGAIN (1)','roll again caption 
 C.Reply={Ok=true,Stage=1,Variant='Pack01',Rarity='Common',Label='Forest Seed Pack',Pool='1',Ready=0}
 local invokedBefore=C.Invoked
 panel.Actions.Again.Activated:Fire()
-check(C.Invoked==invokedBefore+1 and overlay.Enabled==true and panel.Word.Visible==false and panel.Status.Visible==true and #overlay.Fx:GetChildren()==0,'ROLL AGAIN: closes, asks once, a fresh spin with a clean screen')
+check(C.Invoked==invokedBefore+1 and overlay.Enabled==true and panel.Word.Visible==false and panel.Status.Visible==true and #panel.Fx:GetChildren()==0,'ROLL AGAIN: closes, asks once, a fresh spin with a clean screen')
 check(panel.Result.Text==Style.SpinHint and panel:FindFirstChild('Pop')~=nil and panel.StripWindow.Strip:FindFirstChild('Rays')==nil,'ROLL AGAIN: no leftovers from the last reveal')
 spinOut();panel.Actions.Close.Activated:Fire()
+check(denied(dAgain)==0,'R150 review: Skip, a second roll and ROLL AGAIN never click Denied ('..denied(dAgain)..')')
 -- ReducedMotion roll ---------------------------------------------------------------------------------------------------------
 W.Gui.ReducedMotionEnabled=true
 openRoll(cases[5],0)
@@ -297,7 +307,7 @@ local movedPointer=false;local y0=panel.PointerTop.Position.Y.Offset
 local took2=0;while panel.Actions.Skip.Visible and took2<600 do UW.frames(1,1/60);took2+=1;if panel.PointerTop.Position.Y.Offset~=y0 then movedPointer=true end end
 check(took2/60<=Rules.Strip.ReducedDuration+.1,'ReducedMotion: short spin ('..took2/60 ..' s)')
 check(not movedPointer and UW.frameListeners()==0,'ReducedMotion: no ambient motion and no listener after the stop ('..UW.frameListeners()..')')
-check(panel.Word.Visible and panel.Word.Pop.Scale==1 and #overlay.Fx:GetChildren()==0,'ReducedMotion: the word shows without a pop, no confetti, no sparkles')
+check(panel.Word.Visible and panel.Word.Pop.Scale==1 and #panel.Fx:GetChildren()==0,'ReducedMotion: the word shows without a pop, no confetti, no sparkles')
 local rays2=panel.StripWindow.Strip:FindFirstChild('Rays')
 check(rays2~=nil,'ReducedMotion: the rays still show (still)')
 secs(2);check(rays2.Rotation==0 and panel.StripWindow.Strip['Card'..Rules.Strip.Win]:FindFirstChild('ShinePane')==nil,'ReducedMotion: rays do not turn, no shine sweep')
@@ -307,19 +317,27 @@ panel.Actions.Close.Activated:Fire();W.Gui.ReducedMotionEnabled=false
 me:SetAttribute('FastMode',true)
 openRoll(cases[5],0);spinOut()
 local lstrip=panel.StripWindow.Strip
-check(#overlay.Fx:GetChildren()==3+math.floor(Style.Reveal('Legendary').Confetti*.3),'FastMode: fewer pieces ('..#overlay.Fx:GetChildren()..')')
+check(#panel.Fx:GetChildren()==3+math.floor(Style.Reveal('Legendary').Confetti*.3),'FastMode: fewer pieces ('..#panel.Fx:GetChildren()..')')
 check(lstrip['Card'..Rules.Strip.Win]:FindFirstChild('ShinePane')==nil,'FastMode: no shine sweep')
 local lr=lstrip:FindFirstChild('Rays');secs(1);check(lr~=nil and lr.Rotation==0,'FastMode: rays stay still')
 local tw1=panel.Twinkle1.BackgroundTransparency;secs(.5);check(panel.Twinkle1.BackgroundTransparency==tw1,'FastMode: no twinkle updates')
 panel.Actions.Close.Activated:Fire();me:SetAttribute('FastMode',nil)
 -- ClientFxBudget tier 1 counts as low as well
 C.Tier=1;openRoll(cases[6],0);spinOut()
-check(#overlay.Fx:GetChildren()==3+math.floor(Style.Reveal('Mythic').Confetti*.3),'low tier 1: fewer pieces ('..#overlay.Fx:GetChildren()..')')
+check(#panel.Fx:GetChildren()==3+math.floor(Style.Reveal('Mythic').Confetti*.3),'low tier 1: fewer pieces ('..#panel.Fx:GetChildren()..')')
 panel.Actions.Close.Activated:Fire();C.Tier=3
 -- unchanged result handling: malformed replies do nothing
-C.set('Ready',1);C.Reply={Ok=true,Stage=99,Variant=nil};secs(2);button.Activated:Fire()
+C.set('Ready',1);C.Reply={Ok=true,Stage=99,Variant=nil};secs(2)
+local d3=#C.Played;button.Activated:Fire()
 check(overlay.Enabled==false,'a malformed reply opens nothing')
-C.Reply=nil;secs(3);button.Activated:Fire();check(overlay.Enabled==false,'no reply opens nothing')
+check(denied(d3)==1,'R150 review: a malformed reply clicks Denied once ('..denied(d3)..')')
+C.Reply=nil;secs(3);d3=#C.Played;button.Activated:Fire();check(overlay.Enabled==false,'no reply opens nothing')
+check(denied(d3)==1,'R150 review: no reply at all clicks Denied once ('..denied(d3)..')')
+do -- the server call itself fails (a network error): the same refusal
+ secs(3);local realInvoke=C.Remote.InvokeServer;C.Remote.InvokeServer=function()error('network down')end
+ d3=#C.Played;button.Activated:Fire();check(overlay.Enabled==false,'a failed call opens nothing')
+ check(denied(d3)==1,'R150 review: a failed call clicks Denied once ('..denied(d3)..')');C.Remote.InvokeServer=realInvoke
+end
 secs(3);C.set('Ready',0);frames(2)
 -- 5. No leaks over repeated rolls -------------------------------------------------------------------------------------------------
 local soundCount=#W.service('SoundService'):GetChildren()
@@ -338,7 +356,200 @@ check(worst==0,'24 rolls: the overlay never grows (worst difference '..worst..')
 check(UW.count(hud)==hudCount and UW.count(bar)==barCount,'24 rolls: the HUD button and the timer never grow')
 check(#W.service('SoundService'):GetChildren()==soundCount and soundCount>=4,'24 rolls: the tick sound pool stays at its 4 sounds ('..#W.service('SoundService'):GetChildren()..')')
 check(UW.frameListeners()==0 and UW.activeTweens()==0,'24 rolls: nothing running afterwards')
-check(#overlay.Fx:GetChildren()==0 and #hud.Fx:GetChildren()==0 and #bar.Fx:GetChildren()==0,'24 rolls: no pieces left in any effect layer')
+check(#panel.Fx:GetChildren()==0 and #hud.Fx:GetChildren()==0 and #bar.Fx:GetChildren()==0,'24 rolls: no pieces left in any effect layer')
+-- 5b. R150 review fixes ---------------------------------------------------------------------------------------------------------------------------
+-- The reveal confetti never crosses the ribbon header, the reveal word and the HUD button pop about their centres, the roll screen builds fewer instances,
+-- the gloss is for the special cards only, no twinkle sits on the fine print, the gift timer's shadow follows its pop and shake.
+C.set('Ready',0);training(false);frames(3);secs(1)
+local VIEWS={{1280,720,false,'desktop'},{844,390,true,'phone'}}
+local function setView(v)W.UIS.TouchEnabled=v[3];C.size(v[1],v[2]);frames(2)end
+local PANEL='TreadmillBonusRoll.Panel.'
+local function stripTags(text)return(text:gsub('<[^>]+>',''))end
+-- Where the text of a label really is (centred, scaled to the box like TextScaled): not the whole label box.
+local function textRect(e)
+ local label=e.Obj;local text=label.RichText and stripTags(label.Text)or label.Text
+ local _,size,lines=UW.fit(label,{W=e.RW,H=e.RH})
+ local tw=lines>1 and e.RW or math.min(e.RW,UW.width(text,size));local th=math.min(e.RH,lines*size*1.12)
+ return {X=e.RX+(e.RW-tw)/2,Y=e.RY+(e.RH-th)/2,W=tw,H=th}
+end
+-- (a) the confetti and the sparkles are drawn under the ribbon header ----------------------------------------------------------------------------------
+do
+ local overlapFrames,pieceFrames,underHeader,aboveStrip,aboveWord,bad,badStrip=0,0,0,0,0,0,0
+ for _,v in ipairs(VIEWS)do
+  setView(v);local w,h=v[1],v[2]
+  for _,case in ipairs({cases[5],cases[6],cases[7],cases[1]})do
+   openRoll(case,0);frames(25);panel.Actions.Skip.Activated:Fire()
+   for _=1,100 do
+    frames(1)
+    local list,by=UW.rects(overlay,w,h)
+    local ribbon,title,window,word=by[PANEL..'Ribbon'],by[PANEL..'Ribbon.Title'],by[PANEL..'StripWindow'],by[PANEL..'Word']
+    local words=textRect(title)
+    for _,e in ipairs(list)do
+     if e.Visible and e.Path:sub(1,#PANEL+3)==PANEL..'Fx.'then
+      pieceFrames+=1
+      if UW.overlap(e,ribbon)then overlapFrames+=1 end
+      if UW.overlap(e,words)or UW.overlap(e,ribbon)then
+       underHeader+=1
+       if not(UW.drawsAbove(ribbon.Obj,e.Obj)and UW.drawsAbove(title.Obj,e.Obj))then bad+=1 end
+      end
+      if UW.overlap(e,window)then aboveStrip+=1;if not UW.drawsAbove(e.Obj,window.Obj)then badStrip+=1 end end
+      if word.Visible and UW.overlap(e,word)then aboveWord+=1;if not UW.drawsAbove(e.Obj,word.Obj)then badStrip+=1 end end
+     end
+    end
+   end
+   panel.Actions.Close.Activated:Fire();secs(2)
+  end
+ end
+ check(pieceFrames>=1000,'R150 review: the confetti test saw plenty of pieces ('..pieceFrames..' piece-frames, desktop and phone)')
+ check(overlapFrames>=60 and underHeader>=60,'R150 review: ... and many of them fly right across the header ('..overlapFrames..' piece-frames on the ribbon)')
+ check(bad==0,'R150 review: no confetti or sparkle piece is ever drawn over the ribbon header or its text, desktop and phone, Common / Legendary / Mythic / Secret ('..bad..' of '..underHeader..' piece-frames over it)')
+ check(aboveStrip>=60 and aboveWord>=1 and badStrip==0,'R150 review: ... while they still fly over the strip window and the reveal word ('..aboveStrip..' / '..aboveWord..' piece-frames, '..badStrip..' hidden behind them)')
+ -- the layer: inside the panel, over the strip window (3), under the ribbon (5), the pointers (9) and the bow (10); it never takes a click
+ openRoll(cases[5],0)
+ local fxLayer=panel:FindFirstChild('Fx')
+ check(fxLayer~=nil and fxLayer.Parent==panel and overlay:FindFirstChild('Fx')==nil,'R150 review: the reveal layer lives in the panel, not on the screen')
+ check(fxLayer.ZIndex>panel.StripWindow.ZIndex and fxLayer.ZIndex<panel.Ribbon.ZIndex and fxLayer.ZIndex<panel.PointerTop.ZIndex and fxLayer.ZIndex<panel.Bow.ZIndex,'R150 review: ... over the strip window ('..panel.StripWindow.ZIndex..'), under the ribbon ('..panel.Ribbon.ZIndex..'), the pointers and the bow')
+ check(fxLayer.Active==false and fxLayer.BackgroundTransparency==1,'R150 review: ... and it is invisible and takes no clicks')
+ panel.Actions.Close.Activated:Fire();secs(2)
+end
+-- (b) the reveal word pops about its centre ------------------------------------------------------------------------------------------------------------
+do
+ local worst,shrunk,count=0,0,0
+ for _,v in ipairs(VIEWS)do
+  setView(v);local w,h=v[1],v[2]
+  for _,case in ipairs(cases)do
+   openRoll(case,0);frames(25);panel.Actions.Skip.Activated:Fire()
+   local xs,ys,ws={},{},{}
+   for i=1,70 do
+    local _,by=UW.rects(overlay,w,h);local e=by[PANEL..'Word'];local pe=by['TreadmillBonusRoll.Panel']
+    xs[i]=e.X+e.W/2;ys[i]=e.Y+e.H/2;ws[i]=e.W
+    if i==1 then
+     check(math.abs(xs[1]-(pe.X+pe.W/2))<=.01,v[4]..' '..case.Rarity..': the word starts at the middle of the panel ('..xs[1]..' vs '..pe.X+pe.W/2 ..')')
+    end
+    frames(1)
+   end
+   local restX,restY,restW=xs[70],ys[70],ws[70]
+   local lo=math.huge
+   for i=1,70 do worst=math.max(worst,math.abs(xs[i]-restX),math.abs(ys[i]-restY));lo=math.min(lo,ws[i])end
+   count+=1;if lo<restW*.95 then shrunk+=1 end
+   panel.Actions.Close.Activated:Fire();secs(2)
+  end
+ end
+ check(worst<=.01,'R150 review: the word\'s centre does not move during the pop, on any rarity, desktop and phone (worst drift '..worst..' px; a top-left pivot slid it ~250 px)')
+ check(shrunk==count,'R150 review: ... and the pop really scales it ('..shrunk..' of '..count..' reveals start smaller)')
+end
+-- (c) no twinkle sits on the fine print or the status / result lines -----------------------------------------------------------------------------------
+do
+ for _,v in ipairs(VIEWS)do
+  setView(v);local w,h=v[1],v[2]
+  openRoll(cases[1],0);frames(25)
+  local _,by=UW.rects(overlay,w,h);local hits,n={},0
+  for i=1,12 do
+   local t=by[PANEL..'Twinkle'..i]
+   if t then
+    n+=1
+    for _,name in ipairs({'Odds','Result','Status'})do
+     local row=by[PANEL..name];local r=textRect(row)
+     if UW.overlap(t,r,1)then hits[#hits+1]='Twinkle'..i..' on '..name end -- (1 px of slack: a line box has air above its glyphs)
+    end
+    if UW.overlap(t,by[PANEL..'Actions.Skip'])then hits[#hits+1]='Twinkle'..i..' on SKIP' end
+   end
+  end
+  check(n==8,v[4]..': eight twinkles are left (the four along the bottom edge are gone) ('..n..')')
+  check(#hits==0,'R150 review: '..v[4]..': no twinkle sits on the odds line, the status / result text or the buttons ('..table.concat(hits,', ')..')')
+  local odds=by[PANEL..'Odds'];local lowest=0
+  for i=1,12 do local t=by[PANEL..'Twinkle'..i];if t and t.Y+t.H>lowest and t.Y<odds.Y+odds.H then lowest=math.max(lowest,t.Y+t.H)end end
+  check(lowest<=odds.Y+1,'R150 review: '..v[4]..': no twinkle reaches into the odds row\'s height ('..lowest..' vs row top '..odds.Y..')')
+  panel.Actions.Skip.Activated:Fire();panel.Actions.Close.Activated:Fire();secs(2)
+ end
+end
+-- (d) the HUD button pops and pulses about its centre ---------------------------------------------------------------------------------------------------
+do
+ setView(VIEWS[1]);local w,h=1280,720
+ local function rectOf(path)local _,by=UW.rects(hud,w,h);return by['TreadmillBonusHud.BonusRollButton'..path]end
+ check(button.AnchorPoint.X==.5 and button.AnchorPoint.Y==.5,'R150 review: the HUD button is anchored at its centre (the pop and the pulse scale about the AnchorPoint)')
+ C.set('Ready',1);secs(3)
+ local rest=rectOf('');local gift=rectOf('.Face.Icon')
+ local cx0,cy0=rest.RX+rest.RW/2,rest.RY+rest.RH/2
+ -- the pulse: ~14 s of the attention loop (a wiggle and a pulse every 4.2 s)
+ local drift,widest=0,rest.W
+ for _=1,60*14 do
+  frames(1);local b=rectOf('');drift=math.max(drift,math.abs(b.X+b.W/2-cx0),math.abs(b.Y+b.H/2-cy0));widest=math.max(widest,b.W)
+ end
+ check(widest>rest.W*1.02,'R150 review: the attention pulse was measured (the button grows to '..string.format('%.3f',widest/rest.W)..' x)')
+ check(drift<=.01,'R150 review: the attention pulse keeps the button\'s centre in place ('..drift..' px drift)')
+ -- the ready pop: gone, then back
+ C.set('Ready',0);frames(3);secs(1)
+ C.set('Ready',1)
+ local sparks=hud.Fx:GetChildren()
+ check(#sparks==8,'R150 review: the sparkle burst is there at once ('..#sparks..')')
+ local near2=true
+ for _,sp in ipairs(sparks)do
+  if math.abs(sp.Position.X.Offset-(gift.X+gift.W/2))>1.5 or math.abs(sp.Position.Y.Offset-(gift.Y+gift.H/2))>1.5 then near2=false end
+ end
+ check(near2 and #sparks>0,'R150 review: ... starting on the gift icon (buttonCenter follows the new anchor): icon centre '..string.format('%.1f,%.1f',gift.X+gift.W/2,gift.Y+gift.H/2)..' vs '..string.format('%.1f,%.1f',sparks[1].Position.X.Offset,sparks[1].Position.Y.Offset))
+ local pdrift,smallest=0,rest.W
+ for _=1,40 do
+  local b=rectOf('');pdrift=math.max(pdrift,math.abs(b.X+b.W/2-cx0),math.abs(b.Y+b.H/2-cy0));smallest=math.min(smallest,b.W);frames(1)
+ end
+ check(smallest<rest.W*.8,'R150 review: the ready pop was measured (it starts at '..string.format('%.2f',smallest/rest.W)..' x)')
+ check(pdrift<=.01,'R150 review: the ready pop keeps the button\'s centre in place ('..pdrift..' px drift; a top-left pivot moved it ~30 px)')
+ local after=rectOf('')
+ check(math.abs(after.RX-rest.RX)<.01 and math.abs(after.RY-rest.RY)<.01 and after.RW==rest.RW,'R150 review: the button comes back to the same place')
+ C.set('Ready',0);secs(1)
+end
+-- (e) instance counts: the roll opens with fewer, the gloss is for the special cards only ------------------------------------------------------------------
+do
+ setView(VIEWS[1])
+ local made=0
+ do local inew=R.Instance.new;R.Instance.new=function(...)made+=1;return inew(...)end end
+ local worstOpen,worstReveal=0,0;local glossOk,glossCount,specialCount=true,0,0
+ for _,case in ipairs(cases)do
+  C.Reply={Ok=true,Stage=case.Stage,Variant=case.Variant,Rarity=case.Rarity,Label=case.Label,Pool='1,6,2,3,4,5,7',Ready=0}
+  C.set('Ready',1);frames(1)
+  made=0;button.Activated:Fire();worstOpen=math.max(worstOpen,made)
+  panel.StripWindow.AbsoluteSize=R.Vector2.new(panel.Size.X.Offset-28,panel.StripWindow.Size.Y.Offset)
+  if case.Rarity=='Common'or case.Rarity=='Secret'then
+   for _,card in ipairs(panel.StripWindow.Strip:GetChildren())do
+    local isSpecial=card:FindFirstChild('Design')~=nil;if isSpecial then specialCount+=1 end
+    local hasGloss=card:FindFirstChild('Gloss')~=nil;if hasGloss then glossCount+=1 end
+    if hasGloss~=isSpecial then glossOk=false end
+   end
+  end
+  frames(10);made=0;panel.Actions.Skip.Activated:Fire();worstReveal=math.max(worstReveal,made)
+  panel.Actions.Close.Activated:Fire();secs(2)
+ end
+ check(glossOk and glossCount==specialCount and glossCount>=1,'R150 review: only the special cards (Legendary / Mythic / Secret) carry the gloss ('..glossCount..' gloss frames on '..specialCount..' special cards)')
+ check(worstOpen<=500,'R150 review: opening a roll builds at most 500 instances in the one frame (first cut 598-625, R149 368-395): '..worstOpen)
+ check(worstReveal<=100,'R150 review: the reveal frame builds at most 100 (first cut 41 / 120 / 142 / 160; R149 4-5): '..worstReveal)
+ -- a sparkle is one instance: a Secret reveal's pieces are exactly its count
+ openRoll(cases[7],0);frames(10);panel.Actions.Skip.Activated:Fire()
+ local st=Style.Reveal('Secret');local bare=0
+ for _,pc in ipairs(panel.Fx:GetChildren())do if #pc:GetChildren()==0 then bare+=1 end end
+ check(bare==#panel.Fx:GetChildren() and #panel.Fx:GetChildren()==st.Sparkles+st.Confetti,'R150 review: every sparkle and confetti piece is one bare Frame ('..bare..' of '..#panel.Fx:GetChildren()..')')
+ panel.Actions.Close.Activated:Fire();secs(2)
+end
+-- (f) the gift timer's shadow lip pops and shakes with the pill -------------------------------------------------------------------------------------------
+do
+ training(true);C.set('Interval',360);C.set('Ready',0);C.set('DueAt',R.clock+300);C.set('Left',300);frames(20)
+ local back,lip=bar.Back,bar.Lip
+ C.set('Ready',1)
+ local dScale,dRot,dW,dY,sawPop,sawShake=0,0,0,0,false,false
+ for _=1,45 do
+  local _,by=UW.rects(bar,bar.Size.X.Offset,bar.Size.Y.Offset)
+  local b,l=by['TreadmillBonusProgress.Back'],by['TreadmillBonusProgress.Lip']
+  dScale=math.max(dScale,math.abs(lip.Pop.Scale-back.Pop.Scale));dRot=math.max(dRot,math.abs(lip.Rotation-back.Rotation));dW=math.max(dW,math.abs(l.RW-b.RW))
+  dY=math.max(dY,math.abs((l.RY+l.RH/2)-(b.RY+b.RH/2)-4*back.Pop.Scale))
+  if back.Pop.Scale>1.05 then sawPop=true end;if math.abs(back.Rotation)>2 then sawShake=true end
+  frames(1)
+ end
+ check(sawPop and sawShake,'R150 review: the gift timer popped and shook in this test')
+ check(dScale<1e-9 and dRot<1e-9 and dW<.01,'R150 review: the shadow lip has the pill\'s scale and rotation on every frame (scale off by '..dScale..', rotation by '..dRot..', width by '..dW..')')
+ check(dY<=1,'R150 review: ... and stays its 4 px (scaled) under the pill ('..string.format('%.2f',dY)..' px off)')
+ secs(1);check(lip.Pop.Scale==1 and lip.Rotation==0 and back.Rotation==0,'R150 review: ... and both are back at rest')
+ training(false);C.set('Ready',0);frames(5);secs(4)
+end
+setView(VIEWS[1])
 -- 6. Teardown ---------------------------------------------------------------------------------------------------------------------------
 training(true);C.set('DueAt',R.clock+100);C.set('Ready',0);frames(20)
 C.set('Ready',1);frames(2) -- billboard pop + button pop in flight

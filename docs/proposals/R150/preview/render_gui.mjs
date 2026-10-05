@@ -1,5 +1,5 @@
 // R150 preview: draws the nested GUI JSON of dump_tree.luau with headless Chromium (playwright). Layout follows Roblox: a child's
-// UDim2 resolves against its parent's UNSCALED size, AnchorPoint is the pivot of position / rotation / UIScale, UICorner radius =
+// UDim2 resolves against its parent's UNSCALED size, AnchorPoint is the pivot of position / UIScale (rotation turns about the centre), UICorner radius =
 // scale * min side + offset, UIStroke (Border) draws outside the frame, UIGradient multiplies the background colour, siblings are
 // stacked by ZIndex (every child starts a stacking context, so a child never interleaves with another sibling's subtree),
 // ClipsDescendants clips to the RECTANGLE (not the rounded corners), TextScaled shrinks to fit between MinTextSize and MaxTextSize.
@@ -61,7 +61,11 @@ function build(n,pw,ph,parent){
   const el=document.createElement('div'); el.dataset.n=n.n;
   const s=el.style; s.position='absolute'; s.left=(ax-n.ap[0]*w)+'px'; s.top=(ay-n.ap[1]*h)+'px'; s.width=w+'px'; s.height=h+'px'; s.zIndex=n.z;
   s.transformOrigin=(n.ap[0]*100)+'% '+(n.ap[1]*100)+'%';
-  const tf=[]; if(n.rot) tf.push('rotate('+n.rot+'deg)'); if(n.scale!==1) tf.push('scale('+n.scale+')'); if(tf.length) s.transform=tf.join(' ');
+  // UIScale scales about the AnchorPoint (the transform origin); Roblox rotates about the CENTRE whatever the AnchorPoint (R150 review), so the rotation is
+  // wrapped in translate(c) ... translate(-c) with c = centre - anchor point.
+  const tf=[]; if(n.scale!==1) tf.push('scale('+n.scale+')');
+  if(n.rot){ const cx=(0.5-n.ap[0])*w, cy=(0.5-n.ap[1])*h; tf.push(cx||cy?'translate('+cx+'px,'+cy+'px) rotate('+n.rot+'deg) translate('+(-cx)+'px,'+(-cy)+'px)':'rotate('+n.rot+'deg)'); }
+  if(tf.length) s.transform=tf.join(' ');
   if(n.clip) s.overflow='hidden';
   if(n.cr){ s.borderRadius=Math.max(0,Math.min(n.cr[0]*Math.min(w,h)+n.cr[1],Math.min(w,h)/2))+'px'; }
   if(n.bg){ if(n.grad) s.background=gradientCss(n.grad,n.bg,n.bgA); else s.background=rgb(n.bg,1-n.bgA); }

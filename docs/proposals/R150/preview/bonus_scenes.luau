@@ -68,7 +68,8 @@ local function buttonScene(name,ready,training,left)
  set('DueAt',training and ready<2 and R.clock+(left or 200)or nil);set('Left',left or 200)
  settle()
  if not button.Visible then return false end
- local x,y,w,h=button.Position.X.Offset,button.Position.Y.Offset,button.Size.X.Offset,button.Size.Y.Offset
+ local ap=button.AnchorPoint or{X=0,Y=0} -- (R150 review: this checkout's button is anchored at its centre, R149's at its top-left corner)
+ local w,h=button.Size.X.Offset,button.Size.Y.Offset;local x,y=button.Position.X.Offset-ap.X*w,button.Position.Y.Offset-ap.Y*h
  emit(name,hud,{x-26,y-24,w+52,h+46},3.2,VW,VH);return true
 end
 buttonScene('button_charging',0,true,360*.54)

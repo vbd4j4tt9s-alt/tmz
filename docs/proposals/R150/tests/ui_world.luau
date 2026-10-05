@@ -3,7 +3,7 @@
 --  * a stepping TweenService (numbers, Color3, UDim2, Vector2 interpolate over the mock clock; Completed fires),
 --  * live-listener counting on RunService signals (idle checks) and a wrapper that counts task.delay calls,
 --  * UW.rects: absolute rectangles of a GUI tree the way Roblox lays them out (UDim2 against the parent, AnchorPoint, UIScale,
---    rotation as an axis-aligned box), with ClipsDescendants rectangles,
+--    rotation about the object's centre as an axis-aligned box), with ClipsDescendants rectangles,
 --  * UW.fit: whether a label's text fits its box (Montserrat Black character widths, which are a little wider than GothamBlack, so a
 --    pass here is conservative); TextScaled labels are simulated between MinTextSize and MaxTextSize.
 local W=require('./world');local R=W.R
@@ -89,14 +89,11 @@ function UW.rects(root,rootW,rootH)
     local rot=math.rad(c.Rotation or 0)
     local bx,by,bw,bh=x,y,w,h
     if rot~=0 then
-     -- rotated about the anchor point
+     -- R150 review: Roblox rotates a GuiObject about its CENTRE, whatever its AnchorPoint (the model used to pivot about the anchor point, which only
+     -- agrees for AnchorPoint (.5,.5)): the box is the axis-aligned bounds of the rectangle turned about its own centre
      local cs,sn=math.abs(math.cos(rot)),math.abs(math.sin(rot))
      local ew,eh=w*cs+h*sn,w*sn+h*cs
-     -- the centre moves with a pivot at the anchor point
-     local cx,cy=x+w/2,y+h/2;local dx,dy=cx-ax,cy-ay
-     local rc,rs=math.cos(rot),math.sin(rot)
-     local ncx,ncy=ax+dx*rc-dy*rs,ay+dx*rs+dy*rc
-     bx,by,bw,bh=ncx-ew/2,ncy-eh/2,ew,eh
+     bx,by,bw,bh=x+w/2-ew/2,y+h/2-eh/2,ew,eh
     end
     local vis=visible and c.Visible~=false
     local entry={Obj=c,Path=path..'.'..c.Name,X=bx,Y=by,W=bw,H=bh,RX=x,RY=y,RW=w,RH=h,Visible=vis,Clip=clip,Scale=k*own,Name=c.Name}
@@ -159,6 +156,32 @@ function UW.fit(label,rect)
  local lines=wrapped and UW.lines(text,size,rect.W)or 1
  local ok=lines*size*LINE<=rect.H+.5 and(wrapped or UW.width(text,size)<=rect.W+.5)
  return ok,size,lines
+end
+-- Draw order under ZIndexBehavior.Sibling: does a draw above b? The two branches below their lowest common ancestor are compared: the higher ZIndex wins and
+-- a tie goes to the later sibling; a descendant draws above its own ancestor. (This is how a layer inside a panel ends up under or over the panel's other children.)
+function UW.drawsAbove(a,b)
+ local function chain(o)local list={};while o do table.insert(list,1,o);o=o.Parent end;return list end
+ local ca,cb=chain(a),chain(b)
+ local i=1;while ca[i]and cb[i]and ca[i]==cb[i]do i+=1 end
+ if not ca[i]then return false end
+ if not cb[i]then return true end
+ local za,zb=ca[i].ZIndex or 1,cb[i].ZIndex or 1
+ if za~=zb then return za>zb end
+ local siblings=ca[i-1]._children;return table.find(siblings,ca[i])>table.find(siblings,cb[i])
+end
+-- Does the rectangle of a UW.rects entry (its unrotated RX / RY / RW / RH turned about its centre by its Rotation) touch the box r = {X,Y,W,H}? (separating axes)
+function UW.turnedHits(e,r)
+ local rot=math.rad(e.Obj.Rotation or 0);local cs,sn=math.cos(rot),math.sin(rot)
+ local cx,cy=e.RX+e.RW/2,e.RY+e.RH/2;local pts={}
+ for _,d in ipairs({{-1,-1},{1,-1},{1,1},{-1,1}})do local dx,dy=d[1]*e.RW/2,d[2]*e.RH/2;pts[#pts+1]={cx+dx*cs-dy*sn,cy+dx*sn+dy*cs}end
+ local corners={{r.X,r.Y},{r.X+r.W,r.Y},{r.X+r.W,r.Y+r.H},{r.X,r.Y+r.H}}
+ for _,axis in ipairs({{1,0},{0,1},{cs,sn},{-sn,cs}})do
+  local a0,a1,b0,b1=math.huge,-math.huge,math.huge,-math.huge
+  for _,p in ipairs(pts)do local v=p[1]*axis[1]+p[2]*axis[2];a0=math.min(a0,v);a1=math.max(a1,v)end
+  for _,p in ipairs(corners)do local v=p[1]*axis[1]+p[2]*axis[2];b0=math.min(b0,v);b1=math.max(b1,v)end
+  if a1<=b0 or b1<=a0 then return false end
+ end
+ return true
 end
 function UW.overlap(a,b,pad)pad=pad or 0;return a.X<b.X+b.W-pad and a.X+a.W>b.X+pad and a.Y<b.Y+b.H-pad and a.Y+a.H>b.Y+pad end
 function UW.inside(a,outer,tol)tol=tol or 0;return a.X>=outer.X-tol and a.Y>=outer.Y-tol and a.X+a.W<=outer.X+outer.W+tol and a.Y+a.H<=outer.Y+outer.H+tol end

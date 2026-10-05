@@ -62,10 +62,19 @@ check(table.find(played,'GemClaim')~=nil,'claiming a gem reward plays the gem so
 check(not toggle.RewardBadge.Visible and not hub.IndexRewardAlert.Visible and not forest.RewardDot.Visible,'nothing left: every badge goes away')
 local apple=list:FindFirstChild('AppleSeed')
 check(apple and not apple:FindFirstChild('Pedestal'),'no empty gray box above the names any more')
--- R150: a reward that becomes claimable AFTER the join-time burst of saved data pops its badge with the reward cue (the burst itself is silent).
+-- R150 review: a reward that becomes claimable pops its badge SILENTLY. The server commits a seed's reward the moment a pack opens (OpenSeedPack: MarkSeedDiscovered +
+-- CommitSeedReward), seconds before the reveal shows the seed, so any chime on the badge change would spoil the reveal. Nothing may play - not in the join-time burst
+-- of saved data, not for a new find, not for a repeat's cash, not for a change of the same reward - and the badge still shows the new count.
 played={};R.advance(7);seeds.AppleSeed:SetAttribute('RewardCash',9000);W.frames(5)
-check(table.find(played,'GemClaim')~=nil,'R150: a new reward badge pops with the reward cue (GemClaim)')
+check(#played==0 and shown(toggle.RewardBadge)=='1','R150 review: a new reward badge pops silently, no sound at all ('..table.concat(played,',')..')')
 played={};seeds.AppleSeed:SetAttribute('RewardCash',9500);W.frames(5)
-check(table.find(played,'GemClaim')==nil,'R150: a change of the same reward is not a new one (no repeat cue)')
+check(#played==0,'R150 review: a change of the same reward is silent too')
+-- A pack opening as the server does it: the discovery and its reward arrive together, while the reveal has not shown the seed yet.
+seeds.AppleSeed:SetAttribute('RewardCash',nil);W.frames(5);played={}
+local fresh={};for _,e in ipairs(catalog:GetChildren())do if not seeds:FindFirstChild(e.Name)and #fresh<2 then fresh[#fresh+1]=e.Name end end
+local opened=R.new('BoolValue');opened.Name=fresh[1];opened.Value=true;opened:SetAttribute('RewardCash',120000);opened.Parent=seeds;W.frames(5)
+check(#played==0 and shown(toggle.RewardBadge)=='1','R150 review: a pack opening (new discovery + reward at once) plays no Index sound before the reveal ('..table.concat(played,',')..')')
+local more=R.new('BoolValue');more.Name=fresh[2];more.Value=true;more.Parent=seeds;more:SetAttribute('RewardCash',3000);W.frames(5)
+check(#played==0 and shown(toggle.RewardBadge)=='2','R150 review: a second opening is silent as well ('..table.concat(played,',')..')')
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

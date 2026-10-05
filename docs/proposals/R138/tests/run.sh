@@ -17,6 +17,8 @@ python3 "$INV/mkbundle.py" "$OUT/rs_bundle.luau" ChestIndex="$C/ChestIndex.clien
 cp "$T/roblox.luau" "$T/test_tutorial.luau" "$T/test_guide_flow.luau" "$T/test_guide_layout.luau" "$OUT/t/"
 cp "$REPO/src/ReplicatedStorage/BeginnerGuide.lua" "$OUT/t/new_Guide.luau";cp "$REPO/src/ReplicatedStorage/BeginnerGuide.lua" "$OUT/t/old_Guide.luau";cp "$REPO/src/ReplicatedStorage/HudLayout.lua" "$OUT/t/Hud.luau"
 python3 "$T/bundle.py" "$OUT/t/tut_bundle.luau" BeginnerTutorial="$C/BeginnerTutorial.client.lua" BeginnerGuide="$REPO/src/ReplicatedStorage/BeginnerGuide.lua" HudLayout="$REPO/src/ReplicatedStorage/HudLayout.lua" >/dev/null
+# R150 review: the Index badge pops silently (a chime at the badge change fired when a pack was OPENED, before the reveal shows the seed)
+! grep -nE "alertsFrom|total>alertTotal and .*Audio.Play" "$C/ChestIndex.client.lua"
 cd "$OUT"
 for t in test_lowtier test_index_alerts;do echo "== $t";/opt/luau/luau $t.luau > $t.log 2>&1 || { tail -25 $t.log;exit 1; };tail -1 $t.log;done
 (cd srv && echo "== test_starter" && { /opt/luau/luau test_starter.luau > starter.log 2>&1 || { tail -25 starter.log;exit 1; }; } && tail -1 starter.log)

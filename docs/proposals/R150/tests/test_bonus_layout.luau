@@ -88,6 +88,10 @@ for _,v in ipairs(views)do
     check(badge.Y-grow>=b.RY-9,tag..': the badge pop (x1.28) stays within 9 px above the button')
    end
    check(b.RX>=8 and b.RY>=8 and b.RX+b.RW<=w-8 and b.RY+b.RH<=h-8,tag..': the button keeps the 8 px screen margin')
+   -- R150 review: the button is anchored at its centre (its pop and pulse scale about it); its placement is exactly the one TreadmillBonusRules.Place gives
+   local want=Rules.Place(m,w,h,boxes,extra)
+   check(button.AnchorPoint.X==.5 and button.AnchorPoint.Y==.5 and want and math.abs(b.RX-want.X)<.01 and math.abs(b.RY-want.Y)<.01 and math.abs(b.RW-want.W)<.01 and math.abs(b.RH-want.H)<.01,
+    tag..string.format(': R150 review: the centre-anchored button sits exactly where Place puts its top-left corner (%.1f,%.1f vs %.1f,%.1f)',b.RX,b.RY,want and want.X or-1,want and want.Y or-1))
    check(union.X>=2 and union.Y>=2 and union.X+union.W<=w-2 and union.Y+union.H<=h-2,tag..': button and badge are on screen')
    for _,bx in ipairs(boxes)do check(not ov(union,bx,0),tag..': button + badge clear of '..bx.N)end
    for _,bx in ipairs(extra)do check(not ov(union,bx,0),tag..': button + badge clear of notice row '..bx.N)end
@@ -235,8 +239,10 @@ for _,v in ipairs(views)do
    fitsText(panel.Actions.Again.Face.Label,E2('Actions.Again.Face.Label'),'ROLL AGAIN (2)',tag..' '..case.Rarity..': again caption',10)
    local rays=E2('StripWindow.Strip.Rays')
    check(rays and rays.Visible,tag..' '..case.Rarity..': the rays show ('..tostring(rays and rays.Path)..' '..tostring(panel.StripWindow.Strip:FindFirstChild('Rays'))..' revealed='..tostring(panel.Word.Visible)..')')
-   local fxLayer=b2['TreadmillBonusRoll.Fx']
-   check(fxLayer.W==w and fxLayer.H==h,tag..' '..case.Rarity..': the effect layer covers the screen')
+   -- R150 review: the reveal pieces fly inside the panel (over the strip window, under the ribbon header, the pointers and the bow)
+   local fxLayer=b2['TreadmillBonusRoll.Panel.Fx'];local pan=b2['TreadmillBonusRoll.Panel']
+   check(fxLayer and math.abs(fxLayer.W-pan.W)<.01 and math.abs(fxLayer.H-pan.H)<.01 and math.abs(fxLayer.X-pan.X)<.01 and math.abs(fxLayer.Y-pan.Y)<.01,tag..' '..case.Rarity..': the effect layer covers the panel')
+   check(fxLayer.Obj.ZIndex>b2['TreadmillBonusRoll.Panel.StripWindow'].Obj.ZIndex and fxLayer.Obj.ZIndex<E2('Ribbon').Obj.ZIndex and fxLayer.Obj.ZIndex<E2('PointerTop').Obj.ZIndex and fxLayer.Obj.ZIndex<E2('Bow').Obj.ZIndex,tag..' '..case.Rarity..': the effect layer is over the strip window and under the ribbon, the pointers and the bow')
   end
   panel.Actions.Close.Activated:Fire()
   -- the spinning state shows SKIP centred

@@ -143,7 +143,7 @@ local function waiting(stage)
  end
  return n
 end
-local alertTotal=0;local alertsFrom=os.clock()+6 -- R150: the join-time burst of saved data is not "a new reward"
+local alertTotal=0
 local function updateAlerts()
  local total=0;local perTab={}
  for stage=1,9 do
@@ -154,7 +154,7 @@ local function updateAlerts()
  local mine=badge(toggle,'RewardBadge',24);mine.Position=UDim2.new(1,-6,0,6);mine.Visible=total>0;mine.Count.Text=total>9 and'9+'or tostring(total)
  local nav=pg:FindFirstChild('GardenNavigation');local hub=nav and nav:FindFirstChild('MenuButton')
  if hub then local alert=badge(hub,'IndexRewardAlert',20);alert.Position=UDim2.new(1,-4,0,4);alert.Visible=total>0;alert.Count.Text='!'end
- if total>alertTotal and os.clock()>=alertsFrom then Audio.Play('GemClaim')end -- R150: a new reward just became claimable: its badge pops with the reward cue
+ -- R150 review: the badge pops SILENTLY (as in R149). A chime here fired the moment the server opened a pack (OpenSeedPack commits the seed's reward at once), before the reveal shows the seed.
  if total>alertTotal and not Gui.ReducedMotionEnabled then
   for _,b in ipairs({mine,hub and hub:FindFirstChild('IndexRewardAlert')})do if b then local sc=b:FindFirstChildOfClass('UIScale');sc.Scale=1.5;Tween:Create(sc,TweenInfo.new(.35,Enum.EasingStyle.Back),{Scale=1}):Play()end end
  end

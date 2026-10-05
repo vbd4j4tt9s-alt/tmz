@@ -126,7 +126,7 @@ check(M.Stage({{Stage=8}},1)==1 and M.Stage({{Stage=0}},1)==1 and M.Stage({{Stag
 -- 2. The world: two bases, the real service ---------------------------------------------------------------------------
 local Map={BaseRecords={},GetStageAccent=function()return R.Color3.new(.5,.5,.5)end}
 local shown={}
-local Notes={Show=function(_,p,text,color)shown[#shown+1]={P=p,Text=text,Color=color}end}
+local Notes={Show=function(_,p,text,color,duration,kind)shown[#shown+1]={P=p,Text=text,Color=color,Kind=kind}end} -- (R150 review: kind = the 5th argument, 'Denied' for a refusal)
 local Data=server('PlayerDataService').new(Config,Map,Notes)
 R.clock=20000*86400+3600 -- 01:00 UTC
 local DAY0=20000
@@ -466,6 +466,8 @@ R.advance(1);local fok=S:Claim(A3,rec1)
 check(fok==false and bag(A3)==fullBag and attr(rec1,'State')=='Ready'and syncs(A3)==syncF and Data:GetPremium(A3).Mystery.Claimed==false,'a full Bag: taking it is refused, it stays Ready on the pedestal')
 local fn=notes(A3,noteF)
 check(#fn==1 and fn[1]:find('FULL',1,true),'and the player is told why: '..tostring(fn[1]))
+do local _,fullEntry=lastNote(A3)
+check(fullEntry and fullEntry.Kind=='Denied','[denied] R150 review: that refusal is marked Denied (the client clicks the Denied cue; its orange colour and 🎒 prefix are not one of SimpleGameText\'s red keys): kind '..tostring(fullEntry and fullEntry.Kind))end
 Config.MaxSavedChests=cap;R.advance(1);local took=S:Claim(A3,rec1)
 check(took==true and bag(A3)==fullBag+1 and attr(rec1,'State')=='Claimed','after making room the same pack can be taken')
 -- ...and across midnight: it is owed (kept), today's pack starts as normal.
@@ -481,12 +483,16 @@ check(#owedNow.Owed==1 and owedNow.Owed[1].Day==today()-1 and owedNow.Owed[1].Va
 check(owedNow.Seconds==6 and near(attr(rec1,'UnlockAt')-W.workspace:GetServerTimeNow(),894,1.01),'today\'s 15 minutes run: '..tostring(owedNow.Seconds)..' s counted, 894 s to go on the countdown')
 local fn2=notes(A3,noteF)
 check(#fn2==1 and fn2[1]:find('Make room',1,true)and fn2[1]:find('1 mystery pack waiting',1,true)and syncs(A3)==syncF,'the player is told once: '..tostring(fn2[1])..' (and the retries make no more noise)')
+do local _,waitEntry=lastNote(A3)
+check(waitEntry and waitEntry.Kind==nil,'[denied] R150 review: the "N packs waiting" reminder is not a refusal: no Denied cue ('..tostring(waitEntry and waitEntry.Kind)..')')end
 check(prompt(rec1).Enabled==false,'[prompt] (locked again: off)')
 Config.MaxSavedChests=cap
 S:Step(1)
 check(bag(A3)==bagBefore+1 and Data:GetChestRecords(A3)[bag(A3)].BagVariant==fullVariant and Data:GetChestRecords(A3)[bag(A3)].Stage==fullStage,'once there is room the owed pack goes into the Bag by itself')
 check(#Data:GetPremium(A3).Mystery.Owed==0 and attr(rec1,'State')=='Locked'and Data:GetPremium(A3).Mystery.Claimed==false and Data:GetPremium(A3).Mystery.Day==today(),'and it leaves the list; today\'s pack goes on')
 local fn3=notes(A3,noteF);check(#fn3==2 and fn3[2]:find('waiting',1,true)and fn3[2]:find('Mystery Pack',1,true)and fn3[2]:find('Rare',1,true),'with a notice: '..tostring(fn3[2]))
+do local _,wentIn=lastNote(A3)
+check(wentIn and wentIn.Kind==nil,'[denied] R150 review: and a pack that goes into the Bag is no refusal either')end
 for _=1,5 do S:Step(1)end
 check(bag(A3)==bagBefore+1,'and it is not given again')
 -- The size pity reaches the mystery pack through {Luck=true}.

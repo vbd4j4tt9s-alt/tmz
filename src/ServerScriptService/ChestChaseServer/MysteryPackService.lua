@@ -125,7 +125,7 @@ end
 function S:_grant(player,state,carried)
  local record,why=self:_give(player,state)
  if not record then
-  if self.Notes and not carried then pcall(function()self.Notes:Show(player,'🎒 '..tostring(why or'Make room in your Bag first.'),RGB(255,190,90),4)end)end
+  if self.Notes and not carried then pcall(function()self.Notes:Show(player,'🎒 '..tostring(why or'Make room in your Bag first.'),RGB(255,190,90),4,'Denied')end)end -- R150 review: a refused take clicks Denied (the orange colour and the 🎒 prefix are not one of SimpleGameText's red keys)
   return false
  end
  state.Claimed=true;self.Data:MarkDirty(player);self.Data:QueueGardenSave(player)

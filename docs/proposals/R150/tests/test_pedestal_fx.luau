@@ -228,6 +228,9 @@ do
  local aimUp=Fx.Tuning.AimUp;local aim=myRoot.Position+V3(0,aimUp,0)
  local maxY=-math.huge;local arrived=false;local frames=0;local lastDist=math.huge;local monotone=true;local lastAt,firstExt,lastExt,firstAt,sane
  sane=true;local start=R.clock
+ -- R150 review: the arc must not graze the TAKEN sign. While the copy is under the sign (within half its width of the pedestal's axis) the top of its parts stays
+ -- clear of the sign's bottom edge.
+ local halfWidth=sig.Size.X.Scale/2;local framesUnderSign,leastRoom,signAt=0,math.huge,0
  for k=1,45 do
   H.run(1/30);frames+=1
   local g=flightsFolder()and flightsFolder():GetChildren()[1]
@@ -236,11 +239,15 @@ do
   local at=g.PrimaryPart.Position;local ext=g:GetExtentsSize().Y
   if not notNaN(at)then sane=false;break end
   firstAt=firstAt or at;firstExt=firstExt or ext;lastAt=at;lastExt=ext;maxY=math.max(maxY,at.Y)
+  if math.sqrt((at.X-PACK.X)^2+(at.Z-PACK.Z)^2)<halfWidth+g:GetExtentsSize().X/2 then
+   local sg=sign();local bottom=PACK.Y+sg.StudsOffsetWorldSpace.Y-sg.Size.Y.Scale/2;framesUnderSign+=1;signAt=bottom-PACK.Y;leastRoom=math.min(leastRoom,bottom-(at.Y+ext/2))
+  end
   local d=(at-aim).Magnitude
   if k>8 and d>lastDist+.05 then monotone=false end;lastDist=d
  end
  local took=R.clock-start
  check(sane and arrived and took>=.2+.4-.05 and took<=.2+.7+.1,'[take] it flies to the player and lands within ~'..string.format('%.2f',took)..' s (.2 lift + .4-.7 flight)')
+ check(framesUnderSign>=3 and leastRoom>=1.0,'[take] R150 review: the arc does not graze the TAKEN sign: while under it the pack keeps at least '..string.format('%.2f',leastRoom)..' studs (1.0 wanted; the arc peak 2.2 left .89) below its bottom edge (the sign starts '..string.format('%.2f',signAt)..' studs over the pedestal\'s pack spot; '..framesUnderSign..' frames under it)')
  check(vnear(firstAt,PACK,Fx.Tuning.LiftHeight+.6)and firstAt.Y>PACK.Y-.5,'[take] its parts start at the pack on the pedestal and lift off it')
  check(maxY>=PACK.Y+Fx.Tuning.LiftHeight-.3 and monotone,'[take] they rise (the lift), then close in on the player the whole way')
  check((lastAt-aim).Magnitude<2.2,'[take] and by the last frame they are at the player\'s chest ('..string.format('%.2f',(lastAt-aim).Magnitude)..' studs away)')

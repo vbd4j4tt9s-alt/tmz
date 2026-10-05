@@ -117,14 +117,43 @@ check(rays.Beams[3].BackgroundTransparency==.7 and rays.Beams[3].Core.Background
 check(valid(rays.Beams[1]:FindFirstChildOfClass('UIGradient').Transparency,20),'ray fade is valid')
 local beamAngles={};for _,b in ipairs(rays.Beams)do beamAngles[#beamAngles+1]=b.Rotation end
 check(beamAngles[1]==0 and near(beamAngles[6],150),'beams are spread over 180 degrees')
+-- Shine: the stripe sweeps fully across the pane and starts / ends fully outside it. Roblox turns the stripe about its CENTRE (R150 review), so its real
+-- rectangle is tested (a turned box against the pane, separating axes), on a winner card (94 x 118: a tall pane) and on the HUD button face (190 x 36: a wide one).
+do
+ local function paneRect(w,h)return {X=0,Y=0,W=w,H=h}end
+ for _,dim in ipairs({{94,118,'a winner card'},{190,36,'the HUD button face'},{114,46,'a narrow button face'}})do
+  local host=R.new('Frame');host.Size=R.UDim2.fromOffset(dim[1]+12,dim[2]+12)
+  local sh=A.Shine(host,6,6,.55,9)
+  local function stripeEntry()
+   local list,by=UW.rects(host,dim[1]+12,dim[2]+12);return by[host.Name..'.ShinePane.Sweep'],by[host.Name..'.ShinePane']
+  end
+  A.SetShine(sh,.01);local e,pane=stripeEntry()
+  check(e and not UW.turnedHits(e,{X=pane.RX,Y=pane.RY,W=pane.RW,H=pane.RH}),dim[3]..': at the start of the sweep the stripe is fully outside the pane')
+  A.SetShine(sh,.99);e,pane=stripeEntry()
+  check(e and not UW.turnedHits(e,{X=pane.RX,Y=pane.RY,W=pane.RW,H=pane.RH}),dim[3]..': at the end of the sweep the stripe is fully outside the pane')
+  local crossed=0;for k=1,99 do A.SetShine(sh,k/100);e,pane=stripeEntry();if UW.turnedHits(e,{X=pane.RX,Y=pane.RY,W=pane.RW,H=pane.RH})then crossed+=1 end end
+  check(crossed>=30 and crossed<=95,dim[3]..': in between it crosses the pane ('..crossed..' of 99 steps)')
+  -- the middle of the sweep covers the pane's centre line
+  A.SetShine(sh,.5);e,pane=stripeEntry()
+  check(UW.turnedHits(e,{X=pane.RX+pane.RW/2-1,Y=pane.RY,W=2,H=pane.RH}),dim[3]..': halfway the stripe is over the middle of the pane')
+  A.SetShine(sh,0);check(sh.Stripe.Visible==false,dim[3]..': u = 0 hides the stripe');A.SetShine(sh,1);check(sh.Stripe.Visible==false,dim[3]..': u = 1 hides it')
+ end
+end
 -- Burst
 local layer=R.new('Frame')
 local burst=A.Burst(layer,100,100,{Count=10,Shape='Star',Size=12,Life=.8,Speed={50,100}})
 check(#layer:GetChildren()==10,'burst creates exactly its count')
-check(#layer:GetChildren()[1]:GetChildren()==2,'a sparkle is two crossing bars')
+-- R150 review: a sparkle is ONE Frame (a spinning diamond), a confetti bit is one Frame: a Secret reveal draws 160 pieces on a single frame
+local oneFrame=true;for _,piece in ipairs(layer:GetChildren())do if #piece:GetChildren()~=0 or piece.ClassName~='Frame' and piece._class~='Frame'then oneFrame=false end end
+check(oneFrame and R.Instance and #layer:GetChildren()==10 and #layer:GetDescendants()==10,'a sparkle is one Frame with nothing inside it ('..#layer:GetDescendants()..' instances for 10 sparkles)')
+check(layer:GetChildren()[1].Rotation==45 and layer:GetChildren()[1].Size.X.Offset==layer:GetChildren()[1].Size.Y.Offset and layer:GetChildren()[1].Size.X.Offset>=4,'a sparkle is a square turned 45 degrees: a diamond')
+check(layer:GetChildren()[1].BackgroundTransparency==0,'and it starts opaque')
 local done,steps=false,0
 while not done and steps<200 do done=burst:Step(1/60);steps+=1 end
 check(done and steps>=45 and steps<=60,'burst ends after its life ('..steps..' steps)')
+do local b2=A.Burst(layer,0,0,{Count=4,Shape='Star',Size=12,Life=.8,Speed={50,100}});b2:Step(.45)
+ local faded=true;for _,piece in ipairs(layer:GetChildren())do if piece.BackgroundTransparency<=0 then faded=false end end
+ check(faded,'a sparkle fades out through its own Frame in the second half of its life');b2:Destroy()end
 burst:Destroy();check(#layer:GetChildren()==0,'destroyed burst leaves nothing behind')
 local confetti=A.Burst(layer,0,0,{Count=6,Shape='Confetti',Size=7,Life=1,Speed={100,200},Gravity=800})
 check(#layer:GetChildren()==6 and layer:GetChildren()[1].Size.Y.Offset>=layer:GetChildren()[1].Size.X.Offset,'confetti bits are taller than wide')

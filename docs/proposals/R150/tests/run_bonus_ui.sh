@@ -7,6 +7,9 @@
 #  * test_bonus_ui     - button states (charging / almost / ready / count), press, refusals, gift timer states (normal / almost / ready pop /
 #                        full), roll flow for all seven rarities (spin, status line, reveal word, rays, confetti, close caption, again), ReducedMotion,
 #                        low quality, no per-frame work when idle, teardown, no leaks over repeated rolls.
+#                        R150 review fixes: the reveal confetti is drawn under the ribbon header (Sibling draw order, every frame, desktop and phone), the reveal word
+#                        and the HUD button pop about their centres, Denied on every refusal and never on a roll that starts, no twinkle on the fine print, the gift
+#                        timer's shadow follows its pop and shake, the roll opens with fewer instances (gloss for special cards only, one Frame per sparkle).
 #  * test_bonus_layout - every screen size of the R123 layout test (and a few more): the button and its parts, the roll screen rows, the
 #                        gift timer all fit, never overlap, text fits (conservative width model), with and without touch controls.
 set -e

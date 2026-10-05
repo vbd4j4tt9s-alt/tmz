@@ -25,7 +25,7 @@ F.Tuning={
  ShaftHeight=5.8,ShaftWidth=4.6,                         -- the light column over the pad
  LockSeconds=.95,LockHeight=3.4,                         -- the padlock's unlock animation, and its height on the column
  HopSeconds=1.1,HopHeight=.4,                            -- the pack's hop when it unlocks (the sign hangs .9 + .35 above its highest bob)
- LiftSeconds=.2,LiftHeight=.9,ArcHeight=2.2,ShrinkTo=.55,-- the take: the pack lifts, then flies to the player the way a harvested fruit does (PlantGrowthFx)
+ LiftSeconds=.2,LiftHeight=.9,ArcHeight=1.4,ShrinkTo=.55,-- the take: the pack lifts, then flies to the player the way a harvested fruit does (PlantGrowthFx); R150 review: the arc peaks 1.4 studs (was 2.2) so it clears the TAKEN sign
  FlightMin=.40,FlightMax=.70,FlightPerStud=.012,AimUp=.9,
 }
 local function smooth(x)x=math.clamp(x,0,1);return x*x*(3-2*x)end

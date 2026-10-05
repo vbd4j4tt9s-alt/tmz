@@ -78,6 +78,7 @@ mutate "the light shaft shows on everybody's pedestal" $F "fx.Shaft.Transparency
 mutate "the unlock chime plays in the Interface group" $F "require(script.Parent.AudioMixer).Route(v,'Effects')" "require(script.Parent.AudioMixer).Route(v,'Interface')" fx
 mutate "the padlock never drops away" $F "if u>=1 then F.DestroyLock(fx);if fx.State=='Locked'then F.BuildLock(fx)end" "if u>=2 then F.DestroyLock(fx);if fx.State=='Locked'then F.BuildLock(fx)end" fx
 mutate "the hop lifts the pack into the sign" $F "HopSeconds=1.1,HopHeight=.4," "HopSeconds=1.1,HopHeight=1.4," fx
+mutate "the take flight's arc grazes the TAKEN sign" $F "ArcHeight=1.4," "ArcHeight=2.2," fx
 mutate "teardown leaves the flights behind" $C "if flightFolder then flightFolder:Destroy()end" "" fx
 mutate "the sign shows only up to 60 studs" $C "local FAR,FAR_MINE=90,120" "local FAR,FAR_MINE=60,120" fx
 mutate "a refused take plays the pickup cue (any prompt press)" $C "local function applyPrompt(entry)

@@ -221,8 +221,8 @@ local function startAttention()
  end
  task.delay(1.4,loop)
 end
-local function buttonCenter()
- return button.Position.X.Offset+26,button.Position.Y.Offset+(button.Size.Y.Offset-LIP)/2
+local function buttonCenter() -- the gift's middle, in screen pixels (the button is anchored at its centre)
+ return button.Position.X.Offset-button.Size.X.Offset/2+26,button.Position.Y.Offset-button.Size.Y.Offset/2+(button.Size.Y.Offset-LIP)/2
 end
 -- Sparkle layer: an empty 0 x 0 frame at the corner (pieces are placed in screen pixels from it), so no full-screen box sits over the game.
 make('Frame',{Name='Fx',BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.fromOffset(0,0),Active=false,ZIndex=40},hud)
@@ -268,7 +268,7 @@ local function layoutButton()
   if ok then for name,row in pairs(rows)do if type(row)=='table'then table.insert(extra,{N=name,X=row.X-row.Width/2,Y=row.Y,W=row.Width,H=row.Height})end end end
  end
  local r=Rules.Place(m,w,h,Layout.HudBoxes(m,w,h,true),extra)
- button.Position=UDim2.fromOffset(r.X,r.Y);button.Size=UDim2.fromOffset(r.W,r.H)
+ button.AnchorPoint=Vector2.new(.5,.5);button.Position=UDim2.fromOffset(r.X+r.W/2,r.Y+r.H/2);button.Size=UDim2.fromOffset(r.W,r.H) -- R150 review: the ready pop and the pulse scale about the button's centre
  local fh=r.H-LIP
  -- Narrow phones get the text-only size: drop the gift icon and use the full width for the caption.
  local icon=r.W>=140;gift.Root.Visible=icon
@@ -290,6 +290,7 @@ local function nudge()
  end)
 end
 local function flashMessage(message)
+ if Audio then pcall(Audio.Play,'Denied')end -- R150 review: every flash is a refusal (charging tap, server refusal, no / bad reply); a roll that starts never flashes
  -- Short copy on the button (the full text goes to the accessibility label).
  messageUntil=os.clock()+2.5;sub.Text=Style.Flash(message);button:SetAttribute('AccessibleLabel','Treadmill bonus roll: '..tostring(message));refreshButton();nudge()
  task.delay(2.6,function()if not dead then lastPaint=nil;refreshButton()end end)
@@ -298,8 +299,8 @@ end
 -- R124: framed panel (gold ribbon header, inner gold line, corner studs, twinkling dots), strip window with soft side
 -- fades and a glowing marker; Legendary / Mythic / Secret cards carry their own designs; the result lights up the
 -- BORDERS (card + panel), never a full-panel flash; rows and buttons are stacked so nothing overlaps.
--- R150: wrapping-paper stripes and a bow on the ribbon header, bouncing gem pointers, rarity plaques and a soft gloss on every card,
--- a playful status line while it spins, a reveal word that pops, light rays and confetti behind the winner, candy buttons.
+-- R150: wrapping-paper stripes and a bow on the ribbon header, bouncing gem pointers, rarity plaques on every card (a soft gloss on the special ones),
+-- a playful status line while it spins, a reveal word that pops, light rays and confetti behind the winner (the confetti flies under the ribbon header), candy buttons.
 do local o=pg:FindFirstChild('TreadmillBonusRoll');if o then o:Destroy()end end
 local overlay=make('ScreenGui',{Name='TreadmillBonusRoll',ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=60,Enabled=false,
  ZIndexBehavior=Enum.ZIndexBehavior.Sibling},pg)
@@ -319,11 +320,11 @@ do
  for i,c in ipairs({{0,0},{1,0},{0,1},{1,1}})do local d=diamond(inner,'Stud'..i,8,GOLD,3);d.Position=UDim2.fromScale(c[1],c[2])end
 end
 local twinkles={}
-for i,c in ipairs({{.06,.2},{.94,.17},{.12,.62},{.9,.6},{.04,.86},{.97,.88},{.3,.08},{.72,.07},{.5,.95},{.2,.95},{.8,.95},{.62,.9}})do
+for i,c in ipairs({{.06,.2},{.94,.17},{.12,.62},{.9,.6},{.04,.86},{.97,.88},{.3,.08},{.72,.07}})do -- R150 review: none along the bottom, where the odds fine print sits
  twinkles[i]=make('Frame',{Name='Twinkle'..i,AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(c[1],c[2]),Size=UDim2.fromOffset(3,3),Rotation=45,
   BackgroundColor3=RGB(255,240,190),BackgroundTransparency=.5,BorderSizePixel=0,ZIndex=2},panel)
 end
-local ribbon=make('Frame',{Name='Ribbon',AnchorPoint=Vector2.new(.5,0),BackgroundColor3=WHITE,ZIndex=3},panel)
+local ribbon=make('Frame',{Name='Ribbon',AnchorPoint=Vector2.new(.5,0),BackgroundColor3=WHITE,ZIndex=5},panel) -- R150 review: above the reveal effect layer (4), so confetti never crosses the header
 round(ribbon,9);stroke(ribbon,INK,2)
 make('UIGradient',{Color=ColorSequence.new({ColorSequenceKeypoint.new(0,RGB(255,236,140)),ColorSequenceKeypoint.new(.5,RGB(255,200,70)),ColorSequenceKeypoint.new(1,RGB(232,140,36))}),Rotation=90},ribbon)
 for i,x in ipairs({0,1})do local tail=diamond(ribbon,'Tail'..i,14,RGB(214,128,30),2);tail.Position=UDim2.new(x,x==0 and 2 or-2,.5,0)end
@@ -375,7 +376,8 @@ do
 end
 local function setCaption(b,value)b.Face.Label.Text=value end
 local buttonW=170
-make('Frame',{Name='Fx',BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.fromScale(1,1),Active=false,ZIndex=30},overlay)
+-- R150 review: the reveal pieces fly INSIDE the panel: over the strip window (3), the word and the rows, under the ribbon header (5), the pointers (9) and the bow (10). The panel does not clip, so they still leave it.
+local revealFx=make('Frame',{Name='Fx',BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.fromScale(1,1),Active=false,ZIndex=4},panel)
 -- The visible buttons sit side by side, centred as a group (CLOSE alone is centred too).
 local function arrangeActions()
  local shown={};for _,b in ipairs({skipButton,closeButton,againButton})do if b.Visible then shown[#shown+1]=b end end
@@ -408,7 +410,7 @@ local function layoutOverlay()
  bow.Size=UDim2.fromOffset(bowSize,math.floor(bowSize*.62+.5));bow.Position=UDim2.new(.5,0,0,ribbonY-(short and 19 or 25))
  window.Position=UDim2.fromOffset(14,y);windowY=y;windowH=cardH+2*cardY;window.Size=UDim2.new(1,-28,0,windowH);y+=windowH+rowGap
  status.Position=UDim2.fromOffset(16,y);status.Size=UDim2.new(1,-32,0,wordH)
- word.Position=status.Position;word.Size=status.Size;y+=wordH
+ word.AnchorPoint=Vector2.new(.5,.5);word.Position=UDim2.new(.5,0,0,y+wordH/2);word.Size=status.Size;y+=wordH -- R150 review: the pop scales about its centre (UIScale pivots at the AnchorPoint)
  result.Position=UDim2.fromOffset(16,y);result.Size=UDim2.new(1,-32,0,resultH);y+=resultH+rowGap
  actions.Position=UDim2.fromOffset(16,y);actions.Size=UDim2.new(1,-32,0,actionH);y+=actionH+rowGap
  oddsLine.Position=UDim2.fromOffset(16,y);oddsLine.Size=UDim2.new(1,-32,0,oddsH);y+=oddsH+pad
@@ -500,8 +502,10 @@ buildCard=function(i,pack)
  local name=text(f,'Rarity',string.upper(tierName),13,color);name.ZIndex=7;name.Size=UDim2.new(1,-6,0,16);name.Position=UDim2.new(0,3,1,-36)
  local biome=text(f,'Biome',pack.Variant==Rules.Void.Variant and Rules.Void.Label or biomeName(pack.Stage),11,RGB(225,230,255));biome.ZIndex=7;biome.Font=Enum.Font.GothamBold
  biome.Size=UDim2.new(1,-6,0,14);biome.Position=UDim2.new(0,3,1,-19)
- local gloss=make('Frame',{Name='Gloss',BackgroundColor3=WHITE,BorderSizePixel=0,Position=UDim2.fromOffset(4,4),Size=UDim2.new(1,-8,.34,0),ZIndex=8},f)
- round(gloss,7);make('UIGradient',{Rotation=90,Transparency=NumberSequence.new(.78,1)},gloss)
+ if motion then -- R150 review: the soft gloss only on the special tiers (46 plain cards under the card gradient barely show it: -138 instances when the roll opens)
+  local gloss=make('Frame',{Name='Gloss',BackgroundColor3=WHITE,BorderSizePixel=0,Position=UDim2.fromOffset(4,4),Size=UDim2.new(1,-8,.34,0),ZIndex=8},f)
+  round(gloss,7);make('UIGradient',{Rotation=90,Transparency=NumberSequence.new(.78,1)},gloss)
+ end
  local entry={Frame=f,Holder=holder,Stroke=edge,Pack=pack,Tier=tierName,Color=color,Motion=motion,Proxy=proxy};cards[i]=entry;return entry
 end
 end
@@ -548,10 +552,7 @@ local function startAmbient()
   return false
  end)
 end
-local function fxOrigin()
- local view=overlay.AbsoluteSize;local w,h=view.X>0 and view.X or 1280,view.Y>0 and view.Y or 720
- return w/2,h/2-panel.Size.Y.Offset/2+windowY+windowH/2
-end
+local function fxOrigin()return panelW/2,windowY+windowH/2 end -- panel-local: the middle of the strip window
 local function celebrate(entry,res)
  local special=Rules.Special[res.Rarity]==true
  local style=Style.Reveal(res.Rarity)
@@ -568,11 +569,11 @@ local function celebrate(entry,res)
   wordScale.Scale=math.max(.2,1-style.Pop*3)
   tween(wordScale,style.Elastic and .7 or .45,style.Elastic and Enum.EasingStyle.Elastic or Enum.EasingStyle.Back,{Scale=1})
   local x,y=fxOrigin()
-  spawnBurst(overlay.Fx,x,y,sparkleOpts(entry.Color,style.Sparkles))
+  spawnBurst(revealFx,x,y,sparkleOpts(entry.Color,style.Sparkles))
   if style.Confetti>0 then
    local count=lite()and math.floor(style.Confetti*.3)or style.Confetti
    local colors={entry.Color,Art.Confetti[1],Art.Confetti[3],Art.Confetti[4],Art.Confetti[5],WHITE}
-   spawnBurst(overlay.Fx,x,y,{Count=count,Shape='Confetti',Size=7,Life=1.3,Speed={260,620},Arc={-math.pi*.95,-math.pi*.05},Gravity=820,Colors=colors,Drag=1.8})
+   spawnBurst(revealFx,x,y,{Count=count,Shape='Confetti',Size=7,Life=1.3,Speed={260,620},Arc={-math.pi*.95,-math.pi*.05},Gravity=820,Colors=colors,Drag=1.8})
   end
  else
   wordScale.Scale=1
@@ -616,7 +617,7 @@ local statusIndex=0
 local function startRoll(res)
  rolling=true;revealed=false;refreshButton();clearCards();stopSpin()
  current=res;overlay.Enabled=true;layoutOverlay()
- stopGlow();clearRays();clearBursts(overlay.Fx)
+ stopGlow();clearRays();clearBursts(revealFx)
  word.Visible=false;wordScale.Scale=1;status.Visible=true;statusIndex=1;status.Text=Style.SpinLines[1]
  result.Text=Style.SpinHint;result.TextColor3=RGB(190,184,235)
  setCaption(closeButton,'COLLECT')
@@ -645,7 +646,7 @@ local function startRoll(res)
 end
 local function close()
  stopSpin();if spin and not revealed then finish()end
- stopGlow();stopAmbient();clearRays();clearBursts(overlay.Fx);overlay.Enabled=false;rolling=false;clearCards();current=nil;spin=nil;refreshButton()
+ stopGlow();stopAmbient();clearRays();clearBursts(revealFx);overlay.Enabled=false;rolling=false;clearCards();current=nil;spin=nil;refreshButton()
 end
 local function requestRoll()
  if busy then return end
@@ -692,6 +693,7 @@ pill(back);stroke(back,GOLD,2.5);Art.gradient(back,RGB(86,76,172),RGB(36,32,92))
 local backLip=make('Frame',{Name='Lip',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(.5,0,.5,4),Size=UDim2.fromOffset(184,46),BackgroundColor3=RGB(20,18,52),BorderSizePixel=0,ZIndex=2},bar)
 pill(backLip);stroke(backLip,INK,2.5)
 local backPop=make('UIScale',{Name='Pop'},back)
+local lipPop=make('UIScale',{Name='Pop'},backLip) -- R150 review: the shadow lip pops and shakes with the pill
 local barGift=Art.Gift(back,36,'Icon');barGift.Root.Position=UDim2.fromOffset(24,23);barGift.Root.ZIndex=5
 local chip,chipText=Art.Badge(back,'Chip',16,11);chip.Position=UDim2.fromOffset(40,9);chip.Visible=false;chip.ZIndex=8;chipText.ZIndex=9
 local caption=Art.fitText(back,'Caption','NEXT ROLL',12,8,RGB(255,236,170));caption.Position=UDim2.fromOffset(48,3);caption.Size=UDim2.fromOffset(TRACK_W+4,16);caption.ZIndex=5
@@ -722,10 +724,11 @@ popBar=function()
  task.delay(Style.ReadyHold+.1,function()if not dead then refreshBar()end end)
  if reduced()then return end
  backPop.Scale=1.18;tween(backPop,.45,Enum.EasingStyle.Back,{Scale=1})
+ lipPop.Scale=1.18;tween(lipPop,.45,Enum.EasingStyle.Back,{Scale=1})
  local t=0
  addEffect(function(dt)
-  t+=dt;back.Rotation=6*math.sin(t*34)*math.max(0,1-t/.6)
-  if t>=.6 then back.Rotation=0;return true end
+  t+=dt;back.Rotation=6*math.sin(t*34)*math.max(0,1-t/.6);backLip.Rotation=back.Rotation
+  if t>=.6 then back.Rotation=0;backLip.Rotation=0;return true end
   return false
  end)
  spawnBurst(barFx,56,58,{Count=lite()and 4 or 8,Shape='Star',Size=14,Life=.9,Speed={40,95},Arc={-math.pi*.95,-math.pi*.05},Gravity=60,Colors={GOLD,WHITE,RGB(255,150,190)},Drag=1.6})

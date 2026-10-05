@@ -153,7 +153,9 @@ end
 function A.SetShine(shine,u)
  local stripe=shine.Stripe
  if u<=0 or u>=1 then if stripe.Visible then stripe.Visible=false end;return end
- stripe.Visible=true;stripe.Position=UDim2.fromScale(-.35+u*1.5,-.45)
+ -- -.6 .. 1.4: the stripe starts and ends fully outside the pane. Roblox rotates a GuiObject about its CENTRE (not its AnchorPoint), so a 22 degree stripe
+ -- reaches far beyond its own box; the old -.35 .. 1.15 left it popping in and out inside a tall winner card.
+ stripe.Visible=true;stripe.Position=UDim2.fromScale(-.6+u*2,-.45)
 end
 
 -- Rays: crossing light beams (every beam is a full-length bar through the centre = two rays, with a brighter narrow core).
@@ -197,7 +199,8 @@ function A.Stripes(parent,count,rotation,alpha,z)
  return frame
 end
 
--- Sparkle / confetti burst from (x,y) in the layer. opts: Count, Shape 'Star' (diamonds) or 'Confetti' (bits), Size, Life, Speed {lo,hi},
+-- Sparkle / confetti burst from (x,y) in the layer. Every piece is ONE Frame (a sparkle is a spinning diamond: a square at 45 degrees; a confetti bit is a
+-- tall rectangle): a Secret reveal draws 160 pieces on one frame, so a piece must not cost 5 instances. opts: Count, Shape 'Star' (diamonds) or 'Confetti' (bits), Size, Life, Speed {lo,hi},
 -- Arc {lo,hi} radians (negative = up), Gravity, Colors, Z. Step(dt) returns true when finished; Destroy() removes the pieces.
 function A.Burst(layer,x,y,opts)
  local rng=Random.new();local colors=opts.Colors or A.Confetti;local star=opts.Shape~='Confetti'
@@ -205,21 +208,12 @@ function A.Burst(layer,x,y,opts)
  local pieces={}
  for i=1,opts.Count do
   local color=colors[(i-1)%#colors+1]
-  local w=star and size*rng:NextNumber(.7,1.2)or math.floor(size*rng:NextNumber(.7,1.1));local h=star and w or math.floor(w*rng:NextNumber(1.3,1.9))
+  -- A sparkle's side is .62 of the old cross's arm (a diamond's diagonal is 1.41 x its side), so it covers about the same space.
+  local w=star and math.max(4,math.floor(size*rng:NextNumber(.7,1.2)*.62+.5))or math.floor(size*rng:NextNumber(.7,1.1));local h=star and w or math.floor(w*rng:NextNumber(1.3,1.9))
   local frame=make('Frame',{Name=star and'Spark'or'Confetti',AnchorPoint=Vector2.new(.5,.5),BorderSizePixel=0,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),
-   Rotation=star and 0 or rng:NextNumber(0,360),BackgroundColor3=color,BackgroundTransparency=star and 1 or 0,ZIndex=opts.Z or 30},layer)
-  local paint={frame}
-  if star then
-   -- A four-point sparkle: two thin bars crossing.
-   paint={};local thick=math.max(2,math.floor(w*.3))
-   for k=1,2 do
-    local bar=make('Frame',{Name='Bar'..k,AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),BorderSizePixel=0,BackgroundColor3=color,
-     Size=k==1 and UDim2.new(1,0,0,thick)or UDim2.new(0,thick,1,0),ZIndex=opts.Z or 30},frame)
-    pill(bar);paint[k]=bar
-   end
-  end
+   Rotation=star and 45 or rng:NextNumber(0,360),BackgroundColor3=color,BackgroundTransparency=0,ZIndex=opts.Z or 30},layer)
   local angle=rng:NextNumber(arc[1],arc[2]);local v=rng:NextNumber(speed[1],speed[2])
-  pieces[i]={Frame=frame,Paint=paint,X=0,Y=0,VX=math.cos(angle)*v,VY=math.sin(angle)*v,Angle=frame.Rotation,Spin=rng:NextNumber(-540,540)*(star and .5 or 1),Life=rng:NextNumber(life*.6,life)}
+  pieces[i]={Frame=frame,X=0,Y=0,VX=math.cos(angle)*v,VY=math.sin(angle)*v,Angle=frame.Rotation,Spin=rng:NextNumber(-540,540)*(star and .5 or 1),Life=rng:NextNumber(life*.6,life)}
  end
  local burst={Age=0,Life=life,Pieces=pieces}
  local gravity=opts.Gravity or 0
@@ -231,8 +225,7 @@ function A.Burst(layer,x,y,opts)
    else
     p.VY+=gravity*dt;p.VX*=drag;p.VY*=star and drag or 1;p.X+=p.VX*dt;p.Y+=p.VY*dt;p.Angle+=p.Spin*dt
     p.Frame.Position=UDim2.fromOffset(x+p.X,y+p.Y);p.Frame.Rotation=p.Angle
-    local alpha=t<.5 and 0 or(t-.5)/.5
-    for _,item in ipairs(p.Paint)do item.BackgroundTransparency=alpha end
+    p.Frame.BackgroundTransparency=t<.5 and 0 or(t-.5)/.5
    end
   end
   return self.Age>=self.Life

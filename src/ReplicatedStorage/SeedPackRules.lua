@@ -14,7 +14,7 @@ Rules.OpenClicks = 5
 Rules.ClickInterval = .065
 Rules.TearSoundId = "rbxassetid://9125725227"
 Rules.TearVolume = 0.45
-Rules.TearSoundStart = 0.10
+-- (R150: the tear sound's lead-in lives in SoundTiming, the one table every cue is tuned in; there is no Rules.TearSoundStart any more)
 -- Soft built-in bell sample: no new external audio permission is needed.
 Rules.RevealBellSoundId = "rbxasset://sounds/electronicpingshort.wav"
 Rules.RevealBellVolume = .055

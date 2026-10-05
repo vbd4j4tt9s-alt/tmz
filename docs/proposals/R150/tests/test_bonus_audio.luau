@@ -121,7 +121,7 @@ roll(cases.Legendary,0)
 UW.frames(30,1/60)
 mark=#audio.Plays+1
 panel.Actions.Skip.Activated:Fire();panel.Actions.Skip.Activated:Fire();panel.Actions.Skip.Activated:Fire()
-local gemPlays=#plays(mark,'^Interaction_GemClaim');local fx=#C.Overlay.Fx:GetChildren()
+local gemPlays=#plays(mark,'^Interaction_GemClaim');local fx=#panel.Fx:GetChildren()
 local expected=Style.Reveal('Legendary').Sparkles+Style.Reveal('Legendary').Confetti
 check(gemPlays==1 and fx==expected,'three quick Skip taps reveal once: one chime, one set of pieces ('..gemPlays..', '..fx..' of '..expected..')')
 panel.Actions.Close.Activated:Fire()
@@ -138,5 +138,32 @@ local reveals=0;for _,s in ipairs(SS:GetChildren())do if s.Name:match('^Reveal_'
 check(reveals==8,'the reveal voice pool stays at its 8 voices ('..reveals..')')
 local tickCount=0;for _,s in ipairs(SS:GetChildren())do if s.Name:match('^Interaction_BonusTick%d$')then tickCount+=1 end end
 check(tickCount==4,'the tick pool stays at 4 voices')
+-- 6. R150 review: every refusal clicks Denied (the built-in ping, low, in the Interface group); a roll that starts never does ----------------------------------
+do
+ me:SetAttribute('TreadmillTraining',true);C.set('Interval',360);C.set('DueAt',R.clock+300);C.set('Left',300);C.set('Ready',0);UW.seconds(3,1/60)
+ local denied=function(from)return plays(from,'^Interaction_Denied$')end
+ mark=#audio.Plays+1;button.Activated:Fire()
+ local d=denied(mark)
+ check(#d==1 and d[1].Loaded and d[1].Group and d[1].Group.Name=='GardenInterface','R150 review: a tap on the charging button plays the Denied ping once, on a loaded voice, in the Interface group ('..#d..')')
+ check(d[1] and d[1].Pitch==.55 and d[1].Volume<=.25,'R150 review: ... low and quiet (speed '..tostring(d[1]and d[1].Pitch)..', volume '..tostring(d[1]and d[1].Volume)..')')
+ -- a server refusal
+ UW.seconds(1,1/60);C.set('Ready',1);UW.frames(1,1/60);C.Reply={Error='SEED BAG FULL! Make room - your roll stays ready.',Ready=1}
+ mark=#audio.Plays+1;button.Activated:Fire()
+ check(#denied(mark)==1 and #plays(mark,'^Reveal_')==0,'R150 review: a server refusal plays Denied once (nothing else)')
+ -- no reply / a failed call
+ UW.seconds(1,1/60);C.Reply=nil;mark=#audio.Plays+1;button.Activated:Fire()
+ check(#denied(mark)==1,'R150 review: no reply plays Denied once')
+ -- two refusals closer than the cue's gap are one sound (InteractionAudio: .25 s)
+ mark=#audio.Plays+1;button.Activated:Fire();UW.seconds(.1,1/60);button.Activated:Fire()
+ check(#denied(mark)<=1,'R150 review: a refusal tapped twice within .25 s stays one sound ('..#denied(mark)..')')
+ -- a roll that starts: spin, reveal and close without a Denied
+ UW.seconds(3,1/60);mark=#audio.Plays+1
+ roll(cases.Common,0)
+ local m=0;while panel.Actions.Skip.Visible and m<2000 do UW.frames(1,1/60);m+=1 end
+ panel.Actions.Close.Activated:Fire();UW.seconds(2,1/60)
+ roll(cases.Legendary,0);panel.Actions.Skip.Activated:Fire();UW.seconds(1,1/60);panel.Actions.Close.Activated:Fire();UW.seconds(2,1/60)
+ check(#denied(mark)==0 and #plays(mark,'^Interaction_BonusTick')>0,'R150 review: two rolls that start, spin and reveal never play Denied')
+ C.set('Ready',0);me:SetAttribute('TreadmillTraining',nil);UW.seconds(3,1/60)
+end
 print(string.format('%d/%d checks passed%s',checks-fails,checks,fails>0 and(' ('..fails..' FAILED)')or''))
 if fails>0 then error('failures',0)end

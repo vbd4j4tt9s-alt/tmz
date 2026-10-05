@@ -1,4 +1,4 @@
-"""R150 mutation check: breaks TreadmillBonusClient in twelve ways a regression could (a listener that never stops, a leak, a lost tick, stacked
+"""R150 mutation check: breaks TreadmillBonusClient (and BonusGiftArt) in thirty ways a regression could (a listener that never stops, a leak, a lost tick, stacked
 cues, overlapping rows, ...) and runs the R150 suites against each broken copy. Every mutation must make at least one suite FAIL; a mutation
 that passes means a hole in the tests. Usage: python3 mutation_check.py [scratch dir]   (sh mutation_check.sh calls it)"""
 import os
@@ -9,8 +9,10 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, '../../../..'))
 CLIENT = os.path.join(REPO, 'src/StarterPlayer/StarterPlayerScripts/TreadmillBonusClient.client.lua')
+ART = os.path.join(REPO, 'src/ReplicatedStorage/BonusGiftArt.lua')
 SCRATCH = sys.argv[1] if len(sys.argv) > 1 else '/tmp/r150_mutants'
 src = open(CLIENT, encoding='utf-8').read()
+art_src = open(ART, encoding='utf-8').read()
 
 MUTANTS = [
     ('an ambient effect is never cancelled', 'if ambient then cancelEffect(ambient);ambient=nil end', 'if ambient then ambient=nil end', ['ui']),
@@ -27,6 +29,42 @@ MUTANTS = [
      'if #effects==0 and effectConnection then effectConnection=nil end\n end\n addEffect', ['ui']),
     ('teardown forgets the gift timer', 'hud:Destroy();overlay:Destroy();bar:Destroy()', 'hud:Destroy();overlay:Destroy()', ['ui']),
     ('the lip is 6 px', 'local LIP=4\n', 'local LIP=6\n', ['layout']),
+    # R150 review fix round
+    ('the ribbon is under the reveal layer again (confetti crosses the header)',
+     "BackgroundColor3=WHITE,ZIndex=5},panel) -- R150 review: above the reveal effect layer",
+     "BackgroundColor3=WHITE,ZIndex=3},panel) -- R150 review: above the reveal effect layer", ['ui', 'layout']),
+    ('the reveal layer is above the ribbon', "Size=UDim2.fromScale(1,1),Active=false,ZIndex=4},panel)",
+     "Size=UDim2.fromScale(1,1),Active=false,ZIndex=30},panel)", ['ui', 'layout']),
+    ('the reveal layer is back on the screen', "Size=UDim2.fromScale(1,1),Active=false,ZIndex=4},panel)",
+     "Size=UDim2.fromScale(1,1),Active=false,ZIndex=30},overlay)", ['ui', 'layout']),
+    ('the reveal word pops from its top-left corner',
+     "word.AnchorPoint=Vector2.new(.5,.5);word.Position=UDim2.new(.5,0,0,y+wordH/2);word.Size=status.Size;y+=wordH",
+     "word.Position=status.Position;word.Size=status.Size;y+=wordH", ['ui']),
+    ('no Denied on a refusal', "if Audio then pcall(Audio.Play,'Denied')end -- R150 review",
+     "if false then pcall(Audio.Play,'Denied')end -- R150 review", ['ui']),
+    ('Denied also plays when a roll starts', "current=res;overlay.Enabled=true;layoutOverlay()",
+     "current=res;if Audio then pcall(Audio.Play,'Denied')end;overlay.Enabled=true;layoutOverlay()", ['ui']),
+    ('the HUD button pops from its top-left corner',
+     "button.AnchorPoint=Vector2.new(.5,.5);button.Position=UDim2.fromOffset(r.X+r.W/2,r.Y+r.H/2);button.Size",
+     "button.Position=UDim2.fromOffset(r.X,r.Y);button.Size", ['ui', 'layout']),
+    ('the sparkle origin ignores the new anchor',
+     "return button.Position.X.Offset-button.Size.X.Offset/2+26,button.Position.Y.Offset-button.Size.Y.Offset/2+(button.Size.Y.Offset-LIP)/2",
+     "return button.Position.X.Offset+26,button.Position.Y.Offset+(button.Size.Y.Offset-LIP)/2", ['ui']),
+    ('every card builds its gloss again', "if motion then -- R150 review: the soft gloss only on the special tiers",
+     "if true then -- R150 review: the soft gloss only on the special tiers", ['ui']),
+    ('twinkles sit on the odds fine print again', "{.3,.08},{.72,.07}})do",
+     "{.3,.08},{.72,.07},{.5,.95},{.2,.95},{.8,.95},{.62,.9}})do", ['ui']),
+    ('the gift timer shadow does not shake', "backLip.Rotation=back.Rotation\n  if t>=.6", "\n  if t>=.6", ['ui']),
+    ('the gift timer shadow does not pop', "lipPop.Scale=1.18;tween(lipPop,.45,Enum.EasingStyle.Back,{Scale=1})", "", ['ui']),
+    ('the sparkle burst is drawn off the gift',
+     "local x,y=buttonCenter();spawnBurst(hud.Fx,x,y,sparkleOpts(GOLD,8))",
+     "local x,y=buttonCenter();x,y=x+30,y+30;spawnBurst(hud.Fx,x,y,sparkleOpts(GOLD,8))", ['ui']),
+    # BonusGiftArt
+    ('a sparkle is a Frame with two bars again', "BackgroundTransparency=0,ZIndex=opts.Z or 30},layer)\n",
+     "BackgroundTransparency=0,ZIndex=opts.Z or 30},layer);if star then for k=1,2 do pill(make('Frame',{Name='Bar'..k,Size=UDim2.fromScale(1,.3)},frame))end end\n",
+     ['style', 'ui'], 'art'),
+    ('the shine sweeps the old way (pops in and out inside a tall card)', "stripe.Position=UDim2.fromScale(-.6+u*2,-.45)",
+     "stripe.Position=UDim2.fromScale(-.35+u*1.5,-.45)", ['style'], 'art'),
 ]
 # the lazy-tick mutant also needs the first tick to build the pool
 LAZY_FIX = ('local function tickSound(pitch)\n if #tickVoices==0 then return end', 'local function tickSound(pitch)\n if #tickVoices==0 then buildTicks() end\n if #tickVoices==0 then return end')
@@ -42,25 +80,29 @@ def run(tests, out):
 
 bad = 0
 os.makedirs(SCRATCH, exist_ok=True)
-for i, (name, old, new, tests) in enumerate(MUTANTS, 1):
+for i, entry in enumerate(MUTANTS, 1):
+    name, old, new, tests = entry[:4]
+    target = entry[4] if len(entry) > 4 else 'client'
+    base = art_src if target == 'art' else src
     out = os.path.join(SCRATCH, 'm%02d' % i)
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(out)
-    if src.count(old) != 1:
-        print('M%02d %-70s SKIPPED (pattern found %d times)' % (i, name, src.count(old)))
+    if base.count(old) != 1:
+        print('M%02d %-70s SKIPPED (pattern found %d times)' % (i, name, base.count(old)))
         bad += 1
         continue
-    mutated = src.replace(old, new)
+    mutated = base.replace(old, new)
     if 'buildTicks' in new:
         assert LAZY_FIX[0] in mutated
         mutated = mutated.replace(LAZY_FIX[0], LAZY_FIX[1])
-    path = os.path.join(out, 'client_mut.lua')
+    path = os.path.join(out, 'client_mut.lua' if target == 'client' else 'art_mut.lua')
     open(path, 'w', encoding='utf-8').write(mutated)
     for f in (os.path.join(REPO, 'tools/tests/roblox.luau'), os.path.join(REPO, 'docs/proposals/treadmill_bonus_R123/tests/world.luau'), os.path.join(HERE, 'ui_world.luau')):
         shutil.copy(f, out)
     for t in tests:
         shutil.copy(os.path.join(HERE, 'test_bonus_%s.luau' % t), out)
-    subprocess.run([sys.executable, os.path.join(HERE, 'mkbundle.py'), out, 'TreadmillBonusClient=' + path], check=True, capture_output=True)
+    pair = ('TreadmillBonusClient=' if target == 'client' else 'BonusGiftArt=') + path
+    subprocess.run([sys.executable, os.path.join(HERE, 'mkbundle.py'), out, pair], check=True, capture_output=True)
     failed, last = run(tests, out)
     if failed:
         print('M%02d %-70s caught by test_bonus_%s: %s' % (i, name, failed, last))
