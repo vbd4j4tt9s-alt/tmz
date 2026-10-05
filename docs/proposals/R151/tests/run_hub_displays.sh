@@ -70,7 +70,7 @@ wiring() {
  done
  grep -q "MemoryStoreService" "$SRV/HubDisplayStore.lua" || { echo "the store does not use MemoryStoreService";return 1; }
  # saves / economy / odds unchanged: ProfileVersion and the version string are the base's, and the gameplay files are byte-identical (sha256 list)
- grep -q "Config.ProfileVersion=22" "$SRV/Config.lua" && grep -q "Config.Version='V150 R150'" "$SRV/Config.lua" || { echo "Config.ProfileVersion / Version changed";return 1; }
+ grep -q "Config.ProfileVersion=22" "$SRV/Config.lua" && grep -q "Config.Version='V150 R151'" "$SRV/Config.lua" || { echo "Config.ProfileVersion / Version changed";return 1; }
  (cd "$REPO" && sha256sum -c "$HERE/frozen.sha256" > "$OUT/frozen.log" 2>&1) || { cat "$OUT/frozen.log";return 1; }
  echo "wiring ok ($(wc -l < "$HERE/frozen.sha256") gameplay files byte-identical)"
 }
