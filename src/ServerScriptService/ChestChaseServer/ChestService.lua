@@ -7,6 +7,7 @@ local PackVisuals = require(ReplicatedStorage:WaitForChild("SeedPackVisuals"))
 
 local Weather=require(ReplicatedStorage.WeatherTraits);local FX=require(ReplicatedStorage.ItemEffectAnchor)
 local PackShapes=require(ReplicatedStorage.PackShapes151) -- R151: each pack rolls one of six chip-bag shapes and keeps it for life (PlayerDataService.AddChest, RefreshWorldPack)
+local VerityReasons=require(ReplicatedStorage.VerityConfig).Reasons -- R152: what Verity says when a hand-in is refused (ConvertVoidPack)
 local ChestService = {}
 ChestService.__index = ChestService
 
@@ -963,7 +964,7 @@ end
 -- and the reason with nothing changed. A pack whose opening is committed (the reveal is playing) is refused; an opening that
 -- has only been started (held, clicks) is finished first, then the Tool is rebuilt for the new pack.
 function ChestService:ConvertVoidPack(player, id)
-	if not player or not self.PlayerData:IsLoaded(player) then return nil, "YOUR DATA IS STILL LOADING" end
+	if not player or not self.PlayerData:IsLoaded(player) then return nil, VerityReasons.Loading end
 	if id == nil then
 		local character = player.Character
 		if character then
@@ -979,13 +980,13 @@ function ChestService:ConvertVoidPack(player, id)
 				if record.Kind == "Pack" and record.BagVariant == "EclipseReliquary" and record.Stage == 7 then id = record.Id; break end
 			end
 		end
-		if id == nil then return nil, "YOU HAVE NO VOID PACK TO GIVE" end
+		if id == nil then return nil, VerityReasons.NoVoid end
 	end
 	local target, reason = self.PlayerData:CheckVoidPack(player, id)
 	if not target then return nil, reason end
 	local opening = self.Openings[player]
 	if opening and opening.Tool and opening.Tool:GetAttribute("SeedInventoryId") == target.Id then
-		if opening.Committed then return nil, "WAIT FOR THAT PACK TO FINISH OPENING" end
+		if opening.Committed then return nil, VerityReasons.Opening end
 		self:_finishOpening(player, opening)
 	end
 	local record, why = self.PlayerData:ConvertVoidPack(player, target.Id)

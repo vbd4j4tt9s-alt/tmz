@@ -7,8 +7,8 @@
 --    in a new session), a bouncing gold "?" while a Void Pack Tool (SeedPackTool + BagVariant EclipseReliquary, in the Backpack or the
 --    Character) is held; never both once the limited event is over. The sign is one studs-sized BillboardGui: marker row, gap, name,
 --    event timer row (rows that cannot overlap, also while the marker bounces, she bobs and swells), offset in camera space.
---  * The limited event (LimitedEvent, EndsAt 2026-11-01 00:00 UTC, the server's clock): "EVENT ENDS IN 27d 04h 12m 09s" under her name
---    (ticking every second); after the end EVENT ENDED, GIVE disabled, no marker. R149: NOT in the dialog any more (owner: "remove the event
+--  * The limited event (LimitedEvent, EndsAt 2026-11-01 00:00 UTC, the server's clock): "HURRY! ENDS IN 27d 04h 12m 09s" (R152; it said EVENT ENDS IN) under
+--    her name (ticking every second); after the end EVENT OVER! THANKS!, GIVE disabled, no marker. R149: NOT in the dialog any more (owner: "remove the event
 --    ends thing"): no such line anywhere in her window, and no empty row where it was.
 --  * Her greeting (VerityConfig.GreetingSoundId): plays from her body when the dialog opens with Talk, and once when you first come
 --    within 30 studs (at most once a minute; a Talk greeting counts); never two copies at once; routed to the Effects group and
@@ -20,6 +20,8 @@
 --    the thank-you sound, the refusal reason, SeedMenu = 'Verity' set and cleared, hostile payloads, and the window fitting phones and
 --    computers with every text shown in full (R149: the quest sentence at a readable size, in at most 5 lines, measured with a font 15%
 --    wider than the mock's usual one, on the first Open and on every later one, and no empty row anywhere).
+--  * R152 (her texts in her voice): the status line says what to do next until the server answers (section 4b), and every one-line text (The Darkened's
+--    line, the status line, both buttons, the stat box titles) stays readable (12 px) on every screen size when drawn with the 15% wider real font.
 local W=require('./world');local F=require('./fixtures');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -199,13 +201,13 @@ do
  check(mark.Text=='?','a new Backpack after respawn is watched');backpack=fresh
  for _,t in ipairs(fresh:GetChildren())do t:Destroy()end;frames(2);check(mark.Text=='!','(and back to "!")')
 end
--- The timer line under her name: "EVENT ENDS IN 27d 04h 12m 09s" on the server's clock, ticking every second.
-check(timerLabel.Text:find('^EVENT ENDS IN %d+d %d%dh %d%dm %d%ds$')~=nil,'the timer line reads like "EVENT ENDS IN 27d 04h 12m 09s": '..timerLabel.Text)
+-- The timer line under her name: "HURRY! ENDS IN 27d 04h 12m 09s" (R152; it said EVENT ENDS IN) on the server's clock, ticking every second.
+check(C.Event.Prefix=='HURRY! ENDS IN 'and timerLabel.Text:find('^HURRY! ENDS IN %d+d %d%dh %d%dm %d%ds$')~=nil,'the timer line reads like "HURRY! ENDS IN 27d 04h 12m 09s": '..timerLabel.Text)
 do
  local left0=Limited.Left(W.workspace:GetServerTimeNow())
- check(timerLabel.Text=='EVENT ENDS IN '..Limited.Text(left0),'(and it is LimitedEvent\'s text for the time left: '..left0..' s)')
+ check(timerLabel.Text=='HURRY! ENDS IN '..Limited.Text(left0),'(and it is LimitedEvent\'s text for the time left: '..left0..' s)')
  local before=timerLabel.Text;R.advance(1.05);frames(2)
- check(timerLabel.Text~=before and timerLabel.Text=='EVENT ENDS IN '..Limited.Text(Limited.Left(W.workspace:GetServerTimeNow())),'it ticks: a second later '..timerLabel.Text)
+ check(timerLabel.Text~=before and timerLabel.Text=='HURRY! ENDS IN '..Limited.Text(Limited.Left(W.workspace:GetServerTimeNow())),'it ticks: a second later '..timerLabel.Text)
 end
 -- 3. Her voice ----------------------------------------------------------------------------------------------------------------------
 local function greetings()local n=0;for _,e in ipairs(soundLog)do if e.Sound.Name=='VerityGreeting'then n+=1 end end;return n end
@@ -218,7 +220,7 @@ standAt(0,7,-150);frames(40);check(greetings()==0,'far away (190 studs): no gree
 -- Open with Talk plays it, from her body.
 check(mark.Visible and mark.Text=='!','(before anyone talked to her the "!" is showing)')
 local nextAt=R.clock+754
-server('Open',{VoidPacks=0,Delivered=3,RewardText='1 VOID PACK = 1 VERITY PACK',EventActive=false,NextAt=nextAt})
+server('Open',{VoidPacks=0,Delivered=3,RewardText=C.RewardText,EventActive=false,NextAt=nextAt})
 local s=voiceSound()
 check(not mark.Visible and sign:GetAttribute('MarkerShown')==false,'she has been talked to: the "!" is gone')
 check(greetings()==1 and s and s:IsA('Sound')and s.Parent==body,'opening her dialog with Talk plays her greeting (once), from her body')
@@ -294,7 +296,7 @@ do
 do local lo3=1e9;for _=1,200 do frames(1);lo3=math.min(lo3,(sign.StudsOffset.Y-sign.Size.Y.Scale/2)-body.Size.X/2)end;check(lo3>=.3,string.format('and through a whole bob cycle: %.2f studs',lo3))end
  check(not mark.Visible,'(the "!" is still gone after the voice and the proximity greetings)')
  R.advance(5);frames(30);check(not mark.Visible and sign:GetAttribute('MarkerShown')==false,'it does not come back by itself (time passing, the once-a-second recount)')
- server('Done',{Delivered=9});server('Refused',{Reason='COME CLOSER TO VERITY'});panel.Header.Close.Activated:Fire();frames(2);plays={}
+ server('Done',{Delivered=9});server('Refused',{Reason=C.Reasons.TooFar});panel.Header.Close.Activated:Fire();frames(2);plays={}
  check(not mark.Visible,'nor after a hand-in, a refusal or closing the window')
  local vt=F.tool(W,'Void Pack',{SeedPackTool=true,SeedInventoryId='t1',BagVariant='EclipseReliquary',Stage=7},backpack);frames(2)
  check(mark.Visible and mark.Text=='?'and sign:GetAttribute('Bounce')==true and bounced()>1.1,'but a Void Pack still brings the bouncing "?" (a different cue)')
@@ -307,7 +309,7 @@ do local lo3=1e9;for _=1,200 do frames(1);lo3=math.min(lo3,(sign.StudsOffset.Y-s
  check(near(body.CFrame.Position.Y,16.45,1e-6)and near(lookOf().Z,1,1e-6)and near(lookOf().X,0,1e-6)and body.Size.X==22,'(and she is left exactly as the server placed her, so the next entry takes that as home)')
  W.CS:AddTag(model,'VerityNPC');frames(3)
  mark=sign:FindFirstChild('Mark');timerLabel=sign:FindFirstChild('Timer')
- check(mark and not mark.Visible and timerLabel and timerLabel.Text:find('^EVENT ENDS IN '),'streamed back in: still no "!" (the session remembers), the timer is back')
+ check(mark and not mark.Visible and timerLabel and timerLabel.Text:find('^HURRY! ENDS IN '),'streamed back in: still no "!" (the session remembers), the timer is back')
  -- A respawn (new Backpack and Character) does not bring it back either.
  backpack:Destroy();local fresh=R.new('Backpack');fresh.Parent=player;frames(2);backpack=fresh;check(not mark.Visible,'a respawn does not bring it back')
 end
@@ -345,26 +347,26 @@ do
 end
 -- 4. The dialog -----------------------------------------------------------------------------------------------------------------------
 local gBefore=greetings()
-server('Refused',{Reason='YOUR DATA IS STILL LOADING'})
+server('Refused',{Reason=C.Reasons.Loading})
 local quest,eventLine,voidChip,doneChip,rewardLine,status,give,closeButton=panel.QuestText,panel.EventLine,panel.VoidChip,panel.DeliveredChip,panel.Exchange.RewardLine,panel.Status,panel.GiveButton,panel.CloseButton
 check(panel.Visible and pg:GetAttribute('SeedMenu')=='Verity','a refusal while closed opens the window (SeedMenu = Verity)')
-check(status.Text=='YOUR DATA IS STILL LOADING'and not give.Active,'it shows the reason, GIVE disabled')
+check(status.Text=='HOLD ON, YOUR DATA IS LOADING!'and not give.Active,'it shows the reason, GIVE disabled')
 panel.Header.Close.Activated:Fire();frames(2)
 check(not panel.Visible and pg:GetAttribute('SeedMenu')==nil,'X closes it and clears SeedMenu')
 check(greetings()==gBefore,'(a refusal does not make her speak: only Talk does)')
 R.advance(5)
 nextAt=R.clock+754
-server('Open',{VoidPacks=0,Delivered=3,RewardText='1 VOID PACK = 1 VERITY PACK',EventActive=false,NextAt=nextAt})
+server('Open',{VoidPacks=0,Delivered=3,RewardText=C.RewardText,EventActive=false,NextAt=nextAt})
 check(panel.Visible and pg:GetAttribute('SeedMenu')=='Verity','Open shows the window and sets SeedMenu = Verity')
 check(quest:GetAttribute('FullText')==C.Quest and not quest:GetAttribute('TextShortened')and quest.Text:gsub('\n',' ')==C.Quest,'her quest text, in full (wrapped by the text fitter): '..quest.Text:gsub('\n',' '))
 check(panel.Header.Title.Text:find('VERITY',1,true),'titled VERITY')
-check(voidChip.Count.Text=='0'and doneChip.Count.Text=='3'and voidChip.Caption.Text:find('VOID',1,true)and doneChip.Caption.Text:find('HANDED',1,true),'chips: 0 Void packs, 3 handed in')
-check(rewardLine:GetAttribute('FullText')=='1 VOID PACK = 1 VERITY PACK','the reward line from the server, in the exchange row')
-local function eventEndsLines(root) -- every label of her window that says (or would say, in full) "EVENT ENDS ..."
+check(voidChip.Count.Text=='0'and doneChip.Count.Text=='3'and voidChip.Caption.Text:find('VOID',1,true)and voidChip.Caption.Text=='YOUR VOID PACKS'and doneChip.Caption.Text=='YOU GAVE ME','chips: 0 Void packs, 3 handed in (R152 titles: YOUR VOID PACKS / YOU GAVE ME)')
+check(rewardLine:GetAttribute('FullText')=='SWAP! 1 VOID PACK = 1 VERITY PACK'and C.RewardText=='SWAP! 1 VOID PACK = 1 VERITY PACK','the reward line from the server, in the exchange row')
+local function eventEndsLines(root) -- every label of her window that says (or would say, in full) "... ENDS IN ..." (R152: the sign's "HURRY! ENDS IN ...")
  local found={};for _,d in ipairs((root or panel):GetDescendants())do
   if d:IsA('TextLabel')or d:IsA('TextButton')then
    local full=d:GetAttribute('FullText')
-   if d.Text:find('EVENT ENDS',1,true)or(type(full)=='string'and full:find('EVENT ENDS',1,true))then found[#found+1]=d.Name..': '..d.Text end
+   if d.Text:find('ENDS IN',1,true)or(type(full)=='string'and full:find('ENDS IN',1,true))then found[#found+1]=d.Name..': '..d.Text end
   end
  end;return found
 end
@@ -374,27 +376,27 @@ do -- R149 (owner: "remove the event ends thing"): her window has no "EVENT ENDS
  R.advance(2.05);frames(2)
  check(#eventEndsLines()==0,'(nor does one appear later while the window is open)')
  nextAt=R.clock+754
- server('Open',{VoidPacks=0,Delivered=3,RewardText='1 VOID PACK = 1 VERITY PACK',EventActive=false,NextAt=nextAt})
+ server('Open',{VoidPacks=0,Delivered=3,RewardText=C.RewardText,EventActive=false,NextAt=nextAt})
 end
-do local m0,s0=eventLine.Text:match('ARRIVES IN (%d+)m (%d+)s');local left0=m0 and tonumber(m0)*60+tonumber(s0)or -1
+do local m0,s0=eventLine.Text:match('WAKES IN (%d+)m (%d+)s');local left0=m0 and tonumber(m0)*60+tonumber(s0)or -1
  check(eventLine.Visible and left0>=752 and left0<=754,'The Darkened\'s countdown (12m 34s, a moment ago): '..eventLine.Text)end
-check(give.Active==false and give.Interactable==false and give.Caption.Text=='GIVE VOID PACK','no Void pack: GIVE VOID PACK is disabled')
+check(give.Active==false and give.Interactable==false and give.Caption.Text=='GIVE VOID PACK\u{00A0}🌑','no Void pack: GIVE VOID PACK 🌑 is disabled')
 give.Activated:Fire();frames(2);check(#fired==0,'(clicking it sends nothing)')
-check(closeButton.Caption.Text=='CLOSE','a CLOSE button')
+check(closeButton.Caption.Text=='BYE! 👋','a close button, "BYE! 👋" (R152)')
 R.advance(61);frames(2)
-local mm,ss=eventLine.Text:match('ARRIVES IN (%d+)m (%d+)s');local shownLeft=mm and tonumber(mm)*60+tonumber(ss)or -1;local trueLeft=nextAt-R.clock
+local mm,ss=eventLine.Text:match('WAKES IN (%d+)m (%d+)s');local shownLeft=mm and tonumber(mm)*60+tonumber(ss)or -1;local trueLeft=nextAt-R.clock
 check(mm and shownLeft<=754-60 and trueLeft-shownLeft<=2 and trueLeft-shownLeft>=-1,'the countdown ticks while open: '..eventLine.Text..' (really '..math.floor(trueLeft)..' s left)')
 server('Open',{VoidPacks=0,Delivered=3,EventActive=true})
-check(eventLine.Visible and eventLine.Text:find('HERE NOW',1,true)and rewardLine:GetAttribute('FullText')==C.RewardText,'The Darkened is here: "HERE NOW" (and the reward line falls back to the config)')
+check(eventLine.Visible and eventLine.Text=='🌑 EEK! THE DARKENED IS HERE NOW!'and rewardLine:GetAttribute('FullText')==C.RewardText,'The Darkened is here: "HERE NOW" (and the reward line falls back to the config)')
 server('Open',{VoidPacks=0,Delivered=3})
 check(not eventLine.Visible,'no schedule information: the line is hidden')
 server('Open',{VoidPacks=0,Delivered=3,EventActive=false,NextAt=R.clock-5})
-check(eventLine.Visible and eventLine.Text:find('ARRIVING',1,true),'a NextAt in the past reads "arriving"')
+check(eventLine.Visible and eventLine.Text=='🌑 THE DARKENED IS WAKING UP...','a NextAt in the past reads "waking up"')
 server('Open',{VoidPacks=2,Delivered=3,EventActive=false})
 check(voidChip.Count.Text=='2'and give.Active and give.Interactable,'two Void packs: GIVE VOID PACK is enabled')
 give.Activated:Fire();frames(2)
 check(#fired==1 and fired[1][1]=='Give'and #fired[1]==1,'a click sends exactly "Give" (no arguments)')
-check(not give.Active and give.Caption.Text:find('HANDING',1,true),'then it is locked until the server answers')
+check(not give.Active and give.Caption.Text=='SWAPPING... ✨','then it is locked until the server answers')
 give.Activated:Fire();give.Activated:Fire();frames(2);check(#fired==1,'more clicks while waiting send nothing')
 server('Done',{Delivered=4,RecordId='x_1'})
 check(status.Text==C.Thanks and plays[#plays]=='GemClaim','Done: the thank-you and the GemClaim sound ('..status.Text..')')
@@ -405,8 +407,8 @@ local gemClaims=0;for _,k in ipairs(plays)do if k=='GemClaim'then gemClaims+=1 e
 check(voidChip.Count.Text=='0'and doneChip.Count.Text=='5'and not give.Active and gemClaims==2,'the last one: 0 left, GIVE disabled, the sound played twice (R150: a refusal earlier clicked Denied, which is not counted)')
 server('Open',{VoidPacks=1,Delivered=5})
 give.Activated:Fire();frames(2);check(#fired==3 and not give.Active,'(another click, waiting)')
-server('Refused',{Reason='COME CLOSER TO VERITY'})
-check(status.Text=='COME CLOSER TO VERITY'and status.TextColor3.R>.9 and status.TextColor3.G<.5,'Refused: the reason, in red')
+server('Refused',{Reason=C.Reasons.TooFar})
+check(status.Text=='OVER HERE! COME CLOSER TO ME!'and status.TextColor3.R>.9 and status.TextColor3.G<.5,'Refused: the reason, in red')
 check(plays[#plays]=='Denied','R150: a refused hand-in clicks Denied (and a success never does)')
 check(give.Active and voidChip.Count.Text=='1','and GIVE is unlocked again, the count unchanged')
 give.Activated:Fire();frames(2);check(not give.Active and #fired==4,'(waiting for an answer that never comes)')
@@ -427,6 +429,41 @@ check(panel.Visible and pg:GetAttribute('SeedMenu')=='Verity','opening while ano
 pg:SetAttribute('SeedMenu','Index');frames(2)
 check(not panel.Visible and pg:GetAttribute('SeedMenu')=='Index','another menu opening closes hers and leaves its SeedMenu alone')
 pg:SetAttribute('SeedMenu',nil);frames(2)
+-- 4b. R152: the status line is not empty after an Open: it says what to do next, until the server answers ---------------------------------
+do
+ local function colorIs(c,r,g,b)return near(c.R,r/255,.01)and near(c.G,g/255,.01)and near(c.B,b/255,.01)end
+ local MINT,GOLD,MUTED,RED=function(c)return colorIs(c,110,226,96)end,function(c)return colorIs(c,255,206,64)end,function(c)return colorIs(c,204,224,255)end,function(c)return c.R>.9 and c.G<.5 end
+ server('Open',{VoidPacks=2,Delivered=3,EventActive=false})
+ check(status.Text=='Ooh, a Void Pack! Hand it over!'and status.Text==C.Hint.Have and MINT(status.TextColor3),'you carry a Void Pack: "Ooh, a Void Pack! Hand it over!" in green ('..status.Text..')')
+ server('Open',{VoidPacks=1,Delivered=3,EventActive=true})
+ check(status.Text==C.Hint.Have,'(a Void Pack wins over The Darkened being here)')
+ server('Open',{VoidPacks=0,Delivered=3,EventActive=true})
+ check(status.Text=='Quick! Steal one in Storm Peaks!'and status.Text==C.Hint.Here and GOLD(status.TextColor3),'none, and The Darkened is here: "Quick! Steal one in Storm Peaks!" in gold ('..status.Text..')')
+ server('Open',{VoidPacks=0,Delivered=3,EventActive=false,NextAt=R.clock+600})
+ check(status.Text=='Get ready to steal one!'and status.Text==C.Hint.Wait and MUTED(status.TextColor3),'none, and it comes back later: "Get ready to steal one!" in pale blue ('..status.Text..')')
+ server('Open',{VoidPacks=0,Delivered=3})
+ check(status.Text==C.Hint.Wait,'(no schedule information reads the same)')
+ server('Open',{VoidPacks=1,Delivered=3,EventActive=false})
+ give.Activated:Fire();frames(2)
+ check(status.Text==''and give.Caption.Text=='SWAPPING... ✨','while the hand-in waits the status line is quiet and the button says "SWAPPING... ✨"')
+ server('Done',{Delivered=4})
+ check(status.Text=='Yay, thanks! Here\'s your Verity Pack!'and status.Text==C.Thanks and MINT(status.TextColor3),'Done: the thanks replaces the hint ('..status.Text..')')
+ server('Open',{VoidPacks=0,Delivered=4,EventActive=true})
+ check(status.Text==C.Hint.Here,'opening the window again: the thanks is gone and the hint is back')
+ server('Open',{VoidPacks=1,Delivered=4,EventActive=true});give.Activated:Fire();frames(2)
+ server('Refused',{Reason=C.Reasons.NoVoid})
+ check(status.Text=='NO VOID PACK YET! GO STEAL ONE!'and RED(status.TextColor3),'a refusal replaces the hint, in red ('..status.Text..')')
+ R.advance(5);frames(2);check(status.Text==C.Reasons.NoVoid,'(and it stays while the window is open)')
+ server('Open',{VoidPacks=1,Delivered=4,EventActive=true})
+ check(status.Text==C.Hint.Have,'the next Open brings the hint back')
+ -- Every text of her window is one of these: nothing else is left in the old words.
+ local words={C.Quest,C.RewardText,C.Thanks,C.Notice,C.Dialog.VoidChip,C.Dialog.DoneChip,C.Dialog.Give,C.Dialog.Busy,C.Dialog.Close,C.Dialog.Here,C.Dialog.Next,C.Dialog.Arriving,C.Hint.Have,C.Hint.Here,C.Hint.Wait,C.Hint.Over,C.Event.Prefix,C.Event.Ended,C.PromptActionText}
+ for _,r in pairs(C.Reasons)do words[#words+1]=r end
+ local old={'HANDED IN','VOID PACKS YOU HAVE','ARRIVES IN','HANDING IT OVER','EVENT ENDED','EVENT ENDS IN','Thank you! Here is','COME CLOSER TO VERITY','VERITY IS NOT READY','YOU NEED A VOID PACK'}
+ local stale={};for _,w in ipairs(words)do for _,o in ipairs(old)do if w:find(o,1,true)then stale[#stale+1]=o..' in "'..w..'"'end end end
+ check(#stale==0 and #words>=30,'none of her '..#words..' texts still has an old wording ('..table.concat(stale,' | ')..')')
+ pg:SetAttribute('SeedMenu',nil);frames(2)
+end
 -- 5. Verity herself in the window (R149: her 3D model in a ViewportFrame), and the exchange as real pack pictures ---------------------------------
 server('Open',{VoidPacks=2,Delivered=7,EventActive=true});frames(4)
 local portrait=panel.Portrait;local view=portrait:FindFirstChild('Model')
@@ -494,15 +531,24 @@ local function questProblems(label,minSize)
  if #lines*size*1.15>abs.Y+1e-6 then why=why..(' %d lines of %d px need %d px, the box is %d'):format(#lines,size,#lines*size*1.15,abs.Y)end
  return why,#lines,size
 end
+-- R152: a one-line label as the REAL font would draw it: the capitals of FredokaOne are about 15% wider than the mock's measure (the margin of the quest check
+-- above), so a line too wide for its box at that width is drawn smaller by the same factor. Returns the size it would settle on.
+local function realOneLine(label)
+ local abs=label.AbsoluteSize;local size=label.TextSize
+ local wide=TextS:GetTextSize(label.Text,size,label.Font,R.Vector2.new(1e5,1e5)).X*1.15
+ local room=abs.X-4
+ return wide<=room and size or math.floor(size*room/wide)
+end
 local sizes={{1920,1080},{1280,720},{1024,768},{844,390},{780,360},{667,340},{667,375},{430,932},{390,844},{390,760},{375,667},{360,640},{360,600}}
 local worstSize,worstLines=99,0
 for _,sz in ipairs(sizes)do
- for _,variant in ipairs({{'with The Darkened\'s line',{VoidPacks=2,Delivered=7,EventActive=true}},{'without it',{VoidPacks=2,Delivered=7}}})do
+ for _,variant in ipairs({{'with The Darkened\'s line',{VoidPacks=2,Delivered=7,EventActive=true}},{'without it',{VoidPacks=2,Delivered=7}},
+  {'none, here now',{VoidPacks=0,Delivered=7,EventActive=true}},{'none, countdown',{VoidPacks=0,Delivered=7,EventActive=false,NextAt=R.clock+754}}})do
   resize(sz[1],sz[2]);server('Done',{Delivered=8});server('Open',variant[2]);frames(4)
   local P=rect(panel);local good,why=true,''
   local short=P.H<380
   local items=itemsOf()
-  check(eventLine.Visible==(variant[2].EventActive==true),'(the Darkened line shows only when there is something to say)')
+  check(eventLine.Visible==(variant[2].EventActive==true or variant[2].NextAt~=nil),'(the Darkened line shows only when there is something to say)')
   for i,a in ipairs(items)do
    local r=rect(a[2])
    if r.X<P.X-1 or r.Y<P.Y-1 or r.X+r.W>P.X+P.W+1 or r.Y+r.H>P.Y+P.H+1 then good=false;why=why..(' %s outside the panel'):format(a[1])end
@@ -527,6 +573,13 @@ for _,sz in ipairs(sizes)do
   local hdr=rect(panel.Header.Close);if hdr.X+hdr.W>P.X+P.W+1 or hdr.W<30 then good=false;why=why..' X button off or small'end
   for _,label in ipairs({eventLine,rewardLine,status,voidChip.Count,doneChip.Count,voidChip.Caption,doneChip.Caption,give.Caption,closeButton.Caption})do
    if label:GetAttribute('TextShortened')then good=false;why=why..' text cut: '..tostring(label.Name)..' ("'..label.Text..'")'end
+  end
+  -- R152: every one-line text stays readable with the real font too (the status line and The Darkened's line are the longest).
+  for _,label in ipairs({eventLine,status,give.Caption,closeButton.Caption,voidChip.Caption,doneChip.Caption})do
+   if label.Visible and label.Text~=''then
+    local real=realOneLine(label);local need=math.min(label.TextSize,short and 10 or 12) -- (a box too short for a bigger font, like the chip titles, is not the text's doing)
+    if real<need then good=false;why=why..(' %s would be %d px with the real font ("%s")'):format(label.Name,real,label.Text)end
+   end
   end
   -- The quest sentence (R149: it was cut off with "..." in the owner's window): in full and readable, on the first Open and on every later one.
   local qwhy,qlines,qsize=questProblems(quest,short and 12 or 14)
@@ -590,31 +643,33 @@ do
  local sc4=load('a fourth VerityClient (2 s before the end of the event)');frames(5)
  local gui4=pg:FindFirstChild('VerityGui');local panel4=gui4.VerityPanel
  local mk=sign:FindFirstChild('Mark');local tl=sign:FindFirstChild('Timer')
- check(mk.Visible and mk.Text=='!'and tl.Text=='EVENT ENDS IN 0d 00h 00m 02s','2 s before the end: the "!" shows and the sign says "'..tl.Text..'"')
+ check(mk.Visible and mk.Text=='!'and tl.Text=='HURRY! ENDS IN 0d 00h 00m 02s','2 s before the end: the "!" shows and the sign says "'..tl.Text..'"')
  server('Open',{VoidPacks=2,Delivered=4})
  local gb,gc=panel4.GiveButton,panel4.GiveButton.Caption
- check(#eventEndsLines(panel4)==0 and gb.Active and gc.Text=='GIVE VOID PACK','2 s before the end the dialog has no countdown (R149) and GIVE VOID PACK works')
+ check(#eventEndsLines(panel4)==0 and gb.Active and gc.Text=='GIVE VOID PACK\u{00A0}🌑','2 s before the end the dialog has no countdown (R149) and GIVE VOID PACK works')
  local vt=F.tool(W,'Void Pack',{SeedPackTool=true,SeedInventoryId='e1',BagVariant='EclipseReliquary',Stage=7},backpack);frames(2)
  check(mk.Visible and mk.Text=='?','(with a Void Pack she shows the "?")')
  R.advance(1.1);frames(2)
- check(#eventEndsLines(panel4)==0 and tl.Text=='EVENT ENDS IN 0d 00h 00m 01s','one second later her sign says "'..tl.Text..'" and the dialog still has no countdown')
+ check(#eventEndsLines(panel4)==0 and tl.Text=='HURRY! ENDS IN 0d 00h 00m 01s','one second later her sign says "'..tl.Text..'" and the dialog still has no countdown')
  R.advance(1.1);frames(3) -- the end has passed
- check(not gb.Active and not gb.Interactable and gc.Text==C.Event.Ended and #eventEndsLines(panel4)==0,'the event ends while the window is open: GIVE is disabled and says "'..gc.Text..'" even with Void Packs')
- check(tl.Text==C.Event.Ended and tl.TextColor3.R>.9 and tl.TextColor3.G<.5,'her sign says EVENT ENDED too')
+ check(not gb.Active and not gb.Interactable and gc:GetAttribute('FullText')==C.Event.Ended and #eventEndsLines(panel4)==0,'the event ends while the window is open: GIVE is disabled and says "'..gc.Text..'" even with Void Packs')
+ check(tl.Text==C.Event.Ended and tl.TextColor3.R>.9 and tl.TextColor3.G<.5,'her sign says the event is over too')
  check(not mk.Visible and sign:GetAttribute('Bounce')==false,'and neither the "!" nor the "?" shows (with a Void Pack in the Bag)')
  local n0=#fired;gb.Activated:Fire();frames(2);check(#fired==n0,'clicking GIVE sends nothing')
  server('Open',{VoidPacks=2,Delivered=4})
- check(not gb.Active and gc.Text==C.Event.Ended and panel4.VoidChip.Count.Text=='2','a fresh Open after the end: 2 Void Packs counted, GIVE still disabled, "EVENT ENDED"')
- server('Refused',{Reason=C.Reasons.EventEnded});check(panel4.Status.Text=='THE VERITY EVENT HAS ENDED','the server\'s refusal text is shown: '..panel4.Status.Text)
+ check(not gb.Active and gc:GetAttribute('FullText')==C.Event.Ended and C.Event.Ended=='EVENT OVER! THANKS!'and panel4.VoidChip.Count.Text=='2','a fresh Open after the end: 2 Void Packs counted, GIVE still disabled, "EVENT OVER! THANKS!"')
+ check(panel4.Status.Text==C.Hint.Over and panel4.Status.Text=='Thanks for playing, you were great!','(and the status line says so too: "'..panel4.Status.Text..'")')
+ server('Refused',{Reason=C.Reasons.EventEnded});check(panel4.Status.Text=='EVENT\'S OVER! THANKS FOR PLAYING!','the server\'s refusal text is shown: '..panel4.Status.Text)
  vt:Destroy();frames(2);gui4:Destroy();frames(3)
  -- A session that starts after the end: the "!" never shows.
  local sc5=load('a fifth VerityClient (after the end)');frames(5)
  local gui5=pg:FindFirstChild('VerityGui');local mk5=sign:FindFirstChild('Mark');local tl5=sign:FindFirstChild('Timer')
- check(not mk5.Visible and tl5.Text==C.Event.Ended,'a session after the end: no "!", the sign says EVENT ENDED')
+ check(not mk5.Visible and tl5.Text==C.Event.Ended,'a session after the end: no "!", the sign says the event is over')
  R.advance(5);frames(30);check(not mk5.Visible,'(and it never comes back)')
- server('Open',{VoidPacks=0,Delivered=0});check(gui5.VerityPanel.GiveButton.Caption.Text==C.Event.Ended and not gui5.VerityPanel.GiveButton.Active,'her dialog says EVENT ENDED on the GIVE button, which is disabled')
+ server('Open',{VoidPacks=0,Delivered=0});check(gui5.VerityPanel.GiveButton.Caption:GetAttribute('FullText')==C.Event.Ended and not gui5.VerityPanel.GiveButton.Active,'her dialog says the event is over on the GIVE button, which is disabled')
  -- Phones: the ended window fits too.
- resize(360,640);check(not gui5.VerityPanel.GiveButton.Caption:GetAttribute('TextShortened'),'EVENT ENDED fits the GIVE button on a phone');resize(1280,720)
+ resize(360,640);check(not gui5.VerityPanel.GiveButton.Caption:GetAttribute('TextShortened')and not gui5.VerityPanel.Status:GetAttribute('TextShortened'),'EVENT OVER! THANKS! and the status line fit on a phone')
+ check(realOneLine(gui5.VerityPanel.GiveButton.Caption)>=12 and realOneLine(gui5.VerityPanel.Status)>=12,'(and stay readable with the real font: '..realOneLine(gui5.VerityPanel.GiveButton.Caption)..' / '..realOneLine(gui5.VerityPanel.Status)..' px)');resize(1280,720)
  gui5:Destroy();frames(3)
 end
 print(('%d checks, %d failures'):format(checks,fails))

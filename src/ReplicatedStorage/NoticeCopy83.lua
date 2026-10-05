@@ -16,7 +16,8 @@ function N.Pack(m)
 end
 -- R131: "🎁 Sunny gave you Frosted Golden Apple!"
 function N.Gift(giver,item)return '🎁 '..N.Color(tostring(giver),Color3.fromRGB(147,255,69))..' gave you '..N.Color(tostring(item),Color3.fromRGB(255,229,71))..'!'end
-function N.Arrival()return '🌑 '..N.Color('The Darkened has arrived...',Color3.fromRGB(221,195,255))..'  '..N.Color('Two Void Packs',Color3.fromRGB(184,141,255))..' await in '..N.Color('Storm Peaks',colors[7])..'.'end
+-- R152 (owner: "add more personality to the texts"): in Verity's voice, she is the one who trades a Void Pack for a Verity Pack (VerityConfig).
+function N.Arrival()return '🌑 '..N.Color('Eek! The Darkened is here...',Color3.fromRGB(221,195,255))..'  '..N.Color('Two Void Packs',Color3.fromRGB(184,141,255))..' await in '..N.Color('Storm Peaks',colors[7])..'. '..N.Color('Verity',Color3.fromRGB(255,206,64))..' wants one!'end
 -- R122: nobody stole a Void Pack for three refreshes, so the remaining packs changed.
 function N.VoidShift()return '🌌 '..N.Color('The void shifts...',Color3.fromRGB(221,195,255))..'  The '..N.Color('Void Packs',Color3.fromRGB(184,141,255))..' in '..N.Color('Storm Peaks',colors[7])..' changed.'end
 -- R127 (owner): an owner weather notice names the plant that changed ("Your Moonberry plant", "A fruit on your

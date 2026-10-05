@@ -15,7 +15,7 @@
 -- Fruit of the Hour pedestal, fast-travel marker), the lobby bounds, the bases and the spawn.
 -- R148 follow-up: her sign is one studs-sized BillboardGui (marker row, gap, name, event timer row: rows that cannot overlap, offset
 -- in camera space so it clears her top from any angle, also while she bobs and swells); and the limited event (LimitedEvent.EndsAt,
--- 2026-11-01 00:00 UTC): once it is over the server refuses every hand-in ("THE VERITY EVENT HAS ENDED") before anything else.
+-- 2026-11-01 00:00 UTC): once it is over the server refuses every hand-in ("EVENT'S OVER! THANKS FOR PLAYING!") before anything else.
 local W=require('./world');local R=W.R
 local function near(a,b,tol)return type(a)=='number'and type(b)=='number'and math.abs(a-b)<=(tol or 1e-6)end
 local fails,checks=0,0
@@ -124,7 +124,7 @@ check(C.Image=='rbxassetid://102712963740896','the owner\'s Verity picture');
 check(C.Position==R.Vector3.new(0,4,-340)and C.Facing==R.Vector3.new(0,0,1),'behind the market at (0, 4, -340), facing +Z')
 check(C.BodySize==22 and C.FootOffset~=nil and C.DaisDiameter==28 and C.DaisHeight==1.2,'BodySize 22 / FootOffset / DaisDiameter 28 exposed to tune')
 check(C.BodyColor.R==1 and C.BodyColor.G==1 and C.BodyColor.B==0,'the yellow (255, 255, 0)')
-check(C.Quest=='Steal a Void Pack from The Darkened One at the end of Storm Peaks and bring it to me. I\'ll give you a Verity Pack!','the quest text')
+check(C.Quest=='I dare you to steal a Void Pack from the scary Darkened One at the end of Storm Peaks! Bring it to me and I\'ll give you a Verity Pack!','the quest text (R152: in her voice)')
 check(C.GiveDistance==38 and C.PromptDistance==26 and C.VoidVariant==VOID,'38 stud hand-in range, 26 stud prompt, Void = EclipseReliquary')
 check(C.GreetingSoundId=='rbxassetid://123997993114202','the owner\'s greeting voice id in VerityConfig.GreetingSoundId')
 local gateSrc=W.B.SecurityGate
@@ -207,7 +207,7 @@ do -- her sign: rows in studs that cannot overlap, clear of her at every camera 
  check(sign.AlwaysOnTop==false and sign.MaxDistance>=200,'(depth-tested, visible from far away)')
 end
 local prompt=model:FindFirstChild('Talk',true)
-check(prompt and prompt:IsA('ProximityPrompt')and prompt.ActionText=='Talk'and prompt.HoldDuration==0 and prompt.MaxActivationDistance==26 and prompt.RequiresLineOfSight==false and prompt.Enabled,'ProximityPrompt "Talk": hold 0, 26 studs, no line of sight needed')
+check(prompt and prompt:IsA('ProximityPrompt')and prompt.ActionText=='Say hi!'and prompt.ObjectText=='Verity'and prompt.HoldDuration==0 and prompt.MaxActivationDistance==26 and prompt.RequiresLineOfSight==false and prompt.Enabled,'ProximityPrompt "Talk" (R152: says "Say hi!"): hold 0, 26 studs, no line of sight needed')
 -- Where she stands, against the real market and the lobby.
 do
  local fp=footprint;local c=C.Position;local radius=C.DaisDiameter/2
@@ -286,8 +286,8 @@ do
  check(Data.GardenSaveQueued[A]~=nil,'and a save is queued')
  local done=last(A)
  check(done.Args[1]=='Done'and done.Args[2].Delivered==1 and done.Args[2].RecordId==newRecord.Id and msgs(A,'Done')==1,'Done {Delivered = 1, RecordId = the new pack}')
- local told=false;for _,s in ipairs(shown)do if s.P==A and s.Text=='🌟 Verity gave you a Verity Pack!'then told=true end end
- check(told,'the notification: "🌟 Verity gave you a Verity Pack!"')
+ local told=false;for _,s in ipairs(shown)do if s.P==A and s.Text=='🌟 Yippee! Verity gave you a Verity Pack!'then told=true end end
+ check(told,'the notification: "🌟 Yippee! Verity gave you a Verity Pack!"')
  -- Saved and loaded.
  local save=Data:_buildSaveData(A)
  check(save.Premium and type(save.Premium.Verity)=='table'and save.Premium.Verity.Count==1,'the count is in the save data')
@@ -454,7 +454,7 @@ end
 -- The limited event is over: every hand-in is refused first (LimitedEvent.EndsAt, 2026-11-01 00:00 UTC, on the server's clock).
 do
  local Limited=W.module('LimitedEvent')
- check(Limited.EndsAt==1793491200 and C.EventEndsAt==Limited.EndsAt and C.Reasons.EventEnded=='THE VERITY EVENT HAS ENDED','the event ends at LimitedEvent.EndsAt (2026-11-01 00:00 UTC) and the refusal reads "THE VERITY EVENT HAS ENDED"')
+ check(Limited.EndsAt==1793491200 and C.EventEndsAt==Limited.EndsAt and C.Reasons.EventEnded=='EVENT\'S OVER! THANKS FOR PLAYING!','the event ends at LimitedEvent.EndsAt (2026-11-01 00:00 UTC) and the refusal reads "EVENT\'S OVER! THANKS FOR PLAYING!"')
  local before=R.clock
  local Z=makePlayer('Zed');spawn(Z);local zv=void(Z,3);for _,rec in ipairs(Data:GetChestRecords(Z))do toolFor(rec,bag(Z))end
  R.clock=Limited.EndsAt-3
