@@ -101,6 +101,27 @@ def added_script(f):
         if f.endswith(suffix): return cls, f[:-len(suffix)]
 
 def sha(b): return hashlib.sha256(b).hexdigest()
+def byte_ops(b, a):
+    # Byte-level opcodes. A char-level SequenceMatcher on a big region is quadratic (R151: 100+ heavily edited scripts took
+    # minutes each), so diff by lines first and refine only small changed line blocks byte by byte; a big changed block is
+    # replaced whole. Same result shape as SequenceMatcher.get_opcodes() (byte offsets into b / a).
+    if len(b) + len(a) <= 4000:
+        return difflib.SequenceMatcher(None, b, a, autojunk=False).get_opcodes()
+    bl, al = b.splitlines(keepends=True), a.splitlines(keepends=True)
+    bo, ao = [0], [0]
+    for line in bl: bo.append(bo[-1] + len(line))
+    for line in al: ao.append(ao[-1] + len(line))
+    out = []
+    for t, i1, i2, j1, j2 in difflib.SequenceMatcher(None, bl, al, autojunk=False).get_opcodes():
+        x1, x2, y1, y2 = bo[i1], bo[i2], ao[j1], ao[j2]
+        if t == 'equal':
+            out.append(('equal', x1, x2, y1, y2))
+        elif t == 'replace' and (x2 - x1) + (y2 - y1) <= 4000:
+            for tt, k1, k2, l1, l2 in difflib.SequenceMatcher(None, b[x1:x2], a[y1:y2], autojunk=False).get_opcodes():
+                out.append((tt, x1 + k1, x1 + k2, y1 + l1, y1 + l2))
+        else:
+            out.append(('replace' if t == 'replace' else t, x1, x2, y1, y2))
+    return out
 def patches(before, after):
     # Only diff the region between the common prefix and suffix; big files usually change in a few spots.
     head = 0
@@ -108,8 +129,7 @@ def patches(before, after):
     tail = 0
     while tail < min(len(before), len(after)) - head and before[-1 - tail] == after[-1 - tail]: tail += 1
     mid_b, mid_a = before[head:len(before) - tail], after[head:len(after) - tail]
-    ops = [(t, i1 + head, i2 + head, j1 + head, j2 + head)
-           for t, i1, i2, j1, j2 in difflib.SequenceMatcher(None, mid_b, mid_a, autojunk=False).get_opcodes()]
+    ops = [(t, i1 + head, i2 + head, j1 + head, j2 + head) for t, i1, i2, j1, j2 in byte_ops(mid_b, mid_a)]
     spans = []  # (i1, i2, j1, j2) in before/after coordinates; merge edits separated by < 24 equal bytes
     for tag, i1, i2, j1, j2 in ops:
         if tag == 'equal': continue
