@@ -129,6 +129,7 @@ ModuleScript	ReplicatedStorage/KeeperAttackPose	ReplicatedStorage/KeeperAttackPo
 ModuleScript	ReplicatedStorage/KeeperAudio	ReplicatedStorage/KeeperAudio.lua
 ModuleScript	ReplicatedStorage/KeeperCombat	ReplicatedStorage/KeeperCombat.lua
 ModuleScript	ReplicatedStorage/KeeperFx	ReplicatedStorage/KeeperFx.lua
+ModuleScript	ReplicatedStorage/KeeperFx152	ReplicatedStorage/KeeperFx152.lua
 ModuleScript	ReplicatedStorage/KeeperMotion	ReplicatedStorage/KeeperMotion.lua
 ModuleScript	ReplicatedStorage/KeeperNearAlarm	ReplicatedStorage/KeeperNearAlarm.lua
 ModuleScript	ReplicatedStorage/KeeperPolish	ReplicatedStorage/KeeperPolish.lua

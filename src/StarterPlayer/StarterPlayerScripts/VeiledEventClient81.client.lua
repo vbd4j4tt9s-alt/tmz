@@ -11,7 +11,8 @@ local keepers,bags={},{};local connections={};local alive=true
 local function watch(signal,fn)connections[#connections+1]=signal:Connect(fn)end
 local function keeper(model)if model:IsA('Model')then keepers[model]={At=-100}end end
 for _,m in ipairs(Tags:GetTagged('VeiledKeeper81'))do keeper(m)end
-watch(Tags:GetInstanceAddedSignal('VeiledKeeper81'),keeper);watch(Tags:GetInstanceRemovedSignal('VeiledKeeper81'),function(m)keepers[m]=nil end)
+local Fx152 -- (R152: KeeperFx152, required with the first new-model Darkened)
+watch(Tags:GetInstanceAddedSignal('VeiledKeeper81'),keeper);watch(Tags:GetInstanceRemovedSignal('VeiledKeeper81'),function(m)local r=keepers[m];if r and r.Fx152 then Fx152.Destroy(r.Fx152)end;keepers[m]=nil end)
 -- R149 (owner: the Verity pack is just pure yellow with her face, "that's the only design needed"): only the Void pack has local motion and fx; the Verity pack (R147 / R148 gave it gold sparkles and a light here) has none.
 local function track(bag)if bag:GetAttribute('BagVariant')=='EclipseReliquary'and not bags[bag]then bags[bag]={}end end
 local function remove(bag)local r=bags[bag];if r and r.Capture then PackFx.Clear(r.Capture)end;bags[bag]=nil end
@@ -34,7 +35,7 @@ watch(Run.RenderStepped,function(dt)
  elapsed+=dt;local tier=Fx.Get();local mode=Players.LocalPlayer:GetAttribute('StudioPlantEffects');if mode=='low'then tier=1 end;local interval=tier==1 and 1/15 or 1/30;local effectTick=elapsed>=interval;if effectTick then elapsed=0 end
  local camera=workspace.CurrentCamera;if not camera then return end;local now=workspace:GetServerTimeNow();local origin=camera.CFrame.Position
  for m,r in pairs(keepers)do
-  local root=m.PrimaryPart;if not m.Parent or not root then keepers[m]=nil;continue end
+  local root=m.PrimaryPart;if not m.Parent or not root then if r.Fx152 then Fx152.Destroy(r.Fx152)end;keepers[m]=nil;continue end
   local distance=(root.Position-origin).Magnitude;local period=distance<350 and 0 or distance<900 and .15 or 1
   -- R152: the baked Darkened's two faces (its glowing line): Asleep while it sleeps (GUARDING / SLEEPING), Chase otherwise.
   local state=m:GetAttribute('GuardianBehavior')or'GUARDING';local asleep=state=='GUARDING'or state=='SLEEPING'
@@ -42,6 +43,12 @@ watch(Run.RenderStepped,function(dt)
    r.FaceAsleep=asleep
    for _,p in ipairs(m:GetChildren())do local face=p:GetAttribute('KeeperFaceState');if face and p:IsA('BasePart')then p.LocalTransparencyModifier=(face=='Asleep')~=asleep and 1 or 0 end end
   end
+  -- R152: its void wisps at the cloak hem, hands and feet (KeeperFx152), by state and graphics tier
+  if r.Fx152==nil and m:GetAttribute('KeeperMeshVariant')=='R152'then
+   local mod=not Fx152 and RS:FindFirstChild('KeeperFx152');if mod then Fx152=require(mod)end
+   r.Fx152=Fx152 and Fx152.new(m,0)or false
+  end
+  if r.Fx152 then local c=r.Fx152Ctx or{};r.Fx152Ctx=c;c.Now=now;c.Asleep=asleep;c.Chasing=not asleep;c.Striking=false;c.Distance=distance;c.Tier=tier;Fx152.Step(r.Fx152,c)end
   -- R112-style lead: a late-seen attack plays its wind-up from where this client first saw it.
   local attackAt=m:GetAttribute('KeeperAttackAt');if attackAt~=r.AttackAt then r.AttackAt=attackAt;r.Seen=now end
   local striking=type(attackAt)=='number'and now>=attackAt and now-attackAt<Combat.Get(7).Windup+Combat.Recovery
@@ -95,6 +102,7 @@ watch(Run.RenderStepped,function(dt)
 end)
 script.Destroying:Connect(function()
  alive=false;for _,c in ipairs(connections)do c:Disconnect()end
- for _,r in pairs(bags)do if r.Capture then PackFx.Clear(r.Capture)end end;table.clear(bags);table.clear(keepers)
+ for _,r in pairs(bags)do if r.Capture then PackFx.Clear(r.Capture)end end;table.clear(bags)
+ for _,r in pairs(keepers)do if r.Fx152 then Fx152.Destroy(r.Fx152)end end;table.clear(keepers)
  Arrival.Stop()
 end)

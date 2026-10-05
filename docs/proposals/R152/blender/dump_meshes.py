@@ -74,6 +74,11 @@ def dump(st):
         hv = sorted({tuple(round(c, 4) for c in v.co) for v in hull['geom'] if isinstance(v, bmesh.types.BMVert)})
         bm.free()
         hulls[g] = [list(v) for v in hv]
+    fx = []
+    for group, kind, piece, geo in k.parts(fx=True):
+        if kind == 'fx' and piece != 'Z':
+            for pts in islands(geo):
+                fx.append(dict(fx_shape(pts), Group=group, Piece=piece or ''))
     zg = k.geos.get(('Head', 'fx', 'Z'))
     z = None
     if zg is not None and zg.v:
@@ -81,7 +86,39 @@ def dump(st):
         z = {'Center': list((mn + mx) / 2), 'Size': list(mx - mn)}
     pal = [list(k.pal.rgb[key]) for key in k.pal.keys]
     return {'Key': k.key, 'Name': k.name, 'Stage': st, 'Y0': y0, 'Y1': y1, 'Palette': pal, 'PaletteKeys': k.pal.keys, 'Parts': parts,
-            'Hulls': hulls, 'Z': z}
+            'Hulls': hulls, 'Z': z, 'Fx': fx}
+
+
+def islands(geo):
+    """The separate pieces of an effect stand-in (one flame / bolt / wisp / smoke puff each), as lists of points (rig space)."""
+    parent = list(range(len(geo.v)))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    for f in geo.f:
+        for i in f[1:]:
+            ra, rb_ = find(f[0]), find(i)
+            if ra != rb_:
+                parent[ra] = rb_
+    groups = {}
+    for i, p in enumerate(geo.v):
+        groups.setdefault(find(i), []).append(list(p))
+    return [groups[r] for r in sorted(groups)]
+
+
+def fx_shape(pts):
+    """One stand-in piece, where the R151 sheets draw the game's particles and beams. Flames, wisps and bolts are kit.tube pieces,
+    whose last two vertices are the closures of the start (Base) and the end (Tip) of the tube; smoke puffs are blobs (Centre,
+    Width). Width = the largest distance across."""
+    import numpy as np
+    P = np.array(pts)
+    c = P.mean(axis=0)
+    width = max(float(np.linalg.norm(P[i] - P[j])) for i in range(0, len(P), max(1, len(P) // 24)) for j in range(len(P)))
+    return {'Base': [round(float(x), 4) for x in P[-2]], 'Tip': [round(float(x), 4) for x in P[-1]], 'Centre': [round(float(x), 4) for x in c],
+            'Width': round(width, 4)}
 
 
 BURIED = -4.1

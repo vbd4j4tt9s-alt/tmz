@@ -151,6 +151,78 @@ def bounds(k, facts, man, groups):
     return out
 
 
+FX_KIND = {(4, ''): 'Flame', (4, 'Smoke'): 'Smoke', (7, ''): 'Bolt', (0, 'Wisp'): 'Wisp'}
+
+
+def fx_sources(k, facts, man):
+    """The sheets' effect stand-ins (dump_meshes.py) as the game's effect anchors: one per source, in its group's rest space, hosted by
+    the group's nearest main mesh part (the attachments ride on it, so they move with the pose group). Flames and wisps: the tongues
+    of one source (within 1 stud) merge into one emitter at their mean start, pointing along their mean direction; smoke: one emitter
+    per nostril at the first puff, pointing along the row of puffs; bolts: each its own beam from Base to Tip."""
+    def sub(a, b):
+        return [a[i] - b[i] for i in range(3)]
+
+    def norm(a):
+        m = math.sqrt(sum(x * x for x in a)) or 1
+        return [x / m for x in a]
+
+    def host(group, at):
+        best, bd = None, 1e9
+        for p, f, m in zip(k['Parts'], facts, man['Parts']):
+            if p['Group'] != group or m['Kind'] != 'main':
+                continue
+            d = math.sqrt(sum(max(0, abs(at[i] - f['Center'][i]) - f['Size'][i] / 2) ** 2 for i in range(3)))
+            if d < bd:
+                best, bd = p['Name'], d
+        return best
+    groups = {}
+    for f in k['Fx']:
+        kind = FX_KIND[(k['Stage'], f['Piece'])]
+        groups.setdefault((kind, f['Group']), []).append(f)
+    out = []
+    for (kind, group), items in sorted(groups.items()):
+        if kind == 'Bolt':
+            for f in items:
+                out.append({'Kind': kind, 'Group': group, 'At': f['Base'], 'To': f['Tip'], 'Size': f['Width']})
+            continue
+        clusters = []
+        for f in items:
+            key = f['Centre'] if kind == 'Smoke' else f['Base']
+            for c in clusters:
+                ref = c[0]['Centre'] if kind == 'Smoke' else c[0]['Base']
+                if (kind == 'Smoke' and (key[0] > 0) == (ref[0] > 0)) or (kind != 'Smoke' and math.dist(key, ref) < 1.0):
+                    c.append(f)
+                    break
+            else:
+                clusters.append([f])
+        for c in clusters:
+            if kind == 'Smoke':
+                c = sorted(c, key=lambda f: -f['Centre'][2])
+                at, d, size = c[0]['Centre'], norm(sub(c[-1]['Centre'], c[0]['Centre'])), c[-1]['Width']
+            else:
+                at = [sum(f['Base'][i] for f in c) / len(c) for i in range(3)]
+                d = norm([sum(f['Tip'][i] - f['Base'][i] for f in c) / len(c) for i in range(3)])
+                size = sum(math.dist(f['Base'], f['Tip']) for f in c) / len(c)
+            out.append({'Kind': kind, 'Group': group, 'At': at, 'Dir': d, 'Size': size})
+    for s in out:
+        s['Part'] = host(s['Group'], s['At'])
+        assert s['Part'], s
+    return out
+
+
+def fx_lua(sources):
+    rows = []
+    for s in sources:
+        f = ["Kind='%s'" % s['Kind'], "Part=%s" % lua_str(s['Part']), 'At=%s' % vec(s['At'])]
+        if 'To' in s:
+            f.append('To=%s' % vec(s['To']))
+        if 'Dir' in s:
+            f.append('Dir=%s' % vec(s['Dir']))
+        f.append('Size=%s' % num(s['Size']))
+        rows.append('{%s}' % ','.join(f))
+    return 'Fx={%s}' % ','.join(rows)
+
+
 def part_spec(st, p, f, m):
     fields = ['Name=%s' % lua_str(m['Name']), 'Group=%s' % lua_str(m['Group']), 'Kind=%s' % lua_str(m['Kind']),
               'Center=%s' % vec(f['Center']), 'Size=%s' % vec(f['Size']), 'Triangles=%d' % m['Triangles']]
@@ -211,6 +283,11 @@ def main():
                 body.append('Mouth=%s' % vec((m0[0], m0[1] + nj[1][1] - oj[1][1], m0[2] + nj[0][2] - oj[0][2])))
             report.append('%-15s floor samples %3d (today %3d), worst grounding error on unseen poses %.3f studs' % (
                 k['Name'], fl['Picked'], sum(len(v) for v in legacy['FloorSamples'].values()), fl['WorstError']))
+        if k['Fx']:
+            sources = fx_sources(k, facts, man)
+            body.append(fx_lua(sources))
+            report.append('%-15s effect anchors: %s' % (k['Name'], ', '.join('%d %s' % (sum(1 for s in sources if s['Kind'] == kd), kd)
+                                                                          for kd in sorted({s['Kind'] for s in sources}))))
         body.append('Parts={\n  %s}' % specs)
         lines.append(' [%d]={%s},' % (st, ',\n '.join(body)))
     src = ('-- R152: the approved rev 6 keeper models (docs/proposals/R151/keepers) for KeeperMeshes152, which bakes them at server start.\n'
@@ -219,6 +296,7 @@ def main():
            '--                Darkened: group-local), FaceState (the client shows Chase or Asleep), EyeGlow (lit as it wakes), Glow (Neon),\n'
            '--                Cosmetic (never hits), the golem\'s tree disguise (TreeRest / TreeSize: today\'s part it follows, KeeperUpgradeData)\n'
            '--  FloorSamples  the points the pose code grounds with (select_floor.luau); Bounds of the main pieces; Z the sleep Z; Mouth\n'
+           '--  Fx            the sheets\' effect anchors (flames, smoke, bolts, wisps) and the mesh part that carries each (KeeperFx152)\n'
            '-- Get(stage) is the stage\'s config for the new models: these fields over today\'s (KeeperRigConfig: Pivots, Motion, Scale ...).\n'
            'local M={Variant=\'R152\',Version=152}\n'
            'M.Stages={\n%s\n}\n'

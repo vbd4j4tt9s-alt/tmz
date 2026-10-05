@@ -59,6 +59,13 @@ if SCENARIO=='nomodule'then
  return
 end
 local Meshes=W.module('KeeperMeshes152');local Models=W.module('BeastModels');local Contact=W.module('KeeperContact')
+-- (the mock's CFrame has no object-space helpers; KeeperFx152 places its attachments with them)
+do local mt=getmetatable(CF(0,0,0))
+ rawset(mt,'PointToObjectSpace',function(c,v)return c:Inverse()*v end)
+ rawset(mt,'VectorToObjectSpace',function(c,v)local i=c:Inverse();return i*v-i.Position end)
+end
+-- (nor a Sound:Stop; KeeperSleep stops its sound when BeastAnimation drops a keeper, as on a body swap)
+if not rawget(R.Inst,'Stop')then rawset(R.Inst,'Stop',function(self)self.Playing=false end)end
 -- 1. The spawn path: keepers dressed at server start never wait for the bake ----------------------------------------------------------------
 local guardians={}
 local yields0=log.Yields
@@ -318,14 +325,14 @@ do local Pose=W.module('BeastPose');local worst=0;local who=''
 end
 
 -- 8. The client: two faces, the golem's tree, accents, the sleep Z (real BeastAnimation) ------------------------------------------------------------
-local S={awake=0,moving=0,cycle=0,urgency=0,speed=0,t=0}
+local S={awake=0,moving=0,cycle=0,urgency=0,speed=0,t=0,tier=3}
 W.stub('KeeperAudio',{Voice=function()return nil,0,1 end});W.stub('SoundTiming',{Play=function()end})
 W.stub('KeeperVoices',setmetatable({},{__index=function()return {Gap=6}end}))
 W.stub('KeeperMotion',{new=function()return {}end,Update=function(_,frame)return {Frame=frame,Awake=S.awake,Time=S.t,Moving=S.moving,Cycle=S.cycle,Urgency=S.urgency,Speed=S.speed,Turn=0}end})
 W.stub('KeeperRecoveryDash',{VisualFrame=function(_,_,f)return f end})
 local surgeVariant
 W.stub('KeeperSurge',{New=function(_,variant)surgeVariant=variant;return {}end,Step=function()end,Destroy=function()end})
-W.stub('CosmeticBudget',{KeeperDue=function()return true end});W.stub('ClientFxBudget',{Low=function()return false end})
+W.stub('CosmeticBudget',{KeeperDue=function()return true end});W.stub('ClientFxBudget',{Low=function()return S.tier==1 end,Get=function()return S.tier end})
 local fxConfigs={}
 W.stub('KeeperFx',{new=function(_,stage,config)fxConfigs[stage]=config;return {}end,Step=function()end,Slam=function()end,Wake=function()end,Destroy=function()end})
 local camera=W.workspace.CurrentCamera;camera.WorldToViewportPoint=function()return V3(0,0,0),true end;camera.CFrame=CF(0,20,-40)
@@ -412,6 +419,164 @@ for stage=1,7 do
  end
 end
 
+-- 8b. The new models' effects (the real KeeperFx152): on the right mesh parts, none on today's keepers, rates by tier and state, cleaned up --
+local Fx152=W.module('KeeperFx152');local PARTICLES='rbxasset://textures/particles/'
+local function fxList(container)
+ local out={}
+ for _,d in ipairs(container:GetDescendants())do local kind=d:GetAttribute('KeeperFxKind')
+  if kind then local host=d.Parent;if host and host:IsA('Attachment')then host=host.Parent end;out[#out+1]={Inst=d,Kind=kind,Part=host and host.Name or'?',Host=host}end end
+ return out
+end
+-- every instance KeeperFx152 makes: its attachments (KeeperFx152 / KeeperBolt152 / KeeperSlash152) and its emitters, beams, trails
+local function fxMade(container)local n=0;for _,d in ipairs(container:GetDescendants())do if d.Name:find('152',1,true)and(d:IsA('Attachment')or d:GetAttribute('KeeperFxKind'))then n+=1 end end;return n end
+local function fxKeys(container)local n={};for _,f in ipairs(fxList(container))do local k=f.Kind..'@'..f.Part;n[k]=(n[k]or 0)+1 end;return n end
+local function wantKeys(stage)
+ local cfg=stage==0 and C152.Stages[0]or C152.Get(stage);local n={}
+ for _,s in ipairs(cfg.Fx or{})do local k=s.Kind..'@'..s.Part;n[k]=(n[k]or 0)+(s.Kind=='Bolt'and Fx152.Bolt.Kinks+1 or 1)end
+ for _,x in ipairs(Fx152.Extra[stage]or{})do local k=(x.Trail or x.Look)..'@'..x.Part;n[k]=(n[k]or 0)+1 end
+ return n
+end
+local function keyText(t)local o={};for k,v in pairs(t)do o[#o+1]=k..' x'..v end;table.sort(o);return table.concat(o,', ')end
+local function sameKeys(a,b)return keyText(a)==keyText(b)end
+-- one keeper's effects now: the total rate, the highest, emitters on, beams lit, trails on, the rates by kind
+local function rates(container)
+ local out={Total=0,On=0,Beams=0,Trails=0,Kinds={},Max=0}
+ for _,f in ipairs(fxList(container))do local d=f.Inst
+  if d:IsA('ParticleEmitter')then out.Total+=d.Rate;out.Max=math.max(out.Max,d.Rate);if d.Enabled then out.On+=1 end
+   local k=out.Kinds[f.Kind]or{};out.Kinds[f.Kind]=k;k[#k+1]=d.Enabled and d.Rate or 0
+  elseif d:IsA('Beam')then if d.Enabled then out.Beams+=1 end
+  elseif d:IsA('Trail')then if d.Enabled then out.Trails+=1 end end
+ end
+ return out
+end
+local function lookAt(stage)camera.CFrame=CF(stage*60,20,-40)end
+local function allSum(list)local t=0;for _,v in ipairs(list or{})do t+=v end;return t end
+-- where they are: the sheets' anchors (KeeperRigConfig152 Fx) and the notes' extras, each on its mesh part, built-in textures only
+local made0={}
+for stage=1,7 do
+ local body=guardians[stage].BeastBody;local got,want=fxKeys(body),wantKeys(stage);made0[stage]=fxMade(body)
+ check(next(want)~=nil and sameKeys(got,want),'stage '..stage..': the effects on the new model: '..keyText(got)..(sameKeys(got,want)and''or' (want '..keyText(want)..')'))
+ local bad,tex=0,0
+ for _,f in ipairs(fxList(body))do
+  if not(f.Host and f.Host:IsA('BasePart')and f.Host.Parent==body and f.Host:GetAttribute('BeastGroup')and moved[f.Host])then bad+=1 end
+  if f.Inst:IsA('ParticleEmitter')and(type(f.Inst.Texture)~='string'or f.Inst.Texture:sub(1,#PARTICLES)~=PARTICLES or f.Inst.LockedToPart~=false)then tex+=1 end
+  if(f.Inst:IsA('Beam')or f.Inst:IsA('Trail'))and(f.Inst.Texture or'')~=''then tex+=1 end
+ end
+ check(bad==0,'stage '..stage..': every effect sits in a mesh part of its rig (a BeastGroup part BeastAnimation poses), so it moves with that group ('..bad..' not)')
+ check(tex==0,'stage '..stage..': built-in particle textures only (rbxasset://textures/particles/), plain beams and trails ('..tex..' not)')
+ -- each emitter's attachment: at its sheet anchor (rig rest space) when it has one, and inside its part's box (1.5 studs: a flame on a spike tip)
+ local off=0;local cfg=C152.Get(stage)
+ for _,f in ipairs(fxList(body))do local att=f.Inst.Parent
+  if f.Inst:IsA('ParticleEmitter')and att:IsA('Attachment')then
+   local p=f.Host:GetAttribute('RestCFrame')*att.CFrame.Position;local best,anchored=1e9,false
+   for _,s in ipairs(cfg.Fx or{})do if s.Kind==f.Kind and s.Part==f.Part then anchored=true;best=math.min(best,(p-V3(s.At[1],s.At[2],s.At[3])).Magnitude)end end
+   local spec;for _,q in ipairs(cfg.Parts)do if q.Name==f.Part then spec=q end end
+   local outside=0;local xyz={p.X,p.Y,p.Z};for a=1,3 do outside=math.max(outside,math.abs(xyz[a]-spec.Center[a])-spec.Size[a]/2)end
+   if(anchored and best>1e-3)or outside>1.5 then off+=1 end
+  end
+ end
+ check(off==0,'stage '..stage..': every emitter attachment at its anchor, inside its part ('..off..' off)')
+end
+do local d=fxKeys(guardians[4].BeastBody);check((d['Flame@Body']or 0)>=5 and d['Flame@Tail']==1 and d['Smoke@Head']==2,'the Lava Dragon: flames along its back spikes (Body), on its tail tip, smoke at both nostrils (Head)')end
+do local c=fxKeys(guardians[7].BeastBody);local cfg=C152.Get(7);local head,cloud;for _,q in ipairs(cfg.Parts)do if q.Name=='Head'then head=q end;if q.Name=='Head_Cloud'then cloud=q end end
+ local under=0;for _,s in ipairs(cfg.Fx)do if s.Part=='Head'and s.Kind=='Bolt'and math.min(s.At[2],s.To[2])>head.Center[2]and math.max(s.At[2],s.To[2])<cloud.Center[2]then under+=1 end end
+ check(c['Bolt@Head']==3*(Fx152.Bolt.Kinks+1)and under==3,'the Storm Colossus: 3 lightning bolts between its head and its cloud crown ('..under..'), on the Head group')
+ check((c['Bolt@LeftArm_Rock']or 0)>0 and(c['Bolt@RightArm_Fist']or 0)>0 and c['Rain@Head_Cloud']==1,'the Storm Colossus: bolts on its shoulder rocks and fists, rain from the cloud')
+end
+do local g=fxKeys(guardians[1].BeastBody);check(g['Leaves@Head_Canopy']==1 and g['Spores@Body']==1,'the golem: falling leaves from its canopy, drifting spores')end
+do local k=fxKeys(guardians[5].BeastBody);check(k['Slash@Sword']==1,'the Crystal Knight: a slash trail on its sword')end
+-- KeeperFx152.new makes nothing on a model that is not an R152 model (today's rig of each stage, a bare model)
+do local none=0
+ for stage=1,7 do local legacy=Models.Build(stage)
+  if legacy and legacy:GetAttribute('KeeperMeshVariant')~='R152'and Fx152.new(legacy,stage)==nil and fxMade(legacy)==0 and Fx152.new(W.new('Model'),stage)==nil then none+=1 end
+  if legacy then legacy:Destroy()end
+ end
+ check(none==7,'KeeperFx152.new makes nothing on today\'s rigs ('..none..' of 7 clean)')
+end
+-- rates by graphics tier (ClientFxBudget.Get) and state, one keeper at a time with the camera beside it
+local cap,capK=Fx152.MaxRate,Fx152.MaxKeeperRate
+local seen={}
+for stage=1,7 do
+ local m=guardians[stage];local body=m.BeastBody;lookAt(stage);seen[stage]={}
+ for _,state in ipairs({'GUARDING','CHASING'})do m:SetAttribute('GuardianBehavior',state);S.awake=state=='CHASING'and 1 or 0
+  for tier=1,3 do S.tier=tier;W.frames(2,1/60);local r=rates(body);seen[stage][state..tier]=r
+   local t=Fx152.TierScale[tier]
+   if tier==1 then check(r.Total==0 and r.On==0 and r.Trails==0,'stage '..stage..' '..state..', tier 1 (low graphics): no particles ('..r.Total..'/s, '..r.On..' on)')
+   else check(r.Max<=cap*t+1e-9 and r.Total<=capK*t+1e-9,('stage %d %s, tier %d: each emitter <= %g/s (max %.2f), the keeper <= %g/s (%.2f)'):format(stage,state,tier,cap*t,r.Max,capK*t,r.Total))end
+  end
+ end
+ local a2,a3=seen[stage].CHASING2,seen[stage].CHASING3
+ if stage==5 then check(a3.Total==0 and a2.Total==0,'the Crystal Knight has no particles (its slash trail only)')
+ else check(a3.Total>0 and math.abs(a2.Total*2-a3.Total)<=.02*#fxList(body),('stage %d: tier 2 runs half the particles of tier 3 (%.2f vs %.2f /s)'):format(stage,a2.Total,a3.Total))end
+ check(seen[stage].GUARDING3.Total<=a3.Total+1e-9,('stage %d: asleep is never busier than awake (%.2f vs %.2f /s)'):format(stage,seen[stage].GUARDING3.Total,a3.Total))
+ print(('INFO effects stage %d: %s; particles/s tier 3 awake %.1f, asleep %.1f, tier 2 awake %.1f'):format(stage,keyText(fxKeys(body)),a3.Total,seen[stage].GUARDING3.Total,a2.Total))
+end
+do local s,a=seen[4].GUARDING3,seen[4].CHASING3
+ check(allSum(s.Kinds.Smoke)>0 and allSum(a.Kinds.Smoke)==0,'the Lava Dragon snorts smoke only in its sleep')
+ check(allSum(s.Kinds.Flame)>0 and allSum(s.Kinds.Flame)<allSum(a.Kinds.Flame)*.5,('its back flames burn low asleep (%.2f vs %.2f /s), full awake'):format(allSum(s.Kinds.Flame),allSum(a.Kinds.Flame)))
+end
+do local s,a=seen[2].GUARDING3,seen[2].CHASING3
+ check(allSum(s.Kinds.Swirl)==0 and allSum(s.Kinds.DustTrail)==0 and allSum(a.Kinds.Swirl)>0 and allSum(a.Kinds.DustTrail)>0,'the Sand Snake: sand swirl and dust trail only while awake and chasing')end
+do local s,a=seen[1].GUARDING3,seen[1].CHASING3;check(allSum(s.Kinds.Leaves)>0 and allSum(a.Kinds.Leaves)>0,'the golem\'s leaves keep falling asleep (it sleeps as a tree) and awake')end
+do local s,a=seen[7].GUARDING3,seen[7].CHASING3;check(allSum(s.Kinds.Rain)>0 and allSum(s.Kinds.Rain)<allSum(a.Kinds.Rain),'the colossus\'s rain falls lighter while it sleeps')end
+-- the colossus's lightning flashes (on briefly, then off), less often asleep, never at tier 1 or out of range
+do local m=guardians[7];local body=m.BeastBody;lookAt(7);local beams=0;for _,f in ipairs(fxList(body))do if f.Inst:IsA('Beam')then beams+=1 end end
+ local function lit(n)local f=0;for _=1,n do W.frames(1,1/60);f+=rates(body).Beams end;return f/(n*beams)end
+ S.tier=3;m:SetAttribute('GuardianBehavior','CHASING');local awake=lit(600)
+ m:SetAttribute('GuardianBehavior','GUARDING');local asleep=lit(600)
+ S.tier=1;local low=lit(120);S.tier=3;camera.CFrame=CF(7*60,20,-40-Fx152.Range-20);local far=lit(120);lookAt(7)
+ check(awake>.02 and awake<.2,('the colossus\'s bolts flash briefly while awake (each lit %.1f %% of the time)'):format(awake*100))
+ check(asleep>0 and asleep<.2,('and still flash in its sleep (%.1f %%)'):format(asleep*100))
+ check(low==0 and far==0,'no lightning at tier 1 or beyond '..Fx152.Range..' studs')
+end
+-- the gap to the next flash: Every (0.9 - 2.6 s) awake, twice that asleep, twice again at tier 2 (KeeperFx152 alone, its bolts read back)
+do local own=Fx152.new(guardians[7].BeastBody,7);local lo,hi={},{};local now0=R.clock+100
+ for _,k in ipairs({{false,3},{true,3},{false,2}})do local key=tostring(k[1])..k[2];lo[key],hi[key]=1e9,-1e9
+  local c={Asleep=k[1],Chasing=not k[1],Tier=k[2],Distance=10}
+  for _=1,30 do now0+=20;c.Now=now0;Fx152.Step(own,c)
+   for _,b in ipairs(own.Bolts)do local gap=b.NextAt-c.Now;lo[key]=math.min(lo[key],gap);hi[key]=math.max(hi[key],gap)end end
+ end
+ local E=Fx152.Bolt.Every
+ check(#own.Bolts==9 and lo.false3>=E[1]-1e-9 and hi.false3<=E[2]+1e-9 and lo.true3>=2*E[1]-1e-9 and hi.true3<=2*E[2]+1e-9 and lo.false2>=2*E[1]-1e-9 and hi.false2<=2*E[2]+1e-9,
+  ('the bolts\' next flash: awake %.2f - %.2f s, asleep %.2f - %.2f s, tier 2 %.2f - %.2f s'):format(lo.false3,hi.false3,lo.true3,hi.true3,lo.false2,hi.false2))
+ Fx152.Destroy(own)
+end
+-- out of range: a keeper far from the camera runs nothing
+do lookAt(1);S.tier=3;W.frames(2,1/60);local r=rates(guardians[7].BeastBody)
+ check(r.Total==0 and r.On==0,'a keeper '..math.floor((guardians[7].HumanoidRootPart.Position-camera.CFrame.Position).Magnitude)..' studs away runs no particles')end
+-- the knight's slash trail: only while it strikes
+do local m=guardians[5];lookAt(5);m:SetAttribute('GuardianBehavior','CHASING');S.tier=3;W.frames(2,1/60)
+ local before=rates(m.BeastBody).Trails
+ m:SetAttribute('KeeperAttackAt',W.workspace:GetServerTimeNow());W.frames(3,1/60);local during=rates(m.BeastBody).Trails
+ W.frames(90,1/60);local after=rates(m.BeastBody).Trails;m:SetAttribute('KeeperAttackAt',nil)
+ check(before==0 and during==1 and after==0,'the Crystal Knight\'s slash trail shows only during its strike ('..before..', '..during..', '..after..')')
+end
+for stage=1,7 do guardians[stage]:SetAttribute('GuardianBehavior','GUARDING')end;S.awake=0;S.tier=3;camera.CFrame=CF(0,20,-40);W.frames(2,1/60)
+-- KeeperFx152.Destroy removes exactly what it made (a second set on the dragon, then destroyed)
+do local body=guardians[4].BeastBody;local n0=fxMade(body);local extra=Fx152.new(body,4)
+ local n1=fxMade(body);Fx152.Destroy(extra);Fx152.Destroy(extra)
+ check(n0>0 and n1==2*n0 and fxMade(body)==n0,'KeeperFx152.Destroy removes its own '..(n1-n0)..' instances (emitters, beams, attachments) and nothing else ('..fxMade(body)..' left of '..n0..')')
+end
+-- cleaned up with the keeper: back to today's model (keepermodels off) leaves no effect anywhere; the new model again gets one set
+do local Cmd=W.module('KeeperMeshCommand152');local old={}
+ for stage=1,7 do for _,f in ipairs(fxList(guardians[stage].BeastBody))do old[#old+1]=f.Inst end end
+ Cmd.Execute({},nil,{'off'});W.frames(3,1/60)
+ local legacy,stray=0,0
+ for stage=1,7 do local m=guardians[stage];if m:GetAttribute('KeeperMeshVariant')=='Legacy'then legacy+=1 end;stray+=#fxList(m)+fxMade(m)end
+ local alive=0;for _,d in ipairs(old)do if d:IsDescendantOf(W.workspace)then alive+=1 end end
+ check(legacy==7 and stray==0 and alive==0,'today\'s keepers (KeeperModels off): no KeeperFx152 effect on any of the 7 ('..stray..'), the old '..#old..' gone with the old body ('..alive..' left)')
+ Cmd.Execute({},nil,{'auto'});W.frames(3,1/60)
+ local again=0;for stage=1,7 do local body=guardians[stage].BeastBody;if body:GetAttribute('KeeperMeshVariant')=='R152'and sameKeys(fxKeys(body),wantKeys(stage))and fxMade(body)==made0[stage]then again+=1 end end
+ check(again==7,'back to the new models: each gets its effects once again ('..again..' of 7)')
+ -- a keeper taken out of the world: BeastAnimation drops its record and destroys its effects (they are not left on the stored body)
+ local m=guardians[6];local list=fxList(m);m.Parent=nil;W.frames(2,1/60)
+ local left=0;for _,f in ipairs(list)do if f.Inst:IsDescendantOf(m)then left+=1 end end
+ check(#list>0 and left==0,'a keeper taken out of the world: its '..#list..' effects are destroyed ('..left..' left)')
+ -- back in (Roblox fires DescendantAdded for each descendant; the mock only for the model, so the body's is fired here)
+ m.Parent=W.workspace;W.workspace.DescendantAdded:Fire(m.BeastBody);W.frames(3,1/60)
+ check(sameKeys(fxKeys(m.BeastBody),wantKeys(6))and fxMade(m.BeastBody)==made0[6],'and back in the world, it gets them once again')
+end
+
 -- 9. The Darkened ------------------------------------------------------------------------------------------------------------------------------
 do local Veiled=W.module('VeiledKeeper81');local spec=C152.Stages[0]
  local parts=Meshes.DarkenedParts();check(parts and #parts==#spec.Parts,'The Darkened: '..#spec.Parts..' baked parts')
@@ -428,6 +593,46 @@ do local Veiled=W.module('VeiledKeeper81');local spec=C152.Stages[0]
  local newGroups={};for _,s in ipairs(spec.Parts)do newGroups[s.Group]=true end
  local same=true;for g in pairs(legacyGroups)do if not newGroups[g]then same=false end end;for g in pairs(newGroups)do if not legacyGroups[g]then same=false end end
  check(same,'The Darkened uses today\'s 17 groups (joint chain unchanged)')
+end
+
+-- 9b. The Darkened's wisps: the real VeiledEventClient81 loop with KeeperFx152, on the new model only, by tier and sleep, cleaned up --------
+do local Veiled=W.module('VeiledKeeper81')
+ local remotes=RS:FindFirstChild('ChestChaseRemotes')or R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=RS
+ if not remotes:FindFirstChild('VeiledArrival81')then local remote=R.new('RemoteEvent');remote.Name='VeiledArrival81';remote._props.OnClientEvent=R.signal();remote.Parent=remotes end
+ if not W.workspace:FindFirstChild('ChestChaseMap')then local map=R.new('Folder');map.Name='ChestChaseMap';map.Parent=W.workspace end
+ local players=W.service('Players');if not players.LocalPlayer then local lp=R.new('Player');lp.Name='KeeperTester';players.LocalPlayer=lp end
+ local d=Veiled.Build(CF(0,5,800),W.workspace,Meshes.DarkenedParts());local old=Veiled.Build(CF(40,5,800),W.workspace)
+ camera.CFrame=CF(0,20,760);S.tier=3
+ local sc=R.new('LocalScript');sc.Name='VeiledEventClient81';local ok,err=pcall(W.load,'VeiledEventClient81',sc)
+ check(ok,'the real VeiledEventClient81 runs on the mock: '..tostring(err))
+ W.frames(3,1/30)
+ local got,want=fxKeys(d),wantKeys(0)
+ check(sameKeys(got,want)and want['Wisp@Torso_Cloak']==4 and want['Wisp@LHand']==1 and want['Wisp@RHand']==1 and want['Wisp@LFoot']==1 and want['Wisp@RFoot']==1,
+  'The Darkened: void wisps at its cloak hem (4), hands and feet: '..keyText(got))
+ check(fxMade(old)==0 and old:GetAttribute('KeeperMeshVariant')=='Legacy','today\'s Darkened (its blocks) gets none')
+ local bad,off=0,0
+ for _,f in ipairs(fxList(d))do
+  if not(f.Host and f.Host.Parent==d and f.Host:GetAttribute('VeiledGroup'))then bad+=1 end
+  local p=f.Host:GetAttribute('VeiledFrame')*f.Inst.Parent.CFrame.Position;local best=1e9
+  for _,s in ipairs(C152.Stages[0].Fx)do if s.Part==f.Part then best=math.min(best,(p-V3(s.At[1],s.At[2],s.At[3])).Magnitude)end end
+  if best>1e-3 then off+=1 end
+ end
+ check(bad==0 and off==0,'each wisp at its anchor, on a mesh part of its pose group (VeiledGroup), so it moves with it ('..bad..', '..off..')')
+ local asleep=rates(d) -- GUARDING
+ d:SetAttribute('GuardianBehavior','CHASING');W.frames(3,1/30);local awake=rates(d)
+ S.tier=2;W.frames(3,1/30);local mid=rates(d);S.tier=1;W.frames(3,1/30);local low=rates(d);S.tier=3
+ check(awake.Total>0 and asleep.Total>0 and asleep.Total<awake.Total,('its wisps dim while it sleeps (%.2f vs %.2f /s)'):format(asleep.Total,awake.Total))
+ print(('INFO effects The Darkened: %s; particles/s tier 3 awake %.1f, asleep %.1f, tier 2 awake %.1f'):format(keyText(got),awake.Total,asleep.Total,mid.Total))
+ check(awake.Max<=Fx152.MaxRate and awake.Total<=Fx152.MaxKeeperRate and mid.Max<=Fx152.MaxRate*.5 and math.abs(mid.Total*2-awake.Total)<=.16 and low.Total==0 and low.On==0,
+  ('tier 3 %.2f /s, tier 2 half (%.2f), tier 1 none (%.2f)'):format(awake.Total,mid.Total,low.Total))
+ camera.CFrame=CF(0,20,760-Fx152.Range-40);W.frames(2,1/30);check(rates(d).Total==0,'none beyond '..Fx152.Range..' studs');camera.CFrame=CF(0,20,760)
+ -- cleaned up: a Darkened leaving the world loses its effects; the script's end destroys the rest
+ local list=fxList(d);d.Parent=nil;W.frames(2,1/30)
+ local left=0;for _,f in ipairs(list)do if f.Inst:IsDescendantOf(d)then left+=1 end end
+ check(#list==8 and left==0,'a Darkened leaving the world: its '..#list..' wisps are destroyed ('..left..' left)')
+ local d2=Veiled.Build(CF(0,5,820),W.workspace,Meshes.DarkenedParts());W.frames(2,1/30);local n=fxMade(d2)
+ sc.Destroying:Fire();check(n>0 and fxMade(d2)==0,'the client script ending destroys the wisps it made ('..n..' -> '..fxMade(d2)..')')
+ d2:Destroy();old:Destroy()
 end
 
 -- 10. Gameplay values untouched ------------------------------------------------------------------------------------------------------------------
