@@ -9,7 +9,8 @@
 #  1. today's keepers unchanged: dump_legacy.luau through the public keeper APIs with no variant (pose / hit / strike frames, dressed rigs,
 #     contact parts, accents, the sleep marker, effect anchors, today's Darkened) on the base and on this checkout: identical.
 #  2. test_keepers.luau main: the bake, the spawn path, the swap, part counts, both faces, the golem's tree, contact, grounding, the Darkened,
-#     the owner command; then the fallbacks (API off, API missing, no mesh memory mid-keeper, a content failure).
+#     the owner command, the new models' effects (KeeperFx152: parts, tiers, sleep, clean-up); then the fallbacks (API off, API missing,
+#     no mesh memory mid-keeper, a content failure).
 #  3. round trip: roundtrip.luau decodes every keeper on the mock and writes OBJ files; check_roundtrip.py decodes the same modules with
 #     an independent Python decoder and compares both with the approved R151 manifests (parts, triangles, bounds) and the Blender dump.
 set -e
@@ -19,7 +20,7 @@ OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
 T=$REPO/tools/tests;INV=$REPO/docs/proposals/inventory_R113/tests;SSS=$REPO/src/ServerScriptService/ChestChaseServer
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
 echo "== 0. static"
-NEW="src/ReplicatedStorage/KeeperRigConfig152.lua src/ServerScriptService/ChestChaseServer/KeeperMeshes152.lua src/ServerScriptService/ChestChaseServer/KeeperMeshCommand152.lua"
+NEW="src/ReplicatedStorage/KeeperRigConfig152.lua src/ReplicatedStorage/KeeperFx152.lua src/ServerScriptService/ChestChaseServer/KeeperMeshes152.lua src/ServerScriptService/ChestChaseServer/KeeperMeshCommand152.lua"
 DATA=""
 for n in Golem JungleKing SandSnake IceFang LavaDragon CrystalKnight StormColossus Darkened;do DATA="$DATA src/ServerScriptService/ChestChaseServer/KeeperMeshData152$n.lua";done
 CHANGED="src/MANIFEST.tsv src/ReplicatedStorage/BeastPose.lua src/ReplicatedStorage/KeeperAccents.lua src/ReplicatedStorage/KeeperFx.lua src/ReplicatedStorage/KeeperSignatureStrike.lua src/ReplicatedStorage/KeeperSleep.lua src/ReplicatedStorage/KeeperStrikeFrames.lua src/ReplicatedStorage/KeeperSurge.lua src/ReplicatedStorage/KeeperUpgradePose.lua src/ReplicatedStorage/StudioTestHelp.lua src/ReplicatedStorage/VeiledKeeper81.lua src/ServerScriptService/ApprovedPlantsBootstrap.server.lua src/ServerScriptService/ChestChaseServer/BeastModels.lua src/ServerScriptService/ChestChaseServer/KeeperContact.lua src/ServerScriptService/ChestChaseServer/OwnerUpdateCommands82.lua src/ServerScriptService/ChestChaseServer/VeiledEvent81.lua src/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua src/StarterPlayer/StarterPlayerScripts/VeiledEventClient81.client.lua"
@@ -32,7 +33,7 @@ if git -C "$REPO" diff --quiet "$BASE" -- $FROZEN;then echo "ok: Config (Config.
 for f in $NEW $DATA $(echo $CHANGED | tr ' ' '\n' | grep '\.lua$');do /opt/luau/luau-compile --binary "$REPO/$f" >/dev/null || fail "$f does not compile";done;echo "ok: luau-compile clean ($(echo $NEW $DATA $CHANGED | wc -w) files)"
 BYTES=$(cat $(for f in $DATA;do echo "$REPO/$f";done) | wc -c);CFG=$(wc -c < "$REPO/src/ReplicatedStorage/KeeperRigConfig152.lua")
 if [ "$BYTES" -lt 409600 ];then echo "ok: embedded mesh data $BYTES bytes for 8 keepers (+ KeeperRigConfig152 $CFG bytes), under 400 KB";else fail "mesh data $BYTES bytes";fi
-for f in $NEW $DATA;do p=$(echo $f | sed 's#^src/##;s#\.lua$##');grep -q "	$p	" "$REPO/src/MANIFEST.tsv" || fail "$p is not in src/MANIFEST.tsv";done;echo "ok: the 11 new scripts are in src/MANIFEST.tsv"
+for f in $NEW $DATA;do p=$(echo $f | sed 's#^src/##;s#\.lua$##');grep -q "	$p	" "$REPO/src/MANIFEST.tsv" || fail "$p is not in src/MANIFEST.tsv";done;echo "ok: the $(echo $NEW $DATA | wc -w) new scripts are in src/MANIFEST.tsv"
 grep -q "Version" "$REPO/src/ServerScriptService/ChestChaseServer/BeastModels.lua" && grep -q "Version=152" "$REPO/src/ServerScriptService/ChestChaseServer/BeastModels.lua" && echo "ok: the keepers' own visual version (BeastModels.Version) is 152" || fail "BeastModels.Version"
 echo "== 1. today's keepers unchanged (no variant, no mesh API) against $BASE"
 rm -rf "$OUT/base" "$OUT/now" "$OUT/srcbase";mkdir -p "$OUT/base" "$OUT/now" "$OUT/srcbase"
@@ -42,7 +43,7 @@ for d in base now;do cp "$T/roblox.luau" "$INV/world.luau" "$HERE/dump_legacy.lu
 python3 "$REPO/docs/proposals/R149/tests/mkbundle_any.py" "$OUT/srcbase/src/ReplicatedStorage" "$OUT/base/rs_bundle.luau" BeastModels="$BS/BeastModels.lua" KeeperUpgradeArt="$BS/KeeperUpgradeArt.lua" KeeperContact="$BS/KeeperContact.lua" >/dev/null
 SERVER="KeeperMeshes152=$SSS/KeeperMeshes152.lua KeeperMeshCommand152=$SSS/KeeperMeshCommand152.lua BeastModels=$SSS/BeastModels.lua KeeperUpgradeArt=$SSS/KeeperUpgradeArt.lua KeeperContact=$SSS/KeeperContact.lua"
 for n in Golem JungleKing SandSnake IceFang LavaDragon CrystalKnight StormColossus Darkened;do SERVER="$SERVER KeeperMeshData152$n=$SSS/KeeperMeshData152$n.lua";done
-python3 "$REPO/docs/proposals/R149/tests/mkbundle_any.py" "$REPO/src/ReplicatedStorage" "$OUT/now/rs_bundle.luau" $SERVER BeastAnimation="$REPO/src/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua" >/dev/null
+python3 "$REPO/docs/proposals/R149/tests/mkbundle_any.py" "$REPO/src/ReplicatedStorage" "$OUT/now/rs_bundle.luau" $SERVER BeastAnimation="$REPO/src/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua" VeiledEventClient81="$REPO/src/StarterPlayer/StarterPlayerScripts/VeiledEventClient81.client.lua" >/dev/null
 (cd "$OUT/base" && /opt/luau/luau dump_legacy.luau > dump.txt 2> err.txt) || { tail -20 "$OUT/base/err.txt";exit 1; }
 (cd "$OUT/now" && /opt/luau/luau dump_legacy.luau > dump.txt 2> err.txt) || { tail -20 "$OUT/now/err.txt";exit 1; }
 grep -v '^WARN' "$OUT/base/dump.txt" > "$OUT/base/d.txt";grep -v '^WARN' "$OUT/now/dump.txt" > "$OUT/now/d.txt"

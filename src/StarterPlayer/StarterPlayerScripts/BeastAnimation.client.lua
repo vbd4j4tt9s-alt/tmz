@@ -20,7 +20,7 @@ local Combat=require(Storage.KeeperCombat)
 local Polish=require(Storage:WaitForChild('KeeperPolish'));local KFx=require(Storage:WaitForChild('KeeperFx'));local Accents=require(Storage:WaitForChild('KeeperAccents'))
 -- R152: a keeper built from the baked rev 6 model (BeastBody KeeperMeshVariant 'R152', VisualVersion 152) uses KeeperRigConfig152's parts and
 -- floor samples, and has two faces: the Asleep face parts show while it sleeps (GUARDING / SLEEPING), the Chase ones in every other state.
-local Config152 -- (required with the first new-model keeper)
+local Config152,Fx152 -- (KeeperRigConfig152 and the new models' effects, KeeperFx152: required with the first new-model keeper)
 local Players=game:GetService('Players')
 local records,watchers,pending={},{},{}
 local BLACK=Color3.new(0,0,0)
@@ -44,7 +44,7 @@ end
 
 local function clear(model)
  local record=records[model]
- if record then if record.Surge then Surge.Destroy(record.Surge)end;KFx.Destroy(record.Fx);Accents.Destroy(record.Accents);record.Sound:Destroy();record.Sleep:Destroy();records[model]=nil end
+ if record then if record.Surge then Surge.Destroy(record.Surge)end;if record.Fx152 then Fx152.Destroy(record.Fx152)end;KFx.Destroy(record.Fx);Accents.Destroy(record.Accents);record.Sound:Destroy();record.Sleep:Destroy();records[model]=nil end
 end
 local function bind(model)
  if destroyed then return end
@@ -53,7 +53,7 @@ local function bind(model)
  local stage=model:GetAttribute('CreatureStage') or model:GetAttribute('Stage')
  if not root or not rig or not Config[stage] or not Voices[stage] then return end
  local variant=rig:GetAttribute('KeeperMeshVariant')=='R152'and 'R152'or nil
- if variant and not Config152 then Config152=require(Storage:WaitForChild('KeeperRigConfig152'))end
+ if variant and not Config152 then Config152=require(Storage:WaitForChild('KeeperRigConfig152'));Fx152=require(Storage:WaitForChild('KeeperFx152'))end
  local cfg=variant and Config152.Get(stage)or Config[stage]
  local expectedVersion=variant and Config152.Version or(stage==1 or stage==5 or stage==7)and 59 or 99
  if rig:GetAttribute('VisualVersion')~=expectedVersion then return end
@@ -84,7 +84,7 @@ local function bind(model)
  records[model]={Root=root,Rig=rig,Parts=parts,Stage=stage,Awake=awake,Variant=variant,
   Last=root.Position,SampleTime=0,SampleTravel=0,ObservedSpeed=0,LastVoice=-100,Sound=sound,State=state,
   Surge=stage==7 and Surge.New(model,variant)or nil,Motion=Motion.new(root.CFrame,awake),Sleep=Sleep.new(root,stage,cfg),
-  Polish=Polish.new(),Fx=KFx.new(root,stage,cfg),Accents=Accents.new(model,stage,variant),PoseDt=0}
+  Polish=Polish.new(),Fx=KFx.new(root,stage,cfg),Fx152=variant and Fx152.new(rig,stage)or nil,Accents=Accents.new(model,stage,variant),PoseDt=0}
  if variant then faces(records[model],awake==0,awake)end
 end
 local function schedule(model)
@@ -175,6 +175,9 @@ local render=Run.RenderStepped:Connect(function(dt)
   fxc.Now=now;fxc.Distance=distance;fxc.LocalDistance=localDistance;fxc.Asleep=asleep;fxc.Awake=motion.Awake;fxc.Moving=motion.Moving
   fxc.Cycle=motion.Cycle;fxc.Urgency=motion.Urgency;fxc.Chasing=hunting;fxc.Frame=motion.Frame;fxc.Frames=r.LastTarget;fxc.Low=low
   KFx.Step(r.Fx,fxc)
+  -- R152: the new models' flames, lightning, leaves, rain ... (KeeperFx152), every frame (bolts flash), by state and graphics tier
+  if r.Fx152 then local c=r.Fx152Ctx or{};r.Fx152Ctx=c;c.Now=now;c.Asleep=asleep;c.Chasing=hunting;c.Distance=distance;c.Tier=Fx.Get()
+   c.Striking=type(seenAttack)=='number'and now>=seenAttack and now-seenAttack<Combat.Get(r.Stage).Windup+Combat.Recovery;Fx152.Step(r.Fx152,c)end
   r.PoseDt+=dt
   local onScreen=true
   if distance>160 then local _,seen=camera:WorldToViewportPoint(r.Root.Position);onScreen=seen end

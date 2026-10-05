@@ -4,6 +4,7 @@
 --                Darkened: group-local), FaceState (the client shows Chase or Asleep), EyeGlow (lit as it wakes), Glow (Neon),
 --                Cosmetic (never hits), the golem's tree disguise (TreeRest / TreeSize: today's part it follows, KeeperUpgradeData)
 --  FloorSamples  the points the pose code grounds with (select_floor.luau); Bounds of the main pieces; Z the sleep Z; Mouth
+--  Fx            the sheets' effect anchors (flames, smoke, bolts, wisps) and the mesh part that carries each (KeeperFx152)
 -- Get(stage) is the stage's config for the new models: these fields over today's (KeeperRigConfig: Pivots, Motion, Scale ...).
 local M={Variant='R152',Version=152}
 M.Stages={
@@ -103,6 +104,7 @@ M.Stages={
  Bounds={Body={{-3.0801,-0.5254,-5.4004},{3.0801,6.7207,9.5508}},Head={{-3.0371,2.0527,-13.9004},{3.0371,11.791,-2.6523}},Jaw={{-1.0996,4.6602,-13.6992},{1.0996,6.2676,-6.832}},LeftBackLeg={{-4.5,-4,2.25},{-1.6484,3,6.3496}},LeftFrontLeg={{-4.3008,-4,-5.5508},{-1.6953,3.1035,-1.4492}},LeftWing={{-17.2246,3.1348,-2.3555},{-1.7832,14.459,12.2754}},RightBackLeg={{1.6484,-4,2.25},{4.5,3,6.3496}},RightFrontLeg={{1.6953,-4,-5.5508},{4.3008,3.1035,-1.4492}},RightWing={{1.7832,3.1348,-2.3555},{17.2246,14.459,12.2754}},Tail={{-1.7148,-0.748,5.3027},{4.8613,4.0898,22.957}}},
  Z={Point={-2.7944,14.0055,-9.945},Height=3.7191},
  Mouth={0,6.5876,-13.764},
+ Fx={{Kind='Flame',Part='Body',At={0.0281,5.9378,-2.5091},Dir={-0.1157,0.9633,0.2423},Size=1.9848},{Kind='Flame',Part='Body',At={-0.0296,5.2373,-0.2962},Dir={-0.0201,0.9595,0.2809},Size=1.9379},{Kind='Flame',Part='Body',At={0.1468,5.2416,2.067},Dir={0.0827,0.9448,0.3169},Size=1.8995},{Kind='Flame',Part='Body',At={-0.1103,5.2289,4.3922},Dir={-0.0758,0.9719,0.223},Size=1.8335},{Kind='Flame',Part='Body',At={-0.1097,5.2419,7.0295},Dir={0.0381,0.9618,0.2712},Size=1.702},{Kind='Flame',Part='Body',At={-0.0831,5.2379,9.2894},Dir={0.0377,0.9437,0.3288},Size=1.8537},{Kind='Flame',Part='Tail',At={4.206,0.7961,22.7697},Dir={0.214,0.8807,0.4226},Size=2.3495},{Kind='Smoke',Part='Head',At={-0.601,7.9993,-13.9991},Dir={-0.5109,0.3852,-0.7685},Size=0.9082},{Kind='Smoke',Part='Head',At={0.6,7.9998,-13.9994},Dir={0.5115,0.3848,-0.7683},Size=0.9031}},
  Parts={
   {Name='Body',Group='Body',Kind='main',Center={0,3.0977,2.0752},Size={6.1602,7.2461,14.9512},Triangles=1680,EyeGlow=false,Glow=false},
   {Name='Body_Glow',Group='Body',Kind='glow',Center={0,2.3203,1.7998},Size={6.1992,4.0391,13.5996},Triangles=300,EyeGlow=false,Glow=true,Color={1,0.45,0.06}},
@@ -156,6 +158,7 @@ M.Stages={
  FloorSamples={LeftLeg={{0.4,-3.8,-6},{0.6,-4,-5.8},{0.8,-4,2.8},{1.65,3.45,3.3},{3.5541,-2.5968,-7.1956},{3.6375,-3.9428,-6.9169},{7.8475,6.3263,-0.972}},RightLeg={{-7.8,-3.8,-6},{-7.6,-4,-5.8},{-7.4,-4,2.8},{-7.1397,-3.6128,-7.2072},{-6.35,3.45,3.3},{-2.1224,-3.9572,-6.8916},{-0.4,-3.8,-6}}},
  Bounds={Body={{-9.2441,7.2031,-5.8008},{9.543,28.8262,6.5}},Head={{-8.6875,21.6191,-5.4785},{8.5293,38.8008,5.9902}},LeftArm={{6.6211,5,-7.4121},{17.3496,32.0918,4.9004}},LeftLeg={{0.4004,-4,-7.1953},{7.8477,8.6523,3.3008}},RightArm={{-17.3496,5,-7.4492},{-6.6211,32.0918,4.9004}},RightLeg={{-7.8008,-4,-7.207},{-0.4004,8.6523,3.3008}}},
  Z={Point={-6.8646,41.3808,-1.92},Height=5.4096},
+ Fx={{Kind='Bolt',Part='Head',At={-0.2347,32.7972,0.523},To={0.0116,33.522,0.8516},Size=0.833},{Kind='Bolt',Part='Head',At={-3.1513,31.4852,0.1538},To={-3.8665,33.0136,0.6192},Size=1.7505},{Kind='Bolt',Part='Head',At={3.3764,31.4698,0.2134},To={4.082,33.1047,-0.203},Size=1.8287},{Kind='Bolt',Part='LeftArm_Rock',At={8.0874,19.8989,0.0145},To={9.0002,20.6871,0.274},Size=1.2339},{Kind='Bolt',Part='LeftArm_Rock',At={12.485,16.7741,-0.5059},To={11.9992,18.7451,-0.2547},Size=2.05},{Kind='Bolt',Part='LeftArm_Fist',At={12.3645,13.7522,-0.5986},To={12.4813,15.5478,-0.6303},Size=1.7996},{Kind='Bolt',Part='RightArm_Rock',At={-8.1272,19.8686,-0.0232},To={-9.038,20.6528,0.2355},Size=1.232},{Kind='Bolt',Part='RightArm_Rock',At={-12.4612,16.7631,-0.4751},To={-11.9782,18.7382,-0.2407},Size=2.048},{Kind='Bolt',Part='RightArm_Fist',At={-12.3429,13.7602,-0.5829},To={-12.4762,15.5476,-0.5728},Size=1.7951}},
  Parts={
   {Name='Body',Group='Body',Kind='main',Center={0.1494,18.0146,0.3496},Size={18.7871,21.623,12.3008},Triangles=1956,EyeGlow=false,Glow=false},
   {Name='Body_Glow',Group='Body',Kind='glow',Center={0,17.3428,-5.0205},Size={12.7617,13.1465,1.5996},Triangles=780,EyeGlow=false,Glow=true,Color={0.48,0.9,1}},
@@ -180,6 +183,7 @@ M.Stages={
  Module='KeeperMeshData152Darkened',
  Triangles=3188,
  TrianglesOnScreen=3172,
+ Fx={{Kind='Wisp',Part='LFoot',At={-0.0799,-0.4527,0.2371},Dir={0.0191,0.9758,0.2178},Size=1.347},{Kind='Wisp',Part='LHand',At={-0.041,-1.1124,-0.0163},Dir={0.0745,-0.9568,-0.281},Size=1.1088},{Kind='Wisp',Part='RFoot',At={-0.0117,-0.4164,0.3514},Dir={0.0092,0.983,0.1831},Size=1.3474},{Kind='Wisp',Part='RHand',At={0.0069,-1.0748,0.122},Dir={-0.009,-0.9651,-0.2619},Size=1.1095},{Kind='Wisp',Part='Torso_Cloak',At={-2.644,-7.1107,2.7657},Dir={-0.1121,0.9339,0.3395},Size=1.7607},{Kind='Wisp',Part='Torso_Cloak',At={-0.66,-6.302,2.6335},Dir={0.0206,0.9463,0.3225},Size=1.7538},{Kind='Wisp',Part='Torso_Cloak',At={1.5241,-7.1728,2.7512},Dir={0.0933,0.9601,0.2637},Size=1.7393},{Kind='Wisp',Part='Torso_Cloak',At={2.9347,-6.3219,2.7929},Dir={0.1983,0.9191,0.3405},Size=1.77}},
  Parts={
   {Name='Torso',Group='Torso',Kind='main',Center={0.0449,0.3564,-0.0303},Size={7.3164,4.2129,2.459},Triangles=332,EyeGlow=false,Glow=false},
   {Name='Torso_Glow',Group='Torso',Kind='glow',Center={0,0,-1.21},Size={0.1992,2.7617,0.1191},Triangles=16,EyeGlow=false,Glow=true,Color={0.8,0.42,1},Cosmetic=true},

@@ -23,7 +23,20 @@ So there is no import and no upload. The game carries the models as data and bui
   are already the right size.
 - **New sleep "Z":** one big cyan Z with a dark outline (and a small z), as in the sheets. The golem has none, because it is a tree.
 - **Effects.** The keepers' existing effects (dust, breath, sparks, the colossus's lightning) stay. Breath and lightning now come
-  from the new mouths and the new chest. The glowing runes, lava seams and storm cracks pulse gently. No other new particles yet.
+  from the new mouths and the new chest. The glowing runes, lava seams and storm cracks pulse gently.
+- **The sheets' effects** are on the new models too. Each one is fixed to its body part, so it moves with that part.
+  - Lava Dragon: flames along its back spikes and on its tail tip. Asleep, the flames burn low and it puffs smoke from its nostrils.
+  - Storm Colossus: lightning flickers under its cloud crown, on its shoulder rocks and on its fists. Rain falls from the cloud.
+    Asleep, the rain is lighter and the flashes come half as often.
+  - The Darkened: purple void wisps at its cloak hem, hands and feet. They are fainter while it sleeps.
+  - Timber Golem: leaves fall from its canopy (also while it sleeps as a tree), and a few spores drift up.
+  - Jungle King: a few leaves fall from its head.
+  - Sand Snake: a sand swirl at its tail and a dust trail while it chases. Asleep, it has neither.
+  - Ice Fang: a light frost mist and a glint on its tail crystals.
+  - Crystal Knight: a slash trail on its sword while it strikes.
+  - Only players' devices draw them, through the game's shared effects budget. They are off in Fast Mode or when a device
+    struggles, there are half as many on phones, and they are off beyond 200 studs.
+  - All use Roblox's built-in particle images, so there is nothing to upload. Today's keepers (models off, or a failed build) have none.
 - **No studs.** The game has no stud texture that works on these parts, so they ship smooth, with the sheets' colours.
 
 | Keeper | Mesh parts (today) | Triangles (on screen) |
@@ -53,6 +66,7 @@ So there is no import and no upload. The game carries the models as data and bui
 5. Look at a sleeping keeper (asleep face, the big Z), wake one (awake face) and get hit by one.
    - Check that the golem turns into its tree and back.
    - Check how bright the Neon eyes and cracks look.
+   - Check the effects against the sheets: the dragon's flames, the colossus's lightning and rain, The Darkened's wisps.
 
 ## What happens if it is off or fails
 - **If "Allow Mesh / Image APIs" is off,** every keeper stays exactly as it is today. The game logs one warning, and
