@@ -52,6 +52,14 @@ return function(W,E,F)
    p.CFrame=piv*CF(rel.Position.X*k,rel.Position.Y*k,rel.Position.Z*k)*rel.Rotation
    p.Size=p._props.Size*k
   end
+  -- (as Roblox: a mesh's Offset scales; a FileMesh's Scale scales too, a Sphere / Brick / Cylinder mesh's Scale is relative to its part and stays)
+  for _,d in ipairs(self:GetDescendants())do
+   if d._class=='SpecialMesh'then
+    local off=d._props.Offset;if R.typeof(off)=='Vector3'then d.Offset=off*k end
+    local kind=d._props.MeshType and d._props.MeshType.Name
+    if kind=='FileMesh'and R.typeof(d._props.Scale)=='Vector3'then d.Scale=d._props.Scale*k end
+   end
+  end
   self._scale=s;self._offsets=nil;X.scaled=(X.scaled or 0)+1
  end
  function Inst:GetScale()return self._scale or 1 end

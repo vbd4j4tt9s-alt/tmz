@@ -124,7 +124,7 @@ for rank=6,8 do
   local tl=L.Timeline(rank,variant);local tag=names[rank]..' '..variant
   for _,a in ipairs(aspects)do
    local lay=L.Layout(a[3],false,rank)
-   local worst={dx=0,dy=0,overlap=nil,small=nil}
+   local worst={dx=0,dy=0,overlap=nil,small=nil,maxDia=0,endDia=0}
    local samples={tl.Climax+.02}
    for t=tl.Climax+.1,tl.FloatEnd,.05 do samples[#samples+1]=t end
    samples[#samples+1]=tl.FloatEnd
@@ -139,13 +139,15 @@ for rank=6,8 do
      local titleBottom=lay.Title.Y+lay.Title.H/2
      if t>=tl.Climax+.12 and y-r<titleBottom-.005 then worst.overlap=string.format('title at %.2f s (seed top %.3f < %.3f)',t,y-r,titleBottom)end
      if t>=tl.Climax+L.SceneCountDelay and y+r>lay.Odds.Y-lay.Odds.H/2+.005 then worst.overlap=string.format('odds at %.2f s (seed bottom %.3f > %.3f)',t,y+r,lay.Odds.Y-lay.Odds.H/2)end
-     local need=t>=tl.FloatEnd-.01 and .12 or .07
-     if r<need then worst.small=string.format('%.3f at %.2f s',r,t)end
+     -- the hero: from .3 s after the hit at least .30 of the screen height, at the end .35-.45 (the owner: the seed is the main focus)
+     if t>=tl.Climax+.3 and 2*r<.30 then worst.small=string.format('%.3f of the height at %.2f s',2*r,t)end
+     worst.maxDia=math.max(worst.maxDia,2*r);if t>=tl.FloatEnd-.01 then worst.endDia=2*r end
     end
    end
    check(worst.dx<=.12 and worst.dy<=.16,('%s %s: the seed stays near the centre from the hit to the end (off by %.3f, %.3f)'):format(tag,a[1],worst.dx,worst.dy))
    check(not worst.overlap,tag..' '..a[1]..': the seed is never under the title / "1 in N" ('..tostring(worst.overlap)..')')
-   check(not worst.small,tag..' '..a[1]..': the seed is big on screen ('..tostring(worst.small)..')')
+   check(not worst.small,tag..' '..a[1]..': the seed is big on screen from .3 s after the hit ('..tostring(worst.small)..')')
+   check(worst.endDia>=.35 and worst.maxDia<=.45,('%s %s: the seed fills the end shot (%.0f%% of the height; at most %.0f%%)'):format(tag,a[1],worst.endDia*100,worst.maxDia*100))
   end
   -- the seed is fully visible from just after the hit; the pack until the hit
   local ok=true

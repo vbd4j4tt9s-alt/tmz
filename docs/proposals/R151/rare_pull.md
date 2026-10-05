@@ -6,7 +6,8 @@ Owner, verbatim:
 3. "The seed should be the main focus in these scenes where it ends with the seed floating down and what not."
 4. "Actually rework for the scenes, we can just have the seed pack and seed be animated differently for king, cosmic, secret. Don't need the avatar, as the seed pack and seed have to go hand in hand."
 5. "We can also rework the legendary, uncommon and common and mythic short animations to the same quality so there isn't a gigantic quality gap in there, also for the pack animations add more suspense to opening the pack in general."
-6. Sounds: the owner uploaded 15 sounds (8 shared, 3 King, 4 Cosmic); only the Secret tier slots wait for uploads.
+6. Sounds: the owner uploaded 17 sounds (8 shared, 3 King, 4 Cosmic, 2 Secret); SecretDrone, SecretWhisper and Heartbeat stay on the layered fallback.
+7. Follow-up: "the SEED to be the main focus" - in the end shots the seed was small under the big title. Now the camera frames the seed itself from the hit on (see §4a).
 
 What this does, in one line: **every pull is now one escalating reveal**: the pack builds suspense (it wobbles, glows, tears a bit at a time, a rarity hint flickers through the cracks), then the seed bursts out and ends **big, centred and floating down** with the rarity word, "1 in N" and its name. Common..Mythic do it in the world plus a seed card; Secret / Cosmic / King cut to a **short story scene** where the **pack and the seed** are the stars (a void vault, deep space, a throne room).
 
@@ -63,18 +64,18 @@ Story scenes run on the opener's clock from the reveal (`RarePullRules.Scenes`);
 | t | Picture | Sound |
 |---|---|---|
 | 0.00 | world desaturates to violet-grey, letterbox slides in, motes gather, RGB glitch bars | SecretDrone (loop) |
-| 0.25 | glitch | SecretGlitch |
+| 0.25 | glitch | SecretGlitch (owner's glitch, a .4 s burst) |
 | 0.45 → 0.70 | glitch tear, fade to black → the void (black glass floor, violet seams, fog); the pack hangs in the dark, rim-lit | SecretWhisper (loop) |
-| 1.30 / 1.90 | the pack glitches (jitter, glitch bars) | SecretGlitch ×2 (the 2nd lower, louder) |
+| 1.30 / 1.90 | the pack glitches (jitter, glitch bars) | SecretGlitch ×2 (.45 / .5 s bursts; the 2nd lower, louder) |
 | 1.50 | skip allowed | |
 | 2.40 | a ring of 8 dark lock plates with violet bolts closes round the pack and turns: click, click, click | PackShake ×2; Riser starts |
-| 2.90 | the bolts pull back, cracks of light grow over the pack, light spills from its edges | SecretVault |
+| 2.90 | the bolts pull back, cracks of light grow over the pack, light spills from its edges | SecretVault (owner's heavy door unlocking, faded out by the silence) |
 | 3.05 → 3.45 | the pack shudders, the cracks blaze | SuckIn, PackShake |
 | **3.45** | **silence** (the screen dips) | everything stops |
 | **3.55** | **the pack bursts in violet light**: flash, shards, shockwave ring; SECRET slams in (RGB split, scanlines) | Impact + GroundImpact + PackBurst + SecretGlitch |
-| 3.55 → 3.95 | the seed rises out of the dark, big and centred, with its eclipse ring and purple wisps | Sparkle |
+| 3.55 → 3.95 | the seed rises out of the dark; the camera takes it as the hero (33% of the height, centred), with its eclipse ring and purple wisps | Sparkle |
 | 3.85 → 4.15 | "1 in N" counts up and slams | TitleSlam |
-| 4.15 → 5.10 | the seed floats down toward the camera, turning; name under "1 in N" | Sparkle |
+| 4.15 → 5.10 | the seed floats down toward the camera, turning, growing to 39% of the screen height; name under "1 in N" | Sparkle |
 | 5.10 → 5.60 | fade to black, back to the world; HUD back; purple wisps around the player (15 s) | |
 
 ### COSMIC: Supernova (deep space), Full 8.0 s / ReducedMotion 4.95 s
@@ -90,7 +91,7 @@ Story scenes run on the opener's clock from the reveal (`RarePullRules.Scenes`);
 | **4.45** | **SUPERNOVA**: flash, expanding shell, two shockwave rings; COSMIC (nebula gradient, stars, two orbiting planets) | **CosmicBoom** (the owner's underwater explosion: the big hit here instead of Impact; its tail rings under the seed) + GroundImpact + PackBurst |
 | 4.45 → 5.30 | the seed flies out of the core as a **falling star** toward the camera and resolves into the seed | CosmicWhoosh; CosmicStar (the shine rings under the seed); the bed returns, softer |
 | 4.75 → 5.05 | "1 in N" counts up and slams | TitleSlam |
-| 5.30 → 6.60 | the seed, big and centred with its orbit rings, floats down | Sparkle |
+| 5.30 → 6.60 | the seed, centred with its orbit rings, floats down and fills the shot (to 39% of the height) | Sparkle |
 | 6.60 → 7.20 | fade, back to the world; two little planets and star motes around the player (20 s) | |
 
 ### KING: the Coronation (throne room), Full 10.2 s / ReducedMotion 5.9 s
@@ -107,7 +108,7 @@ Story scenes run on the opener's clock from the reveal (`RarePullRules.Scenes`);
 | **5.55** | **the pack bursts in gold rays and confetti**, a golden shockwave across the floor; KING (gold gothic letters, a crown, turning rays) | Impact + GroundImpact + PackBurst + KingFanfare (rings under the seed until 9.4) |
 | 5.55 → 6.00 | the seed rises crowned out of the light (the crown lifts with it and fades into its own coronation ring) | Sparkle; KingChoir again, softer |
 | 5.85 → 6.15 | "1 in N" counts up and slams | TitleSlam |
-| 6.00 → 8.70 | the seed floats down the beam to the camera, big and centred | Sparkle |
+| 6.00 → 8.70 | the seed floats down the beam to the camera, centred and filling the shot (to 39% of the height) | Sparkle |
 | 8.70 → 9.40 | fade, back to the world; gold halo at the feet and rising sparkles (25 s) | |
 
 ### In place (Secret+ when the full scene is not safe), on the reveal's server clock
@@ -127,9 +128,15 @@ The hit is on the world seed's burst (SeedAt: Secret 1.35, Cosmic 2.45, King 3.3
 - **Full story scene only when safe** (`RarePullRules.Decide`): not on the track, no keeper within 60 studs or chasing the player, no ragdoll / fling, no run / queue / carried pack, no open menu (`SeedMenu`, title screen), the player's own camera (Custom / Follow), standing on the ground. Otherwise the in-place version.
 - **While the scene runs**: the camera is Scriptable only between the fade to black and Back; HUD ScreenGuis that were on are turned off (only those; `TouchGui` is never touched; new ones are caught too) and Core GUI (player list, chat, emotes, health; the Backpack only if it was on); movement held with the PlayerModule controls; Space / Enter / A / B and a tap anywhere skip (silently).
 - **Every exit path restores exactly**: the normal end, skip, death, the character being removed, being moved 8+ studs (teleport, fling), a keeper turning up (45 studs or chasing), someone replacing the camera, an error in a frame (the frame is pcall'd), the script being destroyed. Camera type, CFrame, Focus, FieldOfView and subject; the HUD guis it turned off; Core GUI it turned off; controls; its colour grade / blur live **on the Camera** and are destroyed (**Lighting is never written**); the stage is destroyed; every voice stopped; the announcement attributes cleared; no render step or binding left. A scene stopped before its hit (danger / moved / camera / error) still shows a **compact result card** so the player knows what they got.
-- **ReducedMotion**: the Calm scenes (cuts only - the camera never moves within a shot; shorter; no shake, no blur, no jitter, no swinging motes, a short seed float), no wobble on the pack (colour pulse only), no FOV push, softer flashes.
+- **ReducedMotion**: the Calm scenes (cuts only - the camera never moves within a shot; shorter; no shake, no blur, no jitter, no swinging motes; the seed rests in one still hero shot at 37% of the height), no wobble on the pack (colour pulse only), no FOV push, softer flashes.
 - **Phones / low quality / FastMode** (`ClientFxBudget.Low` or a touch-only device): lighter stages (King backdrop 122 parts instead of 189), fewer particles and ring pieces, no blur, gentler shake on phones (35%); on low quality / FastMode also no Highlight on the opening pack.
 - **No per-frame work after the end**: the director unbinds its render step; the world module disconnects its RenderStepped when its last aura ends.
+
+### 4a. The seed fills the end shots
+- From the hit on, every story scene's camera keeps its keyed angle but frames the **seed itself** (`RarePullRules.Shot`): it blends in over .3 s, follows the seed as it floats down, and sets its distance so the seed grows from **33% to 39% of the screen height** (`HeroDiameter`; the field of view is vertical, so desktop and phone get the same share). ReducedMotion: one still hero shot at 37% from the hit.
+- The seed is sized by what is **visible** (`RarePullRules.VisibleBounds`: a seed part with a Sphere / Brick / Cylinder SpecialMesh shows Size x Scale, so `GetBoundingBox` was ~1.4x too big and the old shots made the seed look small); the stage scales it to 1.8 studs of visible size. The seed card for Common..Mythic frames the same visible box, and its seed is a little bigger (.26 / .28 / .31 / .35 / .38 of the height).
+- The layout leaves the middle band to the seed: the title sits just under the letterbox (centre `bar + size/2 + .012`), "1 in N" at .78 and the name at .85; band .247-.740 of the height on desktop for King. The camera aims a little below the seed (`HeroAim`) so it sits in the middle of that band.
+- Checked: the real seed model's visible box in the end shot takes 40-44% of the height (Secret 44%, Cosmic 44%, King 40%; its box, so a little more than the seed's own outline), centred within .05, clear of the title and "1 in N".
 
 ## 5. Sound slots (`ReplicatedStorage/RarePullSounds`)
 
@@ -155,8 +162,8 @@ Each slot is `{Id, Volume, Pitch, Start, [Length, AlignEnd], [Region], [Loop]}`.
 | CosmicBoom | 75435110351652 "large underwater explosion" (6.6 s) | .5 / .088 | the supernova (Cosmic's big hit, instead of Impact; also in place), fades out on the way back | 3-6 s tail |
 | CosmicStar | 100732233406279 "shine" (4.1 s, very quiet) | 2.5 / .064 | three short twinkles as the planets lock into line; the star resolving into the seed (rings under it) | .6 s / 1-3 s |
 | SecretDrone | fallback (heartbeat + low rumble) | | Secret 0→silence | loop |
-| SecretGlitch | fallback (high ping stutter + click) | | glitches; the hit; the bonus roll's Secret result | <.4 s |
-| SecretVault | fallback (keeper slam + rumble) | | the lock opens | 1-1.5 s |
+| SecretGlitch | 84688488729958 "glitch sound effect HD" (3.10 s, quiet) | 1.3 / .242, Region .242-1.642 | .25 s, Glitch1, Glitch2 (short bursts: each cue cuts it after .4-.5 s), the hit (1.2 s, faded); the bonus roll's Secret result (the 1.4 s slice) | .4-1.2 s |
+| SecretVault | 102739931931289 "heavy door unlocking" (2.11 s, loud) | .3 / .040 | the lock opens (Unlock), faded out ON the silence | ~.55 s used |
 | SecretWhisper | fallback (wind) | | under the void | loop |
 
 To audition in Studio: `/test raresound KingFanfare` (one slot), `/test rarepull king|cosmic|secret` (a whole scene with a demo seed; also `common`..`mythic`). Nothing is granted.
@@ -172,11 +179,11 @@ New (ReplicatedStorage): `RarePullRules` (all timelines, poses, shots, safety, o
 ## 8. Checked outside Studio
 
 `sh docs/proposals/R151/tests/run_rare_pull.sh <scratch> [only|all]` (the R151 test environment `rare_env.luau` extends the R113 mock with Lighting, the Camera, Core GUI, PlayerModule controls, keepers, and Roblox-faithful `Clone` (attributes, PrimaryPart), `PivotTo` / `ScaleTo` that move every part):
-- **static**: every script in `src/` compiles; the 9 new scripts are in the manifest (sorted); the fallback designs only reuse sound ids the game already uses; the slots carry exactly the owner's 15 uploads; no reveal module touches Lighting.
-- **test_rare_rules: 439 checks** - every tier's timeline (Full / Calm / InPlace, the ladder normal / quick), the server timeline unchanged and the slide still ending with RevealDuration, escalation, the silence before every hit, skip windows, the hint (neutral → every lower tier → the real one, never higher), wobble / glow / tear, **framing**: from the hit to the end the seed stays near the centre, big, and never under the title or "1 in N" (desktop 16:9, phone 844x390, tablet 4:3), the camera stays inside the stage, the pack until the hit, the King crown on the pack, safety, odds, layout, cue sheets.
-- **test_rare_cinematic: 439 checks** - each scene played through frame by frame (HUD / Core GUI / movement held, the colour grade on the Camera with Lighting never written, the camera cut while the screen is black and back at Back, part budgets, the title on the hit, "1 in N", the skip hint, every voice on Effects, the hit / slam on the beat, no voice over itself) and then restored exactly; skip (tap, keys) before and after the hit; every exit path (error in a frame, death, character removed, moved, a keeper chasing / walking up, the camera replaced, the script destroyed) restores and, where it should, shows the result card; ReducedMotion (cuts only, no blur, shorter), phone (lighter, no blur), in place (keeper near, on the track, menu open, in the air: no camera / stage / HUD change); the Common..Mythic card (title waits for the burst, the seed, "1 in N", the push and its restore, the hint colour) and quick reveals; `/test rarepull`, `/test raresound`; the owner's uploads from their measured lead-in, AlignEnd risers ending on the silence, PlaybackRegion slices, the King fanfare / bell / choir on their beats and out of the silence, Cosmic's boom as the hit (no Impact over it, still ringing under the seed), its bed slice clear of the silence and its shine on the alignments, an id set later dropping in; Effects 0; the bonus-roll sting.
+- **static**: every script in `src/` compiles; the 9 new scripts are in the manifest (sorted); the fallback designs only reuse sound ids the game already uses; the slots carry exactly the owner's 17 uploads; no reveal module touches Lighting.
+- **test_rare_rules: 457 checks** - every tier's timeline (Full / Calm / InPlace, the ladder normal / quick), the server timeline unchanged and the slide still ending with RevealDuration, escalation, the silence before every hit, skip windows, the hint (neutral → every lower tier → the real one, never higher), wobble / glow / tear, **framing**: from the hit to the end the seed stays near the centre and never under the title or "1 in N"; from .3 s after the hit it is at least 30% of the screen height, at the end 35-45% (desktop 16:9, phone 844x390, tablet 4:3), the camera stays inside the stage, the pack until the hit, the King crown on the pack, safety, odds, layout, cue sheets.
+- **test_rare_cinematic: 452 checks** - each scene played through frame by frame (HUD / Core GUI / movement held, the colour grade on the Camera with Lighting never written, the camera cut while the screen is black and back at Back, part budgets, the title on the hit, "1 in N", the skip hint, the REAL seed model's visible box in the end shot (Secret / Cosmic / King: 30-50% of the height, centred, clear of the title and odds), every voice on Effects, the hit / slam on the beat, no voice over itself) and then restored exactly; skip (tap, keys) before and after the hit; every exit path (error in a frame, death, character removed, moved, a keeper chasing / walking up, the camera replaced, the script destroyed) restores and, where it should, shows the result card; ReducedMotion (cuts only, no blur, shorter), phone (lighter, no blur), in place (keeper near, on the track, menu open, in the air: no camera / stage / HUD change); the Common..Mythic card (title waits for the burst, the seed, "1 in N", the push and its restore, the hint colour) and quick reveals; `/test rarepull`, `/test raresound`; the owner's uploads from their measured lead-in, AlignEnd risers ending on the silence, PlaybackRegion slices, the King fanfare / bell / choir on their beats and out of the silence, Cosmic's boom as the hit (no Impact over it, still ringing under the seed), its bed slice clear of the silence and its shine on the alignments, Secret's glitch as short bursts on the glitch beats and a longer one on the hit, its vault door on the unlock and silent in the silence, an id set later dropping in; Effects 0; the bonus-roll sting.
 - **test_rare_world: 89 checks** - the real SeedPackClient + PackOpeningFeedback: for every tier the seam glows, the hint ends on the tier colour, the seed comes out at the end of the suspense and not before, the pack wobbles and tears bit by bit, the R138 pops / sounds move to the burst, PackBurst on the burst, everything released; the opener's King scene keeps the camera even with a giant pack; onlookers' pillar on the burst (not before), shockwave, the aura and its hum on Effects after the reveal, ending after 15 / 20 / 25 s with no per-frame work left, hidden far away, lighter on low quality; onlookers never get the hidden stage; Mythic keeps R136's flourish (at the new burst); the R150 onlooker impact still once.
-- **existing suites, all green**: R136 24; R137 43 + 22 + 11 + 14; R138 18 + 16 + 18, guide flow OK, layout ALL PASS, tutorial 436; R148 purchase 329 + 71 + 75; R147 Verity UI 339; R149 Verity pack 673; audio_R123 37; borders_R123 2341 (it checks every ReplicatedStorage module, so it grows with the new ones); R150 SFX 105 + 38 + 14 + 129 + 25 + fast travel 70; R150 bonus UI 188 + 372 + 37 + 5467 (gameplay files frozen).
+- **existing suites** (green except as noted): R136 24; R137 43 + 22 + 11 + 14; R138 18 + 16 + 18, guide flow OK, layout ALL PASS, tutorial 436; R148 purchase 329 + 71 + 75; R147 Verity UI 339 (since b196944, the R151 pack-models audit on origin, 10 of its checks fail: they pin EclipsePackArt / the giant-pack parts to the R146 base, which that audit changed on purpose; nothing in the reveal touches them); R149 Verity pack 673; audio_R123 37; borders_R123 2389 (it checks every ReplicatedStorage module, so it grows with the new ones); R150 SFX 105 + 38 + 14 + 129 + 25 + fast travel 70; R150 bonus UI 188 + 372 + 37 + 5467 (gameplay files frozen).
 
 Preview: `sh docs/proposals/R151/preview/run_rare_pull_preview.sh <scratch> [node_modules]` plays the real reveals on the mock (`preview_frames.luau`), renders the world / stages with three.js (`rare_pull.html`, `render_frames.mjs`), the GUI with R150's `render_gui.mjs` (patched in the scratch copy only, for the tier fonts and text gradients) and composes with Pillow (`compose.py`). **Approximate**: plain materials (no Roblox textures / Future lighting), stand-in pack art (a pouch in its paper colour) and a blocky stand-in avatar on a grass plane for the world frames, SpecialMesh seeds as spheres / blocks, particles as dots, no trails, the post grade / blur approximated in Pillow, the world camera placed in front of the player.
 

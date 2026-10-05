@@ -148,10 +148,14 @@ end
 function Card:SetSeed(model)
  if not self.View or not model then return end
  self.SeedModel=model;model.Parent=self.View
- local ok,cf,size=pcall(function()return model:GetBoundingBox()end)
- if not ok then cf,size=CFrame.new(),Vector3.one end
- -- framed by its biggest side (it turns about Y, so its width and depth both pass the camera): the seed fills most of the card
- self.SeedCentre=cf.Position;self.SeedRadius=math.max(.2,math.max(size.X,size.Y,size.Z)*.56)
+ -- framed by what is visible (RarePullRules.VisibleBounds) and its biggest side (it turns about Y, so its width and depth both pass the
+ -- camera): the seed fills most of the card
+ local ok,centre,size=pcall(Rules.VisibleBounds,model)
+ if not ok or not centre then
+  local ok2,cf,s=pcall(function()return model:GetBoundingBox()end)
+  if ok2 and cf then centre,size=cf.Position,s else centre,size=Vector3.zero,Vector3.one end
+ end
+ self.SeedCentre=centre;self.SeedRadius=math.max(.2,math.max(size.X,size.Y,size.Z)*.53)
  local base=model:GetPivot();self.SeedBase=CFrame.new(self.SeedCentre):ToObjectSpace(base)
  local dist=self.SeedRadius/math.tan(math.rad(15))*1.08
  self.ViewCamera.CFrame=CFrame.lookAt(self.SeedCentre+Vector3.new(0,self.SeedRadius*.12,dist),self.SeedCentre)

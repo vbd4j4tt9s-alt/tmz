@@ -72,15 +72,23 @@ local function prepare(model,height,maxSide)
   if d:IsA('BasePart')then d.Anchored=true;d.CanCollide=false;d.CanTouch=false;d.CanQuery=false;d.CastShadow=false;parts[#parts+1]=d
   elseif d:IsA('Decal')then parts[#parts+1]=d end
  end
- local ok,cf,size=pcall(function()return model:GetBoundingBox()end)
- if ok and size then
+ -- sized and centred by what is visible (RarePullRules.VisibleBounds: a seed's SpecialMesh parts are smaller than their boxes)
+ local function bounds()
+  local ok,c,s=pcall(Rules.VisibleBounds,model)
+  if ok and c then return CF(c),s end
+  local ok2,cf,size=pcall(function()return model:GetBoundingBox()end)
+  if ok2 and cf then return cf,size end
+  return nil
+ end
+ local cf,size=bounds()
+ if cf and size then
   local side=height and size.Y or math.max(size.X,size.Y,size.Z)
   local target=height or maxSide
   if side>.01 then pcall(function()model:ScaleTo(model:GetScale()*target/side)end)end
-  ok,cf,size=pcall(function()return model:GetBoundingBox()end)
+  cf,size=bounds()
  end
- if not ok or not cf then cf,size=model:GetPivot(),V(2,2.6,.6)end
- return parts,cf:Inverse()*model:GetPivot(),size
+ if not cf then cf,size=model:GetPivot(),V(2,2.6,.6)end
+ return parts,CF(cf.Position):Inverse()*model:GetPivot(),size
 end
 local function setAlpha(parts,alpha,base)
  local m=1-clamp01(alpha)

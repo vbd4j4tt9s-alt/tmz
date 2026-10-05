@@ -20,7 +20,7 @@ T=$REPO/docs/proposals/R151/tests;P=$REPO/docs/proposals
 mkdir -p "$S/cl" "$S/strips" "$S/gif"
 cp "$REPO/tools/tests/roblox.luau" "$P/inventory_R113/tests/world.luau" "$P/inventory_R113/tests/fixtures.luau" "$P/R150/tests/sfx_env.luau" "$T/rare_env.luau" \
  "$P/R150/preview/dump_tree.luau" "$HERE/preview_frames.luau" "$S/cl/"
-python3 "$T/mkbundle.py" "$S/cl" all-client >/dev/null
+python3 "$T/mkbundle_rare.py" "$S/cl" all-client >/dev/null
 cd "$S/cl"
 printf "SET='strips'\n" > strips.luau;cat preview_frames.luau >> strips.luau
 printf "SET='gif'\n" > gif.luau;cat preview_frames.luau >> gif.luau

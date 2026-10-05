@@ -91,6 +91,20 @@ for rank=6,8 do
   local odds=gui and X.find(gui,'Odds')
   if odds and t>tl.Odds+.05 and t<tl.FloatEnd-.1 and log.oddsFinalOk==nil then log.oddsFinalOk=odds.Text==final;log.oddsText=odds.Text end
   local hint=gui and X.find(gui,'Skip hint');if hint and hint.Visible and not log.skipHint then log.skipHint=t end
+  -- the real seed model on screen near the end of its float: the share of the screen height its visible box takes, and where
+  if not log.seedShot and t>=tl.FloatEnd-.1 and t<tl.FloatEnd then
+   local st=stage();local sd=st and st:FindFirstChild('RarePullSeed')
+   local c,size;if sd then c,size=L.VisibleBounds(sd)end
+   if c then
+    local eye=cam.CFrame.Position;local tgt=eye+cam.CFrame.LookVector*10;local lo,hi=1,0;local xs={}
+    for _,k in ipairs({{-1,-1,-1},{1,-1,-1},{-1,1,-1},{1,1,-1},{-1,-1,1},{1,-1,1},{-1,1,1},{1,1,1}})do
+     local _,y=L.Project(eye,tgt,cam.FieldOfView,1280/720,c+V3(size.X*k[1],size.Y*k[2],size.Z*k[3])*.5)
+     if y then lo=math.min(lo,y);hi=math.max(hi,y)end
+    end
+    local x,y=L.Project(eye,tgt,cam.FieldOfView,1280/720,c)
+    log.seedShot={Top=lo,Bottom=hi,X=x,Y=y}
+   end
+  end
   local same=X.same(X.base,X.lighting());if not same then log.lightingSame=false end
  end)
  check(M.Active()==nil,tag..': it ends by itself ('..string.format('%.1f',tl.Length)..' s)')
@@ -105,6 +119,11 @@ for rank=6,8 do
  check(log.titleAt and near(log.titleAt,tl.Climax,.1),tag..': the title appears on the hit ('..tostring(log.titleAt)..')')
  check(log.oddsFinalOk,tag..': "'..final..'" after its count-up ('..tostring(log.oddsText)..')')
  check(log.skipHint and log.skipHint>=tl.SkipFrom-.05,tag..': the skip hint appears from '..tl.SkipFrom..' s')
+ do local sh=log.seedShot;local lay=L.Layout(false,false,rank)
+  check(sh and sh.Bottom-sh.Top>=.30 and sh.Bottom-sh.Top<=.5,tag..': the real seed fills the end shot ('..(sh and string.format('%.0f%%',(sh.Bottom-sh.Top)*100)or'-')..' of the height, its visible box)')
+  check(sh and math.abs(sh.X-.5)<.05 and math.abs(sh.Y-.5)<.06,tag..': centred ('..(sh and string.format('%.3f, %.3f',sh.X,sh.Y)or'-')..')')
+  check(sh and sh.Top>=lay.Title.Y+lay.Title.H/2-.005 and sh.Bottom<=lay.Odds.Y-lay.Odds.H/2+.005,tag..': and clear of the title and "1 in N" ('..(sh and string.format('%.3f-%.3f',sh.Top,sh.Bottom)or'-')..' vs '..string.format('%.3f-%.3f',lay.Title.Y+lay.Title.H/2,lay.Odds.Y-lay.Odds.H/2)..')')
+ end
  -- the sounds: routed to Effects, on the beat
  local vs=voices();local routed=#vs>0
  for _,v in ipairs(vs)do if v.SoundGroup~=effects then routed=false end end
@@ -308,14 +327,31 @@ do -- the owner's uploads: on the beat, from their measured lead-in; a pending s
   'the owner\'s riser is entered late so its peak lands ON the silence ('..string.format('%.2f',rl and rl.TimePosition or -1)..' s into the file)')
  check(r and not r.IsPlaying,'and is cut by the silence')
  M.Abort('test')
- check(#Audio.Layers('SecretVault')==2,'a slot still waiting for its upload plays its layered fallback')
- W.RS:FindFirstChild('RarePullSounds'):SetAttribute('SecretVaultId',123456)
- local layers=Audio.Layers('SecretVault');check(#layers==1 and layers[1].Id=='rbxassetid://123456','an id set by the owner (attribute SecretVaultId) replaces the fallback')
- E.resetPlays();run=start(6);tl=run.TL;t0=R.clock;X.run(tl.Unlock+.2)
- local b=voices('SecretVault_1')[1];local bl=b and b.PlayLog[#b.PlayLog]
- check(b and b.SoundId=='rbxassetid://123456'and bl and near(bl.At-t0,tl.Unlock,.05),'and plays on the same beat')
- M.Abort('test');W.RS:FindFirstChild('RarePullSounds'):SetAttribute('SecretVaultId',nil)
- check(#Audio.Layers('SecretVault')==2,'clearing it brings the fallback back')
+ check(#Audio.Layers('SecretDrone')==2,'a slot still waiting for its upload plays its layered fallback')
+ W.RS:FindFirstChild('RarePullSounds'):SetAttribute('SecretDroneId',123456)
+ local layers=Audio.Layers('SecretDrone');check(#layers==1 and layers[1].Id=='rbxassetid://123456','an id set by the owner (attribute SecretDroneId) replaces the fallback')
+ E.resetPlays();run=start(6);tl=run.TL;t0=R.clock;X.run(.3)
+ local b=voices('SecretDrone_1')[1];local bl=b and b.PlayLog[#b.PlayLog]
+ check(b and b.SoundId=='rbxassetid://123456'and bl and near(bl.At-t0,0,.05)and b.Looped,'and plays on the same beat (a loop from the start)')
+ M.Abort('test');W.RS:FindFirstChild('RarePullSounds'):SetAttribute('SecretDroneId',nil)
+ check(#Audio.Layers('SecretDrone')==2,'clearing it brings the fallback back')
+ -- Secret: the owner's glitch as short bursts on every glitch beat and a longer one on the hit; the vault door on the unlock, silent in the silence
+ reset();E.resetPlays();run=start(6);tl=run.TL;t0=R.clock
+ local glitchLen,vaultInSilence={},false
+ local g=nil
+ X.run(tl.Climax+1.5,1/30,function(now)
+  local t=now-t0;g=g or voices('SecretGlitch_1')[1];local v=voices('SecretVault_1')[1]
+  if v and v.IsPlaying and t>tl.Silence+.02 and t<tl.Climax-.01 then vaultInSilence=true end
+  if g then local n=#g.PlayLog;if g.IsPlaying then glitchLen[n]=(glitchLen[n]or 0)+1/30 end end
+ end)
+ local starts={};for _,l in ipairs(g and g.PlayLog or{})do starts[#starts+1]=l.At-t0 end
+ check(g and g.SoundId=='rbxassetid://84688488729958'and g.PlaybackRegionsEnabled and #starts==4 and near(starts[2],tl.Glitch1,.05)and near(starts[3],tl.Glitch2,.05)and near(starts[4],tl.Climax,.05),
+  'Secret: the owner\'s glitch on .25 s, both glitch beats and the hit ('..#starts..' plays)')
+ check((glitchLen[2]or 9)<=.5 and(glitchLen[3]or 9)<=.55 and(glitchLen[4]or 0)>=1.0,'each glitch beat is a short burst, the hit a longer one ('..string.format('%.2f / %.2f / %.2f s',glitchLen[2]or-1,glitchLen[3]or-1,glitchLen[4]or-1)..')')
+ local vault=voices('SecretVault_1')[1];local vl=vault and vault.PlayLog[#vault.PlayLog]
+ check(vault and vault.SoundId=='rbxassetid://102739931931289'and vl and near(vl.At-t0,tl.Unlock,.05)and near(vl.TimePosition-(vl.At-t0-tl.Unlock),.040,.002),'Secret: the owner\'s vault door on the unlock, from its lead-in')
+ check(not vaultInSilence,'and it is silent in the silence before the hit')
+ M.Abort('test')
  -- Cosmic: the owner's supernova boom is the hit (no Impact), its tail rings under the seed; the bed is a slice that leaves the silence clear
  reset();E.resetPlays();run=start(7);tl=run.TL;t0=R.clock
  local padInSilence=false

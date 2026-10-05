@@ -17,11 +17,11 @@ local C=Color3.fromRGB
 -- burst (Quick = opening packs in quick succession). Card: how long the seed card stays after the burst. SeedSize: share of the screen height
 -- the seed's card takes. TitleSize: share of the screen height of the rarity word.
 L.Tiers={
- [1]={Key='Common',Title='COMMON',Hint=C(223,236,242),Glow=C(255,255,255),Deep=C(40,46,52),Font=Enum.Font.FredokaOne,Suspense=.6,Quick=.35,Card=.6,QuickCard=.45,SeedSize=.22,TitleSize=.07,Pulses=1,Heartbeats=0,Push=0,Grade=.12},
- [2]={Key='Uncommon',Title='UNCOMMON',Hint=C(98,235,130),Glow=C(214,255,200),Deep=C(14,52,26),Font=Enum.Font.FredokaOne,Suspense=.7,Quick=.4,Card=.8,QuickCard=.5,SeedSize=.24,TitleSize=.08,Pulses=2,Heartbeats=1,Push=0,Grade=.18},
- [3]={Key='Rare',Title='RARE',Hint=C(91,173,255),Glow=C(214,240,255),Deep=C(10,30,62),Font=Enum.Font.FredokaOne,Suspense=.85,Quick=.5,Card=1.15,QuickCard=.6,SeedSize=.27,TitleSize=.09,Pulses=2,Heartbeats=1,Push=0,Grade=.25},
- [4]={Key='Legendary',Title='LEGENDARY',Hint=C(255,207,89),Glow=C(255,244,190),Deep=C(60,36,4),Font=Enum.Font.LuckiestGuy,Suspense=1.1,Quick=.62,Card=2.4,QuickCard=.9,SeedSize=.31,TitleSize=.105,Pulses=3,Heartbeats=2,Push=5,Grade=.4,Rays=true},
- [5]={Key='Mythic',Title='MYTHIC',Hint=C(230,125,255),Glow=C(150,210,255),Deep=C(40,10,56),Font=Enum.Font.LuckiestGuy,Suspense=1.3,Quick=.75,Card=3.2,QuickCard=1.1,SeedSize=.34,TitleSize=.12,Pulses=4,Heartbeats=3,Push=7,Grade=.55,Rays=true,Shock=true,Letterbox=true},
+ [1]={Key='Common',Title='COMMON',Hint=C(223,236,242),Glow=C(255,255,255),Deep=C(40,46,52),Font=Enum.Font.FredokaOne,Suspense=.6,Quick=.35,Card=.6,QuickCard=.45,SeedSize=.26,TitleSize=.07,Pulses=1,Heartbeats=0,Push=0,Grade=.12},
+ [2]={Key='Uncommon',Title='UNCOMMON',Hint=C(98,235,130),Glow=C(214,255,200),Deep=C(14,52,26),Font=Enum.Font.FredokaOne,Suspense=.7,Quick=.4,Card=.8,QuickCard=.5,SeedSize=.28,TitleSize=.08,Pulses=2,Heartbeats=1,Push=0,Grade=.18},
+ [3]={Key='Rare',Title='RARE',Hint=C(91,173,255),Glow=C(214,240,255),Deep=C(10,30,62),Font=Enum.Font.FredokaOne,Suspense=.85,Quick=.5,Card=1.15,QuickCard=.6,SeedSize=.31,TitleSize=.09,Pulses=2,Heartbeats=1,Push=0,Grade=.25},
+ [4]={Key='Legendary',Title='LEGENDARY',Hint=C(255,207,89),Glow=C(255,244,190),Deep=C(60,36,4),Font=Enum.Font.LuckiestGuy,Suspense=1.1,Quick=.62,Card=2.4,QuickCard=.9,SeedSize=.35,TitleSize=.105,Pulses=3,Heartbeats=2,Push=5,Grade=.4,Rays=true},
+ [5]={Key='Mythic',Title='MYTHIC',Hint=C(230,125,255),Glow=C(150,210,255),Deep=C(40,10,56),Font=Enum.Font.LuckiestGuy,Suspense=1.3,Quick=.75,Card=3.2,QuickCard=1.1,SeedSize=.38,TitleSize=.12,Pulses=4,Heartbeats=3,Push=7,Grade=.55,Rays=true,Shock=true,Letterbox=true},
  [6]={Key='Secret',Title='SECRET',Hint=C(255,119,160),Glow=C(214,170,255),Deep=C(14,4,26),Theme=C(176,112,255),Font=Enum.Font.Sarpanch,SeedSize=.34,TitleSize=.15,Pulses=4,Heartbeats=3,Push=6,Grade=.7,AuraSeconds=15},
  [7]={Key='Cosmic',Title='COSMIC',Hint=C(159,178,255),Glow=C(214,232,255),Deep=C(6,8,30),Theme=C(120,160,255),Font=Enum.Font.Michroma,SeedSize=.34,TitleSize=.15,Pulses=5,Heartbeats=4,Push=6,Grade=.75,AuraSeconds=20},
  [8]={Key='King',Title='KING',Hint=C(255,236,161),Glow=C(255,246,214),Deep=C(48,24,4),Theme=C(255,205,84),Font=Enum.Font.GrenzeGotisch,SeedSize=.34,TitleSize=.16,Pulses=6,Heartbeats=5,Push=6,Grade=.8,AuraSeconds=25},
@@ -29,7 +29,39 @@ L.Tiers={
 L.Neutral=C(255,248,232)
 L.QuickWindow=3 -- a pack opened within this many seconds after the previous reveal ended is a "quick" reveal (shorter suspense and card)
 L.StageOrigin=V(0,2600,0) -- the hidden stage for the Secret / Cosmic / King scenes: far above the map, client-only, built on demand
-L.SeedHeroSize=1.6 -- studs: the seed's biggest side in the scenes
+L.SeedHeroSize=1.8 -- studs: the seed's biggest VISIBLE side in the scenes (RarePullRules.VisibleBounds)
+-- The seed is the hero of every scene's ending (owner: "the seed should be the main focus"): from the hit on, the camera keeps the shot's
+-- angle but frames the seed itself - centred, growing from HeroDiameter.From to .To of the screen height as it floats down (the same share on
+-- desktop and phone: the field of view is vertical). ReducedMotion: one still shot at .Calm.
+L.HeroDiameter={From=.33,To=.39,Calm=.37}
+L.HeroAim=.04 -- the camera aims this share of the seed's size below it, so the seed sits in the middle of the band between title and odds
+function L.HeroDistance(diameter,fov)return L.SeedHeroSize/(diameter*2*math.tan(math.rad(fov)/2))end
+-- The visible box of a model: a part with a Sphere / Brick / Cylinder SpecialMesh shows Size x Scale (+ Offset), not its Size (the seed art is
+-- made of such parts, so GetBoundingBox is ~1.4x too big); other parts their Size. Returns centre (world) and size (world axes), or nil.
+function L.VisibleBounds(model)
+ local lo,hi
+ local corners={V(-1,-1,-1),V(1,-1,-1),V(-1,1,-1),V(1,1,-1),V(-1,-1,1),V(1,-1,1),V(-1,1,1),V(1,1,1)}
+ for _,d in ipairs(model:GetDescendants())do
+  if d:IsA('BasePart')and(d.Transparency or 0)<.99 then
+   local size=d.Size;local cf=d.CFrame
+   local mesh=d:FindFirstChildWhichIsA('SpecialMesh')
+   if mesh then
+    local kind=mesh.MeshType and mesh.MeshType.Name
+    local sc=mesh.Scale
+    if(kind=='Sphere'or kind=='Brick'or kind=='Cylinder')and typeof(sc)=='Vector3'then size=V(size.X*sc.X,size.Y*sc.Y,size.Z*sc.Z)end
+    local off=mesh.Offset;if typeof(off)=='Vector3'then cf=cf*CFrame.new(off)end
+   end
+   local h=size*.5
+   for _,c in ipairs(corners)do
+    local p=cf*V(h.X*c.X,h.Y*c.Y,h.Z*c.Z)
+    lo=lo and V(math.min(lo.X,p.X),math.min(lo.Y,p.Y),math.min(lo.Z,p.Z))or p
+    hi=hi and V(math.max(hi.X,p.X),math.max(hi.Y,p.Y),math.max(hi.Z,p.Z))or p
+   end
+  end
+ end
+ if not lo then return nil end
+ return(lo+hi)*.5,hi-lo
+end
 L.PackHeroHeight=2.6 -- studs: the pack's height in the scenes
 L.OddsPrefix='1 in '
 L.SceneCountDelay=.3 -- the story scenes: "1 in N" starts counting this long after the hit (the seed has risen clear of it)
@@ -177,8 +209,7 @@ L.Shots={
 }
 local function keyTime(tl,k)return(tl[k.Beat]or 0)+(k.Offset or 0)end
 -- Eye, target (stage-local Vector3) and FieldOfView at time t.
-function L.Shot(rank,variant,t,tl)
- tl=tl or L.Timeline(rank,variant)
+local function keyedShot(rank,tl,t)
  local keys=L.Shots[rank][tl.Variant=='Calm'and'Calm'or'Full']
  local first=keys[1]
  if t<=keyTime(tl,first)then return first.Eye,first.Target,first.Fov end
@@ -191,6 +222,23 @@ function L.Shot(rank,variant,t,tl)
   end
  end
  local last=keys[#keys];return last.Eye,last.Target,last.Fov
+end
+function L.Shot(rank,variant,t,tl)
+ tl=tl or L.Timeline(rank,variant)
+ local eye,target,fov=keyedShot(rank,tl,t)
+ if t<tl.Climax then return eye,target,fov end
+ -- the hero shot: the keyed angle, the seed framed (Full: blends in over .3 s and follows it down; Calm: one still shot from the hit)
+ local dir=(eye-target).Unit
+ if tl.Variant=='Calm'then
+  local rest=L.Points[rank].Seed0-V(0,L.SeedHeroSize*L.HeroAim,0)
+  return rest+dir*L.HeroDistance(L.HeroDiameter.Calm,fov),rest,fov
+ end
+ local seed=L.SeedPose(rank,tl,t,true)-V(0,L.SeedHeroSize*L.HeroAim,0)
+ local k=smooth((t-tl.Climax)/math.max(.01,tl.FloatEnd-tl.Climax))
+ local dia=L.HeroDiameter.From+(L.HeroDiameter.To-L.HeroDiameter.From)*k
+ local w=smooth((t-tl.Climax)/.3)
+ local heroEye=seed+dir*L.HeroDistance(dia,fov)
+ return eye:Lerp(heroEye,w),target:Lerp(seed,w),fov
 end
 -- Where the stars are: the pack (centre, stage-local), its spin (radians), its visibility; the seed; the King's crown; the Cosmic star.
 L.Points={
@@ -226,7 +274,8 @@ function L.PackPose(rank,tl,t)
  return pos,yaw,roll,alpha,shake
 end
 -- The seed: position, alpha (0 before the climax) and glow (the Cosmic star around it, 1 = all star).
-function L.SeedPose(rank,tl,t)
+-- (still=true: without the little bob, for the camera that follows the seed)
+function L.SeedPose(rank,tl,t,still)
  local P=L.Points[rank]
  if t<tl.Climax then return P.Seed0,0,0 end
  local calm=tl.Variant=='Calm'
@@ -242,11 +291,11 @@ function L.SeedPose(rank,tl,t)
  end
  local start=rank==7 and tl.StarIn or tl.Rise
  if t>start then
-  -- (ReducedMotion: a shorter float, so the seed stays framed by the still camera)
-  local f=smooth((t-start)/math.max(.01,tl.FloatEnd-start))*(calm and .45 or 1)
+  -- (ReducedMotion: the seed rests where the still hero shot frames it)
+  local f=smooth((t-start)/math.max(.01,tl.FloatEnd-start))*(calm and 0 or 1)
   pos=P.Seed0:Lerp(P.Seed1,f)
  end
- if not calm then pos=pos+V(0,.05*math.sin(t*2.1),0)end
+ if not calm and not still then pos=pos+V(0,.05*math.sin(t*2.1),0)end
  return pos,clamp01((t-tl.Climax)/.08),glow
 end
 function L.SeedYaw(t,reduced)return reduced and math.sin(t*.4)*.25 or t*.75 end
@@ -312,7 +361,8 @@ function L.Layout(phone,compact,rank)
  end
  local bar=phone and .07 or .085
  local th=tier.TitleSize;local sh=tier.SeedSize
- return {Bar=bar,Title={Y=.30-th*.62,H=th},Seed={Y=.5,H=sh},Odds={Y=.745,H=.085},Name={Y=.825,H=.05}}
+ -- the title just under the letterbox, "1 in N" and the name low: the middle band (about .25-.74 of the height) is the seed's
+ return {Bar=bar,Title={Y=bar+th/2+.012,H=th},Seed={Y=.5,H=sh},Odds={Y=.78,H=.08},Name={Y=.85,H=.045}}
 end
 -- Projection of a stage point for a camera (eye, target, vertical fov in degrees, aspect = width / height) -> screen x, y (0..1), depth.
 function L.Project(eye,target,fov,aspect,point)
@@ -352,15 +402,17 @@ function L.SceneCues(rank,tl)
    add(math.max(0,tl.Climax-1.1),'Riser',{Until=tl.Silence,Volume=.8});add(tl.SuckIn,'SuckIn',{Until=tl.Silence,Volume=.7})
   end
   add(tl.Climax,'PackBurst');if rank~=7 then add(tl.Climax,'Impact')end;add(tl.Climax,'GroundImpact',{Volume=.6})
-  add(tl.Climax,rank==8 and'KingFanfare'or rank==7 and'CosmicBoom'or'SecretGlitch')
+  add(tl.Climax,rank==8 and'KingFanfare'or rank==7 and'CosmicBoom'or'SecretGlitch',rank==6 and{Until=tl.Climax+1.2,FadeOut=.3}or nil)
   add(tl.Odds,'TitleSlam');add(tl.Odds+.15,'Sparkle')
  elseif rank==6 then
   add(0,'SecretDrone',{Until=tl.Silence,FadeIn=.4,FadeOut=.06})
   add(tl.SceneIn,'SecretWhisper',{Until=tl.Silence,FadeIn=.6,FadeOut=.1})
-  add(.25,'SecretGlitch',{Pitch=1.1,Volume=.6});add(tl.Glitch1,'SecretGlitch');add(tl.Glitch2,'SecretGlitch',{Pitch=.85,Volume=1.2})
-  add(tl.Lock,'PackShake',{Pitch=.7});add(tl.Lock+.22,'PackShake',{Pitch=.75});add(tl.Unlock,'SecretVault')
+  -- each glitch beat is a short burst of the glitch sound; the vault door is cut (faded) by the silence
+  add(.25,'SecretGlitch',{Pitch=1.1,Volume=.6,Until=.25+.4,FadeOut=.08});add(tl.Glitch1,'SecretGlitch',{Until=tl.Glitch1+.45,FadeOut=.08})
+  add(tl.Glitch2,'SecretGlitch',{Pitch=.85,Volume=1.2,Until=tl.Glitch2+.5,FadeOut=.1})
+  add(tl.Lock,'PackShake',{Pitch=.7});add(tl.Lock+.22,'PackShake',{Pitch=.75});add(tl.Unlock,'SecretVault',{Until=tl.Silence,FadeOut=.12})
   add(tl.Shudder,'PackShake',{Pitch=1.1});add(tl.Lock,'Riser',{Until=tl.Silence});add(tl.SuckIn,'SuckIn',{Until=tl.Silence})
-  add(tl.Climax,'Impact');add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst');add(tl.Climax,'SecretGlitch',{Pitch=.7,Volume=1.3})
+  add(tl.Climax,'Impact');add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst');add(tl.Climax,'SecretGlitch',{Pitch=.7,Volume=1.3,Until=tl.Climax+1.2,FadeOut=.3})
   add(tl.Odds,'TitleSlam');add(tl.Rise+.1,'Sparkle');add((tl.Rise+tl.FloatEnd)/2,'Sparkle',{Pitch=.9})
  elseif rank==7 then
   add(0,'CosmicPad',{Until=tl.Silence,FadeIn=.6,FadeOut=.3});add(tl.Climax+.15,'CosmicPad',{Until=tl.Back,FadeIn=.8,FadeOut=.5,Volume=.55})

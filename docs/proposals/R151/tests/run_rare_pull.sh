@@ -47,9 +47,10 @@ assert not new,'sound ids not used anywhere else in the game: %s'%new
 sl=open(os.path.join(src,'ReplicatedStorage/RarePullSounds.lua')).read()
 owner=set(re.findall(r"Id=(\d+)",sl))
 confirmed={'126242461105018','133616032782359','100663216159686','130581466623902','115669680103388','103090716252123','104885054288395','120422004598250',
- '71607900050825','77199097157197','110440649150958','120548831466483','119158277815268','75435110351652','100732233406279'} # the owner's uploads: 8 shared + 3 King + 4 Cosmic
+ '71607900050825','77199097157197','110440649150958','120548831466483','119158277815268','75435110351652','100732233406279',
+ '84688488729958','102739931931289'} # the owner's uploads: 8 shared + 3 King + 4 Cosmic + 2 Secret
 assert owner==confirmed,'slot ids are not exactly the owner\'s confirmed uploads: %s'%sorted(owner)
-print('ok: the fallback sounds use only the game\'s existing sounds (%d ids); the slots carry exactly the owner\'s 15 confirmed uploads (8 shared, 3 King, 4 Cosmic)'%len(ids))
+print('ok: the fallback sounds use only the game\'s existing sounds (%d ids); the slots carry exactly the owner\'s 17 confirmed uploads (8 shared, 3 King, 4 Cosmic, 2 Secret)'%len(ids))
 PY
 # Lighting is never written by the reveal (its grade / blur live on the Camera)
 if grep -nE "Lighting\.|GetService\('Lighting'\)|GetService\(\"Lighting\"\)" "$S/ReplicatedStorage/RarePullCinematic.lua" "$S/ReplicatedStorage/RarePullCard.lua" "$S/ReplicatedStorage/RarePullScenes.lua" "$S/ReplicatedStorage/RarePullWorld.lua" "$S/ReplicatedStorage/PackSuspense.lua";then echo "FAIL: a reveal module touches Lighting";exit 1;fi

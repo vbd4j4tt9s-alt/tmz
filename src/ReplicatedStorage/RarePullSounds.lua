@@ -46,8 +46,11 @@ S.Slots={
                                                      -- (short twinkles), the falling star resolving into the seed (rings under it)
  -- Secret ----------------------------------------------------------------------------------------------------------------------
  SecretDrone={Id=nil,Volume=.3,Pitch=1,Start=nil,Loop=true}, -- the low drone / heartbeat of the void (loop)
- SecretGlitch={Id=nil,Volume=.35,Pitch=1,Start=nil}, -- the pack glitching (digital stutter; <.4 s)
- SecretVault={Id=nil,Volume=.5,Pitch=1,Start=nil},   -- the lock turning and the pack cracking open like a vault (ideal 1-1.5 s)
+ -- (R151 owner uploads, measured from the owner's files; SecretDrone / SecretWhisper stay on the layered fallback)
+ SecretGlitch={Id=84688488729958,Volume=1.3,Pitch=1,Start=.242,Region={.242,1.642}}, -- "glitch sound effect HD" 3.10 s (quiet, so a high
+                                                     -- Volume): each glitch beat plays a short burst of it (its cue cuts it), the hit a longer one
+ SecretVault={Id=102739931931289,Volume=.3,Pitch=1,Start=.040}, -- "heavy door unlocking" 2.11 s (LOUD, so lower): the lock plates open; cut
+                                                     -- (faded) by the silence before the hit
  SecretWhisper={Id=nil,Volume=.2,Pitch=1,Start=nil,Loop=true}, -- optional eerie whisper / wind under the void (loop)
 }
 S.Order={'Riser','SuckIn','Impact','GroundImpact','TitleSlam','Sparkle','PackShake','PackBurst','Heartbeat','AuraHum','KingChoir','KingFanfare','KingBell',
