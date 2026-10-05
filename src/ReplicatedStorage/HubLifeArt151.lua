@@ -1,14 +1,15 @@
--- R151 Seed Festival Square, client half ("life"): trees, bushes, topiary, flower beds, verges, lamps, benches, signposts, bunting, the
--- Seed Fountain, wall lanterns, grass patches, pebbles and butterflies, built on each player's screen by HubLife151.client.
+-- R151 Seed Festival Square, client half ("life"): trees, bushes, topiary, flower beds, verges, lamps, benches, bunting,
+-- wall lanterns, grass patches, pebbles and butterflies, built on each player's screen by HubLife151.client. (R152: no Seed Fountain, no
+-- signposts, a third of the trees: the square's plaza at the south end is an open space.)
 -- Owner (approving the design): "polish the trees, give them more variety and the stuff and everything". So every prop comes in species /
 -- variants, and each instance gets its own deterministic variation (scale, lean, turn, colour shade, canopy layering) from a seed made of
 -- its kind and position: every client builds the same square, and no two trees look cloned.
 -- Owner (R151, later): "make sure they are studded" - the trees, bushes and topiary are studded Plastic blocks, and the owner's studded tree
 -- models (ReplicatedStorage.HubTreeTemplates151) take the leafy slots when they are there (HubStudTrees151).
 -- Detail levels (A.Build puts every part in a per-cell Folder of its level, the client shows / hides those Folders by distance):
---   core    silhouettes seen from anywhere: trunks and main crowns, lamps, benches, signposts, the fountain, grass patches
+--   core    silhouettes seen from anywhere: trunks and main crowns, lamps, benches, grass patches
 --   detail  within ~230 studs and device tier >= 2: extra crown layers, flowers, pots, pebbles, bunting, wall lanterns
---   fine    within ~130 studs and tier 3: butterflies, blossom petals, fountain sparkles, small extras
+--   fine    within ~130 studs and tier 3: butterflies, blossom petals, small extras
 -- Nothing here collides or can be touched / queried; nothing stands on a street, a base, the run-up, the market, Verity or the reserved
 -- back corners (R151 displays) - A.Clear(x, z, r) checks it.
 local RS=game:GetService('ReplicatedStorage')
@@ -46,6 +47,7 @@ function A.Clear(x,z,r,bases,allowPaving)
  r=r or 0
  if math.abs(x)>333-r or z>-106+r or z<-616+r then return false,'wall'end
  if K.InReserved(x,z,r)then return false,'reserved'end
+ for _,o in ipairs(K.Open)do if(x-o[1])^2+(z-o[2])^2<(o[3]+r)^2 then return false,'open'end end -- (R152: the free Void Pack pedestal's plaza)
  if z>-152-r and math.abs(x)<92+r then return false,'run-up'end
  for _,b in ipairs(BLOCKED)do if x>b[1]-r and x<b[2]+r and z>b[3]-r and z<b[4]+r then return false,'blocked'end end
  if (x*x+(z+340)^2)<(16+r)^2 then return false,'verity'end
@@ -62,7 +64,7 @@ end
 
 -- The builder context: parts go into per-cell level folders; levels above the tier are skipped -----------------------------------------------
 local function context(root,tier)
- local ctx={Root=root,Tier=tier,Cells={},Counts={core=0,detail=0,fine=0},Lights={},LightAt={},Heads={},Emitters={},Butterflies={},Signs={},Lanterns={},Fountain=nil,Templated={},TemplateParts=0}
+ local ctx={Root=root,Tier=tier,Cells={},Counts={core=0,detail=0,fine=0},Lights={},LightAt={},Heads={},Emitters={},Butterflies={},Lanterns={},Templated={},TemplateParts=0}
  function ctx.Folder(level,x,z)
   if A.LevelOf[level]>ctx.Tier then return nil end
   local cx,cz=math.floor(x/A.CellSize),math.floor(z/A.CellSize);local key=cx..':'..cz
@@ -342,28 +344,6 @@ function A.Bench(ctx,x,z,yaw,kind)
  for _,sx in ipairs({-1,1})do ctx.Part('core',x,z,'Bench leg',V(.5,1.8,1.7),c*CF(sx*2.5,.9,.05),P.Metal,Mat.Metal)end
  if kind=='garden'then for _,sx in ipairs({-1,1})do ctx.Ball('detail',x,z,'Bench knob',.6,(c*CF(sx*3,4.2,1.05)).Position,P.Gold)end end
 end
--- Signposts: wooden arrows or a stone pillar; the boards' texts are kept so the client can show the owners' names.
-function A.Signpost(ctx,x,z,boards,kind)
- if kind=='stone'then
-  ctx.Part('core',x,z,'Signpost pillar',V(1.6,13,1.6),CF(x,FLOOR+6.5,z),{214,204,186},Mat.Slate)
-  ctx.Ball('core',x,z,'Signpost cap',2.2,V(x,FLOOR+13.6,z),P.Gold)
- else
-  ctx.VCyl('core',x,z,'Signpost pole',.9,FLOOR,FLOOR+15,x,z,P.WoodDark,Mat.Wood)
-  ctx.Ball('core',x,z,'Signpost cap',1.6,V(x,FLOOR+15.4,z),P.Gold)
- end
- for i,b in ipairs(boards)do
-  local y=FLOOR+(kind=='stone'and 11.8 or 13.4)-(i-1)*2.4
-  local cf=CF(x,y,z)*CFrame.Angles(0,b.Yaw,0)*CF(4.6,0,0)
-  local board=ctx.Part('core',x,z,'Sign board',V(9,1.9,.4),cf,b.Color or P.Cream,Mat.SmoothPlastic)
-  if board then
-   ctx.Wedge('detail',x,z,'Sign tip',V(.4,1.9,1.2),K.Frame((cf*CF(5.1,0,0)).Position,cf.UpVector,-cf.RightVector),b.Color or P.Cream,Mat.SmoothPlastic)
-   for _,face in ipairs({Enum.NormalId.Front,Enum.NormalId.Back})do
-    local gui=K.Label(board,face,b.Text,{ink=b.Ink or{60,40,30},stroke={255,255,255},strokeT=.6,pps=24,maxDistance=220})
-    if b.Owner then table.insert(ctx.Signs,{Line=gui.Line1,Base=b.Owner,Other=b.Other})end
-   end
-  end
- end
-end
 function A.Bunting(ctx,a,b,colours,spacing)
  local mid=(a+b)/2
  ctx.Rod('detail',mid.X,mid.Z,'Bunting line',a,b,.15,{250,250,250})
@@ -372,58 +352,6 @@ function A.Bunting(ctx,a,b,colours,spacing)
  for k=1,n-1 do local t=k/n;local p=a:Lerp(b,t)-V(0,math.sin(t*math.pi)*2.2,0)
   ctx.Wedge('detail',mid.X,mid.Z,'Pennant',V(.12,1.8,1.8),CFrame.fromMatrix(p,-side,V(0,1,0))*CFrame.Angles(math.rad(45),0,0),colours[(k-1)%#colours+1],Mat.Fabric,{shadow=false})
  end
-end
-
--- The Seed Fountain: basin, rim, water, column, bowl, a jet holding up a giant seed pack, spouts with water arcs, ripple rings, sparkles.
-function A.Fountain(ctx,x,z)
- local y=4.26;local F={}
- ctx.VCyl('core',x,z,'Fountain wall',22,y-.3,y+2.4,x,z,P.Plaster,Mat.Plaster)
- ctx.VCyl('core',x,z,'Fountain rim',23,y+2.4,y+2.9,x,z,P.Gold)
- ctx.VCyl('core',x,z,'Fountain water',20.4,y+2.9,y+3.0,x,z,P.Water,Mat.Glass,{t=.15})
- ctx.VCyl('core',x,z,'Fountain column',3.2,y+3.0,y+8.6,x,z,P.Pilaster,Mat.Plaster)
- ctx.VCyl('core',x,z,'Fountain bowl',10,y+8.6,y+10.2,x,z,P.Plaster,Mat.Plaster)
- ctx.VCyl('core',x,z,'Fountain bowl rim',10.8,y+10.2,y+10.6,x,z,P.Gold)
- ctx.VCyl('core',x,z,'Fountain bowl water',9.2,y+10.6,y+10.7,x,z,P.Water,Mat.Glass,{t=.15})
- F.Jet=ctx.VCyl('core',x,z,'Fountain jet',1.2,y+10.7,y+15.4,x,z,{200,236,255},Mat.Glass,{t=.35})
- F.JetBase=F.Jet and F.Jet.CFrame;F.JetSize=F.Jet and F.Jet.Size
- F.Center=V(x,y,z)
- for a=0,3 do local ang=a*math.pi/2+math.pi/4
-  local sx,sz=x+math.cos(ang)*8.4,z+math.sin(ang)*8.4
-  ctx.VCyl('detail',x,z,'Fountain spout',1.2,y+2.9,y+4.6,sx,sz,P.Gold)
-  -- a water arc from the spout toward the column (two glass rods)
-  local p0=V(sx,y+4.6,sz);local p2=V(x+math.cos(ang)*4,y+3.05,z+math.sin(ang)*4);local p1=(p0+p2)/2+V(0,1.6,0)
-  ctx.Rod('detail',x,z,'Water arc',p0,p1,.45,{200,236,255},Mat.Glass,{t=.35});ctx.Rod('detail',x,z,'Water arc',p1,p2,.45,{200,236,255},Mat.Glass,{t=.35})
- end
- F.Ripples={}
- for i=1,2 do local r=ctx.VCyl('fine',x,z,'Ripple',12+i*3,y+3.0,y+3.06+i*.05,x,z,{230,248,255},Mat.Glass,{t=.55,shadow=false});if r then table.insert(F.Ripples,r)end end
- local packAt=CF(x,y+19,z)
- local ok,model=pcall(function()
-  local m=require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.new(),nil,1,nil,5,'Pack06',1,1,'None')
-  for _,d in ipairs(m:GetDescendants())do
-   if d:IsA('BasePart')then d.Anchored=true;d.CanCollide=false;d.CanTouch=false;d.CanQuery=false
-   elseif d:IsA('Script')or d:IsA('LocalScript')or d:IsA('Sound')or d:IsA('JointInstance')or d:IsA('WeldConstraint')then d:Destroy()end
-  end
-  local _,size=m:GetBoundingBox();local k=6.6/math.max(size.X,size.Y,size.Z,.1);m:ScaleTo(m:GetScale()*k)
-  m.Name='Seed pack';m:PivotTo(packAt);m.Parent=ctx.Folder('core',x,z);return m
- end)
- if ok and model then F.Pack=model;F.PackBase=packAt
- else -- a part-built packet (the approved pack mesh is missing, e.g. in tests)
-  local pk=ctx.Part('core',x,z,'Seed pack',V(5.2,6.6,1.8),packAt,{120,92,214},Mat.SmoothPlastic)
-  if pk then
-   ctx.Part('detail',x,z,'Seed pack seal',V(5.4,.6,2),packAt*CF(0,3.1,0),P.Gold,Mat.SmoothPlastic)
-   K.Label(pk,Enum.NormalId.Front,{'🌱','SEED','PACK'},{weights={.4,.3,.3},ink={255,240,190},pps=24})
-   K.Label(pk,Enum.NormalId.Back,{'🌱','SEED','PACK'},{weights={.4,.3,.3},ink={255,240,190},pps=24})
-   F.Pack=pk;F.PackBase=packAt
-  end
- end
- local host=ctx.Part('fine',x,z,'Sparkle source',V(4,.2,4),CF(x,y+15,z),{255,255,255},Mat.SmoothPlastic,{t=1,shadow=false})
- if host then
-  local pe=Instance.new('ParticleEmitter');pe.Name='Fountain sparkles';pe.Rate=5;pe.Lifetime=NumberRange.new(1,1.8);pe.Speed=NumberRange.new(2,4)
-  pe.Color=ColorSequence.new(RGB(220,244,255));pe.Size=NumberSequence.new(.3);pe.LightEmission=.6;pe.Enabled=false;pe.Parent=host
-  table.insert(ctx.Emitters,pe)
- end
- ctx.Fountain=F
- return F
 end
 
 -- Grass patches (two heights, never overlapping at the same height), pebbles, butterflies, wall lanterns, base verges and pots.
@@ -470,24 +398,18 @@ end
 -- topiary field true = a pot standing on the market square's paving by design)
 A.Layout={
  trees={
-  -- welcome lawns and the north islands
-  {'blossom',28,-190,'pink'},{'blossom',-28,-190,'white'},{'oak',96,-184,'L'},{'oak',-96,-184,'L'},{'oak',94,-224,'M'},{'oak',-94,-224,'M'},
-  {'leafy',60,-226,'fresh'},{'leafy',-60,-226,'deep'},{'poplar',104,-200},{'poplar',104,-212},{'poplar',-104,-200},{'poplar',-104,-212},
-  {'oak',134,-136,'M'},{'oak',-134,-136,'M'},{'blossom',100,-142,'lilac'},{'blossom',-100,-142,'pink'},{'oak',26,-222,'S'},{'oak',-26,-222,'S'},
-  -- beside the market square
-  {'leafy',84,-250,'lime'},{'leafy',-84,-250,'fresh'},{'oak',84,-300,'M'},{'oak',-84,-300,'L'},{'leafy',70,-276,'sage'},{'leafy',-70,-276,'lime'},
-  {'poplar',100,-262},{'poplar',-100,-262},
-  -- round the stage and the fountain
-  {'blossom',62,-330,'lilac'},{'blossom',-62,-330,'pink'},{'oak',92,-372,'L'},{'oak',-92,-372,'M'},{'oak',40,-392,'S'},{'oak',-40,-392,'S'},
-  {'poplar',96,-340},{'poplar',-96,-340},{'leafy',72,-392,'fresh'},{'leafy',-72,-392,'sage'},{'blossom',34,-366,'white'},{'blossom',-34,-360,'lilac'},
-  -- Desert garden (+X alley): palms, saguaros, barrel cacti
-  {'palm',170,-252},{'palm',262,-252},{'palm',220,-286},{'palm',300,-286},{'palm',196,-288},
-  {'cactus',240,-252,'saguaro'},{'cactus',285,-251,'barrel'},{'cactus',182,-288,'barrel'},{'cactus',252,-287,'saguaro'},
-  -- Lava garden (-X alley): ember trees and glowing rocks
-  {'ember',-170,-252},{'ember',-220,-286},{'ember',-262,-252},{'ember',-300,-286},{'ember',-196,-251},
-  {'rock',-195,-287},{'rock',-245,-252},{'rock',-285,-251},{'rock',-160,-288},
-  -- Snow lane between Bases 5 and 6
-  {'pine',-8.7,-440,.55},{'pine',8.7,-470,.55},{'pine',-8.7,-500,.55},{'pine',8.7,-530,.55},{'pine',-8.7,-560,.5},{'pine',8.7,-585,.5},
+  -- R152 (owner: "reduce the amount of trees"): 24 of the 62 stay. They frame the square - the front corners by the gate, the lawns' outer
+  -- edges, the market's sides, the south corners, the garden alleys' ends, the snow lane's far end; the middle, the streets and the
+  -- lanes in front of the bases are clear (the welcome lawns by the gate first: the layout's order is the owner's models' order)
+  {'oak',134,-136,'M'},{'oak',-134,-136,'M'},{'blossom',100,-142,'lilac'},{'blossom',-100,-142,'pink'},{'oak',96,-184,'L'},{'oak',-96,-184,'L'},
+  {'oak',84,-300,'M'},{'oak',-84,-300,'L'},{'poplar',100,-262},{'poplar',-100,-262},
+  {'oak',92,-372,'L'},{'oak',-92,-372,'M'},{'leafy',72,-392,'fresh'},{'leafy',-72,-392,'sage'},
+  -- Desert garden (+X alley): palms and a saguaro
+  {'palm',170,-252},{'palm',262,-252},{'palm',300,-286},{'cactus',240,-252,'saguaro'},
+  -- Lava garden (-X alley): ember trees and a glowing rock
+  {'ember',-170,-252},{'ember',-262,-252},{'ember',-300,-286},{'rock',-245,-252},
+  -- Snow lane between Bases 5 and 6: the two pines at its far end
+  {'pine',-8.7,-560,.5},{'pine',8.7,-585,.5},
  },
  bushes={
   {84,-172},{-84,-172},{20,-196},{-20,-196},{137,-290},{-137,-290},{137,-248},{-137,-248},{100,-320},{-100,-320},{58,-374},{-58,-374},
@@ -504,7 +426,7 @@ A.Layout={
   {30,-400,'post'},{-30,-400,'post'},{140,-257,'post'},{-140,-257,'post'},
   {200,-279,'bollard'},{260,-259,'bollard'},{-200,-279,'bollard'},{-260,-259,'bollard'},
  },
- benches={{12.4,-379.6,'wood'},{-12.4,-379.6,'wood'},{12.4,-404.4,'stone'},{-12.4,-404.4,'stone'},
+ benches={ -- (R152: the four benches round the fountain are gone with it)
   {306,-258,0,'garden'},{306,-280,math.pi,'garden'},{-306,-258,0,'garden'},{-306,-280,math.pi,'garden'},
   {75,-200,math.pi/2,'wood'},{-75,-200,-math.pi/2,'wood'},{44,-275,math.pi/2,'garden'},{-44,-275,-math.pi/2,'garden'},{0,-588,math.pi,'stone'}},
  bunting={{{-15.4,17.4,-200},{15.4,17.4,-228},'rainbow'},{{15.4,17.4,-200},{-15.4,17.4,-228},'rainbow'},
@@ -513,7 +435,7 @@ A.Layout={
   {62,-205,16,1,1},{-62,-205,16,2,1},{78,-215,9,2,2},{-78,-195,9,1,2},{88,-282,13,1,1},{-88,-282,13,2,1},{82,-368,15,2,1},{-82,-368,15,1,1},
   {124,-134,9,1,1},{-124,-134,9,2,1},{232,-286,8,3,1},{276,-252,7,3,2},{-232,-286,8,4,1},{-276,-252,7,4,2},
  },
- butterflies={{60,8,-196},{-60,9,-198},{36,7,-252},{-36,8,-300},{118,8,-161},{-118,7,-409},{8,9,-380},{20,10,-372},{312,8,-266},{-312,8,-272},{0,7,-592},{90,9,-240}},
+ butterflies={{60,8,-196},{-60,9,-198},{36,7,-252},{-36,8,-300},{118,8,-161},{-118,7,-409},{70,8,-382},{-70,9,-376},{312,8,-266},{-312,8,-272},{0,7,-592},{90,9,-240}},
 }
 A.LayoutFns={}
 -- The tree slots in layout order (HubStudTrees151.Plan fills the leafy ones with the owner's models in this order).
@@ -539,9 +461,9 @@ function A.OrderLights(ctx)
  ctx.Lights=order
  return order
 end
--- Build everything for a device tier (1..3). bases: {[i]={Frame=CFrame, Size=Vector3, Color=Color3}}; owners(i) -> name or nil;
+-- Build everything for a device tier (1..3). bases: {[i]={Frame=CFrame, Size=Vector3, Color=Color3}};
 -- templates: HubStudTrees151.Collect's list (the owner's studded tree models; nil or empty = the part-built studded trees).
-function A.Build(root,tier,bases,owners,templates)
+function A.Build(root,tier,bases,templates)
  local ctx=context(root,tier)
  ctx.Bases=bases
  local L=A.Layout
@@ -558,11 +480,7 @@ function A.Build(root,tier,bases,owners,templates)
  for _,t in ipairs(L.topiary)do A.Topiary(ctx,t[1],t[2],t[3])end
  for _,l in ipairs(L.lamps)do A.Lamp(ctx,l[1],l[2],l[3],l[4],l[5])end
  A.OrderLights(ctx)
- for _,b in ipairs(L.benches)do
-  if #b==3 then -- around the fountain: face its middle
-   local yaw=math.atan2(-b[1],-(b[2]+392));A.Bench(ctx,b[1],b[2],yaw+math.pi,b[3])
-  else A.Bench(ctx,b[1],b[2],b[3],b[4])end
- end
+ for _,b in ipairs(L.benches)do A.Bench(ctx,b[1],b[2],b[3],b[4])end
  for _,b in ipairs(L.bunting)do A.Bunting(ctx,V(b[1][1],b[1][2],b[1][3]),V(b[2][1],b[2][2],b[2][3]),BUNTING[b[3]])end
  for _,p in ipairs(L.patches)do A.Patch(ctx,p[1],p[2],p[3],PATCH_COLOURS[p[4]],p[5]==1 and 4.07 or 4.12)end
  -- pebbles along the outer edges of the side streets and the garden walks
@@ -570,26 +488,10 @@ function A.Build(root,tier,bases,owners,templates)
   for _,z in ipairs({-222,-320,-386})do A.Pebbles(ctx,sx*131,z,3,1.6,'s')end
   for _,x in ipairs({160,215,250,290})do A.Pebbles(ctx,sx*x,-279.5,2,1.2,'g');A.Pebbles(ctx,sx*(x+12),-258.5,2,1.2,'g')end
  end
- -- signposts (the base boards show the owners' names, kept fresh by the client)
- local function own(i)return(owners and owners(i))or('Base '..i)end
- A.Signpost(ctx,19,-171,{{Yaw=math.rad(-90),Text='THE TRACK',Color={255,236,180}},{Yaw=math.rad(90),Text='MARKET',Color={190,236,226}},
-  {Yaw=math.pi,Text=own(1)..' · '..own(3),Color={255,214,214},Owner=1,Other=3},{Yaw=0,Text=own(2)..' · '..own(4),Color={214,226,255},Owner=2,Other=4}},'wood')
- A.Signpost(ctx,-34,-372,{{Yaw=math.rad(-90),Text='THE TRACK',Color={255,236,180}},{Yaw=math.rad(90),Text='SEED FOUNTAIN',Color={200,236,255}},
-  {Yaw=math.pi,Text=own(5),Color={214,255,226},Owner=5},{Yaw=0,Text=own(6),Color={255,226,200},Owner=6}},'stone')
- A.Fountain(ctx,0,-392)
  for i,b in pairs(bases or{})do
-  A.Verge(ctx,b,i)
-  -- potted topiary either side of the spur's street end
-  local top=b.Frame*CF(0,b.Size.Y/2,0);local look=top.LookVector*-1
-  if math.abs(look.X)>.5 then
-   local x=(top.Position.X>0 and 1 or-1)*131;for _,dz in ipairs({-18.2,18.2})do A.Topiary(ctx,x,top.Position.Z+dz,'ball',{b.Color.R*255,b.Color.G*255,b.Color.B*255})end
-  else
-   for _,dx in ipairs({-18.4,18.4})do A.Topiary(ctx,top.Position.X+dx,-420.4,'cone',{b.Color.R*255,b.Color.G*255,b.Color.B*255})end
-  end
+  A.Verge(ctx,b,i) -- (R152: no potted topiary guarding the spur's street end any more: nothing gate-like at a base)
  end
- for _,m in ipairs(K.Murals)do local sec=K.Sections[m.Sec];local s=K.SOf(sec,m.W)
-  for _,ds in ipairs({-28.5,28.5})do A.WallLantern(ctx,sec,s+ds,K.WallTop)end
- end
+ for _,l in ipairs(K.WallLanterns)do local sec=K.Sections[l.Sec];A.WallLantern(ctx,sec,K.SOf(sec,l.W),K.WallTop)end
  local wings={{255,140,60},{255,230,90},{120,200,255},{240,130,230},{255,255,255}}
  for k,p in ipairs(L.butterflies)do A.Butterfly(ctx,p[1],p[2],p[3],wings[(k-1)%#wings+1],k)end
  for _,cell in pairs(ctx.Cells)do cell.Center=cell.N>0 and cell.Sum/cell.N or V(0,0,0)end
