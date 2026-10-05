@@ -16,6 +16,9 @@ local pg=R.new('PlayerGui');pg.Name='PlayerGui';pg.Parent=player
 W.service('Debris').AddItem=function(_,o,t)R.task.delay(t,function()o:Destroy()end)end
 local workspace=W.workspace;local CS=W.CS
 R.clock=20000*86400+3600
+-- R150: the pedestal's fx and spin only run for pedestals the camera can see: the player stands 32 studs away looking at the pedestal (the mock's own camera looks the other way).
+local function lookAtPedestal()return R.CFrame.lookAt(R.Vector3.new(0,20,-30),R.Vector3.new(0,9,0))end
+W.workspace.CurrentCamera.CFrame=lookAtPedestal()
 local M=W.module('MysteryPackRules');local D=W.module('DailyRewards')
 local function adv(seconds)for _=1,math.floor(seconds/.5+.5)do R.advance(.5)end end
 local function pedestal(name,attrs,withPrompt)
@@ -77,7 +80,8 @@ check(minePrompt.Enabled==true,'the prompt turns on for the owner')
 check(bursts()==b0+1,'a burst of light when MY pack unlocks (Locked -> Ready)')
 local ring=lastBurst()
 check(ring and rgb(ring.Color,255,214,90)and near(ring.Size.Y,16,1e-9)and ring.Shape==R.Enum.PartType.Cylinder and ring.Anchored and not ring.CanCollide and not ring.CanQuery and not ring.CanTouch,'a big gold ring, anchored and not solid')
-check(ring and near(ring.Position.Y,9,1e-9)and near(ring.Position.X,0,1e-9),'around the pack anchor')
+local padY=9-(M.AnchorHeight-M.PadTop-.12) -- (R150: the ring spreads over the glowing pad under the pack, not through it; the flash and the sparks are at the pack)
+check(ring and near(ring.Position.Y,padY,1e-9)and near(ring.Position.X,0,1e-9),'under the pack anchor, over the glowing pad')
 check(bursts()==b0+1,'(and only one)')
 mine:SetAttribute('OwnerName','Tester2');check(bursts()==b0+1,'other attribute changes make no burst')
 mine:SetAttribute('State','Ready');check(bursts()==b0+1,'setting the same state again makes no burst')
@@ -143,7 +147,7 @@ local lv=pk:GetPivot().LookVector
 check(near(lv.X,-math.sin(R.clock*.8%(math.pi*2)),1e-6)and near(lv.Z,-math.cos(R.clock*.8%(math.pi*2)),1e-6)and near(lv.Y,0,1e-9),'turning about the vertical axis (0.8 rad/s)')
 W.workspace.CurrentCamera.CFrame=R.CFrame.new(900,20,0);pk:PivotTo(R.CFrame.new(0,9,0));W.Run.RenderStepped:Fire(1/60)
 check(near(pk:GetPivot().Position.Y,9,1e-9),'a pack more than 130 studs from the camera is left alone')
-W.workspace.CurrentCamera.CFrame=R.CFrame.new(0,20,-30)
+W.workspace.CurrentCamera.CFrame=lookAtPedestal()
 W.Gui.ReducedMotionEnabled=true;pk:PivotTo(R.CFrame.new(0,9,0));W.Run.RenderStepped:Fire(1/60)
 check(near(pk:GetPivot().Position.Y,9,1e-9),'with reduced motion nothing spins')
 W.Gui.ReducedMotionEnabled=false
@@ -168,7 +172,8 @@ do
  -- Size: studs, not pixels.
  check(g.Size.X.Offset==0 and g.Size.Y.Offset==0 and g.Size.X.Scale>=8 and g.Size.X.Scale<=12 and g.Size.Y.Scale>=3 and g.Size.Y.Scale<=4.5,'[size] the label is sized in studs (about 10 x 3.6), not in pixels: it shrinks with distance like a sign ('..tostring(g.Size.X.Scale)..' x '..tostring(g.Size.Y.Scale)..' studs)')
  check(g.StudsOffset==nil or(g.StudsOffset.X==0 and g.StudsOffset.Y==0 and g.StudsOffset.Z==0),'(placed in world space, not relative to the camera)')
- check(g.Size.Y.Scale*.34*pxPerStud(30)>=12 and g.Size.Y.Scale*.34*pxPerStud(20)>=12 and g.Size.Y.Scale*.34*pxPerStud(40)>=9,'[size] it reads at 20-40 studs: the title is 12+ px tall at 20 and 30 studs, still 9+ px at 40')
+ local tf=g.Title.Size.Y.Scale -- (R150: the caption is .27 of the sign, the state line .42: both read at 20-40 studs)
+ check(g.Size.Y.Scale*tf*pxPerStud(30)>=12 and g.Size.Y.Scale*tf*pxPerStud(20)>=12 and g.Size.Y.Scale*tf*pxPerStud(40)>=9 and g.Size.Y.Scale*g.Status.Size.Y.Scale>=g.Size.Y.Scale*tf,'[size] it reads at 20-40 studs: the title is 12+ px tall at 20 and 30 studs, still 9+ px at 40, and the state line is bigger than the caption')
  check(g.Size.Y.Scale*pxPerStud(90)/720<.1 and g.Size.X.Scale*pxPerStud(90)/1280<.06 and g.Size.Y.Scale*pxPerStud(120)/720<.08,'[size] from far away it is small: at 90 studs under 10% of the screen height and 6% of the width (it never covers the screen)')
  local near0=g.DistanceLowerLimit or 0
  check(near0>=12 and near0<=30 and g.Size.Y.Scale*pxPerStud(near0)/720<=.2 and g.Size.X.Scale*pxPerStud(near0)/1280<=.3,'[size] up close it stops growing (DistanceLowerLimit '..tostring(g.DistanceLowerLimit)..': at most 20% of the screen height there)')
@@ -181,7 +186,7 @@ do
  check(bottomY(g)>=topMax+MINGAP,'[above] the label\'s bottom edge ('..string.format('%.2f',bottomY(g))..') is clear of the pack\'s top at its highest bob ('..string.format('%.2f',topMax)..') by at least half a stud')
  check(near(topY(g)-bottomY(g),g.Size.Y.Scale,1e-9)and bottomY(g)<topMax+4,'(and close above it, not floating far away)')
  local worst=math.huge;local phases=0
- W.workspace.CurrentCamera.CFrame=R.CFrame.new(0,20,-30)
+ W.workspace.CurrentCamera.CFrame=lookAtPedestal()
  local saved=R.clock
  for k=0,47 do
   R.clock=saved+k*(2*math.pi/1.6)/48;W.Run.RenderStepped:Fire(1/60)
@@ -252,7 +257,7 @@ do
  mineLate:SetAttribute('UnlockAt',nil);mineLate:SetAttribute('Variant','Pack03');mineLate:SetAttribute('State','Ready')
  local ma=addAnchor(mineLate);local mp=addPrompt(ma,false)
  check(label(mineLate).Adornee==ma and mp.Enabled==true and bursts()==b0,'[streaming] mine, Ready, parts arriving late: label on the anchor, the prompt is on for me, no burst (the anchor was not there when it unlocked)')
- mineLate:SetAttribute('State','Claimed');check(mp.Enabled==false and bursts()==b0+1 and lastBurst().Position.Y==9,'(and taking it turns the prompt off and bursts around the new anchor)')
+ mineLate:SetAttribute('State','Claimed');check(mp.Enabled==false and bursts()==b0+1 and near(lastBurst().Position.Y,9-(M.AnchorHeight-M.PadTop-.12),1e-9),'(and taking it turns the prompt off and bursts around the new anchor)')
  adv(2)
  -- Non-owners never see an enabled prompt, whatever the server does to it.
  local nm=bare('NonOwner',{State='Empty'});local na=addAnchor(nm);local np=addPrompt(na,true)

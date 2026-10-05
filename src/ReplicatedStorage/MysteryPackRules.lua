@@ -15,6 +15,35 @@ M.Odds={Pack02=.45,Pack03=.30,Pack04=.17,Pack05=.06,Pack06=.019,EclipseReliquary
 M.Void={Variant='EclipseReliquary',Stage=7}
 -- Where it stands in each base (pad space): the empty entrance corner opposite the treadmill (which is at X -34).
 M.Offset=Vector3.new(34,0,75)
+-- R150 (owner: "polish the pack pedestal that players have in base"): the look, shared by the server's pedestal art (MysteryPedestalArt) and the
+-- client's fx (MysteryPedestalFx, MysteryPackClient) so the two can never drift. Numbers only: no gameplay, timing or odds here.
+--  * AnchorHeight: the pack hovers this high over the pad (the pedestal's own height is built to it).
+--  * Palette: the pedestal wears the biome of the pack (the best treadmill's), in the treadmill's own theme colours (BiomeVisuals.treadmillThemes:
+--    Body / Trim / Glow / Ink), found by the biome Stage. Material is the body's surface: the theme's own material, except Crystal, whose theme says Glass
+--    (the treadmill never draws its body in Glass; a solid glass column would look see-through): that one stays SmoothPlastic. Tune it here if a biome's
+--    surface looks wrong in Studio. Without an owner it wears the violet "mystery" colours.
+--  * StateLook: the lit parts (glow pad, four gems, light) per state. Locked is calm violet, Ready lights up gold, Claimed is a dim mint ember.
+M.AnchorHeight=9.3
+M.PadTop=6.41 -- the top of the glowing pad under the pack (pedestal space) and the column's radius: where the client's light shaft and padlock sit
+M.ColumnRadius=2.1
+M.Palette={
+ [1]={Body={191,135,75},Trim={106,195,101},Glow={225,253,153},Ink={54,106,68},Material='Wood'},        -- Forest (Trail Runner)
+ [6]={Body={236,201,108},Trim={51,190,127},Glow={255,222,109},Ink={40,110,88},Material='Wood'},        -- Jungle (Vine Runner)
+ [2]={Body={251,202,130},Trim={232,141,90},Glow={255,241,167},Ink={145,87,66},Material='Sandstone'},   -- Desert (Dune Runner)
+ [3]={Body={135,203,234},Trim={195,245,255},Glow={235,255,255},Ink={58,113,157},Material='Ice'},       -- Snow (Glacier Runner)
+ [4]={Body={96,88,111},Trim={255,143,74},Glow={255,216,99},Ink={82,62,89},Material='Basalt'},          -- Lava (Magma Runner)
+ [5]={Body={217,181,250},Trim={124,228,222},Glow={250,223,255},Ink={119,80,155},Material='SmoothPlastic'},     -- Crystal (Prism Runner)
+ [7]={Body={111,155,237},Trim={255,224,96},Glow={255,247,193},Ink={56,82,153},Material='Metal'},      -- Storm (Thunder Runner)
+}
+M.DefaultPalette={Body={104,82,168},Trim={176,118,255},Glow={226,200,255},Ink={62,55,88},Material='Marble'}
+M.Gold={255,198,72}
+M.StateLook={
+ Empty={Color={74,66,102},Neon=false,Transparency=0,Light=nil},
+ Locked={Color={176,118,255},Neon=true,Transparency=.35,Light={Color={170,110,255},Brightness=1,Range=12}},
+ Ready={Color={255,214,90},Neon=true,Transparency=0,Light={Color={255,220,120},Brightness=2.4,Range=20}},
+ Claimed={Color={64,112,92},Neon=false,Transparency=0,Light={Color={110,220,160},Brightness=.35,Range=9}},
+}
+function M.Theme(stage)return M.Palette[stage]or M.DefaultPalette end
 local valid={}for _,v in ipairs(M.Order)do valid[v]=true end
 local function integer(n,lo,hi)return type(n)=='number'and n==n and n%1==0 and n>=lo and n<=hi end
 function M.Day(t)return math.floor((t or os.time())/86400)end

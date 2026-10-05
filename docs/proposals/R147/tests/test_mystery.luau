@@ -149,6 +149,24 @@ local function ped(rec)return S.Pedestals[rec]and S.Pedestals[rec].Model end
 local function attr(rec,k)local m=ped(rec);return m and m:GetAttribute(k)end
 local function pack(rec)local m=ped(rec);local h=m and m:FindFirstChild('MysteryPack');return h and h:FindFirstChild('SeedPacket')end
 local function prompt(rec)return S.Pedestals[rec].Prompt end
+-- R150: the pedestal's look follows the state (MysteryPedestalArt.Tint: the glow pad and the four gems, the light) and its colours follow the treadmill's biome.
+local function litLook(rec,state)
+ local ped=S.Pedestals[rec];local want=M.StateLook[state];local n=0;local ok=true
+ for _,p in ipairs(ped.Model:GetChildren())do if p.Name=='Glow ring'or p.Name=='Gem'then
+  n+=1;local c=p.Color
+  if not(math.abs(c.R*255-want.Color[1])<.5 and math.abs(c.G*255-want.Color[2])<.5 and math.abs(c.B*255-want.Color[3])<.5 and(p.Material==R.Enum.Material.Neon)==want.Neon and math.abs(p.Transparency-want.Transparency)<1e-9)then ok=false end
+ end end
+ local light=ped.Light
+ if want.Light then ok=ok and light.Enabled==true and math.abs(light.Brightness-want.Light.Brightness)<1e-9 and math.abs(light.Range-want.Light.Range)<1e-9 else ok=ok and light.Enabled==false end
+ return ok and n==5
+end
+local function bodyIs(rec,stage)
+ local pal=M.Theme(stage);local ok=true;local n=0
+ for _,p in ipairs(S.Pedestals[rec].Model:GetChildren())do if p.Name=='Column'then n+=1
+  if not(math.abs(p.Color.R*255-pal.Body[1])<.5 and math.abs(p.Color.G*255-pal.Body[2])<.5 and math.abs(p.Color.B*255-pal.Body[3])<.5 and p.Material==R.Enum.Material[pal.Material])then ok=false end
+ end end
+ return ok and n==1
+end
 -- 2a. Both pedestals are built at start, empty, tagged, in the right place.
 check(ped(rec1)~=nil and ped(rec2)~=nil and ped(rec1)~=ped(rec2),'one pedestal per base, built when the service starts')
 check(ped(rec1).Parent==rec1.Model and ped(rec2).Parent==rec2.Model and ped(rec1).Name=='MysteryPedestal','each is a Model "MysteryPedestal" inside its base')
@@ -228,6 +246,8 @@ check(attr(rec1,'State')=='Locked'and attr(rec1,'OwnerUserId')==701 and attr(rec
 check(attr(rec1,'UnlockAt')==t0+900 and attr(rec1,'NextAt')==(DAY0+1)*86400 and attr(rec1,'Stage')==1,('UnlockAt = now + 15 min (%s), NextAt = the next UTC midnight, Stage = the Forest treadmill'):format(tostring(attr(rec1,'UnlockAt'))))
 check(attr(rec1,'Variant')==nil,'the variant is not published while locked (the rarity stays secret)')
 check(prompt(rec1).Enabled==false,'[prompt] Locked: the server keeps the Take prompt off, for everyone')
+check(litLook(rec1,'Locked')and litLook(rec2,'Empty'),'[look] Locked: the glow pad and the four gems are calm violet neon and the light a soft violet (Ben\'s empty pedestal stays cold and dark)')
+check(bodyIs(rec1,1)and bodyIs(rec2,nil),'[look] the pedestal wears the Forest treadmill\'s colours and wood (an empty one the violet default)')
 check(S.Owner[A]==rec1 and attr(rec2,'State')=='Empty','only the joined player\'s pedestal woke up')
 local st=Data:GetPremium(A).Mystery
 check(st and st.Day==DAY0 and st.Seconds==0 and st.Claimed==false and st.Stage==nil,'saved state: today, 0 s, nothing rolled yet')
@@ -284,6 +304,7 @@ check(stageA==Config.TreadmillTiers[Data:GetTreadmillData(A).Tier].Stage and sta
 check(variantA=='Pack03'and variantA~='Pack01'and table.find(M.Order,variantA)~=nil,'its rarity is one of the six, rolled at that moment (Pack03 for the 0.5 draw)')
 check(attr(rec1,'UnlockAt')==nil and attr(rec1,'OwnerUserId')==701,'UnlockAt is cleared once ready')
 check(prompt(rec1).Enabled==true and prompt(rec2).Enabled==false,'[prompt] Ready: the server turns Ava\'s Take prompt on (Ben\'s locked one stays off)')
+check(litLook(rec1,'Ready')and litLook(rec2,'Locked'),'[look] Ready: Ava\'s pad and gems light up bright gold and the light is gold and brighter (Ben\'s locked one stays violet)')
 local stA=Data:GetPremium(A).Mystery
 check(stA.Seconds==900 and stA.Stage==stageA and stA.Variant==variantA and stA.Claimed==false and M.Unlocked(stA),'the saved state holds the rolled pack, not taken yet')
 local noteA=notes(A,noteFrom)
@@ -321,6 +342,7 @@ check(syncs(A)==syncBefore+1,'ChestService:SyncTools ran once (the hotbar shows 
 check(attr(rec1,'State')=='Claimed'and attr(rec1,'Variant')==variantA and attr(rec1,'UnlockAt')==nil,'the pedestal says Claimed (variant kept, no UnlockAt)')
 check(pack(rec1)==nil,'and the pack is gone from the pedestal')
 check(prompt(rec1).Enabled==false,'[prompt] Claimed: the prompt is off again')
+check(litLook(rec1,'Claimed')and bodyIs(rec1,1),'[look] Claimed: dim mint, no longer neon, a faint ember of light; the biome colours stay')
 check(Data:GetPremium(A).Mystery.Claimed==true,'saved as taken')
 local note,noteRow=lastNote(A)
 check(note and note:find('MYSTERY PACK',1,true)and note:find('Rare',1,true)and note:find('Forest',1,true),'the notice names the rarity and biome: '..tostring(note))
@@ -362,6 +384,7 @@ check(benSeconds==780,'(Ben has played 780 s: he joined 2 minutes after Ava)')
 S:Leaving(B)
 check(attr(rec2,'State')=='Empty'and attr(rec2,'OwnerUserId')==nil and attr(rec2,'OwnerName')==nil and attr(rec2,'UnlockAt')==nil and attr(rec2,'Variant')==nil,'Ben leaves: the pedestal goes Empty and loses his name / time / variant')
 check(pack(rec2)==nil and S.Owner[B]==nil and S.Unsaved[B]==nil,'the pack is removed and the service forgets him')
+check(litLook(rec2,'Empty')and bodyIs(rec2,nil),'[look] and his pedestal goes back to the cold look and the violet default colours')
 local sBefore=Data:GetPremium(B).Mystery.Seconds;play(30)
 check(Data:GetPremium(B).Mystery.Seconds==sBefore and attr(rec2,'State')=='Empty','time away does not count')
 local leftClaim=S:Claim(B,rec2)

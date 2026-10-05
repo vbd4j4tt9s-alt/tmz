@@ -12,9 +12,12 @@
 -- The model streams in Persistent mode (the place uses StreamingEnabled: another base's pedestal must not stream out
 -- and come back as new instances), and the Take prompt is only Enabled while the pack is Ready; each client also turns
 -- it off locally for everyone but the owner.
+-- R150 (owner: "polish the pack pedestal"): the pedestal is sculpted in MysteryPedestalArt (themed by the biome of the pack, lit by state: the glow
+-- pad, the four gems and the light are the only things this changes after the build) and the moving parts (swirl, sparkles, padlock, light
+-- shaft, the unlock and take moments) are built by each client around it (MysteryPedestalFx, MysteryPackClient). Nothing about the rules changed.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local CS=game:GetService('CollectionService')
-local M=require(RS.MysteryPackRules);local PackRules=require(RS.SeedPackRules)
+local M=require(RS.MysteryPackRules);local PackRules=require(RS.SeedPackRules);local Art=require(script.Parent.MysteryPedestalArt)
 local S={};S.__index=S
 local RGB=Color3.fromRGB
 local SILHOUETTE=RGB(10,9,16)
@@ -27,11 +30,7 @@ local function part(parent,name,size,frame,color,material,collide)
  p.Anchored=true;p.CanCollide=collide==true;p.CanQuery=collide==true;p.CanTouch=false
  p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=parent;return p
 end
-local function disc(parent,name,height,diameter,frame,color,material,collide)
- local p=part(parent,name,Vector3.new(height,diameter,diameter),frame*CFrame.Angles(0,0,math.pi/2),color,material,collide)
- p.Shape=Enum.PartType.Cylinder;return p
-end
--- The pedestal: a stone plinth, a violet column with gold collars, a glowing top ring and the pack floating above.
+-- The pedestal (MysteryPedestalArt) with the pack floating over it: the anchor holds the glow of the light and the Take prompt.
 function S:_build(record)
  local pad=record.Pad or record.Model and record.Model:FindFirstChild('Pad')
  if not pad then return nil end
@@ -39,22 +38,16 @@ function S:_build(record)
  local m=Instance.new('Model');m.Name='MysteryPedestal';m:SetAttribute('MysteryPedestal',M.Version);m:SetAttribute('State','Empty')
  m.ModelStreamingMode=Enum.ModelStreamingMode.Persistent -- (StreamingEnabled: never streamed out, so no stale or late client copies)
  local o=pad.CFrame*CFrame.new(M.Offset.X,pad.Size.Y/2,M.Offset.Z)
- local stone,violet,gold=RGB(62,55,88),RGB(104,82,168),RGB(255,198,72)
- part(m,'Plinth',Vector3.new(8,1,8),o*CFrame.new(0,.5,0),stone,Enum.Material.Slate,true)
- part(m,'Plinth trim',Vector3.new(8.6,.3,8.6),o*CFrame.new(0,1.1,0),gold)
- disc(m,'Column',4.4,4.4,o*CFrame.new(0,3.45,0),violet,Enum.Material.Marble,true)
- disc(m,'Lower collar',.5,5.2,o*CFrame.new(0,1.45,0),gold)
- disc(m,'Upper collar',.5,5.4,o*CFrame.new(0,5.55,0),gold)
- disc(m,'Top',.6,6.6,o*CFrame.new(0,6.05,0),stone,Enum.Material.Slate,true)
- local ring=disc(m,'Glow ring',.22,7,o*CFrame.new(0,6.42,0),RGB(176,118,255),Enum.Material.Neon);ring.Transparency=.15
- local anchor=part(m,'PackAnchor',Vector3.new(1,1,1),o*CFrame.new(0,9.3,0),Color3.new());anchor.Transparency=1
- local light=Instance.new('PointLight');light.Name='Glow';light.Color=RGB(170,110,255);light.Range=14;light.Brightness=1.6;light.Shadows=false;light.Parent=anchor
+ local art=Art.Build(m,o)
+ local anchor=part(m,'PackAnchor',Vector3.new(1,1,1),o*CFrame.new(0,M.AnchorHeight,0),Color3.new());anchor.Transparency=1
+ local light=Instance.new('PointLight');light.Name='Glow';light.Color=RGB(170,110,255);light.Range=14;light.Brightness=1.6;light.Shadows=false;light.Enabled=false;light.Parent=anchor
  local prompt=Instance.new('ProximityPrompt');prompt.Name='TakeMysteryPack';prompt.ActionText='Take';prompt.ObjectText='Mystery Pack'
  prompt.HoldDuration=.5;prompt.MaxActivationDistance=12;prompt.RequiresLineOfSight=false;prompt.Enabled=false;prompt.Parent=anchor -- (Publish turns it on while the pack is Ready)
  prompt.Triggered:Connect(function(player)self:Claim(player,record)end)
  m.PrimaryPart=anchor;m.Parent=record.Model
  CS:AddTag(m,'MysteryPedestal')
- self.Pedestals[record]={Model=m,Anchor=anchor,Prompt=prompt,Light=light,Ring=ring,Look=nil}
+ Art.Tint(art,'Empty',nil)
+ self.Pedestals[record]={Model=m,Anchor=anchor,Prompt=prompt,Light=light,Ring=art.Ring,Art=art,Look=nil}
  return self.Pedestals[record]
 end
 function S:Pedestal(record)
@@ -68,8 +61,10 @@ function S:_look(p,state,stage,variant)
  local key=state..':'..tostring(stage)..':'..tostring(variant)
  if p.Look==key then return end;p.Look=key
  local old=p.Model:FindFirstChild('MysteryPack');if old then old:Destroy()end
- p.Ring.Color=state=='Ready'and RGB(255,214,90)or RGB(176,118,255)
- p.Light.Color=state=='Ready'and RGB(255,220,120)or RGB(170,110,255);p.Light.Enabled=state~='Empty'
+ Art.Tint(p.Art,state,state~='Empty'and stage or nil) -- (the biome's colours, and the lit parts for the state)
+ local lk=M.StateLook[state];local lamp=lk and lk.Light
+ if lamp then p.Light.Color=RGB(lamp.Color[1],lamp.Color[2],lamp.Color[3]);p.Light.Brightness=lamp.Brightness;p.Light.Range=lamp.Range end
+ p.Light.Enabled=lamp~=nil
  if state~='Locked'and state~='Ready'then return end
  local holder=Instance.new('Model');holder.Name='MysteryPack';holder.Parent=p.Model
  local ok,pack=pcall(function()

@@ -7,13 +7,14 @@
 #                           leaving / rejoining, the next UTC day, carry-over into the Bag, a full Bag, the owner command
 #                           `mystery`; the review fixes: Persistent pedestal model, the prompt Enabled only while Ready,
 #                           UnlockAt republished on drift, a full Bag at midnight (owed list: kept, capped at 3, saved,
-#                           granted once when there is room); plus the keeper tagging (ChaseService._preparePersistentGuardian, VeiledEvent81
+#                           granted once when there is room); R150: the look of each state (lit parts, light, biome colours: [look] checks); plus the keeper tagging (ChaseService._preparePersistentGuardian, VeiledEvent81
 #                           EnsureGuardian, KeeperPursuit.EscapeSpeed).
 #  test_r147_client.luau  - the real MysteryPackClient (label, bar, prompt, burst, spin, and under StreamingEnabled: late and
 #                           re-streamed pedestals / parts, non-owners never see an enabled prompt), KeeperSpeedLabels (the
 #                           "SPEED NEEDED" pill, R148: a small fixed 104x36 sign, the points needed rounded up to 2 significant
 #                           figures as whole multiples of 5 - 3,800 / 18K / 1,200K / 22B -, "0" for nothing, "∞" for The Darkened; colours,
-#                           R149: the friend boost no longer changes the numbers) and
+#                           R149: the friend boost no longer changes the numbers) and R150's sign pill (same size / place / ranges; the burst ring over the glowing pad; the
+#                           padlock, halo, take flight, sounds and the rest of the pedestal's fx are in docs/proposals/R150/tests/run_pedestal.sh) and
 #                           Progression81.PointsFor / PointsText against Progression81.Speed over BalanceValues81.PointCurve.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
