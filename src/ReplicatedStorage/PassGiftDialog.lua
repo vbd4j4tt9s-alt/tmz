@@ -5,7 +5,7 @@ local Bright=require(RS.BrightUI);local Theme=require(RS.GardenTheme);local Mech
 local D={}
 function D.Create(parent,player,act,stateFor,infoFor,productInfoFor)
  local self={Selected=nil,Pass=nil,Pending=nil,Mode='Pass'}
- local veil=Instance.new('TextButton');veil.Name='GiftVeil';veil.Text='';veil.BackgroundColor3=Color3.new();veil.BackgroundTransparency=.35;veil.Size=UDim2.fromScale(1,1);veil.ZIndex=19;veil.Visible=false;veil.Parent=parent
+ local veil=Instance.new('TextButton');veil.Name='GiftVeil';veil.Text='';veil.BackgroundColor3=Color3.new();veil.BackgroundTransparency=.35;veil.Size=UDim2.fromScale(1,1);veil.ZIndex=19;veil.Visible=false;veil:SetAttribute('ButtonSound','MenuClose');veil.Parent=parent -- R150: tapping outside the picker closes it: MenuClose, not the generic click
  local panel=Instance.new('Frame');panel.Name='PassGiftPicker';panel.AnchorPoint=Vector2.new(.5,.5);panel.Position=UDim2.fromScale(.5,.5);panel.Size=UDim2.new(.94,0,.92,0);panel.ZIndex=20;panel.Active=true;panel.Visible=false;panel.BorderSizePixel=0;panel.Parent=parent;Bright.Panel(panel)
  local max=Instance.new('UISizeConstraint');max.MaxSize=Vector2.new(460,490);max.Parent=panel
  local title=Instance.new('TextLabel');title.Text='Gift a pass';title.Position=UDim2.fromOffset(14,9);title.Size=UDim2.new(1,-70,0,58);title.BackgroundTransparency=1;title.ZIndex=22;title.TextWrapped=true;Bright.Text(title,24);title.Parent=panel
@@ -17,7 +17,9 @@ function D.Create(parent,player,act,stateFor,infoFor,productInfoFor)
  local feedback=Instance.new('TextLabel');feedback.Name='GiftStatus';feedback.Text='';feedback.Position=UDim2.new(0,12,1,-155);feedback.Size=UDim2.new(1,-24,0,34);feedback.BackgroundTransparency=1;feedback.TextWrapped=true;feedback.ZIndex=23;Bright.Text(feedback,15,Theme.Colors.Gold);feedback.Parent=panel
  local gem=button('GiftWithGems','Gems',UDim2.new(0,12,1,-113),UDim2.new(1,-24,0,44),Color3.fromRGB(166,111,255))
  local robux=button('GiftWithRobux','Robux',UDim2.new(0,12,1,-61),UDim2.new(1,-24,0,44),Color3.fromRGB(141,241,45))
- function self:Close()self.Pending=nil;panel.Visible=false;veil.Visible=false end
+ -- R150: the picker has no SeedMenu, so it clicks for itself: MenuClick when it opens, MenuClose when it closes (X, veil or after a send).
+ local function click(key)require(RS.InteractionAudio).Play(key)end
+ function self:Close()if panel.Visible then click('MenuClose')end;self.Pending=nil;panel.Visible=false;veil.Visible=false end
  local function send(payment)
   if not self.Pass or not self.Selected then return end
   if self.Mode=='Product'then
@@ -59,8 +61,8 @@ function D.Create(parent,player,act,stateFor,infoFor,productInfoFor)
   list.CanvasSize=UDim2.fromOffset(0,n*52)
   if n==0 then local t=Instance.new('TextLabel');t.Text='No other players here';t.Size=UDim2.new(1,0,0,50);t.BackgroundTransparency=1;t.ZIndex=23;Bright.Text(t,18);t.Parent=list end
  end
- function self:OpenProduct(item)self.Mode='Product';feedback.Text='';self.Pass=item;self.Selected=nil;self.Pending=nil;title.Text='Gift '..item.Name;veil.Visible=true;panel.Visible=true;recipients();self:Refresh()end
- function self:Open(pass)self.Mode='Pass';feedback.Text='';self.Pass=pass;self.Selected=nil;self.Pending=nil;title.Text='Gift '..pass.Name;veil.Visible=true;panel.Visible=true;recipients();self:Refresh()end
+ function self:OpenProduct(item)self.Mode='Product';feedback.Text='';self.Pass=item;self.Selected=nil;self.Pending=nil;title.Text='Gift '..item.Name;if not panel.Visible then click('MenuClick')end;veil.Visible=true;panel.Visible=true;recipients();self:Refresh()end
+ function self:Open(pass)self.Mode='Pass';feedback.Text='';self.Pass=pass;self.Selected=nil;self.Pending=nil;title.Text='Gift '..pass.Name;if not panel.Visible then click('MenuClick')end;veil.Visible=true;panel.Visible=true;recipients();self:Refresh()end
  function self:IsOpen()return panel.Visible end
  close.Activated:Connect(function()self:Close()end);veil.Activated:Connect(function()self:Close()end)
  gem.Activated:Connect(function()if gem.Interactable and self.Mode=='Pass'then send('Gems')end end)

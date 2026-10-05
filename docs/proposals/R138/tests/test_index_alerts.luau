@@ -10,7 +10,8 @@ local pg=R.new('PlayerGui');pg.Name='PlayerGui';pg.Parent=player
 local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=W.RS
 local catalog=R.new('Folder');catalog.Name='SeedCatalog';catalog.Parent=remotes
 local req=R.new('RemoteFunction');req.Name='PremiumRequest';req.Parent=remotes
-local calls={};function req.InvokeServer(_,action,value)calls[#calls+1]={action,value};return {Success=true,Message='Claimed!'}end
+local calls={};local refuse=false
+function req.InvokeServer(_,action,value)calls[#calls+1]={action,value};if refuse then return {Success=false,Message='TRY AGAIN IN A MOMENT'}end;return {Success=true,Message='Claimed!'}end
 local Rules=W.module('SeedPackRules')
 local config={SeedCatalogByStage=Rules.BuildSeedCatalog()}
 local index=0;local expectOdds={}
@@ -47,6 +48,12 @@ seeds.AppleSeed:SetAttribute('RewardCash',nil);W.frames(5)
 -- Claiming plays a sound and the count drops.
 pg:SetAttribute('SeedMenu','Index');W.frames(20)
 local list=gui:FindFirstChild('SeedCards',true);local moon=list:FindFirstChild('MooncapSeed')
+-- R150: a refused claim clicks Denied (never the reward cue); the gem pills press with the normal click like the seed cards (no ButtonSound=false).
+refuse=true;played={};moon.Activated:Fire();W.frames(5)
+check(calls[#calls]and calls[#calls][1]=='ClaimSeed'and played[#played]=='Denied'and not table.find(played,'KaChing'),'R150: a refused seed claim clicks Denied ('..table.concat(played,',')..')')
+refuse=false;calls={};played={};W.frames(10)
+local midBtn=gui:FindFirstChild('MiddleGem',true);local endBtn=gui:FindFirstChild('GemReward',true)
+check(midBtn and endBtn and midBtn:GetAttribute('ButtonSound')==nil and endBtn:GetAttribute('ButtonSound')==nil,'R150: the halfway and completion gems keep the generic press click (they had ButtonSound=false: no press sound, only the claim cue)')
 moon.Activated:Fire();seeds.MooncapSeed:SetAttribute('RewardCash',nil);W.frames(5)
 check(calls[1]and calls[1][1]=='ClaimSeed'and table.find(played,'KaChing'),'claiming a cash reward rings the till (KaChing)')
 check(shown(toggle.RewardBadge)=='1','one left after claiming ('..tostring(shown(toggle.RewardBadge))..')')
@@ -55,5 +62,10 @@ check(table.find(played,'GemClaim')~=nil,'claiming a gem reward plays the gem so
 check(not toggle.RewardBadge.Visible and not hub.IndexRewardAlert.Visible and not forest.RewardDot.Visible,'nothing left: every badge goes away')
 local apple=list:FindFirstChild('AppleSeed')
 check(apple and not apple:FindFirstChild('Pedestal'),'no empty gray box above the names any more')
+-- R150: a reward that becomes claimable AFTER the join-time burst of saved data pops its badge with the reward cue (the burst itself is silent).
+played={};R.advance(7);seeds.AppleSeed:SetAttribute('RewardCash',9000);W.frames(5)
+check(table.find(played,'GemClaim')~=nil,'R150: a new reward badge pops with the reward cue (GemClaim)')
+played={};seeds.AppleSeed:SetAttribute('RewardCash',9500);W.frames(5)
+check(table.find(played,'GemClaim')==nil,'R150: a change of the same reward is not a new one (no repeat cue)')
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

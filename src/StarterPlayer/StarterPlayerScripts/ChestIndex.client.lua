@@ -39,7 +39,7 @@ local bar=Instance.new('Frame');bar.Name='CompletionBar';bar.Position=UDim2.from
 local fill=Instance.new('Frame');fill.Name='Fill';fill.Size=UDim2.fromScale(0,1);fill.BorderSizePixel=0;fill.BackgroundColor3=Color3.new(1,1,1);fill.Parent=bar;Theme.Corner(fill,6);Bright.Gradient(fill,Color3.fromRGB(82,231,255),Color3.fromRGB(150,255,88),0)
 -- Each icon claims only its own server-owned milestone reward.
 local middle=Instance.new('TextButton');middle.Text='';middle.AutoButtonColor=false;middle.Active=false;middle.Interactable=false;middle.Name='MiddleGem';middle.AnchorPoint=Vector2.new(.5,.5);middle.Position=UDim2.fromScale(.5,.5);middle.Size=UDim2.fromOffset(44,44);middle.BackgroundColor3=Theme.Colors.Inset;middle.BorderSizePixel=0;middle.ZIndex=2;middle.Parent=bar;Theme.Corner(middle,19)
-middle:SetAttribute('ButtonSound',false)
+-- R150: the halfway / completion gems click like the seed cards (a press click, then the claim cue on success): no ButtonSound=false.
 local middleScale=Instance.new('UIScale');middleScale.Scale=1;middleScale.Parent=middle
 local middleRim=Instance.new('UIStroke');middleRim.Thickness=2;middleRim.Color=Theme.Colors.Muted;middleRim.Parent=middle
 local function rewardArt(parent,pad)
@@ -49,7 +49,6 @@ end
 local middleIcon=rewardArt(middle,3)
 local middleAmount=text(middle,'RewardAmount','+10',UDim2.new(.5,0,1,3),UDim2.fromOffset(58,19),15,Theme.Colors.Muted);middleAmount.AnchorPoint=Vector2.new(.5,0);middleAmount.TextWrapped=false
 local bonus=Instance.new('TextButton');bonus.Name='GemReward';bonus.Text='';bonus.AnchorPoint=Vector2.new(.5,.5);bonus.Position=UDim2.fromScale(1,.5);bonus.Size=UDim2.fromOffset(52,52);bonus.BackgroundColor3=Color3.fromRGB(67,52,110);bonus.BorderSizePixel=0;bonus.AutoButtonColor=false;bonus.Active=false;bonus.Interactable=false;bonus.ZIndex=3;bonus.Parent=bar;Theme.Corner(bonus,26)
-bonus:SetAttribute('ButtonSound',false)
 local bonusRim=Instance.new('UIStroke');bonusRim.Name='RewardRim';bonusRim.Thickness=2;bonusRim.Color=Theme.Colors.Muted;bonusRim.Parent=bonus
 local gemIcon=rewardArt(bonus,4)
 local bonusAmount=text(bonus,'RewardAmount','',UDim2.new(.5,0,1,3),UDim2.fromOffset(58,19),15,Theme.Colors.Muted);bonusAmount.AnchorPoint=Vector2.new(.5,0);bonusAmount.TextWrapped=false
@@ -144,7 +143,7 @@ local function waiting(stage)
  end
  return n
 end
-local alertTotal=0
+local alertTotal=0;local alertsFrom=os.clock()+6 -- R150: the join-time burst of saved data is not "a new reward"
 local function updateAlerts()
  local total=0;local perTab={}
  for stage=1,9 do
@@ -155,6 +154,7 @@ local function updateAlerts()
  local mine=badge(toggle,'RewardBadge',24);mine.Position=UDim2.new(1,-6,0,6);mine.Visible=total>0;mine.Count.Text=total>9 and'9+'or tostring(total)
  local nav=pg:FindFirstChild('GardenNavigation');local hub=nav and nav:FindFirstChild('MenuButton')
  if hub then local alert=badge(hub,'IndexRewardAlert',20);alert.Position=UDim2.new(1,-4,0,4);alert.Visible=total>0;alert.Count.Text='!'end
+ if total>alertTotal and os.clock()>=alertsFrom then Audio.Play('GemClaim')end -- R150: a new reward just became claimable: its badge pops with the reward cue
  if total>alertTotal and not Gui.ReducedMotionEnabled then
   for _,b in ipairs({mine,hub and hub:FindFirstChild('IndexRewardAlert')})do if b then local sc=b:FindFirstChildOfClass('UIScale');sc.Scale=1.5;Tween:Create(sc,TweenInfo.new(.35,Enum.EasingStyle.Back),{Scale=1}):Play()end end
  end
@@ -172,6 +172,7 @@ local function claim(action,value,pulse)
  task.spawn(function()
   local ok,result=pcall(request.InvokeServer,request,action,value);busy=false;if not gui.Parent then return end
   status.Text=ok and type(result)=='table'and(result.Message or'')or'Please try again.';status.Visible=status.Text~=''
+  if not(ok and type(result)=='table'and result.Success==true)then Audio.Play('Denied')end -- R150: a refused claim
   -- R138 (owner: "add sfx for claiming the rewards"): a cash reward rings the till; gem rewards keep the gem cue.
   if action=='ClaimSeed'and ok and type(result)=='table'and result.Success==true then Audio.Play('KaChing')end
   if(action=='ClaimBiome'or action=='ClaimBiomeHalf')and ok and type(result)=='table'and result.Success==true then
@@ -216,7 +217,7 @@ end
 -- completion gem at its end, each a pill with the gem and its amount. They claim with the row's own category (8 or 9), as the single bar does.
 local function rewardPill(parent,name,kind,stage)
  local b=Instance.new('TextButton');b.Name=name;b.Text='';b.AutoButtonColor=false;b.Active=false;b.Interactable=false;b.AnchorPoint=Vector2.new(.5,.5);b.BackgroundColor3=Color3.fromRGB(49,49,77);b.BorderSizePixel=0;b.ZIndex=3;b.Parent=parent
- b:SetAttribute('ButtonSound',false);b:SetAttribute('Category',stage);b:SetAttribute('RewardKind',kind)
+ b:SetAttribute('Category',stage);b:SetAttribute('RewardKind',kind)
  local corner=Theme.Corner(b,13)
  local rim=Instance.new('UIStroke');rim.Name='RewardRim';rim.Thickness=2;rim.Color=Theme.Colors.Muted;rim.Parent=b
  local holder=Instance.new('Frame');holder.Name='ArtHolder';holder.BackgroundTransparency=1;holder.Active=false;holder.Parent=b

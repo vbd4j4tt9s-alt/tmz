@@ -52,9 +52,15 @@ function F.Preload()
  task.spawn(function()pcall(function()game:GetService('ContentProvider'):PreloadAsync({sound})end)end)
  return sound
 end
-function F.PlaySound()
+-- age: seconds the packet is late. The lights-out already joins that far in (F.LightsOut offset), so the sound joins at the
+-- same point of its own timeline instead of restarting from 0 (R150).
+function F.PlaySound(age)
  local s=F.Preload()
- s:Stop();require(script.Parent.SoundTiming).Play(s)
+ local T=require(script.Parent.SoundTiming)
+ local at=T.Offset(s)+math.max(0,tonumber(age)or 0)
+ s:Stop()
+ if s.IsLoaded and s.TimeLength>0 and at>=s.TimeLength-.05 then return s end -- the whole cue is already over
+ T.Play(s,at)
  return s
 end
 -- Stop at once and give the lights back (safe to call any time).
@@ -106,7 +112,7 @@ function F.Arrive(serial,at,now)
  local age=now-at
  if age<-2 or age>F.MaxAge then return false end -- stale: late joiner or very delayed delivery
  played[serial]=true
- if age<=F.SoundMaxAge then F.PlaySound()end
+ if age<=F.SoundMaxAge then F.PlaySound(math.max(0,age))end
  F.LightsOut(nil,math.max(0,age))
  return true
 end

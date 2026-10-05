@@ -272,7 +272,7 @@ do
  check((W.warns or 0)==warns0+1,'warned exactly once ('..((W.warns or 0)-warns0)..' warnings)')
  regionRefused=false
 end
--- A clip that has not loaded yet: wait for it, then play (not cut by a clock that started early); give up after 3 s without blocking later ones.
+-- A clip that has not loaded yet: wait for it, then play (not cut by a clock that started early); give up after .5 s (R150; it was 3 s) without blocking later ones.
 do
  settleDown()
  local s=lastPlay().Sound;s.IsLoaded=false;s.TimeLength=0;local n=#greetingPlays()
@@ -295,6 +295,24 @@ do
  s.IsLoaded=false;local n3=#greetingPlays();server('Open',{VoidPacks=0,Delivered=0})
  check(#greetingPlays()==n3+1,'a Sound whose IsLoaded still reads false but whose TimeLength is known plays at once')
  seconds(2.3);closeWindow();s.IsLoaded=true
+end
+-- R150: a greeting is skipped, never spoken late. The wait for a clip that has not loaded is bounded by .5 s (it was 3 s), counted from when she
+-- was ASKED to speak, and a 'talk' greeting also needs her window to still be open when the clip arrives.
+do
+ settleDown()
+ local s=lastPlay().Sound;local n=#greetingPlays()
+ s.IsLoaded=false;s.TimeLength=0;server('Open',{VoidPacks=0,Delivered=0});seconds(.4)
+ s.IsLoaded=true;s.TimeLength=3.2;s.Loaded:Fire();frames(2)
+ check(#greetingPlays()==n+1,'R150: a clip that loads .4 s after she was asked plays')
+ seconds(2.3);closeWindow()
+ n=#greetingPlays();s.IsLoaded=false;s.TimeLength=0;server('Open',{VoidPacks=0,Delivered=0});seconds(.7)
+ s.IsLoaded=true;s.TimeLength=3.2;s.Loaded:Fire();frames(2)
+ check(#greetingPlays()==n,'R150: a clip that arrives .7 s after she was asked is skipped, not spoken late')
+ closeWindow();seconds(1)
+ n=#greetingPlays();s.IsLoaded=false;s.TimeLength=0;server('Open',{VoidPacks=0,Delivered=0});seconds(.2);closeWindow()
+ s.IsLoaded=true;s.TimeLength=3.2;s.Loaded:Fire();frames(2)
+ check(#greetingPlays()==n,'R150: a Talk greeting whose window was closed before the clip loaded is skipped')
+ settleDown()
 end
 
 -- 2. Lip sync in the world -----------------------------------------------------------------------------------------------------------------

@@ -1,8 +1,12 @@
 -- R63: saved audio mixing and client-only cosmetic quality.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
-local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local request=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('PremiumRequest')
-local Config=require(RS.SettingsConfig);local Mixer=require(RS.AudioMixer);local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI)
-Mixer.Start();require(RS.InteractionAudio).Preload()
+local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
+local Config=require(RS.SettingsConfig);local Mixer=require(RS.AudioMixer)
+-- R150: the mixer starts FIRST (it used to wait for the PremiumRequest remote below), so every sound already made, and the saved mix the
+-- server publishes on the Player (AudioMixer reads it), is routed and set before anything else here can wait.
+Mixer.Start();local Audio=require(RS.InteractionAudio);Audio.Preload();local RevealAudio=require(RS.RarityRevealAudio);RevealAudio.Preload()
+local request=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('PremiumRequest')
+local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI)
 local previous=pg:FindFirstChild('GardenSettings');if previous then previous:Destroy()end
 local gui=Instance.new('ScreenGui');gui.Name='GardenSettings';gui.ResetOnSpawn=false;gui.DisplayOrder=55;gui.Parent=pg
 local function text(parent,name,value,pos,size,font)
@@ -49,9 +53,16 @@ flush=function()
   if failed then task.delay(3,flush)end
  end)
 end
+-- R150: hear the new level. The Interface row previews a button click, the Effects row a reveal pop (each through its own group, AFTER the
+-- group has the new volume, so 0 is silent and the preview is as loud as the setting). Music / Chase / Ambience change audibly by themselves;
+-- they get a plain click so the control is never silent.
+local function preview(key)
+ if key=='Effects'then RevealAudio.Play('Pop',1.08)else Audio.Play('Bubble04')end
+end
 local function change(key,value)
  if not Config.Valid(key,value)then return end
  touched[key]=true;dirty[key]=value;apply(key,value);status.Text='Saving…';serial+=1;local token=serial
+ if key~='Quality'then preview(key)end
  task.delay(.3,function()if not dead and token==serial then flush()end end)
 end
 for i,pair in ipairs({{'Music','Background music'},{'Chase','Chase music'},{'Ambience','Ambience'},{'Effects','Sound effects'},{'Interface','Button sounds'}})do
@@ -59,6 +70,7 @@ for i,pair in ipairs({{'Music','Background music'},{'Chase','Chase music'},{'Amb
  text(row,'Label',name,UDim2.fromOffset(3,0),UDim2.new(1,-135,0,24),17)
  local value=text(row,'Value','100%',UDim2.new(1,-86,0,4),UDim2.fromOffset(46,30),15);value.TextXAlignment=Enum.TextXAlignment.Center
  local minus=button(row,'Quieter','−',UDim2.new(1,-127,0,4),UDim2.fromOffset(34,34));local plus=button(row,'Louder','+',UDim2.new(1,-34,0,4),UDim2.fromOffset(34,34))
+ minus:SetAttribute('ButtonSound',false);plus:SetAttribute('ButtonSound',false) -- R150: change() previews the NEW level instead of a click at the old one
  local rail=button(row,'Volume','',UDim2.fromOffset(4,29),UDim2.new(1,-145,0,15),Color3.fromRGB(39,63,94));rail:SetAttribute('ButtonSound',false)
  local fill=Instance.new('Frame');fill.Name='Level';fill.Size=UDim2.fromScale(1,1);fill.BorderSizePixel=0;fill.BackgroundColor3=Color3.fromRGB(122,229,255);fill.Parent=rail;Theme.Corner(fill,6)
  controls[key]={Value=value,Fill=fill}

@@ -99,7 +99,7 @@ function Effects:_step(dt)
    local t=math.clamp((self.Now-item.FlyAt)/(quiet and .20 or .48),0,1);local eased=t*t*(3-2*t)
    item.Position=item.Start:Lerp(target,eased)+Vector2.new(0,quiet and 0 or -math.sin(t*math.pi)*35)
    scale=1-.60*eased;item.Button.Rotation=item.Rotation*(1-eased)
-   if t>=1 then wallet:Pulse();self:_remove(i);continue end
+   if t>=1 then wallet:Pulse();require(script.Parent.InteractionAudio).Play('Bubble06');self:_remove(i);continue end -- R150: a coin reaching the wallet clicks with its pulse (a burst becomes a ripple: 0.09 s gap)
   else
    local t=math.clamp(item.Age/.40,0,1);local eased=1-(1-t)^3
    item.Position=item.Origin:Lerp(clampPoint(item.Rest,size,30),eased)+Vector2.new(0,quiet and 0 or -math.sin(t*math.pi)*42)
@@ -146,7 +146,7 @@ function Effects:Burst(receipt,indices,screenOrigin)
  for i=1,count do
   local angle=(i-.5)/count*math.pi+self.Random:NextNumber(-.12,.12)
   local radius=self.Random:NextNumber(quiet and 45 or 65,quiet and 80 or 145)
-  local button=Instance.new('TextButton');button.Name='CollectMoney';button.Text='';button.BackgroundTransparency=1;button.AnchorPoint=Vector2.new(.5,.5);button.AutoButtonColor=false;button.Active=true;button.Selectable=true;button.ZIndex=2;button.Parent=self.Layer;(receipt.Currency=='Gems'and require(RS.GemIcon)or Icon).new(button)
+  local button=Instance.new('TextButton');button.Name='CollectMoney';button:SetAttribute('ButtonSound',false);button.Text='';button.BackgroundTransparency=1;button.AnchorPoint=Vector2.new(.5,.5);button.AutoButtonColor=false;button.Active=true;button.Selectable=true;button.ZIndex=2;button.Parent=self.Layer;(receipt.Currency=='Gems'and require(RS.GemIcon)or Icon).new(button)
   local item={Button=button,Origin=origin,Rest=origin+Vector2.new(math.cos(angle)*radius,direction*(math.sin(angle)*radius*.65+18)),Position=origin,Age=0,Phase=i,Size=self.Random:NextInteger(38,50),Rotation=self.Random:NextNumber(-16,16),ReceiptId=receipt.Id,Index=shares[i].Index,Currency=currency,Shares={}}
   button.Position=UDim2.fromOffset(origin.X,origin.Y);button.Size=UDim2.fromOffset(item.Size*.55,item.Size*.55)
   table.insert(self.Icons,item)

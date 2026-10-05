@@ -83,20 +83,23 @@ check(shut(),'the next action without a message clears the strip at once')
 -- 3. Real errors and hints still show, for 3 seconds ----------------------------------------------------------------------------------
 successful=false
 for _,text in ipairs({'Purchase could not open.','THIS PURCHASE IS UNAVAILABLE','THIS GIFT PURCHASE IS UNAVAILABLE','NOT ENOUGH GEMS','PURCHASES ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE','TRY AGAIN IN A MOMENT'})do
- reply.Message=text;act(pack.BuyWithRobux)
+ plays={};reply.Message=text;act(pack.BuyWithRobux)
+ check(plays[#plays]=='Denied','R150: the refused purchase "'..text..'" clicks Denied')
  check(status.Visible and said()==text,'"'..text..'" is shown')
  R.advance(2.9);check(status.Visible and said()==text,'"'..text..'" is still shown at 2.9 s')
  R.advance(.3);check(shut(),'"'..text..'" hides after 3 s')
 end
 successful=true
-local gems_=page.ConvertCash;reply.Message='Collect your Gems.';gems_.GemQuantity.Text='5';act(gems_.Convert)
+local gems_=page.ConvertCash;reply.Message='Collect your Gems.';gems_.GemQuantity.Text='5';plays={};act(gems_.Convert)
+check(not table.find(plays,'Denied'),'R150: a successful action (the Convert hint) never clicks Denied')
 check(calls[#calls][1]=='Convert'and calls[#calls][2]==5 and status.Visible and said()=='Collect your Gems.','Convert keeps its "Collect your Gems." hint')
 R.advance(3.1);check(shut(),'...and it hides after 3 s')
 gems_.GemQuantity.Text='abc';act(gems_.Convert)
 check(status.Visible and said()=='Enter a whole number of Gems.','a client-side input error shows')
 R.advance(3.1);check(shut(),'...and hides after 3 s')
-failing=true;reply.Message=nil;act(pack.BuyWithRobux)
+failing=true;reply.Message=nil;plays={};act(pack.BuyWithRobux)
 check(status.Visible and said()=='Please try again.','a server call that fails says "Please try again."')
+check(plays[#plays]=='Denied','R150: ...and clicks Denied')
 R.advance(3.1);check(shut(),'...and hides after 3 s')
 failing=false
 -- the same error twice in a row shows each time

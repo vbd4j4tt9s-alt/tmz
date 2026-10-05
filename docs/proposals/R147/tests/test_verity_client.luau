@@ -211,7 +211,9 @@ end
 local function greetings()local n=0;for _,e in ipairs(soundLog)do if e.Sound.Name=='VerityGreeting'then n+=1 end end;return n end
 local function voiceSound()return body:FindFirstChild('VerityGreeting')end
 check(C.GreetingSoundId=='rbxassetid://123997993114202','the owner\'s greeting id is VerityConfig.GreetingSoundId')
-check(greetings()==0 and voiceSound()==nil,'(nothing has played yet: she was far away and no one talked to her)')
+check(greetings()==0,'(nothing has played yet: she was far away and no one talked to her)')
+-- R150: her voice Sound is made as soon as she is in view (the clip downloads before anyone talks to her), so the first greeting is not waiting for it.
+check(voiceSound()~=nil and not voiceSound().IsPlaying,'(her voice Sound already exists, silent, so the clip is loading)')
 standAt(0,7,-150);frames(40);check(greetings()==0,'far away (190 studs): no greeting')
 -- Open with Talk plays it, from her body.
 check(mark.Visible and mark.Text=='!','(before anyone talked to her the "!" is showing)')
@@ -396,11 +398,13 @@ check(status.Text==C.Thanks and plays[#plays]=='GemClaim','Done: the thank-you a
 check(voidChip.Count.Text=='1'and doneChip.Count.Text=='4'and give.Active,'the counts update (1 Void pack left, 4 handed in) and GIVE is ready again')
 give.Activated:Fire();frames(2);check(#fired==2,'a second hand-in sends a second Give')
 server('Done',{Delivered=5})
-check(voidChip.Count.Text=='0'and doneChip.Count.Text=='5'and not give.Active and #plays==2,'the last one: 0 left, GIVE disabled, the sound played twice')
+local gemClaims=0;for _,k in ipairs(plays)do if k=='GemClaim'then gemClaims+=1 end end
+check(voidChip.Count.Text=='0'and doneChip.Count.Text=='5'and not give.Active and gemClaims==2,'the last one: 0 left, GIVE disabled, the sound played twice (R150: a refusal earlier clicked Denied, which is not counted)')
 server('Open',{VoidPacks=1,Delivered=5})
 give.Activated:Fire();frames(2);check(#fired==3 and not give.Active,'(another click, waiting)')
 server('Refused',{Reason='COME CLOSER TO VERITY'})
 check(status.Text=='COME CLOSER TO VERITY'and status.TextColor3.R>.9 and status.TextColor3.G<.5,'Refused: the reason, in red')
+check(plays[#plays]=='Denied','R150: a refused hand-in clicks Denied (and a success never does)')
 check(give.Active and voidChip.Count.Text=='1','and GIVE is unlocked again, the count unchanged')
 give.Activated:Fire();frames(2);check(not give.Active and #fired==4,'(waiting for an answer that never comes)')
 R.advance(3);frames(2);check(not give.Active,'still waiting after 3 s')

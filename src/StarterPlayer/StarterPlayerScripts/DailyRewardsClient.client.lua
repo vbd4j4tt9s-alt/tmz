@@ -44,6 +44,7 @@ local function topButton(name,emoji,caption,color,label)
  return b
 end
 local dailyButton=topButton('DailyButton','🎁','DAILY',RGB(255,150,48),'Daily rewards and quests')
+dailyButton:SetAttribute('ButtonSound','MenuClick') -- R150: it opens the DAILY window (ButtonFeedback's SeedMenu click is the same cue, so it plays once)
 local inviteButton=topButton('InviteButton','👥','INVITE',RGB(64,170,255),'Invite friends. Each friend here: +'..math.floor(D.FriendBoostPerFriend*100+.5)..'% speed gain')
 local function mount()
  local tb=pg:FindFirstChild('TravelButtons');local icons=tb and tb:FindFirstChild('TopIcons')
@@ -267,8 +268,8 @@ local function claim(value)
     Audio.Play('GemClaim')
     if value=='ClaimLogin'then local e=days[state.Login.Claimed];if e then pop(e.Card,1.18)end
     elseif type(value)=='table'then local r=rows[value.Quest];if r then pop(r.Row,1.06)end end
-   end
-  else say('Please try again.')end
+   else Audio.Play('Denied')end -- R150: a refused claim
+  else say('Please try again.');Audio.Play('Denied')end
   render();updateBadges()
  end)
 end
@@ -322,7 +323,7 @@ end
 inviteButton.Activated:Connect(function()
  task.spawn(function()
   local ok,can=pcall(SocialService.CanSendGameInviteAsync,SocialService,player)
-  if not ok or not can then hint('Invites are not available here');return end
+  if not ok or not can then hint('Invites are not available here');Audio.Play('Denied');return end
   local options;pcall(function()options=Instance.new('ExperienceInviteOptions');options.PromptMessage='Friends here boost your speed gain! 👥'end)
   if not pcall(SocialService.PromptGameInvite,SocialService,player,options)then pcall(SocialService.PromptGameInvite,SocialService,player)end
  end)

@@ -860,6 +860,13 @@ function PlayerDataService:Load(player)
 	local premium=require(script.Parent.PremiumProgress).Decode(type(storedData)=='table'and storedData.Premium or nil)
     if not premium then self.CanSave[player]=false;player:SetAttribute('DataStatus','UnsupportedPremium');player:Kick('Your progress needs a newer server. Your save is unchanged.');return false end
     self.Premium=self.Premium or{};self.Premium[player]=premium
+    -- R150: publish the saved audio mix on the Player right away (replicated attributes, no remote): the client's AudioMixer applies it before
+    -- SettingsState answers, so a saved Music / Effects of 0 is not heard at 100% at the start of the session. A new player gets the defaults.
+    pcall(function()
+        local config=require(game:GetService('ReplicatedStorage'):WaitForChild('SettingsConfig'))
+        local mix=config.Read(premium.Settings)
+        for key,attribute in pairs(config.AudioAttributes)do player:SetAttribute(attribute,mix[key])end
+    end)
     if not premium.Tutorial then premium.Tutorial={Version=1,Mask=0,Done=storedData~=nil}end
     local garden, gardenError = self:DecodeGarden(type(storedData) == "table" and storedData.Garden or nil)
 	if not garden then

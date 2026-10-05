@@ -53,6 +53,10 @@ function U.Refresh(self,player)
    if not expected then okay=false;message='Fully upgraded!'
    elseif kind=='Fence'then okay,message=self.PlayerData:BuyFence(sender,expected)
    else okay,message=self.PlayerData:BuyTreadmill(sender,expected)end
+   -- R150: tell the client how the press ended, in the same replication as the tier / price change: a bought upgrade rings the till
+   -- (KaChing), a refused one clicks Denied. (The press click itself, UpgradePressSerial, plays for both.)
+   local resultKey=okay and'UpgradeBoughtSerial'or'UpgradeRefusedSerial'
+   sender:SetAttribute(resultKey,(sender:GetAttribute(resultKey)or 0)+1)
    -- Even a rejected purchase gives a short tactile press without a debit.
    Tween:Create(cap,TweenInfo.new(.10,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{CFrame=home*CF(0,-.35,0)}):Play()
    task.delay(.12,function()if cap.Parent then Tween:Create(cap,TweenInfo.new(.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{CFrame=home}):Play()end end)

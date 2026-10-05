@@ -31,6 +31,7 @@ local getShopState = requireChild(remotes, "GetShopState")
 local purchaseShopItem = requireChild(remotes, "PurchaseShopItem")
 local equipShopItem = requireChild(remotes, "EquipShopItem")
 local InteractionAudio=require(ReplicatedStorage:WaitForChild('InteractionAudio'))
+local LocalSfx=require(ReplicatedStorage:WaitForChild('LocalSfx'));LocalSfx.Preload({LocalSfx.WhooshId})
 local openEconomyUI = requireChild(remotes, "OpenEconomyUI")
 
 local function isLegacyTravelButton(instance)
@@ -340,6 +341,7 @@ local requestBusy = false
 
 local function setStatus(message, isError)
 	local short, color = SimpleText.Format(message)
+	if isError and short ~= "" then InteractionAudio.Play('Denied') end -- R150: a refused market request clicks Denied (can't afford, bag full, no response)
 	statusLabel.Visible = short ~= ""
 	statusLabel.Text = short
 	statusLabel.TextColor3 = isError and SimpleText.Red or color or COLORS.Muted
@@ -478,7 +480,7 @@ shade.Activated:Connect(function()
 	setOpen(false)
 end)
 openEconomyUI.OnClientEvent:Connect(function(requestedTab)
- InteractionAudio.Play('Bubble04')
+	-- R150: no click here any more: ButtonFeedback plays MenuClick when SeedMenu becomes Economy (one rule for every menu).
 	setOpen(true, requestedTab)
 end)
 
@@ -556,6 +558,7 @@ local toastTween, toastSerial = nil, 0
 local function gardenToast(message, failed)
 	local short = SimpleText.Format(message)
 	if short == "" then return end
+	if failed then InteractionAudio.Play('Denied') end -- R150: a refused garden action (AIM AT SOIL, BAG FULL, TOO CLOSE...) clicks Denied
 	toastSerial = toastSerial + 1
 	local token = toastSerial
 	if toastTween then toastTween:Cancel() end
@@ -597,7 +600,6 @@ local function sendGarden(action, payload)
 	if payload.Character ~= player.Character then return end
 	if not ok or type(result) ~= "table" then gardenToast("GARDEN DID NOT RESPOND — TRY AGAIN", true); return end
 	gardenToast(result.Message, result.Success ~= true)
- if action=='Harvest'and result.Success==true then InteractionAudio.Play('Bubble06')end
 	queueSellRefresh()
 	return result
 end
@@ -685,7 +687,9 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, who)
 	if who and who ~= player then return end
 	if not prompt:GetAttribute("GardenPrompt") or prompt:GetAttribute("GardenStage") ~= 4 or prompt:GetAttribute("GardenOwnerId")~=player.UserId then return end
 	if prompt:GetAttribute('GardenAction')=='PlantTop'then
-        sendGarden('PlantTop',{CropId=prompt:GetAttribute('GardenCropId')})
+        local top=sendGarden('PlantTop',{CropId=prompt:GetAttribute('GardenCropId')})
+        -- R150: GO TO TOP moves you: the same arrival whoosh as BASE / TRACK, only when the server says it worked.
+        if top and top.Success==true then LocalSfx.Play(LocalSfx.WhooshId,nil,.22,1.4,2)end
     elseif holdHarvest:NativeTrigger(prompt) then
         local result=sendGarden("Harvest", {CropId=prompt:GetAttribute("GardenCropId"), FruitIndex=prompt:GetAttribute("GardenFruitIndex")})
         holdHarvest:RecordResult(prompt,result)

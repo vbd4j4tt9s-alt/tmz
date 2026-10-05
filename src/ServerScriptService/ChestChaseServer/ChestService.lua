@@ -1036,7 +1036,7 @@ function ChestService:_activatePack(player,tool)
         -- R112: a draw function, not one number: King odds reach 1 in 1T and are rolled in stages.
         local reward,reason=self.PlayerData:OpenSeedPack(player,tool:GetAttribute("SeedInventoryId"),function()return self.PackRandom:NextNumber()end)
         if not reward then
-            self.Notifications:Show(player,reason,Color3.fromRGB(255,185,100),2)
+            self.Notifications:Show(player,reason,Color3.fromRGB(255,185,100),2,"Denied")
             self:_finishOpening(player,opening);return
         end
         opening.Committed=true;opening.RewardId=reward.Id;tool.Enabled=false

@@ -19,7 +19,7 @@ check(F.Create(W.workspace,6,1)==nil and F.Create(W.workspace,8,1)==nil,'Secret 
 local minor=F.Create(W.workspace,3,1);check(minor and minor.Style.Minor and minor.Pillar==nil,'R138: Common..Rare get only the small flourish (no pillar)');minor:Destroy()
 local emitted={}
 local inew=R.Instance.new
-R.Instance.new=function(class,parent)local o=inew(class,parent);if class=='ParticleEmitter'then function o.Emit(_,n)emitted[#emitted+1]=n end end;if class=='Sound'then function o.Play(self)self.IsPlaying=true end end;return o end
+R.Instance.new=function(class,parent)local o=inew(class,parent);if class=='ParticleEmitter'then function o.Emit(_,n)emitted[#emitted+1]=n end end;if class=='Sound'then o.IsLoaded=true;o.Loaded=R.signal();o.TimeLength=3;o.TimePosition=0;function o.Play(self)self.IsPlaying=true end end;return o end -- (R150: the onlooker burst goes through SoundTiming.Play, which reads IsLoaded / Loaded like the engine's Sound)
 W.env.Instance=R.Instance
 local rawEmit=R.Inst.Emit;R.Inst.Emit=function(self,n)if self.ClassName=='ParticleEmitter'then emitted[#emitted+1]=n end;if rawEmit then return rawEmit(self,n)end end
 local holder=R.new('Model');holder.Parent=W.workspace

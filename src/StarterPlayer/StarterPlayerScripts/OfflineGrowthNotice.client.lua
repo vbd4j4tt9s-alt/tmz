@@ -41,7 +41,10 @@ local function detail(n)
  return string.format('Your %d plant%s keep%s growing - come back to harvest!',n,n==1 and''or's',n==1 and's'or'')
 end
 local pulse;local clock=0
+local Audio=require(game:GetService('ReplicatedStorage'):WaitForChild('InteractionAudio'))
 local function setOpen(open)
+ -- R150: the card is a menu-like pop-up on Esc: it clicks open / closed like every other panel (not at script start: gui.Enabled already false).
+ if open~=gui.Enabled then Audio.Play(open and'MenuClick'or'MenuClose')end
  if open then
   sub.Text=detail(plantCount());gui.Enabled=true
   if not pulse then pulse=Run.RenderStepped:Connect(function(dt)

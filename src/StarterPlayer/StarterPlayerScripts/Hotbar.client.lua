@@ -6,6 +6,7 @@ local Players=game:GetService('Players');local RS=game:GetService('ReplicatedSto
 local StarterGui=game:GetService('StarterGui');local GuiService=game:GetService('GuiService');local CAS=game:GetService('ContextActionService')
 local Names=require(RS:WaitForChild('GardenDisplayNames'));local Info=require(RS:WaitForChild('HarvestItemInfo'));local State=require(RS:WaitForChild('GardenInventoryState')).new()
 local Arrival=require(RS:WaitForChild('HarvestArrival'))
+local Audio=require(RS:WaitForChild('InteractionAudio'))
 -- R112: item pictures (cached 3D renders or flat icons) and display-only kg weights.
 local Pictures=require(RS:WaitForChild('ItemPictures'));local Weight=require(RS:WaitForChild('ItemWeight'))
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local bag=player:WaitForChild('Backpack')
@@ -52,6 +53,7 @@ local selectedLabel=label(dock,'SelectedName',UDim2.new(1,0,0,26),UDim2.fromOffs
 local selectedFit=Instance.new('UITextSizeConstraint');selectedFit.MinTextSize=11;selectedFit.MaxTextSize=14;selectedFit.Parent=selectedLabel;selectedLabel.TextScaled=true
 local selectedTraits=label(dock,'SelectedTraits',UDim2.new(1,0,0,16),UDim2.fromOffset(0,-18),'',11);selectedTraits.TextColor3=C.Muted
 local open=button(dock,'OpenInventory','Bag',UDim2.fromOffset(56,56),UDim2.new(1,-56,0,0))
+open:SetAttribute('ButtonSound',false) -- R150: the Bag opens / closes through SeedMenu; ButtonFeedback plays MenuClick / MenuClose for it
 local panel=Instance.new('Frame');panel.Name='Inventory';panel.AnchorPoint=Vector2.new(.5,.5);panel.Position=UDim2.fromScale(.5,.49);panel.Size=UDim2.new(.86,0,.66,0);panel.BackgroundColor3=C.Panel;panel.BackgroundTransparency=.05;panel.Visible=false;panel.Parent=gui;corner(panel)
 local constraint=Instance.new('UISizeConstraint');constraint.MaxSize=Vector2.new(1080,740);constraint.Parent=panel
 label(panel,'Title',UDim2.new(1,-65,0,40),UDim2.fromOffset(16,8),'Inventory',20).TextXAlignment=Enum.TextXAlignment.Left
@@ -167,12 +169,16 @@ local function toggle(show)
  if show then pg:SetAttribute('SeedMenu','Inventory');search:ReleaseFocus();layout();renderRows()
  elseif pg:GetAttribute('SeedMenu')=='Inventory'then pg:SetAttribute('SeedMenu',nil)end
 end
+-- R150: every way to equip (keys 1-0, L1 / R1, a slot, a Bag card) sounds the same Equip cue, once, on the frame the tool changes hands.
+-- Equipping from the Bag also closes it; that close stays quiet so the click is one sound, not two.
 local function equip(key)
  local e=State.Items[key];local char=player.Character;local humanoid=char and char:FindFirstChildOfClass('Humanoid')
  if not e or not humanoid or humanoid.Health<=0 then return end
  if e.Tool.Parent==char then humanoid:UnequipTools();selectedKey=nil else
   State:Ensure(key,visibleSlots);humanoid:EquipTool(e.Tool);selectedKey=key
  end
+ if panel.Visible then Audio.Mute('MenuClose',.25)end
+ Audio.Play('Equip')
  toggle(false);refresh()
 end
 local function beginDrag(button0,key,input)
@@ -189,7 +195,11 @@ for i=1,10 do
  plainLabel(b,'ItemName')
  local weight=label(b,'ItemWeight',UDim2.new(1,-4,0,12),UDim2.new(0,2,1,-26),'',9);weight.TextXAlignment=Enum.TextXAlignment.Right;weight.ZIndex=3
  countBadge(b)
- b.Activated:Connect(function()if os.clock()>=suppressedUntil and State.Slots[i]then equip(State.Slots[i])end end)
+ b:SetAttribute('ButtonSound',false) -- R150: a slot click is the Equip cue (equip()); an empty slot keeps the plain click below
+ b.Activated:Connect(function()
+  if os.clock()<suppressedUntil then return end
+  if State.Slots[i]then equip(State.Slots[i])else Audio.Play('Bubble04')end
+ end)
  b.InputBegan:Connect(function(input)if State.Slots[i]then beginDrag(b,State.Slots[i],input)end end)
 end
 local filterButtons={}
@@ -232,7 +242,7 @@ local function makeCard()
  local name=label(b,'ItemName',UDim2.new(1,-8,0,28),UDim2.new(0,4,1,-31),'',12);name.ZIndex=3
  local detail=label(b,'ItemTraits',UDim2.new(1,-8,0,13),UDim2.new(0,4,1,-45),'',10);detail.ZIndex=3
  countBadge(b).Position=UDim2.fromOffset(4,4)
- selectionBorder(b)
+ selectionBorder(b);b:SetAttribute('ButtonSound',false) -- R150: a Bag card click is the Equip cue (equip())
  b.Activated:Connect(function()local key=b:GetAttribute('InventoryKey');if key and os.clock()>=suppressedUntil then equip(key)end end)
  b.InputBegan:Connect(function(input)local key=b:GetAttribute('InventoryKey');if key then beginDrag(b,key,input)end end)
  return b
@@ -330,6 +340,8 @@ refresh=function()
  end
  renderRows()
  if arrived then
+  -- R150: the "it landed in your bag" cue belongs to this flash (the fruit's arrival), not to the server reply that lifted it off.
+  Audio.Play('Bubble06')
   for key in pairs(arrived)do
    local shown=false
    for i,b in ipairs(slots)do if b.Visible and State.Slots[i]==key then flash(b);shown=true end end
@@ -502,7 +514,7 @@ connect(Input.InputEnded,function(input)
  local d=drag;drag=nil;if not d.Moved then return end;suppressedUntil=os.clock()+.2
  -- InputObject.Position and AbsolutePosition already share CoreUISafeInsets coordinates.
  local p=Vector2.new(input.Position.X,input.Position.Y)
- for i,b in ipairs(slots)do local a,z=b.AbsolutePosition,b.AbsoluteSize;if b.Visible and p.X>=a.X and p.Y>=a.Y and p.X<=a.X+z.X and p.Y<=a.Y+z.Y then State:Place(d.Key,i);refresh();break end end
+ for i,b in ipairs(slots)do local a,z=b.AbsolutePosition,b.AbsoluteSize;if b.Visible and p.X>=a.X and p.Y>=a.Y and p.X<=a.X+z.X and p.Y<=a.Y+z.Y then State:Place(d.Key,i);Audio.Play('Bubble04');refresh();break end end
 end)
 local numbers={[Enum.KeyCode.One]=1,[Enum.KeyCode.Two]=2,[Enum.KeyCode.Three]=3,[Enum.KeyCode.Four]=4,[Enum.KeyCode.Five]=5,[Enum.KeyCode.Six]=6,[Enum.KeyCode.Seven]=7,[Enum.KeyCode.Eight]=8,[Enum.KeyCode.Nine]=9,[Enum.KeyCode.Zero]=10}
 connect(Input.InputBegan,function(input,processed)

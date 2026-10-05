@@ -72,9 +72,10 @@ local talked=false -- opened her dialog this session: the "!" is gone until the 
 -- or the owner's live values on her model), as the Sound's PlaybackRegion. Every greeting starts in startVoice, so every one is cut the same
 -- way. Her volume is faded over the last GreetingFade seconds (voiceTick, from the Sound's own TimePosition) so the cut does not click, and
 -- voice.Until ends it by timer even if the engine did not honour the region. A greeting asked for before the clip has loaded waits for it
--- (up to 3 s) rather than being timed by a clock that started before the audio did.
+-- (up to GreetingMaxWait, .5 s since R150, like every other cue) rather than being timed by a clock that started before the audio did.
+local GREETING_MAX_WAIT=.5 -- R150: a greeting that is not ready this long after it was asked for is skipped, never spoken late
 local voice={Playing=false,Until=0,LastAt=-math.huge,Failed=false,Warned=false,Sound=nil,Checked=false,Plays=0,Start=0,Stop=0,StartedAt=0,Gain=1,
- Lip=VerityVoice.NewLip(C.Lip),Waiting=nil,RegionWarned=false}
+ Lip=VerityVoice.NewLip(C.Lip),Waiting=nil,RegionWarned=false,PanelOpen=function()return false end}
 local entry=nil
 local function failVoice(why)
  voice.Failed=true
@@ -151,15 +152,19 @@ local function greet(kind,override)
  local s=voiceSound(e,override~=nil);if not s or voice.Failed then return false end
  if s.IsLoaded==false and not((s.TimeLength or 0)>0)then -- (an unloaded Sound has no length yet)
   if voice.Waiting then return false end
-  local ticket={};voice.Waiting=ticket
+  local ticket={};voice.Waiting=ticket;local askedAt=os.clock()
   local c;c=s.Loaded:Connect(function()
    c:Disconnect()
    if voice.Waiting~=ticket then return end
    voice.Waiting=nil
+   -- R150: too late is no greeting. (Her mouth follows the sound, so it was never out of step, but "Hello, my name is Verity" seconds after
+   -- the window opened, or after you walked past, is a bug.) A 'talk' greeting also needs her window to still be open.
+   if os.clock()-askedAt>GREETING_MAX_WAIT then return end
+   if kind=='talk'and not voice.PanelOpen()then return end
    if entry==e and e.Body.Parent and s.Parent and not speaking()and not voice.Failed then startVoice(e,s,kind,override)end
   end)
   connections[#connections+1]=c
-  task.delay(3,function()if voice.Waiting==ticket then voice.Waiting=nil;c:Disconnect()end end)
+  task.delay(GREETING_MAX_WAIT,function()if voice.Waiting==ticket then voice.Waiting=nil;c:Disconnect()end end)
   return false
  end
  return startVoice(e,s,kind,override)
@@ -228,6 +233,8 @@ local function build(model,body)
  local look=body.CFrame.LookVector;local yaw=math.atan2(-look.X,-look.Z)
  entry={Model=model,Body=body,Sign=sign,Mark=mark,Timer=timer,Home=body.CFrame,Base=body.Position,Size=body.Size.X,Yaw=yaw,Yaw0=yaw,Has=false,Moved=false,Scale=1,Poll=1,Near=nil,Mouth=nil,MouthShown=false}
  refreshMarker()
+ -- R150: make her voice's Sound now (the asset is requested while she is merely in view), so the first greeting is not waiting for a download.
+ pcall(voiceSound,entry,false)
 end
 local function attach(model)
  if entry and entry.Model==model then return end
@@ -333,6 +340,7 @@ local function recount()if not alive then return end;refreshMarker();task.delay(
 task.delay(1,recount)
 -- The window ---------------------------------------------------------------------------------------------------------------------
 local old=pg:FindFirstChild('VerityGui');if old then old:Destroy()end
+-- R150: the voice code above is declared before the window exists; this tells it whether her window is open (for a late 'talk' greeting).
 local gui=new('ScreenGui',{Name='VerityGui',ResetOnSpawn=false,DisplayOrder=41,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},pg)
 local shade=new('TextButton',{Name='Shade',Text='',AutoButtonColor=false,Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.new(),BackgroundTransparency=.48,BorderSizePixel=0,Visible=false},gui)
 shade:SetAttribute('ButtonSound',false)
@@ -560,7 +568,7 @@ local function onServer(kind,payload)
   if not panel.Visible then open()end
  elseif kind=='Refused'then
   setBusy(false)
-  say(type(payload.Reason)=='string'and payload.Reason:sub(1,90)or C.Reasons.Failed,false)
+  say(type(payload.Reason)=='string'and payload.Reason:sub(1,90)or C.Reasons.Failed,false);Audio.Play('Denied') -- R150: a refused hand-in
   if not panel.Visible then open()else render()end
  end
 end
@@ -573,6 +581,7 @@ task.spawn(function()
   remote:FireServer('Give')
  end)
 end)
+voice.PanelOpen=function()return panel.Visible end
 closeX.Activated:Connect(close);closeButton.Activated:Connect(close);shade.Activated:Connect(close)
 watch(pg:GetAttributeChangedSignal('SeedMenu'),function()
  if panel.Visible and pg:GetAttribute('SeedMenu')~='Verity'then hidePanel()end

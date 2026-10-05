@@ -55,6 +55,8 @@ local function ensure()
    local stroke=Instance.new('UIStroke');stroke.Color=Color3.new(0,0,0);stroke.Thickness=2.5;stroke.Parent=label
    item.Label=label;item.Stroke=stroke;item.At=now;item.Until=now+item.Duration;table.insert(Showing,item)
    if item.Cue then cue(item.Cue,now)end
+   -- R150: a refusal (red notice, or kind='Denied' from the server) clicks Denied on the frame its line appears.
+   if item.Deny then require(script.Parent.InteractionAudio).Play('Denied')end
   end
   local width,row,y=layout.Width,layout.Row,layout.Y
   local size=Vector2.new(width,(row+4)*#Showing)
@@ -68,11 +70,11 @@ local function ensure()
  script.Destroying:Connect(function()alive=false;tick:Disconnect();if root then root:Destroy()end;table.clear(Queue);table.clear(Showing);for _,voice in pairs(voices)do voice:Destroy()end;table.clear(voices)end)
 end
 function F.Preload()ensure()end
-function F.Push(text,duration,key,priority,sound)
+function F.Push(text,duration,key,priority,sound,deny)
  ensure();if not alive or type(text)~='string'or #text>1600 then return end
  if key and not remember(key)then return end
  if #Queue>=64 then table.remove(Queue,1)end
- serial+=1;local item={Text=text,Duration=math.clamp(duration or 4,.8,7),Serial=serial,QueuedAt=os.clock(),Cue=cueIds[sound]and sound or nil}
+ serial+=1;local item={Text=text,Duration=math.clamp(duration or 4,.8,7),Serial=serial,QueuedAt=os.clock(),Cue=cueIds[sound]and sound or nil,Deny=deny==true}
  if priority then
   table.insert(Queue,1,item)
   if priority==true and #Showing>=3 then Showing[1].Label:Destroy();table.remove(Showing,1)end
@@ -80,7 +82,14 @@ function F.Push(text,duration,key,priority,sound)
 end
 -- R131: a received gift, shown first with its chime.
 function F.Gift(text)F.Push(text,5,nil,true,'Gift')end
-function F.Plain(text,color,duration,key)F.Push(Copy.Color(text,color or Color3.new(1,1,1)),duration,key)end
+-- deny (R150): true for a refusal; see F.IsRefusal for how a server notice is classed.
+function F.Plain(text,color,duration,key,deny)F.Push(Copy.Color(text,color or Color3.new(1,1,1)),duration,key,nil,nil,deny)end
+-- A server notice is a refusal when the server says so (kind 'Denied') or when its colour is the shared red of SimpleGameText.
+function F.IsRefusal(color,kind)
+ if kind=='Denied'then return true end
+ local red=require(script.Parent.SimpleGameText).Red
+ return typeof(color)=='Color3'and math.abs(color.R-red.R)<.01 and math.abs(color.G-red.G)<.01 and math.abs(color.B-red.B)<.01
+end
 local pending={};local scheduled=false
 function F.Pack(m)
  if not alive or type(m)~='table'or type(m.Text)~='string'or #m.Text>200 or type(m.Biome)~='string'or #m.Biome>80 or type(m.SpawnId)~='string'or #m.SpawnId>180 or type(m.Stage)~='number'or m.Stage~=m.Stage or m.Stage<1 or m.Stage>8 then return end

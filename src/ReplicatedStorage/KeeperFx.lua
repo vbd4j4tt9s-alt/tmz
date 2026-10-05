@@ -9,6 +9,10 @@ local Fx={MaxLights=3,DustDistance=120,BreathDistance=90,ShakeDistance=60,Rate=9
 -- R124: keepers whose move smashes the ground (KeeperSignatureStrike Ground) play this at the visual impact frame.
 -- Punches, swipes and pushes keep their sounds. A silent lead-in can be trimmed with SoundTiming Start_<id>.
 Fx.GroundSound={Id='rbxassetid://73468358342062',Volume=.5,Lifetime=4}
+-- R150: the slam SOUND is gated by how far a one-shot can be heard (LocalSfx rolls off at 260), not by DustDistance (120), which only limits the
+-- dust, accent and shake. Fx.SlamHeard[stage] = when a slam sound of that stage last actually played: KeeperHitEffects skips its generic snap
+-- exactly then, so a hit near any distance sounds as one slam OR one snap, never both and never neither.
+Fx.GroundSoundDistance=260;Fx.SlamHeard={};Fx.SlamHeardSeconds=1.5
 local groundPreloaded=false
 local V,CF=Vector3.new,CFrame.new
 local SMOKE='rbxasset://textures/particles/smoke_main.dds'
@@ -306,17 +310,21 @@ function Fx.Wake(self,c)
 end
 -- Strike slam at the client's impact instant (visual only; the server decides the hit).
 function Fx.Slam(self,c)
- if not self or self.Destroyed or c.Distance>Fx.DustDistance then return end
+ if not self or self.Destroyed then return end
  local spec=self.Spec;local reach=Combat.Get(self.Stage).Reach
  local point=c.Frame*V(0,-4,-reach*.55)
  -- R123: the move's own accent at its striking tip (from the client strike frames), small and budgeted.
  local tip,n0=V(),0
  if c.Frames then for _,t in ipairs(self.Tips)do local f=c.Frames[t.Group];if f then tip+=c.Frame*(f*t.Point);n0+=1 end end end
  local strike=n0>0 and tip/n0 or point
+ -- R150: the sound first, gated by hearing range (Fx.GroundSoundDistance), not by the dust range below.
+ if self.GroundSound and c.Distance<=Fx.GroundSoundDistance then
+  if require(script.Parent.LocalSfx).Play(Fx.GroundSound.Id,V(strike.X,point.Y,strike.Z),Fx.GroundSound.Volume,1,Fx.GroundSound.Lifetime)then Fx.SlamHeard[self.Stage]=os.clock()end
+ end
+ if c.Distance>Fx.DustDistance then return end
  local n=Fx.Spend(c.Low and 2 or 4,c.Now,c.Low)
  if n>0 then place(self.Foot,self.Root,CF(V(strike.X,point.Y,strike.Z)));self.Dust:Emit(n)end
  if self.Accent then Fx.Accent(self.Accent,strike,c.Frame,c.Low)end
- if self.GroundSound then require(script.Parent.LocalSfx).Play(Fx.GroundSound.Id,V(strike.X,point.Y,strike.Z),Fx.GroundSound.Volume,1,Fx.GroundSound.Lifetime)end
  if spec.Heavy>0 and c.LocalDistance and c.LocalDistance<40 then Fx.Shake(spec.Heavy*.6*(1-c.LocalDistance/40))end
 end
 function Fx.Destroy(self)

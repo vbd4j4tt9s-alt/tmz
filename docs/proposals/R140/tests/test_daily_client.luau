@@ -10,6 +10,9 @@ local W=require('./world');local F=require('./fixtures');local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
 F.packAssets(W)
+-- R150: a recorder in place of InteractionAudio: the DAILY button names MenuClick (the SeedMenu rule's click is the same cue), a success clicks GemClaim, a refused claim clicks Denied.
+local audioLog={};W.stub('InteractionAudio',{Play=function(k)audioLog[#audioLog+1]=k;return true end,Preload=function()end,Transaction=function()end})
+local function audioHas(k)for _,x in ipairs(audioLog)do if x==k then return true end end;return false end
 local Players=W.service('Players');local player=R.new('Player');player.Name='Tester';player.UserId=77;player.Parent=Players;Players.LocalPlayer=player
 local pg=R.new('PlayerGui');pg.Name='PlayerGui';pg.Parent=player
 local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=W.RS
@@ -99,6 +102,7 @@ check(b and b.Visible and b.Count.Text=='2','badge: login + 1 quest = 2')
 daily.Activated:Fire();frames(5)
 local gui=pg.DailyRewardsGui;local panel=gui.DailyPanel
 check(panel.Visible and pg:GetAttribute('SeedMenu')=='Daily','DAILY opens the window (SeedMenu = Daily)')
+check(daily:GetAttribute('ButtonSound')=='MenuClick','R150: the DAILY button clicks MenuClick (it opens a menu), not the generic Bubble04')
 check(not icons.Visible,'the top bar buttons hide while it is open (like the other menus)')
 local login=panel.LoginPage;local quests=panel.QuestsPage
 check(login.Visible and not quests.Visible,'the LOGIN tab first (a login reward is waiting)')
@@ -109,8 +113,10 @@ check(cards[7].Amount.Text=='MECH PACK'and cards[1].Amount.Text=='RANDOM PACK'an
 check(cards[2].Amount.Text=='RANDOM PACK'and cards[3].Amount.Text=='RANDOM PACK','(days 2 and 3 too)')
 check(login.Note.Text:find('MECH',1,true)and login.Note.Text:find('random packs',1,true)and login.Note.Text:find('2 + 3 gems',1,true),'the note: 4 random packs, then 2 + 3 gems, day 7 = MECH: '..login.Note.Text)
 check(login.ClaimButton.Caption.Text=='CLAIM DAY 1!','the big button: CLAIM DAY 1!')
+audioLog={}
 login.ClaimButton.Activated:Fire();frames(5)
 check(calls[#calls][1]=='Daily'and calls[#calls][2]=='ClaimLogin','claiming asks the server')
+check(audioHas('GemClaim')and not audioHas('Denied'),'R150: a successful claim clicks GemClaim and never Denied')
 check(cards[1].Check.Visible and not cards[1].Today.Visible,'day 1 gets a ✓')
 check(login.ClaimButton.Caption.Text:find('NEXT REWARD IN 5h',1,true),'then the button counts down: '..login.ClaimButton.Caption.Text)
 check(panel.Status.Text=='Collect your Gems.','the server message shows')
@@ -126,6 +132,11 @@ check(rows[2].Bar.Count.Text=='1 / 3'and math.abs(rows[2].Bar.Fill.Size.X.Scale-
 check(rows[1].Claim.Visible and not rows[2].Claim.Visible and not rows[3].Claim.Visible,'only finished quests have CLAIM')
 check(rows[1].Reward.Amount.Text=='2'and rows[2].Reward.Amount.Text=='2'and rows[3].Reward.Amount.Text=='2','each pays 💎 2')
 check(quests.Reset.Text:find('NEW QUESTS IN 5h',1,true),'the reset countdown: '..quests.Reset.Text)
+-- R150: the server refuses a claim (it was already taken elsewhere): the press clicks Denied, not GemClaim.
+srv.Quests[1].Claimed=true;audioLog={};rows[1].Claim.Activated:Fire();frames(5)
+check(audioHas('Denied')and not audioHas('GemClaim'),'R150: a refused quest claim clicks Denied (and never GemClaim) ('..table.concat(audioLog,',')..')')
+srv.Quests[1].Claimed=false;player:SetAttribute('DailyRevision',6);frames(5)
+check(rows[1].Claim.Visible,'(the window is back to the claimable quest after a refresh)')
 rows[1].Claim.Activated:Fire();frames(5)
 check(type(calls[#calls][2])=='table'and calls[#calls][2].Quest==1,'claiming quest 1')
 check(not rows[1].Claim.Visible and rows[1].Done.Visible,'then it says ✓ DONE')

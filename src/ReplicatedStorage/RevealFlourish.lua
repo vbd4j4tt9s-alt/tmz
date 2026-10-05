@@ -75,7 +75,8 @@ function F:Update(mouth,t,burstAt,heard)
   self.Burst=true;self.Sparks:Emit(style.Sparks)
   if heard then
    local sound=Instance.new('Sound');sound.Name='Seed burst';sound.SoundId=F.SoundId;sound.Volume=.22;sound.PlaybackSpeed=self.Rank==5 and 1.05 or 1.25
-   sound.RollOffMinDistance=6;sound.RollOffMaxDistance=45;sound.Parent=self.Anchor;sound:Play();self.Sound=sound
+   -- R150: through SoundTiming (the file's .04 s lead-in is skipped, as it is for the opener) so the sound meets the pillar.
+   sound.RollOffMinDistance=6;sound.RollOffMaxDistance=45;sound.Parent=self.Anchor;require(script.Parent.SoundTiming).Play(sound,nil,.25);self.Sound=sound
   end
  end
  for _,m in ipairs(self.Motes)do m.Transparency=1 end

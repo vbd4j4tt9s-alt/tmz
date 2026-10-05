@@ -19,4 +19,22 @@ table.insert(connections,game:GetService('RunService').Heartbeat:Connect(functio
  if os.clock()-pending.At>2 or pending.Character~=player.Character then pending=nil else tryPickup()end
 end))
 table.insert(connections,player:GetAttributeChangedSignal('UpgradePressSerial'):Connect(function()Audio.Play('UpgradeClick')end))
+-- R150: the server says how the press ended (GardenUpgradeService, same replication as the tier / price change): bought = KaChing, refused = Denied.
+table.insert(connections,player:GetAttributeChangedSignal('UpgradeBoughtSerial'):Connect(function()Audio.Play('KaChing')end))
+table.insert(connections,player:GetAttributeChangedSignal('UpgradeRefusedSerial'):Connect(function()Audio.Play('Denied')end))
+-- R150: stepping onto a treadmill (TreadmillTraining false -> true) clicks Equip; the speed-gain popups stay silent (too frequent).
+local training=player:GetAttribute('TreadmillTraining')==true
+table.insert(connections,player:GetAttributeChangedSignal('TreadmillTraining'):Connect(function()
+ local now=player:GetAttribute('TreadmillTraining')==true
+ if now and not training then Audio.Play('Equip')end
+ training=now
+end))
+-- R150: holding E on a prompt (take a pack, harvest, take the mystery pack...) clicks as the hold begins; the finish has its own cue.
+-- ProximityPromptService.PromptButtonHoldBegan only fires for this player's own prompt use.
+pcall(function()
+ local Prompts=game:GetService('ProximityPromptService')
+ table.insert(connections,Prompts.PromptButtonHoldBegan:Connect(function(prompt)
+  if prompt.HoldDuration>0 then Audio.Play('Bubble04')end
+ end))
+end)
 script.Destroying:Connect(function()for _,c in ipairs(connections)do c:Disconnect()end end)

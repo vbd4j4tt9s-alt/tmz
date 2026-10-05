@@ -91,10 +91,12 @@ function S:_downed(player)
   or (ragdoll~=nil and ragdoll.Records~=nil and ragdoll.Records[player]~=nil)
 end
 
+-- R150: the refusals (cooldown, can't dig here / now) click the Denied cue on the client; 'Covered', 'Trapped' and 'Tripped' are news, not refusals.
+local DENIED={Cooldown=true,Carrying=true,Refreshing=true,Ground=true,Pack=true,Camp=true,Entrance=true,Spacing=true,PlayerCap=true,ServerCap=true}
 function S:_tell(player,key,...)
  local text=C.Messages[key];if not text then return end
  if select('#',...)>0 then text=string.format(text,...)end
- if self.Notifications then self.Notifications:Show(player,text,Color3.fromRGB(255,187,91),2)end
+ if self.Notifications then self.Notifications:Show(player,text,Color3.fromRGB(255,187,91),2,DENIED[key]and'Denied'or nil)end
 end
 
 function S:_campHomes()

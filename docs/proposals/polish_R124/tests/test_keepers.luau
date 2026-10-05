@@ -44,8 +44,29 @@ hit({Position=V3(0,3,0),Stage=6,VictimUserId=99})
 check(count(SNAP)==0,'Jungle slam hit in range: no extra snap (slam sound already played at the impact)')
 hit({Position=V3(0,3,0),Stage=1,VictimUserId=99})
 check(count(SNAP)==0,'Forest hammer hit in range: no extra snap')
+-- R150: the slam SOUND is heard out to LocalSfx's range (260), not only the 120-stud effect range, and the generic snap is skipped exactly when that
+-- slam was heard (KeeperFx.SlamHeard, 1.5 s): near the old 120 border a hit sounds as one slam OR one snap, never both and never neither.
+R.advance(2)
 hit({Position=V3(0,3,200),Stage=6,VictimUserId=99})
-check(count(SNAP)==1,'Jungle hit out of slam range keeps the snap')
+check(count(SNAP)==1,'Jungle hit whose slam was not heard keeps the snap')
+do
+ local root6=R.new('Part');root6.Name='Root';root6.CFrame=CF(0,6,0);root6.Parent=W.workspace
+ local _,fx6=pcall(KFx.new,root6,6)
+ for _,d in ipairs({100,119,121,200,259})do
+  R.advance(2);table.clear(played)
+  pcall(KFx.Slam,fx6,{Distance=d,LocalDistance=d,Frame=CF(0,6,0),Low=false,Now=R.clock})
+  local slam=count(GROUND)
+  hit({Position=V3(0,3,d-20),Stage=6,VictimUserId=99})
+  -- (hit() cleared the log: the snap count is the hit's own)
+  check(slam==1,'distance '..d..': the slam sound is heard (the sound range is 260, not the 120-stud effect range)')
+  check(count(SNAP)==0,'distance '..d..': ...and the snap stays out (one slam, not slam + snap)')
+ end
+ R.advance(2);table.clear(played)
+ pcall(KFx.Slam,fx6,{Distance=300,LocalDistance=300,Frame=CF(0,6,0),Low=false,Now=R.clock})
+ check(count(GROUND)==0,'beyond the sound range (300): no slam sound')
+ hit({Position=V3(0,3,235),Stage=6,VictimUserId=99}) -- (the victim is ~255 studs from the camera: inside the hit's own 260 range)
+ check(count(SNAP)==1,'... so the hit keeps its snap (never neither)')
+end
 for _,stage in ipairs({2,3,4,5,7})do hit({Position=V3(0,3,0),Stage=stage,VictimUserId=99});check(count(SNAP)==1,'stage '..stage..' (punch/swipe/push): snap unchanged')end
 hit({Position=V3(0,3,0),Stage=7,VictimUserId=7,Veiled=true})
 check(count(VEIL)==1 and count(SNAP)==0,'The Darkened catch: its own sound, no generic snap')

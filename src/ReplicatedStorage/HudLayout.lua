@@ -362,7 +362,7 @@ local function createNavigation(pg)
   state:SetOpen(state.Open,true)
  end
  state.StopLayout=L.Watch(gui,layout)
- state.Connections[#state.Connections+1]=hub.Activated:Connect(function()if state.Dead or not hub.Active or pg:GetAttribute('SeedMenu')~=nil then return end;require(script.Parent.InteractionAudio).Play('MenuClick');state:SetOpen(not state.Open,false)end)
+ state.Connections[#state.Connections+1]=hub.Activated:Connect(function()if state.Dead or not hub.Active or pg:GetAttribute('SeedMenu')~=nil then return end;require(script.Parent.InteractionAudio).Play(state.Open and'MenuClose'or'MenuClick');state:SetOpen(not state.Open,false)end) -- R150: closing the wheel is MenuClose, like every other close
  state.Connections[#state.Connections+1]=pg:GetAttributeChangedSignal('SeedMenu'):Connect(function()state:SetOpen(false,true)end)
  state.Connections[#state.Connections+1]=Gui:GetPropertyChangedSignal('ReducedMotionEnabled'):Connect(function()state:SetOpen(state.Open,true)end)
  state.Connections[#state.Connections+1]=gui.Destroying:Connect(function()

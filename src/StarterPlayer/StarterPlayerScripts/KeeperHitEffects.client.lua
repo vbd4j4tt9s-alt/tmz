@@ -79,7 +79,7 @@ local connection=remote.OnClientEvent:Connect(function(hit)
  -- R124: a ground-smash keeper's slam sound already played at the visual impact (KeeperFx.Slam, in range), so the
  -- generic snap is skipped there; The Darkened has its own catch sound instead of the snap and voice.
  local move=not batHit and not veiled and Signature.Moves[hit.Stage]
- local slammed=move and move.Ground and distance<KFx.DustDistance
+ local slammed=move and move.Ground and os.clock()-(KFx.SlamHeard[hit.Stage]or-math.huge)<=KFx.SlamHeardSeconds -- R150: skip the snap only when this stage's slam was really heard
  if veiled then Sfx.Play(VEILED.Sound,hit.Position,VEILED.Volume,1,4)
  else
   local snap=batHit and Bat.SlapSoundId or Audio.Asset('Impact');if snap and not slammed then Sfx.Play(snap,hit.Position,batHit and Bat.SlapVolume or Audio.ImpactVolume,1,2)end

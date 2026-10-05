@@ -6,6 +6,7 @@ local remotes=RS:WaitForChild('ChestChaseRemotes')
 local requestBase=remotes:WaitForChild('RequestBaseTeleport');local requestTrack=remotes:WaitForChild('RequestTrackTeleport')
 local Bright=require(RS:WaitForChild('BrightUI'));local Fit=require(RS:WaitForChild('GardenTextFit'))
 local Tween=game:GetService('TweenService')
+local Sfx=require(RS:WaitForChild('LocalSfx'));Sfx.Preload({Sfx.WhooshId}) -- R150: the arrival whoosh is warm before the first teleport
 local old=pg:FindFirstChild('TravelButtons');if old then old:Destroy()end
 -- Below the tutorial card (25) and the menu hub (33): anything important draws above these buttons.
 local gui=Instance.new('ScreenGui');gui.Name='TravelButtons';gui.ResetOnSpawn=false;gui.DisplayOrder=24;gui.ScreenInsets=Enum.ScreenInsets.None;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
@@ -101,6 +102,14 @@ local sized=gui:GetPropertyChangedSignal('AbsoluteSize'):Connect(layout);task.de
 local inset=GuiService:GetPropertyChangedSignal('TopbarInset'):Connect(layout)
 local function stopLayout()sized:Disconnect();inset:Disconnect()end
 for _,key in ipairs({'TitleActive','SeedMenu'})do connections[#connections+1]=pg:GetAttributeChangedSignal(key):Connect(refresh)end
+-- R150: arrival. The server writes FastTravelReadyAt (now + cooldown) right after it moves the character, so a rise to a time still in
+-- the future is "you arrived": a short whoosh. A stale value at join, or the cooldown draining, never plays it.
+local lastReady=tonumber(player:GetAttribute('FastTravelReadyAt'))or 0
+connections[#connections+1]=player:GetAttributeChangedSignal('FastTravelReadyAt'):Connect(function()
+ local ready=tonumber(player:GetAttribute('FastTravelReadyAt'))or 0
+ local rose=ready-lastReady>.5 and ready>workspace:GetServerTimeNow();lastReady=ready
+ if rose then Sfx.Play(Sfx.WhooshId,nil,.22,1.4,2)end
+end)
 for _,key in ipairs({'FastTravelReadyAt','ChestChaseSeedCarrying','ChestChaseRunActive','TreadmillTraining','GuardianRagdollActive','GuardianFlingActive'})do connections[#connections+1]=player:GetAttributeChangedSignal(key):Connect(paint)end
 paint();refresh()
 gui.Destroying:Connect(function()

@@ -195,8 +195,9 @@ local function act(action,value,onDone)
  task.spawn(function()
   local okay,result=pcall(request.InvokeServer,request,action,value);busy=false
   if not gui.Parent then return end
-  if okay and type(result)=='table'then if result.Gems~=nil then state=result end;setStatus(result.Message);if action~='State'and result.Success and action~='RobuxPack'and action~='RobuxBundle'and action~='RobuxGift'and not celebrated[action]then Audio.Transaction('Buy')end
-  else setStatus('Please try again.')end;refresh()
+  if okay and type(result)=='table'then if result.Gems~=nil then state=result end;setStatus(result.Message);if action~='State'and result.Success==false then Audio.Play('Denied')end -- R150: a refused purchase
+  if action~='State'and result.Success and action~='RobuxPack'and action~='RobuxBundle'and action~='RobuxGift'and not celebrated[action]then Audio.Transaction('Buy')end
+  else setStatus('Please try again.');if action~='State'then Audio.Play('Denied')end end;refresh()
   if onDone then onDone(okay and result or nil)end
   if pendingState and not busy then pendingState=false;if panel.Visible then act('State')end end
  end)

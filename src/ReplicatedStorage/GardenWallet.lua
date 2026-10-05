@@ -7,19 +7,26 @@ function Wallet.new(parent)
  local function row(name,color,kind,page)
   local root=Instance.new(kind=='Gems'and'TextButton'or'Frame');root.Name=name;root.BackgroundTransparency=1;root.BorderSizePixel=0;root.ZIndex=50;root.Parent=parent
   root:SetAttribute('AccessibleLabel',kind)
-  if kind=='Gems'then root.Text='';root.AutoButtonColor=false;root:SetAttribute('ButtonHighlight',false)
-   table.insert(connections,root.Activated:Connect(function()require(RS.InteractionAudio).Play('Bubble04');pg:SetAttribute('PremiumPage','Gems');pg:SetAttribute('SeedMenu','Passes')end))
+  -- R150: wallet taps open the Passes panel through SeedMenu; ButtonFeedback plays its MenuClick (one rule for every menu), so the
+  -- buttons themselves are silent (ButtonSound is read at click time, unlike ButtonHighlight, which only counts before the bind). If
+  -- Passes is already open the tap just switches page: a plain click.
+  local function open(page0,focus)
+   if pg:GetAttribute('SeedMenu')=='Passes'then require(RS.InteractionAudio).Play('Bubble04')end
+   pg:SetAttribute('PremiumPage',page0);if focus then pg:SetAttribute('PremiumFocus',focus)end;pg:SetAttribute('SeedMenu','Passes')
+  end
+  if kind=='Gems'then root.Text='';root.AutoButtonColor=false;root:SetAttribute('ButtonHighlight',false);root:SetAttribute('ButtonSound',false)
+   table.insert(connections,root.Activated:Connect(function()open('Gems')end))
   end
   local icon=kind=='Cash'and require(RS.MoneyIcon).new(root)or kind=='Gems'and require(RS.GemIcon).new(root)or require(RS.PremiumEmblems).Draw(root,'Bolt')
   local scale=Instance.new('UIScale');scale.Parent=icon
   local amount=Instance.new('TextLabel');amount.Name=kind=='Gems'and'GemAmount'or'Amount';amount.BackgroundTransparency=1;amount.TextXAlignment=Enum.TextXAlignment.Left;amount.ZIndex=52;Theme.Text(amount,40,true,color);amount.TextStrokeColor3=C(0,0,0);amount.TextStrokeTransparency=0;amount.Parent=root
   local amountScale=Instance.new('UIScale');amountScale.Name='Jump';amountScale.Parent=amount
   local ink=Instance.new('UIStroke');ink.Name='NumberOutline';ink.Color=C(0,0,0);ink.Thickness=2;ink.ApplyStrokeMode=Enum.ApplyStrokeMode.Contextual;ink.Parent=amount
-  local plus=Instance.new('TextButton');plus.Name='More'..kind;plus.Text='+';plus.TextSize=28;plus.BorderSizePixel=0;plus.ZIndex=53;plus.Parent=root;require(RS.BrightUI).Button(plus,C(255,213,65));plus:SetAttribute('AccessibleLabel',kind=='Gems'and'Convert Cash to Gems'or'Buy '..kind)
-  local function buy()pg:SetAttribute('PremiumPage',page);pg:SetAttribute('PremiumFocus',kind);pg:SetAttribute('SeedMenu','Passes')end
+  local plus=Instance.new('TextButton');plus.Name='More'..kind;plus.Text='+';plus.TextSize=28;plus.BorderSizePixel=0;plus.ZIndex=53;plus.Parent=root;require(RS.BrightUI).Button(plus,C(255,213,65));plus:SetAttribute('ButtonSound',false);plus:SetAttribute('AccessibleLabel',kind=='Gems'and'Convert Cash to Gems'or'Buy '..kind)
+  local function buy()open(page,kind)end
   table.insert(connections,plus.Activated:Connect(buy))
   local compactTap=Instance.new('TextButton');compactTap.Name='CompactPurchase';compactTap.Text='';compactTap.BackgroundTransparency=1;compactTap.Size=UDim2.fromScale(1,1);compactTap.ZIndex=53;compactTap.Visible=false;compactTap.Parent=root
-  compactTap:SetAttribute('AccessibleLabel','Buy '..kind);compactTap:SetAttribute('ButtonHighlight',false)
+  compactTap:SetAttribute('AccessibleLabel','Buy '..kind);compactTap:SetAttribute('ButtonHighlight',false);compactTap:SetAttribute('ButtonSound',false)
   table.insert(connections,compactTap.Activated:Connect(buy))
   return setmetatable({Root=root,Amount=amount,AmountScale=amountScale,Icon=icon,IconScale=scale,More=plus,CompactTap=compactTap,Kind=kind,LastPulse=-math.huge,Born=os.clock()},Wallet)
  end

@@ -8,7 +8,7 @@ local Sfx=require(RS:WaitForChild('LocalSfx'))
 local player=Players.LocalPlayer
 local folder=RS:WaitForChild('ChestChaseRemotes',20);if not folder then return end
 local remote=folder:WaitForChild('BatSwing',20);if not remote then return end
-Sfx.Preload({C.SlapSoundId})
+Sfx.Preload({C.SlapSoundId,Sfx.WhooshId})
 local bound,poses,connections={},{},{}
 local preAnimation,preSimulation
 local activateFrames
@@ -76,6 +76,13 @@ table.insert(connections,remote.OnClientEvent:Connect(function(event)
  if not tool then return end
  local handle=tool:FindFirstChild('Handle');if not handle then return end
  restore(character)
+ -- R150: a swing is heard even when it misses: the whoosh is timed so it meets the contact frame (At + Windup), and joins late like the pose does.
+ local root=character:FindFirstChild('HumanoidRootPart');local camera=workspace.CurrentCamera
+ if root and camera and (camera.CFrame.Position-root.Position).Magnitude<=C.SwingSoundRange then
+  local wait=event.At+C.Windup-C.SwingSoundLead-workspace:GetServerTimeNow()
+  local function whoosh()if root.Parent then Sfx.Play(Sfx.WhooshId,root.Position,C.SwingSoundVolume,C.SwingSoundPitch,2,wait<0 and-wait or 0)end end
+  if wait>0 then task.delay(wait,whoosh)else whoosh()end
+ end
  local entries=joints(character,handle);if #entries==0 then return end
  -- R112: Lead lets a late-arriving swing still show its full wind-back; R6 samples the one-piece arm.
  local hum=character:FindFirstChildOfClass('Humanoid')

@@ -7,7 +7,7 @@
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Input=game:GetService('UserInputService')
 local Run=game:GetService('RunService');local GuiService=game:GetService('GuiService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local Remote=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('FruitGift')
-local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI);local Feed=require(RS.NoticeFeed83);local Copy=require(RS.NoticeCopy83)
+local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI);local Feed=require(RS.NoticeFeed83);local Copy=require(RS.NoticeCopy83);local Audio=require(RS.InteractionAudio)
 local RANGE=18;local HOVER_RANGE=250;local SEND_GAP=2.05
 local gui=Instance.new('ScreenGui');gui.Name='FruitGifts';gui.ResetOnSpawn=false;gui.DisplayOrder=36;gui.Parent=pg
 local status=Instance.new('TextLabel');status.Name='GiftStatus';status.Text='';status.Visible=false;status.AnchorPoint=Vector2.new(.5,0);status.Position=UDim2.new(.5,0,1,-220);status.Size=UDim2.new(.8,0,0,38);status.BackgroundTransparency=1;status.TextWrapped=true;Theme.Text(status,17,true,Theme.Colors.Gold);status.Parent=gui
@@ -26,6 +26,9 @@ local function button(name,caption,x,color)
  Bright.Button(b,color);return b
 end
 local giveButton=button('Give','Give',0,Theme.Colors.Mint);local cancelButton=button('Cancel','Cancel',1,Color3.fromRGB(248,78,106))
+-- R150: this dialog has no SeedMenu, so it clicks for itself: MenuClick when it opens, MenuClose when it closes, Bubble06 on Give (the gift is
+-- on its way). The two buttons are therefore silent on their own.
+giveButton:SetAttribute('ButtonSound',false);cancelButton:SetAttribute('ButtonSound',false)
 local glow;local pending;local filtered
 local function lastInput()
  local kind=Input:GetLastInputType()
@@ -42,7 +45,8 @@ local function heldItem(character)
  end
  return nil
 end
-local function say(message)
+local function say(message,refused)
+ if refused then Audio.Play('Denied')end -- R150: "Get closer", "Hold the item": a refusal clicks Denied
  serial+=1;local current=serial;status.Text=tostring(message or'');status.Visible=status.Text~=''
  task.delay(2.5,function()if gui.Parent and serial==current then status.Text='';status.Visible=false end end)
 end
@@ -79,7 +83,8 @@ local function light(target)
  glow.OutlineColor=Color3.fromRGB(255,244,170);glow.OutlineTransparency=0;glow.DepthMode=Enum.HighlightDepthMode.Occluded
  glow.Adornee=character;glow.Parent=character
 end
-local function close()
+local function close(quiet)
+ if dialog.Visible and not quiet then Audio.Play('MenuClose')end
  pending=nil;dialog.Visible=false
  if GuiService.SelectedObject==giveButton or GuiService.SelectedObject==cancelButton then GuiService.SelectedObject=nil end
 end
@@ -88,6 +93,7 @@ local function open(target,held,id,action)
  local item=held.Name~=''and held.Name or'this item'
  local function esc(s)return(s:gsub('&','&amp;'):gsub('<','&lt;'):gsub('>','&gt;'))end
  question.Text=('Are you sure you want to give <font color="#FFE547">%s</font> to <font color="#93FF45">%s</font>?'):format(esc(item),esc(target.DisplayName))
+ if not dialog.Visible then Audio.Play('MenuClick')end
  dialog.Visible=true;light(target)
  if lastInput()=='Gamepad'then GuiService.SelectedObject=giveButton end
 end
@@ -96,17 +102,17 @@ local function give(point)
  local held,id,action=giftable();if not held then return end
  local target=playerAt(point);if not target then return end
  last=os.clock()
- if not inReach(target)then say('Get closer to '..target.DisplayName..' to give.');return end
+ if not inReach(target)then say('Get closer to '..target.DisplayName..' to give.',true);return end
  open(target,held,id,action)
 end
 local function confirm()
  local p=pending;if not p then return end
  -- Matched by inventory id: a refreshed Tool for the same item is still the same gift.
  local held,id,action=giftable()
- if not held or id~=p.Id or action~=p.Action then close();say('Hold the item you want to give.');return end
+ if not held or id~=p.Id or action~=p.Action then close(true);say('Hold the item you want to give.',true);return end
  if not p.Target.Parent then close();return end
- if not inReach(p.Target)then close();say('Get closer to '..p.Target.DisplayName..' to give.');return end
- close()
+ if not inReach(p.Target)then close(true);say('Get closer to '..p.Target.DisplayName..' to give.',true);return end
+ close(true);Audio.Play('Bubble06') -- R150: Give: the dialog closes and the gift goes out on this click
  -- The server accepts one gift every 2 s; a quick second gift is sent as soon as it may be.
  local wait=math.max(0,lastSent+SEND_GAP-os.clock());lastSent=os.clock()+wait
  local function send()Remote:FireServer(action,p.Target.UserId,id)end

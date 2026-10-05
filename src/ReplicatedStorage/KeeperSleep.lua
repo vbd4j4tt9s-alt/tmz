@@ -60,6 +60,8 @@ function Sleep.new(root, _stage, config)
     sound.Volume = .16; sound.PlaybackSpeed = 1; sound.Looped = true
     sound.RollOffMode = Enum.RollOffMode.InverseTapered
     sound.RollOffMinDistance = 8; sound.RollOffMaxDistance = 65; sound.Parent = attachment
+    -- R150: routed to Effects here (not left to whenever AudioMixer.Start happens to run), so the Effects slider, including 0, always covers the snore.
+    pcall(function() require(script.Parent.AudioMixer).Route(sound, 'Effects') end)
     local bounds = assert(config.Bounds.Head, 'Keeper head bounds required')
     local low, high = bounds[1], bounds[2]
     local gui, labels

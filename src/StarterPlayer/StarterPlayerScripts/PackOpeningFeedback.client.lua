@@ -83,7 +83,9 @@ end
 local function pulse()
  if not active or active:GetAttribute('RevealAt')then return end
  pulseAt=os.clock();pulseStrength=.13+count*.025
- cloneBag(active);kick(.85+count*.16);Audio.Play('Bubble04')
+ -- R150: every click the server rules accept (one per Rules.ClickInterval) sounds: the cue's own 0.09 s gap used to swallow 2 of 5 at full
+ -- tapping speed while the bag still shook. The gap here is a little under the click interval, so rapid input never stacks beyond the accepted rate.
+ cloneBag(active);kick(.85+count*.16);Audio.Play('Bubble04',Rules.ClickInterval*.8)
 end
 local function beginReveal(bag)
  if reveal or not bag:GetAttribute('RevealSeedId')then return end

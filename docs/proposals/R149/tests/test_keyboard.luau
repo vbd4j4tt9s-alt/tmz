@@ -284,9 +284,11 @@ function workspace.BulkMoveTo(_,parts,cfs)
  inBulk=true;for i,p in ipairs(parts)do p.CFrame=cfs[i]end;inBulk=false
 end
 local plays={}
+-- R150: a click goes through SoundTiming.Play, which reads IsLoaded / Loaded / TimeLength like the engine's Sound has.
+do local inew=R.Instance.new;R.Instance.new=function(class,parent)local o=inew(class,parent);if class=='Sound'then o.IsLoaded=true;o.Loaded=R.signal();o.TimeLength=1 end;return o end end
 function R.Inst.Play(self)
  local anchor=self.Parent;self.Playing=true
- plays[#plays+1]={Id=self.SoundId,Speed=self.PlaybackSpeed,Volume=self.Volume,T=R.clock,Pos=anchor and anchor._props.CFrame and anchor._props.CFrame.Position,Group=self.SoundGroup,
+ plays[#plays+1]={Id=self.SoundId,Speed=self.PlaybackSpeed,Volume=self.Volume,T=R.clock,TimePosition=self.TimePosition,Pos=anchor and anchor._props.CFrame and anchor._props.CFrame.Position,Group=self.SoundGroup,
   Min=self.RollOffMinDistance,Max=self.RollOffMaxDistance,Mode=self.RollOffMode,Sound=self}
 end
 function R.Inst.Stop(self)self.Playing=false end
@@ -667,6 +669,15 @@ check(#plays==0,'Effects volume 0 (Settings): the keys still move but nothing is
 Mixer.Set('Effects',100);plays={}
 put(cx(C20),nil,cz(R10));frames(12)
 check(#plays==1,'...and clicks are back with the volume')
+-- R150: the click starts at SoundTiming's lead-in for its file (the one shared table: 0 until the owner measures it), not a hard-coded 0.
+check(plays[1]and near(plays[1].TimePosition,0,1e-9),'R150: the click starts at SoundTiming\'s lead-in for its file (0 until measured) ('..tostring(plays[1]and plays[1].TimePosition)..')')
+do
+ local ts=W.RS:FindFirstChild('SoundTiming');ts:SetAttribute('Start_113108830240353',.07)
+ put(cx(C20)+20,nil,cz(R10));frames(14);plays={}
+ put(cx(C20),nil,cz(R10));frames(12)
+ check(plays[1]and near(plays[1].TimePosition,.07,1e-9),'R150: Start_113108830240353 on SoundTiming moves the click (tuned in Studio, no code change) ('..tostring(plays[1]and plays[1].TimePosition)..')')
+ ts:SetAttribute('Start_113108830240353',nil)
+end
 put(cx(C20)+20,nil,cz(R10));frames(14);plays={}
 -- standing on a corner shared by 4 keys presses all 4 - with ONE click (owner: no stacked bursts)
 local zc=select(2,g.RowZ(R10))

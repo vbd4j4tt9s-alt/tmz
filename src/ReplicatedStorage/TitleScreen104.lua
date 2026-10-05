@@ -43,6 +43,12 @@ function T.Start(player,pg)
  local desiredScale,currentScale=1,1
  local previewBag,previewRest,previewAmplitude
  local promptBefore=Prompts.Enabled
+ -- R150: the start click. Loaded while the title is up (its voices warm in the meantime), so Enter / gamepad A / a click all sound the same.
+ local Audio
+ task.spawn(function()
+  local module=RS:WaitForChild('InteractionAudio',10)
+  if module then local ok,loaded=pcall(require,module);if ok then Audio=loaded end end
+ end)
  local oldSelected=Gui.SelectedObject
  local binding='StealAPackTitle104'
  local promptConnection
@@ -85,6 +91,7 @@ function T.Start(player,pg)
  local function start()
   if dead or(phase~='Ready'and phase~='Opening')or Gui.MenuIsOpen then return false end
   phase='Leaving';leaving=0;button.Active=false;button.Selectable=false
+  if Audio then Audio.Play('MenuClick')end -- R150: Enter / A used to be silent; the button's own click is off (ButtonSound=false) so this is the only one
   return true
  end
  local function guard(fn)
@@ -135,6 +142,7 @@ function T.Start(player,pg)
   button=make('TextButton',group,{Name='ClickToStart',AnchorPoint=Vector2.new(.5,.5),Text='Click to Start',
    Font=Enum.Font.FredokaOne,TextSize=26,TextColor3=RGB(255,255,242),BackgroundColor3=RGB(72,154,51),
    BorderSizePixel=0,AutoButtonColor=false,Selectable=true,Active=true,Modal=true})
+  button:SetAttribute('ButtonSound',false)
   make('UICorner',button,{CornerRadius=UDim.new(0,16)})
   make('UIStroke',button,{Thickness=3,Color=RGB(25,68,31)})
   local shine=make('UIGradient',button,{Rotation=90,Color=ColorSequence.new(RGB(157,233,101),RGB(74,164,65))})

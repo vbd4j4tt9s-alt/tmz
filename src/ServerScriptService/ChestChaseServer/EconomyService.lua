@@ -277,7 +277,7 @@ end
 function EconomyService:_teleport(player, stationName)
 	if player:GetAttribute("GuardianRagdollActive") or player:GetAttribute("GuardianFlingActive") then return end
 	if self.Chase:IsPlayerBusy(player) then
-		self.Notifications:Show(player, "STATION TRAVEL IS DISABLED DURING A CHASE", Color3.fromRGB(255, 174, 87), 2.5)
+		self.Notifications:Show(player, "STATION TRAVEL IS DISABLED DURING A CHASE", Color3.fromRGB(255, 174, 87), 2.5, "Denied")
 		return
 	end
 	local now = os.clock()

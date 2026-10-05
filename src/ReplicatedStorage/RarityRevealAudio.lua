@@ -1,10 +1,13 @@
 -- R66: preloaded, opener-only build / impact / fanfare, synchronised to the screen timeline.
 local Sound=game:GetService('SoundService');local Content=game:GetService('ContentProvider')
 local A={};local pool={};local beat=0
-local sources={Whoosh={Id='rbxassetid://9120768742',Volume=.09,Start=.44},Impact={Id='rbxassetid://9120769331',Volume=.12,Start=.04},Royal={Id='rbxassetid://12222253',Volume=.10,Start=0},Chime={Id='rbxasset://sounds/electronicpingshort.wav',Volume=.04,Start=0},
+-- R150: no per-cue Start any more. The lead-in silence of every file comes from SoundTiming (one place); the optional
+-- script attribute <Key>Start still overrides it for one cue. (Pop used to be forced to 0 and sounded ~90 ms after the
+-- burst; Whoosh .44 and Impact / Spark .04 moved to SoundTiming.Starts unchanged.)
+local sources={Whoosh={Id='rbxassetid://9120768742',Volume=.09},Impact={Id='rbxassetid://9120769331',Volume=.12},Royal={Id='rbxassetid://12222253',Volume=.10},Chime={Id='rbxasset://sounds/electronicpingshort.wav',Volume=.04},
  -- R138: Common / Uncommon / Rare pulls (the bubble pop from InteractionAudio, two clearer notes, a soft sparkle).
- Pop={Id='rbxassetid://96764044228884',Volume=.18,Start=0},Note={Id='rbxasset://sounds/electronicpingshort.wav',Volume=.07,Start=0},
- Note2={Id='rbxasset://sounds/electronicpingshort.wav',Volume=.07,Start=0},Spark={Id='rbxassetid://9120769331',Volume=.06,Start=.04}}
+ Pop={Id='rbxassetid://96764044228884',Volume=.18},Note={Id='rbxasset://sounds/electronicpingshort.wav',Volume=.07},
+ Note2={Id='rbxasset://sounds/electronicpingshort.wav',Volume=.07},Spark={Id='rbxassetid://9120769331',Volume=.06}}
 function A.Preload()
  if next(pool)then return end
  local all={}
@@ -19,8 +22,9 @@ end
 function A.Play(key,pitch,skip,volume)
  A.Preload();local sound=pool[key];if not sound or not sound.IsLoaded then return false end
  sound:Stop();sound.PlaybackSpeed=pitch or 1;sound.Volume=volume or tonumber(script:GetAttribute(key..'Volume'))or sources[key].Volume
- local start=tonumber(script:GetAttribute(key..'Start'))or sources[key].Start
- require(script.Parent.SoundTiming).Play(sound,start+math.max(0,tonumber(skip)or 0)*(pitch or 1))
+ local Timing=require(script.Parent.SoundTiming)
+ local start=tonumber(script:GetAttribute(key..'Start'))or Timing.Offset(sound)
+ Timing.Play(sound,start+math.max(0,tonumber(skip)or 0)*(pitch or 1))
  return true
 end
 function A.Stop()beat=0;for _,s in pairs(pool)do s:Stop()end end
@@ -60,8 +64,11 @@ function A.Step(rank,t)
  end
 end
 -- t: seconds since the reveal began (a low-tier cue reaching this client too late is dropped).
+A.HighGrace=.35 -- R150: a rank 4+ burst reaching this client more than this long after its seed moment is dropped
 function A.Burst(rank,t)
  if pool.Whoosh then pool.Whoosh:Stop()end
+ -- R150: Legendary+ used to play its impact and chime at any lateness, long after the screen's burst ring had ended.
+ if rank>=4 and tonumber(t)and t>require(script.Parent.RarityRevealSequence).SeedAt(rank)+A.HighGrace then return end
  local low=A.Low[rank]
  if low then
   if tonumber(t)and t>require(script.Parent.RarityRevealSequence).SeedAt(rank)+A.LowGrace then return end

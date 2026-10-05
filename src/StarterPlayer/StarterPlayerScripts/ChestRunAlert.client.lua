@@ -262,8 +262,7 @@ local function showSuccess()
 	visualStrength = 0
 	if successSoundReady then
 		successSound:Stop()
-		successSound.TimePosition = 0
-		successSound:Play()
+		SoundTiming.Play(successSound) -- R150: through the shared lead-in table like the alarm (0 until 82180364878410 is measured)
 	end
 end
 

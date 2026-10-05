@@ -24,8 +24,14 @@ function S.Read(storage,map,point,now)
  local closed=map and map:GetAttribute('BiomesRefreshing')==true
  local nextReset=map and S.Seconds(map:GetAttribute('NextBiomeRefreshAt'),now)
  local left=closed and tonumber(map:GetAttribute('BiomeRefreshSeconds'))or nextReset
- if closed then left=left and math.max(0,math.ceil(left))or 0 end
- local track={Title=closed and 'Track refreshing'or'Track resets',Caption=closed and(left>0 and'Reopens in'or'Reopening…')or(nextReset and'New packs in'or'Syncing…'),Time=S.Clock(left),Progress=left and math.clamp(left/(closed and Packs.RefreshClosedSeconds or Packs.RefreshInterval),0,1)or 0,Closed=closed}
+ if closed then
+  -- R150: read the same server deadline the countdown beeps and the wall number use (and round up like they do), so this
+  -- row changes on the beep. The server-written whole-second BiomeRefreshSeconds is only the fallback.
+  local endsAt=tonumber(map:GetAttribute('BiomeRefreshEndsAt'))
+  if endsAt and endsAt==endsAt and endsAt<math.huge then left=math.max(0,math.ceil(endsAt-now))end
+  left=left and math.max(0,math.ceil(left))or 0
+ end
+ local track={Title=closed and 'Track refreshing'or'Track resets',Caption=closed and(left>0 and'Reopens in'or'Reopening…')or(nextReset and'New packs in'or'Syncing…'),Time=S.Clock(left),Progress=left and math.clamp(left/(closed and Packs.RefreshClosedSeconds or Packs.RefreshInterval),0,1)or 0,Closed=closed,Left=left}
  return weather,track
 end
 return S

@@ -42,6 +42,7 @@ local function optional(name)
  local ok,v=pcall(require,m);return ok and v or nil
 end
 local Fx,Mixer,Dash=optional('ClientFxBudget'),optional('AudioMixer'),optional('KeeperRecoveryDash')
+local Timing=optional('SoundTiming')                -- R150: the shared lead-in table (Start_<id> on SoundTiming tunes the click)
 
 local conns={};local folder;local started=false;local stopped=false
 local hidden={}                                      -- real floor part -> {Faces = {decals / textures}, Patches = {local copies}, Conn = its ChildAdded}
@@ -599,7 +600,8 @@ local function start()
   if v.Sound.Playing then v.Sound:Stop()end
   v.Part.CFrame=CF(x,F+1,z)
   v.Sound.PlaybackSpeed=K.ClickPitch(kind,gate.N);v.Sound.Volume=C.ClickVolume
-  v.Sound.TimePosition=0;v.Sound:Play()
+  -- R150: the click starts at the shared SoundTiming lead-in for its file (0 until measured), like every other cue.
+  if Timing then Timing.Play(v.Sound,nil,.25)else v.Sound.TimePosition=0;v.Sound:Play()end
  end
  end
 

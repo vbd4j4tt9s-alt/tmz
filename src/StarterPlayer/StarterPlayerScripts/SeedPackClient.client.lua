@@ -26,6 +26,10 @@ local bellPreload=Instance.new("Sound");bellPreload.SoundId=Rules.RevealBellSoun
 task.spawn(function() pcall(function() ContentProvider:PreloadAsync({preload,bellPreload}) end) end)
 Debris:AddItem(preload,12)
 Debris:AddItem(bellPreload,12)
+-- R150: onlookers hear a Secret / Cosmic / King pull as the reveal's impact at the bag (Legendary / Mythic have their own in RevealFlourish).
+local LocalSfx=require(ReplicatedStorage:WaitForChild("LocalSfx"));local OnlookerId=require(ReplicatedStorage:WaitForChild("RevealFlourish")).SoundId
+LocalSfx.Preload({OnlookerId})
+local ONLOOKER_RANGE=160
 local function destroyEffect(record)
     if record.CameraState then local saved=record.CameraState;record.CameraState=nil;local camera=workspace.CurrentCamera;if camera==saved.Camera then camera.CameraType=saved.Type;camera.CFrame=saved.Frame;camera.Focus=saved.Focus end end
     if record.SeedMotion then record.SeedMotion:Destroy();record.SeedMotion=nil end
@@ -132,7 +136,8 @@ local function beginReveal(record,at,seedId,now)
         local sound=Instance.new("Sound");sound.Name="Paper bag tearing";sound.SoundId=Rules.TearSoundId
         sound.Volume=0;sound.Looped=false;sound.RollOffMinDistance=5;sound.RollOffMaxDistance=36;sound.Parent=copy.PrimaryPart
         record.TearShift=math.max(0,lag-.02)
-        sound.TimePosition=Rules.TearSoundStart+math.clamp(lag,0,.02);sound:Play();record.TearSound=sound
+        -- R150: the lead-in comes from SoundTiming (9125725227 = .10, the old Rules.TearSoundStart) so every cue is tuned in one place.
+        sound.TimePosition=require(ReplicatedStorage:WaitForChild("SoundTiming")).Offset(sound)+math.clamp(lag,0,.02);sound:Play();record.TearSound=sound
     end
 end
 local function renderReveal(record,now)
@@ -215,7 +220,13 @@ local function renderReveal(record,now)
     if not record.HeavenlyStarted and t>=revealStart and rank>=4 then
         record.HeavenlyStarted=true
         local char=Players.LocalPlayer and Players.LocalPlayer.Character
-        if age<.4 and char and bag:IsDescendantOf(char)and now-lastHeavenlyAt>=Rules.RevealAudioCooldown then
+        local mine=char~=nil and bag:IsDescendantOf(char)
+        if age<.4 and rank>=6 and not mine then
+            -- R150: someone else's Secret+ pull: one impact at the seed on the frame it appears (rate-limited: LocalSfx de-dupes; one per reveal).
+            local camera=workspace.CurrentCamera;local at=record.Seed.PrimaryPart.Position
+            if camera and (camera.CFrame.Position-at).Magnitude<=ONLOOKER_RANGE then LocalSfx.Play(OnlookerId,at,.3,rank==8 and .88 or 1,3)end
+        end
+        if age<.4 and char and mine and now-lastHeavenlyAt>=Rules.RevealAudioCooldown then
             lastHeavenlyAt=now
             local pitches=rank==4 and {.5,.63,.75}or rank==6 and {.375,.5,.75}or rank>=7 and {.5,.75,1,1.25}or {.5,.75,.94}
             for i,pitch in ipairs(pitches)do

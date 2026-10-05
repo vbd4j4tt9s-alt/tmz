@@ -48,7 +48,7 @@ function H.Create(pg,player)
  local gui=Instance.new('ScreenGui');gui.Name='WorldStatus';gui.ResetOnSpawn=false;gui.DisplayOrder=23;gui.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets;gui.Parent=pg
  local root=block(gui,'StatusStack',UDim2.new(1,-12,1,-22),UDim2.fromOffset(190,82),Color3.new());root.AnchorPoint=Vector2.new(1,1);root.BackgroundTransparency=1
  local scale=Instance.new('UIScale');scale.Parent=root
- local rows={};local connections={};local dead=false;local elapsed=0
+ local rows={};local connections={};local dead=false;local elapsed=0;local tickFast=false
  for i,name in ipairs({'Weather','Track'})do
   local card=block(root,name,UDim2.fromOffset(0,(i-1)*43),UDim2.new(1,0,0,39),Color3.new(),7);card.BackgroundTransparency=.73
   local glyph=block(card,'Icon',UDim2.fromOffset(7,4),UDim2.fromOffset(30,30),Color3.new());glyph.BackgroundTransparency=1
@@ -153,6 +153,7 @@ function H.Create(pg,player)
   local point=part and hum and hum.Health>0 and part.Position or nil
   local weather,track=State.Read(RS,workspace:FindFirstChild('ChestChaseMap'),point,now or workspace:GetServerTimeNow())
   paint(rows.Weather,weather,weather.Kind);paint(rows.Track,track,track.Closed and'Refresh'or'Track')
+  tickFast=track.Closed==true and(tonumber(track.Left)or 0)>0 and(tonumber(track.Left)or 99)<=3 -- R150: repaint every frame during the 3-2-1 so the row changes with the beep (not once it reads 0)
   local first=boostRows[1].Root.Position
   if m.Phone and m.WalletHorizontal then boostTimer.Position=UDim2.fromOffset(first.X.Offset,first.Y.Offset+43)
   else boostTimer.Position=UDim2.fromOffset(first.X.Offset,first.Y.Offset-43)end
@@ -173,7 +174,7 @@ function H.Create(pg,player)
  for _,attribute in ipairs({'TreadmillTier','TreadmillMultiplier','ChestLuckMultiplier','DoubleSpeedOwned',SpeedBoost.Attribute})do
   connections[#connections+1]=player:GetAttributeChangedSignal(attribute):Connect(updateBoosts)
  end
- connections[#connections+1]=Run.Heartbeat:Connect(function(dt)elapsed+=dt;if elapsed>=.25 then elapsed=0;update()end end)
+ connections[#connections+1]=Run.Heartbeat:Connect(function(dt)elapsed+=dt;if elapsed>=.25 or tickFast then elapsed=0;update()end end)
  connections[#connections+1]=pg:GetAttributeChangedSignal('SeedMenu'):Connect(function()root.Visible=pg:GetAttribute('SeedMenu')==nil end)
  local stopLayout
  local function cleanup()
