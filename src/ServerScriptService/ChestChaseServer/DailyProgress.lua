@@ -42,6 +42,7 @@ function T.Attach(Data)
   local expectedVariant=mech and 'MechLimited'or pack.BagVariant
   if #records==before+1 and type(added)=='table'and type(added.Id)=='string'and added.Kind=='Pack'and added.Stage==expectedStage and added.BagVariant==expectedVariant then
    -- Inventory is the commit point, including a throw in a later display hook.
+   pcall(function()require(script.Parent.OwnerTestPacks).Claim(player,'Daily',added)end) -- R151: a login pack that an owner "daily" command made claimable is a TEST pack (never announced)
    return added
   end
   if not okay then warn('[R141 daily pack] '..tostring(result));return nil,'PACK COULD NOT BE ADDED; PLEASE RETRY'end

@@ -1,17 +1,21 @@
--- R151 (owner: "serverwide messages saying who pulled what and so on and a in server announcement"): pull announcements, the SERVER half.
--- Only this module decides that something is announced; clients never ask for one (the remote below is server -> client only), display names come
--- from Roblox (already filtered, and cleaned again in PullAnnounceRules.Clean) and no player-typed text is ever sent.
---  * A real pack open (PlayerDataService:OpenSeedPack calls OnOpened) whose seed is at least InServerMinRarity (Legendary) is shown to everyone in THIS
---    server once the reveal has finished (a banner and a chat line on every client). An owner TEST pack (/test rarepacks), a seed that was given,
---    granted or bought and anything else that is not a pack open never gets here.
+-- R151 (owner: "serverwide messages saying who pulled what and so on and a in server announcement"; then: "pull announcement should only be said in chat"): pull announcements,
+-- the SERVER half. They are CHAT LINES only (PullAnnouncerClient writes them; no banner). Only this module decides that something is announced; clients never ask for one
+-- (the remote below is server -> client only), display names come from Roblox (already filtered, and cleaned again in PullAnnounceRules.Clean) and no player-typed text is
+-- ever sent.
+--  * A real pack open (PlayerDataService:OpenSeedPack calls OnOpened) whose seed is at least InServerMinRarity (Legendary) is sent to everyone in THIS server once the
+--    puller's reveal has finished (ALL players get it then: the puller's own line must not come before their reveal ends, and one rule for everybody is simpler than two).
+--    Never announced: a pack an owner / admin command created (marked TestGrant=true on the pack record when it was made: /test pack, packset, void, verity,
+--    rarepacks, and the packs that mystery / daily / bonus commands cause), a TEST guaranteed reveal (/test rarepacks), a seed that was given or granted and anything that
+--    is not a pack open. Real purchases (Robux Mech / Verity packs) and normal gameplay packs are announced.
 --  * At least GlobalMinRarity (Secret: Secret, Cosmic, King and above) it is also published to the OTHER servers through MessagingService (topic
 --    PullAnnounce151). Publishing is limited to one message per PublishGapSeconds per server (pulls wait and travel together, 1 kB at most, a failed publish
 --    is retried a few times while it is still fresh). A receiving server drops its own messages (the origin shows the in-server version), repeats, anything
 --    older than StaleSeconds and anything over its per-minute limit, re-derives the rarity from its own seed catalog, and only sends it on to players who
---    have "Announcements from other servers" on (SettingsConfig.GlobalAnnouncements). The subscription is retried until it works.
---  * PullAnnouncer.Announce({Kind='Record', Player=player, Record='BestPull', SeedId=..}) shows a record banner ("took BEST PULL TODAY!") to this server:
+--    have "Announcements from other servers" on (SettingsConfig.GlobalAnnouncements: it gates the 🌐 chat lines). The subscription is retried until it works.
+--  * PullAnnouncer.Announce({Kind='Record', Player=player, Record='BestPull', SeedId=..}) writes a record line ("🏆 Name took BEST PULL TODAY!") for this server:
 --    the hook for the hub displays. Record keys are letters only; the title comes from PullAnnounceRules.Records.
---  * Owner test: /test announce <seed> [gold|diamond] [@name], /test announce global <seed> [here] and /test announce record [bestpull|biggestfruit] [seed].
+--  * Owner test: /test announce <seed> [@name], /test announce global <seed> [here] and /test announce record [bestpull|biggestfruit] [seed] (these ARE announcements on
+--    purpose: they exist to look at the chat lines).
 local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Rules=require(RS:WaitForChild('PullAnnounceRules'))
@@ -65,7 +69,7 @@ end
 
 -- Sending to this server's players -------------------------------------------------------------------------------------------------------------------
 local function wire(e)
- return {Kind=e.Kind,Id=e.Id,UserId=e.UserId,Name=e.Name,SeedId=e.SeedId,Odds=e.Odds,Size=e.Size,Mutation=e.Mutation,Record=e.Record,At=e.At}
+ return {Kind=e.Kind,Id=e.Id,UserId=e.UserId,Name=e.Name,SeedId=e.SeedId,Odds=e.Odds,Record=e.Record,At=e.At}
 end
 -- Everyone in this server (a pull here, a record). wants = optional per-player filter.
 function A:_broadcast(e,wants)
@@ -215,21 +219,23 @@ end
 
 -- Pulls --------------------------------------------------------------------------------------------------------------------------------------------
 -- Called (through PullAnnouncer.OnOpened) by PlayerDataService:OpenSeedPack right after a pack was opened and its seed saved. pack = the pack record that was opened, reward = the seed
--- record, wasTest = an owner TEST pack (a guaranteed reveal). Returns true when something was scheduled, else false and the reason.
+-- record, wasTest = an owner TEST guaranteed reveal (/test rarepacks). A pack that an owner / admin command created carries TestGrant=true on its record (set when the command made it,
+-- saved with the pack, kept through gifts and the Void -> Verity conversion): it is never announced either. Returns true when something was scheduled, else false and the reason.
 function A:Pulled(player,pack,reward,wasTest)
  if wasTest then return false,'test pack'end
  if type(reward)~='table'or type(pack)~='table'or not player then return false,'not a pack open'end
+ if pack.TestGrant==true then return false,'test pack'end
  local rarity=reward.Rarity
  local inServer,global=Rules.Qualifies('InServer',rarity),Rules.Qualifies('Global',rarity)
  if not inServer and not global then return false,'below the threshold'end
  local config=self.Data and self.Data.Config
  local odds=config and A.OddsOf(config,player,pack,reward.SeedId)
  local name=player.DisplayName;if type(name)~='string'or name==''then name=player.Name end
- local e,why=Rules.Event('Pull',{Name=name,UserId=player.UserId,Id=self:_id(),SeedId=reward.SeedId,Odds=odds,Size=reward.SeedScale,Mutation=reward.PackMutation,At=self.Time()})
+ local e,why=Rules.Event('Pull',{Name=name,UserId=player.UserId,Id=self:_id(),SeedId=reward.SeedId,Odds=odds,At=self.Time()})
  if not e then return false,why end
  -- the rarity read from the catalog must be the rarity that was rolled (a seed whose catalog entry differs is not announced)
  if e.Rarity~=rarity then return false,'rarity mismatch'end
- -- after the reveal: the pulling player's screen is still playing the pack opening until then
+ -- after the reveal, for everybody: the pulling player's screen is still playing the pack opening until then
  local ok,delay=pcall(Packs.GetRevealDuration,rarity)
  task.delay(ok and type(delay)=='number'and delay or 5,function()
   if inServer then self:_broadcast(e)end
@@ -238,7 +244,7 @@ function A:Pulled(player,pack,reward,wasTest)
  return true
 end
 
--- Public API for other server code (the hub displays): {Kind='Record', Player=player | Name=,UserId=, Record='BestPull', SeedId=?, Size=?, Odds=?}.
+-- Public API for other server code (the hub displays): {Kind='Record', Player=player | Name=,UserId=, Record='BestPull', SeedId=?, Odds=?}.
 function A:Send(spec)
  if type(spec)~='table'then return false,'spec'end
  local kind=spec.Kind
@@ -246,7 +252,7 @@ function A:Send(spec)
  local p=spec.Player
  local name=spec.Name;local uid=spec.UserId
  if p then name=(type(p.DisplayName)=='string'and p.DisplayName~='')and p.DisplayName or p.Name;uid=p.UserId end
- local fields={Name=name,UserId=uid,Id=self:_id(),SeedId=spec.SeedId,Odds=spec.Odds,Size=spec.Size,Mutation=spec.Mutation,Record=spec.Record,At=self.Time()}
+ local fields={Name=name,UserId=uid,Id=self:_id(),SeedId=spec.SeedId,Odds=spec.Odds,Record=spec.Record,At=self.Time()}
  local e,why=Rules.Event(kind,fields);if not e then return false,why end
  self:_broadcast(e);return true
 end
@@ -272,7 +278,7 @@ local function defaultOdds(config,spec)
  end
  return nil
 end
-A.Usage='Use announce <seed> [gold|diamond] (a banner and chat line for this server), announce global <seed> [here] (publish to the other servers; here also shows it in this server as an other-server pull) or announce record [bestpull|biggestfruit] [seed].'
+A.Usage='Use announce <seed> (a chat line for this server), announce global <seed> [here] (publish to the other servers; here also shows it in this server as an other-server pull) or announce record [bestpull|biggestfruit] [seed].'
 function A:RunCommand(ctx,p,a)
  local words={};for _,w in ipairs(a or{})do words[#words+1]=tostring(w)end
  local sub=(words[1]or''):lower()
@@ -286,22 +292,15 @@ function A:RunCommand(ctx,p,a)
   local spec=#words>0 and findSeed(table.concat(words,' '))
   if#words>0 and not spec then return false,'Unknown seed. See /test catalog all.'end
   local ok,why=self:Send({Kind='Record',Player=p,Record=record,SeedId=spec and spec.id or nil,Odds=spec and ctx and ctx.Config and defaultOdds(ctx.Config,spec)or nil})
-  return ok,ok and('Record banner sent to this server: '..name..' took '..Rules.RecordTitle(record)..'.')or('Not sent: '..tostring(why))
+  return ok,ok and('Record chat line sent to this server: '..name..' took '..Rules.RecordTitle(record)..'.')or('Not sent: '..tostring(why))
  end
- local here,mutation=false,'None'
- while#words>0 do
-  local last=words[#words]:lower()
-  if last=='here'then here=true;table.remove(words)
-  elseif last=='gold'then mutation='Gold';table.remove(words)
-  elseif last=='diamond'then mutation='Diamond';table.remove(words)
-  elseif last=='none'then table.remove(words)
-  else break end
- end
+ local here=false
+ if#words>0 and words[#words]:lower()=='here'then here=true;table.remove(words)end
  if#words==0 then return false,A.Usage end
  local spec=findSeed(table.concat(words,' '))
  if not spec then return false,'Unknown seed. See /test catalog all (an id such as FirePepperSeed, or the plant name).'end
  local odds=ctx and ctx.Config and defaultOdds(ctx.Config,spec)or nil
- local fields={Name=name,UserId=p.UserId,Id=self:_id(),SeedId=spec.id,Odds=odds,Size=1,Mutation=mutation,At=self.Time()}
+ local fields={Name=name,UserId=p.UserId,Id=self:_id(),SeedId=spec.id,Odds=odds,At=self.Time()}
  if mode=='global'then
   local e,why=Rules.Event('Global',fields);if not e then return false,'Not sent: '..tostring(why)end
   self:_queue(e)
@@ -311,7 +310,7 @@ function A:RunCommand(ctx,p,a)
  end
  local e,why=Rules.Event('Pull',fields);if not e then return false,'Not sent: '..tostring(why)end
  local sent=self:_broadcast(e)
- return true,'Banner and chat line sent to '..sent..' player'..(sent==1 and''or's')..' in this server: '..Rules.Line(e)..(Rules.Qualifies('InServer',e.Rarity)and''or' (below the in-server threshold, so a real pull would not show it)')
+ return true,'Chat line sent to '..sent..' player'..(sent==1 and''or's')..' in this server: '..Rules.Line(e)..(Rules.Qualifies('InServer',e.Rarity)and''or' (below the in-server threshold, so a real pull would not show it)')
 end
 
 -- The one running instance (ChestChaseServerMain calls Start once) -------------------------------------------------------------------------------------

@@ -108,6 +108,7 @@ function S:Roll(player)
  local size=PackRules.RollPackSize(self.Random:NextNumber()) -- R126: rolls a pack size like world packs
  local record,reason=self.Data:AddChest(player,{Stage=pick.Stage,BagVariant=pick.Variant,PackSize=size,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion},{Luck=true}) -- R137: hidden size pity
  if not record then return {Error=reason or'PACK COULD NOT BE ADDED',Ready=ready}end
+ pcall(function()require(script.Parent.OwnerTestPacks).Claim(player,'Bonus',record)end) -- R151: a roll that an owner "bonus" command made ready is a TEST pack (never announced)
  self.Ready[player]=ready-1
  if self.Data.QueueGardenSave then self.Data:QueueGardenSave(player)end
  self:_publish(player)

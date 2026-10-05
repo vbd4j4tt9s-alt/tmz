@@ -2,7 +2,7 @@
 local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Packs=require(RS.SeedPackRules);local T=require(RS.BalanceValues81)
-local State=require(script.Parent.OwnerTestState82)
+local State=require(script.Parent.OwnerTestState82);local TestPacks=setmetatable({},{__index=function(_,k)return require(script.Parent.OwnerTestPacks)[k]end}) -- R151: packs these commands make never announce (loaded when first used)
 local X={Actions={cashoffers=true,economy=true,collisions=true,weather=true,mechshop=true,voidcheck=true,fence=true,eventpack=true,gardenbonus=true,keepersmack=true,notice=true,routes=true,spawnodds=true,void=true,event=true,eclipse=true,packset=true,odds=true,pity=true,packluck=true,refreshcycle=true,movespeed=true,animrate=true,training=true,gems=true,bundle=true,boots=true,trail=true,indexinfo=true,claimindex=true,fling=true,ragdoll=true,holes=true,dig=true,gifts=true,admins=true,bonus=true,daily=true,mystery=true,verity=true,verityvoice=true,announce=true,bestpull=true,bigfruit=true,hubdisplays=true}}
 local biomes={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7,stormpeaks=7,mech=8,verity=9}
 local tiers={common='Pack01',uncommon='Pack02',rare='Pack03',epic='Pack04',legendary='Pack05',mythic='Pack06',event='EclipseReliquary',eclipse='EclipseReliquary',verity='VerityReliquary'}
@@ -197,6 +197,7 @@ function X.Execute(ctx,p,action,a)
    for i,q in ipairs(quests.Keys)do daily.Quests.Progress[i]=D.Quests[q].Goal end
   elseif sub=='week'then daily.Login={Step=#D.Login-1,Day=day-1}
   elseif sub=='reset'then data:GetPremium(p).Daily=nil end
+  if sub=='next'or sub=='week'or sub=='reset'then TestPacks.Arm(p,'Daily',1)end -- R151: the login pack they make claimable is a TEST pack
   if sub~=''then data:PublishDaily(p);save(ctx,p)end
   local state=data:DailyState(p);local rows={}
   for _,q in ipairs(state.Quests)do rows[#rows+1]=q.Text..' '..q.Progress..'/'..q.Goal..(q.Claimed and' ✓'or'')end
@@ -211,7 +212,9 @@ function X.Execute(ctx,p,action,a)
   if sub=='ready'then local st=svc:State(p);if st.Claimed then st.Claimed=false;st.Stage=nil;st.Variant=nil end;st.Seconds=M.UnlockSeconds-3
   elseif sub=='next'then local st=svc:State(p);st.Day=st.Day-1;premium.Mystery=st
   elseif sub=='reset'then premium.Mystery={Owed=M.Read(premium.Mystery).Owed} end -- (today's pack starts over; packs owed from earlier days are real and stay)
+  if sub=='ready'or sub=='next'then TestPacks.Arm(p,'Mystery',1)end -- R151: the pack they make takeable is a TEST pack
   if sub~=''then svc:Publish(p,true);save(ctx,p)end
+  if sub=='next'then TestPacks.Disarm(p,'Mystery')end -- (a pack carried over from yesterday was given by that Publish; a new day's pack is a normal one)
   local st=svc:State(p)
   local status=st.Claimed and'taken today'or M.Unlocked(st)and('ready: '..st.Variant..' stage '..st.Stage)or('locked, '..M.Clock(M.Left(st))..' to go')
   return true,p.Name..': mystery pack '..status..(#st.Owed>0 and(' | '..#st.Owed..' owed (Bag was full)')or'')..' | pedestal '..(svc.Owner[p]and'in their base'or'not assigned')
@@ -301,15 +304,15 @@ function X.Execute(ctx,p,action,a)
   local mode=(a[1]or'status'):lower()
   if mode=='ready'then
    local n=integer(a[2]or'1',0,2);if #a>2 or not n then return false,'Use bonus ready <0–2>.'end
-   bonus.Ready[p]=0;local ok,ready=bonus:GrantReady(p,n);return ok,'Bonus rolls ready: '..tostring(ready)
+   bonus.Ready[p]=0;local ok,ready=bonus:GrantReady(p,n);TestPacks.Arm(p,'Bonus',n);return ok,'Bonus rolls ready: '..tostring(ready) -- R151: those rolls make TEST packs
   elseif mode=='progress'then
    local text=a[2]or'';local m,sec=text:match('^(%d+):(%d%d)$');local seconds=m and tonumber(m)*60+tonumber(sec)or tonumber(text)
    local interval=require(game:GetService('ReplicatedStorage').TreadmillBonusRules).IntervalSeconds -- R124: 360 s (was 600)
    if #a~=2 or not seconds or seconds~=seconds or seconds<0 or seconds>interval then return false,'Use bonus progress <0–'..interval..' seconds or m:ss>, e.g. bonus progress 5:50.'end
-   local ok,left=bonus:SetProgress(p,seconds);return ok,'Saved treadmill progress: '..math.floor(tonumber(left)or 0)..' / '..interval..' s. Get on the treadmill to see the bar.'
+   local ok,left=bonus:SetProgress(p,seconds);TestPacks.Arm(p,'Bonus',1);return ok,'Saved treadmill progress: '..math.floor(tonumber(left)or 0)..' / '..interval..' s. Get on the treadmill to see the bar.'
   elseif mode=='roll'then
    if #a~=1 then return false,'Use bonus roll.'end
-   local result=bonus:Roll(p);if result.Error then return false,result.Error end
+   TestPacks.Arm(p,'Bonus',1);local result=bonus:Roll(p);TestPacks.Disarm(p,'Bonus');if result.Error then return false,result.Error end -- R151: this roll is a TEST pack
    return true,'Rolled for the target (no animation): '..tostring(result.Label or result.Variant)..' ('..tostring(result.Rarity)..'). Ready left: '..tostring(result.Ready)..'.'
   elseif mode=='status'then
    if #a>1 then return false,'Use bonus, bonus ready <n>, bonus progress <s> or bonus roll.'end
@@ -349,7 +352,7 @@ function X.Execute(ctx,p,action,a)
   if #a>1 or not count or not st or st>=8 then return false,action=='eclipse'and'Use eclipse [1–20].'or action=='verity'and'Use verity [1–20].'or'Use packset <biome>.'end
   if #data:GetChestRecords(p)+count>ctx.Config.MaxSavedChests then return false,'Make space in the target inventory.'end
   for i=1,count do
-   local record,reason=data:AddChest(p,{Stage=st,BagVariant=action=='eclipse'and'EclipseReliquary'or action=='verity'and'VerityReliquary'or string.format('Pack%02d',i),PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
+   local record,reason=data:AddChest(p,{Stage=st,BagVariant=action=='eclipse'and'EclipseReliquary'or action=='verity'and'VerityReliquary'or string.format('Pack%02d',i),PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{TestGrant=true}) -- R151: TEST packs (never announced)
    if not record then return false,'Stopped after '..(i-1)..' packs: '..tostring(reason)end
   end
   ctx.Chests:SyncTools(p);save(ctx,p);return true,'Added '..count..' packs with the current odds.'

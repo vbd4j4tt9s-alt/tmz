@@ -81,9 +81,9 @@ return {
  {'/test bonus progress 5:50 @username','Set saved treadmill time (seconds or m:ss, max 6:00). 5:50 = roll in 10 s on the treadmill.'},
  {'/test bonus roll @username','Use a ready roll for them now (grants the pack, no animation).'},
  {'— PULL ANNOUNCEMENTS —',''},
- {'/test announce <seed> [gold|diamond] @username','R151: the in-server banner + chat line as if they just pulled that seed (any rarity; the real threshold is Legendary).'},
- {'/test announce global <seed> [here] @username','R151: publish it to the other servers (this server is the origin and shows nothing; add here to also see the other-server banner).'},
- {'/test announce record [bestpull|biggestfruit] [seed] @username','R151: the record banner ("took BEST PULL TODAY!") for the hub displays.'},
+ {'/test announce <seed> @username','R151: the chat line for everyone in this server, as if they just pulled that seed (any rarity; the real threshold is Legendary). Packs made by owner commands never announce.'},
+ {'/test announce global <seed> [here] @username','R151: publish it to the other servers (this server is the origin and shows nothing; add here to also see the other-server chat line).'},
+ {'/test announce record [bestpull|biggestfruit] [seed] @username','R151: the record chat line ("took BEST PULL TODAY!") for the hub displays.'},
 
  {'— GIFTS —',''},
  {'/test gifts @username','Gifts this player sent that are still finishing.'},

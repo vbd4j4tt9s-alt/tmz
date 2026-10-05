@@ -118,7 +118,7 @@ do
  check(e and e.SeedId==reward.SeedId and e.UserId==701 and e.Name=='Ann D'and e.Id and e.Id:match('^jobA0000%-%d+$'),'the payload names the seed, the puller (display name, user id) and carries an id ('..tostring(e and e.Id)..')')
  local percent=Packs.SeedOdds(Config,pack.Stage,pack.BagVariant,Ann:GetAttribute('ChestLuckMultiplier'),pack.OddsVersion,pack.RateBoost)[reward.SeedId]
  check(e and percent and math.abs(e.Odds-100/percent)<1e-9*e.Odds,'the odds are the pack\'s own chance for that seed: 1/'..tostring(e and e.Odds)..' (SeedOdds '..tostring(percent)..'%)')
- check(e and e.Size==reward.SeedScale and e.Mutation==reward.PackMutation,'size and coat come from the reward')
+ check(e and e.Size==nil and e.Mutation==nil and e.Rarity==nil,'the payload carries no size, no coat and no rarity (chat lines need none of them; the client reads its own catalog)')
  check(bus:Count('A')==0,'a Legendary pull is NOT sent to other servers (Secret and above only)')
  table.clear(sinkLog)
  -- a Mythic open the same way
@@ -193,6 +193,280 @@ do
  check(Announcer.OnOpened(Ann,{},{Rarity='Common',SeedId='SunflowerSeed'},false)==false,'the module function OnOpened works through the running instance')
 end
 
+-- 1b. packs an owner / admin command made are TEST packs (TestGrant on the record): never announced, in the server or to other servers; the same packs from real sources are -----
+-- Every command goes through the REAL StudioTestCommands.Execute (what /test and F4 call), so the Normalize / Targeting / OwnerUpdateCommands82 routing is the game's own.
+local TestPacks=server('OwnerTestPacks');local Studio=server('StudioTestCommands');local M=W.module('MysteryPackRules');local D=W.module('DailyRewards')
+local DRAWS={0,1e-12,1e-9,1e-6,1e-4,.001,.005,.01,.02,.05,.1,.2,.3,.4,.5,.6,.7,.8,.9,.95,.99,.999,.99999,.9999999}
+local function loud(pack,player) -- a draw that rolls a Legendary+ seed from this pack: an UNMARKED pack opened with it WOULD be announced
+ for _,d in ipairs(DRAWS)do
+  local ok,seed,r=pcall(Packs.Roll,Config,pack.Stage,drawConstant(d),player:GetAttribute('ChestLuckMultiplier'),pack.BagVariant,pack.OddsVersion,pack.RateBoost)
+  if ok and seed and Rules.Qualifies('InServer',r)then return d,r end
+ end
+end
+local function emptyBag(p)local records=Data:GetChestRecords(p);for i=#records,1,-1 do table.remove(records,i)end end
+local function packsOf(p)local out={};for _,r in ipairs(Data:GetChestRecords(p))do if r.Kind=='Pack'then out[#out+1]=r end end;return out end
+local spy
+local function watch()spy={Calls=0,Reasons={},Published=bus:Count('A')};local real=A.Pulled;spy.Real=real
+ A.Pulled=function(self,...)local ok,why=real(self,...);spy.Calls+=1;spy.Reasons[#spy.Reasons+1]=ok and'announced'or tostring(why);return ok,why end end
+local function unwatch()A.Pulled=spy.Real end
+local function count(list,value)local n=0;for _,x in ipairs(list)do if x==value then n+=1 end end;return n end
+-- opens every pack in the bag with a Legendary+ draw where the pack has one; returns opened, loud
+local function openAll(p)
+ local opened,loudCount=0,0
+ for _,r in ipairs(packsOf(p))do
+  local d=loud(r,p);local reward=Data:OpenSeedPack(p,r.Id,drawConstant(d or .5));opened+=1
+  if d and reward and Rules.Qualifies('InServer',reward.Rarity)then loudCount+=1 end
+ end
+ return opened,loudCount
+end
+local Notes2={Show=function()end}
+local ctx2={Config=Config,Data=Data,Map={MapRoot={}},Bases={GetPlayerBase=function()return nil end},Chests={IsOpening=function()return false end,SyncTools=function()end},Chase={IsPlayerBusy=function()return false end}}
+local Bonus=server('TreadmillBonusService').new(Config,Data,{TrainingSessions={}},ctx2.Chests,Notes2)
+local Mystery=server('MysteryPackService').new(Config,Data,nil,ctx2.Chests,Notes2,nil)
+ctx2.Chase.TreadmillBonus=Bonus;ctx2.Chase.Mystery=Mystery
+local function command(p,text)return Studio.Execute(ctx2,p,text)end
+do
+ -- the unit: OwnerTestPacks
+ check(TestPacks.Field=='TestGrant'and TestPacks.Mark({Kind='Pack'}).TestGrant==true and TestPacks.Mark({Kind='Seed'}).TestGrant==nil and TestPacks.Mark(nil)==nil,'OwnerTestPacks.Mark sets TestGrant on a pack record only')
+ check(TestPacks.Is({TestGrant=true})and not TestPacks.Is({})and not TestPacks.Is({TestGrant='yes'})and not TestPacks.Is(nil),'OwnerTestPacks.Is is exactly "TestGrant == true"')
+ local who={}
+ check(TestPacks.Arm(who,'Mystery',1,100)and TestPacks.Armed(who,'Mystery',100)and not TestPacks.Armed(who,'Daily',100),'Arm is per player and per source')
+ check(not TestPacks.Arm(who,'Nonsense')and not TestPacks.Arm(nil,'Mystery')and not TestPacks.Arm(who,'Mystery',0),'an unknown source, no player or a count of 0 arms nothing (and a 0 clears)')
+ TestPacks.Arm(who,'Bonus',2,100)
+ check(TestPacks.Take(who,'Bonus',101)and TestPacks.Take(who,'Bonus',102)and not TestPacks.Take(who,'Bonus',103),'an arm for 2 packs marks exactly 2')
+ TestPacks.Arm(who,'Daily',1,100);check(not TestPacks.Take(who,'Daily',100+TestPacks.Seconds+1)and not TestPacks.Armed(who,'Daily',100),'an arm ends after '..TestPacks.Seconds..' s')
+ TestPacks.Arm(who,'Daily',1,100);TestPacks.Disarm(who,'Daily');check(not TestPacks.Take(who,'Daily',101),'Disarm clears it')
+ local rec={Kind='Pack'};TestPacks.Arm(who,'Mystery',1,R.clock)
+ check(TestPacks.Claim(who,'Mystery',rec)==rec and rec.TestGrant==true,'Claim marks the record that was just made and uses the arm up')
+ local rec2={Kind='Pack'};check(TestPacks.Claim(who,'Mystery',rec2)==rec2 and rec2.TestGrant==nil and TestPacks.Claim(who,'Mystery',nil)==nil,'... the next pack is a normal pack (and a nil record is harmless)')
+ -- the pack record
+ Ann:SetAttribute('PaidRandomAllowed',true) -- (a bought pack opens only where paid random items are allowed)
+ local plain=Data:AddChest(Ann,{Stage=7,BagVariant='Pack06',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
+ local marked=Data:AddChest(Ann,{Stage=7,BagVariant='Pack06',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{TestGrant=true})
+ local lucky=Data:AddChest(Ann,{Stage=7,BagVariant='Pack06',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{Luck=true})
+ check(plain.TestGrant==nil and lucky.TestGrant==nil and marked.TestGrant==true,'AddChest: TestGrant only with the option (a normal pack and a Luck pack carry nothing)')
+ emptyBag(Ann)
+end
+
+do
+ -- every direct command path: the packs it makes carry TestGrant, and opening them announces nothing
+ local paths={
+  {'/test pack storm 6','pack (one)'},{'/test pack lava 5 1 none 3','pack (three)'},{'/test packset storm','packset'},{'/test void 2','void'},{'/test eclipse 1','eclipse'},
+  {'/test verity 2','verity'},{'/test rarepacks all','rarepacks all'},{'/test rarepacks verity','rarepacks verity'},{'/test rarepacks mech','rarepacks mech'},{'/test rarepacks roster','rarepacks roster'},
+  {'/test rarepacks mythic','rarepacks mythic'},
+ }
+ for _,path in ipairs(paths)do
+  emptyBag(Ann);table.clear(sinkLog);watch()
+  local ok,msg=command(Ann,path[1]);check(ok==true,path[2]..': the command works ('..tostring(msg)..')')
+  local packs=packsOf(Ann);local allMarked=#packs>0
+  for _,r in ipairs(packs)do if r.TestGrant~=true then allMarked=false end end
+  check(allMarked,path[2]..': all '..#packs..' packs it made carry TestGrant')
+  local opened,loudCount=openAll(Ann);settle(30)
+  check(opened==#packs and(loudCount>=1 or path[1]:find('rarepacks')),path[2]..': opened '..opened..', '..loudCount..' of them Legendary+ (an unmarked pack would have been announced)')
+  check(#sinkLog==0 and bus:Count('A')==spy.Published and#A.Pending==0,path[2]..': nothing was announced in the server or published to other servers')
+  check(spy.Calls==opened and count(spy.Reasons,'test pack')==opened and count(spy.Reasons,'announced')==0,path[2]..': the announcer was asked for every open and refused each one as a "test pack" ('..table.concat(spy.Reasons,',')..')')
+  unwatch()
+ end
+ -- /test seed makes SEEDS (never opened): no mark on them
+ emptyBag(Ann)
+ local okSeed=command(Ann,'/test seed SunflowerSeed');local seeds=Data:GetChestRecords(Ann)
+ check(okSeed==true and#seeds==1 and seeds[1].Kind=='Seed'and seeds[1].TestGrant==nil,'/test seed makes a Seed record without the mark (only packs are marked)')
+ emptyBag(Ann)
+end
+
+-- a pack with a guaranteed-reveal override (StudioPackRewards, what /test rarepacks sets) is excluded even when its record carries no TestGrant: the hook's own wasTest flag
+do
+ emptyBag(Ann);table.clear(sinkLog);watch()
+ local pack=Data:AddChest(Ann,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
+ check(pack.TestGrant==nil,'(a normal Void pack, no mark)')
+ Data.StudioPackRewards=Data.StudioPackRewards or setmetatable({},{__mode='k'})
+ Data.StudioPackRewards[Ann]=Data.StudioPackRewards[Ann]or{};Data.StudioPackRewards[Ann][pack.Id]='ObsidianMawSeed'
+ local reward=Data:OpenSeedPack(Ann,pack.Id,drawConstant(.5));settle(30)
+ check(reward and reward.SeedId=='ObsidianMawSeed'and#sinkLog==0 and bus:Count('A')==spy.Published and spy.Reasons[1]=='test pack','a guaranteed-reveal pack without TestGrant is still a test pack (the hook passes wasTest): not announced, not published')
+ unwatch();emptyBag(Ann)
+end
+
+-- a TestGrant pack is excluded even when nothing else marks it as a test (no StudioPackRewards override): the flag alone is enough
+do
+ table.clear(sinkLog);watch()
+ local pack=Data:AddChest(Ann,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{TestGrant=true})
+ local reward=Data:OpenSeedPack(Ann,pack.Id,drawConstant(.5));settle(30)
+ check(reward and Rules.Qualifies('Global',reward.Rarity)and#sinkLog==0 and bus:Count('A')==spy.Published and spy.Reasons[1]=='test pack','a marked Void pack (a Secret+ seed) is not announced and not published: TestGrant alone is enough ('..tostring(reward and reward.Rarity)..')')
+ unwatch()
+end
+
+-- the indirect commands: they only make a normal reward claimable, and arm that source for the player
+do
+ -- mystery ready: the pack that is then taken is a TEST pack
+ emptyBag(Ann);table.clear(sinkLog);watch()
+ Mystery.Random={NextNumber=function()return .9999999 end} -- the rarest mystery pack (the Void pack)
+ local pedestal={}
+ Mystery.Owner[Ann]=pedestal
+ local ok=command(Ann,'/test mystery ready');check(ok==true and TestPacks.Armed(Ann,'Mystery'),'/test mystery ready arms the mystery source')
+ local st=Mystery:State(Ann);Mystery:Unlock(Ann,st)
+ check(M.Unlocked(st)and st.Variant=='EclipseReliquary','the mystery pack unlocks (Void pack, rarest)')
+ check(Mystery:Claim(Ann,pedestal)==true,'... and is taken')
+ local packs=packsOf(Ann)
+ check(#packs==1 and packs[1].TestGrant==true and not TestPacks.Armed(Ann,'Mystery'),'the pack taken after "mystery ready" carries TestGrant and the arm is used up')
+ openAll(Ann);settle(30)
+ check(#sinkLog==0 and bus:Count('A')==spy.Published and spy.Reasons[1]=='test pack','... and opening it announces nothing')
+ -- the next mystery pack (a new day, no command) is a normal pack and IS announced
+ emptyBag(Ann);Data:GetPremium(Ann).Mystery=nil;R.clock+=86400*2;table.clear(sinkLog)
+ local st2=Mystery:State(Ann);Mystery:Unlock(Ann,st2);Mystery:Claim(Ann,pedestal)
+ local packs2=packsOf(Ann)
+ check(#packs2==1 and packs2[1].TestGrant==nil,'a later mystery pack (no command) is a normal pack')
+ local _,loudCount=openAll(Ann);settle(duration('King')+1)
+ check(loudCount==1 and#ofKind(sinkLog,'Pull')>=1,'... and opening it IS announced')
+ -- mystery next: a new day for the target; the arm must not survive for the new day's pack
+ emptyBag(Ann);Data:GetPremium(Ann).Mystery=nil;R.clock+=86400*2;Mystery:State(Ann)
+ command(Ann,'/test mystery next');check(not TestPacks.Armed(Ann,'Mystery'),'/test mystery next leaves nothing armed (a new day\'s pack is a normal one)')
+ -- an arm that nobody used expires: a pack taken long after the command is a normal pack
+ emptyBag(Ann);Data:GetPremium(Ann).Mystery=nil;R.clock+=86400*2
+ command(Ann,'/test mystery ready');R.clock+=TestPacks.Seconds+60
+ local st3=Mystery:State(Ann);Mystery:Unlock(Ann,st3);Mystery:Claim(Ann,pedestal)
+ check(#packsOf(Ann)==1 and packsOf(Ann)[1].TestGrant==nil,'a "mystery ready" nobody used for '..TestPacks.Seconds..' s has expired: that pack is normal')
+ Mystery.Owner[Ann]=nil;unwatch();emptyBag(Ann)
+end
+do
+ -- daily week: the login pack (day 7 = a Mech pack) the target claims is a TEST pack; a later claim without a command is a normal Mech pack
+ emptyBag(Ann);table.clear(sinkLog);watch()
+ local ok=command(Ann,'/test daily week');check(ok==true and TestPacks.Armed(Ann,'Daily'),'/test daily week arms the daily source')
+ local claimed,msg=Data:ClaimDailyLogin(Ann);check(claimed==true,'the day 7 login claim works ('..tostring(msg)..')')
+ local packs=packsOf(Ann)
+ check(#packs==1 and packs[1].BagVariant=='MechLimited'and packs[1].TestGrant==true and not TestPacks.Armed(Ann,'Daily'),'the Mech pack from the claim carries TestGrant; the arm is used up')
+ openAll(Ann);settle(30)
+ check(#sinkLog==0 and bus:Count('A')==spy.Published and spy.Reasons[1]=='test pack','... and opening it announces nothing')
+ emptyBag(Ann);table.clear(sinkLog)
+ local day=D.Day(os.time());local daily=Data:DailyData(Ann);daily.Login={Step=#D.Login-1,Day=day-1}
+ local claimed2=Data:ClaimDailyLogin(Ann);local packs2=packsOf(Ann)
+ check(claimed2==true and#packs2==1 and packs2[1].BagVariant=='MechLimited'and packs2[1].TestGrant==nil,'the next day 7 Mech pack (no command) is a normal pack')
+ local _,loudCount=openAll(Ann);settle(duration('King')+1)
+ check(loudCount==1 and#ofKind(sinkLog,'Pull')>=1,'... and opening it IS announced (Mech seeds are Legendary and above)')
+ -- daily done (quests, gems only) arms nothing
+ TestPacks.Disarm(Ann,'Daily');command(Ann,'/test daily done');check(not TestPacks.Armed(Ann,'Daily'),'/test daily done (gems only) arms nothing')
+ unwatch();emptyBag(Ann)
+end
+do
+ -- bonus: roll / ready / progress
+ emptyBag(Ann);table.clear(sinkLog);watch()
+ Bonus:Setup(Ann);Bonus.Random={NextNumber=function()return .9999999 end}
+ Bonus:GrantReady(Ann,1);R.advance(2) -- a NATURAL ready roll (no owner command gave it)
+ local ok,msg=command(Ann,'/test bonus roll');check(ok==true,'/test bonus roll works ('..tostring(msg)..')')
+ local packs=packsOf(Ann)
+ check(#packs==1 and packs[1].TestGrant==true and not TestPacks.Armed(Ann,'Bonus'),'the pack of an owner "bonus roll" carries TestGrant and nothing stays armed')
+ openAll(Ann);settle(30)
+ check(#sinkLog==0 and bus:Count('A')==spy.Published and spy.Reasons[1]=='test pack','... and opening it announces nothing')
+ -- bonus ready 2: the player rolls twice (test packs); a third, natural roll is a normal pack
+ emptyBag(Ann);table.clear(sinkLog);spy.Reasons={}
+ command(Ann,'/test bonus ready 2');check(TestPacks.Armed(Ann,'Bonus'),'/test bonus ready 2 arms the source')
+ R.advance(2);local r1=Bonus:Roll(Ann);R.advance(2);local r2=Bonus:Roll(Ann)
+ check(r1.Ok and r2.Ok and#packsOf(Ann)==2 and packsOf(Ann)[1].TestGrant==true and packsOf(Ann)[2].TestGrant==true and not TestPacks.Armed(Ann,'Bonus'),'the two rolls of "bonus ready 2" are TEST packs and the arm is used up')
+ Bonus:GrantReady(Ann,1);R.advance(2);local r3=Bonus:Roll(Ann)
+ check(r3.Ok and#packsOf(Ann)==3 and packsOf(Ann)[3].TestGrant==nil,'a third roll (a natural one) is a normal pack')
+ local opened,loudCount=openAll(Ann);settle(duration('King')+1)
+ check(opened==3 and count(spy.Reasons,'test pack')==2 and count(spy.Reasons,'announced')==1,'of the three opens two are refused as test packs and the normal one is announced ('..table.concat(spy.Reasons,',')..')')
+ -- bonus progress: one roll afterwards
+ emptyBag(Ann);command(Ann,'/test bonus progress 5:50');check(TestPacks.Armed(Ann,'Bonus'),'/test bonus progress arms the source for one roll')
+ TestPacks.Disarm(Ann,'Bonus');unwatch();emptyBag(Ann)
+end
+
+-- real sources still announce: a Robux / gems Mech purchase, a normal track pack (ChestService:Bank), a Void pack turned into a Verity pack
+do
+ emptyBag(Ann);table.clear(sinkLog);watch()
+ local packs=Data:GrantMechPacks(Ann,true,1)
+ check(packs and#packs==1 and packs[1].TestGrant==nil and packs[1].PaidRandom==true,'a bought Mech pack (GrantMechPacks, the Robux / gems path) carries no mark')
+ local reward=Data:OpenSeedPack(Ann,packs[1].Id,drawConstant(.5));settle(duration(reward.Rarity)+1)
+ check(reward and#ofKind(sinkLog,'Pull')==2 and spy.Reasons[1]=='announced','... and opening it IS announced ('..tostring(reward and reward.Rarity)..')')
+ -- a normal pack banked from the track
+ emptyBag(Ann);table.clear(sinkLog);spy.Reasons={}
+ local Chests=server('ChestService')
+ local banked=Chests.Bank({PlayerData=Data,SyncTools=function()end},Ann,{Stage=7,BagVariant='Pack06',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
+ local testBanked=Chests.Bank({PlayerData=Data,SyncTools=function()end},Ann,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion,TestGrant=true})
+ check(banked and banked.TestGrant==nil and testBanked and testBanked.TestGrant==true,'ChestService:Bank: a normal world pack carries no mark; a world pack of an owner-forced event (TestGrant on the world pack) is a TEST pack')
+ local d=loud(banked,Ann);Data:OpenSeedPack(Ann,banked.Id,drawConstant(d));settle(duration('King')+1)
+ check(#ofKind(sinkLog,'Pull')>=1 and spy.Reasons[1]=='announced','a normal banked pack IS announced')
+ table.clear(sinkLog);Data:OpenSeedPack(Ann,testBanked.Id,drawConstant(.5));settle(30)
+ check(#sinkLog==0 and spy.Reasons[2]=='test pack','... the forced-event world pack is not')
+ -- Void -> Verity conversion keeps the mark either way
+ emptyBag(Ann);table.clear(sinkLog)
+ local voidReal=Data:AddChest(Ann,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
+ local voidTest=Data:AddChest(Ann,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{TestGrant=true})
+ local vReal=Data:ConvertVoidPack(Ann,voidReal.Id);local vTest=Data:ConvertVoidPack(Ann,voidTest.Id)
+ check(vReal and vReal.TestGrant==nil and vTest and vTest.TestGrant==true and vTest.BagVariant==vReal.BagVariant,'a Void pack turned into a Verity pack keeps its mark (marked stays marked, a normal one stays normal)')
+ spy.Reasons={};Data:OpenSeedPack(Ann,vReal.Id,drawConstant(0));settle(duration('King')+1)
+ check(#ofKind(sinkLog,'Pull')>=1 and spy.Reasons[1]=='announced','a normal Verity pack IS announced (the Verity seed)')
+ table.clear(sinkLog);Data:OpenSeedPack(Ann,vTest.Id,drawConstant(0));settle(30)
+ check(#sinkLog==0 and spy.Reasons[2]=='test pack','... a test Verity pack is not')
+ unwatch();emptyBag(Ann)
+end
+
+-- the mark is saved with the pack, survives a reload and a gift, and costs nothing else
+do
+ local pack=Data:AddChest(Ann,{Stage=3,BagVariant='Pack03',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{TestGrant=true})
+ local normal=Data:AddChest(Ann,{Stage=3,BagVariant='Pack03',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
+ local row,rowN=Data:SerializeSeedRecord(pack),Data:SerializeSeedRecord(normal)
+ check(row.TestGrant==true and rowN.TestGrant==nil,'the saved row of a test pack has TestGrant=true; a normal pack\'s row has no such key')
+ local keysTest,keysNormal={},{};for k in pairs(row)do keysTest[k]=true end;for k in pairs(rowN)do keysNormal[k]=true end
+ local extra={};for k in pairs(keysTest)do if not keysNormal[k]then extra[#extra+1]=k end end
+ check(#extra==1 and extra[1]=='TestGrant','TestGrant is the ONLY difference between the two saved rows')
+ local saved=Data:_buildSaveData(Ann)
+ check(saved.Version==Config.ProfileVersion and Config.ProfileVersion==22,'a full save of a bag with a test pack: ProfileVersion is still 22')
+ local DataB=server('PlayerDataService').new(Config,Map,Notes)
+ DataB.Store.Data[DataB:_getKey({UserId=1701,Name='Back'})]=saved
+ local back=makePlayer(1701,'Back',DataB)
+ local loadedFlag,loadedNormal=0,0
+ for _,r in ipairs(DataB:GetChestRecords(back))do if r.Kind=='Pack'then if r.TestGrant==true then loadedFlag+=1 else loadedNormal+=1 end end end
+ check(loadedFlag>=1 and loadedNormal>=1,'after a save and a load the test pack is still marked and the normal pack is not ('..loadedFlag..' / '..loadedNormal..')')
+ -- a gift keeps it
+ local giftRow=Data:SerializeSeedRecord(pack);giftRow.RateBoost=nil
+ local decoded=Data:DecodeGiftedSeed(Bob,giftRow);check(decoded and decoded.TestGrant==true,'a gifted test pack arrives marked')
+ local decodedN=Data:DecodeGiftedSeed(Bob,Data:SerializeSeedRecord(normal));check(decodedN and decodedN.TestGrant==nil,'a gifted normal pack arrives unmarked')
+ -- a Seed row never carries the mark (only packs do), whatever a record says
+ local seedRow=Data:SerializeSeedRecord({Id='x1',Kind='Seed',ChestNumber=5,ChestName='A',Stage=1,SeedId='SunflowerSeed',SeedName='Sunflower',TestGrant=true,BagVariant='Pack01',PackSize=1,PackMutation='None',SeedScale=1})
+ check(seedRow.TestGrant==nil,'a Seed record never serialises the mark')
+ local junk=Data:_decodeSavedSeedRecord(Ann,{Id='j',Kind='Pack',ChestNumber=9,ChestName='P',Stage=1,TestGrant='yes',BagVariant='Pack01',PackSize=1,PackMutation='None',SeedScale=1},9)
+ check(junk.TestGrant==nil,'a saved TestGrant that is not exactly true reads as a normal pack')
+ emptyBag(Ann)
+end
+
+-- an R150 server (the previous release, from the git history) loads and re-saves a bag with an R151 test pack: the pack is untouched, the mark is dropped, nothing else changes
+do
+ local old=RS:FindFirstChild('PlayerDataServiceR150')
+ if not old then
+  print('SKIP: the R150 PlayerDataService is not in the repository history, so the old-server save check did not run')
+ else
+  old.Parent=folder
+  local OldData=W.require(old).new(Config,Map,Notes)
+  local pack=Data:AddChest(Ann,{Stage=3,BagVariant='Pack03',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{TestGrant=true})
+  local keep=Data:AddChest(Ann,{Stage=4,BagVariant='Pack05',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
+  local saved=Data:_buildSaveData(Ann)
+  OldData.Store.Data[OldData:_getKey({UserId=1801,Name='Old'})]=saved
+  local oldPlayer=makePlayer(1801,'Old',OldData)
+  local found;for _,r in ipairs(OldData:GetChestRecords(oldPlayer))do if r.Id==pack.Id then found=r end end
+  check(found~=nil and found.Kind=='Pack'and found.Stage==3 and found.BagVariant=='Pack03','an R150 server loads a save that has an R151 test pack: the pack is there, unchanged')
+  check(found and found.TestGrant==nil,'... it does not know the field: the mark is dropped on load')
+  local resaved=OldData:_buildSaveData(oldPlayer)
+  local function rowOf(save,id)for _,row in ipairs(save.Seeds)do if row.Id==id then return row end end end
+  local before,after=rowOf(saved,pack.Id),rowOf(resaved,pack.Id)
+  check(before and before.TestGrant==true and after and after.TestGrant==nil,'the R150 server writes the pack back WITHOUT the field (before: marked, after: not)')
+  local same=after~=nil
+  if after then for k,v in pairs(before)do if k~='TestGrant'and after[k]~=v then same=false;print('differs after an R150 save:',k,tostring(v),tostring(after[k]))end end
+   for k in pairs(after)do if before[k]==nil then same=false;print('new key after an R150 save:',k)end end end
+  check(same,'... and every other saved field of the pack is identical')
+  local keepBefore,keepAfter=rowOf(saved,keep.Id),rowOf(resaved,keep.Id)
+  local keepSame=keepAfter~=nil;if keepAfter then for k,v in pairs(keepBefore)do if keepAfter[k]~=v then keepSame=false end end end
+  check(keepSame,'a normal pack is saved identically by both versions')
+  check(resaved.Version==saved.Version and resaved.Version==22,'the profile version is the same in both saves (22)')
+  -- and R151 reads what R150 wrote
+  local DataC=server('PlayerDataService').new(Config,Map,Notes)
+  DataC.Store.Data[DataC:_getKey({UserId=1802,Name='Again'})]=resaved
+  local again=makePlayer(1802,'Again',DataC)
+  local back;for _,r in ipairs(DataC:GetChestRecords(again))do if r.Id==pack.Id then back=r end end
+  check(back~=nil and back.Kind=='Pack'and back.TestGrant==nil,'an R151 server reads the R150 save fine (the pack is a normal pack again; nothing breaks)')
+  emptyBag(Ann)
+ end
+end
+
 -- 2. publishing ------------------------------------------------------------------------------------------------------------------------------------
 local function fresh(name,opts)
  opts=opts or{}
@@ -236,7 +510,7 @@ do
  check(#s4.Pending==6 and s4.Stats.Dropped==4,'at most 6 pulls wait for the next publish (the oldest are dropped): '..#s4.Pending..' waiting, '..s4.Stats.Dropped..' dropped')
  -- long names: several messages, none over the limit, everything arrives
  local b5=E.bus(function()return R.clock end,unix);local s5=fresh('S',{Bus=b5});s5:Run()
- for i=1,6 do local e=Rules.Event('Pull',{Name=string.rep('é',24),UserId=1e9+i,Id=s5:_id(),SeedId='ObsidianMawSeed',Odds=1e12,Size=123.456,Mutation='Diamond',At=unix()});s5:_queue(e)end
+ for i=1,6 do local e=Rules.Event('Pull',{Name=string.rep('é',24),UserId=1e9+i,Id=s5:_id(),SeedId='ObsidianMawSeed',Odds=1e12,At=unix()});s5:_queue(e)end
  R.advance(30)
  local sent=0;local biggest=0;for _,e in ipairs(b5.Log)do sent+=#E.decode(e.Message).p;biggest=math.max(biggest,e.Bytes)end
  check(sent==6 and biggest<=900,'six pulls with the longest names: all sent, the biggest message is '..biggest..' bytes ('..b5:Count('S')..' messages)')
@@ -410,7 +684,8 @@ do
  local ok,msg=X.Execute(ctx,p1,'announce',{'firepepper'})
  check(ok==true and#log==2 and log[1].Payload.Kind=='Pull'and log[1].Payload.SeedId=='FirePepperSeed'and log[1].Payload.Name=='Kay Display'and type(log[1].Payload.Odds)=='number','announce firepepper: a banner for everyone in the server ('..tostring(msg)..')')
  table.clear(log)
- check(select(1,X.Execute(ctx,p1,'announce',{'fire','pepper','gold'}))==true and log[1].Payload.SeedId=='FirePepperSeed'and log[1].Payload.Mutation=='Gold','announce fire pepper gold: the plant name in words and a coat')
+ check(select(1,X.Execute(ctx,p1,'announce',{'fire','pepper'}))==true and log[1].Payload.SeedId=='FirePepperSeed'and log[1].Payload.Mutation==nil and log[1].Payload.Size==nil,'announce fire pepper: the plant name in words (there is no coat any more)')
+ table.clear(log);check(select(1,X.Execute(ctx,p1,'announce',{'firepepper','gold'}))==false and#log==0,'a coat word is not part of the command any more (it reads as an unknown seed)')
  table.clear(log)
  check(select(1,X.Execute(ctx,p1,'announce',{'SunflowerSeed'}))==true and log[1].Payload.SeedId=='SunflowerSeed','a Common seed works too (it is a test)')
  local _,common=X.Execute(ctx,p1,'announce',{'SunflowerSeed'});check(common:find('below the in-server threshold',1,true)~=nil,'... and the answer says a real pull would not show it')

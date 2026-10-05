@@ -190,6 +190,7 @@ end
 function ChestService:Bank(player, seed)
 	local record, reason = self.PlayerData:AddChest(player, seed, {Luck=true}) -- R137: hidden pack-size pity
 	if not record then return nil, reason end
+	if seed.TestGrant == true then record.TestGrant = true end -- R151: a world pack an owner command spawned (a forced event) is a TEST pack: never announced when opened
 	self.PlayerData:QuestEvent(player,'Steal',1) -- R140 daily quest: a pack stolen from the track and banked
 	self:SyncTools(player)
 	return record

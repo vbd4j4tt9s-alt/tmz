@@ -85,7 +85,7 @@ local quality=button(scroll,'Quality','',UDim2.fromOffset(3,287),UDim2.new(1,-12
 text(quality,'Label','Effects quality',UDim2.fromOffset(10,0),UDim2.new(.65,-10,1,0),17)
 controls.Quality={Value=text(quality,'Value','Auto',UDim2.fromScale(.66,0),UDim2.fromScale(.32,1),17)}
 quality.Activated:Connect(function()change('Quality',values.Quality=='Auto'and'High'or values.Quality=='High'and'Low'or'Auto')end)
--- R151: "Announcements from other servers" (on by default): a Secret+ pull in another server shows as a small banner and a chat line. Pulls in THIS server always show.
+-- R151: "Announcements from other servers" (on by default): a Secret+ pull in another server is a 🌐 chat line. Pulls in THIS server always show.
 local announce=button(scroll,'GlobalAnnouncements','',UDim2.fromOffset(3,340),UDim2.new(1,-12,0,43),Color3.fromRGB(93,97,173))
 text(announce,'Label','Announcements from other servers',UDim2.fromOffset(10,0),UDim2.new(.74,-10,1,0),17)
 local announceValue=text(announce,'Value','On',UDim2.fromScale(.76,0),UDim2.fromScale(.22,1),17);announceValue.TextXAlignment=Enum.TextXAlignment.Center;controls.GlobalAnnouncements={Value=announceValue}

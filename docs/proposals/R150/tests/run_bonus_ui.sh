@@ -3,6 +3,8 @@
 # TreadmillBonusClient, TreadmillBonusStyle, BonusGiftArt, TreadmillBonusRules and HudLayout:
 #  * frozen        - the gameplay files (TreadmillBonusRules, TreadmillBonusService) are byte-identical to R149 (sha256 list in frozen.sha256),
 #                    and every server error string TreadmillBonusStyle.Flash shortens still exists in the service.
+#                    (R151 changed ONE line of TreadmillBonusService, after AddChest in Roll: OwnerTestPacks.Claim marks the pack of a roll that an owner "bonus"
+#                    command made ready as a TEST pack; frozen.sha256 holds the hash with that line. Nothing about rolls, odds or timing changed.)
 #  * test_bonus_style  - copy / state / timeline functions and the shape builders (gift fill, bow, rays, stripes, bursts, candy buttons).
 #  * test_bonus_ui     - button states (charging / almost / ready / count), press, refusals, gift timer states (normal / almost / ready pop /
 #                        full), roll flow for all seven rarities (spin, status line, reveal word, rays, confetti, close caption, again), ReducedMotion,

@@ -1,6 +1,6 @@
 local C={Defaults={Music=100,Chase=100,Ambience=100,Effects=100,Interface=100,Quality='Auto',GlobalAnnouncements=true}}
 -- R151: on / off settings (saved in the same Settings table of the Premium save, so no profile version change). GlobalAnnouncements: show pulls from
--- other servers (PullAnnouncer): a banner and a chat line. Pulls in this very server are always shown.
+-- other servers (PullAnnouncer): the 🌐 chat lines. Pulls in this very server are always shown.
 C.Toggles={GlobalAnnouncements=true}
 -- R150: the saved volumes are also published on the Player (server, at data load) under these attribute names, so the client's AudioMixer can
 -- use them before the SettingsState request is answered.

@@ -356,6 +356,7 @@ end
 
 -- R137: options.Luck = a pack the player earned (track steal, event pack, treadmill bonus): its size goes through
 -- the hidden pack-size pity (PackSizePityData). Bought, gifted and test packs pass no options.
+-- R151: options.TestGrant = a pack an owner / admin command made (OwnerTestPacks): the record carries TestGrant=true and its open is never announced.
 function PlayerDataService:AddChest(player, chest, options)
 	local canReceive, reason = self:CanReceiveSeed(player)
 	if not canReceive then return nil, reason end
@@ -372,6 +373,7 @@ function PlayerDataService:AddChest(player, chest, options)
             PackSize=PackRules.SanitizePackSize(packSize),PackMutation=PackRules.MutationKey(chest.PackMutation),Weather=Weather.Key(chest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chest.WeatherCheckedEvent),
         SeedScale = PackRules.NewSeedScale(chest.Stage,chest.BagVariant,packSize),
         RateBoost = PackRules.SanitizeRateBoost(chest.RateBoost), -- R138: the free starter pack's 2x rates
+        TestGrant = (type(options) == "table" and options.TestGrant == true) or nil, -- R151: made by an owner command (never announced when opened)
 	}
 	table.insert(self:GetChestRecords(player), record)
     if chest.Stage<=self.Config.StageCount then self:MarkTreadmillBiome(player,chest.Stage)end
@@ -455,6 +457,7 @@ function PlayerDataService:ConvertVoidPack(player, inventoryId)
 			PackSize = size, PackMutation = PackRules.MutationKey(pack.PackMutation), Weather = Weather.Key(pack.Weather),
 			WeatherCheckedEvent = Weather.CheckedEvent(pack.WeatherCheckedEvent), PaidRandom = pack.PaidRandom == true,
 			SeedScale = PackRules.NewSeedScale(VerityCatalog.PackStage, VerityCatalog.Variant, size),
+			TestGrant = pack.TestGrant == true or nil, -- R151: an owner-made Void pack stays a test pack as a Verity pack
 		}
 		records[index] = record
 		local tests = self.StudioPackRewards and self.StudioPackRewards[player]
@@ -780,6 +783,7 @@ function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNu
 			or string.format("%d_%d", player.UserId, chestNumber),
 		Kind = savedChest.Kind == "Pack" and "Pack" or "Seed",
                 PaidRandom=savedChest.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(savedChest.RateBoost),
+                TestGrant=(savedChest.Kind=="Pack" and savedChest.TestGrant==true) or nil, -- R151 (optional; an older server drops it)
                 BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=PackRules.ValidOddsVersion(savedChest.OddsVersion)and savedChest.OddsVersion or nil, -- R137: 81, 112 and 137 all load
             PackSize=PackRules.SanitizePackSize(savedChest.PackSize),PackMutation=PackRules.MutationKey(savedChest.PackMutation),Weather=Weather.Key(savedChest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(savedChest.WeatherCheckedEvent),
                 SeedScale = PackRules.SanitizeSeedScale(savedChest.SeedScale),
@@ -1122,6 +1126,7 @@ function PlayerDataService:SerializeSeedRecord(chestRecord)
 		Id = string.sub(chestRecord.Id, 1, 80),
 		Kind = chestRecord.Kind or "Seed",
             PaidRandom=chestRecord.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(chestRecord.RateBoost),
+            TestGrant=(chestRecord.Kind=="Pack" and chestRecord.TestGrant==true) or nil, -- R151 (optional; an older server drops it)
             BagVariant = PackRules.VariantKey(chestRecord.BagVariant),OddsVersion=chestRecord.OddsVersion,
             PackSize=PackRules.SanitizePackSize(chestRecord.PackSize),PackMutation=PackRules.MutationKey(chestRecord.PackMutation),Weather=Weather.Key(chestRecord.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chestRecord.WeatherCheckedEvent),
             SeedScale = PackRules.SanitizeSeedScale(chestRecord.SeedScale),

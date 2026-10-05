@@ -136,7 +136,7 @@ function E:_makeSlot(index,cycle,ground,floorY,endZ)
  local glow=Instance.new('PointLight');glow.Enabled=false;glow.Parent=body
  model.Parent=self.Folder
  local seed={Model=model,Body=body,Prompt=prompt,Billboard=billboard,Glow=glow,Stage=7,EventKeeper=true,SlotIndex=index,
-  Kind='Pack',SeedName='Void Pack',Available=false,Generation=cycle,PartState={},PackHome=body.Position,OddsVersion=PackRules.OddsVersion}
+  Kind='Pack',SeedName='Void Pack',Available=false,Generation=cycle,PartState={},PackHome=body.Position,OddsVersion=PackRules.OddsVersion,TestGrant=self.Forced==true or nil} -- R151: a Void pack of an owner-forced event is a TEST pack (its open is never announced)
  chase.KnownSeeds[seed]=true
  chase.Chests:RefreshWorldPack(seed,'EclipseReliquary')
  seed.Connection=prompt.Triggered:Connect(function(player)chase:Begin(player,seed)end)
@@ -147,6 +147,7 @@ function E:Spawn(cycle,force)
  if self:Active()and not force then return false end
  if not force and not require(RS.PackSchedule81).Event(cycle)then return false end
  self:Clear()
+ self.Forced=force==true -- R151: force = an owner command / Studio test; the packs of this event carry TestGrant (ChestService:Bank hands it to the pack record)
  local chase=self.Chase;local ground=chase.Chests:_packGround(7)
  if not ground then warn('[R81] Storm event ground is missing');return false end
  local endZ=chase.Map.MapRoot:GetAttribute('BiomeTrackEndZ')or(ground.Position.Z+ground.Size.Z*.5)

@@ -110,7 +110,9 @@ function S:_stage(player)
 end
 -- Puts the pack in the Bag: the record, or nil and why. Does not yield, so the caller can record that it is gone straight after.
 function S:_give(player,pack)
- return self.Data:AddChest(player,{Stage=pack.Stage,BagVariant=pack.Variant,PackSize=1,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion},{Luck=true})
+ local record,why=self.Data:AddChest(player,{Stage=pack.Stage,BagVariant=pack.Variant,PackSize=1,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion},{Luck=true})
+ pcall(function()require(script.Parent.OwnerTestPacks).Claim(player,'Mystery',record)end) -- R151: a pack that an owner "mystery" command made claimable is a TEST pack (never announced); marking never blocks a grant
+ return record,why
 end
 -- The hotbar and the notice. how: nil = taken now, true = yesterday's pack, 'owed' = a pack that waited for room.
 function S:_announce(player,pack,record,how)
