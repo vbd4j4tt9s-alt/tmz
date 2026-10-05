@@ -1,11 +1,26 @@
-# R151 proposal: speed-gain popups that move like the reference (PREVIEW, nothing in `src/` changed)
+# R151: speed-gain popups that move like the reference
+
+> **Implemented** (owner: "proposed + split"). The proposal below was built as written, with these decisions:
+> - `src/ReplicatedStorage/SpeedPopupStyle.lua` (new, in `src/MANIFEST.tsv`): every tunable number and the pure curves. `Cadence.SplitTo = 2` is the number of
+>   popups one server tick is shown as for the local player (equal shares, the sum exact, each at least 1 point): 12 a second at the 1/6 s tick.
+> - `src/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua`: the popup half is rewritten (the V134 belt arrows half is byte for byte unchanged).
+>   Per player that has popups one pooled fixed-pixel `BillboardGui` (adorned to the head, `MaxDistance` 100) holds `cap + 2` pooled popup frames, built whole at first use;
+>   ONE `RenderStepped` updater for everybody, connected only while a popup is alive or queued; no `TweenService`, no `task.delay`, no Instance made or destroyed once the pool exists.
+> - Colours, font and the bolt are exactly as before (pale cyan amount `(125,248,255)` with the navy outline `(17,26,42)` at 2.5, yellow bolt, FredokaOne): `Colors.Text` is unchanged.
+> - Caps (own / others) 8/3 at tier 3, 6/2 at tier 2 (phones), 4/1 at tier 1 and FastMode. Other players' popups only within 100 studs, **not split** (their caps are lower, so
+>   half the shares would be thrown away); Reduced Motion is **not split** either (a calm fade-up, 6 a second, own cap 4 / others 1).
+> - `Config.TreadmillPopupLifetime` (1.35) and the remote's payload are untouched (the client no longer reads the lifetime; `SpeedPopupStyle.Life` is 0.65 s).
+> - Tests: `docs/proposals/R151/tests/run_speed_popups.sh` (`all` also runs the R150 / R123 treadmill and bonus suites, R150 `run_sfx.sh` and the R117 treadmills; `mutate` breaks the code
+>   on purpose 33 ways, every one must fail a suite). The preview below was made before the build; `speed_popups/run_speed_popups_preview.sh` now runs the real module.
+
+# (proposal as shown to the owner) speed-gain popups that move like the reference
 
 Owner: "speed gain should be touch up on regarding the speed popups we don't have to colour it black as seen in the video, keep ours white but the
 physics and feel of it should feel the same as the video". Then: "show previews before implementation".
 
 **Preview:** `speed_popups.png` (sheet: now / proposed / proposed with split awards / Reduced Motion at five moments, the measured curves, the numbers
-side by side) and `speed_popups.gif` (now next to the proposal, 1.5 s, 470 KB). **Prototype:** `speed_popups/SpeedPopupStyle.lua` (every tunable number and the
-pure curves) run by `sim_popups.luau`; `check_curves.luau` checks it (74 checks); `run_speed_popups_preview.sh <scratch>` rebuilds everything.
+side by side) and `speed_popups.gif` (now next to the proposal, 1.5 s, 470 KB). **Prototype (now the real module):** `src/ReplicatedStorage/SpeedPopupStyle.lua` (every tunable number and the
+pure curves) run by `speed_popups/sim_popups.luau`; its curves are checked by `tests/test_speed_popups_style.luau`; `speed_popups/run_speed_popups_preview.sh <scratch>` rebuilds the preview.
 
 ## What the game does today
 
@@ -46,7 +61,7 @@ samples are in `reference_fit.py`, the results in `reference_numbers.json`. Noth
 Limits: small samples (7 resting spots, 4 flight tracks, 3 fades), 30 fps, and the camera zoom only changed about 15%, so "constant on screen" is
 a good fit rather than proven. The numbers describe the feel; they are not exact constants of that game.
 
-## What would change (proposal, in `SpeedPopupStyle.lua`)
+## What changes (in `SpeedPopupStyle.lua`)
 
 All values are "design px at a 1080 p screen" times `Unit(viewport height)` (0.8 on phones, up to 1.35), so they read the same at any camera distance.
 

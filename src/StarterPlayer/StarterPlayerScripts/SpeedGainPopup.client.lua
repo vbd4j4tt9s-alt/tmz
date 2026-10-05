@@ -1,9 +1,18 @@
--- V0.55 whole-point treadmill gains emitted from the head in a narrow cone.
--- Place this LocalScript in StarterPlayer > StarterPlayerScripts.
-
+-- Treadmill speed-gain popups. Place this LocalScript in StarterPlayer > StarterPlayerScripts.
+-- V0.55: whole-point gains from the head. R151 (owner: "speed gain should be touch up regarding the speed popups ... keep ours white but the physics and feel of
+-- it should feel the same as the video", then "proposed + split"): the motion of a popular treadmill game's popups with OUR colours, font and bolt. All numbers
+-- and curves are in ReplicatedStorage/SpeedPopupStyle (measured in docs/proposals/R151/speed_popups.md): a popup is born at the head at 0.45 size, pops past
+-- full size, flies to its own spot in a fan above the head (cubic ease-out, 0.4 s, pixels not studs), holds, fades in 0.15 s and is gone at 0.65 s. The
+-- local player's award is shown as 2 equal shares per server tick (12 a second, the sum is exact); other players' popups (only within 100 studs) are not split.
+-- Reduced Motion: no fling or pop, a plain fade-up. FastMode / a slow device (ClientFxBudget tier 1) and phones (tier 2) keep fewer alive (SpeedPopupStyle.Caps).
+-- Cheap by construction: one BillboardGui per player that has popups, from a small pool, holding pooled popup frames that are moved and reused; ONE RenderStepped
+-- updater for all of them, connected only while a popup is alive or queued; no TweenService, no task.delay, no Instance created or destroyed once the pool exists.
+-- (The server still publishes Config.TreadmillPopupLifetime as the remote's PopupLifetime attribute; the lifetime now lives in SpeedPopupStyle.)
+do
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
 
 local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
@@ -13,174 +22,265 @@ assert(remotes, "[V0.55] Missing ChestChaseRemotes; check the first server error
 local speedGainPopup = remotes:WaitForChild("SpeedGainPopup", 10)
 assert(speedGainPopup, "[V0.55] Missing SpeedGainPopup; install matching Config and BaseService modules.")
 
+local Style = require(ReplicatedStorage:WaitForChild("SpeedPopupStyle"))
+local Budget = require(ReplicatedStorage:WaitForChild("ClientFxBudget"))
+
 local randomizer = Random.new()
-local POPUP_LIFETIME = math.clamp(tonumber(speedGainPopup:GetAttribute("PopupLifetime")) or 1.35, 0.5, 2)
-local FADE_DELAY = 0.35
-local FADE_DURATION = POPUP_LIFETIME - FADE_DELAY
-local activePopups = {}
-local popupSequences = {}
-local MAX_VISIBLE_PER_PLAYER = 4
-local CONE_HALF_ANGLE_DEGREES = 15
--- Alternating sides separates consecutive gains while keeping every path
--- within a 30-degree cone centred directly above the player's head.
-local CONE_ANGLES_DEGREES = {-14, 14, -7, 7, 0, -11, 11, -4, 4, 0}
+local function rng() return randomizer:NextNumber() end
 
-local function formatGain(amount)
- for _,unit in ipairs({{1e12,'T'},{1e9,'B'},{1e6,'M'},{1e3,'K'}})do
-  if amount>=unit[1]then return (string.format('%.1f',amount/unit[1]):gsub('%.0$',''))..unit[2]end
- end
- return string.format('%.0f',amount)
-end
+local function rgb(c) return Color3.fromRGB(c[1], c[2], c[3]) end
+local TEXT_COLOR, STROKE_COLOR = rgb(Style.Colors.Text), rgb(Style.Colors.TextStroke)
+local ICON_COLOR, LEGACY_STROKE = rgb(Style.Colors.Icon), rgb(Style.Colors.LegacyStroke)
 
-local function makeTextLabel(parent, name, text, position, size, color, textSize)
+local entries = {}                                  -- [Player] = what is alive or queued for that player (removed when nothing is)
+local bags = setmetatable({}, {__mode = "k"})       -- [Player] = the fan-slot bag of SpeedPopupStyle.Plan (kept, tiny)
+local freeFields = {}                               -- idle pooled fields
+local itemPool = {}                                 -- recycled queue items
+local connection                                    -- the one RenderStepped updater, only while entries is not empty
+
+-- Pool: a field (BillboardGui) holds popups (a Frame with the bolt and the amount); nothing is destroyed while it is in use ----------------------------
+local function makeLabel(parent, name, text, textSize, color, width, order)
 	local label = Instance.new("TextLabel")
 	label.Name = name
-	label.Position = position
-	label.Size = size
+	label.Size = UDim2.fromOffset(width, Style.Size.Box[2])
 	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
-	label.Font = Enum.Font.FredokaOne
+	label.Font = Enum.Font[Style.Font]
 	label.Text = text
 	label.TextColor3 = color
 	label.TextSize = textSize
-	label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	label.TextStrokeColor3 = LEGACY_STROKE
 	label.TextStrokeTransparency = 0
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextYAlignment = Enum.TextYAlignment.Center
+	label.LayoutOrder = order
+	local stroke = Instance.new("UIStroke")
+	stroke.Name = "BoldOutline86"
+	stroke.Thickness = Style.StrokeThickness
+	stroke.Color = STROKE_COLOR
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	stroke.Parent = label
 	label.Parent = parent
- local stroke=Instance.new('UIStroke');stroke.Name='BoldOutline86';stroke.Thickness=2.5
- stroke.Color=Color3.fromRGB(17,26,42);stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Contextual;stroke.Parent=label
-	return label
+	return label, stroke
 end
 
-local function showGain(targetPlayer, amount)
-	if typeof(targetPlayer) ~= "Instance"
-		or not targetPlayer:IsA("Player")
-		or type(amount) ~= "number"
-		or amount <= 0 then
-		return
-	end
+local function makePopup(field)
+	local box = Style.Size.Box
+	local frame = Instance.new("Frame")
+	frame.Name = "Popup"
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+	frame.Size = UDim2.fromOffset(box[1], box[2])
+	frame.BackgroundTransparency = 1
+	frame.BorderSizePixel = 0
+	frame.Visible = false
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.Padding = UDim.new(0, Style.Size.Gap)
+	layout.Parent = frame
+	local uiScale = Instance.new("UIScale")
+	uiScale.Parent = frame
+	local icon, iconStroke = makeLabel(frame, "Lightning", Style.Icon, Style.Size.Icon, ICON_COLOR, Style.Size.IconBox, 1)
+	local amount, amountStroke = makeLabel(frame, "Amount", "", Style.Size.Text, TEXT_COLOR, 0, 2)
+	amount.AutomaticSize = Enum.AutomaticSize.X
+	frame.Parent = field.Gui
+	local popup = {
+		Field = field, Frame = frame, Scale = uiScale, Icon = icon, IconStroke = iconStroke, Amount = amount, AmountStroke = amountStroke,
+		Plan = {}, At = 0, Retired = nil, Reduced = false, Unit = 1, PX = 0, PY = 0, PS = 1, PA = 1,
+	}
+	field.Popups[#field.Popups + 1] = popup
+	return popup
+end
 
-	local character = targetPlayer.Character
-	local head = character and character:FindFirstChild("Head")
- local root=character and character:FindFirstChild("HumanoidRootPart")
+local function makeField()
+	local f = Style.Field
+	local gui = Instance.new("BillboardGui")
+	gui.Name = f.Name
+	gui.Size = UDim2.fromOffset(f.Width, f.Height)
+	gui.AlwaysOnTop = true
+	gui.LightInfluence = 0
+	gui.MaxDistance = Style.MaxDistance
+	gui.ResetOnSpawn = false
+	gui.Active = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.Enabled = false
+	gui.Parent = playerGui
+	return {Gui = gui, Popups = {}, Free = {}, Seq = 0}
+end
+
+local function takeField(head)
+	local field = table.remove(freeFields)
+	while field and field.Gui.Parent ~= playerGui do field = table.remove(freeFields) end -- one that was removed from the PlayerGui is not reused
+	field = field or makeField()
+	field.Gui.Adornee = head
+	field.Gui.Enabled = true
+	return field
+end
+
+local function giveField(field)
+	field.Gui.Enabled = false
+	field.Gui.Adornee = nil
+	if #freeFields < Style.Field.FreeFields then freeFields[#freeFields + 1] = field else field.Gui:Destroy() end
+end
+
+local function takeItem(at, amount)
+	local item = table.remove(itemPool) or {}
+	item.At, item.Amount = at, amount
+	return item
+end
+
+local function hidePopup(popup)
+	popup.Frame.Visible = false
+	popup.Retired = nil
+	local free = popup.Field.Free
+	free[#free + 1] = popup
+end
+
+-- Everything of one player is put away (the player left, the character was replaced, or nothing is alive any more).
+local function finishEntry(entry)
+	local active, pending = entry.Active, entry.Pending
+	for i = #active, 1, -1 do hidePopup(active[i]); active[i] = nil end
+	for i = #pending, 1, -1 do itemPool[#itemPool + 1] = pending[i]; pending[i] = nil end
+	if entry.Field then giveField(entry.Field); entry.Field = nil end
+end
+
+-- Moving one popup: only what changed is written (a resting popup costs nothing) ---------------------------------------------------------------------
+local function apply(popup, x, y, scale, alpha)
+	local unit = popup.Unit
+	x, y = x * unit, y * unit
+	if math.abs(x - popup.PX) > 0.05 or math.abs(y - popup.PY) > 0.05 then
+		popup.PX, popup.PY = x, y
+		popup.Frame.Position = UDim2.new(0.5, x, 0.5, y)
+	end
+	scale = scale * unit
+	if math.abs(scale - popup.PS) > 0.002 then
+		popup.PS = scale
+		popup.Scale.Scale = scale
+	end
+	if math.abs(alpha - popup.PA) > 0.004 then
+		popup.PA = alpha
+		local t = 1 - alpha
+		popup.Icon.TextTransparency = t
+		popup.Icon.TextStrokeTransparency = t
+		popup.IconStroke.Transparency = t
+		popup.Amount.TextTransparency = t
+		popup.Amount.TextStrokeTransparency = t
+		popup.AmountStroke.Transparency = t
+	end
+end
+
+local function readReducedMotion() return GuiService.ReducedMotionEnabled end
+local function reducedMotion()
+	local ok, value = pcall(readReducedMotion)
+	return ok and value == true
+end
+
+-- ClientFxBudget tier (3 best .. 1 lowest); FastMode is always 1.
+local function currentTier()
+	if localPlayer:GetAttribute("FastMode") == true then return 1 end
+	local ok, tier = pcall(Budget.Get)
+	return ok and tier or 1
+end
+
+local function spawnPopup(entry, item, now)
+	local reduced = reducedMotion()
+	local cap = Style.Cap(currentTier(), entry.Own, reduced)
+	local active = entry.Active
+	-- over the cap: the oldest ones fade out fast (SpeedPopupStyle.RetireFade) instead of vanishing
+	local live = 0
+	for i = 1, #active do if active[i].Retired == nil then live += 1 end end
+	if live >= cap then
+		for i = 1, #active do
+			local old = active[i]
+			if old.Retired == nil then
+				old.Retired = now - old.At
+				live -= 1
+				if live < cap then break end
+			end
+		end
+	end
+	local field = entry.Field
+	if not field then
+		field = takeField(entry.Head)
+		entry.Field = field
+	end
+	-- the pool is built whole the first time a field is used for this cap (cap + Spare frames); after that nothing is created
+	while #field.Popups < cap + Style.Field.Spare do
+		local built = makePopup(field)
+		field.Free[#field.Free + 1] = built
+	end
+	local popup = table.remove(field.Free)
+	if not popup then popup = table.remove(active, 1) end -- every frame is busy (not expected): the oldest goes at once
 	local camera = workspace.CurrentCamera
-	if not head or not root or (camera and (camera.CFrame.Position - head.Position).Magnitude > 100) then
-		return
-	end
-	local visible = activePopups[targetPlayer] or {}
-	activePopups[targetPlayer] = visible
-	for index = #visible, 1, -1 do
-		if not visible[index].Parent then table.remove(visible, index) end
-	end
-	if #visible >= MAX_VISIBLE_PER_PLAYER then table.remove(visible, 1):Destroy() end
-
-	local sequence = (popupSequences[targetPlayer] or 0) + 1
-	popupSequences[targetPlayer] = sequence
-	local angleDegrees = CONE_ANGLES_DEGREES[
-	((sequence - 1) % #CONE_ANGLES_DEGREES) + 1
-	]
-	angleDegrees = math.clamp(
-		angleDegrees + randomizer:NextNumber(-0.7, 0.7),
-		-CONE_HALF_ANGLE_DEGREES,
-		CONE_HALF_ANGLE_DEGREES
-	)
-	local angle = math.rad(angleDegrees)
-	local startHorizontal = randomizer:NextNumber(-0.08, 0.08)
-	local startVertical = math.max(2,head.Position.Y-root.Position.Y+1.25)
-	local travelDistance = 3.0
-		+ ((sequence - 1) % 3) * 0.38
-		+ randomizer:NextNumber(-0.12, 0.12)
-	local cameraRight = camera and camera.CFrame.RightVector or Vector3.new(1, 0, 0)
-	local flatRight = Vector3.new(cameraRight.X, 0, cameraRight.Z)
-	if flatRight.Magnitude < 0.01 then
-		flatRight = Vector3.new(1, 0, 0)
-	else
-		flatRight = flatRight.Unit
-	end
-	local startOffset = flatRight * startHorizontal
-		+ Vector3.new(0, startVertical, 0)
-	local endOffset = flatRight
-		* (startHorizontal + math.sin(angle) * travelDistance)
-		+ Vector3.new(0, startVertical + math.cos(angle) * travelDistance, 0)
-
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "SpeedGainPopup"
-	billboard.Adornee = root
-	billboard.Size = UDim2.fromOffset(178, 48)
-	billboard.StudsOffsetWorldSpace = startOffset
-	billboard.AlwaysOnTop = true
-	billboard.LightInfluence = 0
-	billboard.MaxDistance = 100
-	billboard.ResetOnSpawn = false
-	billboard.Parent = playerGui
-	table.insert(visible, billboard)
-
-	local icon = makeTextLabel(
-		billboard,
-		"Lightning",
-		"⚡",
-		UDim2.fromOffset(0, 0),
-		UDim2.fromOffset(34, 42),
-		Color3.fromRGB(255, 222, 66),
-		24
-	)
-	icon.Rotation = randomizer:NextNumber(-14, 14)
-
-	local amountLabel = makeTextLabel(
-		billboard,
-		"Amount",
-		"+" .. formatGain(amount),
-		UDim2.fromOffset(31, 0),
-		UDim2.new(1, -33, 1, 0),
-		Color3.fromRGB(125, 248, 255),
-		26
-	)
-	amountLabel.Rotation = randomizer:NextNumber(-3, 3)
-
-	local riseTween = TweenService:Create(
-		billboard,
-		TweenInfo.new(POPUP_LIFETIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{
-			StudsOffsetWorldSpace = endOffset,
-		}
-	)
-	local iconFade = TweenService:Create(
-		icon,
-		TweenInfo.new(FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-		{
-			TextTransparency = 1,
-			TextStrokeTransparency = 1,
-		}
-	)
-	local amountFade = TweenService:Create(
-		amountLabel,
-		TweenInfo.new(FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-		{
-			TextTransparency = 1,
-			TextStrokeTransparency = 1,
-		}
-	)
-
-	riseTween:Play()
-	task.delay(FADE_DELAY, function()
-		if billboard.Parent then
-			iconFade:Play()
-            amountFade:Play()
-            for _,label in ipairs({icon,amountLabel})do
-             TweenService:Create(label.BoldOutline86,TweenInfo.new(FADE_DURATION),{Transparency=1}):Play()
-            end
-		end
-	end)
-	riseTween.Completed:Connect(function()
-		if billboard.Parent then
-			billboard:Destroy()
-		end
-	end)
+	popup.Unit = Style.Unit(camera and camera.ViewportSize.Y)
+	popup.Reduced = reduced
+	popup.At = item.At
+	popup.Retired = nil
+	local plan = Style.Plan(rng, entry.Bag, popup.Plan)
+	field.Seq = field.Seq % 1000000 + 1
+	popup.Frame.ZIndex = field.Seq -- the newest is drawn on top
+	popup.Icon.Rotation = reduced and 0 or plan.IconTilt
+	popup.Amount.Rotation = reduced and 0 or plan.TextTilt
+	popup.Amount.Text = "+" .. Style.FormatGain(item.Amount)
+	popup.PX, popup.PY, popup.PS, popup.PA = math.huge, math.huge, -1, -1 -- the first pose writes everything
+	local x, y, scale, alpha = Style.Pose(plan, now - item.At, reduced)
+	apply(popup, x, y, scale, alpha)
+	popup.Frame.Visible = true
+	active[#active + 1] = popup
 end
 
--- A delayed server frame can contain several real awards. Spread those out
--- visually, conserving their integer sum and rejecting old-character events.
+-- One entry per frame: spawn what is due, move what is alive. Returns false when the entry is finished (nothing alive or queued, or the player / character is gone).
+local function updateEntry(entry, now)
+	local player = entry.Player
+	if player.Parent == nil or player.Character ~= entry.Character or entry.Head.Parent == nil then return false end
+	local pending = entry.Pending
+	local index = 1
+	while index <= #pending do
+		local item = pending[index]
+		if item.At <= now then
+			table.remove(pending, index)
+			-- as before R151: the award only shows while the player is still on the treadmill with the character that earned it
+			if player:GetAttribute("TreadmillTraining") == true and now - item.At < Style.Life then spawnPopup(entry, item, now) end
+			itemPool[#itemPool + 1] = item
+		else
+			index += 1
+		end
+	end
+	local active = entry.Active
+	index = 1
+	while index <= #active do
+		local popup = active[index]
+		local x, y, scale, alpha, alive = Style.Pose(popup.Plan, now - popup.At, popup.Reduced, popup.Retired)
+		if alive then
+			apply(popup, x, y, scale, alpha)
+			index += 1
+		else
+			table.remove(active, index)
+			hidePopup(popup)
+		end
+	end
+	return #active > 0 or #pending > 0
+end
+
+local function step()
+	local now = os.clock()
+	for player, entry in pairs(entries) do
+		if not updateEntry(entry, now) then
+			finishEntry(entry)
+			entries[player] = nil
+		end
+	end
+	if next(entries) == nil and connection then
+		connection:Disconnect()
+		connection = nil
+	end
+end
+
+-- A delayed server frame can contain several real awards (ticks). Each tick is shown as SplitFor popups of equal share for the local player (the sum is kept
+-- exactly), spaced over the tick; old-character events are rejected when they are due.
 speedGainPopup.OnClientEvent:Connect(function(targetPlayer, amount, _, ticks, interval, earnedCharacter)
 	if typeof(targetPlayer) ~= "Instance" or not targetPlayer:IsA("Player")
 		or type(amount) ~= "number" or amount ~= amount or amount <= 0
@@ -188,28 +288,59 @@ speedGainPopup.OnClientEvent:Connect(function(targetPlayer, amount, _, ticks, in
 	amount = math.floor(amount)
 	if amount < 1 then return end
 	local character = earnedCharacter or targetPlayer.Character
-	local count = math.min(amount, math.clamp(math.floor(tonumber(ticks) or 1), 1, 10))
-	local spacing = math.min(math.clamp(tonumber(interval) or 0.2, 0.1, 1), 1 / count)
-	local each = math.floor(amount / count)
-	local extra = amount % count
-	for index = 1, count do
-		local gain = each + (index <= extra and 1 or 0)
-		task.delay((index - 1) * spacing, function()
-			if targetPlayer.Parent and targetPlayer.Character == character
-				and targetPlayer:GetAttribute("TreadmillTraining") == true then
-				showGain(targetPlayer, gain)
-			end
-		end)
+	if typeof(character) ~= "Instance" or targetPlayer.Character ~= character or targetPlayer.Parent == nil then return end
+	local head = character:FindFirstChild("Head")
+	if not head or not head:IsA("BasePart") then return end
+	local camera = workspace.CurrentCamera
+	if camera and (camera.CFrame.Position - head.Position).Magnitude > Style.MaxDistance then return end
+	local own = targetPlayer == localPlayer
+	local split = Style.SplitFor(own, reducedMotion())
+	local shares = Style.Shares(amount, ticks, split)
+	if shares < 1 then return end
+	local spacing = Style.Spacing(interval, split, shares)
+	local entry = entries[targetPlayer]
+	if entry and (entry.Character ~= character or entry.Head ~= head) then
+		finishEntry(entry) -- a new character: the old one's popups are gone
+		entries[targetPlayer] = nil
+		entry = nil
 	end
+	if not entry then
+		local bag = bags[targetPlayer]
+		if not bag then
+			bag = {}
+			bags[targetPlayer] = bag
+		end
+		entry = {Player = targetPlayer, Own = own, Character = character, Head = head, Bag = bag, Field = nil, Active = {}, Pending = {}}
+		entries[targetPlayer] = entry
+	end
+	local pending = entry.Pending
+	local now = os.clock()
+	local each, extra = amount // shares, amount % shares
+	for i = 1, shares do
+		if #pending >= Style.Cadence.MaxPending then break end
+		pending[#pending + 1] = takeItem(now + (i - 1) * spacing, each + (i <= extra and 1 or 0))
+	end
+	if not connection then connection = RunService.RenderStepped:Connect(step) end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
-	for _, popup in ipairs(activePopups[player] or {}) do popup:Destroy() end
-	activePopups[player] = nil
-	popupSequences[player] = nil
+	local entry = entries[player]
+	if entry then
+		finishEntry(entry)
+		entries[player] = nil
+	end
+	bags[player] = nil
 end)
 
-if game:GetService('RunService'):IsStudio()then print("[V0.55] PASS - Speed gains emit from the head through a narrow 30-degree cone.") end -- R114: Studio-only load message
+script.Destroying:Connect(function()
+	if connection then
+		connection:Disconnect()
+		connection = nil
+	end
+end)
+
+if game:GetService('RunService'):IsStudio()then print("[R151] PASS - speed popups: pooled, one updater, popped and flung like the reference, split awards for you.") end -- R114: Studio-only load message
+end
 
 
 do

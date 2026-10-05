@@ -146,7 +146,7 @@ function buildStrip(){
               ['new6','new6','PROPOSED',"one popup per award (6 a second), the video's pop, fling, stop and quick fade, pixels not studs"],
               ['new12','new12','PROPOSED + split awards','each award shown as 2 equal shares (12 a second, about the video\'s 10)'],
               ['reduced','reduced','REDUCED MOTION','no fling or overshoot: appears, rises 72 px in 0.7 s, fades; sides alternate']];
-  let h='<h1>Treadmill speed popups: now vs proposed</h1><p class="sub">Preview only, nothing in src/ is changed. Same 1080 p screen and camera (head 44 px wide, as in the reference clip), our colours, our font, our lightning icon; "+4.2K" is one tick\'s award. The proposal is SpeedPopupStyle.lua in this folder, run by sim_popups.luau; its numbers are the ones measured from the reference clip (table and curves below). Time runs left to right from the start of a run.</p>';
+  let h='<h1>Treadmill speed popups: now vs proposed</h1><p class="sub">Preview of the proposal, made before it was built. Same 1080 p screen and camera (head 44 px wide, as in the reference clip), our colours, our font, our lightning icon; "+4.2K" is one tick\'s award. The proposal is src/ReplicatedStorage/SpeedPopupStyle.lua (the module the game now uses), run by sim_popups.luau; its numbers are the ones measured from the reference clip (table and curves below). Time runs left to right from the start of a run.</p>';
   h+='<div class="grid"><div></div>'+cols.map(t=>'<div class="colhead">t = '+t.toFixed(2)+' s</div>').join('');
   rows.forEach(([key,model,title,desc])=>{
     h+='<div class="rowlab"><b>'+title+'</b><span>'+desc+'</span></div>';

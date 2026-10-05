@@ -8,7 +8,7 @@
 --   reduced  = the proposal with Reduced Motion on.
 -- The screen is a 1080 p one: "px" below are 1080 p pixels, the camera shows the head 44 px wide (as in the reference clip, 55 px of 1344), i.e.
 -- 36.8 px per stud (a 1.2 stud head); offsets are from the head centre, y down.
--- Usage (from this folder):  /opt/luau/luau sim_popups.luau > frames.log
+-- Usage: run_speed_popups_preview.sh copies this file next to src/ReplicatedStorage/SpeedPopupStyle.lua and runs  /opt/luau/luau sim_popups.luau > frames.log
 local Style = require('./SpeedPopupStyle')
 
 local PX_PER_STUD = 44.2 / 1.2
@@ -34,15 +34,17 @@ end
 
 local function easeOut(u, p) u = math.clamp(u, 0, 1) return 1 - (1 - u) ^ p end
 
--- the spawn schedule: {time, amount}
+-- the spawn schedule: {time, amount} (the very functions the game uses: SplitFor / Shares / Split / Spacing of src/ReplicatedStorage/SpeedPopupStyle.lua;
+-- the local player at full motion is split SplitTo = 2 ways, the first model of the preview ("6 a second") is the unsplit one)
 local function ticks(split)
 	local list = {}
 	local k = 1
-	Style.Cadence.SplitTo = split and Style.Cadence.Target or nil   -- the optional cadence of the proposal (off by default)
+	local parts = split and Style.SplitFor(true, false) or 1
 	while k * TICK < SECONDS do
 		local at = k * TICK
-		local shares = Style.Split(AWARD, Style.Shares(AWARD, TICK))
-		for j, v in ipairs(shares) do list[#list + 1] = {at + (j - 1) * TICK / #shares, v} end
+		local shares = Style.Split(AWARD, Style.Shares(AWARD, 1, parts))
+		local spacing = Style.Spacing(TICK, parts, #shares)
+		for j, v in ipairs(shares) do list[#list + 1] = {at + (j - 1) * spacing, v} end
 		k += 1
 	end
 	return list
