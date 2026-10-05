@@ -5,6 +5,8 @@ Design proposal with renders. **Nothing in `src/` was changed**, and no installe
 > **Update (5 Oct 2026): approved and built.** You said *"i like this design and polish the trees, give them more variety and the stuff and everything"*. Phase 1 and Phase 2 are now in `src/`, with much more variety than the proposal. See **§8 As built** and the `base_area_built_*.png` pictures. The sections below are the original proposal, kept as written.
 >
 > **Update 2: studded trees.** You sent two Creator Store trees and said *"make sure they are studded"* and *"make sure they are collision is off"*. See **§9 Studded trees**, which also has the steps for you in Studio.
+>
+> **Update 3: just trees.** You said *"remove the apples or red stuff on the trees the trees are just trees"*. No tree has fruit or red bits any more. See **§10**.
 
 Your question (5 Oct 2026): *"I also want you to take a look at a redesign of the base area and the walls what can we add to liven up the base area"*.
 
@@ -414,7 +416,7 @@ You approved theme A (Seed Festival Square), the dressed 48-stud walls, base arc
 |---|---|
 | `base_area_built_spawn.png` … `_avenue.png` | The proposal's cameras, plus a new avenue view. Each sheet has TODAY (before R151) and the LOW TIER (phones on low or FastMode) small, and AS BUILT (desktop tier) large. Sheets: spawn, street, entrance, walls, backwall, gate, aerial, avenue. |
 | `base_area_built_darkened.png` | The lamps switched on in The Darkened's blackout. |
-| `base_area_built_variety.png` | 14 close-ups of the tree and prop variety: oaks, blossoms, fruit trees, poplars, Desert and Lava gardens, the Snow lane, the fountain, a bed, the market square, two murals, the gate keys with green ticks, and a free base's arch. |
+| `base_area_built_variety.png` | 14 close-ups of the tree and prop variety: oaks, blossoms, leafy trees, poplars, Desert and Lava gardens, the Snow lane, the fountain, a bed, the market square, two murals, the gate keys with green ticks, and a free base's arch. |
 | `base_area_built_plan.png` | The built hub from above, with zones and the part budget the tests counted. |
 
 The pictures are still previews, not Roblox screenshots: no Roblox lighting, PBR materials, bloom or Fredoka font. The approved pack mesh isn't available offline, so the fountain shows its part-built fallback pack.
@@ -457,10 +459,10 @@ The pictures are still previews, not Roblox screenshots: no Roblox lighting, PBR
   - 14 round oaks in 3 sizes;
   - 8 poplars and cypresses;
   - 8 blossoms (pink, white, lilac) with falling petals near the camera;
-  - 8 fruit trees (apple, orange, lemon, plum);
+  - 8 leafy trees in four greens (fresh, deep, lime, sage); these were fruit trees until §10;
   - 6 pines with snow rims on the Snow lane;
   - 5 palms and 4 cacti (saguaro, barrel) in the Desert garden;
-  - 5 ember trees and 4 glowing basalt rocks in the Lava garden.
+  - 5 ember trees (autumn amber since §10) and 4 glowing basalt rocks in the Lava garden.
 - **Props:**
   - 16 bushes (garden, desert and ember kinds), and potted topiary cones and balls.
   - Mixed flower beds (warm and cool mixes, three heights).
@@ -566,16 +568,16 @@ This section records what was built for them. The Roblox site is blocked here, s
   - Each block of a tree keeps its top and bottom off the planes of that tree's other blocks, so nothing flickers.
   - The species, sizes, colours, positions and per-tree variety are unchanged.
   - This costs no extra parts, textures or uploads.
-- **Your models take the leafy slots:** the 14 oaks, 8 blossoms and 8 fruit trees (30 slots).
+- **Your models take the leafy slots:** the 14 oaks, 8 blossoms and 8 leafy trees (30 slots).
   - Each slot gets its own clone, fitted to the slot by its bounding box: `Model:ScaleTo` to the slot's height (13 to 23 studs), never wider than the slot's crown.
   - Each clone gets its own turn and a lean of up to 3 degrees. It stands on the floor, sunk 0.3 studs.
   - The leaves take the slot's colour:
-    - oaks and fruit trees get one of six greens, each part keeping its own light or dark;
+    - oaks get one of six greens, leafy trees their slot's green tone, each part keeping its own light or dark;
     - blossoms get pink, white or lilac.
-  - Fruit trees keep their fruit as my parts, set into the clone's crown. Blossoms keep their falling petals.
+  - Any fruit in your model is removed (§10). Blossoms keep their falling petals.
   - With several models, they are spread over the slots by a hash, so every player sees the same square.
 - **Which trees, and why:**
-  - Oaks, blossoms and fruit trees have round crowns, which a tree model fits.
+  - Oaks, blossoms and leafy trees have round crowns, which a tree model fits.
   - Poplars stay part-built: they are tall columns, and uniform scaling can't make a column out of a round tree. They also keep the variety.
   - Pines (Snow lane), palms and cacti (Desert garden), ember trees and glowing rocks (Lava garden) are themed shapes, so they stay part-built. They are studded too.
   - A model whose leaves cannot be recoloured (a textured MeshPart or a SurfaceAppearance) is not used for blossoms, because they would be green.
@@ -609,7 +611,7 @@ This section records what was built for them. The Roblox site is blocked here, s
   - Clone parts of 2 studs or more cast shadows on tiers 2 and 3. Small bits and tier 1 cast none.
   - What happened on your screen is in `workspace.HubLife151`'s attributes:
     - `TemplateParts`, for example `StandInStudTree 9, StandInStudTree2 12`;
-    - `UsedFor`, for example `30 of 30 leafy trees (oak 14, blossom 8, fruit 8), 321 parts; tier 3: one tree up to 40 parts, 600 in all`;
+    - `UsedFor`, for example `30 of 30 leafy trees (oak 14, blossom 8, leafy 8), 321 parts; tier 3: one tree up to 40 parts, 600 in all`;
     - `ScriptsRemoved`.
 - **Broken or missing models:**
   - An empty model, a script, a part with an impossible size, or a model that cannot be copied is reported in `TemplateParts` and skipped.
@@ -679,7 +681,7 @@ This section records what was built for them. The Roblox site is blocked here, s
   - parts and models added later are locked;
   - signs, lamp lights and particles survive level-of-detail changes.
 - **Models:** templates of 5, 14, 30 and 60 parts; broken ones (empty, a script, NaN size); the budget per tier; textured models kept out of blossom slots.
-- **Spread and fit:** models spread by hash and deterministic; fit (height, width, grounded, on the slot); leaf colours; fruit; each clone with its own turn.
+- **Spread and fit:** models spread by hash and deterministic; fit (height, width, grounded, on the slot); leaf colours; no fruit (§10); each clone with its own turn.
 - **Folder changes:**
   - a model added later is picked up;
   - nothing changes while the folder stays the same;
@@ -719,3 +721,64 @@ The z-fighting scene check passes **both** with the part-built studded trees and
 2. **Route A or B really loading** (Output and `/test hubtrees`). `LoadAssetAsync` is new API; if it's missing, route B or C still works.
 3. **The stud look on the block trees** in real lighting, next to the track's own studded trees. Roblox draws Studs on Plastic block faces.
 4. **The client rebuild** when the models arrive a moment after a player joins: it should happen once.
+
+---
+
+## 10. Just trees (no fruit, nothing red)
+
+You said: *"remove the apples or red stuff on the trees the trees are just trees"*.
+
+### What changed
+- **No fruit on any tree.**
+  - The 8 fruit-tree slots (apple, orange, lemon, plum) are now **plain leafy trees**. Each has a crown block, a top block and a side block in one of four greens: fresh, deep, lime or sage.
+  - Same places, same sizes, the same per-tree variety, still studded and never colliding.
+  - Your tree models fill these slots too (`UsedFor` now counts them as `leafy`).
+- **Nothing else that reads as fruit or "red stuff" on a tree:**
+  - the palms' coconuts are gone;
+  - the cacti's flower balls are gone;
+  - the ember trees' little glowing balls are gone;
+  - the ember trees' crowns changed from red and orange-red to **autumn amber and gold**.
+- **Kept, my judgement:**
+  - **Blossoms** keep their pink, white and lilac crowns and the soft petals that fall near the camera. They are the trees' own leaves, and pastel, not red.
+  - The Lava garden keeps its glow on the **basalt rocks**, which are not trees.
+  - The flower beds, verges and bunting are not on trees, so they are unchanged.
+  - If you'd rather have green ember trees or plain green blossoms, either is a one-line palette change.
+- **Your tree models are cleaned of fruit as well**, by `HubStudTrees151.StripFruit`, on the server when they load and again on each screen. A part is removed when either is true:
+  - its name is a fruit: apple, cherry, orange, berry, lemon, peach, pear, plum, coconut, banana, mango, apricot, grape, fig or "fruit";
+  - it is a small part (at most 14 % of the tree's height) in a fruit colour: red or crimson, bright orange or yellow, purple or magenta.
+  - Trunks, branches (browns) and leaves (greens) always stay.
+  - A model that is nothing but fruit is skipped as broken.
+  - The count shows in the Output (`[R151 trees] … N fruit removed`), in `TemplateParts` (for example `Fruity 10 (6 fruit removed)`), in the folder's `FruitRemoved` attribute, and in `/test hubtrees`.
+
+### Tests
+- **`run_hub_trees.sh`:** 57 passed, 0 failed. A walk of the whole square, with the models and with the part-built trees, finds none of these:
+  - no part named like a fruit (or Fruit, Coconut, Ember, Cactus flower);
+  - nothing fruit-like in a clone;
+  - nothing red on a tree part;
+  - no ball in any tree's crown space.
+  - A fake model with 3 apples, 2 unnamed red bits and a lemon loses exactly those 6; its twig and small leaf stay.
+  - The server strips the loaded models' fruit (`FruitRemoved`).
+- **Mutations: 26 of 26 mutations caught.** Six of them put fruit back, and each is caught:
+  - fruit balls on the leafy trees;
+  - unnamed red balls on the oaks;
+  - red ember crowns;
+  - templates keeping their fruit;
+  - names-only detection, so unnamed red fruit stays;
+  - the server keeping the loaded models' fruit.
+- **`run_base_area.sh`:** 67 passed, 0 failed, including "no fruit … on any tree" on your place. The z-fighting checks are clean.
+- **`run_cloudy.sh`:** static checks, then 141 + 175 + 79 checks, and 30 on your place, all passed.
+- **`run_perf.sh`:** 75 checks, and 9 of 9 on your place, all passed.
+
+### Budgets
+Without models, the part-built trees cost fewer parts than before §10: no fruit, coconuts, cactus flowers or embers, and one side block per leafy tree.
+
+| | At §9 (measured then) | Now |
+|---|---|---|
+| Tier 1 | 435 | 435 |
+| Tier 2 | 1,114 | 1,050 |
+| Tier 3 | 1,165 | 1,101 |
+| A phone at the front street | 703 | 680 |
+| Tier 2 with the stand-in models | 1,257 | 1,184 |
+| Tier 3 with the stand-in models | 1,317 | 1,241 |
+
+Server Phase 1 is unchanged at 725. The pictures (`base_area_built_studded.png`, `base_area_built_variety.png` and the other `base_area_built_*.png` sheets) are re-rendered.

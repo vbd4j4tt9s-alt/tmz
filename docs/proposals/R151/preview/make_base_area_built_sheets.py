@@ -58,7 +58,7 @@ def sheet(name, title, caption, small, big):
 
 CAPTIONS = {
  'spawn': "Ben spawns inside Base 1 and looks out at the hub. AS BUILT: his arch (BASE 1 inside, BEN'S BASE outside), a spur with curbs and a welcome mat in his colour, potted topiary, the avenue's poplars, blossoms, lamps and bunting, the market square and the gate towers on the right. The LOW TIER keeps every silhouette (trunks, main crowns, lamps, benches, beds, the fountain) and drops the small detail.",
- 'street': "The west street at the mouth of the alley between Base 1 and Base 3. AS BUILT: the Lava garden walk with its red edging, ember trees with glowing embers, basalt rocks, bollard lamps, pebbles, the base banners 1 and 3 and the LAVA mural (5 of 7) closing the view.",
+ 'street': "The west street at the mouth of the alley between Base 1 and Base 3. AS BUILT: the Lava garden walk with its red edging, ember trees in autumn amber, glowing basalt rocks, bollard lamps, pebbles, the base banners 1 and 3 and the LAVA mural (5 of 7) closing the view.",
  'entrance': "Base 3 from the west street. AS BUILT: the arch in the base's colour with the owner's name, the number medallion, pennants, a flower verge, potted topiary at the spur's street end; the 32-stud opening, fence art, treadmill and pedestal are untouched.",
  'walls': "The east wall at the end of the Desert garden. AS BUILT: the saved wall part (same size, place, collision) in cream plaster with a stone plinth and cap, a gold string course, pilasters on stone bases with topiary balls and two-tier topiary, a clipped hedge, wall lanterns, the DESERT mural (3 of 7, a richer relief), palms, cacti and the garden nook.",
  'backwall': "From the south street down the back lane between Base 5 and Base 6. AS BUILT: pines with snow rims along the lane, the lane's curbs, the SNOW mural (4 of 7) with a snowman, base banners 5 and 6.",
@@ -105,9 +105,9 @@ if STUD and os.path.exists(STUD):
     gap = 14; pw, ph = 720, 405; cols = 2
     W = cols * pw + (cols + 1) * gap
     intro = ('Owner: "there are different variations of trees that we can use make sure they are studded". LEFT: the leafy trees (oaks, blossoms, '
-             'fruit trees) with two STAND-IN studded tree models in ReplicatedStorage.HubTreeTemplates151 - made here, NOT the owner\'s Creator Store '
+             'leafy trees) with two STAND-IN studded tree models in ReplicatedStorage.HubTreeTemplates151 - made here, NOT the owner\'s Creator Store '
              'trees (16637971059, 17280628013), which cannot be downloaded offline: each slot gets a clone fitted to its size, turned, leaned, its '
-             'leaves in the slot\'s colour, fruit set in. RIGHT: no models (until they load, or on phones on low): the part-built studded trees. '
+             'leaves in the slot\'s colour, any fruit in the model removed (owner: "the trees are just trees"). RIGHT: no models (until they load, or on phones on low): the part-built studded trees. '
              'Pines, palms, cacti and ember trees are always part-built and studded. Preview renderer with a drawn stud pattern, not Roblox.')
     lines = wrap(ImageDraw.Draw(Image.new('RGB', (W, 10))), intro, W - 2 * gap, T2)
     top = 64 + 24 * len(lines); H = top + len(rows) * (ph + gap)

@@ -1,11 +1,13 @@
 #!/bin/sh
 # Usage: sh run_hub_trees.sh [scratch dir] [mutate]
 # R151 studded hub trees (owner: "tress can also use this" + "there are different variations of trees that we can use make sure they are
-# studded" + "make sure they are collision is off as we dont want players jumping around bugging with it in highspeeds"):
+# studded" + "make sure they are collision is off as we dont want players jumping around bugging with it in highspeeds" + "remove the apples or red
+# stuff on the trees the trees are just trees"):
 #  test_hub_trees.luau on the Roblox mock with the REAL HubTreeLoader151 / HubStudTrees151 / HubLifeArt151 / HubLife151.client of this
 #  checkout and fake studded tree models: the load routes (AssetService / InsertService / by hand / none), scripts and junk stripped, every
 #  part of every tree locked (no collision, touch or query), broken models, the budget per tier, fitting, colours, fruit, the attributes,
-#  the rebuild, '/test hubtrees', and the part-built trees / bushes / topiary studded. Fast (no place file needed).
+#  the rebuild, '/test hubtrees', the part-built trees / bushes / topiary studded, and NO FRUIT on any tree (part-built or model). Fast (no
+#  place file needed).
 # With "mutate" as the 2nd argument, broken copies of the sources must each make a check fail.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -55,5 +57,11 @@ mutate "a clone that cannot be placed leaves a gap" $A "  if plan[i]and A.Templa
 mutate "the part-built trees are not studded" $A "return ctx.Part(level,x,z,name,size,cf,color,Mat.Plastic,{studs=true})" "return ctx.Part(level,x,z,name,size,cf,color,Mat.Plastic,{})"
 mutate "studs on the wrong face" $KIT "top,bottom=bottom,top end" "top,bottom=top,bottom end"
 mutate "the client never rebuilds when the folder changes" $C "or treeSig()~=state.TreeSig then build()end" "then build()end"
+mutate "fruit back on the leafy trees" $A ";local pal=LEAFY[tone]or LEAFY.fresh" ";local pal=LEAFY[tone]or LEAFY.fresh;ctx.Ball('detail',x,z,'Fruit',1.3,V(x,FLOOR+9,z+3),{226,52,52},Mat.SmoothPlastic)"
+mutate "red balls (apples by another name) back on the oaks" $A " local g=pick(rng,GREENS);local top=trunk(ctx,x,z,rng,1.9*s,8.5*s,pick(rng,BARKS))" " local g=pick(rng,GREENS);local top=trunk(ctx,x,z,rng,1.9*s,8.5*s,pick(rng,BARKS));ctx.Ball('detail',x,z,'Tree crown',1.3*s,(top*CF(4*s,2*s,0)).Position,{226,52,52},Mat.SmoothPlastic)"
+mutate "red ember crowns back" $A "local EMBERS={{214,150,60}," "local EMBERS={{176,52,34},"
+mutate "the templates keep their fruit" $T "if okSizes and #pre>0 then fruit=T.StripFruit(model)end" "if false then fruit=T.StripFruit(model)end"
+mutate "unnamed red fruit kept (names only)" $T " if r>=.35 and g<=.55*r and b<=.6*r then return true end -- red" " if false then return true end -- red"
+mutate "the server keeps the loaded models' fruit" $L "st.Fruit=T.IsCode(m)and 0 or T.StripFruit(m)" "st.Fruit=0"
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]

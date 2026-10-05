@@ -3,13 +3,16 @@
 -- (This module is ReplicatedStorage.HubStudTrees151; the models live in the Folder ReplicatedStorage.HubTreeTemplates151.)
 -- ReplicatedStorage.HubTreeTemplates151 holds tree models: the Creator Store trees the server loads at start (ChestChaseServer.HubTreeLoader151,
 -- ids in HubDecorKit151.TreeAssetIds) and any model the owner drops in by hand. This module turns them into safe templates and places clones
--- in the hub's leafy tree slots (oaks, blossoms, fruit trees; HubLifeArt151):
+-- in the hub's leafy tree slots (oaks, blossoms, leafy trees; HubLifeArt151):
 --  * Sanitize: everything that is not geometry is removed - every Script / LocalScript / ModuleScript (counted), and every other non-visual
 --    instance (welds, joints, constraints, body movers, sounds, lights, particles, prompts, values ...). Kept: parts, models, folders, meshes,
 --    decals / textures, surface appearances.
 --  * Lock: every BasePart (MeshParts, unions, nested parts included) Anchored, CanCollide / CanTouch / CanQuery off, the Default collision
 --    group; Guard does the same to anything added later (DescendantAdded on the folders).
---  * Prepare: a sanitized, locked private copy (the original is never cloned into the world), its part count, size, and which parts are
+--  * StripFruit (owner: "remove the apples or red stuff on the trees the trees are just trees"): every fruit-like part goes - named like a
+--    fruit (apple, cherry, orange, berry ...) or a small part (at most 14 % of the tree's height) in a fruit colour (red, bright orange /
+--    yellow, purple); leaves, trunks and branches (greens, browns) stay.
+--  * Prepare: a sanitized, fruitless, locked private copy (the original is never cloned into the world), its part count, size, and which parts are
 --    leaves (name, colour, height) so clones can take the slot's leaf colour. Broken templates (no parts, impossible size, cannot be copied)
 --    are reported and skipped.
 --  * Plan: which slots get a template on this device tier (HubDecorKit151.TreeBudget: a clone with more than PerTree parts is not used on
@@ -102,6 +105,43 @@ local function classify(p,centre,size)
  return(p.CFrame.Position.Y-(centre.Y-size.Y/2))/math.max(size.Y,.01)>.45 -- the upper part of the tree
 end
 local function finite(v)return v==v and v>-1e6 and v<1e6 end
+-- Fruit -------------------------------------------------------------------------------------------------------------------------------------
+local FRUIT_WORDS={'apple','fruit','cherry','cherries','berry','berries','orange','lemon','peach','pear','plum','coconut','banana','mango','apricot','grape','fig'}
+local function wordIn(n,w)
+ local i=1
+ while true do
+  local a=string.find(n,w,i,true);if not a then return false end
+  local before=a>1 and string.sub(n,a-1,a-1)or''
+  if not string.match(before,'%a')then return true end
+  i=a+1
+ end
+end
+function T.FruitName(name)
+ local n=string.lower(tostring(name or''))
+ for _,w in ipairs(FRUIT_WORDS)do if wordIn(n,w)then return true end end
+ return false
+end
+-- A fruit colour: red / crimson, bright orange / yellow, purple / magenta (greens and browns are leaves, trunks and branches).
+function T.FruitColour(c)
+ local r,g,b=c.R,c.G,c.B;local mx,mn=math.max(r,g,b),math.min(r,g,b)
+ if r>=.35 and g<=.55*r and b<=.6*r then return true end -- red
+ if mx==r and mx>=.75 and(mx-mn)/mx>=.5 and g<r-.02 then return true end -- bright orange / yellow
+ if r>=.35 and b>=.35 and g<=.6*math.min(r,b)then return true end -- purple / magenta
+ return false
+end
+-- Is part p (in a tree treeHeight studs tall) a fruit?
+function T.IsFruit(p,treeHeight)
+ if T.FruitName(p.Name)then return true end
+ local s=p.Size;local big=math.max(s.X,s.Y,s.Z)
+ return big<=math.max(treeHeight or 0,1)*.14 and T.FruitColour(p.Color)
+end
+-- Removes every fruit-like part under root; returns how many.
+function T.StripFruit(root)
+ local _,size=T.Box(root);if not size then return 0 end
+ local n=0
+ for _,d in ipairs(root:GetDescendants())do if d:IsA('BasePart')and d.Parent and T.IsFruit(d,size.Y)then n+=1;pcall(function()d:Destroy()end)end end
+ return n
+end
 -- A safe private copy of a template. Returns info, or nil and why it cannot be used.
 function T.Prepare(src)
  if typeof(src)~='Instance'then return nil,'not an instance'end
@@ -117,9 +157,14 @@ function T.Prepare(src)
  elseif not copy:IsA('Model')then copy:Destroy();return nil,'not a model or part ('..src.ClassName..')'end
  model.Name=src.Name
  local scripts,other=T.Sanitize(model)
+ local fruit=0
+ do local pre={};for _,d in ipairs(model:GetDescendants())do if d:IsA('BasePart')then pre[#pre+1]=d end end
+  local okSizes=true;for _,p in ipairs(pre)do local s=p.Size;if not(finite(s.X)and finite(s.Y)and finite(s.Z))then okSizes=false end end
+  if okSizes and #pre>0 then fruit=T.StripFruit(model)end
+ end
  local parts={};for _,d in ipairs(model:GetDescendants())do if d:IsA('BasePart')then parts[#parts+1]=d end end
- local info={Source=src,Name=src.Name,Model=model,Parts=#parts,ScriptsRemoved=scripts,OtherRemoved=other}
- if #parts==0 then model:Destroy();info.Model=nil;info.Broken='no parts';return info end
+ local info={Source=src,Name=src.Name,Model=model,Parts=#parts,ScriptsRemoved=scripts,OtherRemoved=other,FruitRemoved=fruit}
+ if #parts==0 then model:Destroy();info.Model=nil;info.Broken=fruit>0 and'nothing but fruit'or'no parts';return info end
  for _,p in ipairs(parts)do local s=p.Size
   if not(finite(s.X)and finite(s.Y)and finite(s.Z))or s.Magnitude<.01 then model:Destroy();info.Model=nil;info.Broken='a part with an impossible size ('..p.Name..')';return info end
  end
@@ -139,12 +184,12 @@ function T.Prepare(src)
 end
 -- Every usable template in the folder, sorted by name (every client the same order), plus a summary.
 function T.Collect(folder)
- local infos,summary={},{ScriptsRemoved=0,Broken={},Templates=0}
+ local infos,summary={},{ScriptsRemoved=0,FruitRemoved=0,Broken={},Templates=0}
  if not folder then return infos,summary end
  local list=folder:GetChildren();table.sort(list,function(a,b)return a.Name<b.Name end)
  for _,c in ipairs(list)do
   local info,why=T.Prepare(c)
-  if info then summary.ScriptsRemoved+=info.ScriptsRemoved;infos[#infos+1]=info;if info.Broken then table.insert(summary.Broken,c.Name..': '..info.Broken)else summary.Templates+=1 end
+  if info then summary.ScriptsRemoved+=info.ScriptsRemoved;summary.FruitRemoved+=info.FruitRemoved or 0;infos[#infos+1]=info;if info.Broken then table.insert(summary.Broken,c.Name..': '..info.Broken)else summary.Templates+=1 end
   else table.insert(summary.Broken,c.Name..': '..tostring(why))end
  end
  return infos,summary
@@ -175,12 +220,12 @@ end
 -- The folder attributes' texts.
 function T.Describe(infos,sum)
  local parts={}
- for _,i in ipairs(infos or{})do parts[#parts+1]=i.Broken and(i.Name..' broken: '..i.Broken)or(i.Name..' '..i.Parts)end
+ for _,i in ipairs(infos or{})do parts[#parts+1]=i.Broken and(i.Name..' broken: '..i.Broken)or(i.Name..' '..i.Parts..((i.FruitRemoved or 0)>0 and(' ('..i.FruitRemoved..' fruit removed)')or''))end
  local used
  if not sum or #(infos or{})==0 then used='none: no tree templates (part-built studded trees)'
  elseif sum.Used==0 then used=string.format('none on tier %d: %s (part-built studded trees)',sum.Tier,#sum.TooBig>0 and('more than '..sum.PerTree..' parts a tree: '..table.concat(sum.TooBig,', '))or'no usable template')
  else
-  local k={};for _,kind in ipairs({'oak','blossom','fruit'})do if sum.ByKind[kind]then k[#k+1]=kind..' '..sum.ByKind[kind]end end
+  local k={};for _,kind in ipairs({'oak','blossom','leafy'})do if sum.ByKind[kind]then k[#k+1]=kind..' '..sum.ByKind[kind]end end
   used=string.format('%d of %d leafy trees (%s), %d parts; tier %d: one tree up to %d parts, %d in all',sum.Used,sum.Eligible,table.concat(k,', '),sum.Parts,sum.Tier,sum.PerTree,sum.Total)
  end
  return table.concat(parts,', '),used
@@ -188,7 +233,7 @@ end
 
 -- Place --------------------------------------------------------------------------------------------------------------------------------------
 -- Slot sizes (studs): the part-built tree's height and crown width.
-T.Fit={oak={S={13,14},M={18,18},L={23,22}},blossom={16,18},fruit={14,15}}
+T.Fit={oak={S={13,14},M={18,18},L={23,22}},blossom={16,18},leafy={14,15}}
 local function fitOf(kind,variant)local f=T.Fit[kind]or T.Fit.oak;if f[1]then return f[1],f[2]end;f=f[variant]or f.M;return f[1],f[2]end
 local function relLum(c)return .3*c.R+.59*c.G+.11*c.B end
 -- A clone for one slot: {Kind, Variant, X, Z}; o = {Floor, Leaf (Color3 or nil), Shadows}. Returns the Model (unparented) or nil.
@@ -220,7 +265,7 @@ function T.Place(info,slot,o)
  if ok then return m end
  return nil
 end
--- The leaves' bounding box (for fruit): centre, size.
+-- The leaves' bounding box (for the blossoms' petals): centre, size.
 function T.LeafBox(m)
  local c,s=T.Box(m,function(p)return p:GetAttribute('R151Leaf')==true end)
  if not c then c,s=T.Box(m)end

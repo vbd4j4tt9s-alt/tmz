@@ -274,6 +274,15 @@ do local Art=W.module('HubLifeArt151');local bad={}
  check('variety: no two crowns identical in size, height and shade',dup==0,dup)
  local a=W.module('HubDecorKit151').Rng('oak:M:1')();local b=W.module('HubDecorKit151').Rng('oak:M:1')()
  check('variety: deterministic per instance (same seed, same tree on every client)',a==b)
+ -- owner: "remove the apples or red stuff on the trees the trees are just trees"
+ local fruity={}
+ for _,p in ipairs(clientParts)do
+  if p.Name=='Fruit'or p.Name=='Coconut'or p.Name=='Ember'or p.Name=='Cactus flower'then fruity[#fruity+1]=path(p)end
+  local c=p._props.Color
+  if c and(p.Name:find('crown')or p.Name:find('Crown')or p.Name:find('trunk')or p.Name=='Palm leaf'or p.Name=='Pine tier'or p.Name:find('[Cc]actus'))and c.R>=.35 and c.G<=.55*c.R and c.B<=.6*c.R then fruity[#fruity+1]='red '..path(p)end
+ end
+ local kinds={};for _,t in ipairs(Art.Layout.trees)do kinds[t[1]]=true end
+ check('no fruit: no fruit, coconut, cactus flower or ember on any tree, nothing red on a tree, no fruit-tree slot left',#fruity==0 and not kinds.fruit and kinds.leafy,first(fruity))
 end
 
 -- 8. detail by distance ----------------------------------------------------------------------------------------------------------------------

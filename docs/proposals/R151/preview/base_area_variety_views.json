@@ -45,7 +45,7 @@
   },
   {
    "name": "v_fruit",
-   "title": "Fruit trees: apple, lemon, plum; poplars",
+   "title": "Leafy trees (fresh, lime, sage greens), poplars",
    "fov": 58,
    "pos": [
     60,
@@ -108,7 +108,7 @@
   },
   {
    "name": "v_lava",
-   "title": "Lava garden: ember trees, glowing basalt rocks",
+   "title": "Lava garden: amber ember trees, glowing basalt rocks",
    "fov": 60,
    "pos": [
     -150,

@@ -1,6 +1,7 @@
 --!nocheck
 -- R151 studded hub trees (owner: "tress can also use this" + "there are different variations of trees that we can use make sure they are
--- studded" + "make sure they are collision is off as we dont want players jumping around bugging with it in highspeeds"), on the Roblox mock
+-- studded" + "make sure they are collision is off as we dont want players jumping around bugging with it in highspeeds" + "remove the apples or
+-- red stuff on the trees the trees are just trees"), on the Roblox mock
 -- with the REAL ChestChaseServer.HubTreeLoader151, ReplicatedStorage.HubStudTrees151 / HubLifeArt151 and HubLife151.client of this
 -- checkout, and FAKE studded tree models (the owner's Creator Store trees cannot be downloaded here):
 --  * the load routes: AssetService:LoadAssetAsync works / is refused / errors / is missing, InsertService:LoadAsset works / is refused, the
@@ -8,7 +9,8 @@
 --  * safety: every script and non-geometry instance removed and counted, every BasePart of every tree (loaded, hand-placed, part-built,
 --    bushes, topiary) Anchored with CanCollide / CanTouch / CanQuery off and the Default collision group, also for parts added later;
 --  * templates of several part counts, broken ones, the per-tier budget rule, fitting (height, crown width, grounded, on the slot), leaf
---    colours, fruit, determinism, the attributes, the rebuild when the folder changes, the '/test hubtrees' text;
+--    colours, NO FRUIT (none on the part-built trees, every fruit stripped from the models), determinism, the attributes, the rebuild when
+--    the folder changes, the '/test hubtrees' text;
 --  * the part-built trees, bushes and topiary are studded (Plastic, Studs on the face that points up, Inlet under it).
 -- Prints "ok <name>" / "FAIL <name>: why"; errors at the end if anything failed.
 local Z=require('./zfight_world');local W=Z.W;local R=Z.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -40,7 +42,8 @@ end
 -- Fake studded trees ------------------------------------------------------------------------------------------------------------------------
 -- n parts: a trunk, leaf blocks (green, studded, CanCollide on as a free model would have it), far from the hub. o.scripts adds a Script, a
 -- LocalScript in a leaf and a ModuleScript in a folder; o.junk adds a weld, a sound, a light, a click detector and a value; o.mesh makes one
--- leaf a MeshPart.
+-- leaf a MeshPart; o.fruit adds 3 red 'Apple' balls, 2 small unnamed red blocks (cherries), a yellow 'Lemon' MeshPart (6 fruit) and a small
+-- brown twig and a small green leaf (not fruit: they stay).
 local function fakeTree(name,n,o)
  o=o or{}
  local m=R.new('Model');m.Name=name
@@ -54,6 +57,14 @@ local function fakeTree(name,n,o)
   local s=R.new('Script');s.Name='Spreader';s.Parent=m
   local ls=R.new('LocalScript');ls.Name='Sway';ls.Parent=m:FindFirstChild('Leaves')or t
   local f=R.new('Folder');f.Name='Lib';f.Parent=m;local ms=R.new('ModuleScript');ms.Name='Util';ms.Parent=f
+ end
+ if o.fruit then
+  local function bit(cls,nm,size,pos,rgb,ball)local p=R.new(cls);p.Name=nm;p.Size=size;p.CFrame=CF(pos[1],pos[2],pos[3]);p.Color=R.Color3.fromRGB(rgb[1],rgb[2],rgb[3])
+   if ball then p.Shape=R.Enum.PartType.Ball end;p.Parent=m;return p end
+  for k=1,3 do bit('Part','Apple',V3(1.2,1.2,1.2),{600+k-2,11+k*.7,603.6},{226,52,52},true)end
+  bit('Part','Part',V3(.8,.8,.8),{603.4,12.2,600},{200,30,40});bit('Part','Part',V3(.8,.8,.8),{596.6,12.8,600.4},{186,24,36})
+  bit('MeshPart','Lemon',V3(1,1.2,1),{600,13.6,596.4},{250,220,60})
+  bit('Part','Twig',V3(.4,.4,2),{601.6,9.6,600},{110,76,46});bit('Part','Leaf',V3(.9,.3,.9),{598.6,11.4,598.6},{80,160,70})
  end
  if o.junk then
   local w=R.new('Weld');w.Parent=t;local snd=R.new('Sound');snd.Parent=t;local l=R.new('PointLight');l.Parent=t
@@ -70,7 +81,7 @@ local refused=function()error('Asset is not trusted for this place')end
 -- 1. load routes ---------------------------------------------------------------------------------------------------------------------------
 do
  local f=folder()
- routes(function(_,id)return container(fakeTree('Stud Tree '..id,12,{scripts=true,junk=true}))end,function()error('should not be asked')end)
+ routes(function(_,id)return container(fakeTree('Stud Tree '..id,12,{scripts=true,junk=true,fruit=true}))end,function()error('should not be asked')end)
  Loader.Run(true)
  local a,b=f:FindFirstChild('Asset16637971059'),f:FindFirstChild('Asset17280628013')
  check('load: AssetService:LoadAssetAsync first - both ids parked in ReplicatedStorage.HubTreeTemplates151',a~=nil and b~=nil)
@@ -81,6 +92,9 @@ do
  check('safety: welds, sounds, lights, click detectors and values removed from the loaded models',junk==0,junk)
  local bad=unsafe(f);check('safety: every part of the loaded models anchored, CanCollide / CanTouch / CanQuery off',#bad==0,first(bad))
  check('load: Loaded = 2, Manual = 0',f:GetAttribute('Loaded')==2 and f:GetAttribute('Manual')==0)
+ local left=0;for _,d in ipairs(f:GetDescendants())do if d.Name=='Apple'or d.Name=='Lemon'or(d:IsA('BasePart')and d.Color.R>.6 and d.Color.G<.25)then left+=1 end end
+ check('no fruit: the server strips the loaded models\' fruit (6 each: named and unnamed red, a lemon; twig and leaf kept), FruitRemoved = 12',
+  f:GetAttribute('FruitRemoved')==12 and left==0 and a:FindFirstChild('Twig')~=nil and a:FindFirstChild('Leaf')~=nil,tostring(f:GetAttribute('FruitRemoved'))..', '..left..' left')
 end
 do
  local f=folder()
@@ -121,12 +135,24 @@ check('templates: sorted by name, 3 usable (5, 14, 60 parts), 3 broken reported 
 check('templates: the private copy has no scripts (3 counted) and the source in ReplicatedStorage is never parented to the world',codeIn(byName['A small'].Model)==0 and byName['A small'].ScriptsRemoved==3 and byName['A small'].Model.Parent==nil)
 check('templates: leaves found by name / colour (the trunk is not a leaf)',byName['B medium'].Leaves==13 and byName['B medium'].Recolourable==false,byName['B medium'].Leaves..' leaves, recolourable '..tostring(byName['B medium'].Recolourable)..' (a textured MeshPart leaf)')
 check('templates: a model of plain parts can take the slot\'s leaf colour',byName['A small'].Recolourable==true)
+do local fm=fakeTree('Fruity',8,{fruit=true});local fi=T.Prepare(fm)
+ local left={};for _,p in ipairs(parts(fi.Model))do if T.IsFruit(p,fi.Size.Y)or p.Name=='Apple'or p.Name=='Lemon'then left[#left+1]=p.Name end end
+ check('no fruit: a model\'s fruit is stripped from the template (3 apples, 2 unnamed red bits, a lemon), its twig and small leaf stay',
+  fi.FruitRemoved==6 and #left==0 and fi.Parts==10 and fi.Model:FindFirstChild('Twig')~=nil and fi.Model:FindFirstChild('Leaf')~=nil,tostring(fi.FruitRemoved)..' removed, '..fi.Parts..' parts, left: '..table.concat(left,','))
+ local parts_,_=T.Describe({fi});check('no fruit: TemplateParts says so ("Fruity 10 (6 fruit removed)")',parts_=='Fruity 10 (6 fruit removed)',parts_)
+ local only=R.new('Model');only.Name='Only fruit';for k=1,3 do local a=R.new('Part');a.Name='Apple';a.Size=V3(1,1,1);a.CFrame=CF(k,1,0);a.Parent=only end
+ local oi=T.Prepare(only);check('no fruit: a model that is nothing but fruit is skipped as broken',oi.Broken=='nothing but fruit',oi.Broken)
+ check('no fruit: brown trunks / branches and green leaves are never fruit; red, orange, yellow, purple are',
+  not T.FruitColour(R.Color3.fromRGB(124,86,52))and not T.FruitColour(R.Color3.fromRGB(58,44,44))and not T.FruitColour(R.Color3.fromRGB(80,160,70))and not T.FruitColour(R.Color3.fromRGB(248,172,204))
+  and T.FruitColour(R.Color3.fromRGB(226,52,52))and T.FruitColour(R.Color3.fromRGB(255,150,40))and T.FruitColour(R.Color3.fromRGB(250,220,60))and T.FruitColour(R.Color3.fromRGB(140,70,170)))
+ fi.Model:Destroy()
+end
 
 -- 3. the budget rule -----------------------------------------------------------------------------------------------------------------------
 local slots=Art.TreeSlots()
 local plans={}
 for tier=1,3 do local _,p=T.Plan(infos,tier,slots);plans[tier]=p end
-check('budget: 30 leafy slots (oaks, blossoms, fruit trees); pines, palms, cacti, ember trees and rocks stay part-built',plans[3].Eligible==30,plans[3].Eligible)
+check('budget: 30 leafy slots (oaks, blossoms, leafy trees); pines, palms, cacti, ember trees and rocks stay part-built',plans[3].Eligible==30,plans[3].Eligible)
 check('budget: tier 1 (phones on low) - only a clone of at most 6 parts, at most 90 parts in all',plans[1].Parts<=90 and plans[1].Used==18 and plans[1].ByKind.oak~=nil,plans[1].Used..' trees, '..plans[1].Parts..' parts')
 check('budget: tier 2 - clones up to 16 parts, at most 300 in all',plans[2].Parts<=300 and plans[2].Used>18,plans[2].Used..' trees, '..plans[2].Parts..' parts')
 check('budget: tier 3 (desktop) - the 60-part model is too big for one tree (over 40), the rest fill all 30 slots within 600',plans[3].Used==30 and plans[3].Parts<=600 and table.find(plans[3].TooBig,'C big')~=nil,plans[3].Used..' trees, '..plans[3].Parts..' parts')
@@ -145,6 +171,7 @@ do local a=T.Plan(infos,3,slots);local b=T.Plan(infos,3,slots);local same,spread
  check('variety: the models are spread over the slots by a hash, the same on every client',same and n==2,n)
 end
 
+put(fakeTree('Fruity',8,{fruit=true})) -- (a model with apples, cherries and a lemon: the square must show it without them)
 -- 4. the client builds the square with them ------------------------------------------------------------------------------------------------
 Run.IsClient=function()return true end;Run.IsServer=function()return false end
 local map=R.new('Model');map.Name='ChestChaseMap';map.Parent=W.workspace
@@ -161,6 +188,32 @@ local function client()
  api.Near.detail=1e6;api.Near.fine=1e6;api.ApplyLod()
  return api,sc,W.workspace:FindFirstChild('HubLife151')
 end
+-- No fruit under any tree (owner: "remove the apples or red stuff on the trees the trees are just trees"): no fruit-named part anywhere in
+-- the square, nothing fruit-like in a clone, no red on a part-built tree part, and no ball in any tree's crown space.
+local TREE_PARTS={['Tree trunk']=1,['Tree crown']=1,['Tree crown top']=1,['Root flare']=1,['Poplar crown']=1,['Blossom crown']=1,['Leaf tuft']=1,['Pine trunk']=1,['Pine tier']=1,
+ ['Snow rim']=1,['Pine snow']=1,['Palm trunk']=1,['Palm leaf']=1,['Cactus']=1,['Cactus top']=1,['Cactus arm']=1,['Barrel cactus']=1,['Ember crown']=1,['Charred branch']=1}
+local FRUIT_NAMES={Fruit=1,Coconut=1,Ember=1,['Cactus flower']=1}
+local function isRed(c)return c.R>=.35 and c.G<=.55*c.R and c.B<=.6*c.R end
+local function fruitOnTrees(life)
+ local bad={}
+ local all=parts(life)
+ for _,p in ipairs(all)do
+  if FRUIT_NAMES[p.Name]or T.FruitName(p.Name)then bad[#bad+1]='named '..p.Name..' at '..Z.path(p)end
+  if TREE_PARTS[p.Name]and isRed(p.Color)then bad[#bad+1]='red '..p.Name..' at '..Z.path(p)end
+ end
+ for _,d in ipairs(life:GetDescendants())do if d._class=='Model'and d.Name=='Studded tree'then
+  local _,size=T.Box(d);for _,p in ipairs(parts(d))do if T.IsFruit(p,size.Y)then bad[#bad+1]='fruit-like '..p.Name..' in a clone'end end
+ end end
+ local Art=W.module('HubLifeArt151')
+ for _,t in ipairs(Art.Layout.trees)do if t[1]~='rock'then
+  for _,p in ipairs(all)do local sh=p._props.Shape;sh=sh and(sh.Name or tostring(sh))
+   if sh=='Ball'then local q=p.CFrame.Position
+    if q.Y>K.Floor+4.5 and(V3(q.X,0,q.Z)-V3(t[2],0,t[3])).Magnitude<7.5 then bad[#bad+1]='a ball ('..p.Name..') in the crown of the '..t[1]..' at '..t[2]..','..t[3]end
+   end
+  end
+ end end
+ return bad
+end
 local function clones(life)local out={};for _,d in ipairs(life:GetDescendants())do if d._class=='Model'and d.Name=='Studded tree'then out[#out+1]=d end end;return out end
 local FL=K.Floor
 local api,sc,life=client()
@@ -169,7 +222,7 @@ check('client: the leafy slots get the owner\'s models (desktop: 30 clones)',#cl
 check('client: attributes TemplateParts / UsedFor / ScriptsRemoved on workspace.HubLife151',life:GetAttribute('TemplateParts'):find('A small 5',1,true)~=nil and life:GetAttribute('UsedFor'):find('30 of 30 leafy trees',1,true)~=nil and life:GetAttribute('ScriptsRemoved')==3,
  tostring(life:GetAttribute('TemplateParts'))..' | '..tostring(life:GetAttribute('UsedFor'))..' | '..tostring(life:GetAttribute('ScriptsRemoved')))
 check('safety: no script anywhere in the square',codeIn(life)==0)
-do local bad=unsafe(life);check('safety: EVERY part of the square (clones, fruit, part-built trees, bushes, topiary, props) anchored, CanCollide / CanTouch / CanQuery off',#bad==0,first(bad))end
+do local bad=unsafe(life);check('safety: EVERY part of the square (clones, part-built trees, bushes, topiary, props) anchored, CanCollide / CanTouch / CanQuery off',#bad==0,first(bad))end
 -- fitting: height and crown width of the slot, standing on the floor, on the slot
 do local bad={}
  local byPos={};for i,s in ipairs(slots)do byPos[s.X..','..s.Z]=s end
@@ -184,10 +237,12 @@ do local bad={}
  end
  check('fit: every clone scaled to its slot (height within 80-125 %, crown no wider than 1.5 x the slot\'s, which a turn can add), grounded and on its slot',#bad==0,first(bad))
 end
-do local pink,fruit=0,0
+do local pink=0
  for _,m in ipairs(cl)do if m:GetAttribute('Template')=='A small'then for _,p in ipairs(parts(m))do if p:GetAttribute('R151Leaf')and p.Color.R>p.Color.G+.15 then pink+=1 end end end end
- for _,d in ipairs(life:GetDescendants())do if d.Name=='Fruit'then fruit+=1 end end
- check('look: blossom slots recolour the model\'s leaves (pink / white / lilac), fruit trees keep their fruit',pink>0 and fruit>=32,pink..' pink leaves, '..fruit..' fruit')
+ check('look: blossom slots recolour the model\'s leaves (pink / white / lilac)',pink>0,pink..' pink leaves')
+ local fruity=0;for _,m in ipairs(cl)do if m:GetAttribute('Template')=='Fruity'then fruity+=1 end end
+ local bad=fruitOnTrees(life)
+ check('no fruit: under no tree of the square with the models (the "Fruity" model used '..fruity..' times, stripped): no fruit-named part, nothing fruit-like in a clone, no ball in a crown',fruity>0 and #bad==0,first(bad))
 end
 do local a={};for _,m in ipairs(cl)do local c=T.Box(m);a[#a+1]=string.format('%.3f,%.3f,%.3f',c.X,c.Y,c.Z)end
  local api2,sc2,life2=client();local b={};for _,m in ipairs(clones(life2))do local c=T.Box(m);b[#b+1]=string.format('%.3f,%.3f,%.3f',c.X,c.Y,c.Z)end
@@ -250,7 +305,7 @@ do sc:Destroy()
  local a5,s5,l5=client()
  R.Inst.ScaleTo=raw
  local trunks=0;for _,d in ipairs(l5:GetDescendants())do if d.Name=='Tree trunk'then trunks+=1 end end
- check('a model that cannot be placed: every leafy slot falls back to its part-built tree (no gap)',#clones(l5)==0 and trunks==43,trunks..' trunks (43 = 14 oaks + 8 poplars + 8 blossoms + 8 fruit trees + 5 ember trees)')
+ check('a model that cannot be placed: every leafy slot falls back to its part-built tree (no gap)',#clones(l5)==0 and trunks==43,trunks..' trunks (43 = 14 oaks + 8 poplars + 8 blossoms + 8 leafy trees + 5 ember trees)')
  s5:Destroy()
 end
 
@@ -273,6 +328,10 @@ do local f4=folder()
  check('studs: every part-built tree, bush and topiary part has Studs ('..studded..' parts)',#flat==0 and studded>300,first(flat))
  check('studs: always on the face that points up (Inlet under it)',#wrongFace==0,first(wrongFace))
  check('studs: Plastic (the material the stud surfaces show on, like the place\'s track trees)',#notPlastic==0,first(notPlastic))
+ local bad=fruitOnTrees(l)
+ check('no fruit: the part-built trees are just trees (no fruit, coconuts, cactus flowers or embers, nothing red, no ball in a crown)',#bad==0,first(bad))
+ local leafy=0;for _,t in ipairs(W.module('HubLifeArt151').Layout.trees)do if t[1]=='leafy'then leafy+=1 end;assert(t[1]~='fruit','a fruit slot')end
+ check('no fruit: the 8 former fruit-tree slots are plain leafy trees (fresh, deep, lime, sage greens)',leafy==8,leafy)
  s2:Destroy()
 end
 

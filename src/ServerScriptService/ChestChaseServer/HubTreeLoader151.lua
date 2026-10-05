@@ -6,7 +6,8 @@
 --      Security > "Allow Loading Third Party Assets" = AssetService.AllowInsertFreeAssets, which scripts cannot set); returns a sandboxed model.
 --   2. InsertService:LoadAsset(id) - works when the owner (the game's creator) owns the model, e.g. took it into the inventory.
 --   3. Neither: whatever tree models the owner put into the folder by hand in Studio; with none, the part-built studded trees stay.
--- Whatever arrives (loaded or hand-inserted) is stripped of every script and non-geometry instance and has all collision / touch / query off
+-- Whatever arrives (loaded or hand-inserted) is stripped of every script and non-geometry instance and of any fruit (owner: "remove the apples
+-- or red stuff on the trees the trees are just trees"; HubStudTrees151.StripFruit) and has all collision / touch / query off
 -- (HubStudTrees151.Sanitize / Lock), also for anything added to the folder later. One log line per id says which route worked; the folder
 -- carries Route<id>, ScriptsRemoved, Loaded, Manual and Ready attributes. '/test hubtrees' (Command) prints all of it plus each tier's plan.
 local RS=game:GetService('ReplicatedStorage')
@@ -45,10 +46,10 @@ function L.Run(again) -- (again: the offline tests run it more than once)
  if started and not again then return L.Status end
  started=true
  local f=L.Folder()
- local scripts,manual,loaded=0,0,0
+ local scripts,manual,loaded,fruit=0,0,0,0
  -- the owner's hand-inserted trees: strip code, physics off
  for _,c in ipairs(f:GetChildren())do if c:GetAttribute('R151AssetId')==nil then
-  if T.IsCode(c)then c:Destroy();scripts+=1 else scripts+=T.Sanitize(c);T.Lock(c);manual+=1 end
+  if T.IsCode(c)then c:Destroy();scripts+=1 else scripts+=T.Sanitize(c);fruit+=T.StripFruit(c);T.Lock(c);manual+=1 end
  end end
  if L.Watch then L.Watch:Disconnect()end
  L.Watch=f.DescendantAdded:Connect(function(d)local n=T.Guard(d);if n>0 then f:SetAttribute('ScriptsRemoved',(f:GetAttribute('ScriptsRemoved')or 0)+n)end end)
@@ -62,7 +63,7 @@ function L.Run(again) -- (again: the offline tests run it more than once)
    if res then
     local m=unwrap(res)
     local assetName=m.Name;local s=T.IsCode(m)and 1 or T.Sanitize(m)
-    scripts+=s;st.Scripts=s;st.Name=assetName
+    scripts+=s;st.Scripts=s;st.Name=assetName;st.Fruit=T.IsCode(m)and 0 or T.StripFruit(m);fruit+=st.Fruit
     if T.IsCode(m)or countParts(m)==0 then st.Route='failed';st.Error='the asset has no parts';pcall(function()m:Destroy()end)
     else
      T.Lock(m);m.Name=name;m:SetAttribute('R151AssetId',id);m:SetAttribute('R151Route',route);m:SetAttribute('AssetName',assetName)
@@ -72,12 +73,13 @@ function L.Run(again) -- (again: the offline tests run it more than once)
   end
   f:SetAttribute('Route'..tostring(id),st.Route)
   if st.Route=='AssetService'or st.Route=='InsertService'then
-   print(string.format('[R151 trees] %s "%s": loaded by %s (%d parts, %d scripts removed)',tostring(id),tostring(st.Name),st.Route=='AssetService'and'AssetService:LoadAssetAsync'or'InsertService:LoadAsset',st.Parts or 0,st.Scripts or 0))
+   print(string.format('[R151 trees] %s "%s": loaded by %s (%d parts, %d scripts and %d fruit removed)',tostring(id),tostring(st.Name),st.Route=='AssetService'and'AssetService:LoadAssetAsync'or'InsertService:LoadAsset',st.Parts or 0,st.Scripts or 0,st.Fruit or 0))
   elseif st.Route=='already there'then print(string.format('[R151 trees] %s: already in ReplicatedStorage.%s',tostring(id),K.TreeFolder))
   else warn(string.format('[R151 trees] %s: not loaded (%s); %s',tostring(id),tostring(st.Error),manual>0 and'using the trees placed in the folder by hand'or'the hub keeps its part-built studded trees'))end
  end
- f:SetAttribute('ScriptsRemoved',scripts);f:SetAttribute('Loaded',loaded);f:SetAttribute('Ready',true)
+ f:SetAttribute('ScriptsRemoved',scripts);f:SetAttribute('FruitRemoved',fruit);f:SetAttribute('Loaded',loaded);f:SetAttribute('Ready',true)
  if scripts>0 then print(string.format('[R151 trees] removed %d script(s) from the tree templates',scripts))end
+ if fruit>0 then print(string.format('[R151 trees] removed %d fruit part(s) from the tree templates (the trees are just trees)',fruit))end
  return L.Status
 end
 -- '/test hubtrees': what the server has, and what each device tier builds from it.
@@ -85,7 +87,7 @@ function L.Command(ctx,p,a)
  local f=RS:FindFirstChild(K.TreeFolder)
  local out={}
  if not f then return true,'No ReplicatedStorage.'..K.TreeFolder..' yet: the hub uses its part-built studded trees.'end
- out[#out+1]=string.format('Tree templates: %d loaded by id, %d placed by hand, %d script(s) removed, ready: %s.',f:GetAttribute('Loaded')or 0,f:GetAttribute('Manual')or 0,f:GetAttribute('ScriptsRemoved')or 0,tostring(f:GetAttribute('Ready')==true))
+ out[#out+1]=string.format('Tree templates: %d loaded by id, %d placed by hand, %d script(s) and %d fruit removed, ready: %s.',f:GetAttribute('Loaded')or 0,f:GetAttribute('Manual')or 0,f:GetAttribute('ScriptsRemoved')or 0,f:GetAttribute('FruitRemoved')or 0,tostring(f:GetAttribute('Ready')==true))
  for _,id in ipairs(K.TreeAssetIds)do local st=L.Status[id]
   out[#out+1]=string.format('  %s: %s%s',tostring(id),tostring(f:GetAttribute('Route'..tostring(id))or'not tried'),st and st.Error and(' ('..st.Error..')')or'')
  end

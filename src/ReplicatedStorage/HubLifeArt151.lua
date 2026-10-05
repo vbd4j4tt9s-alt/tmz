@@ -7,7 +7,7 @@
 -- models (ReplicatedStorage.HubTreeTemplates151) take the leafy slots when they are there (HubStudTrees151).
 -- Detail levels (A.Build puts every part in a per-cell Folder of its level, the client shows / hides those Folders by distance):
 --   core    silhouettes seen from anywhere: trunks and main crowns, lamps, benches, signposts, the fountain, grass patches
---   detail  within ~230 studs and device tier >= 2: extra crown layers, fruit, flowers, pots, pebbles, bunting, wall lanterns
+--   detail  within ~230 studs and device tier >= 2: extra crown layers, flowers, pots, pebbles, bunting, wall lanterns
 --   fine    within ~130 studs and tier 3: butterflies, blossom petals, fountain sparkles, small extras
 -- Nothing here collides or can be touched / queried; nothing stands on a street, a base, the run-up, the market, Verity or the reserved
 -- back corners (R151 displays) - A.Clear(x, z, r) checks it.
@@ -27,13 +27,16 @@ A.LevelOf={core=1,detail=2,fine=3}
 local GREENS={{88,170,72},{104,184,84},{76,156,66},{120,196,92},{96,176,70},{70,148,74}}
 local DARK_GREENS={{58,128,66},{70,140,74},{52,118,60},{64,134,80}}
 local BLOSSOMS={pink={{248,172,204},{255,200,224},{236,150,190}},white={{255,246,250},{250,236,242},{240,240,232}},lilac={{206,170,240},{224,196,250},{190,150,228}}}
-local FRUITS={apple={226,52,52},orange={255,150,40},lemon={250,220,60},plum={140,70,170}}
+-- Owner (R151): "remove the apples or red stuff on the trees the trees are just trees" - no fruit, berries, coconuts, flowers or glowing bits
+-- on any tree; the former fruit-tree slots are plain leafy trees in four green tones.
+local LEAFY={fresh={{120,196,92},{132,204,98},{110,188,86}},deep={{62,138,64},{70,146,70},{56,128,60}},lime={{150,204,84},{162,212,94},{140,196,78}},
+ sage={{110,158,96},{120,168,104},{100,148,90}}}
 local BARKS={{150,104,64},{132,92,58},{164,116,72},{120,86,56}}
-local EMBERS={{176,52,34},{214,84,40},{150,40,36},{236,120,48}}
+local EMBERS={{214,150,60},{232,176,72},{200,140,56},{240,196,96}} -- (autumn amber and gold: no red on any tree)
 local FLOWERS={warm={{255,96,120},{255,214,80},{255,255,255},{255,150,60},{255,120,170}},cool={{170,120,255},{120,200,255},{255,255,255},{255,170,220},{140,220,200}},
  desert={{255,200,90},{255,120,60},{255,255,255},{240,90,120}},lava={{255,90,40},{255,170,40},{150,30,30},{255,220,90}},snow={{200,230,255},{255,255,255},{150,190,255}}}
 local BUNTING={rainbow={{255,96,96},{255,206,72},{96,200,120},{90,170,255},{190,120,255}},candy={{236,104,92},{252,244,226},{52,168,160},{244,196,86}}}
-A.Palettes={Greens=GREENS,Blossoms=BLOSSOMS,Fruits=FRUITS,Flowers=FLOWERS}
+A.Palettes={Greens=GREENS,Blossoms=BLOSSOMS,Leafy=LEAFY,Flowers=FLOWERS,Embers=EMBERS}
 
 -- Where props may stand -------------------------------------------------------------------------------------------------------------------------
 local BLOCKED={ -- (x0, x1, z0, z1): the market, the leaderboards, the gate towers' feet
@@ -90,7 +93,7 @@ local function shade(c,rng,k)k=k or 10;local d=rng(-k,k);return{math.clamp(c[1]+
 -- Owner (R151): "make sure they are studded". Every part-built tree, bush and topiary is made of Plastic blocks with Studs on top and Inlet
 -- underneath - the classic Roblox look of the place's own track trees (Plastic blocks with Studs) and of the owner's studded tree models.
 -- Stud surfaces show on block faces, so crowns are clusters of turned blocks. Each block of a tree keeps its top and bottom off the planes of
--- the tree's other blocks (freeY: coplanar faces would flicker). The owner's tree models replace the leafy trees (oaks, blossoms, fruit
+-- the tree's other blocks (freeY: coplanar faces would flicker). The owner's tree models replace the leafy trees (oaks, blossoms, leafy
 -- trees) when ReplicatedStorage.HubTreeTemplates151 has them (A.TemplateTree, HubStudTrees151).
 local function block(ctx,level,x,z,name,size,cf,color)return ctx.Part(level,x,z,name,size,cf,color,Mat.Plastic,{studs=true})end
 local function turned(pos,yaw)return CF(pos)*CFrame.Angles(0,yaw,0)end
@@ -165,19 +168,16 @@ function A.Blossom(ctx,x,z,colour)
  petals(ctx,x,z,(top*CF(0,1.5*s,0)).Position,6*s,pal)
  return main
 end
--- Fruit trees: a crown block with a top block, fruit set into its sides.
-function A.FruitTree(ctx,x,z,fruit)
- local rng=K.Rng('fruit'..fruit..x..z);local s=rng(.8,1);local pl={}
+-- Leafy trees (the former fruit-tree slots; owner: "the trees are just trees"): a crown block, a top block and a side block in one of four
+-- green tones (fresh, deep, lime, sage). Just leaves.
+function A.LeafyTree(ctx,x,z,tone)
+ local rng=K.Rng('leafy'..tostring(tone)..x..z);local s=rng(.8,1);local pl={};local pal=LEAFY[tone]or LEAFY.fresh
  local top=trunk(ctx,x,z,rng,1.6*s,6.5*s,pick(rng,BARKS))
  local w,h=8.4*s,6.6*s
- local _,cf=crown(ctx,pl,x,z,'core','Tree crown',w,h,(top*CF(0,3*s,0)).Position,yawOf(rng),shade(pick(rng,GREENS),rng))
- crown(ctx,pl,x,z,'detail','Tree crown',5.2*s,3.2*s,cf.Position+V(rng(-1.5,1.5)*s,h/2+1.1*s,rng(-1.5,1.5)*s),yawOf(rng),shade(pick(rng,GREENS),rng))
- local n=math.floor(rng(4,6.99))
- local faces={V(1,0,0),V(-1,0,0),V(0,0,1),V(0,0,-1)}
- for i=1,n do local f=faces[(i-1)%4+1];local along=rng(-.34,.34)*w;local up=rng(-.3,.32)*h
-  local lp=f*(w/2)+V(math.abs(f.X)<.5 and along or 0,up,math.abs(f.Z)<.5 and along or 0)
-  ctx.Ball('detail',x,z,'Fruit',rng(1.1,1.5)*s,cf*lp,FRUITS[fruit],Mat.SmoothPlastic)
- end
+ local _,cf=crown(ctx,pl,x,z,'core','Tree crown',w,h,(top*CF(0,3*s,0)).Position,yawOf(rng),shade(pick(rng,pal),rng,8))
+ crown(ctx,pl,x,z,'detail','Tree crown',5.2*s,3.2*s,cf.Position+V(rng(-1.5,1.5)*s,h/2+1.1*s,rng(-1.5,1.5)*s),yawOf(rng),shade(pick(rng,pal),rng,8))
+ local a=rng(0,math.pi*2)
+ crown(ctx,pl,x,z,'detail','Tree crown',rng(4,5)*s,rng(2.8,3.6)*s,cf.Position+V(math.cos(a)*3.8*s,rng(-1,.6)*s,math.sin(a)*3.8*s),yawOf(rng),shade(pick(rng,pal),rng,10))
 end
 -- Pines for the Snow lane: 3-4 square tiers, each turned 45 degrees, snow on their tops.
 function A.Pine(ctx,x,z,s)
@@ -197,7 +197,7 @@ function A.Pine(ctx,x,z,s)
  local sy=freeY(pl,y+1.2*s,2*s)
  block(ctx,'detail',x,z,'Pine snow',V(1.9*s,2*s,1.9*s),turned(V(x,sy,z),yaw),{246,250,255})
 end
--- Palms for the Desert garden: a curving trunk of square segments, drooping leaves, coconuts.
+-- Palms for the Desert garden: a curving trunk of square segments, drooping leaves (no coconuts: "the trees are just trees").
 function A.Palm(ctx,x,z)
  local rng=K.Rng('palm'..x..z);local s=rng(.85,1.15);local a=rng(0,math.pi*2)
  local lean=V(math.cos(a),0,math.sin(a))*rng(.8,1.5)*s;local base=V(x,FLOOR-.3,z);local prev=base
@@ -209,14 +209,12 @@ function A.Palm(ctx,x,z)
   local tip=crownAt+V(math.cos(ang)*reach,-rng(2,3.4)*s,math.sin(ang)*reach)
   ctx.Part(i<=4 and'core'or'detail',x,z,'Palm leaf',V(reach+1,.35,rng(1.7,2.3)*s),CFrame.lookAt((crownAt+tip)/2,tip)*CFrame.Angles(0,math.pi/2,0),shade({60,150,72},rng,14),Mat.Plastic,{studs=true})
  end
- for i=1,math.floor(rng(2,3.99))do ctx.Ball('detail',x,z,'Coconut',1.3*s,crownAt+V(rng(-.8,.8),-1.1,rng(-.8,.8)),{120,84,52})end
 end
--- Cacti: a saguaro with one or two arms, or a barrel cactus; flowers on top.
+-- Cacti: a saguaro with one or two arms, or a barrel cactus (plain: no flower balls on top).
 function A.Cactus(ctx,x,z,kind)
  local rng=K.Rng('cactus'..kind..x..z);local s=rng(.85,1.2);local g=shade({86,160,74},rng,12);local yaw=yawOf(rng);local pl={}
  if kind=='barrel'then
   block(ctx,'core',x,z,'Barrel cactus',V(3*s,2.6*s,3*s),turned(V(x,FLOOR-.2+1.3*s,z),yaw),g)
-  ctx.Ball('detail',x,z,'Cactus flower',1.1*s,V(x,FLOOR-.2+2.6*s+.25,z),pick(rng,FLOWERS.desert))
   return
  end
  local h=rng(6,8.5)*s
@@ -230,9 +228,9 @@ function A.Cactus(ctx,x,z,kind)
   local ah=rng(2,3.2)*s;local ay=freeY(pl,y0-.4*s+ah/2,ah)
   block(ctx,'detail',x,z,'Cactus arm',V(1.3*s,ah,1.3*s),turned(V(x+dx,ay,z+dz),ang),g)
  end
- ctx.Ball('detail',x,z,'Cactus flower',1*s,V(x,cy+.6*s+.3,z),pick(rng,FLOWERS.desert))
 end
--- Ember trees for the Lava garden: charred leaning trunks, smouldering crown blocks with a few glowing embers.
+-- Ember trees for the Lava garden: charred leaning trunks, autumn amber / gold crown blocks (no glowing bits, no red: "the trees are just
+-- trees"). The garden's glow stays on its basalt rocks.
 function A.EmberTree(ctx,x,z)
  local rng=K.Rng('ember'..x..z);local s=rng(.8,1.1);local pl={}
  local top=trunk(ctx,x,z,rng,1.8*s,8*s,{58,44,44})
@@ -242,7 +240,6 @@ function A.EmberTree(ctx,x,z)
   crown(ctx,pl,x,z,'detail','Ember crown',rng(4.4,6)*s,rng(3,4)*s,c+V(math.cos(a)*3.6*s,rng(.5,3)*s,math.sin(a)*3.6*s),yawOf(rng),pick(rng,EMBERS))
  end
  beam(ctx,'detail',x,z,'Charred branch',(top*CF(0,-2*s,0)).Position,(top*CF(4*s,1*s,1*s)).Position,.7*s,{58,44,44})
- for i=1,3 do ctx.Ball('detail',x,z,'Ember',rng(.8,1.2),c+V(rng(-4,4)*s,rng(-3.5,-2)*s,rng(-4,4)*s),{255,170,60},Mat.Neon)end
 end
 function A.GlowRock(ctx,x,z)
  local rng=K.Rng('rock'..x..z);local s=rng(.8,1.3)
@@ -250,24 +247,18 @@ function A.GlowRock(ctx,x,z)
  ctx.Ball('detail',x,z,'Basalt rock',2.4*s,V(x+2.2*s,FLOOR+.3*s,z+.8*s),shade({76,62,70},rng,8),Mat.Basalt)
  ctx.Ball('detail',x,z,'Ember glow',1.5*s,V(x+1.1*s,FLOOR+2.1*s,z-.4*s),{255,140,40},Mat.Neon)
 end
--- The owner's studded tree model in a leafy slot (HubStudTrees151.Place: fitted, turned, leaned, grounded, leaves in the slot's colour);
--- fruit trees keep their fruit (parts set into the clone's crown), blossoms their petals. nil when the clone cannot be placed.
+-- The owner's studded tree model in a leafy slot (HubStudTrees151.Place: fitted, turned, leaned, grounded, leaves in the slot's colour; any
+-- fruit in the model was removed by HubStudTrees151.Prepare); blossoms keep their petals. nil when the clone cannot be placed.
 function A.TemplateTree(ctx,x,z,kind,variant,info)
  local f=ctx.Folder('core',x,z);if not f then return nil end
  local rng=K.Rng('leaf'..kind..tostring(variant)..x..z)
- local leaf=kind=='blossom'and shade(pick(rng,BLOSSOMS[variant]or BLOSSOMS.pink),rng,6)or shade(pick(rng,GREENS),rng)
+ local leaf=kind=='blossom'and shade(pick(rng,BLOSSOMS[variant]or BLOSSOMS.pink),rng,6)or kind=='leafy'and shade(pick(rng,LEAFY[variant]or LEAFY.fresh),rng,8)or shade(pick(rng,GREENS),rng)
  local m=Trees.Place(info,{Kind=kind,Variant=variant,X=x,Z=z},{Floor=FLOOR,Leaf=leaf,Shadows=ctx.Tier>=2})
  if not m then return nil end
  m.Name='Studded tree';m:SetAttribute('Template',info.Name);m.Parent=f
  ctx.Counts.core+=info.Parts;ctx.Templated[kind]=(ctx.Templated[kind]or 0)+1;ctx.TemplateParts+=info.Parts
  local c,size=Trees.LeafBox(m)
- if kind=='fruit'and c then
-  local n=math.floor(rng(4,6.99))
-  for i=1,n do local a=i/n*math.pi*2+rng(0,.6);local e=rng(-.3,.5)
-   local dir=V(math.cos(a)*math.cos(e),math.sin(e),math.sin(a)*math.cos(e))
-   ctx.Ball('detail',x,z,'Fruit',rng(1.1,1.5),c+V(dir.X*size.X,dir.Y*size.Y,dir.Z*size.Z)*.46,FRUITS[variant]or FRUITS.apple,Mat.SmoothPlastic)
-  end
- elseif kind=='blossom'and c then petals(ctx,x,z,c+V(0,-size.Y*.2,0),math.min(size.X,size.Z)*.6,BLOSSOMS[variant]or BLOSSOMS.pink)end
+ if kind=='blossom'and c then petals(ctx,x,z,c+V(0,-size.Y*.2,0),math.min(size.X,size.Z)*.6,BLOSSOMS[variant]or BLOSSOMS.pink)end
  return m
 end
 -- Bushes and topiary (studded blocks too).
@@ -481,14 +472,14 @@ A.Layout={
  trees={
   -- welcome lawns and the north islands
   {'blossom',28,-190,'pink'},{'blossom',-28,-190,'white'},{'oak',96,-184,'L'},{'oak',-96,-184,'L'},{'oak',94,-224,'M'},{'oak',-94,-224,'M'},
-  {'fruit',60,-226,'apple'},{'fruit',-60,-226,'orange'},{'poplar',104,-200},{'poplar',104,-212},{'poplar',-104,-200},{'poplar',-104,-212},
+  {'leafy',60,-226,'fresh'},{'leafy',-60,-226,'deep'},{'poplar',104,-200},{'poplar',104,-212},{'poplar',-104,-200},{'poplar',-104,-212},
   {'oak',134,-136,'M'},{'oak',-134,-136,'M'},{'blossom',100,-142,'lilac'},{'blossom',-100,-142,'pink'},{'oak',26,-222,'S'},{'oak',-26,-222,'S'},
   -- beside the market square
-  {'fruit',84,-250,'lemon'},{'fruit',-84,-250,'apple'},{'oak',84,-300,'M'},{'oak',-84,-300,'L'},{'fruit',70,-276,'plum'},{'fruit',-70,-276,'lemon'},
+  {'leafy',84,-250,'lime'},{'leafy',-84,-250,'fresh'},{'oak',84,-300,'M'},{'oak',-84,-300,'L'},{'leafy',70,-276,'sage'},{'leafy',-70,-276,'lime'},
   {'poplar',100,-262},{'poplar',-100,-262},
   -- round the stage and the fountain
   {'blossom',62,-330,'lilac'},{'blossom',-62,-330,'pink'},{'oak',92,-372,'L'},{'oak',-92,-372,'M'},{'oak',40,-392,'S'},{'oak',-40,-392,'S'},
-  {'poplar',96,-340},{'poplar',-96,-340},{'fruit',72,-392,'apple'},{'fruit',-72,-392,'plum'},{'blossom',34,-366,'white'},{'blossom',-34,-360,'lilac'},
+  {'poplar',96,-340},{'poplar',-96,-340},{'leafy',72,-392,'fresh'},{'leafy',-72,-392,'sage'},{'blossom',34,-366,'white'},{'blossom',-34,-360,'lilac'},
   -- Desert garden (+X alley): palms, saguaros, barrel cacti
   {'palm',170,-252},{'palm',262,-252},{'palm',220,-286},{'palm',300,-286},{'palm',196,-288},
   {'cactus',240,-252,'saguaro'},{'cactus',285,-251,'barrel'},{'cactus',182,-288,'barrel'},{'cactus',252,-287,'saguaro'},
@@ -559,7 +550,7 @@ function A.Build(root,tier,bases,owners,templates)
   local kind,x,z=t[1],t[2],t[3]
   if plan[i]and A.TemplateTree(ctx,x,z,kind,t[4],plan[i])then -- (the owner's model)
   elseif kind=='oak'then A.Oak(ctx,x,z,t[4])elseif kind=='poplar'then A.Poplar(ctx,x,z)elseif kind=='blossom'then A.Blossom(ctx,x,z,t[4])
-  elseif kind=='fruit'then A.FruitTree(ctx,x,z,t[4])elseif kind=='pine'then A.Pine(ctx,x,z,t[4])elseif kind=='palm'then A.Palm(ctx,x,z)
+  elseif kind=='leafy'then A.LeafyTree(ctx,x,z,t[4])elseif kind=='pine'then A.Pine(ctx,x,z,t[4])elseif kind=='palm'then A.Palm(ctx,x,z)
   elseif kind=='cactus'then A.Cactus(ctx,x,z,t[4])elseif kind=='ember'then A.EmberTree(ctx,x,z)elseif kind=='rock'then A.GlowRock(ctx,x,z)end
  end
  for _,b in ipairs(L.bushes)do A.Bush(ctx,b[1],b[2],b[3]=='desert'and{{150,170,80},{170,176,96}}or b[3]=='ember'and{{120,50,40},{150,70,40}}or nil)end

@@ -45,7 +45,7 @@
   },
   {
    "name": "s_fruit",
-   "title": "Fruit trees keep their fruit",
+   "title": "Leafy trees (just leaves)",
    "fov": 58,
    "pos": [
     44,
@@ -129,7 +129,7 @@
   },
   {
    "name": "p_lava",
-   "title": "Lava: studded ember trees",
+   "title": "Lava: studded amber ember trees",
    "fov": 60,
    "pos": [
     -150,

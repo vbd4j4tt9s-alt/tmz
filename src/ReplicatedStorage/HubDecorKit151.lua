@@ -89,7 +89,7 @@ K.TreeFolder='HubTreeTemplates151'
 -- What a template tree may cost (HubStudTrees151.Plan): a clone with more than PerTree parts is not used on that device tier, and all
 -- clones together add at most Total parts (the slots are filled in the layout's order: the welcome lawns by the gate first). The part-built
 -- tree a clone replaces costs 2 core + about 5 detail parts. Tier 1 = phones on low / FastMode, 2 = phones, 3 = desktop.
-K.TreeBudget={PerTree={[1]=6,[2]=16,[3]=40},Total={[1]=90,[2]=300,[3]=600},MaxParts=400,Kinds={oak=true,blossom=true,fruit=true}}
+K.TreeBudget={PerTree={[1]=6,[2]=16,[3]=40},Total={[1]=90,[2]=300,[3]=600},MaxParts=400,Kinds={oak=true,blossom=true,leafy=true}}
 
 -- Part constructors -----------------------------------------------------------------------------------------------------------------------
 K.Made=0
