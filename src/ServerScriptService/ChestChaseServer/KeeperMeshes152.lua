@@ -15,7 +15,7 @@
 --    FailureCount, BakeSeconds, Triangles, MeshParts, Mode (auto / off: the owner's /test keepermodels), LastFailure, Revision and
 --    per keeper Stage1 .. Stage7 / Darkened = Loading / Ready / Failed; Failures holds one StringValue per failed keeper.
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
-local Config=require(RS:WaitForChild('KeeperRigConfig152'))
+local Config=require(assert(RS:FindFirstChild('KeeperRigConfig152'),'ReplicatedStorage.KeeperRigConfig152 is not installed'))
 local M={Revision=152,Variant='R152',Folder='KeeperMeshStatus152',Templates='KeeperMeshTemplates152',SliceSeconds=.004,
  Order={1,6,2,3,4,5,7,0}, -- biome order, then The Darkened (it only appears in events)
  Unavailable='EditableMesh is not available in this environment'}

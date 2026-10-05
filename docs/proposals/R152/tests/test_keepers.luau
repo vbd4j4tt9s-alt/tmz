@@ -12,6 +12,7 @@
 --   missing  no CreateEditableMesh at all: the same, quietly reported as unavailable.
 --   failat   the 20th CreateEditableMesh returns nil mid-keeper: that keeper keeps today's model, the others are baked.
 --   content  the 50th CreateDataModelContentAsync fails: the same for that keeper.
+--   nomodule KeeperMeshes152 is not installed (a broken install): BeastModels dresses every keeper with today's model.
 local SCENARIO=...or'main'
 local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local Mock=require('./keeper_mesh_mock')
@@ -41,12 +42,23 @@ do local tf=R.new('Folder');tf.Name='KeeperTemplatesV100';tf.Parent=SS
   m.Parent=tf
  end
 end
-local Meshes=W.module('KeeperMeshes152');local Models=W.module('BeastModels');local Contact=W.module('KeeperContact')
 local ORDER={1,6,2,3,4,5,7,0}
 local function keeperModel(stage,at)
  local m=R.new('Model');m.Name='Guardian_Stage'..stage;local root=R.new('Part');root.Name='HumanoidRootPart';root.CFrame=at;root.Parent=m;m.PrimaryPart=root
  m:SetAttribute('GuardianBehavior','GUARDING');m:SetAttribute('GuardianLeaseToken',0);m.Parent=W.workspace;CS:AddTag(m,'BiomeKeeper');return m
 end
+if SCENARIO=='nomodule'then
+ -- a broken install (KeeperMeshes152 missing): BeastModels still dresses every keeper, with today's model, and says so once
+ RS:FindFirstChild('KeeperMeshes152').Name='KeeperMeshes152Missing'
+ local Models=W.module('BeastModels')
+ for stage=1,7 do local m=keeperModel(stage,CF(stage*60,6,0));local ok=pcall(Models.Dress,m,stage)
+  check(ok and m:GetAttribute('KeeperMeshVariant')=='Legacy'and #m.BeastBody:GetChildren()==#Cfg[stage].Parts,'stage '..stage..': without the mesh module the keeper is today\'s')end
+ R.advance(2.1);check(W.warns==1,'one warning ('..tostring(W.warns)..')')
+ print(('R152 keepers (%s): %d checks, %d failures'):format(SCENARIO,checks,fails))
+ if fails>0 then error('failures',0)end
+ return
+end
+local Meshes=W.module('KeeperMeshes152');local Models=W.module('BeastModels');local Contact=W.module('KeeperContact')
 -- 1. The spawn path: keepers dressed at server start never wait for the bake ----------------------------------------------------------------
 local guardians={}
 local yields0=log.Yields
@@ -375,6 +387,14 @@ do local eyes=guardians[5].BeastBody.Head_Eyes_Asleep
  check(eyes.Material==R.Enum.Material.Neon and near(eyes.Color.R,.4)and eyes.LocalTransparencyModifier==1,'the knight awake: its dim asleep eyes are hidden')
  guardians[5]:SetAttribute('GuardianBehavior','GUARDING');S.awake=0;W.frames(2,1/60)
  check(eyes.LocalTransparencyModifier==0 and eyes.Material==R.Enum.Material.Neon and near(eyes.Color.R,.4),'the knight asleep: its asleep eyes glow dimly (Neon, their own colour)')
+end
+-- the runes, seams and storm cracks pulse gently on the client (70 - 100 % of their Neon colour)
+do local g=guardians[7].BeastBody.Body_Glow;local base
+ for _,s in ipairs(C152.Stages[7].Parts)do if s.Name=='Body_Glow'then base=s.Color end end
+ local seen={}
+ for _=1,6 do W.frames(9,1/60);seen[#seen+1]=g.Color.B end
+ local lo,hi=math.min(table.unpack(seen)),math.max(table.unpack(seen))
+ check(hi-lo>.01 and hi<=base[3]+1e-6 and lo>=base[3]*.7-1e-6 and g.Material==R.Enum.Material.Neon,('the colossus\'s storm cracks pulse (blue %.3f .. %.3f of %.3f)'):format(lo,hi,base[3]))
 end
 -- accents: only the snake's rattle stays
 for stage=1,7 do

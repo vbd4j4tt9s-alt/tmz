@@ -50,7 +50,7 @@ if cmp -s "$OUT/base/d.txt" "$OUT/now/d.txt";then echo "ok: $(wc -l < "$OUT/now/
 else fail "today's keepers differ from the base:";diff "$OUT/base/d.txt" "$OUT/now/d.txt" | head -20;fi
 echo "== 2. test_keepers"
 cp "$T/roblox.luau" "$INV/world.luau" "$HERE/keeper_mesh_mock.luau" "$HERE/test_keepers.luau" "$OUT/now/"
-for s in main throw missing failat content;do
+for s in main throw missing failat content nomodule;do
  (cd "$OUT/now" && timeout 900 /opt/luau/luau test_keepers.luau -a $s > keepers_$s.log 2>&1) || { grep -v '^WARN' "$OUT/now/keepers_$s.log" | tail -40;fail "test_keepers $s";continue; }
  grep '^INFO' "$OUT/now/keepers_$s.log" || true;grep -v '^WARN\|^INFO' "$OUT/now/keepers_$s.log" | tail -1
 done

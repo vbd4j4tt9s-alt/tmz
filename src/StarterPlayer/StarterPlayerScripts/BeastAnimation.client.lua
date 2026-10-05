@@ -20,7 +20,7 @@ local Combat=require(Storage.KeeperCombat)
 local Polish=require(Storage:WaitForChild('KeeperPolish'));local KFx=require(Storage:WaitForChild('KeeperFx'));local Accents=require(Storage:WaitForChild('KeeperAccents'))
 -- R152: a keeper built from the baked rev 6 model (BeastBody KeeperMeshVariant 'R152', VisualVersion 152) uses KeeperRigConfig152's parts and
 -- floor samples, and has two faces: the Asleep face parts show while it sleeps (GUARDING / SLEEPING), the Chase ones in every other state.
-local Config152=require(Storage:WaitForChild('KeeperRigConfig152'))
+local Config152 -- (required with the first new-model keeper)
 local Players=game:GetService('Players')
 local records,watchers,pending={},{},{}
 local BLACK=Color3.new(0,0,0)
@@ -53,6 +53,7 @@ local function bind(model)
  local stage=model:GetAttribute('CreatureStage') or model:GetAttribute('Stage')
  if not root or not rig or not Config[stage] or not Voices[stage] then return end
  local variant=rig:GetAttribute('KeeperMeshVariant')=='R152'and 'R152'or nil
+ if variant and not Config152 then Config152=require(Storage:WaitForChild('KeeperRigConfig152'))end
  local cfg=variant and Config152.Get(stage)or Config[stage]
  local expectedVersion=variant and Config152.Version or(stage==1 or stage==5 or stage==7)and 59 or 99
  if rig:GetAttribute('VisualVersion')~=expectedVersion then return end
@@ -61,11 +62,13 @@ local function bind(model)
  for _,spec in ipairs(cfg.Parts) do
   if spec.EyeGlow then eyeColor=Color3.new(table.unpack(spec.Color));break end
  end
+ local glows={};if variant then for _,spec in ipairs(cfg.Parts)do if spec.Kind=='glow'then glows[spec.Name]=Color3.new(table.unpack(spec.Color))end end end
  for _,part in ipairs(rig:GetDescendants()) do
   if part:IsA('BasePart') and part:GetAttribute('RestCFrame') then
    local tree=part:GetAttribute('TreeRestCFrame')
    table.insert(parts,{Part=part,Rest=part:GetAttribute('RestCFrame'),Group=part:GetAttribute('BeastGroup'),Size=part.Size,TreeRest=tree,TreeSize=part:GetAttribute('TreeRestSize'),IdleRest=part:GetAttribute('IdleRestCFrame'),IdleSize=part:GetAttribute('IdleRestSize'),Eye=part:GetAttribute('KeeperEyeGlow')==true,EyeColor=eyeColor,
-    Face=part:GetAttribute('KeeperFaceState'),TreeGlow=tree~=nil and part:GetAttribute('KeeperMeshKind')=='glow'or nil})
+    Face=part:GetAttribute('KeeperFaceState'),TreeGlow=tree~=nil and part:GetAttribute('KeeperMeshKind')=='glow'or nil,
+    Glow=glows[part.Name],Seed=#parts*1.7})
   end
  end
  if #parts~=#cfg.Parts then return end -- wait for a complete streamed rig
@@ -212,6 +215,8 @@ local render=Run.RenderStepped:Connect(function(dt)
    if (p.TreeRest or p.IdleRest)and p.Part.Size~=size then p.Part.Size=size end
    if p.Eye and p.LastEyeAwake~=motion.Awake then eyes(p.Part,p.EyeColor,motion.Awake,p.TreeRest~=nil,p.Face and(p.Face=='Asleep')~=asleep);p.LastEyeAwake=motion.Awake
    elseif p.TreeGlow and p.LastEyeAwake~=motion.Awake then p.Part.LocalTransparencyModifier=1-motion.Awake;p.LastEyeAwake=motion.Awake end
+   -- R152: the new models' runes, seams and storm cracks pulse gently (their Neon colour, 70 - 100 %)
+   if p.Glow then p.Part.Color=BLACK:Lerp(p.Glow,.85+.15*math.sin(now*2.4+p.Seed))end
   end end
   -- R149: the snow tiger's gear studs and facets are LOD pieces (hidden beyond Accents.DetailRange and in low graphics).
   Accents.Pose(r.Accents,target,motion.Frame,motion.Awake,now,hunting and not asleep,moveParts,moveFrames,distance,low)

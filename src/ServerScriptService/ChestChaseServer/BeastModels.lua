@@ -6,7 +6,9 @@
 local Storage=game:GetService('ServerStorage')
 local Config=require(game:GetService('ReplicatedStorage').KeeperRigConfig)
 local Upgrades=require(script.Parent.KeeperUpgradeArt)
-local Meshes=require(script.Parent.KeeperMeshes152)
+-- (a missing or broken mesh module can only mean today's keepers: never a failed dress)
+local okMeshes,Meshes=pcall(require,script.Parent:FindFirstChild('KeeperMeshes152'))
+if not okMeshes then warn('[R152 keeper models] today\'s keepers only: '..tostring(Meshes));Meshes={Revision=152,Start=function()end,Wanted=function()return nil end,BuildRig=function()return nil end}end
 local function version(stage)return (stage==1 or stage==5 or stage==7)and 59 or 99 end
 local Art={Version=152,KeepSeconds=2}
 
@@ -92,12 +94,12 @@ function Art.Keepers()
  return out
 end
 -- One check now (returns how many keepers were swapped), then again every KeepSeconds (one timer per server).
-local keeping=false
+local keeping=false;local failedSwap=setmetatable({},{__mode='k'})
 function Art.Step()
  local swapped=0
  for _,model in ipairs(Art.Keepers())do
   local ok,did=pcall(Art.Swap,model,model:GetAttribute('CreatureStage'))
-  if ok and did then swapped+=1 elseif not ok then warn('[R152 keeper models] '..tostring(did))end
+  if ok and did then swapped+=1 elseif not ok and not failedSwap[model]then failedSwap[model]=true;warn('[R152 keeper models] '..tostring(did))end
  end
  return swapped
 end
