@@ -43,12 +43,15 @@ W.frames(2);check(button.Size.X.Offset>=150 and button.Size.Y.Offset>=44,'button
 set('Ready',0);set('Interval',360);set('DueAt',R.clock+222);me:SetAttribute('TreadmillTraining',true)
 W.frames(20,1/60)
 check(bar.Enabled==true and bar.Adornee==root,'bar shows over the player while training')
-local label=bar.Back.Label.Text
-check(label:find('Next roll 3:4')~=nil,'bar text counts down: '..label)
+-- R150: the gift timer is a capsule: caption 'NEXT ROLL' over a track whose label holds the countdown.
+local label=bar.Back.Track.Label.Text
+check(label:find('^3:4')~=nil and bar.Back.Caption.Text=='NEXT ROLL','bar text counts down: '..bar.Back.Caption.Text..' '..label)
 check(bar.StudsOffsetWorldSpace.Y>5,'bar sits above the head, clear of speed popups')
-local fill=bar.Back.Fill.Size.X.Scale;check(math.abs(fill-(1-222/360))<.02,'bar fill = progress ('..fill..')')
+local fill=bar.Back.Track.Fill.Size.X.Offset/120;check(math.abs(fill-(1-222/360))<.02,'bar fill = progress ('..fill..')')
 set('Ready',2);set('DueAt',nil);W.frames(20,1/60)
-check(bar.Back.Label.Text:find('2 rolls ready')~=nil,'at the cap the bar says claim: '..bar.Back.Label.Text)
+check(bar.Back.Caption.Text:find('BONUS READY')~=nil,'R150: a roll completing pops "BONUS READY!" first: '..bar.Back.Caption.Text)
+R.advance(3.5);W.frames(20,1/60)
+check(bar.Back.Caption.Text:find('2 ROLLS READY')~=nil,'at the cap the bar says so: '..bar.Back.Caption.Text)
 me:SetAttribute('TreadmillTraining',false);W.frames(20,1/60);check(bar.Enabled==false,'bar hides off the treadmill')
 -- 3. Click -> server result -> strip lands on it ---------------------------------------------------------
 set('Ready',2)
@@ -73,7 +76,7 @@ local function spinTo(res,label2)
  -- R124 layout: rows stacked (result above the buttons), the visible buttons centred as a group.
  local function bottom(x)return x.Position.Y.Offset+x.Size.Y.Offset end
  check(bottom(panel.Result)<=panel.Actions.Position.Y.Offset,label2..': result text ends above the buttons')
- check(bottom(panel.Odds)<=panel.Result.Position.Y.Offset and panel:FindFirstChild('Pool')==nil,label2..': odds / result rows do not overlap; no "Packs from" line')
+ check(panel.Odds.Position.Y.Offset>=bottom(panel.Actions)and panel:FindFirstChild('Pool')==nil,label2..': R150: the odds are the fine print under the buttons; no "Packs from" line')
  check(bottom(panel.Actions)<=panel.Size.Y.Offset,label2..': buttons inside the panel')
  local shownButtons={};for _,b in ipairs(panel.Actions:GetChildren())do if b:IsA('TextButton')and b.Visible then shownButtons[#shownButtons+1]=b end end
  local lo,hi=math.huge,-math.huge
@@ -125,7 +128,7 @@ overlay.Panel.Actions.Close.Activated:Fire();W.Gui.ReducedMotionEnabled=false
 -- 4. Server refusal: no overlay, message on the button ------------------------------------------------------
 set('Ready',1);reply={Error='SEED BAG FULL! Make room - your roll stays ready.',Ready=1}
 button.Activated:Fire()
-check(overlay.Enabled==false and button.Sub.Text:find('SEED BAG FULL'),'refusal shown on the button: '..button.Sub.Text)
+check(overlay.Enabled==false and button.Face.Sub.Text:find('BAG FULL'),'refusal shown on the button: '..button.Face.Sub.Text)
 reply={Ok=true,Stage=99,Variant=nil};R.advance(3);button.Activated:Fire()
 check(overlay.Enabled==false,'malformed reply ignored')
 print(string.format('%d/%d checks passed%s',checks-fails,checks,fails>0 and(' ('..fails..' FAILED)')or''))
