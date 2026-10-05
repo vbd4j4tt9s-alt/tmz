@@ -30,10 +30,24 @@ Debris:AddItem(bellPreload,12)
 local LocalSfx=require(ReplicatedStorage:WaitForChild("LocalSfx"));local OnlookerId=require(ReplicatedStorage:WaitForChild("RevealFlourish")).SoundId
 LocalSfx.Preload({OnlookerId})
 local ONLOOKER_RANGE=160
+-- R151: every pack builds suspense before the seed bursts out (wobble, a bit-by-bit tear, a glowing seam whose rarity hint flickers up the
+-- ladder), for everyone watching; the seed comes out at RarePullRules.BurstAt (Secret+ unchanged) and hovers shorter, so the reveal still
+-- ends with the server's RevealDuration. Secret / Cosmic / King also get the light pillar and afterglow aura (RarePullWorld).
+local Ladder=require(ReplicatedStorage:WaitForChild("RarePullRules"))
+local Suspense=require(ReplicatedStorage:WaitForChild("PackSuspense"))
+local RareWorld do local ok,m=pcall(require,ReplicatedStorage:WaitForChild("RarePullWorld",10));RareWorld=ok and m or nil end
+local RareCinematic=nil
+local function cinematicOwnsCamera()
+    if RareCinematic==nil then local ok,m=pcall(require,ReplicatedStorage:FindFirstChild("RarePullCinematic"));RareCinematic=ok and m or false end
+    return RareCinematic and RareCinematic.OwnsCamera()==true
+end
+local function reducedMotion()local ok,v=pcall(function()return game:GetService("GuiService").ReducedMotionEnabled end);return ok and v==true end
+local function ownerOf(character)for _,p in ipairs(Players:GetPlayers())do if p.Character==character then return p end end;return nil end
 local function destroyEffect(record)
     if record.CameraState then local saved=record.CameraState;record.CameraState=nil;local camera=workspace.CurrentCamera;if camera==saved.Camera then camera.CameraType=saved.Type;camera.CFrame=saved.Frame;camera.Focus=saved.Focus end end
     if record.SeedMotion then record.SeedMotion:Destroy();record.SeedMotion=nil end
     if record.Flourish then record.Flourish:Destroy();record.Flourish=nil end
+    if record.Suspense then record.Suspense:Destroy();record.Suspense=nil end
     if record.Effect then record.Effect:Destroy();record.Effect=nil end
     for _,part in ipairs(record.Hidden or {}) do
         if part.Parent then
@@ -59,6 +73,8 @@ local function beginReveal(record,at,seedId,now)
     local name,rarity=Rules.GetRarity(seedId)
     record.RarityRank=rarity.Rank;record.RarityName=name
     record.Duration=record.Bag:GetAttribute("RevealDuration") or Rules.GetRevealDuration(name)
+    record.Quick=Ladder.IsQuick(record.Bag);record.BurstAt=Ladder.BurstAt(rarity.Rank,record.Quick)
+    record.Hover=Ladder.Hover(rarity.Rank,record.BurstAt,record.Duration);record.TearTicks=Ladder.TearTicks(rarity.Rank,record.Quick);record.TickPlayed={[1]=true}
     record.HeavenlySounds={};record.HeavenlyStarted=false;record.Celestial={}
     record.SeedVisible=nil;record.LastSeedScale=nil;record.SeedFullyGrown=nil;record.TearSound=nil
     local effect=Instance.new("Model");effect.Name="SeedReveal";effect.Parent=effects
@@ -129,6 +145,12 @@ local function beginReveal(record,at,seedId,now)
     if rarity.Rank>=3 then record.SeedMotion=Visuals.CreateSeedMotion(seed,effect,true)end
     -- R136: Legendary / Mythic pulls get a charge-up and a burst (pillar, shockwave, sparkles, sound for onlookers).
     record.Flourish=require(ReplicatedStorage:WaitForChild("RevealFlourish")).Create(effect,rarity.Rank,record.Bag:GetAttribute("VisualScale")or 1)
+    local lowFx=false;pcall(function()lowFx=require(ReplicatedStorage.ClientFxBudget).Low()end)
+    record.Suspense=Suspense.Create(effect,rarity.Rank,record.Bag:GetAttribute("VisualScale")or 1,record.Quick,lowFx);record.Suspense:SetPack(copy)
+    if rarity.Rank>=6 and RareWorld then
+        local owner=ownerOf(record.Bag.Parent)
+        if owner then pcall(RareWorld.Begin,owner,record.Bag.Parent,rarity.Rank,at)end
+    end
     -- R123: the reveal reaches this client one replication delay after RevealAt. Up to TEAR_AUDIO_GRACE late, the
     -- tear still plays while the paper scraps fly (its short envelope is shifted to start now); later it is skipped.
     local lag=now-at;record.TearShift=0
@@ -144,7 +166,7 @@ local function renderReveal(record,now)
     local bag=record.Bag;local t=now-record.At
     local s=bag:GetAttribute("VisualScale")or 1;local root=bag.PrimaryPart.CFrame
     local mouth=(bag:GetAttribute("TearLipY")or 1.11)*s
-    if bag.Parent==Players.LocalPlayer.Character and math.max(s,record.SeedBaseScale)>10 then
+    if bag.Parent==Players.LocalPlayer.Character and math.max(s,record.SeedBaseScale)>10 and not cinematicOwnsCamera() then
      local camera=workspace.CurrentCamera
      if camera then
       if not record.CameraState then record.CameraState={Camera=camera,Type=camera.CameraType,Frame=camera.CFrame,Focus=camera.Focus}end
@@ -153,14 +175,17 @@ local function renderReveal(record,now)
       camera.CameraType=Enum.CameraType.Scriptable;camera.CFrame=CFrame.lookAt(focus+Vector3.new(.3,.15,-1).Unit*(radius/math.sin(angle)),focus);camera.Focus=CFrame.new(focus)
      end
     end
-    local progress=math.clamp(t/Rules.TearSeconds,0,1)
-    local ageFromTear=math.max(0,t-Rules.TearSeconds)
-    local wrapperFade=math.clamp((ageFromTear-.42)/.7,0,1)
-    local wrapperRoot=root*CFrame.new(0,-ageFromTear*.12*s,0)
+    -- R151: the strips peel a few at a time through the suspense; the wrapper holds (wobbling) until the seed bursts out, then empties
+    local rank0=record.RarityRank;local burstAt=record.BurstAt or Ladder.BurstAt(rank0)
+    local progress=0;for i=1,8 do progress+=Ladder.StripPeel(rank0,t,i,record.Quick)/8 end
+    local ageFromTear=math.max(0,t-burstAt)
+    local wrapperFade=math.clamp((ageFromTear-.2)/.6,0,1)
+    local wobble=Ladder.Wobble(rank0,t,record.Quick,reducedMotion());wobble=CFrame.new(wobble.Position*s)*wobble.Rotation
+    local wrapperRoot=root*CFrame.new(0,-ageFromTear*.12*s,0)*wobble
     for p,localFrame in pairs(record.FlapFrames)do
         local index=p:GetAttribute("TearIndex")
         if index then
-            local peel=math.clamp(progress*8-(index-1),0,1)
+            local peel=Ladder.StripPeel(rank0,t,index,record.Quick)
             p.CFrame=wrapperRoot*CFrame.new(0,peel*.23*s,peel*.27*s)*localFrame*CFrame.Angles(peel*1.3,0,-peel*.16)
             p.Transparency=record.BagTransparency[p]+(1-record.BagTransparency[p])*math.max(wrapperFade,peel*.92)
         else p.CFrame=wrapperRoot*localFrame;p.Transparency=record.BagTransparency[p]+(1-record.BagTransparency[p])*wrapperFade end
@@ -170,12 +195,12 @@ local function renderReveal(record,now)
     record.Mouth.CFrame=wrapperRoot*CFrame.new((progress-1)*.84*s,mouth+.015*s,0)
     record.Mouth.Transparency=progress==0 and 1 or wrapperFade
     for i,p in ipairs(record.Lips)do
-        local peel=math.clamp(progress*8-(i-1),0,1)
+        local peel=Ladder.StripPeel(rank0,t,i,record.Quick)
         local x=-.84+(i-.5)*1.68/8
         p.Size=Vector3.new(.218,.14,.035)*s
         p.CFrame=wrapperRoot*CFrame.new(x*s,mouth+(.025+peel*.10)*s,-peel*.22*s)*CFrame.Angles(-peel*1.2,0,(i%2==0 and .08 or -.08))
         p.Transparency=peel==0 and 1 or wrapperFade
-        local release=.02+(i-1)/8*(Rules.TearSeconds-.02);local age=math.max(0,t-release)
+        local release=Ladder.StripStart(rank0,i,record.Quick)+.02;local age=math.max(0,t-release)
         local scrap=record.Scraps[i];scrap.Size=Vector3.new(.07,.11,.02)*math.min(s,3)
         scrap.CFrame=root*CFrame.new((x+age*.12)*s,mouth+(age*.9-age*age*1.7)*s,age*.24*s)*CFrame.Angles(age*2.5,i,age*1.7)
         scrap.Transparency=t<release and 1 or math.clamp((age-.1)/.55,0,1)
@@ -185,13 +210,27 @@ local function renderReveal(record,now)
         if tt>Rules.TearSeconds+.1 then record.TearSound:Stop();record.TearSound=nil
         else record.TearSound.Volume=Rules.TearVolume*math.clamp(tt/.025,0,1)*math.clamp((Rules.TearSeconds+.08-tt)/.15,0,1)end
     end
-    local revealStart=require(ReplicatedStorage.RarityRevealSequence).SeedAt(record.RarityRank);local age=math.max(0,t-revealStart)
+    -- R151: a short rip each time the next strips go (on the beat of the peel; a tick reaching this client late is skipped)
+    for i,tick in ipairs(record.TearTicks or{})do
+        if not record.TickPlayed[i]and t>=tick then
+            record.TickPlayed[i]=true
+            if t-tick<=TEAR_AUDIO_GRACE then
+                local sound=record.TickSound
+                if not sound then sound=Instance.new("Sound");sound.Name="Paper bag tearing";sound.SoundId=Rules.TearSoundId;sound.RollOffMinDistance=5;sound.RollOffMaxDistance=36;sound.Parent=record.Copy.PrimaryPart or record.Effect;record.TickSound=sound end
+                sound.Volume=Rules.TearVolume*.75;sound.PlaybackSpeed=1+.06*i
+                sound.TimePosition=require(ReplicatedStorage:WaitForChild("SoundTiming")).Offset(sound);sound:Play();record.TickStop=t+.14
+            end
+        end
+    end
+    if record.TickSound and record.TickStop and t>=record.TickStop then record.TickSound:Stop();record.TickStop=nil end
+    local revealStart=burstAt;local age=math.max(0,t-revealStart)
+    if record.Suspense then record.Suspense:Update(wrapperRoot*CFrame.new(0,mouth,0),t)end
+    if RareWorld and record.RarityRank>=6 then local owner=ownerOf(bag.Parent);if owner then RareWorld.SetMouth(owner,root*CFrame.new(0,mouth,0))end end
     if record.Flourish then
         local char=Players.LocalPlayer and Players.LocalPlayer.Character
         record.Flourish:Update(root*CFrame.new(0,mouth,0),t,revealStart,not(char and bag:IsDescendantOf(char)))
     end
-    local timing=require(ReplicatedStorage.BalanceRules)
-    local rise,slide=timing.SeedPhase(age);local ease=1-(1-rise)^3
+    local rise,slide=Ladder.SeedPhase(age,record.Hover);local ease=1-(1-rise)^3
     local scale=record.SeedBaseScale -- slide the seed out at its real held size
     if not record.LastSeedScale or math.abs(scale-record.LastSeedScale)>.025 or (rise==1 and not record.SeedFullyGrown)then
         record.Seed:ScaleTo(scale);record.LastSeedScale=scale;record.SeedFullyGrown=rise==1
@@ -349,7 +388,7 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
         elseif record.Effect then destroyEffect(record) end
     end
 end))
-table.insert(connections,Players.PlayerRemoving:Connect(remove))
+table.insert(connections,Players.PlayerRemoving:Connect(function(player)remove(player);if RareWorld then RareWorld.Stop(player)end end))
 script.Destroying:Connect(function()
     for _,c in ipairs(connections) do c:Disconnect() end
     for player in pairs(records) do remove(player) end

@@ -26,6 +26,7 @@ local function optional(name)
 end
 local Pictures=optional('ItemPictures');local Audio=optional('InteractionAudio');local Reveal=optional('RarityRevealAudio')
 local Mixer=optional('AudioMixer');local Timing=optional('SoundTiming');local Notices=optional('HudNoticeLayout');local Budget=optional('ClientFxBudget')
+local RareAudio=optional('RarePullAudio') -- R151: the Secret pull sting (RarePullSounds.SecretGlitch) under a Secret result's fanfare
 local RGB=Color3.fromRGB;local INK=Art.INK;local GOLD=Art.GOLD;local WHITE=Art.WHITE
 local connections={};local dead=false
 local function connect(signal,fn)local c=signal:Connect(fn);table.insert(connections,c);return c end
@@ -582,6 +583,7 @@ local function celebrate(entry,res)
   local big=res.Rarity~='Legendary'
   if Reveal then pcall(function()Reveal.Preload();Reveal.Play(big and'Impact'or'Chime',big and 1.1 or .8)
    if big then Reveal.Play('Chime',.7)end end)end
+  if RareAudio and res.Rarity=='Secret'then pcall(RareAudio.Sting,6)end
   -- Light-up on the borders: the card's own border flashes white then settles in its colour and pulses inside a
   -- glow ring; the panel border takes the colour and pulses with it.
   entry.Stroke.Thickness=5;entry.Stroke.Color=Color3.new(1,1,1)

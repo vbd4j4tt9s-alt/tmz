@@ -1,0 +1,357 @@
+--!nocheck
+-- R151 pull reveals, part 2: the REAL RarePullCinematic (director) with RarePullScenes, RarePullCard, RarePullAudio, RarePullRules and
+-- AudioMixer / SoundTiming on the Roblox mock: each story scene played through frame by frame, every exit path, the variants.
+local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
+local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
+local fails,checks=0,0
+local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
+local function near(a,b,tol)return type(a)=='number'and type(b)=='number'and math.abs(a-b)<=(tol or 1e-6)end
+local function noop()end
+function R.Inst:Play()local own=rawget(self,'_props').Play;if own then return own(self)end end
+function R.Inst:Stop()local own=rawget(self,'_props').Stop;if own then return own(self)end end
+local Mixer=W.module('AudioMixer');Mixer.Start()
+local M=W.module('RarePullCinematic');local L=W.module('RarePullRules');local Audio=W.module('RarePullAudio');local Sounds=W.module('RarePullSounds')
+local Visuals=W.module('SeedPackVisuals')
+local cam=W.workspace.CurrentCamera;local Run=W.Run
+local names={'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
+local effects=Mixer.Group('Effects')
+local function voices(slot)local out={};for _,s in ipairs(E.sounds)do if s.Name:match('^RarePull_'..(slot or''))and s.Parent then out[#out+1]=s end end;return out end
+local function anyPlaying()for _,s in ipairs(voices())do if s.IsPlaying then return s.Name end end;return nil end
+local baseCamera
+local function reset()
+ M.Abort('test');W.module('RarePullWorld').Clear()
+ cam=W.workspace.CurrentCamera
+ cam.CameraType=R.Enum.CameraType.Custom;cam.FieldOfView=70;cam.CFrame=CF(3,9,112);cam.Focus=CF(0,3,100);cam.CameraSubject=X.hum
+ W.Gui.ReducedMotionEnabled=false;W.UIS.TouchEnabled=false;W.UIS.KeyboardEnabled=true
+ X.root.CFrame=CF(0,3,100);X.hum.Health=100;X.state=R.Enum.HumanoidStateType.Running
+ for _,k in ipairs(W.CS:GetTagged('BiomeKeeper'))do k:Destroy()end
+ X.player:SetAttribute('RarePullPreview',nil)
+ R.advance(4) -- (no quick reveal: the previous presentation ended long ago)
+ baseCamera=X.camera()
+end
+local function packFor(rank,seedId)
+ local bag=Visuals.CarryBag(X.char,2,'Pack06',1,1,'None');bag:SetAttribute('RevealSeedId',seedId);bag:SetAttribute('RevealAt',W.workspace:GetServerTimeNow())
+ local tool=F.tool(W,'Seed Pack',{SeedPackTool=true,SeedInventoryId='p'..rank,Stage=2},nil)
+ local spec=W.module('SeedPackRules').SeedDesignById[seedId]
+ tool.ToolTip='Desert Seed Pack\nSomething: 1/2\n'..(spec and spec.name or seedId)..': 1/'..({'2','4','16','60','400','5K','83.3K','1.67B'})[rank]
+ return bag,tool
+end
+local function start(rank,extra)
+ local seedId=X.byRank[rank];local bag,tool=packFor(rank,seedId)
+ local info={Rank=rank,SeedId=seedId,At=W.workspace:GetServerTimeNow(),Bag=bag,Tool=tool,Mutation='None'}
+ for k,v in pairs(extra or{})do info[k]=v end
+ return M.Start(info),bag
+end
+local function hudShown()return X.hud.Main.Enabled and X.hud.Hotbar.Enabled end
+local function stage()return W.workspace:FindFirstChild('_RarePullStage')end
+local function restoredAll(tag,opts)
+ opts=opts or{}
+ local c=X.camera()
+ check(c.Type==baseCamera.Type and c.CFrame==baseCamera.CFrame and c.Fov==baseCamera.Fov and c.Subject==baseCamera.Subject and c.Focus==baseCamera.Focus,tag..': the camera is restored exactly (type, CFrame, focus, FieldOfView, subject)')
+ check(hudShown()and X.hud.Menu.Enabled==false and X.hud.Touch.Enabled,tag..': the HUD is back; a GUI that was already off stays off; the touch controls were never touched')
+ check(X.core.PlayerList==true and X.core.Chat==true and X.core.Backpack==false,tag..': Core GUI restored (and the Backpack, already off, left off)')
+ check(X.controls.Enabled,tag..': movement is back')
+ check(cam:FindFirstChild('RarePullGrade')==nil and cam:FindFirstChild('RarePullBlur')==nil,tag..': the colour grade and blur are gone')
+ check(stage()==nil,tag..': the hidden stage is destroyed')
+ check(X.pg:FindFirstChild('RarePullReveal')==nil,tag..': the reveal GUI is gone')
+ check(W.rsBound[M.BindName]==nil and W.actions[M.SkipAction]==nil,tag..': no render step or skip binding left')
+ check(X.player:GetAttribute('RarePullCinematic')==nil and X.player:GetAttribute('RarePullClimaxAt')==nil,tag..': the announcement attributes are cleared')
+ if not opts.result then check(anyPlaying()==nil,tag..': every reveal sound is stopped ('..tostring(anyPlaying())..')')end
+ local same,key=X.same(X.base,X.lighting());check(same,tag..': Lighting untouched ('..tostring(key)..')')
+end
+X.base=X.lighting()
+local renderBefore=X.live(Run.RenderStepped)
+-- 1. each story scene, start to end ------------------------------------------------------------------------------------------------------
+local budgets={[6]=150,[7]=200,[8]=320} -- the stage incl. the pack, the seed and the seed's own rarity aura (backdrop budgets: test below)
+for rank=6,8 do
+ reset();E.resetPlays()
+ local disables=X.controls.Disables
+ local run,bag=start(rank)
+ local tag=names[rank]..' Full'
+ check(run and run.Kind=='Scene'and run.Variant=='Full',tag..': a safe player gets the full story scene')
+ local tl=run.TL;local t0=R.clock
+ local log={hudHidden=true,coreOff=true,controlsHeld=true,lightingSame=true,grade=false,switchAt=nil,backAt=nil,maxParts=0,nearStage=true,titleAt=nil,oddsFinalOk=nil,skipHint=nil,blurSeen=false}
+ local final='1 in '..({'2','4','16','60','400','5K','83.3K','1.67B'})[rank]
+ X.run(tl.Length+.4,1/30,function(now)
+  local t=now-t0
+  if not M.Active()then return end
+  if t<tl.Back-.05 then
+   if hudShown()then log.hudHidden=false end
+   if X.core.PlayerList~=false then log.coreOff=false end
+   if X.controls.Enabled then log.controlsHeld=false end
+  end
+  if cam:FindFirstChild('RarePullGrade')then log.grade=true end
+  if cam:FindFirstChild('RarePullBlur')then log.blurSeen=true end
+  if cam.CameraType==R.Enum.CameraType.Scriptable and not log.switchAt then log.switchAt=t end
+  if log.switchAt and not log.backAt and cam.CameraType~=R.Enum.CameraType.Scriptable then log.backAt=t end
+  if cam.CameraType==R.Enum.CameraType.Scriptable and(cam.CFrame.Position-L.StageOrigin).Magnitude>120 then log.nearStage=false end
+  local st=stage();if st then local n=0;for _,d in ipairs(st:GetDescendants())do if d:IsA('BasePart')then n+=1 end end;log.maxParts=math.max(log.maxParts,n)end
+  local gui=X.pg:FindFirstChild('RarePullReveal');local title=gui and X.find(gui,'Title')
+  if title and title.TextTransparency<.5 and not log.titleAt then log.titleAt=t end
+  local odds=gui and X.find(gui,'Odds')
+  if odds and t>tl.Odds+.05 and t<tl.FloatEnd-.1 and log.oddsFinalOk==nil then log.oddsFinalOk=odds.Text==final;log.oddsText=odds.Text end
+  local hint=gui and X.find(gui,'Skip hint');if hint and hint.Visible and not log.skipHint then log.skipHint=t end
+  local same=X.same(X.base,X.lighting());if not same then log.lightingSame=false end
+ end)
+ check(M.Active()==nil,tag..': it ends by itself ('..string.format('%.1f',tl.Length)..' s)')
+ check(log.hudHidden and log.coreOff and log.controlsHeld,tag..': HUD, Core GUI and movement are held for the whole scene')
+ check(X.controls.Disables==disables+1,tag..': movement held once')
+ check(log.grade and log.lightingSame,tag..': the colour grade lives on the Camera; Lighting is never written')
+ check(log.blurSeen,tag..': a short blur on the fades (desktop)')
+ check(log.switchAt and near(log.switchAt,tl.SceneIn-.05,.07),tag..': the camera cuts to the stage while the screen is black ('..tostring(log.switchAt)..' s)')
+ check(log.backAt and near(log.backAt,tl.Back,.07),tag..': and back to the player at '..tostring(log.backAt)..' s')
+ check(log.nearStage,tag..': the camera only looks at the hidden stage')
+ check(log.maxParts>20 and log.maxParts<=budgets[rank],tag..': '..log.maxParts..' parts (budget '..budgets[rank]..')')
+ check(log.titleAt and near(log.titleAt,tl.Climax,.1),tag..': the title appears on the hit ('..tostring(log.titleAt)..')')
+ check(log.oddsFinalOk,tag..': "'..final..'" after its count-up ('..tostring(log.oddsText)..')')
+ check(log.skipHint and log.skipHint>=tl.SkipFrom-.05,tag..': the skip hint appears from '..tl.SkipFrom..' s')
+ -- the sounds: routed to Effects, on the beat
+ local vs=voices();local routed=#vs>0
+ for _,v in ipairs(vs)do if v.SoundGroup~=effects then routed=false end end
+ check(routed,tag..': '..#vs..' reveal voices, all on the Effects group')
+ local hitSlot=rank==7 and'CosmicBoom_1'or'Impact_1' -- (Cosmic's big hit is its supernova boom)
+ local impact=voices(hitSlot)[1];local hitAt=impact and impact.PlayLog[#impact.PlayLog]and impact.PlayLog[#impact.PlayLog].At
+ check(hitAt and near(hitAt-t0,tl.Climax,.05),tag..': the big hit ('..hitSlot..') plays on the hit ('..tostring(hitAt and hitAt-t0)..' s)')
+ local slam=voices('TitleSlam_1')[1];local slamAt=slam and slam.PlayLog[1]and slam.PlayLog[#slam.PlayLog].At
+ check(slamAt and near(slamAt-t0,tl.Odds,.05),tag..': TitleSlam on the "1 in N" slam')
+ local stacked=false;for _,v in ipairs(vs)do if v.Plays>(v.Stops or 0)+1 then stacked=true end end
+ check(not stacked,tag..': no voice ever plays over itself (a replay stops it first)')
+ restoredAll(tag)
+ check(X.live(Run.RenderStepped)<=renderBefore+1,tag..': no per-frame work left after the end (RenderStepped listeners '..X.live(Run.RenderStepped)..', before '..renderBefore..'; +1 = the aura of the world module)')
+ bag:Destroy()
+end
+-- backdrop budgets, desktop and phone / low quality
+do local S=W.module('RarePullScenes')
+ for rank=6,8 do for _,lite in ipairs({false,true})do
+  local sc=S.Build(rank,{Lite=lite});local cap=({[6]={80,55},[7]={95,55},[8]={190,125}})[rank][lite and 2 or 1]
+  check(sc.Count<=cap and sc.Lights<=4,names[rank]..(lite and' lite'or'')..': backdrop '..sc.Count..' parts (<= '..cap..'), '..sc.Lights..' lights')
+  local cast=false;for _,d in ipairs(sc.Folder:GetDescendants())do if d:IsA('BasePart')and d.CastShadow then cast=true end end
+  check(not cast,names[rank]..': no part casts a shadow');sc:Destroy()
+ end end
+end
+-- 2. skip ----------------------------------------------------------------------------------------------------------------------------------
+reset();E.resetPlays()
+do
+ local run=start(8);local tl=run.TL;local t0=R.clock
+ X.run(1.0)
+ check(M.Skip()==false,'King: no skip before '..tl.SkipFrom..' s')
+ X.run(1.5)
+ local button=X.find(X.pg,'Backdrop')
+ check(button and button:GetAttribute('ButtonHighlight')==false and button:GetAttribute('ButtonSound')==false,'the tap-anywhere skip is silent and unhighlighted')
+ button.Activated:Fire()
+ X.run(.1)
+ local t=run.Clock()
+ check(near(t,tl.Climax,.12),'King: a tap after '..tl.SkipFrom..' s jumps straight to the hit ('..string.format('%.2f',t)..' s)')
+ local impact=voices('Impact_1')[1]
+ check(impact and impact.PlayLog[#impact.PlayLog]and R.clock-impact.PlayLog[#impact.PlayLog].At<.2,'King: the hit\'s Impact plays on the skip')
+ X.run(.6)
+ check(W.actions[M.SkipAction]~=nil,'Space / Enter / A / B skip too (bound while the scene runs)')
+ W.actions[M.SkipAction](M.SkipAction,R.Enum.UserInputState.Begin)
+ X.run(.05)
+ check(near(run.Clock(),tl.FloatEnd,.1),'King: a second skip goes to the way out')
+ X.run(tl.Length-tl.FloatEnd+.3)
+ check(M.Active()==nil,'King: skipped run ends')
+ restoredAll('after skip')
+end
+-- 3. every other exit path ----------------------------------------------------------------------------------------------------------------
+local function midScene(rank,how,tag,expectResult)
+ reset();E.resetPlays()
+ local run=start(rank);local tl=run.TL
+ X.run(tl.SceneIn+.6)
+ check(cam.CameraType==R.Enum.CameraType.Scriptable,tag..': (in the scene)')
+ how(run)
+ X.run(.3)
+ local active=M.Active()
+ if expectResult then
+  check(active and active.Kind=='Result',tag..': the player still sees what they got (a compact result card)')
+  check(cam.CameraType==R.Enum.CameraType.Custom and hudShown()and X.controls.Enabled and stage()==nil,tag..': the world is back at once')
+  X.run(3)
+ else check(active==nil,tag..': it stops at once') end
+ check(M.Active()==nil,tag..': nothing left running')
+ restoredAll(tag)
+end
+midScene(7,function(run)run.Scene.Update=function()error('boom')end end,'error in a frame',true)
+midScene(8,function()X.hum.Died:Fire()end,'death')
+midScene(6,function()X.player.CharacterRemoving:Fire(X.char)end,'character removed')
+midScene(7,function()X.root.CFrame=CF(0,3,140)end,'moved / teleported',true)
+midScene(8,function()X.keeper(V3(10,3,170),{TargetUserId=7,GuardianBehavior='CHASING'})end,'a keeper starts chasing',true)
+midScene(6,function()X.keeper(V3(20,3,100),{GuardianBehavior='GUARDING'})end,'a keeper walks up (20 studs)',true)
+do -- a replaced camera: the old one is not written back over the new one
+ reset();local run=start(7);X.run(run.TL.SceneIn+.5)
+ local old=W.workspace.CurrentCamera;local new=R.new('Camera');new.CameraType=R.Enum.CameraType.Custom;new.FieldOfView=70;new.CFrame=CF(1,2,3);new.Parent=W.workspace
+ W.workspace.CurrentCamera=new;X.run(.2)
+ check(M.Active()==nil or M.Active().Kind=='Result','a replaced camera stops the scene')
+ check(new.CFrame.Position==V3(1,2,3)and new.CameraType==R.Enum.CameraType.Custom,'the new camera is left alone')
+ check(hudShown()and X.controls.Enabled and stage()==nil,'HUD, movement and stage restored after the camera change')
+ X.run(3);W.workspace.CurrentCamera=old;old.CameraType=R.Enum.CameraType.Custom;new:Destroy()
+end
+do -- the script that started it is destroyed
+ reset();local holder=R.new('LocalScript');holder.Name='PackOpeningFeedback';M.Bind(holder)
+ local run=start(8);X.run(run.TL.SceneIn+.4)
+ holder.Destroying:Fire();X.run(.1)
+ check(M.Active()==nil,'script destroyed: the scene stops');restoredAll('script destroyed')
+end
+-- 4. the variants -------------------------------------------------------------------------------------------------------------------------
+do -- ReducedMotion: the Calm scene - still shots (cuts only), no shake, no blur, shorter
+ reset();W.Gui.ReducedMotionEnabled=true
+ local run=start(8);local tl=run.TL;local t0=R.clock
+ check(run.Kind=='Scene'and run.Variant=='Calm','ReducedMotion: the Calm scene')
+ local moved,blur,lastPos,lastT=0,false,nil,nil
+ local cuts={tl.SceneIn,tl.Climax}
+ X.run(tl.Length+.3,1/30,function(now)
+  local t=now-t0
+  if cam:FindFirstChild('RarePullBlur')then blur=true end
+  if cam.CameraType==R.Enum.CameraType.Scriptable then
+   local p=cam.CFrame.Position
+   if lastPos and(p-lastPos).Magnitude>1e-6 then local isCut=false;for _,c in ipairs(cuts)do if math.abs(t-c)<.07 then isCut=true end end;if not isCut then moved+=1 end end
+   lastPos=p
+  end
+ end)
+ check(moved==0,'ReducedMotion: the camera never moves inside a shot (cuts only; '..moved..' moving frames)')
+ check(not blur,'ReducedMotion: no blur')
+ check(tl.Length<L.Timeline(8,'Full').Length-2,'ReducedMotion: shorter ('..tl.Length..' s)')
+ check(X.controls.Enabled and hudShown(),'ReducedMotion: restored');restoredAll('ReducedMotion')
+end
+do -- phone: lighter stage, gentle shake, no blur
+ reset();W.UIS.TouchEnabled=true;W.UIS.KeyboardEnabled=false
+ local run=start(8);local tl=run.TL
+ check(run.Lite and run.Phone,'phone: the light version')
+ local parts,blur=0,false
+ X.run(tl.Length+.3,1/30,function()
+  local st=stage();if st then local n=0;for _,d in ipairs(st:GetDescendants())do if d:IsA('BasePart')then n+=1 end end;parts=math.max(parts,n)end
+  if cam:FindFirstChild('RarePullBlur')then blur=true end
+ end)
+ check(parts>20 and parts<=200,'phone: King stage '..parts..' parts (<= 200 with the pack, the seed and its aura)')
+ check(not blur,'phone: no blur (no stacked post-processing)')
+ restoredAll('phone')
+end
+do -- unsafe: the in-place version (no camera, no stage, HUD and movement untouched)
+ local cases={{'a keeper is near',function()X.keeper(V3(25,3,100),{})end},{'on the track',function()
+   local motion=W.RS:FindFirstChild('RunnerMotion');motion:SetAttribute('TrackBoundaryZ',50);motion:SetAttribute('TrackCenterX',0);motion:SetAttribute('TrackHalfWidth',90)end},
+  {'a menu is open',function()X.pg:SetAttribute('SeedMenu','Bag')end},{'in the air',function()X.state=R.Enum.HumanoidStateType.Freefall end}}
+ for _,case in ipairs(cases)do
+  reset();case[2]()
+  local writes=X.coreWrites;local disables=X.controls.Disables
+  local run=start(7);local tl=run.TL
+  check(run.Kind=='InPlace',case[1]..': the in-place version ('..tostring(run.Why)..')')
+  local scriptable,hudOff,stageSeen,titleSeen,compactOk=false,false,false,false,true
+  X.run(tl.Length+.3,1/30,function()
+   if cam.CameraType==R.Enum.CameraType.Scriptable then scriptable=true end
+   if not hudShown()then hudOff=true end
+   if stage()then stageSeen=true end
+   local gui=X.pg:FindFirstChild('RarePullReveal');local title=gui and X.find(gui,'Title')
+   if title and title.TextTransparency<.5 then titleSeen=true;local _,y,_,h=X.rect(title,1280,720);if(y+h)/720>.5 then compactOk=false end end
+  end)
+  check(not scriptable and not hudOff and not stageSeen,case[1]..': no camera, HUD stays, no hidden stage')
+  check(X.coreWrites==writes and X.controls.Disables==disables,case[1]..': Core GUI and movement untouched')
+  check(titleSeen and compactOk,case[1]..': the compact title shows in the upper half')
+  restoredAll(case[1])
+  X.pg:SetAttribute('SeedMenu',nil);local motion=W.RS:FindFirstChild('RunnerMotion');if motion then motion:SetAttribute('TrackBoundaryZ',nil)end
+ end
+end
+-- 5. the Common..Mythic seed card ---------------------------------------------------------------------------------------------------------
+for rank=1,5 do
+ reset();E.resetPlays()
+ local run,bag=start(rank);local tl=run.TL;local t0=R.clock
+ check(run.Kind=='Ladder'and not run.Quick,names[rank]..': the seed card (not quick)')
+ local before,at,seedSeen,fovMin,final,edge=false,false,false,70,nil,nil
+ X.run(tl.Length+.3,1/30,function(now)
+  local t=now-t0;local gui=X.pg:FindFirstChild('RarePullReveal');local title=gui and X.find(gui,'Title')
+  if title and t<tl.Burst-.03 and title.TextTransparency<.99 then before=true end
+  if title and t>tl.Burst+.15 and t<tl.Out and title.TextTransparency<.2 then at=true end
+  local view=gui and X.find(gui,'Seed');if view and view.Visible and view.ImageTransparency<.5 then seedSeen=true end
+  fovMin=math.min(fovMin,cam.FieldOfView)
+  local odds=gui and X.find(gui,'Odds');if odds and t>tl.Odds+.05 and t<tl.Out then final=odds.Text end
+  local e=gui and X.find(gui,'Edge Top');if e and t>tl.Burst-.06 and t<tl.Burst-.01 then edge=e.BackgroundColor3 end
+ end)
+ check(not before and at,names[rank]..': the title waits for the burst, then shows')
+ check(seedSeen,names[rank]..': the seed itself (its model) is the centre of the card')
+ check(final=='1 in '..({'2','4','16','60','400'})[rank],names[rank]..': "1 in N" ('..tostring(final)..')')
+ check((rank>=4)==(fovMin<69.9),names[rank]..': '..(rank>=4 and'a short camera push'or'no camera push')..' (FieldOfView down to '..string.format('%.1f',fovMin)..')')
+ check(edge and math.abs(edge.R-L.Tiers[rank].Hint.R)<.02 and math.abs(edge.G-L.Tiers[rank].Hint.G)<.02,names[rank]..': the screen edges end the suspense in the tier colour')
+ check(M.Active()==nil and near(cam.FieldOfView,70),names[rank]..': ends and the FieldOfView is back')
+ restoredAll(names[rank]..' card')
+ bag:Destroy()
+end
+do -- quick reveals: packs opened back to back
+ reset()
+ local first,bag1=start(1);X.run(first.TL.Length+.2)
+ local second,bag2=start(2)
+ check(second.Quick and L.IsQuick(bag2),'a pack opened right after the last reveal is a quick reveal (and the world pack knows it)')
+ check(second.TL.Length<L.CardTimeline(2).Length,'quick: shorter ('..string.format('%.2f',second.TL.Length)..' s)')
+ X.run(second.TL.Length+.2);restoredAll('quick')
+ R.advance(5);local third=start(2);check(not third.Quick,'after a pause the full suspense comes back');M.Abort('test')
+ bag1:Destroy();bag2:Destroy()
+end
+-- 6. owner previews and sound slots --------------------------------------------------------------------------------------------------------
+do
+ reset();local holder=R.new('LocalScript');M.Bind(holder)
+ X.player:SetAttribute('RarePullPreview','rarepull:king:1');X.run(.1)
+ local run=M.Active();check(run and run.Rank==8 and run.Info.Preview,'/test rarepull king plays the King reveal with a demo seed')
+ M.Abort('test');X.run(.1)
+ X.player:SetAttribute('RarePullPreview','raresound:Riser:2');X.run(.2)
+ local riser=voices('Riser_1')[1];check(riser and riser.IsPlaying,'/test raresound Riser plays that slot')
+ X.run(7);check(anyPlaying()==nil,'and stops by itself')
+ holder.Destroying:Fire()
+end
+do -- the owner's uploads: on the beat, from their measured lead-in; a pending slot keeps its fallback; an id set later drops straight in
+ reset();E.resetPlays()
+ local run=start(8);local tl=run.TL;local t0=R.clock;X.run(tl.Climax+.2)
+ local v=voices('Impact_1')[1];local log=v and v.PlayLog[#v.PlayLog]
+ check(v and v.SoundId=='rbxassetid://133616032782359'and #Audio.Layers('Impact')==1,'Impact is the owner\'s "cinematic impact hit"')
+ check(log and near(log.At-t0,tl.Climax,.05)and near(log.TimePosition-(log.At-t0-tl.Climax),.106,1e-3)and v.SoundGroup==effects,'it plays on the hit from its measured lead-in (.106 s, plus the frame it joined late), on Effects')
+ local g=voices('GroundImpact_1')[1];local gl=g and g.PlayLog[#g.PlayLog]
+ check(g and g.SoundId=='rbxassetid://130581466623902'and gl and near(gl.At-t0,tl.Climax,.05),'the owner\'s ground impact under it')
+ local r=voices('Riser_1')[1];local rl=r and r.PlayLog[#r.PlayLog]
+ local cueAt,cueUntil;for _,c in ipairs(L.SceneCues(8,tl))do if c.Slot=='Riser'then cueAt,cueUntil=c.At,c.Until end end
+ check(r and r.SoundId=='rbxassetid://126242461105018'and rl and near(rl.TimePosition-(rl.At-t0-cueAt),.128+math.max(0,2.67-(cueUntil-cueAt)),.002),
+  'the owner\'s riser is entered late so its peak lands ON the silence ('..string.format('%.2f',rl and rl.TimePosition or -1)..' s into the file)')
+ check(r and not r.IsPlaying,'and is cut by the silence')
+ M.Abort('test')
+ check(#Audio.Layers('SecretVault')==2,'a slot still waiting for its upload plays its layered fallback')
+ W.RS:FindFirstChild('RarePullSounds'):SetAttribute('SecretVaultId',123456)
+ local layers=Audio.Layers('SecretVault');check(#layers==1 and layers[1].Id=='rbxassetid://123456','an id set by the owner (attribute SecretVaultId) replaces the fallback')
+ E.resetPlays();run=start(6);tl=run.TL;t0=R.clock;X.run(tl.Unlock+.2)
+ local b=voices('SecretVault_1')[1];local bl=b and b.PlayLog[#b.PlayLog]
+ check(b and b.SoundId=='rbxassetid://123456'and bl and near(bl.At-t0,tl.Unlock,.05),'and plays on the same beat')
+ M.Abort('test');W.RS:FindFirstChild('RarePullSounds'):SetAttribute('SecretVaultId',nil)
+ check(#Audio.Layers('SecretVault')==2,'clearing it brings the fallback back')
+ -- Cosmic: the owner's supernova boom is the hit (no Impact), its tail rings under the seed; the bed is a slice that leaves the silence clear
+ reset();E.resetPlays();run=start(7);tl=run.TL;t0=R.clock
+ local padInSilence=false
+ X.run(tl.Climax+1.5,1/30,function(now)local t=now-t0;local pad=voices('CosmicPad_1')[1];if pad and pad.IsPlaying and t>tl.Silence+.02 and t<tl.Climax-.01 then padInSilence=true end end)
+ local boom=voices('CosmicBoom_1')[1];local bl2=boom and boom.PlayLog[#boom.PlayLog];local imp=voices('Impact_1')[1]
+ check(boom and boom.SoundId=='rbxassetid://75435110351652'and bl2 and near(bl2.At-t0,tl.Climax,.05)and boom.IsPlaying,'Cosmic: the owner\'s supernova on the hit, still ringing 1.5 s later')
+ check(not imp or #imp.PlayLog==0,'Cosmic: no Impact on top of it')
+ local pad=voices('CosmicPad_1')[1];check(pad and pad.SoundId=='rbxassetid://120548831466483'and pad.PlaybackRegionsEnabled and not padInSilence,'Cosmic: the music bed is a slice that drops out for the silence')
+ local star=voices('CosmicStar_1')[1];check(star and star.SoundId=='rbxassetid://100732233406279'and #star.PlayLog>=3,'Cosmic: the owner\'s shine as the planets lock into line')
+ M.Abort('test')
+ local sp=W.module('RarePullSounds').Get('Sparkle');check(sp.Region and sp.Region[2]-sp.Region[1]<=1.6,'the long shimmer plays as a ~1.5 s slice (PlaybackRegion)')
+ local spv=voices('Sparkle_1')[1];check(spv and spv.PlaybackRegionsEnabled==true and near(spv.PlaybackRegion.Min,sp.Region[1]),'its voice plays only that slice')
+ -- King: the owner's fanfare as the crown lands (cut by the silence) and again on the hit; the bell as it settles; the choir as a slice
+ reset();E.resetPlays()
+ run=start(8);tl=run.TL;t0=R.clock
+ local fan=nil;local inSilence=false
+ X.run(tl.Climax+.3,1/30,function(now)
+  local t=now-t0;fan=fan or voices('KingFanfare_1')[1]
+  if fan and t>tl.Silence+.03 and t<tl.Climax-.01 and fan.IsPlaying then inSilence=true end
+ end)
+ local plays={};for _,l in ipairs(fan and fan.PlayLog or{})do plays[#plays+1]=l.At-t0 end
+ check(fan and fan.SoundId=='rbxassetid://77199097157197'and #plays==2 and near(plays[1],tl.CrownOn,.05)and near(plays[2],tl.Climax,.05),
+  'King: the owner\'s fanfare as the crown lands on the pack and again on the hit ('..table.concat((function()local o={};for _,p in ipairs(plays)do o[#o+1]=string.format('%.2f',p)end;return o end)(),', ')..')')
+ check(not inSilence,'King: the fanfare drops out for the silence before the hit')
+ local bell=voices('KingBell_1')[1];local bl=bell and bell.PlayLog[#bell.PlayLog]
+ check(bell and bell.SoundId=='rbxassetid://110440649150958'and bl and near(bl.At-t0,tl.CrownOn,.05),'King: the owner\'s church bell as the crown settles')
+ local choir=voices('KingChoir_1')[1]
+ check(choir and choir.SoundId=='rbxassetid://71607900050825'and choir.PlaybackRegionsEnabled and near(choir.PlaybackRegion.Max,6.0)and not choir.Looped,'King: the owner\'s choir plays a 6 s slice of its swell (not all 18 s, not looped)')
+ M.Abort('test')
+end
+do -- Effects 0 mutes the reveal
+ Mixer.Set('Effects',0);check(effects.Volume==0,'Effects 0: the group every reveal voice is on is silent');Mixer.Set('Effects',100)
+end
+do -- the bonus-roll hook: a Secret result's sting is one-shot and on Effects
+ E.resetPlays();check(Audio.Sting(6)==true and Audio.Sting(5)==false,'the bonus roll Secret sting')
+ local g=voices('SecretGlitch_1')[1];check(g and g.IsPlaying and g.SoundGroup==effects,'the sting plays on Effects');Audio.Stop()
+end
+print(('R151 cinematic checks %d, fails %d'):format(checks,fails))
+if fails>0 then error('failures')end

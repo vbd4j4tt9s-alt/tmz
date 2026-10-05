@@ -34,6 +34,8 @@ return {
  {'/test void 1 @username','Void Pack(s) 1–20 (Secret-or-better odds, 1/200 Mech).'},
  {'/test verity 1 @username','Verity Pack(s) 1–20 (Verity seed 1/100, then Secret / Cosmic without the King seeds, 1/200 Mech without the Crowncore Tree). Verity also swaps a Void Pack you hand in for one.'},
  {'/test rarepacks @username','Five TEST packs that reveal Legendary, Mythic, Secret, Cosmic and King. rarepacks mech gives the six Mech designs; rarepacks king just one; rarepacks verity a TEST Verity Pack that reveals the Verity seed; rarepacks roster four TEST packs that reveal Fire Pepper, Moon Melon, Aloe and Sand Fruit.'},
+ {'/test rarepull king @username','R151: play a pull reveal with a demo seed (nothing granted): secret / cosmic / king story scenes, or common..mythic.'},
+ {'/test raresound KingFanfare @username','R151: play one pull sound slot alone (RarePullSounds) to audition an uploaded id.'},
  {'/test seeds snow @username','All seeds of a biome (seeds all = every seed, seeds verity = the Verity seed).'},
  {'/test seed <SeedId> @username','One seed by id (see catalog). Or type: give big diamond apple seed to @username.'},
  {'/test catalog storm','List seed ids, biomes and rarities.'},

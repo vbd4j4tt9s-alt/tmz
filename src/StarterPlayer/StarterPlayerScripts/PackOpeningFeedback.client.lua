@@ -14,6 +14,11 @@ local function frame(name,parent,color,position,size,angle)
  f.BackgroundColor3=color;f.BorderSizePixel=0;f.Rotation=angle or 0;f.Parent=parent;return f
 end
 local sequence=require(RS.RarityRevealScreen).Create(gui);local revealAudio=require(RS.RarityRevealAudio);revealAudio.Preload()
+-- R151: one reveal ladder for every rarity (RarePullCinematic): the seed card for Common..Mythic, the story scenes for Secret / Cosmic / King.
+-- The pack's suspense (wobble, tear, hint colour) is in the world (SeedPackClient); this script keeps the clicks, the shakes and the small pops.
+local Ladder=require(RS:WaitForChild('RarePullRules'))
+local Rare do local ok,m=pcall(require,RS:WaitForChild('RarePullCinematic',10));Rare=ok and m or nil end
+if Rare then pcall(Rare.Bind,script)end
 local white=Color3.fromRGB(245,247,255)
 local panel=frame('Cover',gui,Color3.fromRGB(9,9,18),UDim2.fromScale(.5,.5),UDim2.fromScale(1.06,1.06));panel.Visible=false;panel.ZIndex=1
 local canvas=frame('Effects',gui,white,UDim2.fromScale(.5,.5),UDim2.fromScale(1,1));canvas.BackgroundTransparency=1;canvas.ZIndex=2
@@ -92,7 +97,16 @@ local function beginReveal(bag)
  clearCopy(false)
  local _,rarity=Rules.GetRarity(bag:GetAttribute('RevealSeedId'))
  local at=bag:GetAttribute('RevealAt');if not at then return end
- reveal={At=at,Rank=rarity.Rank,Color=rarity.Color};revealAudio.Begin(rarity.Rank,workspace:GetServerTimeNow()-at)
+ reveal={At=at,Rank=rarity.Rank,Color=rarity.Color}
+ -- R151: the director decides first (a quick reveal when packs are opened back to back), so the world pack's suspense uses the same timing.
+ local started=false
+ if Rare then
+  local tool=player.Character and player.Character:FindFirstChildOfClass('Tool')
+  started=pcall(Rare.Start,{Rank=rarity.Rank,SeedId=bag:GetAttribute('RevealSeedId'),At=at,Bag=bag,Tool=tool and tool:GetAttribute('SeedPackTool')and tool or nil,Mutation=bag:GetAttribute('PackMutation')})
+ end
+ reveal.BurstAt=Ladder.BurstAt(rarity.Rank,Ladder.IsQuick(bag));reveal.Pulses=Ladder.Pulses(rarity.Rank,Ladder.IsQuick(bag));reveal.Pulse=1
+ if rarity.Rank>=6 and started then reveal.Cinematic=true;return end -- the story scene owns the screen, the camera and the sound
+ if not started then revealAudio.Begin(rarity.Rank,workspace:GetServerTimeNow()-at)end
  kick(rarity.Rank>=6 and 2.1 or 1.65)
 end
 local function watchTool(tool)
@@ -133,17 +147,25 @@ Run:BindToRenderStep('ChestChasePackPresentation',Enum.RenderPriority.Camera.Val
    copy:PivotTo(active.PrimaryPart.CFrame*CFrame.new(wave*pulseStrength*envelope*intensity,math.sin(age*55)*pulseStrength*.8*envelope*intensity,pulseStrength*1.2*envelope*intensity)*CFrame.Angles(0,0,wave*.19*envelope*intensity))
   end
  end
- if reveal then
+ if reveal and not reveal.Cinematic then
   local t=workspace:GetServerTimeNow()-reveal.At;local rank=reveal.Rank
-  local sequenceState=sequence:Step(rank,t,reduced());revealAudio.Step(rank,t)
-  if not reveal.Burst and t>=require(RS.RarityRevealSequence).SeedAt(rank)then reveal.Burst=true;revealAudio.Burst(rank,t);kick(rank==8 and 2.6 or rank==7 and 2 or 1.2)end
-  local duration=rank>=6 and 0 or .7
+  local sequenceState=sequence:Step(rank,t,reduced());if not Rare then revealAudio.Step(rank,t)end
+  -- R151: the pack wobbles in the world on each suspense pulse; the camera gives a small kick with it (not with ReducedMotion)
+  while reveal.Pulses[reveal.Pulse]and t>=reveal.Pulses[reveal.Pulse]do reveal.Pulse+=1;if rank>=2 and t-reveal.Pulses[reveal.Pulse-1]<.15 then kick(.35+.12*rank)end end
+  if not reveal.Burst and t>=reveal.BurstAt then
+   reveal.Burst=true
+   -- (RarityRevealAudio drops a cue that reaches it late against SeedAt; the seed now bursts out at the end of the suspense, so lateness
+   -- is measured from there)
+   do local t=t-(reveal.BurstAt-require(RS.RarityRevealSequence).SeedAt(rank));revealAudio.Burst(rank,t)end
+   kick(rank==8 and 2.6 or rank==7 and 2 or 1.2)
+  end
+  local duration=rank>=6 and 0 or math.max(.7,reveal.BurstAt+.6) -- (R151: the small pops follow the burst, which now ends the suspense)
   burst.Visible=rank<6 and t>=0 and t<.23
   if burst.Visible then local a=math.clamp(t/.23,0,1);burst.Size=UDim2.fromScale(.08+.38*a,.08+.38*a);burstStroke.Transparency=a;burstStroke.Color=reveal.Color end
   -- R136 (owner: polish Legendary / Mythic pulls): motes gather during their short charge-up, then the ring bursts
   -- out with a soft colour flash exactly when the seed does.
-  local at=require(RS.RarityRevealSequence).SeedAt(rank)
-  if rank==4 or rank==5 then
+  local at=reveal.BurstAt
+  if(rank==4 or rank==5)and not Rare then -- (R151: the seed card draws Legendary / Mythic now; this is the fallback without it)
    local color=rank==5 and Color3.fromRGB(235,120,255)or Color3.fromRGB(255,213,100)
    local n=rank==5 and 16 or 10
    if t<at then
@@ -192,7 +214,7 @@ Run:BindToRenderStep('ChestChasePackPresentation',Enum.RenderPriority.Camera.Val
       end
      end
     end
-    if rank>=4 then
+    if rank>=6 then -- (R151: was rank>=4, but Legendary / Mythic never reached this branch; with the seed card they do, and must not)
      panel.Visible=rank>=6
      panel.BackgroundColor3=rank==6 and Color3.fromRGB(7,7,10)or rank==7 and Color3.fromRGB(12,8,33)or Color3.fromRGB(40,25,5)
      panel.BackgroundTransparency=fade

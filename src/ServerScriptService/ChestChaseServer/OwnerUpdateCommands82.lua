@@ -23,7 +23,10 @@ local function applySpeed(ctx,p)
  require(script.Parent.MovementGuard).Reset(p)
 end
 local function save(ctx,p)ctx.Data:MarkDirty(p);ctx.Data:QueueGardenSave(p)end
+-- R151: owner previews of the pull reveals and their sound slots (RarePullTestCommands).
+X.Actions.rarepull=true;X.Actions.raresound=true
 function X.Execute(ctx,p,action,a)
+ if action=='rarepull'or action=='raresound'then return require(script.Parent.RarePullTestCommands).Execute(ctx,p,action,a)end
  local map=ctx.Map.MapRoot;local event=ctx.Chase.Event81;local data=ctx.Data
  if action=='void'then action='eclipse'end
  if action=='announce'then return require(script.Parent.PullAnnouncer).Command(ctx,p,a)end -- R151: announce <seed> | announce global <seed> | announce record
