@@ -27,12 +27,16 @@ function S.Rect()
  local geo=k.Geometry(map:GetAttributes(),type(cx)=='number'and cx or nil)
  local last=geo.Segs[#geo.Segs]
  if geo.Rows<1 or not last then return nil end
- return geo.CenterX-geo.HalfWidth,geo.CenterX+geo.HalfWidth,geo.Z0,last.EndZ
+ return geo.CenterX-geo.HalfWidth,geo.CenterX+geo.HalfWidth,geo.Z0,last.EndZ,geo
 end
--- The resting key top at (x, z), or nil where there is no keyboard.
+-- The resting key top at (x, z), or nil where there is no keyboard (or no key: R152, the cells it leaves out).
 function S.TopY(x,z)
- local x0,x1,z0,z1=S.Rect()
- if x0 and x>=x0 and x<=x1 and z>=z0 and z<z1 then return K.KeyTop(0)end
+ local x0,x1,z0,z1,geo=S.Rect()
+ if x0 and x>=x0 and x<=x1 and z>=z0 and z<z1 then
+  -- R152: a cell the keyboard leaves out (a pool, a rock) has no key: the effect stays at the floor
+  if geo and geo.SkipCount>0 and geo.Skip[geo.RowOfZ(z)*64+geo.ColOfX(x)]then return nil end
+  return K.KeyTop(0)
+ end
  return nil
 end
 function S.Lift(x,z,floorY)

@@ -25,6 +25,18 @@
 # heading (along +Z / -Z, or symmetric when it looks across / down), the NEAR zone (114 / 90 / 65 studs each side) is dressed in the same frame and never
 # missing (section 5d: teleports into every biome, sprints to 2,000 studs/s, tiers 3 / 2 / 1 at 60 and 30 fps, every camera way), far rows still
 # waiting show a flat stand-in in the biome's key colour; 4 new mutations.
+# R152 (owner: "keys behind also not rendering and its not loud enough"; far keys were bare caps; "no keyboard tiles" over the Desert oasis; Forest / Jungle presses play their own sound):
+#  5e  keys AND letters from anywhere on every tier, looking along / back / across (hard studs written in the test: keys 990 / 600 / 365 ahead, 320 / 225 / 175 behind; letters
+#      500 / 340 / 230 ahead, 220 / 170 / 140 behind), every key of every letter row has exactly one upright label over it (near strips and the far one-strip-a-row letters);
+#      the per-tier budget (parts in use, SurfaceGuis, letters shown) is printed ("budget tier ..", "reach: ..") and capped; the track ends; the near zone is unchanged.
+#  5f  the click: volume 1.8 (was .8, +7 dB = ~1.6x), roll-off 28 .. 160 (was 16 .. 90), a slight per-click gain, the voice cap; a press in a Forest / Jungle row (and its spacebar)
+#      plays rbxassetid://73942179280083 (volume Config.PressSoundVolume), every other biome the click.
+#  5g  cells left out (water / lava / pools / props on the floor): the shared KeyboardSkip encoding and geometry, the server scan (KeyboardSkip152) on a synthetic map (thresholds,
+#      turned boxes, balls, discs, flush patches, invisible / non-scenery parts, spacebars), the client with cells left out (no key / press / letter, strips trimmed, the floor
+#      kept under them as local copies, no stand-in over them, effects stay at the floor, live attribute changes, a string for another grid ignored).
+#  place scene (keyboard_place.luau, needs the owner's place file: PLACE=...): the REAL start-up passes + the scan on the whole map (prints AREAS per biome and DROPPED), the oasis
+#      checked with the water parts' oriented boxes (no key over them), the real client next to it. "NEWONLY=1 ... mutate" runs only the R152 mutations, "DRY=1 ... mutate"
+#      only checks that every mutation target is still in the sources.
 # The R148 suite (docs/proposals/R147/tests/test_keyboard.luau) tested the retired layered design; its runner now runs this suite.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -51,15 +63,29 @@ bundle() { # $1 = src tree
  python3 "$OUT/mkbundle.py" "$OUT/cl/rs_bundle.luau" KeyboardTrackClient="$1/StarterPlayer/StarterPlayerScripts/KeyboardTrack.client.lua" >/dev/null
 }
 runsuite() { (cd "$OUT/cl" && timeout 600 /opt/luau/luau test_keyboard.luau > keyboard.log 2>&1); }
+# R152: the owner's place (not in the repo; the checks are skipped without it): the REAL start-up passes + KeyboardSkip152 + the real client next to the Desert oasis.
+PLACE=${PLACE:-/root/.claude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl}
+place_scene() { # $1 = src tree
+ [ -f "$PLACE" ] || { echo "(no place file at $PLACE: the whole-map keyboard scene was skipped)";return 0; }
+ mkdir -p "$OUT/pl"
+ cp "$T/roblox.luau" "$INV/world.luau" "$HERE/zfight_world.luau" "$OUT/pl/"
+ python3 "$HERE/zfight_bundle.py" "$1" "$OUT/pl" >/dev/null
+ python3 "$REPO/docs/proposals/R149/tools/rbxl_geom.py" --tree "$PLACE" "$OUT/pl/place_tree.luau" Workspace/ChestChaseMap >/dev/null
+ (echo '--!nocheck';sed -n 11,63p "$HERE/zfight_scene.luau";cat "$HERE/keyboard_place.luau") > "$OUT/pl/run.luau"
+ (cd "$OUT/pl" && timeout 900 /opt/luau/luau run.luau > place.log 2>&1) || { grep -E "FAIL|rror|STEP" "$OUT/pl/place.log" | head -20;return 1; }
+ grep -E "^(AREAS|DROPPED)" "$OUT/pl/place.log" || true;tail -1 "$OUT/pl/place.log"
+}
 if [ "$MODE" != "mutate" ]; then
  bundle "$REPO/src"
  echo "== test_keyboard (R149)"
  runsuite || { tail -40 "$OUT/cl/keyboard.log";exit 1; }
- grep -E "^(parts|sprints|teleports|counts|sprint writes|turn )" "$OUT/cl/keyboard.log" || true;tail -1 "$OUT/cl/keyboard.log"
+ grep -E "^(parts|sprints|teleports|counts|sprint writes|turn |click|budget|reach|press sounds)" "$OUT/cl/keyboard.log" || true;tail -1 "$OUT/cl/keyboard.log"
+ echo "== keyboard on the owner's place (R152: no keys over water / lava / props)"
+ place_scene "$REPO/src"
  exit 0
 fi
 # --- mutation checks: break one thing at a time in a copy of src, the suite must fail ------------------------------------------------
-M=$OUT/mut_src;caught=0;total=0
+M=$OUT/mut_src;caught=0;total=0;PHASE=old
 mutate() { # $1 = name, $2 = file under src, $3 = text to replace (first occurrence), $4 = replacement
  rm -rf "$M";mkdir -p "$M";cp -r "$REPO/src/." "$M/"
  python3 - "$M/$2" "$3" "$4" <<'PY'
@@ -69,6 +95,9 @@ s=open(p,encoding='utf-8').read()
 assert s.count(old)>=1,'mutation target not found: '+old
 open(p,'w',encoding='utf-8').write(s.replace(old,new,1))
 PY
+ if [ -n "$NEWONLY" ]&&[ "$PHASE" = old ];then return 0;fi # NEWONLY=1: only the R152 mutations
+ if [ -n "$ONLY" ]&&[ "$ONLY" != "$1" ];then return 0;fi # ONLY="<name>": just that mutation
+ if [ -n "$DRY" ];then echo "target found: $1";return 0;fi # DRY=1: only check that every mutation target is still in the sources
  bundle "$M";total=$((total+1))
  if runsuite; then echo "MUTATION SURVIVED: $1"; else echo "mutation caught: $1"; caught=$((caught+1)); fi
 }
@@ -83,9 +112,9 @@ mutate "one click budget shared by every presser" $S "  local gate=ownGate
 mutate "keys under a hole can be pressed (the hole floats)" $S "   if holeCell[key]then return end" "   if false then return end"
 mutate "letters turned 180 degrees (the R149 orientation: a quarter turn off on the real Top-face canvas)" $S "  l.Rotation=ROT;l.Font=FONT" "  l.Rotation=180;l.Font=FONT"
 mutate "the bed sits at the floor plane (z-fighting)" $R " BedDepth=1.6," " BedDepth=0,"
-mutate "short range (the far keys stop at 330 studs)" $R "[3]={Back=14,Ahead=122," "[3]={Back=14,Ahead=40,"
+mutate "short range (the far keys stop at 330 studs)" $R "[3]={Near=14,Back=40,Ahead=122," "[3]={Near=14,Back=40,Ahead=40,"
 mutate "Lava keys back to candy strawberry" $R "Shades={{150,36,28},{198,58,26},{236,108,34},{112,30,30}}" "Shades={{255,120,150},{232,72,104},{255,150,170},{196,48,84}}"
-mutate "three alternating click recordings" $S "sound.SoundId='rbxassetid://'..tostring(C.ClickSoundId)" "sound.SoundId='rbxassetid://'..tostring(C.ClickSoundIds[(i-1)%3+1])"
+mutate "three alternating click recordings" $S "sound.Name='KeyClickSound';sound.SoundId=id" "sound.Name='KeyClickSound';sound.SoundId='rbxassetid://'..tostring(C.ClickSoundIds[(i-1)%3+1])"
 # R149 performance patch (review part 1)
 mutate "the camera clamp runs before the camera module (one frame late)" $S "Enum.RenderPriority.Camera.Value+1" "Enum.RenderPriority.Camera.Value-1"
 mutate "the camera clamp never lifts the camera" $S "  cam.CFrame=cf+V3(0,camMinY-y,0)" "  local _=cf"
@@ -94,7 +123,7 @@ mutate "the camera clamp fights first person" $S "  if focus and(focus.Position-
 mutate "a camera turn is a burst again (4x the budget in two frames)" $S "  local burst=false
 " "  local burst=true
 "
-mutate "RowsPerFrame back to 8" $R "KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4}" "KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=8}"
+mutate "RowsPerFrame back to 8" $R "Font='FredokaOne',RowsPerFrame=4," "Font='FredokaOne',RowsPerFrame=8,"
 mutate "letter labels rewritten on every bind" $S "     if st.PX[i]~=px or st.PY[i]~=py then" "     if true then"
 mutate "a parked strip keeps its gui on" $S "    if st.On then st.On=false;st.Gui.Enabled=false end
    end
@@ -139,8 +168,42 @@ mutate "the strips are coplanar with the key tops (no margin)" $R "Margin=.04,Ma
 mutate "the canvas of a Top face is width x depth (R149)" $R "function K.TopCanvas(sizeX,sizeZ,pps)return sizeZ*pps,sizeX*pps end" "function K.TopCanvas(sizeX,sizeZ,pps)return sizeX*pps,sizeZ*pps end"
 # R151 performance patch: the near zone is never missing
 mutate "no across way (a camera looking across / down keeps its long side behind it: the owner's bare floor)" $R "if math.abs(h)<=C.FacingAcross then return 0 end" ""
-mutate "the R149 near zone on tier 1 (Back 5 = 41 studs)" $R "[1]={Back=8,Ahead=45,Hyst=1," "[1]={Back=5,Ahead=48,Hyst=1,"
+mutate "the R149 near zone on tier 1 (Back 5 = 41 studs)" $R "[1]={Near=8,Back=22,Ahead=45,Hyst=1," "[1]={Near=5,Back=5,Ahead=48,Hyst=1,"
 mutate "no stand-ins (bare bed while the far rows wait)" $S "  if Fill.Update(wa,wb)>0 then pending=true end" ""
 mutate "the stand-ins reach the key-top plane (z-fighting)" $R "FillerDrop=.08," "FillerDrop=0,"
+PHASE=new
+# R152: keys behind and far letters, the louder click, the Forest / Jungle sound, the cells left out (water / lava / pools / props)
+K2=ReplicatedStorage/KeyboardSkip152.lua;KS=ReplicatedStorage/KeyboardSurface149.lua
+mutate "keys behind the camera's way back to 114 studs (tier 3 Back 14)" $R "[3]={Near=14,Back=40," "[3]={Near=14,Back=14,"
+mutate "the near zone is as big as Back (a teleport dresses 81 rows at once)" $R "return t.Near or t.Back end" "return t.Back end"
+mutate "letters stop where the near letters stop (no far letters)" $R "FarBehind=28,FarAhead=64,FarRows=4," "FarBehind=2,FarAhead=19,FarRows=4,"
+mutate "the far strips' guis stop rendering at 300 studs" $R "FarPixelsPerStud=4,FarMaxDistance=800}" "FarPixelsPerStud=4,FarMaxDistance=300}"
+mutate "far strips are never bound" $S "if fn<farN then Far.Bind(r);fn+=1 else pending=true end" "local _=0"
+mutate "far letters turned 180 degrees" $S "l.TextSize=FTEXT;l.Size=UDim2.fromOffset(KW*FPPS,KW*FPPS)" "l.TextSize=FTEXT;l.Rotation=180;l.Size=UDim2.fromOffset(KW*FPPS,KW*FPPS)"
+mutate "the click volume back to .8" $R "ClickVolume=1.8," "ClickVolume=.8,"
+mutate "the click roll-off / range back to 90" $R "ClickRollOffMax=160,ClickRange=160," "ClickRollOffMax=90,ClickRange=90,"
+mutate "a click gain above 1 (the peak rises: clipping)" $R "ClickGains={1,.94,.97,.91}" "ClickGains={1,1.3,1.6,.91}"
+mutate "no per-click gain" $S "v.Sound.Volume=K.PressVolume(stage)*K.ClickGain(gate.N)" "v.Sound.Volume=K.PressVolume(stage)"
+mutate "the Jungle plays the click" $R "PressSound={Forest='rbxassetid://73942179280083',Jungle='rbxassetid://73942179280083'}" "PressSound={Forest='rbxassetid://73942179280083'}"
+mutate "the biome sound starts at another volume than the click" $R "PressSoundVolume={Forest=1.8,Jungle=1.8}" "PressSoundVolume={Forest=.5,Jungle=.5}"
+mutate "every press plays the click (the biome is ignored)" $S "local pool=pools[K.PressSoundId(stage)]or pools[DEFAULT]" "local pool=pools[DEFAULT]"
+mutate "a spacebar plays the click" $S "click(kind,who,px,pz,bar and bar.Stage)" "click(kind,who,px,pz,nil)"
+mutate "keys are dressed on left-out cells" $S "for col=1,COLS do if not skip[row*64+col]then" "for col=1,COLS do if true then"
+mutate "near letter strips are not trimmed to their keys" $S "local a0,a1=keyedSpan(row,c0,c1)" "local a0,a1=c0,c1"
+mutate "far letter strips are not trimmed to their keys" $S "local a0,a1=keyedSpan(row,1,COLS)" "local a0,a1=1,COLS"
+mutate "the real floor is not kept under left-out cells" $S "local e=rec.Ext
+  for _,r in ipairs(skipRects)do" "local e=rec.Ext
+  for _,r in ipairs({})do"
+mutate "a stand-in covers rows with left-out cells" $S "if not rowBound[r]and not barOfRow[r]and not geo.RowSkip[r]then" "if not rowBound[r]and not barOfRow[r]then"
+mutate "a changed KeyboardSkip attribute is never applied" $S "if skipDirty then refreshSkip()end" "local _=0"
+mutate "the skip string is read for any grid" $R "if v=='1'and tonumber(c0)==cols and tonumber(r0)==rows and math.abs(" "if v=='1'and math.abs("
+mutate "the scan counts a prop from 0% (any touch)" $K2 "Flat=.10,Prop=.25,Grid=5," "Flat=.10,Prop=.00,Grid=5,"
+mutate "a ball is a box in the scan" $K2 "if shape:find('Ball',1,true)then" "if false then"
+mutate "the scan looks under Lobby too" $K2 "S.Roots={'Obby/Biomes'," "S.Roots={'Lobby','Obby/Biomes',"
+mutate "the scan counts invisible parts" $K2 "d.Transparency<S.Config.InvisibleAt and" "true and"
+mutate "the scan counts flush patches and parts above the keys as props" $K2 "local prop=not item.Flat and fp.Y0<=K.KeyTop(0)and fp.Y1>=F+C.PropMinTop" "local prop=not item.Flat"
+mutate "the scan uses the axis-aligned box of a turned part" $K2 "local h=hull(pts);if #h<3 then return nil end" "local h;do local a,b,c,e=math.huge,-math.huge,math.huge,-math.huge;for _,p in ipairs(pts)do a=math.min(a,p[1]);b=math.max(b,p[1]);c=math.min(c,p[2]);e=math.max(e,p[2])end;h={{a,c},{b,c},{b,e},{a,e}}end;if #h<3 then return nil end"
+mutate "effects lift onto keys over a left-out cell" $KS "if geo and geo.SkipCount>0 and geo.Skip[geo.RowOfZ(z)*64+geo.ColOfX(x)]then return nil end" "if false then return nil end"
+[ -z "$DRY" ] || exit 0
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]
