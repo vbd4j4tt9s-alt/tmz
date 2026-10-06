@@ -251,7 +251,7 @@ local function executeFor(ctx,player,text,requester)
  elseif action=='sellall'then
   local items=table.clone(data.Gardens[player].Harvests);local count,total=0,0
   for _,item in ipairs(items)do local ok,value=data:SellHarvest(player,item.Id);if ok then count+=1;total+=value end end
-  changed(ctx,player,false);return true,'Sold '..count..' crops for '..total..' coins. Hover over the floating cash to collect.'
+  changed(ctx,player,false);return true,'Sold '..count..' crops for '..total..' coins. The cash flies to your balance.'
  elseif action=='cash'then
   local value=number(a[2],nil,0,require(RS.EconomyBalance90).MaxCash,true)
   if not exact(2)or not value or(a[1]~='set'and a[1]~='add')then return false,'Use /test cash set <amount> or /test cash add <amount>.'end
