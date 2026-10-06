@@ -5,6 +5,8 @@
 -- "FAIL <name>: why" and "BUDGET ..." lines; errors at the end if anything failed.
 -- R152 (owner: no fountain, fewer trees, no base entrances / signposts / banners / murals / corner towers, a chess-rook battlement on every wall,
 -- the track gate as two rook towers): section 16 checks every removal and the battlement and the rook gate.
+-- R153 (owner: "remove the ground design for the side gardens"): section 17 checks that the garden spurs are plain cobblestone: no welcome mats,
+-- no base-coloured curbs or strips on the ground, and the cream street curbs run flush to each spur with no gap.
 local Z=require('./zfight_world');local W=Z.W;local R=Z.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local RS=W.RS
 local Run=W.service('RunService');Run.IsServer=function()return true end;Run.IsClient=function()return false end;Run.IsStudio=function()return false end
@@ -532,6 +534,66 @@ do
   local nkeys=0;for _,k in ipairs(kids)do if k:GetAttribute('R151Stage')then nkeys+=1 end end
   check('gate: the seven biome speed keys stay on the gatehouse',nkeys==7)
  end
+end
+
+-- 17. R153: the garden spurs are plain cobblestone (no welcome mats, no base-coloured ground strips); the street curbs meet them flush ------------
+-- (owner: "remove the ground design for the side gardens")
+do
+ local Kit=W.module('HubDecorKit151')
+ -- six saturated base colours (purple first; the game's BaseService sets them, the mock has none), then a fresh Apply
+ local palette={{150,60,200},{230,60,60},{60,140,230},{240,170,40},{40,190,110},{230,90,170}}
+ for i,r in pairs(records)do r.Model:SetAttribute('BaseColor',R.Color3.fromRGB(table.unpack(palette[i])))end
+ dec=server('HubDecor151').Apply(map)
+ local pp=partsUnder(dec.Paths)
+ local function rgb(c)return{c.R*255,c.G*255,c.B*255}end
+ local function same(c,t)return math.abs(c[1]-t[1])<1.5 and math.abs(c[2]-t[2])<1.5 and math.abs(c[3]-t[3])<1.5 end
+ local mats={};for _,p in ipairs(partsUnder(dec))do if p.Name:find('[Mm]at$')or p.Name:find('[Mm]at ')or p.Name:find('[Ww]elcome')then mats[#mats+1]=path(p)end end
+ check('removed: no welcome mat (nor any "mat" part) in the server folder, none in the kit',#mats==0 and Kit.Mats==nil and Kit.WelcomeMat==nil,first(mats))
+ -- no flat thing on the paving (top under 4.5) in a base's colour, whatever it is called
+ local cols={};for _,r in pairs(records)do local c=r.Model:GetAttribute('BaseColor');if R.typeof(c)=='Color3'then cols[#cols+1]=rgb(c)end end
+ local tinted={}
+ for _,p in ipairs(pp)do local _,b=aabb(p);if b[2]<4.5 then for k,c in ipairs(cols)do if same(rgb(p._props.Color),c)then tinted[#tinted+1]=path(p)end end end end
+ check('removed: no ground part in a base colour ('..#cols..' base colours): no coloured curb, strip or disc at any garden',#cols==6 and #tinted==0,first(tinted))
+ -- every curb is neutral cream, bar the 4 themed garden-walk edgings (gold east, brick west: on the garden walks, not at a spur)
+ local odd,edging={},0
+ for _,p in ipairs(pp)do if p.Name=='Curb'then
+  local q=p._props.CFrame.Position
+  if same(rgb(p._props.Color),Kit.P.Cream)then elseif math.abs(math.abs(q.Z+269)-7.6)<.01 then edging+=1 else odd[#odd+1]=path(p)end
+ end end
+ check('curbs: all neutral cream, apart from the 4 garden-walk edgings ('..edging..')',#odd==0 and edging==4,first(odd))
+ -- the six spurs: plain street-coloured cobblestone, with nothing laid on them or along their sides
+ local plain,why=true,nil;local spurs={}
+ for i=1,6 do local sp=dec.Paths:FindFirstChild('Base spur '..i);spurs[i]=sp
+  if not sp or sp._props.Material.Name~='Cobblestone'or not same(rgb(sp._props.Color),Kit.P.Street)then plain=false;why='Base spur '..i end end
+ check('spurs: six base spurs, each plain street-coloured cobblestone',plain,why)
+ local clutter={}
+ for i=1,6 do local sp=spurs[i];if sp then local a,b=aabb(sp)
+  for _,p in ipairs(pp)do if p~=sp then local c,d=aabb(p)
+   if d[1]>a[1]-1 and c[1]<b[1]+1 and d[3]>a[3]-1 and c[3]<b[3]+1 then -- within a stud of the spur
+    local q=p._props.CFrame.Position
+    local street=p.Name:find(' street$')~=nil or p.Name=='Garden walk'or p.Name=='Corner circle' -- what the spur joins
+    local endCurb=p.Name=='Curb'and same(rgb(p._props.Color),Kit.P.Cream)and(math.abs(math.abs(q.X)-127.3)<.01 or math.abs(q.Z+418.3)<.01) -- the street's cream curb butting against its end
+    if not street and not endCurb then clutter[#clutter+1]='spur '..i..': '..path(p)end
+   end
+  end end
+ end end
+ check('spurs: nothing laid on or beside a spur (no mat, no coloured curb; only the street\'s cream curb butts against its ends)',#clutter==0,first(clutter))
+ -- no gap: along the side street's outer edge and the south street's south edge the cream curbs, the spurs and the garden walk leave no bare lawn
+ local function covered(axis,lo,hi,fix,fixV) -- is [lo, hi] along axis covered by curbs on the line fix = fixV, spurs and garden walks?
+  local iv={}
+  for _,p in ipairs(pp)do local a,b=aabb(p)
+   if p.Name:find('^Base spur')or p.Name=='Garden walk'or(p.Name=='Curb'and math.abs((a[fix]+b[fix])/2-fixV)<.4)then iv[#iv+1]={a[axis],b[axis]}end end
+  table.sort(iv,function(x,y)return x[1]<y[1]end)
+  local at=lo
+  for _,v in ipairs(iv)do if v[1]<=at+1e-3 then at=math.max(at,v[2])elseif v[1]<hi then break end end
+  return at>=hi-1e-3,at
+ end
+ local gaps={}
+ for _,sx in ipairs({-1,1})do
+  local ok,at=covered(3,-399,-195.534,1,sx*127.3);if not ok then gaps[#gaps+1]='side street '..sx..' outer edge: bare from z='..at end
+  local ok2,at2=covered(1,sx>0 and 6.6 or-106,sx>0 and 106 or-6.6,3,-418.3);if not ok2 then gaps[#gaps+1]='south street edge '..sx..': bare from x='..at2 end
+ end
+ check('no gaps: the street curbs meet every spur flush (no bare lawn between a curb end and a spur)',#gaps==0,first(gaps))
 end
 
 print(string.format('R151 base area: %d passed, %d failed',passed,failed))
