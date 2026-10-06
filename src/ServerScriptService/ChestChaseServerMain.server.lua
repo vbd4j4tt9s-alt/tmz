@@ -137,6 +137,11 @@ local function runServer()
 	baseService:SetBusyChecker(function(player)
 		return chaseService:IsPlayerBusy(player)
 	end)
+	-- R153: opening a pack (its reveal: IsPlayerBusy counts ChestService:IsOpening) no longer ends treadmill training; a chase (a run, or one that is starting) still does.
+	baseService:SetTrainingBusyChecker(function(player)
+		if type(chaseService.Runs) == "table" and type(chaseService.Starting) == "table" then return chaseService.Runs[player] ~= nil or chaseService.Starting[player] == true end
+		return chaseService:IsPlayerBusy(player)
+	end)
 
 	startupPhase = "starting ChestService"
 	chestService:Start()
