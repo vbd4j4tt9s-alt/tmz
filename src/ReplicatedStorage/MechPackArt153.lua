@@ -7,7 +7,8 @@
 --    EditableMesh) the body is plain parts with exactly the same faces (SachetSpecs), so the design sits the same either way. Never shaped
 --    (PackShapes151.Applies excludes the Mech): one look in every context.
 --  * Every design part sits ON a flat face or on the part under it, and every face stacked over another stands A.Layer (.046) off it: over .02 even on a .5x
---    pack (the R152 z-fighting rule: tools/zfight.py's near band).
+--    pack (the R152 z-fighting rule: tools/zfight.py's near band). The seal and the 8 tear strips stand on the middle of the body's crimps (the flat pouch is
+--    centred .047 in front of the root, where the plain pack's strips are not), and the design follows the body where it really is (Build).
 --  * Held: a soft cyan hum light and a few sparks from the antenna (one PointLight, one ParticleEmitter, in Attachments on the pack: they follow it with no
 --    per-frame writes). Both start off; SeedPackRender switches them on for a pack it details (SpecialPackArt89.CaptureMotion:Live). No orbiting scanner.
 local A={Revision=153,TemplateKey='Forest_01',Layer=.046}
@@ -95,16 +96,17 @@ function A.Specs()
  end
  -- the hazard-stripe seal: one black diagonal stripe through each tear strip (it follows its strip open: MechPackFx153) and each eighth of the bottom seal,
  -- standing a layer proud of both their faces (the strips and the seal themselves are painted yellow by Build)
+ local zc=A.Pouch.Center.Z -- (Build seats the seal and the strips on this plane, the middle of the crimps, and each stripe on its own strip as built)
  for i=1,8 do
   local x=-.95+(i-.5)*1.9/8
-  add('HazardStripe'..i,V(.17,.07,.035+2*G),CF(x,1.11,0)*ANG(0,0,PI/4),C.Stripe).Tear=i
-  add('HazardSeal'..i,V(.155,.07,.035+2*G),CF(x,-1.12,0)*ANG(0,0,PI/4),C.Stripe)
+  add('HazardStripe'..i,V(.17,.07,.035+2*G),CF(x,1.11,zc)*ANG(0,0,PI/4),C.Stripe).Tear=i
+  add('HazardSeal'..i,V(.155,.07,.035+2*G),CF(x,-1.12,zc)*ANG(0,0,PI/4),C.Stripe).Seal=x
  end
- -- the antenna on the top crimp (centred on the pouch's thickness: in front of the strips, which sit on z = 0) and its LED
- local x,z=A.Antenna.X,A.Pouch.Center.Z
- add('AntennaBase',V(.10,.06,.09),CF(x,.985,z),C.Mast,M.Metal)
- add('AntennaMast',V(.33,.022,.022),CF(x,1.18,z)*ANG(0,0,PI/2),C.Steel,M.Metal,Enum.PartType.Cylinder)
- add('AntennaLED',V(.05,.05,.05),CF(x,1.365,z),C.Led,M.Neon,Enum.PartType.Ball).Blink=.9
+ -- the antenna: its base on the top crimp, the mast and the LED just in front of the strips (clear of them and of their stripes)
+ local x=A.Antenna.X
+ add('AntennaBase',V(.10,.06,.09),CF(x,.985,zc),C.Mast,M.Metal)
+ add('AntennaMast',V(.33,.022,.022),CF(x,1.18,zc-.03)*ANG(0,0,PI/2),C.Steel,M.Metal,Enum.PartType.Cylinder)
+ add('AntennaLED',V(.05,.05,.05),CF(x,1.365,zc-.03),C.Led,M.Neon,Enum.PartType.Ball).Blink=.9
  specs=out;return out
 end
 -- The plain-parts body (no flat pouch yet): the same width, height, faces, rounded long edges, tapered ends and crimps as the generated pouch.
@@ -137,7 +139,9 @@ function A.PouchTemplate()
   local m=Pouch.Template();if not(m and m:GetAttribute('Flat')==true)then return nil end
   local mesh;for _,p in ipairs(m:GetChildren())do if p:IsA('MeshPart')then if mesh then return nil end;mesh=p end end
   local f=mesh and mesh:GetAttribute('PackLocalFrame');local P=A.Pouch;local tol=P.Tolerance
-  if typeof(f)~='CFrame'or math.abs(mesh.Size.X-P.Width)>tol or math.abs(mesh.Size.Y-P.Height)>tol or math.abs(mesh.Size.Z-P.Depth)>tol or(f.Position-P.Center).Magnitude>tol then return nil end
+  -- (its depth position may differ: the design follows the pouch where it is, Build)
+  if typeof(f)~='CFrame'or math.abs(mesh.Size.X-P.Width)>tol or math.abs(mesh.Size.Y-P.Height)>tol or math.abs(mesh.Size.Z-P.Depth)>tol
+   or math.abs(f.Position.X-P.Center.X)>tol or math.abs(f.Position.Y-P.Center.Y)>tol then return nil end
   return m
  end)
  return ok and t or nil
@@ -159,27 +163,39 @@ function A.Build(bag)
   end)
   if not ok then local f=bag:FindFirstChild('PackGeometry');if f then f:Destroy()end;folder,pouch=nil,nil;bag:SetAttribute('CompactPackReady',nil);bag:SetAttribute('CompactPackPartCount',nil)end
  end
+ local shift=CF() -- (the body's real depth position against the one the design was drawn on: the design and the seal follow it)
  if pouch then
   pouch.Color=C.Body;pouch.Material=Enum.Material.Metal;pouch.MaterialVariant='';pouch.TextureID='';pouch.Reflectance=0;pouch.Transparency=0
   for _,v in ipairs(pouch:GetChildren())do if not v:IsA('WeldConstraint')then v:Destroy()end end
+  local f=pouch:GetAttribute('PackLocalFrame');if typeof(f)=='CFrame'then shift=CF(0,0,f.Position.Z/scale-A.Pouch.Center.Z)end
   count+=1
  else folder=Instance.new('Folder');folder.Name='PackGeometry' end
+ local mid=(A.Pouch.Center.Z+shift.Position.Z)*scale
+ -- the seal and the 8 tear strips stand on the middle of the body's crimps (flush with its knife edges), whatever depth they were made at
+ local strips={}
+ for _,p in ipairs(bag:GetChildren())do if p:IsA('BasePart')and(p.Name=='BottomSeal'or p:GetAttribute('TearIndex'))then
+  local f=root.CFrame:ToObjectSpace(p.CFrame);p.CFrame=root.CFrame*CF(f.Position.X,f.Position.Y,mid)*f.Rotation
+  strips[p.Name=='BottomSeal'and'Seal'or p:GetAttribute('TearIndex')]=p
+ end end
  local placed={}
  local function place(s)
   local p=Instance.new(s.Class or'Part');p.Name=s.Name;if s.Shape then p.Shape=s.Shape end;p.Size=s.Size*scale
-  local frame=CF(s.Frame.Position*scale)*s.Frame.Rotation;p.CFrame=root.CFrame*frame;p:SetAttribute('PackLocalFrame',frame)
+  local at=shift*s.Frame -- (identity on the plain-parts body: it is drawn where the design was)
+  if s.Tear and strips[s.Tear]then at=CF(root.CFrame:ToObjectSpace(strips[s.Tear].CFrame).Position/scale)*s.Frame.Rotation -- (on its strip, as built)
+  elseif s.Seal and strips.Seal then at=CF(root.CFrame:ToObjectSpace(strips.Seal.CFrame).Position/scale+V(s.Seal,0,0))*s.Frame.Rotation end
+  local frame=CF(at.Position*scale)*at.Rotation;p.CFrame=root.CFrame*frame;p:SetAttribute('PackLocalFrame',frame)
   p.Color=s.Color;p.Material=s.Material;p.Reflectance=0;p.Transparency=0
   p.Anchored=root.Anchored;p.Massless=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false
   p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth
   if s.Motion then
    p:SetAttribute('MechMotion',s.Motion);p:SetAttribute('MechMotionRate',s.Rate);p:SetAttribute('MechMotionAmplitude',0);p:SetAttribute('MechMotionPhase',s.Phase or 0)
-   p:SetAttribute('MechMotionPivot',CF(s.Pivot.Position*scale)*s.Pivot.Rotation)
+   local pv=shift*s.Pivot;p:SetAttribute('MechMotionPivot',CF(pv.Position*scale)*pv.Rotation)
   end
   if s.Pulse then p:SetAttribute('MechPulse',s.Pulse);p:SetAttribute('MechMotionPhase',s.Phase or 0)end
   if s.Glow then p:SetAttribute('MechGlow',true)end
   if s.Blink then p:SetAttribute('MechBlink',s.Blink)end
   if s.Tear then p:SetAttribute('MechTear',s.Tear)end
-  if s.Bolt then p:SetAttribute('MechBolt',s.Bolt);p:SetAttribute('MechFace',s.Face);p:SetAttribute('MechBoltPivot',CF(s.BoltPivot.Position*scale)*s.BoltPivot.Rotation)end
+  if s.Bolt then local bp=shift*s.BoltPivot;p:SetAttribute('MechBolt',s.Bolt);p:SetAttribute('MechFace',s.Face);p:SetAttribute('MechBoltPivot',CF(bp.Position*scale)*bp.Rotation)end
   if not p.Anchored then
    if s.Motion then local joint=Instance.new('Motor6D');joint.Name='MechServo';joint.Part0=root;joint.Part1=p;joint.C0=frame;joint.C1=CF();joint.Parent=p
    else local w=Instance.new('WeldConstraint');w.Part0=root;w.Part1=p;w.Parent=p end
@@ -190,9 +206,9 @@ function A.Build(bag)
  if not pouch then for _,s in ipairs(A.SachetSpecs())do place(s)end end
  for _,s in ipairs(A.Specs())do place(s)end
  -- the seal and the 8 tear strips of the ordinary pack: hazard yellow under their black stripes
- for _,p in ipairs(bag:GetChildren())do if p:IsA('BasePart')and(p.Name=='BottomSeal'or p:GetAttribute('TearIndex'))then p.Color=C.Hazard;p.Material=Enum.Material.SmoothPlastic;p.Reflectance=0 end end
+ for _,p in pairs(strips)do p.Color=C.Hazard;p.Material=Enum.Material.SmoothPlastic;p.Reflectance=0 end
  -- held fx: the hum at the pouch's centre, the sparks at the LED (off until SeedPackRender details the pack)
- local hum=Instance.new('Attachment');hum.Name='MechHum';hum.CFrame=CF(A.Pouch.Center*scale);hum.Parent=root
+ local hum=Instance.new('Attachment');hum.Name='MechHum';hum.CFrame=CF((A.Pouch.Center+shift.Position)*scale);hum.Parent=root
  local light=Instance.new('PointLight');light.Name='MechHumLight';light.Color=RGB(70,225,255);light.Brightness=.8;light.Range=math.min(60,5*scale);light.Shadows=false;light.Enabled=false
  light:SetAttribute('MechHum',.8);light:SetAttribute('MechHeldFx',true);light.Parent=hum
  local tip=Instance.new('Attachment');tip.Name='MechSparks';tip.Parent=placed.AntennaLED
@@ -203,7 +219,7 @@ function A.Build(bag)
  e:SetAttribute('MechHeldFx',true);e.Parent=tip
  if not pouch then folder.Parent=bag end
  bag:SetAttribute('ApprovedShapeKey89',A.TemplateKey);bag:SetAttribute('SpecialPackDesign89',true);bag:SetAttribute('CompactPackPartCount',count);bag:SetAttribute('CompactPackReady',true)
- bag:SetAttribute('PaperColor',C.Body);bag:SetAttribute('PreserveTextStyle',true);bag:SetAttribute('MechDesignRevision',A.Revision);bag:SetAttribute('MechPouch',pouch~=nil)
+ bag:SetAttribute('PaperColor',C.Body);bag:SetAttribute('PreserveTextStyle',true);bag:SetAttribute('MechDesignRevision',A.Revision);bag:SetAttribute('MechPouch',pouch~=nil);bag:SetAttribute('MechBodyZ',shift.Position.Z)
  -- (no orbiting scanner any more: MechFX false; the weather trait's own effect, if any, as before)
  require(script.Parent.ItemEffectAnchor).Set(bag,bag:GetAttribute('Weather'),false,scale*1.05,scale*2.2)
  return true

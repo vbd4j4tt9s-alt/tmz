@@ -105,7 +105,7 @@ local function pulse()
  pulseAt=os.clock();pulseStrength=.13+count*.025
  -- R150: every click the server rules accept (one per Rules.ClickInterval) sounds: the cue's own 0.09 s gap used to swallow 2 of 5 at full
  -- tapping speed while the bag still shook. The gap here is a little under the click interval, so rapid input never stacks beyond the accepted rate.
- cloneBag(active);kick(.85+count*.16);local m=mech();Audio.Play(m and copy and m.Click(copy,count,os.clock())and'MechClick'or'Bubble04',Rules.ClickInterval*.8)
+ cloneBag(active);kick(.85+count*.16);local m=mech();if m and copy and m.Click(copy,count,os.clock())then Audio.Play('MechClick',Rules.ClickInterval*.8)else Audio.Play('Bubble04',Rules.ClickInterval*.8)end
 end
 local function beginReveal(bag)
  if reveal or not bag:GetAttribute('RevealSeedId')then return end

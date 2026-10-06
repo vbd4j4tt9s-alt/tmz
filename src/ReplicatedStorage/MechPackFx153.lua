@@ -138,11 +138,11 @@ function F.Opening(copy,record)
  for _,side in ipairs({-1,1})do
   local p=Instance.new('Part');p.Name='MechScan';p.Size=F.Scan.Size*s;p.Material=Enum.Material.Neon;p.Color=Ladder.Neutral;p.Transparency=1
   p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=false;p.Parent=parent
-  self.Scans[#self.Scans+1]={Part=p,Face=Art.FaceFrame(side)}
+  self.Scans[#self.Scans+1]={Part=p,Face=CF(0,0,copy:GetAttribute('MechBodyZ')or 0)*Art.FaceFrame(side)}
  end
  local root=copy.PrimaryPart
  if not self.Calm then
-  local a=Instance.new('Attachment');a.Name='MechSteam';a.CFrame=CF(0,(copy:GetAttribute('TearLipY')or 1.11)*s,Art.Pouch.Center.Z*s);a.Parent=root
+  local a=Instance.new('Attachment');a.Name='MechSteam';a.CFrame=CF(0,(copy:GetAttribute('TearLipY')or 1.11)*s,(Art.Pouch.Center.Z+(copy:GetAttribute('MechBodyZ')or 0))*s);a.Parent=root
   local e=Instance.new('ParticleEmitter');e.Name='MechSteamPuff';e.Texture='rbxasset://textures/particles/smoke_main.dds';e.Rate=0;e.Enabled=true
   e.Color=ColorSequence.new(Color3.fromRGB(236,242,248));e.LightEmission=.15;e.LightInfluence=.6;e.Lifetime=NumberRange.new(.55,.85);e.Drag=3
   e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,.12*s),NumberSequenceKeypoint.new(1,.55*s)})

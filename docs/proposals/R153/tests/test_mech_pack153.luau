@@ -158,6 +158,71 @@ do
  check(near(fr.Position.Z,P.Center.Z-P.Depth/2)and near(bk.Position.Z,P.Center.Z+P.Depth/2)and fr.LookVector.Z>.99 and bk.LookVector.Z<-.99,'the face frames sit on the pouch\'s two flat faces, +Z out of each')
 end
 
+-- 4b. flush: every part of the design sits ON the body ----------------------------------------------------------------------------------------
+-- In each face's frame (+Z out): a part's back must lie on the flat face (its footprint inside the flat part) or on / in a part that starts under it (their
+-- footprints overlapping) - touching or sunk in (a rivet), never a gap. The turbine is checked at 24 angles of its spin, the bolts at rest. The seal and the strips
+-- stand on the middle of the body's crimps (their edges on the crimps' edges), each stripe through its own strip, the antenna's base in the top crimp. Held, on
+-- either body and at every size the parts are where they are on the ground (sections 2 / 3 / 6): this holds in every context.
+do
+ local Pz=Art.Pouch.Center.Z;local flatU,flatV=Art.Flat.U,Art.Flat.V
+ local function comps(cf)local t={cf:GetComponents()};return t end
+ local function ext(shape,size,cf) -- half-extents along the frame's u / v / w axes
+  local c=comps(cf);local M={{c[4],c[5],c[6]},{c[7],c[8],c[9]},{c[10],c[11],c[12]}};local out={}
+  for k=1,3 do
+   if shape==R.Enum.PartType.Ball then out[k]=size.X/2
+   elseif shape==R.Enum.PartType.Cylinder then out[k]=math.abs(M[k][1])*size.X/2+math.sqrt(M[k][2]^2+M[k][3]^2)*size.Y/2
+   else out[k]=math.abs(M[k][1])*size.X/2+math.abs(M[k][2])*size.Y/2+math.abs(M[k][3])*size.Z/2 end
+  end
+  return out,c
+ end
+ local per=(#specs-19)/2;local worst,who,checked=-1,'',0
+ local function face(side,turbine)
+  local F=Art.FaceFrame(side);local list={}
+  for i=side<0 and 1 or per+1,side<0 and per or 2*per do
+   local s=specs[i];local fr=s.Frame
+   if s.Motion=='Spin'then fr=s.Pivot*R.CFrame.Angles(0,0,turbine*s.Rate)*s.Pivot:Inverse()*s.Frame end
+   local e,c=ext(s.Shape,s.Size,F:Inverse()*fr);list[#list+1]={Name=s.Name,U=c[1],Vv=c[2],W=c[3],E=e}
+  end
+  for _,a in ipairs(list)do
+   local back=a.W-a.E[3];local support=-math.huge
+   if math.abs(a.U)+a.E[1]<=flatU+1e-6 and math.abs(a.Vv)+a.E[2]<=flatV+1e-6 then support=0 end
+   for _,b in ipairs(list)do if b~=a then
+    local front,under=b.W+b.E[3],b.W-b.E[3] -- (a part that starts lower and overlaps it: a is on it when its back is at or below b's front)
+    if under<back-1e-9 and math.abs(a.U-b.U)<a.E[1]+b.E[1]-1e-6 and math.abs(a.Vv-b.Vv)<a.E[2]+b.E[2]-1e-6 then support=math.max(support,front)end
+   end end
+   local gap=back-support;checked+=1
+   if gap>worst then worst=gap;who=a.Name end
+  end
+ end
+ for _,side in ipairs({-1,1})do for k=0,23 do face(side,k*.37)end end
+ check(worst<=1e-6,('flush: every part of both faces sits on the face or on the part under it, the turbine at 24 angles (%d placements, worst gap %.2g at %s)'):format(checked,worst,who))
+ for _,bodyless in ipairs({false,true})do
+  if bodyless then dropFolder()else bake()end
+  local bag=H.ground(8,MECH,1,'None');local rootInv=bag.PrimaryPart.CFrame:Inverse();local by=byName(bag);local bad={}
+  for i=1,8 do local st=by['TearStrip'..i];local f=rootInv*st.CFrame
+   if math.abs(f.Position.Z-Pz)>1e-6 or math.abs(f.Position.Y-st.Size.Y/2-(Art.Pouch.Center.Y+Art.Pouch.Height/2))>1e-6 then bad[#bad+1]='TearStrip'..i end
+   local sp=by['HazardStripe'..i];if(sp.Position-st.Position).Magnitude>1e-6 then bad[#bad+1]='HazardStripe'..i end
+  end
+  local seal=by.BottomSeal;local sf=rootInv*seal.CFrame
+  if math.abs(sf.Position.Z-Pz)>1e-6 or math.abs(sf.Position.Y+seal.Size.Y/2-(Art.Pouch.Center.Y-Art.Pouch.Height/2))>1e-6 then bad[#bad+1]='BottomSeal'end
+  for i=1,8 do local sp=rootInv*by['HazardSeal'..i].CFrame;if math.abs(sp.Position.Z-Pz)>1e-6 or math.abs(sp.Position.Y-sf.Position.Y)>1e-6 then bad[#bad+1]='HazardSeal'..i end end
+  local base=rootInv*by.AntennaBase.CFrame;local crimpTop=Art.Pouch.Center.Y+Art.Pouch.Height/2
+  if not(base.Position.Y-by.AntennaBase.Size.Y/2<crimpTop-.05 and base.Position.Y+by.AntennaBase.Size.Y/2<=crimpTop+1e-6 and math.abs(base.Position.Z-Pz)<1e-6)then bad[#bad+1]='AntennaBase'end
+  local mast,led=rootInv*by.AntennaMast.CFrame,rootInv*by.AntennaLED.CFrame
+  if math.abs(mast.Position.Y-by.AntennaMast.Size.X/2-(base.Position.Y+by.AntennaBase.Size.Y/2))>1e-6 or(led.Position-(mast.Position+V3(0,by.AntennaMast.Size.X/2,0))).Magnitude>by.AntennaLED.Size.X/2 then bad[#bad+1]='AntennaMast/LED'end
+  -- the strips and the mast never cross (the mast stands just in front of them)
+  local m0=mast.Position.Z+by.AntennaMast.Size.Y/2;local s0=Pz-by.TearStrip1.Size.Z/2
+  if m0>s0-1e-6 then bad[#bad+1]='AntennaMast in the strips'end
+  check(#bad==0,(bodyless and'plain-parts body'or'flat pouch')..': the seal and the strips stand on the middle of the crimps, edge to edge with them; each stripe through its own strip; the antenna\'s base in the top crimp, the mast on it, the LED on the mast ('..table.concat(bad,',')..')')
+  -- and held: the same parts in the same places (the root's frame), every one welded to the torso
+  local held,char=H.held(8,MECH,1,'None','R15');local hb=byName(held);local diff=0
+  for name,p in pairs(by)do local q=hb[name];if p~=bag.PrimaryPart and q then
+   local a,b=rootInv*p.CFrame,held.PrimaryPart.CFrame:Inverse()*q.CFrame;if not cfNear(a,b,1e-5)then diff+=1 end end end
+  check(diff==0,(bodyless and'plain-parts body'or'flat pouch')..(': held in hand, every part (seal, strips, stripes, antenna included) is where it is on the ground (%d differ)'):format(diff))
+  bag:Destroy();held:Destroy();char:Destroy()
+ end
+end
+
 -- 5. the features -------------------------------------------------------------------------------------------------------------------------------
 do
  local bag=ref;local all=parts(bag)
