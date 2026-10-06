@@ -3,8 +3,9 @@
 #  test_lowtier.luau        - Common / Uncommon / Rare small reveal pop (RevealFlourish) and the 2D sparkle pop.
 #  test_index_alerts.luau   - Index reward badges (INDEX, MENU, biome tabs), claim sounds, no pedestal box.
 #  test_starter.luau        - the free 2x-luck Forest pack for finishing the tutorial (real PlayerDataService).
-#  tools/tests tutorial set - test_guide_flow, test_guide_layout (26 screens), test_tutorial (the visual tutorial,
-#                             clicking indicator, slides, confetti), all against the working copy.
+#  tools/tests tutorial set - test_guide_flow, test_guide_layout (26 screens), test_tutorial (R152: every step's look,
+#                             pointer and trigger, the pop, input, safe area, finish / skip / replay / returning players,
+#                             no leftovers, write-on-change), all against the working copy.
 # Reveal sounds: docs/proposals/audio_R123/tests. Previews: docs/proposals/R138/preview.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -16,7 +17,7 @@ cp "$T/roblox.luau" "$TB/world.luau" "$HERE"/test_starter.luau "$OUT/srv/";pytho
 python3 "$INV/mkbundle.py" "$OUT/rs_bundle.luau" ChestIndex="$C/ChestIndex.client.lua" PackOpeningFeedback="$C/PackOpeningFeedback.client.lua" >/dev/null
 cp "$T/roblox.luau" "$T/test_tutorial.luau" "$T/test_guide_flow.luau" "$T/test_guide_layout.luau" "$OUT/t/"
 cp "$REPO/src/ReplicatedStorage/BeginnerGuide.lua" "$OUT/t/new_Guide.luau";cp "$REPO/src/ReplicatedStorage/BeginnerGuide.lua" "$OUT/t/old_Guide.luau";cp "$REPO/src/ReplicatedStorage/HudLayout.lua" "$OUT/t/Hud.luau"
-python3 "$T/bundle.py" "$OUT/t/tut_bundle.luau" BeginnerTutorial="$C/BeginnerTutorial.client.lua" BeginnerGuide="$REPO/src/ReplicatedStorage/BeginnerGuide.lua" HudLayout="$REPO/src/ReplicatedStorage/HudLayout.lua" >/dev/null
+python3 "$T/bundle.py" "$OUT/t/tut_bundle.luau" BeginnerTutorial="$C/BeginnerTutorial.client.lua" BeginnerGuide="$REPO/src/ReplicatedStorage/BeginnerGuide.lua" HudLayout="$REPO/src/ReplicatedStorage/HudLayout.lua" PropCache152="$REPO/src/ReplicatedStorage/PropCache152.lua" >/dev/null
 # R150 review: the Index badge pops silently (a chime at the badge change fired when a pack was OPENED, before the reveal shows the seed)
 ! grep -nE "alertsFrom|total>alertTotal and .*Audio.Play" "$C/ChestIndex.client.lua"
 cd "$OUT"
