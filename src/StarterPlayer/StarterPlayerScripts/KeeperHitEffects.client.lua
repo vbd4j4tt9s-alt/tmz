@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R39: shared snap impact, Knight catch grunt, a local hit burst and bounded camera kick.
 local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')

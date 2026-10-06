@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R152 (owner: "add a pedestal in the middle that gives a player 1 void pack ... there is a number above that shows how many is left"): the client half of the Void Pack giveaway
 -- pedestal in the hub's plaza (the stone, the prompt and the count are the server's: VoidGiveaway152 / VoidGiveawayArt152). This script:
 --  * hangs the NUMBER over the pedestal: a BillboardGui in studs (so it shrinks with distance and can never fill the screen from afar), stopped from growing closer than

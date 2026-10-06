@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R118: the hub's global leaderboards, drawn on each player's own screen so they can be scrolled (top 100).
 -- A SurfaceGui inside Workspace cannot take input, so this one lives in PlayerGui with Adornee = the board part.
 -- Data comes from SpeedBoardService (attributes on the board model); the server's own sign is hidden locally.

@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- V106: weighted chase poses; existing root smoothing and server catches remain authoritative.
 local Run=game:GetService('RunService')
 local Storage=game:GetService('ReplicatedStorage')

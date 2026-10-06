@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R149 (owner): "for the snow biome add the snow patches there as permanent". Client only. The Snow stage (3) of the track gets flat white
 -- snow patches, built from a deterministic layout (WeatherWorld149.BiomeSpec: a hash of grid cells, so every client builds the same) in a
 -- window around the runner, with level of detail by distance. They never fade and do not depend on the weather.

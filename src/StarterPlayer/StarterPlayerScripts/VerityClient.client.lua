@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R147 (owner: "Verity NPC is a quest giver: it tells players to steal a pack from The Darkened one and give it to the
 -- Verity NPC. The Verity NPC will be behind the market and it will be big."): the client half of VerityService.
 -- R148 (owner's play test, "Verity should be a big yellow sphere", and her greeting voice):

@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R151 Seed Festival Square, client. Builds the hub's "life" on this screen (HubLifeArt151: trees, bushes, flower beds, lamps, benches,
 -- bunting, verges, wall lanterns, grass patches, pebbles, butterflies) once the server's
 -- ChestChaseMap.HubDecor151 exists, and keeps it light:

@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage')
 local Audio=require(RS:WaitForChild('InteractionAudio'));local player=Players.LocalPlayer
 local connections={};local lastToken=0;local pending

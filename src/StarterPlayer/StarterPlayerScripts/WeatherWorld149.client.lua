@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R149 (owner): "rework weather and make it so that it's not a camera-only thing: during rain, thunder or snow, when moving the camera the
 -- effects stop for a while and take some time to begin again. Make rain, blizzard and thunder actually happen: droplets actually fall from
 -- the sky onto the ground. For snow / blizzard add patches of snow on the ground; they fade in and fade out after a while."

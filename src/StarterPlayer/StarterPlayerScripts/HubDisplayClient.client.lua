@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R151 (owner: BEST PULL TODAY and BIGGEST FRUIT TODAY in the hub's two empty corners): the part each player runs on their own screen. The server (HubDisplayService /
 -- HubDisplayArt) builds everything that is still: the pedestal, the words, the showcase item and the champion's avatar. This adds what moves, and only while it is near and nothing
 -- is switched off:

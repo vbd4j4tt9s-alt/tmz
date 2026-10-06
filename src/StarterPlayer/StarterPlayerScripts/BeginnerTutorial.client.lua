@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R111: the game owner's avatar guides new players through five short steps: a welcome pop-up on the first join,
 -- an objective card at the top centre, a straight red arrow line from your feet to every goal (built on this client
 -- only, so only you see it), a bouncing marker over the goal, a pointer at the pack in the hotbar, then quick tips.

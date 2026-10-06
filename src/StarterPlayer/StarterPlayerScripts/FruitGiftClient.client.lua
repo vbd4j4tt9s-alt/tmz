@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R79: equip a crop and click/tap a nearby player. No recipient menu or acceptance dialog.
 -- R122: the same click/tap/RT gives a held seed pack or seed (inventory items only).
 -- R130 (owner): while holding a fruit, seed or pack, the player under the mouse (or the screen centre on a controller)

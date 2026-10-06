@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R151 (owner: "for the offline text when players press esc just make it a simple big rainbow text that says 'Plants grow
 -- offline'"): replaces the R125 card. While the Roblox menu is open (Esc, the Roblox button, the console menu button) one line
 -- of big chunky text, "🌱 Plants grow offline", sits outside the menu panel: no card, no panel, a dark outline for contrast and

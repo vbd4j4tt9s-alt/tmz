@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R83: distance-limited local animation and a shared small effect budget.
 -- R122: Void Pack motion/effects via VoidPackFx (budgeted); arrival sound + lights-out via VeiledArrivalFx.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Tags=game:GetService('CollectionService')

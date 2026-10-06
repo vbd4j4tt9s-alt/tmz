@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R151 (owner playtest of R149 / R150): "it doesn't push down far enough", "the words are missing, they only appear if under my foot", "the
 -- forest, desert named tiles must also be parallel to the safe zone and horizontal":
 --  * the press travels 1.15 studs (resting top floor + 1.2, pressed floor + .05: level with the planted feet) and the runner's footprint reaches

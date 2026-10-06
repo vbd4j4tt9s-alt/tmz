@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R120: one scrolling Robux shop (FEATURED, PASSES, SPEED, MONEY, GEMS) with a quick-jump column.
 -- Products, prices and every purchase / gift / owned flow are unchanged from R79; only the look and layout moved.
 -- R122 (owner): no gift buttons, no "DOUBLE Your SPEED" boost banner, and Robux buttons read "49 Robux" (no glyph).

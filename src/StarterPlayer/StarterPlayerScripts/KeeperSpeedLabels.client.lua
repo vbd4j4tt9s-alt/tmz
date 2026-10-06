@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R141 (owner: "add a speed req on top of every keeper's head"): a label over every keeper (each biome's keeper and
 -- The Darkened) with the Speed it takes to outrun it, in the same Speed numbers as the HUD. Green ✓ when you are
 -- already faster, red when not. The server stamps each keeper with KeeperEscapeSpeed (the walk speed it chases at

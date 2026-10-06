@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local Hologram=require(game:GetService('ReplicatedStorage'):WaitForChild('HologramProjection'))
 -- Streamed-out gardens use static client silhouettes from small replicated descriptions.
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Players=game:GetService('Players')

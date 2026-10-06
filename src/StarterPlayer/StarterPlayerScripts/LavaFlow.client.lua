@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- V092: one continuous, visual-only route from the volcano outlet into its pool.
 local Run=game:GetService('RunService')
 -- V134: cache world-space flow nodes only after the expanded layout is ready.

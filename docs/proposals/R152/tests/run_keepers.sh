@@ -31,7 +31,9 @@ for f in $NEW $DATA $CHANGED;do echo $f;done | grep -v MANIFEST | LC_ALL=C sort 
 # work (hub, packs, keyboard track, Void giveaway, Verity's texts in VerityConfig.lua) and the shared hook files R152 also edits
 # (manifest, help line, bootstrap, owner commands: on the list, compiled below) are not checked here.
 KEEPER='/(Keeper[A-Za-z0-9]*|Beast[A-Za-z0-9]*|Veiled(Keeper|Event|EventClient)81|ChaseService|Config)(\.client|\.server)?\.lua$'
-{ git -C "$REPO" diff --name-only "$BASE" -- src;git -C "$REPO" ls-files --others --exclude-standard -- src; } | grep -E "$KEEPER" | LC_ALL=C sort -u > "$OUT/changed.txt"
+{ git -C "$REPO" diff --name-only "$BASE" -- src;git -C "$REPO" ls-files --others --exclude-standard -- src; } | grep -E "$KEEPER" | LC_ALL=C sort -u > "$OUT/changed0.txt"
+# (a file whose only change is the R152 load guard line every client script got is not a keeper change)
+while read f;do if [ -e "$REPO/$f" ] && git -C "$REPO" cat-file -e "$BASE:$f" 2>/dev/null && sh "$REPO/tools/tests/r152_real_diff.sh" "$REPO" "$BASE" "$f" >/dev/null;then :;else echo "$f";fi;done < "$OUT/changed0.txt" > "$OUT/changed.txt"
 LC_ALL=C comm -13 "$OUT/allowed.txt" "$OUT/changed.txt" > "$OUT/files.diff"
 if [ ! -s "$OUT/files.diff" ];then echo "ok: in the keeper code only R152's files differ from $BASE ($(wc -l < "$OUT/changed.txt") changed, all on the list)";else fail "unexpected keeper-code changes:";cat "$OUT/files.diff";fi
 FROZEN="src/ServerScriptService/ChestChaseServer/Config.lua src/ReplicatedStorage/KeeperCombat.lua src/ReplicatedStorage/KeeperMotion.lua src/ReplicatedStorage/KeeperRigConfig.lua src/ReplicatedStorage/KeeperUpgradeData.lua src/ServerScriptService/ChestChaseServer/ConcurrentKeeperService.lua src/ReplicatedStorage/KeeperAttackPose.lua src/ReplicatedStorage/KeeperPolish.lua src/ServerScriptService/ChestChaseServer/ChaseService.lua src/ServerScriptService/ChestChaseServer/KeeperUpgradeArt.lua src/ReplicatedStorage/KeeperVoices.lua src/ReplicatedStorage/KeeperAudio.lua src/ServerScriptService/ChestChaseServer/RagdollService.lua src/ReplicatedStorage/KnockbackConfig.lua"

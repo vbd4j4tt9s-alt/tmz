@@ -1,3 +1,5 @@
+pcall(function()game:GetService('StarterGui'):SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)end) -- R152: hide Roblox's own backpack before waiting (this script replaces it)
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local Traits=require(game:GetService('ReplicatedStorage').ItemTraitNames)
 local Fit=require(game:GetService('ReplicatedStorage'):WaitForChild('GardenTextFit'))
 local MenuStyle=require(game:GetService('ReplicatedStorage'):WaitForChild('GardenMenuStyle'))

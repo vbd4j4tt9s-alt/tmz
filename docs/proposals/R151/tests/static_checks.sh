@@ -15,8 +15,8 @@ echo "ok: the hooks are one line each (PlayerDataService, ChestChaseServerMain, 
 if grep -rn "PullBannerBottom" "$S"; then fail "PullBannerBottom must not exist any more (HudNotices has no banner hook)"; fi
 if grep -n "PullAnnounce\|PullBanner" "$C/HudNotices.client.lua"; then fail "HudNotices must not mention the pull announcements"; fi
 if git -C "$REPO" cat-file -e a1390a7 2>/dev/null; then
- git -C "$REPO" diff --quiet a1390a7 -- src/StarterPlayer/StarterPlayerScripts/HudNotices.client.lua || fail "HudNotices differs from its R150 version (it must be restored exactly)"
- echo "ok: HudNotices is byte for byte its R150 version (git diff a1390a7 is empty)"
+ sh "$REPO/tools/tests/r152_real_diff.sh" "$REPO" a1390a7 src/StarterPlayer/StarterPlayerScripts/HudNotices.client.lua >/dev/null || fail "HudNotices differs from its R150 version (it must be restored exactly)"
+ echo "ok: HudNotices is byte for byte its R150 version apart from the R152 load guard line"
 else echo "skip: no R150 commit in this checkout, HudNotices compared by name only"; fi
 if grep -n "Instance.new\|ScreenGui\|Sound\|TweenService\|RenderStepped\|Heartbeat\|RarityRevealAudio\|AudioMixer\|GetUserThumbnailAsync\|ItemPictures\|BonusGiftArt\|SetAttribute\|FireServer\|InvokeServer" "$C/PullAnnouncerClient.client.lua" | grep -v "^[0-9]*:--"; then fail "the announcer client must not build any Gui, play any sound or tween, run per frame, fetch pictures, write attributes or call the server"; fi
 if grep -n "Metrics\|Enqueue\|Dequeue\|NewQueue\|Subline\|Headline\|Sparkles\|HudNoticeLayout\|HudLayout\|BannerSeconds\|MaxWaiting\|WaitSeconds" "$RS/PullAnnounceRules.lua" | grep -v "^[0-9]*:--"; then fail "PullAnnounceRules must not keep any banner rule"; fi

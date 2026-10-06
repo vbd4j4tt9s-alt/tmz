@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R152 (owner: "darkened chase is the whole audio but ... skip to the 0:22 part of the song"): The Darkened's chase theme (BackgroundMusic's 'Intense', the Sound
 -- ChestChaseSpecialTrack84 in SoundService) skips its first SKIP seconds: it plays from 0:22 to the end of the song, and every loop restarts at 0:22, never at 0.
 -- A script of its own on purpose: the owner's live BackgroundMusic was hand-edited (the music ids typed in), so it is not replaced. Any Sound in

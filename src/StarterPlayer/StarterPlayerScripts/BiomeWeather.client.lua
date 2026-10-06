@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- Local weather around the view, behind UI. Never changes music or gameplay.
 -- R128 (owner): particles live in the world (AmbientParticleField128); only the birth box follows the camera.
 local Players=game:GetService('Players')

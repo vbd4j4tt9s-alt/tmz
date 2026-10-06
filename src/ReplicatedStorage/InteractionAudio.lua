@@ -4,7 +4,7 @@ local SoundService=game:GetService('SoundService')
 local Players=game:GetService('Players')
 local Debris=game:GetService('Debris')
 local Content=game:GetService('ContentProvider')
-local Timing=require(script.Parent.SoundTiming)
+local Timing=require(script.Parent:WaitForChild('SoundTiming')) -- R152: WaitForChild (it could run before SoundTiming had replicated)
 local M={}
 -- R150: MenuClose is the MenuClick file a little lower; Denied is the built-in ping, low and muted (no new upload).
 M.AssetIds={Bubble04=96764044228884,Bubble06=131731955363530,UpgradeClick=87218932219010,Equip=99675704394731,KaChing=86218459564041,GemClaim=82559527540705,MenuClick=116737765668953,

@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R69: illustrated biome crest and warm lettering; short, forward-only notices.
 -- R125 redo (owner: the logos had vanished; "redo and polish"). The logo sits in its own small CanvasGroup medallion
 -- (in R124's plain-Frame title the clipped artwork did not draw), faded as one piece through GroupTransparency.
