@@ -8,41 +8,40 @@ local function near(a,b,e)return math.abs(a-b)<=(e or 1e-6)end
 local C=UW.boot({})
 local Rules,me,pg=C.Rules,C.Me,C.PG
 local Style=W.module('TreadmillBonusStyle')
-local button,bar,overlay,hud=C.Button,C.Bar,C.Overlay,C.Hud
+local button,overlay,hud=C.Button,C.Overlay,C.Hud
 local face=button.Face
 local function frames(n)UW.frames(n,1/60)end
 -- R150 review: how often the Denied cue was asked for since C.Played had `from` entries (every flashMessage = one refusal; nothing else plays Denied here)
 local function denied(from)local n=0;for i=from+1,#C.Played do if C.Played[i]=='Denied'then n+=1 end end;return n end
 local function secs(s)UW.seconds(s,1/60)end
 UW.frames(3,1/60)
-local baseHud,baseOverlay,baseBar=UW.count(hud),UW.count(overlay),UW.count(bar)
+local baseHud,baseOverlay=UW.count(hud),UW.count(overlay)
 local function training(on)me:SetAttribute('TreadmillTraining',on or nil)end
 -- 0. Idle: nothing runs ----------------------------------------------------------------------------------------------
 local d0=UW.delays
 secs(30)
-check(button.Visible==false and bar.Enabled==false and overlay.Enabled==false,'idle: no button, no gift timer, no roll window')
+check(button.Visible==false and overlay.Enabled==false and UW.made.BillboardGui==nil,'idle: no button, no roll window, no head billboard')
 check(UW.frameListeners()==0,'idle: not a single per-frame listener ('..UW.frameListeners()..')')
 check((C.RevealPreloads or 0)>=1,'the reveal / cue voices are preloaded at script start')
 check(UW.delays==d0,'idle: no scheduled work at all in 30 s ('..(UW.delays-d0)..')')
-check(bar.ClipsDescendants==false and bar.AlwaysOnTop==true and bar.MaxDistance==80 and bar.Size.X.Offset>=240 and bar.Size.Y.Offset>=110,'gift timer billboard: not clipped, room for the pop')
 -- 1. Button: charging -------------------------------------------------------------------------------------------------
 C.set('Interval',360);C.set('Ready',0)
 C.set('DueAt',R.clock+222);C.set('Left',222);training(true)
 frames(20)
 check(button.Visible==true,'charging: the button shows while standing on the treadmill')
 check(face.Title.Text=='BONUS ROLL' and face.Sub.Text=='NEXT 3:42','charging: second line counts down: '..face.Sub.Text)
-check(face.Fill.Visible==true and near(face.Fill.Size.X.Scale,1-221.67/360,.01),'charging: the face fills with progress ('..face.Fill.Size.X.Scale..')')
+check(face.FillClip.Visible==true and near(face.FillClip.Fill.Size.X.Scale,1-221.67/360,.01),'charging: the face fills with progress ('..face.FillClip.Fill.Size.X.Scale..')')
 check(face.Meter.Visible==false and button.CountBadge.Visible==false,'charging: no meter strip, no badge')
 local calmLip=button.Lip.BackgroundColor3
 check(button:GetAttribute('AccessibleLabel')=='Treadmill bonus roll, charging','charging: accessibility label says so')
-check(face.Icon.Visible==true and face.Icon.Body.Fill.Color.A~=nil,'charging: the gift icon fills up with the progress')
-local f1=face.Fill.Size.X.Scale
+check(face.Icon.Visible==true and face.Icon.Picture~=nil and face.Icon:GetChildren()~=nil,'charging: the pack icon shows (R153: the owner\'s pack picture, no gift)')
+local f1=face.FillClip.Fill.Size.X.Scale
 secs(10)
-check(face.Sub.Text=='NEXT 3:32' and face.Fill.Size.X.Scale>f1,'charging: ten seconds later the clock and the fill moved ('..face.Sub.Text..')')
+check(face.Sub.Text=='NEXT 3:32' and face.FillClip.Fill.Size.X.Scale>f1,'charging: ten seconds later the clock and the fill moved ('..face.Sub.Text..')')
 C.set('DueAt',R.clock+24);frames(20)
-check(face.Sub.Text:find('^ALMOST! 0:')~=nil,'last 30 s: ALMOST! '..face.Sub.Text)
+check(face.Title.Text=='ALMOST THERE!' and face.Sub.Text:find('^0:')~=nil,'last 30 s: '..face.Title.Text..' / '..face.Sub.Text)
 C.set('DueAt',R.clock+31);frames(20)
-check(face.Sub.Text:find('^NEXT 0:')~=nil,'31 s left is still NEXT')
+check(face.Title.Text=='BONUS ROLL' and face.Sub.Text:find('^NEXT 0:')~=nil,'31 s left is still NEXT')
 -- tapping while charging asks nothing of the server
 local before=C.Invoked
 C.set('DueAt',R.clock+200);frames(20)
@@ -59,7 +58,7 @@ UW.frames(1,1/60)
 local hudFx=hud.Fx
 C.set('DueAt',R.clock+250);C.set('Left',250)
 C.set('Ready',1);frames(2)
-check(button.Visible==true and face.Sub.Text=='READY!' and face.Fill.Visible==false,'ready: READY!, no charging fill')
+check(button.Visible==true and face.Title.Text=='BONUS READY!' and face.Sub.Text=='OPEN IT!' and face.FillClip.Visible==false,'ready: a roll completing says BONUS READY! / OPEN IT!, no charging fill')
 check(button.Lip.BackgroundColor3~=calmLip,'ready: the lip took the cheerful colour')
 check(face.Meter.Visible==true and face.Meter.Bar.Size.X.Scale>0,'ready with the next one charging: a thin meter shows it')
 check(button.CountBadge.Visible==false,'ready (1): no count badge')
@@ -91,6 +90,7 @@ check(scaleMax>1.02 and scaleMax<=1.06,'ready: a small bounce (max scale '..scal
 check(bursts>=3 and bursts<=4,'ready: one attention burst about every 4.2 s ('..bursts..' in 14 s)')
 check(idleFrames>=60*14*.65,'ready: no per-frame listener between the bursts ('..idleFrames..' of '..(60*14)..' frames idle)')
 check(near(face.Icon.Rotation,0,1e-6) and face.ShinePane.Sweep.Visible==false and near(button.Pulse.Scale,1,1e-6),'everything rests at neutral between bursts')
+check(face.Title.Text=='BONUS ROLL' and face.Sub.Text=='READY!','ready: after BONUS READY! / OPEN IT! it says BONUS ROLL / READY!')
 -- count 2: badge
 C.set('Ready',2);frames(2)
 check(button.CountBadge.Visible==true and button.CountBadge.Count.Text=='2','two ready: the count badge shows 2')
@@ -116,7 +116,7 @@ check(face.Position.Y.Offset==0,'other input does not press it')
 pg:SetAttribute('TitleActive',true);frames(1);check(button.Visible==false,'the title screen hides the button');pg:SetAttribute('TitleActive',nil);frames(1);check(button.Visible==true,'and it comes back')
 -- off the treadmill with nothing ready: hidden, and the ticker stops
 C.set('Ready',0);training(false);frames(2)
-check(button.Visible==false and bar.Enabled==false,'off the treadmill with nothing ready: no button, no timer')
+check(button.Visible==false,'off the treadmill with nothing ready: no button')
 d0=UW.delays;secs(10);check(UW.delays==d0 and UW.frameListeners()==0,'...and nothing scheduled (idle again)')
 -- refusal on the button
 C.set('Ready',1);frames(2)
@@ -127,7 +127,7 @@ check(denied(d2)==1,'R150 review: a server refusal ("SEED BAG FULL!") clicks Den
 check(face.Sub.Text=='BAG FULL!' and #face.Sub.Text<=15,'refusal: short copy on the button ('..face.Sub.Text..')')
 check(button:GetAttribute('AccessibleLabel'):find('SEED BAG FULL')~=nil,'refusal: the full text goes to the accessibility label')
 check(overlay.Enabled==false,'refusal: no roll window')
-secs(3)
+secs(3.6)
 check(button:GetAttribute('AccessibleLabel')=='Treadmill bonus roll, ready' and face.Sub.Text=='READY!','after the message the accessibility label and the status line are back to normal')
 C.set('Ready',0);frames(2)
 -- ReducedMotion: the button shows and says everything, nothing moves
@@ -147,64 +147,74 @@ check(#hudFx:GetChildren()==3,'FastMode: a small sparkle burst (3) ('..#hudFx:Ge
 local sweeps=false;for i=1,60*6 do UW.frames(1,1/60);if face.ShinePane.Sweep.Visible then sweeps=true end end
 check(sweeps==false,'FastMode: no shine sweep')
 me:SetAttribute('FastMode',nil);C.set('Ready',0);frames(2);secs(2)
--- 3. Gift timer ----------------------------------------------------------------------------------------------------
-local back=bar.Back
-local function barText()return back.Caption.Text,back.Track.Label.Text end
-C.set('Ready',0);C.set('Interval',360);C.set('DueAt',R.clock+222);C.set('Left',222);training(true);frames(20)
-check(bar.Enabled==true and bar.Adornee==C.Root,'timer shows over the player while training')
-local cap,clock=barText()
-check(cap=='NEXT ROLL' and clock:find('^3:4')~=nil,'timer: caption + countdown ('..cap..' / '..clock..')')
-local px=back.Track.Fill.Size.X.Offset
-check(near(px,math.floor((1-221.67/360)*120+.5),1.1),'timer: fill = progress ('..px..' of 120)')
-check(back.Chip.Visible==false,'timer: no count chip with nothing ready')
-check(bar.StudsOffsetWorldSpace.Y>5,'timer: above the head, clear of speed popups')
-local before1=px;secs(30);check(back.Track.Fill.Size.X.Offset>before1,'timer: the fill grows with time')
--- almost there
-C.set('DueAt',R.clock+20);frames(20)
-cap,clock=barText()
-check(cap=='ALMOST THERE!' and clock:find('^0:')~=nil,'timer, last 30 s: '..cap..' '..clock)
-local rotMax=0;for i=1,60*5 do UW.frames(1,1/60);rotMax=math.max(rotMax,math.abs(back.Icon.Rotation))end
-check(rotMax>6 and rotMax<=12.5,'timer, almost there: the gift wiggles ('..rotMax..')')
-check(near(back.Icon.Rotation,0,12.5),'timer: wiggle in range')
--- a roll completes while the timer is showing: pop
-local fxBar=bar.Fx
-C.set('DueAt',R.clock+360);C.set('Left',360)
-C.set('Ready',1);frames(1)
-cap,clock=barText()
-check(cap:find('BONUS READY!')~=nil and clock=='OPEN IT!','timer: a roll completing says BONUS READY! / OPEN IT!')
-check(back.Pop.Scale>1.1 and back.Pop.Scale<=1.18,'timer: the pill pops ('..back.Pop.Scale..')')
-local shakeMax=0;local sparkMax=#fxBar:GetChildren()
-for i=1,40 do UW.frames(1,1/60);shakeMax=math.max(shakeMax,math.abs(back.Rotation));sparkMax=math.max(sparkMax,#fxBar:GetChildren())end
-check(shakeMax>2 and shakeMax<=6.01,'timer: a small shake ('..shakeMax..' deg)')
-check(sparkMax==8,'timer: sparkles pop (8) ('..sparkMax..')')
-check(near(back.Pop.Scale,1,.001) and back.Rotation==0,'timer: pop and shake settle')
-check(back.Chip.Visible==true and back.Chip.Count.Text=='1','timer: a chip shows 1 ready')
-secs(1);check(#fxBar:GetChildren()==0,'timer: sparkles removed')
-secs(2.6)
-cap,clock=barText()
-check(cap=='NEXT ROLL' and clock:find('^[56]:')~=nil,'timer: after ~3 s it goes back to counting ('..cap..' '..clock..')')
--- at the cap
-C.set('DueAt',nil);C.set('Ready',2);frames(1)
-secs(3.5)
-cap,clock=barText()
-check(cap=='2 ROLLS READY!' and clock=='TAP BONUS ROLL' and back.Track.Fill.Size.X.Offset==120,'timer at the cap: says so, full ('..cap..')')
-check(back.Chip.Count.Text=='2','timer at the cap: chip 2')
-d0=UW.delays;secs(5);check(UW.delays-d0>=15 and UW.delays-d0<=25,'timer: ticks about 4 times a second while on the treadmill, nothing per frame ('..(UW.delays-d0)..' in 5 s)')
-check(UW.frameListeners()==0,'timer: no per-frame listener while it just counts')
--- off the treadmill
-training(false);frames(2);check(bar.Enabled==false,'timer hides off the treadmill')
-C.set('Ready',1);frames(2);check(#fxBar:GetChildren()==0,'no pop while the timer is hidden')
-C.set('Ready',0);frames(2);secs(2)
--- ReducedMotion on the timer
-W.Gui.ReducedMotionEnabled=true
-C.set('DueAt',R.clock+10);training(true);frames(5)
-check(barText()=='ALMOST THERE!','reduced: still says almost there')
-rotMax=0;for i=1,60*5 do UW.frames(1,1/60);rotMax=math.max(rotMax,math.abs(back.Icon.Rotation))end
-check(rotMax==0 and UW.frameListeners()==0,'ReducedMotion: the timer gift does not wiggle')
-C.set('Ready',1);frames(2)
-check(barText()=='BONUS READY! 🎁' and back.Pop.Scale==1 and #fxBar:GetChildren()==0,'ReducedMotion: the ready line shows, no pop, no sparkles')
-W.Gui.ReducedMotionEnabled=false
-training(false);C.set('Ready',0);frames(5);secs(4)
+-- 3. R153: the gift pill over the player's head is gone; the BONUS ROLL button carries its phases ---------------------------------------------------------------------
+-- (owner: "remove the NEXT ROLL billboard above the head" and "the almost ready also must be displayed on that bonus roll button")
+do
+ local function titleSub()return face.Title.Text,face.Sub.Text end
+ check(UW.made.BillboardGui==nil and pg:FindFirstChild('TreadmillBonusProgress')==nil,'R153: no BillboardGui is ever made (the head pill is not built at all)')
+ for _,d in ipairs(pg:GetDescendants())do check(d._class~='BillboardGui','R153: nothing in PlayerGui is a BillboardGui ('..d.Name..')')end
+ for _,d in ipairs(C.Root.Parent:GetDescendants())do check(d._class~='BillboardGui','R153: nothing on the character is a BillboardGui ('..d.Name..')')end
+ C.set('Ready',0);C.set('Interval',360);C.set('DueAt',R.clock+341);C.set('Left',341);training(true);frames(20)
+ local t,s=titleSub()
+ check(button.Visible and t=='BONUS ROLL' and s:find('^NEXT 5:4')~=nil,'R153: charging, 5:41 to go: '..t..' / '..s)
+ check(button:GetAttribute('AccessibleLabel')=='Treadmill bonus roll, charging','R153: accessibility label: charging')
+ -- the phases, with the gift pill's own threshold: the last 30 s
+ for _,case in ipairs({{300,'BONUS ROLL','NEXT'},{60,'BONUS ROLL','NEXT'},{31,'BONUS ROLL','NEXT'},{29,'ALMOST THERE!',''},{12,'ALMOST THERE!',''},{2,'ALMOST THERE!',''}})do
+  C.set('DueAt',R.clock+case[1]);frames(20);t,s=titleSub()
+  local okClock=(case[3]=='NEXT'and s:find('^NEXT ')~=nil)or(case[3]==''and s:find('^0:')~=nil)
+  check(t==case[2]and okClock,'R153: '..case[1]..' s left: '..t..' / '..s)
+ end
+ check(button:GetAttribute('AccessibleLabel')=='Treadmill bonus roll, almost ready','R153: accessibility label: almost ready')
+ C.set('DueAt',R.clock+2);frames(20)
+ t,s=titleSub();check(t=='ALMOST THERE!' and s:find('^0:0[12]$')~=nil,'R153: the owner\'s example: ALMOST THERE! / 0:02 ('..t..' / '..s..')')
+ -- colours: the fill is yellow while it charges and orange / red in the last 30 s; the text stays white with a dark green stroke
+ local fillGradient=face.FillClip.Fill:FindFirstChildOfClass('UIGradient')
+ local function near3(c,r,g,b)return math.abs(c.R*255-r)<1.5 and math.abs(c.G*255-g)<1.5 and math.abs(c.B*255-b)<1.5 end
+ check(near3(fillGradient.Color.A,255,132,70)and near3(fillGradient.Color.B,222,60,34),'R153: ALMOST THERE!: the fill is orange / red')
+ C.set('DueAt',R.clock+200);frames(20)
+ check(near3(fillGradient.Color.A,252,220,41)and near3(fillGradient.Color.B,231,152,2),'R153: charging: the fill is the pack\'s yellow')
+ check(face.Title.TextColor3.R==1 and face.Title.TextColor3.G==1 and face.Title.TextColor3.B==1 and face.Sub.TextColor3.R==1,'R153: the text is white')
+ check(near3(face.Title.TextStrokeColor3,8,58,20)and face.Title.TextStrokeTransparency==0 and near3(face.Sub.TextStrokeColor3,8,58,20),'R153: ... with a dark green stroke')
+ -- the emphasis: the gift icon wiggles and the button pulses in short bursts every Style.AlmostPeriod s, nothing runs in between
+ C.set('DueAt',R.clock+25);frames(5)
+ local maxRot,maxScale=0,1;local bursts,idle,lastWas,total=0,0,0,60*9
+ local starts={}
+ for i=1,total do
+  UW.frames(1,1/60)
+  maxRot=math.max(maxRot,math.abs(face.Icon.Rotation));maxScale=math.max(maxScale,button.Pulse.Scale)
+  local n=UW.frameListeners();if n>0 and lastWas==0 then bursts+=1;starts[#starts+1]=i/60 end;if n==0 then idle+=1 end;lastWas=n
+ end
+ check(maxRot>6 and maxRot<=12.5,'R153: almost: the pack wiggles ('..maxRot..' deg)')
+ check(maxScale>1.03 and maxScale<=1.07,'R153: almost: the button pulses (max scale '..maxScale..')')
+ check(bursts>=3 and bursts<=5,'R153: almost: a pulse about every '..Style.AlmostPeriod..' s ('..bursts..' in 9 s)')
+ check(idle>=total*.6,'R153: almost: nothing per frame between the pulses ('..idle..' of '..total..' frames idle)')
+ check(near(face.Icon.Rotation,0,12.5),'R153: the wiggle stays in range')
+ secs(1);check(near(button.Pulse.Scale,1,.001) or UW.frameListeners()>0,'R153: the pulse settles at 1')
+ -- ReducedMotion: the words and the colours are there, nothing moves
+ W.Gui.ReducedMotionEnabled=true
+ C.set('DueAt',R.clock+10);training(false);training(true);frames(10)
+ t,s=titleSub();check(t=='ALMOST THERE!','R153: ReducedMotion: still says ALMOST THERE! ('..t..')')
+ local moved=0;for i=1,60*6 do UW.frames(1,1/60);if UW.frameListeners()>0 or face.Icon.Rotation~=0 or button.Pulse.Scale~=1 then moved+=1 end end
+ check(moved==0,'R153: ReducedMotion: the almost button never moves or runs a listener in 6 s ('..moved..')')
+ W.Gui.ReducedMotionEnabled=false
+ -- the ready state: a roll completing says BONUS READY! / OPEN IT! for Style.ReadyHold seconds, then READY!; the pop, the sparkles and the cue are the button's
+ C.set('DueAt',R.clock+360);C.set('Left',360);frames(5)
+ local fxBefore=#hud.Fx:GetChildren()
+ C.set('Ready',1);frames(1)
+ t,s=titleSub();check(t=='BONUS READY!' and s=='OPEN IT!','R153: a roll completing: BONUS READY! / OPEN IT! ('..t..' / '..s..')')
+ check(face.FillClip.Visible==false,'R153: ready: no charging fill (the thin meter shows the next roll)')
+ check(#hud.Fx:GetChildren()==fxBefore+8,'R153: the sparkles pop on the button (8) ('..(#hud.Fx:GetChildren()-fxBefore)..')')
+ secs(Style.ReadyHold-.5);t,s=titleSub();check(t=='BONUS READY!','R153: still BONUS READY! just before '..Style.ReadyHold..' s')
+ secs(1);t,s=titleSub();check(t=='BONUS ROLL' and s=='READY!','R153: then BONUS ROLL / READY! ('..t..' / '..s..')')
+ -- at the cap
+ C.set('DueAt',nil);C.set('Ready',2);frames(1);secs(Style.ReadyHold+.5)
+ t,s=titleSub();check(t=='BONUS ROLL' and s=='2 ROLLS READY!' and button.CountBadge.Visible,'R153: at the cap: 2 ROLLS READY! and the count badge ('..t..' / '..s..')')
+ -- the ticker still ticks only while on the treadmill
+ d0=UW.delays;secs(5);check(UW.delays-d0>=15 and UW.delays-d0<=25,'R153: the button\'s clock ticks about 4 times a second while on the treadmill, nothing per frame ('..(UW.delays-d0)..' in 5 s)')
+ check(UW.frameListeners()==0,'R153: no per-frame listener while it just counts')
+ training(false);C.set('Ready',0);frames(5);secs(4)
+ check(button.Visible==false and UW.made.BillboardGui==nil,'R153: off the treadmill with nothing ready: no button, still no billboard')
+end
 -- 4. Roll screen flow, all seven rarities --------------------------------------------------------------------------------
 local panel=overlay.Panel
 local cases={
@@ -233,7 +243,7 @@ for _,case in ipairs(cases)do
  local tag=case.Rarity
  check(overlay.Enabled==true and C.Invoked>0,tag..': the roll window opens')
  check(panel.Status.Visible==true and panel.Word.Visible==false and panel.Status.Text==Style.SpinLines[1],tag..': spinning: playful status line '..panel.Status.Text)
- check(panel.Result.Text==Style.SpinHint,tag..': spinning: reassurance line under it')
+ check(panel.Result.Visible==false and panel.Result.Text=='',tag..': R153: spinning: nothing under the status line (no "already in ur bag" line)')
  check(panel.Actions.Skip.Visible and not panel.Actions.Close.Visible,tag..': SKIP while spinning')
  check(panel.Pop.Scale<1,tag..': the panel pops in ('..panel.Pop.Scale..')')
  check(UW.frameListeners()==2,tag..': while it spins: the spin and the one animator listener ('..UW.frameListeners()..')')
@@ -296,7 +306,7 @@ C.Reply={Ok=true,Stage=1,Variant='Pack01',Rarity='Common',Label='Forest Seed Pac
 local invokedBefore=C.Invoked
 panel.Actions.Again.Activated:Fire()
 check(C.Invoked==invokedBefore+1 and overlay.Enabled==true and panel.Word.Visible==false and panel.Status.Visible==true and #panel.Fx:GetChildren()==0,'ROLL AGAIN: closes, asks once, a fresh spin with a clean screen')
-check(panel.Result.Text==Style.SpinHint and panel:FindFirstChild('Pop')~=nil and panel.StripWindow.Strip:FindFirstChild('Rays')==nil,'ROLL AGAIN: no leftovers from the last reveal')
+check(panel.Result.Visible==false and panel.Result.Text==''and panel:FindFirstChild('Pop')~=nil and panel.StripWindow.Strip:FindFirstChild('Rays')==nil,'ROLL AGAIN: no leftovers from the last reveal (the result line is hidden again)')
 spinOut();panel.Actions.Close.Activated:Fire()
 check(denied(dAgain)==0,'R150 review: Skip, a second roll and ROLL AGAIN never click Denied ('..denied(dAgain)..')')
 -- ReducedMotion roll ---------------------------------------------------------------------------------------------------------
@@ -341,7 +351,7 @@ end
 secs(3);C.set('Ready',0);frames(2)
 -- 5. No leaks over repeated rolls -------------------------------------------------------------------------------------------------
 local soundCount=#W.service('SoundService'):GetChildren()
-local hudCount,barCount=UW.count(hud),UW.count(bar)
+local hudCount=UW.count(hud)
 local worst=0
 for i=1,24 do
  local case=cases[(i-1)%#cases+1]
@@ -353,10 +363,10 @@ for i=1,24 do
 end
 secs(3)
 check(worst==0,'24 rolls: the overlay never grows (worst difference '..worst..')')
-check(UW.count(hud)==hudCount and UW.count(bar)==barCount,'24 rolls: the HUD button and the timer never grow')
+check(UW.count(hud)==hudCount,'24 rolls: the HUD button never grows')
 check(#W.service('SoundService'):GetChildren()==soundCount and soundCount>=4,'24 rolls: the tick sound pool stays at its 4 sounds ('..#W.service('SoundService'):GetChildren()..')')
 check(UW.frameListeners()==0 and UW.activeTweens()==0,'24 rolls: nothing running afterwards')
-check(#panel.Fx:GetChildren()==0 and #hud.Fx:GetChildren()==0 and #bar.Fx:GetChildren()==0,'24 rolls: no pieces left in any effect layer')
+check(#panel.Fx:GetChildren()==0 and #hud.Fx:GetChildren()==0,'24 rolls: no pieces left in any effect layer')
 -- 5b. R150 review fixes ---------------------------------------------------------------------------------------------------------------------------
 -- The reveal confetti never crosses the ribbon header, the reveal word and the HUD button pop about their centres, the roll screen builds fewer instances,
 -- the gloss is for the special cards only, no twinkle sits on the fine print, the gift timer's shadow follows its pop and shake.
@@ -520,7 +530,7 @@ do
   panel.Actions.Close.Activated:Fire();secs(2)
  end
  check(glossOk and glossCount==specialCount and glossCount>=1,'R150 review: only the special cards (Legendary / Mythic / Secret) carry the gloss ('..glossCount..' gloss frames on '..specialCount..' special cards)')
- check(worstOpen<=500,'R150 review: opening a roll builds at most 500 instances in the one frame (first cut 598-625, R149 368-395): '..worstOpen)
+ check(worstOpen<=530,'R150 review: opening a roll builds at most 530 instances in the one frame (first cut 598-625, R149 368-395; R150 490 at most; R153: the Secret tease card is ~29 more, 519 at most): '..worstOpen)
  check(worstReveal<=100,'R150 review: the reveal frame builds at most 100 (first cut 41 / 120 / 142 / 160; R149 4-5): '..worstReveal)
  -- a sparkle is one instance: a Secret reveal's pieces are exactly its count
  openRoll(cases[7],0);frames(10);panel.Actions.Skip.Activated:Fire()
@@ -529,25 +539,133 @@ do
  check(bare==#panel.Fx:GetChildren() and #panel.Fx:GetChildren()==st.Sparkles+st.Confetti,'R150 review: every sparkle and confetti piece is one bare Frame ('..bare..' of '..#panel.Fx:GetChildren()..')')
  panel.Actions.Close.Activated:Fire();secs(2)
 end
--- (f) the gift timer's shadow lip pops and shakes with the pill -------------------------------------------------------------------------------------------
+-- (g) R153: no "already in ur bag" line; the spin text is centred; a Secret card flies by on every reel; the reel always stops on the server's result ------------
 do
- training(true);C.set('Interval',360);C.set('Ready',0);C.set('DueAt',R.clock+300);C.set('Left',300);frames(20)
- local back,lip=bar.Back,bar.Lip
- C.set('Ready',1)
- local dScale,dRot,dW,dY,sawPop,sawShake=0,0,0,0,false,false
- for _=1,45 do
-  local _,by=UW.rects(bar,bar.Size.X.Offset,bar.Size.Y.Offset)
-  local b,l=by['TreadmillBonusProgress.Back'],by['TreadmillBonusProgress.Lip']
-  dScale=math.max(dScale,math.abs(lip.Pop.Scale-back.Pop.Scale));dRot=math.max(dRot,math.abs(lip.Rotation-back.Rotation));dW=math.max(dW,math.abs(l.RW-b.RW))
-  dY=math.max(dY,math.abs((l.RY+l.RH/2)-(b.RY+b.RH/2)-4*back.Pop.Scale))
-  if back.Pop.Scale>1.05 then sawPop=true end;if math.abs(back.Rotation)>2 then sawShake=true end
-  frames(1)
+ local SECRET=string.upper(Rules.Tier(Rules.Void.Variant));local WIN,CW=Rules.Strip.Win,Rules.Strip.CardWidth
+ local function cardsOf()local out={};for _,c in ipairs(panel.StripWindow.Strip:GetChildren())do local n=tonumber(c.Name:match('^Card(%d+)$'));if n then out[n]=c end end;return out end
+ local function isSecret(c)return c.Rarity.Text==SECRET and c.Biome.Text==Rules.Void.Label end
+ local function secretSlots()local out={};for i,c in pairs(cardsOf())do if isSecret(c)then out[#out+1]=i end end;table.sort(out);return out end
+ local function mid()return panel.StripWindow.AbsoluteSize.X/2 end
+ local function centreOf(c)return panel.StripWindow.Strip.Position.X.Offset+c.Position.X.Offset+CW/2 end
+ local function biomeLabel(case)return case.Variant==Rules.Void.Variant and Rules.Void.Label or W.module('SeedPackRules').DesignBiomes[case.Stage]end
+ local pools={'1,6,2,3,4,5,7','7','1','3,4',''}
+ local function openPool(case,pool)
+  C.Reply={Ok=true,Stage=case.Stage,Variant=case.Variant,Rarity=case.Rarity,Label=case.Label,Pool=pool,Ready=0}
+  C.set('Ready',1);frames(1);button.Activated:Fire()
+  panel.StripWindow.AbsoluteSize=R.Vector2.new(panel.Size.X.Offset-28,panel.StripWindow.Size.Y.Offset)
  end
- check(sawPop and sawShake,'R150 review: the gift timer popped and shook in this test')
- check(dScale<1e-9 and dRot<1e-9 and dW<.01,'R150 review: the shadow lip has the pill\'s scale and rotation on every frame (scale off by '..dScale..', rotation by '..dRot..', width by '..dW..')')
- check(dY<=1,'R150 review: ... and stays its 4 px (scaled) under the pill ('..string.format('%.2f',dY)..' px off)')
- secs(1);check(lip.Pop.Scale==1 and lip.Rotation==0 and back.Rotation==0,'R150 review: ... and both are back at rest')
- training(false);C.set('Ready',0);frames(5);secs(4)
+ -- (1) no line about the bag anywhere on the roll screen, spinning or revealed, every rarity, desktop / phone / ReducedMotion
+ local function bagLines(w,h)
+  local list=UW.rects(overlay,w,h);local hits={}
+  for _,e in ipairs(list)do
+   local o=e.Obj
+   if e.Visible and(o:IsA('TextLabel')or o:IsA('TextButton'))and type(o.Text)=='string'and o.Text~=''then
+    local low=string.lower(o.Text);if low:find('bag',1,true)or low:find('already',1,true)then hits[#hits+1]=e.Path..': '..o.Text end
+   end
+  end
+  return hits
+ end
+ local scans,hits=0,{}
+ for _,mode in ipairs({{VIEWS[1],false},{VIEWS[2],false},{VIEWS[1],true}})do
+  W.Gui.ReducedMotionEnabled=mode[2];setView(mode[1]);local w,h=mode[1][1],mode[1][2]
+  for _,case in ipairs(cases)do
+   openPool(case,pools[1]);frames(30)
+   for _,t in ipairs(bagLines(w,h))do hits[#hits+1]=case.Rarity..' spinning: '..t end;scans+=1
+   check(panel.Result.Visible==false and panel.Result.Text=='','R153: '..case.Rarity..' spinning: the result row is empty and hidden')
+   spinOut();frames(2)
+   for _,t in ipairs(bagLines(w,h))do hits[#hits+1]=case.Rarity..' revealed: '..t end;scans+=1
+   check(panel.Result.Visible==true and panel.Result.Text:find(case.Label,1,true)~=nil,'R153: '..case.Rarity..' revealed: the result line shows (and names the pack)')
+   panel.Actions.Close.Activated:Fire();secs(1)
+  end
+ end
+ W.Gui.ReducedMotionEnabled=false
+ check(scans==42 and #hits==0,'R153: no text on the roll screen mentions the bag ("Ur pack is already in ur bag!" is gone), '..scans..' screens scanned'..(hits[1]and(' - '..hits[1])or''))
+ -- (2) the spin text is centred between the strip and the buttons, and the rows around it did not move
+ for _,v in ipairs(VIEWS)do
+  setView(v);local w,h=v[1],v[2]
+  openPool(cases[1],pools[1]);frames(40)
+  local _,by=UW.rects(overlay,w,h)
+  local st,win,act,res=by[PANEL..'Status'],by[PANEL..'StripWindow'],by[PANEL..'Actions'],by[PANEL..'Result']
+  local gapMid=(win.RY+win.RH+act.RY)/2
+  check(st.Visible and math.abs(st.RY+st.RH/2-gapMid)<=1,v[4]..': R153: the spin text sits in the middle of the gap between the strip and the buttons ('..string.format('%.1f vs %.1f',st.RY+st.RH/2,gapMid)..')')
+  check(not res.Visible and st.RY+st.RH<=act.RY and st.RY>=win.RY+win.RH,v[4]..': R153: its box stays between the strip and the buttons')
+  panel.Actions.Skip.Activated:Fire();frames(2)
+  local _,by2=UW.rects(overlay,w,h);local word,res2,act2=by2[PANEL..'Word'],by2[PANEL..'Result'],by2[PANEL..'Actions']
+  check(word.Visible and res2.Visible and word.RY+word.RH<=res2.RY+.01 and res2.RY+res2.RH<=act2.RY,v[4]..': R153: the reveal still has its word above the result line above the buttons')
+  check(math.abs(act2.RY-act.RY)<.01,v[4]..': R153: the buttons are where they were (the panel does not jump at the reveal)')
+  panel.Actions.Close.Activated:Fire();secs(1)
+ end
+ -- (3) the Secret pack flies by on every roll; (4) the reel always stops on the server's result
+ local rolls,teased,anySecret,landed,wrongLanding,starSeen,underMarker,inViewOk,restFar,secretWins,watched=0,0,0,0,0,0,0,0,0,0,0
+ local noTease={}
+ for mi,mode in ipairs({{VIEWS[1],false,'desktop'},{VIEWS[2],false,'phone'},{VIEWS[1],true,'reduced'}})do
+  W.Gui.ReducedMotionEnabled=mode[2];setView(mode[1])
+  for rep=1,3 do
+   for ci,case in ipairs(cases)do
+    local pool=pools[(rep+ci+mi)%#pools+1]
+    openPool(case,pool);rolls+=1
+    local all=cardsOf();local slots=secretSlots()
+    local n=0;for _ in pairs(all)do n+=1 end
+    check(n==Rules.Strip.Count,mode[3]..' '..case.Rarity..': the reel keeps its '..Rules.Strip.Count..' cards ('..n..')')
+    local back1,back2=WIN-Style.TeaseBack[1],WIN-Style.TeaseBack[2]
+    local tease=(table.find(slots,back1)and back1)or(table.find(slots,back2)and back2)
+    if tease then teased+=1 else noTease[#noTease+1]=mode[3]..' '..case.Rarity end
+    if #slots>=1 then anySecret+=1 end
+    local winCard=all[WIN]
+    check(winCard.Rarity.Text==string.upper(case.Rarity)and winCard.Biome.Text==biomeLabel(case),mode[3]..' '..case.Rarity..': the card in the winning slot is the server\'s pack ('..winCard.Rarity.Text..' / '..winCard.Biome.Text..')')
+    if case.Rarity=='Secret'then
+     secretWins+=1;check(table.find(slots,WIN)~=nil and #slots>=2,mode[3]..': a Secret result keeps its card and the tease flies by too ('..#slots..' Secret cards)')
+    else check(table.find(slots,WIN)==nil,mode[3]..' '..case.Rarity..': the winning slot is never a Secret card unless the server rolled it')end
+    -- watch the tease card fly by (every frame); on the second pass of each mode the roll is skipped part-way
+    local skipAt=(rep==2)and(15+37*ci)or nil
+    local tc=tease and all[tease];local minDist,inView=math.huge,0
+    local star0=tc and tc.Design.Star1.BackgroundTransparency;local starMoved,starMovedOffscreen=false,false
+    local f=0
+    while panel.Actions.Skip.Visible and f<2000 do
+     UW.frames(1,1/60);f+=1
+     if tc and panel.Actions.Skip.Visible then
+      local c=centreOf(tc);local W_=panel.StripWindow.AbsoluteSize.X
+      minDist=math.min(minDist,math.abs(c-mid()))
+      if c-CW/2>=0 and c+CW/2<=W_ then inView+=1 end
+      local star=tc.Design.Star1.BackgroundTransparency
+      if star~=star0 then if c+CW/2>0 and c-CW/2<W_ then starMoved=true else starMovedOffscreen=true end;star0=star end
+     end
+     if skipAt and f==skipAt then panel.Actions.Skip.Activated:Fire()end
+    end
+    if tc and not skipAt then
+     watched+=1
+     if minDist<=CW/2 then underMarker+=1 end
+     if inView>=(mode[2]and 10 or 15)then inViewOk+=1 end
+     if mode[2]or(starMoved and not starMovedOffscreen)then starSeen+=1 end -- (ReducedMotion has no ambient animation at all)
+    end
+    -- the stop: the server's card is the one under the marker
+    local cards2=cardsOf();local best,bestD=nil,math.huge
+    for i,c in pairs(cards2)do local d=math.abs(centreOf(c)-mid());if d<bestD then best,bestD=i,d end end
+    local landedCard=cards2[best]
+    if best==WIN and bestD<=CW/2 and landedCard.Rarity.Text==string.upper(case.Rarity)and landedCard.Biome.Text==biomeLabel(case)and isSecret(landedCard)==(case.Rarity=='Secret')then landed+=1 else wrongLanding+=1 end
+    if tease and math.abs(centreOf(cards2[tease])-mid())>CW then restFar+=1 end
+    check(panel.Word.Text==Style.Reveal(case.Rarity).Word,mode[3]..' '..case.Rarity..': the reveal names the server\'s rarity')
+    panel.Actions.Close.Activated:Fire();secs(1)
+   end
+  end
+ end
+ W.Gui.ReducedMotionEnabled=false
+ check(rolls==63 and teased==rolls and anySecret==rolls,'R153: the Secret pack is on the reel of every roll, '..Style.TeaseBack[1]..' or '..Style.TeaseBack[2]..' cards before the winner ('..teased..' of '..rolls..' rolls; none: '..table.concat(noTease,', ')..')')
+ check(watched>=40 and underMarker==watched,'R153: the Secret card passes under the pointer on every watched roll, desktop / phone / ReducedMotion ('..underMarker..' of '..watched..')')
+ check(inViewOk==watched,'R153: ... and is fully inside the window for a good stretch of the spin ('..inViewOk..' of '..watched..')')
+ check(landed==rolls and wrongLanding==0,'R153: every reel stops on the server\'s result, Skip included, desktop / phone / ReducedMotion, any pool ('..landed..' of '..rolls..' rolls, '..wrongLanding..' wrong)')
+ check(restFar==rolls,'R153: ... and the Secret tease is not near the pointer at the stop ('..restFar..' of '..rolls..')')
+ check(secretWins==9,'R153: the Secret result itself was tested ('..secretWins..' rolls)')
+ check(starSeen==watched,'R153: a special card is only animated while it is inside the window: the off-screen tease holds still, then moves once in view ('..starSeen..' of '..watched..')')
+ -- a roll the server answered with Common .. Mythic never has a Secret card in the winning slot
+ local landSecret=0
+ for i=1,60 do
+  local case=cases[(i-1)%6+1]
+  openPool(case,pools[i%#pools+1]);if isSecret(cardsOf()[WIN])then landSecret+=1 end
+  panel.Actions.Skip.Activated:Fire();panel.Actions.Close.Activated:Fire()
+ end
+ check(landSecret==0,'R153: a roll the server answered with Common .. Mythic never has a Secret card in the winning slot (60 rolls)')
+ secs(2)
 end
 setView(VIEWS[1])
 -- 6. Teardown ---------------------------------------------------------------------------------------------------------------------------
@@ -556,7 +674,7 @@ C.set('Ready',1);frames(2) -- billboard pop + button pop in flight
 openRoll(cases[5],0);frames(40) -- a roll mid-spin
 check(UW.frameListeners()>=1,'before teardown: things are running')
 C.Script.Destroying:Fire()
-check(hud._destroyed and overlay._destroyed and bar._destroyed,'teardown: the three GUIs are destroyed')
+check(hud._destroyed and overlay._destroyed,'teardown: the two GUIs are destroyed')
 check(UW.frameListeners()==0,'teardown: every listener is disconnected ('..UW.frameListeners()..')')
 local ticksLeft=0;for _,s in ipairs(W.service('SoundService'):GetChildren())do if s.Name:find('Interaction_BonusTick')then ticksLeft+=1 end end
 check(ticksLeft==0,'teardown: the tick sounds are removed')
@@ -567,7 +685,7 @@ check(UW.delays-d0==0 and UW.frameListeners()==0,'teardown: nothing is scheduled
 local second=R.new('LocalScript');second.Name='TreadmillBonusClient'
 W.load('TreadmillBonusClient',second)
 local huds=0;for _,g in ipairs(pg:GetChildren())do if g.Name=='TreadmillBonusHud'and not g._destroyed then huds+=1 end end
-check(huds==1 and pg:FindFirstChild('TreadmillBonusRoll')~=nil and pg:FindFirstChild('TreadmillBonusProgress')~=nil,'a re-run builds one fresh set of GUIs')
+check(huds==1 and pg:FindFirstChild('TreadmillBonusRoll')~=nil and pg:FindFirstChild('TreadmillBonusProgress')==nil,'a re-run builds one fresh set of GUIs (and still no head pill)')
 second.Destroying:Fire()
 print(string.format('%d/%d checks passed%s',checks-fails,checks,fails>0 and(' ('..fails..' FAILED)')or''))
 if fails>0 then error('failures',0)end

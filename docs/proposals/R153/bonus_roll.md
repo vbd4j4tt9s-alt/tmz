@@ -1,0 +1,26 @@
+# R153: bonus roll and treadmill
+
+Owner requests, in the order they came in. Odds and what the server awards are unchanged (`TreadmillBonusRules.lua` and `TreadmillBonusService.lua` are byte-identical: `docs/proposals/R150/tests/frozen.sha256` plus the literal table lines in `run_bonus_ui.sh`).
+
+| # | Owner | What changed |
+|---|---|---|
+| 1 | "remove this bonus ready bag" | The line under "Unwrapping ur gift..." ("Ur pack is already in ur bag!") is gone: `TreadmillBonusStyle.SpinHint` deleted, the Result label is hidden during the spin, and the spin text is centred in the gap between the strip and the SKIP button (the Status box spans the Status + Result rows). The reveal is unchanged (word, result line, buttons stay where they were). |
+| 2 | "make the secret pack appear in the roll section area" | `TreadmillBonusStyle.Tease` puts the Void (Secret) pack on the reel on every roll, 3 or 4 cards before the winner, so it passes under the pointer in the full spin and in the short ReducedMotion spin. The winning card is never touched: a Secret lands only when the server rolled it. It is drawn like every other card (same builder, the Secret card design). A special card is now only animated while it is inside the window. |
+| 3 | "remove the NEXT ROLL billboard above the head" | The BillboardGui (`TreadmillBonusProgress`) is not built at all. `TreadmillBonusStyle.BillboardLines` removed. |
+| 4 | "the almost ready also must be displayed on that bonus roll button" | The button shows the pill's phases with its words and its 30 s threshold: `BONUS ROLL / NEXT 5:41` -> `ALMOST THERE! / 0:02` (the title carries the words: a bigger box than the status line, so it reads on a phone) -> `BONUS READY! / OPEN IT!` for 3 s when a roll completes -> `BONUS ROLL / READY!` (at the cap `2 ROLLS READY!`). The last 30 s turn the fill orange / red and pulse the button with a gift-pill-style wiggle every 2.2 s (bursts of 0.75 s, nothing between; ReducedMotion keeps words and colours only). |
+| 5 | "the yellow fill must cover the whole button" | The fill lives in a `CanvasGroup` with the face's own pill corner (`Face > FillClip > Fill`, no corner on the fill): flush with the rounded left end at any progress, edge to edge at 100%, never past the outline. |
+| 6 | "replace that gift icon with the pack and make the colour of the button pair with the image" | The owner's pack picture (112 x 112, 12.6 KB of Luau data, `BonusPackImage153`) is decoded and drawn by `EmbeddedImage153` (EditableImage, one shared copy per picture, released when unused) on the button and on the roll screen's ribbon (the gift emoji is gone). Fallback (Image API off, memory budget, bad stream, still decoding): a green pack with gold seals and a yellow "?" drawn from frames. The button is the pack's green with a gold outline, the pack's yellow charge fill, white text with a dark green stroke. Make the data again with `docs/proposals/R153/tools/make_pack.py`. |
+| 7 | "make it so that players can also roll and open packs whilst on the treadmill" | The roll was never blocked. Opening a pack was: `ConcurrentKeeperService:IsPlayerBusy` (the chase's, installed over `ChaseService`) counts a pack reveal (`Chests:IsOpening`), and the treadmill used it as its busy checker, so the fifth click ended the training session. Training now asks `BaseService:_trainingBusy`, which is the chase-only checker `ChestChaseServerMain` passes (`Runs[player]` / `Starting[player]`: a run or a start, not a reveal). Everything else that reads `BusyChecker` (garden, treadmill upgrade, shops) is unchanged. |
+
+## Where the treadmill change is (for merges)
+
+- `ServerScriptService/ChestChaseServer/BaseService.lua`: new `SetTrainingBusyChecker` + `_trainingBusy` (after `SetBusyChecker`), and `BusyChecker(player)` -> `_trainingBusy(player)` in `StopTraining` (the speed restore) and in `_updateTrainingPlayer` (`canTrain`).
+- `ServerScriptService/ChestChaseServerMain.server.lua`: `baseService:SetTrainingBusyChecker(...)` right after `baseService:SetBusyChecker(...)`.
+- Not touched: `Hotbar.client.lua`, `ChestService.lua`, `ConcurrentKeeperService.lua` (frozen by the keeper suites) (nothing in the pack hold, `_canOpenPack`, `OpenSeedPack` or the bonus roll looks at the treadmill; `docs/proposals/R153/tests/run.sh` greps that).
+
+## Tests
+
+- `docs/proposals/R150/tests/run_bonus_ui.sh`: style (button lines / phases / Tease / odds), UI (no head billboard, phases, emphasis, fill, Secret on every reel, the reel stops on the server's result, no bag line), layout (every screen: fill at 0 / 50 / 100%, texts fit), audio, image (decode, hooks, fallbacks, release, colours); static: rule table lines, no `already in ur bag`, data under 20 KB.
+- `docs/proposals/R150/tests/mutation_check.py`: 34 mutants of the client and the art, eleven of them R153 (the four that targeted the removed gift pill are gone).
+- `docs/proposals/R153/tests/run.sh`: the real server code (R151 pack harness): a pack is held, opened and revealed on the treadmill with the session, the anchoring and the gain per tick untouched; the roll works there; the other blocks still refuse; what the pre-R153 wiring did.
+- `docs/proposals/R153/preview/run_preview153.sh` makes `docs/proposals/R153/bonus_roll.png`.
