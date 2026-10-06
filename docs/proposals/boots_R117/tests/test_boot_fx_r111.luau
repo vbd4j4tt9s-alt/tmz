@@ -259,7 +259,7 @@ local hbBefore=0;for _,c in ipairs(Run.RenderStepped._c)do if c.Connected then h
 clientScript:Destroy()
 local hbAfter=0;for _,c in ipairs(Run.RenderStepped._c)do if c.Connected then hbAfter+=1 end end
 local removalLive=0;for _,c in ipairs(Players.PlayerRemoving._c)do if c.Connected then removalLive+=1 end end
-check(hbBefore==1 and hbAfter==0 and removalLive==0,'connections disconnected on destroy')
+check(hbBefore>=1 and hbBefore-hbAfter==1 and removalLive==0,'connections disconnected on destroy (R153: one RenderStepped of the client script; ClientFxBudget keeps its own)')
 check(aliveEffectParts()==0,'no effect parts left after destroy ('..aliveEffectParts()..')')
 check(workspace:FindFirstChild('RunnerGroundEffects')==nil,'effects folder removed')
 local maxParts=3*(b3.LocalMarks+b3.OtherMarks)+3*b3.Arcs+12*(b3.Idle+1)+1+2*b3.Characters -- R117: idle rigs hold up to 12 parts (was 7)

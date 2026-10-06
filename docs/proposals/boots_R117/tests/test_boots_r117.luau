@@ -296,7 +296,7 @@ check(observed[4].IdleShards and observed[4].Ring and not observed[4].Strike,'Cr
 dress(me,'Crystal');run(.3);me.Vel=V3(0,0,-20);run(2);me.Vel=V3(0,0,0)
 local colours={};for _,m in ipairs(fx.Rings.Local.Marks)do if m.Live and m.Print.Kind=='Crystal'then colours[tostring(m.Parts[3].Color.R)..tostring(m.Parts[3].Color.G)]=true end end
 local nc=0;for _ in pairs(colours)do nc+=1 end;check(nc>=3,'Crystal print centres cycle rainbow colours ('..nc..')')
--- Coil pulse: colours change only in steps (bounded writes) and are restored on detach.
+-- Coil pulse: restored on detach; R153: the glow runs smoothly (it jumped between four steps), at most one write per coil per frame (when it moved 1/250).
 dress(me,'Storm');run(.3)
 local rm=recordOf(me);local writes=0
 local coilParts={};for _,c in ipairs(rm.Attach and rm.Attach.Coils or{})do coilParts[c.Part]=c.Color end
@@ -305,7 +305,7 @@ R.instMeta.__newindex=function(o,key,v)if key=='Color'and coilParts[o]then write
 me.Vel=V3(0,0,-60);run(2)
 R.instMeta.__newindex=rawNewIndex
 check(rm.Attach and#rm.Attach.Coils==6,'Thunder: 6 coils found (3 per boot) ('..tostring(rm.Attach and#rm.Attach.Coils)..')')
-check(writes>0 and writes<=6*40,'coil pulse writes bounded ('..writes..' in 2 s; <=40 per coil)')
+check(writes>6*40 and writes<=6*120,'coil pulse writes: smooth, at most one per coil per frame ('..writes..' in 2 s = 120 frames; <=120 per coil, more than the old 4-step 40)')
 -- 4. Crowd: culling, caps and budgets ==================================================================================
 section('4 crowd and budgets')
 me.Vel=V3(0,0,0);run(1)
@@ -422,7 +422,7 @@ local hbBefore=0;for _,c in ipairs(Run.RenderStepped._c)do if c.Connected then h
 clientScript:Destroy()
 local hbAfter=0;for _,c in ipairs(Run.RenderStepped._c)do if c.Connected then hbAfter+=1 end end
 local removalLive=0;for _,c in ipairs(Players.PlayerRemoving._c)do if c.Connected then removalLive+=1 end end
-check(hbBefore==1 and hbAfter==0 and removalLive==0,'destroy: connections closed')
+check(hbBefore>=1 and hbBefore-hbAfter==1 and removalLive==0,'destroy: connections closed (R153: one RenderStepped of the client script; ClientFxBudget keeps its own)')
 check(aliveEffectParts()==0,'destroy: no effect parts left ('..aliveEffectParts()..')')
 check(liveEmitters()==0,'destroy: no boot emitters left in any character ('..liveEmitters()..')')
 local coilsBack=true;for p,c in pairs(coilBase)do if p.Color~=c then coilsBack=false end end

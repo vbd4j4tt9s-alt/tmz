@@ -427,7 +427,8 @@ do
  loudMode='speech';settleDown()
  -- Once real loudness has been heard, silence means a pause (she settles), not "no loudness": no rhythm runs through the pauses.
  samples=fullRun(function()server('Open',{VoidPacks=0,Delivered=0})end,2.9)
- local g=windowOf(samples,.66,.78);check(last(g,'Hop')<.15 and peak(windowOf(samples,.66,.78),'Hop')<.5,'with real loudness, a pause stays down (no rhythm is mixed in)')
+ -- (R153: the hop trails the voice level by a frame or so, a smoothing that takes the buzz out of it; the window starts 20 ms later for that)
+ local g=windowOf(samples,.68,.78);check(last(g,'Hop')<.15 and peak(windowOf(samples,.68,.78),'Hop')<.5,'with real loudness, a pause stays down (no rhythm is mixed in)')
  seconds(.8)
 end
 

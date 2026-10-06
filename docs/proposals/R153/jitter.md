@@ -39,7 +39,7 @@ What made things jitter, in this game:
 | Hub showcase spin (`HubDisplayClient`, one line) | 30 Hz on tier 2 (R152 fix B6) | every frame on every tier; out of view only the core moves (ViewCull152, as before) |
 | Void giveaway pack (`VoidGiveawayClient152`) | 30 Hz on tier 2 and below (R152 fix B5) | every frame while in view on every tier; out of view tier 2 keeps 30 Hz with the skipped time |
 | Mystery pedestal sign (`MysteryPackClient`) | (checked: hung on the static PackAnchor, offset measured in the pack's own frame, the spin is per frame) | none needed |
-| Verity's bounce (`VerityVoice` / `VerityClient`) | the hop followed a noisy PlaybackLoudness that changes every few frames: it buzzed | the hop follows `Bounce`, a critically damped follower of the level (55 / s up, 82 / s down) |
+| Verity's bounce (`VerityVoice` / `VerityClient`) | the hop followed a noisy PlaybackLoudness that changes every few frames: it jumped with each reading and turned sharply at each peak | the hop follows `Bounce`, a critically damped follower of the level (120 / s up, 200 / s down): smooth speed, about a frame behind |
 | Reveal beams for onlookers (`RarePullWorld`) | (already per frame; its mouth point came from SeedPackClient at 30 Hz) | fixed with SeedPackClient |
 | Garden: Frostbell bells, rarity effects (fireflies, sparks, glints, fruit effects, glows) (`GardenVisuals` / `PlantEffects`) | the 20 Hz (10 Hz low) animation tick | a RenderStepped pass for plants within 75 studs (45 low) on screen; slow motions (growth, sway, tree drift, jaw, petals, holograms) keep the tick |
 | Harvest flights (`PlantGrowthFx`) | on Heartbeat; the shrink was written every other frame | in RenderStepped; the size every frame |
@@ -84,4 +84,5 @@ connects per-frame signals only in its gameplay services and tweens nothing. `JI
 fails there (the stepping is measured, e.g. a Drippy item repeats 59 of 90 frames at 60 fps, the keeper sign 64 of 90).
 Updated suites: R128 follow, boots_R117 (RenderStepped connection), trails_R117 (frame driver), R149 growth fx (shrink every frame),
 R151 hub client (tier 2 every frame, 30 / 144 fps), R151 speed popups (root adornee), R152 giveaway client (tier 2 in / out of view, 30 / 144
-fps, two mutations), tools/tests/test_tutorial (chevron fade steps).
+fps, two mutations), R152 keepers (R153's two keeper files on its list), R149 Verity lip sync (one pause window starts 20 ms later: the hop
+trails the level by a frame), boots_R117 (the coil glow's write bound), tools/tests/test_tutorial (chevron fade steps).
