@@ -117,7 +117,7 @@ function S:_grant(player)
 end
 -- Seconds until this player may ask the store again: their own cooldown (after a store failure) or the store's backoff, whichever is later. 0 = now.
 function S:_wait(player)
- local t=math.max(self.Cool[player]or 0,self.Store.Mode=='Memory'and 0 or self.Store.NextTryAt);local now=self.Clock()
+ local t=math.max(self.Cool[player]or 0,self.Store.Mode=='Memory'and 0 or self.Store.NextTryAt or 0);local now=self.Clock()
  return t>now and math.ceil(t-now)or 0
 end
 -- A failure the loop's retry (auto) hit: the player is told once (their own press always is), and the loop waits 5, 10, 20 .. 60 s before the next try.
