@@ -18,9 +18,17 @@ M = {
     # the sign is the full-size R124 sign (taller than the panel)
     'barrier_sign_full': ('barrier', RS + 'RefreshBarrier.lua', 'local k=math.min(1,canvas.Y*B.Fill/B.SignSize.Y)', 'local k=1'),
     # the barrier's front face lies in the plane of the gatehouse's / haunches' front faces (z-fighting)
-    'barrier_coplanar': ('barrier', RS + 'RefreshBarrier.lua', 'wall.CFrame=CFrame.new(line.Position.X,o.Bottom+o.Height/2,math.min(startZ,line.Position.Z))', 'wall.CFrame=CFrame.new(line.Position.X,o.Bottom+o.Height/2,math.min(startZ,line.Position.Z)-2.5)'),
+    'barrier_coplanar': ('barrier', RS + 'RefreshBarrier.lua', 'local z=math.min(startZ,line.Position.Z)', 'local z=math.min(startZ,line.Position.Z)-2.5'),
     # the barrier reads its numbers from nowhere (hard-coded, the kit is ignored)
-    'barrier_not_from_kit': ('barrier', RS + 'RefreshBarrier.lua', "return{TowerX=G.TowerX or 99,TowerD=G.TowerD or 14.4,BeamY0=G.BeamY0 or 44,KeyY=G.KeyY or 50,KeySize=G.KeySize or 15}", 'return{TowerX=99,TowerD=14.4,BeamY0=44,KeyY=50,KeySize=15}'),
+    'barrier_not_from_kit': ('barrier', RS + 'RefreshBarrier.lua', "return{TowerX=G.TowerX or 99,TowerD=G.TowerD or 14.4,BeamY0=G.BeamY0 or 44,KeyY=G.KeyY or 50,KeySize=G.KeySize or 15,", 'return{TowerX=99,TowerD=14.4,BeamY0=44,KeyY=50,KeySize=15,'),
+    # the gate keys are back in the R152 frame: the legends read sideways (bottom to top)
+    'keys_old_frame': ('barrier', RS + 'HubDecorKit151.lua', 'function K.KeyFrame(pos)return CFrame.fromMatrix(pos,V(0,-1,0),V(0,0,-1),V(1,0,0))end', 'function K.KeyFrame(pos)return CFrame.fromMatrix(pos,V(-1,0,0),V(0,0,-1),V(0,-1,0))end'),
+    # the keys face the wrong way round (mirrored): reading toward +X
+    'keys_mirrored': ('barrier', RS + 'HubDecorKit151.lua', 'function K.KeyFrame(pos)return CFrame.fromMatrix(pos,V(0,-1,0),V(0,0,-1),V(1,0,0))end', 'function K.KeyFrame(pos)return CFrame.fromMatrix(pos,V(0,-1,0),V(0,0,-1),V(-1,0,0))end'),
+    # no wings: the centre slab is the whole width again (it runs into the haunches)
+    'barrier_no_wings': ('barrier', RS + 'RefreshBarrier.lua', 'local core=math.min(half,foot+math.max(0,G.BeamY0-top)/slope)', 'local core=half'),
+    # the wing slabs reach the full height (into the haunches)
+    'barrier_wing_into_haunch': ('barrier', RS + 'RefreshBarrier.lua', 'local edge=core<half and G.BeamY0-(half-foot)*slope or top', 'local edge=top'),
     # the pattern is behind the quality gate again (the R152 cause)
     'belt_gated': ('belt', RS + 'TreadmillFx.lua', 'record.Scrolling=#l.Textures>0 and not policy.Reduced and record.Visible and record.Distance<=range', 'record.Scrolling=#l.Textures>0 and not policy.Reduced and record.Visible and record.Distance<=range and policy.Animate'),
     # FastMode stops it

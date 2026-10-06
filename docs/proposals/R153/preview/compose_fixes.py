@@ -76,16 +76,60 @@ def draw_face(img, rect, gui):
         # (the three caption dots are left out: DejaVu's caption is wider than Fredoka's, so they would land on the text)
 
 
-def elevation(scene, label, col, W_=1000, H_=300):
+def wedge_polygon(p):
+    """The triangle of a WedgePart in the x / y plane: local (y, z) = (-h/2, +d/2) [the right angle], (-h/2, -d/2), (+h/2, +d/2); its two triangular faces are local +-X."""
+    r, c, s_ = p['r'], p['p'], p['size']
+    h, d = s_[1], s_[2]
+
+    def w(ly, lz):
+        return (r[0][1] * ly + r[0][2] * lz + c[0], r[1][1] * ly + r[1][2] * lz + c[1])
+    return [w(-h / 2, d / 2), w(-h / 2, -d / 2), w(h / 2, d / 2)]
+
+
+def key_legend(p, gui, k):
+    """The key's Top-face legend as it appears in the elevation: drawn upright on its canvas, then turned by the part's frame (reading along its LookVector, down along its
+    RightVector: the Top-face canvas of KeyboardTrack's measurement), so a legend that reads along the world's up shows sideways exactly as in the game."""
+    cw, ch = gui['cw'], gui['ch']
+    sc = 3
+    img = Image.new('RGBA', (int(cw * sc), int(ch * sc)), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    for it in gui['items']:
+        text = it['text'] or ''
+        if not text:
+            continue
+        cx, cy = (it['x'] + it['w'] / 2) * sc, (it['y'] + it['h'] / 2) * sc
+        if it['y'] < ch * .3:  # the emoji line (DejaVu has no emoji): a plain marker
+            rr = it['h'] * sc * .3
+            d.ellipse((cx - rr, cy - rr, cx + rr, cy + rr), fill=(255, 255, 255, 235), outline=(20, 30, 40, 255), width=int(3 * sc))
+            continue
+        d.text((cx, cy), text.replace('\u26a1', '+'), font=font(it['h'] * sc * .78), fill=tuple(it['tc']) + (255,), anchor='mm', stroke_width=int(3 * sc), stroke_fill=(20, 30, 40, 255))
+    r = p['r']
+    look = (-r[0][2], -r[1][2])        # LookVector = -back column: the canvas x axis in the world (x, y)
+    down = (r[0][0], r[1][0])          # RightVector: the canvas y axis (down)
+    pps = cw / p['size'][0]
+    # screen vector of one canvas pixel along u (reading) and v (down): the elevation flips x (the viewer looks +Z) and y
+    a, b = -k * look[0] / pps, -k * look[1] / pps
+    c, e = -k * down[0] / pps, -k * down[1] / pps
+    det = a * e - b * c
+    side = int(15 * k) + 4
+    # PIL maps an output pixel (x, y) to the input (m0 x + m1 y + m2, m3 x + m4 y + m5); (x, y) are measured from the centre of the output, canvas px from its centre
+    i0, i1, i2, i3 = e / det, -c / det, -b / det, a / det
+    m0, m1, m3, m4 = i0 * sc, i1 * sc, i2 * sc, i3 * sc
+    m = (m0, m1, cw * sc / 2 - (m0 * side / 2 + m1 * side / 2), m3, m4, ch * sc / 2 - (m3 * side / 2 + m4 * side / 2))
+    return img.transform((side, side), Image.AFFINE, m, resample=Image.BILINEAR), side
+
+
+def elevation(scene, label, col, W_=1000, H_=300, box=(-118.0, 118.0, 0.0, 74.0)):
     parts = json.load(open(scene))
+    guis = {g['path']: g for g in parts['guis'] if g['face'] == 'Top' and 'Biome key' in g['path']}
     gui = [g for g in parts['guis'] if g['path'].endswith('BiomeRefreshWall') and g['face'] == 'Front'][0]
     ps = parts['parts']
     keep = []
     for p in ps:
         path = p['path']
-        if '/HubDecor151/Gate/' in path or path.endswith('/BiomeRefreshWall') or '/TrackRefreshBlackout/' in path or '/ChestChaseWalls/LobbyFrontWall' in path or path.endswith('/Lobby/LobbyFloor'):
+        if '/HubDecor151/Gate/' in path or '/BiomeRefreshWall' in path or '/TrackRefreshBlackout/' in path or '/ChestChaseWalls/LobbyFrontWall' in path or path.endswith('/Lobby/LobbyFloor'):
             keep.append(p)
-    x_lo, x_hi, y_lo, y_hi = -118.0, 118.0, 0.0, 74.0
+    x_lo, x_hi, y_lo, y_hi = box
     k = min(W_ / (x_hi - x_lo), H_ / (y_hi - y_lo))
     img = Image.new('RGB', (W_, H_), (20, 26, 48))
     d = ImageDraw.Draw(img)
@@ -102,7 +146,8 @@ def elevation(scene, label, col, W_=1000, H_=300):
         path = p['path']
         col_p = tuple(p['color'])
         if path.endswith('/Lobby/LobbyFloor'):
-            d.rectangle((0, sy(4), W_, H_), fill=(120, 150, 110))
+            if sy(4) < H_:
+                d.rectangle((0, sy(4), W_, H_), fill=(120, 150, 110))
             continue
         if '/TrackRefreshBlackout/' in path:
             d.rectangle((sx(a[1]), sy(min(a[3], y_hi)), sx(a[0]), sy(max(a[2], 0))), fill=(0, 0, 0))
@@ -111,22 +156,36 @@ def elevation(scene, label, col, W_=1000, H_=300):
             rect = (sx(a[1]), sy(a[3]), sx(a[0]), sy(a[2]))
             draw_face(img, tuple(int(v) for v in rect), gui)
             d = ImageDraw.Draw(img)
-            d.rectangle(rect, outline=(255, 110, 110), width=2)
+            continue
+        if '/BiomeRefreshWall/' in path:  # a wing: plain paper
+            if p['class'] == 'WedgePart':
+                d.polygon([(sx(x), sy(y)) for x, y in wedge_polygon(p)], fill=(242, 242, 242))
+            else:
+                d.rectangle((sx(a[1]), sy(a[3]), sx(a[0]), sy(a[2])), fill=(242, 242, 242))
             continue
         if p['class'] == 'WedgePart':  # the haunches: tall side against the tower
-            inner = a[0] if abs(a[0]) < abs(a[1]) else a[1]
-            outer = a[1] if inner == a[0] else a[0]
-            d.polygon([(sx(inner), sy(a[3])), (sx(outer), sy(a[3])), (sx(outer), sy(a[2]))], fill=col_p, outline=(120, 105, 80))
+            d.polygon([(sx(x), sy(y)) for x, y in wedge_polygon(p)], fill=col_p, outline=(120, 105, 80))
             continue
         d.rectangle((sx(a[1]), sy(a[3]), sx(a[0]), sy(a[2])), fill=col_p, outline=(120, 105, 80))
-        if 'Biome key' in path:
-            i = int(path.rsplit(' ', 1)[1]) - 1
-            d.text(((sx(a[1]) + sx(a[0])) / 2, (sy(a[3]) + sy(a[2])) / 2), KEYS[i], font=font(k * 2.1), fill=(255, 255, 255), anchor='mm', stroke_width=2, stroke_fill=(20, 30, 40))
-    # the numbers: gatehouse lower edge (44), the keys' bottoms (42.5), the tower shafts' inner edges (+-91.8)
-    for y, text in ((44.0, 'gatehouse edge 44'), (42.5, 'keys hang to 42.5')):
-        for x in range(0, W_, 14):
-            d.line((x, sy(y), x + 7, sy(y)), fill=(255, 200, 60), width=1)
-        d.text((8, sy(y) - (14 if y == 44.0 else -2)), text, font=font(13), fill=(255, 210, 90), anchor='lm' if False else 'la')
+        if 'Biome key' in path and path in guis:
+            leg, side = key_legend(p, guis[path], k)
+            cxk, cyk = (sx(a[1]) + sx(a[0])) / 2, (sy(a[3]) + sy(a[2])) / 2
+            img.paste(leg, (int(cxk - side / 2), int(cyk - side / 2)), leg)
+            d = ImageDraw.Draw(img)
+    # the barrier's parts outlined in red
+    for p in keep:
+        if '/BiomeRefreshWall' in p['path']:
+            a = aabb(p)
+            if p['class'] == 'WedgePart':
+                d.polygon([(sx(x), sy(y)) for x, y in wedge_polygon(p)], outline=(255, 110, 110))
+            else:
+                d.rectangle((sx(a[1]), sy(a[3]), sx(a[0]), sy(a[2])), outline=(255, 110, 110))
+    # the numbers: gatehouse lower edge (44), the keys' bottoms (42.5)
+    if y_lo < 10:
+        for y, text in ((44.0, 'gatehouse edge 44'), (42.5, 'keys hang to 42.5')):
+            for x in range(0, W_, 14):
+                d.line((x, sy(y), x + 7, sy(y)), fill=(255, 200, 60), width=1)
+            d.text((8, sy(y) - (14 if y == 44.0 else -2)), text, font=font(13), fill=(255, 210, 90), anchor='la')
     return img
 
 
@@ -229,6 +288,9 @@ def popup_view(view, key, size_key, icon_key, scale=1.0, label=''):
 # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 before_gate = elevation(os.path.join(S, 'refresh_before.json'), '', RED)
 after_gate = elevation(os.path.join(S, 'refresh_after.json'), '', GREEN)
+KEYBOX = (-90.0, 90.0, 38.0, 62.0)
+before_keys = elevation(os.path.join(S, 'refresh_before.json'), '', RED, 1000, 140, KEYBOX)
+after_keys = elevation(os.path.join(S, 'refresh_after.json'), '', GREEN, 1000, 140, KEYBOX)
 ba, bb, bc = badge_crops('before')
 aa, ab, ac = badge_crops('after')
 pop = json.load(open(os.path.join(S, 'popups.json')))['views']
@@ -253,11 +315,16 @@ d.text((pad, y), 'APPROXIMATE: flat elevations / trees drawn from the Roblox moc
 y += 40
 d.text((pad, y), '1. THE NIGHT REFRESH SCREEN FITS THE TRACK GATE (seen from the hub; yellow dashes: the gatehouse edge and the keys\' bottoms)', font=font(22), fill=YELLOW)
 y += 62
-d.text((pad, y - 26), 'R152: 188 x 53 studs, taller than the opening: the moon and the count sit behind the keys', font=font(16), fill=RED)
-d.text((pad + before_gate.width + 24, y - 26), 'R153: 182.8 x 38.4, floor to under the keys, between the shafts; the sign is scaled to it', font=font(16), fill=GREEN)
+d.text((pad, y - 26), 'R152: 188 x 53 studs, taller than the opening and into the towers: the moon and the count sit behind the keys', font=font(16), fill=RED)
+d.text((pad + before_gate.width + 24, y - 26), 'R153: floor to under the keys, between the shafts, under the haunch slope (red: its 5 parts); sign scaled', font=font(16), fill=GREEN)
 sheet.paste(before_gate, (pad, y))
 sheet.paste(after_gate, (pad + before_gate.width + 24, y))
-y += before_gate.height + 34
+y += before_gate.height + 30
+d.text((pad, y), 'THE GATE KEYS, close up, as the hub sees them: R152 reads sideways (bottom to top, the marker for the emoji on the left); R153 reads left to right, upright (emoji above the name above the speed)', font=font(16), fill=YELLOW)
+y += 26
+sheet.paste(before_keys, (pad, y))
+sheet.paste(after_keys, (pad + before_keys.width + 24, y))
+y += before_keys.height + 34
 d.text((pad, y), '2. NOTIFICATION BADGES 1.5x, zoomed 4x (yellow dashes: the edge of what clips them)   INDEX count 24 -> 36 px, MENU "!" 20 -> 30, tab dot 14 -> 21, DAILY 20 -> 30', font=font(22), fill=YELLOW)
 y += 62
 x = pad

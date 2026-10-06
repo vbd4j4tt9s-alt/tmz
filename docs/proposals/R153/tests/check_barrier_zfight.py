@@ -28,10 +28,11 @@ def main():
     a = ap.parse_args()
     parts, fs = Z.run(a.scene)
     walls = [p for p in parts if p.path.endswith(WALL)]
+    wings = [p for p in parts if WALL + '/' in p.path]
     gate = [p for p in parts if '/HubDecor151/Gate/' in p.path]
     covers = [p for p in parts if COVER in p.path]
-    print('scene: %d parts, the barrier %d (%s), the gate %d parts, the blackout cover %d parts' % (len(parts), len(walls), ', '.join('%.1f x %.1f x %.1f' % tuple(p.size) for p in walls), len(gate), len(covers)))
-    if len(walls) != 1 or len(gate) < 60:
+    print('scene: %d parts, the barrier %d (%s) with %d wings, the gate %d parts, the blackout cover %d parts' % (len(parts), len(walls), ', '.join('%.1f x %.1f x %.1f' % tuple(p.size) for p in walls), len(wings), len(gate), len(covers)))
+    if len(walls) != 1 or len(wings) != 4 or len(gate) < 60:
         print('FAIL: the closed track is not in the scene (nothing was checked)')
         return 1
     vis = [f for f in fs if not f['same_look']]

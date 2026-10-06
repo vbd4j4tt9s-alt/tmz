@@ -33,7 +33,8 @@ local wall,labels=Bar.Build(line,-100,runtime)
 check(wall.Name=='BiomeRefreshWall'and wall.Parent==runtime,'wall parented')
 -- R122: track-sized wall. R153: the wall is the rook gate's OPENING (test_barrier153.luau has the geometry against the built gate): between the tower shafts
 -- (x = +-(99 - 7.2 - .4)), from line.Y - 1 up to 1 stud under the keys that hang under the gatehouse (42.5 - 1).
-check(math.abs(wall.Size.X-2*(99-14.4/2-.4))<1e-6 and wall.Size.Z==4,'wall spans the gate opening between the tower shafts (got '..wall.Size.X..')')
+-- (R153: the centre slab reaches |x| 68.67 where the haunches' slope meets the top; each side a wing slab and a wedge follow the slope out to the shafts, 91.4)
+check(math.abs(wall.Size.X-2*(94-32+(44-42.5+1)*32/12))<1e-6 and wall.Size.Z==4,'the centre slab spans the opening up to where the haunches\' slope starts (got '..wall.Size.X..')')
 check(math.abs(wall.Size.Y-(42.5-1-3.12))<1e-6,'wall height = floor to just under the keys (got '..wall.Size.Y..')')
 local wb=wall.CFrame.Position.Y-wall.Size.Y/2;local wt=wall.CFrame.Position.Y+wall.Size.Y/2
 check(math.abs(wb-(4.12-1))<1e-6,'wall bottom unchanged at line.Y-1 (got '..wb..')')
@@ -45,7 +46,7 @@ check(wt-4>=30,'wall top far above default jump (7.2) from ground Y 4')
 check(wall.CanCollide==true and wall.Anchored==true and wall.CanQuery==true and wall.CanTouch==false,'collision flags unchanged')
 check(wall:GetAttribute('BiomeRefreshBarrier')==true,'barrier attribute')
 local colliders=0;for _,d in ipairs(wall:GetDescendants())do if d:IsA('BasePart')then colliders+=1 end end
-check(colliders==0,'no extra parts on the wall')
+check(colliders==4,'the wall carries only its four wings (a slab and a wedge each side, R153)')
 -- sign fits inside the smaller canvas
 for _,g in ipairs(wall:GetChildren())do if g:IsA('SurfaceGui')then
  local cv=g.CanvasSize;local sg=g.NightSign.Sign

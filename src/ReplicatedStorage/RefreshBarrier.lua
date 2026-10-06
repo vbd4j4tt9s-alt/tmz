@@ -8,8 +8,10 @@
 -- caption whose three dots loop . .. ... on the client; a soft inset border and faint stars dress the white wall.
 -- R153 (owner, after R152's rook gate: the moon and "6s" sat up behind the biome keys that hang in front of the gatehouse, and the wall was taller than the opening): the barrier is
 -- now exactly the gate's OPENING: between the two tower shafts (HubDecorKit151.Gate: TowerX, TowerD), from the floor up to just under the lowest thing that hangs in it (the
--- gatehouse's lower edge BeamY0 and the biome keys, which hang from KeyY down to KeyY - KeySize / 2), with B.Margin all round. It is still one opaque, colliding slab in the
--- track-start plane (Z and thickness as before; the blackout cover starts 1 stud behind its front face). The sign (moon, count, caption, dots) is the R124 one, scaled by
+-- gatehouse's lower edge BeamY0 and the biome keys, which hang from KeyY down to KeyY - KeySize / 2), with B.Margin all round, and under the haunches' slope: a centre slab
+-- (BiomeRefreshWall, it carries the sign) and, each side, a wing slab and a wedge that follow the slope up to it, so no part of it enters a haunch, a key, the gatehouse or a tower
+-- shaft (the barrier's edge only tucks under the tower bases' stone steps). Opaque, colliding, in the track-start plane (Z and thickness as before; the blackout cover starts 1 stud
+-- behind its front face). The sign (moon, count, caption, dots) is the R124 one, scaled by
 -- Fit so its block fills B.Fill of the panel's height and is centred on it; the digits stay about 25 studs tall (seen from the hub), the caption 5.
 local B={}
 B.Ink=Color3.fromRGB(70,72,79);B.Outline=Color3.new(0,0,0);B.Paper=Color3.fromRGB(242,242,242)
@@ -23,15 +25,21 @@ B.Caption='REFRESHING';B.CaptionSize=50;B.DotSize=16;B.DotGap=12;B.DotPeriod=.4
 local function gate()
  local ok,K=pcall(function()return require(script.Parent.HubDecorKit151)end)
  local G=ok and type(K)=='table'and type(K.Gate)=='table'and K.Gate or{}
- return{TowerX=G.TowerX or 99,TowerD=G.TowerD or 14.4,BeamY0=G.BeamY0 or 44,KeyY=G.KeyY or 50,KeySize=G.KeySize or 15}
+ return{TowerX=G.TowerX or 99,TowerD=G.TowerD or 14.4,BeamY0=G.BeamY0 or 44,KeyY=G.KeyY or 50,KeySize=G.KeySize or 15,
+  HaunchRise=G.HaunchRise or 12,HaunchRun=G.HaunchRun or 32,HaunchOuter=G.HaunchOuter or 94}
 end
 -- The opening for a track-start line part: Half (studs either side of the line's X), Bottom / Top (world Y), Width, Height. The bottom stays at line.Y - 1 (as since R122).
+-- The haunches (the pointed shoulders under the gatehouse) cut its top corners: their slope runs from (Foot, BeamY0) down to (HaunchOuter, BeamY0 - HaunchRise). Core = how far
+-- the full-height centre of the barrier reaches (where the slope meets Top); past it, out to Half, the barrier follows the slope: Edge = its height at Half. (Core = Half: no wings.)
 function B.Opening(line)
  local G=gate()
  local half=G.TowerX-G.TowerD/2-B.Margin.Side
  local top=math.min(G.BeamY0,G.KeyY-G.KeySize/2)-B.Margin.Top
  local bottom=line.Position.Y-1
- return{Half=half,Top=top,Bottom=bottom,Width=2*half,Height=top-bottom}
+ local foot=G.HaunchOuter-G.HaunchRun;local slope=G.HaunchRise/G.HaunchRun
+ local core=math.min(half,foot+math.max(0,G.BeamY0-top)/slope)
+ local edge=core<half and G.BeamY0-(half-foot)*slope or top
+ return{Half=half,Top=top,Bottom=bottom,Width=2*half,Height=top-bottom,Core=core,Edge=math.min(top,edge)}
 end
 function B.Format(seconds)return tostring(math.max(0,math.ceil(tonumber(seconds)or 0)))..'s'end
 local function textWidth(text,size)
@@ -62,10 +70,24 @@ local function frame(name,parent,x,y,w,h,color,round)
  if round then local c=Instance.new('UICorner');c.CornerRadius=UDim.new(.5,0);c.Parent=f end
  return f
 end
+-- A wing: the same paper slab as the centre (opaque, collides), with an unlit paper face on each side (the centre's sign is on its own part).
+local function wing(parent,class,name,size,cf,faces)
+ local p=Instance.new(class);p.Name=name;p.Size=size;p.CFrame=cf
+ p.Anchored=true;p.CanCollide=true;p.CanTouch=false;p.CanQuery=true;p.CastShadow=false
+ p.Color=B.Paper;p.Material=Enum.Material.SmoothPlastic;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth
+ for _,face in ipairs(faces)do
+  local gui=Instance.new('SurfaceGui');gui.Name='RefreshingWing';gui.Face=face;gui.SizingMode=Enum.SurfaceGuiSizingMode.FixedSize
+  gui.CanvasSize=Vector2.new(math.max(8,math.floor(size.X*B.PixelsPerStud)),math.max(8,math.floor(size.Y*B.PixelsPerStud)));gui.LightInfluence=0;gui.Brightness=1;gui.Parent=p
+  frame('NightSign',gui,0,0,gui.CanvasSize.X,gui.CanvasSize.Y,B.Paper)
+ end
+ p.Parent=parent
+ return p
+end
 function B.Build(line,startZ,parent)
  local o=B.Opening(line)
- local wall=Instance.new('Part');wall.Name='BiomeRefreshWall';wall.Size=Vector3.new(o.Width,o.Height,4)
- wall.CFrame=CFrame.new(line.Position.X,o.Bottom+o.Height/2,math.min(startZ,line.Position.Z))
+ local z=math.min(startZ,line.Position.Z)
+ local wall=Instance.new('Part');wall.Name='BiomeRefreshWall';wall.Size=Vector3.new(2*o.Core,o.Height,4)
+ wall.CFrame=CFrame.new(line.Position.X,o.Bottom+o.Height/2,z)
  wall.Anchored=true;wall.CanCollide=true;wall.CanTouch=false;wall.CanQuery=true;wall.CastShadow=false
  wall.Color=B.Paper;wall.Material=Enum.Material.SmoothPlastic;wall.TopSurface=Enum.SurfaceType.Smooth;wall.BottomSurface=Enum.SurfaceType.Smooth;wall:SetAttribute('BiomeRefreshBarrier',true)
  local canvas=Vector2.new(math.floor(wall.Size.X*B.PixelsPerStud),math.floor(wall.Size.Y*B.PixelsPerStud))
@@ -78,7 +100,7 @@ function B.Build(line,startZ,parent)
   -- Soft inset border and a few faint four-point stars (static frames).
   local border=frame('InsetBorder',panel,18,18,canvas.X-36,canvas.Y-36);local bc=Instance.new('UICorner');bc.CornerRadius=UDim.new(0,36);bc.Parent=border
   local bs=Instance.new('UIStroke');bs.Color=B.Soft;bs.Thickness=6;bs.Parent=border
-  for i,c in ipairs({{.06,.3,22},{.13,.7,14},{.2,.2,12},{.8,.22,14},{.88,.34,22},{.94,.7,14},{.86,.82,10},{.16,.84,10}})do -- (all outside the sign block, x .26 - .74)
+  for i,c in ipairs({{.04,.3,22},{.09,.7,14},{.14,.2,12},{.86,.22,14},{.92,.34,22},{.96,.7,14},{.9,.82,10},{.12,.84,10}})do -- (all outside the sign block, x .17 - .83)
    local star=frame('Star'..i,panel,0,0,c[3],c[3],B.Soft);star.AnchorPoint=Vector2.new(.5,.5);star.Position=UDim2.fromScale(c[1],c[2]);star.Rotation=45
   end
   local k=math.min(1,canvas.Y*B.Fill/B.SignSize.Y)
@@ -106,6 +128,16 @@ function B.Build(line,startZ,parent)
    if key=='Text'then value=B.Format(value)end;count[key]=value
    if key=='Text'then B.Center(sign)end
   end})
+ end
+ -- the wings: each side a slab (floor to the slope's height at the shaft) and a wedge above it (its slope is the haunch's underside, its tall side against the centre)
+ if o.Core<o.Half then
+  local run=o.Half-o.Core;local lift=o.Edge-o.Bottom;local rise=o.Top-o.Edge
+  for _,sx in ipairs({-1,1})do
+   local x=line.Position.X+sx*(o.Core+run/2)
+   wing(wall,'Part','BiomeRefreshWing',Vector3.new(run,lift,4),CFrame.new(x,o.Bottom+lift/2,z),{Enum.NormalId.Front,Enum.NormalId.Back})
+   -- (a WedgePart's vertical face is its back (+Z), its sloped face rises toward it: turned so the back looks at the centre and its triangles (local +-X) face the hub and the track)
+   wing(wall,'WedgePart','BiomeRefreshWing',Vector3.new(4,rise,run),CFrame.new(x,o.Edge+rise/2,z,0,0,-sx,0,1,0,sx,0,0),{Enum.NormalId.Left,Enum.NormalId.Right})
+  end
  end
  wall.Parent=parent;return wall,labels
 end
