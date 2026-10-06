@@ -60,7 +60,7 @@ local connection=Run.RenderStepped:Connect(function(dt)
   end end
  end
  if job then
-  job.Parts=16;job.Deadline=os.clock()+.001;local okay,why=coroutine.resume(job.Thread)
+  local own=job.Tool.Parent==player.Character;job.Parts=own and 64 or 16;job.Deadline=os.clock()+(own and .003 or .001);local okay,why=coroutine.resume(job.Thread)
   if not okay then retry[job.Tool]=os.clock()+5;warn('[V149] Held fruit: '..tostring(why));cancel()
   elseif coroutine.status(job.Thread)=='dead'then job=nil end
  end
@@ -71,5 +71,13 @@ local connection=Run.RenderStepped:Connect(function(dt)
  end end
  debug.profileend()
 end)
+-- R153 (owner: "i need to put in inputs twice to equip something"): the fruit you just took out used to show up to a second later (a scan every 0.25 s, then
+-- 16 parts a frame), so a second press put it away again. Your own new fruit is scanned at once and built 4x faster; everyone else's is unchanged.
+local ownLink
+local function own(character)
+ if ownLink then ownLink:Disconnect();ownLink=nil end
+ if character then ownLink=character.ChildAdded:Connect(function(c)if c:IsA('Tool')and c:GetAttribute('HarvestItemTool')then scanClock=1 end end)end
+end
+local ownAdded=player.CharacterAdded:Connect(own);own(player.Character)
 local jointConnection=Run.PreSimulation:Connect(function()for tool,s in pairs(states)do if equipped(tool)and s.Rig then Rig.Apply(s.Rig)end end end)
-script.Destroying:Connect(function()connection:Disconnect();jointConnection:Disconnect();cancel();for tool in pairs(states)do dispose(tool)end end)
+script.Destroying:Connect(function()connection:Disconnect();jointConnection:Disconnect();ownAdded:Disconnect();own(nil);cancel();for tool in pairs(states)do dispose(tool)end end)
