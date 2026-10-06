@@ -904,6 +904,7 @@ function PlayerDataService:Load(player)
         local config=require(game:GetService('ReplicatedStorage'):WaitForChild('SettingsConfig'))
         local mix=config.Read(premium.Settings)
         for key,attribute in pairs(config.AudioAttributes)do player:SetAttribute(attribute,mix[key])end
+        for key,attribute in pairs(config.ToggleAttributes or{})do player:SetAttribute(attribute,mix[key])end -- R153: "Skip pack animations" for the reveal
     end)
     if not premium.Tutorial then premium.Tutorial={Version=1,Mask=0,Done=storedData~=nil}end
     local garden, gardenError = self:DecodeGarden(type(storedData) == "table" and storedData.Garden or nil)

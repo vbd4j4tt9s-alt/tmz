@@ -29,13 +29,14 @@ local panel=Instance.new('Frame');panel.Name='SettingsPanel';panel.AnchorPoint=V
 local cap=Instance.new('UISizeConstraint');cap.MaxSize=Vector2.new(520,470);cap.Parent=panel
 text(panel,'Title','SETTINGS',UDim2.fromOffset(16,7),UDim2.new(1,-78,0,37),26)
 local close=button(panel,'Close','X',UDim2.new(1,-49,0,8),UDim2.fromOffset(36,36),Color3.fromRGB(239,76,99))
-local scroll=Instance.new('ScrollingFrame');scroll.Name='Controls';scroll.Position=UDim2.fromOffset(12,57);scroll.Size=UDim2.new(1,-24,1,-89);scroll.CanvasSize=UDim2.fromOffset(0,444);scroll.BackgroundTransparency=1;scroll.BorderSizePixel=0;scroll.ScrollBarThickness=4;scroll.Parent=panel
+local scroll=Instance.new('ScrollingFrame');scroll.Name='Controls';scroll.Position=UDim2.fromOffset(12,57);scroll.Size=UDim2.new(1,-24,1,-89);scroll.CanvasSize=UDim2.fromOffset(0,497);scroll.BackgroundTransparency=1;scroll.BorderSizePixel=0;scroll.ScrollBarThickness=4;scroll.Parent=panel
 local status=text(panel,'SaveStatus','',UDim2.new(0,16,1,-27),UDim2.new(1,-32,0,22),13)
 local values=Config.Read();local controls={};local dirty={};local touched={};local serial=0;local saving=false;local dead=false;local connections={}
 local function apply(key,value)
  values[key]=value;if not Config.Toggles[key]then Mixer.Set(key,value)end
  if key=='Quality'then player:SetAttribute('QualityChoice',value)end -- R113b: the player's own choice (Auto/Low/...)
  if key=='Quality'and value~='Auto'then player:SetAttribute('FastMode',value=='Low')end
+ local attribute=Config.ToggleAttributes and Config.ToggleAttributes[key];if attribute then player:SetAttribute(attribute,value)end -- R153: the reveal reads it
  local row=controls[key];if row then row.Value.Text=type(value)=='number'and value..'%'or type(value)=='boolean'and(value and'On'or'Off')or value;if row.Fill then row.Fill.Size=UDim2.fromScale(value/100,1)end end
 end
 local flush
@@ -91,6 +92,12 @@ local announce=button(scroll,'GlobalAnnouncements','',UDim2.fromOffset(3,340),UD
 text(announce,'Label','Announcements from other servers',UDim2.fromOffset(10,0),UDim2.new(.74,-10,1,0),17)
 local announceValue=text(announce,'Value','On',UDim2.fromScale(.76,0),UDim2.fromScale(.22,1),17);announceValue.TextXAlignment=Enum.TextXAlignment.Center;controls.GlobalAnnouncements={Value=announceValue}
 announce.Activated:Connect(function()change('GlobalAnnouncements',not values.GlobalAnnouncements)end)
+-- R153 (owner: "they can skip if they want or we can add a skip cutscene option in the settings"): "Skip pack animations" (off by default):
+-- on, every pack opens the short way (quick suspense, the result card, no story scene). Off, every opening plays in full.
+local skip=button(scroll,'SkipCutscenes','',UDim2.fromOffset(3,393),UDim2.new(1,-12,0,43),Color3.fromRGB(93,97,173))
+text(skip,'Label','Skip pack animations',UDim2.fromOffset(10,0),UDim2.new(.74,-10,1,0),17)
+local skipValue=text(skip,'Value','Off',UDim2.fromScale(.76,0),UDim2.fromScale(.22,1),17);skipValue.TextXAlignment=Enum.TextXAlignment.Center;controls.SkipCutscenes={Value=skipValue}
+skip.Activated:Connect(function()change('SkipCutscenes',not values.SkipCutscenes)end)
 local loading=false
 local function loadSettings()
  if loading or dead then return end;loading=true
@@ -107,7 +114,7 @@ local function open(value)
  elseif pg:GetAttribute('SeedMenu')=='Settings'then pg:SetAttribute('SeedMenu',nil)end
  -- The shared navigation wheel owns its option visibility.
 end
-local replay=button(scroll,'ReplayTutorial','Replay tutorial',UDim2.fromOffset(3,393),UDim2.new(1,-12,0,43),Color3.fromRGB(55,168,135))
+local replay=button(scroll,'ReplayTutorial','Replay tutorial',UDim2.fromOffset(3,446),UDim2.new(1,-12,0,43),Color3.fromRGB(55,168,135))
 replay.TextSize=19;Bright.Button(replay,Color3.fromRGB(55,168,135))
 replay.Activated:Connect(function()
  task.spawn(function()local ok,result=pcall(request.InvokeServer,request,'Tutorial','Replay');if ok and result and result.Success then open(false)end end)
