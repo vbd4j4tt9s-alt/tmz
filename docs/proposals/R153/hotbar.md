@@ -50,4 +50,4 @@ The custom order holds for the **whole session**: refreshes, new items, items us
   - the log, and a seeded random run.
 - `test_hold_server153.luau` runs the real ChestService: the hand-off goes into an empty hand only, plus the refusal reasons and the server's log.
 - R152's `test_hotbar_click` / `test_hotbar_stress` / `test_hold_race` still pass unchanged. The load-guard lines 1 and 2 of Hotbar are unchanged.
-- `mutate`: with the R152 Hotbar, GardenInventoryState, HeldHarvests and ChestService, all 12 client runs fail (14 to 33 checks each) and the server test fails (3 checks).
+- `mutate`: with the R152 Hotbar, GardenInventoryState, HeldHarvests and ChestService, all 12 client runs fail (20 to 33 checks each). In the engine variant R152 assumed (InputBegan reaches the button), and with Activated wherever it is let go but released first, its drag passes; it fails in the other 9 runs (InputBegan kept by the button, a stale mouse release, the inset in InputObjects, Activated first wherever let go) and the server test fails (3 checks).
