@@ -39,7 +39,16 @@ function Scene:Part(name,size,cf,color,mat,trans,shape)
  p.Size=size;p.CFrame=self.Origin*cf;p.Color=color;p.Material=mat or SMOOTH;p.Transparency=trans or 0;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth
  p.Parent=self.Folder;self.Count+=1;return p
 end
-function Scene:Place(p,cf)p.CFrame=self.Origin*cf end
+-- R152 perf: the stage's per-frame values are written only when they change (one cache per stage: PropCache152), and a plain piece (no child that
+-- draws) that is and stays fully transparent is not moved: it is placed again in the frame it shows.
+function Scene:Place(p,cf)self.Set(p,'CFrame',self.Origin*cf)end
+function Scene:Piece(p,cf,size,trans)
+ if trans>=1 and self.Gone[p]then return end
+ local S=self.Set
+ if size then S(p,'Size',size)end
+ S(p,'CFrame',self.Origin*cf);S(p,'Transparency',trans)
+ self.Gone[p]=trans>=1
+end
 function Scene:Light(parent,color,brightness,range)
  local l=Instance.new('PointLight');l.Color=color;l.Brightness=brightness;l.Range=range;l.Shadows=false;l.Parent=parent;self.Lights+=1;return l
 end
@@ -100,19 +109,22 @@ function Scene:Box(w,d,h,zc,floorColor,wallColor,floorMat,wallMat)
 end
 -- a flat ring of segments (radius set per frame); plane: 'XZ' (the floor) or 'XY' (facing the camera)
 function Scene:Ring(name,n,color,plane)
- local r={Plane=plane,Segs={}}
+ local r={Plane=plane,Segs={},Gone=true}
  for i=1,n do r.Segs[i]=self:Part(name,V(.4,.08,.12),CF(0,-50,0),color,NEON,1)end
  return r
 end
 function Scene:PlaceRing(r,centre,radius,width,trans)
+ if trans>=1 and r.Gone then return end -- (a ring that is and stays fully transparent: nothing to draw, nothing to move)
+ local S=self.Set
  local n=#r.Segs
  for i,seg in ipairs(r.Segs)do
   local a=(i-.5)/n*math.pi*2;local len=2*math.pi*radius/n*1.06
-  seg.Size=V(math.max(.05,len),.08,width)
+  S(seg,'Size',V(math.max(.05,len),.08,width))
   if r.Plane=='XY'then self:Place(seg,CF(centre+V(math.cos(a)*radius,math.sin(a)*radius,0))*ANG(0,0,a+math.pi/2)*ANG(math.pi/2,0,0))
   else self:Place(seg,CF(centre+V(math.cos(a)*radius,0,math.sin(a)*radius))*ANG(0,-a+math.pi/2,0))end
-  seg.Transparency=trans
+  S(seg,'Transparency',trans)
  end
+ r.Gone=trans>=1
 end
 -- The pack: a clone of the real pack (or a stand-in), scaled to the hero height, centred on its bounding box.
 local function prepare(model,height,maxSide)
@@ -149,6 +161,7 @@ function S.Build(rank,opts)
  local folder=Instance.new('Folder');folder.Name='_RarePullStage'
  local self=setmetatable({Rank=rank,Folder=folder,Origin=CF(opts.Origin or Rules.StageOrigin),Count=0,Lights=0,Images=0,Lite=opts.Lite==true,Reduced=opts.Reduced==true,Fx={},
   NoArt=opts.NoArt==true or not Art.Allowed(),FxTier=opts.FxTier or(opts.Lite and math.min(2,Fx.Tier())or Fx.Tier())},Scene)
+ self.Cache=Fx.Cache.new();self.Set=self.Cache.Set;self.Gone={}
  local tier=Rules.Tier(rank)
  if Art.Allowed()then pcall(Art.Request,S.ArtNames[rank]or{})end -- (drawn now if they were not yet: ready for the next scene; on low quality they would never be shown, so never drawn)
  -- the stars
@@ -398,9 +411,9 @@ function Scene:_throne()
  -- carpet; one crowns it on the throne (it has the light)
  local tl=Rules.Timeline(8,self.Reduced and'Calm'or'Full')
  self.CarryBeam=Fx.Beam({Parent=self.Folder,Name='Carry beam',Ground=self.Origin.Position,Height=20,Width=2.4,Color=gold,Glow=C(255,244,214),Arrive='fade',
-  Land=tl.SceneIn,Hold=math.max(.1,tl.Land+.3-tl.SceneIn),Fade=.4,Impact=false,Light=false,Strength=.8,Tier=self.FxTier,Reduced=self.Reduced})
+  Land=tl.SceneIn,Hold=math.max(.1,tl.Land+.3-tl.SceneIn),Fade=.4,Impact=false,Light=false,Strength=.8,Tier=self.FxTier,Reduced=self.Reduced,Cache=self.Cache})
  self.CrownBeam=Fx.Beam({Parent=self.Folder,Name='Crown beam',Ground=(self.Origin*CF(pk.X,pk.Y-Rules.PackHeroHeight*.5,pk.Z)).Position,Height=19,Width=2.2,Color=gold,Glow=C(255,246,220),Arrive='fade',Strength=.6,
-  Land=tl.CrownStart+.4,Hold=tl.Climax+.6-(tl.CrownStart+.4),Fade=1.2,Impact=false,Light=true,Tier=self.FxTier,Reduced=self.Reduced})
+  Land=tl.CrownStart+.4,Hold=tl.Climax+.6-(tl.CrownStart+.4),Fade=1.2,Impact=false,Light=true,Tier=self.FxTier,Reduced=self.Reduced,Cache=self.Cache})
  self.BeamLight=self.CrownBeam.Light;self.Lights+=1
  -- the crown: band, points with jewels
  self.Crown={}
@@ -429,7 +442,8 @@ function Scene:_placePack(pos,yaw,roll,alpha,shake,t)
  local sx=self.Reduced and 0 or shake
  local jig=V(math.sin(t*71)*sx,math.sin(t*53+1)*sx*.6,0)
  local cf=CF(pos+jig)*ANG(0,yaw,roll+(self.Reduced and 0 or math.sin(t*63)*shake*.6))*FRONT
- pcall(function()self.Pack:PivotTo(self.Origin*cf*self.PackRel)end)
+ local at=self.Origin*cf*self.PackRel
+ if self.PackAt~=at then self.PackAt=at;pcall(function()self.Pack:PivotTo(at)end)end -- (R152 perf: only this moves the scene's pack: a still pack is not moved again)
  if self.LastPackAlpha~=alpha then self.LastPackAlpha=alpha;setAlpha(self.PackParts,alpha)end
  self.PackCF=cf
 end
@@ -440,16 +454,17 @@ function Scene:_placeSeed(pos,alpha,t)
  if self.LastSeedAlpha~=alpha then self.LastSeedAlpha=alpha;setAlpha(self.SeedParts,alpha)end
  if self.Motion then pcall(function()self.Motion:Update(self.Origin*cf,t,self.SeedScale or 1,alpha)end)end
  -- one key light from the camera side: on the pack until the seed is out (the stages are dark at night), then on the seed
+ local S=self.Set
  if alpha<=0 and self.PackCF and self.LastPackAlpha~=0 then
-  self:Place(self.Key,CF(self.PackCF.Position+V(0,1.4,3.4)));self.KeyLight.Brightness=1.3
+  self:Place(self.Key,CF(self.PackCF.Position+V(0,1.4,3.4)));S(self.KeyLight,'Brightness',1.3)
  else
-  self:Place(self.Key,CF(pos+V(0,1.2,3.2)));self.KeyLight.Brightness=1.8*alpha
+  self:Place(self.Key,CF(pos+V(0,1.2,3.2)));S(self.KeyLight,'Brightness',1.8*alpha)
  end
  -- the halo behind the seed (it follows it)
  if self.HaloAnchor then
   self:Place(self.HaloAnchor,CF(pos-V(0,0,1.1))) -- (just behind the seed: its glow never lies over the seed itself)
-  if self.SeedGlow then self.SeedGlow.Image.ImageTransparency=1-.5*alpha end
-  if self.SeedHalo then self.SeedHalo.Image.ImageTransparency=1-.7*alpha;self.SeedHalo.Image.Rotation=self.Reduced and 0 or t*25 end
+  if self.SeedGlow then S(self.SeedGlow.Image,'ImageTransparency',1-.5*alpha)end
+  if self.SeedHalo then S(self.SeedHalo.Image,'ImageTransparency',1-.7*alpha);S(self.SeedHalo.Image,'Rotation',self.Reduced and 0 or t*25)end
  end
 end
 function Scene:Update(t,tl)
@@ -461,12 +476,13 @@ function Scene:Update(t,tl)
  self:_placeSeed(spos,salpha,t)
  local burst=t-tl.Climax
  self:Place(self.FlashPart,CF(pos))
- self.FlashLight.Brightness=burst>=0 and 6*math.max(0,1-burst/.6)or 0
+ self.Set(self.FlashLight,'Brightness',burst>=0 and 6*math.max(0,1-burst/.6)or 0)
  if burst<0 then self.Burst:Place(self.Origin*CF(pos))elseif not self.Burst.Fired then self.Burst:Fire(self.Origin*CF(pos))end
- if self.PackRim then self.PackRim.Enabled=burst<0 and alpha>.05 end
+ if self.PackRim then self.Set(self.PackRim,'Enabled',burst<0 and alpha>.05)end
  if rank==6 then self:_updateVoid(t,tl,pos,burst)elseif rank==7 then self:_updateSpace(t,tl,pos,burst,spos,glow)else self:_updateThrone(t,tl,pos,burst,spos)end
 end
 function Scene:_updateVoid(t,tl,pos,burst)
+ local S=self.Set
  local n=#self.Plates
  local lockIn=clamp01((t-tl.Lock)/.3);local open=clamp01((t-tl.Unlock)/math.max(.05,tl.Silence-tl.Unlock))
  local turns=0;for _,k in ipairs(Rules.LockTurns)do if t>=tl.Lock+k and tl.Lock+k<tl.Unlock then turns+=1 end end -- (one click each: RarePullRules)
@@ -476,48 +492,44 @@ function Scene:_updateVoid(t,tl,pos,burst)
   local c=pos+V(math.cos(a)*r,math.sin(a)*r,.1)
   self:Place(self.Plates[i],CF(c)*ANG(0,0,a+math.pi/2))
   local fade=t<tl.Lock and 1 or 1-lockIn+clamp01((t-tl.Unlock-.2)/.4)
-  self.Plates[i].Transparency=clamp01(fade);self:Place(self.Bolts[i],CF(pos+V(math.cos(a)*(1.55+1.2*open),math.sin(a)*(1.55+1.2*open),.25)))
-  self.Bolts[i].Transparency=clamp01(t<tl.Lock and 1 or 1-lockIn+open)
+  S(self.Plates[i],'Transparency',clamp01(fade))
+  self:Piece(self.Bolts[i],CF(pos+V(math.cos(a)*(1.55+1.2*open),math.sin(a)*(1.55+1.2*open),.25)),nil,clamp01(t<tl.Lock and 1 or 1-lockIn+open))
  end
  local front=(self.PackSize and self.PackSize.Z or .6)*.5+.03
  for _,c in ipairs(self.Cracks)do
   local g=clamp01((t-tl.Unlock-.1)/math.max(.05,tl.Silence-tl.Unlock-.1))
   local len=c.L*g
-  c.Part.Size=V(.05,math.max(.02,len),.03)
-  self:Place(c.Part,CF(pos+V(c.X,c.Y,front))*ANG(0,0,c.R))
-  c.Part.Transparency=(g<=0 or burst>=0)and 1 or .05
+  self:Piece(c.Part,CF(pos+V(c.X,c.Y,front))*ANG(0,0,c.R),V(.05,math.max(.02,len),.03),(g<=0 or burst>=0)and 1 or .05)
  end
  for i,l in ipairs(self.Leaks)do
   local g=clamp01((t-tl.Unlock)/math.max(.05,tl.Climax-tl.Unlock));local a=i/#self.Leaks*math.pi*2+.4
   local len=.5+5*g*g
-  l.Size=V(.12+.3*g,len,.04)
-  self:Place(l,CF(pos+V(math.cos(a)*(.9+len*.5),math.sin(a)*(1.1+len*.5),-.2))*ANG(0,0,a-math.pi/2))
-  l.Transparency=(g<=0 or burst>.3)and 1 or math.clamp(.9-.5*g+(burst>0 and burst*2 or 0),0,1)
+  self:Piece(l,CF(pos+V(math.cos(a)*(.9+len*.5),math.sin(a)*(1.1+len*.5),-.2))*ANG(0,0,a-math.pi/2),V(.12+.3*g,len,.04),(g<=0 or burst>.3)and 1 or math.clamp(.9-.5*g+(burst>0 and burst*2 or 0),0,1))
  end
  for i,s in ipairs(self.Shards)do
   local k=clamp01(burst/.8);local a=i*2.399
   local d=V(math.cos(a),math.sin(a)*.8,.4+.6*((i%3)/2))*(k*(3+i%4))
-  self:Place(s,CF(pos+d)*ANG(burst*4+i,burst*3,burst*5))
-  s.Transparency=(burst<0 or k>=1)and 1 or .1+.9*k
+  self:Piece(s,CF(pos+d)*ANG(burst*4+i,burst*3,burst*5),nil,(burst<0 or k>=1)and 1 or .1+.9*k)
  end
  local wk=clamp01(burst/.7)
  self:PlaceRing(self.Wave,pos,.6+wk*(self.Reduced and 2 or 7),.18*(1-wk)+.02,burst<0 and 1 or .15+.85*wk)
- self.Wisps.Enabled=burst>=0 and t<tl.FloatEnd
- self.Rim.Brightness=1.2+(t>=tl.Unlock and t<tl.Climax and 1.5*clamp01((t-tl.Unlock)/.5)or 0)
+ S(self.Wisps,'Enabled',burst>=0 and t<tl.FloatEnd)
+ S(self.Rim,'Brightness',1.2+(t>=tl.Unlock and t<tl.Climax and 1.5*clamp01((t-tl.Unlock)/.5)or 0))
  -- the rune circle turns slowly, brightens as the lock opens, flares on the hit and dims as the seed takes over
  local open=clamp01((t-tl.Unlock)/math.max(.05,tl.Silence-tl.Unlock))
  if self.Runes then
-  local img=self.Runes.Image;img.Rotation=self.Reduced and 0 or t*4
+  local img=self.Runes.Image;S(img,'Rotation',self.Reduced and 0 or t*4)
   local glow=.42+.4*open+(burst>=0 and .18*math.max(0,1-burst/.6)or 0)
   if burst>=0 then glow*=1-.55*clamp01((burst-.5)/1.2)end
-  img.ImageTransparency=1-glow
+  S(img,'ImageTransparency',1-glow)
  end
  for i,inlay in pairs(self.Inlays or{})do
   local plate=self.Plates[i]
-  if plate then inlay.BackgroundTransparency=math.max(plate.Transparency,.6-.55*open)end
+  if plate then S(inlay,'BackgroundTransparency',math.max(plate.Transparency,.6-.55*open))end
  end
 end
 function Scene:_updateSpace(t,tl,pos,burst,spos,glow)
+ local S=self.Set
  for i,p in ipairs(self.Planets)do
   local align=tl['Align'..i]or tl.Align3
   local free=p.Phase+t*(.35+.08*i)
@@ -530,31 +542,31 @@ function Scene:_updateSpace(t,tl,pos,burst,spos,glow)
   local c=pos+V(math.cos(a)*r,math.sin(a)*r*.35+math.sin(a)*p.Tilt*r*.3,-math.sin(a)*r*.6-1)
   self:Place(p.Body,CF(c))
   local fade=clamp01(out*1.4)
-  if p.Art then p.Art.Image.ImageTransparency=fade else p.Body.Transparency=fade end
-  if p.Shell then self:Place(p.Shell,CF(c));p.Shell.Transparency=.84+.16*fade end
-  if p.Ring then self:Place(p.Ring,CF(c)*ANG(.4,0,math.pi/2+.3));p.Ring.Transparency=math.max(.45,fade)end
+  if p.Art then S(p.Art.Image,'ImageTransparency',fade)else S(p.Body,'Transparency',fade)end
+  if p.Shell then self:Place(p.Shell,CF(c));S(p.Shell,'Transparency',.84+.16*fade)end
+  if p.Ring then self:Place(p.Ring,CF(c)*ANG(.4,0,math.pi/2+.3));S(p.Ring,'Transparency',math.max(.45,fade))end
  end
  local g=clamp01((t-tl.SpinUp)/.6);local suck=clamp01((t-tl.Implode)/math.max(.05,tl.Silence-tl.Implode))
  local n=#self.Galaxy/2
  for _,s in ipairs(self.Galaxy)do
   local k=s.J/n;local spin=(t-tl.SpinUp)*(1.2+5*clamp01((t-tl.SpinUp)/math.max(.05,tl.Implode-tl.SpinUp)))
   local a=k*math.pi*1.6+(s.Arm-1)*math.pi+spin;local r=(1.6+k*5.5)*(1-suck)
-  self:Place(s.Part,CF(pos+V(math.cos(a)*r,math.sin(a)*r*.45,math.sin(a)*r*.3)))
-  s.Part.Transparency=(g<=0 or burst>=0)and 1 or 1-g*(.15+.85*(1-k*.5))
+  self:Piece(s.Part,CF(pos+V(math.cos(a)*r,math.sin(a)*r*.45,math.sin(a)*r*.3)),nil,(g<=0 or burst>=0)and 1 or 1-g*(.15+.85*(1-k*.5)))
  end
  local core=0
  if t>=tl.Implode and t<tl.Climax then local a=t-tl.Implode;local up=clamp01(a/.25);local down=clamp01((t-tl.Implode-.25)/math.max(.05,tl.Silence-tl.Implode-.25));core=1.8*up*(1-down)+.15 end
- self.Core.Size=V(core,core,core);self:Place(self.Core,CF(pos));self.Core.Transparency=core>0 and .05 or 1
+ self:Piece(self.Core,CF(pos),V(core,core,core),core>0 and .05 or 1)
  local nk=clamp01(burst/.8)
- local d=.5+nk*(self.Reduced and 6 or 16);self.Nova.Size=V(d,d,d);self:Place(self.Nova,CF(pos));self.Nova.Transparency=burst<0 and 1 or .25+.75*nk
+ local d=.5+nk*(self.Reduced and 6 or 16);self:Piece(self.Nova,CF(pos),V(d,d,d),burst<0 and 1 or .25+.75*nk)
  for i,w in ipairs(self.Waves)do local k=clamp01((burst-(i-1)*.15)/.8);self:PlaceRing(w,pos,.6+k*(self.Reduced and 3 or 10),.25*(1-k)+.03,(burst<(i-1)*.15)and 1 or .1+.9*k)end
- self.Star.Size=V(1,1,1)*(.5+1.6*glow);self:Place(self.Star,CF(spos));self.Star.Transparency=(burst<0 or glow<=.02)and 1 or .15+.6*(1-glow)
- self.Trail.Enabled=burst>=0 and glow>.05 and not self.Reduced
+ S(self.Star,'Size',V(1,1,1)*(.5+1.6*glow));self:Place(self.Star,CF(spos));S(self.Star,'Transparency',(burst<0 or glow<=.02)and 1 or .15+.6*(1-glow))
+ S(self.Trail,'Enabled',burst>=0 and glow>.05 and not self.Reduced)
  -- (R152: turned by the clock, not by a fixed step per frame: at 240 fps the nebulae spun four times as fast as at 60)
- for i,n2 in ipairs(self.Nebula)do if not self.Reduced then n2.CFrame=self.NebulaBase[i]*ANG(.03*i*t,0,0)end end
- for i,a in pairs(self.NebulaArt or{})do a.Image.Rotation=self.Reduced and 0 or t*(1.5+i*.4)end -- (the clouds turn very slowly, by the clock)
+ for i,n2 in ipairs(self.Nebula)do if not self.Reduced then S(n2,'CFrame',self.NebulaBase[i]*ANG(.03*i*t,0,0))end end
+ for i,a in pairs(self.NebulaArt or{})do S(a.Image,'Rotation',self.Reduced and 0 or t*(1.5+i*.4))end -- (the clouds turn very slowly, by the clock)
 end
 function Scene:_updateThrone(t,tl,pos,burst,spos)
+ local S=self.Set
  -- the carry beam follows the pack down the carpet
  self.CarryBeam:Update(t,(self.Origin*CF(pos-V(0,Rules.PackHeroHeight*.5,0))).Position)
  self.CrownBeam:Update(t)
@@ -576,21 +588,18 @@ function Scene:_updateThrone(t,tl,pos,burst,spos)
   elseif c.Kind=='Point'then off=CF(math.cos(a)*r,.48*scale,math.sin(a)*r)*ANG(0,-a+math.pi/2,0)
   elseif c.Kind=='Tip'then off=CF(math.cos(a)*r,.86*scale,math.sin(a)*r)
   else off=CF(math.cos(a)*(r+.08),0,math.sin(a)*(r+.08))*ANG(0,-a+math.pi/2,0)end
-  self:Place(c.Part,CF(centre)*off);c.Part.Size=(c.Kind=='Band'and V(.7,.42,.16)or c.Kind=='Point'and V(.26,.62,.14)or c.Kind=='Tip'and V(.22,.22,.22)or V(.18,.18,.12))*scale
-  c.Part.Transparency=1-calpha
+  self:Piece(c.Part,CF(centre)*off,(c.Kind=='Band'and V(.7,.42,.16)or c.Kind=='Point'and V(.26,.62,.14)or c.Kind=='Tip'and V(.22,.22,.22)or V(.18,.18,.12))*scale,1-calpha)
  end
  -- the burst: rays, shockwave on the floor, confetti
  for i,r in ipairs(self.Rays)do
   local k=clamp01(burst/.3);local fade=clamp01((burst-.4)/1.6);local a=i/#self.Rays*math.pi*2+(self.Reduced and 0 or burst*.4)
   local len=.5+9*k
-  r.Size=V(.18+.25*(i%2),len,.05)
-  self:Place(r,CF(pos+V(math.cos(a)*(1+len*.5),math.sin(a)*(1+len*.5),-.6))*ANG(0,0,a-math.pi/2))
-  r.Transparency=burst<0 and 1 or .2+.8*fade
+  self:Piece(r,CF(pos+V(math.cos(a)*(1+len*.5),math.sin(a)*(1+len*.5),-.6))*ANG(0,0,a-math.pi/2),V(.18+.25*(i%2),len,.05),burst<0 and 1 or .2+.8*fade)
  end
  local wk=clamp01(burst/.9)
  self:PlaceRing(self.Wave,V(pos.X,.12,pos.Z),1+wk*(self.Reduced and 5 or 16),.35*(1-wk)+.05,burst<0 and 1 or .1+.9*wk)
  if burst>=0 and not self.ConfettiDone then self.ConfettiDone=true;pcall(function()self.Confetti:Emit(self.Lite and 50 or 130)end)end
- self.Sparkles.Enabled=burst>=0 and t<tl.FloatEnd
+ S(self.Sparkles,'Enabled',burst>=0 and t<tl.FloatEnd)
 end
 function Scene:Destroy()
  if self.Destroyed then return end

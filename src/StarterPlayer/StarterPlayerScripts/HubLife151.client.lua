@@ -28,7 +28,7 @@ local V=Vector3.new
 local GREEN,WHITE=Color3.fromRGB(110,236,96),Color3.fromRGB(255,255,255)
 local NEAR={detail=230,detailPhone=160,fine=130};local AMBIENCE_RANGE=150;local FAR_TRACK_Z=320
 
-local state={Root=nil,Ctx=nil,Tier=nil,Clock=0,Ambience=nil,Dark=false,LastKeys={},LightBase=setmetatable({},{__mode='k'}),HeadBase=setmetatable({},{__mode='k'})}
+local state={Root=nil,Ctx=nil,Tier=nil,Clock=0,Ambience=nil,Dark=false,LastKeys={},LightBase=setmetatable({},{__mode='k'}),HeadBase=setmetatable({},{__mode='k'}),MoveParts={},MoveFrames={}}
 local connections={}
 local function reduced()local ok,v=pcall(function()return GuiService.ReducedMotionEnabled end);return ok and v==true end
 local function tier()
@@ -64,7 +64,7 @@ end
 local function ambienceStep(dt)
  local ctx=state.Ctx;if not ctx then return end
  state.Clock+=dt;local c=state.Clock
- local parts,cfs={},{}
+ local parts,cfs=state.MoveParts,state.MoveFrames;table.clear(parts);table.clear(cfs) -- (R152 perf: two lists reused, not made every frame)
  for _,b in ipairs(ctx.Butterflies)do if b.Left:IsDescendantOf(workspace)then
   local t=c*b.Speed+b.Phase
   local pos=b.Home+V(math.sin(t*.7)*3,math.sin(t*1.3)*.7,math.cos(t*.5)*3)
@@ -211,7 +211,8 @@ local function applySounds(dt)
   end
   local s=e.Sound;local v=s.Volume+(target-s.Volume)*math.min(1,dt*2)
   if math.abs(v-target)<.0005 then v=target end
-  if v~=s.Volume then s.Volume=v end
+  -- (R152 perf: a level that holds is not written again: Roblox keeps Volume as a 32-bit float, so it never read back equal to the target)
+  if v~=e.Wrote and v~=s.Volume then s.Volume=v end;e.Wrote=v
   if v>0 and not s.IsPlaying then s:Play()elseif v==0 and s.IsPlaying then s:Pause()end
  end
 end

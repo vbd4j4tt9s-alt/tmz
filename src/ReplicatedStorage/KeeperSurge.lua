@@ -22,16 +22,23 @@ function M.New(parent,variant)
  end
  return self
 end
+-- (R152 perf: between flashes the arcs are fully transparent: they are not reshaped then (each flash places them again before it shows them),
+-- and their transparency is written when it changes, against what this wrote)
 function M.Step(self,root,frames,t,strength)
- local on=(t%2.6)<.52
+ local on=(t%2.6)<.52;local tr=on and 1-.9*(strength or 1)or 1
+ local shown=self.Shown;if not shown then shown={};self.Shown=shown end
+ if tr>=1 then
+  for k,p in ipairs(self.Parts)do if shown[k]~=tr then shown[k]=tr;p.Transparency=tr end end
+  return
+ end
  for j,path in ipairs(self.Paths)do
   local pose=root*(frames[path[1]]or frames.Body);local previous=pose*path[2]
   for i=1,4 do
    local point=path[2]:Lerp(path[3],i/4)
    if i<4 then point+=V(math.sin(t*18+i*7+j)*.75,math.cos(t*13+i*3)*.25,-.12)end
-   point=pose*point;local p=self.Parts[(j-1)*4+i]
+   point=pose*point;local k=(j-1)*4+i;local p=self.Parts[k]
    p.Size=V(.13,.13,(point-previous).Magnitude);p.CFrame=CFrame.lookAt((point+previous)*.5,point)
-   p.Transparency=on and 1-.9*(strength or 1)or 1;previous=point
+   if shown[k]~=tr then shown[k]=tr;p.Transparency=tr end;previous=point
   end
  end
 end
