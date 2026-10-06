@@ -40,4 +40,4 @@ Z-fighting is two visible faces that point the same way, lie in (nearly) the sam
 
 ## Pack-opening files
 
-The rule not to touch them was lifted when the rework merged; the three files above are the only changes. `test_seed_*` and R151 `run_rare_pull.sh` stay green. `run_seed_opening.sh`'s model-name grep no longer trips on the `.claude/uploads` path of the place file.
+The rule not to touch them was lifted when the rework merged; the three files above are the only changes. `test_seed_*` and R151 `run_rare_pull.sh` stay green. `run_seed_opening.sh`'s "no model names" grep no longer trips on the upload folder in the place file's path.

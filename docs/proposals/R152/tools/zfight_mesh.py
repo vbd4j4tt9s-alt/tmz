@@ -5,9 +5,10 @@ the game's own decoder (KeeperMeshes152.Decode) and pose code (BeastPose / Veile
 The rules are the R149 detector's (docs/proposals/R149/tools/zfight.py): coplanar |offset| <= 0.002 studs, near <= 0.02, far < 4 steps of a 24-bit depth buffer at the distance the
 overlap is seen from (0.02 .. 0.043; D = how far away it still covers ~8 px), `strict` (up to 0.002 x D) listed, not counted; overlaps under 0.02 stud^2 do not count.
 A pair is only counted when both triangles are DRAWN (BeastAnimation / VeiledEventClient81: the Chase face + eyes awake, the Asleep face asleep, the golem's tree glow only awake),
-look different (a different palette colour; look-alike triangles have the same vertex colours: nothing to flicker) and the overlap is SEEN: a few sample points of it, lifted 0.04 along
-the normal, must have a clear line to some camera direction on the face's side (>= 0.3 of the normal, not below the ground, which is y = -4 in rig space where the keepers stand, and a
-face that points down and is within CAMERA_GAP of the ground cannot be looked at), so an overlap buried in the body, a belly plate on the floor or a face hidden by a limb never counts.
+look different (a different palette colour; look-alike triangles have the same vertex colours: nothing to flicker) and the overlap is SEEN: a few sample points of it, lifted 0.04
+along the normal, must lie outside every closed piece (a box / bevelled block: a plate sunk into a head is not seen from inside it) and have a clear line to a camera at least CAMERA_NEAR
+(4) studs away on the face's side (>= 0.3 of the normal), standing at least CAMERA_GAP (0.5) above the ground (y = -4 in rig space, where the keepers stand): an overlap buried in the
+body, a belly plate on the floor, the underside of something near the ground or a face hidden by a limb never counts.
 Poses: 'bind' (every group frame the identity: the model as built), 'rest' (awake, standing) and 'asleep', each as the client poses the parts (the golem asleep: its tree rest and size)."""
 import collections, itertools, math, os, sys
 import numpy as np
