@@ -143,6 +143,8 @@ mutate "a board that a write did not settle is retried at every step" $SV "if se
 mutate "a failed request does not back off" $ST "self.NextTryAt=self.Clock()+wait" "self.NextTryAt=0" store
 mutate "the request budget is not kept" $ST "if #self.Calls>=Rules.RequestsPerMinute then return false,'budget'end" "" store
 mutate "a store error escapes (no pcall)" $ST "local ok,a,b=pcall(fn,map)" "local ok,a,b=true,fn(map)" store
+mutate "a fruit grown from an owner-given seed counts" $SV "if harvest.TestGrant==true then return false,'test seed'end" "" service
+mutate "a pull with owner-given boots counts" ServerScriptService/ChestChaseServer/PlayerDataService.lua "Test=testSeed~=nil or pack.TestGrant==true or luckTest" "Test=testSeed~=nil or pack.TestGrant==true" hooks
 mutate "a TEST pack counts" $SV "if info.Test==true then return false,'test pack'end" "" service
 mutate "an owner-granted seed counts" $SV "if self.Tainted[player]then return false,'owner-granted'end" "" service
 mutate "a pull record is announced before the puller's reveal" $SV "elseif kind=='Pull'then spec.AfterReveal=true end" "elseif false then spec.AfterReveal=true end" service

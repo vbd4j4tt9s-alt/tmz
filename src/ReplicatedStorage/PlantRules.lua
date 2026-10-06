@@ -19,7 +19,8 @@ function R.NewCrop(seed,id,definition,now,x,z)
  return {Id=id,SeedId=seed.SeedId,PlantedAt=now,ReadyAt=now+definition.Seconds,
   MatureAt=now+definition.Seconds,Value=definition.Value,OffsetX=x,OffsetZ=z,
   PaidRandom=seed.PaidRandom==true,SeedScale=size,PlantScale=R.PlantScale(size,R.Roll(seed.Id,'plant-size')),
-  Mutation=R.Mutation(seed.PackMutation),Weather=Weather.Key(seed.Weather),HarvestCycle=0,PickedMask=0,TraitVersion=1}
+  Mutation=R.Mutation(seed.PackMutation),Weather=Weather.Key(seed.Weather),HarvestCycle=0,PickedMask=0,TraitVersion=1,
+  TestGrant=seed.TestGrant==true or nil} -- R152: a plant from an owner-given seed stays a TEST plant (optional, kept with the crop and its harvests: its fruit never counts for the hub)
 end
 function R.Migrate(crop)
  if crop.TraitVersion==nil then

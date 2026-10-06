@@ -375,6 +375,39 @@ do
   check(hub:Snapshot().Pull.Record==nil and#logA==0 and bus:Count('A')==published,'a TestGrant pack opened with no owner taint on the player (a pack kept from an earlier session, or gifted) is still not a record')
  end
 
+ -- c2. R152: owner-given BOOTS and SEEDS are TEST too (R151 left them real). A pull made with /test boots never takes the board nor speaks; fruit grown from a seed an owner gave never
+ -- counts, even in a later session (the in-memory owner taint is gone then): the mark travels with the seed, the plant and the harvest.
+ do
+  local published=fresh()
+  local boots=Config.ShopCatalog.Accessories
+  local Una,Vic=makePlayer(112,'Una'),makePlayer(113,'Vic')
+  Run.IsStudio=function()return true end;local okB=Cmd.Execute(ctx,owner,'/test boots 5 @Una');Run.IsStudio=function()return false end
+  check(okB and Data:HasTestLuck(Una)and not hub.Tainted[Una],'/test boots 5 @Una: owner boots (and the boots command leaves no session taint: the boots themselves carry the mark)')
+  Data:AddBoost(Vic,boots[5].Id)
+  local rewardU=openReal(Una,'Secret');step(14,function()return false end)
+  check(rewardU and rewardU.Rarity~='Common'and hub:Snapshot().Pull.Record==nil,'a pull with owner-given boots does not take the Best Pull ('..tostring(rewardU and rewardU.Rarity)..')')
+  check(#logA==0 and#logB==0 and bus:Count('A')==published and hubNotices()==0,'... and nothing is said anywhere (no pull line, no record line, nothing published)')
+  local rewardV=openReal(Vic,'Secret');step(14,function()return false end)
+  check(rewardV and hub:Snapshot().Pull.Record and hub:Snapshot().Pull.Record.Name=='Vic'and#distinct(logA)==2,'control: the same pull with BOUGHT boots takes the board and is announced (the pull line and the record line)')
+  -- seeds: an owner-given seed, planted and harvested later with no taint on the player
+  fresh();hub.Tainted=setmetatable({},{__mode='k'})
+  Run.IsStudio=function()return true end;local okS=Cmd.Execute(ctx,owner,'/test seed SunflowerSeed @Una');Run.IsStudio=function()return false end
+  hub.Tainted=setmetatable({},{__mode='k'}) -- (a later session: nothing in memory says who was given what)
+  local seedU;for _,r in ipairs(Data:GetChestRecords(Una))do if r.Kind=='Seed'and r.SeedId=='SunflowerSeed'and r.TestGrant==true then seedU=r end end
+  table.insert(Data:GetChestRecords(Vic),{Id='real1',Kind='Seed',ChestNumber=901,ChestName='Sunflower Seed',Stage=1,SeedId='SunflowerSeed',SeedName='Sunflower Seed',SeedEmoji='x',AccentColor=R.Color3.new(1,1,1),SeedScale=1,BagVariant='Pack01',PackSize=1,PackMutation='None'})
+  check(okS and seedU,'/test seed @Una gave a marked seed')
+  local fid=hub.Board.FruitId;local now=os.time()
+  local okP,cropU=Data:PlantSeed(Una,1,seedU and seedU.Id or'?',{OffsetX=0,OffsetZ=0},now);local okQ,cropV=Data:PlantSeed(Vic,1,'real1',{OffsetX=0,OffsetZ=0},now)
+  local okH,harvestU=Data:HarvestPlant(Una,1,okP and cropU.Id or'?',now+1e6);local okI,harvestV=Data:HarvestPlant(Vic,1,okQ and cropV.Id or'?',now+1e6)
+  check(okP and okQ and okH and okI and harvestU.TestGrant==true and harvestV.TestGrant==nil,'the harvest of the owner-given seed carries the mark; the normal seed\'s does not')
+  if okH and okI then
+   harvestU.SeedId=fid;harvestV.SeedId=fid;harvestU.FruitScale=40;harvestV.FruitScale=2 -- (made today\'s fruit; the marked one is far heavier)
+   check(not hub:NoteHarvest(Una,harvestU)and hub:Snapshot().Fruit.Record==nil,'a fruit grown from an owner-given seed never counts for the Biggest Fruit, with no session taint')
+   check(hub:NoteHarvest(Vic,harvestV)and hub:Snapshot().Fruit.Record.Name=='Vic','control: a normal seed\'s fruit counts')
+  end
+  everyone=#Players:GetPlayers() -- (two more players are in the server now)
+ end
+
  -- d. an owner's bestpull / bigfruit test: private to the target, never to the server, never to other servers (shared or not)
  do
   local published=fresh()

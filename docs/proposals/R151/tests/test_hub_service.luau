@@ -192,6 +192,7 @@ do
  -- fruit
  local fid=svc.Board.FruitId
  check(not svc:NoteHarvest(p1,{SeedId='NoSuchSeed',FruitScale=3}),'a fruit of another type is ignored (one comparison)')
+ check(not svc:NoteHarvest(p1,{SeedId=fid,FruitScale=9,TestGrant=true})and svc:Snapshot().Fruit.Record==nil,'R152: a fruit grown from a seed an owner gave (TestGrant on the harvest) is not counted, with no session taint')
  check(svc:NoteHarvest(p1,{SeedId=fid,FruitScale=2,Mutation='None',Weather='None'}),'today\'s fruit is counted')
  local fr=svc:Snapshot().Fruit.Record
  check(fr.Name=='Ann'and math.abs(fr.Kg-2*Weight.FruitBase(fid))<1e-9,'with its weight = base kg x its size')

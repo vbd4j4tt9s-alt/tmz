@@ -2,7 +2,7 @@
 -- the server half. What it does:
 --  * Counts every real thing the server decides: a pack opened (PlayerDataService:OpenSeedPack calls NotePull with the reward and the pack it came from) and a fruit
 --    picked by hand (ChestService's garden Harvest calls NoteHarvest). Not counted: TEST packs (/test rarepacks), anything an owner command just gave that player
---    (NoteOwnerGrant: the rest of that session), the owner's injected test pulls / fruit (they only ever show on this server).
+--    (NoteOwnerGrant: the rest of that session; R152: and for good, what carries TestGrant: packs, seeds and the plants grown from them, pulls with owner-given boots), the owner's injected test pulls / fruit (they only ever show on this server).
 --  * Keeps this server's view of today's two boards (HubDisplayBoard): the shared store's best (Remote), this server's own best (Local) and an injected one (Test). The
 --    displays always show the best of the three. Everything an event does here is instant and local; the shared store (HubDisplayStore, MemoryStore) is written about 3 s
 --    later (compare-and-set: only if better) and read about once a minute (45 s + 0..15 s of jitter), so the other servers' champions arrive within a minute. If the store
@@ -139,7 +139,7 @@ end
 function S:NoteOwnerGrant(player)if player then self.Tainted[player]=true end end
 local function wholeNumber(n)return type(n)=='number'and n==n and n%1==0 end
 -- A pack was opened: reward = the record OpenSeedPack made (SeedId, SeedName, Rarity, SeedScale, PackMutation), info = {Stage, Variant, Version, Boost, Luck, Test} of the PACK it
--- came from (Test = a guaranteed TEST reveal or an owner-made TestGrant pack). Never throws, never yields. Returns true when the pull was counted.
+-- came from (Test = a guaranteed TEST reveal, an owner-made TestGrant pack, or luck from owner-given boots: R152). Never throws, never yields. Returns true when the pull was counted.
 function S:NotePull(player,reward,info)
  if self.Dead or type(reward)~='table'or typeof(player)~='Instance'then return false end
  info=type(info)=='table'and info or{}
@@ -160,6 +160,7 @@ function S:NoteHarvest(player,harvest)
  if self.Dead or type(harvest)~='table'or typeof(player)~='Instance'then return false end
  self:_syncDay()
  if harvest.SeedId~=self.Board.FruitId then return false,'not today\'s fruit'end -- (the common case: one string compare)
+ if harvest.TestGrant==true then return false,'test seed'end -- R152: grown from a seed an owner command gave (it keeps the mark through planting, saving and harvesting)
  if self.Tainted[player]then return false,'owner-granted'end
  local rec=Rules.CleanFruit({Uid=player.UserId,Name=player.DisplayName,Id=harvest.SeedId,Scale=harvest.FruitScale or harvest.PlantScale or 1,Coat=harvest.Mutation,
   Weather=harvest.Weather,At=self:Now()})
