@@ -137,9 +137,9 @@ do
  -- a record: amber
  local r={Kind='Record',Id='rec-1',UserId=3000,Name='Rex',Record='BestPull',SeedId=KING,Odds=5e6};send(r)
  local rl=chatLog[#chatLog].Text
- check(rl=='<font color="'..Rules.Hex(Rules.Amber)..'">🏆 Rex took BEST PULL TODAY!</font>','a record: amber, "🏆 Rex took BEST PULL TODAY!" ('..rl..')')
+ check(rl=='<font color="'..Rules.Hex(Rules.Amber)..'">🏆 Rex just took BEST PULL TODAY!</font>','a record: amber, "🏆 Rex just took BEST PULL TODAY!" ('..rl..')')
  send({Kind='Record',Id='rec-2',UserId=3001,Name='Roy',Record='BiggestFruit'})
- check(chatLog[#chatLog].Text:find('🏆 Roy took BIGGEST FRUIT TODAY!',1,true)~=nil,'"took BIGGEST FRUIT TODAY!" (a record needs no seed)')
+ check(chatLog[#chatLog].Text:find('🏆 Roy just took BIGGEST FRUIT TODAY!',1,true)~=nil,'"just took BIGGEST FRUIT TODAY!" (a record needs no seed)')
  check(#chatLog==8,'eight events (five rarities, another server, two records), eight lines ('..#chatLog..')')
 end
 
@@ -178,7 +178,7 @@ do
  check(wellFormed(line)and line:find('#FF0000',1,true)==nil and line:find('<b>Hax',1,true)==nil,'markup in a name never reaches the chat as a tag ('..line..')')
  seconds(2)
  send({Kind='Record',Id='x2',UserId=7,Name='Zed',Record='<font color="#FF0000">Hack</font>'})
- check(chatLog[#chatLog].Text=='<font color="'..Rules.Hex(Rules.Amber)..'">🏆 Zed took A NEW RECORD!</font>','a record key with markup is the plain "A NEW RECORD" (no free text is ever shown)')
+ check(chatLog[#chatLog].Text=='<font color="'..Rules.Hex(Rules.Amber)..'">🏆 Zed just took A NEW RECORD!</font>','a record key with markup is the plain "A NEW RECORD" (no free text is ever shown)')
  seconds(2)
  send({Kind='Pull',Id='x3',UserId=7,Name=string.rep('W',80),SeedId=KING,Odds=1e15})
  local long=chatLog[#chatLog].Text
@@ -191,7 +191,7 @@ do
  check(chatLog[#chatLog].Text:find('a b c',1,true)~=nil and chatLog[#chatLog].Text:find('\u{202E}',1,true)==nil,'text-direction and zero-width characters are blanked')
  seconds(2)
  send({Kind='Pull',Id='x6',UserId=7,Name='🌟Star🌟',SeedId=LEG})
- check(chatLog[#chatLog].Text:find('🌟Star🌟 pulled',1,true)~=nil,'emoji in a name stay')
+ check(chatLog[#chatLog].Text:find('🌟Star🌟 just pulled',1,true)~=nil,'emoji in a name stay')
 end
 
 -- 6. the old chat ------------------------------------------------------------------------------------------------------------------------------------------
@@ -202,7 +202,7 @@ do
  check(oldChat[1].Value.Text==Rules.Plain(e)and oldChat[1].Value.Text:find('<',1,true)==nil,'... a plain sentence, no markup ('..tostring(oldChat[1].Value.Text)..')')
  check(oldChat[1].Value.Color==Rules.RarityColor('Legendary'),'... in the rarity colour')
  send(pull(SEC,{Kind='Global',Odds=1000}));check(oldChat[2].Value.Color==Rules.Gold,'another server: gold in the old chat')
- send({Kind='Record',Id='o-r',UserId=1,Name='Rex',Record='BestPull'});check(oldChat[3].Value.Color==Rules.Amber and oldChat[3].Value.Text=='🏆 Rex took BEST PULL TODAY!','a record: amber')
+ send({Kind='Record',Id='o-r',UserId=1,Name='Rex',Record='BestPull'});check(oldChat[3].Value.Color==Rules.Amber and oldChat[3].Value.Text=='🏆 Rex just took BEST PULL TODAY!','a record: amber')
  -- the channel appears later (TextChatService finishes loading): the next line goes there, and only there
  general.Parent=channels;seconds(11)
  send(pull(MYTH));check(#chatLog==1 and#oldChat==3,'when RBXGeneral exists the line goes to it and not to the old chat')

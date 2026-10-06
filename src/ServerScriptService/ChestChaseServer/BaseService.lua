@@ -588,14 +588,14 @@ function BaseService:SetupTreadmillRemotes(folder)
     local request=remote('ManageTreadmill','RemoteFunction')
     request.OnServerInvoke=function(player,action,expected)
         if not require(script.Parent.SecurityGate).Allow(player,'ManageTreadmill',action,expected)or not require(script.Parent.MovementGuard).Check(player)then return {Error='Please try again.'}end
-        if not self:CanManageTreadmill(player)then return {Error='Go to your own treadmill.'}end
+        if not self:CanManageTreadmill(player)then return {Error='Go to ur own treadmill!'}end
         local now=os.clock()
-        if now-(self.TreadmillRequests[player]or -math.huge)<.25 then return {Error='Please wait a moment.'}end
+        if now-(self.TreadmillRequests[player]or -math.huge)<.25 then return {Error='Wait a sec!'}end
         self.TreadmillRequests[player]=now
         if action=='Info'then return self:TreadmillSnapshot(player)end
         local ok,message
         if action=='Upgrade'then ok,message=self.PlayerData:BuyTreadmill(player,expected)
-        else return {Error='Unknown request.'}end
+        else return {Error='Try again!'}end
         if ok then
             local rendered,why=pcall(function()self:RefreshTreadmill(player)end)
             if not rendered then warn('[V131] Treadmill appearance needs retry: '..tostring(why))end

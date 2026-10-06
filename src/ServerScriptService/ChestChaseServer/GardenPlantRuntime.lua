@@ -102,16 +102,16 @@ function Runtime.Install(Service)
  function Service:TeleportGardenPlant(player,info,crop,root)
   local function reject(message)return {Success=false,Message=message}end
   local def=Catalog[crop.SeedId];local _,stage=Rules.Growth(crop,os.time())
-  if stage~=4 or not Access.IsGiant(def,Rules.Scale(crop.PlantScale))then return reject('THIS PLANT DOES NOT NEED A LIFT')end
+  if stage~=4 or not Access.IsGiant(def,Rules.Scale(crop.PlantScale))then return reject('THIS PLANT DOESN\'T NEED A LIFT')end
   local at=origin(info.Part,crop)
 
   self.GardenTopCooldowns=self.GardenTopCooldowns or setmetatable({},{__mode='k'})
-  if os.clock()-(self.GardenTopCooldowns[player]or -math.huge)<Access.TeleportCooldown then return reject('WAIT A MOMENT BEFORE GOING UP AGAIN')end
+  if os.clock()-(self.GardenTopCooldowns[player]or -math.huge)<Access.TeleportCooldown then return reject('WAIT A SEC BEFORE GOING UP AGAIN')end
   local record=info.Rendered[crop.Id];local model=record and record.Model
   if not model or model.Parent~=info.Part or not model:GetAttribute('GardenPlantV141')or model:GetAttribute('CropId')~=crop.Id
    or model:GetAttribute('GardenOwnerId')~=player.UserId or model:GetAttribute('GrowthStage')~=4 then return reject('THIS PLANT HAS CHANGED — TRY AGAIN')end
-  if not require(RS:WaitForChild('GardenLiftContact')).Find(model,root.Position)then return reject('MOVE NEXT TO THE STEM')end
-  local localTop=Visuals.TopSurface(crop.SeedId,crop,os.time());if not localTop then return reject('PLANT TOP IS NOT READY')end
+  if not require(RS:WaitForChild('GardenLiftContact')).Find(model,root.Position)then return reject('GET NEXT TO THE STEM')end
+  local localTop=Visuals.TopSurface(crop.SeedId,crop,os.time());if not localTop then return reject('THE TOP ISN\'T READY YET')end
   local surface=at:PointToWorldSpace(localTop)+Vector3.new(0,.15,0)
   local character=player.Character;local humanoid=character:FindFirstChildOfClass('Humanoid')
   local leg=character:FindFirstChild('Left Leg')or character:FindFirstChild('Right Leg')
@@ -204,7 +204,7 @@ function Runtime.Install(Service)
        local trait=Rules.Fruit(crop,index,def)
        group:SetAttribute('Weather',trait.Weather);FX.Set(anchor,trait.Weather,false,math.min(35,(def.FruitRadii[index]or 1)*trait.Scale),math.min(60,(def.FruitRadii[index]or 1)*trait.Scale*1.4))
        if def.Mode~='whole'then Visuals.FruitProxy(group,crop.SeedId,crop,index,origin(info.Part,crop))end
-       local prompt=Instance.new('ProximityPrompt');prompt.Name='HarvestPrompt';prompt.ActionText='Harvest';prompt.Style=Enum.ProximityPromptStyle.Custom;prompt.GamepadKeyCode=Enum.KeyCode.ButtonX
+       local prompt=Instance.new('ProximityPrompt');prompt.Name='HarvestPrompt';prompt.ActionText='Pick';prompt.Style=Enum.ProximityPromptStyle.Custom;prompt.GamepadKeyCode=Enum.KeyCode.ButtonX
        prompt.ObjectText=(trait.Weather~='None'and Weather.Display(trait.Weather)..' 'or'')..(trait.Mutation~='None'and trait.Mutation..' 'or'')..(Hologram.Name(crop,index)or def.HarvestName)
        prompt.HoldDuration=0;prompt.KeyboardKeyCode=Enum.KeyCode.E;prompt.ClickablePrompt=true;prompt.MaxActivationDistance=math.max(self.Config.GardenInteractionDistance,Visuals.FruitReach(crop,def,index));prompt.RequiresLineOfSight=false
        prompt.Exclusivity=Enum.ProximityPromptExclusivity.OnePerButton

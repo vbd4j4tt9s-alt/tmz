@@ -284,7 +284,7 @@ do
  check(f.State=='Champion'and f.Plaque.Title.Text=='BIGGEST FRUIT TODAY'and f.Plaque.Name.Text=='Sam'and f.Label.Name.Text=='Sam'and f.Label.Info.Text==Rules.KgText(fr.Kg)and f.Plaque.Footer.Text=='New fruit in 1h 0m','the BIGGEST FRUIT plaque and label: the title, the winner, the weight, a countdown')
  check(f.Plaque.Line.Text=='Today: 🍉 Watermelon','a short line under the winner tells the fruit of the day: "Today: 🍉 Watermelon"')
  local fe=Rules.SignText('Fruit',nil,'SunflowerSeed',60,'Watermelon')
- check(fe.State=='Empty'and fe.Plaque.Line.Text=='Today: 🍉 Watermelon'and fe.Label.Name.Text=='Nobody yet'and fe.Label.Info.Text:find('Harvest',1,true),'the empty BIGGEST FRUIT still says the fruit of the day and invites a harvest')
+ check(fe.State=='Empty'and fe.Plaque.Line.Text=='Today: 🍉 Watermelon'and fe.Label.Name.Text=='Nobody yet'and fe.Label.Info.Text:find('Pick',1,true),'the empty BIGGEST FRUIT still says the fruit of the day and invites a harvest')
  check(Rules.SignText('Fruit',Rules.CleanFruit({Uid=1,Name='G',Id='SunflowerSeed',Scale=2,Coat='Gold',Weather='Drippy',At=5}),'SunflowerSeed',60,'Watermelon').Label.Info.Text:find(' · Gold · Drippy',1,true),'a coat and a weather are told after the weight')
  check(Rules.SignText('Fruit',nil,'SunflowerSeed',60).Plaque.Line.Text:find('Today: ',1,true)==1,'a fruit with no name given is looked up (never an error)')
  -- the rows fit: the plaque's four rows are inside its canvas and one under another; the label's three rows inside the label

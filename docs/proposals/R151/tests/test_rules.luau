@@ -127,23 +127,23 @@ end
 local function unescape(text)return(text:gsub('&(%a+);',function(n)return ENTITIES[n]end))end
 do
  local pull=Rules.Event('Pull',{Name='Ann',UserId=1,Id='a-1',SeedId='FirePepperSeed',Odds=800})
- check(Rules.Line(pull)=='🌟 Ann pulled a MYTHIC Fire Pepper! (1/800)','the in-server sentence: "'..Rules.Line(pull)..'"')
+ check(Rules.Line(pull)=='🌟 Ann just pulled a MYTHIC Fire Pepper! (1/800) Nice pull!','the in-server sentence: "'..Rules.Line(pull)..'"')
  local sec=Rules.Event('Global',{Name='Ann',UserId=1,Id='a-2',SeedId='ObsidianMawSeed',Odds=1000})
- check(Rules.Line(sec)=='🌐 Ann pulled a SECRET Obsidian Maw (1/1,000)!','the other-server sentence: "'..Rules.Line(sec)..'"')
- check(Rules.Line(Rules.Event('Pull',{Name='Ann',SeedId='FirePepperSeed'}))=='🌟 Ann pulled a MYTHIC Fire Pepper!','no odds known = no odds in the sentence')
- check(Rules.Line(Rules.Event('Global',{Name='Ann',Id='a-3',SeedId='ObsidianMawSeed'}))=='🌐 Ann pulled a SECRET Obsidian Maw!','... also for another server')
+ check(Rules.Line(sec)=='🌐 Ann just pulled a SECRET Obsidian Maw (1/1,000)!','the other-server sentence: "'..Rules.Line(sec)..'"')
+ check(Rules.Line(Rules.Event('Pull',{Name='Ann',SeedId='FirePepperSeed'}))=='🌟 Ann just pulled a MYTHIC Fire Pepper! Nice pull!','no odds known = no odds in the sentence')
+ check(Rules.Line(Rules.Event('Global',{Name='Ann',Id='a-3',SeedId='ObsidianMawSeed'}))=='🌐 Ann just pulled a SECRET Obsidian Maw!','... also for another server')
  local rec=Rules.Event('Record',{Name='Ann',Record='BestPull'})
- check(Rules.Line(rec)=='🏆 Ann took BEST PULL TODAY!','the record sentence: "'..Rules.Line(rec)..'"')
- check(Rules.Line(Rules.Event('Record',{Name='Ann',Record='BiggestFruit'}))=='🏆 Ann took BIGGEST FRUIT TODAY!'and Rules.Line(Rules.Event('Record',{Name='Ann',Record='LongestFruit'}))=='🏆 Ann took LONGEST FRUIT!','record titles: known keys and a CamelCase key spelled out')
- check(Rules.Line(Rules.Event('Record',{Name='Ann',Record='BestPull',SeedId=KING.id}))=='🏆 Ann took BEST PULL TODAY!','a record that names a seed has the same line (the seed is for the hub display)')
+ check(Rules.Line(rec)=='🏆 Ann just took BEST PULL TODAY!','the record sentence: "'..Rules.Line(rec)..'"')
+ check(Rules.Line(Rules.Event('Record',{Name='Ann',Record='BiggestFruit'}))=='🏆 Ann just took BIGGEST FRUIT TODAY!'and Rules.Line(Rules.Event('Record',{Name='Ann',Record='LongestFruit'}))=='🏆 Ann just took LONGEST FRUIT!','record titles: known keys and a CamelCase key spelled out')
+ check(Rules.Line(Rules.Event('Record',{Name='Ann',Record='BestPull',SeedId=KING.id}))=='🏆 Ann just took BEST PULL TODAY!','a record that names a seed has the same line (the seed is for the hub display)')
  check(Rules.Article('MYTHIC')=='a'and Rules.Article('ELITE')=='an'and Rules.Article('')=='a','a / an')
  -- rich text: the whole line in ONE colour run, the rarity word bold, every part escaped
  local hex=Rules.Hex(Rules.RarityColor('Mythic'))
- check(Rules.Line(pull,true)=='🌟 Ann pulled a <b>MYTHIC</b> Fire Pepper! (1/800)','the rich sentence bolds the rarity word ('..Rules.Line(pull,true)..')')
- check(Rules.Chat(pull)==('<font color="%s">🌟 Ann pulled a <b>MYTHIC</b> Fire Pepper! (1/800)</font>'):format(hex),'the chat line is one colour run in the rarity colour ('..Rules.Chat(pull)..')')
+ check(Rules.Line(pull,true)=='🌟 Ann just pulled a <b>MYTHIC</b> Fire Pepper! (1/800) Nice pull!','the rich sentence bolds the rarity word ('..Rules.Line(pull,true)..')')
+ check(Rules.Chat(pull)==('<font color="%s">🌟 Ann just pulled a <b>MYTHIC</b> Fire Pepper! (1/800) Nice pull!</font>'):format(hex),'the chat line is one colour run in the rarity colour ('..Rules.Chat(pull)..')')
  check(hex:match('^#%x%x%x%x%x%x$')~=nil and hex==Rules.Hex(Packs.Rarities.Mythic.Color),'the colour is the game\'s own Mythic colour as #RRGGBB ('..hex..')')
- check(Rules.Chat(sec)==('<font color="%s">🌐 Ann pulled a <b>SECRET</b> Obsidian Maw (1/1,000)!</font>'):format(Rules.Hex(Rules.Gold)),'an other-server chat line is gold ('..Rules.Chat(sec)..')')
- check(Rules.Chat(rec)==('<font color="%s">🏆 Ann took BEST PULL TODAY!</font>'):format(Rules.Hex(Rules.Amber)),'a record chat line is amber ('..Rules.Chat(rec)..')')
+ check(Rules.Chat(sec)==('<font color="%s">🌐 Ann just pulled a <b>SECRET</b> Obsidian Maw (1/1,000)!</font>'):format(Rules.Hex(Rules.Gold)),'an other-server chat line is gold ('..Rules.Chat(sec)..')')
+ check(Rules.Chat(rec)==('<font color="%s">🏆 Ann just took BEST PULL TODAY!</font>'):format(Rules.Hex(Rules.Amber)),'a record chat line is amber ('..Rules.Chat(rec)..')')
  check(Rules.Gold.R==1 and Rules.Gold.G>.8 and Rules.Gold.B<.4,'gold is gold')
  check(Rules.ChatColor(pull)==Rules.RarityColor('Mythic')and Rules.ChatColor(sec)==Rules.Gold and Rules.ChatColor(rec)==Rules.Amber,'ChatColor: the rarity colour, gold, amber')
  -- every rarity: the line carries ITS colour (not a neighbour's), for a pull in this server; gold and amber stay gold and amber whatever the rarity
@@ -157,7 +157,7 @@ do
   check(Rules.Chat(g):find('<font color="'..Rules.Hex(Rules.Gold)..'">',1,true)==1,name..': from another server it is gold')
  end
  -- the old chat: plain text, nothing that could be read as markup
- check(Rules.Plain(pull)=='🌟 Ann pulled a MYTHIC Fire Pepper! (1/800)'and Rules.Plain(sec)==Rules.Line(sec)and Rules.Plain(rec)==Rules.Line(rec),'the plain line (old chat) is the sentence without markup')
+ check(Rules.Plain(pull)=='🌟 Ann just pulled a MYTHIC Fire Pepper! (1/800) Nice pull!'and Rules.Plain(sec)==Rules.Line(sec)and Rules.Plain(rec)==Rules.Line(rec),'the plain line (old chat) is the sentence without markup')
  check(Rules.Plain({Kind='Pull',Name='A<b>x</b>',SeedName='S>t',Rarity='Mythic',Odds=5}):find('[<>]')==nil,'... and a < or > from anywhere is dropped from it')
  -- escaping: a name, a seed name and a record title are escaped in rich text (a seed name with an apostrophe or an ampersand, a name that tries to open a tag)
  local nasty={Kind='Pull',Name='A<b>&"x"\'',SeedName="Dragon's & <i>Fruit</i>",Rarity='Mythic',Odds=5}

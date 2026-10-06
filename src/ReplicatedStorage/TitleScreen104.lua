@@ -139,7 +139,7 @@ function T.Start(player,pg)
   end)
   loaded()
   if logo.Image~=''then task.spawn(function()pcall(Content.PreloadAsync,Content,{logo});loaded()end)end
-  button=make('TextButton',group,{Name='ClickToStart',AnchorPoint=Vector2.new(.5,.5),Text='Click to Start',
+  button=make('TextButton',group,{Name='ClickToStart',AnchorPoint=Vector2.new(.5,.5),Text='Click to play!',
    Font=Enum.Font.FredokaOne,TextSize=26,TextColor3=RGB(255,255,242),BackgroundColor3=RGB(72,154,51),
    BorderSizePixel=0,AutoButtonColor=false,Selectable=true,Active=true,Modal=true})
   button:SetAttribute('ButtonSound',false)

@@ -177,16 +177,16 @@ function R.Line(e,rich)
  local function esc(text)return rich and R.Escape(text)or tostring(text)end
  local who=esc(e.Name)
  if e.Kind=='Record'then
-  return '🏆 '..who..' took '..esc(R.RecordTitle(e.Record))..'!'
+  return '🏆 '..who..' just took '..esc(R.RecordTitle(e.Record))..'!'
  end
  local word=string.upper(e.Rarity or'')
  local shown=rich and('<b>'..esc(word)..'</b>')or word
  local seed=esc(e.SeedName or'seed')
  local odds=R.OddsLabel(e.Odds)
  if e.Kind=='Global'then
-  return '🌐 '..who..' pulled '..R.Article(word)..' '..shown..' '..seed..(odds and' ('..odds..')'or'')..'!'
+  return '🌐 '..who..' just pulled '..R.Article(word)..' '..shown..' '..seed..(odds and' ('..odds..')'or'')..'!'
  end
- return '🌟 '..who..' pulled '..R.Article(word)..' '..shown..' '..seed..'!'..(odds and' ('..odds..')'or'')
+ return '🌟 '..who..' just pulled '..R.Article(word)..' '..shown..' '..seed..'!'..(odds and' ('..odds..')'or'')..' Nice pull!'
 end
 -- The colour of the whole line: the rarity's own for a pull in this server, gold for a pull in another server, amber for a record.
 function R.ChatColor(e)return e.Kind=='Pull'and R.RarityColor(e.Rarity)or e.Kind=='Record'and R.Amber or R.Gold end

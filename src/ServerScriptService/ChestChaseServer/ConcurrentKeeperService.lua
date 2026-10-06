@@ -285,7 +285,7 @@ return function(Legacy)
                     self.RunAlertRemote:FireClient(run.Player, "Success", nil, nil, run.GuardianLeaseToken, run.Character)
                     -- V103: the bank-confirmed Success event owns celebration feedback.
                 else
-                    self.Notifications:Show(run.Player, reason or "COULDN'T SAVE THE PACK!", Color3.fromRGB(255,187,91), 3)
+                    self.Notifications:Show(run.Player, reason or "PACK COULD NOT BE STORED", Color3.fromRGB(255,187,91), 3)
                 end
             end
         end)

@@ -186,7 +186,7 @@ local cap=Config.MaxSavedChests;Config.MaxSavedChests=seedRecords(B)
 send(A,'GiveSeed',B,p2.Id)
 check(find(A,p2.Id)~=nil,'full recipient: giver keeps the pack')
 check(find(B,p2.Id)==nil,'full recipient: nothing added')
-check(lastFor(A).Text=='Their seed inventory is full.','full recipient message')
+check(lastFor(A).Text=='Their bag is full.','full recipient message')
 -- Full only at delivery time: the gift waits in the inbox, is not lost, and lands once there is room.
 Config.MaxSavedChests=cap
 local realRecover=Gifts.Recover;local heldRecover=true
@@ -305,7 +305,7 @@ local profileStore;for name,s in pairs(stores)do if s.Data['Player_'..A.UserId]t
 dsFail[profileStore]=true;send(A,'GiveSeed',B,p7.Id);dsFail[profileStore]=nil
 check(find(A,p7.Id)==nil and find(B,p7.Id)==nil,'failed save: item held in the outbox only')
 check(Data.Gardens[A].OutgoingSeedGifts and next(Data.Gardens[A].OutgoingSeedGifts)~=nil,'failed save: outbox entry kept')
-check(lastFor(A).Text:find('pending a safe save'),'failed save: giver told it will retry')
+check(lastFor(A).Text:find('waiting for a safe save'),'failed save: giver told it will retry')
 Data.Revision[A]=(Data.Revision[A]or 0)+1;advance(16) -- background retry loop
 recover(B);recover(A);recover(B);recover(A)
 local copies=0;for _,p in ipairs({A,B})do if find(p,p7.Id)then copies+=1 end end
@@ -382,7 +382,7 @@ do
  Chase.Busy[B]=true;send(A,'GiveSeed',B,q.Id);Chase.Busy[B]=nil
  check(find(A,q.Id)~=nil and(statusFor(A)or''):find('in a run',1,true),'receiver in a run: giver is told')
  blockLine=true;send(A,'GiveSeed',B,q.Id);blockLine=false
- check(find(A,q.Id)~=nil and(statusFor(A)or''):find('Something is between you',1,true),'blocked line of sight: giver is told')
+ check(find(A,q.Id)~=nil and(statusFor(A)or''):find('Something is blocking',1,true),'blocked line of sight: giver is told')
  -- A gift save or inbox check in progress is waited out instead of refusing the click.
  Gifts.Working[B]=true;task2.spawn(function()task2.wait(1.5);Gifts.Working[B]=nil end)
  send(A,'GiveSeed',B,q.Id)

@@ -139,7 +139,7 @@ function MapService.new(config)
 	self.SellPrompt = requireChild(config, self.SellStation, "OpenSellPrompt", "ProximityPrompt")
 	self.BuyTeleportCFrame = consumeTeleportMarker(self.EconomyHub, "BuyTeleport", self.BuyStation)
 	self.SellTeleportCFrame = consumeTeleportMarker(self.EconomyHub, "SellTeleport", self.SellStation)
-	updateStationPresentation(self.BuyStation, self.BuyPrompt, "SHOP", "PICK A BOOST!")
+	updateStationPresentation(self.BuyStation, self.BuyPrompt, "SHOP", "GET A BOOST!")
 	updateStationPresentation(self.SellStation, self.SellPrompt, "SELL", "SELL CROPS!")
  self.BuyPrompt.ActionText="MARKET";self.BuyPrompt.ObjectText="";self.BuyPrompt.HoldDuration=0
  self.BuyPrompt.RequiresLineOfSight=false;self.BuyPrompt.MaxActivationDistance=config.EconomyInteractionDistance

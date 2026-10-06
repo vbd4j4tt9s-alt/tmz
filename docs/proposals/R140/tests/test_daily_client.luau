@@ -196,7 +196,7 @@ check(#invites==1 and type(invites[1])~='string'and invites[1].PromptMessage~=ni
 check(type(invites[1])~='string'and invites[1].PromptMessage:find('speed gain',1,true)and not invites[1].PromptMessage:lower():find('faster',1,true)and #invites[1].PromptMessage<=60,'(R149: the message is about faster speed gains, short: '..tostring(invites[1].PromptMessage)..')')
 check(tostring(invite:GetAttribute('AccessibleLabel')):find('+10% speed gain',1,true)~=nil,'(and so is the INVITE tooltip: '..tostring(invite:GetAttribute('AccessibleLabel'))..')')
 canInvite=false;invite.Activated:Fire();R.advance(.1);frames(1)
-check(#invites==1 and invite.InviteHint.Visible and invite.InviteHint.Text:find('not available',1,true),'where invites are off it says so')
+check(#invites==1 and invite.InviteHint.Visible and invite.InviteHint.Text:find('right now',1,true),'where invites are off it says so')
 R.advance(3);frames(1);check(not invite.InviteHint.Visible,'(the hint goes away)')
 -- 7. Friend chip.
 player:SetAttribute('FriendsInServer',2);player:SetAttribute('FriendSpeedBoost',1.2);frames(2)

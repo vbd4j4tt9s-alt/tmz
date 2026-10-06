@@ -1175,7 +1175,7 @@ function ChaseService:_dropChestAfterCatch(run)
 			if label.Parent then
 				label.Text = secondsLeft > 0
 					and string.format("SEED! 🌱 %ds", secondsLeft)
-					or "LAST CHANCE! GRAB IT!"
+					or "DROPPED SEED  •  LAST CHANCE"
 			end
 			task.wait(0.1)
 		end

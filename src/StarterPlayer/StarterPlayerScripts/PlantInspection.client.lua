@@ -201,7 +201,7 @@ connect(Run.Heartbeat,function(dt)
   Traits.Style(traits,fruit)
   if def.Regrows==false or def.Mode=='whole'then text..='\nSingle harvest';lines+=1 end
   if lastTraits~=text then traits.Text=text;lastTraits=text end
-  action.Text=(keyButton.Text=='E'and'Press E'or keyButton.Text)..' to harvest'
+  action.Text=(keyButton.Text=='E'and'Press E'or keyButton.Text)..' to pick'
   local traitHeight=13*lines;traits.Size=UDim2.new(1,-52,0,traitHeight);action.Position=UDim2.fromOffset(46,23+traitHeight)
   local size=UDim2.fromOffset(panelWidth,37+traitHeight)
   if harvest.Size~=size then harvest.Size=size;harvestWorld.Size=size end

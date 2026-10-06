@@ -76,9 +76,9 @@ end
 
 -- Status line while the strip spins; a = 0..1 progress of the spin. Returns the line and its index (the label changes only
 -- when the index does).
-S.SpinLines={'Unwrapping your gift...','Ooh, what could it be?','Slowing down...','Here it comes!'}
+S.SpinLines={'Unwrapping ur gift...','Ooh, what could it be?','Slowing down...','Here it comes!'}
 S.SpinAt={0,.3,.62,.86}
-S.SpinHint='Your pack is already in your bag!' -- the server grants it before the strip moves
+S.SpinHint='Ur pack is already in ur bag!' -- the server grants it before the strip moves
 function S.SpinLine(a)
  a=tonumber(a)or 0;local index=1
  for i,at in ipairs(S.SpinAt)do if a>=at then index=i end end

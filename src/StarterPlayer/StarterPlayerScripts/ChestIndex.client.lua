@@ -165,7 +165,7 @@ local function claim(action,value,pulse)
  for _,row in ipairs(rowList)do for _,g in ipairs({row.Half,row.End})do g.Button.Active=false;g.Button.Interactable=false end end
  task.spawn(function()
   local ok,result=pcall(request.InvokeServer,request,action,value);busy=false;if not gui.Parent then return end
-  status.Text=ok and type(result)=='table'and(result.Message or'')or'Please try again.';status.Visible=status.Text~=''
+  status.Text=ok and type(result)=='table'and(result.Message or'')or'Try again in a sec!';status.Visible=status.Text~=''
   if not(ok and type(result)=='table'and result.Success==true)then Audio.Play('Denied')end -- R150: a refused claim
   -- R138 (owner: "add sfx for claiming the rewards"): a cash reward rings the till; gem rewards keep the gem cue.
   if action=='ClaimSeed'and ok and type(result)=='table'and result.Success==true then Audio.Play('KaChing')end

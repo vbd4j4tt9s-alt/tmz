@@ -79,7 +79,7 @@ for _,p in ipairs(rs)do
 end
 check(runeProps,'[locked] violet, neon, a little see-through (dim), anchored, not solid, no touch / query / shadow')
 local sig=sign()
-check(sig.Enabled==true and sig.Status.Text:find('🔒 12:',1,true)==1 and sig.Title.Text=='❓ YOUR MYSTERY PACK','[locked] the sign: ❓ YOUR MYSTERY PACK / 🔒 12:xx')
+check(sig.Enabled==true and sig.Status.Text:find('🔒 12:',1,true)==1 and sig.Title.Text=='❓ UR MYSTERY PACK','[locked] the sign: ❓ UR MYSTERY PACK / 🔒 12:xx')
 -- The halo orbits the pack: a tilted ring of radius 3.4 around (a little under) its centre, clear of the pack, moving.
 local centre=PACK+V3(0,-.2,0)
 local function radiusOk()for _,p in ipairs(runes())do if not near((p.Position-centre).Magnitude,Fx.Tuning.Radius,1e-6)then return false end end;return true end
@@ -137,7 +137,7 @@ do
  -- Ready
  mine('Ready');H.run(.6)
  check(rgb(pill.BackgroundColor3,58,40,10)and rgb(pill.Outline.Color,255,214,90)and rgb(t.TextColor3,255,214,90)and rgb(s.TextColor3,255,214,90),'[sign] Ready: warm gold pill, gold outline, gold caption and state line')
- check(s.Text=='UNLOCKED! TAKE IT 🎁'and t.Text=='✨ YOUR MYSTERY PACK'and b.Visible==true and b.Fill.Size.X.Scale==1,'[sign] Ready: ✨ YOUR MYSTERY PACK / UNLOCKED! TAKE IT 🎁 and a full bar')
+ check(s.Text=='UNLOCKED! GRAB IT 🎁'and t.Text=='✨ UR MYSTERY PACK'and b.Visible==true and b.Fill.Size.X.Scale==1,'[sign] Ready: ✨ UR MYSTERY PACK / UNLOCKED! TAKE IT 🎁 and a full bar')
  check(near(g.Size.X.Scale,10,1e-9)and near(g.Size.Y.Scale,3.6,1e-9),'[sign] (the pop at the change settles back to exactly 10 x 3.6)')
  -- Someone else's pill is quieter
  H.publish(recs[2],'Ready',{Owner=88,Name='Ben',Variant='Pack04'})
@@ -147,7 +147,7 @@ do
  -- Claimed
  mine('Claimed',{Variant='Pack03',NextIn=2*3600+46*60+30});H.run(.6)
  check(rgb(pill.BackgroundColor3,14,36,30)and rgb(pill.Outline.Color,72,160,108)and rgb(t.TextColor3,120,236,110)and pill.BackgroundTransparency>=.3,'[sign] Taken: a quiet dark-mint pill, mint caption')
- check(t.Text=='✓ TAKEN TODAY'and s.Text=='NEW PACK IN 2h 46m'and b.Visible==false,'[sign] Taken: ✓ TAKEN TODAY / NEW PACK IN 2h 46m, no bar')
+ check(t.Text=='✓ GRABBED TODAY'and s.Text=='NEW PACK IN 2h 46m'and b.Visible==false,'[sign] Taken: ✓ TAKEN TODAY / NEW PACK IN 2h 46m, no bar')
 end
 H.run(1.2)
 check(fx()==nil,'[taken] the fx are gone once it is taken (a dim pedestal and the sign is all that is left)')
@@ -283,7 +283,7 @@ do
  mine('Claimed',{Variant='Pack03',NextIn=3*3600}) -- (the owner joins having taken today's pack: the pedestal goes Empty -> Claimed in front of the client)
  H.run(1.5)
  check(H.bursts()==b0 and #H.sounds==0 and flightsCount()==0 and H.named('MysteryPop')==0,'[join] a pedestal that wakes up Taken (the owner joined, today\'s pack is long gone) makes no ring, no sound and no flight: nothing was taken just now')
- check(fx()==nil and sign().Title.Text=='✓ TAKEN TODAY','[join] it is simply shown as taken')
+ check(fx()==nil and sign().Title.Text=='✓ GRABBED TODAY','[join] it is simply shown as taken')
  H.publish(rec,'Empty');H.run(1)
  mine('Ready',{Variant='Pack03'});H.run(.5)
  check(H.bursts()==b0+1 and H.soundCount('Sound:MysteryUnlockChime')==1 and #H.sounds==1,'[join] joining with an unlocked pack waiting: one ring and one chime (as in R147: your pack is ready), no flight')
@@ -354,7 +354,7 @@ do
  H.run(1.2)
  local nf=nm:FindFirstChild('MysteryFx')
  check(nf~=nil and nf~=oldFx and #H.parts(nf)>=10,'[streaming] the streamed-back copy gets fresh fx of its own')
- check(nm:FindFirstChild('MysteryLabel')~=nil and nm.MysteryLabel~=oldSign and nm.MysteryLabel.Status.Text=='UNLOCKED! TAKE IT 🎁','[streaming] and its own sign, up to date')
+ check(nm:FindFirstChild('MysteryLabel')~=nil and nm.MysteryLabel~=oldSign and nm.MysteryLabel.Status.Text=='UNLOCKED! GRAB IT 🎁','[streaming] and its own sign, up to date')
  check(H.bursts()==b0 and #H.sounds==0 and nf:FindFirstChild('Padlock')==nil,'[streaming] no ring, no sound and no padlock for a pack that was already Ready')
  -- parts arriving late: a pedestal whose PackAnchor streams in after the model
  nm:Destroy();H.run(.5)
@@ -529,7 +529,7 @@ do
  check(fx()==nil and pivotY()~=py,'[errors] then the fx are gone and the pack still spins')
  H.run(1);check(fx()==nil and #warned==3,'[errors] they stay off for the session and nothing else is reported')
  mine('Ready',{Variant='Pack03'});H.run(.5)
- check(sign().Status.Text=='UNLOCKED! TAKE IT 🎁'and sign().Pill.Outline.Color.R*255>254,'[errors] the sign keeps working (it follows the state)')
+ check(sign().Status.Text=='UNLOCKED! GRAB IT 🎁'and sign().Pill.Outline.Color.R*255>254,'[errors] the sign keeps working (it follows the state)')
  check(H.model(rec):FindFirstChild('MysteryFx')==nil and H.pedestal(rec).Prompt.Enabled==true,'[errors] no fx are built again, and the take prompt is untouched')
  table.clear(H.sounds);mine('Claimed',{Variant='Pack03'})
  check(flightsCount()==0 and H.soundCount('Bubble06')==1,'[errors] taking it still works: no flight, the pickup cue at once')

@@ -65,7 +65,7 @@ end
 local function prompt(position,center)
  if busy then return end;local model=aim(position,center);if not model then return end
  pending=model;box.Visible=true;pg:SetAttribute('SeedMenu','Shovel');selectionView:Clear()
- local def=Catalog[model:GetAttribute('SeedId')];title.Text='Remove '..(def.Name or def.HarvestName)..'?\nThis removes the plant and its unpicked fruit. The seed is not returned.'
+ local def=Catalog[model:GetAttribute('SeedId')];title.Text='Remove '..(def.Name or def.HarvestName)..'?\nThis removes the plant and any fruit still on it. U won\'t get the seed back.'
 end
 connect(remove.Activated,function()
  local model=pending;if busy or not equipped()or not valid(model)then close();return end
@@ -75,7 +75,7 @@ connect(remove.Activated,function()
  if okay and type(result)=='table'and result.Success==true then
   if digCue then Sfx.Play(digCue.Id,spot,digCue.Volume)end
  else Audio.Play('Denied')end
- feedback.Text=okay and type(result)=='table'and result.Message or'Could not remove the plant. Try again.';feedbackUntil=os.clock()+3
+ feedback.Text=okay and type(result)=='table'and result.Message or'Couldn\'t remove the plant. Try again!';feedbackUntil=os.clock()+3
 end)
 connect(cancel.Activated,close)
 connect(Input.InputBegan,function(input,processed)

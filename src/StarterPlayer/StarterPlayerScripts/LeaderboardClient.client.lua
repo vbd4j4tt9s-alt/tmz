@@ -131,7 +131,7 @@ local function refreshData(b)
  local state=b.Model:GetAttribute('LeaderboardStatus')
  b.Scope.Text='🌍 GLOBAL TOP '..#b.Data..' • '..(state=='retry'and'RETRYING'or ago(b.Model:GetAttribute('LeaderboardUpdated')))
  b.Status.Visible=#b.Data==0
- b.Status.Text=state=='retry'and'Global rankings unavailable. Retrying…'or state=='ok'and'Be the first to rank!'or'Loading global rankings…'
+ b.Status.Text=state=='retry'and'Can\'t load the rankings. Trying again…'or state=='ok'and'Be the first to rank!'or'Loading global rankings…'
  b.Me=nil;for i,entry in ipairs(b.Data)do if entry.u==player.UserId then b.Me=i;break end end
  b.Mine.Text=b.Me and('YOUR RANK  #'..b.Me)or'Not in the top '..math.max(100,#b.Data)..' yet - keep going!'
  b.JumpText.Text=b.Me and'FIND ME'or'TOP'
