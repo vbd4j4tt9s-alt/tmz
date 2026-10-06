@@ -130,6 +130,8 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 
 **Packs an owner command made never announce** (`TestGrant` on the pack record): `pack`, `packset`, `void` / `eclipse`, `verity`, `rarepacks` (all kinds), a Void pack from `event spawn`, and the packs that a `mystery ready` / `mystery next`, `daily next` / `week` / `reset` (the login pack) or `bonus ready` / `progress` / `roll` command makes claimable. A Void pack turned into a Verity pack by the NPC stays a test pack. Real Robux Mech / Verity purchases, packs from the track, the mystery pedestal, the daily login and treadmill rolls (when no owner command was used) still announce.
 
+**Owner-given boots and seeds are TEST too (R152).** `boots 1-5` (when it unlocks a pair the player did not own) saves a `TestBoosts` mark with the profile: while the luck in use comes from such boots (no bought pair reaches it), every pack that player opens is a TEST pull: never announced, never counted by the hub boards, and the seed it makes is a TEST seed. `seed` / `seeds` / `give ... seed` / `plant` mark the seed (or plant), and the plant and fruit grown from it keep the mark for good (no longer just for the session): its fruit never counts for BIGGEST FRUIT. Bought boots and normal seeds are unaffected.
+
 | Command | What it does |
 |---|---|
 | `announce firepepper @name` | The chat line for everyone in this server, as if `@name` had just pulled that seed. Any rarity works (a real pull needs Legendary or above). Seed = an id (`FirePepperSeed`) or the plant name. This command IS an announcement on purpose (it is how you look at the lines) |

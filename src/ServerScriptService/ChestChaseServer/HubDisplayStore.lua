@@ -68,26 +68,29 @@ function S:Read(day)
  return true,Rules.CleanDoc(value)
 end
 -- Offers a record to the day's document (kind 'Pull' | 'Fruit'; rec = a clean record). The stored one is replaced only when rec is better (checked inside the
--- transform, on the freshest stored value). Returns true, doc, took  (doc = the document as it is now, took = our record is the stored one) or false, reason.
+-- transform, on the freshest stored value). Returns true, doc, took, foreign  (doc = the document as it is now, took = our record is the stored one, foreign = the stored fruit is of
+-- another type than ours: R152, servers on different plant lists have different fruits of the day; neither may replace the other's, so ours is not written) or false, reason.
 function S:Merge(day,kind,rec,fruitId)
  local field=kind=='Fruit'and'fruit'or'pull'
  local result
  local ok,final=request(self,function(map)
-  local took=false
+  local took,foreign=false,false
   local value=map:UpdateAsync(S.Key(day),function(old)
    local doc=Rules.CleanDoc(old)
    local current=doc[field]
-   -- (a stored fruit of another type than ours is another list's day: ours wins only when it is today's type, which the caller already checked)
+   -- a stored fruit of another type than ours is another list's day (R152): never compared (a kg of one fruit says nothing about another) and never replaced; ours stays on this server
+   foreign=kind=='Fruit'and current~=nil and current.Id~=rec.Id
+   if foreign then took=false;return nil end
    if current and not Rules.Better(kind,rec,current)then took=false;return nil end
    doc[field]=rec;took=true
    return Rules.StoreDoc(doc)
   end,self.Expiry)
-  return{Value=value,Took=took}
+  return{Value=value,Took=took,Foreign=foreign}
  end)
  if not ok then return false,final end
  result=final
- if result.Value==nil then return true,nil,false end -- (cancelled: someone's record is better; the caller reads it back)
- return true,Rules.CleanDoc(result.Value),result.Took
+ if result.Value==nil then return true,nil,false,result.Foreign end -- (cancelled: someone's record is better, or another list's fruit is there; the caller reads it back)
+ return true,Rules.CleanDoc(result.Value),result.Took,false
 end
 -- Deletes a day's document (the owner's `hubdisplays reset`).
 function S:Remove(day)

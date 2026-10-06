@@ -22,7 +22,7 @@ if grep -n "Instance.new\|ScreenGui\|Sound\|TweenService\|RenderStepped\|Heartbe
 if grep -n "Metrics\|Enqueue\|Dequeue\|NewQueue\|Subline\|Headline\|Sparkles\|HudNoticeLayout\|HudLayout\|BannerSeconds\|MaxWaiting\|WaitSeconds" "$RS/PullAnnounceRules.lua" | grep -v "^[0-9]*:--"; then fail "PullAnnounceRules must not keep any banner rule"; fi
 echo "ok: chat only: no PullBannerBottom anywhere; the client has no Gui, sound, tween, per-frame code, picture, attribute or server call; the rules keep no banner layout / queue / timing"
 # 3. the open of a real pack is the ONLY caller of the announcer's pull hook, and it is told whether the pack was a TEST pack
-grep -q "OnOpened(player,pack,reward,testSeed~=nil)" "$SS/PlayerDataService.lua" || fail "the hook must pass testSeed~=nil as wasTest"
+grep -q "OnOpened(player,pack,reward,testSeed~=nil or luckTest)" "$SS/PlayerDataService.lua" || fail "the hook must pass testSeed~=nil (or luck from owner-given boots, R152) as wasTest"
 grep -q "pack.TestGrant==true" "$SS/PullAnnouncer.lua" || fail "PullAnnouncer:Pulled must refuse a pack whose record has TestGrant"
 n=$(grep -rn "PullAnnouncer" "$S" --include=*.lua | grep -v "PullAnnouncer.lua:" | grep -v "PullAnnouncerClient.client.lua:" | grep -v "PullAnnounceRules.lua:" | grep -v "OwnerTestPacks.lua:" | grep -v "HubDisplayService.lua:" | wc -l)
 [ "$n" = 4 ] || fail "PullAnnouncer is referenced from $n other lines (expected 4: PlayerDataService, ChestChaseServerMain, OwnerUpdateCommands82 and the comment in SettingsConfig; the hub's own use is checked in 6)"
@@ -38,7 +38,7 @@ for f in RarePackTests StudioSeedCommands StudioTestCommands FruitGiftService Pa
 done
 echo "ok: TEST packs, seed grants, gifts, the mystery pedestal, bonus rolls and daily rewards never call the announcer"
 # 4. every owner-command path that makes a pack marks it (TestGrant), and the services behind the indirect commands claim the arm
-grep -q "TestGrant=isPack or nil" "$SS/StudioTestCommands.lua" || fail "/test pack must set TestGrant on the pack record"
+grep -q "PackMutation=coat,TestGrant=true," "$SS/StudioTestCommands.lua" || fail "/test pack and /test seed(s) must set TestGrant on the record (R152: seeds too)"
 grep -q "TestGrant=true" "$SS/RarePackTests.lua" || fail "/test rarepacks must set TestGrant on every pack record"
 [ "$(grep -c "{TestGrant=true})" "$SS/OwnerUpdateCommands82.lua")" = 1 ] || fail "packset / eclipse (void) / verity must call AddChest with {TestGrant=true} (one AddChest line serves all three)"
 for source in Mystery Daily Bonus; do

@@ -23,6 +23,7 @@
 --    just left); a server that just started delivers after 15 s;
 --  * the owner gets a clear console line for a missing setup piece and `/test plantnotify [status|send|reset]`;
 --  * a friend check that failed (web hiccup) is tried again 30 s later instead of only on the next join.
+-- R152: delivery runs in a task of its own (S:Kick) with a time budget (PassSeconds): a big backlog used to hold the loop inside Deliver for minutes, and S:Step (this server's daily reset) waited with it.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Http=game:GetService('HttpService');local MemoryStore=game:GetService('MemoryStoreService')
 local D=require(RS.DailyRewards);local PlantRules=require(RS.PlantRules);local Names=require(RS.GardenDisplayNames)
@@ -40,6 +41,7 @@ S.SweepSeconds=120       -- R151: players in this server have their queue entry 
 S.PauseSeconds=600       -- R151: a setup problem pauses sending on this server for 10 minutes (the entries wait)
 S.FlushSeconds=8         -- R151: how long a closing server waits for its queue writes
 S.FriendRetrySeconds=30
+S.PassSeconds=20         -- R152: one delivery pass works at most this long (the rest of a big backlog waits for the next poll)
 local QUEUE,SENT='PlantReady140','PlantReadySent140'
 function S.new(data,notifications)
  local okToken,token=pcall(function()return Http:GenerateGUID(false)end)
@@ -257,13 +259,14 @@ function S:Deliver(now)
  now=now or os.time()
  if self.PausedUntil and now<self.PausedUntil then return 0 end
  local sent,seen,lower=0,0,nil
- while seen<S.MaxPerPass do
+ local began=os.clock() -- R152: a pass is budgeted (PassSeconds); what is left is due at the next poll
+ while seen<S.MaxPerPass and os.clock()-began<S.PassSeconds do
   local ok,page=pcall(function()return self:_queue():GetRangeAsync(Enum.SortDirection.Ascending,S.PageSize,lower,{sortKey=now+1})end)
   if not ok or type(page)~='table'or #page==0 then break end
   -- Servers read the same page: each walks it from a random start, so they mostly claim different entries.
   local start=math.random(1,#page)
   for i=0,#page-1 do
-   if self.Closing then return sent end -- (the server started closing during this pass)
+   if self.Closing or os.clock()-began>=S.PassSeconds then return sent end -- (the server started closing during this pass, or the pass used its time)
    local item=page[(start+i-1)%#page+1];seen+=1
    local result=type(item)=='table'and type(item.key)=='string'and self:_deliverOne(item.key,now)or'skip'
    if result=='sent'then sent+=1 elseif result=='stop'then return sent end
@@ -272,6 +275,13 @@ function S:Deliver(now)
   local last=page[#page];lower={key=last.key,sortKey=last.sortKey}
  end
  return sent
+end
+-- R152: starts a delivery pass in its own task (one at a time) and returns at once: a backlog's MemoryStore / HTTP waits must not hold up the loop (Step = the daily reset). Returns true when a pass started.
+function S:Kick(now)
+ if self.Dead or self.Delivering then return false end
+ self.Delivering=true
+ task.spawn(function()pcall(function()self:Deliver(now or os.time())end);self.Delivering=false end)
+ return true
 end
 -- Setup / status ----------------------------------------------------------------------------------------------------------
 function S:SetupProblems()
@@ -385,7 +395,7 @@ function S:Start()
    if self.Dead then break end
    self:Step(os.time())
    local clock=os.clock()
-   if clock-lastPoll>=S.PollSeconds then lastPoll=clock;pcall(function()self:Deliver(os.time())end)end
+   if clock-lastPoll>=S.PollSeconds then lastPoll=clock;self:Kick()end
    if clock-lastSweep>=S.SweepSeconds then lastSweep=clock;pcall(function()self:Sweep()end)end
   end
  end)

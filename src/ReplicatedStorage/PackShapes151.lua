@@ -30,6 +30,8 @@
 --    shape at once (the default everywhere, packs keep their roll); a forced number is the roll of NEW packs; auto is a uniform roll.
 --  * Status (server, replicated): ReplicatedStorage.PackShapeTemplates151 attributes Ready (on and nothing failed), FailureCount, BakedCount, Requested, Pending,
 --    Pairs, Vertices (resident), Megabytes (an estimate), Evicted, Demoted, Mode, LastFailure. A client keeps its own numbers with a Client suffix.
+--    R152: LastFailure there is only a generic KIND (unavailable / over budget / time-out / bake failed): the folder is replicated, and the failed pair names a design, which could hint the next
+--    rare pack. The full text (pair + reason) stays server-side: M.Status().LastFailure, which the owner's /test packshape prints.
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local WHITE=Color3.new(1,1,1)
 local M={Folder='PackShapeTemplates151',Revision=151,Count=6,
@@ -137,6 +139,9 @@ local function folder()
 end
 local function pending()local n=0;for _ in pairs(inflight)do n+=1 end;return n end
 local function pairCount()local n=0;for _ in pairs(cache)do n+=1 end;return n end
+local function failureKind(text) -- R152: a failure's generic kind for the replicated folder (no design key, no reason text that could carry one)
+ return text:find(M.Unavailable,1,true)and'unavailable'or text:find('over budget',1,true)and'over budget'or text:find('did not finish',1,true)and'time-out'or'bake failed'
+end
 local function publish()
  local f=RS:FindFirstChild(M.Folder);if not f then return end
  local p=Run:IsServer()and''or'Client'
@@ -147,7 +152,7 @@ local function publish()
   f:SetAttribute('Megabytes'..p,math.floor(resident*M.Config.BytesPerVertex/1e5+.5)/10)
   f:SetAttribute('Evicted'..p,stats.Evicted);f:SetAttribute('Demoted'..p,stats.Demoted);f:SetAttribute('Mode'..p,tostring(M.Mode()))
   f:SetAttribute('Revision',M.Revision)
-  if stats.Last then f:SetAttribute('LastFailure'..p,stats.Last)end
+  f:SetAttribute('LastFailure'..p,stats.Last and failureKind(stats.Last)or nil)
  end)
 end
 if Run:IsServer()then

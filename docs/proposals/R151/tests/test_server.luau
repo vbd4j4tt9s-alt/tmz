@@ -393,7 +393,7 @@ do
  -- /test seed makes SEEDS (never opened): no mark on them
  emptyBag(Ann)
  local okSeed=command(Ann,'/test seed SunflowerSeed');local seeds=Data:GetChestRecords(Ann)
- check(okSeed==true and#seeds==1 and seeds[1].Kind=='Seed'and seeds[1].TestGrant==nil,'/test seed makes a Seed record without the mark (only packs are marked)')
+ check(okSeed==true and#seeds==1 and seeds[1].Kind=='Seed'and seeds[1].TestGrant==true,'/test seed makes a Seed record WITH the mark (R152: an owner-given seed is a TEST seed; R151 left it unmarked)')
  emptyBag(Ann)
 end
 
@@ -544,9 +544,14 @@ do
  local giftRow=Data:SerializeSeedRecord(pack);giftRow.RateBoost=nil
  local decoded=Data:DecodeGiftedSeed(Bob,giftRow);check(decoded and decoded.TestGrant==true,'a gifted test pack arrives marked')
  local decodedN=Data:DecodeGiftedSeed(Bob,Data:SerializeSeedRecord(normal));check(decodedN and decodedN.TestGrant==nil,'a gifted normal pack arrives unmarked')
- -- a Seed row never carries the mark (only packs do), whatever a record says
+ -- a Seed row carries the mark too (R152: an owner-given seed, or the seed of a TEST opening), and only exactly true
  local seedRow=Data:SerializeSeedRecord({Id='x1',Kind='Seed',ChestNumber=5,ChestName='A',Stage=1,SeedId='SunflowerSeed',SeedName='Sunflower',TestGrant=true,BagVariant='Pack01',PackSize=1,PackMutation='None',SeedScale=1})
- check(seedRow.TestGrant==nil,'a Seed record never serialises the mark')
+ check(seedRow.TestGrant==true,'a marked Seed record serialises the mark (R152)')
+ local plainRow=Data:SerializeSeedRecord({Id='x2',Kind='Seed',ChestNumber=6,ChestName='A',Stage=1,SeedId='SunflowerSeed',SeedName='Sunflower',BagVariant='Pack01',PackSize=1,PackMutation='None',SeedScale=1})
+ check(plainRow.TestGrant==nil,'an unmarked Seed record serialises no such key (the saved row is exactly the R151 one)')
+ local junkSeed=Data:_decodeSavedSeedRecord(Ann,{Id='j2',Kind='Seed',ChestNumber=9,ChestName='P',Stage=1,SeedId='SunflowerSeed',TestGrant='yes',BagVariant='Pack01',PackSize=1,PackMutation='None',SeedScale=1},9)
+ local goodSeed=Data:DecodeGiftedSeed(Bob,seedRow)
+ check(junkSeed.TestGrant==nil and goodSeed and goodSeed.TestGrant==true,'a saved Seed row reads back marked only when TestGrant is exactly true; a gifted marked seed arrives marked')
  local junk=Data:_decodeSavedSeedRecord(Ann,{Id='j',Kind='Pack',ChestNumber=9,ChestName='P',Stage=1,TestGrant='yes',BagVariant='Pack01',PackSize=1,PackMutation='None',SeedScale=1},9)
  check(junk.TestGrant==nil,'a saved TestGrant that is not exactly true reads as a normal pack')
  emptyBag(Ann)
@@ -590,6 +595,86 @@ do
   check(back~=nil and back.Kind=='Pack'and back.TestGrant==nil,'an R151 server reads the R150 save fine (the pack is a normal pack again; nothing breaks)')
   emptyBag(Ann)
  end
+end
+
+-- 1c. R152 (R151's known small issue: "owner-granted boots and seeds don't count as test"): boots an owner command gave (/test boots) make every pull with their luck a TEST pull -- never announced
+-- (here or to other servers), never counted by the hub -- and seeds an owner gave carry the mark to the plants and fruit they grow. Real boots (bought) and normal seeds are untouched.
+do
+ local boots=Config.ShopCatalog.Accessories
+ local Tess,Rae,Cyd,Dee=makePlayer(711,'Tess'),makePlayer(712,'Rae'),makePlayer(713,'Cyd'),makePlayer(714,'Dee')
+ local seen
+ Data.OnPackOpened=function(p,reward,info)seen={Player=p,Reward=reward,Info=info}end
+ -- a REAL (unmarked) Void pack, opened with a draw that rolls a Legendary+ seed with this player's luck: an unmarked open of it is announced
+ local function open(p)
+  local pack=addPack(p,7,'EclipseReliquary');local d=loud(pack,p)
+  table.clear(sinkLog);watch();seen=nil
+  local reward=Data:OpenSeedPack(p,pack.Id,drawConstant(d or .5));settle(30)
+  local result={Reward=reward,Reason=spy.Reasons[1],Lines=#sinkLog,Published=bus:Count('A')-spy.Published,Seen=seen,Loud=d~=nil}
+  unwatch();return result
+ end
+ check(not Data:HasTestLuck(Tess)and not Data:HasTestLuck(Rae),'(nobody has test luck to begin with)')
+ -- control: bought boots are real
+ check(Data:AddBoost(Rae,boots[5].Id)and not Data:HasTestLuck(Rae),'a bought pair of Thunder Boots is not test luck')
+ local real=open(Rae)
+ check(real.Loud and real.Reward and real.Reason=='announced'and real.Lines>=1 and real.Seen.Info.Test==false and real.Reward.TestGrant==nil,'control: a pull with BOUGHT boots is announced and counted for the hub ('..tostring(real.Reason)..', '..real.Lines..' lines)')
+ -- owner boots
+ local okB,textB=command(Tess,'/test boots 5')
+ check(okB==true and Data:OwnsBoost(Tess,boots[5].Id)and Data:HasTestLuck(Tess),'/test boots 5: Tess owns them and her luck is test luck ('..tostring(textB)..')')
+ check(tostring(textB):find('TEST pulls',1,true)~=nil,'... and the command says so')
+ check(Tess:GetAttribute('ChestLuckMultiplier')==Rae:GetAttribute('ChestLuckMultiplier'),'(the same luck as the bought pair: the boots work as before, only the pulls are marked)')
+ local owner=open(Tess)
+ check(owner.Loud and owner.Reward and owner.Reward.Rarity and Rules.Qualifies('InServer',owner.Reward.Rarity),'(the owner\'s pull is a Legendary+ one: unmarked it would be announced)')
+ check(owner.Reason=='test pack'and owner.Lines==0 and owner.Published==0,'a pull with owner-given boots is not announced in the server or to other servers ('..tostring(owner.Reason)..', '..owner.Lines..' lines, '..owner.Published..' published)')
+ check(owner.Seen and owner.Seen.Info.Test==true,'... and the hub\'s hook is told it is a TEST pull')
+ check(owner.Reward.TestGrant==true,'... and the seed it made is a TEST seed')
+ -- mixed boots
+ Data:AddBoost(Cyd,boots[2].Id);command(Cyd,'/test boots 5')
+ check(Data:HasTestLuck(Cyd)and Cyd:GetAttribute('ChestLuckMultiplier')>=Tess:GetAttribute('ChestLuckMultiplier'),'bought Frost Boots + owner Thunder Boots: the luck in use is the owner\'s: test luck')
+ local mixed=open(Cyd);check(mixed.Reason=='test pack'and mixed.Lines==0,'... so that pull is a TEST pull')
+ Data:AddBoost(Dee,boots[5].Id);command(Dee,'/test boots 1');command(Dee,'/test boots 5')
+ check(not Data:HasTestLuck(Dee),'bought Thunder Boots + owner Sand Boots (lower) + owner Thunder Boots (already owned): the luck in use is the bought pair\'s: not test luck')
+ local both=open(Dee);check(both.Reason=='announced'and both.Seen.Info.Test==false,'... so that pull is real: announced and counted')
+ -- saved with the profile as an OPTIONAL list; a player without test boots saves exactly what R151 saved
+ local saved=Data:_buildSaveData(Tess);local savedRae=Data:_buildSaveData(Rae)
+ check(type(saved.TestBoosts)=='table'and#saved.TestBoosts==1 and saved.TestBoosts[1]==boots[5].Id and savedRae.TestBoosts==nil,'the save of Tess lists her owner boots (TestBoosts); Rae\'s save has no such key')
+ check(saved.Version==Config.ProfileVersion and Config.ProfileVersion==22,'ProfileVersion is still 22 (the list is optional)')
+ local DataB=server('PlayerDataService').new(Config,Map,Notes)
+ DataB.Store.Data[DataB:_getKey({UserId=1711,Name='Back'})]=saved
+ DataB.Store.Data[DataB:_getKey({UserId=1712,Name='Back2'})]=savedRae
+ local back,back2=makePlayer(1711,'Back',DataB),makePlayer(1712,'Back2',DataB)
+ check(DataB:HasTestLuck(back)and not DataB:HasTestLuck(back2)and back:GetAttribute('ChestLuckMultiplier')==Tess:GetAttribute('ChestLuckMultiplier'),'after a save and a load Tess still has test luck (same luck) and Rae still does not')
+ check(DataB:_buildSaveData(back).TestBoosts[1]==boots[5].Id,'... and the next save keeps the list')
+ -- a list that names boots the player does not own, or junk, is ignored
+ do
+  local function copy(v)if type(v)~='table'then return v end;local t={};for k,x in pairs(v)do t[k]=copy(x)end;return t end
+  local forged=copy(savedRae);forged.TestBoosts={boots[1].Id,7,{},'NoSuchBoots'}
+  DataB.Store.Data[DataB:_getKey({UserId=1714,Name='Back4'})]=forged
+  local back4=makePlayer(1714,'Back4',DataB)
+  check(not DataB:HasTestLuck(back4),'a TestBoosts list with boots the player does not own, numbers, tables and unknown ids is ignored')
+ end
+ -- seeds: an owner-given seed is marked; planted and harvested it keeps the mark
+ emptyBag(Tess);emptyBag(Rae)
+ check(command(Tess,'/test seed SunflowerSeed'),'/test seed')
+ check(command(Tess,'give me sunflower seed'),'give me sunflower seed (the English form, OwnerPlayerCommands)')
+ local given=Data:GetChestRecords(Tess)
+ check(#given==2 and given[1].TestGrant==true and given[2].TestGrant==true,'both owner-given seeds carry the mark ('..#given..' seeds)')
+ local Plant=W.module('PlantRules');local def=Config.GardenPlants.SunflowerSeed
+ local crop=Plant.NewCrop(given[1],'c1',def,1000,0,0);local cropN=Plant.NewCrop({SeedId='SunflowerSeed',SeedScale=1,PackMutation='None'},'c2',def,1000,0,0)
+ check(crop.TestGrant==true and cropN.TestGrant==nil,'a plant grown from a marked seed is marked (a normal seed\'s plant is not)')
+ local now=os.time();local okPlant,planted=Data:PlantSeed(Tess,1,given[1].Id,{OffsetX=0,OffsetZ=0},now)
+ check(okPlant and planted.TestGrant==true,'PlantSeed: the crop of a marked seed carries the mark ('..tostring(planted)..')')
+ if okPlant then
+  local okH,harvest=Data:HarvestPlant(Tess,1,planted.Id,planted.ReadyAt+5)
+  check(okH and harvest.TestGrant==true,'HarvestPlant: the harvest carries it (the hub / announcements ignore it) ('..tostring(okH and harvest.TestGrant)..')')
+  local savedGarden=Data:_buildSaveData(Tess).Garden
+  local marked=false;for _,list in pairs(savedGarden.Harvests)do if list.TestGrant==true then marked=true end end
+  check(marked,'and it is saved with the harvest (an optional key of the garden: an R151 server keeps unknown crop keys)')
+ end
+ -- a normal seed: no mark anywhere
+ table.insert(Data:GetChestRecords(Rae),{Id='n1',Kind='Seed',ChestNumber=900,ChestName='Sunflower Seed',Stage=1,SeedId='SunflowerSeed',SeedName='Sunflower Seed',SeedEmoji='x',AccentColor=R.Color3.new(1,1,1),SeedScale=1,BagVariant='Pack01',PackSize=1,PackMutation='None'})
+ local okN,plantedN=Data:PlantSeed(Rae,1,'n1',{OffsetX=0,OffsetZ=0},now)
+ check(okN and plantedN.TestGrant==nil,'control: a normal seed makes an unmarked crop')
+ Data.OnPackOpened=nil;emptyBag(Tess);emptyBag(Rae);emptyBag(Cyd);emptyBag(Dee)
 end
 
 -- 2. publishing ------------------------------------------------------------------------------------------------------------------------------------
