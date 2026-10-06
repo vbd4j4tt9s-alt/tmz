@@ -1,7 +1,7 @@
--- R153 (owner: the 4 Leaf Clover pass picture): the owner's chunky low-poly clover, 128x128, drawn on the client with EditableImage (CloverIcon153) until the pass's own Roblox icon is there.
+-- R153 (owner: the 4 Leaf Clover pass picture): the owner's chunky low-poly clover, 128x128, drawn on the client with EditableImage (CloverIcon153 -> EmbeddedImage153) until the pass's own Roblox icon is there.
 -- Made by docs/proposals/R153/tools/encode_clover.py (it describes the format): stream = palette (Colors x RGB) + indices (Width x Height, top row first) + alpha (Width x Height),
--- raw deflate, base64. Bytes = the stream length, Adler = its Adler-32. Decoded by Inflate153 (pure Luau), once per client.
-return {Width=128,Height=128,Colors=256,Bytes=33536,Adler=4117426859,Data={
+-- raw deflate, base64. Bytes = the stream length, Key = the cache key, Check = its Adler-32. Decoded by EmbeddedImage153 (pure Luau), once per client.
+return {Key='CloverPass153',Width=128,Height=128,Colors=256,Bytes=33536,Check=4117426859,Data={
 '7Zt3INfbG8fRsjKyZZYy+1YaUrqkaCklW8PMykgpygiVnS0kyawQyV4RmdFXokIikZWMKA1+z/moW/d3w/frxv3nvovW+X5e53nO',
 'c55znvM5fR499+mr+fBng77Pep1f9Lo+6bZ8OdzySeP5Z/W6zwoVX3flf976YES2cGhv5iepzI9/ZHyQTP687e6HzanDfyQPb04a',
 'kogf2pT0flP8oPitQfG4AfGEHpmwL9sjhqRiBsVjBjZcH9gY3b/+er941DuxiHfrr7/bEP5ONOzdhrDe1Vd6N4S9XR/asza4Ryy4',

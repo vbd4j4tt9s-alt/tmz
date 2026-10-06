@@ -1,6 +1,6 @@
 """R153: bundle every ReplicatedStorage module and every ChestChaseServer module of a source tree into OUT/rs_bundle.luau for the Roblox mock, plus the client scripts the
 4 Leaf Clover tests load (GamePassClient, PurchaseCelebration), and write OUT/srv_names.luau (the server module names, moved under ServerScriptService.ChestChaseServer by the test).
-Usage: python3 mkbundle.py OUTDIR [--src SRC_DIR] [--font FONT.ttf] [Name=path ...]
+Usage: python3 mkbundle_clover.py OUTDIR [--src SRC_DIR] [--font FONT.ttf] [Name=path ...]
   --src SRC_DIR   the tree to bundle (default: this checkout's src). run_clover.sh gives the R152 release (git archive) for the old-server test.
   --font F.ttf    also write OUTDIR/metrics.luau: the advance widths of the font (Fredoka One) for the mock TextService, as the R120 shop test does.
   Name=path       an extra / replacing module (e.g. a client script of another tree)."""

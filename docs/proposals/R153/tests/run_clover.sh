@@ -1,9 +1,9 @@
 #!/bin/sh
 # Usage: sh run_clover.sh [scratch dir] [mutate]       (needs /opt/luau/luau, python3 with Pillow + numpy, git history with the R152 release)
 # R153, the 4 Leaf Clover game pass (2x luck on every pack), on the Roblox mock (/opt/luau/luau) with the REAL modules of this checkout:
-#  0. static    - every changed / new script compiles; the pass id is in ONE place (the DefaultId line of GamePassCatalog, no copy anywhere else,);
-#                 Config.Version and ProfileVersion 22 as in R152; the new modules are in src/MANIFEST.tsv; the load guard is still line 1 of every client script; the decoder KeeperMeshes152
-#                 used to hold is byte-identical in Inflate153; the picture module is under 20 KB and an independent Python decoder agrees with the game's (size, alpha, Adler of the RGBA)
+#  0. static    - every changed / new script compiles; the pass id is in ONE place (the DefaultId line of GamePassCatalog, no copy anywhere else);
+#                 Config.Version and ProfileVersion 22 as in R152; the new modules are in src/MANIFEST.tsv; the load guard is still line 1 of every client script; KeeperMeshes152 is
+#                 byte-identical to R152 and the clover has no decoder of its own (EmbeddedImage153); the picture module is under 20 KB and an independent Python decoder agrees with the game's (size, alpha, Adler of the RGBA)
 #  1. server    - test_clover.luau: the catalog row / Gem price 999 / the id (default, attribute, 0); luck x1 without, x2 with the pass (Gems, Robux, a purchase in the game, a gift), stacked with
 #                 the boots, owner test boots stay TEST luck, the cap, the friend boost (a speed gain) untouched, every pack opening; the Gem purchase (999 off, a second one refused, too few Gems,
 #                 id 0 still sells); Robux ownership and PromptGamePassPurchaseFinished; save / load (version 22, the optional Premium.Later153, nothing extra without the pass, junk refused);
@@ -24,8 +24,8 @@ T=$REPO/tools/tests;P=$REPO/docs/proposals;S=$REPO/src
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
 echo "== 0. static"
 CATALOG=$S/ReplicatedStorage/GamePassCatalog.lua
-NEW="src/ReplicatedStorage/CloverIcon153.lua src/ReplicatedStorage/CloverIconData153.lua src/ReplicatedStorage/Inflate153.lua"
-CHANGED="src/ReplicatedStorage/GamePassCatalog.lua src/ReplicatedStorage/MechCatalog.lua src/ReplicatedStorage/PremiumBoostCard.lua src/ReplicatedStorage/PremiumEmblems.lua src/ReplicatedStorage/WorldStatusHud.lua src/ServerScriptService/ChestChaseServer/PlayerDataService.lua src/ServerScriptService/ChestChaseServer/PremiumProgress.lua src/ServerScriptService/ChestChaseServer/PurchaseAnnouncer.lua src/ServerScriptService/ChestChaseServer/KeeperMeshes152.lua src/StarterPlayer/StarterPlayerScripts/GamePassClient.client.lua src/StarterPlayer/StarterPlayerScripts/PurchaseCelebration.client.lua"
+NEW="src/ReplicatedStorage/CloverIcon153.lua src/ReplicatedStorage/CloverPassImage153.lua"
+CHANGED="src/ReplicatedStorage/GamePassCatalog.lua src/ReplicatedStorage/MechCatalog.lua src/ReplicatedStorage/PremiumBoostCard.lua src/ReplicatedStorage/PremiumEmblems.lua src/ReplicatedStorage/WorldStatusHud.lua src/ServerScriptService/ChestChaseServer/PlayerDataService.lua src/ServerScriptService/ChestChaseServer/PremiumProgress.lua src/ServerScriptService/ChestChaseServer/PurchaseAnnouncer.lua src/ReplicatedStorage/EmbeddedImage153.lua src/StarterPlayer/StarterPlayerScripts/GamePassClient.client.lua src/StarterPlayer/StarterPlayerScripts/PurchaseCelebration.client.lua"
 for f in $NEW $CHANGED;do /opt/luau/luau-compile --null "$REPO/$f" >/dev/null 2>&1 || fail "$f does not compile";done;echo "ok: $(echo $NEW $CHANGED | wc -w) new / changed scripts compile"
 # the pass id: one place
 ID=$(sed -n 's/.*Key=.Clover.*DefaultId=\([0-9][0-9]*\).*/\1/p' "$CATALOG")
@@ -37,22 +37,21 @@ if [ -n "$ID" ] && [ "$ID" != 0 ];then
 fi
 V=$(grep -c "Config.Version='V150 R152';Config.ProfileVersion=22" "$S/ServerScriptService/ChestChaseServer/Config.lua")
 [ "$V" = 1 ] && echo "ok: Config.Version is still 'V150 R152' and ProfileVersion 22" || fail "Config.Version / ProfileVersion changed"
-for p in CloverIcon153 CloverIconData153 Inflate153;do grep -q "ReplicatedStorage/$p	" "$S/MANIFEST.tsv" || fail "$p is not in src/MANIFEST.tsv";done;echo "ok: the 3 new modules are in src/MANIFEST.tsv"
+for p in CloverIcon153 CloverPassImage153;do grep -q "ReplicatedStorage/$p	" "$S/MANIFEST.tsv" || fail "$p is not in src/MANIFEST.tsv";done;echo "ok: the 2 new modules are in src/MANIFEST.tsv"
 sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 && echo "ok: the R152 load guard is still line 1 of every client script ($(tail -1 "$OUT/guard.log"))" || { fail "the load guard test fails";tail -5 "$OUT/guard.log"; }
-BYTES=$(wc -c < "$S/ReplicatedStorage/CloverIconData153.lua");[ "$BYTES" -lt 20480 ] && echo "ok: the picture module is $BYTES bytes (under 20 KB)" || fail "the picture module is $BYTES bytes"
-# the decoder moved out of KeeperMeshes152 unchanged
-git -C "$REPO" show "$R152:src/ServerScriptService/ChestChaseServer/KeeperMeshes152.lua" | sed -n 27,139p > "$OUT/decoder_r152.txt"
-N=$(wc -l < "$S/ReplicatedStorage/Inflate153.lua");sed -n "5,$((N-2))p" "$S/ReplicatedStorage/Inflate153.lua" > "$OUT/decoder_now.txt"
-cmp -s "$OUT/decoder_r152.txt" "$OUT/decoder_now.txt" && echo "ok: Inflate153 holds the R152 decoder (base64, raw deflate, Adler-32) byte for byte ($(wc -l < "$OUT/decoder_now.txt") lines)" || { fail "Inflate153 differs from the decoder KeeperMeshes152 had";diff "$OUT/decoder_r152.txt" "$OUT/decoder_now.txt" | head -10; }
-git -C "$REPO" show "$R152:src/ServerScriptService/ChestChaseServer/KeeperMeshes152.lua" | sed '27,139d' > "$OUT/keeper_r152_rest.txt"
-sed -n '1,26p;31,$p' "$S/ServerScriptService/ChestChaseServer/KeeperMeshes152.lua" > "$OUT/keeper_now_rest.txt"
-cmp -s "$OUT/keeper_r152_rest.txt" "$OUT/keeper_now_rest.txt" && echo "ok: KeeperMeshes152 differs from R152 only by the 4 lines that require the shared decoder" || { fail "KeeperMeshes152 changed beyond the decoder move";diff "$OUT/keeper_r152_rest.txt" "$OUT/keeper_now_rest.txt" | head -10; }
+BYTES=$(wc -c < "$S/ReplicatedStorage/CloverPassImage153.lua");[ "$BYTES" -lt 20480 ] && echo "ok: the picture module is $BYTES bytes (under 20 KB)" || fail "the picture module is $BYTES bytes"
+# KeeperMeshes152 is byte-identical to the R152 release; the clover has NO decoder of its own: it is drawn through EmbeddedImage153 (the game's one embedded-image decoder)
+KEEPER=src/ServerScriptService/ChestChaseServer/KeeperMeshes152.lua
+git -C "$REPO" show "$R152:$KEEPER" > "$OUT/keeper_r152.txt"
+cmp -s "$OUT/keeper_r152.txt" "$REPO/$KEEPER" && echo "ok: KeeperMeshes152 is byte-identical to the R152 release (the keepers are untouched)" || fail "KeeperMeshes152 differs from the R152 release"
+if grep -qE "local function (inflate|base64)|LBASE|DBASE" "$S/ReplicatedStorage/CloverIcon153.lua" "$S/ReplicatedStorage/CloverPassImage153.lua";then fail "the clover files hold a decoder of their own";else echo "ok: no second decoder: CloverIcon153 / CloverPassImage153 hold none, the picture goes through EmbeddedImage153";fi
+grep -q "require(script.Parent.EmbeddedImage153)" "$S/ReplicatedStorage/CloverIcon153.lua" && grep -q "^return {Key='CloverPass153'" "$S/ReplicatedStorage/CloverPassImage153.lua" || fail "CloverIcon153 must use EmbeddedImage153 and CloverPassImage153 must have its Key"
 python3 -I "$P/R153/tools/encode_clover.py" --adler > "$OUT/py_adler.txt" || fail "the independent Python decoder rejects the picture module"
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]|gp[t]-?[0-9]" "$HERE" "$P/R153/tools" $(for f in $NEW $CHANGED;do echo "$REPO/$f";done) 2>/dev/null | grep -v "Binary file" | grep -v '/run_clover.sh:' | grep -q .;then fail "a model name in the R153 files";else echo "ok: no model names in the R153 files";fi
 # worlds -------------------------------------------------------------------------------------------------------------------------------------------
 build(){ # dir srcdir
  mkdir -p "$1";cp "$T/roblox.luau" "$P/treadmill_bonus_R123/tests/world.luau" "$HERE"/*.luau "$1/"
- python3 "$HERE/mkbundle.py" "$1" --src "$2" --font "$P/shop_R120/tests/FredokaOne.ttf" > /dev/null
+ python3 "$HERE/mkbundle_clover.py" "$1" --src "$2" --font "$P/shop_R120/tests/FredokaOne.ttf" > /dev/null
 }
 run(){ # dir test
  ( cd "$1" && timeout 900 /opt/luau/luau "$2.luau" > "$2.log" 2>&1 ) || { grep -v '^WARN\|^PROFILE\|^RESAVED\|^DUMP\|^CLOVERRGBA' "$1/$2.log" | tail -30;fail "$2 FAILED";return 1; }
@@ -75,7 +74,7 @@ run "$W153" test_clover_back
 echo "== 3. the picture"
 run "$W153" test_clover_icon
 LUA_ADLER=$(sed -n 's/^ADLER //p' "$W153/test_clover_icon.log");PY_ADLER=$(sed -n 's/^ADLER //p' "$OUT/py_adler.txt")
-[ -n "$LUA_ADLER" ] && [ "$LUA_ADLER" = "$PY_ADLER" ] && echo "ok: the game's decoder (Inflate153 + palette) and the independent Python decoder make the same RGBA (Adler-32 $LUA_ADLER)" || fail "the decoders disagree (game $LUA_ADLER, python $PY_ADLER)"
+[ -n "$LUA_ADLER" ] && [ "$LUA_ADLER" = "$PY_ADLER" ] && echo "ok: the game's decoder (EmbeddedImage153) and the independent Python decoder make the same RGBA (Adler-32 $LUA_ADLER)" || fail "the decoders disagree (game $LUA_ADLER, python $PY_ADLER)"
 echo "== 4. the shop, the HUD, the purchase pop"
 run "$W153" test_clover_shop
 mkdir -p "$OUT/renders";python3 "$P/R153/tools/render_clover.py" "$W153/test_clover_shop.log" "$OUT/renders" > "$OUT/renders.log" 2>&1 && echo "ok: preview rendered: $OUT/renders/clover.png" || { fail "render_clover.py";tail -5 "$OUT/renders.log"; }
@@ -96,7 +95,7 @@ PY
   rm -rf "$MUT/w_$name";mkdir -p "$MUT/w_$name";cp "$T/roblox.luau" "$P/treadmill_bonus_R123/tests/world.luau" "$HERE"/*.luau "$MUT/w_$name/"
   [ -f "$W153/profiles.luau" ] && cp "$W153/profiles.luau" "$W153/resaved.luau" "$MUT/w_$name/"
   modname=$(basename "$file" .lua);modname=${modname%.client}
-  python3 "$HERE/mkbundle.py" "$MUT/w_$name" "$modname=$MUT/$name.lua" --font "$P/shop_R120/tests/FredokaOne.ttf" > /dev/null
+  python3 "$HERE/mkbundle_clover.py" "$MUT/w_$name" "$modname=$MUT/$name.lua" --font "$P/shop_R120/tests/FredokaOne.ttf" > /dev/null
   if ( cd "$MUT/w_$name" && timeout 900 /opt/luau/luau "$suite.luau" > "$suite.log" 2>&1 );then fail "mutation $name was NOT noticed by $suite";else echo "ok: $name -> $suite fails ($(grep -c '^FAIL' "$MUT/w_$name/$suite.log") failing checks)";fi
  }
  mutate no_luck "$SSS/PlayerDataService.lua" "bestLuckMultiplier*self:PassLuck(player)" "bestLuckMultiplier" test_clover
@@ -108,7 +107,9 @@ PY
  mutate announcer_icon "$SSS/PurchaseAnnouncer.lua" "Icon=row and row.Icon or nil" "Icon=nil" test_clover
  mutate robux_button "$SP/GamePassClient.client.lua" "if v.Robux.Visible==soon then v.Robux.Visible=not soon;reflow=true end" "" test_clover_shop
  mutate pass_icon "$RSD/CloverIcon153.lua" "local usePass=pass~=nil and pass.IsLoaded==true" "local usePass=false" test_clover_icon
- mutate leak "$RSD/CloverIcon153.lua" "if object then destroyImage(object)end" "" test_clover_icon
+ mutate leak "$RSD/CloverIcon153.lua" "pcall(function()embedded().Release(emb)end)" "" test_clover_icon
+ mutate no_start "$RSD/CloverIcon153.lua" "if not(pass and pass.IsLoaded==true)then startRoot(root)end" "" test_clover_icon
+ mutate write_leak "$RSD/EmbeddedImage153.lua" "if not written then pcall(image.Destroy,image);error(why,0)end" "if not written then error(why,0)end" test_clover_icon
  mutate no_ensure "$RSD/WorldStatusHud.lua" "if i==2 and active then pcall(function()require(RS.CloverIcon153).Ensure()end)end" "" test_clover_shop
  mutate tag_title "$RSD/PremiumBoostCard.lua" "Clover={Title='x2 Luck'" "Clover={Title='Lucky Clover Pass Deluxe'" test_clover_shop
  mutate old_server_ok "$SSS/PremiumProgress.lua" "saved=P.Unpack(saved);if not saved then return nil end" "" test_clover

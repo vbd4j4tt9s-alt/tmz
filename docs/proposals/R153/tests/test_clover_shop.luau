@@ -48,9 +48,11 @@ W.stub('PackViewport89',{DecorateCard=function()end,Create=function(parent)
  local v=R.Instance.new('ViewportFrame');v.Name='MechPackPreview';v.Parent=parent;return v end})
 -- the clover picture: hooks stand in for the engine (an EditableImage is a table here)
 local Icon=W.module('CloverIcon153');local created={}
-Icon.Hooks.Create=function(w,h,rgba)local o={W=w,H=h,Data=rgba,Destroyed=false};function o.Destroy(self)self.Destroyed=true end;created[#created+1]=o;return o end
-Icon.Hooks.Content=function(image)return {Image=image} end
-Icon.Hooks.Spawn=function(f)f()end;Icon.Hooks.Wait=function()end;Icon.Hooks.Preload=function()end;Icon.Hooks.Delay=function()end
+local Emb=W.module('EmbeddedImage153')
+local function live()local n=0;for _,o in ipairs(created)do if not o.Destroyed then n+=1 end end;return n end
+Emb.Hooks.Create=function(w,h,rgba)local o={W=w,H=h,Data=rgba,Destroyed=false};function o.Destroy(self)self.Destroyed=true end;created[#created+1]=o;return o end
+Emb.Hooks.Content=function(image)return {Image=image} end;Emb.Hooks.None={None=true}
+Emb.Hooks.Spawn=function(f)f()end;Emb.Hooks.Wait=function()end;Icon.Hooks.Preload=function()end
 -- screens ----------------------------------------------------------------------------------------------------------------------------------------
 local screens={{'PC 1280x720',1280,720,false,{0,58,0,0}},{'Phone 844x390',844,390,true,{47,58,47,21}},{'Phone 667x375',667,375,true,{0,58,0,0}},{'Portrait 390x844',390,844,true,{0,105,0,34}}}
 local function controlsFor(w,h)
@@ -204,7 +206,7 @@ for si,s in ipairs(screens)do
   local icon=iconOf(card)
   check(icon~=nil and icon.Parent==card.IconStage,name..': the card holds the clover picture (CloverIcon153)')
   check(inside(rect(card.IconStage),rc,1)and rect(card.IconStage).W>=60,name..': the picture stage is inside the card and at least 60 px ('..math.floor(rect(card.IconStage).W)..')')
-  check(Icon.Stats().Status=='ready'and#created==1,name..': opening the shop drew the picture (once)')
+  check(Emb.Status().Ready==1 and#created==1,name..': opening the shop drew the picture (once)')
   local _,emb,pass=icon.Fallback,icon.Embedded,icon:FindFirstChild('PassIcon')
   check(pass~=nil and pass.Image=='rbxassetid://424242','the pass\'s own icon (IconImageAssetId) is set from the info the shop fetched: '..tostring(pass and pass.Image))
   check(Icon.Source(icon)=='embedded','until the pass icon has loaded the drawn clover shows')
@@ -212,7 +214,7 @@ for si,s in ipairs(screens)do
   if si==1 then
    toPasses();emit('clover_passes');print('CLOVERRGBA '..hex(created[1].Data))
    pass.IsLoaded=true;check(Icon.Source(icon)=='pass','once the pass icon has loaded it shows instead')
-   check(Icon.Stats().Live==0 and created[1].Destroyed==true,'... and the drawn picture is released (no EditableImage left)')
+   check(live()==0 and created[1].Destroyed==true,'... and the drawn picture is released (no EditableImage left)')
    pass.IsLoaded=false
   end
   -- buying
@@ -296,13 +298,13 @@ do
  Icon.Reset();table.clear(created)
  local Hud=W.module('WorldStatusHud');local h=Hud.Create(pg,player)
  local root=pg.WorldStatus.StatusStack;local row=root.LuckBoost
- check(row.Visible==false and Icon.Stats().Created==0,'HUD: no luck row at x1, and no picture drawn for it')
+ check(row.Visible==false and#created==0,'HUD: no luck row at x1, and no picture drawn for it')
  local icon=row.Icon:FindFirstChild('CloverIcon153')
  check(icon~=nil,'HUD: the luck row\'s icon is the clover picture (CloverIcon153), the same one as the shop card')
  check(Icon.Source(icon)=='fallback','HUD: until it is drawn the plain clover shows')
  player:SetAttribute('ChestLuckMultiplier',2);R.advance(0)
  check(row.Visible==true and row.Value.Text=='×2','HUD: luck 2 (the pass alone) shows ×2 ('..tostring(row.Value.Text)..')')
- check(Icon.Stats().Status=='ready'and#created==1 and Icon.Source(icon)=='embedded','HUD: the picture is drawn when the row first shows')
+ check(Emb.Status().Ready==1 and#created==1 and Icon.Source(icon)=='embedded','HUD: the picture is drawn when the row first shows')
  player:SetAttribute('ChestLuckMultiplier',100);R.advance(0);check(row.Value.Text=='×100','HUD: Sand Boots x50 + the pass = ×100 ('..tostring(row.Value.Text)..')')
  player:SetAttribute('ChestLuckMultiplier',50000000);R.advance(0);check(row.Value.Text=='×50M','HUD: the cap shows ×50M ('..tostring(row.Value.Text)..')')
  player:SetAttribute('ChestLuckMultiplier',1e12);R.advance(0);check(row.Value.Text=='×50M','HUD: more than the cap is shown as the cap')
@@ -310,8 +312,10 @@ do
  player:SetAttribute('ChestLuckMultiplier',1);R.advance(0);check(row.Visible==false,'HUD: back to x1: the row is hidden')
  check(#created==1,'HUD: the picture was drawn once')
  h.Destroy()
- local h2=Hud.Create(pg,player);player:SetAttribute('ChestLuckMultiplier',2);R.advance(0);h2.Destroy()
- check(#created==1 and Icon.Stats().Live==1,'a rebuilt HUD (respawn) shares the one picture: still 1 EditableImage made, 1 alive')
+ check(live()==0 and created[1].Destroyed==true,'HUD: destroyed (a respawn): it let go of its picture, nothing alive')
+ local h2=Hud.Create(pg,player);player:SetAttribute('ChestLuckMultiplier',2);R.advance(0)
+ check(live()==1 and#created==2,'a rebuilt HUD draws its own picture: 1 alive (2 made over the session, the first destroyed)')
+ h2.Destroy();check(live()==0,'... and lets go of it when it is destroyed: nothing leaked')
  player:SetAttribute('ChestLuckMultiplier',nil)
 end
 -- D. the purchase pop ----------------------------------------------------------------------------------------------------------------------------------
@@ -329,14 +333,14 @@ do
  check(pop~=nil and pop:FindFirstChild('CloverIcon153')~=nil,'a purchase with Icon "Clover": the clover picture pops up in the middle of the burst')
  check(played==2,'... with the chime too')
  W.frames(6,1/60);check(pop.Size.X.Offset>0,'... it grows in ('..string.format('%.0f',pop.Size.X.Offset)..' px)')
- check(Icon.Stats().Status=='ready','... and it is drawn for it (Ensure)')
+ check(Emb.Status().Ready==1,'... and it is drawn for it (Ensure)')
  for _=1,200 do W.frames(1,1/30)end;check(bursts()==nil and pop.Parent==nil,'... and removed with the burst (nothing left in the PlayerGui)')
  R.advance(1)
  for i,junk in ipairs({'clover','Clover ',5,true,{},{'Clover'},false})do
   doneRemote.OnClientEvent:Fire({Kind='Pass',Name='X',Icon=junk});local l=bursts();check(l==nil or l:FindFirstChild('PurchaseIcon')==nil,'a hostile Icon ('..tostring(junk)..') pops nothing, breaks nothing')
   for _=1,100 do W.frames(1,1/30)end;R.advance(1)
  end
- check(Icon.Stats().Live<=1,'(still at most one EditableImage alive)')
+ check(live()<=1,'(still at most one EditableImage alive)')
 end
 print(string.format('R153 clover shop: %d checks, %d failures',checks,fails))
 if fails>0 then error('failed')end

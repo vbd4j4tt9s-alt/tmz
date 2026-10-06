@@ -1,10 +1,10 @@
-"""R153: the owner's 4 Leaf Clover picture (clover_owner.webp, 1254x1254 RGBA) -> src/ReplicatedStorage/CloverIconData153.lua.
-The game draws it on the client (EditableImage) until / unless the pass's own Roblox icon is there, so nothing is uploaded.
+"""R153: the owner's 4 Leaf Clover picture (clover_owner.webp, 1254x1254 RGBA) -> src/ReplicatedStorage/CloverPassImage153.lua.
+The game draws it on the client (EmbeddedImage153: base64 + inflate -> EditableImage) until / unless the pass's own Roblox icon is there, so nothing is uploaded.
 Steps: crop to the picture's alpha box (alpha > 40) (+8 %, square, centred) -> resize to 128x128 in PREMULTIPLIED space (PIL mode 'RGBa': clean edges, no dark or
 light fringe) -> back to straight RGBA -> every fully transparent pixel gets one dark green (it compresses, and bilinear filtering bleeds green, not
 black, into the edge) -> the colour plane is quantised to 256 colours (median cut, no dither: the picture is flat-shaded low poly) ->
 stream = palette (3 x Colors bytes: RGB) + indices (W x H, top row first) + alpha (W x H) -> raw deflate (RFC 1951, level 9) -> base64, in 100-character lines.
-The module also holds Bytes (the stream length) and Adler (Adler-32 of the stream); the game checks both (Inflate153 + CloverIcon153.Decode).
+The module also holds Key (the cache key), Bytes (the stream length) and Check (Adler-32 of the stream); EmbeddedImage153 checks both.
 Usage: python3 encode_clover.py [clover_owner.webp] [out.lua]      (needs Pillow + numpy)
        python3 encode_clover.py --check [out.lua]                  (re-reads the module with an independent decoder and prints the size and the alpha box)
        python3 encode_clover.py --adler [out.lua]                  (prints ADLER <Adler-32 of the decoded RGBA>: the game's own decoder must print the same, run_clover.sh compares)"""
@@ -50,10 +50,10 @@ def write(raw, z, out):
     b64 = base64.b64encode(z).decode('ascii')
     lines = [b64[i:i + 100] for i in range(0, len(b64), 100)]
     with open(out, 'w', encoding='utf-8') as f:
-        f.write('-- R153 (owner: the 4 Leaf Clover pass picture): the owner\'s chunky low-poly clover, %dx%d, drawn on the client with EditableImage (CloverIcon153) until the pass\'s own Roblox icon is there.\n' % (SIZE, SIZE))
+        f.write('-- R153 (owner: the 4 Leaf Clover pass picture): the owner\'s chunky low-poly clover, %dx%d, drawn on the client with EditableImage (CloverIcon153 -> EmbeddedImage153) until the pass\'s own Roblox icon is there.\n' % (SIZE, SIZE))
         f.write('-- Made by docs/proposals/R153/tools/encode_clover.py (it describes the format): stream = palette (Colors x RGB) + indices (Width x Height, top row first) + alpha (Width x Height),\n')
-        f.write('-- raw deflate, base64. Bytes = the stream length, Adler = its Adler-32. Decoded by Inflate153 (pure Luau), once per client.\n')
-        f.write('return {Width=%d,Height=%d,Colors=%d,Bytes=%d,Adler=%d,Data={\n' % (SIZE, SIZE, COLORS, len(raw), zlib.adler32(raw)))
+        f.write('-- raw deflate, base64. Bytes = the stream length, Key = the cache key, Check = its Adler-32. Decoded by EmbeddedImage153 (pure Luau), once per client.\n')
+        f.write("return {Key='CloverPass153',Width=%d,Height=%d,Colors=%d,Bytes=%d,Check=%d,Data={\n" % (SIZE, SIZE, COLORS, len(raw), zlib.adler32(raw)))
         for l in lines:
             f.write("'%s',\n" % l)
         f.write('}}\n')
@@ -62,7 +62,7 @@ def write(raw, z, out):
 
 def check(path):
     text = open(path, encoding='utf-8').read()
-    w, h, colors, nbytes, adler = (int(re.search(k + r'=(\d+)', text).group(1)) for k in ('Width', 'Height', 'Colors', 'Bytes', 'Adler'))
+    w, h, colors, nbytes, adler = (int(re.search(k + r'=(\d+)', text).group(1)) for k in ('Width', 'Height', 'Colors', 'Bytes', 'Check'))
     b64 = ''.join(re.findall(r"^'([A-Za-z0-9+/=]+)',$", text, re.M))
     raw = zlib.decompress(base64.b64decode(b64), -15)
     assert len(raw) == nbytes == colors * 3 + 2 * w * h, (len(raw), nbytes)
@@ -79,7 +79,7 @@ def check(path):
 
 if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
-    default_out = os.path.normpath(os.path.join(HERE, '../../../../src/ReplicatedStorage/CloverIconData153.lua'))
+    default_out = os.path.normpath(os.path.join(HERE, '../../../../src/ReplicatedStorage/CloverPassImage153.lua'))
     if '--adler' in sys.argv:
         print('ADLER %d' % zlib.adler32(check(args[0] if args else default_out).tobytes()))
     elif '--check' in sys.argv:
