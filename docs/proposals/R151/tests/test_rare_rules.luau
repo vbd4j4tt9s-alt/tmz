@@ -67,7 +67,8 @@ for rank=1,8 do
  local function amp(t)local c=L.Wobble(rank,t,false,false);return c.Position.Magnitude+math.abs(c.R[1][2])+math.abs(c.R[2][1])end
  local early,late=0,0;for i=1,20 do early=math.max(early,amp(at*.1*i/20));late=math.max(late,amp(at*(.8+.18*i/20)))end
  check(late>early,names[rank]..': the wobble grows toward the burst')
- check(amp(at+.01)==0 and amp(at+1)==0,names[rank]..': the pack is still after the burst')
+ -- (R152: it settles over SettleSeconds after the burst instead of snapping straight on the burst frame)
+ check(amp(at+(L.SettleSeconds or 0)+.01)==0 and amp(at+1)==0 and amp(at+.005)<=late*1.05+1e-6,names[rank]..': the pack is still after the burst (settling from where it was)')
  check(L.Wobble(rank,at*.7,false,true).Position.Magnitude==0,names[rank]..': ReducedMotion: no wobble')
  local pulses=L.Pulses(rank);local ok=#pulses>=1
  for i,p in ipairs(pulses)do if p<=0 or p>=at or(i>1 and p<=pulses[i-1])then ok=false end end
@@ -164,7 +165,7 @@ for rank=6,8 do
 end
 -- King: the crown lands on the PACK, then rises with the seed
 do local tl=L.Timeline(8,'Full');local pack=L.PackPose(8,tl,tl.CrownOn+.1)
- local c0=L.CrownPose(tl,tl.CrownStart-.1);local c1,_,a1=L.CrownPose(tl,tl.CrownOn+.1);local c2=L.CrownPose(tl,tl.Climax+1)
+ local c0=L.CrownPose(tl,tl.CrownStart-.1);local c1,_,a1=L.CrownPose(tl,tl.CrownOn+.35);local c2=L.CrownPose(tl,tl.Climax+1) -- (R152: c1 after the little press as it lands)
  check(c0.Y>pack.Y+5,'King: the crown starts high above the throne')
  check(near(c1.Y,pack.Y+L.PackHeroHeight*.5+.32,.02)and near(c1.X,pack.X,.01)and a1==1,'King: the crown settles on top of the pack')
  local seed=L.SeedPose(8,tl,tl.Climax+1);check(c2.Y>seed.Y,'King: after the burst the crown rises with the seed')

@@ -95,8 +95,18 @@ function L.SeedPhase(age,hover)
 end
 -- Quick reveals are decided by the opener's client only (its own presentation); a weak table so nothing leaks.
 L.QuickBags=setmetatable({},{__mode='k'})
-function L.MarkQuick(bag,quick)if bag then L.QuickBags[bag]=quick and true or nil end end
+function L.MarkQuick(bag,quick)if bag then L.QuickBags[bag]=quick==true end end
 function L.IsQuick(bag)return bag~=nil and L.QuickBags[bag]==true end
+-- R152: decided ONCE per bag by whichever asks first, the director (PackOpeningFeedback) or the world pack (SeedPackClient): they run in
+-- either order within a frame, and the world used to keep the normal timing when it asked first, so the seed burst out of the pack at a
+-- different moment than the card and its sounds. A reveal still running, or one that ended under QuickWindow ago, makes it quick.
+L.LastRevealEnd=-math.huge;L.RevealRunning=false -- (RarePullCinematic keeps these)
+function L.QuickFor(bag)
+ if bag~=nil and L.QuickBags[bag]~=nil then return L.QuickBags[bag]end
+ local q=L.RevealRunning==true or(os.clock()-L.LastRevealEnd)<L.QuickWindow
+ if bag~=nil then L.QuickBags[bag]=q end
+ return q
+end
 -- Suspense: the pack's rarity hint, wobble and tear -------------------------------------------------------------------------------------
 -- The hint starts neutral and walks up the ladder (Common, Uncommon, ...) to the real tier, flickering between neighbours like Sol's RNG
 -- "it could be...": higher tiers pass through every lower colour. The last quarter holds the real colour.
@@ -124,24 +134,49 @@ function L.Pulses(rank,quick)
  return out
 end
 -- The wobble of the pack (a CFrame offset in the bag's own frame, scaled by its visual scale): rising sway plus a kick on every pulse.
+-- R152 (owner: "animation must be smooth"): each kick swells in over 40 ms instead of jumping on (up to 7 degrees in one frame), and after
+-- the burst the pack settles out over SettleSeconds instead of snapping straight (it jumped back by the whole sway on the burst frame).
+L.SettleSeconds=.3
+local function kickEnvelope(a)if a<0 or a>=.26 then return 0 elseif a<.04 then return smooth(a/.04)end;return(1-(a-.04)/.22)^2 end
 function L.Wobble(rank,t,quick,reduced)
- local at=L.BurstAt(rank,quick);if t<0 or t>=at or reduced then return CFrame.new()end
- local q=clamp01(t/at);local tier=L.Tier(rank)
- local amp=(.025+.012*rank)*(.25+.75*q*q)
+ local at=L.BurstAt(rank,quick);if t<0 or t>=at+L.SettleSeconds or reduced then return CFrame.new()end
+ local settle=t>=at and 1-smooth((t-at)/L.SettleSeconds)or 1
+ local q=clamp01(t/at)
+ local amp=(.025+.012*rank)*(.25+.75*q*q)*settle
  local kick=0
- for _,p in ipairs(L.Pulses(rank,quick))do local a=t-p;if a>=0 and a<.22 then kick=math.max(kick,(1-a/.22)^2)end end
+ for _,p in ipairs(L.Pulses(rank,quick))do kick=math.max(kick,kickEnvelope(t-p))end
+ kick*=settle
  local w=t*(14+rank*1.5)
  return CFrame.new(math.sin(w)*amp*.6+math.sin(w*2.3)*kick*.05,math.abs(math.sin(w*.5))*amp*.4+kick*.04,0)
   *CFrame.Angles(math.sin(w*.8)*amp*.5,math.sin(w*1.1)*amp*.35,math.sin(w)*amp*1.6+math.sin(w*2.7)*kick*.12)
 end
--- Glow of the pack's seams: pulses (faster as it builds) and flares on every wobble pulse.
+-- The opener's heartbeats (seconds after RevealAt; none on a quick reveal): the LadderCues sound them, the screen edges and the seam glow
+-- throb on them (R152: they used to pulse on a free-running sine, so the thump you heard never matched the throb you saw).
+function L.Heartbeats(rank,quick)
+ local tier=L.Tier(rank);local burst=L.BurstAt(rank,quick);local beats=quick and 0 or tier.Heartbeats;local out={}
+ for i=1,beats do out[i]=burst*(i/(beats+1))^.8 end
+ return out
+end
+-- 0..1 envelope of one throb a seconds after its beat: a 25 ms swell, then it dies away
+local function throb(a)if a<0 then return 0 elseif a<.025 then return a/.025 end;return math.exp(-(a-.025)/.14)end
+L.ThrobEnvelope=throb
+-- The suspense's visible beat at t: a throb on every heartbeat, a slightly smaller one on every wobble pulse (PackShake), 0..1. The throbs
+-- add up (screen blend), so a heartbeat right after a pulse still shows as a new throb on its own frame.
+function L.Beat(rank,t,quick)
+ local keep=1
+ for _,h in ipairs(L.Heartbeats(rank,quick))do keep*=1-throb(t-h)end
+ for _,p in ipairs(L.Pulses(rank,quick))do keep*=1-.8*throb(t-p)end
+ return 1-keep
+end
+-- Glow of the pack's seams: builds, flares on every wobble pulse and throbs on every heartbeat (a faint free pulse under it).
 function L.Glow(rank,t,quick)
  local at=L.BurstAt(rank,quick);if t<0 then return 0 end
  if t>=at then return math.max(0,1-(t-at)/.25)end
  local q=clamp01(t/at);local beat=.5+.5*math.sin(t*(6+10*q))
  local flare=0
  for _,p in ipairs(L.Pulses(rank,quick))do local a=t-p;if a>=0 and a<.25 then flare=math.max(flare,1-a/.25)end end
- return clamp01(.12+.55*q*q+.18*beat*q+.35*flare)
+ local heart=0;for _,h in ipairs(L.Heartbeats(rank,quick))do heart=1-(1-heart)*(1-throb(t-h))end
+ return clamp01(.12+.55*q*q+.06*beat*q+.35*flare+.3*heart)
 end
 -- The tear: the 8 strips peel a few at a time (2, then 3, then 3) instead of all at once, so the pack rips open bit by bit.
 L.TearGroups={{1,2,At=0},{3,4,5,At=.38},{6,7,8,At=.72}}
@@ -192,6 +227,25 @@ function L.Timeline(rank,variant)
  if variant=='InPlace'then return L.InPlace(rank)elseif variant=='Result'then return L.InPlace(rank,true)end
  local base=L.Scenes[rank][variant=='Calm'and'Calm'or'Full'];local out=table.clone(base);out.Variant=variant=='Calm'and'Calm'or'Full';return out
 end
+L.LockTurns={0,.22,.44} -- Secret: the ring of lock plates turns (and clicks) this long after Lock, unless the unlock has begun
+-- R152: when THIS presentation has shown the seed (its clock): the title on, the seed on screen and "1 in N" slammed. The director publishes
+-- it (RarePullSeedShownAt) so the puller's own chat line about the pull waits for it, also on a slow device.
+function L.ShownAt(tl)return math.max(tl.Climax or tl.Burst or 0,tl.Rise or 0,tl.Odds or 0)end
+-- R152: how far the game's music is ducked under a reveal (0..1 of RarePullAudio.DuckDb), on the presentation's clock: it starts with the
+-- reveal (the bed fades in at 0), is down by the cut (the story scenes) or half way through the suspense (the ladder), holds, and comes
+-- back over the way out so it is fully back on Length. Common / Uncommon do not duck.
+L.LadderDuck={0,0,.15,.35,.5}
+function L.Duck(kind,rank,tl,t)
+ local depth,inEnd,hold
+ if kind=='Ladder'then depth=L.LadderDuck[math.clamp(rank,1,5)]or 0;inEnd=math.max(.2,tl.Burst*.6);hold=tl.Out
+ elseif kind=='Scene'then depth=1;inEnd=math.max(.1,tl.Cut);hold=tl.Back
+ elseif kind=='InPlace'then depth=.6;inEnd=.5;hold=tl.FloatEnd
+ else depth=.4;inEnd=.2;hold=tl.FloatEnd end
+ if depth<=0 or t<0 or t>=tl.Length then return 0 end
+ if t<inEnd then return depth*smooth(t/inEnd)end
+ if t<hold then return depth end
+ return depth*(1-smooth((t-hold)/math.max(.05,tl.Length-hold)))
+end
 -- When the opener's own screen has SHOWN the seed -------------------------------------------------------------------------------------------
 -- For the pull announcements (PullAnnounceRules.RevealDelay, used by the server): seconds after the server's RevealAt at which the opener's reveal has shown the seed - its
 -- rarity title and the seed on screen AND "1 in N" slammed, the card's last beat. Common..Mythic (the ladder): the card's Odds slam; the story scenes: the latest of Climax, Rise
@@ -230,6 +284,22 @@ L.Shots={
   Calm={K('SceneIn',0,V(2.2,6.4,4.2),V(0,5.2,-4.6),52,true),K('Climax',0,V(0,7.1,4.0),V(0,6.9,-2.8),50,true)}},
 }
 local function keyTime(tl,k)return(tl[k.Beat]or 0)+(k.Offset or 0)end
+-- (R152: one flowing path through the keys - a Hermite curve whose speed carries on through each key - instead of easing to a stop at every
+-- key and setting off again: the camera no longer halts on each beat. It still eases out of the first key and into the last, and comes to
+-- rest before a cut. Tangents: the neighbours' difference over their time span, so it never overshoots far.)
+local function slope(keys,tl,i,field)
+ local k,prev,nxt=keys[i],keys[i-1],keys[i+1]
+ if not prev or not nxt or k.Cut or nxt.Cut then return nil end
+ local span=keyTime(tl,nxt)-keyTime(tl,prev);if span<1e-3 then return nil end
+ return(nxt[field]-prev[field])/span
+end
+local function hermite(p0,p1,m0,m1,u,span)
+ local u2,u3=u*u,u*u*u
+ local v=p0*(2*u3-3*u2+1)+p1*(3*u2-2*u3)
+ if m0 then v=v+m0*((u3-2*u2+u)*span)end
+ if m1 then v=v+m1*((u3-u2)*span)end
+ return v
+end
 -- Eye, target (stage-local Vector3) and FieldOfView at time t.
 local function keyedShot(rank,tl,t)
  local keys=L.Shots[rank][tl.Variant=='Calm'and'Calm'or'Full']
@@ -239,8 +309,9 @@ local function keyedShot(rank,tl,t)
   local a,b=keys[i],keys[i+1];local ta,tb=keyTime(tl,a),keyTime(tl,b)
   if t<tb then
    if b.Cut then return a.Eye,a.Target,a.Fov end
-   local u=smooth((t-ta)/math.max(1e-3,tb-ta))
-   return a.Eye:Lerp(b.Eye,u),a.Target:Lerp(b.Target,u),a.Fov+(b.Fov-a.Fov)*u
+   local span=math.max(1e-3,tb-ta);local u=clamp01((t-ta)/span)
+   return hermite(a.Eye,b.Eye,slope(keys,tl,i,'Eye'),slope(keys,tl,i+1,'Eye'),u,span),hermite(a.Target,b.Target,slope(keys,tl,i,'Target'),slope(keys,tl,i+1,'Target'),u,span),
+    hermite(a.Fov,b.Fov,slope(keys,tl,i,'Fov'),slope(keys,tl,i+1,'Fov'),u,span)
   end
  end
  local last=keys[#keys];return last.Eye,last.Target,last.Fov
@@ -269,6 +340,9 @@ L.Points={
  [8]={Pack=V(0,4.6,-4.6),Enter=V(0,5.6,22),Seed0=V(0,7.4,-4.6),Seed1=V(0,6.3,-1.0)},
 }
 local function jitter(t,seed)return math.sin(t*61+seed)*math.sin(t*23+seed*2.3)end
+-- (R152: a pack's shake swells in over `fadeIn` and settles over the last .06 s before it ends: it used to start at full strength, the pack
+-- jumping a few hundredths of a stud on the first frame, and snap still on the last)
+local function swell(t,from,to,fadeIn)return smooth((t-from)/fadeIn)*smooth((to-t)/.06)end
 -- Returns position, yaw, roll, alpha (1 = visible) and a shake amount for the pack.
 function L.PackPose(rank,tl,t)
  local P=L.Points[rank];local pos=P.Pack;local yaw=0;local roll=0;local alpha=1;local shake=0
@@ -276,22 +350,23 @@ function L.PackPose(rank,tl,t)
  if rank==6 then
   pos=pos+V(0,.08*math.sin(t*1.6),0);yaw=math.sin(t*.45)*.3
   for _,g in ipairs({'Glitch1','Glitch2'})do local a=t-(tl[g]or -9);if a>=0 and a<.22 then pos=pos+V(jitter(t,1)*.14,jitter(t,2)*.06,0);roll=jitter(t,3)*.08 end end
-  if t>=tl.Unlock and t<tl.Silence then shake=.03+.07*clamp01((t-tl.Unlock)/(tl.Silence-tl.Unlock))end
+  if t>=tl.Unlock and t<tl.Silence then shake=(.03+.07*clamp01((t-tl.Unlock)/(tl.Silence-tl.Unlock)))*swell(t,tl.Unlock,tl.Silence,.1)end
  elseif rank==7 then
   local d=easeOut((t-tl.SceneIn)/math.max(.01,tl.Drift-tl.SceneIn))
   pos=(P.Drift and tl.Drift>tl.SceneIn)and P.Drift:Lerp(P.Pack,d)or P.Pack
   local spin=.5+13.5*easeIn((t-tl.SpinUp)/math.max(.01,tl.Implode-tl.SpinUp))
   yaw=t*.5+(t>tl.SpinUp and(t-tl.SpinUp)*spin*.5 or 0);roll=math.sin(t*.3)*.3
   if t>=tl.Implode then alpha=math.min(alpha,1-clamp01((t-tl.Implode)/math.max(.01,tl.Silence-tl.Implode)))end
-  if t>=tl.SpinUp and t<tl.Silence then shake=.02+.05*clamp01((t-tl.SpinUp)/(tl.Silence-tl.SpinUp))end
+  if t>=tl.SpinUp and t<tl.Silence then shake=(.02+.05*clamp01((t-tl.SpinUp)/(tl.Silence-tl.SpinUp)))*swell(t,tl.SpinUp,tl.Silence,.1)end
  else
   if tl.Land>tl.SceneIn then
    local g=smooth((t-tl.SceneIn)/math.max(.01,tl.Glide-tl.SceneIn))
    local above=P.Pack+V(0,.8,0)
    pos=P.Enter:Lerp(above,g)+V(0,.12*math.sin(t*2.4)*(1-g),0)
-   if t>=tl.Glide then pos=above:Lerp(P.Pack,easeOut((t-tl.Glide)/math.max(.01,tl.Land-tl.Glide)))end
+   -- (R152: set down with a smooth curve; the ease-out started at full speed the frame the glide had stopped)
+   if t>=tl.Glide then pos=above:Lerp(P.Pack,smooth((t-tl.Glide)/math.max(.01,tl.Land-tl.Glide)))end
   end
-  if t>=tl.CrownOn and t<tl.Silence then shake=.02+.09*easeIn((t-tl.CrownOn)/(tl.Silence-tl.CrownOn))end
+  if t>=tl.CrownOn and t<tl.Silence then shake=(.02+.09*easeIn((t-tl.CrownOn)/(tl.Silence-tl.CrownOn)))*swell(t,tl.CrownOn,tl.Silence,.08)end
  end
  return pos,yaw,roll,alpha,shake
 end
@@ -305,7 +380,7 @@ function L.SeedPose(rank,tl,t,still)
  if rank==7 then
   local k=clamp01((t-tl.Climax)/math.max(.01,tl.StarIn-tl.Climax))
   if t<tl.StarIn then
-   local e=smooth(k);pos=P.Pack:Lerp(P.Seed0,e)+V(0,math.sin(k*math.pi)*.25,0);glow=1-e
+   local e=smooth(k);pos=P.Pack:Lerp(P.Seed0,e)+V(0,math.sin(k*math.pi)^2*.25,0);glow=1-e -- (R152: an arc that also arrives at rest: sin² not sin)
   else pos=P.Seed0 end
  else
   local from=P.Pack
@@ -326,7 +401,11 @@ function L.CrownPose(tl,t)
  local P=L.Points[8];local top=P.Pack+V(0,L.PackHeroHeight*.5+.32,0)
  if t<tl.CrownStart then return top+V(0,9,0),1,0 end
  if t<tl.Climax then
-  local k=easeOut((t-tl.CrownStart)/math.max(.01,tl.CrownOn-tl.CrownStart));return(top+V(0,9,0)):Lerp(top,k),1,clamp01((t-tl.CrownStart)/.3)
+  -- (R152: it comes down on a smooth curve and touches the pack ON CrownOn, pressing in a little as the fanfare and the bell sound; the
+  -- ease-out it had was 99.8 % down a sixth of a second early, so the landing seemed to come before its sound)
+  local k=smooth((t-tl.CrownStart)/math.max(.01,tl.CrownOn-tl.CrownStart))
+  local press=t>=tl.CrownOn and .06*math.sin(math.pi*clamp01((t-tl.CrownOn)/.28))or 0
+  return(top+V(0,9,0)):Lerp(top,k)-V(0,press,0),1,clamp01((t-tl.CrownStart)/.3)
  end
  -- after the burst the crown lifts with the seed, shrinks and fades into the seed's own coronation ring
  local seed=L.SeedPose(8,tl,t);local k=clamp01((t-tl.Climax)/.9)
@@ -399,18 +478,54 @@ function L.ProjectedRadius(fov,z,rho)return rho/(z*math.tan(math.rad(fov)/2))*.5
 -- {At, Slot, Pitch, Volume (x), Until, FadeIn, FadeOut}: At on the clock of the presentation (Common..Mythic and in place: the reveal's
 -- server clock; the story scenes: the cinematic's clock). Loops play from At to Until. All on the Effects group.
 local function cue(at,slot,o)o=o or{};o.At=at;o.Slot=slot;return o end
+-- R152 (owner: "whoosh for the flying"): every flight of a presentation, {Name, From, To, Peak = its fastest moment (from the curve that
+-- moves it: smoothstep peaks half way, an ease-out at its start), Pitch, Volume}. Each gets a soft whoosh (slot Flight) whose swell peaks on
+-- Peak; each its own pitch, so repeats do not sound the same. ReducedMotion (Calm) has no flights but the planets.
+function L.Flights(kind,rank,tl)
+ local out={}
+ local function fly(name,from,to,peak,pitch,volume)if from and to and to>from+.05 then out[#out+1]={Name=name,From=from,To=to,Peak=peak or(from+to)/2,Pitch=pitch,Volume=volume}end end
+ if kind=='Ladder'then
+  fly('Card float',tl.Burst,tl.FloatEnd,nil,1.55+.04*rank,.3)
+ elseif kind=='InPlace'or kind=='Result'then
+  fly('Card float',tl.Climax,tl.FloatEnd,nil,1.5,.35)
+ elseif tl.Variant=='Calm'then
+  if rank==7 then for i,p in ipairs({1.38,1.46,1.55})do local at=tl['Align'..i];fly('Planet '..i,at-.6,at,at-.3,p,.45)end end
+ else
+  if rank==7 then
+   fly('Pack drift',tl.SceneIn,tl.Drift,tl.SceneIn+.03,1.2,.8) -- (ease-out: fastest as it comes in)
+   for i,p in ipairs({1.38,1.46,1.55})do local at=tl['Align'..i];fly('Planet '..i,at-.6,at,at-.3,p,.45)end
+   fly('Seed float',tl.StarIn,tl.FloatEnd,nil,1.3,.6)
+  else
+   if rank==8 and tl.Glide>tl.SceneIn then fly('Pack carry',tl.SceneIn,tl.Glide,nil,1.05,.7)end
+   fly('Seed rise',tl.Climax,tl.Rise,nil,1.7,.6)
+   fly('Seed float',tl.Rise,tl.FloatEnd,nil,1.3,.6)
+  end
+ end
+ return out
+end
+-- The world seed's flight into the opener's hand (SeedPackClient; everyone near hears its whoosh at the seed): seconds after RevealAt.
+function L.HandFlight(burstAt,hover)
+ local b=require(script.Parent.BalanceRules);local from=burstAt+b.SeedRiseSeconds+(hover or b.SeedHoverSeconds)
+ return {Name='Seed to hand',From=from,To=from+b.SeedSlideSeconds,Peak=from+b.SeedSlideSeconds/2,Pitch=1.6,Volume=.5}
+end
+local function flights(out,kind,rank,tl)
+ for _,f in ipairs(L.Flights(kind,rank,tl))do
+  out[#out+1]=cue(f.From,'Flight',{PeakAt=f.Peak,Pitch=f.Pitch/1.45,Volume=f.Volume,Until=math.min(tl.Length,f.To+.45),FadeOut=.35,Flight=f.Name})
+ end
+end
 function L.LadderCues(rank,quick)
- local tier=L.Tier(rank);local burst=L.BurstAt(rank,quick);local card=L.CardTimeline(rank,quick);local out={}
- local beats=quick and 0 or tier.Heartbeats
- for i=1,beats do out[#out+1]=cue(burst*(i/(beats+1))^.8,'Heartbeat',{Pitch=.9+.06*i,Volume=.6+.4*i/beats})end
+ local burst=L.BurstAt(rank,quick);local card=L.CardTimeline(rank,quick);local out={}
+ local hearts=L.Heartbeats(rank,quick)
+ for i,h in ipairs(hearts)do out[#out+1]=cue(h,'Heartbeat',{Pitch=.9+.06*i,Volume=.6+.4*i/#hearts})end
  for i,p in ipairs(L.Pulses(rank,quick))do out[#out+1]=cue(p,'PackShake',{Pitch=.95+.07*i+.02*rank,Volume=.5+.5*i/#L.Pulses(rank,quick)})end
  if rank>=4 then out[#out+1]=cue(burst*.25,'Riser',{Until=burst-.08,Volume=rank==4 and .7 or .85})end
  if rank>=5 and not quick then out[#out+1]=cue(burst-.42,'SuckIn',{Until=burst-.08,Volume=.75})end
- out[#out+1]=cue(burst,'PackBurst',{Pitch=1.15-.05*rank,Volume=.55+.07*rank})
+ out[#out+1]=cue(burst,'PackBurst',{Pitch=1.15-.05*rank,Volume=.68+.09*rank}) -- (R152: the burst is the loudest moment, even for Common; it grows with the tier)
  if rank>=4 then out[#out+1]=cue(burst,'GroundImpact',{Volume=rank==4 and .8 or .65})end -- the smaller hit (Legendary), under the big one (Mythic)
  if rank>=5 then out[#out+1]=cue(burst,'Impact',{Volume=.6})end
  out[#out+1]=cue(card.Odds,'TitleSlam',{Pitch=1.15-.04*rank,Volume=.45+.08*rank})
  if rank>=2 then out[#out+1]=cue(card.Odds+.12,'Sparkle',{Pitch=1+.05*rank,Volume=.5+.07*rank})end
+ flights(out,'Ladder',rank,card)
  table.sort(out,function(a,b)return a.At<b.At end)
  return out
 end
@@ -423,7 +538,7 @@ function L.SceneCues(rank,tl)
    add(0,rank==8 and'KingChoir'or rank==7 and'CosmicPad'or'SecretDrone',{Until=tl.Silence,FadeIn=.3,FadeOut=.08,Volume=.7})
    add(math.max(0,tl.Climax-1.1),'Riser',{Until=tl.Silence,Volume=.8});add(tl.SuckIn,'SuckIn',{Until=tl.Silence,Volume=.7})
   end
-  add(tl.Climax,'PackBurst');if rank~=7 then add(tl.Climax,'Impact')end;add(tl.Climax,'GroundImpact',{Volume=.6})
+  add(tl.Climax,'PackBurst',{Volume=.7});if rank~=7 then add(tl.Climax,'Impact')end;add(tl.Climax,'GroundImpact',{Volume=.6})
   add(tl.Climax,rank==8 and'KingFanfare'or rank==7 and'CosmicBoom'or'SecretGlitch',rank==6 and{Until=tl.Climax+1.2,FadeOut=.3}or nil)
   add(tl.Odds,'TitleSlam');add(tl.Odds+.15,'Sparkle')
  elseif rank==6 then
@@ -432,10 +547,13 @@ function L.SceneCues(rank,tl)
   -- each glitch beat is a short burst of the glitch sound; the vault door is cut (faded) by the silence
   add(.25,'SecretGlitch',{Pitch=1.1,Volume=.6,Until=.25+.4,FadeOut=.08});add(tl.Glitch1,'SecretGlitch',{Until=tl.Glitch1+.45,FadeOut=.08})
   add(tl.Glitch2,'SecretGlitch',{Pitch=.85,Volume=1.2,Until=tl.Glitch2+.5,FadeOut=.1})
-  add(tl.Lock,'PackShake',{Pitch=.7});add(tl.Lock+.22,'PackShake',{Pitch=.75});add(tl.Unlock,'SecretVault',{Until=tl.Silence,FadeOut=.12})
+  -- one click per turn of the lock ring (R152: the third turn had no click); a turn that would fall after the unlock does not happen
+  for i,k in ipairs(L.LockTurns)do if tl.Lock+k<tl.Unlock then add(tl.Lock+k,'PackShake',{Pitch=.65+.05*i})end end
+  add(tl.Unlock,'SecretVault',{Until=tl.Silence,FadeOut=.12})
   add(tl.Shudder,'PackShake',{Pitch=1.1});add(tl.Lock,'Riser',{Until=tl.Silence});add(tl.SuckIn,'SuckIn',{Until=tl.Silence})
-  add(tl.Climax,'Impact');add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst');add(tl.Climax,'SecretGlitch',{Pitch=.7,Volume=1.3,Until=tl.Climax+1.2,FadeOut=.3})
+  add(tl.Climax,'Impact');add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst',{Volume=.7});add(tl.Climax,'SecretGlitch',{Pitch=.7,Volume=.9,Until=tl.Climax+1.2,FadeOut=.3})
   add(tl.Odds,'TitleSlam');add(tl.Rise+.1,'Sparkle');add((tl.Rise+tl.FloatEnd)/2,'Sparkle',{Pitch=.9})
+  add(tl.FloatEnd,'Sparkle',{Pitch=.75,Volume=.7}) -- (R152) the seed has floated down and settles
  elseif rank==7 then
   add(0,'CosmicPad',{Until=tl.Silence,FadeIn=.6,FadeOut=.3});add(tl.Climax+.15,'CosmicPad',{Until=tl.Back,FadeIn=.8,FadeOut=.5,Volume=.55})
   -- each planet locks into line with a short twinkle (rising)
@@ -444,17 +562,28 @@ function L.SceneCues(rank,tl)
   add(tl.SuckIn,'SuckIn',{Until=tl.Silence})
   -- the supernova: CosmicBoom is the big hit here (instead of Impact), its tail rings under the seed
   add(tl.Climax,'CosmicBoom',{Until=tl.Back+.6,FadeOut=.6});add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst',{Volume=.7})
-  add(tl.Climax+.15,'CosmicWhoosh',{Pitch=1.15,Volume=.8,Until=tl.StarIn,FadeOut=.2});add(tl.StarIn-.1,'CosmicStar',{Pitch=1.15,Until=tl.FloatEnd,FadeOut=.4})
+  -- (R152: the falling star's whoosh swells at the star's fastest moment, half way; it was cut by StarIn before its swell)
+  add(tl.Climax,'CosmicWhoosh',{Pitch=1.15,Volume=.8,PeakAt=(tl.Climax+tl.StarIn)/2,Until=tl.StarIn+.15,FadeOut=.3})
+  -- (R152: on the frame the star resolves into the seed; it sounded .1 s early)
+  add(tl.StarIn,'CosmicStar',{Pitch=1.15,Until=tl.FloatEnd,FadeOut=.4})
   add(tl.Odds,'TitleSlam');add((tl.StarIn+tl.FloatEnd)/2,'Sparkle',{Pitch=.9})
+  add(tl.FloatEnd,'CosmicStar',{Pitch=1.3,Volume=.5,Until=tl.Length,FadeOut=.5}) -- (R152) the seed settles
  else
   add(0,'KingChoir',{Until=tl.Silence,FadeIn=.5,FadeOut=.06});add(tl.Climax+.2,'KingChoir',{Until=tl.Back,FadeIn=.6,FadeOut=.5,Volume=.65})
-  -- the heralds' fanfare as the crown lands on the pack (cut by the silence), the bell as it settles
-  add(tl.Cut+.05,'KingBell',{Pitch=.7,Volume=.8});add(tl.Fanfare,'KingFanfare',{Until=tl.Silence,FadeOut=.08});add(tl.CrownOn,'KingBell')
+  -- R152 (owner: "for the king everything is synced up"): the low toll as the throne room opens (it rang on the fade to black), a soft
+  -- landing as the pack is set on the cushion, a shimmer as the crown appears in its beam; the heralds' fanfare and the bell as the crown
+  -- lands on the pack (the fanfare cut by the silence); the hit; a high bell as the seed settles at the end of its float
+  add(tl.SceneIn,'KingBell',{Pitch=.7,Volume=.8})
+  if tl.Land>tl.SceneIn+.1 then add(tl.Land,'PackShake',{Pitch=.62,Volume=.55})end
+  add(tl.CrownStart,'Sparkle',{Pitch=.8,Volume=.7})
+  add(tl.Fanfare,'KingFanfare',{Until=tl.Silence,FadeOut=.08});add(tl.CrownOn,'KingBell')
   add(tl.CrownOn+.05,'PackShake',{Pitch=.9});add(tl.CrownOn+.25,'PackShake',{Pitch=1.05});add(math.max(tl.CrownStart,tl.Silence-1.45),'Riser',{Until=tl.Silence})
   add(tl.SuckIn,'SuckIn',{Until=tl.Silence})
-  add(tl.Climax,'Impact');add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst');add(tl.Climax,'KingFanfare',{Until=tl.Back,FadeOut=.6})
+  add(tl.Climax,'Impact');add(tl.Climax,'GroundImpact',{Volume=.6});add(tl.Climax,'PackBurst',{Volume=.7});add(tl.Climax,'KingFanfare',{Until=tl.Back,FadeOut=.6,Volume=.85})
   add(tl.Odds,'TitleSlam');add(tl.Rise+.25,'Sparkle');add((tl.Rise+tl.FloatEnd)/2,'Sparkle',{Pitch=.9})
+  add(tl.FloatEnd,'KingBell',{Pitch=1.5,Volume=.4})
  end
+ flights(out,inPlace and(tl.ResultOnly and'Result'or'InPlace')or'Scene',rank,tl)
  table.sort(out,function(a,b)return a.At<b.At end)
  return out
 end

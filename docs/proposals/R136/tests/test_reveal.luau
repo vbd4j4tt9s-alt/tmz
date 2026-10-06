@@ -26,22 +26,23 @@ local holder=R.new('Model');holder.Parent=W.workspace
 local function run(rank,heard)
  local f=F.Create(holder,rank,1);local mouth=CF(0,2,0);local at=Seq.SeedAt(rank)
  local states={}
- local function visible(name)local n=0;for _,d in ipairs(f.Folder:GetDescendants())do if d.Name==name and d.Transparency<1 then n+=1 end end;return n end
+ local function visible(name)local n=0;for _,d in ipairs(f.Folder:GetDescendants())do if d.Name==name and d:IsA('BasePart')and d.Transparency<1 then n+=1 end end;return n end
  local function dist(name)local best=0;local count=0;for _,d in ipairs(f.Folder:GetDescendants())do if d.Name==name and d.Transparency<1 then best+=(d.Position-mouth.Position).Magnitude;count+=1 end end;return count>0 and best/count or 0 end
- f:Update(mouth,at*.2,at,heard);states.early={Glow=f.Glow.Transparency,Light=f.Light.Brightness,Motes=visible('Charge mote'),Dist=dist('Charge mote')}
- f:Update(mouth,at*.9,at,heard);states.late={Glow=f.Glow.Transparency,Light=f.Light.Brightness,Motes=visible('Charge mote'),Pillar=f.Pillar.Transparency}
- f:Update(mouth,at+.05,at,heard);states.burst={Pillar=f.Pillar.Size.X,Sound=f.Sound}
+ f:Update(mouth,at*.2,at,heard);states.early={Glow=f.Glow.Transparency,Light=f.Light.Brightness,Motes=visible('Charge mote'),Dist=dist('Charge mote'),Pillar=f.Pillar:Visible()}
+ f:Update(mouth,at*.9,at,heard);states.late={Glow=f.Glow.Transparency,Light=f.Light.Brightness,Motes=visible('Charge mote')}
+ -- (R152: the pillar is the smaller sky beam of RarePullFx: it comes down in its last Descent seconds and lands on the burst)
+ f:Update(mouth,at+.05,at,heard);states.burst={Landed=f.Pillar.Landed==true,Foot=f.Pillar.Anchor.Position,Sound=f.Sound}
  f:Update(mouth,at+.3,at,heard)
  local radius=0;for _,d in ipairs(f.Rings[1])do radius=math.max(radius,(V3(d.Position.X,0,d.Position.Z)-V3(0,0,0)).Magnitude)end
- states.mid={Pillar=f.Pillar.Size.X,Ring=radius,Rings=#f.Rings,Helix=visible('Helix mote'),Motes=visible('Charge mote'),Light=f.Light.Brightness}
+ states.mid={Pillar=f.Pillar:Visible()and f.Pillar.H or 0,Ring=radius,Rings=#f.Rings,Helix=visible('Helix mote'),Motes=visible('Charge mote'),Light=f.Light.Brightness}
  f:Update(mouth,at+.55,at,heard);local radius2=0;for _,d in ipairs(f.Rings[1])do radius2=math.max(radius2,(V3(d.Position.X,0,d.Position.Z)).Magnitude)end;states.mid.Ring2=radius2
- f:Update(mouth,at+F.BurstSeconds+.1,at,heard);states.done=visible('Light pillar')+visible('Shockwave')+visible('Helix mote')+visible('Mouth glow')
+ f:Update(mouth,at+F.BurstSeconds+.1,at,heard);states.done=(f.Pillar:Visible()and 1 or 0)+visible('Shockwave')+visible('Helix mote')+visible('Mouth glow')
  return f,states
 end
 local leg,L=run(4,true)
 check(L.early.Motes>=5 and L.late.Glow<L.early.Glow and L.late.Light>L.early.Light,'charge-up: motes swirl in while the mouth glow and light build')
-check(L.late.Pillar==1,'no pillar before the burst')
-check(L.burst.Pillar>0 and L.mid.Pillar>L.burst.Pillar and L.mid.Pillar<=7.01,'burst: the pillar shoots up (to 7 studs)')
+check(not L.early.Pillar,'no pillar during the charge-up')
+check(L.burst.Landed and(L.burst.Foot-V3(0,2,0)).Magnitude<1e-6 and math.abs(L.mid.Pillar-7*1.6)<1e-6,'burst: the beam has come down onto the mouth (11.2 studs tall; R152: the sky beam, was a 7-stud pillar)')
 check(L.mid.Motes==0,'the charge motes are gone once the seed is out')
 check(L.mid.Ring2>L.mid.Ring and L.mid.Ring>.5,'the shockwave ring expands')
 check(#emitted==1 and emitted[1]==28,'Legendary sparkle burst: 28 sparkles, once')

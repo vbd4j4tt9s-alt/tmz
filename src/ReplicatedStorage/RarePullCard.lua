@@ -11,6 +11,18 @@
 -- and phone keep the same framing (RarePullRules.Layout); ReducedMotion: no float, spin, jitter or moving motes; lite: fewer pieces.
 local RS=game:GetService('ReplicatedStorage')
 local Rules=require(script.Parent.RarePullRules)
+-- R152 (owner: "improve look on ... the card, the seed display"): a soft glow and, from Legendary up, a turning halo ring behind the seed,
+-- and the Cosmic title's planets, drawn on the client (RarePullArt: the same images the story scenes use); the R151 shapes otherwise.
+local Art do local ok,m=pcall(require,script.Parent.RarePullArt);Art=ok and m or nil end
+local function artImage(parent,name,props)
+ if not Art then return nil end
+ local state,content=Art.Get(name);if state~='ready'then return nil end
+ local img=Instance.new('ImageLabel');img.BackgroundTransparency=1;img.BorderSizePixel=0;img.Active=false
+ for k,v in pairs(props)do img[k]=v end
+ local ok=pcall(function()img.ImageContent=content end)
+ if not ok then img:Destroy();return nil end
+ img:SetAttribute('RarePullArt',name);img.Parent=parent;return img
+end
 local Card={};Card.__index=Card
 local C=Color3.fromRGB;local WHITE=C(255,255,255);local BLACK=C(0,0,0)
 local function new(class,props,parent)
@@ -36,6 +48,19 @@ local function gradient(parent,a,b,c)
  return new('UIGradient',{Color=seq,Rotation=90},parent)
 end
 local function clamp01(x)return math.clamp(x,0,1)end
+-- R152: the right and bottom insets of the device's safe area, as shares of the full screen (0, 0 on a plain screen or if unknown)
+function Card.SafeInsets()
+ local ok,r,b=pcall(function()
+  local G=game:GetService('GuiService')
+  local full,safe=G:GetInsetArea(Enum.ScreenInsets.None),G:GetInsetArea(Enum.ScreenInsets.DeviceSafeInsets)
+  local function corner(a)return a.Max or Vector2.new(a.Min.X+a.Width,a.Min.Y+a.Height)end
+  local fw,fh=full.Width,full.Height;if not(fw and fh and fw>0 and fh>0)then return 0,0 end
+  local fm,sm=corner(full),corner(safe)
+  return math.clamp((fm.X-sm.X)/fw,0,.12),math.clamp((fm.Y-sm.Y)/fh,0,.12)
+ end)
+ if ok and type(r)=='number'and type(b)=='number'then return r,b end
+ return 0,0
+end
 -- kind: 'Ladder' | 'Scene' | 'InPlace'; opts: {Rank, Phone, Reduced, Lite, Quick, SeedName, Odds (final "N" text or nil), Seed (Model or nil)}
 function Card.Create(gui,kind,opts)
  local rank=math.clamp(opts.Rank or 1,1,8);local tier=Rules.Tier(rank)
@@ -81,9 +106,20 @@ function Card.Create(gui,kind,opts)
   local view=new('ViewportFrame',{Name='Seed',BackgroundTransparency=1,AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,L.Seed.Y),Size=UDim2.fromScale(L.Seed.H,L.Seed.H),
    ImageTransparency=1,ZIndex=6,Ambient=C(170,170,182),LightColor=C(255,250,240),LightDirection=Vector3.new(-.6,-1,-.8),Visible=false},root)
   new('UIAspectRatioConstraint',{AspectRatio=1,DominantAxis=Enum.DominantAxis.Height},view)
-  local glow=frame(root,'Seed glow',tier.Glow,5,{Position=UDim2.fromScale(.5,L.Seed.Y),Size=UDim2.fromScale(L.Seed.H*1.05,L.Seed.H*1.05),BackgroundTransparency=1,Visible=false})
-  round(glow);new('UIAspectRatioConstraint',{AspectRatio=1,DominantAxis=Enum.DominantAxis.Height},glow) -- (sized by the screen height, like the seed)
-  new('UIGradient',{Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.35),NumberSequenceKeypoint.new(1,1)})},glow)
+  local glow=artImage(root,'glow',{Name='Seed glow',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,L.Seed.Y),Size=UDim2.fromScale(L.Seed.H*1.5,L.Seed.H*1.5),
+   ImageColor3=tier.Glow,ImageTransparency=1,ZIndex=5,Visible=false})
+  if glow then self.GlowIsImage=true
+  else
+   glow=frame(root,'Seed glow',tier.Glow,5,{Position=UDim2.fromScale(.5,L.Seed.Y),Size=UDim2.fromScale(L.Seed.H*1.05,L.Seed.H*1.05),BackgroundTransparency=1,Visible=false})
+   round(glow)
+   new('UIGradient',{Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.35),NumberSequenceKeypoint.new(1,1)})},glow)
+  end
+  new('UIAspectRatioConstraint',{AspectRatio=1,DominantAxis=Enum.DominantAxis.Height},glow) -- (sized by the screen height, like the seed)
+  if rank>=4 then
+   self.SeedHalo=artImage(root,'halo',{Name='Seed halo',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,L.Seed.Y),Size=UDim2.fromScale(L.Seed.H*1.25,L.Seed.H*1.25),
+    ImageColor3=(tier.Theme or tier.Hint):Lerp(WHITE,.25),ImageTransparency=1,ZIndex=5,Visible=false})
+   if self.SeedHalo then new('UIAspectRatioConstraint',{AspectRatio=1,DominantAxis=Enum.DominantAxis.Height},self.SeedHalo)end
+  end
   self.View=view;self.SeedGlow=glow
   local cam=Instance.new('Camera');cam.Name='Seed camera';cam.FieldOfView=30;cam.Parent=view;view.CurrentCamera=cam;self.ViewCamera=cam
   self.ViewScale=new('UIScale',{Scale=1},view)
@@ -107,10 +143,15 @@ function Card.Create(gui,kind,opts)
   for i=1,(self.Lite and 4 or 7)do
    local s=frame(root,'Title star '..i,WHITE,13,{Size=UDim2.fromScale(.012,.012),Rotation=45,Visible=false,BackgroundTransparency=0});new('UIAspectRatioConstraint',{AspectRatio=1},s);self.Stars[i]=s
   end
-  self.Planets={}
+  self.Planets={};self.PlanetImages={}
   for i,c in ipairs({C(255,170,120),C(140,200,255)})do
-   local p=round(frame(root,'Title planet '..i,c,13,{Size=UDim2.fromScale(.022+.008*i,.022+.008*i),Visible=false,BackgroundTransparency=0}));new('UIAspectRatioConstraint',{AspectRatio=1},p)
-   local ringF=frame(p,'Ring',WHITE,13,{Size=UDim2.fromScale(1.9,.35),BackgroundTransparency=1,Rotation=-18});round(ringF);new('UIStroke',{Color=WHITE,Thickness=1.5,Transparency=.35},ringF)
+   local size=.022+.008*i
+   local p=artImage(root,i==1 and'planet_gas'or'planet_ring',{Name='Title planet '..i,AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromScale(size*(i==1 and 1.35 or 2.4),size*(i==1 and 1.35 or 2.4)),ZIndex=13,Visible=false})
+   if p then new('UIAspectRatioConstraint',{AspectRatio=1},p);self.PlanetImages[i]=true
+   else
+    p=round(frame(root,'Title planet '..i,c,13,{Size=UDim2.fromScale(size,size),Visible=false,BackgroundTransparency=0}));new('UIAspectRatioConstraint',{AspectRatio=1},p)
+    local ringF=frame(p,'Ring',WHITE,13,{Size=UDim2.fromScale(1.9,.35),BackgroundTransparency=1,Rotation=-18});round(ringF);new('UIStroke',{Color=WHITE,Thickness=1.5,Transparency=.35},ringF)
+   end
    self.Planets[i]=p
   end
  else
@@ -138,7 +179,9 @@ function Card.Create(gui,kind,opts)
  self.Flash=frame(root,'Flash',tier.Glow,31,{BackgroundTransparency=1})
  if kind=='Scene'then
   local hint=label(root,'Skip hint',Enum.Font.GothamBold,C(230,230,240),BLACK,32)
-  hint.AnchorPoint=Vector2.new(1,.5);hint.Position=UDim2.fromScale(.975,1-L.Bar*.5);hint.Size=UDim2.fromScale(.22,L.Bar*.42);hint.TextXAlignment=Enum.TextXAlignment.Right
+  -- (R152: inside the device's safe area: on a notched / rounded phone the corner of the full-screen layer is cut off)
+  local right,bottom=Card.SafeInsets()
+  hint.AnchorPoint=Vector2.new(1,.5);hint.Position=UDim2.fromScale(.975-right,1-math.max(L.Bar*.5,bottom+L.Bar*.25));hint.Size=UDim2.fromScale(.22,L.Bar*.42);hint.TextXAlignment=Enum.TextXAlignment.Right
   hint.Text=opts.SkipText or(self.Phone and'TAP TO SKIP  ▸'or'CLICK TO SKIP  ▸');self.SkipHint=hint
  end
  if opts.Seed then self:SetSeed(opts.Seed)end
@@ -188,6 +231,10 @@ function Card:_fade(a)self.Fade.BackgroundTransparency=1-clamp01(a)end
 function Card:_texts(t,inAt,countAt,slamAt,outAt,goneAt)
  local out=1-clamp01((t-outAt)/math.max(.01,goneAt-outAt))
  local shown=t>=inAt and out>0
+ -- (R152) on the way out the texts and the seed lift a little as they fade (eased in), instead of fading where they stand
+ local lift=self.Reduced and 0 or .03*Rules.EaseIn(1-out);self.Lift=lift
+ local L=self.Layout
+ self.Title.Position=UDim2.fromScale(.5,L.Title.Y-lift);self.OddsLabel.Position=UDim2.fromScale(.5,L.Odds.Y-lift);self.NameLabel.Position=UDim2.fromScale(.5,L.Name.Y-lift)
  local tin=clamp01((t-inAt)/.12)
  self.Title.TextTransparency=shown and 1-tin*out or 1;self.Title.TextStrokeTransparency=shown and 1-(.6*tin*out)or 1
  local pop=clamp01((t-inAt)/.2)
@@ -197,8 +244,9 @@ function Card:_texts(t,inAt,countAt,slamAt,outAt,goneAt)
   local k=clamp01((t-countAt)/math.max(.01,slamAt-countAt))
   self.OddsLabel.Text=Rules.CountText(odds,k)
   self.OddsLabel.TextTransparency=1-clamp01((t-countAt)/.1)*out;self.OddsLabel.TextStrokeTransparency=1-.55*clamp01((t-countAt)/.1)*out
-  local s=clamp01((t-slamAt)/.18)
-  self.OddsScale.Scale=(self.Reduced or t<slamAt)and 1 or 1+.45*(1-s)^2
+  -- the slam: up to 1.45x over 25 ms (R152: it jumped there in one frame), then settles
+  local up=Rules.Smooth((t-slamAt)/.025);local s=clamp01((t-slamAt-.025)/.18)
+  self.OddsScale.Scale=(self.Reduced or t<slamAt)and 1 or 1+.45*up*(1-s)^2
   self.OddsLabel.TextColor3=t>=slamAt and WHITE:Lerp(self.Tier.Glow,.25+.75*s)or WHITE
  else self.OddsLabel.TextTransparency=1;self.OddsLabel.TextStrokeTransparency=1 end
  local nk=clamp01((t-slamAt)/.2)*out
@@ -207,7 +255,7 @@ function Card:_texts(t,inAt,countAt,slamAt,outAt,goneAt)
 end
 -- Tier dressing of the title (Secret glitch, Cosmic stars / planets, King crown) while it is shown.
 function Card:_dress(t,since,alpha)
- local L=self.Layout;local y=L.Title.Y
+ local L=self.Layout;local y=L.Title.Y-(self.Lift or 0)
  if self.Split then
   local jitter=since<.6 and not self.Reduced
   for i,s in ipairs(self.Split)do
@@ -227,13 +275,14 @@ function Card:_dress(t,since,alpha)
   end
   for i,p in ipairs(self.Planets)do
    local a=(self.Reduced and 0 or t*(.9+.3*i))+i*math.pi;p.Visible=alpha>.01
-   p.Position=UDim2.fromScale(.5+math.cos(a)*.21,y+math.sin(a)*L.Title.H*.55);p.BackgroundTransparency=1-alpha
+   p.Position=UDim2.fromScale(.5+math.cos(a)*.21,y+math.sin(a)*L.Title.H*.55)
+   if self.PlanetImages[i]then p.ImageTransparency=1-alpha else p.BackgroundTransparency=1-alpha end
    p.ZIndex=math.sin(a)>0 and 13 or 9
   end
  end
  if self.Crown then
   local drop=self.Reduced and 1 or 1-(1-clamp01(since/.3))^3
-  self.Crown.Visible=alpha>.01;self.Crown.Position=UDim2.fromScale(.5,L.Title.Y-L.Title.H*(.62+.5*(1-drop)))
+  self.Crown.Visible=alpha>.01;self.Crown.Position=UDim2.fromScale(.5,y-L.Title.H*(.62+.5*(1-drop)))
   if self.CrownAlpha~=alpha then self.CrownAlpha=alpha;for _,d in ipairs(self.CrownParts)do d.BackgroundTransparency=1-alpha end end
  end
 end
@@ -241,12 +290,14 @@ function Card:_seed(t,appear,floatEnd,outAt,goneAt)
  if not self.View then return end
  local out=1-clamp01((t-outAt)/math.max(.01,goneAt-outAt))
  local shown=t>=appear and out>0
- self.View.Visible=shown;self.SeedGlow.Visible=shown
+ self.View.Visible=shown;self.SeedGlow.Visible=shown;if self.SeedHalo then self.SeedHalo.Visible=shown end
  if not shown then return end
  local k=clamp01((t-appear)/.2);local f=clamp01((t-appear)/math.max(.05,floatEnd-appear))
- local y=self.Layout.Seed.Y+(self.Reduced and 0 or(-.03+.06*Rules.Smooth(f)))
+ local y=self.Layout.Seed.Y+(self.Reduced and 0 or(-.03+.06*Rules.Smooth(f))-.03*Rules.EaseIn(1-out))
  self.View.Position=UDim2.fromScale(.5,y);self.SeedGlow.Position=self.View.Position
- self.View.ImageTransparency=1-k*out;self.SeedGlow.BackgroundTransparency=1-.55*k*out
+ self.View.ImageTransparency=1-k*out
+ if self.GlowIsImage then self.SeedGlow.ImageTransparency=1-.6*k*out else self.SeedGlow.BackgroundTransparency=1-.55*k*out end
+ if self.SeedHalo then self.SeedHalo.Position=self.View.Position;self.SeedHalo.ImageTransparency=1-.65*k*out;self.SeedHalo.Rotation=self.Reduced and 0 or t*30 end
  self.ViewScale.Scale=self.Reduced and 1 or .6+.4*(1-(1-k)^3)
  if self.SeedModel and self.SeedBase then
   local yaw=Rules.SeedYaw(t,self.Reduced)
@@ -259,14 +310,16 @@ function Card:UpdateLadder(t,tl)
  local q=clamp01(t/burst)
  if t<burst then
   local color,strength=Rules.Hint(rank,q)
-  local pulse=self.Reduced and .5 or .5+.5*math.sin(t*(7+9*q))
-  self:_edges(color,(.06+.05*rank)*strength*(.55+.45*pulse)*(self.Lite and .8 or 1))
+  -- R152: the edges throb on the heartbeats and wobbles you hear (Rules.Beat), not on a free-running pulse
+  local beat=self.Reduced and .5 or Rules.Beat(rank,t,self.Quick)
+  self:_edges(color,(.06+.05*rank)*strength*(.45+.55*beat)*(self.Lite and .8 or 1))
   self:_motes(q,t,color,#self.Motes>0 and q or 0)
  else
   local a=1-clamp01((t-burst)/.45)
   self:_edges(self.Tier.Hint,(.1+.06*rank)*a);self:_motes(1,t,self.Tier.Hint,0)
  end
- self:_bars(tl.Letterbox and(t<burst and clamp01((q-.45)/.3)or 1-clamp01((t-tl.Out)/.25))*.6 or 0)
+ -- (R152: the letterbox eases out over the card's own fade, gone on Length; it used to be cut off at a fifth of its height)
+ self:_bars(tl.Letterbox and(t<burst and Rules.Smooth((q-.45)/.3)or 1-Rules.Smooth((t-tl.Out)/math.max(.05,tl.Length-tl.Out)))*.6 or 0)
  self:_flash(t>=burst and(.18+.08*rank)*(1-clamp01((t-burst)/.28))or 0)
  self:_ring(clamp01((t-burst)/.55),t>=burst and 1 or 0)
  local _,out=self:_texts(t,tl.TitleIn,tl.Count,tl.Odds,tl.Out,tl.Length)
@@ -313,8 +366,11 @@ end
 function Card:UpdateInPlace(t,tl)
  local accent=self.Tier.Theme or self.Tier.Hint
  local pre=tl.ResultOnly and 0 or clamp01(t/math.max(.01,tl.Climax))
- self:_edges(accent,t<tl.Climax and .22*pre or .22*(1-clamp01((t-tl.Climax)/.6)))
- self:_motes(pre,t,accent,t<tl.Climax and .7*pre or 0)
+ -- (R152: before the hit the edges and motes walk the same rarity hint as the pack in the world, as on the ladder; the tier colour
+ -- from the first frame told the rarity before the suspense)
+ local color=(t<tl.Climax and not tl.ResultOnly)and Rules.Hint(self.Rank,pre)or accent
+ self:_edges(color,t<tl.Climax and .22*pre or .22*(1-clamp01((t-tl.Climax)/.6)))
+ self:_motes(pre,t,color,t<tl.Climax and .7*pre or 0)
  self:_bars(0);self:_fade(0)
  self:_flash(t>=tl.Climax and .35*(1-clamp01((t-tl.Climax)/.35))or 0)
  self:_ring(clamp01((t-tl.Climax)/.6),t>=tl.Climax and .6 or 0)

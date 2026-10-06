@@ -46,7 +46,10 @@ local HOLD_MAX=8
 local function holdFor(e)
  local me=Players.LocalPlayer
  if not me or e.Kind=='Global'or e.UserId~=me.UserId then return 0 end
- local at=me:GetAttribute('RarePullClimaxAt')
+ -- R152: the moment the reveal has SHOWN the seed (title, seed, "1 in N" slammed); the hit alone came up to .85 s before it in the story
+ -- scenes, so a line held only for the hit + margin could still show in chat before the seed on a slow device
+ local at=me:GetAttribute('RarePullClimaxAt');local shown=me:GetAttribute('RarePullSeedShownAt')
+ if type(shown)=='number'and shown==shown and(type(at)~='number'or at~=at or shown>at)then at=shown end
  if type(at)~='number'or at~=at then return 0 end
  return math.clamp(at+Rules.Setting('RevealMargin')-workspace:GetServerTimeNow(),0,HOLD_MAX)
 end
