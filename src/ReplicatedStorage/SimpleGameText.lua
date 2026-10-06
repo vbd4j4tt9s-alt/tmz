@@ -1,4 +1,5 @@
 -- V140 display copy only. Validation messages, remote payloads and saved IDs stay intact.
+-- R152 (owner: "for any text in the game just type it like how I talk"): the short texts below are in the owner's voice; old -> new in docs/proposals/R152/game_text.md.
 local Text = {}
 Text.Red = Color3.fromRGB(255, 55, 65)
 Text.Green = Color3.fromRGB(65, 235, 125)

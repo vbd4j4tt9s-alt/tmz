@@ -1,5 +1,9 @@
 # R152: the free Void Pack pedestal (500 claims, every server)
 
+> **Update (R152 text pass).** The owner then asked for every text in the game to be typed "like how I talk", so the pedestal's words were rewritten: the sign hint is now
+> `LIMITED! 1 PER PLAYER`, the prompt `Grab ur FREE Void Pack`, and the notices are casual ("U already grabbed ur free Void Pack!", "Make room in ur bag, then claim again",
+> ...); every old -> new is in section "11. Free Void Pack giveaway pedestal" of [`game_text.md`](game_text.md). The text below keeps the first wording where it quotes a line.
+
 Owner request: *"add a pedestal in the middle that gives a player 1 void pack. it will be a limited time for 500 players only and its in every server so basically once serverwide 500 claims have been done it will go to 0 and will not be claimable any more. there is a number above that shows how many is left"*.
 
 Preview (approximate, the owner's real hub): `void_giveaway.png`. Regenerate with `sh preview/run_giveaway_preview.sh <scratch dir>`.

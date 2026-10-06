@@ -1,4 +1,5 @@
 -- Shared announcement copy; no user string can inject RichText markup.
+-- R152: the wording is in the owner's voice ("just type it like how I talk"): docs/proposals/R152/game_text.md.
 local N={}
 N.Emojis={Common='🌱',Uncommon='🍀',Rare='💠',Epic='⚡',Legendary='🌟',Mythic='🔥',Secret='👁️',Cosmic='🌌',King='👑'}
 function N.Rarity(name)return(N.Emojis[name]or'✨')..' '..name end

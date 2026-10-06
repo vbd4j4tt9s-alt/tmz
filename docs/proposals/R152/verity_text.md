@@ -1,5 +1,9 @@
 # R152: Verity's quest texts with personality
 
+> **Update (R152 text pass).** The owner then asked for every text in the game to be typed "like how I talk", so the words of this window were rewritten once more
+> (casual, "u" / "ur", still bubbly): the new wording of every line is in section "10. Verity" of [`game_text.md`](game_text.md), and [`verity_text.png`](verity_text.png)
+> is redrawn with it. The tables below keep the wording of the first pass (the "New" column) as history.
+
 Owner: "add more personality to the texts above" (the quest window of Verity, the big yellow ball behind the market).
 
 Voice: cheerful, bubbly, a little cheeky and dramatic about The Darkened One, kid friendly, short. Every line still says what to do:

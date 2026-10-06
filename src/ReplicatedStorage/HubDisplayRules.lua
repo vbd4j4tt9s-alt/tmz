@@ -288,7 +288,7 @@ function R.SignText(kind,rec,fruitId,secondsLeft,fruitName)
   else
    out.State='Empty';out.Accent=gold
    winner(PLACEHOLDER);L.Info={Text='Open a pack!',Color=soft}
-   P.Line={Text='Open a pack to take the spot!',Color=soft}
+   P.Line={Text='Open a pack to grab it!',Color=soft}
   end
  else
   local name=fruitName or R.FruitLabel(fruitId,fruitId)
@@ -299,7 +299,7 @@ function R.SignText(kind,rec,fruitId,secondsLeft,fruitName)
    winner(rec.Name);L.Info={Text=R.KgText(rec.Kg)..(traits~=''and(' · '..traits)or''),Color=gold}
   else
    out.State='Empty';out.Accent=gold
-   winner(PLACEHOLDER);L.Info={Text='Pick one to take the spot!',Color=soft}
+   winner(PLACEHOLDER);L.Info={Text='Pick one to grab it!',Color=soft}
   end
  end
  return out
