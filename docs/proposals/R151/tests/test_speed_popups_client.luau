@@ -21,6 +21,8 @@ local function maxFrames(field)return #PW.frameList(field)end
 local function sum(list,from)local s=0;for i=from or 1,#list do s+=list[i]end;return s end
 local pose0={Angle=0,Radius=0,StartX=0,StartY=0}
 local poolSize=Style.Cap(3,true,false)+Style.Field.Spare -- own cap 8 at tier 3 + 2 spare
+-- R153: the fan's size on the current screen (SpeedPopupStyle.FanScale: 2 x 2 on a desktop; the offsets of a popup are its design px x unit x these)
+local function fan()local v=W.workspace.CurrentCamera.ViewportSize;return Style.FanScale(v.X,v.Y)end
 
 -- 0. boot: nothing built, nothing running ----------------------------------------------------------------------------------------------------------------
 check(PW.live(Run.RenderStepped)==0,'idle: no per-frame updater before the first award ('..PW.live(Run.RenderStepped)..')')
@@ -43,7 +45,8 @@ check(#vis==1,'first frame: the first share shows ('..#vis..')')
 local r=PW.read(vis[1])
 check(r.Text=='+2.1K','an award of 4200 is shown as two shares of 2.1K ('..r.Text..')')
 check(near(r.Scale,0.45,1e-6) and r.Alpha==1,'born at 0.45 size, opaque ('..r.Scale..')')
-check(math.abs(r.X)<=Style.Spawn.Jitter+1e-6 and near(r.Y,-Style.Spawn.Lift,1e-6),'born at the head (within '..Style.Spawn.Jitter..' px, '..Style.Spawn.Lift..' px up): '..r.X..', '..r.Y)
+local fx,fy=fan()
+check(math.abs(r.X)<=Style.Spawn.Jitter*fx+1e-6 and near(r.Y,-Style.Spawn.Lift*fy,1e-6),'born at the head (within '..Style.Spawn.Jitter*fx..' px, '..Style.Spawn.Lift*fy..' px up, the 2x fan '..fx..' x '..fy..'): '..r.X..', '..r.Y)
 PW.frames(4,1/120)
 check(#PW.visible(field)==1,'the second share is not there before 1/10 s')
 PW.frames(10,1/120)
@@ -72,7 +75,8 @@ do
  end
  local p0=rows[0].r;local pEnd=rows[60].r
  local D=math.sqrt((pEnd.X-p0.X)^2+(pEnd.Y-p0.Y)^2)
- check(D>=40 and D<=120,'fling: the resting spot is 44..104 px from the head (+ start offset): '..D)
+ local fx,fy=fan()
+ check(D>=40*math.min(fx,fy) and D<=120*math.max(fx,fy),'fling: the resting spot is 44..104 px (x the screen\'s fan '..fx..' x '..fy..') from the head (+ start offset): '..D)
  local worstScale,worstAlpha,worstPos,worstIcon,worstStroke,peak,peakAt=0,0,0,0,0,0,0
  local holdMove=0
  for k=0,90 do
@@ -110,7 +114,8 @@ end
 for _,case in ipairs({{360,0.8},{720,0.8},{1080,1},{1296,1.2},{2160,1.35}})do
  PW.view(case[1]);C.fire(me,1000,1,1/5);PW.frames(1,0)
  local f=PW.fields(pg)[1];local r=PW.read(PW.visible(f)[1])
- check(near(r.Scale,0.45*case[2],1e-6) and near(r.Y,-Style.Spawn.Lift*case[2],1e-6),'unit at '..case[1]..' px high: '..case[2]..' (size '..r.Scale..', offset '..r.Y..')')
+ local _,fy=fan()
+ check(near(r.Scale,0.45*case[2],1e-6) and near(r.Y,-Style.Spawn.Lift*case[2]*fy,1e-6),'unit at '..case[1]..' px high: '..case[2]..' (size '..r.Scale..', offset '..r.Y..', fan Y '..fy..')')
  settle()
 end
 PW.view(1080)
@@ -262,12 +267,13 @@ do
   if row.v then
    local r=row.r
    local _,y,_,alpha=Style.Pose({StartY=-Style.Spawn.Lift,ReducedX=14},row.t,true)
+   local fx,fy=fan();y*=fy
    worstY=math.max(worstY,math.abs(r.Y-y));worstA=math.max(worstA,math.abs(r.Alpha-alpha))
    xs[#xs+1]=r.X;if not near(r.Scale,1,1e-9)then scaleOk=false end
    if r.IconRot~=0 or r.TextRot~=0 then rotOk=false end
   end
  end
- local sameX=true;for _,x in ipairs(xs)do if not near(math.abs(x),14,1e-6) or not near(x,xs[1],1e-6)then sameX=false end end
+ local fx0=fan();local sameX=true;for _,x in ipairs(xs)do if not near(math.abs(x),14*fx0,1e-6) or not near(x,xs[1],1e-6)then sameX=false end end
  check(worstY<=0.06,'reduced: rises 72 px with an ease-out, no fling (worst '..worstY..' px)')
  check(worstA<=0.0045,'reduced: fades in and out (worst '..worstA..')')
  check(sameX and scaleOk and rotOk,'reduced: stays on its side, never changes size, no tilt')
@@ -448,15 +454,15 @@ do
   if not rgb(amt.TextColor3,125,248,255)then ok.Text=false end
   for _,label in ipairs({icon,amt})do
    local st=label.BoldOutline86
-   if not(rgb(st.Color,17,26,42) and st.Thickness==2.5 and st.ApplyStrokeMode.Name=='Contextual' and rgb(label.TextStrokeColor3,0,0,0) and label.TextStrokeTransparency<=1 and label.Font.Name=='FredokaOne')then ok.Stroke=false end
+   if not(rgb(st.Color,17,26,42) and st.Thickness==Style.StrokeThickness and st.ApplyStrokeMode.Name=='Contextual' and rgb(label.TextStrokeColor3,0,0,0) and label.TextStrokeTransparency<=1 and label.Font.Name=='FredokaOne')then ok.Stroke=false end
   end
   if not(icon.TextSize==Style.Size.Icon and amt.TextSize==Style.Size.Text and icon.BackgroundTransparency==1 and amt.BackgroundTransparency==1 and (amt.Text==''or amt.Text:sub(1,1)=='+'))then ok.Misc=false end
  end end
  check(frames>=poolSize,'colour check ran over '..frames..' pooled frames')
  check(ok.Bolt,'the bolt is still the yellow (255,222,66) ⚡')
  check(ok.Text,'the amount is still (125,248,255), the pale cyan the owner calls white')
- check(ok.Stroke,'the outlines are still navy (17,26,42) at 2.5, the legacy stroke black, FredokaOne, Contextual')
- check(ok.Misc,'sizes 20 / 22 as approved, no background')
+ check(ok.Stroke,'the outlines are still navy (17,26,42) (R153: 5 px on the 2x text), the legacy stroke black, FredokaOne, Contextual')
+ check(ok.Misc and Style.Size.Icon==40 and Style.Size.Text==44,'R153: the sizes are 2x the approved 20 / 22 (40 / 44), no background')
  local lf=PW.visible(PW.fieldOf(pg,head(me)))[1]
  if lf then
   check(lf.Amount.AutomaticSize.Name=='X' and lf.Amount.TextXAlignment.Name=='Center','the number sizes itself and sits next to the bolt')

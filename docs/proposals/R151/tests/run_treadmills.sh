@@ -3,7 +3,7 @@
 # R151 treadmill polish (owner: "works we can implement the treadmill polishes"; "adjust the steps per second on top of the treadmill to multples of 5";
 # "for numnbers obvere 1000 it willl be read as 1k"), on the Roblox mock (/opt/luau/luau, tools/tests/roblox.luau via the R149 zfight_world):
 #  static              - the new / changed scripts compile; TreadmillLook151 and TreadmillBeltArt151 are in src/MANIFEST.tsv (sorted); the speed popup code is
-#                        untouched (SpeedGainPopup.client.lua as at 19d05d4; SpeedPopupStyle: only FormatGain, the default 1/5 s step and comments); no model names.
+#                        untouched (TreadmillAnimation.client.lua as at 19d05d4; R153: SpeedGainPopup.client.lua and SpeedPopupStyle only changed for the 2x popups the owner asked for - sizes, fan scale - plus FormatGain, the default 1/5 s step and comments); no model names.
 #  test_treadmills151  - the REAL BiomeVisuals / TreadmillFx / TreadmillBeltArt151 / GardenUpgradeService / Config: every skin x level builds; every part of the
 #                        machine keeps its size, place, colour and material (only the per-part flow pieces are retired, the chevrons stay); the training belt
 #                        (running surface + step detection), the prompt and badge unchanged; nothing in the art or the sign collides, answers raycasts or
@@ -38,24 +38,52 @@ done
 for n in TreadmillLook151 TreadmillBeltArt151;do grep -q "^ModuleScript	ReplicatedStorage/$n	ReplicatedStorage/$n.lua$" "$S/MANIFEST.tsv" || fail "$n is not in src/MANIFEST.tsv";done
 tail -n +2 "$S/MANIFEST.tsv" | cut -f2 > "$OUT/manifest_paths.txt";LC_ALL=C sort -c "$OUT/manifest_paths.txt" || fail "src/MANIFEST.tsv is not sorted"
 if git -C "$REPO" rev-parse -q --verify $BASE >/dev/null 2>&1;then
- sh "$T/r152_real_diff.sh" "$REPO" $BASE "$S/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua" "$S/StarterPlayer/StarterPlayerScripts/TreadmillAnimation.client.lua" >/dev/null || fail "the popup script / treadmill animation changed" # (the R152 load guard line aside)
+ sh "$T/r152_real_diff.sh" "$REPO" $BASE "$S/StarterPlayer/StarterPlayerScripts/TreadmillAnimation.client.lua" >/dev/null || fail "the treadmill animation changed" # (the R152 load guard line aside)
+ # R153 (owner: "numbers should also be bigger", then "2x bigger"): the speed popups are 2x. SpeedGainPopup.client.lua changed in exactly three places (the pooled popup carries the fan's
+ # size on this screen, FanX / FanY, and apply() multiplies by it: SpeedPopupStyle.FanScale) and SpeedPopupStyle in its sizes (Size, StrokeThickness), the pooled field (Field), the fan
+ # numbers (Fan) and FanScale; everything else of both must still be what it was at $BASE (the motion curves, the rate, the colours, the formatting).
+ git -C "$REPO" show $BASE:src/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua > "$OUT/popup_base.lua"
+ python3 - "$OUT/popup_base.lua" "$S/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua" <<'EOF' || fail "SpeedGainPopup.client.lua changed outside the R153 fan scale (the load guard line aside)"
+import sys
+skip = ("R152: start once the whole game has arrived",)
+def norm(text):
+    return '\n'.join(l for l in text.split('\n') if not any(s in l for s in skip))
+old = norm(open(sys.argv[1], encoding='utf-8').read())
+new = norm(open(sys.argv[2], encoding='utf-8').read())
+undo = [  # the three R153 edits, put back as they were at the base
+    ("Unit = 1, FanX = 1, FanY = 1, PX = 0,", "Unit = 1, PX = 0,"),
+    ("\tx, y = x * unit * popup.FanX, y * unit * popup.FanY -- (R153: the fan's size on this screen, SpeedPopupStyle.FanScale)", "\tx, y = x * unit, y * unit"),
+    ("\tlocal viewport = camera and camera.ViewportSize\n\tpopup.Unit = Style.Unit(viewport and viewport.Y)\n\tpopup.FanX, popup.FanY = Style.FanScale(viewport and viewport.X, viewport and viewport.Y)", "\tpopup.Unit = Style.Unit(camera and camera.ViewportSize.Y)"),
+]
+for a, b in undo:
+    assert new.count(a) == 1, a
+    new = new.replace(a, b)
+sys.exit(0 if old == new else 1)
+EOF
  git -C "$REPO" show $BASE:src/ReplicatedStorage/SpeedPopupStyle.lua > "$OUT/style_base.lua"
- python3 - "$OUT/style_base.lua" "$S/ReplicatedStorage/SpeedPopupStyle.lua" <<'EOF' || fail "SpeedPopupStyle changed outside FormatGain and the 1/5 s step"
+ python3 - "$OUT/style_base.lua" "$S/ReplicatedStorage/SpeedPopupStyle.lua" <<'EOF' || fail "SpeedPopupStyle changed outside FormatGain, the 1/5 s step and the R153 sizes / fan"
 import re, sys
+def cut(s, head):  # a whole function: from its header line to the next line that is just "end"
+    a = s.index(head); b = s.index('\nend\n', a) + 5
+    return s[:a] + s[b:]
 def strip(path):
     s = open(path, encoding='utf-8').read()
-    a = s.index('function S.FormatGain(amount)'); b = s.index('\nend\n', a) + 5
-    s = s[:a] + s[b:]                                             # FormatGain itself (the owner's K / M request)
+    s = cut(s, 'function S.FormatGain(amount)')                   # FormatGain itself (the owner's K / M request)
+    if 'function S.FanScale(' in s:
+        s = cut(s, 'function S.FanScale(')                        # R153: the fan's size on this screen (does not exist at the base)
     s = s.replace('num(interval, 1 / 6)', 'num(interval, STEP)').replace('num(interval, 1 / 5)', 'num(interval, STEP)')   # the default step: 1/6 -> 1/5 s
     out = []
     for line in s.split('\n'):
         line = re.sub(r'\s*--.*$', '', line)                      # comments may change (the cadence note: 10 a second at the 1/5 s step)
+        # R153 (owner: "numbers should also be bigger", then "2x bigger"): the popup sizes, the outline, the pooled field and the fan numbers are new values
+        if re.match(r'^S\.(Size|StrokeThickness|Field|Fan) = ', line.strip()):
+            continue
         if line.strip():
             out.append(line)
     return '\n'.join(out)
 sys.exit(0 if strip(sys.argv[1]) == strip(sys.argv[2]) else 1)
 EOF
- echo "ok: SpeedGainPopup.client.lua and TreadmillAnimation.client.lua as at $BASE; SpeedPopupStyle changed only in FormatGain, the default step (1/5 s) and comments"
+ echo "ok: TreadmillAnimation.client.lua as at $BASE; SpeedGainPopup.client.lua and SpeedPopupStyle changed only in the R153 2x popups (sizes, outline, field, fan scale), FormatGain, the default step (1/5 s) and comments"
 fi
 if grep -niE "claude|opus|sonnet|haiku|anthropic|gpt" $NEW "$HERE/test_treadmills151.luau" "$HERE/check_belt_images.py" "$HERE/mutation_treadmills.py" "$P/R151/treadmills.md" "$P/R151/treadmills/"*.luau "$P/R151/treadmills/"*.py "$P/R151/treadmills/"*.mjs "$P/R151/treadmills/"*.html;then fail "a model name in the treadmill files";fi
 echo "ok: everything compiles, the two modules are in src/MANIFEST.tsv (sorted), no model names"

@@ -21,7 +21,7 @@ for f in ReplicatedStorage/NotifyBadge151 ReplicatedStorage/RefreshBarrier Repli
  /opt/luau/luau-compile --null "$S/$f.lua" >/dev/null 2>&1 || fail "$f does not compile"
 done
 for f in "$HERE"/test_*.luau;do /opt/luau/luau-compile --null "$f" >/dev/null 2>&1 || fail "$f does not compile";done
-if grep -rniE "cla[u]de|op[u]s|sonn[e]t|haik[u]|anthrop[i]c|gp[t]-?[0-9]" "$HERE" "$P/R153.md" 2>/dev/null;then fail "a model name in the R153 files";fi
+if grep -rniE "cla[u]de|op[u]s|sonn[e]t|haik[u]|anthrop[i]c|gp[t]-?[0-9]" "$HERE" "$P/R153/fixes.md" 2>/dev/null;then fail "a model name in the R153 files";fi
 sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 || { cat "$OUT/guard.log";fail "the R152 load guard (line 1 of every client script)"; }
 echo "ok: the touched scripts and the R153 tests compile; line 1 of every client script is still the R152 load guard; no model names"
 echo "== 1. badges (R151 run_badges.sh: sizes, reach on screen, clipping, daily)"
@@ -33,6 +33,11 @@ cp "$T/roblox.luau" "$INV/world.luau" "$P/R149/tests/zfight_world.luau" "$HERE/t
 python3 "$P/R149/tests/zfight_bundle.py" "$S" "$B" > /dev/null
 (cd "$B" && $LUAU test_barrier153.luau > barrier.log 2>&1) || { grep -v '^WARN' "$B/barrier.log" | tail -30;fail "barrier"; }
 grep -v '^WARN' "$B/barrier.log" | tail -3
+if [ -f "$PLACE" ];then
+ echo "== 2b. barrier z-fighting on the owner's place (the closed track: the real start-up builders, the rook gate, the blackout cover, the barrier)"
+ sh "$HERE/run_barrier_zfight.sh" "$OUT/zf" "$PLACE" > "$OUT/zf.log" 2>&1 || { tail -20 "$OUT/zf.log";fail "barrier z-fighting"; }
+ tail -3 "$OUT/zf.log"
+else echo "(no place file at $PLACE: the barrier z-fighting scene was skipped)";fi
 echo "== 3. belt"
 # belt MODE SRC DIR: the REAL TreadmillFx / BiomeVisuals / BeltArt + the chevrons' own code of SRC, test_belt153.luau in MODE (before = the R152 src measured for the root cause)
 belt() {
@@ -50,4 +55,29 @@ if git -C "$REPO" cat-file -e "$BASE152" 2>/dev/null;then
 else echo "(no $BASE152 here: the R152 root-cause measurement was skipped)";fi
 belt after "$S" "$OUT/belt" || { grep -v '^WARN' "$OUT/belt/belt.log" | tail -30;fail "belt"; }
 grep -v '^WARN' "$OUT/belt/belt.log" | tail -8
+echo "== 4. speed popups (2x)"
+PP=$OUT/popups;mkdir -p "$PP"
+cp "$T/roblox.luau" "$INV/world.luau" "$HERE/test_popups153.luau" "$PP/"
+git -C "$REPO" show "$BASE152:src/ReplicatedStorage/SpeedPopupStyle.lua" > "$PP/ref_style.luau" 2>/dev/null || fail "no $BASE152 (the R152 SpeedPopupStyle is the reference of the 2x test)"
+python3 "$P/R149/tests/zfight_bundle.py" "$S" "$PP" > /dev/null
+(cd "$PP" && $LUAU test_popups153.luau > popups.log 2>&1) || { grep -v '^WARN' "$PP/popups.log" | tail -30;fail "popups"; }
+grep -v '^WARN' "$PP/popups.log" | tail -22
+echo "== 4b. the R151 speed popup suites (sizes follow, the belt arrows block is frozen, no churn)"
+sh "$P/R151/tests/run_speed_popups.sh" "$OUT/speed_popups" > "$OUT/speed_popups.log" 2>&1 || { tail -30 "$OUT/speed_popups.log";fail "R151 speed popups"; }
+grep -E "checks|passed" "$OUT/speed_popups.log" | tail -4
+if [ "$MODE" = "mutate" ];then
+ echo "== mutations: the suite that guards each must fail on a broken copy of src"
+ for m in $(python3 "$HERE/mutate153.py" x list);do
+  want=$(python3 "$HERE/mutate153.py" x suite "$m")
+  rm -rf "$OUT/mut";mkdir -p "$OUT/mut";cp -r "$S" "$OUT/mut/src"
+  python3 "$HERE/mutate153.py" "$OUT/mut/src" "$m" > /dev/null
+  d=$OUT/mut/run;mkdir -p "$d";cp "$T/roblox.luau" "$INV/world.luau" "$P/R149/tests/zfight_world.luau" "$d/"
+  case "$want" in
+   barrier) cp "$HERE/test_barrier153.luau" "$d/";python3 "$P/R149/tests/zfight_bundle.py" "$OUT/mut/src" "$d" > /dev/null;file=test_barrier153;;
+   belt) (echo "MODE='after'";cat "$HERE/test_belt153.luau") > "$d/test_belt153.luau";python3 "$HERE/mkbundle_belt.py" "$OUT/mut/src" "$d" > /dev/null;file=test_belt153;;
+   popups) cp "$HERE/test_popups153.luau" "$PP/ref_style.luau" "$d/";python3 "$P/R149/tests/zfight_bundle.py" "$OUT/mut/src" "$d" > /dev/null;file=test_popups153;;
+  esac
+  if (cd "$d" && timeout 900 $LUAU $file.luau > run.log 2>&1);then fail "mutant $m was NOT noticed by the $want suite";else echo "ok: mutant $m noticed by the $want suite ($(grep -c '^FAIL' "$d/run.log") failed checks)";fi
+ done
+fi
 echo "all R153 checks passed"
