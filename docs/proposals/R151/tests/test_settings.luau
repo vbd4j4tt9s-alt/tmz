@@ -165,6 +165,38 @@ do
  check(srv:_wants(a)==false and srv:_wants(p2)==true,'_wants reads the live setting')
 end
 
+-- 5. R153: "Skip pack animations" (SkipCutscenes): off by default, saved like the other settings, published on the Player at load for the reveal ---------
+do
+ check(Settings.Defaults.SkipCutscenes==false and Settings.Read(nil).SkipCutscenes==false and Settings.Read({}).SkipCutscenes==false,'R153: the default is OFF')
+ check(Settings.Valid('SkipCutscenes',true)and Settings.Valid('SkipCutscenes',false)and not Settings.Valid('SkipCutscenes',1)and not Settings.Valid('SkipCutscenes','on')and not Settings.Valid('SkipCutscenes',nil),'R153: on / off only (a boolean)')
+ check(Settings.Read({SkipCutscenes=true}).SkipCutscenes==true and Settings.Read({SkipCutscenes='yes'}).SkipCutscenes==false,'R153: a saved ON reads on, a bad value reads off')
+ check(Settings.ToggleAttributes.SkipCutscenes=='SettingSkipCutscenes'and Settings.AudioAttributes.SkipCutscenes==nil,'R153: published under SettingSkipCutscenes (not an audio attribute)')
+ local DataE=server('PlayerDataService').new(Config,Map,{Show=function()end})
+ local e=makePlayer(DataE,1108,'NewOne')
+ check(DataE:GetPremium(e).Settings.SkipCutscenes==false and e:GetAttribute('SettingSkipCutscenes')==false,'R153: a new player: off, and the Player says so from the moment the data loads')
+ local before={};for _,c in ipairs(remotes:GetChildren())do before[c]=true end
+ server('PremiumService').new(DataE,{SyncTools=function()end},{Refresh=function()end})
+ local request;for _,c in ipairs(remotes:GetChildren())do if c.Name=='PremiumRequest'and not before[c]then request=c end end
+ R.advance(1)
+ local r=request.OnServerInvoke(e,'SetSetting',{Key='SkipCutscenes',Value=true})
+ check(r and r.Success==true and DataE:GetPremium(e).Settings.SkipCutscenes==true,'R153: SetSetting true is accepted and kept')
+ R.advance(1)
+ check(request.OnServerInvoke(e,'SetSetting',{Key='SkipCutscenes',Value='on'}).Success==false and DataE:GetPremium(e).Settings.SkipCutscenes==true,'R153: a non-boolean is refused')
+ R.advance(1)
+ check(request.OnServerInvoke(e,'SettingsState').Settings.SkipCutscenes==true,'R153: SettingsState says on')
+ local saved=DataE:_buildSaveData(e)
+ check(saved.Premium.Settings.SkipCutscenes==true and saved.Version==Config.ProfileVersion,'R153: saved inside Premium.Settings (no profile version change)')
+ local DataF=server('PlayerDataService').new(Config,Map,{Show=function()end})
+ DataF.Store.Data[DataF:_getKey({UserId=1109,Name='Again'})]=saved
+ local f=makePlayer(DataF,1109,'Again')
+ check(DataF:GetPremium(f).Settings.SkipCutscenes==true and f:GetAttribute('SettingSkipCutscenes')==true,'R153: it persists: the next session loads ON and publishes it on the Player')
+ local old=DataE:_buildSaveData(e);old.Premium.Settings.SkipCutscenes=nil
+ local DataG=server('PlayerDataService').new(Config,Map,{Show=function()end})
+ DataG.Store.Data[DataG:_getKey({UserId=1110,Name='Older'})]=old
+ local g=makePlayer(DataG,1110,'Older')
+ check(DataG:GetPremium(g).Settings.SkipCutscenes==false and g:GetAttribute('SettingSkipCutscenes')==false,'R153: a profile saved before R153 (no key) reads off')
+end
+
 print(('R151 settings (data): %d checks, %d fails'):format(checks,fails))
 if fails>0 then error('failures')end
 print(('%d/%d checks passed'):format(checks-fails,checks))

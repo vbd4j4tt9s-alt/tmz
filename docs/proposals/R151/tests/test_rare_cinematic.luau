@@ -26,7 +26,7 @@ local function reset()
  X.root.CFrame=CF(0,3,100);X.hum.Health=100;X.state=R.Enum.HumanoidStateType.Running
  for _,k in ipairs(W.CS:GetTagged('BiomeKeeper'))do k:Destroy()end
  X.player:SetAttribute('RarePullPreview',nil)
- R.advance(4) -- (no quick reveal: the previous presentation ended long ago)
+ R.advance(4) -- (the previous presentation ended long ago)
  baseCamera=X.camera()
 end
 local function packFor(rank,seedId)
@@ -292,15 +292,45 @@ for rank=1,5 do
  restoredAll(names[rank]..' card')
  bag:Destroy()
 end
-do -- quick reveals: packs opened back to back
+do -- R153: packs opened back to back play in full every time (R151 made them quick); the short version is the player's own setting
  reset()
  local first,bag1=start(1);X.run(first.TL.Length+.2)
  local second,bag2=start(2)
- check(second.Quick and L.IsQuick(bag2),'a pack opened right after the last reveal is a quick reveal (and the world pack knows it)')
- check(second.TL.Length<L.CardTimeline(2).Length,'quick: shorter ('..string.format('%.2f',second.TL.Length)..' s)')
- X.run(second.TL.Length+.2);restoredAll('quick')
- R.advance(5);local third=start(2);check(not third.Quick,'after a pause the full suspense comes back');M.Abort('test')
- bag1:Destroy();bag2:Destroy()
+ check(not second.Quick and not L.IsQuick(bag2)and second.TL.Length==L.CardTimeline(2).Length,'R153: a pack opened right after the last reveal plays in full (and the world pack knows it)')
+ X.run(.5);local third,bag3=start(3)
+ check(not third.Quick and third.TL.Length==L.CardTimeline(3).Length,'R153: one opened while the last card is still up plays in full too')
+ X.run(third.TL.Length+.2);restoredAll('back to back')
+ X.player:SetAttribute('SettingSkipCutscenes',true);reset()
+ local fourth,bag4=start(2)
+ check(fourth.Quick and L.IsQuick(bag4)and fourth.TL.Length<L.CardTimeline(2).Length,'R153: with "Skip pack animations" on: the short version ('..string.format('%.2f',fourth.TL.Length)..' s)')
+ X.run(fourth.TL.Length+.2);restoredAll('skip pack animations')
+ X.player:SetAttribute('SettingSkipCutscenes',nil)
+ R.advance(5);local fifth,bag5=start(2);check(not fifth.Quick,'R153: and off again, the full suspense');M.Abort('test')
+ for _,b in ipairs({bag1,bag2,bag3,bag4,bag5})do b:Destroy()end
+ -- with the setting on, Secret / Cosmic / King: the result card in place, never the story scene
+ X.player:SetAttribute('SettingSkipCutscenes',true);reset()
+ local short,bag6=start(8)
+ check(short.Kind=='InPlace'and short.Why=='skip pack animations is on','R153: with "Skip pack animations" on, King plays the in-place result card ('..tostring(short.Kind)..')')
+ X.run(short.TL.Length+.2);restoredAll('King short');bag6:Destroy()
+ X.player:SetAttribute('SettingSkipCutscenes',nil);reset()
+ local preview=M.Start({Rank=8,SeedId=X.byRank[8],At=W.workspace:GetServerTimeNow(),Preview=true})
+ check(preview and preview.Kind=='Scene','R153: an owner preview is the full scene ('..tostring(preview and preview.Kind)..')');M.Abort('test')
+end
+do -- R153: every card can be skipped by the player (R151 / R152: only the story scenes): the hint, the jump to the hit, the close
+ for _,c in ipairs({{3,false},{5,false},{7,true}})do
+  reset();if c[2]then X.keeper(V3(25,3,100),{})end
+  local run,bag=start(c[1]);local tl=run.TL;local hit=tl.Climax or tl.Burst;local tag='R153 '..names[c[1]]..(c[2]and' in place'or' card')
+  X.run(tl.SkipFrom-.1);check(M.Skip()==false,tag..': no skip before '..tl.SkipFrom..' s')
+  X.run(.3)
+  local hint=X.find(X.pg,'Skip hint')
+  check(hint and hint.Visible and hint.TextTransparency<1,tag..': the skip hint shows')
+  check(M.Skip()and near(run.Clock(),hit-.02,.01),tag..': a skip jumps straight to the hit')
+  check(W.actions[M.SkipAction]==nil and X.find(X.pg,'Backdrop')==nil and X.controls.Enabled and hudShown(),tag..': nothing is taken from the player (no full-screen button, no bound keys, the HUD and movement stay)')
+  X.run(L.ShownAt(tl)-run.Clock()+.1)
+  check(M.Skip(),tag..': a second skip once the result is shown closes it')
+  X.run(tl.Length-tl.FloatEnd+.2)
+  check(M.Active()==nil,tag..': gone');restoredAll(tag);bag:Destroy()
+ end
 end
 -- 6. owner previews and sound slots --------------------------------------------------------------------------------------------------------
 do
@@ -423,16 +453,18 @@ do
   if out.Climax then check(out.Climax<=delay-margin+1e-6,tag..': the hit (RarePullClimaxAt) is at '..string.format('%.2f',out.Climax)..' s, at least the margin before the line') end
   rows[#rows+1]=string.format('%s/%s title %.2f name %.2f hit %s',names[rank],tag:match('%((.-)%)')or tag,out.Title or -1,out.Name or -1,out.Climax and string.format('%.2f',out.Climax)or'-')
  end
- -- the ladder (Common..Mythic), normal and quick
+ -- the ladder (Common..Mythic), normal and quick (R153: quick = "Skip pack animations" on, after another pack)
  for rank=1,5 do
   reset();local run,bag=start(rank);local t0=R.clock
   check(run.Kind=='Ladder'and not run.Quick,names[rank]..' (card): a normal seed card')
   verify(names[rank]..' (card)',rank,watch(run,t0,run.TL.Length+.4));bag:Destroy()
   if rank>=2 then
+   X.player:SetAttribute('SettingSkipCutscenes',true)
    reset();local first,bag1=start(1);X.run(first.TL.Length+.2)
    local second,bag2=start(rank);local t1=R.clock
    check(second.Quick,names[rank]..' (quick): a quick reveal')
    verify(names[rank]..' (quick)',rank,watch(second,t1,second.TL.Length+.4));bag1:Destroy();bag2:Destroy()
+   X.player:SetAttribute('SettingSkipCutscenes',nil)
   end
  end
  -- the story scenes: every presentation

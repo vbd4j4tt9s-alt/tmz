@@ -16,6 +16,10 @@
 --  Every opening must produce its reveal (the opener's card / story scene and the pack opening in the world; an onlooker's world reveal
 --  and, for Secret+, the sky beam) and every one must end clean (no presentation, stage, GUI, sound, duck, binding, camera change, held
 --  controls or hidden HUD left; no beam or emitter outside the afterglow). At the end nothing has leaked (instances, GUIs, connections).
+--  R153 (owner: "pack animations should play all the time and shouldn't stop after 2/3 times"): every opener's presentation is the FULL
+--  one (the short one only when the player has "Skip pack animations" on: now and then here) and plays to its end: it ends by itself, or,
+--  for a fast second pack opened over a card, after the card has shown its result (a story scene keeps the clicks and the gamepad's R2
+--  until it is over, so the next pack waits for it). Now and then the player skips (a click / the scene's button at a random moment).
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local Y=require('./rare152_env')(W,E,F,X)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -85,6 +89,10 @@ addSeed(Verity.Id)
 local published={};for _,id in pairs(X.byRank)do published[id]=true end
 local seed=20251005
 local function rnd()seed=(seed*16807)%2147483647;return seed/2147483647 end
+-- (R153: the setting and the skips draw from their own sequence, so every other choice of the run is what it was)
+local seed2=153
+local function rnd2()seed2=(seed2*16807)%2147483647;return seed2/2147483647 end
+local ATTR=W.module('SettingsConfig').ToggleAttributes.SkipCutscenes
 local function pick(list)return list[math.floor(rnd()*#list)+1]end
 local function serverBag(char,pack,shape,size)
  local ok,bag=pcall(Visuals.CarryBag,char,pack.Stage,pack.Variant,1,size,'None',shape)
@@ -247,7 +255,19 @@ end
 baseline=census()
 local baseSet={};for _,d in ipairs(W.workspace:GetDescendants())do baseSet[d]=true end
 -- the random openings ---------------------------------------------------------------------------------------------------------------
-local stats={own=0,other=0,double=0,respawn=0,inject=0,unequip=0,fallbackArt=0,byRank={0,0,0,0,0,0,0,0},device={desktop=0,phone=0,low=0},injected={}}
+local stats={own=0,other=0,double=0,respawn=0,inject=0,unequip=0,fallbackArt=0,byRank={0,0,0,0,0,0,0,0},device={desktop=0,phone=0,low=0},injected={},short=0,skipped=0,toEnd=0,handedOver=0}
+-- R153: the presentation the opener got is the full one (or, with "Skip pack animations" on, the short one)
+local function fullFor(r,short)
+ if r.Kind=='Ladder'then return r.Quick==(short==true)and r.TL.Length==L.CardTimeline(r.Rank,short==true).Length end
+ if r.Kind=='Scene'then return not short and r.TL.Length==L.Timeline(r.Rank,r.Variant).Length end
+ if r.Kind=='InPlace'then return r.TL.Length==L.Timeline(r.Rank,'InPlace').Length end
+ return r.Kind=='Result'
+end
+local function skipNow()
+ local run=M.Active()
+ if run and run.Kind=='Scene'then local b=X.find(revealGui(),'Backdrop');if b then b.Activated:Fire()end
+ else W.UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,KeyCode=R.Enum.KeyCode.Unknown,Position=V3(400,300,0)},false)end
+end
 local produced,finished=0,0
 local forceOwn=false
 local function device(kind)
@@ -295,17 +315,25 @@ for i=1,N do
  end
  if own then
   stats.own+=1;if unequip then stats.unequip+=1 end
+  -- R153: now and then "Skip pack animations" is on; now and then the player skips at a random moment (both drawn from rnd2)
+  local short=rnd2()<.15;local skipAt=rnd2()<.25 and rnd2()*dur or nil
+  if short then stats.short+=1;tag=tag..' [skip pack animations on]'end;if skipAt then stats.skipped+=1;tag=tag..string.format(' [skipped at %.2f s]',skipAt)end
+  X.player:SetAttribute(ATTR,short or nil)
   local o=openOwn({Tag=tag},seedId,pack,shape,size,{Unequip=unequip})
   if o then
    if o.Ok then produced+=1 end
+   local first,second=o.Run,nil
+   local reached={} -- the furthest each presentation's own clock got
+   local function watch()local run=M.Active();if run and not run.Done then reached[run]=math.max(reached[run]or -1,run.Clock())end end
    local sawTitle,sawSeed=false,false
    local dieAt=died and(R.clock+.3+rnd()*(dur-.5))or nil
-   local dead=false
+   local dead,skipped=false,false
    X.run(dur-.15,1/30,function(now)
-    armStage()
+    armStage();watch()
     if titleShown()then sawTitle=true end
     if seedOut()then sawSeed=true end
     if dieAt and not dead and now>=dieAt then dead=true;X.hum.Health=0;X.hum.Died:Fire()end
+    if skipAt and not skipped and not dead and now-o.Start>=skipAt then skipped=true;skipNow()end
    end)
    -- the server ends the opening
    o.Bag:Destroy();o.Tool:Destroy()
@@ -313,23 +341,42 @@ for i=1,N do
     stats.respawn+=1
     X.run(.2+rnd()*.8);respawn()
    elseif double then
-    -- the next pack straight away, while this presentation still plays
     stats.double+=1
+    -- (R153: a story scene keeps the clicks, the screen and the gamepad's R2 until it is over: the next pack is opened when the player has
+    -- control again; over a card (the HUD and the controls stay the player's) straight away, while the card still plays)
+    if first and first.Kind=='Scene'then local g=0;while M.Active()==first and g<300 do X.run(.2,1/30,watch);g+=1 end end
     X.run(rnd()*.3)
     local rank2=math.floor(rnd()*8)+1;local seed2=pick(seedsByRank[rank2])
     local o2=openOwn({Tag=tag..' then a fast '..names[rank2]},seed2,pick(packs),nil,1,{})
     if o2 then
-     X.run(Rules.GetRevealDuration(names[rank2])-.15,1/30,function()armStage();if titleShown()then sawTitle=true end end)
+     second=o2.Run
+     X.run(Rules.GetRevealDuration(names[rank2])-.15,1/30,function()armStage();watch();if titleShown()then sawTitle=true end end)
      o2.Bag:Destroy();o2.Tool:Destroy()
     end
    end
    -- the presentation ends by itself
    local guard=0
-   while M.Active()and guard<300 do X.run(.2,1/30,function()if titleShown()then sawTitle=true end end);guard+=1 end
+   while M.Active()and guard<300 do X.run(.2,1/30,function()watch();if titleShown()then sawTitle=true end end);guard+=1 end
    X.run(.4)
+   X.player:SetAttribute(ATTR,nil)
    if not dead then
     check(sawTitle,tag..': the seed is shown on the opener\'s screen')
     check(sawSeed,tag..': and in the world')
+   end
+   -- R153: full (or short by the setting), and to its end
+   local fired=armed and armed.Fired
+   for _,r in ipairs({first,second})do
+    if r then
+     local which=r==first and'its presentation'or'the second pack\'s presentation'
+     check(fullFor(r,short),tag..': '..which..' is the '..(short and'short'or'full')..' one ('..tostring(r.Kind)..' '..tostring(r.Variant or'')..(r.Quick and' quick'or'')..', '..string.format('%.2f',r.TL.Length)..' s)')
+     if not dead and not fired then
+      local gotTo=reached[r]or -1
+      local toEnd=r.Reason=='done'
+      local over=r.Reason=='replaced'and r==first and r.Kind~='Scene'and gotTo>=L.ShownAt(r.TL)-1/30
+      if toEnd then stats.toEnd+=1 elseif over then stats.handedOver+=1 end
+      check(toEnd or over,tag..': '..which..' plays to its end ('..tostring(r.Reason)..' at '..string.format('%.2f',gotTo)..' of '..string.format('%.2f',r.TL.Length)..' s)')
+     end
+    end
    end
    if clean(tag)then finished+=1 end
   end
@@ -366,5 +413,7 @@ check(finished==N,'every opening ended clean ('..finished..' of '..N..')')
 local inj={};for k,v in pairs(stats.injected)do inj[#inj+1]=k..' '..v end;table.sort(inj)
 print(string.format('stress: %d openings (%d own, %d onlooker); tiers %s; desktop %d, phone %d, low %d; %d fast second packs, %d deaths + respawns, %d tools put away, %d seeds not in the published art; %d errors injected (%s)',
  N,stats.own,stats.other,table.concat(stats.byRank,'/'),stats.device.desktop,stats.device.phone,stats.device.low,stats.double,stats.respawn,stats.unequip,stats.fallbackArt,stats.inject,table.concat(inj,', ')))
+print(string.format('R153: %d own presentations played to their end, %d cards handed over to a fast second pack after their result; %d with "Skip pack animations" on, %d skipped by the player',
+ stats.toEnd,stats.handedOver,stats.short,stats.skipped))
 print(('R152 stress checks %d, fails %d'):format(checks,fails))
 if fails>0 then error('failures')end
