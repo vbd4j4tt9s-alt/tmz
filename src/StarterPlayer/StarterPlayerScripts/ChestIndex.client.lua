@@ -145,13 +145,14 @@ local function updateAlerts()
  end
  local grew=total>alertTotal
  -- R148: a tab's dot is its categories together: LIMITED lights up for a reward of either MECH SET (8) or VERITY (9).
- -- R151: a dot sits fully INSIDE its tab (overhang -3): the tab row is a ScrollingFrame, which clips at its edge, and the old dot hung out of the tab's top and was cut there.
- for key,t in pairs(tabsByKey)do Badge.Set(Badge.Make(t.Button,'RewardDot',14,-3),'',(perTab[key]or 0)>0,false)end
- -- The INDEX button's count: 6 px of the badge hang past the button's corner; the wheel's CanvasGroup (HudLayout) keeps NotifyBadge151.Margin around the button, which holds it.
+ -- R151: a dot sits fully INSIDE its tab: the tab row is a ScrollingFrame, which clips at its edge, and the old dot hung out of the tab's top and was cut there.
+ -- R153: every badge is 1.5x bigger; sizes and overhangs are NotifyBadge151.Sizes / .Overhang.
+ for key,t in pairs(tabsByKey)do Badge.Set(Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot),'',(perTab[key]or 0)>0,false)end
+ -- The INDEX button's count: 9 px of the badge hang past the button's corner; the wheel's CanvasGroup (HudLayout) keeps NotifyBadge151.Margin around the button, which holds it.
  -- R150 review: the badge pops SILENTLY (as in R149). A chime here fired the moment the server opened a pack (OpenSeedPack commits the seed's reward at once), before the reveal shows the seed.
- Badge.Set(Badge.Make(toggle,'RewardBadge',24,6),Badge.Text(total),total>0,grew)
+ Badge.Set(Badge.Make(toggle,'RewardBadge',Badge.Sizes.Count,Badge.Overhang.Count),Badge.Text(total),total>0,grew)
  local nav=pg:FindFirstChild('GardenNavigation');local hub=nav and nav:FindFirstChild('MenuButton')
- if hub then Badge.Set(Badge.Make(hub,'IndexRewardAlert',20,6),'!',total>0,grew)end
+ if hub then Badge.Set(Badge.Make(hub,'IndexRewardAlert',Badge.Sizes.Alert,Badge.Overhang.Alert),'!',total>0,grew)end
  alertTotal=total
 end
 local alertQueued=false
