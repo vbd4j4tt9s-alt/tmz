@@ -129,6 +129,7 @@ local function ring(fx,name,color,radius,height,speed,tilt,gap)
 end
 local function discardDetails(r)
     if r.Fx then r.Fx.Folder:Destroy();r.Fx=nil end
+    if r.MechMotion then r.MechMotion:Live(false)end -- (R153: the Mech pack's hum and sparks)
 end
 local function discard(r)
     discardDetails(r)
@@ -376,7 +377,7 @@ local function choose(camera,now,low)
     for _,r in ipairs(candidates)do
         if r.Bright then highlight(r)end
         if r.HasDistant then distant(r);r.Distant.Enabled=not r.Detailed end
-        if r.Detailed then details(r);r.Fx.Light.Enabled=r.Lit end
+        if r.Detailed then details(r);r.Fx.Light.Enabled=r.Lit;if r.MechMotion then r.MechMotion:Live(true,low)end end
     end
 end
 local selectionClock,detailClock,distantClock=.25,0,0

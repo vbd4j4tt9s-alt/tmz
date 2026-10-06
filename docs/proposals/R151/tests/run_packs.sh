@@ -59,10 +59,11 @@ grep '^COUNT' "$OUT/before/fp.txt" "$OUT/after/fp.txt"
 # against the audit's merge nothing may differ. Against the pre-audit base only the audit's documented fixes may: the giant tags on the seal / tear strips
 # (SeedPackVisuals), the Void's stars / specks / rune strokes backed onto the pouch (EclipsePackArt) and the moss patches / ice glaze of the pads made .006 thicker
 # (SeedPackVisuals.Platform)
+# (R153: the Mech pack is redrawn on purpose, look B: its packs are left out here and checked by docs/proposals/R153/tests/run_mech_pack.sh)
 if [ "$BASE" = "c1e8829" ];then
- python3 "$HERE/compare_fingerprints.py" "$OUT/before/fp.txt" "$OUT/after/fp.txt" --expect-only '^Part (BottomSeal|TearStripN): tags' '^Part (StarV|StarH|StarSpeck)[FB]N: ' '^Part RuneSigil[FB]N_N: ' '^Part (MossPatch|IceGlaze): size  \[pad\]'
+ python3 "$HERE/compare_fingerprints.py" "$OUT/before/fp.txt" "$OUT/after/fp.txt" --skip-packs ' MechLimited ' --expect-only '^Part (BottomSeal|TearStripN): tags' '^Part (StarV|StarH|StarSpeck)[FB]N: ' '^Part RuneSigil[FB]N_N: ' '^Part (MossPatch|IceGlaze): size  \[pad\]'
 else
- python3 "$HERE/compare_fingerprints.py" "$OUT/before/fp.txt" "$OUT/after/fp.txt" --expect-only '(?!)'
+ python3 "$HERE/compare_fingerprints.py" "$OUT/before/fp.txt" "$OUT/after/fp.txt" --skip-packs ' MechLimited ' --expect-only '(?!)'
 fi
 
 echo "== the Verity pouch (VerityPouch151): runtime bake, pouch pack, sachet fallback"

@@ -342,12 +342,18 @@ do
   if p:GetAttribute('VoidSpin')then spinners+=1;if typeof(p:GetAttribute('VoidPivot'))~='CFrame'or typeof(p:GetAttribute('PackLocalFrame'))~='CFrame'then bad+=1 end end
  end
  kind('special',spinners>=20 and bad==0,'Void: '..spinners..' spinning halo / debris parts, each with its pivot and rest frame ('..bad..' without)')
- -- the Void and the Mech pack use the standard pouch mesh (the Forest_01 template's main pouch), painted
+ -- the Void pack uses the standard pouch mesh (the Forest_01 template's main pouch), painted
  local forest=designs.Forest_01:FindFirstChild('ApprovedMesh01')
- for _,e in ipairs({{7,H.VOID},{8,H.MECH}})do
+ for _,e in ipairs({{7,H.VOID}})do
   local b=H.ground(e[1],e[2],1,'None');local body=b:FindFirstChild('ApprovedMesh01',true)
   kind('special',body~=nil and body.MeshId==forest.MeshId,name(e[1],e[2],1,'None')..': its body is the Forest_01 pouch mesh ('..tostring(body and body.MeshId)..')')
   b:Destroy()
+ end
+ -- R153: the Mech pack (look B) no longer wears Forest_01's printed mesh: its body is the server's neutral flat pouch, or (here: no pouch made) the gunmetal sachet
+ -- (docs/proposals/R153/tests/test_mech_pack153.luau checks both)
+ do local b=H.ground(8,H.MECH,1,'None');local printed=false
+  for _,p in ipairs(allParts(b,false))do if p:IsA('MeshPart')and p.MeshId==forest.MeshId then printed=true end end
+  kind('special',not printed and b:GetAttribute('MechDesignRevision')==153 and b:FindFirstChild('SachetCore',true)~=nil,name(8,H.MECH,1,'None')..': no Forest_01 print, the R153 design on the sachet body');b:Destroy()
  end
  bag:Destroy()
  local held,char,_,torso=H.held(7,H.VOID,1,'None');connection(held,'held Void',torso,char);held:Destroy();char:Destroy()

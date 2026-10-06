@@ -1,9 +1,10 @@
 """R151: compares two fingerprint_packs.luau outputs (BEFORE = the base commit, AFTER = this checkout), pack by pack and instance by instance.
-Usage: python3 compare_fingerprints.py before.txt after.txt [--expect-only REGEX ...]
+Usage: python3 compare_fingerprints.py before.txt after.txt [--skip-packs REGEX] [--expect-only REGEX ...]
 
 Prints the number of packs compared, how many are identical and, for the others, the differences grouped by what changed (instance name with its
 digits folded, the properties that differ). With --expect-only, every difference must match one of the regexes (applied to the grouped
-description) or the exit status is 1: "nothing but the documented fixes changed"."""
+description) or the exit status is 1: "nothing but the documented fixes changed". --skip-packs (R153): packs whose label matches are left out on both sides
+(a design that was redrawn on purpose and has its own suite: the Mech pack, docs/proposals/R153/tests/run_mech_pack.sh)."""
 import collections, re, sys
 
 
@@ -30,6 +31,10 @@ def fold(name):
 def main():
     a, b = load(sys.argv[1]), load(sys.argv[2])
     expect = []
+    if '--skip-packs' in sys.argv:
+        skip = re.compile(sys.argv[sys.argv.index('--skip-packs') + 1])
+        a = collections.OrderedDict((k, v) for k, v in a.items() if not skip.search(k))
+        b = collections.OrderedDict((k, v) for k, v in b.items() if not skip.search(k))
     if '--expect-only' in sys.argv:
         expect = [re.compile(x) for x in sys.argv[sys.argv.index('--expect-only') + 1:]]
     same = 0

@@ -497,9 +497,7 @@ do
     if stage==4 or stage==7 then local h,char=H.held(stage,variant,size,coat,'R15');out[#out+1]=('held %d %s %s %s\n'):format(stage,variant,size,coat)..table.concat(H.lines(h),'\n');h:Destroy();char:Destroy();count+=1 end
    end end end
   end
-  for _,size in ipairs({1,25})do for _,coat in ipairs({'None','Gold'})do
-   local g=H.ground(8,H.MECH,size,coat);out[#out+1]=('mech %s %s\n'):format(size,coat)..table.concat(H.lines(g),'\n');g:Destroy();count+=1
-  end end
+  -- (R153: the Mech pack shares this flat pouch now: it is checked below, not here)
   return out,count
  end
  server();dropFolder();Mock.reset();Pouch.Prepare();local ready,n1=snapshot()
@@ -510,11 +508,18 @@ do
   local a,b={},{};for l in ready[first]:gmatch('[^\n]+')do a[#a+1]=l end;for l in off[first]:gmatch('[^\n]+')do b[#b+1]=l end
   for i=1,math.max(#a,#b)do if a[i]~=b[i]then print('first difference ('..a[1]..'):\n  ready: '..tostring(a[i])..'\n  none : '..tostring(b[i]));break end end
  end
- check(n1==n2 and n1>300 and different==0,('%d other packs (every ordinary design, the legacy keys, the Void and the Mech; ground and held; sizes 1 / 25; None / Gold) are identical with the pouch ready and with none: %d differ'):format(n1,different))
+ check(n1==n2 and n1>300 and different==0,('%d other packs (every ordinary design, the legacy keys and the Void; ground and held; sizes 1 / 25; None / Gold) are identical with the pouch ready and with none: %d differ'):format(n1,different))
  if different==0 then print(('nothing else: %d packs identical with and without the neutral pouch'):format(n1))end
  -- and the Verity pack alone differs
  Mock.reset();Pouch.Prepare();local a=H.ground(7,VERITY,1,'None');local aSig=sig(a);dropFolder();local b=sachetPack();local bSig=sig(b)
  check(a:GetAttribute('VerityPouch')==true and b:GetAttribute('VerityPouch')==nil and not sameSig(aSig,bSig),'the Verity pack itself is the pouch with it and the sachet without');a:Destroy();b:Destroy()
+ -- R153: the Mech pack (look B) is the same flat pouch, painted gunmetal, when it is ready, and its plain-parts body without: the design on it is the same either way
+ local function design(bag)local t={};for _,l in ipairs(H.lines(bag))do if not l:find('Sachet',1,true)and not l:find('ApprovedMesh',1,true)and not l:find('MechPouch',1,true)and not l:find('CompactPackPartCount',1,true)then t[#t+1]=l end end;return table.concat(t,'\n')end
+ Mock.reset();Pouch.Prepare();local m1=H.ground(8,H.MECH,1,'None');local d1=design(m1);local mesh=m1:FindFirstChild('ApprovedMesh01',true)
+ check(m1:GetAttribute('MechPouch')==true and mesh~=nil and mesh:IsA('MeshPart')and math.abs(mesh.Size.Z-W.module('MechPackArt153').Pouch.Depth)<.02 and mesh.Color==W.module('MechPackArt153').Colors.Body and m1:FindFirstChild('SachetCore',true)==nil,'R153: the Mech pack is the flat pouch when it is ready')
+ dropFolder();local m2=H.ground(8,H.MECH,1,'None');local d2=design(m2)
+ check(m2:GetAttribute('MechPouch')==false and m2:FindFirstChild('SachetCore',true)~=nil and m2:FindFirstChild('ApprovedMesh01',true)==nil,'R153: and its plain-parts body without it')
+ check(d1==d2 and #d1>1000,'R153: the Mech design (frame, reactor, traces, bolts, stripes, antenna) is the same on either body');m1:Destroy();m2:Destroy()
 end
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end
