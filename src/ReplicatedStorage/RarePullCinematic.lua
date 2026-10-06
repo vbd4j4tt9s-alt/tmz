@@ -33,6 +33,7 @@ M.KeepGuis={TouchGui=true,Freecam=true}
 M.CoreTypes={'PlayerList','Chat','EmotesMenu','Health','Backpack'}
 M.DangerRadius=45;M.MoveLimit=8
 local current=nil;M.LastEnd=-math.huge
+local lastPress=-math.huge -- (R153: the last press on the world: a run of clicks never skips, M.SkipGap)
 local function clamp01(x)return math.clamp(x,0,1)end
 local function lp()return Players.LocalPlayer end
 local function reduced()local ok,v=pcall(function()return Gui.ReducedMotionEnabled end);return ok and v==true end
@@ -270,6 +271,7 @@ finish=function(run,reason)
  if run.Gui then run.Gui:Destroy();run.Gui=nil end
  if run.SeedModel and run.SeedModel.Parent then run.SeedModel:Destroy()end
  if run.Audio then run.Audio=false;pcall(Audio.Stop)end
+ for tool in pairs(run.Held or{})do pcall(function()if tool.ManualActivationOnly then tool.ManualActivationOnly=false end end)end;run.Held=nil;run.Armed=false
  local player=lp()
  if player and(current==run or current==nil)then
   player:SetAttribute('RarePullCinematic',nil);player:SetAttribute('RarePullClimaxAt',nil);player:SetAttribute('RarePullSeedShownAt',nil)
@@ -310,7 +312,7 @@ function M._start(info)
  local hand
  if current then hand=handoff(current);finish(current,'replaced')end
  local run={Info=info,Rank=rank,Connections={},Reduced=reduced(),Phone=phone(),Lite=lite(),At=tonumber(info.At)or workspace:GetServerTimeNow()}
- run.Set=Cache.new().Set
+ run.Set=Cache.new().Set;run.Held={}
  M._building=run
  -- what kind of presentation
  if rank<=5 then
@@ -441,10 +443,26 @@ local function ladderGrade(run,t,tl,tier)
  local spike=t>=tl.Burst and .22*G*(1-clamp01((t-tl.Burst)/.25))or 0
  grade(run,-.08*G*pre+spike,.12*G*(pre+after*.5),-.6*G*pre-.25*G*after,WHITE:Lerp(hint,.12*pre),nil)
 end
+-- R153 follow-up (coordinator: the click that skips a card must not also plant the seed just put in the hand, or use the shovel): a press
+-- on the world is the reveal's when a card would take it now (Armed: it would skip / close it) or a story scene runs (it owns every press).
+-- The routes that act on a held tool (planting, the shovel, digging, giving) ask RarePullRules.ClaimPress first and do nothing when it is
+-- the reveal's; a tool the engine activates on a click (a pack, the bat) is set ManualActivationOnly on this client for as long as a press
+-- would be the reveal's, and put back the moment it would be the tool's again or the reveal ends. No reveal: the tools work as before.
+local function armed(run,t)
+ if run.Kind=='Scene'then return false end
+ local tl=run.TL;local hit=tl.Climax or tl.Burst
+ return t>=(tl.SkipFrom or math.huge)and t<tl.FloatEnd and not(t>=hit-.02 and t<Rules.ShownAt(tl))and os.clock()-lastPress>=M.SkipGap
+end
+local function holdTool(run,hold)
+ local player=lp();local char=hold and player and player.Character;local tool=char and char:FindFirstChildOfClass('Tool')
+ for held in pairs(run.Held)do if held~=tool then run.Held[held]=nil;if held.ManualActivationOnly then held.ManualActivationOnly=false end end end
+ if tool and not run.Held[tool]and tool.ManualActivationOnly==false then tool.ManualActivationOnly=true;run.Held[tool]=true end
+end
 function M._step(run,pg)
  local t=run.Clock();local tl=run.TL;local tier=Rules.Tier(run.Rank)
  if t>=tl.Length then finish(run,'done');return end
  if t>=(tl.Climax or tl.Burst or 0)then run.SawClimax=true end
+ run.Armed=armed(run,t);part(run,'tool',holdTool,run,run.Armed or run.Kind=='Scene')
  local cam=workspace.CurrentCamera
  if run.Kind=='Ladder'then
   part(run,'card',run.Card.UpdateLadder,run.Card,t,tl)
@@ -552,30 +570,38 @@ function M.Skip()
 end
 -- R153: a card (Ladder, InPlace, Result) is skipped by a click / tap on the world, Enter or the gamepad's B / R2. The HUD and the controls
 -- stay the player's, so nothing is taken from them: a press the game already used (a button, the chat box) is ignored, a touch counts as a
--- tap on its release (a drag turns the camera), and a press under SkipGap after the one before is part of a run of clicks (the clicks that
--- opened the pack go on for a moment). The story scene has its own: the full-screen button and the bound keys.
+-- tap on its release (a drag turns the camera; the engine's TouchTapInWorld counts too), and a press under SkipGap after the one before is
+-- part of a run of clicks (the clicks that opened the pack go on for a moment). The story scene has its own: the full-screen button and the
+-- bound keys. Every route of a press (these, and the tools' own: see armed) goes through RarePullRules.ClaimPress: one answer per press.
 M.SkipGap=.25;M.TapSeconds=.35;M.TapMove=14
-local lastPress=-math.huge;local listening=nil
+local listening=nil
+-- (the reveal's side of RarePullRules.ClaimPress, asked once per press by whichever route comes first)
+Rules.PressTaker=function()
+ lastPress=os.clock()
+ local run=current;if not run or run.Done then return false end
+ if run.Kind=='Scene'then return true end -- (its button and keys act on it)
+ if not run.Armed then return false end
+ M.Skip();return true
+end
 function M.Press(processed)
  if processed then return false end
- local now=os.clock();local gap=now-lastPress;lastPress=now
- local run=current;if gap<M.SkipGap or not run or run.Kind=='Scene'then return false end
- return M.Skip()
+ return Rules.ClaimPress()
 end
 local pressKeys={[Enum.KeyCode.Return]=true,[Enum.KeyCode.ButtonB]=true,[Enum.KeyCode.ButtonR2]=true}
 function M.Listen()
  if listening then return end
+ listening={}
  local touches=setmetatable({},{__mode='k'})
- local ok,conns=pcall(function()
-  return {UIS.InputBegan:Connect(function(input,processed)
-   if input.UserInputType==Enum.UserInputType.Touch then if not processed then touches[input]={At=os.clock(),Pos=input.Position}end;return end
-   if input.UserInputType==Enum.UserInputType.MouseButton1 or pressKeys[input.KeyCode]then M.Press(processed)end
-  end),UIS.InputEnded:Connect(function(input)
-   local t=touches[input];if not t then return end;touches[input]=nil
-   if os.clock()-t.At<=M.TapSeconds and(input.Position-t.Pos).Magnitude<=M.TapMove then M.Press(false)end
-  end)}
+ local function on(signal,fn)local ok,c=pcall(function()return signal():Connect(fn)end);if ok and c then listening[#listening+1]=c end end
+ on(function()return UIS.InputBegan end,function(input,processed)
+  if input.UserInputType==Enum.UserInputType.Touch then if not processed then touches[input]={At=os.clock(),Pos=input.Position}end;return end
+  if input.UserInputType==Enum.UserInputType.MouseButton1 or pressKeys[input.KeyCode]then M.Press(processed)end
  end)
- listening=ok and conns or{}
+ on(function()return UIS.InputEnded end,function(input)
+  local t=touches[input];if not t then return end;touches[input]=nil
+  if os.clock()-t.At<=M.TapSeconds and(input.Position-t.Pos).Magnitude<=M.TapMove then M.Press(false)end
+ end)
+ on(function()return UIS.TouchTapInWorld end,function(_,processed)M.Press(processed)end)
 end
 local function unlisten()for _,c in ipairs(listening or{})do c:Disconnect()end;listening=nil end
 -- Everything at once (death of the script, a test): the presentation, a card still fading out, every sound and the music duck.
