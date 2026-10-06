@@ -9,7 +9,7 @@
 --  4. FruitGiftClient: the dialog opens / closes with MenuClick / MenuClose, Give sends with Bubble06, "Get closer" / "Hold the item" click Denied.
 --  5. GardenShovel: a removed plant is heard as the planting Dig layer at the plant, a refused removal clicks Denied, its buttons are silent themselves.
 --  6. SettingsClient: the volume previews (Interface row = click, Effects row = reveal pop, at the NEW level), and the mixer starts before the remote wait.
---  7. SaleMoneyEffects: a coin reaching the wallet clicks Bubble06 (a hover collect too); the coin button carries ButtonSound=false.
+--  7. SaleMoneyEffects: a coin reaching the wallet clicks Bubble06 (R152: coins fly and claim by themselves, no hover / tap; a refused claim is retried).
 --  8. GardenWallet / PassGiftDialog / HudLayout: the wallet taps are silent themselves (the SeedMenu rule clicks), the gift picker clicks open / close.
 --  9. TitleScreen104: Enter / gamepad A / a click on Click to Start sound the same MenuClick, once.
 local W=require('./world');local F=require('./fixtures');local E=require('./sfx_env')(W);local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -257,7 +257,7 @@ do
  sc.Destroying:Fire();Mixer.Start=rawStart
 end
 
--- 7. SaleMoneyEffects ---------------------------------------------------------------------------------------------------------------------------------------
+-- 7. SaleMoneyEffects (R152: no hover or tap: the coins fly to the wallet by themselves and claim on arrival; R150's click / hover checks became these) -------------------
 do
  local Effects=W.module('SaleMoneyEffects')
  local gui=R.new('ScreenGui');gui.Parent=pg
@@ -266,31 +266,30 @@ do
  wallet.Gems=wallet
  local claimed={}
  local fx=Effects.new(gui,wallet,function(id,index)claimed[#claimed+1]=index;return {Success=true}end)
+ fx.Layer.AbsoluteSize=R.Vector2.new(1280,720)
  local receipt={Id='r1',Amount=1000,Count=8,Claimed=0,Currency='Cash'}
  fx:Sync({receipt},R.Vector2.new(300,300))
  frames(40,1/60)
- local buttons={};for _,c in ipairs(fx.Layer:GetChildren())do if c.Name=='CollectMoney'then buttons[#buttons+1]=c end end
- check(#buttons>=1,'the sale shows coin icons ('..#buttons..')')
- check(buttons[1]:GetAttribute('ButtonSound')==false,'a coin button is silent itself: the sound is the coin arriving at the wallet')
+ local coins={};for _,c in ipairs(fx.Layer:GetChildren())do if c.Name=='SaleCoin'then coins[#coins+1]=c end end
+ check(#coins>=1,'the sale shows coin icons ('..#coins..')')
+ check(coins[1] and not coins[1]:IsA('GuiButton'),'a coin takes no input at all (no button: nothing to hover or tap, and it cannot block the screen behind it)')
+ check(#claimed==0 and rec.count()==0,'while the coins pop out nothing is claimed and nothing sounds')
  rec.clear()
- buttons[1].Activated:Fire()
- check(rec.count()==0,'clicking a coin makes no sound at the click (it would play even if the claim were refused)')
- frames(60,1/60)
- check(pulses>=1 and rec.count('Bubble06')==pulses and rec.count()==pulses,'each coin that reaches the wallet clicks Bubble06 together with its pulse ('..rec.count('Bubble06')..' / '..pulses..')')
- -- a hover collect
- local before=rec.count('Bubble06');local pulsesBefore=pulses
- if buttons[2]then buttons[2].MouseEnter:Fire() end
- frames(60,1/60)
- check(buttons[2]==nil or(pulses==pulsesBefore+1 and rec.count('Bubble06')==before+1),'a hover-collected coin sounds too (it used to be silent)')
- -- the claim being refused: the coin does not fly and nothing sounds
+ frames(120,1/60) -- (no input of any kind)
+ check(#claimed==8,'every share is claimed by itself ('..#claimed..' / 8)')
+ check(pulses==8 and rec.count('Bubble06')==pulses and rec.count()==pulses,'each coin that reaches the wallet clicks Bubble06 together with its pulse ('..rec.count('Bubble06')..' / '..pulses..')')
+ -- the claim being refused: the coin still lands (its pulse and click are the landing); the claim is retried until it goes through
  fx:Destroy()
- local fx2=Effects.new(gui,wallet,function()return {Success=false}end)
+ local attempts,refuse=0,true
+ local fx2=Effects.new(gui,wallet,function()attempts+=1;return {Success=not refuse}end)
+ fx2.Layer.AbsoluteSize=R.Vector2.new(1280,720)
  fx2:Sync({{Id='r2',Amount=500,Count=8,Claimed=0,Currency='Cash'}},R.Vector2.new(300,300))
- frames(40,1/60)
- local list={};for _,c in ipairs(fx2.Layer:GetChildren())do if c.Name=='CollectMoney'then list[#list+1]=c end end
  rec.clear();local p2=pulses
- if list[1]then list[1].Activated:Fire()end;frames(80,1/60)
- check(pulses==p2 and rec.count()==0,'a refused claim: no flight, no sound')
+ frames(120,1/60)
+ check(pulses==p2+8 and rec.count('Bubble06')==8,'a refused claim: the coins still land with their click ('..(pulses-p2)..')')
+ check(attempts>8,'a refused claim is retried ('..attempts..' attempts for 8 shares)')
+ refuse=false;R.advance(10);local before=attempts;R.advance(10)
+ check(#fx2.Open==0 and attempts==before,'once the server accepts, every share is claimed and the retries stop')
  fx2:Destroy();gui:Destroy()
 end
 

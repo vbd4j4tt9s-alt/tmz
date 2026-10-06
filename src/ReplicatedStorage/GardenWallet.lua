@@ -1,4 +1,4 @@
--- R66: one event-driven Speed / Cash / Gems dock; saved numbers and hover claims stay authoritative.
+-- R66: one event-driven Speed / Cash / Gems dock; saved numbers stay authoritative. R152: sale coins fly to the Cash / Gems rows (TargetPosition) and bump them (Pulse).
 local RS=game:GetService('ReplicatedStorage');local Numbers=require(RS.CashNumbers);local Theme=require(RS.GardenTheme)
 local Tween=game:GetService('TweenService');local Wallet={};Wallet.__index=Wallet
 local C=Color3.fromRGB

@@ -125,7 +125,7 @@ function Service.new(data,chests,passes)
    else okay=false;message='THIS PURCHASE IS UNAVAILABLE'end
   else okay=false;message='UNKNOWN ACTION'end
   -- R148: a gem purchase that went through gets the notice, chime and sparkles; their confirmation line is then redundant
-  -- (the "Collect your Gems / Cash." hints stay: they tell the buyer what to do next).
+  -- (R152: the "Gems / Cash on the way." lines stay: the coins fly to the counter and claim themselves, nothing to collect).
   if okay==true then
    if action=='BuyPack'then if self:Announce(p,'Pack',value)then message=nil end
    elseif action=='BuyBundle'then
