@@ -1,7 +1,10 @@
 -- R150: small UI-shape builders for the treadmill bonus UI (the HUD button, the gift timer and the roll screen). Only frames,
 -- gradients, strokes and text: no uploaded images. Nothing here animates by itself; TreadmillBonusClient drives the few
 -- moving parts (and only while they are visible).
---  * Gift(parent,size)       a little wrapped gift (box, lid, ribbon, bow); :Fill(f) fills the box from the bottom with colour.
+--  * Gift(parent,size)       a little wrapped gift (box, lid, ribbon, bow); :Fill(f) fills the box from the bottom with colour. (R153: no longer used by the game;
+--                            the BONUS ROLL button and the roll screen show the pack picture instead.)
+--  * PackIcon(parent,name,size)  R153: the owner's bonus pack picture. Picture = an ImageLabel (EmbeddedImage153 draws the picture into it), Drawn = the plain stand-in
+--                            (green chip bag, gold seals, yellow "?") for when the picture cannot be drawn.
 --  * Bow(parent,size)        two ribbon loops and a knot.
 --  * Candy(parent,name,...)  chunky 3D button: darker lip, gradient face, top gloss, label; Press() squashes it.
 --  * Badge / Shine / Rays / Stripes / Burst   count chip, shine sweep pane, light beams, wrapping-paper stripes, sparkle burst.
@@ -13,6 +16,8 @@ local RGB=Color3.fromRGB
 A.INK=RGB(10,14,28);A.GOLD=RGB(255,206,72);A.WHITE=Color3.new(1,1,1)
 A.Pink={RGB(255,164,200),RGB(240,66,122)}
 A.Dim={RGB(104,110,168),RGB(58,62,114)}
+-- R153: the colours of the owner's BONUS ROLL pack picture (a glossy green chip bag with gold seals and a yellow "?"): the button and the plain stand-in use them.
+A.Pack={Body=RGB(38,152,56),Dark=RGB(17,102,30),Light=RGB(94,205,64),Gold=RGB(252,220,41),GoldDark=RGB(231,152,2),Edge=RGB(8,58,20),Outline=RGB(244,195,35),OutlineDark=RGB(176,112,10)}
 A.Ribbon={RGB(255,238,136),RGB(255,176,40)}
 A.Confetti={RGB(255,214,79),RGB(120,232,110),RGB(110,190,255),RGB(255,110,150),RGB(200,140,255),RGB(255,255,255)}
 local INK,WHITE=A.INK,A.WHITE
@@ -64,6 +69,24 @@ function A.Bow(parent,size,name,colors)
  return root
 end
 
+-- PackIcon: Root is a square Frame (move / rotate it like the old gift); Picture is hidden until a picture is drawn into it; Drawn is the stand-in made of frames.
+function A.PackIcon(parent,name,size)
+ local P=A.Pack
+ local root=make('Frame',{Name=name or'Icon',BackgroundTransparency=1,AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromOffset(size,size),ZIndex=3},parent)
+ make('ImageLabel',{Name='Picture',BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.fromScale(1,1),ScaleType=Enum.ScaleType.Fit,Visible=false,ZIndex=3},root)
+ local drawn=make('Frame',{Name='Drawn',BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.fromScale(1,1),ZIndex=3},root)
+ local line=size>=30 and 2 or 1.5
+ local body=make('Frame',{Name='Body',BackgroundColor3=WHITE,BorderSizePixel=0,Position=UDim2.fromScale(.13,.14),Size=UDim2.fromScale(.74,.72),ZIndex=3},drawn)
+ round(body,math.max(2,size*.1));stroke(body,P.Edge,line);A.gradient(body,P.Light,P.Body)
+ for i,y in ipairs({.02,.82})do
+  local seal=make('Frame',{Name=i==1 and'SealTop'or'SealBottom',BackgroundColor3=WHITE,BorderSizePixel=0,Position=UDim2.fromScale(.07,y),Size=UDim2.fromScale(.86,.16),ZIndex=5},drawn)
+  round(seal,math.max(2,size*.05));stroke(seal,P.Edge,line);A.gradient(seal,P.Gold,P.GoldDark)
+ end
+ local mark=A.text(drawn,'Mark','?',math.max(10,math.floor(size*.58)),P.Gold)
+ mark.Size=UDim2.fromScale(1,.7);mark.Position=UDim2.fromScale(0,.15);mark.TextWrapped=false;mark.TextStrokeColor3=P.Edge;mark.TextStrokeTransparency=0;mark.ZIndex=6
+ return {Root=root,Picture=root.Picture,Drawn=drawn}
+end
+
 -- Gift: a box that fills with colour from the bottom as :Fill(f) rises (a hard gradient step: no clipping, so the whole
 -- icon can rotate for the wiggle). Lid, ribbon bands and bow are always in colour.
 function A.Gift(parent,size,name)
@@ -108,16 +131,17 @@ function A.Badge(parent,name,size,textSize)
 end
 
 -- Chunky 3D button: a transparent TextButton (the hit area) holding a darker Lip and a gradient Face; the label sits on the
--- face. Press(true) sinks the face onto the lip. color = the candy colour; opts.Lip px, opts.TextSize, opts.Z (face z+1, gloss z+3, label z+4), opts.NoLabel.
+-- face. Press(true) sinks the face onto the lip. color = the candy colour; opts.Lip px, opts.TextSize, opts.Z (face z+1, gloss z+3, label z+4), opts.NoLabel,
+-- opts.Outline / opts.LipOutline = the outline colours of the face / the lip (ink by default; R153: the BONUS ROLL button's is gold).
 function A.Candy(parent,name,color,caption,opts)
  opts=opts or {};local lip=opts.Lip or 4;local z=opts.Z or 4
  local button=make('TextButton',{Name=name,Text='',AutoButtonColor=false,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=z},parent)
  button:SetAttribute('Lip',lip)
  pill(button) -- the shared hover / press outline (ButtonHighlights) follows the capsule, not a square
  local lipFrame=make('Frame',{Name='Lip',BackgroundColor3=color:Lerp(INK,.58),BorderSizePixel=0,Position=UDim2.fromOffset(0,lip),Size=UDim2.new(1,0,1,-lip),ZIndex=z},button)
- pill(lipFrame);stroke(lipFrame,INK,opts.Stroke or 2)
+ pill(lipFrame);stroke(lipFrame,opts.LipOutline or INK,opts.Stroke or 2)
  local face=make('Frame',{Name='Face',BackgroundColor3=WHITE,BorderSizePixel=0,Size=UDim2.new(1,0,1,-lip),ZIndex=z+1},button)
- pill(face);stroke(face,INK,opts.Stroke or 2);A.candyGradient(face,color)
+ pill(face);stroke(face,opts.Outline or INK,opts.Stroke or 2);A.candyGradient(face,color)
  local gloss=make('Frame',{Name='Gloss',BackgroundColor3=WHITE,BorderSizePixel=0,Position=UDim2.fromOffset(8,3),Size=UDim2.new(1,-16,.4,0),ZIndex=z+3},face)
  pill(gloss);make('UIGradient',{Rotation=90,Transparency=NumberSequence.new(.55,1)},gloss)
  if not opts.NoLabel then

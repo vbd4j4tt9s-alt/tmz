@@ -4,14 +4,15 @@
 --    widths), badge and rest-pose bounds stay clear of every HudLayout box and the notice rows (the Place rule, 6 px, with the badge's few px).
 --  * Roll screen: panel inside the screen, rows stacked without overlap, bow / pointers clear of neighbours, cards inside the strip window,
 --    buttons centred and inside, every text line fits (all status lines, all seven reveal words, long result sentences, the odds line).
---  * Gift timer: every part inside the billboard, also at the peak of the pop and while the sparkles fly; captions and clocks fit.
+--  * R153: the yellow fill is clipped to the button's rounded shape at 0 / 50 / 100% on every screen; the almost / ready texts fit; the header pack picture sits on the ribbon.
+--    (The gift pill over the player's head is gone: no billboard.)
 local UW=require('./ui_world');local W,R=UW.W,UW.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
 local C=UW.boot({})
 local Rules,me,pg=C.Rules,C.Me,C.PG
 local Style=W.module('TreadmillBonusStyle');local L=W.module('HudLayout');local Notice=W.module('HudNoticeLayout')
-local hud,overlay,bar,button=C.Hud,C.Overlay,C.Bar,C.Button
+local hud,overlay,button=C.Hud,C.Overlay,C.Button
 local panel=overlay.Panel
 UW.frames(3,1/60)
 local function controls(w,h)
@@ -48,7 +49,7 @@ end
 -- =====================================================================================================================
 -- 1. The HUD button on every screen
 -- =====================================================================================================================
-local SUBS={'READY!','NEXT 6:00','NEXT 0:01','ALMOST! 0:24','NEXT IN 5:59','BAG FULL!','ONE SEC...','NOT YET!','LOADING...','TRY AGAIN!','ROLLING...','TRY LATER'}
+local SUBS={'READY!','NEXT 6:00','NEXT 0:01','0:24','0:02','OPEN IT!','2 ROLLS READY!','NEXT IN 5:59','BAG FULL!','ONE SEC...','NOT YET!','LOADING...','TRY AGAIN!','ROLLING...','TRY LATER'}
 local sizesSeen={}
 for _,v in ipairs(views)do
  local w,h,touch=v[1],v[2],v[3]
@@ -119,6 +120,7 @@ for _,v in ipairs(views)do
    check(title.RX+title.RW<=badge.X+.5 or title.RX>=badge.X+badge.W-.5,tag..': the title does not run under the badge')
    -- texts
    fitsText(face.Obj.Title,title,'BONUS ROLL',tag..': title',10)
+   fitsText(face.Obj.Title,title,'BONUS READY!',tag..': R153: the ready pop title (with the count badge, the narrowest case)',9)
    for _,line in ipairs(SUBS)do fitsText(face.Obj.Sub,sub,line,tag..': status line',8)end
    -- narrow: no icon below 140 wide
    check((b.RW>=140)==icon.Visible,tag..': the gift icon only on buttons 140+ wide')
@@ -127,10 +129,38 @@ for _,v in ipairs(views)do
    local list2,by2=UW.rects(hud,w,h)
    local b2=by2['TreadmillBonusHud.BonusRollButton']
    check(b2.Visible and b2.RW==b.RW and b2.RH==b.RH and b2.RX==b.RX and b2.RY==b.RY,tag..string.format(': charging: same place and size (%.1fx%.1f at %.1f,%.1f vs %.1fx%.1f at %.1f,%.1f)',b2.RW,b2.RH,b2.RX,b2.RY,b.RW,b.RH,b.RX,b.RY))
-   local fill=by2['TreadmillBonusHud.BonusRollButton.Face.Fill']
-   check(fill.Visible and fill.RX>=face.RX and fill.RX+fill.RW<=face.RX+face.RW+.5 and fill.RY>=face.RY and fill.RY+fill.RH<=face.RY+face.RH,tag..': the charging fill stays inside the face')
+   -- R153 (owner: "the yellow fill must cover the whole button"): the fill is clipped to the face's own rounded shape: at 0 / 50 / 100% it stays inside the face, at 100% it covers the
+   -- face edge to edge, it grows from the left, and its clip has the face's corner radius. Measured with the button's pulse UIScale in the way (the rects follow it).
+   local faceObj=face.Obj;local faceCorner=faceObj:FindFirstChildOfClass('UICorner')
+   local clipObj=faceObj.FillClip;local clipCorner=clipObj:FindFirstChildOfClass('UICorner')
+   check(clipObj._class=='CanvasGroup' and faceCorner and clipCorner and clipCorner.CornerRadius.Scale==faceCorner.CornerRadius.Scale and clipCorner.CornerRadius.Offset==faceCorner.CornerRadius.Offset,
+    tag..': R153: the fill sits in a CanvasGroup with the face\'s corner radius ('..tostring(clipCorner and clipCorner.CornerRadius.Scale)..' vs '..tostring(faceCorner and faceCorner.CornerRadius.Scale)..')')
+   check(clipObj.Parent==faceObj and clipObj.Fill.Parent==clipObj and clipObj.Fill:FindFirstChildOfClass('UICorner')==nil,tag..': R153: Face > FillClip > Fill, and the fill has no corner of its own (the group rounds it)')
+   local lastW=-1
+   for _,pct in ipairs({0,50,100})do
+    local left=360*(1-pct/100)
+    C.set('DueAt',R.clock+left);C.set('Left',left);UW.frames(8,1/60);settle()
+    local _,by4=UW.rects(hud,w,h)
+    local face4=by4['TreadmillBonusHud.BonusRollButton.Face']
+    local clip4=by4['TreadmillBonusHud.BonusRollButton.Face.FillClip'];local fill4=by4['TreadmillBonusHud.BonusRollButton.Face.FillClip.Fill']
+    local want=face4.RW*pct/100
+    check(math.abs(clip4.RX-face4.RX)<.01 and math.abs(clip4.RY-face4.RY)<.01 and math.abs(clip4.RW-face4.RW)<.01 and math.abs(clip4.RH-face4.RH)<.01,tag..': R153: '..pct..'%: the clip is exactly the face')
+    check(pct==0 and not clip4.Visible or(clip4.Visible and fill4.Visible),tag..': R153: '..pct..'%: the fill shows when there is progress, not at 0%')
+    if pct>0 then
+     check(fill4.RX>=face4.RX-.01 and fill4.RY>=face4.RY-.01 and fill4.RX+fill4.RW<=face4.RX+face4.RW+.01 and fill4.RY+fill4.RH<=face4.RY+face4.RH+.01,tag..': R153: '..pct..'%: the fill is inside the face')
+     check(math.abs(fill4.RX-face4.RX)<.01 and math.abs(fill4.RY-face4.RY)<.01 and math.abs(fill4.RH-face4.RH)<.01,tag..': R153: '..pct..'%: it starts at the very left edge and is as tall as the face')
+     check(math.abs(fill4.RW-want)<=.5,tag..string.format(': R153: %d%%: the fill is %.1f of %.1f px wide (want %.1f)',pct,fill4.RW,face4.RW,want))
+     check(fill4.RW>lastW,tag..': R153: the fill grows with the progress')
+     lastW=fill4.RW
+    end
+    if pct==100 then check(math.abs(fill4.RW-face4.RW)<.01,tag..': R153: 100%: the fill covers the face edge to edge ('..fill4.RW..' of '..face4.RW..' px)')end
+   end
+   C.set('DueAt',R.clock+200);C.set('Left',200);UW.frames(3,1/60);settle()
+   list2,by2=UW.rects(hud,w,h)
    local gift0=icon.Visible
    local t2,s2=by2['TreadmillBonusHud.BonusRollButton.Face.Title'],by2['TreadmillBonusHud.BonusRollButton.Face.Sub']
+   fitsText(face.Obj.Title,t2,'ALMOST THERE!',tag..': R153: the almost title (no badge while charging) is readable (10 px or more; 9 px on the very narrowest box, under 90 px)',t2.RW<90 and 9 or 10)
+   for _,line in ipairs({'0:24','0:02','NEXT 5:41'})do fitsText(face.Obj.Sub,s2,line,tag..': R153: the clock line',8)end
    check(t2.RW>=title.RW and s2.RX==title.RX and t2.RX==title.RX and (not gift0 or t2.RW==title.RW),tag..': charging (no badge): the text keeps its place (and gets the corner room back without the gift)')
    C.set('Ready',1);UW.frames(3,1/60);settle()
    local list3,by3=UW.rects(hud,w,h)
@@ -175,8 +205,9 @@ for _,v in ipairs(views)do
   local function E(path)return by['TreadmillBonusRoll.Panel.'..path]end
   local pe=by['TreadmillBonusRoll.Panel']
   check(pe.X>=6 and pe.Y>=6 and pe.X+pe.W<=w-6 and pe.Y+pe.H<=h-6,tag..string.format(': the panel is on screen (%.0fx%.0f at %.0f,%.0f)',pe.W,pe.H,pe.X,pe.Y))
-  local rows={'Ribbon','StripWindow','Status','Result','Actions','Odds'}
-  local minGap={Ribbon=8,StripWindow=7,Status=0,Result=6,Actions=6}
+  -- R153: while it spins the Result row is hidden (no "already in ur bag" line) and the Status box spans the Status + Result rows, so the spin text is centred
+  local rows={'Ribbon','StripWindow','Status','Actions','Odds'}
+  local minGap={Ribbon=8,StripWindow=7,Status=6,Actions=6}
   for i=1,#rows-1 do
    local a,b=E(rows[i]),E(rows[i+1])
    check(a.Y+a.H<=b.Y+.01,tag..': '..rows[i]..' ends above '..rows[i+1]..string.format(' (%.1f vs %.1f)',a.Y+a.H,b.Y))
@@ -195,11 +226,15 @@ for _,v in ipairs(views)do
    local p=E(name);check(p.X>=window.X and p.X+p.W<=window.X+window.W and p.Y>=ribbon.Y+ribbon.H-.5 and p.Y+p.H<=E('Status').Y+2.5,tag..': '..name..' sits on the strip edge without touching the rows around it')
   end
   -- the ribbon title
-  local heading=E('Ribbon.Title');fitsText(panel.Ribbon.Title,heading,'🎁 TREADMILL BONUS ROLL',tag..': ribbon title',9)
+  local heading=E('Ribbon.Title');fitsText(panel.Ribbon.Title,heading,'TREADMILL BONUS ROLL',tag..': ribbon title',9)
+  local pack=E('Ribbon.Pack')
+  check(pack and pack.Visible and pack.X>=ribbon.X-.5 and pack.X+pack.W<=heading.X+.5 and pack.Y>=ribbon.Y-4 and pack.Y+pack.H<=ribbon.Y+ribbon.H+4,tag..': R153: the header pack picture sits on the left of the ribbon, left of the title, at most 4 px past its edges')
   check(heading.X>=ribbon.X and heading.X+heading.W<=ribbon.X+ribbon.W,tag..': the title is inside the ribbon')
   -- status lines and the hint
   for _,line in ipairs(Style.SpinLines)do fitsText(panel.Status,E('Status'),line,tag..': status line',10)end
-  fitsText(panel.Result,E('Result'),Style.SpinHint,tag..': hint',9)
+  check(not E('Result').Visible and panel.Result.Text=='','R153: '..tag..': no hint line under the spin text (the result row is hidden)')
+  local gapMid=(window.Y+window.H+E('Actions').Y)/2
+  check(math.abs(E('Status').Y+E('Status').H/2-gapMid)<=1,'R153: '..tag..string.format(': the spin text is centred between the strip and the buttons (%.1f vs %.1f)',E('Status').Y+E('Status').H/2,gapMid))
   -- odds
   fitsText(panel.Odds,E('Odds'),panel.Odds.Text,tag..': odds',9)
   -- cards inside the window
@@ -256,45 +291,9 @@ for _,v in ipairs(views)do
 end
 W.Gui.ReducedMotionEnabled=false
 -- =====================================================================================================================
--- 3. The gift timer billboard
+-- 3. R153: the gift pill over the player's head is gone
 -- =====================================================================================================================
-local BW,BH=bar.Size.X.Offset,bar.Size.Y.Offset
-local function barRects()return UW.rects(bar,BW,BH)end
-me:SetAttribute('TreadmillTraining',true);C.set('Interval',360);C.set('Ready',0);C.set('DueAt',R.clock+222);C.set('Left',222);UW.frames(20,1/60)
-local list,by=barRects()
-local function B(path)return by['TreadmillBonusProgress.'..path]end
-local inside=true;for _,e in ipairs(list)do if e.Visible and not(e.X>=-.01 and e.Y>=-.01 and e.X+e.W<=BW+.01 and e.Y+e.H<=BH+.01)then inside=false;print('  outside:',e.Path,e.X,e.Y,e.W,e.H)end end
-check(inside,'gift timer: every part is inside the billboard at rest')
-local back=B('Back');local lip=B('Lip')
-check(math.abs(back.X+back.W/2-BW/2)<.01 and math.abs(back.Y+back.H/2-BH/2)<.01,'gift timer: the pill is centred on the billboard (so it keeps the old spot over the head)')
-check(lip.Y+lip.H<=BH,'gift timer: the lip is inside too')
-local caption,track,icon,chip=B('Back.Caption'),B('Back.Track'),B('Back.Icon'),B('Back.Chip')
-check(icon.X>=back.X and icon.X+icon.W<=caption.X+.5,'gift timer: the gift is left of the caption and the track')
-check(caption.Y+caption.H<=track.Y+.5,'gift timer: caption above the track')
-check(track.X+track.W<=back.X+back.W-8 and track.Y+track.H<=back.Y+back.H-4,'gift timer: the track keeps a margin from the capsule end')
-local fit=B('Back.Track.Fill');check(fit.X>=track.X and fit.X+fit.W<=track.X+track.W and fit.Y>=track.Y and fit.Y+fit.H<=track.Y+track.H,'gift timer: the fill is inside the track')
-local capLabel=bar.Back.Caption;local labelEntry=B('Back.Track.Label');local capEntry=B('Back.Caption')
-for _,line in ipairs({'NEXT ROLL','ALMOST THERE!','BONUS READY! 🎁','2 ROLLS READY!'})do fitsText(capLabel,capEntry,line,'gift timer: caption',8)end
-for _,line in ipairs({'6:00','3:42','0:01','OPEN IT!','TAP BONUS ROLL','0:00'})do fitsText(bar.Back.Track.Label,labelEntry,line,'gift timer: track text',8)end
-local chipEntry=B('Back.Chip');C.set('Ready',1);UW.frames(2,1/60)
-list,by=barRects();chipEntry=B('Back.Chip')
-check(chipEntry.Visible and chipEntry.X>=B('Back').X and chipEntry.X+chipEntry.W<=B('Back').X+B('Back').W,'gift timer: the chip sits on the pill')
--- the pop: at its peak (scale 1.18, 6 degrees of shake) and while the sparkles fly, everything stays in the billboard
-local worst={}
-local function checkInside(tag)
- local l=barRects()
- for _,e in ipairs(l)do
-  if e.Visible and not(e.X>=-.5 and e.Y>=-.5 and e.X+e.W<=BW+.5 and e.Y+e.H<=BH+.5)then worst[#worst+1]=tag..' '..e.Path..string.format(' %.1f,%.1f %.1fx%.1f',e.X,e.Y,e.W,e.H)end
- end
-end
-C.set('Ready',0);me:SetAttribute('TreadmillTraining',nil);UW.frames(5,1/60);UW.seconds(4,1/60)
-me:SetAttribute('TreadmillTraining',true);C.set('DueAt',R.clock+300);UW.frames(10,1/60)
-C.set('Ready',1)
-for i=1,70 do UW.frames(1,1/60);checkInside('pop frame '..i)end
-check(#worst==0,'gift timer: nothing leaves the billboard during the pop, the shake and the sparkles ('..#worst..(worst[1]and(' e.g. '..worst[1])or'')..')')
--- gift in the almost-there wiggle
-C.set('Ready',0);C.set('DueAt',R.clock+15);UW.seconds(4,1/60)
-worst={};for i=1,150 do UW.frames(1,1/60);checkInside('wiggle')end
-check(#worst==0,'gift timer: the wiggling gift stays inside too')
+me:SetAttribute('TreadmillTraining',true);C.set('Interval',360);C.set('Ready',0);C.set('DueAt',R.clock+222);C.set('Left',222);UW.frames(20,1/60);C.set('Ready',1);UW.frames(40,1/60)
+check(UW.made.BillboardGui==nil and pg:FindFirstChild('TreadmillBonusProgress')==nil,'R153: standing on the treadmill, charging and ready: no BillboardGui is ever built')
 print(string.format('%d/%d checks passed%s',checks-fails,checks,fails>0 and(' ('..fails..' FAILED)')or''))
 if fails>0 then error('failures',0)end
