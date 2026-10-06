@@ -27,8 +27,8 @@ R.SignGap=1.4;R.Sign={W=20,H=8}   -- the sign's bottom edge is SignGap over the 
 R.SignNear=30                     -- closer than this the sign stops growing (BillboardGui.DistanceLowerLimit), so it is never huge up close
 R.SignFar=320                     -- and it shows up to here (it reads from across the plaza and well past it)
 -- Texts. The number is "<n> / <cap> LEFT" ("487 / 500 LEFT").
-R.Title='FREE VOID PACK';R.TitleDone='ALL CLAIMED';R.Loading='…';R.Hint='LIMITED · ONE PER PLAYER';R.Mine='CLAIMED ✓';R.Busy='CLAIMING…'
-R.PromptAction='Claim FREE Void Pack';R.PromptObject='Void Pack giveaway'
+R.Title='FREE VOID PACK';R.TitleDone='ALL CLAIMED';R.Loading='…';R.Hint='LIMITED! 1 PER PLAYER';R.Mine='CLAIMED ✓';R.Busy='CLAIMING…'
+R.PromptAction='Grab ur FREE Void Pack';R.PromptObject='Void Pack giveaway'
 local function whole(n)
  if type(n)~='number'or n~=n or n<0 then return 0 end
  return math.floor(math.min(n,1e9))

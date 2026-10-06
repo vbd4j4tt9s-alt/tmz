@@ -7,7 +7,7 @@ function S.new(notifications)return setmetatable({Notes=notifications,Key=nil,Cl
 function S.Text(current,now)
  local span='for the next hour'
  if current.Test then span=('for %d minutes (test)'):format(math.max(1,math.ceil((current.EndsAt-(now or current.StartsAt))/60)))end
- return('🌟 Fruit of the Hour: %s sells ×%.1f %s!'):format(current.Name or'Fruit',current.Multiplier,span)
+ return('🌟 Fruit of the Hour: %s! Sells ×%.1f %s!'):format(current.Name or'Fruit',current.Multiplier,span)
 end
 function S:Step(now)
  local current=Hour.At(now)

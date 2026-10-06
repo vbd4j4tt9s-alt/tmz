@@ -239,7 +239,7 @@ end
 function PlayerDataService:CanReceiveSeed(player)
 	if not self:IsLoaded(player) then return false, "YOUR DATA IS STILL LOADING" end
 	if #self:GetChestRecords(player) >= self.Config.MaxSavedChests then
-		return false, "SEED INVENTORY FULL — MAKE ROOM BEFORE STEALING"
+		return false, "BAG FULL - MAKE ROOM IN UR BAG FIRST"
 	end
 	return true
 end

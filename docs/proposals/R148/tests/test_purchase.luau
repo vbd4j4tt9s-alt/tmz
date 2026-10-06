@@ -133,7 +133,7 @@ local function expectOne(m,p,kind,name,what)
   local payload=done[1].Args[1]
   check(type(payload)=='table'and payload.Kind==kind and payload.Name==name,what..': payload {Kind='..kind..', Name='..name..'} (got '..tostring(payload and payload.Kind)..' / '..tostring(payload and payload.Name)..')')
  end
- check(#ns==1 and ns[1].P==p and ns[1].Text=='✅ Purchased: '..name..'!',what..': one notice "✅ Purchased: '..name..'!" to the buyer (got '..tostring(ns[1]and ns[1].Text)..')')
+ check(#ns==1 and ns[1].P==p and ns[1].Text=='✅ Bought: '..name..'!',what..': one notice "✅ Bought: '..name..'!" to the buyer (got '..tostring(ns[1]and ns[1].Text)..')')
  return ok
 end
 local function expectNone(m,what)

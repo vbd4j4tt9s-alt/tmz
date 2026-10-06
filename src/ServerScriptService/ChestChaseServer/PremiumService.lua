@@ -61,7 +61,7 @@ function Service.new(data,chests,passes)
    self.Last[p]=self.Last[p]or{};local now=os.clock()
    if now-(self.Last[p].Daily or-10)<.3 then return {Success=false,Message='TRY AGAIN IN A MOMENT'}end;self.Last[p].Daily=now
    if value=='State'then return data:DailyState(p)end
-   if not data.CanSave[p]then local state=data:DailyState(p);state.Success=false;state.Message='REWARDS ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE';return state end
+   if not data.CanSave[p]then local state=data:DailyState(p);state.Success=false;state.Message='NO REWARDS UNTIL UR DATA CAN SAVE';return state end
    local okay,message
    if value=='ClaimLogin'then
     okay,message=data:ClaimDailyLogin(p)

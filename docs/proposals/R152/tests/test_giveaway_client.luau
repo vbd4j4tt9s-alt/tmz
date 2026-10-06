@@ -44,7 +44,7 @@ check(gui.MaxDistance==Rules.SignFar and Rules.SignFar>=200,'and shows from acro
 check(gui.LightInfluence==0 and gui.AlwaysOnTop==false,'unlit, not through walls')
 check(text(s,'Title')=='FREE VOID PACK','the small title: FREE VOID PACK')
 check(text(s,'Count')=='500 / 500 LEFT','the number: "500 / 500 LEFT"')
-check(text(s,'Note')==Rules.Hint,'a quiet line: LIMITED · ONE PER PLAYER')
+check(text(s,'Note')==Rules.Hint,'a quiet line: LIMITED! 1 PER PLAYER')
 -- apparent size (Roblox: a studs-sized billboard is H / (2 d tan(fov / 2)) of the screen height)
 local function share(h,d,fov)return h/(2*d*math.tan(math.rad(fov or 70)/2))end
 check(share(Rules.Sign.H,Rules.SignNear)<=.2,'at the closest it grows to '..string.format('%.0f%%',share(Rules.Sign.H,Rules.SignNear)*100)..' of the screen height (<= 20%)')

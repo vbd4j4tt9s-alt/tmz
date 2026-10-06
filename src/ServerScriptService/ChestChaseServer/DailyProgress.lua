@@ -75,7 +75,7 @@ function T.Attach(Data)
  end
  function Data:ClaimDailyLogin(player)
   if not self:IsLoaded(player)then return false,'YOUR DATA IS LOADING'end
-  if not self.CanSave[player]then return false,'REWARDS ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE'end
+  if not self.CanSave[player]then return false,'NO REWARDS UNTIL UR DATA CAN SAVE'end
   local daily,_,day=self:DailyData(player);local login=D.LoginStatus(daily.Login,day)
   if not login.Ready then return false,'COME BACK TOMORROW FOR DAY '..(login.Claimed%#D.Login+1)end
   local reward=D.Login[login.Next];local message
@@ -93,7 +93,7 @@ function T.Attach(Data)
  end
  function Data:ClaimDailyQuest(player,index)
   if not self:IsLoaded(player)then return false,'YOUR DATA IS LOADING'end
-  if not self.CanSave[player]then return false,'REWARDS ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE'end
+  if not self.CanSave[player]then return false,'NO REWARDS UNTIL UR DATA CAN SAVE'end
   local daily,quests=self:DailyData(player)
   if type(index)~='number'or index%1~=0 or not quests.Keys[index]then return false,'INVALID QUEST'end
   if quests.Claimed[index]then return false,'ALREADY CLAIMED'end
@@ -120,7 +120,7 @@ function T.Attach(Data)
   if not changed then return false end
   self:MarkDirty(player);self:PublishDaily(player)
   if finished and self.Notifications then
-   pcall(function()self.Notifications:Show(player,'✅ QUEST DONE: '..finished.Text..'! Claim 💎'..D.QuestGems..' in 🎁 DAILY',Color3.fromRGB(120,255,150),5)end)
+   pcall(function()self.Notifications:Show(player,'✅ QUEST DONE: '..finished.Text..'! Grab ur 💎'..D.QuestGems..' in 🎁 DAILY',Color3.fromRGB(120,255,150),5)end)
   end
   return true
  end

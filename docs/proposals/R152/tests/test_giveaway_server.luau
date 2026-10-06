@@ -115,7 +115,7 @@ for round=1,2 do
  check(b.Calls.Transforms>=3,'round '..round..': the loser\'s transform ran again (a compare-and-set retry)')
  check(attr(first,'Left')==0 and attr(first,'State')=='Empty'and prompt(first).Enabled==false,'round '..round..': the loser\'s server shows 0 / ALL CLAIMED and its prompt is off')
  check(attr(second,'Left')==0 and prompt(second).Enabled==false,'round '..round..': so does the winner\'s')
- check(first.Notes:last(firstP).Text:find('claimed',1,true)~=nil,'round '..round..': the loser is told they are all claimed')
+ check(first.Notes:last(firstP).Text:find('gone',1,true)~=nil,'round '..round..': the loser is told they are all claimed')
  check(firstP:GetAttribute('VoidGift152')=='Open','round '..round..': the loser may still be offered it never (state Open, nothing taken)')
 end
 -- many racers on one remaining slot: 8 players on 4 servers, each one's UpdateAsync interrupted by the next
@@ -181,7 +181,7 @@ do
  b2.Race=function()s2.Data:AddChest(q,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',Weather='None'})end -- a pack lands while we wait for the store
  local ok3,why3=s2.Svc:Claim(q)
  check(ok3==false and why3=='room'and stored(b2).Count==1 and s2.Data:voidPacks(q)==0,'a Bag that filled during the wait: the reservation stands, no pack yet')
- check(s2.Notes:last(q).Text:lower():find('reserved',1,true)~=nil,'"your Void Pack is reserved! Make room"')
+ check(s2.Notes:last(q).Text:lower():find('saved for u',1,true)~=nil,'"your Void Pack is reserved! Make room"')
  table.remove(s2.Data:GetChestRecords(q),1);s2.Svc:Step()
  check(s2.Data:voidPacks(q)==1 and stored(b2).Count==1,'as soon as there is room the server gives it (once), without a second reservation')
  s2.Svc:Step();s2.Svc:Step();check(s2.Data:voidPacks(q)==1,'and never twice')
@@ -414,7 +414,7 @@ do
  local nochar=G.player(s,1405,'NoBody',{Stand=false});ok,why=s.Svc:Claim(nochar);check(not ok and why=='far','no character: refused')
  -- the prompt calls Claim
  local pp=G.player(s,1406,'Presser');prompt(s).Triggered:Fire(pp);check(voidPacks(s,pp)==1,'the pedestal\'s prompt (Triggered) makes the claim')
- check(prompt(s).ActionText=='Claim FREE Void Pack'and prompt(s).MaxActivationDistance>=10,'the prompt says "Claim FREE Void Pack"')
+ check(prompt(s).ActionText=='Grab ur FREE Void Pack'and prompt(s).MaxActivationDistance>=10,'the prompt says "Grab ur FREE Void Pack"')
  -- busy: a second press while the first waits for the store
  local b2=G.backend();local s2=new(b2,nil);local q=G.player(s2,1407,'Double')
  local inner
@@ -500,13 +500,13 @@ do
  s.Data.ThrowAdd=true
  local adds0=s.Data.AddCalls
  for _=1,30 do s.Svc:Step();s.Clock.advance(2)end -- 60 s of the 2 s loop
- check(said(s,p,'could not be added')==1,'A3: 30 loop steps of a pack that cannot be added: the player is told once ('..said(s,p,'could not be added')..')')
+ check(said(s,p,'add the pack')==1,'A3: 30 loop steps of a pack that cannot be added: the player is told once ('..said(s,p,'add the pack')..')')
  local tries=s.Data.AddCalls-adds0
  check(tries>=3 and tries<=6,'A3: ... and the loop backed off (5, 10, 20 .. s) instead of trying every 2 s: '..tries..' tries in 60 s (was 30)')
  check(s.Data:voidPacks(p)==0 and stored(b).Users['1701']~=nil,'A3: nothing was given, the reservation stands')
  -- a press of the player's own always gets an answer and tries at once
- local n0=said(s,p,'could not be added');local okp,whyp=s.Svc:Claim(p)
- check(okp==false and whyp=='add'and said(s,p,'could not be added')==n0+1,'A3: the player\'s own press tries at once and says so')
+ local n0=said(s,p,'add the pack');local okp,whyp=s.Svc:Claim(p)
+ check(okp==false and whyp=='add'and said(s,p,'add the pack')==n0+1,'A3: the player\'s own press tries at once and says so')
  -- it works again: the next try after the backoff gives the pack, once, and the retry state is forgotten
  s.Data.ThrowAdd=false
  for _=1,40 do s.Svc:Step();s.Clock.advance(2)end
@@ -516,13 +516,13 @@ do
  -- _run is told whether it is the loop (auto): the loop's failure is quiet after the first line, a press is not
  local b2=G.backend();seedStore(b2,1,{1702});local s2=new(b2,nil);local q=G.player(s2,1702,'Direct');s2.Data.ThrowAdd=true
  s2.Svc:_run(q,true,true);s2.Svc:_run(q,true,true);s2.Svc:_run(q,true,true)
- check(said(s2,q,'could not be added')==1,'A3: _run(player, owed, auto) tells an auto retry once')
- s2.Svc:_run(q,true,false);check(said(s2,q,'could not be added')==2,'A3: ... and a non-auto run always tells')
+ check(said(s2,q,'add the pack')==1,'A3: _run(player, owed, auto) tells an auto retry once')
+ s2.Svc:_run(q,true,false);check(said(s2,q,'add the pack')==2,'A3: ... and a non-auto run always tells')
  -- an error thrown out of a claim is handled the same way (once, then the backoff)
  local b3=G.backend();seedStore(b3,1,{1703});local s3=new(b3,nil);local r=G.player(s3,1703,'Throws')
  s3.Svc._run=function()error('boom')end
  for _=1,10 do s3.Svc:Step();s3.Clock.advance(2)end
- check(said(s3,r,'Could not claim')==1,'A3: a claim that throws is announced once by the loop ('..said(s3,r,'Could not claim')..')')
+ check(said(s3,r,'claim it')==1,'A3: a claim that throws is announced once by the loop ('..said(s3,r,'claim it')..')')
 end
 
 print(string.format('giveaway server: %d checks, %d failed',checks,fails))

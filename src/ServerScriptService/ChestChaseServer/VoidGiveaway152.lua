@@ -112,7 +112,7 @@ function S:_grant(player)
  data:MarkDirty(player);data:QueueGardenSave(player)
  pcall(function()self.Chests:SyncTools(player)end)
  player:SetAttribute(Rules.Attr.At,workspace:GetServerTimeNow());self:_state(player,'Claimed')
- self:_say(player,'🌑 FREE VOID PACK! Check your Bag!',true)
+ self:_say(player,'🌑 FREE VOID PACK! Check ur bag!',true)
  return added
 end
 -- Seconds until this player may ask the store again: their own cooldown (after a store failure) or the store's backoff, whichever is later. 0 = now.
@@ -132,10 +132,10 @@ function S:_run(player,owed,auto)
   local ok,outcome,value=self.Store:Reserve(player.UserId)
   if not ok then
    if outcome~='backoff'then self.Cool[player]=self.Clock()+S.StoreCooldown end -- (a real failure: this player waits before pressing again)
-   self:_say(player,'⚠ Could not reach the giveaway. Try again in '..math.max(1,self:_wait(player))..' s.');return false,outcome=='backoff'and'backoff'or'store'
+   self:_say(player,'⚠ Can\'t reach the giveaway. Try again in '..math.max(1,self:_wait(player))..' s.');return false,outcome=='backoff'and'backoff'or'store'
   end
   self:_take(value,'claim')
-  if outcome=='full'then self:_say(player,'🌑 All '..Rules.Cap..' free Void Packs have been claimed.');return false,'empty'end
+  if outcome=='full'then self:_say(player,'🌑 All '..Rules.Cap..' free Void Packs are gone!');return false,'empty'end
   self.Reserved[player.UserId]=true
   if outcome=='new'then self:_queuePublish()end
  end
@@ -143,8 +143,8 @@ function S:_run(player,owed,auto)
  local record,why=self:_grant(player)
  if record then self.Failed[player]=nil;return true,record end
  if why=='claimed'then return false,'claimed'end
- if why=='room'then self:_say(player,'🎒 Your Void Pack is reserved! Make room in your Bag, then claim again.');return false,'room'end
- self:_failed(player,'⚠ The pack could not be added. Try again in a moment.',auto);return false,'add'
+ if why=='room'then self:_say(player,'🎒 Ur Void Pack is saved for u! Make room in ur bag, then claim again.');return false,'room'end
+ self:_failed(player,'⚠ Couldn\'t add the pack. Try again in a sec!',auto);return false,'add'
 end
 -- A player presses the prompt (auto = this server giving a pack the player is owed: quiet, no distance check). Returns true, record or false, reason.
 function S:Claim(player,auto)
@@ -154,23 +154,23 @@ function S:Claim(player,auto)
  local fail=auto and self.Failed[player];if fail and self.Clock()<fail.Until then return false,'backoff'end -- (the loop backs off after a pack that could not be added)
  local data=self.Data;local function refuse(text,why)if not auto then self:_say(player,text)end;return false,why end
  if not data:IsLoaded(player)then return refuse('YOUR DATA IS STILL LOADING','loading')end
- if not data.CanSave[player]and not self.Studio then return refuse('REWARDS ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE','cannotsave')end -- (Studio without API access cannot save: the test goes on)
- if self:_flag(player)then self:_state(player,'Claimed');return refuse('✅ You already claimed your free Void Pack.','claimed')end
+ if not data.CanSave[player]and not self.Studio then return refuse('NO REWARDS UNTIL UR DATA CAN SAVE','cannotsave')end -- (Studio without API access cannot save: the test goes on)
+ if self:_flag(player)then self:_state(player,'Claimed');return refuse('✅ U already grabbed ur free Void Pack!','claimed')end
  local owed=self:_owed(player)
- if not owed and self:Full()then return refuse('🌑 All '..Rules.Cap..' free Void Packs have been claimed.','empty')end
+ if not owed and self:Full()then return refuse('🌑 All '..Rules.Cap..' free Void Packs are gone!','empty')end
  local minAge=Rules.MinAccountAgeDays -- (0 = off; a reserved player is owed their pack whatever the rule says now)
  if not owed and minAge>0 and(tonumber(player.AccountAge)or 0)<minAge then return refuse('🌑 The free Void Pack is for accounts '..minAge..' days old or more. Come back in '..math.ceil(minAge-(tonumber(player.AccountAge)or 0))..' day(s)!','young')end
  if not auto and not self:_near(player)then return false,'far'end
  if not self:_room(player)then
-  if not auto or not self.Told[player]then self.Told[player]=true;self:_say(player,owed and'🎒 Your Void Pack is reserved! Make room in your Bag.'or'🎒 Make room in your Bag first (nothing was used).')end
+  if not auto or not self.Told[player]then self.Told[player]=true;self:_say(player,owed and'🎒 Ur Void Pack is saved for u! Make room in ur bag.'or'🎒 Make room in ur bag first! (nothing got used)')end
   return false,'room'
  end
- if not owed then local wait=self:_wait(player);if wait>0 then return refuse('⚠ Could not reach the giveaway. Try again in '..wait..' s.','wait')end end -- (the store's backoff / this player's cooldown: no request)
+ if not owed then local wait=self:_wait(player);if wait>0 then return refuse('⚠ Can\'t reach the giveaway. Try again in '..wait..' s.','wait')end end -- (the store's backoff / this player's cooldown: no request)
  self.Busy[player]=true;self:_state(player,'Busy')
  local ok,done,result=pcall(self._run,self,player,owed,auto)
  self.Busy[player]=nil
  if not ok then
-  warn('[R152] Void giveaway claim failed: '..tostring(done));self:_failed(player,'⚠ Could not claim. Try again in a moment.',auto)
+  warn('[R152] Void giveaway claim failed: '..tostring(done));self:_failed(player,'⚠ Couldn\'t claim it. Try again in a sec!',auto)
   done,result=false,'error'
  end
  if not done and player.Parent then self:_state(player,self:_flag(player)and'Claimed'or'Open')end

@@ -46,7 +46,7 @@ function A:Announce(player,kind,arg)
  local okay,name=pcall(A.Name,kind,arg)
  if not okay or type(name)~='string'or not player or not player.Parent then return false end
  local notices=self.Data and self.Data.Notifications
- if notices then pcall(notices.Show,notices,player,'✅ Purchased: '..name..'!',A.Color,A.Seconds)end
+ if notices then pcall(notices.Show,notices,player,'✅ Bought: '..name..'!',A.Color,A.Seconds)end
  return(pcall(self.Remote.FireClient,self.Remote,player,{Kind=kind,Name=name}))
 end
 return A

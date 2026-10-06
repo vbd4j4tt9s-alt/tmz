@@ -12,14 +12,14 @@ function N.Pack(m)
  local count=math.max(1,math.floor(tonumber(m.Count)or 1));local prefix=count>1 and(count..' ')or'A '
  local name=m.Text..(count>1 and's'or'')
  local emoji=(tonumber(m.Size)or 1)>7 and'📏'or m.Mutation=='Diamond'and'💎'or m.Mutation=='Gold'and'✨'or N.Emojis[m.Tier]or'✨'
- return emoji..' '..prefix..N.Color(name,m.Color or Color3.new(1,1,1))..' spawned in '..N.Color(m.Biome,colors[m.Stage]or Color3.fromRGB(175,220,255))..'!'
+ return emoji..' '..prefix..N.Color(name,m.Color or Color3.new(1,1,1))..' just spawned in '..N.Color(m.Biome,colors[m.Stage]or Color3.fromRGB(175,220,255))..'!'
 end
 -- R131: "🎁 Sunny gave you Frosted Golden Apple!"
 function N.Gift(giver,item)return '🎁 '..N.Color(tostring(giver),Color3.fromRGB(147,255,69))..' gave you '..N.Color(tostring(item),Color3.fromRGB(255,229,71))..'!'end
 -- R152 (owner: "add more personality to the texts"): in Verity's voice, she is the one who trades a Void Pack for a Verity Pack (VerityConfig).
-function N.Arrival()return '🌑 '..N.Color('Eek! The Darkened is here...',Color3.fromRGB(221,195,255))..'  '..N.Color('Two Void Packs',Color3.fromRGB(184,141,255))..' await in '..N.Color('Storm Peaks',colors[7])..'. '..N.Color('Verity',Color3.fromRGB(255,206,64))..' wants one!'end
+function N.Arrival()return '🌑 '..N.Color('The Darkened is here!!',Color3.fromRGB(221,195,255))..'  '..N.Color('Two Void Packs',Color3.fromRGB(184,141,255))..' are up in '..N.Color('Storm Peaks',colors[7])..'. '..N.Color('Verity',Color3.fromRGB(255,206,64))..' wants one!'end
 -- R122: nobody stole a Void Pack for three refreshes, so the remaining packs changed.
-function N.VoidShift()return '🌌 '..N.Color('The void shifts...',Color3.fromRGB(221,195,255))..'  The '..N.Color('Void Packs',Color3.fromRGB(184,141,255))..' in '..N.Color('Storm Peaks',colors[7])..' changed.'end
+function N.VoidShift()return '🌌 '..N.Color('The void shifted!',Color3.fromRGB(221,195,255))..'  The '..N.Color('Void Packs',Color3.fromRGB(184,141,255))..' in '..N.Color('Storm Peaks',colors[7])..' changed.'end
 -- R127 (owner): an owner weather notice names the plant that changed ("Your Moonberry plant", "A fruit on your
 -- Watermelon", "Your Apple, Moonberry and 2 more plants"). Items are MutationGlow127 items; nil when there are none.
 function N.PlantSubject(items,packs)
@@ -59,6 +59,6 @@ function N.Weather(m)
  if named then subject=named
  elseif m.Scope=='Owned'then subject='Your '..subject
  elseif m.Scope=='World'then local biomes={[1]='Forest',[6]='Jungle',[2]='Desert',[3]='Snow',[4]='Lava',[5]='Crystal',[7]='Storm Peaks'};local name=biomes[m.Stage];if name then place=' in '..N.Color(name,colors[m.Stage])end end
- return(named and'🌈 'or'')..N.Color(subject,Color3.new(1,1,1))..place..' became '..N.Color(W.Display(trait),row.Color or Color3.new(1,1,1))..'!'
+ return(named and'🌈 'or'')..N.Color(subject,Color3.new(1,1,1))..place..' got '..N.Color(W.Display(trait),row.Color or Color3.new(1,1,1))..'!'
 end
 return N
