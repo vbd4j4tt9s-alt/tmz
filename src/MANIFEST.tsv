@@ -131,6 +131,7 @@ ModuleScript	ReplicatedStorage/KeeperAccents	ReplicatedStorage/KeeperAccents.lua
 ModuleScript	ReplicatedStorage/KeeperAttackPose	ReplicatedStorage/KeeperAttackPose.lua
 ModuleScript	ReplicatedStorage/KeeperAudio	ReplicatedStorage/KeeperAudio.lua
 ModuleScript	ReplicatedStorage/KeeperCombat	ReplicatedStorage/KeeperCombat.lua
+ModuleScript	ReplicatedStorage/KeeperFollow153	ReplicatedStorage/KeeperFollow153.lua
 ModuleScript	ReplicatedStorage/KeeperFx	ReplicatedStorage/KeeperFx.lua
 ModuleScript	ReplicatedStorage/KeeperFx152	ReplicatedStorage/KeeperFx152.lua
 ModuleScript	ReplicatedStorage/KeeperMotion	ReplicatedStorage/KeeperMotion.lua

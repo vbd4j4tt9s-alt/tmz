@@ -35,9 +35,13 @@ local function refresh()
  if not gui or not gui.Parent then gui=build()end
  gui.Adornee=pad;gui.Parent=holder;place(clock)
 end
-local connection=Run.Heartbeat:Connect(function(dt)
+-- R153 (owner: "fix all jittery type effects"): the bob is written in RenderStepped (was Heartbeat), with the frame that is drawn, and not at all
+-- while the marker is past its MaxDistance (nothing is drawn there).
+local connection=Run.RenderStepped:Connect(function(dt)
  clock+=dt;elapsed+=dt
  if elapsed>=1 then elapsed=0;refresh()end
+ local camera=workspace.CurrentCamera
+ if pad and camera and(camera.CFrame.Position-pad.Position).Magnitude>Marker.MaxDistance then return end
  place(clock)
 end)
 script.Destroying:Connect(function()connection:Disconnect();if gui then gui:Destroy()end end)

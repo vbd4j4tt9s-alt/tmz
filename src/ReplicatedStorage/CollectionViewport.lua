@@ -2,7 +2,7 @@
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Gui=game:GetService('GuiService')
 local FX=require(RS.ItemVisualEffects)
 local Geometry=require(RS.HarvestGeometry);local CachedVisible=require(RS.ShopViewport).CachedVisible
-local V={};local entries={};local connection;local elapsed=0
+local V={};local entries={};local connection
 local function silhouette(model)
  for _,p in ipairs(model:GetDescendants())do
   if p:IsA('BasePart')and p.Transparency<.95 then
@@ -68,8 +68,11 @@ function V.Attach(view,id,adult,known)
  end
  destroy=view.Destroying:Connect(cleanup)
  attempt()
- if not connection then connection=Run.Heartbeat:Connect(function(dt)
-  elapsed+=dt;if elapsed<1/20 then return end;elapsed=0;local count,retries=0,0;local t=os.clock();local player=game:GetService('Players').LocalPlayer;local budget=require(RS.CosmeticBudget).CollectionViews(player and player:GetAttribute('FastMode'))
+ -- R153 (owner: "fix all jittery type effects"): the cards' seeds and their weather effects move every rendered frame in RenderStepped (20 Hz before).
+ -- A ViewportFrame redraws when its content moves, so the budget stays: CosmeticBudget.CollectionViews (6 low / 18), at most 6 on phones (tier 2).
+ if not connection then connection=Run.RenderStepped:Connect(function(dt)
+  local count,retries=0,0;local t=os.clock();local player=game:GetService('Players').LocalPlayer;local budget=require(RS.CosmeticBudget).CollectionViews(player and player:GetAttribute('FastMode'))
+  local okTier,tier=pcall(function()return require(RS.ClientFxBudget).Get()end);if okTier and type(tier)=='number'and tier<3 then budget=math.min(budget,6)end
   -- R121: cards stay attached after the Index closes; the cached hidden ancestor makes those checks cheap.
   for r in pairs(entries)do if count<budget and CachedVisible(r)then
    count+=1

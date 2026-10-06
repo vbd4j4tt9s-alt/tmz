@@ -76,7 +76,7 @@ local function place()
  edge.Thickness=thick
  gui:SetAttribute('TextSize',size);gui:SetAttribute('Placement',math.max(below,above)>=MIN_BAND and(below>=above and'below'or'above')or'edge')
 end
-local live={};local phase,acc=0,0
+local live={};local phase=0
 local function stop()for _,c in ipairs(live)do c:Disconnect()end;table.clear(live)end
 local function setOpen(open,quiet)
  if open==gui.Enabled then return end
@@ -86,9 +86,8 @@ local function setOpen(open,quiet)
  place();gui.Enabled=true
  live[#live+1]=gui:GetPropertyChangedSignal('AbsoluteSize'):Connect(place) -- (turning the phone, resizing the window)
  if GuiService.ReducedMotionEnabled then paint(0);return end
- live[#live+1]=Run.RenderStepped:Connect(function(dt)
-  acc+=dt;if acc<1/30 then return end
-  phase=(phase+acc*.22)%1;acc=0;paint(phase)
+ live[#live+1]=Run.RenderStepped:Connect(function(dt) -- R153: the rainbow slides every frame (was 30 Hz: it stepped on a 60 Hz screen)
+  phase=(phase+dt*.22)%1;paint(phase)
  end)
 end
 local conns={GuiService.MenuOpened:Connect(function()setOpen(true)end),GuiService.MenuClosed:Connect(function()setOpen(false)end),

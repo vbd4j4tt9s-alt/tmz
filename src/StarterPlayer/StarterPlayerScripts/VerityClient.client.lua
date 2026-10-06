@@ -233,7 +233,7 @@ local function detach(model)
   if entry.Mark then entry.Mark:Destroy()end
   if entry.Timer then entry.Timer:Destroy()end
   if voice.Sound then voice.Sound:Destroy();voice.Sound=nil;voice.Checked=false;voice.Playing=false end
-  voice.Waiting=nil;voice.Lip.Level=0
+  voice.Waiting=nil;VerityVoice.Rest(voice.Lip)
   entry=nil
  end
 end
@@ -280,11 +280,11 @@ watch(Run.RenderStepped,function(dt)
  local lip=voice.Lip
  if worldOn or portraitOn then
   local talking=speaking()
-  if talking or lip.Level>0 then
+  if talking or VerityVoice.Moving(lip)then
    local sound=voice.Sound
    VerityVoice.Step(lip,C.Lip,talking and sound and sound.PlaybackLoudness or 0,dt,talking)
   end
- elseif lip.Level>0 then lip.Level=0 end
+ elseif VerityVoice.Moving(lip)then VerityVoice.Rest(lip)end
  if portraitOn or P.Model then portraitFrame(reduced)end
  if not live then return end
  if not worldOn then settle(e);return end
@@ -296,7 +296,7 @@ watch(Run.RenderStepped,function(dt)
   end
  end
  -- Swelling and bouncing with the voice (the level: smoothed in and out): she grows upward from the dais and hops by TalkBounce of her size.
- local pose=VerityVoice.Pose(C,e.Size,lip.Level)
+ local pose=VerityVoice.Pose(C,e.Size,VerityVoice.Bounce(lip)) -- (R153: the smoothed level: no stutter as PlaybackLoudness steps)
  local scale=pose.Scale
  if scale~=e.Scale then e.Scale=scale;local d=pose.Size;e.Body.Size=Vector3.new(d,d,d);e.Moved=true end
  local y=e.Base.Y+math.sin(now*1.4)*C.FootOffset+pose.Rise
@@ -367,7 +367,7 @@ portraitFrame=function(still)
   if P.Still then return end
   P.Still=true
  else P.Still=false end
- local D=C.Portrait.Size;local level=still and 0 or voice.Lip.Level
+ local D=C.Portrait.Size;local level=still and 0 or VerityVoice.Bounce(voice.Lip)
  local pose=VerityVoice.Pose(C,D,level)
  local scale=pose.Scale
  if scale~=P.Scale then P.Scale=scale;ball.Size=Vector3.new(pose.Size,pose.Size,pose.Size)end
@@ -584,7 +584,7 @@ gui.Destroying:Connect(function()
   if entry.Timer then entry.Timer:Destroy()end
   if entry.Body.Parent then settle(entry)end -- leave her as the server placed her
   if voice.Sound then voice.Sound:Destroy();voice.Sound=nil end
-  voice.Playing=false;voice.Waiting=nil;voice.Lip.Level=0
+  voice.Playing=false;voice.Waiting=nil;VerityVoice.Rest(voice.Lip)
   entry=nil
  end
 end)

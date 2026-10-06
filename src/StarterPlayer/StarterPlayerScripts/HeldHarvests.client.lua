@@ -4,7 +4,7 @@ local H=require(RS:WaitForChild('HarvestPresentation'));local Rig=require(RS:Wai
 local Catalog=require(RS:WaitForChild('PlantCatalog'));local retry=setmetatable({},{__mode='k'})
 local function equipped(tool)return tool.Parent and Players:GetPlayerFromCharacter(tool.Parent)~=nil end
 local Planner=require(RS:WaitForChild('PlantDetailPlanner'))
-local player=Players.LocalPlayer;local states={};local selected={};local job;local scanClock=1;local motionClock=0
+local player=Players.LocalPlayer;local states={};local selected={};local job;local scanClock=1
 local function dispose(tool)
  local s=states[tool];if s then if s.Rig then Rig.Destroy(s.Rig)end;states[tool]=nil end
 end
@@ -41,9 +41,12 @@ local function scan()
  if job and not selected[job.Tool]then cancel()end
  if Run:IsStudio()then player:SetAttribute('HeldHarvestModels',count);player:SetAttribute('HeldHarvestBudget',cost)end
 end
-local connection=Run.Heartbeat:Connect(function(dt)
+-- R153 (owner: "fix all jittery type effects"): one RenderStepped step a frame. A held fruit's own motion (the jaw, the bells, the idle sway: its
+-- joints' Transform, applied in PreSimulation below) and its effects follow the hand every rendered frame; the joints used to change at 20 Hz.
+-- Bounded by the selection: 6 held fruits (900 parts), effects for the 3 nearest within 90 studs.
+local connection=Run.RenderStepped:Connect(function(dt)
  for tool in pairs(states)do if not equipped(tool)then dispose(tool)end end
- scanClock+=dt;motionClock+=dt;if scanClock>=.25 then scanClock=0;scan()end
+ scanClock+=dt;if scanClock>=.25 then scanClock=0;scan()end
  if job and(not equipped(job.Tool)or not selected[job.Tool])then cancel()end
  if not job then
   for tool,e in pairs(selected)do if not states[tool]and equipped(tool)and os.clock()>=(retry[tool]or 0) then
@@ -61,19 +64,12 @@ local connection=Run.Heartbeat:Connect(function(dt)
   if not okay then retry[job.Tool]=os.clock()+5;warn('[V149] Held fruit: '..tostring(why));cancel()
   elseif coroutine.status(job.Thread)=='dead'then job=nil end
  end
- if motionClock<.05 then
-  -- R128 (owner): between the 20 Hz motion steps, held fruit effects still follow the hand every frame (their orbits
-  -- trailed behind runners). Only already-running effect sets move; nothing new is built here.
-  local now=workspace:GetServerTimeNow()
-  for tool,state in pairs(states)do if state.Rig and equipped(tool)then Rig.Follow(state.Rig,now)end end
- else
-  motionClock=0;local now=workspace:GetServerTimeNow();local fx=0
-  debug.profilebegin('Held fruit animation')
-  for tool,state in pairs(states)do local e=selected[tool];if e and state.Rig then
-   local effects=e.Distance<90 and fx<3;if effects then fx+=1 end;Rig.Step(state.Rig,now,effects,effects and e.Distance<32)
-  end end
-  debug.profileend()
- end
+ local now=workspace:GetServerTimeNow();local fx=0
+ debug.profilebegin('Held fruit animation')
+ for tool,state in pairs(states)do local e=selected[tool];if e and state.Rig and equipped(tool)then
+  local effects=e.Distance<90 and fx<3;if effects then fx+=1 end;Rig.Step(state.Rig,now,effects,effects and e.Distance<32)
+ end end
+ debug.profileend()
 end)
 local jointConnection=Run.PreSimulation:Connect(function()for tool,s in pairs(states)do if equipped(tool)and s.Rig then Rig.Apply(s.Rig)end end end)
 script.Destroying:Connect(function()connection:Disconnect();jointConnection:Disconnect();cancel();for tool in pairs(states)do dispose(tool)end end)

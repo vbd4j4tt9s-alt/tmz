@@ -113,7 +113,7 @@ local function groundFrame(position,normal,forward)
 end
 -- Footprints ------------------------------------------------------------------------------------------------
 local function alpha(m,i,value)
- local p=m.Parts[i];if math.abs((m.Alpha[i]or -1)-value)>=.04 or(value>=1 and m.Alpha[i]~=1)then m.Alpha[i]=value;p.Transparency=value end
+ local p=m.Parts[i];if math.abs((m.Alpha[i]or -1)-value)>=.01 or(value>=1 and m.Alpha[i]~=1)then m.Alpha[i]=value;p.Transparency=value end -- (R153: .01, was .04: a fade stepped every few frames)
 end
 function E:Stamp(frame,theme,scale,now,ringName,speed,mirror)
  local b=self.Budget;local ring=self.Rings[ringName or'Local']or self.Rings.Local
@@ -159,7 +159,7 @@ function E:AgeMark(m,t,now,reduced)
   return
  elseif kind=='Ember'then
   if m.Stage==0 then
-   local step=math.floor(math.clamp(t/P.Turn,0,1)*4+.5)/4 -- five colour steps while the magma cools
+   local step=math.floor(math.clamp(t/P.Turn,0,1)*50+.5)/50 -- the magma cools smoothly (R153: 50 steps, was 5 visible jumps)
    if step~=m.Step then m.Step=step;local c=P.Color:Lerp(P.Color2,step);m.Parts[1].Color=c;m.Parts[2].Color=c;m.Parts[3].Color=P.Accent:Lerp(P.Color2,step*.6)end
    if t>=P.Turn then m.Stage=1;for i=1,2 do m.Parts[i].Material=P.Material2;m.Parts[i].Color=P.Cool end end
   elseif m.Stage==1 and t>=P.Turn2 then m.Stage=2;m.Parts[3].Material=P.Material2;m.Parts[3].Color=P.Cool end
@@ -300,13 +300,13 @@ function E:StepIdle(r,dt,now,want)
   local radius=(orbit and orbit.Radius or 1.6)*scale;local height=orbit and orbit.Height+bob*.5 or .55+i*.15+bob
   s.Size=(orbit and V(orbit.Size,orbit.Size,orbit.Size)or V(.2,.34,.2))*scale
   s.CFrame=CF(center+V(math.cos(angle)*radius,height*scale,math.sin(angle)*radius))*CFrame.Angles(.4,b.Reduced and i or now*1.3+i,.3)
-  local a=1-(i==1 and .9 or .85)*r.Fade;if math.abs(s.Transparency-a)>=.04 or a>=1 then s.Transparency=a end
+  local a=1-(i==1 and .9 or .85)*r.Fade;if math.abs(s.Transparency-a)>=.01 or a>=1 then s.Transparency=a end
  end
  if rig.Dome then
   -- The field dome is centred on the ground, so only its top half shows; it breathes unless motion is reduced.
   local dome=idle.Dome;local size=dome.Size*scale*(b.Reduced and 1 or 1+.04*math.sin(now*5))
   rig.Dome.Size=V(size,size,size);rig.Dome.CFrame=CF(center)
-  local a=1-(1-dome.Alpha)*r.Fade;if math.abs(rig.Dome.Transparency-a)>=.04 or a>=1 then rig.Dome.Transparency=a end
+  local a=1-(1-dome.Alpha)*r.Fade;if math.abs(rig.Dome.Transparency-a)>=.01 or a>=1 then rig.Dome.Transparency=a end
  end
  -- Ground patches sit in a ring around the feet; placed when the wearer settles, faded with the aura.
  local patch=idle.Patches
@@ -320,7 +320,7 @@ function E:StepIdle(r,dt,now,want)
    end
   end
   local a=1-(1-patch.Alpha)*r.Fade
-  for _,s in ipairs(rig.Patches)do if math.abs(s.Transparency-a)>=.04 or(a>=1 and s.Transparency<1)then s.Transparency=a end end
+  for _,s in ipairs(rig.Patches)do if math.abs(s.Transparency-a)>=.01 or(a>=1 and s.Transparency<1)then s.Transparency=a end end
  end
  if idle.ArcEvery and r.Fade>.5 and now>=rig.NextArc then
   -- A short discharge jumps from the outer side of one boot to the ground.
@@ -381,8 +381,14 @@ function E:Step(r,dt,now,params,detail)
   if foot and foot:IsA('BasePart')then
    local scale=math.clamp(foot.Size.X,.4,2.5)
    local sole=(foot.CFrame*CF(0,-foot.Size.Y*.5,0)).Position
-   local hit=workspace:Raycast(sole+V(0,1.4*scale,0),V(0,-3.3*scale,0),params)
-   local frame=hit and hit.Normal.Y>.5 and groundFrame(hit.Position,hit.Normal,root.CFrame.LookVector)
+   -- R153: the ribbon follows the sole every frame; the ground under it is cast at most every Rules.Interval (or after 4 studs), and between
+   -- casts the ribbon slides along that ground's plane straight under the sole (exactly the hit point on the frame it is cast).
+   local hit=g.Hit
+   if hit==nil or now-(g.HitAt or -math.huge)>=Rules.Interval or(sole-g.HitSole).Magnitude>4*scale then
+    local h=workspace:Raycast(sole+V(0,1.4*scale,0),V(0,-3.3*scale,0),params)
+    hit=h and{Position=h.Position,Normal=h.Normal}or false;g.Hit=hit;g.HitAt=now;g.HitSole=sole
+   end
+   local frame=hit and hit.Normal.Y>.5 and groundFrame(sole-V(0,(sole-hit.Position):Dot(hit.Normal)/hit.Normal.Y,0),hit.Normal,root.CFrame.LookVector)
    if frame then
     g.Part.CFrame=frame;g.A.Position=V(-.24*scale,0,0);g.B.Position=V(.24*scale,0,0)
     g.Trail.Lifetime=math.clamp(5/math.max(speed,1),.04,.34);g.Trail.Enabled=true;hits[i]={Frame=frame,Scale=scale}

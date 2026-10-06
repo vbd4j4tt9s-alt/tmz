@@ -1,7 +1,7 @@
 -- R48: rotate cameras around visible native products, with one shared scheduler.
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Gui=game:GetService('GuiService')
 local Art=require(RS:WaitForChild('ShopProductArt'));local Geometry=require(RS:WaitForChild('HarvestGeometry'))
-local V={};local entries={};local connection;local elapsed=0
+local V={};local entries={};local connection
 -- R121: a hidden result also returns the ancestor that hid the view and its property, so the
 -- per-frame loops can re-check that one ancestor instead of walking the whole GUI chain again.
 function V.Visible(view)
@@ -33,10 +33,13 @@ local function pose(e)
  local direction=Vector3.new(math.sin(e.Angle),.43,math.cos(e.Angle)).Unit
  e.Camera.CFrame=CFrame.lookAt(e.Center+direction*distance,e.Center)
 end
+-- R153 (owner: "fix all jittery type effects"): a product turns every rendered frame in RenderStepped (it turned at 30 Hz, 15 Hz in FastMode). A
+-- ViewportFrame redraws whenever its camera moves, so only so many turn: 12 visible ones (4 on phones, tier 2); on tier 1 / FastMode they stand still.
 local function step(dt)
- elapsed+=dt;local player=game:GetService('Players').LocalPlayer;if elapsed<(player and player:GetAttribute('FastMode')and 1/15 or 1/30)then return end;local d=math.min(elapsed,.1);elapsed=0
+ local ok,tier=pcall(function()return require(RS:WaitForChild('ClientFxBudget')).Get()end);tier=ok and type(tier)=='number'and tier or 3
+ local cap=tier>=3 and 12 or tier==2 and 4 or 0;local turned=0;local d=math.min(dt,.1)
  for e in pairs(entries)do if V.CachedVisible(e)then
-  if not Gui.ReducedMotionEnabled then e.Angle=(e.Angle+d*.48)%(2*math.pi)end
+  if turned<cap and not Gui.ReducedMotionEnabled then turned+=1;e.Angle=(e.Angle+d*.48)%(2*math.pi)end
   pose(e)
  end end
 end
@@ -50,10 +53,10 @@ function V.Attach(view,product,biome)
   if dead then return end;dead=true;entries[e]=nil;if destroy then destroy:Disconnect()end
   if view.CurrentCamera==camera then view.CurrentCamera=nil end
   world:Destroy();camera:Destroy()
-  if not next(entries)and connection then connection:Disconnect();connection=nil;elapsed=0 end
+  if not next(entries)and connection then connection:Disconnect();connection=nil end
  end
  destroy=view.Destroying:Connect(cleanup)
- if not connection then connection=Run.Heartbeat:Connect(step)end
+ if not connection then connection=Run.RenderStepped:Connect(step)end
  return cleanup
 end
 return V

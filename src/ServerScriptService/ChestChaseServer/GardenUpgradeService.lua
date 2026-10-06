@@ -1,5 +1,7 @@
 -- Server-owned transactions. Two anchored buttons per base, animated only on a press.
-local RS=game:GetService('ReplicatedStorage');local Tween=game:GetService('TweenService')
+-- R153 (owner: "fix all jittery type effects"): the press itself is drawn by every client (InteractionFeedback, at the frame rate); the server only
+-- stamps it (PressedAt153). It used to tween the cap here, which replicated in network-rate steps.
+local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local Rules=require(RS:WaitForChild('GardenFenceRules'));local Art=require(script.Parent.GardenFenceArt)
 local U={};local V,CF=Vector3.new,CFrame.new;local RGB=Color3.fromRGB
 local function cash(n)
@@ -101,7 +103,7 @@ function U.Refresh(self,player)
   local pos=CF(-49,.75,68.5+(i-1)*11.5)
   part(model,kind..' housing',V(10.4,1.5,10.4),origin*pos,RGB(47,62,55))
   local cap=part(model,kind..' button',V(9.6,.55,9.6),origin*pos*CF(0,.90,0),RGB(67,185,98));cap:SetAttribute('GardenUpgradeKind',kind)
-  local home=cap.CFrame;local surface=Instance.new('SurfaceGui');surface.Name='ButtonLabel';surface.Face=Enum.NormalId.Top;surface.SizingMode=Enum.SurfaceGuiSizingMode.FixedSize;surface.CanvasSize=Vector2.new(512,512);surface.LightInfluence=0;surface.MaxDistance=100;surface.Parent=cap
+  local home=cap.CFrame;cap:SetAttribute('PressHome153',home);CS:AddTag(cap,'GardenUpgradeCap153');local surface=Instance.new('SurfaceGui');surface.Name='ButtonLabel';surface.Face=Enum.NormalId.Top;surface.SizingMode=Enum.SurfaceGuiSizingMode.FixedSize;surface.CanvasSize=Vector2.new(512,512);surface.LightInfluence=0;surface.MaxDistance=100;surface.Parent=cap
   local function lettering(name,text,y,height,maxSize,minSize,font)
    local label=Instance.new('TextLabel');label.Name=name;label.Size=UDim2.new(1,-40,0,height);label.Position=UDim2.fromOffset(20,y);label.BackgroundTransparency=1;label.Text=text;label.Font=font;label.TextScaled=true;label.TextWrapped=true;label.TextColor3=RGB(255,255,239);label.TextStrokeTransparency=.7;label.Parent=surface
    local fit=Instance.new('UITextSizeConstraint');fit.MaxTextSize=maxSize;fit.MinTextSize=minSize;fit.Parent=label;return label
@@ -127,8 +129,7 @@ function U.Refresh(self,player)
    local resultKey=okay and'UpgradeBoughtSerial'or'UpgradeRefusedSerial'
    sender:SetAttribute(resultKey,(sender:GetAttribute(resultKey)or 0)+1)
    -- Even a rejected purchase gives a short tactile press without a debit.
-   Tween:Create(cap,TweenInfo.new(.10,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{CFrame=home*CF(0,-.35,0)}):Play()
-   task.delay(.12,function()if cap.Parent then Tween:Create(cap,TweenInfo.new(.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{CFrame=home}):Play()end end)
+   cap:SetAttribute('PressedAt153',workspace:GetServerTimeNow()) -- (every client sinks the cap .35 studs and brings it back: InteractionFeedback)
    if not okay then note.Text=message or'Try again';note.Visible=true end
    task.delay(.34,function()
     if self.GardenUpgradeRecords[record.Index]~=state then return end
