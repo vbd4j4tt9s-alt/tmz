@@ -1420,7 +1420,7 @@ do
  end
  do -- 5g.2 --------------------------------------------------------------------------------------------------------------------
  local S=W.module('KeyboardSkip152');local SC=S.Config
- check(SC.Flat==.10 and SC.Prop==.25 and SC.Grid==5,'scan thresholds: a flat feature (water / lava / ...) leaves a key out from 10% of its footprint, a prop from 25%')
+ check(SC.Flat==.10 and SC.Prop==.60 and SC.Grid==8,'scan thresholds: a flat feature (water / lava / ...) leaves a key out from 10% of its footprint, a prop only when it is mostly buried: from 60% (a key partly covered by a wall bank stays, as in R151)')
  local synth=R.new('Model');synth.Name='SynthMap';for k,v in pairs(ATTR)do synth:SetAttribute(k,v)end;synth.Parent=workspace
  local function folder(parent,name)local f=R.new('Folder');f.Name=name;f.Parent=parent;return f end
  local obbyS=folder(synth,'Obby');local biomesS=folder(obbyS,'Biomes');local desert=folder(biomesS,'Biome_2_GOLDEN_DESERT');local scen=folder(desert,'GeneratedScenery')
@@ -1444,10 +1444,10 @@ do
  coverLeft(oasis,'Oasis water',DR,3,.5,.3);coverLeft(oasis,'Water edge',DR,5,.05,.3);coverLeft(oasis,'Water corner',DR,7,.15,.3)
  -- props (not flat): 15% -> in, 40% -> out; a flush patch (top .05 over the floor) and a bridge (foot 12 over the floor) never count
  local rocks=folder(scen,'Rock garden')
- coverLeft(rocks,'Boulder',DR,9,.15,3);coverLeft(rocks,'Boulder',DR,11,.40,3);coverLeft(rocks,'Dirt patch',DR,13,1,.05);coverLeft(rocks,'Bridge',DR,15,1,3,F+12)
- -- a palm trunk (1.9 square) with its stone base (6.7 x 5.0): the base covers over 25% of its key, the trunk 1.9 x 1.9 does not
+ coverLeft(rocks,'Boulder',DR,9,.15,3);coverLeft(rocks,'Boulder',DR,11,.40,3);coverLeft(rocks,'Boulder',DR+8,11,.75,3);coverLeft(folder(scen,'Right wall bank'),'Wall bank slope',DR+10,1,.42,4.5);coverLeft(rocks,'Dirt patch',DR,13,1,.05);coverLeft(rocks,'Bridge',DR,15,1,3,F+12)
+ -- a palm trunk (1.9 square) with its stone base (7.4 x 5.6 = 70% of a key): the base buries its key, the trunk 1.9 x 1.9 does not
  local palm=folder(scen,'Palm corner')
- mk(palm,'Palm trunk',g.ColCenter(17)-2,F+5,cz(DR),1.9,10,1.9);mk(palm,'Stone base',g.ColCenter(19),F+1,cz(DR),6.7,2,5.0)
+ mk(palm,'Palm trunk',g.ColCenter(17)-2,F+5,cz(DR),1.9,10,1.9);mk(palm,'Stone base',g.ColCenter(19),F+1,cz(DR),7.4,2,5.6)
  -- liquid by an ancestor's name, by Material.Water, by a pit name; lava in another root
  mk(folder(scen,'Frozen pond'),'Ice',g.ColCenter(21),F+.1,cz(DR),KW,.2,KW)
  local wm=mk(scen,'Slab',g.ColCenter(1),F+.1,cz(DR+2),KW,.2,KW);wm.Material=R.Enum.Material.Water
@@ -1469,9 +1469,10 @@ do
  local cells=res and res.Cells or {}
  local function out(row,col)return cells[row*64+col]==true end
  check(out(DR,3)and not out(DR,5)and out(DR,7),'flat features: a key half covered by water is left out, a 5% sliver stays, one with 15% of its width covered (20% of its footprint: over the 10%) is left out')
- check(not out(DR,9)and out(DR,11),'props: 20% of a key covered by a boulder stays, 40% goes')
+ check(not out(DR,9)and not out(DR,11)and out(DR+8,11),'props: a key 20% or 40% covered by a boulder stays (an edge key poking into a bank, as in R151), one 75% buried goes')
+ check(not out(DR+10,1)and not out(DR+10,2),'a wall bank 3.2 studs wide on the outer column (42% of its key) leaves the edge key in: no bare gaps along the walls (a coarse sample grid read it as 60%)')
  check(not out(DR,13)and not out(DR,15),'a flush patch (top .05 over the floor: under the key) and a bridge (foot 12 over the floor: above the key) never count')
- check(out(DR,17)==false and out(DR,19),'a palm trunk (1.9 x 1.9 = 5% of a key) leaves it alone; its stone base (6.7 x 5.0 over 25% of a key) does not')
+ check(out(DR,17)==false and out(DR,19),'a palm trunk (1.9 x 1.9 = 5% of a key) leaves it alone; its stone base (70% of a key) does not')
  check(out(DR,21)and out(DR+2,1)and out(DR+2,2)and out(DR+2,10),'liquid by the ancestor\'s name (Frozen pond), by Material.Water, by a pit name (Sinkhole), by a lava pool\'s name in another scenery root')
  check(not out(DR+2,12)and not out(DR+2,14)and not out(DR+2,16)and not out(barRow,10)and not out(barRow,9),'an invisible barrier, a part under Lobby / Bases (not scenery) and a feature on a spacebar row leave the keys alone')
  check(out(DR+4,5)and not out(DR+4,4)and not out(DR+4,6)and not out(DR+3,5)and not out(DR+5,5),'a pool turned 45 degrees uses its real footprint (the hull of the turned box): its own key only; its axis-aligned box would take the neighbours too')
@@ -1490,7 +1491,7 @@ do
  do
   local a3=synth:GetAttributes();a3.KeyboardSkip=nil
   S.Config.Ignore={'rock garden'};local r2=S.Scan(synth,K.Geometry(a3,0));S.Config.Ignore={}
-  check(#SC.Ignore==0 and r2.Cells[DR*64+11]==nil and r2.Cells[DR*64+3]==true and r2.Count==n-1,'Config.Ignore: a model whose name has one of the words is never a feature (here Rock garden: one key back, the others stay); empty by default')
+  check(#SC.Ignore==0 and r2.Cells[(DR+8)*64+11]==nil and r2.Cells[DR*64+3]==true and r2.Count==n-1,'Config.Ignore: a model whose name has one of the words is never a feature (here Rock garden: one key back, the others stay); empty by default')
  end
  synth:Destroy()
  end

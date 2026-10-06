@@ -13,7 +13,7 @@ local attrStr=map:GetAttribute('KeyboardSkip')
 check(type(attrStr)=='string'and #attrStr>40,'MapService.new published the map attribute KeyboardSkip ('..tostring(attrStr and #attrStr)..' characters)')
 local geo=K.Geometry(map:GetAttributes(),0)
 local dropped=geo.SkipCount
-check(geo.Rows==728 and dropped>=300 and dropped<=700,('the keyboard has %d of its %d cells left out (%.1f%%)'):format(dropped,geo.Rows*geo.Cols,dropped/(geo.Rows*geo.Cols)*100))
+check(geo.Rows==728 and dropped>=100 and dropped<=250,('the keyboard has %d of its %d cells left out (%.1f%%)'):format(dropped,geo.Rows*geo.Cols,dropped/(geo.Rows*geo.Cols)*100))
 -- the scan again: the same cells, and the areas per biome
 local a2=map:GetAttributes();a2.KeyboardSkip=nil
 local res=S.Scan(map,K.Geometry(a2,0))
@@ -31,7 +31,15 @@ local desertFlat=0;for _,e in ipairs(res.Report[2]or{})do if e.Class=='flat'and 
 check(desertFlat>=10,'the Desert oasis (Small oasis: water, its stone and palm bases) leaves out '..desertFlat..' keys')
 local lavaFlat=0;for _,e in ipairs(res.Report[4]or{})do if e.Class=='flat'then lavaFlat+=e.Cells end end
 check(lavaFlat>=15,'the Lava biome leaves out '..lavaFlat..' keys over its lava river / pools / channels')
-for stage=1,7 do check((perBiome[stage]or 0)>=1,K.BiomeNames[stage]..' has props / water left out ('..tostring(perBiome[stage])..')')end
+-- props only when mostly buried (60%): the wall banks / rocky edges along the track's edge leave their edge keys in (R151 look, no bare gaps along the walls)
+local bankCells,flatTotal,propTotal=0,0,0
+for stage=1,7 do for _,e in ipairs(res.Report[stage]or{})do
+ if e.Class=='flat'then flatTotal+=e.Cells else propTotal+=e.Cells end
+ local n=e.Name:lower();if n:find('wall bank',1,true)or n:find('rocky edge',1,true)then bankCells+=e.Cells end
+end end
+check(bankCells<=12,('wall banks / rocky edges drop only %d keys in all (was 175 at a 25%% threshold)'):format(bankCells))
+check(flatTotal>=40 and propTotal>=60,('%d keys dropped for water / lava, %d for props that bury them'):format(flatTotal,propTotal))
+print(('SPLIT water/lava %d, props %d'):format(flatTotal,propTotal))
 -- the live oasis: its water parts (oriented boxes, turned a little about the vertical axis), found by name in the finished map
 local function find(root,path)for n in path:gmatch('[^/]+')do root=root and root:FindFirstChild(n)end;return root end
 local oasis;for _,b in ipairs(map.Obby.Biomes:GetChildren())do local f=find(b,'GeneratedScenery/Small oasis');if f then oasis=f end end
