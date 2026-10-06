@@ -12,7 +12,7 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 --  * turns the prompt off for YOU once you have claimed (the server turns it off for everyone at 0), and plays the claim moment when your pack arrives: the pack hops, a spark
 --    burst, the sign pops, and the game's reward chime (InteractionAudio GemClaim: no new sound). The text notice ("FREE VOID PACK! Check your Bag!") is the server's.
 -- Per frame: only while a pedestal's pack is inside ACTIVE_IN studs of the camera (leaves at ACTIVE_OUT); nothing runs for a pedestal that is far. Tier 3 steps it every frame;
--- tier 2 and below at 30 Hz and without the pack's Highlight (VoidPackFx.Budget.Highlight): the per-frame costs a phone felt. Quality tiers and the plant
+-- tier 2 and below at 30 Hz and without the pack's Highlight (VoidPackFx.Create's noHighlight): the per-frame costs a phone felt. Quality tiers and the plant
 -- effects setting limit the effects like the track's Void packs (ClientFxBudget / VoidPackFx.Budget); Reduced Motion: no turn, no bob, no pop, no moving fx (the same parts, still).
 -- The place uses StreamingEnabled: the pedestal is Persistent, but a pedestal is found by its tag whenever it appears, its parts are looked up again each half second until they
 -- are there, and one that goes away is forgotten (a streamed-back copy starts clean).
@@ -149,7 +149,7 @@ local function stepPack(entry,dt,t,now)
  else frame=PackFx.Pose(r,now,parts,frames,entry.Dist<PackFx.Budget.SpinDistance)end
  local want=entry.Dist<PackFx.Budget.EffectDistance and player:GetAttribute('StudioPlantEffects')~='off'and entry.Model:GetAttribute(A.State)~='Empty' -- (at 0 the pack sleeps: it turns, but its glow and sparks are off)
  if r.Fx and(not want or r.Fx.Tier~=tierNow)then PackFx.Clear(r)end
- if want and not r.Fx then PackFx.Create(r,tierNow)end
+ if want and not r.Fx then PackFx.Create(r,tierNow,tierNow<3)end -- (tier 2 and below: no Highlight)
  if r.Fx then PackFx.Pulse(r,now,rm);PackFx.Step(r,now,frame,tierNow,rm,true,parts,frames)end
  workspace:BulkMoveTo(parts,frames,Enum.BulkMoveMode.FireCFrameChanged)
 end

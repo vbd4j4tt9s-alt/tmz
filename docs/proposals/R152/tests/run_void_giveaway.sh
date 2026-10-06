@@ -210,7 +210,7 @@ mutate "a removed pedestal keeps its pack" $CLI " dropPack(entry);if entry.Gui t
 mutate "the sign is built before its anchor exists" $CLI " if entry.SignAnchor and not(entry.Gui and entry.Gui.Parent)then buildSign(entry)end" " if not(entry.Gui and entry.Gui.Parent)then buildSign(entry)end" client
 mutate "tier 2 steps the pack every frame" $CLI "if tierNow>=3 or entry.Owed>=STEP_LOW-.004 then" "if true then" client
 mutate "the 30 Hz step loses the time it skipped" $CLI "local step=entry.Owed;entry.Owed=0" "local step=dt;entry.Owed=0" client
-mutate "the Highlight is on every tier" ReplicatedStorage/VoidPackFx.lua "if pal.Fill and X.Budget.Highlight[tier]then" "if pal.Fill then" client
+mutate "the Highlight is on every tier" $CLI "PackFx.Create(r,tierNow,tierNow<3)" "PackFx.Create(r,tierNow)" client
 mutate "the main script starts it unguarded" ServerScriptService/ChestChaseServerMain.server.lua "pcall(function()require(modules.VoidGiveaway152).new(" "(function()require(modules.VoidGiveaway152).new(" wiring
 mutate "voidgift is a per-player command" ServerScriptService/ChestChaseServer/OwnerCommandTargets82.lua "or s:match('^voidgift')~=nil or" "or" wiring
 mutate "a new sound asset" $CLI "local Audio;pcall(" "local SOUND='rbxassetid://1234567';local Audio;pcall(" wiring
