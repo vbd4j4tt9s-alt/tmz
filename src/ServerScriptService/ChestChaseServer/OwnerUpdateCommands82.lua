@@ -247,14 +247,14 @@ function X.Execute(ctx,p,action,a)
    elseif sub=='reset'then
     if #a>1 then return false,'Use hubdisplays reset.'end
     local removed=hub:Reset()
-    return true,'Both boards are empty for today on this server'..(removed and' and in the shared store'or'')..'. Other servers keep their own best until they are reset too.\n'..hub:StatusText()
+    return true,'Both boards are empty for today on this server'..(removed and' and in the shared store'or'')..'. Other servers keep their own best until they are reset too.\n'..hub:StatusText(p)
    elseif sub=='day'then
     local n=({['0']=0,today=0,['+1']=1,['1']=1,tomorrow=1,['-1']=-1,yesterday=-1,['+2']=2,['2']=2,['+7']=7,['7']=7})[tostring(a[2]or''):lower()]
     if #a~=2 or n==nil then return false,'Use hubdisplays day +1 (tomorrow\'s fruit), +2, +7, -1 or 0 (back to today).'end
     hub:SetDayOffset(n)
-    return true,(n==0 and'Back to today.'or'Previewing day '..string.format('%+d',n)..' on this server only (nothing is shared while you preview). hubdisplays day 0 comes back.')..'\n'..hub:StatusText()
+    return true,(n==0 and'Back to today.'or'Previewing day '..string.format('%+d',n)..' on this server only (nothing is shared while you preview). hubdisplays day 0 comes back.')..'\n'..hub:StatusText(p)
    else return false,'Use hubdisplays [reset | day +1 | day 0].'end
-   return true,hub:StatusText()
+   return true,hub:StatusText(p)
   end
   local words,share,coat={},false,nil
   for _,w in ipairs(a)do

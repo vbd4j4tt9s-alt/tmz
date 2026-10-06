@@ -5,15 +5,15 @@ Usage: python3 check_hub_scene.py <scene_empty.json> <scene_champions.json> <ste
   (place_geom.json: docs/proposals/R149/tools/rbxl_geom.py <place> out.json Workspace/ChestChaseMap: every part of the saved map, invisible ones too: the bases' Spawn parts)
 Checks (every one fails the run):
   * z-fighting: docs/proposals/R149/tools/zfight.py on each scene: no COUNTED finding (coplanar / near / far) that involves a part of a display's frame (the pedestal: plinth, trim, studs, column,
-    inlays, plaque, band, capital, prongs). The showcase item is the game's own seed / fruit art and the avatar is Roblox's rig (a mock here): their findings are listed apart, not counted;
+    inlays, band, capital, prongs). The showcase item is the game's own seed / fruit art and the avatar is Roblox's rig (a mock here): their findings are listed apart, not counted;
   * nothing but a pedestal, an item and an avatar: no sign board, posts, stage, halo, disc or tube (no part of the frame is round, translucent, neon or named like the old ones);
   * placement: every display part is inside its back corner (HubDecorKit151.K.Reserved: BEST PULL x 145 .. 335, BIGGEST FRUIT x -335 .. -145, z -618 .. -420) with at least WALL_GAP studs to the walls,
     clear of EVERY other part of the map in 3D (nothing overlaps), and at least MIN_GAP studs away in plan from the bases, their fences, treadmills and pedestals, the market, Verity, the
     leaderboards and the hub walls;
   * the avatar: 22 to 28 studs tall (head top to soles, the real scale of the stand), its soles on the hub floor, beside the pedestal;
-  * the words: each plaque faces the market (the angle between its front and the way to the market is under 5 degrees); from every player's spawn (the six bases and the hub's own), the
-    market's sides, Verity and the track gate the plaque's front is within 60 degrees (and the label over the item, which turns to the camera, is in plain view) and nothing in the hub stands between
-    the spawn's eye and the plaque within PLAQUE_RANGE studs (the plaque's own draw distance; farther the display is a landmark with its label);
+  * the words (R153: one big label over the item, no plaque on the column): each display faces the market (the angle between its front and the way to the market is under 5 degrees);
+    from every player's spawn (the six bases and the hub's own), the market's sides, Verity and the track gate the label (which turns to the camera) is in plain view: nothing in the hub
+    stands between the spawn's eye and the label within LABEL_RANGE studs (its draw distance); no part is named like the old plaque;
   * size: every display (frame + item + avatar) is at most 260 parts, the pedestal at most 24, the item at most 150.
 """
 import collections, json, math, os, re, sys
@@ -24,7 +24,6 @@ import zfight as Z  # noqa: E402
 MIN_GAP = 40.0            # studs in plan between a display and the map's own pieces
 CORNER = {'Pull': (145.0, 335.0, -618.0, -420.0), 'Fruit': (-335.0, -145.0, -618.0, -420.0)}   # HubDecorKit151.K.Reserved
 WALL_GAP = 30.0            # studs between a display's parts and the hub's walls (x +-335, z -618)
-PLAQUE_RANGE = 300.0       # the plaque's SurfaceGui MaxDistance (HubDisplayRules.Plaque): within it nothing may stand between a spawn and the plaque
 LABEL_RANGE = 420.0        # the label's BillboardGui MaxDistance (HubDisplayRules.Label)
 AVATAR_TALL = (22.0, 28.5)
 SKIP = ('Lobby/LobbyFloor', 'Lobby/BaseBoundaryLine', 'Lobby/FallbackSpawn', 'SafeZonePresentation', 'Lobby/EntranceSign')
@@ -201,33 +200,36 @@ if len([s for s in spawns if 'Base' in s[0]]) != 6 or not [s for s in spawns if 
     fail('expected the six bases\' spawns and the hub\'s own, found %d' % len(spawns))
 blockers = [(q, qb) for q, qb in obox if (q.get('area') or '') in ('bases', 'fence', 'pedestal', 'treadmill', 'shop', 'verity', 'hub') and qb[3] - qb[2] > 0.5]
 for kind, plist in mine.items():
-    board = [p for p in plist if p['path'].endswith('/Pedestal plaque')][0]
-    r = board['r']
-    front = (-r[0][2], -r[1][2], -r[2][2])
-    c = board['p']
+    plaques = [p for p in plist if p['path'].endswith('/Pedestal plaque')]
+    if plaques:
+        fail('%s still has a plaque on its column (R153: the words are on the big label)' % kind)
+    # the display's frame and its label (the HUBTEXT line the scene wrote)
+    t = None
+    for line in (open(steps, encoding='utf-8') if steps and os.path.exists(steps) else []):
+        if line.startswith('HUBTEXT '):
+            x = json.loads(line[len('HUBTEXT '):])
+            if x['kind'] == kind:
+                t = x
+    if not t:
+        if steps and os.path.exists(steps):
+            fail('no HUBTEXT line for %s' % kind)
+        continue
+    lk = t['look']
+    front = (lk[0], lk[1], lk[2])
+    c = t['origin']
     to_market = (0 - c[0], 0, -265 - c[2])
     n = math.hypot(to_market[0], to_market[2])
     cosm = (front[0] * to_market[0] + front[2] * to_market[2]) / n / math.hypot(front[0], front[2])
     ang = math.degrees(math.acos(max(-1, min(1, cosm))))
-    print('  %s plaque at (%.0f, %.0f, %.0f) faces %.1f degrees off the market' % (kind, c[0], c[1], c[2], ang))
+    print('  %s display at (%.0f, %.0f, %.0f) faces %.1f degrees off the market' % (kind, c[0], c[1], c[2], ang))
     if ang > 5:
-        fail('%s plaque does not face the market (%.1f degrees)' % (kind, ang))
-    # the label floats over the item (45 studs or so up, turned to the camera): its middle
-    label = None
-    for line in (open(steps, encoding='utf-8') if steps and os.path.exists(steps) else []):
-        if line.startswith('HUBTEXT '):
-            t = json.loads(line[len('HUBTEXT '):])
-            if t['kind'] == kind:
-                label = t['label']
+        fail('%s display does not face the market (%.1f degrees)' % (kind, ang))
+    # the label floats over the item (35 to 48 studs up, turned to the camera): its middle, its ends, its top and bottom edge
+    label = t['label']
+    right = tuple(t['right'])
     for name, at in spawns:
-        v = (at[0] - c[0], at[1] - c[1], at[2] - c[2])
-        dist = math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
-        ang2 = math.degrees(math.acos(max(-1, min(1, (front[0] * v[0] + front[1] * v[1] + front[2] * v[2]) / dist / math.sqrt(sum(x * x for x in front))))))
-        # eye 5 studs above the spawn pad; five rays at the plaque (its middle, its two ends, its top and bottom edge): it is hidden only when every ray is stopped (a fence post or a
-        # porch column is not a wall: the player moves his head)
+        # eye 5 studs above the spawn pad; five rays at the label: it is hidden only when every ray is stopped (a fence post or a porch column is not a wall: the player moves his head)
         eye = (at[0], at[1] + 5.0, at[2])
-        right = (r[0][0], r[1][0], r[2][0])
-        hw, hh = board['size'][0] / 2, board['size'][1] / 2
         def targets(center, half_w, half_h, axis):
             return [center, (center[0] + axis[0] * half_w, center[1], center[2] + axis[2] * half_w), (center[0] - axis[0] * half_w, center[1], center[2] - axis[2] * half_w),
                     (center[0], center[1] + half_h, center[2]), (center[0], center[1] - half_h, center[2])]
@@ -240,20 +242,12 @@ for kind, plist in mine.items():
                         n_ += 1;who_ = q['path'].split('/', 2)[-1]
                         break
             return n_ == len(tlist), n_, who_
-        gone, blocked, who = hidden(targets(tuple(c), hw, hh, right))
-        seen = ''
-        if label:
-            lp = tuple(label['p'])
-            ld = math.dist(at, lp)
-            lgone, lblocked, lwho = hidden(targets(lp, label['w'] / 2, label['h'] / 2, right))
-            seen = ', label %3.0f studs %s' % (ld, 'clear' if not lblocked else ('hidden by ' + lwho if lgone else '%d of 5 rays stopped' % lblocked))
-            if ld <= LABEL_RANGE and lgone:
-                fail('%s label is hidden from %s by %s' % (kind, name, lwho))
-        print('    from %-20s %5.0f studs, %5.1f degrees off the front, plaque %s%s' % (name, dist, ang2, 'clear' if not blocked else ('hidden by ' + who if gone else '%d of 5 rays stopped' % blocked), seen))
-        if ang2 > 60 and dist <= PLAQUE_RANGE:
-            fail('%s plaque\'s front is %.1f degrees off the way to %s' % (kind, ang2, name))
-        if gone and dist <= PLAQUE_RANGE:
-            fail('%s plaque is hidden from %s (%.0f studs) by %s' % (kind, name, dist, who))
+        lp = tuple(label['p'])
+        ld = math.dist(at, lp)
+        lgone, lblocked, lwho = hidden(targets(lp, label['w'] / 2, label['h'] / 2, right))
+        print('    from %-20s label %3.0f studs %s' % (name, ld, 'clear' if not lblocked else ('hidden by ' + lwho if lgone else '%d of 5 rays stopped' % lblocked)))
+        if ld <= LABEL_RANGE and lgone:
+            fail('%s label is hidden from %s by %s' % (kind, name, lwho))
 
 print('== size')
 if steps and os.path.exists(steps):
