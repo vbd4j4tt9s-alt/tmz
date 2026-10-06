@@ -41,10 +41,16 @@ One DataStore key, store `VoidGiveaway152`, key `Claims`, value `{Count = n, Use
 3. Not at the cap, unless they already hold a reservation.
 4. Standing at the pedestal.
 5. Room in the Bag (`Config.MaxSavedChests`, the game's own limit). If full: "Make room in your Bag first", **nothing reserved**.
-6. Reserve with `UpdateAsync`: four tries with waits of about 0.6, 1.4, 3 s; then "try again". **A pack is never given without a successful reservation.**
-7. Give one real Void Pack (`AddChest`, stage 7, `EclipseReliquary`, size 1, no options: **not `TestGrant`**, so it announces when opened like any pack), set the flag, `MarkDirty` + `QueueGardenSave` like the daily and mystery grants, sync the hotbar, notify. Step 7 never yields: the flag check, the pack and the flag are one step, so a profile gets at most one pack however many paths run.
+6. Reserve with `UpdateAsync`: four tries with waits of about 0.6, 1.4, 3 s; then "try again". **A pack is never given without a successful reservation.** While the store's backoff (`NextTryAt`: 5 s, doubling to 60 s after failures) runs, a claim is refused at once with "try again in N s" and **no request** (`Store:Reserve` and the service both check), and a player who just hit a store failure waits 10 s (`StoreCooldown`) before pressing again.
+7. Give one real Void Pack (`AddChest`, stage 7, `EclipseReliquary`, size 1, no options: **not `TestGrant`**, so it announces when opened like any pack, and saved **`GiftLocked=true`**, see below), set the flag, `MarkDirty` + `QueueGardenSave` like the daily and mystery grants, sync the hotbar, notify. Step 7 never yields: the flag check, the pack and the flag are one step, so a profile gets at most one pack however many paths run.
 
 **Interrupted grants.** A player who is in `Users` but has no flag (a crash, a Bag that filled while the store answered, a save that was lost) is *owed*. This server gives the pack when it sees them (every 2 s, and when they press the prompt), using the same reservation (no second count), even at 0 left (where the prompt is off). It cannot give twice: the flag is checked and set in the same step as the pack.
+
+**Retries of an owed pack.** The loop passes `auto` into `_run`: when a pack cannot be added the player is told **once**, and the loop waits 5, 10, 20 .. 60 s before the next try (their own press always tries at once and always answers).
+
+**Free packs can't be gifted (`GiftLocked`).** Alternate accounts claimed the pack and gave it to a main account. The giveaway pack's record carries the optional field `GiftLocked=true`, saved exactly like `PackShape` / `TestGrant` (`PlayerDataService`: `AddChest`, `SerializeSeedRecord`, `_decodeSavedSeedRecord`; only a Pack row, only exactly `true`). `FruitGiftService` refuses it in `OfferSeed` and `AcceptSeed` ("Free giveaway packs can't be gifted"), and `ConvertVoidPack` gives the Verity Pack the same lock. An opened pack is a Seed record (no lock). No profile version change: an **R151 server ignores the field** (it loads the pack as a normal Void Pack and, if it saves that profile, writes the row without it, so the lock is lost for that profile: keep R151 servers out of rotation once R152 is live).
+
+**Account age (`Rules.MinAccountAgeDays`).** `0` = off (shipped off: the owner decides). Above 0, `Claim` refuses an account younger than that many days with a friendly line ("Come back in N day(s)!"), before anything is reserved; a player who already holds a reservation is still given their pack.
 
 The flag is an optional field of the saved `Premium` table (`Premium.VoidGift152 = true`). `PremiumProgress.Decode` copies fields it does not know, so older servers keep it and no profile version change is needed.
 
@@ -64,6 +70,7 @@ Budgets: about 1.2 reads a minute per server, one `UpdateAsync` per claim, at mo
 ## Studio
 
 - Studio uses its **own store** (`VoidGiveaway152_Studio`), exactly like the player data's `_Studio` store, so a test can never touch the live count.
+- **Live or Studio is decided by `RunService:IsStudio()`, nothing else** (the store and the service both ask it when they start). A *published test place in the same universe is not Studio*: `IsStudio()` is false there, so it uses the **live key** (`VoidGiveaway152` / `Claims`) and every claim made in it counts against the real 500. Test in Studio itself, or give the test place its own universe.
 - With **Game Settings -> Security -> "Enable Studio Access to API Services"** on, Studio reads and writes that Studio store (a real DataStore test, including `UpdateAsync`). The game must be published for it to work.
 - With it **off**, the first read fails and the server switches to an in-memory counter with **one** warn line (`[R152] Void giveaway: no DataStore in Studio ... using an in-memory counter`). It resets when you stop playing. A live server never does this: if the live store fails it keeps trying and players are told to try again.
 - Your own profile cannot save without API access either; the claim still works in Studio so you can see the whole flow.
@@ -80,13 +87,14 @@ Budgets: about 1.2 reads a minute per server, one `UpdateAsync` per claim, at mo
 
 ## Tests
 
-`sh docs/proposals/R152/tests/run_void_giveaway.sh [scratch dir] [mutate]` (also in `tools/tests/run_all_suites.sh`): wiring, the server (192 checks: claim, second claim, race at 499, cap, full Bag, interrupted grants, failures, messaging, polling, Studio fallback, commands, guards), the real player data (40), the pedestal (59), the client (92), and the R149 z-fighting detector on the pedestal, pack and effects. `mutate` breaks 73 things one at a time; each must make a suite fail.
+`sh docs/proposals/R152/tests/run_void_giveaway.sh [scratch dir] [mutate]` (also in `tools/tests/run_all_suites.sh`): wiring, the server (224 checks: claim, second claim, race at 499, cap, full Bag, interrupted grants, failures, messaging, polling, Studio fallback, commands, guards, the review fixes: GiftLocked, account age, backoff, retries), the real player data (59, with GiftLocked saved, loaded, kept by Verity, ignored by an R151 server), the pedestal (59), the client (92), and the R149 z-fighting detector on the pedestal, pack and effects. `mutate` breaks 87 things one at a time; each must make a suite fail.
 
 R151's `static_checks.sh` was updated on purpose: MessagingService is now used by the announcer **and** the giveaway, and `VoidGiveaway152.lua` is a known pack source (a real one: it announces).
 
 ## Doubts
 
-- One account can claim once; alternate accounts can each claim. If that is a worry, an account-age check is one line in `Claim`.
+- One account can claim once; alternate accounts can each claim. The pack is now `GiftLocked` (it can't be handed to a main account) and `Rules.MinAccountAgeDays` (0 = off) is there if you want an age gate: your call. An alt can still **open** a locked pack; the seed that comes out is a normal item.
+- The hotbar stacks identical packs whatever their lock, so a stack of a locked and an unlocked Void Pack says "can't be gifted" when the held one is the locked one.
 - A single hot key means a flood of claims at launch is throttled by DataStore (per-key write limits); players get "try again" and the retry is safe, nobody is double-counted or loses a pack.
 - The pack art (approved meshes) cannot be rendered offline: the preview shows stand-in meshes under the Void art's own parts. Check the look in Studio.
 - The old Seed Fountain is removed by another change; the pedestal's footing (16 studs) leaves about 5 studs to the benches that stood round it.

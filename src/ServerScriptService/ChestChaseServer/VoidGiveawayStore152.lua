@@ -70,8 +70,10 @@ function S:_reserveOnce(userId)
  self:_ok();return true,outcome,seen
 end
 -- Reserves a place for this user. Returns true, outcome ('new' | 'already' | 'full'), value (the store as it is now: Count and Users) or false, reason (the store could not be
--- reached after S.Attempts tries). Yields (UpdateAsync, the waits).
+-- reached after S.Attempts tries). Yields (UpdateAsync, the waits). While the backoff of an earlier failure runs (NextTryAt, the same one Read honours) it refuses at once, with
+-- no request: false, 'backoff', seconds left (a throttled store was hit 240 times by claims that ignored it). The tries of ONE claim go on through their own waits.
 function S:Reserve(userId)
+ if self.Mode~='Memory'and self.Clock()<self.NextTryAt then return false,'backoff',math.ceil(self.NextTryAt-self.Clock())end
  local last
  for attempt=1,S.Attempts do
   local ok,outcome,value=self:_reserveOnce(userId)

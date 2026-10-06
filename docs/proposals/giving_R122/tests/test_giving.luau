@@ -267,6 +267,38 @@ B:SetAttribute('PaidRandomAllowed',true);local mechTraits=Data:SerializeSeedReco
 local gm=find(B,mech.Id);check(gm~=nil,'paid pack gifted when both accounts allow it')
 sameTraits(gm and Data:SerializeSeedRecord(gm),mechTraits,'mech pack')
 
+-- 8b. R152: a free giveaway pack (record.GiftLocked) can't be gifted: not by the give click (OfferSeed), not by an offer that reaches AcceptSeed; an ordinary pack still can
+do
+ local free=Data:AddChest(A,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',GiftLocked=true});local freeTool=hold(A,free)
+ check(free.GiftLocked==true,'R152: the fixture giveaway pack is GiftLocked')
+ local outbox0=0;for _ in pairs(Data.Gardens[A].OutgoingSeedGifts or{})do outbox0+=1 end
+ local beforeA,beforeB=seedRecords(A),seedRecords(B)
+ local accepts,rawAccept=0,Gifts.Accept;Gifts.Accept=function(...)accepts+=1;return rawAccept(...)end -- (a refusal in OfferSeed itself never makes an offer to accept)
+ send(A,'GiveSeed',B,free.Id)
+ Gifts.Accept=rawAccept
+ local told=lastFor(A)
+ check(accepts==0,'R152: OfferSeed refuses it before any offer is made ('..accepts..' offers reached Accept)')
+ check(find(A,free.Id)~=nil and find(B,free.Id)==nil and freeTool.Parent==A.Character,'R152: OfferSeed refuses a GiftLocked pack: the giver keeps it (and still holds it)')
+ check(told and told.Action=='Status'and told.Text=="Free giveaway packs can't be gifted",'R152: ... with a short clear notice ('..tostring(told and told.Text)..')')
+ local outbox1=0;for _ in pairs(Data.Gardens[A].OutgoingSeedGifts or{})do outbox1+=1 end
+ check(outbox1==outbox0 and seedRecords(A)==beforeA and seedRecords(B)==beforeB,'R152: ... nothing staged, nothing moved')
+ -- an offer that already exists (made before the pack was locked, or forged): AcceptSeed refuses too
+ local before=#fired;local offerId='locked-offer-1'
+ Gifts.Offers[offerId]={From=A,To=B,ItemId=free.Id,Kind='Seed',Expires=math.huge}
+ task2.spawn(function()Gifts:Accept(B,offerId)end);advance(5)
+ local refusal;for i=before+1,#fired do if fired[i].P==A and fired[i].Text=="Free giveaway packs can't be gifted"then refusal=fired[i]end end
+ check(find(A,free.Id)~=nil and find(B,free.Id)==nil and refusal~=nil,'R152: AcceptSeed refuses a GiftLocked pack too (same notice to the giver)')
+ check(seedRecords(A)==beforeA and seedRecords(B)==beforeB and Gifts.Offers[offerId]==nil,'R152: ... nothing moved, the offer is gone')
+ -- an ordinary Void pack (the track\'s) is still a gift, and arrives unlocked
+ local own=Data:AddChest(A,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None'});hold(A,own)
+ send(A,'GiveSeed',B,own.Id)
+ local got2=find(B,own.Id);check(got2 and find(A,own.Id)==nil and got2.GiftLocked==nil,'R152: an ordinary Void pack can still be gifted')
+ -- tidy up so later sections see the same inventory
+ for i,r in ipairs(Data:GetChestRecords(A))do if r.Id==free.Id then table.remove(Data:GetChestRecords(A),i);break end end;freeTool:Destroy()
+ for i,r in ipairs(Data:GetChestRecords(B))do if r.Id==own.Id then table.remove(Data:GetChestRecords(B),i);break end end
+ Data:_notifySeedInventory(A);Data:_notifySeedInventory(B)
+end
+
 -- 9. Save failure: debit stays in the outbox, nothing is lost or duplicated ------------------------------
 local p7=Data:AddChest(A,{Stage=1,BagVariant='Pack01',PackSize=1});hold(A,p7)
 local profileStore;for name,s in pairs(stores)do if s.Data['Player_'..A.UserId]then profileStore=name end end
@@ -420,7 +452,7 @@ do
  local ok2,paid2=Data:SellHarvest(A,c2.Id)
  check(ok2 and paid2==c2.Value,'R132: in another hour the same fruit sells for its normal price')
  local listed2;Data.Gardens[A].PendingSales={};local c3=grow(A);local c4=grow(A)
- for _,g in ipairs(Data:GetHarvestInventory(A))do if g.InventoryId==c3.Id or g.InventoryId==c4.Id then listed2=g end end
+ for _,g in ipairs(Data:GetHarvestInventory(A))do if g.InventoryId==c3.Id then listed2=g end end -- (c3 only: two fruits roll their own sizes, so c4's price is not c3's)
  check(listed2 and listed2.SellValue==c3.Value and listed2.HourMultiplier==nil,'R132: no bonus shown outside its hour')
  clock=hot.StartsAt+3000
  local ok3,total,count=Data:SellAllHarvests(A)
