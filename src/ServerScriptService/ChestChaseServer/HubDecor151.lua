@@ -132,7 +132,7 @@ local function buildGate(root)
  K.Label(sign,Enum.NormalId.Front,'THE TRACK',{ink={255,236,180},pps=24})
  for i,b in ipairs(K.Biomes)do
   local x=G.KeyX[i];local need,escape=M.SpeedNeed(b.Stage)
-  local k=K.Keycap(f,'Biome key '..i,V(15,3.6,15),CFrame.fromMatrix(V(x,G.KeyY,zc-6.1),V(-1,0,0),V(0,0,-1),V(0,-1,0)),b.Key,
+  local k=K.Keycap(f,'Biome key '..i,V(G.KeySize,3.6,G.KeySize),CFrame.fromMatrix(V(x,G.KeyY,zc-6.1),V(-1,0,0),V(0,0,-1),V(0,-1,0)),b.Key,
    {b.Emoji,b.Name,'⚡ '..need},{name='KeyLegend',weights={.42,.24,.34},ink={255,255,255},stroke=b.Ink,strokeT=.1,pps=20})
   k:SetAttribute('R151Stage',b.Stage);k:SetAttribute('R151Need',need);k:SetAttribute('R151EscapeSpeed',escape)
  end

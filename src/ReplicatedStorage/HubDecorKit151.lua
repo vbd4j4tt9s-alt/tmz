@@ -67,7 +67,8 @@ K.Pilasters={
 -- The track gate (R152: two chess-rook towers and a crenellated gatehouse). TowerD is the colliding shaft's lower diameter (its inner edge,
 -- 91.8, stays outside the 180-wide run-up); the stepped base reaches 17.4 (inner edge 90.3, as the R151 plinth did). The gatehouse wall runs
 -- BeamY0 .. BeamY1 between the towers; the keys hang over the opening in front of it.
-K.Gate={TowerX=99,TowerZ=-100,TowerD=14.4,BeamY0=44,BeamY1=58,KeyY=50,KeyX={72,48,24,0,-24,-48,-72}}
+-- R153: KeySize is a key's width and height (a key hangs from KeyY + KeySize / 2 down to KeyY - KeySize / 2 = 42.5); the track's refresh barrier (ReplicatedStorage.RefreshBarrier) fills the opening under it.
+K.Gate={TowerX=99,TowerZ=-100,TowerD=14.4,BeamY0=44,BeamY1=58,KeyY=50,KeySize=15,KeyX={72,48,24,0,-24,-48,-72}}
 -- The 14 wall lanterns (client): on the pilasters, 28.5 either side of the old mural spots.
 K.WallLanterns={
  {Sec='FrontXPos',W=131.5},{Sec='FrontXPos',W=188.5},{Sec='FrontXPos',W=233.5},{Sec='FrontXPos',W=290.5},

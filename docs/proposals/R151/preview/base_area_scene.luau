@@ -48,7 +48,7 @@ for _,n in ipairs({'ChestChaseRoutesV134Backup','ChestChaseRoutePolishV136Backup
 local movement=R.new('ModuleScript');movement.Name='RunnerMotion';if not RS:FindFirstChild('RunnerMotion')then movement.Parent=RS end
 local Config;step('Config',function()Config=server('Config')end)
 local art;step('BiomeVisuals',function()art=server('BiomeVisuals')end)
-step('MapService.new',function()server('MapService').new(Config);R.advance(.1)end)
+step('MapService.new',function()MAPSVC=server('MapService').new(Config);R.advance(.1)end)
 -- Treadmills and fences: the starting tier (1, Forest) on every base, as most bases look; base 2 / 4 show tier 3 / 5 for variety.
 local skins={1,3,1,5,2,1}
 local records={}
@@ -126,6 +126,8 @@ if BUILT and(PHASE or 2)>=2 then step('HubLife151.client',function()
  BUILT_API=api
 end)end
 model.Parent=nil -- (the test runner's invisible root is not drawn anyway)
+-- R153: REFRESH = true closes the track as the server does at a refresh (MapService:SetBiomeRefreshing: the blackout cover and the barrier in the gate opening).
+if REFRESH then step('refresh barrier',function()MAPSVC:SetBiomeRefreshing(true,10);R.advance(.1)end)end
 -- Dump ---------------------------------------------------------------------------------------------------------------------------------
 local playable={}
 do local f=map.Lobby.LobbyFloor;local c,s=f.CFrame.Position,f.Size

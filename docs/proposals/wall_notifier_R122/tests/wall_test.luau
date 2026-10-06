@@ -31,16 +31,17 @@ local line=new('Part');line.Size=R.Vector3.new(180,.24,1);line.CFrame=R.CFrame.n
 local Bar=req(RS.RefreshBarrier)
 local wall,labels=Bar.Build(line,-100,runtime)
 check(wall.Name=='BiomeRefreshWall'and wall.Parent==runtime,'wall parented')
--- R122: track-sized wall. Track: 180 field, side walls 5 thick at x=±91.5 (outer ±94), 48 tall (top Y 51).
-check(wall.Size.X==188 and wall.Size.Z==4,'wall spans the track incl. side walls (got '..wall.Size.X..')')
-check(wall.Size.Y>=48 and wall.Size.Y<=60,'wall height bounded to about the track walls (got '..wall.Size.Y..')')
+-- R122: track-sized wall. R153: the wall is the rook gate's OPENING (test_barrier153.luau has the geometry against the built gate): between the tower shafts
+-- (x = +-(99 - 7.2 - .4)), from line.Y - 1 up to 1 stud under the keys that hang under the gatehouse (42.5 - 1).
+check(math.abs(wall.Size.X-2*(99-14.4/2-.4))<1e-6 and wall.Size.Z==4,'wall spans the gate opening between the tower shafts (got '..wall.Size.X..')')
+check(math.abs(wall.Size.Y-(42.5-1-3.12))<1e-6,'wall height = floor to just under the keys (got '..wall.Size.Y..')')
 local wb=wall.CFrame.Position.Y-wall.Size.Y/2;local wt=wall.CFrame.Position.Y+wall.Size.Y/2
 check(math.abs(wb-(4.12-1))<1e-6,'wall bottom unchanged at line.Y-1 (got '..wb..')')
-check(wt>=51+1,'wall top above track side walls (got '..wt..')')
+check(wt<=44 and wt<=42.5,'wall top under the gatehouse edge (44) and the keys (42.5) (got '..wt..')')
 check(wall.CFrame.Position.Z==-100 and wall.CFrame.Position.X==0,'wall Z/X placement unchanged')
--- still blocks the entrance: covers the whole 180 field opening and is far above jump height
-check(wall.CFrame.Position.X-wall.Size.X/2<=-94 and wall.CFrame.Position.X+wall.Size.X/2>=94,'wall covers entrance to the outer side-wall edge')
-check(wt-4>=40,'wall top far above default jump (7.2) from ground Y 4')
+-- still blocks the entrance: fills the opening between the shafts and is far above jump height
+check(wall.CFrame.Position.X-wall.Size.X/2>=-(99-14.4/2)and wall.CFrame.Position.X+wall.Size.X/2<=99-14.4/2,'wall stays between the tower shafts')
+check(wt-4>=30,'wall top far above default jump (7.2) from ground Y 4')
 check(wall.CanCollide==true and wall.Anchored==true and wall.CanQuery==true and wall.CanTouch==false,'collision flags unchanged')
 check(wall:GetAttribute('BiomeRefreshBarrier')==true,'barrier attribute')
 local colliders=0;for _,d in ipairs(wall:GetDescendants())do if d:IsA('BasePart')then colliders+=1 end end
@@ -48,14 +49,14 @@ check(colliders==0,'no extra parts on the wall')
 -- sign fits inside the smaller canvas
 for _,g in ipairs(wall:GetChildren())do if g:IsA('SurfaceGui')then
  local cv=g.CanvasSize;local sg=g.NightSign.Sign
- check(cv.X==math.floor(188*Bar.PixelsPerStud)and cv.Y==math.floor(wall.Size.Y*Bar.PixelsPerStud),'canvas follows wall size')
+ check(cv.X==math.floor(wall.Size.X*Bar.PixelsPerStud)and cv.Y==math.floor(wall.Size.Y*Bar.PixelsPerStud),'canvas follows wall size')
  local cy=(1-Bar.SignHeight)*cv.Y
  check(sg.Size.X.Offset<=cv.X and cy-sg.Size.Y.Offset/2>=0 and cy+sg.Size.Y.Offset/2<=cv.Y,'sign inside the canvas')
  check(sg:FindFirstChild('MoonIcon')and #sg.MoonIcon:GetChildren()==0,'server builds an empty moon slot (no hand-drawn moon)')
  local legacy=0;for _,d in ipairs(g:GetDescendants())do if d.Name=='Cloud'or d.Name=='CloudEdge'or d.Name=='Crescent'or d.Name=='Bite'then legacy+=1 end end
  check(legacy==0,'hand-drawn moon/cloud removed')
  local c=sg.Count;local glyph=c.Size.Y.Offset*c.UIScale.Scale
- check(glyph>=200 and glyph/Bar.PixelsPerStud>=25,'countdown still big: '..glyph..' px = '..glyph/Bar.PixelsPerStud..' studs')
+ check(glyph>=190 and glyph/Bar.PixelsPerStud>=20,'countdown still big (R153: scaled to the gate opening): '..glyph..' px = '..glyph/Bar.PixelsPerStud..' studs')
  check(c.Position.X.Offset+c.Size.X.Offset*c.UIScale.Scale<=sg.Size.X.Offset+1,'count fits in sign')
  check(sg.MoonIcon.Position.Y.Offset>=0 and sg.MoonIcon.Position.Y.Offset+sg.MoonIcon.Size.Y.Offset<=sg.Size.Y.Offset,'moon fits in sign')
 end end
@@ -89,7 +90,7 @@ for _,txt in ipairs({'10s','3s','0s'})do
  local sg=faces[1].NightSign.Sign;local moon,c=sg.MoonIcon,sg.Count
  local left=moon.Position.X.Offset;local right=sg.Size.X.Offset-(c.Position.X.Offset+(c.Size.X.Offset-8)*c.UIScale.Scale)
  check(math.abs(left-right)<=12,('%s: moon + count centred (left %.0f, right %.0f)'):format(txt,left,right))
- check(c.Size.Y.Offset*c.UIScale.Scale>=200,txt..': count still big')
+ check(c.Size.Y.Offset*c.UIScale.Scale>=190,txt..': count still big')
 end
 local sg=faces[1].NightSign.Sign
 check(sg:FindFirstChild('Caption')and sg.Caption.Text=='REFRESHING','caption under the count')
