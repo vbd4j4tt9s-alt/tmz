@@ -72,7 +72,7 @@ function H.Create(pg,player)
  for i,name in ipairs({'Speed gain','Pack luck'})do
   local card=block(root,i==1 and'SpeedBoost'or'LuckBoost',UDim2.fromOffset(0,(i-1)*43),UDim2.fromOffset(137,39),Color3.new());card.BackgroundTransparency=1;card.Visible=false
   local glyph=block(card,'Icon',UDim2.fromOffset(0,1),UDim2.fromOffset(37,37),Color3.new());glyph.BackgroundTransparency=1
-  require(RS.HudArtwork).Attach(glyph,i==1 and'Bolt'or'Clover')
+  if i==1 then require(RS.HudArtwork).Attach(glyph,'Bolt')else require(RS.CloverIcon153).Attach(glyph)end -- R153: the luck row shows the 4 Leaf Clover picture (the pass's icon / the owner's drawing / the shapes)
   local value=label(card,'Value',UDim2.fromOffset(39,1),UDim2.fromOffset(94,37),26);value.TextXAlignment=Enum.TextXAlignment.Right
   value.TextColor3=i==1 and C(255,211,99)or C(116,243,180);require(RS.GardenTextFit).Attach(value,26,16)
   boostRows[i]={Root=card,Value=value,Label=name}
@@ -165,6 +165,7 @@ function H.Create(pg,player)
   local values={H.Boosts(player)};hasBoosts=false
   for i,row in ipairs(boostRows)do
    local active=values[i]>1;row.Root.Visible=active;hasBoosts=hasBoosts or active
+   if i==2 and active then pcall(function()require(RS.CloverIcon153).Ensure()end)end -- R153: drawn when the row first shows
    local text=H.Multiplier(values[i]);if row.Value.Text~=text then row.Value.Text=text end
    row.Root:SetAttribute('AccessibleLabel',row.Label..' '..text)
    if i==1 then row.Root:SetAttribute('PointsPerSecond',100*values[i]);row.Root:SetAttribute('Breakdown',tostring(Balance.TrainingTiers[math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)])..' machine × '..tostring(player:GetAttribute('TreadmillMultiplier')or 1)..' trail × '..(player:GetAttribute('DoubleSpeedOwned')and'2' or'1')..' pass × '..SpeedBoost.PlayerFactor(player)..' boost')end

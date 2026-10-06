@@ -126,7 +126,7 @@ for i,pass in ipairs(Passes)do
  local row={Gem=c.GemPerk,Robux=c.RobuxPass,Pass=pass,Views={}}
  passButtons[pass.Key]=row
  table.insert(row.Views,{Card=c,Gem=c.GemPerk,Robux=c.RobuxPass})
- marketplaceInfo(Passes.Id(pass),Enum.InfoType.GamePass,function(info)passButtons[pass.Key].Info=info end)
+ marketplaceInfo(Passes.Id(pass),Enum.InfoType.GamePass,function(info)passButtons[pass.Key].Info=info;if pass.Icon=='Clover'then pcall(function()require(RS.CloverIcon153).SetInfo(info)end)end end) -- R153: the pass's own icon (IconImageAssetId) is the clover's first choice
 end
 for _,row in pairs(passButtons)do for _,v in ipairs(row.Views)do table.insert(passViews,v)end end
 -- SPEED and MONEY bundles.
@@ -182,6 +182,11 @@ refresh=function()
   local info=row.Info;local forSale=info~=nil and info.IsForSale==true and info.PriceInRobux~=nil
   for _,v in ipairs(row.Views)do
    if v.Gem.Visible==owned then v.Gem.Visible=not owned;reflow=true end
+   -- R153: a pass that is Gem-only until it has a Robux id (Passes.RobuxSoon) has no Robux button and says ROBUX SOON; once it is owned the button is back and reads OWNED, the tag PERMANENT
+   local soon=Passes.RobuxSoon(row.Pass)and not owned
+   if v.Robux.Visible==soon then v.Robux.Visible=not soon;reflow=true end
+   local tag=v.Card:FindFirstChild('Permanent');local tagText=soon and'ROBUX SOON'or'PERMANENT'
+   if tag and v.Card:GetAttribute('Tag')~=tagText and(soon or v.Card:GetAttribute('Tag')~=nil)then v.Card:SetAttribute('Tag',tagText);tag.Text=tagText end
    setPrice(v.Gem,owned and'Owned'or not ownershipReady and'Checking…'or tostring(Catalog.PassGemPrices[row.Pass.Key]),ownershipReady and not owned);active(v.Gem,ownershipReady and not owned and not busy)
    setPrice(v.Robux,owned and'OWNED'or forSale and Art.RobuxText(info.PriceInRobux)or'Unavailable',forSale and not owned,owned and Art.Colors.Owned or Art.Colors.Robux)
    active(v.Robux,not owned and not busy and info~=nil and info.IsForSale==true)
@@ -378,6 +383,7 @@ local function open(value)
  local changed=panel.Visible~=value
  if value then relayout()end
  panel.Visible=value;shade.Visible=value;jumpRoot.Visible=value
+ if value then pcall(function()require(RS.CloverIcon153).Ensure()end)end -- R153: the clover picture is drawn when the shop opens (once per client)
  if value then
   if changed then goTo(pg:GetAttribute('PremiumPage'),false)end
   if pg:GetAttribute('SeedMenu')~='Passes'then pg:SetAttribute('SeedMenu','Passes')end;if changed then act('State')end;focusBundle()

@@ -7,9 +7,46 @@ local P={}
 local SizeRandom=Random.new()
 local function integer(n,lo,hi)return type(n)=='number'and n==n and n%1==0 and n>=lo and n<=hi end
 local function copy(t)local out={};for k,v in pairs(t)do out[k]=type(v)=='table'and copy(v)or v end;return out end
+-- R153: passes added after R152 (GamePassCatalog Late) keep their saved data apart, in the optional field Premium.Later153 = {Entitlements={Clover=true},GiftCredits={Clover=n},PassOutbox={[id]=gift}}:
+-- an R152 server rejects an Entitlements / GiftCredits / PassOutbox key it does not know (UnsupportedPremium: it kicks the player, the save stays safe) but keeps an unknown Premium field as it
+-- is, so there the field is simply ignored. In memory everything stays where the other passes are (Entitlements ...): Pack (on the copy that is being saved) moves the late keys out,
+-- Unpack (Decode) moves them back. Keys of a pass this server does not know stay inside Later153 untouched, so a newer server's data survives an older server's save.
+local function lateKeys()local set={};for _,p in ipairs(require(RS.GamePassCatalog))do if p.Late then set[p.Key]=true end end;return set end
+function P.Pack(premium)
+ local late=lateKeys();local out=type(premium.Later153)=='table'and premium.Later153 or{}
+ for _,name in ipairs({'Entitlements','GiftCredits','PassOutbox'})do if type(out[name])~='table'then out[name]={}end end
+ for key in pairs(late)do for _,name in ipairs({'Entitlements','GiftCredits'})do
+  local map=premium[name];if type(map)=='table'and map[key]~=nil then out[name][key]=map[key];map[key]=nil end
+ end end
+ if type(premium.PassOutbox)=='table'then for id,gift in pairs(premium.PassOutbox)do if type(gift)=='table'and late[gift.PassKey]then out.PassOutbox[id]=gift;premium.PassOutbox[id]=nil end end end
+ local any=false;for _,name in ipairs({'Entitlements','GiftCredits','PassOutbox'})do if next(out[name])~=nil then any=true end end
+ premium.Later153=any and out or nil
+ return premium
+end
+-- saved Premium -> a copy with the late keys back where the checks look (nil = the field is not what Pack writes).
+function P.Unpack(saved)
+ local result=copy(saved);local later=result.Later153;result.Later153=nil
+ if later==nil then return result end
+ if type(later)~='table'then return nil end
+ local known=lateKeys();local rest={Entitlements={},GiftCredits={},PassOutbox={}}
+ for _,name in ipairs({'Entitlements','GiftCredits','PassOutbox'})do
+  local map=later[name];if map==nil then continue end
+  if type(map)~='table'then return nil end
+  result[name]=result[name]or{}
+  if type(result[name])~='table'then return nil end
+  for key,value in pairs(map)do
+   if name=='PassOutbox'then
+    if type(value)=='table'and known[value.PassKey]then result[name][key]=value else rest[name][key]=value end
+   elseif known[key]then result[name][key]=value else rest[name][key]=value end
+  end
+ end
+ for _,name in ipairs({'Entitlements','GiftCredits','PassOutbox'})do if next(rest[name])~=nil then result.Later153=rest;break end end
+ return result
+end
 function P.Decode(saved)
  if saved==nil then return {Version=2,BalanceVersion81=81,IndexRewardVersion=104,BiomeBackpay81={},BiomeHalfRewards={},OldRoster148={},Gems=0,Entitlements={},Biomes={},Receipts={},Plants={},SeedRewards={},Settings=require(RS.SettingsConfig).Read()}end
  if type(saved)~='table'or (saved.Version~=1 and saved.Version~=2) or not integer(saved.Gems,0,Catalog.MaxGems)then return nil end
+ saved=P.Unpack(saved);if not saved then return nil end -- R153: the late passes' saved data (Later153) goes back where the checks below look
  for _,key in ipairs({'Entitlements','Biomes','Receipts'})do
   if type(saved[key])~='table'then return nil end
   local n=0;for id,v in pairs(saved[key])do

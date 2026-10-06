@@ -324,6 +324,12 @@ function PlayerDataService:PreparePlayer(player)
 	player:SetAttribute("DataStatus", "Loading")
 	player:SetAttribute("TreadmillMultiplier", 1)
 	player:SetAttribute("ChestLuckMultiplier", 1)
+	-- R153: owning a luck pass (any way) changes the luck at once, not at the next boots change.
+	for _, pass in ipairs(require(game:GetService('ReplicatedStorage').GamePassCatalog)) do
+		if (pass.Luck or 1) > 1 then
+			player:GetAttributeChangedSignal(pass.Attribute):Connect(function() if self.OwnedBoosts[player] then self:RefreshBoostMultipliers(player) end end)
+		end
+	end
 	player:SetAttribute("SeedInventoryCount", 0)
 	player:SetAttribute("SeedInventoryRevision", 0)
 	player:SetAttribute("DiscoveredSeedCount", 0)
@@ -698,6 +704,15 @@ end
 function PlayerDataService:HasTestLuck(player)
 	return self.TestLuck[player] == true
 end
+-- R153: the product of the luck passes the player owns (a pass counts when its Owned attribute is on, which the Robux check, a game-pass purchase, a Gem purchase and a gift all set, or when the saved Gem / gift entitlement is there).
+function PlayerDataService:PassLuck(player)
+	local luck = 1
+	local premium = self.Premium and self.Premium[player]
+	for _, pass in ipairs(require(game:GetService('ReplicatedStorage').GamePassCatalog)) do
+		if (pass.Luck or 1) > 1 and (player:GetAttribute(pass.Attribute) == true or (premium and type(premium.Entitlements) == "table" and premium.Entitlements[pass.Key] == true)) then luck = luck * pass.Luck end
+	end
+	return luck
+end
 function PlayerDataService:RefreshBoostMultipliers(player)
 	local bestSpeedMultiplier = 1
 	local bestLuckMultiplier = 1
@@ -714,7 +729,9 @@ function PlayerDataService:RefreshBoostMultipliers(player)
 		end
 	end
 	player:SetAttribute("TreadmillMultiplier", bestSpeedMultiplier)
-	bestLuckMultiplier=math.clamp(bestLuckMultiplier,1,require(game:GetService('ReplicatedStorage').BalanceValues81).MaxLuck)
+	-- R153: the best boots (owner test boots too) x every luck pass the player owns (GamePassCatalog Luck: the 4 Leaf Clover = x2, bought with Robux or Gems), then the one cap (MaxLuck).
+	-- The pass multiplies real and test luck alike, so HasTestLuck still says whether the BOOTS in use are the owner's.
+	bestLuckMultiplier=math.clamp(bestLuckMultiplier*self:PassLuck(player),1,require(game:GetService('ReplicatedStorage').BalanceValues81).MaxLuck)
 	player:SetAttribute("ChestLuckMultiplier", bestLuckMultiplier)
 	self.TestLuck[player] = testLuck > realLuck
 	return bestSpeedMultiplier, bestLuckMultiplier
@@ -1246,7 +1263,7 @@ function PlayerDataService:_buildSaveData(player)
 
 	return {
 		Version = self.Config.ProfileVersion,
-        Premium = gardenClonePremium(self:GetPremium(player)),
+        Premium = require(script.Parent.PremiumProgress).Pack(gardenClonePremium(self:GetPremium(player))), -- R153: late passes' data goes to the optional Later153 (an R152 server ignores it)
 		Garden = self:CopyGarden(self.Gardens[player]),
 		DiscoveredSeeds = self:GetDiscoveredSeeds(player),
 		SeedInventorySerial = player:GetAttribute("ChestInventorySerial") or 0,

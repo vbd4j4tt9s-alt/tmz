@@ -45,8 +45,10 @@ end
 function A:Announce(player,kind,arg)
  local okay,name=pcall(A.Name,kind,arg)
  if not okay or type(name)~='string'or not player or not player.Parent then return false end
+ -- R153: a pass with an Emoji (the 4 Leaf Clover 🍀) shows it in the line, and its Icon key goes to the client (PurchaseCelebration pops that picture); the other passes send exactly what they did.
+ local row=(kind=='Pass'or kind=='Gift')and pass(arg)or nil
  local notices=self.Data and self.Data.Notifications
- if notices then pcall(notices.Show,notices,player,'✅ Bought: '..name..'!',A.Color,A.Seconds)end
- return(pcall(self.Remote.FireClient,self.Remote,player,{Kind=kind,Name=name}))
+ if notices then pcall(notices.Show,notices,player,'✅ Bought: '..(row and row.Emoji and row.Emoji..' 'or'')..name..'!',A.Color,A.Seconds)end
+ return(pcall(self.Remote.FireClient,self.Remote,player,{Kind=kind,Name=name,Icon=row and row.Icon or nil}))
 end
 return A
