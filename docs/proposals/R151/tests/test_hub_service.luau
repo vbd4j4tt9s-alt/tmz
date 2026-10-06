@@ -96,7 +96,7 @@ local function makeServer(backend,opts)
  local lobby=R.new('Folder');lobby.Name='Lobby';lobby.Parent=folder
  local floor=R.new('Part');floor.Name='LobbyFloor';floor.Size=V3(680,1,524);floor.CFrame=CF(0,3.5,-361);floor.Parent=lobby
  s.Map={MapRoot=folder}
- s.Service=Service.new(Config,{},s.Notes,s.Map,{Clock=s.Clock.now,Time=s.Clock.time,Store=s.Store,Art=s.Art,Avatars=s.Avatars,FruitList=list,NoLoop=true,Random=rng,Announce=s.Announcer.Announce})
+ s.Service=Service.new(Config,{},s.Notes,s.Map,{Clock=s.Clock.now,Time=s.Clock.time,Store=s.Store,Art=s.Art,Avatars=s.Avatars,FruitList=opts.List or list,NoLoop=true,Random=rng,Announce=s.Announcer.Announce})
  return s
 end
 local function pull(over)
@@ -558,6 +558,78 @@ do
  svc:SetDayOffset(0)
  check(svc:Snapshot().Day==DAY and svc:Snapshot().FruitId==todayId and svc:Snapshot().Fruit.Record==nil,'day 0 comes back to today with an empty fruit board')
  local clamp=svc:SetDayOffset(1e9);check(clamp<=400,'the preview offset is limited');svc:SetDayOffset(0)
+end
+-- 11. R152: servers that disagree on the fruit of the day (an update that adds plants changes the list) must not starve BEST PULL. The fruit board of a server whose fruit is not the stored one
+-- stayed "unsynced" for ever (the store never holds its fruit), so every step tried again (a compare-and-set + a read) and spent this server's whole request budget (12 a minute): the
+-- pull board's own writes and reads were refused with 'budget' and BEST PULL stopped syncing for the day.
+do
+ local listB;for drop=1,#list do local t={};for i,id in ipairs(list)do if i~=drop then t[#t+1]=id end end;if Rules.FruitForDay(t,DAY)~=todayFruit then listB=t;break end end
+ local otherFruit=listB and Rules.FruitForDay(listB,DAY)
+ check(listB~=nil and otherFruit~=nil and otherFruit~=todayFruit,'(two lists with different fruits of the day: '..tostring(todayFruit)..' and '..tostring(otherFruit)..')')
+ local function mismatch(label,heavyOther)
+  local backend=HH.backend();local ca=HH.clock(T0);local cb=HH.clock(T0);backend.Now=function()return ca.t end
+  local SA=makeServer(backend,{Clock=ca,Seed=5});local SB=makeServer(backend,{Clock=cb,Seed=77,List=listB})
+  SA.Service:Start();SB.Service:Start()
+  check(SA.Service.Board.FruitId==todayFruit and SB.Service.Board.FruitId==otherFruit,label..': the two servers have different fruits of the day')
+  local pa,pb=HH.player(91,'Ann'),HH.player(92,'Bea')
+  local function both(seconds)for _=1,math.floor(seconds/5)do ca.advance(5);cb.advance(5);SA.Service:Step();SB.Service:Step()end end
+  -- A takes the shared fruit slot first; B has a fruit of ITS day and a pull
+  SA.Service:NoteHarvest(pa,{SeedId=todayFruit,FruitScale=8});both(10)
+  local firstFruit=backend.peek(Rules.StoreName,'d'..DAY).fruit
+  check(firstFruit and firstFruit.Name=='Ann'and firstFruit.Id==todayFruit,label..': A\'s fruit is the shared one')
+  SB.Service:NoteHarvest(pb,{SeedId=otherFruit,FruitScale=heavyOther and 50 or .5})
+  SB.Service:NotePull(pb,reward('FirePepperSeed','Mythic'),info())
+  local r0=SB.Svc.Requests
+  both(60)
+  local stored=backend.peek(Rules.StoreName,'d'..DAY)
+  check(stored.pull and stored.pull.Name=='Bea','B\'s pull reached the store (a minute) although its fruit board is out of step ('..tostring(stored.pull and stored.pull.Name)..')')
+  check(stored.fruit and stored.fruit.Name=='Ann'and stored.fruit.Id==todayFruit,label..': a fruit of another type is never written over the shared one ('..tostring(stored.fruit and stored.fruit.Id)..')')
+  check(not SB.Service:Snapshot().Fruit.Unsynced and SB.Service:Snapshot().Fruit.Record and SB.Service:Snapshot().Fruit.Record.Name=='Bea','B keeps its own fruit board (shown, and nothing left to write: a mismatch is not an outstanding write)')
+  -- the other way round: a King pulled on A reaches B within a couple of minutes, and B's traffic stays small
+  SA.Service:NotePull(pa,reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01'}))
+  both(120)
+  check(SB.Service:Snapshot().Pull.Record and SB.Service:Snapshot().Pull.Record.Name=='Ann','A\'s King shows on B within two minutes ('..tostring(SB.Service:Snapshot().Pull.Record and SB.Service:Snapshot().Pull.Record.Name)..')')
+  both(600)
+  local perMinute=(SB.Svc.Requests-r0)/13
+  check(perMinute<=4,label..': B spends at most a few store requests a minute ('..string.format('%.1f',perMinute)..'); it used to retry the fruit every step until the budget ran out')
+  check(SB.Store:Status().Failures==0,label..': and nothing was refused or failed ('..SB.Store:Status().Failures..' failures)')
+  -- ten minutes into the mismatch a better pull on B is still written at once, and A reads it within a minute
+  SB.Service:NotePull(pb,reward('SolarStarfruitSeed','King',{SeedScale=9}),info({Stage=2,Variant='Pack01'}))
+  both(10)
+  check(backend.peek(Rules.StoreName,'d'..DAY).pull.Name=='Bea','a better pull taken on B ten minutes into the mismatch is written within seconds')
+  both(60)
+  check(SA.Service:Snapshot().Pull.Record.Name=='Bea','and A shows it within a minute')
+ end
+ mismatch('B\'s fruit is lighter',false)
+ mismatch('B\'s fruit is heavier',true)
+ -- a mismatch that has gone (B restarted on the new list): the fruit syncs again
+ do
+  local backend=HH.backend();local ca=HH.clock(T0);local cb=HH.clock(T0);backend.Now=function()return ca.t end
+  local SA=makeServer(backend,{Clock=ca,Seed=5});local SB=makeServer(backend,{Clock=cb,Seed=77,List=listB});SA.Service:Start();SB.Service:Start()
+  local pa,pb=HH.player(93,'Cy'),HH.player(94,'Di')
+  SA.Service:NoteHarvest(pa,{SeedId=todayFruit,FruitScale=8})
+  for _=1,12 do ca.advance(5);cb.advance(5);SA.Service:Step();SB.Service:Step()end
+  SB.Service:NoteHarvest(pb,{SeedId=otherFruit,FruitScale=9})
+  for _=1,24 do ca.advance(5);cb.advance(5);SA.Service:Step();SB.Service:Step()end
+  check(backend.peek(Rules.StoreName,'d'..DAY).fruit.Name=='Cy','(while the shared fruit is of A\'s type, B writes none)')
+  SB.Service.FruitList=list;SB.Service.Board:SetDay(DAY,todayFruit) -- B now agrees with A
+  SB.Service:NoteHarvest(pb,{SeedId=todayFruit,FruitScale=9})
+  for _=1,24 do ca.advance(5);cb.advance(5);SA.Service:Step();SB.Service:Step()end
+  check(backend.peek(Rules.StoreName,'d'..DAY).fruit.Name=='Di','once both servers agree on the fruit, the heavier one is shared again')
+ end
+ -- the safety net for anything else that keeps a board unsynced after a write (a store that answers but never keeps the record): that board waits a poll before it tries again, so it can
+ -- never spend the request budget the other board needs
+ do
+  local backend=HH.backend();local ca=HH.clock(T0);backend.Now=function()return ca.t end
+  local S=makeServer(backend,{Clock=ca,Seed=5});S.Service:Start()
+  local merges=0;S.Service.Store.Merge=function()merges+=1;return true,nil,false,false end
+  S.Service.Store.Read=function()return true,{}end
+  S.Service:NotePull(HH.player(95,'Eve'),reward('FirePepperSeed','Mythic'),info())
+  for _=1,12 do ca.advance(5);S.Service:Step()end
+  check(merges>=1 and merges<=2,'a write that settles nothing is not repeated every step ('..merges..' attempts in a minute; it used to be one per step)')
+  for _=1,18 do ca.advance(5);S.Service:Step()end
+  check(merges<=4,'... and in two and a half minutes only about once a poll ('..merges..')')
+ end
 end
 print(string.format('%d checks, %d failures',checks,fails))
 if fails>0 then error('FAILED')end

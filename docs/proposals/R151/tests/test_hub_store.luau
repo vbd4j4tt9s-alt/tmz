@@ -115,6 +115,18 @@ do
  local _,_,f3=b:Merge(DAY,'Fruit',fruit({Uid=6,Scale=4,At=2000}))
  local _,_,f4=b:Merge(DAY,'Fruit',fruit({Uid=6,Scale=4,At=500}))
  check(f1 and not f2 and not f3 and f4 and backend.peek(Rules.StoreName,KEY).fruit.Uid==6,'fruit: a heavier one wins, a lighter or a later equal one does not, an earlier equal one does')
+ -- R152: a stored fruit of ANOTHER type (a server on another plant list) is never compared and never replaced; the writer is told (Foreign) and nothing is written
+ backend=HH.backend();backend.Now=function()return clock.t end
+ a=server(backend,clock);b=server(backend,clock)
+ a:Merge(DAY,'Fruit',fruit({Uid=5,Scale=2}),'SunflowerSeed')
+ local updates=backend.Calls.Update
+ local okF,docF,tookF,foreignF=b:Merge(DAY,'Fruit',fruit({Uid=6,Id='AppleSeed',Scale=40}),'AppleSeed')
+ check(okF and docF==nil and tookF==false and foreignF==true and backend.peek(Rules.StoreName,KEY).fruit.Uid==5,'another type of fruit, however heavy, does not replace the stored one: answered Foreign, nothing written')
+ local okS,docS,tookS,foreignS=b:Merge(DAY,'Fruit',fruit({Uid=6,Scale=1}),'SunflowerSeed')
+ check(okS and docS==nil and tookS==false and foreignS==false,'a lighter fruit of the SAME type is a plain "someone else is better" (not Foreign)')
+ local _,docP,tookP,foreignP=b:Merge(DAY,'Pull',pull(),'AppleSeed')
+ check(tookP and foreignP==false and docP.pull and docP.fruit.Uid==5,'a pull is written whatever fruit the document holds, and keeps it')
+ check(backend.Calls.Update==updates+3,'(each answer was one request)')
  -- junk already in the store
  backend=HH.backend();backend.Now=function()return clock.t end
  a=server(backend,clock)

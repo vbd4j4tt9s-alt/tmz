@@ -246,14 +246,17 @@ function S:_push()
  for _,kind in ipairs(KINDS)do
   if self.Board:Unsynced(kind)and now>=self.Blocked[kind]then
    local rec=self.Board:LocalBest(kind)
-   local ok,doc=self.Store:Merge(self.Board.Day,kind,rec,self.Board.FruitId)
+   local ok,doc,_,foreign=self.Store:Merge(self.Board.Day,kind,rec,self.Board.FruitId)
    if not ok then return wrote end -- (the store backs off; the record stays Unsynced and goes out when it can)
    wrote=true
-   if doc then self:_merge(doc)
+   if foreign then self.Board:SetForeign(kind) -- (R152: the shared fruit is another plant list's: this board stays on this server, no read-back needed)
+   elseif doc then self:_merge(doc)
    else -- someone else's record is better: read it (or, if that fails too, wait a poll before offering again)
     local readOk,fresh=self.Store:Read(self.Board.Day)
     if readOk then self:_merge(fresh)else self.Blocked[kind]=now+Rules.PollSeconds end
    end
+   -- R152: a board that a write did not settle waits a poll before it tries again, so one board can never spend the request budget the other needs
+   if self.Board:Unsynced(kind)then self.Blocked[kind]=now+Rules.PollSeconds end
   end
  end
  return wrote
@@ -388,7 +391,7 @@ function S:StatusText()
  local p=snap.Pull
  lines[#lines+1]=p.Record and('BEST PULL: %s - %s %s, %s (%s%s)'):format(p.Record.Name,p.Record.Rarity,p.Record.Seed,Rules.OddsText(p.Record.Odds),p.Source,p.Unsynced and', not shared yet'or'')or'BEST PULL: nobody yet'
  local f=snap.Fruit
- lines[#lines+1]=f.Record and('BIGGEST FRUIT: %s - %s%s (%s%s)'):format(f.Record.Name,Rules.KgText(f.Record.Kg),f.Record.Coat~='None'and(' '..f.Record.Coat)or'',f.Source,f.Unsynced and', not shared yet'or'')or'BIGGEST FRUIT: nobody yet'
+ lines[#lines+1]=f.Record and('BIGGEST FRUIT: %s - %s%s (%s%s%s)'):format(f.Record.Name,Rules.KgText(f.Record.Kg),f.Record.Coat~='None'and(' '..f.Record.Coat)or'',f.Source,f.Unsynced and', not shared yet'or'',self.Board.Boards.Fruit.Foreign and', not shared: other servers have another fruit today'or'')or'BIGGEST FRUIT: nobody yet'
  local st=snap.Store
  lines[#lines+1]=self:_preview()and'Shared board: off while previewing another day'
   or('Shared board: %s, %d request%s, %s'):format(st.Failures==0 and'ok'or('FAILING x'..st.Failures..(st.Throttled and' (throttled)'or'')),st.Requests,st.Requests==1 and''or's',st.LastError and('last error: '..st.LastError..'; retry in '..math.ceil(st.RetryIn)..' s')or(st.LastOk and'last ok'or'not read yet'))
