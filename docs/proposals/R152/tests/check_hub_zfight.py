@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', '..', 'R149', 'tools'))
 import zfight as Z  # noqa: E402
 
-MARKS = ('/HubDecor151/', 'HubLife151/')
+MARKS = ('/HubDecor151/', 'HubLife151/', '/HubTrampolines153/')  # (R153: the trampolines in the garden nooks)
 SAVED = ('ChestChaseWalls/', 'GardenHubDesign/')
 DESIGNED = (('Grass patch', 'Grass patch'), ('Stage circle', 'Market square'), ('South street', 'South plaza'), ('Garden walk', 'Garden nook'),
             ('Back lane', 'Lane nook'), ('Corner circle', 'Curb'))

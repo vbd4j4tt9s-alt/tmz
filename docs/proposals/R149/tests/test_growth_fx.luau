@@ -178,6 +178,9 @@ do
  local straight=centre0+(aim-centre0)*((c-centre0):Dot(aim-centre0)/(total*total))
  check(c.Y>straight.Y+.3,'... and above the straight line (an arc)')
  local ratio=ps[1].Size.X/sizes[1].X;check(ratio<.95 and ratio>.55,('... and smaller (x%.2f)'):format(ratio))
+ -- R153 (owner: "fix all jittery type effects"): it shrinks on every frame (the size was written every other frame: a 30 Hz stutter)
+ do local same,last=0,ps[1].Size.X;for _=1,6 do R.advance(1/60);fx:StepFrame();if ps[1].Size.X==last then same+=1 end;last=ps[1].Size.X end
+  check(same==0,'R153: ... shrinking on every frame ('..same..' of 6 frames kept the last size)')end
  -- the harvester moves: the fruit follows
  myRoot.CFrame=CF(3,3,-6)
  while R.clock-t0<flight.Seconds*.97 do R.advance(1/60);fx:StepFrame()end

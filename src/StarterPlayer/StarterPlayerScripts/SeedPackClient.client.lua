@@ -466,10 +466,10 @@ table.insert(connections,RunService.PreSimulation:Connect(function()
         record.Pose:Apply(bag,now)
     end
 end))
-local revealAccumulator=0
+-- R153 (owner: "fix all jittery type effects"): the loose / held seeds' aura and the pack reveal in the world are drawn every rendered frame (they ran at
+-- Rules.SeedMotion.UpdateInterval, 30 Hz: stepped on a 60 Hz screen). Bounded as before: 12 seed auras (6 detailed) within 120 studs, reveals near the camera.
 table.insert(connections,RunService.RenderStepped:Connect(function(dt)
-    revealAccumulator+=dt;if revealAccumulator<Rules.SeedMotion.UpdateInterval then return end
-    local elapsed=revealAccumulator;revealAccumulator%=Rules.SeedMotion.UpdateInterval
+    local elapsed=dt
     local now=workspace:GetServerTimeNow()
     updateHeldSeeds(elapsed,now)
     if #tails>0 then stepTails(now)end

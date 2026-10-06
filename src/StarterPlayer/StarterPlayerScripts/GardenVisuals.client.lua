@@ -17,6 +17,13 @@ local Effects=require(RS:WaitForChild('PlantEffects'))
 local Trees=require(RS:WaitForChild('TreeReworkMotion'))
 local Batch=require(RS:WaitForChild('PlantAnimationBatch'))
 local animationBatch=Batch.new(workspace)
+-- R153 (owner: "fix all jittery type effects"): the fast motions of a plant near the camera (within FAST_NEAR studs, on screen) are drawn every
+-- frame in RenderStepped: the Frostbell's ringing bells and its rarity effects (orbiting fireflies, sparks, glints, fruit effects, glows). They
+-- moved on the 20 Hz (10 Hz low) animation tick below, in visible steps. The slow ones stay on that tick (growth, wind sway, jaw, petals, holograms,
+-- tree drift: well under a pixel a tick). The tick picks them (the same budgets: 2 bell plants, the near plants' effects) and the frame pass moves
+-- only those, in its own batch.
+local fastBatch=Batch.new(workspace);local fastEntries={}
+local FAST_NEAR,FAST_NEAR_LOW=75,45
 local Gui=game:GetService('GuiService')
 local Arrival=require(RS:WaitForChild('HarvestArrival'))
 local Planner=require(RS:WaitForChild('PlantDetailPlanner'))
@@ -365,7 +372,6 @@ RunService.Heartbeat:Connect(function(dt)
   if not okay or coroutine.status(job.Thread)=='dead'then finishJob(job)end
  end
  if RunService:IsStudio()or player:GetAttribute('ChestChaseCommandsAllowed')then player:SetAttribute('PlantBuildInProgress',activeBuild~=nil)end
- Anim:StepFrame() -- R149 (#8): the harvest flights, smooth every frame (one call, no connection per fruit); nothing runs when none fly
  if animateClock<(Fx.Low()and .1 or 1/20)then return end;animateClock=0
  debug.profilebegin('Plant animations');local animationStarted=os.clock()
  local t=workspace:GetServerTimeNow()
@@ -380,6 +386,7 @@ RunService.Heartbeat:Connect(function(dt)
  if not passOk then error(passWhy,0)end
  Anim:StepBounces(animationBatch) -- R149 (#7): queued before the rigs are posed, which only fill the parts not queued yet
  local bellCount,petalModels,petalParts,mawCount=0,0,0,0
+ local fast={}
  for _,entry in ipairs(ordered)do
   local r=entry.Record
   if r.Visual and not r.Build and r.Crop and r.Crop.SeedId=='ObsidianMawSeed'and not r.Growing and r.Mode=='normal'and motionVisible(entry,65,180) and mawCount<2 then
@@ -390,7 +397,8 @@ RunService.Heartbeat:Connect(function(dt)
    if not r.Bells then
     local pose=r.Visual:GetPivot();r.Visual:PivotTo(r.Origin);r.Bells=Bells.Capture(r.Visual,r.Origin);r.Visual:PivotTo(pose)
    end
-   if r.MotionDue then Bells.Step(r.Bells,r.Pose or r.Origin,r.Crop.Id,t,entry.Distance<32,animationBatch)end
+   r.FastBells=entry.Distance<(Fx.Low()and FAST_NEAR_LOW or FAST_NEAR)
+   if r.MotionDue and not r.FastBells then Bells.Step(r.Bells,r.Pose or r.Origin,r.Crop.Id,t,entry.Distance<32,animationBatch)end
   elseif r.Bells then Bells.Reset(r.Bells,r.Pose or r.Origin,animationBatch);r.Bells=nil end
   if r.Floating and not r.Build then
    local animate=r.Mode=='normal'and not r.Growing and motionVisible(entry,65,180) and petalModels<2 and petalParts+#r.Floating<=12
@@ -409,7 +417,9 @@ RunService.Heartbeat:Connect(function(dt)
   end
   -- Overrides are queued first, so the body computes only the remaining part poses.
   if r.QueuePose then animationBatch:Pose(r.Rig,r.Pose,true);r.QueuePose=false end
-  if r.Effects and r.Visual and r.MotionDue then Effects.Step(r,t,animationBatch,r.Pose or r.Origin)end
+  r.FastEffects=r.Effects~=nil and r.Visual~=nil and not r.Build and entry.OnScreen and entry.Distance<(Fx.Low()and FAST_NEAR_LOW or FAST_NEAR)
+  if r.Effects and r.Visual and r.MotionDue then Effects.Step(r,t,animationBatch,r.Pose or r.Origin,r.FastEffects and'tree'or nil)end
+  if r.FastEffects or(r.Bells and r.FastBells)then fast[#fast+1]=entry end
 
  end
  for _,entry in ipairs(hologramEntries)do
@@ -423,7 +433,24 @@ RunService.Heartbeat:Connect(function(dt)
   end
  end
  lastAnimationMoves,lastAnimationRequests=animationBatch:Flush();lastAnimationMs=(os.clock()-animationStarted)*1000
+ fastEntries=fast
  debug.profileend()
+end)
+-- R153: the frame pass (see FAST_NEAR): only what the last tick picked; nothing when no plant is near.
+RunService.RenderStepped:Connect(function()
+ Anim:StepFrame() -- R149 (#8): the harvest flights, smooth every frame (one call, no connection per fruit); nothing runs when none fly. R153: here, in
+ -- RenderStepped (was the Heartbeat step), with the frame that is drawn: the fruit flies to the harvester's root as the camera sees it.
+ if #fastEntries==0 then return end
+ local t=workspace:GetServerTimeNow();local live=0
+ for _,entry in ipairs(fastEntries)do
+  local r=entry.Record
+  if r.Visual and r.Visual.Parent and not r.Build and r.Crop then
+   if r.FastBells and r.Bells then Bells.Step(r.Bells,r.Pose or r.Origin,r.Crop.Id,t,entry.Distance<32,fastBatch);live+=1 end
+   if r.FastEffects and r.Effects then Effects.Step(r,t,fastBatch,r.Pose or r.Origin,'fast');live+=1 end
+  end
+ end
+ fastBatch:Flush()
+ if live==0 then table.clear(fastEntries)end
 end)
 task.spawn(function()
  while script.Parent do

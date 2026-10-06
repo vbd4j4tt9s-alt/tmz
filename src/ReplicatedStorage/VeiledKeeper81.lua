@@ -68,7 +68,7 @@ local function jointPose(t,sleep,move,speed,load,hit,sig)
  return p
 end
 local cached=setmetatable({},{__mode='k'})
-function K.Frames(model,now)
+function K.Frames(model,now,root)
  if not model.PrimaryPart then return nil end
  local state=model:GetAttribute('GuardianBehavior')or'GUARDING'
  local asleep=state=='GUARDING'or state=='SLEEPING'
@@ -77,17 +77,19 @@ function K.Frames(model,now)
  local moving=(state=='CHASING'or state=='RETURNING'or state=='DASHING')and awake or 0
  local load,hit=Combat.Pose(7,now,model:GetAttribute('KeeperAttackAt'))
  local localFrames=jointPose(now,1-awake,moving,model:GetAttribute('KeeperTravelSpeed')or 600,load,hit)
- local rootFrame=require(script.Parent.KeeperRecoveryDash).VisualFrame(model,now,model.PrimaryPart.CFrame)
+ local rootFrame=root or require(script.Parent.KeeperRecoveryDash).VisualFrame(model,now,model.PrimaryPart.CFrame)
  local out={};for key,f in pairs(localFrames)do out[key]=rootFrame*f end
  return out
 end
 -- R123: the client's view: the signature lunge inside the strike window, otherwise exactly K.Frames.
 -- lead: seconds of the windup this client missed (late replication). The server never calls this.
-function K.ClientFrames(model,now,lead)
+-- R153: root (optional): the body's frame to pose on, the client's smoothed root (KeeperMotion: the server's root arrives in packet steps);
+-- without it, the replicated root as before (the server's K.Frames never passes one).
+function K.ClientFrames(model,now,lead,root)
  local sig=model.PrimaryPart and require(script.Parent.KeeperSignatureStrike).Veiled(now,model:GetAttribute('KeeperAttackAt'),lead)
- if not sig then return K.Frames(model,now)end
+ if not sig then return K.Frames(model,now,root)end
  local localFrames=jointPose(now,0,0,model:GetAttribute('KeeperTravelSpeed')or 600,0,0,sig)
- local rootFrame=require(script.Parent.KeeperRecoveryDash).VisualFrame(model,now,model.PrimaryPart.CFrame)
+ local rootFrame=root or require(script.Parent.KeeperRecoveryDash).VisualFrame(model,now,model.PrimaryPart.CFrame)
  local out={};for key,f in pairs(localFrames)do out[key]=rootFrame*f end
  return out
 end

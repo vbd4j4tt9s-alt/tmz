@@ -182,14 +182,20 @@ local function settle(entry)
 end
 -- The loop (connected only while a pack is near) --------------------------------------------------------------------------------------------------------------
 local loop
-local STEP_LOW=1/30 -- tier 2 and below (phones): the whole pack step (pose, debris, comets, pulse) runs at 30 Hz, with the time it skipped, so the turn keeps its speed (every frame on tier 3)
+local STEP_LOW=1/30 -- tier 2 and below (phones), out of view only: the whole pack step (pose, debris, comets, pulse) runs at 30 Hz, with the time it skipped, so the turn keeps its speed
+-- R153 (owner: "fix all jittery type effects"): in view the pack steps every rendered frame on every tier (on tier 2 and below it turned in 30 Hz
+-- steps on a 60 Hz screen: R152 fix B5). The tier-2 saving stays where nothing is seen: out of view (ViewCull152), 30 Hz.
+local function inView(entry)
+ local anchor=entry.PackAnchor
+ return not(Cull and entry.Reach and anchor and Cull.Hidden(workspace.CurrentCamera,anchor.Position,entry.Reach,12))
+end
 local function frame(dt)
  local busy=false;local t=os.clock();local now=workspace:GetServerTimeNow()
  for _,entry in pairs(entries)do
   if entry.Active and entry.Pack then
    busy=true
    entry.Owed=(entry.Owed or STEP_LOW)+dt
-   if tierNow>=3 or entry.Owed>=STEP_LOW-.004 then
+   if tierNow>=3 or entry.Owed>=STEP_LOW-.004 or inView(entry)then
     local step=entry.Owed;entry.Owed=0
     local ok,err=pcall(stepPack,entry,step,t,now);if not ok then entry.Failed=(entry.Failed or 0)+1;if entry.Failed==1 then warn('[R152] Void giveaway pack: '..tostring(err))end end
    end

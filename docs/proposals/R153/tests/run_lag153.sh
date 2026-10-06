@@ -10,7 +10,7 @@
 #     property writes per frame by area and the Lua ms per client on the mock.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
-OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.claude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl}
+OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl}
 mkdir -p "$OUT"
 python3 -I "$HERE/../tools/place_census.py" "$PLACE" "$OUT/place_census.json" > "$OUT/place_census.txt"
 echo "place census: $OUT/place_census.txt"

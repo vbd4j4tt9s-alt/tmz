@@ -89,7 +89,7 @@ function P.Attach(Data)
   for i=1,9 do local pending=(state.BiomeBackpay81 or{})[tostring(i)]or 0
    player:SetAttribute('IndexBiomeReward'..i,state.Biomes[tostring(i)]==true and pending==0)
    player:SetAttribute('IndexBiomeHalfReward'..i,(state.BiomeHalfRewards or{})[tostring(i)]==true)
-   player:SetAttribute('IndexBiomeBackpay'..i,pending)
+   player:SetAttribute('IndexBiomeBackpay'..i,T.HalveGems(pending)) -- R153: a pending backpay pays half (shown = claimed)
    -- R148: the milestones already met under the old roster (ChestIndex ORs them with the live ones, as IndexMilestone does)
    local old=state.OldRoster148 or{}
    player:SetAttribute('IndexOldHalf'..i,(old.Half or{})[tostring(i)]==true)
@@ -312,7 +312,7 @@ function P.Attach(Data)
   local backpay=(state.BiomeBackpay81 or{})[key]or 0
   if state.Biomes[key]and backpay==0 then return false,'U ALREADY CLAIMED THIS!'end
   if backpay==0 and not self:BiomeComplete(player,stage)then return false,'FIND EVERY SEED AND GROW EVERY PLANT!'end
-  local amount=backpay>0 and backpay or T.CompletionGems[stage]
+  local amount=backpay>0 and T.HalveGems(backpay)or T.CompletionGems[stage] -- R153: Index gems are halved
   local okay,why=self:QueueCurrency(player,amount,'Gems');if not okay then return false,why end
   state.Biomes[key]=true
   state.BiomeBackpay81=state.BiomeBackpay81 or{};state.BiomeBackpay81[key]=nil;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true,'Ur Gems are on the way!'

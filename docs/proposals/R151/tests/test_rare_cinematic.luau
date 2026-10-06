@@ -71,7 +71,8 @@ for rank=6,8 do
  check(run and run.Kind=='Scene'and run.Variant=='Full',tag..': a safe player gets the full story scene')
  local tl=run.TL;local t0=R.clock
  local log={hudHidden=true,coreOff=true,controlsHeld=true,lightingSame=true,grade=false,switchAt=nil,backAt=nil,maxParts=0,nearStage=true,titleAt=nil,oddsFinalOk=nil,skipHint=nil,blurSeen=false}
- local final='1 in '..({'2','4','16','60','400','5K','83.3K','1.67B'})[rank]
+ -- R153: the card says the seed's ONE fixed chance (SeedRarity153), not the held pack's tooltip row (packFor writes 1/5K, 1/83.3K, 1/1.67B for the Secret / Cosmic / King: a Void pack's numbers)
+ local final='1 in '..W.module('SeedRarity153').Count(X.byRank[rank])
  X.run(tl.Length+.4,1/30,function(now)
   local t=now-t0
   if not M.Active()then return end
@@ -285,7 +286,7 @@ for rank=1,5 do
  end)
  check(not before and at,names[rank]..': the title waits for the burst, then shows')
  check(seedSeen,names[rank]..': the seed itself (its model) is the centre of the card')
- check(final=='1 in '..({'2','4','16','60','400'})[rank],names[rank]..': "1 in N" ('..tostring(final)..')')
+ check(final=='1 in '..W.module('SeedRarity153').Count(X.byRank[rank])and final=='1 in '..({'2','4','16','60','400'})[rank],names[rank]..': "1 in N" ('..tostring(final)..'): the seed\'s fixed chance (here it is also the pack\'s tooltip row)')
  check((rank>=4)==(fovMin<69.9),names[rank]..': '..(rank>=4 and'a short camera push'or'no camera push')..' (FieldOfView down to '..string.format('%.1f',fovMin)..')')
  check(edge and math.abs(edge.R-L.Tiers[rank].Hint.R)<.02 and math.abs(edge.G-L.Tiers[rank].Hint.G)<.02,names[rank]..': the screen edges end the suspense in the tier colour')
  check(M.Active()==nil and near(cam.FieldOfView,70),names[rank]..': ends and the FieldOfView is back')

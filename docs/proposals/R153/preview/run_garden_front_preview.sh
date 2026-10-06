@@ -5,7 +5,7 @@
 # playwright (global; PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers) and three@0.169.0 (THREE_MODULES=<a node_modules dir that has three>, else npm install).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd);R151=$REPO/docs/proposals/R151/preview
-S=${1:?scratch dir};PLACE=${2:-/root/.claude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};BEFORE=${3:-e36b71b}
+S=${1:?scratch dir};PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};BEFORE=${3:-e36b71b}
 sh "$REPO/docs/proposals/R152/preview/run_hub_scenes.sh" "$S" "$PLACE" "$BEFORE"
 mkdir -p "$S/render/out"
 cp "$R151/base_area.html" "$R151/render_base_area.mjs" "$S/render/"

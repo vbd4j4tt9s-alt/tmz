@@ -1,4 +1,4 @@
-"""R151 preview (R152: the pedestal, the showcase item and the dancing giant): composes docs/proposals/R152/hub_displays.png from render_hub.mjs's images (Pillow).
+"""R151 preview (R152: the pedestal, the showcase item and the dancing giant; R153: one big label over the item, no plaque): composes docs/proposals/R153/hub_displays.png from render_hub.mjs's images (Pillow).
 Usage: python3 make_hub_sheet.py <render out dir> <scene dir (scene_champions.json, champions.steps)> <out.png>"""
 import json, math, os, re, sys
 from PIL import Image, ImageDraw, ImageFont
@@ -86,14 +86,14 @@ rows.append(("From a player's base, a champion on each: Base 4's and Base 3's sp
 rows.append(("From the same spawns, nobody has taken the spot yet", [
     tile('empty', 'pull_wide', 'BEST PULL TODAY, empty: the black mystery seed and a black silhouette (static, the same giant size)'),
     tile('empty', 'fruit_wide', 'BIGGEST FRUIT TODAY, empty: the fruit of the day, a black silhouette')]))
-rows.append(('Close up: the pedestal with its plaque, the seed and its label, the avatar beside it', [
+rows.append(('Close up: the pedestal, the seed and the big label over it, the avatar beside it', [
     tile('champions', 'pull_close', 'the rarest seed pulled today: it turns over the prongs, its light and sparkles on it'),
     tile('champions', 'fruit_close', "today's fruit (it changes every day): the heaviest one, Gold coat")]))
 rows.append(('Close up, empty', [
-    tile('empty', 'pull_close', 'BEST PULL TODAY: "Nobody yet", "Open a pack!", the plaque says the same'),
-    tile('empty', 'fruit_close', 'BIGGEST FRUIT TODAY: "Today: ... Watermelon" under the title, "Harvest one to claim it!"')]))
-rows.append(('The pedestal and the plaque, three-quarter view', [
-    tile('champions', 'pull_detail', 'the Fruit of the Hour pedestal x 3.2: the plaque has the title, winner, rarity, countdown'),
+    tile('empty', 'pull_close', 'BEST PULL TODAY: "Nobody yet", "???", "Open a pack to grab it!", the countdown'),
+    tile('empty', 'fruit_close', 'BIGGEST FRUIT TODAY: "Nobody yet", "Pick one to grab it!", "Today: ... Watermelon", the countdown')]))
+rows.append(('The pedestal and the label, three-quarter view', [
+    tile('champions', 'pull_detail', 'the Fruit of the Hour pedestal x 3.2 (no plaque): the label has the title, winner, seed, rarity and chance, countdown'),
     tile('champions', 'fruit_detail', 'the same for the fruit: "Today: ... " is the fruit of the day')]))
 rows.append(('How big: a normal 5.3 stud player 32 studs in front of each stand', [
     tile('champions', 'pull_scale', 'the avatar is %.0f studs tall (a normal one is 5.3: about 4.7 times), the pedestal %.0f studs (prongs)' % (N['avatar'], N['prongs'])),
@@ -109,8 +109,8 @@ sheet = Image.new('RGB', (W, height), BG)
 d = ImageDraw.Draw(sheet)
 # header
 d.rectangle((0, 0, W, 120), fill=(30, 33, 62))
-d.text((PAD + 12, 16), 'R152  Hub displays: a pedestal, a spinning showcase, a dancing giant', font=font(40, True), fill=INK)
-d.text((PAD + 12, 72), 'BEST PULL TODAY and BIGGEST FRUIT TODAY: the market\'s Fruit of the Hour pedestal built big, the winning seed / fruit turning over it, the champion\'s avatar 25 studs tall beside it.', font=font(20), fill=SOFT)
+d.text((PAD + 12, 16), 'R153  Hub displays: one big label over the spinning showcase, a dancing giant', font=font(40, True), fill=INK)
+d.text((PAD + 12, 72), 'BEST PULL TODAY and BIGGEST FRUIT TODAY: the Fruit of the Hour pedestal built big (no plaque), the winning seed / fruit turning under ONE big label, the champion 25 studs tall beside it.', font=font(20), fill=SOFT)
 d.text((PAD + 12, 98), 'Approximate render (three.js): plain materials, no Roblox textures or lighting, not the Fredoka font; the avatar is a stand-in rig in ONE frame of its dance (the real one dances), sparkles frozen.', font=font(17), fill=(205, 170, 120))
 y = 140
 
