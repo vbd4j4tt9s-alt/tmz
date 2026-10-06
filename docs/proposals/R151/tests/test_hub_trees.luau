@@ -152,13 +152,13 @@ end
 local slots=Art.TreeSlots()
 local plans={}
 for tier=1,3 do local _,p=T.Plan(infos,tier,slots);plans[tier]=p end
-check('budget: 30 leafy slots (oaks, blossoms, leafy trees); pines, palms, cacti, ember trees and rocks stay part-built',plans[3].Eligible==30,plans[3].Eligible)
-check('budget: tier 1 (phones on low) - only a clone of at most 6 parts, at most 90 parts in all',plans[1].Parts<=90 and plans[1].Used==18 and plans[1].ByKind.oak~=nil,plans[1].Used..' trees, '..plans[1].Parts..' parts')
-check('budget: tier 2 - clones up to 16 parts, at most 300 in all',plans[2].Parts<=300 and plans[2].Used>18,plans[2].Used..' trees, '..plans[2].Parts..' parts')
-check('budget: tier 3 (desktop) - the 60-part model is too big for one tree (over 40), the rest fill all 30 slots within 600',plans[3].Used==30 and plans[3].Parts<=600 and table.find(plans[3].TooBig,'C big')~=nil,plans[3].Used..' trees, '..plans[3].Parts..' parts')
+check('budget: 12 leafy slots (8 oaks, 2 blossoms, 2 leafy trees; R152: was 30); poplars, pines, palms, cacti, ember trees and rocks stay part-built',plans[3].Eligible==12,plans[3].Eligible)
+check('budget: tier 1 (phones on low) - only a clone of at most 6 parts, at most 90 parts in all',plans[1].Parts<=90 and plans[1].Used==12 and plans[1].ByKind.oak~=nil,plans[1].Used..' trees, '..plans[1].Parts..' parts')
+check('budget: tier 2 - clones up to 16 parts, at most 300 in all',plans[2].Parts<=300 and plans[2].Used==12,plans[2].Used..' trees, '..plans[2].Parts..' parts')
+check('budget: tier 3 (desktop) - the 60-part model is too big for one tree (over 40), the rest fill all 12 slots within 600',plans[3].Used==12 and plans[3].Parts<=600 and table.find(plans[3].TooBig,'C big')~=nil,plans[3].Used..' trees, '..plans[3].Parts..' parts')
 do local only={byName['C big']};local _,p3=T.Plan(only,3,slots);local _,p2=T.Plan(only,2,slots)
  local mid=fakeTree('G thirty',30);mid.Parent=nil;local gi=T.Prepare(mid);local _,q3=T.Plan({gi},3,slots);local _,q2=T.Plan({gi},2,slots)
- check('budget: a 30-part model is used on the desktop only, for the first 20 slots (600 / 30), none on phones',q3.Used==20 and q3.Parts==600 and q2.Used==0,q3.Used..' / '..q2.Used)
+ check('budget: a 30-part model is used on the desktop only, for all 12 slots (360 of 600), none on phones',q3.Used==12 and q3.Parts==360 and q2.Used==0,q3.Used..' / '..q2.Used)
  check('budget: a model over every tier\'s limit is never used',p3.Used==0 and p2.Used==0)
 end
 do local plan=T.Plan({byName['B medium']},3,slots);local blossom=0
@@ -218,8 +218,8 @@ local function clones(life)local out={};for _,d in ipairs(life:GetDescendants())
 local FL=K.Floor
 local api,sc,life=client()
 local cl=clones(life)
-check('client: the leafy slots get the owner\'s models (desktop: 30 clones)',#cl==30,#cl)
-check('client: attributes TemplateParts / UsedFor / ScriptsRemoved on workspace.HubLife151',life:GetAttribute('TemplateParts'):find('A small 5',1,true)~=nil and life:GetAttribute('UsedFor'):find('30 of 30 leafy trees',1,true)~=nil and life:GetAttribute('ScriptsRemoved')==3,
+check('client: the leafy slots get the owner\'s models (desktop: 12 clones)',#cl==12,#cl)
+check('client: attributes TemplateParts / UsedFor / ScriptsRemoved on workspace.HubLife151',life:GetAttribute('TemplateParts'):find('A small 5',1,true)~=nil and life:GetAttribute('UsedFor'):find('12 of 12 leafy trees',1,true)~=nil and life:GetAttribute('ScriptsRemoved')==3,
  tostring(life:GetAttribute('TemplateParts'))..' | '..tostring(life:GetAttribute('UsedFor'))..' | '..tostring(life:GetAttribute('ScriptsRemoved')))
 check('safety: no script anywhere in the square',codeIn(life)==0)
 do local bad=unsafe(life);check('safety: EVERY part of the square (clones, part-built trees, bushes, topiary, props) anchored, CanCollide / CanTouch / CanQuery off',#bad==0,first(bad))end
@@ -249,7 +249,7 @@ do local a={};for _,m in ipairs(cl)do local c=T.Box(m);a[#a+1]=string.format('%.
  check('variety: deterministic (a second client builds the same clones in the same places)',table.concat(a,'|')==table.concat(b,'|'))
  local yaws={};for _,m in ipairs(clones(life2))do local t=parts(m)[1];yaws[string.format('%.2f',t.CFrame.RightVector.X)]=true end
  local n=0;for _ in pairs(yaws)do n+=1 end
- check('variety: every clone has its own turn',n>=25,n)
+ check('variety: every clone has its own turn (at least 10 turns among the 12 clones)',n>=10,n)
  sc:Destroy();api,sc,life=api2,sc2,life2;cl=clones(life)
 end
 -- anything added to the square later is locked too
@@ -265,13 +265,13 @@ do local function count(cls)local n=0;for _,d in ipairs(life:GetDescendants())do
  local g0,l0,e0=count('SurfaceGui'),count('PointLight'),count('ParticleEmitter')
  local cam=W.workspace.CurrentCamera
  cam.CFrame=CF(0,12,1200);api.ApplyLod();cam.CFrame=CF(0,12,-300);api.ApplyLod()
- check('safety: the square keeps its signs, lamp lights and particles when its detail folders come and go (the guard strips only code)',
-  g0>0 and l0>0 and e0>0 and count('SurfaceGui')==g0 and count('PointLight')==l0 and count('ParticleEmitter')==e0,g0..'/'..count('SurfaceGui')..' guis, '..l0..'/'..count('PointLight')..' lights, '..e0..'/'..count('ParticleEmitter')..' emitters')
+ check('safety: the square keeps its lamp lights and particles when its detail folders come and go (the guard strips only code; R152: no signposts, so no SurfaceGui)',
+  g0==0 and l0>0 and e0>0 and count('SurfaceGui')==g0 and count('PointLight')==l0 and count('ParticleEmitter')==e0,g0..'/'..count('SurfaceGui')..' guis, '..l0..'/'..count('PointLight')..' lights, '..e0..'/'..count('ParticleEmitter')..' emitters')
 end
 -- tiers
 for _,t in ipairs({1,2})do budget.Tier=t
  local a,s2,l=client();local n=#clones(l)
- check('client tier '..t..': '..(t==1 and'18 clones of the 5-part model'or'the 5- and 14-part models within 300 parts'),t==1 and n==18 or t==2 and n>18 and n<=30,n..' clones, '..tostring(l:GetAttribute('UsedFor')))
+ check('client tier '..t..': '..(t==1 and'12 clones of the 5-part model'or'the 5- and 14-part models within 300 parts'),n==12,n..' clones, '..tostring(l:GetAttribute('UsedFor')))
  local bad=unsafe(l);check('client tier '..t..': every part locked',#bad==0,first(bad))
  s2:Destroy()
 end
@@ -288,7 +288,7 @@ do sc:Destroy()
  fakeTree('Owner tree',9).Parent=f2
  a.Tick(.6)
  local l2=W.workspace:FindFirstChild('HubLife151')
- check('client: a tree model placed in the folder later -> the square rebuilds with it',l2~=nil and #clones(l2)==30,l2 and#clones(l2))
+ check('client: a tree model placed in the folder later -> the square rebuilds with it',l2~=nil and #clones(l2)==12,l2 and#clones(l2))
  s2:Destroy()
  f2:Destroy()
  local a3,s3,l3=client()
@@ -305,7 +305,7 @@ do sc:Destroy()
  local a5,s5,l5=client()
  R.Inst.ScaleTo=raw
  local trunks=0;for _,d in ipairs(l5:GetDescendants())do if d.Name=='Tree trunk'then trunks+=1 end end
- check('a model that cannot be placed: every leafy slot falls back to its part-built tree (no gap)',#clones(l5)==0 and trunks==43,trunks..' trunks (43 = 14 oaks + 8 poplars + 8 blossoms + 8 leafy trees + 5 ember trees)')
+ check('a model that cannot be placed: every leafy slot falls back to its part-built tree (no gap)',#clones(l5)==0 and trunks==17,trunks..' trunks (17 = 8 oaks + 2 poplars + 2 blossoms + 2 leafy trees + 3 ember trees)')
  s5:Destroy()
 end
 
@@ -325,13 +325,13 @@ do local f4=folder()
   end
   local m=p._props.Material;if not(m and(m.Name or tostring(m)):find('Plastic'))or(m.Name or tostring(m))=='SmoothPlastic'then notPlastic[#notPlastic+1]=Z.path(p)end
  end end
- check('studs: every part-built tree, bush and topiary part has Studs ('..studded..' parts)',#flat==0 and studded>300,first(flat))
+ check('studs: every part-built tree, bush and topiary part has Studs ('..studded..' parts)',#flat==0 and studded>150,first(flat))
  check('studs: always on the face that points up (Inlet under it)',#wrongFace==0,first(wrongFace))
  check('studs: Plastic (the material the stud surfaces show on, like the place\'s track trees)',#notPlastic==0,first(notPlastic))
  local bad=fruitOnTrees(l)
  check('no fruit: the part-built trees are just trees (no fruit, coconuts, cactus flowers or embers, nothing red, no ball in a crown)',#bad==0,first(bad))
  local leafy=0;for _,t in ipairs(W.module('HubLifeArt151').Layout.trees)do if t[1]=='leafy'then leafy+=1 end;assert(t[1]~='fruit','a fruit slot')end
- check('no fruit: the 8 former fruit-tree slots are plain leafy trees (fresh, deep, lime, sage greens)',leafy==8,leafy)
+ check('no fruit: the former fruit-tree slots (2 left of 8 after R152) are plain leafy trees (fresh, deep, lime, sage greens)',leafy==2,leafy)
  s2:Destroy()
 end
 

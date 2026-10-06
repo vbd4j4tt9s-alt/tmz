@@ -3,7 +3,7 @@
 # preview (docs/proposals/R151/preview). The owner's place file is loaded (its Workspace.ChestChaseMap), every real start-up builder runs on it, then the REAL
 # HubDisplayService builds the displays (docs/proposals/R151/tests/make_hub_scene.py on top of R149's zfight_scene.luau).
 # Usage: sh build_hub_scenes.sh <scratch dir> <place.rbxl> [src dir, default this checkout's src]
-# Writes <scratch>/scene/: scene_empty.json, scene_champions.json, empty.steps, champions.steps (the HUBINFO / HUBSIGN lines), place_geom.json (every saved part of the map,
+# Writes <scratch>/scene/: scene_empty.json, scene_champions.json, empty.steps, champions.steps (the HUBINFO / HUBTEXT lines), place_geom.json (every saved part of the map,
 # invisible spawns included). Exits 1 when a scene fails to build.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)

@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R132 (owner): the Fruit of the Hour floats over the market pedestal, turning slowly, with its bonus and time left
 -- above it. The fruit is the game's own fruit model (HarvestPresentation). Animated only while the camera is near.
 -- R133 (owner: "the fruit is not big enough and the text is obscuring the fruit; the fruit should be the emphasis"):

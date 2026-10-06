@@ -194,9 +194,10 @@ function Fx.Accent(kind,point,frame,isLow)
 end
 -- Per keeper ------------------------------------------------------------------------------------
 local function center(b)return V((b[1][1]+b[2][1])/2,(b[1][2]+b[2][2])/2,(b[1][3]+b[2][3])/2)end
-function Fx.new(root,stage)
- local spec=Fx.Stages[stage];local rig=Config[stage];if not spec or not rig then return nil end
- local self={Root=root,Stage=stage,Spec=spec,Feet={},NextBreath=0,NextSlither=0,LastCycle=nil}
+-- R152: config = the keeper's rig config (KeeperRigConfig152.Get for the baked models: their bounds, eyes and Mouth); nil = today's.
+function Fx.new(root,stage,config)
+ local spec=Fx.Stages[stage];local rig=config or Config[stage];if not spec or not rig then return nil end
+ local self={Root=root,Stage=stage,Spec=spec,Feet={},NextBreath=0,NextSlither=0,LastCycle=nil,MouthPoint=rig.Mouth and V(table.unpack(rig.Mouth))or Fx.Mouth[stage]}
  self.GroundSound=(Signature.Moves[stage]and Signature.Moves[stage].Ground)==true
  if self.GroundSound and not groundPreloaded then groundPreloaded=true;require(script.Parent.LocalSfx).Preload({Fx.GroundSound.Id})end
  local s=spec.Size
@@ -292,7 +293,7 @@ function Fx.Step(self,c)
  if self.Breath and not isLow and c.Distance<Fx.BreathDistance and frames.Head and now>=self.NextBreath then
   self.NextBreath=now+(c.Chasing and .55 or 1.5)+math.random()*.3
   local n=Fx.Spend(c.Chasing and 3 or 2,now,isLow)
-  if n>0 then place(self.Mouth,self.Root,frame*frames.Head*CF(Fx.Mouth[self.Stage]));self.Breath:Emit(n)end
+  if n>0 then place(self.Mouth,self.Root,frame*frames.Head*CF(self.MouthPoint));self.Breath:Emit(n)end
  end
 end
 -- Wake burst: ground ring and dust at the body, a breath burst, and a short shake nearby.
@@ -304,7 +305,7 @@ function Fx.Wake(self,c)
  local n=Fx.Spend(c.Low and 6 or 14,c.Now,c.Low)
  if n>0 then place(self.Foot,self.Root,CF(ground));self.Dust:Emit(n)end
  if self.Breath and frames and frames.Head and not c.Low then
-  local m=Fx.Spend(8,c.Now,c.Low);if m>0 then place(self.Mouth,self.Root,frame*frames.Head*CF(Fx.Mouth[self.Stage]));self.Breath:Emit(m)end
+  local m=Fx.Spend(8,c.Now,c.Low);if m>0 then place(self.Mouth,self.Root,frame*frames.Head*CF(self.MouthPoint));self.Breath:Emit(m)end
  end
  if c.LocalDistance and c.LocalDistance<45 then Fx.Shake((.25+spec.Heavy*.5)*(1-c.LocalDistance/45))end
 end

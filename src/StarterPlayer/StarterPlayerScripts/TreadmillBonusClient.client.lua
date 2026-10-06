@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R123: treadmill bonus rolls (client view only). The server (TreadmillBonusService) counts treadmill time, owns the
 -- READY count, decides every result and grants the pack before this script animates anything.
 --  * Gift timer: a gift pill above the player while on the treadmill (BillboardGui, local only) that fills up as the next

@@ -12,10 +12,11 @@ local Points=require(game:GetService('ReplicatedStorage').SpeedPoints)
 local Progression=require(game:GetService('ReplicatedStorage').Progression81)
 local PackRules = require(game:GetService("ReplicatedStorage"):WaitForChild("SeedPackRules"))
 local VerityCatalog = require(game:GetService("ReplicatedStorage"):WaitForChild("VerityCatalog")) -- R147
+local VerityReasons = require(game:GetService("ReplicatedStorage"):WaitForChild("VerityConfig")).Reasons -- R152: what Verity says when a hand-in is refused (CheckVoidPack / ConvertVoidPack)
 local PackShapes = require(game:GetService("ReplicatedStorage"):WaitForChild("PackShapes151")) -- R151: a pack's chip-bag shape (an optional field of its record)
 -- R151: the optional PackShape of a saved / gifted Pack row: 1-6, or nil (absent, 0, or anything else = the default shape).
 local function savedPackShape(row)
-	if row.Kind ~= "Pack" then return nil end
+	if row.Kind ~= "Pack" or not PackShapes.Applies(PackRules.VariantKey(row.BagVariant)) then return nil end -- R152: the Verity pack (flat pouch) and the Void / Mech never carry a shape, whatever an older record says
 	local shape = PackShapes.Sanitize(row.PackShape)
 	return shape > 0 and shape or nil
 end
@@ -438,15 +439,15 @@ end
 
 -- R147: the Verity NPC turns a Void Pack into a Verity Pack. CheckVoidPack finds the record or says why not (changes nothing).
 function PlayerDataService:CheckVoidPack(player, inventoryId)
-	if not self:IsLoaded(player) then return nil, "YOUR DATA IS STILL LOADING" end
-	if type(inventoryId) ~= "string" or #inventoryId > 80 then return nil, "INVALID PACK" end
+	if not self:IsLoaded(player) then return nil, VerityReasons.Loading end
+	if type(inventoryId) ~= "string" or #inventoryId > 80 then return nil, VerityReasons.Invalid end
 	for _, pack in ipairs(self:GetChestRecords(player)) do
 		if pack.Id == inventoryId then
-			if pack.Kind ~= "Pack" or pack.BagVariant ~= "EclipseReliquary" or pack.Stage ~= 7 then return nil, "ONLY A VOID PACK CAN BE GIVEN TO VERITY" end
+			if pack.Kind ~= "Pack" or pack.BagVariant ~= "EclipseReliquary" or pack.Stage ~= 7 then return nil, VerityReasons.NotVoid end
 			return pack
 		end
 	end
-	return nil, "THAT PACK IS NO LONGER IN YOUR INVENTORY"
+	return nil, VerityReasons.Gone
 end
 
 -- One non-yielding inventory transaction, like OpenSeedPack. The Verity Pack takes the Void Pack's slot (the bag keeps its
@@ -471,7 +472,6 @@ function PlayerDataService:ConvertVoidPack(player, inventoryId)
 			SeedScale = PackRules.NewSeedScale(VerityCatalog.PackStage, VerityCatalog.Variant, size),
 			TestGrant = pack.TestGrant == true or nil, -- R151: an owner-made Void pack stays a test pack as a Verity pack
 		}
-		do local shape = PackShapes.Roll(VerityCatalog.Variant);if shape then record.PackShape = shape end end -- R151: the Verity pack rolls its own chip-bag shape (a Void pack has none)
 		records[index] = record
 		local tests = self.StudioPackRewards and self.StudioPackRewards[player]
 		if tests then tests[pack.Id] = nil end -- an owner-test guarantee on the old pack does not carry over
@@ -479,7 +479,7 @@ function PlayerDataService:ConvertVoidPack(player, inventoryId)
 		self:MarkDirty(player)
 		return record
 	end
-	return nil, "THAT PACK IS NO LONGER IN YOUR INVENTORY"
+	return nil, VerityReasons.Gone
 end
 
 function PlayerDataService:AddCash(player, amount)

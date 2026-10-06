@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R124 performance: the server's always-on biome particle emitters (BiomeVisuals: WindblownSnow, CinderSmoke,
 -- RisingEmbers, PrismMotes, CrystalDust; attribute BiomeEffect) follow the shared client budget, locally only:
 --  tier 3: as built | tier 2 or ReducedMotion: half rate | tier 1 / FastMode: off | farther than FarStuds from the

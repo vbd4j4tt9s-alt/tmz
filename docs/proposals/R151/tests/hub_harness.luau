@@ -67,7 +67,7 @@ end
 -- two Players methods HubDisplayAvatar calls. HH.avatars = {Describe = n calls, Create = n calls, Mode = 'ok' | 'describe fails' | 'create fails' | 'throws', Accessories = n worn, Scale}.
 local Rig=require('./hub_rig')(W,R)
 HH.rig=Rig.rig
-HH.avatars={Describe=0,Create=0,Mode='ok',Accessories=3,Scale=1,Last=nil}
+HH.avatars={Describe=0,Create=0,Mode='ok',Accessories=3,Scale=1,Last=nil,Dance={Mode='ok',Loads=0}}
 function HH.installPlayers()return Rig.install(W.service('Players'),HH.avatars)end
 -- Time ------------------------------------------------------------------------------------------------------------------------------------------------------
 -- A fake clock for a server: seconds (timers) and Unix time (the day); set .unix to move the day.

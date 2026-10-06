@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- All top-of-screen notices use the same layout. Five direct lookups, no GUI descendant sweeps.
 local Players=game:GetService('Players');local Run=game:GetService('RunService');local RS=game:GetService('ReplicatedStorage');local Gui=game:GetService('GuiService')
 local Fit=require(RS:WaitForChild('GardenTextFit'));local Layout=require(RS:WaitForChild('HudNoticeLayout'));local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local elapsed=0;local connections={}

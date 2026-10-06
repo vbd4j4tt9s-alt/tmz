@@ -93,7 +93,7 @@
 | `notice event @name` | Preview a notice (`event`, `legendary`, `mythic`, `giant`) |
 
 ## Hub displays (R151)
-The two giant displays in the hub's back corners: **BEST PULL TODAY** (the +X corner, below Base_4) and **BIGGEST FRUIT TODAY** (the -X corner, below Base_3). They count real pack openings and hand-picked fruit across all servers (MemoryStore); `rarepacks` TEST packs, any pack an owner command made (`TestGrant`), anything an owner command just gave that player (this server session) and the test commands below are never counted. Both reset at midnight UTC. When someone takes a top spot in this server the news is ONE amber chat line through the pull announcer (see Pull announcements below: after the puller's own reveal, in the scope the announcement rules give; the hub has no banner of its own any more) and the display's chime plays with it.
+The two giant displays in the hub's back corners: **BEST PULL TODAY** (the +X corner, below Base_4) and **BIGGEST FRUIT TODAY** (the -X corner, below Base_3). Each is the market's Fruit of the Hour pedestal built 3.2 times bigger, the winning seed / fruit turning over it (its light and sparkles on it) with a small plaque and label (title, winner, seed or weight), and the champion's avatar, 25 studs tall and dancing, standing beside it. They count real pack openings and hand-picked fruit across all servers (MemoryStore); `rarepacks` TEST packs, any pack an owner command made (`TestGrant`), anything an owner command just gave that player (this server session) and the test commands below are never counted. Both reset at midnight UTC. When someone takes a top spot in this server the news is ONE amber chat line through the pull announcer (see Pull announcements below: after the puller's own reveal, in the scope the announcement rules give; the hub has no banner of its own any more) and the display's chime plays with it.
 | Command | What it does |
 |---|---|
 | `bestpull FirePepperSeed @name` | A test BEST PULL TODAY for that player: a seed id or a plant name (`fire pepper`), at its odds in its biome's Pack03. **This server only**; add `share` to write it to the shared board as well (to test MemoryStore: use `hubdisplays reset` afterwards). The record line ("🏆 Name took BEST PULL TODAY!") and the chime go to that player ALONE, shared or not: a test never talks to the server or to other servers (`announce record` shows the line to everyone, on purpose) |
@@ -142,6 +142,13 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 |---|---|
 | `gifts @name` | Gifts they sent that are still finishing |
 | `gifts recover @name` | Finish stuck gifts now (normally automatic within a minute) |
+
+## Free Void Pack pedestal
+| Command | What it does |
+|---|---|
+| `voidgift` (server) | R152: the giveaway pedestal in the middle of the plaza: how many of the 500 are claimed and left, whether YOU have claimed (profile flag, the shared list, your state), which store this server uses (`DataStore` live, the Studio test store, or the in-memory counter when Studio has no API access), messages sent / received, and the pedestal (state, prompt). No @name |
+| `voidgift reset me` (server, **Studio only**) | Clears YOUR claim and your profile flag (the shared list loses you, the count goes down by one) so you can claim again. The pack you already got stays in your Bag (`clear packs` removes it). A live server refuses: it never changes the shared count |
+| `voidgift left 3` (server, **Studio only**) | Sets how many the pedestal shows as left (0 = ALL CLAIMED, 487 = a fresh start). Players already in the list keep their places, so the number cannot go above 500 minus them. Studio only; a live server refuses |
 
 ## Verity's voice
 | Command | What it does |

@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local RS=game:GetService('ReplicatedStorage');local Feed=require(RS:WaitForChild('NoticeFeed83'))
 local remote=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('Notice83')
 -- R123: warm the notice cues (rare pack / weather) at startup; a cold cue is skipped, so the first one was silent.

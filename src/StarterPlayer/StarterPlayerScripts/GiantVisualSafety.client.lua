@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- Giant geometry stays at its authored dimensions. Close surfaces fade locally;
 -- bounded work keeps the safety pass independent of the number of world parts.
 local Collection=game:GetService('CollectionService');local Run=game:GetService('RunService');local Players=game:GetService('Players')

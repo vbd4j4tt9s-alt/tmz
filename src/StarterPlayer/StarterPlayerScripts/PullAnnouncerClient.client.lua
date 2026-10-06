@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R151 (owner: "serverwide messages saying who pulled what and so on and a in server announcement"; then: "pull announcement should only be said in chat"): pull announcements, the CLIENT half.
 -- The server (PullAnnouncer) decides and sends {Kind='Pull'|'Global'|'Record', ...} through ChestChaseRemotes.PullAnnounce151; this script only writes the chat line and
 -- nothing it does can start an announcement. Every payload is sanitised again (PullAnnounceRules.Event: the rarity comes from the local seed catalog).

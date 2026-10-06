@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R127 (owner): mutation highlights.
 --  * A seed pack that weather mutates carries a server Highlight (tag MutationGlow) that every player sees; here it pulses
 --    and hides while the pack is taken.

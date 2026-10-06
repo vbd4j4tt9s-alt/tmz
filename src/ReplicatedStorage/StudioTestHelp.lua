@@ -72,6 +72,7 @@ return {
  {'/test event go @username','Teleport next to a Void Pack.'},
  {'/test eventpack 7.5 diamond','server: Change the size/material of the waiting Void Pack.'},
  {'/test keepersmack','server: Preview The Darkened’s smack pose (hits nobody).'},
+ {'/test keepermodels','R152 new keeper models: bake status and which model each keeper shows. keepermodels off = today’s keepers again (each when idle), auto = the new ones. Needs "Allow Mesh / Image APIs".'},
  {'/test notice event @username','Preview a notice: event, legendary, mythic or giant. Spawns nothing.'},
 
  {'— SHOVEL HOLES —',''},
@@ -96,6 +97,11 @@ return {
  {'/test bestpull FirePepperSeed @username','A test BEST PULL TODAY for that player: a seed id or plant name (fire pepper), at its odds in its biome\'s Pack03. Shows on this server only; add share to write it to the shared board too.'},
  {'/test bigfruit 12.4 @username','A test BIGGEST FRUIT TODAY: a fruit of today\'s type weighing that many kg (gold or diamond for a coat, share to write the shared board). Shows on this server only unless shared.'},
  {'/test hubdisplays','server: Both corner displays: the day, the fruit of the day, the champions and where they came from, the shared board\'s health and the part counts. hubdisplays reset empties both boards (this server and the shared one); hubdisplays day +1 previews tomorrow\'s fruit on this server (day 0 comes back).'},
+
+ {'— FREE VOID PACK PEDESTAL (R152) —',''},
+ {'/test voidgift','server: The giveaway pedestal: how many of the 500 are claimed / left, whether YOU have claimed (profile flag and the shared list), which store this server uses (live DataStore, Studio test store or the in-memory counter), messages and the pedestal.'},
+ {'/test voidgift reset me','Studio only: clears YOUR claim and flag so you can claim again (the pack you got stays in your Bag). A live server refuses: it never changes the shared count.'},
+ {'/test voidgift left 3','Studio only: sets how many the pedestal shows as left (0 = ALL CLAIMED). Studio uses its own store or an in-memory counter, never the live count.'},
 
  {'— VERITY\'S VOICE —',''},
  {'/test verityvoice 2.1 0.3','server: Find where "Hello, my name is Verity" ends by ear. verityvoice <end seconds> [start seconds] sets the cut for this server and plays it for you at once (from anywhere); verityvoice alone plays it again and prints the numbers; verityvoice reset goes back to VerityConfig. Copy the final numbers into VerityConfig.GreetingStart / GreetingEnd.'},

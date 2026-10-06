@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- Local signs for the nearest two gardens; nothing overlaps beds or upgrade buttons.
 local RS=game:GetService('ReplicatedStorage');local Players=game:GetService('Players');local Run=game:GetService('RunService')
 local Rules=require(RS.GardenBonusRules84);local Art=require(RS.HudArtwork)

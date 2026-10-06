@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- Compact rare-spawn announcements, weather notices, dark clouds and thunder; gameplay lives on the server.
 -- R149 (owner): the rain / snow itself moved to WeatherWorld149.client.lua (world-anchored tiles, splashes, snow patches); the old
 -- camera-following precipitation box that starved the view whenever the camera moved is gone from here.

@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R152 (owner playtest of R151: "keys behind also not rendering and its not loud enough"; far keys were bare caps): the window keeps Back rows behind
 -- (327 / 229 / 180 studs, a camera zoomed out to 128 studs sees below / behind its own feet) and every row out to FarAhead / FarBehind rows carries
 -- its letters: the near rows keep their two full-size strips, the rows beyond ONE strip each (a single SurfaceGui at 4 px / stud with the row's 22

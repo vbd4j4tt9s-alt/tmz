@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R141 (owner: "a pedestal with a mystery pack ... black silhouette ... after 15 minutes of staying in the game they
 -- unlock the pack, refreshes every day"): the label over every base's mystery pedestal (whose it is, 🔒 time left with a
 -- bar, ✨ UNLOCKED / TAKE IT, ✓ taken and the time to the next one), the take prompt (only its owner sees it, only once

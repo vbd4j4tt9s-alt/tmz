@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R113b: BASE / TRACK fast-travel rectangles in Roblox's top bar row (owner request). R114: centred on the whole screen. The server checks every request
 -- (FastTravelService); this script only shows the buttons, the shared cooldown and a dimmed state.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local GuiService=game:GetService('GuiService')

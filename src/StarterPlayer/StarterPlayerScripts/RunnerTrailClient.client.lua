@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R47: one bounded cosmetic scheduler for local and nearby players.
 -- R111: boot prints/bursts/idle aura for every boot tier; per-runner detail from distance and screen position,
 -- pool sizes from the shared client quality (ClientFxBudget, Effects quality setting, graphics level, Reduced Motion).

@@ -3,7 +3,8 @@
 -- game modules (SeedPackRules / Config / ItemWeight ...), a MemoryStore mock shared by several "servers", a fake clock per server, and a recording stand-in for the art and
 -- the avatar builder (their own suites: test_hub_art, test_hub_avatar):
 --  1. start: both displays built, the first day set up, the fruit of the day = HubDisplayRules.FruitForDay;
---  2. events: a real pull is ranked and shown (sign, accent, item and avatar requested once), odds = the pack's own SeedOdds; TEST packs, owner-granted players and injected
+--  2. events: a real pull is ranked and shown (plaque and label, accent, item and avatar requested once, the avatar placed, put in the display and then told to dance: R152), odds = the
+--     pack's own SeedOdds; TEST packs, owner-granted players and injected
 --     tests are not counted; a worse pull / fruit only moves nothing; fruit of another type ignored;
 --  3. the record line: ONE announcement through PullAnnouncer.Announce (a stand-in that decides like the real one; the real one is in test_hub_hooks), no notice of the hub's
 --     own, a pull record AfterReveal and the chime in step with it, a fruit record at once, the gap, nothing for another server's champion or a preview day, an announcer that fails;
@@ -11,7 +12,7 @@
 --  5. cross-server: A writes (about 3 s later), B reads (within 45-60 s) and shows it with a pop but no notice; races between two servers; the better one wins everywhere;
 --  6. polling and writes: the interval and jitter, how many requests an hour costs, writes are coalesced;
 --  7. failures: MemoryStore down -> this server's own best, keeps trying with backoff, catches up; throttled; recovered;
---  8. a champion change rebuilds the item and the avatar once (a stale build is dropped, an identical record rebuilds nothing);
+--  8. a champion change rebuilds the item and the avatar once (a stale build is dropped, also while its dance loads; an identical record rebuilds nothing);
 --  9. owner tools: bestpull / bigfruit (this server only, `share`; announced PRIVATELY to the target), reset, day preview (no store traffic), status text.
 local HH=require('./hub_harness');local H=HH.H;local W,R=H.W,H.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -33,25 +34,31 @@ local function fakeArt()
   A.Built[kind]=d;return d
  end
  function A.SetSign(d,text)A.SignWrites+=1;d.Text=text;d.Model:SetAttribute('State',text.State)end
- function A.Tint(d,accent,state,stage)d.Accent=accent;d.TintState=state;d.Stage=stage;A.Tints[#A.Tints+1]={d.Kind,state}end
+ function A.Tint(d,accent,state)d.Accent=accent;d.TintState=state;A.Tints[#A.Tints+1]={d.Kind,state}end
  function A.BuildItem(d,spec)
   A.ItemBuilds[#A.ItemBuilds+1]={Kind=d.Kind,Spec=spec}
   local m=R.new('Model');m.Name='Item'..#A.ItemBuilds;return m,{Parts=10,Source='art'}
  end
  function A.SetItem(d,m)if d.Item and d.Item~=m then d.Item:Destroy()end;d.Item=m end
- function A.SetAvatar(d,m)if d.Avatar and d.Avatar~=m then d.Avatar:Destroy()end;d.Avatar=m end
+ function A.SetAvatar(d,m)if d.Avatar and d.Avatar~=m then d.Avatar:Destroy()end;d.Avatar=m;if m then m:SetAttribute('InDisplay',true)end end
  function A.Counts(d)return{Frame=10,Item=d.Item and 10 or 0,Avatar=d.Avatar and 10 or 0}end
  return A
 end
 local function fakeAvatars()
- local V={Builds={},Pending={},Yield=false,Placed=0}
+ local V={Builds={},Pending={},Yield=false,Placed=0,Animated={},AnimateYield=false,AnimatePending={},AnimateMode='dance'}
  function V:Build(uid,opts)
   V.Builds[#V.Builds+1]={Uid=uid,Silhouette=opts and opts.Silhouette}
   if V.Yield then V.Pending[#V.Pending+1]=coroutine.running();coroutine.yield()end
   local m=R.new('Model');m.Name='Avatar'..uid;m:SetAttribute('UserId',uid)
   return m,'avatar'
  end
- function V:Place()V.Placed+=1;return true end
+ function V:Place(m,feet,height,turn)V.Placed+=1;V.Last={Height=height,Turn=turn};if m then m:SetAttribute('Placed',true)end;return true end
+ -- R152: the dance. The real one runs after the avatar is in the display (its Animator plays only in the world) and yields while the track loads.
+ function V:Animate(m,uid)
+  V.Animated[#V.Animated+1]={Model=m,Uid=uid,Placed=m:GetAttribute('Placed')==true,InDisplay=m:GetAttribute('InDisplay')==true}
+  if V.AnimateYield then V.AnimatePending[#V.AnimatePending+1]=coroutine.running();coroutine.yield()end
+  m:SetAttribute('AvatarMode',V.AnimateMode);return V.AnimateMode
+ end
  return V
 end
 -- A stand-in for PullAnnouncer.Announce that decides like the real one where it matters here (PullAnnounceRules.RecordScope: a BestPull below Legendary is refused; a pull
@@ -125,14 +132,15 @@ do
  check(snap.Day==DAY and snap.FruitId==todayFruit and todayFruit~=nil,'the day is the UTC day ('..snap.Day..') and the fruit of the day is HubDisplayRules.FruitForDay ('..tostring(todayFruit)..')')
  check(snap.Pull.Record==nil and snap.Fruit.Record==nil,'both boards start empty')
  local pd,fd=A.Art.Built.Pull,A.Art.Built.Fruit
- check(pd.Text and pd.Text.State=='Empty'and fd.Text.State=='Empty'and pd.Text.Rows.Name.Text=='Nobody yet','both signs show the empty state at once')
- check(pd.TintState=='Empty'and fd.TintState=='Ready','the empty BEST PULL is calm; the empty fruit is lit in its plant\'s colours (the fruit is shown anyway)')
+ check(pd.Text and pd.Text.State=='Empty'and fd.Text.State=='Empty'and pd.Text.Label.Name.Text=='Nobody yet'and pd.Text.Plaque.Name.Text=='Nobody yet'and pd.Text.Plaque.Title.Text=='BEST PULL TODAY'and fd.Text.Plaque.Title.Text=='BIGGEST FRUIT TODAY','both pedestals show the empty state at once (the plaque and the label)')
+ check(pd.TintState=='Empty'and fd.TintState=='Ready','the empty BEST PULL is calm; the empty fruit is lit (the fruit is shown anyway)')
  check(pd.Model:GetAttribute('Rev')==1 and pd.Model:GetAttribute('NextAt')==Rules.NextAt(DAY)and pd.Model:GetAttribute('FooterPrefix')=='New board in 'and fd.Model:GetAttribute('FooterPrefix')=='New fruit in ','the client\'s attributes are set (Rev, NextAt, FooterPrefix)')
  check(fd.Model:GetAttribute('FruitId')==todayFruit,'the fruit display tells the client which fruit it is')
  check(#A.Art.ItemBuilds==2,'each display builds its item once')
  local kinds={};for _,b in ipairs(A.Art.ItemBuilds)do kinds[b.Kind]=b.Spec end
- check(kinds.Pull.Mystery==true and kinds.Pull.Kind=='Seed'and kinds.Fruit.Kind=='Fruit'and kinds.Fruit.Id==todayFruit and kinds.Fruit.Coat=='None','empty: a black mystery seed; the day\'s fruit in its own colours')
+ check(kinds.Pull.Mystery==true and kinds.Pull.Calm==true and kinds.Pull.Kind=='Seed'and kinds.Fruit.Kind=='Fruit'and kinds.Fruit.Id==todayFruit and kinds.Fruit.Coat=='None'and not kinds.Fruit.Calm,'empty: a black mystery seed with its light off; the day\'s fruit lit')
  check(#A.Avatars.Builds==2 and A.Avatars.Builds[1].Silhouette and A.Avatars.Builds[2].Silhouette,'both show the black silhouette while nobody holds the spot')
+ check(A.Avatars.Last.Height==Rules.AvatarHeight and Rules.AvatarHeight==25 and A.Avatars.Last.Turn==Rules.AvatarTurn,'at the giant size (25 studs), turned toward the pedestal')
  check(svc:Start()==svc and #A.Art.ItemBuilds==2,'Start twice does nothing')
  svc:Destroy();check(svc.Folder==nil,'Destroy removes the folder')
 end
@@ -151,11 +159,14 @@ do
  check(rec and rec.Name=='Ann'and rec.Uid==11 and rec.Id=='FirePepperSeed'and rec.Rarity=='Mythic'and rec.Seed=='Fire Pepper'and snap.Pull.Source=='Local','the board holds it (name, user id, seed, rarity), from this server')
  local want=P.SeedOdds(Config,4,'Pack03',1,P.OddsVersion)['FirePepperSeed']
  check(want and math.abs(rec.Odds-want)<1e-12,'its odds are the pack\'s own SeedOdds for that seed ('..tostring(want)..'%)')
- check(pd.Text.State=='Champion'and pd.Text.Rows.Name.Text=='Ann'and pd.Text.Rows.Line.Text=='Mythic Fire Pepper'and pd.Text.Rows.Odds.Text==Rules.OddsText(want),'the sign shows "Ann", "Mythic Fire Pepper" and its chance')
+ check(pd.Text.State=='Champion'and pd.Text.Label.Name.Text=='Ann'and pd.Text.Plaque.Name.Text=='Ann'and pd.Text.Label.Info.Text=='Fire Pepper'and pd.Text.Plaque.Line.Text=='Mythic · '..Rules.OddsText(want),'the plaque and the label say "Ann", the seed ("Fire Pepper") and the rarity and chance')
  check(pd.Model:GetAttribute('Champion')=='Ann'and pd.Model:GetAttribute('Rarity')=='Mythic'and pd.Model:GetAttribute('ChampionUserId')==11 and pd.Model:GetAttribute('Rev')==2,'the display\'s attributes name the champion and Rev goes up')
- check(pd.TintState=='Ready'and pd.Accent[1]==Rules.RarityColor('Mythic')[1]and pd.Stage==4,'tinted in the rarity\'s colour, the podium in Lava\'s (the seed\'s biome)')
+ check(pd.TintState=='Ready'and pd.Accent[1]==Rules.RarityColor('Mythic')[1],'tinted in the rarity\'s colour')
  check(#A.Art.ItemBuilds==before+1 and A.Art.ItemBuilds[#A.Art.ItemBuilds].Spec.Id=='FirePepperSeed'and A.Art.ItemBuilds[#A.Art.ItemBuilds].Spec.Mystery==false,'one new item: the seed itself (not the mystery one)')
  check(A.Avatars.Builds[#A.Avatars.Builds].Uid==11 and A.Art.Built.Pull.Avatar:GetAttribute('UserId')==11,'and Ann\'s avatar (by user id)')
+ local an=A.Avatars.Animated[#A.Avatars.Animated]
+ check(an and an.Uid==11 and an.Model==A.Art.Built.Pull.Avatar and an.Placed and an.InDisplay and A.Art.Built.Pull.Avatar:GetAttribute('AvatarMode')=='dance','the avatar is told to dance, after it was placed and put in the display (an Animator plays only in the world)')
+ check(A.Service.AvatarMode and A.Service.AvatarMode.Pull=='dance'and A.Service:StatusText():find('dance',1,true),'and the owner\'s hubdisplays line says so')
  -- exclusions
  local n=#A.Art.ItemBuilds
  check(not svc:NotePull(p2,reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01',Test=true})),'a TEST pack (/test rarepacks) is not counted (even a King that would take the spot)')
@@ -177,7 +188,7 @@ do
  svc:NotePull(p2,reward('SolarStarfruitSeed','King',{SeedScale=4,PackMutation='Gold'}),info({Stage=2,Variant='Pack01'}))
  local top=svc:Snapshot().Pull.Record
  check(top.Name=='Ben'and top.Coat=='Gold'and top.Scale==4,'the same King and pack, a bigger seed: the heavier one wins, with its pack\'s coat')
- check(A.Art.ItemBuilds[#A.Art.ItemBuilds].Spec.Coat=='Gold','and the giant item is built with the coat')
+ check(A.Art.ItemBuilds[#A.Art.ItemBuilds].Spec.Coat=='Gold','and the showcase item is built with the coat')
  -- fruit
  local fid=svc.Board.FruitId
  check(not svc:NoteHarvest(p1,{SeedId='NoSuchSeed',FruitScale=3}),'a fruit of another type is ignored (one comparison)')
@@ -185,11 +196,11 @@ do
  local fr=svc:Snapshot().Fruit.Record
  check(fr.Name=='Ann'and math.abs(fr.Kg-2*Weight.FruitBase(fid))<1e-9,'with its weight = base kg x its size')
  local fd=A.Art.Built.Fruit
- check(fd.Text.State=='Champion'and fd.Text.Rows.Name.Text==Rules.KgText(fr.Kg)and fd.Text.Rows.Line.Text=='Ann','the sign shows the weight and the name')
+ check(fd.Text.State=='Champion'and fd.Text.Label.Info.Text:find(Rules.KgText(fr.Kg),1,true)==1 and fd.Text.Label.Name.Text=='Ann'and fd.Text.Plaque.Name.Text=='Ann'and fd.Text.Plaque.Line.Text:find('Today: ',1,true)==1,'the label shows the winner and the weight; the plaque the winner and the fruit of the day')
  check(not svc:NoteHarvest(p2,{SeedId=fid,FruitScale=1.5}),'a lighter fruit is recorded for Ben but changes nothing... (counted as ignored: lighter than this server\'s own)')
  check(svc:NoteHarvest(p2,{SeedId=fid,FruitScale=6,Mutation='Gold',Weather='Drippy'})and svc:Snapshot().Fruit.Record.Name=='Ben','a heavier one takes the spot')
  check(svc:Snapshot().Fruit.Record.Coat=='Gold'and A.Art.ItemBuilds[#A.Art.ItemBuilds].Spec.Coat=='Gold'and A.Art.ItemBuilds[#A.Art.ItemBuilds].Spec.Kind=='Fruit','its coat is kept and the giant fruit is built with it')
- check(fd.Text.Rows.Odds.Text=='Gold · Drippy','the sign tells the coat and the weather')
+ check(fd.Text.Label.Info.Text==Rules.KgText(svc:Snapshot().Fruit.Record.Kg)..' · Gold · Drippy','the label tells the coat and the weather after the weight')
  check(not svc:NoteHarvest(p1,{SeedId=fid}) and not svc:NoteHarvest(p1,{SeedId=fid,FruitScale=0/0})and not svc:NoteHarvest(p1,nil)and not svc:NoteHarvest(nil,{SeedId=fid,FruitScale=2}),'a harvest without a size, a NaN size, nothing or no player is refused')
  -- a fruit that took the spot but is not the biggest of a pair at the same weight
  local f1=svc:NoteHarvest(p3,{SeedId=fid,FruitScale=6,Mutation='Gold',Weather='Drippy'})
@@ -320,15 +331,15 @@ do
  check(polled and polled<=65,'server B shows Ava\'s pull within about a minute ('..tostring(polled)..' s)')
  local snapB=SB.Service:Snapshot()
  check(snapB.Pull.Record.Name=='Ava'and snapB.Pull.Source=='Remote'and not snapB.Pull.Unsynced,'as the shared (Remote) champion, nothing to write back')
- check(SB.Art.Built.Pull.Text.Rows.Name.Text=='Ava'and SB.Art.Built.Pull.Model:GetAttribute('Rev')==2 and SB.Avatars.Builds[#SB.Avatars.Builds].Uid==41,'B\'s display now shows Ava with her avatar and pops (Rev + 1)')
+ check(SB.Art.Built.Pull.Text.Label.Name.Text=='Ava'and SB.Art.Built.Pull.Model:GetAttribute('Rev')==2 and SB.Avatars.Builds[#SB.Avatars.Builds].Uid==41,'B\'s display now shows Ava with her avatar and pops (Rev + 1)')
  check(#SB.Notes.Shown==0 and#SB.Announcer.Calls==0,'B posted no notice and announced nothing (it happened in server A)')
  -- B takes the spot with a better pull
  SB.Service:NotePull(pb,reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01'}))
- check(SB.Art.Built.Pull.Text.Rows.Name.Text=='Bo','B\'s own King shows at once on B')
- check(SA.Art.Built.Pull.Text.Rows.Name.Text=='Ava','while A still shows Ava')
+ check(SB.Art.Built.Pull.Text.Label.Name.Text=='Bo','B\'s own King shows at once on B')
+ check(SA.Art.Built.Pull.Text.Label.Name.Text=='Ava','while A still shows Ava')
  cb.advance(5);SB.Service:Step();ca.advance(5)
  for _=1,14 do ca.advance(5);SA.Service:Step()end
- check(SA.Service:Snapshot().Pull.Record.Name=='Bo'and SA.Art.Built.Pull.Text.Rows.Name.Text=='Bo','within a minute A shows Bo\'s King too')
+ check(SA.Service:Snapshot().Pull.Record.Name=='Bo'and SA.Art.Built.Pull.Text.Label.Name.Text=='Bo','within a minute A shows Bo\'s King too')
  check(#SA.Announcer.Calls==1 and SA.Announcer.Calls[1].Player==pa and#SA.Notes.Shown==0,'A only ever announced its own pull (Ava), never Bo\'s King that came from another server')
  -- a worse pull on A afterwards changes nothing and writes nothing
  local updates=backend.Calls.Update
@@ -343,7 +354,7 @@ do
  backend.Race=function()SB.Service:Step()end -- (B writes its King between A's read and A's commit)
  SA.Service:Step()
  check(backend.peek(Rules.StoreName,'d'..DAY).pull.Name=='Bo','the King is in the store even though A started writing first')
- check(SA.Service:Snapshot().Pull.Record.Name=='Bo'and SA.Art.Built.Pull.Text.Rows.Name.Text=='Bo','A reads the winner back at once (no wait for a poll) and shows it')
+ check(SA.Service:Snapshot().Pull.Record.Name=='Bo'and SA.Art.Built.Pull.Text.Label.Name.Text=='Bo','A reads the winner back at once (no wait for a poll) and shows it')
  check(not SA.Service:Snapshot().Pull.Unsynced,'and has nothing left to write')
  -- fruit across servers: the heavier wins
  local fid=SA.Service.Board.FruitId
@@ -405,7 +416,7 @@ do
  backend.Fail=function()return'HTTP 500 InternalServerError'end
  local q=HH.player(61,'Dot')
  S.Service:NotePull(q,reward('FirePepperSeed','Mythic'),info())
- check(S.Art.Built.Pull.Text.Rows.Name.Text=='Dot','MemoryStore down: this server still shows its own best')
+ check(S.Art.Built.Pull.Text.Label.Name.Text=='Dot','MemoryStore down: this server still shows its own best')
  for _=1,6 do ca.advance(5);S.Service:Step()end
  local snap=S.Service:Snapshot()
  check(snap.Store.Failures>=1 and snap.Pull.Unsynced and snap.Pull.Record.Name=='Dot','the failure is counted and the record stays unsynced')
@@ -419,7 +430,7 @@ do
  other:SetAsync('d'..DAY,Rules.StoreDoc({pull=pull({Uid=70,Name='Far',Rarity='Cosmic',Odds=.001})}),1e6)
  for _=1,80 do ca.advance(5);S.Service:Step()end
  snap=S.Service:Snapshot()
- check(snap.Store.Failures==0 and snap.Pull.Record.Name=='Far'and S.Art.Built.Pull.Text.Rows.Name.Text=='Far','when it recovers it catches up with the shared board (a Cosmic from another server beats the Mythic)')
+ check(snap.Store.Failures==0 and snap.Pull.Record.Name=='Far'and S.Art.Built.Pull.Text.Label.Name.Text=='Far','when it recovers it catches up with the shared board (a Cosmic from another server beats the Mythic)')
  check(not snap.Pull.Unsynced and backend.peek(Rules.StoreName,'d'..DAY).pull.Name=='Far','and the better shared record was kept (our Mythic never overwrote it)')
  -- a local record that is better is written after the outage
  backend.Fail=function()return'429 throttled'end
@@ -463,6 +474,15 @@ do
  check(d.Avatar and d.Avatar:GetAttribute('UserId')==72,'only the newer champion\'s avatar is installed (the stale one, finishing last, was dropped)')
  check(S.Avatars.Placed==placed0+1,'(the older avatar was never placed)')
  check(d.Item~=nil and d.Item.Name=='Item'..#S.Art.ItemBuilds,'(the newest item stays)')
+ -- the dance is waited for (it loads): a champion overtaken while it loads is dropped too, and only the newest counts as built
+ S.Avatars.AnimateYield=true
+ local built0=S.Art.Built.Pull.Model:GetAttribute('Built')or 0
+ S.Service:NotePull(HH.player(75,'Hal'),reward('SolarStarfruitSeed','King',{SeedScale=11}),info({Stage=2,Variant='Pack01'}))
+ S.Service:NotePull(HH.player(76,'Ida'),reward('SolarStarfruitSeed','King',{SeedScale=13}),info({Stage=2,Variant='Pack01'}))
+ check(#S.Avatars.AnimatePending==2 and S.Art.Built.Pull.Model:GetAttribute('Built')==built0,'two champions\' avatars are waiting for their dance to load (nothing is counted as built yet)')
+ S.Avatars.AnimateYield=false
+ for i=#S.Avatars.AnimatePending,1,-1 do coroutine.resume(S.Avatars.AnimatePending[i])end
+ check(S.Art.Built.Pull.Model:GetAttribute('Built')==built0+1 and d.Avatar:GetAttribute('UserId')==76,'when they finish only the newer champion (Ida) counts: one built, hers on the display')
  -- the same for a day change while a build is in flight
  S.Avatars.Yield=true
  S.Service:NotePull(HH.player(73,'Gus'),reward('SolarStarfruitSeed','King',{SeedScale=9}),info({Stage=2,Variant='Pack01'}))
@@ -471,6 +491,10 @@ do
  for _,co in ipairs(S.Avatars.Pending)do pcall(coroutine.resume,co)end
  local snap=S.Service:Snapshot()
  check(snap.Pull.Record==nil and d.Avatar and d.Avatar:GetAttribute('UserId')==0,'a champion that was loading at midnight does not show on the new empty board (a silhouette does)')
+ -- an avatar that could not dance is the static pose: the service just records it
+ S.Avatars.AnimateMode='pose';S.Service:NotePull(HH.player(77,'Jo'),reward('SolarStarfruitSeed','King',{SeedScale=15}),info({Stage=2,Variant='Pack01'}))
+ check(S.Service.AvatarMode.Pull=='pose'and S.Service:StatusText():find('pose',1,true),'an avatar that could not dance is reported as the static pose')
+ S.Avatars.AnimateMode='dance'
 end
 
 -- 9. Owner tools ---------------------------------------------------------------------------------------------------------------------------------------------------------

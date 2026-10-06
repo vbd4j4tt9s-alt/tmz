@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- Treadmill speed-gain popups. Place this LocalScript in StarterPlayer > StarterPlayerScripts.
 -- V0.55: whole-point gains from the head. R151 (owner: "speed gain should be touch up regarding the speed popups ... keep ours white but the physics and feel of
 -- it should feel the same as the video", then "proposed + split"): the motion of a popular treadmill game's popups with OUR colours, font and bolt. All numbers

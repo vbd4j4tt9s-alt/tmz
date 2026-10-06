@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R132 (owner): a 🏠 floats over the middle of your own garden (above the centre aisle, clear of the beds) so you always
 -- know which base is yours. Only you see it. Sized in studs with a small pixel floor so it stays findable from the track
 -- without covering the garden up close; it bobs gently and follows you if the server moves you to another base.

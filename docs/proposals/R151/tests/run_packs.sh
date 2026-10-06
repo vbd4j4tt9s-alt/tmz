@@ -12,9 +12,9 @@
 #  3. fingerprint_packs.luau + compare_fingerprints.py   BEFORE (the base commit, default b196944 = the R151 pack audit as merged) against AFTER: every
 #                            property of every part of 1,500+ packs; NOTHING may differ (the Verity pouch work changes no other pack, and with no baked pouch
 #                            the Verity pack is the unchanged R149 sachet). `--base c1e8829` (R150 + the research) reproduces the audit's own three fixes.
-#  4. run_verity_pouch.sh    (R151 follow-up: the Verity pack is the REAL chip-bag pouch in pure yellow, baked at runtime; the sachet is the fallback) - the
-#                            EditableMesh bake on a mock with a switch for every failure, the pouch pack in every context, the sachet fallback, no leaks,
-#                            and every other pack identical with the pouch ready and without it.
+#  4. run_verity_pouch.sh    (R151 follow-up, R152: the Verity pack is a clean FLAT chip-bag pouch in pure yellow, generated at runtime with EditableMesh; the sachet is the
+#                            fallback) - the generated mesh (flat faces, no relief), the bake on a mock with a switch for every failure, the pouch pack in every context,
+#                            never shaped, the sachet fallback, no leaks, and every other pack identical with the pouch ready and without it.
 #  5. run_pack_shapes.sh     (R151 follow-up: chip-bag shape variations designed in Blender, applied at run time to the owner's own pouch meshes; every pack rolls
 #                            one of six and keeps it for life, the Index / catalogues use the default) - the field against the Blender design's samples, the roll and
 #                            its distribution, the bake of all 252 (design, variation) pairs, every context identical, builds that never yield, sticky fallbacks, the

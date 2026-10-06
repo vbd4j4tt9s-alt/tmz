@@ -38,7 +38,7 @@ done
 for n in TreadmillLook151 TreadmillBeltArt151;do grep -q "^ModuleScript	ReplicatedStorage/$n	ReplicatedStorage/$n.lua$" "$S/MANIFEST.tsv" || fail "$n is not in src/MANIFEST.tsv";done
 tail -n +2 "$S/MANIFEST.tsv" | cut -f2 > "$OUT/manifest_paths.txt";LC_ALL=C sort -c "$OUT/manifest_paths.txt" || fail "src/MANIFEST.tsv is not sorted"
 if git -C "$REPO" rev-parse -q --verify $BASE >/dev/null 2>&1;then
- git -C "$REPO" diff --quiet $BASE -- "$S/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua" "$S/StarterPlayer/StarterPlayerScripts/TreadmillAnimation.client.lua" || fail "the popup script / treadmill animation changed"
+ sh "$T/r152_real_diff.sh" "$REPO" $BASE "$S/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua" "$S/StarterPlayer/StarterPlayerScripts/TreadmillAnimation.client.lua" >/dev/null || fail "the popup script / treadmill animation changed" # (the R152 load guard line aside)
  git -C "$REPO" show $BASE:src/ReplicatedStorage/SpeedPopupStyle.lua > "$OUT/style_base.lua"
  python3 - "$OUT/style_base.lua" "$S/ReplicatedStorage/SpeedPopupStyle.lua" <<'EOF' || fail "SpeedPopupStyle changed outside FormatGain and the 1/5 s step"
 import re, sys

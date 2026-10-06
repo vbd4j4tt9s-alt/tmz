@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R104: independent halfway/end claims, live discovery updates and explicit reward states.
 -- R137 (owner: "polish up the index"): cards with a rarity chip and a 1/N odds chip, a soft rarity glow and pedestal
 -- behind a bigger model, the name under it, SEED / GROWN check chips and a gold CLAIM pill; cards sorted Common to

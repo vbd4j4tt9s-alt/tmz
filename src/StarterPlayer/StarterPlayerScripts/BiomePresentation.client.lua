@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R73: 5-Hz location checks, 20-Hz transitions, no property writes once settled.
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Lighting=game:GetService('Lighting')
 local player=game:GetService('Players').LocalPlayer;local Mood=require(RS:WaitForChild('BiomeMood'));local Renderer=require(RS:WaitForChild('EnvironmentLighting'))

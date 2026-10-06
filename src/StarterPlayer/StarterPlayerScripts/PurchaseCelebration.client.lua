@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R148 (owner: "remove this line when purchasing and add the vfx and sfx and also the notification for making a successful
 -- purchase"): the buyer's half of a purchase. PurchaseAnnouncer (server) already sent the "✅ Purchased: <what>!" notice;
 -- when ChestChaseRemotes.PurchaseDone arrives this plays the reward chime (InteractionAudio GemClaim, the one the Index,

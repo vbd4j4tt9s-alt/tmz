@@ -17,7 +17,9 @@ M = {
     'grows_too_much': ('shapes', RS + 'PackShapes151.lua', 'return 1-.04*b,1+.05*b end', 'return 1-.04*b,1+.12*b end'),
     # --- the roll
     'roll_never_six': ('shapes', RS + 'PackShapes151.lua', 'id=math.min(M.Count,math.floor(math.clamp(u,0,1)*M.Count)+1)', 'id=math.min(M.Count,math.floor(math.clamp(u,0,1)*(M.Count-1))+1)'),
-    'void_takes_shape': ('shapes', RS + 'PackShapes151.lua', "if type(variantKey)~='string'or variantKey=='EclipseReliquary'or variantKey=='MechLimited'then return false end", "if type(variantKey)~='string'then return false end"),
+    'void_takes_shape': ('shapes', RS + 'PackShapes151.lua', "if type(variantKey)~='string'or variantKey=='EclipseReliquary'or variantKey=='MechLimited'or variantKey==", "if type(variantKey)~='string'or false and variantKey=='EclipseReliquary'or variantKey=='MechLimited'or variantKey=="),
+    # R152: the Verity pack takes a shape again (it rolls, carries and builds one)
+    'verity_takes_shape': ('shapes', RS + 'PackShapes151.lua', "or variantKey==require(script.Parent.VerityCatalog).Variant then return false end", " then return false end"),
     'roll_ignores_force': ('shapes', RS + 'PackShapes151.lua', ' local id=mode\n', ' local id=nil\n'),
     # --- the bake
     'prints_whitened': ('shapes', RS + 'PackShapes151.lua', '  if neutral then\n   colors=editable:GetColors()', '  if true then\n   colors=editable:GetColors()'),
@@ -48,8 +50,10 @@ M = {
     'addchest_gives_void_a_shape': ('server', SV + 'PlayerDataService.lua', 'if shape > 0 and PackShapes.Applies(chest.BagVariant) then record.PackShape = shape end', 'if shape > 0 then record.PackShape = shape end'),
     'record_not_saved': ('server', SV + 'PlayerDataService.lua', 'PackShape=savedPackShape(chestRecord),', 'PackShape=nil,'),
     'record_not_loaded': ('server', SV + 'PlayerDataService.lua', 'PackShape=savedPackShape(savedChest),', 'PackShape=nil,'),
-    'seed_keeps_shape': ('server', SV + 'PlayerDataService.lua', '\tif row.Kind ~= "Pack" then return nil end\n', ''),
-    'verity_handin_no_roll': ('server', SV + 'PlayerDataService.lua', 'local shape = PackShapes.Roll(VerityCatalog.Variant);if shape then record.PackShape = shape end', 'local shape = nil'),
+    'seed_keeps_shape': ('server', SV + 'PlayerDataService.lua', 'if row.Kind ~= "Pack" or not PackShapes.Applies(', 'if not PackShapes.Applies('),
+    # R152: an older Verity record keeps the shape R151 rolled for it; a Verity pack handed a shape keeps it
+    'verity_record_keeps_shape': ('server', SV + 'PlayerDataService.lua', ' or not PackShapes.Applies(PackRules.VariantKey(row.BagVariant)) then return nil end', ' then return nil end'),
+    'verity_addchest_keeps_shape': ('server', SV + 'PlayerDataService.lua', 'if shape > 0 and PackShapes.Applies(chest.BagVariant) then record.PackShape = shape end', 'if shape > 0 then record.PackShape = shape end'),
     'spawn_not_stored': ('server', SV + 'ChestService.lua', '    seed.PackShape=shape -- R151\n', '    seed.PackShape=nil -- R151\n'),
     'spawn_not_pinned': ('server', SV + 'ChestService.lua', 'if shape and shape>0 then PackShapes.Pin(seed,', 'if false then PackShapes.Pin(seed,'),
     'spawn_keeps_cold_roll': ('server', SV + 'ChestService.lua', 'shape=PackShapes.Settle(design,rolledShape~=nil and rolledShape or PackShapes.Roll(variant))', 'shape=rolledShape~=nil and rolledShape or PackShapes.Roll(variant)'),
@@ -67,16 +71,15 @@ M = {
     'picture_ignores_shape': ('shapes', RS + 'ItemPictures.lua', "spec.Mutation,nil,spec.Plain,spec.Shape)", "spec.Mutation,nil,spec.Plain)"),
     'bag_tags_every_pack': ('shapes', RS + 'SeedPackVisuals.lua', 'if shape~=nil then local Shapes=require(script.Parent.PackShapes151)', 'if true then local Shapes=require(script.Parent.PackShapes151)'),
     'renderer_ignores_shape': ('shapes', RS + 'SeedPackRenderer.lua', "    if shape~=nil then\n        local shown;", "    if false then\n        local shown;"),
-    'verity_ignores_roll': ('shapes', RS + 'VerityPackArt.lua', "   if bag:GetAttribute('DefaultPackShape')~=true and bag:GetAttribute('PackShape')~=nil then", "   if false then"),
     # --- the default shape (DefaultPackShape): the catalogue, shop and reward pictures, the market stalls
     'flag_does_not_win': ('shapes', RS + 'SeedPackVisuals.lua', "if defaultShape==true then m:SetAttribute('DefaultPackShape',true)\n    elseif shape~=nil then", "if defaultShape==true then m:SetAttribute('DefaultPackShape',true) end\n    if shape~=nil then"),
     'renderer_ignores_flag': ('shapes', RS + 'SeedPackRenderer.lua', "local shape=bag:GetAttribute('DefaultPackShape')~=true and bag:GetAttribute('PackShape')or nil", "local shape=bag:GetAttribute('PackShape')"),
-    'verity_ignores_flag_with_roll': ('shapes', RS + 'VerityPackArt.lua', "if bag:GetAttribute('DefaultPackShape')~=true and bag:GetAttribute('PackShape')~=nil then", "if bag:GetAttribute('PackShape')~=nil then"),
+    # R152: the Verity builder requires PackShapes151 again (it must never)
+    'verity_uses_shapes': ('static', RS + 'VerityPackArt.lua', "local Config=require(script.Parent.VerityConfig)", "local Config=require(script.Parent.VerityConfig);local Shapes=require(script.Parent.PackShapes151)"),
     'picture_flag_keeps_roll': ('shapes', RS + 'ItemPictures.lua', "local shape=tool:GetAttribute('DefaultPackShape')==true and 0 or shapes().Sanitize(tool:GetAttribute('PackShape'))", "local shape=shapes().Sanitize(tool:GetAttribute('PackShape'))"),
     'picture_flag_not_passed': ('shapes', RS + 'ItemPictures.lua', "spec.Mutation,nil,spec.Plain,spec.Shape)", "spec.Mutation,nil,nil,spec.Shape)"),
     'market_not_default': ('static', SV + 'MarketLayout.lua', "spec.Variant,1,1,'None',nil,true)", "spec.Variant,1,1,'None')"),
     'viewport_not_default': ('static', RS + 'PackViewport89.lua', "'MechLimited',1,1,'None',nil,true)", "'MechLimited',1,1,'None')"),
-    'plain_bake_warns': ('shapes', RS + 'VerityPouch151.lua', "if Run:IsStudio()and not plainFailure.Reason:find('EditableMesh is not available in this environment',1,true)then warn(", "if Run:IsStudio()then warn("),
     'stack_mixes_shapes': ('static', CL + 'Hotbar.client.lua', ",'SeedScale','PackShape'}", ",'SeedScale'}"),
     'catalogue_shows_a_roll': ('static', RS + 'TitleScreen104.lua', "visuals.Bag(CFrame.Angles(0,.15,-.12),world,1,nil,1,'Pack06',1,1,'None')", "visuals.Bag(CFrame.Angles(0,.15,-.12),world,1,nil,1,'Pack06',1,1,'None',nil,PackShape)"),
 }

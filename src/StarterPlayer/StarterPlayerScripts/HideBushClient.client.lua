@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R124: hiding in the Forest / Jungle bushes (HideBushes124 on the server makes them big and walk-through).
 -- The bush you stand in turns see-through for you only; other players' names are hidden while they are inside one.
 -- A pack carrier's carry nameplate (CarryNameplate84) still shows: you cannot hide a stolen pack.

@@ -2,6 +2,9 @@
 -- day, biggest tomato or bigger watermelon and so on, it will be a giant display and the persons avatar will be standing beside it"): the pure rules and
 -- numbers of the two hub displays, shared by the server (HubDisplayBoard / Store / Art / Service) and the client (HubDisplayClient). No services, no
 -- Instances: everything here can be tested alone.
+-- R152 (owner: "make sure that the avatar is sized up and dancing while the seed rotates around and the effects are actually on the seed not behind ... a billboard is not
+-- needed ... the same format and look as the fruit of the hour type pedestal"): no sign board any more. A display is the Fruit of the Hour pedestal, built big, with the
+-- winning seed / fruit turning over it and the champion's avatar, 25 studs tall and dancing, beside it. Its words are small, in the Fruit of the Hour's own format (see Words).
 --  * BEST PULL TODAY: the rarest seed any player pulled from a pack today, across all servers. Order: highest rarity rank (Common ... King, as
 --    SeedPackRules.Rarities ranks them), then the smaller chance (the rarer pull), then the heavier seed, then the earlier pull. PullBetter is a strict
 --    total order (the last two keys make even identical pulls differ), so every server picks the same winner.
@@ -30,9 +33,10 @@ R.NoticeGap=8                     -- seconds between two record chat lines of on
 R.MaxFruitRank=5                  -- fruit types in the daily rotation: up to Mythic (raise to 8 to include Secret / Cosmic / King plants)
 R.MinFruitKg=.5                   -- a plant whose fruit weighs less than this at size 1 has no meaningful weight: never the fruit of the day
 R.NameLength=24
-R.ItemHeight=10                   -- the giant item is scaled to about this many studs tall
+R.ItemHeight=12                   -- the showcase item (seed / fruit) is scaled to about this many studs tall
 R.ItemParts=150                   -- at most this many parts in one giant model
-R.AvatarHeight=10.5               -- the champion's avatar stands about this tall (a normal R15 avatar is about 5.3)
+R.AvatarHeight=25                 -- the champion's avatar stands about this tall (a normal R15 avatar is about 5.3: about 4.7 times; R152)
+R.AvatarTurn=-.3                  -- the avatar turns this far (radians) from facing the viewers toward the pedestal beside it
 R.AvatarAccessories=10            -- at most this many accessories are worn by the display's avatar
 R.AvatarCache=12                  -- humanoid descriptions kept (per user id)
 R.Tag='HubDisplay151'
@@ -237,61 +241,65 @@ function R.FruitTraits(rec)
  return table.concat(words,' · ')
 end
 
--- The sign ---------------------------------------------------------------------------------------------------------------------------------------------
--- A board of Board studs, drawn at PixelsPerStud: Canvas pixels. Rows are boxes in canvas pixels (X, Y, W, H) with the biggest text size they may use (the labels
--- shrink to fit); Fit() is the conservative width model the tests use (Fredoka One is a chunky face: about 0.62 em per character, an emoji about 1.5).
-R.Sign={BoardW=48,BoardH=20,PixelsPerStud=24,Canvas={W=1152,H=480},MaxDistance=700}
-R.Sign.Rows={
- Title={X=48,Y=14,W=1056,H=100,Max=76},
- Name={X=48,Y=122,W=1056,H=108,Max=96},
- Line={X=48,Y=234,W=1056,H=94,Max=78},
- Odds={X=48,Y=332,W=1056,H=84,Max=74},
- Footer={X=48,Y=420,W=1056,H=48,Max=38},
+-- The words ---------------------------------------------------------------------------------------------------------------------------------------------
+-- Small, in the Fruit of the Hour pedestal's own format (MarketLayout.Pedestal / FruitOfHourDisplay), only bigger: an engraved PLAQUE on the pedestal column's front (a SurfaceGui: a dark plate with gold
+-- Fredoka lettering) and a LABEL floating over the showcase item (a BillboardGui sized in studs, its text fills each row). Rows are boxes (X, Y, W, H) with the biggest text size they may use (plaque: pixels
+-- on a canvas drawn at PixelsPerStud; label: studs); the text shrinks to fit. Fit() is the conservative width model the tests use (Fredoka One is a chunky face: about 0.62 em per character, an emoji about 1.5).
+R.Plaque={W=10,H=5,PixelsPerStud=48,Canvas={W=480,H=240},MaxDistance=300}
+R.Plaque.Rows={
+ Title={X=20,Y=8,W=440,H=70,Max=56},
+ Name={X=20,Y=80,W=440,H=64,Max=52},
+ Line={X=20,Y=146,W=440,H=52,Max=40},
+ Footer={X=20,Y=200,W=440,H=34,Max=26},
+}
+R.Label={W=26,H=8,MaxDistance=420}
+R.Label.Rows={
+ Title={X=.5,Y=0,W=25,H=2.2,Max=2.0},
+ Name={X=.5,Y=2.2,W=25,H=3.2,Max=3.0},
+ Info={X=.5,Y=5.4,W=25,H=2.6,Max=2.4},
 }
 function R.TextWidthEm(text)
  local em=0
  for _,cp in utf8.codes(text)do em+=(cp>=0x2190)and 1.5 or .62 end
  return em
 end
--- The biggest size (pixels) text may be drawn at inside a row: its Max, less when the words are too long for the row's width or the row is not tall enough.
+-- The biggest size (pixels on the plaque, studs on the label) text may be drawn at inside a row: its Max, less when the words are too long for the row's width or the row is not tall enough.
 function R.Fit(text,row)
  local em=math.max(R.TextWidthEm(text),.01)
  return math.min(row.Max,row.W/em,row.H*.95)
 end
 local PLACEHOLDER='Nobody yet'
--- The sign's words. kind 'Pull' | 'Fruit'; rec = the champion's record (nil: nobody yet); fruitId = today's fruit; secondsLeft = to the next board.
--- Returns {Kind, State, Accent={r,g,b}, Rows={Title=, Name=, Line=, Odds=, Footer=}} (each row {Text, Color={r,g,b}}).
+-- The words of a display. kind 'Pull' | 'Fruit'; rec = the champion's record (nil: nobody yet); fruitId = today's fruit; secondsLeft = to the next board; fruitName = its plain name.
+-- Returns {Kind, State, Accent={r,g,b}, Plaque={Title=, Name=, Line=, Footer=}, Label={Title=, Name=, Info=}} (each row {Text, Color={r,g,b}}): the plaque says the title, the winner, a line (a pull's
+-- rarity and chance; the fruit of the day) and the countdown; the label says the title, the winner and the seed / the weight.
 function R.SignText(kind,rec,fruitId,secondsLeft,fruitName)
  local gold={255,214,90};local white={255,255,255};local soft={206,214,238}
- local out={Kind=kind,Rows={}}
- local footer=(kind=='Pull'and'New board in 'or'New fruit in ')..R.Countdown(secondsLeft)
- out.Rows.Footer={Text=footer,Color=soft}
+ local out={Kind=kind,Plaque={},Label={}}
+ local P,L=out.Plaque,out.Label
+ P.Footer={Text=(kind=='Pull'and'New board in 'or'New fruit in ')..R.Countdown(secondsLeft),Color=soft}
+ local title=kind=='Pull'and'BEST PULL TODAY'or'BIGGEST FRUIT TODAY'
+ P.Title={Text=title,Color=gold};L.Title={Text=title,Color=gold}
+ local function winner(text)P.Name={Text=text,Color=white};L.Name={Text=text,Color=white}end
  if kind=='Pull'then
-  out.Rows.Title={Text='🏆 BEST PULL TODAY',Color=white}
   if rec then
    out.State='Champion';out.Accent=R.RarityColor(rec.Rarity)
-   out.Rows.Name={Text=rec.Name,Color=white}
-   out.Rows.Line={Text=R.PullName(rec),Color=out.Accent}
-   out.Rows.Odds={Text=R.OddsText(rec.Odds)..(COAT[rec.Coat]and(' · '..COAT[rec.Coat])or''),Color=gold}
+   winner(rec.Name);L.Info={Text=rec.Seed,Color=out.Accent}
+   P.Line={Text=rec.Rarity..' · '..R.OddsText(rec.Odds)..(COAT[rec.Coat]and(' · '..COAT[rec.Coat])or''),Color=out.Accent}
   else
    out.State='Empty';out.Accent=gold
-   out.Rows.Name={Text=PLACEHOLDER,Color=white}
-   out.Rows.Line={Text='Open a pack to take the first spot!',Color=soft}
-   out.Rows.Odds={Text='1/?',Color=gold}
+   winner(PLACEHOLDER);L.Info={Text='Open a pack!',Color=soft}
+   P.Line={Text='Open a pack to claim it!',Color=soft}
   end
  else
   local name=fruitName or R.FruitLabel(fruitId,fruitId)
-  out.Rows.Title={Text=R.Emoji(fruitId)..' BIGGEST '..string.upper(name)..' TODAY',Color=white}
+  P.Line={Text='Today: '..R.Emoji(fruitId)..' '..name,Color=white}
   if rec then
    out.State='Champion';out.Accent=gold
-   out.Rows.Name={Text=R.KgText(rec.Kg),Color=gold}
-   out.Rows.Line={Text=rec.Name,Color=white}
-   out.Rows.Odds={Text=R.FruitTraits(rec),Color={150,235,170}}
+   local traits=R.FruitTraits(rec)
+   winner(rec.Name);L.Info={Text=R.KgText(rec.Kg)..(traits~=''and(' · '..traits)or''),Color=gold}
   else
    out.State='Empty';out.Accent=gold
-   out.Rows.Name={Text='0 kg',Color=gold}
-   out.Rows.Line={Text='Harvest the biggest '..name..' today to get here!',Color=white}
-   out.Rows.Odds={Text='',Color=soft}
+   winner(PLACEHOLDER);L.Info={Text='Harvest one to claim it!',Color=soft}
   end
  end
  return out
@@ -299,16 +307,16 @@ end
 
 -- Where they stand ---------------------------------------------------------------------------------------------------------------------------------------
 -- The hub is a flat 680 x 524 field (floor top y 4, walls 48 high, inner faces at x +-335 and z -618). Bases 3 and 4 end at z -417; Bases 5 and 6 sit at the back between
--- x -133 and 133. So the two back corners (x 133 .. 335 and -335 .. -133, z -618 .. -417) are empty. Each display stands in one, 100 studs from both its walls, and
--- faces the market (the players' meeting place), so it reads from the whole hub.
+-- x -133 and 133. So the two back corners (HubDecorKit151.Reserved: x 145 .. 335 and -335 .. -145, z -618 .. -420) are kept empty for the displays. Each stands in one, about 100 studs from both its
+-- walls, and faces the market (the players' meeting place), so it reads from the whole hub.
 --  Pull : the +X corner (below Base_4, beside Base_6)        Fruit: the -X corner (below Base_3, beside Base_5)
 R.Layout={
  FloorTop=4,
  Target=Vector3.new(0,4,-265),
  Pull={Center=Vector3.new(236,4,-516)},
  Fruit={Center=Vector3.new(-236,4,-516)},
- -- the free space, for the tests and for anyone moving them (studs, world X / Z): corner rectangles with their walls and the bases' edges
- Corner={X0=135,X1=335,Z0=-618,Z1=-422},
- Footprint={HalfX=30,HalfZ=18}, -- the apron's half size (HubDisplayArt keeps everything inside it, 4 studs more clear)
+ -- the reserved corner (studs, world X / Z) and how far a stand reaches from its centre in its own frame (the pedestal on one side, the dancing avatar's arms on the other)
+ Corner={X0=145,X1=335,Z0=-618,Z1=-420},
+ Footprint={HalfX=36,HalfZ=24},
 }
 return R

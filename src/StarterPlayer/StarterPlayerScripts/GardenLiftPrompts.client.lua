@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Players=game:GetService('Players')
 local Contact=require(RS:WaitForChild('GardenLiftContact'));local Catalog=require(RS:WaitForChild('PlantCatalog'));local Cache=require(RS:WaitForChild('PlantPartCache'))
 local player=Players.LocalPlayer;local map=workspace:WaitForChild('ChestChaseMap');local records={};local connections={};local elapsed=0

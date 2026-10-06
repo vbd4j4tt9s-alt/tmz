@@ -3,6 +3,8 @@
 -- StarterPlayerScripts.HubLife151.client) on the owner's place (place_tree.luau from docs/proposals/R149/tools/rbxl_geom.py) in the R149
 -- Roblox mock, after the real start-up builders (treadmills, fences, mystery pedestals, Verity, leaderboards). Prints "ok <name>" /
 -- "FAIL <name>: why" and "BUDGET ..." lines; errors at the end if anything failed.
+-- R152 (owner: no fountain, fewer trees, no base entrances / signposts / banners / murals / corner towers, a chess-rook battlement on every wall,
+-- the track gate as two rook towers): section 16 checks every removal and the battlement and the rook gate.
 local Z=require('./zfight_world');local W=Z.W;local R=Z.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local RS=W.RS
 local Run=W.service('RunService');Run.IsServer=function()return true end;Run.IsClient=function()return false end;Run.IsStudio=function()return false end
@@ -102,6 +104,8 @@ do local ok,why=true,nil
  check('walls: restyled cream plaster, the old colour kept as an attribute',w._props.Material and tostring(w._props.Material.Name)=='Plaster'and w:GetAttribute('R151OldColor')~=nil)
  local piers=0;for _,d in ipairs(map.GardenHubDesign:GetChildren())do if d.Name:find('TimberPier')and d._props.Transparency==1 then piers+=1 end end
  check('walls: the 13 old timber strips hidden',piers==13,piers)
+ local caps=0;for _,d in ipairs(map.GardenHubDesign:GetChildren())do if d.Name:find('^Lobby.*Cap$')and d._props.Transparency==1 then caps+=1 end end
+ check('walls: the 5 saved wood caps (51 - 52) hidden under the battlement',caps==5,caps)
 end
 
 -- 2. server parts: anchored, untouchable, unqueryable; only the gate towers collide ----------------------------------------------------------
@@ -112,7 +116,7 @@ do local bad,coll={},0
   if p._props.CanCollide then coll+=1;if p.Name~='Gate tower'then bad[#bad+1]='collides: '..path(p)end end
  end
  check('server: every part anchored, CanTouch / CanQuery off',#bad==0,first(bad))
- check('server: only the two gate towers collide',coll==2,coll)
+ check('server: only the gate towers\' shafts collide (two stacked cylinders per rook)',coll==4,coll)
 end
 
 -- 3. clearances against every gameplay object -------------------------------------------------------------------------------------------------
@@ -157,19 +161,18 @@ do local c=clashes(serverParts,serverAllowed);check('clearances: no server part 
 local corners={{{145,0,-614},{331,200,-420}},{{-331,0,-614},{-145,200,-420}}}
 local function inCorners(parts)local out={};for _,p in ipairs(parts)do if(p._props.Transparency or 0)<1 then for _,c in ipairs(corners)do if partOverlaps(p,c[1],c[2],.01)then out[#out+1]=path(p)end end end end;return out end
 do local c=inCorners(serverParts);check('reserved corners: no server part',#c==0,first(c))end
--- arch and gate clearances
-do local ok,why=true,nil
- for i,r in pairs(records)do local arch=dec.BaseEntrances:FindFirstChild('Base'..i..'Arch');local trim=arch and arch:FindFirstChild('Arch beam trim')
-  local padTop=r.Pad._props.CFrame.Position.Y+r.Pad._props.Size.Y/2
-  local lo=trim and select(1,aabb(trim))
-  if not lo or lo[2]-padTop<14 then ok=false;why='Base'..i end
- end
- check('clearance: every base arch is at least 14 studs over its pad',ok,why)
- local beamLo=select(1,boxOf(dec.Gate['Arch trim']));check('clearance: the gate beam\'s lowest trim is 39.5 studs over the floor',beamLo[2]-4>=39.5,beamLo[2])
+-- gate clearances
+do
+ local trim=dec.Gate['Gatehouse trim'];local beamLo=select(1,boxOf(trim));check('clearance: the gatehouse\'s lowest trim is 39.5 studs over the floor',beamLo[2]-4>=39.5,beamLo[2])
  local keyLo=math.huge;for _,k in ipairs(dec.Gate:GetChildren())do if k:GetAttribute('R151Stage')then keyLo=math.min(keyLo,select(1,aabb(k))[2])end end
  check('clearance: the gate keys hang 38 studs over the floor',keyLo-4>=38,keyLo)
- local towersOk=true;for _,t in ipairs(dec.Gate:GetChildren())do if t.Name=='Gate tower'then local a,b=aabb(t);if math.min(math.abs(a[1]),math.abs(b[1]))<90.9 then towersOk=false end end end
- check('clearance: the gate towers stay outside the 180-wide run-up and track (|x| > 90.9)',towersOk)
+ local towersOk,baseOk=true,true
+ for _,t in ipairs(dec.Gate:GetChildren())do
+  if t.Name=='Gate tower'then local a,b=aabb(t);if math.min(math.abs(a[1]),math.abs(b[1]))<90.9 then towersOk=false end end
+  if t.Name:find('^Gate base')then local a,b=aabb(t);if math.min(math.abs(a[1]),math.abs(b[1]))<90.2 then baseOk=false end end
+ end
+ check('clearance: the gate towers\' shafts stay outside the 180-wide run-up and track (|x| > 90.9)',towersOk)
+ check('clearance: the rooks\' stepped bases reach no further in than the R151 plinth did (|x| > 90.2)',baseOk)
 end
 
 -- 4. gate keys: the keeper speeds -------------------------------------------------------------------------------------------------------------
@@ -182,7 +185,7 @@ do local keys={};for _,k in ipairs(dec.Gate:GetChildren())do local st=k:GetAttri
  local forest=dec.Gate['Biome key 1'];check('gate: the Forest key reads "⚡ 0"',forest.KeyLegend.Line3.Text=='⚡ 0',forest.KeyLegend.Line3.Text)
 end
 
--- 5. server: re-Apply is idempotent; the arch beams follow the owners -------------------------------------------------------------------------
+-- 5. server: re-Apply is idempotent -----------------------------------------------------------------------------------------------------------
 do
  local n0=#serverParts
  local H=server('HubDecor151')
@@ -192,15 +195,10 @@ do
  local w=map.ChestChaseWalls.LobbyBackWall
  check('server: the walls\' original colour survives a second Apply',w:GetAttribute('R151OldColor')==savedWalls.LobbyBackWall.Color)
  dec=dec2
- records[1].Model:SetAttribute('BaseOwnerDisplayName','Ben')
- local beam=dec.BaseEntrances.Base1Arch['Arch name beam']
- check('server: the arch beam shows the owner ("BEN\'S BASE")',beam.OwnerName.Line1.Text=='BEN\'S BASE',beam.OwnerName.Line1.Text)
- records[1].Model:SetAttribute('BaseOwnerDisplayName','')
- check('server: a free base reads "FREE BASE"',beam.OwnerName.Line1.Text=='FREE BASE',beam.OwnerName.Line1.Text)
  records[1].Model:SetAttribute('BaseOwnerDisplayName','Ben');records[3].Model:SetAttribute('BaseOwnerDisplayName','Leo')
  local server1=0;for _,p in ipairs(partsUnder(dec))do server1+=1 end
  print(string.format('BUDGET server (Phase 1) parts %d',server1))
- check('budget: server (Phase 1) parts <= 800',server1<=800,server1)
+ check('budget: server (Phase 1) parts <= 600 (R151: 725)',server1<=600,server1)
 end
 
 -- Client ---------------------------------------------------------------------------------------------------------------------------------------
@@ -267,7 +265,7 @@ do local Art=W.module('HubLifeArt151');local bad={}
  -- variety: species, deterministic, no two trees alike
  local species={};for _,t in ipairs(Art.Layout.trees)do species[t[1]..(t[4]and('/'..tostring(t[4]))or'')]=true end
  local n=0;for _ in pairs(species)do n+=1 end
- check('variety: at least 15 tree kinds / sizes / colours',n>=15,n)
+ check('variety: at least 8 tree kinds / sizes / colours (R152: 24 trees, was 62)',n>=8,n)
  local crowns={};local dup=0
  for _,p in ipairs(clientParts)do if p.Name=='Tree crown'or p.Name=='Blossom crown'then local key=string.format('%.2f|%.2f|%d,%d,%d',p._props.Size.X,p._props.CFrame.Position.Y%10,math.floor(p._props.Color.R*255),math.floor(p._props.Color.G*255),math.floor(p._props.Color.B*255))
   if crowns[key]then dup+=1 end;crowns[key]=true end end
@@ -289,11 +287,11 @@ end
 api.Near.detail,api.Near.fine=saveNear[1],saveNear[2]
 cam.CFrame=CF(0,12,-180);api.ApplyLod();local atGate=visible(api)
 cam.CFrame=CF(0,12,1200);api.ApplyLod();local onTrack=visible(api)
-cam.CFrame=CF(0,12,-392);api.ApplyLod();local atFountain=visible(api)
-print(string.format('BUDGET visible at the front street: core %d, detail %d, fine %d; at the fountain: core %d, detail %d, fine %d',atGate.core,atGate.detail,atGate.fine,atFountain.core,atFountain.detail,atFountain.fine))
+cam.CFrame=CF(0,12,-392);api.ApplyLod();local atFountain=visible(api) -- (R152: the old fountain spot, the open south plaza)
+print(string.format('BUDGET visible at the front street: core %d, detail %d, fine %d; at the old fountain spot: core %d, detail %d, fine %d',atGate.core,atGate.detail,atGate.fine,atFountain.core,atFountain.detail,atFountain.fine))
 check('lod: near the front street some detail is hidden (far cells)',atGate.detail>0 and atGate.detail<counts[3].detail)
 check('lod: far down the track everything is hidden',onTrack.core==0 and onTrack.detail==0 and onTrack.fine==0)
-check('lod: at the fountain its fine level shows',atFountain.fine>0)
+check('lod: at the old fountain spot (the south plaza) the fine level shows (butterflies of the south lawn)',atFountain.fine>0)
 budget.Tier=2;cam.CFrame=CF(0,12,-180);api.ApplyLod();local phone=visible(api);budget.Tier=3
 print(string.format('BUDGET visible on a phone (tier 2) at the front street: core %d, detail %d, fine %d (total %d)',phone.core,phone.detail,phone.fine,phone.core+phone.detail+phone.fine))
 check('lod: tier 2 (phones) shows less detail than the desktop and no fine level',phone.detail<atGate.detail and phone.fine==0)
@@ -302,17 +300,17 @@ check('lod: FastMode hides detail and fine',fast.detail==0 and fast.fine==0 and 
 player:SetAttribute('FastMode',nil);api.ApplyLod()
 
 -- 9. ambience only when near, never with Reduced Motion -------------------------------------------------------------------------------------
-cam.CFrame=CF(0,12,-392);api.ApplyLod()
-check('ambience: wanted near the fountain',api.AmbienceWanted())
-local bf=api.State.Ctx.Butterflies[1];for _,b in ipairs(api.State.Ctx.Butterflies)do if(b.Home-V3(0,8,-392)).Magnitude<(bf.Home-V3(0,8,-392)).Magnitude then bf=b end end
+cam.CFrame=CF(100,12,-150);api.ApplyLod()
+check('ambience: wanted near the butterflies and the blossoms by the gate',api.AmbienceWanted())
+local bf=api.State.Ctx.Butterflies[1];for _,b in ipairs(api.State.Ctx.Butterflies)do if(b.Home-V3(100,8,-150)).Magnitude<(bf.Home-V3(100,8,-150)).Magnitude then bf=b end end
 local before=bf.Left._props.CFrame.Position
 api.AmbienceStep(.1);api.AmbienceStep(.1)
 check('ambience: butterflies move',(bf.Left._props.CFrame.Position-before).Magnitude>0)
 local emit=0;for _,pe in ipairs(api.State.Ctx.Emitters)do if pe.Enabled then emit+=1 end end
-check('ambience: petals / sparkles on near the fountain',emit>0,emit)
+check('ambience: petals on near the blossoms (no fountain sparkles any more)',emit>0 and api.State.Ctx.Fountain==nil,emit)
 cam.CFrame=CF(0,12,1200);api.ApplyLod()
 check('ambience: off far away',not api.AmbienceWanted())
-cam.CFrame=CF(0,12,-392);W.Gui.ReducedMotionEnabled=true;api.ApplyLod()
+cam.CFrame=CF(100,12,-150);W.Gui.ReducedMotionEnabled=true;api.ApplyLod()
 local on=0;for _,pe in ipairs(api.State.Ctx.Emitters)do if pe.Enabled then on+=1 end end
 check('reduced motion: no ambience, no particles',not api.AmbienceWanted()and on==0)
 W.Gui.ReducedMotionEnabled=false;api.ApplyLod()
@@ -339,14 +337,7 @@ do local Pursuit=W.module('KeeperPursuit')
  check('keys: a slow player gets no tick on Jungle (and the number stays)',line(2).Text=='⚡ '..tostring(dec.Gate['Biome key 2']:GetAttribute('R151Need')),line(2).Text)
 end
 
--- 12. signposts show the owners ---------------------------------------------------------------------------------------------------------------
-do api.ApplySigns()
- local found=false;for _,s in ipairs(api.State.Ctx.Signs)do if s.Base==1 and s.Line.Text=='Ben · Leo'then found=true end end
- check('signposts: the base boards show the owners ("Ben · Leo")',found)
- records[2].Model:SetAttribute('BaseOwnerDisplayName','Mia');api.ApplySigns()
- local mia=false;for _,s in ipairs(api.State.Ctx.Signs)do if s.Base==2 and s.Line.Text:find('Mia')then mia=true end end
- check('signposts: follow owner changes',mia)
-end
+-- 12. (R152: the signposts are gone: see section 16) --------------------------------------------------------------------------------------------
 
 -- 13. ambience sound zones --------------------------------------------------------------------------------------------------------------------
 do local s=api.Sounds.Birds
@@ -387,7 +378,7 @@ do
    api2.Near.detail=1e6;api2.Near.fine=1e6;api2.ApplyLod()
    local all=partsUnder(life2);local bad={}
    for _,p in ipairs(all)do if p._props.Anchored~=true or p._props.CanCollide~=false or p._props.CanTouch~=false or p._props.CanQuery~=false then bad[#bad+1]=path(p)end end
-   check('trees: desktop - the leafy slots take the stand-in models ('..n..' clones)',n==30,n)
+   check('trees: desktop - the leafy slots take the stand-in models ('..n..' clones: 8 oaks, 2 blossoms, 2 leafy trees)',n==12,n)
    check('trees: every part of the square with the models anchored, never collides, CanTouch / CanQuery off',#bad==0,first(bad))
    local c=clashes(all,function(p,g)return g.Name=='market'and(p.Name=='Bunting line'or p.Name=='Pennant')end)
    check('trees: clearances with the models (base plots / pads / openings / treadmills / pedestals / spawns / safe line / market / Verity / leaderboards / track)',#c==0,first(c))
@@ -398,6 +389,149 @@ do
  check('trees: budgets with the models - tier 1 <= 500, tier 2 <= 1300, tier 3 <= 1600',totals[1]<=500 and totals[2]<=1300 and totals[3]<=1600,totals[1]..' / '..totals[2]..' / '..totals[3])
  for _,c in ipairs(tf:GetChildren())do c:Destroy()end
  budget.Tier=3
+end
+
+-- 16. R152: what was removed, the chess-rook battlement round the walls, the rook gate -----------------------------------------------------------
+-- (owner: "removing the fountain. reduce the amount of trees ... remove the front gates for the garden", "remove these painting and flatten out the
+-- top of the wall ... the gate of the track has to be a castle like gate like u know a rook in chess", "remove the signs, the banners and that red
+-- track thingy, make all the walls in the base area for the top design be like a rook in chess design")
+do
+ local Kit=W.module('HubDecorKit151');local Art=W.module('HubLifeArt151');local H=server('HubDecor151')
+ local WALL_TOP=51
+ local function namesLike(list,pats)local out={}
+  for _,p in ipairs(list)do for _,pat in ipairs(pats)do if p.Name:find(pat)then out[#out+1]=p.Name..' @ '..path(p);break end end end
+  return out
+ end
+ local sp=partsUnder(dec)
+ -- the removed things (server): fountain, murals, banners, base entrances (every piece), corner towers, hedge, topiary, red crest, flags
+ local entrance={'^Arch','Pennant','[Mm]edallion','Gate post','Guard','[Ss]tatue','Footing'}
+ check('removed: no base entrance piece at any base (no arch footings, posts, post bands, ball tops, pennant poles / pennants, name beam, beam trim, number medallion), no BaseEntrances folder',
+  #namesLike(sp,entrance)==0 and dec:FindFirstChild('BaseEntrances')==nil and H.UpdateOwnerNames==nil and H.FreeText==nil,first(namesLike(sp,entrance)))
+ check('removed: no murals (plates, pieces, frames, plaques, crests, number keys) and no mural data in the kit',
+  #namesLike(sp,{'Mural'})==0 and dec:FindFirstChild('Murals')==nil and Kit.Murals==nil and Kit.MuralW==nil and Kit.MuralH==nil and Kit.MuralY0==nil)
+ check('removed: no base banners (rods, cloth, stripes, tails) and no banner data in the kit',#namesLike(sp,{'Banner'})==0 and dec:FindFirstChild('Banners')==nil and Kit.Banners==nil)
+ check('removed: no corner towers (tower, plinth, band, three roofs, finial), no hedge, no topiary on the walls',
+  #namesLike(sp,{'^Corner tower','^Tower ','^Hedge','^Topiary'})==0)
+ check('removed: no red track crest, no flags and flag poles on the gate, no old gate roofs / finials / haunch names',
+  #namesLike(sp,{'crest','Flag','^Gate roof','^Gate finial','^Gate tower band','^Gate tower plinth','^Arch '})==0 and Kit.Gate.FlagX==nil)
+ check('removed: no fountain part and no fountain plaza in the server folder; the south plaza stays as paving',#namesLike(sp,{'[Ff]ountain'})==0 and dec.Paths:FindFirstChild('South plaza')~=nil and dec.Paths:FindFirstChild('Fountain plaza')==nil)
+ check('removed: the art has no fountain and no signposts',Art.Fountain==nil and Art.Signpost==nil)
+ -- trees: 22 .. 25 of the old 62 (a third to 40 %), none in the middle of the square, the streets or the lanes
+ do local trees=Art.Layout.trees;local n=#trees
+  check('trees: '..n..' of the old 62 stay (a third to 40 %)',n>=21 and n<=25 and n/62>=.33 and n/62<=.40,n)
+  local mid={};for _,t in ipairs(trees)do if math.abs(t[2])<70 and t[3]>-540 then mid[#mid+1]=t[1]..' '..t[2]..','..t[3]end end
+  check('trees: none on the central lawns, the avenue or the market square (|x| < 70; only the snow lane\'s far pines stand there)',#mid==0,first(mid))
+  local slots=Art.TreeSlots();local leafy=0;for _,t in ipairs(slots)do if t.Kind=='oak'or t.Kind=='blossom'or t.Kind=='leafy'then leafy+=1 end end
+  check('trees: the tree slots still list every tree in layout order for the owner\'s models ('..#slots..' slots, '..leafy..' leafy)',#slots==n and leafy==12,leafy)
+ end
+ -- the wall top: only battlement merlons stand over 51, all one size, evenly spaced, one on every outer corner, none anywhere near tower height
+ local B=Kit.Battlement
+ local merlons,otherTop={},-1
+ for _,p in ipairs(partsUnder(dec.Walls))do local a,b=aabb(p);if p.Name=='Wall merlon'then merlons[#merlons+1]=p else otherTop=math.max(otherTop,b[2])end end
+ check('walls: '..#merlons..' merlons (4 corners, 46 front, 102 side, 66 back)',#merlons==218,#merlons)
+ check('walls: nothing but merlons rises above the wall top (plinth, string course, pilasters and their stone caps all end at 51 or under)',otherTop<=WALL_TOP+1e-6,otherTop)
+ do local bad={}
+  for _,p in ipairs(merlons)do local a,b=aabb(p);local sz=p._props.Size
+   if math.abs(sz.X-B.Size)>1e-6 or math.abs(sz.Z-B.Size)>1e-6 or math.abs(sz.Y-B.Height)>1e-6 or math.abs(a[2]-WALL_TOP)>1e-6 or math.abs(b[2]-(WALL_TOP+B.Height))>1e-6 then bad[#bad+1]=path(p)end end
+  check('walls: every merlon is one size ('..B.Size..' x '..B.Height..' x '..B.Size..'), square, standing on the wall top (bottom 51, top 57)',#bad==0,first(bad))
+  local topAll=0;for _,p in ipairs(sp)do if not p:IsDescendantOf(dec.Gate)then topAll=math.max(topAll,select(2,aabb(p))[2])end end
+  local crownTop=select(2,aabb(dec.Gate['Gate crown']))[2]
+  check('walls: nothing of the walls or paths is over '..(WALL_TOP+B.Height)..' and the merlons are far under the gate towers (crown top '..crownTop..')',topAll<=WALL_TOP+B.Height+1e-6 and WALL_TOP+B.Height<crownTop-8,topAll)
+ end
+ do local at={};for _,p in ipairs(merlons)do local q=p._props.CFrame.Position;at[#at+1]={q.X,q.Z}end
+  local function has(x,z)for _,q in ipairs(at)do if math.abs(q[1]-x)<.01 and math.abs(q[2]-z)<.01 then return true end end;return false end
+  check('walls: a square merlon on each of the four outer corners (no tower, nothing higher)',has(337.5,-101.5)and has(-337.5,-101.5)and has(337.5,-620.5)and has(-337.5,-620.5))
+  local lines={}
+  local function add(key,v)lines[key]=lines[key]or{};table.insert(lines[key],v)end
+  for _,q in ipairs(at)do
+   if math.abs(q[2]+101.5)<.01 then add(q[1]>0 and'front east'or'front west',q[1])end
+   if math.abs(q[2]+620.5)<.01 then add('back',q[1])end
+   if math.abs(math.abs(q[1])-337.5)<.01 then add(q[1]>0 and'east'or'west',q[2])end
+  end
+  local bad={}
+  for key,list in pairs(lines)do table.sort(list)
+   local lo,hi=math.huge,0
+   for i=2,#list do local d=list[i]-list[i-1];lo=math.min(lo,d);hi=math.max(hi,d)end
+   if hi-lo>1e-3 or lo<9.9 or hi>10.1 then bad[#bad+1]=key..' '..lo..' .. '..hi end
+  end
+  check('walls: the merlons are evenly spaced along every run (front east / west, east, west, back: one pitch each, 9.9 - 10.1 studs, gaps = merlons)',#bad==0 and next(lines)~=nil,first(bad))
+  local counts={};for k,l in pairs(lines)do counts[k]=#l end
+  check('walls: run lengths 24 / 24 front, 53 / 53 side, 68 back (corners shared)',counts['front east']==24 and counts['front west']==24 and counts.east==53 and counts.west==53 and counts.back==68,
+   string.format('%s %s %s %s %s',tostring(counts['front east']),tostring(counts['front west']),tostring(counts.east),tostring(counts.west),tostring(counts.back)))
+ end
+ -- client props never rise over the wall top near a wall (lanterns hang at 27)
+ do budget.Tier=3;local api3,sc3=load();tick(1);local life2=W.workspace:FindFirstChild('HubLife151')
+  api3.Near.detail=1e6;api3.Near.fine=1e6;api3.ApplyLod()
+  local cp=partsUnder(life2);local high={}
+  for _,p in ipairs(cp)do local q=p._props.CFrame.Position;local a,b=aabb(p)
+   local d=math.min(335-math.abs(q.X),q.Z+618,(math.abs(q.X)>94 and -104-q.Z)or 1e9)
+   if d<6 and b[2]>WALL_TOP then high[#high+1]=path(p)end end
+  check('client: nothing within 6 studs of a wall stands over the wall top',#high==0,first(high))
+  check('client: the wall lanterns stay (14), hung under the battlement',#api3.State.Ctx.Lanterns==14)
+  -- the old fountain spot: nothing at all in the plaza circle (radius 19 of the 21-stud paving), no fountain / sign parts anywhere
+  local inPlaza,fountain={},namesLike(cp,{'[Ff]ountain','^Ripple','^Seed pack','Sparkle','^Water arc','Signpost','^Sign board','^Sign tip'})
+  for _,p in ipairs(cp)do local q=p._props.CFrame.Position;if q.X*q.X+(q.Z+392)^2<19*19 and p.Name~='Butterfly wing'then inPlaza[#inPlaza+1]=path(p)end end
+  check('removed: the old fountain spot (south plaza, 19 studs round x = 0, z = -392) is clear of every prop (no benches round it, no spouts, no pack, no ripples)',#inPlaza==0,first(inPlaza))
+  check('removed: no fountain, ripple, seed pack, sparkle, water arc or signpost / sign board part in the whole square',#fountain==0,first(fountain))
+  local sparkles=0;for _,d in ipairs(life2:GetDescendants())do if d.Name=='Fountain sparkles'then sparkles+=1 end end
+  check('removed: no fountain sparkles emitter, ctx.Fountain / ctx.Signs / ApplySigns gone',sparkles==0 and api3.State.Ctx.Fountain==nil and api3.State.Ctx.Signs==nil and api3.ApplySigns==nil)
+  local spurPots={};for _,p in ipairs(cp)do if p.Name=='Topiary pot'then local q=p._props.CFrame.Position;if math.abs(math.abs(q.X)-131)<.01 or math.abs(q.Z+420.4)<.01 then spurPots[#spurPots+1]=path(p)end end end
+  check('removed: no potted topiary guarding a base spur\'s street end',#spurPots==0,first(spurPots))
+  check('removed: the layout has 9 benches (the four round the fountain are gone)',#Art.Layout.benches==9,#Art.Layout.benches)
+  -- the free Void Pack pedestal's plaza: a plain 18-stud circle round (0, -392) (Kit.Open): no tree, bush, bed, topiary, lamp, bench or sign, in the layout or built
+  do local near,L={},Art.Layout
+   local function chk(list,label,rad)for _,t in ipairs(list)do local x,z=t[1],t[2];if label=='tree'then x,z=t[2],t[3]end
+    if x*x+(z+392)^2<(18+(rad or 0))^2 then near[#near+1]=label..' '..x..','..z end end end
+   chk(L.trees,'tree',3);chk(L.bushes,'bush',2);chk(L.beds,'bed',3);chk(L.topiary,'topiary',2);chk(L.lamps,'lamp',1);chk(L.benches,'bench',4)
+   local ok,why=Art.Clear(0,-392,0)
+   check('plaza: the 18-stud circle round (0, -392) is kept clear for the free Void Pack pedestal (no tree, bush, bed, topiary, lamp or bench in the layout; HubLifeArt151.Clear refuses it)',
+    #near==0 and ok==false and why=='open' and Kit.Open[1][3]==18,first(near))
+   local built={};for _,p in ipairs(cp)do local q=p._props.CFrame.Position;if q.X*q.X+(q.Z+392)^2<18*18 and p.Name~='Butterfly wing'then built[#built+1]=p.Name end end
+   for _,p in ipairs(sp)do local q=p._props.CFrame.Position;local a,b=aabb(p);if q.X*q.X+(q.Z+392)^2<18*18 and b[2]>4.5 then built[#built+1]=p.Name end end
+   check('plaza: nothing built on it either - only paving (the server\'s parts there are under 4.5 studs high, the client has none)',#built==0,first(built))
+  end
+  local verges=0;for _,p in ipairs(cp)do if p.Name=='Verge rim'then verges+=1 end end
+  check('kept: the flower verge at each of the six bases',verges==6,verges)
+  sc3:Destroy()
+ end
+ -- the rook gate: two chess-rook towers and a crenellated gatehouse
+ local G=dec.Gate;local kids=G:GetChildren()
+ for _,sx in ipairs({-1,1})do
+  local function mine(name)local out={};for _,p in ipairs(kids)do if p.Name==name and p._props.CFrame.Position.X*sx>0 and math.abs(math.abs(p._props.CFrame.Position.X)-99)<9 then out[#out+1]=p end end;return out end
+  local bases={};for i=1,3 do bases[i]=mine('Gate base '..i)[1]end
+  local shafts=mine('Gate tower');table.sort(shafts,function(a,b)return a._props.CFrame.Position.Y<b._props.CFrame.Position.Y end)
+  local ring,collar,flare,crown=mine('Gate tower ring')[1],mine('Gate collar')[1],mine('Gate flare')[1],mine('Gate crown')[1]
+  local ms=mine('Gate merlon')
+  local tag='rook '..(sx<0 and'west'or'east')..': '
+  check(tag..'a wide round stepped base (3 steps, 17.4 / 16.2 / 15.2, each narrower than the one under it)',bases[1]and bases[2]and bases[3]and bases[1]._props.Size.Y>bases[2]._props.Size.Y and bases[2]._props.Size.Y>bases[3]._props.Size.Y and bases[1]._props.Size.Y>=17)
+  check(tag..'a round shaft that tapers (two stacked cylinders, 14.4 then 13, both colliding)',#shafts==2 and shafts[1]._props.Size.Y>shafts[2]._props.Size.Y and shafts[1]._props.CanCollide and shafts[2]._props.CanCollide)
+  check(tag..'a gold ring, a collar, a flared crown (collar < flare < crown, the crown wider than the upper shaft)',ring~=nil and collar~=nil and flare~=nil and crown~=nil and collar._props.Size.Y<flare._props.Size.Y and flare._props.Size.Y<crown._props.Size.Y and crown._props.Size.Y>shafts[2]._props.Size.Y+3)
+  local okM,why=#ms==8,#ms
+  local crownTop=crown and select(2,aabb(crown))[2]or 0;local angs={};local cx,cz=crown._props.CFrame.Position.X,crown._props.CFrame.Position.Z
+  for _,m in ipairs(ms)do local q=m._props.CFrame.Position;local sz=m._props.Size
+   local r=math.sqrt((q.X-cx)^2+(q.Z-cz)^2);local a,b=aabb(m)
+   if math.abs(sz.X-sz.Z)>1e-6 or math.abs(a[2]-crownTop)>1e-6 or r<5 or r>8 or math.sqrt((r+sz.Z/2)^2+(sz.X/2)^2)>crown._props.Size.Y/2+.01 then okM=false;why=path(m)end
+   angs[#angs+1]=math.deg(math.atan2(q.Z-cz,q.X-cx))%360 end
+  table.sort(angs);local even=#angs==8;for i=1,#angs do local d=(angs[i%#angs+1]-angs[i])%360;if math.abs(d-45)>.5 then even=false end end
+  check(tag..'eight square merlons round the crown\'s rim, 45 degrees apart, on its top, inside its edge',okM and even,why)
+ end
+ do local wall=G['Gatehouse wall'];local a,b=aabb(wall)
+  check('gate: a crenellated gatehouse wall spans between the rooks (its ends inside both shafts, over the whole 182-stud opening)',a[1]<=-95 and b[1]>=95 and b[2]-a[2]>=14)
+  local gm,km={},{};for _,p in ipairs(kids)do if p.Name=='Gatehouse merlon'then gm[#gm+1]=p elseif p.Name=='Gatehouse keep merlon'then km[#km+1]=p end end
+  local okS=true;local gx={}
+  for _,p in ipairs(gm)do local sz=p._props.Size;if math.abs(sz.X-B.Size)>1e-6 or math.abs(sz.Y-B.Height)>1e-6 then okS=false end;gx[#gx+1]=p._props.CFrame.Position.X end
+  local kx={};for _,p in ipairs(km)do local sz=p._props.Size;if math.abs(sz.X-B.Size)>1e-6 or math.abs(sz.Y-B.Height)>1e-6 then okS=false end;kx[#kx+1]=p._props.CFrame.Position.X end
+  table.sort(gx);table.sort(kx)
+  local evenG=#gx==12;for i=2,#gx do if gx[i]>0 and gx[i-1]>0 or gx[i]<0 and gx[i-1]<0 then if math.abs(gx[i]-gx[i-1]-10)>1e-6 then evenG=false end end end
+  for i=2,#kx do if math.abs(kx[i]-kx[i-1]-10)>1e-6 then evenG=false end end
+  check('gate: '..#gm..' + '..#km..' gatehouse merlons (12 on the wall, 5 on the keep), the wall\'s merlon size, on the same 10-stud rhythm',#gm==12 and #km==5 and okS and evenG,#gm..' '..#km)
+  local rookTop=select(2,aabb(G['Gate merlon']))[2];local keepTop=0;for _,p in ipairs(km)do keepTop=math.max(keepTop,select(2,aabb(p))[2])end
+  check('gate: the rook towers are the tallest part (merlon tops '..rookTop..' over the keep\'s '..keepTop..' over the wall\'s 57)',rookTop>keepTop and keepTop>WALL_TOP+B.Height)
+  local sign=G['Gate sign'];local sa,sb=aabb(sign)
+  check('gate: the "THE TRACK" sign sits on the gatehouse keep, readable from the hub (front face, text THE TRACK)',sign.HubText and sign.HubText.Line1.Text=='THE TRACK'and sa[1]>=-26 and sb[1]<=26 and sa[2]>=WALL_TOP+8 and G['Gate sign frame']~=nil)
+  local nkeys=0;for _,k in ipairs(kids)do if k:GetAttribute('R151Stage')then nkeys+=1 end end
+  check('gate: the seven biome speed keys stay on the gatehouse',nkeys==7)
+ end
 end
 
 print(string.format('R151 base area: %d passed, %d failed',passed,failed))

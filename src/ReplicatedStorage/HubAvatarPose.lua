@@ -1,5 +1,7 @@
 -- R151: the champion's avatar on a hub display stands in a pose and (on each player's own screen, only while near) cheers. No animation assets and no Animator:
 -- an R15 rig is a tree of Motor6D joints, and both looks are just joint rotations.
+-- R152: the avatar now DANCES (HubDisplayAvatar.Animate plays one of Roblox's default R15 dance emotes on its Animator). This module is what it does when it cannot: the static pose
+-- below (applied only then: a dance on top of a posed C0 would be turned) and the client's cheer, which only moves a rig the server marked AvatarMode 'pose'.
 --  * Static pose (the server, once, when the avatar is built): Pose rotates a few joints' C0 (their rest frame, which replicates): the right arm raised out and a
 --    little forward, as if presenting the giant item beside it, the left hand on the hip, the head turned toward the item. It is what everyone sees from afar and
 --    what stays if the client script never runs (the avatar is anchored at its root: nothing moves it).

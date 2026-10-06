@@ -49,8 +49,30 @@ return function(W,R)
   local script=R.new('Script');script.Name='Animate';script.Parent=m -- (some rigs carry one: the display's avatar must not)
   return m
  end
+ -- R152: Animator:LoadAnimation / GetPlayingAnimationTracks for the dance (the mock's Instance has no Animator). state.Dance = {Mode, Loads, Last}: Mode 'ok' (a track with a length that
+ -- plays), 'never loads' (Length stays 0, as an animation that cannot be fetched), 'not playing' (loads but Play does nothing), 'throws' (LoadAnimation errors).
+ local host -- (the state table install() was given: its .Dance is looked up at every call, so a test may replace it)
+ if not R.Inst.LoadAnimation then
+  function R.Inst.LoadAnimation(self,anim)
+   local st=host and host.Dance or{Mode='ok',Loads=0}
+   st.Loads+=1
+   if st.Mode=='throws'then error('Animator: could not load the animation',2)end
+   local track={Animation=anim,Looped=false,IsPlaying=false,Length=st.Mode=='never loads'and 0 or 2.4,Speed=1,Plays=0,Stops=0,Priority=nil}
+   function track:Play()if st.Mode=='not playing'then return end;self.IsPlaying=true;self.Plays+=1 end
+   function track:Stop()self.IsPlaying=false;self.Stops+=1 end
+   function track:AdjustSpeed(s)self.Speed=s end
+   local list=self._tracks or{};list[#list+1]=track;self._tracks=list
+   st.Last=track
+   return track
+  end
+  function R.Inst.GetPlayingAnimationTracks(self)
+   local out={};for _,t in ipairs(self._tracks or{})do if t.IsPlaying then out[#out+1]=t end end;return out
+  end
+ end
  -- Players:GetHumanoidDescriptionFromUserId / CreateHumanoidModelFromDescription. state: {Describe=0, Create=0, Mode='ok' | 'describe fails' | 'create fails' | 'throws', Accessories=3, Scale=1}
  function M.install(Players,state)
+  state.Dance=state.Dance or{Mode='ok',Loads=0}
+  host=state
   function Players.GetHumanoidDescriptionFromUserId(_,userId)
    state.Describe+=1
    if state.Mode=='describe fails'or state.Mode=='throws'then error('HTTP 404 (user '..tostring(userId)..')',2)end

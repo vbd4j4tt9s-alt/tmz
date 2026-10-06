@@ -2,15 +2,19 @@
 # Usage: sh run_base_area.sh [scratch dir] [place.rbxl] [before commit, default e5211cc = the branch before R151's hub code]
 # R151 Seed Festival Square (owner: "i like this design and polish the trees, give them more variety and the stuff and everything"):
 #  test_base_area.luau  - the REAL HubDecor151 (run by MapService.new) and HubLife151.client + HubLifeArt151 on the owner's place in the R149
-#                         Roblox mock: the saved walls keep CFrame / Size / CanCollide; only the gate towers collide; every part anchored,
+#                         Roblox mock: the saved walls keep CFrame / Size / CanCollide; only the rook towers' shafts collide; every part anchored,
 #                         untouchable, unqueryable; clearances against every gameplay object (base plots and pad interiors, the 32-stud
 #                         openings, treadmills, mystery pedestals, spawns, the safe line, market, Verity, leaderboards, the track walkway;
-#                         shape-exact for balls / upright cylinders); the reserved back corners (R151 displays) empty; arch / gate
-#                         clearances; the gate keys' keeper speeds and the per-player green tick; owner names on the arches and signposts;
+#                         shape-exact for balls / upright cylinders); the reserved back corners (R151 displays) empty; gate
+#                         clearances; the gate keys' keeper speeds and the per-player green tick;
 #                         re-Apply idempotent; part budgets per device tier; detail by distance, FastMode, Reduced Motion, ambience only when
 #                         near; lamps on in The Darkened / storms; sound zones; streaming (the server folder goes and comes back), teardown;
 #                         with the STAND-IN studded tree models (preview/standin_tree.luau) in ReplicatedStorage.HubTreeTemplates151:
 #                         every part locked, clearances, corners, budgets per tier.
+#                         R152 (section 16): no fountain / base entrance / mural / banner / signpost / corner tower / hedge / red crest, 24 of 62
+#                         trees, the 18-stud plaza circle at (0, -392) clear, the chess-rook battlement (218 evenly spaced merlons, a corner merlon,
+#                         nothing else over the wall top, none near tower height) and the rook gate (stepped base, tapering shaft, ring, collar,
+#                         flared crown, 8 merlons each; crenellated gatehouse with the sign and the 7 keys).
 #  test_hub_trees.luau  - run_hub_trees.sh: the owner's studded tree models (load routes, scripts stripped, collision off, budget, fit).
 #  z-fighting           - the R151 scene check (preview/check_base_area_zfight.py, the R149 detector) on the full built hub WITH the client
 #                         props, once with the part-built studded trees and once with the stand-in tree models (no counted finding with

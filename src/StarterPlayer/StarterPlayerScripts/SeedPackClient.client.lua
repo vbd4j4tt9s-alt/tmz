@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local TextFit=require(game:GetService('ReplicatedStorage'):WaitForChild('GardenTextFit'))
 -- V119. Replicated bags drive cosmetic poses/reveals on every viewer.
 -- The server alone chooses and commits rewards; this script cannot grant seeds.

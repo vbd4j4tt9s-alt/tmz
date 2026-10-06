@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R122: shovel holes on the track (client). Sends only an optional aim point; the server decides everything.
 -- Click / tap / R2 with the Shovel equipped while on the track: dig a hole there (or cover your own hole).
 -- Also plays the dig / cover / fall effects for everyone. R124: a short tip fades in and out when the shovel comes out

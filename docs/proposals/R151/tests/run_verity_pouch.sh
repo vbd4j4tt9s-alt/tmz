@@ -1,12 +1,15 @@
 #!/bin/sh
 # Usage: sh run_verity_pouch.sh [scratch dir] [--mutations]
-# R151 (owner: the Verity pack should be the REAL standard chip-bag pouch in pure yellow, made at runtime; the sachet only as the fallback): VerityPouch151 (the
-# server bake: AssetService:CreateEditableMeshAsync -> every vertex colour white -> CreateMeshPartAsync -> ReplicatedStorage.VerityPouchTemplate151) and VerityPackArt
-# (the pouch pack, the sachet fallback) on the Roblox mock (/opt/luau/luau) with the REAL modules of this checkout, the REAL pack templates of the owner's place
-# (pack_templates.luau) and a mock of the EditableMesh route with a switch for every failure (pouch_mock.luau). See test_verity_pouch.luau for what is checked.
-#  --mutations  also breaks the code ten ways (the colours not whitened / not read back, a hard-coded mesh id, the EditableMesh not destroyed, a tinted Decal, a
-#               pouch that is not yellow, the Decals on the seal, a client that does not wait, another design built from the pouch, no sachet fallback) and
-#               expects the test to notice each one (a failed check, or the test stopping on the error).
+# R151 / R152 (owner: "verity pack is also not flat for some reason and there is some leftover design"): VerityPouch151 (the server GENERATES a clean flat pouch with EditableMesh:
+# AssetService:CreateEditableMesh -> AddVertex ... AddTriangle -> every vertex colour white -> CreateMeshPartAsync -> ReplicatedStorage.VerityPouchTemplate151; no copy of the standard pouch's
+# relief) and VerityPackArt (the pouch pack, the sachet fallback) on the Roblox mock (/opt/luau/luau) with the REAL modules of this checkout, the REAL pack templates of the owner's place
+# (pack_templates.luau) and a mock of the EditableMesh routes with a switch for every failure (pouch_mock.luau). See test_verity_pouch.luau for what is checked: the mesh (two exactly flat
+# planes, no relief, rounded edges, a crimped seal, a closed outward surface, UVs), the same width / height / frame as the standard pouch, never shaped by PackShapes151, no leftover design,
+# the EditableMesh destroyed, the sachet fallback.
+#  --mutations  also breaks the code 24 ways (a colour not white, relief, a puffy belly, open ends, inward faces, sharp edges, a wrong width / frame / size check, a leaked EditableMesh, a hard-coded
+#               asset id, all of the template's parts, a stray warning, another design built from the pouch, a tinted Decal, a pouch / seal that is not the right yellow, the Decals on the seal,
+#               leftover parts / appearances kept, a template that is not flat used, a client that does not wait, no sachet fallback, the Verity pack shaped again) and expects the test to
+#               notice each one (a failed check, or the test stopping on the error).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=$(mktemp -d);MUT=0

@@ -26,6 +26,10 @@
 --  * The dark mouth oval (C.Mouth, VerityVoice.MouthPose, the mouth parts in the world and in the portrait) is gone: her smiley is the only face. She
 --    swells (TalkPulse) AND bounces (TalkBounce) with the loudness of the voice, in the world and in the window's portrait.
 --  * GreetingEnd 1.9 -> 2.35: the cut stopped inside "Verity" (at "Ver"). `/test verityvoice <end> [start]` is still there to tune it by ear.
+-- R152 (owner: "add more personality to the texts above"): every player-facing text of her quest (the "Texts" block at the end, plus the sign's timer
+--  and her prompt) is in her voice: cheerful, bubbly, a little cheeky and dramatic about The Darkened One. Words only: the numbers, the timing
+--  (GreetingEnd 2.35) and every rule are as before. The window's own labels moved here too (C.Dialog, C.Hint), so all her copy is in one place.
+--  Lines stay about as long as the ones they replace (the status line is one 16 px line in a 314 px phone column).
 local Catalog=require(script.Parent.VerityCatalog)
 local Limited=require(script.Parent.LimitedEvent)
 local C={Version=149}
@@ -54,7 +58,7 @@ C.Sign={W=32,H=15.5,Gap=1.6,
  Name={Top=8.2,Height=4.5},
  Timer={Top=13.3,Height=2.2}}
 C.NameMaxDistance=300
-C.PromptActionText='Talk';C.PromptObjectText='Verity';C.PromptDistance=26;C.PromptHold=0
+C.PromptActionText='Say hi!';C.PromptObjectText='Verity';C.PromptDistance=26;C.PromptHold=0
 C.PromptHeight=3                   -- studs above the dais (the prompt hangs inside the sphere's lower half)
 -- Voice (owner: "123997993114202 is the audio id for Verity's greetings") -------------------------------------------------
 C.GreetingSoundId='rbxassetid://123997993114202'
@@ -85,10 +89,10 @@ C.Lip={Heard=2,Floor=60,Gate=.08,Curve=.75,Attack=40,Release=14,PeakDecay=.5,Fal
 C.Portrait={Size=10,Fov=30,Fill=.75,Bob=.03}
 -- Security --------------------------------------------------------------------------------------------------------------
 -- The limited event (R148 owner: "place a timer ... 27 days, hrs, mins, s ... same for the event for Verity"): LimitedEvent.EndsAt
--- (UTC) is shared with the Index LIMITED tab. After it Verity takes nothing: the server refuses, the GIVE button says EVENT ENDED, the "!" is
--- gone and her sign says EVENT ENDED. (R149: the dialog has no countdown line any more; her sign and the Index LIMITED tab keep theirs.)
+-- (UTC) is shared with the Index LIMITED tab. After it Verity takes nothing: the server refuses, the GIVE button says C.Event.Ended, the "!" is
+-- gone and her sign says it too. (R149: the dialog has no countdown line any more; her sign and the Index LIMITED tab keep theirs.)
 C.EventEndsAt=Limited.EndsAt
-C.Event={Prefix='EVENT ENDS IN ',Ended='EVENT ENDED'}
+C.Event={Prefix='HURRY! ENDS IN ',Ended='EVENT OVER! THANKS!'} -- Prefix: her sign's timer ("HURRY! ENDS IN 27d 04h 12m 09s"). Ended: her sign and the GIVE button after the end
 C.EventColor=Color3.fromRGB(255,236,150)
 C.GiveDistance=38                  -- the server's own range check for the hand-in (the prompt itself reaches 26)
 C.MaxDelivered=1e9                 -- saved counter ceiling (anything larger in a save is clamped)
@@ -97,21 +101,36 @@ C.PackName=Catalog.PackName
 -- The player attributes that block a hand-in, with the reason said to the player (carrying a stolen pack, in a run, queued
 -- for one, ragdolled / flung by a keeper). Checked in this order.
 C.BusyAttributes={{'ChestChaseSeedCarrying','Busy'},{'ChestChaseRunActive','Busy'},{'ChestChaseQueued','Busy'},{'GuardianRagdollActive','Moment'},{'GuardianFlingActive','Moment'}}
--- Texts -----------------------------------------------------------------------------------------------------------------
-C.Quest='Steal a Void Pack from The Darkened One at the end of Storm Peaks and bring it to me. I\'ll give you a '..Catalog.PackName..'!'
-C.RewardText='1 VOID PACK = 1 '..Catalog.PackName:upper()
-C.Thanks='Thank you! Here is your '..Catalog.PackName..'.'
-C.Notice='🌟 Verity gave you a '..Catalog.PackName..'!'
+-- Texts (R152, in her voice: a good answer is sentence case, a refusal one short capitalised line) ---------------------------------------------
+C.Quest='I dare you to steal a Void Pack from the scary Darkened One at the end of Storm Peaks! Bring it to me and I\'ll give you a '..Catalog.PackName..'!'
+C.RewardText='SWAP! 1 VOID PACK = 1 '..Catalog.PackName:upper()
+C.Thanks='Yay, thanks! Here\'s your '..Catalog.PackName..'!'
+C.Notice='🌟 Yippee! Verity gave you a '..Catalog.PackName..'!'
+-- The window's other labels. VoidChip / DoneChip: the two stat boxes (short titles). Give / Busy: the hand-in button (Busy while it waits for the
+-- server; the emoji is glued to "PACK" with a no-break space so a narrow phone never wraps it onto a line of its own). Close: the other button.
+-- Here / Next / Arriving: the line about The Darkened (purple while it is here, blue before; Next is followed by the time left, "12m 3s").
+C.Dialog={
+ VoidChip='YOUR VOID PACKS',DoneChip='YOU GAVE ME',
+ Give='GIVE VOID PACK\u{00A0}🌑',Busy='SWAPPING... ✨',Close='BYE! 👋',
+ Here='🌑 EEK! THE DARKENED IS HERE NOW!',Next='🌑 THE DARKENED WAKES IN ',Arriving='🌑 THE DARKENED IS WAKING UP...',
+}
+-- The status line when the server has said nothing to show (right after Open): what to do next, by what you carry. Have: a Void Pack (green).
+-- Here: none, and The Darkened is here (gold). Wait: none, and it is not (pale blue). Over: the event has ended (pale blue).
+C.Hint={Have='Ooh, a Void Pack! Hand it over!',Here='Quick! Steal one in Storm Peaks!',Wait='Get ready to steal one!',Over='Thanks for playing, you were great!'}
 C.Reasons={
- Loading='YOUR DATA IS STILL LOADING',
- CannotSave='YOUR DATA CANNOT SAVE RIGHT NOW',
- TooFar='COME CLOSER TO VERITY',
- Busy='FINISH YOUR RUN FIRST',
- Moment='WAIT A MOMENT AND TRY AGAIN',
- Opening='FINISH OPENING THAT PACK FIRST',
- NoVoid='YOU NEED A VOID PACK',
- NotReady='VERITY IS NOT READY',
- Failed='VERITY COULD NOT TAKE IT. TRY AGAIN',
- EventEnded='THE VERITY EVENT HAS ENDED',
+ Loading='HOLD ON, YOUR DATA IS LOADING!',
+ CannotSave='OOPS! YOUR DATA CAN\'T SAVE NOW',
+ TooFar='OVER HERE! COME CLOSER TO ME!',
+ Busy='WHOA, FINISH YOUR RUN FIRST!',
+ Moment='ONE MOMENT, THEN TRY AGAIN!',
+ Opening='PLEASE FINISH OPENING THAT PACK!',
+ NoVoid='NO VOID PACK YET! GO STEAL ONE!',
+ NotReady='I\'M NOT READY YET! ONE SEC!',
+ Failed='OOPS! THAT DIDN\'T WORK. TRY AGAIN',
+ EventEnded='EVENT\'S OVER! THANKS FOR PLAYING!',
+ -- what ChestService:ConvertVoidPack and PlayerDataService:CheckVoidPack answer (the hand-in passes their reason on as it is)
+ Invalid='HMM, I CAN\'T USE THAT PACK',
+ NotVoid='ONLY A VOID PACK WORKS FOR ME!',
+ Gone='THAT PACK LEFT YOUR BAG! TRY AGAIN',
 }
 return C

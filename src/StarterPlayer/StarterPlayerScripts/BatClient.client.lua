@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R43. Native tool activation supports mouse, touch and controller. No client hit claims.
 local Players=game:GetService('Players')
 local Run=game:GetService('RunService')
