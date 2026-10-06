@@ -23,8 +23,11 @@ local WHITE=Color3.new(1,1,1)
 function M.Key(stage)return Config.Stages[stage]and Config.Stages[stage].Key end
 
 -- 1. Decoding (pure: base64 -> inflate -> parts) -------------------------------------------------------------------------------------------
+-- Every step takes an optional `tick` (the bake passes slice()): called about every 1 KB of work so a keeper's 13 - 38 ms decode no longer runs in one go (the result is identical).
+local function noop()end
 local B64={};do local a='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';for i=1,64 do B64[string.byte(a,i)]=i-1 end end
-local function base64(s)
+local function base64(s,tick)
+ tick=tick or noop;local nextTick=8192
  local n=#s;assert(n%4==0,'mesh data: base64 length '..n..' is not a multiple of 4')
  local pad=(string.sub(s,-2)=='==' and 2)or(string.sub(s,-1)=='=' and 1)or 0
  local out=buffer.create(n//4*3-pad);local o,size=0,n//4*3-pad
@@ -33,6 +36,7 @@ local function base64(s)
   local v=assert(B64[a],'mesh data: bad base64')*262144+assert(B64[b],'mesh data: bad base64')*4096+(B64[c]or 0)*64+(B64[d]or 0)
   buffer.writeu8(out,o,v//65536);if o+1<size then buffer.writeu8(out,o+1,v//256%256)end;if o+2<size then buffer.writeu8(out,o+2,v%256)end
   o+=3
+  if i>=nextTick then nextTick=i+8192;tick()end
  end
  return out
 end
@@ -54,8 +58,8 @@ local function construct(lengths,from,n)
  return {Count=count,Symbol=symbol}
 end
 local FIXED_L,FIXED_D
-local function inflate(src,size)
- local out=buffer.create(size);local op=0
+local function inflate(src,size,tick)
+ tick=tick or noop;local out=buffer.create(size);local op=0;local nextTick=1024
  local ip,len=0,buffer.len(src);local bitbuf,bitcnt=0,0
  local function bits(n)
   while bitcnt<n do
@@ -79,6 +83,7 @@ local function inflate(src,size)
  local function codes(lcode,dcode)
   while true do
    local sym=decode(lcode)
+   if op>=nextTick then nextTick=op+1024;tick()end
    if sym<256 then
     assert(op<size,'mesh data: more bytes than announced');buffer.writeu8(out,op,sym);op+=1
    elseif sym==256 then return
@@ -127,15 +132,17 @@ local function inflate(src,size)
  return out
 end
 M.Inflate=inflate
-local function adler(b)
+local function adler(b,tick)
  local a,s=1,0
- for i=0,buffer.len(b)-1 do a=(a+buffer.readu8(b,i))%65521;s=(s+a)%65521 end
+ for i=0,buffer.len(b)-1 do a=(a+buffer.readu8(b,i))%65521;s=(s+a)%65521;if i%4096==4095 then tick()end end
  return s*65536+a
 end
 -- data (a KeeperMeshData152 module's table) -> {Parts={{V={x,y,z,...} studs (rig space), T={a,b,c,...} 1-based, P={cell per triangle} or nil}}}
-function M.Decode(data)
- local raw=inflate(base64(table.concat(data.Data)),data.Bytes)
- assert(adler(raw)==data.Adler,'mesh data: checksum mismatch')
+-- tick (optional): called every ~1 KB of work (base64, inflate, checksum, parts) so the caller can yield between slices; no tick = one go, same result.
+function M.Decode(data,tick)
+ tick=tick or noop
+ local raw=inflate(base64(table.concat(data.Data),tick),data.Bytes,tick)
+ assert(adler(raw,tick)==data.Adler,'mesh data: checksum mismatch')
  local p=0
  local function u()
   local v,m=0,1
@@ -147,9 +154,9 @@ function M.Decode(data)
  for i=1,u()do
   local nv,nt,pal=u(),u(),u()==1
   local V=table.create(nv*3)
-  for axis=1,3 do local q=0;for j=1,nv do q+=s();V[(j-1)*3+axis]=q*step end end
+  for axis=1,3 do local q=0;for j=1,nv do q+=s();V[(j-1)*3+axis]=q*step;if j%512==0 then tick()end end end
   local T=table.create(nt*3);local q=0
-  for j=1,nt*3 do q+=s();assert(q>=0 and q<nv,'mesh data: vertex index out of range');T[j]=q+1 end
+  for j=1,nt*3 do q+=s();assert(q>=0 and q<nv,'mesh data: vertex index out of range');T[j]=q+1;if j%512==0 then tick()end end
   local P
   if pal then P=table.create(nt);local j=0;while j<nt do local cell,count=u(),u();for _=1,count do j+=1;P[j]=cell end end;assert(j==nt,'mesh data: palette runs')end
   parts[i]={V=V,T=T,P=P}
@@ -265,7 +272,7 @@ end
 local function bakeKeeper(stage)
  local spec=Config.Stages[stage];local data=dataModule(stage)
  assert(data.Key==spec.Key and data.Parts==#spec.Parts,'mesh data '..spec.Module..' does not match KeeperRigConfig152')
- local decoded=M.Decode(data);slice()
+ local decoded=M.Decode(data,slice);slice() -- (sliced: the decode of one keeper is 13 - 38 ms)
  local model=Instance.new('Model');model.Name=spec.Key;model:SetAttribute('KeeperMeshVariant',M.Variant)
  local ok,why=pcall(function()
   local tris=0

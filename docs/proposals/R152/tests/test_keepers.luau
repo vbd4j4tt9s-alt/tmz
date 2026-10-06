@@ -641,6 +641,51 @@ do local Combat=W.module('KeeperCombat');local base={[1]=.30,[2]=.22,[3]=.24,[4]
  check(same and Combat.Recovery==.30 and Combat.HitHold==.07,'strike timing (KeeperCombat) unchanged')
  for stage=1,7 do local a,b=C152.Get(stage),Cfg[stage];check(a.Motion==b.Motion and a.Pivots==b.Pivots and a.Scale==b.Scale and a.Name==b.Name,'stage '..stage..': same pivots, motion (stride / speed) and scale as today')end
 end
+
+-- 11. The decode is sliced: a keeper's base64 + inflate + checksum + parts took 13 - 38 ms in one go at server start (review fix) ----------------------------------------
+do
+ local function sameParts(a,b)
+  if #a.Parts~=#b.Parts then return false end
+  for i,p in ipairs(a.Parts)do
+   local q=b.Parts[i];if #p.V~=#q.V or #p.T~=#q.T or(p.P==nil)~=(q.P==nil)then return false end
+   for j=1,#p.V do if p.V[j]~=q.V[j]then return false end end
+   for j=1,#p.T do if p.T[j]~=q.T[j]then return false end end
+   if p.P then for j=1,#p.P do if p.P[j]~=q.P[j]then return false end end end
+  end
+  return true
+ end
+ local identical,sliced,minTotal,gapMax,tickSum=true,true,0,0,0
+ for _,stage in ipairs(ORDER)do
+  local spec=C152.Stages[stage];local data=W.module(spec.Module)
+  local plain=Meshes.Decode(data);local ticks,last=0,os.clock()
+  local cut=Meshes.Decode(data,function()ticks+=1;local c=os.clock();gapMax=math.max(gapMax,c-last);last=c end)
+  tickSum+=ticks
+  if not sameParts(plain,cut)then identical=false;print('FAIL: '..spec.Name..': the sliced decode differs from the one-go decode')end
+  -- about one tick per 1 KB inflated (a match can overshoot by 258 bytes), one per 4 KB checksummed, one per 512 parsed numbers
+  local parse=0;for _,p in ipairs(plain.Parts)do parse+=(#p.V//3//512)*3+#p.T//512 end
+  local least=data.Bytes//1300+data.Bytes//4096+parse
+  if ticks<least then sliced=false;print('FAIL: '..spec.Name..': '..ticks..' ticks, at least '..least..' expected')end
+  minTotal+=least
+  -- the inflate alone: ticks too, same bytes
+  local raw=Meshes.Base64(table.concat(data.Data));local t2=0
+  local a,b=Meshes.Inflate(raw,data.Bytes),Meshes.Inflate(raw,data.Bytes,function()t2+=1 end)
+  if t2<data.Bytes//1300 then sliced=false;print('FAIL: '..spec.Name..': inflate ticked '..t2..' times')end
+  for k=0,data.Bytes-1 do if buffer.readu8(a,k)~=buffer.readu8(b,k)then identical=false;print('FAIL: '..spec.Name..': a ticked inflate differs at byte '..k);break end end
+ end
+ check(identical,'a decode with a tick is identical to one without (every keeper: vertices, triangles, palette cells)')
+ check(sliced,'every keeper\'s decode ticks (about every 1 KB of work; >= '..minTotal..' ticks for the 8)')
+ print(('INFO decode: %d ticks for the 8 keepers, longest stretch between two ticks %.2f ms (a keeper was 13 - 38 ms in one go)'):format(tickSum,gapMax*1000))
+ -- the real bake yields while it decodes: count the task.wait calls made before its first EditableMesh (SliceSeconds -1: the mock clock stands still, so every slice() call yields)
+ local calls0,before,waitRaw=log.Calls,0,W.env.task.wait
+ W.env.task.wait=function(...)if log.Calls==calls0 then before+=1 end;return waitRaw(...)end
+ local sliceWas=Meshes.SliceSeconds;Meshes.SliceSeconds=-1
+ local ok,model=pcall(Meshes._bakeKeeper,6)
+ Meshes.SliceSeconds=sliceWas;W.env.task.wait=waitRaw
+ local data6=W.module(C152.Stages[6].Module)
+ check(ok and model~=nil,'a keeper can still be baked with a slice of -1 s (every slice yields) ('..tostring(model)..')')
+ check(before>=data6.Bytes//1300,'the bake yields while it decodes: '..before..' yields before the first EditableMesh (>= '..(data6.Bytes//1300)..')')
+ if ok and model then model:Destroy()end
+end
 check(log.Alive()==0,'no EditableMesh alive at the end')
 print(('R152 keepers (%s): %d checks, %d failures'):format(SCENARIO,checks,fails))
 if fails>0 then error('failures',0)end
