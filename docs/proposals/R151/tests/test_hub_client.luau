@@ -2,7 +2,7 @@
 -- R151 hub displays (R152: the pedestal, the spinning showcase item and the dancing avatar): the REAL HubDisplayClient as the local player, on the displays the REAL HubDisplayArt builds (with a
 -- showcase item and an avatar rig):
 --  1. the countdown on the pedestal's plaque: right at once, kept up to date, "New fruit in ..." for the fruit board, for a display that streams in later, nothing without its attributes;
---  2. motion only when near (260 studs in, 300 out) and allowed: the item turns about its own vertical axis and floats a little (a bulk move about 20 times a second), the sparkles are an
+--  2. motion only when near (260 studs in, 300 out) and allowed: the item turns about its own vertical axis and floats a little (one bulk move every frame; 30 times a second on the middle tier), the sparkles are an
 --     emitter ON the item's own ItemCore part in the champion's colour (they turn with it), a dancing avatar is left to its Animator (the client writes none of its joints), a rig in the static
 --     pose cheers (joint transforms, bounded), the per-frame function is connected only while a display is near, and everything is put back when you walk away;
 --  3. reduced motion and the lowest quality: no motion, no sparkles, no pop, the dance is paused (speed 0) and runs again; the countdown still runs;
@@ -149,9 +149,9 @@ do
  for _,d in ipairs(rig:GetDescendants())do if d:IsA('Motor6D')then local a=angle(d.Transform);local named=Pose.CheerAt(0,0)[d.Name];if a>1e-9 and not named then touched=false end end end
  check(touched,'only the cheer\'s own joints are written (the legs and wrists are never touched)')
  camera(V3(-30,-8,-40));H.run(1.2)
- -- the cost: bulk moves at most ~20 a second
- bulk=0;H.run(2)
- check(bulk>=30 and bulk<=45,'the item is moved with one BulkMoveTo about 20 times a second ('..bulk..' in 2 s)')
+ -- the cost: one bulk move a frame (R152 review fix B6: 20 a second turned in visible steps; the item is at most 150 parts)
+ bulk=0;H.run(2,1/60)
+ check(bulk>=110 and bulk<=125,'the item is moved with one BulkMoveTo every frame ('..bulk..' in 2 s at 60 fps)')
  -- walking away puts everything back
  camera(V3(0,0,-400))
  H.run(1.5)
@@ -193,8 +193,8 @@ do
  check(H.renderConnections()>=1 and tracks.Pull.Speed==1,'the middle tier moves')
  local e=sparksOf(pullD)
  check(e and e.Rate==8,'with half the sparkles')
- bulk=0;H.run(2)
- check(bulk>=18 and bulk<=28,'and the item is moved about 12 times a second instead of 20 ('..bulk..' bulk moves in 2 s)')
+ bulk=0;H.run(2,1/60)
+ check(bulk>=55 and bulk<=66,'and the item is moved about 30 times a second instead of every frame (R152 review fix B6: 12 a second turned in visible steps) ('..bulk..' bulk moves in 2 s)')
  -- a calm board (nobody holds the spot): the item turns, but no sparkles
  pullD.Model:SetAttribute('Calm',true);H.run(1.2)
  check(not sparksOf(pullD)and H.renderConnections()>=1,'a calm display has no sparkles (the item still turns)')
