@@ -88,7 +88,7 @@ do
  check(K.PressVolume(1)==C.PressSoundVolume.Forest and K.PressVolume(6)==C.PressSoundVolume.Jungle and K.PressVolume(2)==C.ClickVolume and C.PressSoundVolume.Forest==C.ClickVolume,'R152: the biome sound has its own volume per biome (Config.PressSoundVolume, starting at the click\'s '..C.ClickVolume..'); a biome with no sound uses the click volume')
 end
 local LT=C.Legend
-check(LT.Margin>=.03 and LT.Margin<=.05 and LT.Rotation==270 and LT.MaxExtra>=1,'letter strips stand .03 - .05 above the measured resting key top (Margin '..LT.Margin..'), labels turn 270 degrees')
+check(LT.Margin>=.05-1e-9 and LT.Margin<=.06 and LT.Rotation==270 and LT.MaxExtra>=1,'letter strips stand .05 - .06 above the measured resting key top (Margin '..LT.Margin..': R152 z-fighting, the strip and the key top overlap over the whole key, so the gap must clear the R149 depth rule, .043 at 300 studs), labels turn 270 degrees')
 check(LT.TextHeight*LT.PixelsPerStud<=100 and LT.TextHeight>=4 and LT.KeysPerStrip==11,'letters 4.6 studs tall (TextSize '..LT.TextHeight*LT.PixelsPerStud..' <= 100), 11 per SurfaceGui (half a row)')
 
 local g=K.Geometry(ATTR,0)
@@ -1732,9 +1732,9 @@ check(keyAt(HR,HC)~=nil and near(topOf(HR,HC),K.KeyTop(0),1e-6),'a hole leaves i
 check(near(pit1.CFrame.Position.Y,F+.04+C.HoleLift,1e-6)and near(rim1.CFrame.Position.Y,F+.03+C.HoleLift,1e-6),'the hole parts are lifted onto the key tops')
 local rimBottom=rim1.CFrame.Position.Y-.03;local rimTop=rim1.CFrame.Position.Y+.03;local pitTop=pit1.CFrame.Position.Y+.04
 check(rimBottom>=K.KeyTop(0)+.015 and rimTop-K.KeyTop(0)>=.06 and pitTop-K.KeyTop(0)>=.08,'z-fighting: the Rim / Pit tops are 0.08 / 0.10 above the key top (no shared plane)')
-do -- (TrackHoleService: Rim .04 thick at +.02, Pit .08 thick at +.04 above the floor; the letter strips' tops lie at the key top + Legend.Margin .04)
+do -- (TrackHoleService: Rim .04 thick at +.02, Pit .08 thick at +.04 above the floor; the letter strips' tops lie at the key top + Legend.Margin .05)
  local stripTop=K.KeyTop(0)+LT.Margin
- check((F+.02+C.HoleLift+.02)-stripTop>=.05-1e-9 and (F+.04+C.HoleLift+.04)-stripTop>=.08-1e-9,'z-fighting (review part 2): a lifted hole\'s Rim top stands .06 and its Pit top .10 above the letter strips (R151: HoleLift = RestRise + .06 keeps the same clearance over the .04 strips)')
+ check((F+.02+C.HoleLift+.02)-stripTop>=.05-1e-9 and (F+.04+C.HoleLift+.04)-stripTop>=.08-1e-9,'z-fighting (review part 2): a lifted hole\'s Rim top stands .06 and its Pit top .10 above the letter strips (R151: HoleLift = RestRise + .06 keeps the clearance over the strips: .05 since R152, the least the R149 depth rule allows)')
 end
 local sl=nil
 for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 and g.RowOfZ(st.CFrame.Position.Z)==HR then
@@ -1950,11 +1950,11 @@ do
   hum.FloorMaterial=PLASTIC;put(cx(9),nil,cz(BR));frames(10)
   local kp=nil;for _,p in ipairs(visT.Keys:GetChildren())do if p.Name=='Key'and p.Transparency==0 then local pos=p.CFrame.Position;if g.RowOfZ(pos.Z)==BR and g.ColOfX(pos.X)==9 then kp=p end end end
   local kg=kp and kp:FindFirstChildWhichIsA('SurfaceGui')
-  check(kg and near(kg.ZOffset,.3+LT.Margin,1e-9),'a pressed key\'s own letter is drawn .34 toward the camera (ZOffset), clearing the taller mesh ('..tostring(kg and kg.ZOffset)..')')
+  check(kg and near(kg.ZOffset,.3+LT.Margin,1e-9),'a pressed key\'s own letter is drawn .35 toward the camera (ZOffset), clearing the taller mesh ('..tostring(kg and kg.ZOffset)..')')
   hum.FloorMaterial=AIR;put(cx(11),nil,cz(BR));frames(20)
   local tops={};for _,st in ipairs(visT.Legends:GetChildren())do if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 then tops[#tops+1]=st.CFrame.Position.Y+st.Size.Y/2 end end
   local minTop=1e9;for _,y in ipairs(tops)do minTop=min(minTop,y)end
-  check(#tops>=30 and near(minTop,K.KeyTop(0)+.3+LT.Margin,1e-6),'...and every strip stands .3 + .04 above the configured resting top ('..string.format('%.3f',minTop-K.KeyTop(0))..')')
+  check(#tops>=30 and near(minTop,K.KeyTop(0)+.3+LT.Margin,1e-6),'...and every strip stands .3 + .05 above the configured resting top ('..string.format('%.3f',minTop-K.KeyTop(0))..')')
  end)
  scenario('a ray that answers with something else (not the probe)',0,60*4,function()workspace.Raycast=dome(.3,.3,workspace)end)
  scenario('an absurd hit 4 studs up is capped at Legend.MaxExtra',1.5,90,function()workspace.Raycast=dome(4,4)end)

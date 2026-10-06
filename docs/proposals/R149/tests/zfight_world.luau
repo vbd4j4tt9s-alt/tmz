@@ -154,9 +154,9 @@ function Z.dump(root,areaOf,extra)
     local faces,mesh={},nil
     for _,d in ipairs(c._children)do
      if d._class=='Decal'or d._class=='Texture'then
-      faces[#faces+1]=string.format('{"kind":%s,"face":%s,"sig":%s,"t":%s,"ltm":%s}',q(d._class),q(enumName(d._props.Face)or'Front'),q(d._props.Texture or''),n4(d._props.Transparency or 0),n4(d._props.LocalTransparencyModifier or 0))
+      faces[#faces+1]=string.format('{"kind":%s,"face":%s,"sig":%s,"t":%s,"ltm":%s,"z":%s,"name":%s}',q(d._class),q(enumName(d._props.Face)or'Front'),q(d._props.Texture or''),n4(d._props.Transparency or 0),n4(d._props.LocalTransparencyModifier or 0),n4(d._props.ZIndex or 1),q(d._props.Name or''))
      elseif d._class=='SurfaceGui'and d._props.Enabled~=false then
-      faces[#faces+1]=string.format('{"kind":"SurfaceGui","face":%s,"sig":%s,"t":0,"alwaysOnTop":%s}',q(enumName(d._props.Face)or'Front'),q('gui:'..d._props.Name),d._props.AlwaysOnTop and'true'or'false')
+      faces[#faces+1]=string.format('{"kind":"SurfaceGui","face":%s,"sig":%s,"t":0,"alwaysOnTop":%s,"z":%s,"name":%s}',q(enumName(d._props.Face)or'Front'),q('gui:'..d._props.Name),d._props.AlwaysOnTop and'true'or'false',n4(d._props.ZOffset or 0),q(d._props.Name or''))
      elseif d._class=='SpecialMesh'then
       local sc=d._props.Scale;if type(sc)~='table'then sc=V3(1,1,1)end;local off=d._props.Offset or V3(0,0,0)
       mesh=string.format('{"type":%s,"scale":[%s,%s,%s],"offset":[%s,%s,%s]}',q(enumName(d._props.MeshType)or'Brick'),n4(sc.X),n4(sc.Y),n4(sc.Z),n4(off.X),n4(off.Y),n4(off.Z))

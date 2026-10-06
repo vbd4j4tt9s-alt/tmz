@@ -1,0 +1,17 @@
+[
+{"key": "Stage1", "part": "Body", "piece": 496, "by": [-0.0117, -0.0, -0.0]},
+{"key": "Stage1", "part": "Head_Canopy", "piece": 176, "by": [0.0, 0.0312, 0.0]},
+{"key": "Stage2", "part": "Segment1", "piece": 32, "by": [-0.0058, -0.0168, -0.0181]},
+{"key": "Stage3", "part": "Head_Face_Chase", "piece": 0, "by": [0.0, 0.0, -0.0312]},
+{"key": "Stage3", "part": "Head_Face_Chase", "piece": 20, "by": [0.0, 0.0, -0.0312]},
+{"key": "Stage4", "part": "Body_Glow", "piece": 168, "by": [0.0, 0.0117, 0.0]},
+{"key": "Stage4", "part": "Jaw", "piece": 0, "by": [0.0, -0.0137, 0.0]},
+{"key": "Stage4", "part": "LeftFrontLeg_Glow", "piece": 0, "by": [-0.0117, 0.0, 0.0]},
+{"key": "Stage4", "part": "RightFrontLeg_Glow", "piece": 0, "by": [0.0117, 0.0, 0.0]},
+{"key": "Stage5", "part": "Body", "piece": 352, "by": [0.0, -0.0, 0.0312]},
+{"key": "Stage5", "part": "Sword", "piece": 448, "by": [-0.0312, 0.0, 0.0]},
+{"key": "Stage5", "part": "Sword", "piece": 456, "by": [0.0312, 0.0, 0.0]},
+{"key": "Stage5", "part": "Sword_Point", "piece": 64, "by": [-0.0312, 0.0, 0.0]},
+{"key": "Stage5", "part": "Sword_Point", "piece": 72, "by": [0.0312, 0.0, 0.0]},
+{"key": "Stage7", "part": "Head_Cloud", "piece": 32, "by": [-0.0, -0.0, 0.0234]}
+]

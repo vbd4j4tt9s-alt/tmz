@@ -92,11 +92,12 @@ K.Config={
  CameraAbove=.6,                                          -- the camera never sinks under (resting key top + this = 5.8): the real floor is hidden, so it no
                                                           -- longer stops the default camera (Popper) from dropping into the keys / under the bed
  -- letters: PixelsPerStud on every letter SurfaceGui (TextHeight * PixelsPerStud = TextSize <= 100), Margin = the strip's top above the VISIBLE top of
- -- a resting key (the client measures that top from the keycap template: Legend.MaxExtra caps what a measurement may add), Rotation = the label's
+ -- a resting key (the client measures that top from the keycap template: Legend.MaxExtra caps what a measurement may add; R152 z-fighting: .05, not .04: a strip's face and a key's top
+ -- overlap over the whole key, and the R149 depth rule wants .043 at 300 studs), Rotation = the label's
  -- turn on the Top-face canvas (270: upright, reading left -> right for a runner heading +Z), KeysPerStrip = letters per SurfaceGui (a half row),
  -- MaxDistance = the guis' own render limit, RowsPerFrame = rows of letters dressed per frame (4, so a camera turn spreads the letters over several
  -- frames). The spacebars' biome names are big: they get their own render limit.
- Legend={PixelsPerStud=16,TextHeight=4.6,Margin=.04,MaxExtra=1.5,Rotation=270,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4,
+ Legend={PixelsPerStud=16,TextHeight=4.6,Margin=.05,MaxExtra=1.5,Rotation=270,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4,
   FarPixelsPerStud=4,FarMaxDistance=800},                  -- R152: far letters, one strip (22 labels, 18 px text) per row at 4 px / stud, rendered out to 800 studs
  SpacebarPixelsPerStud=10,SpacebarMaxDistance=800,
  GroundScanSeconds=2,
