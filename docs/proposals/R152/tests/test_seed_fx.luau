@@ -101,6 +101,63 @@ do
  check(failed==#Art.Order,'without EditableImage every image is "failed" (and every user keeps its fallback): '..failed)
  X.lowFx=true;check(not Art.Allowed()and Art.Warm()==false,'low quality / FastMode: nothing is drawn');X.lowFx=false
 end
+-- 1b. review fixes B1 / B4: nothing is drawn that is never shown, nothing is drawn while a reveal runs, 2 ms slices on tier 2, a light warm-up once idle ----------------------
+do
+ local B=W.module('ClientFxBudget')
+ local drawn,waits={},0
+ local function record(onWait)
+  Art.Reset();table.clear(drawn);waits=0
+  Art.Hooks.Spawn=function(fn)fn()end
+  Art.Hooks.Wait=function()waits+=1;if onWait then onWait()end end
+  Art.Hooks.Create=function(w,h,rgba,name)drawn[#drawn+1]={Name=name,Running=L.RevealRunning==true};return {W=w,H=h,Data=rgba,Destroy=function()end}end
+  Art.Hooks.Content=function(o)return 'rbxtemp://r152/'..o.W..'x'..o.H end
+ end
+ local function names_()local n={};for _,d in ipairs(drawn)do n[#n+1]=d.Name end;return table.concat(n,',')end
+ -- B1: a scene built on low quality draws nothing (its images would never be shown); on tier 2 / 3 the scene asks for its own
+ record();X.lowFx=true
+ local sc=Scenes.Build(7,{});check(#drawn==0 and Art.Get('planet_gas')==nil and Art.Get('glow')==nil,'B1: low quality: building a story scene draws no image ('..#drawn..': '..names_()..')');sc:Destroy()
+ X.lowFx=false
+ sc=Scenes.Build(7,{});local want7=0;for _,n in ipairs(Scenes.ArtNames[7])do if Art.Get(n)=='ready'then want7+=1 end end
+ check(want7==#Scenes.ArtNames[7],'B1: on normal quality the scene asks for its images (drawn for the next one): '..want7..' of '..#Scenes.ArtNames[7]);sc:Destroy()
+ -- B1: no drawing WHILE a reveal runs (RarePullRules.RevealRunning): the worker waits, mid-image too, and goes on when the reveal is over
+ local sliceWas=Art.SliceSeconds;Art.SliceSeconds=-1 -- (the mock's clock stands still: every step may pause)
+ local started=0
+ record(function()
+  if L.RevealRunning then started+=1;if started>=400 then L.RevealRunning=false end -- (longer than the drawing of both images: a worker that carried on would finish them first)
+  elseif #drawn==0 and waits==10 then L.RevealRunning=true end -- (a reveal begins 10 pauses into the first image)
+ end)
+ Art.Request({'glow','halo'})
+ local during=0;for _,d in ipairs(drawn)do if d.Running then during+=1 end end
+ check(#drawn==2 and during==0,'B1: nothing is drawn while a reveal runs (images finished: '..names_()..'; drawn during it: '..during..')')
+ check(started>=400,'B1: the worker waited out the reveal ('..started..' pauses while it ran)')
+ L.RevealRunning=false;Art.SliceSeconds=sliceWas
+ -- a reveal already running when the request comes: the worker waits first
+ record(function()if L.RevealRunning then started+=1;if started>=60 then L.RevealRunning=false end end end);started=0;L.RevealRunning=true
+ Art.Request({'glow'});check(#drawn==1 and not drawn[1].Running and started>=30,'B1: a request made during a reveal is drawn after it ('..started..' pauses)')
+ L.RevealRunning=false
+ -- a reveal flag that never clears does not stop the drawing for ever
+ record();L.RevealRunning=true;Art.Request({'glow'});check(#drawn==1,'B1: a stuck reveal flag is given up on after '..Art.MaxRevealWaits..' pauses (the image is drawn)');L.RevealRunning=false
+ -- B1: the slice of work a frame: 4 ms, 2 ms on tier 2
+ local get=B.Get
+ B.Get=function()return 3 end;check(Art.Slice()==.004,'B1: tier 3: a 4 ms slice ('..Art.Slice()..')')
+ B.Get=function()return 2 end;check(Art.Slice()==.002,'B1: tier 2: a 2 ms slice ('..Art.Slice()..')')
+ B.Get=function()return 1 end;check(Art.Slice()==.004,'(tier 1 draws nothing at all; the slice is the default)')
+ B.Get=get
+ -- B4: the warm-up (15 s after the client starts) is the planets and the seed's halo, only once no reveal is running; the rest is drawn when a scene asks
+ check(table.concat(Art.WarmOrder,',')=='glow,halo,planet_gas,planet_rock,planet_ring','B4: the warm-up list is the seed halo and the three planets ('..table.concat(Art.WarmOrder,',')..')')
+ record();L.RevealRunning=true
+ check(Art.Warm(1)==true,'B4: Warm schedules')
+ R.advance(1.5);check(#drawn==0,'B4: a reveal is running when the warm-up is due: nothing is drawn')
+ R.advance(Art.WarmRetry*2);check(#drawn==0,'B4: ... and it keeps waiting while the reveal runs')
+ L.RevealRunning=false;R.advance(Art.WarmRetry+.5)
+ local got={};for _,d in ipairs(drawn)do got[d.Name]=true end
+ check(#drawn==5 and got.glow and got.halo and got.planet_gas and got.planet_rock and got.planet_ring,'B4: idle again: the warm-up draws the planets and the seed halo only ('..names_()..')')
+ check(Art.Get('nebula_rose')==nil and Art.Get('starmap')==nil and Art.Get('runes')==nil and Art.Get('carpet')==nil,'B4: the nebulas, the star map, the runes and the palace art wait until a scene asks')
+ sc=Scenes.Build(7,{});check(Art.Get('nebula_rose')=='ready'and Art.Get('starmap')=='ready','B4: ... and a story scene draws what it needs');sc:Destroy()
+ -- B4: the warm-up does not start when quality dropped to low in the meantime
+ record();Art.Warm(1);X.lowFx=true;R.advance(2);check(#drawn==0,'B4: low quality by the time it is due: nothing is drawn');X.lowFx=false
+ Art.Reset();hooks(true)
+end
 -- 2. the stages with and without images -------------------------------------------------------------------------------------------------
 local caps={[6]={80,55},[7]={95,55},[8]={190,125}}
 local function stageChecks(withArt)

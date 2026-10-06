@@ -164,6 +164,70 @@ do
  check(stores['VoidGiveaway152'].Data.Claims.Count==n,'Count equals the number of listed users ('..n..')')
 end
 
+-- 6. GiftLocked: a free giveaway pack can't be gifted; the lock is an OPTIONAL record field (like PackShape) -----------------------------------------------------------------
+do
+ local profileStore=stores[Config.GetDataStoreName(false)]
+ local function savedRow(id)for _,v in pairs(profileStore.Data)do if type(v)=='table'then for _,r in ipairs(v.Seeds or{})do if r.Id==id then return r end end end end end
+ local function recOf(D,p,id)for _,r in ipairs(D:GetChestRecords(p))do if r.Id==id then return r end end end
+ local D=dataServer();local svc=giveaway(D)
+ local P=makePlayer(D,2040,'Locked');svc:Step();local ok,rec=svc:Claim(P)
+ check(ok==true and rec.GiftLocked==true,'A1: the giveaway pack is GiftLocked (the real AddChest keeps the field)')
+ local row=D:SerializeSeedRecord(rec);check(row.GiftLocked==true and row.Kind=='Pack','A1: it is serialised (SerializeSeedRecord: the same row a save and a gift use)')
+ local plain=D:AddChest(P,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})
+ check(plain.GiftLocked==nil and D:SerializeSeedRecord(plain).GiftLocked==nil,'A1: an ordinary Void pack (the track\'s) carries no lock')
+ local shaped=D:AddChest(P,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion,GiftLocked=true})
+ check(shaped.GiftLocked==true,'A1: any pack added with GiftLocked=true keeps it')
+ table.remove(D:GetChestRecords(P))
+ -- decode: exactly true, packs only
+ local function decode(extra)
+  local r={Id='d1',Kind='Pack',ChestNumber=9,ChestName='P',Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',SeedScale=1};for k,v in pairs(extra)do r[k]=v end
+  return D:_decodeSavedSeedRecord(P,r,9)
+ end
+ check(decode({GiftLocked=true}).GiftLocked==true,'A1: a saved GiftLocked=true reads as locked')
+ check(decode({GiftLocked='yes'}).GiftLocked==nil and decode({GiftLocked=1}).GiftLocked==nil and decode({}).GiftLocked==nil,'A1: anything but exactly true (and an old row without the field) reads as not locked')
+ check(decode({Kind='Seed',GiftLocked=true,SeedId='SunflowerSeed'}).GiftLocked==nil,'A1: a Seed row never carries the lock')
+ local gifted=D:DecodeGiftedSeed(P,row);check(gifted and gifted.GiftLocked==true,'A1: a row that reached the gift decoder keeps its lock (it cannot be shed by a gift)')
+ -- saved with the profile; another server loads it
+ local plainId=plain.Id;D:Save(P,'test',true)
+ local saved=savedRow(rec.Id);check(saved and saved.GiftLocked==true and savedRow(plainId).GiftLocked==nil,'A1: the saved profile row has GiftLocked = true (the plain Void pack\'s row has none)')
+ check(Config.ProfileVersion==22,'A1: ProfileVersion is still 22 (an optional field)')
+ leave(D,P)
+ local D2=dataServer();local svc2=giveaway(D2);local P2=makePlayer(D2,2040,'Locked');svc2:Step()
+ local back=recOf(D2,P2,rec.Id);local backPlain=recOf(D2,P2,plainId)
+ check(back and back.GiftLocked==true and backPlain and backPlain.GiftLocked==nil,'A1: on another server the loaded pack is still locked (and the other one is not)')
+ -- Verity: the Verity Pack you get for a locked Void Pack is locked too; an ordinary one is not
+ local c1=D2:ConvertVoidPack(P2,rec.Id);local c2=D2:ConvertVoidPack(P2,plainId);local VC=W.module('VerityCatalog')
+ check(c1 and c1.BagVariant==VC.Variant and c1.GiftLocked==true,'A1: ConvertVoidPack carries the lock to the Verity Pack')
+ check(c2 and c2.BagVariant==VC.Variant and c2.GiftLocked==nil,'A1: ... and an ordinary Void pack gives an unlocked Verity Pack')
+ check(D2:SerializeSeedRecord(c1).GiftLocked==true,'A1: the Verity Pack\'s saved row keeps it')
+ -- opening a locked pack: the seed that comes out is a Seed (no lock)
+ local P3=makePlayer(D2,2041,'Opener');svc2:Step();svc2:Claim(P3);local lp=D2:GetChestRecords(P3)[1]
+ local seed=D2:OpenSeedPack(P3,lp.Id,function()return .5 end)
+ check(seed and seed.Kind=='Seed'and seed.GiftLocked==nil and D2:SerializeSeedRecord(seed).GiftLocked==nil,'A1: an opened pack is a Seed record without the lock')
+ -- an R151 server (git history) loads a profile with the field, ignores it, and saves the row without it; everything else in the row is identical
+ local old=RS:FindFirstChild('PlayerDataServiceR151')
+ if not old then print('SKIP: the R151 PlayerDataService is not in the repository history, so the older-server check did not run')
+ else
+  old.Parent=folder
+  local D151=W.require(old).new(Config,Map,Notes)
+  -- (the locked pack is in a Verity Pack and a Void Pack now: give the profile a fresh locked Void Pack to read)
+  local P4=makePlayer(D2,2042,'Old151');svc2:Step();svc2:Claim(P4);local lockedId=D2:GetChestRecords(P4)[1].Id;D2:Save(P4,'test',true);leave(D2,P4)
+  local before=savedRow(lockedId);local copy={};for k,v in pairs(before)do copy[k]=v end
+  local P151=makePlayer(D151,2042,'Old151')
+  local found=recOf(D151,P151,lockedId)
+  check(found and found.Kind=='Pack'and found.BagVariant=='EclipseReliquary'and found.Stage==7,'A1: an R151 server loads a save with a locked pack: the pack is there, unchanged')
+  check(found and found.GiftLocked==nil,'A1: ... it does not know the field: nothing breaks, the lock is not carried (R151 has no gifting of it to protect)')
+  D151:Save(P151,'test',true)
+  local after=savedRow(lockedId);local same=after~=nil
+  if after then for k,v in pairs(copy)do if k~='GiftLocked'and after[k]~=v then same=false;print('differs after an R151 save:',k,tostring(v),tostring(after[k]))end end
+   for k in pairs(after)do if copy[k]==nil then same=false;print('new key after an R151 save:',k)end end end
+  check(same and after.GiftLocked==nil and copy.GiftLocked==true,'A1: the R151 server writes the pack back WITHOUT the field and every other saved field is identical')
+  leave(D151,P151)
+  local D3=dataServer();local P5=makePlayer(D3,2042,'Old151');local again=recOf(D3,P5,lockedId)
+  check(again and again.Kind=='Pack'and again.BagVariant=='EclipseReliquary','A1: an R152 server reads what the R151 server wrote (the pack is a normal Void pack)')
+ end
+end
+
 print(string.format('giveaway real data: %d checks, %d failed',checks,fails))
 if fails>0 then error('FAILED '..fails)end
 print('OK '..checks..' checks')

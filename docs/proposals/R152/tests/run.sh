@@ -9,7 +9,8 @@
 #  test_hold_race.luau    - the server half (R151's pack harness): a pack the player equipped is not thrown back into the Backpack by a second hold (quick unequip / re-equip while
 #                           its shape loads) or by the previous pack's opening that has not finished yet.
 #  test_silence.luau      - treadmills silent, InteractionFeedback keeps its real cues but not the hold-begin click.
-#  test_chase_trim.luau   - ChaseMusicTrim152 cuts the secret keeper chase theme to its first 4 s (regions 0-4, loop), later sounds too, others untouched.
+#  test_chase_trim.luau   - ChaseMusicTrim152 makes the Darkened's (secret keeper) chase theme skip to 0:22: playback and loop regions 22 s -> the end of the file, the position moved up to 0:22 if
+#                           BackgroundMusic restarts it at 0; sounds created or given their id later are cut too, other music untouched.
 #  static checks          - the removed cues are gone from the scripts; the fruit-of-the-hour pedestal has no tube (docs/proposals/R135/tests covers the model).
 # "mutate" bundles the R151 Hotbar instead (BASE=<commit before R152>) and expects the click test to FAIL: proof it catches the double-click.
 set -e

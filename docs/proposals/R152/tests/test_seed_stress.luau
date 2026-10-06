@@ -198,6 +198,43 @@ do
  X.run(6)
  clean('slow join')
 end
+-- 0b. the seed's whoosh into the hand (SeedPackClient) is not cut when the world reveal ends (review fix B3): it was a child of the seed effect, destroyed at RevealDuration
+-- while the whoosh was still fading (cut at ~75 % volume). It must finish its fade (on an anchor of its own) and then be gone.
+do
+ local hand=R.new('Part');hand.Name='RightHand';hand.Size=V3(1,1,1);hand.CFrame=CF(1.5,4,100);hand.Parent=X.char
+ local known={};for _,s in ipairs(Y.sounds)do known[s]=true end
+ local handedOver=0
+ for _,rank in ipairs({3,5,7})do
+  local tag='whoosh '..names[rank]
+  local tool=packTool(X.char,packs[6]);local bag=serverBag(X.char,packs[6],nil,1)
+  if bag then
+   bag:SetAttribute('PackClickCount',5);reveal(bag,X.byRank[rank])
+   local snd,peak,lastVol,gone,goneVol,goneStops,onTail=nil,0,0,false,nil,nil,false
+   X.run(Rules.GetRevealDuration(names[rank])+1.2,1/30,function()
+    if not snd then for _,s in ipairs(Y.sounds)do if not known[s]and s.Name=='Seed flight'then snd=s end end end
+    if snd and not gone then
+     if snd.Parent~=nil and snd:IsDescendantOf(W.workspace)then
+      lastVol=snd.Volume;peak=math.max(peak,lastVol);if snd.Parent.Name=='Seed flight whoosh'then onTail=true end
+     else gone=true;goneVol=lastVol;goneStops=snd.Stops or 0 end
+    end
+   end)
+   if onTail then handedOver+=1 end
+   check(snd~=nil and peak>0,tag..': the seed\'s whoosh into the hand plays (peak volume '..string.format('%.3f',peak)..')')
+   check(gone,tag..': and is cleaned up afterwards (nothing left in the world)')
+   check(gone and goneVol<=.12*peak,tag..': it finished its fade before it went: '..string.format('%.3f',goneVol or -1)..' of a peak of '..string.format('%.3f',peak)..' when it was removed (a cut would leave ~75 %)')
+   check(gone and goneStops>=1,tag..': and was stopped, not just destroyed')
+   local e=effects();local stray=0;if e then for _,c in ipairs(e:GetChildren())do if c.Name=='Seed flight whoosh'then stray+=1 end end end
+   check(stray==0,tag..': no whoosh anchor is left in the effects folder ('..stray..')')
+   bag:Destroy();tool:Destroy()
+  end
+  local guard=0;while M.Active()and guard<300 do X.run(.2);guard+=1 end
+  X.run(2)
+  for _,s in ipairs(Y.sounds)do known[s]=true end
+ end
+ check(handedOver>=1,'at least one of the three reveals ended while its whoosh was still fading (the hand-over ran: '..handedOver..')')
+ hand:Destroy()
+ X.run(1);clean('whoosh scenes')
+end
 -- the baseline (after the auras have ended)
 X.run(40);World.Clear();X.run(.2)
 local function census()

@@ -128,10 +128,12 @@ local function pick(pair)
  if not playing[b]then return b end
  return playing[a].StartedAt<=playing[b].StartedAt and a or b
 end
+-- (a Sound's IsPlaying can read false for a frame or two after Play(): a voice that started this recently still sounds, else the one-shots of one frame -- the King's four climax hits -- stopped each other)
+A.PlayLag=.1
 local function cap(t)
  local n,oldest=0,nil
  for v,e in pairs(playing)do
-  if v.IsPlaying and t<e.EndsAt then n+=1;if not e.Loop and(not oldest or e.StartedAt<playing[oldest].StartedAt)then oldest=v end
+  if t<e.EndsAt and(v.IsPlaying or t-e.StartedAt<=A.PlayLag)then n+=1;if not e.Loop and(not oldest or e.StartedAt<playing[oldest].StartedAt)then oldest=v end
   else stopVoice(v)end -- (ended, or due to end: stopped, never just forgotten while still sounding)
  end
  if n>=A.MaxVoices and oldest then stopVoice(oldest)end

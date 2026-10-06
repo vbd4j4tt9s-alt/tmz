@@ -80,8 +80,9 @@ local function emitter(parent,name,texture,colors,size,rate,life,speed,emission,
  e.LightEmission=emission;e.LightInfluence=emission>0 and 0 or .25;e.Rotation=NumberRange.new(0,360);e.RotSpeed=NumberRange.new(-35,35)
  e.Parent=parent;return e
 end
--- Create (once) the effect set for one pack at the given tier.
-function X.Create(r,tier)
+-- Create (once) the effect set for one pack at the given tier. noHighlight (optional): leave out the violet outline on the pack (a Highlight written every frame by Step): the giveaway
+-- pedestal's pack asks for that on tier 2 and below; the track's Void packs always have it, as before.
+function X.Create(r,tier,noHighlight)
  local s=r.Scale;local pal=r.Palette or X.Void;local folder=Instance.new('Folder');folder.Name='_VoidPackFx122'
  local core=fxPart(folder,'VoidFxCore',V(.1,.1,.1),Color3.new(),Enum.Material.SmoothPlastic);core.Transparency=1
  local fx={Folder=folder,Core=core,Tier=tier,Debris={},Comets={}}
@@ -104,7 +105,7 @@ function X.Create(r,tier)
   trail.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.1),NumberSequenceKeypoint.new(1,1)});trail.Parent=comet
   fx.Comets[i]={Part=comet,Trail=trail}
  end
- if pal.Fill then
+ if pal.Fill and not noHighlight then
   local h=Instance.new('Highlight');h.Name='VoidDistortion';h.Adornee=r.Bag;h.FillColor=pal.Fill;h.FillTransparency=.88
   h.OutlineColor=pal.Outline;h.OutlineTransparency=.35;h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;fx.Highlight=h
  end

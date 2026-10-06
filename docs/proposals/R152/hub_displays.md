@@ -13,8 +13,8 @@ stand-in rig in ONE frame of a dance, the sparkles are a frozen frame. `docs/pro
 - **The pedestal**: the market's Fruit of the Hour pedestal (`MarketLayout.Pedestal`: stone plinth with a gold trim and four studs, teal column with its inlays, gold band, stone capital, gold-deep top,
   four gold prongs; same shapes, same palette), built **3.2 times bigger**: plinth 19.8 studs wide, the capital 15.9 and the prong tips 20.8 studs up. 17 static parts, 4 of them solid. Copied, not called:
   `MarketLayout` is another agent's file, and the Fruit of the Hour's translucent projector tube (and its flat neon cradle glow) are left out.
-- **The showcase**: the winning seed / fruit (the game's own art, about 12 studs, at most 150 parts) floats over the prongs and **turns slowly** (client side, `HubDisplayClient`: one BulkMoveTo about 20 times a
-  second, 12 on phones' middle tier, only within 260 studs and when reduced motion is off). **Its effects are on it**: an invisible `ItemCore` part inside the item holds a PointLight in the champion's colour
+- **The showcase**: the winning seed / fruit (the game's own art, about 12 studs, at most 150 parts) floats over the prongs and **turns slowly** (client side, `HubDisplayClient`: one BulkMoveTo every frame
+  (review fix: 20 a second turned in visible steps), 30 a second on phones' middle tier, only within 260 studs and when reduced motion is off). **Its effects are on it**: an invisible `ItemCore` part inside the item holds a PointLight in the champion's colour
   (server), and the client puts the sparkle emitter on that same core while it is near, so light and sparkles turn and bob with the seed. The halo disc and the lit rings are gone; an empty BEST PULL is calm
   (a black mystery seed, light off, no sparkles).
 - **The words**, small, in the Fruit of the Hour's own format: a dark plaque with gold lettering on the pedestal column (title, winner, rarity and chance or the fruit of the day, the countdown) and a

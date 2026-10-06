@@ -26,7 +26,8 @@ T=$REPO/tools/tests;P=$REPO/docs/proposals;S=$REPO/src
 echo "== static checks"
 bad=0;for f in $(find "$S" -name '*.lua');do /opt/luau/luau-compile --null "$f" >/dev/null 2>&1 || { echo "FAIL: $f does not compile";bad=1; };done
 [ "$bad" = 0 ];echo "ok: every script in src/ compiles"
-if grep -rniE "cla[u]de|op[u]s|sonn[e]t|haik[u]|anthrop[i]c|gp[t]-" "$HERE" "$P/R152/seed_opening.md" "$P/R152/tools" 2>/dev/null | grep -v "^Binary";then echo "FAIL: a model name in the R152 files";exit 1;fi
+# (real model names / ids only, e.g. a vendor name + version or a "xx-yy-4" id; a path like /root/.claude/... is not one. The brackets keep this very line from matching itself.)
+if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]|gp[t]-?[0-9]" "$HERE" "$P/R152/seed_opening.md" "$P/R152/tools" 2>/dev/null | grep -v "^Binary";then echo "FAIL: a model name in the R152 files";exit 1;fi
 echo "ok: no model names in the R152 files"
 INV=$P/inventory_R113/tests
 cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$P/R150/tests/sfx_env.luau" "$P/R151/tests/rare_env.luau" "$HERE"/*.luau "$OUT/cl/"

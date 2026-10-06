@@ -11,7 +11,7 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 --     replicates), and a bigger celebration (both arms up) when a new champion arrives
 --   * the pop when the champion changes (a burst of sparks over the item) and the celebration sound the server asks for when someone in THIS server takes the top spot
 --     (InteractionAudio GemClaim, the game's own reward chime, through the Interface group like every cue).
--- Per-frame work: one function, connected only while a display is near; it moves the item's parts in one BulkMoveTo about 20 times a second (12 on the middle quality tier) and sets about 8 joint
+-- Per-frame work: one function, connected only while a display is near; it moves the item's parts (at most 150) in one BulkMoveTo every frame (30 times a second on the middle quality tier: 12 a second turned in visible steps) and sets about 8 joint
 -- transforms 30 times a second (a cheering rig only). Reduced motion (GuiService.ReducedMotionEnabled): none of the motion, no pop (the countdown and the sound stay). Low quality
 -- (ClientFxBudget tier 1): no motion either. A display that streams out is forgotten and a streamed-back copy starts clean; nothing here counts on any child existing yet.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
@@ -26,7 +26,7 @@ local TICK=.5                    -- how often the distance (and what is on the d
 local TEXT_EVERY=5               -- seconds between countdown writes
 local SPIN=.6                    -- the item's turn, radians a second
 local BOB=.6                     -- the item's float up and down (studs, every ~4 s)
-local ITEM_HZ,ITEM_HZ_LOW,POSE_HZ=20,12,30 -- how often the item's parts (ITEM_HZ_LOW on the middle quality tier: phones) / the avatar's joints are written while near
+local ITEM_HZ,ITEM_HZ_LOW,POSE_HZ=math.huge,30,30 -- how often the item's parts (every frame; ITEM_HZ_LOW on the middle quality tier: phones) / the avatar's joints are written while near
 local itemHz=ITEM_HZ
 local SPARK='rbxasset://textures/particles/sparkles_main.dds'
 local entries={}                 -- model -> entry

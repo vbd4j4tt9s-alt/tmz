@@ -5,7 +5,8 @@
 --  3. a second claim refused;  4. two servers racing at 499: only one gets the last pack;  5. at 500 every claim refused, prompt off, "ALL CLAIMED", for ever;
 --  6. a full Bag: nothing reserved;  7. an interrupted grant: given again once, never twice;  8. a DataStore failure: no pack, retries with backoff, then "try again";
 --  9. messaging: another server's claim lowers the number here;  10. polling (45-60 s, backoff, stops at the cap);  11. the Studio fallback (own store, in-memory counter, one warn);
---  12. the owner commands (voidgift, reset me, left N: Studio only);  13. guards (data, save, distance, busy, rate, leaving).
+--  12. the owner commands (voidgift, reset me, left N: Studio only);  13. guards (data, save, distance, busy, rate, leaving);
+--  14. review fixes: the pack is GiftLocked, MinAccountAgeDays (0 = off), claims honour the store's backoff and a 10 s cooldown, the loop's retries tell once and back off.
 local G=require('./giveaway_harness');local H,W,R,E=G.H,G.W,G.R,G.E;local V3=R.Vector3.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -210,7 +211,7 @@ do
  local ok3,why3=s3.Svc:Claim(r)
  check(ok3==false and why3=='add'and voidPacks(s3,r)==0 and s3.Data:GetPremium(r).VoidGift152==nil,'AddChest threw: no pack, no flag')
  check(stored(b3).Count==1 and stored(b3).Users['603']~=nil,'the reservation stands (the grant was interrupted)')
- s3.Data.ThrowAdd=false;s3.Svc:Step()
+ s3.Data.ThrowAdd=false;s3.Clock.advance(6);s3.Svc:Step() -- (the loop waits 5 s after a pack could not be added)
  check(voidPacks(s3,r)==1 and s3.Data:GetPremium(r).VoidGift152==true and stored(b3).Count==1,'the next step gives it: one pack, Count still 1')
  s3.Svc:Step();s3.Svc:Claim(r);check(voidPacks(s3,r)==1,'never twice')
  -- d) a hook that throws AFTER the pack was added still counts (the inventory is the commit point)
@@ -252,7 +253,7 @@ do
  check(stored(b)==nil and p:GetAttribute('VoidGift152')=='Open','nothing stored, the player is Open again')
  -- recovers on the third try: one pack, one count
  b.Fail=(function()local n=0;return function(kind)if kind=='Update'then n+=1;if n<=2 then return 'HTTP 500'end end end end)()
- b.Calls.Update=0
+ b.Calls.Update=0;s.Clock.advance(61) -- (the store's backoff after the failures above has run out)
  local ok2=s.Svc:Claim(p);check(ok2==true and voidPacks(s,p)==1 and stored(b).Count==1 and b.Calls.Update==3,'two failures then success on the third try: one pack, Count 1')
  -- a failing store at start: the count is unknown, the prompt stays off, then it recovers by itself
  local b2=G.backend();b2.Fail=function()return 'HTTP 503'end
@@ -430,6 +431,98 @@ do
  local fl2=G.player(s2,1410,'Flagged',{Flag=true});check(fl2:GetAttribute('VoidGift152')==nil,'before the step nothing is set');s2.Svc:Step();check(fl2:GetAttribute('VoidGift152')=='Claimed','after it a flagged profile is Claimed')
  -- teardown
  s2.Svc:Destroy();check(s2.Svc.Model==nil and G.Service.Current~=s2.Svc,'Destroy removes the pedestal')
+end
+
+-- 14. Review fixes ------------------------------------------------------------------------------------------------------------------------------------------------
+local function said(s,p,needle)local n=0;for _,x in ipairs(s.Notes.Log)do if x.P==p and x.Text:find(needle,1,true)then n+=1 end end;return n end
+-- A1: the pack is GiftLocked (FruitGiftService refuses it; the real record round trip is in test_giveaway_real); MinAccountAgeDays = 0 (off) by default
+do
+ local b=G.backend();local s=new(b,nil);local p=G.player(s,1501,'Alt')
+ local ok,record=s.Svc:Claim(p)
+ check(ok==true and record.GiftLocked==true,'A1: the giveaway pack is a GiftLocked record (a free pack can\'t be gifted)')
+ check(Rules.MinAccountAgeDays==0,'A1: MinAccountAgeDays is 0 (off: the owner decides)')
+ local q=G.player(s,1502,'Brand new');q.AccountAge=0;check(s.Svc:Claim(q)==true,'A1: with the rule off a day-0 account can claim')
+ -- the rule on: a young account is refused with a friendly line, nothing reserved, no request
+ Rules.MinAccountAgeDays=7
+ local young=G.player(s,1503,'Young');young.AccountAge=3;local before=b.Calls.Update
+ local oky,why=s.Svc:Claim(young)
+ check(oky==false and why=='young'and b.Calls.Update==before and s.Data:voidPacks(young)==0,'A1: MinAccountAgeDays 7: a 3-day-old account is refused, nothing reserved, no store request')
+ local n=s.Notes:last(young);check(n and n.Text:find('7 days',1,true)and n.Text:find('4 day',1,true)and n.Kind=='Denied','A1: ... with a friendly line that says how long to wait ("'..tostring(n and n.Text)..'")')
+ check(young:GetAttribute('VoidGift152')~='Claimed'and not stored(b).Users['1503'],'A1: ... not Claimed, not in the shared list')
+ local unknown=G.player(s,1504,'Unknown');check(s.Svc:Claim(unknown)==false,'A1: an account whose age is unknown is refused while the rule is on')
+ local seven=G.player(s,1505,'Seven');seven.AccountAge=7;check(s.Svc:Claim(seven)==true and s.Data:voidPacks(seven)==1,'A1: a 7-day-old account may claim')
+ -- a player already in the shared list (reserved before the rule) is owed their pack whatever the rule says
+ b.Data[KEY].Users['1506']=1700000000;b.Data[KEY].Count+=1;s.Svc:Poll()
+ local owed=G.player(s,1506,'Owed');owed.AccountAge=1;s.Svc:Step()
+ check(s.Data:voidPacks(owed)==1,'A1: a player reserved earlier is still given their pack when the rule is turned on')
+ Rules.MinAccountAgeDays=0
+end
+
+-- A2: claims honour the store's backoff and a per-player cooldown after a store failure
+do
+ local b=G.backend();local s=new(b,nil);local p=G.player(s,1601,'First')
+ b.Fail=function(kind)if kind=='Update'then return '429: DataStore request was throttled'end end
+ local ok,why=s.Svc:Claim(p);local used=b.Calls.Update
+ check(ok==false and why=='store'and used==4,'A2: the first claim tries the store (4 tries) and fails')
+ check(s.Notes:last(p).Text:find('Try again in 40 s',1,true)~=nil,'A2: the failed player is told "try again in 40 s" ('..s.Notes:last(p).Text..')')
+ -- 20 more players press over the next 30 s while the backoff runs: no UpdateAsync at all
+ local refused,told=0,0
+ for i=1,20 do
+  s.Clock.advance(1.5);local q=G.player(s,1610+i,'P'..i);local _,whyq=s.Svc:Claim(q)
+  if whyq=='wait'then refused+=1 end
+  local t=s.Notes:last(q);if t and t.Text:find('Try again in',1,true)and t.Text:find(' s.',1,true)then told+=1 end
+ end
+ check(b.Calls.Update==used and refused==20,'A2: 20 claims during the backoff are refused at once, 0 more UpdateAsync calls ('..(b.Calls.Update-used)..' made)')
+ check(told==20,'A2: ... each told "try again in N s"')
+ -- the store's own gate: Reserve called directly during the backoff makes no request
+ local before=b.Calls.Update;local okr,reason,secs=s.Store:Reserve(1650)
+ check(okr==false and reason=='backoff'and type(secs)=='number'and secs>=1 and b.Calls.Update==before,'A2: Store:Reserve refuses at once while NextTryAt is in the future (backoff, '..tostring(secs)..' s left)')
+ -- once the backoff has run out the store is asked again (and a recovered store works)
+ b.Fail=nil;s.Clock.advance(60)
+ local r=G.player(s,1651,'After');check(s.Svc:Claim(r)==true and s.Data:voidPacks(r)==1,'A2: after the backoff the store is asked again')
+ -- the per-player cooldown: after a store failure the same player waits ~10 s, even when the store is back at once (a good read clears the backoff)
+ local c=G.player(s,1652,'Cool');b.Fail=function(kind)if kind=='Update'then return 'HTTP 500'end end
+ local okC,whyC=s.Svc:Claim(c);check(okC==false and whyC=='store','A2: a failing store: refused')
+ b.Fail=nil;s.Store:_ok()
+ local u=b.Calls.Update;local again,whyAgain=s.Svc:Claim(c)
+ check(again==false and whyAgain=='wait'and b.Calls.Update==u,'A2: the same player pressing again at once is held back by their cooldown (no request)')
+ local other=G.player(s,1653,'Other');check(s.Svc:Claim(other)==true,'A2: another player is not held back')
+ s.Clock.advance(9);check(s.Svc:Claim(c)==false,'A2: 9 s later the cooldown still holds')
+ s.Clock.advance(2);check(s.Svc:Claim(c)==true and s.Data:voidPacks(c)==1,'A2: after ~10 s the player may claim')
+ check(G.Service.StoreCooldown==10,'A2: the cooldown is 10 s')
+ -- memory mode (Studio without API access) has no backoff to honour
+ local m=new(G.backend(),nil,{Studio=true,Memory=true,Name='M'});local mp=G.player(m,1660,'Mem');check(m.Svc:Claim(mp)==true,'A2: the in-memory counter is never held back')
+end
+
+-- A3: the loop's retries of a pack the player is owed: told once, backing off after an 'add' failure
+do
+ local b=G.backend();seedStore(b,1,{1701});local s=new(b,nil);local p=G.player(s,1701,'Owed')
+ s.Data.ThrowAdd=true
+ local adds0=s.Data.AddCalls
+ for _=1,30 do s.Svc:Step();s.Clock.advance(2)end -- 60 s of the 2 s loop
+ check(said(s,p,'could not be added')==1,'A3: 30 loop steps of a pack that cannot be added: the player is told once ('..said(s,p,'could not be added')..')')
+ local tries=s.Data.AddCalls-adds0
+ check(tries>=3 and tries<=6,'A3: ... and the loop backed off (5, 10, 20 .. s) instead of trying every 2 s: '..tries..' tries in 60 s (was 30)')
+ check(s.Data:voidPacks(p)==0 and stored(b).Users['1701']~=nil,'A3: nothing was given, the reservation stands')
+ -- a press of the player's own always gets an answer and tries at once
+ local n0=said(s,p,'could not be added');local okp,whyp=s.Svc:Claim(p)
+ check(okp==false and whyp=='add'and said(s,p,'could not be added')==n0+1,'A3: the player\'s own press tries at once and says so')
+ -- it works again: the next try after the backoff gives the pack, once, and the retry state is forgotten
+ s.Data.ThrowAdd=false
+ for _=1,40 do s.Svc:Step();s.Clock.advance(2)end
+ check(s.Data:voidPacks(p)==1 and s.Data:GetPremium(p).VoidGift152==true,'A3: when AddChest works again the next retry gives the pack')
+ check(s.Svc.Failed[p]==nil,'A3: ... and the failure record is cleared')
+ s.Svc:Step();check(s.Data:voidPacks(p)==1,'A3: never twice')
+ -- _run is told whether it is the loop (auto): the loop's failure is quiet after the first line, a press is not
+ local b2=G.backend();seedStore(b2,1,{1702});local s2=new(b2,nil);local q=G.player(s2,1702,'Direct');s2.Data.ThrowAdd=true
+ s2.Svc:_run(q,true,true);s2.Svc:_run(q,true,true);s2.Svc:_run(q,true,true)
+ check(said(s2,q,'could not be added')==1,'A3: _run(player, owed, auto) tells an auto retry once')
+ s2.Svc:_run(q,true,false);check(said(s2,q,'could not be added')==2,'A3: ... and a non-auto run always tells')
+ -- an error thrown out of a claim is handled the same way (once, then the backoff)
+ local b3=G.backend();seedStore(b3,1,{1703});local s3=new(b3,nil);local r=G.player(s3,1703,'Throws')
+ s3.Svc._run=function()error('boom')end
+ for _=1,10 do s3.Svc:Step();s3.Clock.advance(2)end
+ check(said(s3,r,'Could not claim')==1,'A3: a claim that throws is announced once by the loop ('..said(s3,r,'Could not claim')..')')
 end
 
 print(string.format('giveaway server: %d checks, %d failed',checks,fails))

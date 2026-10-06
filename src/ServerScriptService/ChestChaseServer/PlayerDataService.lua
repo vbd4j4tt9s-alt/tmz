@@ -385,6 +385,7 @@ function PlayerDataService:AddChest(player, chest, options)
         SeedScale = PackRules.NewSeedScale(chest.Stage,chest.BagVariant,packSize),
         RateBoost = PackRules.SanitizeRateBoost(chest.RateBoost), -- R138: the free starter pack's 2x rates
         TestGrant = (type(options) == "table" and options.TestGrant == true) or nil, -- R151: made by an owner command (never announced when opened)
+        GiftLocked = chest.GiftLocked == true or nil, -- R152: a free giveaway pack (VoidGiveaway152): it can't be gifted (an optional field, like PackShape)
 	}
 	do local shape = chest.PackShape;if shape == nil then shape = PackShapes.Roll(chest.BagVariant) end;shape = PackShapes.Sanitize(shape);if shape > 0 and PackShapes.Applies(chest.BagVariant) then record.PackShape = shape end end
 	table.insert(self:GetChestRecords(player), record)
@@ -471,6 +472,7 @@ function PlayerDataService:ConvertVoidPack(player, inventoryId)
 			WeatherCheckedEvent = Weather.CheckedEvent(pack.WeatherCheckedEvent), PaidRandom = pack.PaidRandom == true,
 			SeedScale = PackRules.NewSeedScale(VerityCatalog.PackStage, VerityCatalog.Variant, size),
 			TestGrant = pack.TestGrant == true or nil, -- R151: an owner-made Void pack stays a test pack as a Verity pack
+			GiftLocked = pack.GiftLocked == true or nil, -- R152: so does a free giveaway pack: the Verity Pack it becomes can't be gifted either
 		}
 		records[index] = record
 		local tests = self.StudioPackRewards and self.StudioPackRewards[player]
@@ -798,6 +800,7 @@ function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNu
                 PaidRandom=savedChest.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(savedChest.RateBoost),
                 TestGrant=(savedChest.Kind=="Pack" and savedChest.TestGrant==true) or nil, -- R151 (optional; an older server drops it)
                 PackShape=savedPackShape(savedChest), -- R151 (optional chip-bag shape 1-6; absent / anything else = the default shape)
+                GiftLocked=(savedChest.Kind=="Pack" and savedChest.GiftLocked==true) or nil, -- R152 (optional; an R151 server drops it)
                 BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=PackRules.ValidOddsVersion(savedChest.OddsVersion)and savedChest.OddsVersion or nil, -- R137: 81, 112 and 137 all load
             PackSize=PackRules.SanitizePackSize(savedChest.PackSize),PackMutation=PackRules.MutationKey(savedChest.PackMutation),Weather=Weather.Key(savedChest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(savedChest.WeatherCheckedEvent),
                 SeedScale = PackRules.SanitizeSeedScale(savedChest.SeedScale),
@@ -1142,6 +1145,7 @@ function PlayerDataService:SerializeSeedRecord(chestRecord)
             PaidRandom=chestRecord.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(chestRecord.RateBoost),
             TestGrant=(chestRecord.Kind=="Pack" and chestRecord.TestGrant==true) or nil, -- R151 (optional; an older server drops it)
             PackShape=savedPackShape(chestRecord), -- R151 (optional chip-bag shape 1-6)
+            GiftLocked=(chestRecord.Kind=="Pack" and chestRecord.GiftLocked==true) or nil, -- R152 (optional; an R151 server drops it)
             BagVariant = PackRules.VariantKey(chestRecord.BagVariant),OddsVersion=chestRecord.OddsVersion,
             PackSize=PackRules.SanitizePackSize(chestRecord.PackSize),PackMutation=PackRules.MutationKey(chestRecord.PackMutation),Weather=Weather.Key(chestRecord.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chestRecord.WeatherCheckedEvent),
             SeedScale = PackRules.SanitizeSeedScale(chestRecord.SeedScale),

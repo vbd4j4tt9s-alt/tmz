@@ -9,6 +9,7 @@ local R={Version=152}
 R.Cap=500
 R.StoreName='VoidGiveaway152';R.StudioStoreName='VoidGiveaway152_Studio' -- (Studio sessions never touch the live key, like the player data's own _Studio store)
 R.Key='Claims';R.Topic='VoidGiveaway152'
+R.MinAccountAgeDays=0 -- 0 = off (the owner decides): above 0, Claim refuses an account younger than this many days (Player.AccountAge). The pack is also GiftLocked (FruitGiftService).
 R.ModelName='VoidGiveaway152';R.Tag='VoidGiveaway152'
 R.Flag='VoidGift152' -- Premium.VoidGift152 = true: this profile has had its pack (an optional field of the saved Premium table: no ProfileVersion change)
 R.Pack={Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',Weather='None'} -- the Void Pack, exactly as the track / Verity know it (VerityConfig.VoidVariant, stage 7)

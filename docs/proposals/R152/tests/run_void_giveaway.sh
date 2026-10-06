@@ -121,7 +121,24 @@ mutate "the cap is 501" $RU "R.Cap=500" "R.Cap=501" server
 mutate "the cap is not checked in the transform" $RU " if v.Count>=(cap or R.Cap)then return nil,'full',v end" "" server
 mutate "a user already listed is counted again" $RU " if v.Users[key]~=nil then return nil,'already',v end" "" server
 mutate "the reservation is not one UpdateAsync" $ST "local ok,err=pcall(function()return store:UpdateAsync(self.Key,transform)end)" "local ok,err=pcall(function()local cur=store:GetAsync(self.Key);local v=transform(cur);if v then store:UpdateAsync(self.Key,function()return v end)end end)" server
-mutate "a pack is given when the store failed" $SV "if not ok then self:_say(player,'⚠ Could not reach the giveaway. Try again in a moment.');return false,'store'end" "if not ok then outcome,value='new',Rules.Clean(nil)end" server
+mutate "a pack is given when the store failed" $SV "  if not ok then
+   if outcome~='backoff'then" "  if not ok then outcome,value='new',Rules.Clean(nil)end
+  if false then
+   if outcome~='backoff'then" server
+mutate "the giveaway pack is not GiftLocked" $SV ";pack.GiftLocked=true" "" server
+mutate "AddChest drops the lock" ServerScriptService/ChestChaseServer/PlayerDataService.lua "        GiftLocked = chest.GiftLocked == true or nil," "" real
+mutate "a save drops the lock" ServerScriptService/ChestChaseServer/PlayerDataService.lua "            GiftLocked=(chestRecord.Kind==\"Pack\" and chestRecord.GiftLocked==true) or nil," "" real
+mutate "a load drops the lock" ServerScriptService/ChestChaseServer/PlayerDataService.lua "                GiftLocked=(savedChest.Kind==\"Pack\" and savedChest.GiftLocked==true) or nil," "" real
+mutate "Verity drops the lock" ServerScriptService/ChestChaseServer/PlayerDataService.lua "			GiftLocked = pack.GiftLocked == true or nil," "" real
+mutate "the lock is not exactly true" ServerScriptService/ChestChaseServer/PlayerDataService.lua "GiftLocked=(savedChest.Kind==\"Pack\" and savedChest.GiftLocked==true) or nil" "GiftLocked=savedChest.GiftLocked" real
+mutate "the account age rule is never checked" $SV " if not owed and minAge>0 and" " if false and" server
+mutate "the account age rule is on by default" $RU "R.MinAccountAgeDays=0" "R.MinAccountAgeDays=7" server
+mutate "claims ignore the store's backoff" $ST " if self.Mode~='Memory'and self.Clock()<self.NextTryAt then return false,'backoff'" " if false then return false,'backoff'" server
+mutate "the service does not look at the backoff first" $SV " if not owed then local wait=self:_wait(player);if wait>0 then" " if false then local wait=self:_wait(player);if wait>0 then" server
+mutate "no cooldown after a store failure" $SV "self.Cool[player]=self.Clock()+S.StoreCooldown end" "end" server
+mutate "the loop tells the player on every retry" $SV " if not auto or not f.Told then" " if true then" server
+mutate "no backoff after a pack could not be added" $SV "if fail and self.Clock()<fail.Until then return false,'backoff'end" "" server
+mutate "_run is not told it is the loop" $SV "pcall(self._run,self,player,owed,auto)" "pcall(self._run,self,player,owed)" server
 mutate "a full Bag still reserves" $SV " if not self:_room(player)then" " if false then" server
 mutate "no room check at the grant (the Bag can pass the limit)" $SV " if before>=self.Config.MaxSavedChests then return nil,'room'end" "" server
 mutate "the giveaway pack is a TestGrant pack" $SV "pcall(function()return data:AddChest(player,pack)end)" "pcall(function()return data:AddChest(player,pack,{TestGrant=true})end)" server
@@ -191,6 +208,9 @@ mutate "the chime is not played" $CLI " if Audio then pcall(Audio.Play,'GemClaim
 mutate "no spark burst" $CLI "  if fx and not reduced()then pcall(function()fx.Nebula:Emit(16);fx.Stars:Emit(28)end)end" "" client
 mutate "a removed pedestal keeps its pack" $CLI " dropPack(entry);if entry.Gui then entry.Gui:Destroy()end" " if entry.Gui then entry.Gui:Destroy()end" client
 mutate "the sign is built before its anchor exists" $CLI " if entry.SignAnchor and not(entry.Gui and entry.Gui.Parent)then buildSign(entry)end" " if not(entry.Gui and entry.Gui.Parent)then buildSign(entry)end" client
+mutate "tier 2 steps the pack every frame" $CLI "if tierNow>=3 or entry.Owed>=STEP_LOW-.004 then" "if true then" client
+mutate "the 30 Hz step loses the time it skipped" $CLI "local step=entry.Owed;entry.Owed=0" "local step=dt;entry.Owed=0" client
+mutate "the Highlight is on every tier" $CLI "PackFx.Create(r,tierNow,tierNow<3)" "PackFx.Create(r,tierNow)" client
 mutate "the main script starts it unguarded" ServerScriptService/ChestChaseServerMain.server.lua "pcall(function()require(modules.VoidGiveaway152).new(" "(function()require(modules.VoidGiveaway152).new(" wiring
 mutate "voidgift is a per-player command" ServerScriptService/ChestChaseServer/OwnerCommandTargets82.lua "or s:match('^voidgift')~=nil or" "or" wiring
 mutate "a new sound asset" $CLI "local Audio;pcall(" "local SOUND='rbxassetid://1234567';local Audio;pcall(" wiring

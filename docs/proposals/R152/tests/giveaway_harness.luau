@@ -96,7 +96,7 @@ function G.fakeData(config)
   local records=self:GetChestRecords(p);if #records>=config.MaxSavedChests then return nil,'SEED INVENTORY FULL'end
   local n=(p:GetAttribute('ChestInventorySerial')or 0)+1;p:SetAttribute('ChestInventorySerial',n)
   local record={Id=p.UserId..'_'..n,ChestNumber=n,ChestName='Seed Pack',Kind='Pack',Stage=chest.Stage,BagVariant=chest.BagVariant,OddsVersion=chest.OddsVersion or 81,
-   PackSize=chest.PackSize,PackMutation=chest.PackMutation,Weather=chest.Weather,TestGrant=(type(options)=='table'and options.TestGrant==true)or nil}
+   PackSize=chest.PackSize,PackMutation=chest.PackMutation,Weather=chest.Weather,TestGrant=(type(options)=='table'and options.TestGrant==true)or nil,GiftLocked=chest.GiftLocked==true or nil}
   table.insert(records,record)
   if self.ThrowAfterAdd then error('a hook after AddChest exploded')end
   return record

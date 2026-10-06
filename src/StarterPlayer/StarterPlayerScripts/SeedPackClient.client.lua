@@ -53,7 +53,28 @@ local function cinematicOwnsCamera()local c=cinematic();return c~=nil and c.Owns
 local function cinematicRunning()local c=cinematic();return c~=nil and c.Active()~=nil end
 local function reducedMotion()local ok,v=pcall(function()return game:GetService("GuiService").ReducedMotionEnabled end);return ok and v==true end
 local function ownerOf(character)for _,p in ipairs(Players:GetPlayers())do if p.Character==character then return p end end;return nil end
+-- R152 fix: the seed-to-hand whoosh was a child of the seed effect, which ends at RevealDuration while the whoosh is still fading (it was cut at about 75 % volume). One that
+-- is still fading then moves to an anchor of its own (a tail) that outlives the record, follows the same fade (stepTails) and is destroyed once the fade is done.
+local tails={}
+local function handOver(record)
+    local sound,f=record.SlideWhoosh,record.SlideWhooshFlight;record.SlideWhoosh=nil
+    if not(sound and f and sound.Parent)then return end
+    if workspace:GetServerTimeNow()-record.At-f.Peak>.45 then return end -- (its own fade is over: nothing to finish)
+    local root=record.Seed and record.Seed.PrimaryPart
+    local anchor=Instance.new("Part");anchor.Name="Seed flight whoosh";anchor.Size=Vector3.one*.2;anchor.Transparency=1
+    anchor.Anchored=true;anchor.CanCollide=false;anchor.CanTouch=false;anchor.CanQuery=false;anchor.CastShadow=false
+    anchor.CFrame=root and root.CFrame or CFrame.new();anchor.Parent=effects
+    sound.Parent=anchor;tails[#tails+1]={Sound=sound,Flight=f,Anchor=anchor,At=record.At}
+end
+local function stepTails(now)
+    for i=#tails,1,-1 do
+        local tail=tails[i];local a=now-tail.At-tail.Flight.Peak
+        if a>.45 or not tail.Sound.Parent then pcall(function()tail.Sound:Stop()end);tail.Anchor:Destroy();table.remove(tails,i)
+        else tail.Sound.Volume=tail.Flight.Volume*math.clamp(1-(a-.15)/.3,0,1)end
+    end
+end
 local function destroyEffect(record)
+    if record.SlideWhoosh then pcall(handOver,record)end
     if record.CameraState then local saved=record.CameraState;record.CameraState=nil;local camera=workspace.CurrentCamera;if camera==saved.Camera then camera.CameraType=saved.Type;camera.CFrame=saved.Frame;camera.Focus=saved.Focus end end
     if record.SeedMotion then record.SeedMotion:Destroy();record.SeedMotion=nil end
     if record.Flourish then record.Flourish:Destroy();record.Flourish=nil end
@@ -441,6 +462,7 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
     local elapsed=revealAccumulator;revealAccumulator%=Rules.SeedMotion.UpdateInterval
     local now=workspace:GetServerTimeNow()
     updateHeldSeeds(elapsed,now)
+    if #tails>0 then stepTails(now)end
     for _,record in pairs(records) do
         local bag=record.Bag
         if not bag.Parent or not bag.PrimaryPart then continue end
