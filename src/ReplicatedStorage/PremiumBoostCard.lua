@@ -4,7 +4,7 @@
 local RS=game:GetService('ReplicatedStorage')
 local Art=require(RS.PremiumShopArt);local Bright=require(RS.BrightUI);local Catalog=require(RS.MechCatalog)
 local B={};local C=Color3.fromRGB
-B.Copy={Growth={Title='x2 Growth',Detail='Plants grow x2 faster!'},Speed={Title='x2 Speed',Detail='Train x2 speed!'}}
+B.Copy={Growth={Title='x2 Growth',Detail='Plants grow 2x faster!'},Speed={Title='x2 Speed',Detail='Train with 2x speed!'}}
 local function buttons(card,pass)
  Art.Button(card,'GemPerk',Art.Colors.Gem,'Gem');Art.SetCaption(card.GemPerk,tostring(Catalog.PassGemPrices[pass.Key]))
  Art.Button(card,'RobuxPass',Art.Colors.Robux);Art.SetCaption(card.RobuxPass,'Unavailable',false)

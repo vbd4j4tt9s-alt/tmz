@@ -533,7 +533,7 @@ function EconomyService:_sellHarvest(player, harvestId)
 	if not success then return {Success = false, Message = result} end
 	self.PlayerData:QueueGardenSave(player)
  self.Chests:SyncTools(player)
- local state=self:_buildState(player, string.format("SOLD FOR $%d — HOVER OVER CASH TO COLLECT", result))
+ local state=self:_buildState(player, string.format("SOLD FOR $%d! HOVER OVER THE CASH TO GRAB IT", result))
  state.SaleAmount=result -- Proceeds stay in PendingSales until each cash icon is claimed.
  return state
 end

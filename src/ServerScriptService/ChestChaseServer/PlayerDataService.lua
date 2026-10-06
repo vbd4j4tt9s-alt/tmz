@@ -1830,23 +1830,23 @@ function PlayerDataService:CopyTreadmillData(player)
     return {Tier=d.Tier,Skin=d.Skin,Cleared=cleared}
 end
 function PlayerDataService:BuyTreadmill(player,expectedTier)
-    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Your save is not ready.'end
+    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Ur save isn\'t ready yet!'end
     local d=self:GetTreadmillData(player)
-    if expectedTier~=d.Tier+1 then return false,'The upgrade changed. Try again.'end
+    if expectedTier~=d.Tier+1 then return false,'The upgrade changed! Try again.'end
     local nextTier=self.Config.TreadmillTiers[expectedTier]
     if not nextTier then return false,'Fully upgraded!'end
-    if not self:SpendCash(player,nextTier.Cost)then return false,'Not enough coins.'end
+    if not self:SpendCash(player,nextTier.Cost)then return false,'Not enough cash!'end
     -- Spend and level change do not yield; duplicate clicks cannot buy this level twice.
     d.Tier=expectedTier;d.Skin=expectedTier;self:PublishTreadmillData(player)
     self:MarkDirty(player);self:QueueGardenSave(player)
     return true,'Upgraded to '..nextTier.Name..'!'
 end
 function PlayerDataService:SelectTreadmillSkin(player,tier)
-    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Your save is not ready.'end
+    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Ur save isn\'t ready yet!'end
     local d=self:GetTreadmillData(player)
-    if type(tier)~='number'or tier~=math.floor(tier)or tier<1 or tier>d.Tier then return false,'That style is locked.'end
+    if type(tier)~='number'or tier~=math.floor(tier)or tier<1 or tier>d.Tier then return false,'That style is still locked!'end
     d.Skin=tier;self:PublishTreadmillData(player);self:MarkDirty(player);self:QueueGardenSave(player)
-    return true,'Style changed; your training power stays the same.'
+    return true,'Style changed! Ur training power stays the same.'
 end
 
 require(script.Parent.GardenFenceData).Install(PlayerDataService)

@@ -25,45 +25,45 @@ function S:Save(p,reason)
 end
 function S:PriceLevelAllowed(from,to)
  local okay,rows=pcall(Market.GetUsersPriceLevelsAsync,Market,{from.UserId,to.UserId})
- if not okay or type(rows)~='table'then return false,'Gift pricing is unavailable. Try again shortly.'end
+ if not okay or type(rows)~='table'then return false,'Can\'t get the gift price right now. Try again soon!'end
  local levels={};local n=0
  for _,row in pairs(rows)do
   n+=1
   if n>2 or type(row)~='table'or(row.UserId~=from.UserId and row.UserId~=to.UserId)
    or levels[row.UserId]~=nil or type(row.PriceLevel)~='number'or row.PriceLevel~=row.PriceLevel or row.PriceLevel<1 or row.PriceLevel>1000 then
-   return false,'Gift pricing is unavailable. Try again shortly.'
+   return false,'Can\'t get the gift price right now. Try again soon!'
   end
   levels[row.UserId]=row.PriceLevel
  end
- if levels[from.UserId]==nil or levels[to.UserId]==nil then return false,'Gift pricing is unavailable. Try again shortly.'end
- if levels[from.UserId]<levels[to.UserId]then return false,'Regional pricing does not allow this gift.'end
+ if levels[from.UserId]==nil or levels[to.UserId]==nil then return false,'Can\'t get the gift price right now. Try again soon!'end
+ if levels[from.UserId]<levels[to.UserId]then return false,'This gift isn\'t allowed in their country.'end
  return true
 end
 function S:Send(from,key,userId,payment)
- if not Catalog.Pass(key)or type(userId)~='number'or userId~=userId or userId%1~=0 or userId<=0 or userId>=9007199254740991 then return false,'Choose a player.'end
+ if not Catalog.Pass(key)or type(userId)~='number'or userId~=userId or userId%1~=0 or userId<=0 or userId>=9007199254740991 then return false,'Pick a player first!'end
  local to=Players:GetPlayerByUserId(userId)
- if to==from or not self:Ready(from)or not self:Ready(to)or self.Busy[from]or self.Working[from]then return false,'Player unavailable.'end
- if payment~='Gems'and payment~='Credit'then return false,'Choose Gems or Robux.'end
+ if to==from or not self:Ready(from)or not self:Ready(to)or self.Busy[from]or self.Working[from]then return false,'That player isn\'t here.'end
+ if payment~='Gems'and payment~='Credit'then return false,'Pick Gems or Robux!'end
  self.Busy[from]=true
  local okay,success,message=pcall(function()
   local allowed,reason=self:PriceLevelAllowed(from,to)
   if not allowed then return false,reason end
-  if not self:Ready(from)or not self:Ready(to)then return false,'Player unavailable.'end
+  if not self:Ready(from)or not self:Ready(to)then return false,'That player isn\'t here.'end
   local owned=self:Owns(to,key)
-  if owned==nil then return false,'Try again shortly.'end
-  if owned then return false,'They already own this pass.'end
-  if not self:Ready(from)or not self:Ready(to)then return false,'Player unavailable.'end
+  if owned==nil then return false,'Try again soon!'end
+  if owned then return false,'They already have this pass!'end
+  if not self:Ready(from)or not self:Ready(to)then return false,'That player isn\'t here.'end
   local state=self.Data:GetPremium(from)
-  if count(state.PassOutbox)>=Catalog.MaxOutbox then return false,'Pending gifts are still saving.'end
-  for _,v in pairs(state.PassOutbox)do if v.RecipientId==userId and v.PassKey==key then return false,'This gift is already pending.'end end
+  if count(state.PassOutbox)>=Catalog.MaxOutbox then return false,'Ur other gifts are still saving.'end
+  for _,v in pairs(state.PassOutbox)do if v.RecipientId==userId and v.PassKey==key then return false,'This gift is already on its way!'end end
   local price=Mech.PassGemPrices[key]
-  if payment=='Gems'and state.Gems<price then return false,'Not enough Gems.'end
-  if payment=='Credit'and(state.GiftCredits[key]or 0)<1 then return false,'No purchased gift ready.'end
+  if payment=='Gems'and state.Gems<price then return false,'Not enough Gems!'end
+  if payment=='Credit'and(state.GiftCredits[key]or 0)<1 then return false,'No gift is ready to send.'end
   local id=Http:GenerateGUID(false)
   -- This debit and outbox insertion cannot yield or be separated by another request.
   if payment=='Gems'then state.Gems-=price else state.GiftCredits[key]-=1 end
   state.PassOutbox[id]={RecipientId=userId,PassKey=key,State='Pending'};self.Data:MarkDirty(from);self.Data:PublishPremium(from)
-  if not self:Save(from,'PassGiftDebit')then return true,'Gift pending. Delivery retries automatically.'end
+  if not self:Save(from,'PassGiftDebit')then return true,'Gift on its way! It retries by itself.'end
   -- The saved debit authorizes this inbox write even if either player disconnects.
   -- Keep Busy set through bounded retries so acknowledgement cannot race a retry.
   for attempt=1,3 do
@@ -71,11 +71,11 @@ function S:Send(from,key,userId,payment)
    if box and box[id]then return true,'Gift sent to '..to.DisplayName..'.'end
    if attempt<3 then task.wait(attempt)end
   end
-  return true,'Gift pending. Delivery retries automatically.'
+  return true,'Gift on its way! It retries by itself.'
  end)
  self.Busy[from]=nil
  if okay and success then task.spawn(function()self:Recover(from);self:Recover(to)end)end
- return okay and success==true,okay and message or'Gift pending. Please try again shortly.'
+ return okay and success==true,okay and message or'Gift on its way! Try again soon.'
 end
 function S:ChangeInbox(userId,change)
  local okay,result=pcall(self.Store.UpdateAsync,self.Store,tostring(userId),function(old)

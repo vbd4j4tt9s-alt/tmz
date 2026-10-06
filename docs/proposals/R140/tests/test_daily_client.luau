@@ -31,9 +31,9 @@ function request.InvokeServer(_,action,value)
  if value=='State'then return stateNow()end
  if value=='ClaimLogin'then
   if not srv.Ready then local s=stateNow();s.Success=false;s.Message='COME BACK TOMORROW';return s end
-  srv.Step+=1;srv.Ready=false;local s=stateNow();s.Message='Collect your Gems.';return s
+  srv.Step+=1;srv.Ready=false;local s=stateNow();s.Message='Grab ur Gems!';return s
  end
- if type(value)=='table'then local q=srv.Quests[value.Quest];if q and q.Progress>=q.Goal and not q.Claimed then q.Claimed=true;local s=stateNow();s.Message='Collect your Gems.';return s end end
+ if type(value)=='table'then local q=srv.Quests[value.Quest];if q and q.Progress>=q.Goal and not q.Claimed then q.Claimed=true;local s=stateNow();s.Message='Grab ur Gems!';return s end end
  local s=stateNow();s.Success=false;s.Message='NO';return s
 end
 -- Roblox services the script uses.
@@ -119,7 +119,7 @@ check(calls[#calls][1]=='Daily'and calls[#calls][2]=='ClaimLogin','claiming asks
 check(audioHas('GemClaim')and not audioHas('Denied'),'R150: a successful claim clicks GemClaim and never Denied')
 check(cards[1].Check.Visible and not cards[1].Today.Visible,'day 1 gets a ✓')
 check(login.ClaimButton.Caption.Text:find('NEXT REWARD IN 5h',1,true),'then the button counts down: '..login.ClaimButton.Caption.Text)
-check(panel.Status.Text=='Collect your Gems.','the server message shows')
+check(panel.Status.Text=='Grab ur Gems!','the server message shows')
 -- Day 7 wording.
 srv.Step=6;srv.Ready=true;panel.QuestsTab.Activated:Fire();panel.LoginTab.Activated:Fire();player:SetAttribute('DailyRevision',5);frames(5)
 check(login.ClaimButton.Caption.Text:find('MECH PACK',1,true)and cards[7].Today.Visible,'day 7: CLAIM YOUR MECH PACK!')

@@ -419,7 +419,7 @@ renderCurrentTab = function()
  if itemMode then
   shopMenu:Hide();title.Text='Market'
   if renderHarvests then renderHarvests()end
-  setStatus(currentState and not currentState.CanSell and'Visit the market to sell your crops.'or'',false)
+  setStatus(currentState and not currentState.CanSell and'Go to the market to sell ur crops!'or'',false)
  else
   if harvestMenu then harvestMenu:Hide()end
   title.Text='Market';shopMenu:Show(currentState,currentTab);setStatus('',false)

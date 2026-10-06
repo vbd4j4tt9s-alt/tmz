@@ -11,7 +11,7 @@ local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=W.
 local catalog=R.new('Folder');catalog.Name='SeedCatalog';catalog.Parent=remotes
 local req=R.new('RemoteFunction');req.Name='PremiumRequest';req.Parent=remotes
 local calls={};local refuse=false
-function req.InvokeServer(_,action,value)calls[#calls+1]={action,value};if refuse then return {Success=false,Message='TRY AGAIN IN A MOMENT'}end;return {Success=true,Message='Claimed!'}end
+function req.InvokeServer(_,action,value)calls[#calls+1]={action,value};if refuse then return {Success=false,Message='TRY AGAIN IN A SEC!'}end;return {Success=true,Message='Claimed!'}end
 local Rules=W.module('SeedPackRules')
 local config={SeedCatalogByStage=Rules.BuildSeedCatalog()}
 local index=0;local expectOdds={}

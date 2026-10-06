@@ -23,10 +23,10 @@ function D.Create(parent,player,act,stateFor,infoFor,productInfoFor)
  local function send(payment)
   if not self.Pass or not self.Selected then return end
   if self.Mode=='Product'then
-   act('GiftProduct',{Key=self.Pass.Key,RecipientId=self.Selected},function(result)if result and result.Success then self:Close()else feedback.Text=result and result.Message or'Please try again.'end end)
+   act('GiftProduct',{Key=self.Pass.Key,RecipientId=self.Selected},function(result)if result and result.Success then self:Close()else feedback.Text=result and result.Message or'Try again in a sec!'end end)
    return
   end
-  act('GiftPass',{Key=self.Pass.Key,RecipientId=self.Selected,Payment=payment},function(result)if result and result.Success then self:Close()else feedback.Text=result and result.Message or'Please try again.'end end)
+  act('GiftPass',{Key=self.Pass.Key,RecipientId=self.Selected,Payment=payment},function(result)if result and result.Success then self:Close()else feedback.Text=result and result.Message or'Try again in a sec!'end end)
  end
  function self:Refresh()
   if not panel.Visible or not self.Pass then return end
@@ -59,7 +59,7 @@ function D.Create(parent,player,act,stateFor,infoFor,productInfoFor)
    b.Activated:Connect(function()self.Selected=p.UserId;self.Pending=nil;feedback.Text='';recipients();self:Refresh()end)
   end end
   list.CanvasSize=UDim2.fromOffset(0,n*52)
-  if n==0 then local t=Instance.new('TextLabel');t.Text='No other players here';t.Size=UDim2.new(1,0,0,50);t.BackgroundTransparency=1;t.ZIndex=23;Bright.Text(t,18);t.Parent=list end
+  if n==0 then local t=Instance.new('TextLabel');t.Text='No one else is here';t.Size=UDim2.new(1,0,0,50);t.BackgroundTransparency=1;t.ZIndex=23;Bright.Text(t,18);t.Parent=list end
  end
  function self:OpenProduct(item)self.Mode='Product';feedback.Text='';self.Pass=item;self.Selected=nil;self.Pending=nil;title.Text='Gift '..item.Name;if not panel.Visible then click('MenuClick')end;veil.Visible=true;panel.Visible=true;recipients();self:Refresh()end
  function self:Open(pass)self.Mode='Pass';feedback.Text='';self.Pass=pass;self.Selected=nil;self.Pending=nil;title.Text='Gift '..pass.Name;if not panel.Visible then click('MenuClick')end;veil.Visible=true;panel.Visible=true;recipients();self:Refresh()end
@@ -72,14 +72,14 @@ function D.Create(parent,player,act,stateFor,infoFor,productInfoFor)
   if self.Mode=='Product'then
    if((stateFor().ProductGiftCredits or{})[key]or 0)>0 then send('Credit');return end
    act('RobuxProductGift',{Key=key,RecipientId=userId},function(result)
-    if panel.Visible then feedback.Text=result and result.Success and'Finish the purchase; the gift is sent automatically.'or result and result.Message or'Please try again.'end
+    if panel.Visible then feedback.Text=result and result.Success and'Finish buying it and the gift goes out by itself!'or result and result.Message or'Try again in a sec!'end
    end)
    return
   end
   local credit=(stateFor().GiftCredits or{})[key]or 0
   if credit>0 then send('Credit');return end
   act('RobuxGift',key,function(result)
-   if result and result.Success and panel.Visible and self.Pass.Key==key and self.Selected==userId then self.Pending={Key=key,UserId=userId,Before=credit};self:Refresh()elseif panel.Visible then feedback.Text=result and result.Message or'Please try again.'end
+   if result and result.Success and panel.Visible and self.Pass.Key==key and self.Selected==userId then self.Pending={Key=key,UserId=userId,Before=credit};self:Refresh()elseif panel.Visible then feedback.Text=result and result.Message or'Try again in a sec!'end
   end)
  end)
  local added=Players.PlayerAdded:Connect(function()if panel.Visible then recipients()end end)

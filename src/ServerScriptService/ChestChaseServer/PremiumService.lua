@@ -39,8 +39,8 @@ function Service.new(data,chests,passes)
  local remote=Instance.new('RemoteFunction');remote.Name='PremiumRequest';remote.Parent=RS:WaitForChild('ChestChaseRemotes')
  local self=setmetatable({Data=data,Chests=chests,Passes=passes,Last={},Busy={},Unannounced={},Announcer=announcer(data),Product=nil,PackProducts={},Products={},GiftProducts={},Gifts=require(script.Parent.PassGiftService).new(data,passes),Remote=remote},Service)
  remote.OnServerInvoke=function(p,action,value)
-  if not Gate.Allow(p,'PremiumRequest',action,value)then return {Success=false,Message='Please wait.'}end
-  if not data:IsLoaded(p)then return {Success=false,Message='YOUR DATA IS LOADING'}end
+  if not Gate.Allow(p,'PremiumRequest',action,value)then return {Success=false,Message='Wait a sec!'}end
+  if not data:IsLoaded(p)then return {Success=false,Message='HOLD ON, UR DATA IS LOADING!'}end
   if action=='Tutorial'then
    self.Last[p]=self.Last[p]or{};local now=os.clock()
    if now-(self.Last[p].Tutorial or-10)<.2 then return {Success=false}end;self.Last[p].Tutorial=now
@@ -59,7 +59,7 @@ function Service.new(data,chests,passes)
   -- R140: the DAILY panel: value 'State', 'ClaimLogin' or {Quest=index}. Claims need a profile that can save.
   if action=='Daily'then
    self.Last[p]=self.Last[p]or{};local now=os.clock()
-   if now-(self.Last[p].Daily or-10)<.3 then return {Success=false,Message='TRY AGAIN IN A MOMENT'}end;self.Last[p].Daily=now
+   if now-(self.Last[p].Daily or-10)<.3 then return {Success=false,Message='TRY AGAIN IN A SEC!'}end;self.Last[p].Daily=now
    if value=='State'then return data:DailyState(p)end
    if not data.CanSave[p]then local state=data:DailyState(p);state.Success=false;state.Message='NO REWARDS UNTIL UR DATA CAN SAVE';return state end
    local okay,message
@@ -67,20 +67,20 @@ function Service.new(data,chests,passes)
     okay,message=data:ClaimDailyLogin(p)
     if okay then pcall(function()chests:SyncTools(p)end)end -- day 7: the Mech pack lands in the hotbar
    elseif type(value)=='table'then okay,message=data:ClaimDailyQuest(p,value.Quest)
-   else okay,message=false,'UNKNOWN ACTION'end
+   else okay,message=false,'TRY AGAIN!'end
    local state=data:DailyState(p);state.Success=okay==true;state.Message=message;return state
   end
   if action=='SettingsState'or action=='SetSetting'then
    local config=require(RS.SettingsConfig);local state=data:GetPremium(p);state.Settings=config.Read(state.Settings)
    if action=='SettingsState'then return {Success=true,Settings=state.Settings}end
-   if type(value)~='table'or not config.Valid(value.Key,value.Value)then return {Success=false,Message='Invalid setting.'}end
+   if type(value)~='table'or not config.Valid(value.Key,value.Value)then return {Success=false,Message='That setting didn\'t work.'}end
    self.Last[p]=self.Last[p]or{};local now=os.clock()
-   if now-(self.Last[p].Settings or-10)<.12 then return {Success=false,Message='Please try again.'}end
+   if now-(self.Last[p].Settings or-10)<.12 then return {Success=false,Message='Try again in a sec!'}end
    self.Last[p].Settings=now;state.Settings[value.Key]=value.Value;data:MarkDirty(p);data:QueueGardenSave(p)
    return {Success=true}
   end
   local now=os.clock();local key=action=='State'and'State'or'Action';self.Last[p]=self.Last[p]or{}
-  if now-(self.Last[p][key]or-10)<(key=='State'and .35 or .65)then return {Success=false,Message='TRY AGAIN IN A MOMENT'}end
+  if now-(self.Last[p][key]or-10)<(key=='State'and .35 or .65)then return {Success=false,Message='TRY AGAIN IN A SEC!'}end
   self.Last[p][key]=now
   if action=='State'then
    data:RefreshBiomeRewards(p)
@@ -90,9 +90,9 @@ function Service.new(data,chests,passes)
    end
    return self:State(p)
   end
-  if not data.CanSave[p]then return {Success=false,Message='PURCHASES ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE'}end
+  if not data.CanSave[p]then return {Success=false,Message='NO PURCHASES UNTIL UR DATA CAN SAVE'}end
   if(action=='RobuxBundle'or action=='RobuxGift'or action=='RobuxPack')and not receiptSpace(data:GetPremium(p))then
-   local state=self:State(p);state.Success=false;state.Message='ROBUX PURCHASES ARE UNAVAILABLE FOR THIS SAVE';return state
+   local state=self:State(p);state.Success=false;state.Message='ROBUX PURCHASES AREN\'T ON FOR THIS SAVE';return state
   end
   local okay,message
   if action=='ClaimSeed'then okay,message=data:ClaimIndexSeed(p,value)
@@ -105,25 +105,25 @@ function Service.new(data,chests,passes)
    local row=Pricing.Find(value);local info=row and self.Products[row.Key];local id=row and Pricing.ProductId(row)or 0
    local route,routed=Routing.Resolve(id)
    if row and route=='Bundle'and routed==row.Key and info and info.IsForSale~=false and data:CanReceiveBundle(p,row.Key)then
-    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Purchase could not open.'or nil -- R148: the opened prompt needs no status line
-   else okay=false;message='THIS PURCHASE IS UNAVAILABLE'end
+    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Couldn\'t open the purchase. Try again!'or nil -- R148: the opened prompt needs no status line
+   else okay=false;message='CAN\'T BUY THIS RIGHT NOW'end
   elseif action=='GiftPass'then
-   if type(value)=='table'then okay,message=self.Gifts:Send(p,value.Key,value.RecipientId,value.Payment)else okay=false;message='Choose a gift.'end
+   if type(value)=='table'then okay,message=self.Gifts:Send(p,value.Key,value.RecipientId,value.Payment)else okay=false;message='Pick a gift first!'end
   elseif action=='RobuxGift'then
    local pass=type(value)=='string'and Gifts.Pass(value);local info=pass and self.GiftProducts[value];local id=pass and Gifts.ProductId(value)or 0
    local route,routed=Routing.Resolve(id);local credits=data:GetPremium(p).GiftCredits
    if pass and route=='Gift'and routed==value and info and info.IsForSale~=false and(credits[value]or 0)<Gifts.MaxCredits then
-    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Purchase could not open.'or nil -- R148: the opened prompt needs no status line
-   else okay=false;message='THIS GIFT PURCHASE IS UNAVAILABLE'end
+    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Couldn\'t open the purchase. Try again!'or nil -- R148: the opened prompt needs no status line
+   else okay=false;message='CAN\'T GIFT THIS RIGHT NOW'end
   elseif action=='BuyPerk'then okay,message=data:BuyGemPerk(p,value);if okay then task.spawn(function()passes:Refresh(p)end)end
   elseif action=='RobuxPack'then
    local offer=Catalog.Offer(value);local count=offer and offer.Count
    local entry=count and self:State(p).PackOffers[tostring(count)]
    local id=Catalog.ProductId(value);local route,routed=Routing.Resolve(id)
    if entry and entry.RobuxAvailable and route=='Mech'and routed==count and data:CanReceiveMechPacks(p,count)then
-    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Purchase could not open.'or nil -- R148: the opened prompt needs no status line
-   else okay=false;message='THIS PURCHASE IS UNAVAILABLE'end
-  else okay=false;message='UNKNOWN ACTION'end
+    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Couldn\'t open the purchase. Try again!'or nil -- R148: the opened prompt needs no status line
+   else okay=false;message='CAN\'T BUY THIS RIGHT NOW'end
+  else okay=false;message='TRY AGAIN!'end
   -- R148: a gem purchase that went through gets the notice, chime and sparkles; their confirmation line is then redundant
   -- (the "Collect your Gems / Cash." hints stay: they tell the buyer what to do next).
   if okay==true then
