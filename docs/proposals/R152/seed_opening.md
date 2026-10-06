@@ -167,12 +167,21 @@ From `tools/print_timelines.luau`. Calm (ReducedMotion) and in-place versions us
 | `test_seed_fx` | 571 checks, 0 fails. Images (size, deterministic, see-through, seamless tiles, sliced, none on low quality); stages with and without images (budgets, fallbacks); every beam / emitter / light / image anchored to its subject (halo behind the seed, burst at the pack, carry beam on the pack, crown beam on the throne, sky beam at a walking puller's feet); beam slam, landing frame, impact, tiers, Destroy; clean-up on skip / close / second pack; smoothness at 30 and 60 fps (no pop, no kink, same picture); particle and layer budgets |
 | `test_seed_stress` | 3617 checks, 0 fails. The real `SeedPackClient` + `PackOpeningFeedback`. Slow join: the reveal starts before the scripts and still plays. Then 240 random openings: every tier; all 54 + Mech + Verity seeds (184 not in the published art); every pack variant, shape and giant size; desktop / phone / low quality; ReducedMotion; onlookers; 37 fast second packs; 17 deaths + respawns; 19 tools put away; 32 injected errors (card, stage, beam, suspense, flourish, sound engine). Every opening produced its reveal and ended clean; nothing leaked |
 
+**Review fixes (two independent bug reviews, after the first hand-over).** Each has a regression test in the suite named:
+
+* **Images never shown are never drawn** (`test_seed_fx`): `RarePullScenes.Build` asks for its images only when `Art.Allowed()` (not on tier 1 / FastMode); the drawing worker waits while `RarePullRules.RevealRunning` is true (mid-image too) and goes on when the reveal ends; its slice is 4 ms, **2 ms on tier 2** (`Art.Slice()`).
+* **A lighter warm-up** (`test_seed_fx`): 15 s after joining, and only when no reveal is running (it asks again every 5 s), the client draws just the planets and the seed's halo (`Art.WarmOrder`: glow, halo, three planets); the nebulas, star map, runes and the palace art are drawn the first time a scene asks for them (the next story scene finds them).
+* **The voice cap cannot cut the climax** (`test_seed_sync`, a mock whose `IsPlaying` turns true a frame after `Play()`): a voice counts as sounding while `EndsAt` is ahead and it is playing **or started within `A.PlayLag` (0.1 s)**; before, the King's four same-frame hits stopped each other.
+* **The seed's whoosh into the hand is not cut** (`test_seed_stress`): it was a child of the seed effect, destroyed at `RevealDuration` while still fading (cut at ~75 %). A whoosh still fading then moves to an anchor part of its own, follows the same fade, and is destroyed after it.
+* The giveaway pack and the hub showcase (`test_giveaway_client`, R151 `test_hub_client`): see `void_giveaway.md` and `hub_displays.md`.
+* The seed suites now run: `run_seed_opening.sh`'s model-name check matched `.claude` in a path (it now matches real model names only), and `tools/tests/run_all_suites.sh` runs the four suites (`only`).
+
 Also run green: R151 `run_rare_pull.sh` (its world test now checks the beam), R136 (its reveal test now checks the Legendary / Mythic beam), R150 `run_sfx.sh` (incl. pack tests), R138, R151
 `run_announce.sh`, R147 Verity UI, R149 Verity pack, and the full runner `tools/tests/run_all_suites.sh` (64 suites: 63 passed on the first pass; R136 still checked the old 7-stud pillar part, its test now checks the beam, 24 checks, 0 fails).
 
 ## 8. Check in Studio (needs eyes / ears)
 
-* **EditableImage live.** Images draw ~15 s after joining. Planets should be textured; Output should have no `[RarePullArt]` failure.
+* **EditableImage live.** The planets and the seed's halo draw ~15 s after joining (when no reveal is running); the other images the first time a story scene asks for them. Planets should be textured; Output should have no `[RarePullArt]` failure.
   If EditableImage is unavailable for the experience, everything falls back to the dressed parts.
 * **Beams in daylight and at night.** Widths (world beam 3.2 / 3.4 / 3.6 studs), the King's beam `Strength` (.8 / .6), rings on sloped
   terrain (the ring part sits 0.05 above the ground at the feet).
