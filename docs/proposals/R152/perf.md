@@ -9,9 +9,13 @@ is still line 1 of every client script.
 
 ## How it was checked
 
-`docs/proposals/R152/tests/run_perf152.sh` (in `tools/tests/run_all_suites.sh`) builds the candidate (`git archive 1e7dced`) and this checkout side by
-side on the Roblox mock with the real scripts, and fingerprints both: every instance that is drawn, with every property the scripts gave it (class, name,
-CFrame / Size to 1e-4, colour, material, transparency, reflectance, mesh / texture ids, emitter / beam / light values, GUI text / size / position / ZIndex,
+`docs/proposals/R152/tests/run_perf152.sh` builds two sides on the Roblox mock with the real scripts and fingerprints both. For this patch's verdict
+(`PERF_BASE=1e7dced`) the two sides are the candidate (`git archive 1e7dced`) and this checkout. In `tools/tests/run_all_suites.sh` it runs without
+`PERF_BASE`: this checkout against the same checkout with the patch switched off (`perf152_off.py` swaps `PropCache152` / `ViewCull152` for
+pass-throughs and undoes every inline guard), so texts reworded later, the rebuilt tutorial or anything else that lands after R152 is on both sides and
+only the patch is compared; if a guarded line is edited later, `perf152_off.py` stops and names it.
+
+Each fingerprint holds every instance that is drawn, with every property the scripts gave it (class, name, CFrame / Size to 1e-4, colour, material, transparency, reflectance, mesh / texture ids, emitter / beam / light values, GUI text / size / position / ZIndex,
 sounds with ids, volumes and their play schedule). `perf152_canon.py` compares the two exactly (siblings in any order). Both sides run on the same mock
 (which, for these runs, compares CFrames by value as Roblox does). Covered:
 
@@ -132,4 +136,5 @@ Not changed (identical fingerprints: hotbar 119 frames, popups 300 frames per ti
 ## Run it
 
 `sh docs/proposals/R152/tests/run_perf152.sh [scratch dir] [place.rbxl]` (about half an hour on 4 cores; `ONLY=hub,kb,keepers,seed,hotbar,popups,packs`
-for a part; `PERF_BASE` for another base). `PERF_WHERE=true` in front of a seed / keeper driver lists which line wrote a repeated value.
+for a part). `PERF_BASE=1e7dced sh ...` gives this page's verdict and numbers (against the candidate); without it, the patch on against the patch off
+(the numbers are then "patch off -> on"). `PERF_WHERE=true` in front of a seed / keeper driver lists which line wrote a repeated value.

@@ -1,9 +1,14 @@
 #!/bin/sh
 # Usage: sh run_perf152.sh [scratch dir] [place.rbxl]
 # R152 performance patch (owner: "do a performance patch after everything is done make sure performance patch doesn't change look and feel or unexpectedly
-# revert the change that u did"). The look / sound fingerprints of the R152 candidate (PERF_BASE, default 1e7dced, taken with git archive) against this
-# checkout, on the Roblox mock (/opt/luau/luau) with the REAL scripts of each side (docs/proposals/R152/perf.md):
-#  0. static   - every client script starts with the R152 load guard (line 1), Config.Version unchanged, every changed script compiles, no model names
+# revert the change that u did"). The look / sound fingerprints of two sides on the Roblox mock (/opt/luau/luau) with the REAL scripts of each side
+# (docs/proposals/R152/perf.md):
+#  * default: this checkout against THE SAME checkout with the patch switched off (perf152_off.py: PropCache152 / ViewCull152 replaced by pass-throughs,
+#    every inline guard of the patch undone). Texts reworded later, a rebuilt tutorial or anything else that lands after R152 is on both sides, so only
+#    the patch is compared. If the patch's guarded lines are edited, perf152_off.py stops the run and names them.
+#  * PERF_BASE=<commit> (the patch's own verdict: PERF_BASE=1e7dced, the R152 candidate): that commit (git archive) against this checkout, with the
+#    candidate's static rules (the load guard where the candidate has it, Config.Version unchanged)
+#  0. static   - every changed script compiles, no model names in the perf files, the two helpers' unit checks (+ the PERF_BASE rules above)
 #  1. hub      - perf152_world.luau MODE=hub on the owner's place (every start-up builder, the hub decor, the market and the Fruit of the Hour pedestal, the
 #                treadmills, the two displays empty / with champions, the Void giveaway pedestal + its client, HubLife151 per tier 1 / 2 / 3): the whole world
 #                once, then the moving parts every 4 frames from 7 camera poses (the displays' items are left out while they are provably off screen)
@@ -19,12 +24,14 @@
 # Without the place file the hub and keyboard parts are skipped.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
-OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.claude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};BASE=${PERF_BASE:-1e7dced}
+OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.claude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};BASE=${PERF_BASE:-}
 JOBS=${JOBS:-4}
 mkdir -p "$OUT"
 T=$REPO/tools/tests;P=$REPO/docs/proposals;INV=$P/inventory_R113/tests;S=$REPO/src;SP=$S/StarterPlayer/StarterPlayerScripts
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
 echo "== 0. static"
+if [ -n "$BASE" ];then
+echo "(base: $BASE)"
 # (the load guard stays where the candidate has it: line 1 of the client scripts; Hotbar hides Roblox's backpack on line 1 and waits on line 2)
 bad=0;n=0;for f in "$SP"/*.client.lua;do
  rel=src/StarterPlayer/StarterPlayerScripts/$(basename "$f")
@@ -38,10 +45,16 @@ grep 'Config.Version' "$S/ServerScriptService/ChestChaseServer/Config.lua" > "$O
 cmp -s "$OUT/version_base.txt" "$OUT/version_now.txt" && echo "ok: Config.Version unchanged" || fail "Config.Version changed"
 bad=0;for f in $(git -C "$REPO" diff --name-only "$BASE" -- src | grep '\.lua$');do [ -f "$REPO/$f" ] || continue;/opt/luau/luau-compile --null "$REPO/$f" >/dev/null 2>&1 || { echo "does not compile: $f";bad=1; };done
 [ "$bad" = 0 ] && echo "ok: every script changed since $BASE compiles ($(git -C "$REPO" diff --name-only "$BASE" -- src | grep -c '\.lua$') files)" || fail "compile"
+else
+echo "(base: this checkout with the performance patch switched off, perf152_off.py)"
+bad=0;n=0;for f in $(find "$S" -name '*.lua');do n=$((n+1));/opt/luau/luau-compile --null "$f" >/dev/null 2>&1 || { echo "does not compile: $f";bad=1; };done
+[ "$bad" = 0 ] && echo "ok: every script compiles ($n files)" || fail "compile"
+fi
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]|gp[t]-?[0-9]" "$HERE"/perf152_* "$HERE/run_perf152.sh" "$P/R152/perf.md" 2>/dev/null;then fail "a model name in the perf files";else echo "ok: no model names in the perf files";fi
 # the two sides --------------------------------------------------------------------------------------------------------------------------------------
 rm -rf "$OUT/base_src";mkdir -p "$OUT/base_src"
-git -C "$REPO" archive "$BASE" src | tar -x -C "$OUT/base_src"
+if [ -n "$BASE" ];then git -C "$REPO" archive "$BASE" src | tar -x -C "$OUT/base_src"
+elif ! python3 "$HERE/perf152_off.py" "$S" "$OUT/base_src/src";then fail "perf152_off.py could not switch the patch off";exit 1;fi
 HAVE_PLACE=0;[ -f "$PLACE" ] && HAVE_PLACE=1
 [ "$HAVE_PLACE" = 1 ] && python3 "$P/R149/tools/rbxl_geom.py" --tree "$PLACE" "$OUT/place_tree.luau" Workspace/ChestChaseMap >/dev/null
 prepare() { # $1 = side dir, $2 = src
@@ -123,5 +136,5 @@ else fail "packs differ";head -30 "$OUT/cmp_packs.txt";fi
 fi
 echo "== numbers (before -> after)"
 python3 "$HERE/perf152_report.py" "$OUT/base" "$OUT/now" || true
-[ "$RC" = 0 ] && echo "R152 perf: all checks passed - the look and the sound are identical (allowed differences listed above)"
+[ "$RC" = 0 ] && echo "R152 perf: all checks passed - the look and the sound are identical (allowed differences listed above; base: ${BASE:-the patch switched off})"
 exit $RC
