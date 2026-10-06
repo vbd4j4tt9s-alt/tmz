@@ -79,6 +79,14 @@ local row;for _,r in ipairs(saved.Seeds or{})do if r.RateBoost then row=r end en
 check(row and row.RateBoost==2 and saved.Premium and saved.Premium.StarterPack==true,'the boost and the "given" flag are saved')
 local back=Data:_decodeSavedSeedRecord(A,row,1);check(back.RateBoost==2,'and load back')
 local forged=Data:_decodeSavedSeedRecord(A,{Id='x',Kind='Pack',Stage=1,BagVariant='Pack01',RateBoost=1000,ChestNumber=5},5);check(forged.RateBoost==nil,'a forged boost in a save is dropped')
+-- R152: a returning player (a save from before the tutorial existed) skips it: done, no step, and no free pack.
+do local old=Data:_buildSaveData(A);old.Premium=old.Premium or{};old.Premium.Tutorial=nil;old.Premium.StarterPack=nil
+ Data.Store.Data['Player_402']=old
+ local Ben=makePlayer(402,'Ben')
+ check(Ben:GetAttribute('TutorialDone')==true and Ben:GetAttribute('TutorialStep')==0,'a returning player skips the tutorial (done, step 0)')
+ check(Data:GrantStarterPack(Ben)==nil,'and is not given the free pack for it')
+ local Cy=makePlayer(403,'Cy');check(Cy:GetAttribute('TutorialDone')==false and Cy:GetAttribute('TutorialStep')==1,'a brand-new player starts at step 1')
+end
 -- Opening it rolls the 2x odds.
 local legend,total=0,0
 for i=1,4000 do

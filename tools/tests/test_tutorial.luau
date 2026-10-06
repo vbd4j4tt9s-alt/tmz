@@ -1,4 +1,8 @@
 --!nocheck
+-- R152 smoke test: the real BeginnerTutorial + BeginnerGuide + HudLayout on the Roblox mock. Every step's look (icon, words,
+-- device key), its pointer (beam + ring + bubble / pressing hand / ring on a button), the trigger that moves it on (with the
+-- ✓ NICE!! pop), nothing taking input, the phone safe area, the finish card, skipping, replays, returning players and no
+-- leftovers. (R138 checks kept: the chevron trail geometry and the clicking indicator.)
 local R=require('./roblox');local B=require('./tut_bundle')
 local new,V3,CF=R.new,R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -19,10 +23,7 @@ local lastInput=R.Enum.UserInputType.MouseMovement;function UIS.GetLastInputType
 local Tween=service('TweenService');function Tween.Create(_,obj,_,props)return {Play=function()for k,v in pairs(props)do obj[k]=v end end,Cancel=function()end,Completed=R.signal()}end
 local TextS=service('TextService');function TextS.GetTextSize(_,text,size,_,bounds)local per=math.max(1,math.floor(bounds.X/(size*.55)));return R.Vector2.new(math.min(bounds.X,#text*size*.55),math.ceil(#text/per)*size*1.2)end
 local pathCalls=0
-local Paths=service('PathfindingService');function Paths.CreatePath()local path={Status=R.Enum.PathStatus.NoPath};local pts
- function path.ComputeAsync(_,a,b)pathCalls+=1;path.Status=R.Enum.PathStatus.Success;local mid=V3((a.X+b.X)/2+10,0,(a.Z+b.Z)/2);pts={a,mid,b}end
- function path.GetWaypoints()local out={};for _,p in ipairs(pts)do out[#out+1]={Position=p}end;return out end
- return path end
+local Paths=service('PathfindingService');function Paths.CreatePath()pathCalls+=1;return {}end
 local Gui=service('GuiService');Gui.ReducedMotionEnabled=false;function Gui.GetInsetArea()return {Min=R.Vector2.new(0,0),Width=1280,Height=720}end
 local Players=service('Players');local RS=service('ReplicatedStorage')
 game.CreatorType=R.Enum.CreatorType.User;game.CreatorId=777
@@ -34,10 +35,12 @@ local pg=new('PlayerGui');pg.Name='PlayerGui';pg.Parent=player
 local backpack=new('Backpack');backpack.Name='Backpack';backpack.Parent=player
 local character=new('Model');character.Name='Alex';character.Parent=workspace;player.Character=character
 local root=new('Part');root.Name='HumanoidRootPart';root.Parent=character;root.CFrame=CF(0,3,0)
+-- The track starts at z=50 (the line between the bases and the track), x=0 is its middle.
+local motion=new('ModuleScript');motion.Name='RunnerMotion';motion:SetAttribute('TrackBoundaryZ',50);motion:SetAttribute('TrackCenterX',0);motion:SetAttribute('TrackHalfWidth',114);motion.Parent=RS
 -- Remote: returns targets for the current step and records commands.
 local remotes=new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=RS
 local request=new('RemoteFunction');request.Name='PremiumRequest';request.Parent=remotes
-local commands={};local serverStep={Kind='Pack',Target=V3(40,3,60)}
+local commands={};local serverStep={Kind='Pack',Target=V3(40,3,90)}
 function request.InvokeServer(_,action,value)
  check(action=='Tutorial','remote action')
  commands[#commands+1]=value
@@ -49,6 +52,11 @@ end
 local hot=new('ScreenGui');hot.Name='ChestToolHotbar';hot.Parent=pg
 local dock=new('Frame');dock.Name='Dock';dock.Parent=hot
 for i=1,5 do local s=new('TextButton');s.Name='Slot'..i;s.Parent=dock;s.AbsolutePosition=R.Vector2.new(400+i*70,640);s.AbsoluteSize=R.Vector2.new(64,64);local n=new('TextLabel');n.Name='ItemName';n.Parent=s end
+-- The BASE / TRACK buttons in the top bar row (TravelButtons).
+local travel=new('ScreenGui');travel.Name='TravelButtons';travel.Parent=pg
+local pair=new('Frame');pair.Name='TravelPair';pair.Visible=true;pair.Parent=travel
+local baseB=new('TextButton');baseB.Name='BaseButton';baseB.AbsolutePosition=R.Vector2.new(560,8);baseB.AbsoluteSize=R.Vector2.new(70,36);baseB.Parent=pair
+local trackB=new('TextButton');trackB.Name='TrackButton';trackB.AbsolutePosition=R.Vector2.new(650,8);trackB.AbsoluteSize=R.Vector2.new(70,36);trackB.Parent=pair
 -- Modules: real BeginnerGuide + HudLayout; small stubs for art/audio helpers.
 local modules={}
 local function module(name,value)local m=new('ModuleScript');m.Name=name;m.Parent=RS;modules[m]=value;return m end
@@ -69,154 +77,267 @@ local function req(m)
 end
 local guideModule=module('BeginnerGuide',nil);guideModule._source='BeginnerGuide';modules[guideModule]=nil
 local hudModule=module('HudLayout',nil);hudModule._source='HudLayout';modules[hudModule]=nil
+local cacheModule=module('PropCache152',nil);cacheModule._source='PropCache152';modules[cacheModule]=nil
+-- Every property write on an instance is counted (the R152 perf habit: write only what changed, nothing while hidden or idle).
+local writes=0
+do local rawSet=R.instMeta.__newindex;R.instMeta.__newindex=function(o,k,v)writes+=1;return rawSet(o,k,v)end end
 env=setmetatable({game=game,workspace=workspace,Instance=R.Instance,Vector3=R.Vector3,Vector2=R.Vector2,CFrame=R.CFrame,UDim=R.UDim,UDim2=R.UDim2,Color3=R.Color3,ColorSequence=R.ColorSequence,ColorSequenceKeypoint=R.ColorSequenceKeypoint,NumberSequence=R.NumberSequence,TweenInfo=R.TweenInfo,Enum=R.Enum,RaycastParams={new=function()return {}end},typeof=R.typeof,task=R.task,require=req,os={clock=function()return R.clock end,time=os.time},utf8=utf8,warn=function(...)print('WARN',...)end},{__index=_G})
 -- ScreenGuis report the viewport as their absolute size.
+local VIEW=R.Vector2.new(1280,720)
 local rawNew=R.Instance.new
-R.Instance.new=function(class,parent)local o=rawNew(class,parent);if class=='ScreenGui'then o.AbsoluteSize=R.Vector2.new(1280,720);o.AbsolutePosition=R.Vector2.new(0,0)end;return o end
+R.Instance.new=function(class,parent)local o=rawNew(class,parent);if class=='ScreenGui'then o.AbsoluteSize=VIEW;o.AbsolutePosition=R.Vector2.new(0,0)end;return o end
 env.Instance=R.Instance
 local function frames(n,dt)for _=1,n do R.advance(dt or 1/60);Run.RenderStepped:Fire(dt or 1/60);Run.Heartbeat:Fire(dt or 1/60)end end
 -- Run --------------------------------------------------------------------------
+local Guide=req(guideModule)
 player:SetAttribute('TutorialMask',0);player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialStep',1)
 local scriptInst=new('LocalScript');scriptInst.Name='BeginnerTutorial'
 local ok,err=pcall(load,'BeginnerTutorial',scriptInst);check(ok,'script loads: '..tostring(err))
-frames(90)
+frames(30)
 local gui=pg:FindFirstChild('BeginnerTutorial');check(gui~=nil,'gui created')
-local card=gui.GuideCard;local welcome=gui.Welcome
-check(welcome.Visible==true,'welcome shows for a new player');check(card.Visible==false,'card waits behind welcome')
-check(welcome.Body.Text:find('Alex',1,true)~=nil,'welcome uses display name')
-check(welcome.Title.Text=='STEAL A PACK!','game name in welcome')
--- R138: the welcome is the whole game in four pictures.
-local strip=welcome:FindFirstChild('Strip');local icons={}
-for i=1,4 do local panel=strip and strip:FindFirstChild('Panel'..i);icons[i]=panel and panel.Icon.Glyph.Text..' '..panel.Word.Text or'?'end
-check(table.concat(icons,' | ')=='🎒 STEAL | 🏠 RUN HOME | 🎁 OPEN | 🌱 PLANT','welcome picture strip: '..table.concat(icons,' | '))
-check(welcome.Guide.Avatar.Visible==true and welcome.Guide.Avatar.Image:find('777',1,true)~=nil,'owner avatar on welcome badge')
-check(gui.GuideCard.NameTag.Label.Text=='TMZ','guide name TMZ on tag')
-check(gui.GuideCard.Skip.Text=='X','skip shows a plain X')
--- Trail: chevrons ahead of the player point at the goal.
-local trail=workspace:FindFirstChild('TutorialTrail');check(trail~=nil,'trail folder')
-local visible,pointing,count=0,0,0
-local target=V3(40,3,60)
-for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'then count+=1;if p.Transparency<1 then visible+=1
- local to=(target-p.CFrame.Position);if to.Magnitude>1 then local arm=p.CFrame.LookVector end end end end
-check(count==36,'36 chevrons built');check(visible>=10,'chevrons visible during welcome: '..visible)
-check(pathCalls==0,'no pathfinding');check(moved>30,'trail animated with BulkMoveTo')
--- Chevron geometry: left+right arm midpoint lies behind the tip; tip points along the route toward the goal.
-local L,Rt;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and not L and p.Transparency<.5 then L=p end end
-local idx=table.find(trail:GetChildren(),L);Rt=trail:GetChildren()[idx+1]
-local mid=(L.CFrame.Position+Rt.CFrame.Position)/2
-local tipDir=(L.CFrame.LookVector+Rt.CFrame.LookVector).Unit
-check(Rt.Name=='ArmR','arm pairing')
--- Both arms' -Z (LookVector) point toward the shared tip; their average must head roughly along the route.
-local routeDir=(V3(40,0,60)-V3(0,0,0)).Unit -- straight at the goal
-check(tipDir:Dot(routeDir)>.7,('chevron points along route (dot=%.2f)'):format(tipDir:Dot(routeDir)))
-check(math.abs(mid.Y-.09)<.05,'chevrons sit on the ground (y='..mid.Y..')')
--- Dismiss welcome.
-welcome.Go.Activated:Fire();frames(30)
-check(welcome.Visible==false,'welcome closes');check(card.Visible==true,'card shows after welcome')
-local function chip()return(card.Hint.Key.Visible and('['..card.Hint.Key.Label.Text..'] ')or'')..(card.Hint.Arrow.Visible and'➜ 'or'')..card.Hint.Label.Text end
-check(card.Instruction.Text=='STEAL A PACK'and card.StepIcon.Glyph.Text=='🎒','step 1: icon + three words ('..card.Instruction.Text..')')
-check(chip()=='[E] HOLD','mouse chip: [E] HOLD ('..chip()..')')
-check(card.Progress.Dot1.Size.X.Offset>card.Progress.Dot2.Size.X.Offset,'step row: the current step is the big one')
-check(not card.StepPill.Visible,'no STEP x/5 pill (the icon row shows it)')
-check(card.AnchorPoint.Y==0 and card.Position.Y.Offset<200,'card sits at the top ('..card.Position.Y.Offset..')')
+local card=gui.GuideCard
+local function trail()return workspace:FindFirstChild('TutorialTrail')end
+local function chip()return(card.Hint.Key.Visible and('['..card.Hint.Key.Label.Text..'] ')or'')..(card.Hint.Arrow.Visible and'➜ 'or'')..Guide.Plain(card.Hint.Label.Text)end
+local function says(title,chipText,msg)check(card.Visible and card.Instruction.Text==title and(chipText==nil or(card.Hint.Visible and chip()==chipText)),msg..' ('..tostring(card.Instruction.Text)..' / '..chip()..')')end
+local function shownChevrons()local n=0;local t=trail();if t then for _,p in ipairs(t:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then n+=1 end end end;return n end
+local function beamAt()local t=trail();local b=t and t:FindFirstChild('GoalBeam');return b and b.Transparency<1 and b.CFrame.Position or nil end
+local function near(a,x,z,tol)return a~=nil and math.abs(a.X-x)<(tol or 1.5)and math.abs(a.Z-z)<(tol or 1.5)end
+local tapGui=pg:FindFirstChild('BeginnerTutorialTap');local tapUi=tapGui and tapGui.TapHand
+local function ringOn(b)return tapUi.Visible and math.abs(tapUi.Ring.Position.X.Offset-(b.AbsolutePosition.X-6))<1 and math.abs(tapUi.Ring.Position.Y.Offset-(b.AbsolutePosition.Y-6))<1 end
+-- Nothing in the tutorial takes a click or tap except the small two-tap X.
+local function inputFree(where)
+ local buttons,active={},{}
+ local all=gui:GetDescendants();for _,o in ipairs(tapGui:GetDescendants())do all[#all+1]=o end
+ for _,o in ipairs(all)do
+  if o:IsA('GuiButton')then buttons[#buttons+1]=o.Name end
+  if o:IsA('GuiObject')and o.Active==true and not o:IsA('GuiButton')then active[#active+1]=o.Name end
+  if o.Modal==true then active[#active+1]=o.Name..'(Modal)'end
+ end
+ check(#buttons==1 and buttons[1]=='Skip'and #active==0,where..': only the X takes input (buttons: '..table.concat(buttons,',')..' / active: '..table.concat(active,',')..')')
+end
+local function popped(msg)
+ check(card.Instruction.Text=='NICE!!'and card.StepIcon.Glyph.Text=='✓'and not card.Hint.Visible,msg..': the ✓ NICE!! pop ('..card.Instruction.Text..')')
+ check(sounds[#sounds]=='Bubble06',msg..': pop sound')
+ check(shownChevrons()==0 and not gui.Goal.Enabled and not tapUi.Visible,msg..': the pointers wait for the next step')
+end
+
+-- 1. A brand-new player off the track: no welcome page, straight to the TRACK button.
+check(gui:FindFirstChild('Welcome')==nil and card:FindFirstChild('NextTip')==nil,'no welcome page and no NEXT button (nothing to click through)')
+check(gui.ScreenInsets==R.Enum.ScreenInsets.CoreUISafeInsets,'the tutorial lives inside the safe area (notch / home bar / top bar)')
+check(tapGui and tapGui.ScreenInsets==R.Enum.ScreenInsets.None and tapGui.DisplayOrder>25,'the pressing hand has its own no-inset layer above the card + hotbar (it can ring a top-bar button)')
+says('GO TO THE TRACK!','[TRACK] click it','off the track: the TRACK button')
+check(card.StepIcon.Glyph.Text=='🏃','off the track: 🏃 icon')
+check(ringOn(trackB),'a ring + pressing hand on the TRACK button')
+check(card.Position.Y.Offset>=trackB.AbsolutePosition.Y+trackB.AbsoluteSize.Y+20,'the card sits below the pressing hand ('..card.Position.Y.Offset..')')
+check(beamAt()and near(beamAt(),0,58),'a beam at the track gate')
+check(shownChevrons()>=5,'a ghost path to the track gate ('..shownChevrons()..')')
+check(gui.Goal.Enabled and gui.Goal.Bubble.Icon.Text=='🏃','the bubble over the gate')
+check(sounds[1]=='Bubble04','a hello pop when the card first shows')
+check(not card.StepPill.Visible,'no SKIP? pill yet');check(card.Skip.Text=='X','skip shows a plain X')
+check(card.NameTag.Label.Text=='TMZ'and card.Guide.Avatar.Visible and card.Guide.Avatar.Image:find('777',1,true)~=nil,'the owner\'s avatar + TMZ tag guide you')
 check(type(pg:GetAttribute('TutorialCardBottom'))=='number','notice reservation published')
-check(gui.Goal.Enabled==true,'goal marker on');check(gui.Goal.Label.Text=='😈 STEAL!','marker label')
--- Walk toward the goal; trail start follows the player.
-for i=1,20 do root.CFrame=CF(i,3,i*1.4);frames(3)end
-local nearest=math.huge;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then local d=p.CFrame.Position-root.CFrame.Position;nearest=math.min(nearest,math.sqrt(d.X^2+d.Z^2))end end
-check(nearest<4.5,'trail starts at the player after moving ('..math.floor(nearest)..')')
-do local rp=root.CFrame.Position;local dir=(V3(40,0,60)-V3(rp.X,0,rp.Z)).Unit;local worst=0
- for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then
+inputFree('off the track')
+-- Onto the track: pop, then GRAB A PACK.
+root.CFrame=CF(0,3,60);frames(12)
+popped('on the track')
+check(card.Progress.Dot1.BackgroundColor3.R<.9,'the step is not ticked by a detour')
+frames(45)
+says('GRAB A PACK!','[E] hold','step 1')
+check(card.StepIcon.Glyph.Text=='🎒'and card.StepIcon.UIGradient.Color.A.R>.9,'step 1: 🎒 on gold')
+check(not tapUi.Visible,'no hand on a button once on the track')
+check(beamAt()and near(beamAt(),40,90),'a beam on the pack')
+check(gui.Goal.Enabled and gui.Goal.Bubble.Icon.Text=='🎒'and not gui.TapSpot.Enabled,'the 🎒 bubble over the pack')
+check(card.Progress.Dot1.Size.X.Offset>card.Progress.Dot2.Size.X.Offset,'step row: the current step is the big one')
+-- Chevrons: straight from the feet to the pack, on the ground, pointing at it.
+local t=trail();check(t~=nil,'trail folder');local count=0;for _,p in ipairs(t:GetChildren())do if p.Name=='ArmL'then count+=1 end end
+check(count==36,'36 chevrons built');check(moved>10,'trail animated with BulkMoveTo');check(pathCalls==0,'no pathfinding')
+local L;for _,p in ipairs(t:GetChildren())do if p.Name=='ArmL'and not L and p.Transparency<.5 then L=p end end
+local idx=table.find(t:GetChildren(),L);local Rt=t:GetChildren()[idx+1]
+check(Rt.Name=='ArmR','arm pairing')
+local tipDir=(L.CFrame.LookVector+Rt.CFrame.LookVector).Unit;local routeDir=(V3(40,0,90)-V3(0,0,60)).Unit
+check(tipDir:Dot(routeDir)>.7,('chevron points along route (dot=%.2f)'):format(tipDir:Dot(routeDir)))
+check(math.abs((L.CFrame.Position+Rt.CFrame.Position).Y/2-.09)<.05,'chevrons sit on the ground')
+for i=1,20 do root.CFrame=CF(i,3,60+i*1.4);frames(3)end
+local nearest=math.huge;for _,p in ipairs(t:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then local d=p.CFrame.Position-root.CFrame.Position;nearest=math.min(nearest,math.sqrt(d.X^2+d.Z^2))end end
+check(nearest<4.5,'the path starts at the player after moving ('..math.floor(nearest)..')')
+do local rp=root.CFrame.Position;local dir=(V3(40,0,90)-V3(rp.X,0,rp.Z)).Unit;local worst=0
+ for _,p in ipairs(t:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then
   local rel=V3(p.CFrame.Position.X-rp.X,0,p.CFrame.Position.Z-rp.Z);local side=(rel-dir*rel:Dot(dir)).Magnitude;worst=math.max(worst,side)
  end end
  check(worst<1.6,('arrows sit on the straight line (max sideways %.2f)'):format(worst))
 end
--- Near the goal the trail hides.
-root.CFrame=CF(39,3,58);frames(10)
-local shown=0;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then shown+=1 end end
-check(shown==0,'trail hidden at the goal')
--- Step 2: carrying.
-serverStep={Kind='Safety',Target=V3(0,3,-20)};player:SetAttribute('ChestChaseSeedCarrying',true);frames(90)
-check(card.Instruction.Text=='RUN HOME!'and chip()=='➜ FOLLOW THE ARROWS','step 2: RUN HOME! + follow the arrows ('..chip()..')');check(sounds[#sounds]=='Bubble06','step change sound')
-check(card.Progress.Dot1.BackgroundColor3.G>.8 and card.Progress.Dot1.BackgroundColor3.R<.6,'step row: step 1 ticked green')
--- Step 3: pack in backpack; pointer over its slot; equipped wording.
-player:SetAttribute('ChestChaseSeedCarrying',nil);serverStep={Kind=nil,Target=nil}
+root.CFrame=CF(39,3,88);frames(10);check(shownChevrons()==0 and beamAt()~=nil,'at the pack: the path hides, the beam stays')
+-- No pack yet: PACKS COMING.
+serverStep={Kind='Pack',Waiting=true};frames(70);says('PACKS COMING!','hang tight','no packs yet')
+check(shownChevrons()==0 and not gui.Goal.Enabled,'no pointer while waiting')
+serverStep={Kind='Pack',Target=V3(40,3,90)};frames(70);says('GRAB A PACK!','[E] hold','a pack shows up')
+inputFree('step 1')
+
+-- 2. Picked up: pop, then RUN HOME!!
+local before=#sounds
+serverStep={Kind='Safety',Target=V3(0,3,38)};player:SetAttribute('ChestChaseSeedCarrying',true);frames(6)
+popped('picked it up');check(#sounds>before,'a sound for the pop')
+check(card.Progress.Dot1.BackgroundColor3.G>.8 and card.Progress.Dot1.BackgroundColor3.R<.6 and card.Progress.Dot1.Glyph.Text=='✓','step row: step 1 ticked green')
+frames(60);says('RUN HOME!!','➜ to ur base','step 2')
+check(card.StepIcon.Glyph.Text=='🏠'and gui.Goal.Bubble.Icon.Text=='🏠','step 2: 🏠 icon + bubble')
+check(beamAt()and near(beamAt(),0,38),'a beam on the home line')
+check(not tapUi.Visible,'no BASE button while carrying (you can\'t teleport with a pack)')
+-- Caught (the pack is gone): back to GRAB, no pop.
+before=#sounds;player:SetAttribute('ChestChaseSeedCarrying',nil);serverStep={Kind='Pack',Target=V3(40,3,90)};frames(70)
+says('GRAB A PACK!','[E] hold','lost the pack: back to step 1');check(#sounds==before,'no pop going backwards')
+serverStep={Kind='Safety',Target=V3(0,3,38)};player:SetAttribute('ChestChaseSeedCarrying',true);frames(60)
+
+-- 3. Banked: OPEN IT, ring + hand on the pack's hotbar slot.
+player:SetAttribute('ChestChaseSeedCarrying',nil);serverStep={Kind=nil,Target=nil};root.CFrame=CF(0,3,20)
 local tool=new('Tool');tool.Name='Forest Pack';tool:SetAttribute('SeedPackTool',true);tool.Parent=backpack
-dock.Slot2.ItemName.Text='Forest Pack';player:SetAttribute('TutorialStep',3);frames(90)
-check(card.Instruction.Text=='OPEN IT'and chip()=='[CLICK] YOUR PACK','step 3: OPEN IT [CLICK] YOUR PACK ('..chip()..')');check(gui.HotbarPointer.Visible==true,'hotbar pointer visible')
-check(math.abs(gui.HotbarPointer.Position.X.Offset-(540+32))<1,'pointer over slot 2 ('..gui.HotbarPointer.Position.X.Offset..')')
-local shownTrail=0;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then shownTrail+=1 end end
-check(shownTrail==0,'no trail on a step without a world goal')
-tool.Parent=character;player:SetAttribute('ChestChaseSeedCarrying',false);frames(90)
-check(card.Instruction.Text=='KEEP CLICKING!'and chip()=='[CLICK] OPEN IT','holding it: KEEP CLICKING! ('..card.Instruction.Text..')');check(gui.HotbarPointer.Visible==false,'pointer hides once equipped')
--- R138: the clicking indicator next to the pack in your hand, one pip per click still needed.
+dock.Slot2.ItemName.Text='Forest Pack';player:SetAttribute('TutorialStep',3);frames(6)
+popped('banked')
+frames(60)
+says('OPEN IT!','[CLICK] ur pack','step 3');check(card.StepIcon.Glyph.Text=='🎁','step 3: 🎁')
+check(ringOn(dock.Slot2),'a ring + pressing hand on the pack\'s slot')
+local fx=tapUi.Hand.Position.X.Offset;check(fx>=540 and fx<=540+64,'the finger is on the slot ('..fx..')')
+check(shownChevrons()==0 and not gui.Goal.Enabled,'no world pointer on step 3')
+do local lo,hi=1,0;for _=1,50 do frames(1);local k=tapUi.Hand.Press.Scale;lo=math.min(lo,k);hi=math.max(hi,k)end;check(lo<.95 and hi>.99,'the finger keeps pressing')end
+inputFree('step 3')
+-- In your hand: KEEP CLICKING!! + the R138 clicking indicator.
+tool.Parent=character;frames(20)
+says('KEEP CLICKING!!','[CLICK] open it','pack in hand');check(not tapUi.Visible,'the slot hand goes once it\'s in your hand')
 local bag=new('Model');bag.Name='CarriedSeed';bag:SetAttribute('SeedPackCarry',true);bag:SetAttribute('PackClicksRequired',5);bag:SetAttribute('PackClickCount',0)
 local bagPart=new('Part');bagPart.CFrame=CF(2,4,3);bagPart.Parent=bag;bag.PrimaryPart=bagPart;bag.Parent=character;frames(10)
-local hintUi=gui:FindFirstChild('ClickHint')
+local hintUi=gui.ClickHint
 local function lit()local n=0;for i=1,5 do local p=hintUi.Pips:FindFirstChild('Pip'..i);if p and p.Visible and p.BackgroundColor3.R>.9 then n+=1 end end;return n end
-check(hintUi and hintUi.Visible and hintUi.Word.Text=='CLICK!'and hintUi.Hand.Text=='🖱️','clicking indicator: a mouse and CLICK! by the pack')
-check(lit()==0 and hintUi.Pips:FindFirstChild('Pip5')and hintUi.Pips.Pip5.Visible,'five pips, none lit yet')
+check(hintUi.Visible and hintUi.Word.Text=='CLICK!'and hintUi.Hand.Text=='🖱️','clicking indicator: a mouse and CLICK! by the pack')
+check(lit()==0 and hintUi.Pips.Pip5.Visible,'five pips, none lit yet')
 local lowest,highest=1,0;for _=1,40 do frames(1);local k=hintUi.Hand.UIScale.Scale;lowest=math.min(lowest,k);highest=math.max(highest,k)end
-check(lowest<.9 and highest>.99,'the hand keeps pressing (scale '..string.format('%.2f..%.2f',lowest,highest)..')')
-bag:SetAttribute('PackClickCount',2);frames(2);check(lit()==2,'each click lights a pip ('..lit()..')')
-bag:SetAttribute('PackClickCount',4);frames(2);check(lit()==4,'four clicks, four pips')
-bag:SetAttribute('RevealAt',123);frames(2);check(not hintUi.Visible,'gone once the pack opens')
-bag:SetAttribute('RevealAt',nil);bag:SetAttribute('PackClickCount',0);frames(2)
--- Menu wheel open hides the card.
-pg:SetAttribute('GardenMenuExpanded',true);frames(2);check(card.Visible==false,'card hides while menu open')
-check(pg:GetAttribute('TutorialCardBottom')==nil,'reservation cleared while hidden')
-pg:SetAttribute('GardenMenuExpanded',false);frames(2);check(card.Visible==true,'card returns')
--- Touch wording.
+check(lowest<.9 and highest>.99,'the hand keeps pressing')
+bag:SetAttribute('PackClickCount',2);frames(2);check(lit()==2,'each click lights a pip')
+-- Phone: the same step in tap words, a finger and TAP!
 UIS.TouchEnabled=true;UIS.MouseEnabled=false;lastInput=R.Enum.UserInputType.Touch;UIS.LastInputTypeChanged:Fire(lastInput);frames(5)
-check(card.Instruction.Text=='KEEP TAPPING!'and chip()=='[TAP] OPEN IT','touch wording ('..card.Instruction.Text..')')
-check(hintUi.Visible and hintUi.Word.Text=='TAP!'and hintUi.Hand.Text=='👆','touch: a finger and TAP!')
-bag:Destroy();frames(2)
--- R125: the BASE and TRACK top-bar buttons (slides 2 and 3 highlight them).
-local travel=new('ScreenGui');travel.Name='TravelButtons';travel.Parent=pg
-local pair=new('Frame');pair.Name='TravelPair';pair.Visible=true;pair.Parent=travel
-local baseB=new('TextButton');baseB.Name='BaseButton';baseB.AbsolutePosition=R.Vector2.new(560,8);baseB.AbsoluteSize=R.Vector2.new(70,36);baseB.Parent=pair
-local trackB=new('TextButton');trackB.Name='TrackButton';trackB.AbsolutePosition=R.Vector2.new(650,8);trackB.AbsoluteSize=R.Vector2.new(70,36);trackB.Parent=pair
--- Step 5: three picture slides (5 s each), NEXT skips ahead, then the tutorial completes itself.
-serverStep={Kind=nil,Target=nil};player:SetAttribute('TutorialStep',5);frames(10)
-check(card.NextTip.Visible==true,'NEXT shown on the slides')
-check(card.Instruction.Text=='GROW ➜ PICK ➜ SELL'and chip()=='🌱 ➜ 🍎 ➜ 💰','slide 1: the loop in pictures ('..chip()..')')
-frames(60*5.2)
-local ringUi=pg.BeginnerTutorial:FindFirstChild('TravelHighlight');local arrowUi=pg.BeginnerTutorial:FindFirstChild('TravelPointer')
-check(card.Instruction.Text=='ZOOM HOME'and chip()=='[BASE] UP TOP','slide 2 after 5 s: ZOOM HOME [BASE] ('..card.Instruction.Text..')')
-check(ringUi and ringUi.Visible and ringUi.Position.X.Offset<=560 and ringUi.Position.X.Offset>=550,'BASE button ringed')
-check(arrowUi and arrowUi.Visible,'arrow under the BASE button')
-card.NextTip.Activated:Fire();frames(2)
-check(card.Instruction.Text=='ZOOM TO TRACK'and chip()=='[TRACK] UP TOP','NEXT: slide 3, ZOOM TO TRACK')
-check(ringUi.Visible and ringUi.Position.X.Offset>=640,'TRACK button ringed')
-local trailOnTips=0;for _,p in ipairs(trail:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then trailOnTips+=1 end end
-check(trailOnTips==0,'no arrows during tips')
-for _=1,60*12 do frames(1);if card.Instruction.Text=="YOU'RE READY!"then break end end
-check(table.find(commands,'TreadmillInfo')~=nil,'tips complete the tutorial')
-check(card.Visible==true and card.Instruction.Text=="YOU'RE READY!"and card.StepIcon.Glyph.Text=='🏆','finish card: YOU\'RE READY! 🏆')
-check(card.Hint.Label.Text=='🎁 FREE PACK!','R138: the finish card tells them about the free pack (R139: no word of its luck)');check(sounds[#sounds]=='GemClaim','finish sound')
-check(gui.Confetti.Visible,'confetti on the finish');frames(60*3);check(not gui.Confetti.Visible,'confetti clears')
-check(card.NextTip.Visible==false,'NEXT hidden on finish card')
-frames(60*3);check(card.Visible==false,'finish card hides after 5 s')
--- Replay then skip with two taps: no finish card.
-player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialMask',1);player:SetAttribute('TutorialStep',1);serverStep={Kind='Pack',Target=V3(40,3,60)};frames(30)
-check(welcome.Visible==true,'replay shows welcome again');welcome.Go.Activated:Fire();frames(10)
+says('KEEP TAPPING!!','[TAP] open it','touch wording');check(hintUi.Visible and hintUi.Word.Text=='TAP!'and hintUi.Hand.Text=='👆','touch: a finger and TAP!')
+-- The menu wheel hides the card (and its pointers), then it comes back. Hidden, nothing is written per frame.
+pg:SetAttribute('GardenMenuExpanded',true);frames(2);check(not card.Visible and not hintUi.Visible and pg:GetAttribute('TutorialCardBottom')==nil,'card + pointers hide while the menu is open')
+do local w,m=writes,moved;frames(120);check(writes==w and moved==m,'card hidden: no property writes, no trail moves for 2 s ('..(writes-w)..' writes)')end
+pg:SetAttribute('GardenMenuExpanded',false);frames(2);check(card.Visible,'card returns')
+-- It opens: the reveal plays, the card waits, then PLANT IT.
+bag:SetAttribute('RevealAt',123);frames(2);check(not hintUi.Visible,'the clicking indicator goes once the pack opens')
+bag:Destroy();tool:Destroy();dock.Slot2.ItemName.Text=''
+local seed=new('Tool');seed.Name='Carrot Seed';seed:SetAttribute('GardenSeed',true);seed.Parent=character
+serverStep={Kind='Garden',Target=V3(-20,3,10)};player:SetAttribute('TutorialStep',4);frames(6)
+popped('opened')
+frames(60);check(card.Instruction.Text=='NICE!!','the pop waits while the reveal plays')
+player:SetAttribute('RarePullCinematic','Mythic');frames(2);check(not card.Visible,'a rare pull\'s cinematic hides the card')
+player:SetAttribute('RarePullCinematic',nil);frames(100)
+
+-- 4. PLANT IT: a beam + ring + pressing hand on the dirt.
+says('PLANT IT!','[TAP] the dirt','step 4 (touch)');check(card.StepIcon.Glyph.Text=='🌱','step 4: 🌱')
+check(beamAt()and near(beamAt(),-20,10),'a beam on the garden dirt')
+check(gui.TapSpot.Enabled and not gui.Goal.Enabled,'a pressing 👇 on the dirt instead of a bubble')
+check(gui.TapSpot.Hand.Text=='👇','the dirt hand points down')
+check(shownChevrons()>=3,'a ghost path to the dirt')
+-- Reduced Motion, standing still: nothing changes, so nothing is written or moved.
+Gui.ReducedMotionEnabled=true;frames(10)
+do local w,m=writes,moved;frames(60);check(writes==w and moved==m,'Reduced Motion, standing still: no writes, no moves for 1 s ('..(writes-w)..' writes, '..(moved-m)..' moves)')end
+check(shownChevrons()>=3 and gui.TapSpot.Enabled,'Reduced Motion: the path and the hand still show (still)')
+Gui.ReducedMotionEnabled=false;frames(2)
+do local w=writes;frames(60);local per=(writes-w)/60;check(per<60,('animated step 4: %.1f writes per frame (only what moves)'):format(per))end
+inputFree('step 4')
+-- The seed went back to the Bag: tap ur seed (its slot).
+seed.Parent=backpack;dock.Slot1.ItemName.Text='Carrot Seed';frames(20)
+says('PLANT IT!','[TAP] ur seed','seed not in hand');check(ringOn(dock.Slot1),'a ring + hand on the seed\'s slot')
+check(shownChevrons()==0 and not gui.TapSpot.Enabled,'no world pointer until the seed is in hand')
+seed.Parent=character;frames(12);popped('seed in hand');frames(50);says('PLANT IT!','[TAP] the dirt','back to the dirt')
+-- Ran off to the track: GO HOME (BASE ringed), only then.
+root.CFrame=CF(0,3,80);frames(12)
+says('GO HOME!','[BASE] tap it','on the track in step 4');check(ringOn(baseB),'a ring + pressing hand on the BASE button')
+check(shownChevrons()==0 and not gui.Goal.Enabled and not gui.TapSpot.Enabled,'no world pointer while BASE is asked')
+root.CFrame=CF(-10,3,20);frames(12);popped('back home');frames(50);says('PLANT IT!','[TAP] the dirt','home again')
+
+-- 5. Planted: GET FASTER! (your treadmill). Hopping on it ends the tutorial.
+seed:Destroy();dock.Slot1.ItemName.Text=''
+serverStep={Kind='Treadmill',Target=V3(12,3,-6)};player:SetAttribute('TutorialStep',5);frames(6);popped('planted');frames(50)
+says('GET FASTER!','➜ hop on it','step 5');check(card.StepIcon.Glyph.Text=='⚡'and gui.Goal.Bubble.Icon.Text=='⚡','step 5: ⚡ icon + bubble')
+check(beamAt()and near(beamAt(),12,-6),'a beam on the treadmill')
+check(card.Progress.Dot4.Glyph.Text=='✓'and card.Progress.Dot5.Size.X.Offset>card.Progress.Dot4.Size.X.Offset,'step row: 4 ticked, 5 current')
+check(table.find(commands,'TreadmillInfo')==nil,'step 5 waits for you')
+inputFree('step 5')
+player:SetAttribute('StarterPackClaimed',false);frames(2)
+player:SetAttribute('TreadmillTraining',true);frames(3)
+check(table.find(commands,'TreadmillInfo')~=nil,'stepping on the treadmill finishes the tutorial')
+check(player:GetAttribute('TutorialDone')==true,'done')
+-- The finish: U GOT THIS!! + the free pack, confetti, then nothing left.
+says('U GOT THIS!!','🎁 FREE PACK!','finish card');check(card.StepIcon.Glyph.Text=='🏆'and sounds[#sounds]=='GemClaim','🏆 + the gem sound')
+check(gui.Confetti.Visible,'confetti')
+check(trail()==nil,'the world pieces are gone as soon as it is done')
+check(not tapUi.Visible and not gui.Goal.Enabled and not gui.TapSpot.Enabled and not gui.ClickHint.Visible,'no pointer on the finish card')
+for i=1,5 do check(card.Progress['Dot'..i].Glyph.Text=='✓','finish: step '..i..' ticked')end
+frames(60*3);check(not gui.Confetti.Visible,'confetti clears')
+frames(60*2);check(not card.Visible and pg:GetAttribute('TutorialCardBottom')==nil,'finish card gone after 4 s, reservation cleared')
+local function nothingLeft(where)
+ check(not card.Visible and not tapUi.Visible and not gui.Goal.Enabled and not gui.TapSpot.Enabled and not gui.ClickHint.Visible and not gui.Direction.Visible and not gui.Confetti.Visible and trail()==nil,where..': nothing left on screen or in the world')
+ check(pg:GetAttribute('TutorialCardBottom')==nil,where..': no notice reservation')
+end
+nothingLeft('after finishing')
+local movedBefore,cmdBefore,writesBefore=moved,#commands,writes;frames(120);check(moved==movedBefore and #commands==cmdBefore and writes==writesBefore,'idle after finishing: no writes, no trail work, no polling ('..(writes-writesBefore)..' writes)')
+check(gui.Enabled==false and tapGui.Enabled==false,'idle: the tutorial ScreenGuis are off')
+player:SetAttribute('TreadmillTraining',false)
+
+-- Replay (Settings): starts at step 1; the free pack was given, so the finish says have fun.
+player:SetAttribute('StarterPackClaimed',true);root.CFrame=CF(0,3,60)
+player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialMask',1);player:SetAttribute('TutorialStep',1);serverStep={Kind='Pack',Target=V3(40,3,90)};frames(30)
+says('GRAB A PACK!','[👆] hold it','replay on a phone: step 1 again');check(trail()~=nil,'the world pieces come back for a replay')
+-- Step 5 with no treadmill in your base: done at once. Then the replay finish.
+serverStep={Kind='Treadmill',Target=nil};player:SetAttribute('TutorialStep',5);frames(90)
+check(player:GetAttribute('TutorialDone')==true,'no treadmill: step 5 finishes by itself')
+says('U GOT THIS!!','have fun Alex!','replay finish: no second free pack promised')
+frames(60*5);nothingLeft('after the replay')
+-- Step 5 ignored: it finishes by itself after its time, so the free pack still comes.
+player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialMask',31);player:SetAttribute('TutorialStep',5);serverStep={Kind='Treadmill',Target=V3(12,3,-6)};root.CFrame=CF(0,3,20)
+local cut=#commands;frames(60*20)
+local sent=false;for i=cut+1,#commands do if commands[i]=='TreadmillInfo'then sent=true end end
+check(not sent and card.Instruction.Text=='GET FASTER!','step 5 waits a while')
+frames(60*(Guide.Steps[5].Seconds-18))
+sent=false;for i=cut+1,#commands do if commands[i]=='TreadmillInfo'then sent=true end end
+check(sent and player:GetAttribute('TutorialDone')==true,'step 5 finishes by itself after '..Guide.Steps[5].Seconds..' s')
+frames(60*5);nothingLeft('after a timed-out step 5')
+-- Skip with two taps: no finish card, nothing left.
+player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialMask',1);player:SetAttribute('TutorialStep',1);serverStep={Kind='Pack',Target=V3(40,3,90)};frames(30)
+check(card.Visible and gui.Enabled and tapGui.Enabled,'replay shows the card again (ScreenGuis back on)')
 card.Skip.Activated:Fire();frames(5);check(card.StepPill.Visible and card.StepPill.Label.Text=='SKIP?','first tap arms skip');check(table.find(commands,'Skip')==nil,'one tap does not skip')
 card.Skip.Activated:Fire();frames(30);check(table.find(commands,'Skip')~=nil,'second tap skips')
-check(card.Visible==false,'no finish card after skip')
-frames(60*4);check(not card.StepPill.Visible,'the SKIP? pill goes away')
--- R125: step 1 off the track first asks for TRACK (ring on the button); on the track the steal wording returns.
-local motion=new('ModuleScript');motion.Name='RunnerMotion';motion:SetAttribute('TrackBoundaryZ',50);motion:SetAttribute('TrackCenterX',0);motion:SetAttribute('TrackHalfWidth',114);motion.Parent=RS
-player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialMask',3);player:SetAttribute('TutorialStep',1);serverStep={Kind='Pack',Target=V3(40,3,60)}
-root.CFrame=CF(0,3,0);frames(40)
-check(card.Visible and card.Instruction.Text=='GO TO THE TRACK'and chip()=='[TRACK] UP TOP','off the track: '..card.Instruction.Text)
-check(pg.BeginnerTutorial.TravelHighlight.Visible and pg.BeginnerTutorial.TravelHighlight.Position.X.Offset>=640,'TRACK button ringed in step 1')
-root.CFrame=CF(0,3,60);frames(40)
-check(card.Instruction.Text=='STEAL A PACK'and chip()=='[STEAL] HOLD','on the track (touch): steal ('..chip()..')')
-check(not pg.BeginnerTutorial.TravelHighlight.Visible,'ring gone on the track')
-player:SetAttribute('TutorialStep',3);frames(10)
-check(card:FindFirstChild('Stamp')and card.Stamp.Visible,'NICE! stamp when a step is done')
-frames(60*2);check(not card.Stamp.Visible,'stamp fades')
--- Cleanup.
-scriptInst.Destroying:Fire();check(workspace:FindFirstChild('TutorialTrail')==nil,'trail removed on cleanup')
-frames(5)
+nothingLeft('after skipping');frames(60*4);check(not card.StepPill.Visible,'the SKIP? pill goes away')
+
+-- Phone landscape (844x390, safe area): the card fits inside, clear of the top bar row, with a big X.
+UIS.TouchEnabled=true;VIEW=R.Vector2.new(844,390);gui.AbsoluteSize=VIEW
+baseB.AbsolutePosition=R.Vector2.new(342,-40);trackB.AbsolutePosition=R.Vector2.new(422,-40)
+player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialMask',1);player:SetAttribute('TutorialStep',1);root.CFrame=CF(0,3,0);frames(40)
+says('GO TO THE TRACK!','[TRACK] tap it','phone: off the track')
+local left=card.Position.X.Offset-card.Size.X.Offset/2;local right=left+card.Size.X.Offset;local top=card.Position.Y.Offset-12;local bottom=card.Position.Y.Offset+card.Size.Y.Offset
+check(left>=8 and right<=844-8 and top>=0 and bottom<=390-8,('phone: the card is inside the safe area (%d..%d x %d..%d)'):format(left,right,top,bottom))
+check(bottom<=390*.42,'phone: the card stays above your character ('..bottom..')')
+check(card.Skip.Size.X.Offset>=40,'phone: a big X to tap ('..card.Skip.Size.X.Offset..')')
+check(card.Instruction.UITextSizeConstraint.MaxTextSize>=26 and card.Hint.Label.TextSize>=16,'phone: big words')
+check(ringOn(trackB),'phone: the TRACK button is ringed')
+check(card.Size.X.Offset<460,'phone: the card hugs its words ('..card.Size.X.Offset..')')
+inputFree('phone')
+-- Phone, opening the pack: the clicking indicator is smaller and stays between the card and the hotbar.
+do local Hud=req(hudModule);local m=Hud.Read(VIEW,true,nil);local barTop=390-m.HotbarBottom-m.SlotSize-(m.HotbarDetails~=false and 44 or 0)
+ local t2=new('Tool');t2.Name='Forest Pack';t2:SetAttribute('SeedPackTool',true);t2.Parent=character
+ local b2=new('Model');b2.Name='CarriedSeed';b2:SetAttribute('SeedPackCarry',true);b2:SetAttribute('PackClicksRequired',5);b2:SetAttribute('PackClickCount',1)
+ local p2=new('Part');p2.CFrame=CF(2,4,3);p2.Parent=b2;b2.PrimaryPart=p2;b2.Parent=character
+ player:SetAttribute('TutorialStep',3);frames(90)
+ local ch=gui.ClickHint;local k=ch.UIScale.Scale;local y=ch.Position.Y.Offset
+ check(ch.Visible and k<.8,'phone: a smaller clicking indicator ('..k..')')
+ check(y+95*k<=barTop+1 and y-95*k>=card.Position.Y.Offset+card.Size.Y.Offset-14,('phone: it sits between the card and the hotbar (%d..%d, bar at %d)'):format(y-95*k,y+95*k,barTop))
+ b2:Destroy();t2:Destroy()
+end
+-- Returning players: a fresh start with a finished tutorial shows nothing and builds nothing.
+scriptInst.Destroying:Fire();frames(2);check(trail()==nil and pg:FindFirstChild('BeginnerTutorial')==nil and pg:FindFirstChild('BeginnerTutorialTap')==nil,'script cleanup removes everything')
+player:SetAttribute('TutorialDone',true);player:SetAttribute('TutorialStep',0);player:SetAttribute('TutorialMask',255)
+local again=new('LocalScript');again.Name='BeginnerTutorial';local cmdStart=#commands
+local ok2,err2=pcall(load,'BeginnerTutorial',again);check(ok2,'reload: '..tostring(err2))
+movedBefore=moved;frames(120)
+local gui2=pg:FindFirstChild('BeginnerTutorial')
+check(gui2 and not gui2.GuideCard.Visible and trail()==nil and gui2.Enabled==false and pg.BeginnerTutorialTap.Enabled==false,'returning player: no card, no world pieces, the ScreenGuis off')
+check(moved==movedBefore and #commands-cmdStart<=1,'returning player: no per-frame work, one state check at most')
+again.Destroying:Fire()
 print(('%d checks, %d failures'):format(checks,fails))
