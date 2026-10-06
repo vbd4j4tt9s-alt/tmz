@@ -31,7 +31,6 @@ What made things jitter, in this game:
 | Trail aura head pieces, veil palette, ribbon sheen (`RunnerTrailAura` / `RunnerTrailAuraFx`) | shimmer 12.5 Hz, palette / sheen 10 Hz, Heartbeat | every frame in RenderStepped for full-detail runners |
 | Aurora halo colour flow (`RunnerTrailArt.Cycle`) | the cycle blended each colour with itself: held a colour, snapped to the next every 2.2 s | blends into the next colour |
 | Carry nameplate (`CarryNameplate84`) | (checked: a BillboardGui on the root, world offset: attached) | none needed |
-| Speed popups (`SpeedGainPopup`) | the field hung on the Head, which shakes with the fast treadmill run | hangs on the HumanoidRootPart at the head's height (`StudsOffsetWorldSpace`) |
 | Keeper speed signs (`KeeperSpeedLabels`) | hung on the server root (packet steps) while the body glided | hang on `KeeperFollow153`'s anchor, moved with the smoothed body in the animator's batch |
 | Keepers 160-350 studs (`CosmeticBudget.KeeperDue`) | awake, on screen: posed at 30 Hz (20 low) | every frame; asleep / off screen keep the slow rates |
 | The Darkened (`VeiledEventClient81` + `VeiledKeeper81.ClientFrames`) | its body was posed on the raw root (packet steps) | posed on a KeeperMotion-smoothed root; drives its sign anchor too |
@@ -75,14 +74,17 @@ caches, off-screen keeper rates.
 ## Left for other agents' files (not changed here)
 
 - Treadmill belt (treadmill agent): `TreadmillAnimation.client.lua` line 7 steps the belt at 30 Hz on Heartbeat; `TreadmillFx.lua` `Controller:Step`
-  (`interval=... 1/30 or 1/20`); `SpeedGainPopup.client.lua` belt-arrows half (`if elapsed<(low and 1/20 or 1/30)then return end`, frozen by
-  the R151 popup suite's sha). Same fix: every frame in RenderStepped while near, keep the distance gate.
+  (`interval=... 1/30 or 1/20`); `SpeedGainPopup.client.lua` belt-arrows half (`if elapsed<(low and 1/20 or 1/30)then return end`, held to
+  its base by the R151 treadmill suite). Same fix: every frame in RenderStepped while near, keep the distance gate.
 - Hub avatar (hub display agent): `HubDisplayClient.client.lua` line 30 `POSE_HZ=30`: the static avatar's cheer pose is written at 30 Hz.
   Edited here: only line 184 (`itemHz=ITEM_HZ`, the showcase item).
 - Pack opening (pack-opening agent): `RarePullFx.lua` `Beam:_alpha` quantises a layer's fade to 1/32 (cached NumberSequences): fine but visible
   on a slow fade; `RarePullWorld` steps before SeedPackClient's mouth update some frames (one frame behind the bag).
-- Speed popups (popup agent): `SpeedGainPopup.client.lua` `takeField` (the field on the root) is the only line changed there; its R151 tests
-  (`speed_popups_world.luau` `PW.fieldOf`, `test_speed_popups_client.luau` the two adornee checks and the reset check) follow.
+- Speed popups (popup agent; not changed here: the R151 treadmill suite holds `SpeedGainPopup.client.lua` to its base outside the agent's 2x
+  edits): `takeField` hangs the field on the Head (`field.Gui.Adornee = head`), and the head bobs with the fast treadmill run, so the whole fan
+  shakes. Fix: `local root = head.Parent and head.Parent:FindFirstChild("HumanoidRootPart")`, `field.Gui.Adornee = root or head`,
+  `field.Gui.StudsOffsetWorldSpace = root and Vector3.new(0, head.Position.Y - root.Position.Y, 0) or Vector3.zero`; then R151
+  `speed_popups_world.luau` `PW.fieldOf` and `test_speed_popups_client.luau` (the adornee checks, the reset check) look for the root.
 - Gameplay-frozen: none needed. The legacy escape course's stage fade (`MapService` `_playCourseTween`, a server Transparency tween tied to a
   collision change) is left on the server.
 
@@ -93,6 +95,6 @@ RenderStepped) advances on every frame at 30 / 60 / 144 fps while visible; follo
 connects per-frame signals only in its gameplay services and tweens nothing. `JITTER_BASE=d73905e` runs the same checks on R152: every check set
 fails there (the stepping is measured, e.g. a Drippy item repeats 59 of 90 frames at 60 fps, the keeper sign 64 of 90).
 Updated suites: R128 follow, boots_R117 (RenderStepped connection), trails_R117 (frame driver), R149 growth fx (shrink every frame),
-R151 hub client (tier 2 every frame, 30 / 144 fps), R151 speed popups (root adornee), R152 giveaway client (tier 2 in / out of view, 30 / 144
+R151 hub client (tier 2 every frame, 30 / 144 fps), R152 giveaway client (tier 2 in / out of view, 30 / 144
 fps, two mutations), R152 keepers (R153's two keeper files on its list), R149 Verity lip sync (one pause window starts 20 ms later: the hop
 trails the level by a frame), boots_R117 (the coil glow's write bound), tools/tests/test_tutorial (chevron fade steps).

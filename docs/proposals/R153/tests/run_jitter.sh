@@ -4,7 +4,7 @@
 # what is drawn (read right after RenderStepped) advances on every frame at 30 / 60 / 144 fps while it is visible and near, followers move in
 # RenderStepped (not in the physics half of the frame) or on a smoothed / attached frame, and nothing decorative is written by the server per frame.
 #  test_jitter_world   - mutation / weather item effects, track packs (hover, aura rings incl. Gold / Diamond), lava glows, the home marker;
-#  test_jitter_runners - runner trails (ground ribbons, idle aura, boot coils), the trail aura's halo and veil, speed popups on the root;
+#  test_jitter_runners - runner trails (ground ribbons, idle aura, boot coils), the trail aura's halo and veil, the speed popups' flight;
 #  test_jitter_keepers - keeper speed signs on the smoothed body (KeeperFollow153 + BeastAnimation's motion), The Darkened's smoothed body,
 #                        the world Void pack and its effects, keepers 160-350 studs (CosmeticBudget);
 #  test_jitter_misc    - Verity's hop, held fruit, seed auras, GUI shine / card borders / rainbow, the upgrade button press on the client, and

@@ -34,12 +34,10 @@ check(PW.live(Run.RenderStepped)==1,'an award connects the one updater')
 check(PW.visibleAll(pg)==0,'nothing shows before the first frame')
 PW.frames(1,0)
 local field=PW.fields(pg)[1]
--- (R153: hung on the root at the head's height, so the fan does not shake with the head's run bob)
-local rootOf=me.Character:FindFirstChild('HumanoidRootPart')
-check(#PW.fields(pg)==1 and field.Enabled==true and field.Adornee==rootOf and field.StudsOffsetWorldSpace==V3(0,head(me).Position.Y-rootOf.Position.Y,0),'one field, on, on the root at the head\'s height')
+check(#PW.fields(pg)==1 and field.Enabled==true and field.Adornee==head(me),'one field, on, adorned to the head')
 check(field.AlwaysOnTop==true and field.MaxDistance==100 and field.LightInfluence==0 and field.ResetOnSpawn==false and field.Active==false,'field: AlwaysOnTop, 100 studs, no light, no reset on spawn')
 check(field.Size.X.Scale==0 and field.Size.Y.Scale==0 and field.Size.X.Offset==Style.Field.Width and field.Size.Y.Offset==Style.Field.Height,'field: a fixed pixel size (no scale: the same on screen at any camera distance)')
-check((field.StudsOffset==nil or field.StudsOffset==V3(0,0,0))and field.StudsOffsetWorldSpace.Y>0,'field: centred on the head (no camera-space offset; a world offset up to the head)')
+check(field.StudsOffset==nil or field.StudsOffset==V3(0,0,0),'field: centred on the head (no studs offset)')
 local vis=PW.visible(field)
 check(#vis==1,'first frame: the first share shows ('..#vis..')')
 local r=PW.read(vis[1])
@@ -361,7 +359,7 @@ do
  check(PW.visibleAll(pg)==0,'reset: an award earned by the OLD character shows nothing')
  C.fire(resetter,4200,1,1/5,newChar);PW.frames(2,1/60)
  local nf=PW.fieldOf(pg,newHead)
- check(nf~=nil and #PW.visible(nf)==1 and nf.Adornee==newHead.Parent:FindFirstChild('HumanoidRootPart'),'reset: the new character\'s award shows over the new head (R153: on its root)')
+ check(nf~=nil and #PW.visible(nf)==1 and nf.Adornee==newHead,'reset: the new character\'s award shows on the new head')
  -- the old character is still around for a moment after a reset (Roblox removes it later): its award shows nothing either
  do
   local stale=PW.newPlayer('Stale',{Pos=V3(4,3,4)})

@@ -4,8 +4,7 @@
 --     smoothly up the boots (four steps at 20 Hz before), the idle aura's shards orbit every frame (20 Hz before); the ground is still found at most
 --     every Rules.Interval per sole (the raycasts per second are what they were); nothing is drawn in the physics half of a frame;
 --  2. RunnerTrailAura: the Aurora halo's colour flow and the veil ribbon's palette move every frame (12.5 / 10 Hz before), in RenderStepped;
---  3. SpeedGainPopup: the popup field hangs on the HumanoidRootPart at the head's height (the head bobs with the fast treadmill run); the popups
---     fly every frame.
+--  3. SpeedGainPopup: the popups fly every frame (already so; the field on the bobbing Head is left for the popup agent: R153 jitter.md).
 local J=require('./jitter_world');local W,R=J.W,J.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -80,10 +79,6 @@ do
  ev.OnClientEvent:Fire(me,120,nil,1,.2,char);J.frame(1/60)
  local field=fieldOf()
  if check(field~=nil,'SpeedGainPopup: a popup field is shown')then
-  check(field.Adornee==root and math.abs(field.StudsOffsetWorldSpace.Y-(char.Head.Position.Y-root.Position.Y))<1e-6,'SpeedGainPopup: the field hangs on the root at the head\'s height (not on the bobbing head)')
-  -- the head bobs (the treadmill run): the field's anchor does not move with it
-  local at=field.Adornee.Position;char.Head.CFrame=char.Head.CFrame+V3(0,.3,0);J.frame(1/60)
-  check(field.Adornee.Position==at,'SpeedGainPopup: a head bob does not move the field')
   J.everyFrame(check,'a speed popup flying out',.3,function()ev.OnClientEvent:Fire(me,120,nil,1,.2,char);J.frame(1/60)end,function()
    local f=fieldOf();local p;for _,c in ipairs(f and f:GetChildren()or{})do if c.Name=='Popup'and c.Visible and(not p or c.ZIndex>p.ZIndex)then p=c end end
    return p and p.Position end)

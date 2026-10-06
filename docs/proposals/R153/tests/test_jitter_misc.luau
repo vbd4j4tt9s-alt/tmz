@@ -170,7 +170,6 @@ do
  check(B.HarvestPresentation:find('connection=RunService.RenderStepped:Connect',1,true)~=nil and B.HarvestPresentation:find('elapsed',1,true)==nil,'HarvestPresentation: the fruit previews every frame (20 Hz before)')
  check(B.PackViewport89:find('if clock<',1,true)==nil and B.HarvestViewport:find('Run.RenderStepped:Connect(step)',1,true)~=nil,'PackViewport89 / HarvestViewport: every frame in RenderStepped')
  check(B.KeeperSpeedLabels:find("entry.Gui.Adornee=Follow and Follow.Get(model)or root",1,true)~=nil,'KeeperSpeedLabels hangs the sign on the smoothed body\'s anchor')
- check(B.SpeedGainPopup:find('field.Gui.Adornee = root or head',1,true)~=nil,'SpeedGainPopup hangs the field on the root')
  check(B.PlantGrowthFx:find('Tick%2',1,true)==nil,'PlantGrowthFx: a flying fruit\'s size is written every frame')
  check(B.RunnerTrailArt:find('colors[(i+1)%n+1]',1,true)~=nil,'RunnerTrailArt.Cycle flows into the next colour (the Aurora halo snapped)')
  -- the server: no part tweened, and per-frame (Heartbeat / Stepped) only in the gameplay services
