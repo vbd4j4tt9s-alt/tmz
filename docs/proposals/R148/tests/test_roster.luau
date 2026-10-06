@@ -176,7 +176,7 @@ check(T.IndexFirst.DesertAloeSeed==10000000 and T.IndexRepeat.DesertAloeSeed==20
 check(T.IndexFirst.SandFruitSeed==26400000 and T.IndexRepeat.SandFruitSeed==5280000 and T.IndexFirst.SandFruitSeed==P.SandFruitSeed.Value and T.IndexRepeat.SandFruitSeed==P.SandFruitSeed.Value/5,'Sand Fruit index cash: 26,400,000 first / 5,280,000 repeat (one base fruit / a fifth)')
 check(T.IndexFirst.FirePepperSeed==360000000 and T.IndexRepeat.FirePepperSeed==72000000 and T.IndexFirst.MoonflowerSeed==475000000 and T.IndexRepeat.MoonflowerSeed==95000000,'Fire Pepper 360M / 72M, Moon Melon 475M / 95M index cash')
 check(T.SeedValues.DesertAloeSeed==nil and T.SeedValues.SandFruitSeed==nil,'the new ids are NOT in BalanceValues81.SeedValues (the PlantCatalog loop asserts a plant exists for each)')
-check(T.CompletionGems[2]==20 and T.CompletionGems[4]==20 and T.CompletionGems[5]==20 and T.HalfwayGems==10,'completion / halfway Gems unchanged')
+check(T.CompletionGems[2]==10 and T.CompletionGems[4]==10 and T.CompletionGems[5]==10 and T.HalfwayGems==5,'completion / halfway Gems (R153: halved, 20 -> 10 and 10 -> 5)')
 end
 
 -- 3. Odds -----------------------------------------------------------------------------------------------------------------------------
@@ -619,9 +619,9 @@ check(dH:IndexMilestone(H,2,true)and dH:BiomeComplete(H,2),'old 5/5: complete, s
 local hh,hhWhy=dH:ClaimIndexBiomeHalf(H,2)
 local c1,c1why=dH:ClaimIndexBiome(H,2);local c2,c2why=dH:ClaimIndexBiome(H,2)
 check(hh and c1 and not c2 and c2why=='U ALREADY CLAIMED THIS!'and H:GetAttribute('IndexBiomeReward2')==true and H:GetAttribute('IndexBiomeHalfReward2')==true,'both rewards claim once, then U ALREADY CLAIMED THIS!; the claimed attributes follow ('..tostring(c2why)..')')
-check(pendingGems(dH,H)=='10,20','the Gems: 10 (halfway) and 20 (completion) once each ('..pendingGems(dH,H)..')')
+check(pendingGems(dH,H)=='5,10','the Gems: 5 (halfway) and 10 (completion) once each (R153: halved from 10 and 20) ('..pendingGems(dH,H)..')')
 discoverOn(dH,H,'DesertAloeSeed',true);discoverOn(dH,H,'SandFruitSeed',true)
-check(not select(1,dH:ClaimIndexBiome(H,2))and not select(1,dH:ClaimIndexBiomeHalf(H,2))and pendingGems(dH,H)=='10,20','finding the two new seeds later pays nothing more')
+check(not select(1,dH:ClaimIndexBiome(H,2))and not select(1,dH:ClaimIndexBiomeHalf(H,2))and pendingGems(dH,H)=='5,10','finding the two new seeds later pays nothing more')
 -- (4) A player who claimed both before the update cannot claim again, whatever they have found.
 local dI,I=oldPlayer(754,'Ian',5,function(row)row.Premium.Biomes['2']=true;row.Premium.BiomeHalfRewards=row.Premium.BiomeHalfRewards or{};row.Premium.BiomeHalfRewards['2']=true end)
 local g1,g1why=dI:ClaimIndexBiomeHalf(I,2);local g2,g2why=dI:ClaimIndexBiome(I,2)

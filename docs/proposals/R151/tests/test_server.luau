@@ -451,22 +451,22 @@ do
  Mystery.Owner[Ann]=nil;unwatch();emptyBag(Ann)
 end
 do
- -- daily week: the login pack (day 7 = a Mech pack) the target claims is a TEST pack; a later claim without a command is a normal Mech pack
+ -- daily week: the login pack (day 7 = a Void Pack since R153; it was a Mech pack) the target claims is a TEST pack; a later claim without a command is a normal Void pack
  emptyBag(Ann);table.clear(sinkLog);watch()
  local ok=command(Ann,'/test daily week');check(ok==true and TestPacks.Armed(Ann,'Daily'),'/test daily week arms the daily source')
  local claimed,msg=Data:ClaimDailyLogin(Ann);check(claimed==true,'the day 7 login claim works ('..tostring(msg)..')')
  local packs=packsOf(Ann)
- check(#packs==1 and packs[1].BagVariant=='MechLimited'and packs[1].TestGrant==true and not TestPacks.Armed(Ann,'Daily'),'the Mech pack from the claim carries TestGrant; the arm is used up')
+ check(#packs==1 and packs[1].BagVariant=='EclipseReliquary'and packs[1].TestGrant==true and not TestPacks.Armed(Ann,'Daily'),'the Void pack from the claim carries TestGrant; the arm is used up')
  openAll(Ann);settle(30)
  check(#sinkLog==0 and bus:Count('A')==spy.Published and spy.Reasons[1]=='test pack','... and opening it announces nothing')
  emptyBag(Ann);table.clear(sinkLog)
  local day=D.Day(os.time());local daily=Data:DailyData(Ann);daily.Login={Step=#D.Login-1,Day=day-1}
  local claimed2=Data:ClaimDailyLogin(Ann);local packs2=packsOf(Ann)
- check(claimed2==true and#packs2==1 and packs2[1].BagVariant=='MechLimited'and packs2[1].TestGrant==nil,'the next day 7 Mech pack (no command) is a normal pack')
+ check(claimed2==true and#packs2==1 and packs2[1].BagVariant=='EclipseReliquary'and packs2[1].TestGrant==nil,'the next day 7 Void pack (no command) is a normal pack')
  local _,loudCount=openAll(Ann);settle(waitFor('King')+1)
- check(loudCount==1 and#ofKind(sinkLog,'Pull')>=1,'... and opening it IS announced (Mech seeds are Legendary and above)')
- -- daily done (quests, gems only) arms nothing
- TestPacks.Disarm(Ann,'Daily');command(Ann,'/test daily done');check(not TestPacks.Armed(Ann,'Daily'),'/test daily done (gems only) arms nothing')
+ check(loudCount==1 and#ofKind(sinkLog,'Pull')>=1,'... and opening it IS announced (Void seeds are Secret and above)')
+ -- daily done (finishes the quests) arms nothing
+ TestPacks.Disarm(Ann,'Daily');command(Ann,'/test daily done');check(not TestPacks.Armed(Ann,'Daily'),'/test daily done (R153: quests pay normal packs; the owner\'s TestGrant rule is untouched) arms nothing')
  unwatch();emptyBag(Ann)
 end
 do
