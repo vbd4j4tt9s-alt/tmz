@@ -37,6 +37,12 @@
 #  place scene (keyboard_place.luau, needs the owner's place file: PLACE=...): the REAL start-up passes + the scan on the whole map (prints AREAS per biome and DROPPED), the oasis
 #      checked with the water parts' oriented boxes (no key over them), the real client next to it. "NEWONLY=1 ... mutate" runs only the R152 mutations, "DRY=1 ... mutate"
 #      only checks that every mutation target is still in the sources.
+# R153 (owner: "when keepers knock players up the keyboard clicking sounds play, it should only play when players step on the keyboard"):
+#  7c  a key SOUNDS only when a player character really steps on it (K.Steps: feet within StepReach of the floor, not rising faster than StepMaxRise; K.Thrown: not ragdolled /
+#      flung / knocked back = the player's GuardianRagdollActive / GuardianFlingActive, the character's ChestChaseRagdollActive, PlatformStand, the Physics / FallingDown states).
+#      For you and for every other player: a grounded walk clicks; a body lying on the keys presses them silently; one flying over them (a stale FloorMaterial) presses nothing and
+#      clicks nothing; a knock-up's first frames (no flag yet) and a high hop are silent; landing, recovering and walking again clicks; a thrown body and a walker on one key the
+#      same frame: one click, the walker's; keepers press the keys and never sound; the per-kind sounds are unchanged (normal key 73942179280083, spacebar the click). 14 mutations.
 # The R148 suite (docs/proposals/R147/tests/test_keyboard.luau) tested the retired layered design; its runner now runs this suite.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -95,8 +101,9 @@ s=open(p,encoding='utf-8').read()
 assert s.count(old)>=1,'mutation target not found: '+old
 open(p,'w',encoding='utf-8').write(s.replace(old,new,1))
 PY
- if [ -n "$NEWONLY" ]&&[ "$PHASE" = old ];then return 0;fi # NEWONLY=1: only the R152 mutations
- if [ -n "$OLDONLY" ]&&[ "$PHASE" = new ];then return 0;fi # OLDONLY=1: only the mutations before R152
+ if [ -n "$NEWONLY" ]&&[ "$PHASE" = old ];then return 0;fi # NEWONLY=1: only the R152 and R153 mutations
+ if [ -n "$OLDONLY" ]&&[ "$PHASE" != old ];then return 0;fi # OLDONLY=1: only the mutations before R152
+ if [ -n "$R153ONLY" ]&&[ "$PHASE" != r153 ];then return 0;fi # R153ONLY=1: only the R153 mutations (key sounds only for a player who really steps on a key)
  if [ -n "$ONLY" ]&&[ "$ONLY" != "$1" ];then return 0;fi # ONLY="<name>": just that mutation
  if [ -n "$ONLYRE" ]&&! echo "$1" | grep -qE "$ONLYRE";then return 0;fi # ONLYRE="<regex>": the mutations whose name matches
  if [ -n "$DRY" ];then echo "target found: $1";return 0;fi # DRY=1: only check that every mutation target is still in the sources
@@ -210,6 +217,22 @@ mutate "the scan counts invisible parts" $K2 "d.Transparency<S.Config.InvisibleA
 mutate "the scan counts flush patches and parts above the keys as props" $K2 "local prop=not item.Flat and fp.Y0<=K.KeyTop(0)and fp.Y1>=F+C.PropMinTop" "local prop=not item.Flat"
 mutate "the scan uses the axis-aligned box of a turned part" $K2 "local h=hull(pts);if #h<3 then return nil end" "local h;do local a,b,c,e=math.huge,-math.huge,math.huge,-math.huge;for _,p in ipairs(pts)do a=math.min(a,p[1]);b=math.max(b,p[1]);c=math.min(c,p[2]);e=math.max(e,p[2])end;h={{a,c},{b,c},{b,e},{a,e}}end;if #h<3 then return nil end"
 mutate "effects lift onto keys over a left-out cell" $KS "if geo and geo.SkipCount>0 and geo.Skip[geo.RowOfZ(z)*64+geo.ColOfX(x)]then return nil end" "if false then return nil end"
+PHASE=r153
+# R153: key sounds only for a player who really steps on a key
+mutate "a keeper's press sounds again" $S "   if kind<3 then playKey(idx,kind,who,px,pz)else mutedAt[idx]=frameNo end" "   playKey(idx,kind,who,px,pz)"
+mutate "a ragdolled / flung runner sounds (the thrown state is ignored)" $S "  local thrown=K.Thrown(p,char,hum)" "  local thrown=false"
+mutate "a flying body with a stale FloorMaterial presses keys under it" $S "  if thrown and feetY>F+C.PlayerFeetReach then return nil end -- a stale FloorMaterial under a flying body must not press anything" "  local _=0"
+mutate "every press sounds (K.Steps ignored)" $S "if K.Steps(feetY,typeof(vel)=='Vector3'and vel.Y or 0,thrown)then return own and 1 or 2 end" "if true then return own and 1 or 2 end"
+mutate "a runner above the floor sounds (K.Steps ignores the feet height)" $R "return not thrown and feetY<=C.FloorTop+C.StepReach and(velY or 0)<=C.StepMaxRise" "return not thrown and(velY or 0)<=C.StepMaxRise"
+mutate "a runner being knocked up sounds (K.Steps ignores the rising speed)" $R "return not thrown and feetY<=C.FloorTop+C.StepReach and(velY or 0)<=C.StepMaxRise" "return not thrown and feetY<=C.FloorTop+C.StepReach"
+mutate "GuardianRagdollActive is not a thrown state" $R "player:GetAttribute('GuardianRagdollActive')==true or " ""
+mutate "GuardianFlingActive is not a thrown state" $R " or player:GetAttribute('GuardianFlingActive')==true" ""
+mutate "ChestChaseRagdollActive is not a thrown state" $R "if char and char:GetAttribute('ChestChaseRagdollActive')==true then return true end" "local _=0"
+mutate "PlatformStand is not a thrown state" $R "if hum.PlatformStand==true then return true end" "local _=0"
+mutate "the Humanoid states are not read" $R "local ok,state=pcall(hum.GetState,hum);if ok and THROWN_STATES[state]then return true end" "local _=0"
+mutate "FallingDown is not a thrown state" $R "{'Physics','Ragdoll','FallingDown','PlatformStanding','Flying'}" "{'Physics','Ragdoll','PlatformStanding','Flying'}"
+mutate "a walker loses his click to a keeper / a thrown body that pressed the key first" $S "if mutedAt[idx]==frameNo and kind>0 and kind<3 then" "if false then"
+mutate "you press with FloorMaterial Air (the grounded test is gone)" $S "  if own and hum.FloorMaterial==AIR then return nil end" "  local _=0"
 [ -z "$DRY" ] || exit 0
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]

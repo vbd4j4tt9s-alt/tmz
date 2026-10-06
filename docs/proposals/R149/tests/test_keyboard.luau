@@ -1678,7 +1678,7 @@ plays={};frames(12)
 local ek=K.KeeperFootprint(6,6);local kdown=0
 for cc=12,16 do for rr=BR+2,BR+6 do if near(topOf(rr,cc)or 99,K.KeyTop(1),1e-6)then kdown+=1 end end end
 check(near(ek,1.8)and kdown>=1 and kdown<=4,'a keeper presses the keys under its feet (footprint '..ek..', '..kdown..' keys down)')
-check(#plays==1 and near(plays[1].Speed,C.KeeperPitch)and plays[1].Id==K.PressSoundId('Key',g.RowStage[BR+4]),'keeper: one sound, the key sound a touch deeper (0.94)')
+check(#plays==0,'keeper: its presses make no sound (R153: only a player who steps on the keys clicks; the keys still go down under it) ('..#plays..')')
 kroot.CFrame=CF(300,F+5,cz(BR+4));frames(14)
 kdown=0;for cc=12,16 do for rr=BR+2,BR+6 do if near(topOf(rr,cc)or 99,K.KeyTop(1),1e-6)then kdown+=1 end end end
 check(kdown==0,'the keys come back up when the keeper walks away')
@@ -1722,6 +1722,165 @@ do
  frames(30)
  local left=0;for _,p in ipairs(keyParts())do if p:FindFirstChildWhichIsA('SurfaceGui')then left+=1 end end
  check(left==0,'when they leave, every key gives its letter back to its strip ('..left..' left riding)')
+end
+-- 7c. R153 (owner playtest of R152: "when keepers knock players up the keyboard clicking sounds play, it should only play when players step on the keyboard"). A key SOUNDS only when a
+-- player character really steps on it: grounded (feet at the floor top), not rising fast (a knock-up's first frames), not ragdolled / flung / knocked back (RagdollService: the player's
+-- GuardianRagdollActive / GuardianFlingActive, the character's ChestChaseRagdollActive, PlatformStand, the Physics / FallingDown states). Keepers never sound. The keys still go down
+-- (silently) under a body lying on them, none under one flying over them. A player who landed and walks again clicks normally; the sound per key kind is unchanged.
+do
+local ST=R.Enum.HumanoidStateType
+function R.Inst.GetState(self)return rawget(self._props,'TestState')or ST.Running end
+local KEYSND,CLICK='rbxassetid://73942179280083','rbxassetid://113108830240353'
+local ZERO=V3(0,0,0)
+-- K.Steps on its own
+check(K.Steps(F,0,false)and K.Steps(F+C.StepReach-.01,0,false)and not K.Steps(F+C.StepReach+.1,0,false)and K.Steps(F,C.StepMaxRise,false)and not K.Steps(F,C.StepMaxRise+1,false)and K.Steps(F,-90,false)and K.Steps(F,nil,false)and not K.Steps(F,0,true),
+ 'K.Steps: feet within StepReach '..C.StepReach..' of the floor top, not rising faster than StepMaxRise '..C.StepMaxRise..' (falling is fine: a landing), never while thrown')
+-- the state flags a thrown runner carries (the same list for you and for the other players)
+local FLAGS={
+ {'GuardianRagdollActive on the player',function(p,c,h,on)p:SetAttribute('GuardianRagdollActive',on or nil)end},
+ {'GuardianFlingActive on the player',function(p,c,h,on)p:SetAttribute('GuardianFlingActive',on or nil)end},
+ {'ChestChaseRagdollActive on the character',function(p,c,h,on)c:SetAttribute('ChestChaseRagdollActive',on or nil)end},
+ {'PlatformStand',function(p,c,h,on)h.PlatformStand=on or false end},
+ {'the Physics state',function(p,c,h,on)h.TestState=on and ST.Physics or nil end},
+ {'the FallingDown state',function(p,c,h,on)h.TestState=on and ST.FallingDown or nil end},
+}
+local function allOff(p,c,h)for _,f in ipairs(FLAGS)do f[2](p,c,h,false)end end
+local function ids(list,id)for _,p in ipairs(list)do if p.Id~=id then return false end end;return #list>0 end
+local function down(row,c0,n)local d=0;for c=c0,c0+n-1 do if near(topOf(row,c),K.KeyTop(1),1e-6)then d+=1 end end;return d end
+local function park()hum.FloorMaterial=AIR;root.AssemblyLinearVelocity=ZERO;allOff(player,char,hum);put(cx(20),F+9,cz(BR));frames(20);plays={} end
+-- you: the runner crosses n fresh keys (6 frames each) starting at column c0, at height y (nil: on the floor), with FloorMaterial `mat`
+local function lrun(c0,n,y,mat)plays={};hum.FloorMaterial=mat or PLASTIC;for i=0,n-1 do put(cx(c0+i),y,cz(BR));frames(6)end;local l=plays;plays={};return l end
+-- a grounded walk clicks
+park()
+check(not K.Thrown(player,char,hum),'K.Thrown: a standing runner is not thrown')
+local l=lrun(2,6)
+check(#l>=5 and ids(l,KEYSND),'you: a grounded walk across 6 keys clicks, the key sound ('..#l..' clicks)')
+check(down(BR,7,1)==1,'...and the keys go down under him')
+-- every state flag: lying on the keys (FloorMaterial still reads Plastic) = the keys go down, no click; flying over them (a stale FloorMaterial) = nothing at all
+for _,f in ipairs(FLAGS)do
+ park();f[2](player,char,hum,true)
+ check(K.Thrown(player,char,hum),'K.Thrown sees '..f[1])
+ l=lrun(2,6)
+ check(#l==0 and down(BR,7,1)==1,'you, ragdolled / flung ('..f[1]..') lying on the keys: they go down, no click ('..#l..' clicks)')
+ park();f[2](player,char,hum,true)
+ l=lrun(2,6,F+25)
+ check(#l==0 and down(BR,2,6)==0,'you, flung over the keys with a stale FloorMaterial ('..f[1]..'): no key goes down, no click ('..#l..' clicks, '..down(BR,2,6)..' keys down)')
+ f[2](player,char,hum,false)
+ check(not K.Thrown(player,char,hum),'K.Thrown lets go of '..f[1])
+end
+-- a flung runner lands and walks again: the flags clear (the server's recovery) and he clicks normally
+park();for _,f in ipairs(FLAGS)do f[2](player,char,hum,true)end
+l=lrun(2,6,F+25);local flying=#l
+l=lrun(2,6);local lying=#l
+allOff(player,char,hum);frames(4)
+l=lrun(2,6)
+check(flying==0 and lying==0 and #l>=5 and ids(l,KEYSND),('you: flown (%d clicks), lying (%d), then recovered and walking again: %d clicks, the key sound'):format(flying,lying,#l))
+-- the first frames of a knock-up (the flags have not arrived yet): feet still at the floor, FloorMaterial not Air yet, rising fast
+park();root.AssemblyLinearVelocity=V3(0,60,0)
+l=lrun(2,6)
+check(#l==0,'you, knocked up (rising at 60 studs/s) before any flag arrives: no click ('..#l..')')
+root.AssemblyLinearVelocity=V3(0,-80,0);l=lrun(2,6)
+check(#l>=5,'...a fast fall onto the keys is a landing: it clicks ('..#l..')')
+root.AssemblyLinearVelocity=ZERO
+-- in the air, no FloorMaterial: still nothing
+park();l=lrun(2,6,F+9,AIR)
+check(#l==0 and down(BR,2,6)==0,'you, in the air (FloorMaterial Air): no click, no key down')
+-- a runner a little above the floor (a platform edge, a hop): the key may go down, but silently
+park();l=lrun(2,6,F+3+C.StepReach+.8)
+check(#l==0,'you, feet '..string.format('%.1f',C.StepReach+.8)..' above the floor: no click ('..#l..')')
+
+-- other players (their presses are computed here, at 30 Hz); you wait in the air
+park()
+local function newPal(name,uid)
+ local pl=R.new('Player');pl.Name=name;pl.UserId=uid;pl.Parent=Players;others[#others+1]=pl
+ local pc,pr,ph=makeCharacter(name,cx(20),cz(BR)+300);pl.Character=pc;return pl,pc,pr,ph
+end
+local pal,pchar,proot,phum=newPal('Pal153',153)
+local function parkP()proot.AssemblyLinearVelocity=ZERO;allOff(pal,pchar,phum);proot.CFrame=CF(cx(20),F+3,cz(BR)+300);frames(22);plays={} end
+local function prun(c0,n,y)plays={};for i=0,n-1 do proot.CFrame=CF(cx(c0+i),y or F+3,cz(BR));frames(6)end;local pl=plays;plays={};return pl end
+parkP()
+l=prun(2,6)
+check(#l>=5 and ids(l,KEYSND)and l[1].Speed>=.98 and l[1].Speed<=1.02,'another player: a grounded walk across 6 keys clicks, the key sound ('..#l..' clicks)')
+for _,f in ipairs(FLAGS)do
+ parkP();f[2](pal,pchar,phum,true)
+ check(K.Thrown(pal,pchar,phum),'K.Thrown sees '..f[1]..' on another player')
+ l=prun(2,6)
+ check(#l==0 and down(BR,7,1)==1,'another player, ragdolled / flung ('..f[1]..') lying on the keys: they go down, no click ('..#l..' clicks)')
+ parkP();f[2](pal,pchar,phum,true)
+ l=prun(2,6,F+25)
+ check(#l==0 and down(BR,2,6)==0,'another player, flung over the keys ('..f[1]..'): no key goes down, no click ('..#l..' clicks)')
+ f[2](pal,pchar,phum,false)
+end
+parkP();for _,f in ipairs(FLAGS)do f[2](pal,pchar,phum,true)end
+l=prun(2,6,F+25);flying=#l
+l=prun(2,6);lying=#l
+allOff(pal,pchar,phum);frames(4)
+l=prun(2,6)
+check(flying==0 and lying==0 and #l>=5 and ids(l,KEYSND),('another player: flown (%d clicks), lying (%d), then recovered and walking again: %d clicks, the key sound'):format(flying,lying,#l))
+parkP();proot.AssemblyLinearVelocity=V3(0,60,0)
+l=prun(2,6)
+check(#l==0,'another player, knocked up before any flag arrives: no click ('..#l..')')
+proot.AssemblyLinearVelocity=ZERO
+parkP();l=prun(2,6,F+3+C.StepReach+.8)
+check(#l==0,'another player, feet '..string.format('%.1f',C.StepReach+.8)..' above the floor (a high hop): no click ('..#l..')')
+
+-- a thrown body pressing a key the same frame as a walker never takes his click away (the thrown one is listed first)
+do
+ parkP()
+ local pal2,pchar2,proot2=newPal('Pal153b',154)
+ proot2.CFrame=CF(cx(20),F+3,cz(BR)+300);frames(14)
+ pal:SetAttribute('GuardianRagdollActive',true)
+ plays={};proot.CFrame=CF(cx(9),F+3,cz(BR));proot2.CFrame=CF(cx(9),F+3,cz(BR));frames(10)
+ check(#plays==1 and plays[1].Id==KEYSND and down(BR,9,1)==1,'a ragdolled body and a walker on the same key in the same frame: the key goes down once and the walker\'s click still plays ('..#plays..' clicks)')
+ pal:SetAttribute('GuardianRagdollActive',nil)
+ proot.CFrame=CF(cx(20),F+3,cz(BR)+300);proot2.CFrame=CF(cx(20),F+3,cz(BR)+300);frames(14)
+ for i=#others,2,-1 do others[i]=nil end;pchar2:Destroy();pal2:Destroy()
+end
+
+-- keepers press the keys down and never sound, even next to a walker
+do
+ parkP()
+ local keeper=R.new('Model');keeper.Name='ForestKeeper153';keeper:SetAttribute('PersistentBiomeGuardian',true)
+ local kroot=R.new('Part');kroot.Name='HumanoidRootPart';kroot.Size=V3(6,10,6);kroot.CFrame=CF(cx(16),F+5,cz(BR+3));kroot.Parent=keeper;keeper.PrimaryPart=kroot
+ keeper.Parent=camps;W.CS:AddTag(keeper,'BiomeKeeper');frames(2)
+ plays={};for cc=8,12 do kroot.CFrame=CF(cx(cc+4),F+5,cz(BR+3));frames(8)end -- it walks over fresh keys
+ local kd=0;for cc=11,18 do for rr=BR+1,BR+5 do if near(topOf(rr,cc)or 99,K.KeyTop(1),1e-6)then kd+=1 end end end
+ check(kd>=1 and #plays==0,'a keeper walking over the keys: they go down ('..kd..'), no click ('..#plays..')')
+ kroot.CFrame=CF(cx(16),F+5,cz(BR+3));frames(12)
+ l=prun(2,6)
+ local nearKeeper=0;for _,pl in ipairs(l)do if abs(pl.Pos.Z-cz(BR+3))<20 and abs(pl.Pos.X-kroot.CFrame.Position.X)<20 then nearKeeper+=1 end end
+ check(#l>=5 and nearKeeper==0,'...and the clicks around it are the walker\'s ('..#l..' clicks, '..nearKeeper..' at the keeper)')
+ keeper:Destroy();frames(10)
+end
+
+-- the sound per key kind is unchanged: a normal key the key sound, a spacebar the click (for a player who steps on it; silent for a thrown one)
+do
+ local bar=g.Bars[1];local zb=bar.Z0+2;local zFar=bar.Z0+70
+ local function barRun(set)set(zFar);frames(14);plays={};set(zb);frames(12);local pl=table.clone(plays);set(zFar);frames(14);return pl end
+ parkP();park()
+ hum.FloorMaterial=PLASTIC
+ local lb=barRun(function(z)put(cx(8),nil,z)end)
+ check(#lb==1 and lb[1].Id==CLICK and lb[1].Volume<=C.ClickVolume+1e-9,'you, grounded on a spacebar: the original click 113108830240353 ('..#lb..')')
+ hum.FloorMaterial=AIR;put(cx(20),F+9,zb+8);frames(10) -- you hover near the bar (a click is only heard within ClickRange of you)
+ pal:SetAttribute('GuardianFlingActive',true)
+ lb=barRun(function(z)proot.CFrame=CF(cx(8),F+3,z)end)
+ check(#lb==0,'another player, flung, lying on a spacebar: no click ('..#lb..')')
+ pal:SetAttribute('GuardianFlingActive',nil)
+ lb=barRun(function(z)proot.CFrame=CF(cx(8),F+3,z)end)
+ check(#lb==1 and lb[1].Id==CLICK,'...recovered: the spacebar click again ('..#lb..')')
+ proot.CFrame=CF(cx(20),F+3,cz(BR)+300);frames(10)
+ player:SetAttribute('GuardianRagdollActive',true);hum.FloorMaterial=PLASTIC
+ lb=barRun(function(z)put(cx(8),nil,z)end)
+ check(#lb==0,'you, ragdolled on a spacebar: no click ('..#lb..')')
+ player:SetAttribute('GuardianRagdollActive',nil)
+end
+check(K.PressSoundId('Key',g.RowStage[BR])==KEYSND and K.PressSoundId('Spacebar')==CLICK,'the per-kind sounds are unchanged: normal key 73942179280083, spacebar the click')
+
+-- back to the state the next section expects
+for i=#others,1,-1 do others[i]=nil end
+pchar:Destroy();pal:Destroy()
+allOff(player,char,hum);root.AssemblyLinearVelocity=nil
+hum.FloorMaterial=AIR;put(cx(11),F+9,cz(BR));frames(40);plays={}
 end
 -- 8. shovel holes: they lie on the keys (near and far); the keys under them stay up
 do
