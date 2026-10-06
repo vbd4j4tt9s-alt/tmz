@@ -5,6 +5,10 @@
 # R152 (owner: "the avatar is sized up and dancing while the seed rotates around and the effects are actually on the seed not behind ... a billboard is not needed ... the same format
 # and look as the fruit of the hour type pedestal"): a display is the market's Fruit of the Hour pedestal built 3.2 times bigger (no board, no slab, no posts, no tube), the winning
 # seed / fruit turning over its prongs with its light and sparkles ON it, and the champion's avatar, 25 studs tall, dancing on its Animator beside it:
+# R153 (owner's Studio: the giant stood posed, then "violently shaking ... not on the ground", "or it would stop", "and freeze"; and of the plaque: "this detail here should be put on
+# top of the fruit and it should be big"): each CLIENT plays the dance (the server only makes the rig ready: an Animator, joints at rest, the root alone anchored, the state machine off,
+# DanceId; it plays nothing), retries with the next ids and poses the rig when it cannot, a watchdog keeps ONE looped track playing, nothing culls or freezes it, the soles stand on the
+# floor through the joints, the same champion keeps its avatar, the clients report to the owner's `/test hubdisplays`; and the plaque is gone: ONE big label over the item says it all.
 #  wiring                - the files, src/MANIFEST.tsv, the hooks in PlayerDataService / ChestService, the main script, the owner commands and docs/COMMANDS.md; no DataStore,
 #                          no per-frame server loop in the hub scripts; the gameplay files (odds, economy, daily rewards, plant catalog, Config: ProfileVersion 22) are unchanged;
 #  test_hub_rules.luau   - the ranking (rarity, then smaller chance, then bigger weight, then earlier: a strict total order), the exclusions' building blocks (record cleaning), the UTC day,
@@ -13,15 +17,19 @@
 #  test_hub_store.luau   - the MemoryStore wrapper against a mock of the shared backend: compare-and-set races, expiry, quota / throttle / errors (backoff, budget), pcall everywhere;
 #  test_hub_service.luau - the service: events, ranking across servers (two servers on one backend), polling with jitter, one write per gap, the day rollover, the record line
 #                          (ONE PullAnnouncer.Announce, no notice of its own, AfterReveal for a pull, the chime in step, private owner tests), the owner tools, fallback to the server's
-#                          own best, a champion change rebuilds once, the avatar is placed, put in the display and THEN told to dance (a dance that is overtaken is dropped);
-#  test_hub_avatar.luau  - the avatar: description cache, rig build, scale (Model:ScaleTo, 25 studs, 4-5 times a normal avatar), anchored / inert, no name or health bar, the DANCE (one of Roblox's
-#                          three default R15 dances looped on the rig's Animator; the static pose only as the fallback when it cannot load / play), the blocky fallback and the silhouette
-#                          (the same giant size, static), user ids that are not users;
-#  test_hub_art.luau     - the frame: just the Fruit of the Hour pedestal x 3.2 compared part by part with MarketLayout.Pedestal (no board, posts, slab, halo, disc or tube), the plaque and the
-#                          label, the pedestal checked FACE BY FACE for z-fighting, inside the reserved corner and the footprint; the showcase item (cap 150 parts, 12 studs, over the prongs)
+#                          own best, a champion change rebuilds once, the avatar is placed, put in the display and THEN made ready to dance (one that is overtaken is dropped); R153: the same
+#                          champion keeps the avatar; the clients' dance reports (checked, rate-limited) and the owner's status line (AvatarMode, dance id, your screen's track and Length);
+#  test_hub_avatar.luau  - the avatar: description cache, rig build, scale (Model:ScaleTo, 25 studs, 4-5 times a normal avatar; R153: the soles on the floor in the rest pose THROUGH THE
+#                          JOINTS), anchored / inert, no name or health bar, READY TO DANCE (R153: an Animator, joints at rest and enabled, limbs unanchored, the state machine off, no
+#                          server track, DanceId one of Roblox's three default R15 dances; the static pose only for a rig with nothing to dance with), the blocky fallback and the
+#                          silhouette (the same giant size, static), user ids that are not users;
+#  test_hub_art.luau     - the frame: just the Fruit of the Hour pedestal x 3.2 compared part by part with MarketLayout.Pedestal (no board, posts, slab, halo, disc or tube; R153: no plaque),
+#                          the ONE big label (five rows, in studs, DistanceLowerLimit, over the item), the pedestal checked FACE BY FACE for z-fighting, inside the reserved corner and the footprint; the showcase item (cap 150 parts, 12 studs, over the prongs)
 #                          with its light on an ItemCore inside it, nothing flat behind it;
-#  test_hub_client.luau  - the client: near / far (260 / 300 studs), the item turns and floats, the sparkles are an emitter on the item's core, a dancing avatar is left to its Animator (paused only
-#                          with reduced motion / the lowest tier), a posed one cheers, the burst on a new champion (no ring), the sound, nothing per frame when far;
+#  test_hub_client.luau  - the client: near / far (260 / 300 studs), the item turns and floats, the sparkles are an emitter on the item's core; R153: the client plays ONE looped dance
+#                          track on the rig's Animator (no joint writes while it plays), retries the next ids and then poses the rig here and cheers, the watchdog, nothing culls it,
+#                          paused only with reduced motion / Fast Mode (never by the automatic tier), the same champion keeps its track, no leaks, the reports; the countdown on the label;
+#                          the burst on a new champion (no ring), the sound, nothing per frame when far;
 #  test_hub_hooks.luau   - how it is wired into the game: the pack-opened hook, TEST packs and owner grants never count, the harvest hook, the owner commands; and the REAL PullAnnouncer
 #                          behind the real hub: a real Mythic / Secret open says the pull line then the record line only after the puller's reveal (other servers too), no hub notice,
 #                          owner test packs / bestpull / bigfruit never speak to the server, a leaving puller, a fruit record, a preview day;
@@ -163,38 +171,66 @@ mutate "the avatar is built for any id" $AV "if type(userId)~='number'or userId~
 mutate "the avatar description is not cached" $AV "local hit=self.Cache[userId];if hit then return hit end" "local hit=nil" avatar
 mutate "the giant item has no part cap" $AR "if #list<=limit then return 0 end" "if true then return 0 end" art
 mutate "the giant item is solid" $AR "item.Anchored=true;item.CanCollide=false;item.CanQuery=false" "item.Anchored=true;item.CanCollide=true;item.CanQuery=false" art
-mutate "reduced motion still moves the display" $CL "local allowed=not reduced()and tier()>=2" "local allowed=tier()>=2" client
+mutate "reduced motion still moves the display" $CL "local allowed=not paused and tier()>=2" "local allowed=tier()>=2" client
 mutate "far displays move too" $CL "local active=allowed and(wasActive and d<=NEAR_OUT or d<=NEAR_IN)" "local active=allowed" client
-mutate "the lowest quality tier still gets the motion" $CL "local allowed=not reduced()and tier()>=2" "local allowed=not reduced()and tier()>=0" client
+mutate "the lowest quality tier still gets the motion" $CL "local allowed=not paused and tier()>=2" "local allowed=not paused and tier()>=0" client
 mutate "the pack-opened hook is gone" ServerScriptService/ChestChaseServer/PlayerDataService.lua "local hook=self.OnPackOpened" "local hook=nil" hooks
 mutate "the harvest hook is gone" ServerScriptService/ChestChaseServer/ChestService.lua "if action == \"Harvest\" and self.HarvestHook then" "if false then" hooks
 mutate "the Best Pull display stands in the Base 4 garden" $RU "Pull={Center=Vector3.new(236,4,-516)}," "Pull={Center=Vector3.new(180,4,-440)}," scene
 mutate "the Best Pull display crowds the back wall" $RU "Pull={Center=Vector3.new(236,4,-516)}," "Pull={Center=Vector3.new(236,4,-590)}," scene
 mutate "the column band's sides lie in the column's faces (z-fighting)" $AR "u('Column band',4.1,.25,4.1,0,3.5,0,GOLD)" "u('Column band',3.8,.25,3.8,0,3.5,0,GOLD)" scene
 mutate "the column band's sides lie in the column's faces (z-fighting, the part's own test)" $AR "u('Column band',4.1,.25,4.1,0,3.5,0,GOLD)" "u('Column band',3.8,.25,3.8,0,3.5,0,GOLD)" art
-mutate "a sign board comes back" $AR " d.Plaque=plate" " d.Plaque=plate;part(ped,'Sign board',V3(48,20,1.2),L(0,35,11.5),RGB(24,28,54))" art
-mutate "a sign board comes back (in the finished hub)" $AR " d.Plaque=plate" " d.Plaque=plate;part(ped,'Sign board',V3(48,20,1.2),L(0,35,11.5),RGB(24,28,54))" scene
-mutate "a flat glow disc comes back behind the item" $AR " d.Plaque=plate" " d.Plaque=plate;local halo=part(model,'Halo',V3(.3,16,16),L(15,26,6),GOLD,Enum.Material.Neon);halo.Shape=Enum.PartType.Cylinder" art
-mutate "the Fruit of the Hour's projector tube comes back" $AR " d.Plaque=plate" " d.Plaque=plate;local tube=part(ped,'Projector beam',V3(14,3,3),L(15,12,0),GOLD,Enum.Material.Neon);tube.Transparency=.86" art
+mutate "a sign board comes back" $AR " d.Top=top" " d.Top=top;part(ped,'Sign board',V3(48,20,1.2),L(0,35,11.5),RGB(24,28,54))" art
+mutate "a sign board comes back (in the finished hub)" $AR " d.Top=top" " d.Top=top;part(ped,'Sign board',V3(48,20,1.2),L(0,35,11.5),RGB(24,28,54))" scene
+mutate "a flat glow disc comes back behind the item" $AR " d.Top=top" " d.Top=top;local halo=part(model,'Halo',V3(.3,16,16),L(15,26,6),GOLD,Enum.Material.Neon);halo.Shape=Enum.PartType.Cylinder" art
+mutate "the Fruit of the Hour's projector tube comes back" $AR " d.Top=top" " d.Top=top;local tube=part(ped,'Projector beam',V3(14,3,3),L(15,12,0),GOLD,Enum.Material.Neon);tube.Transparency=.86" art
+mutate "the plaque comes back on the column" $AR " d.Top=top" " d.Top=top;part(ped,'Pedestal plaque',V3(10,5,.2),L(px,2.2*S,-(1.96*S+.1)),RGB(30,34,50))" art
+mutate "the plaque comes back on the column (in the finished hub)" $AR " d.Top=top" " d.Top=top;part(ped,'Pedestal plaque',V3(10,5,.2),L(px,2.2*S,-(1.96*S+.1)),RGB(30,34,50))" scene
+mutate "the label is the small R152 one" $RU "R.Label={W=32,H=14,Near=40,MaxDistance=420}" "R.Label={W=26,H=8,Near=40,MaxDistance=420}" rules
+mutate "the label grows without limit up close" $AR "gui.DistanceLowerLimit=S.Near;" "" art
+mutate "the label hangs inside the item" $AR "gui.StudsOffsetWorldSpace=V3(0,itemTop+A.Dim.LabelGap+S.H/2-4.78*A.Dim.Scale,0)" "gui.StudsOffsetWorldSpace=V3(0,itemTop-S.H/2-4.78*A.Dim.Scale,0)" art
+mutate "the countdown is not on the label" $RU "L.Line=P.Line;L.Footer=P.Footer" "L.Line=P.Line" rules
+mutate "the rarity and chance are not on the label" $RU "L.Line=P.Line;L.Footer=P.Footer" "L.Footer=P.Footer" art
 mutate "the item's light is on the frame, not on the item" $AR "light.Enabled=spec.Calm~=true;light.Parent=core" "light.Enabled=spec.Calm~=true;light.Parent=model" art
 mutate "the avatar is the old size" $RU "R.AvatarHeight=25 " "R.AvatarHeight=10.5 " rules
 mutate "the avatar's scale is not applied" $AV "local ok=pcall(function()model:ScaleTo(k)end)" "local ok=true" avatar
-mutate "the avatar never dances" $AV "   track:Play()" "" avatar
-mutate "a dancing avatar is posed too (the dance would be turned)" $AV " if mode~='dance'then
-  model:SetAttribute('DanceId',nil)" " if true then
-  model:SetAttribute('DanceId',nil)" avatar
-mutate "an avatar whose dance cannot load stays unposed" $AV "while waited<Av.DanceWait and not(track.Length>0)do task.wait(.25);waited+=.25 end
-  if track.Length>0 and track.IsPlaying and model.Parent then mode='dance'else pcall(function()track:Stop()end)end" "mode='dance'" avatar
+mutate "the server plays a dance too (two tracks on every screen)" $AV "pcall(function()for _,t in ipairs(animator:GetPlayingAnimationTracks())do t:Stop(0)end end)" "pcall(function()animator:LoadAnimation(Instance.new('Animation')):Play()end)" avatar
+mutate "a dancing avatar is posed too (the dance would be turned)" $AV "  mode='dance'
+" "  mode='dance';pcall(Pose.Apply,model)
+" avatar
+mutate "the humanoid's state machine stays on while it dances" $AV "   humanoid.EvaluateStateMachine=false
+   pcall(function()humanoid.AutoRotate=false end)" "   pcall(function()humanoid.AutoRotate=false end)" avatar
+mutate "a limb stays anchored (its joint cannot move it)" $AV "   for p in pairs(moved)do if p.Name~='HumanoidRootPart'and p.Anchored then p.Anchored=false end end" "" avatar
+mutate "the feet are measured on the parts, not through the joints (it floats)" $AV "local function settle(model)
+ local at=restPose(model);if not at then return 0 end" "local function settle(model)
+ do return 0 end;local at=restPose(model)" avatar
+mutate "the client never loads the dance" $CL "local track=animator:LoadAnimation(anim);d.Track=track" "local track=nil;d.Track=track;error('no load')" client
+mutate "a dance that cannot load is never retried" $CL "if d.Try>=Rules.DanceTries then fallBack(entry,d);return end" "if d.Try>=1 then fallBack(entry,d);return end" client
+mutate "a dance that cannot load leaves the rig unposed" $CL " if not posedHere[rig]then posedHere[rig]=true;pcall(Pose.Apply,rig)end" "" client
+mutate "the watchdog does not restart a stopped track" $CL "  pcall(function()track:Play(FADE)end)
+ else d.Restarts=0 end" " else d.Restarts=0 end" client
+mutate "the watchdog does not loop the track" $CL " if track.Looped~=true then pcall(function()track.Looped=true end)end" "" client
+mutate "another track keeps playing beside the dance (the shaking)" $CL " quiet(d.Animator,track)
+end
+-- The avatar the server put" "end
+-- The avatar the server put" client
+mutate "the client cheers (writes the joints of) a dancing avatar" $CL "d.Loaded=true;d.Restarts=0;entry.Local='dance'" "d.Loaded=true;d.Restarts=0;entry.Local='pose';cheerJoints(entry,d.Rig)" client
+mutate "the dance is paused while the item is culled" $CL "      local r=entry.CoreRec;if r and r.Part.Parent then entry.Batch:Set(r.Part,turn*r.Rel)end" "      local r=entry.CoreRec;if r and r.Part.Parent then entry.Batch:Set(r.Part,turn*r.Rel)end;if entry.Dance and entry.Dance.Track then entry.Dance.Track:AdjustSpeed(0)end" client
+mutate "the automatic quality tier freezes the dance" $CL "local paused=reduced()or fastMode()" "local paused=reduced()or fastMode()or tier()<2" client
+mutate "the old champion's track is not let go" $CL " stopDance(entry);entry.Joints=nil;entry.Mode=nil;entry.Local=nil" " entry.Joints=nil;entry.Mode=nil;entry.Local=nil" client
+mutate "the dance is never reported" $CL " pcall(function()reportRemote:FireServer(info)end)" "" client
+mutate "the same champion gets a new avatar (every screen's dance restarts)" $SV " if rec and shown and shown.Uid==rec.Uid and shown.Source=='avatar'and shown.Model and shown.Model.Parent then" " if false then" service
+mutate "a client's report is believed as sent" $SV " for _,known in ipairs(Rules.DanceIds)do if info.Id==known then id=known end end" " id=info.Id" service
+mutate "the reports are not rate-limited" $SV " if r.Count>=S.ReportBurst then return false end" "" service
 mutate "the dance starts before the avatar is in the display" $SV "   self.Art.SetAvatar(d,avatar)
    -- in the world now" "   if self.Avatars.Animate then pcall(self.Avatars.Animate,self.Avatars,avatar,0)end
    self.Art.SetAvatar(d,avatar)
    -- in the world now" service
-mutate "a champion overtaken while the dance loads is not dropped" $SV "   if self:_stale(kind,gen)then return end
+mutate "a champion overtaken while its avatar is made ready is not dropped" $SV "   if self:_stale(kind,gen)then return end
   else avatar:Destroy()" "  else avatar:Destroy()" service
 mutate "the showcase item does not turn" $CL "entry.Angle=(entry.Angle+itemClock*SPIN)%(math.pi*2)" "entry.Angle=entry.Angle" client
 mutate "the sparkles are not on the item" $CL "e.Parent=core;entry.Emitter=e" "e.Parent=entry.Model;entry.Emitter=e" client
-mutate "the client cheers a dancing avatar" $CL "if not rig or rig:GetAttribute('Fallback')or entry.Mode~='pose'then return end" "if not rig or rig:GetAttribute('Fallback')then return end" client
-mutate "reduced motion does not pause the dance" $CL "danceSpeed(entry,allowed and 1 or 0)" "danceSpeed(entry,1)" client
+mutate "reduced motion does not pause the dance" $CL "local want=paused and 0 or 1" "local want=1" client
 mutate "a ring comes back on a new champion" $CL " Debris:AddItem(spot,1.8)" " Debris:AddItem(spot,1.8);local ring=Instance.new('Part');ring.Name='HubPopRing';ring.Parent=workspace;Debris:AddItem(ring,1)" client
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]

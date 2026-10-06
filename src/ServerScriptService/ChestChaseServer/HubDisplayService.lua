@@ -8,8 +8,9 @@
 --    later (compare-and-set: only if better) and read about once a minute (45 s + 0..15 s of jitter), so the other servers' champions arrive within a minute. If the store
 --    fails the server keeps its own board and keeps trying (the store backs off; see HubDisplayStore).
 --  * Shows them: HubDisplayArt builds the two pedestals (the Fruit of the Hour's, bigger) in the hub's empty back corners; on a change this writes the words, the colours, a new showcase item
---    and the champion's avatar (HubDisplayAvatar: 25 studs tall, dancing: Animate), each built once per champion (a generation number drops a build that a newer champion overtook), and bumps the display's `Rev` attribute so every
---    client pops it. When someone takes the top spot in THIS server it is announced in CHAT, through PullAnnouncer.Announce({Kind='Record', ...}) (the owner: pull announcements
+--    and the champion's avatar (HubDisplayAvatar: 25 studs tall, made ready to dance: Animate; R153: each client plays the dance), each built once per champion (a generation number drops a build
+--    that a newer champion overtook; R153: a new record of the SAME champion keeps the avatar that stands there, so its dance goes on), and bumps the display's `Rev` attribute so every
+--    client pops it. R153: each client tells how the dance went on its screen (ChestChaseRemotes.HubDisplayAvatarReport -> NoteReport), shown by the owner's `/test hubdisplays`. When someone takes the top spot in THIS server it is announced in CHAT, through PullAnnouncer.Announce({Kind='Record', ...}) (the owner: pull announcements
 --    only in chat): who hears it is PullAnnounceRules.RecordScope (a Secret+ best pull every server, Legendary / Mythic this server, lower nothing; a fruit record this server);
 --    a record that comes from a pack open waits until the puller's reveal has shown the seed (AfterReveal), like the pull line; there is no notice banner of its own any more (it
 --    would be a second message). The celebration chime (a Remote the client plays GemClaim for) goes out in step with the line. An owner's test (bestpull / bigfruit) is told to its
@@ -113,7 +114,14 @@ function S:_visuals(kind,rec,gen,fruitId,accent,calm)
  local model,info=self.Art.BuildItem(d,spec)
  if self:_stale(kind,gen)then if model then model:Destroy()end;return end
  self.Art.SetItem(d,model);self.Built[kind]=info
- -- the avatar: the champion's, or a black silhouette while nobody holds the spot
+ -- the avatar: the champion's, or a black silhouette while nobody holds the spot. R153: the same champion with a better record keeps the avatar that stands there (no new rig: the dance
+ -- every client is playing on it goes on, nothing is fetched again)
+ self.AvatarShown=self.AvatarShown or{}
+ local shown=self.AvatarShown[kind]
+ if rec and shown and shown.Uid==rec.Uid and shown.Source=='avatar'and shown.Model and shown.Model.Parent then
+  d.Model:SetAttribute('Built',(d.Model:GetAttribute('Built')or 0)+1)
+  return
+ end
  local avatar,source
  if rec then avatar,source=self.Avatars:Build(rec.Uid)else avatar,source=self.Avatars:Build(0,{Silhouette=true})end
  if self:_stale(kind,gen)then if avatar then avatar:Destroy()end;return end
@@ -122,17 +130,71 @@ function S:_visuals(kind,rec,gen,fruitId,accent,calm)
   local placed=self.Avatars:Place(avatar,d.FeetAt,Rules.AvatarHeight,Rules.AvatarTurn)
   if placed then
    self.Art.SetAvatar(d,avatar)
-   -- in the world now: dance (the rig's Animator plays a default R15 dance; if it cannot, the static pose goes on instead). This waits for the dance to load, so look again afterwards.
+   -- in the world now: ready to dance (R153: each client plays it; a rig that cannot dance gets the static pose instead). A stand-in Avatars may yield here, so look again afterwards.
    if self.Avatars.Animate then
     local okAnimate,result=pcall(self.Avatars.Animate,self.Avatars,avatar,rec and rec.Uid or 0)
     if okAnimate then mode=result else warn('[R151] avatar animation: '..tostring(result))end
    end
    if self:_stale(kind,gen)then return end
-  else avatar:Destroy();self.Art.SetAvatar(d,nil)end
+  else avatar:Destroy();self.Art.SetAvatar(d,nil);avatar=nil end
  end
+ self.AvatarShown[kind]={Uid=rec and rec.Uid or 0,Source=source,Model=avatar}
  self.AvatarSource=self.AvatarSource or{};self.AvatarSource[kind]=source
  self.AvatarMode=self.AvatarMode or{};self.AvatarMode[kind]=mode
+ self.DanceId=self.DanceId or{};self.DanceId[kind]=avatar and avatar:GetAttribute('DanceId')or nil
  d.Model:SetAttribute('Built',(d.Model:GetAttribute('Built')or 0)+1)
+end
+-- Client reports (R153) --------------------------------------------------------------------------------------------------------------------------------------
+-- What the dance did on one player's screen (HubDisplayClient sends it when it changes): {Kind='Pull'|'Fruit', Mode='dance'|'loading'|'pose'|'static', Id=<one of DanceIds>, Loaded=bool,
+-- Length=seconds, Tries=n, Paused=bool, User=<the rig's user id>}. Only for the owner's status line: checked field by field, at most ReportBurst a player in ReportWindow seconds, the last
+-- one per display kept (players who left are forgotten with their Player). Returns true when it was kept.
+S.ReportBurst=20;S.ReportWindow=10
+local REPORT_MODES={dance=true,loading=true,pose=true,static=true}
+function S:NoteReport(player,info)
+ if typeof(player)~='Instance'or type(info)~='table'then return false end
+ local kind=info.Kind;if kind~='Pull'and kind~='Fruit'then return false end
+ if type(info.Mode)~='string'or not REPORT_MODES[info.Mode]then return false end
+ self.Reports=self.Reports or setmetatable({},{__mode='k'})
+ local r=self.Reports[player];local now=self.Clock()
+ if not r then r={Count=0,Since=now};self.Reports[player]=r end
+ if now-r.Since>=S.ReportWindow then r.Count=0;r.Since=now end
+ if r.Count>=S.ReportBurst then return false end
+ r.Count+=1
+ local id=nil
+ for _,known in ipairs(Rules.DanceIds)do if info.Id==known then id=known end end
+ local length=tonumber(info.Length);if not length or length~=length or length<0 or length>600 then length=0 end
+ local tries=tonumber(info.Tries);if not tries or tries~=tries or tries<0 or tries>99 then tries=0 end
+ local user=tonumber(info.User);if not user or user~=user or user%1~=0 or math.abs(user)>2^53 then user=0 end
+ r[kind]={Mode=info.Mode,Id=id,Loaded=info.Loaded==true,Length=math.floor(length*100+.5)/100,Tries=math.floor(tries),Paused=info.Paused==true,User=user,At=now}
+ return true
+end
+-- The owner's words about one display's dance: the server's AvatarMode and dance id, then `player`'s own screen (when given) and how many other screens report what.
+function S:_danceText(kind,player)
+ local mode=self.AvatarMode and self.AvatarMode[kind]
+ local id=self.DanceId and self.DanceId[kind]
+ local out='AvatarMode '..tostring(mode or'-')..(id and(' '..(tostring(id):match('%d+')or id))or'')
+ local function screen(r)
+  if not r then return'no report yet'end
+  local t=r.Mode
+  if r.Mode=='dance'then t=t..string.format(': track loaded, Length %.2f s, %s%s',r.Length,r.Paused and'paused (reduced motion / low quality)'or'playing',r.Tries>1 and(', try '..r.Tries)or'')
+  elseif r.Mode=='loading'then t=t..string.format(': try %d of %d, Length %.2f',r.Tries,Rules.DanceTries,r.Length)
+  elseif r.Mode=='pose'and r.Tries>0 then t=t..string.format(': the dance did not load (%d tries, Length %.2f), posed on that screen',r.Tries,r.Length)end
+  if r.Id and r.Id~=id then t=t..' (id '..(r.Id:match('%d+')or r.Id)..')'end
+  return t
+ end
+ local shown=self.AvatarShown and self.AvatarShown[kind]
+ if player then
+  local r=self.Reports and self.Reports[player];r=r and r[kind]
+  if r and shown and r.User~=shown.Uid then r=nil end -- (a report about an avatar that is gone)
+  out=out..'; your screen: '..screen(r)
+ end
+ local counts={};local n=0
+ for p,r in pairs(self.Reports or{})do local k=r[kind];if k and p~=player and(not shown or k.User==shown.Uid)then counts[k.Mode]=(counts[k.Mode]or 0)+1;n+=1 end end
+ if n>0 then
+  local parts={};for _,m in ipairs({'dance','loading','pose','static'})do if counts[m]then parts[#parts+1]=counts[m]..' '..m end end
+  out=out..'; other screens: '..table.concat(parts,', ')
+ end
+ return out
 end
 -- Events -----------------------------------------------------------------------------------------------------------------------------------------------------
 -- An owner command just gave this player packs / seeds / plants: what they open or pick for the rest of this session is not counted.
@@ -296,6 +358,11 @@ function S:Start()
   local remote=remotes:FindFirstChild(S.RemoteName)
   if not remote then remote=Instance.new('RemoteEvent');remote.Name=S.RemoteName;remote.Parent=remotes end
   self.Remote=remote
+  -- R153: the clients' dance reports (for the owner's status line only)
+  local report=remotes:FindFirstChild(Rules.ReportRemote)
+  if not report then report=Instance.new('RemoteEvent');report.Name=Rules.ReportRemote;report.Parent=remotes end
+  self.ReportRemote=report
+  pcall(function()self.ReportConnection=report.OnServerEvent:Connect(function(player,info)if not self.Dead then pcall(self.NoteReport,self,player,info)end end)end)
  end
  self.NextPoll=self.Clock()+Rules.FirstPollDelay
  self:_syncDay() -- (the first day: sets the boards up and shows both displays)
@@ -312,6 +379,7 @@ function S:Start()
 end
 function S:Destroy()
  self.Dead=true
+ if self.ReportConnection then pcall(function()self.ReportConnection:Disconnect()end);self.ReportConnection=nil end
  if self.Folder then self.Folder:Destroy();self.Folder=nil end
 end
 -- Owner tools (OwnerUpdateCommands82) ------------------------------------------------------------------------------------------------------------------------
@@ -385,7 +453,7 @@ function S:Snapshot()
  end
  return out
 end
-function S:StatusText()
+function S:StatusText(player) -- (player: the owner who asked; their own screen's dance is told)
  local snap=self:Snapshot();local lines={}
  local fruit=snap.FruitId and self:FruitName(snap.FruitId)or'(none)'
  lines[#lines+1]=('Day %s%s | fruit of the day: %s | new board in %s'):format(tostring(snap.Day),snap.DayOffset~=0 and(' (preview '..string.format('%+d',snap.DayOffset)..')')or'',fruit,Rules.Countdown(Rules.SecondsLeft(self:Now())))
@@ -398,7 +466,7 @@ function S:StatusText()
   or('Shared board: %s, %d request%s, %s'):format(st.Failures==0 and'ok'or('FAILING x'..st.Failures..(st.Throttled and' (throttled)'or'')),st.Requests,st.Requests==1 and''or's',st.LastError and('last error: '..st.LastError..'; retry in '..math.ceil(st.RetryIn)..' s')or(st.LastOk and'last ok'or'not read yet'))
  for _,kind in ipairs(KINDS)do
   local d=self.Displays[kind]
-  if d then local n=self.Art.Counts(d);lines[#lines+1]=('%s display: %d pedestal parts, %d item parts, %d avatar parts (%s, %s)'):format(kind,n.Frame,n.Item,n.Avatar,tostring(self.AvatarSource and self.AvatarSource[kind]or'-'),tostring(self.AvatarMode and self.AvatarMode[kind]or'-'))end
+  if d then local n=self.Art.Counts(d);lines[#lines+1]=('%s display: %d pedestal parts, %d item parts, %d avatar parts (%s) | %s'):format(kind,n.Frame,n.Item,n.Avatar,tostring(self.AvatarSource and self.AvatarSource[kind]or'-'),self:_danceText(kind,typeof(player)=='Instance'and player or nil))end
  end
  return table.concat(lines,'\n')
 end

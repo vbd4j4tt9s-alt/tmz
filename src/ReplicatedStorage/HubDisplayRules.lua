@@ -4,7 +4,7 @@
 -- Instances: everything here can be tested alone.
 -- R152 (owner: "make sure that the avatar is sized up and dancing while the seed rotates around and the effects are actually on the seed not behind ... a billboard is not
 -- needed ... the same format and look as the fruit of the hour type pedestal"): no sign board any more. A display is the Fruit of the Hour pedestal, built big, with the
--- winning seed / fruit turning over it and the champion's avatar, 25 studs tall and dancing, beside it. Its words are small, in the Fruit of the Hour's own format (see Words).
+-- winning seed / fruit turning over it and the champion's avatar, 25 studs tall and dancing, beside it. R153: its words are one BIG label over the item (see Words).
 --  * BEST PULL TODAY: the rarest seed any player pulled from a pack today, across all servers. Order: highest rarity rank (Common ... King, as
 --    SeedPackRules.Rarities ranks them), then the smaller chance (the rarer pull), then the heavier seed, then the earlier pull. PullBetter is a strict
 --    total order (the last two keys make even identical pulls differ), so every server picks the same winner.
@@ -40,6 +40,19 @@ R.AvatarTurn=-.3                  -- the avatar turns this far (radians) from fa
 R.AvatarAccessories=10            -- at most this many accessories are worn by the display's avatar
 R.AvatarCache=12                  -- humanoid descriptions kept (per user id)
 R.Tag='HubDisplay151'
+-- R153 (owner's Studio: the giant avatar stood in its static pose, not dancing): each CLIENT plays the dance on its own screen (HubDisplayClient), on the rig's Animator: one of
+-- Roblox's default R15 dance emotes (the Animate script's dance set: Roblox's own assets, which load in any experience), picked per user id. A load that has no Length after
+-- DanceTry seconds is dropped and the next id tried, DanceTries times in all (20 s); then that client poses the rig instead (HubAvatarPose: the R151 look, cheering).
+R.DanceIds={'rbxassetid://507771019','rbxassetid://507771955','rbxassetid://507772104'}
+R.DanceTry=5
+R.DanceTries=4
+R.ReportRemote='HubDisplayAvatarReport' -- (client -> server: what the dance did on that screen, for the owner's `/test hubdisplays`)
+-- Which of DanceIds a user id dances (try 1; every further try moves on to the next id). Any input gives a valid index.
+function R.DanceIndex(userId,try)
+ local n=tonumber(userId);n=(n and n==n and math.abs(n)<2^52)and math.floor(n)or 0
+ local t=tonumber(try);t=(t and t==t and math.abs(t)<2^52)and math.floor(t)or 1
+ return(n+t-1)%#R.DanceIds+1
+end
 
 -- Time -----------------------------------------------------------------------------------------------------------------------------------------------
 function R.Day(t)return D.Day(t)end
@@ -242,36 +255,34 @@ function R.FruitTraits(rec)
 end
 
 -- The words ---------------------------------------------------------------------------------------------------------------------------------------------
--- Small, in the Fruit of the Hour pedestal's own format (MarketLayout.Pedestal / FruitOfHourDisplay), only bigger: an engraved PLAQUE on the pedestal column's front (a SurfaceGui: a dark plate with gold
--- Fredoka lettering) and a LABEL floating over the showcase item (a BillboardGui sized in studs, its text fills each row). Rows are boxes (X, Y, W, H) with the biggest text size they may use (plaque: pixels
--- on a canvas drawn at PixelsPerStud; label: studs); the text shrinks to fit. Fit() is the conservative width model the tests use (Fredoka One is a chunky face: about 0.62 em per character, an emoji about 1.5).
-R.Plaque={W=10,H=5,PixelsPerStud=48,Canvas={W=480,H=240},MaxDistance=300}
-R.Plaque.Rows={
- Title={X=20,Y=8,W=440,H=70,Max=56},
- Name={X=20,Y=80,W=440,H=64,Max=52},
- Line={X=20,Y=146,W=440,H=52,Max=40},
- Footer={X=20,Y=200,W=440,H=34,Max=26},
-}
-R.Label={W=26,H=8,MaxDistance=420}
+-- R153 (owner, of the R152 plaque on the pedestal's column: "this detail here should be put on top of the fruit and it should be big"): no plaque any more. Every line is on ONE big LABEL
+-- floating over the showcase item (a BillboardGui sized in studs, so it shrinks with distance like the world around it; DistanceLowerLimit = Near: closer than that it stops growing, so it
+-- is never silly-large up close; it reads from about 150 studs). Rows, top to bottom (boxes in studs, X / Y from the label's top-left, Max = the biggest text height a row may use; the text
+-- shrinks to fit): the title and the winner biggest, then the seed / the weight, the rarity and chance / the fruit of the day, and the countdown. Fit() is the conservative width model the
+-- tests use (Fredoka One is a chunky face: about 0.62 em per character, an emoji about 1.5).
+R.Label={W=32,H=14,Near=40,MaxDistance=420}
 R.Label.Rows={
- Title={X=.5,Y=0,W=25,H=2.2,Max=2.0},
- Name={X=.5,Y=2.2,W=25,H=3.2,Max=3.0},
- Info={X=.5,Y=5.4,W=25,H=2.6,Max=2.4},
+ Title={X=1,Y=0,W=30,H=3.0,Max=2.8},
+ Name={X=1,Y=3.0,W=30,H=4.2,Max=4.0},
+ Info={X=1,Y=7.2,W=30,H=2.6,Max=2.4},
+ Line={X=1,Y=9.8,W=30,H=2.3,Max=2.1},
+ Footer={X=1,Y=12.1,W=30,H=1.9,Max=1.7},
 }
+R.Label.Order={'Title','Name','Info','Line','Footer'}
 function R.TextWidthEm(text)
  local em=0
  for _,cp in utf8.codes(text)do em+=(cp>=0x2190)and 1.5 or .62 end
  return em
 end
--- The biggest size (pixels on the plaque, studs on the label) text may be drawn at inside a row: its Max, less when the words are too long for the row's width or the row is not tall enough.
+-- The biggest size (studs on the label) text may be drawn at inside a row: its Max, less when the words are too long for the row's width or the row is not tall enough.
 function R.Fit(text,row)
  local em=math.max(R.TextWidthEm(text),.01)
  return math.min(row.Max,row.W/em,row.H*.95)
 end
 local PLACEHOLDER='Nobody yet'
 -- The words of a display. kind 'Pull' | 'Fruit'; rec = the champion's record (nil: nobody yet); fruitId = today's fruit; secondsLeft = to the next board; fruitName = its plain name.
--- Returns {Kind, State, Accent={r,g,b}, Plaque={Title=, Name=, Line=, Footer=}, Label={Title=, Name=, Info=}} (each row {Text, Color={r,g,b}}): the plaque says the title, the winner, a line (a pull's
--- rarity and chance; the fruit of the day) and the countdown; the label says the title, the winner and the seed / the weight.
+-- Returns {Kind, State, Accent={r,g,b}, Label={Title=, Name=, Info=, Line=, Footer=}, Plaque={Title=, Name=, Line=, Footer=}} (each row {Text, Color={r,g,b}}): the label says the title, the winner,
+-- the seed / the weight, a line (a pull's rarity and chance; the fruit of the day) and the countdown. (Plaque: the same rows as R151 / R152 named them, for older readers; nothing draws it now.)
 function R.SignText(kind,rec,fruitId,secondsLeft,fruitName)
  local gold={255,214,90};local white={255,255,255};local soft={206,214,238}
  local out={Kind=kind,Plaque={},Label={}}
@@ -287,7 +298,7 @@ function R.SignText(kind,rec,fruitId,secondsLeft,fruitName)
    P.Line={Text=rec.Rarity..' · '..R.OddsText(rec.Odds)..(COAT[rec.Coat]and(' · '..COAT[rec.Coat])or''),Color=out.Accent}
   else
    out.State='Empty';out.Accent=gold
-   winner(PLACEHOLDER);L.Info={Text='Open a pack!',Color=soft}
+   winner(PLACEHOLDER);L.Info={Text='???',Color=soft}
    P.Line={Text='Open a pack to grab it!',Color=soft}
   end
  else
@@ -302,6 +313,7 @@ function R.SignText(kind,rec,fruitId,secondsLeft,fruitName)
    winner(PLACEHOLDER);L.Info={Text='Pick one to grab it!',Color=soft}
   end
  end
+ L.Line=P.Line;L.Footer=P.Footer -- (R153: the plaque's rows are the label's lower rows)
  return out
 end
 

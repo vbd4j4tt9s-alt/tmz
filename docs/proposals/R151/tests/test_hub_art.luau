@@ -2,14 +2,15 @@
 -- R151 hub displays (rebuilt in R152): HubDisplayArt on the Roblox mock with the REAL game builders (SeedPackVisuals for seeds, HarvestPresentation / PlantVisuals for fruit, MarketLayout.Pedestal
 -- for the look to match). The place's own layout against the map is check_hub_scene.py (the whole hub after the real start-up builders); this is the display alone:
 --  1. the frame: just the market's Fruit of the Hour pedestal, bigger (same names, colours, shapes and proportions as MarketLayout.Pedestal x 3.2), and nothing else: NO sign board, posts,
---     slab, halo, disc, plinth for the avatar or tube; a plaque (SurfaceGui) and a label (BillboardGui) with their rows laid out by HubDisplayRules; a handful of static parts, 4 of them solid;
+--     slab, halo, disc, plinth for the avatar or tube, and (R153) no plaque: ONE big label (BillboardGui in studs, DistanceLowerLimit) with its five rows laid out by HubDisplayRules, over
+--     the item; a handful of static parts, 4 of them solid;
 --     everything inside the stand's footprint, inside the corner reserved for it (HubDecorKit151.Reserved) and clear of the hub's walls and the market, under the walls' height; no z-fighting
 --     (no two same-facing faces within .02 stud where they overlap: the frame checked face by face);
 --  2. the showcase item for EVERY seed of the game (54) and EVERY fruit of the rotation, plain and with Gold / Diamond coats: at most 150 parts, static anchored inert parts, no scripts or
 --     emitters, scaled to about 12 studs, floating over the pedestal's prongs and under the label; an item over the cap is trimmed or built with the plant builder's simplified fruit; a
 --     builder that fails gives a gem, never an empty display;
 --  3. the effects are ON the item: an invisible core part inside it with the PointLight (the accent colour; off when calm), nothing in the frame lights or glows, nothing flat behind it;
---  4. the words: the plaque and the label say the title and the winner (and the seed / fruit, the countdown); the empty state invites;
+--  4. the words: the label says the title, the winner, the seed / weight, the rarity and chance / the fruit of the day and the countdown; the empty state invites;
 --  5. cost: the numbers of parts, lights, guis and emitters of a finished display.
 local HH=require('./hub_harness');local H=HH.H;local W,R=H.W,H.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -68,10 +69,12 @@ do
  end
  check(see==0 and round==0 and neon==0,'every part is opaque, block-shaped and plain (no translucent tube, no round disc, no neon or glass plate)')
  local nonParts=0;for _,d in ipairs(pullD.Model:GetDescendants())do
-  if not(d:IsA('BasePart')or d:IsA('Model')or d:IsA('Folder')or d:IsA('SurfaceGui')or d:IsA('BillboardGui')or d:IsA('TextLabel')or d:IsA('UITextSizeConstraint'))then nonParts+=1;print('   unexpected '..d._class)end
+  if not(d:IsA('BasePart')or d:IsA('Model')or d:IsA('Folder')or d:IsA('BillboardGui')or d:IsA('TextLabel'))then nonParts+=1;print('   unexpected '..d._class)end
  end
- check(nonParts==0,'the frame is parts and two guis with their text labels: no scripts, emitters, lights, joints or sounds')
- check(#all(pullD.Model,'SurfaceGui')==1 and #all(pullD.Model,'BillboardGui')==1 and #lightsIn(pullD.Model)==0 and #all(pullD.Model,'ParticleEmitter')==0 and #all(pullD.Model,'Script')==0,'one plaque, one label, no light, no emitters, no scripts')
+ check(nonParts==0,'the frame is parts and one gui with its text labels: no scripts, emitters, lights, joints or sounds')
+ check(#all(pullD.Model,'SurfaceGui')==0 and #all(pullD.Model,'BillboardGui')==1 and #lightsIn(pullD.Model)==0 and #all(pullD.Model,'ParticleEmitter')==0 and #all(pullD.Model,'Script')==0,'R153: no plaque (no SurfaceGui), one label, no light, no emitters, no scripts')
+ local plates=0;for _,p in ipairs(parts(pullD.Model))do if p.Name=='Pedestal plaque'then plates+=1 end end
+ check(plates==0,'the plaque\'s plate is gone from the column')
  local bad=0;for _,p in ipairs(parts(pullD.Model))do if not p.Anchored or p.CanTouch then bad+=1 end end
  check(bad==0,'every part is anchored and untouchable')
  local solid={};local solids=0;for _,p in ipairs(parts(pullD.Model))do if p.CanCollide then solid[p.Name]=(solid[p.Name]or 0)+1;solids+=1;if not p.CanQuery then bad+=1 end elseif p.CanQuery then bad+=1 end end
@@ -83,28 +86,25 @@ do
   local foh=Market.Pedestal(fold,CF(0,0,0));local base=Market.FruitOfHour
   local theirs={};for _,p in ipairs(parts(foh))do theirs[#theirs+1]={Name=p.Name,Size=p.Size,Pos=p.CFrame.Position-base,Color=p.Color}end
   local mine={};for _,p in ipairs(parts(pullD.Model.Pedestal))do local q=toLocal(pullD,p.CFrame.Position);mine[#mine+1]={Name=p.Name,Size=p.Size,Pos=V3(q.X-Art.Dim.Pedestal.X,q.Y,q.Z),Color=p.Color}end
-  local skip={['Projector beam']=true,['Cradle glow']=true,['FruitAnchor']=true}
+  local skip={['Projector beam']=true,['Cradle glow']=true,['FruitAnchor']=true,['Pedestal plaque']=true} -- (R153: the words are on the big label; the market's own plaque says FRUIT OF THE HOUR)
   local missing,wrong,compared={},{},0
   for _,t in ipairs(theirs)do if not skip[t.Name]then
    local hit
-   local loose=t.Name=='Pedestal plaque'or t.Name=='Column inlay' -- (bigger here, to frame the bigger plaque: same side of the column, about the same height)
    for _,m in ipairs(mine)do
     if m.Name==t.Name and not m.Used then
      local exact=near(m.Pos.X,t.Pos.X*S,.001)and near(m.Pos.Y,t.Pos.Y*S,.001)and near(m.Pos.Z,t.Pos.Z*S,.001)
-     local side=near(m.Pos.Y,t.Pos.Y*S,1.0)and(m.Pos.Z<0)==(t.Pos.Z<0)
-     if exact or(loose and side)then hit=m;break end
+     if exact then hit=m;break end
     end
    end
    if not hit then missing[#missing+1]=t.Name else
     hit.Used=true;compared+=1
-    if t.Name~='Pedestal plaque'and not near(hit.Color.R,t.Color.R,1e-6)then wrong[#wrong+1]=t.Name..' colour'end
-    if t.Name~='Pedestal plaque'and t.Name~='Column inlay'and not(near(hit.Size.X,t.Size.X*S,.001)and near(hit.Size.Y,t.Size.Y*S,.001)and near(hit.Size.Z,t.Size.Z*S,.001))then wrong[#wrong+1]=t.Name..' size'end
-    if t.Name=='Column inlay'and not near(hit.Size.Z,t.Size.Z*S,.001)then wrong[#wrong+1]='inlay depth'end
+    if not near(hit.Color.R,t.Color.R,1e-6)then wrong[#wrong+1]=t.Name..' colour'end
+    if not(near(hit.Size.X,t.Size.X*S,.001)and near(hit.Size.Y,t.Size.Y*S,.001)and near(hit.Size.Z,t.Size.Z*S,.001))then wrong[#wrong+1]=t.Name..' size'end
    end
   end end
-  check(#missing==0 and #wrong==0 and compared>=16,'every part of the Fruit of the Hour pedestal (except its projector tube and its flat cradle glow) is there at 3.2 times the size, in the same place and colour: plinth, trim, studs, column, inlays, band, capital, top, prongs ('..compared..' compared; missing: '..table.concat(missing,',')..'; wrong: '..table.concat(wrong,',')..')')
+  check(#missing==0 and #wrong==0 and compared>=16,'every part of the Fruit of the Hour pedestal (except its projector tube, its flat cradle glow and, R153, its plaque) is there at 3.2 times the size, in the same place, size and colour: plinth, trim, studs, column, inlays, band, capital, top, prongs ('..compared..' compared; missing: '..table.concat(missing,',')..'; wrong: '..table.concat(wrong,',')..')')
   local used=0;for _,m in ipairs(mine)do if m.Used then used+=1 end end
-  check(#mine-used<=1,'and the pedestal has nothing of its own but the plaque\'s plate ('..(#mine-used)..' extra)')
+  check(#mine-used==0,'and the pedestal has nothing of its own ('..(#mine-used)..' extra)')
   fold:Destroy()
  end
  -- where it stands
@@ -122,42 +122,27 @@ do
  local fl=fruitD.F.LookVector;local ft=(Rules.Layout.Target-fruitD.F.Position);ft=V3(ft.X,0,ft.Z).Unit
  check(near(fl.X,ft.X,1e-6)and near(fl.Z,ft.Z,1e-6),'and so does the other')
  check(pullD.F.Position.X>0 and fruitD.F.Position.X<0 and near(pullD.F.Position.X,-fruitD.F.Position.X)and near(pullD.F.Position.Z,fruitD.F.Position.Z),'BEST PULL in the +X corner, BIGGEST FRUIT in the -X corner, mirror images')
- -- the plaque and the label
- local plate
- for _,p in ipairs(parts(pullD.Model))do if p.Name=='Pedestal plaque'then plate=p end end
- local pq=toLocal(pullD,plate.CFrame.Position)
- local column;for _,p in ipairs(parts(pullD.Model))do if p.Name=='Pedestal column'then column=p end end
- local cq=toLocal(pullD,column.CFrame.Position)
- check(near(plate.Size.X,Rules.Plaque.W)and near(plate.Size.Y,Rules.Plaque.H)and plate.Size.X<column.Size.X and plate.Size.Y<column.Size.Y,'the plaque is a '..Rules.Plaque.W..' x '..Rules.Plaque.H..' stud plate on the column, smaller than its face')
- check(pq.Z<cq.Z-column.Size.Z/2 and near(pq.X,cq.X,.01),'on the column\'s FRONT (toward the viewers), centred')
- check(near(plate.Color.R*255,30,.6)and near(plate.Color.G*255,34,.6)and near(plate.Color.B*255,50,.6),'a dark plate, the Fruit of the Hour plaque\'s own (30, 34, 50)')
- local gui=pullD.Gui
- check(gui.Face==R.Enum.NormalId.Front and gui.SizingMode==R.Enum.SurfaceGuiSizingMode.PixelsPerStud and gui.PixelsPerStud==Rules.Plaque.PixelsPerStud and gui.LightInfluence==0 and gui.Parent==plate and gui.MaxDistance==Rules.Plaque.MaxDistance,'the plaque\'s words are a SurfaceGui on its front, '..Rules.Plaque.PixelsPerStud..' px per stud, LightInfluence 0')
- local c=Rules.Plaque.Canvas
- check(c.W==Rules.Plaque.W*Rules.Plaque.PixelsPerStud and c.H==Rules.Plaque.H*Rules.Plaque.PixelsPerStud,'its canvas is the plate\'s studs x pixels per stud')
- local rows=0
- for key,row in pairs(Rules.Plaque.Rows)do
-  local l=pullD.Plate[key]
-  if l then rows+=1
-   check(near(l.Position.X.Scale,row.X/c.W,1e-9)and near(l.Position.Y.Scale,row.Y/c.H,1e-9)and near(l.Size.X.Scale,row.W/c.W,1e-9)and near(l.Size.Y.Scale,row.H/c.H,1e-9),'the plaque\'s "'..key..'" label sits in its row')
-   local fit=l:FindFirstChildOfClass('UITextSizeConstraint')
-   check(l.TextScaled and fit and fit.MaxTextSize==row.Max and l.Font==R.Enum.Font.FredokaOne,'"'..key..'": scaled text, at most '..row.Max..' px, Fredoka One')
+ -- the label: everything the R152 plaque said, big, over the item
+ local label=pullD.LabelGui;local LB=Rules.Label
+ check(R.typeof(label)=='Instance'and label:IsA('BillboardGui')and label.Adornee~=nil and label.Adornee:IsA('BasePart')and label.Parent==label.Adornee and label.LightInfluence==0 and label.MaxDistance==LB.MaxDistance and label.AlwaysOnTop==false,'the label is a BillboardGui over the item, like the Fruit of the Hour\'s')
+ check(near(label.Size.X.Scale,LB.W)and near(label.Size.Y.Scale,LB.H)and label.Size.X.Offset==0 and label.Size.Y.Offset==0,'sized in studs: '..LB.W..' x '..LB.H..' (it shrinks with distance like the world)')
+ check(label.DistanceLowerLimit==LB.Near and LB.Near>0,'closer than '..LB.Near..' studs it stops growing (DistanceLowerLimit: never silly-large up close)')
+ local lrows=0
+ for i,key in ipairs(LB.Order)do
+  local row=LB.Rows[key];local l=pullD.Tag[key]
+  if l then lrows+=1
+   check(near(l.Position.X.Scale,row.X/LB.W,1e-9)and near(l.Position.Y.Scale,row.Y/LB.H,1e-9)and near(l.Size.X.Scale,row.W/LB.W,1e-9)and near(l.Size.Y.Scale,row.H/LB.H,1e-9)and l.TextScaled and l.Font==R.Enum.Font.FredokaOne and l.Parent==label,'the label\'s "'..key..'" row sits in its box (scaled Fredoka One)')
   end
  end
- check(rows==4 and pullD.Plate.Footer.Parent==gui,'four rows: title, winner, line, countdown (the client finds the countdown by the name Footer)')
- local label=pullD.LabelGui
- check(R.typeof(label)=='Instance'and label:IsA('BillboardGui')and label.Adornee~=nil and label.Adornee:IsA('BasePart')and label.Parent==label.Adornee and label.LightInfluence==0 and label.MaxDistance==Rules.Label.MaxDistance,'the label is a BillboardGui over the item, like the Fruit of the Hour\'s')
- check(near(label.Size.X.Scale,Rules.Label.W)and near(label.Size.Y.Scale,Rules.Label.H),'sized in studs: '..Rules.Label.W..' x '..Rules.Label.H)
- local lrows=0
- for key,row in pairs(Rules.Label.Rows)do
-  local l=pullD.Tag[key]
-  if l then lrows+=1;check(near(l.Position.Y.Scale,row.Y/Rules.Label.H,1e-9)and near(l.Size.Y.Scale,row.H/Rules.Label.H,1e-9)and l.TextScaled and l.Font==R.Enum.Font.FredokaOne,'the label\'s "'..key..'" row sits in its box (scaled Fredoka One)')end
- end
- check(lrows==3,'three rows: title, winner, seed / fruit')
- -- the label floats above the item and under the walls
+ check(lrows==5 and pullD.Tag.Footer and pullD.Tag.Footer.Name=='Footer','five rows: title, winner, seed / weight, rarity and chance / fruit of the day, countdown (the client finds the countdown by the name Footer)')
+ check(pullD.Tag.Name.Size.Y.Scale>pullD.Tag.Info.Size.Y.Scale and pullD.Tag.Title.Size.Y.Scale>pullD.Tag.Line.Size.Y.Scale and pullD.Tag.Line.Size.Y.Scale>pullD.Tag.Footer.Size.Y.Scale,'the winner and the title are the biggest rows')
+ local foot=0;for _,d in ipairs(pullD.Model:GetDescendants())do if d.Name=='Footer'then foot+=1 end end
+ check(foot==1,'one countdown in the display (the plaque\'s is gone)')
+ -- the label floats above the item and about as high as the walls
  local labelBottom=Art.ItemBase()+Rules.ItemHeight+Art.Dim.LabelGap
  local offsetY=label.StudsOffsetWorldSpace.Y+4.78*S
- check(near(offsetY-Rules.Label.H/2,labelBottom,.01)and labelBottom+Rules.Label.H<=47,'it hangs '..Art.Dim.LabelGap..' studs over the item\'s top, its own top at '..string.format('%.1f',labelBottom+Rules.Label.H)..' (the hub\'s walls are 48)')
+ check(near(offsetY-LB.H/2,labelBottom,.01)and labelBottom>=Art.ItemBase()+Rules.ItemHeight+.6+.5 and labelBottom+LB.H<=48.01,'it hangs '..Art.Dim.LabelGap..' studs over the item\'s top (clear of its bob), its own top at '..string.format('%.1f',labelBottom+LB.H)..' (the hub\'s walls are 48)')
+ check(near(label.StudsOffsetWorldSpace.X,0,1e-9)and near(label.StudsOffsetWorldSpace.Z,0,1e-9),'right over the item (the pedestal\'s top, where the item turns)')
  -- the stand's numbers
  local base=Art.ItemBase()
  check(base>Art.CapitalTop()+2 and base<=Art.CapitalTop()+7 and near(base,Art.Dim.ItemTop*S),'the item floats '..string.format('%.1f',base-Art.CapitalTop())..' studs over the pedestal\'s top, over the prongs\' tips')
@@ -264,7 +249,7 @@ end
 do
  local found,nfaces,skipped=zfight(pullD)
  check(#found==0,'no z-fighting on the pedestal: no two same-facing faces within .02 stud overlap ('..table.concat(found,'; ')..')')
- check(nfaces>=13*6 and skipped==4,'(the check looked at '..nfaces..' faces; the '..skipped..' slanted prongs are left out)')
+ check(nfaces>=12*6 and skipped==4,'(the check looked at '..nfaces..' faces; the '..skipped..' slanted prongs are left out)')
  -- the checker has teeth: a slab lying 0.01 stud above the plinth's top, and a flush plate on the column's front, both flicker
  local plinth;for _,p in ipairs(parts(pullD.Model))do if p.Name=='Pedestal plinth'then plinth=p end end
  local fake=R.new('Part');fake.Name='Fake';fake.Size=V3(5,.2,5);fake.Parent=pullD.Model.Pedestal
@@ -434,25 +419,23 @@ end
 do
  local text=Rules.SignText('Pull',nil,nil,3600)
  Art.SetSign(pullD,text)
- check(pullD.Plate.Name.Text=='Nobody yet'and pullD.Tag.Name.Text=='Nobody yet'and pullD.Model:GetAttribute('State')=='Empty','the empty BEST PULL says nobody yet (plaque and label)')
- check(pullD.Plate.Line.Text:find('Open a pack',1,true)and pullD.Tag.Info.Text:find('Open a pack',1,true),'and invites the first pull')
+ check(pullD.Plate==nil and pullD.Tag.Name.Text=='Nobody yet'and pullD.Model:GetAttribute('State')=='Empty','the empty BEST PULL says nobody yet')
+ check(pullD.Tag.Line.Text:find('Open a pack',1,true)and pullD.Tag.Info.Text=='???'and pullD.Tag.Footer.Text=='New board in 1h 0m','and invites the first pull, under the mystery seed, with the countdown')
  local rec=Rules.CleanPull({Uid=1,Name='Jess',Id='FirePepperSeed',Seed='Fire Pepper',Rarity='Mythic',Odds=.125,Scale=1,At=5})
  local t2=Rules.SignText('Pull',rec,nil,18720)
  Art.SetSign(pullD,t2)
  local want=R.Color3.fromRGB(t2.Accent[1],t2.Accent[2],t2.Accent[3])
- check(pullD.Plate.Title.Text=='BEST PULL TODAY'and pullD.Plate.Name.Text=='Jess'and pullD.Plate.Line.Text=='Mythic · 1/800'and pullD.Plate.Footer.Text=='New board in 5h 12m','the plaque says the title, the winner, the rarity and chance, the countdown')
- check(pullD.Tag.Title.Text=='BEST PULL TODAY'and pullD.Tag.Name.Text=='Jess'and pullD.Tag.Info.Text=='Fire Pepper','and the label the title, the winner and the seed')
- check(near(pullD.Tag.Info.TextColor3.R,want.R,.01)and near(pullD.Tag.Info.TextColor3.G,want.G,.01)and near(pullD.Plate.Line.TextColor3.R,want.R,.01),'the seed is in the rarity\'s colour')
+ check(pullD.Tag.Title.Text=='BEST PULL TODAY'and pullD.Tag.Name.Text=='Jess'and pullD.Tag.Info.Text=='Fire Pepper'and pullD.Tag.Line.Text==t2.Label.Line.Text and pullD.Tag.Line.Text=='Mythic · 1/800'and pullD.Tag.Footer.Text=='New board in 5h 12m','the label says the title, the winner, the seed, the rarity and chance (HubDisplayRules\' own text) and the countdown')
+ check(near(pullD.Tag.Info.TextColor3.R,want.R,.01)and near(pullD.Tag.Info.TextColor3.G,want.G,.01)and near(pullD.Tag.Line.TextColor3.R,want.R,.01),'the seed and its chance are in the rarity\'s colour')
  check(pullD.Model:GetAttribute('State')=='Champion','the model says Champion')
  -- the fruit board
  local f=Rules.CleanFruit({Uid=2,Name='Sam',Id='SunflowerSeed',Scale=2.5,Coat='Gold',At=5})
  local ft=Rules.SignText('Fruit',f,'SunflowerSeed',100,'Watermelon')
  Art.SetSign(fruitD,ft)
- check(fruitD.Plate.Title.Text=='BIGGEST FRUIT TODAY'and fruitD.Plate.Name.Text=='Sam'and fruitD.Plate.Line.Text=='Today: 🍉 Watermelon','the fruit plaque: the title, the winner, and the fruit of the day under it')
- check(fruitD.Tag.Name.Text=='Sam'and fruitD.Tag.Info.Text==Rules.KgText(f.Kg)..' · Gold','the fruit label: the winner, the weight and the coat')
+ check(fruitD.Tag.Title.Text=='BIGGEST FRUIT TODAY'and fruitD.Tag.Name.Text=='Sam'and fruitD.Tag.Info.Text==Rules.KgText(f.Kg)..' · Gold'and fruitD.Tag.Line.Text=='Today: 🍉 Watermelon'and fruitD.Tag.Footer.Text=='New fruit in 1m 40s','the fruit label: the title, the winner, the weight and the coat, the fruit of the day, the countdown')
  Art.SetSign(nil,ft)
- Art.SetSign(pullD,{Plaque={},Label={}})
- check(pullD.Plate.Title.Text==''and pullD.Tag.Name.Text=='','missing rows are blank (never an error)')
+ Art.SetSign(pullD,{Plaque={},Label={}});Art.SetSign(fruitD,nil)
+ check(pullD.Tag.Title.Text==''and pullD.Tag.Name.Text==''and fruitD.Tag.Footer.Text=='','missing rows are blank (never an error)')
 end
 
 -- 5. Cost ---------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -462,7 +445,7 @@ do
  local avatar=HH.rig(10);avatar.Parent=pullD.AvatarFolder
  local n=Art.Counts(pullD)
  check(n.Frame+n.Item+n.Avatar<=230,'a finished display with the biggest seed and an avatar with 10 hats is '..(n.Frame+n.Item+n.Avatar)..' parts (frame '..n.Frame..', item '..n.Item..', avatar '..n.Avatar..'; the old one was up to 400)')
- check(#lightsIn(pullD.Model)==1 and #all(pullD.Model,'SurfaceGui')==1 and #all(pullD.Model,'BillboardGui')==1,'one light (the item\'s), one plaque, one label')
+ check(#lightsIn(pullD.Model)==1 and #all(pullD.Model,'SurfaceGui')==0 and #all(pullD.Model,'BillboardGui')==1,'one light (the item\'s), one label, no plaque')
  check(#all(pullD.Model,'ParticleEmitter')==0,'no emitters on the server (the client adds sparkles to the item near the camera)')
  local fns=0;for k,v in pairs(Art)do if type(v)=='function'then fns+=1 end end
  check(next(Art.Dim)~=nil and fns>=8,'the art module is functions and constants (no connections, no state)')
