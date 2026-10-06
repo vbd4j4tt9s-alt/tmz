@@ -7,7 +7,8 @@
 #    every inline guard of the patch undone). Texts reworded later, a rebuilt tutorial or anything else that lands after R152 is on both sides, so only
 #    the patch is compared. If the patch's guarded lines are edited, perf152_off.py stops the run and names them.
 #  * PERF_BASE=<commit> (the patch's own verdict: PERF_BASE=1e7dced, the R152 candidate): that commit (git archive) against this checkout, with the
-#    candidate's static rules (the load guard where the candidate has it, Config.Version unchanged)
+#    candidate's static rules (the load guard where the candidate has it, Config.Version unchanged). PERF_BASE=1e7dced PERF_NOW_OFF=1: the candidate
+#    against this checkout switched off (no difference may show at all: a check of perf152_off.py)
 #  0. static   - every changed script compiles, no model names in the perf files, the two helpers' unit checks (+ the PERF_BASE rules above)
 #  1. hub      - perf152_world.luau MODE=hub on the owner's place (every start-up builder, the hub decor, the market and the Fruit of the Hour pedestal, the
 #                treadmills, the two displays empty / with champions, the Void giveaway pedestal + its client, HubLife151 per tier 1 / 2 / 3): the whole world
@@ -72,10 +73,15 @@ prepare() { # $1 = side dir, $2 = src
  python3 "$P/R151/tests/mkbundle_packs.py" "$d/packs" "$src" >/dev/null
 }
 prepare "$OUT/base" "$OUT/base_src/src"
-prepare "$OUT/now" "$S"
+# (PERF_NOW_OFF=1 with PERF_BASE=1e7dced: the "now" side is this checkout switched off; it must match the candidate with no difference at all, which
+# checks perf152_off.py itself)
+NOW_SRC=$S
+if [ -n "$PERF_NOW_OFF" ];then python3 "$HERE/perf152_off.py" "$S" "$OUT/off_src/src" >/dev/null || { fail "perf152_off.py";exit 1; };NOW_SRC=$OUT/off_src/src;fi
+prepare "$OUT/now" "$NOW_SRC"
 # the two helpers on their own (PropCache152: write once / on change, by value; ViewCull152: hidden only when provably out of view)
+if [ -n "$PERF_NOW_OFF" ];then echo "(the helpers' unit checks skipped: the now side has them switched off)";else
 cp "$HERE/perf152_units.luau" "$OUT/now/keepers/"
-if (cd "$OUT/now/keepers" && /opt/luau/luau perf152_units.luau > "$OUT/units.txt" 2>&1);then echo "ok: $(tail -n 1 "$OUT/units.txt")";else fail "the helpers' unit checks";tail -n 8 "$OUT/units.txt";fi
+if (cd "$OUT/now/keepers" && /opt/luau/luau perf152_units.luau > "$OUT/units.txt" 2>&1);then echo "ok: $(tail -n 1 "$OUT/units.txt")";else fail "the helpers' unit checks";tail -n 8 "$OUT/units.txt";fi;fi
 # the runs: one line each "<dir> <output> <globals line> <driver>", both sides, JOBS at a time
 : > "$OUT/jobs.txt"
 # (ONLY=hub,kb,keepers,seed,hotbar,popups,packs: just those runs, for a quick look while working; the full suite runs everything)
