@@ -325,7 +325,7 @@ function S:FindSeed(query)
  end
  return nil
 end
--- A test pull for `player` (nobody opened a pack): the seed's chance is its odds in its biome's Pack03 (Verity: the Verity pack). Shown on this server only unless
+-- A test pull for `player` (nobody opened a pack): the seed's chance (which ranks it) is its odds in its biome's Pack03 (Verity: the Verity pack); the words say its fixed 1/N (R153). Shown on this server only unless
 -- share = true (then it is written to the shared store like a real one: use it to test MemoryStore, and `hubdisplays reset` afterwards).
 function S:InjectPull(player,seedQuery,share)
  local spec=self:FindSeed(seedQuery)
@@ -343,7 +343,7 @@ function S:InjectPull(player,seedQuery,share)
  if not rec then return false,'Could not make that pull.'end
  local ok,result=self:_event('Pull',rec,{Player=player,Injected=true})
  if not ok then return false,'Not better than what this server already holds for today.'end
- return true,('%s: %s %s, %s%s'):format(player.Name,rec.Rarity,rec.Seed,Rules.OddsText(rec.Odds),share and' (shared)'or' (this server only)')..(result=='took'and''or' - recorded, but someone\'s is better')
+ return true,('%s: %s %s, %s%s'):format(player.Name,rec.Rarity,rec.Seed,Rules.PullOddsText(rec),share and' (shared)'or' (this server only)')..(result=='took'and''or' - recorded, but someone\'s is better')
 end
 -- A test fruit of today's type weighing `kg` (the size is kg over the plant's base weight; the fruit size limit is 50). coat: 'Gold' | 'Diamond' | nil.
 function S:InjectFruit(player,kg,coat,share)
@@ -390,7 +390,7 @@ function S:StatusText()
  local fruit=snap.FruitId and self:FruitName(snap.FruitId)or'(none)'
  lines[#lines+1]=('Day %s%s | fruit of the day: %s | new board in %s'):format(tostring(snap.Day),snap.DayOffset~=0 and(' (preview '..string.format('%+d',snap.DayOffset)..')')or'',fruit,Rules.Countdown(Rules.SecondsLeft(self:Now())))
  local p=snap.Pull
- lines[#lines+1]=p.Record and('BEST PULL: %s - %s %s, %s (%s%s)'):format(p.Record.Name,p.Record.Rarity,p.Record.Seed,Rules.OddsText(p.Record.Odds),p.Source,p.Unsynced and', not shared yet'or'')or'BEST PULL: nobody yet'
+ lines[#lines+1]=p.Record and('BEST PULL: %s - %s %s, %s (%s%s)'):format(p.Record.Name,p.Record.Rarity,p.Record.Seed,Rules.PullOddsText(p.Record),p.Source,p.Unsynced and', not shared yet'or'')or'BEST PULL: nobody yet'
  local f=snap.Fruit
  lines[#lines+1]=f.Record and('BIGGEST FRUIT: %s - %s%s (%s%s%s)'):format(f.Record.Name,Rules.KgText(f.Record.Kg),f.Record.Coat~='None'and(' '..f.Record.Coat)or'',f.Source,f.Unsynced and', not shared yet'or'',self.Board.Boards.Fruit.Foreign and', not shared: other servers have another fruit today'or'')or'BIGGEST FRUIT: nobody yet'
  local st=snap.Store

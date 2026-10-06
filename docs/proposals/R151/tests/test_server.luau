@@ -2,7 +2,7 @@
 -- R151 pull announcements, part 2: the SERVER half on the Roblox mock with the REAL modules (PullAnnouncer, PullAnnounceRules, PlayerDataService, RarePackTests,
 -- SeedPackRules, Config, OwnerUpdateCommands82, StudioTestHelp) and a MessagingService bus (announce_env.luau):
 --  1. the hook: PlayerDataService:OpenSeedPack of a real pack announces a Legendary+ seed once the PULLER's reveal has shown the seed (PullAnnounceRules.RevealDelay, from
---     RarePullRules); a TEST pack (/test rarepacks), a given / granted seed, a Common pull and a changed threshold announce nothing; the odds are the pack's own; the pull is
+--     RarePullRules); a TEST pack (/test rarepacks), a given / granted seed, a Common pull and a changed threshold announce nothing; the odds are the seed's fixed chance (R153, SeedRarity153; they were the pack's own); the pull is
 --     still announced when the puller has left (at once, there is no reveal left to spoil)
 --  1a. timing per rarity: the line goes out at exactly that delay (to the puller and everybody else alike, never earlier), the publish to the other servers and the line the other
 --     servers show come after it too; for every presentation the client can pick (Full / Calm / InPlace, quick) the delay is after the seed is shown; a leaving puller releases it
@@ -122,7 +122,8 @@ do
  local e=pulls[1]and pulls[1].Payload
  check(e and e.SeedId==reward.SeedId and e.UserId==701 and e.Name=='Ann D'and e.Id and e.Id:match('^jobA0000%-%d+$'),'the payload names the seed, the puller (display name, user id) and carries an id ('..tostring(e and e.Id)..')')
  local percent=Packs.SeedOdds(Config,pack.Stage,pack.BagVariant,Ann:GetAttribute('ChestLuckMultiplier'),pack.OddsVersion,pack.RateBoost)[reward.SeedId]
- check(e and percent and math.abs(e.Odds-100/percent)<1e-9*e.Odds,'the odds are the pack\'s own chance for that seed: 1/'..tostring(e and e.Odds)..' (SeedOdds '..tostring(percent)..'%)')
+ local fixed=W.module('SeedRarity153').Canonical(reward.SeedId)
+ check(e and fixed and math.abs(e.Odds-fixed)<1e-9*e.Odds,'R153: the odds are the seed\'s fixed chance: 1/'..tostring(e and e.Odds)..' (this pack\'s own chance for it was SeedOdds '..tostring(percent)..'%; test_seed_rarity.luau opens a real Void pack)')
  check(e and e.Size==nil and e.Mutation==nil and e.Rarity==nil,'the payload carries no size, no coat and no rarity (chat lines need none of them; the client reads its own catalog)')
  check(bus:Count('A')==0,'a Legendary pull is NOT sent to other servers (Secret and above only)')
  table.clear(sinkLog)

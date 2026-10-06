@@ -159,7 +159,7 @@ do
  check(rec and rec.Name=='Ann'and rec.Uid==11 and rec.Id=='FirePepperSeed'and rec.Rarity=='Mythic'and rec.Seed=='Fire Pepper'and snap.Pull.Source=='Local','the board holds it (name, user id, seed, rarity), from this server')
  local want=P.SeedOdds(Config,4,'Pack03',1,P.OddsVersion)['FirePepperSeed']
  check(want and math.abs(rec.Odds-want)<1e-12,'its odds are the pack\'s own SeedOdds for that seed ('..tostring(want)..'%)')
- check(pd.Text.State=='Champion'and pd.Text.Label.Name.Text=='Ann'and pd.Text.Plaque.Name.Text=='Ann'and pd.Text.Label.Info.Text=='Fire Pepper'and pd.Text.Plaque.Line.Text=='Mythic · '..Rules.OddsText(want),'the plaque and the label say "Ann", the seed ("Fire Pepper") and the rarity and chance')
+ check(pd.Text.State=='Champion'and pd.Text.Label.Name.Text=='Ann'and pd.Text.Plaque.Name.Text=='Ann'and pd.Text.Label.Info.Text=='Fire Pepper'and pd.Text.Plaque.Line.Text=='Mythic · '..W.module('SeedRarity153').Text('FirePepperSeed'),'the plaque and the label say "Ann", the seed ("Fire Pepper") and the rarity and chance (R153: the seed\'s fixed chance, 1/800, not the Pack03 one the pull is ranked by: '..Rules.OddsText(want)..')')
  check(pd.Model:GetAttribute('Champion')=='Ann'and pd.Model:GetAttribute('Rarity')=='Mythic'and pd.Model:GetAttribute('ChampionUserId')==11 and pd.Model:GetAttribute('Rev')==2,'the display\'s attributes name the champion and Rev goes up')
  check(pd.TintState=='Ready'and pd.Accent[1]==Rules.RarityColor('Mythic')[1],'tinted in the rarity\'s colour')
  check(#A.Art.ItemBuilds==before+1 and A.Art.ItemBuilds[#A.Art.ItemBuilds].Spec.Id=='FirePepperSeed'and A.Art.ItemBuilds[#A.Art.ItemBuilds].Spec.Mystery==false,'one new item: the seed itself (not the mystery one)')

@@ -42,7 +42,7 @@ local function lite()
  return false
 end
 local function remotes()return RS:FindFirstChild('ChestChaseRemotes')end
--- The seed's display name, its "1 in N" (the held pack's tooltip, else the Index chance) and a model of it.
+-- The seed's display name, its "1 in N" (R153: its fixed chance, SeedRarity153; the Index chance if that cannot load) and a model of it.
 function M.SeedInfo(seedId,tool)
  local r=remotes();local catalog=r and r:FindFirstChild('SeedCatalog');local entry=catalog and catalog:FindFirstChild(seedId)
  local name=entry and entry:GetAttribute('DisplayName')
@@ -51,10 +51,12 @@ function M.SeedInfo(seedId,tool)
   if ok and Packs and Packs.SeedDesignById and Packs.SeedDesignById[seedId]then name=Packs.SeedDesignById[seedId].name end
  end
  name=name or tostring(seedId)
- local odds=tool and Rules.TooltipOdds(tool.ToolTip,name)
+ -- R153 (owner: a Cosmic from a Void pack must still read how rare it is): the seed's one fixed chance (SeedRarity153), never the held pack's own rows (those answer what THAT pack gives).
+ local odds
+ local okC,Canon=pcall(require,RS:FindFirstChild('SeedRarity153'));if okC and Canon then odds=Canon.Count(seedId)end
  if not odds and entry then
   local chance=entry:GetAttribute('BaseChance')
-  if type(chance)=='number'and chance>0 then local ok,O=pcall(require,RS:FindFirstChild('OddsText85'));if ok then odds=(O.Format(chance)):match('^1/(.+)$')end end
+  if type(chance)=='number'and chance>0 then local ok,O=pcall(require,RS:FindFirstChild('OddsText85'));if ok then odds=O.Count(1/(math.min(chance,100)/100))end end
  end
  return name,odds
 end

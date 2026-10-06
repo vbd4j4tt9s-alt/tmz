@@ -231,6 +231,13 @@ function R.KgText(kg)
  return s..' kg'
 end
 function R.OddsText(percent)return require(script.Parent.OddsText85).Format(percent)end
+-- R153 (owner: a Cosmic from a Void pack must still read how rare it is): the plaque names the SEED's one fixed chance (SeedRarity153), not the pack the pull came from. rec.Odds
+-- stays the pull's real chance: it ranks the pulls (PullBetter) and is what is stored; only the words change.
+function R.PullOddsText(rec)
+ local ok,Canon=pcall(function()return require(script.Parent.SeedRarity153)end)
+ if ok and type(rec)=='table'and Canon.Percent(rec.Id)then return Canon.Text(rec.Id)end
+ return R.OddsText(type(rec)=='table'and rec.Odds or nil)
+end
 local COAT={Gold='Gold',Diamond='Diamond'}
 function R.PullName(rec)return rec.Rarity..' '..rec.Seed end
 -- The words of a fruit's special looks: "Gold", "Diamond", a weather ("Drippy"), both ("Gold · Drippy"), or ''.
@@ -284,7 +291,7 @@ function R.SignText(kind,rec,fruitId,secondsLeft,fruitName)
   if rec then
    out.State='Champion';out.Accent=R.RarityColor(rec.Rarity)
    winner(rec.Name);L.Info={Text=rec.Seed,Color=out.Accent}
-   P.Line={Text=rec.Rarity..' · '..R.OddsText(rec.Odds)..(COAT[rec.Coat]and(' · '..COAT[rec.Coat])or''),Color=out.Accent}
+   P.Line={Text=rec.Rarity..' · '..R.PullOddsText(rec)..(COAT[rec.Coat]and(' · '..COAT[rec.Coat])or''),Color=out.Accent}
   else
    out.State='Empty';out.Accent=gold
    winner(PLACEHOLDER);L.Info={Text='Open a pack!',Color=soft}

@@ -333,6 +333,7 @@ watch(gui:GetPropertyChangedSignal('AbsoluteSize'),resize)
 watch(list:GetPropertyChangedSignal('AbsoluteSize'),resize)
 local function signature(entry)local id=entry:GetAttribute('SeedId');return tostring(owned('DiscoveredSeeds',id))..':'..tostring(owned('DiscoveredPlants',id))..':'..tostring(amount(id))end
 local RarityRank=require(RS.SeedPackRules).Rarities
+local Canon=require(RS.SeedRarity153) -- R153
 local function rank(rarity)local r=RarityRank[rarity];return r and r.Rank or 1 end
 local function pill(parent,name,pos,size,fill,alpha,line)
  local f=Instance.new('Frame');f.Name=name;f.Position=pos;f.Size=size;f.BackgroundColor3=fill;f.BackgroundTransparency=alpha or 0;f.BorderSizePixel=0;f.Parent=parent;Theme.Corner(f,10)
@@ -357,8 +358,8 @@ local function makeCard(entry,index)
  local core=Instance.new('Frame');core.Name='Core';core.AnchorPoint=Vector2.new(.5,.5);core.Position=UDim2.fromScale(.5,.5);core.Size=UDim2.fromScale(.6,.6);core.BackgroundColor3=style.Color;core.BackgroundTransparency=seedKnown and .72 or .9;core.BorderSizePixel=0;core.Parent=glow;Theme.Corner(core,36)
  local view=Instance.new('ViewportFrame');view.Name='Preview';view.BackgroundTransparency=1;view.Position=UDim2.fromOffset(6,30);view.Size=UDim2.new(1,-12,0,112);view.Ambient=Color3.fromRGB(215,219,240);view.LightColor=Color3.fromRGB(255,253,246);view.Parent=card
  local stop=Preview.Attach(view,id,false,seedKnown);local adult=false;local generation=0
- -- Top row: rarity chip and the 1/N chance (OddsText85).
- local chance=entry:GetAttribute('BaseChance');local odds=chance and require(RS.OddsText85).Format(chance)or'–'
+ -- Top row: rarity chip and the 1/N chance (R153: the seed's one fixed chance, SeedRarity153, the same text as the reveal card, the chat and the plaque; the entry's BaseChance is the same number).
+ local chance=entry:GetAttribute('BaseChance');local odds=Canon.Percent(id)and Canon.Text(id)or chance and require(RS.OddsText85).Format(chance)or'–'
  local rarityChip=pill(card,'RarityChip',UDim2.fromOffset(7,7),UDim2.new(.58,-7,0,21),Color3.fromRGB(10,14,32),.2,style.Accent)
  local rarityLabel=text(rarityChip,'Rarity',string.upper(rarity),UDim2.fromOffset(4,0),UDim2.new(1,-8,1,0),12);Theme.RarityText(rarityLabel,rarity,12,false)
  local oddsChip=pill(card,'OddsChip',UDim2.new(.58,4,0,7),UDim2.new(.42,-11,0,21),Color3.fromRGB(10,14,32),.2,Theme.Colors.Line)
