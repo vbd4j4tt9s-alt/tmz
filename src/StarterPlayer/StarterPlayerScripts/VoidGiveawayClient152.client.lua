@@ -11,7 +11,8 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 --    pack sleeps: it still turns, its glow and sparks are off.
 --  * turns the prompt off for YOU once you have claimed (the server turns it off for everyone at 0), and plays the claim moment when your pack arrives: the pack hops, a spark
 --    burst, the sign pops, and the game's reward chime (InteractionAudio GemClaim: no new sound). The text notice ("FREE VOID PACK! Check your Bag!") is the server's.
--- Per frame: only while a pedestal's pack is inside ACTIVE_IN studs of the camera (leaves at ACTIVE_OUT); nothing runs for a pedestal that is far. Quality tiers and the plant
+-- Per frame: only while a pedestal's pack is inside ACTIVE_IN studs of the camera (leaves at ACTIVE_OUT); nothing runs for a pedestal that is far. Tier 3 steps it every frame;
+-- tier 2 and below at 30 Hz, and without the pack's Highlight (VoidPackFx.Budget.Highlight), the per-frame costs a phone felt. Quality tiers and the plant
 -- effects setting limit the effects like the track's Void packs (ClientFxBudget / VoidPackFx.Budget); Reduced Motion: no turn, no bob, no pop, no moving fx (the same parts, still).
 -- The place uses StreamingEnabled: the pedestal is Persistent, but a pedestal is found by its tag whenever it appears, its parts are looked up again each half second until they
 -- are there, and one that goes away is forgotten (a streamed-back copy starts clean).
@@ -154,10 +155,18 @@ local function stepPack(entry,dt,t,now)
 end
 -- The loop (connected only while a pack is near) --------------------------------------------------------------------------------------------------------------
 local loop
+local STEP_LOW=1/30 -- tier 2 and below (phones): the whole pack step (pose, debris, comets, pulse) runs at 30 Hz, with the time it skipped, so the turn keeps its speed (every frame on tier 3)
 local function frame(dt)
  local busy=false;local t=os.clock();local now=workspace:GetServerTimeNow()
  for _,entry in pairs(entries)do
-  if entry.Active and entry.Pack then busy=true;local ok,err=pcall(stepPack,entry,dt,t,now);if not ok then entry.Failed=(entry.Failed or 0)+1;if entry.Failed==1 then warn('[R152] Void giveaway pack: '..tostring(err))end end end
+  if entry.Active and entry.Pack then
+   busy=true
+   entry.Owed=(entry.Owed or STEP_LOW)+dt
+   if tierNow>=3 or entry.Owed>=STEP_LOW-.004 then
+    local step=entry.Owed;entry.Owed=0
+    local ok,err=pcall(stepPack,entry,step,t,now);if not ok then entry.Failed=(entry.Failed or 0)+1;if entry.Failed==1 then warn('[R152] Void giveaway pack: '..tostring(err))end end
+   end
+  end
  end
  if not busy and loop then loop:Disconnect();loop=nil end
 end

@@ -129,6 +129,32 @@ me:SetAttribute('StudioPlantEffects','off');G.run(1.2);check(fxCount()==0 and ba
 me:SetAttribute('StudioPlantEffects',nil);G.run(1.2);check(fxCount()==1,'and they come back')
 me:SetAttribute('StudioPlantEffects','low');G.run(1.2);fx=fxFolder();check(fx and fx:FindFirstChild('VoidHaze',true).Enabled==false,'"effects low" is the lowest tier')
 me:SetAttribute('StudioPlantEffects',nil);G.run(1.2)
+-- review fix B5: what the pack costs every frame, by tier. Tier 3 is unchanged (every frame, with its Highlight); tier 2 and below have no Highlight (an outline written every frame) and
+-- step the pack (pose, debris, comets, pulse: one BulkMoveTo) at 30 Hz, with the time it skipped, so the turn keeps its speed
+do
+ local PackFx=W.module('VoidPackFx')
+ local moves,pulses,rawMove,rawPulse=0,0,W.workspace.BulkMoveTo,PackFx.Pulse
+ W.workspace.BulkMoveTo=function(self,parts,frames,mode)moves+=1;return rawMove(self,parts,frames,mode)end
+ PackFx.Pulse=function(...)pulses+=1;return rawPulse(...)end
+ local seen={}
+ for _,tier in ipairs({3,2,1})do
+  H.tier=tier;G.run(1.2,1/60);fx=fxFolder()
+  local hl=fx and fx:FindFirstChildWhichIsA('Highlight',true)
+  check((hl~=nil)==(tier==3),'B5: tier '..tier..(tier==3 and': the pack keeps its violet Highlight'or': no Highlight on the pack'))
+  moves,pulses=0,0;local y0=yaw(root);local outlines={};local last=hl and hl.OutlineTransparency
+  for _=1,180 do G.run(1/60,1/60);if hl and hl.OutlineTransparency~=last then outlines[#outlines+1]=true;last=hl.OutlineTransparency end end
+  local turned=yaw(root)-y0;if turned<-math.pi then turned+=2*math.pi end
+  seen[tier]={Moves=moves/3,Pulses=pulses/3,Turn=turned/3,Outline=#outlines/3}
+ end
+ check(seen[3].Moves>=57 and seen[3].Pulses>=57 and seen[3].Outline>=50,string.format('B5: tier 3: the pack is stepped every frame at 60 fps (%.0f moves, %.0f pulses, the Highlight written %.0f times a second)',seen[3].Moves,seen[3].Pulses,seen[3].Outline))
+ for _,tier in ipairs({2,1})do
+  check(seen[tier].Moves>=27 and seen[tier].Moves<=33 and seen[tier].Pulses>=27 and seen[tier].Pulses<=33,string.format('B5: tier %d: 30 Hz at 60 fps (%.0f moves, %.0f pulses a second)',tier,seen[tier].Moves,seen[tier].Pulses))
+  check(math.abs(seen[tier].Turn-seen[3].Turn)<.12 and seen[tier].Turn>.3,string.format('B5: tier %d: it turns at the same speed (%.3f vs %.3f rad/s; the slow sway adds up to +-.05, half the speed would read .22)',tier,seen[tier].Turn,seen[3].Turn))
+ end
+ W.workspace.BulkMoveTo=rawMove;PackFx.Pulse=rawPulse
+ H.tier=3;G.run(1.2)
+ check(fxFolder()~=nil and fxFolder():FindFirstChildWhichIsA('Highlight',true)~=nil,'B5: back on tier 3 the Highlight is back')
+end
 -- at 0 left the pack sleeps: it still turns, its glow and sparks are off; reopened (a Studio reset) they are back
 m:SetAttribute('Count',500);m:SetAttribute('Left',0);m:SetAttribute('State','Empty');G.run(1.2)
 local yawA=yaw(root);G.run(1)

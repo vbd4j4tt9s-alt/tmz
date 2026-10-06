@@ -12,6 +12,7 @@ X.Budget={
  Debris={[1]=2,[2]=4,[3]=6},    -- orbiting debris pieces per pack
  Comets={[1]=0,[2]=1,[3]=2},    -- trailed comets per pack
  Lights=1,                      -- one pulsing light in the whole scene (nearest pack, tier 3)
+ Highlight={[1]=false,[2]=false,[3]=true}, -- the violet outline on the pack (a Highlight written every frame): top tier only
  EffectDistance=160,MotionDistance=850,SpinDistance=160,
 }
 -- R147: every colour / texture of the effect set. X.Void is the Void pack's (what this module always built). R147 / R148 gave the Verity
@@ -104,7 +105,7 @@ function X.Create(r,tier)
   trail.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.1),NumberSequenceKeypoint.new(1,1)});trail.Parent=comet
   fx.Comets[i]={Part=comet,Trail=trail}
  end
- if pal.Fill then
+ if pal.Fill and X.Budget.Highlight[tier]then
   local h=Instance.new('Highlight');h.Name='VoidDistortion';h.Adornee=r.Bag;h.FillColor=pal.Fill;h.FillTransparency=.88
   h.OutlineColor=pal.Outline;h.OutlineTransparency=.35;h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;fx.Highlight=h
  end
