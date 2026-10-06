@@ -366,7 +366,7 @@ tools.Sync(fakeChests,P)
 local made=P.Backpack:FindFirstChild('Shovel')
 check(made and made:GetAttribute('GardenShovel')==true and made.ManualActivationOnly==true and made.CanBeDropped==false
  and made:GetAttribute('InventoryKey')=='shovel'and made.RequiresHandle==true,'garden shovel tool unchanged')
-check(made and made.ToolTip:find('Remove a plant',1,true)and made.ToolTip:find('Dig a hole on the track',1,true),'tooltip hints the hole feature')
+check(made and made.ToolTip:find('Remove a plant',1,true)and made.ToolTip:find('Dig holes on the track',1,true),'tooltip hints the hole feature')
 
 -- 18. R123 owner commands: dig / holes / holes clear / ragdoll / fling (OwnerUpdateCommands82.Execute)
 local X=server('OwnerUpdateCommands82')
