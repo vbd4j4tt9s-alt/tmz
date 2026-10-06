@@ -337,5 +337,55 @@ section('11',function()
  check(A:GetAttribute('FriendsInServer')==1 and B:GetAttribute('FriendsInServer')==1,'30 s later the check runs again and both get the boost')
 end)
 
+-- 12. R152: a big backlog must not delay this server's daily reset. R151 ran Deliver inside the loop that also runs Step (the reset), and a slow queue (a MemoryStore claim + an HTTP call per
+-- entry) held the loop for minutes. Now delivery is its own task (Kick), one pass at a time, with a time budget (PassSeconds). Real SocialService.Start on a small cooperative scheduler
+-- and a virtual clock (task.wait / os.clock / os.time), every notification call taking 2 s.
+section('12',function()
+ local vt=0;local sleeping={};local realTask,realOs=W.env.task,W.env.os
+ local function resume(co,...)local ok,why=coroutine.resume(co,...);if not ok then error(why,0)end end
+ local sched={
+  spawn=function(f,...)local co=coroutine.create(f);resume(co,...);return co end,
+  wait=function(t)sleeping[#sleeping+1]={At=vt+(t or 0),Co=coroutine.running()};coroutine.yield();return t end,
+  delay=function(t,f,...)local a={...};sleeping[#sleeping+1]={At=vt+(t or 0),Co=coroutine.create(function()f(table.unpack(a))end)}end,
+  defer=function(f,...)local a={...};sleeping[#sleeping+1]={At=vt,Co=coroutine.create(function()f(table.unpack(a))end)}end,cancel=function()end}
+ local function advance(untilAt)
+  while vt<untilAt do
+   vt+=.5
+   local due={};local keep={}
+   for _,w in ipairs(sleeping)do if w.At<=vt then due[#due+1]=w else keep[#keep+1]=w end end
+   sleeping=keep;for _,w in ipairs(due)do resume(w.Co)end
+  end
+ end
+ local boundary=21000*86400;local base=boundary-145 -- the UTC day changes 145 s into the run, in the middle of the third delivery pass
+ W.env.task=sched;W.env.os=setmetatable({clock=function()return vt end,time=function()return base+math.floor(vt)end},{__index=os})
+ local published={};local publish=Data.PublishDaily
+ Data.PublishDaily=function(self,p,...)published[#published+1]=vt;return publish(self,p,...)end
+ present[601]=nil;present[602]=nil;present[603]=nil
+ for i=1,100 do queue():SetAsync(tostring(30000+i),{At=base-i,Ready=base-i,Plant=melon},86400,base-i)end -- 100 due entries, nobody online
+ respond=function()sched.wait(2);return okResponse()end
+ local svc=Social.new(Data,Notes)
+ check(svc.Day==21000-1,'(the run starts on the day before the boundary)')
+ local passes,running,most={},0,0;local deliver=svc.Deliver
+ function svc:Deliver(...)running+=1;most=math.max(most,running);local began=vt;local sent=deliver(self,...);running-=1;passes[#passes+1]={Began=began,Seconds=vt-began,Sent=sent};return sent end
+ svc:Start()
+ present[601]=A;present[602]=B;present[603]=C -- (the players of this server: the reset publishes their daily state)
+ advance(60)
+ local first=passes[1]or{Sent=0,Seconds=1e9}
+ check(#passes==1 and first.Sent>=5 and first.Sent<100,'the first pass (15 s in) sends part of the backlog and stops ('..first.Sent..' of 100 in '..first.Seconds..' s)')
+ check(first.Seconds<=Social.PassSeconds+2.5,'a pass takes at most PassSeconds ('..Social.PassSeconds..' s) plus the call in flight ('..first.Seconds..' s)')
+ advance(147)
+ check(#published>=1 and published[1]>=145 and published[1]<=150.5,'the daily reset ran within one loop tick of the day change (at '..tostring(published[1])..' s, change at 145 s) while a delivery pass was running')
+ check(running==1,'(a pass is running right now)')
+ check(svc:Kick()==false,'a second pass does not start while one runs')
+ advance(900)
+ check(most==1,'passes never overlap')
+ local longest=0;for _,pass in ipairs(passes)do longest=math.max(longest,pass.Seconds)end
+ check(longest<=Social.PassSeconds+2.5,'every pass used at most its budget ('..longest..' s)')
+ check(#requests==100 and svc.Stats.Sent==100,'the whole backlog was still delivered, over several polls ('..#requests..' notifications in '..#passes..' passes)')
+ check(entry(30001)==nil and entry(30100)==nil,'and the queue is empty')
+ svc.Dead=true;advance(vt+10)
+ W.env.task=realTask;W.env.os=realOs;Data.PublishDaily=nil;Social.Current=nil
+end)
+
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end
