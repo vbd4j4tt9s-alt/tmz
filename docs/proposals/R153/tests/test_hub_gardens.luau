@@ -545,5 +545,183 @@ do
  end
 end
 
+-- 6. the look from the owner's asset 12088629887 (HubTrampoline153: template -> InsertService -> built) ---------------------------------------------------------
+do
+ local IS,AS=W.service('InsertService'),W.service('AssetService')
+ local HT=server('HubTrampoline153')
+ if MUT=='nostrip'then W.module('HubStudTrees151').Sanitize=function()return 0,0 end end -- (a loader that strips nothing: the look test must fail)
+ local calls={IS=0,AS=0}
+ local function routes(isFn,asFn)
+  IS.LoadAsset=function(_,id)calls.IS+=1;return isFn(id)end;AS.LoadAssetAsync=function(_,id)calls.AS+=1;return asFn(id)end
+ end
+ local DENIED=function()error('User is not authorized to access Asset.')end
+ local function part(parent,name,size,pos,tr)
+  local p=R.new('Part');p.Name=name;p.Size=size;p.CFrame=CF(pos[1],pos[2],pos[3]);p.Anchored=false;p.CanCollide=true;p.CanTouch=true;p.CanQuery=true;p.Transparency=tr or 0;p.Parent=parent;return p
+ end
+ -- a store trampoline in its own units (20 wide): a frame, 4 legs, 8 springs, a mat, and everything a store model may carry
+ local function asset(o)
+  o=o or{}
+  local m=R.new('Model');m.Name=o.Name or'Trampoline Pro'
+  if o.Generic then -- two like flat discs, no names to tell them by
+   part(m,'Part',V3(20,.4,20),{0,3.2,0});part(m,'Part',V3(20,.4,20),{0,3.25,0});part(m,'Part',V3(1,3,1),{9,1.5,9})
+  else
+   part(m,'Frame',V3(20,.6,20),{0,3.3,0})
+   for _,c in ipairs({{9,1.5,9},{-9,1.5,9},{9,1.5,-9},{-9,1.5,-9}})do part(m,'Leg',V3(1,3,1),c)end
+   for k=1,8 do part(m,'Spring',V3(.5,.8,.5),{math.cos(k)*8,3.2,math.sin(k)*8})end
+   part(m,'Mat',V3(17,.4,17),{0,3.2,0})
+  end
+  if o.Junk~=false then
+   local g=part(m,'Giant',V3(5000,1,5000),{0,0,0});part(m,'Hull',V3(60,5,60),{0,2,0},1)
+   local s=R.new('Script');s.Name='Evil';s.Parent=m
+   local l=R.new('LocalScript');l.Name='Spy';l.Parent=m:FindFirstChild('Frame')or g
+   local sub=R.new('Model');sub.Name='Inner';sub.Parent=m;local ms=R.new('ModuleScript');ms.Name='Req';ms.Parent=sub
+   for _,c in ipairs({'Sound','ClickDetector','ProximityPrompt','Humanoid','WeldConstraint','Attachment','ParticleEmitter','SurfaceGui','RemoteEvent'})do local x=R.new(c);x.Name='Junk'..c;x.Parent=m end
+  end
+  for _=1,(o.Extra or 0)do part(m,'Bolt',V3(.3,.3,.3),{0,1,0})end
+  return m
+ end
+ local function container(m)local c=R.new('Model');c.Name='Model';m.Parent=c;return c end
+ local CODE={'Script','LocalScript','ModuleScript'};local ALIEN={'Sound','ClickDetector','ProximityPrompt','Humanoid','WeldConstraint','Attachment','ParticleEmitter','SurfaceGui','RemoteEvent'}
+ local function leftovers(root)
+  local out={};for _,d in ipairs(root:GetDescendants())do for _,c in ipairs(CODE)do if d._class==c then out[#out+1]=c end end;for _,c in ipairs(ALIEN)do if d._class==c then out[#out+1]=c end end end;return out
+ end
+ local function fold()return map:FindFirstChild(T.FolderName)end
+ local function lookOf(spot)local m=fold():FindFirstChild('Trampoline '..spot.Name);return m,m and m:FindFirstChild('Trampoline look')end
+ local function solids()local n=0;for _,p in ipairs(parts(fold()))do if solid(p)then n+=1 end end;return n end
+ local function names(m)local out={};for _,c in ipairs(m:GetChildren())do out[c.Name]=(out[c.Name]or 0)+1 end;return out end
+ local function flat(look)local bad={};for _,p in ipairs(parts(look))do local a,b=aabb(p);if b[2]-a[2]<=.5 then for _,y in ipairs({4.14,4.2,4.26,4.32})do if math.abs(b[2]-y)<.04 then bad[#bad+1]=p.Name end end end end;return bad end
+ local function box(look)local lo,hi;for _,p in ipairs(parts(look))do local a,b=aabb(p);lo=lo and{math.min(lo[1],a[1]),math.min(lo[2],a[2]),math.min(lo[3],a[3])}or a;hi=hi and{math.max(hi[1],b[1]),math.max(hi[2],b[2]),math.max(hi[3],b[3])}or b end;return lo,hi end
+ local function reload(isFn,asFn)calls.IS,calls.AS=0,0;routes(isFn,asFn);HT.Reset();HT.Build(map);return HT.Status end
+
+ -- A. the asset loads (a model with scripts and junk inside, as a store model may come)
+ local st=reload(function()return container(asset())end,DENIED)
+ check('look: a successful InsertService:LoadAsset(12088629887) dresses both trampolines (asset, one call, AssetService not asked)',HT.Look=='asset'and st.Route=='InsertService:LoadAsset'and calls.IS==1 and calls.AS==0 and T.AssetId==12088629887 and fold():GetAttribute('Look')=='asset',tostring(HT.Look)..' '..tostring(st.Route))
+ check('look: the 3 scripts (Script, LocalScript, ModuleScript) are counted and gone, and so is everything else that is not geometry (9 kinds: sounds, click detectors, prompts, welds, humanoids, attachments, particles, guis, remotes)',st.Scripts==3 and st.Other>=9 and #leftovers(fold())==0,'scripts '..tostring(st.Scripts)..' other '..tostring(st.Other)..' left '..#leftovers(fold()))
+ check('look: the absurd (5000 studs) and the invisible (hull) parts are dropped; 14 parts stay per trampoline (frame, 4 legs, 8 springs, mat)',st.Dropped==2 and st.Parts==14,tostring(st.Dropped)..' '..tostring(st.Parts))
+ local worstScale,placed,flatBad,lockBad,gone,matOk,oneLook=true,true,{},{},true,true,true
+ for _,spot in ipairs(T.Spots)do
+  local m,look=lookOf(spot)
+  if not look then oneLook=false else
+   local lo,hi=box(look);local foot=math.max(hi[1]-lo[1],hi[3]-lo[3])
+   if math.abs(foot-T.Dims.Radius*2)>.01 then worstScale=false end
+   if math.abs((lo[1]+hi[1])/2-spot.X)>.01 or math.abs((lo[3]+hi[3])/2-spot.Z)>.01 then placed=false end
+   local mat=look:FindFirstChild('Trampoline mat',true)
+   local mh=mat and select(2,aabb(mat))
+   if not mat or math.abs(mh[2]-T.Top())>.001 or math.abs(mat._props.Size.X-17*(T.Dims.Radius*2/20))>.01 then matOk=false end
+   for _,p in ipairs(parts(look))do if p._props.Anchored~=true or p._props.CanCollide~=false or p._props.CanTouch~=false or p._props.CanQuery~=false then lockBad[#lockBad+1]=p.Name end end
+   for _,n in ipairs(flat(look))do flatBad[#flatBad+1]=n end
+   local nm=names(m);for _,b in ipairs({'Trampoline foot','Trampoline frame','Trampoline spring','Trampoline gap','Trampoline badge','Trampoline mat'})do if nm[b]then gone=false end end
+   if nm['Trampoline collider']~=1 or nm['Trampoline look']~=1 or #m:GetChildren()~=2 then oneLook=false end
+  end
+ end
+ check('look: scaled so the footprint is the collider\'s 12.1 studs (20 x 0.605) and centred on each nook (312 / -269 and -312 / -269)',worstScale and placed)
+ check('look: the mat (the largest flat top part, named Mat) is renamed "Trampoline mat", 10.3 studs, with its top exactly at the collider\'s walking top (4.9): the feet land where they look',matOk)
+ check('look: every look part anchored, CanCollide / CanTouch / CanQuery off',#lockBad==0 and #parts(fold())==2*(1+14),first(lockBad)or#parts(fold()))
+ check('look: the built feet, frame, springs, gap, mat and badge are gone: one look, the collider and the look model only',gone and oneLook)
+ local c1=lookOf(T.Spots[1]):FindFirstChild('Trampoline collider');local _,ch=aabb(c1)
+ check('look: ONE collider per trampoline (2 solid parts in the whole folder), still 0.9 over the floor and 6.05 round',solids()==2 and math.abs(ch[2]-T.Top())<.001 and math.abs(c1._props.Size.Y/2-6.05)<.01)
+ check('look: no flat top of the look lies on a plane of the paving (4.14 / 4.20 / 4.26 / 4.32)',#flatBad==0,first(flatBad))
+ local ok,text=HT.Command(nil,nil,{})
+ check('command: /test trampoline says THE ASSET 12088629887, how it loaded, the parts and the squash mat',ok and text:find('THE ASSET 12088629887',1,true)~=nil and text:find('InsertService:LoadAsset',1,true)~=nil and text:find('14 parts',1,true)~=nil and text:find('"Mat"',1,true)~=nil and text:find('one invisible collider',1,true)~=nil,text)
+ info('look: a store look with 14 parts per trampoline here; the cap is '..T.AssetMaxParts..' per trampoline (a bigger one is refused and the built trampoline stays)')
+ -- B. a rebuild (HubDecor151.Apply again) re-dresses at once, no second load
+ local before=calls.IS;HT.Build(map)
+ local _,l1=lookOf(T.Spots[1])
+ check('look: Build again (HubDecor151.Apply runs again) puts the same look back without loading again',calls.IS==before and l1~=nil and HT.Look=='asset'and solids()==2)
+
+ -- C. the client on the asset look: the bounce is unchanged and the asset's mat squashes
+ do
+  local plays={}
+  W.stub('LocalSfx',{Play=function(id)plays[#plays+1]=id;return{}end,Preload=function()end})
+  local plr=R.new('Player');plr.Name='Looker';plr.UserId=2001;plr.Parent=Players;Players.LocalPlayer=plr
+  function Players.GetPlayers()return{plr}end
+  local pg=R.new('PlayerGui');pg.Name='PlayerGui';pg.Parent=plr
+  local mdl=R.new('Model');mdl.Name='Looker';local root=R.new('Part');root.Name='HumanoidRootPart';root.Size=V3(2,2,1);root.Parent=mdl
+  local hum=R.new('Humanoid');hum.Health=100;hum.HipHeight=2;hum.RigType=R.Enum.HumanoidRigType.R15;hum.Parent=mdl;mdl.PrimaryPart=root;mdl.Parent=W.workspace;plr.Character=mdl
+  local function put(x,feet,z,vy)root.CFrame=CF(x,feet+3,z);root.AssemblyLinearVelocity=V3(0,vy,0)end
+  local sc=R.new('LocalScript');sc.Name='HubTrampoline153';sc:SetAttribute('R153TestHook',true);sc.Parent=pg
+  local api=W.load('HubTrampoline153Client',sc)
+  put(0,60,-100,0);W.frames(2)
+  check('look client: finds both nooks and the asset\'s mat (a part inside the look model; the asset has no badge)',#api.Spots==2 and api.Spots[1].Mat~=nil and api.Spots[1].Mat.Name=='Trampoline mat'and api.Spots[1].Mat:IsDescendantOf(select(2,lookOf(T.Spots[1])))and api.Spots[1].Badge==nil)
+  local up=T.Velocity(196.2)
+  put(312,T.Top()+.1,-269,-50);W.frames(1)
+  check('look client: landing on the asset trampoline gives the same bounce ('..string.format('%.1f',root.AssemblyLinearVelocity.Y)..' studs/s, the apex 30), one boing',math.abs(root.AssemblyLinearVelocity.Y-up)<1e-6 and #plays==1)
+  W.frames(6)
+  local s=api.Spots[1];local dy=s.MatCF.Position.Y-s.Mat._props.CFrame.Position.Y
+  local dipped=math.abs(dy)>.001 and math.abs(dy)<=T.SquashDepth+1e-9
+  W.frames(40)
+  check('look client: the asset\'s mat squashes (off its rest pose, within 0.2 studs) and is back at rest after 0.7 s',dipped and s.Mat._props.CFrame.Position.Y==s.MatCF.Position.Y and #api.Active==0,dy)
+  put(312,T.Top()+.05,-269,-40);W.frames(1);local second=root.AssemblyLinearVelocity.Y;put(312,T.Top()+.05,-269,-40);W.frames(6)
+  check('look client: the debounce is unchanged (a contact .1 s after a bounce is ignored; no stacking)',math.abs(second-up)<1e-6 and root.AssemblyLinearVelocity.Y==-40,root.AssemblyLinearVelocity.Y)
+  sc:Destroy()
+ end
+
+ -- D. the owner's asset is refused ("User is not authorized to access Asset"): the hand-placed template, then the built trampoline
+ st=reload(DENIED,DENIED)
+ check('fallback: "User is not authorized to access Asset" on both routes keeps the BUILT trampoline (42 parts each, one collider), nothing breaks',HT.Look=='built'and calls.IS==1 and calls.AS==1 and solids()==2 and #lookOf(T.Spots[1]):GetChildren()==42 and fold():GetAttribute('Look')=='built',tostring(HT.Look))
+ local ok2,text2=HT.Command(nil,nil,{})
+ check('fallback: /test trampoline says THE BUILT TRAMPOLINE, why (the real errors of both routes) and how to cure "not authorized" (Get Model, HubTrampolineTemplates153)',ok2 and text2:find('THE BUILT TRAMPOLINE',1,true)~=nil and text2:find('InsertService:LoadAsset: ',1,true)~=nil and text2:find('AssetService:LoadAssetAsync: ',1,true)~=nil and text2:find('User is not authorized',1,true)~=nil and text2:find('Get Model',1,true)~=nil and text2:find('HubTrampolineTemplates153',1,true)~=nil,text2)
+ -- the hand-placed template
+ local tf=R.new('Folder');tf.Name=T.TemplateFolder;tf.Parent=RS
+ local hand=asset({Name='My Trampoline'});hand.Parent=tf
+ st=reload(DENIED,DENIED)
+ check('template: a model the owner dropped into ReplicatedStorage.HubTrampolineTemplates153 is used (scripts and junk stripped from a COPY), the asset is not even tried',HT.Look=='template'and calls.IS==0 and calls.AS==0 and st.Name=='My Trampoline'and st.Scripts==3 and #leftovers(fold())==0 and solids()==2)
+ local keepsScript=false;for _,d in ipairs(hand:GetDescendants())do if d._class=='Script'then keepsScript=true end end
+ check('template: the owner\'s original in the folder is never used in place (it still holds its own Script, and no part of it is in the world)',keepsScript and not hand:IsDescendantOf(W.workspace))
+ local _,look=lookOf(T.Spots[2]);local lo,hi=box(look);local tm=look:FindFirstChild('Trampoline mat',true)
+ check('template: scaled and placed like the asset (12.1 studs, centred on the Lava nook, mat top 4.9)',math.abs(math.max(hi[1]-lo[1],hi[3]-lo[3])-12.1)<.01 and math.abs((lo[1]+hi[1])/2-T.Spots[2].X)<.01 and tm~=nil and math.abs(select(2,aabb(tm))[2]-T.Top())<.001)
+ st=reload(function()return container(asset())end,DENIED)
+ check('template: preferred over an asset that WOULD load (the asset is not asked: 0 calls)',HT.Look=='template'and calls.IS==0)
+ -- a template with nothing usable falls through to the asset, and an empty folder to the built one
+ for _,c in ipairs(tf:GetChildren())do c:Destroy()end
+ local bad=R.new('Model');bad.Name='OnlyCode';local bs=R.new('Script');bs.Parent=bad;bad.Parent=tf
+ st=reload(function()return container(asset())end,DENIED)
+ check('template: one with nothing but a script is refused (why is told) and the asset is used',HT.Look=='asset'and calls.IS==1 and st.Tried[1]~=nil and st.Tried[1]:find('OnlyCode',1,true)~=nil and st.Tried[1]:find('no usable parts',1,true)~=nil,tostring(st.Tried[1]))
+ for _,c in ipairs(tf:GetChildren())do c:Destroy()end
+ st=reload(DENIED,DENIED)
+ check('fallback: template removed again and the asset still refused: back to the built trampoline',HT.Look=='built'and solids()==2 and #lookOf(T.Spots[1]):GetChildren()==42)
+ tf:Destroy()
+
+ -- E. the asset comes back wrong
+ st=reload(function()coroutine.yield()end,DENIED)
+ check('fallback: a load that never answers times out ('..T.LoadTimeout..' s) and the built trampoline stays',HT.Look=='built'and st.Tried[1]~=nil and st.Tried[1]:find('timed out after '..T.LoadTimeout..' s',1,true)~=nil,tostring(st.Tried[1]))
+ st=reload(function()return container(asset({Extra=T.AssetMaxParts}))end,DENIED)
+ check('fallback: an asset with more than '..T.AssetMaxParts..' parts per trampoline is not used (the count is told) and the built one stays',HT.Look=='built'and(st.Tried[#st.Tried]or''):find('too many parts',1,true)~=nil,tostring(st.Tried[#st.Tried]))
+ local codeOnly=R.new('Model');local cs=R.new('Script');cs.Parent=codeOnly
+ st=reload(function()return container(codeOnly)end,DENIED)
+ check('fallback: an asset that is nothing but a script has no usable parts: built stays, nothing runs',HT.Look=='built'and(st.Tried[#st.Tried]or''):find('no usable parts',1,true)~=nil and #leftovers(fold())==0)
+ st=reload(function()return nil end,function()return container(asset())end)
+ check('fallback: InsertService returning nothing falls through to AssetService:LoadAssetAsync (the second route)',HT.Look=='asset'and calls.IS==1 and calls.AS==1 and st.Route=='AssetService:LoadAssetAsync')
+ local sp,why=HT.Prepare(R.new('Script'))
+ check('security: a script handed in as the look is refused, and so is anything that is not a model or a part',sp==nil and why:find('script',1,true)~=nil and HT.Prepare(R.new('Humanoid'))==nil)
+ -- a look that cannot be fitted leaves BOTH built trampolines exactly as they were (nothing half dressed)
+ do local raw=R.Inst.ScaleTo;R.Inst.ScaleTo=function()error('cannot scale this model')end
+  st=reload(function()return container(asset())end,DENIED)
+  R.Inst.ScaleTo=raw
+  local n1,n2=#lookOf(T.Spots[1]):GetChildren(),#lookOf(T.Spots[2]):GetChildren()
+  check('fallback: a look that cannot be scaled / placed keeps both built trampolines untouched (42 parts each) and says why',HT.Look=='built'and n1==42 and n2==42 and solids()==2 and(st.Tried[#st.Tried]or''):find('could not be placed',1,true)~=nil and fold():GetAttribute('Look')=='built',tostring(st.Tried[#st.Tried]))
+ end
+ -- a single part, and a look whose mat cannot be told
+ local one=R.new('Part');one.Name='Flat';one.Size=V3(8,1,8);one.CFrame=CF(50,10,50)
+ st=reload(function()return container(one)end,DENIED)
+ local m1,l=lookOf(T.Spots[1]);local lo1,hi1=box(l)
+ check('look: a single part is taken too (wrapped, scaled to 12.1, centred, its top at 4.9); one part has no separate mat: no squash, the bounce stays',HT.Look=='asset'and st.Parts==1 and st.MatName==nil and math.abs(hi1[1]-lo1[1]-12.1)<.01 and math.abs(hi1[2]-T.Top())<.001 and m1:GetAttribute('HasMat')==false)
+ st=reload(function()return container(asset({Generic=true,Junk=false}))end,DENIED)
+ check('look: two like flat discs with no telling names: no mat is guessed (no squash), the look is still used',HT.Look=='asset'and st.MatName==nil and lookOf(T.Spots[1]):GetAttribute('HasMat')==false)
+ -- the nudge: a flat part whose top would land on the nook paving (4.26) lifts the look
+ local nudge=R.new('Model');nudge.Name='Nudge'
+ part(nudge,'Mat',V3(12.1,.4,12.1),{0,3.2,0});part(nudge,'Pan',V3(12.1,.1,12.1),{0,2.71,0});part(nudge,'Leg',V3(1,3,1),{5,1.5,5})
+ st=reload(function()return container(nudge)end,DENIED)
+ local _,ln=lookOf(T.Spots[1])
+ check('look: a flat part that would lie on the paving plane 4.26 is lifted off it (the look is nudged up by tenths, at most three)',HT.Look=='asset'and ln:GetAttribute('Nudged')>=1 and ln:GetAttribute('Nudged')<=3 and #flat(ln)==0,tostring(ln:GetAttribute('Nudged')))
+ -- the command
+ local rok,rtext=HT.Command(nil,nil,{'reload'})
+ local bok=HT.Command(nil,nil,{'bogus'})
+ check('command: trampoline reload rebuilds and says so; an unknown argument is refused',rok and rtext:find('rebuilt',1,true)~=nil and bok==false)
+ -- leave the world as the game starts: the built look
+ routes(DENIED,DENIED);HT.Reset();HT.Build(map)
+ check('look: back to the built trampoline when nothing can be loaded (the state the rest of the suite and the game start in)',HT.Look=='built'and solids()==2)
+end
+
 print(string.format('R153 hub fixes: %d checks, %d failures',passed+failed,failed))
 if failed>0 then error('failed')end

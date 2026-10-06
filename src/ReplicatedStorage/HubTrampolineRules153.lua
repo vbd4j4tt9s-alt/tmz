@@ -17,6 +17,13 @@ T.Spots={{X=312,Z=-269,Name='Desert'},{X=-312,Z=-269,Name='Lava'}}
 -- Dims: Top = the walking surface over the floor (0.9: a player steps on from the ground like onto a kerb, the game's own runner clears 1.1);
 -- Radius = the collider and the frame's outer edge; MatRadius = the bouncy mat.
 T.Dims={Top=.9,Radius=6.05,MatRadius=4.15}
+-- The look (the server's HubTrampoline153): the owner's trampoline model from the Creator Store, "trampoline can just use this asset 12088629887". The server tries a
+-- model the owner dropped into ReplicatedStorage.HubTrampolineTemplates153 first, then InsertService:LoadAsset(AssetId); with neither the built trampoline stays.
+T.AssetId=12088629887
+T.TemplateFolder='HubTrampolineTemplates153'
+T.AssetMaxParts=400    -- a look with more parts per trampoline is not used (the built one stays; /test trampoline says so)
+T.LoadTimeout=15       -- seconds one load route may take before it counts as failed
+T.MaxPartSize=600      -- a part of any side above this (or not a number) is "absurd" and dropped from a loaded look
 T.SquashSeconds=.6     -- the mat's squash-and-recover animation
 T.SquashDepth=.2       -- studs the mat's top dips at the deepest squash (the mat's top stays over the dark gap's, 4.62, so it never disappears)
 
