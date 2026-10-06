@@ -70,11 +70,15 @@ local function clearCopy(restore)
  if restore then for p,value in pairs(originals)do if p.Parent then p.LocalTransparencyModifier=value end end end
  table.clear(originals)
 end
+-- R152 perf: the cover, rings, burst, sparkles and crown pieces are shown / hidden every frame of a reveal (and hidden every frame after a small
+-- one); only this script shows them, so it remembers what it set and writes a change only
+local shown={}
+local function vis(o,v)if shown[o]~=v then shown[o]=v;o.Visible=v end;return v end
 local function hideEffects()
  sequence:Hide()
- panel.Visible=false;ring.Visible=false;burst.Visible=false
- for _,p in ipairs(nodes)do p.Visible=false end
- for _,p in ipairs(crownParts)do p.Visible=false end
+ vis(panel,false);vis(ring,false);vis(burst,false)
+ for _,p in ipairs(nodes)do vis(p,false)end
+ for _,p in ipairs(crownParts)do vis(p,false)end
 end
 local function clear()
  revealAudio.Stop()
@@ -181,9 +185,9 @@ local function presentation()
    kick(rank==8 and 2.6 or rank==7 and 2 or 1.2)
   end
   local duration=rank>=6 and 0 or math.max(.7,reveal.BurstAt+.6) -- (R151: the small pops follow the burst, which now ends the suspense)
-  burst.Visible=rank<6 and t>=0 and t<.23
+  vis(burst,rank<6 and t>=0 and t<.23)
   -- (R152: the ring of the fifth click is neutral: in the tier colour it told the rarity before the suspense had begun)
-  if burst.Visible then local a=math.clamp(t/.23,0,1);local e=1-(1-a)^3;burst.Size=UDim2.fromScale(.08+.38*e,.08+.38*e);burstStroke.Transparency=a;burstStroke.Color=Ladder.Neutral end
+  if shown[burst] then local a=math.clamp(t/.23,0,1);local e=1-(1-a)^3;burst.Size=UDim2.fromScale(.08+.38*e,.08+.38*e);burstStroke.Transparency=a;burstStroke.Color=Ladder.Neutral end
   -- R136 (owner: polish Legendary / Mythic pulls): motes gather during their short charge-up, then the ring bursts
   -- out with a soft colour flash exactly when the seed does.
   local at=reveal.BurstAt
@@ -192,10 +196,9 @@ local function presentation()
    local n=rank==5 and 16 or 10
    if t<at then
     local q=math.clamp(t/at,0,1)
-    ring.Visible=false;panel.Visible=false
+    vis(ring,false);vis(panel,false)
     for i,p in ipairs(nodes)do
-     p.Visible=i<=n
-     if p.Visible then
+     if vis(p,i<=n)then
       local angle=i*math.pi*2/n+t*(rank==5 and 2.2 or 1.6);local radius=.46-q*.32
       p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
       p.Size=UDim2.fromScale(.01,.01);p.Rotation=45;p.BackgroundColor3=color;p.BackgroundTransparency=1-q*.85
@@ -203,17 +206,16 @@ local function presentation()
     end
    elseif t<at+.75 then
     local tb=t-at;local fade=math.clamp((tb-.15)/.6,0,1);local rise=1-(1-math.clamp(tb/.3,0,1))^3
-    panel.Visible=not reduced()and tb<.3;panel.BackgroundColor3=color;panel.BackgroundTransparency=.72+math.clamp(tb/.3,0,1)*.28
-    ring.Visible=true;ring.Size=UDim2.fromScale(.15+rise*.55,.15+rise*.55);stroke.Color=color;stroke.Transparency=fade;stroke.Thickness=rank==5 and 3 or 2
+    vis(panel,not reduced()and tb<.3);panel.BackgroundColor3=color;panel.BackgroundTransparency=.72+math.clamp(tb/.3,0,1)*.28
+    vis(ring,true);ring.Size=UDim2.fromScale(.15+rise*.55,.15+rise*.55);stroke.Color=color;stroke.Transparency=fade;stroke.Thickness=rank==5 and 3 or 2
     for i,p in ipairs(nodes)do
-     p.Visible=i<=n
-     if p.Visible then
+     if vis(p,i<=n)then
       local angle=i*math.pi*2/n;local radius=.14+rise*(rank==5 and .30 or .24)
       p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
       p.Size=UDim2.fromScale(.009,.024);p.Rotation=angle*180/math.pi+90;p.BackgroundColor3=color;p.BackgroundTransparency=fade
      end
     end
-   else ring.Visible=false;panel.Visible=false;for _,p in ipairs(nodes)do p.Visible=false end end
+   else vis(ring,false);vis(panel,false);for _,p in ipairs(nodes)do vis(p,false)end end
   else
    if t<duration then
     local fade=math.clamp((t-(rank>=6 and .5 or .15))/(duration-(rank>=6 and .5 or .15)),0,1)
@@ -225,11 +227,9 @@ local function presentation()
      local tb=t-at;local life=.45
      local show=tb>=0 and tb<life and not reduced()
      local k=math.clamp(tb/life,0,1);local pop=1-(1-k)^3;local n=rank==3 and 8 or rank==2 and 6 or 4
-     ring.Visible=show and rank==3
-     if ring.Visible then ring.Size=UDim2.fromScale(.1+pop*.22,.1+pop*.22);stroke.Color=reveal.Color;stroke.Transparency=.35+k*.65;stroke.Thickness=2 end
+     if vis(ring,show and rank==3)then ring.Size=UDim2.fromScale(.1+pop*.22,.1+pop*.22);stroke.Color=reveal.Color;stroke.Transparency=.35+k*.65;stroke.Thickness=2 end
      for i,p in ipairs(nodes)do
-      p.Visible=show and i<=n
-      if p.Visible then
+      if vis(p,show and i<=n)then
        local angle=i*math.pi*2/n+.4;local radius=.05+pop*(.06+rank*.025);local size=.006+rank*.0015
        p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
        p.Size=UDim2.fromScale(size,size);p.Rotation=45+tb*160;p.BackgroundColor3=reveal.Color;p.BackgroundTransparency=k
@@ -237,15 +237,14 @@ local function presentation()
      end
     end
     if rank>=6 then -- (R151: was rank>=4, but Legendary / Mythic never reached this branch; with the seed card they do, and must not)
-     panel.Visible=rank>=6
+     vis(panel,rank>=6)
      panel.BackgroundColor3=rank==6 and Color3.fromRGB(7,7,10)or rank==7 and Color3.fromRGB(12,8,33)or Color3.fromRGB(40,25,5)
      panel.BackgroundTransparency=fade
      local color=rank==6 and white or rank==7 and Color3.fromRGB(180,159,255)or rank==5 and Color3.fromRGB(255,85,102)or Color3.fromRGB(255,213,100)
-     ring.Visible=true;ring.Size=UDim2.fromScale(.15+rise*.49,.15+rise*.49);stroke.Color=color;stroke.Transparency=fade;stroke.Thickness=rank>=6 and 4 or 2
+     vis(ring,true);ring.Size=UDim2.fromScale(.15+rise*.49,.15+rise*.49);stroke.Color=color;stroke.Transparency=fade;stroke.Thickness=rank>=6 and 4 or 2
      local n=rank>=6 and 24 or 10
      for i,p in ipairs(nodes)do
-      p.Visible=i<=n
-      if p.Visible then
+      if vis(p,i<=n)then
        local angle=i*math.pi*2/n+(rank==7 and t*.45 or 0);local radius=.17+rise*(rank>=6 and .39 or .20)
        p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
        p.BackgroundColor3=color;p.BackgroundTransparency=fade
@@ -255,7 +254,7 @@ local function presentation()
        else p.Size=UDim2.fromScale(.008,.018);p.Rotation=45+t*40 end
       end
      end
-     for _,p in ipairs(crownParts)do p.Visible=rank==8;p.BackgroundTransparency=fade end
+     for _,p in ipairs(crownParts)do vis(p,rank==8);p.BackgroundTransparency=fade end
     end
    elseif rank<6 then hideEffects()end
   end
