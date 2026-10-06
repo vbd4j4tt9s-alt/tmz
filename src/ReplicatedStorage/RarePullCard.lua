@@ -11,6 +11,7 @@
 -- and phone keep the same framing (RarePullRules.Layout); ReducedMotion: no float, spin, jitter or moving motes; lite: fewer pieces.
 local RS=game:GetService('ReplicatedStorage')
 local Rules=require(script.Parent.RarePullRules)
+local Cache=require(script.Parent.PropCache152)
 -- R152 (owner: "improve look on ... the card, the seed display"): a soft glow and, from Legendary up, a turning halo ring behind the seed,
 -- and the Cosmic title's planets, drawn on the client (RarePullArt: the same images the story scenes use); the R151 shapes otherwise.
 local Art do local ok,m=pcall(require,script.Parent.RarePullArt);Art=ok and m or nil end
@@ -67,6 +68,7 @@ function Card.Create(gui,kind,opts)
  local self=setmetatable({Gui=gui,Kind=kind,Rank=rank,Tier=tier,Phone=opts.Phone==true,Reduced=opts.Reduced==true,Lite=opts.Lite==true,Quick=opts.Quick==true,
   Odds=opts.Odds,SeedName=opts.SeedName or'',Layout=Rules.Layout(opts.Phone==true,kind=='InPlace',rank)},Card)
  local root=frame(gui,'RarePull',BLACK,1);root.Size=UDim2.fromScale(1,1);self.Root=root
+ local cache=Cache.new();self.Set,self.Scale=cache.Set,cache.Scale -- (R152 perf: per-frame writes only when a value changes)
  local accent=tier.Theme or tier.Hint
  -- edges: four soft gradients in the hint colour (the dim / suspense pulse)
  self.Edges={}
@@ -203,105 +205,115 @@ function Card:SetSeed(model)
  local dist=self.SeedRadius/math.tan(math.rad(15))*1.08
  self.ViewCamera.CFrame=CFrame.lookAt(self.SeedCentre+Vector3.new(0,self.SeedRadius*.12,dist),self.SeedCentre)
 end
-local function show(o,v)if o then o.Visible=v end end
 -- Shared pieces --------------------------------------------------------------------------------------------------------------------------
-function Card:_edges(color,a)for _,e in ipairs(self.Edges)do e.Visible=a>.005;e.BackgroundColor3=color;e.BackgroundTransparency=1-a end end
-function Card:_bars(k)local h=self.Layout.Bar*clamp01(k);for _,b in ipairs(self.Bars)do b.Size=UDim2.fromScale(1,h);b.Visible=h>0 end end
+-- R152 perf: every frame used to set every property of every piece (most to the value already there); the card's own cache (PropCache152)
+-- writes only what changes. Every value is the same as before: only the writes of unchanged values are gone.
+function Card:_edges(color,a)local S=self.Set;for _,e in ipairs(self.Edges)do S(e,'Visible',a>.005);S(e,'BackgroundColor3',color);S(e,'BackgroundTransparency',1-a)end end
+function Card:_bars(k)local S=self.Set;local h=self.Layout.Bar*clamp01(k);for _,b in ipairs(self.Bars)do self.Scale(b,'Size',1,h);S(b,'Visible',h>0)end end
 function Card:_motes(k,t,color,alpha)
+ local S=self.Set
  for i,m in ipairs(self.Motes)do
   local a=i*2.399+.3;local r=.62*(1-k)+.06
   if self.Reduced then r=.5 end
-  m.Visible=alpha>.01;m.BackgroundColor3=color;m.BackgroundTransparency=1-alpha*(.4+.6*math.sin(i+t*3)^2)
-  m.Position=UDim2.fromScale(.5+math.cos(a+t*(self.Reduced and 0 or .9))*r*.62,.5+math.sin(a+t*(self.Reduced and 0 or .9))*r)
+  S(m,'Visible',alpha>.01);S(m,'BackgroundColor3',color);S(m,'BackgroundTransparency',1-alpha*(.4+.6*math.sin(i+t*3)^2))
+  self.Scale(m,'Position',.5+math.cos(a+t*(self.Reduced and 0 or .9))*r*.62,.5+math.sin(a+t*(self.Reduced and 0 or .9))*r)
  end
 end
 function Card:_rays(t,alpha)
  if not self.RayHolder then return end
- self.RayHolder.Visible=alpha>.01;self.RayHolder.Rotation=self.Reduced and 0 or t*14
- for _,r in ipairs(self.Rays)do r.BackgroundTransparency=1-alpha end
+ local S=self.Set
+ S(self.RayHolder,'Visible',alpha>.01);S(self.RayHolder,'Rotation',self.Reduced and 0 or t*14)
+ for _,r in ipairs(self.Rays)do S(r,'BackgroundTransparency',1-alpha)end
 end
 function Card:_ring(k,alpha)
  if not self.Ring then return end
- self.Ring.Visible=alpha>.01 and k<1;local d=.1+(self.Reduced and .35 or 1.3)*(1-(1-k)^2)
- self.Ring.Size=UDim2.fromScale(d,d);self.RingStroke.Transparency=1-alpha*(1-k);self.RingStroke.Thickness=2+6*(1-k)
+ local S=self.Set
+ S(self.Ring,'Visible',alpha>.01 and k<1);local d=.1+(self.Reduced and .35 or 1.3)*(1-(1-k)^2)
+ self.Scale(self.Ring,'Size',d,d);S(self.RingStroke,'Transparency',1-alpha*(1-k));S(self.RingStroke,'Thickness',2+6*(1-k))
 end
-function Card:_flash(a)self.Flash.BackgroundTransparency=1-clamp01(a)*(self.Reduced and .35 or 1)end
-function Card:_fade(a)self.Fade.BackgroundTransparency=1-clamp01(a)end
+function Card:_flash(a)self.Set(self.Flash,'BackgroundTransparency',1-clamp01(a)*(self.Reduced and .35 or 1))end
+function Card:_fade(a)self.Set(self.Fade,'BackgroundTransparency',1-clamp01(a))end
 -- Texts: title pops in at `inAt`, odds count from `countAt` and slam at `slamAt`, everything fades out between `outAt` and `goneAt`.
 function Card:_texts(t,inAt,countAt,slamAt,outAt,goneAt)
+ local S,Sc=self.Set,self.Scale
  local out=1-clamp01((t-outAt)/math.max(.01,goneAt-outAt))
  local shown=t>=inAt and out>0
  -- (R152) on the way out the texts and the seed lift a little as they fade (eased in), instead of fading where they stand
  local lift=self.Reduced and 0 or .03*Rules.EaseIn(1-out);self.Lift=lift
  local L=self.Layout
- self.Title.Position=UDim2.fromScale(.5,L.Title.Y-lift);self.OddsLabel.Position=UDim2.fromScale(.5,L.Odds.Y-lift);self.NameLabel.Position=UDim2.fromScale(.5,L.Name.Y-lift)
+ Sc(self.Title,'Position',.5,L.Title.Y-lift);Sc(self.OddsLabel,'Position',.5,L.Odds.Y-lift);Sc(self.NameLabel,'Position',.5,L.Name.Y-lift)
  local tin=clamp01((t-inAt)/.12)
- self.Title.TextTransparency=shown and 1-tin*out or 1;self.Title.TextStrokeTransparency=shown and 1-(.6*tin*out)or 1
+ S(self.Title,'TextTransparency',shown and 1-tin*out or 1);S(self.Title,'TextStrokeTransparency',shown and 1-(.6*tin*out)or 1)
  local pop=clamp01((t-inAt)/.2)
- self.TitleScale.Scale=self.Reduced and 1 or 1+.7*(1-pop)^3
+ S(self.TitleScale,'Scale',self.Reduced and 1 or 1+.7*(1-pop)^3)
  local odds=self.Odds
  if odds and t>=countAt and out>0 then
   local k=clamp01((t-countAt)/math.max(.01,slamAt-countAt))
-  self.OddsLabel.Text=Rules.CountText(odds,k)
-  self.OddsLabel.TextTransparency=1-clamp01((t-countAt)/.1)*out;self.OddsLabel.TextStrokeTransparency=1-.55*clamp01((t-countAt)/.1)*out
+  S(self.OddsLabel,'Text',Rules.CountText(odds,k))
+  S(self.OddsLabel,'TextTransparency',1-clamp01((t-countAt)/.1)*out);S(self.OddsLabel,'TextStrokeTransparency',1-.55*clamp01((t-countAt)/.1)*out)
   -- the slam: up to 1.45x over 25 ms (R152: it jumped there in one frame), then settles
   local up=Rules.Smooth((t-slamAt)/.025);local s=clamp01((t-slamAt-.025)/.18)
-  self.OddsScale.Scale=(self.Reduced or t<slamAt)and 1 or 1+.45*up*(1-s)^2
-  self.OddsLabel.TextColor3=t>=slamAt and WHITE:Lerp(self.Tier.Glow,.25+.75*s)or WHITE
- else self.OddsLabel.TextTransparency=1;self.OddsLabel.TextStrokeTransparency=1 end
+  S(self.OddsScale,'Scale',(self.Reduced or t<slamAt)and 1 or 1+.45*up*(1-s)^2)
+  S(self.OddsLabel,'TextColor3',t>=slamAt and WHITE:Lerp(self.Tier.Glow,.25+.75*s)or WHITE)
+ else S(self.OddsLabel,'TextTransparency',1);S(self.OddsLabel,'TextStrokeTransparency',1)end
  local nk=clamp01((t-slamAt)/.2)*out
- self.NameLabel.TextTransparency=t>=slamAt and 1-nk or 1;self.NameLabel.TextStrokeTransparency=t>=slamAt and 1-.5*nk or 1
+ S(self.NameLabel,'TextTransparency',t>=slamAt and 1-nk or 1);S(self.NameLabel,'TextStrokeTransparency',t>=slamAt and 1-.5*nk or 1)
  return shown,out
 end
 -- Tier dressing of the title (Secret glitch, Cosmic stars / planets, King crown) while it is shown.
 function Card:_dress(t,since,alpha)
+ local S,Sc=self.Set,self.Scale
  local L=self.Layout;local y=L.Title.Y-(self.Lift or 0)
  if self.Split then
   local jitter=since<.6 and not self.Reduced
   for i,s in ipairs(self.Split)do
    local off=jitter and(math.sin(t*97+i*2)*.006+(i==1 and -.004 or .004))or(i==1 and -.0025 or .0025)
-   s.Position=UDim2.fromScale(.5+off,y+(jitter and math.sin(t*71+i)*.003 or 0));s.TextTransparency=1-alpha*.55;s.Visible=alpha>.01
+   Sc(s,'Position',.5+off,y+(jitter and math.sin(t*71+i)*.003 or 0));S(s,'TextTransparency',1-alpha*.55);S(s,'Visible',alpha>.01)
   end
   for i,s in ipairs(self.Scan)do
    local on=alpha>.01 and((math.floor(t*12+i*3)%5)==0 or since<.5)and not self.Reduced
-   s.Visible=on;s.Position=UDim2.fromScale(.5+math.sin(t*13+i)*.05,y-L.Title.H*.4+((t*.7+i*.27)%1)*L.Title.H*.8)
+   S(s,'Visible',on);Sc(s,'Position',.5+math.sin(t*13+i)*.05,y-L.Title.H*.4+((t*.7+i*.27)%1)*L.Title.H*.8)
   end
  end
  if self.Stars then
   for i,s in ipairs(self.Stars)do
-   local a=i*2.1;s.Visible=alpha>.01
-   s.Position=UDim2.fromScale(.5+math.cos(a)*(.16+.04*(i%3)),y+math.sin(a)*L.Title.H*.75)
-   s.BackgroundTransparency=1-alpha*(self.Reduced and .8 or .3+.7*math.abs(math.sin(t*3+i)))
+   local a=i*2.1;S(s,'Visible',alpha>.01)
+   Sc(s,'Position',.5+math.cos(a)*(.16+.04*(i%3)),y+math.sin(a)*L.Title.H*.75)
+   S(s,'BackgroundTransparency',1-alpha*(self.Reduced and .8 or .3+.7*math.abs(math.sin(t*3+i))))
   end
   for i,p in ipairs(self.Planets)do
-   local a=(self.Reduced and 0 or t*(.9+.3*i))+i*math.pi;p.Visible=alpha>.01
-   p.Position=UDim2.fromScale(.5+math.cos(a)*.21,y+math.sin(a)*L.Title.H*.55)
-   if self.PlanetImages[i]then p.ImageTransparency=1-alpha else p.BackgroundTransparency=1-alpha end
-   p.ZIndex=math.sin(a)>0 and 13 or 9
+   local a=(self.Reduced and 0 or t*(.9+.3*i))+i*math.pi;S(p,'Visible',alpha>.01)
+   Sc(p,'Position',.5+math.cos(a)*.21,y+math.sin(a)*L.Title.H*.55)
+   if self.PlanetImages[i]then S(p,'ImageTransparency',1-alpha)else S(p,'BackgroundTransparency',1-alpha)end
+   S(p,'ZIndex',math.sin(a)>0 and 13 or 9)
   end
  end
  if self.Crown then
   local drop=self.Reduced and 1 or 1-(1-clamp01(since/.3))^3
-  self.Crown.Visible=alpha>.01;self.Crown.Position=UDim2.fromScale(.5,y-L.Title.H*(.62+.5*(1-drop)))
+  S(self.Crown,'Visible',alpha>.01);Sc(self.Crown,'Position',.5,y-L.Title.H*(.62+.5*(1-drop)))
   if self.CrownAlpha~=alpha then self.CrownAlpha=alpha;for _,d in ipairs(self.CrownParts)do d.BackgroundTransparency=1-alpha end end
  end
 end
 function Card:_seed(t,appear,floatEnd,outAt,goneAt)
  if not self.View then return end
+ local S,Sc=self.Set,self.Scale
  local out=1-clamp01((t-outAt)/math.max(.01,goneAt-outAt))
  local shown=t>=appear and out>0
- self.View.Visible=shown;self.SeedGlow.Visible=shown;if self.SeedHalo then self.SeedHalo.Visible=shown end
+ S(self.View,'Visible',shown);S(self.SeedGlow,'Visible',shown);if self.SeedHalo then S(self.SeedHalo,'Visible',shown)end
  if not shown then return end
  local k=clamp01((t-appear)/.2);local f=clamp01((t-appear)/math.max(.05,floatEnd-appear))
  local y=self.Layout.Seed.Y+(self.Reduced and 0 or(-.03+.06*Rules.Smooth(f))-.03*Rules.EaseIn(1-out))
- self.View.Position=UDim2.fromScale(.5,y);self.SeedGlow.Position=self.View.Position
- self.View.ImageTransparency=1-k*out
- if self.GlowIsImage then self.SeedGlow.ImageTransparency=1-.6*k*out else self.SeedGlow.BackgroundTransparency=1-.55*k*out end
- if self.SeedHalo then self.SeedHalo.Position=self.View.Position;self.SeedHalo.ImageTransparency=1-.65*k*out;self.SeedHalo.Rotation=self.Reduced and 0 or t*30 end
- self.ViewScale.Scale=self.Reduced and 1 or .6+.4*(1-(1-k)^3)
+ Sc(self.View,'Position',.5,y);Sc(self.SeedGlow,'Position',.5,y)
+ S(self.View,'ImageTransparency',1-k*out)
+ if self.GlowIsImage then S(self.SeedGlow,'ImageTransparency',1-.6*k*out)else S(self.SeedGlow,'BackgroundTransparency',1-.55*k*out)end
+ if self.SeedHalo then Sc(self.SeedHalo,'Position',.5,y);S(self.SeedHalo,'ImageTransparency',1-.65*k*out);S(self.SeedHalo,'Rotation',self.Reduced and 0 or t*30)end
+ S(self.ViewScale,'Scale',self.Reduced and 1 or .6+.4*(1-(1-k)^3))
  if self.SeedModel and self.SeedBase then
   local yaw=Rules.SeedYaw(t,self.Reduced)
-  pcall(function()self.SeedModel:PivotTo(CFrame.new(self.SeedCentre)*CFrame.Angles(0,yaw,0)*self.SeedBase)end)
+  if yaw~=self.SeedYawShown then -- (R152 perf: a seed that stands still is not moved again)
+   self.SeedYawShown=yaw
+   pcall(function()self.SeedModel:PivotTo(CFrame.new(self.SeedCentre)*CFrame.Angles(0,yaw,0)*self.SeedBase)end)
+  end
  end
 end
 -- Ladder: t on the reveal's server clock -------------------------------------------------------------------------------------------------
@@ -350,16 +362,18 @@ function Card:UpdateScene(t,tl,skipShown)
  self:_rays(t,t>=tl.Climax and .45*out or 0)
  self:_dress(t,t-tl.Climax,shown and(1-clamp01((t-tl.FloatEnd)/math.max(.01,tl.Back-.1-tl.FloatEnd)))*clamp01((t-tl.Climax)/.12)or 0)
  if self.Glitch then
+  local S=self.Set
   local on=false
   for _,g in ipairs({.25,tl.Cut,tl.Glitch1,tl.Glitch2,tl.Climax})do if g and t>=g and t<g+.2 then on=true end end
   for i,g in ipairs(self.Glitch)do
-   g.Visible=on and not self.Reduced
-   if g.Visible then g.Size=UDim2.fromScale(.3+.5*math.abs(math.sin(t*37+i)),.012+.02*math.abs(math.sin(t*53+i*2)));g.Position=UDim2.fromScale(.5+math.sin(t*41+i)*.25,(i*.19+t*3.1)%1)end
+   local v=on and not self.Reduced
+   S(g,'Visible',v)
+   if v then self.Scale(g,'Size',.3+.5*math.abs(math.sin(t*37+i)),.012+.02*math.abs(math.sin(t*53+i*2)));self.Scale(g,'Position',.5+math.sin(t*41+i)*.25,(i*.19+t*3.1)%1)end
   end
  end
  if self.SkipHint then
   local a=skipShown and clamp01((t-tl.SkipFrom)/.3)*(1-clamp01((t-tl.FloatEnd)/.2))or 0
-  self.SkipHint.TextTransparency=1-.75*a;self.SkipHint.Visible=a>.01
+  self.Set(self.SkipHint,'TextTransparency',1-.75*a);self.Set(self.SkipHint,'Visible',a>.01)
  end
 end
 -- InPlace: t on the reveal's server clock (or from 0 for a result card) --------------------------------------------------------------------

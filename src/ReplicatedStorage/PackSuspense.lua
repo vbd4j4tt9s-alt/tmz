@@ -5,9 +5,11 @@
 -- RarePullRules.Wobble / StripPeel, applied by SeedPackClient to the pack itself. Cheap: one neon slab, one light, one Highlight
 -- (no Highlight on low quality / FastMode); nothing is left once the reveal ends.
 local Rules=require(script.Parent.RarePullRules)
+local Cache do local ok,m=pcall(require,script.Parent.PropCache152);Cache=ok and m or{new=function()return{Set=function(o,k,v)o[k]=v end}end}end -- (R152 perf)
 local P={};P.__index=P
 function P.Create(parent,rank,scale,quick,lite)
  local self=setmetatable({Rank=rank,Scale=math.clamp(tonumber(scale)or 1,.3,25),Quick=quick==true,BurstAt=Rules.BurstAt(rank,quick)},P)
+ self.Set=Cache.new().Set -- (R152 perf: per-frame values are written only when they change)
  local glow=Instance.new('Part');glow.Name='Pack seam glow';glow.Anchored=true;glow.CanCollide=false;glow.CanTouch=false;glow.CanQuery=false;glow.CastShadow=false
  glow.Material=Enum.Material.Neon;glow.Color=Rules.Neutral;glow.Transparency=1;glow.Size=Vector3.new(1.55,.05,.22)*self.Scale;glow.Parent=parent;self.Glow=glow
  local light=Instance.new('PointLight');light.Name='Pack hint light';light.Color=Rules.Neutral;light.Brightness=0;light.Range=6*math.min(self.Scale,4);light.Shadows=false;light.Parent=glow;self.Light=light
@@ -25,14 +27,15 @@ function P:Update(mouth,t)
  local color,strength=Rules.Hint(self.Rank,q)
  local glow=Rules.Glow(self.Rank,t,self.Quick)
  local shown=t>=0 and glow>.01
- self.Glow.CFrame=mouth*CFrame.new(0,.02*self.Scale,0)
- self.Glow.Color=color;self.Glow.Transparency=shown and math.clamp(1-glow*(.35+.6*strength),0,1)or 1
- self.Glow.Size=Vector3.new(1.55*math.clamp(.25+q,0,1),.05+.05*glow,.22)*self.Scale
- self.Light.Color=color;self.Light.Brightness=shown and glow*(1.2+1.8*strength)or 0
+ local S=self.Set
+ S(self.Glow,'CFrame',mouth*CFrame.new(0,.02*self.Scale,0))
+ S(self.Glow,'Color',color);S(self.Glow,'Transparency',shown and math.clamp(1-glow*(.35+.6*strength),0,1)or 1)
+ S(self.Glow,'Size',Vector3.new(1.55*math.clamp(.25+q,0,1),.05+.05*glow,.22)*self.Scale)
+ S(self.Light,'Color',color);S(self.Light,'Brightness',shown and glow*(1.2+1.8*strength)or 0)
  if self.Highlight then
-  self.Highlight.FillColor=color;self.Highlight.OutlineColor=color
-  self.Highlight.FillTransparency=t<self.BurstAt and math.clamp(1-glow*.38,0,1)or 1
-  self.Highlight.OutlineTransparency=t<self.BurstAt and math.clamp(1-glow*.8,0,1)or 1
+  S(self.Highlight,'FillColor',color);S(self.Highlight,'OutlineColor',color)
+  S(self.Highlight,'FillTransparency',t<self.BurstAt and math.clamp(1-glow*.38,0,1)or 1)
+  S(self.Highlight,'OutlineTransparency',t<self.BurstAt and math.clamp(1-glow*.8,0,1)or 1)
  end
  self.Color=color;self.Strength=glow
 end
