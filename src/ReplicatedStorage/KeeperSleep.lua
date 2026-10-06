@@ -88,7 +88,7 @@ function Sleep.new(root, _stage, config)
     local z = _stage ~= 1 and config.Z
     if z then gui, labels = bigZ(attachment, z.Height)
     elseif _stage ~= 1 then gui, labels = zzz(attachment, _stage) end
-    return setmetatable({Muted = _stage==1, Root = root, Attachment = attachment, Sound = sound, Playing = false, Zzz = gui, Labels = labels, Big = z and true or nil,
+    return setmetatable({Muted = _stage==1, Root = root, Attachment = attachment, Sound = sound, Playing = false, Zzz = gui, Labels = labels, Big = z and true or nil, Faded = {},
         HeadPoint = z and Vector3.new(z.Point[1], z.Point[2], z.Point[3]) or Vector3.new((low[1] + high[1]) / 2, high[2] + 2, (low[3] + high[3]) / 2)}, Sleep)
 end
 -- Keep the existing BeastAnimation call signature; no second update owner.
@@ -117,7 +117,11 @@ function Sleep:Update(asleep, distance, _now, headFrame, low)
                 label.Position = UDim2.fromScale(.3 + u * .4 + math.sin(u * 6.28) * .08, .9 - u * .8)
                 label.Size = UDim2.fromScale(.25 + u * .3, .16 + u * .18)
                 local fade = u < .2 and 1 - u / .2 * .75 or .25 + .75 * math.max(0, (u - .6) / .4)
-                label.TextTransparency = fade; label.TextStrokeTransparency = math.max(.55, fade)
+                -- (R152 perf: the fade holds still for part of each drift: written when it changes, against what this wrote)
+                local stroke = math.max(.55, fade); local was = self.Faded[i]
+                if not was then was = {}; self.Faded[i] = was end
+                if was[1] ~= fade then was[1] = fade; label.TextTransparency = fade end
+                if was[2] ~= stroke then was[2] = stroke; label.TextStrokeTransparency = stroke end
             end
         end
     end

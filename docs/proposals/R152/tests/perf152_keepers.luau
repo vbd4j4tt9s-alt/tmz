@@ -101,15 +101,17 @@ state('GUARDING');S.awake=0;S.moving=0;S.speed=0;S.urgency=0
 run(60,'asleep again')
 -- per-frame cost: chasing, near
 state('CHASING');S.awake=1;S.moving=1;S.speed=30
-FP.probeStart()
+FP.probeStart();FP.Probe.Where=PERF_WHERE==true
 local tm=FP.minTimes(W.Run,4,30,function()S.t+=1/60;S.cycle=(S.cycle+1/60*1.6)%1;W.frames(1,1/60)end)
 local p=FP.probeStop()
 print(string.format('PERF keepers.chase variant=%s tier=%d lua: BeastAnimation %.3f ms | %s',VARIANT,TIER,tm.BeastAnimation or 0,FP.probeText(p,120,10)))
+if PERF_WHERE then FP.whereText(120)end
 state('GUARDING');S.awake=0;S.moving=0;W.frames(10,1/60)
-FP.probeStart()
+FP.probeStart();FP.Probe.Where=PERF_WHERE==true
 tm=FP.minTimes(W.Run,4,30,function()S.t+=1/60;W.frames(1,1/60)end)
 p=FP.probeStop()
 print(string.format('PERF keepers.asleep variant=%s tier=%d lua: BeastAnimation %.3f ms | %s',VARIANT,TIER,tm.BeastAnimation or 0,FP.probeText(p,120,10)))
+if PERF_WHERE then FP.whereText(120)end
 local c=FP.counts(W.workspace)
 print(string.format('PERF keepers.counts variant=%s tier=%d %s',VARIANT,TIER,FP.countText(c)))
 print('PERF152 KEEPERS DONE')

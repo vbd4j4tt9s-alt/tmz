@@ -254,13 +254,16 @@ function Fx.Step(self,c)
   local want=not isLow and c.Distance<120 and c.Chasing and c.Awake>.5
   if want and not lit[self]then local count=0;for _ in pairs(lit)do count+=1 end;if count>=Fx.MaxLights then want=false end end
   if want then
-   lit[self]=true;self.Light.Enabled=true;self.Light.Brightness=.6+1.6*math.clamp(c.Urgency or 0,0,1)
+   -- (R152 perf: the light, its brightness and the breath rate are written when they change, against what was written: Roblox keeps them as
+   -- 32-bit floats, so reading them back never matched; nothing else writes them)
+   if not lit[self]then lit[self]=true;self.Light.Enabled=true end
+   local b=.6+1.6*math.clamp(c.Urgency or 0,0,1);if self.LitB~=b then self.LitB=b;self.Light.Brightness=b end
    if frames and frames.Head then place(self.Eyes,self.Root,frame*frames.Head*CF(self.EyePoint))end
-  elseif lit[self]then lit[self]=nil;self.Light.Enabled=false end
+  elseif lit[self]then lit[self]=nil;self.Light.Enabled=false;self.LitB=nil end
  end
  if self.Ambient then
   local on=not isLow and c.Distance<Fx.BreathDistance and c.Awake>.6
-  if on then self.Ambient.Rate=spec.Ambient.Rate*(1+(c.Urgency or 0));if frames and frames.Body then place(self.Body,self.Root,frame*frames.Body*CF(self.BodyPoint))end end
+  if on then local r=spec.Ambient.Rate*(1+(c.Urgency or 0));if self.AmbientRate~=r then self.AmbientRate=r;self.Ambient.Rate=r end;if frames and frames.Body then place(self.Body,self.Root,frame*frames.Body*CF(self.BodyPoint))end end
   if self.Ambient.Enabled~=on then self.Ambient.Enabled=on end
  end
  -- Footfalls: detect the gait phase crossing a contact and puff at the lowest foot.
