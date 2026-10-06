@@ -119,3 +119,19 @@ All three options keep the standard pouch, its seal and tear strips, pivot, boun
 **Questions:**
 - **"LIMITED TIME!"**: should the pack go off sale when the Index LIMITED countdown ends (1 Nov 2026, set `SaleEndsAt`)? Or is it permanent, in which case drop "LIMITED TIME!" from the banner?
 - **Keep the prices** at 80 / 375 / 700? (Recommended: yes.)
+
+## 6. Built (R153): look B and the full opening
+
+The owner picked **look B** and **the full Mech touch**. Value (pity, coats) is **not** approved yet: odds, prices, pity and coats are unchanged.
+Picture of the real build: **`mech_pack_built.png`** (today next to the built pack, front / side / back, both at hotbar size), made from the parts the
+game now builds (`sh docs/proposals/R153/mech_pack/run_mech_built_preview.sh <scratch> <python with bpy 4.5>`).
+
+| | |
+| --- | --- |
+| Design | `MechPackArt153` (new; `SpecialPackArt89` delegates to it). Gunmetal pouch, riveted steel frame, 10 cyan traces a face out of R103's reactor + turbine (a soft `MechPulse` runs out along them), 4 hex corner bolts a face (3 blocks 60 degrees apart), MECH plate (14 neon strokes), a hazard seal (yellow strips / seal, a black diagonal stripe through each), an antenna with a red LED that blinks on the top crimp. Both faces. **173 design parts** (today 174) |
+| The print | The pouch is `VerityPouch151`'s **generated flat pouch** (every vertex colour white, the same 1.97 x 2.06 footprint as Forest_01): gunmetal is the real colour. One server bake serves both packs. While it is not there, a plain-parts body with the same faces |
+| Layers | Every layer stands .046 off the one under it, so nothing is in tools/zfight.py's .02 band even on a .5x pack. Seal, strips and stripes sit on the body's own mid-plane and the faces follow the body's depth, so every part sits flush on the pouch or the sachet, on the ground and in hand (tested) |
+| Held | A soft cyan hum (one PointLight) and 2.5 sparks a second from the antenna (one ParticleEmitter), both in Attachments on the pack; `SeedPackRender` switches them on while it details the pack (no per-frame writes). No orbiting scanner any more (the Mech plants keep theirs) |
+| Bounds | Only `MaxY` grows (the LED): the carry layout, pad and pickup point are unchanged. Never shaped (`PackShapes151`), as before |
+| Opening | `MechPackFx153`, on the reveal's own beats (read, never set): clicks 1-4 back out a bolt each with UpgradeClick's tick at Bubble04's volume; a scan line in the hint colour on every wobble pulse (core + traces flash in it); steam + a soft hiss (the Flight whoosh pitched up, -39 LUFS) on every tear group; a steam ring and the turbine spinning down on the burst. ReducedMotion / low quality: just the colour |
+| Tests | `docs/proposals/R153/tests/run_mech_pack.sh` (in the full runner) and the R152 z-fight sweep's Mech step |
