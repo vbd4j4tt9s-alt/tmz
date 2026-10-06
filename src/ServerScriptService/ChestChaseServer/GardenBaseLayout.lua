@@ -98,8 +98,10 @@ end
 -- (WalkthroughProps90), but the soil beds are not: they stand 0.8 over the pad, and the rear bed 1.8 over the hub floor (it is flush with the pad's
 -- three outer edges). The game's own runner sweep (RunnerSweep.Hull) steps over anything within 1.1 studs of the feet, so those 1.8 faces stopped a
 -- runner until they jumped. Fix: every exposed soil face gets an invisible low ramp (a wedge from the outside surface up to the soil top, 2.5 studs of
--- run per stud of rise: a 22 degree slope). The soil itself, the borders, the plants and the planting frames are untouched; a ramp can be neither
--- queried (clicks, planting, digging and inspection rays pass through) nor touched. They stand in Workspace.ChestChaseMap.GardenBedRamps153.
+-- run per stud of rise: a 22 degree slope). The soil itself, the borders, the plants and the planting frames are untouched. A ramp is a floor like the
+-- pad and the soil (solid and queryable, so the Humanoid and the runner sweep both treat it as ground; not touchable), invisible, and lies wholly under
+-- the soil's plane: a ray that ends on soil or on a plant (planting's "KEEP A CLEAR VIEW OF THE SOIL" check, digging, inspection) comes from above that
+-- plane and never crosses one. They stand in Workspace.ChestChaseMap.GardenBedRamps153 (not under a base: WalkthroughProps90 would make them walk-through).
 L.RampFolder='GardenBedRamps153'
 L.Ramp={Slope=2.5,PadRun=2,MinLength=1.2,MinRise=.15,MinRun=1.5,RimMargin=1.2}
 -- The ramps of one base, as {Name, Cf (world), Size} (pure: reads the pad and the plots).
@@ -177,7 +179,7 @@ function L.Ramps(map)
  local n=0
  for _,base in ipairs(map.Bases:GetChildren())do if base:IsA('Model')and base:GetAttribute('BaseIndex')then
   for _,spec in ipairs(L.RampSpecs(base))do
-   local p=Instance.new('WedgePart');p.Name=spec.Name;p.Size=spec.Size;p.CFrame=spec.Cf;p.Anchored=true;p.CanCollide=true;p.CanTouch=false;p.CanQuery=false
+   local p=Instance.new('WedgePart');p.Name=spec.Name;p.Size=spec.Size;p.CFrame=spec.Cf;p.Anchored=true;p.CanCollide=true;p.CanTouch=false;p.CanQuery=true
    p.Transparency=1;p.CastShadow=false;p.Material=Enum.Material.Plastic;p:SetAttribute('BaseIndex',base:GetAttribute('BaseIndex'));p.Parent=folder;n+=1
   end
  end end

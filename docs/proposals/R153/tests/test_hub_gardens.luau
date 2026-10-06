@@ -427,6 +427,53 @@ if not MUT then
  check('gardens: and nothing but the rear beds (DirtPlot_10) fails: the 0.8-stud pad-to-soil edges and the 1.0 pad rim are within the limit',rear and #before.Fail>0,tostring(before.Fail[1]and before.Fail[1].Label))
  check('gardens: all 18 rear faces (3 per base: back, two ends) fail without ramps, and the rear beds\' outer corners with them',(function()local n,c=0,0;for k in pairs(before.Faces)do if k:find('corner')then c+=1 else n+=1 end end;return n==18 and c==6 end)(),faces)
 end
+-- the ramps are queryable floors, so check what a ray sees: planting's server check ("KEEP A CLEAR VIEW OF THE SOIL") casts from the player's head to the soil point
+-- and must hit the plot; digging and plant inspection cast from the camera. From heads 4.5 studs over the ground (pad, floor or ramp), 1.5 / 4 / 9 studs out from every
+-- bed edge (sampled every 2 studs), to soil points half a stud in: no point of any ray lies inside a ramp.
+do
+ local rays,hits=0,{}
+ local function insideRamp(p,x,y,z)
+  local c=p._props.CFrame;local s=p._props.Size;local r=c.R;local q=c.Position
+  local dx,dy,dz=x-q.X,y-q.Y,z-q.Z
+  local lx=dx*r[1][1]+dz*r[3][1];local lz=dx*r[1][3]+dz*r[3][3]
+  if math.abs(lx)>=s.X/2 or math.abs(lz)>=s.Z/2 then return false end
+  return dy>-s.Y/2 and dy<-s.Y/2+s.Y*((lz+s.Z/2)/s.Z)-1e-6
+ end
+ for i=1,6 do
+  local base=bases[i];local plots={};local lox,hix,loz,hiz=math.huge,-math.huge,math.huge,-math.huge
+  for _,p in ipairs(base.GardenPlots:GetChildren())do
+   local a,b=aabb(p);plots[#plots+1]={X0=a[1],X1=b[1],Z0=a[3],Z1=b[3],Top=b[2]}
+   lox=math.min(lox,a[1]);hix=math.max(hix,b[1]);loz=math.min(loz,a[3]);hiz=math.max(hiz,b[3])
+  end
+  local near=nearParts(lox-16,hix+16,loz-16,hiz+16)
+  local mine={};for _,p in ipairs(rampParts)do if p:GetAttribute('BaseIndex')==i then mine[#mine+1]=p end end
+  local function inPlot(x,z)for _,q in ipairs(plots)do if x>q.X0+1e-6 and x<q.X1-1e-6 and z>q.Z0+1e-6 and z<q.Z1-1e-6 then return true end end;return false end
+  for _,q in ipairs(plots)do
+   for _,side in ipairs({{-1,0,q.X0},{1,0,q.X1},{0,-1,q.Z0},{0,1,q.Z1}})do
+    local nx,nz=side[1],side[2];local a,b=q.Z0,q.Z1;if nx==0 then a,b=q.X0,q.X1 end
+    local t=a+1
+    while t<b do
+     local px,pz=side[3],t;if nx==0 then px,pz=t,side[3]end
+     if not inPlot(px+nx*.05,pz+nz*.05)then
+      local tx,tz=px-nx*.5,pz-nz*.5
+      for _,d in ipairs({1.5,4,9})do
+       local hx,hz=px+nx*d,pz+nz*d;local hy=heightAt(hx,hz,near)+4.5
+       rays+=1
+       local len=math.sqrt((hx-tx)^2+(hy-q.Top)^2+(hz-tz)^2);local n=math.floor(len/.1)
+       for k=0,n-3 do -- (the last .3 studs are the soil itself)
+        local f=k/n;local x,y,z=hx+(tx-hx)*f,hy+(q.Top-hy)*f,hz+(tz-hz)*f
+        for _,r in ipairs(mine)do if insideRamp(r,x,y,z)then hits[#hits+1]=i..' '..r.Name..string.format(' at %.1f,%.1f,%.1f',x,y,z);break end end
+       end
+      end
+     end
+     t+=2
+    end
+   end
+  end
+ end
+ info('gardens: '..rays..' rays from a head to a soil point at a bed edge checked against the ramps')
+ check('gardens: no ray from a player\'s head (4.5 studs up, 1.5 - 9 studs out) to a soil point at any bed edge crosses a ramp: planting\'s clear-view check, digging and inspection stay as they were',#hits==0 and rays>1500,#hits..' hits of '..rays..' '..tostring(hits[1]))
+end
 -- the step table the owner asked for
 do
  local pad=bases[1].Pad;local plot=bases[1].GardenPlots.DirtPlot_5;local border
@@ -450,9 +497,9 @@ do
  check('gardens: every plot still collides (the soil keeps its walkable height)',#notSolid==0)
  local bad={}
  for _,p in ipairs(rampParts)do
-  if p._props.CanQuery~=false or p._props.CanTouch~=false or p._props.CanCollide~=true or p._props.Anchored~=true or p._props.Transparency~=1 or p._class~='WedgePart'then bad[#bad+1]=p.Name end
+  if p._props.CanQuery~=true or p._props.CanTouch~=false or p._props.CanCollide~=true or p._props.Anchored~=true or p._props.Transparency~=1 or p._class~='WedgePart'then bad[#bad+1]=p.Name end
  end
- check('gardens: every ramp is an anchored, invisible, solid wedge that cannot be queried (planting, digging, inspection and click rays pass through) or touched',#bad==0 and #rampParts>0,first(bad)or#rampParts)
+ check('gardens: every ramp is an anchored, invisible, solid wedge that is queryable (a floor to the Humanoid and the runner sweep, like the pad and the soil) and untouchable',#bad==0 and #rampParts>0,first(bad)or#rampParts)
  -- never above the soil, never over a plot (but .03 into its face), never off the hub floor
  local over,inside,outside={},{},{}
  for _,p in ipairs(rampParts)do
@@ -469,7 +516,7 @@ do
   end
   if b[1]>336 or a[1]<-336 or a[3]<-617 or b[3]>-104.5 then outside[#outside+1]=p.Name end
  end
- check('gardens: no ramp rises above the soil top (5.8) or stands above a plot: nothing under a plant, nothing in the way of a click',#over==0 and #inside==0,first(over)or first(inside))
+ check('gardens: no ramp rises above the soil top (5.8) or stands above a plot: a ray that ends on the soil or a plant (planting\'s clear-view check, digging, inspection) comes from above that plane and crosses no ramp; nothing is under a plant',#over==0 and #inside==0,first(over)or first(inside))
  check('gardens: every ramp is inside the hub (x within the walls, z between the front wall and the back wall): the keepers\' track (z > -104) and the biomes are not touched',#outside==0,first(outside))
  -- clear of the things that stand on a pad: the spawn, the treadmill's collider, the mystery pedestal's spot (MysteryPackRules.Offset 34, 75 on the pad), 2 studs of room
  local MPR=W.module('MysteryPackRules');local crowd={}
