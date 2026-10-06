@@ -388,5 +388,49 @@ do
  end
  client.Destroying:Fire()
 end
+
+-- 9. review fix B2: the engine may report IsPlaying false for a frame after Play(): the voice cap must not stop the one-shots that started in the same frame (the King's four climax hits) -------
+do
+ local HITS={Impact=true,GroundImpact=true,PackBurst=true,KingFanfare=true}
+ for _,dt in ipairs({1/30,1/60})do
+  for _,rank in ipairs({8,7})do
+   reset()
+   local run=start(rank);local tl=run.TL;local tag='lagging IsPlaying '..names[rank]..' @'..math.floor(1/dt+.5)..'fps'
+   -- IsPlaying turns true one frame after Play() (a RenderStepped listener runs after the director's frame); every Stop is logged
+   local pending,played,stops,restore={},{},{},{}
+   for _,s in ipairs(Y.sounds)do
+    local props=rawget(s,'_props');local play,stop=props.Play,props.Stop
+    props.Play=function(self)play(self);self.IsPlaying=false;pending[self]=true;played[self]=R.clock end
+    -- (a Stop right after its own Play is a cut; the Stop that comes just BEFORE a Play, to reset the voice, is not)
+    props.Stop=function(self)pending[self]=nil;if played[self]then stops[#stops+1]={Sound=self,After=R.clock-played[self],At=R.clock}end;stop(self) end
+    restore[#restore+1]=function()props.Play=play;props.Stop=stop end
+   end
+   local conn=W.Run.RenderStepped:Connect(function()for s in pairs(pending)do pending[s]=nil;if s.Parent then s.IsPlaying=true end end end)
+   local hitAt
+   X.run(tl.Climax+.4,dt,function()if not hitAt and run.Clock()>=tl.Climax then hitAt=R.clock end end)
+   local cut,heard,slots={},{},{}
+   for _,st in ipairs(stops)do
+    local slot=st.Sound.Name:match('^RarePull_(.-)_%d+b?$')
+    if slot and HITS[slot]and hitAt and st.At>=hitAt-1e-6 and st.At<=hitAt+.1 and st.After<=.1 then cut[#cut+1]=st.Sound.Name end
+   end
+   for _,s in ipairs(Y.sounds)do
+    local slot=s.Name:match('^RarePull_(.-)_%d+b?$')
+    if slot and HITS[slot]and s.IsPlaying and s.Parent then heard[#heard+1]=s.Name;slots[slot]=true end
+   end
+   local wanted=rank==8 and{'Impact','GroundImpact','PackBurst','KingFanfare'}or{'GroundImpact','PackBurst'}
+   local missing={};for _,slot in ipairs(wanted)do if not slots[slot]then missing[#missing+1]=slot end end
+   check(hitAt~=nil,tag..': the climax was reached')
+   check(#cut==0,tag..': no climax hit is stopped on its own frame by the voice cap ('..table.concat(cut,',')..')')
+   check(#missing==0,tag..': every climax hit is still sounding 0.4 s after the climax (missing: '..table.concat(missing,',')..'; sounding: '..table.concat(heard,',')..')')
+   conn:Disconnect();for _,f in ipairs(restore)do f()end
+   M.Abort('test');X.run(.3)
+  end
+ end
+ -- the grace a voice gets before the cap judges it by IsPlaying is short: a voice that never started does not hold a place for long
+ reset()
+ local run=start(8);X.run(run.TL.Climax+.3,1/60)
+ check(Audio.PlayLag>0 and Audio.PlayLag<=.25,'the lag a voice may show before it is judged is short ('..tostring(Audio.PlayLag)..' s)')
+ M.Abort('test');X.run(.3)
+end
 print(('R152 sync checks %d, fails %d'):format(checks,fails))
 if fails>0 then error('failures')end
