@@ -382,8 +382,9 @@ local function work()
   if os.clock()-t0>slice then wait();t0=os.clock();slice=A.Slice()end
  end
  while #queue>0 do
-  step()
-  local name=table.remove(queue,1);local e=entries[name]
+  step() -- (a reveal already running when the request came: wait for it first)
+  local name=table.remove(queue,1);local e=name and entries[name]
+  if not e then continue end -- (the queue was cleared during that wait)
   local ok,value=pcall(function()
    local w,h,rgba=A.Pattern(name,step);assert(w,'unknown image '..tostring(name))
    local image=createImage(w,h,rgba,name)

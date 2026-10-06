@@ -12,7 +12,7 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 --  * turns the prompt off for YOU once you have claimed (the server turns it off for everyone at 0), and plays the claim moment when your pack arrives: the pack hops, a spark
 --    burst, the sign pops, and the game's reward chime (InteractionAudio GemClaim: no new sound). The text notice ("FREE VOID PACK! Check your Bag!") is the server's.
 -- Per frame: only while a pedestal's pack is inside ACTIVE_IN studs of the camera (leaves at ACTIVE_OUT); nothing runs for a pedestal that is far. Tier 3 steps it every frame;
--- tier 2 and below at 30 Hz, and without the pack's Highlight (VoidPackFx.Budget.Highlight), the per-frame costs a phone felt. Quality tiers and the plant
+-- tier 2 and below at 30 Hz and without the pack's Highlight (VoidPackFx.Budget.Highlight): the per-frame costs a phone felt. Quality tiers and the plant
 -- effects setting limit the effects like the track's Void packs (ClientFxBudget / VoidPackFx.Budget); Reduced Motion: no turn, no bob, no pop, no moving fx (the same parts, still).
 -- The place uses StreamingEnabled: the pedestal is Persistent, but a pedestal is found by its tag whenever it appears, its parts are looked up again each half second until they
 -- are there, and one that goes away is forgotten (a streamed-back copy starts clean).
