@@ -29,8 +29,8 @@ local ticks={};W.stub('SoundTiming',{Play=function(s)ticks[#ticks+1]={At=R.clock
 do local inew=R.Instance.new;R.Instance.new=function(class,parent)local o=inew(class,parent);if class=='Sound'then o.IsLoaded=true;function o.Stop()end;function o.Play()end end;return o end;W.env.Instance=R.Instance end
 local script=R.new('LocalScript');script.Name='TreadmillBonusClient'
 W.load('TreadmillBonusClient',script)
-local hud=pg:FindFirstChild('TreadmillBonusHud');local overlay=pg:FindFirstChild('TreadmillBonusRoll');local bar=pg:FindFirstChild('TreadmillBonusProgress')
-check(hud and overlay and bar,'GUIs created')
+local hud=pg:FindFirstChild('TreadmillBonusHud');local overlay=pg:FindFirstChild('TreadmillBonusRoll')
+check(hud and overlay and pg:FindFirstChild('TreadmillBonusProgress')==nil,'GUIs created (R153: the head billboard is not built)')
 local button=hud.BonusRollButton
 local function set(k,v)me:SetAttribute(Rules.Attr[k],v)end
 -- 1. Button --------------------------------------------------------------------------------------------
@@ -39,20 +39,19 @@ set('Ready',1);check(button.Visible==true,'1 ready: button shows')
 check(button.CountBadge.Visible==false,'1 ready: no count badge')
 set('Ready',2);check(button.CountBadge.Visible==true and button.CountBadge.Count.Text=='2','2 ready: badge shows 2')
 W.frames(2);check(button.Size.X.Offset>=150 and button.Size.Y.Offset>=44,'button is a full touch target ('..button.Size.X.Offset..'x'..button.Size.Y.Offset..')')
--- 2. Progress bar over the player while on the treadmill --------------------------------------------------
+-- 2. R153: the countdown is on the button (the gift pill over the player's head is gone) -----------------------------------------------------
 set('Ready',0);set('Interval',360);set('DueAt',R.clock+222);me:SetAttribute('TreadmillTraining',true)
 W.frames(20,1/60)
-check(bar.Enabled==true and bar.Adornee==root,'bar shows over the player while training')
--- R150: the gift timer is a capsule: caption 'NEXT ROLL' over a track whose label holds the countdown.
-local label=bar.Back.Track.Label.Text
-check(label:find('^3:4')~=nil and bar.Back.Caption.Text=='NEXT ROLL','bar text counts down: '..bar.Back.Caption.Text..' '..label)
-check(bar.StudsOffsetWorldSpace.Y>5,'bar sits above the head, clear of speed popups')
-local fill=bar.Back.Track.Fill.Size.X.Offset/120;check(math.abs(fill-(1-222/360))<.02,'bar fill = progress ('..fill..')')
+check(pg:FindFirstChild('TreadmillBonusProgress')==nil and button.Visible==true,'R153: on the treadmill the button shows the timer, there is no billboard over the player')
+check(button.Face.Title.Text=='BONUS ROLL' and button.Face.Sub.Text:find('^NEXT 3:4')~=nil,'button text counts down: '..button.Face.Title.Text..' / '..button.Face.Sub.Text)
+local fill=button.Face.FillClip.Fill.Size.X.Scale;check(math.abs(fill-(1-222/360))<.02,'button fill = progress ('..fill..')')
+set('DueAt',R.clock+20);W.frames(20,1/60)
+check(button.Face.Title.Text=='ALMOST THERE!' and button.Face.Sub.Text:find('^0:')~=nil,'R153: the last 30 s: '..button.Face.Title.Text..' / '..button.Face.Sub.Text)
 set('Ready',2);set('DueAt',nil);W.frames(20,1/60)
-check(bar.Back.Caption.Text:find('BONUS READY')~=nil,'R150: a roll completing pops "BONUS READY!" first: '..bar.Back.Caption.Text)
+check(button.Face.Title.Text=='BONUS READY!' and button.Face.Sub.Text=='OPEN IT!','R150: a roll completing says BONUS READY! / OPEN IT! first: '..button.Face.Title.Text)
 R.advance(3.5);W.frames(20,1/60)
-check(bar.Back.Caption.Text:find('2 ROLLS READY')~=nil,'at the cap the bar says so: '..bar.Back.Caption.Text)
-me:SetAttribute('TreadmillTraining',false);W.frames(20,1/60);check(bar.Enabled==false,'bar hides off the treadmill')
+check(button.Face.Sub.Text:find('2 ROLLS READY')~=nil,'at the cap the button says so: '..button.Face.Sub.Text)
+me:SetAttribute('TreadmillTraining',false);W.frames(20,1/60);check(button.Visible==true,'two rolls ready: the button stays off the treadmill too')
 -- 3. Click -> server result -> strip lands on it ---------------------------------------------------------
 set('Ready',2)
 local function spinTo(res,label2)

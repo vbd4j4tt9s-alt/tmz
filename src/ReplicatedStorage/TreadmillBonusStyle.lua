@@ -1,14 +1,16 @@
 -- R150: copy, states and timelines of the treadmill bonus UI (owner: "polish the bonus roll button, the bonus gift timer and
 -- the bonus roll screen by adding design and personality"). Pure functions only: no Instances, no gameplay. The rules, odds
 -- and the server stay in TreadmillBonusRules / TreadmillBonusService; TreadmillBonusClient draws, BonusGiftArt builds shapes.
---  * Timer(...)    what the gift timer shows (the billboard over the player and the button while charging).
+--  * Timer(...)    what the timer shows (the button while charging: NEXT m:ss, then ALMOST THERE! in the last 30 s).
 --  * ButtonMode    which of the three button looks applies: 'ready' (cheerful), 'charging' (calm, progress) or 'hidden'.
 --  * Reveal(...)   the rarity-scaled reveal on the roll screen (word, pop, rays, confetti, close caption).
 --  * SpinLine(a)   the playful status line while the strip spins.
+--  * Tease(...)    R153: the Secret pack that flies by on the reel (never the winner).
 local S={}
 S.AlmostSeconds=30 -- the last stretch of a countdown: "Almost there!"
 S.AttentionPeriod=4.2 -- READY button: a short wiggle + shine every this many seconds
-S.ReadyHold=3 -- how long the "Bonus ready!" line stays on the gift timer
+S.AlmostPeriod=2.2 -- the last AlmostSeconds: a short pulse + gift wiggle every this many seconds (what the gift pill over the player did)
+S.ReadyHold=3 -- how long "BONUS READY! / OPEN IT!" stays on the button when a roll completes
 
 function S.Clock(seconds)
  if type(seconds)~='number'or seconds~=seconds then seconds=0 end
@@ -16,7 +18,7 @@ function S.Clock(seconds)
  return string.format('%d:%02d',seconds//60,seconds%60)
 end
 
--- What the gift timer shows. count = READY rolls, maxReady = the cap, interval / left in seconds.
+-- What the timer shows (R153: the HUD button's charging look; the pill over the player's head is gone). count = READY rolls, maxReady = the cap, interval / left in seconds.
 --  State 'charging' | 'almost' (last AlmostSeconds) | 'full' (at the cap the timer is paused: claim!)
 --  Fraction 0..1 (how full the gift is), Clock 'm:ss', Caption (small line), Count.
 function S.Timer(count,maxReady,interval,left)
@@ -41,20 +43,26 @@ function S.ButtonMode(count,training,titleActive,rolling)
  return'hidden'
 end
 
--- Title and sub line of the button. busy = a request is in flight.
-function S.ButtonLines(mode,timer,busy)
+-- R153 (owner: "the almost ready also must be displayed on that bonus roll button"): the button shows what the gift pill over the player's head
+-- showed, with the same thresholds and words:
+--  charging  BONUS ROLL / NEXT 5:41  ->  last AlmostSeconds (30 s)  ALMOST THERE! / 0:02  ->  a roll completes  BONUS READY! / OPEN IT! for ReadyHold seconds
+--  ->  BONUS ROLL / READY!  (at the cap: BONUS ROLL / 2 ROLLS READY!). The title carries ALMOST THERE! (a bigger box than the status line), so it reads on a phone.
+-- The look of each phase: 'charging' | 'almost' | 'ready' | 'hidden'.
+function S.ButtonPhase(mode,timer)
+ if mode=='ready'then return'ready'end
+ if mode=='charging'then return timer and timer.State=='almost'and'almost'or'charging'end
+ return'hidden'
+end
+-- Title and sub line of the button. busy = a request is in flight, popping = the "ready" moment (ReadyHold seconds after a roll completed).
+function S.ButtonLines(mode,timer,busy,popping)
  if busy then return'BONUS ROLL','ROLLING...'end
  if mode=='charging'and timer then
-  return'BONUS ROLL',(timer.State=='almost'and'ALMOST! 'or'NEXT ')..timer.Clock
+  if timer.State=='almost'then return timer.Caption,timer.Clock end
+  return'BONUS ROLL','NEXT '..timer.Clock
  end
+ if popping then return'BONUS READY!','OPEN IT!'end
+ if timer and timer.State=='full'then return'BONUS ROLL',timer.Caption end
  return'BONUS ROLL','READY!'
-end
-
--- Caption and clock of the billboard pill. popping = the "ready" moment (a few seconds after a roll became ready).
-function S.BillboardLines(timer,popping)
- if popping then return'BONUS READY! 🎁','OPEN IT!'end
- if timer.State=='full'then return timer.Caption,timer.Hint end
- return timer.Caption,timer.Clock
 end
 
 -- Reveal by rarity: the word that pops, how hard it pops, light rays, confetti and sparkles, the close button's caption.
@@ -78,11 +86,29 @@ end
 -- when the index does).
 S.SpinLines={'Unwrapping ur gift...','Ooh, what could it be?','Slowing down...','Here it comes!'}
 S.SpinAt={0,.3,.62,.86}
-S.SpinHint='Ur pack is already in ur bag!' -- the server grants it before the strip moves
-function S.SpinLine(a)
+function S.SpinLine(a) -- R153: no bag hint line under it any more (owner: "remove this bonus ready bag")
  a=tonumber(a)or 0;local index=1
  for i,at in ipairs(S.SpinAt)do if a>=at then index=i end end
  return S.SpinLines[index],index
+end
+
+-- R153 (owner: "make the secret pack appear in the roll section area to let players at least know of its existence"): the reel is a
+-- presentation of the server's result, so a Secret card flies by on every roll as a TEASE. It replaces one cosmetic filler 3 or 4
+-- cards before the winner: it passes under the pointer while the strip is slowing (about the 2nd to 3rd second of the spin), in
+-- the short ReducedMotion spin too (that one only passes the last ReducedLead = 4 cards) and is out of sight again when the strip
+-- stops. The winning card (cards[win]) is never touched, so a Secret only lands when the server rolled it. Odds, the server and
+-- the filler draw (TreadmillBonusRules) are unchanged.
+S.TeaseBack={3,4} -- the tease sits this many cards before the winner (one of them, at random)
+function S.TeaseSlot(win,draw)
+ local u=draw and draw()or 0;u=type(u)=='number'and u==u and math.clamp(u,0,1-1e-12)or 0
+ local slot=win-S.TeaseBack[math.floor(u*#S.TeaseBack)+1]
+ return slot>=1 and slot<win and slot or nil
+end
+-- cards = the built strip (BuildStrip), void = TreadmillBonusRules.Void. Returns cards and the slot the tease took.
+function S.Tease(cards,win,void,draw)
+ local slot=S.TeaseSlot(win,draw)
+ if slot and cards[slot]and slot~=win then cards[slot]={Stage=void.Stage,Variant=void.Variant}else slot=nil end
+ return cards,slot
 end
 
 -- Seconds left from the published attributes: DueAt (server time) when the timer runs, else the saved Left, else a full interval.

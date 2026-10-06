@@ -18,7 +18,7 @@
    "caption": "The south plaza where the Seed Fountain stood: a clean open paved circle, no benches, no spouts, nothing to look at but the lawn and the stage behind."},
   {"name": "entrance", "title": "At a base entrance", "fov": 60, "pos": [-98, 12, -366], "look": [-150, 13, -357], "shadowAt": [-140, 4, -358], "shadowExtent": 90,
    "avatars": [[-116, 4.2, -352, 1.9, 13775418]],
-   "caption": "Base 3 from the west street: the street, curbs, spur and welcome mat stay; the arch, posts, name beam, medallion, pennants and potted topiary are gone."},
+   "caption": "Base 3 from the west street: the street, curbs and spur stay (R153: the welcome mat and the base-coloured curbs along the spur are gone too); the arch, posts, name beam, medallion, pennants and potted topiary are gone."},
   {"name": "spawn", "title": "Leaving a base", "fov": 64, "pos": [-184, 13.5, -183], "look": [-40, 10, -205], "shadowAt": [-110, 4, -205], "shadowExtent": 160,
    "avatars": [[-170, 5, -181, -1.57, 13775418]],
    "caption": "What a player sees leaving Base 1: the open paved street, a few trees at the edges, the avenue, and the rook towers of the gate to the right."}

@@ -20,14 +20,12 @@ MUTANTS = [
     ('finished bursts are not destroyed', 'burst:Destroy();local i=table.find(liveBursts,burst)', 'local i=table.find(liveBursts,burst)', ['ui']),
     ('the 4 Hz timer never stops', 'if training()then task.delay(.25,loop)else ticking=false end', 'task.delay(.25,loop)', ['ui']),
     ('no cooldown between ready cues', 'local now=os.clock();if now-lastCue<.25 then return end', 'local now=os.clock()', ['audio']),
-    ('the gift timer clips its pop', 'ResetOnSpawn=false,Enabled=false,ClipsDescendants=false,ZIndexBehavior', 'ResetOnSpawn=false,Enabled=false,ClipsDescendants=true,ZIndexBehavior', ['ui']),
     ('the roll screen rows touch', 'local rowGap=8;', 'local rowGap=2;', ['layout']),
     ('ReducedMotion ignored by the ambient motion', 'stopAmbient();if reduced()then return end', 'stopAmbient();', ['ui']),
     ('the tick voices are built at the first tick (the dropped first tick)', 'do\n local id=Audio and Audio.Asset and Audio.Asset(\'MenuClick\')',
      'local function buildTicks()\n local id=Audio and Audio.Asset and Audio.Asset(\'MenuClick\')', ['audio']),
     ('the animator keeps its listener', 'if #effects==0 and effectConnection then effectConnection:Disconnect();effectConnection=nil end\n end\n addEffect',
      'if #effects==0 and effectConnection then effectConnection=nil end\n end\n addEffect', ['ui']),
-    ('teardown forgets the gift timer', 'hud:Destroy();overlay:Destroy();bar:Destroy()', 'hud:Destroy();overlay:Destroy()', ['ui']),
     ('the lip is 6 px', 'local LIP=4\n', 'local LIP=6\n', ['layout']),
     # R150 review fix round
     ('the ribbon is under the reveal layer again (confetti crosses the header)',
@@ -38,8 +36,8 @@ MUTANTS = [
     ('the reveal layer is back on the screen', "Size=UDim2.fromScale(1,1),Active=false,ZIndex=4},panel)",
      "Size=UDim2.fromScale(1,1),Active=false,ZIndex=30},overlay)", ['ui', 'layout']),
     ('the reveal word pops from its top-left corner',
-     "word.AnchorPoint=Vector2.new(.5,.5);word.Position=UDim2.new(.5,0,0,y+wordH/2);word.Size=status.Size;y+=wordH",
-     "word.Position=status.Position;word.Size=status.Size;y+=wordH", ['ui']),
+     "word.AnchorPoint=Vector2.new(.5,.5);word.Position=UDim2.new(.5,0,0,y+wordH/2);word.Size=UDim2.new(1,-32,0,wordH);y+=wordH",
+     "word.Position=status.Position;word.Size=UDim2.new(1,-32,0,wordH);y+=wordH", ['ui']),
     ('no Denied on a refusal', "if Audio then pcall(Audio.Play,'Denied')end -- R150 review",
      "if false then pcall(Audio.Play,'Denied')end -- R150 review", ['ui']),
     ('Denied also plays when a roll starts', "current=res;overlay.Enabled=true;layoutOverlay()",
@@ -54,11 +52,22 @@ MUTANTS = [
      "if true then -- R150 review: the soft gloss only on the special tiers", ['ui']),
     ('twinkles sit on the odds fine print again', "{.3,.08},{.72,.07}})do",
      "{.3,.08},{.72,.07},{.5,.95},{.2,.95},{.8,.95},{.62,.9}})do", ['ui']),
-    ('the gift timer shadow does not shake', "backLip.Rotation=back.Rotation\n  if t>=.6", "\n  if t>=.6", ['ui']),
-    ('the gift timer shadow does not pop', "lipPop.Scale=1.18;tween(lipPop,.45,Enum.EasingStyle.Back,{Scale=1})", "", ['ui']),
     ('the sparkle burst is drawn off the gift',
      "local x,y=buttonCenter();spawnBurst(hud.Fx,x,y,sparkleOpts(GOLD,8))",
      "local x,y=buttonCenter();x,y=x+30,y+30;spawnBurst(hud.Fx,x,y,sparkleOpts(GOLD,8))", ['ui']),
+    # R153: no bag line, the Secret tease
+    ('the Secret tease is dropped (no Secret card on the reel)', " Style.Tease(reel,Rules.Strip.Win,Rules.Void,draw)", " local _unused=nil", ['ui']),
+    ('the tease overwrites the winning card (a Secret always lands)', " Style.Tease(reel,Rules.Strip.Win,Rules.Void,draw)",
+     " reel[Rules.Strip.Win]={Stage=Rules.Void.Stage,Variant=Rules.Void.Variant}", ['ui']),
+    ('the bag line is back under the spin text', " result.Visible=false;result.Text=''", " result.Visible=true;result.Text='Ur pack is already in ur bag!'", ['ui', 'layout']),
+    ('the spin text is not re-centred (it hangs at the top of the gap)', "status.Size=UDim2.new(1,-32,0,wordH+resultH)", "status.Size=UDim2.new(1,-32,0,wordH)", ['ui', 'layout']),
+    ('special cards are animated off screen again', "if x>-Rules.Strip.CardWidth and x<viewW then animateDesign(entry,clock)end", "animateDesign(entry,clock)", ['ui']),
+    ('the result line stays hidden after the reveal', " result.Visible=true;result.Text=(special", " result.Text=(special", ['ui', 'layout']),
+    ('the fill is a plain pill inside the face again (a gap at its left end)', "pill(fillClip)\n", "\n", ['layout']),
+    ('the fill is inset by 3 px again (it never reaches the outline)', "fill.Size=UDim2.fromScale(t.Fraction,1)", "fill.Size=UDim2.new(t.Fraction,-6*t.Fraction,1,-6)", ['layout', 'ui']),
+    ('the plain pack stays under the picture', "if icon.Drawn.Parent then icon.Drawn:Destroy()end", "", ['image']),
+    ('the button text is not stroked dark green', "label.TextStrokeColor3=Art.Pack.Edge;label.TextStrokeTransparency=0", "", ['ui', 'image']),
+    ('the almost phase is not applied (no orange fill, no pulse)', "if phase~=lastPhase then lastPhase=phase;applyPhase(phase)end", "", ['ui', 'image']),
     # BonusGiftArt
     ('a sparkle is a Frame with two bars again', "BackgroundTransparency=0,ZIndex=opts.Z or 30},layer)\n",
      "BackgroundTransparency=0,ZIndex=opts.Z or 30},layer);if star then for k=1,2 do pill(make('Frame',{Name='Bar'..k,Size=UDim2.fromScale(1,.3)},frame))end end\n",
@@ -80,8 +89,11 @@ def run(tests, out):
 
 bad = 0
 os.makedirs(SCRATCH, exist_ok=True)
+ONLY = [t for t in os.environ.get('ONLY', '').split(',') if t]  # e.g. ONLY='tease,fill,picture' runs the mutants whose number or name contains one of them
 for i, entry in enumerate(MUTANTS, 1):
     name, old, new, tests = entry[:4]
+    if ONLY and not any(t == str(i) or t.lower() in name.lower() for t in ONLY):
+        continue
     target = entry[4] if len(entry) > 4 else 'client'
     base = art_src if target == 'art' else src
     out = os.path.join(SCRATCH, 'm%02d' % i)
