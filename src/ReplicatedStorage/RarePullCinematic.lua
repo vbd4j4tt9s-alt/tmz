@@ -392,10 +392,9 @@ function M._start(info)
  return run
 end
 -- Every frame -------------------------------------------------------------------------------------------------------------------------
--- R152: one failing piece (the card, the grade, the stage, a sound) is switched off for the rest of the presentation and logged once;
--- the reveal plays on and ends on its own clock. Only the camera / timeline failing ends it (cleanly, restoring everything).
--- (R152: a piece that fails once skips that frame only; one failing three frames in a row is left out for the rest of the reveal. A single
--- bad frame used to freeze the card for the whole reveal.)
+-- R152: a failing piece (the card, the grade, a sound) never stops the reveal: one that fails once skips that frame only, one failing three
+-- frames in a row is left out for the rest of it (logged); the reveal plays on and ends on its own clock. Only the camera / timeline
+-- failing ends it (cleanly, restoring everything). (A first version switched a piece off on its first error: one bad frame froze the card.)
 local function part(run,name,fn,...)
  local n=run.Broken and run.Broken[name]
  if n and n>=3 then return end

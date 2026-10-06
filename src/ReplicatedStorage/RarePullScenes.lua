@@ -77,6 +77,7 @@ function Scene:FaceArt(target,face,name,opts)
  end
  local d=Instance.new(opts.StudsPerTile and'Texture'or'Decal');d.Name='Art '..name;d.Face=face
  if opts.StudsPerTile then d.StudsPerTileU=opts.StudsPerTile[1];d.StudsPerTileV=opts.StudsPerTile[2]end
+ if opts.Color then d.Color3=opts.Color end
  local ok=pcall(function()d.TextureContent=content end)
  if not ok then d:Destroy();return nil end
  d:SetAttribute('RarePullArt',name);d.Parent=target;self.Images+=1
@@ -367,15 +368,19 @@ function Scene:_throne()
  local tz=-4.6
  for i,s in ipairs({{11,3.6},{9,3},{7,2.4}})do self:Part('Dais step',V(s[1],.4,s[2]),CF(0,.2+(i-1)*.4,tz-.3-(i-1)*.3),i%2==1 and stone or cream,MARBLE)end
  self:Part('Dais trim',V(11.1,.12,.12),CF(0,.4,tz+1.5),gold,METAL)
- self:Part('Throne seat',V(4,.6,3),CF(0,2.6,tz-.1),crimson,FABRIC)
+ -- (R152: the seat and back upholstered in a crimson brocade - the wall's damask, tinted - instead of plain fabric)
+ local seat=self:Part('Throne seat',V(4,.6,3),CF(0,2.6,tz-.1),crimson,FABRIC)
+ self:FaceArt(seat,Enum.NormalId.Top,'damask',{StudsPerTile={1.5,1.5},Color=C(196,40,58)})
  self:Part('Throne base',V(4.2,1.4,3.1),CF(0,1.9,tz-.1),gold,METAL)
- self:Part('Throne back',V(4.4,6.5,.6),CF(0,6.1,tz-1.75),crimson,FABRIC)
+ local back=self:Part('Throne back',V(4.4,6.5,.6),CF(0,6.1,tz-1.75),crimson,FABRIC)
+ self:FaceArt(back,Enum.NormalId.Back,'damask',{StudsPerTile={1.5,1.5},Color=C(196,40,58)})
  self:Part('Throne frame',V(4.9,7,.4),CF(0,6.0,tz-2.05),gold,METAL)
  self:Part('Throne crest',V(2.2,1.4,.4),CF(0,10.1,tz-2.05),gold,METAL)
  self:Part('Throne gem',V(.7,.7,.7),CF(0,10.1,tz-1.8),C(220,30,60),NEON,0,BALL)
  for _,x in ipairs({-2.3,2.3})do self:Part('Throne arm',V(.5,1.2,3),CF(x,3.4,tz-.1),gold,METAL);if not lite then self:Part('Arm knob',V(.6,.6,.6),CF(x,4.1,tz+1.3),gold,METAL,0,BALL)end end
  local pk=Rules.Points[8].Pack
- self:Part('Royal cushion',V(3.0,.42,2.3),CF(pk.X,pk.Y-Rules.PackHeroHeight*.5-.2,pk.Z),C(150,14,34),FABRIC)
+ local cushion=self:Part('Royal cushion',V(3.0,.42,2.3),CF(pk.X,pk.Y-Rules.PackHeroHeight*.5-.2,pk.Z),C(150,14,34),FABRIC)
+ self:FaceArt(cushion,Enum.NormalId.Top,'damask',{StudsPerTile={1.2,1.2},Color=C(176,30,48)})
  for _,o in ipairs(lite and{}or{{-1.5,-1.15},{1.5,-1.15},{-1.5,1.15},{1.5,1.15}})do self:Part('Tassel',V(.25,.25,.25),CF(pk.X+o[1],pk.Y-Rules.PackHeroHeight*.5-.38,pk.Z+o[2]),gold,METAL,0,BALL)end
  -- the great crown relief on the back wall
  self:Part('Wall crown band',V(7,1.2,.3),CF(0,15,-12.3),gold,METAL)

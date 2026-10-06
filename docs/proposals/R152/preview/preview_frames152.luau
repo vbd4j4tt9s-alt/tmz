@@ -340,11 +340,13 @@ elseif SET=='king'then
  play(8,function(tl)local out={};local t=.05;while t<tl.Back+1.0 do out[#out+1]={string.format('%.1f s',t),t};t+=.1 end;return out end,640,360,'king','King')
 elseif SET=='planets'then
  setDevice(false)
- local function near(i,dist)return function(run)
+ -- (a close-up from a little to the side of the scene camera, so a planet that passes in front of another is seen alone)
+ local function near(i,dist,turn)return function(run)
   local p=run.Scene.Planets[i].Body;local pos=p.CFrame.Position;local cam=W.workspace.CurrentCamera
-  local dir=(cam.CFrame.Position-pos).Unit;return {Eye=pos+dir*dist+V3(0,.2,0),Target=pos,Fov=38,NoGui=true}
+  local d=(cam.CFrame.Position-pos).Unit;local c,s=math.cos(turn or 0),math.sin(turn or 0)
+  local dir=V3(d.X*c-d.Z*s,d.Y,d.X*s+d.Z*c);return {Eye=pos+dir*dist+V3(0,.2,0),Target=pos,Fov=38,NoGui=true}
  end end
- play(7,function(tl)return{{'THE STAGE: STAR MAP, NEBULAE, THREE PLANETS',tl.Align2+.1,{NoGui=true}},{'A CRATERED WORLD',tl.SceneIn+.5,near(1,4.2)},{'THE GAS GIANT',tl.SceneIn+.9,near(2,6)},
+ play(7,function(tl)return{{'THE STAGE: STAR MAP, NEBULAE, THREE PLANETS',tl.Align2+.1,{NoGui=true}},{'THE CRATERED WORLD (THE GAS GIANT BEYOND IT)',tl.SceneIn+.5,near(1,4.2,.7)},{'THE GAS GIANT (PASSING BEHIND)',tl.SceneIn+.9,near(2,6,-.7)},
   {'THE RINGED ICE WORLD',tl.SceneIn+1.3,near(3,4.6)},{'PLANETS ALIGN',tl.Align3+.08},{'SUPERNOVA',tl.Climax+.12}}end,1280,720,'planets','Cosmic')
 elseif SET=='beam'then
  setDevice(false)

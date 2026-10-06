@@ -10,7 +10,7 @@ local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fi
 local Y=require('./rare152_env')(W,E,F,X)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
-local REPORT=rawget(_G,'REPORT_ONLY')==true
+local REPORT=REPORT_ONLY==true -- (a global set by the line put before this file: loudness_before_after.sh)
 local function check(c,msg)checks+=1;if not c and not REPORT then fails+=1;print('FAIL: '..msg)end;return c end
 local Mixer=W.module('AudioMixer');Mixer.Start()
 local M=W.module('RarePullCinematic');local L=W.module('RarePullRules');local Audio=W.module('RarePullAudio');local Sounds=W.module('RarePullSounds')

@@ -85,7 +85,9 @@ local function sphere(w,h,R,atmo,surface,step,ring)
     local ha=k*.75
     if ha>a then r,g,b=mix(r,atmo[1],ha),mix(g,atmo[2],ha),mix(b,atmo[3],ha);a=math.max(a,ha)end
    end
-   if ring then local rr,rg,rb,ra,front=ring(x,y);if ra>0 and front then r,g,b=mix(r,rr,ra),mix(g,rg,ra),mix(b,rb,ra);a=a+(1-a)*ra end end
+   -- the near half of the ring over it ("over" compositing: on bare space the ring keeps its own colour; R152 review: it was darkened by
+   -- its alpha there, a seam where the two halves met)
+   if ring then local rr,rg,rb,ra,front=ring(x,y);if ra>0 and front then local oa=ra+a*(1-ra);r,g,b=(rr*ra+r*a*(1-ra))/oa,(rg*ra+g*a*(1-ra))/oa,(rb*ra+b*a*(1-ra))/oa;a=oa end end
    c.set(px,py,r,g,b,a)
   end
   if step then step()end
@@ -364,7 +366,11 @@ local function work()
    local image=createImage(w,h,rgba,name)
    return {Image=image,Content=contentOf(image)}
   end)
-  if ok and value then e.State='ready';e.Value=value.Image;e.Content=value.Content else e.State='failed';e.Why=tostring(value)end
+  if ok and value then e.State='ready';e.Value=value.Image;e.Content=value.Content
+  else
+   e.State='failed';e.Why=tostring(value)
+   if not A.Warned then A.Warned=true;warn('[RarePullArt] an image could not be drawn, the plain parts are used: '..e.Why)end
+  end
   step()
  end
  worker=false

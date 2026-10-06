@@ -82,10 +82,6 @@ if MODE == 'gif':
     sys.exit(0)
 
 
-def header(width, title, note=NOTE):
-    return title, note
-
-
 if MODE == 'strips':
     rows = []
     for m in meta:

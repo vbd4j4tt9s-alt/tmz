@@ -22,7 +22,7 @@ local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
 local failLines={}
 local function check(c,msg)checks+=1;if not c then fails+=1;if #failLines<60 then print('FAIL: '..msg)end;failLines[#failLines+1]=msg end;return c end
-local N=tonumber(rawget(_G,'STRESS_N'))or 240
+local N=tonumber(STRESS_N)or 240 -- (STRESS_N=... on a line put before this file: a shorter or longer run)
 local noop=function()end
 W.Run.PreAnimation=R.signal()
 W.stub('SeedCarryPose',{new=function()return{Reset=noop,IsReady=function()return true end,Apply=noop}end})
