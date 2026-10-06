@@ -44,7 +44,7 @@ function ChestService.new(config, mapService, playerData, baseService, notificat
 			entry:SetAttribute("Color", seed.Color)
             local rarity, style = PackRules.GetRarity(seed.Id)
             entry:SetAttribute("Rarity",rarity)
-            entry:SetAttribute('BaseChance',PackRules.SeedOdds(config,PackRules.ObtainableStage(seed.Id)or stage,'Pack01',1)[seed.Id])
+            entry:SetAttribute('BaseChance',require(ReplicatedStorage.SeedRarity153).Percent(seed.Id)) -- R153: the seed's one fixed chance (its home pack's), the same text everywhere
             entry:SetAttribute("RarityColor",style.Color)
 			entry:SetAttribute("Stage", PackRules.ObtainableStage(seed.Id) or stage)
 			entry:SetAttribute("SeedIndex", index)

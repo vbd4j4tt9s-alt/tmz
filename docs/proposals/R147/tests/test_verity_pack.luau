@@ -449,7 +449,8 @@ check(seeds9==1 and plants9==1 and total9==1 and Data:BiomeComplete(A,9),'Index 
 local baseChance=Rules.SeedOdds(Config,Rules.ObtainableStage('VeritySeed')or 9,'Pack01',1)['VeritySeed']
 check(baseChance==1 and Odds.Format(baseChance)=='1/100','the catalog BaseChance of the Verity seed is 1 (percent) and the Index chip reads '..Odds.Format(baseChance))
 local cs=W.B.ChestService
-check(cs:find("PackRules.SeedOdds(config,PackRules.ObtainableStage(seed.Id)or stage,'Pack01',1)[seed.Id]",1,true)~=nil,'(ChestService builds BaseChance exactly that way)')
+-- R153: BaseChance comes from SeedRarity153 (the seed's home pack = this very Pack01 / Verity pack / Mech pack odds): same number for the Verity seed
+check(cs:find("require(ReplicatedStorage.SeedRarity153).Percent(seed.Id)",1,true)~=nil and W.module('SeedRarity153').Percent('VeritySeed')==baseChance,'(ChestService builds BaseChance from SeedRarity153, which is that same number)')
 check(Rules.SeedOdds(Config,9,'Pack01',1,137).VeritySeed==1 and Rules.SeedOdds(Config,9,'Pack06',50,112).VeritySeed==1 and next(Rules.SeedOdds(Config,9,'Pack01',1,137),'VeritySeed')==nil,'stage 9 odds: only the Verity seed, 1%')
 local c1,cWhy=Data:ClaimIndexBiomeHalf(A,9);local c2=Data:ClaimIndexBiomeHalf(A,9)
 check(c1 and not c2,'half reward of category 9 claims once ('..tostring(cWhy)..')')

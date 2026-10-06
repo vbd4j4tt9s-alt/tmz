@@ -86,7 +86,9 @@ do
  -- user id, odds, ids
  local function field(k,v)local f=table.clone(fire);f[k]=v;return Rules.Event('Pull',f)end
  check(field('UserId',-5).UserId==0 and field('UserId',1.5).UserId==0 and field('UserId','7').UserId==0 and field('UserId',2^60).UserId==0 and field('UserId',0/0).UserId==0,'a bad user id becomes 0 (negative, fractional, a string, huge, NaN)')
- check(field('Odds',0.5).Odds==nil and field('Odds',0/0).Odds==nil and field('Odds',math.huge).Odds==nil and field('Odds',2e15).Odds==nil and field('Odds','5').Odds==nil and field('Odds',1).Odds==1,'odds must be 1 .. 1e15')
+ local function plain(v)return Rules.Event('Record',{Name='Ann',Record='BestPull',Odds=v})end -- (R153: a seed's odds are derived, so the number is checked on an event that names none)
+ check(plain(0.5).Odds==nil and plain(0/0).Odds==nil and plain(math.huge).Odds==nil and plain(2e15).Odds==nil and plain('5').Odds==nil and plain(1).Odds==1,'odds must be 1 .. 1e15 (an event with no seed keeps the number it is given)')
+ check(field('Odds',0.5).Odds==800 and field('Odds',0/0).Odds==800 and field('Odds',math.huge).Odds==800 and field('Odds',2e15).Odds==800 and field('Odds','5').Odds==800 and field('Odds',1).Odds==800,'R153: a pull of a known seed carries the seed\'s fixed N (Fire Pepper 800) whatever Odds says')
  check(field('Id','bad id!').Id==nil and field('Id',string.rep('a',49)).Id==nil and field('Id',5).Id==nil and field('Id','ok_1:2-3').Id=='ok_1:2-3','ids: letters, digits, - _ : up to 48')
  check(field('At',-1).At==nil and field('At','now').At==nil and field('At',1.7e9).At==1700000000,'the time must be a number')
  -- records
@@ -129,9 +131,9 @@ do
  local pull=Rules.Event('Pull',{Name='Ann',UserId=1,Id='a-1',SeedId='FirePepperSeed',Odds=800})
  check(Rules.Line(pull)=='🌟 Ann just pulled a MYTHIC Fire Pepper! (1/800) Nice pull!','the in-server sentence: "'..Rules.Line(pull)..'"')
  local sec=Rules.Event('Global',{Name='Ann',UserId=1,Id='a-2',SeedId='ObsidianMawSeed',Odds=1000})
- check(Rules.Line(sec)=='🌐 Ann just pulled a SECRET Obsidian Maw (1/1,000)!','the other-server sentence: "'..Rules.Line(sec)..'"')
- check(Rules.Line(Rules.Event('Pull',{Name='Ann',SeedId='FirePepperSeed'}))=='🌟 Ann just pulled a MYTHIC Fire Pepper! Nice pull!','no odds known = no odds in the sentence')
- check(Rules.Line(Rules.Event('Global',{Name='Ann',Id='a-3',SeedId='ObsidianMawSeed'}))=='🌐 Ann just pulled a SECRET Obsidian Maw!','... also for another server')
+ check(Rules.Line(sec)=='🌐 Ann just pulled a SECRET Obsidian Maw (1/10K)!','the other-server sentence says the seed\'s fixed chance, not the 1/1,000 its sender wrote (R153): "'..Rules.Line(sec)..'"')
+ check(Rules.Line(Rules.Event('Pull',{Name='Ann',SeedId='FirePepperSeed'}))=='🌟 Ann just pulled a MYTHIC Fire Pepper! (1/800) Nice pull!','no odds sent = the seed\'s fixed chance (R153: the sentence always has it)')
+ check(Rules.Line(Rules.Event('Global',{Name='Ann',Id='a-3',SeedId='ObsidianMawSeed'}))=='🌐 Ann just pulled a SECRET Obsidian Maw (1/10K)!','... also for another server')
  local rec=Rules.Event('Record',{Name='Ann',Record='BestPull'})
  check(Rules.Line(rec)=='🏆 Ann just took BEST PULL TODAY!','the record sentence: "'..Rules.Line(rec)..'"')
  check(Rules.Line(Rules.Event('Record',{Name='Ann',Record='BiggestFruit'}))=='🏆 Ann just took BIGGEST FRUIT TODAY!'and Rules.Line(Rules.Event('Record',{Name='Ann',Record='LongestFruit'}))=='🏆 Ann just took LONGEST FRUIT!','record titles: known keys and a CamelCase key spelled out')
@@ -142,7 +144,7 @@ do
  check(Rules.Line(pull,true)=='🌟 Ann just pulled a <b>MYTHIC</b> Fire Pepper! (1/800) Nice pull!','the rich sentence bolds the rarity word ('..Rules.Line(pull,true)..')')
  check(Rules.Chat(pull)==('<font color="%s">🌟 Ann just pulled a <b>MYTHIC</b> Fire Pepper! (1/800) Nice pull!</font>'):format(hex),'the chat line is one colour run in the rarity colour ('..Rules.Chat(pull)..')')
  check(hex:match('^#%x%x%x%x%x%x$')~=nil and hex==Rules.Hex(Packs.Rarities.Mythic.Color),'the colour is the game\'s own Mythic colour as #RRGGBB ('..hex..')')
- check(Rules.Chat(sec)==('<font color="%s">🌐 Ann just pulled a <b>SECRET</b> Obsidian Maw (1/1,000)!</font>'):format(Rules.Hex(Rules.Gold)),'an other-server chat line is gold ('..Rules.Chat(sec)..')')
+ check(Rules.Chat(sec)==('<font color="%s">🌐 Ann just pulled a <b>SECRET</b> Obsidian Maw (1/10K)!</font>'):format(Rules.Hex(Rules.Gold)),'an other-server chat line is gold ('..Rules.Chat(sec)..')')
  check(Rules.Chat(rec)==('<font color="%s">🏆 Ann just took BEST PULL TODAY!</font>'):format(Rules.Hex(Rules.Amber)),'a record chat line is amber ('..Rules.Chat(rec)..')')
  check(Rules.Gold.R==1 and Rules.Gold.G>.8 and Rules.Gold.B<.4,'gold is gold')
  check(Rules.ChatColor(pull)==Rules.RarityColor('Mythic')and Rules.ChatColor(sec)==Rules.Gold and Rules.ChatColor(rec)==Rules.Amber,'ChatColor: the rarity colour, gold, amber')
@@ -219,7 +221,9 @@ do
  local back=Rules.Event('Global',Rules.Expand(Rules.Compact(e)))
  check(back and back.Name=='Ann'and back.UserId==77 and back.Id=='ab12cd34-5'and back.SeedId=='FirePepperSeed'and back.Odds==800 and back.Rarity=='Mythic'and back.Kind=='Global','compact -> expand -> event round trip (odds as a whole number)')
  local c=Rules.Compact(Rules.Event('Pull',{Name='Ann',Id='x-1',SeedId='FirePepperSeed'}))
- check(c.o==nil and c.z==nil and c.m==nil and c.s=='FirePepperSeed','empty fields are left out of the message; there is no size or coat in it')
+ check(c.o==800 and c.z==nil and c.m==nil and c.s=='FirePepperSeed','empty fields are left out of the message; there is no size or coat in it (R153: the odds ride as the seed\'s fixed whole N)')
+ local noSeed=Rules.Compact(Rules.Event('Record',{Name='Ann',Id='x-2',Record='BestPull'}))
+ check(noSeed.o==nil and noSeed.s==nil,'... and a record about nobody carries no odds')
  check(Rules.Expand(5)==nil and Rules.Expand(nil)==nil,'expand of a non-table')
  local list={};for i=1,8 do list[i]=Rules.Event('Pull',{Name=string.rep('é',24),UserId=1e9+i,Id='abcdef12-'..i,SeedId='ObsidianMawSeed',Odds=1e12})end
  local text,count=Rules.Batch(list,'11111111-2222-3333-4444-555555555555',1700000000,E.encode)
