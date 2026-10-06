@@ -53,7 +53,8 @@ local function sameSig(a,b,ignoreClass,ignoreDepth)
  for k,x in pairs(a)do
   local y=b[k];if not y then return false,'missing '..k end
   local xs,ys=x.Size,y.Size;if k==ignoreDepth then xs=V3(xs.X,xs.Y,0);ys=V3(ys.X,ys.Y,0)end -- (the flat pouch is thinner than the standard one, by design)
-  local d=math.max((xs-ys).Magnitude,(x.Pos-y.Pos).Magnitude,select(2,cfDelta(x.Frame,y.Frame))*.1)
+  local xp,yp=x.Pos,y.Pos;if k==ignoreDepth then xp=V3(xp.X,xp.Y,0);yp=V3(yp.X,yp.Y,0)end -- (R153: and centred on the seam plane, not on the standard mesh's box centre: checked on its own)
+  local d=math.max((xs-ys).Magnitude,(xp-yp).Magnitude,select(2,cfDelta(x.Frame,y.Frame))*.1)
   if d>1e-5 then return false,k..' differs by '..d end
   if not ignoreClass and x.Class~=y.Class then return false,k..' is a '..x.Class..' / '..y.Class end
  end
@@ -90,8 +91,8 @@ do
  local np=neutral and neutral:FindFirstChild('ApprovedMesh01')
  check(np~=nil and np:IsA('MeshPart')and #neutral:GetChildren()==1,'... holding ONE MeshPart, named like the template\'s')
  check(near(np.Size.X,tpl.Size.X)and near(np.Size.Y,tpl.Size.Y)and near(np.Size.Z,DEPTH,1e-9)and np.Size.Z<tpl.Size.Z,'the flat pouch has the template\'s width and height and the flat depth '..string.format('%.4f',DEPTH)..' ('..tostring(np.Size)..' vs '..tostring(tpl.Size)..')')
- local d,r=cfDelta(np:GetAttribute('PackLocalFrame'),tpl:GetAttribute('PackLocalFrame'))
- check(d<1e-9 and r<1e-9,'... and its PackLocalFrame (pivot and the 180 degree turn)')
+ local d,r=cfDelta(np:GetAttribute('PackLocalFrame'),Pouch.SeamFrame(tpl:GetAttribute('PackLocalFrame')))
+ check(d<1e-9 and r<1e-9 and np:GetAttribute('PackLocalFrame').Position.Z==0,'... and its PackLocalFrame (pivot and the 180 degree turn), centred on the seam plane z = 0 where the seal and strips are (R153)')
  check(np.TextureID==''and np.Color.R==1 and np.Color.G==1 and np.Color.B==1 and np.Material.Name=='SmoothPlastic'and#np:GetChildren()==0,'... white, no texture, no appearance, no children')
  check(Mock.generated==1 and Mock.calls==1 and #Mock.uris==0,'the mesh is GENERATED (CreateEditableMesh once); no asset is loaded (no CreateEditableMeshAsync, no MeshId: '..#Mock.uris..' asked)')
  check(#Mock.colorsAtBake==1 and Mock.colorsAtBake[1]==0,'every vertex colour was white when the mesh was baked ('..tostring(Mock.colorsAtBake[1])..' were not)')
@@ -275,8 +276,8 @@ local function inspect(bag,label,size,coat,opts)
  local ratio=mesh.Size.Z/(std:FindFirstChild('ApprovedMesh01',true).Size.Z)
  check(near(mesh.Size.X,std:FindFirstChild('ApprovedMesh01',true).Size.X,1e-9)and near(mesh.Size.Y,std:FindFirstChild('ApprovedMesh01',true).Size.Y,1e-9)and near(ratio,Pouch.DepthShare,1e-9),label..': the pouch is the standard pouch\'s width and height and '..Pouch.DepthShare..' of its depth')
  check(near(scale,std:GetAttribute('VisualScale'),1e-9)and tostring(Visuals.Bounds(7,VERITY,size).Radius)==tostring(Visuals.Bounds(7,'Standard',size).Radius),label..': VisualScale and Bounds are the plain pack\'s')
- local d,r=cfDelta(inv(root.CFrame)*mesh.CFrame,tpl:GetAttribute('PackLocalFrame')*CF(0,0,0));local expect=tpl:GetAttribute('PackLocalFrame')
- check(near((inv(root.CFrame)*mesh.CFrame).Position.X,expect.Position.X*scale,1e-5)and near((inv(root.CFrame)*mesh.CFrame).Position.Y,expect.Position.Y*scale,1e-5)and near((inv(root.CFrame)*mesh.CFrame).Position.Z,expect.Position.Z*scale,1e-5),label..': the pouch sits at the template\'s PackLocalFrame (x scale)')
+ local expect=Pouch.SeamFrame(tpl:GetAttribute('PackLocalFrame')) -- (R153: the template's x / y, on the seam plane)
+ check(near((inv(root.CFrame)*mesh.CFrame).Position.X,expect.Position.X*scale,1e-5)and near((inv(root.CFrame)*mesh.CFrame).Position.Y,expect.Position.Y*scale,1e-5)and near((inv(root.CFrame)*mesh.CFrame).Position.Z,expect.Position.Z*scale,1e-5),label..': the pouch sits at the template\'s PackLocalFrame x / y (x scale), centred on the seam plane')
  std:Destroy()
  -- colour: pure yellow everywhere (None); the coat paints it like any pack (the Decals stay white)
  local c=Rules.PackMutations[coat]
