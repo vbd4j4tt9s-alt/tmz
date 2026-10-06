@@ -1,53 +1,52 @@
--- R111: five short steps that end right after planting, then quick tips. Simple words (about grade 3).
--- R133: casual, funny voice with emojis (owner).
+-- R111: short steps, then done. R133: casual voice. R138: big icon, a few words, one key chip.
+-- R152 (owner: "make tutorial understandable in 5 seconds for new players see player know instantly", every text "like how I
+-- talk"): one idea per step, a big icon, a title of at most 4 words + a chip of at most 3, the key / button for your device,
+-- and a beam + ring + path (or a pressing hand) on the exact thing. Steps move on by themselves; no welcome page, no slides.
 -- The guide is the game owner's avatar (the client picks it). Game name: Steal A Pack.
 local G={Version=1,Bits={Begin=1,Pack=2,Seed=4,Train=8,Plant=16,Harvest=32,Sell=64,Cash=128}}
 -- Optional: set a Roblox user id here to force whose avatar guides players (nil = the game's owner).
 G.GuideUserId=nil
 -- Name on the guide's tag (nil = that account's username).
 G.GuideName='TMZ'
--- {name}, {Steal}, {Tap}, {Use}, {StealKey}, {OpenKey}, {PickKey}, {OpenVerb} are filled per device.
--- R138 (owner: "make the tutorial clearly visual, just make it oversimplified"): every card is a big icon, two or three
--- words and one key chip; a row of step icons shows the whole loop. Text stays as a plain description (tests).
+-- One look = {Icon, Title, Chip={Key, KeyStyle, Arrow, Label}}. {name} and the device words below are filled per device.
+-- Target = what the server points the beam at (TutorialTargets); Marker = the icon over it; Hand = a pressing hand on it.
 G.Steps={
- {Icon='🎒',Title='STEAL A PACK',Chip={Key='{StealKey}',Label='HOLD'},Text="{Steal} a pack 😈",Target='Pack',Marker='😈 STEAL!'},
- {Icon='🏠',Title='RUN HOME!',Chip={Arrow=true,Label='FOLLOW THE ARROWS'},Text="Run home, don't get caught 🏃💨",Target='Safety',Marker='🏠 HOME'},
- {Icon='🎁',Title='OPEN IT',Chip={Key='{PickKey}',Label='YOUR PACK'},Text="{Tap} your pack 🎁",
-  Equipped="{Use} to open it 🎁",EquippedTitle='KEEP {OpenVerb}!',EquippedChip={Key='{OpenKey}',Label='OPEN IT'}},
- {Icon='🌱',Title='PLANT IT',Chip={Arrow=true,Label='FOLLOW THE ARROWS'},Text="Plant your seed in your garden 🌱",Target='Garden',Marker='🌱 PLANT'},
- {Icon='💰',Title='',Text="",Tips=true,Informational=true},
+ {Icon='🎒',Title='GRAB A PACK!',Chip={Key='{StealKey}',Label='{HoldIt}'},Target='Pack',Marker='🎒'},
+ {Icon='🏠',Title='RUN HOME!!',Chip={Arrow=true,Label='to ur base'},Target='Safety',Marker='🏠'},
+ {Icon='🎁',Title='OPEN IT!',Chip={Key='{PickKey}',Label='ur pack'},Pick='Pack',
+  EquippedTitle='KEEP {OpenVerb}!!',EquippedChip={Key='{OpenKey}',Label='open it'}},
+ {Icon='🌱',Title='PLANT IT!',Chip={Key='{PlantKey}',Label='the dirt'},Target='Garden',Hand=true,Home=true},
+ -- R152: step 5 is the treadmill (it was 3 tip slides): done when you step on it, or after Seconds anyway.
+ {Icon='⚡',Title='GET FASTER!',Chip={Arrow=true,Label='hop on it'},Target='Treadmill',Marker='⚡',Home=true,Seconds=40},
 }
--- Step 5: picture slides, one at a time, then the tutorial is done. No waiting for the plant to grow.
-G.Tips={
- {Icon='🌱',Title='GROW ➜ PICK ➜ SELL',Chip={Label='🌱 ➜ 🍎 ➜ 💰'},Text="Plants grow, pick the fruit, sell it 💰"},
- {Icon='🏠',Title='ZOOM HOME',Chip={Key='BASE',Label='UP TOP'},Text="{TapBase} up top to zoom home 🏠",Button='BaseButton'},
- {Icon='🏃',Title='ZOOM TO TRACK',Chip={Key='TRACK',Label='UP TOP'},Text="{TapTrack} up top for the track 🏃",Button='TrackButton'},
-}
--- R125 (owner): the BASE / TRACK top-bar buttons are taught. Tip index -> the button the tutorial highlights.
-G.TipButtons={};for i,tip in ipairs(G.Tips)do G.TipButtons[i]=tip.Button end
--- Step 1 while the player is not on the track yet (presentation only; saved progress is unchanged).
-G.TravelTrack={Icon='🏃',Title='GO TO THE TRACK',Chip={Key='TRACK',Label='UP TOP'},Text="{TapTrack} up top to zoom to the track 🏃💨"}
-G.TipSeconds=5
-G.Steps[5].Seconds=#G.Tips*G.TipSeconds
-G.Welcome={Title='STEAL A PACK!',Text="Hey {name}! 👋",Button="LET'S GO!",
- Strip={{Icon='🎒',Word='STEAL'},{Icon='🏠',Word='RUN HOME'},{Icon='🎁',Word='OPEN'},{Icon='🌱',Word='PLANT'}}}
-G.Waiting={Icon='⏳',Title='PACKS SOON',Chip={Label='HANG TIGHT'},Text="No packs right now, one's coming ⏳"}
-G.Finished={Icon='🏆',Title="YOU'RE READY!",Chip={Label='🎁 FREE PACK!'},Text="You're a pro, {name}! 🤑"}
-G.FinishedAgain={Label='HAVE FUN {name}!'} -- the chip when the free pack was already given (a replay)
+G.StepCount=#G.Steps
+-- Step 1 while you're off the track: the TRACK button (ringed, with a pressing hand) and a path to the track gate.
+G.TravelTrack={Icon='🏃',Title='GO TO THE TRACK!',Chip={Key='TRACK',KeyStyle='Track',Label='{TapIt}'},Button='TrackButton',Marker='🏃'}
+-- Steps 4-5 (Home=true) while you're on the track: the BASE button.
+G.TravelBase={Icon='🏠',Title='GO HOME!',Chip={Key='BASE',KeyStyle='Base',Label='{TapIt}'},Button='BaseButton'}
+-- Step 4 while the seed is not in your hand: its hotbar slot.
+G.PickSeed={Icon='🌱',Title='PLANT IT!',Chip={Key='{PickKey}',Label='ur seed'}}
+G.Waiting={Icon='⏳',Title='PACKS COMING!',Chip={Label='hang tight'}}
+-- The tiny pop between steps.
+G.Nice={Icon='✓',Title='NICE!!'}
+G.NiceSeconds=.7;G.RevealSeconds=2.5;G.FinishSeconds=4
+G.Finished={Icon='🏆',Title='U GOT THIS!!',Chip={Label='🎁 FREE PACK!'}}
+G.FinishedAgain={Label='have fun {name}!'} -- the chip when the free pack was already given (a replay)
 -- R138 (owner): finishing the tutorial gives one free Forest pack with 2x rates (server: TutorialProgress.GrantStarterPack).
 -- R139 (owner: "make it so that players dont know that the pack is 2x luck"): it is named, announced and shows its odds
 -- exactly like any Forest pack; only the server knows.
-G.StarterPack={Name='Seed Pack',Notice='🎁 FREE Forest Seed Pack! Check your Bag!'}
+G.StarterPack={Name='Seed Pack',Notice='🎁 FREE Forest pack!! check ur Bag'}
 -- The step row on the card: one icon per step.
-G.Progress={'🎒','🏠','🎁','🌱','💰'}
+G.Progress={'🎒','🏠','🎁','🌱','⚡'}
 -- R138 (owner: "a clicking indicator to visually show players to keep clicking to open a pack").
 G.ClickHint={Mouse={Hand='🖱️',Word='CLICK!'},Touch={Hand='👆',Word='TAP!'},Gamepad={Hand='🎮',Word='R2!'}}
+-- On-screen word budget (tested): title <= 4 words, chip label <= 3, both together <= 6.
+G.MaxTitleWords,G.MaxChipWords,G.MaxWords=4,3,6
 function G.Copy(spec,key)return spec[key]end
-G.StepCount=#G.Steps
 local words={
- Touch={Steal='Hold STEAL to grab',Tap='Tap',Use='Tap',TapTrack='Tap TRACK',TapBase='Tap BASE',StealKey='STEAL',OpenKey='TAP',PickKey='TAP',OpenVerb='TAPPING'},
- Gamepad={Steal='Hold X to steal',Tap='Pick',Use='Press R2',TapTrack='Select TRACK',TapBase='Select BASE',StealKey='X',OpenKey='R2',PickKey='PICK',OpenVerb='PRESSING'},
- Mouse={Steal='Hold E to steal',Tap='Click',Use='Click',TapTrack='Click TRACK',TapBase='Click BASE',StealKey='E',OpenKey='CLICK',PickKey='CLICK',OpenVerb='CLICKING'},
+ Touch={StealKey='👆',HoldIt='hold it',PickKey='TAP',OpenKey='TAP',OpenVerb='TAPPING',PlantKey='TAP',TapIt='tap it'},
+ Gamepad={StealKey='X',HoldIt='hold',PickKey='R1',OpenKey='R2',OpenVerb='PRESSING',PlantKey='R2',TapIt='select it'},
+ Mouse={StealKey='E',HoldIt='hold',PickKey='CLICK',OpenKey='CLICK',OpenVerb='CLICKING',PlantKey='CLICK',TapIt='click it'},
 }
 -- Fills placeholders. The name is escaped because the label uses RichText.
 function G.Format(text,device,name)
@@ -59,7 +58,8 @@ function G.Format(text,device,name)
  end))
 end
 function G.Plain(text)return(tostring(text):gsub('<[^>]->',''):gsub('&lt;','<'):gsub('&gt;','>'):gsub('&amp;','&'))end
--- Harvest/Sell/Cash still record progress but no longer hold the tutorial open.
+function G.Words(text)local n=0;for _ in G.Plain(text or''):gmatch('%S+')do n+=1 end;return n end
+-- Saved progress (unchanged since R111): Harvest/Sell/Cash still record progress but no longer hold the tutorial open.
 local order={{'Pack',1},{'Seed',3},{'Plant',4},{'Train',5}}
 function G.Read(saved)
  if type(saved)~='table'then return {Version=1,Mask=1,Done=false}end
@@ -80,15 +80,12 @@ function G.Event(state,event)
  if G.Step(state)==0 then state.Done=true end
  return true
 end
+-- TreadmillInfo: step 5 is done (R152: the client sends it when you step on the treadmill).
 function G.Action(state,action)
  if action=='TreadmillInfo'and G.Step(state)==5 then state.Mask=bit32.bor(state.Mask,G.Bits.Train);state.Done=true;return true end
  if action=='Replay'then state.Mask=1;state.Done=false;return true end
  if action=='Skip'then state.Done=true;return true end
  return false
-end
-function G.Layout(w,h,step)
- local width=math.min(304,math.max(190,w-112));local compact=w<700
- return {X=w-width-12,Y=h<480 and 116 or 76,Width=width,Height=step==9 and(compact and 68 or 56)or(compact and 50 or 46),Font=compact and 17 or 20}
 end
 -- Screen boxes the tutorial card must never cover (mirrors how each HUD script positions itself).
 -- The default camera keeps the character in the middle of the screen, head near the centre, feet below it,
@@ -129,9 +126,10 @@ end
 function G.Font(m,w,h)return m.Phone and((h<400 or w<400)and 16 or 17)or(h<560 and 18 or 21)end
 -- Objective card at the top centre (where Roblox players look for goals). It slides down, narrows or
 -- shifts until it clears every HUD box and the character. heightFor(width) gives the card height at a width.
-function G.Card(w,h,m,heightFor,relaxed,top)
+-- R152: top = where to start looking (below a ringed top-bar button); want = the width its words need (it hugs them).
+function G.Card(w,h,m,heightFor,relaxed,top,want)
  local boxes=G.Obstacles(m,w,h,relaxed);top=math.max(8,top or 8)
- local widest=math.min(m.Phone and 460 or 540,w-24)
+ local widest=math.min(want or 9999,m.Phone and 460 or 540,w-24)
  local tallest=math.max(150,heightFor(widest)*1.6)
  local function clear(box)
   if box.X<8 or box.Y<8 or box.X+box.W>w-8 or box.Y+box.H>h-8 then return false end

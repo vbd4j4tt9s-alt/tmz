@@ -62,7 +62,8 @@ end
 scan(Guide,'BeginnerGuide')
 check(#words==0,'no tutorial text mentions luck or 2x'..(#words>0 and(': '..table.concat(words,' | '))or''))
 check(Guide.Finished.Chip.Label=='🎁 FREE PACK!','the finish card says 🎁 FREE PACK!')
-check(Guide.StarterPack.Notice=='🎁 FREE Forest Seed Pack! Check your Bag!','the notice: '..Guide.StarterPack.Notice)
+-- (R152: the notice is in the owner's words; it still names it a Forest pack, like any other)
+check(Guide.StarterPack.Notice=='🎁 FREE Forest pack!! check ur Bag','the notice: '..Guide.StarterPack.Notice)
 -- The pack tool and its hold tooltip (ChestService) read exactly like a normal Forest pack's.
 local Chests=server('ChestService')
 local fake=setmetatable({PlayerData=Data,Config=Config,Openings={}},{__index=Chests})
