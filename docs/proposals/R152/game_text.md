@@ -30,14 +30,14 @@ Verity's window in its states: [`verity_text.png`](verity_text.png) (redrawn wit
 
 ## Old -> new
 
-253 strings changed in 21 areas (every row is one old -> new; a row that shows only a piece of a sentence, like ` got `, says what the whole line looks like).
+252 strings changed in 21 areas (every row is one old -> new; a row that shows only a piece of a sentence, like ` got `, says what the whole line looks like).
 
 | Area | Strings |
 |------|---------|
 | 1. HUD notices and refusals (top of the screen) | 43 |
 | 2. Shovel, holes and removing a plant | 8 |
 | 3. Robux shop, gem shop, game passes and gifting a pass | 68 |
-| 4. Boost shop, market and selling | 5 |
+| 4. Boost shop, market and selling | 4 |
 | 5. Treadmill and fence upgrade signs | 8 |
 | 6. Bag (hotbar and inventory) | 2 |
 | 7. Plant Index | 1 |
@@ -135,11 +135,11 @@ Verity's window in its states: [`verity_text.png`](verity_text.png) (redrawn wit
 | 12 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:102 | `INVALID REWARD` | `TRY AGAIN!` |
 | 13 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:102 | `INVALID CURRENCY` | `TRY AGAIN!` |
 | 14 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:104 | `YOUR GARDEN IS LOADING` | `UR GARDEN IS LOADING...` |
-| 15 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:107 | `COLLECT YOUR FLOATING REWARDS FIRST` | `GRAB THE FLOATING REWARDS FIRST!` |
+| 15 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:107 | `COLLECT YOUR FLOATING REWARDS FIRST` | `UR LAST REWARDS ARE STILL ARRIVING` |
 | 16 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:108 | `CURRENCY LIMIT REACHED` | `U'RE MAXED OUT! SPEND SOME FIRST` |
 | 17 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:117 | `ENTER A WHOLE NUMBER OF GEMS` | `TYPE A WHOLE NUMBER OF GEMS` |
-| 18 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:123 | `Collect your Gems.` | `Grab ur Gems!` |
-| 19 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:201 | `Collect your Cash.` | `Grab ur Cash!` |
+| 18 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:123 | `Collect your Gems.` | `Ur Gems are on the way!` |
+| 19 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:201 | `Collect your Cash.` | `Ur Cash is on the way!` |
 | 20 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:127 | `YOUR DATA IS LOADING` | `HOLD ON, UR DATA IS LOADING!` |
 | 21 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:128 | `end` | `end` |
 | 22 | `ServerScriptService/ChestChaseServer/PremiumProgress.lua`:148 | `PACKS COULD NOT BE ADDED; PLEASE RETRY` | `COULDN'T ADD THE PACKS! TRY AGAIN` |
@@ -194,11 +194,10 @@ Verity's window in its states: [`verity_text.png`](verity_text.png) (redrawn wit
 
 | # | Where it lives | Old | New |
 |---|----------------|-----|-----|
-| 1 | `ServerScriptService/ChestChaseServer/EconomyService.lua`:536 | `SOLD FOR $%d — HOVER OVER CASH TO COLLECT` | `SOLD FOR $%d! HOVER OVER THE CASH TO GRAB IT` |
-| 2 | `StarterPlayer/StarterPlayerScripts/EconomyClient.client.lua`:422 | `Visit the market to sell your crops.` | `Go to the market to sell ur crops!` |
-| 3 | `ReplicatedStorage/ShopMenu.lua`:18 | `Please wait` | `Wait a sec` |
-| 4 | `ReplicatedStorage/ShopMenu.lua`:76 | `No items yet.` | `Nothing here yet!` |
-| 5 | `ReplicatedStorage/HarvestSellMenu.lua`:26 | `No crops` | `No crops yet!` |
+| 1 | `StarterPlayer/StarterPlayerScripts/EconomyClient.client.lua`:429 | `Visit the market to sell your crops.` | `Go to the market to sell ur crops!` |
+| 2 | `ReplicatedStorage/ShopMenu.lua`:18 | `Please wait` | `Wait a sec` |
+| 3 | `ReplicatedStorage/ShopMenu.lua`:76 | `No items yet.` | `Nothing here yet!` |
+| 4 | `ReplicatedStorage/HarvestSellMenu.lua`:26 | `No crops` | `No crops yet!` |
 
 ### 5. Treadmill and fence upgrade signs
 
@@ -243,7 +242,7 @@ Verity's window in its states: [`verity_text.png`](verity_text.png) (redrawn wit
 | 11 | `ServerScriptService/ChestChaseServer/DailyProgress.lua`:33 | `DAILY PACK POOL IS UNAVAILABLE` | `DAILY PACKS AREN'T READY YET` |
 | 12 | `ServerScriptService/ChestChaseServer/DailyProgress.lua`:48 | `PACK COULD NOT BE ADDED; PLEASE RETRY` | `COULDN'T ADD THE PACK! TRY AGAIN` |
 | 13 | `ServerScriptService/ChestChaseServer/DailyProgress.lua`:69 | `YOUR DATA IS LOADING` | `HOLD ON, UR DATA IS LOADING!` |
-| 14 | `ServerScriptService/ChestChaseServer/DailyProgress.lua`:88 | `Collect your Gems.` | `Grab ur Gems!` |
+| 14 | `ServerScriptService/ChestChaseServer/DailyProgress.lua`:88 | `Collect your Gems.` | `Ur Gems are on the way!` |
 | 15 | `ServerScriptService/ChestChaseServer/DailyProgress.lua`:98 | `INVALID QUEST` | `TRY AGAIN!` |
 | 16 | `ServerScriptService/ChestChaseServer/DailyProgress.lua`:99 | `ALREADY CLAIMED` | `U ALREADY CLAIMED THIS!` |
 | 17 | `ServerScriptService/ChestChaseServer/DailyProgress.lua`:101 | `DAILY QUEST GEM LIMIT REACHED; TRY AFTER THE UTC RESET` | `DAILY QUEST GEM LIMIT HIT! COME BACK AFTER THE UTC RESET` |
@@ -423,7 +422,8 @@ Verity's window in its states: [`verity_text.png`](verity_text.png) (redrawn wit
 
 ## Left as they are, and why
 
-- **The tutorial** (`BeginnerTutorial`, `BeginnerGuide`, `TutorialProgress`, `TutorialTargets` and every tutorial string): another agent is rebuilding it.
+- **The tutorial** (`BeginnerTutorial`, `BeginnerGuide`, `TutorialProgress`, `TutorialTargets` and every tutorial string, including the free-pack notice
+  "🎁 FREE Forest pack!! check ur Bag"): rebuilt by another agent and already in the owner's voice (`docs/proposals/R152/tutorial.md`); not touched here.
 - **Owner-only texts**: `StudioTestHelp`, `OwnerUpdateCommands82` and every other `/test` reply, `COMMANDS.md`, the Studio-only prints and `warn` lines.
 - **Names**: seeds, plants, packs ("Void Pack", "Verity Pack", "Mech Pack"), biomes ("Storm Peaks"), keepers ("The Darkened"), rarities, mutations and weather
   traits ("Drippy", "Frosted", "Charged"), boots and trails. Numbers, prices, odds (`1/N`) and the K / M / B formats are untouched.
@@ -458,9 +458,11 @@ phone (`test_verity_client.luau`, 13 screen sizes); the others did not change le
 Many older suites assert exact strings. They were moved to the new words (never loosened: every check still compares the same thing, only the expected text changed):
 `R138`, `R140`, `R147` (mystery, Verity), `R148` (purchase, shop, roster), `R150` (pedestal, hotbar), `R151` (chat lines, hub plaque, settings), `R152` (Void giveaway),
 `giving_R122`, `shop_R120` and `tools/tests/test_fast_travel.luau`; the mutation snippets in `run_void_giveaway.sh` follow the new source lines.
-Frozen files: `EconomyService.lua` changed by one sentence (the sale line "SOLD FOR $N! HOVER OVER THE CASH TO GRAB IT"), so its line in
-`docs/proposals/R151/tests/frozen.sha256` was updated; `Config.lua`, `DailyRewards.lua`, `TreadmillBonusRules.lua`, `TreadmillBonusService.lua`, `HudNotices.client.lua`,
-`ConcurrentKeeperService.lua` and `ChaseService.lua` are byte-identical to before. `tools/tests/run_all_suites.sh` passes (all suites, including `run_perf152.sh`
+Frozen files: none needed a new hash from this pass (`Config.lua`, `DailyRewards.lua`, `EconomyService.lua`, `TreadmillBonusRules.lua`, `TreadmillBonusService.lua`, `HudNotices.client.lua`,
+`ConcurrentKeeperService.lua` and `ChaseService.lua` hold the words they had on the release branch; the short texts for their sentences are in `SimpleGameText`).
+The money auto-collect change that landed on the release branch meanwhile ("Gems on the way.", "Cash on the way.", "YOUR LAST REWARDS ARE STILL ARRIVING") is kept in meaning and
+put in the owner's voice here: "Ur Gems are on the way!", "Ur Cash is on the way!", "UR LAST REWARDS ARE STILL ARRIVING".
+`tools/tests/run_all_suites.sh` passes (all suites, including `run_perf152.sh`
 and the R152 load guard).
 
 ## How the picture is made
