@@ -135,6 +135,6 @@ Not changed (identical fingerprints: hotbar 119 frames, popups 300 frames per ti
 
 ## Run it
 
-`sh docs/proposals/R152/tests/run_perf152.sh [scratch dir] [place.rbxl]` (about half an hour on 4 cores; `ONLY=hub,kb,keepers,seed,hotbar,popups,packs`
+`sh docs/proposals/R152/tests/run_perf152.sh [scratch dir] [place.rbxl]` (5 minutes on 4 idle cores, longer under load; `ONLY=hub,kb,keepers,seed,hotbar,popups,packs`
 for a part). `PERF_BASE=1e7dced sh ...` gives this page's verdict and numbers (against the candidate); without it, the patch on against the patch off
 (the numbers are then "patch off -> on"). `PERF_WHERE=true` in front of a seed / keeper driver lists which line wrote a repeated value.
