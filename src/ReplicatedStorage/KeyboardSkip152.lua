@@ -5,19 +5,20 @@
 --   FLAT features = water / oasis / pond / pool / lava / magma / river / ice pond ... by part or group name (S.Config.Liquid), or Material Water, standing on the floor: a key
 --      is left out when at least Flat (10%) of its footprint lies over one (a pool's edge is not covered by a half-key).
 --   PROPS = any other scenery part standing on the floor high enough to meet a key (its top above the floor + PropMinTop, its foot no higher than the resting key top):
---      rocks, logs, roots, palm trunks and their stone bases, banks ... a key is left out when at least Prop (25%) of its footprint is covered.
+--      rocks, logs, roots, palm trunks and their stone bases, wall banks, cliffs, landmarks ... a key is left out only when it is mostly BURIED: at least Prop (60%) of its
+--      footprint is covered. A partly covered key (a wall bank along the edge column) stays, poking into the prop as in R151, so the track edge shows no bare gaps.
 -- Only scenery counts (the roots in S.Roots); floors, walls, barriers, bases, the hub, seeds, keepers and anything invisible do not. Footprint = the convex hull of the part's
 -- projected box (a circle for a ball / a standing disc); coverage = a Grid x Grid sample of the key's footprint, the union over every feature. Spacebar rows are never touched.
 local K=require(script.Parent.KeyboardTrack)
 local S={}
 S.Config={
- Flat=.10,Prop=.25,Grid=5,
+ Flat=.10,Prop=.60,Grid=8,
  PropMinTop=.3,                  -- a prop's top must stand this far above the floor top to meet a key (a flush patch sits under the keys)
  InvisibleAt=.95,                -- parts at least this transparent (barriers, anchors) are not scenery
  MaxFootprint=60000,             -- bigger footprints (a whole-biome slab) are floors, not features
  Liquid={'water','oasis','pond','pool','lava','magma','molten','puddle','lake','river','stream','frozen','slush','quicksand','swamp','bog','sinkhole','crater','tar pit','mud'},
- -- Lower-case words: a part (or a model above it) whose name has one is never a feature. Empty: the wall banks along the track's edges, which stand on the outer column
- -- of keys, leave that column out where they run; {'wall bank','rocky edge'} would keep it (the keys then poke into the banks).
+ -- Lower-case words: a part (or a model above it) whose name has one is never a feature. Empty by default: {'wall bank','rocky edge'} would also keep the edge keys the
+ -- banks bury by 60% or more.
  Ignore={},
 }
 -- Roots under the map whose parts are scenery (a '/' walks down: Obby/Biomes).
@@ -121,10 +122,10 @@ end
 -- Report[stage] = list of {Name, Class = 'flat' | 'prop', Cells} (cells credited to the first feature that covers them), Parts = scenery parts looked at.
 function S.Scan(map,geo)
  local C=S.Config;local KC=K.Config
- local F=KC.FloorTop;local KW=K.KeySize(geo.Pitch);local G=C.Grid;local N=G*G
+ local F=KC.FloorTop;local KW=K.KeySize(geo.Pitch);local G=C.Grid;local N=G*G;local WORDS=(N+31)//32
  local sampleX,sampleZ={}, {}
  for i=1,G do local o=((i-.5)/G-.5)*KW;sampleX[i]=o;sampleZ[i]=o end
- local flatMask,propMask={},{}      -- cell key -> bit set of the covered samples
+ local flatMask,propMask={},{}      -- cell key -> the covered samples as a bit set of WORDS 32-bit words
  local flatBy,propBy={}, {}         -- cell key -> group name of the first feature that covered it
  local looked=0
  for _,item in ipairs(sceneryParts(map))do
@@ -139,19 +140,21 @@ function S.Scan(map,geo)
     for r=r1,r2 do if not geo.BarOfRow[r]then
      local za,zb=geo.RowZ(r);local zc=(za+zb)/2
      for c=c1,c2 do
-      local xc=geo.ColCenter(c);local key=r*64+c;local m=masks[key]or 0;local before=m
+      local xc=geo.ColCenter(c);local key=r*64+c;local m=masks[key];local grew=false
       for i=1,G do for j=1,G do
-       local bit=(i-1)*G+j
-       local flag=bit32.lshift(1,bit-1)
-       if bit32.band(m,flag)==0 and S.Covers(fp,xc+sampleX[i],zc+sampleZ[j])then m=bit32.bor(m,flag)end
+       local bit=(i-1)*G+j-1;local w=bit//32+1;local flag=bit32.lshift(1,bit%32)
+       if not(m and bit32.band(m[w],flag)~=0)and S.Covers(fp,xc+sampleX[i],zc+sampleZ[j])then
+        if not m then m=table.create(WORDS,0);masks[key]=m end
+        m[w]=bit32.bor(m[w],flag);grew=true
+       end
       end end
-      if m~=before then masks[key]=m;if not by[key]then by[key]=item.Group end end
+      if grew and not by[key]then by[key]=item.Group end
      end
     end end
    end
   end
  end
- local function count(m)local n=0;while m~=0 do n+=bit32.band(m,1);m=bit32.rshift(m,1)end;return n end
+ local function count(m)local n=0;for _,w in ipairs(m)do while w~=0 do n+=bit32.band(w,1);w=bit32.rshift(w,1)end end;return n end
  local cells,total={},0;local report={}
  local seen={}
  for key,m in pairs(flatMask)do
