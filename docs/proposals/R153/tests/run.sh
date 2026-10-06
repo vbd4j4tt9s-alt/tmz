@@ -35,12 +35,16 @@ serverside() { # $1 dir, extra Name=path overrides after
  cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$R151/pack_world.luau" "$R151/pack_templates.luau" "$R151/pouch_mock.luau" "$R151/pack_shape_samples.luau" "$HERE/test_hold_server153.luau" "$d/"
  python3 "$R151/mkbundle_packs.py" "$d" "$S" --server "$@" >/dev/null
 }
+kinds() { # the failed checks of a log, by what they are about
+ f=$1;c() { grep '^FAIL' "$f" | grep -ciE "$1"; }
+ echo "one press=one equip $(c 'one press|single click|shows in the hand'), drag $(c 'drag:|drag onto|flick onto'), Bag $(c 'Bag card|onto the open Bag|Bag button|stay off|dragged back'), order $(c 'respawn|holds across|keeps its slot|new item does not'), server moves $(c 'reveal|carrying|chase|knocked'), re-sort/stacking $(c 're-sorts|ScreenGui'), log $(c 'log'), random $(c 'random run')"
+}
 variants() { # $1 dir, $2 hand-off rule; prints one line per run; returns the number of runs that failed
  d=$1;n=0;for v in began nobegan stale anywhere objscreen nobegan_gui;do for o in "activated first" "release first";do
   name=$(echo "real_${v}_$o" | tr ' ' '_')
   printf "VARIANT='%s';ORDER='%s';HANDOFF='%s'\n" "$v" "$o" "$2" > "$d/$name.luau";cat "$d/test_hotbar_real.luau" >> "$d/$name.luau"
   if (cd "$d" && timeout 900 /opt/luau/luau "$name.luau" > "$name.log" 2>&1);then echo "  $v / $o: $(grep -v '^WARN' "$d/$name.log" | grep -v '^\[Hotbar\]' | tail -1)"
-  else n=$((n+1));echo "  $v / $o: FAILED ($(grep -c '^FAIL' "$d/$name.log") checks): $(grep '^FAIL' "$d/$name.log" | head -3 | cut -c1-150 | tr '\n' ' ')";fi
+  else n=$((n+1));echo "  $v / $o: FAILED ($(grep -c '^FAIL' "$d/$name.log") checks): $(kinds "$d/$name.log")";fi
  done;done
  return $n
 }

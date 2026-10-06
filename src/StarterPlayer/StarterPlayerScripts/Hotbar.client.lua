@@ -241,7 +241,9 @@ local function moved(tool,hand)
  local m=mine[tool];mine[tool]=nil
  if m and m.Hand==hand and os.clock()-m.At<3 then return end
  if not keyOf[tool]then return end -- (a new item)
- local why=not hand and tool:GetAttribute('HoldRefused');why=why and tostring(why):match('^[^@]*')
+ -- (the server's reason counts only when it is fresh: an old one stays on the tool)
+ local why=not hand and tool:GetAttribute('HoldRefused');local at=why and tonumber(tostring(why):match('@(.*)$'))
+ why=at and math.abs(workspace:GetServerTimeNow()-at)<3 and tostring(why):match('^[^@]*')or nil
  note(('%s -> %s, not by the hotbar%s, %.2f s after the last press'):format(tool.Name,hand and'hand'or'Backpack',why and' (server: '..why..')'or'',os.clock()-lastPress))
  if not hand and pending and pending.Tool==tool and not pending.Queued then
   -- (the server refused it: a reveal it knew of before this client did, or a knock-down, means wait and hold it after; carrying / a chase means not now)
@@ -265,7 +267,7 @@ local function paintPending()
 end
 -- R153 presses: one press = one action, whatever the engine delivers (owner: "i need to put in inputs twice" / "cant drag seeds and reorganise").
 --  * a press starts on a slot / card's InputBegan OR its MouseButton1Down (a button may keep its primary click to itself: then InputBegan never comes and
---    R113-R152 never saw a drag at all), moves with UserInputService.InputChanged (the mouse, or that touch: by identity, else the touch nearest it) and ends
+--    R112-R152 never saw a drag at all), moves with UserInputService.InputChanged (the mouse, or that touch: by identity, else the touch nearest it) and ends
 --    with UserInputService.InputEnded OR the MouseButton1Up of the button it is let go over. Activated is the engine's own "that was a click" and counts when
 --    the release has not acted already. The first of them acts, once.
 --  * where it ends decides: on another slot = a move (swap), off the hotbar onto the Bag (its sheet or its button) = out of the hotbar, on its own slot /
