@@ -151,6 +151,8 @@ function MapService.new(config)
     movement:SetAttribute('TrackBoundaryZ',self.BaseBoundaryLine.Position.Z)
     movement:SetAttribute('TrackCenterX',self.BaseBoundaryLine.Position.X)
     movement:SetAttribute('TrackHalfWidth',math.max(90,self.BaseBoundaryLine.Size.X/2)+24)
+    -- R152: the keyboard leaves out the cells over water / lava / pools / props on the track floor: found once here, in the finished map (every scenery pass above has run).
+    do local ok,err=pcall(function()require(game:GetService('ReplicatedStorage').KeyboardSkip152).Apply(mapRoot,self.BaseBoundaryLine.Position.X)end);if not ok then warn('[R152] Keyboard skip scan skipped: '..tostring(err))end end
 	self.FallbackSpawn = requireChild(config, self.LobbyFolder, "FallbackSpawn", "SpawnLocation")
 	local obbyStartPad = self.LobbyFolder:FindFirstChild("ObbyStartPad")
 	if obbyStartPad and obbyStartPad:IsA("BasePart") then

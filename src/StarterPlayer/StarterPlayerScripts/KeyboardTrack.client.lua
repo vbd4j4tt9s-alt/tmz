@@ -1,4 +1,12 @@
 do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
+-- R152 (owner playtest of R151: "keys behind also not rendering and its not loud enough"; far keys were bare caps): the window keeps Back rows behind
+-- (327 / 229 / 180 studs, a camera zoomed out to 128 studs sees below / behind its own feet) and every row out to FarAhead / FarBehind rows carries
+-- its letters: the near rows keep their two full-size strips, the rows beyond ONE strip each (a single SurfaceGui at 4 px / stud with the row's 22
+-- labels, 95 KB of canvas instead of 1.5 MB), bound nearest first FarRows a frame and fading over the last rows; clicks are 1.8 / 28 .. 160 studs.
+-- R152 (owner: "for some areas on the track like this make sure that there is no keyboard tiles there": a Desert oasis with keys in and under its water): the cells in
+-- geo.Skip (the map attribute KeyboardSkip, written by the server's KeyboardSkip152 scan: water / lava / pools / props on the floor) get no key, no press, no click
+-- and no letter; letter strips are trimmed to the keys they carry (a half row with none carries no strip); the real floor stays visible there (local copies of it,
+-- like the arena's) so the pool lies on its own ground, not over the bed; a stand-in never covers a row that has such a cell.
 -- R151 (owner playtest of R149 / R150): "it doesn't push down far enough", "the words are missing, they only appear if under my foot", "the
 -- forest, desert named tiles must also be parallel to the safe zone and horizontal":
 --  * the press travels 1.15 studs (resting top floor + 1.2, pressed floor + .05: level with the planted feet) and the runner's footprint reaches
@@ -129,7 +137,7 @@ local function start()
  -- The real floor: hidden for this client under the keyboard; the rest of a floor part is drawn by a local copy ------------------------
  -- (armed at the very end of start(): until the keys exist and the frame step is connected, the floor stays visible - an error half way
  -- through start() must never leave an invisible floor and no keys)
- local scanGround,armGround
+ local scanGround,armGround,patchSkips
  -- The camera clamp's rectangle: the keys plus whatever hidden floor the local copies redraw (The Darkened's arena), grown by 2 studs
  local clampRect={CX-HALF-2,CX+HALF+2,geo.Z0-2,geo.Segs[#geo.Segs].EndZ+2}
  do
@@ -177,17 +185,55 @@ local function start()
    end
   end
  end
+ -- R152: the cells the keyboard leaves out keep the real floor: merged into rectangles (a run of columns over consecutive rows), each clipped to a floor part as a local
+ -- copy at the floor's own height, so a pool / lava river lies on its ground and not over the sunken bed.
+ local skipRects={}
+ local function buildSkipRects()
+  skipRects={}
+  if geo.SkipCount==0 then return end
+  local open={};local rows={}
+  for r in pairs(geo.RowSkip)do rows[#rows+1]=r end
+  table.sort(rows)
+  for _,r in ipairs(rows)do
+   local za,zb=geo.RowZ(r);local nextOpen={};local c=1
+   while c<=COLS do
+    if geo.Skip[r*64+c]then
+     local c2=c;while c2<COLS and geo.Skip[r*64+c2+1]do c2+=1 end
+     local id=c..'-'..c2;local o=open[id]
+     if o and o.Last==r-1 then o.Z1=zb;o.Last=r else o={X0=LEFT-c2*P,X1=LEFT-(c-1)*P,Z0=za,Z1=zb,Last=r};skipRects[#skipRects+1]=o end
+     nextOpen[id]=o;c=c2+1
+    else c+=1 end
+   end
+   open=nextOpen
+  end
+ end
+ buildSkipRects()
+ local function makeSkipPatches(part,rec)
+  local e=rec.Ext
+  for _,r in ipairs(skipRects)do
+   local rect={max(r.X0,e[1]),min(r.X1,e[2]),max(r.Z0,e[5]),min(r.Z1,e[6])}
+   if rect[2]-rect[1]>.01 and rect[4]-rect[3]>.01 then rec.SkipPatches[#rec.SkipPatches+1]=makePatch(part,rect,e[3],e[4])end
+  end
+ end
+ function patchSkips()
+  buildSkipRects()
+  for part,rec in pairs(hidden)do
+   for _,p in ipairs(rec.SkipPatches)do p:Destroy()end
+   rec.SkipPatches={};makeSkipPatches(part,rec)
+  end
+ end
  local function hideGround(part)
   if stopped or hidden[part]or not part:IsA('BasePart')or not part.Name:match('^BiomeGround_%d')then return end
   if abs(part.CFrame.UpVector.Y)<.99 then return end
   local x0,x1,y0,y1,z0,z1=extents(part)
   if abs(y1-F)>.6 then return end                      -- not the track floor at the keyboard's height
   if x1<=keyRect[1]or x0>=keyRect[2]or z1<=keyRect[3]or z0>=keyRect[4]then return end
-  local rec={Faces={},Patches={},Rects={}}
+  local rec={Faces={},Patches={},Rects={},SkipPatches={},Ext={x0,x1,y0,y1,z0,z1}}
   for _,rect in ipairs(K.RectMinus({x0,x1,z0,z1},keyRect))do
    if rect[2]-rect[1]>.01 and rect[4]-rect[3]>.01 then rec.Patches[#rec.Patches+1]=makePatch(part,rect,y0,y1);rec.Rects[#rec.Rects+1]=rect end
   end
   hidden[part]=rec
+  makeSkipPatches(part,rec)
   part.LocalTransparencyModifier=1
   hideFaces(part,rec)
   growClamp()
@@ -214,7 +260,7 @@ local function start()
   local gone=false
   for part,rec in pairs(hidden)do
    if not part.Parent then
-    for _,p in ipairs(rec.Patches)do p:Destroy()end;hidden[part]=nil;gone=true
+    for _,p in ipairs(rec.Patches)do p:Destroy()end;for _,p in ipairs(rec.SkipPatches)do p:Destroy()end;hidden[part]=nil;gone=true
     if rec.Conn then rec.Conn:Disconnect();rec.Conn=nil end
    else
     if part.LocalTransparencyModifier~=1 then part.LocalTransparencyModifier=1 end
@@ -250,6 +296,7 @@ local function start()
  local hideList,hideN={},0                           -- slots released in this window pass (hidden at its end unless they were dressed again)
  local rowBound,boundRows,boundRowPos={},{},{}
  local boundKeys=0
+ local rowKeys={}                                   -- row -> keys bound in it (COLS less the cells the keyboard leaves out)
  local downPos,animPos,animT0,animFrom,animTo,animDur={},{},{},{},{},{}
  local stampAt,moveMark={},{}
  local downList,animList,moveList={},{},{}
@@ -331,6 +378,7 @@ local function start()
   return {Part=p,Gui=gui,Labels=labels,K=k,W=0,D=0,X=0,Z=0,Alpha=-1,On=true,Free=false,Parked=false,PX={},PY={},Tx={},Ink={},Vis={true,true,true,true,true,true,true,true,true,true,true}}
  end
  local keyLegendOf={}                                -- slot -> pooled per-key letter while the key is down
+ local Far={Of={},Rows={},Pos={},Free={},N=0}          -- R152 far letters: row -> its one strip, bound rows (O(1) list), pooled strips (in a table: start() is near the 200-locals limit)
  local function labelShown(row,col)
   local key=row*64+col
   if holeCell[key]or platCell[key]then return false end
@@ -339,6 +387,8 @@ local function start()
   return true
  end
  local function setLabel(row,col,shown)
+  local f=Far.Of[row]
+  if f then if f.Vis[col]~=shown then f.Vis[col]=shown;f.Labels[col].Visible=shown end;return end
   local list=stripsOfRow[row];if not list then return end
   local k=(col-1)//SPAN+1;local st=list[k];if not st then return end
   local i=col-(k-1)*SPAN
@@ -362,6 +412,22 @@ local function start()
   st.Alpha=a
   for _,l in ipairs(st.Labels)do l.TextTransparency=a end
  end
+ -- The first / last column of cols a .. b that has a key (the keyboard leaves some cells out): nil when none has. A strip is trimmed to them.
+ local function keyedSpan(row,a,b)
+  if not geo.RowSkip[row]then return a,b end
+  local skip=geo.Skip
+  while a<=b and skip[row*64+a]do a+=1 end
+  while b>=a and skip[row*64+b]do b-=1 end
+  if a>b then return nil end
+  return a,b
+ end
+ -- A strip with no key to carry letters: parked in place (its row keeps it so it is given back with the row), gui off.
+ local function emptyStrip(st)
+  st.Empty=true
+  if st.On then st.On=false;st.Gui.Enabled=false end
+  st.Part.CFrame=CF(CX,F-200,0)
+  for i,l in ipairs(st.Labels)do if st.Vis[i]~=false then st.Vis[i]=false;l.Visible=false end end
+ end
  local function bindStrips(row)
   local za,zb=geo.RowZ(row);local d=zb-za;local z=(za+zb)/2;local stage=rowStage[row]
   local y=stripCentreY()
@@ -370,9 +436,12 @@ local function start()
    local st
    local n=stripFreeN[k]
    if n>0 then st=stripFree[k][n];stripFree[k][n]=nil;stripFreeN[k]=n-1 else st=newStrip(k)end
-   st.Free=false;st.Parked=false
+   st.Free=false;st.Parked=false;st.Empty=false
    local c0=(k-1)*SPAN+1;local c1=min(COLS,k*SPAN)
-   local w=(c1-c0+1)*P;local xMin=LEFT-c1*P
+   local a0,a1=keyedSpan(row,c0,c1)
+   if not a0 then emptyStrip(st)
+   else
+   local w=(a1-a0+1)*P;local xMin=LEFT-a1*P
    if abs(st.W-w)>1e-6 or abs(st.D-d)>1e-6 then st.W=w;st.D=d;st.Part.Size=V3(w,STRIP_H,d)end
    st.X,st.Z=xMin+w/2,z
    st.Part.CFrame=CF(st.X,y,z)
@@ -381,7 +450,7 @@ local function start()
    local px=d/2*PPS
    for i=1,SPAN do
     local l=st.Labels[i];local c=c0+i-1
-    if c<=c1 then
+    if c>=a0 and c<=a1 then
      local _,py=K.TopPoint(st.X,z,w,d,PPS,LEFT-(c-.5)*P,z)
      if st.PX[i]~=px or st.PY[i]~=py then st.PX[i]=px;st.PY[i]=py;l.Position=UDim2.fromOffset(px,py)end
      local text=K.Legend(row,c);if st.Tx[i]~=text then st.Tx[i]=text;l.Text=text end
@@ -390,6 +459,7 @@ local function start()
     elseif st.Vis[i]~=false then st.Vis[i]=false;l.Visible=false end
    end
    stripAlpha(st,K.LegendAlpha(tier,row-focusRow,facing)) -- (st.Alpha is kept across rows: only a changed fade is written)
+   end
    list[k]=st
   end
   stripsOfRow[row]=list;listAdd(stripRows,stripRowPos,row)
@@ -401,6 +471,54 @@ local function start()
    parkN+=1;parkList[parkN]=st
   end
   stripsOfRow[row]=nil;listRemove(stripRows,stripRowPos,row)
+ end
+ -- Far letters (R152): a row beyond the near letters has ONE strip across the whole floor (one SurfaceGui at FarPixelsPerStud, COLS labels 4.6 studs
+ -- tall) instead of two 16 px / stud ones: the same frame (K.TopPoint, 270 degrees, the same ink / legend / hide rules), a fifth of the pixels a stud
+ -- and a quarter of the canvas of one near strip. Pooled and parked like the near ones (they share parkList).
+ do
+ local FPPS=LG.FarPixelsPerStud;local FTEXT=min(100,floor(LG.TextHeight*FPPS+.5))
+ local function newFar()
+  local p=Instance.new('Part');p.Name='LegendFar';flat(p);p.Transparency=1;p.Size=V3(1,STRIP_H,1);p.CFrame=CF(CX,F-200,0);p.Parent=legendFolder
+  local gui=Instance.new('SurfaceGui');gui.Name='FarLetters';gui.Face=Enum.NormalId.Top;gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud
+  gui.PixelsPerStud=FPPS;gui.LightInfluence=0;gui.AlwaysOnTop=false;pcall(function()gui.MaxDistance=LG.FarMaxDistance end);gui.Parent=p
+  local labels,vis={},{}
+  for i=1,COLS do local l=letterLabel(gui);l.TextSize=FTEXT;l.Size=UDim2.fromOffset(KW*FPPS,KW*FPPS);labels[i]=l;vis[i]=true end
+  return {Part=p,Gui=gui,Labels=labels,W=0,D=0,X=0,Z=0,Alpha=-1,On=true,Free=false,Parked=false,PX={},PY={},Tx={},Ink={},Vis=vis}
+ end
+ function Far.Bind(row)
+  local za,zb=geo.RowZ(row);local d=zb-za;local z=(za+zb)/2;local stage=rowStage[row]
+  local st
+  if Far.N>0 then st=Far.Free[Far.N];Far.Free[Far.N]=nil;Far.N-=1 else st=newFar()end
+  st.Free=false;st.Parked=false;st.Empty=false
+  local a0,a1=keyedSpan(row,1,COLS)
+  if not a0 then emptyStrip(st)
+  else
+  local w=(a1-a0+1)*P
+  if abs(st.W-w)>1e-6 or abs(st.D-d)>1e-6 then st.W=w;st.D=d;st.Part.Size=V3(w,STRIP_H,d)end
+  st.X,st.Z=LEFT-(a0-1)*P-w/2,z
+  st.Part.CFrame=CF(st.X,stripCentreY(),z)
+  if not st.On then st.On=true;st.Gui.Enabled=true end
+  local px=d/2*FPPS
+  for c=1,COLS do
+   local l=st.Labels[c]
+   if c>=a0 and c<=a1 then
+    local _,py=K.TopPoint(st.X,z,w,d,FPPS,LEFT-(c-.5)*P,z)
+    if st.PX[c]~=px or st.PY[c]~=py then st.PX[c]=px;st.PY[c]=py;l.Position=UDim2.fromOffset(px,py)end
+    local text=K.Legend(row,c);if st.Tx[c]~=text then st.Tx[c]=text;l.Text=text end
+    local ink=inkColor(stage,row,c);if st.Ink[c]~=ink then st.Ink[c]=ink;l.TextColor3=ink end
+    local vis=labelShown(row,c);if st.Vis[c]~=vis then st.Vis[c]=vis;l.Visible=vis end
+   elseif st.Vis[c]~=false then st.Vis[c]=false;l.Visible=false end
+  end
+  stripAlpha(st,K.LegendAlpha(tier,row-focusRow,facing))
+  end
+  Far.Of[row]=st;listAdd(Far.Rows,Far.Pos,row)
+ end
+ function Far.Release(row)
+  local st=Far.Of[row];if not st then return end
+  st.Free=true;Far.N+=1;Far.Free[Far.N]=st
+  parkN+=1;parkList[parkN]=st
+  Far.Of[row]=nil;listRemove(Far.Rows,Far.Pos,row)
+ end
  end
  -- per-key letters (a key that is down keeps its letter while it moves)
  local klFree,klFreeN,klMade={},0,0
@@ -423,8 +541,9 @@ local function start()
   topExtra=extra
   local y=stripCentreY()
   for _,r in ipairs(stripRows)do
-   for _,st in ipairs(stripsOfRow[r])do st.Part.CFrame=CF(st.X,y,st.Z)end
+   for _,st in ipairs(stripsOfRow[r])do if not st.Empty then st.Part.CFrame=CF(st.X,y,st.Z)end end
   end
+  for _,r in ipairs(Far.Rows)do local st=Far.Of[r];if not st.Empty then st.Part.CFrame=CF(st.X,y,st.Z)end end
   for _,e in ipairs(klAll)do keyLegendOffset(e.Gui)end
  end
  local function dropKeyLegend(slot)
@@ -467,18 +586,20 @@ local function start()
  end
  local function bindRow(row)
   local stage=rowStage[row];local za,zb=geo.RowZ(row);local z=(za+zb)/2
-  for col=1,COLS do
+  local skip=geo.Skip;local n=0
+  for col=1,COLS do if not skip[row*64+col]then
+   n+=1
    local s=takeSlot();local key=row*64+col
    slotOf[key]=s;kKey[s]=key;kRow[s]=row;kCol[s]=col
    kX[s]=LEFT-(col-.5)*P;kZ[s]=z;kDepth[s]=0;kFresh[s]=frameNo
    local part=kPart[s];part.Color=K.CellColor(stage,row,col,1)
    if not shown[s]then shown[s]=true;part.Transparency=0 end -- a slot recycled in the same pass is still visible: no write
    queueMove(s)
-  end
-  rowBound[row]=true;listAdd(boundRows,boundRowPos,row);boundKeys+=COLS
+  end end
+  rowBound[row]=true;rowKeys[row]=n;listAdd(boundRows,boundRowPos,row);boundKeys+=n
  end
  local function releaseRow(row)
-  releaseStrips(row)
+  releaseStrips(row);Far.Release(row)
   for col=1,COLS do
    local key=row*64+col;local s=slotOf[key]
    if s then
@@ -488,7 +609,7 @@ local function start()
     freeN+=1;freeSlots[freeN]=s
    end
   end
-  rowBound[row]=nil;listRemove(boundRows,boundRowPos,row);boundKeys-=COLS
+  rowBound[row]=nil;listRemove(boundRows,boundRowPos,row);boundKeys-=rowKeys[row]or COLS;rowKeys[row]=nil
  end
  -- swap a plain block for a keycap in place (the template replicated after the keys were dressed)
  local function swapSlot(s)
@@ -539,9 +660,9 @@ local function start()
  function Fill.Update(wa,wb)
   local n=0;local r=wa
   while r<=wb do
-   if not rowBound[r]and not barOfRow[r]then
+   if not rowBound[r]and not barOfRow[r]and not geo.RowSkip[r]then
     local r0,seg=r,geo.RowSeg[r]
-    while r<wb and not rowBound[r+1]and not barOfRow[r+1]and geo.RowSeg[r+1]==seg do r+=1 end
+    while r<wb and not rowBound[r+1]and not barOfRow[r+1]and not geo.RowSkip[r+1]and geo.RowSeg[r+1]==seg do r+=1 end
     if n<C.FillerSlabs then n+=1;local z0=geo.RowZ(r0);local _,z1=geo.RowZ(r);placeFiller(n,z0,z1,rowStage[r0])end
    end
    r+=1
@@ -610,18 +731,33 @@ local function start()
   return pending or released>=relBudget
  end
  end
+ -- The letters' rows (R152): near rows (K.LegendWindow) get the two full-size strips, the rest of K.FarLegendWindow one far strip; nearest first, the near
+ -- ones RowsPerFrame rows a frame, the far ones the tier's FarRows. A near strip is kept one row past its window (no flicker); a far strip of a row that
+ -- has become near is only given back when its near strips are bound.
  local function legendWindowPass()
-  local la,lb=K.LegendWindow(geo,tier,focusRow,facing)
+  local na,nb=K.LegendWindow(geo,tier,focusRow,facing)
+  local fa,fb=K.FarLegendWindow(geo,tier,focusRow,facing)
   for i=#stripRows,1,-1 do
    local r=stripRows[i]
-   if r<la-1 or r>lb+1 or not rowBound[r]then releaseStrips(r)end
+   if r<na-1 or r>nb+1 or not rowBound[r]then releaseStrips(r)end
   end
-  local n,pending=0,false
-  for d=0,max(focusRow-la,lb-focusRow)do
+  for i=#Far.Rows,1,-1 do
+   local r=Far.Rows[i]
+   if r<fa-1 or r>fb+1 or not rowBound[r]then Far.Release(r)end
+  end
+  local n,fn,pending=0,0,false
+  local farN=tierCfg.FarRows
+  for d=0,max(focusRow-fa,fb-focusRow)do
    for pass=1,(d==0 and 1 or 2)do
     local r=pass==1 and focusRow+d or focusRow-d
-    if r>=la and r<=lb and rowBound[r]and not stripsOfRow[r]then
-     if n<LG.RowsPerFrame then bindStrips(r);n+=1 else pending=true end
+    if r>=fa and r<=fb and rowBound[r]and rowKeys[r]>0 then -- (a row whose every cell is left out has no letters to carry)
+     if r>=na and r<=nb then
+      if not stripsOfRow[r]then
+       if n<LG.RowsPerFrame then Far.Release(r);bindStrips(r);n+=1 else pending=true end
+      end
+     elseif not stripsOfRow[r]and not Far.Of[r]then
+      if fn<farN then Far.Bind(r);fn+=1 else pending=true end
+     end
     end
    end
   end
@@ -629,6 +765,7 @@ local function start()
    local a=K.LegendAlpha(tier,r-focusRow,facing)
    for _,st in ipairs(stripsOfRow[r])do stripAlpha(st,a)end
   end
+  for _,r in ipairs(Far.Rows)do stripAlpha(Far.Of[r],K.LegendAlpha(tier,r-focusRow,facing))end
   -- park the strips no row took again: moved away, and neither drawn nor rendered (their gui is off until they are bound again; a parked
   -- strip sat within MaxDistance of the base). A strip that goes straight to another row is not touched.
   for i=1,parkN do
@@ -755,22 +892,31 @@ local function start()
  end
 
  -- Clicks -----------------------------------------------------------------------------------------------------------
+ -- R152: a press plays K.PressSoundId(its biome): the click, or the biome's own sound (Forest / Jungle). One pool of ClickVoices voices per sound id.
  local click
  do
- local voices={};local voiceNext=1
+ local pools={}
  local RANGE2=C.ClickRange*C.ClickRange
- for i=1,C.ClickVoices do
-  local anchor=Instance.new('Part');flat(anchor);anchor.Name='KeyClick';anchor.Size=V3(.2,.2,.2);anchor.Transparency=1;anchor.Parent=soundFolder
-  local sound=Instance.new('Sound');sound.Name='KeyClickSound';sound.SoundId='rbxassetid://'..tostring(C.ClickSoundId)
-  sound.Volume=C.ClickVolume;sound.RollOffMode=Enum.RollOffMode.InverseTapered;sound.RollOffMinDistance=C.ClickRollOffMin;sound.RollOffMaxDistance=C.ClickRollOffMax
-  sound.Parent=anchor
-  if Mixer and type(Mixer.Route)=='function'then pcall(Mixer.Route,sound,'Effects')end
-  voices[i]={Part=anchor,Sound=sound}
+ local DEFAULT=K.PressSoundId(nil)
+ local function poolFor(id)
+  local pool=pools[id];if pool then return pool end
+  local voices={}
+  for i=1,C.ClickVoices do
+   local anchor=Instance.new('Part');flat(anchor);anchor.Name='KeyClick';anchor.Size=V3(.2,.2,.2);anchor.Transparency=1;anchor.Parent=soundFolder
+   local sound=Instance.new('Sound');sound.Name='KeyClickSound';sound.SoundId=id
+   sound.Volume=C.ClickVolume;sound.RollOffMode=Enum.RollOffMode.InverseTapered;sound.RollOffMinDistance=C.ClickRollOffMin;sound.RollOffMaxDistance=C.ClickRollOffMax
+   sound.Parent=anchor
+   if Mixer and type(Mixer.Route)=='function'then pcall(Mixer.Route,sound,'Effects')end
+   voices[i]={Part=anchor,Sound=sound}
+  end
+  pool={Voices=voices,Next=1};pools[id]=pool
+  task.spawn(function()pcall(function()Content:PreloadAsync({voices[1].Sound})end)end)
+  return pool
  end
- task.spawn(function()pcall(function()Content:PreloadAsync({voices[1].Sound})end)end)
+ poolFor(DEFAULT);for stage=1,K.StageCount do poolFor(K.PressSoundId(stage))end
  local ownGate=K.NewCadence(C.ClickGap)
  local gates=setmetatable({},{__mode='k'})          -- presser (a Player or a keeper Model) -> its own cadence
- function click(kind,who,x,z)
+ function click(kind,who,x,z,stage)
   if Mixer and type(Mixer.Get)=='function'and Mixer.Get('Effects')==0 then return end
   if kind~=1 then local dx,dz=x-focusX,z-focusZ;if dx*dx+dz*dz>RANGE2 then return end end
   local gate=ownGate
@@ -780,11 +926,12 @@ local function start()
   end
   if not K.Allow(gate,now)then return end
   gate.N=(gate.N or 0)+1
-  -- strict rotation: the voice reused is always the one started longest ago (all voices play the same recording)
-  local v=voices[voiceNext];voiceNext=voiceNext%#voices+1
+  -- strict rotation: the voice reused is always the one started longest ago (all voices of a pool play the same recording)
+  local pool=pools[K.PressSoundId(stage)]or pools[DEFAULT]
+  local v=pool.Voices[pool.Next];pool.Next=pool.Next%#pool.Voices+1
   if v.Sound.Playing then v.Sound:Stop()end
   v.Part.CFrame=CF(x,F+1,z)
-  v.Sound.PlaybackSpeed=K.ClickPitch(kind,gate.N);v.Sound.Volume=C.ClickVolume
+  v.Sound.PlaybackSpeed=K.ClickPitch(kind,gate.N);v.Sound.Volume=K.PressVolume(stage)*K.ClickGain(gate.N)
   -- R150: the click starts at the shared SoundTiming lead-in for its file (0 until measured), like every other cue.
   if Timing then Timing.Play(v.Sound,nil,.25)else v.Sound.TimePosition=0;v.Sound:Play()end
  end
@@ -807,7 +954,7 @@ local function start()
    kDepth[idx]=1;queueMove(idx)
   else
    startAnim(idx,1) -- Reduced Motion: animate() finishes it in the same frame
-   if idx>=BARBASE then click(kind,who,px,pz)else click(kind,who,kX[idx],kZ[idx])end
+   if idx>=BARBASE then local bar=bars[idx-BARBASE];click(kind,who,px,pz,bar and bar.Stage)else click(kind,who,kX[idx],kZ[idx],rowStage[kRow[idx]])end
   end
  end
  local function releaseKey(idx)
@@ -938,6 +1085,7 @@ local function start()
  local LIFT=V3(0,C.HoleLift,0)
  local function liftPart(d)
   if not d:IsA('BasePart')then return end
+  if geo.SkipCount>0 then local p=d.Position;if geo.Skip[geo.RowOfZ(p.Z)*64+geo.ColOfX(p.X)]then return end end -- no key there: the part stays on the floor
   local y=d.Position.Y;local base=liftBase[d]
   if not base then
    liftBase[d]=y;liftSet[d]=y+C.HoleLift;d.Position=d.Position+LIFT
@@ -973,6 +1121,7 @@ local function start()
   markRects(holeRects,holeCell,nil);markRects(platRects,platCell,platList)
   for i,bar in ipairs(bars)do barHole[i]=barTouched(holeRects,bar);barPlat[i]=not barHole[i]and barTouched(platRects,bar)end
   for _,r in ipairs(stripRows)do for c=1,COLS do setLabel(r,c,labelShown(r,c))end end
+  for _,r in ipairs(Far.Rows)do for c=1,COLS do setLabel(r,c,labelShown(r,c))end end
  end
  function scanClearances()
   local sig=0;local nh,np=0,0
@@ -1021,6 +1170,18 @@ local function start()
  end
  end
 
+ -- A changed KeyboardSkip attribute (it arrives after the biome ones when a client joins early, or a server scans again): every bound row is dressed again
+ local skipStr=map:GetAttribute('KeyboardSkip');local skipDirty=false
+ table.insert(conns,map.AttributeChanged:Connect(function(name)if name=='KeyboardSkip'then skipDirty=true end end))
+ local function refreshSkip()
+  skipDirty=false
+  local str=map:GetAttribute('KeyboardSkip');if str==skipStr then return end
+  skipStr=str
+  geo.Skip,geo.RowSkip,geo.SkipCount=K.DecodeSkip(str,COLS,geo.Rows,CX)
+  for i=#boundRows,1,-1 do releaseRow(boundRows[i])end
+  windowDirty=true;patchSkips()
+ end
+
  -- Frame ---------------------------------------------------------------------------------------------------------
  local T={Tier=0,Clear=0,Keeper=0,Sample=0,Ground=0}   -- timers
  local function updateFocus()
@@ -1053,6 +1214,7 @@ local function start()
   now=clock();frameNo+=1;reduced=Gui.ReducedMotionEnabled==true
   updateFocus()
   T.Tier+=dt;T.Clear+=dt;T.Keeper+=dt;T.Sample+=dt;T.Ground+=dt
+  if skipDirty then refreshSkip()end
   if tier==0 or T.Tier>=.5 then
    T.Tier=0
    local want=Fx and Fx.Get()or 3

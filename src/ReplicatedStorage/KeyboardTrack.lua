@@ -12,6 +12,15 @@
 --    x offsets up to 1374: only the one label inside the 131 px survived (column 11 / 22 of each row: the owner saw "S", "V" ... in a single
 --    line of keys), every label was turned a quarter too far, and the spacebar's name ran ALONG the track. K.TopCanvas / K.TopPoint /
 --    Legend.Rotation below are that frame; the letters turn by 270 degrees to read upright (left -> right) for a runner heading +Z.
+-- R152 (owner playtest of R151: "keys behind also not rendering and its not loud enough"; his screenshot looked down the track: the far keys were bare
+-- caps). Why: the keys of a tier reach 998 / 605 / 368 studs ahead but only 115 / 90 / 65 behind (a camera zoomed out to Roblox's 128 studs sees
+-- below and behind its own feet), and the LETTERS stopped at 147 / 98 / 57 studs ahead and 16 / 25 / 16 behind (LegendAhead / LegendBehind rows
+-- of full-size strips: 2 SurfaceGuis, 22 labels and 0.75 MB of canvas per row); the guis' own MaxDistance (420) would have cut them anyway. Now:
+--  * Back (the keys behind the way the camera faces) is 327 / 229 / 180 studs: past the camera's reach on every tier. Near (14 / 11 / 8 rows,
+--    dressed in the frame it is wanted) is what Back used to be; the near letters (LegendBehind / LegendAhead) are unchanged.
+--  * FAR LETTERS: every row beyond the near letters, out to FarAhead / FarBehind rows (524 / 360 / 245 studs ahead, 229 / 180 / 147 behind),
+--    gets ONE strip (a single SurfaceGui, FarPixelsPerStud 4 = 95 KB of canvas, the whole row's 22 labels) instead of two 16-px strips; the
+--    last LegendFade rows fade out. Click: louder (ClickVolume .8 -> 1.8 = +7 dB, ~1.6x as loud) with a wider roll-off (16 .. 90 -> 28 .. 160).
 -- Pure config + grid maths for the client script KeyboardTrack.client.lua: no instances, no Roblox services, no randomness (every colour,
 -- letter and cell is a function of the grid position, so every client builds the same keyboard).
 --
@@ -56,7 +65,15 @@ K.Config={
  ClickSoundIds={113108830240353,88838553648526,96591611478915},ClickSoundId=113108830240353,
  ClickPitches={.98,1.01,.99,1.02,1.0},                    -- each presser cycles through these (0.98 .. 1.02)
  KeeperPitch=.94,                                         -- keepers: the same click, a touch deeper
- ClickVolume=.8,ClickRollOffMin=16,ClickRollOffMax=90,ClickRange=90,ClickVoices=12,
+ -- R152 ("not loud enough"): volume .8 -> 1.8 (x2.25 = +7 dB, ~1.6x as loud), 3D roll-off 16 .. 90 -> 28 .. 160 studs (the camera trails the runner by
+ -- 12 .. 128 studs, so his own click used to be past the full-volume radius; presses a little ahead are heard); a slight per-click gain keeps
+ -- 12 overlapping voices from sounding like one flat block (never above ClickVolume: the peak is unchanged).
+ ClickVolume=1.8,ClickRollOffMin=28,ClickRollOffMax=160,ClickRange=160,ClickVoices=12,ClickGains={1,.94,.97,.91},
+ -- R152 (owner): the Forest and Jungle keys play their own sound instead of the click; every other biome keeps the click. PressSound = the asset per biome
+ -- NAME (K.BiomeNames; a biome with no entry plays the click), PressSoundVolume = that sound's own volume per biome (starts at the click's: nobody could hear the
+ -- asset when this was written, so tune it by ear HERE). Same 3D roll-off / range / cadence / gain cycle as the click; one pool of ClickVoices voices per sound.
+ PressSound={Forest='rbxassetid://73942179280083',Jungle='rbxassetid://73942179280083'},
+ PressSoundVolume={Forest=1.8,Jungle=1.8},
  ClickGap=1/12,                                           -- per presser: at most one click every 1/12 s, evenly spaced while sprinting
  TierHoldSeconds=3,                                       -- a ClientFxBudget tier change applies after it has held this long
  TeleportBurst=4,                                         -- the far rows of a window whose rows around the runner were missing (a teleport) are
@@ -79,7 +96,8 @@ K.Config={
  -- turn on the Top-face canvas (270: upright, reading left -> right for a runner heading +Z), KeysPerStrip = letters per SurfaceGui (a half row),
  -- MaxDistance = the guis' own render limit, RowsPerFrame = rows of letters dressed per frame (4, so a camera turn spreads the letters over several
  -- frames). The spacebars' biome names are big: they get their own render limit.
- Legend={PixelsPerStud=16,TextHeight=4.6,Margin=.04,MaxExtra=1.5,Rotation=270,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4},
+ Legend={PixelsPerStud=16,TextHeight=4.6,Margin=.04,MaxExtra=1.5,Rotation=270,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4,
+  FarPixelsPerStud=4,FarMaxDistance=800},                  -- R152: far letters, one strip (22 labels, 18 px text) per row at 4 px / stud, rendered out to 800 studs
  SpacebarPixelsPerStud=10,SpacebarMaxDistance=800,
  GroundScanSeconds=2,
 }
@@ -122,18 +140,20 @@ K.Ease={
  BackOut=function(t)local c1=1.70158;local c3=c1+1;local u=t-1;return 1+c3*u*u*u+c1*u*u end,
 }
 
--- Per ClientFxBudget tier (3 best .. 1 lowest; phones start on 2). Rows of keys around the runner (all columns, all the same keycap):
--- Back / Ahead = key rows behind / ahead of the runner's row along the camera's way (R151: Back is also the NEAR zone, dressed at once and
--- never missing, 114 / 90 / 65 studs each side on tier 3 / 2 / 1; a camera looking across the track gets Side = (Back + Ahead) / 2 rows each
--- way, the same number of keys), Hyst = extra rows kept before a row is recycled (no flicker at the window
--- edge), Bind = keys dressed per frame (x min(2, dt * 60)). Letters: LegendAhead / LegendBehind rows carry their letters, the farthest
--- LegendFade rows fade out; LegendRadius = the letters under and around the runner's feet are always shown (other effects keep clear of
--- that radius, e.g. the Snow-biome dust). PressRange = other runners / keepers farther than this (along the track) press nothing.
--- KeyLegends = pooled letters for keys that are down (a key's letter rides with it while it moves).
+-- Per ClientFxBudget tier (3 best .. 1 lowest; phones start on 2, a slow device drops to 1). Rows of keys around the runner (all columns, all the
+-- same keycap): Back / Ahead = key rows behind / ahead of the runner's row along the camera's way (R152: Back covers a camera zoomed out to
+-- 128 studs: 327 / 229 / 180 studs, was 115 / 90 / 65; a camera looking across the track gets Side = (Back + Ahead) / 2 rows each way, the same
+-- number of keys), Near = the rows each side of the runner that are dressed in the very frame they are wanted whatever the budget (R151: what
+-- Back was), Hyst = extra rows kept before a row is recycled (no flicker at the window edge), Bind = keys dressed per frame (x min(2, dt * 60)).
+-- Letters: LegendBehind / LegendAhead rows carry full-size letters (the near strips, two 16 px / stud SurfaceGuis a row, unchanged); beyond them
+-- FarBehind / FarAhead rows (from the runner, the way the camera faces; across the track (FarSide) each way) carry the far letters, one 4 px / stud
+-- strip a row, FarRows rows dressed per frame, the last LegendFade rows fading out; LegendRadius = the letters under and around the runner's feet
+-- are always shown (other effects keep clear of that radius, e.g. the Snow-biome dust). PressRange = other runners / keepers farther than this
+-- (along the track) press nothing. KeyLegends = pooled letters for keys that are down (a key's letter rides with it while it moves).
 K.Tiers={
- [3]={Back=14,Ahead=122,Hyst=4,Bind=264,LegendBehind=2,LegendAhead=18,LegendFade=4,LegendRadius=24,PressRange=260,KeyLegends=48},
- [2]={Back=11,Ahead=74,Hyst=2,Bind=198,LegendBehind=2,LegendAhead=12,LegendFade=3,LegendRadius=20,PressRange=200,KeyLegends=32},
- [1]={Back=8,Ahead=45,Hyst=1,Bind=132,LegendBehind=1,LegendAhead=7,LegendFade=2,LegendRadius=16,PressRange=150,KeyLegends=16},
+ [3]={Near=14,Back=40,Ahead=122,Hyst=4,Bind=264,LegendBehind=2,LegendAhead=18,FarBehind=28,FarAhead=64,FarRows=4,LegendFade=4,LegendRadius=24,PressRange=260,KeyLegends=48},
+ [2]={Near=11,Back=28,Ahead=74,Hyst=2,Bind=198,LegendBehind=2,LegendAhead=12,FarBehind=22,FarAhead=44,FarRows=3,LegendFade=3,LegendRadius=20,PressRange=200,KeyLegends=32},
+ [1]={Near=8,Back=22,Ahead=45,Hyst=1,Bind=132,LegendBehind=1,LegendAhead=7,FarBehind=18,FarAhead=30,FarRows=2,LegendFade=2,LegendRadius=16,PressRange=150,KeyLegends=16},
 }
 function K.Tier(tier)return K.Tiers[tier]or K.Tiers[3]end
 
@@ -249,10 +269,54 @@ function K.BiomeAt(z,attrs)
  return 0,nil
 end
 
+-- R152 (owner: "for some areas on the track like this make sure that there is no keyboard tiles there": a desert oasis with keys inside and under the water): the
+-- cells the keyboard leaves out are DATA, written once by the server (KeyboardSkip152.Apply scans the finished map for water / lava / ice pools, pits and props
+-- standing on the floor) into the map attribute KeyboardSkip, so every client, key, letter and press agrees: "1|<cols>|<rows>|<centerX>|<row>:<a>-<b>,<c>;<row>:..."
+-- (column runs per row). A string for another grid (other columns / rows / centre) is ignored: the keys are then everywhere, as before R152.
+local skipMemo={Str=nil,Cols=0,NRows=0,X=0,Set=nil,Rows=nil,N=0}
+function K.EncodeSkip(set,cols,rows,centerX)
+ local byRow,rowList={},{}
+ for key in pairs(set)do
+  local r,c=key//64,key%64
+  local l=byRow[r];if not l then l={};byRow[r]=l;rowList[#rowList+1]=r end
+  l[#l+1]=c
+ end
+ table.sort(rowList)
+ local out={}
+ for _,r in ipairs(rowList)do
+  local l=byRow[r];table.sort(l);local runs={};local a=l[1];local b=a
+  for i=2,#l do if l[i]==b+1 then b=l[i]else runs[#runs+1]=a==b and tostring(a)or(a..'-'..b);a=l[i];b=a end end
+  runs[#runs+1]=a==b and tostring(a)or(a..'-'..b)
+  out[#out+1]=r..':'..table.concat(runs,',')
+ end
+ return string.format('1|%d|%d|%.3f|',cols,rows,centerX)..table.concat(out,';')
+end
+function K.DecodeSkip(str,cols,rows,centerX)
+ if type(str)~='string'then return {},{},0 end
+ if skipMemo.Str==str and skipMemo.Cols==cols and skipMemo.NRows==rows and skipMemo.X==centerX then return skipMemo.Set,skipMemo.Rows,skipMemo.N end
+ local set,rc,n={},{},0
+ local v,c0,r0,x0,body=str:match('^(%d+)|(%d+)|(%d+)|(-?[%d.]+)|(.*)$')
+ if v=='1'and tonumber(c0)==cols and tonumber(r0)==rows and math.abs((tonumber(x0)or 1e9)-centerX)<.01 then
+  for entry in body:gmatch('[^;]+')do
+   local r,runs=entry:match('^(%d+):(.+)$');r=tonumber(r)
+   if r and r>=1 and r<=rows then
+    for run in runs:gmatch('[^,]+')do
+     local a,b=run:match('^(%d+)-(%d+)$');if not a then a=run:match('^(%d+)$');b=a end
+     a,b=tonumber(a),tonumber(b)
+     if a and b then for col=max(1,a),min(cols,b)do if not set[r*64+col]then set[r*64+col]=true;rc[r]=(rc[r]or 0)+1;n+=1 end end end
+    end
+   end
+  end
+ end
+ skipMemo.Str,skipMemo.Cols,skipMemo.NRows,skipMemo.X,skipMemo.Set,skipMemo.Rows,skipMemo.N=str,cols,rows,centerX,set,rc,n
+ return set,rc,n
+end
+
 -- Geometry(attrs, centerX, fieldWidth): the whole grid for this map. Fields: Pitch (= fieldWidth / Cols exactly, so the keys run edge to
 -- edge), Cols, HalfWidth, CenterX, Z0 (start of the first biome), KeyEndZ (BiomeTrackEndZ - 120), Rows (all rows, spacebars included),
 -- Segs (one per biome, sorted by start: {Id, Name, StartZ, EndZ, Rows, FirstRow, LastRow, RowPitch, SpaceLast, KeyFirst}), RowSeg[row],
--- RowStage[row], Bars (one spacebar per biome: {Seg, Stage, Name, Row0, Row1, Z0, Z1}), BarOfRow[row]. Helpers (call with a dot):
+-- RowStage[row], Bars (one spacebar per biome: {Seg, Stage, Name, Row0, Row1, Z0, Z1}), BarOfRow[row], Skip / RowSkip / SkipCount (R152: the cells left out,
+-- see K.EncodeSkip; Skipped(row, col)). Helpers (call with a dot):
 -- ColCenter(col), ColOfX(x), RowZ(row) -> zmin,zmax, RowOfZ(z), CellCenter(row,col) -> x,z, CellRange(xmin,xmax,zmin,zmax) -> c1,c2,r1,r2
 -- (no allocation; empty when c1>c2 or r1>r2), CellsInRect(...) -> list of {row=,col=}, BiomeAt(z).
 function K.Geometry(attrs,centerX,fieldWidth)
@@ -290,6 +354,9 @@ function K.Geometry(attrs,centerX,fieldWidth)
   end
  end
  g.Rows=rows
+ -- R152: cells the keyboard leaves out (water, lava, pits, props: see KeyboardSkip152). Skip = set of row * 64 + col, RowSkip[row] = how many cells of that row, SkipCount.
+ g.Skip,g.RowSkip,g.SkipCount=K.DecodeSkip(attrs.KeyboardSkip,cols,rows,centerX)
+ function g.Skipped(row,col)return g.Skip[row*64+col]==true end
  local segs=g.Segs
  local left=centerX+half   -- column 1's outer edge (+X side)
  function g.ColCenter(col)return left-(col-.5)*P end
@@ -333,7 +400,7 @@ end
 -- across the track or straight down: Side rows each way. Returns ra, rb (rows wanted) and ka, kb (rows kept: a bound row outside ka .. kb is
 -- recycled), all clamped to 1 .. Rows.
 function K.Side(tier)local t=K.Tier(tier);return(t.Back+t.Ahead)//2 end
-function K.Near(tier)return K.Tier(tier).Back end
+function K.Near(tier)local t=K.Tier(tier);return t.Near or t.Back end
 function K.KeyWindow(geo,tier,focusRow,facing)
  local t=K.Tier(tier);local n=geo.Rows
  local f=max(1,min(n,focusRow))
@@ -367,13 +434,27 @@ function K.Facing(lookZ,current,lookX)
  if math.abs(h)<=C.FacingAcross then return 0 end
  return current or 1
 end
+-- R152: the far letters' window (the rows that carry letters at all: the near letters' window lies inside it) and the fade of the far end.
+function K.FarSide(tier)local t=K.Tier(tier);return max(t.FarBehind,ceil((t.FarBehind+t.FarAhead)/2))end
+function K.FarLegendWindow(geo,tier,focusRow,facing)
+ local t=K.Tier(tier);local n=geo.Rows;local f=max(1,min(n,focusRow))
+ local lo,hi=t.FarBehind,t.FarAhead
+ if facing==-1 then lo,hi=hi,lo elseif facing==0 then lo=K.FarSide(tier);hi=lo end
+ return max(1,f-lo),min(n,f+hi)
+end
+-- Letters' transparency d rows from the runner (signed, in the window's way; 0 = solid): solid out to LegendFade rows short of the far end, fading
+-- to gone over the last ones. The near letters (inside LegendAhead / LegendBehind) are always solid: the far letters carry on from them.
 function K.LegendAlpha(tier,d,facing)
  local t=K.Tier(tier)
- local ahead=t.LegendAhead
- if facing==0 then d=math.abs(d);ahead=K.LegendSide(tier)elseif facing then d*=facing end
- local start=ahead-t.LegendFade
+ local reach
+ if facing==0 then d=math.abs(d);reach=K.FarSide(tier)
+ else
+  if facing then d*=facing end
+  if d>=0 then reach=t.FarAhead else d=-d;reach=t.FarBehind end
+ end
+ local start=reach-t.LegendFade
  if d<=start then return 0 end
- if d>ahead then return 1 end
+ if d>reach then return 1 end
  return(d-start)/(t.LegendFade+1)
 end
 
@@ -411,6 +492,19 @@ function K.Allow(gate,now)
  local slot=gate.Next+gate.Gap
  gate.Next=(now-gate.Next<gate.Gap)and slot or now+gate.Gap
  return true
+end
+-- The gain of a presser's n-th click (ClickGains, a short cycle that does not line up with ClickPitches): at most 1, so ClickVolume stays the peak.
+function K.ClickGain(n)local list=C.ClickGains;return list[(n-1)%#list+1]end
+-- R152: the sound a press in stage `stage` plays (an 'rbxassetid://' string: the biome's PressSound, else the click) and its peak volume.
+function K.PressSoundId(stage)
+ local name=stage and K.BiomeNames[stage];local id=name and C.PressSound[name]
+ if type(id)=='number'then id='rbxassetid://'..id end
+ return type(id)=='string'and id or'rbxassetid://'..tostring(C.ClickSoundId)
+end
+function K.PressVolume(stage)
+ local name=stage and K.BiomeNames[stage]
+ if name and C.PressSound[name]then return C.PressSoundVolume[name]or C.ClickVolume end
+ return C.ClickVolume
 end
 -- The pitch of a presser's n-th click: players cycle through ClickPitches, keepers use KeeperPitch.
 function K.ClickPitch(kind,n)

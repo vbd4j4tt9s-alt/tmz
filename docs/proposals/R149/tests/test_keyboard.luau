@@ -64,7 +64,29 @@ check(near(C.PressLead,.06)and C.PressLeadMax>=3 and C.PressLeadMax<=6,'the runn
 check(C.ClickSoundId==113108830240353 and C.ClickSoundIds[1]==C.ClickSoundId and near(C.ClickGap,1/12)and C.KeeperPitch>=.9 and C.KeeperPitch<1 and C.ClickVoices>=10,'clicks: one recording, at most one click per 1/12 s per presser, keepers a touch deeper (0.94), a pool of '..C.ClickVoices..' voices')
 local pitchOk=#C.ClickPitches>=3;for _,p in ipairs(C.ClickPitches)do if p<.98 or p>1.02 then pitchOk=false end end
 check(pitchOk,'click pitch varies only a little: 0.98 .. 1.02')
-check(C.ClickRollOffMin>=10 and C.ClickRollOffMax==C.ClickRange and C.ClickVolume==.8,'one volume rule for every click: volume .8 with a 3D roll-off to the 90-stud range')
+-- R152 (owner: "its not loud enough"): was volume .8, roll-off 16 .. 90, range 90 (the camera trails the runner by 12 .. 128 studs: his own click was already past the full-volume radius).
+-- Now volume 1.8 (x2.25 = +7.0 dB = about 1.6x as loud; +6 dB is x1.5, +10 dB is x2), roll-off 28 .. 160, range 160. The Effects group (AudioMixer, default 100) does not pull it down.
+do
+ local OLD={Volume=.8,Min=16,Max=90}
+ local dB=20*math.log10(C.ClickVolume/OLD.Volume);local perceived=2^(dB/10)
+ check(C.ClickRollOffMin>=24 and C.ClickRollOffMax==C.ClickRange and C.ClickRange>=150 and C.ClickRollOffMin<C.ClickRollOffMax,('one volume rule for every click: 3D roll-off %d .. %d studs, range %d (was 16 .. 90, 90)'):format(C.ClickRollOffMin,C.ClickRollOffMax,C.ClickRange))
+ check(C.ClickVolume>=1.5 and C.ClickVolume<=2.5 and perceived>=1.5 and perceived<=2.1,('click volume %.2f (was .8): +%.1f dB = about %.2fx as loud (the aim: 1.5 .. 2x)'):format(C.ClickVolume,dB,perceived))
+ -- Roblox's InverseTapered roll-off, approximated as min / d inverse falloff times a linear taper to zero at the max distance: what the player hears at 14 (default camera), 30, 60 and 100 studs
+ local function heard(vol,min,max,d)if d<=min then return vol end;if d>=max then return 0 end;return vol*(min/d)*(1-(d-min)/(max-min))end
+ local line={}
+ for _,d in ipairs({14,30,60,100})do
+  local a,b=heard(OLD.Volume,OLD.Min,OLD.Max,d),heard(C.ClickVolume,C.ClickRollOffMin,C.ClickRollOffMax,d)
+  line[#line+1]=('%d studs: %.2f -> %.2f'):format(d,a,b)
+  check(b>=a*(d==14 and 2 or 3) and(a>0 or b>0),('the click is clearly louder %d studs from the camera (about %.2f before, %.2f now)'):format(d,a,b))
+ end
+ print('click: '..table.concat(line,' | ')..' (approximate heard gain: volume x roll-off)')
+ check(C.ClickVoices==12 and #C.ClickGains>=3 and K.ClickGain(1)==1,'the voice pool keeps its cap ('..C.ClickVoices..' voices per sound) and the first click of a presser plays at full volume')
+ local gainOk=true;for _,gn in ipairs(C.ClickGains)do if gn>1 or gn<.85 then gainOk=false end end
+ check(gainOk and #C.ClickGains~=#C.ClickPitches,'a slight per-click gain (.85 .. 1 of the volume: the peak never rises) on a cycle that does not line up with the pitches')
+ check(K.PressSoundId(1)=='rbxassetid://73942179280083'and K.PressSoundId(6)=='rbxassetid://73942179280083'and K.PressSoundId(2)=='rbxassetid://113108830240353'and K.PressSoundId(nil)=='rbxassetid://113108830240353'
+  and K.PressSoundId(4)=='rbxassetid://113108830240353'and K.PressSoundId(7)=='rbxassetid://113108830240353','R152: Forest (1) and Jungle (6) press 73942179280083, every other biome (and no biome) keeps the click 113108830240353')
+ check(K.PressVolume(1)==C.PressSoundVolume.Forest and K.PressVolume(6)==C.PressSoundVolume.Jungle and K.PressVolume(2)==C.ClickVolume and C.PressSoundVolume.Forest==C.ClickVolume,'R152: the biome sound has its own volume per biome (Config.PressSoundVolume, starting at the click\'s '..C.ClickVolume..'); a biome with no sound uses the click volume')
+end
 local LT=C.Legend
 check(LT.Margin>=.03 and LT.Margin<=.05 and LT.Rotation==270 and LT.MaxExtra>=1,'letter strips stand .03 - .05 above the measured resting key top (Margin '..LT.Margin..'), labels turn 270 degrees')
 check(LT.TextHeight*LT.PixelsPerStud<=100 and LT.TextHeight>=4 and LT.KeysPerStrip==11,'letters 4.6 studs tall (TextSize '..LT.TextHeight*LT.PixelsPerStud..' <= 100), 11 per SurfaceGui (half a row)')
@@ -241,16 +263,20 @@ check(#rm2==4 and near(area,200*100-180*60),'RectMinus: a wider, longer floor le
 check(#K.RectMinus({0,10,0,10},{20,30,0,10})==1 and #K.RectMinus({0,10,0,10},{-5,15,-5,15})==0,'RectMinus: disjoint = whole rect, covered = nothing')
 -- windows per tier: one representation, long range, caps
 local capOk=true
-for tier,want in pairs({[3]={990,3200,140},[2]={600,2000,95},[1]={365,1250,55}})do
+for tier,want in pairs({[3]={990,3800,500},[2]={600,2400,340},[1]={365,1600,230}})do
  local t=K.Tier(tier)
- if t.Ahead*P<want[1]or K.KeyCap(tier,22)>want[2]or t.LegendAhead*P<want[3]then capOk=false end
+ if t.Ahead*P<want[1]or K.KeyCap(tier,22)>want[2]or t.FarAhead*P<want[3]or t.LegendAhead*P<140*(tier==3 and 1 or tier==2 and .68 or .39)then capOk=false end
  local ra,rb,ka,kb=K.KeyWindow(g,tier,300)
  if ra~=300-t.Back or rb~=300+t.Ahead or ka~=ra-t.Hyst or kb~=rb+t.Hyst then capOk=false end
  if K.KeyCap(tier,22)~=(t.Back+t.Ahead+1+2*t.Hyst)*22 then capOk=false end
 end
-check(capOk,'tiers: keys reach >= 990 / 600 / 365 studs ahead (tier 3 / 2 / 1) with at most 3200 / 2000 / 1250 keys; letters >= 140 / 95 / 55 studs ahead')
+check(capOk,'tiers: keys reach >= 990 / 600 / 365 studs ahead (tier 3 / 2 / 1) with at most 3800 / 2400 / 1600 keys (R152: Back is larger); the near letters >= 140 / 95 / 55 studs ahead, letters (far ones included) >= 500 / 340 / 230')
 -- R151: the near zone (Back rows) is at least 60 studs each side on every tier (it was 41 on tier 1, 65 on tier 2)
-check(K.Near(3)*P>=110 and K.Near(2)*P>=85 and K.Near(1)*P>=60 and K.Near(1)==K.Tier(1).Back,('R151 near zone: %.0f / %.0f / %.0f studs each side (tier 3 / 2 / 1)'):format(K.Near(3)*P,K.Near(2)*P,K.Near(1)*P))
+check(K.Near(3)*P>=110 and K.Near(2)*P>=85 and K.Near(1)*P>=60 and K.Near(1)==K.Tier(1).Near and K.Near(3)==K.Tier(3).Near,('R151 near zone: %.0f / %.0f / %.0f studs each side (tier 3 / 2 / 1), unchanged by R152'):format(K.Near(3)*P,K.Near(2)*P,K.Near(1)*P))
+-- R152 (owner: "keys behind also not rendering"): Back, the keys behind the way the camera faces, covers a camera zoomed out to Roblox's 128 studs (it sees below and behind its own feet) on every tier
+check(K.Tier(3).Back*P>=320 and K.Tier(2).Back*P>=225 and K.Tier(1).Back*P>=175 and K.Tier(1).Back*P>=128+40,('R152 keys behind: %.0f / %.0f / %.0f studs (tier 3 / 2 / 1; was 115 / 90 / 65)'):format(K.Tier(3).Back*P,K.Tier(2).Back*P,K.Tier(1).Back*P))
+do local ok=true;for t=1,3 do local tt=K.Tier(t);if tt.FarBehind>tt.Back or tt.FarAhead>tt.Ahead or tt.FarBehind<tt.LegendBehind or tt.FarAhead<=tt.LegendAhead+tt.LegendFade or K.FarSide(t)>K.Side(t)or tt.Near>tt.Back then ok=false end end
+ check(ok,'R152 letter reach lies inside the key window and beyond the near letters on every tier (FarBehind <= Back, FarAhead <= Ahead, past LegendAhead + the fade, FarSide <= Side, Near <= Back)')end
 do local ok=true;for t=1,3 do local a,b=K.KeyWindow(g,t,300,0);local s=K.Side(t);if a~=300-s or b~=300+s or 2*s>K.Tier(t).Back+K.Tier(t).Ahead or s<K.Near(t)then ok=false end end
  check(ok,'R151 KeyWindow across the track (facing 0): Side rows each way, never more keys than along it, never less than the near zone')end
 local a1,b1=K.KeyWindow(g,3,1);local a2,b2=K.KeyWindow(g,3,728);check(a1==1 and b2==728 and b1==123 and a2==728-K.Tier(3).Back,'KeyWindow clamps to the track')
@@ -263,8 +289,12 @@ check(K.Facing(.9,1)==1 and K.Facing(-.9,1)==-1 and K.Facing(.1,-1)==0 and K.Fac
  and K.Facing(.8,0)==1 and K.Facing(0,1,0)==0 and K.Facing(-.3,1,.05)==-1 and K.Facing(.3,-1,.9)==0,
  'Facing (R151): along the track by the camera\'s heading (+-41 deg), across it within +-57 deg of sideways or looking straight down; between, the current way')
 end
-check(K.LegendAlpha(3,0)==0 and K.LegendAlpha(3,-2)==0 and K.LegendAlpha(3,14)==0 and K.LegendAlpha(3,15)>0 and K.LegendAlpha(3,18)<1 and K.LegendAlpha(3,19)==1,'letters fade over their last 4 rows (tier 3: solid to 14 rows ahead, gone after 18)')
-local fadeUp=true;for d=14,18 do if K.LegendAlpha(3,d+1)<K.LegendAlpha(3,d)then fadeUp=false end end;check(fadeUp,'...monotonically')
+-- R152: the near letters (LegendAhead 18 rows) are never faded: the far letters carry on from them and fade over their last LegendFade rows (tier 3: solid to 60 rows ahead, gone after 64; behind: solid to 24, gone after 28)
+check(K.LegendAlpha(3,0)==0 and K.LegendAlpha(3,-2)==0 and K.LegendAlpha(3,18)==0 and K.LegendAlpha(3,19)==0 and K.LegendAlpha(3,60)==0 and K.LegendAlpha(3,61)>0 and K.LegendAlpha(3,64)<1 and K.LegendAlpha(3,65)==1,'letters fade over the last 4 rows of the far reach (tier 3: solid to 60 rows ahead, gone after 64), the near rows never fade')
+check(K.LegendAlpha(3,-24)==0 and K.LegendAlpha(3,-25)>0 and K.LegendAlpha(3,-29)==1 and K.LegendAlpha(3,-20,-1)==0 and K.LegendAlpha(3,20,-1)==0 and K.LegendAlpha(3,-61,-1)>0 and K.LegendAlpha(3,40,0)==0 and K.LegendAlpha(3,-60,0)==1,'...behind the runner too (24 .. 28 rows), the long side turns with the facing, across the track it is symmetric (FarSide 46)')
+local fadeUp=true;for d=60,64 do if K.LegendAlpha(3,d+1)<K.LegendAlpha(3,d)then fadeUp=false end end;check(fadeUp,'...monotonically')
+do local fw=K.FarLegendWindow(g,3,300,1);local _,fb=K.FarLegendWindow(g,3,300,1);local a2,b2=K.FarLegendWindow(g,3,300,-1);local a3,b3=K.FarLegendWindow(g,3,300,0)
+ check(fw==300-28 and fb==300+64 and a2==300-64 and b2==300+28 and a3==300-46 and b3==300+46 and K.FarLegendWindow(g,3,1,1)==1 and select(2,K.FarLegendWindow(g,3,728,1))==728,'FarLegendWindow: 28 behind / 64 ahead (tier 3), mirrored facing -Z, 46 each way across the track, clamped to the track') end
 check(K.Tier(3).LegendRadius>=20 and K.Tier(2).LegendRadius>=16 and K.Tier(1).LegendRadius>=12,'LegendRadius (the letters around the runner\'s feet other effects keep clear of) is set for every tier')
 -- click cadence: per presser, evenly spaced, independent
 do
@@ -337,7 +367,7 @@ W.stub('ClientFxBudget',{Get=function()return fxTier end,Low=function()return fx
 -- count writes per frame: Color on keys (= keys dressed), CFrame on keys outside BulkMoveTo. While `measure` is on, every property write on an
 -- instance under the keyboard folder (visRoot) is counted too (all = everything but Parent; the rest by kind), and a part whose Transparency is
 -- written twice in one frame is counted (tpTwice). cam = CFrame writes on the camera.
-local writes={key=0,all=0,tp=0,tpTwice=0,pos=0,text=0,ink=0,vis=0,alpha=0,gui=0,strip=0,cam=0};local cframeWrites=0
+local writes={key=0,all=0,tp=0,tpTwice=0,pos=0,text=0,ink=0,vis=0,alpha=0,gui=0,strip=0,cam=0,fpos=0,ftext=0,fink=0,fvis=0,falpha=0,fstrip=0};local cframeWrites=0 -- (f... = the R152 far letters' strips)
 local measure,visRoot,tpAt=false,nil,{}
 -- what already existed when the real floor was hidden for the first time after `hideSeen` was reset (the end of start())
 local hideSeen=nil
@@ -355,9 +385,13 @@ R.instMeta.__newindex=function(o,k,v)
   if name=='Key'then
    if k=='Transparency'then writes.tp+=1;if tpAt[o]==R.clock then writes.tpTwice+=1 end;tpAt[o]=R.clock end
   elseif name=='Letter'then
-   if k=='Position'then writes.pos+=1 elseif k=='Text'then writes.text+=1 elseif k=='TextColor3'then writes.ink+=1 elseif k=='Visible'then writes.vis+=1 elseif k=='TextTransparency'then writes.alpha+=1 end
+   local far=o._parent and o._parent._props.Name=='FarLetters'
+   if k=='Position'then if far then writes.fpos+=1 else writes.pos+=1 end elseif k=='Text'then if far then writes.ftext+=1 else writes.text+=1 end elseif k=='TextColor3'then if far then writes.fink+=1 else writes.ink+=1 end
+   elseif k=='Visible'then if far then writes.fvis+=1 else writes.vis+=1 end elseif k=='TextTransparency'then if far then writes.falpha+=1 else writes.alpha+=1 end end
   elseif name=='LegendStrip'then
    if k=='CFrame'and v.Position.Y>0 then writes.strip+=1 end
+  elseif name=='LegendFar'then
+   if k=='CFrame'and v.Position.Y>0 then writes.fstrip+=1 end
   elseif k=='Enabled'then writes.gui+=1 end
  end
  return origNew(o,k,v)
@@ -685,10 +719,10 @@ local keyN=0;for _,p in ipairs(keysF:GetChildren())do if p.Name=='Key'then keyN+
 check(cframeWrites==keyN,'keys are parked by script once each and moved with BulkMoveTo only ('..cframeWrites..' direct writes on '..keyN..' keys)')
 check(bulkCalls>0,'keys are positioned with BulkMoveTo')
 local routed,ids,voices=0,{},0
-for _,o in ipairs(R.created)do if o._class=='Sound'and o._props.Name=='KeyClickSound'then voices+=1;ids[o.SoundId]=true;if o.SoundGroup~=nil then routed+=1 end end end
+for _,o in ipairs(R.created)do if o._class=='Sound'and o._props.Name=='KeyClickSound'then voices+=1;ids[o.SoundId]=(ids[o.SoundId]or 0)+1;if o.SoundGroup~=nil then routed+=1 end end end
 local nIds=0;for _ in pairs(ids)do nIds+=1 end
-check(voices==C.ClickVoices and routed==voices,'a pool of '..C.ClickVoices..' click voices, routed through AudioMixer (Effects group) ('..routed..')')
-check(nIds==1 and ids['rbxassetid://113108830240353'],'every voice plays the same recording (one click sound; was three alternating)')
+check(voices==2*C.ClickVoices and routed==voices,'R152: a pool of '..C.ClickVoices..' voices for each of the two sounds (the click and the Forest / Jungle sound), routed through AudioMixer (Effects group) ('..voices..' voices, '..routed..' routed)')
+check(nIds==2 and ids['rbxassetid://113108830240353']==C.ClickVoices and ids['rbxassetid://73942179280083']==C.ClickVoices,'every voice of a pool plays the same recording (the click 113108830240353; the Forest / Jungle sound 73942179280083)')
 check(contentCalls>=1,'the click is preloaded')
 -- the toolbox keycap template carries a SurfaceGui / TextLabel / Script; it is stripped ONCE and the keys are clones of the stripped copy: the
 -- ~3,000 clones copy none of those children (R149 review part 1, finding 12: they were cloned and destroyed again for every pooled key)
@@ -744,7 +778,7 @@ do
  check(W.rsBound['KeyboardCameraFloor']~=nil and W.rsOrder[1]=='KeyboardCameraFloor'and #W.rsOrder==1,'one render step is bound (no duplicates)')
 end
 -- 1c. the real floor is hidden last (finding 9): at the end of start(), after everything that can fail, not before the keys / bed / sounds exist
-check(hideSeen~=nil and hideSeen.Bed>0 and hideSeen.Spacebar==7 and hideSeen.KeyClick==C.ClickVoices,('the real floor is hidden at the very end of start(): the bed (%d pieces), 7 spacebars and %d click voices already existed'):format(hideSeen and hideSeen.Bed or 0,hideSeen and hideSeen.KeyClick or 0))
+check(hideSeen~=nil and hideSeen.Bed>0 and hideSeen.Spacebar==7 and hideSeen.KeyClick==2*C.ClickVoices,('the real floor is hidden at the very end of start(): the bed (%d pieces), 7 spacebars and %d click voices already existed'):format(hideSeen and hideSeen.Bed or 0,hideSeen and hideSeen.KeyClick or 0))
 
 -- 1d. R151 (owner: "the words are missing, they only appear if under my foot"): in EVERY biome, at the start of its keys and in its middle, every key of every
 -- row that carries letters has a visible label over it, in both half rows (columns 1 .. 11 and 12 .. 22), not just the one column that happened to sit
@@ -766,6 +800,7 @@ end
 
 -- 2. a runner presses a key and releases it
 local R10,C20=BR,9
+local function pressVol(p,stage)local v=K.PressVolume(stage);local lo=1;for _,gn in ipairs(C.ClickGains)do lo=min(lo,gn)end;return p~=nil and p.Volume<=v+1e-9 and p.Volume>=v*lo-1e-9 end
 do
 plays={};hum.FloorMaterial=PLASTIC;put(cx(C20),nil,cz(R10));frames(3)
 check(topOf(R10,C20)and topOf(R10,C20)<K.KeyTop(0)-.1,'a key goes down under the runner (mid-press)')
@@ -778,8 +813,8 @@ do -- R151: the press is clearly visible (>= 1 stud of travel) and the feet stay
  check(topOf(R10,C20)>=feetY-1e-9 and topOf(R10,C20)-feetY<=.1,'feet stay planted: the pressed key top is level with the soles (the real floor top, +'..string.format('%.2f',topOf(R10,C20)-feetY)..'), never under them (no hovering) nor above them (no sinking)')
  check(K.KeyTop(0)-feetY>=1.1,'the keys around him stand 1.2 above his soles at rest: a pressed key is a clear dent in the keyboard')
 end
-check(#plays==1 and plays[1].Id=='rbxassetid://113108830240353','one click played for the one key ('..#plays..')')
-check(plays[1]and plays[1].Speed>=.98 and plays[1].Speed<=1.02 and plays[1].Volume==C.ClickVolume,'own click: pitch within 0.98 .. 1.02, volume .8')
+check(#plays==1 and plays[1].Id=='rbxassetid://73942179280083','one sound played for the one key, in the Jungle row (R152: the Jungle sound 73942179280083, not the click) ('..#plays..')')
+check(plays[1]and plays[1].Speed>=.98 and plays[1].Speed<=1.02 and pressVol(plays[1],g.RowStage[R10]),'own press: pitch within 0.98 .. 1.02, volume 1.8 x the click-to-click gain (.91 .. 1)')
 check(plays[1]and plays[1].Group and plays[1].Group.Name=='GardenEffects','clicks go through the Effects sound group (AudioMixer.Route)')
 check(plays[1]and near(plays[1].Pos.X,cx(C20),.01)and near(plays[1].Pos.Z,cz(R10),.01)and plays[1].Min==C.ClickRollOffMin and plays[1].Max==C.ClickRollOffMax,'the click is played at the key, with the one roll-off rule')
 -- the pressed key carries its letter; the strip's label for it is hidden meanwhile
@@ -810,11 +845,11 @@ check(#plays==1,'...and clicks are back with the volume')
 -- R150: the click starts at SoundTiming's lead-in for its file (the one shared table: 0 until the owner measures it), not a hard-coded 0.
 check(plays[1]and near(plays[1].TimePosition,0,1e-9),'R150: the click starts at SoundTiming\'s lead-in for its file (0 until measured) ('..tostring(plays[1]and plays[1].TimePosition)..')')
 do
- local ts=W.RS:FindFirstChild('SoundTiming');ts:SetAttribute('Start_113108830240353',.07)
+ local ts=W.RS:FindFirstChild('SoundTiming');ts:SetAttribute('Start_73942179280083',.07)
  put(cx(C20)+20,nil,cz(R10));frames(14);plays={}
  put(cx(C20),nil,cz(R10));frames(12)
- check(plays[1]and near(plays[1].TimePosition,.07,1e-9),'R150: Start_113108830240353 on SoundTiming moves the click (tuned in Studio, no code change) ('..tostring(plays[1]and plays[1].TimePosition)..')')
- ts:SetAttribute('Start_113108830240353',nil)
+ check(plays[1]and near(plays[1].TimePosition,.07,1e-9),'R150: Start_<id> on SoundTiming moves the sound (tuned in Studio, no code change; here the Jungle sound) ('..tostring(plays[1]and plays[1].TimePosition)..')')
+ ts:SetAttribute('Start_73942179280083',nil)
 end
 put(cx(C20)+20,nil,cz(R10));frames(14);plays={}
 -- standing on a corner shared by 4 keys presses all 4 - with ONE click (owner: no stacked bursts)
@@ -925,14 +960,19 @@ end
 do
  hum.FloorMaterial=PLASTIC;put(cx(11),nil,1300);frames(80)
  local made=0;for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'then made+=1 end end
+ local farBefore=0;for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendFar'then farBefore+=1 end end
  measure=true;visRoot=workspace.KeyboardTrackVisuals;resetAll()
  local z=1300;local n=36
  for f=1,n do z+=1000/60;put(cx(11),nil,z);frames(1)end
  measure=false
  local rowsDressed=writes.key/22;local stripsBound=writes.strip
  local naive=stripsBound*11
- print(('sprint writes: 1000 studs/s for %d frames (tier 3, %d letter strips made): %d property writes in all = %.0f a frame; %d strips bound; labels: Position %d, Text %d, TextColor3 %d, Visible %d, TextTransparency %d of %d each if every label were rewritten; strip guis switched %d times; keys dressed %d, key Transparency writes %d (twice in one frame: %d)'):format(
-  n,made,writes.all,writes.all/n,stripsBound,writes.pos,writes.text,writes.ink,writes.vis,writes.alpha,naive,writes.gui,writes.key,writes.tp,writes.tpTwice))
+  print(('sprint writes: 1000 studs/s for %d frames (tier 3, %d letter strips made): %d property writes in all = %.0f a frame; %d near strips bound; near labels: Position %d, Text %d, TextColor3 %d, Visible %d, TextTransparency %d of %d each if every label were rewritten; far strips bound %d (labels: Position %d, Text %d, TextColor3 %d, Visible %d, TextTransparency %d); strip guis switched %d times; keys dressed %d, key Transparency writes %d (twice in one frame: %d)'):format(
+  n,made,writes.all,writes.all/n,stripsBound,writes.pos,writes.text,writes.ink,writes.vis,writes.alpha,naive,writes.fstrip,writes.fpos,writes.ftext,writes.fink,writes.fvis,writes.falpha,writes.gui,writes.key,writes.tp,writes.tpTwice))
+ -- R152: the far strips keep their label positions too: a Position is only written when a strip is made (22 labels), never when it is bound to another row
+ local farAfter=0;for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendFar'then farAfter+=1 end end
+ check(writes.fstrip>=40 and writes.fpos<=farAfter*22 and writes.fpos<writes.fstrip*22*.5,('R152 far letters: %d far strips bound by the sprint, %d Position writes (a strip of the pool only writes its 22 positions once, when it first serves a row of this biome; %d strips in the pool; %d made during the sprint)'):format(writes.fstrip,writes.fpos,farAfter,farAfter-farBefore))
+ check(writes.fvis<=writes.fstrip*22*.1,('...and %d Visible writes for %d far strips bound (a label is only shown / hidden when its key goes down / up)'):format(writes.fvis,writes.fstrip))
  check(stripsBound>=40 and writes.key>=22*40,('the sprint dressed %d rows of keys and %d strips'):format(rowsDressed,stripsBound))
  check(writes.pos<=naive*.25,('letter labels keep their positions: %d Position writes (a rewrite of every bound label would be %d)'):format(writes.pos,naive))
  check(writes.vis<=naive*.1,('...and their Visible flag: %d writes (%d if every label were rewritten)'):format(writes.vis,naive))
@@ -1040,6 +1080,10 @@ do
  local stripsZ={};for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 then stripsZ[#stripsZ+1]=st.CFrame.Position.Z end end
  local lo,hi=1e9,-1e9;for _,z in ipairs(stripsZ)do lo=min(lo,z);hi=max(hi,z)end
  check(2400-lo>=140 and hi-2400<=3*P+P,('letters follow the facing too: %.0f studs toward -Z, %.0f toward +Z'):format(2400-lo,hi-2400))
+ do -- R152: the far letters follow the facing too: strips toward -Z (long side) and a short side toward +Z
+  local flo,fhi=1e9,-1e9;for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendFar'and st.CFrame.Position.Y>0 then local z=st.CFrame.Position.Z;flo=min(flo,z);fhi=max(fhi,z)end end
+  check(2400-flo>=480 and fhi-2400>=200 and fhi-2400<=31*P,('R152 far letters facing -Z: letters reach %.0f studs toward -Z (tier 3: 64 rows) and %.0f toward +Z (28 rows)'):format(2400-flo,fhi-2400))
+ end
  look(100);frames(40)
  local _,aBack=reach();check(aBack>=990,'turning back to +Z restores the long side ahead')
 end
@@ -1159,6 +1203,427 @@ do
   ('a stand-in reaches from the bed to %.2f under the resting key tops (.04 .. .2: never coplanar with a key top, never above one)'):format(C.FillerDrop))
  fxTier=3;look(100);put(cx(11),F+9,2400);frames(60*4)
 end
+-- 5e. R152 (owner: "keys behind also not rendering and its not loud enough"; his screenshot looked down the track and the far keys were bare caps).
+-- From anywhere on the track and looking any way, every key that can reasonably be seen has its keycap AND its letter: along the camera's way out to the view distance
+-- (~1000 / 600 / 365 studs of keys, letters 500 / 340 / 230), behind it (keys 327 / 229 / 180 studs, letters 229 / 180 / 147: a camera zoomed out to 128 studs sees its own
+-- surroundings), and each way when it looks across the track. The numbers below are written out here, not read from the module. Then the budget per tier: parts, SurfaceGuis,
+-- TextLabels (the far rows carry one cheap strip each: a single SurfaceGui at 4 px / stud, not two 16 px ones).
+local H={} -- helpers shared by 5e and 5g (one local: the main chunk is near Luau's limit of local variables)
+ -- every visible label of every bound strip (near and far) audited against the keys: exactly over its key's centre, its legend, upright, inside its canvas, above the key top
+ function H.letterAudit()
+  local keyTop={}
+  for _,p in ipairs(keysF:GetChildren())do
+   if p.Name=='Key'and p.Transparency==0 then local pos=p.CFrame.Position;keyTop[g.RowOfZ(pos.Z)*64+g.ColOfX(pos.X)]=pos.Y+p.Size.Y/2 end
+  end
+  local perRow,bad={}, {pos=0,canvas=0,text=0,upright=0,above=0,nokey=0,gui=0,twice=0}
+  local nearN,farN,labels=0,0,0
+  for _,st in ipairs(legF:GetChildren())do
+   local far=st.Name=='LegendFar'
+   if(st.Name=='LegendStrip'or far)and st.CFrame.Position.Y>0 then
+    local gui=st:FindFirstChildWhichIsA('SurfaceGui');local pps=gui.PixelsPerStud;local cw,ch=canvasOf(st,pps)
+    if far then farN+=1 else nearN+=1 end
+    if gui.Enabled==false or gui.Face~=R.Enum.NormalId.Top or gui.AlwaysOnTop~=false or gui.LightInfluence~=0 or gui.MaxDistance<(far and 700 or 400)or pps~=(far and LT.FarPixelsPerStud or LT.PixelsPerStud)then bad.gui+=1 end
+    for _,l in ipairs(gui:GetChildren())do
+     if l._class=='TextLabel'and l.Visible and l.TextTransparency<1 then
+      labels+=1
+      local px,py=l.Position.X.Offset,l.Position.Y.Offset;local hw,hh=l.Size.X.Offset/2,l.Size.Y.Offset/2
+      local wx,wz=worldOf(st,px,py,pps);local row,col=g.RowOfZ(wz),g.ColOfX(wx);local kx,kz=g.CellCenter(row,col)
+      local rr=perRow[row];if not rr then rr={};perRow[row]=rr end
+      if rr[col]then bad.twice+=1 end;rr[col]=true
+      if px-hw<-1e-6 or px+hw>cw+1e-6 or py-hh<-1e-6 or py+hh>ch+1e-6 then bad.canvas+=1 end
+      if not kx or abs(kx-wx)>1e-6 or abs(kz-wz)>1e-6 then bad.pos+=1 end
+      if l.Text~=K.Legend(row,col)then bad.text+=1 end
+      local rx,rz=readsAlong(l.Rotation);local ux,uz=upOf(l.Rotation)
+      if not(near(rx,-1,1e-9)and near(rz,0,1e-9)and near(ux,0,1e-9)and near(uz,1,1e-9))then bad.upright+=1 end
+      local kt=keyTop[row*64+col]
+      if not kt then bad.nokey+=1 elseif st.CFrame.Position.Y+st.Size.Y/2<kt+LT.Margin-1e-6 then bad.above+=1 end
+     end
+    end
+   end
+  end
+  return perRow,bad,nearN,farN,labels
+ end
+ -- rows a..b (bars excepted) that do not carry exactly one label per key
+ function H.lettersMissing(perRow,a,b)
+  local missing,rows=0,0
+  for r=max(1,a),min(g.Rows,b)do if not g.BarOfRow[r]then rows+=1;local rr=perRow[r];for c=1,22 do if not(rr and rr[c])then missing+=1 end end end end
+  return missing,rows
+ end
+ -- how far (studs) from z the keys / letters reach toward +Z and -Z without a gap (bars skipped)
+ function H.reach(perRow,z)
+  local fr=g.RowOfZ(z);local idx=keyIndex()
+  local function run(from,to,step,has)
+   local far=0
+   for r=from,to,step do
+    if not g.BarOfRow[r]then local n=0;for c=1,22 do if has(r,c)then n+=1 end end;if n==22 then local za,zb=g.RowZ(r);far=step>0 and zb-z or z-za else break end end
+   end
+   return far
+  end
+  local hasKey=function(r,c)local e=idx[r*64+c];return e and e[1]==1 end
+  local hasLetter=function(r,c)return perRow[r]and perRow[r][c]end
+  return run(fr,g.Rows,1,hasKey),run(fr,1,-1,hasKey),run(fr,g.Rows,1,hasLetter),run(fr,1,-1,hasLetter)
+ end
+ function H.budget()
+  -- what is in use: visible keys, bound strips, bars, bed, stand-ins, click anchors; guis bound; labels shown (the pools themselves only grow, see the print)
+  local parts,pool,bound,shown,labelsAll,inst=0,0,0,0,0,0
+  for _,o in ipairs(vis:GetDescendants())do
+   inst+=1
+   if o:IsA('BasePart')then
+    pool+=1
+    if o.Name=='Key'or o.Name=='KeyFiller'then if o.Transparency==0 then parts+=1 end
+    elseif o.Name=='LegendStrip'or o.Name=='LegendFar'then if o.CFrame.Position.Y>0 then parts+=1 end
+    else parts+=1 end
+   elseif o._class=='SurfaceGui'then if o.Enabled~=false and o.Parent and o.Parent.CFrame and o.Parent.CFrame.Position.Y>0 then bound+=1 end
+   elseif o._class=='TextLabel'then labelsAll+=1;if o.Visible and o.Parent and o.Parent.Parent and o.Parent.Parent.CFrame and o.Parent.Parent.CFrame.Position.Y>0 then shown+=1 end end
+  end
+  return parts,pool,bound,shown,labelsAll,inst
+ end
+ do
+ local need={ -- keys along the way / behind / each way across; letters along / behind / each way across (studs)
+  [3]={ka=990,kb=320,ks=600,la=500,lb=220,ls=360,parts=4000,guis=150,labels=2300},
+  [2]={ka=600,kb=225,ks=380,la=340,lb=170,ls=260,parts=2600,guis=110,labels=1700},
+  [1]={ka=350,kb=175,ks=250,la=230,lb=140,ls=190,parts=1700,guis=80,labels=1300}}
+ local dirs={{'+Z',1,function()look(100)end},{'-Z',-1,function()look(-100)end},{'across',0,function()look(0,100)end}}
+ local lines,worst={}, {}
+ hum.FloorMaterial=AIR
+ for _,tierN in ipairs({3,2,1})do
+  fxTier=tierN;put(cx(11),F+9,2400);look(100);frames(60*4)
+  local nd=need[tierN];worst[tierN]={parts=0,pool=0,bound=0,labels=0,inst=0,keys=0}
+  for _,d in ipairs(dirs)do
+   put(cx(11),F+9,2400);d[3]();frames(60*3)
+   local fr=g.RowOfZ(2400);local wa,wb=K.KeyWindow(g,tierN,fr,d[2])
+   coverage(wa,wb,('tier %d facing %s'):format(tierN,d[1]))
+   local perRow,bad,nearN,farN,labels=H.letterAudit()
+   local la,lb=K.FarLegendWindow(g,tierN,fr,d[2])
+   local missing,rowsN=H.lettersMissing(perRow,la,lb)
+   local flaws=0;for _,v in pairs(bad)do flaws+=v end
+   check(missing==0 and flaws==0 and rowsN>=40,('tier %d facing %s: every key of the %d letter rows %d .. %d has its letter (%d near + %d far strips, %d labels; %d missing; wrong place / text / turn / height / canvas / gui: %d %d %d %d %d %d %d %d)'):format(
+    tierN,d[1],rowsN,la,lb,nearN,farN,labels,missing,bad.pos,bad.text,bad.upright,bad.above,bad.canvas,bad.nokey,bad.gui,bad.twice))
+   local kPlus,kMinus,lPlus,lMinus=H.reach(perRow,2400)
+   local along,behind,lAlong,lBehind
+   if d[2]==1 then along,behind,lAlong,lBehind=kPlus,kMinus,lPlus,lMinus elseif d[2]==-1 then along,behind,lAlong,lBehind=kMinus,kPlus,lMinus,lPlus end
+   if d[2]~=0 then
+    check(along>=nd.ka and behind>=nd.kb,('tier %d facing %s: keys %.0f studs along the camera\'s way (need %d), %.0f behind it (need %d)'):format(tierN,d[1],along,nd.ka,behind,nd.kb))
+    check(lAlong>=nd.la and lBehind>=nd.lb,('tier %d facing %s: letters %.0f studs along the camera\'s way (need %d), %.0f behind it (need %d)'):format(tierN,d[1],lAlong,nd.la,lBehind,nd.lb))
+    lines[#lines+1]=('tier %d %s: keys %.0f ahead / %.0f behind, letters %.0f / %.0f'):format(tierN,d[1],along,behind,lAlong,lBehind)
+   else
+    check(kPlus>=nd.ks and kMinus>=nd.ks and lPlus>=nd.ls and lMinus>=nd.ls,('tier %d looking across: keys %.0f / %.0f studs each way (need %d), letters %.0f / %.0f (need %d)'):format(tierN,kPlus,kMinus,nd.ks,lPlus,lMinus,nd.ls))
+    lines[#lines+1]=('tier %d across: keys %.0f / %.0f each way, letters %.0f / %.0f'):format(tierN,kPlus,kMinus,lPlus,lMinus)
+   end
+   local parts,pool,bound,shown,labelsAll,inst=H.budget()
+   local w=worst[tierN];w.parts=max(w.parts,parts);w.pool=max(w.pool,pool);w.bound=max(w.bound,bound);w.labels=max(w.labels,shown);w.inst=max(w.inst,inst);w.keys=max(w.keys,#keyParts())
+  end
+  local w=worst[tierN]
+  check(w.parts<=nd.parts and w.bound<=nd.guis and w.labels<=nd.labels,('tier %d budget in use: %d parts (%d of them keys), %d SurfaceGuis, %d letters shown; caps %d / %d / %d'):format(tierN,w.parts,w.keys,w.bound,w.labels,nd.parts,nd.guis,nd.labels))
+  print(('budget tier %d: %d parts in use (%d keys), %d SurfaceGuis, %d letters shown (pools made so far: %d parts, %d instances under the keyboard folder)'):format(tierN,w.parts,w.keys,w.bound,w.labels,w.pool,w.inst))
+ end
+ print('reach: '..table.concat(lines,' | '))
+ -- the ends of the track: no row behind the first / past the last, a window that is clamped still has its keys and its letters
+ for _,e in ipairs({{-40,-1,'the start, looking back toward base'},{-40,1,'the start, looking along'},{5850,1,'the end, looking along'},{5850,-1,'the end, looking back'}})do
+  fxTier=2;put(cx(11),F+9,e[1]);look(e[2]*100);frames(60*5)
+  local fr=g.RowOfZ(e[1]);local wa,wb=K.KeyWindow(g,2,fr,e[2])
+  coverage(wa,wb,'tier 2, '..e[3])
+  local perRow,bad=H.letterAudit();local la,lb=K.FarLegendWindow(g,2,fr,e[2]);local missing=H.lettersMissing(perRow,la,lb)
+  local flaws=0;for _,v in pairs(bad)do flaws+=v end
+  check(missing==0 and flaws==0,('tier 2, %s: every letter row %d .. %d is complete (%d missing, %d flaws)'):format(e[3],la,lb,missing,flaws))
+ end
+ -- the near zone (R151) is unchanged by all this: still dressed in the frame it is wanted (a teleport: the very first frame)
+ fxTier=3;frames(60*4);put(cx(11),F+9,2400);look(100);frames(60)
+ put(cx(11),F+9,4000);frames(1);local idx=keyIndex();local f4=g.RowOfZ(4000);local nm=0
+ for r=f4-K.Near(3),f4+K.Near(3)do if not g.BarOfRow[r]then for c=1,22 do local e=idx[r*64+c];if not e or e[1]~=1 then nm+=1 end end end end
+ check(nm==0 and K.Near(3)==14,'the R151 near zone (14 rows each side on tier 3) is complete on the very first frame after a teleport (R152 left it as it was): '..nm..' missing')
+ put(cx(11),F+9,cz(BR));frames(60*3)
+end
+
+-- 5f. R152 (owner: "for every Jungle, Forest keyboard tile that players step on it plays this audio instead 73942179280083"; "its not loud enough"): a press in the Forest or the
+-- Jungle plays the biome's own sound, every other biome keeps the click; the same voice pool cap, roll-off, range, cadence and gain cycle; the click is louder.
+do
+ hum.FloorMaterial=PLASTIC;fxTier=3;frames(60*4)
+ local FOREST,CLICK='rbxassetid://73942179280083','rbxassetid://113108830240353'
+ local function pressAt(row,col,xo)
+  put(cx(col)+25,nil,cz(row));frames(14) -- everything up first
+  plays={};put(cx(col),nil,cz(row));frames(12);local list=table.clone(plays)
+  put(cx(col)+25,nil,cz(row));frames(14)
+  return list
+ end
+ local want={Forest=FOREST,Jungle=FOREST,Desert=CLICK,Snow=CLICK,Lava=CLICK,Crystal=CLICK,['Storm Peaks']=CLICK}
+ local summary={}
+ for _,seg in ipairs(g.Segs)do
+  local row=seg.FirstRow+min(9,seg.Rows-2);local list=pressAt(row,9)
+  local id=list[1]and list[1].Id
+  summary[#summary+1]=seg.Name..' '..(id==FOREST and 'sound' or 'click')
+  check(#list==1 and id==want[seg.Name],('a press in a %s row (row %d) plays %s (%s)'):format(seg.Name,row,want[seg.Name]==FOREST and '73942179280083 (the biome sound)' or 'the click 113108830240353',tostring(id)))
+  check(list[1]and list[1].Min==C.ClickRollOffMin and list[1].Max==C.ClickRollOffMax and list[1].Mode==R.Enum.RollOffMode.InverseTapered and list[1].Group and list[1].Group.Name=='GardenEffects',
+   ('...with the same 3D roll-off (%d .. %d, InverseTapered) and the Effects group as every click'):format(C.ClickRollOffMin,C.ClickRollOffMax))
+ end
+ print('press sounds: '..table.concat(summary,', '))
+ -- a spacebar belongs to its biome's segment: the Forest bar plays the Forest sound, the Desert bar the click
+ do
+  put(cx(8),nil,g.Bars[1].Z0+60);frames(14);plays={};put(cx(8),nil,g.Bars[1].Z0+2);frames(12)
+  local forestBar=plays[1]and plays[1].Id;put(cx(8),nil,g.Bars[3].Z0-30);frames(14);plays={}
+  put(cx(8),nil,g.Bars[3].Z0+2);frames(12);local desertBar=plays[1]and plays[1].Id
+  check(forestBar==FOREST and desertBar==CLICK,'the Forest spacebar plays the Forest sound, the Desert spacebar the click ('..tostring(forestBar)..', '..tostring(desertBar)..')')
+ end
+ -- one pool of ClickVoices voices per sound, strict rotation inside it, nothing shared between the two sounds
+ do
+  plays={};local zJ=cz(g.Segs[2].FirstRow+4);local voices,ids={},{}
+  for i=1,26 do put(cx(11),nil,zJ+i*8.2);frames(6)end
+  for _,p in ipairs(plays)do voices[p.Sound]=true;ids[p.Id]=true end
+  local nv=0;for _ in pairs(voices)do nv+=1 end
+  local n=0;for _ in pairs(ids)do n+=1 end
+  check(#plays>=20 and nv==C.ClickVoices and n==1,('running through the Jungle: %d presses use the Jungle sound\'s pool of %d voices (%d distinct), none of the click\'s'):format(#plays,C.ClickVoices,nv))
+  local mixed=false;for _,p in ipairs(plays)do if p.Sound.SoundId~=FOREST then mixed=true end end
+  check(not mixed,'every voice of that pool plays the Jungle sound')
+ end
+ -- loudness (the click, in the Desert): every press at the new volume times a slight gain; the peak is the config volume; pitch as before
+ do
+  plays={};local zD=cz(g.Segs[3].FirstRow+10);local lo,hi,sum,n=1e9,0,0,0
+  for i=1,40 do put(cx(11),nil,zD+i*8.2);frames(6)end
+  for _,p in ipairs(plays)do lo=min(lo,p.Volume);hi=max(hi,p.Volume);sum+=p.Volume;n+=1 end
+  local gmin=1;for _,gn in ipairs(C.ClickGains)do gmin=min(gmin,gn)end
+  check(n>=30 and near(hi,C.ClickVolume,1e-9)and lo>=C.ClickVolume*gmin-1e-9 and lo<hi-.05 and sum/n>=C.ClickVolume*.9,('Desert clicks: volume %.2f .. %.2f (mean %.2f) over %d presses: the peak is the config volume %.1f (was .8), the gain cycle takes at most %d%% off'):format(lo,hi,sum/max(1,n),n,C.ClickVolume,floor((1-gmin)*100+.5)))
+  local pitches={};for _,p in ipairs(plays)do pitches[p.Speed]=true end;local np=0;for _ in pairs(pitches)do np+=1 end
+  check(np>=3 and np<=#C.ClickPitches,'...and the pitch still varies only within 0.98 .. 1.02 ('..np..' pitches)')
+ end
+ -- the sound and its volume are per biome in the config (the owner can change them later)
+ do
+  local old,oldV=C.PressSound.Desert,C.PressSoundVolume.Desert
+  C.PressSound.Desert=123456;C.PressSoundVolume.Desert=3.25
+  check(K.PressSoundId(2)=='rbxassetid://123456'and K.PressVolume(2)==3.25,'Config.PressSound / PressSoundVolume are read per biome name (a number is an asset id; a biome with an entry uses its own volume)')
+  C.PressSound.Desert=old;C.PressSoundVolume.Desert=oldV
+  check(K.PressSoundId(2)==CLICK and K.PressVolume(2)==C.ClickVolume,'...and an entry removed gives the click back')
+ end
+ hum.FloorMaterial=AIR;put(cx(11),F+9,cz(BR));frames(60)
+end
+
+-- 5g. R152 (owner: "for some areas on the track like this make sure that there is no keyboard tiles there": a Desert oasis with keys inside and under its water and a palm
+-- tree at its edge; rocks, logs and palm bases clip into keys too). The cells to leave out are data (map attribute KeyboardSkip, written by KeyboardSkip152 on the server);
+-- every key, letter and press agrees. 5g.1 the shared encoding and geometry, 5g.2 the scan on a synthetic map, 5g.3 the client with cells left out (live: the attribute changes).
+do
+ local X={} -- state shared by the blocks below (the main chunk is near Luau's limit of 200 local variables)
+ do -- 5g.1 --------------------------------------------------------------------------------------------------------------------
+ local set={}
+ for _,k in ipairs({{5,3},{5,4},{5,5},{6,4},{7,1},{7,22},{9,22},{9,21},{300,10},{728,22},{728,1}})do set[k[1]*64+k[2]]=true end
+ local enc=K.EncodeSkip(set,22,728,0)
+ check(enc=='1|22|728|0.000|5:3-5;6:4;7:1,22;9:21-22;300:10;728:1,22','K.EncodeSkip: column runs per row, in row order ('..enc..')')
+ local dset,drow,dn=K.DecodeSkip(enc,22,728,0)
+ local same=dn==11;for key in pairs(set)do if not dset[key]then same=false end end;for key in pairs(dset)do if not set[key]then same=false end end
+ check(same and drow[5]==3 and drow[7]==2 and drow[728]==2 and drow[8]==nil,'K.DecodeSkip gives the same cells back, and how many each row has')
+ local e1,e2,e3=K.DecodeSkip(enc,22,729,0);local f1,f2,f3=K.DecodeSkip(enc,26,728,0);local h1,h2,h3=K.DecodeSkip(enc,22,728,12)
+ check(e3==0 and f3==0 and h3==0,'a string written for another grid (other row count / columns / centre) is ignored: keys everywhere, as before R152')
+ local junk={'',nil,42,'1|22|728|0.000|','1|22|728|0.000|x:y;5:;:3;999999:1-2;3:0-99','2|22|728|0.000|5:3','1|22|728','garbage'}
+ local junkOk=true;for i=1,8 do local ok,_,_,n=pcall(K.DecodeSkip,junk[i],22,728,0);if not ok or(n or 0)>22 then junkOk=false end end
+ check(junkOk,'K.DecodeSkip never errors on junk (empty, nil, a number, a wrong version, half a header, bad runs) and never invents more than the grid')
+ local a2=table.clone(ATTR);a2.KeyboardSkip=enc
+ local gs=K.Geometry(a2,0)
+ check(gs.SkipCount==11 and gs.Skipped(5,4)and not gs.Skipped(5,6)and gs.RowSkip[5]==3 and K.Geometry(ATTR,0).SkipCount==0 and not K.Geometry(ATTR,0).Skipped(5,4),'K.Geometry carries the skipped cells (Skip, RowSkip, SkipCount, Skipped(row, col)); a map with no attribute has none')
+ end
+ do -- 5g.2 --------------------------------------------------------------------------------------------------------------------
+ local S=W.module('KeyboardSkip152');local SC=S.Config
+ check(SC.Flat==.10 and SC.Prop==.25 and SC.Grid==5,'scan thresholds: a flat feature (water / lava / ...) leaves a key out from 10% of its footprint, a prop from 25%')
+ local synth=R.new('Model');synth.Name='SynthMap';for k,v in pairs(ATTR)do synth:SetAttribute(k,v)end;synth.Parent=workspace
+ local function folder(parent,name)local f=R.new('Folder');f.Name=name;f.Parent=parent;return f end
+ local obbyS=folder(synth,'Obby');local biomesS=folder(obbyS,'Biomes');local desert=folder(biomesS,'Biome_2_GOLDEN_DESERT');local scen=folder(desert,'GeneratedScenery')
+ local polish=folder(synth,'EnvironmentPolishV127');local lobbyS=folder(synth,'Lobby');local basesS=folder(synth,'Bases')
+ local DR=100 -- a Desert row (stage 2)
+ local KW=K.KeySize(g.Pitch)
+ local function mk(parent,name,x,y,z,sx,sy,sz,t,rot)
+  local pt=R.new('Part');pt.Name=name;pt.Size=V3(sx,sy,sz);pt.Transparency=t or 0
+  if rot then pt.CFrame=R.CFrame.new(x,y,z,rot[1],rot[2],rot[3],rot[4],rot[5],rot[6],rot[7],rot[8],rot[9])else pt.CFrame=CF(x,y,z)end
+  pt.Parent=parent;return pt
+ end
+ -- a feature covering the left (+X) frac of cell (row, col)'s key footprint over its full depth: x from the key edge - .2 (inside the .5 grout) to edge - frac * KW
+ local function coverLeft(parent,name,row,col,frac,height,y0)
+  local xc=g.ColCenter(col);local zc=cz(row);local xe=xc+KW/2
+  local x1=xe+.2;local x0=xe-frac*KW
+  return mk(parent,name,(x0+x1)/2,(y0 or F)+height/2,zc,x1-x0,height,KW+.4)
+ end
+ local function pool(parent,name,height)local m=folder(parent,name);return m end
+ -- cells: (DR, 3) pool half: 50% -> out; (DR, 5) pool sliver ~4% -> in; (DR, 7) pool 15% (2 of 5 sample columns hit one -> 20%) -> out
+ local oasis=folder(scen,'Small oasis')
+ coverLeft(oasis,'Oasis water',DR,3,.5,.3);coverLeft(oasis,'Water edge',DR,5,.05,.3);coverLeft(oasis,'Water corner',DR,7,.15,.3)
+ -- props (not flat): 15% -> in, 40% -> out; a flush patch (top .05 over the floor) and a bridge (foot 12 over the floor) never count
+ local rocks=folder(scen,'Rock garden')
+ coverLeft(rocks,'Boulder',DR,9,.15,3);coverLeft(rocks,'Boulder',DR,11,.40,3);coverLeft(rocks,'Dirt patch',DR,13,1,.05);coverLeft(rocks,'Bridge',DR,15,1,3,F+12)
+ -- a palm trunk (1.9 square) with its stone base (6.7 x 5.0): the base covers over 25% of its key, the trunk 1.9 x 1.9 does not
+ local palm=folder(scen,'Palm corner')
+ mk(palm,'Palm trunk',g.ColCenter(17)-2,F+5,cz(DR),1.9,10,1.9);mk(palm,'Stone base',g.ColCenter(19),F+1,cz(DR),6.7,2,5.0)
+ -- liquid by an ancestor's name, by Material.Water, by a pit name; lava in another root
+ mk(folder(scen,'Frozen pond'),'Ice',g.ColCenter(21),F+.1,cz(DR),KW,.2,KW)
+ local wm=mk(scen,'Slab',g.ColCenter(1),F+.1,cz(DR+2),KW,.2,KW);wm.Material=R.Enum.Material.Water
+ mk(scen,'Sinkhole',g.ColCenter(2),F+.1,cz(DR+2),KW,.2,KW)
+ local lava=folder(folder(polish,'IrregularMagmaPools'),'LavaPool_1');mk(lava,'MagmaSurface',g.ColCenter(10),F+.4,cz(DR+2),KW,.2,KW)
+ -- never features: an invisible barrier, a part outside the scenery roots (Lobby, Bases), a spacebar row
+ mk(scen,'Oasis water',g.ColCenter(12),F+.4,cz(DR+2),KW,.4,KW,1)
+ mk(lobbyS,'Water',g.ColCenter(14),F+.4,cz(DR+2),KW,.4,KW);mk(basesS,'Lava',g.ColCenter(16),F+.4,cz(DR+2),KW,.4,KW)
+ local barRow=g.Segs[3].FirstRow
+ check(g.BarOfRow[barRow]~=nil,'(row '..barRow..' is the Desert spacebar)')
+ mk(scen,'Oasis water',g.ColCenter(10),F+.4,cz(barRow),KW,.4,KW)
+ -- a diamond pool (a square turned 45 degrees, half-diagonal 6) on (DR+4, 5): only its own cell; the axis-aligned box of the same part would reach the neighbours
+ local c45=math.cos(math.rad(45));local s45=math.sin(math.rad(45));local half=6/math.sqrt(2)*2/ 2
+ mk(scen,'Diamond pool',g.ColCenter(5),F+.2,cz(DR+4),12/math.sqrt(2)*1,.3,12/math.sqrt(2)*1,0,{c45,0,s45,0,1,0,-s45,0,c45})
+ -- round pools: a ball (radius 5.3: a box of that size would take the neighbours, a circle only 1 sample of one) and a standing disc (radius 5) on (DR+6, 5) and (DR+6, 12)
+ local ball=mk(scen,'Round pool',g.ColCenter(5),F+.5,cz(DR+6),10.6,10.6,10.6);ball.Shape=R.Enum.PartType.Ball
+ local disc=mk(scen,'Disc pool',g.ColCenter(12),F+.2,cz(DR+6),.4,10,10,0,{0,-1,0,1,0,0,0,0,1});disc.Shape=R.Enum.PartType.Cylinder
+ local res=S.Apply(synth,0)
+ local cells=res and res.Cells or {}
+ local function out(row,col)return cells[row*64+col]==true end
+ check(out(DR,3)and not out(DR,5)and out(DR,7),'flat features: a key half covered by water is left out, a 5% sliver stays, one with 15% of its width covered (20% of its footprint: over the 10%) is left out')
+ check(not out(DR,9)and out(DR,11),'props: 20% of a key covered by a boulder stays, 40% goes')
+ check(not out(DR,13)and not out(DR,15),'a flush patch (top .05 over the floor: under the key) and a bridge (foot 12 over the floor: above the key) never count')
+ check(out(DR,17)==false and out(DR,19),'a palm trunk (1.9 x 1.9 = 5% of a key) leaves it alone; its stone base (6.7 x 5.0 over 25% of a key) does not')
+ check(out(DR,21)and out(DR+2,1)and out(DR+2,2)and out(DR+2,10),'liquid by the ancestor\'s name (Frozen pond), by Material.Water, by a pit name (Sinkhole), by a lava pool\'s name in another scenery root')
+ check(not out(DR+2,12)and not out(DR+2,14)and not out(DR+2,16)and not out(barRow,10)and not out(barRow,9),'an invisible barrier, a part under Lobby / Bases (not scenery) and a feature on a spacebar row leave the keys alone')
+ check(out(DR+4,5)and not out(DR+4,4)and not out(DR+4,6)and not out(DR+3,5)and not out(DR+5,5),'a pool turned 45 degrees uses its real footprint (the hull of the turned box): its own key only; its axis-aligned box would take the neighbours too')
+ check(out(DR+6,5)and out(DR+6,12)and not out(DR+6,4)and not out(DR+6,6)and not out(DR+6,11)and not out(DR+6,13),'a ball and a standing disc are round: their own key only')
+ local n=0;for _ in pairs(cells)do n+=1 end
+ do local l={};for key in pairs(cells)do l[#l+1]=(key//64-DR)..':'..key%64 end;table.sort(l);print('scan cells (row - '..DR..': col): '..table.concat(l,' '))end
+ check(res and res.Count==n and n==11,'the scan counts what it leaves out ('..tostring(n)..' cells)')
+ local rep=res and res.Report[2]or{};local names={};for _,e in ipairs(rep)do names[e.Name]=e end
+ check(names['Small oasis']and names['Small oasis'].Class=='flat'and names['Small oasis'].Cells==2 and names['Rock garden']and names['Rock garden'].Class=='prop'and names['Rock garden'].Cells==1 and names['Palm corner']and names['Palm corner'].Cells==1,
+  'the report lists the areas per biome (stage 2): Small oasis (flat, 2 cells), Rock garden (prop, 1), Palm corner (prop, 1) ...')
+ local attrStr=synth:GetAttribute('KeyboardSkip');local back,_,backN=K.DecodeSkip(attrStr,22,728,0)
+ local sameCells=backN==n;for key in pairs(cells)do if not back[key]then sameCells=false end end
+ check(type(attrStr)=='string'and sameCells,'Apply publishes the cells as the map attribute KeyboardSkip (and it decodes to the same cells)')
+ S.Apply(synth,0)
+ check(synth:GetAttribute('KeyboardSkip')==attrStr,'scanning again gives the same string (the previous attribute is not read as a feature)')
+ do
+  local a3=synth:GetAttributes();a3.KeyboardSkip=nil
+  S.Config.Ignore={'rock garden'};local r2=S.Scan(synth,K.Geometry(a3,0));S.Config.Ignore={}
+  check(#SC.Ignore==0 and r2.Cells[DR*64+11]==nil and r2.Cells[DR*64+3]==true and r2.Count==n-1,'Config.Ignore: a model whose name has one of the words is never a feature (here Rock garden: one key back, the others stay); empty by default')
+ end
+ synth:Destroy()
+ end
+ do -- 5g.3 --------------------------------------------------------------------------------------------------------------------
+ hum.FloorMaterial=AIR;fxTier=3;frames(60*4);look(100)
+ local R0=BR -- Jungle row 60: the runner stands on (60, 11); every skipped cell lies within the near / far letter zone around him
+ local skip={}
+ local function add(r,a,b)for c=a,b do skip[r*64+c]=true end end
+ add(55,3,8);add(56,3,8);add(57,3,8);add(58,3,8)     -- a pool: 4 rows x 6 columns
+ add(60,15,15)                                        -- one cell
+ add(62,1,4);add(62,20,22)                            -- both ends of a row: strips trimmed
+ add(64,1,11)                                         -- the whole first half row: its strip is empty
+ add(66,1,22)                                         -- a whole row: no keys, no strips
+ add(68,5,7)                                          -- a gap in the middle of a half row: its letters are hidden
+ add(R0+50,10,13);add(R0+54,1,6)                      -- far rows (far letters: trimmed / gap); the stand-ins of a teleport reach them (they wait for their keys)
+ local skipStr=K.EncodeSkip(skip,22,g.Rows,0)
+ put(cx(11),F+9,cz(R0));frames(60)
+ local keysBefore=#keyParts()
+ map:SetAttribute('KeyboardSkip',skipStr);frames(60*3)  -- the attribute arrives after the keys were dressed: every bound row is dressed again
+ local nSkip=0;for _ in pairs(skip)do nSkip+=1 end
+ local idx=keyIndex();local wa,wb=K.KeyWindow(g,3,g.RowOfZ(cz(R0)),1)
+ local leaked,bare,total=0,0,0
+ for r=wa,wb do if not g.BarOfRow[r]then for c=1,22 do
+  local e=idx[r*64+c];total+=1
+  if skip[r*64+c]then if e then leaked+=1 end else if not e or e[1]~=1 then bare+=1 end end
+ end end end
+ check(leaked==0 and bare==0,('%d cells left out (a pool, a single cell, row ends, half and whole rows, gaps, far rows): none of them has a key, every other cell of the window rows %d .. %d does (%d keys in a window, %d leaked, %d bare)'):format(nSkip,wa,wb,total,leaked,bare))
+ check(#keyParts()<=total-nSkip+22*K.Tier(3).Hyst*2,('the keys bound: %d for %d keyed cells of the window rows (+ the rows kept by the hysteresis)'):format(#keyParts(),total-nSkip))
+ -- pressing: a runner on a left-out cell presses nothing and nothing clicks; next to it a key goes down
+ hum.FloorMaterial=PLASTIC;plays={}
+ put(cx(5),nil,cz(56));frames(20)
+ local downNear=0;for _,p in ipairs(keyParts())do if near(top(p),K.KeyTop(1),1e-6)then downNear+=1 end end
+ check(downNear==0 and #plays==0,'a runner standing in the pool (left-out cells) presses nothing and nothing clicks ('..downNear..' keys down, '..#plays..' plays)')
+ put(cx(11),nil,cz(R0));frames(20)
+ check(near(topOf(R0,11),K.KeyTop(1),1e-6)and #plays==1,'...a key next to the pool still goes down with its sound ('..#plays..')')
+ hum.FloorMaterial=AIR;put(cx(11),F+9,cz(R0));frames(30)
+ X.skip,X.nSkip,X.wa,X.wb,X.R0,X.skipStr=skip,nSkip,wa,wb,R0,skipStr
+ end
+ do
+ local skip,nSkip,wa,wb,R0=X.skip,X.nSkip,X.wa,X.wb,X.R0
+ -- letters: none over a left-out cell, exactly one over every other key of the letter rows; strips trimmed to their keys; empty strips are off
+ local perRow,bad,nearN,farN,labels=H.letterAudit()
+ local la,lb=K.FarLegendWindow(g,3,g.RowOfZ(cz(R0)),1)
+ local missing,over=0,0
+ for r=la,lb do if not g.BarOfRow[r]then for c=1,22 do
+  local has=perRow[r]and perRow[r][c]
+  if skip[r*64+c]then if has then over+=1 end else if not has then missing+=1 end end
+ end end end
+ local flaws=0;for _,v in pairs(bad)do flaws+=v end
+ check(missing==0 and over==0 and flaws==0,('letters: none over the %d left-out cells (%d floating), one over every other key of rows %d .. %d (%d missing), no flaws (%d); %d near + %d far strips'):format(nSkip,over,la,lb,missing,flaws,nearN,farN))
+ local trimBad,spanN,emptyOn,stripOverGap=0,0,0,0
+ for _,st in ipairs(legF:GetChildren())do
+  if(st.Name=='LegendStrip'or st.Name=='LegendFar')then
+   local gui=st:FindFirstChildWhichIsA('SurfaceGui');local pos=st.CFrame.Position
+   if pos.Y>0 and gui.Enabled~=false then
+    spanN+=1
+    local row=g.RowOfZ(pos.Z);local c1=g.ColOfX(pos.X+st.Size.X/2-.01);local c2=g.ColOfX(pos.X-st.Size.X/2+.01)
+    if skip[row*64+c1]or skip[row*64+c2]or c1<1 or c2>22 then trimBad+=1 end -- an end of the strip over a left-out cell = a strip floating over a gap
+    local shown=0;for _,l in ipairs(gui:GetChildren())do if l._class=='TextLabel'and l.Visible then shown+=1 end end
+    if shown==0 then emptyOn+=1 end
+    if row==66 then stripOverGap+=1 end
+   end
+  end
+ end
+ check(trimBad==0 and spanN>=40,('no letter strip floats over a gap: all %d bound strips start and end on a key (trimmed at row ends); none lies over the whole-row gap (%d), none is bound with no letter (%d)'):format(spanN,stripOverGap,emptyOn))
+ check(stripOverGap==0 and emptyOn==0,'a half row with no key has no strip; a strip with no visible letter is parked and its SurfaceGui is off')
+ local r62=0;for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 and g.RowOfZ(st.CFrame.Position.Z)==62 then r62+=1;check(st.Size.X<11*g.Pitch-1,'row 62: a near strip is shorter than a whole half row ('..string.format('%.1f',st.Size.X)..' of '..string.format('%.1f',11*g.Pitch)..')')end end
+ check(r62==2,'row 62 still has its two trimmed strips ('..r62..')')
+ end
+ do
+ local skip,nSkip,wa,wb,R0=X.skip,X.nSkip,X.wa,X.wb,X.R0
+ -- the real floor stays under the left-out cells: local copies at the floor's height and colour; none under a key
+ local patches=0;local covered=0;local keyedCovered=0
+ for _,pt in ipairs(groundF:GetChildren())do
+  if pt.Name=='GroundPatch'and pt.CFrame.Position.Z<5000 then
+   patches+=1
+   local fl=floors[g.RowStage[g.RowOfZ(pt.CFrame.Position.Z)]]
+   check(fl and near(pt.CFrame.Position.Y+pt.Size.Y/2,F,1e-6)and near(pt.Color.R,fl.Color.R,1e-6)and pt.CanCollide==false and pt.Anchored==true,'a floor copy lies at the floor top ('..F..') in its biome\'s floor colour, anchored, not solid')
+  end
+ end
+ for key in pairs(skip)do
+  local r,c=key//64,key%64;local x,z=g.CellCenter(r,c);local found=false
+  for _,pt in ipairs(groundF:GetChildren())do if pt.Name=='GroundPatch'and pt.CFrame.Position.Z<5000 then
+   local p=pt.CFrame.Position;if abs(x-p.X)<=pt.Size.X/2+1e-6 and abs(z-p.Z)<=pt.Size.Z/2+1e-6 then found=true end end end
+  if found then covered+=1 end
+ end
+ for r=wa,wb do for c=1,22 do if not skip[r*64+c]and not g.BarOfRow[r]then
+  local x,z=g.CellCenter(r,c)
+  for _,pt in ipairs(groundF:GetChildren())do if pt.Name=='GroundPatch'and pt.CFrame.Position.Z<5000 then
+   local p=pt.CFrame.Position;if abs(x-p.X)<=pt.Size.X/2 and abs(z-p.Z)<=pt.Size.Z/2 then keyedCovered+=1 end end end
+ end end end
+ check(covered==nSkip and keyedCovered==0,('every left-out cell has the real floor under it (%d of %d), no key stands on a floor copy (%d)'):format(covered,nSkip,keyedCovered))
+ check(patches>=7 and patches<=14,('...in %d merged patches (a block of cells is one part: the pool is one, not 24)'):format(patches))
+ -- effects authored at floor level stay at the floor over a left-out cell, and lift onto the keys elsewhere
+ local KS=W.module('KeyboardSurface149')
+ local px,pz=g.CellCenter(56,4);local kx,kz=g.CellCenter(R0,11)
+ check(KS.TopY(px,pz)==nil and KS.Lift(px,pz,F)==0 and near(KS.TopY(kx,kz),K.KeyTop(0)),'KeyboardSurface149: no lift over a left-out cell (the effect stays on the floor), the usual lift over a key')
+ end
+ do
+ local skip,nSkip,wa,wb,R0,skipStr=X.skip,X.nSkip,X.wa,X.wb,X.R0,X.skipStr
+ -- stand-ins never cover a row with left-out cells: teleport far away and back (the far rows wait under stand-ins): none lies over a row of the pool / gaps
+ local skipRows={};for key in pairs(skip)do skipRows[key//64]=true end
+ local slabOver,slabSeen=0,0
+ for _,jump in ipairs({1500,-1500,900})do
+  put(cx(11),F+9,cz(R0)+jump);frames(3);put(cx(11),F+9,cz(R0))
+  for f=1,8 do frames(1)
+   for _,p in ipairs(keysF:GetChildren())do if p.Name=='KeyFiller'and p.Transparency==0 then
+    slabSeen+=1
+    local z0,z1=p.CFrame.Position.Z-p.Size.Z/2,p.CFrame.Position.Z+p.Size.Z/2
+    for r in pairs(skipRows)do local a,b=g.RowZ(r);if a<z1-1e-6 and b>z0+1e-6 then slabOver+=1 end end
+   end end
+  end
+ end
+ check(slabOver==0 and slabSeen>0,('a stand-in never covers a row that has a left-out cell (%d overlaps in %d slab sightings)'):format(slabOver,slabSeen))
+ frames(60)
+ -- the attribute changes again: back to every key, floor copies gone
+ map:SetAttribute('KeyboardSkip',nil);frames(60*3)
+ local idx2=keyIndex();local bare2=0
+ for r=wa,wb do if not g.BarOfRow[r]then for c=1,22 do local e=idx2[r*64+c];if not e or e[1]~=1 then bare2+=1 end end end end
+ local left=0;for _,pt in ipairs(groundF:GetChildren())do if pt.Name=='GroundPatch'and pt.CFrame.Position.Z<5000 then left+=1 end end
+ check(bare2==0 and left==0,('with the attribute cleared every cell has its key again (%d bare) and no floor copy is left (%d)'):format(bare2,left))
+ local pn=0;local _,bad3=H.letterAudit();for _,v in pairs(bad3)do pn+=v end
+ check(pn==0,'...letters back on every key, no flaws ('..pn..')')
+ -- a string for another grid is ignored
+ map:SetAttribute('KeyboardSkip',(skipStr:gsub('^1|22|','1|24|')));frames(60*2)
+ local idx3=keyIndex();local bare3=0
+ for r=wa,wb do if not g.BarOfRow[r]then for c=1,22 do local e=idx3[r*64+c];if not e or e[1]~=1 then bare3+=1 end end end end
+ check(bare3==0,'an attribute written for another grid changes nothing: keys everywhere ('..bare3..' bare)')
+ map:SetAttribute('KeyboardSkip',nil);frames(30)
+ put(cx(11),F+9,cz(BR));frames(40)
+ end
+end
+
 -- 6. other players
 do
 hum.FloorMaterial=AIR
@@ -1167,7 +1632,7 @@ local other=R.new('Player');other.Name='Pal';other.UserId=5;other.Parent=Players
 local ochar,oroot=makeCharacter('Pal',cx(8),cz(BR));other.Character=ochar
 plays={};frames(8) -- a 30 Hz sample (up to 2 frames) + the .07 s press
 check(near(topOf(BR,8),K.KeyTop(1),1e-6),'another player standing on a key presses it')
-check(#plays==1 and plays[1].Speed>=.98 and plays[1].Speed<=1.02 and plays[1].Volume==C.ClickVolume,'...with one click, same recording, pitch and volume rule as your own ('..#plays..')')
+check(#plays==1 and plays[1].Speed>=.98 and plays[1].Speed<=1.02 and pressVol(plays[1],g.RowStage[BR])and plays[1].Id==K.PressSoundId(g.RowStage[BR]),'...with one sound, the biome\'s recording, pitch and volume rule as your own ('..#plays..')')
 oroot.CFrame=CF(cx(8),F+9,cz(BR));frames(14)
 check(near(topOf(BR,8),K.KeyTop(0),1e-6),'jumping high (feet more than 3 studs up) releases it')
 oroot.CFrame=CF(cx(8),F+5.5,cz(BR));frames(10)
@@ -1203,7 +1668,7 @@ plays={};frames(12)
 local ek=K.KeeperFootprint(6,6);local kdown=0
 for cc=12,16 do for rr=BR+2,BR+6 do if near(topOf(rr,cc)or 99,K.KeyTop(1),1e-6)then kdown+=1 end end end
 check(near(ek,1.8)and kdown>=1 and kdown<=4,'a keeper presses the keys under its feet (footprint '..ek..', '..kdown..' keys down)')
-check(#plays==1 and near(plays[1].Speed,C.KeeperPitch)and plays[1].Id=='rbxassetid://113108830240353','keeper: one click, the same recording a touch deeper (0.94)')
+check(#plays==1 and near(plays[1].Speed,C.KeeperPitch)and plays[1].Id==K.PressSoundId(g.RowStage[BR+4]),'keeper: one sound, the biome\'s recording a touch deeper (0.94)')
 kroot.CFrame=CF(300,F+5,cz(BR+4));frames(14)
 kdown=0;for cc=12,16 do for rr=BR+2,BR+6 do if near(topOf(rr,cc)or 99,K.KeyTop(1),1e-6)then kdown+=1 end end end
 check(kdown==0,'the keys come back up when the keeper walks away')
@@ -1240,8 +1705,8 @@ do
  check(down>=60 and riding==K.Tier(3).KeyLegends,('60 runners on 60 keys: all down, letters ride on %d of them (the tier-3 pool of %d)'):format(riding,K.Tier(3).KeyLegends))
  local voiceSet={};for i=#plays-11,#plays do if plays[i]then voiceSet[plays[i].Sound]=true end end;local nv=0;for _ in pairs(voiceSet)do nv+=1 end
  check(nv==min(12,#plays),'click voices rotate: the last 12 clicks used 12 different voices (the one reused is always the oldest)')
- local volOk=true;for _,o in ipairs(R.created)do if o._class=='Sound'and o._props.Name=='KeyClickSound'and(o.Volume~=C.ClickVolume or o.RollOffMinDistance~=C.ClickRollOffMin or o.RollOffMaxDistance~=C.ClickRollOffMax)then volOk=false end end
- check(volOk,'every voice keeps the same volume and roll-off (one volume-by-distance rule for every presser)')
+ local volOk=true;for _,o in ipairs(R.created)do if o._class=='Sound'and o._props.Name=='KeyClickSound'and(o.Volume>C.ClickVolume+1e-9 or o.Volume<C.ClickVolume*.85 or o.RollOffMinDistance~=C.ClickRollOffMin or o.RollOffMaxDistance~=C.ClickRollOffMax)then volOk=false end end
+ check(volOk,'every voice keeps the same roll-off and a volume within .85 .. 1 of the peak (one volume-by-distance rule for every presser)')
  for i=#others,1,-1 do others[i]=nil end
  for _,r2 in ipairs(crowd)do r2.Parent:Destroy()end
  frames(30)
