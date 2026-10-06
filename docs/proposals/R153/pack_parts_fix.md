@@ -64,6 +64,7 @@ Older suites narrowed for the intended changes:
 * `R151/tests/test_verity_pouch.luau`: the pouch's frame is now the seam frame.
 * `R151/tests/run_packs.sh`: the fingerprint diff allows the seated Void details.
 * `R151/tests/mutate_packs.py`: the Void star mutant's pattern.
+* `R151/tests/test_pack_shapes.luau`: on a tall design, at least 5% of the mock lattice must move (was 10%), because the pouch hold keeps more of its box still. Shoulders moves 6 to 9%.
 
 ## Not checkable without Studio
 
