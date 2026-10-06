@@ -48,8 +48,10 @@ function X.LocalFrame(e,t,spin)
  return e.Frame
 end
 -- World hover pose (same motion as before R122) plus galaxy / halo spin near the camera.
+-- R152 perf: the hover frame alone (what Pose returns), for a caller that does not move the pack's own parts this frame (it is off screen).
+function X.HoverFrame(r,now)return r.Origin*CF(0,math.sin(now*1.2)*.16,0)*CFrame.Angles(0,math.sin(now*.35)*.13,math.sin(now*.55)*.018)end
 function X.Pose(r,now,parts,frames,spin)
- local frame=r.Origin*CF(0,math.sin(now*1.2)*.16,0)*CFrame.Angles(0,math.sin(now*.35)*.13,math.sin(now*.55)*.018)
+ local frame=X.HoverFrame(r,now)
  for _,e in ipairs(r.Parts)do if e.Part.Parent then
   parts[#parts+1]=e.Part;frames[#frames+1]=frame*X.LocalFrame(e,now,spin)
  end end
@@ -117,17 +119,24 @@ function X.Clear(r)
  if r.Fx then r.Fx.Folder:Destroy();r.Fx=nil end
  X.Restore(r)
 end
+-- R152 perf: an effect object's property is written only when its value changes (the set is this module's own: nothing else writes it)
+local function put(fx,o,k,v)
+ local w=fx.Written;if not w then w={};fx.Written=w end
+ local key=w[o];if not key then key={};w[o]=key end
+ if key[k]~=v then key[k]=v;o[k]=v end
+end
 -- Moves effect parts in the same BulkMoveTo batch as the pack.
 function X.Step(r,now,frame,tier,reduced,lit,parts,frames)
  local fx=r.Fx;if not fx then return end
  local s=r.Scale
  parts[#parts+1]=fx.Core;frames[#frames+1]=frame
- fx.Haze.Enabled=tier>1;fx.Haze.Rate=tier==3 and 5 or 2
- fx.Nebula.Enabled=tier>1 and not reduced
- fx.Stars.Enabled=tier==3
- fx.Light.Enabled=lit and tier==3
- if fx.Light.Enabled then fx.Light.Brightness=reduced and 1.4 or 1.4+.8*math.sin(now*2.2)end
- if fx.Highlight then fx.Highlight.OutlineTransparency=reduced and .4 or .3+.12*math.sin(now*1.6)end
+ put(fx,fx.Haze,'Enabled',tier>1);put(fx,fx.Haze,'Rate',tier==3 and 5 or 2)
+ put(fx,fx.Nebula,'Enabled',tier>1 and not reduced)
+ put(fx,fx.Stars,'Enabled',tier==3)
+ local light=lit and tier==3
+ put(fx,fx.Light,'Enabled',light)
+ if light then put(fx,fx.Light,'Brightness',reduced and 1.4 or 1.4+.8*math.sin(now*2.2))end
+ if fx.Highlight then put(fx,fx.Highlight,'OutlineTransparency',reduced and .4 or .3+.12*math.sin(now*1.6))end
  -- Orbiting debris on a tilted ring; frozen in place under Reduced Motion.
  local t=reduced and 0 or now
  local orbit=frame*CFrame.Angles(.35,0,.2)
@@ -136,7 +145,7 @@ function X.Step(r,now,frame,tier,reduced,lit,parts,frames)
   parts[#parts+1]=p;frames[#frames+1]=orbit*CF(math.cos(a)*radius,math.sin(a*2)*.12*s,math.sin(a)*radius)*CFrame.Angles(t*1.3+i,t*.7,i)
  end
  for i,c in ipairs(fx.Comets)do
-  c.Trail.Enabled=not reduced
+  put(fx,c.Trail,'Enabled',not reduced)
   local a=-t*2.2+(i-1)*math.pi;local radius=1.55*s
   parts[#parts+1]=c.Part;frames[#frames+1]=frame*CFrame.Angles(-.5+i*.4,0,.3)*CF(math.cos(a)*radius,0,math.sin(a)*radius)
  end

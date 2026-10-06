@@ -20,6 +20,7 @@ local Rules=require(RS:WaitForChild('HubDisplayRules'));local Pose=require(RS:Wa
 local Batch;pcall(function()Batch=require(RS:WaitForChild('PlantAnimationBatch'))end)
 local Audio;pcall(function()Audio=require(RS:WaitForChild('InteractionAudio'))end)
 local ClientFx;pcall(function()ClientFx=require(RS:WaitForChild('ClientFxBudget'))end)
+local Cull;pcall(function()Cull=require(RS:WaitForChild('ViewCull152',5))end) -- R152 perf: an item out of view does not move its pieces (its core, light and sparkles still turn)
 local RGB=Color3.fromRGB
 local NEAR_IN,NEAR_OUT=260,300   -- studs from the camera to the item: the motion starts inside, stops outside (the stand is a landmark: it turns for the whole hub)
 local TICK=.5                    -- how often the distance (and what is on the display) is looked at
@@ -61,9 +62,14 @@ local function captureItem(entry)
  local folder=entry.Model:FindFirstChild('Item');local item=folder and folder:FindFirstChildOfClass('Model')
  local center=entry.Model:GetAttribute('ItemCenter')
  if not item or typeof(center)~='Vector3'then return end
- local origin=CFrame.new(center);local list={}
- for _,p in ipairs(item:GetDescendants())do if p:IsA('BasePart')then list[#list+1]={Part=p,Rel=origin:ToObjectSpace(p.CFrame),Home=p.CFrame}end end
+ local origin=CFrame.new(center);local list={};local reach=0
+ for _,p in ipairs(item:GetDescendants())do if p:IsA('BasePart')then
+  local rel=origin:ToObjectSpace(p.CFrame);list[#list+1]={Part=p,Rel=rel,Home=p.CFrame}
+  reach=math.max(reach,rel.Position.Magnitude+p.Size.Magnitude/2)
+ end end
  entry.ItemModel=item;entry.Parts=list;entry.Center=center;entry.Angle=0;entry.Core=item:FindFirstChild('ItemCore')
+ entry.Reach=reach+BOB+2 -- (R152 perf: a ball round the whole item as it turns and bobs; out of view = no piece of it can be on screen)
+ entry.CoreRec=nil;for _,r in ipairs(list)do if r.Part==entry.Core then entry.CoreRec=r end end
 end
 local function restoreItem(entry)
  if not entry.Parts then return end
@@ -143,7 +149,13 @@ local function step(dt)
     if Batch then
      entry.Batch=entry.Batch or Batch.new(workspace)
      local turn=CFrame.new(entry.Center+Vector3.new(0,math.sin(t*1.5)*BOB,0))*CFrame.Angles(0,entry.Angle,0)
-     for _,r in ipairs(entry.Parts)do if r.Part.Parent then entry.Batch:Set(r.Part,turn*r.Rel)end end
+     -- R152 perf: out of view (and not close: the giant pieces' close-up fade) only the core moves: its light and sparkles stay right; the pieces
+     -- (no shadow, no light) are put where they belong again in the frame the item comes back into view
+     if Cull and entry.Reach and Cull.Hidden(workspace.CurrentCamera,entry.Center,entry.Reach,12)then
+      local r=entry.CoreRec;if r and r.Part.Parent then entry.Batch:Set(r.Part,turn*r.Rel)end
+     else
+      for _,r in ipairs(entry.Parts)do if r.Part.Parent then entry.Batch:Set(r.Part,turn*r.Rel)end end
+     end
      entry.Batch:Flush()
     end
    end

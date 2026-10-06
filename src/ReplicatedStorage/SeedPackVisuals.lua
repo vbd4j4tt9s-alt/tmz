@@ -390,6 +390,8 @@ end
 -- V139 client-only seed decoration. Never moves or welds the authoritative seed.
 -- One owner updates/destroys each returned object; no per-particle event loops.
 local SeedMotion={};SeedMotion.__index=SeedMotion
+-- R152 perf: a seed aura's per-frame values are written only when they change (its own pieces; PropCache152, without it every write as before)
+local Cache do local ok,m=pcall(require,script.Parent.PropCache152);Cache=ok and m or{new=function()return{Set=function(o,k,v)o[k]=v end}end}end
 local V,CF=Vector3.new,CFrame.new
 local SOFT="rbxasset://textures/particles/flare_main.dds"
 local biomeColors={Forest=Color3.fromRGB(198,239,160),Jungle=Color3.fromRGB(255,203,104),
@@ -476,6 +478,7 @@ function Visuals.CreateSeedMotion(seed,parent,detailed)
  local self=setmetatable({Seed=seed,Rank=style.Rank,Color=style.Color,
   Biome=seed:GetAttribute("SeedBiome")or "Forest",Detailed=detailed~=false,
   Groups={},Rings={},Orbits={},Motes={},GlowItems={},Trails={},Destroyed=false},SeedMotion)
+ self.Set=Cache.new().Set
  local folder=Instance.new("Folder");folder.Name="SeedMotionV139";self.Folder=folder
  self.Anchor=fxPart(folder,"Seed aura anchor",Vector3.one*.02,self.Color,1)
  self.Core=softGlow(folder,self.Anchor,self.Color,self.Rank>=7 and 3.35 or 2.5,self.Rank>=7 and .19 or .14)
@@ -532,19 +535,19 @@ function Visuals.CreateSeedMotion(seed,parent,detailed)
  end
  folder.Parent=parent;return self
 end
-local function placeGroup(g,frame,scale,opacity,rescale)
+local function placeGroup(S,g,frame,scale,opacity,rescale)
  for _,p in ipairs(g.Pieces)do
-  p.Part.CFrame=frame*scaled(p.Frame,scale)
+  S(p.Part,'CFrame',frame*scaled(p.Frame,scale))
   if rescale then p.Part.Size=p.Size*scale end
-  p.Part.Transparency=1-(1-p.Alpha)*opacity
+  S(p.Part,'Transparency',1-(1-p.Alpha)*opacity)
  end
  if g.Trail then
   if rescale then g.TrailEnds[1].Position=V(0,.035*scale,0);g.TrailEnds[2].Position=V(0,-.035*scale,0)end
-  g.Trail.Enabled=opacity>.05
+  S(g.Trail,'Enabled',opacity>.05)
  end
 end
-local function placeRing(r,frame,scale,opacity,rescale)
- r.Anchor.CFrame=frame
+local function placeRing(S,r,frame,scale,opacity,rescale)
+ S(r.Anchor,'CFrame',frame)
  for _,a in ipairs(r.Arcs)do
   if rescale then
    local radius=r.Radius*scale
@@ -553,7 +556,7 @@ local function placeRing(r,frame,scale,opacity,rescale)
    local curve=4/3*math.tan((a.Finish-a.Start)/4)*radius
    a.Beam.CurveSize0=curve;a.Beam.CurveSize1=curve;a.Beam.Width0=r.Width*scale;a.Beam.Width1=r.Width*scale
   end
-  a.Beam.Enabled=opacity>.01
+  S(a.Beam,'Enabled',opacity>.01)
   if r.LastOpacity~=opacity then a.Beam.Transparency=NumberSequence.new(1-(1-r.Alpha)*opacity)end
  end
  r.LastOpacity=opacity
@@ -566,32 +569,33 @@ function SeedMotion:Update(frame,age,scale,opacity)
  if self.LastPosition and(self.LastPosition-frame.Position).Magnitude>math.max(8,4*scale)or opacity==0 then
   for _,t in ipairs(self.Trails)do t:Clear()end
  end
- self.LastPosition=frame.Position;self.Anchor.CFrame=frame
- self.Light.Enabled=opacity>.01;self.Light.Brightness=(.4+.14*math.sin(age*1.35))*opacity
- self.Light.Range=math.min(18,6*scale)
+ local S=self.Set
+ self.LastPosition=frame.Position;S(self.Anchor,'CFrame',frame)
+ S(self.Light,'Enabled',opacity>.01);S(self.Light,'Brightness',(.4+.14*math.sin(age*1.35))*opacity)
+ S(self.Light,'Range',math.min(18,6*scale))
  for _,g in ipairs(self.GlowItems)do
   if rescale then g.Gui.Size=UDim2.fromScale(g.Size*scale,g.Size*scale)end
-  g.Gui.Enabled=opacity>.01;g.Image.ImageTransparency=1-g.Opacity*opacity
+  S(g.Gui,'Enabled',opacity>.01);S(g.Image,'ImageTransparency',1-g.Opacity*opacity)
  end
- self.Core.Image.ImageTransparency=1-(self.Core.Opacity+.035*math.sin(age*1.35))*opacity
+ S(self.Core.Image,'ImageTransparency',1-(self.Core.Opacity+.035*math.sin(age*1.35))*opacity)
  for _,p in ipairs(self.Motes)do
   local life=(age*p.Speed+p.Offset)%1;local fade=math.sin(life*math.pi)^2
   local x=math.cos(p.Phase)*(1.05+(p.Index%3)*.13)+math.sin(age*.48+p.Phase)*.15
   local z=math.sin(p.Phase)*(.78+(p.Index%4)*.12)+math.sin(age*.33+p.Phase*1.4)*.14
-  p.Part.CFrame=frame*CF(V(x,-.86+life*2.3,z)*scale)
-  p.Glow.Image.ImageTransparency=1-fade*(.44+.12*math.sin(age*.9+p.Phase))*opacity
+  S(p.Part,'CFrame',frame*CF(V(x,-.86+life*2.3,z)*scale))
+  S(p.Glow.Image,'ImageTransparency',1-fade*(.44+.12*math.sin(age*.9+p.Phase))*opacity)
  end
  for _,o in ipairs(self.Orbits)do
   local plane=frame*CFrame.Angles(o.TiltX,math.sin(age*.17+o.Index)*.1,o.TiltZ)
-  placeRing(o.Ring,plane,scale,opacity,rescale)
+  placeRing(S,o.Ring,plane,scale,opacity,rescale)
   for _,item in ipairs(o.Nodes)do
    local a=item.Phase+age*o.Speed*o.Direction
    local offset=CF(V(math.cos(a)*o.Radius,0,math.sin(a)*o.Radius)*scale)*CFrame.Angles(age*.32,a,age*.22)
-   placeGroup(item.Group,plane*offset,scale,opacity,rescale)
+   placeGroup(S,item.Group,plane*offset,scale,opacity,rescale)
   end
  end
  if self.Eclipse then
-  placeRing(self.Eclipse,frame*CFrame.Angles(math.pi/2,0,.18-age*.10),scale,opacity*(.8+.2*math.sin(age*1.2)),rescale)
+  placeRing(S,self.Eclipse,frame*CFrame.Angles(math.pi/2,0,.18-age*.10),scale,opacity*(.8+.2*math.sin(age*1.2)),rescale)
  end
  for _,a in ipairs(self.Anim)do
   local t=age+a.Phase;local k
@@ -600,13 +604,13 @@ function SeedMotion:Update(frame,age,scale,opacity)
   else k=.5+.5*math.sin(t*2.2)end
   k=1-(1-k)*opacity
   local dark,bright=a.Color:Lerp(Color3.new(0,0,0),.4),a.Color:Lerp(Color3.new(1,1,1),.35)
-  a.Part.Color=dark:Lerp(bright,k)
+  S(a.Part,'Color',dark:Lerp(bright,k)) -- (the seed's own part: only this aura writes its colour while it runs)
  end
- if self.Rays then placeGroup(self.Rays,frame*CFrame.Angles(0,0,age*.25),scale,opacity*(.75+.25*math.sin(age*1.1)),rescale)end
+ if self.Rays then placeGroup(S,self.Rays,frame*CFrame.Angles(0,0,age*.25),scale,opacity*(.75+.25*math.sin(age*1.1)),rescale)end
  if self.Crown then
   local cf=frame*CF(0,(1.72+math.sin(age*1.3)*.04)*scale,0)*CFrame.Angles(0,-age*.16,0)
-  placeRing(self.Crown,cf,scale,opacity,rescale);placeGroup(self.CrownTeeth,cf,scale,opacity,rescale)
-  for _,j in ipairs(self.CrownJewels)do placeGroup(j.Group,cf*CF(V(math.cos(j.Angle)*.61,j.Height,math.sin(j.Angle)*.61)*scale),scale,opacity,rescale)end
+  placeRing(S,self.Crown,cf,scale,opacity,rescale);placeGroup(S,self.CrownTeeth,cf,scale,opacity,rescale)
+  for _,j in ipairs(self.CrownJewels)do placeGroup(S,j.Group,cf*CF(V(math.cos(j.Angle)*.61,j.Height,math.sin(j.Angle)*.61)*scale),scale,opacity,rescale)end
  end
 end
 function SeedMotion:Destroy()

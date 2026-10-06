@@ -108,7 +108,7 @@ function M.new(container,stage)
    local look=M.Looks[s.Kind]
    local e=emitter(look,keep(attach(part,vec(s.At),vec(s.Dir))),s.Kind)
    e.Size=seq(look.Size[1]*math.max(.6,s.Size*.55),look.Size[2]*math.max(.6,s.Size*.55))
-   table.insert(self.Emitters,{Emitter=e,Look=look,Kind=s.Kind,Part=part.Name})
+   table.insert(self.Emitters,{Emitter=e,Look=look,Kind=s.Kind,Part=part.Name,Rate=0,On=false})
   end
  end
  for _,x in ipairs(M.Extra[stage]or{})do
@@ -117,18 +117,20 @@ function M.new(container,stage)
    local a0=keep(attach(part,relative(cfg,x.Part,x.From),nil,'KeeperSlash152'));local a1=keep(attach(part,relative(cfg,x.Part,x.To),nil,'KeeperSlash152'))
    local t=Instance.new('Trail');t.Name='KeeperSlash152';t:SetAttribute('KeeperFxKind',x.Trail);t.Attachment0=a0;t.Attachment1=a1;t.Color=colours(M.Slash.Colors);t.Transparency=seq(.25,1)
    t.Lifetime=M.Slash.Life;t.LightEmission=.7;t.FaceCamera=false;t.Enabled=false;t.Parent=part
-   table.insert(self.Trails,{Trail=keep(t),Part=part.Name})
+   table.insert(self.Trails,{Trail=keep(t),Part=part.Name,On=false})
   elseif part then
    local look=M.Looks[x.Look]
    local host=look.Area and part or keep(attach(part,relative(cfg,x.Part,x.At),vec(x.Dir)))
    local e=emitter(look,host,x.Look);if look.Area then keep(e)end
-   table.insert(self.Emitters,{Emitter=e,Look=look,Kind=x.Look,Part=part.Name})
+   table.insert(self.Emitters,{Emitter=e,Look=look,Kind=x.Look,Part=part.Name,Rate=0,On=false})
   end
  end
  if #self.Emitters==0 and #self.Bolts==0 and #self.Trails==0 then return nil end
  return self
 end
 -- c: Now, Asleep, Chasing (hunting), Striking, Distance (camera), Tier (ClientFxBudget). Writes only what changed.
+-- (R152 perf: compared with what this module last wrote, not read back: Roblox keeps Rate as a 32-bit float, so a rate like .35 never
+-- read back equal and every emitter was written again every frame; only this module writes these emitters, beams and trails)
 function M.Step(self,c)
  if not self or self.Destroyed then return end
  local tier=M.TierScale[c.Tier]or 0;local on=tier>0 and(c.Distance or 0)<=M.Range
@@ -141,8 +143,8 @@ function M.Step(self,c)
  local cap=M.MaxKeeperRate*tier;local scale=total>cap and cap/total or 1
  for _,it in ipairs(self.Emitters)do
   local r=math.floor(it.Want*scale*100)/100;local e=it.Emitter
-  if e.Rate~=r then e.Rate=r end
-  if e.Enabled~=(r>0)then e.Enabled=r>0 end
+  if it.Rate~=r then it.Rate=r;e.Rate=r end
+  local en=r>0;if it.On~=en then it.On=en;e.Enabled=en end
  end
  local now=c.Now or os.clock();local rnd=self.Random
  for _,b in ipairs(self.Bolts)do
@@ -161,7 +163,7 @@ function M.Step(self,c)
   end
   if b.Shown~=show then b.Shown=show;for _,beam in ipairs(b.Beams)do beam.Enabled=show end end
  end
- for _,t in ipairs(self.Trails)do local want=on and c.Striking==true;if t.Trail.Enabled~=want then t.Trail.Enabled=want end end
+ for _,t in ipairs(self.Trails)do local want=on and c.Striking==true;if t.On~=want then t.On=want;t.Trail.Enabled=want end end
 end
 -- Current rates (tests, /test views): {total, count}.
 function M.Rates(self)
