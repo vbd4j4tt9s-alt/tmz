@@ -87,7 +87,7 @@ Budgets: about 1.2 reads a minute per server, one `UpdateAsync` per claim, at mo
 
 ## Tests
 
-`sh docs/proposals/R152/tests/run_void_giveaway.sh [scratch dir] [mutate]` (also in `tools/tests/run_all_suites.sh`): wiring, the server (224 checks: claim, second claim, race at 499, cap, full Bag, interrupted grants, failures, messaging, polling, Studio fallback, commands, guards, the review fixes: GiftLocked, account age, backoff, retries), the real player data (59, with GiftLocked saved, loaded, kept by Verity, ignored by an R151 server), the pedestal (59), the client (92), and the R149 z-fighting detector on the pedestal, pack and effects. `mutate` breaks 90 things one at a time; each must make a suite fail.
+`sh docs/proposals/R152/tests/run_void_giveaway.sh [scratch dir] [mutate]` (also in `tools/tests/run_all_suites.sh`): wiring, the server (224 checks: claim, second claim, race at 499, cap, full Bag, interrupted grants, failures, messaging, polling, Studio fallback, commands, guards, the review fixes: GiftLocked, account age, backoff, retries), the real player data (59, with GiftLocked saved, loaded, kept by Verity, ignored by an R151 server), the pedestal (59), the client (101), and the R149 z-fighting detector on the pedestal, pack and effects. `mutate` breaks 90 things one at a time; each must make a suite fail.
 
 R151's `static_checks.sh` was updated on purpose: MessagingService is now used by the announcer **and** the giveaway, and `VoidGiveaway152.lua` is a known pack source (a real one: it announces).
 
