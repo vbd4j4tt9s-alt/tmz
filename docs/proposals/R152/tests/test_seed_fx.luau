@@ -127,7 +127,10 @@ local function stageChecks(withArt)
    local textured=0;for _,p in ipairs(sc.Planets)do if p.Art then textured+=1 end end
    if withArt then
     check(textured==3 and count(sc.Folder,'Planet atmosphere')==0,t..': the three planets are textured spheres with atmospheres')
-    local neb=0;for _ in pairs(sc.NebulaArt)do neb+=1 end;check(neb==#sc.Nebula,t..': every nebula is a cloud of gas ('..neb..')')
+    local neb,onWall=0,true;for _,a in pairs(sc.NebulaArt)do neb+=1;local wall=a.Gui and a.Gui.Parent;if not(wall and wall.Name=='Wall back')then onWall=false end
+     local img=a.Image;local top=img.Position.Y.Scale-img.Size.Y.Scale/2;local bottom=img.Position.Y.Scale+img.Size.Y.Scale/2;if top<0 or bottom>1 then onWall=false end end
+    check(neb==(lite and 3 or 5)and #sc.Nebula==0,t..': every nebula is a cloud of gas ('..neb..'), no neon disc')
+    check(onWall,t..': painted wholly on the far wall (a cloud cut by the floor or a wall showed a hard edge)')
    else
     check(textured==0 and count(sc.Folder,'Planet atmosphere')==3 and count(sc.Folder,'Planet ring')==1,t..': plain planets with an atmosphere shell, the third ringed')
     local mats={};for _,p in ipairs(sc.Planets)do mats[p.Body.Material.Name]=true end
@@ -228,7 +231,9 @@ for tier=1,3 do
  local B=Fx.Budget[tier];local tag='sky beam, tier '..tier
  local folder=R.new('Folder');folder.Name='BeamTest';folder.Parent=W.workspace
  local b=Fx.Beam({Parent=folder,Name='Light beam',Ground=V3(10,0,20),Height=140,Width=2.5,Color=R.Color3.fromRGB(170,120,255),Land=1,Descent=.16,Hold=1.5,Fade=1,Tier=tier,Cracks=true})
- check(#b.Streaks==B.Streaks and(b.Haze~=nil)==B.Haze and #b.Ring==B.Ring and #b.Debris==B.Debris and #b.Cracks==B.Cracks,tag..': '..(3+B.Streaks-(B.Haze and 0 or 1))..' layers, '..#b.Ring..' ring pieces, '..#b.Debris..' debris, '..#b.Cracks..' cracks (its budget)')
+ -- (the shockwaves: two smooth image rings from tier 2 when the halo image is drawn - it is, here; otherwise rings of segments)
+ local ringsOk=(tier>=2 and b.RingArt~=nil and #b.RingArt==2 and #b.Ring==0)or(tier==1 and b.RingArt==nil and #b.Ring==B.Ring)
+ check(#b.Streaks==B.Streaks and(b.Haze~=nil)==B.Haze and ringsOk and #b.Debris==B.Debris and #b.Cracks==B.Cracks,tag..': '..(3+B.Streaks-(B.Haze and 0 or 1))..' layers, '..(b.RingArt and'2 image rings'or(#b.Ring..' ring pieces'))..', '..#b.Debris..' debris, '..#b.Cracks..' cracks (its budget)')
  local beams=0;local ok=true
  for _,d in ipairs(folder:GetDescendants())do
   if d.ClassName=='Beam'then beams+=1;if not(d.Attachment0 and d.Attachment1 and d.Attachment0.Parent==b.Anchor and d.Attachment1.Parent==b.Anchor)then ok=false end
@@ -247,10 +252,10 @@ for tier=1,3 do
    lastFoot=foot
   end
   if b.Landed and not landedAt then landedAt=t end
-  local shown=false;for _,s in ipairs(b.Ring)do if s.Transparency<1 then shown=true end end
+  local shown=b:RingShown()
   if shown and a<0 then ringEarly=true end
   if shown and a>=0 and a<.6 then ringSeen=true end
-  if a>2.3 then local cf=b.Ring[1].CFrame;if lastRing and lastRing~=cf then impactAfter=true end;lastRing=cf end
+  if a>2.3 then local cf=(b.RingArt and b.RingArt[1].Part or b.Ring[1]).CFrame;if lastRing and lastRing~=cf then impactAfter=true end;lastRing=cf end
  end
  check(not early,tag..': nothing before it starts coming down')
  check(accel,tag..': its foot falls faster and faster (a slam, not a slide)')

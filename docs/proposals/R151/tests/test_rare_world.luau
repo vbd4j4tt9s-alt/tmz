@@ -128,7 +128,7 @@ for rank=6,8 do
    if t<tl.Burst-e.Beam.Descent-.03 and e.Beam:Visible()then early=true end
    if e.Beam.Landed and not landedAt then landedAt=t end
    if t>tl.Burst+.3 and t<tl.Burst+1 and e.Beam:Visible()then pillar=true end
-   if t>tl.Burst+.3 and t<tl.Burst+.8 then for _,s in ipairs(e.Beam.Ring)do if s.Transparency<.9 then ring=true end end end
+   if t>tl.Burst+.3 and t<tl.Burst+.8 and e.Beam:RingShown()then ring=true end
   end
  end)
  local e=World.Get(who)

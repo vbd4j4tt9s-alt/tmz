@@ -60,7 +60,7 @@ function W.Begin(player,character,rank,at,opts)
  for i=1,(isLite and 6 or 10)do e.Motes[i]=part(f,'Charge mote',V(.16,.16,.16),Rules.Neutral,Enum.PartType.Ball)end
  -- the sky beam: lands on the burst, holds, thins out by PillarEnd (budget: ClientFxBudget tier; low quality = tier 1)
  local fxTier=isLite and math.min(2,Fx.Tier())or Fx.Tier()
- e.Beam=Fx.Beam({Parent=f,Name='Light beam',Ground=W.Ground(character),Height=140,Width=rank==8 and 2.9 or rank==7 and 2.7 or 2.5,Color=color,Glow=tier.Glow,
+ e.Beam=Fx.Beam({Parent=f,Name='Light beam',Ground=W.Ground(character),Height=140,Width=rank==8 and 3.6 or rank==7 and 3.4 or 3.2,Color=color,Glow=tier.Glow,
   Land=e.TL.Burst,Descent=.16,Hold=1.5,Fade=e.TL.PillarEnd-e.TL.Burst-1.5,Tier=fxTier,Reduced=e.Reduced,Cracks=true})
  effects[player]=e
  if not connection then connection=Run.RenderStepped:Connect(function()step()end)end

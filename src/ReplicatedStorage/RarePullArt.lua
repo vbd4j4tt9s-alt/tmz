@@ -19,7 +19,7 @@
 -- 'pending' or 'failed'. Every user keeps its plain parts as the fallback (EditableImage off, its memory budget used up, low quality).
 local A={Version=152}
 A.SliceSeconds=.004
-A.Hooks={} -- tests / preview: Create(w,h,rgba) -> object; Content(object) -> content; Spawn(fn); Wait()
+A.Hooks={} -- tests / preview: Create(w,h,rgba,name) -> object; Content(object) -> content; Spawn(fn); Wait()
 A.Sizes={planet_gas={192,192},planet_rock={192,192},planet_ring={256,256},nebula_rose={128,128},nebula_blue={128,128},starmap={192,192},
  glow={64,64},halo={128,128},runes={256,256},carpet={64,128},banner={96,192},glass={96,192},damask={96,96}}
 A.Order={'glow','halo','planet_gas','planet_rock','planet_ring','nebula_rose','nebula_blue','starmap','runes','carpet','banner','glass','damask'}
@@ -320,14 +320,15 @@ P.damask=function(w,h,step)
    local x,y=(u-.5)*2,(v-.5)*2
    -- a damask flourish: a four-petal outline, a small ring at its heart, quarter arcs in the corners (they meet the next tile's)
    local rr=sqrt(x*x+y*y);local ang=atan2(y,x)
-   local outline=exp(-((rr-(.44+.2*cos(ang*4)))^2)/.0022)
-   local inner=exp(-((rr-.15)^2)/.0012)+exp(-(rr*rr)/.004)*.8
+   -- (tone on tone: a woven sheen a little darker and warmer than the silk, never a drawn outline)
+   local outline=exp(-((rr-(.44+.2*cos(ang*4)))^2)/.0035)
+   local inner=exp(-((rr-.15)^2)/.0016)+exp(-(rr*rr)/.006)*.8
    local cr=sqrt((1-abs(x))^2+(1-abs(y))^2)
-   local corner=exp(-((cr-.36)^2)/.0018)
+   local corner=exp(-((cr-.36)^2)/.0026)
    local k=clamp01(outline*.9+inner*.8+corner*.75)
-   local paper=.94+.04*vnoise(px*.25,py*.25,71,floor(w*.25))
+   local paper=.95+.03*vnoise(px*.25,py*.25,71,floor(w*.25))
    local r,g,b=.93*paper,.88*paper,.78*paper
-   r,g,b=mix(r,.78,k*.6),mix(g,.62,k*.6),mix(b,.36,k*.6)
+   r,g,b=mix(r,.84,k*.32),mix(g,.74,k*.32),mix(b,.54,k*.32)
    c.set(px,py,r,g,b,1)
   end
   if step then step()end
@@ -344,8 +345,8 @@ end
 -- Client side ------------------------------------------------------------------------------------------------------------------------------
 local entries={} -- name -> {State='pending'|'ready'|'failed', Value, Content, Why}
 local queue={};local worker=false
-local function createImage(w,h,rgba)
- if A.Hooks.Create then return A.Hooks.Create(w,h,rgba)end
+local function createImage(w,h,rgba,name)
+ if A.Hooks.Create then return A.Hooks.Create(w,h,rgba,name)end
  local image=game:GetService('AssetService'):CreateEditableImage({Size=Vector2.new(w,h)})
  assert(image,'no EditableImage (memory budget or API unavailable)')
  image:WritePixelsBuffer(Vector2.zero,Vector2.new(w,h),rgba)
@@ -360,7 +361,7 @@ local function work()
   local name=table.remove(queue,1);local e=entries[name]
   local ok,value=pcall(function()
    local w,h,rgba=A.Pattern(name,step);assert(w,'unknown image '..tostring(name))
-   local image=createImage(w,h,rgba)
+   local image=createImage(w,h,rgba,name)
    return {Image=image,Content=contentOf(image)}
   end)
   if ok and value then e.State='ready';e.Value=value.Image;e.Content=value.Content else e.State='failed';e.Why=tostring(value)end

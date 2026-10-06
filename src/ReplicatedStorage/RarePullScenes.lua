@@ -196,8 +196,8 @@ function Scene:_void()
  local pack=Rules.Points[6].Pack
  -- the seal under the pack: a glowing rune circle on the black glass that turns slowly and flares as the lock opens (an image; without it,
  -- the neon seams of R151)
- local seal=self:Art('runes')and self:Part('Rune circle',V(16,.04,16),CF(pack.X,.03,pack.Z),C(8,4,14),SMOOTH,0)
- self.Runes=seal and self:FaceArt(seal,Enum.NormalId.Top,'runes',{Unlit=true,Color=C(186,130,255),PixelsPerStud=16})
+ local seal=self:Art('runes')and self:Part('Rune circle',V(34,.04,34),CF(pack.X,.03,pack.Z),C(8,4,14),SMOOTH,0)
+ self.Runes=seal and self:FaceArt(seal,Enum.NormalId.Top,'runes',{Unlit=true,Color=C(186,130,255),PixelsPerStud=8}) -- (34 studs across: it reaches out to where the floor is in view)
  if seal and not self.Runes then seal:Destroy();self.Count-=1 end
  if not self.Runes then
   for i=1,(lite and 4 or 8)do
@@ -249,18 +249,30 @@ function Scene:_space()
  for i=1,(lite and 4 or 8)do local s=stars[i];self:Part('Bright star',V(.5,.5,.5),CF(s[1],s[2],s[3]),C(255,255,255),NEON,0,BALL)end
  -- the star map on the far walls and the ceiling (unlit, tiled; without the image, the particle starfield alone)
  local box=self.Folder
- for _,w in ipairs({{'Wall back',Enum.NormalId.Back},{'Wall left',Enum.NormalId.Right},{'Wall right',Enum.NormalId.Left},{'Ceiling',Enum.NormalId.Bottom}})do
-  local wall=box:FindFirstChild(w[1]);if wall then self:FaceArt(wall,w[2],'starmap',{Unlit=true,PixelsPerStud=6,Tile=180,Color=C(220,225,255)})end
+ local farWall
+ -- (and, dimmer, on the floor: space all around, no floor line under the far wall's stars)
+ for _,w in ipairs({{'Wall back',Enum.NormalId.Back},{'Wall left',Enum.NormalId.Right},{'Wall right',Enum.NormalId.Left},{'Ceiling',Enum.NormalId.Bottom},{'Floor',Enum.NormalId.Top,C(110,118,160)}})do
+  local wall=box:FindFirstChild(w[1]);if wall then local a=self:FaceArt(wall,w[2],'starmap',{Unlit=true,PixelsPerStud=6,Tile=180,Color=w[3]or C(220,225,255)});if w[1]=='Wall back'then farWall=a and{Art=a,Part=wall}end end
  end
  self.Nebula={}
- -- nebulae: clouds of gas drawn on the client, turning very slowly (without the images: the soft neon discs of R151)
+ -- nebulae: clouds of gas drawn on the client, painted on the far wall over its star map (as camera-facing images, clouds this big cut into
+ -- the floor and the walls), wholly on it, turning very slowly. Without the images: the soft neon discs of R151.
  local neb={{C(255,90,200),-18,18,-62,34,'nebula_rose'},{C(120,90,255),14,26,-66,40,'nebula_blue'},{C(60,200,255),-2,10,-70,46,'nebula_blue'},{C(255,140,90),26,4,-64,26,'nebula_rose'},{C(150,60,220),-30,34,-60,30,'nebula_rose'}}
  self.NebulaBase={};self.NebulaArt={}
  for i=1,(lite and 3 or 5)do
-  local n=neb[i]
-  self.Nebula[i]=self:Part('Nebula',V(.3,n[5],n[5]),CF(n[2],n[3],n[4])*ANG(0,math.pi/2,0)*ANG(0,0,0),n[1],NEON,.88,CYL);self.NebulaBase[i]=self.Nebula[i].CFrame
-  local art=self:Billboard(self.Nebula[i],n[5]*1.35,n[6],n[1]:Lerp(C(255,255,255),.25))
-  if art then self.Nebula[i].Transparency=1;art.Image.ImageTransparency=.12;self.NebulaArt[i]=art end
+  local n=neb[i];local content=farWall and self:Art(n[6])
+  if content then
+   local ws=farWall.Part.Size;local size=n[5]*1.2;local y=math.max(n[3],size/2+2)
+   local img=Instance.new('ImageLabel');img.Name='Nebula';img.BackgroundTransparency=1;img.AnchorPoint=Vector2.new(.5,.5);img.ZIndex=2
+   img.Position=UDim2.fromScale((n[2]+ws.X/2)/ws.X,1-y/ws.Y);img.Size=UDim2.fromScale(size/ws.X,size/ws.Y)
+   img.ImageColor3=n[1]:Lerp(C(255,255,255),.15);img.ImageTransparency=.3
+   if pcall(function()img.ImageContent=content end)then img:SetAttribute('RarePullArt',n[6]);img.Parent=farWall.Art.Gui;self.Images+=1;self.NebulaArt[i]={Gui=farWall.Art.Gui,Image=img}
+   else img:Destroy()end
+  end
+  if not self.NebulaArt[i]then
+   local k=#self.Nebula+1
+   self.Nebula[k]=self:Part('Nebula',V(.3,n[5],n[5]),CF(n[2],n[3],n[4])*ANG(0,math.pi/2,0)*ANG(0,0,0),n[1],NEON,.88,CYL);self.NebulaBase[k]=self.Nebula[k].CFrame
+  end
  end
  self.Planets={}
  -- textured planets: a lit sphere drawn on the client (its image is the planet and its atmosphere rim; the third is ringed). Without the
@@ -301,7 +313,7 @@ function Scene:_throne()
  self:Box(30,48,24,11,C(232,222,204),cream,MARBLE,SMOOTH)
  -- (R152) damask on the walls (tiled; without the image, the plain cream walls)
  for _,w in ipairs({{'Wall back',Enum.NormalId.Back},{'Wall left',Enum.NormalId.Right},{'Wall right',Enum.NormalId.Left}})do
-  local wall=self.Folder:FindFirstChild(w[1]);if wall then self:FaceArt(wall,w[2],'damask',{StudsPerTile={5,5}})end
+  local wall=self.Folder:FindFirstChild(w[1]);if wall then self:FaceArt(wall,w[2],'damask',{StudsPerTile={3.4,3.4}})end
  end
  -- floor trim and carpet (R152: woven with gold borders and a running diamond; without the image, plain crimson)
  local carpet=self:Part('Carpet',V(4.2,.08,38),CF(0,.04,15.5),crimson,FABRIC)
@@ -381,8 +393,8 @@ function Scene:_throne()
  -- carpet; one crowns it on the throne (it has the light)
  local tl=Rules.Timeline(8,self.Reduced and'Calm'or'Full')
  self.CarryBeam=Fx.Beam({Parent=self.Folder,Name='Carry beam',Ground=self.Origin.Position,Height=20,Width=2.4,Color=gold,Glow=C(255,244,214),Arrive='fade',
-  Land=tl.SceneIn,Hold=math.max(.1,tl.Land+.3-tl.SceneIn),Fade=.4,Impact=false,Light=false,Tier=self.FxTier,Reduced=self.Reduced})
- self.CrownBeam=Fx.Beam({Parent=self.Folder,Name='Crown beam',Ground=(self.Origin*CF(pk.X,pk.Y-Rules.PackHeroHeight*.5,pk.Z)).Position,Height=19,Width=2.7,Color=gold,Glow=C(255,246,220),Arrive='fade',
+  Land=tl.SceneIn,Hold=math.max(.1,tl.Land+.3-tl.SceneIn),Fade=.4,Impact=false,Light=false,Strength=.8,Tier=self.FxTier,Reduced=self.Reduced})
+ self.CrownBeam=Fx.Beam({Parent=self.Folder,Name='Crown beam',Ground=(self.Origin*CF(pk.X,pk.Y-Rules.PackHeroHeight*.5,pk.Z)).Position,Height=19,Width=2.2,Color=gold,Glow=C(255,246,220),Arrive='fade',Strength=.6,
   Land=tl.CrownStart+.4,Hold=tl.Climax+.6-(tl.CrownStart+.4),Fade=1.2,Impact=false,Light=true,Tier=self.FxTier,Reduced=self.Reduced})
  self.BeamLight=self.CrownBeam.Light;self.Lights+=1
  -- the crown: band, points with jewels

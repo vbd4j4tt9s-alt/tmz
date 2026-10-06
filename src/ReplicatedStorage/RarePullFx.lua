@@ -4,15 +4,19 @@
 -- Legendary / Mythic pull (RevealFlourish) and the King's carry / crown beams in the throne room (RarePullScenes), scaled by tier.
 --  Layers (Beams between attachments, textures that ship with every client, already used by the game):
 --   core    a narrow white-hot beam (no texture), fading out toward the sky
---   glow    a wider soft beam (flare texture) streaming down
+--   glow    a wider soft beam (flare texture) in the tier colour, streaming down (half light, half colour: a fully additive beam is a white
+--           line in daylight)
 --   haze    a wide smoky sleeve (smoke texture) drifting down slowly (not on low quality)
 --   streaks 1-3 thin sparkle streaks that twist around the core (their attachments orbit), streaming fast
 --  Arrival: it SLAMS DOWN from the sky (its foot drops from the top to the ground in Descent seconds, accelerating) and lands on Land, then
---  holds (the core breathing), then thins out and fades. Landing on the ground: a flash (PointLight), two shockwave rings, dust kicked out,
+--  holds (the core breathing), then thins out and fades. Landing on the ground: a flash (PointLight), two shockwave rings (smooth: the
+--  client-drawn halo image on a flat part, white and tier colour; rings of segments without it / on low quality), dust kicked out,
 --  sparks, debris, glowing cracks (Secret+), embers rising inside the beam while it holds. A beam that "fades" in (the King's) has no slam.
 --  Everything sits under one anchor part that follows its subject (Update(t, ground)), and is gone with Destroy(). Budgets per
 --  ClientFxBudget tier: Fx.Budget. Driven by its owner's clock: Update(t) every frame, no task.delay, nothing runs after Destroy().
+--  opts.Strength dims the layers (the King's beams: the crown is the star, not the light).
 local Fx={}
+local Art do local ok,m=pcall(require,script.Parent.RarePullArt);Art=ok and m or nil end
 local V,CF,ANG=Vector3.new,CFrame.new,CFrame.Angles
 local C=Color3.fromRGB
 Fx.SPARK='rbxasset://textures/particles/sparkles_main.dds';Fx.SMOKE='rbxasset://textures/particles/smoke_main.dds';Fx.FLARE='rbxasset://textures/particles/flare_main.dds'
@@ -44,22 +48,23 @@ local function emitter(parent,name,props)
 end
 local Beam={};Beam.__index=Beam
 -- opts: {Parent, Name, Ground (Vector3), Height, Width, Color, Glow, Land, Descent, Hold, Fade, Tier, Reduced, Impact (ground effects),
---        Cracks, Arrive ('slam' | 'fade'), Light (default true), Dust (Color3)}
+--        Cracks, Arrive ('slam' | 'fade'), Light (default true), Dust (Color3), Strength (0..1: how bright its layers are, default 1)}
 function Fx.Beam(opts)
  local tier=math.clamp(opts.Tier or Fx.Tier(),1,3);local budget=Fx.Budget[tier]
  local W=opts.Width or 2;local H=opts.Height or 120
  local self=setmetatable({Opts=opts,Tier=tier,Budget=budget,W=W,H=H,Land=opts.Land or 0,Descent=opts.Descent or .16,Hold=opts.Hold or 1.4,Fade=opts.Fade or 1,
-  Color=opts.Color or C(255,255,255),Glow=opts.Glow or C(255,255,255),Reduced=opts.Reduced==true,Arrive=opts.Arrive or'slam',ImpactHidden=true,Streaks={},Ring={},Ring2={},Debris={},Cracks={},Cache={}},Beam)
+  Color=opts.Color or C(255,255,255),Glow=opts.Glow or C(255,255,255),Reduced=opts.Reduced==true,Arrive=opts.Arrive or'slam',Strength=math.clamp(opts.Strength or 1,0,1),ImpactHidden=true,Streaks={},Ring={},Ring2={},Debris={},Cracks={},Cache={}},Beam)
  local folder=Instance.new('Folder');folder.Name=opts.Name or'Sky beam';folder.Parent=opts.Parent;self.Folder=folder
  local anchor=part(folder,'Beam anchor',V(.2,.2,.2),self.Color);self.Anchor=anchor
  anchor.CFrame=CF(opts.Ground or Vector3.zero)
  self.Top=attachment(anchor,'Top');self.Foot=attachment(anchor,'Foot')
  local white=C(255,255,255)
  self.Core=beam(folder,'Beam core',self.Top,self.Foot,{Color=ColorSequence.new(self.Glow:Lerp(white,.6),white),LightEmission=1,Width0=W*.22,Width1=W*.34,Texture='',TextureLength=1})
- self.GlowBeam=beam(folder,'Beam glow',self.Top,self.Foot,{Color=ColorSequence.new(self.Color,self.Glow),LightEmission=1,Width0=W*.8,Width1=W*1.15,
+ -- (the glow and the haze half add light, half paint their colour: in daylight a fully additive beam washes out to a white line)
+ self.GlowBeam=beam(folder,'Beam glow',self.Top,self.Foot,{Color=ColorSequence.new(self.Color,self.Color:Lerp(self.Glow,.5)),LightEmission=.6,Width0=W*1.0,Width1=W*1.35,
   Texture=Fx.FLARE,TextureMode=Enum.TextureMode.Wrap,TextureLength=math.max(4,H/7),TextureSpeed=self.Reduced and .4 or 1.6})
  if budget.Haze then
-  self.Haze=beam(folder,'Beam haze',self.Top,self.Foot,{Color=ColorSequence.new(self.Color:Lerp(white,.25),self.Color),LightEmission=.35,Width0=W*2.4,Width1=W*2.1,
+  self.Haze=beam(folder,'Beam haze',self.Top,self.Foot,{Color=ColorSequence.new(self.Color:Lerp(white,.15),self.Color),LightEmission=.15,Width0=W*2.6,Width1=W*2.2,
    Texture=Fx.SMOKE,TextureMode=Enum.TextureMode.Wrap,TextureLength=math.max(6,H/4),TextureSpeed=self.Reduced and .1 or .35})
  end
  for i=1,budget.Streaks do
@@ -83,13 +88,27 @@ function Fx.Beam(opts)
   self.Sparks=emitter(ground,'Impact sparks',{Texture=Fx.SPARK,LightEmission=1,Color=ColorSequence.new(white,self.Glow),Lifetime=NumberRange.new(.45,.9),
    Speed=NumberRange.new(W*5,W*10),SpreadAngle=Vector2.new(70,70),EmissionDirection=Enum.NormalId.Top,Drag=2,Acceleration=V(0,-W*4,0),
    Size=NumberSequence.new({NumberSequenceKeypoint.new(0,W*.2),NumberSequenceKeypoint.new(1,0)})})
-  for i=1,budget.Ring do self.Ring[i]=part(folder,'Shockwave',V(.4,.08,.3),white)end
-  for i=1,math.max(8,math.floor(budget.Ring*.75))do self.Ring2[i]=part(folder,'Shockwave glow',V(.4,.05,.6),self.Color)end
+  -- the shockwaves: two smooth rings on the ground (the client-drawn halo image on a flat part, unlit: one white, one in the tier colour);
+  -- without the image (not drawn yet, low quality), rings of short segments
+  local halo=tier>=2 and Art and Art.Allowed()and(function()local st,ct=Art.Get('halo');return st=='ready'and ct or nil end)()
+  if halo then
+   self.RingArt={}
+   for i,c in ipairs({white,self.Color})do
+    local p=part(folder,i==1 and'Shockwave'or'Shockwave glow',V(1,.05,1),c)
+    local g=Instance.new('SurfaceGui');g.Name='Shockwave image';g.Face=Enum.NormalId.Top;g.LightInfluence=0;g.AlwaysOnTop=false;g.CanvasSize=Vector2.new(256,256)
+    local img=Instance.new('ImageLabel');img.BackgroundTransparency=1;img.Size=UDim2.fromScale(1,1);img.ImageColor3=c;img.ImageTransparency=1
+    if pcall(function()img.ImageContent=halo end)then img.Parent=g;g.Parent=p;self.RingArt[i]={Part=p,Image=img}else g:Destroy();p:Destroy();self.RingArt=nil;break end
+   end
+  end
+  if not self.RingArt then
+   for i=1,budget.Ring do self.Ring[i]=part(folder,'Shockwave',V(.4,.08,.3),white)end
+   for i=1,math.max(8,math.floor(budget.Ring*.75))do self.Ring2[i]=part(folder,'Shockwave glow',V(.4,.05,.6),self.Color)end
+  end
   for i=1,budget.Debris do
    local d=part(folder,'Debris',V(.22,.16,.2)*math.max(.6,W*.35),C(92,86,80),Enum.Material.Slate)
    local a=i*2.399+.4;self.Debris[i]={Part=d,Dir=V(math.cos(a),0,math.sin(a)),Speed=W*(2.6+1.6*((i*7)%5)/5),Up=W*(3+2*((i*3)%4)/4),Spin=V(3+i%3,2+i%4,1+i%5)}
   end
-  if opts.Cracks then for i=1,budget.Cracks do local a=(i-.5)/budget.Cracks*math.pi*2+((i*5)%3)*.21;self.Cracks[i]={Part=part(folder,'Ground crack',V(.1,.06,1),self.Glow),A=a,L=W*(1.6+((i*11)%7)/7*1.8)}end end
+  if opts.Cracks then for i=1,budget.Cracks do local a=(i-.5)/budget.Cracks*math.pi*2+((i*5)%3)*.21;self.Cracks[i]={Part=part(folder,'Ground crack',V(.1,.06,1),self.Color:Lerp(self.Glow,.4)),A=a,L=W*(1.6+((i*11)%7)/7*1.8)}end end
  end
  return self
 end
@@ -124,12 +143,13 @@ function Beam:Update(t,ground)
  end
  if on and a>=self.Hold then local k=smooth((a-self.Hold)/self.Fade);width*=1-.85*k;alpha*=1-k end
  if on and not self.Reduced and a>=0 then width*=1+.05*math.sin(t*9)end
+ local shade=alpha*self.Strength -- (a softer beam: the King's, which must not outshine the crown)
  for _,b in ipairs({self.Core,self.GlowBeam,self.Haze})do if b then b.Enabled=on and alpha>.01 end end
  self.Top.Position=V(0,H,0);self.Foot.Position=V(0,footY,0)
  if on then
-  self.Core.Width0=W*.22*width;self.Core.Width1=W*.34*width;self:_alpha(self.Core,.02,.25,alpha)
-  self.GlowBeam.Width0=W*.8*width;self.GlowBeam.Width1=W*1.15*width;self:_alpha(self.GlowBeam,.3,.55,alpha)
-  if self.Haze then self.Haze.Width0=W*2.4*width;self.Haze.Width1=W*2.1*width;self:_alpha(self.Haze,.62,.8,alpha)end
+  self.Core.Width0=W*.22*width;self.Core.Width1=W*.34*width;self:_alpha(self.Core,.02,.25,shade)
+  self.GlowBeam.Width0=W*1.0*width;self.GlowBeam.Width1=W*1.35*width;self:_alpha(self.GlowBeam,.2,.5,shade)
+  if self.Haze then self.Haze.Width0=W*2.6*width;self.Haze.Width1=W*2.2*width;self:_alpha(self.Haze,.5,.78,shade)end
  end
  local spin=self.Reduced and 0 or t*1.1
  for i,s in ipairs(self.Streaks)do
@@ -137,7 +157,7 @@ function Beam:Update(t,ground)
   if on then
    local th=s.Phase+spin;local r=W*.45*width
    s.Top.Position=V(math.cos(th+1.6)*r*.5,H,math.sin(th+1.6)*r*.5);s.Foot.Position=V(math.cos(th)*r,footY,math.sin(th)*r)
-   s.Beam.Width0=W*.12*width;s.Beam.Width1=W*.28*width;self:_alpha(s.Beam,.15,.5,alpha)
+   s.Beam.Width0=W*.12*width;s.Beam.Width1=W*.28*width;self:_alpha(s.Beam,.15,.5,shade)
   end
  end
  local holding=on and a>=0 and a<self.Hold
@@ -158,7 +178,15 @@ function Beam:Update(t,ground)
 end
 function Beam:_impact(a,g)
  local W=self.W;local k1=clamp01(a/.6);local k2=clamp01((a-.08)/1.1)
- if #self.Ring>0 then
+ if self.RingArt then
+  -- (the halo image's ring sits at .72 of its half size: the part is sized so the bright ring is at the radius)
+  local show=self.Arrive=='slam'and a>=0
+  for i,r in ipairs(self.RingArt)do
+   local radius=i==1 and W*(.5+(self.Reduced and 3 or 7)*easeOut(k1))or W*(.4+(self.Reduced and 2.2 or 4.6)*easeOut(k2))
+   local d=2*radius/.72;r.Part.Size=V(d,.05,d);r.Part.CFrame=CF(g+V(0,.05+.01*i,0))
+   r.Image.ImageTransparency=i==1 and(show and k1<1 and .05+.95*k1 or 1)or(show and a>=.08 and k2<1 and .35+.65*k2 or 1)
+  end
+ elseif #self.Ring>0 then
   local show=self.Arrive=='slam'and a>=0
   placeRing(self.Ring,g+V(0,.06,0),W*(.5+(self.Reduced and 3 or 7)*easeOut(k1)),W*(.22*(1-k1)+.04),show and k1<1 and .05+.95*k1 or 1)
   placeRing(self.Ring2,g+V(0,.04,0),W*(.4+(self.Reduced and 2.2 or 4.6)*easeOut(k2)),W*(.6*(1-k2)+.1),show and a>=.08 and k2<1 and .55+.45*k2 or 1)
@@ -176,11 +204,17 @@ function Beam:_impact(a,g)
    local len=c.L*easeOut(a/.14)
    c.Part.Size=V(math.max(.04,self.W*.07),.04,math.max(.05,len))
    c.Part.CFrame=CF(g+V(math.cos(c.A)*len*.5,.03,math.sin(c.A)*len*.5))*ANG(0,-c.A+math.pi/2,0)
-   c.Part.Transparency=.15+.85*clamp01((a-.5)/1.5)
+   c.Part.Transparency=.3+.7*clamp01((a-.5)/1.5)
   else c.Part.Transparency=1 end
  end
 end
 function Beam:Visible()return self.On==true and self.Alpha>.01 end
+-- whether a shockwave ring shows now (either kind)
+function Beam:RingShown()
+ for _,r in ipairs(self.RingArt or{})do if r.Image.ImageTransparency<1 then return true end end
+ for _,s in ipairs(self.Ring)do if s.Transparency<1 then return true end end
+ return false
+end
 function Beam:Destroy()
  if self.Destroyed then return end
  self.Destroyed=true;self.Folder:Destroy()
