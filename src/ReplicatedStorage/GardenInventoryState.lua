@@ -7,7 +7,7 @@
 --  * Stow(key): an item dragged off the hotbar into the Bag stays off it until it is placed or held again.
 local S={};S.__index=S
 S.Window=15
-function S.new(clock)return setmetatable({Slots={},Items={},Stowed={},Back={},BackUntil=-math.huge,Clock=clock or os.clock},S)end
+function S.new(clock)return setmetatable({Slots={},Items={},Stowed={},Back={},Gone={},BackUntil=-math.huge,Clock=clock or os.clock},S)end
 function S:Remember()
  local now=self.Clock();if now>self.BackUntil then table.clear(self.Back)end
  for i=1,10 do local k=self.Slots[i];if k then self.Back[k]=i end end;self.BackUntil=now+S.Window
@@ -26,27 +26,28 @@ function S:Reconcile(items,renames)
  local assigned={};for i=1,10 do local k=self.Slots[i];if k then assigned[k]=true end end
  local keys={};for key in pairs(items)do if not assigned[key]and not self.Stowed[key]then table.insert(keys,key)end end
  table.sort(keys,function(a,b)local x,y=items[a],items[b];return x.Order==y.Order and a<b or x.Order<y.Order end)
- local kept={} -- slots of items still on their way back
- if back then for k,i in pairs(back)do if items[k]then if assigned[k]then back[k]=nil end else kept[i]=true end end end
+ local kept={} -- slots of items still on their way back (an item stays remembered until it has been gone and come back, or the window ends)
+ if back then for k,i in pairs(back)do if items[k]then if assigned[k]and self.Gone[k]then back[k]=nil;self.Gone[k]=nil end else kept[i]=true;self.Gone[k]=true end end
+ else table.clear(self.Gone)end
  local rest={}
  for _,key in ipairs(keys)do local i=back and back[key]
-  if i and i>=2 and not self.Slots[i]then self.Slots[i]=key;back[key]=nil else table.insert(rest,key)end
+  if i and i>=2 and not self.Slots[i]then self.Slots[i]=key;back[key]=nil;self.Gone[key]=nil else table.insert(rest,key)end
  end
  for _,key in ipairs(rest)do
   local pick;for slot=2,10 do if not self.Slots[slot]and not kept[slot]then pick=slot;break end end
   if not pick then for slot=2,10 do if not self.Slots[slot]then pick=slot;break end end end
-  if pick then self.Slots[pick]=key end;if back then back[key]=nil end
+  if pick then self.Slots[pick]=key end;if back then back[key]=nil;self.Gone[key]=nil end
  end
 end
 function S:Place(key,slot)
  if not self.Items[key]or key=='shovel'or slot<2 or slot>10 then return false end
  local prior;for i=2,10 do if self.Slots[i]==key then prior=i;break end end
- if prior then self.Slots[prior]=self.Slots[slot]end;self.Slots[slot]=key;self.Stowed[key]=nil;table.clear(self.Back);return true
+ if prior then self.Slots[prior]=self.Slots[slot]end;self.Slots[slot]=key;self.Stowed[key]=nil;table.clear(self.Back);table.clear(self.Gone);return true
 end
 function S:Stow(key)
  if not self.Items[key]or key=='shovel'then return false end
  local found=false;for i=2,10 do if self.Slots[i]==key then self.Slots[i]=nil;found=true end end
- self.Stowed[key]=true;table.clear(self.Back);return found
+ self.Stowed[key]=true;table.clear(self.Back);table.clear(self.Gone);return found
 end
 function S:Ensure(key,visibleSlots)
  self.Stowed[key]=nil

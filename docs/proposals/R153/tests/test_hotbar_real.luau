@@ -165,7 +165,7 @@ do -- a respawn: the server hands everything back, in reverse order, as new inst
    else n=harvest(t:GetAttribute('SeedId'),t:GetAttribute('SourceCropId'));n.Parent=nb end
    fresh[t]=n
   end
- end)
+ end,function()shovel:SetAttribute('Weather','None');X.frames(5)end) -- (a refresh between CharacterRemoving and the new Backpack)
  X.frames(10)
  local after=names();local moved={}
  for i=1,10 do if before[i]~=after[i]then moved[#moved+1]=('%d: %s -> %s'):format(i,before[i],after[i])end end

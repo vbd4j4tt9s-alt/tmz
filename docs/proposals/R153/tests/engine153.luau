@@ -184,12 +184,15 @@ return function(W,E,F,opts)
   end)
   return true
  end
- -- a respawn: new character, new Backpack (the old tools go with it), the server hands the tools back after 0.25 s in ITS order (`remake` builds them)
- function X.respawn(remake)
+ -- a respawn: new character, new Backpack (the old tools go with it), the server hands the tools back after 0.25 s in ITS order (`remake` builds them;
+ -- `between` runs after CharacterRemoving, before the old Backpack goes)
+ function X.respawn(remake,between)
   local old,oldBag=player.Character,bag()
   player.CharacterRemoving:Fire(old)
+  if between then between()end -- (whatever happens before the old Backpack goes: a refresh with every item still there)
   for _,t in ipairs(old:GetChildren())do if t:IsA('Tool')then t:Destroy()end end
   for _,t in ipairs(oldBag:GetChildren())do t:Destroy()end;oldBag:Destroy();old:Destroy()
+  X.frames(2) -- (the client sees the empty hand and Backpack before the new character arrives)
   local nc=R.new('Model');nc.Name=player.Name;nc.Parent=W.workspace;player.Character=nc
   local root=R.new('Part');root.Name='HumanoidRootPart';root.CFrame=R.CFrame.new(0,3,100);root.Parent=nc
   local nh=R.new('Humanoid');nh.Health=100;nh.Parent=nc
