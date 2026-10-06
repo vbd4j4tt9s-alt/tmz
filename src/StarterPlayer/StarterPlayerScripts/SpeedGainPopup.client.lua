@@ -112,11 +112,15 @@ local function makeField()
 	return {Gui = gui, Popups = {}, Free = {}, Seq = 0}
 end
 
+-- R153 (owner: "fix all jittery type effects"): the field hangs on the HumanoidRootPart at the head's height (StudsOffsetWorldSpace), not on the
+-- Head: the head bobs with the fast treadmill run animation and the whole fan of popups shook with it. (No root: the head, as before.)
 local function takeField(head)
 	local field = table.remove(freeFields)
 	while field and field.Gui.Parent ~= playerGui do field = table.remove(freeFields) end -- one that was removed from the PlayerGui is not reused
 	field = field or makeField()
-	field.Gui.Adornee = head
+	local root = head.Parent and head.Parent:FindFirstChild("HumanoidRootPart")
+	field.Gui.Adornee = root or head
+	field.Gui.StudsOffsetWorldSpace = root and Vector3.new(0, head.Position.Y - root.Position.Y, 0) or Vector3.zero
 	field.Gui.Enabled = true
 	return field
 end

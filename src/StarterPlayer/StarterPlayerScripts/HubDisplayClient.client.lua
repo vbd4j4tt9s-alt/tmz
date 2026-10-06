@@ -181,7 +181,7 @@ local function update(entry)
  local d=distance(entry)
  local wasActive=entry.Active==true
  local allowed=not reduced()and tier()>=2
- itemHz=tier()>=3 and ITEM_HZ or ITEM_HZ_LOW
+ itemHz=ITEM_HZ -- R153 (owner: "fix all jittery type effects"): the item turns every frame on every tier (ITEM_HZ_LOW, 30 Hz on tier 2, stepped on a 60 Hz screen); out of view only its core moves (ViewCull152)
  local active=allowed and(wasActive and d<=NEAR_OUT or d<=NEAR_IN)
  entry.Active=active
  danceSpeed(entry,allowed and 1 or 0)

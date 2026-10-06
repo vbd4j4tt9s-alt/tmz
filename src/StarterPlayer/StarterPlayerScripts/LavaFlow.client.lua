@@ -80,18 +80,20 @@ local function add(v)
 end
 for _,v in ipairs(workspace:GetDescendants())do add(v)end
 workspace.DescendantAdded:Connect(add)
+-- R153 (owner: "fix all jittery type effects"): the glows that flow down a route within 160 studs move every frame (they slid in 20 Hz steps,
+-- about a third of a stud each); farther routes (to 350) and the pools' slow crust drift, surface pulse and currents keep the 20 Hz tick.
 Run.RenderStepped:Connect(function(dt)
- elapsed+=dt;if elapsed<.05 then return end;elapsed=0
- for m in pairs(pending)do register(m);pending[m]=nil end
+ elapsed+=dt;local tick=elapsed>=.05;if tick then elapsed=0 end
+ if tick then for m in pairs(pending)do register(m);pending[m]=nil end end
  local camera=workspace.CurrentCamera;if not camera then return end
  local t=workspace:GetServerTimeNow()
- animateMagma(t,camera.CFrame.Position)
+ if tick then animateMagma(t,camera.CFrame.Position)else table.clear(magmaParts);table.clear(magmaFrames)end
  for model,route in pairs(routes)do
   if not model:IsDescendantOf(workspace)then routes[model]=nil
   else
    local nearest=math.huge
    for _,node in ipairs(route.Nodes)do nearest=math.min(nearest,(camera.CFrame.Position-node).Magnitude)end
-   if nearest<350 then
+   if nearest<350 and(tick or nearest<160)then
     for p,phase in pairs(route.Glows)do
      if p.Parent~=model then route.Glows[p]=nil
      else

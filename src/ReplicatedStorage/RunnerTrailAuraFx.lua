@@ -2,7 +2,7 @@
 -- motes, sparks, glows, a start burst, secondary ribbons (Aurora veil, Nebula swirl, Royal gold/purple double helix),
 -- main-ribbon colour shimmer, Royal crown glints and footstep sparkles, and an idle shimmer on Nebula and Royal.
 -- Built-in particle textures only. Rigs are pooled per trail; nothing here connects events (the client script owns
--- the Heartbeat and PlayerRemoving connections), and Release/Destroy free everything a rig made.
+-- the RenderStepped (R153, was Heartbeat) and PlayerRemoving connections), and Release/Destroy free everything a rig made.
 -- R118: head pieces (RunnerTrailArt.HeadPiece): Royal wears a glowing crown, Nebula a ring of orbiting space dust and
 -- Aurora a shimmering halo. Client-only parts welded to the Head (massless, no collision/query/touch/shadow), following
 -- the Head's LocalTransparencyModifier (hidden in first person). Layers marked Head=true live on Head attachments
@@ -310,7 +310,7 @@ function F:_animatePiece(rec,now)
    if a and a.Parent==rec.Head then local q=o.Phase+t*o.Speed;a.Position=o.Center+V(math.sin(q)*o.Radius,math.sin(q*1.7)*o.Lift,-math.cos(q)*o.Radius)end
   end
  end
- if now>=(pc.ShimmerAt or 0)then pc.ShimmerAt=now+.08;shimmerAt(pc,t)end
+ shimmerAt(pc,t) -- (R153: every frame, was 12.5 Hz: the crown's sheen and the halo's colour flow moved in steps)
 end
 local function restoreShift(rec)
  if not rec.Shifted then return end;rec.Shifted=false
@@ -435,6 +435,8 @@ function F:_logic(rec,dt,now)
  end
 end
 -- Per-frame motion (swirls, veil sway, colour shimmer). Only full-detail rigs with motion allowed.
+-- R153 (owner: "fix all jittery type effects"): the veil's palette flow and the main ribbon's sheen / pulse are written every frame (were 10 Hz:
+-- the sheen visibly stepped along the ribbon); only full-detail rigs (the local runner and near, on-screen ones) run this.
 function F:_animate(rec,now)
  local rig=rec.Rig;local b=self.Budget
  if rec.Detail<3 or not b.Motion then return end
@@ -442,13 +444,13 @@ function F:_animate(rec,now)
   local s=L.Spec
   if s.Kind=='Ribbon'and L.Trail.Enabled then
    L.A0.Position=self:_ribbonPoint(L,rig.Points,-1,now+rec.Phase*3,true);L.A1.Position=self:_ribbonPoint(L,rig.Points,1,now+rec.Phase*3,true)
-   if s.Cycle and now>=(L.CycleAt or 0)then
-    L.CycleAt=now+.1;local look=Art.Look(s.Palette);local keys={};local phase=(now*s.Cycle+rec.Phase)%1
+   if s.Cycle then
+    local look=Art.Look(s.Palette);local keys={};local phase=(now*s.Cycle+rec.Phase)%1
     for i=0,4 do keys[#keys+1]=ColorSequenceKeypoint.new(i/4,Art.Sample(look.Colors,i/4,phase))end
     L.Trail.Color=ColorSequence.new(keys)
    end
-  elseif s.Kind=='Shift'and now>=rec.ShiftAt and(rec.Moving or rec.Still>=.6)then
-   rec.ShiftAt=now+.1;rec.Shifted=true;local phase=(now*s.Speed+rec.Phase)%1
+  elseif s.Kind=='Shift'and(rec.Moving or rec.Still>=.6)then
+   rec.Shifted=true;local phase=(now*s.Speed+rec.Phase)%1
    for _,t in ipairs(rec.Body)do if t.Parent then local layer=t:GetAttribute('TrailLayer117')or(t.Name:sub(-1)=='2'and 2 or 1);t.Color=Art.Sequence(rec.Id,layer,phase)end end
   end
  end
