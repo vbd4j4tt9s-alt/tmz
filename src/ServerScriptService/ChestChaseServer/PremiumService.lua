@@ -65,8 +65,11 @@ function Service.new(data,chests,passes)
    local okay,message
    if value=='ClaimLogin'then
     okay,message=data:ClaimDailyLogin(p)
-    if okay then pcall(function()chests:SyncTools(p)end)end -- day 7: the Mech pack lands in the hotbar
-   elseif type(value)=='table'then okay,message=data:ClaimDailyQuest(p,value.Quest)
+    if okay then pcall(function()chests:SyncTools(p)end)end -- day 7 (R153: the Void pack) and a quest pack land in the hotbar
+   elseif value=='ClaimBonus'then okay,message=data:ClaimDailyBonus(p) -- R153: the all-done 2 Gems
+   elseif type(value)=='table'then
+    okay,message=data:ClaimDailyQuest(p,value.Quest)
+    if okay then pcall(function()chests:SyncTools(p)end)end -- R153: a quest gives a pack (it lands in the hotbar)
    else okay,message=false,'TRY AGAIN!'end
    local state=data:DailyState(p);state.Success=okay==true;state.Message=message;return state
   end

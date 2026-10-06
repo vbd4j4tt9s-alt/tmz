@@ -1,5 +1,5 @@
 do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
--- R141: daily login pack/gem rewards and two-gem daily quests.
+-- R141: daily login pack/gem rewards and daily quests. R153: a quest pays one random pack and an ALL DONE row pays 2 gems once; an unclaimed random pack is a mystery pack (a near-black silhouette on a white tile).
 -- The existing DAILY/INVITE UI, friend chip and plant-ready opt-in use server state.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Tween=game:GetService('TweenService')
 local GuiService=game:GetService('GuiService');local SocialService=game:GetService('SocialService')
@@ -8,6 +8,7 @@ local request=remotes:WaitForChild('PremiumRequest')
 local D=require(RS:WaitForChild('DailyRewards'));local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI)
 local Fit=require(RS.GardenTextFit);local Audio=require(RS.InteractionAudio)
 local Pictures;pcall(function()Pictures=require(RS.ItemPictures)end)
+local WHITE,SILHOUETTE=Color3.new(1,1,1),Color3.fromRGB(10,9,16)
 local RGB=Color3.fromRGB
 local GOLD,MINT,SKY,GRAPE=RGB(255,206,64),RGB(110,226,96),RGB(86,182,255),RGB(150,96,255)
 local old=pg:FindFirstChild('DailyRewardsGui');if old then old:Destroy()end
@@ -68,23 +69,26 @@ for i,spec in ipairs({{'Login','📅 LOGIN'},{'Quests','📜 QUESTS'}})do
 end
 local pages={Login=new('Frame',{Name='LoginPage',BackgroundTransparency=1},panel),Quests=new('Frame',{Name='QuestsPage',BackgroundTransparency=1,Visible=false},panel)}
 local status=text(panel,'Status','',15,Theme.Colors.Gold);status.Visible=false
--- LOGIN page: the week as seven cards (day 7 is the wide Mech pack card) and one big CLAIM button.
-local loginNote=text(pages.Login,'Note','4 random packs, then 2 + 3 gems. DAY 7 = MECH 🤖',17,Theme.Colors.Muted)
+-- LOGIN page: the week as seven cards (day 7 is the wide Void pack card, R153: it was the Mech pack) and one big CLAIM button.
+local loginNote=text(pages.Login,'Note','4 random packs, then 2 + 3 gems. DAY 7 = VOID 🌑',17,Theme.Colors.Muted)
 local days={}
 for d=1,#D.Login do
- local reward=D.Login[d];local big=reward.MechPack~=nil
+ local reward=D.Login[d];local big=reward.VoidPack~=nil or reward.MechPack~=nil
  local card=new('Frame',{Name='Day'..d,BorderSizePixel=0,BackgroundColor3=big and RGB(70,46,128)or Theme.Colors.Card},pages.Login);Theme.Corner(card,12)
  if big then Bright.Gradient(card,RGB(124,74,214),RGB(52,30,104),90)end
  local edge=stroke(card,big and RGB(196,150,255)or Theme.Colors.Line,2);edge.Name='Edge'
  local dayText=text(card,'DayLabel','DAY '..d,15);dayText.ZIndex=4
  local art=new('Frame',{Name='Art',BackgroundTransparency=1,ZIndex=3},card)
- if reward.MechPack or reward.SeedPack then
+ if reward.VoidPack or reward.MechPack or reward.SeedPack then
   local shown=false
+  -- R153: a random pack is a mystery until it is in the Bag: the plain pack's default shape in near-black on a white tile (no hint of which pack). The Void pack day is the real Void pack, shown as one.
+  if reward.SeedPack then art.BackgroundTransparency=0;art.BackgroundColor3=WHITE;Theme.Corner(art,10)end
   if Pictures then
-   local proxy=Instance.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',reward.MechPack and 8 or 1);proxy:SetAttribute('BagVariant',reward.MechPack and 'MechLimited'or 'Pack01');proxy:SetAttribute('PackMutation','None')
+   local proxy=Instance.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',reward.VoidPack and 7 or reward.MechPack and 8 or 1);proxy:SetAttribute('BagVariant',reward.VoidPack and 'EclipseReliquary'or reward.MechPack and 'MechLimited'or 'Pack01');proxy:SetAttribute('PackMutation','None')
+   if reward.SeedPack then proxy:SetAttribute('Silhouette',true)end
    shown=pcall(Pictures.Show,art,proxy,2)
   end
-  if not shown then local e=text(art,'Emoji',reward.MechPack and '🤖'or '🎒',30);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
+  if not shown then local e=text(art,'Emoji',reward.VoidPack and '🌑'or reward.MechPack and '🤖'or '?',30,reward.SeedPack and SILHOUETTE or nil);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
  else
   local holder=new('CanvasGroup',{Name='Gem',BackgroundTransparency=1,Size=UDim2.fromScale(1,1)},art)
   local ok=pcall(function()require(RS.GemIcon).new(holder)end)
@@ -101,27 +105,43 @@ end
 local claimButton=new('TextButton',{Name='ClaimButton',Text='',BorderSizePixel=0},pages.Login);Bright.Button(claimButton,GOLD)
 local claimText=text(claimButton,'Caption','',22);claimText.Size=UDim2.new(1,-16,1,0);claimText.Position=UDim2.fromOffset(8,0);claimText.ZIndex=12
 new('UIScale',{Name='Pulse'},claimButton)
--- QUESTS page: three rows (icon, task, progress bar, 💎5 and a CLAIM button) and the time until the new quests.
+-- QUESTS page: three quest rows (icon, task, progress bar, "+1 PACK" over a mystery pack and a CLAIM button), a fourth ALL DONE row ("+2" gems, claimable once all three are claimed) and the time until the new quests.
 local questTitle=text(pages.Quests,'Title','DAILY QUESTS',20);questTitle.TextXAlignment=Enum.TextXAlignment.Left
 local questReset=text(pages.Quests,'Reset','',15,Theme.Colors.Muted);questReset.TextXAlignment=Enum.TextXAlignment.Right
-local rows={}
-for i=1,D.QuestsPerDay do
- local row=new('Frame',{Name='Quest'..i,BorderSizePixel=0,BackgroundColor3=Theme.Colors.Card},pages.Quests);Theme.Corner(row,12);local edge=stroke(row,Theme.Colors.Line,2);edge.Name='Edge'
+local rows={};local BONUS=D.QuestsPerDay+1
+for i=1,BONUS do
+ local bonus=i==BONUS
+ local row=new('Frame',{Name=bonus and'Bonus'or'Quest'..i,BorderSizePixel=0,BackgroundColor3=Theme.Colors.Card},pages.Quests);Theme.Corner(row,12);local edge=stroke(row,Theme.Colors.Line,2);edge.Name='Edge'
  local iconBack=new('Frame',{Name='IconBack',BackgroundColor3=Theme.Colors.Inset,BorderSizePixel=0},row);Theme.Corner(iconBack,40)
- local icon=new('TextLabel',{Name='Icon',BackgroundTransparency=1,Size=UDim2.fromScale(.78,.78),Position=UDim2.fromScale(.11,.11),TextScaled=true,Font=Enum.Font.FredokaOne,TextColor3=Color3.new(1,1,1),Text=''},iconBack)
- local task_=text(row,'Task','',18);task_.TextXAlignment=Enum.TextXAlignment.Left
+ local icon=new('TextLabel',{Name='Icon',BackgroundTransparency=1,Size=UDim2.fromScale(.78,.78),Position=UDim2.fromScale(.11,.11),TextScaled=true,Font=Enum.Font.FredokaOne,TextColor3=Color3.new(1,1,1),Text=bonus and'🎉'or''},iconBack)
+ local task_=text(row,'Task',bonus and'ALL DONE BONUS!'or'',18);task_.TextXAlignment=Enum.TextXAlignment.Left
  local bar=new('Frame',{Name='Bar',BackgroundColor3=Theme.Colors.Inset,BorderSizePixel=0},row);Theme.Corner(bar,7)
  local fill=new('Frame',{Name='Fill',BorderSizePixel=0,BackgroundColor3=Color3.new(1,1,1),Size=UDim2.fromScale(0,1)},bar);Theme.Corner(fill,7);Bright.Gradient(fill,RGB(82,231,255),RGB(150,255,88),0)
  local count=text(bar,'Count','',13);count.Size=UDim2.fromScale(1,1);count.ZIndex=5
  local reward=new('Frame',{Name='Reward',BackgroundColor3=RGB(67,52,110),BorderSizePixel=0},row);Theme.Corner(reward,10);stroke(reward,RGB(170,140,255),2)
- local gem=new('CanvasGroup',{Name='Gem',BackgroundTransparency=1},reward)
- if not pcall(function()require(RS.GemIcon).new(gem)end)then local e=text(gem,'Emoji','💎',20);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
- local gems=text(reward,'Amount',tostring(D.QuestGems),18,GOLD)
+ local gem,gems
+ if bonus then
+  gem=new('CanvasGroup',{Name='Gem',BackgroundTransparency=1},reward)
+  if not pcall(function()require(RS.GemIcon).new(gem)end)then local e=text(gem,'Emoji','💎',20);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
+  gems=text(reward,'Amount','+'..D.AllDoneGems,18,GOLD)
+  reward:SetAttribute('AccessibleLabel',D.BonusRewardText())
+ else
+  -- R153: the reward is a mystery pack: the default-shape pack in near-black on a white tile (ItemPictures' Silhouette look), never the pack that will be rolled.
+  gem=new('Frame',{Name='PackTile',BackgroundColor3=WHITE,BorderSizePixel=0},reward);Theme.Corner(gem,8)
+  local shown=false
+  if Pictures then
+   local proxy=Instance.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',1);proxy:SetAttribute('BagVariant','Pack01');proxy:SetAttribute('PackMutation','None');proxy:SetAttribute('Silhouette',true)
+   shown=pcall(Pictures.Show,gem,proxy,2)
+  end
+  if not shown then local e=text(gem,'Emoji','?',20,SILHOUETTE);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
+  gems=text(reward,'Amount',D.QuestRewardText(),16,GOLD)
+  reward:SetAttribute('AccessibleLabel','One random pack')
+ end
  local claim=new('TextButton',{Name='Claim',Text='',BorderSizePixel=0},row);Bright.Button(claim,MINT);new('UIScale',{Name='Pulse'},claim)
  local claimCap=text(claim,'Caption','CLAIM',17);claimCap.Size=UDim2.new(1,-8,1,0);claimCap.Position=UDim2.fromOffset(4,0);claimCap.ZIndex=12
  local done=text(row,'Done','✓ DONE',16,MINT);done.Visible=false
  new('UIScale',{},row)
- rows[i]={Row=row,Edge=edge,IconBack=iconBack,Icon=icon,Task=task_,Bar=bar,Fill=fill,Count=count,Reward=reward,Gem=gem,Gems=gems,Claim=claim,ClaimCap=claimCap,Done=done}
+ rows[i]={Row=row,Edge=edge,IconBack=iconBack,Icon=icon,Task=task_,Bar=bar,Fill=fill,Count=count,Reward=reward,Gem=gem,Gems=gems,Claim=claim,ClaimCap=claimCap,Done=done,Bonus=bonus}
 end
 -- Layout (pixels from the panel's real size, so phones and computers both fit) ----------------------------------------
 local state,stateAt=nil,0;local narrowQuests=false
@@ -169,24 +189,24 @@ local function layout()
  end
  claimButton.AnchorPoint=Vector2.new(.5,0);claimButton.Position=UDim2.new(.5,0,0,cardsTop+blockH+gap*2);claimButton.Size=UDim2.fromOffset(math.min(pw,360),buttonH);claimText.TextSize=short and 18 or 22
  -- QUESTS
- -- Narrow screens: the 💎 chip and the CLAIM button share one spot (CLAIM shows when the quest is done).
+ -- Narrow screens: the reward chip and the CLAIM button share one spot (CLAIM shows when the quest is done).
  local narrow=pw<520;narrowQuests=narrow
  local qTitle=short and 24 or 30;questTitle.Size=UDim2.fromOffset(pw*.45,qTitle);questTitle.TextSize=short and 16 or 20
  questReset.Position=UDim2.fromOffset(pw*.45,0);questReset.Size=UDim2.fromOffset(pw*.55,qTitle);questReset.TextSize=(short or narrow)and 13 or 15
  questReset.Text=resetText()
- local rowGap=short and 6 or 10;local rowH=math.clamp(math.floor((ph-qTitle-rowGap*D.QuestsPerDay)/D.QuestsPerDay),44,76)
+ local rowGap=short and 6 or 10;local rowH=math.clamp(math.floor((ph-qTitle-rowGap*#rows)/#rows),short and 32 or 44,76)
  for i,r in ipairs(rows)do
   r.Row.Position=UDim2.fromOffset(0,qTitle+rowGap+(i-1)*(rowH+rowGap));r.Row.Size=UDim2.fromOffset(pw,rowH)
   local icon=rowH-12;r.IconBack.Position=UDim2.fromOffset(6,6);r.IconBack.Size=UDim2.fromOffset(icon,icon)
-  local buttonW=narrow and math.max(84,math.floor(pw*.26))or math.min(120,math.floor(pw*.2))
-  local rewardW=narrow and buttonW or math.min(78,math.floor(pw*.14))
+  local buttonW=narrow and math.max(88,math.floor(pw*.27))or math.min(120,math.floor(pw*.2))
+  local rewardW=narrow and buttonW or math.min(112,math.floor(pw*.2))
   local textX=icon+16;local textW=narrow and pw-textX-buttonW-20 or pw-textX-buttonW-rewardW-28
   r.Task.Position=UDim2.fromOffset(textX,4);r.Task.Size=UDim2.fromOffset(textW,math.floor(rowH*.48));r.Task.TextSize=math.min(19,math.floor(rowH*.34))
   r.Bar.Position=UDim2.fromOffset(textX,math.floor(rowH*.56));r.Bar.Size=UDim2.fromOffset(textW,math.max(12,math.floor(rowH*.28)))
   r.Reward.Position=UDim2.fromOffset(narrow and pw-buttonW-8 or pw-buttonW-rewardW-14,math.floor(rowH*.18));r.Reward.Size=UDim2.fromOffset(rewardW,math.floor(rowH*.64))
   r.Reward.Visible=not narrow or(not r.Claim.Visible and not r.Done.Visible)
-  local gem=math.floor(rowH*.5);r.Gem.Position=UDim2.fromOffset(4,math.floor((rowH*.64-gem)/2));r.Gem.Size=UDim2.fromOffset(gem,gem)
-  r.Gems.Position=UDim2.fromOffset(gem+6,0);r.Gems.Size=UDim2.new(1,-gem-10,1,0)
+  local chipH=math.floor(rowH*.64);local gem=math.floor(math.min(rowH*.5,chipH-6));r.Gem.Position=UDim2.fromOffset(4,math.floor((chipH-gem)/2));r.Gem.Size=UDim2.fromOffset(gem,gem)
+  r.Gems.Position=UDim2.fromOffset(gem+7,0);r.Gems.Size=UDim2.new(1,-gem-9,1,0);r.Gems.TextSize=math.min(18,math.max(10,math.floor(chipH*.42)));Fit.Attach(r.Gems,r.Gems.TextSize,9)
   r.Claim.Position=UDim2.fromOffset(pw-buttonW-8,math.floor(rowH*.16));r.Claim.Size=UDim2.fromOffset(buttonW,math.floor(rowH*.68))
   r.Done.Position=r.Claim.Position;r.Done.Size=r.Claim.Size
  end
@@ -212,22 +232,35 @@ local function render()
   if today then pulse(e.Edge,'Transparency',0,.55)end
  end
  if login.Ready then
-  claimText.Text=login.Next==#D.Login and'CLAIM YOUR MECH PACK!'or'CLAIM DAY '..login.Next..'!';tint(claimButton,GOLD);claimButton.Active=true;claimButton.AutoButtonColor=true
+  claimText.Text=login.Next==#D.Login and'CLAIM YOUR VOID PACK!'or'CLAIM DAY '..login.Next..'!';tint(claimButton,GOLD);claimButton.Active=true;claimButton.AutoButtonColor=true
   pulse(claimButton.Pulse,'Scale',1,1.05)
  else
   claimText.Text='NEXT REWARD IN '..D.Countdown(resetLeft());tint(claimButton,RGB(96,104,140));claimButton.Active=false;claimButton.AutoButtonColor=false
  end
  for i,r in ipairs(rows)do
-  local q=state and state.Quests and state.Quests[i]
-  r.Row.Visible=q~=nil
-  if q then
-   local complete=q.Progress>=q.Goal
-   r.Icon.Text=q.Icon;r.Task.Text=q.Text;r.Count.Text=q.Progress..' / '..q.Goal;r.Fill.Size=UDim2.fromScale(math.clamp(q.Progress/q.Goal,0,1),1)
-   r.Claim.Visible=complete and not q.Claimed and not q.Blocked;r.Done.Visible=q.Claimed or q.Blocked;r.Done.Text=q.Claimed and '✓ DONE'or 'DAILY LIMIT'
-   r.Gems.Text=tostring(q.Gems)
-   r.Edge.Color=complete and not q.Claimed and not q.Blocked and GOLD or Theme.Colors.Line;r.Row.BackgroundColor3=q.Claimed and Theme.Colors.Inset or Theme.Colors.Card
-   if complete and not q.Claimed and not q.Blocked then pulse(r.Claim.Pulse,'Scale',1,1.06)end
-   if not complete and not q.Blocked then r.Done.Visible=false end
+  if r.Bonus then
+   -- R153: the ALL DONE row: how many quests are claimed, CLAIM once all are (2 Gems, once), then ✓ DONE; "GOT UR 💎" when older-style claims already paid today's Gems.
+   local b=state and state.Bonus
+   r.Row.Visible=type(b)=='table'
+   if r.Row.Visible then
+    local total=math.max(1,tonumber(b.Total)or D.QuestsPerDay);local got=math.clamp(tonumber(b.Done)or 0,0,total)
+    r.Count.Text=got..' / '..total;r.Fill.Size=UDim2.fromScale(got/total,1)
+    r.Claim.Visible=b.Ready==true and b.Claimed~=true;r.Done.Visible=b.Claimed==true or(b.Blocked==true and b.Claimed~=true);r.Done.Text=b.Claimed and'✓ DONE'or'GOT UR 💎'
+    r.Gems.Text='+'..tostring(b.Gems or D.AllDoneGems)
+    r.Edge.Color=r.Claim.Visible and GOLD or Theme.Colors.Line;r.Row.BackgroundColor3=(b.Claimed or b.Blocked)and Theme.Colors.Inset or Theme.Colors.Card
+    if r.Claim.Visible then pulse(r.Claim.Pulse,'Scale',1,1.06)end
+   end
+  else
+   local q=state and state.Quests and state.Quests[i]
+   r.Row.Visible=q~=nil
+   if q then
+    local complete=q.Progress>=q.Goal
+    r.Icon.Text=q.Icon;r.Task.Text=q.Text;r.Count.Text=q.Progress..' / '..q.Goal;r.Fill.Size=UDim2.fromScale(math.clamp(q.Progress/q.Goal,0,1),1)
+    r.Claim.Visible=complete and not q.Claimed;r.Done.Visible=q.Claimed==true;r.Done.Text='✓ DONE'
+    r.Gems.Text=D.QuestRewardText()
+    r.Edge.Color=complete and not q.Claimed and GOLD or Theme.Colors.Line;r.Row.BackgroundColor3=q.Claimed and Theme.Colors.Inset or Theme.Colors.Card
+    if complete and not q.Claimed then pulse(r.Claim.Pulse,'Scale',1,1.06)end
+   end
   end
  end
  layout()
@@ -261,6 +294,7 @@ local function claim(value)
    if result.Success then
     Audio.Play('GemClaim')
     if value=='ClaimLogin'then local e=days[state.Login.Claimed];if e then pop(e.Card,1.18)end
+    elseif value=='ClaimBonus'then pop(rows[BONUS].Row,1.06)
     elseif type(value)=='table'then local r=rows[value.Quest];if r then pop(r.Row,1.06)end end
    else Audio.Play('Denied')end -- R150: a refused claim
   else say('Try again in a sec!');Audio.Play('Denied')end
@@ -268,7 +302,7 @@ local function claim(value)
  end)
 end
 claimButton.Activated:Connect(function()if claimButton.Active then claim('ClaimLogin')end end)
-for i,r in ipairs(rows)do r.Claim.Activated:Connect(function()if r.Claim.Visible then claim({Quest=i})end end)end
+for i,r in ipairs(rows)do r.Claim.Activated:Connect(function()if r.Claim.Visible then claim(r.Bonus and'ClaimBonus'or{Quest=i})end end)end
 local ticking=false
 local function open(value,tab)
  if tab then selected=tab end

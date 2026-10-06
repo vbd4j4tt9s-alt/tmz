@@ -75,7 +75,7 @@
 | `refreshpacks` (server) | Refresh the track now |
 | `refreshcycle 30` (server) | Refresh into reset 30. Legendary every 5 resets, Mythic every 10, The Darkened every 3 |
 | `pity 30`, `spawnodds`, `routes` | Look at guarantees, spawn chances and keeper speeds |
-| `daily`, `daily next`, `daily done`, `daily week`, `daily reset` (`@name`) | R140 login week + daily quests: show the state; pretend a new day (login claim back, quests from 0); finish today's quests; make the next claim day 7 (Mech pack); start over |
+| `daily`, `daily next`, `daily done`, `daily week`, `daily reset` (`@name`) | R140 login week + daily quests: show the state; pretend a new day (login claim back, quests from 0); finish today's quests; make the next claim day 7 (R153: a Void pack); start over |
 | `plantnotify`, `plantnotify send`, `plantnotify reset` | R151 offline "your plant is ready" notifier: what is missing from the setup (MessageId, HTTP, secret), the shared queue, your entry and cooldown, this server's counts; send you a notification now (Roblox delivers 1 a day, only if you opted in and are 13+); clear your cooldown |
 | `packluck`, `packluck 29 @name` | R137 hidden big-pack luck (players never see it): packs since a 5x+ / 10x+ and the track's refreshes; a number sets the 5x count (29 = next earned pack is 5x+) |
 | `fling storm @name` | Fling them like that biome's keeper (forest … storm, or `darkened`). Tests the air time; nothing drops |
@@ -281,8 +281,8 @@ listed separately any more because each one is the same as a command above.
    - Free tutorial pack: the finish card says 🎁 FREE PACK!, the notice FREE Forest Seed Pack; its tooltip matches a normal Forest pack (no luck row). Replay: no second one. Gift it: the alt gets a normal Forest pack.
 25. **R140:**
    - 🎁 DAILY and 👥 INVITE sit right of TRACK in the top bar (phone too). DAILY's red number = login reward + finished quests.
-   - After the tutorial the week opens by itself: claim day 1 (Gems float in). `daily next` → claim day 2; `daily week` → claim day 7 = a Mech pack in the Bag (rainbow ring).
-   - Steal and bank 3 packs: ✅ QUEST DONE notice, CLAIM in QUESTS gives 💎5. `daily done` finishes all three.
+   - After the tutorial the week opens by itself: claim day 1 (Gems float in). `daily next` → claim day 2; `daily week` → claim day 7 = a Void pack in the Bag (R153; it was a Mech pack).
+   - Steal and bank 3 packs: ✅ QUEST DONE notice, CLAIM in QUESTS gives one random pack (R153; it was Gems); claim all three and the ALL DONE row gives 💎2 once. `daily done` finishes all three.
    - Live server with a friend: both get a "Friend boost" notice, INVITE shows +10% / +20%, and treadmill training gives you that much more speed per second (R149: your running speed itself is not boosted; bought speed and bonus rolls are not either). `training` shows the "friends x1.2" part. INVITE opens Roblox's invite screen.
    - "Your plant is ready" needs the one-time setup in `docs/releases/R140.md` (notification string id on SocialService.MessageId, API key secret `PlantReadyKey`, HTTP on).
 26. **R151 pull announcements (chat only):**

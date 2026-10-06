@@ -39,7 +39,9 @@ function P.Key(tool)
   -- (one template, not two). Any other pack's own chip-bag shape (PackShape, 0 = the default) is part of its look; a tool without it (a proxy, an old record) is the default shape.
   local plain=tool:GetAttribute('DefaultPackShape')==true and variant~='EclipseReliquary'and variant~='MechLimited'
   local shape=tool:GetAttribute('DefaultPackShape')==true and 0 or shapes().Sanitize(tool:GetAttribute('PackShape'))
-  return table.concat(shape>0 and{'Pack',stage,variant,mutation,shape}or{'Pack',stage,variant,mutation},'|')..(plain and'|Plain'or''),{Kind='Pack',Stage=stage,Variant=variant,Mutation=mutation,Plain=plain or nil,Shape=shape>0 and shape or nil}
+  -- R153: a proxy with Silhouette is the mystery pack of the DAILY window (the plain pack's default shape, near-black): its own look, so no other picture ever takes its dark view.
+  local dark=tool:GetAttribute('Silhouette')==true
+  return table.concat(shape>0 and{'Pack',stage,variant,mutation,shape}or{'Pack',stage,variant,mutation},'|')..(plain and'|Plain'or'')..(dark and'|Dark'or''),{Kind='Pack',Stage=stage,Variant=variant,Mutation=mutation,Plain=plain or nil,Shape=shape>0 and shape or nil,Dark=dark or nil}
  end
  if tool:GetAttribute('GardenSeed')then
   local id=tool:GetAttribute('SeedId')or'';local mutation=mutationKey(tool:GetAttribute('Mutation'))
@@ -115,6 +117,17 @@ local function toolModel(spec,work)
  return model
 end
 local shapeHooked
+-- R153: the black silhouette of a pack (the colour of the mystery pedestal's and the hub displays' silhouettes): every drawn part flat near-black, no textures, decals or effects.
+local SILHOUETTE=RGB(10,9,16)
+local function silhouette(model)
+ for _,d in ipairs(model:GetDescendants())do
+  if d:IsA('SurfaceAppearance')or d:IsA('Decal')or d:IsA('Texture')or d:IsA('ParticleEmitter')or d:IsA('Light')then d:Destroy()
+  elseif d:IsA('BasePart')and d.Transparency<1 then
+   d.Color=SILHOUETTE;d.Material=Enum.Material.SmoothPlastic;d.MaterialVariant='';d.Reflectance=0
+   if d:IsA('MeshPart')then d.TextureID=''end
+  end
+ end
+end
 local function build(spec,work)
  if spec.Kind=='Pack'then
   -- R151: a hotbar / Bag picture of a pack shows the pack's own chip-bag shape (spec.Shape, from the tool's PackShape attribute); a picture flagged DefaultPackShape (spec.Plain:
@@ -122,7 +135,9 @@ local function build(spec,work)
   -- VerityPackArt take the baked template of the (design, variation) pair; while this client's bake of it runs the build errors "still loading" (retried in a moment: nothing
   -- is drawn, nothing cached). The owner's /test packshape off / auto flips whether shapes show: every picture is drawn again.
   if not shapeHooked then shapeHooked=true;shapes().OnChanged(function()P.Reset();P.Hurry()end)end
-  return require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.Angles(0,.22,-.025),nil,1,nil,spec.Stage,spec.Variant,1,1,spec.Mutation,nil,spec.Plain,spec.Shape)
+  local pack=require(RS:WaitForChild('SeedPackVisuals')).Bag(CFrame.Angles(0,.22,-.025),nil,1,nil,spec.Stage,spec.Variant,1,1,spec.Mutation,nil,spec.Plain,spec.Shape)
+  if spec.Dark and pack then silhouette(pack)end
+  return pack
  elseif spec.Kind=='Seed'then
   local ok,model=pcall(require(RS:WaitForChild('SeedPackVisuals')).Seed,{Id=spec.Id},nil,CFrame.new(),nil,1,nil,spec.Mutation)
   if ok and model then return model end

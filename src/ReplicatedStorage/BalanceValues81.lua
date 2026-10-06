@@ -21,8 +21,11 @@ T.FenceCosts={0,500000,15000000,1000000000,150000000000,4000000000000,9000000000
 require(script.Parent.EconomyBalance90).Apply(T)
 -- R104: independent index milestones; historical balances keep their original backpay.
 T.LegacyCompletionGems=T.CompletionGems
-T.HalfwayGems=10
-T.CompletionGems={[1]=20,[6]=20,[2]=20,[3]=20,[4]=20,[5]=20,[7]=20,[8]=100}
+-- R153 (owner: "index gem gain is halved"): the Index's gems are halved, whole gems, halves round up, at least 1: halfway 10 -> 5, completion 20 -> 10, Mech 100 -> 50, Verity 100 -> 50 (VerityCatalog).
+-- A pending R81 backpay (saved at its old amount) is halved by T.HalveGems when it is shown and claimed. Index seed cash is not gems and stays.
+function T.HalveGems(n)n=tonumber(n)or 0;if n<=0 then return 0 end;return math.max(1,math.floor(n/2+.5))end
+T.HalfwayGems=5
+T.CompletionGems={[1]=10,[6]=10,[2]=10,[3]=10,[4]=10,[5]=10,[7]=10,[8]=50}
 -- R147: the Verity seed (Index category 9): fruit value, first / repeat index cash and the category's completion Gems.
 -- (HalfwayGems is one number for every category, so it is not repeated here.)
 do

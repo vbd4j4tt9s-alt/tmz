@@ -7,7 +7,7 @@ local C={Id='VeritySeed',Variant='VerityReliquary',PackStage=7,Stage=9,Biome='Ve
  Name='Verity',SeedName='Verity Seed',FruitName='Verity Fruit',PackName='Verity Pack',
  VerityChance=.01,
  -- Economy (owner default: a bit above the best King plant; one fruit at the per-fruit cap, quick regrow).
- Value=9e10,Seconds=14400,RegrowSeconds=1500,FruitCount=1,IndexFirst=1e11,IndexRepeat=2e10,HalfwayGems=10,CompletionGems=100,
+ Value=9e10,Seconds=14400,RegrowSeconds=1500,FruitCount=1,IndexFirst=1e11,IndexRepeat=2e10,HalfwayGems=5,CompletionGems=50,
  -- R148 (owner: "the exact same smile that Verity has" on the seed, the fruit and the plant): Verity's smiley, a black line
  -- drawing on a transparent background, as ONE Decal (R151: one face, no longer front and back) on the yellow ball. A literal, equal to VerityConfig.Image
  -- (VerityConfig requires this module, so it cannot be required from here); the test keeps the two equal.

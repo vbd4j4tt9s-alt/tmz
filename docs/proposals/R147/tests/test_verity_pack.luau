@@ -151,9 +151,9 @@ check(pcall(Config.Validate),'Config.Validate passes (stage 9 has 1 seed, the pl
 local pool9=Rules.ObtainablePool(Config,9)
 check(pool9 and #pool9==1 and pool9[1].Id=='VeritySeed','ObtainablePool(9) = the Verity seed')
 for stage=1,8 do for _,s in ipairs(Rules.ObtainablePool(Config,stage)or{})do if s.Id=='VeritySeed'then check(false,'Verity seed in pool '..stage)end end end
-check(T.SeedValues.VeritySeed==9e10 and T.IndexFirst.VeritySeed==1e11 and T.IndexRepeat.VeritySeed==2e10 and T.CompletionGems[9]==100 and T.HalfwayGems==10,'balance: fruit 9e10, index 1e11 first / 2e10 repeat, 100 Gems, halfway 10')
-local gemsOk=true;for _,k in ipairs({1,2,3,4,5,6,7})do if T.CompletionGems[k]~=20 then gemsOk=false end end
-check(gemsOk and T.CompletionGems[8]==100,'completion Gems of categories 1-8 unchanged')
+check(T.SeedValues.VeritySeed==9e10 and T.IndexFirst.VeritySeed==1e11 and T.IndexRepeat.VeritySeed==2e10 and T.CompletionGems[9]==50 and T.HalfwayGems==5,'balance: fruit 9e10, index 1e11 first / 2e10 repeat, 50 Gems (R153: halved from 100), halfway 5 (was 10)')
+local gemsOk=true;for _,k in ipairs({1,2,3,4,5,6,7})do if T.CompletionGems[k]~=10 then gemsOk=false end end
+check(gemsOk and T.CompletionGems[8]==50,'completion Gems of categories 1-8: R153 halved (20 -> 10, Mech 100 -> 50)')
 local vp=Config.GardenPlants.VeritySeed
 check(vp and vp.Verity==true and vp.Mode=='repeat'and vp.FruitCount==1 and vp.Tree==false and vp.HarvestName=='Verity Fruit'and vp.Rarity=='King'and vp.Biome=='Verity'
  and vp.Seconds==14400 and vp.RegrowSeconds==1500 and vp.Value==9e10 and vp.BaseScale==1 and vp.Rank==8 and vp.HarvestMode=='fruit'and vp.Height==23.6 and vp.Radius==11.2
@@ -456,7 +456,7 @@ check(c1 and not c2,'half reward of category 9 claims once ('..tostring(cWhy)..'
 local fullOk,fullWhy=Data:ClaimIndexBiome(A,9);local fullAgain=Data:ClaimIndexBiome(A,9)
 check(fullOk and not fullAgain and A:GetAttribute('IndexBiomeReward9')==true and A:GetAttribute('IndexBiomeHalfReward9')==true,'completion reward of category 9 claims once, the attributes follow ('..tostring(fullWhy)..')')
 local gemAmounts={};for _,rc in ipairs(Data.Gardens[A].PendingSales or{})do if rc.Currency=='Gems'then gemAmounts[#gemAmounts+1]=rc.Amount end end
-check(table.concat(gemAmounts,',')=='10,100','the Gems: 10 (half) and 100 (complete)')
+check(table.concat(gemAmounts,',')=='5,50','the Gems: 5 (half) and 50 (complete) (R153: halved from 10 and 100)')
 check(not Data:ClaimIndexBiome(A,10)and not Data:ClaimIndexBiome(A,0)and not Data:ClaimIndexBiomeHalf(A,10)and not Data:ClaimIndexBiomeHalf(A,'9'),'categories outside 1-9 are refused')
 local cashOk=Data:ClaimIndexSeed(A,'VeritySeed')
 local cashAmounts={};for _,rc in ipairs(Data.Gardens[A].PendingSales or{})do if rc.Currency=='Cash'then cashAmounts[#cashAmounts+1]=rc.Amount end end
@@ -579,7 +579,7 @@ local okE=X.Execute(ctx,D,'eclipse',{'2'});local ev=0;for _,r in ipairs(Data:Get
 check(okE and ev>=2 and select(1,X.Execute(ctx,D,'void',{'1'})),'void / eclipse still give Void packs')
 check(not X.Execute(ctx,D,'packset',{'verity'})and not X.Execute(ctx,D,'packset',{'mech'}),'packset verity / mech are refused')
 local okI,textI=X.Execute(ctx,D,'indexinfo',{'verity'})
-check(okI and textI:find('Completion reward: 100 Gems',1,true),'indexinfo verity: the category-9 reward ('..tostring(textI)..')')
+check(okI and textI:find('Completion reward: 50 Gems',1,true),'indexinfo verity: the category-9 reward ('..tostring(textI)..')')
 local okI2,textI2=X.Execute(ctx,D,'indexinfo',{'VeritySeed'})
 check(okI2 and textI2:find('first 100000000000 Cash',1,true)~=nil and textI2:find('repeat 20000000000 Cash',1,true)~=nil,'indexinfo VeritySeed: first / repeat cash ('..tostring(textI2)..')')
 -- rarepacks verity (Studio only).
