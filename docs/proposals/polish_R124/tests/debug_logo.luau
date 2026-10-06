@@ -1,4 +1,5 @@
 --!nocheck
+-- (R153: obsolete. The biome title has no medallion or logo any more; test_notifier.luau covers the new text-only notifier.)
 local W=require('./world');local R=W.R
 local V3,CF=R.Vector3.new,R.CFrame.new
 local Players=W.service('Players')
