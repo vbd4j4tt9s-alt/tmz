@@ -13,6 +13,7 @@
 #  4. seed     - perf152_seed.luau: the real SeedPackClient + PackOpeningFeedback, every rarity on desktop / phone / low quality at 60 and 30 fps, and an
 #                onlooker's Secret / King (the sky beam), every frame, and the sound schedule (which sound, when, file position, speed, volume, heard gain)
 #  5. hotbar, speed popups (per tier), every pack (R151 fingerprint_packs.luau: the Verity pack, the Void pack, every design / size / coat / context)
+#  (and perf152_units.luau: the two new helpers, PropCache152 and ViewCull152, on their own)
 # perf152_canon.py compares each pair: what is drawn must be identical; the allowed differences (instances that are never drawn, a display item frozen
 # while off screen) are listed. The PERF lines (instances, SurfaceGuis, writes per frame, Lua ms on the mock) are tabled by perf152_report.py.
 # Without the place file the hub and keyboard parts are skipped.
@@ -59,6 +60,9 @@ prepare() { # $1 = side dir, $2 = src
 }
 prepare "$OUT/base" "$OUT/base_src/src"
 prepare "$OUT/now" "$S"
+# the two helpers on their own (PropCache152: write once / on change, by value; ViewCull152: hidden only when provably out of view)
+cp "$HERE/perf152_units.luau" "$OUT/now/keepers/"
+if (cd "$OUT/now/keepers" && /opt/luau/luau perf152_units.luau > "$OUT/units.txt" 2>&1);then echo "ok: $(tail -n 1 "$OUT/units.txt")";else fail "the helpers' unit checks";tail -n 8 "$OUT/units.txt";fi
 # the runs: one line each "<dir> <output> <globals line> <driver>", both sides, JOBS at a time
 : > "$OUT/jobs.txt"
 # (ONLY=hub,kb,keepers,seed,hotbar,popups,packs: just those runs, for a quick look while working; the full suite runs everything)
@@ -119,5 +123,5 @@ else fail "packs differ";head -30 "$OUT/cmp_packs.txt";fi
 fi
 echo "== numbers (before -> after)"
 python3 "$HERE/perf152_report.py" "$OUT/base" "$OUT/now" || true
-[ "$RC" = 0 ] && echo "R152 perf: the look and the sound are identical (allowed differences listed above)"
+[ "$RC" = 0 ] && echo "R152 perf: all checks passed - the look and the sound are identical (allowed differences listed above)"
 exit $RC

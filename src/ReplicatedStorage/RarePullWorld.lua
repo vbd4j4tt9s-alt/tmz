@@ -55,13 +55,14 @@ function W.Begin(player,character,rank,at,opts)
  if not folder or not folder.Parent then folder=Instance.new('Folder');folder.Name='_RarePullWorld';folder.Parent=workspace end
  local tier=Rules.Tier(rank);local isLite=opts.Lite;if isLite==nil then isLite=lite()end
  local e={Player=player,Character=character,Rank=rank,At=at,Tier=tier,TL=Rules.WorldTimeline(rank),Lite=isLite,Reduced=opts.Reduced or reduced(),Motes={},Planets={}}
+ e.Cache=Fx.Cache.new();e.Set=e.Cache.Set -- (R152 perf: this effect's per-frame values are written only when they change; its beam shares the cache)
  local f=Instance.new('Folder');f.Name='RarePull '..tier.Key;f.Parent=folder;e.Folder=f
  local color=tier.Theme or tier.Hint
  for i=1,(isLite and 6 or 10)do e.Motes[i]=part(f,'Charge mote',V(.16,.16,.16),Rules.Neutral,Enum.PartType.Ball)end
  -- the sky beam: lands on the burst, holds, thins out by PillarEnd (budget: ClientFxBudget tier; low quality = tier 1)
  local fxTier=isLite and math.min(2,Fx.Tier())or Fx.Tier()
  e.Beam=Fx.Beam({Parent=f,Name='Light beam',Ground=W.Ground(character),Height=140,Width=rank==8 and 3.6 or rank==7 and 3.4 or 3.2,Color=color,Glow=tier.Glow,
-  Land=e.TL.Burst,Descent=.16,Hold=1.5,Fade=e.TL.PillarEnd-e.TL.Burst-1.5,Tier=fxTier,Reduced=e.Reduced,Cracks=true})
+  Land=e.TL.Burst,Descent=.16,Hold=1.5,Fade=e.TL.PillarEnd-e.TL.Burst-1.5,Tier=fxTier,Reduced=e.Reduced,Cracks=true,Cache=e.Cache})
  effects[player]=e
  if not connection then connection=Run.RenderStepped:Connect(function()step()end)end
  return e
@@ -136,11 +137,12 @@ local function update(player,e,now,camera)
   local t=now-e.At
   if not player.Parent or not root or(humanoid and humanoid.Health<=0)or t>e.TL.AuraEnd or player.Character~=char then stopEffect(player);return end
   local far=camera and(camera.CFrame.Position-root.Position).Magnitude>W.FarDistance
+  local S=e.Set
   if far and not e.Far then
    e.Far=true
-   for _,d in ipairs(e.Folder:GetDescendants())do if d:IsA('BasePart')then d.Transparency=1 elseif d:IsA('Beam')or d:IsA('ParticleEmitter')then d.Enabled=false end end
-   for _,em in ipairs(e.AuraEmitters or{})do em.Enabled=false end
-   if e.Hum then e.Hum.Volume=0 end
+   for _,d in ipairs(e.Folder:GetDescendants())do if d:IsA('BasePart')then S(d,'Transparency',1)elseif d:IsA('Beam')or d:IsA('ParticleEmitter')then S(d,'Enabled',false)end end
+   for _,em in ipairs(e.AuraEmitters or{})do S(em,'Enabled',false)end
+   if e.Hum then S(e.Hum,'Volume',0)end
   elseif not far then e.Far=false end
   if e.Far then return end
   local mouth=e.Mouth or root.CFrame*CF(0,1,-1)
@@ -151,8 +153,8 @@ local function update(player,e,now,camera)
    if t<burst then
     local q=clamp01(t/burst);local k=(q*1.7+i/#e.Motes)%1;local a=i*2.39996+t*(e.Reduced and 0 or 3+i%3)
     local r=.2+(1-k)*2.6;local h=.1+(1-k)*2.2
-    m.CFrame=CF(up+V(math.cos(a)*r,h,math.sin(a)*r));m.Transparency=1-math.sin(k*math.pi)*q*.9;m.Color=Rules.Hint(e.Rank,q)
-   else m.Transparency=1 end
+    S(m,'CFrame',CF(up+V(math.cos(a)*r,h,math.sin(a)*r)));S(m,'Transparency',1-math.sin(k*math.pi)*q*.9);S(m,'Color',Rules.Hint(e.Rank,q))
+   else S(m,'Transparency',1)end
   end
   -- the sky beam (it follows the puller; gone once it has faded), and its whoosh
   local age=t-burst
@@ -160,24 +162,24 @@ local function update(player,e,now,camera)
    if t>e.TL.PillarEnd+.1 then e.Beam:Destroy();e.Beam=nil else e.Beam:Update(t,W.Ground(char))end
   end
   whoosh(e,t)
-  if e.Whoosh then e.Whoosh.Volume=e.WhooshVolume*clamp01(1-(age-.35)/.5);if age>.9 then e.Whoosh:Stop();e.Whoosh=nil end end -- (faded on the clock)
+  if e.Whoosh then S(e.Whoosh,'Volume',e.WhooshVolume*clamp01(1-(age-.35)/.5));if age>.9 then e.Whoosh:Stop();e.Whoosh=nil end end -- (faded on the clock)
   -- afterglow aura
   if age>=0 then
    if not e.Attachment then buildAura(e,root)end
    local fadeIn=clamp01(age/.6);local fadeOut=clamp01((e.TL.AuraEnd-t)/2);local a=fadeIn*fadeOut
-   for _,em in ipairs(e.AuraEmitters or{})do em.Enabled=a>.2 end
-   if e.Hum then e.Hum.Volume=(e.HumVolume or .06)*a end
+   for _,em in ipairs(e.AuraEmitters or{})do S(em,'Enabled',a>.2)end
+   if e.Hum then S(e.Hum,'Volume',(e.HumVolume or .06)*a)end
    local spin=e.Reduced and 0 or t
    for _,p in ipairs(e.Planets)do
-    local ang=spin*p.Speed*2+p.Radius;p.Part.CFrame=CF(root.Position+V(math.cos(ang)*p.Radius,2.4+math.sin(ang*1.3)*.3,math.sin(ang)*p.Radius))
-    if p.Image then p.Image.ImageTransparency=1-a else p.Part.Transparency=1-a end
+    local ang=spin*p.Speed*2+p.Radius;S(p.Part,'CFrame',CF(root.Position+V(math.cos(ang)*p.Radius,2.4+math.sin(ang*1.3)*.3,math.sin(ang)*p.Radius)))
+    if p.Image then S(p.Image,'ImageTransparency',1-a)else S(p.Part,'Transparency',1-a)end
    end
-   if e.PlanetRing and e.Planets[1]then e.PlanetRing.CFrame=e.Planets[1].Part.CFrame*ANG(.5,0,math.pi/2);e.PlanetRing.Transparency=1-a*.6 end
+   if e.PlanetRing and e.Planets[1]then S(e.PlanetRing,'CFrame',e.Planets[1].Part.CFrame*ANG(.5,0,math.pi/2));S(e.PlanetRing,'Transparency',1-a*.6)end
    if e.Halo then
     local r=2.1+(e.Reduced and 0 or .12*math.sin(t*2))
     for i,seg in ipairs(e.Halo)do
      local ang=(i-.5)/#e.Halo*math.pi*2+spin*.4;local len=2*math.pi*r/#e.Halo*1.05
-     seg.Size=V(len,.06,.14);seg.CFrame=CF(root.Position+V(math.cos(ang)*r,-2.85,math.sin(ang)*r))*ANG(0,-ang+math.pi/2,0);seg.Transparency=1-a*.7
+     S(seg,'Size',V(len,.06,.14));S(seg,'CFrame',CF(root.Position+V(math.cos(ang)*r,-2.85,math.sin(ang)*r))*ANG(0,-ang+math.pi/2,0));S(seg,'Transparency',1-a*.7)
     end
    end
   end

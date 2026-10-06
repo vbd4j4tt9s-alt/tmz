@@ -98,7 +98,7 @@ for _,sc in ipairs(SEED_SET or{})do
  reveal(bag,X.byRank[rank])
  local dur=Rules.GetRevealDuration(names[rank])
  local f=0;local quiet=0;local st=FP.stream(label)
- FP.timesReset();FP.probeStart()
+ FP.timesReset();FP.probeStart();FP.Probe.Where=PERF_WHERE==true
  while true do
   FP.timeHandlers(W.Run);W.frames(1,dt);f+=1
   if f==math.floor(dur/dt+.5)then bag:Destroy();if tool then tool:Destroy()end end -- the server ends the opening
@@ -112,6 +112,7 @@ for _,sc in ipairs(SEED_SET or{})do
  local chunks={};for k,v in pairs(tm)do chunks[#chunks+1]=k end;table.sort(chunks)
  local parts={};for _,k in ipairs(chunks)do if tm[k]*1000/f>=.0005 then parts[#parts+1]=string.format('%s %.3f ms',k,tm[k]*1000/f)end end
  print(string.format('PERF seed %s frames=%d lua: %s | %s',label,f,table.concat(parts,', '),FP.probeText(probe,f,10)))
+ if PERF_WHERE then FP.whereText(f)end
  -- the sound schedule: every play (slot, start time from the reveal, file position, speed, volume, when it ends) and the voices heard on every frame
  local plays={}
  for _,p in ipairs(Y.plays(t0))do plays[#plays+1]=string.format('%s@%s pos=%s x%s v=%s end=%s',tostring(p.Slot or p.Sound.Name),n4(p.At-t0),n4(p.Pos or 0),n4(p.Speed or 1),n4(p.Volume or 0),p.Ends==math.huge and'loop'or n4(p.Ends-t0))end

@@ -94,6 +94,9 @@ A.Attack=.008 -- a one-shot with a measured Hit starts this long (real time) bef
 A.MaxVoices=10 -- voices sounding at once (the oldest one-shot gives way)
 A.EndFade=.25 -- a voice still ringing at the end of its presentation fades out over this, ending on the presentation's Length
 local function stopVoice(v)if v then v:Stop();playing[v]=nil end end
+-- R152 perf: the level each voice was last given (only this module sets its voices' Volume): a held level is not written again every frame
+local wrote=setmetatable({},{__mode='k'})
+local function setLevel(v,x)if wrote[v]~=x then wrote[v]=x;v.Volume=x end end
 local function expand(cues)
  local out={}
  for _,c in ipairs(cues)do
@@ -141,7 +144,7 @@ end
 local function play(e,v,t,into)
  local Timing=require(script.Parent.SoundTiming)
  playing[v]=nil
- v:Stop();v.Looped=e.Loop;v.PlaybackSpeed=e.Pitch;v.Volume=e.FadeIn>0 and 0 or e.Volume
+ v:Stop();v.Looped=e.Loop;v.PlaybackSpeed=e.Pitch;setLevel(v,e.FadeIn>0 and 0 or e.Volume)
  local l=e.Layer;local base
  if e.Entry then base=e.Entry
  elseif l.Hit and not e.Sustained then base=math.max(l.Region and l.Region[1]or 0,l.Hit-A.Attack*e.Pitch)
@@ -192,10 +195,10 @@ function A.Update(t)
   elseif e.Until and t>=e.Until-e.FadeOut then
    -- the fade ENDS on Until: a cue that stops for the silence is already silent when the silence starts
    local left=e.Until-t
-   if left<=0 then stopVoice(v)else v.Volume=e.Volume*math.min(1,left/math.max(1e-3,e.FadeOut))end
+   if left<=0 then stopVoice(v)else setLevel(v,e.Volume*math.min(1,left/math.max(1e-3,e.FadeOut)))end
   else
    local fade=e.FadeIn>0 and math.clamp((t-e.At)/e.FadeIn,0,1)or 1
-   v.Volume=e.Volume*fade
+   setLevel(v,e.Volume*fade)
    if e.PitchTo and e.Until then v.PlaybackSpeed=e.Pitch+(e.PitchTo-e.Pitch)*math.clamp((t-e.At)/math.max(.01,e.Until-e.At),0,1)end
   end
  end
@@ -228,7 +231,7 @@ function A.Duck(level)
    m=m or mixer();local g=m and m.Group(key)
    if g then fx=Instance.new('EqualizerSoundEffect');fx.Name='RarePullDuck';fx.Priority=10;fx.Parent=g;ducks[key]=fx end
   end
-  if fx then local db=-A.DuckDb*level;fx.LowGain=db;fx.MidGain=db;fx.HighGain=db end
+  if fx then local db=-A.DuckDb*level;if wrote[fx]~=db then wrote[fx]=db;fx.LowGain=db;fx.MidGain=db;fx.HighGain=db end end -- (the duck is this module's own too)
  end
  A.DuckLevel=level
 end
@@ -261,7 +264,7 @@ function A.Sting(rank)
   local list,layers=voicesFor(slot)
   for i,l in ipairs(layers)do
    if not l.Loop and(l.Delay or 0)==0 then
-    local v=list[i][1];v:Stop();v.PlaybackSpeed=l.Pitch or 1;v.Volume=(l.Volume or .3)
+    local v=list[i][1];v:Stop();v.PlaybackSpeed=l.Pitch or 1;setLevel(v,l.Volume or .3)
     pcall(function()local T=require(script.Parent.SoundTiming);T.Play(v,l.Start,.35)end)
    end
   end

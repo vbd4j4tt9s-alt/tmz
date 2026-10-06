@@ -41,6 +41,7 @@ local ONLOOKER_RANGE=160
 -- ends with the server's RevealDuration. Secret / Cosmic / King also get the light pillar and afterglow aura (RarePullWorld).
 local Ladder=require(ReplicatedStorage:WaitForChild("RarePullRules"))
 local Suspense=require(ReplicatedStorage:WaitForChild("PackSuspense"))
+local PropCache do local ok,m=pcall(require,ReplicatedStorage:WaitForChild("PropCache152",5));PropCache=ok and m or{new=function()return{Set=function(o,k,v)o[k]=v end}end}end -- (R152 perf)
 local RareWorld do local ok,m=pcall(require,ReplicatedStorage:WaitForChild("RarePullWorld",10));RareWorld=ok and m or nil end
 if not RareWorld then task.spawn(function()local m=ReplicatedStorage:WaitForChild("RarePullWorld");local ok,w=pcall(require,m);if ok then RareWorld=w end end)end -- (R152: late, not never)
 local RareCinematic=nil
@@ -129,6 +130,7 @@ local function beginReveal(record,at,seedId,now)
     record.SeedVisible=nil;record.LastSeedScale=nil;record.SeedFullyGrown=nil;record.TearSound=nil;record.SlideFlight=nil;record.SlideWhooshDone=nil;record.SlideWhoosh=nil
     local effect=Instance.new("Model");effect.Name="SeedReveal";effect.Parent=effects
     record.Effect=effect;record.At=at;record.Hidden={};record.SeedParts={};record.SeedEffects={}
+    record.Set=PropCache.new().Set -- R152 perf: the reveal's per-frame values are written only when they change
     local copy=record.Bag:Clone();copy.Name="OpeningBag";copy:SetAttribute("RevealAt",nil)
     for _,item in ipairs(copy:GetDescendants())do
         if item:IsA("WeldConstraint") or item:IsA("Motor6D") then item:Destroy()
@@ -248,33 +250,34 @@ local function renderReveal(record,now)
     local wobble=Ladder.Wobble(rank0,t,record.Quick,reducedMotion());wobble=CFrame.new(wobble.Position*s)*wobble.Rotation
     -- (R152: the emptied wrapper starts to sink from rest, a^2/(a+.2), instead of at full speed on the burst frame)
     local wrapperRoot=root*CFrame.new(0,-(ageFromTear*ageFromTear/(ageFromTear+.2))*.12*s,0)*wobble
+    local S=record.Set
     for p,localFrame in pairs(record.FlapFrames)do
         local index=p:GetAttribute("TearIndex")
         if index then
             local peel=Ladder.StripPeel(rank0,t,index,record.Quick)
-            p.CFrame=wrapperRoot*CFrame.new(0,peel*.23*s,peel*.27*s)*localFrame*CFrame.Angles(peel*1.3,0,-peel*.16)
-            p.Transparency=record.BagTransparency[p]+(1-record.BagTransparency[p])*math.max(wrapperFade,peel*.92)
-        else p.CFrame=wrapperRoot*localFrame;p.Transparency=record.BagTransparency[p]+(1-record.BagTransparency[p])*wrapperFade end
+            S(p,"CFrame",wrapperRoot*CFrame.new(0,peel*.23*s,peel*.27*s)*localFrame*CFrame.Angles(peel*1.3,0,-peel*.16))
+            S(p,"Transparency",record.BagTransparency[p]+(1-record.BagTransparency[p])*math.max(wrapperFade,peel*.92))
+        else S(p,"CFrame",wrapperRoot*localFrame);S(p,"Transparency",record.BagTransparency[p]+(1-record.BagTransparency[p])*wrapperFade)end
     end
-    for d,base in pairs(record.DecalFade or{})do d.Transparency=base+(1-base)*wrapperFade end
-    record.Mouth.Size=Vector3.new(math.max(.001,1.68*progress*s),.025*s,math.max(.001,.3*progress*s))
-    record.Mouth.CFrame=wrapperRoot*CFrame.new((progress-1)*.84*s,mouth+.015*s,0)
-    record.Mouth.Transparency=progress==0 and 1 or wrapperFade
+    for d,base in pairs(record.DecalFade or{})do S(d,"Transparency",base+(1-base)*wrapperFade)end
+    S(record.Mouth,"Size",Vector3.new(math.max(.001,1.68*progress*s),.025*s,math.max(.001,.3*progress*s)))
+    S(record.Mouth,"CFrame",wrapperRoot*CFrame.new((progress-1)*.84*s,mouth+.015*s,0))
+    S(record.Mouth,"Transparency",progress==0 and 1 or wrapperFade)
     for i,p in ipairs(record.Lips)do
         local peel=Ladder.StripPeel(rank0,t,i,record.Quick)
         local x=-.84+(i-.5)*1.68/8
-        p.Size=Vector3.new(.218,.14,.035)*s
-        p.CFrame=wrapperRoot*CFrame.new(x*s,mouth+(.025+peel*.10)*s,-peel*.22*s)*CFrame.Angles(-peel*1.2,0,(i%2==0 and .08 or -.08))
-        p.Transparency=peel==0 and 1 or wrapperFade
+        S(p,"Size",Vector3.new(.218,.14,.035)*s)
+        S(p,"CFrame",wrapperRoot*CFrame.new(x*s,mouth+(.025+peel*.10)*s,-peel*.22*s)*CFrame.Angles(-peel*1.2,0,(i%2==0 and .08 or -.08)))
+        S(p,"Transparency",peel==0 and 1 or wrapperFade)
         local release=Ladder.StripStart(rank0,i,record.Quick)+.02;local age=math.max(0,t-release)
-        local scrap=record.Scraps[i];scrap.Size=Vector3.new(.07,.11,.02)*math.min(s,3)
-        scrap.CFrame=root*CFrame.new((x+age*.12)*s,mouth+(age*.9-age*age*1.7)*s,age*.24*s)*CFrame.Angles(age*2.5,i,age*1.7)
-        scrap.Transparency=t<release and 1 or math.clamp((age-.1)/.55,0,1)
+        local scrap=record.Scraps[i];S(scrap,"Size",Vector3.new(.07,.11,.02)*math.min(s,3))
+        S(scrap,"CFrame",root*CFrame.new((x+age*.12)*s,mouth+(age*.9-age*age*1.7)*s,age*.24*s)*CFrame.Angles(age*2.5,i,age*1.7))
+        S(scrap,"Transparency",t<release and 1 or math.clamp((age-.1)/.55,0,1))
     end
     if record.TearSound then
         local tt=t-(record.TearShift or 0)
         if tt>Rules.TearSeconds+.1 then record.TearSound:Stop();record.TearSound=nil
-        else record.TearSound.Volume=Rules.TearVolume*math.clamp(tt/.025,0,1)*math.clamp((Rules.TearSeconds+.08-tt)/.15,0,1)end
+        else S(record.TearSound,"Volume",Rules.TearVolume*math.clamp(tt/.025,0,1)*math.clamp((Rules.TearSeconds+.08-tt)/.15,0,1))end
     end
     -- R151: a short rip each time the next strips go (on the beat of the peel; a tick reaching this client late is skipped)
     for i,tick in ipairs(record.TearTicks or{})do
@@ -299,7 +302,7 @@ local function renderReveal(record,now)
     local rise,slide=Ladder.SeedPhase(age,record.Hover);local ease=1-(1-rise)^3
     local scale=record.SeedBaseScale -- slide the seed out at its real held size
     if not record.LastSeedScale or math.abs(scale-record.LastSeedScale)>.025 or (rise==1 and not record.SeedFullyGrown)then
-        record.Seed:ScaleTo(scale);record.LastSeedScale=scale;record.SeedFullyGrown=rise==1
+        record.Seed:ScaleTo(scale);record.LastSeedScale=scale;record.SeedFullyGrown=rise==1;record.SeedPivot=nil
     end
     local rank=record.RarityRank
     local centre=root*CFrame.new(0,mouth-record.SeedRadius*(1-ease)+ease*(record.SeedRadius+.8),-ease*(.4+record.SeedRadius*.22))
@@ -324,11 +327,14 @@ local function renderReveal(record,now)
     if record.SlideWhoosh then
         local f=record.SlideWhooshFlight;local a=t-f.Peak
         if a>.45 then record.SlideWhoosh:Stop();record.SlideWhoosh=nil
-        else record.SlideWhoosh.Volume=f.Volume*math.clamp(1-(a-.15)/.3,0,1)end
+        else S(record.SlideWhoosh,"Volume",f.Volume*math.clamp(1-(a-.15)/.3,0,1))end
     end
-    record.Seed:PivotTo(seedFrame)
+    -- (R152 perf: a seed that holds still is not moved again every frame; only this reveal moves it, and a rescale moves it again)
+    if record.SeedPivot~=seedFrame then record.Seed:PivotTo(seedFrame);record.SeedPivot=seedFrame end
     local fade=math.clamp((slide-.85)/.15,0,1);local visible=t>=revealStart and fade<1
-    for _,p in ipairs(record.SeedParts)do if p~=record.Seed.PrimaryPart then p.LocalTransparencyModifier=visible and fade or 1 end end
+    -- (a giant seed's parts also get GiantVisualSafety's close-up fade: the value there is read, not remembered)
+    local seedAlpha=visible and fade or 1
+    for _,p in ipairs(record.SeedParts)do if p~=record.Seed.PrimaryPart and p.LocalTransparencyModifier~=seedAlpha then p.LocalTransparencyModifier=seedAlpha end end
     if visible~=record.SeedVisible then
         record.SeedVisible=visible
         for _,p in ipairs(record.SeedEffects)do p.Enabled=visible end
@@ -338,8 +344,8 @@ local function renderReveal(record,now)
     for i,p in ipairs(record.Celestial)do
         local offset=Rules.RevealAuraPoint(rank,i,#record.Celestial,age,radius)
         local frame=seedFrame;local world=frame:PointToWorldSpace(offset)
-        p.Size=Vector3.one*(.065+.008*rank)*math.min(record.SeedBaseScale,2);p.CFrame=CFrame.new(world)
-        p.Transparency=visible and math.clamp(.16+fade*.84+(rank==6 and .12*(1+math.sin(age*1.7+i))or 0),0,1)or 1
+        S(p,"Size",Vector3.one*(.065+.008*rank)*math.min(record.SeedBaseScale,2));S(p,"CFrame",CFrame.new(world))
+        S(p,"Transparency",visible and math.clamp(.16+fade*.84+(rank==6 and .12*(1+math.sin(age*1.7+i))or 0),0,1)or 1)
     end
     -- One restrained major chord for the opener, never a loop or a global server sound.
     if not record.HeavenlyStarted and t>=revealStart and rank>=4 then
@@ -365,7 +371,7 @@ local function renderReveal(record,now)
     for _,voice in ipairs(record.HeavenlySounds)do
         local elapsed=age-voice.Delay
         if elapsed>=0 and not voice.Played then voice.Played=true;voice.Sound:Play()end
-        voice.Sound.Volume=Rules.RevealBellVolume*math.clamp(elapsed/.1,0,1)*math.clamp((1.6-elapsed)/1.2,0,1)*(1-fade)
+        S(voice.Sound,"Volume",Rules.RevealBellVolume*math.clamp(elapsed/.1,0,1)*math.clamp((1.6-elapsed)/1.2,0,1)*(1-fade))
         if elapsed>=1.6 then voice.Sound:Stop()end
     end
 end

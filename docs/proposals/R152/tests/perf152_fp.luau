@@ -12,6 +12,16 @@ return function(W)
  local R=W.R
  local FP={}
  local fmt=string.format
+ -- (as Roblox: two CFrames with the same components are ==; the shared mock compares them by identity. Both sides of a comparison run with it.)
+ do local mt=getmetatable(R.CFrame.new(0,0,0))
+  if mt and not rawget(mt,'__eq')then
+   mt.__eq=function(a,b)
+    if getmetatable(a)~=mt or getmetatable(b)~=mt or a.Position~=b.Position then return false end
+    for i=1,3 do for j=1,3 do if a.R[i][j]~=b.R[i][j]then return false end end end
+    return true
+   end
+  end
+ end
  local function n(v)
   if v~=v then return'nan'end
   if v==math.huge then return'inf'elseif v==-math.huge then return'-inf'end
@@ -287,7 +297,11 @@ return function(W)
    probe.Writes+=1;probe.By[key]=(probe.By[key]or 0)+1
    if k~='Parent'then
     local old=rawget(o,'_props')[k]
-    if old==v or(old~=nil and type(old)=='table'and type(v)=='table'and ser(old)==ser(v))then probe.Same+=1;probe.SameBy[key]=(probe.SameBy[key]or 0)+1 end
+    if old==v or(old~=nil and type(old)=='table'and type(v)=='table'and ser(old)==ser(v))then probe.Same+=1;probe.SameBy[key]=(probe.SameBy[key]or 0)+1
+     -- (probe.Where: which line wrote it; a debugging aid, off in the runs)
+     if probe.Where then local s,l=debug.info(2,'sl');for lv=3,8 do if not tostring(s):match('^[=@]?%./')then break end;s,l=debug.info(lv,'sl')end
+      local w=key..' @'..tostring(s):gsub('^[=@]','')..':'..tostring(l);probe.WhereBy=probe.WhereBy or{};probe.WhereBy[w]=(probe.WhereBy[w]or 0)+1 end
+    end
    elseif o._parent==v then probe.Same+=1;probe.SameBy[key]=(probe.SameBy[key]or 0)+1 end
    probe.Overhead+=os.clock()-t0
   end
@@ -301,6 +315,11 @@ return function(W)
   local parts={}
   for i=1,math.min(top or 8,#list)do parts[#parts+1]=fmt('%s %.1f (same %.1f)',list[i][1],list[i][2]/frames,list[i][3]/frames)end
   return fmt('writes/frame=%.1f same/frame=%.1f made/frame=%.2f top: %s',p.Writes/frames,p.Same/frames,p.Made/frames,table.concat(parts,'; '))
+ end
+ function FP.whereText(frames)
+  local list={};for k,v in pairs(probe.WhereBy or{})do list[#list+1]={k,v}end;probe.WhereBy={}
+  table.sort(list,function(a,b)if a[2]~=b[2]then return a[2]>b[2]end;return a[1]<b[1]end)
+  for i=1,math.min(40,#list)do print(fmt('WHERE %.1f/frame %s',list[i][2]/frames,list[i][1]))end
  end
  -- writes per area (the part of the key before ':' when a classifier is set): {area = {writes, same}}
  function FP.probeAreas(p)

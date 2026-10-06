@@ -17,6 +17,9 @@
 --  opts.Strength dims the layers (the King's beams: the crown is the star, not the light).
 local Fx={}
 local Art do local ok,m=pcall(require,script.Parent.RarePullArt);Art=ok and m or nil end
+-- R152 perf: per-frame values are written only when they change (PropCache152; without it, every write as before)
+local Cache do local ok,m=pcall(require,script.Parent.PropCache152);Cache=ok and m or{new=function()return{Set=function(o,k,v)o[k]=v end}end}end
+Fx.Cache=Cache
 local V,CF,ANG=Vector3.new,CFrame.new,CFrame.Angles
 local C=Color3.fromRGB
 Fx.SPARK='rbxasset://textures/particles/sparkles_main.dds';Fx.SMOKE='rbxasset://textures/particles/smoke_main.dds';Fx.FLARE='rbxasset://textures/particles/flare_main.dds'
@@ -54,6 +57,7 @@ function Fx.Beam(opts)
  local W=opts.Width or 2;local H=opts.Height or 120
  local self=setmetatable({Opts=opts,Tier=tier,Budget=budget,W=W,H=H,Land=opts.Land or 0,Descent=opts.Descent or .16,Hold=opts.Hold or 1.4,Fade=opts.Fade or 1,
   Color=opts.Color or C(255,255,255),Glow=opts.Glow or C(255,255,255),Reduced=opts.Reduced==true,Arrive=opts.Arrive or'slam',Strength=math.clamp(opts.Strength or 1,0,1),ImpactHidden=true,Streaks={},Ring={},Ring2={},Debris={},Cracks={},Cache={}},Beam)
+ self.Set=(opts.Cache or Cache.new()).Set -- (opts.Cache: the owner's cache, when the owner also writes these pieces)
  local folder=Instance.new('Folder');folder.Name=opts.Name or'Sky beam';folder.Parent=opts.Parent;self.Folder=folder
  local anchor=part(folder,'Beam anchor',V(.2,.2,.2),self.Color);self.Anchor=anchor
  anchor.CFrame=CF(opts.Ground or Vector3.zero)
@@ -67,6 +71,7 @@ function Fx.Beam(opts)
   self.Haze=beam(folder,'Beam haze',self.Top,self.Foot,{Color=ColorSequence.new(self.Color:Lerp(white,.15),self.Color),LightEmission=.15,Width0=W*2.6,Width1=W*2.2,
    Texture=Fx.SMOKE,TextureMode=Enum.TextureMode.Wrap,TextureLength=math.max(6,H/4),TextureSpeed=self.Reduced and .1 or .35})
  end
+ self.Layers={self.Core,self.GlowBeam,self.Haze}
  for i=1,budget.Streaks do
   local a0,a1=attachment(anchor,'Streak top '..i),attachment(anchor,'Streak foot '..i)
   local b=beam(folder,'Beam streak '..i,a0,a1,{Color=ColorSequence.new(white,self.Glow),LightEmission=1,Width0=W*.12,Width1=W*.28,
@@ -117,19 +122,20 @@ function Beam:_alpha(b,base,top,alpha)
  local q=math.floor(alpha*32+.5)/32
  local key=b.Name..q;local s=self.Cache[key]
  if not s then s=seq(1,1-(1-top)*q,1-(1-base)*q);self.Cache[key]=s end
- if b.Transparency~=s then b.Transparency=s end
+ self.Set(b,'Transparency',s)
 end
-local function placeRing(segs,centre,radius,width,trans)
+local function placeRing(S,segs,centre,radius,width,trans)
  local n=#segs
  for i,seg in ipairs(segs)do
   local a=(i-.5)/n*math.pi*2;local len=2*math.pi*radius/n*1.06
-  seg.Size=V(math.max(.05,len),seg.Size.Y,width);seg.CFrame=CF(centre+V(math.cos(a)*radius,0,math.sin(a)*radius))*ANG(0,-a+math.pi/2,0);seg.Transparency=trans
+  S(seg,'Size',V(math.max(.05,len),seg.Size.Y,width));S(seg,'CFrame',CF(centre+V(math.cos(a)*radius,0,math.sin(a)*radius))*ANG(0,-a+math.pi/2,0));S(seg,'Transparency',trans)
  end
 end
 -- t: the owner's clock; ground (optional): where its foot is now (it follows its subject)
 function Beam:Update(t,ground)
  if self.Destroyed then return end
- if ground then self.Anchor.CFrame=CF(ground)end
+ local S=self.Set
+ if ground then S(self.Anchor,'CFrame',CF(ground))end
  local g=self.Anchor.CFrame.Position
  local a=t-self.Land;local W,H=self.W,self.H
  local endAt=self.Hold+self.Fade
@@ -144,25 +150,26 @@ function Beam:Update(t,ground)
  if on and a>=self.Hold then local k=smooth((a-self.Hold)/self.Fade);width*=1-.85*k;alpha*=1-k end
  if on and not self.Reduced and a>=0 then width*=1+.05*math.sin(t*9)end
  local shade=alpha*self.Strength -- (a softer beam: the King's, which must not outshine the crown)
- for _,b in ipairs({self.Core,self.GlowBeam,self.Haze})do if b then b.Enabled=on and alpha>.01 end end
- self.Top.Position=V(0,H,0);self.Foot.Position=V(0,footY,0)
+ local lit=on and alpha>.01
+ for _,b in ipairs(self.Layers)do S(b,'Enabled',lit)end
+ S(self.Top,'Position',V(0,H,0));S(self.Foot,'Position',V(0,footY,0))
  if on then
-  self.Core.Width0=W*.22*width;self.Core.Width1=W*.34*width;self:_alpha(self.Core,.02,.25,shade)
-  self.GlowBeam.Width0=W*1.0*width;self.GlowBeam.Width1=W*1.35*width;self:_alpha(self.GlowBeam,.2,.5,shade)
-  if self.Haze then self.Haze.Width0=W*2.6*width;self.Haze.Width1=W*2.2*width;self:_alpha(self.Haze,.5,.78,shade)end
+  S(self.Core,'Width0',W*.22*width);S(self.Core,'Width1',W*.34*width);self:_alpha(self.Core,.02,.25,shade)
+  S(self.GlowBeam,'Width0',W*1.0*width);S(self.GlowBeam,'Width1',W*1.35*width);self:_alpha(self.GlowBeam,.2,.5,shade)
+  if self.Haze then S(self.Haze,'Width0',W*2.6*width);S(self.Haze,'Width1',W*2.2*width);self:_alpha(self.Haze,.5,.78,shade)end
  end
  local spin=self.Reduced and 0 or t*1.1
  for i,s in ipairs(self.Streaks)do
-  s.Beam.Enabled=on and alpha>.01
+  S(s.Beam,'Enabled',lit)
   if on then
    local th=s.Phase+spin;local r=W*.45*width
-   s.Top.Position=V(math.cos(th+1.6)*r*.5,H,math.sin(th+1.6)*r*.5);s.Foot.Position=V(math.cos(th)*r,footY,math.sin(th)*r)
-   s.Beam.Width0=W*.12*width;s.Beam.Width1=W*.28*width;self:_alpha(s.Beam,.15,.5,shade)
+   S(s.Top,'Position',V(math.cos(th+1.6)*r*.5,H,math.sin(th+1.6)*r*.5));S(s.Foot,'Position',V(math.cos(th)*r,footY,math.sin(th)*r))
+   S(s.Beam,'Width0',W*.12*width);S(s.Beam,'Width1',W*.28*width);self:_alpha(s.Beam,.15,.5,shade)
   end
  end
  local holding=on and a>=0 and a<self.Hold
- self.Embers.Enabled=holding and alpha>.3
- if self.Light then self.Light.Brightness=on and(self.Arrive=='fade'and 1.4*alpha or a<0 and 0 or 5*math.exp(-a*4)+.9*alpha)or 0 end
+ S(self.Embers,'Enabled',holding and alpha>.3)
+ if self.Light then S(self.Light,'Brightness',on and(self.Arrive=='fade'and 1.4*alpha or a<0 and 0 or 5*math.exp(-a*4)+.9*alpha)or 0)end
  -- the landing
  if self.Arrive=='slam'and a>=0 and not self.Landed then
   self.Landed=true
@@ -177,35 +184,36 @@ function Beam:Update(t,ground)
  self.On=on;self.Alpha=on and alpha or 0
 end
 function Beam:_impact(a,g)
+ local S=self.Set
  local W=self.W;local k1=clamp01(a/.6);local k2=clamp01((a-.08)/1.1)
  if self.RingArt then
   -- (the halo image's ring sits at .72 of its half size: the part is sized so the bright ring is at the radius)
   local show=self.Arrive=='slam'and a>=0
   for i,r in ipairs(self.RingArt)do
    local radius=i==1 and W*(.5+(self.Reduced and 3 or 7)*easeOut(k1))or W*(.4+(self.Reduced and 2.2 or 4.6)*easeOut(k2))
-   local d=2*radius/.72;r.Part.Size=V(d,.05,d);r.Part.CFrame=CF(g+V(0,.025+.05*i,0)) -- (R152 z-fighting: tops at .10 / .15 over the ground, the cracks' tops at .05: every layer .05 apart, the R149 depth rule wants .043)
-   r.Image.ImageTransparency=i==1 and(show and k1<1 and .05+.95*k1 or 1)or(show and a>=.08 and k2<1 and .35+.65*k2 or 1)
+   local d=2*radius/.72;S(r.Part,'Size',V(d,.05,d));S(r.Part,'CFrame',CF(g+V(0,.025+.05*i,0))) -- (R152 z-fighting: tops at .10 / .15 over the ground, the cracks' tops at .05: every layer .05 apart, the R149 depth rule wants .043)
+   S(r.Image,'ImageTransparency',i==1 and(show and k1<1 and .05+.95*k1 or 1)or(show and a>=.08 and k2<1 and .35+.65*k2 or 1))
   end
  elseif #self.Ring>0 then
   local show=self.Arrive=='slam'and a>=0
-  placeRing(self.Ring,g+V(0,.06,0),W*(.5+(self.Reduced and 3 or 7)*easeOut(k1)),W*(.22*(1-k1)+.04),show and k1<1 and .05+.95*k1 or 1)
-  placeRing(self.Ring2,g+V(0,.125,0),W*(.4+(self.Reduced and 2.2 or 4.6)*easeOut(k2)),W*(.6*(1-k2)+.1),show and a>=.08 and k2<1 and .55+.45*k2 or 1)
+  placeRing(S,self.Ring,g+V(0,.06,0),W*(.5+(self.Reduced and 3 or 7)*easeOut(k1)),W*(.22*(1-k1)+.04),show and k1<1 and .05+.95*k1 or 1)
+  placeRing(S,self.Ring2,g+V(0,.125,0),W*(.4+(self.Reduced and 2.2 or 4.6)*easeOut(k2)),W*(.6*(1-k2)+.1),show and a>=.08 and k2<1 and .55+.45*k2 or 1)
  end
  for _,d in ipairs(self.Debris)do
   local s=a;local show=self.Arrive=='slam'and s>=0 and s<1
   if show then
    local p=g+d.Dir*d.Speed*s+V(0,math.max(0,d.Up*s-9*s*s),0)
-   d.Part.CFrame=CF(p)*ANG(d.Spin.X*s,d.Spin.Y*s,d.Spin.Z*s);d.Part.Transparency=clamp01((s-.6)/.4)
-  else d.Part.Transparency=1 end
+   S(d.Part,'CFrame',CF(p)*ANG(d.Spin.X*s,d.Spin.Y*s,d.Spin.Z*s));S(d.Part,'Transparency',clamp01((s-.6)/.4))
+  else S(d.Part,'Transparency',1)end
  end
  for _,c in ipairs(self.Cracks)do
   local show=self.Arrive=='slam'and a>=0 and a<2.2
   if show then
    local len=c.L*easeOut(a/.14)
-   c.Part.Size=V(math.max(.04,self.W*.07),.04,math.max(.05,len))
-   c.Part.CFrame=CF(g+V(math.cos(c.A)*len*.5,.03,math.sin(c.A)*len*.5))*ANG(0,-c.A+math.pi/2,0)
-   c.Part.Transparency=.3+.7*clamp01((a-.5)/1.5)
-  else c.Part.Transparency=1 end
+   S(c.Part,'Size',V(math.max(.04,self.W*.07),.04,math.max(.05,len)))
+   S(c.Part,'CFrame',CF(g+V(math.cos(c.A)*len*.5,.03,math.sin(c.A)*len*.5))*ANG(0,-c.A+math.pi/2,0))
+   S(c.Part,'Transparency',.3+.7*clamp01((a-.5)/1.5))
+  else S(c.Part,'Transparency',1)end
  end
 end
 function Beam:Visible()return self.On==true and self.Alpha>.01 end
