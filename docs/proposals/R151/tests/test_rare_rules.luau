@@ -183,6 +183,12 @@ check(L.Decide(safe)=='Full','safe: the full story scene')
 for k,v in pairs({OnTrack=true,KeeperDistance=30,KeeperChasing=true,Ragdoll=true,Running=true,Menu=true,CameraType='Scriptable',Grounded=false,Alive=false})do
  local s=table.clone(safe);s[k]=v;check(L.Decide(s)=='InPlace','unsafe ('..k..'): the short in-place version')
 end
+-- R153: the player's "Skip pack animations": the in-place result card even when safe; every card is skippable (from SkipFrom), the story
+-- scenes as before; and the short (quick) timing is the setting's alone (no window after the last reveal)
+do local s=table.clone(safe);s.SkipCutscenes=true;check(L.Decide(s)=='InPlace','R153: "Skip pack animations" on: the in-place result card, never the story scene')end
+for rank=1,5 do local tl=L.CardTimeline(rank);check(tl.SkipFrom and tl.SkipFrom>0 and tl.SkipFrom<tl.Burst-.02 and tl.SkipFrom<tl.FloatEnd,names[rank]..': the card can be skipped from '..tostring(tl.SkipFrom)..' s, before its hit')end
+for rank=6,8 do for _,v in ipairs({'InPlace','Result'})do local tl=L.Timeline(rank,v);check(tl.SkipFrom and tl.SkipFrom<tl.FloatEnd,names[rank]..' '..v..': skippable too ('..tostring(tl.SkipFrom)..' s)')end end
+check(L.QuickWindow==nil and L.QuickFor(nil)==false,'R153: no quick window: without the setting a reveal is never short')
 -- 7. odds ------------------------------------------------------------------------------------------------------------------------------
 local tip='Storm Seed Pack\nStatic Grass: 1/2\nStorm Sovereign: 1/1.67B\nBlackout Bloom: 1/12K\nVolt Orchid: 1/1,250'
 check(L.TooltipOdds(tip,'Storm Sovereign')=='1.67B'and L.TooltipOdds(tip,'Blackout Bloom')=='12K'and L.TooltipOdds(tip,'Volt Orchid')=='1,250','the held pack\'s tooltip gives the seed\'s own odds')

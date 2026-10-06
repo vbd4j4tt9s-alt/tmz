@@ -6,6 +6,8 @@
 -- mix, the loudest single voice, the worst-case sample peak (every voice's file peak at its gain, added as amplitudes), the most voices at once.
 -- Checked (unless REPORT_ONLY): the caps below, whooshes well under the hits, the beds under the hits, the climax the loudest moment of its
 -- story, the ladder growing with the tier, the voice cap, and the old reveal sounds no louder than they were.
+-- R153: also the short version ("Skip pack animations" on) and every presentation skipped by the player: the same caps, and a skip is never
+-- louder than the full presentation (it stops what was sounding and joins the sheet at the hit).
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local Y=require('./rare152_env')(W,E,F,X)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -25,6 +27,7 @@ local function reset()
  cam.CameraType=R.Enum.CameraType.Custom;cam.FieldOfView=70;cam.CFrame=CF(3,9,112);cam.Focus=CF(0,3,100);cam.CameraSubject=X.hum
  W.Gui.ReducedMotionEnabled=false;X.root.CFrame=CF(0,3,100);X.hum.Health=100
  for _,k in ipairs(W.CS:GetTagged('BiomeKeeper'))do k:Destroy()end
+ X.player:SetAttribute('SettingSkipCutscenes',nil)
  R.advance(4)
 end
 local function start(rank,extra)
@@ -36,14 +39,15 @@ end
 local function peakOf(id)local l=Y.ById[id];return l and l.Peak or -6 end
 local function slotOf(v)return v.Sound.Name:match('^RarePull_(.-)_%d+b?$')end
 local rows={}
-local function measure(tag,rank,extra,setup)
+local function measure(tag,rank,extra,setup,skip)
  reset();if setup then setup()end
  local run=start(rank,extra);if not run then return nil end
  Y.record(function()return run.Clock()end)
- X.run(run.TL.Length+.3,1/60)
+ local skipped=false -- (skip: seconds after SkipFrom at which the player skips)
+ X.run(run.TL.Length+.3,1/60,skip and function()if not skipped and not run.Done and run.Clock()>=(run.TL.SkipFrom or math.huge)+skip then skipped=M.Skip()end end or nil)
  local frames=Y.stop()
  local r={Tag=tag,Rank=rank,Kind=run.Kind,Mix=-99,MixAt=0,Voice=-99,VoiceSlot='',Peak=-99,Voices=0,Whoosh=-99,Bed=-99,Hit=-99,SlotMax={},PreHitMix=-99,PostHitMix=-99}
- local hitT=run.TL.Climax or run.TL.Burst or 0
+ local hitT=run.TL.Climax or run.TL.Burst or 0;r.Skip=skip
  for _,f in ipairs(frames)do
   local mix=Y.mixLoudness(f)
   if mix>r.Mix then r.Mix=mix;r.MixAt=f.T or 0 end
@@ -72,6 +76,17 @@ for rank=6,8 do
  measure(names[rank]..' Full',rank)
  measure(names[rank]..' InPlace',rank,nil,function()X.keeper(V3(10,3,100),{GuardianBehavior='WANDER'})end)
 end
+-- R153: the short version and the skips
+local full={};for _,r in ipairs(rows)do full[r.Tag]=r end
+local skips={}
+for rank=1,5 do
+ local r=measure(names[rank]..' short',rank,nil,function()X.player:SetAttribute('SettingSkipCutscenes',true)end);if r then r.Extra=true end
+ for _,at in ipairs({.05,.5})do local k=measure(names[rank]..' skip+'..at,rank,nil,nil,at);if k then k.Extra=true;skips[#skips+1]={Row=k,Full=full[names[rank]..' card']}end end
+end
+for rank=6,8 do
+ for _,at in ipairs({.05,1})do local k=measure(names[rank]..' skip+'..at,rank,nil,nil,at);if k then k.Extra=true;skips[#skips+1]={Row=k,Full=full[names[rank]..' Full']}end end
+ local k=measure(names[rank]..' IP skip',rank,nil,function()X.keeper(V3(10,3,100),{GuardianBehavior='WANDER'})end,.05);if k then k.Extra=true;skips[#skips+1]={Row=k,Full=full[names[rank]..' InPlace']}end
+end
 print(string.format('%-18s %8s %8s %-13s %8s %8s %8s %8s %7s','presentation','mix','at','loudest','voice','whoosh','bed','peak','voices'))
 for _,r in ipairs(rows)do
  print(string.format('%-18s %8.1f %8.2f %-13s %8.1f %8.1f %8.1f %8.1f %7d',r.Tag,r.Mix,r.MixAt,r.VoiceSlot,r.Voice,r.Whoosh,r.Bed,r.Peak,r.Voices))
@@ -92,10 +107,15 @@ for _,r in ipairs(rows)do
   if r.Hit>-99 then check(r.Whoosh<=r.Hit-8,r.Tag..': the whooshes are at least 8 dB under the hit ('..string.format('%.1f vs %.1f',r.Whoosh,r.Hit)..')')end
  end
  if r.Bed>-99 and r.Hit>-99 then check(r.Bed<=r.Hit-3,r.Tag..': the music bed sits under the hit ('..string.format('%.1f vs %.1f',r.Bed,r.Hit)..')')end
- if r.Kind=='Scene'or r.Kind=='Ladder'then check(r.PostHitMix>=r.PreHitMix-1,r.Tag..': the hit is the loudest moment of the reveal (build '..string.format('%.1f, hit %.1f',r.PreHitMix,r.PostHitMix)..')')end
+ -- (a skip cuts the build wherever the player chose: what it stopped there is not compared with its hit)
+ if(r.Kind=='Scene'or r.Kind=='Ladder')and not r.Skip then check(r.PostHitMix>=r.PreHitMix-1,r.Tag..': the hit is the loudest moment of the reveal (build '..string.format('%.1f, hit %.1f',r.PreHitMix,r.PostHitMix)..')')end
 end
 -- the ladder grows with the tier, and the story scenes sit above it, without a jump
-local ladder={};for _,r in ipairs(rows)do if r.Kind=='Ladder'then ladder[r.Rank]=r.Mix end end
+local ladder={};for _,r in ipairs(rows)do if r.Kind=='Ladder'and not r.Extra then ladder[r.Rank]=r.Mix end end
+-- R153: a skip is never louder than the full presentation
+for _,k in ipairs(skips)do
+ check(k.Full and k.Row.Mix<=k.Full.Mix+.5,k.Row.Tag..': no louder than the full presentation ('..string.format('%.1f vs %.1f',k.Row.Mix,k.Full and k.Full.Mix or -99)..' LUFS)')
+end
 for rank=2,5 do check(ladder[rank]and ladder[rank-1]and ladder[rank]>=ladder[rank-1]-1,names[rank]..' is at least as loud as (within 1 dB) '..names[rank-1]..string.format(' (%.1f vs %.1f)',ladder[rank]or-99,ladder[rank-1]or-99))end
 check(ladder[1]and ladder[1]<=CAP.Mix-4,'Common stays modest ('..string.format('%.1f',ladder[1]or 99)..' LUFS)')
 -- nothing louder than it was: R151's loudest moment of each presentation (measured the same way: loudness_before_after.sh)
