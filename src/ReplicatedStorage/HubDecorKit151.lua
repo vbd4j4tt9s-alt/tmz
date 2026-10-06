@@ -67,7 +67,10 @@ K.Pilasters={
 -- The track gate (R152: two chess-rook towers and a crenellated gatehouse). TowerD is the colliding shaft's lower diameter (its inner edge,
 -- 91.8, stays outside the 180-wide run-up); the stepped base reaches 17.4 (inner edge 90.3, as the R151 plinth did). The gatehouse wall runs
 -- BeamY0 .. BeamY1 between the towers; the keys hang over the opening in front of it.
-K.Gate={TowerX=99,TowerZ=-100,TowerD=14.4,BeamY0=44,BeamY1=58,KeyY=50,KeyX={72,48,24,0,-24,-48,-72}}
+-- R153: KeySize is a key's width and height (a key hangs from KeyY + KeySize / 2 down to KeyY - KeySize / 2 = 42.5); the track's refresh barrier (ReplicatedStorage.RefreshBarrier) fills the opening under it.
+-- R153: the haunches (the pointed shoulders under the gatehouse at both ends): a wedge HaunchRise tall and HaunchRun wide, its tall side against the tower at |x| = HaunchOuter,
+-- its slope running from (HaunchOuter, BeamY0 - HaunchRise) up to (HaunchOuter - HaunchRun, BeamY0); the refresh barrier's wings follow that slope.
+K.Gate={TowerX=99,TowerZ=-100,TowerD=14.4,BeamY0=44,BeamY1=58,KeyY=50,KeySize=15,HaunchRise=12,HaunchRun=32,HaunchOuter=94,KeyX={72,48,24,0,-24,-48,-72}}
 -- The 14 wall lanterns (client): on the pilasters, 28.5 either side of the old mural spots.
 K.WallLanterns={
  {Sec='FrontXPos',W=131.5},{Sec='FrontXPos',W=188.5},{Sec='FrontXPos',W=233.5},{Sec='FrontXPos',W=290.5},
@@ -143,6 +146,13 @@ function K.VCyl(parent,name,d,y0,y1,x,z,color,mat,o)return K.Cyl(parent,name,d,y
 function K.Wedge(parent,name,size,cf,color,mat,o)o=o or{};o.class='WedgePart';return K.Part(parent,name,size,cf,color,mat,o)end
 -- A CFrame from a position and two axes (X = Y x Z keeps it right-handed).
 function K.Frame(pos,y,z)local x=y:Cross(z);return CFrame.fromMatrix(pos,x,y,z)end
+-- R153 (owner: "make sure that the forest jungle and so on tiles at the track gate are facing the right direction and upright"): the frame of a gate key at `pos`, its top
+-- facing the hub (-Z) with its legend reading left to right and upright for someone standing in the hub looking at the gate (looking +Z, his right is world -X).
+-- A part's Top-face SurfaceGui reads along the part's LookVector (canvas x, = local -Z) and runs DOWN along its RightVector (canvas y, = local +X): the frame measured on the
+-- owner's screenshots, see KeyboardTrack.TopReading / TopCanvas. So: LookVector = world -X (reading to the viewer's right), RightVector = world -Y (down the canvas is down in the
+-- world), UpVector = world -Z (the top faces the hub): fromMatrix(pos, X = right = (0,-1,0), Y = up = (0,0,-1), Z = back = -look = (1,0,0)), right-handed (X x Y = Z).
+-- (R152 had X = (-1,0,0), Y = (0,0,-1), Z = (0,-1,0): look = world UP, so the legends read from the bottom to the top, tops to the viewer's left.)
+function K.KeyFrame(pos)return CFrame.fromMatrix(pos,V(0,-1,0),V(0,0,-1),V(1,0,0))end
 -- A rod (thin cylinder) between two points.
 function K.Rod(parent,name,a,b,d,color,mat,o)
  local mid=(a+b)/2;local len=(b-a).Magnitude

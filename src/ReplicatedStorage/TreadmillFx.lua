@@ -3,8 +3,15 @@
 -- treadmills that are near, on screen and allowed by ClientFxBudget / FastMode / ReducedMotion. Gameplay never reads it.
 -- R151 treadmill polish (TreadmillLook151): the belt's Texture layers (attribute BeltImage) get their image from TreadmillBeltArt151 once
 -- (uploaded id, else drawn with EditableImage, else the grid texture) and scroll with the chevrons (OffsetStudsV, TreadmillScroll x the belt
--- speed: Look.Scroll) whenever the machine animates (near, on screen, motion allowed: none with Reduced Motion or on low quality / FastMode);
--- the "+N/step" label (BillboardGui, attribute HideWhileOwnerTrains) hides while its base's owner (= the local player) trains on it.
+-- speed: Look.Scroll); the "+N/step" label (BillboardGui, attribute HideWhileOwnerTrains) hides while its base's owner (= the local player) trains on it.
+-- R153 (owner, in Studio: "the ground like the lava or the track should be moving for all treadmills not just the arrow"): the scroll lived in Animate, which only runs
+-- when Policy.Animate is true (quality 2+, not FastMode, not Reduced Motion) and the belt is within 90 studs and in the view cone, while the chevrons (SpeedGainPopup) move at
+-- every quality within 140 studs (90 in FastMode): in Studio ClientFxBudget drops to tier 1 after a few slow seconds, and then only the arrows moved. The scroll now has
+-- its own gate, the chevrons': near (Look.Scroll.Range / RangeFast), on screen, and not with Reduced Motion; quality and FastMode no longer stop it (it is one property write
+-- per layer at 20 - 30 Hz on a belt that is close). One clock per belt (record.Travel: studs at the chevrons' speed, wrapped), every layer at the same speed (Rate 1) and
+-- direction, each texture's offset = base + travel x rate wrapped at its tile (no jump), a write only when the offset changed, on whatever route painted the image.
+-- If Studio shows the pattern sliding sideways or against the arrows: the local player's attributes TreadmillBeltAxis ('U' / 'V') and TreadmillBeltSign (1 / -1) override
+-- TreadmillLook151.Scroll.Axis / Sign live (read every .25 s).
 local Fx={}
 Fx.Version=117
 Fx.NEAR=110      -- emitters, lights and ribbons
@@ -12,13 +19,13 @@ Fx.ANIMATE=90    -- pulses, hue, orbiters and lightning arcs
 Fx.BURST=80      -- run-start burst
 Fx.SCAN=1        -- seconds between base scans
 Fx.CULL=.25      -- seconds between distance/visibility/budget decisions
-Fx.SCROLL={Training=3.0,Idle=1.3,Sign=1} -- R151: belt texture travel (studs/s) when TreadmillLook151 is not given
+Fx.SCROLL={Training=3.0,Idle=1.3,Sign=1,Axis='V',Range=140,RangeFast=90} -- R151: belt texture travel (studs/s) when TreadmillLook151 is not given; R153: Range = the chevrons' reach
 
 -- quality: ClientFxBudget tier 1..3 (1 = low). FastMode forces low. ReducedMotion keeps lights and gentle particles
 -- but stops every moving/flashing effect.
 function Fx.Policy(quality,fast,reduced)
     quality=fast and 1 or math.clamp(math.floor(tonumber(quality)or 1),1,3)
-    return {Quality=quality,Particles=quality>=2,Lights=quality>=2,Animate=quality>=2 and not reduced,
+    return {Quality=quality,Particles=quality>=2,Lights=quality>=2,Animate=quality>=2 and not reduced,Fast=fast==true,
         Bursts=quality>=2 and not reduced,Reduced=reduced==true,RateScale=(quality>=3 and 1 or .55)*(reduced and .5 or 1)}
 end
 function Fx.Allowed(inst,policy)
@@ -45,7 +52,9 @@ function Fx.Collect(art)
         elseif v:IsA('Beam')and role=='Arc'then
             table.insert(lists.Arcs,{Inst=v,Curve=tonumber(v:GetAttribute('TreadmillArcCurve'))or 1,Width=v.Width0,Next=0,Off=0})
         elseif v.ClassName=='Texture'and v:GetAttribute('BeltImage')then
-            table.insert(lists.Textures,{Inst=v,Rate=tonumber(v:GetAttribute('TreadmillScroll'))or 0,Period=math.max(.01,tonumber(v.StudsPerTileV)or 1),Offset=tonumber(v.OffsetStudsV)or 0})
+            table.insert(lists.Textures,{Inst=v,Rate=tonumber(v:GetAttribute('TreadmillScroll'))or 0,
+                PeriodU=math.max(.01,tonumber(v.StudsPerTileU)or 1),PeriodV=math.max(.01,tonumber(v.StudsPerTileV)or 1),
+                BaseU=tonumber(v.OffsetStudsU)or 0,BaseV=tonumber(v.OffsetStudsV)or 0})
         elseif v:IsA('BillboardGui')and v:GetAttribute('HideWhileOwnerTrains')then
             table.insert(lists.Labels,{Inst=v})
         end
@@ -106,7 +115,7 @@ function Controller:Track(base)
     if record and record.Belt~=belt then self:Release(record);self.Records[art]=nil;record=nil end
     if not record then
         record={Art=art,Belt=belt,Dirty=true,Connections={},Training=belt:GetAttribute('TrainingActive')==true,
-            Distance=math.huge,Visible=false,Animated=false,Clock=0,SpinTime=0,FlashUntil=0}
+            Distance=math.huge,Visible=false,Animated=false,Scrolling=false,Travel=0,Clock=0,SpinTime=0,FlashUntil=0}
         self.Records[art]=record
         local function dirty()record.Dirty=true end
         table.insert(record.Connections,art.DescendantAdded:Connect(dirty))
@@ -120,7 +129,7 @@ function Controller:Track(base)
         end))
     end
     -- Streaming adds/removes parts; only a changed model is rescanned.
-    if record.Dirty then record.Dirty=false;self:Quiet(record,false);record.Lists=Fx.Collect(art);self:Paint(record);self:Apply(record)end
+    if record.Dirty then record.Dirty=false;self:Quiet(record,false);record.Lists=Fx.Collect(art);record.Travel=0;self:Paint(record);self:Apply(record)end -- (Travel 0: the bases are the textures' offsets now)
 end
 function Controller:Scan()
     local seen={}
@@ -188,10 +197,18 @@ function Controller:Apply(record)
     local animate=policy.Animate and record.Visible and record.Distance<=Fx.ANIMATE
     if not animate and record.Animated then self:Quiet(record,false)end
     record.Animated=animate
+    -- R153: the belt's own gate (the chevrons': near, any quality, FastMode included; on screen; not with Reduced Motion)
+    local scroll=self.Env.Look and self.Env.Look.Scroll or Fx.SCROLL
+    local range=policy.Fast and(scroll.RangeFast or Fx.SCROLL.RangeFast)or(scroll.Range or Fx.SCROLL.Range)
+    record.Scrolling=#l.Textures>0 and not policy.Reduced and record.Visible and record.Distance<=range
 end
 function Controller:Cull()
     local env=self.Env
     self.Policy=Fx.Policy(env.Quality(),env.Fast(),env.Reduced())
+    if env.Tune then -- R153: the player's TreadmillBeltAxis / TreadmillBeltSign attributes (Studio: flip a belt that runs sideways or backwards)
+        local axis,sign=env.Tune()
+        self.Axis=(axis=='U'or axis=='V')and axis or nil;self.Sign=(sign==1 or sign==-1)and sign or nil
+    end
     local camera=env.Camera()
     for _,record in pairs(self.Records)do
         if camera and record.Belt.Parent then
@@ -231,15 +248,6 @@ function Controller:Animate(record,dt)
         end
         if #parts>0 then self.Env.Move(parts,frames)end
     end
-    -- R151: the belt textures travel with the chevrons (studs per second x each layer's rate), wrapped at one tile.
-    if #l.Textures>0 then
-        local scroll=self.Env.Look and self.Env.Look.Scroll or Fx.SCROLL
-        local speed=(training and scroll.Training or scroll.Idle)*(scroll.Sign or 1)
-        for _,e in ipairs(l.Textures)do
-            local v=e.Inst
-            if v.Parent then e.Offset=(e.Offset+dt*speed*e.Rate)%e.Period;v.OffsetStudsV=e.Offset end
-        end
-    end
     local arcOn=false
     for _,e in ipairs(l.Arcs)do
         local v=e.Inst
@@ -266,6 +274,26 @@ function Controller:Animate(record,dt)
         end
     end
 end
+-- R153: the belt's textures travel with the chevrons: one clock per belt (record.Travel, studs at 3.0 training / 1.3 idle, the chevrons' speed), every layer's offset
+-- = its base + travel x its rate, wrapped at its tile (the pattern tiles there: no jump), written only when it changed. Axis: which texture axis runs along the belt.
+function Controller:Scroll(record,dt)
+    local l=record.Lists;local scroll=self.Env.Look and self.Env.Look.Scroll or Fx.SCROLL
+    local axis,sign=self.Axis or scroll.Axis or'V',self.Sign or scroll.Sign or 1
+    local speed=record.Training and scroll.Training or scroll.Idle
+    record.Travel=(record.Travel+dt*speed)%100000
+    for _,e in ipairs(l.Textures)do
+        local v=e.Inst
+        if v.Parent then
+            if e.Axis~=axis then -- (the axis was switched: the other one goes back to its base)
+                if e.Axis then local old='OffsetStuds'..e.Axis;if v[old]~=e['Base'..e.Axis]then v[old]=e['Base'..e.Axis]end end
+                e.Axis=axis;e.Wrote=nil
+            end
+            local period,base=e['Period'..axis],e['Base'..axis]
+            local offset=(base+record.Travel*sign*e.Rate)%period
+            if e.Wrote~=offset then e.Wrote=offset;v['OffsetStuds'..axis]=offset end
+        end
+    end
+end
 function Controller:Step(dt)
     if type(dt)~='number'or dt~=dt or dt<0 then return end
     self.ScanClock+=dt;self.CullClock+=dt;self.FrameClock+=dt
@@ -275,7 +303,10 @@ function Controller:Step(dt)
     if self.FrameClock<interval then return end
     local step=math.min(self.FrameClock,.1);self.FrameClock=0
     for _,record in pairs(self.Records)do
-        if record.Animated and record.Lists and record.Belt.Parent then self:Animate(record,step)end
+        if record.Lists and record.Belt.Parent then
+            if record.Scrolling then self:Scroll(record,step)end
+            if record.Animated then self:Animate(record,step)end
+        end
     end
 end
 function Controller:Destroy()
@@ -301,6 +332,7 @@ function Fx.Start(player)
         Move=function(parts,frames)workspace:BulkMoveTo(parts,frames,Enum.BulkMoveMode.FireCFrameChanged)end,
         -- R151: the belt images and the label hide. A missing module only switches those off.
         Look=look,Belt=beltArt,UserId=function()return player.UserId end,
+        Tune=function()return player:GetAttribute('TreadmillBeltAxis'),player:GetAttribute('TreadmillBeltSign')end,
         Publish=function(routes)player:SetAttribute('TreadmillBeltTextures',routes)end,
     })
     local connection=Run.Heartbeat:Connect(function(dt)controller:Step(dt)end)

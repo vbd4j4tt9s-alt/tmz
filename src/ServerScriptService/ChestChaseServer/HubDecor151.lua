@@ -114,7 +114,7 @@ local function buildGate(root)
  for _,sx in ipairs({-1,1})do
   buildRook(f,sx*G.TowerX,zc,G)
   -- the haunch: an upside-down wedge from the tower under the wall (its tall side against the tower) gives the opening its pointed shoulders
-  K.Wedge(f,'Gate haunch',V(9,12,32),K.Frame(V(sx*78,G.BeamY0-6,zc),V(0,-1,0),V(sx,0,0)),P.Plaster,Mat.Plaster)
+  K.Wedge(f,'Gate haunch',V(9,G.HaunchRise,G.HaunchRun),K.Frame(V(sx*(G.HaunchOuter-G.HaunchRun/2),G.BeamY0-G.HaunchRise/2,zc),V(0,-1,0),V(sx,0,0)),P.Plaster,Mat.Plaster)
  end
  -- the gatehouse: a wall between the rooks (its ends inside the shafts), a gold course under it, a stone cornice over it, merlons along the top
  -- and a raised keep in the middle with the sign and five merlons of its own
@@ -133,7 +133,7 @@ local function buildGate(root)
  K.Label(sign,Enum.NormalId.Front,'THE TRACK',{ink={255,236,180},pps=24})
  for i,b in ipairs(K.Biomes)do
   local x=G.KeyX[i];local need,escape=M.SpeedNeed(b.Stage)
-  local k=K.Keycap(f,'Biome key '..i,V(15,3.6,15),CFrame.fromMatrix(V(x,G.KeyY,zc-6.1),V(-1,0,0),V(0,0,-1),V(0,-1,0)),b.Key,
+  local k=K.Keycap(f,'Biome key '..i,V(G.KeySize,3.6,G.KeySize),K.KeyFrame(V(x,G.KeyY,zc-6.1)),b.Key,
    {b.Emoji,b.Name,'⚡ '..need},{name='KeyLegend',weights={.42,.24,.34},ink={255,255,255},stroke=b.Ink,strokeT=.1,pps=20})
   k:SetAttribute('R151Stage',b.Stage);k:SetAttribute('R151Need',need);k:SetAttribute('R151EscapeSpeed',escape)
  end

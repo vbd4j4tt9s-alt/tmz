@@ -12,13 +12,16 @@
 --  * Images: uploaded asset ids that override the generated belt images (empty = generate them on each client with EditableImage; if that is not
 --    possible, the place's own grid texture Grid). The PNGs to upload are docs/proposals/R151/treadmills/textures/*.png.
 --  * Scroll: the belt texture travel in studs per second (the chevrons' speed: SpeedGainPopup moves them 3.0 / 1.3 studs a second); Sign flips
---    the direction if Studio shows the texture running against the arrows.
+--    the direction if Studio shows the texture running against the arrows; Axis is the Texture axis that runs along the belt ('V' as designed; 'U' if Studio shows the
+--    pattern sliding sideways). Range / RangeFast: how near the camera must be (studs; the chevrons' 140 / 90 in FastMode). The local player's attributes
+--    TreadmillBeltAxis / TreadmillBeltSign override Axis / Sign live in Studio. R153: every layer travels at the chevrons' speed (a belt is one rigid thing; the glow
+--    and stream layers used to run 1.6 / 2.4 x faster), at every quality tier (TreadmillFx.Scroll).
 local L={Version=151}
 local RGB=Color3.fromRGB
 local Style=require(script.Parent:WaitForChild('SpeedPopupStyle'))
 L.Grid='rbxassetid://6372755229'
 L.Images={slats='',circuit='',crust='',veins='',stream=''}
-L.Scroll={Training=3.0,Idle=1.3,Sign=1}
+L.Scroll={Training=3.0,Idle=1.3,Sign=1,Axis='V',Range=140,RangeFast=90}
 L.Biome={'Forest','Jungle','Desert','Snow','Lava','Crystal','Storm'}
 L.Grade={'low','low','mid','mid','mid','top','top'}
 L.Grades={
@@ -29,15 +32,15 @@ L.Grades={
 L.Biomes={
  Forest={Slats={'slats',RGB(178,225,140),.4,9.2,1.6,1},Neon=RGB(150,230,110),Accent='Lantern',Mote={RGB(214,255,120),'sparkles'},Lamp=RGB(255,214,120)},
  Jungle={Slats={'slats',RGB(140,230,170),.4,9.2,1.4,1},Neon=RGB(90,225,150),Accent='Torch',Mote={RGB(255,190,90),'sparkles'},Lamp=RGB(255,160,60)},
- Desert={Slats={'slats',RGB(150,92,48),.3,9.2,1.6,1},Glow={'veins',RGB(255,240,170),.35,4.6,4.6,1.6},Beam={RGB(255,226,140),'sparkles'},
+ Desert={Slats={'slats',RGB(150,92,48),.3,9.2,1.6,1},Glow={'veins',RGB(255,240,170),.35,4.6,4.6,1},Beam={RGB(255,226,140),'sparkles'},
   Neon=RGB(255,196,90),Accent='Brazier',Mote={RGB(255,200,90),'sparkles'},Lamp=RGB(255,170,70)},
- Snow={Slats={'slats',RGB(70,150,215),.35,9.2,1.6,1},Glow={'circuit',RGB(130,245,255),.12,4.6,4.6,1.6},Beam={RGB(150,240,255),'sparkles'},
+ Snow={Slats={'slats',RGB(70,150,215),.35,9.2,1.6,1},Glow={'circuit',RGB(130,245,255),.12,4.6,4.6,1},Beam={RGB(150,240,255),'sparkles'},
   Neon=RGB(110,230,255),Accent='Frost',Mote={RGB(235,250,255),'sparkles'},Lamp=RGB(150,235,255)},
- Lava={Slats={'crust',RGB(56,26,24),.04,4.6,4.6,1},Glow={'veins',RGB(255,226,110),.3,4.6,5.12,1.6},Beam={RGB(255,150,50),'fire'},
+ Lava={Slats={'crust',RGB(56,26,24),.04,4.6,4.6,1},Glow={'veins',RGB(255,226,110),.3,4.6,5.12,1},Beam={RGB(255,150,50),'fire'},
   Neon=RGB(255,120,40),Accent='Plinth'},
- Crystal={Slats={'slats',RGB(255,205,250),.35,9.2,1.6,1},Glow={'circuit',RGB(140,255,240),.15,4.6,4.6,1.6},Stream={'veins',RGB(255,255,255),.45,3.07,5.12,2.4},
+ Crystal={Slats={'slats',RGB(255,205,250),.35,9.2,1.6,1},Glow={'circuit',RGB(140,255,240),.15,4.6,4.6,1},Stream={'veins',RGB(255,255,255),.45,3.07,5.12,1},
   Beam={RGB(255,200,250),'sparkles'},Neon=RGB(150,250,240),Accent='Prism',Mote={RGB(255,190,250),'sparkles'},Lamp=RGB(150,250,240)},
- Storm={Slats={'slats',RGB(110,170,255),.3,9.2,1.4,1},Glow={'circuit',RGB(255,236,120),.15,4.6,4.6,1.6},Stream={'stream',RGB(170,225,255),.1,2.3,4.6,2.4},
+ Storm={Slats={'slats',RGB(110,170,255),.3,9.2,1.4,1},Glow={'circuit',RGB(255,236,120),.15,4.6,4.6,1},Stream={'stream',RGB(170,225,255),.1,2.3,4.6,1},
   Beam={RGB(150,205,255),'sparkles'},Neon=RGB(120,190,255),Accent='Plinth'},
 }
 -- The label floats this far above the top of the machine's front, and is drawn within MaxDistance studs (BillboardGui.MaxDistance).

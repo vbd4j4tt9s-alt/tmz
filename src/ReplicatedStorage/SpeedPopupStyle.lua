@@ -18,10 +18,12 @@ S.Colors = {
 }
 S.Font = 'FredokaOne'
 S.Icon = '\u{26A1}'
-S.StrokeThickness = 2.5
+S.StrokeThickness = 5
 -- Reference: the video's text is ~1.8% of the screen height; ours was 26 px on a 1080 p screen (2.4%). Smaller = "many small popups".
--- Box = the frame the bolt and the number sit in (centred, 2 px apart); the tilts are random +- degrees per popup.
-S.Size = {Text = 22, Icon = 20, Box = {150, 36}, IconBox = 24, Gap = 2, IconTilt = 14, TextTilt = 3}
+-- Box = the frame the bolt and the number sit in (centred, Gap px apart); the tilts are random +- degrees per popup.
+-- R153 (owner, in Studio: "numbers should also be bigger", then "2x bigger"): every size is 2x its R151 value (text 22 -> 44, bolt 20 -> 40, box 150 x 36 -> 300 x 72, bolt box
+-- 24 -> 48, gap 2 -> 4, outline 2.5 -> 5); the motion, rate, colours and formatting are untouched. A fan this size does not fit a phone, see S.Fan below.
+S.Size = {Text = 44, Icon = 40, Box = {300, 72}, IconBox = 48, Gap = 4, IconTilt = 14, TextTilt = 3}
 
 -- Spawn: the popup starts AT the head (the video: head centre, within a few px), already 45% of full size, nothing in front of the face.
 S.Spawn = {Lift = 5, Jitter = 6}     -- px above the head centre, +- px of random start offset
@@ -54,7 +56,15 @@ S.Cadence = {SplitTo = 2, MaxShares = 12, MaxTicks = 10, MinInterval = 0.1, MaxI
 -- The pooled field: one BillboardGui per player that has popups (fixed pixel size, centred on the head, room for the whole fan at the largest Unit).
 -- Spare = frames kept beyond the cap (a retired popup still fades out for RetireFade s while its replacement is already there). FreeFields = how many idle
 -- fields are kept for the next player or the next run (more are destroyed).
-S.Field = {Name = 'SpeedGainField', Width = 560, Height = 420, Spare = 2, FreeFields = 4}
+-- R153: Width / Height hold the biggest fan (S.FanScale) at the biggest Unit and the pop's 7% overshoot (was 560 x 420 for the 1x popups).
+S.Field = {Name = 'SpeedGainField', Width = 960, Height = 760, Spare = 2, FreeFields = 4}
+-- R153: the fan's size on THIS screen. The popups fly out of the head in a fan of design px; at 2x text the fan that kept R151's look (x2 on both axes) reaches 324 px to each side of the head and 248 px
+-- above it (design px), more than a phone has: a landscape phone (844 x 390) has no room above the head, a portrait phone (390 x 844) none at the sides. FanScale(w, h) returns
+-- X, Y: the multipliers of a popup's x / y offset (the client applies them with the Unit). Base = 2 (the same fan, 2x, so the popups pile up exactly as much as in R151: about
+-- 46% of a popup under others). A direction that lacks room (the head is assumed HeadY of the way down the screen, Margin px to keep clear of the edge, popups HalfWidth /
+-- HalfHeight wide / tall at the widest "+999.5K") gets what fits (never below Min), and the other direction takes the room back (up to Max) so the fan keeps its area.
+-- A portrait phone keeps the top PortraitTop px clear too: HudLayout puts the status box up there (down to y 67; the three balances under it reach y 209 at the right).
+S.Fan = {Base = 2, Max = 3, Min = 0.75, HeadY = 0.36, Margin = 12, PortraitTop = 72, HalfWidth = 111, HalfHeight = 30}
 
 local function clamp(v, lo, hi) return v < lo and lo or (v > hi and hi or v) end
 S.Clamp = clamp
@@ -68,6 +78,25 @@ end
 -- px multiplier for this screen: 1 at 1080 p, never below .8 (phones keep it readable) or above 1.35.
 function S.Unit(viewportHeight)
 	return clamp(num(viewportHeight, 1080) / 1080, 0.8, 1.35)
+end
+
+-- The fan's X / Y multipliers for a viewport (see S.Fan). Unknown sizes read as a 16:9 desktop screen: 2, 2.
+function S.FanScale(viewportWidth, viewportHeight)
+	local f = S.Fan
+	local h = num(viewportHeight, 1080)
+	local w = num(viewportWidth, h * 16 / 9)
+	local u = S.Unit(h)
+	local reach = S.Fling.Radius[2]
+	local roomX = (w / 2 - f.Margin) / u - f.HalfWidth                      -- design px from the head to the side edge, less the half popup
+	local top = (h > w and w <= 500) and f.PortraitTop or f.Margin
+	local roomY = (h * f.HeadY - top) / u - f.HalfHeight                    -- ... to the top edge (or to the HUD stack of a portrait phone)
+	local fitX = roomX / (S.Spawn.Jitter + math.sin(math.rad(S.Fling.HalfAngle)) * reach)
+	local fitY = roomY / (S.Spawn.Lift + reach)
+	local x, y = math.min(fitX, f.Base), math.min(fitY, f.Base)
+	local area = f.Base * f.Base
+	if x < f.Base then y = math.min(fitY, f.Max, area / math.max(x, f.Min)) end
+	if y < f.Base then x = math.min(fitX, f.Max, area / math.max(y, f.Min)) end
+	return clamp(x, f.Min, f.Max), clamp(y, f.Min, f.Max)
 end
 
 -- Cap for one player: own popups or another player's.

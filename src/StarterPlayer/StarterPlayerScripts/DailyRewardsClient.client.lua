@@ -235,11 +235,11 @@ end
 local function updateBadges()
  local loginReady=player:GetAttribute('DailyLoginReady')==true;local quests=tonumber(player:GetAttribute('DailyQuestsReady'))or 0
  local n=(loginReady and 1 or 0)+quests
- -- (overhang 1: the DAILY button sits 4 px under the top of the screen, which cuts off whatever hangs past it)
- local b=Badge.Make(dailyButton,'RewardBadge',20,1);local before=b.Visible and tonumber(b.Count.Text)or 0
+ -- (the DAILY button sits 4 px under the top of the screen, which cuts off whatever hangs past it: R153's 30 px badge sits inside the corner, Overhang.Daily)
+ local b=Badge.Make(dailyButton,'RewardBadge',Badge.Sizes.Daily,Badge.Overhang.Daily);local before=b.Visible and tonumber(b.Count.Text)or 0
  Badge.Set(b,Badge.Text(n),n>0,n>before)
- Badge.Set(Badge.Make(tabs.Login,'RewardDot',14,-3),'',loginReady,false)
- Badge.Set(Badge.Make(tabs.Quests,'RewardDot',14,-3),'',quests>0,false)
+ Badge.Set(Badge.Make(tabs.Login,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot),'',loginReady,false)
+ Badge.Set(Badge.Make(tabs.Quests,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot),'',quests>0,false)
 end
 local function fetch()
  task.spawn(function()
