@@ -310,7 +310,7 @@ m=mark();r=invoke(buyer,'BuyBundle',quote('SpeedSmall'))
 check(r.Success==true and r.Message==nil,'BuyBundle Speed: succeeds, its "Speed added!" line is replaced by the notice ('..tostring(r.Message)..')');expectOne(m,buyer,'Bundle','+250K Speed','BuyBundle SpeedSmall')
 m=mark();r=invoke(buyer,'BuyBundle','SpeedMega');expectOne(m,buyer,'Bundle','+25M Speed','BuyBundle SpeedMega (by key)')
 m=mark();r=invoke(buyer,'BuyBundle',quote('CashMega'))
-check(r.Success==true and r.Message=='Grab ur Cash!','BuyBundle Cash keeps its "Grab ur Cash!" hint (it tells the buyer what to do)');expectOne(m,buyer,'Bundle','+1.4T Cash','BuyBundle CashMega')
+check(r.Success==true and r.Message=='Ur Cash is on the way!','BuyBundle Cash keeps its "Ur Cash is on the way!" hint (the coins fly in and claim themselves)');expectOne(m,buyer,'Bundle','+1.4T Cash','BuyBundle CashMega')
 m=mark();r=invoke(buyer,'BuyBundle',{Key='CashSmall',Amount=1,GemPrice=1});check(r.Success==false and r.Message=='The offer changed! Check the new amount.','a stale quote is refused');expectNone(m,'BuyBundle with a stale quote')
 m=mark();r=invoke(buyer,'BuyBundle','Nope');check(r.Success==false and r.Message=='NOT AVAILABLE RIGHT NOW','an unknown bundle is refused');expectNone(m,'BuyBundle unknown')
 Data:GetPremium(buyer).Gems=5
@@ -325,9 +325,9 @@ Data:GetPremium(buyer).Gems=3
 m=mark();r=invoke(buyer,'BuyPerk','Speed');check(r.Success==false and r.Message=='NOT ENOUGH GEMS','BuyPerk without Gems says NOT ENOUGH GEMS');expectNone(m,'BuyPerk without Gems')
 Data:GetPremium(buyer).Gems=gems
 m=mark();r=invoke(buyer,'BuyPerk','Speed');expectOne(m,buyer,'Pass','Double Speed Pass','BuyPerk Speed')
--- Convert (Cash -> Gems): a purchase of Gems; its "Collect your Gems." hint stays
+-- Convert (Cash -> Gems): a purchase of Gems; its "Gems on the way." hint stays
 m=mark();r=invoke(buyer,'Convert',12)
-check(r.Success==true and r.Message=='Grab ur Gems!','Convert keeps its "Grab ur Gems!" hint');expectOne(m,buyer,'Gems','12 Gems','Convert 12')
+check(r.Success==true and r.Message=='Ur Gems are on the way!','Convert keeps its "Ur Gems are on the way!" hint');expectOne(m,buyer,'Gems','12 Gems','Convert 12')
 m=mark();r=invoke(buyer,'Convert',1);expectOne(m,buyer,'Gems','1 Gem','Convert 1')
 m=mark();r=invoke(buyer,'Convert',9001);check(r.Success==false and r.Message=='TYPE A WHOLE NUMBER OF GEMS','Convert 9001 is refused');expectNone(m,'Convert out of range')
 m=mark();r=invoke(buyer,'Convert',2.5);check(r.Success==false,'Convert 2.5 is refused');expectNone(m,'Convert fractional')

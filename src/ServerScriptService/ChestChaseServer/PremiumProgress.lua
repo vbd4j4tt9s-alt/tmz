@@ -104,7 +104,7 @@ function P.Attach(Data)
   local garden=self.Gardens[player];if not garden then return nil,'UR GARDEN IS LOADING...'end
   local pending=garden.PendingSales or{};local limit=currency=='Gems'and Catalog.MaxGems or Receipts.MaxCash
   local balance=currency=='Gems'and self:GetPremium(player).Gems or self:GetCash(player)
-  if #pending>=Receipts.MaxReceipts then return nil,'GRAB THE FLOATING REWARDS FIRST!'end
+  if #pending>=Receipts.MaxReceipts then return nil,'UR LAST REWARDS ARE STILL ARRIVING'end
   if balance+Receipts.Total(pending,currency)+amount>limit then return nil,'U\'RE MAXED OUT! SPEND SOME FIRST'end
   return {Id=Http:GenerateGUID(false),Currency=currency,Amount=amount,Count=currency=='Gems'and math.min(amount,math.random(3,5))or math.random(8,13),Claimed=0}
  end
@@ -120,7 +120,7 @@ function P.Attach(Data)
   local receipt,why=self:CurrencyReceipt(player,count,'Gems');if not receipt then return false,why end
   if not self:SpendCash(player,cost)then return false,'NOT ENOUGH CASH'end
   local garden=self.Gardens[player];garden.PendingSales=garden.PendingSales or{};table.insert(garden.PendingSales,receipt)
-  self:_gardenChanged(player);self:QueueGardenSave(player);return true,'Grab ur Gems!'
+  self:_gardenChanged(player);self:QueueGardenSave(player);return true,'Ur Gems are on the way!'
  end
  function Data:CanReceiveMechPacks(player,count)
   local offer=Catalog.Offer(count)
@@ -198,7 +198,7 @@ function P.Attach(Data)
   else okay,why=self:GrantPremiumBundle(player,key)end
   if not okay then return false,why end
   state.Gems-=quote.GemPrice;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player)
-  return true,quote.Kind=='Cash'and'Grab ur Cash!'or'Speed added!'
+  return true,quote.Kind=='Cash'and'Ur Cash is on the way!'or'Speed added!'
  end
  function Data:BuyGemPerk(player,key)
   if not self:IsLoaded(player)or not self.CanSave[player]or type(key)~='string'then return false,'HOLD ON, UR DATA IS LOADING!'end
@@ -294,7 +294,7 @@ function P.Attach(Data)
   -- Queueing and clearing the entitlement never yield; a replay cannot grant it twice.
   local okay,why=self:QueueCurrency(player,amount,'Cash');if not okay then return false,why end
   state.SeedRewards[id]=nil;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player)
-  return true,'Grab ur Cash!'
+  return true,'Ur Cash is on the way!'
  end
  function Data:ClaimIndexBiomeHalf(player,stage)
   if not self:IsLoaded(player)or not integer(stage,1,9)then return false,'TRY AGAIN!'end
@@ -304,7 +304,7 @@ function P.Attach(Data)
   local amount=T.HalfwayGems
   local okay,why=self:QueueCurrency(player,amount,'Gems');if not okay then return false,why end
   state.BiomeHalfRewards=state.BiomeHalfRewards or{};state.BiomeHalfRewards[key]=true
-  self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true,'Grab ur Gems!'
+  self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true,'Ur Gems are on the way!'
  end
  function Data:ClaimIndexBiome(player,stage)
   if not self:IsLoaded(player)or not integer(stage,1,9)then return false,'TRY AGAIN!'end
@@ -315,7 +315,7 @@ function P.Attach(Data)
   local amount=backpay>0 and backpay or T.CompletionGems[stage]
   local okay,why=self:QueueCurrency(player,amount,'Gems');if not okay then return false,why end
   state.Biomes[key]=true
-  state.BiomeBackpay81=state.BiomeBackpay81 or{};state.BiomeBackpay81[key]=nil;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true,'Grab ur Gems!'
+  state.BiomeBackpay81=state.BiomeBackpay81 or{};state.BiomeBackpay81[key]=nil;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true,'Ur Gems are on the way!'
  end
 end
 return P

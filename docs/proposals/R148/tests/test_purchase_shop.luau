@@ -2,7 +2,7 @@
 -- R148 (owner: "remove this line when purchasing"): the real GamePassClient shop on the Roblox mock, with a scripted
 -- PremiumRequest. A Robux prompt that merely opened now comes back with NO Message, and the dark strip across the shop cards
 -- (panel.Status) must stay hidden for it: a nil, empty, blank or non-string message never leaves an empty bar. Real errors
--- ("Purchase could not open.", "THIS PURCHASE IS UNAVAILABLE", ...) and the "Collect your Gems." hints still show for 3 s.
+-- ("Purchase could not open.", "THIS PURCHASE IS UNAVAILABLE", ...) and the "Gems on the way." hints still show for 3 s.
 -- The gem purchases the server announces get the chime from PurchaseCelebration, so no KaChing on top of it here.
 local W=require('./world');local R=W.R
 local fails,checks=0,0
@@ -90,9 +90,9 @@ for _,text in ipairs({'Couldn\'t open the purchase. Try again!','CAN\'T BUY THIS
  R.advance(.3);check(shut(),'"'..text..'" hides after 3 s')
 end
 successful=true
-local gems_=page.ConvertCash;reply.Message='Grab ur Gems!';gems_.GemQuantity.Text='5';plays={};act(gems_.Convert)
+local gems_=page.ConvertCash;reply.Message='Ur Gems are on the way!';gems_.GemQuantity.Text='5';plays={};act(gems_.Convert)
 check(not table.find(plays,'Denied'),'R150: a successful action (the Convert hint) never clicks Denied')
-check(calls[#calls][1]=='Convert'and calls[#calls][2]==5 and status.Visible and said()=='Grab ur Gems!','Convert keeps its "Grab ur Gems!" hint')
+check(calls[#calls][1]=='Convert'and calls[#calls][2]==5 and status.Visible and said()=='Ur Gems are on the way!','Convert keeps its "Ur Gems are on the way!" hint')
 R.advance(3.1);check(shut(),'...and it hides after 3 s')
 gems_.GemQuantity.Text='abc';act(gems_.Convert)
 check(status.Visible and said()=='Type a whole number of Gems.','a client-side input error shows')

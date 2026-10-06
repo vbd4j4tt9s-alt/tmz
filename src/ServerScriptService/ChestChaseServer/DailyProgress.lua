@@ -85,7 +85,7 @@ function T.Attach(Data)
    message=reward.MechPack and '🤖 FREE MECH PACK! Check ur bag!'or '🎒 RANDOM SEED PACK! Check ur bag!'
   else
    local okay,why=self:QueueDailyGems(player,reward.Gems);if not okay then return false,why end
-   message='Grab ur Gems!'
+   message='Ur Gems are on the way!'
   end
   daily.Login={Step=login.Next,Day=day}
   self:MarkDirty(player);self:QueueGardenSave(player);self:PublishDaily(player)
@@ -103,7 +103,7 @@ function T.Attach(Data)
   daily.Quests.Claimed[index]=true
   daily.Quests.GemsGranted=quests.GemsGranted+D.QuestGems
   self:MarkDirty(player);self:QueueGardenSave(player);self:PublishDaily(player)
-  return true,'Grab ur Gems!'
+  return true,'Ur Gems are on the way!'
  end
  -- Called where the action really happens (ChestService.Bank, OpenSeedPack, PlantSeed, HarvestPlant, selling).
  function Data:QuestEvent(player,key,count)

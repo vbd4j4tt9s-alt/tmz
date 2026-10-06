@@ -210,9 +210,11 @@ local wallet = GardenWallet.new(screenGui)
 local claimCash=remotes:WaitForChild('CollectSaleCash')
 local pendingCash=remotes:WaitForChild('GetPendingSales')
 local rewardGui=Instance.new('ScreenGui');rewardGui.Name='CurrencyRewards';rewardGui.ResetOnSpawn=false;rewardGui.DisplayOrder=75;rewardGui.Parent=playerGui
+local menuBalance -- set below: the Sell window's own balance line (the HUD counters hide while it is open)
+-- R152: sale money pops, flies to its counter and claims itself on arrival (no hover or tap); the claim callback is unchanged.
 local saleEffects=require(ReplicatedStorage:WaitForChild('SaleMoneyEffects')).new(rewardGui,wallet,function(id,index)
  return claimCash:InvokeServer(id,index)
-end)
+end,{Anchor=function(currency)return menuBalance and menuBalance(currency)end})
 -- Rejoin recovery and owner-command sales use the same persisted receipts.
 task.spawn(function()
  while screenGui.Parent do
@@ -315,6 +317,11 @@ GardenTheme.Text(title,26,true)
 GardenTheme.Text(cashLabel,18,true,GardenTheme.Colors.Gold)
 title.Position=UDim2.fromOffset(16,10);title.Size=UDim2.new(1,-76,0,30)
 cashLabel.Position=UDim2.fromOffset(16,48);cashLabel.Size=UDim2.new(1,-32,0,22);cashLabel.TextXAlignment=Enum.TextXAlignment.Left
+do -- R152: while the Sell window is open the wallet row is hidden, so sale cash flies to this balance line and it flashes as each coin lands
+ local line={TargetPosition=function()return cashLabel.AbsolutePosition+Vector2.new(math.min(60,cashLabel.AbsoluteSize.X*.5),cashLabel.AbsoluteSize.Y*.5)end,
+  Pulse=function()if GuiService.ReducedMotionEnabled then return end;cashLabel.TextColor3=Color3.new(1,1,1);TweenService:Create(cashLabel,TweenInfo.new(.25),{TextColor3=GardenTheme.Colors.Gold}):Play()end}
+ menuBalance=function(currency)if currency=='Cash'and panel.Visible and cashLabel.AbsoluteSize.X>1 then return line end end
+end
 local closeButton = makeButton(
 	panel,
 	"Close",
