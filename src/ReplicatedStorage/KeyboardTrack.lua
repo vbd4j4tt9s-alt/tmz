@@ -69,11 +69,14 @@ K.Config={
  -- 12 .. 128 studs, so his own click used to be past the full-volume radius; presses a little ahead are heard); a slight per-click gain keeps
  -- 12 overlapping voices from sounding like one flat block (never above ClickVolume: the peak is unchanged).
  ClickVolume=1.8,ClickRollOffMin=28,ClickRollOffMax=160,ClickRange=160,ClickVoices=12,ClickGains={1,.94,.97,.91},
- -- R152 (owner): the Forest and Jungle keys play their own sound instead of the click; every other biome keeps the click. PressSound = the asset per biome
- -- NAME (K.BiomeNames; a biome with no entry plays the click), PressSoundVolume = that sound's own volume per biome (starts at the click's: nobody could hear the
- -- asset when this was written, so tune it by ear HERE). Same 3D roll-off / range / cadence / gain cycle as the click; one pool of ClickVoices voices per sound.
- PressSound={Forest='rbxassetid://73942179280083',Jungle='rbxassetid://73942179280083'},
- PressSoundVolume={Forest=1.8,Jungle=1.8},
+ -- R152 (owner: "this audio is played for all keys which are as wide and big as the forest jungle keys so it goes for snow and lava and crystal and so on too"): by KEY
+ -- KIND, not biome. Every normal letter key of every biome plays PressSound.Key; a spacebar (the one huge full-width key at the start of each biome) plays PressSound.Spacebar,
+ -- the original click. A kind with no entry plays the click. PressSoundVolume = the peak volume of the Key sound (it starts at the click's: nobody could hear the asset when
+ -- this was written, so TUNE IT BY EAR HERE); the spacebar's click plays at ClickVolume. PressSoundBiome = an optional per-biome override of the Key sound by biome NAME
+ -- (K.BiomeNames; empty: e.g. {Desert='rbxassetid://123'}). Same 3D roll-off / range / cadence / gain cycle as the click; one pool of ClickVoices voices per sound.
+ PressSound={Key='rbxassetid://73942179280083',Spacebar='rbxassetid://113108830240353'},
+ PressSoundVolume=1.8,
+ PressSoundBiome={},
  ClickGap=1/12,                                           -- per presser: at most one click every 1/12 s, evenly spaced while sprinting
  TierHoldSeconds=3,                                       -- a ClientFxBudget tier change applies after it has held this long
  TeleportBurst=4,                                         -- the far rows of a window whose rows around the runner were missing (a teleport) are
@@ -496,15 +499,21 @@ function K.Allow(gate,now)
 end
 -- The gain of a presser's n-th click (ClickGains, a short cycle that does not line up with ClickPitches): at most 1, so ClickVolume stays the peak.
 function K.ClickGain(n)local list=C.ClickGains;return list[(n-1)%#list+1]end
--- R152: the sound a press in stage `stage` plays (an 'rbxassetid://' string: the biome's PressSound, else the click) and its peak volume.
-function K.PressSoundId(stage)
- local name=stage and K.BiomeNames[stage];local id=name and C.PressSound[name]
- if type(id)=='number'then id='rbxassetid://'..id end
- return type(id)=='string'and id or'rbxassetid://'..tostring(C.ClickSoundId)
+-- R152: the sound a press plays: kind = 'Spacebar' (the huge full-width key) or anything else = a normal key; stage = the biome's stable id (only for the optional
+-- PressSoundBiome override of a normal key). Returns an 'rbxassetid://' string (the configured sound of that kind, else the click) and, for K.PressVolume, its peak volume.
+local function assetOf(id)
+ if type(id)=='number'then return'rbxassetid://'..id end
+ return type(id)=='string'and id or nil
 end
-function K.PressVolume(stage)
+function K.PressSoundId(kind,stage)
+ if kind=='Spacebar'then return assetOf(C.PressSound.Spacebar)or'rbxassetid://'..tostring(C.ClickSoundId)end
  local name=stage and K.BiomeNames[stage]
- if name and C.PressSound[name]then return C.PressSoundVolume[name]or C.ClickVolume end
+ return(name and assetOf(C.PressSoundBiome[name]))or assetOf(C.PressSound.Key)or'rbxassetid://'..tostring(C.ClickSoundId)
+end
+function K.PressVolume(kind,stage)
+ if kind=='Spacebar'then return C.ClickVolume end
+ local name=stage and K.BiomeNames[stage]
+ if(name and assetOf(C.PressSoundBiome[name]))or assetOf(C.PressSound.Key)then return C.PressSoundVolume or C.ClickVolume end
  return C.ClickVolume
 end
 -- The pitch of a presser's n-th click: players cycle through ClickPitches, keepers use KeeperPitch.
