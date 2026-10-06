@@ -53,7 +53,7 @@ function Commands.Execute(config,data,chests,chase,player,text)
   serial+=1
   table.insert(pending,{Id=string.format("%d_%d",player.UserId,serial),Kind="Seed",ChestNumber=serial,
    ChestName=seed.Name,Stage=spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,
-   AccentColor=seed.Color,Rarity=spec.rarity,SeedScale=size,BagVariant="Pack03",PackSize=1,PackMutation="None"})
+   AccentColor=seed.Color,Rarity=spec.rarity,SeedScale=size,BagVariant="Pack03",PackSize=1,PackMutation="None",TestGrant=true}) -- R152: a Studio-granted seed is a TEST seed
  end
  player:SetAttribute("ChestInventorySerial",serial)
  for _,record in ipairs(pending)do table.insert(records,record);data:MarkSeedDiscovered(player,record.SeedId,true)end

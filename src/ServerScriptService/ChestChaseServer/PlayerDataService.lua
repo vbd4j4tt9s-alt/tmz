@@ -44,6 +44,7 @@ function PlayerDataService.new(config, mapService, notifications)
 	self.Revision = {}
 	self.ChestRecords = {}
 	self.OwnedBoosts = {}
+    self.TestBoosts = {};self.TestLuck = {} -- R152: boots an owner command gave (TestGrant), and whether the luck in use comes from them
     self.EquippedBoosts = {}
     self.Treadmills = {}
 	self.PedestalItems = {}
@@ -310,6 +311,7 @@ function PlayerDataService:PreparePlayer(player)
 	self.Gardens[player] = {Version = 7, Plots = {}, Harvests = {}}
 	player:SetAttribute("GardenRevision", 0)
 	self.OwnedBoosts[player] = {}
+    self.TestBoosts[player] = {};self.TestLuck[player] = nil
     self.EquippedBoosts[player] = {}
     self.Treadmills[player]={Tier=1,Skin=1,Cleared={}}
     self:PublishTreadmillData(player)
@@ -407,6 +409,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         if pack.PaidRandom and player:GetAttribute('PaidRandomAllowed')~=true then return nil,'THIS PURCHASED PACK IS UNAVAILABLE FOR THIS ACCOUNT' end
         local seed, rarity = PackRules.Roll(self.Config,pack.Stage,unitRoll,player:GetAttribute("ChestLuckMultiplier"),pack.BagVariant,pack.OddsVersion,pack.RateBoost)
         local testSeed=require(script.Parent.RarePackTests).Expected(self,player,pack.Id)
+        local luckTest=self:HasTestLuck(player) -- R152: the luck comes from owner-given boots (/test boots): a TEST open, like an owner-made pack (its seed is a TEST seed too)
         if testSeed then seed=self.Config.GetSeedById(testSeed);rarity=PackRules.GetRarity(testSeed)end
         if not seed then return nil, "THIS PACK NEEDS AN UPDATE" end
         local rewardCash,reason=self:SeedCollectReward(player,seed.Id)
@@ -417,6 +420,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
             AccentColor=seed.Color, Rarity=rarity, SeedScale=PackRules.NewSeedScale(pack.Stage,pack.BagVariant,pack.PackSize),
             BagVariant=PackRules.VariantKey(pack.BagVariant),OddsVersion=pack.OddsVersion,
             PackSize=PackRules.SanitizePackSize(pack.PackSize),PackMutation=PackRules.MutationKey(pack.PackMutation),Weather=Weather.Key(pack.Weather),WeatherCheckedEvent=Weather.CheckedEvent(pack.WeatherCheckedEvent),
+            TestGrant=(pack.TestGrant==true or luckTest) or nil, -- R152: the seed of a TEST open is a TEST seed (the fruit it grows never counts for the hub / announcements)
         }
         records[index] = reward
         self:_gardenChanged(player)
@@ -428,11 +432,11 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         self:QueueGardenSave(player)
         self:TutorialEvent(player,'Seed')
         self:QuestEvent(player,'Open',1) -- R140 daily quest
-        pcall(function()require(script.Parent.PullAnnouncer).OnOpened(player,pack,reward,testSeed~=nil)end) -- R151: a real open of a Legendary+ seed is announced (a TEST pack never is)
+        pcall(function()require(script.Parent.PullAnnouncer).OnOpened(player,pack,reward,testSeed~=nil or luckTest)end) -- R151: a real open of a Legendary+ seed is announced (a TEST pack never is)
         -- R151: the hub's BEST PULL TODAY board (HubDisplayService.NotePull; set by the main script). It never yields or throws here; a TEST pack (/test rarepacks, or any pack an owner command made:
         -- TestGrant) is flagged so it is not counted and never announced as a record.
         local hook=self.OnPackOpened
-        if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=player:GetAttribute("ChestLuckMultiplier"),Test=testSeed~=nil or pack.TestGrant==true}) end
+        if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=player:GetAttribute("ChestLuckMultiplier"),Test=testSeed~=nil or pack.TestGrant==true or luckTest}) end
         return reward
     end
     return nil, "THIS PACK IS NO LONGER IN YOUR INVENTORY"
@@ -690,9 +694,14 @@ function PlayerDataService:EquipBoost(player, id, equipped)
  return true
 end
 
+-- R152: the luck in use comes from boots an owner command gave (/test boots): no bought boots reach it. A pull made with that luck is a TEST pull (never announced, never on the hub's boards).
+function PlayerDataService:HasTestLuck(player)
+	return self.TestLuck[player] == true
+end
 function PlayerDataService:RefreshBoostMultipliers(player)
 	local bestSpeedMultiplier = 1
 	local bestLuckMultiplier = 1
+	local realLuck, testLuck, tests = 1, 1, self.TestBoosts[player] or {}
 	for productId in pairs(self:GetOwnedBoosts(player)) do
 		local product = self:_findShopProduct(productId)
 		if product and product.Enabled ~= false then
@@ -700,12 +709,14 @@ function PlayerDataService:RefreshBoostMultipliers(player)
 				bestSpeedMultiplier = math.max(bestSpeedMultiplier, product.SpeedMultiplier)
 			elseif product.Type == "Accessory" and product.LuckMultiplier then
 				bestLuckMultiplier = math.max(bestLuckMultiplier, product.LuckMultiplier)
+				if tests[productId] then testLuck = math.max(testLuck, product.LuckMultiplier) else realLuck = math.max(realLuck, product.LuckMultiplier) end
 			end
 		end
 	end
 	player:SetAttribute("TreadmillMultiplier", bestSpeedMultiplier)
 	bestLuckMultiplier=math.clamp(bestLuckMultiplier,1,require(game:GetService('ReplicatedStorage').BalanceValues81).MaxLuck)
 	player:SetAttribute("ChestLuckMultiplier", bestLuckMultiplier)
+	self.TestLuck[player] = testLuck > realLuck
 	return bestSpeedMultiplier, bestLuckMultiplier
 end
 
@@ -713,7 +724,8 @@ function PlayerDataService:RefreshTreadmillMultiplier(player)
 	return self:RefreshBoostMultipliers(player)
 end
 
-function PlayerDataService:AddBoost(player, productId)
+-- R152: options.TestGrant = boots an owner command gave (/test boots): remembered (and saved, as the optional TestBoosts list) so pulls made with their luck count as TEST pulls.
+function PlayerDataService:AddBoost(player, productId, options)
 	local product = self:_findShopProduct(productId)
 	if not product or product.Enabled == false
 		or (product.Type ~= "Trail" and product.Type ~= "Accessory") then
@@ -724,6 +736,7 @@ function PlayerDataService:AddBoost(player, productId)
 		return false
 	end
 	owned[productId] = true
+	if type(options) == "table" and options.TestGrant == true then self.TestBoosts[player] = self.TestBoosts[player] or {};self.TestBoosts[player][productId] = true end
     self.EquippedBoosts[player]=self.EquippedBoosts[player]or{}
     self.EquippedBoosts[player][product.Type]=productId
 	self:RefreshBoostMultipliers(player)
@@ -798,7 +811,7 @@ function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNu
 			or string.format("%d_%d", player.UserId, chestNumber),
 		Kind = savedChest.Kind == "Pack" and "Pack" or "Seed",
                 PaidRandom=savedChest.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(savedChest.RateBoost),
-                TestGrant=(savedChest.Kind=="Pack" and savedChest.TestGrant==true) or nil, -- R151 (optional; an older server drops it)
+                TestGrant=savedChest.TestGrant==true or nil, -- R151 (optional; an older server drops it); R152: on a Seed record too (an owner-given seed, or the seed of a TEST opening)
                 PackShape=savedPackShape(savedChest), -- R151 (optional chip-bag shape 1-6; absent / anything else = the default shape)
                 GiftLocked=(savedChest.Kind=="Pack" and savedChest.GiftLocked==true) or nil, -- R152 (optional; an R151 server drops it)
                 BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=PackRules.ValidOddsVersion(savedChest.OddsVersion)and savedChest.OddsVersion or nil, -- R137: 81, 112 and 137 all load
@@ -932,7 +945,7 @@ function PlayerDataService:Load(player)
 	local loadedCash = 0
 	local loadedItems = {}
 	local loadedChests = {}
-	local loadedBoosts = {}
+	local loadedBoosts, loadedTestBoosts = {}, {}
 	local loadedPedestalItem = nil
 	local loadedDiscoveries = {}
 	local loadedSeedDiscoveries = {}
@@ -974,6 +987,7 @@ function PlayerDataService:Load(player)
 		if type(storedData.OwnedBoosts) == "table" then
 			loadedBoosts = storedData.OwnedBoosts
 		end
+		if type(storedData.TestBoosts) == "table" then loadedTestBoosts = storedData.TestBoosts end -- R152 (optional; an R151 server drops it)
 		if type(storedData.PedestalItem) == "table" then
 			loadedPedestalItem = storedData.PedestalItem
 		end
@@ -1034,6 +1048,10 @@ function PlayerDataService:Load(player)
 		if type(productId) == "string" and self:_findShopProduct(productId) then
 			self.OwnedBoosts[player][productId] = true
 		end
+	end
+	self.TestBoosts[player] = {}
+	for _, productId in ipairs(loadedTestBoosts) do
+		if type(productId) == "string" and self.OwnedBoosts[player][productId] then self.TestBoosts[player][productId] = true end
 	end
 
     self:RestoreEquippedBoosts(player,type(storedData)=='table'and storedData.EquippedBoosts or nil)
@@ -1143,7 +1161,7 @@ function PlayerDataService:SerializeSeedRecord(chestRecord)
 		Id = string.sub(chestRecord.Id, 1, 80),
 		Kind = chestRecord.Kind or "Seed",
             PaidRandom=chestRecord.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(chestRecord.RateBoost),
-            TestGrant=(chestRecord.Kind=="Pack" and chestRecord.TestGrant==true) or nil, -- R151 (optional; an older server drops it)
+            TestGrant=chestRecord.TestGrant==true or nil, -- R151 (optional; an older server drops it); R152: Seed records too
             PackShape=savedPackShape(chestRecord), -- R151 (optional chip-bag shape 1-6)
             GiftLocked=(chestRecord.Kind=="Pack" and chestRecord.GiftLocked==true) or nil, -- R152 (optional; an R151 server drops it)
             BagVariant = PackRules.VariantKey(chestRecord.BagVariant),OddsVersion=chestRecord.OddsVersion,
@@ -1210,6 +1228,9 @@ function PlayerDataService:_buildSaveData(player)
 		table.insert(savedBoosts, productId)
 	end
 	table.sort(savedBoosts)
+	local savedTestBoosts = {}
+	for productId in pairs(self.TestBoosts[player] or {}) do if self:OwnsBoost(player, productId) then table.insert(savedTestBoosts, productId) end end
+	table.sort(savedTestBoosts)
 
 	local discoveredItems = self:GetDiscoveredItems(player)
 
@@ -1237,6 +1258,7 @@ function PlayerDataService:_buildSaveData(player)
 		Items = items,
 		Seeds = savedChests,
 		OwnedBoosts = savedBoosts,
+		TestBoosts = #savedTestBoosts > 0 and savedTestBoosts or nil, -- R152 (optional; an R151 server drops it)
         EquippedBoosts = self:CopyEquippedBoosts(player),
         Treadmill = self:CopyTreadmillData(player),
         Fence = self:CopyFenceData(player),
@@ -1392,6 +1414,7 @@ function PlayerDataService:CleanupPlayer(player)
 	self.Revision[player] = nil
 	self.ChestRecords[player] = nil
 	self.OwnedBoosts[player] = nil
+    self.TestBoosts[player] = nil;self.TestLuck[player] = nil
     self.EquippedBoosts[player] = nil
     self.Treadmills[player] = nil
     if self.Fences then self.Fences[player]=nil end

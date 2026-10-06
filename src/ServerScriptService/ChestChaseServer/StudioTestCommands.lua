@@ -202,7 +202,7 @@ local function executeFor(ctx,player,text,requester)
     table.insert(pending,{Id=HttpService:GenerateGUID(false),Kind=isPack and'Pack'or'Seed',ChestNumber=serial,ChestName=seed.Name,
      Stage=spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,AccentColor=seed.Color,Rarity=spec.rarity,
      SeedScale=isPack and Packs.NewSeedScale(spec.stage,variant,size)or Packs.SanitizeSeedScale(size),
-     BagVariant=variant,OddsVersion=isPack and Packs.OddsVersion or nil,PackSize=isPack and size or 1,PackMutation=coat,TestGrant=isPack or nil,
+     BagVariant=variant,OddsVersion=isPack and Packs.OddsVersion or nil,PackSize=isPack and size or 1,PackMutation=coat,TestGrant=true,
      PackShape=isPack and require(RS:WaitForChild('PackShapes151')).Roll(variant) or nil}) -- R151: a /test pack is a TEST pack (never announced); it rolls its chip-bag shape like any pack
    end
   end
@@ -219,7 +219,7 @@ local function executeFor(ctx,player,text,requester)
    local definition=Catalog[spec.id];local spot
    spot=Layout.Find(config,garden,spec.id,math.min(size,3),ctx.Chests.GardenPlots and ctx.Chests.GardenPlots[base.Index])
    if not spot then break end
-   local crop=Rules.NewCrop({Id=HttpService:GenerateGUID(false),SeedId=spec.id,SeedScale=1,PackMutation=coat},HttpService:GenerateGUID(false),definition,now-definition.Seconds,spot[2],spot[3])
+   local crop=Rules.NewCrop({Id=HttpService:GenerateGUID(false),SeedId=spec.id,SeedScale=1,PackMutation=coat,TestGrant=true},HttpService:GenerateGUID(false),definition,now-definition.Seconds,spot[2],spot[3])
    crop.PlantScale=size;local slot=tostring(spot[1]);garden.Plots[slot]=garden.Plots[slot]or{};table.insert(garden.Plots[slot],crop);count+=1
   end
   if count>0 then changed(ctx,player,false)end

@@ -247,6 +247,17 @@ do
  check(b:MergeRemote('Fruit',fruit({Scale=6,Uid=2}))and b:Best('Fruit').Scale==6,'a heavier shared fruit wins')
  check(not b:MergeRemote('Fruit',fruit({Scale=6,Uid=2})),'merging the same shared record changes nothing')
  check(b:MergeRemote('Fruit',nil)and b:Best('Fruit').Scale==4,'the shared record vanishing (an owner reset) leaves this server\'s own best')
+ -- R152: the shared fruit is another list's (another type): this fruit board has nothing to write, and the BEST PULL board is not touched by it
+ local c=Board.new();c:SetDay(104,'SunflowerSeed')
+ c:Offer('Fruit',fruit({Scale=2}));c:Offer('Pull',pull({At=10}))
+ check(c:Unsynced('Fruit')and c:Unsynced('Pull'),'(a local fruit and a local pull both need writing)')
+ c:MergeRemote('Fruit',fruit({Id='AppleSeed',Scale=9}))
+ check(c.Boards.Fruit.Foreign==true and not c:Unsynced('Fruit'),'the stored fruit is of another type: the fruit board is Foreign and needs no write (it used to stay "unsynced" for ever)')
+ check(c:Unsynced('Pull')and c.Boards.Pull.Foreign==false,'the BEST PULL board is unaffected')
+ c:MergeRemote('Fruit',nil);check(c.Boards.Fruit.Foreign==false and c:Unsynced('Fruit'),'when the other type is gone from the store the fruit board needs writing again')
+ c:SetForeign('Fruit');check(not c:Unsynced('Fruit'),'the store saying "another list\'s fruit" does the same (SetForeign)');c:SetForeign('Pull');check(c:Unsynced('Pull'),'(only the fruit board can be Foreign)')
+ c:MergeRemote('Fruit',fruit({Scale=1,Uid=2}));check(c.Boards.Fruit.Foreign==false,'a stored fruit of our type clears it')
+ c:SetForeign('Fruit');c:SetDay(105,'SunflowerSeed');check(c.Boards.Fruit.Foreign==false,'a new day clears it')
 end
 
 -- 6. Texts and the sign --------------------------------------------------------------------------------------------------------------------------------------

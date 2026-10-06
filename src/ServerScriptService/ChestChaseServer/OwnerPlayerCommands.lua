@@ -91,7 +91,7 @@ function Admin.Execute(ctx,requester,command)
       if not seed then reason='seed catalog mismatch';break end
       serial+=1;table.insert(pending,{Id=Http:GenerateGUID(false),Kind='Seed',ChestNumber=serial,ChestName=seed.Name,
        Stage=spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,AccentColor=seed.Color,Rarity=spec.rarity,
-       SeedScale=Packs.SanitizeSeedScale(size),BagVariant='Pack03',PackSize=1,PackMutation=coat})
+       SeedScale=Packs.SanitizeSeedScale(size),BagVariant='Pack03',PackSize=1,PackMutation=coat,TestGrant=true}) -- R152: an owner-given seed is a TEST seed
      end
      if not reason then
       for _,record in ipairs(pending)do table.insert(records,record);data:MarkSeedDiscovered(p,record.SeedId,true)end

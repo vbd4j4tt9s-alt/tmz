@@ -384,8 +384,8 @@ function X.Execute(ctx,p,action,a)
  elseif action=='boots'or action=='trail'then
   local products=action=='boots'and ctx.Config.ShopCatalog.Accessories or ctx.Config.ShopCatalog.Trails
   local i=integer(a[1],1,#products);if #a~=1 or not i then return false,'Use '..action..' <1–'..#products..'>.'end
-  local product=products[i];data:AddBoost(p,product.Id);data:EquipBoost(p,product.Id);data:RefreshBoostMultipliers(p);save(ctx,p)
-  return true,'Unlocked '..product.Name..'. Highest owned upgrade supplies the bonus.'
+  local product=products[i];data:AddBoost(p,product.Id,action=='boots'and{TestGrant=true}or nil);data:EquipBoost(p,product.Id);data:RefreshBoostMultipliers(p);save(ctx,p)
+  return true,'Unlocked '..product.Name..'. Highest owned upgrade supplies the bonus.'..(action=='boots'and' Pulls with these boots are TEST pulls (never announced, never on the hub boards).'or'')
  elseif action=='bundle'then
   if #a~=1 then return false,'Use bundle <bundle key>.'end
   local found;for _,row in ipairs(require(RS.PremiumPricing).Bundles)do if row.Key:lower()==a[1]:lower()then found=row end end

@@ -6,12 +6,14 @@
 --    Test    an owner-injected one (/test bestpull, /test bigfruit): shown on this server only, never sent anywhere.
 -- Best(kind) = the best of the three, by HubDisplayRules ordering. A board needs a shared write while its Local record is better than the Remote one (Unsynced): the
 -- Service writes it (compare-and-set: the store only takes it when it is better than what is there) and, whatever the answer, reads the winner back with MergeRemote.
+-- R152: Foreign = the shared fruit is of ANOTHER type than this server's fruit of the day (servers on different plant lists, around an update that adds plants): that board has nothing to
+-- write (the store holds another list's fruit, which is never replaced) so it is not Unsynced; the BEST PULL board is never held up by it.
 -- A new day clears everything. Nothing here can throw on bad input: records are cleaned by the caller (HubDisplayRules.CleanPull / CleanFruit).
 local Rules=require(game:GetService('ReplicatedStorage'):WaitForChild('HubDisplayRules'))
 local B={};B.__index=B
 local KINDS={'Pull','Fruit'}
 B.Kinds=KINDS
-local function fresh()return{Remote=nil,Local=nil,Test=nil}end
+local function fresh()return{Remote=nil,Local=nil,Test=nil,Foreign=false}end
 function B.new()
  return setmetatable({Day=nil,FruitId=nil,Boards={Pull=fresh(),Fruit=fresh()}},B)
 end
@@ -47,19 +49,25 @@ function B:Offer(kind,rec)
  b[slot]=rec
  return self:Best(kind)==rec and'took'or'kept'
 end
--- What the shared store says (a clean record or nil). Replaces the Remote slot. A fruit of another type than today's is not today's board: ignored.
+-- What the shared store says (a clean record or nil). Replaces the Remote slot. A fruit of another type than today's is not today's board: ignored (and the board is Foreign).
 function B:MergeRemote(kind,rec)
  if not valid(kind)then return false end
- if rec~=nil and kind=='Fruit'and self.FruitId~=nil and rec.Id~=self.FruitId then rec=nil end
- local b=self.Boards[kind];local before=Rules.Key(b.Remote)
+ local b=self.Boards[kind]
+ b.Foreign=rec~=nil and kind=='Fruit'and self.FruitId~=nil and rec.Id~=self.FruitId
+ if b.Foreign then rec=nil end
+ local before=Rules.Key(b.Remote)
  b.Remote=rec
  return Rules.Key(rec)~=before
 end
--- Local is better than what the store holds: it needs writing.
+-- R152: the store refused to take our record because it holds another list's fruit (HubDisplayStore:Merge answered Foreign): this board stays on this server until a read says otherwise.
+function B:SetForeign(kind)
+ if valid(kind)and kind=='Fruit'then self.Boards[kind].Foreign=true end
+end
+-- Local is better than what the store holds: it needs writing (not while the store holds another list's fruit: nothing can be written there).
 function B:Unsynced(kind)
  if not valid(kind)then return false end
  local b=self.Boards[kind]
- return b.Local~=nil and Rules.Better(kind,b.Local,b.Remote)
+ return b.Local~=nil and not b.Foreign and Rules.Better(kind,b.Local,b.Remote)
 end
 -- Forgets this server's own records and the owner's injected ones (the shared store's answer stays).
 function B:ClearLocal()

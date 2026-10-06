@@ -137,9 +137,14 @@ mutate "the board's day is off by one" $RU "function R.Day(t)return D.Day(t)end"
 mutate "limited-time plants can be the fruit of the day" $RU "return verity.Is(id)or mech.Is(id)" "return false" rules
 mutate "a stored record may claim any rank" $RU "local rec={Uid=uid,Name=name,Id=id,Seed=seed,Rarity=v.Rarity,Rank=style.Rank," "local rec={Uid=uid,Name=name,Id=id,Seed=seed,Rarity=v.Rarity,Rank=tonumber(v.Rank)or style.Rank," rules
 mutate "the store overwrites a better record (no compare-and-set)" $ST "if current and not Rules.Better(kind,rec,current)then took=false;return nil end" "" store
+mutate "another list's fruit is replaced by a heavier one" $ST "foreign=kind=='Fruit'and current~=nil and current.Id~=rec.Id" "foreign=false" store
+mutate "a fruit board with another list's fruit stays unsynced for ever" ServerScriptService/ChestChaseServer/HubDisplayBoard.lua "return b.Local~=nil and not b.Foreign and Rules.Better(kind,b.Local,b.Remote)" "return b.Local~=nil and Rules.Better(kind,b.Local,b.Remote)" rules
+mutate "a board that a write did not settle is retried at every step" $SV "if self.Board:Unsynced(kind)then self.Blocked[kind]=now+Rules.PollSeconds end" "" service
 mutate "a failed request does not back off" $ST "self.NextTryAt=self.Clock()+wait" "self.NextTryAt=0" store
 mutate "the request budget is not kept" $ST "if #self.Calls>=Rules.RequestsPerMinute then return false,'budget'end" "" store
 mutate "a store error escapes (no pcall)" $ST "local ok,a,b=pcall(fn,map)" "local ok,a,b=true,fn(map)" store
+mutate "a fruit grown from an owner-given seed counts" $SV "if harvest.TestGrant==true then return false,'test seed'end" "" service
+mutate "a pull with owner-given boots counts" ServerScriptService/ChestChaseServer/PlayerDataService.lua "Test=testSeed~=nil or pack.TestGrant==true or luckTest" "Test=testSeed~=nil or pack.TestGrant==true" hooks
 mutate "a TEST pack counts" $SV "if info.Test==true then return false,'test pack'end" "" service
 mutate "an owner-granted seed counts" $SV "if self.Tainted[player]then return false,'owner-granted'end" "" service
 mutate "a pull record is announced before the puller's reveal" $SV "elseif kind=='Pull'then spec.AfterReveal=true end" "elseif false then spec.AfterReveal=true end" service
