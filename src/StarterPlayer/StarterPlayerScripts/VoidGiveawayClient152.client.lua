@@ -23,6 +23,7 @@ local Rules=require(RS:WaitForChild('VoidGiveawayRules152'))
 local PackFx;pcall(function()PackFx=require(RS:WaitForChild('VoidPackFx',10))end)
 local Budget;pcall(function()Budget=require(RS:WaitForChild('ClientFxBudget',10))end)
 local Audio;pcall(function()Audio=require(RS:WaitForChild('InteractionAudio',10))end)
+local Cull;pcall(function()Cull=require(RS:WaitForChild('ViewCull152',5))end) -- R152 perf: a pack out of view does not move or recolour its own pieces
 local RGB=Color3.fromRGB
 local A=Rules.Attr
 local ACTIVE_IN,ACTIVE_OUT=190,230 -- the pack turns and wears its effects inside this many studs of the camera (leaving at ACTIVE_OUT)
@@ -121,6 +122,13 @@ local function buildPack(entry)
   end
   bag.Name='VoidGiveawayPack';entry.Pack=bag
   entry.R=PackFx and PackFx.Capture(bag)or nil
+  -- (R152 perf: a ball round the pack's pieces as it turns, hovers and hops: out of view = none of them can be on screen)
+  local okR,reach=pcall(function()
+   local o=at.Position;local far=0
+   for _,d in ipairs(bag:GetDescendants())do if d:IsA('BasePart')then far=math.max(far,(d.Position-o).Magnitude+d.Size.Magnitude/2)end end
+   return far
+  end)
+  entry.Reach=okR and reach>0 and reach+Rules.PackBob+1.5+2 or nil
  else
   warn('[R152] Void giveaway: the Void Pack art could not be built ('..tostring(bag)..'); a plain pouch is shown.')
   entry.Pack=standIn(at);entry.R=nil
@@ -144,13 +152,32 @@ local function stepPack(entry,dt,t,now)
  if not r then entry.Pack:PivotTo(origin);return end
  r.Origin=origin;table.clear(parts);table.clear(frames)
  local frame=origin
- if rm then -- reduced motion: the same parts, standing still (VoidPackFx.Pose would still sway and bob the pack)
+ -- R152 perf: out of view (and not close up) the pack's own pieces stay where they are and keep their colours; its effects (core, emitters, light,
+ -- debris, comets) still move every step. In the step it is back in view the pieces get this moment's pose and pulse: on screen nothing differs.
+ local hidden=Cull and entry.Reach and Cull.Hidden(workspace.CurrentCamera,anchor.Position,entry.Reach,12)
+ -- (the pose a hidden step skipped: the pieces take it if the pack stops being stepped while out of view, where every step used to leave them)
+ if hidden then
+  local o=entry.StaleRec;if not o then o={};entry.StaleRec=o end
+  o.Origin,o.Now,o.Rm,o.Spin=origin,now,rm,entry.Dist<PackFx.Budget.SpinDistance;entry.Stale=o
+ else entry.Stale=nil end
+ if hidden then if not rm then frame=PackFx.HoverFrame(r,now)end
+ elseif rm then -- reduced motion: the same parts, standing still (VoidPackFx.Pose would still sway and bob the pack)
   for _,e in ipairs(r.Parts)do if e.Part.Parent then parts[#parts+1]=e.Part;frames[#frames+1]=origin*PackFx.LocalFrame(e,now,false)end end
  else frame=PackFx.Pose(r,now,parts,frames,entry.Dist<PackFx.Budget.SpinDistance)end
  local want=entry.Dist<PackFx.Budget.EffectDistance and player:GetAttribute('StudioPlantEffects')~='off'and entry.Model:GetAttribute(A.State)~='Empty' -- (at 0 the pack sleeps: it turns, but its glow and sparks are off)
  if r.Fx and(not want or r.Fx.Tier~=tierNow)then PackFx.Clear(r)end
  if want and not r.Fx then PackFx.Create(r,tierNow,tierNow<3)end -- (tier 2 and below: no Highlight)
- if r.Fx then PackFx.Pulse(r,now,rm);PackFx.Step(r,now,frame,tierNow,rm,true,parts,frames)end
+ if r.Fx then if not hidden then PackFx.Pulse(r,now,rm)end;PackFx.Step(r,now,frame,tierNow,rm,true,parts,frames)end
+ workspace:BulkMoveTo(parts,frames,Enum.BulkMoveMode.FireCFrameChanged)
+end
+-- R152 perf: the pieces' pose of the last step, when that step was out of view and skipped them (the pack stops being stepped: it leaves its range)
+local function settle(entry)
+ local o=entry.Stale;local r=entry.R;entry.Stale=nil
+ if not(o and r and PackFx and entry.Pack)then return end
+ table.clear(parts);table.clear(frames)
+ r.Origin=o.Origin
+ if o.Rm then for _,e in ipairs(r.Parts)do if e.Part.Parent then parts[#parts+1]=e.Part;frames[#frames+1]=o.Origin*PackFx.LocalFrame(e,o.Now,false)end end
+ else PackFx.Pose(r,o.Now,parts,frames,o.Spin)end
  workspace:BulkMoveTo(parts,frames,Enum.BulkMoveMode.FireCFrameChanged)
 end
 -- The loop (connected only while a pack is near) --------------------------------------------------------------------------------------------------------------
@@ -200,6 +227,7 @@ local function refresh(entry)
  if near and not entry.Pack and entry.PackAnchor then buildPack(entry)end
  local active=near and entry.Pack~=nil
  if active and not entry.Active then wake()end
+ if entry.Active and not active then pcall(settle,entry)end -- (R152 perf: a pose skipped out of view is put back first)
  if entry.Active and not active and entry.R and PackFx then pcall(PackFx.Clear,entry.R)end -- (leaving: the effects go, the pack stays where it is)
  entry.Active=active
 end

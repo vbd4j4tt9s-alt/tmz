@@ -215,7 +215,10 @@ local render=Run.RenderStepped:Connect(function(dt)
   -- R78: full-rate nearby combat; distant geometry updates use bounded LOD.
   for _,p in ipairs(r.Parts)do if p.Part.Parent then
    local pose,size=UpgradePose.PartPose(p.Rest,p.TreeRest or p.IdleRest,p.Size,p.TreeSize or p.IdleSize,target[p.Group],motion.Awake)
-   table.insert(moveParts,p.Part);table.insert(moveFrames,motion.Frame*pose)
+   -- (R152 perf: a part whose pose did not change since this script last placed it is not moved again: an asleep keeper's still limbs;
+   -- only this script places a keeper's rig parts on the client, the server places them once when it builds the rig)
+   local cf=motion.Frame*pose
+   if p.Placed~=cf then p.Placed=cf;table.insert(moveParts,p.Part);table.insert(moveFrames,cf)end
    if (p.TreeRest or p.IdleRest)and p.Part.Size~=size then p.Part.Size=size end
    if p.Eye and p.LastEyeAwake~=motion.Awake then eyes(p.Part,p.EyeColor,motion.Awake,p.TreeRest~=nil,p.Face and(p.Face=='Asleep')~=asleep);p.LastEyeAwake=motion.Awake
    elseif p.TreeGlow and p.LastEyeAwake~=motion.Awake then p.Part.LocalTransparencyModifier=1-motion.Awake;p.LastEyeAwake=motion.Awake end

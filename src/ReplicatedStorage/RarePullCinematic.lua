@@ -22,6 +22,7 @@ local Players=game:GetService('Players');local RS=game:GetService('ReplicatedSto
 local Gui=game:GetService('GuiService');local UIS=game:GetService('UserInputService');local CAS=game:GetService('ContextActionService')
 local Collection=game:GetService('CollectionService');local StarterGui=game:GetService('StarterGui')
 local Rules=require(script.Parent.RarePullRules);local Audio=require(script.Parent.RarePullAudio)
+local Cache do local ok,m=pcall(require,script.Parent.PropCache152);Cache=ok and m or{new=function()return{Set=function(o,k,v)o[k]=v end}end}end -- (R152 perf)
 local M={}
 M.BindName='ChestChaseRarePull';M.SkipAction='ChestChaseRarePullSkip'
 M.KeepGuis={TouchGui=true,Freecam=true}
@@ -189,16 +190,18 @@ local function carry(run)
  return c.From*(1-Rules.Smooth(k))
 end
 -- Colour grade on the Camera (never Lighting): {Brightness, Contrast, Saturation, Tint, Blur}
+-- (R152 perf: the grade's and the blur's values are written only when they change: they are this run's own)
 local function grade(run,b,c,s,tint,blur)
  local cam=workspace.CurrentCamera;if not cam then return end
  if not run.Grade or run.Grade.Parent~=cam then
   if run.Grade then run.Grade:Destroy()end
   local g=Instance.new('ColorCorrectionEffect');g.Name='RarePullGrade';g.Parent=cam;run.Grade=g
  end
- local g=run.Grade;g.Brightness=b;g.Contrast=c;g.Saturation=s;g.TintColor=tint
+ local S=run.Set
+ local g=run.Grade;S(g,'Brightness',b);S(g,'Contrast',c);S(g,'Saturation',s);S(g,'TintColor',tint)
  if blur and blur>.05 and not run.Lite then
   if not run.Blur or run.Blur.Parent~=cam then local bl=Instance.new('BlurEffect');bl.Name='RarePullBlur';bl.Parent=cam;run.Blur=bl end
-  run.Blur.Size=blur
+  S(run.Blur,'Size',blur)
  elseif run.Blur then run.Blur:Destroy();run.Blur=nil end
 end
 local WHITE=Color3.new(1,1,1)
@@ -301,6 +304,7 @@ function M._start(info)
  local hand
  if current then hand=handoff(current);finish(current,'replaced')end
  local run={Info=info,Rank=rank,Connections={},Reduced=reduced(),Phone=phone(),Lite=lite(),At=tonumber(info.At)or workspace:GetServerTimeNow()}
+ run.Set=Cache.new().Set
  M._building=run
  -- what kind of presentation
  if rank<=5 then
@@ -415,7 +419,11 @@ local function push(run,cam,amount)
  amount=math.max(amount,carry(run))
  if not(cam and run.CameraState and cam==run.CameraState.Camera and cam.CameraType==Enum.CameraType.Custom)then return end
  if amount<=0 and not run.FovWritten then return end
- if run.FovWritten==nil or cam.FieldOfView==run.FovWritten then cam.FieldOfView=run.CameraState.Fov-amount;run.FovWritten=cam.FieldOfView end
+ if run.FovWritten==nil or cam.FieldOfView==run.FovWritten then
+  local fov=run.CameraState.Fov-amount
+  if cam.FieldOfView~=fov then cam.FieldOfView=fov end -- (R152 perf: an unchanged push is not written again)
+  run.FovWritten=cam.FieldOfView
+ end
 end
 local function ladderGrade(run,t,tl,tier)
  local q=clamp01(t/tl.Burst)
@@ -505,7 +513,7 @@ function M._stepScene(run,pg,t,tl,tier,cam)
   local eye,target,fov=Rules.Shot(run.Rank,run.Variant,t,tl)
   local origin=run.Scene.Origin
   local cf=origin*CFrame.lookAt(eye,target)*shake(run,t)
-  cam.CFrame=cf;cam.Focus=origin*CFrame.new(target);cam.FieldOfView=fov
+  cam.CFrame=cf;cam.Focus=origin*CFrame.new(target);if cam.FieldOfView~=fov then cam.FieldOfView=fov end
  elseif t<tl.SceneIn and not run.Reduced then
   -- the world: a slow push in (FieldOfView only; the player's own camera keeps control)
   part(run,'camera',push,run,cam,tier.Push*Rules.Smooth(t/math.max(.01,tl.Cut)))
