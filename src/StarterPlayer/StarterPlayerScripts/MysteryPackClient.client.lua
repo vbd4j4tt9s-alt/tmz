@@ -271,7 +271,7 @@ local function update(entry)
  local gui=entry.Gui;gui.Enabled=state~='Empty';gui.MaxDistance=mine and FAR_MINE or FAR
  applyPrompt(entry);if state~='Empty'then place(entry)end
  if state=='Empty'then entry.State=state;refresh(entry);return end
- local owner=mine and'YOUR'or(tostring(m:GetAttribute('OwnerName')or'?'):upper().."'S")
+ local owner=mine and'UR'or(tostring(m:GetAttribute('OwnerName')or'?'):upper().."'S")
  local bar,fill=gui.Bar,gui.Bar.Fill
  dress(gui,state,mine)
  if state=='Locked'then
@@ -281,11 +281,11 @@ local function update(entry)
   bar.Visible=true;fill.Size=UDim2.fromScale(math.clamp(1-left/M.UnlockSeconds,0,1),1);fill.BackgroundColor3=VIOLET
  elseif state=='Ready'then
   gui.Title.Text='✨ '..owner..' MYSTERY PACK';gui.Title.TextColor3=GOLD
-  gui.Status.Text=mine and'UNLOCKED! TAKE IT 🎁'or'UNLOCKED!';gui.Status.TextColor3=GOLD
+  gui.Status.Text=mine and'UNLOCKED! GRAB IT 🎁'or'UNLOCKED!';gui.Status.TextColor3=GOLD
   bar.Visible=true;fill.Size=UDim2.fromScale(1,1);fill.BackgroundColor3=GOLD
  else
   local at=tonumber(m:GetAttribute('NextAt'));local left=at and math.max(0,at-now())or 0
-  gui.Title.Text='✓ TAKEN TODAY';gui.Title.TextColor3=MINT
+  gui.Title.Text='✓ GRABBED TODAY';gui.Title.TextColor3=MINT
   gui.Status.Text='NEW PACK IN '..D.Countdown(left);gui.Status.TextColor3=Color3.new(1,1,1)
   bar.Visible=false
  end

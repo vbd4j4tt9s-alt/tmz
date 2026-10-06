@@ -100,7 +100,7 @@ function ChestService:_createTool(seedRecord, backpack)
 	local tool = Instance.new("Tool")
 	tool.Name = (PackRules.MutationKey(seedRecord.PackMutation) ~= "None" and seedRecord.PackMutation.." " or "")..seedName
     local rarity = PackRules.GetRarity(canonical.Id)
-    tool.ToolTip = rarity.." | "..(self.Config.GardenPlants[canonical.Id] and "Click or tap soil to plant. Controller: RT" or "Collectible seed. Planting coming later.")
+    tool.ToolTip = rarity.." | "..(self.Config.GardenPlants[canonical.Id] and "Click or tap the soil to plant! Controller: RT" or "A seed to collect. Planting is coming soon!")
     tool:SetAttribute("Weather",Weather.Key(seedRecord.Weather))
     tool:SetAttribute("Mutation", PackRules.MutationKey(seedRecord.PackMutation))
     tool:SetAttribute("SeedScale",PackRules.SanitizeSeedScale(seedRecord.SeedScale))

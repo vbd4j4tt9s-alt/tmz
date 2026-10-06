@@ -124,7 +124,7 @@ check(C.Image=='rbxassetid://102712963740896','the owner\'s Verity picture');
 check(C.Position==R.Vector3.new(0,4,-340)and C.Facing==R.Vector3.new(0,0,1),'behind the market at (0, 4, -340), facing +Z')
 check(C.BodySize==22 and C.FootOffset~=nil and C.DaisDiameter==28 and C.DaisHeight==1.2,'BodySize 22 / FootOffset / DaisDiameter 28 exposed to tune')
 check(C.BodyColor.R==1 and C.BodyColor.G==1 and C.BodyColor.B==0,'the yellow (255, 255, 0)')
-check(C.Quest=='I dare you to steal a Void Pack from the scary Darkened One at the end of Storm Peaks! Bring it to me and I\'ll give you a Verity Pack!','the quest text (R152: in her voice)')
+check(C.Quest=='I dare u to steal a Void Pack from the scary Darkened One at the end of Storm Peaks! Bring it to me and I\'ll give u a Verity Pack!','the quest text (R152: in her voice)')
 check(C.GiveDistance==38 and C.PromptDistance==26 and C.VoidVariant==VOID,'38 stud hand-in range, 26 stud prompt, Void = EclipseReliquary')
 check(C.GreetingSoundId=='rbxassetid://123997993114202','the owner\'s greeting voice id in VerityConfig.GreetingSoundId')
 local gateSrc=W.B.SecurityGate
@@ -286,8 +286,8 @@ do
  check(Data.GardenSaveQueued[A]~=nil,'and a save is queued')
  local done=last(A)
  check(done.Args[1]=='Done'and done.Args[2].Delivered==1 and done.Args[2].RecordId==newRecord.Id and msgs(A,'Done')==1,'Done {Delivered = 1, RecordId = the new pack}')
- local told=false;for _,s in ipairs(shown)do if s.P==A and s.Text=='🌟 Yippee! Verity gave you a Verity Pack!'then told=true end end
- check(told,'the notification: "🌟 Yippee! Verity gave you a Verity Pack!"')
+ local told=false;for _,s in ipairs(shown)do if s.P==A and s.Text=='🌟 Yippee! Verity gave u a Verity Pack!'then told=true end end
+ check(told,'the notification: "🌟 Yippee! Verity gave u a Verity Pack!"')
  -- Saved and loaded.
  local save=Data:_buildSaveData(A)
  check(save.Premium and type(save.Premium.Verity)=='table'and save.Premium.Verity.Count==1,'the count is in the save data')

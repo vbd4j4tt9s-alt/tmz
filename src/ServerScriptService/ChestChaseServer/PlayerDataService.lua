@@ -239,7 +239,7 @@ end
 function PlayerDataService:CanReceiveSeed(player)
 	if not self:IsLoaded(player) then return false, "YOUR DATA IS STILL LOADING" end
 	if #self:GetChestRecords(player) >= self.Config.MaxSavedChests then
-		return false, "SEED INVENTORY FULL — MAKE ROOM BEFORE STEALING"
+		return false, "BAG FULL - MAKE ROOM IN UR BAG FIRST"
 	end
 	return true
 end
@@ -401,17 +401,17 @@ end
 -- One non-yielding inventory transaction. Replays find a Seed, not a Pack.
 function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
     if not self:IsLoaded(player) then return nil, "YOUR DATA IS STILL LOADING" end
-    if type(inventoryId) ~= "string" or #inventoryId > 80 then return nil, "INVALID PACK" end
+    if type(inventoryId) ~= "string" or #inventoryId > 80 then return nil, "TRY AGAIN!" end
     local records = self:GetChestRecords(player)
     for index, pack in ipairs(records) do
         if pack.Id ~= inventoryId then continue end
-        if pack.Kind ~= "Pack" then return nil, "THIS PACK WAS ALREADY OPENED" end
-        if pack.PaidRandom and player:GetAttribute('PaidRandomAllowed')~=true then return nil,'THIS PURCHASED PACK IS UNAVAILABLE FOR THIS ACCOUNT' end
+        if pack.Kind ~= "Pack" then return nil, "U ALREADY OPENED THIS PACK!" end
+        if pack.PaidRandom and player:GetAttribute('PaidRandomAllowed')~=true then return nil,'THIS BOUGHT PACK DOESN\'T WORK ON THIS ACCOUNT' end
         local seed, rarity = PackRules.Roll(self.Config,pack.Stage,unitRoll,player:GetAttribute("ChestLuckMultiplier"),pack.BagVariant,pack.OddsVersion,pack.RateBoost)
         local testSeed=require(script.Parent.RarePackTests).Expected(self,player,pack.Id)
         local luckTest=self:HasTestLuck(player) -- R152: the luck comes from owner-given boots (/test boots): a TEST open, like an owner-made pack (its seed is a TEST seed too)
         if testSeed then seed=self.Config.GetSeedById(testSeed);rarity=PackRules.GetRarity(testSeed)end
-        if not seed then return nil, "THIS PACK NEEDS AN UPDATE" end
+        if not seed then return nil, "REJOIN TO OPEN THIS PACK!" end
         local rewardCash,reason=self:SeedCollectReward(player,seed.Id)
         if not rewardCash then return nil,reason end
         local reward = {
@@ -439,7 +439,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=player:GetAttribute("ChestLuckMultiplier"),Test=testSeed~=nil or pack.TestGrant==true or luckTest}) end
         return reward
     end
-    return nil, "THIS PACK IS NO LONGER IN YOUR INVENTORY"
+    return nil, "THAT PACK IS GONE FROM UR BAG!"
 end
 
 -- R147: the Verity NPC turns a Void Pack into a Verity Pack. CheckVoidPack finds the record or says why not (changes nothing).
@@ -590,7 +590,7 @@ function PlayerDataService:RemovePedestalItem(player)
 	end
 	local current = self.PedestalItems[player]
 	if not current then
-		return false, "YOUR PEDESTAL IS EMPTY"
+		return false, "THE PEDESTAL IS EMPTY!"
 	end
 	self.PedestalItems[player] = nil
 	self:ReturnLootRecord(player, current)
@@ -870,7 +870,7 @@ function PlayerDataService:Load(player)
 			tostring(storedData)
 			))
 		if not self.IsStudio then
-			player:Kick("Your progress could not be loaded. Please rejoin to retry. Your saved data has not been changed.")
+			player:Kick("Couldn't load ur progress. Rejoin to try again! Ur saved data is safe.")
 			return false
 		end
 		task.delay(0.75, function()
@@ -892,11 +892,11 @@ function PlayerDataService:Load(player)
 		or (type(storedData) == "table" and (tonumber(storedData.Version) or 0) > self.Config.ProfileVersion) then
 		self.CanSave[player] = false
 		player:SetAttribute("DataStatus", "UnsupportedProfile")
-		player:Kick("Your saved garden requires a newer server. Please rejoin; your data has not been changed.")
+		player:Kick("Ur saved garden needs a newer server. Rejoin and u'll be good! Ur data is safe.")
 		return false
 	end
 	local premium=require(script.Parent.PremiumProgress).Decode(type(storedData)=='table'and storedData.Premium or nil)
-    if not premium then self.CanSave[player]=false;player:SetAttribute('DataStatus','UnsupportedPremium');player:Kick('Your progress needs a newer server. Your save is unchanged.');return false end
+    if not premium then self.CanSave[player]=false;player:SetAttribute('DataStatus','UnsupportedPremium');player:Kick('Ur progress needs a newer server. Rejoin! Ur save is safe.');return false end
     self.Premium=self.Premium or{};self.Premium[player]=premium
     -- R150: publish the saved audio mix on the Player right away (replicated attributes, no remote): the client's AudioMixer applies it before
     -- SettingsState answers, so a saved Music / Effects of 0 is not heard at 100% at the start of the session. A new player gets the defaults.
@@ -910,7 +910,7 @@ function PlayerDataService:Load(player)
 	if not garden then
 		self.CanSave[player] = false
 		player:SetAttribute("DataStatus", "UnsupportedGarden")
-		player:Kick("Your garden could not be read safely. Your save was left unchanged. Please contact the developer.")
+		player:Kick("Couldn't read ur garden safely. Ur save is safe. Please tell the developer!")
 		warn("[V0.73] Garden load rejected: "..tostring(gardenError))
 		return false
 	end
@@ -919,14 +919,14 @@ function PlayerDataService:Load(player)
         if type(item) ~= "table" or type(item.Name) ~= "string" or #item.Name<1 or #item.Name>80
             or (item.Stage ~= nil and (not self.Config.IsFiniteGardenNumber(item.Stage) or item.Stage<1 or item.Stage>self.Config.StageCount)) then
             self.CanSave[player]=false; player:SetAttribute("DataStatus","UnsupportedPedestal")
-            player:Kick("Your previous display item could not be recovered safely. Your save is unchanged.")
+            player:Kick("Couldn't get back ur old display item safely. Ur save is safe.")
             return false
         end
         garden.RetiredPedestalItem = item
         local checked=self:DecodeGarden(garden)
         if not checked then
             self.CanSave[player]=false; player:SetAttribute("DataStatus","UnsupportedPedestal")
-            player:Kick("Your previous display item needs a safe migration. Your save is unchanged.")
+            player:Kick("Ur old display item needs a safe update. Ur save is safe.")
             return false
         end
         garden=checked
@@ -953,7 +953,7 @@ function PlayerDataService:Load(player)
 	local seedMigrationNeeded = false
 	if type(storedData) == "table" then
 		if storedData.SpeedExact~=nil then
-            if not Points.Valid(storedData.SpeedExact)then self.CanSave[player]=false;player:SetAttribute('DataStatus','UnsupportedSpeed');player:Kick('Your Speed data needs a newer server. Your save is unchanged.');return false end
+            if not Points.Valid(storedData.SpeedExact)then self.CanSave[player]=false;player:SetAttribute('DataStatus','UnsupportedSpeed');player:Kick('Ur Speed data needs a newer server. Ur save is safe.');return false end
             loadedSpeed=Points.Normalize(storedData.SpeedExact)
         elseif type(storedData.Speed) == "number" then
 			if storedData.SpeedSystemVersion == self.Config.SpeedSystemVersion then
@@ -1316,7 +1316,7 @@ function PlayerDataService:Save(player, reason, forceSave, finalization)
 		self.Loaded[player] = false
 		player:SetAttribute("DataStatus", "SaveConflict")
 		if player.Parent then
-			player:Kick("Your garden was updated in another server. Please rejoin to load the latest save.")
+			player:Kick("Ur garden was updated in another server. Rejoin to load the newest save!")
 		end
 	end
 	warn(string.format("[%s] Save did not complete for %s (%s): %s", self.Config.Version,
@@ -1576,7 +1576,7 @@ function PlayerDataService:PlantSeed(player, slot, seedInventoryId, placement, n
 		if record.Id == seedInventoryId then seed, seedIndex = record, index; break end
 	end
 	if not seed then return false, "THAT SEED IS NO LONGER IN YOUR INVENTORY" end
-	if seed.Kind == "Pack" then return false, "OPEN THE PACK BEFORE PLANTING" end
+	if seed.Kind == "Pack" then return false, "OPEN THE PACK FIRST!" end
 	local growing = self.Config.GardenPlants[seed.SeedId]
 	if not growing then return false, "THIS SEED CANNOT BE PLANTED YET" end
 	if not gardenInteger(growing.Seconds, 1, 86400) or not gardenInteger(growing.Value, 1, 9000000000000) then
@@ -1616,7 +1616,7 @@ function PlayerDataService:HarvestPlant(player, slot, expectedCropId, now, fruit
     local definition = self.Config.GardenPlants[crop.SeedId]
     fruitIndex = fruitIndex or PlantRules.NextFruit(crop, definition, now)
     if not gardenInteger(fruitIndex, 1, definition.FruitCount) or not PlantRules.FruitReady(crop, fruitIndex, now) then
-        return false, "THAT FRUIT WAS ALREADY PICKED"
+        return false, "THAT FRUIT IS ALREADY PICKED!"
     end
     local trait = PlantRules.Fruit(crop, fruitIndex, definition)
     local harvest = gardenClone(crop)
@@ -1713,7 +1713,7 @@ end
 function PlayerDataService:SellAllHarvests(player)
  if not self:IsLoaded(player)then return false,'YOUR DATA IS STILL LOADING'end
  local garden=self.Gardens[player];local crops=garden and garden.Harvests or{}
- if #crops==0 then return false,'NO CROPS TO SELL'end
+ if #crops==0 then return false,'NO CROPS TO SELL YET!'end
  local total=0;local Hour=require(game:GetService('ReplicatedStorage').FruitOfHour);local now=workspace:GetServerTimeNow()
  for _,crop in ipairs(crops)do
   if not self.Config.GardenPlants[crop.SeedId]or not gardenInteger(crop.Value,1,9000000000000)then return false,'THIS HARVEST NEEDS A NEWER UPDATE'end
@@ -1830,23 +1830,23 @@ function PlayerDataService:CopyTreadmillData(player)
     return {Tier=d.Tier,Skin=d.Skin,Cleared=cleared}
 end
 function PlayerDataService:BuyTreadmill(player,expectedTier)
-    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Your save is not ready.'end
+    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Ur save isn\'t ready yet!'end
     local d=self:GetTreadmillData(player)
-    if expectedTier~=d.Tier+1 then return false,'The upgrade changed. Try again.'end
+    if expectedTier~=d.Tier+1 then return false,'The upgrade changed! Try again.'end
     local nextTier=self.Config.TreadmillTiers[expectedTier]
     if not nextTier then return false,'Fully upgraded!'end
-    if not self:SpendCash(player,nextTier.Cost)then return false,'Not enough coins.'end
+    if not self:SpendCash(player,nextTier.Cost)then return false,'Not enough cash!'end
     -- Spend and level change do not yield; duplicate clicks cannot buy this level twice.
     d.Tier=expectedTier;d.Skin=expectedTier;self:PublishTreadmillData(player)
     self:MarkDirty(player);self:QueueGardenSave(player)
     return true,'Upgraded to '..nextTier.Name..'!'
 end
 function PlayerDataService:SelectTreadmillSkin(player,tier)
-    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Your save is not ready.'end
+    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Ur save isn\'t ready yet!'end
     local d=self:GetTreadmillData(player)
-    if type(tier)~='number'or tier~=math.floor(tier)or tier<1 or tier>d.Tier then return false,'That style is locked.'end
+    if type(tier)~='number'or tier~=math.floor(tier)or tier<1 or tier>d.Tier then return false,'That style is still locked!'end
     d.Skin=tier;self:PublishTreadmillData(player);self:MarkDirty(player);self:QueueGardenSave(player)
-    return true,'Style changed; your training power stays the same.'
+    return true,'Style changed! Ur training power stays the same.'
 end
 
 require(script.Parent.GardenFenceData).Install(PlayerDataService)

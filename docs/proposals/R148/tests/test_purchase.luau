@@ -133,7 +133,7 @@ local function expectOne(m,p,kind,name,what)
   local payload=done[1].Args[1]
   check(type(payload)=='table'and payload.Kind==kind and payload.Name==name,what..': payload {Kind='..kind..', Name='..name..'} (got '..tostring(payload and payload.Kind)..' / '..tostring(payload and payload.Name)..')')
  end
- check(#ns==1 and ns[1].P==p and ns[1].Text=='✅ Purchased: '..name..'!',what..': one notice "✅ Purchased: '..name..'!" to the buyer (got '..tostring(ns[1]and ns[1].Text)..')')
+ check(#ns==1 and ns[1].P==p and ns[1].Text=='✅ Bought: '..name..'!',what..': one notice "✅ Bought: '..name..'!" to the buyer (got '..tostring(ns[1]and ns[1].Text)..')')
  return ok
 end
 local function expectNone(m,what)
@@ -178,18 +178,18 @@ expectNone(m,'opening prompts announces nothing')
 -- ...while real errors stay visible.
 local promptStub=Market.PromptProductPurchase
 Market.PromptProductPurchase=function()error('the prompt could not be shown')end
-r=invoke(buyer,'RobuxBundle','CashSmall');check(r.Success==false and r.Message=='Purchase could not open.','RobuxBundle: a prompt that fails to open says "Purchase could not open."')
-r=invoke(buyer,'RobuxPack',1);check(r.Success==false and r.Message=='Purchase could not open.','RobuxPack: a prompt that fails to open says so')
-r=invoke(buyer,'RobuxGift','Speed');check(r.Success==false and r.Message=='Purchase could not open.','RobuxGift: a prompt that fails to open says so')
+r=invoke(buyer,'RobuxBundle','CashSmall');check(r.Success==false and r.Message=='Couldn\'t open the purchase. Try again!','RobuxBundle: a prompt that fails to open says "Couldn\'t open the purchase. Try again!"')
+r=invoke(buyer,'RobuxPack',1);check(r.Success==false and r.Message=='Couldn\'t open the purchase. Try again!','RobuxPack: a prompt that fails to open says so')
+r=invoke(buyer,'RobuxGift','Speed');check(r.Success==false and r.Message=='Couldn\'t open the purchase. Try again!','RobuxGift: a prompt that fails to open says so')
 Market.PromptProductPurchase=promptStub
 local products=Service.Products.CashSmall;Service.Products.CashSmall={PriceInRobux=49,IsForSale=false}
-r=invoke(buyer,'RobuxBundle','CashSmall');check(r.Success==false and r.Message=='THIS PURCHASE IS UNAVAILABLE','an off-sale bundle says THIS PURCHASE IS UNAVAILABLE')
+r=invoke(buyer,'RobuxBundle','CashSmall');check(r.Success==false and r.Message=='CAN\'T BUY THIS RIGHT NOW','an off-sale bundle says CAN\'T BUY THIS RIGHT NOW')
 Service.Products.CashSmall=products
-r=invoke(buyer,'RobuxBundle','Nope');check(r.Success==false and r.Message=='THIS PURCHASE IS UNAVAILABLE','an unknown bundle says THIS PURCHASE IS UNAVAILABLE')
-r=invoke(buyer,'RobuxPack',7);check(r.Success==false and r.Message=='THIS PURCHASE IS UNAVAILABLE','an unknown pack count says THIS PURCHASE IS UNAVAILABLE')
-r=invoke(buyer,'RobuxGift','Nope');check(r.Success==false and r.Message=='THIS GIFT PURCHASE IS UNAVAILABLE','an unknown gift says THIS GIFT PURCHASE IS UNAVAILABLE')
-r=invoke(buyer,'Nonsense');check(r.Success==false and r.Message=='UNKNOWN ACTION','an unknown action keeps UNKNOWN ACTION')
-Data.CanSave[buyer]=false;r=invoke(buyer,'RobuxPack',1);check(r.Success==false and r.Message=='PURCHASES ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE','no-save data keeps its message');Data.CanSave[buyer]=true
+r=invoke(buyer,'RobuxBundle','Nope');check(r.Success==false and r.Message=='CAN\'T BUY THIS RIGHT NOW','an unknown bundle says CAN\'T BUY THIS RIGHT NOW')
+r=invoke(buyer,'RobuxPack',7);check(r.Success==false and r.Message=='CAN\'T BUY THIS RIGHT NOW','an unknown pack count says CAN\'T BUY THIS RIGHT NOW')
+r=invoke(buyer,'RobuxGift','Nope');check(r.Success==false and r.Message=='CAN\'T GIFT THIS RIGHT NOW','an unknown gift says CAN\'T GIFT THIS RIGHT NOW')
+r=invoke(buyer,'Nonsense');check(r.Success==false and r.Message=='TRY AGAIN!','an unknown action keeps TRY AGAIN!')
+Data.CanSave[buyer]=false;r=invoke(buyer,'RobuxPack',1);check(r.Success==false and r.Message=='NO PURCHASES UNTIL UR DATA CAN SAVE','no-save data keeps its message');Data.CanSave[buyer]=true
 expectNone(m,'refused prompts announce nothing')
 
 -- 2. Robux receipts: one PurchaseDone + one notice per granted receipt ----------------------------------------------
@@ -294,7 +294,7 @@ m=mark();r=invoke(buyer,'BuyPack',5);expectOne(m,buyer,'Pack','5 Mech Packs','Bu
 m=mark();r=invoke(buyer,'BuyPack',10);expectOne(m,buyer,'Pack','10 Mech Packs','BuyPack 10')
 check(Data:GetPremium(buyer).Gems==100000-80-375-700,'the Gems were spent ('..Data:GetPremium(buyer).Gems..')')
 -- refusals
-m=mark();r=invoke(buyer,'BuyPack',7);check(r.Success==false and r.Message=='INVALID QUANTITY','BuyPack 7 is refused with its message');expectNone(m,'BuyPack with a bad quantity')
+m=mark();r=invoke(buyer,'BuyPack',7);check(r.Success==false and r.Message=='TRY AGAIN!','BuyPack 7 is refused with its message');expectNone(m,'BuyPack with a bad quantity')
 local gems=Data:GetPremium(buyer).Gems;Data:GetPremium(buyer).Gems=10
 m=mark();r=invoke(buyer,'BuyPack',1);check(r.Success==false and r.Message=='NOT ENOUGH GEMS','BuyPack without Gems says NOT ENOUGH GEMS');expectNone(m,'BuyPack without Gems')
 Data:GetPremium(buyer).Gems=gems
@@ -307,29 +307,29 @@ Data.Chests[buyer]=keepBag
 -- BuyBundle
 local function quote(key)return Data:BundleQuote(buyer,key)end
 m=mark();r=invoke(buyer,'BuyBundle',quote('SpeedSmall'))
-check(r.Success==true and r.Message==nil,'BuyBundle Speed: succeeds, its "Speed added." line is replaced by the notice ('..tostring(r.Message)..')');expectOne(m,buyer,'Bundle','+250K Speed','BuyBundle SpeedSmall')
+check(r.Success==true and r.Message==nil,'BuyBundle Speed: succeeds, its "Speed added!" line is replaced by the notice ('..tostring(r.Message)..')');expectOne(m,buyer,'Bundle','+250K Speed','BuyBundle SpeedSmall')
 m=mark();r=invoke(buyer,'BuyBundle','SpeedMega');expectOne(m,buyer,'Bundle','+25M Speed','BuyBundle SpeedMega (by key)')
 m=mark();r=invoke(buyer,'BuyBundle',quote('CashMega'))
-check(r.Success==true and r.Message=='Cash on the way.','BuyBundle Cash keeps its "Cash on the way." hint (the coins fly in and claim themselves)');expectOne(m,buyer,'Bundle','+1.4T Cash','BuyBundle CashMega')
-m=mark();r=invoke(buyer,'BuyBundle',{Key='CashSmall',Amount=1,GemPrice=1});check(r.Success==false and r.Message=='Offer updated. Check the new amount.','a stale quote is refused');expectNone(m,'BuyBundle with a stale quote')
-m=mark();r=invoke(buyer,'BuyBundle','Nope');check(r.Success==false and r.Message=='UNAVAILABLE','an unknown bundle is refused');expectNone(m,'BuyBundle unknown')
+check(r.Success==true and r.Message=='Ur Cash is on the way!','BuyBundle Cash keeps its "Ur Cash is on the way!" hint (the coins fly in and claim themselves)');expectOne(m,buyer,'Bundle','+1.4T Cash','BuyBundle CashMega')
+m=mark();r=invoke(buyer,'BuyBundle',{Key='CashSmall',Amount=1,GemPrice=1});check(r.Success==false and r.Message=='The offer changed! Check the new amount.','a stale quote is refused');expectNone(m,'BuyBundle with a stale quote')
+m=mark();r=invoke(buyer,'BuyBundle','Nope');check(r.Success==false and r.Message=='NOT AVAILABLE RIGHT NOW','an unknown bundle is refused');expectNone(m,'BuyBundle unknown')
 Data:GetPremium(buyer).Gems=5
 m=mark();r=invoke(buyer,'BuyBundle',quote('Speed'));check(r.Success==false and r.Message=='NOT ENOUGH GEMS','BuyBundle without Gems says NOT ENOUGH GEMS');expectNone(m,'BuyBundle without Gems')
 Data:GetPremium(buyer).Gems=gems
 -- BuyPerk
 m=mark();r=invoke(buyer,'BuyPerk','Growth')
 check(r.Success==true and r.Message==nil,'BuyPerk: succeeds, its "unlocked." line is replaced by the notice ('..tostring(r.Message)..')');expectOne(m,buyer,'Pass','Double Plant Growth Pass','BuyPerk Growth')
-m=mark();r=invoke(buyer,'BuyPerk','Growth');check(r.Success==false and r.Message=='ALREADY OWNED','a second BuyPerk says ALREADY OWNED');expectNone(m,'BuyPerk twice')
-m=mark();r=invoke(buyer,'BuyPerk','Nope');check(r.Success==false and r.Message=='UNKNOWN PASS','BuyPerk unknown says UNKNOWN PASS');expectNone(m,'BuyPerk unknown')
+m=mark();r=invoke(buyer,'BuyPerk','Growth');check(r.Success==false and r.Message=='U ALREADY HAVE THIS!','a second BuyPerk says U ALREADY HAVE THIS!');expectNone(m,'BuyPerk twice')
+m=mark();r=invoke(buyer,'BuyPerk','Nope');check(r.Success==false and r.Message=='TRY AGAIN!','BuyPerk unknown says TRY AGAIN!');expectNone(m,'BuyPerk unknown')
 Data:GetPremium(buyer).Gems=3
 m=mark();r=invoke(buyer,'BuyPerk','Speed');check(r.Success==false and r.Message=='NOT ENOUGH GEMS','BuyPerk without Gems says NOT ENOUGH GEMS');expectNone(m,'BuyPerk without Gems')
 Data:GetPremium(buyer).Gems=gems
 m=mark();r=invoke(buyer,'BuyPerk','Speed');expectOne(m,buyer,'Pass','Double Speed Pass','BuyPerk Speed')
 -- Convert (Cash -> Gems): a purchase of Gems; its "Gems on the way." hint stays
 m=mark();r=invoke(buyer,'Convert',12)
-check(r.Success==true and r.Message=='Gems on the way.','Convert keeps its "Gems on the way." hint');expectOne(m,buyer,'Gems','12 Gems','Convert 12')
+check(r.Success==true and r.Message=='Ur Gems are on the way!','Convert keeps its "Ur Gems are on the way!" hint');expectOne(m,buyer,'Gems','12 Gems','Convert 12')
 m=mark();r=invoke(buyer,'Convert',1);expectOne(m,buyer,'Gems','1 Gem','Convert 1')
-m=mark();r=invoke(buyer,'Convert',9001);check(r.Success==false and r.Message=='ENTER A WHOLE NUMBER OF GEMS','Convert 9001 is refused');expectNone(m,'Convert out of range')
+m=mark();r=invoke(buyer,'Convert',9001);check(r.Success==false and r.Message=='TYPE A WHOLE NUMBER OF GEMS','Convert 9001 is refused');expectNone(m,'Convert out of range')
 m=mark();r=invoke(buyer,'Convert',2.5);check(r.Success==false,'Convert 2.5 is refused');expectNone(m,'Convert fractional')
 Data.Cash[buyer]=5
 m=mark();r=invoke(buyer,'Convert',3);check(r.Success==false and r.Message=='NOT ENOUGH CASH','Convert without Cash says NOT ENOUGH CASH');expectNone(m,'Convert without Cash')
@@ -355,7 +355,7 @@ local fireStub=Service.Announcer.Remote.FireClient
 Service.Announcer.Remote.FireClient=function()error('the remote is gone')end
 m=mark();local d=receipt(buyer,203);check(d==Granted,'a receipt is still granted when the notice and the event both fail')
 check(#doneSince(m)==0,'(nothing was delivered)')
-m=mark();r=invoke(buyer,'BuyPack',1);check(r.Success==true and r.Message=='Mech pack added to your bag.','a gem purchase still succeeds, and keeps its confirmation line when no celebration could be sent')
+m=mark();r=invoke(buyer,'BuyPack',1);check(r.Success==true and r.Message=='Mech pack is in ur bag!','a gem purchase still succeeds, and keeps its confirmation line when no celebration could be sent')
 Service.Announcer.Remote.FireClient=fireStub;Data.Notifications.Show=noticeStub
 m=mark();Data.Notifications.Show=nil;d=receipt(buyer,204);check(d==Granted,'a receipt is granted when Notifications has no Show')
 check(#doneSince(m)==1 and doneSince(m)[1].Args[1].Name=='+650B Cash','... and the event still goes (the notice is best effort)');Data.Notifications.Show=noticeStub

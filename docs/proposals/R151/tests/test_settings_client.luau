@@ -21,7 +21,7 @@ function request.InvokeServer(_,action,value)
  if action=='SettingsState'then return {Success=true,Settings=table.clone(server.Settings)}end
  if action=='SetSetting'then
   if server.FailSave then return {Success=false}end
-  local Config=W.module('SettingsConfig');if not Config.Valid(value.Key,value.Value)then return {Success=false,Message='Invalid setting.'}end
+  local Config=W.module('SettingsConfig');if not Config.Valid(value.Key,value.Value)then return {Success=false,Message='That setting didn\'t work.'}end
   server.Settings[value.Key]=value.Value;return {Success=true}
  end
  return {Success=true}

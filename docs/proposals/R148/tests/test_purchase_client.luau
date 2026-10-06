@@ -59,7 +59,7 @@ check(Announcer:Announce(player,'Pack',10)==true,'the announcer sends the purcha
 seconds(.2)
 local shown=notices()
 check(#shown==1,'one notice is showing ('..#shown..')')
-check(shown[1]and shown[1].Text=='<font color="#96FF6E">✅ Purchased: 10 Mech Packs!</font>','the notice reads "✅ Purchased: 10 Mech Packs!" in light green ('..tostring(shown[1]and shown[1].Text)..')')
+check(shown[1]and shown[1].Text=='<font color="#96FF6E">✅ Bought: 10 Mech Packs!</font>','the notice reads "✅ Bought: 10 Mech Packs!" in light green ('..tostring(shown[1]and shown[1].Text)..')')
 check(#played==1 and played[1]==GEM,'the chime (GemClaim) played once ('..#played..')')
 local s=screen()
 check(s~=nil and s:IsA('ScreenGui')and s.ResetOnSpawn==false and s.DisplayOrder>34 and s.DisplayOrder<100,'a ScreenGui over the shop (34) and under the notices (100)')
@@ -110,7 +110,7 @@ for _,case in ipairs({{'Pack',1,'1 Mech Pack'},{'Bundle','CashMega','+1.4T Cash'
  check(Announcer:Announce(player,case[1],case[2]),'announce '..case[1])
  seconds(.1)
  local shownNow=notices();local last=shownNow[#shownNow]
- check(last and last.Text:find('✅ Purchased: '..case[3]..'!',1,true)~=nil,case[1]..': the notice names "'..case[3]..'"')
+ check(last and last.Text:find('✅ Bought: '..case[3]..'!',1,true)~=nil,case[1]..': the notice names "'..case[3]..'"')
  check(#played==1 and played[1]==GEM and screen()~=nil and root:FindFirstChild('PurchaseSparks')~=nil,case[1]..': chime + burst + sparkles')
  seconds(2.2)
  check(screen()==nil and root:FindFirstChild('PurchaseSparks')==nil,case[1]..': all cleaned up')

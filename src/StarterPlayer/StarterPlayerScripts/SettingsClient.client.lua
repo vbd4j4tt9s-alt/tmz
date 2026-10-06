@@ -50,7 +50,7 @@ flush=function()
    task.wait(.16)
   end
   saving=false;if dead then return end
-  status.Text=failed and 'Could not save yet. Retrying…'or 'Saved'
+  status.Text=failed and 'Can\'t save yet. Retrying…'or 'Saved'
   if failed then task.delay(3,flush)end
  end)
 end

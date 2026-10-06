@@ -58,14 +58,14 @@ local open=button(dock,'OpenInventory','Bag',UDim2.fromOffset(56,56),UDim2.new(1
 open:SetAttribute('ButtonSound',false) -- R150: the Bag opens / closes through SeedMenu; ButtonFeedback plays MenuClick / MenuClose for it
 local panel=Instance.new('Frame');panel.Name='Inventory';panel.AnchorPoint=Vector2.new(.5,.5);panel.Position=UDim2.fromScale(.5,.49);panel.Size=UDim2.new(.86,0,.66,0);panel.BackgroundColor3=C.Panel;panel.BackgroundTransparency=.05;panel.Visible=false;panel.Parent=gui;corner(panel)
 local constraint=Instance.new('UISizeConstraint');constraint.MaxSize=Vector2.new(1080,740);constraint.Parent=panel
-label(panel,'Title',UDim2.new(1,-65,0,40),UDim2.fromOffset(16,8),'Inventory',20).TextXAlignment=Enum.TextXAlignment.Left
+label(panel,'Title',UDim2.new(1,-65,0,40),UDim2.fromOffset(16,8),'Ur Bag',20).TextXAlignment=Enum.TextXAlignment.Left
 require(RS:WaitForChild('GardenMenuStyle')).Panel(panel,46)
 panel.BackgroundColor3=C.Sheet;panel.BackgroundTransparency=.1 -- R112: dark translucent green sheet.
 local close=button(panel,'Close','×',UDim2.fromOffset(36,36),UDim2.new(1,-48,0,10))
 local search=Instance.new('TextBox');search.Name='Search';search.PlaceholderText='Search';search.Text='';search.ClearTextOnFocus=false;search.Size=UDim2.new(1,-32,0,36);search.Position=UDim2.fromOffset(16,54);search.BackgroundColor3=C.Slot;search.TextColor3=C.Text;search.PlaceholderColor3=C.Muted;search.Font=Enum.Font.FredokaOne;search.TextSize=14;search.Parent=panel;corner(search);require(RS:WaitForChild('GardenMenuStyle')).Inset(search);search.BackgroundColor3=C.Well
 local filters=Instance.new('Frame');filters.Name='Categories';filters.BackgroundTransparency=1;filters.Size=UDim2.new(1,-32,0,32);filters.Position=UDim2.fromOffset(16,98);filters.Parent=panel
 local scroll=Instance.new('ScrollingFrame');scroll.Name='Items';scroll.BackgroundTransparency=1;scroll.BorderSizePixel=0;scroll.Size=UDim2.new(1,-32,1,-218);scroll.Position=UDim2.fromOffset(16,178);scroll.ScrollBarThickness=5;scroll.CanvasSize=UDim2.new();scroll.Parent=panel
-label(panel,'Hint',UDim2.new(1,-32,0,26),UDim2.new(0,16,1,-32),'Click to equip • Drag a slot or item onto the hotbar',12).TextColor3=C.Muted
+label(panel,'Hint',UDim2.new(1,-32,0,26),UDim2.new(0,16,1,-32),'Click to hold it • Drag it onto the hotbar',12).TextColor3=C.Muted
 local rarityFilter=button(panel,'RarityFilter','Rarity: All',UDim2.new(1,-32,0,30),UDim2.fromOffset(16,138));rarityFilter.BackgroundColor3=C.Tile
 local arrow=Theme.ControlIcon(rarityFilter,'chevron');arrow.Position=UDim2.new(1,-24,.5,-7)
 local rarityMenu=Instance.new('Frame');rarityMenu.Name='RarityOptions';rarityMenu.Position=UDim2.fromOffset(16,174);rarityMenu.Size=UDim2.new(1,-32,0,110);rarityMenu.BackgroundColor3=C.Sheet;rarityMenu.BorderSizePixel=0;rarityMenu.Visible=false;rarityMenu.ZIndex=10;rarityMenu.Parent=panel;corner(rarityMenu)

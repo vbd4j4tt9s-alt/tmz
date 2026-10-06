@@ -175,7 +175,7 @@ check(ped(rec1):GetAttribute('MysteryPedestal')==M.Version,'the model carries th
 check(attr(rec1,'State')=='Empty'and attr(rec1,'OwnerUserId')==nil and attr(rec1,'OwnerName')==nil and attr(rec1,'UnlockAt')==nil and attr(rec1,'Variant')==nil,'with no owner: State Empty and no owner / time / variant')
 check(pack(rec1)==nil and ped(rec1):FindFirstChild('MysteryPack')==nil,'no pack on an empty pedestal')
 local pr=prompt(rec1)
-check(pr.Name=='TakeMysteryPack'and pr.ActionText=='Take'and pr.ObjectText=='Mystery Pack'and pr.HoldDuration==.5 and pr.MaxActivationDistance==12 and pr.Parent==S.Pedestals[rec1].Anchor,'the ProximityPrompt "TakeMysteryPack" (hold 0.5 s, 12 studs) sits on the pack anchor')
+check(pr.Name=='TakeMysteryPack'and pr.ActionText=='Grab'and pr.ObjectText=='Mystery Pack'and pr.HoldDuration==.5 and pr.MaxActivationDistance==12 and pr.Parent==S.Pedestals[rec1].Anchor,'the ProximityPrompt "TakeMysteryPack" (hold 0.5 s, 12 studs) sits on the pack anchor')
 check(ped(rec1).ModelStreamingMode==R.Enum.ModelStreamingMode.Persistent and ped(rec2).ModelStreamingMode==R.Enum.ModelStreamingMode.Persistent,'[streaming] each pedestal Model is Persistent (it never streams out, so clients never hold stale or late copies)')
 check(ped(rec1).ModelStreamingMode~=R.Enum.ModelStreamingMode.Default and ped(rec1).ModelStreamingMode~=R.Enum.ModelStreamingMode.Atomic,'[streaming] (not Default, not Atomic)')
 check(pr.Enabled==false and prompt(rec2).Enabled==false,'[prompt] built Enabled=false: nobody sees a Take prompt on an empty pedestal')
@@ -308,7 +308,7 @@ check(litLook(rec1,'Ready')and litLook(rec2,'Locked'),'[look] Ready: Ava\'s pad 
 local stA=Data:GetPremium(A).Mystery
 check(stA.Seconds==900 and stA.Stage==stageA and stA.Variant==variantA and stA.Claimed==false and M.Unlocked(stA),'the saved state holds the rolled pack, not taken yet')
 local noteA=notes(A,noteFrom)
-check(#noteA==1 and noteA[1]:find('unlocked',1,true)and noteA[1]:find('take it',1,true),'a notice tells Ava: '..tostring(noteA[1]))
+check(#noteA==1 and noteA[1]:find('unlocked',1,true)and noteA[1]:find('grab it',1,true),'a notice tells Ava: '..tostring(noteA[1]))
 local rp=pack(rec1)
 local colourful,textures,seal=false,0,nil
 for _,d in ipairs(rp:GetDescendants())do
@@ -445,7 +445,7 @@ local crec=Data:GetChestRecords(A2)[bag(A2)]
 check(crec and crec.Kind=='Pack'and crec.Stage==carryStage and crec.BagVariant==carryVariant and crec.OddsVersion==Rules.OddsVersion,'the very pack that was on the pedestal ('..tostring(carryVariant)..', stage '..tostring(carryStage)..')')
 check(syncs(A2)==syncC+1,'SyncTools ran once for the carried pack')
 local carryNotes=notes(A2,noteC)
-check(#carryNotes==1 and carryNotes[1]:find('Yesterday',1,true)and carryNotes[1]:find('Bag',1,true),'with a notice: '..tostring(carryNotes[1]))
+check(#carryNotes==1 and carryNotes[1]:find('Yesterday',1,true)and carryNotes[1]:find('bag',1,true),'with a notice: '..tostring(carryNotes[1]))
 check(attr(rec1,'State')=='Locked'and attr(rec1,'Variant')==nil and Data:GetPremium(A2).Mystery.Claimed==false and Data:GetPremium(A2).Mystery.Day==DAY0+2,'and today\'s pack starts locked as normal')
 -- Not unlocked yet when midnight comes: nothing carries.
 play(300);local bagN=bag(A2)
@@ -671,7 +671,7 @@ check(Veiled.EnsureGuardian({Home=nil,Folder=evFolder})==nil,'(no Home: no keepe
  check(d1.Day==today()and d1.Claimed==false and d1.Stage==nil and d1.Seconds==6 and attr(rec3,'State')=='Locked'and near(attr(rec3,'UnlockAt')-W.workspace:GetServerTimeNow(),894,1.01),'[owed] today starts fresh and its 15 minutes run: 6 s counted, 894 s on the countdown (the old pack no longer blocks it)')
  check(prompt(rec3).Enabled==false and pack(rec3)~=nil and pack(rec3):GetAttribute('BagVariant')=='Pack01','[prompt] the pedestal is a locked silhouette again, prompt off')
  local n1=notes(Dee,from1)
- check(#n1==1 and n1[1]:find('Make room: 1 mystery pack waiting',1,true),'[owed] the player is told once: '..tostring(n1[1]))
+ check(#n1==1 and n1[1]:find('Make room in ur bag! 1 mystery pack waiting',1,true),'[owed] the player is told once: '..tostring(n1[1]))
  -- Days 2 and 3: the same again; the list grows oldest first.
  check(readyBy(.8)and attr(rec3,'Variant')=='Pack04','(day 2: Ready, Pack04)')
  nextDay();play(1)

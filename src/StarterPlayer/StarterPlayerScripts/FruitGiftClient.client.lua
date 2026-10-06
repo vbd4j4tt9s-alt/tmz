@@ -93,7 +93,7 @@ local function open(target,held,id,action)
  pending={Target=target,Tool=held,Id=id,Action=action}
  local item=held.Name~=''and held.Name or'this item'
  local function esc(s)return(s:gsub('&','&amp;'):gsub('<','&lt;'):gsub('>','&gt;'))end
- question.Text=('Are you sure you want to give <font color="#FFE547">%s</font> to <font color="#93FF45">%s</font>?'):format(esc(item),esc(target.DisplayName))
+ question.Text=('Give <font color="#FFE547">%s</font> to <font color="#93FF45">%s</font>?'):format(esc(item),esc(target.DisplayName))
  if not dialog.Visible then Audio.Play('MenuClick')end
  dialog.Visible=true;light(target)
  if lastInput()=='Gamepad'then GuiService.SelectedObject=giveButton end
@@ -103,16 +103,16 @@ local function give(point)
  local held,id,action=giftable();if not held then return end
  local target=playerAt(point);if not target then return end
  last=os.clock()
- if not inReach(target)then say('Get closer to '..target.DisplayName..' to give.',true);return end
+ if not inReach(target)then say('Get closer to '..target.DisplayName..' first!',true);return end
  open(target,held,id,action)
 end
 local function confirm()
  local p=pending;if not p then return end
  -- Matched by inventory id: a refreshed Tool for the same item is still the same gift.
  local held,id,action=giftable()
- if not held or id~=p.Id or action~=p.Action then close(true);say('Hold the item you want to give.',true);return end
+ if not held or id~=p.Id or action~=p.Action then close(true);say('Hold the item u want to give.',true);return end
  if not p.Target.Parent then close();return end
- if not inReach(p.Target)then close(true);say('Get closer to '..p.Target.DisplayName..' to give.',true);return end
+ if not inReach(p.Target)then close(true);say('Get closer to '..p.Target.DisplayName..' first!',true);return end
  close(true);Audio.Play('Bubble06') -- R150: Give: the dialog closes and the gift goes out on this click
  -- The server accepts one gift every 2 s; a quick second gift is sent as soon as it may be.
  local wait=math.max(0,lastSent+SEND_GAP-os.clock());lastSent=os.clock()+wait

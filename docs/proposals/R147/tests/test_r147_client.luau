@@ -51,7 +51,7 @@ mine:SetAttribute('OwnerUserId',77);mine:SetAttribute('OwnerName','Tester');mine
 mine:SetAttribute('UnlockAt',UNLOCK);mine:SetAttribute('State','Locked')
 local gm=label(mine)
 check(gm.Enabled==true,'Locked: the label shows')
-check(gm.Title.Text=='❓ YOUR MYSTERY PACK'and rgb(gm.Title.TextColor3,190,140,255),'title: ❓ YOUR MYSTERY PACK (violet)')
+check(gm.Title.Text=='❓ UR MYSTERY PACK'and rgb(gm.Title.TextColor3,190,140,255),'title: ❓ UR MYSTERY PACK (violet)')
 check(gm.Status.Text=='🔒 15:00','status: 🔒 15:00 ('..gm.Status.Text..')')
 check(gm.Bar.Visible==true and near(gm.Bar.Fill.Size.X.Scale,0,1e-9)and gm.Bar.Fill.Size.Y.Scale==1 and rgb(gm.Bar.Fill.BackgroundColor3,190,140,255),'the bar is empty and violet')
 check(minePrompt.Enabled==false,'the prompt stays off while locked, even for the owner')
@@ -73,8 +73,8 @@ check(label(fresh).Status.Text=='🔒 15:00','no UnlockAt (yet): the full 15:00'
 -- Ready: mine.
 mine:SetAttribute('UnlockAt',nil);mine:SetAttribute('Variant','Pack03');local b0=bursts()
 mine:SetAttribute('State','Ready')
-check(gm.Title.Text=='✨ YOUR MYSTERY PACK'and rgb(gm.Title.TextColor3,255,214,90),'Ready, mine: ✨ YOUR MYSTERY PACK in gold')
-check(gm.Status.Text=='UNLOCKED! TAKE IT 🎁'and rgb(gm.Status.TextColor3,255,214,90),'status: UNLOCKED! TAKE IT 🎁')
+check(gm.Title.Text=='✨ UR MYSTERY PACK'and rgb(gm.Title.TextColor3,255,214,90),'Ready, mine: ✨ UR MYSTERY PACK in gold')
+check(gm.Status.Text=='UNLOCKED! GRAB IT 🎁'and rgb(gm.Status.TextColor3,255,214,90),'status: UNLOCKED! TAKE IT 🎁')
 check(gm.Bar.Visible==true and gm.Bar.Fill.Size.X.Scale==1 and rgb(gm.Bar.Fill.BackgroundColor3,255,214,90),'the bar is full and gold')
 check(minePrompt.Enabled==true,'the prompt turns on for the owner')
 check(bursts()==b0+1,'a burst of light when MY pack unlocks (Locked -> Ready)')
@@ -93,13 +93,13 @@ check(go.Status.Text=='UNLOCKED!'and go.Title.Text=="✨ BEN D'S MYSTERY PACK",'
 check(otherPrompt.Enabled==false,'the prompt stays off for me')
 check(bursts()==b1,'no burst for somebody else\'s pack')
 -- Ownership changes flip the prompt (a base changing hands).
-other:SetAttribute('OwnerUserId',77);check(otherPrompt.Enabled==true and go.Status.Text=='UNLOCKED! TAKE IT 🎁','if the owner becomes me: the prompt turns on and the text changes')
+other:SetAttribute('OwnerUserId',77);check(otherPrompt.Enabled==true and go.Status.Text=='UNLOCKED! GRAB IT 🎁','if the owner becomes me: the prompt turns on and the text changes')
 other:SetAttribute('OwnerUserId',999);check(otherPrompt.Enabled==false,'and off again')
 -- Claimed.
 local nextAt=R.clock+10000
 mine:SetAttribute('NextAt',nextAt);local b2=bursts()
 mine:SetAttribute('State','Claimed')
-check(gm.Title.Text=='✓ TAKEN TODAY'and rgb(gm.Title.TextColor3,120,236,110),'Claimed: ✓ TAKEN TODAY (mint)')
+check(gm.Title.Text=='✓ GRABBED TODAY'and rgb(gm.Title.TextColor3,120,236,110),'Claimed: ✓ TAKEN TODAY (mint)')
 check(gm.Status.Text=='NEW PACK IN 2h 46m','status: NEW PACK IN 2h 46m ('..gm.Status.Text..')')
 check(gm.Bar.Visible==false,'no bar')
 check(minePrompt.Enabled==false,'the prompt is off again')
@@ -113,7 +113,7 @@ adv(80);check(gm.Status.Text=='NEW PACK IN 0s','never negative')
 mine:SetAttribute('NextAt',nil);check(gm.Status.Text=='NEW PACK IN 0s','no NextAt: 0s')
 -- Not mine, claimed: no burst (the other player took it).
 local b3=bursts();other:SetAttribute('NextAt',R.clock+3700);other:SetAttribute('State','Claimed')
-check(label(other).Title.Text=='✓ TAKEN TODAY'and label(other).Status.Text=='NEW PACK IN 1h 1m'and bursts()==b3,'someone else\'s taken pedestal: ✓ TAKEN TODAY, NEW PACK IN 1h 1m, no burst')
+check(label(other).Title.Text=='✓ GRABBED TODAY'and label(other).Status.Text=='NEW PACK IN 1h 1m'and bursts()==b3,'someone else\'s taken pedestal: ✓ TAKEN TODAY, NEW PACK IN 1h 1m, no burst')
 -- Back to Empty (the owner left).
 mine:SetAttribute('OwnerUserId',nil);mine:SetAttribute('State','Empty')
 check(gm.Enabled==false and minePrompt.Enabled==false,'Empty again: the label is off and the prompt disabled')
@@ -127,7 +127,7 @@ check(latePrompt.Enabled==true,'a prompt that replicates after the pedestal is s
 local odd=R.new('Model');odd.Name='Odd';odd.Parent=workspace
 local b5=bursts()
 local seen,_,seenPrompt=pedestal('AlreadyReady',{State='Ready',OwnerUserId=77,OwnerName='Tester',Variant='Pack02',Stage=1})
-check(label(seen).Status.Text=='UNLOCKED! TAKE IT 🎁'and seenPrompt.Enabled==true and bursts()==b5,'a pedestal that is already Ready when the client first sees it: shown at once, no burst (nothing "just" unlocked)')
+check(label(seen).Status.Text=='UNLOCKED! GRAB IT 🎁'and seenPrompt.Enabled==true and bursts()==b5,'a pedestal that is already Ready when the client first sees it: shown at once, no burst (nothing "just" unlocked)')
 local joiner,_,joinPrompt=pedestal('Joiner',{State='Empty'})
 joiner:SetAttribute('OwnerUserId',77);joiner:SetAttribute('Variant','Pack04');joiner:SetAttribute('State','Ready')
 check(joinPrompt.Enabled==true and bursts()==b5+1,'my base waking up with the pack already unlocked (Empty -> Ready) also bursts and lights the prompt')
@@ -284,12 +284,12 @@ do
  check(oldLabel~=nil and oldLabel.Adornee==oa and op.Enabled==true,'(a pedestal of mine, Ready, with its parts)')
  local b1=bursts();old.Parent=nil -- streamed out
  check(oldLabel.Parent==nil and bursts()==b1,'[streaming] a pedestal that streams out loses its label (nothing stale is kept)')
- old:SetAttribute('State','Locked');check(oldStatus.Text=='UNLOCKED! TAKE IT 🎁','(and the old instance is not updated any more)')
+ old:SetAttribute('State','Locked');check(oldStatus.Text=='UNLOCKED! GRAB IT 🎁','(and the old instance is not updated any more)')
  local nu=bare('Restream',{State='Ready',OwnerUserId=77,OwnerName='Tester',Variant='Pack03',Stage=1});local na2=addAnchor(nu);local np2=addPrompt(na2,true)
  local nl=label(nu)
- check(nl~=nil and nl~=oldLabel and nl.Adornee==na2 and nl.Status.Text=='UNLOCKED! TAKE IT 🎁'and np2.Enabled==true and bursts()==b1,'[streaming] it comes back as a new instance: a label of its own on the new anchor, the prompt on for me, no burst for a pack that was already Ready')
+ check(nl~=nil and nl~=oldLabel and nl.Adornee==na2 and nl.Status.Text=='UNLOCKED! GRAB IT 🎁'and np2.Enabled==true and bursts()==b1,'[streaming] it comes back as a new instance: a label of its own on the new anchor, the prompt on for me, no burst for a pack that was already Ready')
  nu:SetAttribute('State','Claimed')
- check(nl.Title.Text=='✓ TAKEN TODAY'and np2.Enabled==false and bursts()==b1+1 and rgb(lastBurst().Color,120,236,110),'[streaming] and the new instance works like any other (taking it: mint burst, prompt off)')
+ check(nl.Title.Text=='✓ GRABBED TODAY'and np2.Enabled==false and bursts()==b1+1 and rgb(lastBurst().Color,120,236,110),'[streaming] and the new instance works like any other (taking it: mint burst, prompt off)')
  adv(2)
  -- Re-streamed again as Locked: its countdown runs on the new instance after a long time in the world.
  CS:RemoveTag(nu,'MysteryPedestal')

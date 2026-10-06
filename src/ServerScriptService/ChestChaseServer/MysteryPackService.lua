@@ -42,7 +42,7 @@ function S:_build(record)
  local art=Art.Build(m,o)
  local anchor=part(m,'PackAnchor',Vector3.new(1,1,1),o*CFrame.new(0,M.AnchorHeight,0),Color3.new());anchor.Transparency=1
  local light=Instance.new('PointLight');light.Name='Glow';light.Color=RGB(170,110,255);light.Range=14;light.Brightness=1.6;light.Shadows=false;light.Enabled=false;light.Parent=anchor
- local prompt=Instance.new('ProximityPrompt');prompt.Name='TakeMysteryPack';prompt.ActionText='Take';prompt.ObjectText='Mystery Pack'
+ local prompt=Instance.new('ProximityPrompt');prompt.Name='TakeMysteryPack';prompt.ActionText='Grab';prompt.ObjectText='Mystery Pack'
  prompt.HoldDuration=.5;prompt.MaxActivationDistance=12;prompt.RequiresLineOfSight=false;prompt.Enabled=false;prompt.Parent=anchor -- (Publish turns it on while the pack is Ready)
  prompt.Triggered:Connect(function(player)self:Claim(player,record)end)
  m.PrimaryPart=anchor;m.Parent=record.Model
@@ -140,15 +140,15 @@ function S:_announce(player,pack,record,how)
  pcall(function()self.Chests:SyncTools(player)end)
  local tier=PackRules.GetPackTier(pack.Variant);local label=PackRules.PackLabel(pack.Stage,pack.Variant,record.PackSize,'None')
  if self.Notes then pcall(function()
-  local text=how=='owed'and('🎁 A waiting Mystery Pack went into your Bag: '..tier.Name..' '..label..'!')
-   or how and('🎁 Yesterday\'s Mystery Pack went into your Bag: '..tier.Name..' '..label..'!')or('🎁 MYSTERY PACK: '..tier.Name..' '..label..'!')
+  local text=how=='owed'and('🎁 Ur waiting Mystery Pack is in ur bag: '..tier.Name..' '..label..'!')
+   or how and('🎁 Yesterday\'s Mystery Pack is in ur bag: '..tier.Name..' '..label..'!')or('🎁 MYSTERY PACK: '..tier.Name..' '..label..'!')
   self.Notes:Show(player,text,tier.Color or RGB(255,214,90),5)
  end)end
 end
 function S:_grant(player,state,carried)
  local record,why=self:_give(player,state)
  if not record then
-  if self.Notes and not carried then pcall(function()self.Notes:Show(player,'🎒 '..tostring(why or'Make room in your Bag first.'),RGB(255,190,90),4,'Denied')end)end -- R150 review: a refused take clicks Denied (the orange colour and the 🎒 prefix are not one of SimpleGameText's red keys)
+  if self.Notes and not carried then pcall(function()self.Notes:Show(player,'🎒 '..tostring(why or'Make room in ur bag first!'),RGB(255,190,90),4,'Denied')end)end -- R150 review: a refused take clicks Denied (the orange colour and the 🎒 prefix are not one of SimpleGameText's red keys)
   return false
  end
  state.Claimed=true;self.Data:MarkDirty(player);self.Data:QueueGardenSave(player)
@@ -168,7 +168,7 @@ function S:_payOwed(player)
  local waiting=#self:_read(player).Owed
  if waiting>0 and not self.Told[player]and self.Notes then
   self.Told[player]=true
-  pcall(function()self.Notes:Show(player,'🎁 Make room: '..waiting..' mystery pack'..(waiting==1 and''or's')..' waiting',RGB(255,190,90),6)end)
+  pcall(function()self.Notes:Show(player,'🎁 Make room in ur bag! '..waiting..' mystery pack'..(waiting==1 and''or's')..' waiting',RGB(255,190,90),6)end)
  end
 end
 function S:Publish(player,force)
@@ -195,7 +195,7 @@ function S:Unlock(player,state)
  state.Stage,state.Variant=pick.Stage,pick.Variant;state.Seconds=M.UnlockSeconds
  self.Data:MarkDirty(player);self.Data:QueueGardenSave(player);self.Unsaved[player]=0
  self:Publish(player,true)
- if self.Notes then pcall(function()self.Notes:Show(player,'🔓 Your Mystery Pack is unlocked! Go home and take it 🎁',RGB(200,160,255),6)end)end
+ if self.Notes then pcall(function()self.Notes:Show(player,'🔓 Ur Mystery Pack is unlocked! Go to ur base and grab it 🎁',RGB(200,160,255),6)end)end
 end
 function S:Claim(player,record)
  if self.Owner[player]~=record then return false,'NOT YOURS'end

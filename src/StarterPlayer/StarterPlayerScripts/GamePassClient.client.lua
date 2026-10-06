@@ -148,13 +148,13 @@ local gemIcon=require(RS.GemIcon).new(gems);gemIcon.ZIndex=3
 local gemHeading=Art.Text(gems,'Heading','CASH TO GEMS',26,C(190,246,255));gemHeading.ZIndex=4;gemHeading.TextXAlignment=Enum.TextXAlignment.Left
 local rate=Art.Text(gems,'Rate',Cash.Compact(Catalog.CashPerGem)..' Cash = 1 Gem',18);rate.ZIndex=4;rate.TextXAlignment=Enum.TextXAlignment.Left
 local quantityLabel=Art.Text(gems,'QuantityLabel','How many Gems?',15);quantityLabel.ZIndex=4;quantityLabel.TextXAlignment=Enum.TextXAlignment.Left
-local quantity=Instance.new('TextBox');quantity.Name='GemQuantity';quantity.Text='1';quantity.ClearTextOnFocus=false;quantity.PlaceholderText='Whole number';quantity.BackgroundColor3=C(24,26,40);quantity.BorderSizePixel=0;quantity.ZIndex=5;Bright.Text(quantity,20);Theme.Corner(quantity,8);Art.Stroke(quantity,Art.Ink,2);quantity.Parent=gems
+local quantity=Instance.new('TextBox');quantity.Name='GemQuantity';quantity.Text='1';quantity.ClearTextOnFocus=false;quantity.PlaceholderText='Type a number';quantity.BackgroundColor3=C(24,26,40);quantity.BorderSizePixel=0;quantity.ZIndex=5;Bright.Text(quantity,20);Theme.Corner(quantity,8);Art.Stroke(quantity,Art.Ink,2);quantity.Parent=gems
 local maxButton=button(gems,'Maximum','MAX',UDim2.new(),UDim2.new(),C(255,196,52))
 local cost=Art.Text(gems,'Cost','Cost: '..Cash.Compact(Catalog.CashPerGem)..' Cash',15);cost.ZIndex=4;cost.TextXAlignment=Enum.TextXAlignment.Left
 local convert=button(gems,'Convert','CONVERT',UDim2.new(),UDim2.new(),C(98,211,255))
 local ways=Art.Card(page,'EarnGems',{C(90,94,124),C(58,60,86)},false)
-local waysTitle=Art.Text(ways,'Title','COMPLETE YOUR PLANT INDEX',20,Theme.Colors.Gold);waysTitle.ZIndex=4;waysTitle.TextXAlignment=Enum.TextXAlignment.Left
-local waysDetail=Art.Text(ways,'Detail','Collect Gems from your plant index.',15);waysDetail.ZIndex=4;waysDetail.TextXAlignment=Enum.TextXAlignment.Left
+local waysTitle=Art.Text(ways,'Title','FILL UR PLANT INDEX',20,Theme.Colors.Gold);waysTitle.ZIndex=4;waysTitle.TextXAlignment=Enum.TextXAlignment.Left
+local waysDetail=Art.Text(ways,'Detail','Grab Gems from ur plant index!',15);waysDetail.ZIndex=4;waysDetail.TextXAlignment=Enum.TextXAlignment.Left
 local function active(b,enabled)b.Interactable=enabled;b.Active=enabled;b.AutoButtonColor=enabled;b.BackgroundTransparency=enabled and 0 or .45 end
 local layoutKey;local content;local frame
 local function setPrice(b,text,icon,color)Art.SetCaption(b,text,icon,color)end
@@ -198,7 +198,7 @@ local function act(action,value,onDone)
   if not gui.Parent then return end
   if okay and type(result)=='table'then if result.Gems~=nil then state=result end;setStatus(result.Message);if action~='State'and result.Success==false then Audio.Play('Denied')end -- R150: a refused purchase
   if action~='State'and result.Success and action~='RobuxPack'and action~='RobuxBundle'and action~='RobuxGift'and not celebrated[action]then Audio.Transaction('Buy')end
-  else setStatus('Please try again.');if action~='State'then Audio.Play('Denied')end end;refresh()
+  else setStatus('Try again in a sec!');if action~='State'then Audio.Play('Denied')end end;refresh()
   if onDone then onDone(okay and result or nil)end
   if pendingState and not busy then pendingState=false;if panel.Visible then act('State')end end
  end)
@@ -218,9 +218,9 @@ for _,row in pairs(passButtons)do
  watch(player:GetAttributeChangedSignal(row.Pass.Key..'OwnershipReady'),refresh)
 end
 local function count()local n=tonumber(quantity.Text);return n and n==n and n%1==0 and n>=1 and n<=9000 and n or nil end
-quantity:GetPropertyChangedSignal('Text'):Connect(function()local n=count();cost.Text=n and('Cost: '..Cash.Compact(n*Catalog.CashPerGem)..' Cash')or'Enter 1–9,000 Gems.'end)
+quantity:GetPropertyChangedSignal('Text'):Connect(function()local n=count();cost.Text=n and('Cost: '..Cash.Compact(n*Catalog.CashPerGem)..' Cash')or'Pick 1–9,000 Gems.'end)
 maxButton.Activated:Connect(function()local stats=player:FindFirstChild('ChestChaseStats');local cash=stats and stats:FindFirstChild('Cash');quantity.Text=tostring(math.min(9000,math.floor((cash and cash.Value or 0)/Catalog.CashPerGem)))end)
-convert.Activated:Connect(function()local n=count();if n then act('Convert',n)else setStatus('Enter a whole number of Gems.')end end)
+convert.Activated:Connect(function()local n=count();if n then act('Convert',n)else setStatus('Type a whole number of Gems.')end end)
 -- Layout ----------------------------------------------------------------------------------------
 local function place(item,r,dx,dy)item.Position=UDim2.fromOffset(r.X+(dx or 0),r.Y+(dy or 0));item.Size=UDim2.fromOffset(r.W,r.H)end
 local function viewport()

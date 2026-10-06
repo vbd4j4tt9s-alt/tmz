@@ -76,13 +76,13 @@ for _,case in ipairs({{'an empty string',''},{'a blank string','   '},{'a tab an
  check(shut(),'Message = '..case[1]..': the strip stays hidden, no empty dark bar ('..tostring(status.Visible)..' / "'..status.Text..'")')
 end
 -- ...also right after a real error was showing
-reply.Message='Purchase could not open.';act(pack.BuyWithRobux)
-check(status.Visible and said()=='Purchase could not open.','a real error shows')
+reply.Message='Couldn\'t open the purchase. Try again!';act(pack.BuyWithRobux)
+check(status.Visible and said()=='Couldn\'t open the purchase. Try again!','a real error shows')
 reply.Message=nil;act(pack.BuyWithRobux)
 check(shut(),'the next action without a message clears the strip at once')
 -- 3. Real errors and hints still show, for 3 seconds ----------------------------------------------------------------------------------
 successful=false
-for _,text in ipairs({'Purchase could not open.','THIS PURCHASE IS UNAVAILABLE','THIS GIFT PURCHASE IS UNAVAILABLE','NOT ENOUGH GEMS','PURCHASES ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE','TRY AGAIN IN A MOMENT'})do
+for _,text in ipairs({'Couldn\'t open the purchase. Try again!','CAN\'T BUY THIS RIGHT NOW','CAN\'T GIFT THIS RIGHT NOW','NOT ENOUGH GEMS','NO PURCHASES UNTIL UR DATA CAN SAVE','TRY AGAIN IN A SEC!'})do
  plays={};reply.Message=text;act(pack.BuyWithRobux)
  check(plays[#plays]=='Denied','R150: the refused purchase "'..text..'" clicks Denied')
  check(status.Visible and said()==text,'"'..text..'" is shown')
@@ -90,21 +90,21 @@ for _,text in ipairs({'Purchase could not open.','THIS PURCHASE IS UNAVAILABLE',
  R.advance(.3);check(shut(),'"'..text..'" hides after 3 s')
 end
 successful=true
-local gems_=page.ConvertCash;reply.Message='Gems on the way.';gems_.GemQuantity.Text='5';plays={};act(gems_.Convert)
+local gems_=page.ConvertCash;reply.Message='Ur Gems are on the way!';gems_.GemQuantity.Text='5';plays={};act(gems_.Convert)
 check(not table.find(plays,'Denied'),'R150: a successful action (the Convert hint) never clicks Denied')
-check(calls[#calls][1]=='Convert'and calls[#calls][2]==5 and status.Visible and said()=='Gems on the way.','Convert keeps its "Gems on the way." hint')
+check(calls[#calls][1]=='Convert'and calls[#calls][2]==5 and status.Visible and said()=='Ur Gems are on the way!','Convert keeps its "Ur Gems are on the way!" hint')
 R.advance(3.1);check(shut(),'...and it hides after 3 s')
 gems_.GemQuantity.Text='abc';act(gems_.Convert)
-check(status.Visible and said()=='Enter a whole number of Gems.','a client-side input error shows')
+check(status.Visible and said()=='Type a whole number of Gems.','a client-side input error shows')
 R.advance(3.1);check(shut(),'...and hides after 3 s')
 failing=true;reply.Message=nil;plays={};act(pack.BuyWithRobux)
-check(status.Visible and said()=='Please try again.','a server call that fails says "Please try again."')
+check(status.Visible and said()=='Try again in a sec!','a server call that fails says "Try again in a sec!"')
 check(plays[#plays]=='Denied','R150: ...and clicks Denied')
 R.advance(3.1);check(shut(),'...and hides after 3 s')
 failing=false
 -- the same error twice in a row shows each time
-reply.Message='Purchase could not open.';act(pack.BuyWithRobux);R.advance(1);act(pack.BuyWithRobux)
-check(status.Visible and said()=='Purchase could not open.','the same error again is shown again')
+reply.Message='Couldn\'t open the purchase. Try again!';act(pack.BuyWithRobux);R.advance(1);act(pack.BuyWithRobux)
+check(status.Visible and said()=='Couldn\'t open the purchase. Try again!','the same error again is shown again')
 R.advance(3.1);check(shut(),'...and hides')
 -- 4. The gem purchases the server announces make no KaChing (the chime comes from PurchaseCelebration) ----------------------------------------
 reply.Message=nil;buys=0;plays={}

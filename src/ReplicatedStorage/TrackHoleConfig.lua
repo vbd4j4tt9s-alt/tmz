@@ -35,21 +35,21 @@ return {
 
  Messages={
   Cooldown='%ds',          -- R124: only the time left
-  Carrying="CAN'T DIG WHILE CARRYING A PACK",
+  Carrying="CAN'T DIG WITH A PACK!",
   Refreshing='TRACK IS REFRESHING',
-  Ground='DIG ON THE TRACK GROUND',
+  Ground='ONLY DIG ON THE TRACK!',
   Pack='TOO CLOSE TO A PACK',
   Camp='TOO CLOSE TO A KEEPER CAMP',
   Entrance='TOO CLOSE TO THE ENTRANCE',
   Spacing='TOO CLOSE TO ANOTHER HOLE',
-  PlayerCap='%d HOLES MAX - COVER ONE OR WAIT FOR A TRAP',
+  PlayerCap='%d HOLES MAX! COVER ONE OR WAIT',
   ServerCap='TOO MANY HOLES ON THE TRACK',
   Covered='HOLE COVERED',
-  Trapped='YOU FELL IN A HOLE! PACK DROPPED',
+  Trapped='U FELL IN A HOLE! PACK DROPPED',
   Tripped='%s FELL IN YOUR HOLE!',
  },
  -- R124: shown once when the shovel comes out on the track, then fades (replaces the permanent hint line).
- Hint='Dig holes on the ground to trap players!', -- R125 (owner): 'players', not 'pack thieves'
+ Hint='Dig holes to trap other players!', -- R125 (owner): 'players', not 'pack thieves'
  HintSeconds=4,
  HintRepeatSeconds=30, -- not shown again sooner than this
 

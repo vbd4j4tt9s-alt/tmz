@@ -107,7 +107,7 @@ function H.Create(pg,player)
   local nextAt=map and map:GetAttribute('VeiledNextAt');local waitFor=type(nextAt)=='number'and nextAt-(now or workspace:GetServerTimeNow())or nil
   local event=active or(waitFor~=nil and waitFor>0)
   special.Visible=event
-  local hint=active and(player:GetAttribute('SpecialKeeperChase84')and'CHASING YOU' or'AT STORM PEAKS')or(event and'ARRIVES IN '..SpeedBoost.Clock(waitFor))or''
+  local hint=active and(player:GetAttribute('SpecialKeeperChase84')and'CHASING YOU' or'AT STORM PEAKS')or(event and'COMING IN '..SpeedBoost.Clock(waitFor))or''
   if specialHint.Text~=hint then specialHint.Text=hint end
   special:SetAttribute('AccessibleLabel','The Darkened '..hint:lower())
   scale.Scale=m.StatusScale
