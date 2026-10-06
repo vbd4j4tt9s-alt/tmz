@@ -17,6 +17,10 @@ FILES = {'Stage1': 'Golem', 'Stage6': 'JungleKing', 'Stage2': 'SandSnake', 'Stag
          'Stage7': 'StormColossus', 'Darkened': 'Darkened'}
 MANIFEST = {'Stage1': 'timber_golem', 'Stage6': 'jungle_king', 'Stage2': 'sand_snake', 'Stage3': 'ice_fang', 'Stage4': 'lava_dragon',
             'Stage5': 'crystal_knight', 'Stage7': 'storm_colossus', 'Darkened': 'the_darkened'}
+# R152 z-fighting (blender/fix_zfight.py): the parts whose bounding box changed because a piece slid 0.01 - 0.06 stud out of its neighbour's plane (their config Center / Size follow);
+# every other part still matches the approved manifest within the quantization
+ZFIGHT_MOVED = {'Stage2': ('Segment1',), 'Stage4': ('Jaw', 'LeftFrontLeg_Glow', 'RightFrontLeg_Glow'), 'Stage5': ('Sword_Point',)}
+ZFIGHT_BOX = 0.07
 fails = 0
 checks = 0
 
@@ -122,7 +126,11 @@ for key, k in luau.items():
         lo = [min(v[i] for v in a['V']) for i in range(3)]
         hi = [max(v[i] for v in a['V']) for i in range(3)]
         for i in range(3):
-            worstM = max(worstM, abs((lo[i] + hi[i]) / 2 - mp['Center'][i]), abs(hi[i] - lo[i] - mp['Size'][i]))
+            d = max(abs((lo[i] + hi[i]) / 2 - mp['Center'][i]), abs(hi[i] - lo[i] - mp['Size'][i]))
+            if a['Name'] in ZFIGHT_MOVED.get(key, ()):   # a piece of this part slid apart from its neighbour's plane (blender/fix_zfight.py): its box may differ by the slide
+                check(d < ZFIGHT_BOX, '%s %s: the box moved by %.4f studs (the z-fight pass allows %.2f)' % (key, a['Name'], d, ZFIGHT_BOX))
+            else:
+                worstM = max(worstM, d)
         tris += len(a['T'])
         if b['P']:
             check(max(b['P']) < len(m['Palette']), '%s %s: every cell is in the palette' % (key, a['Name']))

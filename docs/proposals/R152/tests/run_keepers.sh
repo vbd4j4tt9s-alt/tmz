@@ -14,6 +14,10 @@
 #     no mesh memory mid-keeper, a content failure).
 #  3. round trip: roundtrip.luau decodes every keeper on the mock and writes OBJ files; check_roundtrip.py decodes the same modules with
 #     an independent Python decoder and compares both with the approved R151 manifests (parts, triangles, bounds) and the Blender dump.
+#  4. z-fighting (R152, owner: "look for z fighting cases fix them"): keeper_zfight_dump.luau (the game's decoder and pose code) and check_keeper_zfight.py: no two triangles of a
+#     keeper's DRAWN parts (the awake face set, or the asleep one) that face the same way, lie in one plane (the R149 depth rule: 0.02 .. 0.043 stud), overlap and look different, in the
+#     rest and the asleep pose, face / eye plates and glow slits against their heads included; blender/fix_zfight.py (the pass that slid 15 pieces apart) is a no-op on this data and its
+#     encoder / config formulas reproduce the committed files; every one of its slides, undone on its own, is noticed again.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 BASE=${KEEPERS_BASE:-24ed94b}
@@ -67,5 +71,12 @@ echo "== 3. round trip"
 cp "$HERE/roundtrip.luau" "$OUT/now/"
 (cd "$OUT/now" && /opt/luau/luau roundtrip.luau > roundtrip.txt 2> roundtrip.err) || { tail -20 "$OUT/now/roundtrip.err";exit 1; }
 python3 "$HERE/check_roundtrip.py" "$OUT/now/roundtrip.txt" "$OUT/obj" "$REPO" || fail "round trip"
+echo "== 4. z-fighting inside the keepers"
+cp "$HERE/keeper_zfight_dump.luau" "$OUT/now/"
+(cd "$OUT/now" && /opt/luau/luau keeper_zfight_dump.luau > zfight_dump.txt 2> zfight_dump.err) || { tail -20 "$OUT/now/zfight_dump.err";exit 1; }
+python3 "$HERE/check_keeper_zfight.py" "$OUT/now/zfight_dump.txt" > "$OUT/now/zfight_check.txt" || { tail -20 "$OUT/now/zfight_check.txt";fail "keeper z-fighting"; }
+python3 "$HERE/../blender/fix_zfight.py" data "$REPO" "$OUT/now/zfight_dump.txt" --dry | tail -1 | grep -q "^0 pieces" || fail "blender/fix_zfight.py still has pieces to slide apart (or its encoder / config formulas no longer reproduce the committed files)"
+python3 "$HERE/check_keeper_zfight.py" "$OUT/now/zfight_dump.txt" --moves "$HERE/../blender/keeper_zfight_moves.json" | tail -1 | grep -q "15 of 15" || fail "an undone z-fight slide is not noticed"
+echo "ok: no z-fighting in the rest / asleep poses of the 8 keepers; the fix pass is a no-op and reproduces the files; the 15 slides are each noticed when undone"
 [ $RC = 0 ] && echo "R152 keeper suite: all stages passed"
 exit $RC

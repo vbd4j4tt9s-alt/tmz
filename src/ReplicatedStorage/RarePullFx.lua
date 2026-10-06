@@ -183,13 +183,13 @@ function Beam:_impact(a,g)
   local show=self.Arrive=='slam'and a>=0
   for i,r in ipairs(self.RingArt)do
    local radius=i==1 and W*(.5+(self.Reduced and 3 or 7)*easeOut(k1))or W*(.4+(self.Reduced and 2.2 or 4.6)*easeOut(k2))
-   local d=2*radius/.72;r.Part.Size=V(d,.05,d);r.Part.CFrame=CF(g+V(0,.05+.01*i,0))
+   local d=2*radius/.72;r.Part.Size=V(d,.05,d);r.Part.CFrame=CF(g+V(0,.025+.05*i,0)) -- (R152 z-fighting: tops at .10 / .15 over the ground, the cracks' tops at .05: every layer .05 apart, the R149 depth rule wants .043)
    r.Image.ImageTransparency=i==1 and(show and k1<1 and .05+.95*k1 or 1)or(show and a>=.08 and k2<1 and .35+.65*k2 or 1)
   end
  elseif #self.Ring>0 then
   local show=self.Arrive=='slam'and a>=0
   placeRing(self.Ring,g+V(0,.06,0),W*(.5+(self.Reduced and 3 or 7)*easeOut(k1)),W*(.22*(1-k1)+.04),show and k1<1 and .05+.95*k1 or 1)
-  placeRing(self.Ring2,g+V(0,.04,0),W*(.4+(self.Reduced and 2.2 or 4.6)*easeOut(k2)),W*(.6*(1-k2)+.1),show and a>=.08 and k2<1 and .55+.45*k2 or 1)
+  placeRing(self.Ring2,g+V(0,.125,0),W*(.4+(self.Reduced and 2.2 or 4.6)*easeOut(k2)),W*(.6*(1-k2)+.1),show and a>=.08 and k2<1 and .55+.45*k2 or 1)
  end
  for _,d in ipairs(self.Debris)do
   local s=a;local show=self.Arrive=='slam'and s>=0 and s<1

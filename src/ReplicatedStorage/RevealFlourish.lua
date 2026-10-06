@@ -105,7 +105,7 @@ function F:Update(mouth,t,burstAt,heard)
   for i,seg in ipairs(ring)do
    local a=(i-.5)/#ring*math.pi*2;local len=2*math.pi*radius/#ring*1.05
    seg.Size=V(len,.08*s,.16*s*(1-k*.6))
-   seg.CFrame=CF(up+V(math.cos(a)*radius,.05*s,math.sin(a)*radius))*CFrame.Angles(0,-a+math.pi/2,0)
+   seg.CFrame=CF(up+V(math.cos(a)*radius,.05*s+(r-1)*math.max(.05,.06*s),math.sin(a)*radius))*CFrame.Angles(0,-a+math.pi/2,0) -- (R152 z-fighting: the second ring catches up with the first: its own layer, >= .05 stud above)
    seg.Transparency=ra<0 and 1 or math.clamp(.1+k*.9,0,1)
   end
  end

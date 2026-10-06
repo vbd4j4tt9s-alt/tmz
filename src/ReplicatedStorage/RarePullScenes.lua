@@ -206,7 +206,7 @@ function Scene:_void()
    self:Part('Floor seam',V(40,.04,.08),CF(pack.X,.02,pack.Z)*ANG(0,a,0),C(110,50,190),NEON,.62)
   end
  end
- local disc=self:Part('Rim glow',V(.1,5,5),CF(pack.X,.04,pack.Z)*ANG(0,0,math.pi/2),violet,NEON,.55,CYL)
+ local disc=self:Part('Rim glow',V(.1,5,5),CF(pack.X,.06,pack.Z)*ANG(0,0,math.pi/2),violet,NEON,.55,CYL) -- (R152 z-fighting: its top .11 over the floor, the rune circle's .05)
  self.Rim=self:Light(disc,violet,1.6,13)
  local fogAnchor=self:Part('Void fog',V(30,4,30),CF(0,2,-4),C(0,0,0),SMOOTH,1)
  self.Fog=self:Emitter(fogAnchor,{Texture=SMOKE,LightEmission=.2,Color=ColorSequence.new(C(70,26,110),C(20,6,40)),Rate=lite and 3 or 7,Lifetime=NumberRange.new(5,8),
