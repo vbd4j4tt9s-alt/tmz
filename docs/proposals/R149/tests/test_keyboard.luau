@@ -1724,13 +1724,15 @@ do
  check(left==0,'when they leave, every key gives its letter back to its strip ('..left..' left riding)')
 end
 -- 8. shovel holes: they lie on the keys (near and far); the keys under them stay up
+-- R153: the holes are the server's (TrackHoleService._build, sizes from TrackHoleConfig: pit 5.1 across, rim .45 wider all round; was 3.4 / .3), Rim .05 thick at +.025 and Pit .10 thick at +.05 (R153: tops .05 and .10 over the floor; the pit's top is .05 above the rim's, more than the 4 depth steps (.043) a 300-stud view of a 5-stud overlap has).
 do
 local holes=R.new('Folder');holes.Name='TrackHoles';holes.Parent=runtime
+local THC=W.module('TrackHoleConfig');local rimD=THC.Diameter+2*THC.RimWidth
 local function dig(id,x,z)
  local m=R.new('Model');m.Name='TrackHole_'..id
- local pit=R.new('Part');pit.Name='Pit';pit.Size=V3(.08,3.4,3.4);pit.CFrame=CF(x,F+.04,z);pit.Parent=m
- local rim=R.new('Part');rim.Name='Rim';rim.Size=V3(.06,4,4);rim.CFrame=CF(x,F+.03,z);rim.Parent=m
- local crumb=R.new('Part');crumb.Name='Crumb';crumb.Size=V3(.3,.3,.3);crumb.CFrame=CF(x+1.9,F+.1,z);crumb.Parent=m
+ local pit=R.new('Part');pit.Name='Pit';pit.Size=V3(.10,THC.Diameter,THC.Diameter);pit.CFrame=CF(x,F+.05,z);pit.Parent=m
+ local rim=R.new('Part');rim.Name='Rim';rim.Size=V3(.05,rimD,rimD);rim.CFrame=CF(x,F+.025,z);rim.Parent=m
+ local crumb=R.new('Part');crumb.Name='Crumb';crumb.Size=V3(.3,.3,.3);crumb.CFrame=CF(x+rimD/2+.3,F+.1,z);crumb.Parent=m
  m.PrimaryPart=pit;m.Parent=holes;return m,pit,rim,crumb
 end
 put(cx(11),nil,cz(BR));hum.FloorMaterial=PLASTIC;frames(40)
@@ -1738,12 +1740,12 @@ local HR,HC=BR+4,6
 local hx,hzz=cx(HC),cz(HR)
 local h1,pit1,rim1=dig(1,hx,hzz);frames(30)
 check(keyAt(HR,HC)~=nil and near(topOf(HR,HC),K.KeyTop(0),1e-6),'a hole leaves its key in place, at rest')
-check(near(pit1.CFrame.Position.Y,F+.04+C.HoleLift,1e-6)and near(rim1.CFrame.Position.Y,F+.03+C.HoleLift,1e-6),'the hole parts are lifted onto the key tops')
-local rimBottom=rim1.CFrame.Position.Y-.03;local rimTop=rim1.CFrame.Position.Y+.03;local pitTop=pit1.CFrame.Position.Y+.04
-check(rimBottom>=K.KeyTop(0)+.015 and rimTop-K.KeyTop(0)>=.06 and pitTop-K.KeyTop(0)>=.08,'z-fighting: the Rim / Pit tops are 0.08 / 0.10 above the key top (no shared plane)')
-do -- (TrackHoleService: Rim .04 thick at +.02, Pit .08 thick at +.04 above the floor; the letter strips' tops lie at the key top + Legend.Margin .05)
+check(near(pit1.CFrame.Position.Y,F+.05+C.HoleLift,1e-6)and near(rim1.CFrame.Position.Y,F+.025+C.HoleLift,1e-6),'the hole parts are lifted onto the key tops')
+local rimBottom=rim1.CFrame.Position.Y-.025;local rimTop=rim1.CFrame.Position.Y+.025;local pitTop=pit1.CFrame.Position.Y+.05
+check(rimBottom>=K.KeyTop(0)+.015 and rimTop-K.KeyTop(0)>=.06 and pitTop-K.KeyTop(0)>=.08 and pitTop-rimTop>=.045,'z-fighting: the Rim / Pit tops are .11 / .16 above the key top and .05 apart (more than the .043 of 4 depth steps at 300 studs, where a 5-stud hole is still seen)')
+do -- (TrackHoleService: Rim .05 thick at +.025, Pit .10 thick at +.05 above the floor; the letter strips' tops lie at the key top + Legend.Margin .05)
  local stripTop=K.KeyTop(0)+LT.Margin
- check((F+.02+C.HoleLift+.02)-stripTop>=.05-1e-9 and (F+.04+C.HoleLift+.04)-stripTop>=.08-1e-9,'z-fighting (review part 2): a lifted hole\'s Rim top stands .06 and its Pit top .10 above the letter strips (R151: HoleLift = RestRise + .06 keeps the clearance over the strips: .05 since R152, the least the R149 depth rule allows)')
+ check((F+.025+C.HoleLift+.025)-stripTop>=.05-1e-9 and (F+.05+C.HoleLift+.05)-stripTop>=.08-1e-9,'z-fighting (review part 2): a lifted hole\'s Rim top stands .06 and its Pit top .11 above the letter strips (R151: HoleLift = RestRise + .06 keeps the clearance over the strips: .05 since R152, the least the R149 depth rule allows)')
 end
 local sl=nil
 for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 and g.RowOfZ(st.CFrame.Position.Z)==HR then
@@ -1757,31 +1759,58 @@ put(cx(11),nil,cz(BR));frames(14)
 h1:Destroy();frames(30)
 check(sl.Visible==true,'the letter comes back when the hole is filled')
 put(hx,nil,hzz);frames(12);check(near(topOf(HR,HC),K.KeyTop(1),1e-6),'...and the key presses again')
+-- R153: 1.5x the radius. HoleReach covers the rim (3.0 from the centre): every key under ANY part of the rim stays up (a pressed key under it would leave the hole floating over a dip),
+-- also at the corner of four keys; two holes at MinSpacing both lie on the keys.
+do
+ local rimR=THC.Diameter/2+THC.RimWidth
+ check(C.HoleReach>=rimR and C.HoleReach<=rimR+1,'HoleReach '..C.HoleReach..' covers the bigger hole\'s rim radius '..rimR..' (it was 2 for the old rim, 2.0)')
+ put(cx(11),nil,cz(BR));frames(14)
+ local gx,gz=(cx(HC)+cx(HC+1))/2,(cz(HR)+cz(HR+1))/2 -- the corner shared by four keys
+ local hc,pc,rc=dig(7,gx,gz);frames(30)
+ check(near(pc.CFrame.Position.Y,F+.05+C.HoleLift,1e-6)and near(rc.CFrame.Position.Y,F+.025+C.HoleLift,1e-6),'a hole at the corner of four keys is lifted onto the key tops')
+ local cells,n,bad,pressed={},0,0,0
+ for a=0,359,10 do cells[g.RowOfZ(gz+rimR*math.sin(math.rad(a)))*64+g.ColOfX(gx+rimR*math.cos(math.rad(a)))]=true end
+ cells[g.RowOfZ(gz)*64+g.ColOfX(gx)]=true
+ for key in pairs(cells)do
+  local row,col=key//64,key%64;n+=1;plays={}
+  put(cx(col),nil,cz(row));frames(12)
+  if not near(topOf(row,col),K.KeyTop(0),1e-6)or #plays>0 then bad+=1 end
+ end
+ check(n>=4 and bad==0,'every key under the hole (the circle of its rim and its centre: '..n..' keys) stays up and silent when stepped on ('..bad..' pressed)')
+ put(cx(HC+3),nil,cz(HR));frames(12);check(near(topOf(HR,HC+3),K.KeyTop(1),1e-6),'a key two columns past the rim still presses')
+ local h2,p2=dig(8,gx+THC.MinSpacing,gz);frames(30)
+ check(near(p2.CFrame.Position.Y,F+.05+C.HoleLift,1e-6)and near(pc.CFrame.Position.Y,F+.05+C.HoleLift,1e-6),'two holes at MinSpacing ('..THC.MinSpacing..') both lie on the keys')
+ put(cx(11),nil,cz(BR));frames(14)
+ h2:Destroy();hc:Destroy();frames(30)
+ local back=0;for key in pairs(cells)do local row,col=key//64,key%64;put(cx(col),nil,cz(row));frames(12);if near(topOf(row,col),K.KeyTop(1),1e-6)then back+=1 end end
+ check(back==n,'...and every one of those keys presses again once the holes are filled ('..back..' of '..n..')')
+ put(cx(11),nil,cz(BR));frames(14)
+end
 put(cx(11),nil,cz(BR));frames(14)
 -- the lift is per part: streamed-in parts, crumb tweens, rebuilt models
 do
  local h5,pit5,rim5,crumb5=dig(5,hx,hzz);frames(2)
- check(near(crumb5.CFrame.Position.Y,F+.1+C.HoleLift,1e-6)and near(pit5.CFrame.Position.Y,F+.04+C.HoleLift,1e-6),'every part of a hole (Pit, Rim, crumbs) is lifted')
+ check(near(crumb5.CFrame.Position.Y,F+.1+C.HoleLift,1e-6)and near(pit5.CFrame.Position.Y,F+.05+C.HoleLift,1e-6),'every part of a hole (Pit, Rim, crumbs) is lifted')
  pit5:Destroy()
- local pit5b=R.new('Part');pit5b.Name='Pit';pit5b.Size=V3(.08,3.4,3.4);pit5b.CFrame=CF(hx,F+.04,hzz);pit5b.Parent=h5
+ local pit5b=R.new('Part');pit5b.Name='Pit';pit5b.Size=V3(.10,THC.Diameter,THC.Diameter);pit5b.CFrame=CF(hx,F+.05,hzz);pit5b.Parent=h5
  frames(1)
- check(near(pit5b.CFrame.Position.Y,F+.04+C.HoleLift,1e-6),'a hole part that streams in again (a new instance at the server height) is lifted within a frame')
+ check(near(pit5b.CFrame.Position.Y,F+.05+C.HoleLift,1e-6),'a hole part that streams in again (a new instance at the server height) is lifted within a frame')
  local crumbB=R.new('Part');crumbB.Name='Crumb';crumbB.Size=V3(.3,.3,.3);crumbB.CFrame=CF(hx-1.9,F+.1,hzz);crumbB.Parent=h5;frames(1)
  check(near(crumbB.CFrame.Position.Y,F+.1+C.HoleLift,1e-6),'...also a streamed-in crumb')
  crumb5.Position=V3(hx,F+.35,hzz);frames(8)
  check(near(crumb5.CFrame.Position.Y,F+.35,1e-6),'a crumb in mid-tween is not touched')
  crumb5.Position=V3(hx+1.9,F+.1,hzz);frames(30)
  check(near(crumb5.CFrame.Position.Y,F+.1+C.HoleLift,1e-6),'a crumb the tween put back at the server height is lifted again')
- check(near(pit5b.CFrame.Position.Y,F+.04+C.HoleLift,1e-6),'parts already lifted are never lifted twice')
+ check(near(pit5b.CFrame.Position.Y,F+.05+C.HoleLift,1e-6),'parts already lifted are never lifted twice')
  h5:Destroy();frames(5)
  local h5c,pit5c=dig(6,hx,hzz);frames(1)
- check(near(pit5c.CFrame.Position.Y,F+.04+C.HoleLift,1e-6),'a rebuilt hole model is lifted')
+ check(near(pit5c.CFrame.Position.Y,F+.05+C.HoleLift,1e-6),'a rebuilt hole model is lifted')
  h5c:Destroy();frames(30)
 end
 -- far away (600 studs ahead): the same
 local farRow=g.RowOfZ(cz(BR)+600);local farX,farZ=cx(15),cz(farRow)
 local farHole,farPit=dig(3,farX,farZ);frames(30)
-check(keyAt(farRow,15)~=nil and near(topOf(farRow,15),K.KeyTop(0),1e-6)and near(farPit.CFrame.Position.Y,F+.04+C.HoleLift,1e-6),'a hole 600 studs ahead lies on its key the same way (visible from afar)')
+check(keyAt(farRow,15)~=nil and near(topOf(farRow,15),K.KeyTop(0),1e-6)and near(farPit.CFrame.Position.Y,F+.05+C.HoleLift,1e-6),'a hole 600 studs ahead lies on its key the same way (visible from afar)')
 farHole:Destroy();frames(10)
 -- a hole on a spacebar: the bar stays (unpressable) and the hole lies on it
 put(cx(11),nil,cz(BR));frames(10)
@@ -1842,7 +1871,7 @@ sc.Destroying:Fire();frames(2)
 check(workspace:FindFirstChild('KeyboardTrackVisuals')==nil,'the folder goes with the script')
 local restored=true;for _,fp in ipairs(floors)do if fp.LocalTransparencyModifier~=0 then restored=false end end
 check(restored and grassTex.LocalTransparencyModifier==0,'teardown shows the real floor (and its texture) again')
-check(keepPitRef and near(keepPitRef.CFrame.Position.Y,F+.04,1e-6),'teardown puts a lifted shovel hole back at its server height')
+check(keepPitRef and near(keepPitRef.CFrame.Position.Y,F+.05,1e-6),'teardown puts a lifted shovel hole back at its server height')
 check(W.module('KeyboardSurface149').Lift(W.fxProbe.X,W.fxProbe.Z,F)==0,'teardown: floor-level effects are no longer lifted (no keyboard folder, no keys)')
 for _,h in ipairs(runtime:GetDescendants())do if h.Name=='TrackHoles'then h:Destroy()end end
 local before2=#R.created;frames(30);check(#R.created==before2,'nothing runs after the script is destroyed')

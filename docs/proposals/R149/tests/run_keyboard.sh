@@ -210,6 +210,9 @@ mutate "the scan counts invisible parts" $K2 "d.Transparency<S.Config.InvisibleA
 mutate "the scan counts flush patches and parts above the keys as props" $K2 "local prop=not item.Flat and fp.Y0<=K.KeyTop(0)and fp.Y1>=F+C.PropMinTop" "local prop=not item.Flat"
 mutate "the scan uses the axis-aligned box of a turned part" $K2 "local h=hull(pts);if #h<3 then return nil end" "local h;do local a,b,c,e=math.huge,-math.huge,math.huge,-math.huge;for _,p in ipairs(pts)do a=math.min(a,p[1]);b=math.max(b,p[1]);c=math.min(c,p[2]);e=math.max(e,p[2])end;h={{a,c},{b,c},{b,e},{a,e}}end;if #h<3 then return nil end"
 mutate "effects lift onto keys over a left-out cell" $KS "if geo and geo.SkipCount>0 and geo.Skip[geo.RowOfZ(z)*64+geo.ColOfX(x)]then return nil end" "if false then return nil end"
+# R153: the shovel holes are 1.5x the radius (rim 3.0): the keys under the whole rim stay up
+mutate "the keys under a bigger hole's rim can be pressed (HoleReach back to the old rim, 2)" $R " HoleReach=3," " HoleReach=2,"
+mutate "the hole parts are not lifted onto the key tops (the bigger hole sinks into the keys)" $S "   liftBase[d]=y;liftSet[d]=y+C.HoleLift;d.Position=d.Position+LIFT" "   liftBase[d]=y;liftSet[d]=y"
 [ -z "$DRY" ] || exit 0
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]
