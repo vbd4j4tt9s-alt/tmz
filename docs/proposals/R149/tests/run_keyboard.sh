@@ -29,8 +29,8 @@
 #  5e  keys AND letters from anywhere on every tier, looking along / back / across (hard studs written in the test: keys 990 / 600 / 365 ahead, 320 / 225 / 175 behind; letters
 #      500 / 340 / 230 ahead, 220 / 170 / 140 behind), every key of every letter row has exactly one upright label over it (near strips and the far one-strip-a-row letters);
 #      the per-tier budget (parts in use, SurfaceGuis, letters shown) is printed ("budget tier ..", "reach: ..") and capped; the track ends; the near zone is unchanged.
-#  5f  the click: volume 1.8 (was .8, +7 dB = ~1.6x), roll-off 28 .. 160 (was 16 .. 90), a slight per-click gain, the voice cap; a press in a Forest / Jungle row (and its spacebar)
-#      plays rbxassetid://73942179280083 (volume Config.PressSoundVolume), every other biome the click.
+#  5f  the click: volume 1.8 (was .8, +7 dB = ~1.6x), roll-off 28 .. 160 (was 16 .. 90), a slight per-click gain, the voice cap; a press on a normal key in EVERY biome plays
+#      rbxassetid://73942179280083 (volume Config.PressSoundVolume), a spacebar press in every biome the original click (Config.PressSound by key kind).
 #  5g  cells left out (water / lava / pools / props on the floor): the shared KeyboardSkip encoding and geometry, the server scan (KeyboardSkip152) on a synthetic map (thresholds,
 #      turned boxes, balls, discs, flush patches, invisible / non-scenery parts, spacebars), the client with cells left out (no key / press / letter, strips trimmed, the floor
 #      kept under them as local copies, no stand-in over them, effects stay at the floor, live attribute changes, a string for another grid ignored).
@@ -98,6 +98,7 @@ PY
  if [ -n "$NEWONLY" ]&&[ "$PHASE" = old ];then return 0;fi # NEWONLY=1: only the R152 mutations
  if [ -n "$OLDONLY" ]&&[ "$PHASE" = new ];then return 0;fi # OLDONLY=1: only the mutations before R152
  if [ -n "$ONLY" ]&&[ "$ONLY" != "$1" ];then return 0;fi # ONLY="<name>": just that mutation
+ if [ -n "$ONLYRE" ]&&! echo "$1" | grep -qE "$ONLYRE";then return 0;fi # ONLYRE="<regex>": the mutations whose name matches
  if [ -n "$DRY" ];then echo "target found: $1";return 0;fi # DRY=1: only check that every mutation target is still in the sources
  bundle "$M";total=$((total+1))
  if runsuite; then echo "MUTATION SURVIVED: $1"; else echo "mutation caught: $1"; caught=$((caught+1)); fi
@@ -165,7 +166,7 @@ mutate "the probe key is left in the world" $S "   local okMesh,me=pcall(meshExt
    probe:Destroy()" "   local okMesh,me=pcall(meshExtra)"
 mutate "any ray answer counts, not only the probe's" $S "     if hit and hit.Instance==probe then" "     if hit then"
 mutate "the measured excess is not capped" $R " return min(extra,C.Legend.MaxExtra)" " return extra"
-mutate "the strips are coplanar with the key tops (no margin)" $R "Margin=.04,MaxExtra" "Margin=0,MaxExtra"
+mutate "the strips are coplanar with the key tops (no margin)" $R "Margin=.05,MaxExtra" "Margin=0,MaxExtra"
 mutate "the canvas of a Top face is width x depth (R149)" $R "function K.TopCanvas(sizeX,sizeZ,pps)return sizeZ*pps,sizeX*pps end" "function K.TopCanvas(sizeX,sizeZ,pps)return sizeX*pps,sizeZ*pps end"
 # R151 performance patch: the near zone is never missing
 mutate "no across way (a camera looking across / down keeps its long side behind it: the owner's bare floor)" $R "if math.abs(h)<=C.FacingAcross then return 0 end" ""
@@ -184,11 +185,13 @@ mutate "far letters turned 180 degrees" $S "l.TextSize=FTEXT;l.Size=UDim2.fromOf
 mutate "the click volume back to .8" $R "ClickVolume=1.8," "ClickVolume=.8,"
 mutate "the click roll-off / range back to 90" $R "ClickRollOffMax=160,ClickRange=160," "ClickRollOffMax=90,ClickRange=90,"
 mutate "a click gain above 1 (the peak rises: clipping)" $R "ClickGains={1,.94,.97,.91}" "ClickGains={1,1.3,1.6,.91}"
-mutate "no per-click gain" $S "v.Sound.Volume=K.PressVolume(stage)*K.ClickGain(gate.N)" "v.Sound.Volume=K.PressVolume(stage)"
-mutate "the Jungle plays the click" $R "PressSound={Forest='rbxassetid://73942179280083',Jungle='rbxassetid://73942179280083'}" "PressSound={Forest='rbxassetid://73942179280083'}"
-mutate "the biome sound starts at another volume than the click" $R "PressSoundVolume={Forest=1.8,Jungle=1.8}" "PressSoundVolume={Forest=.5,Jungle=.5}"
-mutate "every press plays the click (the biome is ignored)" $S "local pool=pools[K.PressSoundId(stage)]or pools[DEFAULT]" "local pool=pools[DEFAULT]"
-mutate "a spacebar plays the click" $S "click(kind,who,px,pz,bar and bar.Stage)" "click(kind,who,px,pz,nil)"
+mutate "no per-click gain" $S "v.Sound.Volume=K.PressVolume(sk,stage)*K.ClickGain(gate.N)" "v.Sound.Volume=K.PressVolume(sk,stage)"
+mutate "normal keys play the click (no key sound)" $R "PressSound={Key='rbxassetid://73942179280083',Spacebar=" "PressSound={Spacebar="
+mutate "the key sound only in the Forest and Jungle again (a biome override back to the click)" $R "PressSoundBiome={}," "PressSoundBiome={Desert='rbxassetid://113108830240353',Snow='rbxassetid://113108830240353',Lava='rbxassetid://113108830240353',Crystal='rbxassetid://113108830240353',['Storm Peaks']='rbxassetid://113108830240353'},"
+mutate "the spacebars play the key sound too" $R "Spacebar='rbxassetid://113108830240353'}," "Spacebar='rbxassetid://73942179280083'},"
+mutate "the key sound starts at another volume than the click" $R "PressSoundVolume=1.8," "PressSoundVolume=.5,"
+mutate "every press plays the click (the key kind is ignored)" $S "local pool=pools[K.PressSoundId(sk,stage)]or pools[DEFAULT]" "local pool=pools[DEFAULT]"
+mutate "a spacebar is treated as a normal key (it plays the key sound)" $S "click(kind,who,px,pz,true,bar and bar.Stage)" "click(kind,who,px,pz,false,bar and bar.Stage)"
 mutate "keys are dressed on left-out cells" $S "for col=1,COLS do if not skip[row*64+col]then" "for col=1,COLS do if true then"
 mutate "near letter strips are not trimmed to their keys" $S "local a0,a1=keyedSpan(row,c0,c1)" "local a0,a1=c0,c1"
 mutate "far letter strips are not trimmed to their keys" $S "local a0,a1=keyedSpan(row,1,COLS)" "local a0,a1=1,COLS"

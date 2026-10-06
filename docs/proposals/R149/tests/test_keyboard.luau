@@ -83,9 +83,11 @@ do
  check(C.ClickVoices==12 and #C.ClickGains>=3 and K.ClickGain(1)==1,'the voice pool keeps its cap ('..C.ClickVoices..' voices per sound) and the first click of a presser plays at full volume')
  local gainOk=true;for _,gn in ipairs(C.ClickGains)do if gn>1 or gn<.85 then gainOk=false end end
  check(gainOk and #C.ClickGains~=#C.ClickPitches,'a slight per-click gain (.85 .. 1 of the volume: the peak never rises) on a cycle that does not line up with the pitches')
- check(K.PressSoundId(1)=='rbxassetid://73942179280083'and K.PressSoundId(6)=='rbxassetid://73942179280083'and K.PressSoundId(2)=='rbxassetid://113108830240353'and K.PressSoundId(nil)=='rbxassetid://113108830240353'
-  and K.PressSoundId(4)=='rbxassetid://113108830240353'and K.PressSoundId(7)=='rbxassetid://113108830240353','R152: Forest (1) and Jungle (6) press 73942179280083, every other biome (and no biome) keeps the click 113108830240353')
- check(K.PressVolume(1)==C.PressSoundVolume.Forest and K.PressVolume(6)==C.PressSoundVolume.Jungle and K.PressVolume(2)==C.ClickVolume and C.PressSoundVolume.Forest==C.ClickVolume,'R152: the biome sound has its own volume per biome (Config.PressSoundVolume, starting at the click\'s '..C.ClickVolume..'); a biome with no sound uses the click volume')
+ do local KEY,CLK='rbxassetid://73942179280083','rbxassetid://113108830240353';local ok=K.PressSoundId('Key')==KEY and K.PressSoundId('Spacebar')==CLK and K.PressSoundId('Key',nil)==KEY
+  for stage=1,7 do if K.PressSoundId('Key',stage)~=KEY or K.PressSoundId('Spacebar',stage)~=CLK then ok=false end end
+  check(ok and C.PressSound.Key==KEY and C.PressSound.Spacebar==CLK and next(C.PressSoundBiome)==nil,'R152 (owner: the sound is for every key as big as the Forest / Jungle ones): by key KIND, not biome: a normal key of EVERY biome (1 .. 7) plays 73942179280083, a spacebar the original click 113108830240353; the optional per-biome override (PressSoundBiome) is empty')
+  check(K.PressVolume('Key')==C.PressSoundVolume and C.PressSoundVolume==C.ClickVolume and type(C.PressSoundVolume)=='number'and K.PressVolume('Spacebar')==C.ClickVolume,'R152: ONE volume knob for the key sound (Config.PressSoundVolume, starting at the click\'s '..C.ClickVolume..': tune it by ear there); the spacebar\'s click plays at ClickVolume')
+ end
 end
 local LT=C.Legend
 check(LT.Margin>=.05-1e-9 and LT.Margin<=.06 and LT.Rotation==270 and LT.MaxExtra>=1,'letter strips stand .05 - .06 above the measured resting key top (Margin '..LT.Margin..': R152 z-fighting, the strip and the key top overlap over the whole key, so the gap must clear the R149 depth rule, .043 at 300 studs), labels turn 270 degrees')
@@ -800,7 +802,7 @@ end
 
 -- 2. a runner presses a key and releases it
 local R10,C20=BR,9
-local function pressVol(p,stage)local v=K.PressVolume(stage);local lo=1;for _,gn in ipairs(C.ClickGains)do lo=min(lo,gn)end;return p~=nil and p.Volume<=v+1e-9 and p.Volume>=v*lo-1e-9 end
+local function pressVol(p,stage,kind)local v=K.PressVolume(kind or'Key',stage);local lo=1;for _,gn in ipairs(C.ClickGains)do lo=min(lo,gn)end;return p~=nil and p.Volume<=v+1e-9 and p.Volume>=v*lo-1e-9 end
 do
 plays={};hum.FloorMaterial=PLASTIC;put(cx(C20),nil,cz(R10));frames(3)
 check(topOf(R10,C20)and topOf(R10,C20)<K.KeyTop(0)-.1,'a key goes down under the runner (mid-press)')
@@ -813,7 +815,7 @@ do -- R151: the press is clearly visible (>= 1 stud of travel) and the feet stay
  check(topOf(R10,C20)>=feetY-1e-9 and topOf(R10,C20)-feetY<=.1,'feet stay planted: the pressed key top is level with the soles (the real floor top, +'..string.format('%.2f',topOf(R10,C20)-feetY)..'), never under them (no hovering) nor above them (no sinking)')
  check(K.KeyTop(0)-feetY>=1.1,'the keys around him stand 1.2 above his soles at rest: a pressed key is a clear dent in the keyboard')
 end
-check(#plays==1 and plays[1].Id=='rbxassetid://73942179280083','one sound played for the one key, in the Jungle row (R152: the Jungle sound 73942179280083, not the click) ('..#plays..')')
+check(#plays==1 and plays[1].Id=='rbxassetid://73942179280083','one sound played for the one key, in a Jungle row (R152: the key sound 73942179280083, not the click) ('..#plays..')')
 check(plays[1]and plays[1].Speed>=.98 and plays[1].Speed<=1.02 and pressVol(plays[1],g.RowStage[R10]),'own press: pitch within 0.98 .. 1.02, volume 1.8 x the click-to-click gain (.91 .. 1)')
 check(plays[1]and plays[1].Group and plays[1].Group.Name=='GardenEffects','clicks go through the Effects sound group (AudioMixer.Route)')
 check(plays[1]and near(plays[1].Pos.X,cx(C20),.01)and near(plays[1].Pos.Z,cz(R10),.01)and plays[1].Min==C.ClickRollOffMin and plays[1].Max==C.ClickRollOffMax,'the click is played at the key, with the one roll-off rule')
@@ -1335,63 +1337,70 @@ local H={} -- helpers shared by 5e and 5g (one local: the main chunk is near Lua
  put(cx(11),F+9,cz(BR));frames(60*3)
 end
 
--- 5f. R152 (owner: "for every Jungle, Forest keyboard tile that players step on it plays this audio instead 73942179280083"; "its not loud enough"): a press in the Forest or the
--- Jungle plays the biome's own sound, every other biome keeps the click; the same voice pool cap, roll-off, range, cadence and gain cycle; the click is louder.
+-- 5f. R152 (owner: "this audio [73942179280083] is played for all keys which are as wide and big as the forest jungle keys so it goes for snow and lava and crystal and so on too";
+-- "its not loud enough"): every normal key of EVERY biome plays the key sound, the spacebars (a different size) keep the click; the same voice pool cap, roll-off, range, cadence
+-- and gain cycle; the click is louder.
 do
  hum.FloorMaterial=PLASTIC;fxTier=3;frames(60*4)
- local FOREST,CLICK='rbxassetid://73942179280083','rbxassetid://113108830240353'
- local function pressAt(row,col,xo)
-  put(cx(col)+25,nil,cz(row));frames(14) -- everything up first
-  plays={};put(cx(col),nil,cz(row));frames(12);local list=table.clone(plays)
-  put(cx(col)+25,nil,cz(row));frames(14)
+ local KEYSND,CLICK='rbxassetid://73942179280083','rbxassetid://113108830240353'
+ local function pressAt(row,col,z)
+  put(cx(col)+25,nil,z or cz(row));frames(14) -- everything up first
+  plays={};put(cx(col),nil,z or cz(row));frames(12);local list=table.clone(plays)
+  put(cx(col)+25,nil,z or cz(row));frames(14)
   return list
  end
- local want={Forest=FOREST,Jungle=FOREST,Desert=CLICK,Snow=CLICK,Lava=CLICK,Crystal=CLICK,['Storm Peaks']=CLICK}
  local summary={}
  for _,seg in ipairs(g.Segs)do
-  local row=seg.FirstRow+min(9,seg.Rows-2);local list=pressAt(row,9)
+  -- a normal key (row 10 into the biome, column 9) ...
+  local row=seg.KeyFirst+min(9,seg.Rows-3);local list=pressAt(row,9)
   local id=list[1]and list[1].Id
-  summary[#summary+1]=seg.Name..' '..(id==FOREST and 'sound' or 'click')
-  check(#list==1 and id==want[seg.Name],('a press in a %s row (row %d) plays %s (%s)'):format(seg.Name,row,want[seg.Name]==FOREST and '73942179280083 (the biome sound)' or 'the click 113108830240353',tostring(id)))
+  check(#list==1 and id==KEYSND,('a press on a normal key in %s (row %d) plays 73942179280083 (%s)'):format(seg.Name,row,tostring(id)))
   check(list[1]and list[1].Min==C.ClickRollOffMin and list[1].Max==C.ClickRollOffMax and list[1].Mode==R.Enum.RollOffMode.InverseTapered and list[1].Group and list[1].Group.Name=='GardenEffects',
    ('...with the same 3D roll-off (%d .. %d, InverseTapered) and the Effects group as every click'):format(C.ClickRollOffMin,C.ClickRollOffMax))
+  -- ... the first row of the biome: its spacebar (the huge full-width key), the original click
+  local bar=nil
+  for _,b in ipairs(g.Bars)do if b.Name==seg.Name then bar=b end end
+  put(cx(8),nil,bar.Z0+70);frames(14);plays={};put(cx(8),nil,bar.Z0+2);frames(12);local lb=table.clone(plays) -- (a whole bar goes down: it is pressed once, from away)
+  put(cx(8),nil,bar.Z0+70);frames(14)
+  local bid=lb[1]and lb[1].Id
+  check(#lb==1 and bid==CLICK and lb[1].Volume<=C.ClickVolume+1e-9,('the %s spacebar plays the original click 113108830240353 at the click volume (%s)'):format(seg.Name,tostring(bid)))
+  summary[#summary+1]=seg.Name..' key '..(id==KEYSND and'sound'or'?')..' / bar '..(bid==CLICK and'click'or'?')
  end
  print('press sounds: '..table.concat(summary,', '))
- -- a spacebar belongs to its biome's segment: the Forest bar plays the Forest sound, the Desert bar the click
- do
-  put(cx(8),nil,g.Bars[1].Z0+60);frames(14);plays={};put(cx(8),nil,g.Bars[1].Z0+2);frames(12)
-  local forestBar=plays[1]and plays[1].Id;put(cx(8),nil,g.Bars[3].Z0-30);frames(14);plays={}
-  put(cx(8),nil,g.Bars[3].Z0+2);frames(12);local desertBar=plays[1]and plays[1].Id
-  check(forestBar==FOREST and desertBar==CLICK,'the Forest spacebar plays the Forest sound, the Desert spacebar the click ('..tostring(forestBar)..', '..tostring(desertBar)..')')
- end
  -- one pool of ClickVoices voices per sound, strict rotation inside it, nothing shared between the two sounds
  do
-  plays={};local zJ=cz(g.Segs[2].FirstRow+4);local voices,ids={},{}
+  plays={};local zJ=cz(g.Segs[3].KeyFirst+4);local voices,ids={},{}
   for i=1,26 do put(cx(11),nil,zJ+i*8.2);frames(6)end
   for _,p in ipairs(plays)do voices[p.Sound]=true;ids[p.Id]=true end
   local nv=0;for _ in pairs(voices)do nv+=1 end
   local n=0;for _ in pairs(ids)do n+=1 end
-  check(#plays>=20 and nv==C.ClickVoices and n==1,('running through the Jungle: %d presses use the Jungle sound\'s pool of %d voices (%d distinct), none of the click\'s'):format(#plays,C.ClickVoices,nv))
-  local mixed=false;for _,p in ipairs(plays)do if p.Sound.SoundId~=FOREST then mixed=true end end
-  check(not mixed,'every voice of that pool plays the Jungle sound')
+  check(#plays>=20 and nv==C.ClickVoices and n==1,('running through the Desert: %d key presses use the key sound\'s pool of %d voices (%d distinct), none of the click\'s'):format(#plays,C.ClickVoices,nv))
+  local mixed=false;for _,p in ipairs(plays)do if p.Sound.SoundId~=KEYSND then mixed=true end end
+  check(not mixed,'every voice of that pool plays the key sound')
  end
- -- loudness (the click, in the Desert): every press at the new volume times a slight gain; the peak is the config volume; pitch as before
+ -- loudness (Desert keys): every press at the key sound's volume times a slight gain; the peak is the config volume; pitch as before
  do
-  plays={};local zD=cz(g.Segs[3].FirstRow+10);local lo,hi,sum,n=1e9,0,0,0
+  plays={};local zD=cz(g.Segs[3].KeyFirst+10);local lo,hi,sum,n=1e9,0,0,0
   for i=1,40 do put(cx(11),nil,zD+i*8.2);frames(6)end
   for _,p in ipairs(plays)do lo=min(lo,p.Volume);hi=max(hi,p.Volume);sum+=p.Volume;n+=1 end
   local gmin=1;for _,gn in ipairs(C.ClickGains)do gmin=min(gmin,gn)end
-  check(n>=30 and near(hi,C.ClickVolume,1e-9)and lo>=C.ClickVolume*gmin-1e-9 and lo<hi-.05 and sum/n>=C.ClickVolume*.9,('Desert clicks: volume %.2f .. %.2f (mean %.2f) over %d presses: the peak is the config volume %.1f (was .8), the gain cycle takes at most %d%% off'):format(lo,hi,sum/max(1,n),n,C.ClickVolume,floor((1-gmin)*100+.5)))
+  check(n>=30 and near(hi,C.PressSoundVolume,1e-9)and lo>=C.PressSoundVolume*gmin-1e-9 and lo<hi-.05 and sum/n>=C.PressSoundVolume*.9,('Desert key presses: volume %.2f .. %.2f (mean %.2f) over %d presses: the peak is PressSoundVolume %.1f, the gain cycle takes at most %d%% off'):format(lo,hi,sum/max(1,n),n,C.PressSoundVolume,floor((1-gmin)*100+.5)))
   local pitches={};for _,p in ipairs(plays)do pitches[p.Speed]=true end;local np=0;for _ in pairs(pitches)do np+=1 end
   check(np>=3 and np<=#C.ClickPitches,'...and the pitch still varies only within 0.98 .. 1.02 ('..np..' pitches)')
  end
- -- the sound and its volume are per biome in the config (the owner can change them later)
+ -- the sound per key KIND (and its volume) is in the config; an optional per-biome override exists (empty)
  do
-  local old,oldV=C.PressSound.Desert,C.PressSoundVolume.Desert
-  C.PressSound.Desert=123456;C.PressSoundVolume.Desert=3.25
-  check(K.PressSoundId(2)=='rbxassetid://123456'and K.PressVolume(2)==3.25,'Config.PressSound / PressSoundVolume are read per biome name (a number is an asset id; a biome with an entry uses its own volume)')
-  C.PressSound.Desert=old;C.PressSoundVolume.Desert=oldV
-  check(K.PressSoundId(2)==CLICK and K.PressVolume(2)==C.ClickVolume,'...and an entry removed gives the click back')
+  local oldK,oldS,oldV=C.PressSound.Key,C.PressSound.Spacebar,C.PressSoundVolume
+  C.PressSound.Key=123456;C.PressSoundVolume=3.25
+  check(K.PressSoundId('Key',2)=='rbxassetid://123456'and K.PressSoundId('Key',6)=='rbxassetid://123456'and K.PressSoundId('Spacebar',2)==CLICK and K.PressVolume('Key',2)==3.25 and K.PressVolume('Spacebar',2)==C.ClickVolume,
+   'Config.PressSound.Key / PressSoundVolume change the sound and volume of every normal key at once (a number is an asset id); the spacebar is untouched')
+  C.PressSound.Key=oldK;C.PressSoundVolume=oldV
+  C.PressSound.Spacebar='rbxassetid://555';check(K.PressSoundId('Spacebar')=='rbxassetid://555'and K.PressSoundId('Key')==KEYSND,'...and PressSound.Spacebar changes the spacebars\' sound only');C.PressSound.Spacebar=oldS
+  C.PressSound.Key=nil;check(K.PressSoundId('Key')==CLICK and K.PressVolume('Key')==C.ClickVolume,'a kind with no entry plays the click at the click volume');C.PressSound.Key=oldK
+  C.PressSoundBiome.Desert='rbxassetid://777'
+  check(K.PressSoundId('Key',2)=='rbxassetid://777'and K.PressSoundId('Key',6)==KEYSND and K.PressSoundId('Spacebar',2)==CLICK and K.PressVolume('Key',2)==C.PressSoundVolume,'the optional PressSoundBiome (by biome name) overrides the key sound of that biome only')
+  C.PressSoundBiome.Desert=nil
+  check(K.PressSoundId('Key',2)==KEYSND,'...and removing the entry gives the key sound back')
  end
  hum.FloorMaterial=AIR;put(cx(11),F+9,cz(BR));frames(60)
 end
@@ -1633,7 +1642,7 @@ local other=R.new('Player');other.Name='Pal';other.UserId=5;other.Parent=Players
 local ochar,oroot=makeCharacter('Pal',cx(8),cz(BR));other.Character=ochar
 plays={};frames(8) -- a 30 Hz sample (up to 2 frames) + the .07 s press
 check(near(topOf(BR,8),K.KeyTop(1),1e-6),'another player standing on a key presses it')
-check(#plays==1 and plays[1].Speed>=.98 and plays[1].Speed<=1.02 and pressVol(plays[1],g.RowStage[BR])and plays[1].Id==K.PressSoundId(g.RowStage[BR]),'...with one sound, the biome\'s recording, pitch and volume rule as your own ('..#plays..')')
+check(#plays==1 and plays[1].Speed>=.98 and plays[1].Speed<=1.02 and pressVol(plays[1],g.RowStage[BR])and plays[1].Id==K.PressSoundId('Key',g.RowStage[BR]),'...with one sound, the key sound, pitch and volume rule as your own ('..#plays..')')
 oroot.CFrame=CF(cx(8),F+9,cz(BR));frames(14)
 check(near(topOf(BR,8),K.KeyTop(0),1e-6),'jumping high (feet more than 3 studs up) releases it')
 oroot.CFrame=CF(cx(8),F+5.5,cz(BR));frames(10)
@@ -1669,7 +1678,7 @@ plays={};frames(12)
 local ek=K.KeeperFootprint(6,6);local kdown=0
 for cc=12,16 do for rr=BR+2,BR+6 do if near(topOf(rr,cc)or 99,K.KeyTop(1),1e-6)then kdown+=1 end end end
 check(near(ek,1.8)and kdown>=1 and kdown<=4,'a keeper presses the keys under its feet (footprint '..ek..', '..kdown..' keys down)')
-check(#plays==1 and near(plays[1].Speed,C.KeeperPitch)and plays[1].Id==K.PressSoundId(g.RowStage[BR+4]),'keeper: one sound, the biome\'s recording a touch deeper (0.94)')
+check(#plays==1 and near(plays[1].Speed,C.KeeperPitch)and plays[1].Id==K.PressSoundId('Key',g.RowStage[BR+4]),'keeper: one sound, the key sound a touch deeper (0.94)')
 kroot.CFrame=CF(300,F+5,cz(BR+4));frames(14)
 kdown=0;for cc=12,16 do for rr=BR+2,BR+6 do if near(topOf(rr,cc)or 99,K.KeyTop(1),1e-6)then kdown+=1 end end end
 check(kdown==0,'the keys come back up when the keeper walks away')

@@ -892,12 +892,12 @@ local function start()
  end
 
  -- Clicks -----------------------------------------------------------------------------------------------------------
- -- R152: a press plays K.PressSoundId(its biome): the click, or the biome's own sound (Forest / Jungle). One pool of ClickVoices voices per sound id.
+ -- R152: a press plays K.PressSoundId(its key kind): a normal key the Key sound (every biome), a spacebar the original click (K.Config.PressSound). One pool of ClickVoices voices per sound id.
  local click
  do
  local pools={}
  local RANGE2=C.ClickRange*C.ClickRange
- local DEFAULT=K.PressSoundId(nil)
+ local DEFAULT='rbxassetid://'..tostring(C.ClickSoundId)
  local function poolFor(id)
   local pool=pools[id];if pool then return pool end
   local voices={}
@@ -913,10 +913,10 @@ local function start()
   task.spawn(function()pcall(function()Content:PreloadAsync({voices[1].Sound})end)end)
   return pool
  end
- poolFor(DEFAULT);for stage=1,K.StageCount do poolFor(K.PressSoundId(stage))end
+ poolFor(DEFAULT);poolFor(K.PressSoundId('Spacebar'));poolFor(K.PressSoundId('Key'));for stage=1,K.StageCount do poolFor(K.PressSoundId('Key',stage))end
  local ownGate=K.NewCadence(C.ClickGap)
  local gates=setmetatable({},{__mode='k'})          -- presser (a Player or a keeper Model) -> its own cadence
- function click(kind,who,x,z,stage)
+ function click(kind,who,x,z,space,stage) -- space: the huge full-width key; stage: the biome's id (the optional per-biome override)
   if Mixer and type(Mixer.Get)=='function'and Mixer.Get('Effects')==0 then return end
   if kind~=1 then local dx,dz=x-focusX,z-focusZ;if dx*dx+dz*dz>RANGE2 then return end end
   local gate=ownGate
@@ -927,11 +927,12 @@ local function start()
   if not K.Allow(gate,now)then return end
   gate.N=(gate.N or 0)+1
   -- strict rotation: the voice reused is always the one started longest ago (all voices of a pool play the same recording)
-  local pool=pools[K.PressSoundId(stage)]or pools[DEFAULT]
+  local sk=space and'Spacebar'or'Key'
+  local pool=pools[K.PressSoundId(sk,stage)]or pools[DEFAULT]
   local v=pool.Voices[pool.Next];pool.Next=pool.Next%#pool.Voices+1
   if v.Sound.Playing then v.Sound:Stop()end
   v.Part.CFrame=CF(x,F+1,z)
-  v.Sound.PlaybackSpeed=K.ClickPitch(kind,gate.N);v.Sound.Volume=K.PressVolume(stage)*K.ClickGain(gate.N)
+  v.Sound.PlaybackSpeed=K.ClickPitch(kind,gate.N);v.Sound.Volume=K.PressVolume(sk,stage)*K.ClickGain(gate.N)
   -- R150: the click starts at the shared SoundTiming lead-in for its file (0 until measured), like every other cue.
   if Timing then Timing.Play(v.Sound,nil,.25)else v.Sound.TimePosition=0;v.Sound:Play()end
  end
@@ -954,7 +955,7 @@ local function start()
    kDepth[idx]=1;queueMove(idx)
   else
    startAnim(idx,1) -- Reduced Motion: animate() finishes it in the same frame
-   if idx>=BARBASE then local bar=bars[idx-BARBASE];click(kind,who,px,pz,bar and bar.Stage)else click(kind,who,kX[idx],kZ[idx],rowStage[kRow[idx]])end
+   if idx>=BARBASE then local bar=bars[idx-BARBASE];click(kind,who,px,pz,true,bar and bar.Stage)else click(kind,who,kX[idx],kZ[idx],false,rowStage[kRow[idx]])end
   end
  end
  local function releaseKey(idx)
