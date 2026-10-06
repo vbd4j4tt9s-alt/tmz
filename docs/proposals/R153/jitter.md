@@ -93,7 +93,8 @@ caches, off-screen keeper rates.
 `docs/proposals/R153/tests/run_jitter.sh` (in `tools/tests/run_all_suites.sh`): the real scripts on the mock; what is drawn (read right after
 RenderStepped) advances on every frame at 30 / 60 / 144 fps while visible; followers do not move in the physics half of a frame; the server
 connects per-frame signals only in its gameplay services and tweens nothing. `JITTER_BASE=d73905e` runs the same checks on R152: every check set
-fails there (the stepping is measured, e.g. a Drippy item repeats 59 of 90 frames at 60 fps, the keeper sign 64 of 90).
+fails there (the stepping is measured, e.g. a Drippy item repeats 59 of 90 frames at 60 fps, the keeper sign 64 of 90; 21 / 42 / 20 / 29
+failed checks in keepers / misc / runners / world).
 Updated suites: R128 follow, boots_R117 (RenderStepped connection), trails_R117 (frame driver), R149 growth fx (shrink every frame),
 R151 hub client (tier 2 every frame, 30 / 144 fps), R152 giveaway client (tier 2 in / out of view, 30 / 144
 fps, two mutations), R152 keepers (R153's two keeper files on its list), R149 Verity lip sync (one pause window starts 20 ms later: the hop

@@ -19,6 +19,8 @@ J.look(V3(8,8,-12),V3(0,3,0))
 -- 1. Verity's hop ------------------------------------------------------------------------------------------------------------------------------------------
 do
  local Voice=W.module('VerityVoice');local C=W.module('VerityConfig')
+ -- (on a base without the follower: what was drawn, the level itself)
+ local Bounce=Voice.Bounce or function(l)return l.Level end;local Moving=Voice.Moving or function(l)return l.Level>0 end
  for _,fps in ipairs({30,60,144})do
   local lip=Voice.NewLip(C.Lip);local dt=1/fps;local bounces,levels={},{}
   local loud,nextRead=0,0
@@ -27,7 +29,7 @@ do
    -- syllables of ~.2 s with ~.12 s pauses; the engine's reading changes about 40 times a second and is noisy
    if t>=nextRead then nextRead=t+1/40;local syl=(t%.32)<.2;loud=syl and(380+160*(((i*7919)%13)/12))or 0 end
    Voice.Step(lip,C.Lip,loud,dt,true)
-   bounces[#bounces+1]=Voice.Bounce(lip);levels[#levels+1]=lip.Level
+   bounces[#bounces+1]=Bounce(lip);levels[#levels+1]=lip.Level
   end
   local stalls=0;for i=2,#bounces do if bounces[i]==bounces[i-1]and bounces[i]>0 then stalls+=1 end end
   local function jolt(list)local w=0;for i=3,#list do w=math.max(w,math.abs(list[i]-2*list[i-1]+list[i-2]))end;return w end -- (the sharpest change of speed: a kink)
@@ -36,8 +38,8 @@ do
   print(string.format('INFO Verity at %d fps: sharpest change of speed %.3f (hop) against %.3f (the level it used to follow)',fps,jolt(bounces),jolt(levels)))
   if fps>=60 then check(jolt(bounces)<=.7*jolt(levels),string.format('Verity at %d fps: the hop\'s sharpest frame-to-frame change of speed is %.3f against the level\'s %.3f (no kinks: the buzz is gone)',fps,jolt(bounces),jolt(levels)))end -- (at 30 fps a frame is longer than the smoothing)
   check(inside,'Verity at '..fps..' fps: the hop stays inside 0..1')
-  local n=0;while Voice.Moving(lip)and n<fps*3 do Voice.Step(lip,C.Lip,500,dt,false);n+=1 end
-  check(lip.Level==0 and Voice.Bounce(lip)==0,string.format('Verity at %d fps: when the voice stops she settles exactly back down (%.2f s)',fps,n*dt))
+  local n=0;while Moving(lip)and n<fps*3 do Voice.Step(lip,C.Lip,500,dt,false);n+=1 end
+  check(lip.Level==0 and Bounce(lip)==0,string.format('Verity at %d fps: when the voice stops she settles exactly back down (%.2f s)',fps,n*dt))
  end
  local src=W.B.VerityClient
  check(src:find('VerityVoice.Pose(C,e.Size,VerityVoice.Bounce(lip))',1,true)~=nil and src:find('local level=still and 0 or VerityVoice.Bounce(voice.Lip)',1,true)~=nil,
