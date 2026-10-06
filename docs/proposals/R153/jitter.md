@@ -53,6 +53,16 @@ What made things jitter, in this game:
 | Index / harvest / pack previews (`CollectionViewport`, `HarvestPresentation`, `HarvestViewport`, `PackViewport89`) | 20 / 20 / Heartbeat / 30 Hz; the index cards' weather mutation effects too | every frame in RenderStepped; budgets kept (index 6 on tier 2, harvest 4 models on tier 2) |
 | Garden upgrade button press (`GardenUpgradeService` -> `InteractionFeedback`) | a server tween, replicated in network-rate steps | the server stamps `PressedAt153`; every client draws the press per frame |
 
+## Looked at and left as they are (nothing moves in steps you can see)
+
+- Already smooth: mutation highlights, the carry nameplate, the mystery pedestal sign and spin, the hub butterflies, the Fruit of the Hour, the
+  sale money, the reveal world beams' own loop, keeper effects / Zzz / accents (KeeperMotion's frame), the keyboard track.
+- Slow or not motion: lighting fades between biomes (BiomePresentation, 20 Hz writes of a slow fade), weather clouds' cover (WorldEvents),
+  rain / snow tiles (WeatherWorld149: emitters placed on a grid; particles move by themselves), snow patches, biome emitter drift (BiomeWeather:
+  acceleration only), the cosmic lettering's stars (12 Hz, well under a pixel a tick), the garden's growth / wind sway / tree drift / jaw /
+  petals / holograms (20 Hz, under a pixel a tick near, kept), distant gardens, the gift hover highlight (FruitGiftClient picks a target at 12 Hz),
+  text that counts down (HUD notices, world status, signs), track packs past 240 studs (they only turn to face the camera).
+
 ## Cost
 
 Everything above is gated by visibility, distance and the existing count budgets; nothing new runs for what is off screen or far. The added
