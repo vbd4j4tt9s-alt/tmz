@@ -152,6 +152,12 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 | `voidgift reset me` (server, **Studio only**) | Clears YOUR claim and your profile flag (the shared list loses you, the count goes down by one) so you can claim again. The pack you already got stays in your Bag (`clear packs` removes it). A live server refuses: it never changes the shared count |
 | `voidgift left 3` (server, **Studio only**) | Sets how many the pedestal shows as left (0 = ALL CLAIMED, 487 = a fresh start). Players already in the list keep their places, so the number cannot go above 500 minus them. Studio only; a live server refuses |
 
+## Keepers (R152)
+| Command | What it does |
+|---|---|
+| `keepermodels` (server) | R152: the new keeper models the game builds at server start: bake status (needs Game Settings → Security → "Allow Mesh / Image APIs"), which model each keeper shows (`R152` or `Legacy`), parts and triangles |
+| `keepermodels off` / `keepermodels auto` (server) | `off` = every keeper goes back to today's (R151) model, each at its next idle moment; `auto` = the new models again |
+
 ## Verity's voice
 | Command | What it does |
 |---|---|

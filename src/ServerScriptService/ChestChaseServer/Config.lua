@@ -747,7 +747,7 @@ end
 local balance=require(game:GetService('ReplicatedStorage').BalanceRules)
 -- R148: ProfileVersion 22 (the roster change: pack OddsVersion 149 is unknown to an older server, which would re-save such a pack as
 -- a legacy-odds pack for good); a version-22 save is refused by an older server, which leaves it unchanged.
-Config.Version='V150 R151';Config.ProfileVersion=22;Config.SpeedMilestones=balance.SpeedMilestones
+Config.Version='V150 R152';Config.ProfileVersion=22;Config.SpeedMilestones=balance.SpeedMilestones
 Config.MaxTrainedSpeed=nil;Config.MaxWalkSpeed=nil;Config.TrainingPointsPerSecond=100
 for i,tier in ipairs(Config.TreadmillTiers)do tier.Multiplier=balance.TrainingTiers[i]end
 for _,product in ipairs(Config.ShopCatalog.Trails)do product.SpeedMultiplier=balance.TrailMultipliers[product.Id]or product.SpeedMultiplier;product.Description=''end
