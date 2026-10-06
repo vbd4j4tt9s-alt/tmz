@@ -150,7 +150,7 @@ function S.Build(rank,opts)
  local self=setmetatable({Rank=rank,Folder=folder,Origin=CF(opts.Origin or Rules.StageOrigin),Count=0,Lights=0,Images=0,Lite=opts.Lite==true,Reduced=opts.Reduced==true,Fx={},
   NoArt=opts.NoArt==true or not Art.Allowed(),FxTier=opts.FxTier or(opts.Lite and math.min(2,Fx.Tier())or Fx.Tier())},Scene)
  local tier=Rules.Tier(rank)
- pcall(Art.Request,S.ArtNames[rank]or{}) -- (drawn now if they were not yet: ready for the next scene)
+ if Art.Allowed()then pcall(Art.Request,S.ArtNames[rank]or{})end -- (drawn now if they were not yet: ready for the next scene; on low quality they would never be shown, so never drawn)
  -- the stars
  if opts.Pack then
   local pack=opts.Pack;pack.Parent=folder

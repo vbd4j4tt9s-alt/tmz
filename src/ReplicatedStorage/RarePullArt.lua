@@ -14,11 +14,14 @@
 --   banner       a crimson banner with a gold border and a crown
 --   glass        a stained-glass window under an arch
 --   damask       the palace wall's cream damask (tiles)
--- Made once per client, a few at a time (A.SliceSeconds of work a frame), starting a while after the client starts (RarePullCinematic.Bind
--- calls A.Warm) so the first King / Cosmic / Secret pull usually finds them ready. A.Get(name) never waits: 'ready' (with the content),
--- 'pending' or 'failed'. Every user keeps its plain parts as the fallback (EditableImage off, its memory budget used up, low quality).
+-- Made once per client, a few at a time (A.SliceSeconds of work a frame: 4 ms, 2 ms on ClientFxBudget tier 2), starting a while after the client starts
+-- (RarePullCinematic.Bind calls A.Warm) when no reveal is running, and only the planets and the seed's halo (A.WarmOrder); the rest is drawn when a scene asks
+-- for it (RarePullScenes.Build -> A.Request, on tiers 2 and 3) so the first King / Cosmic / Secret pull usually finds the planets ready. Nothing is drawn WHILE a
+-- reveal runs (the worker waits). A.Get(name) never waits: 'ready' (with the content), 'pending' or 'failed'. Every user keeps its plain parts as the fallback
+-- (EditableImage off, its memory budget used up, low quality).
 local A={Version=152}
-A.SliceSeconds=.004
+A.SliceSeconds=.004 -- of drawing a frame (tier 3); A.SliceSecondsMid on tier 2 (phones: it competes with arriving in the hub, the hub's own work)
+A.SliceSecondsMid=.002
 A.Hooks={} -- tests / preview: Create(w,h,rgba,name) -> object; Content(object) -> content; Spawn(fn); Wait()
 A.Sizes={planet_gas={192,192},planet_rock={192,192},planet_ring={256,256},nebula_rose={128,128},nebula_blue={128,128},starmap={192,192},
  glow={64,64},halo={128,128},runes={256,256},carpet={64,128},banner={96,192},glass={96,192},damask={96,96}}
@@ -347,6 +350,20 @@ end
 -- Client side ------------------------------------------------------------------------------------------------------------------------------
 local entries={} -- name -> {State='pending'|'ready'|'failed', Value, Content, Why}
 local queue={};local worker=false
+-- A reveal is playing (RarePullRules.RevealRunning, kept by RarePullCinematic): nothing is drawn meanwhile.
+local Rules
+local function revealing()
+ if Rules==nil then local ok,m=pcall(require,script.Parent.RarePullRules);Rules=ok and m or false end
+ return Rules and Rules.RevealRunning==true or false
+end
+-- The slice of work a frame: 4 ms, 2 ms on ClientFxBudget tier 2 (never more than A.SliceSeconds).
+function A.Slice()
+ local s=A.SliceSeconds
+ local ok,B=pcall(require,script.Parent.ClientFxBudget)
+ if ok and B then local ok2,tier=pcall(B.Get);if ok2 and tier==2 then s=math.min(s,A.SliceSecondsMid)end end
+ return s
+end
+A.MaxRevealWaits=7200 -- frames: a reveal flag that never clears (a bug elsewhere) must not stop the drawing for ever
 local function createImage(w,h,rgba,name)
  if A.Hooks.Create then return A.Hooks.Create(w,h,rgba,name)end
  local image=game:GetService('AssetService'):CreateEditableImage({Size=Vector2.new(w,h)})
@@ -357,9 +374,15 @@ end
 local function contentOf(image)if A.Hooks.Content then return A.Hooks.Content(image)end;return Content.fromObject(image)end
 local function work()
  worker=true
- local t0=os.clock()
- local function step()if os.clock()-t0>A.SliceSeconds then if A.Hooks.Wait then A.Hooks.Wait()else task.wait()end;t0=os.clock()end end
+ local t0=os.clock();local slice=A.Slice();local waits=0
+ local function wait()if A.Hooks.Wait then A.Hooks.Wait()else task.wait()end end
+ local function step()
+  -- a reveal is playing: no drawing now (it would cost the cinematic its frames); the drawing goes on when it is over
+  if revealing()then while revealing()and waits<A.MaxRevealWaits do waits+=1;wait()end;t0=os.clock();slice=A.Slice()end
+  if os.clock()-t0>slice then wait();t0=os.clock();slice=A.Slice()end
+ end
  while #queue>0 do
+  step()
   local name=table.remove(queue,1);local e=entries[name]
   local ok,value=pcall(function()
    local w,h,rgba=A.Pattern(name,step);assert(w,'unknown image '..tostring(name))
@@ -394,11 +417,18 @@ function A.Allowed()
  if ok and B then local ok2,low=pcall(B.Low);if ok2 and low then return false end end
  return true
 end
--- Some time after the client starts (RarePullCinematic.Bind): every image, a slice a frame.
-A.WarmDelay=15
+-- Some time after the client starts (RarePullCinematic.Bind), once no reveal is running: the planets and the seed's halo (a slice a frame); the rest of A.Order
+-- is drawn when a scene asks for it.
+A.WarmDelay=15;A.WarmRetry=5
+A.WarmOrder={'glow','halo','planet_gas','planet_rock','planet_ring'}
 function A.Warm(delay)
  if not A.Allowed()then return false end
- task.delay(delay or A.WarmDelay,function()A.Request(A.Order)end)
+ local function go()
+  if not A.Allowed()then return end
+  if revealing()then task.delay(A.WarmRetry,go);return end -- (a reveal is playing: not now)
+  A.Request(A.WarmOrder)
+ end
+ task.delay(delay or A.WarmDelay,go)
  return true
 end
 -- Shows image `name` on target (an ImageLabel: ImageContent; a Decal / Texture: TextureContent) once it is ready; returns true when shown
