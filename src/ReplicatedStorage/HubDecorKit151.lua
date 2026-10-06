@@ -88,7 +88,7 @@ K.Streets={
 }
 -- R152: open circles nothing of the dressing may stand in (x, z, radius): the old fountain spot, the south plaza's centre, where the free Void
 -- Pack giveaway pedestal goes. Plain paving only: no trees, benches, lamps, signs or flower beds (HubLifeArt151.Clear refuses it).
-K.Open={{0,-392,18}}
+K.Open={{0,-392,18},{312,-269,7.5},{-312,-269,7.5}} -- (R153: and the two trampolines in the garden nooks, HubTrampolineRules153.Spots)
 K.Discs={{0,-340,30},{0,-392,21},{-118,-159,12},{118,-159,12},{-118,-411,12},{118,-411,12},{-312,-269,13},{312,-269,13},{0,-596,10}}
 
 -- Deterministic randomness: the same seed always gives the same props (every client sees the same square).
