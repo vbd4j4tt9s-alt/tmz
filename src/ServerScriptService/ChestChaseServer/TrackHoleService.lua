@@ -2,6 +2,9 @@
 -- Client (TrackHoleClient) sends only an optional aim point; the server picks the shovel, ground, spacing and owner.
 -- A carrier who steps on an armed hole is ragdolled through the chase service's own Ragdoll and drops the pack
 -- through its public Finish(false,true,run,hit) - the same drop/return path a keeper or bat hit uses.
+-- R153: the catch is SWEPT. Every Heartbeat the whole path of a carrier since the last step (previous root -> root now) is tested against each armed
+-- hole's pit circle (flat) and the height band, so a step of 5,000+ studs cannot skip a hole. Only a teleport (MovementGuard.Reset / a correction bumps
+-- the player's MovementResetSerial), a new run or a new character starts a fresh path.
 local Players=game:GetService('Players')
 local RunService=game:GetService('RunService')
 local RS=game:GetService('ReplicatedStorage')
@@ -158,9 +161,10 @@ function S:_build(hole)
  end
  local at=hole.Position;local lay=CFrame.Angles(0,0,math.pi/2) -- cylinder axis X -> up
  local rimD=C.Diameter+C.RimWidth*2
- -- R149: the rim is .04 thick (was .06), so the pit's top is .04 above the rim's instead of .02 (that flickered far away).
- part('Rim',V3(.04,rimD,rimD),CFrame.new(at+V3(0,.02,0))*lay,SOIL_RIM,Enum.Material.Ground,true)
- local pit=part('Pit',V3(.08,C.Diameter,C.Diameter),CFrame.new(at+V3(0,.04,0))*lay,SOIL_PIT,Enum.Material.SmoothPlastic,true)
+ -- R149: the rim is thinner than the pit so the pit's top stands above the rim's (.02 flickered far away). R153: the hole is 5.1 across, so it is seen from up to
+ -- 300 studs where 4 depth steps are .043: rim top .05 over the floor, pit top .10 (was .04 / .08), every step between the layers > .043.
+ part('Rim',V3(.05,rimD,rimD),CFrame.new(at+V3(0,.025,0))*lay,SOIL_RIM,Enum.Material.Ground,true)
+ local pit=part('Pit',V3(.10,C.Diameter,C.Diameter),CFrame.new(at+V3(0,.05,0))*lay,SOIL_PIT,Enum.Material.SmoothPlastic,true)
  local rng=self.Random
  for i=1,C.CrumbCount do
   local angle=(i/C.CrumbCount)*math.pi*2+rng:NextNumber(-.3,.3)
@@ -238,18 +242,45 @@ function S:_tutorialSafe(player)
  return C.TutorialSafeSteps[tonumber(player:GetAttribute('TutorialStep'))or 0]==true
 end
 
--- Distance from c to segment a-b on the ground plane.
-local function segmentDistance(a,b,c)
- local ab=flat(b-a);local length=ab.Magnitude
- if length<1e-3 then return flat(c-a).Magnitude end
- local t=math.clamp(flat(c-a):Dot(ab)/(length*length),0,1)
- return flat(c-(a+ab*t)).Magnitude
+-- R153: the path a -> b (one step, any length) against the pit circle (cx,cz,r) on the ground plane and the height band [cy+dyMin, cy+dyMax] on
+-- the root's height (it varies linearly along the step). Exact: no sampling, no .Touched. Returns the middle of the part of the path that is inside the
+-- pit and inside the band as t (0 = a, 1 = b), and t where it first goes in; nil when the path never is. Pure numbers (no Vector3 per step).
+function S.Cross(ax,ay,az,bx,by,bz,cx,cy,cz,r,dyMin,dyMax)
+ local dx,dz=bx-ax,bz-az;local fx,fz=ax-cx,az-cz
+ local t0,t1=0,1;local len2=dx*dx+dz*dz
+ if len2<1e-8 then -- standing still
+  if fx*fx+fz*fz>r*r then return nil end
+ else
+  local len=math.sqrt(len2);local ux,uz=dx/len,dz/len
+  local perp=fx*uz-fz*ux                      -- flat distance from the centre to the infinite line
+  if perp>r or perp<-r then return nil end
+  local along=-(fx*ux+fz*uz);local half=math.sqrt(r*r-perp*perp)
+  local s0,s1=along-half,along+half            -- the chord, in studs from a
+  if s1<0 or s0>len then return nil end
+  t0,t1=math.max(s0,0)/len,math.min(s1,len)/len
+ end
+ local dy=by-ay;local lo,hi=cy+dyMin,cy+dyMax
+ if dy<1e-9 and dy>-1e-9 then
+  if ay<lo or ay>hi then return nil end
+ else
+  local u0,u1=(lo-ay)/dy,(hi-ay)/dy;if u0>u1 then u0,u1=u1,u0 end
+  t0,t1=math.max(t0,u0),math.min(t1,u1)
+  if t0>t1 then return nil end
+ end
+ return (t0+t1)*.5,t0
 end
 
-function S:_trap(player,run,hole,root)
+-- at: where the fall happens (nil = the root where it is). A carrier faster than the pit is wide is already past it when the server sees him:
+-- he is put back in the middle of the part of his path inside the pit, so he falls IN the hole (and the pack drops there), at any speed.
+function S:_trap(player,run,hole,root,at)
  local chase=self.Chase
  if run.Finishing or chase.Runs[player]~=run or self.Map.Refreshing or not chase.Ragdoll:CanHit(player)then return false end
  self:_remove(hole,'Trap') -- reserve: one hole traps one carrier
+ local here=root.Position
+ if at and flat(here-hole.Position).Magnitude>C.Diameter/2 then
+  local ok=pcall(function()local c=player.Character;c:PivotTo(CFrame.new(at)*root.CFrame.Rotation*root.CFrame:Inverse()*c:GetPivot())end)
+  if ok then pcall(function()require(script.Parent.MovementGuard).Reset(player)end)end -- a server move: the client resyncs, the speed check restarts
+ end
  local motion=flat(root.AssemblyLinearVelocity or Vector3.zero)
  local direction=motion.Magnitude>1 and motion.Unit or flat(root.CFrame.LookVector)
  direction=direction.Magnitude>.01 and direction.Unit or V3(0,0,-1)
@@ -269,24 +300,42 @@ function S:Step()
   if now>=hole.ExpiresAt or not hole.Owner.Parent then self:_remove(hole,'Expired')end
  end
  self.Last=self.Last or setmetatable({},{__mode='k'})
- if self.Count==0 then table.clear(self.Last);return end
+ local last=self.Last
+ if self.Count==0 then table.clear(last);return end
+ local radius=C.Diameter/2;local dyMin,dyMax=C.TrapHeightMin,C.TrapHeightMax
+ self.StepId=(self.StepId or 0)+1;local stamp=self.StepId
  for player,run in pairs(self.Chase.Runs or{})do
   local character,_,root=self:_character(player)
   if character and run.Character==character and not run.Finishing then
-   local here=root.Position;local last=self.Last[player]
-   if not last or flat(here-last).Magnitude>40 then last=here end -- teleports test only the new spot
-   self.Last[player]=here
-   if not self:_tutorialSafe(player)then
-    for _,hole in pairs(self.Holes)do
-     local dy=here.Y-hole.Position.Y
-     if hole.Owner~=player and now>=hole.ArmedAt and dy>=C.TrapHeightMin and dy<=C.TrapHeightMax
-      and segmentDistance(last,here,hole.Position)<=C.Diameter/2 then
-      if self:_trap(player,run,hole,root)then break end
+   local here=root.Position;local hx,hy,hz=here.X,here.Y,here.Z
+   local rec=last[player]
+   if not rec then rec={};last[player]=rec end
+   rec.Stamp=stamp
+   -- A position that is not a number (NaN / inf) is ignored; the path goes on from the last good one.
+   if finite(hx)and finite(hy)and finite(hz)then
+    -- The path starts where the last step ended: same run, same character, no teleport (MovementResetSerial) in between. Otherwise only here.
+    local serial=player:GetAttribute('MovementResetSerial')
+    local ax,ay,az=hx,hy,hz
+    if rec.Run==run and rec.Character==character and rec.Serial==serial and rec.X then ax,ay,az=rec.X,rec.Y,rec.Z end
+    rec.Run,rec.Character,rec.Serial,rec.X,rec.Y,rec.Z=run,character,serial,hx,hy,hz
+    if not self:_tutorialSafe(player)then
+     -- spatial early-out: the box of the path against the box of each pit; the first hole the path goes into is the one that traps
+     local loX,hiX=math.min(ax,hx)-radius,math.max(ax,hx)+radius
+     local loZ,hiZ=math.min(az,hz)-radius,math.max(az,hz)+radius
+     local best,bestMid,bestIn
+     for _,hole in pairs(self.Holes)do
+      local at=hole.Position
+      if hole.Owner~=player and now>=hole.ArmedAt and at.X>=loX and at.X<=hiX and at.Z>=loZ and at.Z<=hiZ then
+       local mid,enter=S.Cross(ax,ay,az,hx,hy,hz,at.X,at.Y,at.Z,radius,dyMin,dyMax)
+       if mid and(not bestIn or enter<bestIn)then best,bestMid,bestIn=hole,mid,enter end
+      end
      end
+     if best then self:_trap(player,run,best,root,V3(ax+(hx-ax)*bestMid,ay+(hy-ay)*bestMid,az+(hz-az)*bestMid))end
     end
    end
-  else self.Last[player]=nil end
+  end
  end
+ for player,rec in pairs(last)do if rec.Stamp~=stamp then last[player]=nil end end -- not carrying any more: the next run starts a new path
 end
 
 function S:ClearAll()

@@ -29,21 +29,31 @@ check(S.Timer(0,2,360,0/0).Fraction==0,'NaN left is a full interval')
 check(S.ButtonMode(0,false,false,false)=='hidden' and S.ButtonMode(1,false,false,false)=='ready' and S.ButtonMode(0,true,false,false)=='charging'
  and S.ButtonMode(2,true,false,false)=='ready','button mode: hidden / ready / charging (charging only on the treadmill)')
 check(S.ButtonMode(2,true,true,false)=='hidden' and S.ButtonMode(1,false,false,true)=='hidden','the title screen and the open roll window hide the button')
+-- R153: the button shows what the gift pill over the player's head showed (NEXT ... ALMOST THERE! ... ready), same words, same threshold ------------------------------------------------
 local title,sub=S.ButtonLines('ready',S.Timer(1,2,360,100),false)
 check(title=='BONUS ROLL' and sub=='READY!','ready lines')
 title,sub=S.ButtonLines('charging',S.Timer(0,2,360,222),false)
-check(sub=='NEXT 3:42','charging line counts down: '..sub)
+check(title=='BONUS ROLL' and sub=='NEXT 3:42','charging line counts down: '..title..' / '..sub)
+title,sub=S.ButtonLines('charging',S.Timer(0,2,360,341),false)
+check(title=='BONUS ROLL' and sub=='NEXT 5:41','charging: NEXT 5:41 (the owner\'s screenshot)')
 title,sub=S.ButtonLines('charging',S.Timer(0,2,360,24),false)
-check(sub=='ALMOST! 0:24','charging line, last 30 s: '..sub)
+check(title=='ALMOST THERE!' and sub=='0:24','R153: the last 30 s say ALMOST THERE! with the clock: '..title..' / '..sub)
+title,sub=S.ButtonLines('charging',S.Timer(0,2,360,2),false)
+check(title=='ALMOST THERE!' and sub=='0:02','R153: ... down to the last seconds: '..title..' / '..sub)
+check(S.ButtonLines('charging',S.Timer(0,2,360,31),false)=='BONUS ROLL' and S.ButtonLines('charging',S.Timer(0,2,360,30),false)=='ALMOST THERE!' and S.ButtonLines('charging',S.Timer(0,2,360,30.01),false)=='BONUS ROLL',
+ 'R153: the threshold is exactly the gift pill\'s: 30 s (S.AlmostSeconds = '..S.AlmostSeconds..')')
+check(S.AlmostSeconds==30 and S.Timer(0,2,360,30).Caption=='ALMOST THERE!' and S.Timer(0,2,360,222).Caption=='NEXT ROLL','R153: the words come from the same timer the pill used (ALMOST THERE! / NEXT ROLL)')
+title,sub=S.ButtonLines('ready',S.Timer(1,2,360,222),false,true)
+check(title=='BONUS READY!' and sub=='OPEN IT!','R153: a roll completing says BONUS READY! / OPEN IT! (the pill\'s ready pop)')
+check(S.ReadyHold==3,'R153: ... for ReadyHold = 3 s, as the pill did')
+title,sub=S.ButtonLines('ready',S.Timer(2,2,360,222),false)
+check(title=='BONUS ROLL' and sub=='2 ROLLS READY!','R153: at the cap: 2 ROLLS READY! (the pill\'s words)')
 check(select(2,S.ButtonLines('ready',S.Timer(1,2,360,100),true))=='ROLLING...','busy shows ROLLING...')
-local caption,clock=S.BillboardLines(S.Timer(0,2,360,222),false)
-check(caption=='NEXT ROLL' and clock=='3:42','billboard normal lines')
-caption,clock=S.BillboardLines(S.Timer(0,2,360,20),false)
-check(caption=='ALMOST THERE!' and clock=='0:20','billboard almost lines')
-caption,clock=S.BillboardLines(S.Timer(1,2,360,222),true)
-check(caption:find('BONUS READY!')~=nil and clock=='OPEN IT!','billboard ready pop lines')
-caption,clock=S.BillboardLines(S.Timer(2,2,360,222),false)
-check(caption=='2 ROLLS READY!' and clock=='TAP BONUS ROLL','billboard at the cap')
+check(select(2,S.ButtonLines('charging',S.Timer(0,2,360,20),true))=='ROLLING...','busy beats the almost phase too')
+check(S.ButtonPhase('charging',S.Timer(0,2,360,222))=='charging' and S.ButtonPhase('charging',S.Timer(0,2,360,29))=='almost' and S.ButtonPhase('ready',S.Timer(1,2,360,20))=='ready'
+ and S.ButtonPhase('hidden',S.Timer(0,2,360,20))=='hidden' and S.ButtonPhase('charging',nil)=='charging','R153: the phase (charging / almost / ready / hidden) follows the same thresholds')
+check(S.BillboardLines==nil and S.ReadyHold~=nil,'R153: the gift pill\'s own line function is gone (the button has the lines)')
+for _,sec in ipairs({0,1,2,29.5,30})do local t=S.Timer(0,2,360,sec);local a,b=S.ButtonLines('charging',t,false);check(#a<=14 and #b<=5 and a==string.upper(a),'R153: almost lines are short enough for a phone button ('..a..' / '..b..')')end
 -- Reveal ---------------------------------------------------------------------------------------------------------------
 local words,prev={}
 for i,name in ipairs(S.Rarities)do
@@ -71,7 +81,56 @@ check(index==1 and line==S.SpinLines[1],'spin line starts at the first line')
 check(select(2,S.SpinLine(.29))==1 and select(2,S.SpinLine(.3))==2 and select(2,S.SpinLine(.62))==3 and select(2,S.SpinLine(.86))==4 and select(2,S.SpinLine(1))==4,'spin line phases change at .3 / .62 / .86')
 check(select(2,S.SpinLine(-1))==1 and select(2,S.SpinLine(nil))==1 and select(2,S.SpinLine(9))==4,'spin line clamps')
 local distinct={};for _,l in ipairs(S.SpinLines)do distinct[l]=true end
-check(#S.SpinLines==4 and next(distinct)~=nil and S.SpinHint:find('bag')~=nil,'four playful lines and the reassurance hint')
+check(#S.SpinLines==4 and next(distinct)~=nil,'four playful lines')
+-- R153 (owner: "remove this bonus ready bag"): the "Ur pack is already in ur bag!" line under the spin text is gone
+local bagWords=0;for _,l in ipairs(S.SpinLines)do if l:lower():find('bag')or l:lower():find('already')then bagWords+=1 end end
+check(S.SpinHint==nil and bagWords==0,'R153: the spin copy has no "already in ur bag" hint (SpinHint is gone, no spin line mentions the bag)')
+-- R153 Tease: a Secret card on the reel, a few cards before the winner, never the winner itself ----------------------------------------------------
+do
+ local VOID=Rules.Void
+ local function strip(win)local c={};for i=1,46 do c[i]={Stage=1+i%6,Variant='Pack0'..(1+i%4),Filler=i}end;c[win]={Stage=3,Variant='Pack04',Winner=true};return c end
+ local slots={}
+ for k=0,99 do
+  local cards=strip(40);local winner=cards[40];local before={};for i=1,46 do before[i]=cards[i]end
+  local out,slot=S.Tease(cards,40,VOID,function()return k/100 end)
+  check(out==cards and slot~=nil and (slot==37 or slot==36) and slot<40,'Tease: the slot is 3 or 4 cards before the winner ('..tostring(slot)..')')
+  check(cards[40]==winner and winner.Winner==true and winner.Variant=='Pack04','Tease: the winning card is untouched (same table, same pack)')
+  local same=true;for i=1,46 do if i~=slot and cards[i]~=before[i]then same=false end end
+  check(same and cards[slot].Variant==VOID.Variant and cards[slot].Stage==VOID.Stage and cards[slot].Filler==nil,'Tease: exactly one filler became the Void (Secret) pack')
+  slots[slot]=(slots[slot]or 0)+1
+ end
+ check(slots[36]==50 and slots[37]==50,'Tease: both slots get used ('..tostring(slots[36])..' / '..tostring(slots[37])..')')
+ local s2=S.TeaseSlot(40,function()return 0/0 end);local s3=S.TeaseSlot(40,nil);local s4=S.TeaseSlot(40,function()return 7 end);local s5=S.TeaseSlot(40,function()return-3 end)
+ check(s2==37 and s3==37 and s4==36 and s5==37,'Tease: a bad draw (NaN / nil / out of range) still lands on a slot before the winner')
+ for win=1,5 do
+  local c=strip(win);local out,slot=S.Tease(c,win,VOID,function()return .1 end)
+  check(c[win].Winner==true and ((win<4 and slot==nil)or(win>=4 and slot==win-3)),'Tease: a winner too early on the reel gets none (or the only card before it), and is never replaced (win '..win..')')
+ end
+ -- a Secret result: the winner is the Void pack and stays the Void pack; the tease is a second Secret card
+ local cards=strip(40);cards[40]={Stage=VOID.Stage,Variant=VOID.Variant};local w=cards[40];S.Tease(cards,40,VOID,function()return .2 end)
+ check(cards[40]==w,'Tease: a Secret result stays on the winning card')
+ -- the real strip builder: 46 cards, the winner is the server's result, the tease is in
+ local stages={1,2,3};local result={Stage=2,Variant='Pack03'};local n=0
+ for k=1,200 do
+  local seed=k;local draw=function()seed=(seed*1103515245+12345)%2147483648;return seed/2147483648 end
+  local reel=Rules.BuildStrip(stages,result,draw);S.Tease(reel,Rules.Strip.Win,VOID,draw)
+  local secrets=0;for i=1,#reel do if reel[i].Variant==VOID.Variant then secrets+=1 end end
+  if #reel==Rules.Strip.Count and reel[Rules.Strip.Win]==result and secrets>=1 and reel[Rules.Strip.Win].Variant~=VOID.Variant then n+=1 end
+ end
+ check(n==200,'Tease: over 200 reels the strip has 46 cards, at least one Secret, and the winner is the server\'s non-Secret result ('..n..')')
+end
+-- R153: the odds are untouched (the rule tables, byte for byte: frozen.sha256 and run_bonus_ui.sh hold the same lines)
+do
+ local o=Rules.Odds;local want={Pack01=.435,Pack02=.286,Pack03=.172,Pack04=.081,Pack05=.02,Pack06=.005,EclipseReliquary=.001};local same=true
+ for k,v in pairs(want)do if o[k]~=v then same=false end end;for k in pairs(o)do if want[k]==nil then same=false end end
+ check(same and table.concat(Rules.VariantOrder,',')=='Pack01,Pack02,Pack03,Pack04,Pack05,Pack06,EclipseReliquary','R153: the bonus odds table and its order are unchanged (Secret 0.1%)')
+ check(Rules.Void.Variant=='EclipseReliquary' and Rules.Void.Stage==7 and Rules.Void.Name=='Secret' and Rules.Void.Label=='Void Pack','R153: the Secret pack is still the Storm Void Pack')
+ check(Rules.Strip.Count==46 and Rules.Strip.Win==40 and Rules.Strip.Duration==5 and Rules.Strip.ReducedLead==4,'R153: the strip size, the winning slot and the spin timing are unchanged')
+ -- RollPack's outcome for fixed draws (what the server awards) is unchanged: the Secret slice is the last 0.1% of the second draw
+ local function roll(a,b)local seq={a,b};local i=0;return Rules.RollPack({1,2,3,4,5,6,7},function()i+=1;return seq[i]end)end
+ local r1,r2,r3=roll(.0,.0),roll(.5,.9995),roll(.5,.996)
+ check(r1.Variant=='Pack01' and r1.Stage==1 and r2.Variant=='EclipseReliquary' and r2.Stage==7 and r3.Variant=='Pack06','R153: RollPack still decides the same pack for the same draws')
+end
 -- LeftSeconds -------------------------------------------------------------------------------------------------------------
 check(near(S.LeftSeconds(1100,nil,360,1000),100) and S.LeftSeconds(nil,200,360,1000)==200 and S.LeftSeconds(nil,nil,360,1000)==360,'left: DueAt, else saved Left, else a full interval')
 check(S.LeftSeconds(900,nil,360,1000)==0 and S.LeftSeconds(5000,nil,360,1000)==360,'left is clamped to 0..interval')

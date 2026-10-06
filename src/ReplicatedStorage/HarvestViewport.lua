@@ -46,7 +46,7 @@ function V.Attach(view,item)
   if #entries==0 and connection then connection:Disconnect();connection=nil end
  end
  destroy=view.Destroying:Connect(cleanup)
- if not connection then connection=Run.Heartbeat:Connect(step)end
+ if not connection then connection=Run.RenderStepped:Connect(step)end -- (R153: the camera's orbit with the drawn frame; was Heartbeat)
  return cleanup
 end
 return V

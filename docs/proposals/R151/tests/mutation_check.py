@@ -79,7 +79,7 @@ MUTATIONS = [
     ('[timing] a leaving puller does not release the line', SERVER, "self.Players.PlayerRemoving:Connect(function(player)self:_released(player)end)", "self.Players.PlayerRemoving:Connect(function(player)end)", 'test_server'),
     ('[timing] a line is not cancelled by Destroy', SERVER, " for entry in pairs(self.Waiting)do entry.Done=true end\n", "\n", 'test_server'),
     ('[timing] the puller\'s own line is not held on their screen', CLIENT, " local wait=holdFor(e)", " local wait=0", 'test_client'),
-    ('[timing] a held line is written after teardown', CLIENT, "task.delay(wait,function()if not dead then chat(e)end end)", "task.delay(wait,function()chat(e)end)", 'test_client'),
+    ('[timing] a held line is written after teardown', CLIENT, " if dead then return end\n local i=1\n", " local i=1\n", 'test_client'), # (R153: held lines go out through release())
     ('[timing] a held line can wait forever', CLIENT, "local HOLD_MAX=8", "local HOLD_MAX=1e9", 'test_client'),
     # --- [records] hub records through the announcer ------------------------------------------------------------------------------------------------------------------
     ('[records] a fruit record travels to every server when its seed is Secret+', RULES, " if record~='BestPull'then return'InServer'end", " if false then return'InServer'end", 'test_server'),

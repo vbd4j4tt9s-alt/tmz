@@ -3,12 +3,12 @@
 --   Players:CreateHumanoidModelFromDescription(desc, R15)  ->  a rig, which is then
 --     * stripped to what is needed: no scripts; its accessories capped (HubDisplayRules.AvatarAccessories);
 --     * made inert: every part CanCollide / CanTouch / CanQuery off, the HumanoidRootPart anchored (the limbs hang off it through their Motor6Ds, which is what lets a
---       client pose them), the humanoid's name and health bar off (DisplayDistanceType None, HealthDisplayType AlwaysOff); its state machine stays on while it dances (Animate);
+--       client animate them), the humanoid's name and health bar off (DisplayDistanceType None, HealthDisplayType AlwaysOff);
 --     * scaled to AvatarHeight (R152: 25 studs, about 4.7 times a normal avatar; Model:ScaleTo, measured on the body parts alone, so a tall hat does not shrink the body) and stood
---       with its feet on the floor beside the pedestal, turned a little toward it (Place).
--- R152 (owner: "the avatar is sized up and dancing"): Animate (once the rig is in the world) loads one of Roblox's default R15 dance emotes on the rig's Animator, looped, and sets the
---   rig's `AvatarMode` attribute ('dance' | 'pose' | 'static') so the client knows whether to leave its joints to the Animator. Only when that cannot happen (the stand-in has no joints, the animation does not load in DanceWait seconds, the
---   Animator throws) does the avatar get its static pose instead (HubAvatarPose.Apply, in the joints' C0 so it replicates; the client's cheer then moves it a little).
+--       with its feet on the floor beside the pedestal, turned a little toward it (Place; R153: measured in the REST POSE THROUGH ITS JOINTS, see restPose).
+-- R152 (owner: "the avatar is sized up and dancing") played one of Roblox's default R15 dance emotes here, on the server, and waited 5 s for the track's Length: on a real server that
+--   never came (a server need not fetch an animation's data), so the owner's giant stood in the fallback pose. R153: the dance is each CLIENT's (HubDisplayClient plays it on its own
+--   screen, retries, falls back to the pose there). Animate only gets the rig READY for it and sets `AvatarMode` ('dance' | 'pose' | 'static'): see Animate.
 -- If the description or the rig cannot be had (a bad user id, a Studio test player, no network, the service throwing), a blocky stand-in is built from parts (the
 -- same size and pose) and the display is still complete. Build never throws: it returns the model and where it came from ('avatar' | 'fallback').
 -- `players` is injectable (tests pass a mock). Caches are per module instance.
@@ -18,9 +18,8 @@ local Pose=require(RS:WaitForChild('HubAvatarPose'))
 local Av={};Av.__index=Av
 local RGB=Color3.fromRGB
 Av.FailureSeconds=60 -- a user id that failed is not asked about again for this long
--- Roblox's default R15 "dance" emotes (the Animate script's dance1 set): one is picked per user id, so a champion always dances the same one.
-Av.DanceIds={'rbxassetid://507771019','rbxassetid://507771955','rbxassetid://507772104'}
-Av.DanceWait=5       -- seconds a dance may take to load before the avatar stands in its static pose instead
+-- Roblox's default R15 "dance" emotes (the Animate script's dance set; HubDisplayRules.DanceIds): one is picked per user id, so a champion always dances the same one.
+Av.DanceIds=Rules.DanceIds
 function Av.new(opts)
  opts=opts or{}
  return setmetatable({Players=opts.Players,Clock=opts.Clock or os.clock,Cache={},Order={},Failed={},Calls={Describe=0,Create=0}},Av)
@@ -103,6 +102,31 @@ function Av:Fallback(silhouette)
  model.PrimaryPart=torso
  return model
 end
+-- R153 (owner: "not on the ground"): a rig's REST POSE through its joints. Once the rig is in the world its anchored root holds it and every Motor6D puts its Part1 at
+-- Part0 * C0 * C1:Inverse() (no animation); the parts' own CFrames on an unparented rig need not say the same, so the feet are measured (and the parts put) where the joints will
+-- hold them. Returns part -> CFrame for the root and every part a Motor6D chain reaches from it, or nil (no root).
+local function restPose(model)
+ local root=model:FindFirstChild('HumanoidRootPart')
+ if not(root and root:IsA('BasePart'))then return nil end
+ local joints={};for _,j in ipairs(model:GetDescendants())do if j:IsA('Motor6D')and j.Part0 and j.Part1 then joints[#joints+1]=j end end
+ local at={[root]=root.CFrame};local grew=true
+ while grew do
+  grew=false
+  for _,j in ipairs(joints)do
+   if at[j.Part0]and not at[j.Part1]then at[j.Part1]=at[j.Part0]*j.C0*j.C1:Inverse();grew=true
+   elseif at[j.Part1]and not at[j.Part0]then at[j.Part0]=at[j.Part1]*j.C1*j.C0:Inverse();grew=true end
+  end
+ end
+ return at
+end
+Av.RestPose=restPose
+-- The rig's body parts put where their joints hold them at rest (the root stays). Returns how many moved.
+local function settle(model)
+ local at=restPose(model);if not at then return 0 end
+ local n=0
+ for p,cf in pairs(at)do if p.Name~='HumanoidRootPart'and p.CFrame~=cf then p.CFrame=cf;n+=1 end end
+ return n
+end
 -- Stands a model upright: scaled so the body is `height` studs tall, its feet at `feet` (a CFrame: position = where the soles go, rotation = which way it faces; a rig
 -- faces its own -Z, like the display's front), then turned `turn` radians about Y. Works on a rig (ScaleTo + PivotTo) and on the stand-in (parts moved by hand).
 function Av:Place(model,feet,height,turn)
@@ -116,47 +140,62 @@ function Av:Place(model,feet,height,turn)
   end end
   return true
  end
+ pcall(settle,model)
  local lo,hi=bodyBox(model)
  local body=lo and hi-lo or 0
  if body>0 then
   local k=math.clamp(height/body,.2,40)
   local ok=pcall(function()model:ScaleTo(k)end)
   if not ok then return false end
+  pcall(settle,model) -- (ScaleTo scales the joints' offsets too: the rest pose again, at the new size)
   lo,hi=bodyBox(model)
  end
- -- stand the soles on the plinth: pivot at the feet, then lift by how far the lowest body part sits from the model's pivot
+ -- stand the soles on the floor: pivot at the feet, then lift by how far the lowest body part (at rest, through the joints) sits below the model's pivot
  local pivot=model:GetPivot()
  local below=lo and(pivot.Position.Y-lo)or 3
  model:PivotTo(face*CFrame.new(0,below,0))
+ -- (a Humanoid's HipHeight is the floor to its root's bottom: the same height, should anything ever read it)
+ local humanoid=model:FindFirstChildOfClass('Humanoid');local root=model:FindFirstChild('HumanoidRootPart')
+ if humanoid and root and lo then pcall(function()humanoid.HipHeight=math.max(below-root.Size.Y/2,0)end)end
  return true
 end
--- Makes a placed avatar that is in the world dance (call it after parenting: an Animator plays only inside the DataModel). Returns 'dance' | 'pose' | 'static': 'dance' = a looped
--- dance track is playing on the rig's Animator (the Animator is made when the rig has none), 'pose' = it could not, so the static pose is in the joints now (the humanoid's state machine
--- is switched off then: a statue), 'static' = a blocky stand-in or silhouette (no joints; it carries its pose in its parts). Yields up to DanceWait seconds while the dance loads. Never throws.
+-- R153: gets a placed avatar that is in the world READY for the dance each client plays on its own screen (HubDisplayClient), and says how it moves: the rig's `AvatarMode`
+-- attribute and the return value, 'dance' | 'pose' | 'static'.
+--  'dance' = clients dance it: an Animator on its Humanoid (made HERE when there is none, so it exists on every client), every Motor6D enabled and every part a joint moves unanchored
+--            (the root alone is anchored: an anchored limb cannot be moved by its joint), every joint at rest (no pose in C0: a dance on top of a posed C0 would be turned), the
+--            humanoid alive with its state machine OFF (no state, no forces, nothing turns or lifts the root: a statue that an Animator still moves), AutoRotate off, no track
+--            playing on the server (one played here would be a second dance on every screen), and `DanceId` = which of HubDisplayRules.DanceIds (a stable pick per user id).
+--  'pose'  = no humanoid, joints or Animator to dance with, or the rig is not in the world: the static pose goes into the joints' C0 here (it replicates; clients cheer it);
+--  'static' = a blocky stand-in or the silhouette (no joints; it carries its pose in its parts).
+-- Never yields, never throws.
 function Av:Animate(model,userId)
  if typeof(model)~='Instance'then return'static'end
  if model:GetAttribute('Fallback')then model:SetAttribute('AvatarMode','static');return'static'end
  local humanoid=model:FindFirstChildOfClass('Humanoid')
- local track
- if humanoid then
-  pcall(function()
+ local ready=false
+ if humanoid and model.Parent then
+  ready=pcall(function()
+   local moved={};local joints=0
+   for _,j in ipairs(model:GetDescendants())do if j:IsA('Motor6D')and j.Part0 and j.Part1 then
+    joints+=1;moved[j.Part1]=true
+    if j.Enabled==false then j.Enabled=true end
+   end end
+   if joints==0 then error('no joints')end
+   for p in pairs(moved)do if p.Name~='HumanoidRootPart'and p.Anchored then p.Anchored=false end end
+   if humanoid.Health<=0 then humanoid.Health=math.max(tonumber(humanoid.MaxHealth)or 100,1)end
    local animator=humanoid:FindFirstChildOfClass('Animator')
    if not animator then animator=Instance.new('Animator');animator.Parent=humanoid end
-   local id=Av.DanceIds[((tonumber(userId)or tonumber(model:GetAttribute('UserId'))or 0)%#Av.DanceIds)+1]
-   local anim=Instance.new('Animation');anim.Name='HubDance';anim.AnimationId=id;anim.Parent=humanoid
-   track=animator:LoadAnimation(anim)
-   track.Looped=true;track.Priority=Enum.AnimationPriority.Action
-   track:Play()
-   model:SetAttribute('DanceId',id)
+   pcall(function()for _,t in ipairs(animator:GetPlayingAnimationTracks())do t:Stop(0)end end)
+   humanoid.EvaluateStateMachine=false
+   pcall(function()humanoid.AutoRotate=false end)
   end)
  end
- local mode='pose'
- if track then
-  local waited=0
-  while waited<Av.DanceWait and not(track.Length>0)do task.wait(.25);waited+=.25 end
-  if track.Length>0 and track.IsPlaying and model.Parent then mode='dance'else pcall(function()track:Stop()end)end
- end
- if mode~='dance'then
+ local mode
+ if ready then
+  mode='dance'
+  model:SetAttribute('DanceId',Rules.DanceIds[Rules.DanceIndex(tonumber(userId)or tonumber(model:GetAttribute('UserId'))or 0,1)])
+ else
+  mode='pose'
   model:SetAttribute('DanceId',nil)
   pcall(Pose.Apply,model)
   if humanoid then pcall(function()humanoid.EvaluateStateMachine=false end)end

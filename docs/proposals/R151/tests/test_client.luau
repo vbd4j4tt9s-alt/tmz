@@ -15,7 +15,7 @@
 local UW=require('./ui_world');local W,R=UW.W,UW.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
-local Rules=W.module('PullAnnounceRules');local Packs=W.module('SeedPackRules')
+local Rules=W.module('PullAnnounceRules');local Packs=W.module('SeedPackRules');local Canon=W.module('SeedRarity153') -- R153: a line says the seed's fixed chance, whatever the payload's Odds says
 local Players=W.service('Players')
 local me=R.new('Player');me.Name='Me';me.DisplayName='Me D';me.UserId=1000;me.Parent=Players;Players.LocalPlayer=me
 local pg=R.new('PlayerGui');pg.Name='PlayerGui';pg.Parent=me
@@ -105,7 +105,7 @@ do
  check(#chatLog==1 and chatLog[1].Text==Rules.Chat(e)and chatLog[1].Meta=='PullAnnounce151','one chat line, '..tostring(chatLog[1]and chatLog[1].Text))
  check(R.clock==t0,'... at once: the client adds no delay (the server decides when to send it: after the puller\'s reveal)')
  check(chatLog[1].Text:find('<font color="'..hexOf('Mythic')..'">',1,true)==1,'the line is in the Mythic colour '..hexOf('Mythic'))
- check(chatLog[1].Text:find('<b>MYTHIC</b>',1,true)~=nil and chatLog[1].Text:find('🌟',1,true)~=nil and chatLog[1].Text:find('(1/800)',1,true)~=nil,'... the rarity word is bold, with the 🌟 and the odds')
+ check(chatLog[1].Text:find('<b>MYTHIC</b>',1,true)~=nil and chatLog[1].Text:find('🌟',1,true)~=nil and chatLog[1].Text:find('('..Canon.Text(MYTH)..')',1,true)~=nil,'... the rarity word is bold, with the 🌟 and the odds (the seed\'s fixed chance, '..Canon.Text(MYTH)..': the payload said 1/800)')
  check(wellFormed(chatLog[1].Text),'... and it is well formed rich text')
  check(#oldChat==0,'the old chat is not used when RBXGeneral works (one line, not two)')
  seconds(10);check(#chatLog==1,'nothing more appears later (no second line, no repeat)')
@@ -133,7 +133,7 @@ do
  seconds(10)
  local g=pull(SEC,{Kind='Global',Odds=1000});local ge=eventOf(g);send(g)
  local gl=chatLog[#chatLog].Text
- check(gl==Rules.Chat(ge)and gl:find('<font color="'..Rules.Hex(Rules.Gold)..'">',1,true)==1 and gl:find('🌐',1,true)~=nil and gl:find('</b> ',1,true)~=nil and gl:find('(1/1,000)!',1,true)~=nil and wellFormed(gl),'another server: gold, "🌐 ... pulled a SECRET ... (1/1,000)!" ('..gl..')')
+ check(gl==Rules.Chat(ge)and gl:find('<font color="'..Rules.Hex(Rules.Gold)..'">',1,true)==1 and gl:find('🌐',1,true)~=nil and gl:find('</b> ',1,true)~=nil and gl:find('('..Canon.Text(SEC)..')!',1,true)~=nil and wellFormed(gl),'another server: gold, "🌐 ... pulled a SECRET ... ('..Canon.Text(SEC)..')!" ('..gl..')')
  -- a record: amber
  local r={Kind='Record',Id='rec-1',UserId=3000,Name='Rex',Record='BestPull',SeedId=KING,Odds=5e6};send(r)
  local rl=chatLog[#chatLog].Text

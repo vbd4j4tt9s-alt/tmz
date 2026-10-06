@@ -416,7 +416,7 @@ A.Layout={
   {230,-248,'desert'},{280,-288,'desert'},{-230,-249,'ember'},{-280,-289,'ember'},
  },
  beds={{60,-196,5.5,'warm'},{-60,-196,5.5,'cool'},{36,-250,3.5,'warm',4.2},{-36,-250,3.5,'cool',4.2},{36,-300,3.5,'cool',4.2},{-36,-300,3.5,'warm',4.2},
-  {118,-159,4,'warm',4.26},{-118,-159,4,'cool',4.26},{118,-411,4,'cool',4.26},{-118,-411,4,'warm',4.26},{312,-269,4,'desert',4.26},{-312,-269,4,'lava',4.26},{0,-596,3.5,'snow',4.26}},
+  {118,-159,4,'warm',4.26},{-118,-159,4,'cool',4.26},{118,-411,4,'cool',4.26},{-118,-411,4,'warm',4.26},{0,-596,3.5,'snow',4.26}}, -- (R153: the two garden nooks' beds went with their benches: a trampoline stands there)
  topiary={{49,-236,'cone',true},{-49,-236,'cone',true},{49,-308,'ball',true},{-49,-308,'ball',true},{16,-170,'ball'},{-16,-170,'ball'},{322,-284,'cone'},{-322,-284,'cone'}},
  lamps={
   {106,-190,'post'},{106,-240,'post',true},{106,-290,'post'},{106,-340,'post',true},{106,-390,'post'},
@@ -426,8 +426,7 @@ A.Layout={
   {30,-400,'post'},{-30,-400,'post'},{140,-257,'post'},{-140,-257,'post'},
   {200,-279,'bollard'},{260,-259,'bollard'},{-200,-279,'bollard'},{-260,-259,'bollard'},
  },
- benches={ -- (R152: the four benches round the fountain are gone with it)
-  {306,-258,0,'garden'},{306,-280,math.pi,'garden'},{-306,-258,0,'garden'},{-306,-280,math.pi,'garden'},
+ benches={ -- (R152: the four benches round the fountain are gone with it; R153: so are the two pairs at the garden nooks, where the trampolines stand)
   {75,-200,math.pi/2,'wood'},{-75,-200,-math.pi/2,'wood'},{44,-275,math.pi/2,'garden'},{-44,-275,-math.pi/2,'garden'},{0,-588,math.pi,'stone'}},
  bunting={{{-15.4,17.4,-200},{15.4,17.4,-228},'rainbow'},{{15.4,17.4,-200},{-15.4,17.4,-228},'rainbow'},
   {{55,17.4,-236},{22,23,-250},'candy'},{{-55,17.4,-236},{-22,23,-250},'candy'},{{55,17.4,-308},{22,23,-287},'candy'},{{-55,17.4,-308},{-22,23,-287},'candy'}},

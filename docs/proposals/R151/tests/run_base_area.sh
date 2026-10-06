@@ -15,6 +15,9 @@
 #                         trees, the 18-stud plaza circle at (0, -392) clear, the chess-rook battlement (218 evenly spaced merlons, a corner merlon,
 #                         nothing else over the wall top, none near tower height) and the rook gate (stepped base, tapering shaft, ring, collar,
 #                         flared crown, 8 merlons each; crenellated gatehouse with the sign and the 7 keys).
+#                         R153 (section 17): the garden spurs are plain street-coloured cobblestone - no welcome mats, no ground part in a base
+#                         colour, every curb neutral cream (bar the 4 garden-walk edgings), nothing laid on or beside a spur, and the street curbs
+#                         meet each spur flush (no bare lawn between a curb end and a spur).
 #  test_hub_trees.luau  - run_hub_trees.sh: the owner's studded tree models (load routes, scripts stripped, collision off, budget, fit).
 #  z-fighting           - the R151 scene check (preview/check_base_area_zfight.py, the R149 detector) on the full built hub WITH the client
 #                         props, once with the part-built studded trees and once with the stand-in tree models (no counted finding with

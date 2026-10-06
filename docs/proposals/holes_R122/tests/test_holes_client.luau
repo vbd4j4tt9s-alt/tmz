@@ -3,6 +3,8 @@
 -- passthrough), DigSoundVariants (Pick / Resolve / Detect / segment playback), DigSoundAnalyzer (Run on a mocked
 -- AudioPlayer + AudioAnalyzer, Report). Run from a folder holding roblox.luau, world.luau, rs_bundle.luau (see run.sh).
 -- R149: the dirt bursts start / land on the keyboard's key tops where the keyboard is drawn (KeyboardSurface149), at the floor elsewhere (3b).
+-- R153: the tip (section 2) shows when the shovel is pulled out, anywhere, the first 3 times of a session, and says the shovel removes plants too;
+-- the dig animation grows the replicated hole back to its configured (1.5x bigger) size and the dirt lands around the bigger rim (section 3).
 local W=require('./world');local R=W.R
 local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -88,16 +90,24 @@ check(#fired==4,'no request without the shovel equipped')
 shovel.Parent=char;me:SetAttribute('ChestChaseSeedCarrying',true);frames(10);click()
 check(#fired==4,'no request while carrying a pack');me:SetAttribute('ChestChaseSeedCarrying',false)
 
--- 2. Tip (R124): one fading notice when the shovel comes out on the track; no permanent hint line; not repeated within 30 s.
+-- 2. Tip (R124, R153): one fading notice when the shovel is pulled out (garden or track), the first HintTimes pull-outs of a session; it says the shovel
+-- removes plants too. A pull-out while the last tip is still on screen shows nothing and is not counted. No permanent hint line.
 local HC=W.module('TrackHoleConfig')
-check(#tips==1 and tips[1].Text==HC.Hint and tips[1].Duration==HC.HintSeconds and HC.Hint:find('trap',1,true)~=nil,'tip shown once on the track: '..tostring(tips[1]and tips[1].Text))
+check(#tips==1 and tips[1].Text==HC.Hint and tips[1].Duration==HC.HintSeconds,'tip shown when the shovel is pulled out (on the track): '..tostring(tips[1]and tips[1].Text))
+check(HC.Hint:find('trap',1,true)~=nil and HC.Hint:find('remove',1,true)~=nil and HC.Hint:find('plant',1,true)~=nil,'the tip says dig holes to trap players AND tap a plant to remove it')
+check(utf8.len(HC.Hint)<=90 and HC.HintSeconds>=4 and HC.HintSeconds<=6 and HC.HintTimes==3,'short (<= 90 chars), 4 - 6 s on screen, 3 times per session: '..utf8.len(HC.Hint)..' chars')
 check(pg:GetAttribute('ShovelHint')==nil,'no permanent hint line')
-root.CFrame=CF(0,3,-40);frames(10);root.CFrame=CF(0,3,100);frames(10)
-check(#tips==1,'leaving and re-entering within 30 s does not repeat the tip')
-root.CFrame=CF(0,3,-40);frames(10);R.advance(31);root.CFrame=CF(0,3,100);frames(10)
-check(#tips==2,'tip shown again after 30 s')
-shovel.Parent=nil;frames(10);R.advance(31);frames(10);check(#tips==2,'no tip without the shovel')
-shovel.Parent=char;frames(10);check(#tips==3,'tip when the shovel comes out on the track')
+local function pull(wait)shovel.Parent=nil;frames(10);R.advance(wait or 9);shovel.Parent=char;frames(10)end
+pull(1);check(#tips==1,'pulling it out again while the tip is still on screen (1 s later) shows nothing')
+root.CFrame=CF(0,3,-40);frames(10)
+pull();check(#tips==2,'2nd pull-out (in the garden, 9 s later) shows the tip again: the quick one above was not counted')
+root.CFrame=CF(0,3,100);frames(10)
+pull();check(#tips==3,'3rd pull-out (on the track) shows it again')
+pull();check(#tips==3,'4th pull-out: not shown (3 per session)')
+R.advance(3600);pull();check(#tips==3,'...not an hour later either (per session, not per hour)')
+shovel.Parent=nil;frames(10);R.advance(31);frames(10);check(#tips==3,'no tip without the shovel')
+check(tips[2].Text==HC.Hint and tips[3].Text==HC.Hint and tips[3].Duration==HC.HintSeconds,'every shown tip is the same fading line')
+shovel.Parent=char;frames(10)
 if okGarden then
  local label=pg:FindFirstChild('GardenShovelUI')and pg.GardenShovelUI:FindFirstChild('ShovelFeedback')
  frames(10);check(label and label.Text=='','shovel feedback line stays empty on the track')
@@ -105,14 +115,24 @@ end
 
 -- 3. Effects: dig grows the replicated hole and plays a dig variant at the hole
 local model=R.new('Model');model.Name='TrackHole_9';model.Parent=holesFolder
-local pit=R.new('Part');pit.Name='Pit';pit.Size=V3(.08,3.4,3.4);pit.CFrame=CF(0,0,100);pit.Parent=model;model.PrimaryPart=pit
-local crumb=R.new('Part');crumb.Name='Crumb';crumb.CFrame=CF(2,0,100);crumb.Parent=model
+-- (the server's hole: pit Diameter across, rim a RimWidth wider all round, crumbs outside it)
+local pit=R.new('Part');pit.Name='Pit';pit.Size=V3(.08,HC.Diameter,HC.Diameter);pit.CFrame=CF(0,0,100);pit.Parent=model;model.PrimaryPart=pit
+local rimD=HC.Diameter+2*HC.RimWidth
+local rimPart=R.new('Part');rimPart.Name='Rim';rimPart.Size=V3(.04,rimD,rimD);rimPart.CFrame=CF(0,0,100);rimPart.Parent=model
+local crumb=R.new('Part');crumb.Name='Crumb';crumb.CFrame=CF(rimD/2+.5,0,100);crumb.Parent=model
 local before=#sounds
+-- the dig animation ("preview"): the pit and the rim open from a quarter to the configured size and stop exactly there; the crumbs go back to where they were
+local grew={}
+local Tween0=W.service('TweenService');local create0=Tween0.Create
+Tween0.Create=function(self,obj,info,props)if props.Size and(obj==pit or obj==rimPart)then grew[obj]={From=obj.Size,To=props.Size}end;return create0(self,obj,info,props)end
 holeRemote.OnClientEvent:Fire({Kind='Dig',Id=9,Position=V3(0,0,100),OwnerUserId=7})
+Tween0.Create=create0
+check(grew[pit]and near(grew[pit].To.Y,HC.Diameter)and near(grew[pit].To.Z,HC.Diameter)and near(grew[pit].From.Y,HC.Diameter*.25)
+ and grew[rimPart]and near(grew[rimPart].To.Y,rimD)and near(grew[rimPart].From.Z,rimD*.25),'dig animation: pit and rim open from 1/4 to exactly the configured size ('..HC.Diameter..' / '..rimD..')')
 local digSound=sounds[#sounds]
 check(#sounds==before+1 and digSound.SoundId==W.module('TrackHoleConfig').DigSound.Id and digSound.IsPlaying,'dig plays the dig recording')
 check(digSound.Parent and near(digSound.Parent.Position.Z,100)and digSound.SoundGroup~=nil,'positional at the hole, routed through AudioMixer')
-check(near(pit.Size.Y,3.4),'hole grows back to full size')
+check(near(pit.Size.Y,HC.Diameter)and near(pit.Size.Z,HC.Diameter)and near(pit.Size.X,.08)and near(rimPart.Size.Y,rimD),'hole grows back to full size (the drawn pit = Config.Diameter)')
 holeRemote.OnClientEvent:Fire({Kind='Cover',Id=9,Position=V3(0,0,100),OwnerUserId=7})
 check(#sounds==before+2 and sounds[#sounds].PlaybackSpeed<1,'cover uses the variant player, lower pitch')
 holeRemote.OnClientEvent:Fire({Kind='Trap',Id=9,Position=V3(0,0,100)})
@@ -163,6 +183,11 @@ do
   local list=dirt(kind,FLOOR)
   check(#list==counts[kind]and lowest(list)>=top0-1e-6,kind..' on the keyboard: every chunk starts, peaks and lands at or above the resting key top ('..string.format('%.3f',lowest(list))..' >= '..string.format('%.3f',top0)..')')
   check(dirtAt(list,top0),kind..' on the keyboard: the same burst, moved up by the key rise (start '..string.format('%.2f',top0+.2)..')')
+ end
+ do -- R153: the toss lands around the bigger hole: outside the pit, no more than 1.4 studs from its edge
+  local list=dirt('Dig',FLOOR);local lo,hi=math.huge,0
+  for _,d in ipairs(list)do local rr=math.sqrt((d.Land.X-FLOOR.X)^2+(d.Land.Z-FLOOR.Z)^2);lo=math.min(lo,rr);hi=math.max(hi,rr)end
+  check(#list>0 and lo>=HC.Diameter/2-1e-6 and hi<=HC.Diameter/2+1.4+1e-6,string.format('dirt lands %.2f .. %.2f studs from the centre (pit edge %.2f, within 1.4 of it)',lo,hi,HC.Diameter/2))
  end
  check(dirtAt(dirt('Dig',V3(100,FL,100)),FL),'beside the 180-wide keyboard (x = 100) the dirt stays at the floor')
  check(dirtAt(dirt('Dig',V3(0,top0+1,100)),top0+1),'a surface already above the key tops is not lowered')

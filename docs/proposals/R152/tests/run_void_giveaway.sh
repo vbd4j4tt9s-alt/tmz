@@ -208,7 +208,8 @@ mutate "the chime is not played" $CLI " if Audio then pcall(Audio.Play,'GemClaim
 mutate "no spark burst" $CLI "  if fx and not reduced()then pcall(function()fx.Nebula:Emit(16);fx.Stars:Emit(28)end)end" "" client
 mutate "a removed pedestal keeps its pack" $CLI " dropPack(entry);if entry.Gui then entry.Gui:Destroy()end" " if entry.Gui then entry.Gui:Destroy()end" client
 mutate "the sign is built before its anchor exists" $CLI " if entry.SignAnchor and not(entry.Gui and entry.Gui.Parent)then buildSign(entry)end" " if not(entry.Gui and entry.Gui.Parent)then buildSign(entry)end" client
-mutate "tier 2 steps the pack every frame" $CLI "if tierNow>=3 or entry.Owed>=STEP_LOW-.004 then" "if true then" client
+mutate "tier 2 steps the pack every frame out of view" $CLI "if tierNow>=3 or entry.Owed>=STEP_LOW-.004 or inView(entry)then" "if true then" client
+mutate "tier 2 steps at 30 Hz in view (R153)" $CLI "if tierNow>=3 or entry.Owed>=STEP_LOW-.004 or inView(entry)then" "if tierNow>=3 or entry.Owed>=STEP_LOW-.004 then" client
 mutate "the 30 Hz step loses the time it skipped" $CLI "local step=entry.Owed;entry.Owed=0" "local step=dt;entry.Owed=0" client
 mutate "the Highlight is on every tier" $CLI "PackFx.Create(r,tierNow,tierNow<3)" "PackFx.Create(r,tierNow)" client
 mutate "the main script starts it unguarded" ServerScriptService/ChestChaseServerMain.server.lua "pcall(function()require(modules.VoidGiveaway152).new(" "(function()require(modules.VoidGiveaway152).new(" wiring

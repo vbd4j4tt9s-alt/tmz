@@ -66,14 +66,31 @@ function PlayerDataService:_disconnectStatLinks(player)
  for _,link in pairs(links.Values)do disconnectStat(link)end
  links.Destroying:Disconnect()
 end
-local function rawStat(self,player,name,class,default,priority)
- local folder=statFolder(player,'ChestChaseStats');local leader=statFolder(player,'leaderstats')
+local function statLinks(self,player)
  self.StatLinks=self.StatLinks or{}
  local links=self.StatLinks[player]
  if not links then
   links={Values={}};self.StatLinks[player]=links
   links.Destroying=player.Destroying:Connect(function()self:_disconnectStatLinks(player)end)
  end
+ return links
+end
+-- The player-list cell: a StringValue tagged ChestChaseDisplayStat (never read back as progress) with its Priority (the higher number shows first: Speed 2, Cash 1, Gems 0).
+local function displayStat(leader,name,priority)
+ local display=leader:FindFirstChild(name)
+ if display and not display:IsA('StringValue')then display:Destroy();display=nil end
+ if not display then display=Instance.new('StringValue');display.Name=name;display.Parent=leader end
+ display:SetAttribute('ChestChaseDisplayStat',true)
+ local order=display:FindFirstChild('Priority')
+ if order and not order:IsA('NumberValue')then order:Destroy();order=nil end
+ if not order then order=Instance.new('NumberValue');order.Name='Priority';order.Parent=display end
+ order.Value=priority
+ local primary=display:FindFirstChild('IsPrimary');if primary and primary:IsA('BoolValue')then primary.Value=false end
+ return display
+end
+local function rawStat(self,player,name,class,default,priority)
+ local folder=statFolder(player,'ChestChaseStats');local leader=statFolder(player,'leaderstats')
+ local links=statLinks(self,player)
  local previous=links.Values[name];local value=folder:FindFirstChild(name)
  if not value and previous and previous.Raw then value=previous.Raw;value.Parent=folder end
  if not value then
@@ -88,15 +105,7 @@ local function rawStat(self,player,name,class,default,priority)
   end
  end
  if not value then value=Instance.new(class);value.Name=name;value.Value=default;value.Parent=folder end
- local display=leader:FindFirstChild(name)
- if display and not display:IsA('StringValue')then display:Destroy();display=nil end
- if not display then display=Instance.new('StringValue');display.Name=name;display.Parent=leader end
- display:SetAttribute('ChestChaseDisplayStat',true)
- local order=display:FindFirstChild('Priority')
- if order and not order:IsA('NumberValue')then order:Destroy();order=nil end
- if not order then order=Instance.new('NumberValue');order.Name='Priority';order.Parent=display end
- order.Value=priority
- local primary=display:FindFirstChild('IsPrimary');if primary and primary:IsA('BoolValue')then primary.Value=false end
+ local display=displayStat(leader,name,priority)
  if not previous or previous.Raw~=value or previous.Display~=display then
   if previous then disconnectStat(previous)end
   local link={Raw=value,Display=display,Connections={}};links.Values[name]=link
@@ -119,6 +128,27 @@ function PlayerDataService:GetOrCreateCashValue(player)
 end
 function PlayerDataService:GetOrCreateSpeedValue(player)
  return rawStat(self,player,'Speed','StringValue',self.Config.NormalizeSpeedStat(self.Config.DefaultSpeed),2)
+end
+
+-- R153: the Gems column (after Cash). Display only: never read back, never saved, no raw object. Premium.Gems stays the balance; PublishPremium sets the Gems attribute after every
+-- gain and spend (money auto-collect, quests, shop, converter, passes, owner command) and the cell follows that attribute. The link lives in StatLinks, so leaving cleans it up.
+function PlayerDataService:GetOrCreateGemsDisplay(player)
+ local links=statLinks(self,player);local display=displayStat(statFolder(player,'leaderstats'),'Gems',0)
+ local previous=links.Values.Gems
+ if previous and previous.Display==display then return display end
+ if previous then disconnectStat(previous)end
+ local link={Display=display,Connections={}};links.Values.Gems=link
+ local function update()
+  if self.StatLinks[player]~=links or links.Values.Gems~=link then return end
+  local text=require(game:GetService('ReplicatedStorage').CashNumbers).PlayerList(player:GetAttribute('Gems'))
+  if display.Value~=text then display.Value=text end
+ end
+ local function unbind()
+  if links.Values.Gems==link then links.Values.Gems=nil end
+  disconnectStat(link)
+ end
+ link.Connections={player:GetAttributeChangedSignal('Gems'):Connect(update),display.Destroying:Connect(unbind)}
+ update();return display
 end
 
 function PlayerDataService:AddSpeed(player,amount)
@@ -304,6 +334,7 @@ end
 function PlayerDataService:PreparePlayer(player)
 	self:GetOrCreateSpeedValue(player)
 	self:GetOrCreateCashValue(player)
+	self:GetOrCreateGemsDisplay(player) -- R153
 	self:GetOrCreateLootInventory(player)
 	self:GetOrCreateDiscoveredLoot(player)
 	self:GetOrCreateDiscoveredSeeds(player)
@@ -904,6 +935,7 @@ function PlayerDataService:Load(player)
         local config=require(game:GetService('ReplicatedStorage'):WaitForChild('SettingsConfig'))
         local mix=config.Read(premium.Settings)
         for key,attribute in pairs(config.AudioAttributes)do player:SetAttribute(attribute,mix[key])end
+        for key,attribute in pairs(config.ToggleAttributes or{})do player:SetAttribute(attribute,mix[key])end -- R153: "Skip pack animations" for the reveal
     end)
     if not premium.Tutorial then premium.Tutorial={Version=1,Mask=0,Done=storedData~=nil}end
     local garden, gardenError = self:DecodeGarden(type(storedData) == "table" and storedData.Garden or nil)

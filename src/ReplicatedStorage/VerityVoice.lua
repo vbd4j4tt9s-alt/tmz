@@ -44,8 +44,24 @@ function M.Begin(lip,cfg)lip.Peak=cfg.Floor;lip.Seen=false;lip.Age=0 end
 --    engine could not measure the sound: not loaded, muted by the platform...) for as long as `playing` lasts.
 --  * Rising is fast (cfg.Attack a second), falling slower (cfg.Release); once the voice has stopped it falls smoothly and snaps to exactly
 --    0 below .004, so whatever the Level drives goes back to rest exactly.
-function M.Step(lip,cfg,loudness,dt,playing)
- dt=finite(dt)and math.clamp(dt,0,.1)or 1/60
+-- R153 (owner: "fix all jittery type effects"): Bounce, what her hop and swell follow, trails Level through a critically damped spring (M.BounceRate
+-- a second going up, M.BounceFall coming down). PlaybackLoudness is a noisy reading that changes every few frames; the fast-rising Level jumped
+-- with each reading and turned sharply at each peak, so her hop buzzed. Bounce's speed changes smoothly (no kinks), it trails Level by a frame
+-- or so, never leaves the range Level went through (a weighted average of past levels) and settles exactly at 0 with Level.
+M.BounceRate,M.BounceFall=120,200
+local function follow(lip,dt)
+ local x,v=lip.Bounce or 0,lip.BounceSpeed or 0;local w=lip.Level<x and M.BounceFall or M.BounceRate
+ local e=x-lip.Level;local k=math.exp(-w*dt);local t=(v+w*e)*dt
+ x=lip.Level+(e+t)*k;v=(v-w*t)*k
+ if lip.Level==0 and x<.004 then x,v=0,0 end
+ lip.Bounce,lip.BounceSpeed=math.clamp(x,0,1),v
+end
+-- The value her pose is drawn from (0..1), and whether anything about her still moves.
+function M.Bounce(lip)return lip.Bounce or lip.Level end
+function M.Moving(lip)return lip.Level>0 or(lip.Bounce or 0)>0 end
+-- Back to rest at once (the voice was torn down).
+function M.Rest(lip)lip.Level=0;lip.Bounce=0;lip.BounceSpeed=0 end
+local function step(lip,cfg,loudness,dt,playing)
  if not playing then
   lip.Level=lip.Level*math.exp(-cfg.Release*dt)
   if lip.Level<.004 then lip.Level=0 end
@@ -69,6 +85,11 @@ function M.Step(lip,cfg,loudness,dt,playing)
  lip.Level+=(target-lip.Level)*(1-math.exp(-rate*dt))
  if lip.Level<.004 and target==0 then lip.Level=0 end
  return lip.Level
+end
+function M.Step(lip,cfg,loudness,dt,playing)
+ dt=finite(dt)and math.clamp(dt,0,.1)or 1/60
+ local level=step(lip,cfg,loudness,dt,playing);follow(lip,dt)
+ return level
 end
 
 -- Her body on a ball of diameter D (any scale) at voice level `level` (0..1 from Step; NaN / nil / negative read as 0, above 1 as 1):

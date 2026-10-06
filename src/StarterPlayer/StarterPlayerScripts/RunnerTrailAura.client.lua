@@ -17,7 +17,9 @@ local function graphicsLevel()
  local ok,level=pcall(function()return UserSettings():GetService('UserGameSettings').SavedQualityLevel.Value end)
  return ok and level or nil
 end
-local heartbeat=RunService.Heartbeat:Connect(function(dt)
+-- R153 (owner: "fix all jittery type effects"): the step runs in RenderStepped (was Heartbeat), every rendered frame: the head pieces' orbits,
+-- the swirls and the colour shimmer move with the frame that is drawn.
+local render=RunService.RenderStepped:Connect(function(dt)
  scan+=dt
  if scan>=.25 then
   scan=0
@@ -26,4 +28,4 @@ local heartbeat=RunService.Heartbeat:Connect(function(dt)
  fx:Step(dt,os.clock())
 end)
 local removing=Players.PlayerRemoving:Connect(function(player)fx:Release(player)end)
-script.Destroying:Connect(function()heartbeat:Disconnect();removing:Disconnect();fx:Destroy()end)
+script.Destroying:Connect(function()render:Disconnect();removing:Disconnect();fx:Destroy()end)

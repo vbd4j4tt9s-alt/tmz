@@ -15,7 +15,7 @@ local Rules,me=C.Rules,C.Me
 local Style=W.module('TreadmillBonusStyle');local Mixer=W.module('AudioMixer')
 local SS=W.service('SoundService')
 local audio=UW.audio
-local button,panel,hud,bar=C.Button,C.Overlay.Panel,C.Hud,C.Bar
+local button,panel,hud=C.Button,C.Overlay.Panel,C.Hud
 local function plays(from,namePattern)
  local out={};for i=from,#audio.Plays do local p=audio.Plays[i];if not namePattern or p.Name:find(namePattern)then out[#out+1]=p end end;return out
 end
@@ -70,7 +70,7 @@ local clockBefore=R.clock
 C.set('Ready',1) -- no frame has run yet
 local cue=plays(mark,'^Reveal_')
 check(#cue==1 and cue[1].Name=='Reveal_Note' and cue[1].Loaded,'a roll becoming ready: one bright note ('..#cue..(cue[1]and(' '..cue[1].Name)or'')..')')
-check(R.clock==clockBefore and #hud.Fx:GetChildren()==8 and #bar.Fx:GetChildren()==8 and bar.Back.Caption.Text:find('BONUS READY')~=nil,'...on the same frame as the button sparkles (8), the timer sparkles (8) and "BONUS READY!"')
+check(R.clock==clockBefore and #hud.Fx:GetChildren()==8 and button.Face.Title.Text=='BONUS READY!' and button.Face.Sub.Text=='OPEN IT!','...on the same frame as the button sparkles (8) and "BONUS READY! / OPEN IT!" on the button (R153: the head pill is gone)')
 check(cue[1].Group and cue[1].Group.Name=='GardenEffects','the cue goes through the Effects group')
 check(cue[1].Pitch>1.2,'the first ready note is bright ('..cue[1].Pitch..')')
 UW.seconds(.3,1/60)

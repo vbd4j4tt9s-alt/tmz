@@ -365,6 +365,7 @@ resetState();frames(5)
 for _,stage in ipairs({8,9})do
  local h,e=gemView(pillOf(gui,stage,'half')),gemView(pillOf(gui,stage,'end'))
  check(h.Gems==Tuning.HalfwayGems and h.Amount=='+'..Tuning.HalfwayGems and e.Gems==Tuning.CompletionGems[stage]and e.Amount=='+'..Tuning.CompletionGems[stage],'category '..stage..': the gems are BalanceValues81 (halfway '..tostring(h.Gems)..', completion '..tostring(e.Gems)..')')
+ check(h.Amount=='+5'and e.Amount=='+50','R153: category '..stage..' shows the halved gems: halfway +5, completion +50 ('..h.Amount..' / '..e.Amount..')')
  check(not h.Active and not e.Active and not h.Ready and not e.Ready and not h.Claimed and not e.Claimed,'category '..stage..': nothing claimable yet')
 end
 check(src:find('tuning.CompletionGems[stage]',1,true)~=nil and src:find('tuning.HalfwayGems',1,true)~=nil and not src:find("'+100'",1,true)and not src:find('gems=100',1,true),'(source: the amounts are read from BalanceValues81 for the row\'s own category, not written into the Index)')

@@ -25,4 +25,36 @@ table.insert(connections,player:GetAttributeChangedSignal('UpgradeBoughtSerial')
 table.insert(connections,player:GetAttributeChangedSignal('UpgradeRefusedSerial'):Connect(function()Audio.Play('Denied')end))
 -- R152 (owner: "the treadmill, no sound effects ... remove that whirring sound"): treadmills are silent. R150 clicked Equip when you stepped onto one
 -- (the same cue as the hotbar's); the speed-gain popups are silent too. Also gone: the click as a prompt's hold begins (the finish has its own cue).
-script.Destroying:Connect(function()for _,c in ipairs(connections)do c:Disconnect()end end)
+-- R153 (owner: "fix all jittery type effects"): the garden upgrade buttons' press, drawn here every frame (the server stamps PressedAt153; it used to
+-- tween the cap itself, replicated in network-rate steps): the cap sinks .35 studs in .10 s (quad out), holds, and comes back in .16 s from .12 s.
+-- One RenderStepped only while a press plays near the camera (200 studs); the server's cap never moves.
+local CS=game:GetService('CollectionService');local Run=game:GetService('RunService')
+local presses,capLinks,pressConn={},{},nil
+local function out(u)u=math.clamp(u,0,1);return 1-(1-u)*(1-u)end
+local function pressDepth(t)return t<.12 and .35*out(t/.10)or .35*(1-out((t-.12)/.16))end
+local function pressStep()
+ local now=workspace:GetServerTimeNow()
+ for cap,at in pairs(presses)do
+  local home=cap:GetAttribute('PressHome153');local t=now-at
+  if not cap.Parent or typeof(home)~='CFrame'or t>=.28 or t<-.5 then
+   presses[cap]=nil;if cap.Parent and typeof(home)=='CFrame'then cap.CFrame=home end
+  else cap.CFrame=home*CFrame.new(0,-pressDepth(math.max(0,t)),0)end
+ end
+ if not next(presses)and pressConn then pressConn:Disconnect();pressConn=nil end
+end
+local function watchCap(cap)
+ if capLinks[cap]then return end
+ capLinks[cap]=cap:GetAttributeChangedSignal('PressedAt153'):Connect(function()
+  local at=cap:GetAttribute('PressedAt153');local camera=workspace.CurrentCamera
+  if type(at)~='number'or(camera and(camera.CFrame.Position-cap.Position).Magnitude>200)then return end
+  presses[cap]=at;if not pressConn then pressConn=Run.RenderStepped:Connect(pressStep)end
+ end)
+end
+for _,cap in ipairs(CS:GetTagged('GardenUpgradeCap153'))do watchCap(cap)end
+table.insert(connections,CS:GetInstanceAddedSignal('GardenUpgradeCap153'):Connect(watchCap))
+table.insert(connections,CS:GetInstanceRemovedSignal('GardenUpgradeCap153'):Connect(function(cap)local c=capLinks[cap];if c then c:Disconnect();capLinks[cap]=nil end;presses[cap]=nil end))
+script.Destroying:Connect(function()
+ for _,c in ipairs(connections)do c:Disconnect()end
+ for _,c in pairs(capLinks)do c:Disconnect()end;table.clear(capLinks)
+ if pressConn then pressConn:Disconnect();pressConn=nil end
+end)

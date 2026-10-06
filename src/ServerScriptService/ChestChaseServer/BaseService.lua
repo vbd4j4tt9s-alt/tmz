@@ -89,6 +89,15 @@ end
 function BaseService:SetBusyChecker(callback)
 	self.BusyChecker = callback
 end
+-- R153 (owner: "make it so that players can also roll and open packs whilst on the treadmill"): the chase's IsPlayerBusy also counts a pack reveal (ChestService:IsOpening), so the
+-- fifth click of a pack used to end the treadmill session on the spot. Training asks this checker instead: a chase (running or starting) still stops it, a reveal does not.
+-- Everything else (the garden, the treadmill upgrade) keeps BusyChecker. Without a training checker it is BusyChecker.
+function BaseService:SetTrainingBusyChecker(callback)
+	self.TrainingBusyChecker = callback
+end
+function BaseService:_trainingBusy(player)
+	return (self.TrainingBusyChecker or self.BusyChecker)(player)
+end
 
 function BaseService:ResetLootDisplay(record)
 	-- Chest opening was removed in V0.66. These checks only clean up a place
@@ -330,7 +339,7 @@ function BaseService:StopTraining(player, jumpOff)
 		humanoid.AutoRotate = session.AutoRotate
 	end
 	if player.Character == session.Character and humanoid.Parent
-		and humanoid.Health > 0 and not self.BusyChecker(player) then
+		and humanoid.Health > 0 and not self:_trainingBusy(player) then
 		self:_applyPhysicalSpeed(player, humanoid,
 			self.PlayerData:GetOrCreateSpeedValue(player).Value)
 		if jumpOff and root.Parent then
@@ -431,7 +440,7 @@ function BaseService:_updateTrainingPlayer(player, deltaTime)
 	local record = self:GetPlayerBase(player)
 	local belt = record and record.Treadmill
 	local canTrain = humanoid and root and humanoid.Health > 0
-		and self.PlayerData:IsLoaded(player) and not self.BusyChecker(player)
+		and self.PlayerData:IsLoaded(player) and not self:_trainingBusy(player)
         and not (player:GetAttribute("StudioTestFlying") or player:GetAttribute("StudioTestNoclip"))
 		and not player:GetAttribute("GuardianFlingActive")
 		and not player:GetAttribute("GuardianRagdollActive")

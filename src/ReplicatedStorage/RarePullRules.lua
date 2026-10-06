@@ -14,8 +14,9 @@ local V=Vector3.new
 local C=Color3.fromRGB
 -- Tiers ----------------------------------------------------------------------------------------------------------------------------------
 -- Hint: the colour that flickers through the pack's cracks (the game's rarity colour). Suspense / Quick: seconds from the 5th click to the
--- burst (Quick = opening packs in quick succession). Card: how long the seed card stays after the burst. SeedSize: share of the screen height
--- the seed's card takes. TitleSize: share of the screen height of the rarity word.
+-- burst (Quick = the short version, only when the player has "Skip pack animations" on: L.SkipAnimations). Card / QuickCard: how long the
+-- seed card stays after the burst. SeedSize: share of the screen height the seed's card takes. TitleSize: share of the screen height of the
+-- rarity word.
 L.Tiers={
  [1]={Key='Common',Title='COMMON',Hint=C(223,236,242),Glow=C(255,255,255),Deep=C(40,46,52),Font=Enum.Font.FredokaOne,Suspense=.6,Quick=.35,Card=.6,QuickCard=.45,SeedSize=.26,TitleSize=.07,Pulses=1,Heartbeats=0,Push=0,Grade=.12},
  [2]={Key='Uncommon',Title='UNCOMMON',Hint=C(98,235,130),Glow=C(214,255,200),Deep=C(14,52,26),Font=Enum.Font.FredokaOne,Suspense=.7,Quick=.4,Card=.8,QuickCard=.5,SeedSize=.28,TitleSize=.08,Pulses=2,Heartbeats=1,Push=0,Grade=.18},
@@ -27,7 +28,6 @@ L.Tiers={
  [8]={Key='King',Title='KING',Hint=C(255,236,161),Glow=C(255,246,214),Deep=C(48,24,4),Theme=C(255,205,84),Font=Enum.Font.GrenzeGotisch,SeedSize=.34,TitleSize=.16,Pulses=6,Heartbeats=5,Push=6,Grade=.8,AuraSeconds=25},
 }
 L.Neutral=C(255,248,232)
-L.QuickWindow=3 -- a pack opened within this many seconds after the previous reveal ended is a "quick" reveal (shorter suspense and card)
 L.StageOrigin=V(0,2600,0) -- the hidden stage for the Secret / Cosmic / King scenes: far above the map, client-only, built on demand
 L.SeedHeroSize=1.8 -- studs: the seed's biggest VISIBLE side in the scenes (RarePullRules.VisibleBounds)
 -- The seed is the hero of every scene's ending (owner: "the seed should be the main focus"): from the hit on, the camera keeps the shot's
@@ -93,20 +93,37 @@ function L.SeedPhase(age,hover)
  local slide=clamp01((age-b.SeedRiseSeconds-hover)/b.SeedSlideSeconds)
  return rise,slide
 end
--- Quick reveals are decided by the opener's client only (its own presentation); a weak table so nothing leaks.
+-- Short (quick) reveals are decided by the opener's client only (its own presentation); a weak table so nothing leaks.
 L.QuickBags=setmetatable({},{__mode='k'})
 function L.MarkQuick(bag,quick)if bag then L.QuickBags[bag]=quick==true end end
 function L.IsQuick(bag)return bag~=nil and L.QuickBags[bag]==true end
+-- R153 (owner: "pack animations should play all the time and shouldn't stop after 2/3 times. they can skip if they want or we can add a
+-- skip cutscene option in the settings"): every opening plays its full presentation, however fast packs are opened (R151 made a pack
+-- opened while a reveal ran, or within 3 s of one, a "quick" reveal: from the 2nd / 3rd pack on, the suspense and the card were cut).
+-- The short version is the player's own choice now: "Skip pack animations" in Settings (SettingsConfig.SkipCutscenes, off by default,
+-- published on the LocalPlayer): the Quick timing for Common..Mythic, the result card in place for Secret / Cosmic / King (L.Decide).
+function L.SkipAnimations()
+ local ok,on=pcall(function()
+  local player=game:GetService('Players').LocalPlayer;if not player then return false end
+  return player:GetAttribute(require(script.Parent.SettingsConfig).ToggleAttributes.SkipCutscenes)
+ end)
+ return ok and on==true
+end
 -- R152: decided ONCE per bag by whichever asks first, the director (PackOpeningFeedback) or the world pack (SeedPackClient): they run in
 -- either order within a frame, and the world used to keep the normal timing when it asked first, so the seed burst out of the pack at a
--- different moment than the card and its sounds. A reveal still running, or one that ended under QuickWindow ago, makes it quick.
-L.LastRevealEnd=-math.huge;L.RevealRunning=false -- (RarePullCinematic keeps these)
+-- different moment than the card and its sounds. (R153: the setting decides; a reveal running or just ended no longer does.)
+L.RevealRunning=false -- (RarePullCinematic keeps it: RarePullArt draws nothing while a reveal runs)
 function L.QuickFor(bag)
  if bag~=nil and L.QuickBags[bag]~=nil then return L.QuickBags[bag]end
- local q=L.RevealRunning==true or(os.clock()-L.LastRevealEnd)<L.QuickWindow
+ local q=L.SkipAnimations()
  if bag~=nil then L.QuickBags[bag]=q end
  return q
 end
+-- R153: a skip by the opener (RarePullCinematic.Skip) jumps the card of THEIR pack to the hit; the pack in the world jumps by the same
+-- seconds (SeedPackClient, PackOpeningFeedback, RarePullWorld), so the seed still bursts out with the card. Opener's client only; weak keys.
+L.Shifts=setmetatable({},{__mode='k'})
+function L.SetShift(bag,s)if bag~=nil and type(s)=='number'and s>(L.Shifts[bag]or 0)then L.Shifts[bag]=s end end
+function L.Shift(bag)return bag~=nil and L.Shifts[bag]or 0 end
 -- Suspense: the pack's rarity hint, wobble and tear -------------------------------------------------------------------------------------
 -- The hint starts neutral and walks up the ladder (Common, Uncommon, ...) to the real tier, flickering between neighbours like Sol's RNG
 -- "it could be...": higher tiers pass through every lower colour. The last quarter holds the real colour.
@@ -196,12 +213,14 @@ function L.StripStart(rank,index,quick)
 end
 function L.TearTicks(rank,quick)local at=L.BurstAt(rank,quick);local out={};for i,g in ipairs(L.TearGroups)do out[i]=g.At*at end;return out end
 -- The opener's screen for Common..Mythic: the seed card --------------------------------------------------------------------------------
--- Times on the reveal's server clock (seconds after RevealAt).
+-- Times on the reveal's server clock (seconds after RevealAt). R153: SkipFrom: a click / tap from then on skips to the hit, a second one
+-- closes the card (RarePullCinematic.Skip; the clicks that opened the pack are over by then).
+L.CardSkipFrom=.35
 function L.CardTimeline(rank,quick)
  local tier=L.Tier(rank);local burst=L.BurstAt(rank,quick);local card=quick and tier.QuickCard or tier.Card
  local slam=burst+math.min(.6,.25+.08*rank)*(quick and .7 or 1)
  return {Burst=burst,TitleIn=burst,Count=burst+.06,Odds=slam,FloatEnd=burst+card,Out=burst+card,Length=burst+card+.2,
-  Letterbox=tier.Letterbox==true,Quick=quick==true}
+  Letterbox=tier.Letterbox==true,Quick=quick==true,SkipFrom=L.CardSkipFrom}
 end
 -- Secret / Cosmic / King story scenes ------------------------------------------------------------------------------------------------------
 -- Beats in seconds after the cinematic starts (the opener's clock). Dim: the world darkens; Cut: fade to black; SceneIn: the hidden stage;
@@ -216,11 +235,12 @@ L.Scenes={
       Calm={Dim=0,Cut=.45,SceneIn=.70,Glide=.70,Land=.70,CrownStart=1.00,CrownOn=2.20,Fanfare=2.20,SuckIn=2.35,Silence=2.75,Climax=2.85,Rise=2.86,Odds=3.45,FloatEnd=4.90,Back=5.30,Length=5.90,SkipFrom=1.0}},
 }
 -- In place (no camera, no hidden stage, HUD stays: a keeper is near, the player is on the track, a menu is open ...): on the reveal's server
--- clock, the climax on the world seed's burst. ResultOnly: a cinematic that had to stop early shows the result card at once.
+-- clock, the climax on the world seed's burst. ResultOnly: a cinematic that had to stop early shows the result card at once. (R153: a
+-- click / tap skips these cards too, from L.CardSkipFrom: to the hit, then closed.)
 function L.InPlace(rank,resultOnly)
- if resultOnly then return {Dim=0,Climax=0,Rise=0,Odds=.35,FloatEnd=1.6,Back=1.6,Length=2.1,SkipFrom=math.huge,InPlace=true,ResultOnly=true}end
+ if resultOnly then return {Dim=0,Climax=0,Rise=0,Odds=.35,FloatEnd=1.6,Back=1.6,Length=2.1,SkipFrom=L.CardSkipFrom,InPlace=true,ResultOnly=true}end
  local c=Sequence.SeedAt(rank)
- return {Dim=0,SuckIn=math.max(0,c-.45),Silence=math.max(0,c-.08),Climax=c,Rise=c,Odds=c+.55,FloatEnd=c+1.9,Back=c+1.9,Length=c+2.5,SkipFrom=math.huge,InPlace=true}
+ return {Dim=0,SuckIn=math.max(0,c-.45),Silence=math.max(0,c-.08),Climax=c,Rise=c,Odds=c+.55,FloatEnd=c+1.9,Back=c+1.9,Length=c+2.5,SkipFrom=L.CardSkipFrom,InPlace=true}
 end
 function L.Timeline(rank,variant)
  rank=math.clamp(math.floor(tonumber(rank)or 6),6,8)
@@ -258,7 +278,7 @@ function L.SeedShown(rank,variant,quick)
  return math.max(tl.Climax,tl.Rise or 0,tl.Odds or 0)
 end
 -- What a SERVER can rely on. It never sees which presentation the opener's client chose (that depends on a safety snapshot only the client has: a keeper near, a menu, reduced
--- motion ...) nor whether the reveal was quick (packs opened back to back), nor a skip (a skip only brings the hit EARLIER), so it takes the latest of them: the normal ladder card,
+-- motion ...) nor whether the reveal was quick (the player's "Skip pack animations"), nor a skip (a skip only brings the hit EARLIER), so it takes the latest of them: the normal ladder card,
 -- and for the story scenes the latest of Full / Calm / InPlace. A story scene that is cut short ('Result': danger, moved, camera) shows its result card at the cut, which is before
 -- the scene's hit, plus the card's own .35 s: never later than the Full scene's own seed-shown time.
 function L.LatestSeedShown(rank)
@@ -412,10 +432,12 @@ function L.CrownPose(tl,t)
  return top:Lerp(seed+V(0,1.15,0),easeOut(k)),1-.45*k,1-clamp01((t-tl.Climax-.5)/.7)
 end
 -- Safety: the full story scene (camera, hidden stage, HUD hidden, controls held) only when nothing can hurt the player. s = a snapshot:
---  {Alive, OnTrack, KeeperDistance, KeeperChasing, Ragdoll, Running, Menu, CameraType, Grounded}
+--  {Alive, OnTrack, KeeperDistance, KeeperChasing, Ragdoll, Running, Menu, CameraType, Grounded, SkipCutscenes}
+-- (R153: SkipCutscenes, the player's "Skip pack animations": the short in-place version, the result card, never the story scene)
 L.KeeperSafeDistance=60
 function L.Decide(s)
  if type(s)~='table'or s.Alive==false then return 'InPlace','not alive'end
+ if s.SkipCutscenes then return 'InPlace','skip pack animations is on'end
  if s.Ragdoll then return 'InPlace','ragdoll / fling'end
  if s.Running then return 'InPlace','carrying / queued run'end
  if s.KeeperChasing then return 'InPlace','a keeper is chasing'end

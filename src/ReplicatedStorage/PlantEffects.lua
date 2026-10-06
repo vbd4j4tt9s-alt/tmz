@@ -164,9 +164,12 @@ function Effects.Create(item,r,def,crop,at,mode)
  end
 end
 
-function Effects.Step(r,t,batch,pose)
+-- part (R153, optional): 'tree' = only the tree body's slow drift (GardenVisuals' 20 Hz tick), 'fast' = everything else (its frame pass for a near
+-- plant: the orbits, sparks, glints, fruit effects and glows move every frame); nil = all of it.
+function Effects.Step(r,t,batch,pose,part)
  local at=pose or r.Visual:GetPivot()
- if r.TreeMotion then Trees.Step(r.TreeMotion,at,t,r.TreeMotion.Identity,batch)end
+ if r.TreeMotion and part~='fast'then Trees.Step(r.TreeMotion,at,t,r.TreeMotion.Identity,batch)end
+ if part=='tree'then return end
  if r.FruitEffectsStep then r.FruitEffectsStep(t,batch)end
  if r.GlowParts then for i,e in ipairs(r.GlowParts)do if e.Part.Parent then
   local seam=e.Part.Name=='Infused bark channel'

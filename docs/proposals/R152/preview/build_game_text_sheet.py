@@ -91,10 +91,10 @@ t['void_prompt']=T(RS+'VoidGiveawayRules152.lua','Grab ur FREE Void Pack')
 t['void_note']=T(SS+'VoidGiveaway152.lua','🌑 FREE VOID PACK! Check ur bag!')
 t['void_room']=T(SS+'VoidGiveaway152.lua','🎒 Make room in ur bag first! (nothing got used)')
 t['shovel_q']=T(CL+'GardenShovel.client.lua','?\nThis removes the plant and any fruit still on it. U won\'t get the seed back.')
-t['hole_hint']=T(RS+'TrackHoleConfig.lua','Dig holes to trap other players!')
+t['hole_hint']=T(RS+'TrackHoleConfig.lua','🕳️ dig holes on the track to trap players • tap a plant in ur garden to remove it') # R153: the shovel tip also says it removes plants
 t['hole_ground']=T(RS+'TrackHoleConfig.lua','ONLY DIG ON THE TRACK!')
 t['hole_cap']=T(RS+'TrackHoleConfig.lua','%d HOLES MAX! COVER ONE OR WAIT')
-t['quest_done']=T(SS+'DailyProgress.lua','! Grab ur 💎')
+t['quest_done']=T(SS+'DailyProgress.lua','! Grab ur 🎒 pack')
 t['title_click']=T(RS+'TitleScreen104.lua','Click to play!')
 t['kick']=T(SS+'PlayerDataService.lua',"Couldn't load ur progress. Rejoin to try again! Ur saved data is safe.")
 t['pull_a']=T(RS+'PullAnnounceRules.lua',' just pulled ')
@@ -117,7 +117,7 @@ t['wait']=T(RS+'ShopMenu.lua','Wait a sec')
 t['hubcl']=T(RS+'HubDisplayRules.lua','Open a pack to grab it!')
 t['pick']=T(CL+'PlantInspection.client.lua',' to pick')
 t['daily_gems']=T(SS+'DailyProgress.lua','Ur Gems are on the way!')
-t['dq']=T(SS+'DailyProgress.lua','🤖 FREE MECH PACK! Check ur bag!')
+t['dq']=T(SS+'DailyProgress.lua','🌑 FREE VOID PACK! Check ur bag!')
 
 print('all',len(t),'texts found in the source')
 
@@ -221,7 +221,7 @@ card('Shovel','remove a plant, dig holes',
 
 # L. daily
 card('Daily rewards','quest done notice, claim answer',
- f'''<div class="phone">{n("✅ QUEST DONE: Steal 3 packs"+t["quest_done"]+"5 in 🎁 DAILY","green",17)}</div>
+ f'''<div class="phone">{n("✅ QUEST DONE: Steal 3 packs"+t["quest_done"]+" in 🎁 DAILY","green",17)}</div>
  <div class="shop" style="margin-top:10px"><div class="sh1">📜 DAILY QUESTS</div><div class="qrow"><span>🎒 Steal 3 packs</span><span class="gold">CLAIM</span></div><div class="stat">{E(t["daily_gems"])}</div></div>
  <div class="phone" style="margin-top:10px"><div class="n rich" style="font-size:17px">{E(t["dq"])}</div></div>''')
 

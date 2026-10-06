@@ -2,7 +2,8 @@
 the two hub displays through the REAL HubDisplayService (real HubDisplayArt, real HubDisplayAvatar on the Players mock of hub_rig.luau), dumped in the same scene format
 for zfight.py and check_hub_scene.py. HUB_STATE (a global the runner puts in front) = 'empty' (nobody holds either spot) or 'champions' (a Mythic Fire Pepper pull and a Gold
 fruit, each with an avatar). R152: the displays are the Fruit of the Hour-style pedestal, the showcase item and the giant avatar; the "HUBTEXT" lines carry the plaque's and the
-label's words for the preview. The mock plays the dance on a Humanoid it cannot animate: a frame of it (arms up, one hip out) is put into the joints by hand.
+label's words for the preview (R153: the label is the only words). The mock cannot animate a Humanoid (each client plays the dance in the game): a frame of it (arms up, one hip out) is
+put into the joints by hand.
 Usage: python3 make_hub_scene.py <zfight_scene.luau> <out hub_scene.luau>"""
 import sys
 
@@ -60,28 +61,23 @@ step('HubDisplays',function()
   local d=svc.Displays[kind];local n=svc.Art.Counts(d)
   print(string.format('HUBINFO %s frame=%d item=%d avatar=%d source=%s mode=%s',kind,n.Frame,n.Item,n.Avatar,tostring(svc.AvatarSource and svc.AvatarSource[kind]),tostring(svc.AvatarMode and svc.AvatarMode[kind])))
  end
- -- the words and where they are, for the preview renderer (docs/proposals/R151/preview): one "HUBTEXT {json}" line per display: the plaque (its plate's frame, the rows as the SurfaceGui lays them out)
- -- and the label (where the BillboardGui floats, its size in studs, the rows)
+ -- the words and where they are, for the preview renderer (docs/proposals/R151/preview) and check_hub_scene.py: one "HUBTEXT {json}" line per display: the display's frame (origin, front, its
+ -- local +X) and the label (R153: the only words; where the BillboardGui floats, its size in studs, its five rows)
  local Rules=W.module('HubDisplayRules')
  local function q(s)return'"'..tostring(s):gsub('\\','\\\\'):gsub('"','\\"'):gsub('\n','\\n')..'"'end
  local function c3(c)return string.format('[%d,%d,%d]',math.floor(c.R*255+.5),math.floor(c.G*255+.5),math.floor(c.B*255+.5))end
  for _,kind in ipairs({'Pull','Fruit'})do
-  local d=svc.Displays[kind];local cf=d.Plaque.CFrame;local r=cf.R;local p=cf.Position;local s=d.Plaque.Size
-  local prows={}
-  for _,key in ipairs({'Title','Name','Line','Footer'})do
-   local row=Rules.Plaque.Rows[key];local label=d.Plate[key]
-   prows[#prows+1]=string.format('{"key":%s,"text":%s,"color":%s,"x":%d,"y":%d,"w":%d,"h":%d,"max":%d,"strokeT":%s}',q(key),q(label.Text),c3(label.TextColor3),row.X,row.Y,row.W,row.H,row.Max,tostring(label.TextStrokeTransparency))
-  end
+  local d=svc.Displays[kind]
   local lrows={}
-  for _,key in ipairs({'Title','Name','Info'})do
+  for _,key in ipairs(Rules.Label.Order)do
    local row=Rules.Label.Rows[key];local label=d.Tag[key]
-   lrows[#lrows+1]=string.format('{"key":%s,"text":%s,"color":%s,"y":%.3f,"h":%.3f}',q(key),q(label.Text),c3(label.TextColor3),row.Y,row.H)
+   lrows[#lrows+1]=string.format('{"key":%s,"text":%s,"color":%s,"x":%.3f,"y":%.3f,"w":%.3f,"h":%.3f,"max":%.3f,"strokeT":%s}',q(key),q(label.Text),c3(label.TextColor3),row.X,row.Y,row.W,row.H,row.Max,tostring(label.TextStrokeTransparency))
   end
   local lp=d.LabelGui.Adornee.CFrame.Position+d.LabelGui.StudsOffsetWorldSpace
-  local ic=d.Model:GetAttribute('ItemCenter');local ac=d.Model:GetAttribute('Accent');local lk=d.F.LookVector;local o=d.F.Position
-  print(string.format('HUBTEXT {"kind":%s,"state":%s,"origin":[%.3f,%.3f,%.3f],"look":[%.5f,%.5f,%.5f],"item":[%.3f,%.3f,%.3f],"accent":%s,"calm":%s,"plaque":{"p":[%.4f,%.4f,%.4f],"r":[%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f],"s":[%.3f,%.3f,%.3f],"canvas":[%d,%d],"rows":[%s]},"label":{"p":[%.3f,%.3f,%.3f],"w":%.2f,"h":%.2f,"rows":[%s]}}',
-   q(kind),q(d.Model:GetAttribute('State')),o.X,o.Y,o.Z,lk.X,lk.Y,lk.Z,ic.X,ic.Y,ic.Z,ac and c3(ac)or'null',tostring(d.Model:GetAttribute('Calm')==true),p.X,p.Y,p.Z,r[1][1],r[1][2],r[1][3],r[2][1],r[2][2],r[2][3],r[3][1],r[3][2],r[3][3],s.X,s.Y,s.Z,
-   Rules.Plaque.Canvas.W,Rules.Plaque.Canvas.H,table.concat(prows,','),lp.X,lp.Y,lp.Z,Rules.Label.W,Rules.Label.H,table.concat(lrows,',')))
+  local ic=d.Model:GetAttribute('ItemCenter');local ac=d.Model:GetAttribute('Accent');local lk=d.F.LookVector;local rt=d.F.RightVector;local o=d.F.Position
+  print(string.format('HUBTEXT {"kind":%s,"state":%s,"origin":[%.3f,%.3f,%.3f],"look":[%.5f,%.5f,%.5f],"right":[%.5f,%.5f,%.5f],"item":[%.3f,%.3f,%.3f],"accent":%s,"calm":%s,"label":{"p":[%.3f,%.3f,%.3f],"w":%.2f,"h":%.2f,"near":%.1f,"rows":[%s]}}',
+   q(kind),q(d.Model:GetAttribute('State')),o.X,o.Y,o.Z,lk.X,lk.Y,lk.Z,rt.X,rt.Y,rt.Z,ic.X,ic.Y,ic.Z,ac and c3(ac)or'null',tostring(d.Model:GetAttribute('Calm')==true),
+   lp.X,lp.Y,lp.Z,Rules.Label.W,Rules.Label.H,Rules.Label.Near,table.concat(lrows,',')))
  end
 end)
 """
