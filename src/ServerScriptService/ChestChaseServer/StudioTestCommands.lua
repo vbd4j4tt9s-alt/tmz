@@ -121,6 +121,13 @@ local function executeFor(ctx,player,text,requester)
   return true,table.concat(lines,'\n')
  elseif action=='perf'then
   player:SetAttribute('StudioTestPerf',not player:GetAttribute('StudioTestPerf'));return true,'Performance display toggled.'
+ elseif action=='hotbar'then -- R153: the hotbar log on this player's screen + what the server did with their packs
+  local on=not player:GetAttribute('HotbarLog');player:SetAttribute('HotbarLog',on)
+  local chests=ctx.Chests;local log=chests and chests.HoldLog and chests.HoldLog[player];local op=chests and chests.Openings and chests.Openings[player]
+  local c=player.Character;local held=c and c:FindFirstChildOfClass('Tool')
+  return true,table.concat({'Hotbar log '..(on and'ON: each press, what it did and anything the server moved shows top-left (select it to copy) and in the F9 console.'or'OFF.'),
+   'Server sees in the hand: '..(held and held.Name or'nothing')..' | pack held: '..(type(op)=='table'and op.Tool and((op.Committed and'revealing 'or'')..op.Tool.Name)or'none'),
+   'Packs the server held late or sent back (newest last): '..(log and #log>0 and table.concat(log,' | ')or'none')},'\n')
  elseif action=='effects'then
   if not exact(1)or(a[1]~='normal'and a[1]~='low'and a[1]~='off')then return false,'Use /test effects normal, low or off.'end
   player:SetAttribute('StudioPlantEffects',a[1]);return true,'Plant effects: '..a[1]
