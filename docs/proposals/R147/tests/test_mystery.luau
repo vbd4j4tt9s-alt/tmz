@@ -615,6 +615,25 @@ for stage=1,7 do
 end
 check(tagOk,'_preparePersistentGuardian stamps KeeperEscapeSpeed (20, 32, 50, 80, 128, 205, 330) and tags every biome keeper "BiomeKeeper"'..detail)
 check(Pursuit.EscapeSpeed(8)==20 and Pursuit.EscapeSpeed(nil)==20 and Pursuit.EscapeSpeed(99)==20,'an unknown stage falls back to the Forest speed (20)')
+-- R153: the server stamps the spawn point (KeeperHome) the SPEED NEEDED sign is pinned to: the camp the chase service keeps for the stage, never where the keeper stands now.
+do
+ local homeOk=true;local why=''
+ for stage=1,7 do
+  local m=R.new('Model');m.Name='Homed'..stage;m:SetAttribute('KeeperClientAnimated',true)
+  local rp=R.new('Part');rp.Name='HumanoidRootPart';rp.Size=R.Vector3.new(2,2,1);rp.CFrame=R.CFrame.new(500,50,500);rp.Parent=m;local bp=R.new('Part');bp.Name='Body';bp.Size=R.Vector3.new(3,5,2);bp.Parent=m;m.Parent=W.workspace
+  local home=R.CFrame.new(10*stage,8,-300*stage)
+  local fc=setmetatable({GuardianHomeCFrames={[stage]=home}},{__index=Chase})
+  Chase._preparePersistentGuardian(fc,m,stage)
+  local h=m:GetAttribute('KeeperHome')
+  if not(R.typeof(h)=='Vector3'and h==home.Position)then homeOk=false;why=why..' stage '..stage..' '..tostring(h)end
+  rp.CFrame=R.CFrame.new(-900,3,1200);Chase._preparePersistentGuardian(fc,m,stage) -- (chasing far away: prepared again, the same camp)
+  if m:GetAttribute('KeeperHome')~=home.Position then homeOk=false;why=why..' moved '..stage end
+ end
+ check(homeOk,'_preparePersistentGuardian stamps KeeperHome = the stage\'s camp (GuardianHomeCFrames), and keeps it while the keeper is elsewhere'..why)
+ local bare=R.new('Model');bare:SetAttribute('KeeperClientAnimated',true);local br=R.new('Part');br.Name='HumanoidRootPart';br.Parent=bare;local bb=R.new('Part');bb.Name='Body';bb.Parent=bare;bare.Parent=W.workspace
+ Chase._preparePersistentGuardian(fakeChase,bare,1)
+ check(bare:GetAttribute('KeeperHome')==nil and W.CS:HasTag(bare,'BiomeKeeper'),'(a chase service with no camp known for the stage stamps no KeeperHome: the sign then waits for it / uses where it first saw the keeper)')
+end
 local noRoot=R.new('Model');noRoot.Parent=W.workspace
 check(Chase._preparePersistentGuardian(fakeChase,noRoot,1)==false and noRoot:GetAttribute('KeeperEscapeSpeed')==nil and not W.CS:HasTag(noRoot,'BiomeKeeper'),'a model with no parts is not tagged')
 check(Chase._preparePersistentGuardian(fakeChase,nil,1)==false,'(nor nil)')
@@ -643,6 +662,10 @@ local again3=Veiled.EnsureGuardian(eventSelf)
 check(again3==guardian,'EnsureGuardian reuses the live keeper')
 guardian:Destroy();local g2=Veiled.EnsureGuardian(eventSelf)
 check(g2~=nil and g2~=guardian and g2:GetAttribute('KeeperEscapeSpeed')==600 and W.CS:HasTag(g2,'BiomeKeeper'),'a new keeper after it despawns is stamped and tagged again')
+check(guardian:GetAttribute('KeeperHome')==eventSelf.Home.Position and g2:GetAttribute('KeeperHome')==eventSelf.Home.Position,'R153: The Darkened is stamped with KeeperHome = where it spawned (the sign stays there while it chases)')
+eventSelf.Home=R.CFrame.new(40,5,900);g2:Destroy();local g3=Veiled.EnsureGuardian(eventSelf)
+check(g3~=nil and g3:GetAttribute('KeeperHome')==R.Vector3.new(40,5,900),'R153: its next appearance, at another spawn point, is stamped with that one')
+eventSelf.Home=R.CFrame.new(0,5,0)
 check(Veiled.EnsureGuardian({Home=nil,Folder=evFolder})==nil,'(no Home: no keeper)')
 
 -- 15. A full Bag at midnight: the unlocked pack is owed (saved), today's timer runs, nothing is lost or given twice -------------------
