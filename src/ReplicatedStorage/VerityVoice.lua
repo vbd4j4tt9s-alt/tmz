@@ -45,11 +45,12 @@ function M.Begin(lip,cfg)lip.Peak=cfg.Floor;lip.Seen=false;lip.Age=0 end
 --  * Rising is fast (cfg.Attack a second), falling slower (cfg.Release); once the voice has stopped it falls smoothly and snaps to exactly
 --    0 below .004, so whatever the Level drives goes back to rest exactly.
 -- R153 (owner: "fix all jittery type effects"): Bounce, what her hop and swell follow, trails Level through a critically damped spring (M.BounceRate
--- a second): PlaybackLoudness only changes every few frames, so Level rises in little stairs and her hop stuttered with them. Bounce has a smooth
--- speed, never leaves the range Level went through (it is a weighted average of past levels) and settles exactly at 0 with Level.
-M.BounceRate=40
+-- a second going up, M.BounceFall coming down, so the pauses still bring her down): PlaybackLoudness is a noisy reading that changes every few
+-- frames, and the fast-rising Level jumped with it, so her hop buzzed. Bounce has a smooth speed, never leaves the range Level went through (a
+-- weighted average of past levels) and settles exactly at 0 with Level.
+M.BounceRate,M.BounceFall=55,82
 local function follow(lip,dt)
- local x,v,w=lip.Bounce or 0,lip.BounceSpeed or 0,M.BounceRate
+ local x,v=lip.Bounce or 0,lip.BounceSpeed or 0;local w=lip.Level<x and M.BounceFall or M.BounceRate
  local e=x-lip.Level;local k=math.exp(-w*dt);local t=(v+w*e)*dt
  x=lip.Level+(e+t)*k;v=(v-w*t)*k
  if lip.Level==0 and x<.004 then x,v=0,0 end

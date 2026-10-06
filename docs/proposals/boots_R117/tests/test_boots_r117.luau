@@ -418,9 +418,9 @@ check(not lAttach or fx.Attached==attachedBefore-1,'leave: attached count drops'
 jump(me,.5);run(.1)
 check(liveMoments()>0,'a moment is live before destroy')
 local coilBase={};for _,c in ipairs(mine3.Attach and mine3.Attach.Coils or{})do coilBase[c.Part]=c.Color end
-local hbBefore=0;for _,c in ipairs(Run.Heartbeat._c)do if c.Connected then hbBefore+=1 end end
+local hbBefore=0;for _,c in ipairs(Run.RenderStepped._c)do if c.Connected then hbBefore+=1 end end -- (R153: the trail client steps in RenderStepped)
 clientScript:Destroy()
-local hbAfter=0;for _,c in ipairs(Run.Heartbeat._c)do if c.Connected then hbAfter+=1 end end
+local hbAfter=0;for _,c in ipairs(Run.RenderStepped._c)do if c.Connected then hbAfter+=1 end end
 local removalLive=0;for _,c in ipairs(Players.PlayerRemoving._c)do if c.Connected then removalLive+=1 end end
 check(hbBefore==1 and hbAfter==0 and removalLive==0,'destroy: connections closed')
 check(aliveEffectParts()==0,'destroy: no effect parts left ('..aliveEffectParts()..')')

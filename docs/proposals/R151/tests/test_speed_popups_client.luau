@@ -361,7 +361,7 @@ do
  check(PW.visibleAll(pg)==0,'reset: an award earned by the OLD character shows nothing')
  C.fire(resetter,4200,1,1/5,newChar);PW.frames(2,1/60)
  local nf=PW.fieldOf(pg,newHead)
- check(nf~=nil and #PW.visible(nf)==1 and nf.Adornee==newHead,'reset: the new character\'s award shows on the new head')
+ check(nf~=nil and #PW.visible(nf)==1 and nf.Adornee==newHead.Parent:FindFirstChild('HumanoidRootPart'),'reset: the new character\'s award shows over the new head (R153: on its root)')
  -- the old character is still around for a moment after a reset (Roblox removes it later): its award shows nothing either
  do
   local stale=PW.newPlayer('Stale',{Pos=V3(4,3,4)})

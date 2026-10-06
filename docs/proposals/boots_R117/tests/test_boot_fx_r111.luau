@@ -255,9 +255,9 @@ check(Styles.Spacing(16)<=Styles.Spacing(100)and Styles.Spacing(1000)==60,'spaci
 check(Styles.Detail(false,200,true,b3)==1 and Styles.Detail(false,10,false,b3)==2 and Styles.Detail(true,1e9,false,b1)==3,'detail levels')
 for _,k in ipairs({'Sand','Frost','Ember','Crystal','Lightning'})do check(#Styles.PrintParts(k,1,1.5,-1)==3,k..' print has 3 parts')end
 -- K: client script destroyed -----------------------------------------------------------------------------------------------------------------
-local hbBefore=0;for _,c in ipairs(Run.Heartbeat._c)do if c.Connected then hbBefore+=1 end end
+local hbBefore=0;for _,c in ipairs(Run.RenderStepped._c)do if c.Connected then hbBefore+=1 end end -- (R153: the trail client steps in RenderStepped)
 clientScript:Destroy()
-local hbAfter=0;for _,c in ipairs(Run.Heartbeat._c)do if c.Connected then hbAfter+=1 end end
+local hbAfter=0;for _,c in ipairs(Run.RenderStepped._c)do if c.Connected then hbAfter+=1 end end
 local removalLive=0;for _,c in ipairs(Players.PlayerRemoving._c)do if c.Connected then removalLive+=1 end end
 check(hbBefore==1 and hbAfter==0 and removalLive==0,'connections disconnected on destroy')
 check(aliveEffectParts()==0,'no effect parts left after destroy ('..aliveEffectParts()..')')

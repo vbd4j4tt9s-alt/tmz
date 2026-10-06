@@ -2,7 +2,7 @@
 -- R151 hub displays (R152: the pedestal, the spinning showcase item and the dancing avatar): the REAL HubDisplayClient as the local player, on the displays the REAL HubDisplayArt builds (with a
 -- showcase item and an avatar rig):
 --  1. the countdown on the pedestal's plaque: right at once, kept up to date, "New fruit in ..." for the fruit board, for a display that streams in later, nothing without its attributes;
---  2. motion only when near (260 studs in, 300 out) and allowed: the item turns about its own vertical axis and floats a little (one bulk move every frame; 30 times a second on the middle tier), the sparkles are an
+--  2. motion only when near (260 studs in, 300 out) and allowed: the item turns about its own vertical axis and floats a little (one bulk move every frame, on the middle tier too since R153), the sparkles are an
 --     emitter ON the item's own ItemCore part in the champion's colour (they turn with it), a dancing avatar is left to its Animator (the client writes none of its joints), a rig in the static
 --     pose cheers (joint transforms, bounded), the per-frame function is connected only while a display is near, and everything is put back when you walk away;
 --  3. reduced motion and the lowest quality: no motion, no sparkles, no pop, the dance is paused (speed 0) and runs again; the countdown still runs;
@@ -194,7 +194,8 @@ do
  local e=sparksOf(pullD)
  check(e and e.Rate==8,'with half the sparkles')
  bulk=0;H.run(2,1/60)
- check(bulk>=55 and bulk<=66,'and the item is moved about 30 times a second instead of every frame (R152 review fix B6: 12 a second turned in visible steps) ('..bulk..' bulk moves in 2 s)')
+ check(bulk>=110 and bulk<=125,'and the item is moved every frame too (R153: 30 a second still stepped on a 60 Hz screen; R152 fix B6: 12 a second) ('..bulk..' bulk moves in 2 s)')
+ for _,fps in ipairs({30,144})do bulk=0;H.run(1,1/fps);check(math.abs(bulk-fps)<=2,string.format('R153: the middle tier at %d fps: one bulk move per drawn frame (%d in 1 s)',fps,bulk))end
  -- a calm board (nobody holds the spot): the item turns, but no sparkles
  pullD.Model:SetAttribute('Calm',true);H.run(1.2)
  check(not sparksOf(pullD)and H.renderConnections()>=1,'a calm display has no sparkles (the item still turns)')

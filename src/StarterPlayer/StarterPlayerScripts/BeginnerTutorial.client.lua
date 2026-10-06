@@ -179,7 +179,7 @@ local lastDevice,lastKey,lastStep,shownKey,currentKey=nil,nil,0,nil,nil
 local highlightButton,goal,cardBottom,cardH=nil,nil,0,112;local currentText='';local currentLook;local clickSeen,clickPopAt,confettiAt=0,-math.huge,nil
 
 local function alphaFor(i,value)
- value=math.clamp(math.floor(value*50+.5)/50,0,1) -- (R153: 1/50, was 1/10: the chevrons faded in and out in ten visible steps)
+ value=math.clamp(math.floor(value*100+.5)/100,0,1) -- (R153: 1/100, was 1/10: the chevrons faded in and out in ten visible steps)
  if lastAlpha[i]==value then return end;lastAlpha[i]=value
  local c=chevrons[i];c[1].Transparency=value;c[2].Transparency=value;c[3].Transparency=math.max(value,.15);c[4].Transparency=math.max(value,.15)
 end
