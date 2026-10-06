@@ -40,9 +40,12 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 --  * Camera: the real floor is hidden (LocalTransparencyModifier 1), so it no longer stops the default camera (Popper only treats a part as an
 --    occluder below 0.25 transparency): a render step right after the camera module keeps the camera at least 0.6 above the resting key tops
 --    while it is over the keyboard (translation only, the look direction stays; Scriptable cameras and first person are left alone).
---  * Clicks: one recording, pitch 0.98 .. 1.02 (keepers 0.94), the same volume rule for all (3D roll-off from the key), a steady cadence per
+--  * Clicks: one recording, pitch 0.98 .. 1.02, the same volume rule for all (3D roll-off from the key), a steady cadence per
 --    presser (K.Allow: at most one click per 1/12 s each, evenly spaced while sprinting) and a voice pool that reuses the oldest voice; no
 --    shared budget that drops some runners' clicks. Effects volume 0 (Settings) = silent.
+--  * R153 (owner: "when keepers knock players up the keyboard clicking sounds play, it should only play when players step on the keyboard"): a key SOUNDS
+--    only when a player character really steps on it (runnerKind: grounded, feet at the floor, not rising fast, not ragdolled / flung / knocked back).
+--    A keeper, a thrown body lying on the keys or a runner a little above the floor still presses the key down, silently; a flying body presses nothing.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Gui=game:GetService('GuiService');local CS=game:GetService('CollectionService');local Content=game:GetService('ContentProvider')
 local K=require(RS:WaitForChild('KeyboardTrack'))
@@ -298,7 +301,7 @@ local function start()
  local boundKeys=0
  local rowKeys={}                                   -- row -> keys bound in it (COLS less the cells the keyboard leaves out)
  local downPos,animPos,animT0,animFrom,animTo,animDur={},{},{},{},{},{}
- local stampAt,moveMark={},{}
+ local stampAt,moveMark,mutedAt={},{},{}              -- mutedAt: a key that went down silently this frame (a keeper / a thrown body): a runner who really steps on it the same frame still clicks
  local downList,animList,moveList={},{},{}
  local moveN=0;local moveParts,moveCFs={},{}
  local oRow,oCol,oKind,oWho,oX,oZ,oN={},{},{},{},{},{},0 -- cells other players / keepers press (30 Hz)
@@ -945,7 +948,11 @@ local function start()
   animDur[idx]=to==1 and max(C.PressSeconds*span,.015)or max(C.ReleaseSeconds*max(span,.35),.04)
   if not animPos[idx]then listAdd(animList,animPos,idx)end
  end
- -- kind: 1 = you, 2 = another player, 3 = a keeper, 0 = a pack platform (silent); who = the presser (gate key); px, pz = where he stands
+ -- kind: 1 = you, 2 = another player (both really stepping: the key sounds), 3 = a keeper, 4 = a runner who is ragdolled / flung / in the air (3 and 4 press the key
+ -- down WITHOUT a sound, R153), 0 = a pack platform (silent); who = the presser (gate key); px, pz = where he stands
+ local function playKey(idx,kind,who,px,pz)
+  if idx>=BARBASE then local bar=bars[idx-BARBASE];click(kind,who,px,pz,true,bar and bar.Stage)else click(kind,who,kX[idx],kZ[idx],false,rowStage[kRow[idx]])end
+ end
  local function pressKey(idx,kind,who,px,pz)
   listAdd(downList,downPos,idx)
   markLabel(idx)
@@ -955,7 +962,7 @@ local function start()
    kDepth[idx]=1;queueMove(idx)
   else
    startAnim(idx,1) -- Reduced Motion: animate() finishes it in the same frame
-   if idx>=BARBASE then local bar=bars[idx-BARBASE];click(kind,who,px,pz,true,bar and bar.Stage)else click(kind,who,kX[idx],kZ[idx],false,rowStage[kRow[idx]])end
+   if kind<3 then playKey(idx,kind,who,px,pz)else mutedAt[idx]=frameNo end
   end
  end
  local function releaseKey(idx)
@@ -963,7 +970,10 @@ local function start()
   startAnim(idx,0)
  end
  local function touch(idx,kind,who,px,pz)
-  if stampAt[idx]==frameNo then return end
+  if stampAt[idx]==frameNo then
+   if mutedAt[idx]==frameNo and kind>0 and kind<3 then mutedAt[idx]=nil;playKey(idx,kind,who,px,pz)end -- a runner who really steps on it wins over a keeper / a thrown body that pressed it first
+   return
+  end
   stampAt[idx]=frameNo
   if not downPos[idx]then pressKey(idx,kind,who,px,pz)end
  end
@@ -1014,6 +1024,20 @@ local function start()
  end
 
  -- Other players and keepers (30 Hz) ------------------------------------------------------------------------------
+ -- R153: how a runner presses the keys under him. 1 / 2 (you / another player) = he really steps on them: the key sounds (K.Steps: feet within StepReach of the floor,
+ -- not rising fast, not K.Thrown = ragdolled / flung / knocked back); 4 = he presses them down silently (a thrown body lying on them, a runner a little above the floor);
+ -- nil = he is not on the keys (in the air: a knock-up, a jump). FloorMaterial is only read for you (a remote character's is not reliable): others go by their feet.
+ local function runnerKind(p,char,hum,root,pos)
+  local feetY=pos.Y-max(C.PlayerRootToFeet,(hum.HipHeight or 0)+root.Size.Y*.5)
+  local own=p==player
+  if own and hum.FloorMaterial==AIR then return nil end
+  local thrown=K.Thrown(p,char,hum)
+  if not own and feetY>F+C.PlayerFeetReach then return nil end
+  if thrown and feetY>F+C.PlayerFeetReach then return nil end -- a stale FloorMaterial under a flying body must not press anything
+  local vel=root.AssemblyLinearVelocity
+  if K.Steps(feetY,typeof(vel)=='Vector3'and vel.Y or 0,thrown)then return own and 1 or 2 end
+  return 4
+ end
  local function addFootprint(x,z,half,kind,who)
   local c1,c2,r1,r2=geo.CellRange(x-half,x+half,z-half,z+half)
   for r=r1,r2 do for c=c1,c2 do
@@ -1046,7 +1070,10 @@ local function start()
     local root=char and char:FindFirstChild('HumanoidRootPart');local hum=char and char:FindFirstChildOfClass('Humanoid')
     if root and hum and hum.Health>0 then
      local pos=root.Position
-     if abs(pos.Z-focusZ)<=range and pos.Y-C.PlayerRootToFeet<=F+C.PlayerFeetReach then addFootprint(pos.X,pos.Z,C.PlayerFootprint,2,p)end
+     if abs(pos.Z-focusZ)<=range then
+      local kind=runnerKind(p,char,hum,root,pos)
+      if kind then addFootprint(pos.X,pos.Z,C.PlayerFootprint,kind,p)end
+     end
     end
    end
   end
@@ -1061,7 +1088,7 @@ local function start()
       local ok,f=pcall(Dash.VisualFrame,model,serverNow,frame);if ok and typeof(f)=='CFrame'then frame=f end
      end
      local pos=frame.Position
-     if abs(pos.Z-focusZ)<=range and pos.Y-rec.ExtY*.5<=F+C.PlayerFeetReach then addFootprint(pos.X,pos.Z,rec.Half,3,model)end
+     if abs(pos.Z-focusZ)<=range and pos.Y-rec.ExtY*.5<=F+C.PlayerFeetReach then addFootprint(pos.X,pos.Z,rec.Half,3,model)end -- a keeper presses the keys under it, silently (R153)
     end
    end
   end
@@ -1236,7 +1263,8 @@ local function start()
   end
   -- presses: the local runner every frame, everyone else from the last 30 Hz sample, pack platforms hold their keys down
   if T.Sample>=1/C.PlayerSampleHz then T.Sample=T.Sample%(1/C.PlayerSampleHz);sampleOthers()end
-  if hasRoot and humRef and humRef.Health>0 and humRef.FloorMaterial~=AIR then
+  local ownKind=hasRoot and humRef and humRef.Health>0 and runnerKind(player,charRef,humRef,rootRef,rootRef.Position) -- R153: 1 = steps (sounds), 4 = silent, nil = off the keys
+  if ownKind then
    local p=rootRef.Position;local half=C.PlayerFootprint
    local x0,x1,z0,z1=p.X-half,p.X+half,p.Z-half,p.Z+half
    -- R151: the key ahead must be down when the foot gets there (the press takes PressSeconds): the footprint also covers PressLead seconds of
@@ -1249,7 +1277,7 @@ local function start()
     if lz>0 then z1+=lz else z0+=lz end
    end
    local c1,c2,r1,r2=geo.CellRange(x0,x1,z0,z1)
-   for r=r1,r2 do for c=c1,c2 do pressCell(r,c,1,nil,p.X,p.Z)end end
+   for r=r1,r2 do for c=c1,c2 do pressCell(r,c,ownKind,nil,p.X,p.Z)end end
   end
   for i=1,oN do pressCell(oRow[i],oCol[i],oKind[i],oWho[i],oX[i],oZ[i])end
   for _,key in ipairs(platList)do local s=slotOf[key];if s then touch(s,0,nil,kX[s],kZ[s])end end
