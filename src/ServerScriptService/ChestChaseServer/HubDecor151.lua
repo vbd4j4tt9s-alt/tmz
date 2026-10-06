@@ -210,6 +210,8 @@ function M.Apply(map)
  buildWalls(root);buildGate(root);buildPaths(root,bases)
  root:SetAttribute('Parts',K.Made-made0)
  root.Parent=map
+ -- R153: the trampolines in the two garden nooks (their own folder; HubTrampoline153 builds the collision and the look)
+ do local ok,err=pcall(function()require(script.Parent.HubTrampoline153).Build(map)end);if not ok then warn('[R153] Trampolines skipped: '..tostring(err))end end
  -- the owner's studded tree models (loaded once per server; the clients use them as tree templates)
  task.spawn(function()local ok,err=pcall(function()require(script.Parent.HubTreeLoader151).Run()end);if not ok then warn('[R151 trees] '..tostring(err))end end)
  return root
