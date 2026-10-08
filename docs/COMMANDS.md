@@ -165,6 +165,11 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 | `keepermodels` (server) | R152: the new keeper models the game builds at server start: bake status (needs Game Settings → Security → "Allow Mesh / Image APIs"), which model each keeper shows (`R152` or `Legacy`), parts and triangles |
 | `keepermodels off` / `keepermodels auto` (server) | `off` = every keeper goes back to today's (R151) model, each at its next idle moment; `auto` = the new models again |
 
+## Hotbar (R153)
+| Command | What it does |
+|---|---|
+| `hotbar` | R153: the hotbar log on / off for you: every press (PC, phone, gamepad), what it did (equip, unequip, moved, stowed, ignored) and anything the server moved back, with times, in a copyable box top-left and as `[Hotbar]` lines in F9. The last 60 lines are kept even while it is off. The reply also prints the server's view: what is in your hand, the pack it holds, recent late holds or refusals and why. Paste it to me if a press ever goes missing |
+
 ## Verity's voice
 | Command | What it does |
 |---|---|
