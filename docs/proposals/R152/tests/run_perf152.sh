@@ -30,6 +30,9 @@ JOBS=${JOBS:-4}
 mkdir -p "$OUT"
 T=$REPO/tools/tests;P=$REPO/docs/proposals;INV=$P/inventory_R113/tests;S=$REPO/src;SP=$S/StarterPlayer/StarterPlayerScripts
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
+# (R153: the Void giveaway pack's pulse skips a colour write that stays inside the same 8-bit level, and a part keeps its colour as 8 bits a channel,
+# so a part colour is compared at those 8 bits: R153's fingerprint options, perf153_opts.luau, unless PERF_EXTRA is set, even to nothing)
+if [ -z "${PERF_EXTRA+x}" ] && [ -f "$P/R153/tests/perf153_opts.luau" ];then PERF_EXTRA=$P/R153/tests/perf153_opts.luau;fi
 echo "== 0. static"
 if [ -n "$BASE" ];then
 echo "(base: $BASE)"

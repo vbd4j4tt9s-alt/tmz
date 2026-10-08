@@ -36,7 +36,7 @@ scripts against each other; the writes are the measure). Tiers: 3 = PC, 2 = phon
 | | Change | Win |
 |---|---|---|
 | D2 | `ArtworkRuntime87`: an icon holder keeps its fallback strips only while no picture of it is shown; they come back if the picture is ever unloaded | PlayerGui with the icons loaded **37,389 -> 6,967** instances (hub and track, every tier); 30,422 hidden strips -> 0 |
-| D3 | Void giveaway: the pieces that never move against the bag are welded to its anchored root, each spinning ring to one invisible hub that turns; `VoidPackFx.Pulse` skips a colour write that stays in the same 8-bit level (the engine keeps part colours in 8 bits) | Plaza writes / frame (tier 3 / 2 / 1): giveaway **294 / 289 / 286 -> 73 / 79 / 76**; all scripts at the plaza 326 / 324 / 322 -> 105 / 112 / 108. Mock Lua for the giveaway client 1.55 / 1.72 / 1.67 ms -> 1.26 / 0.99 / 0.79 ms. +195 never-drawn instances (the welds and 3 hubs) |
+| D3 | Void giveaway: the pieces that never move against the bag are welded to its anchored root, each spinning ring to one invisible hub that turns; `VoidPackFx.Pulse` skips a colour write that stays in the same 8-bit level (the engine keeps part colours in 8 bits) | Plaza writes / frame (tier 3 / 2 / 1): giveaway **294 / 289 / 286 -> 73 / 79 / 76**; all scripts at the plaza 326 / 324 / 322 -> 105 / 111 / 108. Mock Lua for the giveaway client 1.75 / 1.64 / 1.22 ms -> 0.86 / 0.84 / 0.77 ms. +195 never-drawn instances (the welds and 3 hubs) |
 | D6 | Keepers past 200 studs (every keeper effect is off there): once a step has switched their effects off, `KeeperFx` / `KeeperFx152` are not stepped again until the keeper comes within 200 studs; the body's smoothing and pose rules are unchanged (on screen within 350 studs it is still posed every frame) | At the hub all 7 keepers are past 200 studs: 14 effect steps a frame -> 0. Keeper writes unchanged (identical fingerprints) |
 | D7 | `ClientFxBudget.HighlightRoom`: the track packs' outlines take what is left of Roblox's 31 after the weather glows, mutation outlines, plant auras and Void packs; on tier 2 a pack past 150 studs keeps its outline only among the nearest 8 (its far aura stays) | Pack outlines on phones **24 -> 8**; with 16 weather glows: PC 40 -> 30 Highlights at once (never over 31: none silently dropped), phones 40 -> 24. Within 150 studs: the same outlines on every tier |
 | D8 | Keyboard far letters render to 500 studs on tier 2 (800 elsewhere) | On phones the letter window ends ~360 studs ahead of the runner, so at a normal camera nothing changes; a far / zoomed-out camera no longer draws letters past 500 studs |
@@ -45,7 +45,7 @@ scripts against each other; the writes are the measure). Tiers: 3 = PC, 2 = phon
 | A1 | 73 dead files retired (below) | **4.5 MB** less ReplicatedStorage sent to every player at join (10.3 -> 5.8 MB) |
 | A2 | `ChestService`: the never-run `BuildPlantAt` / `BuildGrowthModel` / `BuildArtLibrary` / `RenderGarden` (131 lines) replaced by a pointer to `GardenPlantRuntime` | `test_live_methods153` proves which functions are live |
 | A8 | One quality signal: the frame rate is measured once, in `ClientFxBudget`; `SettingsClient`'s Auto quality reads its 3 s windows instead of counting frames on its own Heartbeat. Thresholds unchanged (tier 42 / 55 fps, FastMode 38 / 53 fps) | Per-frame connections 71 -> 70 (PC hub), 70 -> 69 (phone hub), 69 -> 68 (track). Same FastMode decisions at the same frames (`test_quality153`) |
-| R153 | Hub displays: an inactive display (far, FastMode, tier 1) no longer writes its item home and resets its avatar every half second | 2.7-4.5 same-value CFrame writes a frame -> 0.2 (on the track too: tier 2 43.5 -> 41.4, tier 1 33.4 -> 30.1 writes / frame) |
+| R153 | Hub displays: an inactive display (far, FastMode, tier 1) no longer writes its item home and resets its avatar every half second | 2.7-4.5 same-value CFrame writes a frame -> 0.2 (on the track too: tier 2 43.5 -> 40.8, tier 1 33.4 -> 29.6 writes / frame) |
 
 Unchanged by design (they need geometry or settings changes, so they are in the checklist or the bigger wins): drawn parts within 400 studs
 (hub 7,314 / 7,244 / 7,001; track 2,355 / 2,053 / 1,800), keycap detail, shadows, streaming.
@@ -121,9 +121,13 @@ fallback strips, a parked (switched-off) far keyboard strip's MaxDistance.
 
 ## Tests
 
-`run_perf153.sh` (registered in `tools/tests/run_all_suites.sh`), plus the suites this patch touches, each in its own scratch dir: perf152,
-load_guard, jitter, keepers, hub_displays, keyboard, void_giveaway, seed_opening, badges, pack_parts, sfx, R152 run, and the ones listed in the
-final report. Suites updated narrowly: R148 `test_index_limited` (the fallback may be gone once the picture shows; new: it is drawn again after
+`run_perf153.sh` (registered in `tools/tests/run_all_suites.sh`), plus the suites this patch touches, each in its own scratch dir, all passing:
+R152 perf152 (its own base, the R152 patch switched off: hub, keyboard, keepers, seed, hotbar, popups, packs identical or same-visible),
+load_guard, keepers, void_giveaway, seed_opening, zfight_sweep, R152 `run.sh`; R153 jitter, pack_parts, fixes, fixes_client, fixes_server,
+clover, seed_rarity, nooks, fling_swoosh, track_walls, mech_pack, hotbar, treadmills; R151 hub_displays, badges, pack_shapes, packs, perf,
+rare_pull, announce, treadmills, speed_popups, static checks; R150 sfx; R149 keyboard, growth, weather, tiger_gear; R148 index_limited; R147;
+R137; R130; veiled / holes R122; perf R121. `run_perf152.sh` now compares part colours at 8 bits by default (`perf153_opts.luau`), because the
+giveaway pulse skips a write inside the same 8-bit level. Suites updated narrowly: R148 `test_index_limited` (the fallback may be gone once the picture shows; new: it is drawn again after
 an unload), R149 `test_keyboard` (tier 2's far letters render to 500 studs), R152 `test_giveaway_client` (a piece is anchored or welded to an
 anchored part of the pack), R150 `run_sfx` / `test_fast_travel` and R152 `run.sh` (retired modules out of their lists), R153 `run_pack_parts`
 (the retired pouch data from git). `tools/tests/roblox.luau`: a Weld whose Part0 is anchored moves its Part1 when Part0 moves, as the engine does.
