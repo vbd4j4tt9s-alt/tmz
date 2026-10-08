@@ -18,6 +18,8 @@
 #                loaded), drawn parts within 400 studs, per-frame connections, property writes per frame (the giveaway pack's own), Lua ms
 #  5. units    - test_live_methods153 (which functions are live), test_skin_spread153 (D9: the spread re-skin = the one-frame re-skin),
 #                test_quality153 (one quality signal = the old SettingsClient windows)
+# R154: the base side also has R154's B1 (shadows of parts under 1.5 studs) and B3 (phones' keyboard letters / rows) undone (perf153_off.py; R154_KEEP=1 keeps them),
+#  and docs/proposals/R154/tests/perf154_opts.luau lets exactly those differ in the fingerprints (see docs/proposals/R154/perf154.md); the numbers table has their rows.
 # Without the place file parts 1 (hub / keyboard), 2 and 4 are skipped.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -56,7 +58,8 @@ if grep -rnwE "SeedPackArt[A-Za-z]*[0-9]*|SeedPackLOD[A-Za-z]+|SeedPackShapes[A-
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]|gp[t]-?[0-9]" "$HERE"/perf153_* "$HERE"/run_perf153.sh "$HERE"/test_*153.luau "$P/R153/perf153.md" 2>/dev/null;then fail "a model name in the perf153 files";else echo "ok: no model names in the perf153 files";fi
 
 echo "== 1. look and sound: the R152 fingerprints, base = $( [ -n "$BASE" ] && echo "$BASE" || echo 'this checkout with the R153 perf patch switched off')"
-if PERF_BASE_SRC="$B" PERF_EXTRA="$HERE/perf153_opts.luau" JOBS=$JOBS sh "$P/R152/tests/run_perf152.sh" "$OUT/fp" "$PLACE" > "$OUT/fp.log" 2>&1;then
+# (R154: perf154_opts.luau lets exactly the two approved bigger wins differ - B1 shadows of parts under 1.5 studs, B3 the phones' keyboard - the base side has them undone too)
+if PERF_BASE_SRC="$B" PERF_EXTRA="$HERE/perf153_opts.luau $P/R154/tests/perf154_opts.luau" JOBS=$JOBS sh "$P/R152/tests/run_perf152.sh" "$OUT/fp" "$PLACE" > "$OUT/fp.log" 2>&1;then
  grep -E "^(ok|SKIPPED|R152 perf)|identical|same-visible|offscreen|^  allowed" "$OUT/fp.log" | grep -v "^ok: every script compiles" | cut -c1-220 | sort | uniq -c | sort -rn | head -40
  echo "ok: every fingerprint (hub, keyboard, keepers, seed opening and its sounds, hotbar, popups, packs) matches what is drawn"
 else fail "the R152 fingerprints differ";grep -E "FAIL|DIFFERENT|differs" "$OUT/fp.log" | head -40;fi

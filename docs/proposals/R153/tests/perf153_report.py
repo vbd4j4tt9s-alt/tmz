@@ -19,9 +19,16 @@ def read(path):
         m = re.match(r'FALLBACK tier=.* instances_in_them=(\d+)', l)
         if m:
             out['fallbacks'] = int(m.group(1))
-        m = re.match(r'RADIUS tier=\d+ spot=\w+ r=400 drawn=(\d+)', l)
+        m = re.match(r'RADIUS tier=\d+ spot=\w+ r=400 drawn=(\d+) shadow=(\d+) shadow<1.5=(\d+)', l)
         if m:
             out['drawn400'] = int(m.group(1))
+            # (R154, lag audit B1: the sun's shadow casters within 400 studs, and the ones under 1.5 studs)
+            out['shadow400'], out['tiny400'] = int(m.group(2)), int(m.group(3))
+        # (R154, lag audit B3: the keyboard's keycaps, SurfaceGuis, letter canvas pixels and letters)
+        m = re.match(r'CENSUS tier=\d+ spot=\w+ \| keyboard \| .*? mesh=(\d+) sgui=(\d+) sguiPx=([\d.]+)M labels=(\d+)', l)
+        if m:
+            out['kb_keys'], out['kb_sgui'], out['kb_px'], out['kb_labels'] = int(m.group(1)), int(m.group(2)), float(m.group(3)), int(m.group(4))
+            out['kb_mb'] = float(m.group(3)) * 4  # (4 bytes a pixel)
         m = re.match(r'LOOPS tier=\d+ spot=\w+ n=(\d+)', l)
         if m:
             out['loops'] = int(m.group(1))
@@ -44,7 +51,9 @@ def read(path):
 
 ROWS = [('ui', 'PlayerGui instances (icons loading)', '%d'), ('ui_loaded', 'PlayerGui instances (icons loaded)', '%d'),
         ('fallbacks_loaded', '  of which hidden icon fallback strips', '%d'), ('inst', 'Workspace instances', '%d'),
-        ('drawn400', 'drawn parts within 400 studs', '%d'), ('loops', 'per-frame connections alive', '%d'), ('writes', 'property writes / frame', '%.1f'),
+        ('drawn400', 'drawn parts within 400 studs', '%d'), ('shadow400', 'shadow casters within 400 studs (R154 B1)', '%d'), ('tiny400', '  of which under 1.5 studs', '%d'),
+        ('kb_keys', 'keyboard keys (keycap meshes) (R154 B3)', '%d'), ('kb_sgui', 'keyboard SurfaceGuis', '%d'), ('kb_px', 'keyboard letter canvas, M pixels', '%.1f'),
+        ('kb_mb', '  = letter texture memory, MB (4 bytes a pixel)', '%.1f'), ('kb_labels', 'keyboard letters drawn', '%d'), ('loops', 'per-frame connections alive', '%d'), ('writes', 'property writes / frame', '%.1f'),
         ('giveaway', '  the giveaway pack', '%.1f'), ('keepers', '  the keepers', '%.1f'), ('luams', 'Lua ms / frame (mock)', '%.2f')]
 
 
