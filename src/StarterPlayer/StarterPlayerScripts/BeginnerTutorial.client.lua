@@ -132,45 +132,6 @@ local spotHand=Instance.new('BillboardGui');spotHand.Name='TapSpot';spotHand.Alw
 local spotRipple=frame(spotHand,'Ripple',1);spotRipple.AnchorPoint=Vector2.new(.5,.5);spotRipple.Position=UDim2.new(.5,0,1,-14);round(spotRipple);local spotRippleStroke=stroke(spotRipple,RGB(255,236,120),3)
 local spotFinger=text(spotHand,'Hand','👇',60);spotFinger.AnchorPoint=Vector2.new(.5,1);spotFinger.Position=UDim2.new(.5,0,1,-14);spotFinger.Size=UDim2.fromOffset(64,64);spotFinger.TextScaled=true;spotFinger.TextStrokeTransparency=1;spotFinger.ZIndex=2
 
--- World pieces (this client only, so nobody else sees them; built while the tutorial runs, gone after) ----------------
-local folder,anchor,ring,beam,lastTarget,lastSpot,trailFrom,trailTo;local trailParts,chevrons,lastAlpha,parked={}, {}, {}, {}
-local moveParts,moveFrames={}, {} -- reused every frame: only the chevrons that move are sent to BulkMoveTo
-local TRAIL_COUNT,SPACING,FLOW,REACH,BEAM_HEIGHT=36,3,4.5,2.4,60
-local PARKED=CFrame.new(0,-5000,0)
--- Chevron in its own frame: forward is -Z, tip at z=-0.7. Red neon arms sit on slightly larger white rims.
-local ARM=1.7;local shape
-do local ANGLE,TIP=math.rad(45),-.7;local sa,ca=math.sin(ANGLE),math.cos(ANGLE)
-shape={
- CFrame.new(-sa*ARM/2,.03,TIP+ca*ARM/2)*CFrame.Angles(0,-ANGLE,0),CFrame.new(sa*ARM/2,.03,TIP+ca*ARM/2)*CFrame.Angles(0,ANGLE,0),
- CFrame.new(-sa*ARM/2,0,TIP+ca*ARM/2)*CFrame.Angles(0,-ANGLE,0),CFrame.new(sa*ARM/2,0,TIP+ca*ARM/2)*CFrame.Angles(0,ANGLE,0),
-}end
-local ringAlpha,beamAlpha=1,1
-local function buildWorld()
- if folder then return end
- local function flat(name,size,color,material)
-  local p=Instance.new('Part');p.Name=name;p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false;p.Locked=true
-  p.Size=size;p.Color=color;p.Material=material;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Transparency=1;p.CFrame=PARKED;p.Parent=folder
-  trailParts[#trailParts+1]=p;return p
- end
- folder=Instance.new('Folder');folder.Name='TutorialTrail';trailParts={};chevrons={};lastAlpha={};parked={};lastTarget,lastSpot,trailFrom=nil,nil,nil
- anchor=Instance.new('Part');anchor.Name='TutorialTarget';anchor.Anchored=true;anchor.CanCollide=false;anchor.CanQuery=false;anchor.CanTouch=false;anchor.CastShadow=false;anchor.Transparency=1;anchor.Size=Vector3.new(.1,.1,.1);anchor.CFrame=PARKED;anchor.Parent=folder
- for i=1,TRAIL_COUNT do
-  chevrons[i]={flat('ArmL',Vector3.new(.7,.06,ARM),COL.Red,Enum.Material.Neon),flat('ArmR',Vector3.new(.7,.06,ARM),COL.Red,Enum.Material.Neon),
-   flat('RimL',Vector3.new(1.1,.04,ARM+.4),WHITE,Enum.Material.SmoothPlastic),flat('RimR',Vector3.new(1.1,.04,ARM+.4),WHITE,Enum.Material.SmoothPlastic)}
-  lastAlpha[i]=1;parked[i]=true
- end
- ring=flat('GoalSpot',Vector3.new(.1,6,6),COL.Beam,Enum.Material.Neon);ring.Shape=Enum.PartType.Cylinder
- -- A light beam standing on the goal, seen from far away (a cylinder lies along X, so it is turned upright).
- beam=flat('GoalBeam',Vector3.new(BEAM_HEIGHT,1.4,1.4),COL.Beam,Enum.Material.Neon);beam.Shape=Enum.PartType.Cylinder
- ringAlpha,beamAlpha=1,1;marker.Adornee=anchor;spotHand.Adornee=anchor
- folder.Parent=workspace
-end
-local function dropWorld()
- set(marker,'Enabled',false);set(spotHand,'Enabled',false);set(edge,'Visible',false);marker.Adornee=nil;spotHand.Adornee=nil
- if folder then folder:Destroy()end;folder,anchor,ring,beam,lastTarget,lastSpot=nil,nil,nil,nil,nil,nil;trailParts,chevrons,lastAlpha,parked={}, {}, {}, {}
- table.clear(moveParts);table.clear(moveFrames)
-end
-
 -- State ----------------------------------------------------------------------------------
 local dead,busy=false,false;local info:{[string]:any}={};local step=0;local connections={};local metrics
 local poll,lookPoll,step5Seconds,finishRetry=0,0,0,0;local fetch,render,place,startConfetti,updateConfetti
@@ -178,17 +139,6 @@ local finishedUntil,skipArmedUntil,niceUntil,popAt,wasActive,skipped,packComing=
 local lastDevice,lastKey,lastStep,shownKey,currentKey=nil,nil,0,nil,nil
 local highlightButton,goal,cardBottom,cardH=nil,nil,0,112;local currentText='';local currentLook;local clickSeen,clickPopAt,confettiAt=0,-math.huge,nil
 
-local function alphaFor(i,value)
- value=math.clamp(math.floor(value*100+.5)/100,0,1) -- (R153: 1/100, was 1/10: the chevrons faded in and out in ten visible steps)
- if lastAlpha[i]==value then return end;lastAlpha[i]=value
- local c=chevrons[i];c[1].Transparency=value;c[2].Transparency=value;c[3].Transparency=math.max(value,.15);c[4].Transparency=math.max(value,.15)
-end
-local function hideTrail()
- if not folder then return end
- trailFrom=nil;for i=1,TRAIL_COUNT do alphaFor(i,1)end
- if ringAlpha~=1 then ringAlpha=1;ring.Transparency=1 end
- if beamAlpha~=1 then beamAlpha=1;beam.Transparency=1 end
-end
 local function blocked()return pg:GetAttribute('SeedMenu')~=nil or pg:GetAttribute('TitleActive')==true or player:GetAttribute('RarePullCinematic')~=nil end
 -- On the biome track (same test as the shovel holes): true / false, or nil when the map has not said where the track is.
 local function trackState()
@@ -249,6 +199,61 @@ local function resolve()
  end
  return spec,'Step'..step
 end
+
+-- R153 hotfix (KeyboardTrack died in Studio with "Out of local registers ... exceeded limit 200": Roblox compiles without folding constant
+-- locals; this chunk stood at 182 of the 200): the world pieces below live in one do-block, so their parts, constants and helpers go out of scope
+-- once built; what the rest of the script uses from them is declared here. tools/tests/check_compile_O0.sh keeps every function under 180.
+local folder,buildWorld,dropWorld,hideTrail,hideWorld,updateWorld
+do
+-- World pieces (this client only, so nobody else sees them; built while the tutorial runs, gone after) ----------------
+local anchor,ring,beam,lastTarget,lastSpot,trailFrom,trailTo;local trailParts,chevrons,lastAlpha,parked={}, {}, {}, {}
+local moveParts,moveFrames={}, {} -- reused every frame: only the chevrons that move are sent to BulkMoveTo
+local TRAIL_COUNT,SPACING,FLOW,REACH,BEAM_HEIGHT=36,3,4.5,2.4,60
+local PARKED=CFrame.new(0,-5000,0)
+-- Chevron in its own frame: forward is -Z, tip at z=-0.7. Red neon arms sit on slightly larger white rims.
+local ARM=1.7;local shape
+do local ANGLE,TIP=math.rad(45),-.7;local sa,ca=math.sin(ANGLE),math.cos(ANGLE)
+shape={
+ CFrame.new(-sa*ARM/2,.03,TIP+ca*ARM/2)*CFrame.Angles(0,-ANGLE,0),CFrame.new(sa*ARM/2,.03,TIP+ca*ARM/2)*CFrame.Angles(0,ANGLE,0),
+ CFrame.new(-sa*ARM/2,0,TIP+ca*ARM/2)*CFrame.Angles(0,-ANGLE,0),CFrame.new(sa*ARM/2,0,TIP+ca*ARM/2)*CFrame.Angles(0,ANGLE,0),
+}end
+local ringAlpha,beamAlpha=1,1
+function buildWorld()
+ if folder then return end
+ local function flat(name,size,color,material)
+  local p=Instance.new('Part');p.Name=name;p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false;p.Locked=true
+  p.Size=size;p.Color=color;p.Material=material;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Transparency=1;p.CFrame=PARKED;p.Parent=folder
+  trailParts[#trailParts+1]=p;return p
+ end
+ folder=Instance.new('Folder');folder.Name='TutorialTrail';trailParts={};chevrons={};lastAlpha={};parked={};lastTarget,lastSpot,trailFrom=nil,nil,nil
+ anchor=Instance.new('Part');anchor.Name='TutorialTarget';anchor.Anchored=true;anchor.CanCollide=false;anchor.CanQuery=false;anchor.CanTouch=false;anchor.CastShadow=false;anchor.Transparency=1;anchor.Size=Vector3.new(.1,.1,.1);anchor.CFrame=PARKED;anchor.Parent=folder
+ for i=1,TRAIL_COUNT do
+  chevrons[i]={flat('ArmL',Vector3.new(.7,.06,ARM),COL.Red,Enum.Material.Neon),flat('ArmR',Vector3.new(.7,.06,ARM),COL.Red,Enum.Material.Neon),
+   flat('RimL',Vector3.new(1.1,.04,ARM+.4),WHITE,Enum.Material.SmoothPlastic),flat('RimR',Vector3.new(1.1,.04,ARM+.4),WHITE,Enum.Material.SmoothPlastic)}
+  lastAlpha[i]=1;parked[i]=true
+ end
+ ring=flat('GoalSpot',Vector3.new(.1,6,6),COL.Beam,Enum.Material.Neon);ring.Shape=Enum.PartType.Cylinder
+ -- A light beam standing on the goal, seen from far away (a cylinder lies along X, so it is turned upright).
+ beam=flat('GoalBeam',Vector3.new(BEAM_HEIGHT,1.4,1.4),COL.Beam,Enum.Material.Neon);beam.Shape=Enum.PartType.Cylinder
+ ringAlpha,beamAlpha=1,1;marker.Adornee=anchor;spotHand.Adornee=anchor
+ folder.Parent=workspace
+end
+function dropWorld()
+ set(marker,'Enabled',false);set(spotHand,'Enabled',false);set(edge,'Visible',false);marker.Adornee=nil;spotHand.Adornee=nil
+ if folder then folder:Destroy()end;folder,anchor,ring,beam,lastTarget,lastSpot=nil,nil,nil,nil,nil,nil;trailParts,chevrons,lastAlpha,parked={}, {}, {}, {}
+ table.clear(moveParts);table.clear(moveFrames)
+end
+local function alphaFor(i,value)
+ value=math.clamp(math.floor(value*100+.5)/100,0,1) -- (R153: 1/100, was 1/10: the chevrons faded in and out in ten visible steps)
+ if lastAlpha[i]==value then return end;lastAlpha[i]=value
+ local c=chevrons[i];c[1].Transparency=value;c[2].Transparency=value;c[3].Transparency=math.max(value,.15);c[4].Transparency=math.max(value,.15)
+end
+function hideTrail()
+ if not folder then return end
+ trailFrom=nil;for i=1,TRAIL_COUNT do alphaFor(i,1)end
+ if ringAlpha~=1 then ringAlpha=1;ring.Transparency=1 end
+ if beamAlpha~=1 then beamAlpha=1;beam.Transparency=1 end
+end
 local function currentTarget()
  if not goal then return nil end
  if goal=='Gate'then return trackGate()end
@@ -296,8 +301,8 @@ local function drawTrail(root,target,now)
  if #moveParts>0 then workspace:BulkMoveTo(moveParts,moveFrames,Enum.BulkMoveMode.FireCFrameChanged)end
 end
 local rayFor,rayFolder
-local function hideWorld()hideTrail();set(marker,'Enabled',false);set(spotHand,'Enabled',false);set(edge,'Visible',false)end
-local function updateWorld()
+function hideWorld()hideTrail();set(marker,'Enabled',false);set(spotHand,'Enabled',false);set(edge,'Visible',false)end
+function updateWorld()
  if not folder then return end
  local character=player.Character;local root=character and character:FindFirstChild('HumanoidRootPart')
  local target=currentTarget()
@@ -339,6 +344,7 @@ local function updateWorld()
   local scale=math.min((view.X/2-46)/math.max(math.abs(dx),.01),(view.Y/2-90)/math.max(math.abs(dy),.01))
   set(edge,'Position',UDim2.fromOffset(math.floor(view.X/2+dx*scale),math.floor(view.Y/2+dy*scale)));set(edge,'Rotation',math.floor(math.deg(math.atan2(dy,dx))-90))
  end
+end
 end
 -- The pressing hand on a screen button: the TRACK / BASE button, or the hotbar slot of the pack / seed to pick.
 local function updateTap()
