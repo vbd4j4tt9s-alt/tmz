@@ -631,7 +631,7 @@ do
  local config={SeedCatalogByStage=Packs.BuildSeedCatalog()}
  local expectOdds={}
  for _,stage in ipairs({1,6,2,3,4,5,7})do
-  local odds=Packs.SeedOdds(config,stage,'Pack01',1)
+  local odds=(Packs.RawSeedOdds or Packs.SeedOdds)(config,stage,'Pack01',1) -- R154: the Index's number is the home pack's table before the 80% rule (SeedRarity153 / ChestService BaseChance)
   for _,seed in ipairs(Packs.ObtainablePool(config,stage))do
    local slot;for i,s in ipairs(config.SeedCatalogByStage[Packs.ObtainableStage(seed.Id)or stage])do if s.Id==seed.Id then slot=i end end
    local e=R.new('Folder');e.Name=seed.Id
