@@ -18,8 +18,8 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 -- top is measured from the rest poses (the RestCFrame / TreeRestCFrame / IdleRestCFrame the rig parts carry, so the pose and the
 -- animation do not matter), without the root / hitbox and the effect parts, and measured again - debounced - only when body parts are
 -- added or removed (a swap, a late stream); it stops listening once the model has been quiet. No per-frame work; nothing is written unless it changed.
--- (The R153 jitter sweep had hung the sign on KeeperFollow153's smoothed-body anchor so it glided with the keeper. A pinned sign never moves,
--- so there is nothing to smooth: it does not use KeeperFollow153, which stays for the keeper bodies.)
+-- (The R153 jitter sweep had hung the sign on a smoothed-body follow anchor so it glided with the keeper. A pinned sign never moves,
+-- so there is nothing to smooth: it uses no follow anchor, and that anchor module (KeeperFollow) is gone.)
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local player=Players.LocalPlayer
 local LIFT=18 -- studs from the top of the keeper's body at rest up to the centre of the sign (owner: "really high up"; the sign is a fixed 104x36 px, far away its half height is a few studs: this keeps a gap)

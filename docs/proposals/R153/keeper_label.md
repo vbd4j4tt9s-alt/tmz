@@ -63,7 +63,8 @@ stays byte-identical otherwise).
 
 The R153 jitter sweep (merged) had hung the sign on `KeeperFollow153`'s smoothed-body anchor so it glided with the keeper. The owner's spec
 replaces that for the signs: a pinned sign never moves, so there is nothing to smooth and the label script does not use `KeeperFollow153`
-(it stays for the keeper bodies and The Darkened's body). `run_jitter.sh`'s expectations about the signs changed to match
+(the client bug review's finding 5 then removed the module and the per-frame anchors `BeastAnimation` and `VeiledEventClient81` still moved for it:
+nothing read them; the keeper bodies' own smoothing, `KeeperMotion`, is untouched). `run_jitter.sh`'s expectations about the signs changed to match
 (`test_jitter_keepers`: the sign does not move at all while the keeper runs in packet steps, at 30 / 60 / 144 fps; `test_jitter_misc`: the static check).
 
 ## Not covered

@@ -176,6 +176,12 @@ do
  check(labelCode:find("entry.Gui.Adornee=a;entry.Gui.Parent=a",1,true)~=nil and labelCode:find('KeeperFollow153',1,true)==nil and labelCode:find('Follow',1,true)==nil
   and labelCode:find('RenderStepped',1,true)==nil and labelCode:find('Heartbeat',1,true)==nil and labelCode:find('KeeperHome',1,true)~=nil,
   'KeeperSpeedLabels pins the sign on its own anchor at the keeper\'s spawn point (not the smoothed body\'s anchor, no per-frame signal)')
+ -- (client bug review, finding 5: nothing read KeeperFollow153's anchors once the signs were pinned, so the animators neither build nor move them: no BulkMoveTo entry per keeper per frame)
+ for _,name in ipairs({'BeastAnimation','VeiledEventClient81'})do
+  local code=(B[name]:gsub('%-%-[^\n]*',''))
+  check(code:find('Follow',1,true)==nil and W.RS:FindFirstChild('KeeperFollow153')==nil,name..' does not build or move a KeeperFollow153 anchor (no Follow.Drive / Push / Release, the module is gone)')
+ end
+ check(B.BeastAnimation:find('Motion.Update(r.Motion,frame,speed',1,true)~=nil and B.VeiledEventClient81:find('Motion.Update(r.Motion,visual,speed',1,true)~=nil,'the keeper bodies keep their KeeperMotion smoothing (BeastAnimation, The Darkened)')
  check(B.PlantGrowthFx:find('Tick%2',1,true)==nil,'PlantGrowthFx: a flying fruit\'s size is written every frame')
  check(B.RunnerTrailArt:find('colors[(i+1)%n+1]',1,true)~=nil,'RunnerTrailArt.Cycle flows into the next colour (the Aurora halo snapped)')
  -- the server: no part tweened, and per-frame (Heartbeat / Stepped) only in the gameplay services
