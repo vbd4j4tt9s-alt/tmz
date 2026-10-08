@@ -103,7 +103,9 @@ for _,sc in ipairs(SEED_SET or{})do
   FP.timeHandlers(W.Run);W.frames(1,dt);f+=1
   if f==math.floor(dur/dt+.5)then bag:Destroy();if tool then tool:Destroy()end end -- the server ends the opening
   st:frame('f'..f,roots())
-  local busy=M.Active()~=nil or W.workspace:FindFirstChild('_RarePullStage')~=nil or X.pg:FindFirstChild('RarePullReveal')~=nil
+  -- (R154: a result waits for its collect: collected .3 s after its whole timeline, the seed flies home; the same on both sides)
+  local run=M.Active();if run and run.SawResult and not run.Collected and run.Clock()>=run.TL.Length+.3 then M.Collect()end
+  local busy=M.Active()~=nil or W.workspace:FindFirstChild('_RarePullStage')~=nil or X.pg:FindFirstChild('RarePullReveal')~=nil or X.pg:FindFirstChild('SeedCollectFly')~=nil
   if not busy and f*dt>dur then quiet+=1 else quiet=0 end
   if quiet*dt>=1 or f*dt>40 then break end
  end

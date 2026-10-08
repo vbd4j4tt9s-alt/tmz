@@ -20,6 +20,10 @@
 --  one (the short one only when the player has "Skip pack animations" on: now and then here) and plays to its end: it ends by itself, or,
 --  for a fast second pack opened over a card, after the card has shown its result (a story scene keeps the clicks and the gamepad's R2
 --  until it is over, so the next pack waits for it). Now and then the player skips (a click / the scene's button at a random moment).
+--  R154 (owner: "... the seed stays on the player's screen until they click and the seed goes to their inventory"): no presentation ends by
+--  itself now: its result waits until the player collects it (a click / the scene's button, at a random moment after it is up: at once or
+--  seconds later), or something collects it for them (a death, the fast second pack). Every opening must end with its result collected and
+--  its seed flown in (landed), unless the opener died before the seed was revealed (then it simply shows); nothing left flying.
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local Y=require('./rare152_env')(W,E,F,X)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -41,7 +45,9 @@ local Players=W.service('Players')
 local Visuals=W.module('SeedPackVisuals');local Rules=W.module('SeedPackRules');local L=W.module('RarePullRules')
 local World=W.module('RarePullWorld');local M=W.module('RarePullCinematic');local Audio=W.module('RarePullAudio')
 local Card=W.module('RarePullCard');local Fx=W.module('RarePullFx');local Suspense=W.module('PackSuspense');local Flourish=W.module('RevealFlourish')
-local Art=W.module('RarePullArt')
+local Art=W.module('RarePullArt');local Collect=W.module('SeedCollect154')
+-- every seed that flew in (its hold ended with the arrival): id -> the count
+local landed={};Collect.OnRelease(function(id,cue)if cue and id~=nil then landed[id]=(landed[id]or 0)+1 end end)
 local Mech=W.module('MechCatalog');local Verity=W.module('VerityCatalog')
 local names={'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
 local cam=W.workspace.CurrentCamera
@@ -100,7 +106,8 @@ local function serverBag(char,pack,shape,size)
  if ok and bag then bag:SetAttribute('PackClickCount',0);bag:SetAttribute('PackClicksRequired',Rules.OpenClicks)end
  return ok and bag or nil
 end
-local function reveal(bag,seedId)
+local function reveal(bag,seedId,tool)
+ if tool then tool.Enabled=false end -- (the server switches the opened pack off as it commits: R154 finds the seed's id on it)
  local name=Rules.GetRarity(seedId)
  bag:SetAttribute('RevealSeedId',seedId);bag:SetAttribute('Rarity',name)
  bag:SetAttribute('RevealDuration',Rules.GetRevealDuration(name));bag:SetAttribute('RevealAt',W.workspace:GetServerTimeNow())
@@ -152,6 +159,7 @@ local function clean(tag)
  c(X.controls.Enabled,'movement is back')
  c(X.hud.Main.Enabled and X.hud.Hotbar.Enabled and X.hud.Touch.Enabled and X.core.PlayerList and X.core.Chat,'the HUD and the Core GUI are back')
  c(worldReveals()==0 and W.workspace:FindFirstChild('_LocalClickingPack')==nil,'no world reveal or clicking pack left')
+ c(Collect.Flying()==0 and X.pg:FindFirstChild('SeedCollectFly')==nil,'no seed left flying (R154)')
  local s=strayFx();c(#s==0,'no stray beam / emitter / light ('..table.concat(s,', ',1,math.min(#s,4))..')')
  return ok
 end
@@ -204,17 +212,21 @@ do
  X.run(Rules.GetRevealDuration('Secret'))
  own:Destroy();theirs:Destroy();tool:Destroy()
  X.run(6)
+ check(M.Active()==run and M.Waiting(),'a slow join: its result waits for the player (R154)')
+ M.Collect();local g=0;while(M.Active()or Collect.Flying()>0)and g<300 do X.run(.1);g+=1 end
  clean('slow join')
 end
 -- 0b. the seed's whoosh into the hand (SeedPackClient) is not cut when the world reveal ends (review fix B3): it was a child of the seed effect, destroyed at RevealDuration
 -- while the whoosh was still fading (cut at ~75 % volume). It must finish its fade (on an anchor of its own) and then be gone.
+-- (R154: the opener's own world seed no longer flies into the hand while their result waits on screen - it fades where it hovers - so this
+-- is checked on a pack someone else opens next to them, the seed flying into THAT player's hand: the same code, and what onlookers hear)
 do
- local hand=R.new('Part');hand.Name='RightHand';hand.Size=V3(1,1,1);hand.CFrame=CF(1.5,4,100);hand.Parent=X.char
+ local hand=R.new('Part');hand.Name='RightHand';hand.Size=V3(1,1,1);hand.CFrame=CF(13.5,4,96);hand.Parent=onlookerChar
  local known={};for _,s in ipairs(Y.sounds)do known[s]=true end
  local handedOver=0
  for _,rank in ipairs({3,5,7})do
   local tag='whoosh '..names[rank]
-  local tool=packTool(X.char,packs[6]);local bag=serverBag(X.char,packs[6],nil,1)
+  local tool=packTool(onlookerChar,packs[6]);local bag=serverBag(onlookerChar,packs[6],nil,1)
   if bag then
    bag:SetAttribute('PackClickCount',5);reveal(bag,X.byRank[rank])
    local snd,peak,lastVol,gone,goneVol,goneStops,onTail=nil,0,0,false,nil,nil,false
@@ -255,7 +267,7 @@ end
 baseline=census()
 local baseSet={};for _,d in ipairs(W.workspace:GetDescendants())do baseSet[d]=true end
 -- the random openings ---------------------------------------------------------------------------------------------------------------
-local stats={own=0,other=0,double=0,respawn=0,inject=0,unequip=0,fallbackArt=0,byRank={0,0,0,0,0,0,0,0},device={desktop=0,phone=0,low=0},injected={},short=0,skipped=0,toEnd=0,handedOver=0}
+local stats={own=0,other=0,double=0,respawn=0,inject=0,unequip=0,fallbackArt=0,byRank={0,0,0,0,0,0,0,0},device={desktop=0,phone=0,low=0},injected={},short=0,skipped=0,toEnd=0,handedOver=0,collected=0,landed=0,waited=0}
 -- R153: the presentation the opener got is the full one (or, with "Skip pack animations" on, the short one)
 local function fullFor(r,short)
  if r.Kind=='Ladder'then return r.Quick==(short==true)and r.TL.Length==L.CardTimeline(r.Rank,short==true).Length end
@@ -280,7 +292,7 @@ local function openOwn(trial,seedId,pack,shape,size,opts)
  -- the clicks (the server counts them)
  for i=1,Rules.OpenClicks do bag:SetAttribute('PackClickCount',i);bag:SetAttribute('PackClickAt',W.workspace:GetServerTimeNow());X.run(.12)end
  if opts.Unequip then tool.Parent=E.bag end -- (the hotbar switched on the same frame the reveal starts)
- reveal(bag,seedId)
+ reveal(bag,seedId,tool)
  local rank=select(2,Rules.GetRarity(seedId)).Rank
  W.frames(3,1/30)
  local run=M.Active()
@@ -344,7 +356,8 @@ for i=1,N do
     stats.double+=1
     -- (R153: a story scene keeps the clicks, the screen and the gamepad's R2 until it is over: the next pack is opened when the player has
     -- control again; over a card (the HUD and the controls stay the player's) straight away, while the card still plays)
-    if first and first.Kind=='Scene'then local g=0;while M.Active()==first and g<300 do X.run(.2,1/30,watch);g+=1 end end
+    -- (R154: its result waits: the player collects it, then opens the next pack)
+    if first and first.Kind=='Scene'then local g=0;while M.Active()==first and g<300 do if first.SawResult and not first.Collected and first.Clock()>=L.ShownAt(first.TL)+M.CollectAfter then skipNow()end;X.run(.2,1/30,watch);g+=1 end end
     X.run(rnd()*.3)
     local rank2=math.floor(rnd()*8)+1;local seed2=pick(seedsByRank[rank2])
     local o2=openOwn({Tag=tag..' then a fast '..names[rank2]},seed2,pick(packs),nil,1,{})
@@ -354,9 +367,16 @@ for i=1,N do
      o2.Bag:Destroy();o2.Tool:Destroy()
     end
    end
-   -- the presentation ends by itself
-   local guard=0
-   while M.Active()and guard<300 do X.run(.2,1/30,function()watch();if titleShown()then sawTitle=true end end);guard+=1 end
+   -- R154: the result waits; the player collects it at a random moment once it is up (at once, or up to 4 s later); its seed flies in
+   local guard=0;local waitFor=rnd2()<.3 and 0 or rnd2()*4
+   while(M.Active()or Collect.Flying()>0)and guard<1500 do
+    local run=M.Active()
+    if run and run.SawResult and not run.Collected and run.Clock()>=L.ShownAt(run.TL)+M.CollectAfter+waitFor then
+     if run.Clock()>=run.TL.Length then stats.waited+=1 end
+     skipNow()
+    end
+    X.run(1/30,1/30,function()watch();if titleShown()then sawTitle=true end end);guard+=1
+   end
    X.run(.4)
    X.player:SetAttribute(ATTR,nil)
    if not dead then
@@ -371,10 +391,18 @@ for i=1,N do
      check(fullFor(r,short),tag..': '..which..' is the '..(short and'short'or'full')..' one ('..tostring(r.Kind)..' '..tostring(r.Variant or'')..(r.Quick and' quick'or'')..', '..string.format('%.2f',r.TL.Length)..' s)')
      if not dead and not fired then
       local gotTo=reached[r]or -1
-      local toEnd=r.Reason=='done'
-      local over=r.Reason=='replaced'and r==first and r.Kind~='Scene'and gotTo>=L.ShownAt(r.TL)-1/30
+      -- (R154: to its end = its result shown and the player collected it; a story scene then went out by itself)
+      local toEnd=r.Collected and r.CollectWhy=='press'and gotTo>=L.ShownAt(r.TL)-1/30
+      local over=r.Reason=='replaced'and r==first and r.Kind~='Scene'and gotTo>=L.ShownAt(r.TL)-1/30 and r.Collected
       if toEnd then stats.toEnd+=1 elseif over then stats.handedOver+=1 end
-      check(toEnd or over,tag..': '..which..' plays to its end ('..tostring(r.Reason)..' at '..string.format('%.2f',gotTo)..' of '..string.format('%.2f',r.TL.Length)..' s)')
+      check(toEnd or over,tag..': '..which..' plays to its end and is collected ('..tostring(r.Reason)..' / '..tostring(r.CollectWhy)..' at '..string.format('%.2f',gotTo)..' of '..string.format('%.2f',r.TL.Length)..' s)')
+     end
+     -- R154: every revealed seed was collected and flew in (landed once); one whose opener died before it was revealed just shows
+     if r.Id~=nil then
+      if r.SawClimax then
+       stats.collected+=1;if landed[r.Id]==1 then stats.landed+=1 end
+       check(r.Collected and landed[r.Id]==1,tag..': '..which..': its seed was collected and flew in once ('..tostring(r.CollectWhy)..', landed '..tostring(landed[r.Id])..')')
+      else check(not Collect.Held(r.Id),tag..': '..which..': ended before its seed was revealed: nothing held back') end
      end
     end
    end
@@ -415,5 +443,7 @@ print(string.format('stress: %d openings (%d own, %d onlooker); tiers %s; deskto
  N,stats.own,stats.other,table.concat(stats.byRank,'/'),stats.device.desktop,stats.device.phone,stats.device.low,stats.double,stats.respawn,stats.unequip,stats.fallbackArt,stats.inject,table.concat(inj,', ')))
 print(string.format('R153: %d own presentations played to their end, %d cards handed over to a fast second pack after their result; %d with "Skip pack animations" on, %d skipped by the player',
  stats.toEnd,stats.handedOver,stats.short,stats.skipped))
+print(string.format('R154: %d revealed seeds collected, %d of them flew in (landed once); %d collected after waiting past their whole timeline',stats.collected,stats.landed,stats.waited))
+check(stats.collected>0 and stats.landed==stats.collected,'R154: every revealed seed flew in ('..stats.landed..' of '..stats.collected..')')
 print(('R152 stress checks %d, fails %d'):format(checks,fails))
 if fails>0 then error('failures')end

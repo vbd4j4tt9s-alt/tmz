@@ -8,6 +8,7 @@ local Players=game:GetService('Players');local RS=game:GetService('ReplicatedSto
 local StarterGui=game:GetService('StarterGui');local GuiService=game:GetService('GuiService');local CAS=game:GetService('ContextActionService')
 local Names=require(RS:WaitForChild('GardenDisplayNames'));local Info=require(RS:WaitForChild('HarvestItemInfo'));local State=require(RS:WaitForChild('GardenInventoryState')).new()
 local Arrival=require(RS:WaitForChild('HarvestArrival'))
+local Collect do local ok,m=pcall(function()return require(RS:WaitForChild('SeedCollect154',10))end);Collect=ok and m or nil end -- R154: a pull reveal's seed shows once it has flown in
 local Audio=require(RS:WaitForChild('InteractionAudio'))
 -- R112: item pictures (cached 3D renders or flat icons) and display-only kg weights.
 local Pictures=require(RS:WaitForChild('ItemPictures'));local Weight=require(RS:WaitForChild('ItemWeight'))
@@ -570,7 +571,7 @@ refresh=function()
  -- server hands back after a respawn is the same item and keeps its slot (R152: 'tool-<n>', a new key each time).
  local loose,renames,add={},nil,nil
  local function take(tool)
-  if not tool:IsA('Tool')or not(seen[tool]or not Arrival.Holds(tool))then return end
+  if not tool:IsA('Tool')or not(seen[tool]or not(Arrival.Holds(tool)or Collect~=nil and Collect.Holds(tool)))then return end -- (R154: and a pull's seed until it has flown in)
   -- (R149: only a tool that was never shown is held back; an older fruit of the same plant and slot keeps its place while the new one flies)
   local isNew=not seen[tool]
   if isNew then sequence+=1;seen[tool]=sequence end
@@ -844,6 +845,39 @@ local function showLog()
  note('slots: '..table.concat(list,', '))
 end
 connect(player:GetAttributeChangedSignal('HotbarLog'),showLog);if player:GetAttribute('HotbarLog')==true then task.defer(showLog)end
+-- R154 (owner: "... the seed stays on the player's screen until they click and the seed goes to their inventory"): a pull reveal's seed is held out of
+-- the hotbar until it has flown in (SeedCollect154; take() above), like a harvested fruit. Where it lands: the slot of the stack it joins, else the slot it
+-- will take (the first free one; the opened pack's own when that was its only one), else the Bag button. On arrival it shows and that slot (or the Bag)
+-- flashes; the flight plays the arrival cue (Bubble06) on that frame.
+if Collect then
+ local function fits(tool,spec)for k,v in pairs(spec)do if tostring(tool:GetAttribute(k))~=tostring(v)then return false end end;return true end
+ local function onBar(k)for i=1,visibleSlots do if State.Slots[i]==k and slots[i].Visible then return slots[i]end end;return nil end
+ local function target(id,spec) -- the button, whether the item is on show there now, its key
+  if id==nil then return open,true end -- (an owner preview: nothing is granted)
+  local tool
+  for _,c in ipairs({bag,player.Character or bag})do for _,t in ipairs(c:GetChildren())do if t:IsA('Tool')and t:GetAttribute('GardenSeed')and t:GetAttribute('SeedInventoryId')==id then tool=t end end end
+  local key=tool and(stackKey(tool)or Info.Key(tool));local shown=tool~=nil and seen[tool]~=nil
+  if key then local b=onBar(key);if b then return b,shown,key end end
+  if shown then return open,true,key end -- (on show, in the Bag: not on a visible slot)
+  if not tool and spec then for i=1,visibleSlots do local e=State.Items[State.Slots[i]];if e and slots[i].Visible and e.Tool:GetAttribute('GardenSeed')and fits(e.Tool,spec)then return slots[i],false,State.Slots[i]end end end
+  for i=2,10 do
+   local k=State.Slots[i];local e=k and State.Items[k]
+   if not k or(e and e.Count==1 and e.Tool:GetAttribute('SeedPackTool')and e.Tool:GetAttribute('SeedInventoryId')==id)then
+    if i<=visibleSlots and slots[i].Visible then return slots[i],false,key end
+    break
+   end
+  end
+  return open,false,key
+ end
+ Collect.SetTarget(function(id,spec)if not(gui.Enabled and dock.Visible)then return nil,false end;return target(id,spec)end)
+ table.insert(allConns,Collect.OnRelease(function(id,cue)
+  refresh()
+  if not cue then return end
+  local b,_,key=target(id,nil);if b then flash(b)end
+  if panel.Visible and key and rows[key]then flash(rows[key])end
+  note('a pull\'s seed flew in ('..tostring(id)..')')
+ end))
+end
 local stopHudLayout=require(RS.HudLayout).Watch(gui,layout)
 connect(pg:GetAttributeChangedSignal('HudNoticeBottom'),layout);refresh()
 for attempt=1,5 do local okay=pcall(function()StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)end);if okay then break end;task.wait(.2)end
