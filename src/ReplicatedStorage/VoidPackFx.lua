@@ -50,24 +50,30 @@ end
 -- World hover pose (same motion as before R122) plus galaxy / halo spin near the camera.
 -- R152 perf: the hover frame alone (what Pose returns), for a caller that does not move the pack's own parts this frame (it is off screen).
 function X.HoverFrame(r,now)return r.Origin*CF(0,math.sin(now*1.2)*.16,0)*CFrame.Angles(0,math.sin(now*.35)*.13,math.sin(now*.55)*.018)end
+-- (R153 perf: r.Moving, when a caller sets it, lists the only pieces that still need moving - the root its other pieces are welded to, and the
+-- spinners; VoidGiveawayClient152 does this for the giveaway pack. Without it every piece is posed, as before.)
 function X.Pose(r,now,parts,frames,spin)
  local frame=X.HoverFrame(r,now)
- for _,e in ipairs(r.Parts)do if e.Part.Parent then
+ for _,e in ipairs(r.Moving or r.Parts)do if e.Part.Parent then
   parts[#parts+1]=e.Part;frames[#frames+1]=frame*X.LocalFrame(e,now,spin)
  end end
  return frame
 end
 -- Heartbeat glow on the eye, photon ring, stars and runes (colour only; restored on release).
+-- R153 perf: a part's colour is kept by the engine in 8 bits a channel (BasePart.Color3uint8), so a pulse step that stays inside the same half
+-- level of every channel as the colour written last cannot show: it is not written (exact under rounding and truncation alike).
+local function level(c)return math.floor(c.R*510)+math.floor(c.G*510)*512+math.floor(c.B*510)*262144 end
 function X.Pulse(r,now,reduced)
  for _,e in ipairs(r.Pulsers)do if e.Part.Parent then
   local wave=reduced and .5 or .5+.5*math.sin(now*(e.Amount>.5 and 3.1 or 1.7)+e.Phase)
   -- A double "heartbeat" on the pupil: two quick swells every ~2 s.
   if e.Amount>=.55 and not reduced then local beat=(now+e.Phase)%2.1;wave=math.max(wave*.5,math.exp(-((beat-.15)/.09)^2),math.exp(-((beat-.45)/.09)^2))end
-  e.Part.Color=e.Color:Lerp(Color3.new(1,1,1),wave*e.Amount*.6)
+  local c=e.Color:Lerp(Color3.new(1,1,1),wave*e.Amount*.6);local k=level(c)
+  if e.Level~=k then e.Level=k;e.Part.Color=c end
  end end
 end
 function X.Restore(r)
- for _,e in ipairs(r.Pulsers)do if e.Part.Parent then e.Part.Color=e.Color end end
+ for _,e in ipairs(r.Pulsers)do if e.Part.Parent then e.Part.Color=e.Color;e.Level=nil end end
 end
 local function fxPart(folder,name,size,color,material,shape)
  local p=Instance.new('Part');p.Name=name;p.Size=size;p.Color=color;p.Material=material or Enum.Material.Neon
@@ -110,6 +116,7 @@ function X.Create(r,tier,noHighlight)
  if pal.Fill and not noHighlight then
   local h=Instance.new('Highlight');h.Name='VoidDistortion';h.Adornee=r.Bag;h.FillColor=pal.Fill;h.FillTransparency=.88
   h.OutlineColor=pal.Outline;h.OutlineTransparency=.35;h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;fx.Highlight=h
+  pcall(function()local m=script.Parent:FindFirstChild('ClientFxBudget');if m then require(m).TrackHighlight(h)end end) -- (R153 perf: counted in the shared 31-Highlight budget)
  end
  local light=Instance.new('PointLight');light.Name='VoidPulseLight';light.Color=pal.Light;light.Range=math.min(16,8*s);light.Brightness=0;light.Shadows=false;light.Enabled=false;light.Parent=core;fx.Light=light
  folder.Parent=workspace

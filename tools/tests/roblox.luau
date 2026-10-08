@@ -117,6 +117,18 @@ instMeta.__newindex=function(o,k,v)
  if (o._class=='Part'or o._class=='MeshPart')and k=='Position'then o._props.CFrame=M.CFrame.new(v)*setmetatable({Position=v3(),R=o._props.CFrame.R},CF);o._props.Position=v;fireProp(o,k);return end
  if k=='CFrame'then o._props.Position=v.Position end
  o._props[k]=v;fireProp(o,k);o.Changed:Fire(k)
+ -- R153: a Weld whose Part0 is anchored and Part1 is not holds Part1 at Part0.CFrame * C0 * C1:Inverse(), as the engine does for an anchored
+ -- assembly: writing Part0's CFrame moves Part1 (no property write of its own, no Changed signal). Other joints are not simulated.
+ if o._class=='Weld'and(k=='Part0'or k=='Part1'or k=='Parent')then local p0=o._props.Part0;if p0 then local w=rawget(p0,'_welds')or{};rawset(p0,'_welds',w);w[o]=true end end
+ if k=='CFrame'and rawget(o,'_welds')and o._props.Anchored==true then
+  for w in pairs(rawget(o,'_welds'))do
+   local wp=w._props;local p1=wp.Part1
+   if wp.Part0==o and p1 and w._parent and not w._destroyed and p1._props.Anchored~=true then
+    local c=v;if wp.C0 then c=c*wp.C0 end;if wp.C1 then c=c*wp.C1:Inverse()end
+    p1._props.CFrame=c;p1._props.Position=c.Position
+   end
+  end
+ end
 end
 instMeta.__tostring=function(o)return o._props.Name end
 function Inst:IsA(c)if self._class==c or c=='Instance'then return true end;for _,b in ipairs(isa[self._class]or{})do if b==c then return true end end;return false end
