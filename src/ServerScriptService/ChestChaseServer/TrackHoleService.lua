@@ -168,7 +168,7 @@ function S:_build(hole)
  local rng=self.Random
  for i=1,C.CrumbCount do
   local angle=(i/C.CrumbCount)*math.pi*2+rng:NextNumber(-.3,.3)
-  local radius=rimD/2+rng:NextNumber(.1,1.1);local size=rng:NextNumber(.22,.5)
+  local radius=rimD/2+rng:NextNumber(.1,C.CrumbSpread);local size=rng:NextNumber(C.CrumbSizeMin,C.CrumbSizeMax) -- (inside KeyboardTrack.Config.HoleReach, see TrackHoleConfig)
   local spot=at+V3(math.cos(angle)*radius,size*.35,math.sin(angle)*radius)
   part('Crumb',V3(size,size*rng:NextNumber(.6,1),size),CFrame.new(spot)*CFrame.Angles(rng:NextNumber(-.4,.4),rng:NextNumber(0,math.pi*2),rng:NextNumber(-.4,.4)),
    CRUMBS[(i%#CRUMBS)+1],Enum.Material.Ground)
@@ -190,9 +190,21 @@ function S:_remove(hole,reason)
  if not hole or self.Holes[hole.Id]~=hole then return false end
  self.Holes[hole.Id]=nil;self.Count-=1
  local mine=self.ByOwner[hole.Owner];if mine then mine[hole.Id]=nil end
- if hole.Model and hole.Model.Parent then hole.Model:Destroy()end
+ if hole.Model then hole.Model:Destroy()end
  if reason=='Covered'then self:_fx('Cover',hole)end
  return true
+end
+
+-- R153: nothing of a hole may outlive it. A hole model in the folder that no live hole owns (its record was lost, a failed dig, a stale copy) is removed:
+-- at every ClearAll and every SweepSeconds. Only models of this service ('TrackHole_<id>') are touched.
+function S:Sweep()
+ local owned={}
+ for _,hole in pairs(self.Holes)do if hole.Model then owned[hole.Model]=true end end
+ local n=0
+ for _,child in ipairs(self.Folder:GetChildren())do
+  if not owned[child]and child:IsA('Model')and child.Name:match('^TrackHole_%d+$')then child:Destroy();n+=1 end
+ end
+ return n
 end
 
 function S:OwnedCount(player)
@@ -299,6 +311,7 @@ function S:Step()
  for _,hole in pairs(self.Holes)do
   if now>=hole.ExpiresAt or not hole.Owner.Parent then self:_remove(hole,'Expired')end
  end
+ if now>=(self.NextSweep or 0)then self.NextSweep=now+C.SweepSeconds;self:Sweep()end -- R153: no orphaned hole model is left on the track
  self.Last=self.Last or setmetatable({},{__mode='k'})
  local last=self.Last
  if self.Count==0 then table.clear(last);return end
@@ -341,6 +354,7 @@ end
 function S:ClearAll()
  local all={};for _,hole in pairs(self.Holes)do all[#all+1]=hole end
  for _,hole in ipairs(all)do self:_remove(hole,'Refresh')end
+ self:Sweep()
 end
 
 function S:CleanupPlayer(player)

@@ -201,6 +201,20 @@ do
  Tween.Create=origCreate
 end
 
+-- 3c. R153 (owner: "the dirt piles float up into the sky"): dirt that outlives its toss (a tween or Debris that never finished: the mock's Debris here never takes anything) is removed by the
+-- client after 2 s, so no chunk is left hanging in the air; one that is still in its toss is not touched.
+do
+ for _,d in ipairs(W.workspace:GetChildren())do if d.Name=='HoleDirt'then d:Destroy()end end
+ local function chunks()local n=0;for _,d in ipairs(W.workspace:GetChildren())do if d.Name=='HoleDirt'then n+=1 end end;return n end
+ holeRemote.OnClientEvent:Fire({Kind='Dig',Id=3,Position=V3(0,0,100),OwnerUserId=7})
+ local n0=chunks();frames(30)
+ local n1=chunks();frames(60)
+ local n2=chunks()
+ check(n0>=3 and n1==n0 and n2==0,('dirt tossed by a dig: %d chunks, still all there after 1 s (%d), none left after 3 s (%d)'):format(n0,n1,n2))
+ holeRemote.OnClientEvent:Fire({Kind='Trap',Id=3,Position=V3(0,0,100)});frames(90)
+ check(chunks()==0,'...the same after a trap')
+end
+
 -- 4. DigSoundVariants
 local DS=W.module('DigSoundVariants');local cfg=DS.Config
 local rng=R.new and W.env.Random.new(3)

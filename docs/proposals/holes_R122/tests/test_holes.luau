@@ -414,7 +414,8 @@ check(near(rad/1.7,1.5,1e-3),'R153: the pit radius is 1.5x the old 1.7 ('..rad..
 check(C.MinSpacing>=2*rimR,'R153: two rims never touch (MinSpacing '..C.MinSpacing..' >= '..2*rimR..')')
 check(C.TrapHeightMin==-1.5 and C.TrapHeightMax==7,'R153: the height band is unchanged: the root from 1.5 under to 7 over the hole surface')
 do local reach=W.module('KeyboardTrack').Config.HoleReach
- check(reach>=rimR and reach<=rimR+1,'R153: the keyboard keeps every key under the rim up (HoleReach '..reach..' >= '..rimR..')') end
+ local need=rimR+C.CrumbSpread+C.CrumbSizeMax
+ check(reach>=need-1e-9 and reach<=need+.3,'R153: the keyboard keeps every key under the rim AND under the ring of crumbs up (HoleReach '..reach..' >= rim '..rimR..' + CrumbSpread '..C.CrumbSpread..' + CrumbSizeMax '..C.CrumbSizeMax..')') end
 
 -- 19a. The pure test: the path a -> b against the circle at the origin and the band [-1.5, 7] over y = 0.
 local function hit(ax,ay,az,bx,by,bz)return Cross(ax,ay,az,bx,by,bz,0,0,0,rad,C.TrapHeightMin,C.TrapHeightMax)end
@@ -617,6 +618,49 @@ do
  check(not ok2 and why2=='Spacing','just outside the cover snap is a new dig, refused: too close to the hole ('..tostring(why2)..')')
  moveTo(A,0,3,900+C.MinSpacing-.1);ok2,why2=dig(A);check(not ok2 and why2=='Spacing','MinSpacing '..C.MinSpacing..': 0.1 closer is refused')
  moveTo(A,0,3,900+C.MinSpacing+.1);ok2,why2=dig(A);check(ok2,'...and .1 further is fine ('..tostring(why2)..')')
+ wipe()
+end
+
+-- 20. R153 (owner: "the dirt piles float up into the sky"; client review 2): where the crumbs lie, and nothing of a hole outlives it ------------------------------------------------
+-- 20a. Every crumb the server draws lies inside the keyboard's reach (KeyboardTrack.Config.HoleReach): the key under it stays up, so it never hangs over a key that goes down.
+do
+ wipe()
+ local reach=W.module('KeyboardTrack').Config.HoleReach
+ local worst,smallest,biggest,n=0,math.huge,0,0
+ for i=1,300 do
+  local m=holes:_build({Id=2000+i,Position=V3(0,0,300+i),Owner=A})
+  for _,c in ipairs(m:GetChildren())do
+   if c.Name=='Crumb'then
+    local p=c.CFrame.Position;local r=math.sqrt(p.X^2+(p.Z-(300+i))^2)
+    worst=math.max(worst,r+c.Size.X);smallest=math.min(smallest,c.Size.X);biggest=math.max(biggest,c.Size.X);n+=1
+   end
+  end
+  m:Destroy()
+ end
+ check(n==300*C.CrumbCount and worst<=reach+1e-6 and worst>=rimR+.5,('R153: 300 holes, %d crumbs: the farthest edge of any crumb is %.2f studs from the centre, inside the keyboard\'s HoleReach %.1f'):format(n,worst,reach))
+ check(smallest>=C.CrumbSizeMin-1e-9 and biggest<=C.CrumbSizeMax+1e-9,'...and the crumb sizes follow CrumbSizeMin / CrumbSizeMax ('..string.format('%.2f .. %.2f',smallest,biggest)..')')
+end
+-- 20b. No hole model is left on the track once its hole is gone: an orphan (no live hole owns it) is swept at every ClearAll and every SweepSeconds; live holes and foreign objects stay.
+do
+ wipe();moveTo(A,0,3,900)
+ local okDig=dig(A);local live=onlyHole(A)
+ local orphan=holes:_build({Id=991,Position=V3(0,0,1100),Owner=A})
+ local foreign=R.new('Folder');foreign.Name='Other';foreign.Parent=holes.Folder
+ check(okDig and live and orphan.Parent==holes.Folder,'an orphaned hole model sits in the folder next to a live hole')
+ local removed=holes:Sweep()
+ check(removed==1 and orphan.Parent==nil and live.Model.Parent==holes.Folder and foreign.Parent==holes.Folder,'Sweep removes the orphan only ('..removed..' removed): the live hole and a foreign object stay')
+ local orphan2=holes:_build({Id=992,Position=V3(0,0,1150),Owner=A})
+ step(C.SweepSeconds+.5)
+ check(orphan2.Parent==nil and live.Model.Parent==holes.Folder,'...and the heartbeat sweeps one by itself within '..C.SweepSeconds..' s')
+ local orphan3=holes:_build({Id=993,Position=V3(0,0,1200),Owner=A})
+ holes:ClearAll()
+ local left=0;for _,c in ipairs(holes.Folder:GetChildren())do if c.Name:match('^TrackHole_%d+$')then left+=1 end end
+ check(holes.Count==0 and left==0 and orphan3.Parent==nil and foreign.Parent==holes.Folder,'a refresh clear (ClearAll) leaves no hole model on the track ('..left..' left), also an orphan')
+ foreign:Destroy()
+ -- a hole closed by expiry takes its model with it
+ moveTo(A,0,3,900);dig(A);local h=onlyHole(A);local model=h.Model
+ step(C.LifetimeSeconds+1)
+ check(holes.Count==0 and model.Parent==nil,'a hole that expires is gone with its model')
  wipe()
 end
 

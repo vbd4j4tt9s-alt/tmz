@@ -301,7 +301,7 @@ local function start()
  local boundKeys=0
  local rowKeys={}                                   -- row -> keys bound in it (COLS less the cells the keyboard leaves out)
  local downPos,animPos,animT0,animFrom,animTo,animDur={},{},{},{},{},{}
- local stampAt,moveMark,mutedAt={},{},{}              -- mutedAt: a key that went down silently this frame (a keeper / a thrown body): a runner who really steps on it the same frame still clicks
+ local stampAt,moveMark,mutedAt,quietBy={},{},{},{}    -- mutedAt: a key that went down silently this frame (a keeper / a thrown body): a runner who really steps on it the same frame still clicks. quietBy: a key a runner pressed silently while his feet were a little above it (R153 review: his LANDING on it clicks once)
  local downList,animList,moveList={},{},{}
  local moveN=0;local moveParts,moveCFs={},{}
  local oRow,oCol,oKind,oWho,oX,oZ,oN={},{},{},{},{},{},0 -- cells other players / keepers press (30 Hz)
@@ -332,6 +332,7 @@ local function start()
  local function clearKeyState(idx)
   if downPos[idx]then listRemove(downList,downPos,idx)end
   if animPos[idx]then listRemove(animList,animPos,idx)end
+  quietBy[idx]=nil
   kDepth[idx]=0
  end
 
@@ -963,10 +964,12 @@ local function start()
   else
    startAnim(idx,1) -- Reduced Motion: animate() finishes it in the same frame
    if kind<3 then playKey(idx,kind,who,px,pz)else mutedAt[idx]=frameNo end
+   quietBy[idx]=kind==5 and who or nil
   end
  end
  local function releaseKey(idx)
   listRemove(downList,downPos,idx)
+  quietBy[idx]=nil
   startAnim(idx,0)
  end
  local function touch(idx,kind,who,px,pz)
@@ -975,7 +978,8 @@ local function start()
    return
   end
   stampAt[idx]=frameNo
-  if not downPos[idx]then pressKey(idx,kind,who,px,pz)end
+  if not downPos[idx]then pressKey(idx,kind,who,px,pz)
+  elseif kind==2 and who and quietBy[idx]==who then quietBy[idx]=nil;playKey(idx,kind,who,px,pz) end -- R153 review: the runner who pressed it silently on the way down now LANDS on it: one click
  end
  -- A cell (row, column) is pressed by `kind` / `who`; px, pz = where the presser stands. Keys under a shovel hole stay up.
  local function pressCell(row,col,kind,who,px,pz)
@@ -1025,7 +1029,8 @@ local function start()
 
  -- Other players and keepers (30 Hz) ------------------------------------------------------------------------------
  -- R153: how a runner presses the keys under him. 1 / 2 (you / another player) = he really steps on them: the key sounds (K.Steps: feet within StepReach of the floor,
- -- not rising fast, not K.Thrown = ragdolled / flung / knocked back); 4 = he presses them down silently (a thrown body lying on them, a runner a little above the floor);
+ -- not rising fast, not K.Thrown = ragdolled / flung / knocked back); 4 = he presses them down silently (a thrown body lying on them); 5 = the same for a runner who is NOT thrown but a little above
+ -- the floor (a hop, the last studs of a fall): the key goes down silently, and when that same runner then really steps on it (kind 2) it clicks once, so a landing is heard (quietBy);
  -- nil = he is not on the keys (in the air: a knock-up, a jump). FloorMaterial is only read for you (a remote character's is not reliable): others go by their feet.
  local function runnerKind(p,char,hum,root,pos)
   local feetY=pos.Y-max(C.PlayerRootToFeet,(hum.HipHeight or 0)+root.Size.Y*.5)
@@ -1036,7 +1041,7 @@ local function start()
   if thrown and feetY>F+C.PlayerFeetReach then return nil end -- a stale FloorMaterial under a flying body must not press anything
   local vel=root.AssemblyLinearVelocity
   if K.Steps(feetY,typeof(vel)=='Vector3'and vel.Y or 0,thrown)then return own and 1 or 2 end
-  return 4
+  return thrown and 4 or 5
  end
  local function addFootprint(x,z,half,kind,who)
   local c1,c2,r1,r2=geo.CellRange(x-half,x+half,z-half,z+half)
@@ -1108,22 +1113,41 @@ local function start()
  end
  -- The hole parts were authored a few hundredths above the floor; every part is lifted onto the resting key tops, once per PART (a part
  -- streamed in again is a new instance at the server height). TrackHoleClient.grow tweens crumbs back to the frames it captured, which can
- -- undo a lift for 0.3 s: a part found again at its server height is lifted again. Lifting is relative to the part's current position.
- local liftBase,liftSet=setmetatable({},{__mode='k'}),setmetatable({},{__mode='k'})
- local LIFT=V3(0,C.HoleLift,0)
+ -- undo a lift for 0.3 s: a part found again at its server height is lifted again.
+ -- R153 (owner: "the dirt piles float up into the sky"): the lift used to be remembered in two weak tables keyed by the Instance and applied as
+ -- "Position + HoleLift". Roblox gives a script a NEW wrapper for an Instance it let go of, so the memory vanished and the same part was lifted
+ -- again on every scan (4 a second): a hole climbed ~5 studs a second. Now the part carries its own record, the height it had before the lift
+ -- (attribute KbHoleBase, local to this client), and every write is ABSOLUTE (record + HoleLift): the lift cannot add up, whatever the engine does with
+ -- wrappers. Safety nets: a part with no record that already stands at or above the resting key tops is never lifted; one more than HoleCeiling
+ -- above them is stranded in the air and goes back where the lift puts it. Writes only when a height is wrong (R152 write-on-change).
+ local HOLE_BASE='KbHoleBase'
+ local restTop=K.KeyTop(0)
+ local function setY(d,y)local p=d.Position;d.Position=V3(p.X,y,p.Z)end
  local function liftPart(d)
   if not d:IsA('BasePart')then return end
-  if geo.SkipCount>0 then local p=d.Position;if geo.Skip[geo.RowOfZ(p.Z)*64+geo.ColOfX(p.X)]then return end end -- no key there: the part stays on the floor
-  local y=d.Position.Y;local base=liftBase[d]
-  if not base then
-   liftBase[d]=y;liftSet[d]=y+C.HoleLift;d.Position=d.Position+LIFT
-  elseif abs(y-liftSet[d])>1e-3 and abs(y-base)<1e-3 then
-   d.Position=d.Position+LIFT
+  local p=d.Position
+  if geo.SkipCount>0 and geo.Skip[geo.RowOfZ(p.Z)*64+geo.ColOfX(p.X)]then return end -- no key there: the part stays on the floor
+  local y=p.Y;local base=d:GetAttribute(HOLE_BASE)
+  if type(base)~='number'then
+   if y>=restTop then
+    if y>restTop+C.HoleCeiling then setY(d,F+C.HoleLift+(d.Name=='Pit'and .05 or d.Name=='Rim'and .025 or .1))end -- stranded, no record: where the server's heights + the lift put it
+    return
+   end
+   d:SetAttribute(HOLE_BASE,y);setY(d,y+C.HoleLift)
+  else
+   local want=base+C.HoleLift
+   if abs(y-want)>1e-3 and(abs(y-base)<1e-3 or y>want+C.HoleCeiling)then setY(d,want)end -- (the dig tween put it back at the server height / it is stranded)
   end
  end
  unlift=function()
-  for d,y in pairs(liftSet)do
-   if d.Parent and abs(d.Position.Y-y)<1e-3 then d.Position=d.Position-LIFT end
+  local f=holesFolder
+  if not f or not f.Parent then return end -- (the folder went, its parts with it)
+  for _,d in ipairs(f:GetDescendants())do
+   local base=d:IsA('BasePart')and d:GetAttribute(HOLE_BASE)
+   if type(base)=='number'then
+    if abs(d.Position.Y-(base+C.HoleLift))<1e-3 then setY(d,base)end
+    d:SetAttribute(HOLE_BASE,nil)
+   end
   end
  end
  local function liftAny(d)
@@ -1131,10 +1155,10 @@ local function start()
   elseif d:IsA('Model')then for _,x in ipairs(d:GetDescendants())do liftPart(x)end end
  end
  local liftHook,liftHooked=nil,nil
- local function markRects(rects,set,list)
+ local function markRects(rects,set,list,except)
   for _,rect in ipairs(rects)do
    local c1,c2,r1,r2=geo.CellRange(rect[1],rect[2],rect[3],rect[4])
-   for r=r1,r2 do if not barOfRow[r]then for c=c1,c2 do local key=r*64+c;if not set[key]then set[key]=true;if list then list[#list+1]=key end end end end end
+   for r=r1,r2 do if not barOfRow[r]then for c=c1,c2 do local key=r*64+c;if not set[key]and not(except and except[key])then set[key]=true;if list then list[#list+1]=key end end end end end
   end
  end
  local function barTouched(rects,bar)
@@ -1146,7 +1170,7 @@ local function start()
  end
  local function rebuildClearances()
   holeCell,platCell,platList={},{},{}
-  markRects(holeRects,holeCell,nil);markRects(platRects,platCell,platList)
+  markRects(holeRects,holeCell,nil);markRects(platRects,platCell,platList,holeCell) -- R153 review: a key under both a hole and a platform stays UP (the hole wins: a pressed key would leave the pit floating over a dip)
   for i,bar in ipairs(bars)do barHole[i]=barTouched(holeRects,bar);barPlat[i]=not barHole[i]and barTouched(platRects,bar)end
   for _,r in ipairs(stripRows)do for c=1,COLS do setLabel(r,c,labelShown(r,c))end end
   for _,r in ipairs(Far.Rows)do for c=1,COLS do setLabel(r,c,labelShown(r,c))end end
@@ -1163,10 +1187,8 @@ local function start()
   if f then
    for _,model in ipairs(f:GetChildren())do
     local pit=model:FindFirstChild('Pit')
-    if pit then
-     holes[#holes+1]=pit
-     for _,d in ipairs(model:GetDescendants())do liftPart(d)end
-    end
+    if pit then holes[#holes+1]=pit end
+    for _,d in ipairs(model:GetDescendants())do liftPart(d)end -- (R153: also a model whose Pit has not streamed in: its crumbs and rim are checked too)
    end
   end
   local R=C.HoleReach

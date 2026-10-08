@@ -56,7 +56,8 @@ K.Config={
  PressSeconds=.06,ReleaseSeconds=.2,                      -- quad-out down (snappy), back-out up (springs ~10% of the travel past rest, then settles)
  PressLead=.06,PressLeadMax=4,                            -- the local runner's footprint also covers this many seconds of his velocity ahead (at most PressLeadMax studs): the key in front is down when the foot arrives
  HoleLift=REST+.06,                                       -- shovel-hole parts (authored a few hundredths above the floor) are lifted onto the key tops (+.06: the rim stays over the letter strips, R149 review part 2 / R151)
- HoleReach=3,                                             -- keys within this many studs of a hole's Pit stay up (unpressable) while it exists (R153: 2 -> 3 = the bigger hole's rim radius, TrackHoleConfig Diameter/2 + RimWidth = 3.0)
+ HoleCeiling=1,                                           -- R153: a shovel-hole part more than this above the resting key tops is stranded in the air (a lifted part stands at most .6 + .2 + HoleLift over the floor): it is put back
+ HoleReach=4.6,                                          -- keys within this many studs of a hole's Pit stay up (unpressable) while it exists (R153: 2 -> 3 = the bigger hole's rim radius, TrackHoleConfig Diameter/2 + RimWidth = 3.0; R153 review: 3 -> 4.6 = the farthest crumb of the ring as well, + TrackHoleConfig CrumbSpread 1.1 + CrumbSizeMax .5: a crumb over a key that could be pressed hung in the air)
  PlatformClearance=.3,                                    -- keys under a pack platform (radius + this) are held down: the platform shows on them
  PlayerFootprint=1.2,PlayerFeetReach=3,PlayerRootToFeet=3,-- half-size of a runner's footprint; others press while their feet are within 3 studs of the floor
  KeeperMinFootprint=1.5,KeeperMaxFootprint=6,KeeperFootprintShare=.3,
