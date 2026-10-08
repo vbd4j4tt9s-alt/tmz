@@ -21,6 +21,15 @@ def shadows(d, tier, spot):
     raise SystemExit('no SHADOWS line for tier %d %s in %s' % (tier, spot, d))
 
 
+def radius(d, tier, spot):
+    # the census's own RADIUS line (drawn parts within 400 studs of the runner; the same definition as the audit's and run_perf153.sh's numbers)
+    for l in lines(d, tier, spot):
+        m = re.match(r'RADIUS tier=\d+ spot=\w+ r=400 drawn=(\d+) shadow=(\d+) shadow<1.5=(\d+)', l)
+        if m:
+            return int(m.group(2)), int(m.group(3))
+    raise SystemExit('no RADIUS line for tier %d %s in %s' % (tier, spot, d))
+
+
 def keyboard(d, tier, spot):
     for l in lines(d, tier, spot):
         m = re.match(r'CENSUS tier=\d+ spot=\w+ \| keyboard \| inst=(\d+) parts=(\d+) drawn=(\d+) mesh=(\d+) sgui=(\d+) sguiPx=([\d.]+)M labels=(\d+)', l)
@@ -35,6 +44,8 @@ def main():
     rows = []
     for tier, spot in RUNS:
         b, n = shadows(base, tier, spot), shadows(now, tier, spot)
+        b['within400'], b['within400_tiny'] = radius(base, tier, spot)
+        n['within400'], n['within400_tiny'] = radius(now, tier, spot)
         tag = 'tier %d %s' % (tier, spot)
         rows.append((tag, b, n))
         if n['tiny_scripted'] != 0:

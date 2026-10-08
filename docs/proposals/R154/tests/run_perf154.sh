@@ -38,7 +38,7 @@ git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/Ba
 git -C "$REPO" diff --quiet "$BASE" -- src/ServerScriptService/ChestChaseServer/Config.lua && echo "ok: Config.Version unchanged (Config.lua untouched)" || fail "Config.lua changed"
 tail -n +2 "$S/MANIFEST.tsv" | cut -f3 | LC_ALL=C sort > "$OUT/manifest_files.txt";(cd "$S" && find . -name '*.lua' | sed 's#^\./##' | LC_ALL=C sort) > "$OUT/src_files.txt"
 cmp -s "$OUT/manifest_files.txt" "$OUT/src_files.txt" && echo "ok: src/MANIFEST.tsv lists exactly the $(wc -l < "$OUT/src_files.txt") files in src" || { fail "src/MANIFEST.tsv and src differ";diff "$OUT/manifest_files.txt" "$OUT/src_files.txt" | head; }
-if git -C "$REPO" diff "$BASE" -- src | grep '^+' | grep -v '^+++' | grep -q "DescendantAdded";then fail "R154 added a DescendantAdded listener";else echo "ok: no DescendantAdded listener added";fi
+if git -C "$REPO" diff "$BASE" -- src | grep '^+' | grep -v '^+++' | sed 's/--.*$//' | grep -q "DescendantAdded";then fail "R154 added a DescendantAdded listener";else echo "ok: no DescendantAdded listener added (comments aside)";fi
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]|gp[t]-?[0-9]" "$HERE" "$S/ReplicatedStorage/SmallShadow154.lua" "$REPO/docs/proposals/R154/perf154.md" --include=*.luau --include=*.sh --include=*.py --include=*.md --include=*.patch 2>/dev/null | grep -v "Co-Authored";then fail "a model name in the R154 files";else echo "ok: no model names in the R154 files";fi
 
 echo "== 1. unit: SmallShadow154"
