@@ -164,6 +164,44 @@ if after then
  check(widest<=lr.x1-lr.x0,'R153: "9+" at the INDEX count\'s biggest text size ('..widest..' px wide) fits in the disc\'s label ('..(lr.x1-lr.x0)..' px)')
  check(Badge.Extent(Badge.Sizes.Count,Badge.Overhang.Count)==15 and Badge.Margin==16,'R153: the INDEX count reaches 15 px past its corner and the wheel keeps '..Badge.Margin..' px round a button')
 end
+-- 3b. R153 client bug review, finding 7: the 1.5x tab dot never covers the count --------------------------------------------------------------------------------
+-- The dot (21 px) used to sit on the tab's top-right corner and covered the end of the count text ("18 / 40") on a PC tab (122 x 58) and on a phone's compact tab (106 x 40). It must clear the
+-- count's label (whole box, so any count), the text itself (the mock's width rule: utf8.len * size * .52) and the LIMITED tab's note, on a PC and on phones, and stay 21 px inside its tab. The
+-- INDEX count, the MENU alert and the DAILY badges are untouched (top-right, 1.5x).
+if after then
+ local function meets(a,b)return a.x0<b.x1-1e-6 and b.x0<a.x1-1e-6 and a.y0<b.y1-1e-6 and b.y0<a.y1-1e-6 end
+ local checkedTabs,compactSeen,wideSeen=0,false,false
+ for _,sz in ipairs({{667,375},{375,667},{390,844},{844,390},{360,640},{1280,720},{1920,1080}})do
+  relay(sz[1],sz[2])
+  local tag=sz[1]..'x'..sz[2]
+  local overCount,overText,overNote,notLeft,wrongSize,outside,n,tabW=0,0,0,0,0,0,0,nil
+  for _,t in ipairs(gui:GetDescendants())do
+   local dot=t._class=='TextButton'and t.Name:sub(1,5)=='Biome'and t:FindFirstChild('RewardDot')
+   if dot then
+    n+=1;tabW=t.AbsoluteSize.X
+    local dr,tr,label=L.rect(dot),L.rect(t),t:FindFirstChild('Count');local lr=L.rect(label)
+    local width=math.max(utf8.len(label.Text),9)*label.TextSize*.52 -- (the text as it is, or a longer count: 9 characters)
+    local cx,cy=(lr.x0+lr.x1)/2,(lr.y0+lr.y1)/2;local text={x0=cx-width/2,x1=cx+width/2,y0=cy-label.TextSize/2,y1=cy+label.TextSize/2}
+    if meets(dr,lr)then overCount+=1 end
+    if meets(dr,text)then overText+=1 end
+    local note=t:FindFirstChild('TabNote');if note and note.Visible and meets(dr,L.rect(note))then overNote+=1 end
+    if dot:GetAttribute('BadgeLeft')~=true or(dr.x0+dr.x1)/2>=(tr.x0+tr.x1)/2 then notLeft+=1 end
+    if not near(dr.x1-dr.x0,Badge.Sizes.Dot)or Badge.Sizes.Dot~=21 then wrongSize+=1 end
+    if not(dr.x0>=tr.x0-1e-6 and dr.y0>=tr.y0-1e-6 and dr.x1<=tr.x1+1e-6 and dr.y1<=tr.y1+1e-6)then outside+=1 end
+   end
+  end
+  checkedTabs+=n;if tabW and tabW<110 then compactSeen=true else wideSeen=true end
+  check(n>=8,tag..': the Index has its biome tabs ('..n..', tab '..tostring(tabW)..' px wide)')
+  check(overCount==0,tag..': no tab dot touches its count label ('..overCount..' of '..n..' do)')
+  check(overText==0,tag..': no tab dot covers its count text ('..overText..' of '..n..' do)')
+  check(overNote==0,tag..': no tab dot covers the LIMITED tab\'s note')
+  check(notLeft==0,tag..': the tab dots sit on the tabs\' top-left corner, clear of the count')
+  check(wrongSize==0 and outside==0,tag..': ...still the 1.5x dot (21 px) and fully inside its tab')
+  check(indexBadge():GetAttribute('BadgeLeft')==false and alertBadge():GetAttribute('BadgeLeft')==false and near(L.rect(indexBadge()).x1-L.rect(indexBadge()).x0,36)and near(L.rect(alertBadge()).x1-L.rect(alertBadge()).x0,30),tag..': the INDEX count (36 px) and the MENU alert (30 px) stay 1.5x on their buttons\' top-right corners')
+ end
+ check(compactSeen and wideSeen and checkedTabs>=56,'both tab sizes were measured: the phone\'s compact tab and the PC tab ('..checkedTabs..' tab dots in all)')
+ relay(390,844)
+end
 -- 4. one component --------------------------------------------------------------------------------------------------------------------------------------
 local function source(name)return require('./rs_bundle')[name]end
 if after then

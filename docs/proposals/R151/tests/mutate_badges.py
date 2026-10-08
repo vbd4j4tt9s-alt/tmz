@@ -25,7 +25,9 @@ M = {
     # the disc is a rounded square, not a circle
     'not_circle': ('badge', 'NotifyBadge151.lua', 'c.CornerRadius=UDim.new(1,0)', 'c.CornerRadius=UDim.new(0,6)'),
     # the tab dots hang out of their tab again (the tab row clips at its top)
-    'dot_out': ('badge', 'ChestIndex.client.lua', "Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot)", "Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,3)"),
+    'dot_out': ('badge', 'ChestIndex.client.lua', "Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot,true)", "Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,3,true)"),
+    # R153 client bug review (finding 7): the tab dot is back on the top-right corner, over the end of the count text
+    'dot_on_count': ('badge', 'ChestIndex.client.lua', "Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot,true)", "Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot)"),
     # the DAILY badge hangs off the top of the screen again
     'daily_off_screen': ('daily', 'DailyRewardsClient.client.lua', "Badge.Make(dailyButton,'RewardBadge',Badge.Sizes.Daily,Badge.Overhang.Daily)", "Badge.Make(dailyButton,'RewardBadge',Badge.Sizes.Daily,12)"),
     # past nine the badge says 10, 11 ...

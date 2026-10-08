@@ -147,7 +147,9 @@ local function updateAlerts()
  -- R148: a tab's dot is its categories together: LIMITED lights up for a reward of either MECH SET (8) or VERITY (9).
  -- R151: a dot sits fully INSIDE its tab: the tab row is a ScrollingFrame, which clips at its edge, and the old dot hung out of the tab's top and was cut there.
  -- R153: every badge is 1.5x bigger; sizes and overhangs are NotifyBadge151.Sizes / .Overhang.
- for key,t in pairs(tabsByKey)do Badge.Set(Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot),'',(perTab[key]or 0)>0,false)end
+ -- R153 client bug review (finding 7): the 1.5x dot (21 px) on the tab's top-RIGHT corner covered the end of the count text ("18 / 40") on every tab, on a PC tab (122 x 58) and on a phone's compact
+ -- one (106 x 40) alike, and the text has no room to give. It sits on the top-LEFT corner now (over the biome logo's corner, clear of the count), still 21 px and still inside its tab.
+ for key,t in pairs(tabsByKey)do Badge.Set(Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot,true),'',(perTab[key]or 0)>0,false)end
  -- The INDEX button's count: 9 px of the badge hang past the button's corner; the wheel's CanvasGroup (HudLayout) keeps NotifyBadge151.Margin around the button, which holds it.
  -- R150 review: the badge pops SILENTLY (as in R149). A chime here fired the moment the server opened a pack (OpenSeedPack commits the seed's reward at once), before the reveal shows the seed.
  Badge.Set(Badge.Make(toggle,'RewardBadge',Badge.Sizes.Count,Badge.Overhang.Count),Badge.Text(total),total>0,grew)
