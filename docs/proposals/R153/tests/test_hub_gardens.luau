@@ -426,64 +426,150 @@ local function nearParts(lox,hix,loz,hiz)
  for _,p in ipairs(colliders)do local a,b=aabb(p);if a[1]<hix and b[1]>lox and a[3]<hiz and b[3]>loz then out[#out+1]=p end end
  return out
 end
+-- THE WALK. A body walks the ground, so what counts is the ground's height under its feet along the way, not the runner sweep's 1.1-stud clearance (R153 first
+-- version: that limit let the 0.8-stud step from a 1.0-stud apron onto the soil, exactly where the fence stands, through the test and stopped the owner there).
+-- A way is walkable if the ground never jumps up more than CLIFF in one .05-stud step and never climbs more than SLOPE per stud over half a stud (the ramps are 0.4
+-- per stud = 22 degrees; the Humanoid climbs far steeper). Every exposed side of every one of the 60 plots, every convex corner (diagonally), the pad's rim on its
+-- four sides, and every fence post (a straight line through the post from the lawn) is walked from 6 studs out; then a flood fill over a .25-stud grid of the real
+-- ground (everything that collides near the base, taller things = walls) from the lawn, one cell step up at most STEPCELL, must reach every cell of every soil bed
+-- and every cell of the pad within 3 studs of one (the aprons, the aisles, the ends, the corners).
 local DEPTH,STEP=6,.05
--- every exposed side of every plot sampled every .5 stud, walked in from 6 studs out; plus every convex corner walked in diagonally. Returns the worst rise in one .05 step,
--- the number of samples and the failing ones (rise over the limit).
-local function climbs(includeRamps)
- local report={Samples=0,Corners=0,Worst=0,Fail={},ByBase={},Faces={}}
+local CLIFF,SLOPE,STEPCELL,CELL=.2,.85,.3,.25
+local function boxes(list)
+ local out={};for _,p in ipairs(list)do local a,b=aabb(p);out[#out+1]={P=p,A=a,B=b}end;return out
+end
+local function walkMetrics(entries,qx,qz,nx,nz,d0,d1)
+ -- the line q + n*d from d0 down to d1; the parts that can matter are the ones whose box meets the line's
+ local ex,ez=qx+nx*d0,qz+nz*d0;local fx,fz=qx+nx*d1,qz+nz*d1
+ local lox,hix,loz,hiz=math.min(ex,fx)-.5,math.max(ex,fx)+.5,math.min(ez,fz)-.5,math.max(ez,fz)+.5
+ local near={};for _,e in ipairs(entries)do if e.A[1]<hix and e.B[1]>lox and e.A[3]<hiz and e.B[3]>loz then near[#near+1]=e.P end end
+ local hs={};local d=d0
+ while d>=d1-1e-9 do hs[#hs+1]=heightAt(qx+nx*d,qz+nz*d,near);d-=STEP end
+ local cliff,slope=0,0
+ for i=2,#hs do local r=hs[i]-hs[i-1];if r>cliff then cliff=r end;if i>10 then local s=(hs[i]-hs[i-10])/(STEP*10);if s>slope then slope=s end end end
+ return cliff,slope,hs
+end
+local function newReport()return{Walks=0,Corners=0,Posts=0,Rim=0,Flush=0,Apron=0,Cliff=0,Slope=0,Fail={},Faces={}}end
+local function record(rep,i,label,x,z,cliff,slope)
+ rep.Walks+=1;if cliff>rep.Cliff then rep.Cliff=cliff end;if slope>rep.Slope then rep.Slope=slope end
+ if cliff>CLIFF+1e-6 or slope>SLOPE+1e-6 then rep.Fail[#rep.Fail+1]={Base=i,Label=label,X=x,Z=z,Cliff=cliff,Slope=slope};rep.Faces[i..' '..label]=(rep.Faces[i..' '..label]or 0)+1 end
+end
+local function raster(entries,x0,z0,nx,nz)
+ local H=table.create(nx*nz,K.Floor)
+ for _,e in ipairs(entries)do
+  local p=e.P;local ix0,ix1=math.max(1,math.floor((e.A[1]-x0)/CELL)+1),math.min(nx,math.ceil((e.B[1]-x0)/CELL))
+  local iz0,iz1=math.max(1,math.floor((e.A[3]-z0)/CELL)+1),math.min(nz,math.ceil((e.B[3]-z0)/CELL))
+  for iz=iz0,iz1 do for ix=ix0,ix1 do
+   local y=surface(p,x0+(ix-.5)*CELL,z0+(iz-.5)*CELL);local k=(iz-1)*nx+ix;if y and y>H[k]then H[k]=y end
+  end end
+ end
+ return H
+end
+local function flood(H,nx,nz)
+ local seen=table.create(nx*nz,false);local queue,head={},1
+ local function push(k)if not seen[k]and H[k]<12 then seen[k]=true;queue[#queue+1]=k end end
+ for ix=1,nx do push(ix);push((nz-1)*nx+ix)end;for iz=1,nz do push((iz-1)*nx+1);push((iz-1)*nx+nx)end
+ while head<=#queue do
+  local k=queue[head];head+=1
+  local ix=(k-1)%nx+1;local iz=(k-1)//nx+1;local h=H[k]
+  for dz=-1,1 do for dx=-1,1 do if dx~=0 or dz~=0 then
+   local jx,jz=ix+dx,iz+dz
+   if jx>=1 and jx<=nx and jz>=1 and jz<=nz then local j=(jz-1)*nx+jx;if not seen[j]and H[j]<12 and H[j]-h<=STEPCELL+1e-9 then seen[j]=true;queue[#queue+1]=j end end
+  end end end
+ end
+ return seen
+end
+local function measure(includeRamps)
+ local rep=newReport();rep.Cells=0;rep.Missed=0;rep.MissedList={};rep.Soil=0
  for i=1,6 do
   local base=bases[i];local plots={};local lox,hix,loz,hiz=math.huge,-math.huge,math.huge,-math.huge
   for _,p in ipairs(base.GardenPlots:GetChildren())do
    local a,b=aabb(p);plots[#plots+1]={P=p,X0=a[1],X1=b[1],Z0=a[3],Z1=b[3],Top=b[2]}
-   lox=math.min(lox,a[1]);hix=math.max(hix,b[1]);loz=math.min(loz,a[3]);hiz=math.max(hiz,b[3])
   end
-  local pa,pb=aabb(base.Pad);lox=math.min(lox,pa[1]);hix=math.max(hix,pb[1]);loz=math.min(loz,pa[3]);hiz=math.max(hiz,pb[3])
-  local near=nearParts(lox-DEPTH-8,hix+DEPTH+8,loz-DEPTH-8,hiz+DEPTH+8)
+  local pa,pb=aabb(base.Pad);lox,hix,loz,hiz=pa[1],pb[1],pa[3],pb[3]
+  local near=nearParts(lox-DEPTH-9,hix+DEPTH+9,loz-DEPTH-9,hiz+DEPTH+9)
   if not includeRamps then local keep={};for _,p in ipairs(near)do if p._class~='WedgePart'then keep[#keep+1]=p end end;near=keep end
+  local entries=boxes(near)
   local function inPlot(x,z)for _,q in ipairs(plots)do if x>q.X0+1e-6 and x<q.X1-1e-6 and z>q.Z0+1e-6 and z<q.Z1-1e-6 then return true end end;return false end
-  local function walk(qx,qz,nx,nz,label)
-   -- from DEPTH studs out to the edge, then one step into the soil; the biggest single rise on the way
-   local worst=0;local prev=heightAt(qx+nx*DEPTH,qz+nz*DEPTH,near)
-   local d=DEPTH-STEP
-   while d>-STEP*1.5 do
-    local h=heightAt(qx+nx*d,qz+nz*d,near);if h-prev>worst then worst=h-prev end;prev=h;d-=STEP
-   end
-   report.Samples+=1;report.ByBase[i]=(report.ByBase[i]or 0)+1
-   if worst>report.Worst then report.Worst=worst end
-   if worst>LIMIT+1e-6 then report.Fail[#report.Fail+1]={Base=i,Label=label,X=qx,Z=qz,Rise=worst};report.Faces[i..' '..label]=(report.Faces[i..' '..label]or 0)+1 end
-  end
+  -- every side of every plot, every .5 stud, walked in from 6 studs out to 1 stud into the soil
   for _,q in ipairs(plots)do
    for _,side in ipairs({{-1,0,q.X0,'X0'},{1,0,q.X1,'X1'},{0,-1,q.Z0,'Z0'},{0,1,q.Z1,'Z1'}})do
-    local nx,nz=side[1],side[2]
-    local a,b=q.Z0,q.Z1;if nx==0 then a,b=q.X0,q.X1 end
+    local nx,nz=side[1],side[2];local a,b=q.Z0,q.Z1;if nx==0 then a,b=q.X0,q.X1 end
     local t=a+.25
     while t<b do
      local px,pz=side[3],t;if nx==0 then px,pz=t,side[3]end
-     if not inPlot(px+nx*.05,pz+nz*.05)then walk(px,pz,nx,nz,side[4]..' '..q.P.Name)end
+     if not inPlot(px+nx*.05,pz+nz*.05)then
+      local c,s=walkMetrics(entries,px,pz,nx,nz,DEPTH,-1);record(rep,i,side[4]..' '..q.P.Name,px,pz,c,s)
+      -- a side within 1.5 studs of the pad's rim: flush with it (the rear bed) or an apron (the 1.0 strip beside the fence, between the soil and the rim)
+      local rimAt=nx~=0 and math.min(math.abs(px-lox),math.abs(hix-px))or math.min(math.abs(pz-loz),math.abs(hiz-pz))
+      if rimAt<.1 then rep.Flush+=1 elseif rimAt<1.5 then rep.Apron+=1 end
+     end
      t+=.5
     end
    end
    for _,cx in ipairs({{q.X0,-1},{q.X1,1}})do for _,cz in ipairs({{q.Z0,-1},{q.Z1,1}})do
     local x,z,sx,sz=cx[1],cz[1],cx[2],cz[2]
     if not inPlot(x+sx*.05,z)and not inPlot(x,z+sz*.05)and not inPlot(x+sx*.05,z+sz*.05)then
-     local k=math.sqrt(.5);walk(x,z,sx*k,sz*k,'corner '..q.P.Name);report.Corners+=1
+     local k=math.sqrt(.5);local c,s=walkMetrics(entries,x,z,sx*k,sz*k,DEPTH,-1);record(rep,i,'corner '..q.P.Name,x,z,c,s);rep.Corners+=1
     end
    end end
   end
+  -- the pad's rim on its four sides, every 1 stud, from 6 studs out to 6 studs in; and its four corners diagonally
+  for _,side in ipairs({{-1,0,lox,loz,hiz},{1,0,hix,loz,hiz},{0,-1,loz,lox,hix},{0,1,hiz,lox,hix}})do
+   local nx,nz=side[1],side[2];local t=side[4]+.5
+   while t<side[5]do
+    local px,pz=side[3],t;if nx==0 then px,pz=t,side[3]end
+    local c,s=walkMetrics(entries,px,pz,nx,nz,DEPTH,-6);record(rep,i,'rim',px,pz,c,s);rep.Rim+=1;t+=1
+   end
+  end
+  for _,cx in ipairs({{lox,-1},{hix,1}})do for _,cz in ipairs({{loz,-1},{hiz,1}})do
+   local k=math.sqrt(.5);local c,s=walkMetrics(entries,cx[1],cz[1],cx[2]*k,cz[2]*k,DEPTH,-4);record(rep,i,'rim corner',cx[1],cz[1],c,s);rep.Rim+=1
+  end end
+  -- the fence posts (walk-through, but they are where a player's path would cross the fence): the line through each from the lawn, 6 studs out of the rim to 8 in
+  for _,p in ipairs(parts(base))do if p.Name=='Fence pillar'or p.Name=='Entrance pillar'then
+   local q=p._props.CFrame.Position;local dd={q.X-lox,hix-q.X,q.Z-loz,hiz-q.Z};local k,m=1,dd[1];for j=2,4 do if dd[j]<m then k,m=j,dd[j]end end
+   local nx,nz=0,0;if k==1 then nx=1 elseif k==2 then nx=-1 elseif k==3 then nz=1 else nz=-1 end -- (inward)
+   local c,s=walkMetrics(entries,q.X,q.Z,-nx,-nz,m+8,-3);record(rep,i,'post',q.X,q.Z,c,s);rep.Posts+=1
+  end end
+  -- the flood fill
+  local x0,z0=lox-8,loz-8;local gx,gz=math.ceil((hix-lox+16)/CELL),math.ceil((hiz-loz+16)/CELL)
+  local H=raster(entries,x0,z0,gx,gz);local seen=flood(H,gx,gz)
+  local crowd={}
+  for _,n in ipairs({'Spawn','Treadmill'})do local p=base:FindFirstChild(n,true);if p then local a,c=aabb(p);crowd[#crowd+1]={a[1]-1,a[3]-1,c[1]+1,c[3]+1}end end
+  for iz=1,gz do for ix=1,gx do
+   local x,z=x0+(ix-.5)*CELL,z0+(iz-.5)*CELL
+   local need=false;local soil=false
+   for _,q in ipairs(plots)do
+    if x>q.X0+.3 and x<q.X1-.3 and z>q.Z0+.3 and z<q.Z1-.3 then need=true;soil=true;break end
+    if x>q.X0-3 and x<q.X1+3 and z>q.Z0-3 and z<q.Z1+3 and x>lox+.3 and x<hix-.3 and z>loz+.3 and z<hiz-.3 then need=true end
+   end
+   if need then for _,o in ipairs(crowd)do if x>o[1]and x<o[3]and z>o[2]and z<o[4]then need=false;break end end end
+   if need then
+    rep.Cells+=1;if soil then rep.Soil+=1 end
+    if not seen[(iz-1)*gx+ix]then rep.Missed+=1;if #rep.MissedList<6 then rep.MissedList[#rep.MissedList+1]=string.format('base %d (%.1f,%.1f) h %.2f',i,x,z,H[(iz-1)*gx+ix])end end
+   end
+  end end
  end
- return report
+ return rep
 end
-local after=climbs(true)
-info(string.format('gardens: %d edge samples walked in from 6 studs out (sides every .5 stud, %d convex corners diagonally) over 6 bases; the biggest single rise on any way onto a bed is %.2f studs (limit %.2f)',after.Samples,after.Corners,after.Worst,LIMIT))
-check('gardens: EVERY way onto a bed (all four sides of all 60 plots, the corners, every .5 stud) climbs at most the runner\'s step limit at each step ('..string.format('%.2f',after.Worst)..' <= '..string.format('%.2f',LIMIT)..')',#after.Fail==0 and after.Samples>2000,#after.Fail..' failing of '..after.Samples..' e.g. '..tostring(after.Fail[1]and(after.Fail[1].Base..' '..after.Fail[1].Label..string.format(' rise %.2f',after.Fail[1].Rise))))
+local after=measure(true)
+info(string.format('gardens: %d walks from 6 studs out (every side of 60 plots every .5 stud, %d convex corners diagonally, %d pad-rim walks, %d fence posts; %d of the side walks end at the rear bed\'s flush edges, %d at the 1.0 aprons beside the fence): worst cliff %.2f, worst slope %.2f per stud (limits %.2f / %.2f)',after.Walks,after.Corners,after.Rim,after.Posts,after.Flush,after.Apron,after.Cliff,after.Slope,CLIFF,SLOPE))
+info(string.format('gardens: flood fill from the lawn over the real ground (.25 grid, one cell up at most %.2f): %d of %d cells that matter reached (%d of them soil)%s',STEPCELL,after.Cells-after.Missed,after.Cells,after.Soil,after.Missed>0 and(' missed '..table.concat(after.MissedList,'; '))or''))
+check('gardens: EVERY way onto a bed on all 6 bases (every side of all 60 plots every .5 stud, every convex corner diagonally, the pad rim on its four sides, a line through every fence post) is walkable: no ledge over '..CLIFF..', no slope over '..SLOPE..' per stud ('..string.format('worst %.2f / %.2f',after.Cliff,after.Slope)..')',
+ #after.Fail==0 and after.Walks>2500 and after.Corners>=100 and after.Posts>=100 and after.Flush>=300 and after.Apron>=500,#after.Fail..' failing of '..after.Walks..' e.g. '..tostring(after.Fail[1]and(after.Fail[1].Base..' '..after.Fail[1].Label..string.format(' at %.1f,%.1f cliff %.2f slope %.2f',after.Fail[1].X,after.Fail[1].Z,after.Fail[1].Cliff,after.Fail[1].Slope))))
+if #after.Fail>0 then
+ local by={};for _,f in ipairs(after.Fail)do local k=f.Base..' '..f.Label:gsub(' DirtPlot_%d+','');local e=by[k]or{N=0,C=0,S=0};e.N+=1;if f.Cliff>e.C then e.C=f.Cliff;e.X=f.X;e.Z=f.Z end;if f.Slope>e.S then e.S=f.Slope end;by[k]=e end
+ local keys={};for k in pairs(by)do keys[#keys+1]=k end;table.sort(keys)
+ for _,k in ipairs(keys)do local e=by[k];info(string.format('  fail %s: %d walks, worst cliff %.2f slope %.2f at %.1f,%.1f',k,e.N,e.C,e.S,e.X,e.Z))end
+end
+check('gardens: a flood fill from the lawn (one .25-stud cell step up at most '..STEPCELL..') reaches EVERY cell of every bed and every cell of the pad within 3 studs of a bed (aprons, aisles, ends, corners; all 6 bases): no pocket, no trap',after.Missed==0 and after.Cells>50000 and after.Soil>40000,after.Missed..' missed of '..after.Cells..' '..tostring(after.MissedList[1]))
 if not MUT then
- local before=climbs(false)
+ local before=measure(false)
  local faces=0;for _ in pairs(before.Faces)do faces+=1 end
- info(string.format('gardens: WITHOUT the ramps the worst single rise is %.2f studs and %d of %d samples need a jump (%d plot faces: the rear bed\'s three outer sides on each of the six bases)',before.Worst,#before.Fail,before.Samples,faces))
- check('gardens: the measurement has teeth: without the ramps the rear beds\' outer sides (1.8 over the hub floor) fail it',#before.Fail>0 and before.Worst>1.7 and before.Worst<1.9)
- local rear=true;for _,f in ipairs(before.Fail)do if not f.Label:find('DirtPlot_10')then rear=false end end
- check('gardens: and nothing but the rear beds (DirtPlot_10) fails: the 0.8-stud pad-to-soil edges and the 1.0 pad rim are within the limit',rear and #before.Fail>0,tostring(before.Fail[1]and before.Fail[1].Label))
- check('gardens: all 18 rear faces (3 per base: back, two ends) fail without ramps, and the rear beds\' outer corners with them',(function()local n,c=0,0;for k in pairs(before.Faces)do if k:find('corner')then c+=1 else n+=1 end end;return n==18 and c==6 end)(),faces)
+ info(string.format('gardens: WITHOUT the ramps %d of %d walks fail (worst cliff %.2f) and the flood fill misses %d of %d cells (%d plot sides / corners / the rim)',#before.Fail,before.Walks,before.Cliff,before.Missed,before.Cells,faces))
+ check('gardens: the measurement has teeth: without the ramps the beds\' 0.8 and 1.8 sides and the 1.0 rim fail the walk, and the flood fill from the lawn reaches nothing on the pad',#before.Fail>before.Walks*.4 and before.Cliff>1.7 and before.Missed==before.Cells)
+ local lows={};for _,f in ipairs(before.Fail)do if f.Cliff>.7 and f.Cliff<.9 then lows[f.Label:match('^%a+')]=true end end
+ check('gardens: and the 0.8-stud step from the pad onto the soil (the apron beside the fence) fails it too: that is the step the first R153 ramps left',next(lows)~=nil)
 end
 -- the ramps are queryable floors, so check what a ray sees: planting's server check ("KEEP A CLEAR VIEW OF THE SOIL") casts from the player's head to the soil point
 -- and must hit the plot; digging and plant inspection cast from the camera. From heads 4.5 studs over the ground (pad, floor or ramp), 1.5 / 4 / 9 studs out from every
@@ -539,9 +625,12 @@ do
  local floorTop=K.Floor;local padTop=aabb(pad)[2]and select(2,aabb(pad))[2];local soilTop=select(2,aabb(plot))[2];local bTop=select(2,aabb(border))[2]
  info(string.format('gardens: heights: hub floor %.2f, pad top %.2f (rim %.2f over the floor), soil top %.2f (%.2f over the pad, %.2f over the floor), border top %.2f (%.2f over the soil; CanCollide %s)',
   floorTop,padTop,padTop-floorTop,soilTop,soilTop-padTop,soilTop-floorTop,bTop,bTop-soilTop,tostring(border._props.CanCollide)))
- check('gardens: measured: pad rim 1.0, pad to soil 0.8 (both within the limit), soil over the floor 1.8 (over it: this is what stopped a runner)',math.abs(padTop-floorTop-1)<.001 and math.abs(soilTop-padTop-.8)<.001 and soilTop-floorTop>LIMIT and padTop-floorTop<=LIMIT and soilTop-padTop<=LIMIT)
+ check('gardens: measured: pad rim 1.0, pad to soil 0.8, soil over the hub floor 1.8: the ramps\' height is the soil\'s (2.5 studs of run per stud of rise), and every one of the three steps is far over what a body walks up ('..CLIFF..')',math.abs(padTop-floorTop-1)<.001 and math.abs(soilTop-padTop-.8)<.001 and math.abs(soilTop-floorTop-1.8)<.001 and padTop-floorTop>CLIFF and soilTop-padTop>CLIFF)
  local solidBorders={};for _,b in pairs(bases)do for _,p in ipairs(b.GardenBedBorders:GetChildren())do if solid(p)then solidBorders[#solidBorders+1]=path(p)end end end
  check('gardens: the wooden bed borders (6 x 17 pieces, just over the soil) do not collide at all: walk-through (WalkthroughProps90), not the obstacle',#solidBorders==0,first(solidBorders))
+ local fenceParts,fenceSolid=0,{}
+ for _,b in pairs(bases)do local f=b:FindFirstChild('GardenFence34');if f then for _,p in ipairs(parts(f))do fenceParts+=1;if solid(p)or p._props.CanQuery~=false then fenceSolid[#fenceSolid+1]=path(p)end end end;if b:FindFirstChild('PerimeterFence')then fenceSolid[#fenceSolid+1]='old PerimeterFence on '..b.Name end end
+ check('gardens: the fence (GardenFence34: pillars, rails, footings, sills, '..fenceParts..' parts on 6 bases) is what GardenFenceArt builds and none of it collides or answers a query: it is only dressing, the ramps are the only thing this fix adds (nothing of the fence was moved or made solid)',fenceParts>600 and #fenceSolid==0,first(fenceSolid)or fenceParts)
 end
 -- planting, harvesting, plant inspection and digging: the soil and everything planted on it are untouched; the ramps cannot be queried or touched
 do
@@ -582,11 +671,17 @@ do
   for _,n in ipairs({'Spawn','Treadmill'})do local p=b:FindFirstChild(n,true);if p then local a,c=aabb(p);crowd[#crowd+1]={Name='Base'..i..' '..n,Lo={a[1]-2,a[3]-2},Hi={c[1]+2,c[3]+2}}end end
   local at=b.Pad._props.CFrame*V3(MPR.Offset.X,0,MPR.Offset.Z);crowd[#crowd+1]={Name='Base'..i..' pedestal',Lo={at.X-6.5,at.Z-6.5},Hi={at.X+6.5,at.Z+6.5}}
  end
+ -- (a ramp's lower part lies inside the pad slab; what matters is where a ramp stands ABOVE the pad: sampled every .5 stud over each box)
  local crowded={}
- for _,p in ipairs(rampParts)do local a,c=aabb(p)
-  for _,o in ipairs(crowd)do if a[1]<o.Hi[1]and c[1]>o.Lo[1]and a[3]<o.Hi[2]and c[3]>o.Lo[2]then crowded[#crowded+1]=p.Name..' / '..o.Name end end
+ for _,o in ipairs(crowd)do
+  local bx={};for _,p in ipairs(rampParts)do local a,c=aabb(p);if a[1]<o.Hi[1]and c[1]>o.Lo[1]and a[3]<o.Hi[2]and c[3]>o.Lo[2]then bx[#bx+1]=p end end
+  local x=o.Lo[1]
+  while x<=o.Hi[1]do local z=o.Lo[2]
+   while z<=o.Hi[2]do for _,p in ipairs(bx)do local y=surface(p,x,z);if y and y>5.01 then crowded[#crowded+1]=p.Name..' / '..o.Name;break end end;z+=.5 end
+   x+=.5
+  end
  end
- check('gardens: no ramp within 2 studs of a spawn or a treadmill, or within 6.5 studs of the mystery pedestal\'s spot',#crowded==0 and #crowd==18,first(crowded)or#crowd)
+check('gardens: no ramp stands above the pad within 2 studs of a spawn or a treadmill, or within 6.5 studs of the mystery pedestal\'s spot',#crowded==0 and #crowd==18,first(crowded)or#crowd)
  local counts={};for _,p in ipairs(rampParts)do local i=p:GetAttribute('BaseIndex');counts[i]=(counts[i]or 0)+1 end
  local line={};for i=1,6 do line[#line+1]=i..':'..tostring(counts[i])end
  info('gardens: '..#rampParts..' ramps ('..table.concat(line,' ')..')')

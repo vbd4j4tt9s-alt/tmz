@@ -9,10 +9,13 @@
 #                the feet 25 - 35 studs; debounce, no stacking, no sky launch; the client script launches the local character, squashes the mat, plays an
 #                the owner's boing (94320656351627, pitch 1; ONE sound per bounce, none for a debounced contact, none for the old Bubble04; checked on a stubbed
 #                and on the real LocalSfx: Effects group, SoundTiming's default lead-in); MovementGuard's rise allowance covers the launch.
-#       gardens: the step heights ground -> pad -> border -> soil are measured against the runner's step limit (RunnerSweep.Hull); every exposed soil face of
-#                every bed of the 6 bases gets an invisible ramp (the bed borders stay walk-through) so no climb on any edge - fronts, sides, corners, the
-#                rear bed's three outer faces - exceeds the limit; the soil, the plots and their plants are untouched; ramps cannot be queried or touched
-#                and stay inside the hub (the keepers' track is not affected).
+#       gardens: (R153 second round: owner: "these garden sides also have not been fixed and players cant walk over them") every raised block - each of the 60
+#                soil beds AND the pad - has a continuous 22 degree invisible skirt (a wedge along every exposed face, a fan of wedges at every convex corner),
+#                so a body walks from the hub floor over the pad's rim, the 1.0 apron beside the fence and onto the soil with no ledge: every side of every plot
+#                every .5 stud, every convex corner diagonally, the pad's rim on its four sides and a line through every fence pillar are walked on all 6 bases
+#                (no ledge over 0.2, no slope over 0.85 per stud; without the ramps 99.9% of them fail) and a flood fill over a .25 grid of the real ground from
+#                the lawn reaches every cell of every bed and of the pad within 3 studs of one; the bed borders and the fence stay walk-through and unmoved;
+#                planting's clear-view rays (6828) cross no ramp; ramps cannot be touched, stay inside the hub, stand off the spawn / treadmill / pedestal.
 #  2. static checks - no pathfinding anywhere (keepers / NPCs do not walk the hub), the new client script starts with the R152 load guard, the boing is
 #     the owner's trampoline file (94320656351627) at pitch 1 through LocalSfx (R153: it replaced the Bubble04 placeholder), the manifest lists the new files.
 #  3. the R152 load guard run and the hub z-fight run (run_hub_zfight.sh: no counted finding, no tight pair, the trampoline parts included).
@@ -23,7 +26,7 @@
 # "mutate" as the 3rd argument also runs broken copies (no ramps; a bounce that stacks; no debounce; a loader that strips nothing) that the test must fail.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
-OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};MODE=$3
+OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/5ea4542b-sapkeee.rbxl};MODE=$3
 [ -f "$PLACE" ] || { echo "needs the owner's place file: $PLACE";exit 1; }
 mkdir -p "$OUT/t"
 python3 "$REPO/docs/proposals/R149/tools/rbxl_geom.py" --tree "$PLACE" "$OUT/t/place_tree.luau" Workspace/ChestChaseMap >/dev/null
