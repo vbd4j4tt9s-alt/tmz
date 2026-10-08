@@ -15,8 +15,9 @@ local A={Revision=153,TemplateKey='Forest_01',Layer=.046}
 local V,CF,RGB,ANG=Vector3.new,CFrame.new,Color3.fromRGB,CFrame.Angles
 local PI=math.pi
 local Renderer=require(script.Parent.SeedPackRenderer)
--- the flat pouch in the pack's root frame at scale 1 (VerityPouch151.Generate of Storm_02: Size X / Y, DepthShare .56 x Size Z, centred on its PackLocalFrame)
-A.Pouch={Width=1.97,Height=2.06,Depth=1.004*.56,Center=V(0,-.01,-.0474),Tolerance=.02}
+-- the flat pouch in the pack's root frame at scale 1 (VerityPouch151.Generate of Storm_02: Size X / Y, DepthShare .56 x Size Z, centred on its PackLocalFrame,
+-- which sits on the seal plane z = 0 since the R153 pack-parts fix; the sachet is centred there too. Build follows the pouch part wherever it really is)
+A.Pouch={Width=1.97,Height=2.06,Depth=1.004*.56,Center=V(0,-.01,0),Tolerance=.02}
 A.Flat={U=.845,V=.68} -- the exactly flat part of each face (EdgeRadius .14 in from the sides; TaperHeight + CrimpHeight in from the ends)
 A.Colors={Body=RGB(58,64,74),Steel=RGB(150,160,172),Rivet=RGB(204,211,220),Bolt=RGB(190,198,208),Plate=RGB(30,36,46),Housing=RGB(104,116,130),
  Inset=RGB(20,123,152),Cyan=RGB(34,231,255),Facet=RGB(143,251,255),Silver=RGB(180,197,207),Graphite=RGB(53,66,79),Gold=RGB(242,180,65),

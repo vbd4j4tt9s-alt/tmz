@@ -8,12 +8,15 @@ Usage: python3 check_pack_parts.py <scenes.txt> <src dir> [--templates pack_temp
 2. EVERY SCENE'S POUCH IS WHERE THE DATA IS DRAWN: each MeshPart of a scene (dump_pack_parts.luau) sits on its template's PackLocalFrame (1e-4).
 3. NOTHING HANGS OFF IT (tools/attach.py): every visible part is within .03 of the pouch's surface or touches, through static parts, one that is.
    Known and not counted: the Void's event-horizon halo and its debris (EventHorizon*, HaloDebris*: R122's ring that hangs round the pack on purpose and
-   spins) and the MECH pack (its look is being redesigned in R153: its loose parts are LISTED for that work, not fixed here).
-   --expect-floating   the base side of the suite: exit 0 only if some part that is not on the known list floats (the R152 Void corner details).
+   spins). The MECH pack (R153 look B, MechPackArt153) is COUNTED, on its own body: Body 'MechPouch' (the generated flat pouch: the scene's `pouch`
+   triangles) or 'MechSachet' (the plain-parts sachet: its Sachet* parts are the body), never Forest_01's mesh.
+   --expect-floating   the base side of the suite: exit 0 only if some part that is not on the known list floats in a scene that is not the Mech's
+                       (the R152 Void corner details; the R152 Mech's own floating parts are printed too).
 --seats      ONLY this: <src dir>'s EclipsePackArt.Seats equals what void_seats.py computes from the pouch for the Void details that float WITHOUT a seat (give
              it a scene of the base code, where nothing is seated): within .002.
 Exit 1 on any failure."""
 import json
+import math
 import os
 import re
 import sys
@@ -24,9 +27,41 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', 'tools'))
 import attach  # noqa: E402
 import pouch_mesh  # noqa: E402
+C = attach.C  # (R151 check_packs: part frames)
 
-KNOWN = [(r'^Void', r'^(EventHorizon|HaloDebris)\d', 'the R122 event-horizon halo and its debris hang round the pack on purpose (they spin)'),
-         (r'^Mech', r'.', 'the Mech pack is being redesigned (R153 "Circuit Mech"): listed for that work, not changed here')]
+KNOWN = [(r'^Void', r'^(EventHorizon|HaloDebris)\d', 'the R122 event-horizon halo and its debris hang round the pack on purpose (they spin)')]
+
+
+class MeshPouch(pouch_mesh.Pouch):
+    """a pouch given as triangles [(name, vertices, faces)] in the scene's frame (pouch_mesh.Pouch's surface and gap on them)."""
+    def __init__(self, key, parts):
+        self.key = key; self.parts = parts; self.body = None; self._hm = None
+        allv = np.concatenate([v for _, v, _ in parts]); self.lo, self.hi = allv.min(0), allv.max(0)
+
+
+def solid(p):
+    """a sachet body part as triangles in the scene's frame: a Block's box, a Cylinder (16 sides, along its X), a WedgePart (Roblox's wedge)."""
+    R, c = C.frame(p); sx, sy, sz = np.array(p['size'], float) / 2
+    if p['shape'] == 'Cylinder':
+        n = 16; r = min(sy, sz); a = 2 * np.pi * np.arange(n) / n
+        v = [[x, r * math.cos(t), r * math.sin(t)] for x in (-sx, sx) for t in a] + [[-sx, 0, 0], [sx, 0, 0]]
+        f = [[k, (k + 1) % n, n + k] for k in range(n)] + [[(k + 1) % n, n + (k + 1) % n, n + k] for k in range(n)]
+        f += [[2 * n, (k + 1) % n, k] for k in range(n)] + [[2 * n + 1, n + k, n + (k + 1) % n] for k in range(n)]
+    elif p['class'] == 'WedgePart':  # bottom (y-) and back (z+) full, the slope from the top-back edge to the bottom-front one
+        v = [[x, -sy, -sz] for x in (-sx, sx)] + [[x, -sy, sz] for x in (-sx, sx)] + [[x, sy, sz] for x in (-sx, sx)]
+        f = [[0, 1, 3], [0, 3, 2], [2, 3, 5], [2, 5, 4], [0, 4, 5], [0, 5, 1], [0, 2, 4], [1, 5, 3]]
+    else:
+        v = [[x, y, z] for x in (-sx, sx) for y in (-sy, sy) for z in (-sz, sz)]
+        f = [[0, 1, 3], [0, 3, 2], [4, 5, 7], [4, 7, 6], [0, 1, 5], [0, 5, 4], [2, 3, 7], [2, 7, 6], [0, 2, 6], [0, 6, 4], [1, 3, 7], [1, 7, 5]]
+    return (p['name'], np.array(v, float) @ R.T + c, np.array(f, int))
+
+
+def mech_body(sc):
+    """(the Mech's own pouch surface, its visible parts that are not the body): R153 look B"""
+    if sc['attrs']['Body'] == 'MechPouch':
+        return MeshPouch('MechPouch', [('pouch', np.array(sc['pouch']['v'], float), np.array(sc['pouch']['f'], int))]), attach.visible(sc)
+    body = [p for p in attach.visible(sc) if p['name'].startswith('Sachet')]
+    return MeshPouch('MechSachet', [solid(p) for p in body]), [p for p in attach.visible(sc) if not p['name'].startswith('Sachet')]
 
 
 def templates(path):
@@ -89,23 +124,28 @@ def main():
     print('the pouch: %d designs, the native render data has the template\'s box (worst %.1e) and every pouch closes at z = 0, y = 1.02 / -1.04, x +-.95 (worst %.1e)' % (len(T), worst_box, worst_seam))
     # 2. + 3. every scene
     scenes = [json.loads(l[6:]) for l in open(scenes_path, encoding='utf-8') if l.startswith('SCENE ')]
-    floating_unknown = 0; listed = {}
+    floating_unknown = 0; floating_base = 0; listed = {}
     for sc in scenes:
-        key = sc['attrs'].get('Body') or sc['attrs']['Key']; rows = T[key]; P = pouches[key]
-        for p in sc['parts']:
-            if p['class'] != 'MeshPart':
-                continue
-            s, pos, r = rows[p['name']]
-            dp = float(np.abs(np.array(p['p']) - pos).max()); dr = float(np.abs(np.array(p['r']) - r).max())
-            if dp > 1e-4 or dr > 1e-4:
-                bad += 1; print('FAIL: %s: %s is not on its template frame (%.5f, %.5f)' % (sc['label'], p['name'], dp, dr))
-        loose, gaps, parts = attach.attached(sc, P)
+        key = sc['attrs'].get('Body') or sc['attrs']['Key']
+        if key in ('MechPouch', 'MechSachet'):  # (R153 Mech look B: its own body, see mech_body)
+            P, own = mech_body(sc)
+            loose, gaps, parts = attach.attached(sc, P, parts=own)
+        else:
+            rows = T[key]; P = pouches[key]
+            for p in sc['parts']:
+                if p['class'] != 'MeshPart':
+                    continue
+                s, pos, r = rows[p['name']]
+                dp = float(np.abs(np.array(p['p']) - pos).max()); dr = float(np.abs(np.array(p['r']) - r).max())
+                if dp > 1e-4 or dr > 1e-4:
+                    bad += 1; print('FAIL: %s: %s is not on its template frame (%.5f, %.5f)' % (sc['label'], p['name'], dp, dr))
+            loose, gaps, parts = attach.attached(sc, P)
         for i, g in sorted(loose.items(), key=lambda kv: -kv[1]):
             why = known(sc['label'], parts[i]['name'])
             if why:
                 listed.setdefault((sc['label'], why), []).append((parts[i]['name'], g))
             else:
-                floating_unknown += 1
+                floating_unknown += 1; floating_base += 0 if sc['label'].startswith('Mech') else 1
                 if not '--expect-floating' in sys.argv:
                     print('FAIL: %s: %s hangs %.3f off the pouch and touches nothing that is on it' % (sc['label'], parts[i]['name'], g))
                 else:
@@ -117,8 +157,8 @@ def main():
         names = sorted(set(re.sub(r'([FB-]?\d[\d._-]*)$', '', n) for n, _ in items))
         print('  listed, not counted: %s: %d parts (%s), %.2f - %.2f off: %s' % (label, len(items), ', '.join(names), min(g for _, g in items), max(g for _, g in items), why))
     if '--expect-floating' in sys.argv:
-        print('base: %d parts float that are not on the known list (expected some: the R152 Void corner details)' % floating_unknown)
-        sys.exit(0 if floating_unknown > 0 and bad == 0 else 1)
+        print('base: %d parts float that are not on the known list, %d outside the Mech (expected some: the R152 Void corner details)' % (floating_unknown, floating_base))
+        sys.exit(0 if floating_base > 0 and bad == 0 else 1)
     bad += floating_unknown
     print('pack parts (real pouch): %d scenes, %d failures' % (len(scenes), bad))
     sys.exit(1 if bad else 0)
