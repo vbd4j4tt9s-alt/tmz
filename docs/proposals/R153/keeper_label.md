@@ -58,7 +58,13 @@ The Darkened's spawn is computed at run time (not in the saved place), so it is 
 
 Older tests updated to the new behaviour: `R147/tests/test_r147_client.luau` (where the sign hangs, its height, MaxDistance 250, signs wait for a
 body) and `R147/tests/test_mystery.luau` (+ the `KeeperHome` stamps); `R152/tests/run_keepers.sh` (KeeperSpeedLabels is on its list of changed
-keeper files) and `tools/tests/r152_real_diff.sh` (ignores the one marked `KeeperHome` line in ChaseService, which stays byte-identical otherwise).
+keeper files) and `tools/tests/r152_real_diff.sh` / `R149/tests/run_tiger_gear.sh` (ignore the one marked `KeeperHome` line in ChaseService, which
+stays byte-identical otherwise).
+
+The R153 jitter sweep (merged) had hung the sign on `KeeperFollow153`'s smoothed-body anchor so it glided with the keeper. The owner's spec
+replaces that for the signs: a pinned sign never moves, so there is nothing to smooth and the label script does not use `KeeperFollow153`
+(it stays for the keeper bodies and The Darkened's body). `run_jitter.sh`'s expectations about the signs changed to match
+(`test_jitter_keepers`: the sign does not move at all while the keeper runs in packet steps, at 30 / 60 / 144 fps; `test_jitter_misc`: the static check).
 
 ## Not covered
 
