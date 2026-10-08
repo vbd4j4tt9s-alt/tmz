@@ -16,7 +16,11 @@
 #  2. static checks - no pathfinding anywhere (keepers / NPCs do not walk the hub), the new client script starts with the R152 load guard, the boing is
 #     the owner's trampoline file (94320656351627) at pitch 1 through LocalSfx (R153: it replaced the Bubble04 placeholder), the manifest lists the new files.
 #  3. the R152 load guard run and the hub z-fight run (run_hub_zfight.sh: no counted finding, no tight pair, the trampoline parts included).
-# "mutate" as the 3rd argument also runs broken copies (no ramps; a bounce that stacks; no debounce) that the test must fail.
+#  (R153, the look: the hub's trampolines take their look from the owner's asset 12088629887 (HubTrampoline153: a hand-placed ReplicatedStorage.HubTrampolineTemplates153 model, else
+#     InsertService:LoadAsset, else the built one): section 6 of the test mocks the routes: a store model with scripts and junk inside (stripped: scripts, sounds, prompts, welds, humanoids,
+#     absurd and invisible parts), its scale / centring / mat height, one collider, the squash on its mat, the same bounce and debounce, "User is not authorized to access Asset" -> the
+#     hand-placed template -> the built trampoline, a timeout, too many parts, a single part, a look with no findable mat, the paving-plane nudge, /test trampoline.)
+# "mutate" as the 3rd argument also runs broken copies (no ramps; a bounce that stacks; no debounce; a loader that strips nothing) that the test must fail.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};MODE=$3
@@ -54,7 +58,15 @@ if grep -n "96764044228884\|Bubble04\|InteractionAudio" "$C/HubTrampoline153.cli
 [ "$(grep -c "Sfx.Play(BOING.Id," "$C/HubTrampoline153.client.lua")" = 1 ] || fail "the boing must be played in exactly one place (LocalSfx.Play, once per bounce)"
 for f in ReplicatedStorage/HubTrampolineRules153 ServerScriptService/ChestChaseServer/HubTrampoline153 StarterPlayer/StarterPlayerScripts/HubTrampoline153;do
  grep -q "	$f	" "$S/MANIFEST.tsv" || fail "$f is not in src/MANIFEST.tsv";done
-echo "ok: no pathfinding in the game (keepers and NPCs do not walk the hub or the gardens), the client script starts with the load guard, the boing is the owner's file at pitch 1 played in one place through LocalSfx, the manifest lists the new files"
+SS=$S/ServerScriptService/ChestChaseServer
+# the look from the owner's asset (R153): the owner command is registered and documented, and the loader never leaves a code path open
+grep -q "X.Actions.trampoline=true" "$SS/OwnerUpdateCommands82.lua" && grep -q "action=='trampoline'then return require(script.Parent.HubTrampoline153).Command" "$SS/OwnerUpdateCommands82.lua" || fail "/test trampoline is not registered in OwnerUpdateCommands82"
+grep -q "/test trampoline" "$S/ReplicatedStorage/StudioTestHelp.lua" || fail "/test trampoline is not in StudioTestHelp"
+for w in '`trampoline`' 'trampoline reload' 'HubTrampolineTemplates153' 'Get Model' 'not authorized';do grep -q "$w" "$REPO/docs/COMMANDS.md" || fail "docs/COMMANDS.md does not mention $w";done
+grep -q "12088629887" "$S/ReplicatedStorage/HubTrampolineRules153.lua" || fail "the owner's asset id is not in HubTrampolineRules153"
+grep -q "InsertService" "$SS/HubTrampoline153.lua" && grep -q "Trees.Sanitize" "$SS/HubTrampoline153.lua" && grep -q "Trees.Lock" "$SS/HubTrampoline153.lua" || fail "HubTrampoline153 must load with InsertService and sanitise + lock what it loads"
+if grep -n "Clone()" "$SS/HubTrampoline153.lua" | grep -v "src:Clone\|prepared.Model:Clone" >/dev/null;then fail "HubTrampoline153 clones something it should not";fi
+echo "ok: no pathfinding in the game (keepers and NPCs do not walk the hub or the gardens), the client script starts with the load guard, the boing is the owner's file at pitch 1 played in one place through LocalSfx, the manifest lists the new files, /test trampoline is registered, listed in the help and documented with the not-authorized cure"
 [ $RC = 0 ] || exit 1
 echo "== R152 load guard"
 sh "$REPO/docs/proposals/R152/tests/run_load_guard.sh" "$OUT/lg" | tail -2
@@ -63,7 +75,7 @@ sh "$REPO/docs/proposals/R152/tests/run_hub_zfight.sh" "$OUT/zf" "$PLACE" > "$OU
 grep -E 'AFTER|counted|tight|PASS|FAIL' "$OUT/hub_zfight.log" | head -12
 if [ "$MODE" = mutate ];then
  echo "== mutants (each must make the test fail)"
- for m in noramps stack nodebounce;do
+ for m in noramps stack nodebounce nostrip;do
   if run "m_$m" "MUTANT='$m'";then echo "FAIL: mutant $m passed the test";exit 1;else echo "ok: mutant $m fails ($(grep -c '^FAIL' "$OUT/m_$m.log") checks)";fi
  done
 fi
