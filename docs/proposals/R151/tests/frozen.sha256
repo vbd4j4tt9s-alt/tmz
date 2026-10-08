@@ -8,11 +8,15 @@ b9dbf155ff24c0f63fa3189165814a71d18797b97b8e28b21c296d254be5438b  src/Replicated
 # R153 (on purpose, again): DailyRewards.lua gained the switch LockDay7Void (true: the day-7 login Void Pack is GiftLocked like the free giveaway's; false lets the owner allow gifting it); no number or reward changed
 7b49c9bd5c6f478eac85cafb05cc3e6352fa23caeba2ceb61b6eb523a5fcf7ae  src/ReplicatedStorage/DailyRewards.lua
 be7b27efe3f7450e5b27d4a97aa9ef00adc4ace48e143abb8830aad03c0a0806  src/ReplicatedStorage/PackOdds81.lua
-cd5596076060f0421ded9368e2d9fdea2ab7090296cfe6a01d6d314a42199b52  src/ReplicatedStorage/PackOdds112.lua
-cd8c19bedf3b73805b4c01522adb2d68fcd48803db7093b72a8056083a0ca1cb  src/ReplicatedStorage/PackOdds137.lua
+# R154 (on purpose): PackOdds112.lua and PackOdds137.lua clamp luck at BalanceValues81.LuckCeiling (the boots' cap x the luck passes: x100M with the 4 Leaf Clover) instead of MaxLuck; nothing else changed (luck without a pass is exactly as before)
+57728fa5f9a79a471eb942efd167c9fd76520fb388146a25b74829048b9368b6  src/ReplicatedStorage/PackOdds112.lua
+f892199eac5ae821cb1ebe5b975d8f318844970493c8dcbc2a74649e797f048f  src/ReplicatedStorage/PackOdds137.lua
 d91252dd8786225ce55e6c248ddc962aea83e93094293f03951cdab0dd6c067d  src/ReplicatedStorage/PackSizePity.lua
 d87454e7192cf498d6d50d2d18dd869acbe8e695c3cbad79eacb4c21c3114b38  src/ReplicatedStorage/PackSchedule81.lua
-cf3241dfd886223e3dc923334d0a3876f770f10d4f63013bd074737282124ddf  src/ReplicatedStorage/SeedPackRules.lua
+# R154 (on purpose): SeedPackRules.lua gained an outermost wrapper (PackLuck154): the 4 Leaf Clover's x2 on the Void / Verity / Mech packs (a new last argument, passLuck) and the 80% rule on live packs (no seed over 80%, the others 19%, 1% upgrade); RawSeedOdds = the odds before both; every banked world pack and every pack without the clover the rule leaves alone is as before
+b0668737b8856383b7597b71f05fde9ca755451d824ad75b79a46fd7850c4896  src/ReplicatedStorage/SeedPackRules.lua
+# R154 (new odds file): PackLuck154.lua, the rules of that wrapper (Shape = the 80% rule, Shift / FixedOdds = the clover on the fixed-odds packs, Roll = the exact staged roll)
+18fa5d7626a14f4475bcd64b4d83f40091569bc225fc127289b3e3c5d4cf68df  src/ReplicatedStorage/PackLuck154.lua
 a866bdc4e1a2872bd985c816c50224d9043b8c532b933b72c87cfb74bb45cf50  src/ReplicatedStorage/RarePackRules.lua
 7f769e802f2324c2b322c5f7a79299a538ce9f90d6199f1f1b782064b2b9b573  src/ReplicatedStorage/VerityPackOdds.lua
 aa1d6d9ac03ce00b1b494cae6965a5228fa0f1e157a354d3e39264cb588f9043  src/ReplicatedStorage/VoidPackOdds85.lua

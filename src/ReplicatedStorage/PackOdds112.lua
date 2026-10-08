@@ -35,8 +35,10 @@ function O.LegacyLuck(luck)
  end
  return old
 end
+-- R154 (owner: "the 2x luck is universal"): the clamp is LuckCeiling (the boots' cap x the luck passes: a 4 Leaf Clover owner's x2 also applies at
+-- Thunder Boots' x50M). The server caps each player at MaxLuck x their own passes, so luck without a pass is exactly as before.
 function O.Luck(luck)
- return type(luck)=='number'and luck==luck and math.clamp(luck,1,T.MaxLuck)or 1
+ return type(luck)=='number'and luck==luck and math.clamp(luck,1,T.LuckCeiling or T.MaxLuck)or 1
 end
 local function oneIn(pack,tier)
  return O.MidOneIn[pack][tier]or O.TopOneIn[tier]/O.PackTopLuck[pack]

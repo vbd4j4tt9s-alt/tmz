@@ -182,12 +182,21 @@ function X.Execute(ctx,p,action,a)
   local points=data:GetOrCreateSpeedValue(p).Value
   return true,'Treadmill only | base '..ctx.Config.TrainingPointsPerSecond..'/s | multiplier '..ctx.Bases:GetTreadmillMultiplier(p)..' | friends x'..string.format('%g',math.floor(ctx.Bases:GetFriendGainMultiplier(p)*100+.5)/100)..' | total '..string.format('%g',math.floor(ctx.Config.TrainingPointsPerSecond*ctx.Bases:GetTreadmillMultiplier(p)*ctx.Bases:GetFriendGainMultiplier(p)*100+.5)/100)..'/s | training '..tostring(p:GetAttribute('TreadmillTraining')==true)..' | physical '..string.format('%.2f',ctx.Config.GetPlayerWalkSpeed(p,points))..' | points '..points
  elseif action=='odds'then
-  local st,key,luck
-  if a[1]=='event'or a[1]=='eclipse'then st=7;key='EclipseReliquary';luck=tonumber(a[2]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>2 then return false,'Use odds event [luck].'end
-  elseif a[1]=='verity'then st=7;key='VerityReliquary';luck=tonumber(a[2]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>2 then return false,'Use odds verity [luck].'end
-  else st=stage(a[1]);key=variant(a[2]);luck=tonumber(a[3]or p:GetAttribute('ChestLuckMultiplier')or 1);if #a>3 then return false,'Use odds <biome> <tier> [luck].'end end
-  if not st or st>=8 or not key or not luck or luck~=luck or luck<1 or luck>T.MaxLuck then return false,'Use odds storm mythic [1–'..T.MaxLuck..'], odds event or odds verity.'end
-  local lines={key=='EclipseReliquary'and 'Void Pack | all regular Secret/Cosmic/King seeds | 1/200 normal Mech roll | luck does not affect this pack' or key=='VerityReliquary'and 'Verity Pack | Verity seed 1/100, then the Void pack without its King seeds (1/200 Mech roll without the Crowncore Tree) | luck does not affect this pack' or ctx.Config.BiomeNames[st]..' | '..Packs.GetPackTier(key).Name..' | luck '..luck};local odds=Packs.SeedOdds(ctx.Config,st,key,luck,Packs.OddsVersion)
+  local st,key,luck,word
+  if a[1]=='event'or a[1]=='eclipse'then st=7;key='EclipseReliquary';word=a[2];if #a>2 then return false,'Use odds event [luck|clover].'end
+  elseif a[1]=='verity'then st=7;key='VerityReliquary';word=a[2];if #a>2 then return false,'Use odds verity [luck|clover].'end
+  else st=stage(a[1]);key=variant(a[2]);word=a[3];if #a>3 then return false,'Use odds <biome> <tier> [luck].'end end
+  -- R154: a Void / Verity pack takes ONLY the luck passes' luck (the 4 Leaf Clover's x2; boots never change it): the player's own, or x2 with the word "clover".
+  local fixed=Packs.FixedOddsKind(st,key,Packs.OddsVersion)~=nil;local clover=1
+  if fixed then
+   clover=(word=='clover')and(T.PassLuckCeiling or 2)or(type(data.PassLuck)=='function'and data:PassLuck(p))or 1
+   if word=='clover'then word=nil end
+  end
+  luck=tonumber(word or p:GetAttribute('ChestLuckMultiplier')or 1)
+  local ceiling=T.LuckCeiling or T.MaxLuck
+  if not st or st>=8 or not key or not luck or luck~=luck or luck<1 or luck>ceiling then return false,'Use odds storm mythic [1–'..ceiling..'], odds event [clover] or odds verity [clover].'end
+  local cloverText=' | boots never change this pack; the 4 Leaf Clover '..(clover>1 and'x'..clover..' is on'or'is off (odds event clover shows it)')
+  local lines={key=='EclipseReliquary'and 'Void Pack | all regular Secret/Cosmic/King seeds | 1/200 normal Mech roll'..cloverText or key=='VerityReliquary'and 'Verity Pack | Verity seed 1/100, then the Void pack without its King seeds (1/200 Mech roll without the Crowncore Tree)'..cloverText or ctx.Config.BiomeNames[st]..' | '..Packs.GetPackTier(key).Name..' | luck '..luck};local odds=Packs.SeedOdds(ctx.Config,st,key,luck,Packs.OddsVersion,nil,clover)
   for _,seed in ipairs(Packs.OddsRows(ctx.Config,st,key,odds))do table.insert(lines,seed.Name..': '..require(RS.OddsText85).Format(odds[seed.Id]))end -- R148: by rarity rank, then name
   return true,table.concat(lines,'\n')
  elseif action=='pity'then

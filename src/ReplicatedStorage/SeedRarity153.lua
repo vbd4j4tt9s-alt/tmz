@@ -6,6 +6,9 @@
 --  * Read from the existing odds code (SeedPackRules.SeedOdds) over the catalog the server's Config is built from (SeedPackRules.BuildSeedCatalog): no copied numbers, and
 --    the client and the server get the same answer. Cached. A retired seed (nobody can pull it) has none (nil / '—').
 --  * Text goes through OddsText85 like every chance (whole numbers under a million, 1/1.67B above).
+--  * R154: read from SeedPackRules.RawSeedOdds, the home pack's table BEFORE the 80% rule (no seed over 80% of a pack: Desert / Snow Common packs give their Uncommon
+--    80%, not 86%) and without the 4 Leaf Clover. So every seed keeps the number it had in R153 (Secret 1/10K, Cosmic 1/1M, King 1/1T in every biome): the seed's original
+--    rate, not the odds of the pack in ur hand (that pack's own tooltip shows those).
 -- A PACK's own tooltip (the held pack's rows) and the shop's Mech drop table keep that pack's real odds: they answer "what can THIS pack give".
 local Rules=require(script.Parent.SeedPackRules)
 local Verity=require(script.Parent.VerityCatalog)
@@ -37,7 +40,7 @@ function M.Percent(seed)
  local hit=cache[id];if hit~=nil then return hit or nil end
  local p;local stage,variant=M.Home(id)
  if stage then
-  local ok,odds=pcall(Rules.SeedOdds,cfg(),stage,variant,1,Rules.OddsVersion)
+  local ok,odds=pcall(Rules.RawSeedOdds or Rules.SeedOdds,cfg(),stage,variant,1,Rules.OddsVersion) -- R154: the table before the 80% rule and without the clover (see the header)
   local v=ok and type(odds)=='table'and odds[id]
   if type(v)=='number'and v==v and v>0 then p=math.min(v,100)end
  end

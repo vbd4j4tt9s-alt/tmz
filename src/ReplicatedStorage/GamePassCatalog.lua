@@ -6,7 +6,7 @@
 local C={
  {Key='Growth',Name='Double Plant Growth',Attribute='DoubleGrowthOwned',IdAttribute='GrowthPassId',Price=400,Description='Plants and new fruit grow 2x faster!'},
  {Key='Speed',Name='Double Speed',Attribute='DoubleSpeedOwned',IdAttribute='SpeedPassId',Price=300,Description='Get 2x speed when u train!'},
- {Key='Clover',Name='4 Leaf Clover',Attribute='CloverOwned',IdAttribute='CloverPassId',DefaultId=2005041797,Price=999,Description='2x luck on every pack u open! 🍀',Late=153,Icon='Clover',Emoji='🍀',Luck=2},
+ {Key='Clover',Name='4 Leaf Clover',Attribute='CloverOwned',IdAttribute='CloverPassId',DefaultId=2005041797,Price=999,Description='x2 luck on EVERY pack u open! 🍀',Late=153,Icon='Clover',Emoji='🍀',Luck=2},
 }
 function C.Id(pass)
  local id=script:GetAttribute(pass.IdAttribute)
@@ -15,6 +15,7 @@ function C.Id(pass)
 end
 -- R153: true for a pass that can be sold for Gems before it has a Robux id (it has a DefaultId field, and the id is 0): its card has no Robux button and says ROBUX SOON.
 function C.RobuxSoon(pass)return pass.DefaultId~=nil and C.Id(pass)==0 end
--- R153: the luck a pass multiplies every pack opening by (1 = none).
+-- R153: the luck a pass multiplies every pack opening by (1 = none). R154 (owner: "the 2x luck is universal"): every pack, the Void / Verity / Mech packs too, and on top of
+-- the best boots (a pass raises the luck cap by as much: BalanceValues81.LuckCeiling).
 function C.LuckOf(key)for _,p in ipairs(C)do if p.Key==key then return p.Luck or 1 end end;return 1 end
 return C

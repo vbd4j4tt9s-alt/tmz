@@ -20,7 +20,8 @@ function H.Boosts(player)
  local speed=Balance.Training(Balance.TrainingTiers[tier]or 1,player:GetAttribute('TreadmillMultiplier'),player:GetAttribute('DoubleSpeedOwned')==true)*SpeedBoost.PlayerFactor(player)
  local luck=tonumber(player:GetAttribute('ChestLuckMultiplier'))or 1
  if luck~=luck or luck==math.huge or luck==-math.huge then luck=1 end
- return speed,math.clamp(luck,1,require(RS.BalanceValues81).MaxLuck)
+ local balance=require(RS.BalanceValues81)
+ return speed,math.clamp(luck,1,balance.LuckCeiling or balance.MaxLuck) -- R154: up to the boots' cap x the clover (x100M)
 end
 function H.Multiplier(n)
  if n>=1000 then

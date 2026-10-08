@@ -191,11 +191,14 @@ local E={
   DiamondVineSeed={.1,.25,.666667,3.33333,8.33333,13.3333},HollowGeodeSeed={.01,.025,.06,.2,.6,2},OrbitLotusSeed={1e-4,2.5e-4,6e-4,2e-3,6e-3,.02},PrismMonarchSeed={1e-10,2.5e-10,6e-10,2e-9,6e-9,2e-8}},
 }
 local STAGE={Desert=2,Lava=4,Crystal=5}
+-- R154 (owner: no single-seed packs): the plan's numbers are the table BEFORE the 80% rule (SeedPackRules.RawSeedOdds, what the Index shows); the live roll adds the rule
+-- on top where one seed is over 80% (Desert Common, Lava / Crystal Mythic here), which the R154 suite checks in full. RAW is that table.
+local RAW=Rules.RawSeedOdds or Rules.SeedOdds
 do
 for biome,rows in pairs(E)do
  local wrong={}
  for p,pack in ipairs(PACKS)do
-  local odds=Rules.SeedOdds(Config,STAGE[biome],pack,1,149)
+  local odds=RAW(Config,STAGE[biome],pack,1,149)
   local sum=0
   for id,list in pairs(rows)do
    local got=odds[id]or 0;sum+=got
@@ -215,7 +218,7 @@ check(same,'odds with no version = odds at 149 (the Index chips and the hold too
 -- A 149 pack = a 137 pack wherever the roster is the same (Forest, Snow, Jungle, Storm). Desert grew; Lava and Crystal promoted a seed.
 local eq137,diffs=true,{}
 for _,st in ipairs({1,3,6,7})do for _,pack in ipairs(PACKS)do for _,luck in ipairs({1,50,1e6,5e7})do for _,boost in ipairs({0,2})do
- if not equalOdds(Rules.SeedOdds(Config,st,pack,luck,149,boost==2 and 2 or nil),Rules.SeedOdds(Config,st,pack,luck,137,boost==2 and 2 or nil))then eq137=false;diffs[#diffs+1]=st..'/'..pack end
+ if not equalOdds(RAW(Config,st,pack,luck,149,boost==2 and 2 or nil),Rules.SeedOdds(Config,st,pack,luck,137,boost==2 and 2 or nil))then eq137=false;diffs[#diffs+1]=st..'/'..pack end
 end end end end
 check(eq137,'stages 1 / 3 / 6 / 7 at 149 equal 137 (the roster is the same there) '..table.concat(diffs,' '))
 local deserts=true
@@ -282,7 +285,7 @@ for _,st in ipairs({2,4,5})do for _,ver in ipairs({'nil',0,81,112,137})do for _,
 end end end
 check(#leaked==0,'banked rolls (Desert, Lava, Crystal x versions none / 0 / 81 / 112 / 137 x Pack01 / 03 / 06 x 2001 draws): never a promoted or new seed, labels as the live rarity ('..table.concat(leaked,' ',1,math.min(#leaked,3))..')')
 -- The live roster still has them (the legacy scope is closed again), and a new (149) pack has them at the new tiers.
-check(Rules.SeedOdds(Config,4,'Pack06',1,149).FirePepperSeed==16 and relnear(Rules.SeedOdds(Config,5,'Pack06',1,149).MoonflowerSeed,84.6467,5e-6)and Rules.GetRarity('FirePepperSeed')=='Mythic'and Rules.GetRarity('MoonflowerSeed')=='Legendary',
+check(RAW(Config,4,'Pack06',1,149).FirePepperSeed==16 and relnear(RAW(Config,5,'Pack06',1,149).MoonflowerSeed,84.6467,5e-6)and Rules.GetRarity('FirePepperSeed')=='Mythic'and Rules.GetRarity('MoonflowerSeed')=='Legendary',
  'a new (149) Mythic pack still has Fire Pepper 16% / Moon Melon 84.65%, after all those banked ones (Mythic / Legendary)')
 end
 
@@ -299,7 +302,9 @@ local function sample(stage,pack,version,luck)
  return counts,labels
 end
 local c149,l149=sample(2,'Pack01',149)
-check(math.abs(c149.DesertAloeSeed/N*100-12.5)<.2 and math.abs(c149.SandFruitSeed/N*100-1.11111)<.05,('149 Desert Common pack, 1M rolls: Aloe %.3f%% (12.5), Sand Fruit %.3f%% (1.111)'):format(c149.DesertAloeSeed/N*100,c149.SandFruitSeed/N*100))
+-- R154: the live Desert Common pack is 86% Prickly Pear before the 80% rule, so its rolls follow the rule's table (Prickly Pear 80, Aloe 18.23 with the 1% upgrade, Sand Fruit 1.53)
+local live149=Rules.SeedOdds(Config,2,'Pack01',1,149)
+check(math.abs(c149.DesertAloeSeed/N*100-live149.DesertAloeSeed)<.2 and math.abs(c149.SandFruitSeed/N*100-live149.SandFruitSeed)<.05 and math.abs(c149.CactusSeed/N*100-80)<.2,('149 Desert Common pack, 1M rolls: Prickly Pear %.3f%% (80), Aloe %.3f%% (%.3f), Sand Fruit %.3f%% (%.3f)'):format(c149.CactusSeed/N*100,c149.DesertAloeSeed/N*100,live149.DesertAloeSeed,c149.SandFruitSeed/N*100,live149.SandFruitSeed))
 check(l149['DesertAloeSeed:Rare']and l149['SandFruitSeed:Legendary']and l149['CactusSeed:Uncommon']and l149['DatePalmSeed:Mythic'],'... the rolls come back labelled Rare / Legendary / Uncommon / Mythic')
 local cLava,lLava=sample(4,'Pack01',137)
 check((cLava.FirePepperSeed or 0)==0 and math.abs(cLava.EmberBloomSeed/N*100-49.5783)<.4 and math.abs(cLava.AshRoseSeed/N*100-49.5783)<.4 and lLava['EmberBloomSeed:Rare']and not lLava['FirePepperSeed:Mythic']and not lLava['FirePepperSeed:Rare'],
@@ -387,7 +392,7 @@ check(row(rc,'Moon Melon Seed')=='Moon Melon Seed: 1/150','a 149 Crystal Common 
 local crystal137=addPack(D,5,'Pack01',137);local crystal112=addPack(D,5,'Pack01',112)
 check(row(tipOf(D,crystal137),'Moon Melon Seed')==nil and row(tipOf(D,crystal112),'Moon Melon Seed')==nil and row(tipOf(D,crystal137),'Amethyst Grape Seed')~=nil,'banked 137 / 112 Crystal packs list no Moon Melon')
 local d149=tipOf(D,desert149);local d137=tipOf(D,desert137);local d112=tipOf(D,desert112)
-check(row(d149,'Aloe Seed')=='Aloe Seed: 1/8'and row(d149,'Sand Fruit Seed')=='Sand Fruit Seed: 1/90','a 149 Desert Common pack lists "Aloe Seed: 1/8" and "Sand Fruit Seed: 1/90"')
+check(row(d149,'Aloe Seed')=='Aloe Seed: 1/5'and row(d149,'Sand Fruit Seed')=='Sand Fruit Seed: 1/65','a 149 Desert Common pack lists "Aloe Seed: 1/5" and "Sand Fruit Seed: 1/65" (R154: the pack\'s real odds under the 80% rule; 1/8 and 1/90 before it)')
 check(row(d137,'Aloe Seed')==nil and row(d137,'Sand Fruit Seed')==nil and row(d112,'Aloe Seed')==nil and row(d112,'Sand Fruit Seed')==nil and row(d137,'Prickly Pear Seed')=='Prickly Pear Seed: 1/1','banked 137 / 112 Desert packs list no Aloe and no Sand Fruit (their odds are 0, the row is skipped)')
 sortedTip(d149,'149 Desert Common');sortedTip(d137,'banked 137 Desert Common')
 do
@@ -400,9 +405,10 @@ local d149Rare=addPack(D,2,'Pack03',149)
 local rr=tipOf(D,d149Rare)
 check(row(rr,'Aloe Seed')=='Aloe Seed: 1/3','the Rare Desert pack: "Aloe Seed: '..tostring(row(rr,'Aloe Seed'))..'" (1/2.5 rounds to 1/3: R148 shows whole numbers under a million)')
 -- Index chips: BaseChance = Pack01 at the current version, built exactly like ChestService does.
-check(Odds.Format(Rules.SeedOdds(Config,2,'Pack01',1).DesertAloeSeed)=='1/8'and Odds.Format(Rules.SeedOdds(Config,2,'Pack01',1).SandFruitSeed)=='1/90'
- and Odds.Format(Rules.SeedOdds(Config,4,'Pack01',1).FirePepperSeed)=='1/800'and Odds.Format(Rules.SeedOdds(Config,5,'Pack01',1).MoonflowerSeed)=='1/150','Index chips: Aloe 1/8, Sand Fruit 1/90, Fire Pepper 1/800, Moon Melon 1/150')
-check(Odds.Format(Rules.SeedOdds(Config,2,'Pack01',1).CactusSeed)=='1/1'and relnear(Rules.SeedOdds(Config,2,'Pack01',1).CactusSeed,86.2121,3e-5)and relnear(Rules.SeedOdds(Config,4,'Pack01',1).EmberBloomSeed,49.5158,3e-5),'Prickly Pear 86.2% (1/1.2: was 99.8%), Lava Rares 49.5% (was 33%)')
+-- (R153: the Index reads SeedRarity153 = this table; R154: before the 80% rule, RAW)
+check(Odds.Format(RAW(Config,2,'Pack01',1).DesertAloeSeed)=='1/8'and Odds.Format(RAW(Config,2,'Pack01',1).SandFruitSeed)=='1/90'
+ and Odds.Format(RAW(Config,4,'Pack01',1).FirePepperSeed)=='1/800'and Odds.Format(RAW(Config,5,'Pack01',1).MoonflowerSeed)=='1/150','Index chips: Aloe 1/8, Sand Fruit 1/90, Fire Pepper 1/800, Moon Melon 1/150')
+check(Odds.Format(RAW(Config,2,'Pack01',1).CactusSeed)=='1/1'and relnear(RAW(Config,2,'Pack01',1).CactusSeed,86.2121,3e-5)and relnear(RAW(Config,4,'Pack01',1).EmberBloomSeed,49.5158,3e-5),'Prickly Pear 86.2% (1/1.2: was 99.8%), Lava Rares 49.5% (was 33%)')
 local ok,svc=pcall(Chests.new,Config,Map,Data,{},Notes)
 check(ok,'the real ChestService builds its SeedCatalog remote ('..tostring(svc)..')')
 local catalog=remotes:FindFirstChild('SeedCatalog')
