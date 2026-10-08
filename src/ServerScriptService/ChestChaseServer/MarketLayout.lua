@@ -17,7 +17,7 @@ function M.Apply(map)
  local wood={194,137,86};local lightWood={246,215,155};local darkWood={80,61,53};local trim={32,121,125}
  local function part(name,size,position,color,material,solid)
   local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=CFrame.new(M.Center+position);p.Color=Color3.fromRGB(unpack(color));p.Material=material or Enum.Material.SmoothPlastic
-  p.Anchored=true;p.CanTouch=false;p.CanCollide=false;p.CanQuery=false;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=model;return Shadow.Part(p)
+  p.Anchored=true;p.CanTouch=false;p.CanCollide=false;p.CanQuery=false;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=model;return p
  end
  local function beam(name,a,b,width,color)
   local p=part(name,Vector3.new(width,width,(b-a).Magnitude),(a+b)*.5,color)
@@ -159,6 +159,7 @@ function M.Apply(map)
    localPosition-=Vector3.new(0,1.656,0)
   end
   p.Size*=sizeFactor;p.CFrame=CFrame.new(M.Center+localPosition*sizeFactor)*p.CFrame.Rotation
+  Shadow.Part(p) -- R154 (lag audit B1): decided at the FINAL size - the market is built at 1/1.7 of it, so a 0.9-stud lantern cap that ends 1.53 keeps its shadow
  end end
  model:SetAttribute('MarketScale',sizeFactor);M.Polish(model)
  model.Parent=hub
