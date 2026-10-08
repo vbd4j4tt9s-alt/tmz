@@ -55,7 +55,7 @@ if git -C "$REPO" cat-file -e "$BASE152" 2>/dev/null;then
 else echo "(no $BASE152 here: the R152 root-cause measurement was skipped)";fi
 belt after "$S" "$OUT/belt" || { grep -v '^WARN' "$OUT/belt/belt.log" | tail -30;fail "belt"; }
 grep -v '^WARN' "$OUT/belt/belt.log" | tail -8
-echo "== 4. speed popups (2x)"
+echo "== 4. speed popups (R153 2x; R154: 0.8 of that, so 1.6x R151)"
 PP=$OUT/popups;mkdir -p "$PP"
 cp "$T/roblox.luau" "$INV/world.luau" "$HERE/test_popups153.luau" "$PP/"
 git -C "$REPO" show "$BASE152:src/ReplicatedStorage/SpeedPopupStyle.lua" > "$PP/ref_style.luau" 2>/dev/null || fail "no $BASE152 (the R152 SpeedPopupStyle is the reference of the 2x test)"
