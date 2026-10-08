@@ -292,9 +292,10 @@ end
 local navigation
 -- R151 (owner: the Index's red notification badge "cut out wrongly"): each wheel option sits in a CanvasGroup (MenuOption<i>), and a CanvasGroup clips everything
 -- past its edge. The group used to be the button + 4 px on every side, but the badge on the INDEX button hangs 6 px past the button's corner (plus its ring): its top
--- and right were sliced off flat. The group now keeps NotifyBadge151.Margin (12 px, which a badge's Extent never exceeds) around the button; the button itself does not move.
-local okBadge,NotifyBadge=pcall(function()return require(script.Parent.NotifyBadge151)end) -- (a partial bundle of a test may not have it: 12 is its Margin)
-local PAD=okBadge and NotifyBadge.Margin or 12
+-- and right were sliced off flat. The group now keeps NotifyBadge151.Margin around the button (which a badge's Extent never exceeds); the button itself does not move.
+-- R153: the badges are 1.5x bigger, so the margin is 16 px (was 12).
+local okBadge,NotifyBadge=pcall(function()return require(script.Parent.NotifyBadge151)end) -- (a partial bundle of a test may not have it: 16 is its Margin)
+local PAD=okBadge and NotifyBadge.Margin or 16
 local function menuPixels(value,size)return math.floor(value*size/48+.5)end
 local function styleOption(button,size)
  local captionHeight=menuPixels(14,size);local captionFont=menuPixels(9,size)

@@ -16,12 +16,18 @@
 -- Visible says whether it shows), so callers and tests that read `badge.Visible` and `badge.Count.Text` are unchanged.
 local Tween=game:GetService('TweenService');local Gui=game:GetService('GuiService')
 local RGB=Color3.fromRGB
-local B={Revision=151,
- Margin=12,        -- px a host (HudLayout's CanvasGroup) leaves around a button for the badge on its corner; B.Extent of the largest badge must fit
+-- R153 (owner, after R152: "increase the size of the notification bubble"): every badge is 1.5x its R151 size (B.Grow), the same circle, ring, shine, pop and halo, only bigger. Its
+-- hold on the corner grows with it (overhang x 1.5), so B.Extent of the biggest (the INDEX count: 15 px) is what the wheel's CanvasGroup keeps round a button: Margin 12 -> 16.
+-- The callers read the sizes from B.Sizes / B.Overhang (nothing hard-codes a diameter any more).
+local B={Revision=151,Grow=1.5,
+ Margin=16,        -- px a host (HudLayout's CanvasGroup) leaves around a button for the badge on its corner; B.Extent of the largest badge must fit
  PopScale=1.2,     -- the biggest the holder gets (the pop)
  PulseScale=1.25,  -- the biggest the halo gets, in holders
  PopSeconds=.32,PulseSeconds=1.3,PulseDelay=.6,
  Colors={Top=RGB(255,104,116),Bottom=RGB(214,24,54),Ring=Color3.new(1,1,1),Shadow=RGB(14,0,10),Edge=RGB(124,10,30),Halo=RGB(255,72,88)}}
+-- Outer diameter (px) and overhang past the corner (px; negative = inside it) of every badge in the game. R151: 24 / 20 / 20 / 14 and 6 / 6 / 1 / -3.
+B.Sizes={Count=36,Alert=30,Daily=30,Dot=21}
+B.Overhang={Count=9,Alert=9,Daily=-1,Dot=-4}
 local pulses=setmetatable({},{__mode='k'})
 local hooked
 -- The ring is part of `size` (the holder is the OUTER diameter): 1.5 px on a dot, 2 on the 20-24 px badges.

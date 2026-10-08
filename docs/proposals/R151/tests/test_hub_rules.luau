@@ -8,7 +8,8 @@
 --  4. the fruit of the day: eligible list (harvestable, not retired, not limited-time, weighted), deterministic, any `n` consecutive days all different, never two days in a row,
 --     period n (no repeat for n days), the step is coprime with n, a plant without a meaningful weight is skipped;
 --  5. the board: slots, Offer results, remote merge, unsynced, day change;
---  6. texts and the words: notices, the plaque and label rows (champion / empty, both boards: the title, the winner, the seed / weight, the fruit of the day, the countdown), every
+--  6. texts and the words: notices, the label's rows (R153: one big label, no plaque; champion / empty, both boards: the title, the winner, the seed / weight, the rarity and chance /
+--     the fruit of the day, the countdown; its size: readable from 150 studs, never more than a third of the screen up close), every
 --     fruit title and every pull line fits its row at a readable size, the stand's numbers (a 25 stud avatar, the reserved corner).
 local HH=require('./hub_harness');local H=HH.H;local W,R=H.W,H.R
 local fails,checks=0,0
@@ -273,64 +274,65 @@ do
  check(t.State=='Champion'and t.Plaque.Title.Text=='BEST PULL TODAY'and t.Plaque.Name.Text=='Jess'and t.Plaque.Line.Text=='Mythic · 1/800'and t.Plaque.Footer.Text=='New board in 5h 12m',
   'the BEST PULL plaque: the title, the winner, "Mythic · 1/800", "New board in 5h 12m"')
  check(t.Label.Title.Text=='BEST PULL TODAY'and t.Label.Name.Text=='Jess'and t.Label.Info.Text=='Fire Pepper','the label over the seed: the title, the winner, "Fire Pepper"')
+ check(t.Label.Line==t.Plaque.Line and t.Label.Footer==t.Plaque.Footer and t.Label.Line.Text=='Mythic · 1/800'and t.Label.Footer.Text=='New board in 5h 12m','R153: and under them the rarity and chance (the same rule\'s text) and the countdown: everything is on the label')
  local c=Rules.RarityColor('Mythic');local game=P.Rarities.Mythic.Color
  check(t.Accent[1]==c[1]and t.Accent[2]==c[2]and t.Accent[3]==c[3]and c[1]==math.floor(game.R*255+.5)and c[2]==math.floor(game.G*255+.5)and c[3]==math.floor(game.B*255+.5),'the accent is the rarity\'s own colour (SeedPackRules.Rarities)')
  check(t.Label.Info.Color[1]==c[1]and t.Plaque.Line.Color[1]==c[1],'the seed is written in it')
  local gold=Rules.SignText('Pull',pull({Coat='Gold'}),nil,60)
  check(gold.Plaque.Line.Text=='Mythic · 1/800 · Gold','a coat is told after the chance')
  local e=Rules.SignText('Pull',nil,nil,99)
- check(e.State=='Empty'and e.Label.Name.Text=='Nobody yet'and e.Plaque.Name.Text=='Nobody yet'and e.Plaque.Line.Text:find('Open a pack',1,true)and e.Label.Info.Text:find('Open a pack',1,true),'the empty BEST PULL invites the first pull')
+ check(e.State=='Empty'and e.Label.Name.Text=='Nobody yet'and e.Plaque.Name.Text=='Nobody yet'and e.Label.Line.Text:find('Open a pack',1,true)and e.Label.Info.Text=='???','the empty BEST PULL invites the first pull (the mystery seed is "???": the invitation is said once)')
  local f=Rules.SignText('Fruit',fr,'SunflowerSeed',3600,'Watermelon')
  check(f.State=='Champion'and f.Plaque.Title.Text=='BIGGEST FRUIT TODAY'and f.Plaque.Name.Text=='Sam'and f.Label.Name.Text=='Sam'and f.Label.Info.Text==Rules.KgText(fr.Kg)and f.Plaque.Footer.Text=='New fruit in 1h 0m','the BIGGEST FRUIT plaque and label: the title, the winner, the weight, a countdown')
- check(f.Plaque.Line.Text=='Today: 🍉 Watermelon','a short line under the winner tells the fruit of the day: "Today: 🍉 Watermelon"')
+ check(f.Plaque.Line.Text=='Today: 🍉 Watermelon'and f.Label.Line.Text=='Today: 🍉 Watermelon'and f.Label.Footer.Text=='New fruit in 1h 0m','a line under the weight tells the fruit of the day: "Today: 🍉 Watermelon", then the countdown')
  local fe=Rules.SignText('Fruit',nil,'SunflowerSeed',60,'Watermelon')
  check(fe.State=='Empty'and fe.Plaque.Line.Text=='Today: 🍉 Watermelon'and fe.Label.Name.Text=='Nobody yet'and fe.Label.Info.Text:find('Pick',1,true),'the empty BIGGEST FRUIT still says the fruit of the day and invites a harvest')
  check(Rules.SignText('Fruit',Rules.CleanFruit({Uid=1,Name='G',Id='SunflowerSeed',Scale=2,Coat='Gold',Weather='Drippy',At=5}),'SunflowerSeed',60,'Watermelon').Label.Info.Text:find(' · Gold · Drippy',1,true),'a coat and a weather are told after the weight')
  check(Rules.SignText('Fruit',nil,'SunflowerSeed',60).Plaque.Line.Text:find('Today: ',1,true)==1,'a fruit with no name given is looked up (never an error)')
- -- the rows fit: the plaque's four rows are inside its canvas and one under another; the label's three rows inside the label
- local PL=Rules.Plaque;local rows=PL.Rows
- local inside,apart=true,true
- local keys={'Title','Name','Line','Footer'}
- for i,k in ipairs(keys)do
-  local r=rows[k]
-  if r.X<0 or r.Y<0 or r.X+r.W>PL.Canvas.W or r.Y+r.H>PL.Canvas.H then inside=false end
-  if i>1 then local p=rows[keys[i-1]];if p.Y+p.H>r.Y then apart=false end end
- end
- check(inside and apart and PL.Canvas.W==PL.W*PL.PixelsPerStud and PL.Canvas.H==PL.H*PL.PixelsPerStud,'the plaque\'s four rows are inside its canvas, one under another, and the canvas is the plate\'s studs x pixels per stud')
- local LB=Rules.Label;local lkeys={'Title','Name','Info'};local linside,lapart=true,true
+ -- the rows fit: the label's five rows are inside it and one under another, the title and the winner the biggest
+ local LB=Rules.Label;local rows=LB.Rows;local lkeys={'Title','Name','Info','Line','Footer'};local linside,lapart=true,true
  for i,k in ipairs(lkeys)do
-  local r=LB.Rows[k]
-  if r.X<0 or r.Y<0 or r.X+r.W>LB.W+1e-9 or r.Y+r.H>LB.H+1e-9 then linside=false end
-  if i>1 then local p=LB.Rows[lkeys[i-1]];if p.Y+p.H>r.Y+1e-9 then lapart=false end end
+  local r=rows[k]
+  if not r or r.X<0 or r.Y<0 or r.X+r.W>LB.W+1e-9 or r.Y+r.H>LB.H+1e-9 then linside=false end
+  if r and i>1 then local p=rows[lkeys[i-1]];if p.Y+p.H>r.Y+1e-9 then lapart=false end end
  end
- check(linside and lapart and LB.W==26 and LB.H==8,'the label\'s three rows are inside its 26 x 8 studs, one under another')
+ check(Rules.Plaque==nil,'R153: no plaque any more (its words are on the label)')
+ check(linside and lapart and #LB.Order==5 and LB.Order[1]=='Title'and LB.Order[2]=='Name'and LB.Order[5]=='Footer','the label\'s five rows (title, winner, seed / weight, rarity and chance / fruit of the day, countdown) are inside its '..LB.W..' x '..LB.H..' studs, one under another')
+ local big=math.min(rows.Title.Max,rows.Name.Max);local small=math.max(rows.Info.Max,rows.Line.Max,rows.Footer.Max)
+ check(rows.Name.Max>=rows.Title.Max and big>small and rows.Footer.Max<=rows.Line.Max and rows.Line.Max<=rows.Info.Max,'the winner is the biggest, then the title, then the seed, the chance, the countdown')
+ -- seen from afar and up close (a 1080 px tall view, the default 70 degree field of view): px = studs / (2 d tan 35) x 1080
+ local function px(studs,d)return studs/(2*d*math.tan(math.rad(35)))*1080 end
+ check(px(rows.Name.Max,150)>=18 and px(rows.Title.Max,150)>=13 and px(rows.Footer.Max,150)>=8,string.format('from 150 studs the winner is %.0f px, the title %.0f px, the countdown %.0f px tall (readable across the corner)',px(rows.Name.Max,150),px(rows.Title.Max,150),px(rows.Footer.Max,150)))
+ check(LB.Near>=25 and LB.Near<=80 and px(LB.H,LB.Near)<=1080/3,string.format('closer than %d studs it stops growing (DistanceLowerLimit): at most %.0f px tall, a third of the screen',LB.Near,px(LB.H,LB.Near)))
+ check(LB.MaxDistance>=400 and LB.W>=26 and LB.H>=12,'it shows from '..LB.MaxDistance..' studs (the whole hub)')
  local worst,worstText=1e9,''
- local function fits(text,row)local px=Rules.Fit(text,row);if px<worst then worst,worstText=px,text end;return px end
+ local function fits(text,row)local s=Rules.Fit(text,row);if s<worst then worst,worstText=s,text end;return s end
  local minTitle=1e9
  for _,id in ipairs(list)do
   local def=Catalog[id];local name=Rules.FruitLabel(id,def.HarvestName)
   local text=Rules.SignText('Fruit',nil,id,1,name)
-  minTitle=math.min(minTitle,fits(text.Plaque.Title.Text,rows.Title),fits(text.Plaque.Line.Text,rows.Line))
+  minTitle=math.min(minTitle,fits(text.Label.Title.Text,rows.Title),fits(text.Label.Line.Text,rows.Line))
  end
- check(minTitle>=20,'every fruit of the rotation has a title and a "Today: ..." line that fit the plaque at 20 px or more (the smallest is '..string.format('%.0f',minTitle)..' px, .4 stud)')
- local minPull,minLabel=1e9,1e9
+ check(minTitle>=1.5,'every fruit of the rotation has a title and a "Today: ..." line that fit the label at 1.5 studs or more (the smallest '..string.format('%.2f',minTitle)..')')
+ local minName,minLine,minLabel=1e9,1e9,1e9
  for _,spec in ipairs(P.SeedDesigns)do
-  local r=pull({Id=spec.id,Seed=Rules.SeedLabel(spec.id,spec.name),Rarity=spec.rarity,Name=string.rep('W',24)})
+  local r=pull({Id=spec.id,Seed=Rules.SeedLabel(spec.id,spec.name),Rarity=spec.rarity,Name=string.rep('W',24),Coat='Diamond'})
   if r then
    local pt=Rules.SignText('Pull',r,nil,1)
-   minPull=math.min(minPull,fits(pt.Plaque.Line.Text,rows.Line),fits(pt.Plaque.Name.Text,rows.Name))
-   minLabel=math.min(minLabel,Rules.Fit(pt.Label.Info.Text,LB.Rows.Info),Rules.Fit(pt.Label.Name.Text,LB.Rows.Name))
+   minName=math.min(minName,fits(pt.Label.Name.Text,rows.Name))
+   minLine=math.min(minLine,fits(pt.Label.Line.Text,rows.Line))
+   minLabel=math.min(minLabel,Rules.Fit(pt.Label.Info.Text,rows.Info))
   end
  end
- check(minPull>=20,'every seed\'s rarity line and a 24-letter name fit the plaque at 20 px or more (worst: '..string.format('%.0f',minPull)..' px for "'..worstText..'")')
- check(minLabel>=1.1,'every seed name and a 24-letter winner fit the label at 1.1 studs or more (worst '..string.format('%.2f',minLabel)..')')
+ check(minName>=1.9,string.format('a 24-letter winner fits at %.2f studs (%.0f px from 150 studs)',minName,px(minName,150)))
+ check(minLine>=1.5 and minLabel>=1.5,'every seed name and every rarity / chance line (with a coat) fit at 1.5 studs or more (worst '..string.format('%.2f',math.min(minLine,minLabel))..': "'..worstText..'")')
  local minFruitLabel=1e9
  for _,id in ipairs(list)do
   local r=fruit({Id=id,Name=string.rep('W',24),Scale=50,Coat='Diamond',Weather='Drippy'})
-  if r then minFruitLabel=math.min(minFruitLabel,Rules.Fit(Rules.SignText('Fruit',r,id,1,'x').Label.Info.Text,LB.Rows.Info))end
+  if r then minFruitLabel=math.min(minFruitLabel,Rules.Fit(Rules.SignText('Fruit',r,id,1,'x').Label.Info.Text,rows.Info))end
  end
- check(minFruitLabel>=1.1,'the heaviest, coated, weathered fruit\'s weight line fits the label ('..string.format('%.2f',minFruitLabel)..' studs)')
- check(Rules.Fit('x',rows.Title)==rows.Title.Max and Rules.Fit(string.rep('W',100),rows.Name)<30,'a short text gets the row\'s full size, a very long one shrinks')
+ check(minFruitLabel>=1.5,'the heaviest, coated, weathered fruit\'s weight line fits the label ('..string.format('%.2f',minFruitLabel)..' studs)')
+ check(Rules.Fit('x',rows.Title)==rows.Title.Max and Rules.Fit(string.rep('W',100),rows.Name)<1,'a short text gets the row\'s full size, a very long one shrinks')
  -- the numbers of the stand
  check(Rules.AvatarHeight>=22 and Rules.AvatarHeight<=28 and Rules.ItemHeight>=10 and Rules.ItemHeight<=14,'the avatar is 22 to 28 studs tall (4 to 5 times a normal one), the showcase item about 12')
  local L=Rules.Layout;local Kit=W.module('HubDecorKit151')

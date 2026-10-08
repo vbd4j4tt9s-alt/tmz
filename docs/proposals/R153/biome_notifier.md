@@ -96,3 +96,38 @@ I will build only the one you pick, with the tests updated, after you say so.
   screen gives it (`HudNoticeLayout.Calculate` with the 44 px top bar drawn, exact for the formulas, the bar height is a guess: Roblox's real top bar differs by device).
 - Approximate: the fonts (Fredoka One and Montserrat stand in for Roblox's FredokaOne and Gotham, so text widths are close but not exact), the track (a drawn keyboard, not a screenshot), and the soft shadow in B (see above).
 - The numbers in the table come from the same functions that draw the panels, so sheet and table cannot disagree.
+
+## Built: B (text only), the owner's pick
+
+**What it is now** (`BiomeEntryNotifier.client.lua`, `BiomeTitleStyle.lua`, `HudNoticeLayout.lua`; `HudNotices.client.lua` and `BiomeIconData` are untouched):
+
+- No box, medallion, logo, underline or sparkle. Two lines of text: a small white `entering` over the biome's Title Case name (`BiomeTitleStyle.Label`: "Storm Peaks") in the biome's own colour. The group is still `BiomeEntryUI` / `BiomeTitle`, so `HudNotices` finds and places it as before.
+- **Readability:** each line has a solid dark `UIStroke` (ink 14,20,26, not see-through) and, under it, a dark copy of the same text 2 px lower at 50% transparency with the same stroke (Roblox cannot blur, so the "soft" shadow is this offset copy).
+- **Sizes** by screen class (from the safe area, the same numbers `HudNoticeLayout` uses: height under 480 = landscape phone, else width under height = portrait, else PC):
+
+| Screen | Name / "entering" | UIStroke name / "entering" | "Storm Peaks" block | Reserved row |
+|---|---|---|---|---|
+| PC | 24 / 12 px | 2 / 1.5 px | about 143 x 44 | 240 x 46 (was 490 x 94) |
+| Phone portrait | 21 / 11 px | 1.75 / 1.25 px | about 125 x 39 | 240 x 46 (was 490 x 94) |
+| Phone landscape | 19 / 11 px | 1.5 / 1.25 px | about 113 x 37 | 240 x 40 (was 490 x 58) |
+
+- **Time: 2.4 s.** Fade in 0.3 s while the words settle down 6 px, fully shown until 1.8 s, fade out over 0.6 s; turning back, dying or respawning fades it over 0.45 s as before. Nothing else moves. Reduced Motion: fade only (no settle).
+- When it fires, the de-duplication (`BiomeEntryGate`), the spawn reset, the phone safe area (`CoreUISafeInsets`) and the stacking under it (the run warning and the other notices now sit 52 px under the row top instead of 100 px, 43 px instead of 61 px on a landscape phone) are unchanged. Until `HudNotices` places it (within 0.1 s, at near zero opacity) the group starts in the row `HudNoticeLayout` gives it.
+
+**Readability per biome** (`test_notifier.luau` computes this from the real colours and sky colours; WCAG contrast ratios). The fill alone is weak against a bright sky (1.1 to 1.9:1 against the biome's own sky; Forest, Desert, Snow and Jungle are the palest), so the dark edge carries it: edge against the sky 12.7 to 15.5:1 on the biome's own sky, 6.1 to 9.0:1 on its horizon haze, 18.5:1 on white cloud; the fill against the edge is at least 6.6:1 and it is the fill that carries it at night (7.0 to 12.7:1).
+
+| Biome | Fill against the edge | Own sky: edge / fill | Night: fill | Worst over 23 skies (edge or fill) |
+|---|---|---|---|---|
+| Forest | 11.0 | 15.1 / 1.4 | 11.6 | 3.4 |
+| Jungle | 9.9 | 14.2 / 1.4 | 10.5 | 3.4 |
+| Desert | 12.1 | 14.5 / 1.2 | 12.7 | 3.5 |
+| Snow | 11.9 | 15.5 / 1.3 | 12.5 | 3.5 |
+| Lava | 6.6 | 12.7 / 1.9 | 7.0 | 3.4 |
+| Crystal | 7.3 | 13.2 / 1.8 | 7.7 | 3.4 |
+| Storm Peaks | 9.1 | 12.7 / 1.4 | 9.6 | 3.4 |
+
+The worst case for every biome is a mid slate-blue sky (70,104,176), where neither the edge nor the fill is far from it (3.4 to 3.5:1, above the 3:1 that large text needs; the shadow copy adds to it). **No per-biome adjustment was needed**: no biome colour is too light for the shared ink edge, so nothing is darkened or tinted. The test fails if a new biome colour falls under 4.5:1 against the edge or 3:1 against any of the skies.
+
+**Preview of the built version:** [`biome_notifier_built.png`](biome_notifier_built.png) (`preview/run_biome_notifier_built.sh <scratch dir>` rebuilds it: `dump_built_notifier.luau` runs the real notifier on the Roblox mock and prints its numbers, `biome_notifier_built.html` draws them: Storm Peaks on the three screens, every biome on its own sky / horizon / white cloud / slate / night at PC and landscape-phone size, the motion frames with and without Reduced Motion, the numbers).
+
+**Tests:** `polish_R124/tests/test_notifier.luau` (rewritten: no box / medallion / logo, text and Title Case, stroke and shadow, sizes per screen over 25 screens, the 2.4 s timeline, the 46 / 40 px rows and what stacks under them, Reduced Motion, the gate behaviour, the real `HudNotices` placing it) and `mkbundle.py` (now also bundles `HudNotices`).

@@ -145,13 +145,14 @@ local function updateAlerts()
  end
  local grew=total>alertTotal
  -- R148: a tab's dot is its categories together: LIMITED lights up for a reward of either MECH SET (8) or VERITY (9).
- -- R151: a dot sits fully INSIDE its tab (overhang -3): the tab row is a ScrollingFrame, which clips at its edge, and the old dot hung out of the tab's top and was cut there.
- for key,t in pairs(tabsByKey)do Badge.Set(Badge.Make(t.Button,'RewardDot',14,-3),'',(perTab[key]or 0)>0,false)end
- -- The INDEX button's count: 6 px of the badge hang past the button's corner; the wheel's CanvasGroup (HudLayout) keeps NotifyBadge151.Margin around the button, which holds it.
+ -- R151: a dot sits fully INSIDE its tab: the tab row is a ScrollingFrame, which clips at its edge, and the old dot hung out of the tab's top and was cut there.
+ -- R153: every badge is 1.5x bigger; sizes and overhangs are NotifyBadge151.Sizes / .Overhang.
+ for key,t in pairs(tabsByKey)do Badge.Set(Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot),'',(perTab[key]or 0)>0,false)end
+ -- The INDEX button's count: 9 px of the badge hang past the button's corner; the wheel's CanvasGroup (HudLayout) keeps NotifyBadge151.Margin around the button, which holds it.
  -- R150 review: the badge pops SILENTLY (as in R149). A chime here fired the moment the server opened a pack (OpenSeedPack commits the seed's reward at once), before the reveal shows the seed.
- Badge.Set(Badge.Make(toggle,'RewardBadge',24,6),Badge.Text(total),total>0,grew)
+ Badge.Set(Badge.Make(toggle,'RewardBadge',Badge.Sizes.Count,Badge.Overhang.Count),Badge.Text(total),total>0,grew)
  local nav=pg:FindFirstChild('GardenNavigation');local hub=nav and nav:FindFirstChild('MenuButton')
- if hub then Badge.Set(Badge.Make(hub,'IndexRewardAlert',20,6),'!',total>0,grew)end
+ if hub then Badge.Set(Badge.Make(hub,'IndexRewardAlert',Badge.Sizes.Alert,Badge.Overhang.Alert),'!',total>0,grew)end
  alertTotal=total
 end
 local alertQueued=false
@@ -333,6 +334,7 @@ watch(gui:GetPropertyChangedSignal('AbsoluteSize'),resize)
 watch(list:GetPropertyChangedSignal('AbsoluteSize'),resize)
 local function signature(entry)local id=entry:GetAttribute('SeedId');return tostring(owned('DiscoveredSeeds',id))..':'..tostring(owned('DiscoveredPlants',id))..':'..tostring(amount(id))end
 local RarityRank=require(RS.SeedPackRules).Rarities
+local Canon=require(RS.SeedRarity153) -- R153
 local function rank(rarity)local r=RarityRank[rarity];return r and r.Rank or 1 end
 local function pill(parent,name,pos,size,fill,alpha,line)
  local f=Instance.new('Frame');f.Name=name;f.Position=pos;f.Size=size;f.BackgroundColor3=fill;f.BackgroundTransparency=alpha or 0;f.BorderSizePixel=0;f.Parent=parent;Theme.Corner(f,10)
@@ -357,8 +359,8 @@ local function makeCard(entry,index)
  local core=Instance.new('Frame');core.Name='Core';core.AnchorPoint=Vector2.new(.5,.5);core.Position=UDim2.fromScale(.5,.5);core.Size=UDim2.fromScale(.6,.6);core.BackgroundColor3=style.Color;core.BackgroundTransparency=seedKnown and .72 or .9;core.BorderSizePixel=0;core.Parent=glow;Theme.Corner(core,36)
  local view=Instance.new('ViewportFrame');view.Name='Preview';view.BackgroundTransparency=1;view.Position=UDim2.fromOffset(6,30);view.Size=UDim2.new(1,-12,0,112);view.Ambient=Color3.fromRGB(215,219,240);view.LightColor=Color3.fromRGB(255,253,246);view.Parent=card
  local stop=Preview.Attach(view,id,false,seedKnown);local adult=false;local generation=0
- -- Top row: rarity chip and the 1/N chance (OddsText85).
- local chance=entry:GetAttribute('BaseChance');local odds=chance and require(RS.OddsText85).Format(chance)or'–'
+ -- Top row: rarity chip and the 1/N chance (R153: the seed's one fixed chance, SeedRarity153, the same text as the reveal card, the chat and the plaque; the entry's BaseChance is the same number).
+ local chance=entry:GetAttribute('BaseChance');local odds=Canon.Percent(id)and Canon.Text(id)or chance and require(RS.OddsText85).Format(chance)or'–'
  local rarityChip=pill(card,'RarityChip',UDim2.fromOffset(7,7),UDim2.new(.58,-7,0,21),Color3.fromRGB(10,14,32),.2,style.Accent)
  local rarityLabel=text(rarityChip,'Rarity',string.upper(rarity),UDim2.fromOffset(4,0),UDim2.new(1,-8,1,0),12);Theme.RarityText(rarityLabel,rarity,12,false)
  local oddsChip=pill(card,'OddsChip',UDim2.new(.58,4,0,7),UDim2.new(.42,-11,0,21),Color3.fromRGB(10,14,32),.2,Theme.Colors.Line)

@@ -185,11 +185,14 @@ check(C.Text[1]==125 and C.Text[2]==248 and C.Text[3]==255,'amount colour as bef
 check(C.TextStroke[1]==17 and C.TextStroke[2]==26 and C.TextStroke[3]==42,'outline colour as before (17,26,42)')
 check(C.Icon[1]==255 and C.Icon[2]==222 and C.Icon[3]==66,'bolt colour as before (255,222,66)')
 check(C.LegacyStroke[1]==0 and C.LegacyStroke[2]==0 and C.LegacyStroke[3]==0,'legacy TextStroke colour as before (black)')
-check(Style.Font=='FredokaOne' and Style.Icon=='\u{26A1}' and Style.StrokeThickness==2.5,'font FredokaOne, the bolt, outline thickness 2.5 as before')
+check(Style.Font=='FredokaOne' and Style.Icon=='\u{26A1}','font FredokaOne and the bolt as before')
+check(Style.StrokeThickness==2.5*2,'R153: the outline is 2x too (5 px on the 44 px text; R151: 2.5 on 22)')
 -- the numbers of the proposal the owner approved
 check(Style.Pop.From==0.45 and Style.Pop.Time==0.28 and Style.Fling.Time==0.40 and Style.Fling.Power==3 and Style.Fade.Start==0.5 and Style.Fade.Length==0.15,'the approved pop / fling / fade numbers')
 check(Style.Fling.Radius[1]==44 and Style.Fling.Radius[2]==104 and Style.Fling.HalfAngle==75 and Style.Fling.Slots==7,'the approved fan: +-75 degrees in 7 slots, 44..104 px')
-check(Style.Size.Text==22 and Style.Size.Icon==20,'the approved sizes: text 22, bolt 20')
+-- R153 (owner: "numbers should also be bigger", then "2x bigger"): every size is 2x its R151 value; the tilts (degrees) are not sizes. test_popups153.luau (docs/proposals/R153/tests) has the fan, the screens and the pile-up.
+check(Style.Size.Text==22*2 and Style.Size.Icon==20*2 and Style.Size.Box[1]==150*2 and Style.Size.Box[2]==36*2 and Style.Size.IconBox==24*2 and Style.Size.Gap==2*2,'R153: the sizes are 2x the approved ones: text 44, bolt 40, box 300 x 72, bolt box 48, gap 4')
+check(Style.Size.IconTilt==14 and Style.Size.TextTilt==3,'(the random tilts are the same degrees)')
 
 print(string.format('test_speed_popups_style: %d checks, %d failed',checks,fails))
 if fails>0 then error('test_speed_popups_style failed',0)end

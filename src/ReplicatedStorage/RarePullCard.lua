@@ -62,7 +62,8 @@ function Card.SafeInsets()
  if ok and type(r)=='number'and type(b)=='number'then return r,b end
  return 0,0
 end
--- kind: 'Ladder' | 'Scene' | 'InPlace'; opts: {Rank, Phone, Reduced, Lite, Quick, SeedName, Odds (final "N" text or nil), Seed (Model or nil)}
+-- kind: 'Ladder' | 'Scene' | 'InPlace'; opts: {Rank, Phone, Reduced, Lite, Quick, SeedName, Odds (final "N" text or nil), Seed (Model or nil),
+-- Skip (R153: the card is skippable: it shows the skip hint too)}
 function Card.Create(gui,kind,opts)
  local rank=math.clamp(opts.Rank or 1,1,8);local tier=Rules.Tier(rank)
  local self=setmetatable({Gui=gui,Kind=kind,Rank=rank,Tier=tier,Phone=opts.Phone==true,Reduced=opts.Reduced==true,Lite=opts.Lite==true,Quick=opts.Quick==true,
@@ -179,11 +180,12 @@ function Card.Create(gui,kind,opts)
  end
  self.Fade=frame(root,'Fade',BLACK,30,{BackgroundTransparency=1})
  self.Flash=frame(root,'Flash',tier.Glow,31,{BackgroundTransparency=1})
- if kind=='Scene'then
+ if kind=='Scene'or opts.Skip then
   local hint=label(root,'Skip hint',Enum.Font.GothamBold,C(230,230,240),BLACK,32)
   -- (R152: inside the device's safe area: on a notched / rounded phone the corner of the full-screen layer is cut off)
-  local right,bottom=Card.SafeInsets()
-  hint.AnchorPoint=Vector2.new(1,.5);hint.Position=UDim2.fromScale(.975-right,1-math.max(L.Bar*.5,bottom+L.Bar*.25));hint.Size=UDim2.fromScale(.22,L.Bar*.42);hint.TextXAlignment=Enum.TextXAlignment.Right
+  -- (R153: the cards are skippable too; the in-place card has no letterbox band, its hint keeps the full card's place and size)
+  local right,bottom=Card.SafeInsets();local bar=L.Bar>0 and L.Bar or Rules.Layout(self.Phone,false,rank).Bar
+  hint.AnchorPoint=Vector2.new(1,.5);hint.Position=UDim2.fromScale(.975-right,1-math.max(bar*.5,bottom+bar*.25));hint.Size=UDim2.fromScale(.22,bar*.42);hint.TextXAlignment=Enum.TextXAlignment.Right
   hint.Text=opts.SkipText or(self.Phone and'TAP TO SKIP  ▸'or'CLICK TO SKIP  ▸');self.SkipHint=hint
  end
  if opts.Seed then self:SetSeed(opts.Seed)end
@@ -233,6 +235,12 @@ function Card:_ring(k,alpha)
 end
 function Card:_flash(a)self.Set(self.Flash,'BackgroundTransparency',1-clamp01(a)*(self.Reduced and .35 or 1))end
 function Card:_fade(a)self.Set(self.Fade,'BackgroundTransparency',1-clamp01(a))end
+-- (R153) the skip hint of a card: in from `from`, gone by `to` (the card closing)
+function Card:_skipHint(t,from,to)
+ if not self.SkipHint then return end
+ local a=clamp01((t-(from or math.huge))/.3)*(1-clamp01((t-to)/.2))
+ self.Set(self.SkipHint,'TextTransparency',1-.75*a);self.Set(self.SkipHint,'Visible',a>.01)
+end
 -- Texts: title pops in at `inAt`, odds count from `countAt` and slam at `slamAt`, everything fades out between `outAt` and `goneAt`.
 function Card:_texts(t,inAt,countAt,slamAt,outAt,goneAt)
  local S,Sc=self.Set,self.Scale
@@ -339,6 +347,7 @@ function Card:UpdateLadder(t,tl)
  self:_seed(t,burst,tl.FloatEnd,tl.Out,tl.Length)
  self:_dress(t,t-burst,0)
  self:_fade(0)
+ self:_skipHint(t,tl.SkipFrom,tl.FloatEnd)
 end
 -- Scene: t on the cinematic's clock ----------------------------------------------------------------------------------------------------
 function Card:UpdateScene(t,tl,skipShown)
@@ -392,6 +401,7 @@ function Card:UpdateInPlace(t,tl)
  self:_rays(t,0)
  self:_dress(t,t-tl.Climax,shown and out or 0)
  self:_seed(t,tl.Climax,tl.FloatEnd,tl.FloatEnd,tl.Length)
+ self:_skipHint(t,tl.SkipFrom,tl.FloatEnd)
 end
 function Card:Destroy()
  if self.Destroyed then return end

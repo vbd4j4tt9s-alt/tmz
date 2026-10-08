@@ -1,5 +1,5 @@
 """R151 preview (R152: the pedestal, the showcase item and the dancing giant): turns the two hub scenes (tests/build_hub_scenes.sh: scene_empty.json, scene_champions.json, the HUBTEXT lines of the
-.steps files, place_geom.json) into the file render_hub.mjs draws: one JSON per state with the parts of the hub (blocks, wedges, balls, cylinders), the two plaques' and labels' words and
+.steps files, place_geom.json) into the file render_hub.mjs draws: one JSON per state with the parts of the hub (blocks, wedges, balls, cylinders), the two labels' (R153: no plaque) words and
 layout, the camera views and the labels of the plan view.
 Usage: python3 hub_scenes.py <scene dir> <out scenes.json>
 The views: the wide shots are from a player's spawn (the base's own, about 170 studs away), the close-ups 85 studs in front of a display, the detail shots 50 studs in front and to the avatar's
@@ -121,8 +121,8 @@ def main():
             t = tx[kind]
             o, lk = t['origin'], t['look']
             f = (lk[0], lk[2])                       # the display's front, x / z (toward the market)
-            r = t['plaque']['r']
-            left = (r[0], r[6])                      # local +X = the viewer's left, x / z
+            r = t['right']
+            left = (r[0], r[2])                      # local +X = the viewer's left, x / z
             frames[kind] = {'center': [o[0], o[1], o[2]], 'front': list(f), 'left': list(left), 'item': t['item']}
         views = []
         for kind, base in (('Pull', 'Base_4'), ('Fruit', 'Base_3')):
@@ -132,7 +132,7 @@ def main():
             low = kind.lower()
             views.append(view(low + '_wide', (sp[0], sp[1] + 6.5, sp[2]), (c[0], 19, c[2]), 40, 900, 520))
             views.append(view(low + '_close', (c[0] + f[0] * 85, 13, c[2] + f[1] * 85), (c[0], 19, c[2]), 50, 900, 520))
-            # the detail: in front and to the viewer's right (local -X, where the avatar stands), a 3/4 view of the pedestal, the plaque and the avatar
+            # the detail: in front and to the viewer's right (local -X, where the avatar stands), a 3/4 view of the pedestal, the label and the avatar
             views.append(view(low + '_detail', (c[0] + f[0] * 50 - left[0] * 26, 9, c[2] + f[1] * 50 - left[1] * 26), (c[0], 17, c[2]), 52, 900, 520))
             # the scale: a normal player 30 studs in front of the stand, to the avatar's side
             views.append(view(low + '_scale', (c[0] + f[0] * 62 + left[0] * 4, 8.5, c[2] + f[1] * 62 + left[1] * 4), (c[0], 16, c[2]), 52, 900, 520, ref=True))

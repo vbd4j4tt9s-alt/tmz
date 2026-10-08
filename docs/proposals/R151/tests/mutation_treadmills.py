@@ -16,6 +16,7 @@ MUTS = [
     ('grid fallback missing', 'src/ReplicatedStorage/TreadmillBeltArt151.lua', " else texture.Texture=look.Grid end\n", " else end\n"),
     ('sign price colour fixed', 'src/ServerScriptService/ChestChaseServer/GardenUpgradeService.lua', "(tonumber(balance)or 0)>=cost and RGB(67,185,98)or RGB(200,66,65)", "RGB(200,66,65)"),
     ('scroll while far', 'src/ReplicatedStorage/TreadmillFx.lua', "    local animate=policy.Animate and record.Visible and record.Distance<=Fx.ANIMATE", "    local animate=policy.Animate"),
+    ('R153 scroll while far', 'src/ReplicatedStorage/TreadmillFx.lua', "record.Scrolling=#l.Textures>0 and not policy.Reduced and record.Visible and record.Distance<=range", "record.Scrolling=#l.Textures>0 and not policy.Reduced and record.Visible"),
     ('belt collider resized', 'src/ServerScriptService/ChestChaseServer/BiomeVisuals.lua', "    local beltSize=V(9.4,.4,13.2*lengthScale)", "    local beltSize=V(9.6,.4,13.2*lengthScale)"),
 ]
 caught = 0

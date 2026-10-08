@@ -9,6 +9,8 @@
 #                              death / character removed / being moved / a keeper / a replaced camera / the script destroyed, ReducedMotion
 #                              and phone variants, the in-place version when unsafe, part budgets, no per-frame work after the end, the
 #                              Common..Mythic seed card and quick reveals, the owner previews, the sound slots (owner ids drop in).
+#                              R153: packs opened back to back play in full (quick = the player's "Skip pack animations" only; with it
+#                              Secret+ is the in-place result card); every card is skippable (hint, jump to the hit, close).
 #  test_rare_world.luau      - the real SeedPackClient + PackOpeningFeedback: the pack's suspense in the world for every tier (wobble,
 #                              bit-by-bit tear, hint glow), the seed's new timing, the light pillar and afterglow aura onlookers see
 #                              (Secret+ only), its lifetime and LOD, onlookers never get the story scene, the opener's reveal starts the

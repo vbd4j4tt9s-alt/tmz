@@ -242,7 +242,7 @@ do -- images: drawn once per image name, applied to every texture, route publish
   print('ALPHA '..name..' '..w..' '..h..' '..table.concat(hex))
  end
 end
-do -- scroll: with the chevrons (3.0 studs/s training, 1.3 idle) x each layer's rate, wrapped at one tile; nothing when far / reduced / low quality
+do -- scroll: with the chevrons (3.0 studs/s training, 1.3 idle) x each layer's rate (R153: 1), wrapped at one tile; nothing when far / looking away / Reduced Motion
  local function offsets(level)local out={};for _,t in ipairs(textures(level))do out[t]=t.OffsetStudsV end;return out end
  local function travelled(a,b,expect)
   local ok=true
@@ -267,9 +267,14 @@ do -- scroll: with the chevrons (3.0 studs/s training, 1.3 idle) x each layer's 
  check('looking away: the belt does not scroll',still(function()look(5,40,true)end))
  check('Reduced Motion: the belt does not scroll',still(function()look(5,30);state.Reduced=true end))
  state.Reduced=false
- check('low quality: the belt does not scroll',still(function()state.Quality=1 end))
- check('FastMode: the belt does not scroll',still(function()state.Quality=3;state.Fast=true end))
+ -- R153 (owner: "the ground ... should be moving for all treadmills not just the arrow"): low quality and FastMode no longer stop the belt (the chevrons run there too);
+ -- the reach is the chevrons' 140 studs (90 in FastMode). test_belt153.luau (docs/proposals/R153/tests) has the rest.
+ local function moves(prep)prep();run(.6);local x=offsets(5);run(1);local y=offsets(5);for t,o in pairs(x)do if y[t]==o then return false end end;return true end
+ check('R153 low quality: the belt still scrolls (like the chevrons)',moves(function()look(5,30);state.Quality=1 end))
+ check('R153 FastMode: the belt still scrolls within 90 studs',moves(function()state.Quality=3;state.Fast=true end))
+ check('R153 FastMode: but not beyond them (90 studs)',still(function()look(5,120)end))
  state.Fast=false
+ check('R153: 120 studs away (not FastMode) it scrolls, like the chevrons (140)',moves(function()look(5,120)end))
  -- edge flows: Beams with a moving texture, on near (quality 2+), stopped with Reduced Motion
  look(5,30);run(1)
  local beams={};for _,d in ipairs(machines[5].Art:GetDescendants())do if d.ClassName=='Beam'and d:GetAttribute('TreadmillDress151')then beams[#beams+1]=d end end

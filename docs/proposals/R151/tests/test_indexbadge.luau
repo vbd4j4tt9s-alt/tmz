@@ -74,7 +74,7 @@ if after then
  check(b and b._class=='Frame'and b:GetAttribute('NotifyBadge')==151,'the INDEX count is a NotifyBadge151 (revision attribute)')
  local ratio=b:FindFirstChildOfClass('UIAspectRatioConstraint')
  check(ratio and ratio.AspectRatio==1,'the holder has a UIAspectRatioConstraint of 1 (it stays square)')
- local r=L.rect(b);check(near(r.x1-r.x0,r.y1-r.y0)and near(r.x1-r.x0,24),'the holder is a 24 x 24 square ('..(r.x1-r.x0)..' x '..(r.y1-r.y0)..')')
+ local r=L.rect(b);check(near(r.x1-r.x0,r.y1-r.y0)and near(r.x1-r.x0,Badge.Sizes.Count),'the holder is a '..Badge.Sizes.Count..' x '..Badge.Sizes.Count..' square (R153: 1.5x the R151 24 px) ('..(r.x1-r.x0)..' x '..(r.y1-r.y0)..')')
  check(b.ClipsDescendants==false or b.ClipsDescendants==nil,'the holder itself does not clip')
  local disc=b:FindFirstChild('Disc');local dr=disc and L.rect(disc)
  check(disc and near(dr.x1-dr.x0,dr.y1-dr.y0),'the disc is square')
@@ -89,11 +89,11 @@ if after then
  local soft,tight=b:FindFirstChild('ShadowSoft'),b:FindFirstChild('Shadow')
  check(soft and tight and soft.BackgroundTransparency>=.5 and soft.BackgroundTransparency<=.95 and tight.BackgroundTransparency>=.4 and tight.BackgroundTransparency<=.9 and soft.BackgroundTransparency>tight.BackgroundTransparency,'a soft drop shadow: two dark circles, the wide one fainter')
  local sr,tr=L.rect(soft),L.rect(tight)
- check(sr.y1>r.y1 and tr.y1>r.y1 and sr.y1-r.y1<=5 and(sr.x1-sr.x0)>(r.x1-r.x0)and(sr.y0+sr.y1)/2>(r.y0+r.y1)/2,'... dropped a little below the badge (the shadow is lower and a touch wider)')
+ check(sr.y1>r.y1 and tr.y1>r.y1 and sr.y1-r.y1<=5*Badge.Grow and(sr.x1-sr.x0)>(r.x1-r.x0)and(sr.y0+sr.y1)/2>(r.y0+r.y1)/2,'... dropped a little below the badge (the shadow is lower and a touch wider)')
  local label=b:FindFirstChild('Count');local lr=L.rect(label)
  check(label and label._class=='TextLabel'and label.Font.Name=='FredokaOne'and label.TextScaled==true and label.TextColor3.R==1 and label.TextColor3.G==1 and label.TextColor3.B==1,'the count is FredokaOne, white and TextScaled')
  local fit=label and label:FindFirstChildOfClass('UITextSizeConstraint')
- check(fit and fit.MaxTextSize<=15 and fit.MaxTextSize>=10 and fit.MinTextSize>=6,'... inside a UITextSizeConstraint (max '..tostring(fit and fit.MaxTextSize)..', min '..tostring(fit and fit.MinTextSize)..'), so it never fills the disc edge to edge')
+ check(fit and fit.MaxTextSize<=Badge.Sizes.Count*.7 and fit.MaxTextSize>=Badge.Sizes.Count*.4 and fit.MinTextSize>=6,'... inside a UITextSizeConstraint (max '..tostring(fit and fit.MaxTextSize)..', min '..tostring(fit and fit.MinTextSize)..'), so it never fills the disc edge to edge')
  check(label.TextXAlignment.Name=='Center'and label.TextYAlignment.Name=='Center','the text is centred both ways')
  local lcx,lcy,dcx,dcy=(lr.x0+lr.x1)/2,(lr.y0+lr.y1)/2,(dr.x0+dr.x1)/2,(dr.y0+dr.y1)/2
  check(near(lcx,dcx,.01)and near(lcy,dcy,.01),'the label is centred on the disc ('..string.format('%.2f,%.2f vs %.2f,%.2f',lcx,lcy,dcx,dcy)..')')
@@ -128,12 +128,16 @@ for _,sz in ipairs(SIZES)do
   check(bi<=1e-6,sz[1]..'x'..sz[2]..': the INDEX badge is not clipped (cut '..bi..' px by '..tostring(wi)..')')
   check(bd<=1e-6,sz[1]..'x'..sz[2]..': the tab dot is not clipped (cut '..bd..' px by '..tostring(wd)..')')
   check(ba<=1e-6,sz[1]..'x'..sz[2]..': the MENU alert is not clipped (cut '..ba..' px by '..tostring(wa)..')')
-  local sc=L.rect(gui);local a=reach(indexBadge());check(overshoot(a,{x0=0,y0=0,x1=sz[1],y1=sz[2]})==0,sz[1]..'x'..sz[2]..': the badge is on screen')
+  local sc=L.rect(gui);local a=reach(indexBadge());local screen={x0=0,y0=0,x1=sz[1],y1=sz[2]};check(overshoot(a,screen)==0,sz[1]..'x'..sz[2]..': the badge is on screen')
+  -- R153 (the badges are 1.5x): every badge's whole reach (ring, shadow, pop, halo) is on screen too, the MENU alert on its button's corner and the tab dot in its tab
+  local oa,od=overshoot(reach(alertBadge()),screen),overshoot(reach(dot),screen)
+  check(oa==0,sz[1]..'x'..sz[2]..': the MENU alert is on screen (reach past the screen: '..oa..' px)')
+  check(od==0,sz[1]..'x'..sz[2]..': the tab dot is on screen (reach past the screen: '..od..' px)')
   local grp=L.rect(toggle.Parent);check(toggle.Parent._class=='CanvasGroup'and near(grp.x1-grp.x0,toggle.AbsoluteSize.X+2*Badge.Margin)and near(grp.y1-grp.y0,toggle.AbsoluteSize.Y+2*Badge.Margin),sz[1]..'x'..sz[2]..': the wheel\'s CanvasGroup keeps '..Badge.Margin..' px around the button')
  end
 end
 if after then
- check(Badge.Extent(24,6)<=Badge.Margin and Badge.Extent(20,6)<=Badge.Margin and Badge.Extent(14,-3)==0,'Badge.Extent: the INDEX count ('..Badge.Extent(24,6)..') and the MENU alert ('..Badge.Extent(20,6)..') fit the wheel\'s '..Badge.Margin..' px margin; a dot reaches nothing out of its tab')
+ check(Badge.Extent(Badge.Sizes.Count,Badge.Overhang.Count)<=Badge.Margin and Badge.Extent(Badge.Sizes.Alert,Badge.Overhang.Alert)<=Badge.Margin and Badge.Extent(Badge.Sizes.Dot,Badge.Overhang.Dot)==0,'Badge.Extent: the INDEX count ('..Badge.Extent(Badge.Sizes.Count,Badge.Overhang.Count)..') and the MENU alert ('..Badge.Extent(Badge.Sizes.Alert,Badge.Overhang.Alert)..') fit the wheel\'s '..Badge.Margin..' px margin; a dot reaches nothing out of its tab')
 else
  -- the ROOT CAUSE, measured: the old badge is cut by the wheel's CanvasGroup (and its dot by the tab row)
  check(anyCut.Index>=3.5,'ROOT CAUSE: the R150 INDEX badge overhangs its CanvasGroup by '..anyCut.Index..' px (the top and right of the circle are sliced off flat)')
@@ -141,6 +145,24 @@ else
  check(anyCut.Alert==0,'(the MENU alert was never clipped: its button sits straight in a ScreenGui)')
  local group=toggle.Parent
  check(group and group._class=='CanvasGroup','the INDEX button is inside a CanvasGroup (HudLayout.Navigation), which clips its descendants')
+end
+-- R153: the badges are 1.5x --------------------------------------------------------------------------------------------------------------------------------
+if after then
+ relay(390,844);openWheel();relay(390,844)
+ -- (the R151 sizes were 24 / 20 / 20 / 14 px: the owner asked for a bigger bubble, "about 1.5x")
+ check(Badge.Grow==1.5 and Badge.Sizes.Count==24*1.5 and Badge.Sizes.Alert==20*1.5 and Badge.Sizes.Daily==20*1.5 and Badge.Sizes.Dot==14*1.5,'R153: every badge is 1.5x its R151 size (INDEX count 36, MENU alert 30, DAILY 30, dots 21)')
+ for _,pair in ipairs({{indexBadge(),Badge.Sizes.Count,'INDEX count'},{alertBadge(),Badge.Sizes.Alert,'MENU alert'},{(dotOf(1)),Badge.Sizes.Dot,'tab dot'}})do
+  local b,size,name=pair[1],pair[2],pair[3];local r=L.rect(b)
+  check(near(r.x1-r.x0,size)and near(r.y1-r.y0,size)and b:GetAttribute('BadgeSize')==size,'R153: the '..name..' is '..size..' px ('..(r.x1-r.x0)..')')
+  local ring=b.Disc:FindFirstChildOfClass('UIStroke').Thickness
+  check(ring>=size*.07 and ring<=size*.1,'R153: its white ring grows with it ('..ring..' px on '..size..')')
+  local fit=b.Count:FindFirstChildOfClass('UITextSizeConstraint')
+  check(fit.MaxTextSize>=size*.55 and fit.MaxTextSize<=size*.65,'R153: its count grows with it (max text size '..fit.MaxTextSize..' on '..size..')')
+ end
+ -- "9+" (the widest text) still fits in the disc at its biggest text size, with the mock's width rule (utf8.len * size * .52)
+ local fits=true;local label=indexBadge().Count;local lr=L.rect(label);local widest=utf8.len(Badge.Text(99))*label:FindFirstChildOfClass('UITextSizeConstraint').MaxTextSize*.52
+ check(widest<=lr.x1-lr.x0,'R153: "9+" at the INDEX count\'s biggest text size ('..widest..' px wide) fits in the disc\'s label ('..(lr.x1-lr.x0)..' px)')
+ check(Badge.Extent(Badge.Sizes.Count,Badge.Overhang.Count)==15 and Badge.Margin==16,'R153: the INDEX count reaches 15 px past its corner and the wheel keeps '..Badge.Margin..' px round a button')
 end
 -- 4. one component --------------------------------------------------------------------------------------------------------------------------------------
 local function source(name)return require('./rs_bundle')[name]end

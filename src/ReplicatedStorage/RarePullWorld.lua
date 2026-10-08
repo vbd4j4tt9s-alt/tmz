@@ -68,6 +68,8 @@ function W.Begin(player,character,rank,at,opts)
  return e
 end
 function W.SetMouth(player,cf)local e=effects[player];if e then e.Mouth=cf end end
+-- R153: the puller skipped their card to the hit (RarePullRules.Shift, seconds): their own beam lands with it (never moved back)
+function W.Shift(player,seconds)local e=effects[player];if e and type(seconds)=='number'and seconds>(e.Shift or 0)then e.Shift=seconds end end
 -- where the beam lands: the ground under the puller (their feet)
 function W.Ground(character)
  local root=character and character:FindFirstChild('HumanoidRootPart');if not root then return Vector3.zero end
@@ -134,7 +136,7 @@ end
 local function update(player,e,now,camera)
   local char=e.Character;local root=char and char.Parent and char:FindFirstChild('HumanoidRootPart')
   local humanoid=char and char:FindFirstChildOfClass('Humanoid')
-  local t=now-e.At
+  local t=now-e.At+(e.Shift or 0)
   if not player.Parent or not root or(humanoid and humanoid.Health<=0)or t>e.TL.AuraEnd or player.Character~=char then stopEffect(player);return end
   local far=camera and(camera.CFrame.Position-root.Position).Magnitude>W.FarDistance
   local S=e.Set

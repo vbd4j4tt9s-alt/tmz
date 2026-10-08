@@ -1,6 +1,6 @@
 --!nocheck
 -- R128: weather/Mech effects on an item someone carries follow it every frame (real ItemCosmetics + ItemVisualEffects);
--- items lying in the world keep the 20 Hz animation. Plus source checks for the pack aura, Void Pack and held fruit loops.
+-- R153: items lying in the world too (they stepped at 20 Hz). Plus source checks for the pack aura, Void Pack and held fruit loops.
 local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -38,11 +38,11 @@ for i=1,30 do
 end
 check(heldMoves>=29,'carried item effect follows every frame ('..heldMoves..'/30)')
 check(worst<=1.2*1.1+.05,('carried effect never trails the item (worst sideways gap %.2f studs)'):format(worst))
-check(worldMoves<=12,'world item keeps the cheaper 20 Hz animation ('..worldMoves..'/30)')
+check(worldMoves>=29,'R153: a world item\'s effect moves every frame too ('..worldMoves..'/30)')
 -- Source checks for the other three held-effect loops (their worlds are too large for this mock).
 local function has(name,text)return W.B[name]and W.B[name]:find(text,1,true)~=nil end
-check(has('SeedPackRender','if fx and(polish or carried)then'),'pack aura/orbit frames follow a carried pack every frame')
+check(has('SeedPackRender','        if fx then\n            move(fx.Anchor,rootFrame)'),'pack aura/orbit frames follow a pack every frame (R153: carried or not)')
 check(has('SeedPackRender','if r.MechMotion and(worldMoved or carried or'),'carried Mech pack rig steps every frame')
-check(has('HeldHarvestRig','function Rig.Follow(r,t)'),'held fruit effects have a per-frame follow')
+check(has('HeldHarvestRig','function Rig.Step(r,t,wantEffects,audible)'),'held fruit effects step with the hand (R153: HeldHarvests steps every frame in RenderStepped)')
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

@@ -36,6 +36,7 @@
 --         drops with distance: the letters (they fade out ~150 studs ahead) and the press animation (other runners / keepers far away).
 --  SOUND  one click recording, one pitch band, the same volume rule for every key; every runner (you, each player, each keeper) gets his
 --         own steady cadence (at most one click per ClickGap seconds) - no shared budget that starves some presses, no stacked bursts.
+--         R153: only a player who really steps on a key sounds (K.Steps / K.Thrown): not a keeper, not a body ragdolled / flung / knocked up.
 local K={Version=151}
 local floor,ceil,max,min=math.floor,math.ceil,math.max,math.min
 local C3=Color3.fromRGB
@@ -60,6 +61,7 @@ K.Config={
  PlayerFootprint=1.2,PlayerFeetReach=3,PlayerRootToFeet=3,-- half-size of a runner's footprint; others press while their feet are within 3 studs of the floor
  KeeperMinFootprint=1.5,KeeperMaxFootprint=6,KeeperFootprintShare=.3,
  PlayerSampleHz=30,
+ StepReach=1.2,StepMaxRise=18,                            -- R153: a press SOUNDS only for a runner who really steps on a key: feet within StepReach of the floor top and not flying up faster than StepMaxRise studs/s (K.Steps), not ragdolled / flung / knocked back (K.Thrown)
  -- clicks: ONE recording (the first id; the other two R147 recordings are kept for reference only), a narrow pitch band, one volume
  -- rule (3D roll-off from the key) for every presser, and a steady per-presser cadence.
  ClickSoundIds={113108830240353,88838553648526,96591611478915},ClickSoundId=113108830240353,
@@ -515,6 +517,25 @@ function K.PressVolume(kind,stage)
  local name=stage and K.BiomeNames[stage]
  if(name and assetOf(C.PressSoundBiome[name]))or assetOf(C.PressSound.Key)then return C.PressSoundVolume or C.ClickVolume end
  return C.ClickVolume
+end
+-- R153 (owner playtest of R152: "when keepers knock players up the keyboard clicking sounds play, it should only play when players step on the keyboard"): a press
+-- SOUNDS only when a runner really steps on a key. K.Steps(feet height, vertical speed, thrown) = feet within StepReach of the floor top, not rising faster than
+-- StepMaxRise (a knock-up's first frames, a jump's take-off) and not thrown; K.Thrown(player, character, humanoid) = ragdolled / flung / knocked back, read from what
+-- RagdollService sets (the player's GuardianRagdollActive / GuardianFlingActive, the character's ChestChaseRagdollActive, PlatformStand, the Physics / Ragdoll /
+-- FallingDown states). Keepers never sound; a thrown body may still press keys down (silently) while it lies on them.
+function K.Steps(feetY,velY,thrown)
+ return not thrown and feetY<=C.FloorTop+C.StepReach and(velY or 0)<=C.StepMaxRise
+end
+local THROWN_STATES={}
+if Enum then for _,n in ipairs({'Physics','Ragdoll','FallingDown','PlatformStanding','Flying'})do THROWN_STATES[Enum.HumanoidStateType[n]]=true end end
+function K.Thrown(player,char,hum)
+ if player and(player:GetAttribute('GuardianRagdollActive')==true or player:GetAttribute('GuardianFlingActive')==true)then return true end
+ if char and char:GetAttribute('ChestChaseRagdollActive')==true then return true end
+ if hum then
+  if hum.PlatformStand==true then return true end
+  local ok,state=pcall(hum.GetState,hum);if ok and THROWN_STATES[state]then return true end
+ end
+ return false
 end
 -- The pitch of a presser's n-th click: players cycle through ClickPitches, keepers use KeeperPitch.
 function K.ClickPitch(kind,n)
