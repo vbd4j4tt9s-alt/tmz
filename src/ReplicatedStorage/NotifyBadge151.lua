@@ -7,7 +7,7 @@
 --    that hangs 1 px out was cut there. Nothing was wrong with the colour or the Corner: the circle was simply drawn outside its parent's clip.
 --  * NOW: a transparent square holder (UIAspectRatioConstraint 1) that holds, back to front, a pulse halo, a soft two-layer drop shadow, the disc (a perfect
 --    circle: UICorner 1,0; a bright red UIGradient; a white UIStroke ring that stays INSIDE the holder, so `size` is the outer diameter) with a glass shine, and
---    the count (FredokaOne, centred, TextScaled inside a UITextSizeConstraint, white with a dark red edge; "9+" past nine). The overhang past the corner it
+--    the count (FredokaOne, centred, white with a dark red edge, at an explicit size since R154: B.TextSize; "9+" past nine). The overhang past the corner it
 --    is placed on is explicit (B.Make's `overhang`) and B.Extent says how far the badge can ever reach (ring, shadow, pop, halo), which HudLayout turns into
 --    the CanvasGroup's margin (B.Margin) so nothing is clipped; the tab dots sit fully inside their tab (overhang 0).
 --  * Motion: a pop-in when it appears and a short pop when the count goes up, then a gentle halo pulse (one looping tween per visible badge, none for a
@@ -19,7 +19,14 @@ local RGB=Color3.fromRGB
 -- R153 (owner, after R152: "increase the size of the notification bubble"): every badge is 1.5x its R151 size (B.Grow), the same circle, ring, shine, pop and halo, only bigger. Its
 -- hold on the corner grows with it (overhang x 1.5), so B.Extent of the biggest (the INDEX count: 15 px) is what the wheel's CanvasGroup keeps round a button: Margin 12 -> 16.
 -- The callers read the sizes from B.Sizes / B.Overhang (nothing hard-codes a diameter any more).
+-- R154 (owner, after R153: "the number and signs in the notification bubble is also too small"): the bubbles were big but the text in them was a third of the bubble. The count was
+-- TextScaled inside a UITextSizeConstraint (max 62% of the diameter): the engine's own fit picked the size, and it came out far below that max (the owner's screenshot: digits about
+-- 17% of the bubble tall). The text size is now explicit (TextScaled off, no constraint): B.TextSize(size, text) = 78% of the diameter for one character ("2", "!": the digit is 58% of
+-- the bubble tall, 69% of the red disc), 68% for two ("9+": FredokaOne's "9+" is 1.09 em wide, so it must stay inside the disc: 50% of the bubble, 60% of the disc), whatever the screen:
+-- the badge is a fixed pixel size, so it is the same on a phone and a computer. White, FredokaOne, the dark red edge and the centring are as they were.
 local B={Revision=151,Grow=1.5,
+ TextFill1=.78,    -- R154: text size / badge diameter for one character (a digit or "!")
+ TextFill2=.68,    -- R154: the same for two characters ("9+")
  Margin=16,        -- px a host (HudLayout's CanvasGroup) leaves around a button for the badge on its corner; B.Extent of the largest badge must fit
  PopScale=1.2,     -- the biggest the holder gets (the pop)
  PulseScale=1.25,  -- the biggest the halo gets, in holders
@@ -38,6 +45,11 @@ function B.Text(n)
  n=type(n)=='number'and n==n and math.floor(n)or 0
  if n<=0 then return''end
  return n>9 and'9+'or tostring(n)
+end
+-- R154: the count's text size (px) for a badge of outer diameter `size` showing `text` (see the note at the top). A dot has no text.
+function B.TextSize(size,text)
+ local n=type(text)=='string'and(utf8.len(text)or #text)or 0
+ return math.max(8,math.floor(size*(n>1 and B.TextFill2 or B.TextFill1)+.5))
 end
 -- How far (px) a badge of `size` placed with `overhang` can reach past the corner it sits on, over everything it draws: the pop, the halo's pulse and the
 -- shadow's drop. (Pop and halo never run together: the pulse starts after the pop.) 0 or less = it stays inside the corner.
@@ -58,8 +70,8 @@ local function style(b,size)
  local soft=b.ShadowSoft;soft.Position=UDim2.new(.5,0,.5,drop);soft.Size=UDim2.fromScale(1.14,1.14)
  local tight=b.Shadow;tight.Position=UDim2.new(.5,0,.5,math.max(1,math.floor(drop*.6+.5)))
  local disc=b.Disc;disc.Size=UDim2.new(1,-ring*2,1,-ring*2);disc.RingStroke.Thickness=ring
- local label=b.Count;label.Size=UDim2.new(1,-(ring*2+2),1,-(ring*2+2)) -- inside the disc, a pixel clear of the ring
- label.UITextSizeConstraint.MaxTextSize=math.max(8,math.floor(size*.62));label.UITextSizeConstraint.MinTextSize=6
+ local label=b.Count;label.Size=UDim2.new(1,-(ring*2+2),1,-(ring*2+2)) -- inside the disc, a pixel clear of the ring (the glyphs may be taller than this box: text is not clipped)
+ label.TextSize=B.TextSize(size,label.Text)
  b:SetAttribute('BadgeSize',size)
 end
 local function build(parent,name,size)
@@ -77,10 +89,9 @@ local function build(parent,name,size)
  local shine=circle(disc,'Shine',5);shine.AnchorPoint=Vector2.new(.5,0);shine.Position=UDim2.fromScale(.5,.07);shine.Size=UDim2.fromScale(.62,.3);shine.BackgroundTransparency=.7
  local fade=Instance.new('UIGradient');fade.Rotation=90;fade.Transparency=NumberSequence.new(0,1);fade.Parent=shine
  local label=Instance.new('TextLabel');label.Name='Count';label.AnchorPoint=Vector2.new(.5,.5);label.Position=UDim2.fromScale(.5,.5)
- label.BackgroundTransparency=1;label.BorderSizePixel=0;label.Active=false;label.Font=Enum.Font.FredokaOne;label.Text='';label.TextScaled=true;label.TextWrapped=false
+ label.BackgroundTransparency=1;label.BorderSizePixel=0;label.Active=false;label.Font=Enum.Font.FredokaOne;label.Text='';label.TextScaled=false;label.TextWrapped=false
  label.TextColor3=Color3.new(1,1,1);label.TextStrokeColor3=B.Colors.Edge;label.TextStrokeTransparency=.3
  label.TextXAlignment=Enum.TextXAlignment.Center;label.TextYAlignment=Enum.TextYAlignment.Center;label.ZIndex=6;label.Parent=b
- local fit=Instance.new('UITextSizeConstraint');fit.Parent=label
  b.Parent=parent
  style(b,size)
  b.Destroying:Connect(function()local p=pulses[b];if p then p:Cancel();pulses[b]=nil end end)
@@ -130,7 +141,8 @@ end
 -- Shows / hides the badge with its text ('' for a dot). `pop`: the count went up (a visible badge pops; a badge that has just appeared pops in anyway).
 function B.Set(b,text,visible,pop)
  text=type(text)=='string'and text or'';visible=visible==true
- local label=b:FindFirstChild('Count');if label and label.Text~=text then label.Text=text end
+ local label=b:FindFirstChild('Count')
+ if label and label.Text~=text then label.Text=text;label.TextSize=B.TextSize(b:GetAttribute('BadgeSize')or B.Sizes.Count,text)end -- (R154: one character is bigger than "9+")
  local was=b.Visible
  if visible~=was then b.Visible=visible end
  if not visible then stop(b);return b end
