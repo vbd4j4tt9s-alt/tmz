@@ -1,5 +1,5 @@
--- R151: the shared half of the hub displays. One MemoryStore hash map (HubDisplayRules.StoreName), one key per UTC day ('d20001'), holding that day's two records
--- {v=1, pull=..., fruit=...}. Every server reads the day's key about once a minute and writes only when it has something better (UpdateAsync is a compare-and-set:
+-- R151: the shared half of the hub displays. One MemoryStore hash map (HubDisplayRules.StoreName), one key per UTC day ('d20001'), holding that day's record
+-- {v=1, fruit=...}. Every server reads the day's key about once a minute and writes only when it has something better (UpdateAsync is a compare-and-set:
 -- the transform runs again if another server wrote in between, and it keeps whichever record HubDisplayRules ranks higher, so two servers that finish at the same
 -- moment cannot overwrite each other with a worse one). Keys expire after two days.
 --  * Every call is pcall'd. A failure never throws: the caller gets (false, reason) and the store backs off (5, 10, 20 ... s up to 5 minutes; 90 s or more after a
@@ -7,6 +7,8 @@
 --  * This server's own request budget (HubDisplayRules.RequestsPerMinute) is a sliding minute; over it, a call is refused with 'budget' without touching MemoryStore. The
 --    experience's quota is 1000 + 100 per player a minute: a poll (1 read) every ~50 s and the occasional write use a few of them.
 --  * `service` and `clock` are injectable (the tests pass a mock MemoryStoreService and a fake clock).
+-- R153 (owner: the best pull is "a local server only thing"): this store is BIGGEST FRUIT's alone. BEST PULL never goes through it: Merge refuses a pull before it counts a request or touches
+-- MemoryStore, and a `pull` field that an older server left in the document is ignored (HubDisplayRules.CleanDoc: not read, not kept, not written back).
 local Rules=require(game:GetService('ReplicatedStorage'):WaitForChild('HubDisplayRules'))
 local S={};S.__index=S
 function S.new(opts)
@@ -61,17 +63,18 @@ local function request(self,fn)
  if not ok then self:_fail(a);return false,tostring(a)end
  self:_ok();return true,a,b
 end
--- Reads a day's document. Returns true, doc (clean: {pull=?, fruit=?}, empty when the key is missing) or false, reason.
+-- Reads a day's document. Returns true, doc (clean: {fruit=?}, empty when the key is missing) or false, reason.
 function S:Read(day)
  local ok,value=request(self,function(map)return map:GetAsync(S.Key(day))end)
  if not ok then return false,value end
  return true,Rules.CleanDoc(value)
 end
--- Offers a record to the day's document (kind 'Pull' | 'Fruit'; rec = a clean record). The stored one is replaced only when rec is better (checked inside the
+-- Offers a record to the day's document (kind 'Fruit'; R153: a 'Pull' is refused, false 'local only': no request is made; rec = a clean record). The stored one is replaced only when rec is better (checked inside the
 -- transform, on the freshest stored value). Returns true, doc, took, foreign  (doc = the document as it is now, took = our record is the stored one, foreign = the stored fruit is of
 -- another type than ours: R152, servers on different plant lists have different fruits of the day; neither may replace the other's, so ours is not written) or false, reason.
 function S:Merge(day,kind,rec,fruitId)
- local field=kind=='Fruit'and'fruit'or'pull'
+ if kind~='Fruit'then return false,'local only'end -- (R153: BEST PULL is this server's alone)
+ local field='fruit'
  local result
  local ok,final=request(self,function(map)
   local took,foreign=false,false

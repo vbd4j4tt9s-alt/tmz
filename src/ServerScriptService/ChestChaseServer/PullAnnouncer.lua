@@ -16,10 +16,11 @@
 --    is retried a few times while it is still fresh). A receiving server drops its own messages (the origin shows the in-server version), repeats, anything
 --    older than StaleSeconds and anything over its per-minute limit, re-derives the rarity from its own seed catalog, and only sends it on to players who
 --    have "Announcements from other servers" on (SettingsConfig.GlobalAnnouncements: it gates the 🌐 chat lines). The subscription is retried until it works.
---  * PullAnnouncer.Announce({Kind='Record', Player=player, Record='BestPull', SeedId=.., AfterReveal=true}) writes a record line ("🏆 Name took BEST PULL TODAY!"): the hook
+--  * PullAnnouncer.Announce({Kind='Record', Player=player, Record='BestPull', SeedId=.., AfterReveal=true}) writes a record line ("🏆 Name took BEST PULL!"): the hook
 --    HubDisplayService uses when someone takes over a hub board (its own notice is gone: one message, in chat). Record keys are letters only; the title comes from
---    PullAnnounceRules.Records. WHO hears it is PullAnnounceRules.RecordScope (a BestPull of Secret or above: every server; Legendary / Mythic: this server; a lower one: nobody;
---    BiggestFruit: this server), unless the caller passes Scope. AfterReveal=true (the record comes from a pack open) waits like the pull line does, plus RecordLag so the pull line
+--    PullAnnounceRules.Records. WHO hears it is PullAnnounceRules.RecordScope: this server (R153: never another one; BEST PULL is this server's own board, emptied every 10 minutes, so a
+--    record line is this server's too: a BestPull of Legendary or above, Secret and up included; a lower one: nobody; BiggestFruit: this server), unless the caller passes Scope (a BestPull
+--    cannot be sent to other servers whatever the caller says). AfterReveal=true (the record comes from a pack open) waits like the pull line does, plus RecordLag so the pull line
 --    comes first. To=player makes the line private (the owner's bestpull / bigfruit tests: only their target sees it, never the server and never other servers).
 --  * Owner test: /test announce <seed> [@name], /test announce global <seed> [here] and /test announce record [bestpull|biggestfruit] [seed] (these ARE announcements on
 --    purpose: they exist to look at the chat lines, at once, and a record here stays in this server).
@@ -187,7 +188,7 @@ function A:_onMessage(message)
   for index,entry in ipairs(data.p)do
    if index>6 then break end
    local fields=Rules.Expand(entry)
-   local record=fields~=nil and fields.Record~=nil -- (a hub record of another server travels with its key; a pull does not)
+   local record=fields~=nil and fields.Record~=nil -- (a hub record carries its key; a pull does not. R153: no record is for every server now, so one from an older server is dropped below)
    local e=fields and Rules.Event(record and'Record'or'Global',fields)
    -- the rarity is the one of THIS server's catalog: an unknown seed is dropped, a seed below the global threshold is dropped, and so is a record that is not for every server
    local travels=e and(record and Rules.RecordScope(e.Record,e.Rarity)=='Global'or not record and Rules.Qualifies('Global',e.Rarity))
@@ -302,7 +303,7 @@ function A:Send(spec)
   local scope=spec.Scope
   if scope~='InServer'and scope~='Global'then scope=Rules.RecordScope(e.Record,e.Rarity)end
   if scope==nil then return false,'below the threshold'end
-  global=scope=='Global'
+  global=scope=='Global'and e.Record~='BestPull' -- (R153: BEST PULL is this server's own: its line never travels, whatever Scope was asked for)
  end
  local only=spec.To
  if only then global=false end

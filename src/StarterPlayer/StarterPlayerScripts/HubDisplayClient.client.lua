@@ -1,9 +1,11 @@
 do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
--- R151 (owner: BEST PULL TODAY and BIGGEST FRUIT TODAY in the hub's two empty corners): the part each player runs on their own screen. The server (HubDisplayService /
+-- R151 (owner: BEST PULL TODAY and BIGGEST FRUIT TODAY in the hub's two empty corners; R153: BEST PULL is each server's own 10-minute board now, "new board in 7:42"): the part each player runs on their own screen. The server (HubDisplayService /
 -- HubDisplayArt) builds everything that is still: the pedestal, the words, the showcase item and the champion's avatar. This adds what moves, and only while it is near and nothing
 -- is switched off:
---   * the "New board in 5h 12m" countdown (R153: the Footer row of the big label over the item: the display's NextAt attribute is the server time of the next UTC midnight; kept up to
---     date for every display that has streamed in, every 5 s, a couple of text writes)
+--   * the countdown (R153: the Footer row of the big label over the item: the display's NextAt attribute is the server time of its next board, FooterPrefix its words: the fruit's "New fruit in
+--     5h 12m" at the next UTC midnight, kept up to date for every display that has streamed in, every 5 s; R153: BEST PULL's "new board in 7:42" at the next wall-clock 10-minute mark, written
+--     once a second (only when the text changed, and only while the label can be seen: Rules.Label.MaxDistance). When the board empties the server destroys the champion's rig: the next
+--     look (every TICK) drops its dance track and Animator, and the empty state's silhouette has none)
 --   * R152: the item turns slowly over the pedestal (a gentle bob too), and its sparkles, an emitter on the item's own ItemCore part in the champion's colour, turn with it (within NEAR_IN
 --     studs of the camera, leaving at NEAR_OUT)
 --   * R153 (owner's Studio: the giant stood posed, then "violently shaking ... not on the ground", "or it would stop", "and freeze"): the avatar's DANCE is played HERE, on this screen.
@@ -66,7 +68,7 @@ local function footer(entry)
  if not label then return end
  local at=entry.Model:GetAttribute('NextAt');local prefix=entry.Model:GetAttribute('FooterPrefix')
  if type(at)~='number'or type(prefix)~='string'then return end
- local text=prefix..Rules.Countdown(at-now())
+ local text=prefix..Rules.FooterCountdown(entry.Model:GetAttribute('Kind'),at-now()) -- (R153: BEST PULL counts minutes and seconds, BIGGEST FRUIT as ever)
  if label.Text~=text then label.Text=text end
 end
 -- The showcase item's parts and where each sits relative to its centre (captured again whenever the server swaps the item).
@@ -312,7 +314,7 @@ local function update(entry)
   local humanoid=entry.AvatarModel:FindFirstChildOfClass('Humanoid');quiet(humanoid and humanoid:FindFirstChildOfClass('Animator'),nil)
  end
  if entry.Unsent and reportRemote then report(entry)end
- local d=distance(entry)
+ local d=distance(entry);entry.Distance=d
  local wasActive=entry.Active==true
  local allowed=not paused and tier()>=2
  itemHz=ITEM_HZ -- R153 (owner: "fix all jittery type effects"): the item turns every frame on every tier (ITEM_HZ_LOW, 30 Hz on tier 2, stepped on a 60 Hz screen); out of view only its core moves (ViewCull152)
@@ -377,7 +379,8 @@ local function tick()
  for _,entry in pairs(entries)do
   if entry.Model.Parent then
    safe(entry,update)
-   if text then safe(entry,footer)end
+   -- (R153: BEST PULL's clock shows seconds: looked at every tick while the label can be seen; footer() writes only when the words changed, so about once a second)
+   if text or(entry.Distance~=nil and entry.Distance<=Rules.Label.MaxDistance and entry.Model:GetAttribute('Kind')=='Pull')then safe(entry,footer)end
   end
  end
  task.delay(TICK,tick)

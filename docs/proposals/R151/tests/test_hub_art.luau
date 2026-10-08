@@ -417,15 +417,15 @@ end
 
 -- 4. The words -----------------------------------------------------------------------------------------------------------------------------------------------------------
 do
- local text=Rules.SignText('Pull',nil,nil,3600)
+ local text=Rules.SignText('Pull',nil,nil,462) -- (R153: BEST PULL's clock is a 10-minute window: 462 s left = "7:42")
  Art.SetSign(pullD,text)
  check(pullD.Plate==nil and pullD.Tag.Name.Text=='Nobody yet'and pullD.Model:GetAttribute('State')=='Empty','the empty BEST PULL says nobody yet')
- check(pullD.Tag.Line.Text:find('Open a pack',1,true)and pullD.Tag.Info.Text=='???'and pullD.Tag.Footer.Text=='New board in 1h 0m','and invites the first pull, under the mystery seed, with the countdown')
+ check(pullD.Tag.Line.Text:find('Open a pack',1,true)and pullD.Tag.Info.Text=='???'and pullD.Tag.Footer.Text=='new board in 7:42'and pullD.Tag.Title.Text=='BEST PULL','and invites the first pull, under the mystery seed, with the countdown (R153: "new board in 7:42")')
  local rec=Rules.CleanPull({Uid=1,Name='Jess',Id='FirePepperSeed',Seed='Fire Pepper',Rarity='Mythic',Odds=.125,Scale=1,At=5})
- local t2=Rules.SignText('Pull',rec,nil,18720)
+ local t2=Rules.SignText('Pull',rec,nil,462)
  Art.SetSign(pullD,t2)
  local want=R.Color3.fromRGB(t2.Accent[1],t2.Accent[2],t2.Accent[3])
- check(pullD.Tag.Title.Text=='BEST PULL TODAY'and pullD.Tag.Name.Text=='Jess'and pullD.Tag.Info.Text=='Fire Pepper'and pullD.Tag.Line.Text==t2.Label.Line.Text and pullD.Tag.Line.Text=='Mythic · 1/800'and pullD.Tag.Footer.Text=='New board in 5h 12m','the label says the title, the winner, the seed, the rarity and chance (HubDisplayRules\' own text) and the countdown')
+ check(pullD.Tag.Title.Text=='BEST PULL'and pullD.Tag.Name.Text=='Jess'and pullD.Tag.Info.Text=='Fire Pepper'and pullD.Tag.Line.Text==t2.Label.Line.Text and pullD.Tag.Line.Text=='Mythic · 1/800'and pullD.Tag.Footer.Text=='new board in 7:42','the label says the title, the winner, the seed, the rarity and chance (HubDisplayRules\' own text) and the countdown')
  check(near(pullD.Tag.Info.TextColor3.R,want.R,.01)and near(pullD.Tag.Info.TextColor3.G,want.G,.01)and near(pullD.Tag.Line.TextColor3.R,want.R,.01),'the seed and its chance are in the rarity\'s colour')
  check(pullD.Model:GetAttribute('State')=='Champion','the model says Champion')
  -- the fruit board

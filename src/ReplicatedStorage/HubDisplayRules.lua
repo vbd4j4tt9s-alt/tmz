@@ -5,13 +5,16 @@
 -- R152 (owner: "make sure that the avatar is sized up and dancing while the seed rotates around and the effects are actually on the seed not behind ... a billboard is not
 -- needed ... the same format and look as the fruit of the hour type pedestal"): no sign board any more. A display is the Fruit of the Hour pedestal, built big, with the
 -- winning seed / fruit turning over it and the champion's avatar, 25 studs tall and dancing, beside it. R153: its words are one BIG label over the item (see Words).
---  * BEST PULL TODAY: the rarest seed any player pulled from a pack today, across all servers. Order: highest rarity rank (Common ... King, as
+--  * BEST PULL: the rarest seed any player pulled from a pack IN THIS SERVER in the current 10-minute window. Order: highest rarity rank (Common ... King, as
 --    SeedPackRules.Rarities ranks them), then the smaller chance (the rarer pull), then the heavier seed, then the earlier pull. PullBetter is a strict
---    total order (the last two keys make even identical pulls differ), so every server picks the same winner.
+--    total order (the last two keys make even identical pulls differ).
+--    R153 (owner: "make the best pull of the day refresh every 10 minutes and its a local server only thing to increase performance"): it is no longer 'today' and no longer shared. Nothing
+--    about it is stored or sent: no MemoryStore, DataStore or MessagingService; each server keeps its own board in memory, and the board is emptied at every wall-clock :00 / :10 / :20 ...
+--    (PullWindow seconds, os.time() / 600: PullWindowIndex). The ranking and the champion's avatar are what they were.
 --  * BIGGEST FRUIT TODAY: each UTC day has ONE fruit type (FruitForDay: a fixed walk through the harvestable fruit list, so a type comes back only after
 --    the whole list has been through). The heaviest harvested fruit of that type today wins; ties go to the earlier harvest.
---  * Both reset at UTC midnight, with the same day number the daily rewards use (DailyRewards.Day).
--- Records (what is kept in memory and shipped through MemoryStore): flat tables of numbers / strings only. Clean* make an untrusted one safe (a bad field
+--  * BIGGEST FRUIT resets at UTC midnight, with the same day number the daily rewards use (DailyRewards.Day).
+-- Records (what is kept in memory; the fruit's also shipped through MemoryStore): flat tables of numbers / strings only. Clean* make an untrusted one safe (a bad field
 -- gives nil, nothing is guessed), and recompute rank and weight locally, so a stored value can never claim a rank it does not have.
 local P=require(script.Parent.SeedPackRules)
 local D=require(script.Parent.DailyRewards)
@@ -19,6 +22,7 @@ local Weight=require(script.Parent.ItemWeight)
 local R={Version=151}
 
 -- Tuning ---------------------------------------------------------------------------------------------------------------------------------------------
+-- (R153: the MemoryStore settings down to RequestsPerMinute belong to BIGGEST FRUIT, the only shared board; BEST PULL uses none of them.)
 R.StoreName='HubDisplays151'      -- the MemoryStore hash map (one key per UTC day: 'd<day>')
 R.ExpirySeconds=2*86400           -- a day's key lives two days (it is never read after its own day; the spare day covers clock skew)
 R.PollSeconds=45                  -- a server reads the shared board about this often ...
@@ -33,6 +37,7 @@ R.NoticeGap=8                     -- seconds between two record chat lines of on
 R.MaxFruitRank=5                  -- fruit types in the daily rotation: up to Mythic (raise to 8 to include Secret / Cosmic / King plants)
 R.MinFruitKg=.5                   -- a plant whose fruit weighs less than this at size 1 has no meaningful weight: never the fruit of the day
 R.NameLength=24
+R.PullWindow=600                  -- R153: BEST PULL's board lasts this many seconds (10 minutes), aligned to the wall clock (:00, :10, :20 ...), in this server only
 R.ItemHeight=12                   -- the showcase item (seed / fruit) is scaled to about this many studs tall
 R.ItemParts=150                   -- at most this many parts in one giant model
 R.AvatarHeight=25                 -- the champion's avatar stands about this tall (a normal R15 avatar is about 5.3: about 4.7 times; R152)
@@ -58,6 +63,21 @@ end
 function R.Day(t)return D.Day(t)end
 function R.NextAt(day)return(day+1)*86400 end
 function R.SecondsLeft(t)return D.SecondsLeft(t)end
+-- R153: BEST PULL's windows. t = Unix seconds (os.time()); window n is [n * PullWindow, (n + 1) * PullWindow), so every server's windows start at the same wall-clock :00 / :10 / :20 ...
+-- Any input gives a valid answer (a bad t reads as 0).
+local function wholeSeconds(t)return(type(t)=='number'and t==t and math.abs(t)<2^52)and math.floor(t)or 0 end
+function R.PullWindowIndex(t)return wholeSeconds(t)//R.PullWindow end
+function R.PullWindowEnd(t)return(R.PullWindowIndex(t)+1)*R.PullWindow end
+-- Seconds until the window ends: PullWindow at its first second, 1 at its last (never 0, so the board has always reset by the time it would read 0:00).
+function R.PullSecondsLeft(t)return R.PullWindowEnd(t)-wholeSeconds(t)end
+-- "7:42" (minutes : seconds, never above the window's length, never below 0:00).
+function R.WindowCountdown(seconds)
+ seconds=type(seconds)=='number'and seconds==seconds and math.clamp(math.floor(seconds),0,R.PullWindow)or 0
+ return string.format('%d:%02d',seconds//60,seconds%60)
+end
+-- The footer words of a display: BEST PULL's own board is a short clock ("new board in 7:42"), BIGGEST FRUIT's the day's (R151: "New fruit in 5h 12m").
+function R.FooterPrefix(kind)return kind=='Pull'and'new board in 'or'New fruit in 'end
+function R.FooterCountdown(kind,seconds)return kind=='Pull'and R.WindowCountdown(seconds)or R.Countdown(seconds)end
 -- "5h 12m", "12m 30s", "45s".
 function R.Countdown(seconds)
  seconds=type(seconds)=='number'and seconds==seconds and math.max(0,math.floor(seconds))or 0
@@ -94,7 +114,7 @@ end
 
 -- A pull. Uid = who (the Roblox user id), Name = their display name, Id = the seed id, Seed = its plain name, Rarity, Odds = the chance (percent, 0 < odds <= 100)
 -- the seed had in the pack that was opened (boots, pack, odds version and rate boost included), Scale = the seed's size, Coat = the pack's coat, At = when (Unix seconds).
--- Kg and Rank are computed here from the other fields. Test = an owner's injected pull (never shipped to MemoryStore).
+-- Kg and Rank are computed here from the other fields. Test = an owner's injected pull. (R153: a pull stays in this server's memory; it is never stored or sent anywhere.)
 function R.CleanPull(v)
  if type(v)~='table'then return nil end
  local style=P.Rarities[v.Rarity];if not style then return nil end
@@ -108,9 +128,6 @@ function R.CleanPull(v)
  local rec={Uid=uid,Name=name,Id=id,Seed=seed,Rarity=v.Rarity,Rank=style.Rank,Odds=v.Odds,Scale=scale,Coat=coat(v.Coat),At=at,Test=v.Test==true}
  rec.Kg=Weight.Weight('Seed',id,scale)
  return rec
-end
-function R.StorePull(rec)
- return {Uid=rec.Uid,Name=rec.Name,Id=rec.Id,Seed=rec.Seed,Rarity=rec.Rarity,Odds=rec.Odds,Scale=rec.Scale,Coat=rec.Coat,At=rec.At}
 end
 -- A harvested fruit. Id = the plant (seed id), Scale = FruitScale, Coat = Gold / Diamond / None, Weather = its weather key.
 function R.CleanFruit(v)
@@ -127,17 +144,16 @@ end
 function R.StoreFruit(rec)
  return {Uid=rec.Uid,Name=rec.Name,Id=rec.Id,Scale=rec.Scale,Coat=rec.Coat,Weather=rec.Weather,At=rec.At}
 end
--- One day's shared document: {v=1, pull=<StorePull>, fruit=<StoreFruit>}. Anything that does not clean up is dropped.
+-- One day's shared document: {v=1, fruit=<StoreFruit>}. Anything that does not clean up is dropped. R153: only the fruit is shared. A `pull` field that an older server wrote into the same
+-- document (R151 / R152) is ignored here: never read, never kept, never written back (no migration; the document expires on its own, two days after its last write).
 function R.CleanDoc(v)
  if type(v)~='table'then return {}end
  local out={}
- if type(v.pull)=='table'then out.pull=R.CleanPull(v.pull)end
  if type(v.fruit)=='table'then out.fruit=R.CleanFruit(v.fruit)end
  return out
 end
 function R.StoreDoc(doc)
  local out={v=1}
- if doc.pull then out.pull=R.StorePull(doc.pull)end
  if doc.fruit then out.fruit=R.StoreFruit(doc.fruit)end
  return out
 end
@@ -287,15 +303,16 @@ function R.Fit(text,row)
  return math.min(row.Max,row.W/em,row.H*.95)
 end
 local PLACEHOLDER='Nobody yet'
--- The words of a display. kind 'Pull' | 'Fruit'; rec = the champion's record (nil: nobody yet); fruitId = today's fruit; secondsLeft = to the next board; fruitName = its plain name.
+-- The words of a display. kind 'Pull' | 'Fruit'; rec = the champion's record (nil: nobody yet); fruitId = today's fruit; secondsLeft = to the next board (R153: BEST PULL's 10-minute window
+-- for 'Pull', the UTC day for 'Fruit'); fruitName = its plain name.
 -- Returns {Kind, State, Accent={r,g,b}, Label={Title=, Name=, Info=, Line=, Footer=}, Plaque={Title=, Name=, Line=, Footer=}} (each row {Text, Color={r,g,b}}): the label says the title, the winner,
 -- the seed / the weight, a line (a pull's rarity and chance; the fruit of the day) and the countdown. (Plaque: the same rows as R151 / R152 named them, for older readers; nothing draws it now.)
 function R.SignText(kind,rec,fruitId,secondsLeft,fruitName)
  local gold={255,214,90};local white={255,255,255};local soft={206,214,238}
  local out={Kind=kind,Plaque={},Label={}}
  local P,L=out.Plaque,out.Label
- P.Footer={Text=(kind=='Pull'and'New board in 'or'New fruit in ')..R.Countdown(secondsLeft),Color=soft}
- local title=kind=='Pull'and'BEST PULL TODAY'or'BIGGEST FRUIT TODAY'
+ P.Footer={Text=R.FooterPrefix(kind)..R.FooterCountdown(kind,secondsLeft),Color=soft}
+ local title=kind=='Pull'and'BEST PULL'or'BIGGEST FRUIT TODAY' -- (R153: a pull's board lasts 10 minutes, no longer a day)
  P.Title={Text=title,Color=gold};L.Title={Text=title,Color=gold}
  local function winner(text)P.Name={Text=text,Color=white};L.Name={Text=text,Color=white}end
  if kind=='Pull'then

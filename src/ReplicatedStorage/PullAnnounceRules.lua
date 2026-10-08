@@ -11,7 +11,7 @@
 --  * Chat limit   at most ChatBurst lines per ChatWindow seconds on one client.
 --  * Payload      the compact form sent through MessagingService (1 kB limit) and its freshness rule.
 --  * Timing       RevealDelay: when a line about a pull may go out, so it never reaches the puller before THEIR reveal has shown the seed (derived from RarePullRules, the
---                 tables the puller's client plays: one source of truth). RecordScope: who hears a hub record (this server, every server, or nobody).
+--                 tables the puller's client plays: one source of truth). RecordScope: who hears a hub record (this server, or nobody: R153, never another server).
 local Packs=require(script.Parent.SeedPackRules)
 local Names=require(script.Parent.GardenDisplayNames)
 local Verity=require(script.Parent.VerityCatalog)
@@ -81,17 +81,17 @@ function R.RevealDelay(rarity)
 end
 
 -- Who hears a hub record (BEST PULL / BIGGEST FRUIT) ----------------------------------------------------------------------------------------------
--- Returns 'Global' (this server and every other), 'InServer' (this server), or nil (nobody: the hub display changes, the chat says nothing). rarity = the rarity of the seed
--- the record is about (nil when it names none).
---  * BestPull is a pull: the pull's own rarity decides with the same thresholds as the pull line: GlobalMinRarity and above everywhere (Secret, Cosmic, King), InServerMinRarity and
---    above in this server (Legendary, Mythic), below that nothing (the first Commons of a day only move the display).
+-- Returns 'InServer' (this server), or nil (nobody: the hub display changes, the chat says nothing). rarity = the rarity of the seed the record is about (nil when it names none).
+-- R153 (owner: the best pull is "a local server only thing"): no record is ever sent to another server any more ('Global' is the pull line's alone: R.Qualifies('Global', ...)). BEST PULL is
+-- this server's own 10-minute board, so its record line is this server's too.
+--  * BestPull is a pull: the pull's own rarity decides with the same thresholds as the pull line: InServerMinRarity and above in this server (Legendary, Mythic; and Secret, Cosmic, King, which
+--    used to travel), below that nothing (the first Commons of a window only move the display).
 --  * any other record (BiggestFruit): this server, never the others; a fruit's weight has no pull rarity.
 --  * a BestPull that names no seed (the owner's `announce record`): this server.
 function R.RecordScope(record,rarity)
  if record~='BestPull'then return'InServer'end
  if rarity==nil then return'InServer'end
- if R.Qualifies('Global',rarity)then return'Global'end
- if R.Qualifies('InServer',rarity)then return'InServer'end
+ if R.Qualifies('Global',rarity)or R.Qualifies('InServer',rarity)then return'InServer'end
  return nil
 end
 
@@ -164,7 +164,7 @@ function R.Event(kind,fields)
 end
 
 -- Text --------------------------------------------------------------------------------------------------------------------------------------------
-R.Records={BestPull='BEST PULL TODAY',BiggestFruit='BIGGEST FRUIT TODAY',Record='A NEW RECORD'}
+R.Records={BestPull='BEST PULL',BiggestFruit='BIGGEST FRUIT TODAY',Record='A NEW RECORD'} -- (R153: a pull's board lasts 10 minutes, no longer a day)
 function R.RecordTitle(key)
  if R.Records[key]then return R.Records[key]end
  return string.upper((tostring(key):gsub('(%l)(%u)','%1 %2')))
@@ -177,7 +177,7 @@ end
 -- The sentence: the emoji, then who and what. rich = for rich text (every part escaped, the rarity word in bold); otherwise plain text.
 --   a pull in this server   🌟 Ann pulled a MYTHIC Fire Pepper! (1/800)
 --   a pull in another one   🌐 Ann pulled a SECRET Obsidian Maw (1/1,000)!
---   a record                🏆 Ann took BEST PULL TODAY!
+--   a record                🏆 Ann took BEST PULL!
 function R.Line(e,rich)
  local function esc(text)return rich and R.Escape(text)or tostring(text)end
  local who=esc(e.Name)

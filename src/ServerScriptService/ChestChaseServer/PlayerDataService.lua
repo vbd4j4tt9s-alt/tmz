@@ -470,7 +470,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         self:TutorialEvent(player,'Seed')
         self:QuestEvent(player,'Open',1) -- R140 daily quest
         pcall(function()require(script.Parent.PullAnnouncer).OnOpened(player,pack,reward,testSeed~=nil or luckTest)end) -- R151: a real open of a Legendary+ seed is announced (a TEST pack never is)
-        -- R151: the hub's BEST PULL TODAY board (HubDisplayService.NotePull; set by the main script). It never yields or throws here; a TEST pack (/test rarepacks, or any pack an owner command made:
+        -- R151: the hub's BEST PULL board (this server's own, R153; HubDisplayService.NotePull; set by the main script). It never yields or throws here; a TEST pack (/test rarepacks, or any pack an owner command made:
         -- TestGrant) is flagged so it is not counted and never announced as a record.
         local hook=self.OnPackOpened
         if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=player:GetAttribute("ChestLuckMultiplier"),Test=testSeed~=nil or pack.TestGrant==true or luckTest}) end

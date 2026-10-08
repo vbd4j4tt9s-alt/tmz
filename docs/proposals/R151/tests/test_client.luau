@@ -137,7 +137,7 @@ do
  -- a record: amber
  local r={Kind='Record',Id='rec-1',UserId=3000,Name='Rex',Record='BestPull',SeedId=KING,Odds=5e6};send(r)
  local rl=chatLog[#chatLog].Text
- check(rl=='<font color="'..Rules.Hex(Rules.Amber)..'">🏆 Rex just took BEST PULL TODAY!</font>','a record: amber, "🏆 Rex just took BEST PULL TODAY!" ('..rl..')')
+ check(rl=='<font color="'..Rules.Hex(Rules.Amber)..'">🏆 Rex just took BEST PULL!</font>','a record: amber, "🏆 Rex just took BEST PULL!" ('..rl..')')
  send({Kind='Record',Id='rec-2',UserId=3001,Name='Roy',Record='BiggestFruit'})
  check(chatLog[#chatLog].Text:find('🏆 Roy just took BIGGEST FRUIT TODAY!',1,true)~=nil,'"just took BIGGEST FRUIT TODAY!" (a record needs no seed)')
  check(#chatLog==8,'eight events (five rarities, another server, two records), eight lines ('..#chatLog..')')
@@ -202,7 +202,7 @@ do
  check(oldChat[1].Value.Text==Rules.Plain(e)and oldChat[1].Value.Text:find('<',1,true)==nil,'... a plain sentence, no markup ('..tostring(oldChat[1].Value.Text)..')')
  check(oldChat[1].Value.Color==Rules.RarityColor('Legendary'),'... in the rarity colour')
  send(pull(SEC,{Kind='Global',Odds=1000}));check(oldChat[2].Value.Color==Rules.Gold,'another server: gold in the old chat')
- send({Kind='Record',Id='o-r',UserId=1,Name='Rex',Record='BestPull'});check(oldChat[3].Value.Color==Rules.Amber and oldChat[3].Value.Text=='🏆 Rex just took BEST PULL TODAY!','a record: amber')
+ send({Kind='Record',Id='o-r',UserId=1,Name='Rex',Record='BestPull'});check(oldChat[3].Value.Color==Rules.Amber and oldChat[3].Value.Text=='🏆 Rex just took BEST PULL!','a record: amber')
  -- the channel appears later (TextChatService finishes loading): the next line goes there, and only there
  general.Parent=channels;seconds(11)
  send(pull(MYTH));check(#chatLog==1 and#oldChat==3,'when RBXGeneral exists the line goes to it and not to the old chat')
@@ -256,7 +256,7 @@ do
  send(pull(LEG,{UserId=555,Name='Someone'}));check(#chatLog==n+1,'a line about SOMEONE ELSE is never held (their reveal is their own)')
  send(pull(SEC,{Kind='Global',UserId=me.UserId,Odds=1000}));check(#chatLog==n+2,'a line from another server is never held')
  send({Kind='Record',Id='own-rec',UserId=me.UserId,Name='Me D',Record='BestPull',SeedId=KING});check(#chatLog==n+2,'a record about YOU is held like your pull line')
- seconds(5+margin+.2);check(#chatLog==n+3 and chatLog[#chatLog].Text:find('took BEST PULL TODAY',1,true)~=nil,'... and is written after your hit')
+ seconds(5+margin+.2);check(#chatLog==n+3 and chatLog[#chatLog].Text:find('took BEST PULL',1,true)~=nil,'... and is written after your hit')
  seconds(11);hit(-3)
  send(pull(KING,{UserId=me.UserId,Name='Me D'}));check(#chatLog==n+4,'your hit is already past (a margin ago): written at once')
  -- a skip moves the hit earlier: the wait follows the attribute at the moment the line arrives

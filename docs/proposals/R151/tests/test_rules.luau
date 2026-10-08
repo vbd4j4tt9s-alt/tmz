@@ -7,6 +7,8 @@
 --     the old-chat plain line, the rate limit, and that nothing of the banner (queue, layout, sparkles, sound cues, size, coat) is left in the rules
 --  4. the payload: compact / expand round trip (a pull and a hub record), the 1 kB batch, freshness (stale and future messages)
 --  5. timing: RevealDelay per rarity = the latest moment the puller's client shows the seed (RarePullRules) + the margin; RecordScope: who hears a hub record
+--     R153 (owner: the best pull is "a local server only thing"): RecordScope never says 'Global' (a BestPull of a Secret, Cosmic or King is this server's, like a Legendary's or Mythic's;
+--     BEST PULL is each server's own 10-minute board), and a BestPull's title is "BEST PULL" (no "today"); BIGGEST FRUIT's stays "BIGGEST FRUIT TODAY"
 local W=require('./world');local R=W.R;local E=require('./announce_env')
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -135,9 +137,9 @@ do
  check(Rules.Line(Rules.Event('Pull',{Name='Ann',SeedId='FirePepperSeed'}))=='🌟 Ann just pulled a MYTHIC Fire Pepper! (1/800) Nice pull!','no odds sent = the seed\'s fixed chance (R153: the sentence always has it)')
  check(Rules.Line(Rules.Event('Global',{Name='Ann',Id='a-3',SeedId='ObsidianMawSeed'}))=='🌐 Ann just pulled a SECRET Obsidian Maw (1/10K)!','... also for another server')
  local rec=Rules.Event('Record',{Name='Ann',Record='BestPull'})
- check(Rules.Line(rec)=='🏆 Ann just took BEST PULL TODAY!','the record sentence: "'..Rules.Line(rec)..'"')
+ check(Rules.Line(rec)=='🏆 Ann just took BEST PULL!','the record sentence: "'..Rules.Line(rec)..'"')
  check(Rules.Line(Rules.Event('Record',{Name='Ann',Record='BiggestFruit'}))=='🏆 Ann just took BIGGEST FRUIT TODAY!'and Rules.Line(Rules.Event('Record',{Name='Ann',Record='LongestFruit'}))=='🏆 Ann just took LONGEST FRUIT!','record titles: known keys and a CamelCase key spelled out')
- check(Rules.Line(Rules.Event('Record',{Name='Ann',Record='BestPull',SeedId=KING.id}))=='🏆 Ann just took BEST PULL TODAY!','a record that names a seed has the same line (the seed is for the hub display)')
+ check(Rules.Line(Rules.Event('Record',{Name='Ann',Record='BestPull',SeedId=KING.id}))=='🏆 Ann just took BEST PULL!','a record that names a seed has the same line (the seed is for the hub display)')
  check(Rules.Article('MYTHIC')=='a'and Rules.Article('ELITE')=='an'and Rules.Article('')=='a','a / an')
  -- rich text: the whole line in ONE colour run, the rarity word bold, every part escaped
  local hex=Rules.Hex(Rules.RarityColor('Mythic'))
@@ -145,7 +147,7 @@ do
  check(Rules.Chat(pull)==('<font color="%s">🌟 Ann just pulled a <b>MYTHIC</b> Fire Pepper! (1/800) Nice pull!</font>'):format(hex),'the chat line is one colour run in the rarity colour ('..Rules.Chat(pull)..')')
  check(hex:match('^#%x%x%x%x%x%x$')~=nil and hex==Rules.Hex(Packs.Rarities.Mythic.Color),'the colour is the game\'s own Mythic colour as #RRGGBB ('..hex..')')
  check(Rules.Chat(sec)==('<font color="%s">🌐 Ann just pulled a <b>SECRET</b> Obsidian Maw (1/10K)!</font>'):format(Rules.Hex(Rules.Gold)),'an other-server chat line is gold ('..Rules.Chat(sec)..')')
- check(Rules.Chat(rec)==('<font color="%s">🏆 Ann just took BEST PULL TODAY!</font>'):format(Rules.Hex(Rules.Amber)),'a record chat line is amber ('..Rules.Chat(rec)..')')
+ check(Rules.Chat(rec)==('<font color="%s">🏆 Ann just took BEST PULL!</font>'):format(Rules.Hex(Rules.Amber)),'a record chat line is amber ('..Rules.Chat(rec)..')')
  check(Rules.Gold.R==1 and Rules.Gold.G>.8 and Rules.Gold.B<.4,'gold is gold')
  check(Rules.ChatColor(pull)==Rules.RarityColor('Mythic')and Rules.ChatColor(sec)==Rules.Gold and Rules.ChatColor(rec)==Rules.Amber,'ChatColor: the rarity colour, gold, amber')
  -- every rarity: the line carries ITS colour (not a neighbour's), for a pull in this server; gold and amber stay gold and amber whatever the rarity
@@ -277,14 +279,18 @@ do
 end
 do
  -- who hears a hub record
- local want={Common=nil,Uncommon=nil,Rare=nil,Legendary='InServer',Mythic='InServer',Secret='Global',Cosmic='Global',King='Global'}
+ local want={Common=nil,Uncommon=nil,Rare=nil,Legendary='InServer',Mythic='InServer',Secret='InServer',Cosmic='InServer',King='InServer'} -- (R153: Secret and above used to be 'Global')
  for _,name in ipairs(Packs.RarityOrder)do
-  check(Rules.RecordScope('BestPull',name)==want[name],'a BestPull record of a '..name..' seed: '..tostring(want[name]or'nobody'))
+  check(Rules.RecordScope('BestPull',name)==want[name],'a BestPull record of a '..name..' seed: '..tostring(want[name]or'nobody')..' (never another server)')
   check(Rules.RecordScope('BiggestFruit',name)=='InServer'and Rules.RecordScope('LongestFruit',name)=='InServer','a fruit (or any other) record about a '..name..' seed: this server')
  end
  check(Rules.RecordScope('BestPull',nil)=='InServer'and Rules.RecordScope('BiggestFruit',nil)=='InServer'and Rules.RecordScope(nil,nil)=='InServer','a record that names no seed: this server')
  check(Rules.RecordScope('BestPull','Banana')==nil,'a BestPull of an unknown rarity is nobody\'s business')
- Mod:SetAttribute('GlobalMinRarity','Cosmic');check(Rules.RecordScope('BestPull','Secret')=='InServer'and Rules.RecordScope('BestPull','Cosmic')=='Global','GlobalMinRarity moves the line: Secret stays at home, Cosmic travels');reset()
+ Mod:SetAttribute('GlobalMinRarity','Cosmic');check(Rules.RecordScope('BestPull','Secret')=='InServer'and Rules.RecordScope('BestPull','Cosmic')=='InServer','GlobalMinRarity moves the pull line\'s travel, not the record\'s: Secret and Cosmic records both stay in this server');reset()
+ for _,r in ipairs({'Common','Rare','Legendary','Mythic','Secret','Cosmic','King','Banana'})do for _,k in ipairs({'BestPull','BiggestFruit','Anything'})do
+  if Rules.RecordScope(k,r)=='Global'then check(false,'R153: RecordScope('..k..', '..r..') must never be Global')end
+ end end
+ check(Rules.RecordTitle('BestPull')=='BEST PULL'and Rules.RecordTitle('BiggestFruit')=='BIGGEST FRUIT TODAY','R153: the titles: "BEST PULL" (a 10-minute board, no "today") and "BIGGEST FRUIT TODAY" (a daily one)')
  Mod:SetAttribute('InServerMinRarity','Mythic');check(Rules.RecordScope('BestPull','Legendary')==nil and Rules.RecordScope('BestPull','Mythic')=='InServer','InServerMinRarity moves it too: a Legendary record is silent, a Mythic one is told here');reset()
  -- a record travels with its key
  local e=Rules.Event('Record',{Name='Ann',UserId=77,Id='ab12cd34-9',SeedId=KING.id,Record='BestPull'})

@@ -87,16 +87,16 @@ return {
  {'— PULL ANNOUNCEMENTS —',''},
  {'/test announce <seed> @username','R151: the chat line for everyone in this server, as if they just pulled that seed (any rarity; the real threshold is Legendary). Packs made by owner commands never announce.'},
  {'/test announce global <seed> [here] @username','R151: publish it to the other servers (this server is the origin and shows nothing; add here to also see the other-server chat line).'},
- {'/test announce record [bestpull|biggestfruit] [seed] @username','R151: the record chat line ("took BEST PULL TODAY!") for the hub displays.'},
+ {'/test announce record [bestpull|biggestfruit] [seed] @username','R151: the record chat line ("took BEST PULL!") for the hub displays. This server only.'},
 
  {'— GIFTS —',''},
  {'/test gifts @username','Gifts this player sent that are still finishing.'},
  {'/test gifts recover @username','Finish stuck gifts now (normally automatic within a minute).'},
 
  {'— HUB DISPLAYS (R151) —',''},
- {'/test bestpull FirePepperSeed @username','A test BEST PULL TODAY for that player: a seed id or plant name (fire pepper), ranked at its odds in its biome\'s Pack03 (the plaque shows the seed\'s one fixed 1/N, as everywhere). Shows on this server only; add share to write it to the shared board too.'},
+ {'/test bestpull FirePepperSeed @username','A test BEST PULL for that player: a seed id or plant name (fire pepper), ranked at its odds in its biome\'s Pack03 (the label shows the seed\'s one fixed 1/N, as everywhere). BEST PULL is this server only and the board empties every 10 minutes (:00, :10, :20), so the test goes with it; there is no share.'},
  {'/test bigfruit 12.4 @username','A test BIGGEST FRUIT TODAY: a fruit of today\'s type weighing that many kg (gold or diamond for a coat, share to write the shared board). Shows on this server only unless shared.'},
- {'/test hubdisplays','server: Both corner displays: the day, the fruit of the day, the champions and where they came from, the shared board\'s health and the part counts. hubdisplays reset empties both boards (this server and the shared one); hubdisplays day +1 previews tomorrow\'s fruit on this server (day 0 comes back).'},
+ {'/test hubdisplays','server: Both corner displays: the day, the fruit of the day, the champions and where they came from, BEST PULL\'s clock (this server only, new board every 10 minutes), the fruit\'s shared board health and the part counts. hubdisplays reset empties both boards (this server, and the fruit\'s shared one); hubdisplays day +1 previews tomorrow\'s fruit on this server (day 0 comes back; BEST PULL does not change).'},
 
  {'— FREE VOID PACK PEDESTAL (R152) —',''},
  {'/test voidgift','server: The giveaway pedestal: how many of the 500 are claimed / left, whether YOU have claimed (profile flag and the shared list), which store this server uses (live DataStore, Studio test store or the in-memory counter), messages and the pedestal.'},

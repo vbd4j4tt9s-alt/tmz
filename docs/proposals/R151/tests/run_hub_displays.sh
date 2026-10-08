@@ -9,16 +9,28 @@
 # top of the fruit and it should be big"): each CLIENT plays the dance (the server only makes the rig ready: an Animator, joints at rest, the root alone anchored, the state machine off,
 # DanceId; it plays nothing), retries with the next ids and poses the rig when it cannot, a watchdog keeps ONE looped track playing, nothing culls or freezes it, the soles stand on the
 # floor through the joints, the same champion keeps its avatar, the clients report to the owner's `/test hubdisplays`; and the plaque is gone: ONE big label over the item says it all.
+# R153 (owner: "make the best pull of the day refresh every 10 minutes and its a local server only thing to increase performance"): BEST PULL is each server's own board and lasts one
+# wall-clock 10-minute window (os.time() // 600: :00, :10, :20 ...). Nothing about it is stored or sent: no MemoryStore, no save, no MessagingService (BIGGEST FRUIT is shared and daily, as it was).
+# The mark empties the board and the avatar (the silhouette stands where the champion was; every client drops the dance), the label reads "BEST PULL" and "new board in 7:42", and its record
+# line is told in this server only. check_best_pull_local.py (run by the wiring step) reads the sources for all of that; the suites below test it.
 #  wiring                - the files, src/MANIFEST.tsv, the hooks in PlayerDataService / ChestService, the main script, the owner commands and docs/COMMANDS.md; no DataStore,
 #                          no per-frame server loop in the hub scripts; the gameplay files (odds, economy, daily rewards, plant catalog, Config: ProfileVersion 22) are unchanged;
+#                          R153: check_best_pull_local.py (no store / save / MessagingService for a best pull, a window clears the pull board alone, the loop sleeps through the mark);
+#                          R153: the pull window numbers (os.time() // 600, 600 s, the end, the seconds left), "7:42", the footer words per board, a pull has no store form, the shared document
+#                          holds the fruit only (an old `pull` in it is ignored), the pull board has no Remote and is never Unsynced, a window empties it alone, a day the fruit board alone;
 #  test_hub_rules.luau   - the ranking (rarity, then smaller chance, then bigger weight, then earlier: a strict total order), the exclusions' building blocks (record cleaning), the UTC day,
 #                          the fruit rotation (one fruit a day, no quick repeats, only weighted fruit), the plaque and label texts (title + winner + seed / weight, the fruit of the day, every
 #                          one fits its row), the layout numbers (the reserved corner, the footprint, the 25 stud avatar);
 #  test_hub_store.luau   - the MemoryStore wrapper against a mock of the shared backend: compare-and-set races, expiry, quota / throttle / errors (backoff, budget), pcall everywhere;
+#                          R153: it is the fruit's alone: a pull is refused before any request, an old `pull` in the document is never read or written back or deleted;
 #  test_hub_service.luau - the service: events, ranking across servers (two servers on one backend), polling with jitter, one write per gap, the day rollover, the record line
 #                          (ONE PullAnnouncer.Announce, no notice of its own, AfterReveal for a pull, the chime in step, private owner tests), the owner tools, fallback to the server's
 #                          own best, a champion change rebuilds once, the avatar is placed, put in the display and THEN made ready to dance (one that is overtaken is dropped); R153: the same
 #                          champion keeps the avatar; the clients' dance reports (checked, rate-limited) and the owner's status line (AvatarMode, dance id, your screen's track and Length);
+#                          R153: per server and per window: the board and the avatar clear at the :00 / :10 / :20 mark (the silhouette, the mystery seed, "Nobody yet", "new board in 10:00"), the fruit board
+#                          stays, the next pull is the new record whatever the last window's was, a better pull replaces it, test packs / owner grants / injected tests, an empty board that stays empty is
+#                          not rebuilt, a pull right after the mark is the new window's, the loop wakes at the mark, 48 windows leak no rig, item or table, a preview day leaves it alone, and a recording
+#                          store + traps on DataStoreService / MessagingService / MemoryStoreService prove a pull never reaches them;
 #  test_hub_avatar.luau  - the avatar: description cache, rig build, scale (Model:ScaleTo, 25 studs, 4-5 times a normal avatar; R153: the soles on the floor in the rest pose THROUGH THE
 #                          JOINTS), anchored / inert, no name or health bar, READY TO DANCE (R153: an Animator, joints at rest and enabled, limbs unanchored, the state machine off, no
 #                          server track, DanceId one of Roblox's three default R15 dances; the static pose only for a rig with nothing to dance with), the blocky fallback and the
@@ -28,10 +40,12 @@
 #                          with its light on an ItemCore inside it, nothing flat behind it;
 #  test_hub_client.luau  - the client: near / far (260 / 300 studs), the item turns and floats, the sparkles are an emitter on the item's core; R153: the client plays ONE looped dance
 #                          track on the rig's Animator (no joint writes while it plays), retries the next ids and then poses the rig here and cheers, the watchdog, nothing culls it,
-#                          paused only with reduced motion / Fast Mode (never by the automatic tier), the same champion keeps its track, no leaks, the reports; the countdown on the label;
+#                          paused only with reduced motion / Fast Mode (never by the automatic tier), the same champion keeps its track, no leaks, the reports; the countdown on the label
+#                          (R153: BEST PULL's "new board in 7:42" once a second near, every 5 s far, never negative); R153: the 10-minute mark drops the dance (track, Animator) and the silhouette stays, 12 cycles leak nothing;
 #                          the burst on a new champion (no ring), the sound, nothing per frame when far;
-#  test_hub_hooks.luau   - how it is wired into the game: the pack-opened hook, TEST packs and owner grants never count, the harvest hook, the owner commands; and the REAL PullAnnouncer
-#                          behind the real hub: a real Mythic / Secret open says the pull line then the record line only after the puller's reveal (other servers too), no hub notice,
+#  test_hub_hooks.luau   - how it is wired into the game: the pack-opened hook, TEST packs and owner grants never count, the harvest hook, the owner commands (R153: bestpull refuses `share`); and the REAL
+#                          PullAnnouncer behind the real hub: a real Mythic / Secret open says the pull line then the record line only after the puller's reveal (R153: the record in this server only,
+#                          only a Secret's pull line goes to the other servers), the next window announces its record again, the mark says nothing, no hub notice,
 #                          owner test packs / bestpull / bigfruit never speak to the server, a leaving puller, a fruit record, a preview day;
 #  check_hub_scene.py    - the displays in the FINISHED hub of the owner's place file (build_hub_scenes.sh): the R149 z-fight detector finds nothing on the pedestal, nothing but a pedestal, an
 #                          item and an avatar, inside the reserved corner and 30+ studs from the walls, nothing overlaps the map, 40+ studs from every other piece, the avatar 22-28 studs
@@ -87,6 +101,9 @@ wiring() {
   if grep -q -E "Heartbeat|RenderStepped|Stepped" "$SRV/$f.lua";then echo "$f has a per-frame loop";return 1;fi
  done
  grep -q "MemoryStoreService" "$SRV/HubDisplayStore.lua" || { echo "the store does not use MemoryStoreService";return 1; }
+ # R153: BEST PULL is this server's own: no store, no save, no MessagingService for it (the checker reads the sources)
+ python3 -I "$HERE/check_best_pull_local.py" "$REPO" > "$OUT/local.log" 2>&1 || { cat "$OUT/local.log";return 1; }
+ echo "wiring ok: best pull is local ($(grep -c '^ok:' "$OUT/local.log") static checks)"
  # saves / economy / odds unchanged: ProfileVersion and the version string are the base's, and the gameplay files are byte-identical (sha256 list)
  grep -q "Config.ProfileVersion=22" "$SRV/Config.lua" && grep -q "Config.Version='V150 R152'" "$SRV/Config.lua" || { echo "Config.ProfileVersion / Version changed";return 1; }
  (cd "$REPO" && sha256sum -c "$HERE/frozen.sha256" > "$OUT/frozen.log" 2>&1) || { cat "$OUT/frozen.log";return 1; }
@@ -130,6 +147,38 @@ PY
 }
 RU=ReplicatedStorage/HubDisplayRules.lua;ST=ServerScriptService/ChestChaseServer/HubDisplayStore.lua;SV=ServerScriptService/ChestChaseServer/HubDisplayService.lua
 AR=ServerScriptService/ChestChaseServer/HubDisplayArt.lua;AV=ServerScriptService/ChestChaseServer/HubDisplayAvatar.lua;CL=StarterPlayer/StarterPlayerScripts/HubDisplayClient.client.lua
+BO=ServerScriptService/ChestChaseServer/HubDisplayBoard.lua
+mutate "R153 best pull: a new window does not empty the pull board" $BO "self.Window=window;self.Boards.Pull=fresh()" "self.Window=window" rules
+mutate "R153 best pull: a new window empties the fruit board too" $BO "self.Window=window;self.Boards.Pull=fresh()" "self.Window=window;self.Boards={Pull=fresh(),Fruit=fresh()}" rules
+mutate "R153 best pull: a new day empties the pull board too" $BO "self.Day=day;self.FruitId=fruitId;self.Boards.Fruit=fresh()" "self.Day=day;self.FruitId=fruitId;self.Boards={Pull=fresh(),Fruit=fresh()}" rules
+mutate "R153 best pull: a pull needs a shared write" $BO "function B:Unsynced(kind)
+ if kind~='Fruit'then return false end" "function B:Unsynced(kind)
+ if not valid(kind)then return false end" rules
+mutate "R153 best pull: a shared pull becomes the champion" $BO "function B:MergeRemote(kind,rec)
+ if kind~='Fruit'then return false end" "function B:MergeRemote(kind,rec)
+ if not valid(kind)then return false end" rules
+mutate "R153 best pull: the store takes a pull" $ST " if kind~='Fruit'then return false,'local only'end -- (R153: BEST PULL is this server's alone)" "" store
+mutate "R153 best pull: the shared document keeps an old pull" $RU " if type(v.fruit)=='table'then out.fruit=R.CleanFruit(v.fruit)end
+ return out" " if type(v.pull)=='table'then out.pull=R.CleanPull(v.pull)end
+ if type(v.fruit)=='table'then out.fruit=R.CleanFruit(v.fruit)end
+ return out" rules
+mutate "R153 best pull: the window is not on the wall clock" $RU "function R.PullWindowIndex(t)return wholeSeconds(t)//R.PullWindow end" "function R.PullWindowIndex(t)return(wholeSeconds(t)+7)//R.PullWindow end" rules
+mutate "R153 best pull: the window is a day" $RU "R.PullWindow=600 " "R.PullWindow=86400 " rules
+mutate "R153 best pull: the countdown reads like the day's" $RU "function R.FooterCountdown(kind,seconds)return kind=='Pull'and R.WindowCountdown(seconds)or R.Countdown(seconds)end" "function R.FooterCountdown(kind,seconds)return R.Countdown(seconds)end" rules
+mutate "R153 best pull: the title says today again" $RU "local title=kind=='Pull'and'BEST PULL'or'BIGGEST FRUIT TODAY'" "local title=kind=='Pull'and'BEST PULL TODAY'or'BIGGEST FRUIT TODAY'" rules
+mutate "R153 best pull: the step does not look at the window" $SV " self:_syncWindow() -- (R153: before the preview check: the pull board has nothing to do with a previewed day)" "" service
+mutate "R153 best pull: a pull right after the mark joins the old window" $SV " self:_syncWindow() -- (R153: a pull that comes right after a window mark is the new window's first, even before the loop has noticed the mark)" "" service
+mutate "R153 best pull: an empty board is rebuilt at every window" $SV " if not self:_refresh('Pull')then self:_restamp('Pull')end" " self:_refresh('Pull',true)" service
+mutate "R153 best pull: an empty window leaves the countdown stale" $SV " guard('sign',self.Art.SetSign,d,self:_text(kind,self.Board:Best(kind)))
+ self:_stamp(kind)" " guard('sign',self.Art.SetSign,d,self:_text(kind,self.Board:Best(kind)))" service
+mutate "R153 best pull: the pull's identity includes the window" $SV " local key=kind=='Pull'and Rules.Key(rec)or(" " local key=kind=='Pull'and Rules.Key(rec)..'|'..tostring(self.Board.Window)or(" service
+mutate "R153 best pull: the loop sleeps through the mark" $SV " return math.min(S.LoopSeconds,left)" " return S.LoopSeconds" service
+mutate "R153 best pull: a pull is offered to the shared store" $SV " self.Events[kind]+=1
+" " self.Events[kind]+=1;if kind=='Pull'then pcall(self.Store.Merge,self.Store,self.Board.Day,kind,rec,nil)end
+" service
+mutate "R153 best pull: the client counts the pull's clock like the day's" $CL "Rules.FooterCountdown(entry.Model:GetAttribute('Kind'),at-now())" "Rules.Countdown(at-now())" client
+mutate "R153 best pull: the client writes the pull's clock only every five seconds" $CL "if text or(entry.Distance~=nil and entry.Distance<=Rules.Label.MaxDistance and entry.Model:GetAttribute('Kind')=='Pull')then safe(entry,footer)end" "if text then safe(entry,footer)end" client
+mutate "R153 best pull: the owner can share a best pull" ServerScriptService/ChestChaseServer/OwnerUpdateCommands82.lua "   if share then return false,'BEST PULL is this server only now" "   if false then return false,'BEST PULL is this server only now" hooks
 mutate "the lower rarity wins a pull" $RU "if a.Rank~=b.Rank then return a.Rank>b.Rank end" "if a.Rank~=b.Rank then return a.Rank<b.Rank end" rules
 mutate "the likelier pull wins a rarity tie" $RU "if not same(a.Odds,b.Odds)then return a.Odds<b.Odds end" "if not same(a.Odds,b.Odds)then return a.Odds>b.Odds end" rules
 mutate "the later pull wins a full tie" $RU "if a.At~=b.At then return a.At<b.At end" "if a.At~=b.At then return a.At>b.At end" rules

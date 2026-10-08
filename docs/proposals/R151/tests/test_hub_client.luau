@@ -4,6 +4,8 @@
 --  0. R153: the DANCE is this client's: ONE looped track of the server's DanceId on the rig's Animator (the server's), playing at once, the joints left alone; a dance that will not
 --     load is retried with the next ids (4 tries, 5 s each) and then the rig is posed here (once) and cheers; what happened is reported to the server (HubDisplayAvatarReport);
 --  1. the countdown on the big label's Footer row: right at once, kept up to date, "New fruit in ..." for the fruit board, for a display that streams in later, nothing without its attributes;
+--     R153: BEST PULL's is "new board in 7:42" (minutes and seconds to the next wall-clock 10-minute mark), written once a second while the label can be seen (420 studs) and every 5 s from
+--     further away, never negative or above 10:00, and it follows a new NextAt (the next window) at once; the fruit's is as it was;
 --  2. motion only when near (260 studs in, 300 out) and allowed: the item turns about its own vertical axis and floats a little (one bulk move every frame, on the middle tier too since R153), the sparkles are an
 --     emitter ON the item's own ItemCore part in the champion's colour (they turn with it), a dancing avatar is left to its Animator (the client writes none of its joints), a rig in the static
 --     pose cheers (joint transforms, bounded), the per-frame function is connected only while a display is near, and everything is put back when you walk away;
@@ -15,7 +17,9 @@
 --  5. the celebration sound for a remote from the server, and only for a well-formed one;
 --  6. robustness: the server swapping the item or the avatar, an avatar whose mode arrives late, a display streaming out and back, a display with nothing in it, a destroyed model;
 --     R153: the watchdog (a stopped, unlooped, slowed or destroyed track is put right; another track on the Animator is stopped), the same champion keeps its track, no Animator
---     from the server (one is made here after a try), a slow load, a first load that fails, a stand-in and the silhouette stay static, no leaks over many champion changes.
+--     from the server (one is made here after a try), a slow load, a first load that fails, a stand-in and the silhouette stay static, no leaks over many champion changes;
+--  7. R153: the 10-minute mark empties BEST PULL: the server destroys the champion's rig and stands the silhouette there (State Empty, calm, a new NextAt); this screen drops the dance
+--     track (and the Animator it made), plays nothing on the silhouette, pops nothing, follows the new countdown, and twelve champion / mark cycles leave no track, Animation or part behind.
 local HH=require('./hub_harness');local H=HH.H;local W,R=H.W,H.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -57,8 +61,8 @@ local function dressed(kind,state,danceMode)
  Art.SetSign(d,text)
  local m=d.Model
  m:SetAttribute('Accent',R.Color3.fromRGB(230,125,255))
- m:SetAttribute('FooterPrefix',kind=='Pull'and'New board in 'or'New fruit in ')
- m:SetAttribute('NextAt',math.floor(R.clock+5*3600+12*60+30))
+ m:SetAttribute('FooterPrefix',Rules.FooterPrefix(kind))
+ m:SetAttribute('NextAt',kind=='Pull'and R.clock+462.5 or math.floor(R.clock+5*3600+12*60+30))
  m:SetAttribute('State',state or'Champion');m:SetAttribute('Rev',1)
  return d
 end
@@ -126,16 +130,43 @@ end
 
 -- 1. The countdown -------------------------------------------------------------------------------------------------------------------------------------------------------
 do
- for _,d in ipairs({pullD,fruitD})do d.Model:SetAttribute('NextAt',math.floor(R.clock+5*3600+12*60+30))end -- (section 0 took half a minute)
+ camera(V3(0,0,-300)) -- the label can be seen from here (inside Rules.Label.MaxDistance, 420 studs)
+ local function secs(text)local m,sec=text:match('(%d+):(%d%d)$');return m and tonumber(m)*60+tonumber(sec)or-1000 end
+ local function isNow(d)return math.abs(secs(d.Tag.Footer.Text)-math.max(0,math.floor(d.Model:GetAttribute('NextAt')-R.clock)))<=1 end -- (the label is looked at every half second: within a second of the exact time)
+ pullD.Model:SetAttribute('NextAt',R.clock+462.5) -- (R153: 7:42 to the next 10-minute mark)
+ fruitD.Model:SetAttribute('NextAt',math.floor(R.clock+5*3600+12*60+30)) -- (section 0 took half a minute)
  local label=pullD.Tag.Footer;local flabel=fruitD.Tag.Footer
- check(label.Text=='New board in 5h 12m','the plaque\'s footer shows the countdown at once: "'..label.Text..'"')
- check(flabel.Text=='New fruit in 5h 12m','and the fruit board says "New fruit in ..."')
+ check(label.Text=='new board in 7:42','R153: BEST PULL\'s footer shows the countdown at once: "'..label.Text..'"')
+ check(flabel.Text=='New fruit in 5h 12m','and the fruit board says "New fruit in ..." as it always did: "'..flabel.Text..'"')
+ -- once a second while it can be seen (written only when the words change)
+ local seen={label.Text}
+ for _=1,10 do H.run(.5);if label.Text~=seen[#seen]then seen[#seen+1]=label.Text end end
+ check(#seen>=5 and #seen<=7 and isNow(pullD),'near: it counts every second (5 s: '..table.concat(seen,' > ')..')')
+ local mono=true;for k=2,#seen do local a=tonumber(seen[k-1]:match('(%d+):'))*60+tonumber(seen[k-1]:match(':(%d+)'));local b=tonumber(seen[k]:match('(%d+):'))*60+tonumber(seen[k]:match(':(%d+)'));if b>=a then mono=false end end
+ check(mono,'and only ever downwards')
+ -- from further than the label shows (420 studs) the pull's clock is as cheap as the fruit\'s: a look every 5 s
+ camera(V3(0,0,-600))
+ local far={label.Text}
+ for _=1,20 do H.run(.5);if label.Text~=far[#far]then far[#far+1]=label.Text end end
+ check(#far>=2 and #far<=4,'far away it is written about every 5 s, not every second (10 s: '..table.concat(far,' > ')..')')
+ camera(V3(0,0,-300))
+ H.run(1)
  H.run(60*5)
- check(label.Text=='New board in 5h 7m','five minutes later: "'..label.Text..'"')
- H.run(5*3600+4*60)
- check(label.Text:find('^New board in %d+m %d+s$')~=nil,'in the last hour it shows minutes and seconds: "'..label.Text..'"')
- pullD.Model:SetAttribute('NextAt',math.floor(R.clock+4000))
- check(label.Text=='New board in 1h 6m','a new NextAt is followed at once (the attribute is listened to): "'..label.Text..'"')
+ check(isNow(pullD)and label.Text:find('^new board in %d:%d%d$')~=nil,'five minutes on it reads minutes and seconds: "'..label.Text..'"')
+ check(flabel.Text=='New fruit in 5h 7m','the fruit board: "New fruit in 5h 7m" five minutes later ('..flabel.Text..')')
+ -- the window ends: never negative
+ H.run(400)
+ check(label.Text=='new board in 0:00','after the mark (the server has not rebuilt yet) it reads "new board in 0:00", never a negative number: "'..label.Text..'"')
+ -- the next window: a new NextAt is followed at once
+ pullD.Model:SetAttribute('NextAt',R.clock+600.5)
+ check(label.Text=='new board in 10:00','a new NextAt (the server\'s next window) is followed at once (the attribute is listened to): "'..label.Text..'"')
+ pullD.Model:SetAttribute('NextAt',R.clock+99999)
+ check(label.Text=='new board in 10:00','a wild NextAt cannot print more than the window (10:00)')
+ pullD.Model:SetAttribute('NextAt',R.clock+600.5)
+ H.run(5*3600+4*60-400-300)
+ check(flabel.Text:find('^New fruit in %d+m %d+s$')~=nil,'the fruit in the last hour shows minutes and seconds: "'..flabel.Text..'"')
+ fruitD.Model:SetAttribute('NextAt',math.floor(R.clock+4000))
+ check(flabel.Text=='New fruit in 1h 6m','a new NextAt is followed at once for the fruit too: "'..flabel.Text..'"')
  -- a display without its attributes is left alone
  local lone=Art.BuildFrame(map,'Pull',{Target=V3(0,4,-265),Pull={Center=V3(100,4,-100)},Fruit={Center=V3(-100,4,-100)}},4)
  lone.Tag.Footer.Text='x'
@@ -148,6 +179,10 @@ do
  late.Model:SetAttribute('FooterPrefix','New fruit in ');late.Model:SetAttribute('NextAt',math.floor(R.clock+90))
  check(late.Tag.Footer.Text=='New fruit in 1m 30s'or late.Tag.Footer.Text=='New fruit in 1m 29s','a display tagged after the client started is picked up, and its attributes followed at once ("'..late.Tag.Footer.Text..'")')
  late.Model:Destroy()
+ local latePull=Art.BuildFrame(map,'Pull',{Target=V3(0,4,-265),Pull={Center=V3(100,4,-100)},Fruit={Center=V3(150,4,-150)}},4)
+ latePull.Model:SetAttribute('FooterPrefix','new board in ');latePull.Model:SetAttribute('NextAt',R.clock+222.5)
+ check(latePull.Tag.Footer.Text=='new board in 3:42','a BEST PULL display that streams in later counts in minutes and seconds at once ("'..latePull.Tag.Footer.Text..'")')
+ latePull.Model:Destroy()
 end
 
 -- 2. Motion only when near -------------------------------------------------------------------------------------------------------------------------------------------------
@@ -268,8 +303,8 @@ do
  check(not sparksOf(pullD)and angle(joint(fruitD,'RightShoulder').Transform)==0,'no sparkles, no cheer')
  check(danceTrack(pullD).Speed==0 and danceTrack(pullD).IsPlaying,'a dancing avatar is paused (its track speed is 0, still playing: it resumes where it stood)')
  check(lastReport('Pull').Paused==true,'(and reported as paused)')
- pullD.Model:SetAttribute('NextAt',math.floor(R.clock+3600*2+60));H.run(6)
- check(pullD.Tag.Footer.Text:find('^New board in 2h')~=nil,'the countdown still runs ("'..pullD.Tag.Footer.Text..'")')
+ fruitD.Model:SetAttribute('NextAt',math.floor(R.clock+3600*2+60));pullD.Model:SetAttribute('NextAt',R.clock+300.5);H.run(6)
+ check(fruitD.Tag.Footer.Text:find('^New fruit in 2h')~=nil and pullD.Tag.Footer.Text:find('^new board in 4:5%d$')~=nil,'the countdowns still run ("'..fruitD.Tag.Footer.Text..'", "'..pullD.Tag.Footer.Text..'")')
  local popsBefore=H.named('HubPopSparks')
  pullD.Model:SetAttribute('Rev',pullD.Model:GetAttribute('Rev')+1);H.run(1.2)
  check(H.named('HubPopSparks')==popsBefore,'a new champion pops nothing with reduced motion')
@@ -457,6 +492,67 @@ do
  -- the whole run left no stray parts behind
  local strays=H.named('HubPopRing')+H.named('HubPopSparks')
  check(strays==0,'no pop parts are left in the workspace')
+end
+
+-- 7. R153: the 10-minute mark empties BEST PULL ---------------------------------------------------------------------------------------------------------------------------------------
+-- The server (HubDisplayService at a window mark): destroys the champion's rig by standing the silhouette in its place (HubDisplayArt.SetAvatar), says State Empty, calm, and a new NextAt, and
+-- bumps Rev. This screen must drop the dance for good: the track, the Animator it made, the report, the pop; and a new champion in the next window starts clean.
+do
+ camera(V3(-30,-8,-40));H.run(2)
+ local function champion(uid)
+  local r=avatars:Build(uid);avatars:Place(r,pullD.FeetAt,Rules.AvatarHeight,Rules.AvatarTurn);Art.SetAvatar(pullD,r);avatars:Animate(r,uid)
+  local m=pullD.Model;m:SetAttribute('State','Champion');m:SetAttribute('Calm',false);m:SetAttribute('Rev',m:GetAttribute('Rev')+1)
+  return r
+ end
+ local function mark(nextAt)
+  local sil=avatars:Build(0,{Silhouette=true});avatars:Place(sil,pullD.FeetAt,Rules.AvatarHeight,Rules.AvatarTurn);Art.SetAvatar(pullD,sil);avatars:Animate(sil)
+  local m=pullD.Model;m:SetAttribute('State','Empty');m:SetAttribute('Calm',true);m:SetAttribute('NextAt',nextAt);m:SetAttribute('Rev',m:GetAttribute('Rev')+1)
+  return sil
+ end
+ -- start from an empty board (as a server that just started), with a first champion in the first window
+ mark(R.clock+600.5);H.run(2)
+ local reports0=#reports;local tracks={};local animators={};local popsAfterMark=0;local sparksOnEmpty=0;local label=pullD.Tag.Footer
+ for cycle=1,12 do
+  local rig=champion(3000+cycle);H.run(1.5)
+  if cycle==1 then check(danceTrack(pullD)and danceTrack(pullD).IsPlaying and playingOf(rig)==1 and sparksOf(pullD)~=nil,'a champion in the window: one track dancing, sparks on the item') end
+  for _,t in ipairs(tracksOf(rig))do tracks[#tracks+1]=t end
+  for _,a in ipairs(animatorsOf(rig))do animators[#animators+1]=a end
+  pullD.Model:SetAttribute('NextAt',R.clock+300.5);H.run(2.5) -- (the pop's sparks are long gone: Debris 1.8 s)
+  local sil=mark(R.clock+600.5);H.run(.6)
+  popsAfterMark+=H.named('HubPopSparks')
+  if sparksOf(pullD)then sparksOnEmpty+=1 end
+  if cycle==1 then
+   local t=tracks[1]
+   check(t.Destroyed and not t.IsPlaying and playingOf(sil)==0 and #tracksOf(sil)==0 and #animatorsOf(sil)<=1,'the mark: the champion\'s track is stopped and let go, nothing plays on the silhouette')
+   check(rigOf(pullD)==sil and sil:GetAttribute('Fallback')==true and lastReport('Pull').Mode=='static','the silhouette stands there, reported static')
+   check(label.Text=='new board in 10:00','and the countdown is the new window\'s: "'..label.Text..'"')
+  end
+ end
+ check(popsAfterMark==0,'the mark pops nothing (an empty board is not a new champion)')
+ check(sparksOnEmpty==0,'and the empty board has no sparkles (calm)')
+ local live,kept=0,0;for _,t in ipairs(tracks)do if t.IsPlaying then live+=1 end;if not t.Destroyed then kept+=1 end end
+ check(#tracks==12 and live==0 and kept==0,'twelve windows: twelve champions each had one track, and none is playing or kept now ('..#tracks..' made, '..live..' playing, '..kept..' kept)')
+ local alive=0;for _,a in ipairs(animators)do if a.Parent then alive+=1 end end
+ check(alive==0,'and none of their Animators is still in the world (they went with their rigs)')
+ local strays=0;for _,x in ipairs(W.workspace:GetDescendants())do if x._class=='Animation'then strays+=1 end end
+ check(strays==0,'no Animation is left in the world')
+ local rigs=0;for _,c in ipairs(pullD.AvatarFolder:GetChildren())do rigs+=1 end
+ check(rigs==1,'one avatar on the display: the silhouette ('..rigs..')')
+ check(#reports-reports0<=12*4,'the reports to the server stayed few ('..(#reports-reports0)..' in 12 cycles)')
+ -- the next window's first champion starts clean
+ local rig=champion(3100);H.run(1.5)
+ check(danceTrack(pullD)and danceTrack(pullD).IsPlaying and playingOf(rig)==1 and #tracksOf(rig)==1,'the next window\'s champion dances on its own single track')
+ -- a mark while the dance is still loading (no Length yet) drops the load too
+ HH.avatars.Dance.Delay=3
+ local slow=avatars:Build(3200);avatars:Place(slow,pullD.FeetAt,Rules.AvatarHeight,Rules.AvatarTurn);Art.SetAvatar(pullD,slow);slow:SetAttribute('MockDance','late');avatars:Animate(slow,3200)
+ H.run(1.2)
+ local loading=danceTrack(pullD)
+ check(loading and loading.Length==0 and lastReport('Pull').Mode=='loading','(a champion whose dance is still loading ...)')
+ local sil2=mark(R.clock+600.5);H.run(5)
+ check(loading.Destroyed and not loading.IsPlaying and #tracksOf(sil2)==0 and lastReport('Pull').Mode=='static','... the mark drops the load; the silhouette is static and nothing is retried on it')
+ HH.avatars.Dance.Delay=nil
+ camera(V3(0,0,-600));H.run(1.5)
+ check(H.renderConnections()==0,'nothing stays connected when nothing is near')
 end
 print(string.format('%d checks, %d failures',checks,fails))
 if fails>0 then error('FAILED')end

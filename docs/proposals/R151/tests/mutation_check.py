@@ -82,10 +82,12 @@ MUTATIONS = [
     ('[timing] a held line is written after teardown', CLIENT, " if dead then return end\n local i=1\n", " local i=1\n", 'test_client'), # (R153: held lines go out through release())
     ('[timing] a held line can wait forever', CLIENT, "local HOLD_MAX=8", "local HOLD_MAX=1e9", 'test_client'),
     # --- [records] hub records through the announcer ------------------------------------------------------------------------------------------------------------------
-    ('[records] a fruit record travels to every server when its seed is Secret+', RULES, " if record~='BestPull'then return'InServer'end", " if false then return'InServer'end", 'test_server'),
-    ('[records] a record below the threshold is announced', RULES, " if R.Qualifies('InServer',rarity)then return'InServer'end\n return nil", " if R.Qualifies('InServer',rarity)then return'InServer'end\n return'InServer'", 'test_rules'),
-    ('[records] a Secret+ record stays at home', RULES, " if R.Qualifies('Global',rarity)then return'Global'end", " if false then return'Global'end", 'test_rules'),
-    ('[records] a record travels without its key', RULES, "k=e.Kind=='Record'and e.Record or nil", "k=nil", 'test_server'),
+    # (R153: BEST PULL is each server's own board: no record is ever for another server, and RecordScope never says Global)
+    ('[records] a record below the threshold is announced', RULES, "or R.Qualifies('InServer',rarity)then return'InServer'end\n return nil", "or R.Qualifies('InServer',rarity)then return'InServer'end\n return'InServer'", 'test_rules'),
+    ('[records] a Secret+ best pull record travels to every server again', RULES, " if R.Qualifies('Global',rarity)or R.Qualifies('InServer',rarity)then return'InServer'end", " if R.Qualifies('Global',rarity)then return'Global'end\n if R.Qualifies('InServer',rarity)then return'InServer'end", 'test_rules'),
+    ('[records] a Secret+ best pull record is published when the scope says Global', SERVER, "  global=scope=='Global'and e.Record~='BestPull' -- (R153: BEST PULL is this server's own: its line never travels, whatever Scope was asked for)", "  global=scope=='Global'", 'test_server'),
+    ('[records] the best pull title says today again', RULES, "R.Records={BestPull='BEST PULL',", "R.Records={BestPull='BEST PULL TODAY',", 'test_rules'),
+    ('[records] a record travels without its key', RULES, "k=e.Kind=='Record'and e.Record or nil", "k=nil", 'test_rules'), # (R153: no record travels now; the compact form is still checked by the rules suite)
     ('[records] another server accepts any record', SERVER, "   local travels=e and(record and Rules.RecordScope(e.Record,e.Rarity)=='Global'or not record and Rules.Qualifies('Global',e.Rarity))", "   local travels=e", 'test_server'),
     ('[records] a private record is broadcast', SERVER, "  self:_broadcast(e,only and function(player)return player==only end or nil)", "  self:_broadcast(e)", 'test_server'),
     ('[records] AfterReveal is ignored', SERVER, " if spec.AfterReveal==true and not only and e.Rarity then", " if false then", 'test_server'),

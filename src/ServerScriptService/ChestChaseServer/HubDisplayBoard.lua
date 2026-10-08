@@ -1,26 +1,34 @@
--- R151: what one server knows about today's two hub boards (BEST PULL TODAY and BIGGEST FRUIT TODAY). Pure bookkeeping, no Roblox services: the Service feeds
+-- R151: what one server knows about the two hub boards (BEST PULL and BIGGEST FRUIT). Pure bookkeeping, no Roblox services: the Service feeds
 -- it events and MemoryStore reads and writes, and builds the displays from what it says.
 -- For each board (kind 'Pull' | 'Fruit') three slots, each a record or nil:
---    Remote  the best the shared store last told us (everyone's);
---    Local   the best real pull / harvest this server saw today;
+--    Remote  the best the shared store last told us (everyone's; only BIGGEST FRUIT has one);
+--    Local   the best real pull / harvest this server saw (today for the fruit, in this window for the pull);
 --    Test    an owner-injected one (/test bestpull, /test bigfruit): shown on this server only, never sent anywhere.
--- Best(kind) = the best of the three, by HubDisplayRules ordering. A board needs a shared write while its Local record is better than the Remote one (Unsynced): the
+-- Best(kind) = the best of the three, by HubDisplayRules ordering. A FRUIT board needs a shared write while its Local record is better than the Remote one (Unsynced): the
 -- Service writes it (compare-and-set: the store only takes it when it is better than what is there) and, whatever the answer, reads the winner back with MergeRemote.
 -- R152: Foreign = the shared fruit is of ANOTHER type than this server's fruit of the day (servers on different plant lists, around an update that adds plants): that board has nothing to
--- write (the store holds another list's fruit, which is never replaced) so it is not Unsynced; the BEST PULL board is never held up by it.
--- A new day clears everything. Nothing here can throw on bad input: records are cleaned by the caller (HubDisplayRules.CleanPull / CleanFruit).
+-- write (the store holds another list's fruit, which is never replaced) so it is not Unsynced.
+-- R153 (owner: the best pull is "a local server only thing" that "refresh every 10 minutes"): the PULL board is this server's alone. It has no Remote (MergeRemote ignores it) and is never
+-- Unsynced, so nothing about it can reach a store. It has its own clock: Window (HubDisplayRules.PullWindowIndex: wall-clock 10-minute windows); a new window empties it (SetWindow), all three
+-- slots, as on a fresh server. A new day (SetDay) empties the FRUIT board only. Nothing here can throw on bad input: records are cleaned by the caller (HubDisplayRules.CleanPull / CleanFruit).
 local Rules=require(game:GetService('ReplicatedStorage'):WaitForChild('HubDisplayRules'))
 local B={};B.__index=B
 local KINDS={'Pull','Fruit'}
 B.Kinds=KINDS
 local function fresh()return{Remote=nil,Local=nil,Test=nil,Foreign=false}end
 function B.new()
- return setmetatable({Day=nil,FruitId=nil,Boards={Pull=fresh(),Fruit=fresh()}},B)
+ return setmetatable({Day=nil,FruitId=nil,Window=nil,Boards={Pull=fresh(),Fruit=fresh()}},B)
 end
--- Starts a day (a new day number, or the same day with another fruit): clears both boards. Returns true when anything changed.
+-- Starts a day (a new day number, or the same day with another fruit): clears the FRUIT board (R153: the pull board has its own clock). Returns true when anything changed.
 function B:SetDay(day,fruitId)
  if self.Day==day and self.FruitId==fruitId then return false end
- self.Day=day;self.FruitId=fruitId;self.Boards={Pull=fresh(),Fruit=fresh()}
+ self.Day=day;self.FruitId=fruitId;self.Boards.Fruit=fresh()
+ return true
+end
+-- R153: starts a pull window (HubDisplayRules.PullWindowIndex): clears the PULL board, whatever it held (this server's best, an injected test pull). Returns true when the window changed.
+function B:SetWindow(window)
+ if self.Window==window then return false end
+ self.Window=window;self.Boards.Pull=fresh()
  return true
 end
 local function valid(kind)return kind=='Pull'or kind=='Fruit'end
@@ -50,8 +58,9 @@ function B:Offer(kind,rec)
  return self:Best(kind)==rec and'took'or'kept'
 end
 -- What the shared store says (a clean record or nil). Replaces the Remote slot. A fruit of another type than today's is not today's board: ignored (and the board is Foreign).
+-- R153: only the fruit board has a shared record; whatever is offered for the pull board is ignored (a pull is this server's own).
 function B:MergeRemote(kind,rec)
- if not valid(kind)then return false end
+ if kind~='Fruit'then return false end
  local b=self.Boards[kind]
  b.Foreign=rec~=nil and kind=='Fruit'and self.FruitId~=nil and rec.Id~=self.FruitId
  if b.Foreign then rec=nil end
@@ -63,9 +72,9 @@ end
 function B:SetForeign(kind)
  if valid(kind)and kind=='Fruit'then self.Boards[kind].Foreign=true end
 end
--- Local is better than what the store holds: it needs writing (not while the store holds another list's fruit: nothing can be written there).
+-- Local is better than what the store holds: it needs writing (not while the store holds another list's fruit: nothing can be written there). R153: never for the pull board.
 function B:Unsynced(kind)
- if not valid(kind)then return false end
+ if kind~='Fruit'then return false end
  local b=self.Boards[kind]
  return b.Local~=nil and not b.Foreign and Rules.Better(kind,b.Local,b.Remote)
 end
