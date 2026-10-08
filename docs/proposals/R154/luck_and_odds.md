@@ -196,5 +196,16 @@ It is still a guaranteed TEST reveal, never announced. `rarepacks` (all five), `
 - `test_seed_rarity` section 9: a live pack's favourite is at most 80%.
 - `run_clover.sh`: the cap tests expect x100M; an `old_cap` mutation; the pass-id scan skips the release notes and handoff, which name the id for the publish checklist.
 - Frozen hashes: `docs/proposals/R151/tests/frozen.sha256` has R154 notes for `PackOdds112` / `137`, `SeedPackRules` and the new `PackLuck154`.
+- `R148/tests/test_roster*.luau`: the plan's tables and the Index chips read `RawSeedOdds`; the live Desert Common rolls and tooltip follow the rule (Aloe 1/5, Sand Fruit 1/65).
+
+**Results** (private scratch dirs, one suite at a time), all PASS:
+- R154 luck_and_odds, with 10/10 teeth;
+- R153 seed_rarity, with teeth; R153 clover; R153 `run.sh`; R153 fixes_server;
+- R137; R140 daily; R150 bonus_ui;
+- R148 index_limited and roster;
+- R151 packs, rare_pull, announce, hub_displays and pack_shapes;
+- R147 verity and verity_pack; R149 verity_pack; R152 seed_opening.
+
+The full runner was not run.
 
 Not checked: anything in real Studio, including the HUD showing ×100M and the shop card's new line fitting on a real phone.
