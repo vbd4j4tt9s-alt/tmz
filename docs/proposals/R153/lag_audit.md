@@ -271,6 +271,11 @@ Effort: **S** = under half a day, **M** = 1–2 days, **L** = 3 days or more.
 | D9 | Server: pack re-skin spread over the closed window; garden loop renders one bed per call; treadmill popups batched | [same] | S | No 5-minute spike; 10x less garden work; 6x fewer popup events with 6 trainers |
 | D10 | Workspace `DescendantAdded` listeners narrowed to their folders | [same] | S | Smaller spikes when the keyboard window refills or packs stream in |
 
+**Correction (architecture review, R153 perf patch):** the garden half of D9 and cost #15's "renders a whole base each call" describe
+`ChestService.lua`'s old `RenderGarden`, which never ran: `GardenPlantRuntime.Install` replaces it at load, and the live
+`GardenPlantRuntime:RenderGarden` renders only the slot it is asked for. The never-run copy is gone (`perf153.md`). What was done of this list,
+and how it was measured, is in `perf153.md`.
+
 How to check the patch the R152 way: `run_perf152.sh` style fingerprints (identical near-field shots) for the hub (D3), keepers (D6) and keyboard (D8).
 Also rerun `lag153_census.luau` (PlayerGui count for D2, writes per frame for D3 / D6). D1, D4 and D5 are Studio settings and need one Play test on a
 phone or the device emulator.
