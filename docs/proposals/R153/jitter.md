@@ -97,7 +97,8 @@ Looked at and left (no visible stepping):
 - Biome notifier: fade and settle per frame in RenderStepped (the settle snaps to whole pixels by design; the .12 s poll only decides when).
 - Gate refresh barrier: static; its caption dots step `. .. ...` by design and the count is text.
 - R153 badges: the pop and the halo pulse are client tweens.
-- Keeper speed signs: left to the agent pinning them over each keeper's spawn (`KeeperSpeedLabels` not touched). `KeeperFollow153` stays;
+- Keeper speed signs: now pinned over each keeper's spawn by the keeper-sign agent (merged at `98bf7fb`; this supersedes round 1's sign row: a
+  pinned sign cannot step). `KeeperFollow153` stays;
   `BeastAnimation` and `VeiledEventClient81` still drive its anchors.
 - Server: per-frame connections only in the 13 gameplay services (the same list), no tween but MapService's legacy course fade; the merged
   server code moves parts only when it builds or teleports.
