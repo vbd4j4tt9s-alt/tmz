@@ -65,7 +65,7 @@ wiring() { # $1 = the src tree to check (this checkout's, or a mutated copy)
  # no per-frame loop on the server
  for f in VoidGiveaway152 VoidGiveawayStore152 VoidGiveawayArt152;do if sed 's/--.*$//' "$SRV/$f.lua" | grep -n -E "Heartbeat|RenderStepped|Stepped";then echo "the giveaway has a per-frame loop on the server ($f)";return 1;fi;done
  # the saved flag is an optional field of the existing Premium table: no profile version change (an older server copies it)
- grep -q "Config.ProfileVersion=22" "$SRV/Config.lua" && grep -q "Config.Version='V150 R152'" "$SRV/Config.lua" || { echo "Config.ProfileVersion / Version changed";return 1; }
+ grep -q "Config.ProfileVersion=22" "$SRV/Config.lua" && grep -q "Config.Version='V150 R153'" "$SRV/Config.lua" || { echo "Config.ProfileVersion / Version changed";return 1; }
  if grep -q "VoidGift152" "$SRV/PlayerDataService.lua";then echo "PlayerDataService must not know the flag (it is an optional Premium field)";return 1;fi
  # the real, announcing pack: no TestGrant anywhere in the giveaway's code
  if sed 's/--.*$//' "$SRV/VoidGiveaway152.lua" | grep -n "TestGrant";then echo "the giveaway pack must not be a TestGrant pack";return 1;fi
