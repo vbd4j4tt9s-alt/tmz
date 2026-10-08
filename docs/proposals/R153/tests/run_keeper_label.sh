@@ -15,7 +15,7 @@
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT/cl"
-PLACE=${2:-/root/.claude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl}
+PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl}
 T=$REPO/tools/tests;INV=$REPO/docs/proposals/inventory_R113/tests;C=$REPO/src/StarterPlayer/StarterPlayerScripts;SSS=$REPO/src/ServerScriptService/ChestChaseServer
 S=$C/KeeperSpeedLabels.client.lua
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
