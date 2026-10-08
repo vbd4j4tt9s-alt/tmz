@@ -13,6 +13,7 @@ local Gui=game:GetService('GuiService')
 local Budget=require(RS:WaitForChild('CosmeticBudget'))
 local View=require(RS:WaitForChild('PlantDetailPlanner'))
 local BRIGHT_DISTANCE,DETAIL_DISTANCE,LIGHT_DISTANCE=900,160,42
+local NEAR_BRIGHT,FAR_BRIGHT=150,8 -- R153 perf (D7): tier 2 keeps every outline within 150 studs, and beyond that only among the nearest 8 packs
 local SPARK='rbxasset://textures/particles/sparkles_main.dds'
 local WHITE=Color3.new(1,1,1)
 local ACCENTS = {["Snow_01"]={{0.0,0.1,-0.5061}},["Snow_02"]={{0,0.12,-0.62}},["Snow_03"]={{0.475,0.0498,-0.5005},{-0.475,0.0499,-0.5005},{-0.0223,0.067,-0.6491}},["Snow_04"]={{-0.5196,-0.0299,-0.5595},{0.5194,0.0049,-0.582},{-0.1799,0.705,-0.4184}},["Snow_05"]={{-0.5196,-0.0299,-0.5595},{0.5194,0.0049,-0.582},{0.0,0.03,-0.7265}},["Snow_06"]={{-0.5196,-0.0299,-0.5595},{0.5194,0.0049,-0.582},{0.0,0.03,-0.7265}},["Crystal_01"]={{0.0008,0.0698,-0.6575}},["Crystal_02"]={{-0.4905,-0.2784,-0.5804},{-0.6706,-0.4807,-0.434},{0.5834,0.6359,-0.4033}},["Crystal_03"]={{-0.0006,0.1837,-0.7388},{-0.1943,-0.0503,-0.7139}},["Crystal_04"]={{0.0,0.02,-0.7468},{-0.6232,0.6926,-0.4463},{0.5338,0.6974,-0.4386}},["Crystal_05"]={{0.0,0.02,-0.7668},{-0.6232,0.6926,-0.4463},{0.5338,0.6974,-0.4386}},["Crystal_06"]={{0.0,0.03,-0.7965},{-0.5588,-0.076,-0.2964},{0.5562,-0.0751,-0.2964}}} -- GENERATED_ACCENTS
@@ -336,6 +337,11 @@ table.insert(connections,CollectionService:GetInstanceRemovedSignal('BiomeSeedPa
 local function choose(camera,now,low)
     local cameraPosition=camera.CFrame.Position;local view=View.View(camera)
     local MAX_HIGHLIGHTS,MAX_DETAILS,MAX_LIGHTS,MAX_DISTANT=low and 12 or 24,low and 3 or 8,low and 1 or 4,low and 16 or 48
+    -- R153 perf (lag audit D7): the outlines share Roblox's 31 with every other Highlight (ClientFxBudget.HighlightRoom: weather glows, mutation
+    -- outlines, plant auras, Void packs), and on tier 2 (phones) a pack past NEAR_BRIGHT studs keeps its outline only among the nearest FAR_BRIGHT
+    -- (it keeps its distant aura); within NEAR_BRIGHT studs every pack keeps its outline as before.
+    local room=MAX_HIGHLIGHTS;do local ok,n=pcall(Fx.HighlightRoom);if ok and type(n)=='number'then room=math.min(room,n)end end
+    local farBright=(not low and Fx.Get()==2)and FAR_BRIGHT or room
     local candidates={};local character=Players.LocalPlayer and Players.LocalPlayer.Character
     for bag,r in pairs(records)do
         if not r.Ready then initialize(bag,r)end
@@ -361,7 +367,7 @@ local function choose(camera,now,low)
     table.sort(candidates,function(a,b)return a.Score<b.Score end)
     local count,lights=0,0
     for i,r in ipairs(candidates)do
-        r.Bright=i<=MAX_HIGHLIGHTS;r.HasDistant=i<=MAX_DISTANT
+        r.Bright=i<=room and(i<=farBright or r.Distance<=NEAR_BRIGHT);r.HasDistant=i<=MAX_DISTANT
         if r.Bright and r.Distance<=DETAIL_DISTANCE and count<MAX_DETAILS then
             count+=1;r.Detailed=true
             r.Lit=r.Distance<=LIGHT_DISTANCE and lights<MAX_LIGHTS
