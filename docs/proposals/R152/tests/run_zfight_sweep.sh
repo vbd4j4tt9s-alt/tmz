@@ -12,6 +12,7 @@
 #  3. opening - the pack-opening scenes: the void vault, the space stage and the throne room (with / without the drawn images, lite), the sky beam's landing on a floor at all three tiers
 #               (rings, cracks, debris) and the Legendary / Mythic flourish at three pack scales, sampled through the whole impact; the layer gaps are checked frame by frame.
 #  4. keepers - docs/proposals/R152/tests/run_keepers.sh step 4 (the baked models' triangles).
+#  5. mech    - R153: the Mech pack's look B (docs/proposals/R153/tests/dump_mech_zscene.luau): on the flat pouch in every context, size and coat, its opening copy, its plain-parts body.
 # With "mutate" as the 3rd argument, broken copies of src must each make the sweep fail (the checks have teeth): the letter strips back at .04 over the keys, the opening's ring / crack /
 # rim layers back at their old heights ("mutate-only" runs just those, after a full run).
 # Without the place file the maps are skipped (verity and opening still run).
@@ -25,6 +26,12 @@ verity() { # $1 = work dir, $2 = src dir
  cp "$REPO/tools/tests/roblox.luau" "$P/inventory_R113/tests/world.luau" "$P/inventory_R113/tests/fixtures.luau" "$P/R151/tests/pack_world.luau" "$P/R151/tests/pack_templates.luau" "$P/R151/tests/pouch_mock.luau" "$P/R149/tests/zfight_world.luau" "$HERE/dump_verity_zscene.luau" "$1/"
  python3 "$P/R151/tests/mkbundle_packs.py" "$1" "$2" > /dev/null
  (cd "$1" && timeout 900 /opt/luau/luau dump_verity_zscene.luau > dump.txt 2> dump.err) || { tail -20 "$1/dump.err";return 1; }
+}
+mech() { # $1 = work dir, $2 = src dir (R153)
+ mkdir -p "$1"
+ cp "$REPO/tools/tests/roblox.luau" "$P/inventory_R113/tests/world.luau" "$P/inventory_R113/tests/fixtures.luau" "$P/R151/tests/pack_world.luau" "$P/R151/tests/pack_templates.luau" "$P/R151/tests/pouch_mock.luau" "$P/R149/tests/zfight_world.luau" "$P/R153/tests/dump_mech_zscene.luau" "$1/"
+ python3 "$P/R151/tests/mkbundle_packs.py" "$1" "$2" > /dev/null
+ (cd "$1" && timeout 900 /opt/luau/luau dump_mech_zscene.luau > dump.txt 2> dump.err) || { tail -20 "$1/dump.err";return 1; }
 }
 opening() { # $1 = work dir, $2... = Name=path overrides (a mutant)
  d=$1;shift
@@ -59,6 +66,9 @@ python3 "$HERE/check_zfight_sweep.py" verity "$S/verity/dump.txt"
 echo "== 3. pack-opening scenes"
 opening "$S/opening"
 python3 "$HERE/check_zfight_sweep.py" opening "$S/opening/dump.txt"
+echo "== 5. the Mech pack (R153)"
+mech "$S/mech" "$REPO/src"
+python3 "$HERE/check_zfight_sweep.py" mech "$S/mech/dump.txt"
 }
 # (mutate-only: just the mutations, for a quick look)
 [ "$MODE" = "mutate-only" ] || main_steps

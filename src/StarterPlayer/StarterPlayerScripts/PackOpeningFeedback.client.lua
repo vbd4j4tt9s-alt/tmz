@@ -18,6 +18,7 @@ local sequence=require(RS.RarityRevealScreen).Create(gui);local revealAudio=requ
 -- R151: one reveal ladder for every rarity (RarePullCinematic): the seed card for Common..Mythic, the story scenes for Secret / Cosmic / King.
 -- The pack's suspense (wobble, tear, hint colour) is in the world (SeedPackClient); this script keeps the clicks, the shakes and the small pops.
 local Ladder=require(RS:WaitForChild('RarePullRules'))
+local MechFx;local function mech()if not MechFx then local m=RS:FindFirstChild('MechPackFx153');local ok,mod=pcall(function()return m and require(m)end);MechFx=ok and mod or nil end;return MechFx end -- R153: the Mech pack's clicks 1-4 back out a bolt each, with a ratchet tick
 -- R152 (owner: "sometimes the animation not playing"): the director is fetched again on the next pack if it was not there yet (it used
 -- to be given 10 s at start-up, then every pull of the session fell back to the old reveal).
 local Rare
@@ -104,7 +105,7 @@ local function pulse()
  pulseAt=os.clock();pulseStrength=.13+count*.025
  -- R150: every click the server rules accept (one per Rules.ClickInterval) sounds: the cue's own 0.09 s gap used to swallow 2 of 5 at full
  -- tapping speed while the bag still shook. The gap here is a little under the click interval, so rapid input never stacks beyond the accepted rate.
- cloneBag(active);kick(.85+count*.16);Audio.Play('Bubble04',Rules.ClickInterval*.8)
+ cloneBag(active);kick(.85+count*.16);local m=mech();if m and copy and m.Click(copy,count,os.clock())then Audio.Play('MechClick',Rules.ClickInterval*.8)else Audio.Play('Bubble04',Rules.ClickInterval*.8)end
 end
 local function beginReveal(bag)
  if reveal or not bag:GetAttribute('RevealSeedId')then return end
@@ -167,6 +168,7 @@ local function presentation()
    local age=now-pulseAt;local envelope=math.exp(-age*15);local wave=math.sin(age*72)
    local intensity=reduced()and .22 or 1;local push=math.sin(math.min(age*31,math.pi/2))
    copy:PivotTo(active.PrimaryPart.CFrame*CFrame.new(wave*pulseStrength*envelope*intensity,math.sin(age*55)*pulseStrength*.8*envelope*intensity,pulseStrength*1.2*push*envelope*intensity)*CFrame.Angles(0,0,wave*.19*envelope*intensity))
+   local m=mech();if m then m.StepClicks(copy,now,reduced())end -- (R153: the clicked bolts, after the shake)
   end
  end
  if reveal and not reveal.Cinematic then

@@ -258,7 +258,7 @@ do
  server()
 end
 
--- 3. The Void and the Mech (the Forest_01 pouch, never shaped) ------------------------------------------------------------------------------------------
+-- 3. The Void and the Mech (the Forest_01 crimp rows: the Void's pouch; the Mech's flat pouch / sachet has the same footprint; never shaped) ------------------------------------------------------------------------------------------
 for _,v in ipairs({{H.VOID,7},{H.MECH,8}})do
  local key='Forest_01'
  local g=H.ground(v[2],v[1],1,'None');measure(g,key,v[1]..' ground','special');g:Destroy()

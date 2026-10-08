@@ -8,8 +8,8 @@ local Timing=require(script.Parent:WaitForChild('SoundTiming')) -- R152: WaitFor
 local M={}
 -- R150: MenuClose is the MenuClick file a little lower; Denied is the built-in ping, low and muted (no new upload).
 M.AssetIds={Bubble04=96764044228884,Bubble06=131731955363530,UpgradeClick=87218932219010,Equip=99675704394731,KaChing=86218459564041,GemClaim=82559527540705,MenuClick=116737765668953,
- MenuClose=116737765668953,Denied='rbxasset://sounds/electronicpingshort.wav'}
-local defaults={Bubble04=.20,Bubble06=.22,UpgradeClick=.28,Equip=.26,KaChing=.32,GemClaim=.32,MenuClick=.28,MenuClose=.26,Denied=.24}
+ MenuClose=116737765668953,Denied='rbxasset://sounds/electronicpingshort.wav',MechClick=87218932219010} -- (R153: MechClick is UpgradeClick's file at Bubble04's volume: the Mech pack's clicks 1-4)
+local defaults={Bubble04=.20,Bubble06=.22,UpgradeClick=.28,Equip=.26,KaChing=.32,GemClaim=.32,MenuClick=.28,MenuClose=.26,Denied=.24,MechClick=.20}
 M.Speeds={MenuClose=.85,Denied=.55}
 -- Per-key gap between two plays (default .09); a refusal repeated faster than this stays one sound.
 M.DefaultGap=.09

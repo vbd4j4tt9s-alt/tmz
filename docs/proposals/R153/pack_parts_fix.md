@@ -47,7 +47,7 @@ Checked on the mock, in every context:
 | 16 tall designs | Shaped crimps pulled in or slid. 367 failed checks. | Flush. |
 | Legacy Small / Standard / Grand, giveaway (= Void) | Fine. | Fine. |
 | Void | Corner details floating, 38 per pack. | Seated. |
-| Mech | 18 parts float 0.08 to 0.20 off the pouch: pistons, cuffs, cuff lights, caps, power conduits, LEDs, core accents. **Not changed** (redesign in progress); listed by the check for that work. | Unchanged. |
+| Mech | 18 parts float 0.08 to 0.20 off the pouch: pistons, cuffs, cuff lights, caps, power conduits, LEDs, core accents. **Not changed** (redesign in progress); listed by the check for that work. | Unchanged here. Look B (MechPackArt153, merged after): its own flat pouch / sachet, every part on it; COUNTED by the check (ground, held R15 / R6, 25x, both bodies): 0 float. |
 
 Also noted, not changed:
 * The Void's galaxy sheet rests on the leaf at the middle and its rim stands about 0.3 off the pouch. A flat print cannot lie on a curved pouch without bending it; that is the approved look.
