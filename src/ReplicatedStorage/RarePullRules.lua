@@ -124,6 +124,22 @@ end
 L.Shifts=setmetatable({},{__mode='k'})
 function L.SetShift(bag,s)if bag~=nil and type(s)=='number'and s>(L.Shifts[bag]or 0)then L.Shifts[bag]=s end end
 function L.Shift(bag)return bag~=nil and L.Shifts[bag]or 0 end
+-- R153 follow-up (coordinator: a click that skips a card must not plant the seed just put in the hand, nor use the shovel): a press on the
+-- world that a pull reveal takes (it skips / closes a card; a story scene owns every press) is not a tool's. Each route that acts on a held
+-- tool (EconomyClient planting, GardenShovel, TrackHoleClient, FruitGiftClient) asks ClaimPress first and does nothing when it is true;
+-- the reveal's own listener asks too. One answer per press, whoever asks first (the routes of one press run within PressWindow of each
+-- other: a mouse button, R2 through its CAS action, a tap's release); the director (PressTaker, RarePullCinematic) acts on it then. No
+-- reveal on screen: false, and the tools work exactly as before.
+L.PressTaker=nil;L.PressWindow=.1
+local pressAt,pressTaken=-math.huge,false
+function L.ClaimPress()
+ local now=os.clock()
+ if now-pressAt<L.PressWindow then return pressTaken end
+ pressAt=now;pressTaken=false
+ local taker=L.PressTaker
+ if taker then local ok,taken=pcall(taker);pressTaken=ok and taken==true end
+ return pressTaken
+end
 -- Suspense: the pack's rarity hint, wobble and tear -------------------------------------------------------------------------------------
 -- The hint starts neutral and walks up the ladder (Common, Uncommon, ...) to the real tier, flickering between neighbours like Sol's RNG
 -- "it could be...": higher tiers pass through every lower colour. The last quarter holds the real colour.

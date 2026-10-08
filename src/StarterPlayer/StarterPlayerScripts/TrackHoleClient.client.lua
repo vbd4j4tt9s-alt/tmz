@@ -48,9 +48,11 @@ local function aimPoint(screen,root)
  return nil -- server digs at the feet
 end
 -- Returns true when this input was a dig/cover request (the caller sinks it).
+local function revealPress()local ok,taken=pcall(function()return require(game:GetService('ReplicatedStorage').RarePullRules).ClaimPress()end);return ok and taken==true end -- R153: a press that skips / closes a pull reveal's card is not the tool's
 local function dig(screen)
  local char=shovel();local root=char and onTrack(char)
  if not root or busy()then return false end
+ if revealPress()then return true end
  local now=os.clock();if now-lastSend<.25 then return true end;lastSend=now
  remote:FireServer(aimPoint(screen,root))
  return true
