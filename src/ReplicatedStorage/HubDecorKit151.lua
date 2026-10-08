@@ -4,6 +4,7 @@
 -- rook gate, paths) and the client (HubLifeArt151 + HubLife151.client: trees and props). R152: no murals, banners or base arches. Pure: builds only what it
 -- is asked to, never touches gameplay; every part it makes is Anchored with CanTouch / CanQuery off and CanCollide off unless asked.
 local RS=game:GetService('ReplicatedStorage')
+local Shadow=require(RS:WaitForChild('SmallShadow154')) -- R154 (lag audit B1): a part under 1.5 studs casts no shadow
 local K={}
 local V,CF,RGB=Vector3.new,CFrame.new,Color3.fromRGB
 local Mat=Enum.Material
@@ -132,7 +133,7 @@ function K.Part(parent,name,size,cf,color,mat,o)
  o=o or{}
  local p=Instance.new(o.class or'Part')
  p.Name=name;p.Size=size;p.CFrame=cf;p.Color=K.C(color);p.Material=mat or Mat.SmoothPlastic
- p.Anchored=true;p.CanCollide=o.collide==true;p.CanTouch=false;p.CanQuery=false;p.CastShadow=o.shadow~=false
+ p.Anchored=true;p.CanCollide=o.collide==true;p.CanTouch=false;p.CanQuery=false;p.CastShadow=o.shadow~=false and Shadow.Keeps(size)
  p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth
  if o.shape then p.Shape=o.shape end
  if o.t then p.Transparency=o.t end

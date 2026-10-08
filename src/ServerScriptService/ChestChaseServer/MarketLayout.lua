@@ -5,6 +5,7 @@
 -- fruits that are already in the game"). Those models are built just after the market, each on its own, so one that
 -- cannot be built never stops the market.
 local M={Center=Vector3.new(0,4,-269.275)}
+local Shadow=require(game:GetService('ReplicatedStorage'):WaitForChild('SmallShadow154')) -- R154 (lag audit B1): a part under 1.5 studs casts no shadow
 -- R151 Cloudy sky (WeatherCycle151.Market.Tag): the market's warm lights are tagged so the client can warm and strengthen them while it is cloudy.
 local WARM_TAG='WarmLight151'
 local function warmTag(inst)game:GetService('CollectionService'):AddTag(inst,WARM_TAG)end
@@ -16,7 +17,7 @@ function M.Apply(map)
  local wood={194,137,86};local lightWood={246,215,155};local darkWood={80,61,53};local trim={32,121,125}
  local function part(name,size,position,color,material,solid)
   local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=CFrame.new(M.Center+position);p.Color=Color3.fromRGB(unpack(color));p.Material=material or Enum.Material.SmoothPlastic
-  p.Anchored=true;p.CanTouch=false;p.CanCollide=false;p.CanQuery=false;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=model;return p
+  p.Anchored=true;p.CanTouch=false;p.CanCollide=false;p.CanQuery=false;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=model;return Shadow.Part(p)
  end
  local function beam(name,a,b,width,color)
   local p=part(name,Vector3.new(width,width,(b-a).Magnitude),(a+b)*.5,color)
@@ -185,7 +186,7 @@ local function maker(parent,origin)
  local function part(name,size,at,color,material,solid)
   local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=origin*(typeof(at)=='CFrame'and at or CFrame.new(at));p.Color=rgb(color)
   p.Material=material or Enum.Material.SmoothPlastic;p.Anchored=true;p.CanCollide=solid==true;p.CanTouch=false;p.CanQuery=false
-  p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=parent;return p
+  p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=parent;return Shadow.Part(p)
  end
  local function bulb(name,d,at,color)
   local p=part(name,Vector3.new(d,d,d),at,color,Enum.Material.Neon);p.Shape=Enum.PartType.Ball;p.CastShadow=false;return p
@@ -305,6 +306,7 @@ local function settle(model,origin,at,size,turn,sits,hangs)
  local y=hangs and-bounds.Y/2 or bounds.Y/2-lift
  model:PivotTo(origin*CFrame.new(at+Vector3.new(0,y,0))*CFrame.Angles(0,turn or 0,0)*fromCenter)
  if not hangs then clearTops(model)end
+ Shadow.Tree(model) -- R154 (lag audit B1): at its final size, a part under 1.5 studs casts no shadow (the pass above ran before ScaleTo)
  return model
 end
 local function fruit(id,parent,origin,at,size,turn)

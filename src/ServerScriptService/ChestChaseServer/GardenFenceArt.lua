@@ -1,5 +1,6 @@
 -- Static native geometry; all skins share the same boundary and open entrance.
 local Rules=require(game:GetService('ReplicatedStorage'):WaitForChild('GardenFenceRules'))
+local Shadow=require(game:GetService('ReplicatedStorage'):WaitForChild('SmallShadow154')) -- R154 (lag audit B1): a part under 1.5 studs casts no shadow
 local Players=game:GetService('Players')
 local thumbnails={}
 local A={};local V,CF=Vector3.new,CFrame.new;local RGB=Color3.fromRGB
@@ -13,7 +14,7 @@ local themes={
  {Body=RGB(47,60,77),Trim=RGB(116,145,161),Accent=RGB(117,219,246),Material=Enum.Material.Metal},
 }
 local function part(parent,name,size,cf,color,material,collide,class)
- local p=Instance.new(class or'Part');p.Name=name;p.Size=size;p.CFrame=cf;p.Color=color;p.Material=material or Enum.Material.SmoothPlastic;p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=true;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=parent;return p
+ local p=Instance.new(class or'Part');p.Name=name;p.Size=size;p.CFrame=cf;p.Color=color;p.Material=material or Enum.Material.SmoothPlastic;p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=Shadow.Keeps(size);p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=parent;return p
 end
 -- R131 (owner): the badges were a fixed 210x128 px drawn on top of everything, so from a distance one covered the
 -- garden under it and gardens in front of it. Now the size is in studs (11 x 7) plus a small pixel floor, so a badge

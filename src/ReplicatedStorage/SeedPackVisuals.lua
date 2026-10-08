@@ -1,5 +1,6 @@
 -- V124. The same approved meshes serve world, dropped, held and opening packs.
 local Rules = require(script.Parent.SeedPackRules)
+local Shadow = require(script.Parent.SmallShadow154) -- R154 (lag audit B1): a part under 1.5 studs casts no shadow
 local Visuals = {}
 local function part(model,name,size,frame,color,root,shape)
     local p = Instance.new("Part")
@@ -9,6 +10,7 @@ local function part(model,name,size,frame,color,root,shape)
     p.CanCollide=false; p.CanTouch=false; p.CanQuery=false
     p.TopSurface=Enum.SurfaceType.Smooth; p.BottomSurface=Enum.SurfaceType.Smooth
     if shape then p.Shape=shape end
+    Shadow.Part(p)
     p.Parent=model
     if root and not p.Anchored then
         local w=Instance.new("WeldConstraint"); w.Part0=root; w.Part1=p; w.Parent=p
