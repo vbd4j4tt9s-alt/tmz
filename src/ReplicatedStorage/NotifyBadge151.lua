@@ -87,19 +87,22 @@ local function build(parent,name,size)
  return b
 end
 -- Puts the badge's centre `size/2 - overhang` px inside the parent's top-right corner: `overhang` px of it hang past the top and the right (0 = fully inside).
-local function place(b,size,overhang)
- if b:GetAttribute('BadgeOverhang')==overhang then return end
- local inset=size/2-overhang;b.Position=UDim2.new(1,-inset,0,inset);b:SetAttribute('BadgeOverhang',overhang)
+-- R153 client bug review (finding 7): with `left` it goes on the top-LEFT corner instead (the same distances), for a parent whose top-right holds text (the Index biome tabs' count).
+local function place(b,size,overhang,left)
+ left=left==true
+ if b:GetAttribute('BadgeOverhang')==overhang and b:GetAttribute('BadgeLeft')==left then return end
+ local inset=size/2-overhang;b.Position=left and UDim2.new(0,inset,0,inset)or UDim2.new(1,-inset,0,inset);b:SetAttribute('BadgeOverhang',overhang);b:SetAttribute('BadgeLeft',left)
 end
 -- parent: the button / tab it sits on (its top-right corner); name: 'RewardBadge' / 'RewardDot' / 'IndexRewardAlert'; size: the outer diameter in px (the old badge
--- sizes were 24, 20 and 14); overhang: px hanging past the corner (the parent's clip must have B.Extent(size,overhang) to spare; default 0 = inside).
+-- sizes were 24, 20 and 14); overhang: px hanging past the corner (the parent's clip must have B.Extent(size,overhang) to spare; default 0 = inside);
+-- left: true = the top-left corner (default: the top-right one).
 -- Idempotent: asking again for the same name returns the same badge (and restyles it when the size changed).
-function B.Make(parent,name,size,overhang)
+function B.Make(parent,name,size,overhang,left)
  size=math.max(10,math.floor((tonumber(size)or 20)+.5));overhang=tonumber(overhang)or 0
  local b=parent:FindFirstChild(name)
  if not(b and b:GetAttribute('NotifyBadge')==B.Revision)then if b then b:Destroy()end;b=build(parent,name,size)end
  if b:GetAttribute('BadgeSize')~=size then style(b,size);b:SetAttribute('BadgeOverhang',nil)end
- place(b,size,overhang)
+ place(b,size,overhang,left)
  return b
 end
 local function stop(b)

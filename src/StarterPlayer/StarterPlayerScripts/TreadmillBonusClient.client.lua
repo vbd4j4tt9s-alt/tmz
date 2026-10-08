@@ -244,18 +244,24 @@ local function startAttention()
 end
 -- R153: the last 30 s (ALMOST THERE!): the pack wiggles and the button pulses every Style.AlmostPeriod s, like the gift pill over the head did. Bursts of ~0.75 s; nothing
 -- runs between them, and ReducedMotion keeps only the words and the colours.
+-- (client bug review, finding 10: the burst in flight is kept, and leaving ALMOST THERE! cancels it and puts the rotation and the scale back at once, BEFORE the ready pop
+--  starts. It used to run to its end, writing pulse.Scale every frame over the BONUS ROLL button's ready pop.)
 local almostToken=0
+local almostEffect
 local function playAlmost()
  if reduced()or mode~='charging'or not button.Visible then return end
  local t=0
- addEffect(function(dt)
+ almostEffect=addEffect(function(dt)
   t+=dt
   packIcon.Root.Rotation=Style.Wiggle(t,.7,12);pulse.Scale=1+.06*math.sin(math.clamp(t/.7,0,1)*math.pi)
-  if t>=.75 then packIcon.Root.Rotation=0;pulse.Scale=1;return true end
+  if t>=.75 then packIcon.Root.Rotation=0;pulse.Scale=1;almostEffect=nil;return true end
   return false
  end)
 end
-local function stopAlmost()almostToken+=1 end
+local function stopAlmost()
+ almostToken+=1
+ if almostEffect then cancelEffect(almostEffect);almostEffect=nil;packIcon.Root.Rotation=0;pulse.Scale=1 end
+end
 local function startAlmost()
  almostToken+=1;local mine=almostToken
  local function loop()

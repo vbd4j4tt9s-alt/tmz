@@ -33,7 +33,7 @@ What made things jitter, in this game:
 | Carry nameplate (`CarryNameplate84`) | (checked: a BillboardGui on the root, world offset: attached) | none needed |
 | Keeper speed signs (`KeeperSpeedLabels`) | hung on the server root (packet steps) while the body glided | hang on `KeeperFollow153`'s anchor, moved with the smoothed body in the animator's batch |
 | Keepers 160-350 studs (`CosmeticBudget.KeeperDue`) | awake, on screen: posed at 30 Hz (20 low) | every frame; asleep / off screen keep the slow rates |
-| The Darkened (`VeiledEventClient81` + `VeiledKeeper81.ClientFrames`) | its body was posed on the raw root (packet steps) | posed on a KeeperMotion-smoothed root; drives its sign anchor too |
+| The Darkened (`VeiledEventClient81` + `VeiledKeeper81.ClientFrames`) | its body was posed on the raw root (packet steps) | posed on a KeeperMotion-smoothed root |
 | Void packs in the world and their effects (`VeiledEventClient81` + `VoidPackFx`) | 30 Hz (15 Hz low), carried ones' fx only every frame | the packs wearing effects (nearest 1 / 2 / 4 by tier, 160 studs) every frame; farther ones keep the tick |
 | Hub showcase spin (`HubDisplayClient`, one line) | 30 Hz on tier 2 (R152 fix B6) | every frame on every tier; out of view only the core moves (ViewCull152, as before) |
 | Void giveaway pack (`VoidGiveawayClient152`) | 30 Hz on tier 2 and below (R152 fix B5) | every frame while in view on every tier; out of view tier 2 keeps 30 Hz with the skipped time |
@@ -98,8 +98,8 @@ Looked at and left (no visible stepping):
 - Gate refresh barrier: static; its caption dots step `. .. ...` by design and the count is text.
 - R153 badges: the pop and the halo pulse are client tweens.
 - Keeper speed signs: now pinned over each keeper's spawn by the keeper-sign agent (merged at `98bf7fb`; this supersedes round 1's sign row: a
-  pinned sign cannot step). `KeeperFollow153` stays;
-  `BeastAnimation` and `VeiledEventClient81` still drive its anchors.
+  pinned sign cannot step). `KeeperFollow153` and the per-frame anchors `BeastAnimation` and `VeiledEventClient81` moved for it are gone
+  (client bug review finding 5: nothing read them); the keeper bodies keep their `KeeperMotion` smoothing.
 - Server: per-frame connections only in the 13 gameplay services (the same list), no tween but MapService's legacy course fade; the merged
   server code moves parts only when it builds or teleports.
 

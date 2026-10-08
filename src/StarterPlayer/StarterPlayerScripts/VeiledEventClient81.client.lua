@@ -9,16 +9,15 @@ local PackFx=require(RS:WaitForChild('VoidPackFx'));local Arrival=require(RS:Wai
 -- R123: client-only spectral lunge (Art.ClientFrames) and a small impact accent; the server pose is unchanged.
 local KFx=require(RS:WaitForChild('KeeperFx'));local Combat=require(RS:WaitForChild('KeeperCombat'))
 -- R153 (owner: "fix all jittery type effects"): The Darkened is posed on a smoothed root (KeeperMotion, as BeastAnimation does for the other keepers:
--- the server's anchored root arrives in packet steps, so its body stepped while it chased) and drives the sign anchor (KeeperFollow153);
+-- the server's anchored root arrives in packet steps, so its body stepped while it chased; the keeper signs are pinned at the spawn point, so no anchor follows it);
 -- the Void packs that wear effects (the nearest 1 / 2 / 4 by tier, within 160 studs) are posed and stepped every frame (were 30 Hz, 15 low).
 local Motion=require(RS:WaitForChild('KeeperMotion'));local Dash=require(RS:WaitForChild('KeeperRecoveryDash'))
-local Follow;pcall(function()Follow=require(RS:WaitForChild('KeeperFollow153',5))end)
 local keepers,bags={},{};local connections={};local alive=true
 local function watch(signal,fn)connections[#connections+1]=signal:Connect(fn)end
 local function keeper(model)if model:IsA('Model')then keepers[model]={At=-100}end end
 for _,m in ipairs(Tags:GetTagged('VeiledKeeper81'))do keeper(m)end
 local Fx152 -- (R152: KeeperFx152, required with the first new-model Darkened)
-watch(Tags:GetInstanceAddedSignal('VeiledKeeper81'),keeper);watch(Tags:GetInstanceRemovedSignal('VeiledKeeper81'),function(m)local r=keepers[m];if r and r.Fx152 then Fx152.Destroy(r.Fx152)end;keepers[m]=nil;if Follow then Follow.Release(m)end end)
+watch(Tags:GetInstanceAddedSignal('VeiledKeeper81'),keeper);watch(Tags:GetInstanceRemovedSignal('VeiledKeeper81'),function(m)local r=keepers[m];if r and r.Fx152 then Fx152.Destroy(r.Fx152)end;keepers[m]=nil end)
 -- R149 (owner: the Verity pack is just pure yellow with her face, "that's the only design needed"): only the Void pack has local motion and fx; the Verity pack (R147 / R148 gave it gold sparkles and a light here) has none.
 local function track(bag)if bag:GetAttribute('BagVariant')=='EclipseReliquary'and not bags[bag]then bags[bag]={}end end
 local function remove(bag)local r=bags[bag];if r and r.Capture then PackFx.Clear(r.Capture)end;bags[bag]=nil end
@@ -42,7 +41,7 @@ watch(Run.RenderStepped,function(dt)
  local camera=workspace.CurrentCamera;if not camera then return end;local now=workspace:GetServerTimeNow();local origin=camera.CFrame.Position
  table.clear(parts);table.clear(frames)
  for m,r in pairs(keepers)do
-  local root=m.PrimaryPart;if not m.Parent or not root then if r.Fx152 then Fx152.Destroy(r.Fx152)end;keepers[m]=nil;if Follow then Follow.Release(m)end;continue end
+  local root=m.PrimaryPart;if not m.Parent or not root then if r.Fx152 then Fx152.Destroy(r.Fx152)end;keepers[m]=nil;continue end
   local distance=(root.Position-origin).Magnitude;local period=distance<350 and 0 or distance<900 and .15 or 1
   -- R152: the baked Darkened's two faces (its glowing line): Asleep while it sleeps (GUARDING / SLEEPING), Chase otherwise.
   local state=m:GetAttribute('GuardianBehavior')or'GUARDING';local asleep=state=='GUARDING'or state=='SLEEPING'
@@ -55,7 +54,6 @@ watch(Run.RenderStepped,function(dt)
   if r.SampleTime>=.1 then r.Observed=r.SampleTravel/r.SampleTime;r.SampleTime,r.SampleTravel=0,0 end
   local speed=m:GetAttribute('KeeperTravelSpeed');if type(speed)~='number'or speed~=speed then speed=r.Observed end
   local motion=Motion.Update(r.Motion,visual,speed,asleep,state=='ALERTED'or state=='ATTACKING',dt,7,state=='CHASING'or state=='DASHING',visual~=raw)
-  if Follow then Follow.Drive(m,raw);Follow.Push(m,motion.Frame,parts,frames)end
   if r.FaceAsleep~=asleep and m:GetAttribute('KeeperMeshVariant')=='R152'then
    r.FaceAsleep=asleep
    for _,p in ipairs(m:GetChildren())do local face=p:GetAttribute('KeeperFaceState');if face and p:IsA('BasePart')then p.LocalTransparencyModifier=(face=='Asleep')~=asleep and 1 or 0 end end
@@ -126,6 +124,6 @@ end)
 script.Destroying:Connect(function()
  alive=false;for _,c in ipairs(connections)do c:Disconnect()end
  for _,r in pairs(bags)do if r.Capture then PackFx.Clear(r.Capture)end end;table.clear(bags)
- for m,r in pairs(keepers)do if r.Fx152 then Fx152.Destroy(r.Fx152)end;if Follow then Follow.Release(m)end end;table.clear(keepers)
+ for m,r in pairs(keepers)do if r.Fx152 then Fx152.Destroy(r.Fx152)end end;table.clear(keepers)
  Arrival.Stop()
 end)

@@ -5,6 +5,7 @@ local RS=game:GetService('ReplicatedStorage')
 local Gate=require(script.Parent.SecurityGate)
 local Motion=require(RS.RunnerMotion)
 local Sweep=require(RS.RunnerSweep)
+local okTramp,Tramp=pcall(function()return require(RS.HubTrampolineRules153)end) -- R153: the trampoline's launch (see launch below); without the module the guard is as before
 local M={Records={},Started=false}
 function M.Allowance(speed,elapsed)return Motion.Allowance(speed,elapsed)+Motion.Burst(speed)end
 local function root(player)
@@ -55,6 +56,33 @@ local function barriers(player,character,r)
     if not same then params.FilterDescendantsInstances=include;shared.Include=include end
     return params,#include>0
 end
+-- R153 client bug review (finding 6): a trampoline launch seen late. The bounce rises 30 studs in ~.55 s, but a hitch of ~.35 s at the launch hands this check the whole rise at once
+-- (26 studs against the ~25 of the allowance below), and the player was put back on the mat. A rise the allowance refuses is accepted ONCE if HubTrampolineRules153.LaunchRise says
+-- it is a launch: the last accepted frame was on or over the server's own trampoline collider (the folder the server built, its centres are the server's attributes), no older than the
+-- debounce window, the feet end under the bounce's apex plus a margin, and no launch was allowed in the last Cooldown seconds. The sideways distance is checked right after, as always.
+local function trampolineSpots()
+    local map=M.Bases.Map and M.Bases.Map.MapRoot or workspace:FindFirstChild('ChestChaseMap')
+    local folder=map and map:FindFirstChild(Tramp.FolderName)
+    local spots={}
+    if folder then
+        for _,m in ipairs(folder:GetChildren())do
+            local x,z=m:GetAttribute('CenterX'),m:GetAttribute('CenterZ')
+            if type(x)=='number'and type(z)=='number'and m:FindFirstChild('Trampoline collider')then spots[#spots+1]={X=x,Z=z}end
+        end
+    end
+    return spots
+end
+local function feetY(c,h,r,y)
+    local leg=h.RigType==Enum.HumanoidRigType.R6 and c:FindFirstChild('Left Leg')
+    return Tramp.FeetY(y,r.Size.Y,h.HipHeight,leg and leg.Size.Y or 0)
+end
+local function launch(c,h,r,state,now,p,elapsed)
+    if not okTramp then return false end
+    local spots=trampolineSpots();if #spots==0 then return false end
+    local from=state.Frame.Position
+    if Tramp.LaunchRise(spots,from.X,from.Z,feetY(c,h,r,from.Y),feetY(c,h,r,p.Y),elapsed,now-(state.LaunchAt or-math.huge))then state.LaunchAt=now;return true end
+    return false
+end
 local function correct(player,c,h,r,state,now,frame)
     local target=frame or state.Frame
     c:PivotTo(target*r.CFrame:Inverse()*c:GetPivot())
@@ -91,7 +119,7 @@ function M.Check(player)
     local credit=math.min(state.Budget or 0,Motion.Burst(ceiling))+allowed
     local jump=h.UseJumpPower==false and math.sqrt(2*workspace.Gravity*math.max(0,h.JumpHeight))or math.max(0,h.JumpPower)
     local riseAllowance=18+math.max(jump,48,ceiling*.65)*elapsed*1.5
-    if offset.Y>riseAllowance then return correct(player,c,h,r,state,now)end
+    if offset.Y>riseAllowance and not launch(c,h,r,state,now,p,elapsed)then return correct(player,c,h,r,state,now)end
     if distance>credit+.01 then return correct(player,c,h,r,state,now)end
     if distance>1 then
         local params,enabled=barriers(player,c,r)

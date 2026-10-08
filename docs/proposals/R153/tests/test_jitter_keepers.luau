@@ -4,7 +4,7 @@
 --  1. KeeperSpeedLabels + BeastAnimation: the "SPEED NEEDED" sign is pinned at the keeper's spawn point (R153 owner spec, run_keeper_label.sh): it does
 --     not follow the keeper, so it does not move at all while the keeper runs in packet steps (nothing to smooth), at 30 / 60 / 144 fps;
 --  2. CosmeticBudget.KeeperDue: an awake keeper on screen within 350 studs is posed every frame (30 / 20 Hz before); asleep / off screen keep the saving;
---  3. VeiledEventClient81: The Darkened's body (posed on a smoothed root) advances every drawn frame while the server root steps; its sign anchor too;
+--  3. VeiledEventClient81: The Darkened's body (posed on a smoothed root) advances every drawn frame while the server root steps (it makes no sign anchor: the signs are pinned);
 --  4. VeiledEventClient81: a Void pack in the world with its effects (the nearest 1 / 2 / 4 by tier) is posed and stepped every frame on every tier
 --     (30 Hz, 15 Hz low before); its debris orbit every frame.
 local J=require('./jitter_world');local W,R=J.W,J.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -54,6 +54,12 @@ J.look(V3(0,15,-30),V3(0,6,20))
 local ba=R.new('LocalScript');ba.Name='BeastAnimation';W.load('BeastAnimation',ba)
 local ks=R.new('LocalScript');ks.Name='KeeperSpeedLabels';W.load('KeeperSpeedLabels',ks)
 J.run(.5,60)
+-- Client bug review, finding 5: nothing reads a keeper's follow anchor now that the signs are pinned, so BeastAnimation builds and moves none (no part named
+-- KeeperFollow anywhere in the world, no _KeeperFollow153 folder, and the module is gone); the keeper's body is still smoothed (the checks below and in section 2).
+local function followParts()
+ local n=0;for _,d in ipairs(W.workspace:GetDescendants())do if d.Name=='KeeperFollow'or d.Name=='_KeeperFollow153'then n+=1 end end;return n
+end
+check(followParts()==0 and W.RS:FindFirstChild('KeeperFollow153')==nil,'a keeper makes no per-frame follow anchor (no KeeperFollow part, no _KeeperFollow153 folder, no KeeperFollow153 module)')
 -- R153 (the owner's spawn-pinned spec): the sign no longer follows the keeper at all (KeeperSpeedLabels does not use KeeperFollow153): a pinned sign never
 -- moves, so there is nothing to smooth. Its own suite is run_keeper_label.sh; here it must stay exactly where it is while the packet-stepped, smoothed
 -- keeper runs, on every drawn frame at 30 / 60 / 144 fps.
@@ -112,11 +118,8 @@ do
  local root=D.PrimaryPart;local chest=D:FindFirstChild('BroadChest')
  local stepRoot=packets(root,root.CFrame,30)
  J.everyFrame(check,'The Darkened\'s body while it chases (server root in ~20 Hz packets)',1.5,nil,function()return chest.CFrame.Position end,function()stepRoot()end)
- local anchor=W.workspace:FindFirstChild('_KeeperFollow153')
- local a=anchor and anchor:GetChildren()[1]
- if check(a~=nil,'The Darkened\'s smoothed body drives its KeeperFollow153 anchor (the sign no longer hangs on it: it is pinned at the spawn point)')then
-  J.everyFrame(check,'The Darkened\'s smoothed-body anchor',1,nil,function()return a.CFrame.Position end,function()stepRoot()end)
- end
+ -- finding 5: the sign is pinned at the spawn point, so The Darkened makes no follow anchor either (it used to move one every frame for nothing)
+ check(followParts()==0,'The Darkened makes no per-frame follow anchor (no KeeperFollow part, no _KeeperFollow153 folder)')
  -- the Void pack: every tier, its pieces and its debris every frame
  local pr=void.PrimaryPart
  for _,tier in ipairs({3,2,1})do
@@ -137,7 +140,7 @@ do
  for _=1,120 do J.frame(1/60);if not J.same(fp.CFrame,last)then moves+=1 end;last=fp.CFrame end
  check(moves>=50 and moves<=70,'a Void pack 300 studs away keeps the 30 Hz tick ('..moves..' moves in 2 s)')
  sc:Destroy()
- check(W.workspace:FindFirstChild('_KeeperFollow153')==nil or #W.workspace._KeeperFollow153:GetChildren()==0,'the script\'s removal lets The Darkened\'s anchor go')
+ check(followParts()==0,'after the script\'s removal no follow anchor is left either')
 end
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

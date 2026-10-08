@@ -14,7 +14,6 @@ local UpgradePose=require(Storage:WaitForChild('KeeperUpgradePose'))
 local Sleep=require(Storage:WaitForChild('KeeperSleep'))
 local Surge=require(Storage:WaitForChild('KeeperSurge'))
 local Budget=require(Storage.CosmeticBudget);local Fx=require(Storage.ClientFxBudget)
-local Follow;pcall(function()Follow=require(Storage:WaitForChild('KeeperFollow153',5))end) -- R153: the sign over a keeper follows its smoothed body, not the packet-stepped root
 -- R123: each keeper's own hit animation (client only); the server still tests contact with KeeperStrikeFrames.
 local Signature=require(Storage:WaitForChild('KeeperSignatureStrike'))
 local Combat=require(Storage.KeeperCombat)
@@ -46,7 +45,7 @@ end
 
 local function clear(model)
  local record=records[model]
- if record then if record.Surge then Surge.Destroy(record.Surge)end;if record.Fx152 then Fx152.Destroy(record.Fx152)end;KFx.Destroy(record.Fx);Accents.Destroy(record.Accents);record.Sound:Destroy();record.Sleep:Destroy();records[model]=nil;if Follow then Follow.Release(model)end end
+ if record then if record.Surge then Surge.Destroy(record.Surge)end;if record.Fx152 then Fx152.Destroy(record.Fx152)end;KFx.Destroy(record.Fx);Accents.Destroy(record.Accents);record.Sound:Destroy();record.Sleep:Destroy();records[model]=nil end
 end
 local function bind(model)
  if destroyed then return end
@@ -88,7 +87,6 @@ local function bind(model)
   Surge=stage==7 and Surge.New(model,variant)or nil,Motion=Motion.new(root.CFrame,awake),Sleep=Sleep.new(root,stage,cfg),
   Polish=Polish.new(),Fx=KFx.new(root,stage,cfg),Fx152=variant and Fx152.new(rig,stage)or nil,Accents=Accents.new(model,stage,variant),PoseDt=0}
  if variant then faces(records[model],awake==0,awake)end
- if Follow then Follow.Drive(model,root.CFrame)end
 end
 local function schedule(model)
  if pending[model] then return end
@@ -145,7 +143,6 @@ local render=Run.RenderStepped:Connect(function(dt)
   if type(speed)~='number' or speed~=speed then speed=r.ObservedSpeed end
   local rootFrame=r.Root.CFrame;local frame=Dash.VisualFrame(model,now,rootFrame)
   local motion=Motion.Update(r.Motion,frame,speed,asleep,state=='ALERTED'or state=='ATTACKING',dt,r.Stage,state=='CHASING'or state=='DASHING',frame~=rootFrame)
-  if Follow then Follow.Push(model,motion.Frame,moveParts,moveFrames)end -- R153: every frame (also when the pose below is skipped), with the body's batch
   local distance=(camera.CFrame.Position-r.Root.Position).Magnitude
   local voiceReady=now-(model:GetAttribute('KeeperLastHitAt')or -100)>1.1
   -- R121: Stop only a sound that is playing (was a Stop call per keeper per frame).
