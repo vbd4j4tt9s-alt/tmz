@@ -7,11 +7,12 @@
 --     that player for the session: their pulls and harvests do not count; other commands do not; the target (@name) is tainted, not the requester;
 --  3. a fruit picked by hand: the harvest record carries what NoteHarvest reads (SeedId, FruitScale, Mutation, Weather); ChestService calls its HarvestHook right after a
 --     successful Harvest (and only for a harvest); an owner's `harvestall` (data:HarvestPlant directly) never reaches the hook;
---  4. the owner commands: bestpull / bigfruit / hubdisplays (status, reset, day +/-N): arguments, usage errors, targets, `share`, the server-wide ones refuse @name, strangers are
---     refused; the F4 help and docs/COMMANDS.md list them;
+--  4. the owner commands: bestpull / bigfruit / hubdisplays (status, reset, day +/-N): arguments, usage errors, targets, `share` (bigfruit's; R153: bestpull refuses it, BEST PULL is
+--     this server only), the server-wide ones refuse @name, strangers are refused; the F4 help and docs/COMMANDS.md list them;
 --  5. records in chat: the REAL PullAnnouncer behind the REAL hub: a real Mythic / Secret open that takes the Best Pull says the pull line and then the record line only after the
---     puller's reveal has shown the seed (this server; Secret+ the other servers too), no hub notice, owner test packs and bestpull / bigfruit tests never speak to the server,
---     a leaving puller releases both lines, a fruit record is at once, the gap, a preview day is silent;
+--     puller's reveal has shown the seed (this server; R153: the RECORD line never leaves this server, even a Secret's: only the pull line of a Secret+ goes to the other servers, as
+--     before, and no published message mentions the record), no hub notice, owner test packs and bestpull / bigfruit tests never speak to the server, a leaving puller releases both
+--     lines, a fruit record is at once, the gap, a preview day is silent; R153: the next 10-minute window announces its record again, the mark itself says nothing;
 --  (the files themselves - the main script's wiring, the manifest, the docs - are checked by run_hub_displays.sh)
 local W=require('./world');local R=W.R
 local fails,checks=0,0
@@ -223,7 +224,8 @@ do
  check(ok and hub:Snapshot().Pull.Record.Name=='Gus','bestpull FirePepperSeed @Gus: for the named player')
  hub:Reset()
  ok,msg=run('/test bestpull solar starfruit share')
- check(ok and msg:find('(shared)',1,true),'bestpull ... share')
+ check(not ok and msg:find('this server only',1,true)and hub:Snapshot().Pull.Record==nil,'R153: bestpull ... share is refused (BEST PULL is this server only) and changes nothing ('..tostring(msg)..')')
+ ok,msg=run('/test bestpull share solar starfruit');check(not ok,'in any word order')
  hub:Reset()
  ok,msg=run('/test bestpull');check(not ok and msg:find('Use bestpull',1,true),'bestpull needs a seed ('..tostring(msg)..')')
  ok,msg=run('/test bestpull nonsense');check(not ok and msg:find('Unknown seed',1,true),'an unknown seed is refused')
@@ -255,7 +257,7 @@ do
  -- help and docs
  local Help=W.module('StudioTestHelp');local has={}
  for _,e in ipairs(Help)do for _,k in ipairs({'bestpull','bigfruit','hubdisplays'})do if e[1]:find('/test '..k,1,true)then has[k]=e end end end
- check(has.bestpull and has.bigfruit and has.hubdisplays and has.hubdisplays[2]:find('day +1',1,true)and has.bestpull[2]:find('share',1,true),'the F4 help lists bestpull, bigfruit and hubdisplays (day +1, share)')
+ check(has.bestpull and has.bigfruit and has.hubdisplays and has.hubdisplays[2]:find('day +1',1,true)and has.bestpull[2]:find('10 minutes',1,true)and has.bigfruit[2]:find('share',1,true),'the F4 help lists bestpull (R153: this server only, every 10 minutes), bigfruit (share) and hubdisplays (day +1)')
 end
 
 -- 5. Records in chat: the REAL PullAnnouncer behind the REAL hub (no stand-ins between them) ------------------------------------------------------------------------------------
@@ -322,14 +324,14 @@ do
   check(#logA==0 and hubNotices()==0,'nothing at the moment of the open: no chat line, no hub notice (the puller\'s reveal is just starting)')
   step(12,function()return false end)
   local lines=distinct(logA)
-  check(#lines==2 and lines[1].Kind=='Pull'and lines[2].Kind=='Record'and lines[2].Record=='BestPull'and lines[1].UserId==101 and lines[2].UserId==101,'two chat lines: the pull line, then the record line ("took BEST PULL TODAY"), both about Ava')
+  check(#lines==2 and lines[1].Kind=='Pull'and lines[2].Kind=='Record'and lines[2].Record=='BestPull'and lines[1].UserId==101 and lines[2].UserId==101,'two chat lines: the pull line, then the record line ("took BEST PULL"), both about Ava')
   check(lines[1].Players==everyone and lines[2].Players==everyone,'each goes to every player in the server ('..lines[1].Players..' and '..lines[2].Players..' of '..everyone..')')
   local delay=AnnounceRules.RevealDelay('Mythic')
   check(math.abs(lines[1].At-t0-delay)<=.011,'the pull line at RevealDelay ('..string.format('%.2f',lines[1].At-t0)..' s, RevealDelay '..string.format('%.2f',delay)..' s)')
   check(math.abs(lines[2].At-t0-(delay+AnnounceRules.Setting('RecordLag')))<=.011,'the record line RecordLag later ('..string.format('%.2f',lines[2].At-t0)..' s): after the puller\'s seed is shown on every presentation ('..string.format('%.2f',Reveal.LatestSeedShown(5))..' s)')
   check(lines[1].At-t0>=Reveal.LatestSeedShown(5)and lines[2].At-t0>=Reveal.LatestSeedShown(5),'neither comes before the seed card has shown the seed')
   check(hubNotices()==0,'the hub showed no notice of its own: ONE message per event, in chat')
-  check(bus:Count('A')==published and#logB==0,'a Mythic record stays in this server (Secret and above travel)')
+  check(bus:Count('A')==published and#logB==0,'a Mythic and its record stay in this server')
   check(#chimes>=everyone and chimes[#chimes].At-t0>=delay,'the hub\'s chime is in step with the lines, not at the open')
   table.clear(chimes)
  end
@@ -344,11 +346,14 @@ do
   local lines=distinct(logA);local far_=distinct(logB)
   local delay=AnnounceRules.RevealDelay('Secret')
   check(#lines==2 and lines[1].Kind=='Pull'and lines[2].Kind=='Record'and math.abs(lines[1].At-t0-delay)<=.011,'this server: the pull line at '..string.format('%.2f',delay)..' s, then the record line')
-  check(bus:Count('A')>=published+1 and bus:Count('A')<=published+2,'published to the other servers ('..(bus:Count('A')-published)..' message(s))')
+  check(bus:Count('A')==published+1,'R153: published to the other servers: ONE message, the pull\'s ('..(bus:Count('A')-published)..' message(s))')
   local firstPublish=bus.Log[published+1]
-  check(firstPublish and firstPublish.At-t0>=Reveal.LatestSeedShown(6)and math.abs(firstPublish.At-t0-delay)<=.011,'the first publish is at that same moment ('..string.format('%.2f',firstPublish and firstPublish.At-t0 or -1)..' s), never before the Full scene has shown the seed')
-  check(#far_==2 and far_[1].Kind=='Global'and far_[2].Kind=='Record'and far_[1].At-t0>=Reveal.LatestSeedShown(6)and far_[2].At-t0>=far_[1].At-t0,'the other server shows 🌐 the pull line, then the record line, none before the puller\'s seed is shown ('..string.format('%.2f',far_[1]and far_[1].At-t0 or -1)..' s, '..string.format('%.2f',far_[2]and far_[2].At-t0 or -1)..' s)')
-  check(far_[2]and logB[#logB].Payload.Record=='BestPull'and logB[#logB].Payload.Name=='Bo','... the record line names Bo and BestPull')
+  check(firstPublish and firstPublish.At-t0>=Reveal.LatestSeedShown(6)and math.abs(firstPublish.At-t0-delay)<=.011,'the publish is at that same moment ('..string.format('%.2f',firstPublish and firstPublish.At-t0 or-1)..' s), never before the Full scene has shown the seed')
+  local mentions=false;for k=published+1,#bus.Log do if tostring(bus.Log[k].Message):find('BestPull',1,true)or tostring(bus.Log[k].Message):find('"k"',1,true)then mentions=true end end
+  check(not mentions,'R153: nothing published says BestPull (the record line is this server\'s own)')
+  check(#far_==1 and far_[1].Kind=='Global'and far_[1].At-t0>=Reveal.LatestSeedShown(6),'the other server shows 🌐 the pull line, not before the puller\'s seed is shown ('..string.format('%.2f',far_[1]and far_[1].At-t0 or-1)..' s)')
+  local record=false;for _,l in ipairs(logB)do if l.Payload.Kind=='Record'then record=true end end
+  check(not record,'... and NO record line: a best pull is not told to other servers, a Secret\'s either')
   check(hubNotices()==0,'and no hub notice')
  end
 
@@ -420,8 +425,10 @@ do
   local onlyOwner=true;for _,c in ipairs(chimes)do if c.Player~=owner then onlyOwner=false end end
   check(#chimes>=1 and onlyOwner,'the chime is private too (only the owner hears it)')
   table.clear(logA);table.clear(chimes);hub:Reset();hubClock.t+=30
-  local ok2=run('/test bestpull solar starfruit share @Tess');step(14,function()return false end)
-  check(ok2 and#logA==1 and logA[1].Player==target and bus:Count('A')==published and#logB==0,'bestpull ... share: it reaches the shared board like a real record, yet its chat line is private to the target (Tess)')
+  local ok2,msg2=run('/test bestpull solar starfruit share @Tess');step(14,function()return false end)
+  check(not ok2 and#logA==0 and hub:Snapshot().Pull.Record==nil,'R153: bestpull ... share is refused: nothing changes, nothing is said ('..tostring(msg2)..')')
+  local ok2b=run('/test bestpull solar starfruit @Tess');step(14,function()return false end)
+  check(ok2b and#logA==1 and logA[1].Player==target and bus:Count('A')==published and#logB==0,'bestpull @Tess: its chat line is private to the target (Tess), never to the server or another one')
   table.clear(logA);hub:Reset();hubClock.t+=30
   local ok3=run('/test bigfruit 12.4');step(14,function()return false end)
   check(ok3 and#logA==1 and logA[1].Player==owner and logA[1].Payload.Record=='BiggestFruit'and bus:Count('A')==published,'bigfruit: private to the target too')
@@ -469,6 +476,27 @@ do
   check(#distinct(logA)==1,'a heavier fruit within 8 s: the display changes, no second line (the gap)')
   hubClock.t+=9;hub:NoteHarvest(Di,{SeedId=fid,FruitScale=9,Mutation='None',Weather='None'})
   check(#distinct(logA)==2,'after the gap the next record is announced again')
+ end
+ -- h. R153: BEST PULL is per 10-minute window: the board empties at the mark (nothing is said), and the next window's record is announced again, in this server only
+ do
+  local published=fresh()
+  local toMark=HubRules.PullSecondsLeft(math.floor(R.clock))
+  R.advance(toMark>40 and toMark-30 or toMark+570) -- (30 s before a :00 / :10 / :20 ...)
+  hubClock.t+=30
+  local windowBefore=HubRules.PullWindowIndex(math.floor(R.clock))
+  local ava=A
+  local r1=openReal(ava,'Mythic');step(12,function()return false end)
+  check(r1 and hub:Snapshot().Pull.Record and hub:Snapshot().Pull.Record.Name=='Ava'and#distinct(logA)==2,'30 s before a mark: a Mythic takes the board and is announced (pull line, record line)')
+  step(25,function()return false end)  -- (the mark passes)
+  local linesBefore=#distinct(logA);local toldBefore=#told
+  hub:Step()
+  check(HubRules.PullWindowIndex(math.floor(R.clock))==windowBefore+1 and hub:Snapshot().Pull.Record==nil,'the mark passed: the board is empty after the next step')
+  check(#distinct(logA)==linesBefore and#told==toldBefore and hubNotices()==0,'and the mark said nothing: no chat line, no notice')
+  hubClock.t+=30
+  local r2=openReal(Bo,'Mythic');step(12,function()return false end)
+  local lines=distinct(logA)
+  check(r2 and hub:Snapshot().Pull.Record and hub:Snapshot().Pull.Record.Name=='Bo'and#lines==linesBefore+2 and lines[#lines].Kind=='Record'and lines[#lines].Record=='BestPull'and lines[#lines].UserId==102,'in the next window the first Mythic takes the empty board and its record line is announced again (Bo, this server)')
+  check(bus:Count('A')==published and#logB==0,'neither window published or told another server anything')
  end
  srvA:Destroy();srvB:Destroy();Announcer.Instance=nil
 end

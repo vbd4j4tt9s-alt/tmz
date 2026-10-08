@@ -11,8 +11,9 @@
 --  3. receiving: the origin server drops its own message (it shows the in-server version only), repeats, stale and future messages, an over-limit flood, malformed
 --     messages and messages whose seed is unknown or below the threshold; the rarity is the local catalog's; only players with "Announcements from other servers" on
 --  4. the subscription is retried with a growing wait until it works
---  5. records: PullAnnouncer.Announce({Kind='Record'...}): the scope (RecordScope: this server / every server / nobody), AfterReveal, To (private), the cross-server record, the
---     timing next to the pull line; owner commands: announce <seed>, announce global <seed> [here], announce record
+--  5. records: PullAnnouncer.Announce({Kind='Record'...}): the scope (RecordScope: this server / nobody; R153: never another server, a Secret+ BestPull included, whatever Scope the caller
+--     asks for), AfterReveal, To (private), the timing next to the pull line, what another (older) server's record message is worth here (nothing); owner commands: announce <seed>,
+--     announce global <seed> [here], announce record
 --  6. trust: no client -> server remote exists, nothing a player types is broadcast
 local W=require('./world');local R=W.R;local E=require('./announce_env')
 local fails,checks=0,0
@@ -915,7 +916,7 @@ do
  check(select(1,X.Execute(ctx,p1,'announce',{'global','nonsense'}))==false and select(1,X.Execute(ctx,p1,'announce',{'global'}))==false,'announce global with a bad or missing seed is refused')
  -- announce record
  Announcer.Instance=srv;table.clear(log)
- local r1,rm=X.Execute(ctx,p1,'announce',{'record'});check(r1==true and log[1].Payload.Kind=='Record'and log[1].Payload.Record=='BestPull'and log[1].Payload.SeedId==nil,'announce record: BEST PULL TODAY, no seed ('..tostring(rm)..')')
+ local r1,rm=X.Execute(ctx,p1,'announce',{'record'});check(r1==true and log[1].Payload.Kind=='Record'and log[1].Payload.Record=='BestPull'and log[1].Payload.SeedId==nil,'announce record: BEST PULL, no seed ('..tostring(rm)..')')
  table.clear(log);X.Execute(ctx,p1,'announce',{'record','fruit','moonmelon'})
  check(log[1].Payload.Record=='BiggestFruit'and log[1].Payload.SeedId=='MoonflowerSeed','announce record fruit moonmelon: BIGGEST FRUIT TODAY with Moon Melon\'s picture')
  table.clear(log);local okK,msgK=X.Execute(ctx,p1,'announce',{'record','bestpull',kingKey})
@@ -936,7 +937,7 @@ do
  Announcer.Instance=sA
  local function ids(log)local out={};for _,l in ipairs(log)do out[#out+1]=l.Payload.Kind..':'..tostring(l.Payload.Record)end;return table.concat(out,',')end
  -- BestPull: the pull's own rarity decides, with the pull line's thresholds
- local expected={Common='nothing',Uncommon='nothing',Rare='nothing',Legendary='server',Mythic='server',Secret='everywhere',Cosmic='everywhere',King='everywhere'}
+ local expected={Common='nothing',Uncommon='nothing',Rare='nothing',Legendary='server',Mythic='server',Secret='server',Cosmic='server',King='server'} -- (R153: Secret and above used to be 'everywhere')
  for _,rarity in ipairs(Packs.RarityOrder)do
   R.advance(6);table.clear(logA);table.clear(logB);local published=b:Count('RA')
   local spec=firstOf(rarity)
@@ -947,12 +948,8 @@ do
    check(ok==false and why=='below the threshold'and#logA==0 and b:Count('RA')==published and next(sA.Waiting)==nil,rarity..': a BestPull record is not announced (below Legendary: the display changes, chat says nothing)')
   else
    check(ok==true and#logA==2 and logA[1].Payload.Kind=='Record'and logA[1].Payload.Record=='BestPull'and logA[1].Payload.SeedId==spec.id and logA[1].Payload.Name=='Rec','a '..rarity..' BestPull record: both players of this server get the record line now ('..ids(logA)..')')
-   check(b:Count('RA')==published+(want=='everywhere'and 1 or 0),rarity..': '..(want=='everywhere'and'published to the other servers'or'not published (this server only)'))
-   if want=='everywhere'then
-    local m=E.decode(b.Log[#b.Log].Message)
-    check(#m.p==1 and m.p[1].k=='BestPull'and m.p[1].s==spec.id and m.p[1].n=='Rec'and m.p[1].r==rarity,rarity..': the message carries the record key (k = BestPull), not a pull')
-    check(#logB==1 and logB[1].Player==pb and logB[1].Payload.Kind=='Record'and logB[1].Payload.Record=='BestPull'and logB[1].Payload.SeedId==spec.id and logB[1].Payload.Name=='Rec'and logB[1].Payload.Rarity==nil,rarity..': the other server shows the record line to its player ('..ids(logB)..')')
-   else check(#logB==0,rarity..': nothing in the other server')end
+   check(b:Count('RA')==published,rarity..': R153: not published (this server only: BEST PULL is each server\'s own board)')
+   check(#logB==0,rarity..': nothing in the other server')
   end
  end
  -- every other record: this server, never the others (a fruit's weight has no pull rarity; a record that names no seed has none to judge)
@@ -962,6 +959,13 @@ do
  table.clear(logA);check(Announcer.Announce({Kind='Record',Player=pa,Record='BestPull'})==true and#logA==2 and b:Count('RA')==published,'a BestPull that names no seed: this server only')
  table.clear(logA);check(Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('King').id,Scope='InServer'})==true and#logA==2 and b:Count('RA')==published and#logB==0,'Scope = InServer keeps even a King record in this server (what the owner\'s `announce record` does)')
  table.clear(logA);check(Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('Rare').id,Scope='InServer'})==true and#logA==2,'... and an explicit scope overrides the threshold')
+ -- R153: and asking for every server changes nothing for a BestPull: it is shown here and published nowhere (a guard in the announcer on top of RecordScope)
+ R.advance(6);table.clear(logA);table.clear(logB);published=b:Count('RA')
+ check(Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('King').id,Scope='Global'})==true and#logA==2 and b:Count('RA')==published and#logB==0,'R153: Scope = Global for a BestPull (even a King) is shown in this server and never published')
+ R.advance(6);table.clear(logA);table.clear(logB);published=b:Count('RA')
+ check(Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('King').id,Scope='Global',AfterReveal=true})==true,'(the same after a reveal)')
+ R.advance(30)
+ check(b:Count('RA')==published and#logB==0 and#logA==2,'R153: ... still nothing published or told to another server after the wait')
  -- an explicit Global scope for a record the rules keep at home is dropped by the receiver
  R.advance(6);table.clear(logA);table.clear(logB);local bad0=sB.Stats.Bad
  check(Announcer.Announce({Kind='Record',Player=pa,Record='BiggestFruit',SeedId=firstOf('Mythic').id,Scope='Global'})==true and#logA==2,'Scope = Global is honoured by the sender (this server shows it, and publishes)')
@@ -970,7 +974,7 @@ do
  R.advance(6);table.clear(logA);table.clear(logB);published=b:Count('RA')
  local okTo,waitTo=Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('King').id,To=pa,AfterReveal=true})
  check(okTo==true and waitTo==0 and#logA==1 and logA[1].Player==pa and b:Count('RA')==published and#logB==0,'To = the player: only they get the line, at once (no wait), never another player, never another server')
- -- AfterReveal: a record that comes from a pack open waits for the puller's reveal, then goes out in this server and (Secret+) to the others
+ -- AfterReveal: a record that comes from a pack open waits for the puller's reveal, then goes out in this server (R153: and nowhere else)
  for _,rarity in ipairs({'Mythic','Secret','King'})do
   R.advance(30);table.clear(logA);table.clear(logB);published=b:Count('RA');local t0=R.clock
   local spec=firstOf(rarity)
@@ -979,9 +983,7 @@ do
   check(ok==true and math.abs(wait-(Rules.RevealDelay(rarity)+lag))<1e-9 and#logA==0 and b:Count('RA')==published,rarity..': AfterReveal: nothing at once; it waits RevealDelay + RecordLag ('..string.format('%.2f',wait or -1)..' s)')
   runUntil(20,function()return#logA>=2 end)
   check(#logA==2 and math.abs(logA[1].At-t0-wait)<=.011,rarity..': the record line goes out then ('..string.format('%.2f',logA[1]and logA[1].At-t0 or -1)..' s), after the pull line\'s time ('..string.format('%.2f',Rules.RevealDelay(rarity))..' s)')
-  if Rules.Qualifies('Global',rarity)then
-   check(b:Count('RA')==published+1 and b.Log[#b.Log].At-t0>=Rules.RevealDelay(rarity)-1e-9 and#logB==1 and logB[1].At-t0>=Rules.RevealDelay(rarity)-1e-9,rarity..': the other servers get it then too, never before the puller\'s seed is shown')
-  else check(b:Count('RA')==published and#logB==0,rarity..': this server only')end
+  check(b:Count('RA')==published and#logB==0,rarity..': this server only (R153: a Secret\'s record line does not travel either)')
  end
  -- the puller leaves: released at once; a record below the threshold does not wait at all
  R.advance(30);table.clear(logA);table.clear(logB);published=b:Count('RA');local t0=R.clock
@@ -989,8 +991,8 @@ do
  runUntil(.7,function()return false end)
  check(#logA==0,'(0.7 s into the reveal: nothing yet)')
  table.remove(listA,1);sA:_released(pa) -- (pa is gone from the list; the real PlayerRemoving of the main announcer is tested in 1a)
- check(#logA==1 and logA[1].Player==pa2 and logA[1].At-t0<1 and b:Count('RA')==published+1 and#logB==1,'the puller leaves: the record line goes out at once, in this server and to the others')
- local n=#logA;R.advance(30);check(#logA==n and b:Count('RA')==published+1,'... and not again at the normal time')
+ check(#logA==1 and logA[1].Player==pa2 and logA[1].At-t0<1 and b:Count('RA')==published and#logB==0,'the puller leaves: the record line goes out at once, in this server only')
+ local n=#logA;R.advance(30);check(#logA==n and b:Count('RA')==published,'... and not again at the normal time')
  local rare=Announcer.Announce({Kind='Record',Player=pa,Record='BestPull',SeedId=firstOf('Rare').id,AfterReveal=true})
  check(rare==false and next(sA.Waiting)==nil,'a Rare record from a pull is refused at once: nothing is left waiting')
  -- what another server accepts
@@ -1002,15 +1004,14 @@ do
  sC:_onMessage(packet({i='f3',u=1,n='Evil',s=kingId,k='<b>x</b>'}))
  sC:_onMessage(packet({i='f4',u=1,n='Evil',k='BestPull'}))
  check(#logC==0 and sC.Stats.Bad==bad1+4,'forged records are dropped: a BestPull of a Common seed, a fruit record, a record key with markup, a record without a seed ('..(sC.Stats.Bad-bad1)..' counted)')
+ local bad2=sC.Stats.Bad
  sC:_onMessage(packet({i='f5',u=1,n='Real',s=kingId,k='BestPull'}))
- check(#logC==1 and logC[1].Payload.Kind=='Record'and logC[1].Payload.Record=='BestPull'and logC[1].Payload.Name=='Real','a King BestPull record from another server is shown (the rarity from THIS server\'s catalog)')
- sC:_onMessage(packet({i='f5',u=1,n='Real',s=kingId,k='BestPull'}))
- check(#logC==1 and sC.Stats.Repeat==1,'... once (a repeat is dropped)')
+ check(#logC==0 and sC.Stats.Bad==bad2+1,'R153: a King BestPull record from another server (an older one that still publishes it) is NOT shown here: BEST PULL is each server\'s own ('..(sC.Stats.Bad-bad2)..' counted bad)')
  sC:_onMessage(packet({i='f6',u=1,n='Pat',s=kingId,k=5}))
- check(#logC==2 and logC[2].Payload.Kind=='Global','a record key that is not a string is no record: it reads as the pull it also could be')
+ check(#logC==1 and logC[1].Payload.Kind=='Global','a record key that is not a string is no record: it reads as the pull it also could be')
  sC.Data={IsLoaded=function()return true end,GetPremium=function()return {Settings={GlobalAnnouncements=false}}end}
- sC:_onMessage(packet({i='f7',u=1,n='Real',s=kingId,k='BestPull'}))
- check(#logC==2,'a player who switched "Announcements from other servers" off does not get another server\'s record line either')
+ sC:_onMessage(packet({i='f7',u=1,n='Pat2',s=kingId}))
+ check(#logC==1,'a player who switched "Announcements from other servers" off does not get another server\'s pull line either (as before)')
  sA:Destroy();sB:Destroy();Announcer.Instance=previousInstance
 end
 
