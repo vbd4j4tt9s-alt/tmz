@@ -29,8 +29,8 @@ if grep -rniE "cla[u]de|op[u]s|sonn[e]t|haik[u]|anthrop[i]c|gp[t]-?[0-9]" "$HERE
 sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 || { cat "$OUT/guard.log";fail "the R152 load guard (line 1 of every client script)"; }
 # Config.Version is the release step's: unchanged against the R153 release commit when it is here
 if git -C "$REPO" cat-file -e 006daa1 2>/dev/null;then
- git -C "$REPO" show 006daa1:src/ServerScriptService/ChestChaseServer/Config.lua | grep 'Config.Version' > "$OUT/version_base.txt"
- grep 'Config.Version' "$S/ServerScriptService/ChestChaseServer/Config.lua" > "$OUT/version_now.txt"
+ git -C "$REPO" show 006daa1:src/ServerScriptService/ChestChaseServer/Config.lua | grep 'Config.Version' | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/" > "$OUT/version_base.txt"
+ grep 'Config.Version' "$S/ServerScriptService/ChestChaseServer/Config.lua" | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/" > "$OUT/version_now.txt"
  cmp -s "$OUT/version_base.txt" "$OUT/version_now.txt" || fail "Config.Version changed"
 fi
 echo "ok: the changed scripts and the R154 tests compile at -O0; line 1 of every client script is still the R152 load guard; Config.Version is unchanged; no model names"

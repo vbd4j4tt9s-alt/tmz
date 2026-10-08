@@ -30,9 +30,9 @@ echo "ok: PackLuck154 is in the manifest (sorted)"
 for f in PackOdds112 SeedPackRules PackLuck154;do grep -q "^# R154.*$f.lua" "$P/R151/tests/frozen.sha256" || fail "frozen.sha256 has no R154 note for $f";done
 grep -q "  src/ReplicatedStorage/PackLuck154.lua$" "$P/R151/tests/frozen.sha256" || fail "PackLuck154 is not frozen"
 echo "ok: the frozen odds files match their hashes; the R154 changes (PackOdds112 / 137, SeedPackRules, the new PackLuck154) carry their notes"
-grep -q "Config.Version='V150 R153';Config.ProfileVersion=22" "$S/ServerScriptService/ChestChaseServer/Config.lua" || fail "Config.Version / ProfileVersion changed"
+grep -q "Config.Version='V150 R15[0-9a-z]*';Config.ProfileVersion=22" "$S/ServerScriptService/ChestChaseServer/Config.lua" || fail "Config.Version / ProfileVersion changed"
 if git -C "$REPO" diff --name-only "$BASE" -- src | grep -i "BackgroundMusic";then fail "BackgroundMusic was touched";fi
-echo "ok: Config.Version 'V150 R153' and ProfileVersion 22 as in R153; BackgroundMusic untouched since $BASE"
+echo "ok: Config.Version 'V150 R15x' (the release number is the release step's) and ProfileVersion 22 as in R153; BackgroundMusic untouched since $BASE"
 sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 && echo "ok: the R152 load guard is still line 1 of every client script" || { fail "the load guard test fails";tail -5 "$OUT/guard.log"; }
 SS=$S/ServerScriptService/ChestChaseServer
 grep -q "pack.BagVariant,pack.OddsVersion,pack.RateBoost,passLuck)" "$SS/PlayerDataService.lua" || fail "OpenSeedPack does not hand the roll the clover's luck"
