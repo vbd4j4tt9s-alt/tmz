@@ -116,6 +116,11 @@ do
  local mono=true;local last=0;for i=0,100 do local v=Cycle.LampStrength(i/100);if v<last-1e-12 then mono=false end;last=v end
  check(mono,'lamp strength rises monotonically with the level')
  check(Cycle.RealLights(3)==8 and Cycle.RealLights(2)==4 and Cycle.RealLights(1)==0 and Cycle.RealLights(nil)==0 and Cycle.RealLights(9)==Cycle.Lamps.Real[1],'real lights by tier: 8 desktop, 4 phone, 0 FastMode (an unknown tier gets the lowest)')
+ do -- R154: the lamps' boost (owner: "make each lamp brighter in its warmth during cloudy season too"): noticeable, bounded, warm
+  local L=Cycle.Lamps;local Art=W.module('HubLifeArt151')
+  check(L.Boost.Brightness>=.3 and L.Boost.Brightness<=1 and L.Boost.Range>=.15 and L.Boost.Range<=.5 and L.LightWarmShare>=.5 and L.LightWarmShare<=1 and L.LightWarm.R>=L.LightWarm.B*3 and L.LightWarm.G<.7,'R154: a lamp light at full glow is 1.3 - 2x brighter, 1.15 - 1.5x wider and warmer toward amber (boost '..L.Boost.Brightness..' / '..L.Boost.Range..', warm share '..L.LightWarmShare..')')
+  check(Art.LampLight.Range>22 and Art.LampLight.Brightness>1.4 and Art.LampLight.Range*(1+L.Boost.Range)<=40 and Art.LampLight.Brightness*(1+L.Boost.Brightness)<=3.2,'R154: the base light is brighter and wider than R151\'s 1.4 / 22 ('..Art.LampLight.Brightness..' / '..Art.LampLight.Range..') and the full glow stays modest ('..string.format('%.2f / %.1f',Art.LampLight.Brightness*(1+L.Boost.Brightness),Art.LampLight.Range*(1+L.Boost.Range))..'): the same 8 lights, the same tier caps')
+ end
  check(Cycle.Quant(.51,24)==12/24 and Cycle.Quant(2,10)==1 and Cycle.Quant(-1,10)==0,'Quant clamps and rounds to steps')
 end
 -- 1g. Cloudy is not an event: the mutation weather tables are untouched

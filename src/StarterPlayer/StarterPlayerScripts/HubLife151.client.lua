@@ -9,6 +9,8 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 --  * per-frame work only for the tiny ambience (butterflies and falling petals), and only while the
 --    camera is within 150 studs of it, at tier >= 2 and without Reduced Motion (Reduced Motion: everything stands still, no particles);
 --  * lamps with a PointLight switch on in the dark (The Darkened's blackout via EnvironmentLighting.Level, Rain / Thunderstorm);
+--  * R154: at full glow (full Cloudy, and the dark) a lit lamp's real light is also x1.5 brighter, x1.3 wider and warmer (amber): WeatherCycle151.Lamps.Boost / LightWarm; the
+--    lamp heads warm in the dark too. The lights are the same 8 (the tier caps are unchanged) and still change only on the half-second tick's steps.
 --  * R151 Cloudy (WeatherCycle151, the default sky's other half): as the sky dims the lamps and lanterns warm up and glow: every lamp head and wall lantern
 --    (neon, no light cost) shifts to a warm amber in a few colour steps, the lit lamps' real lights fade in within the device tier's cap (8 / 4 / 0 on
 --    desktop / phone / FastMode; the dark and storms still switch on all 8 everywhere), and the market's warm lights (tagged WarmLight151) strengthen. All of it
@@ -112,6 +114,8 @@ local function applyLamps(force)
  local t=tier();local strength=Cycle and Cycle.LampStrength(hubCloud())or 0
  local q=Cycle and Cycle.Quant(strength,Cycle.Lamps.Steps)or 0
  local hq=Cycle and Cycle.Quant(strength,Cycle.Lamps.HeadSteps[t]or Cycle.Lamps.HeadSteps[1])or 0
+ -- R154: in the dark (The Darkened, Rain, Thunderstorm) the lamps glow at full strength, warm: the heads too (before, only Cloudy warmed them)
+ if dark and Cycle then hq=1 end
  -- real lights: the dark switches on every one (as before R151); Cloudy only as many as the device tier allows
  local cap=dark and #ctx.Lights or math.min(#ctx.Lights,Cycle and Cycle.RealLights(t)or 0)
  local lightsChanged=force or dark~=state.Dark or q~=state.LampQ or cap~=state.LampCap
@@ -119,12 +123,22 @@ local function applyLamps(force)
  if not lightsChanged and not headsChanged then return end
  state.Dark=dark;state.LampQ=q;state.LampCap=cap;state.HeadQ=hq
  if lightsChanged then
+  local L=Cycle and Cycle.Lamps
   for i,l in ipairs(ctx.Lights)do
-   local base=state.LightBase[l];if not base then base=l.Brightness;state.LightBase[l]=base end
-   local on,b=false,base
-   if dark then on=true elseif i<=cap and q>0 then on=true;b=base*q end
+   local base=state.LightBase[l];if not base then base={B=l.Brightness,R=l.Range,C=l.Color};state.LightBase[l]=base end
+   -- R154: a light at glow g (1 in the dark, the Cloudy step q otherwise) is base x g x (1 + Boost x g) bright, base x (1 + Boost x g) wide, and warmer by g
+   local on,b,r,c=false,base.B,base.R,base.C
+   local g=dark and 1 or(i<=cap and q or 0)
+   if dark or(i<=cap and q>0)then
+    on=true
+    if L then
+     b=base.B*(dark and 1 or q)*(1+L.Boost.Brightness*g);r=base.R*(1+L.Boost.Range*g);c=base.C:Lerp(L.LightWarm,L.LightWarmShare*g)
+    elseif not dark then b=base.B*q end
+   end
    if l.Enabled~=on then l.Enabled=on end
    if l.Brightness~=b then l.Brightness=b end
+   if l.Range~=r then l.Range=r end
+   if l.Color~=c then l.Color=c end
   end
  end
  if headsChanged and Cycle then

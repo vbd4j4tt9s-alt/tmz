@@ -11,7 +11,7 @@
 #  test_cloudy_sky       - BiomeMood's Cloudy palette for every biome (dimmer, cooler, hazier, never darker than a storm), EnvironmentLighting (smooth, few writes,
 #                          exact return), the REAL BiomePresentation / WorldEvents clients: event weather priority, track, rare-pull story scenes, track refresh,
 #                          The Darkened, FastMode, Terrain clouds, R149's rain / snow untouched, nothing else writes Lighting;
-#  test_cloudy_hub       - the REAL HubLife151.client + HubLifeArt151: 30 lamp heads and 14 wall lanterns warm up, the real lights fade in within the device
+#  test_cloudy_hub       - the REAL HubLife151.client + HubLifeArt151: 16 lamp heads (R154 tidy; 30 before) and 14 wall lanterns warm up, the real lights fade in within the device
 #                          tier's cap (8 / 4 / 0), the dark's R151 rule unchanged, the market's tagged lights, Reduced Motion, FastMode, late join, no per-frame work;
 #  test_cloudy_place     - the same on the owner's place file (when it is there): the real market tags 6 lights + 2 heads, the real square's lamps tier by tier.
 # Keep green next to this (own scripts): R149 run_weather.sh, R151 run_perf.sh, run_base_area.sh, R150 run_sfx.sh, R129 run.sh, veiled_R122 run.sh (The Darkened).

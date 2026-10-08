@@ -1,6 +1,6 @@
 --!nocheck
 -- R151 Cloudy sky, part 3: the lanterns. "make the other default weather cloudy where it just dims the lighting so that the lanterns around the map can
--- create a warm ambience." The REAL HubLife151.client + HubLifeArt151 (the festival square's 26 lamps with 30 neon heads, 8 of them with a real PointLight,
+-- create a warm ambience." The REAL HubLife151.client + HubLifeArt151 (the festival square's 12 lamps (R154 tidy; 26 before) with 16 neon heads, 8 of them with a real PointLight,
 -- and 14 wall lanterns) and the market's tagged warm lights on the Roblox mock:
 --  * Clear: nothing changes (lights off, heads and lanterns in their own colours);
 --  * Cloudy: the lamp heads and wall lanterns warm up at every tier, the real lights fade in within the device tier's cap (8 desktop / 4 phone / 0 FastMode),
@@ -54,7 +54,7 @@ local api,apiScript=load()
 local ctx=api.State.Ctx
 check(ctx~=nil and W.workspace:FindFirstChild('HubLife151')~=nil,'the festival square builds (tier 3)')
 check(#ctx.Lights==8,'8 lit lamps carry a real PointLight (the R151 cap): '..#ctx.Lights)
-check(#ctx.Heads==30,'30 lamp heads in all (18 posts, 4 doubles x 2, 4 bollards): '..#ctx.Heads)
+check(#ctx.Heads==16,'16 lamp heads in all (R154 tidy: 12 of the 26 lamps stay: 8 posts and 4 doubles x 2; the bollards and the other posts are gone): '..#ctx.Heads)
 check(#ctx.Lanterns==14,'14 wall lanterns (tier >= 2): '..#ctx.Lanterns)
 do
  local allNeon,allLit=true,true
@@ -80,6 +80,17 @@ local lampBase={};for _,l in ipairs(ctx.Lights)do lampBase[l]=l.Brightness end
 local colorBase={};for _,p in ipairs(ctx.Heads)do colorBase[p]=p.Color end;for _,p in ipairs(ctx.Lanterns)do colorBase[p]=p.Color end
 local function allBase()for p,c in pairs(colorBase)do if p.Color.R~=c.R or p.Color.G~=c.G or p.Color.B~=c.B then return false end end;return true end
 local function atBrightness(ctx,f,base)for _,l in ipairs(ctx.Lights)do if not near(l.Brightness,base[l]*f,1e-6)then return false end end;return true end
+-- R154: at full glow a real light is base x Light x (1 + Boost.Brightness) bright, base x (1 + Boost.Range) wide, and warmed toward LightWarm
+local LL=Cycle.Lamps
+local function fullOf(b0)return b0*LL.Light*(1+LL.Boost.Brightness)end
+local function atFull(ctx,base)for _,l in ipairs(ctx.Lights)do if not near(l.Brightness,fullOf(base[l]),1e-6)then return false end end;return true end
+local function fullGlow(ctx,rbase,cbase,upto) -- range and colour of the first `upto` lights at full glow
+ for i=1,upto do local l=ctx.Lights[i]
+  local want=cbase[l]:Lerp(LL.LightWarm,LL.LightWarmShare)
+  if not near(l.Range,rbase[l]*(1+LL.Boost.Range),1e-6)or not near(l.Color.G,want.G,.005)or not near(l.Color.B,want.B,.005)or not near(l.Color.R,want.R,.005)then return false end
+ end
+ return true
+end
 
 print('-- Clear')
 clearSky();api.ApplyLamps(true)
@@ -95,13 +106,14 @@ print('-- Cloudy at every tier')
 for _,tier in ipairs({3,2,1})do
  budget.Tier=tier;local a,sc=load()
  local c=a.State.Ctx
- local base={};for _,l in ipairs(c.Lights)do base[l]=l.Brightness end
+ local base={};local rbase,cbase={},{};for _,l in ipairs(c.Lights)do base[l]=l.Brightness;rbase[l]=l.Range;cbase[l]=l.Color end
  local colors={};for _,p in ipairs(c.Heads)do colors[p]=p.Color end;for _,p in ipairs(c.Lanterns)do colors[p]=p.Color end
  sky('Cloudy',R.clock-300,30,0);a.ApplyLamps()
  local want=Cycle.RealLights(tier)
  check(brightLights(c)==want,('tier %d: %d real lights on (the cap is %d)'):format(tier,brightLights(c),want))
- local ok=true;for i,l in ipairs(c.Lights)do if(i<=want)~=l.Enabled then ok=false end;if l.Enabled and not near(l.Brightness,base[l]*Cycle.Lamps.Light,1e-6)then ok=false end end
- check(ok,'... the first '..want..' of the priority order, at their full brightness')
+ local ok=true;for i,l in ipairs(c.Lights)do if(i<=want)~=l.Enabled then ok=false end;if l.Enabled and not near(l.Brightness,fullOf(base[l]),1e-6)then ok=false end end
+ check(ok,'... the first '..want..' of the priority order, at their full brightness (x'..(1+LL.Boost.Brightness)..' the base: R154)')
+ check(fullGlow(c,rbase,cbase,want),'... and at full range (x'..(1+LL.Boost.Range)..') and warmed toward amber ('..LL.LightWarmShare..' of the way)')
  if want>0 and want%2==0 then
   local sum=0;for i=1,want do sum+=c.LightAt[c.Lights[i]][1]end
   check(near(sum,0,.01),'... a mirror-symmetric set (x sums to 0)')
@@ -145,12 +157,12 @@ do
  check(level==1,'(the sky is fully cloudy after 60 s)')
  check(firstOn and firstOn>=30*.1 and firstOn<=30*.55,('the lights start when the dimming is well under way (after %.1f s of the 30 s fade)'):format(firstOn or -1))
  check(mono,'a light only ever gets brighter during the fade')
- check(maxStep<=base[c.Lights[1]]/Cycle.Lamps.Steps*1.01+1e-9,('in steps of 1/%d of the full brightness (biggest %.3f of %.2f)'):format(Cycle.Lamps.Steps,maxStep,base[c.Lights[1]]))
- check(brightLights(c)==8 and atBrightness(c,Cycle.Lamps.Light,base),'fully cloudy: 8 lights at full brightness')
+ check(maxStep<=base[c.Lights[1]]/Cycle.Lamps.Steps*(1+2*LL.Boost.Brightness+.05)+1e-9,('in steps of 1/%d of the base brightness (x%.2f at most with the boost; biggest %.3f of %.2f)'):format(Cycle.Lamps.Steps,1+2*LL.Boost.Brightness+.05,maxStep,base[c.Lights[1]]))
+ check(brightLights(c)==8 and atFull(c,base),'fully cloudy: 8 lights at full brightness (R154: x1.5 the base, '..string.format('%.2f',fullOf(base[c.Lights[1]]))..' against the base '..string.format('%.2f',base[c.Lights[1]])..')')
  local steps=Cycle.Lamps.HeadSteps[3]
  local count=0;for _ in pairs(distinct)do count+=1 end
  check(count<=steps+1,('the head colour is written in %d steps (at most %d + the start)'):format(count-1,steps))
- check(lightWrites.count<=#c.Lights*(Cycle.Lamps.Steps+1)*2,('%d writes to the lamps\' lights over a 30 s fade (<= %d: Enabled once, Brightness a step at a time)'):format(lightWrites.count,#c.Lights*(Cycle.Lamps.Steps+1)*2))
+ check(lightWrites.count<=#c.Lights*(Cycle.Lamps.Steps+1)*4,('%d writes to the lamps\' lights over a 30 s fade (<= %d: Enabled once; Brightness, Range and Color a step at a time)'):format(lightWrites.count,#c.Lights*(Cycle.Lamps.Steps+1)*4))
  check(headWrites.count<=#c.Heads*(steps+1)and lantWrites.count<=#c.Lanterns*(steps+1),('%d head and %d lantern colour writes (each part %d times at most)'):format(headWrites.count,lantWrites.count,steps+1))
  -- once settled: no work at all (no write, and not even a pass over the 44 heads: reading the warm colour is what that pass does)
  local before=lightWrites.count+headWrites.count+lantWrites.count
@@ -179,10 +191,13 @@ end
 print('-- the dark keeps its rule')
 do
  budget.Tier=1;local a,sc1=load();local c=a.State.Ctx
- local base={};for _,l in ipairs(c.Lights)do base[l]=l.Brightness end
+ local base={};local rbase,cbase={},{};for _,l in ipairs(c.Lights)do base[l]=l.Brightness;rbase[l]=l.Range;cbase[l]=l.Color end
  clearSky();a.ApplyLamps(true)
  Env.Level=1;a.ApplyLamps()
- check(brightLights(c)==8 and atBrightness(c,1,base),'The Darkened at tier 1 (FastMode): all 8 lights on at the R151 brightness, as before')
+ check(brightLights(c)==8,'The Darkened at tier 1 (FastMode): all 8 lights on, as before')
+ check(atFull(c,base)and fullGlow(c,rbase,cbase,8),'... at full glow, R154: x1.5 brightness, x1.3 range, warm amber ('..string.format('%.2f / %.1f',c.Lights[1].Brightness,c.Lights[1].Range)..' against the base '..string.format('%.2f / %.1f',base[c.Lights[1]],rbase[c.Lights[1]])..')')
+ local headsWarm=true;for _,p in ipairs(c.Heads)do if not(warmth(p.Color)<warmth(HEAD)-.05)then headsWarm=false end end
+ check(headsWarm,'... and the lamp heads glow warm in the dark too (R154: before, only Cloudy warmed them)')
  Env.Level=0;a.ApplyLamps();check(brightLights(c)==0,'... off when the lights come back')
  for _,t in ipairs({3,2,1})do
   budget.Tier=t;local b,scb=load();local d=b.State.Ctx
@@ -196,13 +211,15 @@ do
  -- Rain over a cloudy sky: the dark's rule (all 8), the heads leave Cloudy; the rain ends: Cloudy again
  budget.Tier=2;local b,scb=load();local d=b.State.Ctx
  local baseHead={};for _,p in ipairs(d.Heads)do baseHead[p]=p.Color end
+ local baseLights={};for _,l in ipairs(d.Lights)do baseLights[l]=l.Brightness end
  sky('Cloudy',R.clock-300,30,0);b.ApplyLamps()
  local cloudyLights=brightLights(d)
  check(cloudyLights==4,'(phone, cloudy: 4 lights)')
  local warmNow={};for _,p in ipairs(d.Heads)do warmNow[p]=p.Color end
  RS:SetAttribute('GlobalWeather','Rain');b.ApplyLamps()
  local allWarmOff=true;for _,p in ipairs(d.Heads)do if p.Color.R==baseHead[p].R and p.Color.G==baseHead[p].G then else allWarmOff=false end end
- check(brightLights(d)==8 and allWarmOff,'Rain over a Cloudy sky: the storm rule (8 lights, phone too) and the heads back to their own colour (no Cloudy under an event)')
+ local headsFull=true;for _,p in ipairs(d.Heads)do if not near(p.Color.G,baseHead[p].G+(Cycle.Lamps.Warm.G-baseHead[p].G)*Cycle.Lamps.WarmShare,.01)then headsFull=false end end
+ check(brightLights(d)==8 and headsFull and not allWarmOff,'Rain over a Cloudy sky: the storm rule (8 lights, phone too) at full glow and the heads at full warm (R154: the dark warms them; Cloudy itself is off under an event)')
  RS:SetAttribute('GlobalWeather','Blizzard');b.ApplyLamps()
  check(brightLights(d)==0,'a Blizzard does not light the lamps (as before), Cloudy or not')
  RS:SetAttribute('GlobalWeather','Clear');b.ApplyLamps()
@@ -239,7 +256,8 @@ do
  -- mid-fade join
  unload(scb);clearSky();sky('Cloudy',R.clock-18,30,0);b,scb=load();d=b.State.Ctx
  local lvl=Cycle.LampStrength(Cycle.Read(RS,R.clock))
- check(lvl>0 and lvl<1 and brightLights(d)==8 and near(d.Lights[1].Brightness,Cycle.Quant(lvl,Cycle.Lamps.Steps)*1.4,1e-6),'a mid-fade join starts at the fade\'s level')
+ local qj=Cycle.Quant(lvl,Cycle.Lamps.Steps);local LB=W.module('HubLifeArt151').LampLight.Brightness
+ check(lvl>0 and lvl<1 and brightLights(d)==8 and near(d.Lights[1].Brightness,LB*qj*(1+Cycle.Lamps.Boost.Brightness*qj),1e-6),'a mid-fade join starts at the fade\'s level')
  unload(scb)
 end
 

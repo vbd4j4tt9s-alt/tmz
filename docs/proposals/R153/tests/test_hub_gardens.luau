@@ -91,11 +91,10 @@ do
  local near={}
  for _,b in ipairs(Art.Layout.benches)do for _,n in ipairs(NOOKS)do if (b[1]-n[1])^2+(b[2]-n[2])^2<20^2 then near[#near+1]=b[1]..','..b[2]end end end
  check('benches: none of the layout\'s benches stands within 20 studs of a nook\'s centre (the garden nooks\' two teal pairs and the lane nook\'s stone bench are gone)',#near==0,first(near))
- check('benches: the other four stay (two wooden on the front lawns, two garden benches by the market)',#Art.Layout.benches==4,#Art.Layout.benches)
- local kinds={};for _,b in ipairs(Art.Layout.benches)do kinds[b[4]]=(kinds[b[4]]or 0)+1 end
- check('benches: 2 wood, 2 garden, no stone one',kinds.wood==2 and kinds.garden==2 and kinds.stone==nil)
- local bedsNear={};for _,b in ipairs(Art.Layout.beds)do for _,n in ipairs(NOOKS)do if (b[1]-n[1])^2+(b[2]-n[2])^2<(n[3]+1)^2 then bedsNear[#bedsNear+1]=b[1]..','..b[2]end end end
- check('benches: the flower beds at the nooks\' centres (the dark disc ringed in white, three of them) are gone too: 10 beds left, the trampolines fill those circles',#bedsNear==0 and #Art.Layout.beds==10,first(bedsNear)or#Art.Layout.beds)
+ check('benches: and none of the other four is built either: the R154 tidy took every bench (HubLifeArt151.Tidy.Benches); A.Full still lists those four so they can come back',#Art.Layout.benches==0 and #Art.Full.benches==4,#Art.Layout.benches)
+  check('benches: the full list holds 2 wood and 2 garden benches, no stone one',(function()local k={};for _,b in ipairs(Art.Full.benches)do k[b[4]]=(k[b[4]]or 0)+1 end;return k.wood==2 and k.garden==2 and k.stone==nil end)())
+ local bedsNear={};for _,b in ipairs(Art.Full.beds)do for _,n in ipairs(NOOKS)do if (b[1]-n[1])^2+(b[2]-n[2])^2<(n[3]+1)^2 then bedsNear[#bedsNear+1]=b[1]..','..b[2]end end end
+ check('benches: the flower beds at the nooks\' centres (the dark disc ringed in white, three of them) are gone even from the full list (10 left in it), the trampolines fill those circles; the tidy builds none of the 10',#bedsNear==0 and #Art.Full.beds==10 and #Art.Layout.beds==0,first(bedsNear)or#Art.Full.beds)
  check('benches: the kit keeps all three trampoline circles open to their rims (HubLifeArt151.Clear refuses them, the whole brick disc)',#K.Open==4 and select(2,Art.Clear(312,-269,0))=='open'and select(2,Art.Clear(-312,-269,0))=='open'and select(2,Art.Clear(0,-596,0))=='open'and select(2,Art.Clear(0,-392,0))=='open'
   and select(2,Art.Clear(312+12.5,-269,0))=='open'and select(2,Art.Clear(0,-596-9.5,0))=='open'and select(2,Art.Clear(-312,-269+12.5,0))=='open')
  -- built (every device tier): no bench parts and no bed rim at the nooks
@@ -107,8 +106,8 @@ do
   if p.Name=='Bench seat'then seats[#seats+1]=p elseif p.Name=='Bench slab'then slabs[#slabs+1]=p elseif p.Name=='Bed rim'then rims[#rims+1]=p end
   for _,n in ipairs(NOOKS)do if (q.X-n[1])^2+(q.Z-n[2])^2<(n[3]+1)^2 and(p.Name:find('^Bench')or p.Name:find('^Bed ')or p.Name=='Flower')then badNear[#badNear+1]=p.Name end end
  end
- check('benches: built: 4 bench seats (2 wood, 2 garden) and no stone slab, no bench part and no bed part within a nook\'s disc',#seats==4 and #slabs==0 and #badNear==0,#seats..'/'..#slabs..' '..tostring(first(badNear)))
- check('benches: built: 10 flower bed rims',#rims==10,#rims)
+ check('benches: built: no bench seat, no stone slab, no bed part anywhere (the R154 tidy), none within a nook\'s disc',#seats==0 and #slabs==0 and #badNear==0,#seats..'/'..#slabs..' '..tostring(first(badNear)))
+ check('benches: built: no flower bed rim',#rims==0,#rims)
  root:Destroy()
 end
 

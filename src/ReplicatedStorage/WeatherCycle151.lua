@@ -47,6 +47,11 @@ C.Lamps={
  Warm=C3(255,168,76),      -- the colour a neon head warms toward ...
  WarmShare=.8,             -- ... by this share at full glow (its own colour keeps the rest)
  Light=1,                  -- real lights at full Cloudy: this x their dark brightness
+ Boost={Brightness=.5,Range=.3},    -- R154 (owner: "make each lamp brighter in its warmth during cloudy season too", with the tidy's fewer lamps): at full glow - full Cloudy, and the dark
+                           -- (The Darkened, Rain, Thunderstorm) - a real light is this much brighter and further reaching than its base (x1.5 brightness, x1.3 range; the base itself
+                           -- is HubLifeArt151.LampLight, 1.8 / 28, up from 1.4 / 22) ...
+ LightWarm=C3(255,150,60),  -- ... and its colour warms toward this amber ...
+ LightWarmShare=.85,        -- ... by this share at full glow
  Steps=24,                 -- the real lights' brightness is rewritten in this many steps over a fade
 }
 -- The market's warm lights (the two porch lanterns, the three ceiling lantern lights, the Fruit of the Hour light): always on; in Cloudy they warm
