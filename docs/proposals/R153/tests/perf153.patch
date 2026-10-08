@@ -1,0 +1,803 @@
+diff --git a/src/ReplicatedStorage/ArtworkRuntime87.lua b/src/ReplicatedStorage/ArtworkRuntime87.lua
+index 640507c..e30869d 100644
+--- a/src/ReplicatedStorage/ArtworkRuntime87.lua
++++ b/src/ReplicatedStorage/ArtworkRuntime87.lua
+@@ -9,6 +9,10 @@ local function queue(fn)
+   running=false
+  end)
+ end
++-- R153 perf (lag audit D2): an icon's fallback strips (one Frame + UIGradient per pixel strip, ~400 instances an icon) are only in its holder while
++-- no image of it is shown: they go when the image shows and come back (a clone of the kind's one template) if the image is ever unloaded again.
++-- Until an image has loaded they are drawn exactly as before; without image APIs they never go.
++local rootEntry=setmetatable({},{__mode='k'})
+ local function refresh(root)
+  local fallback=root:FindFirstChild('SmoothFallback')
+  local generated=root:FindFirstChild('Artwork');local uploaded=root:FindFirstChild('UploadedArtwork')
+@@ -16,7 +20,9 @@ local function refresh(root)
+  local useGenerated=not useUpload and generated and generated.IsLoaded
+  if uploaded then uploaded.Visible=useUpload==true end
+  if generated then generated.Visible=useGenerated==true end
+- if fallback then fallback.Visible=not(useUpload or useGenerated)end
++ if useUpload or useGenerated then if fallback then fallback:Destroy()end
++ elseif fallback then fallback.Visible=true
++ else local e=rootEntry[root];if e and e.Template and root.Parent then e.Template:Clone().Parent=root end end
+ end
+ local function watchImage(root,image)
+  local loaded,destroyed
+@@ -47,7 +53,7 @@ local function draw(entry,kind,data)
+   local g=Instance.new('UIGradient');g.Color=ColorSequence.new(c);g.Transparency=NumberSequence.new(t);g.Parent=p;p.Parent=f
+  end
+  entry.Template=f
+- for root in pairs(entry.Roots)do if root.Parent and not root:FindFirstChild('SmoothFallback')then f:Clone().Parent=root;refresh(root)end end
++ for root in pairs(entry.Roots)do if root.Parent and not root:FindFirstChild('SmoothFallback')then refresh(root)end end -- (R153 perf: a holder whose image shows gets none)
+ end
+ local function load(entry,kind,data)
+  if entry.Image then return end
+@@ -76,7 +82,7 @@ function A.Attach(parent,kind,data,id)
+  local root=Instance.new('Frame');root.Name='Generated'..kind;root.BackgroundTransparency=1;root.Size=UDim2.fromScale(1,1);root.Active=false;root.ClipsDescendants=true;root.Parent=parent
+  local e=entries[kind]
+  if not e then e={Kind=kind,Roots=setmetatable({},{__mode='k'}),Attempts=0};entries[kind]=e end
+- e.Roots[root]=true
++ e.Roots[root]=true;rootEntry[root]=e
+  -- Every prepared icon is visible immediately, even if image APIs never become available.
+  if not e.Template then draw(e,kind,data)end
+  if e.Template and not root:FindFirstChild('SmoothFallback')then e.Template:Clone().Parent=root end
+diff --git a/src/ReplicatedStorage/ClientFxBudget.lua b/src/ReplicatedStorage/ClientFxBudget.lua
+index 257a5ec..64f6310 100644
+--- a/src/ReplicatedStorage/ClientFxBudget.lua
++++ b/src/ReplicatedStorage/ClientFxBudget.lua
+@@ -11,14 +11,44 @@ function B.Step(s,dt)
+  elseif s.Fast>=12 and s.Tier<s.Ceiling then s.Tier+=1;s.Fast=0;s.Slow=0 end
+  return s.Tier
+ end
++-- R153 perf: ONE quality signal. The frame rate is measured here only: the tier above (42 / 55 fps, smoothed) and, for SettingsClient's Auto quality,
++-- frames counted over 3 s windows (B.OnWindow(fn): fn(fps) when a window ends; SettingsClient keeps its own 38 / 53 fps rule). SettingsClient used to
++-- count those windows on a Heartbeat of its own.
++B.Window=3
++local win,winFrames,listeners=0,0,{}
++local function countWindow(dt)
++ if #listeners==0 then return end
++ win+=math.min(dt,.25);winFrames+=1
++ if win<B.Window then return end
++ local fps=winFrames/win;win=0;winFrames=0
++ for _,fn in ipairs(table.clone(listeners))do local ok,err=pcall(fn,fps);if not ok then warn('[ClientFxBudget] '..tostring(err))end end
++end
++B.CountWindow=countWindow -- (tests)
+ local state,player,connection
++function B.OnWindow(fn)
++ B.Get();table.insert(listeners,fn)
++ return {Disconnect=function()local i=table.find(listeners,fn);if i then table.remove(listeners,i)end end}
++end
++-- R153 perf (lag audit D7): Roblox draws at most 31 Highlights at once and silently skips the rest. Client code that keeps a Highlight hands it to
++-- B.TrackHighlight (the owner's mutation outlines, plant rarity auras, the Void packs' outline); B.HighlightRoom() is what is left for the track packs
++-- (SeedPackRender) after those, the server's weather glows (tag MutationGlow) and HighlightReserve for a brief one (a hover, a gift target).
++B.MaxHighlights,B.HighlightReserve=31,1
++local tracked=setmetatable({},{__mode='k'})
++function B.TrackHighlight(h)if typeof(h)=='Instance'then tracked[h]=true end end
++function B.HighlightRoom()
++ local used=B.HighlightReserve
++ for h in pairs(tracked)do if h.Parent and h.Enabled then used+=1 end end
++ local ok,list=pcall(function()return game:GetService('CollectionService'):GetTagged('MutationGlow')end)
++ if ok and list then for _,h in ipairs(list)do if h.Parent and h.Enabled~=false then used+=1 end end end
++ return math.max(0,B.MaxHighlights-used)
++end
+ function B.Get()
+  if not state then
+   local Players=game:GetService('Players');local input=game:GetService('UserInputService')
+   player=Players.LocalPlayer;state=B.New(input.TouchEnabled and not input.KeyboardEnabled)
+   local run=game:GetService('RunService')
+   if run:IsClient()then
+-   connection=run.RenderStepped:Connect(function(dt)B.Step(state,dt)end)
++   connection=run.RenderStepped:Connect(function(dt)B.Step(state,dt);countWindow(dt)end)
+    script.Destroying:Connect(function()if connection then connection:Disconnect();connection=nil end end)
+   end
+  end
+diff --git a/src/ReplicatedStorage/KeyboardTrack.lua b/src/ReplicatedStorage/KeyboardTrack.lua
+index 114099f..41ed585 100644
+--- a/src/ReplicatedStorage/KeyboardTrack.lua
++++ b/src/ReplicatedStorage/KeyboardTrack.lua
+@@ -104,7 +104,8 @@ K.Config={
+  -- MaxDistance = the guis' own render limit, RowsPerFrame = rows of letters dressed per frame (4, so a camera turn spreads the letters over several
+  -- frames). The spacebars' biome names are big: they get their own render limit.
+  Legend={PixelsPerStud=16,TextHeight=4.6,Margin=.05,MaxExtra=1.5,Rotation=270,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4,
+-  FarPixelsPerStud=4,FarMaxDistance=800},                  -- R152: far letters, one strip (22 labels, 18 px text) per row at 4 px / stud, rendered out to 800 studs
++  FarPixelsPerStud=4,FarMaxDistance=800,                   -- R152: far letters, one strip (22 labels, 18 px text) per row at 4 px / stud, rendered out to 800 studs
++  FarMaxDistanceByTier={[2]=500}},                         -- R153 perf (lag audit D8): on tier 2 (phones) to 500 studs (a 4.6-stud letter is about 6 px tall there)
+  SpacebarPixelsPerStud=10,SpacebarMaxDistance=800,
+  GroundScanSeconds=2,
+ }
+diff --git a/src/ReplicatedStorage/PlantEffects.lua b/src/ReplicatedStorage/PlantEffects.lua
+index 585bbee..c1ac965 100644
+--- a/src/ReplicatedStorage/PlantEffects.lua
++++ b/src/ReplicatedStorage/PlantEffects.lua
+@@ -5,6 +5,7 @@ local Rules=require(RS:WaitForChild('PlantRules'))
+ local PackRules=require(RS:WaitForChild('SeedPackRules'))
+ local FruitEffects=require(RS:WaitForChild('ApprovedFruitEffects'))
+ local Trees=require(RS:WaitForChild('TreeReworkMotion'))
++local FxBudget;pcall(function()FxBudget=require(RS:WaitForChild('ClientFxBudget',10))end)
+ local Effects={}
+ local function move(part,frame,batch)if batch then batch:Set(part,frame)else part.CFrame=frame end end
+ function Effects.Part(parent,name,size,color)
+@@ -67,6 +68,7 @@ function Effects.Create(item,r,def,crop,at,mode)
+   local aura=Instance.new('Highlight');aura.Name='Rarity aura';aura.Adornee=r.Visual
+   aura.FillColor=auraColor;aura.OutlineColor=auraColor;aura.FillTransparency=.95;aura.OutlineTransparency=.78
+   aura.DepthMode=Enum.HighlightDepthMode.Occluded;aura.Parent=effects;r.Aura=aura
++  if FxBudget then pcall(FxBudget.TrackHighlight,aura)end -- (R153 perf: counted in the shared 31-Highlight budget)
+   effects:SetAttribute('AuraRank',style.Rank)
+  end
+  -- Pulse at most four existing luminous details; no extra lights or Heartbeat connections.
+diff --git a/src/ReplicatedStorage/VoidPackFx.lua b/src/ReplicatedStorage/VoidPackFx.lua
+index 2659d31..c2de0bd 100644
+--- a/src/ReplicatedStorage/VoidPackFx.lua
++++ b/src/ReplicatedStorage/VoidPackFx.lua
+@@ -50,24 +50,30 @@ end
+ -- World hover pose (same motion as before R122) plus galaxy / halo spin near the camera.
+ -- R152 perf: the hover frame alone (what Pose returns), for a caller that does not move the pack's own parts this frame (it is off screen).
+ function X.HoverFrame(r,now)return r.Origin*CF(0,math.sin(now*1.2)*.16,0)*CFrame.Angles(0,math.sin(now*.35)*.13,math.sin(now*.55)*.018)end
++-- (R153 perf: r.Moving, when a caller sets it, lists the only pieces that still need moving - the root its other pieces are welded to, and the
++-- spinners; VoidGiveawayClient152 does this for the giveaway pack. Without it every piece is posed, as before.)
+ function X.Pose(r,now,parts,frames,spin)
+  local frame=X.HoverFrame(r,now)
+- for _,e in ipairs(r.Parts)do if e.Part.Parent then
++ for _,e in ipairs(r.Moving or r.Parts)do if e.Part.Parent then
+   parts[#parts+1]=e.Part;frames[#frames+1]=frame*X.LocalFrame(e,now,spin)
+  end end
+  return frame
+ end
+ -- Heartbeat glow on the eye, photon ring, stars and runes (colour only; restored on release).
++-- R153 perf: a part's colour is kept by the engine in 8 bits a channel (BasePart.Color3uint8), so a pulse step that stays inside the same half
++-- level of every channel as the colour written last cannot show: it is not written (exact under rounding and truncation alike).
++local function level(c)return math.floor(c.R*510)+math.floor(c.G*510)*512+math.floor(c.B*510)*262144 end
+ function X.Pulse(r,now,reduced)
+  for _,e in ipairs(r.Pulsers)do if e.Part.Parent then
+   local wave=reduced and .5 or .5+.5*math.sin(now*(e.Amount>.5 and 3.1 or 1.7)+e.Phase)
+   -- A double "heartbeat" on the pupil: two quick swells every ~2 s.
+   if e.Amount>=.55 and not reduced then local beat=(now+e.Phase)%2.1;wave=math.max(wave*.5,math.exp(-((beat-.15)/.09)^2),math.exp(-((beat-.45)/.09)^2))end
+-  e.Part.Color=e.Color:Lerp(Color3.new(1,1,1),wave*e.Amount*.6)
++  local c=e.Color:Lerp(Color3.new(1,1,1),wave*e.Amount*.6);local k=level(c)
++  if e.Level~=k then e.Level=k;e.Part.Color=c end
+  end end
+ end
+ function X.Restore(r)
+- for _,e in ipairs(r.Pulsers)do if e.Part.Parent then e.Part.Color=e.Color end end
++ for _,e in ipairs(r.Pulsers)do if e.Part.Parent then e.Part.Color=e.Color;e.Level=nil end end
+ end
+ local function fxPart(folder,name,size,color,material,shape)
+  local p=Instance.new('Part');p.Name=name;p.Size=size;p.Color=color;p.Material=material or Enum.Material.Neon
+@@ -110,6 +116,7 @@ function X.Create(r,tier,noHighlight)
+  if pal.Fill and not noHighlight then
+   local h=Instance.new('Highlight');h.Name='VoidDistortion';h.Adornee=r.Bag;h.FillColor=pal.Fill;h.FillTransparency=.88
+   h.OutlineColor=pal.Outline;h.OutlineTransparency=.35;h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;fx.Highlight=h
++  pcall(function()local m=script.Parent:FindFirstChild('ClientFxBudget');if m then require(m).TrackHighlight(h)end end) -- (R153 perf: counted in the shared 31-Highlight budget)
+  end
+  local light=Instance.new('PointLight');light.Name='VoidPulseLight';light.Color=pal.Light;light.Range=math.min(16,8*s);light.Brightness=0;light.Shadows=false;light.Enabled=false;light.Parent=core;fx.Light=light
+  folder.Parent=workspace
+diff --git a/src/ServerScriptService/ChestChaseServer/ChestService.lua b/src/ServerScriptService/ChestChaseServer/ChestService.lua
+index 58cbd99..f6e81f7 100644
+--- a/src/ServerScriptService/ChestChaseServer/ChestService.lua
++++ b/src/ServerScriptService/ChestChaseServer/ChestService.lua
+@@ -321,85 +321,9 @@ function ChestService:GetApprovedGardenTemplate(seedId, growthStage)
+ 	return ok and template or nil
+ end
+ 
+-function ChestService:BuildPlantAt(seedId, growthStage, origin)
+-	local template = self:GetApprovedGardenTemplate(seedId, growthStage)
+-	if template then
+-		local model = template:Clone()
+-		model:PivotTo(origin)
+-		for _, part in ipairs(model:GetDescendants()) do
+-			if part:IsA("BasePart") then
+-				part.Anchored, part.CanCollide, part.CanTouch, part.CanQuery = true, false, false, false
+-				part.Massless = true
+-			end
+-		end
+-		return model
+-	end
+-	local stages = self.Config.ArtModels.Plants[seedId]
+-	local specs = stages and stages[tostring(growthStage)] or self.Config.GardenUnknownArt
+-	local model = Instance.new("Model")
+-	local parts = self:BuildArtParts(specs, model, origin, 1, true)
+-	model.PrimaryPart = parts[1]
+-	return model
+-end
+-
+-function ChestService:BuildGrowthModel(plot, crop, growthStage)
+-	local origin = plot.CFrame * CFrame.new(crop.OffsetX or 0, plot.Size.Y / 2 + 0.025, crop.OffsetZ or 0)
+-	-- Replicate one cheap proxy per crop; full growth art is rendered locally.
+-    -- Crop identity/placement/harvest prompts remain server-owned.
+-    local model = Instance.new("Model")
+-    local proxy = Instance.new("Part")
+-    proxy.Name = "CropAnchor"; proxy.Size = Vector3.new(0.5, 0.12, 0.5)
+-    proxy.CFrame = origin * CFrame.new(0, 0.06, 0)
+-    proxy.Color = Color3.fromRGB(94, 127, 73)
+-    proxy.Anchored = true; proxy.CanCollide = false; proxy.CanTouch = false; proxy.CanQuery = false
+-    proxy.Parent = model; model.PrimaryPart = proxy
+-    model:SetAttribute("GardenClientVisual", true)
+-	model.Name = "Crop_"..crop.Id
+-	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+-	model:SetAttribute("GardenGenerated", true)
+-	model:SetAttribute("CropId", crop.Id)
+-	model:SetAttribute("SeedId", crop.SeedId)
+-	model:SetAttribute("GrowthStage", growthStage)
+-	model:SetAttribute("OffsetX", crop.OffsetX or 0)
+-	model:SetAttribute("OffsetZ", crop.OffsetZ or 0)
+-	model.Parent = plot
+-	return model
+-end
+-
+-function ChestService:BuildArtLibrary()
+-	local old = self.Remotes:FindFirstChild("SeedArt")
+-	if old then old:Destroy() end
+-	local library = Instance.new("Folder")
+-	library.Name = "SeedArt"
+-	local plants = Instance.new("Folder")
+-	plants.Name = "Plants"
+-	plants.Parent = library
+-    local stages = Instance.new("Folder"); stages.Name = "GrowthStages"; stages.Parent = library
+-	local seeds = Instance.new("Folder")
+-	seeds.Name = "Seeds"
+-	seeds.Parent = library
+-	for _, catalog in ipairs(self.Config.SeedCatalogByStage) do
+-		for _, definition in ipairs(catalog) do
+-            if plants:FindFirstChild(definition.Id) then continue end -- V090: exactly 25 art entries
+-            if self.Config.GardenPlants[definition.Id] then
+-            local stageFolder = Instance.new("Folder"); stageFolder.Name = definition.Id; stageFolder.Parent = stages
+-            for stage = 1, 4 do
+-                local template = self:BuildPlantAt(definition.Id, stage, CFrame.new())
+-                template.Name = tostring(stage); template.Parent = stageFolder
+-            end
+-			local model = self:BuildPlantAt(definition.Id, 4, CFrame.new())
+-			model.Name = definition.Id
+-			model.Parent = plants
+-            end -- New seeds are collectibles; plant art remains deferred.
+-			local packet = self:BuildLooseSeed(definition.Id, CFrame.new(), seeds)
+-			packet.Name = definition.Id
+-		end
+-	end
+-	library:SetAttribute("Version", 138)
+-	library:SetAttribute("Ready", true)
+-	library.Parent = self.Remotes
+-	self.ArtLibrary = library
+-end
++-- R153 (architecture review, item 2): BuildPlantAt, BuildGrowthModel and BuildArtLibrary are GardenPlantRuntime's. GardenPlantRuntime.Install
++-- (the end of this file) puts them on ChestService as it loads, so the R85-era bodies that stood here never ran; they were removed. Read and edit
++-- them in GardenPlantRuntime.lua (docs/proposals/R153/tests/test_live_methods153.luau checks which functions are live).
+ 
+ function ChestService:SelectBiomePacks()
+     -- Keep all five authored spawn locations and their identity. Pickups are finite per cycle.
+@@ -537,7 +461,9 @@ end
+ -- rolledSize (R137): the size SkinWorldSeeds already rolled for this spot (after the hidden track pity); it is an
+ -- ordinary roll, unlike testSize, so alerts and odds treat it as natural.
+ -- rolledShape (R151): the chip-bag shape SkinWorldSeeds rolled for this spot (its pair is baked ahead of the refresh); a spawn without one (a forced test pack) rolls its own.
+-function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,spawnOdds,rolledSize,rolledShape)
++-- deferred (R153 perf, lag audit D9; SkinWorldSeedsStep only): a list. The pack is built but left hidden and unavailable, and the rest - made
++-- available, the weather roll, the rare-pack alert - is added to the list, for the reopening (SkinWorldSeeds) to run in the same frame and order as before.
++function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,spawnOdds,rolledSize,rolledShape,deferred)
+     seed.Prompt.MaxActivationDistance=24;seed.Prompt.RequiresLineOfSight=false
+     PackShapes.Unpin(seed) -- the slot's previous pack is gone
+     seed.Weather='None';seed.WeatherCheckedEvent=nil;seed.Model:SetAttribute('WeatherTrait','None')
+@@ -592,6 +518,7 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
+     seed.Billboard.Enabled=false
+     seed.Glow.Enabled=false
+     seed.Prompt.ActionText='STEAL';seed.Prompt.ObjectText=''
++    local function finish()
+     self:SetWorldPackAvailable(seed,true)
+     local weatherProbability=1
+     if self.Weather and not seed.EventKeeper then
+@@ -601,6 +528,8 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
+     local odds={TierProbability=spawnOdds or(forcedVariant and 1 or nil),ForcedSize=testSize~=nil,ForcedMutation=testMutation~=nil,Weather=seed.Weather,WeatherProbability=weatherProbability}
+     local alert=require(ReplicatedStorage.RarePackRules).Message(seed.Stage,variant,size,mutation,odds)
+     if alert and not seed.EventKeeper then alert.SpawnId=seed.Model.Name..':'..seed.Generation;alert.At=workspace:GetServerTimeNow();self.RarePackSpawn:FireAllClients(alert)end
++    end
++    if deferred then self:SetWorldPackAvailable(seed,false);table.insert(deferred,finish)else finish()end
+ end
+ -- R151: the plan of one refresh: every spot's tier, size (after the hidden track pity) and chip-bag shape. The NEXT refresh's plan is made right after this one is
+ -- applied and the pairs of its shapes are asked for at once, so they are baked long before the refresh (5 minutes, the closure is 10 s); a spawn whose pair is still
+@@ -623,13 +552,60 @@ function ChestService:PlanWorldPacks(cycle)
+     pcall(PackShapes.Prefetch,wanted)
+     return {Cycle=cycle or 0,Variants=variants,Odds=odds,Sizes=sizes,Shapes=shapes}
+ end
++-- R153 perf (lag audit D9): the 35 world packs were all rebuilt in the one server frame the track reopens (a burst of new instances to replicate:
++-- a hitch on every client every 5 minutes). Now the closed window's last SkinSpread seconds build them SkinPerStep a frame (SkinWorldSeedsStep;
++-- they are hidden, their prompts off and they are unavailable while the map is refreshing), and the reopening finishes them: each is made
++-- available, takes the weather and sends its rare-pack alert in the same frame and order as before. The plan, the rolls and their order are the same.
++ChestService.SkinSpread,ChestService.SkinPerStep=2,2
++function ChestService:SkinWorldSeedsStep(cycle,count)
++    local job=self.SkinJob
++    if job and job.Cycle~=(cycle or 0)then return true end
++    if not job then
++        local plan=self.WorldPlan
++        self.WorldPlan=nil
++        if not plan or plan.Cycle~=(cycle or 0)then plan=ChestService.PlanWorldPacks(self,cycle)end
++        job={Cycle=cycle or 0,Plan=plan,Next=1,Finish={}};self.SkinJob=job
++    end
++    local plan,list=job.Plan,self.Map.Chests
++    for _=1,count do
++        local i=job.Next;local seed=list[i];if not seed then break end
++        self:RefreshWorldPack(seed,plan.Variants[i],nil,nil,plan.Odds[plan.Variants[i]],plan.Sizes[i],plan.Shapes[i],job.Finish)
++        job.Next=i+1
++    end
++    return job.Next>#list
++end
++-- (called when the track closes for a refresh: from SkinSpread seconds before it reopens, a few packs a frame until all are built or it reopens)
++function ChestService:_spreadWorldSkins()
++    local token={};self.SkinToken=token;self.SkinJob=nil
++    local root=self.Map.MapRoot
++    local endsAt=root and root:GetAttribute('BiomeRefreshEndsAt')
++    if type(endsAt)~='number'then return end
++    task.spawn(function()
++        local wait=endsAt-ChestService.SkinSpread-workspace:GetServerTimeNow()
++        if wait>0 then task.wait(wait)end
++        local cycle=(root:GetAttribute('BiomeRefreshCycle')or 0)+1
++        while self.SkinToken==token and self.Map.Refreshing do
++            local ok,done=pcall(self.SkinWorldSeedsStep,self,cycle,ChestService.SkinPerStep)
++            if not ok then warn('[R153] Pack re-skin left to the reopening: '..tostring(done))end
++            if not ok or done then break end
++            task.wait()
++        end
++    end)
++end
+ function ChestService:SkinWorldSeeds(cycle)
+-    local plan=self.WorldPlan
++    -- (R153 perf: the packs the closed window already built are finished first, in order; the rest are built and finished as before)
++    local job=self.SkinJob;self.SkinJob=nil;self.SkinToken=nil
++    local plan,from
++    if job and job.Cycle==(cycle or 0)then plan,from=job.Plan,job.Next else
++    plan=self.WorldPlan
+     self.WorldPlan=nil
+     if not plan or plan.Cycle~=(cycle or 0)then plan=ChestService.PlanWorldPacks(self,cycle)end
++    from=1;job=nil
++    end
+     local variants,odds,sizes=plan.Variants,plan.Odds,plan.Sizes
+     local Pity=require(ReplicatedStorage.PackSizePity)
+-    for i,seed in ipairs(self.Map.Chests)do self:RefreshWorldPack(seed,variants[i],nil,nil,odds[variants[i]],sizes[i],plan.Shapes[i])end
++    if job then for _,finish in ipairs(job.Finish)do finish()end end
++    for i,seed in ipairs(self.Map.Chests)do if i>=from then self:RefreshWorldPack(seed,variants[i],nil,nil,odds[variants[i]],sizes[i],plan.Shapes[i])end end
+     local biggest=0
+     for _,seed in ipairs(self.Map.Chests)do
+         if seed.Available and table.find(PackRules.VariantOrder,seed.BagVariant)then biggest=math.max(biggest,seed.PackSize or 1)end
+@@ -641,6 +617,7 @@ function ChestService:SkinWorldSeeds(cycle)
+ end
+ function ChestService:SetWorldPacksClosed(closed)
+     for _,seed in ipairs(self.Map.Chests) do self:SetWorldPackAvailable(seed,seed.Available) end
++    if closed then pcall(self._spreadWorldSkins,self)else self.SkinToken=nil end -- R153 perf (D9)
+ end
+ 
+ function ChestService:DressGuardian(model, stage)
+@@ -850,56 +827,8 @@ function ChestService:InteractGarden(player, action, payload)
+ 		Message = action == "Harvest" and (name.." harvested! Visit Sell to earn cash.") or (name.." planted!")}
+ end
+ 
+-function ChestService:RenderGarden(base, owner)
+-	if not base then return end
+-	local infos = self.GardenPlots[base.Index]
+-	if not infos then return end
+-	local loaded = owner and self.PlayerData:IsLoaded(owner)
+-	local garden = loaded and self.PlayerData.Gardens[owner]
+-	for slot, info in ipairs(infos) do
+-		local ownerId, seen = owner and owner.UserId or 0, {}
+-		local crops = garden and garden.Plots[tostring(slot)] or {}
+-		for _, crop in ipairs(crops) do
+-			seen[crop.Id] = true
+-			local _, stage = self.Config.GetGardenGrowth(crop, os.time())
+-			local key = table.concat({ownerId, crop.Id, crop.SeedId, stage, crop.OffsetX, crop.OffsetZ}, ":")
+-			local previous = info.Rendered[crop.Id]
+-			if not previous or previous.Key ~= key or not previous.Model.Parent then
+-				-- Build replacement completely before releasing the previous stage.
+-				local model = self:BuildGrowthModel(info.Part, crop, stage)
+-				if previous then previous.Model:Destroy(); previous.Anchor:Destroy() end
+-				local anchor = Instance.new("Attachment")
+-				anchor.Name = "CropInteraction_"..crop.Id
+-				anchor.Position = Vector3.new(crop.OffsetX, info.Part.Size.Y / 2 + 0.4, crop.OffsetZ)
+-				anchor:SetAttribute("GardenGenerated", true)
+-				anchor.Parent = info.Part
+-				local prompt
+-				if stage == 4 and self.Config.GardenPlants[crop.SeedId] then
+-					prompt = Instance.new("ProximityPrompt")
+-					prompt.Name = "HarvestPrompt"
+-					prompt.ActionText = "PICK! 🌾"
+-					local seed = self.Config.GetSeedById(crop.SeedId)
+-					prompt.ObjectText = seed and seed.Name:gsub(" Seed$", "") or "Plant"
+-					prompt.HoldDuration = 0.3
+-					prompt.MaxActivationDistance = self.Config.GardenInteractionDistance
+-					prompt.RequiresLineOfSight = false
+-					prompt.Exclusivity = Enum.ProximityPromptExclusivity.OneGlobally
+-					prompt:SetAttribute("GardenPrompt", true)
+-					prompt:SetAttribute("GardenOwnerId", ownerId)
+-					prompt:SetAttribute("GardenCropId", crop.Id)
+-					prompt:SetAttribute("GardenStage", 4)
+-					prompt.Parent = anchor
+-				end
+-				info.Rendered[crop.Id] = {Key = key, Model = model, Anchor = anchor, Prompt = prompt}
+-			end
+-		end
+-		for id, old in pairs(info.Rendered) do
+-			if not seen[id] then old.Model:Destroy(); old.Anchor:Destroy(); info.Rendered[id] = nil end
+-		end
+-		info.Part:SetAttribute("GardenOwnerId", ownerId)
+-		info.Part:SetAttribute("GardenPlantCount", #crops)
+-	end
+-end
++-- R153 (architecture review, item 2): RenderGarden is GardenPlantRuntime's (installed at the end of this file; it renders only the slot it is
++-- asked for). The older body that stood here never ran and was removed: read and edit GardenPlantRuntime.lua.
+ 
+ function ChestService:StartGardens()
+ 	if self.GardensRunning then return end
+diff --git a/src/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua b/src/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua
+index a44b5e7..c9c3540 100644
+--- a/src/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua
++++ b/src/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua
+@@ -24,6 +24,7 @@ local Polish=require(Storage:WaitForChild('KeeperPolish'));local KFx=require(Sto
+ local Config152,Fx152 -- (KeeperRigConfig152 and the new models' effects, KeeperFx152: required with the first new-model keeper)
+ local Players=game:GetService('Players')
+ local records,watchers,pending={},{},{}
++local check -- (R153 perf: defined below, used by the keeper follow links)
+ local BLACK=Color3.new(0,0,0)
+ local destroyed=false
+ local function eyes(part,color,awake,tree,hidden)
+@@ -92,8 +93,21 @@ local function schedule(model)
+  if pending[model] then return end
+  pending[model]=true;task.defer(function() pending[model]=nil;bind(model) end)
+ end
+-local function watch(model)
++-- R153 perf (lag audit D10): a keeper is found by the scan at start and by its tag (the server tags every keeper BiomeKeeper); this script used to
++-- hear EVERY instance added anywhere in the workspace (the map streaming in, packs, every effect) to spot one. A keeper it knows is followed on its
++-- own: its descendants (a body that streams in or is swapped) and its parent (taken out of the world and put back).
++local follows={}
++local watch
++local function follow(model)
++ if follows[model]then return end
++ local links={};follows[model]=links
++ links[1]=model.DescendantAdded:Connect(function(node)if not destroyed then check(node)end end)
++ links[2]=model.AncestryChanged:Connect(function()if not destroyed and model:IsDescendantOf(workspace)then watch(model)end end)
++ links[3]=model.Destroying:Connect(function()for _,c in ipairs(links)do c:Disconnect()end;follows[model]=nil end)
++end
++function watch(model)
+  if not model or not model:IsA('Model') then return end
++ follow(model)
+  if not watchers[model] then
+   local signals={};watchers[model]=signals
+   table.insert(signals,model:GetAttributeChangedSignal('GardenerArtVersion'):Connect(function() schedule(model) end))
+@@ -110,14 +124,23 @@ local function watch(model)
+  end
+  schedule(model)
+ end
+-local function check(node)
++function check(node)
+  if node.Name=='BeastBody' or node.Name=='HumanoidRootPart' then watch(node.Parent)
+  elseif node:IsA('BasePart') and node.Parent and node.Parent.Name=='BeastBody' then watch(node.Parent.Parent) end
+ end
+ for _,node in ipairs(workspace:GetDescendants()) do check(node) end
+-local added=workspace.DescendantAdded:Connect(check)
++local added
++do local ok,CS=pcall(game.GetService,game,'CollectionService')
++ local function tagged(m)if not destroyed and typeof(m)=='Instance'and m:IsA('Model')and m:IsDescendantOf(workspace)then watch(m)end end
++ if ok and CS then
++  pcall(function()for _,m in ipairs(CS:GetTagged('BiomeKeeper'))do tagged(m)end end)
++  pcall(function()added=CS:GetInstanceAddedSignal('BiomeKeeper'):Connect(tagged)end)
++ end
++ if not added then added=workspace.DescendantAdded:Connect(check)end -- (no CollectionService: listen to the workspace, as before)
++end
+ 
+ local moveParts,moveFrames={},{}
++local FX_FAR=200 -- R153 perf (D6): beyond every KeeperFx range (eye light / dust 120, breath 90, shake 60)
+ local render=Run.RenderStepped:Connect(function(dt)
+  table.clear(moveParts);table.clear(moveFrames)
+  local camera=workspace.CurrentCamera
+@@ -175,10 +198,13 @@ local render=Run.RenderStepped:Connect(function(dt)
+   local fxc=r.FxContext;if not fxc then fxc={};r.FxContext=fxc end
+   fxc.Now=now;fxc.Distance=distance;fxc.LocalDistance=localDistance;fxc.Asleep=asleep;fxc.Awake=motion.Awake;fxc.Moving=motion.Moving
+   fxc.Cycle=motion.Cycle;fxc.Urgency=motion.Urgency;fxc.Chasing=hunting;fxc.Frame=motion.Frame;fxc.Frames=r.LastTarget;fxc.Low=low
+-  KFx.Step(r.Fx,fxc)
++  -- R153 perf (lag audit D6): past FX_FAR studs every KeeperFx effect is off (its farthest reaches 120): once a step there has switched them off,
++  -- the step is skipped while the keeper stays that far (only its gait phase is kept, so a footfall is not mistaken when it comes near again).
++  if distance<=FX_FAR or not r.FxFar then KFx.Step(r.Fx,fxc);r.FxFar=distance>FX_FAR elseif r.Fx then r.Fx.LastCycle=motion.Cycle end
+   -- R152: the new models' flames, lightning, leaves, rain ... (KeeperFx152), every frame (bolts flash), by state and graphics tier
+-  if r.Fx152 then local c=r.Fx152Ctx or{};r.Fx152Ctx=c;c.Now=now;c.Asleep=asleep;c.Chasing=hunting;c.Distance=distance;c.Tier=Fx.Get()
+-   c.Striking=type(seenAttack)=='number'and now>=seenAttack and now-seenAttack<Combat.Get(r.Stage).Windup+Combat.Recovery;Fx152.Step(r.Fx152,c)end
++  -- (R153 perf, D6: beyond its Range everything is off and draws no random numbers: one step switches it off, then none while it stays out there)
++  if r.Fx152 and(distance<=Fx152.Range or not r.Fx152Far)then local c=r.Fx152Ctx or{};r.Fx152Ctx=c;c.Now=now;c.Asleep=asleep;c.Chasing=hunting;c.Distance=distance;c.Tier=Fx.Get()
++   c.Striking=type(seenAttack)=='number'and now>=seenAttack and now-seenAttack<Combat.Get(r.Stage).Windup+Combat.Recovery;Fx152.Step(r.Fx152,c);r.Fx152Far=distance>Fx152.Range end
+   r.PoseDt+=dt
+   local onScreen=true
+   if distance>160 then local _,seen=camera:WorldToViewportPoint(r.Root.Position);onScreen=seen end
+@@ -233,6 +259,7 @@ end)
+ script.Destroying:Connect(function()
+  destroyed=true
+  render:Disconnect();added:Disconnect()
++ for _,links in pairs(follows)do for _,c in ipairs(links)do c:Disconnect()end end;table.clear(follows)
+  for model in pairs(records)do clear(model)end
+  for _,signals in pairs(watchers)do for _,signal in ipairs(signals)do signal:Disconnect()end end
+  table.clear(watchers);table.clear(pending)
+diff --git a/src/StarterPlayer/StarterPlayerScripts/EconomyClient.client.lua b/src/StarterPlayer/StarterPlayerScripts/EconomyClient.client.lua
+index d4b31b6..6e368ba 100644
+--- a/src/StarterPlayer/StarterPlayerScripts/EconomyClient.client.lua
++++ b/src/StarterPlayer/StarterPlayerScripts/EconomyClient.client.lua
+@@ -621,9 +621,11 @@ local function registerPlantCollision(item)
+ end
+ -- Event-driven collection; no full-workspace scans per click.
+ local gardenMap=workspace:WaitForChild('ChestChaseMap')
+-for _,item in ipairs(gardenMap:GetDescendants())do registerPlantCollision(item)end
+-gardenMap.DescendantAdded:Connect(registerPlantCollision)
+-gardenMap.DescendantRemoving:Connect(function(item)
++-- (R153 perf, lag audit D10: plants grow only in the bases' gardens: the Bases folder is listened to, not the whole map as it streams in)
++local plantScope=gardenMap:FindFirstChild('Bases')or gardenMap
++for _,item in ipairs(plantScope:GetDescendants())do registerPlantCollision(item)end
++plantScope.DescendantAdded:Connect(registerPlantCollision)
++plantScope.DescendantRemoving:Connect(function(item)
+  if item.Name~='SolidPlant'or not item:IsA('Folder')then return end
+  local index=table.find(gardenRayExclusions,item);if index then table.remove(gardenRayExclusions,index)end
+ end)
+@@ -724,8 +726,12 @@ local function bindGardenPrompt(prompt)
+ 	prompt:GetPropertyChangedSignal("Enabled"):Connect(function() refreshPrompt(prompt) end)
+ 	refreshPrompt(prompt)
+ end
+-workspace.DescendantAdded:Connect(function(item) if item:IsA("ProximityPrompt") then task.defer(bindGardenPrompt, item) end end)
+-for _, item in ipairs(workspace:GetDescendants()) do bindGardenPrompt(item) end
++-- R153 perf (lag audit D10): garden prompts only exist in the bases' gardens (GardenPlots, under the map's Bases): listen there instead of to every
++-- instance added anywhere in the workspace (the map streaming in, packs, effects); a map without a Bases folder is listened to whole, as before.
++local gardenPromptRoot=workspace
++do local map=workspace:FindFirstChild("ChestChaseMap");local bases=map and map:FindFirstChild("Bases");if bases then gardenPromptRoot=bases end end
++gardenPromptRoot.DescendantAdded:Connect(function(item) if item:IsA("ProximityPrompt") then task.defer(bindGardenPrompt, item) end end)
++for _, item in ipairs(gardenPromptRoot:GetDescendants()) do bindGardenPrompt(item) end
+ playerGui:GetAttributeChangedSignal('SelectedGardenFruitIndex'):Connect(function()
+  for prompt in pairs(boundPrompts)do if prompt.Parent then refreshPrompt(prompt)end end
+ end)
+diff --git a/src/StarterPlayer/StarterPlayerScripts/HubDisplayClient.client.lua b/src/StarterPlayer/StarterPlayerScripts/HubDisplayClient.client.lua
+index 41ce2ab..d802381 100644
+--- a/src/StarterPlayer/StarterPlayerScripts/HubDisplayClient.client.lua
++++ b/src/StarterPlayer/StarterPlayerScripts/HubDisplayClient.client.lua
+@@ -82,27 +82,30 @@ local function captureItem(entry)
+   local rel=origin:ToObjectSpace(p.CFrame);list[#list+1]={Part=p,Rel=rel,Home=p.CFrame}
+   reach=math.max(reach,rel.Position.Magnitude+p.Size.Magnitude/2)
+  end end
+- entry.ItemModel=item;entry.Parts=list;entry.Center=center;entry.Angle=0;entry.Core=item:FindFirstChild('ItemCore')
++ entry.ItemModel=item;entry.Parts=list;entry.Center=center;entry.Angle=0;entry.Core=item:FindFirstChild('ItemCore');entry.AtHome=true
+  entry.Reach=reach+BOB+2 -- (R152 perf: a ball round the whole item as it turns and bobs; out of view = no piece of it can be on screen)
+  entry.CoreRec=nil;for _,r in ipairs(list)do if r.Part==entry.Core then entry.CoreRec=r end end
+ end
++-- (R153 perf: an item that is already home is not written home again: an inactive display - far away, Fast Mode, tier 1 - re-wrote every piece
++-- every TICK; AtHome is cleared whenever step moves a piece)
+ local function restoreItem(entry)
+- if not entry.Parts then return end
++ if not entry.Parts or entry.AtHome then return end
+  for _,r in ipairs(entry.Parts)do if r.Part.Parent then r.Part.CFrame=r.Home end end
+- entry.Angle=0
++ entry.Angle=0;entry.AtHome=true
+ end
+ -- The avatar ------------------------------------------------------------------------------------------------------------------------------------------------
+ -- The joints the cheer moves (by name; a joint that is missing is skipped): only a posed rig's (the server's 'pose', or this screen's when the dance would not load).
+ local function cheerJoints(entry,rig)
+  local joints={}
+  for name in pairs(Pose.CheerAt(0,0))do local j=Pose.Joint(rig,name);if j then joints[name]=j end end
+- entry.Joints=next(joints)and joints or nil
++ entry.Joints=next(joints)and joints or nil;entry.JointsAtRest=nil
+  local ok,cf,size=pcall(rig.GetBoundingBox,rig) -- R153: the ball the cheer is drawn in (the view test of step)
+  if ok and typeof(cf)=='CFrame'and typeof(size)=='Vector3'then entry.AvatarCenter,entry.AvatarReach=cf.Position,size.Magnitude/2+2 else entry.AvatarCenter,entry.AvatarReach=nil,nil end
+ end
+ local function resetAvatar(entry)
+- if not entry.Joints then return end
++ if not entry.Joints or entry.JointsAtRest then return end -- (R153 perf: a rig at rest is not reset again every TICK; the cheer clears it)
+  for _,j in pairs(entry.Joints)do if j.Parent then pcall(function()j.Transform=CFrame.new()end)end end
++ entry.JointsAtRest=true
+ end
+ -- The dance's id for a try: the server's pick (DanceId) first, then the next ones.
+ local function danceId(rig,try)
+@@ -275,6 +278,7 @@ local function step(dt)
+      local turn=CFrame.new(entry.Center+Vector3.new(0,math.sin(t*1.5)*BOB,0))*CFrame.Angles(0,entry.Angle,0)
+      -- R152 perf: out of view (and not close: the giant pieces' close-up fade) only the core moves: its light and sparkles stay right; the pieces
+      -- (no shadow, no light) are put where they belong again in the frame the item comes back into view
++     entry.AtHome=false
+      if Cull and entry.Reach and Cull.Hidden(workspace.CurrentCamera,entry.Center,entry.Reach,12)then
+       local r=entry.CoreRec;if r and r.Part.Parent then entry.Batch:Set(r.Part,turn*r.Rel)end
+      else
+@@ -288,6 +292,7 @@ local function step(dt)
+    if(doPose or seen)and entry.Joints and entry.Local=='pose'then -- (only a posed rig: a dancing one is its Animator's alone)
+     local boost=entry.CelebrateAt and Pose.CelebrateAt(t-entry.CelebrateAt)or 0
+     local pose=Pose.CheerAt(t,boost)
++    entry.JointsAtRest=false
+     for name,j in pairs(entry.Joints)do if j.Parent and pose[name]then pcall(function()j.Transform=pose[name]end)end end
+    end
+   end
+diff --git a/src/StarterPlayer/StarterPlayerScripts/KeyboardTrack.client.lua b/src/StarterPlayer/StarterPlayerScripts/KeyboardTrack.client.lua
+index 66d86d7..cda571d 100644
+--- a/src/StarterPlayer/StarterPlayerScripts/KeyboardTrack.client.lua
++++ b/src/StarterPlayer/StarterPlayerScripts/KeyboardTrack.client.lua
+@@ -489,11 +489,19 @@ local function start()
+   for i=1,COLS do local l=letterLabel(gui);l.TextSize=FTEXT;l.Size=UDim2.fromOffset(KW*FPPS,KW*FPPS);labels[i]=l;vis[i]=true end
+   return {Part=p,Gui=gui,Labels=labels,W=0,D=0,X=0,Z=0,Alpha=-1,On=true,Free=false,Parked=false,PX={},PY={},Tx={},Ink={},Vis=vis}
+  end
++ -- R153 perf (lag audit D8): the far letters' render limit of the current tier (FarMaxDistanceByTier: 500 studs on tier 2), written only when it
++ -- changes; a tier change re-applies it to every strip already dressed (Far.Limit())
++ function Far.Limit(one)
++  local md=LG.FarMaxDistanceByTier and LG.FarMaxDistanceByTier[tier]or LG.FarMaxDistance
++  local function apply(st)if st and st.MaxDist~=md then st.MaxDist=md;pcall(function()st.Gui.MaxDistance=md end)end end
++  if one then apply(one)else for _,r in ipairs(Far.Rows)do apply(Far.Of[r])end end
++ end
+  function Far.Bind(row)
+   local za,zb=geo.RowZ(row);local d=zb-za;local z=(za+zb)/2;local stage=rowStage[row]
+   local st
+   if Far.N>0 then st=Far.Free[Far.N];Far.Free[Far.N]=nil;Far.N-=1 else st=newFar()end
+   st.Free=false;st.Parked=false;st.Empty=false
++  Far.Limit(st) -- (R153 perf, D8: the far letters' render limit of this tier)
+   local a0,a1=keyedSpan(row,1,COLS)
+   if not a0 then emptyStrip(st)
+   else
+@@ -1268,10 +1276,10 @@ local function start()
+   if tier==0 or T.Tier>=.5 then
+    T.Tier=0
+    local want=Fx and Fx.Get()or 3
+-   if tier==0 then tier=want;wantTier=want;wantSince=now;tierCfg=K.Tier(tier);windowDirty=true
++   if tier==0 then tier=want;wantTier=want;wantSince=now;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit()
+    elseif want~=wantTier then wantTier=want;wantSince=now end
+    -- a tier change only applies once it has held for a few seconds (a device bouncing between tiers must not flicker)
+-   if wantTier~=tier and now-wantSince>=C.TierHoldSeconds then tier=wantTier;tierCfg=K.Tier(tier);windowDirty=true end
++   if wantTier~=tier and now-wantSince>=C.TierHoldSeconds then tier=wantTier;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit()end
+   end
+   if T.Clear>=.25 then T.Clear=0;scanClearances()end
+   if T.Keeper>=2 then T.Keeper=0;scanKeepers()end
+diff --git a/src/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua b/src/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua
+index a6ee77a..fc428ac 100644
+--- a/src/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua
++++ b/src/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua
+@@ -78,8 +78,11 @@ local function add(v)
+   register(v.Parent);local route=routes[v.Parent];if route then route.Glows[v]=v:GetAttribute('FlowPhase')end
+  end
+ end
+-for _,v in ipairs(workspace:GetDescendants())do add(v)end
+-workspace.DescendantAdded:Connect(add)
++-- R153 perf (lag audit D10): lava routes and pools are map scenery (ChestChaseMap): only the map is listened to, not every instance the client adds
++-- to the workspace itself (pack openings, effects, the keyboard); a place without the map folder is listened to whole, as before.
++local lavaRoot=workspace:FindFirstChild('ChestChaseMap')or workspace
++for _,v in ipairs(lavaRoot:GetDescendants())do add(v)end
++lavaRoot.DescendantAdded:Connect(add)
+ -- R153 (owner: "fix all jittery type effects"): the glows that flow down a route within 160 studs move every frame (they slid in 20 Hz steps,
+ -- about a third of a stud each); farther routes (to 350) and the pools' slow crust drift, surface pulse and currents keep the 20 Hz tick.
+ Run.RenderStepped:Connect(function(dt)
+diff --git a/src/StarterPlayer/StarterPlayerScripts/MutationHighlights.client.lua b/src/StarterPlayer/StarterPlayerScripts/MutationHighlights.client.lua
+index 9281629..1ccbcb8 100644
+--- a/src/StarterPlayer/StarterPlayerScripts/MutationHighlights.client.lua
++++ b/src/StarterPlayer/StarterPlayerScripts/MutationHighlights.client.lua
+@@ -6,6 +6,7 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
+ --    rainbow label naming it, for a few seconds. Only the owner gets the WeatherAdopted 'Owned' notice, so only they see it.
+ local RS=game:GetService('ReplicatedStorage');local Players=game:GetService('Players');local Run=game:GetService('RunService')
+ local CS=game:GetService('CollectionService')
++local FxBudget;pcall(function()FxBudget=require(RS:WaitForChild('ClientFxBudget',10))end)
+ local Glow=require(RS:WaitForChild('MutationGlow127'));local Weather=require(RS:WaitForChild('WeatherTraits'))
+ local Names=require(RS:WaitForChild('GardenDisplayNames'));local Catalog=require(RS:WaitForChild('PlantCatalog'))
+ local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
+@@ -59,6 +60,7 @@ local function resolve(entry)
+  for _,t in ipairs(targets)do
+   local h=Instance.new('Highlight');h.Name='MutationRainbow';h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+   h.FillTransparency=.3;h.OutlineTransparency=0;h.Adornee=t;h.Parent=t;table.insert(entry.Highlights,h)
++  if FxBudget then pcall(FxBudget.TrackHighlight,h)end -- (R153 perf: counted in the shared 31-Highlight budget)
+  end
+  entry.Model=model
+  local anchor=model.PrimaryPart or model:FindFirstChildWhichIsA('BasePart')
+diff --git a/src/StarterPlayer/StarterPlayerScripts/SeedPackRender.client.lua b/src/StarterPlayer/StarterPlayerScripts/SeedPackRender.client.lua
+index 3c9da74..cb7474c 100644
+--- a/src/StarterPlayer/StarterPlayerScripts/SeedPackRender.client.lua
++++ b/src/StarterPlayer/StarterPlayerScripts/SeedPackRender.client.lua
+@@ -13,6 +13,7 @@ local Gui=game:GetService('GuiService')
+ local Budget=require(RS:WaitForChild('CosmeticBudget'))
+ local View=require(RS:WaitForChild('PlantDetailPlanner'))
+ local BRIGHT_DISTANCE,DETAIL_DISTANCE,LIGHT_DISTANCE=900,160,42
++local NEAR_BRIGHT,FAR_BRIGHT=150,8 -- R153 perf (D7): tier 2 keeps every outline within 150 studs, and beyond that only among the nearest 8 packs
+ local SPARK='rbxasset://textures/particles/sparkles_main.dds'
+ local WHITE=Color3.new(1,1,1)
+ local ACCENTS = {["Snow_01"]={{0.0,0.1,-0.5061}},["Snow_02"]={{0,0.12,-0.62}},["Snow_03"]={{0.475,0.0498,-0.5005},{-0.475,0.0499,-0.5005},{-0.0223,0.067,-0.6491}},["Snow_04"]={{-0.5196,-0.0299,-0.5595},{0.5194,0.0049,-0.582},{-0.1799,0.705,-0.4184}},["Snow_05"]={{-0.5196,-0.0299,-0.5595},{0.5194,0.0049,-0.582},{0.0,0.03,-0.7265}},["Snow_06"]={{-0.5196,-0.0299,-0.5595},{0.5194,0.0049,-0.582},{0.0,0.03,-0.7265}},["Crystal_01"]={{0.0008,0.0698,-0.6575}},["Crystal_02"]={{-0.4905,-0.2784,-0.5804},{-0.6706,-0.4807,-0.434},{0.5834,0.6359,-0.4033}},["Crystal_03"]={{-0.0006,0.1837,-0.7388},{-0.1943,-0.0503,-0.7139}},["Crystal_04"]={{0.0,0.02,-0.7468},{-0.6232,0.6926,-0.4463},{0.5338,0.6974,-0.4386}},["Crystal_05"]={{0.0,0.02,-0.7668},{-0.6232,0.6926,-0.4463},{0.5338,0.6974,-0.4386}},["Crystal_06"]={{0.0,0.03,-0.7965},{-0.5588,-0.076,-0.2964},{0.5562,-0.0751,-0.2964}}} -- GENERATED_ACCENTS
+@@ -336,6 +337,11 @@ table.insert(connections,CollectionService:GetInstanceRemovedSignal('BiomeSeedPa
+ local function choose(camera,now,low)
+     local cameraPosition=camera.CFrame.Position;local view=View.View(camera)
+     local MAX_HIGHLIGHTS,MAX_DETAILS,MAX_LIGHTS,MAX_DISTANT=low and 12 or 24,low and 3 or 8,low and 1 or 4,low and 16 or 48
++    -- R153 perf (lag audit D7): the outlines share Roblox's 31 with every other Highlight (ClientFxBudget.HighlightRoom: weather glows, mutation
++    -- outlines, plant auras, Void packs), and on tier 2 (phones) a pack past NEAR_BRIGHT studs keeps its outline only among the nearest FAR_BRIGHT
++    -- (it keeps its distant aura); within NEAR_BRIGHT studs every pack keeps its outline as before.
++    local room=MAX_HIGHLIGHTS;do local ok,n=pcall(Fx.HighlightRoom);if ok and type(n)=='number'then room=math.min(room,n)end end
++    local farBright=(not low and Fx.Get()==2)and FAR_BRIGHT or room
+     local candidates={};local character=Players.LocalPlayer and Players.LocalPlayer.Character
+     for bag,r in pairs(records)do
+         if not r.Ready then initialize(bag,r)end
+@@ -361,7 +367,7 @@ local function choose(camera,now,low)
+     table.sort(candidates,function(a,b)return a.Score<b.Score end)
+     local count,lights=0,0
+     for i,r in ipairs(candidates)do
+-        r.Bright=i<=MAX_HIGHLIGHTS;r.HasDistant=i<=MAX_DISTANT
++        r.Bright=i<=room and(i<=farBright or r.Distance<=NEAR_BRIGHT);r.HasDistant=i<=MAX_DISTANT
+         if r.Bright and r.Distance<=DETAIL_DISTANCE and count<MAX_DETAILS then
+             count+=1;r.Detailed=true
+             r.Lit=r.Distance<=LIGHT_DISTANCE and lights<MAX_LIGHTS
+diff --git a/src/StarterPlayer/StarterPlayerScripts/SettingsClient.client.lua b/src/StarterPlayer/StarterPlayerScripts/SettingsClient.client.lua
+index 35bea9b..be8bdf4 100644
+--- a/src/StarterPlayer/StarterPlayerScripts/SettingsClient.client.lua
++++ b/src/StarterPlayer/StarterPlayerScripts/SettingsClient.client.lua
+@@ -121,13 +121,24 @@ replay.Activated:Connect(function()
+ end)
+ toggle.Activated:Connect(function()open(not panel.Visible)end);close.Activated:Connect(function()open(false)end);shade.Activated:Connect(function()open(false)end)
+ connections[#connections+1]=pg:GetAttributeChangedSignal('SeedMenu'):Connect(function()open(pg:GetAttribute('SeedMenu')=='Settings')end)
+-local window,frames,slow,healthy=0,0,0,0
+-connections[#connections+1]=Run.Heartbeat:Connect(function(dt)
++local slow,healthy=0,0
++-- R153 perf (one quality signal): the 3 s frame-rate windows come from ClientFxBudget, which measures the frame rate for the quality tier anyway
++-- (this script counted them on its own Heartbeat); the rule is unchanged: under 38 fps for 2 windows -> FastMode, over 53 fps for 4 -> off.
++local function judge(fps)
+  if values.Quality~='Auto'then return end
+- window+=math.min(dt,.25);frames+=1;if window<3 then return end
+- local fps=frames/window;window=0;frames=0
+  slow=fps<38 and slow+1 or 0;healthy=fps>53 and healthy+1 or 0
+  if slow>=2 and player:GetAttribute('FastMode')~=true then player:SetAttribute('FastMode',true)elseif healthy>=4 and player:GetAttribute('FastMode')~=false then player:SetAttribute('FastMode',false)end
+-end)
++end
++do local ok,FxBudget=pcall(function()return require(RS:WaitForChild('ClientFxBudget',10))end)
++ if ok and FxBudget and FxBudget.OnWindow then connections[#connections+1]=FxBudget.OnWindow(judge)
++ else -- (the budget module missing: count the windows here, as before)
++  local window,frames=0,0
++  connections[#connections+1]=Run.Heartbeat:Connect(function(dt)
++   if values.Quality~='Auto'then return end
++   window+=math.min(dt,.25);frames+=1;if window<3 then return end
++   local fps=frames/window;window=0;frames=0;judge(fps)
++  end)
++ end
++end
+ gui.Destroying:Connect(function()dead=true;for _,c in ipairs(connections)do c:Disconnect()end end)
+ loadSettings()
+diff --git a/src/StarterPlayer/StarterPlayerScripts/VoidGiveawayClient152.client.lua b/src/StarterPlayer/StarterPlayerScripts/VoidGiveawayClient152.client.lua
+index 368d4a4..6f5ff89 100644
+--- a/src/StarterPlayer/StarterPlayerScripts/VoidGiveawayClient152.client.lua
++++ b/src/StarterPlayer/StarterPlayerScripts/VoidGiveawayClient152.client.lua
+@@ -122,6 +122,37 @@ local function buildPack(entry)
+   end
+   bag.Name='VoidGiveawayPack';entry.Pack=bag
+   entry.R=PackFx and PackFx.Capture(bag)or nil
++  -- R153 perf (lag audit D3): every piece that never moves against the bag (all but the galaxy / halo spinners) is welded to the pack's root,
++  -- which stays anchored, and the spinners of one ring (the same pivot and rate) are welded to an invisible hub that turns about that pivot. A
++  -- step then moves the root and the few hubs (r.Moving) instead of every piece: each piece gets the very pose VoidPackFx.Pose gave it
++  -- (hover x frame, hover x pivot x turn x offset), ~190 moves become ~4. (A root that spins itself, or a missing one: every piece posed, as before.)
++  if entry.R then pcall(function()
++   local r=entry.R;local root=r.Root;local rootE
++   for _,e in ipairs(r.Parts)do if e.Part==root then rootE=e end end
++   if not rootE or rootE.Spin then return end
++   -- (worked out first, then applied: a failure leaves the pack untouched, every piece posed as before)
++   local toRoot=rootE.Frame:Inverse();local moving={rootE};local hubs={};local joins={}
++   local function ring(e)
++    local p,l,u=e.Pivot.Position,e.Pivot.LookVector,e.Pivot.UpVector
++    return string.format('%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f',e.Spin,p.X,p.Y,p.Z,l.X,l.Y,l.Z,u.X,u.Y,u.Z)
++   end
++   for _,e in ipairs(r.Parts)do if e~=rootE then
++    if e.Spin then
++     local key=ring(e);local hub=hubs[key]
++     if not hub then hub={Frame=e.Pivot,Spin=e.Spin,Pivot=e.Pivot,Offset=CFrame.new()};hubs[key]=hub;moving[#moving+1]=hub end
++     joins[#joins+1]={hub,e.Part,e.Offset}
++    else joins[#joins+1]={rootE,e.Part,toRoot*e.Frame}end
++   end end
++   for _,hub in ipairs(moving)do if hub~=rootE then
++    local p=Instance.new('Part');p.Name='PackSpinHub153';p.Size=Vector3.new(.05,.05,.05);p.Transparency=1;p.Anchored=true;p.CanCollide=false;p.CanTouch=false
++    p.CanQuery=false;p.CastShadow=false;p.CFrame=root.CFrame*toRoot*hub.Pivot;p.Parent=bag;hub.Part=p
++   end end
++   for _,j in ipairs(joins)do
++    local w=Instance.new('Weld');w.Name='PackWeld153';w.C0=j[3];w.Part0=j[1].Part;w.Part1=j[2];w.Parent=j[1].Part
++    j[2].Massless=true;j[2].Anchored=false
++   end
++   r.Moving=moving
++  end)end
+   -- (R152 perf: a ball round the pack's pieces as it turns, hovers and hops: out of view = none of them can be on screen)
+   local okR,reach=pcall(function()
+    local o=at.Position;local far=0
+@@ -162,7 +193,7 @@ local function stepPack(entry,dt,t,now)
+  else entry.Stale=nil end
+  if hidden then if not rm then frame=PackFx.HoverFrame(r,now)end
+  elseif rm then -- reduced motion: the same parts, standing still (VoidPackFx.Pose would still sway and bob the pack)
+-  for _,e in ipairs(r.Parts)do if e.Part.Parent then parts[#parts+1]=e.Part;frames[#frames+1]=origin*PackFx.LocalFrame(e,now,false)end end
++  for _,e in ipairs(r.Moving or r.Parts)do if e.Part.Parent then parts[#parts+1]=e.Part;frames[#frames+1]=origin*PackFx.LocalFrame(e,now,false)end end
+  else frame=PackFx.Pose(r,now,parts,frames,entry.Dist<PackFx.Budget.SpinDistance)end
+  local want=entry.Dist<PackFx.Budget.EffectDistance and player:GetAttribute('StudioPlantEffects')~='off'and entry.Model:GetAttribute(A.State)~='Empty' -- (at 0 the pack sleeps: it turns, but its glow and sparks are off)
+  if r.Fx and(not want or r.Fx.Tier~=tierNow)then PackFx.Clear(r)end
+@@ -176,7 +207,7 @@ local function settle(entry)
+  if not(o and r and PackFx and entry.Pack)then return end
+  table.clear(parts);table.clear(frames)
+  r.Origin=o.Origin
+- if o.Rm then for _,e in ipairs(r.Parts)do if e.Part.Parent then parts[#parts+1]=e.Part;frames[#frames+1]=o.Origin*PackFx.LocalFrame(e,o.Now,false)end end
++ if o.Rm then for _,e in ipairs(r.Moving or r.Parts)do if e.Part.Parent then parts[#parts+1]=e.Part;frames[#frames+1]=o.Origin*PackFx.LocalFrame(e,o.Now,false)end end
+  else PackFx.Pose(r,o.Now,parts,frames,o.Spin)end
+  workspace:BulkMoveTo(parts,frames,Enum.BulkMoveMode.FireCFrameChanged)
+ end
