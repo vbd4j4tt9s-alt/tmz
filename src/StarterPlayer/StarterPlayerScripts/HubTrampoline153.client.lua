@@ -5,7 +5,8 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 -- own HumanoidRootPart so the feet rise HubTrampolineRules153.Height() studs (30). Never added to: standing there bounces at the same height every
 -- time, a rising body (a bounce, a jump) is left alone, and a player bounces at most once per Cooldown (.45 s). MovementGuard's rise allowance
 -- (25 studs per .1 s sample) covers it (test). Everyone's client also squashes the mat and plays the boing when ANY player lands (from the
--- replicated positions: cosmetic only, nothing is applied to another player). The sound is InteractionAudio's existing bubble pop pitched down.
+-- replicated positions: cosmetic only, nothing is applied to another player). The sound is the owner's boing file (94320656351627) at pitch 1 (R153: it replaced the
+-- Bubble04 placeholder pitched to .8); one boing per bounce. Its lead-in is unmeasured: SoundTiming.Start_94320656351627 (a number attribute on SoundTiming) tunes it.
 -- Per frame: two squared distances to the nooks (the rest only within 60 studs of one); twice a second: is the server's folder still the one we know. Reduced Motion: no squash.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local GuiService=game:GetService('GuiService')
@@ -14,7 +15,7 @@ local Sfx=require(RS:WaitForChild('LocalSfx'))
 local player=Players.LocalPlayer
 local map=workspace:WaitForChild('ChestChaseMap')
 local V=Vector3.new
-local BOING={Id='rbxassetid://96764044228884',Volume=.34,Pitch=.8} -- (InteractionAudio.AssetIds.Bubble04, an existing asset; pitched down it boings)
+local BOING={Id='rbxassetid://94320656351627',Volume=.30,Pitch=1} -- (the owner's trampoline bounce file; no pitch shift; LocalSfx plays it on the Effects group)
 local NEAR=60;local COARSE=.5
 
 local spots={}                                     -- {X, Z, Mat, Badge, MatCF, BadgeCF, At}

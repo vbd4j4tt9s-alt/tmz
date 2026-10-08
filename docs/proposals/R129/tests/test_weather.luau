@@ -82,5 +82,34 @@ check(W.B.WorldEvents:find('Raycast(p,Vector3.new(0,80,0)',1,true)==nil and W.B.
 -- BiomePresentation passes Clear on the track; BiomeWeather no longer switches off for weather.
 check(W.B.BiomePresentation:find("stage==0 and(RS:GetAttribute('GlobalWeather')or'Clear')or'Clear'",1,true)~=nil,'track (stage > 0) gets no weather palette')
 check(W.B.BiomeWeather:find("GlobalWeather",1,true)==nil,'biome particles keep running on the track during weather')
+-- 7. R153 (owner: "the 1st one is the new rarity notifier sound"): a RarePackSpawn packet reaches the real WorldEvents, which routes it into the notice
+-- feed's Pack method: ONE line and ONE play of the owner's file (80907337289683; it replaced 118818986767152) per notice, the same packet again nothing.
+do
+ local plays={};local basePlay=R.Inst.Play
+ R.Inst.Play=function(self)basePlay(self);local id=self._props.SoundId;plays[id]=(plays[id]or 0)+1 end
+ local NEW,OLD='rbxassetid://80907337289683','rbxassetid://118818986767152'
+ local folder=R.new('Folder');folder.Name='ChestChaseRemotes';folder.Parent=W.RS
+ local remote=R.new('RemoteEvent');remote.Name='RarePackSpawn';remote.OnClientEvent=R.signal();remote.Parent=folder
+ frames(.5)
+ local gui=pg:FindFirstChild('ChestChaseNotices83')
+ check(gui~=nil,'the notice feed is up (WorldEvents preloaded it)')
+ local function lines()local n=0;if gui then for _,d in ipairs(gui:GetDescendants())do if d.Name=='Announcement'then n+=1 end end end;return n end
+ local function packet(id,text,stage)return {Text=text or'Mythic Pack',Biome='Storm Peaks',SpawnId=id,Stage=stage or 7,Tier='Mythic',Size=1,Mutation='None',Color=RGB(255,80,200)}end
+ local cue=W.service('SoundService'):FindFirstChild('Notice_RarePack')
+ check(cue~=nil and cue.SoundId==NEW,'the rare-pack cue the feed made carries the owner\'s new id')
+ remote.OnClientEvent:Fire(packet('w153:1'));frames(.6)
+ check(lines()==1 and plays[NEW]==1,'a RarePackSpawn packet: one notice line and ONE play of the new notifier sound ('..lines()..' lines, '..tostring(plays[NEW])..' plays)')
+ check(plays[OLD]==nil,'the old rare-pack sound is never played')
+ remote.OnClientEvent:Fire(packet('w153:1'));frames(.6)
+ check(lines()==1 and plays[NEW]==1,'the same packet again (same spawn id): no second line, no second sound')
+ frames(6)
+ remote.OnClientEvent:Fire(packet('w153:2','Legendary Pack',4));frames(.6)
+ check(plays[NEW]==2,'the next spawn plays it once more ('..tostring(plays[NEW])..' plays in all)')
+ -- a weather notice goes through the same feed with its own cue, not the rarity one
+ frames(6);local before=plays[NEW]
+ W.RS:SetAttribute('GlobalWeather','Rain');frames(1);W.RS:SetAttribute('GlobalWeather','Clear');frames(1)
+ check(plays[NEW]==before,'a weather change makes no rarity notifier sound')
+ R.Inst.Play=basePlay
+end
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end

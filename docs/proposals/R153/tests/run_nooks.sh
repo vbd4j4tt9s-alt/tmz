@@ -7,13 +7,14 @@
 #       hub:     the garden nooks' benches and flower beds are gone (the other benches stay), a trampoline (ONE collider, matching frame / mat / springs / feet,
 #                0.9 over the floor: under the runner's step limit) stands in each nook clear of the paths and the wall; the bounce (one config value) lifts
 #                the feet 25 - 35 studs; debounce, no stacking, no sky launch; the client script launches the local character, squashes the mat, plays an
-#                existing sound; MovementGuard's rise allowance covers the launch.
+#                the owner's boing (94320656351627, pitch 1; ONE sound per bounce, none for a debounced contact, none for the old Bubble04; checked on a stubbed
+#                and on the real LocalSfx: Effects group, SoundTiming's default lead-in); MovementGuard's rise allowance covers the launch.
 #       gardens: the step heights ground -> pad -> border -> soil are measured against the runner's step limit (RunnerSweep.Hull); every exposed soil face of
 #                every bed of the 6 bases gets an invisible ramp (the bed borders stay walk-through) so no climb on any edge - fronts, sides, corners, the
 #                rear bed's three outer faces - exceeds the limit; the soil, the plots and their plants are untouched; ramps cannot be queried or touched
 #                and stay inside the hub (the keepers' track is not affected).
-#  2. static checks - no pathfinding anywhere (keepers / NPCs do not walk the hub), the new client script starts with the R152 load guard, the boing is an
-#     existing asset, the manifest lists the new files.
+#  2. static checks - no pathfinding anywhere (keepers / NPCs do not walk the hub), the new client script starts with the R152 load guard, the boing is
+#     the owner's trampoline file (94320656351627) at pitch 1 through LocalSfx (R153: it replaced the Bubble04 placeholder), the manifest lists the new files.
 #  3. the R152 load guard run and the hub z-fight run (run_hub_zfight.sh: no counted finding, no tight pair, the trampoline parts included).
 # "mutate" as the 3rd argument also runs broken copies (no ramps; a bounce that stacks; no debounce) that the test must fail.
 set -e
@@ -48,11 +49,12 @@ GUARD='R152: start once the whole game has arrived'
 head -1 "$C/HubTrampoline153.client.lua" | grep -q "$GUARD" || fail "HubTrampoline153.client: line 1 is not the load guard"
 [ "$(grep -c "$GUARD" "$C/HubTrampoline153.client.lua")" = 1 ] || fail "HubTrampoline153.client: the guard must appear exactly once"
 if grep -rn "PathfindingService\|CreatePath\|ComputeAsync" "$S" --include=*.lua >/dev/null;then fail "something paths through the world: the ramps / trampolines were only checked against walking players";fi
-grep -q "96764044228884" "$S/ReplicatedStorage/InteractionAudio.lua" || fail "the boing id is not InteractionAudio's Bubble04 any more"
-grep -q "BOING={Id='rbxassetid://96764044228884'" "$C/HubTrampoline153.client.lua" || fail "the boing must be the existing Bubble04 asset"
+grep -q "BOING={Id='rbxassetid://94320656351627',Volume=[.0-9]*,Pitch=1}" "$C/HubTrampoline153.client.lua" || fail "the boing must be the owner's file 94320656351627 at pitch 1 (no pitch shift)"
+if grep -n "96764044228884\|Bubble04\|InteractionAudio" "$C/HubTrampoline153.client.lua" | grep -v "^[0-9]*:--" ;then fail "the trampoline client still touches the Bubble04 placeholder";fi
+[ "$(grep -c "Sfx.Play(BOING.Id," "$C/HubTrampoline153.client.lua")" = 1 ] || fail "the boing must be played in exactly one place (LocalSfx.Play, once per bounce)"
 for f in ReplicatedStorage/HubTrampolineRules153 ServerScriptService/ChestChaseServer/HubTrampoline153 StarterPlayer/StarterPlayerScripts/HubTrampoline153;do
  grep -q "	$f	" "$S/MANIFEST.tsv" || fail "$f is not in src/MANIFEST.tsv";done
-echo "ok: no pathfinding in the game (keepers and NPCs do not walk the hub or the gardens), the client script starts with the load guard, the boing is an existing asset, the manifest lists the new files"
+echo "ok: no pathfinding in the game (keepers and NPCs do not walk the hub or the gardens), the client script starts with the load guard, the boing is the owner's file at pitch 1 played in one place through LocalSfx, the manifest lists the new files"
 [ $RC = 0 ] || exit 1
 echo "== R152 load guard"
 sh "$REPO/docs/proposals/R152/tests/run_load_guard.sh" "$OUT/lg" | tail -2
