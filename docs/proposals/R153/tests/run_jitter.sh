@@ -9,11 +9,13 @@
 #                        the world Void pack and its effects, keepers 160-350 studs (CosmeticBudget);
 #  test_jitter_misc    - Verity's hop, held fruit, seed auras, GUI shine / card borders / rainbow, the upgrade button press on the client, and
 #                        the static checks (connection sites);
+#  test_jitter_round2  - round 2 (owner: "reduce jitter in effects"): the speed popup field on the root, the belt arrows and TreadmillFx's pattern / spinners every
+#                        frame in view (the tick out of view), a sky beam's fade without steps (RarePullFx), the charge motes on this frame's mouth (RarePullWorld);
 #  server              - the server connects per-frame signals only in its gameplay services and tweens no part (decorative motion is the clients').
 # Elsewhere (their own suites): the hub showcase on tier 2 (R151 test_hub_client), the giveaway pack in / out of view (R152 test_giveaway_client),
 # the tutorial chevrons' fade (tools/tests/test_tutorial), a flying fruit's shrink (R149 test_growth_fx).
-# JITTER_BASE=<commit> (the teeth): the same dynamic checks against that commit's src (d73905e = R152 as installed): they must FAIL there (the jitter
-# is real and the checks see it); that run passes when every check set fails on the base.
+# JITTER_BASE=<commit> (the teeth): the same dynamic checks against that commit's src (d73905e = R152 as installed; baf5eea = the release before round 2, for
+# test_jitter_round2): they must FAIL there (the jitter is real and the checks see it); that run passes when every check set fails on the base.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
