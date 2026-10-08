@@ -621,9 +621,11 @@ local function registerPlantCollision(item)
 end
 -- Event-driven collection; no full-workspace scans per click.
 local gardenMap=workspace:WaitForChild('ChestChaseMap')
-for _,item in ipairs(gardenMap:GetDescendants())do registerPlantCollision(item)end
-gardenMap.DescendantAdded:Connect(registerPlantCollision)
-gardenMap.DescendantRemoving:Connect(function(item)
+-- (R153 perf, lag audit D10: plants grow only in the bases' gardens: the Bases folder is listened to, not the whole map as it streams in)
+local plantScope=gardenMap:FindFirstChild('Bases')or gardenMap
+for _,item in ipairs(plantScope:GetDescendants())do registerPlantCollision(item)end
+plantScope.DescendantAdded:Connect(registerPlantCollision)
+plantScope.DescendantRemoving:Connect(function(item)
  if item.Name~='SolidPlant'or not item:IsA('Folder')then return end
  local index=table.find(gardenRayExclusions,item);if index then table.remove(gardenRayExclusions,index)end
 end)
@@ -724,8 +726,12 @@ local function bindGardenPrompt(prompt)
 	prompt:GetPropertyChangedSignal("Enabled"):Connect(function() refreshPrompt(prompt) end)
 	refreshPrompt(prompt)
 end
-workspace.DescendantAdded:Connect(function(item) if item:IsA("ProximityPrompt") then task.defer(bindGardenPrompt, item) end end)
-for _, item in ipairs(workspace:GetDescendants()) do bindGardenPrompt(item) end
+-- R153 perf (lag audit D10): garden prompts only exist in the bases' gardens (GardenPlots, under the map's Bases): listen there instead of to every
+-- instance added anywhere in the workspace (the map streaming in, packs, effects); a map without a Bases folder is listened to whole, as before.
+local gardenPromptRoot=workspace
+do local map=workspace:FindFirstChild("ChestChaseMap");local bases=map and map:FindFirstChild("Bases");if bases then gardenPromptRoot=bases end end
+gardenPromptRoot.DescendantAdded:Connect(function(item) if item:IsA("ProximityPrompt") then task.defer(bindGardenPrompt, item) end end)
+for _, item in ipairs(gardenPromptRoot:GetDescendants()) do bindGardenPrompt(item) end
 playerGui:GetAttributeChangedSignal('SelectedGardenFruitIndex'):Connect(function()
  for prompt in pairs(boundPrompts)do if prompt.Parent then refreshPrompt(prompt)end end
 end)
