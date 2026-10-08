@@ -537,6 +537,7 @@ function ChaseService:_preparePersistentGuardian(model, stage)
 	model:SetAttribute("Stage", stage)
 	-- R141: the walk speed that outruns this keeper (KeeperSpeedLabels shows the Speed it takes over its head).
 	model:SetAttribute("KeeperEscapeSpeed", require(ReplicatedStorage.KeeperPursuit).EscapeSpeed(stage))
+	local homes = self.GuardianHomeCFrames; if homes and homes[stage] then model:SetAttribute("KeeperHome", homes[stage].Position) end -- R153: the spawn point the SPEED NEEDED sign is pinned to (KeeperSpeedLabels)
 	game:GetService("CollectionService"):AddTag(model, "BiomeKeeper")
 	local isPlaceholder = model:GetAttribute("FutureNPCModelSlot") == true
 		or model:GetAttribute("FallbackGuardian") == true

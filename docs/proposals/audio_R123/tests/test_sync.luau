@@ -124,6 +124,49 @@ local notice=R.Instance.new('RemoteEvent');notice.Name='Notice83';notice.Parent=
 run('NotificationClient83')
 local rare=SS:FindFirstChild('Notice_RarePack')
 check(rare~=nil and preloaded[rare],'rare-pack cue exists and is preloaded before the first notice')
+-- R153 (owner: "the 1st one is the new rarity notifier sound"): the rare-pack notice plays the owner's file (it replaced 118818986767152), once per
+-- notice, when its line appears; same volume as the other notice cues, same (Interface) group, SoundTiming's default lead-in (the file is unmeasured).
+do
+ local Feed=W.module('NoticeFeed83');local Mixer=W.module('AudioMixer');local Timing=W.module('SoundTiming')
+ local NEW,OLD='rbxassetid://80907337289683','rbxassetid://118818986767152'
+ check(rare.SoundId==NEW,'rare-pack cue is the owner\'s new notifier sound ('..tostring(rare.SoundId)..')')
+ local stale=0;for _,s in ipairs(sounds)do if s.SoundId==OLD then stale+=1 end end
+ check(stale==0,'no sound in the game still carries the old rare-pack id ('..stale..')')
+ local weatherCue=SS:FindFirstChild('Notice_WeatherAdopted')
+ check(rare.Volume==.34 and rare.Volume==weatherCue.Volume and rare.SoundGroup==Mixer.Group('Interface') and rare.PlaybackSpeed==1 and not rare.Looped,'the cue keeps the notice cues\' volume (.34), group (Interface) and plays unpitched')
+ local gui=pg:FindFirstChild('ChestChaseNotices83')
+ local function lines()local n=0;for _,d in ipairs(gui:GetDescendants())do if d.Name=='Announcement'then n+=1 end end;return n end
+ local function msg(id,text,stage)return {Text=text or'Mythic Pack',Biome='Storm Peaks',SpawnId=id,Stage=stage or 7,Tier='Mythic',Size=1,Mutation='None',Color=R.Color3.new(1,0,.8)}end
+ local function settle(sec)for _=1,math.floor(sec*60)do frame()end end
+ local start=rare.Plays or 0
+ -- one spawn: one line, one play, on the frame its line appears
+ R.advance(1);Feed.Pack(msg('r153:a'))
+ local atLine=nil;for _=1,60 do frame();if lines()>0 then atLine=rare.Plays or 0;break end end
+ check(atLine==start+1 and rare.PlayedAt==R.clock,'one rare-pack notice: its line and its sound appear on the same frame, one play (got '..tostring(atLine and atLine-start)..')')
+ check(rare.TimePosition==Timing.Offset(rare),'it starts at SoundTiming\'s lead-in for the file (unmeasured: 0; Start_80907337289683 tunes it)')
+ settle(.5);check((rare.Plays or 0)==start+1,'and it does not play again while the line is up')
+ -- the same spawn announced again (a repeated packet) shows nothing and plays nothing
+ Feed.Pack(msg('r153:a'));settle(.6)
+ check((rare.Plays or 0)==start+1 and lines()==1,'the same spawn id again: no second line, no second sound')
+ settle(6)
+ check(lines()==0,'the line is gone after its time')
+ -- three packs of one kind in one burst are ONE line ("3 Mythic Packs") and one sound
+ local before=rare.Plays or 0
+ Feed.Pack(msg('r153:b1'));Feed.Pack(msg('r153:b2'));Feed.Pack(msg('r153:b3'));settle(.8)
+ check(lines()==1 and (rare.Plays or 0)==before+1,'three packs of the same tier and stage in one burst: one line, one sound ('..lines()..' lines, '..((rare.Plays or 0)-before)..' plays)')
+ settle(6)
+ -- two different notices: two sounds, one after the other (one cue at a time), never together
+ before=rare.Plays or 0
+ Feed.Pack(msg('r153:c1','Legendary Pack',4));Feed.Pack(msg('r153:c2','Mythic Pack',7));settle(.6)
+ check(lines()==1 and (rare.Plays or 0)==before+1,'two different notices in one burst: the second waits for the first one\'s cue (1 line, 1 sound at first)')
+ settle(3.4)
+ check(lines()==2 and (rare.Plays or 0)==before+2,'...and then shows with its own sound: one sound per notice ('..lines()..' lines, '..((rare.Plays or 0)-before)..' plays)')
+ settle(8)
+ -- a notice that is not valid makes no sound
+ before=rare.Plays or 0
+ Feed.Pack({Text='Mythic Pack',Biome='Storm Peaks',Stage=7});Feed.Pack(msg('r153:bad',nil,9));settle(.8)
+ check(lines()==0 and (rare.Plays or 0)==before,'a malformed rare-pack notice (no spawn id, a stage out of range) shows nothing and plays nothing')
+end
 
 -- 6. TrackHoleClient: trap thud preloaded; dirt follows FastMode ----------------------------------------------------
 local hole=R.Instance.new('RemoteEvent');hole.Name='TrackHole';hole.Parent=remotes

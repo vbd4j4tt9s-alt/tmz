@@ -194,7 +194,10 @@ local function geometry(key,id,meshes,label,neutral)
  check(worstCrimp<2e-6,label..': the crimp rows (|v| >= .94) did not move at all, so the seal and the strips stay flush ('..string.format('%.2g',worstCrimp)..')')
  check(worstOut<=.05+1e-9,label..string.format(': nothing went outside the design\'s box by more than 5%% (%.3f)',worstOut))
  check(worstMid<2e-6,label..': each part\'s PackLocalFrame follows its mesh\'s bounding-box centre, so the vertices stay where the field put them ('..string.format('%.2g',worstMid)..')')
- check(moved/total>.1,label..string.format(': the field moved %d%% of the vertices',math.floor(moved/total*100)))
+ -- (R153: a design whose box reaches past the pouch - a crown, wings, a glass shell - keeps the pouch's crimps and what stands beyond them still (PackShapes151.Keep), so less of
+ -- its box moves: Shoulders, which only moves the upper and lower corners, moves 6 - 9% of such a lattice)
+ local tallBox=hi.Y>Shapes.Pouch.Top+1e-6 or lo.Y<Shapes.Pouch.Bottom-1e-6
+ check(moved/total>(tallBox and .05 or .1),label..string.format(': the field moved %d%% of the vertices',math.floor(moved/total*100)))
  check(normalsOk,label..': the normals are unit length and turned by less than 60 degrees')
  check(whiteOk,label..(neutral and': every vertex colour is white'or': every vertex colour is what the print had'))
 end

@@ -41,7 +41,7 @@ M = {
     # a stray part that is not welded to a held Verity pack
     'verity_loose': ('VerityPackArt.lua', "if not p.Anchored then local w=Instance.new('WeldConstraint');w.Part0=root;w.Part1=p;w.Parent=p end", "if not p.Anchored and s.Name~='VerityBodyTop' then local w=Instance.new('WeldConstraint');w.Part0=root;w.Part1=p;w.Parent=p end", 'test:connection'),
     # a Void part pushed off the face (the stars back at .016 / .01 deep is the base; now far out)
-    'void_floating': ('EclipsePackArt.lua', "local at=base*CF(star[1],star[2],-.008)", "local at=base*CF(star[1],star[2],-.2)", 'geometry'),
+    'void_floating': ('EclipsePackArt.lua', "local at=base*CF(star[1],star[2],depth('Star',i))", "local at=base*CF(star[1],star[2],-.2)", 'geometry'),  # (R153: the stars' depth comes from depth())
 }
 if name == 'list':
     print(' '.join(M))

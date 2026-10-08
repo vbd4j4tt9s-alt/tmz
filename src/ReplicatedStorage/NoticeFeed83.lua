@@ -3,7 +3,10 @@ local F={};local RS=game:GetService('ReplicatedStorage');local Run=game:GetServi
 local Copy=require(script.Parent.NoticeCopy83);local Layout=require(script.Parent.NoticeLayout85);local Queue={};local Showing={};local Seen={}
 local seenOrder={};local started=false;local alive=true;local root,host,pg;local serial=0
 -- R131: Gift = the reward chime (InteractionAudio GemClaim) for a received gift.
-local cueIds={RarePack='rbxassetid://118818986767152',WeatherAdopted='rbxassetid://133449446616894',Gift='rbxassetid://82559527540705'}
+-- R153 (owner): RarePack = the owner's new rarity notifier sound (it replaces 118818986767152). It plays once per rare-pack notice, when its line appears
+-- (F.Pack merges the same stage + text of one burst into one line; a spawn id is shown once), at the same .34 as the other notice cues, on the Interface
+-- group like them. Its lead-in silence is unmeasured: SoundTiming.Start_80907337289683 (a number attribute on SoundTiming, or SoundTiming.Starts) tunes it.
+local cueIds={RarePack='rbxassetid://80907337289683',WeatherAdopted='rbxassetid://133449446616894',Gift='rbxassetid://82559527540705'}
 local voices={};local nextWarm=0;local cueUntil=0;local currentVoice
 local function warm()
  local now=os.clock();if now<nextWarm then return end;nextWarm=now+10

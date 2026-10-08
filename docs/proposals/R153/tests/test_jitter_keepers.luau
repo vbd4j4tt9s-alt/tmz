@@ -1,8 +1,8 @@
 --!nocheck
 -- R153 jitter, keepers and the Void, on the mock with the REAL scripts. The server moves a keeper's anchored root in packet steps (here: an irregular
 -- ~20 Hz with 30 studs/s of travel); the client draws the body from KeeperMotion's smoothed frame.
---  1. KeeperSpeedLabels + BeastAnimation (+ KeeperFollow153): the "SPEED NEEDED" sign hangs on the smoothed body's anchor, which advances on every drawn
---     frame at 30 / 60 / 144 fps while the raw root repeats frames between packets; the sign goes back to the root when the keeper is let go;
+--  1. KeeperSpeedLabels + BeastAnimation: the "SPEED NEEDED" sign is pinned at the keeper's spawn point (R153 owner spec, run_keeper_label.sh): it does
+--     not follow the keeper, so it does not move at all while the keeper runs in packet steps (nothing to smooth), at 30 / 60 / 144 fps;
 --  2. CosmeticBudget.KeeperDue: an awake keeper on screen within 350 studs is posed every frame (30 / 20 Hz before); asleep / off screen keep the saving;
 --  3. VeiledEventClient81: The Darkened's body (posed on a smoothed root) advances every drawn frame while the server root steps; its sign anchor too;
 --  4. VeiledEventClient81: a Void pack in the world with its effects (the nearest 1 / 2 / 4 by tier) is posed and stepped every frame on every tier
@@ -54,25 +54,29 @@ J.look(V3(0,15,-30),V3(0,6,20))
 local ba=R.new('LocalScript');ba.Name='BeastAnimation';W.load('BeastAnimation',ba)
 local ks=R.new('LocalScript');ks.Name='KeeperSpeedLabels';W.load('KeeperSpeedLabels',ks)
 J.run(.5,60)
-local sign=K:FindFirstChild('SpeedReq');local root=K.HumanoidRootPart
-if check(sign~=nil,'the speed sign is over the keeper')then
- local anchor=sign.Adornee
- check(anchor~=nil and anchor~=root and anchor.Name=='KeeperFollow'and anchor.Transparency==1 and anchor.Anchored==true and anchor.CanCollide==false and anchor.CanQuery==false,
-  'it hangs on the smoothed body\'s anchor (KeeperFollow153: invisible, anchored, no collision / query), not on the server\'s root')
+-- R153 (the owner's spawn-pinned spec): the sign no longer follows the keeper at all (KeeperSpeedLabels does not use KeeperFollow153): a pinned sign never
+-- moves, so there is nothing to smooth. Its own suite is run_keeper_label.sh; here it must stay exactly where it is while the packet-stepped, smoothed
+-- keeper runs, on every drawn frame at 30 / 60 / 144 fps.
+local function signOf(m)
+ local f=W.workspace:FindFirstChild('KeeperSignAnchors');if not f then return nil end
+ for _,a in ipairs(f:GetChildren())do local link=a:FindFirstChild('Keeper');if link and link.Value==m then return a:FindFirstChild('SpeedReq'),a end end
+ return nil
+end
+local sign,anchor=signOf(K);local root=K.HumanoidRootPart
+if check(sign~=nil,'the speed sign is there (on its own anchor, not under the keeper)')then
+ check(anchor~=nil and sign.Adornee==anchor and anchor~=root and anchor.Name=='SpeedSign'and anchor.Transparency==1 and anchor.Anchored==true and anchor.CanCollide==false and anchor.CanTouch==false and anchor.CanQuery==false and not anchor:IsDescendantOf(K),
+  'it hangs on its own invisible anchored part (no collision / touch / query), not on the keeper\'s root and not on the smoothed body\'s anchor')
+ local home=anchor.Position;local off0=sign.StudsOffsetWorldSpace
  local stepRoot=packets(root,root.CFrame,30)
- local rootRepeats=0
- J.everyFrame(check,'the speed sign over a chasing keeper (server root in ~20 Hz packets)',1.5,nil,function()return sign.Adornee.CFrame.Position end,function()stepRoot()end)
- -- the raw root, the old adornee, repeats frames between packets
- local list=J.sample(60,90,function()return root.Position end,function()stepRoot()end);rootRepeats=J.stalls(list)
- check(rootRepeats>=30,'(the raw root the sign used to hang on repeats '..rootRepeats..' of 90 frames at 60 fps: that was the jitter)')
- -- the anchor rides with the body: its distance to the body's root part stays within the body's own motion
- local bodyPart=K.BeastBody:GetChildren()[1];local d0=(bodyPart.Position-sign.Adornee.Position).Magnitude;local worst=0
- for _=1,60 do stepRoot();J.frame(1/60,function()worst=math.max(worst,math.abs((bodyPart.Position-sign.Adornee.Position).Magnitude-d0))end)end
- check(worst<2,string.format('the anchor moves with the body (its distance to a body part changes by %.2f studs at most, the gait)',worst))
- local before=sign.Adornee.CFrame;J.physicsOnly(10);check(J.same(sign.Adornee.CFrame,before),'the anchor moves in RenderStepped, not in the physics half of a frame')
- -- the animator lets go (the keeper's rig is removed): the sign goes back to the root
+ local worst=0
+ for _,fps in ipairs({30,60,144})do
+  J.sample(fps,fps*2,function()worst=math.max(worst,(anchor.Position-home).Magnitude,(sign.StudsOffsetWorldSpace-off0).Magnitude);return 0 end,function()stepRoot()end)
+ end
+ check(worst==0 and (root.Position-home).Magnitude>30,string.format('the keeper runs %.0f studs away (packets, smoothed body) at 30 / 60 / 144 fps: the sign does not move at all (drift %.3f)',(root.Position-home).Magnitude,worst))
+ local before=anchor.CFrame;J.physicsOnly(10);check(J.same(anchor.CFrame,before),'nothing moves it in the physics half of a frame either')
+ -- the animator lets go (the keeper's rig is removed): the sign stays where it was
  K.BeastBody:Destroy();J.run(.2,60)
- check(sign.Adornee==root,'a keeper that is no longer animated here: the sign is back on its root')
+ check(sign.Adornee==anchor and J.same(anchor.CFrame,before),'a keeper that is no longer animated here: the sign is still pinned at the spawn point')
 end
 ba:Destroy();ks:Destroy();K:Destroy()
 
@@ -110,8 +114,8 @@ do
  J.everyFrame(check,'The Darkened\'s body while it chases (server root in ~20 Hz packets)',1.5,nil,function()return chest.CFrame.Position end,function()stepRoot()end)
  local anchor=W.workspace:FindFirstChild('_KeeperFollow153')
  local a=anchor and anchor:GetChildren()[1]
- if check(a~=nil,'The Darkened drives a sign anchor (KeeperFollow153)')then
-  J.everyFrame(check,'The Darkened\'s sign anchor',1,nil,function()return a.CFrame.Position end,function()stepRoot()end)
+ if check(a~=nil,'The Darkened\'s smoothed body drives its KeeperFollow153 anchor (the sign no longer hangs on it: it is pinned at the spawn point)')then
+  J.everyFrame(check,'The Darkened\'s smoothed-body anchor',1,nil,function()return a.CFrame.Position end,function()stepRoot()end)
  end
  -- the Void pack: every tier, its pieces and its debris every frame
  local pr=void.PrimaryPart

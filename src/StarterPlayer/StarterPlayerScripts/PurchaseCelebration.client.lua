@@ -37,11 +37,16 @@ local function step(dt)
  for i=#bursts,1,-1 do
   local b=bursts[i];b.Age+=dt
   if b.Age>=b.Life then
-   b.Ring:Destroy();for _,piece in ipairs(b.Pieces)do piece.Frame:Destroy()end;table.remove(bursts,i)
+   b.Ring:Destroy();if b.Icon then b.Icon:Destroy()end;for _,piece in ipairs(b.Pieces)do piece.Frame:Destroy()end;table.remove(bursts,i)
   else
    local k=math.min(1,b.Age/RING_LIFE);local size=b.Scale*(30+230*(1-(1-k)^2))
    b.Ring.Size=UDim2.fromOffset(size,size);if b.Edge then b.Edge.Transparency=k end
    b.Ring.Visible=k<1
+   -- R153: the purchase's own picture (info.Icon, the 4 Leaf Clover) pops up in the ring: grows in .3 s with a little overshoot, holds, shrinks away at the end
+   if b.Icon then
+    local t=math.min(1,b.Age/.3);local out=math.max(0,math.min(1,(b.Life-b.Age)/.3));local px=b.Scale*112*t*out*(1+.14*math.sin(t*math.pi))
+    b.Icon.Size=UDim2.fromOffset(px,px)
+   end
    local drag=1-math.min(1,dt*1.8)
    for _,piece in ipairs(b.Pieces)do
     piece.VY+=GRAVITY*dt;piece.VX*=drag;piece.X+=piece.VX*dt;piece.Y+=piece.VY*dt;piece.Angle+=piece.Spin*dt
@@ -57,7 +62,7 @@ local function step(dt)
  if #bursts==0 then stop()end
 end
 -- A ring and a spray of confetti from the middle of the screen.
-local function sprinkle()
+local function sprinkle(info)
  local gui=player:FindFirstChild('PlayerGui');if not gui then return end
  if not layer then
   local holder=Instance.new('ScreenGui');holder.Name='PurchaseCelebration';holder.ResetOnSpawn=false;holder.DisplayOrder=60;holder.IgnoreGuiInset=true
@@ -72,6 +77,11 @@ local function sprinkle()
  ring.BackgroundTransparency=1;ring.BorderSizePixel=0;ring.Parent=layer
  local burst={Age=0,Life=LIFE,Ring=ring,Pieces={},Scale=scale}
  table.insert(bursts,burst)
+ if info and info.Icon=='Clover'then
+  local pop=Instance.new('Frame');pop.Name='PurchaseIcon';pop.AnchorPoint=Vector2.new(.5,.5);pop.Position=UDim2.fromScale(.5,.42);pop.Size=UDim2.fromOffset(0,0);pop.BackgroundTransparency=1;pop.BorderSizePixel=0;pop.Active=false;pop.Parent=layer
+  burst.Icon=pop
+  pcall(function()local clover=require(RS.CloverIcon153);clover.Attach(pop);clover.Ensure()end)
+ end
  if not connection then connection=Run.RenderStepped:Connect(step)end
  local round=Instance.new('UICorner');round.CornerRadius=UDim.new(1,0);round.Parent=ring
  local edge=Instance.new('UIStroke');edge.Name='Edge';edge.Color=PALETTE[1];edge.Thickness=5;edge.Parent=ring;burst.Edge=edge
@@ -98,11 +108,11 @@ local function celebrate(info)
  local now=os.clock();if now-lastAt<GAP then return end;lastAt=now
  if Audio then pcall(Audio.Play,'GemClaim')end
  if reduced()or#bursts>=MAX_BURSTS then return end
- pcall(sprinkle);pcall(sparkle)
+ pcall(sprinkle,info);pcall(sparkle)
 end
 local listener=remote.OnClientEvent:Connect(celebrate)
 script.Destroying:Connect(function()
  dead=true;listener:Disconnect()
- for _,b in ipairs(bursts)do b.Ring:Destroy();for _,piece in ipairs(b.Pieces)do piece.Frame:Destroy()end end
+ for _,b in ipairs(bursts)do b.Ring:Destroy();if b.Icon then b.Icon:Destroy()end;for _,piece in ipairs(b.Pieces)do piece.Frame:Destroy()end end
  table.clear(bursts);stop()
 end)

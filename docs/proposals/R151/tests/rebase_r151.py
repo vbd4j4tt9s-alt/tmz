@@ -4,7 +4,10 @@ Usage: python3 rebase_r151.py <file> [<file> ...]
 Older suites (R147 / R149 Verity pack) prove "every other pack builds exactly what the base commit built" by building each pack with the base commit's
 modules and with this checkout's. R151 changed three things on purpose (giant packs' seal / tear strips are GiantVisualParts, the Void's stars / specks / rune
 strokes are backed onto the pouch, the pads' moss / ice are .006 thicker), so those suites' base copies get the same three edits first: "identical" then means
-"nothing but the R151 fixes changed". A file is only touched where the old text is there (the Void edit in EclipsePackArt, the other two in SeedPackVisuals)."""
+"nothing but the R151 fixes changed". A file is only touched where the old text is there (the Void edit in EclipsePackArt, the other two in SeedPackVisuals).
+R153 (owner: "parts are dislocated on packs"): the Void's corner details that hung off its pouch are seated on it (EclipsePackArt.Seats, read from this checkout so the
+base copy carries exactly today's table); those edits follow the R151 ones."""
+import os
 import sys
 
 EDITS = [
@@ -35,6 +38,18 @@ EDITS = [
      "pulse(segment('RuneSigil'..tag..r..'_'..k,base*CF(rune[1]+V(0,0,-.008)),stroke[1],stroke[2],.022,.026,P.Rune),.5,r*1.3)"),
 ]
 
+# R153: the Void's seats (the table itself comes from this checkout's EclipsePackArt)
+_now = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'src', 'ReplicatedStorage', 'EclipsePackArt.lua'), encoding='utf-8').read()
+_seats = _now[_now.index('A.Seats={'):_now.index('\n', _now.index('A.SeatEmbed=')) + 1]
+EDITS += [
+    ("A.Budget={MaxParts=190}\nlocal P=A.Palette", "A.Budget={MaxParts=190}\n" + _seats + "local P=A.Palette"),
+    ("  for i,star in ipairs({{-.66,.50,.13,P.Star},",
+     "  local seats=A.Seats[tag]\n  local function depth(kind,i)local s=seats[kind][i];return s and math.abs(face)-s+A.SeatEmbed-.013 or -.008 end\n  for i,star in ipairs({{-.66,.50,.13,P.Star},"),
+    ("   local at=base*CF(star[1],star[2],-.008)", "   local at=base*CF(star[1],star[2],depth('Star',i))"),
+    ("base*CF(speck[1],speck[2],-.008)*CFrame.Angles", "base*CF(speck[1],speck[2],depth('Speck',i))*CFrame.Angles"),
+    ("base*CF(rune[1]+V(0,0,-.008))", "base*CF(rune[1]+V(0,0,depth('Rune',r)))"),
+]
+
 for path in sys.argv[1:]:
     text = open(path, encoding='utf-8').read()
     done = 0
@@ -42,4 +57,4 @@ for path in sys.argv[1:]:
         if old in text:
             text = text.replace(old, new, 1); done += 1
     open(path, 'w', encoding='utf-8').write(text)
-    print('%s: %d R151 edit(s) carried over' % (path, done))
+    print('%s: %d R151 / R153 edit(s) carried over' % (path, done))

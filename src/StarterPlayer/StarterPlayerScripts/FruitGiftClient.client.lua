@@ -98,9 +98,10 @@ local function open(target,held,id,action)
  dialog.Visible=true;light(target)
  if lastInput()=='Gamepad'then GuiService.SelectedObject=giveButton end
 end
+local function revealPress()local ok,taken=pcall(function()return require(game:GetService('ReplicatedStorage').RarePullRules).ClaimPress()end);return ok and taken==true end -- R153: a press that skips / closes a pull reveal's card is not the tool's
 local function give(point)
  if pending or os.clock()-last<.65 then return end
- local held,id,action=giftable();if not held then return end
+ local held,id,action=giftable();if not held or revealPress()then return end
  local target=playerAt(point);if not target then return end
  last=os.clock()
  if not inReach(target)then say('Get closer to '..target.DisplayName..' first!',true);return end

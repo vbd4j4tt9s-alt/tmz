@@ -27,6 +27,10 @@
 #                               its sky beam jump with the card; the seed still lands in the hand on the server's time; presses that are
 #                               not a choice never skip; the puller's chat line goes out at the skipped result; the setting ON gives the
 #                               short version (quick card, the result card in place of the story scene) every time, OFF the full one.
+#  test_seed_press.luau       - a press that skips / closes a card is never also the held tool's: planting (EconomyClient's routes, from its
+#                               source), the shovel (GardenShovel), digging (TrackHoleClient), giving (FruitGiftClient) by click / tap / R2;
+#                               packs and the bat (ManualActivationOnly exactly while a press would be the card's); a story scene owns every
+#                               press; with no card, and once it is gone, every tool works as before.
 #  test_seed_server.luau      - the server half (R151's pack harness, the real ChestService / PlayerDataService): packs opened back to back
 #                               each get the full RevealDuration, the seed is committed (and announced) on the 5th click whatever the client
 #                               shows, a pack equipped during a reveal goes back to the Backpack and opens after it; nothing stuck or lost.
@@ -48,7 +52,7 @@ INV=$P/inventory_R113/tests
 cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$P/R150/tests/sfx_env.luau" "$P/R151/tests/rare_env.luau" "$HERE"/*.luau "$OUT/cl/"
 python3 "$P/R151/tests/mkbundle_rare.py" "$OUT/cl" all-client >/dev/null
 cd "$OUT/cl"
-for t in test_seed_sync test_seed_loudness test_seed_fx test_seed_stress test_seed_choice;do
+for t in test_seed_sync test_seed_loudness test_seed_fx test_seed_stress test_seed_choice test_seed_press;do
  [ -f $t.luau ] || continue
  echo "== $t"
  timeout 1800 /opt/luau/luau $t.luau > $t.log 2>&1 || { grep -v '^WARN' $t.log | tail -40;exit 1; }
