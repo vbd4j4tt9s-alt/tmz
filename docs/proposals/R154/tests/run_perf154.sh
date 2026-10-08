@@ -35,7 +35,9 @@ bad=0;c=0;for f in "$SP"/*.client.lua;do
 done
 [ "$bad" = 0 ] && echo "ok: line 1 of every client script is the R152 load guard (Hotbar: line 2), $c scripts" || fail "load guard"
 git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua && echo "ok: BackgroundMusic untouched" || fail "BackgroundMusic changed"
-git -C "$REPO" diff --quiet "$BASE" -- src/ServerScriptService/ChestChaseServer/Config.lua && echo "ok: Config.Version unchanged (Config.lua untouched)" || fail "Config.lua changed"
+# Config.lua: only the Config.Version string may differ from the base (R153b hotfix, the R154 release bump)
+cfg=src/ServerScriptService/ChestChaseServer/Config.lua
+if [ "$(git -C "$REPO" show "$BASE:$cfg" | sed "s/Config.Version='[^']*'/Config.Version='V'/")" = "$(sed "s/Config.Version='[^']*'/Config.Version='V'/" "$REPO/$cfg")" ];then echo "ok: Config.lua untouched apart from Config.Version";else fail "Config.lua changed (beyond Config.Version)";fi
 tail -n +2 "$S/MANIFEST.tsv" | cut -f3 | LC_ALL=C sort > "$OUT/manifest_files.txt";(cd "$S" && find . -name '*.lua' | sed 's#^\./##' | LC_ALL=C sort) > "$OUT/src_files.txt"
 cmp -s "$OUT/manifest_files.txt" "$OUT/src_files.txt" && echo "ok: src/MANIFEST.tsv lists exactly the $(wc -l < "$OUT/src_files.txt") files in src" || { fail "src/MANIFEST.tsv and src differ";diff "$OUT/manifest_files.txt" "$OUT/src_files.txt" | head; }
 if git -C "$REPO" diff "$BASE" -- src | grep '^+' | grep -v '^+++' | sed 's/--.*$//' | grep -q "DescendantAdded";then fail "R154 added a DescendantAdded listener";else echo "ok: no DescendantAdded listener added (comments aside)";fi
