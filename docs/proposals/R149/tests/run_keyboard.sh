@@ -104,6 +104,7 @@ PY
  if [ -n "$NEWONLY" ]&&[ "$PHASE" = old ];then return 0;fi # NEWONLY=1: only the R152 and R153 mutations
  if [ -n "$OLDONLY" ]&&[ "$PHASE" != old ];then return 0;fi # OLDONLY=1: only the mutations before R152
  if [ -n "$R153ONLY" ]&&[ "$PHASE" != r153 ];then return 0;fi # R153ONLY=1: only the R153 mutations (key sounds only for a player who really steps on a key)
+ if [ -n "$R154ONLY" ]&&[ "$PHASE" != r154 ];then return 0;fi # R154ONLY=1: only the R154 mutations (phones: 12 px / stud near letters, 56 rows ahead)
  if [ -n "$ONLY" ]&&[ "$ONLY" != "$1" ];then return 0;fi # ONLY="<name>": just that mutation
  if [ -n "$ONLYRE" ]&&! echo "$1" | grep -qE "$ONLYRE";then return 0;fi # ONLYRE="<regex>": the mutations whose name matches
  if [ -n "$DRY" ];then echo "target found: $1";return 0;fi # DRY=1: only check that every mutation target is still in the sources
@@ -186,7 +187,7 @@ K2=ReplicatedStorage/KeyboardSkip152.lua;KS=ReplicatedStorage/KeyboardSurface149
 mutate "keys behind the camera's way back to 114 studs (tier 3 Back 14)" $R "[3]={Near=14,Back=40," "[3]={Near=14,Back=14,"
 mutate "the near zone is as big as Back (a teleport dresses 81 rows at once)" $R "return t.Near or t.Back end" "return t.Back end"
 mutate "letters stop where the near letters stop (no far letters)" $R "FarBehind=28,FarAhead=64,FarRows=4," "FarBehind=2,FarAhead=19,FarRows=4,"
-mutate "the far strips' guis stop rendering at 300 studs" $R "FarPixelsPerStud=4,FarMaxDistance=800}" "FarPixelsPerStud=4,FarMaxDistance=300}"
+mutate "the far strips' guis stop rendering at 300 studs" $R "FarPixelsPerStud=4,FarMaxDistance=800," "FarPixelsPerStud=4,FarMaxDistance=300," # (R154: the target followed R153 D8, which added FarMaxDistanceByTier after FarMaxDistance)
 mutate "far strips are never bound" $S "if fn<farN then Far.Bind(r);fn+=1 else pending=true end" "local _=0"
 mutate "far letters turned 180 degrees" $S "l.TextSize=FTEXT;l.Size=UDim2.fromOffset(KW*FPPS,KW*FPPS)" "l.TextSize=FTEXT;l.Rotation=180;l.Size=UDim2.fromOffset(KW*FPPS,KW*FPPS)"
 mutate "the click volume back to .8" $R "ClickVolume=1.8," "ClickVolume=.8,"
@@ -245,6 +246,14 @@ mutate "a pack platform presses a key under a hole (the hole floats over the dip
 mutate "another player's landing on the key he pressed silently does not click" $S "elseif kind==2 and who and quietBy[idx]==who then" "elseif false then"
 mutate "a runner a little above the floor is not remembered (his landing is silent)" $S "return thrown and 4 or 5" "return 4"
 mutate "a part that is not at its record is lifted again relative to where it is (the dig tween makes the crumbs climb)" $S "   if abs(y-want)>1e-3 and(abs(y-base)<1e-3 or y>want+C.HoleCeiling)then setY(d,want)end" "   if abs(y-want)>1e-3 then setY(d,y+C.HoleLift)end"
+# R154 (lag audit B3): phones (tier 2) draw the near letters at 12 px / stud and carry 56 key rows ahead; a tier change re-applies the letters' size (section 9b)
+PHASE=r154
+mutate "R154: tier 2 near letters are 16 px / stud again" $R "PixelsPerStudByTier={[2]=12}" "PixelsPerStudByTier={[2]=16}"
+mutate "R154: tier 2 carries 74 key rows ahead again" $R " [2]={Near=11,Back=28,Ahead=56," " [2]={Near=11,Back=28,Ahead=74,"
+mutate "R154: a tier change keeps the letters' old pixels a stud" $S "tierCfg=K.Tier(tier);windowDirty=true;Far.Limit();Far.Tune()end" "tierCfg=K.Tier(tier);windowDirty=true;Far.Limit()end"
+mutate "R154: strips waiting in the pool keep the old size on a tier change" $R " for k=1,#free do for i=1,freeN[k]do strip(free[k][i])end end" " for k=1,0 do for i=1,freeN[k]do strip(free[k][i])end end"
+mutate "R154: bound strips' labels keep their old places on a tier change" $R "   if px then px*=ratio;local py=st.PY[i]*ratio;st.PX[i]=px;st.PY[i]=py;l.Position=UDim2.fromOffset(px,py)end" "   if false then px*=ratio;local py=st.PY[i]*ratio;st.PX[i]=px;st.PY[i]=py;l.Position=UDim2.fromOffset(px,py)end"
+mutate "R154: pressed-key letters keep the old size on a tier change" $R " for _,e in ipairs(keyLetters)do if e.Gui.PixelsPerStud~=pps then" " for _,e in ipairs({})do if e.Gui.PixelsPerStud~=pps then"
 [ -z "$DRY" ] || exit 0
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]
