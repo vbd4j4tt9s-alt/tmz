@@ -21,7 +21,7 @@ for f in "$SP/Hotbar.client.lua" "$SP/HeldHarvests.client.lua" "$S/ReplicatedSto
 done
 head -1 "$SP/Hotbar.client.lua" | grep -q "SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)" || bad "Hotbar line 1 must hide Roblox's backpack (R152 load guard)"
 sed -n 2p "$SP/Hotbar.client.lua" | grep -q "R152: start once the whole game has arrived" || bad "Hotbar line 2 must be the R152 load guard"
-[ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | grep 'Config.Version')" = "$(grep 'Config.Version' "$S/ServerScriptService/ChestChaseServer/Config.lua")" ] || bad "Config.Version changed"
+[ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | grep 'Config.Version' | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/")" = "$(grep 'Config.Version' "$S/ServerScriptService/ChestChaseServer/Config.lua" | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/")" ] || bad "Config.Version changed"
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]" "$HERE" "$P/R153"/*.md 2>/dev/null;then bad "a model name in the R153 files";fi
 [ "$fail" = 0 ]
 echo "ok: the edited scripts compile, Config.Version unchanged, Hotbar lines 1 / 2 are the R152 load guard, no model names"

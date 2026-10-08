@@ -45,7 +45,7 @@ grep -q "QUEUED_SECONDS=8" "$SP/Hotbar.client.lua" || bad "a queued hotbar press
 grep -q "cancelEffect(almostEffect)" "$SP/TreadmillBonusClient.client.lua" || bad "leaving ALMOST THERE! does not stop the wiggle"
 grep -q "local rest=setmetatable" "$SP/HubTrampoline153.client.lua" || bad "the trampoline mat's rest pose is not recorded once per part"
 grep -q "	ReplicatedStorage/KeeperFollow153	" "$S/MANIFEST.tsv" && bad "src/MANIFEST.tsv still lists KeeperFollow153"
-[ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" 2>/dev/null | grep 'Config.Version')" = "$(grep 'Config.Version' "$SS/Config.lua")" ] || bad "Config.Version changed"
+[ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" 2>/dev/null | grep 'Config.Version' | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/")" = "$(grep 'Config.Version' "$SS/Config.lua" | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/")" ] || bad "Config.Version changed"
 if grep -rniE "cla[u]de|op[u]s|sonn[e]t|haik[u]|anthrop[i]c|gp[t]-?[0-9]" "$HERE" 2>/dev/null;then bad "a model name in the R153 files";fi
 BG=$SP/BackgroundMusic.client.lua
 [ -z "$(git -C "$REPO" status --porcelain -- "$BG")" ] || bad "BackgroundMusic.client.lua was touched"

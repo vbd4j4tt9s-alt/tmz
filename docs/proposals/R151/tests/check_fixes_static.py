@@ -19,7 +19,7 @@ def read(rel):
 
 
 # 1. compile --------------------------------------------------------------------------------------------------------------------------------------------------------------------
-changed = subprocess.run(['git', '-C', repo, 'diff', '--name-only', base, '--', 'src'], capture_output=True, text=True).stdout.split()
+changed = subprocess.run(['git', '-C', repo, 'diff', '--name-only', '--diff-filter=d', base, '--', 'src'], capture_output=True, text=True).stdout.split()
 changed += subprocess.run(['git', '-C', repo, 'ls-files', '--others', '--exclude-standard', '--', 'src'], capture_output=True, text=True).stdout.split()
 compiled = 0
 for rel in sorted(set(changed)):

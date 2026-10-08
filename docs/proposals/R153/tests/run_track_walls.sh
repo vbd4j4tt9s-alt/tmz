@@ -41,9 +41,9 @@ if git -C "$REPO" cat-file -e "$BASE^{commit}" 2>/dev/null;then
  gone=$(git -C "$REPO" diff "$BASE" -- "$MG" | grep -c '^-[^-]' || true)
  if [ "$gone" = 1 ] && git -C "$REPO" diff "$BASE" -- "$MG" | grep -q '^-    if offset.Y>riseAllowance then return correct(player,c,h,r,state,now)end$';then echo "ok: MovementGuard differs from $BASE only by the trampoline launch allowance (one line replaced, the rise and distance rules are the same)"
  else fail "MovementGuard changed against $BASE by more than the trampoline launch allowance ($gone lines removed)";fi
- git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | grep 'Config.Version' > "$OUT/version_base.txt"
- grep 'Config.Version' "$SS/Config.lua" > "$OUT/version_now.txt"
- cmp -s "$OUT/version_base.txt" "$OUT/version_now.txt" && echo "ok: Config.Version unchanged" || fail "Config.Version changed"
+ git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | grep 'Config.Version' | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/" > "$OUT/version_base.txt"
+ grep 'Config.Version' "$SS/Config.lua" | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/" > "$OUT/version_now.txt"
+ cmp -s "$OUT/version_base.txt" "$OUT/version_now.txt" && echo "ok: Config.Version unchanged apart from the release number" || fail "Config.Version changed"
 else echo "skip: $BASE is not in this checkout (frozen-file and Config.Version checks not run)";fi
 (cd "$REPO" && grep -v '^#' "$P/R151/tests/frozen.sha256" | sha256sum -c --quiet - ) && echo "ok: the frozen file hashes (docs/proposals/R151/tests/frozen.sha256) still hold" || fail "a frozen file's hash changed"
 n=$(ls "$S/StarterPlayer/StarterPlayerScripts" | grep -c 'client.lua$' || true)

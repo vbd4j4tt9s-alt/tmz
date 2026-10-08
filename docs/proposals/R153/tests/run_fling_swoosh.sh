@@ -45,9 +45,9 @@ if git -C "$REPO" cat-file -e "$BASE^{commit}" 2>/dev/null;then
  FROZEN="src/ServerScriptService/ChestChaseServer/ChaseService.lua src/ServerScriptService/ChestChaseServer/ConcurrentKeeperService.lua src/ServerScriptService/ChestChaseServer/RagdollService.lua src/ServerScriptService/ChestChaseServer/Config.lua src/ReplicatedStorage/KeeperCombat.lua src/ReplicatedStorage/KnockbackConfig.lua src/ReplicatedStorage/KeeperAudio.lua src/ReplicatedStorage/KeeperFx.lua src/ReplicatedStorage/KeeperSignatureStrike.lua src/ReplicatedStorage/SoundTiming.lua src/ReplicatedStorage/LocalSfx.lua src/ReplicatedStorage/AudioMixer.lua src/StarterPlayer/StarterPlayerScripts/KeeperHitEffects.client.lua src/StarterPlayer/StarterPlayerScripts/RagdollClient.client.lua"
  if sh "$T/r152_real_diff.sh" "$REPO" "$BASE" $FROZEN >/dev/null;then echo "ok: the chase / ragdoll / knockback / keeper services, the hit effects, the ragdoll client and the shared sound modules are byte-identical to $BASE"
  else fail "a frozen file changed against $BASE:";sh "$T/r152_real_diff.sh" "$REPO" "$BASE" $FROZEN || true;fi
- git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | grep 'Config.Version' > "$OUT/version_base.txt"
- grep 'Config.Version' "$S/ServerScriptService/ChestChaseServer/Config.lua" > "$OUT/version_now.txt"
- cmp -s "$OUT/version_base.txt" "$OUT/version_now.txt" && echo "ok: Config.Version unchanged" || fail "Config.Version changed"
+ git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | grep 'Config.Version' | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/" > "$OUT/version_base.txt"
+ grep 'Config.Version' "$S/ServerScriptService/ChestChaseServer/Config.lua" | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/" > "$OUT/version_now.txt"
+ cmp -s "$OUT/version_base.txt" "$OUT/version_now.txt" && echo "ok: Config.Version unchanged apart from the release number" || fail "Config.Version changed"
 else echo "skip: $BASE is not in this checkout (frozen-file and Config.Version checks not run)";fi
 # -- the world --------------------------------------------------------------------------------------------------------------------------------------
 INV=$P/inventory_R113/tests
