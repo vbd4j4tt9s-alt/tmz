@@ -32,7 +32,7 @@ local TICK=.5                    -- how often the distance (and what is on the d
 local TEXT_EVERY=5               -- seconds between countdown writes
 local SPIN=.6                    -- the item's turn, radians a second
 local BOB=.6                     -- the item's float up and down (studs, every ~4 s)
-local ITEM_HZ,ITEM_HZ_LOW,POSE_HZ=math.huge,30,30 -- how often the item's parts (every frame; ITEM_HZ_LOW on the middle quality tier: phones) / the avatar's joints are written while near
+local ITEM_HZ,ITEM_HZ_LOW,POSE_HZ=math.huge,30,30 -- how often the item's parts (every frame; ITEM_HZ_LOW on the middle quality tier: phones) / the cheering avatar's joints (out of view; in view every frame) are written while near
 local FADE=.3                    -- the dance fades in over this (seconds)
 local itemHz=ITEM_HZ
 local SPARK='rbxasset://textures/particles/sparkles_main.dds'
@@ -95,6 +95,8 @@ local function cheerJoints(entry,rig)
  local joints={}
  for name in pairs(Pose.CheerAt(0,0))do local j=Pose.Joint(rig,name);if j then joints[name]=j end end
  entry.Joints=next(joints)and joints or nil
+ local ok,cf,size=pcall(rig.GetBoundingBox,rig) -- R153: the ball the cheer is drawn in (the view test of step)
+ if ok and typeof(cf)=='CFrame'and typeof(size)=='Vector3'then entry.AvatarCenter,entry.AvatarReach=cf.Position,size.Magnitude/2+2 else entry.AvatarCenter,entry.AvatarReach=nil,nil end
 end
 local function resetAvatar(entry)
  if not entry.Joints then return end
@@ -279,7 +281,9 @@ local function step(dt)
      entry.Batch:Flush()
     end
    end
-   if doPose and entry.Joints and entry.Local=='pose'then -- (only a posed rig: a dancing one is its Animator's alone)
+   -- R153 (owner: "reduce jitter in effects"): the cheer is written every frame while the avatar is in view (30 Hz before: a giant rig stepping); out of view POSE_HZ
+   local seen=not(Cull and entry.AvatarReach and Cull.Hidden(workspace.CurrentCamera,entry.AvatarCenter,entry.AvatarReach,12))
+   if(doPose or seen)and entry.Joints and entry.Local=='pose'then -- (only a posed rig: a dancing one is its Animator's alone)
     local boost=entry.CelebrateAt and Pose.CelebrateAt(t-entry.CelebrateAt)or 0
     local pose=Pose.CheerAt(t,boost)
     for name,j in pairs(entry.Joints)do if j.Parent and pose[name]then pcall(function()j.Transform=pose[name]end)end end

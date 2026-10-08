@@ -23,7 +23,9 @@ echo "== static checks"
 # 1. the popup half of the script is cheap by construction
 n=$(grep -n '^-- V134:' "$SCRIPT" | cut -d: -f1);[ -n "$n" ] || fail "the V134 belt block marker is gone"
 head -n $((n-2)) "$SCRIPT" > "$OUT/popup_half.lua"
-tail -n +$((n-1)) "$SCRIPT" > "$OUT/belt_half.lua"
+# (R153 jitter: the belt arrows move every frame on a near belt in view; the sha below is of the block with that edit put back: undo_jitter153.py)
+python3 "$P/R153/tests/undo_jitter153.py" "$SCRIPT" "$OUT/popup_undone.lua" || fail "the R153 jitter edits of SpeedGainPopup changed (undo_jitter153.py)"
+m=$(grep -n '^-- V134:' "$OUT/popup_undone.lua" | cut -d: -f1);tail -n +$((m-1)) "$OUT/popup_undone.lua" > "$OUT/belt_half.lua"
 code=$(grep -v '^[[:space:]]*--' "$OUT/popup_half.lua")
 for pat in 'Tween' 'task\.delay' 'task\.defer' 'task\.spawn' 'task\.wait' 'Heartbeat' '[^r]Stepped' 'PreSimulation' 'PostSimulation'; do
  if printf '%s\n' "$code" | grep -Eq "$pat"; then fail "the popup half of SpeedGainPopup uses $pat"; fi

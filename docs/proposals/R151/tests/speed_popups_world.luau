@@ -49,7 +49,7 @@ function PW.frameList(field)local out={};for _,f in ipairs(field:GetChildren())d
 function PW.visible(field)local out={};for _,f in ipairs(field:GetChildren())do if f.Name=='Popup'and f.Visible then out[#out+1]=f end end;return out end
 function PW.visibleAll(pg)local n=0;for _,field in ipairs(PW.fields(pg))do n+=#PW.visible(field)end;return n end
 function PW.enabledFields(pg)local n=0;for _,field in ipairs(PW.fields(pg))do if field.Enabled then n+=1 end end;return n end
-function PW.fieldOf(pg,head)for _,field in ipairs(PW.fields(pg))do if field.Enabled and field.Adornee==head then return field end end;return nil end
+function PW.fieldOf(pg,head)for _,field in ipairs(PW.fields(pg))do if field.Enabled and(field.Adornee==head or head and field.Adornee==head.Parent:FindFirstChild('HumanoidRootPart'))then return field end end;return nil end -- (R153: on the root at the head's height)
 function PW.read(frame)
  local sc=frame:FindFirstChildOfClass('UIScale')
  return {X=frame.Position.X.Offset,Y=frame.Position.Y.Offset,Scale=sc.Scale,Text=frame.Amount.Text,Alpha=1-frame.Amount.TextTransparency,IconAlpha=1-frame.Lightning.TextTransparency,

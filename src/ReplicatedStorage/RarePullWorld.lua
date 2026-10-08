@@ -67,7 +67,9 @@ function W.Begin(player,character,rank,at,opts)
  if not connection then connection=Run.RenderStepped:Connect(function()step()end)end
  return e
 end
-function W.SetMouth(player,cf)local e=effects[player];if e then e.Mouth=cf end end
+-- part (R153, optional): the part the mouth rides on (the bag's PrimaryPart). The mouth is then read off that part when this effect is drawn: the charge
+-- motes no longer trail the bag by a frame when this module's RenderStepped runs before SeedPackClient's (the order of two connections is not fixed).
+function W.SetMouth(player,cf,part)local e=effects[player];if e then e.Mouth=cf;if part then e.MouthPart=part;e.MouthRel=part.CFrame:ToObjectSpace(cf)end end end
 -- R153: the puller skipped their card to the hit (RarePullRules.Shift, seconds): their own beam lands with it (never moved back)
 function W.Shift(player,seconds)local e=effects[player];if e and type(seconds)=='number'and seconds>(e.Shift or 0)then e.Shift=seconds end end
 -- where the beam lands: the ground under the puller (their feet)
@@ -147,7 +149,7 @@ local function update(player,e,now,camera)
    if e.Hum then S(e.Hum,'Volume',0)end
   elseif not far then e.Far=false end
   if e.Far then return end
-  local mouth=e.Mouth or root.CFrame*CF(0,1,-1)
+  local mp=e.MouthPart;local mouth=mp and mp.Parent and e.MouthRel and mp.CFrame*e.MouthRel or e.Mouth or root.CFrame*CF(0,1,-1)
   local up=mouth.Position
   local burst=e.TL.Burst
   -- charge motes, in the walking rarity hint (the pack's: RarePullRules.Hint)

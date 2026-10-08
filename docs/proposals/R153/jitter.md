@@ -71,20 +71,42 @@ bells and effects, the UI previews within their caps (fewer on tier 2). On tier 
 frame while in view (one BulkMoveTo each: 150 / 190 parts). R152's savings that touch nothing visible are kept: ViewCull152 holds, write-on-change
 caches, off-screen keeper rates.
 
-## Left for other agents' files (not changed here)
+## Round 2 (owner, again: "reduce jitter in effects")
 
-- Treadmill belt (treadmill agent): `TreadmillAnimation.client.lua` line 7 steps the belt at 30 Hz on Heartbeat; `TreadmillFx.lua` `Controller:Step`
-  (`interval=... 1/30 or 1/20`); `SpeedGainPopup.client.lua` belt-arrows half (`if elapsed<(low and 1/20 or 1/30)then return end`, held to
-  its base by the R151 treadmill suite). Same fix: every frame in RenderStepped while near, keep the distance gate.
-- Hub avatar (hub display agent): `HubDisplayClient.client.lua` line 30 `POSE_HZ=30`: the static avatar's cheer pose is written at 30 Hz.
-  Edited here: only line 184 (`itemHz=ITEM_HZ`, the showcase item).
-- Pack opening (pack-opening agent): `RarePullFx.lua` `Beam:_alpha` quantises a layer's fade to 1/32 (cached NumberSequences): fine but visible
-  on a slow fade; `RarePullWorld` steps before SeedPackClient's mouth update some frames (one frame behind the bag).
-- Speed popups (popup agent; not changed here: the R151 treadmill suite holds `SpeedGainPopup.client.lua` to its base outside the agent's 2x
-  edits): `takeField` hangs the field on the Head (`field.Gui.Adornee = head`), and the head bobs with the fast treadmill run, so the whole fan
-  shakes. Fix: `local root = head.Parent and head.Parent:FindFirstChild("HumanoidRootPart")`, `field.Gui.Adornee = root or head`,
-  `field.Gui.StudsOffsetWorldSpace = root and Vector3.new(0, head.Position.Y - root.Position.Y, 0) or Vector3.zero`; then R151
-  `speed_popups_world.luau` `PW.fieldOf` and `test_speed_popups_client.luau` (the adornee checks, the reset check) look for the root.
+Merged first: the release branch at `baf5eea` (treadmill / popups / belt, the hub avatar's client dance, pack-opening skip, hotbar). Round 1's
+leftovers in those files, and a fresh pass over what was merged since:
+
+| Effect | Why it jittered | Fix |
+|---|---|---|
+| Speed popup fan (`SpeedGainPopup` `takeField`) | hung on the Head, which bobs with the treadmill run: the whole fan shook | hangs on the HumanoidRootPart at the head's height (`StudsOffsetWorldSpace`) |
+| Treadmill belt arrows (`SpeedGainPopup`, the V134 block) | moved on a 1/30 s tick (1/20 FastMode) | every frame on a near belt in view (TreadmillFx's generous cone); out of view the old tick, with the time each belt is owed; emitters on the tick |
+| Belt pattern, spinners, pulses, hue, lights (`TreadmillFx` `Controller:Step` -> `Scroll` / `Animate`) | a 1/30 s tick (1/20 below tier 3) | every frame for the belts the cull passed (Scrolling: near and on screen; Animated: quality 2+, 90 studs, on screen); offsets still written only when they change |
+| Hub avatar cheer (`HubDisplayClient`, a rig whose dance did not load) | joints written at `POSE_HZ` 30 | every frame while the rig is in view (ViewCull152 on its bounding ball); out of view 30 Hz |
+| Sky beam fade (`RarePullFx` `Beam:_alpha`) | transparency in 1/32 steps (~.03 a jump on a slow fade) | 1/256 (under one 8-bit level); a sequence is still built only when the step changes |
+| Charge motes at the bag's mouth (`RarePullWorld`) | used the mouth SeedPackClient set last: when RarePullWorld's RenderStepped ran first, a frame behind the moving bag | `SetMouth` also takes the bag's part; the mouth is read off it when the motes are drawn |
+
+Looked at and left (no visible stepping):
+
+- `TreadmillAnimation.client.lua` line 7: it steps the run clip's playback CONTROLLER at 30 Hz (`AdjustSpeed` easing, play / stop), not the belt
+  (round 1's note was wrong). The engine animates the pose every frame; a speed eased in steps of under 1% keeps the pose continuous. Left as
+  it is (the R151 treadmill suite holds the file to `19d05d4`).
+- Trampoline mat squash (`HubTrampoline153`): RenderStepped, clock-driven, only while a mat moves. The bounce itself is client physics.
+- Bonus roll button (`TreadmillBonusClient`): its effects run on one on-demand RenderStepped, the glow is client tweens; the charging bar fills
+  on a 4 Hz tick, 360 s for a full bar: about 0.1 px a tick.
+- Hotbar drag ghost: follows `InputChanged` (every pointer move, before the frame is drawn).
+- Biome notifier: fade and settle per frame in RenderStepped (the settle snaps to whole pixels by design; the .12 s poll only decides when).
+- Gate refresh barrier: static; its caption dots step `. .. ...` by design and the count is text.
+- R153 badges: the pop and the halo pulse are client tweens.
+- Keeper speed signs: now pinned over each keeper's spawn by the keeper-sign agent (merged at `98bf7fb`; this supersedes round 1's sign row: a
+  pinned sign cannot step). `KeeperFollow153` stays;
+  `BeastAnimation` and `VeiledEventClient81` still drive its anchors.
+- Server: per-frame connections only in the 13 gameplay services (the same list), no tween but MapService's legacy course fade; the merged
+  server code moves parts only when it builds or teleports.
+
+Round 2 cost: only what is near and in view, every frame: a belt's arrows (one BulkMoveTo) and pattern layers (one write each), its spinners
+(one BulkMoveTo); a posed hub avatar's ~10 joints (only when its dance failed to load); a sky beam's layers build a new sequence when the 1/256
+step changes (a few a frame during a fade). Out of view: as before.
+
 - Gameplay-frozen: none needed. The legacy escape course's stage fade (`MapService` `_playCourseTween`, a server Transparency tween tied to a
   collision change) is left on the server.
 
@@ -99,3 +121,8 @@ Updated suites: R128 follow, boots_R117 (RenderStepped connection), trails_R117 
 R151 hub client (tier 2 every frame, 30 / 144 fps), R152 giveaway client (tier 2 in / out of view, 30 / 144
 fps, two mutations), R152 keepers (R153's two keeper files on its list), R149 Verity lip sync (one pause window starts 20 ms later: the hop
 trails the level by a frame), boots_R117 (the coil glow's write bound), tools/tests/test_tutorial (chevron fade steps).
+Round 2: `test_jitter_round2.luau` (28 checks; `JITTER_BASE=baf5eea`: 20 fail). R151 `run_speed_popups.sh` / `run_treadmills.sh` compare
+SpeedGainPopup with the two R153 jitter edits put back (`undo_jitter153.py`: each must be found exactly once), so the belt block's sha and the
+popup's base check still hold everything else; R151 `speed_popups_world.luau` `PW.fieldOf` and `test_speed_popups_client.luau` look for the root;
+R153 `test_belt153.luau`: one write a frame per layer (was one a tick), the biggest step of a frame <= .06 (was .16); R151 `test_hub_client.luau`:
+the posed avatar's cheer moves on every frame in view at 60 / 144 fps.

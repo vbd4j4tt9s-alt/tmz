@@ -117,9 +117,10 @@ function Fx.Beam(opts)
  end
  return self
 end
--- the transparency of a layer, cached per 1/32 step (a NumberSequence is not built every frame)
+-- the transparency of a layer, cached per 1/256 step (a NumberSequence is not built every frame). R153 (owner: "reduce jitter in effects"): 1/32 before,
+-- a slow fade showed its steps; 1/256 is under what a screen shows (8 bits), and a new sequence is built only when the step changes.
 function Beam:_alpha(b,base,top,alpha)
- local q=math.floor(alpha*32+.5)/32
+ local q=math.floor(alpha*256+.5)/256
  local key=b.Name..q;local s=self.Cache[key]
  if not s then s=seq(1,1-(1-top)*q,1-(1-base)*q);self.Cache[key]=s end
  self.Set(b,'Transparency',s)

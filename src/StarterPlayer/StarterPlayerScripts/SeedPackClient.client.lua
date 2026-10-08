@@ -297,7 +297,7 @@ local function renderReveal(record,now)
     if record.TickSound and record.TickStop and t>=record.TickStop then record.TickSound:Stop();record.TickStop=nil end
     local revealStart=burstAt;local age=math.max(0,t-revealStart)
     if record.Suspense then record.Suspense:Update(wrapperRoot*CFrame.new(0,mouth,0),t)end
-    if RareWorld and record.RarityRank>=6 then local owner=ownerOf(bag.Parent);if owner then RareWorld.SetMouth(owner,root*CFrame.new(0,mouth,0));if shift>0 then RareWorld.Shift(owner,shift)end end end
+    if RareWorld and record.RarityRank>=6 then local owner=ownerOf(bag.Parent);if owner then RareWorld.SetMouth(owner,root*CFrame.new(0,mouth,0),bag.PrimaryPart);if shift>0 then RareWorld.Shift(owner,shift)end end end
     if record.Flourish then
         local char=Players.LocalPlayer and Players.LocalPlayer.Character
         record.Flourish:Update(root*CFrame.new(0,mouth,0),t,revealStart,not(char and bag:IsDescendantOf(char)))
