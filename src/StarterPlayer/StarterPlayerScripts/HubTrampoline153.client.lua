@@ -4,10 +4,12 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 -- character and keeps its vertical one): when the local character's feet land on, or step onto, a mat, this script SETS the vertical speed of its
 -- own HumanoidRootPart so the feet rise HubTrampolineRules153.Height() studs (30). Never added to: standing there bounces at the same height every
 -- time, a rising body (a bounce, a jump) is left alone, and a player bounces at most once per Cooldown (.45 s). MovementGuard's rise allowance
--- (25 studs per .1 s sample) covers it (test). Everyone's client also squashes the mat and plays the boing when ANY player lands (from the
+-- (25 studs per .1 s sample) covers it (test); a launch the server sees late (a network hitch) is allowed once by HubTrampolineRules153.LaunchRise. Everyone's client also squashes the mat and plays the boing when ANY player lands (from the
 -- replicated positions: cosmetic only, nothing is applied to another player). The sound is the owner's boing file (94320656351627) at pitch 1 (R153: it replaced the
 -- Bubble04 placeholder pitched to .8); one boing per bounce. Its lead-in is unmeasured: SoundTiming.Start_94320656351627 (a number attribute on SoundTiming) tunes it.
 -- Per frame: two squared distances to the nooks (the rest only within 60 studs of one); twice a second: is the server's folder still the one we know. Reduced Motion: no squash.
+-- (R153 client bug review, finding 3: a mat's REST pose (CFrame and size) is recorded once per part, from the server's look, and never from a squashing mat. When the folder is read
+--  again mid-squash, every squashing mat goes back to its rest first; a part already known keeps the rest it had. It used to take the dipped height as the new rest and sink for good.)
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local GuiService=game:GetService('GuiService')
 local T=require(RS:WaitForChild('HubTrampolineRules153'))
@@ -22,11 +24,18 @@ local spots={}                                     -- {X, Z, Mat, Badge, MatCF, 
 local active={}                                    -- spots that are squashing
 local states=setmetatable({},{__mode='k'})         -- HumanoidRootPart -> debounce state
 local connections={}
+local rest=setmetatable({},{__mode='k'})        -- mat / badge part -> {CF, Size}: its rest pose, taken once from the server's look (never from a mat that is squashing)
+local function restOf(part)if not part then return nil end;local r=rest[part];if not r then r={CF=part.CFrame,Size=part.Size};rest[part]=r end;return r end
+local function settle(s) -- a spot's mat and badge back at their rest pose (the squash only moves the CFrame; the size is put back too, should anything have touched it)
+ if s.Mat then s.Mat.CFrame=s.MatCF;local r=rest[s.Mat];if r and s.Mat.Size~=r.Size then s.Mat.Size=r.Size end end
+ if s.Badge then s.Badge.CFrame=s.BadgeCF;local r=rest[s.Badge];if r and s.Badge.Size~=r.Size then s.Badge.Size=r.Size end end
+end
 local seen,seenCount,seenLooks,elapsed,render,preloaded
 local function reduced()local ok,v=pcall(function()return GuiService.ReducedMotionEnabled end);return ok and v==true end
 
 -- The server's trampolines: found now and whenever the folder is replaced (HubDecor151 rebuilds it) or re-dressed (the owner's asset arrived) ---------
 local function collect()
+ for _,s in ipairs(active)do settle(s)end -- (a mat that is squashing goes back to its rest before the folder is read again)
  table.clear(spots);table.clear(active)
  local folder=map:FindFirstChild(T.FolderName)
  if not folder then return end
@@ -34,7 +43,8 @@ local function collect()
   local x,z=m:GetAttribute('CenterX'),m:GetAttribute('CenterZ')
   local mat,badge=m:FindFirstChild('Trampoline mat',true),m:FindFirstChild('Trampoline badge',true)
   if type(x)=='number'and type(z)=='number'then -- (the bounce needs only the spot; the squash needs the mat)
-   spots[#spots+1]={X=x,Z=z,Mat=mat,Badge=badge,MatCF=mat and mat.CFrame,BadgeCF=badge and badge.CFrame,At=-math.huge,Want=m:GetAttribute('HasMat')==true}
+   local mr,br=restOf(mat),restOf(badge)
+   spots[#spots+1]={X=x,Z=z,Mat=mat,Badge=badge,MatCF=mr and mr.CF,BadgeCF=br and br.CF,At=-math.huge,Want=m:GetAttribute('HasMat')==true}
   end
  end
 end
@@ -51,7 +61,7 @@ local function squashStep()
  for i=#active,1,-1 do
   local s=active[i];local t=now-s.At
   if t>=T.SquashSeconds or not s.Mat then
-   if s.Mat then s.Mat.CFrame=s.MatCF end;if s.Badge then s.Badge.CFrame=s.BadgeCF end;table.remove(active,i)
+   settle(s);table.remove(active,i)
   else
    any=true;local off=V(0,-T.SquashDepth*T.Squash(t),0)
    s.Mat.CFrame=s.MatCF+off;if s.Badge then s.Badge.CFrame=s.BadgeCF+off end
@@ -117,7 +127,7 @@ connections[#connections+1]=Run.PreSimulation:Connect(step)
 script.Destroying:Connect(function()
  for _,c in ipairs(connections)do c:Disconnect()end
  if render then render:Disconnect()end
- for _,s in ipairs(spots)do if s.Mat then s.Mat.CFrame=s.MatCF end;if s.Badge then s.Badge.CFrame=s.BadgeCF end end
+ for _,s in ipairs(spots)do settle(s)end
 end)
 script:SetAttribute('R153Loaded',true)
 -- (the offline tests set R153TestHook on the script to drive it; in the game nothing is returned)

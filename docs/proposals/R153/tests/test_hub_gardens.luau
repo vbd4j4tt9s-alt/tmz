@@ -329,6 +329,26 @@ do
  put(mine,312,d.Top+.1,-269,0,-30,0);W.frames(1)
  check('client: with Reduced Motion the bounce stays but the mat does not squash',math.abs(mine.AssemblyLinearVelocity.Y-up)<1e-6 and #api.Active==0)
  W.Gui.ReducedMotionEnabled=false
+ -- R153 client bug review, finding 3: the folder is read again while a mat is squashing (the other nook streams in or out, a mat arrives late, the server dresses the look). The dipped pose
+ -- must not become the mat's rest (it used to: the mat stayed 0.1 - 0.2 studs low and every later squash dipped from there), and repeating it must not compound.
+ W.frames(40)
+ do
+  local sp0=api.Spots[1];local mat0,badge0=sp0.Mat,sp0.Badge;local restY=mat0._props.CFrame.Position.Y;local badgeY=badge0._props.CFrame.Position.Y
+  check('client (re-read mid-squash): the mat and its badge start at the rest the spot recorded',sp0.MatCF.Position.Y==restY and sp0.BadgeCF.Position.Y==badgeY,restY)
+  local worst,dips,sameMat,restOk=0,0,true,true
+  for round=1,3 do
+   put(mine,312,d.Top+.1,-269,0,-30,0);W.frames(6)
+   local dipped=restY-mat0._props.CFrame.Position.Y;if dipped>.001 then dips+=1 end
+   local folder=map[T.FolderName];folder:SetAttribute('Looks',(folder:GetAttribute('Looks')or 0)+1);api.Coarse(1) -- (the client looks at the folder again, 6 frames into the squash)
+   local sp=api.Spots[1];sameMat=sameMat and sp.Mat==mat0
+   restOk=restOk and sp.MatCF.Position.Y==restY and sp.BadgeCF.Position.Y==badgeY
+   W.frames(45)
+   worst=math.max(worst,math.abs(mat0._props.CFrame.Position.Y-restY),math.abs(badge0._props.CFrame.Position.Y-badgeY))
+  end
+  check('client (re-read mid-squash): the mat was dipping each time ('..dips..' of 3) when the folder was read again',dips==3,dips)
+  check('client (re-read mid-squash): the same mat is found again and its recorded rest is the real one, not the dipped height (3 rounds)',sameMat and restOk)
+  check('client (re-read mid-squash): after each round the mat and its badge are back exactly at rest, nothing sunk or compounding (worst '..string.format('%.4f',worst)..' studs)',worst==0 and #api.Active==0,worst)
+ end
  -- the server rebuilds the folder (HubDecor151.Apply again): the client finds the new mats
  W.frames(40)
  local oldMat=api.Spots[1].Mat
