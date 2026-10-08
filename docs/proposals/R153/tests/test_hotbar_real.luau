@@ -185,7 +185,9 @@ do -- a pack pressed during another pack's reveal is held when it is over
  check(X.shown(packA),'(pack A is held)')
  local n=0;X.reveal(2,function()n+=1;return F.seed(W,nil,'CloverSeed',1,'None','Reward Seed '..n)end)
  X.wait(.3);X.tap('mouse',slotOf(packB));X.wait(.5)
- if not X.shown(packB)and at(packB)then X.tap('mouse',slotOf(packB))end -- (the owner presses again)
+ -- (the owner presses again when nothing shows; a press that is queued shows its green ring, and since the client bug review's finding 9 a second press on it CANCELS it)
+ local sb=slotOf(packB);local ringUp=sb and sb:FindFirstChild('PendingRing')and sb.PendingRing.Visible
+ if not X.shown(packB)and at(packB)and not ringUp then X.tap('mouse',slotOf(packB))end
  X.wait(4.5)
  check(X.shown(packB),'a pack pressed while another is being revealed is in the hand once the reveal is over (in hand: '..tostring(held()and held().Name)..')')
  packA=nil
@@ -211,6 +213,67 @@ do -- carrying a stolen pack: a pack press says so and nothing flickers into the
   player:SetAttribute('GuardianRagdollActive',nil);X.wait(1.5)
   check(X.shown(seed),'a press while knocked down holds the item once the player is up ('..tostring(held()and held().Name)..')')
  end
+end
+
+-- 5b. client bug review, findings 8 and 9: the pending ring holds still with Reduced Motion; a queued press is cancelled by a second press on its slot, replaced by a press on
+--     another slot, and dropped (quietly) after about 8 s; before, it waited for ever (a second press logged "already on its way, press ignored") and the ring pulsed regardless -----
+do
+ local Feed=W.module('NoticeFeed83');local said=0;local plainSay=Feed.Plain;Feed.Plain=function(...)said+=1;return plainSay(...)end
+ local function ring(tool)local s=slotOf(tool);local r=s and s:FindFirstChild('PendingRing');return r and r.Visible and r.Ring.Transparency or nil end
+ local knock=function(on)player:SetAttribute('GuardianRagdollActive',on or nil)end
+ settle();for _,t in ipairs(bag():GetChildren())do if t:IsA('Tool')and(t.Name:find('Reward Seed',1,true)or t.Name=='Lava Seed Pack')then t:Destroy()end end;X.frames(5) -- (room on the hotbar)
+ local pk=F.pack(W,bag(),4,'Pack03',1,'None','Fix Seed Pack');X.frames(10)
+ check(slotOf(pk)~=nil and slotOf(seed)~=nil and slotOf(bat)~=nil,'(the pack, the seed and the bat are on the hotbar)')
+ -- (the notice spy works: a press on a pack while carrying one says FINISH THAT FIRST!)
+ settle();player:SetAttribute('ChestChaseSeedCarrying',true);said=0;X.tap('mouse',slotOf(pk));X.wait(.5);player:SetAttribute('ChestChaseSeedCarrying',nil)
+ check(said>=1,'(the notice spy sees FINISH THAT FIRST!: '..said..')')
+ -- finding 9: a second press on the queued slot cancels it
+ settle();knock(true);X.tap('mouse',slotOf(seed));X.wait(.4)
+ check(ring(seed)~=nil,'a press while knocked down is queued: its ring shows')
+ X.tap('mouse',slotOf(seed));X.wait(.4)
+ check(ring(seed)==nil,'pressing the queued slot again cancels it: the ring is gone')
+ knock(nil);X.wait(2.5)
+ check(held()==nil and acts==0,'... and the cancelled press is not held when the player is up ('..tostring(held()and held().Name)..', '..acts..' equip calls)')
+ -- finding 9: a press on another slot replaces the queued one
+ settle();knock(true);X.tap('mouse',slotOf(seed));X.wait(.4);X.tap('mouse',slotOf(bat));X.wait(.4)
+ check(ring(bat)~=nil and ring(seed)==nil,'a press on another slot replaces the queued one: the ring moves to the new slot')
+ knock(nil);X.wait(2.5)
+ check(X.shown(bat) and held()==bat and acts==1,'... and only the new one is held when the player is up ('..tostring(held()and held().Name)..', '..acts..' equip calls)')
+ -- finding 9: a press queued behind something that never ends is dropped after about 8 s, quietly; before that it still waits
+ settle();knock(true);said=0;X.tap('mouse',slotOf(seed));X.wait(7)
+ check(ring(seed)~=nil,'queued for 7 s: still waiting')
+ X.wait(1.4)
+ check(ring(seed)==nil,'after about 8 s the wait is dropped: no ring any more')
+ check(said==0,'... quietly: the hotbar shows no message ('..said..')')
+ X.tap('mouse',slotOf(seed));X.wait(.4)
+ check(ring(seed)~=nil,'... and a new press on that slot queues again (the slot is not dead)')
+ knock(nil);X.wait(2.5)
+ check(X.shown(seed),'... and it is held once the player is up ('..tostring(held()and held().Name)..')')
+ -- the same behind a reveal the server never finishes (the carried pack keeps its RevealAt)
+ settle();do
+  local stuck=R.new('Model');stuck.Name='CarriedSeed';stuck:SetAttribute('SeedPackCarry',true);stuck:SetAttribute('RevealAt',1);stuck.Parent=char()
+  X.tap('mouse',slotOf(pk));X.wait(.4)
+  check(ring(pk)~=nil,'a pack pressed during a reveal is queued: its ring shows')
+  X.tap('mouse',slotOf(pk));X.wait(.4)
+  check(ring(pk)==nil,'... and a second press cancels it (a reveal that never ends)')
+  X.tap('mouse',slotOf(pk));X.wait(8.5)
+  check(ring(pk)==nil and held()==nil,'... and a press left queued behind it is dropped after about 8 s ('..tostring(held()and held().Name)..')')
+  stuck:Destroy();X.wait(1.5)
+  check(held()==nil,'... and is not held when the reveal ends later')
+ end
+ -- finding 8: the ring holds still with Reduced Motion (a queued press and a pack "on its way"), and still pulses without it
+ local function sweep(frames)local lo,hi,n=math.huge,-math.huge,0;for _=1,frames do X.frames(1);local t=ring(seed)or ring(pk);if t then lo=math.min(lo,t);hi=math.max(hi,t);n+=1 end end;return lo,hi,n end
+ settle();knock(true);W.Gui.ReducedMotionEnabled=true;X.tap('mouse',slotOf(seed))
+ local lo,hi,n=sweep(50)
+ check(n>=45 and hi-lo==0,('Reduced Motion: the queued press\'s ring holds still (%d frames, transparency %.3f - %.3f)'):format(n,lo,hi))
+ W.Gui.ReducedMotionEnabled=false;lo,hi,n=sweep(50)
+ check(n>=45 and hi-lo>.3,('without it the ring pulses as before (%.3f - %.3f)'):format(lo,hi))
+ X.tap('mouse',slotOf(seed));X.wait(.4);knock(nil);X.wait(1.5)
+ settle();X.S.Baked={};W.Gui.ReducedMotionEnabled=true;X.tap('mouse',slotOf(pk))
+ lo,hi,n=sweep(50)
+ check(n>=40 and hi-lo==0,('Reduced Motion: a pack on its way shows a steady ring (%d frames, transparency %.3f - %.3f)'):format(n,lo,hi))
+ W.Gui.ReducedMotionEnabled=false;X.wait(3);settle()
+ Feed.Plain=plainSay;pk:Destroy();X.frames(5)
 end
 
 -- 6. buttons that change under the pointer; ScreenGui stacking --------------------------------------------------------------------------------------

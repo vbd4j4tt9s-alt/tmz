@@ -202,6 +202,9 @@ local function nameOf(key)local e=key and State.Items[key];return e and e.Tool.N
 --    Backpack by the server with no sign; it now waits and is held as soon as that is over. While carrying a stolen pack / in a chase a pack cannot be held:
 --    FINISH THAT FIRST! says so (nothing is sent).
 local pending -- a pack the player asked to hold that is not in the hand yet {Key, Tool, At, Old (the bag already in the hand), Queued (waiting its turn)}
+-- (R153 client bug review, finding 9: a queued press waits at most QUEUED_SECONDS, then it is dropped quietly (a log line, no message); pressing the same slot again cancels it;
+--  a press on another slot replaces it. Before, a press queued behind a reveal that never finished waited for ever, with a pulsing ring, and a second press was ignored.)
+local QUEUED_SECONDS=8
 local function carried(char)local c=char and char:FindFirstChild('CarriedSeed');return c and c:GetAttribute('SeedPackCarry')and c or nil end
 local function revealing(char)local c=carried(char);return c~=nil and c:GetAttribute('RevealAt')~=nil end
 local function knocked()return player:GetAttribute('GuardianRagdollActive')==true or player:GetAttribute('GuardianFlingActive')==true end
@@ -217,7 +220,11 @@ local function equip(key,how,quiet)
  local char=player.Character;local humanoid=char and char:FindFirstChildOfClass('Humanoid')
  if not e or not alive(e.Tool)or not humanoid or humanoid.Health<=0 then note(how..': nothing to hold ('..tostring(key)..')');return end
  local tool=e.Tool;local held=char:FindFirstChildOfClass('Tool')
- if pending and pending.Key==key then note(how..': '..tool.Name..' is already on its way, press ignored');return end
+ if pending and pending.Key==key then
+  if pending.Queued then pending=nil;wake();note(how..': '..tool.Name..' was waiting; cancelled (pressed again)');return end -- (the next tick takes the ring off)
+  note(how..': '..tool.Name..' is already on its way, press ignored');return
+ end
+ if pending and pending.Queued then note(how..': '..pending.Tool.Name..' was waiting; '..tool.Name..' replaces it');pending=nil end
  if held and(held==tool or keyOf[held]==key)then
   mine[held]={At=os.clock(),Hand=false};humanoid:UnequipTools();selectedKey=nil;pending=nil;note(how..': unequip '..held.Name)
  elseif busy(tool)then note(how..': '..tool.Name..' refused (carrying a pack / in a chase)');notice('FINISH THAT FIRST!');return
@@ -263,7 +270,11 @@ local ringOn
 local function paintPending()
  local want;if pending then for i,b in ipairs(slots)do if b.Visible and State.Slots[i]==pending.Key then want=b end end end
  if ringOn and ringOn~=want then local r=ringOn:FindFirstChild('PendingRing');if r then r.Visible=false end;ringOn=nil end
- if want then local r=ringOf(want);r.Visible=true;r.Ring.Transparency=.1+.5*(.5+.5*math.sin(os.clock()*9));ringOn=want end
+ if want then -- (R153 client bug review, finding 8: with Reduced Motion the ring holds still, like the new-pack rainbow)
+  local r=ringOf(want);r.Visible=true;ringOn=want
+  local alpha=GuiService.ReducedMotionEnabled and .25 or .1+.5*(.5+.5*math.sin(os.clock()*9))
+  if r.Ring.Transparency~=alpha then r.Ring.Transparency=alpha end
+ end
 end
 -- R153 presses: one press = one action, whatever the engine delivers (owner: "i need to put in inputs twice" / "cant drag seeds and reorganise").
 --  * a press starts on a slot / card's InputBegan OR its MouseButton1Down (a button may keep its primary click to itself: then InputBegan never comes and
@@ -426,7 +437,8 @@ tick=function()
  if p then
   if not alive(p.Tool)then pending=nil;note(p.Tool.Name..' is gone while on its way')
   elseif p.Queued then
-   if knocked()or revealing(char)then p.Clear=nil
+   if now-p.At>QUEUED_SECONDS then pending=nil;note(p.Tool.Name..': waited '..QUEUED_SECONDS..' s, dropped') -- (quietly: the hotbar says nothing)
+   elseif knocked()or revealing(char)then p.Clear=nil
    else p.Clear=p.Clear or now;if now-p.Clear>=.35 then pending=nil;equip(p.Key,'its turn came',true)end end -- (the server's own hand-off after a reveal lands first)
   elseif p.Tool.Parent~=char then pending=nil
   else local c=carried(char)
