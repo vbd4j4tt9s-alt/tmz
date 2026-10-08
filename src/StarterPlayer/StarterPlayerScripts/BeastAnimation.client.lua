@@ -24,6 +24,7 @@ local Polish=require(Storage:WaitForChild('KeeperPolish'));local KFx=require(Sto
 local Config152,Fx152 -- (KeeperRigConfig152 and the new models' effects, KeeperFx152: required with the first new-model keeper)
 local Players=game:GetService('Players')
 local records,watchers,pending={},{},{}
+local check -- (R153 perf: defined below, used by the keeper follow links)
 local BLACK=Color3.new(0,0,0)
 local destroyed=false
 local function eyes(part,color,awake,tree,hidden)
@@ -92,8 +93,21 @@ local function schedule(model)
  if pending[model] then return end
  pending[model]=true;task.defer(function() pending[model]=nil;bind(model) end)
 end
-local function watch(model)
+-- R153 perf (lag audit D10): a keeper is found by the scan at start and by its tag (the server tags every keeper BiomeKeeper); this script used to
+-- hear EVERY instance added anywhere in the workspace (the map streaming in, packs, every effect) to spot one. A keeper it knows is followed on its
+-- own: its descendants (a body that streams in or is swapped) and its parent (taken out of the world and put back).
+local follows={}
+local watch
+local function follow(model)
+ if follows[model]then return end
+ local links={};follows[model]=links
+ links[1]=model.DescendantAdded:Connect(function(node)if not destroyed then check(node)end end)
+ links[2]=model.AncestryChanged:Connect(function()if not destroyed and model:IsDescendantOf(workspace)then watch(model)end end)
+ links[3]=model.Destroying:Connect(function()for _,c in ipairs(links)do c:Disconnect()end;follows[model]=nil end)
+end
+function watch(model)
  if not model or not model:IsA('Model') then return end
+ follow(model)
  if not watchers[model] then
   local signals={};watchers[model]=signals
   table.insert(signals,model:GetAttributeChangedSignal('GardenerArtVersion'):Connect(function() schedule(model) end))
@@ -110,14 +124,23 @@ local function watch(model)
  end
  schedule(model)
 end
-local function check(node)
+function check(node)
  if node.Name=='BeastBody' or node.Name=='HumanoidRootPart' then watch(node.Parent)
  elseif node:IsA('BasePart') and node.Parent and node.Parent.Name=='BeastBody' then watch(node.Parent.Parent) end
 end
 for _,node in ipairs(workspace:GetDescendants()) do check(node) end
-local added=workspace.DescendantAdded:Connect(check)
+local added
+do local ok,CS=pcall(game.GetService,game,'CollectionService')
+ local function tagged(m)if not destroyed and typeof(m)=='Instance'and m:IsA('Model')and m:IsDescendantOf(workspace)then watch(m)end end
+ if ok and CS then
+  pcall(function()for _,m in ipairs(CS:GetTagged('BiomeKeeper'))do tagged(m)end end)
+  pcall(function()added=CS:GetInstanceAddedSignal('BiomeKeeper'):Connect(tagged)end)
+ end
+ if not added then added=workspace.DescendantAdded:Connect(check)end -- (no CollectionService: listen to the workspace, as before)
+end
 
 local moveParts,moveFrames={},{}
+local FX_FAR=200 -- R153 perf (D6): beyond every KeeperFx range (eye light / dust 120, breath 90, shake 60)
 local render=Run.RenderStepped:Connect(function(dt)
  table.clear(moveParts);table.clear(moveFrames)
  local camera=workspace.CurrentCamera
@@ -175,10 +198,13 @@ local render=Run.RenderStepped:Connect(function(dt)
   local fxc=r.FxContext;if not fxc then fxc={};r.FxContext=fxc end
   fxc.Now=now;fxc.Distance=distance;fxc.LocalDistance=localDistance;fxc.Asleep=asleep;fxc.Awake=motion.Awake;fxc.Moving=motion.Moving
   fxc.Cycle=motion.Cycle;fxc.Urgency=motion.Urgency;fxc.Chasing=hunting;fxc.Frame=motion.Frame;fxc.Frames=r.LastTarget;fxc.Low=low
-  KFx.Step(r.Fx,fxc)
+  -- R153 perf (lag audit D6): past FX_FAR studs every KeeperFx effect is off (its farthest reaches 120): once a step there has switched them off,
+  -- the step is skipped while the keeper stays that far (only its gait phase is kept, so a footfall is not mistaken when it comes near again).
+  if distance<=FX_FAR or not r.FxFar then KFx.Step(r.Fx,fxc);r.FxFar=distance>FX_FAR elseif r.Fx then r.Fx.LastCycle=motion.Cycle end
   -- R152: the new models' flames, lightning, leaves, rain ... (KeeperFx152), every frame (bolts flash), by state and graphics tier
-  if r.Fx152 then local c=r.Fx152Ctx or{};r.Fx152Ctx=c;c.Now=now;c.Asleep=asleep;c.Chasing=hunting;c.Distance=distance;c.Tier=Fx.Get()
-   c.Striking=type(seenAttack)=='number'and now>=seenAttack and now-seenAttack<Combat.Get(r.Stage).Windup+Combat.Recovery;Fx152.Step(r.Fx152,c)end
+  -- (R153 perf, D6: beyond its Range everything is off and draws no random numbers: one step switches it off, then none while it stays out there)
+  if r.Fx152 and(distance<=Fx152.Range or not r.Fx152Far)then local c=r.Fx152Ctx or{};r.Fx152Ctx=c;c.Now=now;c.Asleep=asleep;c.Chasing=hunting;c.Distance=distance;c.Tier=Fx.Get()
+   c.Striking=type(seenAttack)=='number'and now>=seenAttack and now-seenAttack<Combat.Get(r.Stage).Windup+Combat.Recovery;Fx152.Step(r.Fx152,c);r.Fx152Far=distance>Fx152.Range end
   r.PoseDt+=dt
   local onScreen=true
   if distance>160 then local _,seen=camera:WorldToViewportPoint(r.Root.Position);onScreen=seen end
@@ -233,6 +259,7 @@ end)
 script.Destroying:Connect(function()
  destroyed=true
  render:Disconnect();added:Disconnect()
+ for _,links in pairs(follows)do for _,c in ipairs(links)do c:Disconnect()end end;table.clear(follows)
  for model in pairs(records)do clear(model)end
  for _,signals in pairs(watchers)do for _,signal in ipairs(signals)do signal:Disconnect()end end
  table.clear(watchers);table.clear(pending)

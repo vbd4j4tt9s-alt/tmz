@@ -78,8 +78,11 @@ local function add(v)
   register(v.Parent);local route=routes[v.Parent];if route then route.Glows[v]=v:GetAttribute('FlowPhase')end
  end
 end
-for _,v in ipairs(workspace:GetDescendants())do add(v)end
-workspace.DescendantAdded:Connect(add)
+-- R153 perf (lag audit D10): lava routes and pools are map scenery (ChestChaseMap): only the map is listened to, not every instance the client adds
+-- to the workspace itself (pack openings, effects, the keyboard); a place without the map folder is listened to whole, as before.
+local lavaRoot=workspace:FindFirstChild('ChestChaseMap')or workspace
+for _,v in ipairs(lavaRoot:GetDescendants())do add(v)end
+lavaRoot.DescendantAdded:Connect(add)
 -- R153 (owner: "fix all jittery type effects"): the glows that flow down a route within 160 studs move every frame (they slid in 20 Hz steps,
 -- about a third of a stud each); farther routes (to 350) and the pools' slow crust drift, surface pulse and currents keep the 20 Hz tick.
 Run.RenderStepped:Connect(function(dt)

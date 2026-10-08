@@ -30,6 +30,9 @@ JOBS=${JOBS:-4}
 mkdir -p "$OUT"
 T=$REPO/tools/tests;P=$REPO/docs/proposals;INV=$P/inventory_R113/tests;S=$REPO/src;SP=$S/StarterPlayer/StarterPlayerScripts
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
+# (R153: the Void giveaway pack's pulse skips a colour write that stays inside the same 8-bit level, and a part keeps its colour as 8 bits a channel,
+# so a part colour is compared at those 8 bits: R153's fingerprint options, perf153_opts.luau, unless PERF_EXTRA is set, even to nothing)
+if [ -z "${PERF_EXTRA+x}" ] && [ -f "$P/R153/tests/perf153_opts.luau" ];then PERF_EXTRA=$P/R153/tests/perf153_opts.luau;fi
 echo "== 0. static"
 if [ -n "$BASE" ];then
 echo "(base: $BASE)"
@@ -55,6 +58,7 @@ if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9
 # the two sides --------------------------------------------------------------------------------------------------------------------------------------
 rm -rf "$OUT/base_src";mkdir -p "$OUT/base_src"
 if [ -n "$BASE" ];then git -C "$REPO" archive "$BASE" src | tar -x -C "$OUT/base_src"
+elif [ -n "$PERF_BASE_SRC" ];then mkdir -p "$OUT/base_src/src";cp -r "$PERF_BASE_SRC/." "$OUT/base_src/src/" # (R153: run_perf153.sh hands a ready base tree)
 elif ! python3 "$HERE/perf152_off.py" "$S" "$OUT/base_src/src";then fail "perf152_off.py could not switch the patch off";exit 1;fi
 HAVE_PLACE=0;[ -f "$PLACE" ] && HAVE_PLACE=1
 [ "$HAVE_PLACE" = 1 ] && python3 "$P/R149/tools/rbxl_geom.py" --tree "$PLACE" "$OUT/place_tree.luau" Workspace/ChestChaseMap >/dev/null
@@ -71,6 +75,8 @@ prepare() { # $1 = side dir, $2 = src
  python3 "$HERE/perf152_bundle.py" "$src" "$d/popups" SpeedGainPopup=StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua >/dev/null
  cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$P/R151/tests/pack_world.luau" "$P/R151/tests/pack_templates.luau" "$P/R151/tests/fingerprint_packs.luau" "$d/packs/"
  python3 "$P/R151/tests/mkbundle_packs.py" "$d/packs" "$src" >/dev/null
+ # (R153: PERF_EXTRA = files put next to every driver, e.g. run_perf153.sh's perf153_opts.luau)
+ for f in $PERF_EXTRA;do for e in world seed keepers hotbar popups packs;do if [ -d "$d/$e" ];then cp "$f" "$d/$e/";fi;done;done
 }
 prepare "$OUT/base" "$OUT/base_src/src"
 # (PERF_NOW_OFF=1 with PERF_BASE=1e7dced: the "now" side is this checkout switched off; it must match the candidate with no difference at all, which

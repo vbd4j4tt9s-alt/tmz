@@ -5,6 +5,7 @@ local Rules=require(RS:WaitForChild('PlantRules'))
 local PackRules=require(RS:WaitForChild('SeedPackRules'))
 local FruitEffects=require(RS:WaitForChild('ApprovedFruitEffects'))
 local Trees=require(RS:WaitForChild('TreeReworkMotion'))
+local FxBudget;pcall(function()FxBudget=require(RS:WaitForChild('ClientFxBudget',10))end)
 local Effects={}
 local function move(part,frame,batch)if batch then batch:Set(part,frame)else part.CFrame=frame end end
 function Effects.Part(parent,name,size,color)
@@ -67,6 +68,7 @@ function Effects.Create(item,r,def,crop,at,mode)
   local aura=Instance.new('Highlight');aura.Name='Rarity aura';aura.Adornee=r.Visual
   aura.FillColor=auraColor;aura.OutlineColor=auraColor;aura.FillTransparency=.95;aura.OutlineTransparency=.78
   aura.DepthMode=Enum.HighlightDepthMode.Occluded;aura.Parent=effects;r.Aura=aura
+  if FxBudget then pcall(FxBudget.TrackHighlight,aura)end -- (R153 perf: counted in the shared 31-Highlight budget)
   effects:SetAttribute('AuraRank',style.Rank)
  end
  -- Pulse at most four existing luminous details; no extra lights or Heartbeat connections.

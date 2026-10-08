@@ -1224,7 +1224,8 @@ local H={} -- helpers shared by 5e and 5g (one local: the main chunk is near Lua
    if(st.Name=='LegendStrip'or far)and st.CFrame.Position.Y>0 then
     local gui=st:FindFirstChildWhichIsA('SurfaceGui');local pps=gui.PixelsPerStud;local cw,ch=canvasOf(st,pps)
     if far then farN+=1 else nearN+=1 end
-    if gui.Enabled==false or gui.Face~=R.Enum.NormalId.Top or gui.AlwaysOnTop~=false or gui.LightInfluence~=0 or gui.MaxDistance<(far and 700 or 400)or pps~=(far and LT.FarPixelsPerStud or LT.PixelsPerStud)then bad.gui+=1 end
+    -- (R153 perf, lag audit D8: on tier 2 the far letters render to FarMaxDistanceByTier[2] = 500 studs, elsewhere at least 700)
+    if gui.Enabled==false or gui.Face~=R.Enum.NormalId.Top or gui.AlwaysOnTop~=false or gui.LightInfluence~=0 or gui.MaxDistance<(far and((LT.FarMaxDistanceByTier or{})[fxTier]or 700)or 400)or pps~=(far and LT.FarPixelsPerStud or LT.PixelsPerStud)then bad.gui+=1 end
     for _,l in ipairs(gui:GetChildren())do
      if l._class=='TextLabel'and l.Visible and l.TextTransparency<1 then
       labels+=1

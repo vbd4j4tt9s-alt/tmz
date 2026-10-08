@@ -35,6 +35,54 @@ else
  if root then root.CFrame=CF(r[1],7,r[2])end
  look(V3(r[1],21,r[2]-24),V3(r[1],9,r[2]+40))
 end
+-- R153 perf (run_perf153.sh): IMAGES = the icons' image APIs answer as on Roblox (EncodingService / AssetService EditableImage / Content), so
+-- ArtworkRuntime87 makes its images (the census without it measures "images never load"); after the census the images are marked loaded and the
+-- PlayerGui is counted again (FALLBACK_LOADED / GUI_LOADED). UISHOTS = also print the PlayerGui's fingerprint (perf152_fp) before and after the images
+-- load and every sound played (FACT lines). VIEW = {x, y} viewport, TOUCH = a phone (touch, no keyboard).
+if UISHOTS then FP.orderedPairs()end
+if VIEW then cam.ViewportSize=R.Vector2.new(VIEW[1],VIEW[2])end
+if TOUCH~=nil then local UIS=W.service('UserInputService');UIS.TouchEnabled=TOUCH==true;UIS.KeyboardEnabled=TOUCH~=true;UIS.MouseEnabled=TOUCH~=true end
+-- (the world's ClientFxBudget is a stand-in that only gives the tier: it gets the real one's frame-rate window signal too, so a script that reads it -
+-- R153's SettingsClient - does so here as in the game; the real module counts those windows in the RenderStepped it already has)
+-- (the windows are counted per frame as the real module does - 3 s of frames, dt capped at .25 - from the frame driver, not from a RunService
+-- connection: the real module's RenderStepped is not in this world on either side, so the connection counts stay comparable)
+do local ok,fx=pcall(W.module,'ClientFxBudget')
+ if ok and type(fx)=='table'and fx.OnWindow==nil then
+  local listeners,win,count={},0,0
+  fx.OnWindow=function(fn)listeners[#listeners+1]=fn;return{Disconnect=function()local i=table.find(listeners,fn);if i then table.remove(listeners,i)end end}end
+  local rawFrames=W.frames
+  W.frames=function(n,dt)
+   for _=1,n do
+    rawFrames(1,dt)
+    if #listeners>0 then
+     win+=math.min(dt or 1/60,.25);count+=1
+     if win>=3 then local fps=count/win;win=0;count=0;for _,f in ipairs(table.clone(listeners))do pcall(f,fps)end end
+    end
+   end
+  end
+ end
+end
+local imageSizes={}
+if IMAGES then
+ local Encoding=W.service('EncodingService');local Asset=W.service('AssetService')
+ Encoding.Base64Decode=function(_,b)return b end
+ Encoding.DecompressBuffer=function(_,b)local wh=imageSizes[buffer.tostring(b)];assert(wh,'unknown artwork');return buffer.create(wh[1]*wh[2]*4)end
+ Asset.CreateEditableImage=function(_,props)return{Size=props.Size,WritePixelsBuffer=function()end,Destroy=function()end}end
+ W.env.Content={fromObject=function(o)return o end}
+ local Runtime=W.module('ArtworkRuntime87');local attach=Runtime.Attach
+ Runtime.Attach=function(parent,kind,data,id)
+  if type(data)=='table'and type(data.RGBA)=='string'then imageSizes[data.RGBA]={data.Width or data.Size,data.Height or data.Size}end
+  return attach(parent,kind,data,id)
+ end
+end
+local sounds={}
+if UISHOTS then
+ local rawPlay=R.Inst.Play
+ R.Inst.Play=function(self,...)
+  local p=self._props;sounds[#sounds+1]=string.format('%.3f %s %s vol=%s speed=%s pos=%s',R.clock,FP.path(self),tostring(p.SoundId),FP.num(p.Volume or 0.5),FP.num(p.PlaybackSpeed or 1),FP.num(p.TimePosition or 0))
+  if rawPlay then return rawPlay(self,...)end
+ end
+end
 -- Every frame handler (RunService signals and bound render steps) is wrapped once: a handler that errors on the mock (a method it lacks) is
 -- reported once and keeps running each frame, as on Roblox, without stopping the others; while TIMING is on, its Lua time (real clock, minus the
 -- write probe's own bookkeeping) is added to TIMES under the chunk that defined it (a client script or a module). The mock's frames also fire
@@ -414,4 +462,21 @@ local tt={};for i=1,math.min(45,#tm)do tt[#tt+1]=string.format('%s %.3f',tm[i][1
 print(string.format('WRITES tier=%d spot=%s total/frame=%.1f | %s',TIER,SPOT,p.Writes/N,table.concat(ap,', ')))
 print(string.format('LUAMS tier=%d spot=%s handlers=%d sum=%.3f ms/frame (mock, best of 4 windows) %s',TIER,SPOT,#tm,sum,table.concat(tt,', ')))
 print(string.format('TOPWRITES tier=%d spot=%s %s',TIER,SPOT,FP.probeText(p,N,15)))
+-- R153 perf: the images load (IMAGES), then the PlayerGui again --------------------------------------------------------------------------------------
+local function uiShot(label)
+ if not UISHOTS then return end
+ local pg=me:FindFirstChild('PlayerGui')
+ FP.shot(string.format('ui tier=%d spot=%s view=%s %s',TIER,SPOT,VIEW and(VIEW[1]..'x'..VIEW[2])or'default',label),{pg})
+end
+if IMAGES then
+ uiShot('before images load')
+ local pg=me:FindFirstChild('PlayerGui');local n=0
+ for _,d in ipairs(pg:GetDescendants())do local nm=d._props.Name;if(nm=='Artwork'or nm=='UploadedArtwork')and d._class=='ImageLabel'then d.IsLoaded=true;n+=1 end end
+ W.frames(30,DT)
+ local total=#pg:GetDescendants();local fb,inside=0,0
+ for _,d in ipairs(pg:GetDescendants())do if d._props.Name=='SmoothFallback'then fb+=1;inside+=#d:GetDescendants()+1 end end
+ print(string.format('FALLBACK_LOADED tier=%d spot=%s images=%d playergui=%d icon_fallbacks=%d instances_in_them=%d',TIER,SPOT,n,total,fb,inside))
+ uiShot('after images load')
+end
+if UISHOTS then print('FACT sounds tier='..TIER..' spot='..SPOT..'\t'..table.concat(sounds,' | '))end
 print('LAG153 DONE')

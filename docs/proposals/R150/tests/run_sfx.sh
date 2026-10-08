@@ -50,7 +50,7 @@ grep -v '^WARN' server.log | tail -1
 echo "== tools/tests/test_fast_travel (R150: arrival whoosh + Denied kinds; R150 review: its stale R114 'phone: centred and fits' check, a failure since R140, now checks the pair + DAILY / INVITE group)"
 mkdir -p "$OUT/tp";cp "$T/roblox.luau" "$T/test_fast_travel.luau" "$OUT/tp/"
 python3 "$T/bundle.py" "$OUT/tp/tp_bundle.luau" FastTravelService="$SS/FastTravelService.lua" MovementGuard="$SS/MovementGuard.lua" SecurityGate="$SS/SecurityGate.lua" \
- HudLayout="$S/ReplicatedStorage/HudLayout.lua" VectorIcons91="$S/ReplicatedStorage/VectorIcons91.lua" TravelButtons="$S/StarterPlayer/StarterPlayerScripts/TravelButtons.client.lua" >/dev/null
+ HudLayout="$S/ReplicatedStorage/HudLayout.lua" TravelButtons="$S/StarterPlayer/StarterPlayerScripts/TravelButtons.client.lua" >/dev/null
 (cd "$OUT/tp" && /opt/luau/luau test_fast_travel.luau > ft.log 2>&1; grep -v '^WARN' ft.log | tail -3; grep -q 'ALL PASS' ft.log) || { echo "test_fast_travel FAILED";exit 1; }
 if [ "$MODE" = "all" ]; then
  for r in audio_R123/tests/run.sh R136/tests/run.sh R138/tests/run.sh R140/tests/run.sh R147/tests/run_keyboard.sh R147/tests/run_verity.sh R148/tests/run_purchase.sh \

@@ -321,85 +321,9 @@ function ChestService:GetApprovedGardenTemplate(seedId, growthStage)
 	return ok and template or nil
 end
 
-function ChestService:BuildPlantAt(seedId, growthStage, origin)
-	local template = self:GetApprovedGardenTemplate(seedId, growthStage)
-	if template then
-		local model = template:Clone()
-		model:PivotTo(origin)
-		for _, part in ipairs(model:GetDescendants()) do
-			if part:IsA("BasePart") then
-				part.Anchored, part.CanCollide, part.CanTouch, part.CanQuery = true, false, false, false
-				part.Massless = true
-			end
-		end
-		return model
-	end
-	local stages = self.Config.ArtModels.Plants[seedId]
-	local specs = stages and stages[tostring(growthStage)] or self.Config.GardenUnknownArt
-	local model = Instance.new("Model")
-	local parts = self:BuildArtParts(specs, model, origin, 1, true)
-	model.PrimaryPart = parts[1]
-	return model
-end
-
-function ChestService:BuildGrowthModel(plot, crop, growthStage)
-	local origin = plot.CFrame * CFrame.new(crop.OffsetX or 0, plot.Size.Y / 2 + 0.025, crop.OffsetZ or 0)
-	-- Replicate one cheap proxy per crop; full growth art is rendered locally.
-    -- Crop identity/placement/harvest prompts remain server-owned.
-    local model = Instance.new("Model")
-    local proxy = Instance.new("Part")
-    proxy.Name = "CropAnchor"; proxy.Size = Vector3.new(0.5, 0.12, 0.5)
-    proxy.CFrame = origin * CFrame.new(0, 0.06, 0)
-    proxy.Color = Color3.fromRGB(94, 127, 73)
-    proxy.Anchored = true; proxy.CanCollide = false; proxy.CanTouch = false; proxy.CanQuery = false
-    proxy.Parent = model; model.PrimaryPart = proxy
-    model:SetAttribute("GardenClientVisual", true)
-	model.Name = "Crop_"..crop.Id
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	model:SetAttribute("GardenGenerated", true)
-	model:SetAttribute("CropId", crop.Id)
-	model:SetAttribute("SeedId", crop.SeedId)
-	model:SetAttribute("GrowthStage", growthStage)
-	model:SetAttribute("OffsetX", crop.OffsetX or 0)
-	model:SetAttribute("OffsetZ", crop.OffsetZ or 0)
-	model.Parent = plot
-	return model
-end
-
-function ChestService:BuildArtLibrary()
-	local old = self.Remotes:FindFirstChild("SeedArt")
-	if old then old:Destroy() end
-	local library = Instance.new("Folder")
-	library.Name = "SeedArt"
-	local plants = Instance.new("Folder")
-	plants.Name = "Plants"
-	plants.Parent = library
-    local stages = Instance.new("Folder"); stages.Name = "GrowthStages"; stages.Parent = library
-	local seeds = Instance.new("Folder")
-	seeds.Name = "Seeds"
-	seeds.Parent = library
-	for _, catalog in ipairs(self.Config.SeedCatalogByStage) do
-		for _, definition in ipairs(catalog) do
-            if plants:FindFirstChild(definition.Id) then continue end -- V090: exactly 25 art entries
-            if self.Config.GardenPlants[definition.Id] then
-            local stageFolder = Instance.new("Folder"); stageFolder.Name = definition.Id; stageFolder.Parent = stages
-            for stage = 1, 4 do
-                local template = self:BuildPlantAt(definition.Id, stage, CFrame.new())
-                template.Name = tostring(stage); template.Parent = stageFolder
-            end
-			local model = self:BuildPlantAt(definition.Id, 4, CFrame.new())
-			model.Name = definition.Id
-			model.Parent = plants
-            end -- New seeds are collectibles; plant art remains deferred.
-			local packet = self:BuildLooseSeed(definition.Id, CFrame.new(), seeds)
-			packet.Name = definition.Id
-		end
-	end
-	library:SetAttribute("Version", 138)
-	library:SetAttribute("Ready", true)
-	library.Parent = self.Remotes
-	self.ArtLibrary = library
-end
+-- R153 (architecture review, item 2): BuildPlantAt, BuildGrowthModel and BuildArtLibrary are GardenPlantRuntime's. GardenPlantRuntime.Install
+-- (the end of this file) puts them on ChestService as it loads, so the R85-era bodies that stood here never ran; they were removed. Read and edit
+-- them in GardenPlantRuntime.lua (docs/proposals/R153/tests/test_live_methods153.luau checks which functions are live).
 
 function ChestService:SelectBiomePacks()
     -- Keep all five authored spawn locations and their identity. Pickups are finite per cycle.
@@ -537,7 +461,9 @@ end
 -- rolledSize (R137): the size SkinWorldSeeds already rolled for this spot (after the hidden track pity); it is an
 -- ordinary roll, unlike testSize, so alerts and odds treat it as natural.
 -- rolledShape (R151): the chip-bag shape SkinWorldSeeds rolled for this spot (its pair is baked ahead of the refresh); a spawn without one (a forced test pack) rolls its own.
-function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,spawnOdds,rolledSize,rolledShape)
+-- deferred (R153 perf, lag audit D9; SkinWorldSeedsStep only): a list. The pack is built but left hidden and unavailable, and the rest - made
+-- available, the weather roll, the rare-pack alert - is added to the list, for the reopening (SkinWorldSeeds) to run in the same frame and order as before.
+function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,spawnOdds,rolledSize,rolledShape,deferred)
     seed.Prompt.MaxActivationDistance=24;seed.Prompt.RequiresLineOfSight=false
     PackShapes.Unpin(seed) -- the slot's previous pack is gone
     seed.Weather='None';seed.WeatherCheckedEvent=nil;seed.Model:SetAttribute('WeatherTrait','None')
@@ -592,6 +518,7 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
     seed.Billboard.Enabled=false
     seed.Glow.Enabled=false
     seed.Prompt.ActionText='STEAL';seed.Prompt.ObjectText=''
+    local function finish()
     self:SetWorldPackAvailable(seed,true)
     local weatherProbability=1
     if self.Weather and not seed.EventKeeper then
@@ -601,6 +528,8 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
     local odds={TierProbability=spawnOdds or(forcedVariant and 1 or nil),ForcedSize=testSize~=nil,ForcedMutation=testMutation~=nil,Weather=seed.Weather,WeatherProbability=weatherProbability}
     local alert=require(ReplicatedStorage.RarePackRules).Message(seed.Stage,variant,size,mutation,odds)
     if alert and not seed.EventKeeper then alert.SpawnId=seed.Model.Name..':'..seed.Generation;alert.At=workspace:GetServerTimeNow();self.RarePackSpawn:FireAllClients(alert)end
+    end
+    if deferred then self:SetWorldPackAvailable(seed,false);table.insert(deferred,finish)else finish()end
 end
 -- R151: the plan of one refresh: every spot's tier, size (after the hidden track pity) and chip-bag shape. The NEXT refresh's plan is made right after this one is
 -- applied and the pairs of its shapes are asked for at once, so they are baked long before the refresh (5 minutes, the closure is 10 s); a spawn whose pair is still
@@ -623,13 +552,60 @@ function ChestService:PlanWorldPacks(cycle)
     pcall(PackShapes.Prefetch,wanted)
     return {Cycle=cycle or 0,Variants=variants,Odds=odds,Sizes=sizes,Shapes=shapes}
 end
+-- R153 perf (lag audit D9): the 35 world packs were all rebuilt in the one server frame the track reopens (a burst of new instances to replicate:
+-- a hitch on every client every 5 minutes). Now the closed window's last SkinSpread seconds build them SkinPerStep a frame (SkinWorldSeedsStep;
+-- they are hidden, their prompts off and they are unavailable while the map is refreshing), and the reopening finishes them: each is made
+-- available, takes the weather and sends its rare-pack alert in the same frame and order as before. The plan, the rolls and their order are the same.
+ChestService.SkinSpread,ChestService.SkinPerStep=2,2
+function ChestService:SkinWorldSeedsStep(cycle,count)
+    local job=self.SkinJob
+    if job and job.Cycle~=(cycle or 0)then return true end
+    if not job then
+        local plan=self.WorldPlan
+        self.WorldPlan=nil
+        if not plan or plan.Cycle~=(cycle or 0)then plan=ChestService.PlanWorldPacks(self,cycle)end
+        job={Cycle=cycle or 0,Plan=plan,Next=1,Finish={}};self.SkinJob=job
+    end
+    local plan,list=job.Plan,self.Map.Chests
+    for _=1,count do
+        local i=job.Next;local seed=list[i];if not seed then break end
+        self:RefreshWorldPack(seed,plan.Variants[i],nil,nil,plan.Odds[plan.Variants[i]],plan.Sizes[i],plan.Shapes[i],job.Finish)
+        job.Next=i+1
+    end
+    return job.Next>#list
+end
+-- (called when the track closes for a refresh: from SkinSpread seconds before it reopens, a few packs a frame until all are built or it reopens)
+function ChestService:_spreadWorldSkins()
+    local token={};self.SkinToken=token;self.SkinJob=nil
+    local root=self.Map.MapRoot
+    local endsAt=root and root:GetAttribute('BiomeRefreshEndsAt')
+    if type(endsAt)~='number'then return end
+    task.spawn(function()
+        local wait=endsAt-ChestService.SkinSpread-workspace:GetServerTimeNow()
+        if wait>0 then task.wait(wait)end
+        local cycle=(root:GetAttribute('BiomeRefreshCycle')or 0)+1
+        while self.SkinToken==token and self.Map.Refreshing do
+            local ok,done=pcall(self.SkinWorldSeedsStep,self,cycle,ChestService.SkinPerStep)
+            if not ok then warn('[R153] Pack re-skin left to the reopening: '..tostring(done))end
+            if not ok or done then break end
+            task.wait()
+        end
+    end)
+end
 function ChestService:SkinWorldSeeds(cycle)
-    local plan=self.WorldPlan
+    -- (R153 perf: the packs the closed window already built are finished first, in order; the rest are built and finished as before)
+    local job=self.SkinJob;self.SkinJob=nil;self.SkinToken=nil
+    local plan,from
+    if job and job.Cycle==(cycle or 0)then plan,from=job.Plan,job.Next else
+    plan=self.WorldPlan
     self.WorldPlan=nil
     if not plan or plan.Cycle~=(cycle or 0)then plan=ChestService.PlanWorldPacks(self,cycle)end
+    from=1;job=nil
+    end
     local variants,odds,sizes=plan.Variants,plan.Odds,plan.Sizes
     local Pity=require(ReplicatedStorage.PackSizePity)
-    for i,seed in ipairs(self.Map.Chests)do self:RefreshWorldPack(seed,variants[i],nil,nil,odds[variants[i]],sizes[i],plan.Shapes[i])end
+    if job then for _,finish in ipairs(job.Finish)do finish()end end
+    for i,seed in ipairs(self.Map.Chests)do if i>=from then self:RefreshWorldPack(seed,variants[i],nil,nil,odds[variants[i]],sizes[i],plan.Shapes[i])end end
     local biggest=0
     for _,seed in ipairs(self.Map.Chests)do
         if seed.Available and table.find(PackRules.VariantOrder,seed.BagVariant)then biggest=math.max(biggest,seed.PackSize or 1)end
@@ -641,6 +617,7 @@ function ChestService:SkinWorldSeeds(cycle)
 end
 function ChestService:SetWorldPacksClosed(closed)
     for _,seed in ipairs(self.Map.Chests) do self:SetWorldPackAvailable(seed,seed.Available) end
+    if closed then pcall(self._spreadWorldSkins,self)else self.SkinToken=nil end -- R153 perf (D9)
 end
 
 function ChestService:DressGuardian(model, stage)
@@ -850,56 +827,8 @@ function ChestService:InteractGarden(player, action, payload)
 		Message = action == "Harvest" and (name.." harvested! Visit Sell to earn cash.") or (name.." planted!")}
 end
 
-function ChestService:RenderGarden(base, owner)
-	if not base then return end
-	local infos = self.GardenPlots[base.Index]
-	if not infos then return end
-	local loaded = owner and self.PlayerData:IsLoaded(owner)
-	local garden = loaded and self.PlayerData.Gardens[owner]
-	for slot, info in ipairs(infos) do
-		local ownerId, seen = owner and owner.UserId or 0, {}
-		local crops = garden and garden.Plots[tostring(slot)] or {}
-		for _, crop in ipairs(crops) do
-			seen[crop.Id] = true
-			local _, stage = self.Config.GetGardenGrowth(crop, os.time())
-			local key = table.concat({ownerId, crop.Id, crop.SeedId, stage, crop.OffsetX, crop.OffsetZ}, ":")
-			local previous = info.Rendered[crop.Id]
-			if not previous or previous.Key ~= key or not previous.Model.Parent then
-				-- Build replacement completely before releasing the previous stage.
-				local model = self:BuildGrowthModel(info.Part, crop, stage)
-				if previous then previous.Model:Destroy(); previous.Anchor:Destroy() end
-				local anchor = Instance.new("Attachment")
-				anchor.Name = "CropInteraction_"..crop.Id
-				anchor.Position = Vector3.new(crop.OffsetX, info.Part.Size.Y / 2 + 0.4, crop.OffsetZ)
-				anchor:SetAttribute("GardenGenerated", true)
-				anchor.Parent = info.Part
-				local prompt
-				if stage == 4 and self.Config.GardenPlants[crop.SeedId] then
-					prompt = Instance.new("ProximityPrompt")
-					prompt.Name = "HarvestPrompt"
-					prompt.ActionText = "PICK! 🌾"
-					local seed = self.Config.GetSeedById(crop.SeedId)
-					prompt.ObjectText = seed and seed.Name:gsub(" Seed$", "") or "Plant"
-					prompt.HoldDuration = 0.3
-					prompt.MaxActivationDistance = self.Config.GardenInteractionDistance
-					prompt.RequiresLineOfSight = false
-					prompt.Exclusivity = Enum.ProximityPromptExclusivity.OneGlobally
-					prompt:SetAttribute("GardenPrompt", true)
-					prompt:SetAttribute("GardenOwnerId", ownerId)
-					prompt:SetAttribute("GardenCropId", crop.Id)
-					prompt:SetAttribute("GardenStage", 4)
-					prompt.Parent = anchor
-				end
-				info.Rendered[crop.Id] = {Key = key, Model = model, Anchor = anchor, Prompt = prompt}
-			end
-		end
-		for id, old in pairs(info.Rendered) do
-			if not seen[id] then old.Model:Destroy(); old.Anchor:Destroy(); info.Rendered[id] = nil end
-		end
-		info.Part:SetAttribute("GardenOwnerId", ownerId)
-		info.Part:SetAttribute("GardenPlantCount", #crops)
-	end
-end
+-- R153 (architecture review, item 2): RenderGarden is GardenPlantRuntime's (installed at the end of this file; it renders only the slot it is
+-- asked for). The older body that stood here never ran and was removed: read and edit GardenPlantRuntime.lua.
 
 function ChestService:StartGardens()
 	if self.GardensRunning then return end

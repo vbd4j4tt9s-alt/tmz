@@ -6,6 +6,7 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 --    rainbow label naming it, for a few seconds. Only the owner gets the WeatherAdopted 'Owned' notice, so only they see it.
 local RS=game:GetService('ReplicatedStorage');local Players=game:GetService('Players');local Run=game:GetService('RunService')
 local CS=game:GetService('CollectionService')
+local FxBudget;pcall(function()FxBudget=require(RS:WaitForChild('ClientFxBudget',10))end)
 local Glow=require(RS:WaitForChild('MutationGlow127'));local Weather=require(RS:WaitForChild('WeatherTraits'))
 local Names=require(RS:WaitForChild('GardenDisplayNames'));local Catalog=require(RS:WaitForChild('PlantCatalog'))
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
@@ -59,6 +60,7 @@ local function resolve(entry)
  for _,t in ipairs(targets)do
   local h=Instance.new('Highlight');h.Name='MutationRainbow';h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
   h.FillTransparency=.3;h.OutlineTransparency=0;h.Adornee=t;h.Parent=t;table.insert(entry.Highlights,h)
+  if FxBudget then pcall(FxBudget.TrackHighlight,h)end -- (R153 perf: counted in the shared 31-Highlight budget)
  end
  entry.Model=model
  local anchor=model.PrimaryPart or model:FindFirstChildWhichIsA('BasePart')

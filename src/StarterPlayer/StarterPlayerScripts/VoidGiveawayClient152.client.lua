@@ -122,6 +122,37 @@ local function buildPack(entry)
   end
   bag.Name='VoidGiveawayPack';entry.Pack=bag
   entry.R=PackFx and PackFx.Capture(bag)or nil
+  -- R153 perf (lag audit D3): every piece that never moves against the bag (all but the galaxy / halo spinners) is welded to the pack's root,
+  -- which stays anchored, and the spinners of one ring (the same pivot and rate) are welded to an invisible hub that turns about that pivot. A
+  -- step then moves the root and the few hubs (r.Moving) instead of every piece: each piece gets the very pose VoidPackFx.Pose gave it
+  -- (hover x frame, hover x pivot x turn x offset), ~190 moves become ~4. (A root that spins itself, or a missing one: every piece posed, as before.)
+  if entry.R then pcall(function()
+   local r=entry.R;local root=r.Root;local rootE
+   for _,e in ipairs(r.Parts)do if e.Part==root then rootE=e end end
+   if not rootE or rootE.Spin then return end
+   -- (worked out first, then applied: a failure leaves the pack untouched, every piece posed as before)
+   local toRoot=rootE.Frame:Inverse();local moving={rootE};local hubs={};local joins={}
+   local function ring(e)
+    local p,l,u=e.Pivot.Position,e.Pivot.LookVector,e.Pivot.UpVector
+    return string.format('%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f|%.6f,%.6f,%.6f',e.Spin,p.X,p.Y,p.Z,l.X,l.Y,l.Z,u.X,u.Y,u.Z)
+   end
+   for _,e in ipairs(r.Parts)do if e~=rootE then
+    if e.Spin then
+     local key=ring(e);local hub=hubs[key]
+     if not hub then hub={Frame=e.Pivot,Spin=e.Spin,Pivot=e.Pivot,Offset=CFrame.new()};hubs[key]=hub;moving[#moving+1]=hub end
+     joins[#joins+1]={hub,e.Part,e.Offset}
+    else joins[#joins+1]={rootE,e.Part,toRoot*e.Frame}end
+   end end
+   for _,hub in ipairs(moving)do if hub~=rootE then
+    local p=Instance.new('Part');p.Name='PackSpinHub153';p.Size=Vector3.new(.05,.05,.05);p.Transparency=1;p.Anchored=true;p.CanCollide=false;p.CanTouch=false
+    p.CanQuery=false;p.CastShadow=false;p.CFrame=root.CFrame*toRoot*hub.Pivot;p.Parent=bag;hub.Part=p
+   end end
+   for _,j in ipairs(joins)do
+    local w=Instance.new('Weld');w.Name='PackWeld153';w.C0=j[3];w.Part0=j[1].Part;w.Part1=j[2];w.Parent=j[1].Part
+    j[2].Massless=true;j[2].Anchored=false
+   end
+   r.Moving=moving
+  end)end
   -- (R152 perf: a ball round the pack's pieces as it turns, hovers and hops: out of view = none of them can be on screen)
   local okR,reach=pcall(function()
    local o=at.Position;local far=0
@@ -162,7 +193,7 @@ local function stepPack(entry,dt,t,now)
  else entry.Stale=nil end
  if hidden then if not rm then frame=PackFx.HoverFrame(r,now)end
  elseif rm then -- reduced motion: the same parts, standing still (VoidPackFx.Pose would still sway and bob the pack)
-  for _,e in ipairs(r.Parts)do if e.Part.Parent then parts[#parts+1]=e.Part;frames[#frames+1]=origin*PackFx.LocalFrame(e,now,false)end end
+  for _,e in ipairs(r.Moving or r.Parts)do if e.Part.Parent then parts[#parts+1]=e.Part;frames[#frames+1]=origin*PackFx.LocalFrame(e,now,false)end end
  else frame=PackFx.Pose(r,now,parts,frames,entry.Dist<PackFx.Budget.SpinDistance)end
  local want=entry.Dist<PackFx.Budget.EffectDistance and player:GetAttribute('StudioPlantEffects')~='off'and entry.Model:GetAttribute(A.State)~='Empty' -- (at 0 the pack sleeps: it turns, but its glow and sparks are off)
  if r.Fx and(not want or r.Fx.Tier~=tierNow)then PackFx.Clear(r)end
@@ -176,7 +207,7 @@ local function settle(entry)
  if not(o and r and PackFx and entry.Pack)then return end
  table.clear(parts);table.clear(frames)
  r.Origin=o.Origin
- if o.Rm then for _,e in ipairs(r.Parts)do if e.Part.Parent then parts[#parts+1]=e.Part;frames[#frames+1]=o.Origin*PackFx.LocalFrame(e,o.Now,false)end end
+ if o.Rm then for _,e in ipairs(r.Moving or r.Parts)do if e.Part.Parent then parts[#parts+1]=e.Part;frames[#frames+1]=o.Origin*PackFx.LocalFrame(e,o.Now,false)end end
  else PackFx.Pose(r,o.Now,parts,frames,o.Spin)end
  workspace:BulkMoveTo(parts,frames,Enum.BulkMoveMode.FireCFrameChanged)
 end

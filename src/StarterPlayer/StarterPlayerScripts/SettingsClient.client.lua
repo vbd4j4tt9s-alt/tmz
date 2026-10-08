@@ -121,13 +121,24 @@ replay.Activated:Connect(function()
 end)
 toggle.Activated:Connect(function()open(not panel.Visible)end);close.Activated:Connect(function()open(false)end);shade.Activated:Connect(function()open(false)end)
 connections[#connections+1]=pg:GetAttributeChangedSignal('SeedMenu'):Connect(function()open(pg:GetAttribute('SeedMenu')=='Settings')end)
-local window,frames,slow,healthy=0,0,0,0
-connections[#connections+1]=Run.Heartbeat:Connect(function(dt)
+local slow,healthy=0,0
+-- R153 perf (one quality signal): the 3 s frame-rate windows come from ClientFxBudget, which measures the frame rate for the quality tier anyway
+-- (this script counted them on its own Heartbeat); the rule is unchanged: under 38 fps for 2 windows -> FastMode, over 53 fps for 4 -> off.
+local function judge(fps)
  if values.Quality~='Auto'then return end
- window+=math.min(dt,.25);frames+=1;if window<3 then return end
- local fps=frames/window;window=0;frames=0
  slow=fps<38 and slow+1 or 0;healthy=fps>53 and healthy+1 or 0
  if slow>=2 and player:GetAttribute('FastMode')~=true then player:SetAttribute('FastMode',true)elseif healthy>=4 and player:GetAttribute('FastMode')~=false then player:SetAttribute('FastMode',false)end
-end)
+end
+do local ok,FxBudget=pcall(function()return require(RS:WaitForChild('ClientFxBudget',10))end)
+ if ok and FxBudget and FxBudget.OnWindow then connections[#connections+1]=FxBudget.OnWindow(judge)
+ else -- (the budget module missing: count the windows here, as before)
+  local window,frames=0,0
+  connections[#connections+1]=Run.Heartbeat:Connect(function(dt)
+   if values.Quality~='Auto'then return end
+   window+=math.min(dt,.25);frames+=1;if window<3 then return end
+   local fps=frames/window;window=0;frames=0;judge(fps)
+  end)
+ end
+end
 gui.Destroying:Connect(function()dead=true;for _,c in ipairs(connections)do c:Disconnect()end end)
 loadSettings()

@@ -11,6 +11,8 @@
 return function(W)
  local R=W.R
  local FP={}
+ -- (R153: run_perf153.sh puts perf153_opts.luau next to the drivers; it sets FP.Normal / FP.Drop to compare what the engine can draw. Absent: no change.)
+ local okOpts,optsFn=pcall(require,'./perf153_opts')
  local fmt=string.format
  -- (as Roblox: two CFrames with the same components are ==; the shared mock compares them by identity. Both sides of a comparison run with it.)
  do local mt=getmetatable(R.CFrame.new(0,0,0))
@@ -67,6 +69,11 @@ return function(W)
   return nil -- signals, connections, functions: not part of the look
  end
  FP.ser=ser
+ -- one property of one instance as text (R153: FP.Normal(o, k, v), when a driver's options set it, may give its own text first; false = leave it out)
+ function FP.serKey(o,k,v)
+  local n=FP.Normal;if n then local x=n(o,k,v);if x~=nil then return x or nil end end
+  return ser(v)
+ end
  -- visibility -----------------------------------------------------------------------------------------------------------------------------------
  local MOD={SpecialMesh=true,BlockMesh=true,CylinderMesh=true,SurfaceAppearance=true,UIStroke=true,UICorner=true,UIGradient=true,UIScale=true,UIPadding=true,
   UIAspectRatioConstraint=true,UISizeConstraint=true,UITextSizeConstraint=true,UIListLayout=true,UIGridLayout=true,UIPageLayout=true,UITableLayout=true,UIFlexItem=true}
@@ -110,10 +117,10 @@ return function(W)
   for k in pairs(o._props)do if not SKIP[k]then keys[#keys+1]=k end end
   table.sort(keys)
   local out={tostring(depth),vis,o._class,esc(o._props.Name)}
-  local drop=opts and opts.Drop
+  local drop=opts and opts.Drop or FP.Drop
   for _,k in ipairs(keys)do
    if not(drop and(drop[k]or drop[o._class..'.'..k]))then
-    local s=ser(o._props[k]);if s then out[#out+1]=k..'='..s end
+    local s=FP.serKey(o,k,o._props[k]);if s then out[#out+1]=k..'='..s end
    end
   end
   local ak={};for k in pairs(o._attrs)do ak[#ak+1]=k end;table.sort(ak)
@@ -164,7 +171,7 @@ return function(W)
   -- the serialized values of an instance: {key -> text}; raw: {key -> the value they came from}
   local function full(o,c)
    c.S={};c.Raw={};c.A={}
-   for k,v in pairs(o._props)do if not SKIP[k]then local x=ser(v);if x then c.S[k]=x end;c.Raw[k]=v end end
+   for k,v in pairs(o._props)do if not SKIP[k]then local x=FP.serKey(o,k,v);if x then c.S[k]=x end;c.Raw[k]=v end end
    for k,v in pairs(o._attrs)do local x=ser(v);if x then c.S['@'..k]=x end;c.A[k]=v end
    local tg=tagsOf(o);c.S['#']=tg;c.Name=o._props.Name
   end
@@ -177,7 +184,7 @@ return function(W)
    local p=o._props
    for k,v in pairs(p)do
     if not SKIP[k]and c.Raw[k]~=v then
-     c.Raw[k]=v;local x=ser(v)
+     c.Raw[k]=v;local x=FP.serKey(o,k,v)
      if x~=c.S[k]then c.S[k]=x;out[#out+1]=x and(k..'='..x)or k end
     end
    end
@@ -358,5 +365,6 @@ return function(W)
   return best
  end
  function FP.timed()return times end
+  if okOpts and type(optsFn)=='function'then optsFn(FP,W)end
  return FP
 end

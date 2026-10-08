@@ -82,27 +82,30 @@ local function captureItem(entry)
   local rel=origin:ToObjectSpace(p.CFrame);list[#list+1]={Part=p,Rel=rel,Home=p.CFrame}
   reach=math.max(reach,rel.Position.Magnitude+p.Size.Magnitude/2)
  end end
- entry.ItemModel=item;entry.Parts=list;entry.Center=center;entry.Angle=0;entry.Core=item:FindFirstChild('ItemCore')
+ entry.ItemModel=item;entry.Parts=list;entry.Center=center;entry.Angle=0;entry.Core=item:FindFirstChild('ItemCore');entry.AtHome=true
  entry.Reach=reach+BOB+2 -- (R152 perf: a ball round the whole item as it turns and bobs; out of view = no piece of it can be on screen)
  entry.CoreRec=nil;for _,r in ipairs(list)do if r.Part==entry.Core then entry.CoreRec=r end end
 end
+-- (R153 perf: an item that is already home is not written home again: an inactive display - far away, Fast Mode, tier 1 - re-wrote every piece
+-- every TICK; AtHome is cleared whenever step moves a piece)
 local function restoreItem(entry)
- if not entry.Parts then return end
+ if not entry.Parts or entry.AtHome then return end
  for _,r in ipairs(entry.Parts)do if r.Part.Parent then r.Part.CFrame=r.Home end end
- entry.Angle=0
+ entry.Angle=0;entry.AtHome=true
 end
 -- The avatar ------------------------------------------------------------------------------------------------------------------------------------------------
 -- The joints the cheer moves (by name; a joint that is missing is skipped): only a posed rig's (the server's 'pose', or this screen's when the dance would not load).
 local function cheerJoints(entry,rig)
  local joints={}
  for name in pairs(Pose.CheerAt(0,0))do local j=Pose.Joint(rig,name);if j then joints[name]=j end end
- entry.Joints=next(joints)and joints or nil
+ entry.Joints=next(joints)and joints or nil;entry.JointsAtRest=nil
  local ok,cf,size=pcall(rig.GetBoundingBox,rig) -- R153: the ball the cheer is drawn in (the view test of step)
  if ok and typeof(cf)=='CFrame'and typeof(size)=='Vector3'then entry.AvatarCenter,entry.AvatarReach=cf.Position,size.Magnitude/2+2 else entry.AvatarCenter,entry.AvatarReach=nil,nil end
 end
 local function resetAvatar(entry)
- if not entry.Joints then return end
+ if not entry.Joints or entry.JointsAtRest then return end -- (R153 perf: a rig at rest is not reset again every TICK; the cheer clears it)
  for _,j in pairs(entry.Joints)do if j.Parent then pcall(function()j.Transform=CFrame.new()end)end end
+ entry.JointsAtRest=true
 end
 -- The dance's id for a try: the server's pick (DanceId) first, then the next ones.
 local function danceId(rig,try)
@@ -275,6 +278,7 @@ local function step(dt)
      local turn=CFrame.new(entry.Center+Vector3.new(0,math.sin(t*1.5)*BOB,0))*CFrame.Angles(0,entry.Angle,0)
      -- R152 perf: out of view (and not close: the giant pieces' close-up fade) only the core moves: its light and sparkles stay right; the pieces
      -- (no shadow, no light) are put where they belong again in the frame the item comes back into view
+     entry.AtHome=false
      if Cull and entry.Reach and Cull.Hidden(workspace.CurrentCamera,entry.Center,entry.Reach,12)then
       local r=entry.CoreRec;if r and r.Part.Parent then entry.Batch:Set(r.Part,turn*r.Rel)end
      else
@@ -288,6 +292,7 @@ local function step(dt)
    if(doPose or seen)and entry.Joints and entry.Local=='pose'then -- (only a posed rig: a dancing one is its Animator's alone)
     local boost=entry.CelebrateAt and Pose.CelebrateAt(t-entry.CelebrateAt)or 0
     local pose=Pose.CheerAt(t,boost)
+    entry.JointsAtRest=false
     for name,j in pairs(entry.Joints)do if j.Parent and pose[name]then pcall(function()j.Transform=pose[name]end)end end
    end
   end

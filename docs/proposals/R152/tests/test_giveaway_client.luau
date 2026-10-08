@@ -87,8 +87,11 @@ check(pack~=nil and pack:GetAttribute('BagVariant')=='EclipseReliquary'and pack:
 check(pack:GetAttribute('SpecialPackDesign89')==true and pack:GetAttribute('EclipsePack')==true and pack:GetAttribute('VoidDesignRevision')~=nil,'with the Void art (EclipsePackArt: the galaxy, the event horizon, the eye)')
 check(not W.CS:HasTag(pack,'BiomeSeedPackVisual'),'not tagged as a track pack (the track\'s Void-pack renderer leaves it alone)')
 check(pack.Parent==folder() and folder().Parent==W.workspace and not pack:IsDescendantOf(m),'it lives in its own local folder, not in the pedestal model')
-local anyUnanchored,collides=0,0;for _,d in ipairs(pack:GetDescendants())do if d:IsA('BasePart')then if not d.Anchored then anyUnanchored+=1 end;if d.CanCollide or d.CanQuery or d.CanTouch then collides+=1 end end end
-check(anyUnanchored==0 and collides==0,'every part anchored, no collision, not queryable')
+-- (R153 perf, lag audit D3: a piece may instead be welded to an anchored part of the pack - its root or a ring's spin hub - which holds it)
+local heldBy={};for _,w in ipairs(pack:GetDescendants())do if w._class=='Weld'and w.Part1 and w.Part0 and w.Part0.Anchored and w.Part0:IsDescendantOf(pack)then heldBy[w.Part1]=true end end
+local function held(d)return heldBy[d]==true end
+local anyUnanchored,collides,welded=0,0,0;for _,d in ipairs(pack:GetDescendants())do if d:IsA('BasePart')then if not d.Anchored then if held(d)then welded+=1 else anyUnanchored+=1 end end;if d.CanCollide or d.CanQuery or d.CanTouch then collides+=1 end end end
+check(anyUnanchored==0 and collides==0,'every part anchored or welded to an anchored part of the pack ('..welded..' welded), no collision, not queryable')
 check(nOf(pack,'BaseScript')==0 and nOf(pack,'Sound')==0,'no scripts, no sounds')
 local root=pack.PrimaryPart
 local at=ped.PackAnchor.Position
