@@ -39,7 +39,7 @@ for n in TreadmillLook151 TreadmillBeltArt151;do grep -q "^ModuleScript	Replicat
 tail -n +2 "$S/MANIFEST.tsv" | cut -f2 > "$OUT/manifest_paths.txt";LC_ALL=C sort -c "$OUT/manifest_paths.txt" || fail "src/MANIFEST.tsv is not sorted"
 if git -C "$REPO" rev-parse -q --verify $BASE >/dev/null 2>&1;then
  sh "$T/r152_real_diff.sh" "$REPO" $BASE "$S/StarterPlayer/StarterPlayerScripts/TreadmillAnimation.client.lua" >/dev/null || fail "the treadmill animation changed" # (the R152 load guard line aside)
- # R153 (owner: "numbers should also be bigger", then "2x bigger"): the speed popups are 2x. SpeedGainPopup.client.lua changed in exactly three places (the pooled popup carries the fan's
+ # R153 (owner: "numbers should also be bigger", then "2x bigger"; R154: "reduce the size of the speed notifier number by 20%" and "fix the glitchyness"): the speed popups are 2x, then 1.6x; R154 also holds the own caps at 8 and never reuses a showing frame. SpeedGainPopup.client.lua changed in exactly three places (the pooled popup carries the fan's
  # size on this screen, FanX / FanY, and apply() multiplies by it: SpeedPopupStyle.FanScale) and SpeedPopupStyle in its sizes (Size, StrokeThickness), the pooled field (Field), the fan
  # numbers (Fan) and FanScale; everything else of both must still be what it was at $BASE (the motion curves, the rate, the colours, the formatting).
  git -C "$REPO" show $BASE:src/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua > "$OUT/popup_base.lua"
@@ -55,6 +55,9 @@ undo = [  # the three R153 edits, put back as they were at the base
     ("Unit = 1, FanX = 1, FanY = 1, PX = 0,", "Unit = 1, PX = 0,"),
     ("\tx, y = x * unit * popup.FanX, y * unit * popup.FanY -- (R153: the fan's size on this screen, SpeedPopupStyle.FanScale)", "\tx, y = x * unit, y * unit"),
     ("\tlocal viewport = camera and camera.ViewportSize\n\tpopup.Unit = Style.Unit(viewport and viewport.Y)\n\tpopup.FanX, popup.FanY = Style.FanScale(viewport and viewport.X, viewport and viewport.Y)", "\tpopup.Unit = Style.Unit(camera and camera.ViewportSize.Y)"),
+    # R154 (owner: "fix the glitchyness"): a popup frame that is still showing is never taken for a new popup; the pool grows by one frame instead (the base took the oldest live one)
+    ("\t-- R154 (owner: \"fix the glitchyness\"): a frame that is still showing is NEVER taken for a new popup (it used to jump, mid-flight, to the new popup's place and text when every frame was\n\t-- busy, which a lag spike makes happen: the cap's live popups + the retired ones still fading). The pool gets one more frame instead, up to Style.Field.MaxFrames; past that this popup is not shown.\n\tif #field.Free == 0 and #field.Popups < Style.Field.MaxFrames then\n\t\tlocal built = makePopup(field)\n\t\tfield.Free[#field.Free + 1] = built\n\tend\n\tlocal popup = table.remove(field.Free)\n\tif not popup then return end\n",
+     "\tlocal popup = table.remove(field.Free)\n\tif not popup then popup = table.remove(active, 1) end -- every frame is busy (not expected): the oldest goes at once\n"),
 ]
 for a, b in undo:
     assert new.count(a) == 1, a
@@ -77,7 +80,8 @@ def strip(path):
     for line in s.split('\n'):
         line = re.sub(r'\s*--.*$', '', line)                      # comments may change (the cadence note: 10 a second at the 1/5 s step)
         # R153 (owner: "numbers should also be bigger", then "2x bigger"): the popup sizes, the outline, the pooled field and the fan numbers are new values
-        if re.match(r'^S\.(Size|StrokeThickness|Field|Fan) = ', line.strip()):
+        # R154: the own caps (8 at every tier), the field's MaxFrames and the 0.8x sizes / fan are new values too
+        if re.match(r'^S\.(Size|StrokeThickness|Field|Fan|Caps) = ', line.strip()):
             continue
         if line.strip():
             out.append(line)

@@ -217,8 +217,14 @@ local function spawnPopup(entry, item, now)
 		local built = makePopup(field)
 		field.Free[#field.Free + 1] = built
 	end
+	-- R154 (owner: "fix the glitchyness"): a frame that is still showing is NEVER taken for a new popup (it used to jump, mid-flight, to the new popup's place and text when every frame was
+	-- busy, which a lag spike makes happen: the cap's live popups + the retired ones still fading). The pool gets one more frame instead, up to Style.Field.MaxFrames; past that this popup is not shown.
+	if #field.Free == 0 and #field.Popups < Style.Field.MaxFrames then
+		local built = makePopup(field)
+		field.Free[#field.Free + 1] = built
+	end
 	local popup = table.remove(field.Free)
-	if not popup then popup = table.remove(active, 1) end -- every frame is busy (not expected): the oldest goes at once
+	if not popup then return end
 	local camera = workspace.CurrentCamera
 	local viewport = camera and camera.ViewportSize
 	popup.Unit = Style.Unit(viewport and viewport.Y)
