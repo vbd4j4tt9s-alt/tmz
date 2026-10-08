@@ -79,6 +79,7 @@ local function destroyEffect(record)
     if record.SeedMotion then record.SeedMotion:Destroy();record.SeedMotion=nil end
     if record.Flourish then record.Flourish:Destroy();record.Flourish=nil end
     if record.Suspense then record.Suspense:Destroy();record.Suspense=nil end
+    if record.Mech then record.Mech:Destroy();record.Mech=nil end -- (R153)
     if record.Effect then record.Effect:Destroy();record.Effect=nil end
     for _,part in ipairs(record.Hidden or {}) do
         if part.Parent then
@@ -199,6 +200,7 @@ local function beginReveal(record,at,seedId,now)
     -- (R152: the pack's own seam glow is there, so the flourish adds none at the mouth; its beam follows the effects budget)
     record.Flourish=require(ReplicatedStorage:WaitForChild("RevealFlourish")).Create(effect,rarity.Rank,record.Bag:GetAttribute("VisualScale")or 1,{Suspense=true,Tier=lowFx and 1 or nil})
     record.Suspense=Suspense.Create(effect,rarity.Rank,record.Bag:GetAttribute("VisualScale")or 1,record.Quick,lowFx);record.Suspense:SetPack(copy)
+    do local m=ReplicatedStorage:FindFirstChild("MechPackFx153");if m then local ok,o=pcall(function()return require(m).Opening(copy,record)end);record.Mech=ok and o or nil end end -- R153: the Mech pack's scan, steam, stripes and turbine (nil for any other pack)
     if rarity.Rank>=6 and RareWorld then
         local owner=ownerOf(record.Bag.Parent)
         if owner then pcall(RareWorld.Begin,owner,record.Bag.Parent,rarity.Rank,at)end
@@ -297,6 +299,7 @@ local function renderReveal(record,now)
     if record.TickSound and record.TickStop and t>=record.TickStop then record.TickSound:Stop();record.TickStop=nil end
     local revealStart=burstAt;local age=math.max(0,t-revealStart)
     if record.Suspense then record.Suspense:Update(wrapperRoot*CFrame.new(0,mouth,0),t)end
+    if record.Mech then record.Mech:Update(t,wrapperRoot)end
     if RareWorld and record.RarityRank>=6 then local owner=ownerOf(bag.Parent);if owner then RareWorld.SetMouth(owner,root*CFrame.new(0,mouth,0),bag.PrimaryPart);if shift>0 then RareWorld.Shift(owner,shift)end end end
     if record.Flourish then
         local char=Players.LocalPlayer and Players.LocalPlayer.Character

@@ -15,7 +15,7 @@ For each "SCENE {...}" line (one pack: parts in the root frame, divided by the p
      each other (tier "near": inside the .02 band tools/zfight.py counts). They are shallow printed layers of owner-approved designs; flicker needs
      less than about .0003 stud at 50 studs (a 24-bit depth buffer without reversed Z: D^2 / (near x 2^24)), and a >= .02 spacing would thicken the print
      by about .04 stud and re-place every detail on top of it. They are listed per pack and not counted; any coplanar (<= .002) pair, any near pair
-     outside these named layers and any "far" pair is.
+     outside these named layers and any "far" pair is. (R153: the Mech pack's look B stacks every layer .024+ apart: it is no longer on the list.)
 Exit status 1 when a pack has a floating part or a counted (not known) z-fighting pair."""
 import collections, json, math, os, sys
 import numpy as np
@@ -146,7 +146,6 @@ def zfight(parts):
 
 KNOWN = [  # (pack label regex, part name regex, why)
     (r'^Void$', r'^(VoidNebula|VoidSingularity)', 'translucent haze discs + the opaque singularity, .004 - .018 apart'),
-    (r'^Mech$', r'^(ReactorHousing|ReactorInset|ReactorCore|CoreFacet|PistonCuff|PistonChannel)', 'stepped reactor / piston print, .010 - .016 per step'),
 ]
 
 

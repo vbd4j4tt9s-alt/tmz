@@ -31,7 +31,7 @@ M = {
     # a part count the renderers never reach: the pack would never be animated
     'part_count': ('SeedPackRenderer.lua', "bag:SetAttribute('CompactPackPartCount',count+10)", "bag:SetAttribute('CompactPackPartCount',count+11)", 'test:structure'),
     # a Mech servo whose C0 is not the rest frame: the part jumps when the motor is solved
-    'motor_rest': ('SpecialPackArt89.lua', 'joint.C0=frame;joint.C1=CF()', 'joint.C0=frame*CF(0,.5,0);joint.C1=CF()', 'test:connection'),
+    'motor_rest': ('MechPackArt153.lua', 'joint.C0=frame;joint.C1=CF()', 'joint.C0=frame*CF(0,.5,0);joint.C1=CF()', 'test:connection'),  # (R153: the Mech build moved there)
     # the bottom seal off the pouch: a floating part
     'floating_seal': ('SeedPackVisuals.lua', 'origin*CFrame.new(0,-1.12*scale,0),seal,visualWeldRoot)', 'origin*CFrame.new(0,-1.52*scale,0),seal,visualWeldRoot)', 'geometry'),
     # a duplicate of the seal one stud-thousandth away: z-fighting

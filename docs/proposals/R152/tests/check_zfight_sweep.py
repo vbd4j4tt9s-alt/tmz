@@ -4,6 +4,7 @@ Usage: python3 check_zfight_sweep.py maps    <world dir> NAME [NAME ...]   the w
                                                                           keyboard around a runner (scenes <world>/NAME.json, built by run_variant.sh)
        python3 check_zfight_sweep.py verity  <dump.txt>                    the Verity pack (dump_verity_zscene.luau)
        python3 check_zfight_sweep.py opening <dump.txt>                    the pack-opening scenes (dump_opening_zscene.luau)
+       python3 check_zfight_sweep.py mech    <dump.txt>                    R153: the Mech pack, look B (docs/proposals/R153/tests/dump_mech_zscene.luau)
 Every subcommand exits 1 when a counted finding is left (coplanar / near / far: two visible faces that look different, point the same way, overlap and lie within the depth buffer's
 reach of each other: 0.02 stud for a small overlap up to 0.043 at 300 studs) that is not on the short list of things that are not ours (ALLOWED below, each with its reason), when two
 Decals / Textures with the same ZIndex stack on one face of a part, or when the explicit R152 layer gaps are not kept (see each subcommand).
@@ -169,6 +170,42 @@ def cmd_verity(dump):
     return 1 if bad or n < 24 else 0
 
 
+# ---- mech (R153) ---------------------------------------------------------------------------------------------------------------------------
+def cmd_mech(dump):
+    """The Mech pack's look B on the flat pouch (its real triangles) in every context / size / coat, its opening copy (bolts out, scan, steam) and its
+    plain-parts body: no counted finding at all (every layer of the design stands >= .024 off the one under it), no stacked images, one pouch MeshPart."""
+    bad = n = opening = sachet = 0
+    tmp = dump + '.scene.json'
+    for name, js in scenes_of(dump):
+        n += 1
+        open(tmp, 'w', encoding='utf-8').write(js)
+        parts, fs = Z.run(tmp)
+        raw = json.loads(js)['parts']
+        vis = [f for f in fs if not f['same_look']]
+        ours = report(vis, name)
+        if ours:
+            print('  in scene', name)
+        bad += len(ours)
+        for s in stacked_faces(raw, name):
+            print('  STACKED', s)
+            bad += 1
+        meshes = [p for p in raw if p['class'] == 'MeshPart']
+        opening += name.startswith('opening')
+        sachet += name.startswith('sachet')
+        if name.startswith('sachet'):
+            if meshes:
+                print('  FAIL: %s: the plain-parts body has a MeshPart (%s)' % (name, ', '.join(p['name'] for p in meshes)))
+                bad += 1
+        elif len(meshes) != 1:
+            print('  FAIL: %s: the pack should be on ONE MeshPart, the flat pouch (%d)' % (name, len(meshes)))
+            bad += 1
+    os.remove(tmp)
+    ok = bad == 0 and n >= 30 and opening >= 5 and sachet >= 4
+    print('Mech pack (R153): %d scenes (ground, held R15 / R6, picture; sizes .5 / 1 / 25; plain, Gold, Diamond; %d opening frames; %d on the plain-parts body): %s' % (
+        n, opening, sachet, 'PASS' if ok else 'FAIL (%d)' % bad))
+    return 0 if ok else 1
+
+
 # ---- opening --------------------------------------------------------------------------------------------------------------------------------
 def cmd_opening(dump):
     bad = 0
@@ -237,5 +274,7 @@ if __name__ == '__main__':
         sys.exit(cmd_verity(sys.argv[2]))
     if len(sys.argv) == 3 and sys.argv[1] == 'opening':
         sys.exit(cmd_opening(sys.argv[2]))
+    if len(sys.argv) == 3 and sys.argv[1] == 'mech':
+        sys.exit(cmd_mech(sys.argv[2]))
     print(__doc__)
     sys.exit(2)

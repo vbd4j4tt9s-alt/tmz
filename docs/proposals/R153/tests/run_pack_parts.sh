@@ -9,7 +9,7 @@
 #                            real ItemPictures viewport: hotbar / Bag / Index / the Verity dialog), the opening copy, market, mystery pedestal, viewport, giants, coats.
 #  2. check_pack_parts.py    the native data IS the place's pouch (the template's box, to 1e-4), every pouch closes where the seal and strips are, and no part
 #                            hangs off its pouch (attach.py: within .03 of the real surface, or touching a static part that is); the Void's halo is listed as by
-#                            design, the Mech's loose parts are LISTED (its look is being redesigned), not counted.
+#                            design; the Mech (R153 look B) is COUNTED on its own body: the generated flat pouch's triangles or its plain-parts sachet.
 #  3. reproduce              the same on REF (default 8208603, R152 as released + the R153 proposals): test_pack_parts must fail ONLY on the R152 kinds (seam: the
 #                            Verity pouch .047 off the seal / strips; crimp: the 16 tall designs' shapes pulling their top crimp in under the strips), the geometric
 #                            check must find the Void's floating corner details, and EclipsePackArt.Seats must be exactly their pouch depths there.

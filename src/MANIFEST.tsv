@@ -163,6 +163,8 @@ ModuleScript	ReplicatedStorage/LuckCloverData	ReplicatedStorage/LuckCloverData.l
 ModuleScript	ReplicatedStorage/MechArt	ReplicatedStorage/MechArt.lua
 ModuleScript	ReplicatedStorage/MechCatalog	ReplicatedStorage/MechCatalog.lua
 ModuleScript	ReplicatedStorage/MechGrowth	ReplicatedStorage/MechGrowth.lua
+ModuleScript	ReplicatedStorage/MechPackArt153	ReplicatedStorage/MechPackArt153.lua
+ModuleScript	ReplicatedStorage/MechPackFx153	ReplicatedStorage/MechPackFx153.lua
 ModuleScript	ReplicatedStorage/MechPlantData	ReplicatedStorage/MechPlantData.lua
 ModuleScript	ReplicatedStorage/MenuBackdrop	ReplicatedStorage/MenuBackdrop.lua
 ModuleScript	ReplicatedStorage/MoneyIcon	ReplicatedStorage/MoneyIcon.lua
