@@ -30,6 +30,8 @@
 -- ordinary pack's), and this builder puts nothing else on it: the yellow pouch, the (slightly darker) yellow seal and strips, and the face Decals on its two flat faces.
 -- The Verity pack is NEVER shaped (PackShapes151.Applies excludes it): one flat pouch in every context (track, hand, hotbar / Bag, shop / Index / market / dialog pictures,
 -- the opening), whatever shape a bag or an old record may still carry. A.Seal is the seal's / strips' yellow (the sachet keeps A.Yellow).
+-- R153 (owner: "parts are dislocated on packs"): the flat pouch's frame is the template's x / y and turn but its middle is on the pack's seam plane (VerityPouch151.SeamFrame),
+-- where the seal and the strips are; it used to take the standard mesh's box centre, .047 in front of that plane, so the seal and strips stood off to one side of it.
 local Config=require(script.Parent.VerityConfig)
 local Renderer=require(script.Parent.SeedPackRenderer)
 local Pouch=require(script.Parent.VerityPouch151)

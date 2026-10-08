@@ -644,10 +644,11 @@ local function rayAt(screenPosition, isViewport)
 	params.IgnoreWater = true
 	return workspace:Raycast(ray.Origin, ray.Direction * 500, params)
 end
+local function revealPress()local ok,taken=pcall(function()return require(game:GetService('ReplicatedStorage').RarePullRules).ClaimPress()end);return ok and taken==true end -- R153: a press that skips / closes a pull reveal's card is not the tool's
 local function placeAt(screenPosition, isViewport)
 	if gardenBusy or playerGui:GetAttribute("SeedMenu") or UserInputService:GetFocusedTextBox() then return end
 	local seed = equippedGardenSeed()
-	if not seed then return end
+	if not seed or revealPress() then return end
 	local hit = rayAt(screenPosition, isViewport)
 	-- R122: clicking another player with a seed is a gift (FruitGiftClient), not a planting miss.
 	local model = hit and hit.Instance:FindFirstAncestorOfClass("Model")

@@ -31,6 +31,8 @@ X.Actions.plantnotify=true
 X.Actions.packshape=true
 -- R151: hubtrees: the owner's studded tree models (HubTreeLoader151): which load route worked per id, scripts removed, each tier's plan.
 X.Actions.hubtrees=true
+-- R153: trampoline [status | reload]: which look the two garden-nook trampolines have (the owner's asset 12088629887, a model dropped into ReplicatedStorage.HubTrampolineTemplates153, or the built one) and why (HubTrampoline153).
+X.Actions.trampoline=true
 -- R152: keepermodels [off|auto]: the baked rev 6 keeper models (KeeperMeshCommand152): bake status, which model each keeper shows, a switch back.
 X.Actions.keepermodels=true
 -- R152: voidgift [reset me | left <n>]: the free Void Pack pedestal's status; the two edits are Studio only (VoidGiveaway152).
@@ -38,6 +40,7 @@ X.Actions.voidgift=true
 function X.Execute(ctx,p,action,a)
  if action=='keepermodels'then return require(script.Parent.KeeperMeshCommand152).Execute(ctx,p,a)end
  if action=='hubtrees'then return require(script.Parent.HubTreeLoader151).Command(ctx,p,a)end
+ if action=='trampoline'then return require(script.Parent.HubTrampoline153).Command(ctx,p,a)end
  if action=='voidgift'then return require(script.Parent.VoidGiveaway152).Command(ctx,p,a)end
  if action=='rarepull'or action=='raresound'then return require(script.Parent.RarePullTestCommands).Execute(ctx,p,action,a)end
  if action=='plantnotify'then return require(script.Parent.SocialService).Command(ctx,p,a)end

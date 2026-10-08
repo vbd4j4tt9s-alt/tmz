@@ -5,7 +5,8 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 -- own HumanoidRootPart so the feet rise HubTrampolineRules153.Height() studs (30). Never added to: standing there bounces at the same height every
 -- time, a rising body (a bounce, a jump) is left alone, and a player bounces at most once per Cooldown (.45 s). MovementGuard's rise allowance
 -- (25 studs per .1 s sample) covers it (test). Everyone's client also squashes the mat and plays the boing when ANY player lands (from the
--- replicated positions: cosmetic only, nothing is applied to another player). The sound is InteractionAudio's existing bubble pop pitched down.
+-- replicated positions: cosmetic only, nothing is applied to another player). The sound is the owner's boing file (94320656351627) at pitch 1 (R153: it replaced the
+-- Bubble04 placeholder pitched to .8); one boing per bounce. Its lead-in is unmeasured: SoundTiming.Start_94320656351627 (a number attribute on SoundTiming) tunes it.
 -- Per frame: two squared distances to the nooks (the rest only within 60 studs of one); twice a second: is the server's folder still the one we know. Reduced Motion: no squash.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local GuiService=game:GetService('GuiService')
@@ -14,50 +15,52 @@ local Sfx=require(RS:WaitForChild('LocalSfx'))
 local player=Players.LocalPlayer
 local map=workspace:WaitForChild('ChestChaseMap')
 local V=Vector3.new
-local BOING={Id='rbxassetid://96764044228884',Volume=.34,Pitch=.8} -- (InteractionAudio.AssetIds.Bubble04, an existing asset; pitched down it boings)
+local BOING={Id='rbxassetid://94320656351627',Volume=.30,Pitch=1} -- (the owner's trampoline bounce file; no pitch shift; LocalSfx plays it on the Effects group)
 local NEAR=60;local COARSE=.5
 
-local spots={}                                     -- {X, Z, Mat, Badge, MatCF, BadgeCF, At}
+local spots={}                                     -- {X, Z, Mat, Badge, MatCF, BadgeCF, At, Want} (Mat / Badge may be missing: a look from the store whose mat cannot be told does not squash)
 local active={}                                    -- spots that are squashing
 local states=setmetatable({},{__mode='k'})         -- HumanoidRootPart -> debounce state
 local connections={}
-local seen,seenCount,elapsed,render,preloaded
+local seen,seenCount,seenLooks,elapsed,render,preloaded
 local function reduced()local ok,v=pcall(function()return GuiService.ReducedMotionEnabled end);return ok and v==true end
 
--- The server's trampolines: found now and whenever the folder is replaced (HubDecor151 rebuilds it) --------------------------------------------
+-- The server's trampolines: found now and whenever the folder is replaced (HubDecor151 rebuilds it) or re-dressed (the owner's asset arrived) ---------
 local function collect()
  table.clear(spots);table.clear(active)
  local folder=map:FindFirstChild(T.FolderName)
  if not folder then return end
  for _,m in ipairs(folder:GetChildren())do
   local x,z=m:GetAttribute('CenterX'),m:GetAttribute('CenterZ')
-  local mat,badge=m:FindFirstChild('Trampoline mat'),m:FindFirstChild('Trampoline badge')
-  if type(x)=='number'and type(z)=='number'and mat and badge then
-   spots[#spots+1]={X=x,Z=z,Mat=mat,Badge=badge,MatCF=mat.CFrame,BadgeCF=badge.CFrame,At=-math.huge}
+  local mat,badge=m:FindFirstChild('Trampoline mat',true),m:FindFirstChild('Trampoline badge',true)
+  if type(x)=='number'and type(z)=='number'then -- (the bounce needs only the spot; the squash needs the mat)
+   spots[#spots+1]={X=x,Z=z,Mat=mat,Badge=badge,MatCF=mat and mat.CFrame,BadgeCF=badge and badge.CFrame,At=-math.huge,Want=m:GetAttribute('HasMat')==true}
   end
  end
 end
-local function refresh() -- (twice a second) the server's folder, found again when it is replaced
- local folder=map:FindFirstChild(T.FolderName);local count=folder and #folder:GetChildren()or 0
- if folder~=seen or count~=seenCount then seen,seenCount=folder,count;collect()end
+local function refresh() -- (twice a second) the server's folder, found again when it is replaced or dressed; a mat still on its way is waited for
+ local folder=map:FindFirstChild(T.FolderName);local count=folder and #folder:GetChildren()or 0;local looks=folder and folder:GetAttribute('Looks')or 0
+ local stale=folder~=seen or count~=seenCount or looks~=seenLooks
+ if not stale then for _,s in ipairs(spots)do if(s.Want and not s.Mat)or(s.Mat and not s.Mat:IsDescendantOf(folder))then stale=true;break end end end
+ if stale then seen,seenCount,seenLooks=folder,count,looks;collect()end
 end
 
--- The squash: the mat and its badge dip and rebound (T.Squash), only while one is moving ---------------------------------------------------------
+-- The squash: the mat (and its badge, when it has one) dips and rebounds (T.Squash), only while one is moving ------------------------------------------
 local function squashStep()
  local now=os.clock();local any=false
  for i=#active,1,-1 do
   local s=active[i];local t=now-s.At
-  if t>=T.SquashSeconds then
-   s.Mat.CFrame=s.MatCF;s.Badge.CFrame=s.BadgeCF;table.remove(active,i)
+  if t>=T.SquashSeconds or not s.Mat then
+   if s.Mat then s.Mat.CFrame=s.MatCF end;if s.Badge then s.Badge.CFrame=s.BadgeCF end;table.remove(active,i)
   else
    any=true;local off=V(0,-T.SquashDepth*T.Squash(t),0)
-   s.Mat.CFrame=s.MatCF+off;s.Badge.CFrame=s.BadgeCF+off
+   s.Mat.CFrame=s.MatCF+off;if s.Badge then s.Badge.CFrame=s.BadgeCF+off end
   end
  end
  if not any and render then render:Disconnect();render=nil end
 end
 local function squash(s)
- if reduced()then return end
+ if reduced()or not s.Mat then return end
  s.At=os.clock()
  if not table.find(active,s)then table.insert(active,s)end
  if not render then render=Run.RenderStepped:Connect(squashStep)end
@@ -114,7 +117,7 @@ connections[#connections+1]=Run.PreSimulation:Connect(step)
 script.Destroying:Connect(function()
  for _,c in ipairs(connections)do c:Disconnect()end
  if render then render:Disconnect()end
- for _,s in ipairs(spots)do s.Mat.CFrame=s.MatCF;s.Badge.CFrame=s.BadgeCF end
+ for _,s in ipairs(spots)do if s.Mat then s.Mat.CFrame=s.MatCF end;if s.Badge then s.Badge.CFrame=s.BadgeCF end end
 end)
 script:SetAttribute('R153Loaded',true)
 -- (the offline tests set R153TestHook on the script to drive it; in the game nothing is returned)

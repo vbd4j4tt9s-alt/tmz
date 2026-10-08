@@ -80,6 +80,7 @@ function E:EnsureGuardian()
   -- R141: The Darkened runs at a fixed speed; its label shows the Speed that outruns it.
   if self.Guardian then
    self.Guardian:SetAttribute('KeeperEscapeSpeed',require(game:GetService('ReplicatedStorage').RouteBalance83).EventSpeed)
+   self.Guardian:SetAttribute('KeeperHome',self.Home.Position) -- R153: where it spawned for this appearance (the SPEED NEEDED sign stays there)
    game:GetService('CollectionService'):AddTag(self.Guardian,'BiomeKeeper')
   end
  end
