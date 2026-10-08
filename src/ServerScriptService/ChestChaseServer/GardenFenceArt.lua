@@ -83,8 +83,10 @@ function A.Build(base,level)
  local side=pad.Size.X/2+2;local back=-pad.Size.Z/2-2;local front=pad.Size.Z/2-2
  -- R149: the sill stands .08 above the pad (was .02: the front sills lie on the pad and flickered against it).
  local depth=pad.Size.Y+.08;local footingY=(.08-pad.Size.Y)/2
+ -- R154: the side sills stop at the front and back sills (they ran under them: Slate is a textured material, so the overlapping corners flickered
+ -- even in one colour); the sills' outline and collision are unchanged.
  for _,sign in ipairs({-1,1})do
-  p('Fence foundation',V(3.2,depth,front-back),CF(sign*side,footingY,(back+front)/2),theme.Body,Enum.Material.Slate,true)
+  p('Fence foundation',V(3.2,depth,front-back-3.8),CF(sign*side,footingY,(back+front)/2-.3),theme.Body,Enum.Material.Slate,true)
   p('Fence foundation',V(side-16+3.8,depth,4.4),CF(sign*(side+16-.6)/2,footingY,front),theme.Body,Enum.Material.Slate,true)
  end
  p('Fence foundation',V(side*2+3.2,depth,3.2),CF(0,footingY,back),theme.Body,Enum.Material.Slate,true)

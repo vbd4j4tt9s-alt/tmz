@@ -39,7 +39,7 @@ H.Kinds={
 }
 H.Rise=.07            -- the discs' bottoms over their ground (R149 weather patches: .07)
 H.Unit=.004           -- one height slot: the smallest gap between two top planes (fix round A)
-H.Slots=40            -- slots a drift may be lifted by to clear the drifts it overlaps and the surfaces in Keep (40 x .004 = .16 at most)
+H.Slots=80            -- slots a drift may be lifted by to clear the drifts it overlaps, the surfaces in Keep and the lawns (R154: 80 x .004 = .32 at most; 40 did for all but the lawns)
 H.FenceOut=3.6        -- a base's fence stands this far outside its pad (GardenFenceArt), when the fence itself is not there to measure
 H.TrackMargin=2       -- drifts stay this far off the track rectangle (WeatherWorld149.Outside)
 H.FadeIn,H.FadeOut=W.Patch.FadeIn,W.Patch.FadeOut -- (one source: 10-20 s in, 20-40 s out, WeatherWorld149.Patch)
@@ -287,16 +287,40 @@ end
 -- are all clear of every earlier overlapping drift's planes. The surfaces a drift must also stay clear of (HubSnow151.Keep: the R151 streets
 -- 4.20 / plazas 4.14, 4.26 / curbs 4.32 / run-up 4.06, grass patches 4.07 / 4.12, the floor itself) are never a top plane either: a slot
 -- that would put a lobe within KeepGap of one is skipped.
+-- R154 (owner: "remove the cases of z fighting in the hub area too"):
+--  * the lawns: a drift on the hub floor whose reach meets a grass disc of HubLifeArt151 (A.PatchDiscs: the lawns as pure data, their
+--    discs on the planes 4.07 - 4.27) keeps every top plane at least LawnGap from that disc's top - lifted by more slots where it must (a
+--    drift top .018 - .046 over a raised grass disc flickered). The drifts lie on the lawns a little thicker there; nothing else moves.
+--  * drifts that overlap share one shade (Assign): two overlapping drifts are only .004 apart at least, a gap only a look-alike pair may
+--    have (two whites 11 / 255 apart flickered there).
 local function base(s,k)local K=H.Kinds[s.Kind];return floor(s.Th*(K.Taper[k]or K.Taper[#K.Taper])/H.Unit+.5)end
 function H.Plane(s,k)return base(s,k)+s.Slot end
 H.Keep={4.06,4.07,4.12,4.14,4.20,4.26,4.32} -- tops of the hub's flat things (relative to a floor top of 4: R151 HubDecor151 / HubLifeArt151)
 H.KeepGap=.012
+H.LawnGap=.049 -- (R152's MIN_GAP: the depth rule's .043 at 300 studs plus the quantisation)
+local lawnList
+function H.Lawns() -- HubLifeArt151's grass discs {X, Z, R, Top} (empty when it is not there)
+ if lawnList==nil then
+  lawnList={}
+  local art=script.Parent:FindFirstChild('HubLifeArt151')
+  if art then
+   local ok,A=pcall(require,art)
+   if ok and type(A)=='table'and A.PatchDiscs then local ok2,list=pcall(A.PatchDiscs);if ok2 and type(list)=='table'then lawnList=list end end
+  end
+ end
+ return lawnList
+end
 local function clashes(s,a,out)
  for k=1,s.N do
   local p=base(s,k)+s.Slot
   local top=H.Rise+p*H.Unit -- above the ground
   for _,y in ipairs(H.Keep)do if abs(4+top-y)<H.KeepGap then return true end end
  end
+ if s.Pad==0 then for _,g in ipairs(H.Lawns())do
+  if(g.X-s.X)^2+(g.Z-s.Z)^2<(g.R+s.Reach)^2 then
+   for k=1,s.N do if abs(4+H.Rise+(base(s,k)+s.Slot)*H.Unit-g.Top)<H.LawnGap then return true end end
+  end
+ end end
  for b=1,a-1 do
   local t=out[b]
   if t.Pad==s.Pad and(t.X-s.X)^2+(t.Z-s.Z)^2<(t.Reach+s.Reach)^2 then
@@ -308,6 +332,16 @@ local function clashes(s,a,out)
  return false
 end
 function H.Assign(out)
+ -- R154: drifts that overlap (in a chain) share one white, the shade of the first of them
+ local root={}
+ local function find(i)while root[i]~=i do root[i]=root[root[i]];i=root[i]end;return i end
+ for a=1,out.N do root[a]=a end
+ for a=2,out.N do local s=out[a]
+  for b=1,a-1 do local t=out[b]
+   if t.Pad==s.Pad and(t.X-s.X)^2+(t.Z-s.Z)^2<(t.Reach+s.Reach)^2 then local ra,rb=find(a),find(b);if ra<rb then root[rb]=ra elseif rb<ra then root[ra]=rb end end
+  end
+ end
+ for a=1,out.N do out[a].Shade=out[find(a)].Shade end
  for a=1,out.N do
   local s=out[a];s.Slot=0
   while s.Slot<H.Slots and clashes(s,a,out)do s.Slot+=1 end
