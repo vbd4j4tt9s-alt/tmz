@@ -324,6 +324,27 @@ do
  local p=open(5,1/30,{Pack=PLAIN})
  check(p==nil,'any other pack: no Mech touch')
 end
+-- 5b. the card skipped (R153 release: RarePullCinematic.Skip jumps the world pack's clock by RarePullRules.Shift; the Mech touch reads that t)
+do
+ local o,frames=open(5,1/30,{SkipAt=.5})
+ if check(o~=nil,'Mythic card skipped: the Mech touch plays')then
+  local log=o.Log;local B=o.BurstAt;local jump
+  for k=2,#log do if log[k].T-log[k-1].T>.3 then jump=k;break end end
+  if check(jump~=nil,'the skip jumps the world pack\'s clock (one update moves on by more than .3 s)')then
+   -- (a group jumped by more than Steam.Grace stays silent, like a tick that reaches the client late; one within it plays late, from its own point)
+   local a,b=log[jump-1],log[jump];local passed,late=0,0;for _,tk in ipairs(o.Ticks)do if tk>a.T and tk<=b.T then passed+=1;if b.T-tk<=Fx.Steam.Grace then late+=1 end end end
+   local ring=(b.Rung and not a.Rung)and Fx.Steam.Ring or 0 -- (the jump can land on the burst itself: its ring is the burst's)
+   check(passed>0 and late<=1 and b.Hissed-a.Hissed==late and b.Emitted-a.Emitted==late*Fx.Steam.Puff+ring,
+    ('the tear groups jumped over (%d) stay silent, but one under %.2f s late (%d): no hiss / steam bunched on the skip (%d hiss)'):format(passed,Fx.Steam.Grace,late,b.Hissed-a.Hissed))
+   local tr=firstAt(log,function(e)return e.Rung end)
+   check(tr and tr>=B-1e-9 and tr-B<=1/30+1e-6,('the steam ring still comes on the (earlier) burst (%.3f, BurstAt %.3f)'):format(tr or -1,B))
+   local stray=false;for k=jump,#log do if log[k].Scan and log[k].T>=B then stray=true end end
+   check(not stray,'no scan line after the burst')
+  end
+  voicesCheck(frames,'Mythic skipped')
+  check(o.Destroyed==true and #leftovers()==0,'Mythic skipped: the Mech touch is gone with the reveal, nothing left')
+ end
+end
 
 -- 6. clean ------------------------------------------------------------------------------------------------------------------------------------
 do
