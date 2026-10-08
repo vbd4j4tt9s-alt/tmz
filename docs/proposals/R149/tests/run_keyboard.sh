@@ -66,7 +66,7 @@ cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$HERE/test_keyboard.
 # mkbundle.py reads /home/user/tmz/src; bundle the given src tree (a worktree has its own).
 bundle() { # $1 = src tree
  sed "s#'/home/user/tmz/src'#'$1'#" "$INV/mkbundle.py" > "$OUT/mkbundle.py"
- python3 "$OUT/mkbundle.py" "$OUT/cl/rs_bundle.luau" KeyboardTrackClient="$1/StarterPlayer/StarterPlayerScripts/KeyboardTrack.client.lua" >/dev/null
+ python3 "$OUT/mkbundle.py" "$OUT/cl/rs_bundle.luau" KeyboardTrackClient="$1/StarterPlayer/StarterPlayerScripts/KeyboardTrack.client.lua" TrackHoleClient="$1/StarterPlayer/StarterPlayerScripts/TrackHoleClient.client.lua" >/dev/null # (R153: section 8b runs the real shovel client next to the keyboard)
 }
 runsuite() { (cd "$OUT/cl" && timeout 600 /opt/luau/luau test_keyboard.luau > keyboard.log 2>&1); }
 # R152: the owner's place (not in the repo; the checks are skipped without it): the REAL start-up passes + KeyboardSkip152 + the real client next to the Desert oasis.
@@ -85,7 +85,7 @@ if [ "$MODE" != "mutate" ]; then
  bundle "$REPO/src"
  echo "== test_keyboard (R149)"
  runsuite || { tail -40 "$OUT/cl/keyboard.log";exit 1; }
- grep -E "^(parts|sprints|teleports|counts|sprint writes|turn |click|budget|reach|press sounds)" "$OUT/cl/keyboard.log" || true;tail -1 "$OUT/cl/keyboard.log"
+ grep -E "^(parts|sprints|teleports|counts|sprint writes|turn |click|budget|reach|press sounds|dirt float)" "$OUT/cl/keyboard.log" || true;tail -1 "$OUT/cl/keyboard.log"
  echo "== keyboard on the owner's place (R152: no keys over water / lava / props)"
  place_scene "$REPO/src"
  exit 0
@@ -219,7 +219,7 @@ mutate "the scan uses the axis-aligned box of a turned part" $K2 "local h=hull(p
 mutate "effects lift onto keys over a left-out cell" $KS "if geo and geo.SkipCount>0 and geo.Skip[geo.RowOfZ(z)*64+geo.ColOfX(x)]then return nil end" "if false then return nil end"
 # R153: the shovel holes are 1.5x the radius (rim 3.0): the keys under the whole rim stay up
 mutate "the keys under a bigger hole's rim can be pressed (HoleReach back to the old rim, 2)" $R " HoleReach=3," " HoleReach=2,"
-mutate "the hole parts are not lifted onto the key tops (the bigger hole sinks into the keys)" $S "   liftBase[d]=y;liftSet[d]=y+C.HoleLift;d.Position=d.Position+LIFT" "   liftBase[d]=y;liftSet[d]=y"
+mutate "the hole parts are not lifted onto the key tops (the bigger hole sinks into the keys)" $S "   d:SetAttribute(HOLE_BASE,y);setY(d,y+C.HoleLift)" "   d:SetAttribute(HOLE_BASE,y);setY(d,y)"
 PHASE=r153
 # R153: key sounds only for a player who really steps on a key
 mutate "a keeper's press sounds again" $S "   if kind<3 then playKey(idx,kind,who,px,pz)else mutedAt[idx]=frameNo end" "   playKey(idx,kind,who,px,pz)"
@@ -236,6 +236,11 @@ mutate "the Humanoid states are not read" $R "local ok,state=pcall(hum.GetState,
 mutate "FallingDown is not a thrown state" $R "{'Physics','Ragdoll','FallingDown','PlatformStanding','Flying'}" "{'Physics','Ragdoll','PlatformStanding','Flying'}"
 mutate "a walker loses his click to a keeper / a thrown body that pressed the key first" $S "if mutedAt[idx]==frameNo and kind>0 and kind<3 then" "if false then"
 mutate "you press with FloorMaterial Air (the grounded test is gone)" $S "  if own and hum.FloorMaterial==AIR then return nil end" "  local _=0"
+# R153 (owner: "the dirt piles float up into the sky"): section 8b, a hole must never climb (the lift is absolute, recorded on the part, guarded and capped)
+mutate "a part with no record that is already on the key tops is lifted again (the dirt climbs when the memory is lost)" $S "   if y>=restTop then" "   if false then"
+mutate "the part's height before the lift is not kept on the part (a stranded crumb cannot go back, teardown cannot restore)" $S "   d:SetAttribute(HOLE_BASE,y);setY(d,y+C.HoleLift)" "   setY(d,y+C.HoleLift)"
+mutate "stranded dirt stays in the air (no ceiling)" $R " HoleCeiling=1, " " HoleCeiling=1e9, "
+mutate "a part that is not at its record is lifted again relative to where it is (the dig tween makes the crumbs climb)" $S "   if abs(y-want)>1e-3 and(abs(y-base)<1e-3 or y>want+C.HoleCeiling)then setY(d,want)end" "   if abs(y-want)>1e-3 then setY(d,y+C.HoleLift)end"
 [ -z "$DRY" ] || exit 0
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]

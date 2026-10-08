@@ -1993,6 +1993,159 @@ check(floors[1].Transparency==0 and floors[1].CanCollide==true,'the real floor\'
 local keepHole,keepPit=dig(9,cx(3),cz(BR+12));frames(5)
 keepPitRef=keepPit
 end
+-- 8b. R153 (owner: "fix the bug where dirt piles would float up into the sky", a screenshot of dug holes hanging over the hub): a shovel hole climbed ~5 studs a second.
+-- Cause: the lift onto the key tops was remembered in two weak tables keyed by the Instance and applied as "Position + HoleLift". Roblox hands a script a NEW wrapper for an
+-- Instance it let go of, so the memory vanished and the scan (4 a second) lifted the same part again, for as long as the hole lived (180 s). Here the engine's behaviour is
+-- modelled for the hole folder (every part a script gets from it is a fresh wrapper; the stable-identity mock could never show the climb), with the REAL TrackHoleClient (its
+-- dig animation on a time-stepped TweenService) and the real keyboard: a hole is dug, left for 20 s, the runner leaves (rows recycle) and comes back, teleports.
+do
+ local THC=W.module('TrackHoleConfig');local rimD=THC.Diameter+2*THC.RimWidth
+ local holesF=runtime:FindFirstChild('TrackHoles')
+ local restTop=K.KeyTop(0);local CEIL=C.HoleCeiling or 1
+ -- stand-ins for what TrackHoleClient asks of the world: a time-stepped TweenService (the shared mock jumps to the end value and never completes), the TrackHole remote
+ -- (a BindableEvent here: the keyboard itself must never make or use a RemoteEvent), the PlayerGui and the input / sound services it binds
+ local Tw=W.service('TweenService');local create0=Tw.Create;local live={}
+ local function ease(style,dir,t)
+  if style==R.Enum.EasingStyle.Back then local c1=1.70158;local c3=c1+1;if dir==R.Enum.EasingDirection.Out then return 1+c3*(t-1)^3+c1*(t-1)^2 end;return c3*t*t*t-c1*t*t end
+  if dir==R.Enum.EasingDirection.In then return t*t end
+  return 1-(1-t)*(1-t)
+ end
+ Tw.Create=function(_,obj,info,props)
+  local tw={Completed=R.signal(),T=0,On=false}
+  function tw.Play()tw.On=true;tw.T=0;tw.From={};for k in pairs(props)do tw.From[k]=obj[k]end;live[#live+1]=tw end
+  function tw.Cancel()tw.On=false end
+  tw.Step=function(dt)
+   tw.T+=dt;local a=math.min(1,tw.T/math.max(info.Time,1e-6));local e=ease(info.Style,info.Dir,a)
+   for k,v in pairs(props)do
+    local f=tw.From[k]
+    if R.typeof(v)=='CFrame'then obj[k]=(a>=1)and v or CF(f.Position:Lerp(v.Position,e))
+    elseif R.typeof(v)=='Vector3'then obj[k]=f:Lerp(v,e)
+    else obj[k]=f+(v-f)*e end
+   end
+   if a>=1 then tw.On=false;tw.Completed:Fire()end
+  end
+  return tw
+ end
+ local tweenConn=W.Run.Heartbeat:Connect(function(dt)
+  for i=#live,1,-1 do local tw=live[i];if tw.On then tw.Step(dt)else table.remove(live,i)end end
+ end)
+ local debris=W.service('Debris');local debris0=debris.AddItem
+ debris.AddItem=function(_,o,t)R.task.delay(t,function()if o.Parent then o:Destroy()end end)end
+ local CAS=W.service('ContextActionService');function CAS.BindActionAtPriority(_,name,fn)W.actions[name]=fn end
+ local UIS=W.UIS;UIS.TouchTapInWorld=R.signal();UIS.GamepadEnabled=false;function UIS.GetMouseLocation()return R.Vector2.new(640,360)end
+ local pgui=R.new('PlayerGui');pgui.Name='PlayerGui';pgui.Parent=player
+ local remotesF=R.new('Folder');remotesF.Name='ChestChaseRemotes';remotesF.Parent=RS
+ local holeRemote=R.new('BindableEvent');holeRemote.Name='TrackHole';holeRemote.OnClientEvent=R.signal();holeRemote.Parent=remotesF
+ local motionM=RS:FindFirstChild('RunnerMotion');motionM:SetAttribute('TrackBoundaryZ',0);motionM:SetAttribute('TrackCenterX',0);motionM:SetAttribute('TrackHalfWidth',114)
+ local hsc=R.new('LocalScript');hsc.Name='TrackHoleClient'
+ local okHole,errHole=pcall(W.load,'TrackHoleClient',hsc);check(okHole,'the real TrackHoleClient loads in the keyboard world: '..tostring(errHole))
+
+ -- the engine's wrappers: every Instance a script gets from the hole folder (GetChildren / GetDescendants / FindFirstChild / DescendantAdded) is a NEW object, equal only in what
+ -- it stands for (a table key made from it never finds an earlier entry)
+ local realOf=setmetatable({},{__mode='k'});local rewrap=false;local wraps=0
+ local function isUnder(o)local p=o;while p do if p==holesF then return true end;p=p._parent end;return false end
+ local function unwrap(v)return realOf[v]or v end
+ local function wrap(o)
+  if not rewrap or type(o)~='table'or getmetatable(o)~=R.instMeta then return o end
+  wraps+=1;local proxy={};realOf[proxy]=o
+  return setmetatable(proxy,{
+   __index=function(_,k)local v=o[k];if type(v)=='function'then return function(_,...)return v(o,...)end end;return v end,
+   __newindex=function(_,k,val)o[k]=unwrap(val)end,
+   __tostring=function()return tostring(o)end,
+  })
+ end
+ local function wrapList(list)local out={};for i,v in ipairs(list)do out[i]=wrap(v)end;return out end
+ local gc0,gd0,ff0=R.Inst.GetChildren,R.Inst.GetDescendants,R.Inst.FindFirstChild
+ R.Inst.GetChildren=function(self,...)local r=gc0(self,...);if rewrap and isUnder(self)then return wrapList(r)end;return r end
+ R.Inst.GetDescendants=function(self,...)local r=gd0(self,...);if rewrap and isUnder(self)then return wrapList(r)end;return r end
+ R.Inst.FindFirstChild=function(self,...)local r=ff0(self,...);if rewrap and r and isUnder(self)then return wrap(r)end;return r end
+ local sig=holesF.DescendantAdded;local fire0=sig.Fire
+ sig.Fire=function(self,d,...)return fire0(self,wrap(d),...)end
+
+ -- a hole as the server builds it (TrackHoleService._build): Rim .05 thick at +.025, Pit .10 at +.05, 12 crumbs outside the rim; the model is parented last
+ local auth={};local seedN=7
+ local function rnd(a,b)seedN=(seedN*1103515245+12345)%2147483648;return a+(b-a)*seedN/2147483648 end
+ local function build(id,x,z)
+  local m=R.new('Model');m.Name='TrackHole_'..id
+  local function part(name,size,y,px,pz)local p=R.new('Part');p.Name=name;p.Size=size;p.CFrame=CF(px,y,pz);p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.Parent=m;auth[p]=y;return p end
+  local rim=part('Rim',V3(.05,rimD,rimD),F+.025,x,z)
+  local pit=part('Pit',V3(.10,THC.Diameter,THC.Diameter),F+.05,x,z)
+  for i=1,THC.CrumbCount do
+   local a=(i/THC.CrumbCount)*math.pi*2+rnd(-.3,.3);local rr=rimD/2+rnd(.1,1.1);local s=rnd(.22,.5)
+   part('Crumb',V3(s,s*rnd(.6,1),s),F+s*.35,x+math.cos(a)*rr,z+math.sin(a)*rr)
+  end
+  m.PrimaryPart=pit;m.Parent=holesF
+  return m,pit,rim
+ end
+ local function parts(m)local out={};for _,d in ipairs(m:GetDescendants())do if realOf[d]then out[#out+1]=realOf[d]elseif d:IsA('BasePart')then out[#out+1]=d end end;return out end
+ -- how far each part of the hole is from where one lift puts it: the worst, and the highest centre
+ local function drift(m)
+  local worst,hi=0,-1e9
+  for _,p in ipairs(parts(m))do local y=p.CFrame.Position.Y;worst=max(worst,abs(y-(auth[p]+C.HoleLift)));hi=max(hi,y)end
+  return worst,hi
+ end
+ local function hz()return cx(7),cz(BR+6)end
+
+ put(cx(11),nil,cz(BR));hum.FloorMaterial=PLASTIC;frames(40)
+ local hx,hzz=hz()
+
+ -- (1) a hole dug and left alone: ONE lift (the dig animation tweens the crumbs back to where they were, the keyboard puts them on the keys again)
+ local m1=build(21,hx,hzz);frames(2)
+ holeRemote.OnClientEvent:Fire({Kind='Dig',Id=21,Position=V3(hx,F,hzz)})
+ frames(120)
+ local d1,hi1=drift(m1)
+ check(d1<1e-6 and #parts(m1)==14,('dug with the real client: every part of the hole (rim, pit, 12 crumbs) stands exactly one HoleLift (%.2f) over where the server put it (worst error %.2g)'):format(C.HoleLift,d1))
+ -- (2) the engine's wrappers: the same hole, now with every part a script gets from the folder a fresh wrapper. 20 s next to it, a run 450 rows away (the rows around it are recycled), back, teleports
+ rewrap=true;wraps=0
+ local m2=build(22,hx+THC.MinSpacing,hzz);frames(2)
+ holeRemote.OnClientEvent:Fire({Kind='Dig',Id=22,Position=V3(hx+THC.MinSpacing,F,hzz)})
+ local samples={}
+ for s=1,20 do frames(60);local _,hi=drift(m2);samples[#samples+1]=hi end
+ for i=1,5 do put(cx(11),nil,cz(BR+90*i));frames(80);local _,hi=drift(m2);samples[#samples+1]=hi end
+ put(cx(11),nil,cz(BR));frames(120)
+ for i=1,6 do put(cx(2+i*3),nil,cz(BR+i*40));frames(6);local _,hi=drift(m2);samples[#samples+1]=hi end
+ put(cx(11),nil,cz(BR));frames(240)
+ local d2,hi2=drift(m2);local top=-1e9;for _,v in ipairs(samples)do top=max(top,v)end
+ print(('dirt float: with re-wrapped instances the highest hole part stands at Y %.2f after 20 s, a 450-row run and 6 teleports (key top %.2f, one lift puts a crumb at most at %.2f; the R152 code reached ~5 studs a second); %d wrappers made'):format(max(top,hi2),restTop,F+.175+C.HoleLift,wraps))
+ check(d2<1e-6 and top<=F+.25+C.HoleLift+1e-6,('R153: a hole never climbs: after 20 s, a 450-row run (rows recycled), a return and 6 teleports every part is still one lift over the server height (worst error %.2g, highest centre %.2f <= %.2f)'):format(d2,top,F+.25+C.HoleLift))
+ check(rewrap and wraps>1000,'(the test really handed the keyboard new wrappers: '..wraps..')')
+ -- (3) the part's own record is gone (any other way the memory could be lost): a part that already stands on the key tops is never lifted again
+ local pit2=parts(m2)[2];local y0=pit2.CFrame.Position.Y
+ pit2:SetAttribute('KbHoleBase',nil);for _,p in ipairs(parts(m2))do p:SetAttribute('KbHoleBase',nil)end
+ frames(40)
+ local d3=drift(m2)
+ check(d3<1e-6 and near(pit2.CFrame.Position.Y,y0,1e-9),'a part with no record that stands at or above the resting key top is left where it is (never lifted twice)')
+ -- (4) dirt stranded in the air (whatever put it there) is brought back within a scan: with a record to where the lift puts it, without one to the key tops
+ local kids=parts(m2);local crumbA,crumbB=kids[5],kids[6]
+ crumbA.Position=V3(crumbA.Position.X,60,crumbA.Position.Z);crumbB.Position=V3(crumbB.Position.X,90,crumbB.Position.Z)
+ frames(20)
+ check(crumbA.CFrame.Position.Y<=restTop+CEIL+1e-6 and crumbB.CFrame.Position.Y<=restTop+CEIL+1e-6,('stranded dirt (crumbs at Y 60 and 90, no record) is back on the key tops within a scan (%.2f, %.2f)'):format(crumbA.CFrame.Position.Y,crumbB.CFrame.Position.Y))
+ rewrap=false
+ local m3=build(23,hx,hzz+THC.MinSpacing);frames(2)
+ local crumbC=parts(m3)[7];local cy=crumbC.CFrame.Position.Y
+ crumbC.Position=V3(crumbC.Position.X,cy+70,crumbC.Position.Z);frames(20)
+ check(near(crumbC.CFrame.Position.Y,cy,1e-6),'...a crumb with its record goes back exactly where the lift put it')
+ -- (5) write on change (R152): a hole at rest is not written to
+ local writes=0;local prev=R.instMeta.__newindex;local watch={}
+ for _,mm in ipairs({m1,m3})do for _,p in ipairs(parts(mm))do watch[p]=true end end
+ R.instMeta.__newindex=function(o,k,v)if watch[o]and(k=='CFrame'or k=='Position')then writes+=1 end;return prev(o,k,v)end
+ frames(120)
+ R.instMeta.__newindex=prev
+ check(writes==0,'a hole at rest is never written to ('..writes..' CFrame / Position writes to 2 holes in 2 s)')
+ -- (6) a part that streams in again (a new instance at the server height) is lifted once, also with new wrappers
+ rewrap=true
+ local rimOld=m3:FindFirstChild('Rim');rimOld=unwrap(rimOld);rimOld:Destroy()
+ local rimNew=R.new('Part');rimNew.Name='Rim';rimNew.Size=V3(.05,rimD,rimD);rimNew.CFrame=CF(hx,F+.025,hzz+THC.MinSpacing);rimNew.Anchored=true;rimNew.Parent=m3;auth[rimNew]=F+.025
+ frames(40)
+ check(near(rimNew.CFrame.Position.Y,F+.025+C.HoleLift,1e-6),'a rim streamed in again is lifted once')
+ rewrap=false
+ for _,mm in ipairs({m1,m2,m3})do mm:Destroy()end
+ frames(10)
+ -- put the shared mock back
+ R.Inst.GetChildren,R.Inst.GetDescendants,R.Inst.FindFirstChild=gc0,gd0,ff0;sig.Fire=fire0
+ tweenConn:Disconnect();Tw.Create=create0;debris.AddItem=debris0
+ put(cx(11),nil,cz(BR));frames(30)
+end
 -- 9. tiers: a change applies after it has held a few seconds, and only adds / removes rows at the window's end
 do
 put(cx(11),nil,cz(BR));hum.FloorMaterial=AIR;frames(60)

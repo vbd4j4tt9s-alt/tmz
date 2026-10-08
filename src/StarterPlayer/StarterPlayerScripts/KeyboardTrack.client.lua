@@ -1108,22 +1108,41 @@ local function start()
  end
  -- The hole parts were authored a few hundredths above the floor; every part is lifted onto the resting key tops, once per PART (a part
  -- streamed in again is a new instance at the server height). TrackHoleClient.grow tweens crumbs back to the frames it captured, which can
- -- undo a lift for 0.3 s: a part found again at its server height is lifted again. Lifting is relative to the part's current position.
- local liftBase,liftSet=setmetatable({},{__mode='k'}),setmetatable({},{__mode='k'})
- local LIFT=V3(0,C.HoleLift,0)
+ -- undo a lift for 0.3 s: a part found again at its server height is lifted again.
+ -- R153 (owner: "the dirt piles float up into the sky"): the lift used to be remembered in two weak tables keyed by the Instance and applied as
+ -- "Position + HoleLift". Roblox gives a script a NEW wrapper for an Instance it let go of, so the memory vanished and the same part was lifted
+ -- again on every scan (4 a second): a hole climbed ~5 studs a second. Now the part carries its own record, the height it had before the lift
+ -- (attribute KbHoleBase, local to this client), and every write is ABSOLUTE (record + HoleLift): the lift cannot add up, whatever the engine does with
+ -- wrappers. Safety nets: a part with no record that already stands at or above the resting key tops is never lifted; one more than HoleCeiling
+ -- above them is stranded in the air and goes back where the lift puts it. Writes only when a height is wrong (R152 write-on-change).
+ local HOLE_BASE='KbHoleBase'
+ local restTop=K.KeyTop(0)
+ local function setY(d,y)local p=d.Position;d.Position=V3(p.X,y,p.Z)end
  local function liftPart(d)
   if not d:IsA('BasePart')then return end
-  if geo.SkipCount>0 then local p=d.Position;if geo.Skip[geo.RowOfZ(p.Z)*64+geo.ColOfX(p.X)]then return end end -- no key there: the part stays on the floor
-  local y=d.Position.Y;local base=liftBase[d]
-  if not base then
-   liftBase[d]=y;liftSet[d]=y+C.HoleLift;d.Position=d.Position+LIFT
-  elseif abs(y-liftSet[d])>1e-3 and abs(y-base)<1e-3 then
-   d.Position=d.Position+LIFT
+  local p=d.Position
+  if geo.SkipCount>0 and geo.Skip[geo.RowOfZ(p.Z)*64+geo.ColOfX(p.X)]then return end -- no key there: the part stays on the floor
+  local y=p.Y;local base=d:GetAttribute(HOLE_BASE)
+  if type(base)~='number'then
+   if y>=restTop then
+    if y>restTop+C.HoleCeiling then setY(d,F+C.HoleLift+(d.Name=='Pit'and .05 or d.Name=='Rim'and .025 or .1))end -- stranded, no record: where the server's heights + the lift put it
+    return
+   end
+   d:SetAttribute(HOLE_BASE,y);setY(d,y+C.HoleLift)
+  else
+   local want=base+C.HoleLift
+   if abs(y-want)>1e-3 and(abs(y-base)<1e-3 or y>want+C.HoleCeiling)then setY(d,want)end -- (the dig tween put it back at the server height / it is stranded)
   end
  end
  unlift=function()
-  for d,y in pairs(liftSet)do
-   if d.Parent and abs(d.Position.Y-y)<1e-3 then d.Position=d.Position-LIFT end
+  local f=holesFolder
+  if not f or not f.Parent then return end -- (the folder went, its parts with it)
+  for _,d in ipairs(f:GetDescendants())do
+   local base=d:IsA('BasePart')and d:GetAttribute(HOLE_BASE)
+   if type(base)=='number'then
+    if abs(d.Position.Y-(base+C.HoleLift))<1e-3 then setY(d,base)end
+    d:SetAttribute(HOLE_BASE,nil)
+   end
   end
  end
  local function liftAny(d)
@@ -1163,10 +1182,8 @@ local function start()
   if f then
    for _,model in ipairs(f:GetChildren())do
     local pit=model:FindFirstChild('Pit')
-    if pit then
-     holes[#holes+1]=pit
-     for _,d in ipairs(model:GetDescendants())do liftPart(d)end
-    end
+    if pit then holes[#holes+1]=pit end
+    for _,d in ipairs(model:GetDescendants())do liftPart(d)end -- (R153: also a model whose Pit has not streamed in: its crumbs and rim are checked too)
    end
   end
   local R=C.HoleReach

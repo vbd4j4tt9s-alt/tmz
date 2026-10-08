@@ -15,6 +15,7 @@ return {
  MaxPerPlayer=4,         -- active holes per player; the 5th dig is refused
  MaxPerServer=30,        -- active holes in the whole server
  LifetimeSeconds=180,    -- a hole closes by itself after 3 minutes
+ SweepSeconds=5,         -- R153: a hole model that no live hole owns is removed at least this often (and at every refresh clear)
  ArmSeconds=1,           -- a fresh hole cannot trap anyone for this long
  RemoteRoute='TrackHole',-- SecurityGate budget (Rate 2/s, Burst 4)
 

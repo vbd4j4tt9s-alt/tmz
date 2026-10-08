@@ -63,6 +63,18 @@ local function near(position,range)
  local camera=workspace.CurrentCamera
  return camera and(camera.CFrame.Position-position).Magnitude<=range
 end
+-- R153: every dirt chunk in flight, with the time it was tossed. A chunk lives about a second (Debris takes it at 1.4 s); sweepDirt takes any that is still there after
+-- 2 s (a tween or Debris that never finished) so no dirt is left hanging in the air.
+local dirt={}
+local function sweepDirt(all)
+ local now=os.clock();local keep=0
+ for i=1,#dirt do
+  local rec=dirt[i];local p=rec.Part
+  if p.Parent and not all and now-rec.At<2 then keep+=1;dirt[keep]=rec
+  elseif p.Parent then p:Destroy()end
+ end
+ for i=#dirt,keep+1,-1 do dirt[i]=nil end
+end
 local function burst(position,count,color,height)
  -- R149: the keyboard's key tops stand above the (hidden) floor: dirt tossed from floor height would be under the keys, so it starts and lands on them.
  local okKeys,lift=pcall(function()return require(RS.KeyboardSurface149).Lift(position.X,position.Z,position.Y)end)
@@ -81,7 +93,7 @@ local function burst(position,count,color,height)
   local down=Tween:Create(p,TweenInfo.new(.2,Enum.EasingStyle.Quad,Enum.EasingDirection.In),{CFrame=CFrame.new(land)})
   up.Completed:Connect(function()if p.Parent then down:Play()end end)
   down.Completed:Connect(function()if p.Parent then Tween:Create(p,TweenInfo.new(.5),{Transparency=1}):Play()end end)
-  up:Play();Debris:AddItem(p,1.4)
+  up:Play();Debris:AddItem(p,1.4);dirt[#dirt+1]={Part=p,At=os.clock()}
  end
 end
 local function holeModel(id)
@@ -132,6 +144,7 @@ end,false,2101,Enum.KeyCode.ButtonR2)
 -- (a pull-out while the last tip is still on screen is not counted).
 table.insert(conns,Run.Heartbeat:Connect(function(dt)
  elapsed+=dt;if elapsed<.25 then return end;elapsed=0
+ if #dirt>0 then sweepDirt()end
  local held=shovel()~=nil
  if held and not wasHeld and hintShown<C.HintTimes and os.clock()-hintAt>=C.HintRepeatSeconds then
   hintShown+=1;hintAt=os.clock();Feed.Plain(C.Hint,Color3.fromRGB(255,187,91),C.HintSeconds)
@@ -139,5 +152,5 @@ table.insert(conns,Run.Heartbeat:Connect(function(dt)
  wasHeld=held
 end))
 script.Destroying:Connect(function()
- for _,c in ipairs(conns)do c:Disconnect()end;CAS:UnbindAction('TrackHoleDig')
+ for _,c in ipairs(conns)do c:Disconnect()end;CAS:UnbindAction('TrackHoleDig');sweepDirt(true)
 end)
