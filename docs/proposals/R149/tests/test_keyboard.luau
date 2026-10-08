@@ -1837,6 +1837,31 @@ do
  for i=#others,2,-1 do others[i]=nil end;pchar2:Destroy();pal2:Destroy()
 end
 
+-- R153 review (client 4): another player's LANDING clicks. On the way down his feet are 1.2 .. 3 studs over the floor for a frame or two: the key goes down silently (a runner a little above the
+-- floor), and the landing on that key then found it already down and clicked nothing. Now the runner who pressed it silently clicks once when he really steps on it. A thrown body still never does.
+do
+ local function land(startY,speed,flag)
+  parkP()
+  if flag then pal:SetAttribute('GuardianFlingActive',true)end
+  local y=startY;plays={}
+  proot.AssemblyLinearVelocity=V3(0,-speed,0);proot.CFrame=CF(cx(3),y,cz(BR));frames(1)
+  while y>F+3 do y=math.max(F+3,y-speed/60);proot.CFrame=CF(cx(3),y,cz(BR));frames(1)end
+  proot.AssemblyLinearVelocity=ZERO;frames(14)
+  local n=#plays;local dn=near(topOf(BR,3),K.KeyTop(1),1e-6)
+  pal:SetAttribute('GuardianFlingActive',nil);plays={}
+  return n,dn
+ end
+ local lo,hi,downAll=9,0,true
+ for k=0,9 do local n,dn=land(F+9+k*.19,50);lo=min(lo,n);hi=max(hi,n);downAll=downAll and dn end
+ check(lo==1 and hi==1 and downAll,('another player falls from 6 studs at 50 studs/s onto a fresh key (10 start heights, so the 30 Hz sample catches his feet in the 1.2 .. 3 stud band or not): ONE click each time, the key down (%d .. %d clicks)'):format(lo,hi))
+ local nf,dnf=land(F+9,50,true)
+ check(nf==0 and dnf,'...a flung body falling onto the keys stays silent ('..nf..' clicks, key down '..tostring(dnf)..')')
+ parkP();plays={}
+ l=prun(2,6,F+3+C.StepReach+.8)
+ check(#l==0,'...and a runner who only hops past (feet always above the floor) still never clicks ('..#l..')')
+ parkP()
+end
+
 -- keepers press the keys down and never sound, even next to a walker
 do
  parkP()
@@ -1922,7 +1947,8 @@ put(hx,nil,hzz);frames(12);check(near(topOf(HR,HC),K.KeyTop(1),1e-6),'...and the
 -- also at the corner of four keys; two holes at MinSpacing both lie on the keys.
 do
  local rimR=THC.Diameter/2+THC.RimWidth
- check(C.HoleReach>=rimR and C.HoleReach<=rimR+1,'HoleReach '..C.HoleReach..' covers the bigger hole\'s rim radius '..rimR..' (it was 2 for the old rim, 2.0)')
+ local reachNeed=rimR+THC.CrumbSpread+THC.CrumbSizeMax
+ check(C.HoleReach>=reachNeed-1e-9 and C.HoleReach<=reachNeed+.3,'HoleReach '..C.HoleReach..' covers the bigger hole\'s rim radius '..rimR..' AND the ring of crumbs outside it (R153 review: rim + CrumbSpread '..THC.CrumbSpread..' + CrumbSizeMax '..THC.CrumbSizeMax..' = '..reachNeed..'; it was 2 for the old rim, 3 for the rim only)')
  put(cx(11),nil,cz(BR));frames(14)
  local gx,gz=(cx(HC)+cx(HC+1))/2,(cz(HR)+cz(HR+1))/2 -- the corner shared by four keys
  local hc,pc,rc=dig(7,gx,gz);frames(30)
@@ -1944,6 +1970,50 @@ do
  local back=0;for key in pairs(cells)do local row,col=key//64,key%64;put(cx(col),nil,cz(row));frames(12);if near(topOf(row,col),K.KeyTop(1),1e-6)then back+=1 end end
  check(back==n,'...and every one of those keys presses again once the holes are filled ('..back..' of '..n..')')
  put(cx(11),nil,cz(BR));frames(14)
+ -- R153 review (client 2): the crumbs lie up to CrumbSpread outside the rim (the server draws them 3.1 .. 4.1 studs from the centre): the key under each of them stays up too, wherever
+ -- the hole sits on the grid (a crumb lifted onto a key that went down when someone stepped on it hung 1.16 studs in the air in about 28% of the holes)
+ do
+  local far=rimR+THC.CrumbSpread;local bad,n2=0,0
+  for k,off in ipairs({0,1,2,3,4})do
+   local x0,z0=cx(HC)+off,cz(HR)+off*.5
+   local hm=dig(40+k,x0,z0);local crumbs={}
+   for a=0,315,45 do local c=R.new('Part');c.Name='Crumb';c.Size=V3(.4,.4,.4);c.CFrame=CF(x0+far*math.cos(math.rad(a)),F+.14,z0+far*math.sin(math.rad(a)));c.Parent=hm;crumbs[#crumbs+1]=c end
+   frames(20)
+   for _,c in ipairs(crumbs)do
+    local pp=c.CFrame.Position;local row,col=g.RowOfZ(pp.Z),g.ColOfX(pp.X)
+    plays={};put(cx(col),nil,cz(row));frames(12);n2+=1
+    if not near(topOf(row,col),K.KeyTop(0),1e-6)or #plays>0 then bad+=1 end
+   end
+   put(cx(11),nil,cz(BR));frames(14);hm:Destroy();frames(10)
+  end
+  check(n2==40 and bad==0,'a crumb at the server\'s largest radius ('..string.format('%.1f',far)..' studs from the pit, 8 directions, the hole at 5 places on its key): the key under every one of them stays up and silent when stepped on ('..bad..' of '..n2..' went down)')
+ end
+ -- R153 review (client 1): a hole dug 10 studs from a small pack (PackClearance) can share a key with the pack's platform. The platform holds its keys down, the hole keeps its keys up: where both
+ -- want a key the HOLE wins (a pressed key would leave the pit floating over a dip); the platform's other keys are still down
+ do
+  local sharedN,badUp,badDown,platN=0,0,0,0
+  for t=0,8 do
+   local x0,z0=cx(14)+t-4,cz(BR+8);local px,pz=x0+10,z0
+   local hm=dig(70+t,x0,z0)
+   local seedM=R.new('Model');seedM.Name='SeedShare'..t;seedM.Parent=seeds
+   local pl=R.new('Model');pl.Name='PackPlatform';pl:SetAttribute('PlatformRadius',1.0)
+   local st=R.new('Part');st.Name='BiomeStone';st.CFrame=CF(px,F+.3,pz);st.Parent=pl;pl.PrimaryPart=st;pl.Parent=seedM
+   frames(30)
+   local hc1,hc2,hr1,hr2=g.CellRange(x0-C.HoleReach,x0+C.HoleReach,z0-C.HoleReach,z0+C.HoleReach)
+   local rr=1.0+C.PlatformClearance
+   local pc1,pc2,pr1,pr2=g.CellRange(px-rr,px+rr,pz-rr,pz+rr)
+   for r=hr1,hr2 do for c=hc1,hc2 do
+    if c>=pc1 and c<=pc2 and r>=pr1 and r<=pr2 then sharedN+=1 end
+    if keyAt(r,c)and not near(topOf(r,c),K.KeyTop(0),1e-6)then badUp+=1 end
+   end end
+   for r=pr1,pr2 do for c=pc1,pc2 do
+    if not(c>=hc1 and c<=hc2 and r>=hr1 and r<=hr2)and keyAt(r,c)then platN+=1;if not near(topOf(r,c),K.KeyTop(1),1e-6)then badDown+=1 end end
+   end end
+   seedM:Destroy();hm:Destroy();frames(20)
+  end
+  check(sharedN>=1 and badUp==0,'a hole and a pack platform 10 studs apart (9 offsets, '..sharedN..' keys wanted by both): every key under the hole stays up, the hole wins ('..badUp..' pressed)')
+  check(platN>=1 and badDown==0,'...and the platform\'s own keys (not under the hole) are still held down ('..badDown..' of '..platN..' up)')
+ end
 end
 put(cx(11),nil,cz(BR));frames(14)
 -- the lift is per part: streamed-in parts, crumb tweens, rebuilt models

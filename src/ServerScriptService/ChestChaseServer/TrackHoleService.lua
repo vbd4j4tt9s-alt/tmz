@@ -168,7 +168,7 @@ function S:_build(hole)
  local rng=self.Random
  for i=1,C.CrumbCount do
   local angle=(i/C.CrumbCount)*math.pi*2+rng:NextNumber(-.3,.3)
-  local radius=rimD/2+rng:NextNumber(.1,1.1);local size=rng:NextNumber(.22,.5)
+  local radius=rimD/2+rng:NextNumber(.1,C.CrumbSpread);local size=rng:NextNumber(C.CrumbSizeMin,C.CrumbSizeMax) -- (inside KeyboardTrack.Config.HoleReach, see TrackHoleConfig)
   local spot=at+V3(math.cos(angle)*radius,size*.35,math.sin(angle)*radius)
   part('Crumb',V3(size,size*rng:NextNumber(.6,1),size),CFrame.new(spot)*CFrame.Angles(rng:NextNumber(-.4,.4),rng:NextNumber(0,math.pi*2),rng:NextNumber(-.4,.4)),
    CRUMBS[(i%#CRUMBS)+1],Enum.Material.Ground)

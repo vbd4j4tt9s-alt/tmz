@@ -218,7 +218,8 @@ mutate "the scan counts flush patches and parts above the keys as props" $K2 "lo
 mutate "the scan uses the axis-aligned box of a turned part" $K2 "local h=hull(pts);if #h<3 then return nil end" "local h;do local a,b,c,e=math.huge,-math.huge,math.huge,-math.huge;for _,p in ipairs(pts)do a=math.min(a,p[1]);b=math.max(b,p[1]);c=math.min(c,p[2]);e=math.max(e,p[2])end;h={{a,c},{b,c},{b,e},{a,e}}end;if #h<3 then return nil end"
 mutate "effects lift onto keys over a left-out cell" $KS "if geo and geo.SkipCount>0 and geo.Skip[geo.RowOfZ(z)*64+geo.ColOfX(x)]then return nil end" "if false then return nil end"
 # R153: the shovel holes are 1.5x the radius (rim 3.0): the keys under the whole rim stay up
-mutate "the keys under a bigger hole's rim can be pressed (HoleReach back to the old rim, 2)" $R " HoleReach=3," " HoleReach=2,"
+mutate "the keys under a bigger hole's rim can be pressed (HoleReach back to the old rim, 2)" $R " HoleReach=4.6," " HoleReach=2,"
+mutate "a crumb of the ring can hang over a key that goes down (HoleReach covers the rim only, 3)" $R " HoleReach=4.6," " HoleReach=3,"
 mutate "the hole parts are not lifted onto the key tops (the bigger hole sinks into the keys)" $S "   d:SetAttribute(HOLE_BASE,y);setY(d,y+C.HoleLift)" "   d:SetAttribute(HOLE_BASE,y);setY(d,y)"
 PHASE=r153
 # R153: key sounds only for a player who really steps on a key
@@ -240,6 +241,9 @@ mutate "you press with FloorMaterial Air (the grounded test is gone)" $S "  if o
 mutate "a part with no record that is already on the key tops is lifted again (the dirt climbs when the memory is lost)" $S "   if y>=restTop then" "   if false then"
 mutate "the part's height before the lift is not kept on the part (a stranded crumb cannot go back, teardown cannot restore)" $S "   d:SetAttribute(HOLE_BASE,y);setY(d,y+C.HoleLift)" "   setY(d,y+C.HoleLift)"
 mutate "stranded dirt stays in the air (no ceiling)" $R " HoleCeiling=1, " " HoleCeiling=1e9, "
+mutate "a pack platform presses a key under a hole (the hole floats over the dip)" $S "markRects(platRects,platCell,platList,holeCell)" "markRects(platRects,platCell,platList)"
+mutate "another player's landing on the key he pressed silently does not click" $S "elseif kind==2 and who and quietBy[idx]==who then" "elseif false then"
+mutate "a runner a little above the floor is not remembered (his landing is silent)" $S "return thrown and 4 or 5" "return 4"
 mutate "a part that is not at its record is lifted again relative to where it is (the dig tween makes the crumbs climb)" $S "   if abs(y-want)>1e-3 and(abs(y-base)<1e-3 or y>want+C.HoleCeiling)then setY(d,want)end" "   if abs(y-want)>1e-3 then setY(d,y+C.HoleLift)end"
 [ -z "$DRY" ] || exit 0
 echo "$caught of $total mutations caught"

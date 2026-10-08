@@ -5,10 +5,13 @@
 return {
  -- Size (R153: 1.5x the radius, was 3.4 / .3 / 9). The trap circle IS the visible dark circle (the root must be over it); the server
  -- tests the whole path of a step against it (TrackHoleService.Cross), so a carrier is caught at any speed. KeyboardTrack.Config.HoleReach
- -- (3) must stay >= Diameter/2 + RimWidth: the keys under the rim stay up.
+ -- (4.6) must stay >= Diameter/2 + RimWidth + CrumbSpread + CrumbSizeMax: the keys under the rim AND under every crumb stay up (a crumb lifted onto a key that
+ -- goes down when someone steps on it would hang in the air).
  Diameter=5.1,           -- studs, dark pit circle
  RimWidth=.45,           -- lighter-brown ring around the pit (visual only; never traps)
  CrumbCount=12,          -- loose dirt cubes scattered around the rim
+ CrumbSpread=1.1,        -- a crumb's centre lies at most this far outside the rim (at least .1)
+ CrumbSizeMin=.22,CrumbSizeMax=.5, -- crumb edge
 
  -- Limits (anti-grief)
  CooldownSeconds=3,      -- per player, between two digs (covering is not a dig). R124: 8 -> 3
