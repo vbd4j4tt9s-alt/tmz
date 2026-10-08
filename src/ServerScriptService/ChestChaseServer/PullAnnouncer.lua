@@ -28,7 +28,6 @@ local Players=game:GetService('Players')
 local Rules=require(RS:WaitForChild('PullAnnounceRules'))
 local Packs=require(RS:WaitForChild('SeedPackRules'))
 local Names=require(RS:WaitForChild('GardenDisplayNames'))
-local Verity=require(RS:WaitForChild('VerityCatalog'))
 local A={};A.__index=A
 A.MaxAttempts=3 -- publishes of one global pull (the first and two retries)
 A.MaxLiveSubscribeFailures=1000
@@ -67,12 +66,13 @@ end
 function A:_id()self.Serial+=1;return self.Short..'-'..self.Serial end
 
 -- Odds ----------------------------------------------------------------------------------------------------------------------------------------
--- The chance (the N of "1/N") of this seed from this pack for this player, as OpenSeedPack just rolled it; nil when it cannot be told.
+-- The chance (the N of "1/N") shown for this seed. R153 (owner: a Cosmic from a Void pack must still read how rare it is): the seed's ONE fixed chance (SeedRarity153: its home
+-- pack, no boots, no boost), the same in the Index, on the reveal card and on the hub plaque, never the pack it came from; nil when it cannot be told. (config, player and pack
+-- stay in the signature for the callers and are not read.)
 function A.OddsOf(config,player,pack,seedId)
- local ok,table_=pcall(Packs.SeedOdds,config,pack.Stage,pack.BagVariant,player and player:GetAttribute('ChestLuckMultiplier'),pack.OddsVersion,pack.RateBoost)
- local percent=ok and type(table_)=='table'and table_[seedId]
- if type(percent)~='number'or percent~=percent or percent<=0 then return nil end
- return 100/math.min(percent,100)
+ local ok,n=pcall(function()return require(RS:FindFirstChild('SeedRarity153')).Canonical(seedId)end) -- (never yields: the open that announces it must not wait)
+ if not ok or type(n)~='number'or n~=n or n<1 then return nil end
+ return n
 end
 
 -- Sending to this server's players -------------------------------------------------------------------------------------------------------------------
@@ -325,18 +325,7 @@ local function findSeed(query)
   if query==id or query==id:gsub('seed$','')or query==key(spec.name)or query==key(Names.Plant(spec.id,spec.name))then return spec end
  end
 end
-local function defaultOdds(config,spec)
- local tries
- if Verity.Is(spec.id)then tries={{Verity.PackStage,Verity.Variant}}
- elseif spec.stage==8 then tries={{8,'MechLimited'}}
- else tries={{spec.stage,'Pack06'},{spec.stage,'Pack03'},{spec.stage,'Pack01'},{7,'EclipseReliquary'}}end
- for _,try in ipairs(tries)do
-  local ok,odds=pcall(Packs.SeedOdds,config,try[1],try[2],1,Packs.OddsVersion)
-  local percent=ok and type(odds)=='table'and odds[spec.id]
-  if type(percent)=='number'and percent>0 then return 100/math.min(percent,100)end
- end
- return nil
-end
+local function defaultOdds(config,spec)return A.OddsOf(config,nil,nil,spec.id)end -- R153: the seed's fixed chance, as a real pull shows it
 A.Usage='Use announce <seed> (a chat line for this server), announce global <seed> [here] (publish to the other servers; here also shows it in this server as an other-server pull) or announce record [bestpull|biggestfruit] [seed].'
 function A:RunCommand(ctx,p,a)
  local words={};for _,w in ipairs(a or{})do words[#words+1]=tostring(w)end

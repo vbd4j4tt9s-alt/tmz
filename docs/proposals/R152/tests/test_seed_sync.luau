@@ -7,7 +7,7 @@
 --  3. no sound outlives its presentation, and none is cut while still loud at its end
 --  4. skip / abort / death / the script destroyed: every sound, the music duck, the grade, the GUI, the camera, the bindings are cleaned up
 --  5. two openings in quick succession: the first card fades out under the second, no FieldOfView snap, no leftovers; the same reveal asked
---     for again keeps playing
+--     for again keeps playing (R153: the second plays in full; "quick" is the player's "Skip pack animations" only)
 --  6. the music duck follows the presentation's clock (down by the cut, back by the end, gone after)
 --  7. files still loading on their beat join on the clock (never a late hit)
 --  8. the chat line about a pull never shows before the puller's own screen has shown the seed (a slow device, a skip)
@@ -33,7 +33,8 @@ local function reset()
  W.Gui.ReducedMotionEnabled=false;W.UIS.TouchEnabled=false;W.UIS.KeyboardEnabled=true;X.lowFx=false
  X.root.CFrame=CF(0,3,100);X.hum.Health=100;X.state=R.Enum.HumanoidStateType.Running
  for _,k in ipairs(W.CS:GetTagged('BiomeKeeper'))do k:Destroy()end
- R.advance(4) -- (no quick reveal: the previous presentation ended long ago)
+ X.player:SetAttribute('SettingSkipCutscenes',nil) -- (R153: "Skip pack animations" off, the default)
+ R.advance(4)
 end
 local function packFor(rank,seedId)
  local bag=Visuals.CarryBag(X.char,2,'Pack06',1,1,'None');bag:SetAttribute('RevealSeedId',seedId);bag:SetAttribute('RevealAt',W.workspace:GetServerTimeNow())
@@ -101,7 +102,7 @@ local function presentations()
 end
 local function setup(p)
  reset()
- if p.Quick then M.LastEnd=R.clock-.5;L.LastRevealEnd=M.LastEnd end
+ if p.Quick then X.player:SetAttribute('SettingSkipCutscenes',true)end -- (R153: the short version is the player's setting)
  if p.Reduced then W.Gui.ReducedMotionEnabled=true end
  if p.Keeper then X.keeper(V3(10,3,100),{GuardianBehavior='WANDER'})end
  return start(p.Rank,p.Result and{Result=true}or nil)
@@ -259,6 +260,48 @@ for rank=6,8 do
   check(M.Fading()==0,tag..': nothing fading')
  end
 end
+-- 4b. R153: every card can be skipped too (the player's choice): after the jump the hit is still HEARD on the frame that shows it (the one
+-- clock), the result follows, a second skip closes it, and everything is cleaned up. Common..Mythic cards and the story tiers in place.
+for _,dt in ipairs({1/30,1/60,1/144})do
+ for rank=1,8 do
+  reset()
+  if rank>=6 then X.keeper(V3(10,3,100),{GuardianBehavior='WANDER'})end
+  local run=start(rank);local tl=run.TL;local hit=tl.Climax or tl.Burst
+  local tag=names[rank]..(rank>=6 and' in place'or' card')..' skipped @'..math.floor(1/dt+.5)..'fps'
+  X.run(tl.SkipFrom+.05,dt)
+  local t0=R.clock
+  Y.record(function()return run.Clock()end);Y.frames[1]={Clock=R.clock,T=run.Clock(),Voices={}}
+  check(M.Skip(),tag..': skipped')
+  local carried={}
+  for _,s in ipairs(Y.sounds)do
+   if s.IsPlaying and s.Parent and s.Name:match('^RarePull_')and s.Name~='RarePull_AuraHum'then local l=s.PlayLog[#s.PlayLog];if not(l and l.At>=t0-1e-9)then carried[#carried+1]=s.Name end end
+  end
+  check(#carried==0,tag..': nothing from before the jump rings on into the hit (every voice stops; a bed / riser spanning the target joins on the clock) ('..table.concat(carried,',')..')')
+  local gui=X.pg:FindFirstChild('RarePullReveal');local flash=gui and X.find(gui,'Flash')
+  local flashAt;local closed=false
+  X.run(L.ShownAt(tl)-run.Clock()+.2,dt,function()
+   local f=Y.frames[#Y.frames];if f and flash and not flashAt and flash.BackgroundTransparency<.9 then flashAt=f.T end
+  end)
+  local frames=Y.stop()
+  check(M.Skip(),tag..': a second skip closes it once the result is shown')
+  local slot=rank<=3 and'PackBurst'or rank==7 and'CosmicBoom'or rank>=5 and'Impact'or'GroundImpact'
+  local l=Audio.Layers(slot)[1];local def=Sounds.Get(slot)
+  local pl;for _,p in ipairs(Y.plays(t0))do if p.Slot==slot and not pl then pl=p end end
+  local vf=firstFrameAtOrAfter(frames,hit)
+  if check(pl and vf,tag..': the hit ('..slot..') plays after the jump')then
+   local tp=tOf(frames,pl.At)
+   local owner=l.Owner and def and def.Id==pl.Id
+   local hitPos=(owner and l.Hit)or pl.Pos
+   local heard=tp and tp+(hitPos-pl.Pos)/pl.Speed
+   check(heard and math.abs(heard-vf.T)<=1/60+1e-6,tag..': and is heard within 1/60 s of the frame that shows it ('..string.format('%.4f',heard and heard-vf.T or 99)..' s)')
+   stats.worstHit=math.max(stats.worstHit,heard and math.abs(heard-vf.T)or 0)
+  end
+  check(flashAt and vf and math.abs(flashAt-vf.T)<1e-6,tag..': the flash is on that frame too')
+  X.run(tl.Length-tl.FloatEnd+.4,dt)
+  cleanAll(tag)
+  check(M.Fading()==0,tag..': nothing fading')
+ end
+end
 -- 5. two openings in quick succession --------------------------------------------------------------------------------------------------
 for rank=1,5 do
  for _,frac in ipairs({.3,.8,1.2})do
@@ -270,7 +313,7 @@ for rank=1,5 do
   second=start(math.min(5,rank+1))
   local tag=names[rank]..' -> '..names[math.min(5,rank+1)]..' at '..string.format('%.2f',switchAt)
   check(second and M.Active()==second and first.Done,tag..': the second takes over')
-  check(second.Quick,tag..': and is a quick reveal')
+  check(not second.Quick and second.TL.Length==L.CardTimeline(math.min(5,rank+1)).Length,tag..': and plays in full (R153: no "quick" reveal for a pack opened back to back)')
   local maxGuis,maxGrades,afterGuis,afterGrades=0,0,9,9
   local t0=R.clock
   X.run(second.TL.Length+.4,1/60,function(now)

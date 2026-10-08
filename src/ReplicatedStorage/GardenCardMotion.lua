@@ -1,13 +1,13 @@
 -- R68: static common/rare item borders have no animation entry or heartbeat.
 -- R123: rarity lives in the card border (no emblems). Each rarity has its own frame built
--- from UIStroke/UIGradient/Frames; only Legendary and up animate, on the shared 12 Hz
+-- from UIStroke/UIGradient/Frames; only Legendary and up animate, on the shared per-frame (R153; was 12 Hz)
 -- scheduler, only while visible, at most MaxAnimated cards per tick. FastMode,
 -- ReducedMotion and low/off effects show a fixed (static) pose.
 local Run=game:GetService('RunService');local Players=game:GetService('Players');local Gui=game:GetService('GuiService')
-local M={};local records,animated={},{};local connection;local elapsed=0;local phase=0;local clock=0;local still=false
+local M={};local records,animated={},{};local connection;local phase=0;local clock=0;local still=false
 local RGB=Color3.fromRGB
 M.MaxAnimated=24 -- visible animated borders updated per tick (the rest keep their last pose)
-M.Rate=1/12
+M.Rate=0 -- (R153: every frame; was 1/12)
 local function seq(stops)
  local keys={};for i,s in ipairs(stops)do keys[i]=ColorSequenceKeypoint.new(s[1],s[2])end;return ColorSequence.new(keys)
 end
@@ -86,10 +86,12 @@ local function tick()
 end
 M.Tick=tick
 local function scheduler()
- if not next(animated)then if connection then connection:Disconnect();connection=nil;elapsed=0 end;return end
+ if not next(animated)then if connection then connection:Disconnect();connection=nil end;return end
  if connection then return end
- connection=Run.Heartbeat:Connect(function(dt)
-  elapsed+=dt;if elapsed<M.Rate then return end;phase=(phase+elapsed*24)%360;clock+=elapsed;elapsed=0
+ -- R153 (owner: "fix all jittery type effects"): every rendered frame in RenderStepped (was M.Rate, 12 Hz: the radiant gradient turned in ~8 degree
+ -- jumps and the shine swept in steps); still only visible cards, at most MaxAnimated, and nothing in static mode.
+ connection=Run.RenderStepped:Connect(function(dt)
+  phase=(phase+dt*24)%360;clock+=dt
   tick()
  end)
 end

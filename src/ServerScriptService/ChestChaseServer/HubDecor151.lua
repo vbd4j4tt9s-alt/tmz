@@ -8,7 +8,8 @@
 --   Gate           the track gate: two chess-rook towers on the wall ends (stepped round base, tapering shaft, gold ring, collar, flared crown
 --                  with 8 merlons; their shafts are the ONLY new parts that collide) and a crenellated gatehouse wall between them with a
 --                  raised keep carrying the sign, one big key per biome (each client ticks the keys it is fast enough for) hanging in front.
---   Paths          paved streets, squares and plazas joining spawn, market, every base, the gate and the side gardens; base-coloured curbs.
+--   Paths          paved streets, squares and plazas joining spawn, market, every base, the gate and the side gardens; plain cream
+--                  curbs (R153: the garden spurs lost their base-coloured curbs and welcome mats; each is a plain street).
 -- Everything is Anchored with CanTouch / CanQuery off; nothing stands on a base pad, plot, fence opening, treadmill, pedestal, spawn, the
 -- run-up / track (|x| < 90 north of the walls), the safe line, the leaderboards, the market, Verity or the two reserved back corners
 -- (the R151 displays). Trees and props are the client's (HubLifeArt151 / HubLife151.client).
@@ -113,7 +114,7 @@ local function buildGate(root)
  for _,sx in ipairs({-1,1})do
   buildRook(f,sx*G.TowerX,zc,G)
   -- the haunch: an upside-down wedge from the tower under the wall (its tall side against the tower) gives the opening its pointed shoulders
-  K.Wedge(f,'Gate haunch',V(9,12,32),K.Frame(V(sx*78,G.BeamY0-6,zc),V(0,-1,0),V(sx,0,0)),P.Plaster,Mat.Plaster)
+  K.Wedge(f,'Gate haunch',V(9,G.HaunchRise,G.HaunchRun),K.Frame(V(sx*(G.HaunchOuter-G.HaunchRun/2),G.BeamY0-G.HaunchRise/2,zc),V(0,-1,0),V(sx,0,0)),P.Plaster,Mat.Plaster)
  end
  -- the gatehouse: a wall between the rooks (its ends inside the shafts), a gold course under it, a stone cornice over it, merlons along the top
  -- and a raised keep in the middle with the sign and five merlons of its own
@@ -132,7 +133,7 @@ local function buildGate(root)
  K.Label(sign,Enum.NormalId.Front,'THE TRACK',{ink={255,236,180},pps=24})
  for i,b in ipairs(K.Biomes)do
   local x=G.KeyX[i];local need,escape=M.SpeedNeed(b.Stage)
-  local k=K.Keycap(f,'Biome key '..i,V(15,3.6,15),CFrame.fromMatrix(V(x,G.KeyY,zc-6.1),V(-1,0,0),V(0,0,-1),V(0,-1,0)),b.Key,
+  local k=K.Keycap(f,'Biome key '..i,V(G.KeySize,3.6,G.KeySize),K.KeyFrame(V(x,G.KeyY,zc-6.1)),b.Key,
    {b.Emoji,b.Name,'⚡ '..need},{name='KeyLegend',weights={.42,.24,.34},ink={255,255,255},stroke=b.Ink,strokeT=.1,pps=20})
   k:SetAttribute('R151Stage',b.Stage);k:SetAttribute('R151Need',need);k:SetAttribute('R151EscapeSpeed',escape)
  end
@@ -140,8 +141,8 @@ local function buildGate(root)
 end
 M.TickColor=GREEN
 
--- Paths: rectangles top at 4.20 never overlap each other; discs have their own tops (4.14 under the square, 4.26 over a street); curbs and
--- mats 4.32; the gate run-up lanes stop at 4.06 so the saved "SAFE ZONE" ground title (4.12 - 4.20) still draws on top of them.
+-- Paths: rectangles top at 4.20 never overlap each other; discs have their own tops (4.14 under the square, 4.26 over a street); curbs
+-- 4.32; the gate run-up lanes stop at 4.06 so the saved "SAFE ZONE" ground title (4.12 - 4.20) still draws on top of them.
 local function slab(f,name,x0,x1,z0,z1,top,color,mat)
  return K.Part(f,name,V(math.abs(x1-x0),top-3.9,math.abs(z1-z0)),CF((x0+x1)/2,(top+3.9)/2,(z0+z1)/2),color,mat or Mat.Cobblestone,{shadow=false})
 end
@@ -161,8 +162,8 @@ local function buildPaths(root,bases)
   curb(f,sx*108.4,sx*109,-171,-399)                          -- inner edge (the corner circles cover the ends)
   curb(f,sx*12.6,sx*106,-166.6,-166)                         -- front street, south edge between the avenue and the side street
   curb(f,sx*21,sx*106,-404,-403.4)                           -- south street, north edge (the open plaza in the middle)
-  for _,seg in ipairs({{-196.2,-262},{-276,-342.3},{-373.7,-399}})do curb(f,sx*127,sx*127.6,seg[1],seg[2])end -- side street, outer edge between spurs
-  for _,seg in ipairs({{106,89.6},{58.4,6.6}})do curb(f,sx*seg[1],sx*seg[2],-418.6,-418)end -- south street, south edge between spurs and lane
+  for _,seg in ipairs({{-195.534,-262},{-276,-343.016},{-373.016,-399}})do curb(f,sx*127,sx*127.6,seg[1],seg[2])end -- side street, outer edge between spurs (R153: run flush to each spur's side)
+  for _,seg in ipairs({{106,89},{59,6.6}})do curb(f,sx*seg[1],sx*seg[2],-418.6,-418)end -- south street, south edge between spurs and lane (flush to the spurs)
  end
  slab(f,'South street',-127,127,-404,-418,4.20,P.Street)
  slab(f,'Avenue',-12,12,-166,-232,4.20,P.Street)
@@ -172,18 +173,15 @@ local function buildPaths(root,bases)
  disc(f,'South plaza',0,-392,21,4.26,P.Brick,Mat.Brick) -- (R152: an open square, the fountain is gone)
  for _,c in ipairs({{-118,-159},{118,-159},{-118,-411},{118,-411}})do disc(f,'Corner circle',c[1],c[2],12,4.26,P.Street)end
  for i,b in pairs(bases)do
-  local col=baseColour(b.Model);local pad=b.Pad
+  local pad=b.Pad
   local p0=(pad.CFrame*CF(0,0,pad.Size.Z/2)).Position
   local out=-pad.CFrame.LookVector -- pad +Z (the entrance side) in world
   if math.abs(out.X)>.5 then -- bases 1-4: the entrance faces a side street
    local x0=p0.X+out.X*.1;local x1=(p0.X>0 and 1 or-1)*127
    slab(f,'Base spur '..i,x0,x1,p0.Z-15,p0.Z+15,4.20,P.Street)
-   curb(f,x0,x1,p0.Z-15.6,p0.Z-15,col);curb(f,x0,x1,p0.Z+15,p0.Z+15.6,col)
-   disc(f,'Welcome mat '..i,(x0+x1)/2,p0.Z,6,4.32,col,Mat.SmoothPlastic)
   else -- bases 5 / 6: the entrance faces the south street
    local z0=p0.Z+.1;local z1=-418
    slab(f,'Base spur '..i,p0.X-15,p0.X+15,z0,z1,4.20,P.Street)
-   curb(f,p0.X-15.6,p0.X-15,z0,z1,col);curb(f,p0.X+15,p0.X+15.6,z0,z1,col)
   end
  end
  for _,sx in ipairs({-1,1})do
@@ -212,6 +210,8 @@ function M.Apply(map)
  buildWalls(root);buildGate(root);buildPaths(root,bases)
  root:SetAttribute('Parts',K.Made-made0)
  root.Parent=map
+ -- R153: the trampolines in the two garden nooks (their own folder; HubTrampoline153 builds the collision and the look)
+ do local ok,err=pcall(function()require(script.Parent.HubTrampoline153).Build(map)end);if not ok then warn('[R153] Trampolines skipped: '..tostring(err))end end
  -- the owner's studded tree models (loaded once per server; the clients use them as tree templates)
  task.spawn(function()local ok,err=pcall(function()require(script.Parent.HubTreeLoader151).Run()end);if not ok then warn('[R151 trees] '..tostring(err))end end)
  return root

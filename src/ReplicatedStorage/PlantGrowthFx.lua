@@ -369,9 +369,9 @@ function D:StepFrame()
      local e,arc,scale=M.Flight(u,f.Shrink)
      local aim=root.Position+V(0,T.AimUp,0)
      local at=f.Center+(aim-f.Center)*e+V(0,f.Arc*arc,0)
-     f.Tick+=1;local sizes=f.Tick%2==1
+     f.Tick+=1 -- (R153: the size shrinks every frame with the flight; it was written every other frame, a 30 Hz stutter)
      for _,part in ipairs(f.Parts)do local p=part.Part;if p.Parent then
-      if sizes then p.Size=part.Size*scale end
+      p.Size=part.Size*scale
       writer:Set(p,CF(at+part.Off*scale)*part.Rot)
      end end
     end

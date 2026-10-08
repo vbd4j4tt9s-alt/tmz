@@ -1,6 +1,7 @@
 --!nocheck
--- R140 (updated for the live R141 numbers: days 1-4 RANDOM PACK, day 5 +2, day 6 +3, day 7 MECH PACK; quests 2 Gems
--- each, "DAILY LIMIT" for blocked ones): the real TravelButtons + DailyRewardsClient on the mock. The 🎁 DAILY and 👥 INVITE squares sit right of
+-- R140 (updated for the live R141 numbers: days 1-4 RANDOM PACK, day 5 +2, day 6 +3, day 7 MECH PACK; R153: day 7 is the VOID PACK, each quest pays "+1 PACK", a fourth
+-- ALL DONE row pays "+2" Gems once all three are claimed, an unclaimed random pack is a mystery: a near-black pack silhouette on a white tile):
+-- the real TravelButtons + DailyRewardsClient (and the real ItemPictures) on the mock. The 🎁 DAILY and 👥 INVITE squares sit right of
 -- TRACK in the top bar row on every screen (or just under it on very narrow ones), never over BASE / TRACK or off
 -- screen; the badge counts what is waiting; the DAILY window shows the week and the quests, claims through
 -- PremiumRequest 'Daily' (a fake server here), fits phones and computers; it opens by itself once when a login reward
@@ -19,10 +20,14 @@ local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=W.
 for _,n in ipairs({'RequestBaseTeleport','RequestTrackTeleport'})do local e=R.new('RemoteEvent');e.Name=n;e.Parent=remotes end
 local D=W.module('DailyRewards')
 -- A fake server for PremiumRequest 'Daily' (the real one is tested in test_daily.luau).
-local srv={Step=0,Ready=true,Quests={{Key='Steal',Text='Steal 3 packs',Icon='🎒',Goal=3,Progress=3,Claimed=false,Gems=2},{Key='Plant',Text='Plant 3 seeds',Icon='🌱',Goal=3,Progress=1,Claimed=false,Gems=2},{Key='Sell',Text='Sell 5 fruit',Icon='💰',Goal=5,Progress=0,Claimed=false,Gems=2}}}
+local srv={Step=0,Ready=true,BonusClaimed=false,BonusBlocked=false,Quests={{Key='Steal',Text='Steal 3 packs',Icon='🎒',Goal=3,Progress=3,Claimed=false,Packs=1},{Key='Plant',Text='Plant 3 seeds',Icon='🌱',Goal=3,Progress=1,Claimed=false,Packs=1},{Key='Sell',Text='Sell 5 fruit',Icon='💰',Goal=5,Progress=0,Claimed=false,Packs=1}}}
 local calls={}
+local function bonusNow()
+ local n=0;for _,q in ipairs(srv.Quests)do if q.Claimed then n+=1 end end
+ return {Gems=2,Done=n,Total=#srv.Quests,Claimed=srv.BonusClaimed,Blocked=srv.BonusBlocked,Ready=n==#srv.Quests and not srv.BonusClaimed and not srv.BonusBlocked}
+end
 local function stateNow()
- return {Success=true,Login={Ready=srv.Ready,Next=srv.Ready and srv.Step+1 or srv.Step,Claimed=srv.Step},Quests=srv.Quests,ResetIn=5*3600+12*60,Day=1}
+ return {Success=true,Login={Ready=srv.Ready,Next=srv.Ready and srv.Step+1 or srv.Step,Claimed=srv.Step},Quests=srv.Quests,Bonus=bonusNow(),ResetIn=5*3600+12*60,Day=1}
 end
 local request=R.new('RemoteFunction');request.Name='PremiumRequest';request.Parent=remotes
 function request.InvokeServer(_,action,value)
@@ -33,7 +38,8 @@ function request.InvokeServer(_,action,value)
   if not srv.Ready then local s=stateNow();s.Success=false;s.Message='COME BACK TOMORROW';return s end
   srv.Step+=1;srv.Ready=false;local s=stateNow();s.Message='Ur Gems are on the way!';return s
  end
- if type(value)=='table'then local q=srv.Quests[value.Quest];if q and q.Progress>=q.Goal and not q.Claimed then q.Claimed=true;local s=stateNow();s.Message='Ur Gems are on the way!';return s end end
+ if value=='ClaimBonus'then if bonusNow().Ready then srv.BonusClaimed=true;local s=stateNow();s.Message='🎉 ALL DONE! Ur Gems are on the way!';return s end end
+ if type(value)=='table'then local q=srv.Quests[value.Quest];if q and q.Progress>=q.Goal and not q.Claimed then q.Claimed=true;local s=stateNow();s.Message='🎒 RANDOM SEED PACK! Check ur bag!';return s end end
  local s=stateNow();s.Success=false;s.Message='NO';return s
 end
 -- Roblox services the script uses.
@@ -70,6 +76,9 @@ local function frames(n)
 end
 local function resize(w,h)screen=R.Vector2.new(w,h);frames(3)end
 player:SetAttribute('TutorialDone',false)
+-- R153: what the script asks ItemPictures for, per holder (the proxies it passes: the attributes decide the look)
+local asked={};do local Pic=W.module('ItemPictures');local realShow=Pic.Show
+ Pic.Show=function(holder,tool,priority)if tool then asked[holder]={Stage=tool:GetAttribute('Stage'),Variant=tool:GetAttribute('BagVariant'),Silhouette=tool:GetAttribute('Silhouette'),Shape=tool:GetAttribute('PackShape'),Pack=tool:GetAttribute('SeedPackTool')}end;return realShow(holder,tool,priority)end end
 local tb=R.new('LocalScript');tb.Name='TravelButtons';local okT,errT=pcall(W.load,'TravelButtons',tb);check(okT,'TravelButtons loads: '..tostring(errT))
 local sc=R.new('LocalScript');sc.Name='DailyRewardsClient';local okD,errD=pcall(W.load,'DailyRewardsClient',sc);check(okD,'DailyRewardsClient loads: '..tostring(errD))
 frames(10)
@@ -108,10 +117,31 @@ local login=panel.LoginPage;local quests=panel.QuestsPage
 check(login.Visible and not quests.Visible,'the LOGIN tab first (a login reward is waiting)')
 local cards={};for d=1,7 do cards[d]=login:FindFirstChild('Day'..d)end
 check(#cards==7,'seven day cards')
+-- R153: a random pack is a mystery: the default-shape pack in near-black on a white tile (the real ItemPictures look); the Void day shows the Void pack's own art; the Gem days a gem
+local function dark(holder)
+ local v=holder:FindFirstChild('ItemViewport');if not v then return nil end
+ local parts,bad=0,0
+ for _,d in ipairs(v:GetDescendants())do
+  if d:IsA('BasePart')and d.Transparency<1 then parts+=1;if not(d.Color.R*255<30 and d.Color.G*255<30 and d.Color.B*255<30)or d.Material~=R.Enum.Material.SmoothPlastic then bad+=1 end
+  elseif d:IsA('SurfaceAppearance')or d:IsA('Decal')or d:IsA('Texture')then bad+=1 end
+ end
+ return parts>0 and bad==0
+end
+local function isGold(c)return math.abs(c.R-255/255)<1e-6 and math.abs(c.G-206/255)<1e-6 and math.abs(c.B-64/255)<1e-6 end
+local function isWhite(o)return o.BackgroundTransparency==0 and o.BackgroundColor3.R==1 and o.BackgroundColor3.G==1 and o.BackgroundColor3.B==1 end
+local mystery=true;for d=1,4 do if not isWhite(cards[d].Art)then mystery=false end end
+check(mystery and cards[7].Art.BackgroundTransparency==1 and cards[5].Art.BackgroundTransparency==1 and cards[6].Art.BackgroundTransparency==1,'R153: the four random-pack days sit on a white tile; the Void day and the Gem days have none')
+frames(8)
+local silOK=true;for d=1,4 do if dark(cards[d].Art)~=true then silOK=false end end
+check(silOK,'R153: those four pictures are the near-black default pack silhouette (no colour, no decal, no texture: nothing says which pack it will be)')
+local sameSil=true;for d=1,4 do local a=asked[cards[d].Art];if not(a and a.Pack and a.Silhouette==true and a.Shape==nil and a.Stage==1 and a.Variant=='Pack01')then sameSil=false end end
+check(sameSil,'R153: the four mystery pictures are all the same proxy: the plain Forest pack, no PackShape (the default shape, like the other reward pictures), Silhouette (nothing about the pack that will be rolled)')
+local v7=asked[cards[7].Art];check(v7 and v7.Pack and v7.Variant=='EclipseReliquary'and v7.Stage==7 and v7.Silhouette==nil,'R153: day 7 asks for the Void pack\'s own art (stage 7 EclipseReliquary), no silhouette')
+check(dark(cards[7].Art)~=true and cards[7].Art:FindFirstChild('ItemViewport')~=nil,'(the Void day shows the real Void pack, not a silhouette)')
 check(cards[1].Today.Visible and not cards[2].Today.Visible,'day 1 is marked TODAY')
-check(cards[7].Amount.Text=='MECH PACK'and cards[1].Amount.Text=='RANDOM PACK'and cards[4].Amount.Text=='RANDOM PACK'and cards[5].Amount.Text=='+2'and cards[6].Amount.Text=='+3','rewards: days 1-4 RANDOM PACK, +2, +3 Gems, day 7 MECH PACK')
+check(cards[7].Amount.Text=='VOID PACK'and cards[1].Amount.Text=='RANDOM PACK'and cards[4].Amount.Text=='RANDOM PACK'and cards[5].Amount.Text=='+2'and cards[6].Amount.Text=='+3','rewards: days 1-4 RANDOM PACK, +2, +3 Gems, day 7 VOID PACK')
 check(cards[2].Amount.Text=='RANDOM PACK'and cards[3].Amount.Text=='RANDOM PACK','(days 2 and 3 too)')
-check(login.Note.Text:find('MECH',1,true)and login.Note.Text:find('random packs',1,true)and login.Note.Text:find('2 + 3 gems',1,true),'the note: 4 random packs, then 2 + 3 gems, day 7 = MECH: '..login.Note.Text)
+check(login.Note.Text:find('VOID',1,true)and not login.Note.Text:find('MECH',1,true)and login.Note.Text:find('random packs',1,true)and login.Note.Text:find('2 + 3 gems',1,true),'the note: 4 random packs, then 2 + 3 gems, day 7 = VOID: '..login.Note.Text)
 check(login.ClaimButton.Caption.Text=='CLAIM DAY 1!','the big button: CLAIM DAY 1!')
 audioLog={}
 login.ClaimButton.Activated:Fire();frames(5)
@@ -122,15 +152,21 @@ check(login.ClaimButton.Caption.Text:find('NEXT REWARD IN 5h',1,true),'then the 
 check(panel.Status.Text=='Ur Gems are on the way!','the server message shows')
 -- Day 7 wording.
 srv.Step=6;srv.Ready=true;panel.QuestsTab.Activated:Fire();panel.LoginTab.Activated:Fire();player:SetAttribute('DailyRevision',5);frames(5)
-check(login.ClaimButton.Caption.Text:find('MECH PACK',1,true)and cards[7].Today.Visible,'day 7: CLAIM YOUR MECH PACK!')
+check(login.ClaimButton.Caption.Text:find('VOID PACK',1,true)and not login.ClaimButton.Caption.Text:find('MECH',1,true)and cards[7].Today.Visible,'day 7: CLAIM YOUR VOID PACK!')
 -- Quests.
 panel.QuestsTab.Activated:Fire();frames(3)
 check(quests.Visible and not login.Visible,'QUESTS tab')
-local rows={};for i=1,3 do rows[i]=quests:FindFirstChild('Quest'..i)end
+local rows={};for i=1,3 do rows[i]=quests:FindFirstChild('Quest'..i)end;rows[4]=quests:FindFirstChild('Bonus')
+check(rows[4]~=nil and rows[4].Visible and rows[4].Task.Text=='ALL DONE BONUS!','R153: a fourth ALL DONE row')
 check(rows[1].Task.Text=='Steal 3 packs'and rows[1].IconBack.Icon.Text=='🎒'and rows[1].Bar.Count.Text=='3 / 3','quest 1: 🎒 Steal 3 packs 3 / 3')
 check(rows[2].Bar.Count.Text=='1 / 3'and math.abs(rows[2].Bar.Fill.Size.X.Scale-1/3)<1e-6,'quest 2 shows 1 / 3 with a third of the bar')
 check(rows[1].Claim.Visible and not rows[2].Claim.Visible and not rows[3].Claim.Visible,'only finished quests have CLAIM')
-check(rows[1].Reward.Amount.Text=='2'and rows[2].Reward.Amount.Text=='2'and rows[3].Reward.Amount.Text=='2','each pays 💎 2')
+check(rows[1].Reward.Amount.Text=='+1 PACK'and rows[2].Reward.Amount.Text=='+1 PACK'and rows[3].Reward.Amount.Text=='+1 PACK','each quest pays +1 PACK')
+check(isWhite(rows[1].Reward.PackTile)and isWhite(rows[2].Reward.PackTile)and isWhite(rows[3].Reward.PackTile)and dark(rows[1].Reward.PackTile)==true and dark(rows[3].Reward.PackTile)==true,'R153: the reward is a mystery pack: a near-black pack silhouette on a white tile, the same for every quest')
+local qsil=true;for i=1,3 do local a=asked[rows[i].Reward.PackTile];if not(a and a.Pack and a.Silhouette==true and a.Shape==nil and a.Stage==1 and a.Variant=='Pack01')then qsil=false end end
+check(qsil,'R153: the quest reward pictures ask for the same silhouette proxy as the login days (no hint of the pack)')
+check(rows[4].Reward.Amount.Text=='+2'and rows[4].Reward.Gem~=nil and rows[4].Reward:GetAttribute('AccessibleLabel')=='+2 💎'and rows[4].Bar.Count.Text=='0 / 3'and not rows[4].Claim.Visible and not rows[4].Done.Visible,'ALL DONE: +2 (gem icon), 0 / 3 claimed, nothing to claim yet')
+check(#quests.Title.Text>0 and quests.Title.Text=='DAILY QUESTS','(the page title stays DAILY QUESTS)')
 check(quests.Reset.Text:find('NEW QUESTS IN 5h',1,true),'the reset countdown: '..quests.Reset.Text)
 -- R150: the server refuses a claim (it was already taken elsewhere): the press clicks Denied, not GemClaim.
 srv.Quests[1].Claimed=true;audioLog={};rows[1].Claim.Activated:Fire();frames(5)
@@ -140,15 +176,31 @@ check(rows[1].Claim.Visible,'(the window is back to the claimable quest after a 
 rows[1].Claim.Activated:Fire();frames(5)
 check(type(calls[#calls][2])=='table'and calls[#calls][2].Quest==1,'claiming quest 1')
 check(not rows[1].Claim.Visible and rows[1].Done.Visible,'then it says ✓ DONE')
--- The daily Gem cap: a finished quest that would go over it shows DAILY LIMIT instead of CLAIM.
-srv.Quests[2].Progress=3;srv.Quests[2].Blocked=true;srv.Quests[3].Progress=2;srv.Quests[3].Blocked=true
+-- R153: ALL DONE: 1 / 3 claimed so far; quests 2 and 3 get finished and claimed, then the bonus row gets CLAIM (2 Gems, once).
+check(rows[4].Bar.Count.Text=='1 / 3'and math.abs(rows[4].Bar.Fill.Size.X.Scale-1/3)<1e-6 and not rows[4].Claim.Visible,'ALL DONE shows 1 / 3 claimed, no CLAIM yet')
+srv.Quests[2].Progress=3;srv.Quests[3].Progress=5
 player:SetAttribute('DailyRevision',(player:GetAttribute('DailyRevision')or 0)+1);panel.LoginTab.Activated:Fire();panel.QuestsTab.Activated:Fire();frames(5)
-check(not rows[2].Claim.Visible and rows[2].Done.Visible and rows[2].Done.Text=='DAILY LIMIT','a finished but blocked quest: no CLAIM, DAILY LIMIT')
-check(not rows[3].Claim.Visible and rows[3].Done.Visible and rows[3].Done.Text=='DAILY LIMIT','a blocked quest that is not finished yet says DAILY LIMIT too (no more Gems today)')
-check(rows[1].Done.Visible and rows[1].Done.Text=='✓ DONE','a claimed quest still says ✓ DONE')
-srv.Quests[2].Blocked=nil;srv.Quests[3].Blocked=nil;srv.Quests[2].Progress=1;srv.Quests[3].Progress=0
+check(rows[2].Claim.Visible and rows[3].Claim.Visible and not rows[4].Claim.Visible and isGold(rows[2].Edge.Color),'two finished quests have CLAIM; the bonus waits')
+audioLog={};rows[2].Claim.Activated:Fire();frames(5)
+check(calls[#calls][2].Quest==2 and panel.Status.Text:find('RANDOM',1,true)and panel.Status.Text:find('bag',1,true)and rows[2].Done.Visible and rows[2].Done.Text=='✓ DONE'and audioHas('GemClaim'),'quest 2: a pack ("'..panel.Status.Text..'"), ✓ DONE')
+check(rows[4].Bar.Count.Text=='2 / 3'and not rows[4].Claim.Visible,'ALL DONE 2 / 3')
+rows[3].Claim.Activated:Fire();frames(5)
+check(rows[3].Done.Visible and rows[4].Bar.Count.Text=='3 / 3'and rows[4].Claim.Visible and not rows[4].Done.Visible and math.abs(rows[4].Bar.Fill.Size.X.Scale-1)<1e-6,'all three claimed: ALL DONE is 3 / 3 and gets CLAIM')
+check(isGold(rows[4].Edge.Color),'(a gold rim like a claimable quest)')
+audioLog={};local callsBefore=#calls;rows[4].Claim.Activated:Fire();frames(5)
+check(#calls==callsBefore+1 and calls[#calls][1]=='Daily'and calls[#calls][2]=='ClaimBonus'and audioHas('GemClaim')and not audioHas('Denied'),'claiming ALL DONE asks the server (ClaimBonus) and clicks GemClaim')
+check(rows[4].Done.Visible and rows[4].Done.Text=='✓ DONE'and not rows[4].Claim.Visible and panel.Status.Text:find('ALL DONE',1,true)and panel.Status.Text:find('Gems',1,true),'then it says ✓ DONE and the message shows: '..panel.Status.Text)
+-- pressing it again changes nothing (the button is gone; a stale press is refused by the server and clicks Denied)
+callsBefore=#calls;rows[4].Claim.Activated:Fire();frames(2);check(#calls==callsBefore,'(no CLAIM left to press)')
+srv.BonusClaimed=false;audioLog={};srv.Quests[1].Claimed=false;player:SetAttribute('DailyRevision',(player:GetAttribute('DailyRevision')or 0)+1);frames(5)
+check(not rows[4].Claim.Visible and rows[4].Bar.Count.Text=='2 / 3'and rows[1].Claim.Visible,'(a quest that is not claimed takes the CLAIM away from ALL DONE again)')
+srv.Quests[1].Claimed=true;srv.BonusBlocked=true;player:SetAttribute('DailyRevision',(player:GetAttribute('DailyRevision')or 0)+1);panel.LoginTab.Activated:Fire();panel.QuestsTab.Activated:Fire();frames(5)
+check(not rows[4].Claim.Visible and rows[4].Done.Visible and rows[4].Done.Text=='GOT UR 💎'and rows[4].Bar.Count.Text=='3 / 3','older-style claims already paid today\'s Gems: ALL DONE says GOT UR 💎 (nothing to claim)')
+srv.BonusBlocked=false;srv.Quests[2].Progress=1;srv.Quests[2].Claimed=false;srv.Quests[3].Progress=0;srv.Quests[3].Claimed=false
 player:SetAttribute('DailyRevision',(player:GetAttribute('DailyRevision')or 0)+1);panel.LoginTab.Activated:Fire();panel.QuestsTab.Activated:Fire();frames(5)
-check(not rows[3].Done.Visible and not rows[3].Claim.Visible and not rows[2].Done.Visible and not rows[2].Claim.Visible,'without the limit an unfinished quest shows neither CLAIM nor DONE')
+check(not rows[3].Done.Visible and not rows[3].Claim.Visible and not rows[2].Done.Visible and not rows[2].Claim.Visible and not rows[4].Done.Visible and not rows[4].Claim.Visible,'an unfinished quest shows neither CLAIM nor DONE (and no DAILY LIMIT any more)')
+local limitGone=true;for i=1,4 do if rows[i].Done.Text=='DAILY LIMIT'then limitGone=false end end
+check(limitGone,'(no row says DAILY LIMIT: quests are packs now)')
 -- Close.
 panel.Header.Close.Activated:Fire();frames(3)
 check(not panel.Visible and pg:GetAttribute('SeedMenu')==nil and icons.Visible,'X closes it and the top bar buttons come back')
@@ -165,7 +217,7 @@ for _,s in ipairs({{1280,720},{1920,1080},{780,360},{667,340},{390,760},{360,600
   if pr.Y+pr.H>P.Y+P.H+1 or pr.X+pr.W>P.X+P.W+1 then good=false;why=why..' page outside panel'end
   local items={}
   if tab=='LoginTab'then for d=1,7 do items[#items+1]=rect(cards[d])end;items[#items+1]=rect(login.ClaimButton)
-  else for i=1,3 do items[#items+1]=rect(rows[i])end end
+  else for i=1,4 do items[#items+1]=rect(rows[i])end end
   for i,a in ipairs(items)do
    if a.X<pr.X-1 or a.Y<pr.Y-1 or a.X+a.W>pr.X+pr.W+1 or a.Y+a.H>pr.Y+pr.H+1 then good=false;why=why..(' item %d outside (%d,%d %dx%d in %d,%d %dx%d)'):format(i,a.X,a.Y,a.W,a.H,pr.X,pr.Y,pr.W,pr.H)end
    if a.W<30 or a.H<30 then good=false;why=why..' item '..i..' too small'end

@@ -388,6 +388,9 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
     selectionClock+=dt;detailClock+=dt;distantClock+=dt
     local select=selectionClock>=.25;if select then selectionClock=0;choose(camera,now,Fx.Low())end
     local low=Fx.Low()
+    -- R153 (owner: "fix all jittery type effects"): an on-screen pack within 240 studs hovers, and a detailed one's aura / orbits / rings / rays turn,
+    -- every rendered frame (they stepped at 30 Hz, 20 Hz low). Bounded by the selection: details for 8 packs (3 low) within 160 studs.
+    -- What still ticks: the Highlight's faint outline pulse (+-.04, 30 Hz) and the distant rays' rotor (well under a pixel a tick); packs past 240 studs keep PackDue.
     local polish=detailClock>=(low and 1/20 or 1/30);if polish then detailClock=0 end
     local distantPolish=distantClock>=(low and 1/6 or 1/12);if distantPolish then distantClock=0 end
     table.clear(moveParts);table.clear(moveFrames)
@@ -395,7 +398,7 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
     for bag,r in pairs(records)do
         if not r.Ready or not r.Root.Parent or not bag:IsDescendantOf(workspace)or r.Hidden then continue end
         local rootFrame=r.Root.CFrame;local worldMoved=false
-        if r.World and Budget.PackDue(r.Distance or math.huge,r.OnScreen,now,r.LastMove,low)then
+        if r.World and(r.OnScreen and(r.Distance or math.huge)<=240 or Budget.PackDue(r.Distance or math.huge,r.OnScreen,now,r.LastMove,low))then
             local moveDt=math.min(.15,now-(r.LastMove or now-dt));r.LastMove=now
             local near=(r.Distance or math.huge)<=240
             local pos=r.Origin.Position+Vector3.new(0,.16+(near and math.sin(now*1.65+r.Phase)*.12 or 0),0)
@@ -411,7 +414,7 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
         -- anchored parts join this frame's batch exactly once.
         -- R128 (owner): a carried pack's aura, orbit and Mech rig follow it every frame (they trailed behind at 30 Hz).
         local carried=not r.World and r.OnScreen
-        if r.MechMotion and(worldMoved or carried or(polish and r.OnScreen and(r.Distance or math.huge)<=DETAIL_DISTANCE))then
+        if r.MechMotion and(worldMoved or carried or(r.OnScreen and(r.Distance or math.huge)<=DETAIL_DISTANCE))then
             r.MechMotion:Step(Gui.ReducedMotionEnabled and 0 or now,rootFrame,move)
         end
         if r.Distant and not r.Detailed and distantPolish then
@@ -423,7 +426,7 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
             r.Highlight.OutlineTransparency=r.Rank==1 and .94 or math.max(.25,.80-r.Rank*.07)+.04*math.sin(now*1.4+r.Phase)
         end
         local fx=r.Fx
-        if fx and(polish or carried)then
+        if fx then
             move(fx.Anchor,rootFrame)
             local orbitFrame=AuraGeometry.Frame(rootFrame,r.OrbitBounds)
             move(fx.OrbitAnchor,orbitFrame)
@@ -431,8 +434,7 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
                 local a=now*.9+r.Phase+(i-1)*math.pi
                 move(p,orbitFrame*CFrame.new(math.cos(a)*(r.OrbitBounds.Half.X+.2*r.Scale),math.sin(a)*(r.OrbitBounds.Half.Y+.22*r.Scale),math.sin(a*2)*.5*r.Scale))
             end
-            if polish then
-                local breath=1+.065*math.sin(now*1.25+r.Phase)
+            do
                 for _,g in ipairs(fx.SurfaceGlints)do
                     local sweep=now*.26+r.Phase+g.Index*.19
                     local cycle=math.floor(sweep)

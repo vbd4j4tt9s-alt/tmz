@@ -3,11 +3,11 @@
 --                  Mythic a short camera push (FieldOfView only). The pack's own suspense in the world is SeedPackClient (everyone sees it).
 --  Secret+ 'Scene' (Full, or Calm with ReducedMotion): the world dims and desaturates, letterbox, fade to black, the hidden story stage
 --                  (RarePullScenes) with the camera, silence, the hit, the seed hero shot, fade back; the HUD is hidden and movement held
---                  meanwhile. Skippable after SkipFrom (tap / click anywhere, Space, Enter, A / B): before the hit it jumps to the hit, after
---                  it to the way out.
+--                  meanwhile. Skippable after SkipFrom (tap / click anywhere, Space, Enter, A / B / R2): before the hit it jumps to the
+--                  hit, after it to the way out.
 --  Secret+ 'InPlace' when the full scene is not safe (RarePullRules.Decide: a keeper near or chasing, on the track, ragdoll, a run, a menu,
---                  someone else's camera, in the air): no camera, no hidden stage, HUD and controls untouched, a compact card in the upper
---                  third timed to the world seed's burst.
+--                  someone else's camera, in the air; R153: or "Skip pack animations" on): no camera, no hidden stage, HUD and controls
+--                  untouched, a compact card in the upper third timed to the world seed's burst.
 -- Restores EXACTLY on every exit path (normal end, skip, death, character removed, a keeper turning up, being moved / teleported, someone
 -- replacing the camera, an error in a frame, the script being destroyed): Camera (type, CFrame, focus, FieldOfView, subject), controls,
 -- every ScreenGui it hid (only those), Core GUI it turned off (only those); its own colour grade / blur live on the Camera and are destroyed;
@@ -18,6 +18,10 @@
 -- slammed; the hit alone came up to .85 s before it) is what the puller's own chat line waits for; the sounds are preloaded when the
 -- client starts (Bind); the music is ducked on the presentation's clock; a pack opened while the last card is still up cross-fades it out
 -- (.18 s) and takes over its camera push smoothly instead of snapping the card away and the FieldOfView back.
+-- R153 (owner: "pack animations should play all the time and shouldn't stop after 2/3 times. they can skip if they want or we can add a
+-- skip cutscene option in the settings"): every opening plays in full (no "quick" reveal for packs opened back to back). Skipping is the
+-- player's choice: every card is skippable too (M.Skip; a click / tap on the world, Enter, the gamepad's B / R2: to the hit, then closed),
+-- and the setting "Skip pack animations" gives the short version (RarePullRules.SkipAnimations / Decide).
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Gui=game:GetService('GuiService');local UIS=game:GetService('UserInputService');local CAS=game:GetService('ContextActionService')
 local Collection=game:GetService('CollectionService');local StarterGui=game:GetService('StarterGui')
@@ -42,7 +46,7 @@ local function lite()
  return false
 end
 local function remotes()return RS:FindFirstChild('ChestChaseRemotes')end
--- The seed's display name, its "1 in N" (the held pack's tooltip, else the Index chance) and a model of it.
+-- The seed's display name, its "1 in N" (R153: its fixed chance, SeedRarity153; the Index chance if that cannot load) and a model of it.
 function M.SeedInfo(seedId,tool)
  local r=remotes();local catalog=r and r:FindFirstChild('SeedCatalog');local entry=catalog and catalog:FindFirstChild(seedId)
  local name=entry and entry:GetAttribute('DisplayName')
@@ -51,10 +55,12 @@ function M.SeedInfo(seedId,tool)
   if ok and Packs and Packs.SeedDesignById and Packs.SeedDesignById[seedId]then name=Packs.SeedDesignById[seedId].name end
  end
  name=name or tostring(seedId)
- local odds=tool and Rules.TooltipOdds(tool.ToolTip,name)
+ -- R153 (owner: a Cosmic from a Void pack must still read how rare it is): the seed's one fixed chance (SeedRarity153), never the held pack's own rows (those answer what THAT pack gives).
+ local odds
+ local okC,Canon=pcall(require,RS:FindFirstChild('SeedRarity153'));if okC and Canon then odds=Canon.Count(seedId)end
  if not odds and entry then
   local chance=entry:GetAttribute('BaseChance')
-  if type(chance)=='number'and chance>0 then local ok,O=pcall(require,RS:FindFirstChild('OddsText85'));if ok then odds=(O.Format(chance)):match('^1/(.+)$')end end
+  if type(chance)=='number'and chance>0 then local ok,O=pcall(require,RS:FindFirstChild('OddsText85'));if ok then odds=O.Count(1/(math.min(chance,100)/100))end end
  end
  return name,odds
 end
@@ -128,6 +134,7 @@ function M.Snapshot()
   if k:GetAttribute('TargetUserId')==player.UserId and(state=='ALERTED'or state=='CHASING'or state=='ATTACKING'or state=='DASHING')then chasing=true end
  end
  s.KeeperDistance=best;s.KeeperChasing=chasing;s.OnTrack=onTrack(root)
+ s.SkipCutscenes=Rules.SkipAnimations() -- (R153: the player's "Skip pack animations")
  local ok,state=pcall(function()return hum and hum:GetState()end)
  s.Grounded=not(ok and state and airStates[state.Name])
  return s
@@ -271,7 +278,7 @@ finish=function(run,reason)
  end
  if current==run then current=nil end
  if M._building==run then M._building=nil end
- M.LastEnd=os.clock();Rules.LastRevealEnd=M.LastEnd;Rules.RevealRunning=current~=nil
+ M.LastEnd=os.clock();Rules.RevealRunning=current~=nil
  -- a story scene that had to stop before its hit still shows the result (a compact card), unless the player died / left
  if(reason=='danger'or reason=='moved'or reason=='camera'or reason=='error')and run.Kind=='Scene'and not run.SawClimax and run.Info then
   local info=table.clone(run.Info);info.Result=true
@@ -297,6 +304,7 @@ local function handoff(old)
 end
 function M._start(info)
  local player=lp();if not player or type(info)~='table'then return nil end
+ M.Listen()
  local pg=player:FindFirstChildOfClass('PlayerGui');if not pg then return nil end
  local rank=math.clamp(math.floor(tonumber(info.Rank)or 1),1,8)
  -- (R152: the same reveal asked for again - the pack re-equipped mid-reveal - keeps playing; it used to restart as a "quick" reveal)
@@ -309,16 +317,16 @@ function M._start(info)
  -- what kind of presentation
  if rank<=5 then
   run.Kind='Ladder'
-  Rules.LastRevealEnd=math.max(Rules.LastRevealEnd,M.LastEnd)
-  run.Quick=not info.Preview and Rules.QuickFor(info.Bag) -- (the same answer the world pack gets: RarePullRules.QuickFor)
+  run.Quick=not info.Preview and Rules.QuickFor(info.Bag) -- (R153: only with "Skip pack animations" on; the same answer the world pack gets)
   Rules.MarkQuick(info.Bag,run.Quick)
-  run.TL=Rules.CardTimeline(rank,run.Quick);run.Clock=function()return workspace:GetServerTimeNow()-run.At end
+  run.TL=Rules.CardTimeline(rank,run.Quick);run.Offset=0;run.Clock=function()return workspace:GetServerTimeNow()-run.At+run.Offset end
   run.Cues=Rules.LadderCues(rank,run.Quick)
  elseif info.Result then
-  run.Kind='Result';run.TL=Rules.Timeline(rank,'Result');local t0=os.clock();run.Clock=function()return os.clock()-t0 end
+  run.Kind='Result';run.TL=Rules.Timeline(rank,'Result');local t0=os.clock();run.Offset=0;run.Clock=function()return os.clock()-t0+run.Offset end
   run.Cues=Rules.SceneCues(rank,run.TL)
  else
   local okS,snap=pcall(M.Snapshot)
+  if okS and snap and info.Preview then snap.SkipCutscenes=nil end -- (an owner preview always plays in full)
   local variant,why=Rules.Decide(okS and snap or nil)
   run.Why=why
   if variant=='Full'then
@@ -326,7 +334,7 @@ function M._start(info)
    local t0=os.clock()-math.clamp(workspace:GetServerTimeNow()-run.At,0,.15);run.Offset=0
    run.Clock=function()return os.clock()-t0+run.Offset end
   else
-   run.Kind='InPlace';run.TL=Rules.Timeline(rank,'InPlace');run.Clock=function()return workspace:GetServerTimeNow()-run.At end
+   run.Kind='InPlace';run.TL=Rules.Timeline(rank,'InPlace');run.Offset=0;run.Clock=function()return workspace:GetServerTimeNow()-run.At+run.Offset end
   end
   run.Cues=Rules.SceneCues(rank,run.TL)
  end
@@ -341,7 +349,8 @@ function M._start(info)
  local seedForCard=nil
  if cardKind~='Scene'then local okM,m=pcall(M.SeedModel,info.SeedId,info.Mutation);seedForCard=okM and m or nil end
  run.SeedModel=seedForCard
- run.Card=Card.Create(gui,cardKind,{Rank=rank,Phone=run.Phone,Reduced=run.Reduced,Lite=run.Lite,Quick=run.Quick,SeedName=name,Odds=odds,Seed=seedForCard})
+ run.Card=Card.Create(gui,cardKind,{Rank=rank,Phone=run.Phone,Reduced=run.Reduced,Lite=run.Lite,Quick=run.Quick,SeedName=name,Odds=odds,Seed=seedForCard,
+  Skip=run.TL.SkipFrom~=nil and run.TL.SkipFrom<math.huge})
  -- audio (every slot was preloaded when the client started: Bind)
  local slots={};local seen={};for _,c in ipairs(run.Cues)do if not seen[c.Slot]then seen[c.Slot]=true;slots[#slots+1]=c.Slot end end
  pcall(Audio.Preload,slots)
@@ -372,9 +381,9 @@ function M._start(info)
    CAS:BindActionAtPriority(M.SkipAction,function(_,state)
     if state==Enum.UserInputState.Begin then M.Skip()end
     return Enum.ContextActionResult.Sink
-   end,false,Enum.ContextActionPriority.High.Value,Enum.KeyCode.Space,Enum.KeyCode.Return,Enum.KeyCode.ButtonA,Enum.KeyCode.ButtonB)
+   end,false,Enum.ContextActionPriority.High.Value,Enum.KeyCode.Space,Enum.KeyCode.Return,Enum.KeyCode.ButtonA,Enum.KeyCode.ButtonB,Enum.KeyCode.ButtonR2)
   end)
-  run.SkipBound=ok2
+  run.SkipBound=ok2 -- (R153: R2 too: the gamepad's "click"; taken here, so no pack can be opened under a story scene)
   local hum=player.Character and player.Character:FindFirstChildOfClass('Humanoid')
   if hum then table.insert(run.Connections,hum.Died:Connect(function()finish(run,'death')end))end
   table.insert(run.Connections,workspace:GetPropertyChangedSignal('CurrentCamera'):Connect(function()if run.InStage then finish(run,'camera')end end))
@@ -522,21 +531,55 @@ function M._stepScene(run,pg,t,tl,tier,cam)
  -- colour: the world dims and drains, the stage has its own look, the hit flashes, then the world eases back
  part(run,'grade',sceneGrade,run,t,tl,tier)
 end
--- Skip: only in a story scene, from SkipFrom until the seed has floated down.
+-- Skip (R153: every presentation, the player's choice; R151 / R152: the story scenes only): from SkipFrom until the seed is down / the card
+-- goes. Before the hit it jumps to the hit (the hit and the result still play: straight to the result); once the result is shown (title,
+-- seed, "1 in N": ShownAt) it goes to the way out (the card closes); in between nothing (the result is on its way: a late click must not
+-- close it unseen). A card runs on the reveal's server clock: its jump to the hit is handed to the opener's pack in the world
+-- (RarePullRules.SetShift), so the seed bursts out of it with the card. The seed itself is the server's (granted when the pack opened): a
+-- skip changes nothing there, and the puller's chat line, which waits for RarePullSeedShownAt, now waits for the skipped result.
 function M.Skip()
- local run=current;if not run or run.Kind~='Scene'or run.Done then return false end
- local t=run.Clock();local tl=run.TL
- if t<tl.SkipFrom or t>=tl.FloatEnd then return false end
- local target=t<tl.Climax-.02 and tl.Climax-.02 or tl.FloatEnd
+ local run=current;if not run or run.Done or not run.Offset then return false end
+ local t=run.Clock();local tl=run.TL;local hit=tl.Climax or tl.Burst
+ if t<(tl.SkipFrom or math.huge)or t>=tl.FloatEnd or(t>=hit-.02 and t<Rules.ShownAt(tl))then return false end
+ local target=t<hit-.02 and hit-.02 or tl.FloatEnd
  run.Offset+=target-t;run.Skipped=(run.Skipped or 0)+1
+ if run.Kind~='Scene'and target<tl.FloatEnd then Rules.SetShift(run.Info.Bag,run.Offset)end
  pcall(Audio.Seek,target)
  local player=lp()
  if player then
   local now=workspace:GetServerTimeNow()
-  player:SetAttribute('RarePullClimaxAt',now+math.max(0,tl.Climax-target));player:SetAttribute('RarePullSeedShownAt',now+math.max(0,Rules.ShownAt(tl)-target))
+  player:SetAttribute('RarePullClimaxAt',now+math.max(0,hit-target));player:SetAttribute('RarePullSeedShownAt',now+math.max(0,Rules.ShownAt(tl)-target))
  end
  return true
 end
+-- R153: a card (Ladder, InPlace, Result) is skipped by a click / tap on the world, Enter or the gamepad's B / R2. The HUD and the controls
+-- stay the player's, so nothing is taken from them: a press the game already used (a button, the chat box) is ignored, a touch counts as a
+-- tap on its release (a drag turns the camera), and a press under SkipGap after the one before is part of a run of clicks (the clicks that
+-- opened the pack go on for a moment). The story scene has its own: the full-screen button and the bound keys.
+M.SkipGap=.25;M.TapSeconds=.35;M.TapMove=14
+local lastPress=-math.huge;local listening=nil
+function M.Press(processed)
+ if processed then return false end
+ local now=os.clock();local gap=now-lastPress;lastPress=now
+ local run=current;if gap<M.SkipGap or not run or run.Kind=='Scene'then return false end
+ return M.Skip()
+end
+local pressKeys={[Enum.KeyCode.Return]=true,[Enum.KeyCode.ButtonB]=true,[Enum.KeyCode.ButtonR2]=true}
+function M.Listen()
+ if listening then return end
+ local touches=setmetatable({},{__mode='k'})
+ local ok,conns=pcall(function()
+  return {UIS.InputBegan:Connect(function(input,processed)
+   if input.UserInputType==Enum.UserInputType.Touch then if not processed then touches[input]={At=os.clock(),Pos=input.Position}end;return end
+   if input.UserInputType==Enum.UserInputType.MouseButton1 or pressKeys[input.KeyCode]then M.Press(processed)end
+  end),UIS.InputEnded:Connect(function(input)
+   local t=touches[input];if not t then return end;touches[input]=nil
+   if os.clock()-t.At<=M.TapSeconds and(input.Position-t.Pos).Magnitude<=M.TapMove then M.Press(false)end
+  end)}
+ end)
+ listening=ok and conns or{}
+end
+local function unlisten()for _,c in ipairs(listening or{})do c:Disconnect()end;listening=nil end
 -- Everything at once (death of the script, a test): the presentation, a card still fading out, every sound and the music duck.
 function M.Abort(reason)
  if current then finish(current,reason or'aborted')end
@@ -570,6 +613,7 @@ end
 -- PackOpeningFeedback hands its script over: the owner preview attribute, and stop everything if the script goes.
 function M.Bind(scriptInstance)
  local player=lp();if not player then return end
+ M.Listen() -- R153: the cards' skip (a press is followed from now on, so the clicks that open a pack are known as such)
  pcall(Audio.Preload) -- R152: every reveal sound loads now, long before the first pack is opened (it used to load as the reveal began)
  pcall(function()require(script.Parent.RarePullArt).Warm()end) -- R152: and the images of the story scenes are drawn a while later
  local conns={}
@@ -579,7 +623,7 @@ function M.Bind(scriptInstance)
   if kind then pcall(M.Preview,kind,arg)end
  end)
  if scriptInstance then
-  conns[#conns+1]=scriptInstance.Destroying:Connect(function()M.Abort('destroyed');for _,c in ipairs(conns)do c:Disconnect()end end)
+  conns[#conns+1]=scriptInstance.Destroying:Connect(function()M.Abort('destroyed');unlisten();for _,c in ipairs(conns)do c:Disconnect()end end)
  end
  return conns
 end

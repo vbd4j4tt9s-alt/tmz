@@ -115,7 +115,7 @@ local function beginReveal(bag)
  local okR,_,rarity=pcall(Rules.GetRarity,bag:GetAttribute('RevealSeedId'))
  if not okR or type(rarity)~='table'or not rarity.Rank then rarity={Rank=1,Color=white}end
  reveal={At=at,Rank=rarity.Rank,Color=rarity.Color or white}
- -- R151: the director decides first (a quick reveal when packs are opened back to back), so the world pack's suspense uses the same timing.
+ -- R151: the director decides first (R153: the short version only with "Skip pack animations" on), so the world pack's suspense uses the same timing.
  local started=false
  local Director=director()
  if Director then
@@ -172,7 +172,7 @@ local function presentation()
   end
  end
  if reveal and not reveal.Cinematic then
-  local t=workspace:GetServerTimeNow()-reveal.At;local rank=reveal.Rank
+  local t=workspace:GetServerTimeNow()-reveal.At+Ladder.Shift(active);local rank=reveal.Rank -- (R153: a skipped card: the pack's pops jump with it)
   local sequenceState=sequence:Step(rank,t,reduced());if not reveal.Director then revealAudio.Step(rank,t)end
   revealAudio.Tick(t)
   -- R151: the pack wobbles in the world on each suspense pulse; the camera gives a small kick with it (not with ReducedMotion)

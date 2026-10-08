@@ -2,7 +2,7 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 -- R122: shovel holes on the track (client). Sends only an optional aim point; the server decides everything.
 -- Click / tap / R2 with the Shovel equipped while on the track: dig a hole there (or cover your own hole).
 -- Also plays the dig / cover / fall effects for everyone. R124: a short tip fades in and out when the shovel comes out
--- on the track (no permanent hint line any more).
+-- (no permanent hint line any more). R153: it also says the shovel removes plants, and shows on the first HintTimes pull-outs of a session.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage')
 local Input=game:GetService('UserInputService');local Run=game:GetService('RunService');local CAS=game:GetService('ContextActionService')
 local Tween=game:GetService('TweenService');local Debris=game:GetService('Debris')
@@ -19,7 +19,7 @@ local sounds={};for _,s in ipairs(Planting.Sounds)do sounds[s.Key]=s.Id end
 local digSound=DigSound.new();Sfx.Preload({C.DigSound.Id,sounds.Land})
 local Fx=require(RS:WaitForChild('ClientFxBudget'));local Gui=game:GetService('GuiService')
 local Feed=require(RS:WaitForChild('NoticeFeed83'))
-local conns={};local lastSend=-math.huge;local onTrackNow=false;local hintAt=-math.huge;local elapsed=0
+local conns={};local lastSend=-math.huge;local wasHeld=false;local hintAt,hintShown=-math.huge,0;local elapsed=0
 
 local function shovel()
  local char=player.Character;local hum=char and char:FindFirstChildOfClass('Humanoid');local tool=char and char:FindFirstChildOfClass('Tool')
@@ -126,15 +126,15 @@ CAS:BindActionAtPriority('TrackHoleDig',function(_,state)
  return Enum.ContextActionResult.Sink
 end,false,2101,Enum.KeyCode.ButtonR2)
 
--- R124: tip when the shovel comes out on the track; it fades by itself (NoticeFeed). Not repeated within HintRepeatSeconds.
+-- R124 / R153: the tip when the shovel is pulled out (garden or track); it fades by itself (NoticeFeed). The first C.HintTimes pull-outs of a session
+-- (a pull-out while the last tip is still on screen is not counted).
 table.insert(conns,Run.Heartbeat:Connect(function(dt)
  elapsed+=dt;if elapsed<.25 then return end;elapsed=0
- local char=shovel();local show=char~=nil and onTrack(char)~=nil
- if show and not onTrackNow then
-  local now=os.clock()
-  if now-hintAt>=C.HintRepeatSeconds then hintAt=now;Feed.Plain(C.Hint,Color3.fromRGB(255,187,91),C.HintSeconds)end
+ local held=shovel()~=nil
+ if held and not wasHeld and hintShown<C.HintTimes and os.clock()-hintAt>=C.HintRepeatSeconds then
+  hintShown+=1;hintAt=os.clock();Feed.Plain(C.Hint,Color3.fromRGB(255,187,91),C.HintSeconds)
  end
- onTrackNow=show
+ wasHeld=held
 end))
 script.Destroying:Connect(function()
  for _,c in ipairs(conns)do c:Disconnect()end;CAS:UnbindAction('TrackHoleDig')

@@ -157,6 +157,22 @@ check(Rt.Name=='ArmR','arm pairing')
 local tipDir=(L.CFrame.LookVector+Rt.CFrame.LookVector).Unit;local routeDir=(V3(40,0,90)-V3(0,0,60)).Unit
 check(tipDir:Dot(routeDir)>.7,('chevron points along route (dot=%.2f)'):format(tipDir:Dot(routeDir)))
 check(math.abs((L.CFrame.Position+Rt.CFrame.Position).Y/2-.09)<.05,'chevrons sit on the ground')
+-- R153 (owner: "fix all jittery type effects"): a chevron fading in at the feet / out at the goal changes on every drawn frame at 30 / 60 fps and in
+-- steps of at most 1/100 + the frame's own fade at 144 fps (it faded in tenths: ten visible steps, a new one every few frames)
+for _,fps in ipairs({30,60,144})do
+ local seen,stalls,fading,worstStep={},0,0,0
+ for _=1,fps do
+  frames(1,1/fps)
+  for _,p in ipairs(t:GetChildren())do if p.Name=='ArmL'then
+   local a,last=p.Transparency,seen[p]
+   if last and a>0 and a<1 and last>0 and last<1 then fading+=1;if a==last then stalls+=1 end;worstStep=math.max(worstStep,math.abs(a-last))end
+   seen[p]=a
+  end end
+ end
+ local perFrame=4.5/fps/1.5 -- (the fastest fade: 1.5 studs at 4.5 studs a second)
+ check(fading>10 and worstStep<=perFrame+.011,string.format('R153: at %d fps the chevrons fade in fine steps (%d fading frames, the biggest step %.3f, the fade itself %.3f a frame)',fps,fading,worstStep,perFrame))
+ if fps<=60 then check(stalls==0,string.format('R153: at %d fps a fading chevron changes on every frame (%d repeated)',fps,stalls))end
+end
 for i=1,20 do root.CFrame=CF(i,3,60+i*1.4);frames(3)end
 local nearest=math.huge;for _,p in ipairs(t:GetChildren())do if p.Name=='ArmL'and p.Transparency<1 then local d=p.CFrame.Position-root.CFrame.Position;nearest=math.min(nearest,math.sqrt(d.X^2+d.Z^2))end end
 check(nearest<4.5,'the path starts at the player after moving ('..math.floor(nearest)..')')

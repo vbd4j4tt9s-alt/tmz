@@ -90,7 +90,7 @@ local function makePopup(field)
 	frame.Parent = field.Gui
 	local popup = {
 		Field = field, Frame = frame, Scale = uiScale, Icon = icon, IconStroke = iconStroke, Amount = amount, AmountStroke = amountStroke,
-		Plan = {}, At = 0, Retired = nil, Reduced = false, Unit = 1, PX = 0, PY = 0, PS = 1, PA = 1,
+		Plan = {}, At = 0, Retired = nil, Reduced = false, Unit = 1, FanX = 1, FanY = 1, PX = 0, PY = 0, PS = 1, PA = 1,
 	}
 	field.Popups[#field.Popups + 1] = popup
 	return popup
@@ -151,7 +151,7 @@ end
 -- Moving one popup: only what changed is written (a resting popup costs nothing) ---------------------------------------------------------------------
 local function apply(popup, x, y, scale, alpha)
 	local unit = popup.Unit
-	x, y = x * unit, y * unit
+	x, y = x * unit * popup.FanX, y * unit * popup.FanY -- (R153: the fan's size on this screen, SpeedPopupStyle.FanScale)
 	if math.abs(x - popup.PX) > 0.05 or math.abs(y - popup.PY) > 0.05 then
 		popup.PX, popup.PY = x, y
 		popup.Frame.Position = UDim2.new(0.5, x, 0.5, y)
@@ -216,7 +216,9 @@ local function spawnPopup(entry, item, now)
 	local popup = table.remove(field.Free)
 	if not popup then popup = table.remove(active, 1) end -- every frame is busy (not expected): the oldest goes at once
 	local camera = workspace.CurrentCamera
-	popup.Unit = Style.Unit(camera and camera.ViewportSize.Y)
+	local viewport = camera and camera.ViewportSize
+	popup.Unit = Style.Unit(viewport and viewport.Y)
+	popup.FanX, popup.FanY = Style.FanScale(viewport and viewport.X, viewport and viewport.Y)
 	popup.Reduced = reduced
 	popup.At = item.At
 	popup.Retired = nil

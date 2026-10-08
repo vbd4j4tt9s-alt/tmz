@@ -16,6 +16,7 @@ local Packs=require(script.Parent.SeedPackRules)
 local Names=require(script.Parent.GardenDisplayNames)
 local Verity=require(script.Parent.VerityCatalog)
 local Odds=require(script.Parent.OddsText85)
+local okCanon,Canon=pcall(function()return require(script.Parent.SeedRarity153)end) -- R153: the seed's one fixed chance (a pull never shows the pack's own)
 local R={Version='R151',Topic='PullAnnounce151',RemoteName='PullAnnounce151'}
 
 -- Tunables ---------------------------------------------------------------------------------------------------------------------------------
@@ -136,7 +137,7 @@ local function number(value,lo,hi)
  return value
 end
 -- kind: 'Pull' (a pull in this server), 'Global' (a pull in another server), 'Record' (a hub record taken). fields: Name (required), UserId, Id,
--- SeedId (required for Pull / Global, optional for Record), Odds (the N of "1/N"), Record (a key such as BestPull), At.
+-- SeedId (required for Pull / Global, optional for Record), Odds (the N of "1/N"; R153: replaced by the seed's fixed N whenever the seed is known), Record (a key such as BestPull), At.
 -- Returns the event, or nil and the reason. The rarity and the seed name are always derived here.
 function R.Event(kind,fields)
  if not R.Kinds[kind]then return nil,'kind'end
@@ -149,7 +150,11 @@ function R.Event(kind,fields)
   local info=R.SeedInfo(fields.SeedId);if not info then return nil,'seed'end
   e.SeedId,e.SeedName,e.Rarity=info.Id,info.Name,info.Rarity
  elseif kind~='Record'then return nil,'seed'end
- local odds=number(fields.Odds,1,1e15);if odds then e.Odds=odds end
+ -- R153 (owner: a Cosmic from a Void pack must still read how rare it is): a seed's chance is ALWAYS its fixed one (SeedRarity153), whatever the sender wrote (an older server
+ -- sends its pack's own); only an event with no known seed (a record about nobody) keeps the number it was given. Display only: who hears it is decided by the rarity tier.
+ local odds=number(fields.Odds,1,1e15)
+ if e.SeedId and okCanon then odds=number(Canon.Canonical(e.SeedId),1,1e15)or odds end
+ if odds then e.Odds=odds end
  if kind=='Record'then
   local key=fields.Record
   e.Record=(type(key)=='string'and#key>=1 and#key<=24 and key:match('^%a+$'))and key or'Record'

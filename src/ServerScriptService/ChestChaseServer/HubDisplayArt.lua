@@ -1,35 +1,35 @@
 -- R151 (rebuilt in R152): the shape of the two hub displays (HubDisplayService owns what they say and when). R152 (owner: "make sure that the avatar is sized up and dancing while the seed rotates around
 -- and the effects are actually on the seed not behind ... a billboard is not needed ... the same format and look as the fruit of the hour type pedestal"): a display is just
 --
---        [ label ]               the market's FRUIT OF THE HOUR pedestal (MarketLayout.Pedestal: stone plinth with a gold trim and four studs, teal column with its inlays and a plaque, gold band, stone
+--      [ BIG LABEL ]             the market's FRUIT OF THE HOUR pedestal (MarketLayout.Pedestal: stone plinth with a gold trim and four studs, teal column with its inlays, gold band, stone
 --         ITEM  (turns)          capital, gold-deep top, four gold prongs: same shapes, same palette), built Scale times bigger, the winning seed / fruit floating over its prongs, and the champion's
---   [plaque]   AVATAR (dances)   avatar, 25 studs tall, standing on the floor beside it. Front (what players see) is local -Z, toward the market; local +X is on the viewer's left.
+--            AVATAR (dances)     avatar, 25 studs tall, standing on the floor beside it. Front (what players see) is local -Z, toward the market; local +X is on the viewer's left.
 --   [=== pedestal ===]
 --
 --  * No sign board, posts, stage slab, halo disc or plinth for the avatar, and NOT the Fruit of the Hour's hollow projector tube: only the pedestal, the item and the avatar.
---  * Words, small like the Fruit of the Hour's: an engraved plaque on the column (SurfaceGui: a dark plate, gold lettering; the title, the winner, a line, the countdown) and a label over the
---    item (BillboardGui: the title, the winner's name, the seed / fruit; HubDisplayRules.Plaque / Label / SignText).
+--  * Words (R153, owner: "this detail here should be put on top of the fruit and it should be big"): ONE big label over the item (BillboardGui in studs, DistanceLowerLimit: the title, the
+--    winner, the seed / weight, the rarity and chance / the fruit of the day, the countdown; HubDisplayRules.Label / SignText). The R152 plaque on the column is gone (the column keeps the market's inlays).
 --  * The item (the game's own seed or fruit art, <= ItemParts parts) carries its effects: an invisible core part at its centre holds a PointLight (the champion's colour), and the client puts a sparkle
 --    emitter on the same core while it is near; the client turns the whole item (HubDisplayClient), so light and sparkles move with it. Nothing flat behind it.
 --  * Space: everything inside Rules.Layout.Footprint (36 x 24 studs half size) around the display's centre, under the hub walls' height. Collision: the plinth, column, capital and its top are solid;
---    everything else (trims, inlays, plaque, prongs, the item, the avatar) is for show (CanCollide / CanQuery / CanTouch off).
--- Cost: 17 static parts for the pedestal, one SurfaceGui, one BillboardGui, one light, plus the item (<= ItemParts) and the avatar (a rig, <= 10 accessories). Nothing is animated here: the turn, the
--- sparkles and the cheer are the client's, only near the camera; the dance is the Animator's (HubDisplayAvatar.Animate).
+--    everything else (trims, inlays, prongs, the item, the avatar) is for show (CanCollide / CanQuery / CanTouch off).
+-- Cost: 16 static parts for the pedestal, one BillboardGui, one light, plus the item (<= ItemParts) and the avatar (a rig, <= 10 accessories). Nothing is animated here: the turn, the
+-- sparkles and the cheer are the client's, only near the camera; the dance is each client's own track on the rig's Animator (R153: HubDisplayClient).
 -- Rules for the parts: surfaces that face the same way are never within .02 stud of each other where they overlap (the tests check the frame itself and the finished hub with the R149 detector).
 local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local Rules=require(RS:WaitForChild('HubDisplayRules'))
 local A={}
 local RGB=Color3.fromRGB
 local V3,CF=Vector3.new,CFrame.new
--- the Fruit of the Hour pedestal's palette (MarketLayout.P) and its plaque's dark plate
-local STONE,TEAL,TEALD,GOLD,GOLDD,PLATE=RGB(232,224,206),RGB(36,141,144),RGB(22,92,108),RGB(247,209,119),RGB(241,187,78),RGB(30,34,50)
+-- the Fruit of the Hour pedestal's palette (MarketLayout.P)
+local STONE,TEAL,TEALD,GOLD,GOLDD=RGB(232,224,206),RGB(36,141,144),RGB(22,92,108),RGB(247,209,119),RGB(241,187,78)
 local SILHOUETTE=RGB(10,9,16)
 -- Local numbers (studs; origin = the display's centre on the floor, X to the viewer's left, Y up, Z away from the viewers). The pedestal's own numbers are MarketLayout.Pedestal's (its units) x Scale.
 A.Dim={
  Scale=3.2,                                      -- the pedestal is the Fruit of the Hour's x 3.2: 19.8 wide, 15.9 tall
  Pedestal={X=15},                                -- its centre (the viewer's left)
  Avatar={X=-15},                                -- where the avatar's soles stand (on the floor; Rules.AvatarTurn turns it toward the pedestal)
- Inlay={W=3.4,H=1.9},                            -- the column's front inlay, in pedestal units (wider than the market's 2.6 x 1.5: it frames the bigger plaque)
+ Inlay={W=2.6,H=1.5,Y=2.25},                    -- the column's inlays, in pedestal units: the market's own (R153: no plaque to frame any more)
  ItemTop=6.5,                                    -- the item's bottom floats over the prong tips: pedestal units
  LabelGap=1.2,                                   -- from the item's top to the label's bottom (studs)
 }
@@ -61,7 +61,7 @@ function A.BuildFrame(parent,kind,layout,floorTop)
  local model=Instance.new('Model');model.Name=kind=='Fruit'and'BiggestFruitDisplay'or'BestPullDisplay'
  model.ModelStreamingMode=Enum.ModelStreamingMode.Persistent -- (StreamingEnabled: a landmark; it must be there from afar, never streamed out and back as new instances)
  model:SetAttribute('HubDisplay',Rules.Version);model:SetAttribute('Kind',kind);model:SetAttribute('State','Empty');model:SetAttribute('Rev',0)
- local d={Kind=kind,Model=model,F=F,Plate={},Tag={}}
+ local d={Kind=kind,Model=model,F=F,Tag={}}
  -- the pedestal: MarketLayout.Pedestal's parts and palette (u = its units, x Scale), without its projector tube and its flat cradle glow ----------------------------------------------
  local ped=Instance.new('Folder');ped.Name='Pedestal';ped.Parent=model
  local px=D.Pedestal.X
@@ -71,7 +71,7 @@ function A.BuildFrame(parent,kind,layout,floorTop)
  for _,x in ipairs({-2.7,2.7})do for _,z in ipairs({-2.7,2.7})do u('Plinth stud',.45,.45,.45,x,1.05,z,GOLDD,false,CFrame.Angles(0,math.rad(45),0))end end
  u('Pedestal column',3.8,2.4,3.8,0,2.2,0,TEAL,true)
  local I=D.Inlay
- u('Column inlay',I.W,I.H,.08,0,2.2,-1.92,TEALD);u('Column inlay',I.W,I.H,.08,0,2.2,1.92,TEALD)
+ u('Column inlay',I.W,I.H,.08,0,I.Y,-1.92,TEALD);u('Column inlay',I.W,I.H,.08,0,I.Y,1.92,TEALD)
  u('Column band',4.1,.25,4.1,0,3.5,0,GOLD)
  u('Pedestal capital',3.4,1,3.4,0,4.1,0,STONE,true)
  local top=u('Capital top',4,.35,4,0,4.78,0,GOLDD,true)
@@ -79,11 +79,6 @@ function A.BuildFrame(parent,kind,layout,floorTop)
   local a=i*math.pi/2+math.pi/4
   u('Cradle prong',.22,1.7,.22,math.cos(a)*1.15,5.65,math.sin(a)*1.15,GOLDD,false,CFrame.Angles(0,-a,0)*CFrame.Angles(0,0,math.rad(-18)))
  end
- -- the plaque: a dark plate on the inlay's front (its back face on the inlay's front face), the engraved words a SurfaceGui
- local P=Rules.Plaque
- local plate=part(ped,'Pedestal plaque',V3(P.W,P.H,.2),L(px,2.2*S,-(1.96*S+.1)),PLATE)
- d.Plaque=plate
- A._buildPlaque(d,plate)
  -- the label over the item (the item's top is ItemHeight over its bottom): a BillboardGui on the pedestal's top, lifted in world space
  d.Top=top
  A._buildLabel(d,top)
@@ -98,55 +93,35 @@ function A.BuildFrame(parent,kind,layout,floorTop)
  return d
 end
 -- The words ----------------------------------------------------------------------------------------------------------------------------------------------
--- The plaque: the Fruit of the Hour plaque's look (dark plate, Fredoka One in gold) with four rows: HubDisplayRules.Plaque.Rows.
-function A._buildPlaque(d,plate)
- local S=Rules.Plaque
- local gui=Instance.new('SurfaceGui');gui.Name='Lettering';gui.Face=Enum.NormalId.Front
- gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud;gui.PixelsPerStud=S.PixelsPerStud
- gui.LightInfluence=0;gui.AlwaysOnTop=false;gui.ResetOnSpawn=false
- pcall(function()gui.MaxDistance=S.MaxDistance end)
- gui.Parent=plate
- local W,H=S.Canvas.W,S.Canvas.H
- for _,key in ipairs({'Title','Name','Line','Footer'})do
-  local row=S.Rows[key]
-  local label=Instance.new('TextLabel');label.Name=key;label.BackgroundTransparency=1
-  label.Position=UDim2.fromScale(row.X/W,row.Y/H);label.Size=UDim2.fromScale(row.W/W,row.H/H)
-  label.Font=Enum.Font.FredokaOne;label.Text='';label.TextColor3=GOLD;label.TextScaled=true
-  label.TextStrokeColor3=RGB(14,12,34);label.TextStrokeTransparency=key=='Footer'and .6 or .35;label.TextWrapped=false;label.Parent=gui
-  local fit=Instance.new('UITextSizeConstraint');fit.MaxTextSize=row.Max;fit.MinTextSize=8;fit.Parent=label
-  d.Plate[key]=label
- end
- d.Gui=gui
-end
--- The label: FruitOfHourDisplay's two-row label (white name over a coloured line), floating over the item, with the title above (rows in studs: HubDisplayRules.Label.Rows).
+-- The label: one BillboardGui over the item, sized in studs (HubDisplayRules.Label: W x H), its bottom LabelGap over the item's top; closer than Label.Near it stops growing
+-- (DistanceLowerLimit). Five rows of Fredoka One scaled to their boxes (Label.Rows), with a dark stroke so they read against the sky and the walls.
 function A._buildLabel(d,top)
  local S=Rules.Label
  local gui=Instance.new('BillboardGui');gui.Name='Label';gui.Size=UDim2.fromScale(S.W,S.H)
  local itemTop=A.ItemBase()+Rules.ItemHeight
  gui.StudsOffsetWorldSpace=V3(0,itemTop+A.Dim.LabelGap+S.H/2-4.78*A.Dim.Scale,0) -- (from the top slab's centre)
- gui.LightInfluence=0;gui.AlwaysOnTop=false;gui.ResetOnSpawn=false
+ gui.DistanceLowerLimit=S.Near;gui.LightInfluence=0;gui.AlwaysOnTop=false;gui.ResetOnSpawn=false
  pcall(function()gui.MaxDistance=S.MaxDistance end)
  gui.Adornee=top;gui.Parent=top
- for _,key in ipairs({'Title','Name','Info'})do
+ for _,key in ipairs(S.Order)do
   local row=S.Rows[key]
   local t=Instance.new('TextLabel');t.Name=key;t.Text='';t.BackgroundTransparency=1
   t.Position=UDim2.fromScale(row.X/S.W,row.Y/S.H);t.Size=UDim2.fromScale(row.W/S.W,row.H/S.H)
-  t.Font=Enum.Font.FredokaOne;t.TextScaled=true;t.TextColor3=Color3.new(1,1,1);t.TextStrokeColor3=RGB(20,25,40);t.TextStrokeTransparency=.25;t.Parent=gui
+  t.Font=Enum.Font.FredokaOne;t.TextScaled=true;t.TextColor3=Color3.new(1,1,1);t.TextStrokeColor3=RGB(14,12,34);t.TextStrokeTransparency=key=='Footer'and .3 or .12;t.Parent=gui
   d.Tag[key]=t
  end
  d.LabelGui=gui
 end
--- Writes the words (HubDisplayRules.SignText) into the plaque and the label.
+-- Writes the words (HubDisplayRules.SignText's Label rows) into the label.
 function A.SetSign(d,text)
- if not d or not d.Plate then return end
- for _,pair in ipairs({{d.Plate,text.Plaque},{d.Tag,text.Label}})do
-  for key,label in pairs(pair[1])do
-   local row=pair[2]and pair[2][key]
-   label.Text=row and row.Text or''
-   if row and row.Color then label.TextColor3=c3(row.Color)end
-  end
+ if not d or not d.Tag then return end
+ local rows=type(text)=='table'and text.Label or nil
+ for key,label in pairs(d.Tag)do
+  local row=rows and rows[key]
+  label.Text=row and row.Text or''
+  if row and row.Color then label.TextColor3=c3(row.Color)end
  end
- d.Model:SetAttribute('State',text.State or'Empty')
+ d.Model:SetAttribute('State',type(text)=='table'and text.State or'Empty')
 end
 -- Colours: the item's light wears `accent` ({r,g,b}) and the client's sparkles read it (the model's Accent attribute); a calm display (nobody has taken the spot: state 'Empty') has
 -- its light off and no sparkles (the Calm attribute). The pedestal itself keeps the Fruit of the Hour's colours. (A 4th argument, the old biome stage, is ignored.)

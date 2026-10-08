@@ -23,7 +23,6 @@ local library=await(remotes,"SeedArt")
 local catalog=await(remotes,"SeedCatalog")
 local records={}
 local connections={}
-local lastHeavenlyAt=-math.huge
 local TEAR_AUDIO_GRACE=.25
 local effects=Instance.new("Folder");effects.Name="_LocalSeedPackEffects";effects.Parent=workspace
 local preload=Instance.new("Sound");preload.SoundId=Rules.TearSoundId;preload.Volume=0;preload.Parent=effects
@@ -60,12 +59,12 @@ local tails={}
 local function handOver(record)
     local sound,f=record.SlideWhoosh,record.SlideWhooshFlight;record.SlideWhoosh=nil
     if not(sound and f and sound.Parent)then return end
-    if workspace:GetServerTimeNow()-record.At-f.Peak>.45 then return end -- (its own fade is over: nothing to finish)
+    if workspace:GetServerTimeNow()-record.At+(f.Shift or 0)-f.Peak>.45 then return end -- (its own fade is over: nothing to finish)
     local root=record.Seed and record.Seed.PrimaryPart
     local anchor=Instance.new("Part");anchor.Name="Seed flight whoosh";anchor.Size=Vector3.one*.2;anchor.Transparency=1
     anchor.Anchored=true;anchor.CanCollide=false;anchor.CanTouch=false;anchor.CanQuery=false;anchor.CastShadow=false
     anchor.CFrame=root and root.CFrame or CFrame.new();anchor.Parent=effects
-    sound.Parent=anchor;tails[#tails+1]={Sound=sound,Flight=f,Anchor=anchor,At=record.At}
+    sound.Parent=anchor;tails[#tails+1]={Sound=sound,Flight=f,Anchor=anchor,At=record.At-(f.Shift or 0)}
 end
 local function stepTails(now)
     for i=#tails,1,-1 do
@@ -218,21 +217,25 @@ local function beginReveal(record,at,seedId,now)
     end
 end
 -- R152: the world seed's flight into the hand (RarePullRules.HandFlight) with the whoosh entered so its swell (RarePullSounds.Flight)
--- lands on the flight's fastest frame: {Start, Peak, Entry, Id, Pitch, Volume, Region} on the reveal's clock.
-local function slideFlight(record,revealStart)
-    if record.SlideFlight~=nil then return record.SlideFlight or nil end
+-- lands on the flight's fastest frame: {Start, Peak, Entry, Id, Pitch, Volume, Region, Shift} on the reveal's clock (R153: shifted by the
+-- opener's skip, Shift: the slide itself stays on the server's time).
+local function slideFlight(record,revealStart,shift)
+    if record.SlideFlight~=nil and record.SlideShift==shift then return record.SlideFlight or nil end
+    record.SlideShift=shift
     local ok,f=pcall(function()
         local def=require(ReplicatedStorage.RarePullSounds).Get("Flight")
         if not def or not def.Id or not def.Swell then return false end
-        local flight=Ladder.HandFlight(revealStart,record.Hover)
+        local flight=Ladder.HandFlight(revealStart,record.Hover+shift)
         local bound=def.Region and def.Region[1]or def.Start or 0
-        return {Start=flight.Peak-(def.Swell-bound)/flight.Pitch,Peak=flight.Peak,Entry=bound,Id=def.Id,Pitch=flight.Pitch,Volume=def.Volume*flight.Volume,Region=def.Region}
+        return {Start=flight.Peak-(def.Swell-bound)/flight.Pitch,Peak=flight.Peak,Entry=bound,Id=def.Id,Pitch=flight.Pitch,Volume=def.Volume*flight.Volume,Region=def.Region,Shift=shift}
     end)
     record.SlideFlight=ok and f or false
     return record.SlideFlight or nil
 end
 local function renderReveal(record,now)
-    local bag=record.Bag;local t=now-record.At
+    -- R153: the opener skipped their card to the hit (RarePullRules.Shift): their pack jumps with it, the seed bursts out with the card; its
+    -- hover grows by as much, so it still flies into the hand when the server ends the opening (the seed is the server's: nothing changes there)
+    local bag=record.Bag;local shift=Ladder.Shift(bag);local t=now-record.At+shift
     local s=bag:GetAttribute("VisualScale")or 1;local root=bag.PrimaryPart.CFrame
     local mouth=(bag:GetAttribute("TearLipY")or 1.11)*s
     if bag.Parent==Players.LocalPlayer.Character and math.max(s,record.SeedBaseScale)>10 and not cinematicOwnsCamera() then
@@ -297,12 +300,12 @@ local function renderReveal(record,now)
     local revealStart=burstAt;local age=math.max(0,t-revealStart)
     if record.Suspense then record.Suspense:Update(wrapperRoot*CFrame.new(0,mouth,0),t)end
     if record.Mech then record.Mech:Update(t,wrapperRoot)end
-    if RareWorld and record.RarityRank>=6 then local owner=ownerOf(bag.Parent);if owner then RareWorld.SetMouth(owner,root*CFrame.new(0,mouth,0))end end
+    if RareWorld and record.RarityRank>=6 then local owner=ownerOf(bag.Parent);if owner then RareWorld.SetMouth(owner,root*CFrame.new(0,mouth,0));if shift>0 then RareWorld.Shift(owner,shift)end end end
     if record.Flourish then
         local char=Players.LocalPlayer and Players.LocalPlayer.Character
         record.Flourish:Update(root*CFrame.new(0,mouth,0),t,revealStart,not(char and bag:IsDescendantOf(char)))
     end
-    local rise,slide=Ladder.SeedPhase(age,record.Hover);local ease=1-(1-rise)^3
+    local rise,slide=Ladder.SeedPhase(age,record.Hover+shift);local ease=1-(1-rise)^3
     local scale=record.SeedBaseScale -- slide the seed out at its real held size
     if not record.LastSeedScale or math.abs(scale-record.LastSeedScale)>.025 or (rise==1 and not record.SeedFullyGrown)then
         record.Seed:ScaleTo(scale);record.LastSeedScale=scale;record.SeedFullyGrown=rise==1;record.SeedPivot=nil
@@ -314,7 +317,7 @@ local function renderReveal(record,now)
     if hand then seedFrame=seedFrame:Lerp(hand.CFrame*CFrame.new(0,-.5,0),slide*slide*(3-2*slide))end
     -- R152 (owner: "whoosh for the flying"): a soft whoosh at the seed as it flies into the hand, its swell on the slide's fastest frame
     if hand and not record.SlideWhooshDone then
-        local f=slideFlight(record,revealStart)
+        local f=slideFlight(record,revealStart,shift)
         if not f then record.SlideWhooshDone=true
         elseif t>=f.Start then
             record.SlideWhooshDone=true
@@ -360,8 +363,9 @@ local function renderReveal(record,now)
             local camera=workspace.CurrentCamera;local at=record.Seed.PrimaryPart.Position
             if camera and (camera.CFrame.Position-at).Magnitude<=ONLOOKER_RANGE then LocalSfx.Play(OnlookerId,at,.3,rank==8 and .88 or 1,3)end
         end
-        if age<.4 and char and mine and now-lastHeavenlyAt>=Rules.RevealAudioCooldown and not(rank>=6 and cinematicRunning())then
-            lastHeavenlyAt=now
+        -- (R153: no cooldown between the opener's own pulls any more (Rules.RevealAudioCooldown): each reveal has its chord, and two can never
+        -- overlap: the server opens one pack at a time and the chord is over 1.6 s after its burst)
+        if age<.4 and char and mine and not(rank>=6 and cinematicRunning())then
             local pitches=rank==4 and {.5,.63,.75}or rank==6 and {.375,.5,.75}or rank>=7 and {.5,.75,1,1.25}or {.5,.75,.94}
             for i,pitch in ipairs(pitches)do
                 local sound=Instance.new("Sound");sound.Name="Soft reveal chime";sound.SoundId=Rules.RevealBellSoundId
@@ -465,10 +469,10 @@ table.insert(connections,RunService.PreSimulation:Connect(function()
         record.Pose:Apply(bag,now)
     end
 end))
-local revealAccumulator=0
+-- R153 (owner: "fix all jittery type effects"): the loose / held seeds' aura and the pack reveal in the world are drawn every rendered frame (they ran at
+-- Rules.SeedMotion.UpdateInterval, 30 Hz: stepped on a 60 Hz screen). Bounded as before: 12 seed auras (6 detailed) within 120 studs, reveals near the camera.
 table.insert(connections,RunService.RenderStepped:Connect(function(dt)
-    revealAccumulator+=dt;if revealAccumulator<Rules.SeedMotion.UpdateInterval then return end
-    local elapsed=revealAccumulator;revealAccumulator%=Rules.SeedMotion.UpdateInterval
+    local elapsed=dt
     local now=workspace:GetServerTimeNow()
     updateHeldSeeds(elapsed,now)
     if #tails>0 then stepTails(now)end
