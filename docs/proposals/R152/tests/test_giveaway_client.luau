@@ -147,9 +147,34 @@ do
   seen[tier]={Moves=moves/3,Pulses=pulses/3,Turn=turned/3,Outline=#outlines/3}
  end
  check(seen[3].Moves>=57 and seen[3].Pulses>=57 and seen[3].Outline>=50,string.format('B5: tier 3: the pack is stepped every frame at 60 fps (%.0f moves, %.0f pulses, the Highlight written %.0f times a second)',seen[3].Moves,seen[3].Pulses,seen[3].Outline))
+ -- R153 (owner: "fix all jittery type effects"): in view, tier 2 and below step every frame too (30 Hz turned in steps on a 60 Hz screen)
  for _,tier in ipairs({2,1})do
-  check(seen[tier].Moves>=27 and seen[tier].Moves<=33 and seen[tier].Pulses>=27 and seen[tier].Pulses<=33,string.format('B5: tier %d: 30 Hz at 60 fps (%.0f moves, %.0f pulses a second)',tier,seen[tier].Moves,seen[tier].Pulses))
+  check(seen[tier].Moves>=57 and seen[tier].Pulses>=57,string.format('R153: tier %d, in view: every frame at 60 fps (%.0f moves, %.0f pulses a second)',tier,seen[tier].Moves,seen[tier].Pulses))
   check(math.abs(seen[tier].Turn-seen[3].Turn)<.12 and seen[tier].Turn>.3,string.format('B5: tier %d: it turns at the same speed (%.3f vs %.3f rad/s; the slow sway adds up to +-.05, half the speed would read .22)',tier,seen[tier].Turn,seen[3].Turn))
+ end
+ -- R153: and at 30 / 144 fps, in view, tier 2 steps once per drawn frame
+ H.tier=2;G.run(.5,1/60)
+ for _,fps in ipairs({30,144})do moves,pulses=0,0;G.run(1,1/fps);check(math.abs(moves-fps)<=2 and math.abs(pulses-fps)<=2,string.format('R153: tier 2 at %d fps, in view: %d moves, %d pulses in 1 s (one per drawn frame)',fps,moves,pulses))end
+ -- R153: out of view (ViewCull152) tier 2 keeps B5's saving: 30 Hz, with the time it skipped (back in view the turn is where it should be)
+ do
+  local cam=W.workspace.CurrentCamera;local hadRay=cam._props.ViewportPointToRay
+  cam.ViewportPointToRay=function(self,x,y)
+   local vs=self.ViewportSize;local tv=math.tan(math.rad(self.FieldOfView or 70)/2);local th=tv*vs.X/vs.Y
+   local dx,dy=(2*x/vs.X-1)*th,(1-2*y/vs.Y)*tv;local cf=self.CFrame
+   return {Origin=cf.Position,Direction=(cf.RightVector*dx+cf.UpVector*dy+cf.LookVector).Unit}
+  end
+  local turns={}
+  for _,tier in ipairs({3,2})do
+   H.tier=tier;G.look(V3(0,10,-360),CENTER);G.run(1.2,1/60)
+   local y0=yaw(root);G.look(V3(0,10,-360),V3(0,10,-200));G.run(.5,1/60) -- (facing away: the pack is behind the camera)
+   moves=0;for _=1,180 do G.run(1/60,1/60)end;local away=moves/3
+   G.look(V3(0,10,-360),CENTER);G.run(1/60,1/60)
+   local turned=(yaw(root)-y0)%(2*math.pi);turns[tier]=turned
+   if tier==2 then check(away>=27 and away<=33,string.format('R153: tier 2, out of view: 30 Hz as before (%.0f moves a second)',away))
+   else check(away>=57,string.format('R153: tier 3, out of view: every frame as before (%.0f moves a second)',away))end
+  end
+  check(math.abs(turns[2]-turns[3])<.35 and turns[2]>.75*turns[3],string.format('R153: tier 2 comes back into view turned as far as tier 3 (%.3f vs %.3f rad; the slow sway alone moves +-.13, losing the skipped time would read half)',turns[2],turns[3]))
+  cam.ViewportPointToRay=hadRay;G.look(V3(0,10,-360),CENTER)
  end
  W.workspace.BulkMoveTo=rawMove;PackFx.Pulse=rawPulse
  H.tier=3;G.run(1.2)

@@ -671,6 +671,8 @@ do
  check(list.DesertAloeSeed.RarityChip.Rarity.Text=='RARE'and list.SandFruitSeed.RarityChip.Rarity.Text=='LEGENDARY','Aloe RARE, Sand Fruit LEGENDARY')
  check(list.DesertAloeSeed:FindFirstChild('Name').Text=='???'and list.SandFruitSeed:FindFirstChild('Name').Text=='???','the new seeds start as ??? until found')
  local middle=gui:FindFirstChild('MiddleGem',true);local endGem=gui:FindFirstChild('GemReward',true)
+ local function amountText(g)for _,d in ipairs(g:GetDescendants())do if d:IsA('TextLabel')and d.Text:find('^%+%d+$')then return d.Text end end end
+ check(middle:GetAttribute('RewardGems')==5 and endGem:GetAttribute('RewardGems')==10 and amountText(middle)=='+5'and amountText(endGem)=='+10','R153: Desert shows the halved gems: halfway +5, completion +10 ('..tostring(amountText(middle))..' / '..tostring(amountText(endGem))..')')
  check(middle:GetAttribute('RewardReady')==true and middle.Active and endGem:GetAttribute('RewardReady')==false and not endGem.Active,'5 of 7, no flags: the halfway gem is lit, the completion gem is not')
  -- The server records an old completer (it had reached both milestones with the old roster, before the update) and publishes the flags.
  player:SetAttribute('IndexOldHalf2',true);W.frames(5)

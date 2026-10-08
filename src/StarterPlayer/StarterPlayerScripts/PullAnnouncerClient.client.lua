@@ -53,15 +53,33 @@ local function holdFor(e)
  if type(at)~='number'or at~=at then return 0 end
  return math.clamp(at+Rules.Setting('RevealMargin')-workspace:GetServerTimeNow(),0,HOLD_MAX)
 end
+-- R153: a held line goes out as soon as the puller's reveal has shown the seed: the wait is checked again whenever the reveal moves that
+-- moment (a skip shows the seed sooner: RarePullSeedShownAt / RarePullClimaxAt change), and never runs past the first wait.
+local held={}
+local function release()
+ if dead then return end
+ local i=1
+ while i<=#held do local h=held[i];if holdFor(h.E)<=0 or os.clock()>=h.Until then table.remove(held,i);chat(h.E)else i+=1 end end
+end
 local function receive(payload)
  if dead or type(payload)~='table'then return end
  local e=Rules.Event(payload.Kind,payload)
  if not e or not e.Id or not remember(e.Id)then return end
  local wait=holdFor(e)
- if wait>0 then task.delay(wait,function()if not dead then chat(e)end end)else chat(e)end
+ if wait>0 then held[#held+1]={E=e,Until=os.clock()+wait};task.delay(wait,release)else chat(e)end
 end
 connection=remote.OnClientEvent:Connect(receive)
+local watching={};local me=Players.LocalPlayer
+if me then
+ for _,name in ipairs({'RarePullSeedShownAt','RarePullClimaxAt'})do
+  watching[#watching+1]=me:GetAttributeChangedSignal(name):Connect(function()
+   if #held==0 then return end
+   release();for _,h in ipairs(held)do local w=math.min(holdFor(h.E),h.Until-os.clock());if w>0 then task.delay(w,release)end end
+  end)
+ end
+end
 script.Destroying:Connect(function()
  dead=true
  if connection then connection:Disconnect();connection=nil end
+ for _,c in ipairs(watching)do c:Disconnect()end
 end)

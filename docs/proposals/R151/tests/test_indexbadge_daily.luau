@@ -67,7 +67,7 @@ for _,s in ipairs(SCREENS)do
  check(cut==0,s[1]..'x'..s[2]..': the DAILY badge is not clipped (cut '..cut..' px)')
  local br=L.rect(daily)
  check(overshoot(a,{x0=0,y0=0,x1=s[1],y1=s[2]})==0,s[1]..'x'..s[2]..': it is on screen (button '..string.format('%.0f,%.0f %.0fx%.0f',br.x0,br.y0,br.x1-br.x0,br.y1-br.y0)..', badge reach '..string.format('%.1f,%.1f..%.1f,%.1f',a.x0,a.y0,a.x1,a.y1)..')')
- local r=L.rect(o);check(near(r.x1-r.x0,r.y1-r.y0)and near(r.x1-r.x0,20),s[1]..'x'..s[2]..': a 20 px square (a circle)')
+ local r=L.rect(o);check(near(r.x1-r.x0,r.y1-r.y0)and near(r.x1-r.x0,Badge.Sizes.Daily),s[1]..'x'..s[2]..': a '..Badge.Sizes.Daily..' px square (a circle; R153: 1.5x the R151 20 px)')
 end
 inset(120,1280,0,52);resize(1280,720)
 -- 4. the window's tab dots --------------------------------------------------------------------------------------------------------------------------------

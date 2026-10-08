@@ -12,7 +12,10 @@
 --  5. cross-server: A writes (about 3 s later), B reads (within 45-60 s) and shows it with a pop but no notice; races between two servers; the better one wins everywhere;
 --  6. polling and writes: the interval and jitter, how many requests an hour costs, writes are coalesced;
 --  7. failures: MemoryStore down -> this server's own best, keeps trying with backoff, catches up; throttled; recovered;
---  8. a champion change rebuilds the item and the avatar once (a stale build is dropped, also while its dance loads; an identical record rebuilds nothing);
+--  8. a champion change rebuilds the item and the avatar once (a stale build is dropped, also while its avatar is made ready; an identical record rebuilds nothing); R153: the same
+--     champion with a better record keeps the avatar that stands there (no new rig: every screen's dance goes on);
+--  8b. R153: the clients' dance reports (HubDisplayAvatarReport): checked field by field, rate-limited, the last per display kept; the owner's status line says each display's
+--     AvatarMode and dance id, the asking owner's own screen (track loaded, its Length) and what the other screens report;
 --  9. owner tools: bestpull / bigfruit (this server only, `share`; announced PRIVATELY to the target), reset, day preview (no store traffic), status text.
 local HH=require('./hub_harness');local H=HH.H;local W,R=H.W,H.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -40,7 +43,7 @@ local function fakeArt()
   local m=R.new('Model');m.Name='Item'..#A.ItemBuilds;return m,{Parts=10,Source='art'}
  end
  function A.SetItem(d,m)if d.Item and d.Item~=m then d.Item:Destroy()end;d.Item=m end
- function A.SetAvatar(d,m)if d.Avatar and d.Avatar~=m then d.Avatar:Destroy()end;d.Avatar=m;if m then m:SetAttribute('InDisplay',true)end end
+ function A.SetAvatar(d,m)if d.Avatar and d.Avatar~=m then d.Avatar:Destroy()end;d.Avatar=m;if m then m:SetAttribute('InDisplay',true);m.Parent=d.Model end end -- (in the display, as the real one)
  function A.Counts(d)return{Frame=10,Item=d.Item and 10 or 0,Avatar=d.Avatar and 10 or 0}end
  return A
 end
@@ -50,14 +53,16 @@ local function fakeAvatars()
   V.Builds[#V.Builds+1]={Uid=uid,Silhouette=opts and opts.Silhouette}
   if V.Yield then V.Pending[#V.Pending+1]=coroutine.running();coroutine.yield()end
   local m=R.new('Model');m.Name='Avatar'..uid;m:SetAttribute('UserId',uid)
+  if opts and opts.Silhouette then m:SetAttribute('Fallback',true);return m,'fallback'end
   return m,'avatar'
  end
  function V:Place(m,feet,height,turn)V.Placed+=1;V.Last={Height=height,Turn=turn};if m then m:SetAttribute('Placed',true)end;return true end
- -- R152: the dance. The real one runs after the avatar is in the display (its Animator plays only in the world) and yields while the track loads.
+ -- R152 / R153: made ready to dance once the avatar is in the display (the clients play the dance on its Animator); a stand-in may yield here.
  function V:Animate(m,uid)
   V.Animated[#V.Animated+1]={Model=m,Uid=uid,Placed=m:GetAttribute('Placed')==true,InDisplay=m:GetAttribute('InDisplay')==true}
   if V.AnimateYield then V.AnimatePending[#V.AnimatePending+1]=coroutine.running();coroutine.yield()end
-  m:SetAttribute('AvatarMode',V.AnimateMode);return V.AnimateMode
+  if m:GetAttribute('Fallback')then m:SetAttribute('AvatarMode','static');return'static'end
+  m:SetAttribute('AvatarMode',V.AnimateMode);m:SetAttribute('DanceId',V.AnimateMode=='dance'and Rules.DanceIds[Rules.DanceIndex(uid,1)]or nil);return V.AnimateMode
  end
  return V
 end
@@ -159,14 +164,14 @@ do
  check(rec and rec.Name=='Ann'and rec.Uid==11 and rec.Id=='FirePepperSeed'and rec.Rarity=='Mythic'and rec.Seed=='Fire Pepper'and snap.Pull.Source=='Local','the board holds it (name, user id, seed, rarity), from this server')
  local want=P.SeedOdds(Config,4,'Pack03',1,P.OddsVersion)['FirePepperSeed']
  check(want and math.abs(rec.Odds-want)<1e-12,'its odds are the pack\'s own SeedOdds for that seed ('..tostring(want)..'%)')
- check(pd.Text.State=='Champion'and pd.Text.Label.Name.Text=='Ann'and pd.Text.Plaque.Name.Text=='Ann'and pd.Text.Label.Info.Text=='Fire Pepper'and pd.Text.Plaque.Line.Text=='Mythic · '..Rules.OddsText(want),'the plaque and the label say "Ann", the seed ("Fire Pepper") and the rarity and chance')
+ check(pd.Text.State=='Champion'and pd.Text.Label.Name.Text=='Ann'and pd.Text.Plaque.Name.Text=='Ann'and pd.Text.Label.Info.Text=='Fire Pepper'and pd.Text.Plaque.Line.Text=='Mythic · '..W.module('SeedRarity153').Text('FirePepperSeed'),'the plaque and the label say "Ann", the seed ("Fire Pepper") and the rarity and chance (R153: the seed\'s fixed chance, 1/800, not the Pack03 one the pull is ranked by: '..Rules.OddsText(want)..')')
  check(pd.Model:GetAttribute('Champion')=='Ann'and pd.Model:GetAttribute('Rarity')=='Mythic'and pd.Model:GetAttribute('ChampionUserId')==11 and pd.Model:GetAttribute('Rev')==2,'the display\'s attributes name the champion and Rev goes up')
  check(pd.TintState=='Ready'and pd.Accent[1]==Rules.RarityColor('Mythic')[1],'tinted in the rarity\'s colour')
  check(#A.Art.ItemBuilds==before+1 and A.Art.ItemBuilds[#A.Art.ItemBuilds].Spec.Id=='FirePepperSeed'and A.Art.ItemBuilds[#A.Art.ItemBuilds].Spec.Mystery==false,'one new item: the seed itself (not the mystery one)')
  check(A.Avatars.Builds[#A.Avatars.Builds].Uid==11 and A.Art.Built.Pull.Avatar:GetAttribute('UserId')==11,'and Ann\'s avatar (by user id)')
  local an=A.Avatars.Animated[#A.Avatars.Animated]
  check(an and an.Uid==11 and an.Model==A.Art.Built.Pull.Avatar and an.Placed and an.InDisplay and A.Art.Built.Pull.Avatar:GetAttribute('AvatarMode')=='dance','the avatar is told to dance, after it was placed and put in the display (an Animator plays only in the world)')
- check(A.Service.AvatarMode and A.Service.AvatarMode.Pull=='dance'and A.Service:StatusText():find('dance',1,true),'and the owner\'s hubdisplays line says so')
+ check(A.Service.AvatarMode and A.Service.AvatarMode.Pull=='dance'and A.Service:StatusText():find('AvatarMode dance '..Rules.DanceIds[Rules.DanceIndex(11,1)]:match('%d+'),1,true),'and the owner\'s hubdisplays line says so, with the dance id')
  -- exclusions
  local n=#A.Art.ItemBuilds
  check(not svc:NotePull(p2,reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01',Test=true})),'a TEST pack (/test rarepacks) is not counted (even a King that would take the spot)')
@@ -462,9 +467,14 @@ do
  local rev=S.Art.Built.Pull.Model:GetAttribute('Rev')
  S.Service:NotePull(q,reward('FirePepperSeed','Mythic'),info())
  check(#S.Art.ItemBuilds==n0+1 and S.Art.Built.Pull.Model:GetAttribute('Rev')==rev,'an equal (not better) pull changes nothing')
+ -- R153: the same champion with a better pull keeps the avatar that stands there (the dance every screen plays on it goes on)
+ local before=S.Art.Built.Pull.Avatar;local b0=#S.Avatars.Builds;local a0=#S.Avatars.Animated;local built0=S.Art.Built.Pull.Model:GetAttribute('Built')
+ S.Service:NotePull(q,reward('FirePepperSeed','Mythic'),info({Variant='Pack01'}))
+ check(S.Service:Snapshot().Pull.Record.Odds<P.SeedOdds(Config,4,'Pack03',1,P.OddsVersion)['FirePepperSeed']and S.Art.Built.Pull.Avatar==before and before.Parent~=nil and #S.Avatars.Builds==b0 and #S.Avatars.Animated==a0,'the same champion with a rarer pull: the same avatar stays (no new rig, nothing made ready again)')
+ check(#S.Art.ItemBuilds==n0+2 and S.Art.Built.Pull.Model:GetAttribute('Built')==built0+1,'(the item is the new one, and the display counts as built)')
  -- two champions in a row while the first avatar is still loading: only the second is installed
  S.Avatars.Yield=true
- S.Service:NotePull(q,reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01'}))
+ S.Service:NotePull(HH.player(70,'Dee'),reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01'}))
  local q2=HH.player(72,'Flo')
  S.Service:NotePull(q2,reward('SolarStarfruitSeed','King',{SeedScale=7}),info({Stage=2,Variant='Pack01'}))
  check(#S.Avatars.Pending==2,'two avatar loads are in flight')
@@ -475,12 +485,12 @@ do
  check(d.Avatar and d.Avatar:GetAttribute('UserId')==72,'only the newer champion\'s avatar is installed (the stale one, finishing last, was dropped)')
  check(S.Avatars.Placed==placed0+1,'(the older avatar was never placed)')
  check(d.Item~=nil and d.Item.Name=='Item'..#S.Art.ItemBuilds,'(the newest item stays)')
- -- the dance is waited for (it loads): a champion overtaken while it loads is dropped too, and only the newest counts as built
+ -- an avatar being made ready may yield (a stand-in does): a champion overtaken meanwhile is dropped too, and only the newest counts as built
  S.Avatars.AnimateYield=true
- local built0=S.Art.Built.Pull.Model:GetAttribute('Built')or 0
+ built0=S.Art.Built.Pull.Model:GetAttribute('Built')or 0
  S.Service:NotePull(HH.player(75,'Hal'),reward('SolarStarfruitSeed','King',{SeedScale=11}),info({Stage=2,Variant='Pack01'}))
  S.Service:NotePull(HH.player(76,'Ida'),reward('SolarStarfruitSeed','King',{SeedScale=13}),info({Stage=2,Variant='Pack01'}))
- check(#S.Avatars.AnimatePending==2 and S.Art.Built.Pull.Model:GetAttribute('Built')==built0,'two champions\' avatars are waiting for their dance to load (nothing is counted as built yet)')
+ check(#S.Avatars.AnimatePending==2 and S.Art.Built.Pull.Model:GetAttribute('Built')==built0,'two champions\' avatars are being made ready (nothing is counted as built yet)')
  S.Avatars.AnimateYield=false
  for i=#S.Avatars.AnimatePending,1,-1 do coroutine.resume(S.Avatars.AnimatePending[i])end
  check(S.Art.Built.Pull.Model:GetAttribute('Built')==built0+1 and d.Avatar:GetAttribute('UserId')==76,'when they finish only the newer champion (Ida) counts: one built, hers on the display')
@@ -494,8 +504,55 @@ do
  check(snap.Pull.Record==nil and d.Avatar and d.Avatar:GetAttribute('UserId')==0,'a champion that was loading at midnight does not show on the new empty board (a silhouette does)')
  -- an avatar that could not dance is the static pose: the service just records it
  S.Avatars.AnimateMode='pose';S.Service:NotePull(HH.player(77,'Jo'),reward('SolarStarfruitSeed','King',{SeedScale=15}),info({Stage=2,Variant='Pack01'}))
- check(S.Service.AvatarMode.Pull=='pose'and S.Service:StatusText():find('pose',1,true),'an avatar that could not dance is reported as the static pose')
+ check(S.Service.AvatarMode.Pull=='pose'and S.Service:StatusText():find('AvatarMode pose',1,true),'an avatar that could not dance is reported as the static pose')
  S.Avatars.AnimateMode='dance'
+end
+
+-- 8b. The clients' dance reports (R153) -----------------------------------------------------------------------------------------------------------------------------------
+do
+ local backend=HH.backend();local ca=HH.clock(T0);backend.Now=function()return ca.t end
+ local S=makeServer(backend,{Clock=ca,Seed=9});S.Service:Start()
+ local svc=S.Service
+ local remote=remotes:FindFirstChild(Rules.ReportRemote)
+ check(remote and remote:IsA('RemoteEvent')and Rules.ReportRemote=='HubDisplayAvatarReport','the report remote ChestChaseRemotes.HubDisplayAvatarReport exists')
+ local owner=HH.player(91,'Owner');local other=HH.player(92,'Pal');local third=HH.player(93,'Tri')
+ svc:NotePull(HH.player(90,'Champ'),reward('FirePepperSeed','Mythic'),info())
+ local id=Rules.DanceIds[Rules.DanceIndex(90,1)]
+ local text=svc:StatusText(owner)
+ check(text:find('Pull display:',1,true)and text:find('AvatarMode dance '..id:match('%d+'),1,true)and text:find('your screen: no report yet',1,true),'before any report: the display\'s AvatarMode and dance id, "your screen: no report yet"')
+ check(text:find('Fruit display:',1,true)and text:find('AvatarMode static',1,true),'(the empty fruit board\'s silhouette is static)')
+ -- through the remote, as a client sends it
+ remote.OnServerEvent:Fire(owner,{Kind='Pull',Mode='dance',User=90,Id=id,Loaded=true,Length=8.4321,Tries=1,Paused=false})
+ local t2=svc:StatusText(owner)
+ check(t2:find('your screen: dance: track loaded, Length 8.43 s, playing',1,true),'the owner\'s own screen: the track loaded, its Length, playing ('..t2:match('Pull display:[^\n]*')..')')
+ check(svc:NoteReport(other,{Kind='Pull',Mode='pose',User=90,Id=Rules.DanceIds[2],Loaded=false,Length=0,Tries=4})and svc:NoteReport(third,{Kind='Pull',Mode='dance',User=90,Id=id,Loaded=true,Length=8.4,Tries=2,Paused=true}),'other players\' reports are kept')
+ local t3=svc:StatusText(owner)
+ check(t3:find('other screens: 1 dance, 1 pose',1,true),'and counted: "other screens: 1 dance, 1 pose"')
+ local t4=svc:StatusText(other)
+ check(t4:find('your screen: pose: the dance did not load (4 tries, Length 0.00), posed on that screen (id '..Rules.DanceIds[2]:match('%d+')..')',1,true),'a screen whose dance did not load says so, with its tries and the last id')
+ check(svc:StatusText(third):find('your screen: dance: track loaded, Length 8.40 s, paused (reduced motion / low quality), try 2',1,true),'a paused dance says paused, and a dance that loaded on a later try says which')
+ check(svc:StatusText():find('your screen',1,true)==nil and svc:StatusText():find('other screens: 2 dance, 1 pose',1,true),'without an owner (the server\'s own call) only the counts')
+ -- bad reports are dropped, never an error
+ local okAll=true
+ for _,bad in ipairs({nil,5,'x',{},{Kind='Bogus',Mode='dance'},{Kind='Pull',Mode='jump'},{Kind='Pull'},{Kind='Pull',Mode={}},{Kind='Fruit',Mode=5}})do
+  local okCall,kept=pcall(svc.NoteReport,svc,owner,bad);if not okCall or kept then okAll=false end
+ end
+ check(okAll and not svc:NoteReport('nobody',{Kind='Pull',Mode='dance'}),'a malformed report (no table, an unknown kind or mode, no player) is dropped')
+ svc:NoteReport(owner,{Kind='Pull',Mode='dance',User=90,Id='rbxassetid://1',Loaded=true,Length=1e9,Tries=-3})
+ local kept=svc.Reports[owner].Pull
+ check(kept.Id==nil and kept.Length==0 and kept.Tries==0,'an id that is not one of the dances, an absurd Length or a negative try count is not believed')
+ local okFire=pcall(function()remote.OnServerEvent:Fire(owner,'junk');remote.OnServerEvent:Fire(owner,{Kind='Pull',Mode='dance',Length=0/0})end)
+ check(okFire,'junk through the remote never errors')
+ -- at most ReportBurst a player in ReportWindow seconds
+ local n=0;for i=1,60 do if svc:NoteReport(third,{Kind='Fruit',Mode='static',User=0})then n+=1 end end
+ check(n<=Service.ReportBurst,'a flood is cut off ('..n..' of 60 kept in one window)')
+ ca.advance(Service.ReportWindow+1)
+ check(svc:NoteReport(third,{Kind='Fruit',Mode='static',User=0}),'and the next window takes reports again')
+ -- a report about an avatar that is no longer there is not shown as the current one
+ svc:NotePull(HH.player(95,'Newer'),reward('SolarStarfruitSeed','King'),info({Stage=2,Variant='Pack01'}))
+ check(svc:StatusText(owner):find('your screen: no report yet',1,true),'a new champion: the owner\'s old report (about the last avatar) is not shown as this one\'s')
+ svc:Destroy()
+ check(svc.ReportConnection==nil,'the report connection goes with the service')
 end
 
 -- 9. Owner tools ---------------------------------------------------------------------------------------------------------------------------------------------------------

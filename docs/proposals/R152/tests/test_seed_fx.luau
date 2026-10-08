@@ -383,6 +383,18 @@ for rank=6,8 do
   check(#left==0,tag..': no beam / emitter / light / image left ('..table.concat(left,', ')..')')
  end
 end
+-- R153: a card the player skipped and closed (Common..Mythic, a story tier in place) leaves nothing either
+for _,c in ipairs({{1,false},{4,false},{5,false},{6,true},{8,true}})do
+ reset();if c[2]then X.keeper(V3(25,3,100),{})end
+ local base=set(fxIn(W.workspace))
+ local run=start(c[1]);local tl=run.TL;local tag=names[c[1]]..(c[2]and' in place'or' card')..' skipped and closed'
+ X.run(tl.SkipFrom+.1);check(M.Skip(),tag..': skipped to the hit')
+ X.run(L.ShownAt(tl)-run.Clock()+.15);check(M.Skip(),tag..': closed once the result was shown')
+ X.run(1)
+ check(M.Active()==nil and X.pg:FindFirstChild('RarePullReveal')==nil and cam:FindFirstChild('RarePullGrade')==nil and M.Fading()==0,tag..': no card, GUI or colour grade left')
+ local left={};for _,d in ipairs(fxIn(W.workspace))do if not base[d]and not d:IsDescendantOf(X.char)then left[#left+1]=d.Name end end
+ check(#left==0,tag..': no beam / emitter / light / image left ('..table.concat(left,', ')..')')
+end
 do -- a Legendary / Mythic flourish's beam goes with its pack
  for rank=4,5 do
   local holder=R.new('Model');holder.Parent=W.workspace

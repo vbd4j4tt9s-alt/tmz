@@ -201,7 +201,9 @@ function UW.boot(opts)
  W.service('SoundService')
  local view=opts.view or{1280,720}
  if opts.touch then W.UIS.TouchEnabled=true;W.UIS.MouseEnabled=false end
+ UW.made={} -- R153: how many Instances of each class were made since the boot (e.g. no BillboardGui is ever made)
  do local inew=R.Instance.new;R.Instance.new=function(class,parent)local o=inew(class,parent)
+  UW.made[class]=(UW.made[class]or 0)+1
   if class=='Sound'then
    if opts.realAudio then
     local sound=o;sound.IsLoaded=false;sound.Loaded=R.signal();sound.IsPlaying=false;sound.TimeLength=1;sound.TimePosition=0
@@ -237,9 +239,24 @@ function UW.boot(opts)
   W.stub('SoundTiming',{Play=function(s)ctx.Ticks[#ctx.Ticks+1]={At=R.clock,Pitch=s.PlaybackSpeed}end})
  end
  W.stub('ClientFxBudget',{Get=function()return ctx.Tier or 3 end})
+ -- R153: the owner's pack picture. The REAL EmbeddedImage153 decodes the REAL BonusPackImage153; its hooks stand in for the engine: ctx.Image.Created = the
+ -- EditableImages made (W, H, Len, Destroyed), Contents = Content.fromObject calls, Queue = decodes waiting (opts.imagePending runs them by hand: ctx.Image.Run()),
+ -- opts.imageFail = the Image API is off (CreateEditableImage errors).
+ do
+  local EI=W.module('EmbeddedImage153');local image={Created={},Contents={},Queue={}};ctx.Image=image;ctx.EI=EI
+  EI.Hooks.Create=function(w,h,rgba)
+   if opts.imageFail then error('no EditableImage (memory budget or API unavailable)')end
+   local o={W=w,H=h,Len=buffer.len(rgba),Destroyed=false,Rgba=rgba};function o.Destroy()o.Destroyed=true end
+   image.Created[#image.Created+1]=o;return o
+  end
+  EI.Hooks.Content=function(o)local c={Image=o};image.Contents[#image.Contents+1]=c;return c end
+  EI.Hooks.Spawn=function(fn)if opts.imagePending then image.Queue[#image.Queue+1]=fn else fn()end end
+  EI.Hooks.Wait=function()end;EI.Hooks.None={Name='no content'}
+  function image.Run()local q=image.Queue;image.Queue={};for _,fn in ipairs(q)do fn()end end
+ end
  local script=R.new('LocalScript');script.Name='TreadmillBonusClient';ctx.Script=script
  W.load('TreadmillBonusClient',script)
- ctx.Hud=pg:FindFirstChild('TreadmillBonusHud');ctx.Overlay=pg:FindFirstChild('TreadmillBonusRoll');ctx.Bar=pg:FindFirstChild('TreadmillBonusProgress')
+ ctx.Hud=pg:FindFirstChild('TreadmillBonusHud');ctx.Overlay=pg:FindFirstChild('TreadmillBonusRoll')
  ctx.Button=ctx.Hud.BonusRollButton
  function ctx.set(k,v)me:SetAttribute(Rules.Attr[k],v)end
  function ctx.size(w,h)

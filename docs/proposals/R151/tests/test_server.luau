@@ -2,7 +2,7 @@
 -- R151 pull announcements, part 2: the SERVER half on the Roblox mock with the REAL modules (PullAnnouncer, PullAnnounceRules, PlayerDataService, RarePackTests,
 -- SeedPackRules, Config, OwnerUpdateCommands82, StudioTestHelp) and a MessagingService bus (announce_env.luau):
 --  1. the hook: PlayerDataService:OpenSeedPack of a real pack announces a Legendary+ seed once the PULLER's reveal has shown the seed (PullAnnounceRules.RevealDelay, from
---     RarePullRules); a TEST pack (/test rarepacks), a given / granted seed, a Common pull and a changed threshold announce nothing; the odds are the pack's own; the pull is
+--     RarePullRules); a TEST pack (/test rarepacks), a given / granted seed, a Common pull and a changed threshold announce nothing; the odds are the seed's fixed chance (R153, SeedRarity153; they were the pack's own); the pull is
 --     still announced when the puller has left (at once, there is no reveal left to spoil)
 --  1a. timing per rarity: the line goes out at exactly that delay (to the puller and everybody else alike, never earlier), the publish to the other servers and the line the other
 --     servers show come after it too; for every presentation the client can pick (Full / Calm / InPlace, quick) the delay is after the seed is shown; a leaving puller releases it
@@ -122,7 +122,8 @@ do
  local e=pulls[1]and pulls[1].Payload
  check(e and e.SeedId==reward.SeedId and e.UserId==701 and e.Name=='Ann D'and e.Id and e.Id:match('^jobA0000%-%d+$'),'the payload names the seed, the puller (display name, user id) and carries an id ('..tostring(e and e.Id)..')')
  local percent=Packs.SeedOdds(Config,pack.Stage,pack.BagVariant,Ann:GetAttribute('ChestLuckMultiplier'),pack.OddsVersion,pack.RateBoost)[reward.SeedId]
- check(e and percent and math.abs(e.Odds-100/percent)<1e-9*e.Odds,'the odds are the pack\'s own chance for that seed: 1/'..tostring(e and e.Odds)..' (SeedOdds '..tostring(percent)..'%)')
+ local fixed=W.module('SeedRarity153').Canonical(reward.SeedId)
+ check(e and fixed and math.abs(e.Odds-fixed)<1e-9*e.Odds,'R153: the odds are the seed\'s fixed chance: 1/'..tostring(e and e.Odds)..' (this pack\'s own chance for it was SeedOdds '..tostring(percent)..'%; test_seed_rarity.luau opens a real Void pack)')
  check(e and e.Size==nil and e.Mutation==nil and e.Rarity==nil,'the payload carries no size, no coat and no rarity (chat lines need none of them; the client reads its own catalog)')
  check(bus:Count('A')==0,'a Legendary pull is NOT sent to other servers (Secret and above only)')
  table.clear(sinkLog)
@@ -451,22 +452,22 @@ do
  Mystery.Owner[Ann]=nil;unwatch();emptyBag(Ann)
 end
 do
- -- daily week: the login pack (day 7 = a Mech pack) the target claims is a TEST pack; a later claim without a command is a normal Mech pack
+ -- daily week: the login pack (day 7 = a Void Pack since R153; it was a Mech pack) the target claims is a TEST pack; a later claim without a command is a normal Void pack
  emptyBag(Ann);table.clear(sinkLog);watch()
  local ok=command(Ann,'/test daily week');check(ok==true and TestPacks.Armed(Ann,'Daily'),'/test daily week arms the daily source')
  local claimed,msg=Data:ClaimDailyLogin(Ann);check(claimed==true,'the day 7 login claim works ('..tostring(msg)..')')
  local packs=packsOf(Ann)
- check(#packs==1 and packs[1].BagVariant=='MechLimited'and packs[1].TestGrant==true and not TestPacks.Armed(Ann,'Daily'),'the Mech pack from the claim carries TestGrant; the arm is used up')
+ check(#packs==1 and packs[1].BagVariant=='EclipseReliquary'and packs[1].TestGrant==true and not TestPacks.Armed(Ann,'Daily'),'the Void pack from the claim carries TestGrant; the arm is used up')
  openAll(Ann);settle(30)
  check(#sinkLog==0 and bus:Count('A')==spy.Published and spy.Reasons[1]=='test pack','... and opening it announces nothing')
  emptyBag(Ann);table.clear(sinkLog)
  local day=D.Day(os.time());local daily=Data:DailyData(Ann);daily.Login={Step=#D.Login-1,Day=day-1}
  local claimed2=Data:ClaimDailyLogin(Ann);local packs2=packsOf(Ann)
- check(claimed2==true and#packs2==1 and packs2[1].BagVariant=='MechLimited'and packs2[1].TestGrant==nil,'the next day 7 Mech pack (no command) is a normal pack')
+ check(claimed2==true and#packs2==1 and packs2[1].BagVariant=='EclipseReliquary'and packs2[1].TestGrant==nil,'the next day 7 Void pack (no command) is a normal pack')
  local _,loudCount=openAll(Ann);settle(waitFor('King')+1)
- check(loudCount==1 and#ofKind(sinkLog,'Pull')>=1,'... and opening it IS announced (Mech seeds are Legendary and above)')
- -- daily done (quests, gems only) arms nothing
- TestPacks.Disarm(Ann,'Daily');command(Ann,'/test daily done');check(not TestPacks.Armed(Ann,'Daily'),'/test daily done (gems only) arms nothing')
+ check(loudCount==1 and#ofKind(sinkLog,'Pull')>=1,'... and opening it IS announced (Void seeds are Secret and above)')
+ -- daily done (finishes the quests) arms nothing
+ TestPacks.Disarm(Ann,'Daily');command(Ann,'/test daily done');check(not TestPacks.Armed(Ann,'Daily'),'/test daily done (R153: quests pay normal packs; the owner\'s TestGrant rule is untouched) arms nothing')
  unwatch();emptyBag(Ann)
 end
 do

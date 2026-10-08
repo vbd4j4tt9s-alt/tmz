@@ -44,7 +44,7 @@ function ChestService.new(config, mapService, playerData, baseService, notificat
 			entry:SetAttribute("Color", seed.Color)
             local rarity, style = PackRules.GetRarity(seed.Id)
             entry:SetAttribute("Rarity",rarity)
-            entry:SetAttribute('BaseChance',PackRules.SeedOdds(config,PackRules.ObtainableStage(seed.Id)or stage,'Pack01',1)[seed.Id])
+            entry:SetAttribute('BaseChance',require(ReplicatedStorage.SeedRarity153).Percent(seed.Id)) -- R153: the seed's one fixed chance (its home pack's), the same text everywhere
             entry:SetAttribute("RarityColor",style.Color)
 			entry:SetAttribute("Stage", PackRules.ObtainableStage(seed.Id) or stage)
 			entry:SetAttribute("SeedIndex", index)
@@ -1004,7 +1004,8 @@ function ChestService:_finishOpening(player, opening, skipSync)
         if not player.Parent then return end
         self:SyncTools(player)
         local c=player.Character;local h=c and c:FindFirstChildOfClass('Humanoid');local backpack=player:FindFirstChildOfClass('Backpack')
-        if opening.Committed and opening.RewardId and c==opening.Character and h and h.Health>0 and not h.PlatformStand and not player:GetAttribute('GuardianRagdollActive')and backpack then
+        -- (R153: not when the player already holds something else: they chose it during the reveal, and this hand-off threw it back into the Backpack)
+        if opening.Committed and opening.RewardId and c==opening.Character and h and h.Health>0 and not h.PlatformStand and not player:GetAttribute('GuardianRagdollActive')and backpack and not c:FindFirstChildOfClass('Tool')then
             for _,seed in ipairs(backpack:GetChildren())do
                 if seed:IsA('Tool')and seed:GetAttribute('GardenSeed')and seed:GetAttribute('SeedInventoryId')==opening.RewardId then h:EquipTool(seed);break end
             end
@@ -1025,6 +1026,20 @@ end
 --  * equipping pack B while pack A is in hand: if B.Equipped is handled before A.Unequipped has finished A's opening, B saw A's opening and bounced. An opening
 --    that is not committed and whose pack is no longer in the hand is stale: it is finished here, then B is held. (Committed openings, whose reveal is playing, still win.)
 -- Returns true when this pack is already the held one.
+-- R153 (hotbar debug aid): a pack sent back says why on the tool (HoldRefused = reason@server time: the hotbar logs it, and says FINISH THAT FIRST! for busy, or
+-- holds it after the reveal / the knock-down) and in a short per-player list /test hotbar prints; a hold that waited for its shape is listed too.
+local function holdNote(self,player,text)
+    self.HoldLog=self.HoldLog or setmetatable({},{__mode="k"});local list=self.HoldLog[player] or {};self.HoldLog[player]=list
+    table.insert(list,("%.1f %s"):format(os.clock(),text));if #list>12 then table.remove(list,1) end
+end
+local function bounce(self,player,tool)
+    local h=player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    local why=self.Openings[player] and "opening" or not self.PlayerData:IsLoaded(player) and "loading" or tool.Parent~=player.Character and "moved"
+        or (player:GetAttribute("GuardianRagdollActive") or player:GetAttribute("GuardianFlingActive") or not h or h.Health<=0 or h.PlatformStand) and "knocked" or "busy"
+    holdNote(self,player,tool.Name.." refused: "..why)
+    local backpack=player:FindFirstChildOfClass("Backpack")
+    if backpack and tool.Parent==player.Character then tool:SetAttribute("HoldRefused",why.."@"..("%.2f"):format(workspace:GetServerTimeNow()));tool.Parent=backpack end
+end
 local function settleHold(self,player,tool)
     local existing=self.Openings[player]
     if type(existing)~="table" then return false end
@@ -1045,11 +1060,7 @@ function ChestService:_holdPack(player,tool)
         tool.ToolTip=table.concat(rows,'\n')
     end
     if settleHold(self,player,tool) then return end
-    if self.Openings[player] or not self:_canOpenPack(player,tool) then
-        local backpack=player:FindFirstChildOfClass("Backpack")
-        if backpack and tool.Parent==player.Character then tool.Parent=backpack end
-        return
-    end
+    if self.Openings[player] or not self:_canOpenPack(player,tool) then bounce(self,player,tool);return end
     -- R151: a pack with a chip-bag shape is put in the hand once its (design, variation) pair is baked: a short bounded wait BEFORE anything of the opening exists (the
     -- checks run again after it), so the pack in the hand is the shape its picture shows. Past the wait it is built in the default shape this once (never yields).
     local shape=tool:GetAttribute("PackShape")
@@ -1057,13 +1068,9 @@ function ChestService:_holdPack(player,tool)
         local design=PackRules.DesignKey(tool:GetAttribute("Stage"),tool:GetAttribute("BagVariant"))
         local neutral=PackRules.VariantKey(tool:GetAttribute("BagVariant"))==require(ReplicatedStorage.VerityCatalog).Variant
         if PackShapes.State(design,shape,neutral)~="Ready" then
-            pcall(PackShapes.Await,design,shape,neutral)
+            local waited=os.clock();pcall(PackShapes.Await,design,shape,neutral);holdNote(self,player,("%s waited %.2f s for its shape"):format(tool.Name,os.clock()-waited))
             if settleHold(self,player,tool) then return end -- (R152: a second hold of this very pack began while this one waited)
-            if self.Openings[player] or not self:_canOpenPack(player,tool) then
-                local backpack=player:FindFirstChildOfClass("Backpack")
-                if backpack and tool.Parent==player.Character then tool.Parent=backpack end
-                return
-            end
+            if self.Openings[player] or not self:_canOpenPack(player,tool) then bounce(self,player,tool);return end
         end
     end
     local opening={Tool=tool,Character=player.Character,Connections={},Committed=false,Clicks=0,LastClick=-math.huge}

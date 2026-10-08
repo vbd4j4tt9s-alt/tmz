@@ -11,6 +11,10 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
 local player=Players.LocalPlayer
 local Progress=require(RS:WaitForChild('Progression81'));local Points=require(RS:WaitForChild('SpeedPoints'))
+-- R153 (owner: "fix all jittery type effects"): the sign hangs on the keeper's smoothed body (KeeperFollow153's anchor, moved by the keeper's
+-- animator with the body every frame), not on the server's root, which arrives in packet steps: the sign stepped while the keeper glided.
+-- A keeper no animator drives here keeps the root.
+local Follow;pcall(function()Follow=require(RS:WaitForChild('KeeperFollow153',5))end)
 local RGB=Color3.fromRGB
 local GREEN,RED=RGB(110,236,96),RGB(255,86,86)
 local labels={}
@@ -50,7 +54,7 @@ local function place(entry)
  if not root then return false end
  local ok,box,size=pcall(model.GetBoundingBox,model)
  local top=ok and(box.Position.Y+size.Y/2-root.Position.Y)or 6
- entry.Gui.Adornee=root;entry.Gui.StudsOffsetWorldSpace=Vector3.new(0,math.clamp(top,2,80)+2.5,0)
+ entry.Gui.Adornee=Follow and Follow.Get(model)or root;entry.Gui.StudsOffsetWorldSpace=Vector3.new(0,math.clamp(top,2,80)+2.5,0)
  return true
 end
 local function add(model)
@@ -69,4 +73,6 @@ local function repaint()for _,entry in pairs(labels)do paint(entry)end end
 for _,m in ipairs(CS:GetTagged('BiomeKeeper'))do add(m)end
 local added=CS:GetInstanceAddedSignal('BiomeKeeper'):Connect(add);local removed=CS:GetInstanceRemovedSignal('BiomeKeeper'):Connect(remove)
 local a=player:GetAttributeChangedSignal('PhysicalWalkSpeed'):Connect(repaint)
-script.Destroying:Connect(function()added:Disconnect();removed:Disconnect();a:Disconnect();for m in pairs(labels)do remove(m)end end)
+-- (an animator started / stopped driving a keeper: hang its sign on the anchor / back on the root)
+local unfollow=Follow and Follow.Listen(function(model)local entry=labels[model];if entry then place(entry)end end)or function()end
+script.Destroying:Connect(function()added:Disconnect();removed:Disconnect();a:Disconnect();unfollow();for m in pairs(labels)do remove(m)end end)

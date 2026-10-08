@@ -59,7 +59,7 @@ return {
  {'/test refreshcycle 30','server: Refresh into reset 30 (Legendary every 5, Mythic every 10, The Darkened every 3).'},
  {'/test pity 30','Preview what reset 30 guarantees. spawnodds shows normal slot chances.'},
  {'/test mystery @username','R141 base mystery pack. ready = unlocks in 3 s, next = pretend a new day, reset.'},
- {'/test daily @username','R140 login week + daily quests. next = pretend a new day, done = finish today\'s quests, week = next claim is day 7 (Mech pack), reset.'},
+ {'/test daily @username','R140 login week + daily quests. next = pretend a new day, done = finish today\'s quests, week = next claim is day 7 (Void pack), reset.'},
  {'/test plantnotify','R151 offline "your plant is ready" notifier: setup check + queue + your cooldown. send = send you one now (Roblox: 1 a day), reset = clear your cooldown.'},
  {'/test packluck @username 29','Hidden big-pack luck (players never see it). 29 makes their next earned pack 5x+.'},
  {'/test routes','Biome lengths and keeper speeds.'},
@@ -94,7 +94,7 @@ return {
  {'/test gifts recover @username','Finish stuck gifts now (normally automatic within a minute).'},
 
  {'— HUB DISPLAYS (R151) —',''},
- {'/test bestpull FirePepperSeed @username','A test BEST PULL TODAY for that player: a seed id or plant name (fire pepper), at its odds in its biome\'s Pack03. Shows on this server only; add share to write it to the shared board too.'},
+ {'/test bestpull FirePepperSeed @username','A test BEST PULL TODAY for that player: a seed id or plant name (fire pepper), ranked at its odds in its biome\'s Pack03 (the plaque shows the seed\'s one fixed 1/N, as everywhere). Shows on this server only; add share to write it to the shared board too.'},
  {'/test bigfruit 12.4 @username','A test BIGGEST FRUIT TODAY: a fruit of today\'s type weighing that many kg (gold or diamond for a coat, share to write the shared board). Shows on this server only unless shared.'},
  {'/test hubdisplays','server: Both corner displays: the day, the fruit of the day, the champions and where they came from, the shared board\'s health and the part counts. hubdisplays reset empties both boards (this server and the shared one); hubdisplays day +1 previews tomorrow\'s fruit on this server (day 0 comes back).'},
 
@@ -113,5 +113,6 @@ return {
  {'/test collisions','server: Re-apply walk-through decorations.'},
  {'/test hubtrees','server: R151 hub trees: how each studded tree model loaded (by id or placed by hand), scripts removed, part counts, which trees each device tier uses.'},
  {'/test perf','Toggle the performance display.'},
+ {'/test hotbar','R153: hotbar log on / off: every press, what it did (equip, unequip, move, ignored) and anything the server moved back, with times, top-left and in F9. Paste it if a press goes missing. Also prints the packs the server held late or refused.'},
  {'/test effects low','Plant effects: normal, low or off.'},
 }

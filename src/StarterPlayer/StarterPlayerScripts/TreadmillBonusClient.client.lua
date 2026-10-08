@@ -1,10 +1,8 @@
 do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R123: treadmill bonus rolls (client view only). The server (TreadmillBonusService) counts treadmill time, owns the
 -- READY count, decides every result and grants the pack before this script animates anything.
---  * Gift timer: a gift pill above the player while on the treadmill (BillboardGui, local only) that fills up as the next
---    roll nears ("Almost there!" in the last 30 s, a shake + sparkle pop and "Bonus ready!" when it completes).
 --  * BONUS ROLL button placed clear of every HUD box (TreadmillBonusRules.Place over HudLayout): a chunky candy pill that is
---    cheerful when a roll is READY (gift wiggles, shine sweeps, count badge pops) and calm while charging on the treadmill
+--    cheerful when a roll is READY (the pack wiggles, shine sweeps, count badge pops) and calm while charging on the treadmill
 --    (it shows the progress and the countdown itself).
 --  * Roll screen: gift-wrap panel with a bow on the ribbon header, crate-style strip of rarity-framed pack cards (click per
 --    card under the bouncing pointers, pitch rises as it slows, eases to the server's result), rays behind the winner, a
@@ -14,6 +12,9 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 -- states: TreadmillBonusStyle. Motion: one on-demand RenderStepped (only while something is moving, nothing while idle);
 -- ReducedMotion = no ambient motion and a short spin; FastMode / low quality = no sweeps, rotating rays or twinkles and
 -- fewer pieces.
+-- R153 (owner): no bag hint line under the spin text (it is centred now), a Secret pack card flies by on the reel on every
+-- roll (TreadmillBonusStyle.Tease, a few cards before the winner; presentation only: odds and the awarded pack are the server's, unchanged)
+-- and no gift timer pill over the player's head any more (the HUD button's charging look carries the countdown).
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local GuiService=game:GetService('GuiService');local Tween=game:GetService('TweenService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
@@ -29,6 +30,14 @@ local Pictures=optional('ItemPictures');local Audio=optional('InteractionAudio')
 local Mixer=optional('AudioMixer');local Timing=optional('SoundTiming');local Notices=optional('HudNoticeLayout');local Budget=optional('ClientFxBudget')
 local RareAudio=optional('RarePullAudio') -- R151: the Secret pull sting (RarePullSounds.SecretGlitch) under a Secret result's fanfare
 local RGB=Color3.fromRGB;local INK=Art.INK;local GOLD=Art.GOLD;local WHITE=Art.WHITE
+-- R153: the owner's pack picture (embedded data drawn with an EditableImage, one shared copy) in place of the gift icon; the plain drawn pack until / unless it can be drawn.
+local EmbeddedImage=optional('EmbeddedImage153');local PackData=optional('BonusPackImage153')
+local function showPack(icon)
+ if not(EmbeddedImage and PackData)then return end
+ EmbeddedImage.Show(icon.Picture,PackData,function(route)
+  if route=='image'then icon.Picture.Visible=true;if icon.Drawn.Parent then icon.Drawn:Destroy()end else icon.Picture.Visible=false end
+ end)
+end
 local connections={};local dead=false
 local function connect(signal,fn)local c=signal:Connect(fn);table.insert(connections,c);return c end
 local make,round,pill,stroke,text=Art.make,Art.round,Art.pill,Art.stroke,Art.text
@@ -130,75 +139,85 @@ end
 local function ready()return Rules.ReadyCount(player:GetAttribute(Rules.Attr.Ready))end
 local function training()return player:GetAttribute('TreadmillTraining')==true end
 local function interval()return tonumber(player:GetAttribute(Rules.Attr.Interval))or Rules.IntervalSeconds end
--- The gift timer as the server published it (DueAt counts down on this client; nothing is requested).
+-- The timer as the server published it (DueAt counts down on this client; nothing is requested).
 local function timerNow()
  local left=Style.LeftSeconds(player:GetAttribute(Rules.Attr.DueAt),player:GetAttribute(Rules.Attr.Left),interval(),workspace:GetServerTimeNow())
  return Style.Timer(ready(),Rules.MaxReady,interval(),left)
 end
 -- HUD button ---------------------------------------------------------------------------------------------------
--- A chunky candy pill: a darker lip underneath, a gradient face with a top gloss, the gift icon, the title and a status line.
--- READY = sunny gold, the gift wiggles and a shine sweeps every few seconds. CHARGING (on the treadmill, nothing ready) = calm
--- lilac that fills with gold as the next roll nears and counts down in its second line.
+-- A chunky candy pill: a darker lip underneath, a gradient face with a top gloss, the pack picture, the title and a status line.
+-- READY = bright green, the pack wiggles and a shine sweeps every few seconds. CHARGING (on the treadmill, nothing ready) = calm
+-- deep green that fills with the pack's yellow as the next roll nears and counts down on the button (R153: ALMOST THERE! in the last 30 s).
 local LIP=4
-local READY_COLOR,CHARGE_COLOR=RGB(255,188,50),RGB(116,126,232)
+-- R153 (owner: "replace that gift icon with the pack and make the colour of the button pair with the image"): the pack picture's own colours: a rich green body (bright
+-- when a roll is READY, deeper while it charges), gold outline and accents, the yellow of the pack's "?" for the charge fill, white text with a dark green stroke.
+local READY_COLOR,CHARGE_COLOR=RGB(46,172,66),RGB(26,122,46)
 do local old=pg:FindFirstChild('TreadmillBonusHud');if old then old:Destroy()end end
 local hud=make('ScreenGui',{Name='TreadmillBonusHud',ResetOnSpawn=false,IgnoreGuiInset=false,ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets,
  DisplayOrder=26,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},pg)
-local button=Art.Candy(hud,'BonusRollButton',READY_COLOR,'',{Lip=LIP,Stroke=3,Z=10,NoLabel=true});button.Visible=false
+local button=Art.Candy(hud,'BonusRollButton',READY_COLOR,'',{Lip=LIP,Stroke=3,Z=10,NoLabel=true,Outline=Art.Pack.Outline,LipOutline=Art.Pack.OutlineDark});button.Visible=false
 button:SetAttribute('AccessibleLabel','Treadmill bonus roll')
 local pulse=make('UIScale',{Name='Pulse'},button)
 local face=button.Face
-local fill=make('Frame',{Name='Fill',BackgroundColor3=WHITE,BorderSizePixel=0,Position=UDim2.fromOffset(3,3),Size=UDim2.new(0,0,1,-6),Visible=false,ZIndex=12},face)
-pill(fill);Art.gradient(fill,RGB(255,236,130),RGB(255,162,40))
+-- R153 (owner: "the yellow fill must cover the whole button"): the fill lives in a CanvasGroup with the face's own pill corner, so it is clipped to the same
+-- rounded shape: flush with the rounded left end at any progress, edge to edge at 100%, never past the outline (the old inset pill left a gap at the left end).
+local FILLS={charging={Art.Pack.Gold,Art.Pack.GoldDark},almost={RGB(255,132,70),RGB(222,60,34)}} -- the pack's yellow; the last 30 s turn orange / red, like the bar of the old gift pill
+local fillClip=make('CanvasGroup',{Name='FillClip',BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.fromScale(1,1),Visible=false,ZIndex=12},face)
+pill(fillClip)
+local fill=make('Frame',{Name='Fill',BackgroundColor3=WHITE,BorderSizePixel=0,Size=UDim2.fromScale(0,1),ZIndex=12},fillClip)
+local fillGradient=Art.gradient(fill,FILLS.charging[1],FILLS.charging[2])
 local meter=make('Frame',{Name='Meter',BackgroundColor3=INK,BackgroundTransparency=.45,BorderSizePixel=0,Visible=false,ZIndex=14},face)
 pill(meter)
 do
  local fillBar=make('Frame',{Name='Bar',BackgroundColor3=WHITE,BorderSizePixel=0,Position=UDim2.fromOffset(1,1),Size=UDim2.new(0,0,1,-2),ZIndex=15},meter)
  pill(fillBar);Art.gradient(fillBar,RGB(255,250,200),RGB(255,200,70))
 end
-local gift=Art.Gift(face,34,'Icon');gift.Root.ZIndex=14
-local title=Art.fitText(face,'Title','BONUS ROLL',20,11);title.ZIndex=15
-local sub=Art.fitText(face,'Sub','READY!',13,8,RGB(255,250,215));sub.ZIndex=15
+local packIcon=Art.PackIcon(face,'Icon',34);packIcon.Root.ZIndex=14;showPack(packIcon) -- R153: the owner's pack picture (drawn by EmbeddedImage153; the plain pack until / unless it can be)
+local title=Art.fitText(face,'Title','BONUS ROLL',20,9);title.ZIndex=15;title.TextWrapped=false -- R153: ALMOST THERE! / BONUS READY! share the line: it shrinks (never below 9 px) instead of wrapping
+local sub=Art.fitText(face,'Sub','READY!',13,8,WHITE);sub.ZIndex=15
+for _,label in ipairs({title,sub})do label.TextStrokeColor3=Art.Pack.Edge;label.TextStrokeTransparency=0 end -- white on the green and on the yellow fill: a dark green stroke keeps it readable
 local shine=Art.Shine(face,6,6,.6,16)
 local badge=Art.Badge(button,'CountBadge',20,12);badge.Position=UDim2.new(1,-5,0,6);badge.Visible=false
 local mode,lastMode='hidden','hidden'
 local busy,rolling,messageUntil=false,false,0
-local lastReady=ready();local lastFraction,lastCount
+local lastReady=ready();local lastCount
+local readyPopUntil=0 -- R153: "BONUS READY! / OPEN IT!" on the button for Style.ReadyHold seconds after a roll completes
 local textLeft=12
 -- Title / sub line: full width, or narrower while the count badge sits at the right end.
 local function layoutText()
- local fh=button.Size.Y.Offset-LIP;local right=(badge.Visible and not gift.Root.Visible)and 24 or 12 -- the badge sits on the gift; without the gift it takes the corner
+ local fh=button.Size.Y.Offset-LIP;local right=(badge.Visible and not packIcon.Root.Visible)and 24 or 12 -- the badge sits on the gift; without the gift it takes the corner
  title.Position=UDim2.fromOffset(textLeft,math.floor(fh*.05));title.Size=UDim2.new(1,-textLeft-right,0,math.floor(fh*.5))
  sub.Position=UDim2.fromOffset(textLeft,math.floor(fh*.55));sub.Size=UDim2.new(1,-textLeft-right,0,math.floor(fh*.28))
  meter.Position=UDim2.new(0,textLeft,0,fh-9);meter.Size=UDim2.new(1,-textLeft-14,0,5)
 end
-local lastPaint
+local lastPaint,lastPhase
+local applyPhase
 local function paintButton()
  if mode=='hidden'then return end
- local n=ready();local t=timerNow()
- local lines,subLine=Style.ButtonLines(mode,t,busy)
+ local n=ready();local t=timerNow();local popping=os.clock()<readyPopUntil
+ local titleLine,subLine=Style.ButtonLines(mode,t,busy,popping)
+ local phase=Style.ButtonPhase(mode,t)
  -- Only touch the GUI when something it shows has changed (the 4 Hz tick changes the clock once a second).
- local key=mode..'|'..tostring(busy)..'|'..subLine..'|'..math.floor(t.Fraction*360+.5)..'|'..n
+ local key=mode..'|'..tostring(busy)..'|'..tostring(popping)..'|'..titleLine..'|'..subLine..'|'..math.floor(t.Fraction*360+.5)..'|'..n
  if key==lastPaint then return end
  lastPaint=key
- if title.Text~=lines then title.Text=lines end
+ if phase~=lastPhase then lastPhase=phase;applyPhase(phase)end
+ if title.Text~=titleLine then title.Text=titleLine end
  if os.clock()>=messageUntil and sub.Text~=subLine then sub.Text=subLine end
  local charging=mode=='charging'
  if charging then
-  fill.Visible=t.Fraction>.005
-  fill.Size=UDim2.new(t.Fraction,-6*t.Fraction,1,-6)
+  fillClip.Visible=t.Fraction>.005
+  fill.Size=UDim2.fromScale(t.Fraction,1)
   meter.Visible=false
  else
-  fill.Visible=false
+  fillClip.Visible=false
   meter.Visible=n<Rules.MaxReady
   meter.Bar.Size=UDim2.new(t.Fraction,-2*t.Fraction,1,-2)
  end
- local f=charging and t.Fraction or 1
- if f~=lastFraction then lastFraction=f;gift:Fill(f)end
 end
 local function recolor()
  Art.Recolor(button,mode=='charging'and CHARGE_COLOR or READY_COLOR)
- sub.TextColor3=mode=='charging'and WHITE or RGB(255,250,215)
+ sub.TextColor3=WHITE
 end
 local attnToken=0
 local function playAttention()
@@ -206,14 +225,14 @@ local function playAttention()
  local t=0;local plain=lite()
  addEffect(function(dt)
   t+=dt
-  gift.Root.Rotation=Style.Wiggle(t,.7,12)
+  packIcon.Root.Rotation=Style.Wiggle(t,.7,12)
   pulse.Scale=1+.05*math.sin(math.clamp(t/.7,0,1)*math.pi)
   if not plain then Art.SetShine(shine,(t-.3)/.85)end
-  if t>=1.2 then gift.Root.Rotation=0;pulse.Scale=1;Art.SetShine(shine,0);return true end
+  if t>=1.2 then packIcon.Root.Rotation=0;pulse.Scale=1;Art.SetShine(shine,0);return true end
   return false
  end)
 end
-local function stopAttention()attnToken+=1;gift.Root.Rotation=0;Art.SetShine(shine,0)end
+local function stopAttention()attnToken+=1;packIcon.Root.Rotation=0;Art.SetShine(shine,0)end
 local function startAttention()
  attnToken+=1;local mine=attnToken
  local function loop()
@@ -223,7 +242,35 @@ local function startAttention()
  end
  task.delay(1.4,loop)
 end
-local function buttonCenter() -- the gift's middle, in screen pixels (the button is anchored at its centre)
+-- R153: the last 30 s (ALMOST THERE!): the pack wiggles and the button pulses every Style.AlmostPeriod s, like the gift pill over the head did. Bursts of ~0.75 s; nothing
+-- runs between them, and ReducedMotion keeps only the words and the colours.
+local almostToken=0
+local function playAlmost()
+ if reduced()or mode~='charging'or not button.Visible then return end
+ local t=0
+ addEffect(function(dt)
+  t+=dt
+  packIcon.Root.Rotation=Style.Wiggle(t,.7,12);pulse.Scale=1+.06*math.sin(math.clamp(t/.7,0,1)*math.pi)
+  if t>=.75 then packIcon.Root.Rotation=0;pulse.Scale=1;return true end
+  return false
+ end)
+end
+local function stopAlmost()almostToken+=1 end
+local function startAlmost()
+ almostToken+=1;local mine=almostToken
+ local function loop()
+  if mine~=almostToken or dead or mode~='charging'then return end
+  playAlmost();task.delay(Style.AlmostPeriod,loop)
+ end
+ loop()
+end
+-- What changes with the phase: the fill colours, the title colour (ALMOST THERE! is pink) and the pulse.
+applyPhase=function(phase)
+ local colors=FILLS[phase=='almost'and'almost'or'charging']
+ fillGradient.Color=ColorSequence.new(colors[1],colors[2])
+ if phase=='almost'then startAlmost()else stopAlmost()end
+end
+local function buttonCenter() -- the pack icon middle, in screen pixels (the button is anchored at its centre)
  return button.Position.X.Offset-button.Size.X.Offset/2+26,button.Position.Y.Offset-button.Size.Y.Offset/2+(button.Size.Y.Offset-LIP)/2
 end
 -- Sparkle layer: an empty 0 x 0 frame at the corner (pieces are placed in screen pixels from it), so no full-screen box sits over the game.
@@ -247,11 +294,11 @@ local function refreshButton()
  button.Visible=mode~='hidden'
  if mode~=lastMode then
   local was=lastMode;lastMode=mode
-  recolor();lastFraction=nil;lastPaint=nil
+  recolor();lastPaint=nil;lastPhase=nil
   if mode=='ready'then startAttention()else stopAttention()end
   if was=='hidden'and mode~='hidden'then popButton()end
  end
- if os.clock()>=messageUntil then button:SetAttribute('AccessibleLabel',mode=='ready'and'Treadmill bonus roll, ready'or mode=='charging'and'Treadmill bonus roll, charging'or'Treadmill bonus roll')end
+ if os.clock()>=messageUntil then button:SetAttribute('AccessibleLabel',mode=='ready'and'Treadmill bonus roll, ready'or mode=='charging'and(timerNow().State=='almost'and'Treadmill bonus roll, almost ready'or'Treadmill bonus roll, charging')or'Treadmill bonus roll')end
  if n~=lastCount then
   lastCount=n;badge.Visible=n>=2;badge.Count.Text=tostring(n);layoutText()
   if n>=2 then popBadge()end
@@ -272,9 +319,9 @@ local function layoutButton()
  local r=Rules.Place(m,w,h,Layout.HudBoxes(m,w,h,true),extra)
  button.AnchorPoint=Vector2.new(.5,.5);button.Position=UDim2.fromOffset(r.X+r.W/2,r.Y+r.H/2);button.Size=UDim2.fromOffset(r.W,r.H) -- R150 review: the ready pop and the pulse scale about the button's centre
  local fh=r.H-LIP
- -- Narrow phones get the text-only size: drop the gift icon and use the full width for the caption.
- local icon=r.W>=140;gift.Root.Visible=icon
- local iconSize=math.min(fh-6,36);gift.Root.Size=UDim2.fromOffset(iconSize,iconSize);gift.Root.Position=UDim2.fromOffset(8+iconSize/2,fh/2)
+ -- Narrow phones get the text-only size: drop the pack icon and use the full width for the caption.
+ local icon=r.W>=140;packIcon.Root.Visible=icon
+ local iconSize=math.min(fh-6,36);packIcon.Root.Size=UDim2.fromOffset(iconSize,iconSize);packIcon.Root.Position=UDim2.fromOffset(8+iconSize/2,fh/2)
  badge.Position=icon and UDim2.fromOffset(8+iconSize-5,8)or UDim2.new(1,-5,0,6)
  textLeft=icon and 8+iconSize+6 or 12
  title:FindFirstChildOfClass('UITextSizeConstraint').MaxTextSize=r.H>=50 and 20 or 17
@@ -330,9 +377,11 @@ local ribbon=make('Frame',{Name='Ribbon',AnchorPoint=Vector2.new(.5,0),Backgroun
 round(ribbon,9);stroke(ribbon,INK,2)
 make('UIGradient',{Color=ColorSequence.new({ColorSequenceKeypoint.new(0,RGB(255,236,140)),ColorSequenceKeypoint.new(.5,RGB(255,200,70)),ColorSequenceKeypoint.new(1,RGB(232,140,36))}),Rotation=90},ribbon)
 for i,x in ipairs({0,1})do local tail=diamond(ribbon,'Tail'..i,14,RGB(214,128,30),2);tail.Position=UDim2.new(x,x==0 and 2 or-2,.5,0)end
+local ribbonTitle,headerPack
 do
- local heading=Art.fitText(ribbon,'Title','🎁 TREADMILL BONUS ROLL',19,9,INK);heading.ZIndex=4;heading.Size=UDim2.new(1,-44,1,0);heading.Position=UDim2.fromOffset(22,0)
- heading.TextStrokeColor3=RGB(255,248,220);heading.TextStrokeTransparency=.4
+ ribbonTitle=Art.fitText(ribbon,'Title','TREADMILL BONUS ROLL',19,9,INK);ribbonTitle.ZIndex=4 -- R153: the pack picture on the left takes the place of the gift emoji (layoutOverlay places both)
+ ribbonTitle.TextStrokeColor3=RGB(255,248,220);ribbonTitle.TextStrokeTransparency=.4
+ headerPack=Art.PackIcon(ribbon,'Pack',30);headerPack.Root.ZIndex=6;showPack(headerPack)
 end
 local bow=Art.Bow(panel,56,'Bow',Art.Pink);bow.ZIndex=10;bow.AnchorPoint=Vector2.new(.5,0)
 local window=make('Frame',{Name='StripWindow',BackgroundColor3=WHITE,ClipsDescendants=true,ZIndex=3},panel) -- colour comes from the gradient
@@ -407,12 +456,15 @@ local function layoutOverlay()
  local rowGap=8;local pad=short and 6 or 12
  local y=ribbonY
  ribbon.Position=UDim2.new(.5,0,0,y);ribbon.Size=UDim2.fromOffset(math.min(380,panelW-90),ribbonH);y+=ribbonH+gap
+ local packSize=ribbonH+6 -- R153: the pack sticks out 3 px above and below the ribbon, on its left; the title takes the rest
+ headerPack.Root.Size=UDim2.fromOffset(packSize,packSize);headerPack.Root.Position=UDim2.fromOffset(12+packSize/2,ribbonH/2)
+ ribbonTitle.Position=UDim2.fromOffset(18+packSize,0);ribbonTitle.Size=UDim2.new(1,-(18+packSize)-22,1,0)
  -- The bow sits on the ribbon's top edge, above the title (its loops dip a few px onto the ribbon, clear of the letters).
  local bowSize=short and 44 or 56
  bow.Size=UDim2.fromOffset(bowSize,math.floor(bowSize*.62+.5));bow.Position=UDim2.new(.5,0,0,ribbonY-(short and 19 or 25))
  window.Position=UDim2.fromOffset(14,y);windowY=y;windowH=cardH+2*cardY;window.Size=UDim2.new(1,-28,0,windowH);y+=windowH+rowGap
- status.Position=UDim2.fromOffset(16,y);status.Size=UDim2.new(1,-32,0,wordH)
- word.AnchorPoint=Vector2.new(.5,.5);word.Position=UDim2.new(.5,0,0,y+wordH/2);word.Size=status.Size;y+=wordH -- R150 review: the pop scales about its centre (UIScale pivots at the AnchorPoint)
+ status.Position=UDim2.fromOffset(16,y);status.Size=UDim2.new(1,-32,0,wordH+resultH) -- R153: nothing under the spin line, so it is centred between the strip and the buttons (the result row stays for the reveal)
+ word.AnchorPoint=Vector2.new(.5,.5);word.Position=UDim2.new(.5,0,0,y+wordH/2);word.Size=UDim2.new(1,-32,0,wordH);y+=wordH -- R150 review: the pop scales about its centre (UIScale pivots at the AnchorPoint)
  result.Position=UDim2.fromOffset(16,y);result.Size=UDim2.new(1,-32,0,resultH);y+=resultH+rowGap
  actions.Position=UDim2.fromOffset(16,y);actions.Size=UDim2.new(1,-32,0,actionH);y+=actionH+rowGap
  oddsLine.Position=UDim2.fromOffset(16,y);oddsLine.Size=UDim2.new(1,-32,0,oddsH);y+=oddsH+pad
@@ -549,7 +601,10 @@ local function startAmbient()
   pointerTop.Position=UDim2.fromOffset(panelW/2,pointerTopY+bob);pointerBottom.Position=UDim2.fromOffset(panelW/2,pointerBottomY-bob)
   if plain then return false end
   for i,d in ipairs(twinkles)do d.BackgroundTransparency=.25+.7*(.5+.5*math.sin(clock*2.2+i*1.3))end
-  for _,entry in ipairs(cards)do if entry.Motion then animateDesign(entry,clock)end end
+  local viewW=window.AbsoluteSize.X>0 and window.AbsoluteSize.X or panelW-28;local sx=strip.Position.X.Offset
+  for _,entry in ipairs(cards)do -- R153: a special card is only animated while it is inside the window (the Secret tease is off screen most of the spin)
+   if entry.Motion then local x=sx+entry.Frame.Position.X.Offset;if x>-Rules.Strip.CardWidth and x<viewW then animateDesign(entry,clock)end end
+  end
   if activeRays then activeRays.Root.Rotation=(clock*raySpeed)%360 end
   return false
  end)
@@ -559,7 +614,7 @@ local function celebrate(entry,res)
  local special=Rules.Special[res.Rarity]==true
  local style=Style.Reveal(res.Rarity)
  local calm=reduced()
- result.Text=(special and'✨ 'or'')..'You got a '..string.upper(res.Rarity)..' '..(res.Label or'pack')..'!'
+ result.Visible=true;result.Text=(special and'✨ 'or'')..'You got a '..string.upper(res.Rarity)..' '..(res.Label or'pack')..'!'
  result.TextColor3=entry.Color
  status.Visible=false;word.Text=style.Word;word.TextColor3=entry.Color;word.Visible=true
  setCaption(closeButton,style.Close)
@@ -622,13 +677,16 @@ local function startRoll(res)
  current=res;overlay.Enabled=true;layoutOverlay()
  stopGlow();clearRays();clearBursts(revealFx)
  word.Visible=false;wordScale.Scale=1;status.Visible=true;statusIndex=1;status.Text=Style.SpinLines[1]
- result.Text=Style.SpinHint;result.TextColor3=RGB(190,184,235)
+ result.Visible=false;result.Text='' -- R153: no bag hint line while it spins
  setCaption(closeButton,'COLLECT')
  local stages=Rules.DecodePool(res.Pool);if #stages==0 then stages={res.Stage}end
  oddsLine.Text=oddsText() -- R124: no "Packs from ..." line (owner)
  local winner={Stage=res.Stage,Variant=res.Variant}
  local rng=Random.new()
- for i,pack in ipairs(Rules.BuildStrip(stages,winner,function()return rng:NextNumber()end))do buildCard(i,pack)end
+ local draw=function()return rng:NextNumber()end
+ local reel=Rules.BuildStrip(stages,winner,draw)
+ Style.Tease(reel,Rules.Strip.Win,Rules.Void,draw) -- R153: a Secret card flies by (never the winner: the server's result stays on Strip.Win)
+ for i,pack in ipairs(reel)do buildCard(i,pack)end
  -- R137: every card's real pack picture is built before it scrolls into view (no flat stand-ins any more).
  if Pictures and Pictures.Warm then local proxies={};for _,c in ipairs(cards)do if c.Proxy then proxies[#proxies+1]=c.Proxy end end;pcall(Pictures.Warm,proxies)end
  strip.Size=UDim2.fromOffset(#cards*Rules.Strip.Pitch,cardH+2*cardY)
@@ -681,92 +739,11 @@ local function pressable(b)
  connect(b.MouseLeave,function()Art.Press(b,false)end)
 end
 for _,b in ipairs({button,skipButton,closeButton,againButton})do pressable(b)end
--- Gift timer above the player while on the treadmill -------------------------------------------------------------
--- A capsule: the gift icon on the left fills up with colour as the next roll nears, a caption on top, a progress track with the
--- countdown inside. Last 30 s: "ALMOST THERE!" and a wiggling gift. When a roll completes: a pop, a shake, sparkles and
--- "BONUS READY!" for a few seconds. At the cap (2 ready) it says so.
-local bar,refreshBar,popBar,stopAlmost
-do
-local TRACK_W,TRACK_H=124,18
-do local o=pg:FindFirstChild('TreadmillBonusProgress');if o then o:Destroy()end end
-bar=make('BillboardGui',{Name='TreadmillBonusProgress',Size=UDim2.fromOffset(248,116),AlwaysOnTop=true,LightInfluence=0,MaxDistance=80,
- ResetOnSpawn=false,Enabled=false,ClipsDescendants=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},pg)
-local back=make('Frame',{Name='Back',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(184,46),BackgroundColor3=WHITE,ZIndex=3},bar)
-pill(back);stroke(back,GOLD,2.5);Art.gradient(back,RGB(86,76,172),RGB(36,32,92))
-local backLip=make('Frame',{Name='Lip',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(.5,0,.5,4),Size=UDim2.fromOffset(184,46),BackgroundColor3=RGB(20,18,52),BorderSizePixel=0,ZIndex=2},bar)
-pill(backLip);stroke(backLip,INK,2.5)
-local backPop=make('UIScale',{Name='Pop'},back)
-local lipPop=make('UIScale',{Name='Pop'},backLip) -- R150 review: the shadow lip pops and shakes with the pill
-local barGift=Art.Gift(back,36,'Icon');barGift.Root.Position=UDim2.fromOffset(24,23);barGift.Root.ZIndex=5
-local chip,chipText=Art.Badge(back,'Chip',16,11);chip.Position=UDim2.fromOffset(40,9);chip.Visible=false;chip.ZIndex=8;chipText.ZIndex=9
-local caption=Art.fitText(back,'Caption','NEXT ROLL',12,8,RGB(255,236,170));caption.Position=UDim2.fromOffset(48,3);caption.Size=UDim2.fromOffset(TRACK_W+4,16);caption.ZIndex=5
-local track=make('Frame',{Name='Track',BackgroundColor3=INK,BackgroundTransparency=.4,BorderSizePixel=0,Position=UDim2.fromOffset(48,21),Size=UDim2.fromOffset(TRACK_W,TRACK_H),ZIndex=5},back)
-pill(track);stroke(track,INK,1.5)
-local fill2=make('Frame',{Name='Fill',BackgroundColor3=WHITE,BorderSizePixel=0,Position=UDim2.fromOffset(2,2),Size=UDim2.new(0,0,1,-4),ZIndex=6},track)
-pill(fill2);local fillGradient=Art.gradient(fill2,RGB(255,232,120),RGB(255,150,40))
-local barText=Art.fitText(track,'Label','',14,8);barText.Size=UDim2.fromScale(1,1);barText.ZIndex=8;barText.TextWrapped=false
-local barFx=make('Frame',{Name='Fx',BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.fromScale(1,1),Active=false,ZIndex=20},bar)
-local popUntil=0;local barState,barFill,barCaption,barLabel,barChip
-local almostToken=0
-local FILLS={charging={RGB(255,232,120),RGB(255,150,40)},almost={RGB(255,150,190),RGB(255,120,50)},full={RGB(255,240,150),RGB(255,184,44)}}
-stopAlmost=function()almostToken+=1;barGift.Root.Rotation=0 end
-local function startAlmost()
- almostToken+=1;local mine=almostToken
- local function loop()
-  if mine~=almostToken or dead or not bar.Enabled then return end
-  if not reduced()then
-   local t=0;addEffect(function(dt)t+=dt;barGift.Root.Rotation=Style.Wiggle(t,.7,12);if t>=.75 then barGift.Root.Rotation=0;return true end;return false end)
-  end
-  task.delay(2.2,loop)
- end
- loop()
-end
--- The "ready" moment on the gift timer.
-popBar=function()
- popUntil=os.clock()+Style.ReadyHold
- task.delay(Style.ReadyHold+.1,function()if not dead then refreshBar()end end)
- if reduced()then return end
- backPop.Scale=1.18;tween(backPop,.45,Enum.EasingStyle.Back,{Scale=1})
- lipPop.Scale=1.18;tween(lipPop,.45,Enum.EasingStyle.Back,{Scale=1})
- local t=0
- addEffect(function(dt)
-  t+=dt;back.Rotation=6*math.sin(t*34)*math.max(0,1-t/.6);backLip.Rotation=back.Rotation
-  if t>=.6 then back.Rotation=0;backLip.Rotation=0;return true end
-  return false
- end)
- spawnBurst(barFx,56,58,{Count=lite()and 4 or 8,Shape='Star',Size=14,Life=.9,Speed={40,95},Arc={-math.pi*.95,-math.pi*.05},Gravity=60,Colors={GOLD,WHITE,RGB(255,150,190)},Drag=1.6})
-end
-refreshBar=function()
- local character=player.Character;local root=character and character:FindFirstChild('HumanoidRootPart')
- local head=character and character:FindFirstChild('Head')
- local on=training()and root~=nil
- bar.Enabled=on
- if not on then stopAlmost();barState=nil;return end
- if bar.Adornee~=root then bar.Adornee=root end
- -- Above the head and clear of the rising speed popups (they top out ~4.6 studs over the head).
- bar.StudsOffsetWorldSpace=Vector3.new(0,(head and head.Position.Y-root.Position.Y or 1.5)+5.4,0)
- local t=timerNow();local popping=os.clock()<popUntil
- local line,clock=Style.BillboardLines(t,popping)
- local state=popping and'ready'or t.State
- if state~=barState then
-  barState=state
-  local colors=FILLS[state=='ready'and'full'or state]
-  fillGradient.Color=ColorSequence.new(colors[1],colors[2])
-  caption.TextColor3=state=='almost'and RGB(255,190,214)or state=='ready'and RGB(255,246,170)or RGB(255,236,170)
-  if state=='almost'then startAlmost()else stopAlmost()end
- end
- if line~=barCaption then barCaption=line;caption.Text=line end
- if clock~=barLabel then barLabel=clock;barText.Text=clock end
- local fraction=popping and 1 or t.Fraction
- local px=math.floor(fraction*(TRACK_W-4)+.5)
- if px~=barFill then barFill=px;fill2.Size=UDim2.new(0,px,1,-4);fill2.Visible=px>3;barGift:Fill(fraction)end
- local n=t.Count
- if n~=barChip then barChip=n;chip.Visible=n>=1;chipText.Text=tostring(n)end
-end
-end
+-- R153 (owner): the gift timer pill that floated over the player's head is gone (it is not built at all); the HUD button's charging look carries the countdown.
+do local o=pg:FindFirstChild('TreadmillBonusProgress');if o then o:Destroy()end end -- a copy left by an older run of this script
 -- A 4 Hz tick, only while on the treadmill (no per-frame work, nothing when off it).
 local ticking=false
-local function refreshTimers()refreshBar();if mode~='hidden'then paintButton()end end
+local function refreshTimers()if mode~='hidden'then paintButton()end end
 local function ensureTicker()
  if ticking or dead or not training()then return end
  ticking=true
@@ -778,26 +755,27 @@ local function ensureTicker()
  task.delay(.25,loop)
 end
 for _,key in ipairs({Rules.Attr.DueAt,Rules.Attr.Left,Rules.Attr.Interval,'TreadmillTraining'})do
- connect(player:GetAttributeChangedSignal(key),function()refreshButton();refreshBar();ensureTicker()end)
+ connect(player:GetAttributeChangedSignal(key),function()refreshButton();ensureTicker()end)
 end
 connect(player:GetAttributeChangedSignal(Rules.Attr.Ready),function()
  local n=ready();local before=lastReady;lastReady=n
- refreshButton();refreshBar()
+ if n>before then readyPopUntil=os.clock()+Style.ReadyHold;task.delay(Style.ReadyHold+.1,function()if not dead then lastPaint=nil;refreshButton()end end)end
+ refreshButton()
  if n>before then
   -- One cue on the frame of the visuals (the first ready is a bright note, the second a higher one).
-  if mode=='ready'or bar.Enabled then cue(n>=2 and'Note2'or'Note',n>=2 and 1.7 or 1.35)end
+  if mode=='ready'then cue(n>=2 and'Note2'or'Note',n>=2 and 1.7 or 1.35)end
   readyMoment(n)
-  if bar.Enabled then popBar();refreshBar()end
  end
  ensureTicker()
 end)
 connect(pg:GetAttributeChangedSignal('TitleActive'),refreshButton)
-refreshButton();refreshBar();ensureTicker()
+refreshButton();ensureTicker()
 script.Destroying:Connect(function()
  dead=true;stopSpin();for _,c in ipairs(connections)do c:Disconnect()end;table.clear(connections)
  clearBursts();clearEffects()
- attnToken+=1;stopAlmost()
+ attnToken+=1;almostToken+=1
  for _,t in ipairs(glowTweens)do t:Cancel()end;table.clear(glowTweens)
  for _,s in ipairs(tickVoices)do s:Destroy()end;table.clear(tickVoices)
- hud:Destroy();overlay:Destroy();bar:Destroy()
+ if EmbeddedImage then pcall(EmbeddedImage.Release,packIcon.Picture);pcall(EmbeddedImage.Release,headerPack.Picture)end
+ hud:Destroy();overlay:Destroy()
 end)
