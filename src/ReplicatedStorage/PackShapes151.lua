@@ -67,6 +67,19 @@ local scales={
  function(u,v,w)local b=body(v);return 1+.02*b*(1-v*v),1-.15*b*bump(v,0,.75)*(1-.3*u*u) end,         -- 6 Flat: a flatter belly
 }
 function M.Scales(id,u,v,w)return scales[id](u,v,w)end
+-- R153 (owner: "parts are dislocated on packs"): the field holds |v| >= .94 of the design's BOX still, and for 26 designs that box is the pouch, so their crimps never move.
+-- But every design's pouch is the same: it spans y = -1.04 .. 1.02 (pack units at scale 1), closed by the BottomSeal (top edge -1.04) and the 8 TearStrips (bottom edge 1.02)
+-- of SeedPackVisuals.Bag. In the 16 designs whose box is taller (a crown, wings or a glass shell above or below the pouch: the box reaches 1.11 .. 1.81) the pouch's TOP
+-- crimp sat at |v| = .46 .. .92, inside the moving part of the field: Pillow / Hourglass / Pear / Shoulders pulled its ends in under the strips (by up to .037 a side, .072
+-- for Lava_03 Shoulders) and Flat slid it .016 off the strips' plane. Keep(v, p) is the share of a variation kept at a point whose height is v on the box and p on the pouch
+-- (p = (y - Pouch middle) / Pouch half height): the box's own hold or the pouch's, whichever is stronger, so the pouch's crimps and everything beyond them stay exactly
+-- where the seal and the strips are. 1 wherever the box hold is the stronger: designs whose box is the pouch are not touched at all (Deform does not even ask).
+M.Pouch={Bottom=-1.04,Top=1.02}
+function M.Keep(v,p)
+ local b=body(v);if b<=0 then return 1 end -- (nothing moves there anyway)
+ local k=body(p)/b
+ return k<1 and k or 1
+end
 -- The moved point: (u', v', w') of (u, v, w) for variation `id`.
 function M.Field(id,u,v,w)
  local sx,sz=scales[id](u,v,w)
@@ -253,10 +266,16 @@ function M.Deform(editable,vertices,source,box,id)
  local k=Vector3.new(source.Size.X/ext.X,source.Size.Y/ext.Y,source.Size.Z/ext.Z) -- studs per mesh unit
  local frame=source:GetAttribute('PackLocalFrame');local back=frame:Inverse()
  local c,h=box.Center,box.Half
+ -- R153: a box that reaches past the pouch (a tall design) also holds the pouch's own crimps still (Keep); a box that IS the pouch keeps the field exactly as it was
+ local P=M.Pouch;local pMid,pHalf=(P.Top+P.Bottom)/2,(P.Top-P.Bottom)/2
+ local tall=c.Y+h.Y>P.Top+1e-6 or c.Y-h.Y<P.Bottom-1e-6
+ local field=scales[id]
  local function map(p) -- the deformed mesh-space point of a mesh-space point
   local q=frame*Vector3.new((p.X-mid.X)*k.X,(p.Y-mid.Y)*k.Y,(p.Z-mid.Z)*k.Z)
-  local u2,_,w2=M.Field(id,(q.X-c.X)/h.X,(q.Y-c.Y)/h.Y,(q.Z-c.Z)/h.Z)
-  local s=back*Vector3.new(c.X+u2*h.X,q.Y,c.Z+w2*h.Z)
+  local u,v,w=(q.X-c.X)/h.X,(q.Y-c.Y)/h.Y,(q.Z-c.Z)/h.Z
+  local sx,sz=field(u,v,w)
+  if tall then local keep=M.Keep(v,(q.Y-pMid)/pHalf);if keep<1 then sx,sz=1+(sx-1)*keep,1+(sz-1)*keep end end
+  local s=back*Vector3.new(c.X+u*sx*h.X,q.Y,c.Z+w*sz*h.Z)
   return Vector3.new(mid.X+s.X/k.X,mid.Y+s.Y/k.Y,mid.Z+s.Z/k.Z)
  end
  local new={};local nlo,nhi;local out=0

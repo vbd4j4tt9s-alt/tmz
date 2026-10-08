@@ -62,7 +62,8 @@ grep '^COUNT' "$OUT/before/fp.txt" "$OUT/after/fp.txt"
 if [ "$BASE" = "c1e8829" ];then
  python3 "$HERE/compare_fingerprints.py" "$OUT/before/fp.txt" "$OUT/after/fp.txt" --expect-only '^Part (BottomSeal|TearStripN): tags' '^Part (StarV|StarH|StarSpeck)[FB]N: ' '^Part RuneSigil[FB]N_N: ' '^Part (MossPatch|IceGlaze): size  \[pad\]'
 else
- python3 "$HERE/compare_fingerprints.py" "$OUT/before/fp.txt" "$OUT/after/fp.txt" --expect-only '(?!)'
+ # (R153: the one change since: the Void's corner details that hung off its pouch are seated on it, EclipsePackArt.Seats - their frame only; see docs/proposals/R153/pack_parts_fix.md)
+ python3 "$HERE/compare_fingerprints.py" "$OUT/before/fp.txt" "$OUT/after/fp.txt" --expect-only '^Part (RuneSigil[FB]N_N|StarV[FB]N|StarH[FB]N|StarSpeck[FB]N): @PackLocalFrame,at  \['
 fi
 
 echo "== the Verity pouch (VerityPouch151): runtime bake, pouch pack, sachet fallback"

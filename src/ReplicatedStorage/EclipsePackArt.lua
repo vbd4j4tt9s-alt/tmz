@@ -18,6 +18,18 @@ A.Palette={
  Halo=RGB(176,104,255),HaloHot=RGB(255,214,250),Debris=RGB(26,18,40),
 }
 A.Budget={MaxParts=190}
+-- R153 (owner: "parts are dislocated on packs"): the print's two sheets stand at the Forest_01 pouch's BOX faces, and the box's front is the tip of the pouch's raised leaf
+-- print (z = -.574): the middle of each sheet rests on that leaf, but the pouch itself curves away to -.08 .. -.31 under the corners, so the corner details that do not lie
+-- on the nebula (the four rune sigils, two of the stars, three of the specks) hung .16 - .46 off the pouch, touching nothing. They are SEATED on it now: each one's back sits
+-- (a hair inside, SeatEmbed) on the highest point of the pouch under it, at the same x / y, size, turn and colour, so the front looks the same. Seats = how far out of the
+-- pouch's middle plane its surface is under that detail (pack units at scale 1), baked from the approved Forest_01 pouch (its native render data, SeedPackArtForest01, which
+-- is the uploaded mesh: the same box to 1e-4): docs/proposals/R153/tools/void_seats.py prints this table, and the R153 pack-parts suite checks it against the pouch.
+-- F = the front face, B = the back; a detail that rests on the sheet (on a nebula disc or the accretion disc) has no seat and stays on the sheet.
+A.Seats={
+ F={Star={[1]=.244,[3]=.245},Speck={[2]=.252,[3]=.247,[4]=.221},Rune={[1]=.175,[2]=.184,[3]=.223,[4]=.225}},
+ B={Star={[1]=.244,[3]=.245},Speck={[2]=.252,[3]=.247,[4]=.225},Rune={[1]=.175,[2]=.184,[3]=.225,[4]=.226}},
+}
+A.SeatEmbed=.004
 local P=A.Palette
 local function lerp(a,b,t)return a:Lerp(b,t)end
 local specs
@@ -84,13 +96,16 @@ function A.Specs()
   -- R151: the stars, specks and rune strokes sat .031 in front of the pouch's front face (thin blocks .016 out, .01 deep, away from the nebula
   -- discs that reach to .016); they are backed now: the same front face (.021 out), but .026 deep, so they reach .015 from the pouch like the
   -- discs do (nothing floating off the surface; the front looks exactly as before).
+  -- R153: a seated detail's local z (out of the face is -Z): its .026-deep back on the pouch's surface under it, SeatEmbed inside; -.008 (on the sheet) without a seat
+  local seats=A.Seats[tag]
+  local function depth(kind,i)local s=seats[kind][i];return s and math.abs(face)-s+A.SeatEmbed-.013 or -.008 end
   for i,star in ipairs({{-.66,.50,.13,P.Star},{.60,-.40,.11,P.StarCyan},{.12,.80,.09,P.StarPink}})do
-   local at=base*CF(star[1],star[2],-.008)
+   local at=base*CF(star[1],star[2],depth('Star',i))
    pulse(add('StarV'..tag..i,V(.022,star[3],.026),at,star[4]),.6,i*1.7)
    pulse(add('StarH'..tag..i,V(star[3]*.62,.022,.026),at,star[4]),.6,i*1.7)
   end
   for i,speck in ipairs({{-.42,-.58},{.70,.30},{-.74,-.12},{.36,-.80}})do
-   pulse(add('StarSpeck'..tag..i,V(.035,.035,.026),base*CF(speck[1],speck[2],-.008)*CFrame.Angles(0,0,math.pi/4),i%2==0 and P.StarCyan or P.Star),.7,i*2.3)
+   pulse(add('StarSpeck'..tag..i,V(.035,.035,.026),base*CF(speck[1],speck[2],depth('Speck',i))*CFrame.Angles(0,0,math.pi/4),i%2==0 and P.StarCyan or P.Star),.7,i*2.3)
   end
   -- Four rune sigils in the corners (three strokes each); they flicker.
   local runes={
@@ -100,7 +115,7 @@ function A.Specs()
    {V(.60,-.80,0),{{V(-.05,.09,0),V(-.05,-.09,0)},{V(-.05,.09,0),V(.06,.02,0)},{V(.06,.02,0),V(-.05,-.02,0)}}},
   }
   for r,rune in ipairs(runes)do for k,stroke in ipairs(rune[2])do
-   pulse(segment('RuneSigil'..tag..r..'_'..k,base*CF(rune[1]+V(0,0,-.008)),stroke[1],stroke[2],.022,.026,P.Rune),.5,r*1.3)
+   pulse(segment('RuneSigil'..tag..r..'_'..k,base*CF(rune[1]+V(0,0,depth('Rune',r))),stroke[1],stroke[2],.022,.026,P.Rune),.5,r*1.3)
   end end
  end
  -- Event-horizon halo around the whole pack: a tilted circle, so spinning never changes its outline.

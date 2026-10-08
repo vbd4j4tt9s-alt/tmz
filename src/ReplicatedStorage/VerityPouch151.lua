@@ -6,7 +6,8 @@
 --  * Shape (Generate, pure data, tested): the template pouch's width and height (its MeshPart Size X / Y, so the outline and the seal / tear strips line up) and DepthShare of its
 --    depth (a flat sachet: R149's was .56). Front and back are two exactly flat planes; the long edges are rounded (EdgeRadius); the top and bottom pinch in a smooth taper
 --    (TaperHeight) to a crimped seal (CrimpHeight: a zig-zag, CrimpTeeth ridges, like a chip bag) that closes in a knife edge. Nothing else: no relief anywhere on the body.
---    The mesh is centred on its own origin with its bounding box exactly the pouch's Size, so the part sits on the template's PackLocalFrame like the standard pouch.
+--    The mesh is centred on its own origin with its bounding box exactly the pouch's Size, so the part sits on the template's PackLocalFrame like the standard pouch
+--    (R153: its x / y and turn, but centred on the seam plane z = 0 where the seal and the strips are: SeamFrame below).
 --  * Every vertex colour is white (one white colour on every face), so the part's Color (255,255,0) is the pack's colour. UVs are planar on each face (best effort); flat faces
 --    are what make Verity's face Decals (VerityPackArt) projected on the Front and Back crisp and undistorted.
 --  * Server, at start (ApprovedPlantsBootstrap): Prepare reads the Verity design's template from the live place (SeedPackRenderer.GetGeometry: Storm_02, the Standard design of
@@ -31,6 +32,13 @@ local M={Folder='VerityPouchTemplate151',Revision=152,
  Columns=72,         -- samples across the face (4 per ridge: CrimpTeeth = Columns / 4)
  Corner=6,           -- segments of each rounded corner
  TaperRows=8}        -- rows of the taper
+-- R153 (owner: "parts are dislocated on packs": the yellow pouch held edge-on, its seal and tear strips off to one side and the top one stepped): the template's PackLocalFrame
+-- is the centre of the STANDARD pouch mesh's bounding box, and that box is not centred on the pouch: its print stands out of the front (Storm_02: the coil relief reaches
+-- z = -.549, the back print only .455), so the frame is .047 in front of the pouch's middle. Every design's pouch closes on the plane z = 0 of the pack (its crimp rows), and
+-- the pack's BottomSeal and 8 TearStrips (SeedPackVisuals.Bag) are built on that plane. The generated pouch is symmetric, so it is centred THERE: the template's x / y and
+-- turn, z = SeamZ. (Its knife edges then run into the seal and the strips, centred, as the standard pouch's crimps do.)
+M.SeamZ=0
+function M.SeamFrame(frame)return CFrame.new(frame.Position.X,frame.Position.Y,M.SeamZ)*frame.Rotation end
 local WHITE=Color3.new(1,1,1)
 local WAVE={[0]=0,1,0,-1} -- the seal's triangle wave, per column (period 4: neutral, ridge, neutral, groove)
 local function ss(a,b,x)local t=math.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)end
@@ -144,6 +152,7 @@ local function bake(source)
   local okApi,method=pcall(function()return Assets.CreateEditableMesh end)
   if Content==nil or not okApi or type(method)~='function'then error('EditableMesh is not available in this environment (AssetService:CreateEditableMesh or Content is missing)',0)end
   local frame=source:GetAttribute('PackLocalFrame');assert(typeof(frame)=='CFrame','template mesh '..source.Name..' has no PackLocalFrame')
+  frame=M.SeamFrame(frame) -- R153: on the seam plane, where the seal and the 8 tear strips are (not the standard mesh's box centre)
   local size=source.Size;assert(size.X>0 and size.Y>0 and size.Z>0,'template mesh '..source.Name..' has no size')
   local data=M.Generate(size.X,size.Y,size.Z*M.DepthShare)
   editable=Assets:CreateEditableMesh();assert(editable,'no EditableMesh (mesh memory is unavailable)')
