@@ -265,14 +265,14 @@ check(#rm2==4 and near(area,200*100-180*60),'RectMinus: a wider, longer floor le
 check(#K.RectMinus({0,10,0,10},{20,30,0,10})==1 and #K.RectMinus({0,10,0,10},{-5,15,-5,15})==0,'RectMinus: disjoint = whole rect, covered = nothing')
 -- windows per tier: one representation, long range, caps
 local capOk=true
-for tier,want in pairs({[3]={990,3800,500},[2]={600,2400,340},[1]={365,1600,230}})do
+for tier,want in pairs({[3]={990,3800,500},[2]={455,2400,340},[1]={365,1600,230}})do -- (R154, lag audit B3: tier 2's keys end 56 rows = 458 studs ahead, were 74 rows = 605)
  local t=K.Tier(tier)
  if t.Ahead*P<want[1]or K.KeyCap(tier,22)>want[2]or t.FarAhead*P<want[3]or t.LegendAhead*P<140*(tier==3 and 1 or tier==2 and .68 or .39)then capOk=false end
  local ra,rb,ka,kb=K.KeyWindow(g,tier,300)
  if ra~=300-t.Back or rb~=300+t.Ahead or ka~=ra-t.Hyst or kb~=rb+t.Hyst then capOk=false end
  if K.KeyCap(tier,22)~=(t.Back+t.Ahead+1+2*t.Hyst)*22 then capOk=false end
 end
-check(capOk,'tiers: keys reach >= 990 / 600 / 365 studs ahead (tier 3 / 2 / 1) with at most 3800 / 2400 / 1600 keys (R152: Back is larger); the near letters >= 140 / 95 / 55 studs ahead, letters (far ones included) >= 500 / 340 / 230')
+check(capOk,'tiers: keys reach >= 990 / 455 / 365 studs ahead (tier 3 / 2 / 1) with at most 3800 / 2400 / 1600 keys (R152: Back is larger); the near letters >= 140 / 95 / 55 studs ahead, letters (far ones included) >= 500 / 340 / 230')
 -- R151: the near zone (Back rows) is at least 60 studs each side on every tier (it was 41 on tier 1, 65 on tier 2)
 check(K.Near(3)*P>=110 and K.Near(2)*P>=85 and K.Near(1)*P>=60 and K.Near(1)==K.Tier(1).Near and K.Near(3)==K.Tier(3).Near,('R151 near zone: %.0f / %.0f / %.0f studs each side (tier 3 / 2 / 1), unchanged by R152'):format(K.Near(3)*P,K.Near(2)*P,K.Near(1)*P))
 -- R152 (owner: "keys behind also not rendering"): Back, the keys behind the way the camera faces, covers a camera zoomed out to Roblox's 128 studs (it sees below and behind its own feet) on every tier
@@ -1185,20 +1185,24 @@ do
  check(worstBare==0,('R151: half a second later every row of the wanted window holds keys or the stand-in, for every camera way (worst %d bare rows)'):format(worstBare))
  -- the owner's case: back from a run to base (facing -Z), the camera then looks across the track a little toward +Z: the long side used to stay
  -- behind (only Back rows where he looked); now the window is symmetric and the far side fills nearest first under stand-ins
- fxTier=2;put(cx(11),F+9,2400);look(-100);frames(60*4)
+ for _,tn in ipairs({2,3})do
+ fxTier=tn;put(cx(11),F+9,2400);look(-100);frames(60*4)
  camera.CFrame=R.CFrame.lookAt(V3(-40,20,2400),V3(60,14,2430)) -- heading ~0.29 toward +Z: across
- local fr=g.RowOfZ(2400);local S2=K.Side(2);local seenBare=0;local maxFill=0
+ local fr=g.RowOfZ(2400);local S2=K.Side(tn);local seenBare=0;local maxFill=0
  for f=1,40 do
   frames(1,1/30)
   if f>math.ceil(C.FacingHoldSeconds*30)+1 then seenBare=max(seenBare,bare(fr-S2,fr+S2))end
   maxFill=max(maxFill,#fillers())
  end
  local lo,hi=1e9,-1e9;for _,p in ipairs(keyParts())do local z=p.CFrame.Position.Z;lo=min(lo,z);hi=max(hi,z)end
- check(hi-2400>=(S2-1)*P and 2400-lo>=(S2-1)*P,('R151 (the owner\'s screenshot): looking across after a run back, keys reach %.0f studs toward +Z and %.0f toward -Z (Side %d rows); before R151 only %d rows toward +Z'):format(hi-2400,2400-lo,S2,8))
+ check(hi-2400>=(S2-1)*P and 2400-lo>=(S2-1)*P,('R151 (the owner\'s screenshot): looking across after a run back, tier %d: keys reach %.0f studs toward +Z and %.0f toward -Z (Side %d rows); before R151 only %d rows toward +Z'):format(tn,hi-2400,2400-lo,S2,8))
  check(seenBare==0,'...and while the far side fills no row of the window is bare (stand-ins cover what waits): '..seenBare)
- check(maxFill>0 and maxFill<=C.FillerSlabs,('...stand-ins were used (%d slabs at most, budget %d)'):format(maxFill,C.FillerSlabs))
+ -- (R154, lag audit B3: tier 2's window is smaller now (Side 42 rows, 14 to fill), so the phone fills it inside one frame's budget and needs no stand-in; tier 3 (41 rows to fill) still does)
+ local fillRows=S2-K.Tier(tn).Back;local usesFill=fillRows*22>math.floor(K.Tier(tn).Bind*2)
+ check((maxFill>0 or not usesFill)and maxFill<=C.FillerSlabs,('...stand-ins were used when the fill is more than one frame\'s budget (tier %d: %d rows to fill, %d slabs at most, budget %d)'):format(tn,fillRows,maxFill,C.FillerSlabs))
  frames(60)
  check(#fillers()==0,'...and parked once every row has its keys')
+ end
  -- a stand-in never shares a plane with a key top and sits under the resting tops
  local fl=nil;for _,p in ipairs(keysF:GetChildren())do if p.Name=='KeyFiller'then fl=p end end
  check(fl~=nil and near(fl.Size.Y,K.KeyTop(0)-C.FillerDrop-(K.BedTop()+.02),1e-6)and C.FillerDrop>=.04 and C.FillerDrop<=.2,
@@ -1207,7 +1211,7 @@ do
 end
 -- 5e. R152 (owner: "keys behind also not rendering and its not loud enough"; his screenshot looked down the track and the far keys were bare caps).
 -- From anywhere on the track and looking any way, every key that can reasonably be seen has its keycap AND its letter: along the camera's way out to the view distance
--- (~1000 / 600 / 365 studs of keys, letters 500 / 340 / 230), behind it (keys 327 / 229 / 180 studs, letters 229 / 180 / 147: a camera zoomed out to 128 studs sees its own
+-- (~1000 / 455 / 365 studs of keys (R154: tier 2 was 600), letters 500 / 340 / 230), behind it (keys 327 / 229 / 180 studs, letters 229 / 180 / 147: a camera zoomed out to 128 studs sees its own
 -- surroundings), and each way when it looks across the track. The numbers below are written out here, not read from the module. Then the budget per tier: parts, SurfaceGuis,
 -- TextLabels (the far rows carry one cheap strip each: a single SurfaceGui at 4 px / stud, not two 16 px ones).
 local H={} -- helpers shared by 5e and 5g (one local: the main chunk is near Luau's limit of local variables)
@@ -1225,7 +1229,7 @@ local H={} -- helpers shared by 5e and 5g (one local: the main chunk is near Lua
     local gui=st:FindFirstChildWhichIsA('SurfaceGui');local pps=gui.PixelsPerStud;local cw,ch=canvasOf(st,pps)
     if far then farN+=1 else nearN+=1 end
     -- (R153 perf, lag audit D8: on tier 2 the far letters render to FarMaxDistanceByTier[2] = 500 studs, elsewhere at least 700)
-    if gui.Enabled==false or gui.Face~=R.Enum.NormalId.Top or gui.AlwaysOnTop~=false or gui.LightInfluence~=0 or gui.MaxDistance<(far and((LT.FarMaxDistanceByTier or{})[fxTier]or 700)or 400)or pps~=(far and LT.FarPixelsPerStud or LT.PixelsPerStud)then bad.gui+=1 end
+    if gui.Enabled==false or gui.Face~=R.Enum.NormalId.Top or gui.AlwaysOnTop~=false or gui.LightInfluence~=0 or gui.MaxDistance<(far and((LT.FarMaxDistanceByTier or{})[fxTier]or 700)or 400)or pps~=(far and LT.FarPixelsPerStud or K.NearPPS(fxTier))then bad.gui+=1 end -- (R154, lag audit B3: the near letters' pixels a stud: 12 on tier 2)
     for _,l in ipairs(gui:GetChildren())do
      if l._class=='TextLabel'and l.Visible and l.TextTransparency<1 then
       labels+=1
@@ -1284,7 +1288,7 @@ local H={} -- helpers shared by 5e and 5g (one local: the main chunk is near Lua
  do
  local need={ -- keys along the way / behind / each way across; letters along / behind / each way across (studs)
   [3]={ka=990,kb=320,ks=600,la=500,lb=220,ls=360,parts=4000,guis=150,labels=2300},
-  [2]={ka=600,kb=225,ks=380,la=340,lb=170,ls=260,parts=2600,guis=110,labels=1700},
+  [2]={ka=455,kb=225,ks=340,la=340,lb=170,ls=260,parts=2600,guis=110,labels=1700}, -- (R154, lag audit B3: 56 rows ahead = 458 studs, Side 42 rows = 343 studs each way; were 600 / 380)
   [1]={ka=350,kb=175,ks=250,la=230,lb=140,ls=190,parts=1700,guis=80,labels=1300}}
  local dirs={{'+Z',1,function()look(100)end},{'-Z',-1,function()look(-100)end},{'across',0,function()look(0,100)end}}
  local lines,worst={}, {}
@@ -2248,6 +2252,66 @@ coverage(a,b,'tier 3 again')
 -- a key dressed under a standing runner is down at once and silent
 hum.FloorMaterial=PLASTIC;plays={};put(cx(11),nil,2500);frames(14)
 check(#plays==0 and near(topOf(g.RowOfZ(2500),g.ColOfX(cx(11)))or 99,K.KeyTop(1),1e-6),'a key dressed under a standing runner is down at once and silent ('..#plays..' clicks)')
+end
+-- 9b. R154 (lag audit B3, owner: "for the lag fixes we can implement B3 and B1"): phones (tier 2) draw the NEAR letters at 12 px / stud (16 before) and carry 56 key rows
+-- ahead (74 before); PC (tier 3) and tier 1 are unchanged. The numbers live in KeyboardTrack.lua (K.NearPPS / K.NearText / Tiers[2].Ahead); the client reads them and, like R153's
+-- far-letter render limit, re-applies them when the tier changes: every strip (bound or parked in the pool) and every pressed-key letter.
+do
+check(K.NearPPS(3)==16 and K.NearPPS(2)==12 and K.NearPPS(1)==16 and LT.PixelsPerStud==16,'R154 B3: the near letters are 16 px / stud on tiers 3 and 1 (unchanged) and 12 on tier 2 (K.NearPPS)')
+check(K.NearText(12)==55 and K.NearText(16)==74 and K.NearText(12)*1<=100 and K.NearText(16)<=100,'...a 4.6-stud letter is 55 px tall at 12 px / stud, 74 at 16 (TextSize <= 100)')
+check(K.Tier(2).Ahead==56 and K.Tier(3).Ahead==122 and K.Tier(1).Ahead==45 and K.Tier(2).Back==28 and K.Side(2)==42,'R154 B3: tier 2 carries 56 key rows ahead (was 74; 3 and 1 unchanged), Back 28, Side 42 each way across')
+check(K.KeyCap(2,22)==(28+56+1+2*K.Tier(2).Hyst)*22 and K.KeyCap(2,22)<=1960 and K.KeyCap(3,22)==(40+122+1+8)*22,('...at most %d keys on a phone (was %d), PC %d'):format(K.KeyCap(2,22),(28+74+1+2*K.Tier(2).Hyst)*22,K.KeyCap(3,22)))
+check(K.Tier(2).Ahead*P>=455 and K.Tier(2).FarAhead<=K.Tier(2).Ahead and LT.FarMaxDistanceByTier[2]==500 and K.Tier(2).FarAhead*P+128<=LT.FarMaxDistanceByTier[2],('...the far letters (R153 D8: %d studs on tier 2) still cover the letter window: %d rows = %.0f studs ahead plus a camera zoomed out to 128 studs'):format(LT.FarMaxDistanceByTier[2],K.Tier(2).FarAhead,K.Tier(2).FarAhead*P))
+local function nearGuis()
+ local out={};for _,st in ipairs(legF:GetChildren())do if st.Name=='LegendStrip'then out[#out+1]=st end end
+ return out
+end
+-- every near strip (bound and parked) at `pps`: its gui, its labels' size and text size, its labels' places on the canvas; every pooled pressed-key letter
+local function nearAudit(pps,what)
+ local bad={gui=0,size=0,text=0,place=0};local n,bound,labels=0,0,0
+ for _,st in ipairs(nearGuis())do
+  local gui=st:FindFirstChildWhichIsA('SurfaceGui');n+=1
+  if gui.PixelsPerStud~=pps then bad.gui+=1 end
+  local on=st.CFrame.Position.Y>0;if on then bound+=1 end
+  for _,l in ipairs(gui:GetChildren())do
+   if l._class=='TextLabel'then
+    labels+=1
+    if l.TextSize~=K.NearText(pps)then bad.text+=1 end
+    if not near(l.Size.X.Offset,KW*pps,1e-6)or not near(l.Size.Y.Offset,KW*pps,1e-6)then bad.size+=1 end
+    if on and l.Visible then
+     -- the label stands over the centre of its key: the canvas point is the key's centre whatever the pixels a stud
+     local wx,wz=worldOf(st,l.Position.X.Offset,l.Position.Y.Offset,pps);local row,col=g.RowOfZ(wz),g.ColOfX(wx);local kx,kz=g.CellCenter(row,col)
+     if not kx or abs(kx-wx)>1e-6 or abs(kz-wz)>1e-6 then bad.place+=1 end
+    end
+   end
+  end
+ end
+ local klBad,klN=0,0
+ for _,d in ipairs(legF:GetDescendants())do if d._class=='SurfaceGui'and d.Name=='KeyLegend'then klN+=1;if d.PixelsPerStud~=pps then klBad+=1 end end end
+ for _,d in ipairs(keysF:GetDescendants())do if d._class=='SurfaceGui'and d.Name=='KeyLegend'then klN+=1;if d.PixelsPerStud~=pps then klBad+=1 end;local l=d:FindFirstChildWhichIsA('TextLabel');if l and l.TextSize~=K.NearText(pps)then klBad+=1 end end end
+ check(n>=20 and bad.gui==0 and bad.size==0 and bad.text==0 and bad.place==0 and klBad==0,('%s: %d near strips (%d bound, %d labels) and %d pressed-key letters all at %d px / stud, text %d (wrong gui / label size / text size / place: %d %d %d %d, key letters off: %d)'):format(what,n,bound,labels,klN,pps,K.NearText(pps),bad.gui,bad.size,bad.text,bad.place,klBad))
+ return n,labels
+end
+local function canvasPx()local px=0;for _,st in ipairs(nearGuis())do if st.CFrame.Position.Y>0 then local gui=st:FindFirstChildWhichIsA('SurfaceGui');local cw,ch=canvasOf(st,gui.PixelsPerStud);px+=cw*ch end end;return px end
+-- tier 3 first (16 px), a key down so a pressed-key letter exists, then the phone (12), PC again (16), the slow device (tier 1: unchanged, 16), and the phone once more
+hum.FloorMaterial=AIR;fxTier=3;put(cx(11),F+9,cz(BR));look(100);frames(60*5)
+hum.FloorMaterial=PLASTIC;put(cx(9),nil,cz(BR+2));frames(14)
+check(keyAt(BR+2,9):FindFirstChildWhichIsA('SurfaceGui')~=nil,'R154 B3: a key is down and carries its own letter while the tier changes')
+nearAudit(16,'tier 3');local px3=canvasPx()
+fxTier=2;frames(60*4)
+nearAudit(12,'tier 2 (a tier change re-applies the letters\' pixels a stud to every strip and pressed-key letter already made)');local px2=canvasPx()
+check(px2>0 and px3>0,('...bound near canvas %d px (tier 3) vs %d px (tier 2); per strip the canvas is %.0f%% of the 16 px one, i.e. %.0f%% smaller (12 / 16 squared)'):format(px3,px2,100*(12/16)^2,100-100*(12/16)^2))
+fxTier=3;frames(60*4)
+nearAudit(16,'back to tier 3 (PC unchanged)')
+fxTier=1;frames(60*4)
+nearAudit(16,'tier 1 (unchanged by B3)')
+fxTier=2;frames(60*4)
+nearAudit(12,'tier 2 again')
+-- a key pressed WHILE on tier 2 gets a 12 px letter at once (it is made, or taken from the pool, at the tier's size)
+hum.FloorMaterial=PLASTIC;put(cx(14),nil,cz(BR+3));frames(14)
+local kp2=keyAt(BR+3,14);local kg2=kp2 and kp2:FindFirstChildWhichIsA('SurfaceGui');local kl2=kg2 and kg2:FindFirstChildWhichIsA('TextLabel')
+check(kg2 and kl2 and kg2.PixelsPerStud==12 and kl2.TextSize==55 and kl2.Text==K.Legend(BR+3,14),'a key pressed on tier 2 carries a 12 px / stud letter, TextSize 55')
+hum.FloorMaterial=AIR;put(cx(11),nil,cz(BR));fxTier=3;frames(60*4)
 end
 -- 10. teardown: the folder goes, the floor comes back
 sc.Destroying:Fire();frames(2)
