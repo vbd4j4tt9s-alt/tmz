@@ -811,6 +811,11 @@ do
    local sub=R.new('Model');sub.Name='Inner';sub.Parent=m;local ms=R.new('ModuleScript');ms.Name='Req';ms.Parent=sub
    for _,c in ipairs({'Sound','ClickDetector','ProximityPrompt','Humanoid','WeldConstraint','Attachment','ParticleEmitter','SurfaceGui','RemoteEvent'})do local x=R.new(c);x.Name='Junk'..c;x.Parent=m end
   end
+  if o.Impostor then -- a store model that carries a module / script named like ours (the owner's Studio log: ReplicatedStorage.HubTrampolineRules153 had other text in it)
+   local imp=R.new('ModuleScript');imp.Name='HubTrampolineRules153';imp.Parent=m
+   local imp2=R.new('ModuleScript');imp2.Name='HubTrampolineTemplates153';imp2.Parent=m
+   local imp3=R.new('LocalScript');imp3.Name='HubTrampoline153';imp3.Parent=m
+  end
   for _=1,(o.Extra or 0)do part(m,'Bolt',V3(.3,.3,.3),{0,1,0})end
   return m
  end
@@ -859,6 +864,31 @@ do
  local ok,text=HT.Command(nil,nil,{})
  check('command: /test trampoline says THE ASSET 12088629887, how it loaded, the parts and the squash mat',ok and text:find('THE ASSET 12088629887',1,true)~=nil and text:find('InsertService:LoadAsset',1,true)~=nil and text:find('14 parts',1,true)~=nil and text:find('"Mat"',1,true)~=nil and text:find('one invisible collider',1,true)~=nil and text:find('brick circle',1,true)~=nil and text:find('not round',1,true)~=nil,text)
  info('look: a store look with 14 parts per trampoline here; the cap is '..T.AssetMaxParts..' per trampoline (a bigger one is refused and the built trampoline stays)')
+ -- A2. NOTHING EVER WRITES INTO OR REPLACES ReplicatedStorage.HubTrampolineRules153 (the owner's Studio log: "HubTrampolineRules153:44: Expected identifier ... got '//'": the file in
+ -- his place had text pasted into it; our loader only READS ReplicatedStorage.HubTrampolineTemplates153 and clones what it finds). A store model that carries scripts named like ours
+ -- (HubTrampolineRules153, HubTrampolineTemplates153, HubTrampoline153), loaded by the asset route and by the template route: ReplicatedStorage keeps exactly the same children, the rules
+ -- module is the same instance with the same source, and none of the impostors reaches the world.
+ do
+  local function snapshot()local t={};for _,c in ipairs(RS:GetChildren())do t[#t+1]=c.Name end;table.sort(t);return table.concat(t,',')end
+  local rules=RS:FindFirstChild('HubTrampolineRules153');local src0=rules and rules._source
+  local snap0=snapshot()
+  local parented=0;local rawParent=nil
+  reload(function()return container(asset({Impostor=true}))end,DENIED)
+  local viaAsset=HT.Look=='asset'
+  local tf2=R.new('Folder');tf2.Name=T.TemplateFolder;tf2.Parent=RS
+  local hand2=asset({Name='Impostor',Impostor=true});hand2.Parent=tf2
+  local snapT=snapshot() -- (with the owner's template folder, which the test made)
+  reload(DENIED,DENIED)
+  local viaTemplate=HT.Look=='template'
+  local stillThere=RS:FindFirstChild('HubTrampolineRules153')==rules
+  local count=0;for _,c in ipairs(RS:GetChildren())do if c.Name=='HubTrampolineRules153'then count+=1 end end
+  local inWorld={};for _,d in ipairs(W.workspace:GetDescendants())do if d.Name=='HubTrampolineRules153'or d.Name=='HubTrampolineTemplates153'or d.Name=='HubTrampoline153'then inWorld[#inWorld+1]=Z.path(d)end end
+  local kids=0;for _,c in ipairs(tf2:GetChildren())do kids+=1 end
+  tf2:Destroy()
+  reload(function()return container(asset())end,DENIED) -- (back to the asset look, the state section A left for B and C)
+  check('loader: a store model carrying scripts named HubTrampolineRules153 / HubTrampolineTemplates153 / HubTrampoline153 is loaded (asset route '..tostring(viaAsset)..', template route '..tostring(viaTemplate)..') and NOTHING reaches ReplicatedStorage: one rules module, the same instance and source, the same children, no copy of an impostor in the world',
+   viaAsset and viaTemplate and stillThere and count==1 and rules._source==src0 and snapshot()==snap0 and #inWorld==0 and kids==1,'children '..snap0..' -> '..snapshot()..' world '..tostring(inWorld[1]))
+ end
  -- B. a rebuild (HubDecor151.Apply again) re-dresses at once, no second load
  local before=calls.IS;HT.Build(map)
  local _,l1=lookOf(T.Spots[1])
