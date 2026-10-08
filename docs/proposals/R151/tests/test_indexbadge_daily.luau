@@ -70,6 +70,20 @@ for _,s in ipairs(SCREENS)do
  local r=L.rect(o);check(near(r.x1-r.x0,r.y1-r.y0)and near(r.x1-r.x0,Badge.Sizes.Daily),s[1]..'x'..s[2]..': a '..Badge.Sizes.Daily..' px square (a circle; R153: 1.5x the R151 20 px)')
 end
 inset(120,1280,0,52);resize(1280,720)
+-- R154 (owner: "the number and signs in the notification bubble is also too small"): the DAILY count fills its bubble as the INDEX count does, on a computer and on phones, for "3" and "9+"
+for _,s in ipairs({{1920,1080,140,1920},{1280,720,120,1280},{844,390,150,800},{390,844,110,390},{360,640,110,360}})do
+ inset(s[3],s[4],0,s[2]>500 and 52 or 44);resize(s[1],s[2])
+ local tag=s[1]..'x'..s[2]..(math.min(s[1],s[2])<=500 and' (phone)'or' (computer)')
+ for _,case in ipairs({{2,'3'},{12,'9+'}})do
+  player:SetAttribute('DailyQuestsReady',case[1]);frames(3)
+  local o=badge();local f=L.textFill(o)
+  check(o.Count.Text==(case[2]=='3'and'3'or'9+'),tag..': the DAILY badge reads "'..o.Count.Text..'"')
+  check(f.FillEm>=.6 and f.FillEm<=.8 and f.FillDisc>=.55 and f.FillDisc<=.72 and f.FillInk>=.45,string.format('%s "%s": the text is %.0f%% of the badge (%d px), the digits %.0f%% of the red disc, %.0f%% of the badge',tag,o.Count.Text,f.FillEm*100,f.Em,f.FillDisc*100,f.FillInk*100))
+  check(f.InkW<=f.Disc-2 and f.Corner<=f.Radius-1 and f.Centred and o.Count.TextScaled==false and o.Count.TextSize==Badge.TextSize(Badge.Sizes.Daily,o.Count.Text),tag..' "'..o.Count.Text..'": the glyphs stay inside the badge, centred, at the explicit size')
+ end
+end
+player:SetAttribute('DailyQuestsReady',2)
+inset(120,1280,0,52);resize(1280,720)
 -- 4. the window's tab dots --------------------------------------------------------------------------------------------------------------------------------
 daily.Activated:Fire();frames(6)
 local panel=pg.DailyRewardsGui.DailyPanel

@@ -18,12 +18,15 @@ S.Colors = {
 }
 S.Font = 'FredokaOne'
 S.Icon = '\u{26A1}'
-S.StrokeThickness = 5
+S.StrokeThickness = 4
 -- Reference: the video's text is ~1.8% of the screen height; ours was 26 px on a 1080 p screen (2.4%). Smaller = "many small popups".
 -- Box = the frame the bolt and the number sit in (centred, Gap px apart); the tilts are random +- degrees per popup.
 -- R153 (owner, in Studio: "numbers should also be bigger", then "2x bigger"): every size is 2x its R151 value (text 22 -> 44, bolt 20 -> 40, box 150 x 36 -> 300 x 72, bolt box
 -- 24 -> 48, gap 2 -> 4, outline 2.5 -> 5); the motion, rate, colours and formatting are untouched. A fan this size does not fit a phone, see S.Fan below.
-S.Size = {Text = 44, Icon = 40, Box = {300, 72}, IconBox = 48, Gap = 4, IconTilt = 14, TextTilt = 3}
+-- R154 (owner: "reduce the size of the speed notifier number by 20%"): 0.8 of the R153 sizes, so 1.6x R151's: text 44 -> 35, bolt 40 -> 32, box 300 x 72 -> 240 x 58, bolt box 48 -> 38,
+-- gap 4 -> 3, outline 5 -> 4. A popup is this size from its first frame to its last (SpeedGainPopup: a pixel-sized BillboardGui, the same at any camera distance; only the brief pop-in
+-- below, 0.45 -> 1.07 -> 1 in 0.28 s, changes it).
+S.Size = {Text = 35, Icon = 32, Box = {240, 58}, IconBox = 38, Gap = 3, IconTilt = 14, TextTilt = 3}
 
 -- Spawn: the popup starts AT the head (the video: head centre, within a few px), already 45% of full size, nothing in front of the face.
 S.Spawn = {Lift = 5, Jitter = 6}     -- px above the head centre, +- px of random start offset
@@ -44,7 +47,11 @@ S.RetireFade = 0.08                                  -- a popup retired early (c
 S.Reduced = {FadeIn = 0.08, Rise = 72, RiseTime = 0.70, FadeStart = 0.45, FadeLength = 0.25, Life = 0.70, Side = 14}
 -- How many popups one player may have alive. Tier = ClientFxBudget tier (3 best .. 1 lowest; FastMode and a slow device are 1; phones start at 2).
 -- The local player is always shown; other players' popups only within MaxDistance studs of the camera (as the game did before) and in fewer numbers.
-S.Caps = {[3] = {Own = 8, Others = 3}, [2] = {Own = 6, Others = 2}, [1] = {Own = 4, Others = 1}}
+-- R154 (owner: "fix the glitchyness they have in them"; the screenshot had a popup half faded in mid-air): the stream is 10 a second and a popup lives 0.65 s, so 6 to 7 are alive at
+-- once. The caps of 6 (phones) and 4 (FastMode / a slow frame rate, which includes Studio after a few slow seconds) were BELOW that, so at those tiers every popup was cut short
+-- at about 0.4 s and faded out in 0.08 s while still flying and opaque (measured: 55 of 60 popups at tier 1). Own popups now hold 8 at every tier (the stream's 7 plus one: the cap is
+-- a burst guard, no longer a limit on the normal stream); other players keep their lower caps (their popups are 5 a second, not split).
+S.Caps = {[3] = {Own = 8, Others = 3}, [2] = {Own = 8, Others = 2}, [1] = {Own = 8, Others = 1}}
 S.ReducedCaps = {Own = 4, Others = 1}
 S.MaxDistance = 100
 -- Cadence: the video spawns one popup every 0.10 s, the server awards one tick every 1/5 s (Config.TrainingInterval; 1/6 s before the R151 treadmill
@@ -57,14 +64,17 @@ S.Cadence = {SplitTo = 2, MaxShares = 12, MaxTicks = 10, MinInterval = 0.1, MaxI
 -- Spare = frames kept beyond the cap (a retired popup still fades out for RetireFade s while its replacement is already there). FreeFields = how many idle
 -- fields are kept for the next player or the next run (more are destroyed).
 -- R153: Width / Height hold the biggest fan (S.FanScale) at the biggest Unit and the pop's 7% overshoot (was 560 x 420 for the 1x popups).
-S.Field = {Name = 'SpeedGainField', Width = 960, Height = 760, Spare = 2, FreeFields = 4}
+-- R154: 0.8 of R153's 960 x 760 (the popups and the fan are 0.8 of it); MaxFrames bounds the pool's growth in a burst (a lag spike delivers several awards at once): a frame that is
+-- still showing is never reused for a new popup, the pool gets one more frame instead (never more than MaxFrames; then that popup is not shown).
+S.Field = {Name = 'SpeedGainField', Width = 768, Height = 608, Spare = 2, FreeFields = 4, MaxFrames = 24}
 -- R153: the fan's size on THIS screen. The popups fly out of the head in a fan of design px; at 2x text the fan that kept R151's look (x2 on both axes) reaches 324 px to each side of the head and 248 px
 -- above it (design px), more than a phone has: a landscape phone (844 x 390) has no room above the head, a portrait phone (390 x 844) none at the sides. FanScale(w, h) returns
 -- X, Y: the multipliers of a popup's x / y offset (the client applies them with the Unit). Base = 2 (the same fan, 2x, so the popups pile up exactly as much as in R151: about
 -- 46% of a popup under others). A direction that lacks room (the head is assumed HeadY of the way down the screen, Margin px to keep clear of the edge, popups HalfWidth /
 -- HalfHeight wide / tall at the widest "+999.5K") gets what fits (never below Min), and the other direction takes the room back (up to Max) so the fan keeps its area.
 -- A portrait phone keeps the top PortraitTop px clear too: HudLayout puts the status box up there (down to y 67; the three balances under it reach y 209 at the right).
-S.Fan = {Base = 2, Max = 3, Min = 0.75, HeadY = 0.36, Margin = 12, PortraitTop = 72, HalfWidth = 111, HalfHeight = 30}
+-- R154: the popups are 0.8 of R153's, and so is the fan (Base 1.6 = 0.8 x 2, Max 2.4, Min 0.6, the half popup 89 x 24): the same arrangement and pile-up as R151 / R153, 20% smaller.
+S.Fan = {Base = 1.6, Max = 2.4, Min = 0.6, HeadY = 0.36, Margin = 12, PortraitTop = 72, HalfWidth = 89, HalfHeight = 24}
 
 local function clamp(v, lo, hi) return v < lo and lo or (v > hi and hi or v) end
 S.Clamp = clamp

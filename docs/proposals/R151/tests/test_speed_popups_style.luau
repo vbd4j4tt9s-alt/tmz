@@ -101,10 +101,13 @@ local _,_,_,raRet=Style.Pose(plan,0.3,true,0.25);check(near(raRet,1-0.05/Style.R
 
 -- 6. caps per tier ------------------------------------------------------------------------------------------------------------------------------------------
 check(Style.Cap(3,true,false)==8 and Style.Cap(3,false,false)==3,'caps tier 3: own 8 / others 3')
-check(Style.Cap(2,true,false)==6 and Style.Cap(2,false,false)==2,'caps tier 2 (phones): own 6 / others 2')
-check(Style.Cap(1,true,false)==4 and Style.Cap(1,false,false)==1,'caps tier 1 (low / FastMode): own 4 / others 1')
-check(Style.Cap(9,true,false)==8 and Style.Cap(-4,true,false)==4 and Style.Cap(nil,true,false)==4 and Style.Cap(0/0,true,false)==4 and Style.Cap('x',true,false)==4,'caps: tiers out of range or not numbers clamp to 1..3 (nothing bigger than the top tier)')
-check(Style.Cap(2.9,true,false)==6,'caps: a fractional tier rounds down')
+-- R154 (owner: "fix the glitchyness"): own popups hold 8 at EVERY tier (R151: 8 / 6 / 4). The stream is 10 a second and a popup lives 0.65 s, so 7 are alive at once: a cap of 6 or 4 cut every popup short
+-- and faded it out in 0.08 s while it was still flying (test_popups154.luau measures it on the real client).
+check(Style.Cap(2,true,false)==8 and Style.Cap(2,false,false)==2,'caps tier 2 (phones): own 8 / others 2 (R154: own was 6)')
+check(Style.Cap(1,true,false)==8 and Style.Cap(1,false,false)==1,'caps tier 1 (low / FastMode): own 8 / others 1 (R154: own was 4)')
+check(Style.Cap(9,true,false)==8 and Style.Cap(-4,true,false)==8 and Style.Cap(nil,true,false)==8 and Style.Cap(0/0,true,false)==8 and Style.Cap('x',true,false)==8,'caps: tiers out of range or not numbers clamp to 1..3 (nothing bigger than the top tier)')
+check(Style.Cap(2.9,true,false)==8 and Style.Cap(1.9,false,false)==1 and Style.Cap(2.9,false,false)==2,'caps: a fractional tier rounds down')
+for tier=1,3 do check(Style.Cap(tier,true,false)>=math.ceil(Style.Life/Style.Cadence.MinInterval)+1,'R154: tier '..tier..': the own cap ('..Style.Cap(tier,true,false)..') is above what the 10 a second stream keeps alive ('..math.ceil(Style.Life/Style.Cadence.MinInterval)..'), so the cap never cuts the normal stream short')end
 check(Style.Cap(3,true,true)==4 and Style.Cap(3,false,true)==1 and Style.Cap(1,true,true)==4,'caps: Reduced Motion own 4 / others 1 at any tier')
 check(Style.Cap(2,true,false)<=Style.Cap(3,true,false) and Style.Cap(1,true,false)<=Style.Cap(2,true,false) and Style.Cap(1,false,false)<=Style.Cap(2,false,false),'fewer popups on lower tiers')
 check(Style.MaxDistance==100,'other players only within 100 studs (as before)')
@@ -186,12 +189,14 @@ check(C.TextStroke[1]==17 and C.TextStroke[2]==26 and C.TextStroke[3]==42,'outli
 check(C.Icon[1]==255 and C.Icon[2]==222 and C.Icon[3]==66,'bolt colour as before (255,222,66)')
 check(C.LegacyStroke[1]==0 and C.LegacyStroke[2]==0 and C.LegacyStroke[3]==0,'legacy TextStroke colour as before (black)')
 check(Style.Font=='FredokaOne' and Style.Icon=='\u{26A1}','font FredokaOne and the bolt as before')
-check(Style.StrokeThickness==2.5*2,'R153: the outline is 2x too (5 px on the 44 px text; R151: 2.5 on 22)')
+check(Style.StrokeThickness==4,'R154: the outline is 4 px on the 35 px text (R153: 5 on 44; R151: 2.5 on 22)')
 -- the numbers of the proposal the owner approved
 check(Style.Pop.From==0.45 and Style.Pop.Time==0.28 and Style.Fling.Time==0.40 and Style.Fling.Power==3 and Style.Fade.Start==0.5 and Style.Fade.Length==0.15,'the approved pop / fling / fade numbers')
 check(Style.Fling.Radius[1]==44 and Style.Fling.Radius[2]==104 and Style.Fling.HalfAngle==75 and Style.Fling.Slots==7,'the approved fan: +-75 degrees in 7 slots, 44..104 px')
--- R153 (owner: "numbers should also be bigger", then "2x bigger"): every size is 2x its R151 value; the tilts (degrees) are not sizes. test_popups153.luau (docs/proposals/R153/tests) has the fan, the screens and the pile-up.
-check(Style.Size.Text==22*2 and Style.Size.Icon==20*2 and Style.Size.Box[1]==150*2 and Style.Size.Box[2]==36*2 and Style.Size.IconBox==24*2 and Style.Size.Gap==2*2,'R153: the sizes are 2x the approved ones: text 44, bolt 40, box 300 x 72, bolt box 48, gap 4')
+-- R153 (owner: "numbers should also be bigger", then "2x bigger") made every size 2x its R151 value; R154 (owner: "reduce the size of the speed notifier number by 20%") took 20% off that: 1.6x R151, to whole pixels.
+-- The tilts (degrees) are not sizes. test_popups153.luau (docs/proposals/R153/tests) has the fan, the screens and the pile-up.
+check(Style.Size.Text==35 and Style.Size.Icon==32 and Style.Size.Box[1]==240 and Style.Size.Box[2]==58 and Style.Size.IconBox==38 and Style.Size.Gap==3,'R154: the sizes are 0.8 of R153\'s: text 35, bolt 32, box 240 x 58, bolt box 38, gap 3')
+check(math.abs(Style.Size.Text-22*1.6)<=.5 and math.abs(Style.Size.Icon-20*1.6)<=.5 and math.abs(Style.Size.Box[1]-150*1.6)<=.5 and math.abs(Style.Size.Box[2]-36*1.6)<=.5 and math.abs(Style.Size.IconBox-24*1.6)<=.5 and math.abs(Style.Size.Gap-2*1.6)<=.5,'R154: ... which is 1.6x the R151 sizes, to the nearest pixel')
 check(Style.Size.IconTilt==14 and Style.Size.TextTilt==3,'(the random tilts are the same degrees)')
 
 print(string.format('test_speed_popups_style: %d checks, %d failed',checks,fails))

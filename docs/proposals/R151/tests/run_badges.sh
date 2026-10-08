@@ -9,7 +9,7 @@
 #  test_defaultshape.luau      (client world + the owner's pack templates + the EditableMesh mock) a picture flagged DefaultPackShape asks for the DEFAULT pouch: no variation is requested, no mesh
 #                              is baked, every pack is the design's own mesh (Verity: a plain client bake), and the other pictures keep their shapes
 # --existing   also runs the suites that were there before and touch the same scripts (R137 / R138 Index, R148 index_limited, R140 daily, R151 pack shapes + Verity pouch + static checks)
-# --mutations  breaks the code sixteen ways (R153: the badge sizes, the MENU alert off screen, the INDEX count cut) (mutate_badges.py) and expects the suite that guards each to fail
+# --mutations  breaks the code nineteen ways (R153: the badge sizes, the MENU alert off screen, the INDEX count cut; R154: the text size small, "9+" too wide, TextScaled again) (mutate_badges.py) and expects the suite that guards each to fail
 # INDEX_BASE (default 15d7743, the last commit before R151's badge change) is the "before" of the badge comparison (ChestIndex / HudLayout from git).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)

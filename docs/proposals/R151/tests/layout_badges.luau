@@ -96,6 +96,21 @@ return function(R)
   local half=(r.x1-r.x0)/2*Badge.PulseScale;add({x0=cx-half,y0=cy-half,x1=cx+half,y1=cy+half})
   return out
  end
+ -- R154 (owner: "the number and signs in the notification bubble is also too small"): what a badge's text draws, from FredokaOne's real metrics (measured on docs/proposals/shop_R120/tests/FredokaOne.ttf:
+ -- advance widths per em, digits .745 em tall, ascent .974 + descent .236 em, so a line box is centred on the digits). Returns {Em, Chars, InkW, InkH, Disc (the red disc's diameter), Size (the holder's),
+ -- FillEm = em / holder, FillInk = digit height / holder, FillDisc = digit height / disc, Corner = the ink box's corner distance from the centre, Radius = the holder's radius, Centred = label centre on the disc centre}.
+ local ADV={['0']=.608,['1']=.407,['2']=.609,['3']=.608,['4']=.592,['5']=.530,['6']=.560,['7']=.561,['8']=.582,['9']=.560,['+']=.527,['!']=.267}
+ L.FredokaAdvance,L.FredokaDigit=ADV,.745
+ function L.textFill(b)
+  local label=b:FindFirstChild('Count');local disc=b:FindFirstChild('Disc')
+  local text=label.Text;local em=label.TextSize;local w=0;local n=0
+  for _,cp in utf8.codes(text)do w+=(ADV[utf8.char(cp)]or .6)*em;n+=1 end
+  local h=L.FredokaDigit*em
+  local r,dr,lr=L.rect(b),L.rect(disc),L.rect(label)
+  local size,discSize=r.x1-r.x0,dr.x1-dr.x0
+  return{Em=em,Chars=n,InkW=w,InkH=h,Disc=discSize,Size=size,FillEm=em/size,FillInk=h/size,FillDisc=h/discSize,Corner=math.sqrt((w/2)^2+(h/2)^2),Radius=size/2,
+   Centred=math.abs((lr.x0+lr.x1)/2-(dr.x0+dr.x1)/2)<.01 and math.abs((lr.y0+lr.y1)/2-(dr.y0+dr.y1)/2)<.01}
+ end
  function L.clippers(o)
   local out={};local p=o._parent
   while p and not p:IsA('LayerCollector')do

@@ -44,6 +44,12 @@ M = {
     'alert_off_screen': ('badge', 'NotifyBadge151.lua', 'B.Overhang={Count=9,Alert=9,', 'B.Overhang={Count=9,Alert=26,'),
     # R153: the INDEX count hangs further than the wheel's CanvasGroup keeps room for (cut flat again)
     'count_cut': ('badge', 'NotifyBadge151.lua', 'B.Overhang={Count=9,', 'B.Overhang={Count=20,'),
+    # R154: the count's text is back at the R153 size (62% of the diameter, a third of the bubble in the engine)
+    'text_small': ('badge', 'NotifyBadge151.lua', 'TextFill1=.78,', 'TextFill1=.4,'),
+    # R154: "9+" is set as big as one character, so it runs out of the disc
+    'text_nine_wide': ('badge', 'NotifyBadge151.lua', 'TextFill2=.68,', 'TextFill2=.78,'),
+    # R154: the DAILY / Index badge text is TextScaled again (the engine picks its own, small, size)
+    'text_scaled': ('daily', 'NotifyBadge151.lua', 'label.TextScaled=false', 'label.TextScaled=true'),
     # SeedPackVisuals.Bag does not mark the bag DefaultPackShape (the flag is lost between the picture and the renderer)
     'no_default_flag': ('shape', 'SeedPackVisuals.lua', "if defaultShape==true then m:SetAttribute('DefaultPackShape',true)\n    elseif", "if false then m:SetAttribute('DefaultPackShape',true)\n    elseif"),
     # SeedPackRenderer asks for a shape variation even for a marked bag

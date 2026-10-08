@@ -1,10 +1,11 @@
 --!nocheck
 -- R153 (owner, in Studio, about the treadmill speed-gain popups: "numbers should also be bigger", then "2x bigger"): the popups' size, motion and screens against the R152
 -- SpeedPopupStyle (ref_style.luau, the module as it was: the R151 look) on the Roblox mock with the REAL SpeedPopupStyle and HudLayout of this checkout.
---  1. size      text 44, bolt 40, box 300 x 72, bolt box 48, gap 4, outline 5: every size exactly 2x the reference; the pooled field holds the biggest fan
+--  1. size      R154 (owner: "reduce the size of the speed notifier number by 20%"): text 35, bolt 32, box 240 x 58, bolt box 38, gap 3, outline 4: 0.8 of R153's 44 / 40 / 300 x 72 / 48 / 4 / 5, so 1.6x the
+--               reference (to whole pixels); the pooled field holds the biggest fan
 --  2. unchanged the pop, fling, hold, fade and life numbers; the curves (Pose of the same plans at 200 ages, retired and Reduced Motion too); the plans; the cadence (10 a second:
 --               SplitTo, Shares, Spacing, SplitFor, Split); the caps per tier; Unit; the colours, font, bolt and the 1K / 1M formatting
---  3. screens   FanScale: 2 x 2 where there is room (the same fan as R151, twice the size, so the popups pile up exactly as much); where a direction has none (a landscape
+--  3. screens   FanScale: Base (R154: 1.6) x Base where there is room (the same fan as R151 at the popups' size, so they pile up exactly as much); where a direction has none (a landscape
 --               phone above the head, a portrait phone at the sides) it takes what fits and the other direction more. On 12 phone and 5 computer screens the biggest popup
 --               (a 7 character "+999.5K") stays inside the screen with the head where Roblox's camera puts it (HeadY of the way down) and clear of every HUD box (HudLayout.Read)
 --  4. pile-up   the mean share of a popup that other living popups cover (10 popups a second) is at most 1.25x R151's (~46%) on a computer or a phone with room (the fan is as wide as
@@ -16,8 +17,9 @@ local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)
 local function near(a,b,tol)return type(a)=='number'and type(b)=='number'and math.abs(a-b)<=(tol or 1e-9)end
 -- 1. size -------------------------------------------------------------------------------------------------------------------------------------------------
 local sz,rz=Style.Size,Ref.Size
-check(sz.Text==rz.Text*2 and sz.Icon==rz.Icon*2 and sz.IconBox==rz.IconBox*2 and sz.Gap==rz.Gap*2 and sz.Box[1]==rz.Box[1]*2 and sz.Box[2]==rz.Box[2]*2,'text '..sz.Text..', bolt '..sz.Icon..', bolt box '..sz.IconBox..', gap '..sz.Gap..', box '..sz.Box[1]..' x '..sz.Box[2]..': every size is 2x the R151 one')
-check(sz.Text==44 and sz.Icon==40 and Style.StrokeThickness==5 and Ref.StrokeThickness==2.5,'44 / 40 px, a 5 px outline (was 22 / 20 / 2.5)')
+local function r16(v)return math.floor(v*1.6+.5)end -- (R154: 1.6x the R151 size, to whole pixels)
+check(sz.Text==r16(rz.Text)and sz.Icon==r16(rz.Icon)and sz.IconBox==r16(rz.IconBox)and sz.Gap==r16(rz.Gap)and sz.Box[1]==r16(rz.Box[1])and sz.Box[2]==r16(rz.Box[2]),'text '..sz.Text..', bolt '..sz.Icon..', bolt box '..sz.IconBox..', gap '..sz.Gap..', box '..sz.Box[1]..' x '..sz.Box[2]..': every size is 1.6x the R151 one (0.8 of R153\'s 2x)')
+check(sz.Text==35 and sz.Icon==32 and Style.StrokeThickness==4 and Ref.StrokeThickness==2.5 and math.abs(Style.StrokeThickness-Ref.StrokeThickness*1.6)<=.5,'35 / 32 px, a 4 px outline (R153: 44 / 40 / 5; R151: 22 / 20 / 2.5)')
 check(sz.IconTilt==rz.IconTilt and sz.TextTilt==rz.TextTilt,'the random tilts are the same degrees')
 -- 2. unchanged -------------------------------------------------------------------------------------------------------------------------------------------
 local function same(a,b)
@@ -28,7 +30,9 @@ local function same(a,b)
  return true
 end
 check(same(Style.Pop,Ref.Pop)and same(Style.Fling,Ref.Fling)and same(Style.Fade,Ref.Fade)and Style.Life==Ref.Life and same(Style.Reduced,Ref.Reduced)and same(Style.Spawn,Ref.Spawn)and Style.RetireFade==Ref.RetireFade,'the pop (.45 -> 1, back 2), the fling (.4 s, cubic, +-75 degrees, 44..104 px, 7 slots), the fade (.5 + .15 s), the life (.65 s), Reduced Motion and the spawn are the numbers they were')
-check(same(Style.Cadence,Ref.Cadence)and same(Style.Caps,Ref.Caps)and same(Style.ReducedCaps,Ref.ReducedCaps)and Style.MaxDistance==Ref.MaxDistance,'the cadence (10 a second: SplitTo 2, 1/5 s ticks) and the caps per tier (8 / 6 / 4) are as they were')
+local capsOk=same(Style.Cadence,Ref.Cadence)and same(Style.ReducedCaps,Ref.ReducedCaps)and Style.MaxDistance==Ref.MaxDistance
+for tier=1,3 do capsOk=capsOk and Style.Caps[tier].Others==Ref.Caps[tier].Others and Style.Caps[tier].Own==8 end
+check(capsOk,'the cadence (10 a second: SplitTo 2, 1/5 s ticks), the others\' caps (3 / 2 / 1) and Reduced Motion\'s are as they were; R154: own popups hold 8 at every tier (R151: 8 / 6 / 4, below the 7 the stream keeps alive)')
 check(same(Style.Colors,Ref.Colors)and Style.Font==Ref.Font and Style.Icon==Ref.Icon,'our colours (125,248,255 / 17,26,42 / 255,222,66), FredokaOne and the bolt are as they were')
 local seed=7;local function rng()seed=(seed*16807)%2147483647;return seed/2147483647 end
 local seed2=7;local function rng2()seed2=(seed2*16807)%2147483647;return seed2/2147483647 end
@@ -51,22 +55,26 @@ for _,amount in ipairs({1,2,7,4200,72000,1e9})do for ticks=1,10 do for _,split i
  if Style.Spacing(1/5,split,Style.Shares(amount,ticks,split))~=Ref.Spacing(1/5,split,Ref.Shares(amount,ticks,split))then cad=false end
 end end end
 for _,own in ipairs({true,false})do for _,red in ipairs({true,false})do if Style.SplitFor(own,red)~=Ref.SplitFor(own,red)then cad=false end end end
-for tier=1,3 do for _,own in ipairs({true,false})do if Style.Cap(tier,own,false)~=Ref.Cap(tier,own,false)or Style.Cap(tier,own,true)~=Ref.Cap(tier,own,true)then cad=false end end end
+for tier=1,3 do for _,own in ipairs({true,false})do
+ if(not own)and Style.Cap(tier,own,false)~=Ref.Cap(tier,own,false)then cad=false end -- (R154: the own cap is 8 at every tier)
+ if Style.Cap(tier,own,true)~=Ref.Cap(tier,own,true)then cad=false end
+end end
 for _,h in ipairs({200,390,720,1080,1500,2160})do if Style.Unit(h)~=Ref.Unit(h)then cad=false end end
 for _,v in ipairs({0,.4,1,999,999.6,1000,1234,3500,12000,999950,1.5e6,999950000,4.2e12})do if Style.FormatGain(v)~=Ref.FormatGain(v)then cad=false end end
-check(cad and Style.SplitFor(true,false)==2,'the rate (2 popups per 1/5 s tick = 10 a second), Split / Shares / Spacing, the caps, Unit and the 1K / 1M formatting are identical to R151')
+check(cad and Style.SplitFor(true,false)==2,'the rate (2 popups per 1/5 s tick = 10 a second), Split / Shares / Spacing, the others\' caps, Unit and the 1K / 1M formatting are identical to R151')
 -- 3. screens ---------------------------------------------------------------------------------------------------------------------------------------------
 local fx,fy=Style.FanScale(1920,1080)
-check(fx==2 and fy==2,'1920 x 1080: the fan is 2 x 2 (the R151 fan at twice the size)')
-check(select(1,Style.FanScale(nil,nil))==2 and select(2,Style.FanScale(nil,nil))==2,'an unknown screen reads as a desktop (2 x 2)')
+local base=Style.Fan.Base
+check(base==1.6 and fx==base and fy==base,'1920 x 1080: the fan is '..base..' x '..base..' (the R151 fan at the popups\' 1.6x size)')
+check(select(1,Style.FanScale(nil,nil))==base and select(2,Style.FanScale(nil,nil))==base,'an unknown screen reads as a desktop ('..base..' x '..base..')')
 local lx,ly=Style.FanScale(844,390)
-check(lx>2 and ly<2 and ly>=1 and lx<=Style.Fan.Max,string.format('a landscape phone (844 x 390) has no room above the head: the fan is %.2f wide, %.2f tall',lx,ly))
+check(lx>base and ly<base and ly>=base/2 and lx<=Style.Fan.Max,string.format('a landscape phone (844 x 390) has no room above the head: the fan is %.2f wide, %.2f tall',lx,ly))
 local px,py=Style.FanScale(390,844)
-check(px<2 and px>=1 and py>2 and py<=Style.Fan.Max,string.format('a portrait phone (390 x 844) has no room at the sides: the fan is %.2f wide, %.2f tall',px,py))
+check(px<base and px>=base/2 and py>base*.99 and py<=Style.Fan.Max,string.format('a portrait phone (390 x 844) has no room at the sides: the fan is %.2f wide, %.2f tall',px,py))
 for _,v in ipairs({{844,390},{390,844},{360,640},{932,430},{1920,1080},{2560,1440},{3840,2160}})do
  local x,y=Style.FanScale(v[1],v[2]);check(x>=Style.Fan.Min and x<=Style.Fan.Max and y>=Style.Fan.Min and y<=Style.Fan.Max,'the fan stays within '..Style.Fan.Min..'..'..Style.Fan.Max..' at '..v[1]..' x '..v[2]..' ('..string.format('%.2f x %.2f',x,y)..')')
 end
-check(near(select(1,Style.FanScale(0/0,0/0)),2)and near(select(2,Style.FanScale('x',math.huge)),2),'bad numbers read as a desktop')
+check(near(select(1,Style.FanScale(0/0,0/0)),base)and near(select(2,Style.FanScale('x',math.huge)),base),'bad numbers read as a desktop')
 local function controls(w,h)
  if math.min(w,h)<=500 then return{Joystick={X=20,Y=h-110,W=90,H=90},Jump={X=w-95,Y=h-90,W=70,H=70}}end
  return{Joystick={X=60,Y=h-180,W=120,H=120},Jump={X=w-170,Y=h-210,W=120,H=120}}
