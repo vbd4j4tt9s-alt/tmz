@@ -273,7 +273,7 @@ do
  put(mine,312,d.Top+.1,-269,5,-50,-2);W.frames(1)
  local v1=mine.AssemblyLinearVelocity
  check('client: landing on the mat sets the vertical speed to the launch speed ('..string.format('%.1f',v1.Y)..'), the sideways speed stays (5, -2)',math.abs(v1.Y-up)<1e-6 and v1.X==5 and v1.Z==-2,tostring(v1))
- check('client: one boing, at the mat, the existing Bubble04 asset, pitched down, quiet',#plays>=1 and plays[1].Id=='rbxassetid://96764044228884'and plays[1].Pitch<1 and plays[1].Vol<=.5 and math.abs(plays[1].Pos.X-312)<.01 and math.abs(plays[1].Pos.Y-d.Top)<.01,#plays)
+ check('client: ONE boing per bounce, at the mat: the owner\'s trampoline file (94320656351627), pitch 1 (no pitch shift), quiet (R153: it replaced Bubble04 at .8)',#plays==1 and plays[1].Id=='rbxassetid://94320656351627'and plays[1].Pitch==1 and plays[1].Vol>0 and plays[1].Vol<=.5 and math.abs(plays[1].Pos.X-312)<.01 and math.abs(plays[1].Pos.Y-d.Top)<.01,#plays)
  local n1=#plays
  check('client: the mat squashes (one active) and has not left its rest pose by more than 0.2 studs',#api.Active==1)
  W.frames(6)
@@ -287,10 +287,13 @@ do
  -- (that was ~.77 s after the first: it bounces; now a quick second contact)
  local after=mine.AssemblyLinearVelocity.Y
  check('client: the next landing (.7 s later) bounces again to the same speed',math.abs(after-up)<1e-6,after)
+ check('client: ...with one more boing (once per bounce: '..#plays..' in all)',#plays==n1+1,#plays)
  put(mine,312,d.Top+.05,-269,0,-40,0);W.frames(12) -- .2 s
  check('client: a second contact within the cooldown (.2 s) is ignored: no stacking, no re-launch ('..string.format('%.1f',mine.AssemblyLinearVelocity.Y)..')',math.abs(mine.AssemblyLinearVelocity.Y+40)<1e-6,mine.AssemblyLinearVelocity.Y)
+ check('client: ...and no boing for it (the debounced contact is silent)',#plays==n1+1,#plays)
  W.frames(20) -- .33 s more: .53 s since the bounce
  check('client: past the cooldown it bounces again',math.abs(mine.AssemblyLinearVelocity.Y-up)<1e-6,mine.AssemblyLinearVelocity.Y)
+ check('client: ...with its own boing (the cooldown passed: '..#plays..' in all)',#plays==n1+2,#plays)
  -- stacking: a body that is going up a little (15 studs/s) on the mat gets exactly the launch speed
  W.frames(40)
  put(mine,312,d.Top,-269,0,15,0);W.frames(1)
@@ -312,7 +315,7 @@ do
  local pn=#plays;put(mine,-312+3,l.Top+.1,-269-3,0,-30,0);W.frames(1);W.frames(40)
  put(mine,-312+10,l.Top,-269,0,0,0)
  put(oroot,-312-2,l.Top+.1,-269+1,0,-30,0);W.frames(1)
- check('client: another player landing squashes the mat and boings on this screen but their speed is not touched by us ('..string.format('%.1f',oroot.AssemblyLinearVelocity.Y)..')',oroot.AssemblyLinearVelocity.Y==-30 and #plays>pn+1 and #api.Active>=1,#plays-pn)
+ check('client: another player landing squashes the mat and boings on this screen but their speed is not touched by us ('..string.format('%.1f',oroot.AssemblyLinearVelocity.Y)..')',oroot.AssemblyLinearVelocity.Y==-30 and #plays==pn+2 and #api.Active>=1,#plays-pn)
  put(oroot,0,60,-100,0,0,0);W.frames(40)
  -- guards: ragdolled, sitting, anchored, dead: nothing
  put(mine,312,d.Top+.1,-269,0,-30,0);plr:SetAttribute('GuardianRagdollActive',true);W.frames(1)
@@ -333,7 +336,42 @@ do
  W.frames(40)
  check('client: when the server rebuilds the trampolines the client picks up the new mats',api.Spots[1].Mat~=oldMat and api.Spots[1].Mat:IsDescendantOf(W.workspace)and #api.Spots==2)
  check('client: the rebuilt folder is the same: 2 models, 84 parts',#map[T.FolderName]:GetChildren()==2 and map[T.FolderName]:GetAttribute('Parts')==84)
+ -- R153 (owner: "2nd one will be trampoline bounce sound"): every boing of this whole test is the owner's file at pitch 1; the file is preloaded once
+ local wrong=0;for _,p in ipairs(plays)do if p.Id~='rbxassetid://94320656351627'or p.Pitch~=1 then wrong+=1 end end
+ check('client: every boing above is the owner\'s file at pitch 1 (never Bubble04, nothing pitched): '..#plays..' boings, '..wrong..' other',#plays>=6 and wrong==0,wrong)
+ check('client: the owner\'s file is preloaded once, when a player first comes near a nook',#preloads==1 and #preloads[1]==1 and preloads[1][1]=='rbxassetid://94320656351627',#preloads)
  sc:Destroy()
+ -- the same client on the REAL LocalSfx / SoundTiming / AudioMixer (no stub): what the player would actually hear
+ W.stub('LocalSfx',nil)
+ do
+  local sounds={};local inew=R.Instance.new
+  R.Instance.new=function(class,parent)
+   local o=inew(class,parent)
+   if class=='Sound'then
+    o.Ended=R.signal();o.Loaded=R.signal();o.IsLoaded=true;o.IsPlaying=false;o.TimeLength=2;o.TimePosition=0;o.Plays=0
+    o.Play=function(self)self.IsPlaying=true;self.Plays+=1 end;o.Stop=function(self)self.IsPlaying=false end
+    sounds[#sounds+1]=o
+   end
+   return o
+  end
+  W.service('Debris').AddItem=function()end;W.service('ContentProvider').PreloadAsync=function()end
+  local Mixer=W.module('AudioMixer')
+  local sc2=R.new('LocalScript');sc2.Name='HubTrampoline153';sc2:SetAttribute('R153TestHook',true);sc2.Parent=pg
+  local api2=W.load('HubTrampoline153Client',sc2)
+  W.frames(40)
+  local function boings()local list={};for _,x in ipairs(sounds)do if x.Name=='ChestChaseOneShot'then list[#list+1]=x end end;return list end
+  put(mine,312,d.Top+.1,-269,0,-30,0);W.frames(1)
+  local b=boings();local one=b[1]
+  check('client (real LocalSfx): a bounce makes ONE sound: the owner\'s file, unpitched (PlaybackSpeed 1), at the client\'s volume ('..#b..')',#b==1 and one.SoundId=='rbxassetid://94320656351627'and one.PlaybackSpeed==1 and one.Volume==api2.Boing.Volume and api2.Boing.Volume>0 and api2.Boing.Volume<=.5 and api2.Boing.Pitch==1)
+  check('client (real LocalSfx): it plays once, from SoundTiming\'s lead-in for it (unmeasured: 0; Start_94320656351627 tunes it), on the Effects group, 3D at the mat',
+   one~=nil and one.IsPlaying and one.Plays==1 and one.TimePosition==W.module('SoundTiming').Offset(one) and one.SoundGroup==Mixer.Group('Effects')
+   and one.Parent~=nil and one.Parent.Name=='ChestChaseSfx'and math.abs(one.Parent.Position.X-312)<.01 and math.abs(one.Parent.Position.Y-d.Top)<.01)
+  put(mine,312,d.Top+.05,-269,0,-40,0);W.frames(12)
+  check('client (real LocalSfx): a contact inside the cooldown makes no second sound ('..#boings()..')',#boings()==1)
+  W.frames(20) -- (.53 s since the bounce: the body is still held on the mat)
+  check('client (real LocalSfx): past the cooldown the next bounce makes exactly one more ('..#boings()..')',#boings()==2 and boings()[2].SoundId=='rbxassetid://94320656351627')
+  sc2:Destroy();R.Instance.new=inew
+ end
 end
 
 -- 5. the gardens ---------------------------------------------------------------------------------------------------------------------------------------
