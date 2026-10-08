@@ -3,7 +3,7 @@
 -- A trampoline stands in the middle of each garden nook (the brick plazas at the ends of the two garden walks). ONE number sets the bounce:
 -- BounceHeight, the studs the feet rise above the mat (ReplicatedStorage.HubTrampolineRules153's BounceHeight attribute overrides it in Studio).
 -- How it moves players: the client that owns the character sets the vertical speed of its own HumanoidRootPart (the way RunnerController already
--- owns the horizontal speed, and keeps the vertical one); MovementGuard's 25-stud rise allowance per sample covers the launch (checked by the tests).
+-- owns the horizontal speed, and keeps the vertical one); MovementGuard's 25-stud rise allowance per sample covers the launch (checked by the tests). A launch seen late (a network hitch) is covered by T.LaunchRise (below).
 local T={Version=153}
 T.BounceHeight=30      -- studs the feet rise above the mat: a bit (25 - 35); the apex is about 35 over the floor, over the lamps and the trees
 T.MinHeight,T.MaxHeight=12,40 -- whatever the attribute says, the bounce stays inside these (never a sky launch)
@@ -59,6 +59,26 @@ function T.Step(state,now,dx,dz,feetY,vy,gravity)
 end
 -- The new velocity: the horizontal speed stays, the vertical one is exactly `up`.
 function T.Launch(velocity,up)return Vector3.new(velocity.X,up,velocity.Z)end
+-- R153 client bug review (finding 6): MovementGuard's rise allowance (about 25 studs per .1 s check) is smaller than a launch seen late. The bounce rises 108 studs/s
+-- (30 studs) and a network hitch of ~.35 s at the launch hands the server the whole rise in ONE check (26 studs): the player was put back on the mat. The server (MovementGuard)
+-- now allows, for ONE check, the rise of a launch (T.LaunchRise): the last accepted frame was on or over a trampoline's collider, it is no older than the debounce window,
+-- the feet end no higher than the bounce can lift them (the apex over the walking top, plus a margin), and no launch was allowed in the last Cooldown seconds. Nothing
+-- else is relaxed: the sideways distance is still checked, and so is every rise that does not start on a mat.
+T.GuardMargin=6        -- studs over the bounce's apex that the server still accepts (the body's wobble, a rounded sample)
+T.GuardWindow=T.Cooldown+.15 -- seconds: the longest a launch may be seen after the last accepted frame on the mat (the debounce window plus one check)
+-- Is a body (dx, dz studs from a spot's centre, feet at feetY) on, or above, a trampoline's collider? (the footprint of the collider, not under the floor)
+function T.OverMat(dx,dz,feetY)
+ local r=T.Dims.Radius+.2
+ return dx*dx+dz*dz<=r*r and feetY>=T.Floor-.6
+end
+-- spots: {{X=,Z=}, ...} the colliders that exist; (fx, fz, fromFeetY): the last accepted frame; toFeetY: the feet now; elapsed: seconds since that frame;
+-- sinceLaunch: seconds since the last rise this allowed (math.huge for none). True when the rise from the first frame to the second is a trampoline launch.
+function T.LaunchRise(spots,fx,fz,fromFeetY,toFeetY,elapsed,sinceLaunch)
+ if elapsed>T.GuardWindow or sinceLaunch<T.Cooldown then return false end
+ if toFeetY>T.Top()+.35+T.Height()+T.GuardMargin then return false end
+ for _,s in ipairs(spots)do if T.OverMat(fx-s.X,fz-s.Z,fromFeetY)then return true end end
+ return false
+end
 -- The mat's squash, 0 at rest: 1 at the moment of the bounce, a little rebound past 0, settled by SquashSeconds.
 function T.Squash(t)
  if t<0 or t>=T.SquashSeconds then return 0 end
