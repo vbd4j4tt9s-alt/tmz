@@ -536,6 +536,8 @@ local function start()
  local klFree,klFreeN,klMade={},0,0
  local klList,klPos,klStamp={},{},{}
  local klAll={}                                       -- every pooled per-key letter ever made (applyTopExtra reaches the idle ones too)
+ -- R154 (lag audit B3): the near letters' pixels a stud on this tier (K.NearPPS: 12 on tier 2, 16 elsewhere); a tier change re-applies it to every strip and pressed-key letter already made
+ function Far.Tune()local want=K.NearPPS(tier);if want~=PPS then PPS=want;TEXT=K.NearText(want);K.RetuneLetters(want,TEXT,KW,{stripFree,stripFreeN,stripRows,stripsOfRow,klAll})end end
  local function keyLegendOffset(gui)
   -- a letter on a key's own face is exactly at the configured top; when the mesh stands higher it is drawn that much toward the camera
   if topExtra>0 then pcall(function()gui.ZOffset=topExtra+LG.Margin end)end
@@ -1276,10 +1278,10 @@ local function start()
   if tier==0 or T.Tier>=.5 then
    T.Tier=0
    local want=Fx and Fx.Get()or 3
-   if tier==0 then tier=want;wantTier=want;wantSince=now;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit()
+   if tier==0 then tier=want;wantTier=want;wantSince=now;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit();Far.Tune()
    elseif want~=wantTier then wantTier=want;wantSince=now end
    -- a tier change only applies once it has held for a few seconds (a device bouncing between tiers must not flicker)
-   if wantTier~=tier and now-wantSince>=C.TierHoldSeconds then tier=wantTier;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit()end
+   if wantTier~=tier and now-wantSince>=C.TierHoldSeconds then tier=wantTier;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit();Far.Tune()end
   end
   if T.Clear>=.25 then T.Clear=0;scanClearances()end
   if T.Keeper>=2 then T.Keeper=0;scanKeepers()end

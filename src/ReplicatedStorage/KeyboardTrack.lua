@@ -105,7 +105,8 @@ K.Config={
  -- frames). The spacebars' biome names are big: they get their own render limit.
  Legend={PixelsPerStud=16,TextHeight=4.6,Margin=.05,MaxExtra=1.5,Rotation=270,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4,
   FarPixelsPerStud=4,FarMaxDistance=800,                   -- R152: far letters, one strip (22 labels, 18 px text) per row at 4 px / stud, rendered out to 800 studs
-  FarMaxDistanceByTier={[2]=500}},                         -- R153 perf (lag audit D8): on tier 2 (phones) to 500 studs (a 4.6-stud letter is about 6 px tall there)
+  FarMaxDistanceByTier={[2]=500},                          -- R153 perf (lag audit D8): on tier 2 (phones) to 500 studs (a 4.6-stud letter is about 6 px tall there)
+  PixelsPerStudByTier={[2]=12}},                           -- R154 (lag audit B3, owner-approved): the NEAR letters (strips and pressed-key letters) at 12 px / stud on tier 2 (16 elsewhere: PC unchanged); K.NearPPS
  SpacebarPixelsPerStud=10,SpacebarMaxDistance=800,
  GroundScanSeconds=2,
 }
@@ -160,10 +161,34 @@ K.Ease={
 -- (along the track) press nothing. KeyLegends = pooled letters for keys that are down (a key's letter rides with it while it moves).
 K.Tiers={
  [3]={Near=14,Back=40,Ahead=122,Hyst=4,Bind=264,LegendBehind=2,LegendAhead=18,FarBehind=28,FarAhead=64,FarRows=4,LegendFade=4,LegendRadius=24,PressRange=260,KeyLegends=48},
- [2]={Near=11,Back=28,Ahead=74,Hyst=2,Bind=198,LegendBehind=2,LegendAhead=12,FarBehind=22,FarAhead=44,FarRows=3,LegendFade=3,LegendRadius=20,PressRange=200,KeyLegends=32},
+ [2]={Near=11,Back=28,Ahead=56,Hyst=2,Bind=198,LegendBehind=2,LegendAhead=12,FarBehind=22,FarAhead=44,FarRows=3,LegendFade=3,LegendRadius=20,PressRange=200,KeyLegends=32},
  [1]={Near=8,Back=22,Ahead=45,Hyst=1,Bind=132,LegendBehind=1,LegendAhead=7,FarBehind=18,FarAhead=30,FarRows=2,LegendFade=2,LegendRadius=16,PressRange=150,KeyLegends=16},
 }
 function K.Tier(tier)return K.Tiers[tier]or K.Tiers[3]end
+-- R154 (lag audit B3, owner: "for the lag fixes we can implement B3 and B1"): phones (tier 2) carry 56 key rows ahead (74 before: the keys end ~460 studs ahead, not
+-- ~600) and their near letters are drawn at 12 px / stud (16 before: a canvas 44% smaller, the letters a little softer); tier 3 (PC) is unchanged.
+-- K.NearPPS(tier) = the near letters' pixels a stud on a tier, K.NearText(pps) = their TextSize. The client reads both and re-applies them on a tier change
+-- (K.RetuneLetters: every strip and pressed-key letter already made), the way R153's far-letter render limit (Legend.FarMaxDistanceByTier) is.
+function K.NearPPS(tier)local by=C.Legend.PixelsPerStudByTier;return by and by[tier]or C.Legend.PixelsPerStud end
+function K.NearText(pps)return min(100,floor(C.Legend.TextHeight*pps+.5))end
+-- pools = {free strips by half row, their counts, rows with strips, strips by row, pooled pressed-key letters}: the client's own tables (it names them; this module
+-- only reads them). A strip's label positions are canvas pixels (K.TopPoint), proportional to the pixels a stud, so they scale with it.
+function K.RetuneLetters(pps,text,keyWidth,pools)
+ local free,freeN,rows,of,keyLetters=pools[1],pools[2],pools[3],pools[4],pools[5]
+ local function strip(st)
+  local ratio=pps/st.Gui.PixelsPerStud
+  if ratio==1 then return end
+  st.Gui.PixelsPerStud=pps
+  for i,l in ipairs(st.Labels)do
+   l.TextSize=text;l.Size=UDim2.fromOffset(keyWidth*pps,keyWidth*pps)
+   local px=st.PX[i]
+   if px then px*=ratio;local py=st.PY[i]*ratio;st.PX[i]=px;st.PY[i]=py;l.Position=UDim2.fromOffset(px,py)end
+  end
+ end
+ for k=1,#free do for i=1,freeN[k]do strip(free[k][i])end end
+ for _,r in ipairs(rows)do for _,st in ipairs(of[r])do strip(st)end end
+ for _,e in ipairs(keyLetters)do if e.Gui.PixelsPerStud~=pps then e.Gui.PixelsPerStud=pps;e.Label.TextSize=text end end
+end
 
 -- Deterministic integer hash (no randomness): three small non-negative integers -> 0 .. 2^32-1.
 local function hash(a,b,c)
