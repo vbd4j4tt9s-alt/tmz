@@ -67,7 +67,7 @@ local function trampolineSpots()
     if folder then
         for _,m in ipairs(folder:GetChildren())do
             local x,z=m:GetAttribute('CenterX'),m:GetAttribute('CenterZ')
-            if type(x)=='number'and type(z)=='number'and m:FindFirstChild('Trampoline collider')then spots[#spots+1]={X=x,Z=z}end
+            if type(x)=='number'and type(z)=='number'and m:FindFirstChild('Trampoline collider')then local r=m:GetAttribute('Radius');spots[#spots+1]={X=x,Z=z,Radius=type(r)=='number'and r or nil}end
         end
     end
     return spots

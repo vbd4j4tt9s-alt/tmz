@@ -84,19 +84,20 @@ do
  check('step limit: the game steps over at least 1 stud and no more than 1.2 (RunnerSweep.Hull, four rigs)',LIMIT>=1 and LIMIT<=1.2,LIMIT)
 end
 
--- 1. the benches (and the beds they flanked) in the two garden nooks are gone ---------------------------------------------------------------
+-- 1. the benches (and the beds they flanked) in the three nooks are gone ---------------------------------------------------------------
 local K=W.module('HubDecorKit151');local Art=W.module('HubLifeArt151');local T=W.module('HubTrampolineRules153')
-local NOOKS={{312,-269},{-312,-269}}
+local NOOKS={{312,-269,13},{-312,-269,13},{0,-596,10}} -- x, z, the brick disc's radius
 do
  local near={}
  for _,b in ipairs(Art.Layout.benches)do for _,n in ipairs(NOOKS)do if (b[1]-n[1])^2+(b[2]-n[2])^2<20^2 then near[#near+1]=b[1]..','..b[2]end end end
- check('benches: none of the layout\'s benches stands within 20 studs of a garden nook\'s centre (the two teal pairs are gone)',#near==0,first(near))
- check('benches: the other five stay (two wooden on the front lawns, two garden benches by the market, one stone bench at the lane nook)',#Art.Layout.benches==5,#Art.Layout.benches)
+ check('benches: none of the layout\'s benches stands within 20 studs of a nook\'s centre (the garden nooks\' two teal pairs and the lane nook\'s stone bench are gone)',#near==0,first(near))
+ check('benches: the other four stay (two wooden on the front lawns, two garden benches by the market)',#Art.Layout.benches==4,#Art.Layout.benches)
  local kinds={};for _,b in ipairs(Art.Layout.benches)do kinds[b[4]]=(kinds[b[4]]or 0)+1 end
- check('benches: 2 wood, 2 garden, 1 stone',kinds.wood==2 and kinds.garden==2 and kinds.stone==1)
- local bedsNear={};for _,b in ipairs(Art.Layout.beds)do for _,n in ipairs(NOOKS)do if (b[1]-n[1])^2+(b[2]-n[2])^2<8^2 then bedsNear[#bedsNear+1]=b[1]..','..b[2]end end end
- check('benches: the flower beds at the nooks\' centres (the dark disc ringed in white) are gone too: 11 beds left, the trampolines stand there',#bedsNear==0 and #Art.Layout.beds==11,first(bedsNear)or#Art.Layout.beds)
- check('benches: the kit keeps both trampoline circles open (HubLifeArt151.Clear refuses them)',#K.Open==3 and select(2,Art.Clear(312,-269,0))=='open'and select(2,Art.Clear(-312,-269,0))=='open'and select(2,Art.Clear(0,-392,0))=='open')
+ check('benches: 2 wood, 2 garden, no stone one',kinds.wood==2 and kinds.garden==2 and kinds.stone==nil)
+ local bedsNear={};for _,b in ipairs(Art.Layout.beds)do for _,n in ipairs(NOOKS)do if (b[1]-n[1])^2+(b[2]-n[2])^2<(n[3]+1)^2 then bedsNear[#bedsNear+1]=b[1]..','..b[2]end end end
+ check('benches: the flower beds at the nooks\' centres (the dark disc ringed in white, three of them) are gone too: 10 beds left, the trampolines fill those circles',#bedsNear==0 and #Art.Layout.beds==10,first(bedsNear)or#Art.Layout.beds)
+ check('benches: the kit keeps all three trampoline circles open to their rims (HubLifeArt151.Clear refuses them, the whole brick disc)',#K.Open==4 and select(2,Art.Clear(312,-269,0))=='open'and select(2,Art.Clear(-312,-269,0))=='open'and select(2,Art.Clear(0,-596,0))=='open'and select(2,Art.Clear(0,-392,0))=='open'
+  and select(2,Art.Clear(312+12.5,-269,0))=='open'and select(2,Art.Clear(0,-596-9.5,0))=='open'and select(2,Art.Clear(-312,-269+12.5,0))=='open')
  -- built (every device tier): no bench parts and no bed rim at the nooks
  local root=R.new('Folder');root.Name='ArtTest';root.Parent=W.workspace
  local ctx=Art.Build(root,3,{},{})
@@ -104,10 +105,10 @@ do
  for _,p in ipairs(parts(root))do
   local q=p._props.CFrame.Position
   if p.Name=='Bench seat'then seats[#seats+1]=p elseif p.Name=='Bench slab'then slabs[#slabs+1]=p elseif p.Name=='Bed rim'then rims[#rims+1]=p end
-  for _,n in ipairs(NOOKS)do if (q.X-n[1])^2+(q.Z-n[2])^2<12^2 and(p.Name:find('^Bench')or p.Name:find('^Bed ')or p.Name=='Flower')then badNear[#badNear+1]=p.Name end end
+  for _,n in ipairs(NOOKS)do if (q.X-n[1])^2+(q.Z-n[2])^2<(n[3]+1)^2 and(p.Name:find('^Bench')or p.Name:find('^Bed ')or p.Name=='Flower')then badNear[#badNear+1]=p.Name end end
  end
- check('benches: built: 4 bench seats (2 wood, 2 garden) and 1 stone slab, no bench part and no bed part within 12 studs of a nook',#seats==4 and #slabs==1 and #badNear==0,#seats..'/'..#slabs..' '..tostring(first(badNear)))
- check('benches: built: 11 flower bed rims',#rims==11,#rims)
+ check('benches: built: 4 bench seats (2 wood, 2 garden) and no stone slab, no bench part and no bed part within a nook\'s disc',#seats==4 and #slabs==0 and #badNear==0,#seats..'/'..#slabs..' '..tostring(first(badNear)))
+ check('benches: built: 10 flower bed rims',#rims==10,#rims)
  root:Destroy()
 end
 
@@ -117,18 +118,19 @@ check('trampolines: ChestChaseMap.HubTrampolines153 exists (built by HubDecor151
 if not tf then error('no trampolines')end
 local models=tf:GetChildren()
 local function modelOf(name)for _,m in ipairs(models)do if m.Name=='Trampoline '..name then return m end end end
-check('trampolines: one in the Desert nook (+X) and one in the Lava nook (-X), persistent models',#models==2 and modelOf('Desert')~=nil and modelOf('Lava')~=nil and modelOf('Desert')._props.ModelStreamingMode==R.Enum.ModelStreamingMode.Persistent)
+check('trampolines: one in the Desert nook (+X), one in the Lava nook (-X) and one in the Lane nook (the back lane\'s end), persistent models',#models==3 and modelOf('Desert')~=nil and modelOf('Lava')~=nil and modelOf('Lane')~=nil and modelOf('Lane')._props.ModelStreamingMode==R.Enum.ModelStreamingMode.Persistent and #T.Spots==3)
 local dec=map.HubDecor151
 do
  local rimSolid={}
- for _,p in ipairs(parts(tf))do if solid(p)and p.Name~='Trampoline collider'then rimSolid[#rimSolid+1]=path(p)end end
- check('trampolines: the collider is the ONLY part that collides (2 in all); the dressing is walk-through',#rimSolid==0,first(rimSolid))
+ local nSolid=0
+ for _,p in ipairs(parts(tf))do if solid(p)then nSolid+=1;if p.Name~='Trampoline collider'and p.Name~='Trampoline ramp'then rimSolid[#rimSolid+1]=path(p)end end end
+ check('trampolines: only each collider and its ramp ring collide ('..nSolid..' parts in all); the dressing is walk-through',#rimSolid==0 and nSolid==3+(function()local n=0;for _,m in ipairs(models)do n+=m:GetAttribute('Ramps')or 0 end;return n end)(),first(rimSolid)or nSolid)
  local bad={}
  for _,p in ipairs(parts(tf))do
-  local isCol=p.Name=='Trampoline collider'
+  local isCol=p.Name=='Trampoline collider'or p.Name=='Trampoline ramp'
   if p._props.Anchored~=true or p._props.CanTouch~=false or p._props.CanQuery~=(isCol and true or false)then bad[#bad+1]=path(p)end
  end
- check('trampolines: every part anchored, untouchable; only the collider can be queried (clicks and rays pass through the dressing)',#bad==0,first(bad))
+ check('trampolines: every part anchored, untouchable; only the collider and its ramps can be queried (clicks and rays pass through the dressing)',#bad==0,first(bad))
  local decorCollide=0;for _,p in ipairs(parts(dec))do if solid(p)then decorCollide+=1 end end
  check('trampolines: HubDecor151 itself is as R152 left it: only the 4 gate shafts collide there',decorCollide==4,decorCollide)
 end
@@ -137,8 +139,9 @@ for _,spot in ipairs(T.Spots)do
  local m=modelOf(spot.Name);local cx,cz=spot.X,spot.Z
  local count={};local col
  for _,p in ipairs(m:GetChildren())do count[p.Name]=(count[p.Name]or 0)+1;if p.Name=='Trampoline collider'then col=p end end
- check('trampoline '..spot.Name..': 1 collider, 6 feet, 16 frame boxes, 1 dark gap, 16 springs, 1 mat, 1 badge (42 parts)',count['Trampoline collider']==1 and count['Trampoline foot']==6 and count['Trampoline frame']==16
-  and count['Trampoline gap']==1 and count['Trampoline spring']==16 and count['Trampoline mat']==1 and count['Trampoline badge']==1 and #m:GetChildren()==42,#m:GetChildren())
+ local nRamps=m:GetAttribute('Ramps')
+ check('trampoline '..spot.Name..': 1 collider, '..tostring(nRamps)..' ramp wedges, 6 feet, 16 frame boxes, 1 dark gap, 16 springs, 1 mat, 1 badge ('..(42+(nRamps or 0))..' parts)',count['Trampoline collider']==1 and count['Trampoline foot']==6 and count['Trampoline frame']==16 and nRamps==math.ceil(spot.Radius*2) and count['Trampoline ramp']==nRamps
+  and count['Trampoline gap']==1 and count['Trampoline spring']==16 and count['Trampoline mat']==1 and count['Trampoline badge']==1 and #m:GetChildren()==42+nRamps,#m:GetChildren())
  local lo,hi=aabb(col)
  local radius=col._props.Size.Y/2
  local mat=m:FindFirstChild('Trampoline mat');local matLo,matHi=aabb(mat)
@@ -147,28 +150,32 @@ for _,spot in ipairs(T.Spots)do
   local _,h=aabb(p);frameTop=math.max(frameTop,h[2])
   for _,c in ipairs(corners(p))do local d=math.sqrt((c.X-cx)^2+(c.Z-cz)^2);frameOut=math.max(frameOut,d);frameIn=math.min(frameIn,d)end
  end end
- check('trampoline '..spot.Name..': the collider is centred on the nook\'s middle (312 / -269) and invisible',math.abs((lo[1]+hi[1])/2-cx)<.01 and math.abs((lo[3]+hi[3])/2-cz)<.01 and col._props.Transparency==1)
+ check('trampoline '..spot.Name..': the collider is centred on the nook\'s middle ('..cx..' / '..cz..') and invisible',math.abs((lo[1]+hi[1])/2-cx)<.01 and math.abs((lo[3]+hi[3])/2-cz)<.01 and col._props.Transparency==1)
  check('trampoline '..spot.Name..': the collider\'s walking top is the rules\' Top (floor + 0.9) and the mat, the badge\'s base and the frame stand within 0.1 of it',
   math.abs(hi[2]-T.Top())<.001 and math.abs(matHi[2]-hi[2])<.1 and math.abs(frameTop-hi[2])<.1,string.format('collider %.3f mat %.3f frame %.3f',hi[2],matHi[2],frameTop))
- check('trampoline '..spot.Name..': the collider covers the frame\'s footprint (radius 6.05; the 16-gon\'s outer corners within 0.2), the mat (r 4.15) lies inside the frame\'s inner edge',
-  math.abs(radius-T.Dims.Radius)<.01 and math.abs(frameOut-radius)<.2 and frameIn>=4.9 and math.abs((matHi[1]-matLo[1])/2-T.Dims.MatRadius)<.01,string.format('collider %.2f frame %.2f..%.2f',radius,frameIn,frameOut))
- local ringFree=13-radius
- check('trampoline '..spot.Name..': inside the nook (13-stud brick disc) with a '..string.format('%.2f',ringFree)..'-stud ring to walk round it (6 or more)',ringFree>=6)
+ check('trampoline '..spot.Name..': the collider covers the frame\'s footprint (radius '..string.format('%.1f',spot.Radius)..'; the 16-gon\'s outer corners lie on it), the mat (r '..string.format('%.2f',spot.MatRadius)..') lies inside the frame\'s inner edge',
+  math.abs(radius-spot.Radius)<.01 and math.abs(frameOut-radius)<.05 and frameIn>=radius*.8 and math.abs((matHi[1]-matLo[1])/2-spot.MatRadius)<.01 and matHi[1]-cx<frameIn,string.format('collider %.2f frame %.2f..%.2f',radius,frameIn,frameOut))
+ -- the nook's real brick disc (HubDecor151): the same circle, and the frame's outer edge stands 0.3 - 0.5 studs inside its rim
+ local disc
+ for _,p in ipairs(parts(dec))do if p.Name==(spot.Name=='Lane'and'Lane nook'or'Garden nook')then local a,b=aabb(p);if math.abs((a[1]+b[1])/2-cx)<.01 and math.abs((a[3]+b[3])/2-cz)<.01 then disc=p end end end
+ local discR=disc and disc._props.Size.Y/2
+ local ringFree=(discR or 0)-radius
+ check('trampoline '..spot.Name..': fills the nook: the brick disc is radius '..tostring(discR)..' (HubDecor151) = the rules\' Disc '..spot.Disc..', the frame\'s outer edge stands '..string.format('%.2f',ringFree)..' studs inside its rim (0.3 - 0.5): a thin brick ring shows',discR~=nil and discR==spot.Disc and ringFree>=.3 and ringFree<=.5,tostring(discR))
  TRAMP[spot.Name]={Model=m,Collider=col,Mat=mat,Cx=cx,Cz=cz,Top=hi[2]}
  -- every solid thing in the map within 20 studs of the collider is the floor or its support (nothing to bump, nothing blocked)
- local nearSolid={}
- for _,p in ipairs(parts(map))do if solid(p)and p~=col and p.Name~='LobbyFloor'and not p.Name:find('^Support_')then
-  local a,b=aabb(p);if a[1]<cx+radius+8 and b[1]>cx-radius-8 and a[3]<cz+radius+8 and b[3]>cz-radius-8 and b[2]>4.2 then nearSolid[#nearSolid+1]=path(p)end
+ local nearSolid,nearBase,gap={},0,math.huge
+ for _,p in ipairs(parts(map))do if solid(p)and p~=col and p.Name~='Trampoline ramp'and p.Name~='LobbyFloor'and not p.Name:find('^Support_')and not p:IsDescendantOf(m)then
+  local a,b=aabb(p)
+  if a[1]<cx+radius+8 and b[1]>cx-radius-8 and a[3]<cz+radius+8 and b[3]>cz-radius-8 and b[2]>4.2 then
+   if p.Parent==map:FindFirstChild('GardenBedRamps153')then nearBase+=0 -- (the garden skirts: invisible, they join the trampoline's ring in a valley, walked below)
+   elseif p.Name=='Pad'or p.Name:match('^DirtPlot_%d')or p:IsDescendantOf(map.Bases)then nearBase+=1;gap=math.min(gap,math.max(a[1]-cx-radius,cx-radius-b[1],0)) else nearSolid[#nearSolid+1]=path(p)end
+  end
  end end
- check('trampoline '..spot.Name..': no other solid part within 8 studs of its edge (the wall is 17 studs away)',#nearSolid==0,first(nearSolid))
+ check('trampoline '..spot.Name..': nothing solid but base pads and beds within 8 studs of its edge (the walls stand further out)'..(nearBase>0 and(' - the lane nook\'s two neighbours, Base 5 and Base 6 pads, are '..string.format('%.1f',gap)..' studs off its frame (the garden skirt and its ring join in a valley: the walks below)')or''),#nearSolid==0 and(spot.Name=='Lane'or nearBase==0)and(nearBase==0 or gap>=5),first(nearSolid)or gap)
 end
-do -- the garden walk reaches the nook 7 studs from the frame; the nook's rim is 6.95 studs from it
- local walkEnd=299;local gap=(312-T.Dims.Radius)-walkEnd
- check('trampolines: the garden walk meets the nook\'s rim 7 studs before the frame (the way in stays open on both sides)',gap>=6.5,gap)
- local wall=335;local edge=312+T.Dims.Radius
- check('trampolines: 17 studs between the frame and the wall',wall-edge>=15,wall-edge)
- local lo,hi=aabb(TRAMP.Desert.Collider)
- check('trampolines: the mat\'s walking top is within the runner\'s step limit over the floor (0.9 <= '..string.format('%.2f',LIMIT)..'): walk on, no jump needed',hi[2]-K.Floor<=LIMIT and hi[2]-K.Floor>=.5,hi[2]-K.Floor)
+do -- the ring of ramps reaches 2.25 studs beyond the collider; the walls are further out than that
+ local wall=335;local edge=312+T.Spots[1].Radius+T.Dims.Run
+ check('trampolines: the Desert nook\'s ramp ring ends '..string.format('%.1f',wall-edge)..' studs from the wall (the Lava nook mirrors it)',wall-edge>=6)
 end
 
 -- 3. the bounce: velocity, apex, debounce, no stacking ---------------------------------------------------------------------------------------
@@ -220,7 +227,17 @@ do
  local s2=T.NewState()
  check('rules: a body still rising (a bounce, a jump: 21 studs/s or more) is left alone; 20 or less bounces',T.Step(s2,1,0,0,top,50,G)==nil and T.Step(s2,1,0,0,top,108,G)==nil and T.Step(s2,1,0,0,top,20,G)~=nil)
  local s3=T.NewState()
- check('rules: off the mat (6.3 studs out), or flying over it (feet 1 stud above the top) does nothing',T.Step(s3,1,6.3,0,top,0,G)==nil and T.Step(s3,1,0,0,top+1,-30,G)==nil and T.Step(s3,1,4,4,top,0,G)~=nil)
+ local RD,RL=T.Spots[1].Radius,T.Spots[3].Radius -- the garden nooks' radius (12.6) and the lane nook's (9.6)
+ check('rules: off the mat (13 studs out of a garden trampoline, 10 out of the lane\'s), or flying over it (feet 1 stud above the top) does nothing; 10 studs out of a garden one and 9.5 out of the lane\'s are on it',
+  T.Step(s3,1,13,0,top,0,G,RD)==nil and T.Step(T.NewState(),1,10,0,top,0,G,RL)==nil and T.Step(s3,1,0,0,top+1,-30,G,RD)==nil and T.Step(s3,1,10,0,top,0,G,RD)~=nil and T.Step(T.NewState(),1,9.5,0,top,0,G,RL)~=nil)
+ -- the whole circle bounces: 16 compass points just inside each frame's outer edge bounce, just outside (0.4 studs) do not
+ local inside,outside=0,0
+ for _,sp in ipairs(T.Spots)do for k=0,15 do
+  local a=k/16*math.pi*2;local ca,sa=math.cos(a),math.sin(a)
+  if T.Step(T.NewState(),1,ca*(sp.Radius-.1),sa*(sp.Radius-.1),top,0,G,sp.Radius)~=nil then inside+=1 end
+  if T.Step(T.NewState(),1,ca*(sp.Radius+.4),sa*(sp.Radius+.4),top,0,G,sp.Radius)==nil then outside+=1 end
+ end end
+ check('rules: the WHOLE circle bounces, not a middle patch: 48 of 48 compass points just inside the three frames\' outer edges bounce ('..inside..'), 48 of 48 just outside do not ('..outside..')',inside==48 and outside==48)
  check('rules: a body that tunnelled to the floor in one fast step (feet at 4.0) still bounces; one far under the floor does not',T.Step(T.NewState(),1,0,0,4.0,-100,G)~=nil and T.Step(T.NewState(),1,0,0,3.2,-100,G)==nil)
  check('rules: the bounce SETS the vertical speed (a launch at 15 studs/s is exactly v, not 15 + v; the sideways speed stays)',T.Launch(V3(7,15,-4),v).Y==v and T.Launch(V3(7,15,-4),v).X==7 and T.Launch(V3(7,15,-4),v).Z==-4)
  check('rules: the squash is 1 at the bounce, rebounds past 0 and is gone by 0.6 s',T.Squash(0)==1 and T.Squash(.25)<0 and T.Squash(.6)==0 and T.Squash(-1)==0 and T.SquashDepth<=.3 and T.Top()-T.SquashDepth>T.Floor+.62)
@@ -261,7 +278,7 @@ do
  local sc=R.new('LocalScript');sc.Name='HubTrampoline153';sc:SetAttribute('R153TestHook',true);sc.Parent=pg
  local api=W.load('HubTrampoline153Client',sc)
  W.frames(2)
- check('client: finds both trampolines on its first look',#api.Spots==2 and api.Spots[1].Mat~=nil and api.Spots[2].Badge~=nil,#api.Spots)
+ check('client: finds all three trampolines on its first look, each with its own radius (12.6, 12.6, 9.6)',#api.Spots==3 and api.Spots[1].Mat~=nil and api.Spots[2].Badge~=nil and math.abs(api.Spots[1].R-12.6)<1e-9 and math.abs(api.Spots[3].R-9.6)<1e-9,#api.Spots)
  check('client: the script announced itself',sc:GetAttribute('R153Loaded')==true)
  local d=TRAMP.Desert
  local up=T.Velocity(G)
@@ -305,6 +322,19 @@ do
  check('client: a body rising at 60 over the mat is left alone',mine.AssemblyLinearVelocity.Y==60,mine.AssemblyLinearVelocity.Y)
  put(mine,325,d.Top,-269,0,-10,0);W.frames(1)
  check('client: 13 studs from the centre (the nook\'s rim) is off the mat',mine.AssemblyLinearVelocity.Y==-10,mine.AssemblyLinearVelocity.Y)
+ put(mine,312+12.4,d.Top,-269,0,-10,0);W.frames(1)
+ check('client: 12.4 studs from the centre (the frame\'s outer edge: the brick ring is the last 0.4) is on the mat: the whole circle bounces ('..string.format('%.1f',mine.AssemblyLinearVelocity.Y)..')',math.abs(mine.AssemblyLinearVelocity.Y-up)<1e-6,mine.AssemblyLinearVelocity.Y)
+ W.frames(40)
+ put(mine,312-9,d.Top,-269+8,0,-10,0);W.frames(1) -- (12.04 from the centre, at an angle)
+ check('client: so does 12 studs out at an angle',math.abs(mine.AssemblyLinearVelocity.Y-up)<1e-6,mine.AssemblyLinearVelocity.Y)
+ W.frames(40)
+ local ln=TRAMP.Lane
+ put(mine,9.4,ln.Top+.1,-596,0,-30,0);W.frames(1)
+ check('client: the Lane nook\'s trampoline bounces too, out to its 9.6 edge ('..string.format('%.1f',mine.AssemblyLinearVelocity.Y)..')',math.abs(mine.AssemblyLinearVelocity.Y-up)<1e-6,mine.AssemblyLinearVelocity.Y)
+ W.frames(40)
+ put(mine,10.2,ln.Top,-596,0,-10,0);W.frames(1)
+ check('client: 10.2 studs from the lane nook\'s centre (its brick rim, radius 10) is off its mat',mine.AssemblyLinearVelocity.Y==-10,mine.AssemblyLinearVelocity.Y)
+ W.frames(40)
  -- the Lava mat works too, at its own spot
  W.frames(40)
  local l=TRAMP.Lava
@@ -313,7 +343,7 @@ do
  W.frames(40)
  -- somebody else lands: the squash and the boing happen on this screen, nothing is applied to them
  local pn=#plays;put(mine,-312+3,l.Top+.1,-269-3,0,-30,0);W.frames(1);W.frames(40)
- put(mine,-312+10,l.Top,-269,0,0,0)
+ put(mine,-312+14,l.Top,-269,0,0,0)
  put(oroot,-312-2,l.Top+.1,-269+1,0,-30,0);W.frames(1)
  check('client: another player landing squashes the mat and boings on this screen but their speed is not touched by us ('..string.format('%.1f',oroot.AssemblyLinearVelocity.Y)..')',oroot.AssemblyLinearVelocity.Y==-30 and #plays==pn+2 and #api.Active>=1,#plays-pn)
  put(oroot,0,60,-100,0,0,0);W.frames(40)
@@ -354,8 +384,9 @@ do
  local oldMat=api.Spots[1].Mat
  server('HubDecor151').Apply(map)
  W.frames(40)
- check('client: when the server rebuilds the trampolines the client picks up the new mats',api.Spots[1].Mat~=oldMat and api.Spots[1].Mat:IsDescendantOf(W.workspace)and #api.Spots==2)
- check('client: the rebuilt folder is the same: 2 models, 84 parts',#map[T.FolderName]:GetChildren()==2 and map[T.FolderName]:GetAttribute('Parts')==84)
+ check('client: when the server rebuilds the trampolines the client picks up the new mats',api.Spots[1].Mat~=oldMat and api.Spots[1].Mat:IsDescendantOf(W.workspace)and #api.Spots==3)
+ local rebuilt=0;for _,m in ipairs(map[T.FolderName]:GetChildren())do rebuilt+=#m:GetChildren()end
+ check('client: the rebuilt folder is the same: 3 models, '..rebuilt..' parts (3 x 42 and the ramp rings)',#map[T.FolderName]:GetChildren()==3 and map[T.FolderName]:GetAttribute('Parts')==rebuilt and rebuilt==126+26+26+20,rebuilt)
  -- R153 (owner: "2nd one will be trampoline bounce sound"): every boing of this whole test is the owner's file at pitch 1; the file is preloaded once
  local wrong=0;for _,p in ipairs(plays)do if p.Id~='rbxassetid://94320656351627'or p.Pitch~=1 then wrong+=1 end end
  check('client: every boing above is the owner\'s file at pitch 1 (never Bubble04, nothing pitched): '..#plays..' boings, '..wrong..' other',#plays>=6 and wrong==0,wrong)
@@ -410,12 +441,13 @@ local function surface(p,x,z)
  local c=p._props.CFrame;local s=p._props.Size;local r=c.R;local q=c.Position
  local dx,dz=x-q.X,z-q.Z
  local lx=dx*r[1][1]+dz*r[3][1];local lz=dx*r[1][3]+dz*r[3][3]
+ if p.Name=='Trampoline collider'then if dx*dx+dz*dz<=(s.Y/2)^2 then return q.Y+s.X/2 end;return nil end -- (a cylinder: its Size is height, diameter, diameter)
  if math.abs(lx)>s.X/2+1e-6 or math.abs(lz)>s.Z/2+1e-6 then return nil end
  if p._class=='WedgePart'then return q.Y-s.Y/2+s.Y*((lz+s.Z/2)/s.Z)end
  return q.Y+s.Y/2
 end
 local colliders={}
-for _,p in ipairs(parts(map))do if solid(p)and(p._class=='Part'or p._class=='WedgePart'or p._class=='SpawnLocation')and p._props.Shape~=R.Enum.PartType.Ball and p._props.Shape~=R.Enum.PartType.Cylinder then colliders[#colliders+1]=p end end
+for _,p in ipairs(parts(map))do if solid(p)and(p._class=='Part'or p._class=='WedgePart'or p._class=='SpawnLocation')and p._props.Shape~=R.Enum.PartType.Ball and(p._props.Shape~=R.Enum.PartType.Cylinder or p.Name=='Trampoline collider')then colliders[#colliders+1]=p end end
 local function heightAt(x,z,near)
  local h=-math.huge
  for _,p in ipairs(near)do local y=surface(p,x,z);if y and y>h then h=y end end
@@ -571,6 +603,53 @@ if not MUT then
  local lows={};for _,f in ipairs(before.Fail)do if f.Cliff>.7 and f.Cliff<.9 then lows[f.Label:match('^%a+')]=true end end
  check('gardens: and the 0.8-stud step from the pad onto the soil (the apron beside the fence) fails it too: that is the step the first R153 ramps left',next(lows)~=nil)
 end
+-- WALKING ONTO A TRAMPOLINE. The collider's top is 0.9 over the floor: a ledge to a walking body (the garden beds' 0.8 was one), so each collider is skirted by a ring of invisible
+-- wedges. From 8 studs outside the ring in 16 directions (the garden walk's centre line and the lane's way in among them) to the middle: the same cliff / slope limits as the beds,
+-- the top reached at the collider's edge, which is where the bounce starts (T.OnMat).
+do
+ local function tsurface(p,x,z)
+  if p.Name=='Trampoline collider'then local q=p._props.CFrame.Position;local r=p._props.Size.Y/2;if(x-q.X)^2+(z-q.Z)^2<=r*r then return q.Y+p._props.Size.X/2 end;return nil end
+  return surface(p,x,z)
+ end
+ local function heightOf(list,x,z)local h=K.Floor;for _,p in ipairs(list)do local y=tsurface(p,x,z);if y and y>h then h=y end end;return h end
+ local function walkOn(withRamps)
+  local worstC,worstS,n,fails,topAtEdge=0,0,0,{},true
+  local f=map:FindFirstChild(T.FolderName)
+  for _,sp in ipairs(T.Spots)do
+   local m=f:FindFirstChild('Trampoline '..sp.Name);local list={}
+   for _,p in ipairs(parts(m))do if solid(p)and(withRamps or p.Name~='Trampoline ramp')then list[#list+1]=p end end
+   for k=0,15 do
+    local a=k/16*math.pi*2;local dx,dz=math.cos(a),math.sin(a)
+    local hs={};local d=sp.Radius+T.Dims.Run+8
+    while d>=-.5 do hs[#hs+1]=heightOf(list,sp.X+dx*d,sp.Z+dz*d);d-=.05 end
+    local c,sl=0,0
+    for i=2,#hs do local r=hs[i]-hs[i-1];if r>c then c=r end;if i>10 then local v=(hs[i]-hs[i-10])/.5;if v>sl then sl=v end end end
+    n+=1;if c>worstC then worstC=c end;if sl>worstS then worstS=sl end
+    if c>.2+1e-6 or sl>.85+1e-6 then fails[#fails+1]=sp.Name..' '..k end
+    local edge=heightOf(list,sp.X+dx*(sp.Radius+.15),sp.Z+dz*(sp.Radius+.15)) -- (T.OnMat reaches radius + 0.2)
+    if edge<T.Top()-.12 or edge>T.Top()+.35 then topAtEdge=false end
+   end
+  end
+  return worstC,worstS,n,fails,topAtEdge
+ end
+ local c,sl,n,fails,top=walkOn(true)
+ info(string.format('trampolines: %d walks onto the three trampolines from 8 studs outside the ramp ring (16 directions each): worst cliff %.2f, worst slope %.2f per stud',n,c,sl))
+ check('trampolines: a body WALKS onto every trampoline from every side (16 directions, the garden walks\' and the lane\'s way in among them): no ledge over 0.2, no slope over 0.85 per stud, and the top is reached at the collider\'s edge, where the bounce starts',#fails==0 and n==48 and top,tostring(fails[1])..' top '..tostring(top))
+ -- the lane nook stands 5.4 studs from the pads of Base 5 and Base 6 (their rear beds' skirts reach to x = +-10.5, its ring to 11.85): out from its middle along z = -596 to
+ -- either side the real ground (the ring, a valley between the two skirts, then the bed's skirt up to the soil) never jumps
+ do
+  local near=nearParts(-30,30,-640,-560);local worstC,worstS,valley=0,0,math.huge
+  for side=-1,1,2 do
+   local hs={};for d=0,19,.05 do hs[#hs+1]=heightAt(side*d,-596,near)end
+   for i=2,#hs do local r=math.abs(hs[i]-hs[i-1]);if r>worstC then worstC=r end;if i>10 then local v=math.abs(hs[i]-hs[i-10])/.5;if v>worstS then worstS=v end end end
+   for i=1,#hs do local x=(i-1)*.05;if x>10.4 and x<12.5 and hs[i]<valley then valley=hs[i] end end
+  end
+  info(string.format('trampolines: the lane nook\'s ring and the neighbouring beds\' skirts: the valley between them bottoms out at %.2f over the floor, worst step %.2f, worst slope %.2f',valley-K.Floor,worstC,worstS))
+  check('trampolines: from the lane trampoline\'s middle to both neighbouring beds (the ring, the valley between the two skirts, the skirt up to the soil) the ground never steps up or down more than 0.2 nor climbs steeper than 0.85 per stud',worstC<=.2 and worstS<=.85 and valley>=K.Floor-1e-6,worstC..' '..worstS)
+ end
+ local c0,_,_,fails0=walkOn(false)
+ check('trampolines: the measurement has teeth: without the ramp ring the 0.9 kerb fails every one of the 48 walks (cliff '..string.format('%.2f',c0)..')',#fails0==48 and c0>.85)
+end
 -- the ramps are queryable floors, so check what a ray sees: planting's server check ("KEEP A CLEAR VIEW OF THE SOIL") casts from the player's head to the soil point
 -- and must hit the plot; digging and plant inspection cast from the camera. From heads 4.5 studs over the ground (pad, floor or ramp), 1.5 / 4 / 9 studs out from every
 -- bed edge (sampled every 2 studs), to soil points half a stud in: no point of any ray lies inside a ramp.
@@ -704,6 +783,9 @@ do
  local HT=server('HubTrampoline153')
  if MUT=='nostrip'then W.module('HubStudTrees151').Sanitize=function()return 0,0 end end -- (a loader that strips nothing: the look test must fail)
  local calls={IS=0,AS=0}
+ local ringN=0;for _,sp in ipairs(T.Spots)do ringN+=math.ceil(sp.Radius*2)end
+ local SOLIDS=#T.Spots+ringN -- (a collider and a ring of ramp wedges per trampoline: the only solid parts, whatever the look)
+ local function built(sp)return 42+math.ceil(sp.Radius*2)end
  local function routes(isFn,asFn)
   IS.LoadAsset=function(_,id)calls.IS+=1;return isFn(id)end;AS.LoadAssetAsync=function(_,id)calls.AS+=1;return asFn(id)end
  end
@@ -742,45 +824,46 @@ do
  local function lookOf(spot)local m=fold():FindFirstChild('Trampoline '..spot.Name);return m,m and m:FindFirstChild('Trampoline look')end
  local function solids()local n=0;for _,p in ipairs(parts(fold()))do if solid(p)then n+=1 end end;return n end
  local function names(m)local out={};for _,c in ipairs(m:GetChildren())do out[c.Name]=(out[c.Name]or 0)+1 end;return out end
+ local function reachOf(look,sp)local far=0;for _,p in ipairs(parts(look))do for _,c in ipairs(corners(p))do local d=math.sqrt((c.X-sp.X)^2+(c.Z-sp.Z)^2);if d>far then far=d end end end;return far end
  local function flat(look)local bad={};for _,p in ipairs(parts(look))do local a,b=aabb(p);if b[2]-a[2]<=.5 then for _,y in ipairs({4.14,4.2,4.26,4.32})do if math.abs(b[2]-y)<.04 then bad[#bad+1]=p.Name end end end end;return bad end
  local function box(look)local lo,hi;for _,p in ipairs(parts(look))do local a,b=aabb(p);lo=lo and{math.min(lo[1],a[1]),math.min(lo[2],a[2]),math.min(lo[3],a[3])}or a;hi=hi and{math.max(hi[1],b[1]),math.max(hi[2],b[2]),math.max(hi[3],b[3])}or b end;return lo,hi end
  local function reload(isFn,asFn)calls.IS,calls.AS=0,0;routes(isFn,asFn);HT.Reset();HT.Build(map);return HT.Status end
 
  -- A. the asset loads (a model with scripts and junk inside, as a store model may come)
  local st=reload(function()return container(asset())end,DENIED)
- check('look: a successful InsertService:LoadAsset(12088629887) dresses both trampolines (asset, one call, AssetService not asked)',HT.Look=='asset'and st.Route=='InsertService:LoadAsset'and calls.IS==1 and calls.AS==0 and T.AssetId==12088629887 and fold():GetAttribute('Look')=='asset',tostring(HT.Look)..' '..tostring(st.Route))
+ check('look: a successful InsertService:LoadAsset(12088629887) dresses all three trampolines (asset, one call, AssetService not asked)',HT.Look=='asset'and st.Route=='InsertService:LoadAsset'and calls.IS==1 and calls.AS==0 and T.AssetId==12088629887 and fold():GetAttribute('Look')=='asset',tostring(HT.Look)..' '..tostring(st.Route))
  check('look: the 3 scripts (Script, LocalScript, ModuleScript) are counted and gone, and so is everything else that is not geometry (9 kinds: sounds, click detectors, prompts, welds, humanoids, attachments, particles, guis, remotes)',st.Scripts==3 and st.Other>=9 and #leftovers(fold())==0,'scripts '..tostring(st.Scripts)..' other '..tostring(st.Other)..' left '..#leftovers(fold()))
  check('look: the absurd (5000 studs) and the invisible (hull) parts are dropped; 14 parts stay per trampoline (frame, 4 legs, 8 springs, mat)',st.Dropped==2 and st.Parts==14,tostring(st.Dropped)..' '..tostring(st.Parts))
  local worstScale,placed,flatBad,lockBad,gone,matOk,oneLook=true,true,{},{},true,true,true
  for _,spot in ipairs(T.Spots)do
   local m,look=lookOf(spot)
   if not look then oneLook=false else
-   local lo,hi=box(look);local foot=math.max(hi[1]-lo[1],hi[3]-lo[3])
-   if math.abs(foot-T.Dims.Radius*2)>.01 then worstScale=false end
+   local lo,hi=box(look)
+   if math.abs(reachOf(look,spot)-spot.Radius)>.02 or math.abs(look:GetAttribute('Scale')-spot.Radius/(10*math.sqrt(2)))>1e-6 then worstScale=false end -- (the test store model is square: its corners are its farthest points)
    if math.abs((lo[1]+hi[1])/2-spot.X)>.01 or math.abs((lo[3]+hi[3])/2-spot.Z)>.01 then placed=false end
    local mat=look:FindFirstChild('Trampoline mat',true)
    local mh=mat and select(2,aabb(mat))
-   if not mat or math.abs(mh[2]-T.Top())>.001 or math.abs(mat._props.Size.X-17*(T.Dims.Radius*2/20))>.01 then matOk=false end
+   if not mat or math.abs(mh[2]-T.Top())>.001 or math.abs(mat._props.Size.X-17*look:GetAttribute('Scale'))>.01 then matOk=false end
    for _,p in ipairs(parts(look))do if p._props.Anchored~=true or p._props.CanCollide~=false or p._props.CanTouch~=false or p._props.CanQuery~=false then lockBad[#lockBad+1]=p.Name end end
    for _,n in ipairs(flat(look))do flatBad[#flatBad+1]=n end
    local nm=names(m);for _,b in ipairs({'Trampoline foot','Trampoline frame','Trampoline spring','Trampoline gap','Trampoline badge','Trampoline mat'})do if nm[b]then gone=false end end
-   if nm['Trampoline collider']~=1 or nm['Trampoline look']~=1 or #m:GetChildren()~=2 then oneLook=false end
+   if nm['Trampoline collider']~=1 or nm['Trampoline look']~=1 or nm['Trampoline ramp']~=math.ceil(spot.Radius*2) or #m:GetChildren()~=2+math.ceil(spot.Radius*2) then oneLook=false end
   end
  end
- check('look: scaled so the footprint is the collider\'s 12.1 studs (20 x 0.605) and centred on each nook (312 / -269 and -312 / -269)',worstScale and placed)
- check('look: the mat (the largest flat top part, named Mat) is renamed "Trampoline mat", 10.3 studs, with its top exactly at the collider\'s walking top (4.9): the feet land where they look',matOk)
- check('look: every look part anchored, CanCollide / CanTouch / CanQuery off',#lockBad==0 and #parts(fold())==2*(1+14),first(lockBad)or#parts(fold()))
- check('look: the built feet, frame, springs, gap, mat and badge are gone: one look, the collider and the look model only',gone and oneLook)
+ check('look: scaled so its farthest point lies on the collider\'s circle (12.6 studs for a garden nook, 9.6 for the lane\'s: the disc less 0.4) and centred on each nook',worstScale and placed)
+ check('look: the mat (the largest flat top part, named Mat) is renamed "Trampoline mat", scaled with the look, with its top exactly at the collider\'s walking top (4.9): the feet land where they look',matOk)
+ check('look: every look part anchored, CanCollide / CanTouch / CanQuery off',#lockBad==0 and #parts(fold())==3*14+SOLIDS,first(lockBad)or#parts(fold()))
+ check('look: the built feet, frame, springs, gap, mat and badge are gone: one look, the collider, its ramp ring and the look model only',gone and oneLook)
  local c1=lookOf(T.Spots[1]):FindFirstChild('Trampoline collider');local _,ch=aabb(c1)
- check('look: ONE collider per trampoline (2 solid parts in the whole folder), still 0.9 over the floor and 6.05 round',solids()==2 and math.abs(ch[2]-T.Top())<.001 and math.abs(c1._props.Size.Y/2-6.05)<.01)
+ check('look: ONE collider per trampoline and its ramp ring ('..SOLIDS..' solid parts in the whole folder), still 0.9 over the floor and 12.6 round for a garden nook',solids()==SOLIDS and math.abs(ch[2]-T.Top())<.001 and math.abs(c1._props.Size.Y/2-12.6)<.01)
  check('look: no flat top of the look lies on a plane of the paving (4.14 / 4.20 / 4.26 / 4.32)',#flatBad==0,first(flatBad))
  local ok,text=HT.Command(nil,nil,{})
- check('command: /test trampoline says THE ASSET 12088629887, how it loaded, the parts and the squash mat',ok and text:find('THE ASSET 12088629887',1,true)~=nil and text:find('InsertService:LoadAsset',1,true)~=nil and text:find('14 parts',1,true)~=nil and text:find('"Mat"',1,true)~=nil and text:find('one invisible collider',1,true)~=nil,text)
+ check('command: /test trampoline says THE ASSET 12088629887, how it loaded, the parts and the squash mat',ok and text:find('THE ASSET 12088629887',1,true)~=nil and text:find('InsertService:LoadAsset',1,true)~=nil and text:find('14 parts',1,true)~=nil and text:find('"Mat"',1,true)~=nil and text:find('one invisible collider',1,true)~=nil and text:find('brick circle',1,true)~=nil and text:find('not round',1,true)~=nil,text)
  info('look: a store look with 14 parts per trampoline here; the cap is '..T.AssetMaxParts..' per trampoline (a bigger one is refused and the built trampoline stays)')
  -- B. a rebuild (HubDecor151.Apply again) re-dresses at once, no second load
  local before=calls.IS;HT.Build(map)
  local _,l1=lookOf(T.Spots[1])
- check('look: Build again (HubDecor151.Apply runs again) puts the same look back without loading again',calls.IS==before and l1~=nil and HT.Look=='asset'and solids()==2)
+ check('look: Build again (HubDecor151.Apply runs again) puts the same look back without loading again',calls.IS==before and l1~=nil and HT.Look=='asset'and solids()==SOLIDS)
 
  -- C. the client on the asset look: the bounce is unchanged and the asset's mat squashes
  do
@@ -795,7 +878,7 @@ do
   local sc=R.new('LocalScript');sc.Name='HubTrampoline153';sc:SetAttribute('R153TestHook',true);sc.Parent=pg
   local api=W.load('HubTrampoline153Client',sc)
   put(0,60,-100,0);W.frames(2)
-  check('look client: finds both nooks and the asset\'s mat (a part inside the look model; the asset has no badge)',#api.Spots==2 and api.Spots[1].Mat~=nil and api.Spots[1].Mat.Name=='Trampoline mat'and api.Spots[1].Mat:IsDescendantOf(select(2,lookOf(T.Spots[1])))and api.Spots[1].Badge==nil)
+  check('look client: finds the three nooks and the asset\'s mat (a part inside the look model; the asset has no badge)',#api.Spots==3 and api.Spots[1].Mat~=nil and api.Spots[1].Mat.Name=='Trampoline mat'and api.Spots[1].Mat:IsDescendantOf(select(2,lookOf(T.Spots[1])))and api.Spots[1].Badge==nil)
   local up=T.Velocity(196.2)
   put(312,T.Top()+.1,-269,-50);W.frames(1)
   check('look client: landing on the asset trampoline gives the same bounce ('..string.format('%.1f',root.AssemblyLinearVelocity.Y)..' studs/s, the apex 30), one boing',math.abs(root.AssemblyLinearVelocity.Y-up)<1e-6 and #plays==1)
@@ -811,18 +894,18 @@ do
 
  -- D. the owner's asset is refused ("User is not authorized to access Asset"): the hand-placed template, then the built trampoline
  st=reload(DENIED,DENIED)
- check('fallback: "User is not authorized to access Asset" on both routes keeps the BUILT trampoline (42 parts each, one collider), nothing breaks',HT.Look=='built'and calls.IS==1 and calls.AS==1 and solids()==2 and #lookOf(T.Spots[1]):GetChildren()==42 and fold():GetAttribute('Look')=='built',tostring(HT.Look))
+ check('fallback: "User is not authorized to access Asset" on both routes keeps the BUILT trampoline (42 parts each and the ramp ring, one collider), nothing breaks',HT.Look=='built'and calls.IS==1 and calls.AS==1 and solids()==SOLIDS and #lookOf(T.Spots[1]):GetChildren()==built(T.Spots[1])and fold():GetAttribute('Look')=='built',tostring(HT.Look))
  local ok2,text2=HT.Command(nil,nil,{})
  check('fallback: /test trampoline says THE BUILT TRAMPOLINE, why (the real errors of both routes) and how to cure "not authorized" (Get Model, HubTrampolineTemplates153)',ok2 and text2:find('THE BUILT TRAMPOLINE',1,true)~=nil and text2:find('InsertService:LoadAsset: ',1,true)~=nil and text2:find('AssetService:LoadAssetAsync: ',1,true)~=nil and text2:find('User is not authorized',1,true)~=nil and text2:find('Get Model',1,true)~=nil and text2:find('HubTrampolineTemplates153',1,true)~=nil,text2)
  -- the hand-placed template
  local tf=R.new('Folder');tf.Name=T.TemplateFolder;tf.Parent=RS
  local hand=asset({Name='My Trampoline'});hand.Parent=tf
  st=reload(DENIED,DENIED)
- check('template: a model the owner dropped into ReplicatedStorage.HubTrampolineTemplates153 is used (scripts and junk stripped from a COPY), the asset is not even tried',HT.Look=='template'and calls.IS==0 and calls.AS==0 and st.Name=='My Trampoline'and st.Scripts==3 and #leftovers(fold())==0 and solids()==2)
+ check('template: a model the owner dropped into ReplicatedStorage.HubTrampolineTemplates153 is used (scripts and junk stripped from a COPY), the asset is not even tried',HT.Look=='template'and calls.IS==0 and calls.AS==0 and st.Name=='My Trampoline'and st.Scripts==3 and #leftovers(fold())==0 and solids()==SOLIDS)
  local keepsScript=false;for _,d in ipairs(hand:GetDescendants())do if d._class=='Script'then keepsScript=true end end
  check('template: the owner\'s original in the folder is never used in place (it still holds its own Script, and no part of it is in the world)',keepsScript and not hand:IsDescendantOf(W.workspace))
  local _,look=lookOf(T.Spots[2]);local lo,hi=box(look);local tm=look:FindFirstChild('Trampoline mat',true)
- check('template: scaled and placed like the asset (12.1 studs, centred on the Lava nook, mat top 4.9)',math.abs(math.max(hi[1]-lo[1],hi[3]-lo[3])-12.1)<.01 and math.abs((lo[1]+hi[1])/2-T.Spots[2].X)<.01 and tm~=nil and math.abs(select(2,aabb(tm))[2]-T.Top())<.001)
+ check('template: scaled and placed like the asset (its farthest point on the Lava nook\'s 12.6-stud circle, centred there, mat top 4.9)',math.abs(reachOf(look,T.Spots[2])-12.6)<.02 and math.abs((lo[1]+hi[1])/2-T.Spots[2].X)<.01 and tm~=nil and math.abs(select(2,aabb(tm))[2]-T.Top())<.001)
  st=reload(function()return container(asset())end,DENIED)
  check('template: preferred over an asset that WOULD load (the asset is not asked: 0 calls)',HT.Look=='template'and calls.IS==0)
  -- a template with nothing usable falls through to the asset, and an empty folder to the built one
@@ -832,7 +915,7 @@ do
  check('template: one with nothing but a script is refused (why is told) and the asset is used',HT.Look=='asset'and calls.IS==1 and st.Tried[1]~=nil and st.Tried[1]:find('OnlyCode',1,true)~=nil and st.Tried[1]:find('no usable parts',1,true)~=nil,tostring(st.Tried[1]))
  for _,c in ipairs(tf:GetChildren())do c:Destroy()end
  st=reload(DENIED,DENIED)
- check('fallback: template removed again and the asset still refused: back to the built trampoline',HT.Look=='built'and solids()==2 and #lookOf(T.Spots[1]):GetChildren()==42)
+ check('fallback: template removed again and the asset still refused: back to the built trampoline',HT.Look=='built'and solids()==SOLIDS and #lookOf(T.Spots[1]):GetChildren()==built(T.Spots[1]))
  tf:Destroy()
 
  -- E. the asset comes back wrong
@@ -851,19 +934,19 @@ do
  do local raw=R.Inst.ScaleTo;R.Inst.ScaleTo=function()error('cannot scale this model')end
   st=reload(function()return container(asset())end,DENIED)
   R.Inst.ScaleTo=raw
-  local n1,n2=#lookOf(T.Spots[1]):GetChildren(),#lookOf(T.Spots[2]):GetChildren()
-  check('fallback: a look that cannot be scaled / placed keeps both built trampolines untouched (42 parts each) and says why',HT.Look=='built'and n1==42 and n2==42 and solids()==2 and(st.Tried[#st.Tried]or''):find('could not be placed',1,true)~=nil and fold():GetAttribute('Look')=='built',tostring(st.Tried[#st.Tried]))
+  local n1,n2,n3=#lookOf(T.Spots[1]):GetChildren(),#lookOf(T.Spots[2]):GetChildren(),#lookOf(T.Spots[3]):GetChildren()
+  check('fallback: a look that cannot be scaled / placed keeps all three built trampolines untouched (42 parts and the ramp ring each) and says why',HT.Look=='built'and n1==built(T.Spots[1])and n2==built(T.Spots[2])and n3==built(T.Spots[3])and solids()==SOLIDS and(st.Tried[#st.Tried]or''):find('could not be placed',1,true)~=nil and fold():GetAttribute('Look')=='built',tostring(st.Tried[#st.Tried]))
  end
  -- a single part, and a look whose mat cannot be told
  local one=R.new('Part');one.Name='Flat';one.Size=V3(8,1,8);one.CFrame=CF(50,10,50)
  st=reload(function()return container(one)end,DENIED)
  local m1,l=lookOf(T.Spots[1]);local lo1,hi1=box(l)
- check('look: a single part is taken too (wrapped, scaled to 12.1, centred, its top at 4.9); one part has no separate mat: no squash, the bounce stays',HT.Look=='asset'and st.Parts==1 and st.MatName==nil and math.abs(hi1[1]-lo1[1]-12.1)<.01 and math.abs(hi1[2]-T.Top())<.001 and m1:GetAttribute('HasMat')==false)
+ check('look: a single part is taken too (wrapped, scaled so its corners lie on the 12.6 circle, centred, its top at 4.9); one part has no separate mat: no squash, the bounce stays',HT.Look=='asset'and st.Parts==1 and st.MatName==nil and math.abs(hi1[1]-lo1[1]-12.6*math.sqrt(2))<.02 and math.abs(hi1[2]-T.Top())<.001 and m1:GetAttribute('HasMat')==false)
  st=reload(function()return container(asset({Generic=true,Junk=false}))end,DENIED)
  check('look: two like flat discs with no telling names: no mat is guessed (no squash), the look is still used',HT.Look=='asset'and st.MatName==nil and lookOf(T.Spots[1]):GetAttribute('HasMat')==false)
  -- the nudge: a flat part whose top would land on the nook paving (4.26) lifts the look
  local nudge=R.new('Model');nudge.Name='Nudge'
- part(nudge,'Mat',V3(12.1,.4,12.1),{0,3.2,0});part(nudge,'Pan',V3(12.1,.1,12.1),{0,2.71,0});part(nudge,'Leg',V3(1,3,1),{5,1.5,5})
+ part(nudge,'Mat',V3(12.1,.4,12.1),{0,3.2,0});part(nudge,'Pan',V3(12.1,.1,12.1),{0,2.9154,0});part(nudge,'Leg',V3(1,3,1),{5,1.5,5}) -- (scaled 12.6 / 8.556 = 1.4726 about its corners, the Pan\'s top lands exactly on the Desert nook\'s paving, 4.26)
  st=reload(function()return container(nudge)end,DENIED)
  local _,ln=lookOf(T.Spots[1])
  check('look: a flat part that would lie on the paving plane 4.26 is lifted off it (the look is nudged up by tenths, at most three)',HT.Look=='asset'and ln:GetAttribute('Nudged')>=1 and ln:GetAttribute('Nudged')<=3 and #flat(ln)==0,tostring(ln:GetAttribute('Nudged')))
@@ -873,7 +956,7 @@ do
  check('command: trampoline reload rebuilds and says so; an unknown argument is refused',rok and rtext:find('rebuilt',1,true)~=nil and bok==false)
  -- leave the world as the game starts: the built look
  routes(DENIED,DENIED);HT.Reset();HT.Build(map)
- check('look: back to the built trampoline when nothing can be loaded (the state the rest of the suite and the game start in)',HT.Look=='built'and solids()==2)
+ check('look: back to the built trampoline when nothing can be loaded (the state the rest of the suite and the game start in)',HT.Look=='built'and solids()==SOLIDS)
 end
 
 print(string.format('R153 hub fixes: %d checks, %d failures',passed+failed,failed))

@@ -1,18 +1,19 @@
 -- R153 hub trampolines, server half (owner: "remove these benches at the corner just add a trampoline that boosts players up by a bit"). Built
--- once at start-up by HubDecor151.Apply into Workspace.ChestChaseMap.HubTrampolines153: one round, chunky, low trampoline in the middle of each
--- garden nook (HubTrampolineRules153.Spots), in the hub's palette (HubDecorKit151.P): six stubby feet, a red 16-sided frame, a ring of 16 gold
--- springs round a teal mat with a cream badge. The client half (HubTrampoline153.client) does the bouncing; this one only builds the geometry.
--- Collision matches what you see: ONE invisible cylinder (the only part that collides) covers the frame's whole footprint, its top 0.9 over the
--- floor (a kerb the game's runner steps onto without a jump), the mat and the frame ring at that height; the squash animation moves only the
--- visual mat and badge. Nothing but the collider can be queried (clicks and rays pass through the dressing). Planes: no two same-facing faces of
--- different parts share a height (checked by the hub z-fight run).
+-- once at start-up by HubDecor151.Apply into Workspace.ChestChaseMap.HubTrampolines153: one round, chunky, low trampoline that fills each nook's brick circle
+-- (HubTrampolineRules153.Spots: the two garden nooks, radius 13, and the back lane's, radius 10; owner: "it should fit the whole circle"), in the hub's palette
+-- (HubDecorKit151.P): six stubby feet, a red 16-sided frame, a ring of 16 gold springs round a teal mat with a cream badge. The client half
+-- (HubTrampoline153.client) does the bouncing; this one only builds the geometry.
+-- Collision matches what you see: ONE invisible cylinder covers the frame's whole footprint (its outer corners 0.4 studs inside the disc's rim), its top 0.9 over the
+-- floor, the mat and the frame ring at that height, and a ring of invisible low wedges (22 degrees, like the garden beds' skirt) walks a body up onto it from any side; the
+-- squash animation moves only the visual mat and badge. Nothing but the collider and the ramp ring can be queried (clicks and rays pass through the dressing). Planes: no two
+-- same-facing faces of different parts share a height (checked by the hub z-fight run).
 -- THE LOOK (owner: "trampoline can just use this asset 12088629887"), the pattern of the owner's tree templates (HubTreeLoader151): the built trampoline above is
 -- always made first; then, off the start-up thread, the look is replaced by the owner's model: 1. a model the owner dropped into
 -- ReplicatedStorage.HubTrampolineTemplates153 (preferred; "Get Model" on the store page with the game owner's account, which also cures "User is not authorized
 -- to access Asset"), else 2. InsertService:LoadAsset(12088629887) (then AssetService:LoadAssetAsync), each with a timeout, else 3. the built one stays. A
 -- model from outside is never trusted: it is cloned, every Script / LocalScript / ModuleScript is destroyed and so is everything that is not geometry (sounds,
 -- click detectors, prompts, welds, humanoids, lights, particles, guis, remotes: HubStudTrees151.Sanitize), invisible and absurd parts go, every part is locked
--- (anchored, no collision, no touch, no query), the part count is capped, then it is scaled so its footprint is the collider's (12.1 studs), centred on the nook
+-- (anchored, no collision, no touch, no query), the part count is capped, then it is scaled so its farthest point lies on the collider's circle (the nook's disc less 0.4 stud), centred on the nook
 -- with its mat (the largest flat top part, when one can be told) at the collider's top, held off the paving's planes; the built visuals go, the collider stays.
 -- '/test trampoline' (Command) says which look is in use and why not the others.
 local RS=game:GetService('ReplicatedStorage')
@@ -24,39 +25,56 @@ local P,Mat=K.P,Enum.Material
 local F=T.Floor
 -- Heights (absolute): the paving's top is 4.26; the walking top is Floor + Dims.Top = 4.9.
 M.Layers={FootBottom=F+.2,FootTop=F+.5,GapBottom=F+.3,GapTop=F+.62,FrameBottom=F+.5,FrameTop=F+.94,SpringTop=F+.88,MatBottom=F+.62,MatTop=F+.86,BadgeBottom=F+.8,BadgeTop=F+1.06}
+-- The built trampoline is drawn at a reference size and scaled sideways to each nook (the heights stay): M.Frame / Springs / Feet / BadgeRadius are at the reference, whose
+-- outer corners (the 16-gon's boxes) lie M.Reference studs from the centre; at a spot they lie exactly spot.Radius, the collider's radius.
 M.Frame={Sides=16,Ring=5.55,Width=1.0}      -- the frame's boxes stand on a 16-gon of this radius (5.05 - 6.05 from the centre)
 M.Springs={Count=16,Ring=4.6,Diameter=.45}
 M.Feet={Count=6,Ring=5.65,Diameter=1.2}   -- (the feet stand just outside the dark gap's edge, 5.05: no overlapping tops)
 M.BadgeRadius=1.6
+M.Reference=math.sqrt((M.Frame.Ring+M.Frame.Width/2)^2+(M.Frame.Ring*math.tan(math.pi/M.Frame.Sides)+.08)^2)
+-- The ramp ring: owner "players still step on like a kerb" - a 0.9-stud kerb is a ledge to a walking body (the garden beds' 0.8 was), so the collider is skirted by
+-- invisible wedges (2.5 studs of run per stud of rise, N radial wedges that overlap out to the ring's far end), the same 22 degrees as the garden skirt.
+local function ring(model,spot)
+ local R=spot.Radius;local rise=T.Dims.Top;local run=T.Dims.Run
+ local n=math.ceil(R*2);local wide=2*(R+run)*math.sin(math.pi/n)*1.04;local inner=R*math.cos(math.pi/n) -- (wide enough that neighbours still overlap at the ring's outer end)
+ for k=0,n-1 do
+  local a=(k+.5)/n*math.pi*2;local dx,dz=math.cos(a),math.sin(a)
+  local pos=V(spot.X+dx*(inner+run/2-.01),F+rise/2,spot.Z+dz*(inner+run/2-.01))
+  local w=K.Wedge(model,'Trampoline ramp',V(wide,rise,run+.02),K.Frame(pos,V(0,1,0),V(-dx,0,-dz)),P.Metal,Mat.SmoothPlastic,{collide=true,shadow=false,t=1})
+  w.CanQuery=true -- (a floor the Humanoid and the runner sweep walk up, like the collider's top)
+ end
+ return n
+end
 local function build(parent,spot)
  local L,D=M.Layers,T.Dims
- local x,z=spot.X,spot.Z
+ local x,z=spot.X,spot.Z;local k=spot.Radius/M.Reference
  local model=K.Model(parent,'Trampoline '..spot.Name,true)
- model:SetAttribute('Spot',spot.Name);model:SetAttribute('Top',T.Top());model:SetAttribute('Radius',D.Radius);model:SetAttribute('MatRadius',D.MatRadius)
+ model:SetAttribute('Spot',spot.Name);model:SetAttribute('Top',T.Top());model:SetAttribute('Radius',spot.Radius);model:SetAttribute('MatRadius',spot.MatRadius);model:SetAttribute('Disc',spot.Disc)
  model:SetAttribute('CenterX',x);model:SetAttribute('CenterZ',z)
  -- the collider: the footprint of the frame, from just under the floor to the walking top
- local c=K.VCyl(model,'Trampoline collider',D.Radius*2,F-.1,T.Top(),x,z,P.Metal,Mat.SmoothPlastic,{collide=true,shadow=false,t=1})
+ local c=K.VCyl(model,'Trampoline collider',spot.Radius*2,F-.1,T.Top(),x,z,P.Metal,Mat.SmoothPlastic,{collide=true,shadow=false,t=1})
  c.CanQuery=true -- (it is a floor the Humanoid stands on)
- for k=0,M.Feet.Count-1 do
-  local a=(k+.5)/M.Feet.Count*math.pi*2
-  K.VCyl(model,'Trampoline foot',M.Feet.Diameter,L.FootBottom,L.FootTop,x+math.cos(a)*M.Feet.Ring,z+math.sin(a)*M.Feet.Ring,P.StoneDark,Mat.Slate,{shadow=false})
+ model:SetAttribute('Ramps',ring(model,spot))
+ for i=0,M.Feet.Count-1 do
+  local a=(i+.5)/M.Feet.Count*math.pi*2
+  K.VCyl(model,'Trampoline foot',M.Feet.Diameter*k,L.FootBottom,L.FootTop,x+math.cos(a)*M.Feet.Ring*k,z+math.sin(a)*M.Feet.Ring*k,P.StoneDark,Mat.Slate,{shadow=false})
  end
  -- the frame: 16 red boxes round a 16-gon (each a little longer than its side, so the corners close)
- local n=M.Frame.Sides;local side=2*M.Frame.Ring*math.tan(math.pi/n)+.16
- for k=0,n-1 do
-  local a=k/n*math.pi*2
-  K.Part(model,'Trampoline frame',V(side,L.FrameTop-L.FrameBottom,M.Frame.Width),
-   CF(x+math.cos(a)*M.Frame.Ring,(L.FrameTop+L.FrameBottom)/2,z+math.sin(a)*M.Frame.Ring)*CFrame.Angles(0,-(a+math.pi/2),0),P.RoofRed,Mat.SmoothPlastic,{shadow=false})
+ local n=M.Frame.Sides;local ringR=M.Frame.Ring*k;local side=2*ringR*math.tan(math.pi/n)+.08*2*k
+ for i=0,n-1 do
+  local a=i/n*math.pi*2
+  K.Part(model,'Trampoline frame',V(side,L.FrameTop-L.FrameBottom,M.Frame.Width*k),
+   CF(x+math.cos(a)*ringR,(L.FrameTop+L.FrameBottom)/2,z+math.sin(a)*ringR)*CFrame.Angles(0,-(a+math.pi/2),0),P.RoofRed,Mat.SmoothPlastic,{shadow=false})
  end
  -- the dark floor of the spring ring, and the springs (gold) standing on it between the mat and the frame
- K.VCyl(model,'Trampoline gap',(M.Frame.Ring-M.Frame.Width/2)*2,L.GapBottom,L.GapTop,x,z,P.Ink,Mat.SmoothPlastic,{shadow=false})
- for k=0,M.Springs.Count-1 do
-  local a=(k+.5)/M.Springs.Count*math.pi*2
-  K.VCyl(model,'Trampoline spring',M.Springs.Diameter,L.GapTop,L.SpringTop,x+math.cos(a)*M.Springs.Ring,z+math.sin(a)*M.Springs.Ring,P.Gold,Mat.SmoothPlastic,{shadow=false})
+ K.VCyl(model,'Trampoline gap',(ringR-M.Frame.Width*k/2)*2,L.GapBottom,L.GapTop,x,z,P.Ink,Mat.SmoothPlastic,{shadow=false})
+ for i=0,M.Springs.Count-1 do
+  local a=(i+.5)/M.Springs.Count*math.pi*2
+  K.VCyl(model,'Trampoline spring',M.Springs.Diameter*k,L.GapTop,L.SpringTop,x+math.cos(a)*M.Springs.Ring*k,z+math.sin(a)*M.Springs.Ring*k,P.Gold,Mat.SmoothPlastic,{shadow=false})
  end
  -- the mat and its badge (the only parts the client moves)
- local mat=K.VCyl(model,'Trampoline mat',D.MatRadius*2,L.MatBottom,L.MatTop,x,z,P.RoofTeal,Mat.SmoothPlastic,{shadow=false})
- local badge=K.VCyl(model,'Trampoline badge',M.BadgeRadius*2,L.BadgeBottom,L.BadgeTop,x,z,P.Cream,Mat.SmoothPlastic,{shadow=false})
+ local mat=K.VCyl(model,'Trampoline mat',spot.MatRadius*2,L.MatBottom,L.MatTop,x,z,P.RoofTeal,Mat.SmoothPlastic,{shadow=false})
+ local badge=K.VCyl(model,'Trampoline badge',M.BadgeRadius*k*2,L.BadgeBottom,L.BadgeTop,x,z,P.Cream,Mat.SmoothPlastic,{shadow=false})
  model:SetAttribute('HasMat',true);model:SetAttribute('Look','built')
  return model
 end
@@ -77,6 +95,18 @@ local function aabb(p) -- the world box of a part
  return c.Position-e,c.Position+e
 end
 local function partsOf(model)local out={};for _,d in ipairs(model:GetDescendants())do if d:IsA('BasePart')then out[#out+1]=d end end;return out end
+-- How far the farthest corner of any part lies from `centre`, sideways: the radius of the circle the look fits in.
+local function reachOf(model,centre)
+ local far=0
+ for _,p in ipairs(partsOf(model))do
+  local c,sz=p.CFrame,p.Size
+  for _,sx in ipairs({-1,1})do for _,sy in ipairs({-1,1})do for _,sz2 in ipairs({-1,1})do
+   local q=(c*CF(sx*sz.X/2,sy*sz.Y/2,sz2*sz.Z/2)).Position
+   local d=math.sqrt((q.X-centre.X)^2+(q.Z-centre.Z)^2);if d>far then far=d end
+  end end end
+ end
+ return far
+end
 -- The mat: the largest roughly flat part up at the top of the look (thin, in the upper half, a quarter of the footprint or more), preferring names like Mat /
 -- Bouncy / Jump; frames, legs, springs, poles and nets are not mats. Two like candidates (no telling the frame ring from the mat) = no mat = no squash.
 local function findMat(list,lo,hi)
@@ -123,15 +153,19 @@ function M.Prepare(src)
  if not centre or math.max(size.X,size.Z)<.5 or math.max(size.X,size.Y,size.Z)>T.MaxPartSize*2 then model:Destroy();return nil,'an impossible size'end
  Trees.Lock(model,true) -- anchored, CanCollide / CanTouch / CanQuery off, Default collision group, shadows from the size
  local matI=findMat(list,centre-size/2,centre+size/2)
- return{Model=model,Parts=#list,Scripts=scripts,Other=other,Dropped=dropped,MatIndex=matI,MatName=matI and list[matI].Name or nil,Name=src.Name}
+ local reach=reachOf(model,centre);local half=math.max(size.X,size.Z)/2
+ return{Model=model,Parts=#list,Scripts=scripts,Other=other,Dropped=dropped,MatIndex=matI,MatName=matI and list[matI].Name or nil,Name=src.Name,
+  Round=half>0 and reach/half or 1,Footprint=string.format('%.1f x %.1f',size.X,size.Z)} -- (Round: 1 for a round look, 1.41 for a square one)
 end
--- One look, cloned, scaled to the collider's footprint, centred on a nook, its mat at the collider's top, held off the paving's planes (nothing is in the world yet).
+-- One look, cloned, scaled so its farthest point (the frame's outer edge, for a round look: a frame that is not round is fitted inside the circle by its corners) lies on the
+-- collider's circle (spot.Radius, which is the nook's disc less Inset), centred on the nook, its mat at the collider's top, held off the paving's planes (nothing is in the world yet).
 local function fit(spot)
  local look=prepared.Model:Clone();look.Name='Trampoline look'
- local centre,size=Trees.Box(look)
- local k=T.Dims.Radius*2/math.max(size.X,size.Z)
+ local centre=Trees.Box(look)
+ local k=spot.Radius/reachOf(look,centre)
  look:ScaleTo(k)
  local list=partsOf(look);local mat=prepared.MatIndex and list[prepared.MatIndex]or nil
+ local size
  centre,size=Trees.Box(look)
  local top=mat and select(2,aabb(mat)).Y or centre.Y+size.Y/2
  look:TranslateBy(V(spot.X-centre.X,T.Top()-top,spot.Z-centre.Z))
@@ -146,7 +180,7 @@ local function fit(spot)
  look:SetAttribute('Scale',k);look:SetAttribute('Nudged',nudged);look:SetAttribute('Parts',#list)
  return look,mat~=nil
 end
--- Both trampolines or neither: every look is fitted first, then the built visuals go (the collider stays) and the looks go in. Returns true, or false and why.
+-- All the trampolines or none: every look is fitted first, then the built visuals go (the collider and the ramp ring stay) and the looks go in. Returns true, or false and why.
 local function dressAll(folder,kind)
  local looks={}
  for _,spot in ipairs(T.Spots)do
@@ -158,7 +192,7 @@ local function dressAll(folder,kind)
   end
  end
  for _,l in ipairs(looks)do
-  for _,c in ipairs(l.Model:GetChildren())do if c:IsA('BasePart')and c.Name~='Trampoline collider'then c:Destroy()end end
+  for _,c in ipairs(l.Model:GetChildren())do if c:IsA('BasePart')and c.Name~='Trampoline collider'and c.Name~='Trampoline ramp'then c:Destroy()end end -- (the collider and its ramp ring stay)
   l.Look:SetAttribute('Kind',kind);l.Look.Parent=l.Model
   l.Model:SetAttribute('HasMat',l.HasMat);l.Model:SetAttribute('Look',kind)
  end
@@ -168,7 +202,7 @@ end
 local function finish(info,kind)
  prepared=info;M.Look=kind
  local st=M.Status
- st.Kind=kind;st.Parts=info.Parts;st.Scripts=info.Scripts;st.Other=info.Other;st.Dropped=info.Dropped;st.Route=info.Route;st.Name=info.Name;st.MatName=info.MatName
+ st.Kind=kind;st.Parts=info.Parts;st.Scripts=info.Scripts;st.Other=info.Other;st.Dropped=info.Dropped;st.Route=info.Route;st.Name=info.Name;st.MatName=info.MatName;st.Round=info.Round;st.Footprint=info.Footprint
  local f=mapRef and mapRef:FindFirstChild(T.FolderName)
  if f then
   local ok,why=dressAll(f,kind)
@@ -256,6 +290,8 @@ function M.Describe()
  else out[#out+1]=st.Done and'Trampoline look: THE BUILT TRAMPOLINE (the fallback): the asset and the template were not used.'or(loading and'Trampoline look: the built trampoline for now; the load is still running.'or'Trampoline look: THE BUILT TRAMPOLINE (nothing was tried yet).')end
  if M.Look~='built'then
   out[#out+1]=string.format('  %d parts per trampoline (cap %d), %d script(s) and %d other instance(s) removed, %d invisible or absurd part(s) dropped; mat for the squash: %s.',st.Parts or 0,T.AssetMaxParts,st.Scripts or 0,st.Other or 0,st.Dropped or 0,st.MatName and('"'..st.MatName..'"')or'not found (no squash)')
+  local round=(st.Round or 1)<=1.08
+  out[#out+1]=string.format('  fitted to each nook\'s brick circle by its farthest point (the frame\'s edge %.1f studs inside the rim); its footprint is %s studs: %s.',T.Dims.Inset,tostring(st.Footprint),round and'round, so it fills the circle'or string.format('not round (corners reach %.2fx its half-width): fitted INSIDE the circle by its corners, so its larger side is shorter than the circle',st.Round or 1))
  end
  out[#out+1]='  ReplicatedStorage.'..T.TemplateFolder..': '..hand..'.'
  local lost=false

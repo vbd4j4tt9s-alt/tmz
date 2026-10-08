@@ -4,11 +4,14 @@
 # of the garden bed players have to jump to pass it fix this issue"):
 #  1. test_hub_gardens.luau - the REAL code (MapService.new -> GardenBaseLayout, HubDecor151 -> HubTrampoline153, HubLifeArt151, HubTrampoline153.client,
 #     HubTrampolineRules153) on the owner's place in the R149 Roblox mock:
-#       hub:     the garden nooks' benches and flower beds are gone (the other benches stay), a trampoline (ONE collider, matching frame / mat / springs / feet,
-#                0.9 over the floor: under the runner's step limit) stands in each nook clear of the paths and the wall; the bounce (one config value) lifts
-#                the feet 25 - 35 studs; debounce, no stacking, no sky launch; the client script launches the local character, squashes the mat, plays an
-#                the owner's boing (94320656351627, pitch 1; ONE sound per bounce, none for a debounced contact, none for the old Bubble04; checked on a stubbed
-#                and on the real LocalSfx: Effects group, SoundTiming's default lead-in); MovementGuard's rise allowance covers the launch.
+#       hub:     the three nooks' (the two garden nooks, radius 13, and the back lane's, radius 10) benches and flower beds are gone (the other benches stay), a
+#                trampoline FILLS each brick circle (R153 second round, owner: "it should fit the whole circle": the frame's outer edge 0.4 stud inside the disc's
+#                rim; ONE collider and a ring of invisible 22 degree wedges that walk a body up the 0.9 kerb, matching frame / mat / springs / feet; the bounce covers
+#                the whole circle); the bounce (one config value) lifts the feet 25 - 35 studs; debounce, no stacking, no sky launch; the client script launches the
+#                local character, squashes the mat, plays the owner's boing (94320656351627, pitch 1; ONE sound per bounce, none for a debounced contact, none for
+#                the old Bubble04; checked on a stubbed and on the real LocalSfx: Effects group, SoundTiming's default lead-in); MovementGuard's rise allowance covers
+#                the launch at each nook's own radius (test_guard_trampoline.luau, run_fixes_client.sh); 48 walks onto the three trampolines from every side have no
+#                ledge; the lane nook's ring and the neighbouring beds' skirts join in a valley.
 #       gardens: (R153 second round: owner: "these garden sides also have not been fixed and players cant walk over them") every raised block - each of the 60
 #                soil beds AND the pad - has a continuous 22 degree invisible skirt (a wedge along every exposed face, a fan of wedges at every convex corner),
 #                so a body walks from the hub floor over the pad's rim, the 1.0 apron beside the fence and onto the soil with no ledge: every side of every plot
@@ -19,7 +22,7 @@
 #  2. static checks - no pathfinding anywhere (keepers / NPCs do not walk the hub), the new client script starts with the R152 load guard, the boing is
 #     the owner's trampoline file (94320656351627) at pitch 1 through LocalSfx (R153: it replaced the Bubble04 placeholder), the manifest lists the new files.
 #  3. the R152 load guard run and the hub z-fight run (run_hub_zfight.sh: no counted finding, no tight pair, the trampoline parts included).
-#  (R153, the look: the hub's trampolines take their look from the owner's asset 12088629887 (HubTrampoline153: a hand-placed ReplicatedStorage.HubTrampolineTemplates153 model, else
+#  (R153, the look: the hub's trampolines take their look from the owner's asset 12088629887 (scaled so its farthest point lies on the nook's circle; HubTrampoline153: a hand-placed ReplicatedStorage.HubTrampolineTemplates153 model, else
 #     InsertService:LoadAsset, else the built one): section 6 of the test mocks the routes: a store model with scripts and junk inside (stripped: scripts, sounds, prompts, welds, humanoids,
 #     absurd and invisible parts), its scale / centring / mat height, one collider, the squash on its mat, the same bounce and debounce, "User is not authorized to access Asset" -> the
 #     hand-placed template -> the built trampoline, a timeout, too many parts, a single part, a look with no findable mat, the paving-plane nudge, /test trampoline.)
@@ -62,6 +65,9 @@ if grep -n "96764044228884\|Bubble04\|InteractionAudio" "$C/HubTrampoline153.cli
 for f in ReplicatedStorage/HubTrampolineRules153 ServerScriptService/ChestChaseServer/HubTrampoline153 StarterPlayer/StarterPlayerScripts/HubTrampoline153;do
  grep -q "	$f	" "$S/MANIFEST.tsv" || fail "$f is not in src/MANIFEST.tsv";done
 SS=$S/ServerScriptService/ChestChaseServer
+grep -q "T.Step(st,os.clock(),dx,dz,feetY(char,root,hum),v.Y,workspace.Gravity,s.R)" "$C/HubTrampoline153.client.lua" || fail "the client must bounce by each spot's own radius (s.R)"
+grep -q "m:GetAttribute('Radius')" "$SS/MovementGuard.lua" || fail "MovementGuard must read each trampoline's own Radius for the launch allowance"
+grep -q "Trampoline ramp" "$SS/HubTrampoline153.lua" || fail "the trampoline's ramp ring is gone"
 # the look from the owner's asset (R153): the owner command is registered and documented, and the loader never leaves a code path open
 grep -q "X.Actions.trampoline=true" "$SS/OwnerUpdateCommands82.lua" && grep -q "action=='trampoline'then return require(script.Parent.HubTrampoline153).Command" "$SS/OwnerUpdateCommands82.lua" || fail "/test trampoline is not registered in OwnerUpdateCommands82"
 grep -q "/test trampoline" "$S/ReplicatedStorage/StudioTestHelp.lua" || fail "/test trampoline is not in StudioTestHelp"

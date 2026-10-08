@@ -25,8 +25,8 @@ local runtime=R.new('Folder');runtime.Name='Runtime';runtime.Parent=mapRoot
 local tramps=R.new('Folder');tramps.Name=T.FolderName;tramps.Parent=mapRoot
 local colliders={}
 for _,spot in ipairs(T.Spots)do
- local m=R.new('Model');m.Name='Trampoline '..spot.Name;m:SetAttribute('CenterX',spot.X);m:SetAttribute('CenterZ',spot.Z);m.Parent=tramps
- local c=R.new('Part');c.Name='Trampoline collider';c.Size=V3(T.Dims.Radius*2,T.Top()-(T.Floor-.1),T.Dims.Radius*2);c.CFrame=CF(spot.X,(T.Top()+T.Floor-.1)/2,spot.Z);c.Parent=m;colliders[spot.Name]=c
+ local m=R.new('Model');m.Name='Trampoline '..spot.Name;m:SetAttribute('CenterX',spot.X);m:SetAttribute('CenterZ',spot.Z);m:SetAttribute('Radius',spot.Radius);m.Parent=tramps
+ local c=R.new('Part');c.Name='Trampoline collider';c.Size=V3(spot.Radius*2,T.Top()-(T.Floor-.1),spot.Radius*2);c.CFrame=CF(spot.X,(T.Top()+T.Floor-.1)/2,spot.Z);c.Parent=m;colliders[spot.Name]=c
 end
 local Guard=W.require(G)
 Guard.Config={GetPlayerWalkSpeed=function(_,v)return v end};Guard.Data={GetOrCreateSpeedValue=function()return {Value=60}end,IsLoaded=function()return true end};Guard.Started=true
@@ -72,7 +72,7 @@ do
  local ok,n=hitchAt(100,Top,-100,flight(.35))
  check(ok==false and n==1,'the same 26-stud rise far from any trampoline is corrected ('..tostring(ok)..', '..n..')')
  check(pos().Y<Top+FEET+1,'... and the player is put back where the last frame was ('..string.format('%.1f',pos().Y)..')')
- ok,n=hitchAt(X0+D.Radius+.8,Top,Z0,flight(.35)) -- (beside the collider: 6.85 from the centre, the collider reaches 6.05, the rule 6.25)
+ ok,n=hitchAt(X0+T.Spots[1].Radius+.8,Top,Z0,flight(.35)) -- (beside the collider: 13.4 from the centre, the collider reaches 12.6, the rule 12.8)
  check(ok==false and n==1,'... beside the collider (0.8 stud off its edge) it is corrected too ('..tostring(ok)..', '..n..')')
  ok,n=hitchAt(X0,Top,Z0,40)
  check(ok==false and n==1,'over the mat but higher than the bounce can lift (the feet 40 studs up; the apex is at '..string.format('%.1f',Top+.35+T.Height())..') is corrected ('..tostring(ok)..', '..n..')')
@@ -96,6 +96,12 @@ do
  -- the Lava nook's mat works too
  ok,n=hitchAt(T.Spots[2].X+2,Top,T.Spots[2].Z-2,flight(.35))
  check(ok==true and n==0,'the second nook\'s trampoline allows it too ('..tostring(ok)..', '..n..')')
+ ok,n=hitchAt(T.Spots[2].X+12,Top,T.Spots[2].Z,flight(.35))
+ check(ok==true and n==0,'... out at 12 studs from the centre (the garden nooks\' whole circle) too ('..tostring(ok)..', '..n..')')
+ ok,n=hitchAt(T.Spots[3].X+9,Top,T.Spots[3].Z,flight(.35))
+ check(ok==true and n==0,'the lane nook\'s trampoline (radius 9.6) allows it too, 9 studs out ('..tostring(ok)..', '..n..')')
+ ok,n=hitchAt(T.Spots[3].X+10.5,Top,T.Spots[3].Z,flight(.35))
+ check(ok==false and n==1,'... but 10.5 studs out of it (past its 9.6 edge) it is corrected ('..tostring(ok)..', '..n..')')
 end
 -- 4. once per debounce window ---------------------------------------------------------------------------------------------------------------------------
 do
@@ -145,11 +151,14 @@ do
 end
 -- 6. the pure rule --------------------------------------------------------------------------------------------------------------------------------------
 do
- local spots={{X=312,Z=-269}}
+ local spots={{X=312,Z=-269,Radius=12.6}}
  local cap=Top+.35+T.Height()+T.GuardMargin
  check(T.LaunchRise(spots,312,-269,Top,Top+26,.1,math.huge)==true,'LaunchRise: on the mat, 26 up, 0.1 s, no earlier launch: yes')
  check(T.LaunchRise(spots,312,-269,Top+4,Top+26,.1,math.huge)==true,'... over the mat (4 studs above it): yes')
- check(T.LaunchRise(spots,312+7,-269,Top,Top+26,.1,math.huge)==false,'... 7 studs off the centre (the collider reaches 6.05): no')
+ check(T.LaunchRise(spots,312+13,-269,Top,Top+26,.1,math.huge)==false and T.LaunchRise(spots,312+12.5,-269,Top,Top+26,.1,math.huge)==true,'... 13 studs off the centre (the collider reaches 12.6): no; 12.5 out, at the frame\'s edge: yes (the whole circle)')
+local lane={{X=0,Z=-596,Radius=9.6}}
+check(T.LaunchRise(lane,9.5,-596,Top,Top+26,.1,math.huge)==true and T.LaunchRise(lane,10.2,-596,Top,Top+26,.1,math.huge)==false,'... the lane nook\'s own radius (9.6): 9.5 out yes, 10.2 out no')
+check(T.LaunchRise({{X=312,Z=-269}},312+12.5,-269,Top,Top+26,.1,math.huge)==true,'... a spot without a radius uses the first nook\'s (12.6)')
  check(T.LaunchRise(spots,312,-269,Top,cap+.1,.1,math.huge)==false and T.LaunchRise(spots,312,-269,Top,cap-.1,.1,math.huge)==true,'... above the cap '..string.format('%.2f',cap)..': no; just under it: yes')
  check(T.LaunchRise(spots,312,-269,Top,Top+26,T.GuardWindow+.01,math.huge)==false and T.LaunchRise(spots,312,-269,Top,Top+26,T.GuardWindow-.01,math.huge)==true,'... the last frame older than the debounce window ('..string.format('%.2f',T.GuardWindow)..' s): no')
  check(T.LaunchRise(spots,312,-269,Top,Top+26,.1,T.Cooldown-.01)==false and T.LaunchRise(spots,312,-269,Top,Top+26,.1,T.Cooldown)==true,'... a launch allowed less than the cooldown ago: no')

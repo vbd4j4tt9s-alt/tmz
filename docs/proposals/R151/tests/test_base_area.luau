@@ -479,7 +479,7 @@ do
   check('removed: no fountain sparkles emitter, ctx.Fountain / ctx.Signs / ApplySigns gone',sparkles==0 and api3.State.Ctx.Fountain==nil and api3.State.Ctx.Signs==nil and api3.ApplySigns==nil)
   local spurPots={};for _,p in ipairs(cp)do if p.Name=='Topiary pot'then local q=p._props.CFrame.Position;if math.abs(math.abs(q.X)-131)<.01 or math.abs(q.Z+420.4)<.01 then spurPots[#spurPots+1]=path(p)end end end
   check('removed: no potted topiary guarding a base spur\'s street end',#spurPots==0,first(spurPots))
-  check('removed: the layout has 5 benches (the four round the fountain are gone, R153: so are the four at the garden nooks, where trampolines stand)',#Art.Layout.benches==5,#Art.Layout.benches)
+  check('removed: the layout has 4 benches (the four round the fountain are gone, R153: so are the four at the garden nooks and the lane nook\'s, where trampolines stand)',#Art.Layout.benches==4,#Art.Layout.benches)
   -- the free Void Pack pedestal's plaza: a plain 18-stud circle round (0, -392) (Kit.Open): no tree, bush, bed, topiary, lamp, bench or sign, in the layout or built
   do local near,L={},Art.Layout
    local function chk(list,label,rad)for _,t in ipairs(list)do local x,z=t[1],t[2];if label=='tree'then x,z=t[2],t[3]end
