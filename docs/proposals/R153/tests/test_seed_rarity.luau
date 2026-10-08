@@ -311,7 +311,7 @@ do
   end
  end
  check(ok,'Secret+ goes to every server and Legendary+ to this one, whatever Odds says (rarity tier only)')
- check(Rules.RecordScope('BestPull','Cosmic')=='Global'and Rules.RecordScope('BestPull','Legendary')=='InServer'and Rules.RecordScope('BestPull','Rare')==nil,'hub record scope still by rarity')
+ check(Rules.RecordScope('BestPull','Cosmic')=='InServer'and Rules.RecordScope('BestPull','Legendary')=='InServer'and Rules.RecordScope('BestPull','Rare')==nil,'hub record scope still by rarity (R153 best pull: this server only, never another: a Cosmic record is no longer "Global")')
  local src=Rules.Qualifies and true
  check(src,'(Qualifies exists)')
 end
