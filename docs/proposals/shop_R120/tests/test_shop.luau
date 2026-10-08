@@ -22,12 +22,13 @@ local player=R.new('Player');player.Name='Buyer';player.DisplayName='Buyer';play
 local friend=R.new('Player');friend.Name='Friend';friend.DisplayName='Friendly';friend.UserId=2;friend.Parent=Players
 function Players.GetPlayers()return {player,friend}end
 local pg=R.new('PlayerGui');pg.Name='PlayerGui';pg.Parent=player
-for _,k in ipairs({'Growth','Speed'})do player:SetAttribute(k..'OwnershipReady',true)end
+for _,k in ipairs({'Growth','Speed','Clover'})do player:SetAttribute(k..'OwnershipReady',true)end -- (R153: the 4 Leaf Clover is the third pass)
 -- Products ------------------------------------------------------------------------------------
 local RS=W.RS
 local Passes=W.module('GamePassCatalog');local Pricing=W.module('PremiumPricing');local Mech=W.module('MechCatalog')
 local robux={}
 RS.GamePassCatalog:SetAttribute('GrowthPassId',101);RS.GamePassCatalog:SetAttribute('SpeedPassId',102);robux[101]=467;robux[102]=399
+RS.GamePassCatalog:SetAttribute('CloverPassId',103);robux[103]=999;local passId={Growth=101,Speed=102,Clover=103} -- R153
 for i,row in ipairs(Pricing.Bundles)do RS.PremiumPricing:SetAttribute(row.IdAttribute,200+i);robux[200+i]=row.RobuxPrice end
 for i,offer in ipairs(Mech.Offers)do RS.MechCatalog:SetAttribute(offer.Attribute,300+i);robux[300+i]=offer.TargetRobuxPrice end
 RS.PassGiftCatalog:SetAttribute('GrowthGiftProductId',401);RS.PassGiftCatalog:SetAttribute('SpeedGiftProductId',402);robux[401]=499;robux[402]=449
@@ -236,7 +237,7 @@ for si,s in ipairs(screens)do
   for _,c in ipairs(cards)do
    check(c:FindFirstChild('GiftPass')==nil and c.GemPerk~=nil and c.RobuxPass~=nil,name..': '..c.Name..' has gems/robux, no gift')
    check(rect(c.GemPerk).X+rect(c.GemPerk).W<=rect(c.RobuxPass).X and math.abs(rect(c.GemPerk).Y-rect(c.RobuxPass).Y)<1,name..': '..c.Name..' [Gems | Robux] row')
-   check(caption(c.RobuxPass)==rbx(robux[pass.Key=='Growth'and 101 or 102]),name..': '..c.Name..' robux price '..tostring(caption(c.RobuxPass)))
+   check(caption(c.RobuxPass)==rbx(robux[passId[pass.Key]]),name..': '..c.Name..' robux price '..tostring(caption(c.RobuxPass)))
    check(caption(c.GemPerk)==tostring(Mech.PassGemPrices[pass.Key]),name..': '..c.Name..' gem price')
    for _,b in ipairs({c.GemPerk,c.RobuxPass})do check(inside(rect(b),rect(c),1),name..': '..c.Name..'.'..b.Name..' inside card')end
    captionFits(c.RobuxPass,c.Name..' robux');captionFits(c.GemPerk,c.Name..' gems');textFits(c.Title,c.Name..' title')

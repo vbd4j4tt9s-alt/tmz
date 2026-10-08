@@ -152,7 +152,8 @@ local function createImage(w,h,rgba)
  if M.Hooks.Create then return M.Hooks.Create(w,h,rgba)end
  local image=game:GetService('AssetService'):CreateEditableImage({Size=Vector2.new(w,h)})
  assert(image,'no EditableImage (memory budget or API unavailable)')
- image:WritePixelsBuffer(Vector2.zero,Vector2.new(w,h),rgba)
+ local written,why=pcall(image.WritePixelsBuffer,image,Vector2.zero,Vector2.new(w,h),rgba)
+ if not written then pcall(image.Destroy,image);error(why,0)end -- (R153 clover: a write that fails must not leave the EditableImage alive)
  return image
 end
 local function contentOf(image)if M.Hooks.Content then return M.Hooks.Content(image)end;return Content.fromObject(image)end

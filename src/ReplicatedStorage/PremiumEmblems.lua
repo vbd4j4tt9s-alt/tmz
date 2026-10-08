@@ -46,6 +46,24 @@ function E.Draw(parent,kind)
  elseif kind=='Star'then
   local points={};for i=0,9 do local a=-math.pi/2+i*math.pi/5;local r=i%2==0 and .44 or .19;points[#points+1]={.5+math.cos(a)*r,.5+math.sin(a)*r}end
   polygon(root,'Star',points,C(242,243,255));polygon(root,'Star core',{{.5,.2},{.58,.48},{.5,.64},{.42,.48}},C(255,255,255))
+ elseif kind=='Clover'then
+  -- R153: a 4 Leaf Clover from boxes only (the plain one: CloverIcon153 shows it until the owner's picture is there). A leaf is a heart: a square plus a circle on each of its two outer
+  -- edges; four of them meet at the middle. Dark outline pieces first (a little bigger), then the green ones, the two veins, a shine on every leaf and the stem.
+  local s,o,cx,cy=.29,.028,.5,.43
+  local function leaf(sx,sy,grow,color,tag)
+   local side=s+grow*2
+   box(root,tag..' square',cx+sx*s/2-side/2,cy+sy*s/2-side/2,side,side,color)
+   box(root,tag..' lobe',cx+sx*s-side/2,cy+sy*s/2-side/2,side,side,color,true)
+   box(root,tag..' lobe',cx+sx*s/2-side/2,cy+sy*s-side/2,side,side,color,true)
+  end
+  local stem=function(grow,color,tag)local b=box(root,tag..' stem',cx-.03-grow,cy+.05-grow,.06+grow*2,.47+grow*2,color,true);b.Rotation=-9 end
+  for _,q in ipairs({{-1,-1},{1,-1},{-1,1},{1,1}})do leaf(q[1],q[2],o,C(12,66,30),'Outline')end;stem(o,C(12,66,30),'Outline')
+  stem(0,C(54,168,58),'Green')
+  for _,q in ipairs({{-1,-1},{1,-1},{-1,1},{1,1}})do leaf(q[1],q[2],0,C(72,204,64),'Leaf')end
+  box(root,'Vein',cx-.01,cy-s*1.35,.02,s*2.7,C(30,132,48));box(root,'Vein',cx-s*1.35,cy-.01,s*2.7,.02,C(30,132,48))
+  for _,q in ipairs({{-1,-1},{1,-1},{-1,1},{1,1}})do
+   local shine=box(root,'Shine',cx+q[1]*s*1.02-.045,cy+q[2]*s*.55-.045,.09,.09,C(176,248,112),true);shine.BackgroundTransparency=.25
+  end
 
  end
  return root

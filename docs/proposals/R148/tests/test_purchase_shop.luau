@@ -19,6 +19,7 @@ local RS=W.RS
 local Passes=W.module('GamePassCatalog');local Pricing=W.module('PremiumPricing');local Mech=W.module('MechCatalog')
 local robux={}
 RS.GamePassCatalog:SetAttribute('GrowthPassId',101);RS.GamePassCatalog:SetAttribute('SpeedPassId',102);robux[101]=467;robux[102]=399
+RS.GamePassCatalog:SetAttribute('CloverPassId',103);robux[103]=999 -- R153: the 4 Leaf Clover pass (a third card; its id has a code default, the attribute here overrides it)
 for i,row in ipairs(Pricing.Bundles)do RS.PremiumPricing:SetAttribute(row.IdAttribute,200+i);robux[200+i]=row.RobuxPrice end
 for i,offer in ipairs(Mech.Offers)do RS.MechCatalog:SetAttribute(offer.Attribute,300+i);robux[300+i]=offer.TargetRobuxPrice end
 local Market=W.service('MarketplaceService');local passPrompts=0

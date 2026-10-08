@@ -4,22 +4,29 @@
 local RS=game:GetService('ReplicatedStorage')
 local Art=require(RS.PremiumShopArt);local Bright=require(RS.BrightUI);local Catalog=require(RS.MechCatalog)
 local B={};local C=Color3.fromRGB
-B.Copy={Growth={Title='x2 Growth',Detail='Plants grow 2x faster!'},Speed={Title='x2 Speed',Detail='Train with 2x speed!'}}
+-- R153: the 4 Leaf Clover pass (2x luck on every pack). Its picture is CloverIcon153 (the pass's own Roblox icon, else the owner's clover drawn on the client, else shapes) on a soft glow so the
+-- green stands out on the sky-blue card. A pass whose id is 0 (CloverPassId set to 0) has no Robux button: the card says so and the Gem button takes the whole row (Layout).
+B.Copy={Growth={Title='x2 Growth',Detail='Plants grow 2x faster!'},Speed={Title='x2 Speed',Detail='Train with 2x speed!'},Clover={Title='x2 Luck',Detail='2x luck on every pack u open!'}}
 local function buttons(card,pass)
  Art.Button(card,'GemPerk',Art.Colors.Gem,'Gem');Art.SetCaption(card.GemPerk,tostring(Catalog.PassGemPrices[pass.Key]))
  Art.Button(card,'RobuxPass',Art.Colors.Robux);Art.SetCaption(card.RobuxPass,'Unavailable',false)
 end
 function B.Create(parent,pass,order)
- local growth=pass.Key=='Growth'
- local card=Art.Card(parent,pass.Key,growth and{C(255,90,200),C(255,214,70)}or{C(255,252,170),C(255,222,40),C(255,168,24)})
+ local growth=pass.Key=='Growth';local clover=pass.Key=='Clover'
+ local card=Art.Card(parent,pass.Key,growth and{C(255,90,200),C(255,214,70)}or clover and{C(200,250,255),C(92,214,238),C(44,148,214)}or{C(255,252,170),C(255,222,40),C(255,168,24)})
  card.LayoutOrder=order;card:SetAttribute('PassKey',pass.Key)
  if growth then card.Fill.Color=Bright.Rainbow;card.Fill.Rotation=20 end
  local stage=Art.Frame(card,'IconStage',nil,1);stage.ZIndex=2
- if growth then Art.Clock(stage)else Art.Coin(stage,'Bolt')end
+ if growth then Art.Clock(stage)
+ elseif clover then
+  local glow=Art.Frame(stage,'Glow',Color3.new(1,1,1),.5);glow.AnchorPoint=Vector2.new(.5,.5);glow.Position=UDim2.fromScale(.5,.5);glow.Size=UDim2.fromScale(.94,.94);Art.Corner(glow,UDim.new(.5,0))
+  local icon=require(RS.CloverIcon153).Attach(stage);icon.AnchorPoint=Vector2.new(.5,.5);icon.Position=UDim2.fromScale(.5,.5);icon.Size=UDim2.fromScale(.9,.9)
+ else Art.Coin(stage,'Bolt')end
  local copy=B.Copy[pass.Key]or{Title=pass.Name,Detail=pass.Description}
  Art.Text(card,'Title',copy.Title,30).ZIndex=4
  local detail=Art.Text(card,'Detail',copy.Detail,24);detail.ZIndex=4;detail.TextWrapped=true
- local tag=Art.Text(card,'Permanent','PERMANENT',13,C(255,248,190));tag.ZIndex=4
+ local noRobux=pass.IdAttribute~=nil and require(RS.GamePassCatalog).RobuxSoon(pass)
+ local tag=Art.Text(card,'Permanent',noRobux and'ROBUX SOON'or'PERMANENT',13,C(255,248,190));tag.ZIndex=4
  buttons(card,pass)
  require(RS.GuiShine).Attach(card,false)
  return card
@@ -43,7 +50,7 @@ function B.Layout(card,w,h,button,k)
  card.RobuxPass.Position=UDim2.fromOffset(pad+gemW+g,rowY);card.RobuxPass.Size=UDim2.fromOffset(rest-gemW,button)
  if card.GemPerk.Visible==false then
   card.RobuxPass.Position=card.GemPerk.Position;card.RobuxPass.Size=UDim2.fromOffset(rest+g,button)
- end
+ elseif card.RobuxPass.Visible==false then card.GemPerk.Size=UDim2.fromOffset(rest+g,button) end -- R153: no Robux button (pass id 0)
  for _,b in ipairs({card.GemPerk,card.RobuxPass})do Art.Fit(b)end
 end
 return B
