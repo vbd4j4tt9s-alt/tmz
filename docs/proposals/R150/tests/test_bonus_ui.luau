@@ -197,6 +197,25 @@ do
  local moved=0;for i=1,60*6 do UW.frames(1,1/60);if UW.frameListeners()>0 or face.Icon.Rotation~=0 or button.Pulse.Scale~=1 then moved+=1 end end
  check(moved==0,'R153: ReducedMotion: the almost button never moves or runs a listener in 6 s ('..moved..')')
  W.Gui.ReducedMotionEnabled=false
+ -- R153 client bug review, finding 10: a roll completes in the middle of an ALMOST THERE! wiggle. The wiggle stops and puts the rotation and the scale back at once, so the ready
+ -- pop (the button grows from .72 to 1) is what the player sees; before, the wiggle kept writing the icon's rotation and the button's scale for the rest of its 0.75 s over the pop.
+ do
+  C.set('Ready',0);C.set('Interval',360);C.set('DueAt',R.clock+25);C.set('Left',25);training(true);frames(5)
+  local inBurst=false
+  for _=1,60*6 do UW.frames(1,1/60);if math.abs(face.Icon.Rotation)>3 and UW.frameListeners()>0 then inBurst=true;break end end
+  check(inBurst,'R153 review (10): the ALMOST THERE! wiggle is running ('..face.Icon.Rotation..' deg)')
+  C.set('Ready',1);UW.frames(1,1/60)
+  check(face.Icon.Rotation==0,'R153 review (10): the roll completing stops the wiggle at once: the icon is back at 0 deg ('..face.Icon.Rotation..')')
+  local worstRot,topScale,lowScale=0,0,math.huge
+  for _=1,12 do
+   UW.frames(1,1/60)
+   worstRot=math.max(worstRot,math.abs(face.Icon.Rotation));topScale=math.max(topScale,button.Pulse.Scale);lowScale=math.min(lowScale,button.Pulse.Scale)
+  end
+  check(worstRot==0,'R153 review (10): the icon does not wiggle again over the ready pop ('..worstRot..' deg in the next 12 frames)')
+  check(topScale<=1.0001 and lowScale<.95,'R153 review (10): the ready pop is what the button shows: it grows up from .72, never pulsed above 1 by the wiggle (low '..string.format('%.3f',lowScale)..', high '..string.format('%.3f',topScale)..')')
+  secs(1);check(button.Pulse.Scale>.98 and button.Pulse.Scale<1.05 and face.Icon.Rotation==0 and UW.frameListeners()<=1,'R153 review (10): the pop settles at 1, nothing left running ('..button.Pulse.Scale..')')
+  C.set('Ready',0);training(false);frames(5);secs(4);C.set('DueAt',R.clock+360);C.set('Left',360);training(true);frames(5)
+ end
  -- the ready state: a roll completing says BONUS READY! / OPEN IT! for Style.ReadyHold seconds, then READY!; the pop, the sparkles and the cue are the button's
  C.set('DueAt',R.clock+360);C.set('Left',360);frames(5)
  local fxBefore=#hud.Fx:GetChildren()
