@@ -299,8 +299,8 @@ function Controller:Step(dt)
     self.ScanClock+=dt;self.CullClock+=dt;self.FrameClock+=dt
     if self.ScanClock>=Fx.SCAN then self.ScanClock=0;self:Scan()end
     if self.CullClock>=Fx.CULL then self.CullClock=0;self:Cull()end
-    local interval=self.Policy.Quality>=3 and 1/30 or 1/20
-    if self.FrameClock<interval then return end
+    -- R153 (owner: "reduce jitter in effects"): every frame (was 1/30 s, 1/20 s below tier 3). Only records the cull passed are stepped: Scrolling (near, on screen,
+    -- no Reduced Motion) and Animated (quality 2+, within Fx.ANIMATE, on screen); offsets / transparencies are still written only when they change.
     local step=math.min(self.FrameClock,.1);self.FrameClock=0
     for _,record in pairs(self.Records)do
         if record.Lists and record.Belt.Parent then

@@ -112,11 +112,15 @@ local function makeField()
 	return {Gui = gui, Popups = {}, Free = {}, Seq = 0}
 end
 
+-- R153 (owner: "reduce jitter in effects"): the field hangs on the HumanoidRootPart at the head's height (StudsOffsetWorldSpace), not on the Head:
+-- the head bobs with the treadmill run and the whole fan shook with it. (No root: the head, as before.)
 local function takeField(head)
 	local field = table.remove(freeFields)
 	while field and field.Gui.Parent ~= playerGui do field = table.remove(freeFields) end -- one that was removed from the PlayerGui is not reused
 	field = field or makeField()
-	field.Gui.Adornee = head
+	local root = head.Parent and head.Parent:FindFirstChild("HumanoidRootPart")
+	field.Gui.Adornee = root or head
+	field.Gui.StudsOffsetWorldSpace = root and Vector3.new(0, head.Position.Y - root.Position.Y, 0) or Vector3.zero
 	field.Gui.Enabled = true
 	return field
 end
@@ -422,22 +426,26 @@ table.insert(connections,Run.Heartbeat:Connect(function(dt)
         end
     end
     local low=player:GetAttribute('FastMode')==true
-    if elapsed<(low and 1/20 or 1/30)then return end
-    local step=math.min(elapsed,.10);elapsed=0
-    local camera=workspace.CurrentCamera;table.clear(moving);table.clear(frames)
+    -- R153 (owner: "reduce jitter in effects"): a near belt in view moves its arrows every frame (they stepped at 30 / 20 Hz); out of view the old tick,
+    -- with the time each belt is owed (the arrows are where they would have been). The view test is TreadmillFx.Visible's generous cone.
+    local tick=elapsed>=(low and 1/20 or 1/30);if tick then elapsed=0 end
+    local camera=workspace.CurrentCamera;local view=camera and camera.CFrame;table.clear(moving);table.clear(frames)
     for belt,record in pairs(belts)do
         if not belt:IsDescendantOf(workspace)or record.Art.Parent~=belt.Parent then
             releaseBelt(record);belts[belt]=nil
         else
-            local distance=camera and (camera.CFrame.Position-belt.Position).Magnitude or math.huge
+            local offset=view and belt.Position-view.Position
+            local distance=offset and offset.Magnitude or math.huge
             local near=distance<(low and 90 or 140)
-            for _,e in ipairs(record.Emitters)do
+            if tick then for _,e in ipairs(record.Emitters)do
                 if e.Parent then
                     local enabled=not low and distance<85
                     if e.Enabled~=enabled then e.Enabled=enabled end
                 end
-            end
-            if near then
+            end end
+            record.Owed=near and(record.Owed or 0)+dt or 0
+            if near and(tick or distance<28 or view.LookVector:Dot(offset/distance)>.25)then
+                local step=math.min(record.Owed,.10);record.Owed=0
                 record.Distance+=step*(belt:GetAttribute('TrainingActive')and 3.0 or 1.3)
                 record.Clock+=step
                 for _,entry in ipairs(record.Motion)do

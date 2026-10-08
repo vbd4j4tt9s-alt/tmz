@@ -43,7 +43,8 @@ if git -C "$REPO" rev-parse -q --verify $BASE >/dev/null 2>&1;then
  # size on this screen, FanX / FanY, and apply() multiplies by it: SpeedPopupStyle.FanScale) and SpeedPopupStyle in its sizes (Size, StrokeThickness), the pooled field (Field), the fan
  # numbers (Fan) and FanScale; everything else of both must still be what it was at $BASE (the motion curves, the rate, the colours, the formatting).
  git -C "$REPO" show $BASE:src/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua > "$OUT/popup_base.lua"
- python3 - "$OUT/popup_base.lua" "$S/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua" <<'EOF' || fail "SpeedGainPopup.client.lua changed outside the R153 fan scale (the load guard line aside)"
+ python3 "$P/R153/tests/undo_jitter153.py" "$S/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua" "$OUT/popup_undone.lua" || fail "the R153 jitter edits of SpeedGainPopup changed" # (R153 jitter: the field on the root, the arrows every frame: put back first)
+ python3 - "$OUT/popup_base.lua" "$OUT/popup_undone.lua" <<'EOF' || fail "SpeedGainPopup.client.lua changed outside the R153 fan scale and the R153 jitter edits (the load guard line aside)"
 import sys
 skip = ("R152: start once the whole game has arrived",)
 def norm(text):

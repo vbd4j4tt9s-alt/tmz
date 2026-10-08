@@ -206,6 +206,11 @@ do
  local seen={};for step=1,60 do H.run(.1);seen[#seen+1]=angle(rs2.Transform)end
  local lo,hi=1e9,0;for _,a in ipairs(seen)do lo=math.min(lo,a);hi=math.max(hi,a)end
  check(hi-lo>.1 and hi<=Pose.MaxAngle,'and keeps moving (the arm waves between '..string.format('%.2f',lo)..' and '..string.format('%.2f',hi)..' rad)')
+ -- R153 jitter (owner: "reduce jitter in effects"): in view the cheer is written on every frame (POSE_HZ, 30 a second, stepped on a 60 / 144 Hz screen)
+ for _,fps in ipairs({60,144})do
+  local last,repeats=nil,0;for _=1,fps do H.run(1/fps,1/fps);local a=angle(rs2.Transform);if last and a==last then repeats+=1 end;last=a end
+  check(repeats==0,'in view the cheer moves on every frame at '..fps..' fps ('..repeats..' repeated)')
+ end
  local touched=true;local rig=fruitD.AvatarFolder:FindFirstChildOfClass('Model')
  for _,d in ipairs(rig:GetDescendants())do if d:IsA('Motor6D')then local a=angle(d.Transform);local named=Pose.CheerAt(0,0)[d.Name];if a>1e-9 and not named then touched=false end end end
  check(touched,'only the cheer\'s own joints are written (the legs and wrists are never touched)')

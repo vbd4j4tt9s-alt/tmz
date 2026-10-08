@@ -163,7 +163,7 @@ do
   worst=math.max(worst,l.Max);if l.T.OffsetStudsV<0 or l.T.OffsetStudsV>=l.Period then inside=false end;laps=math.min(laps,l.Sum/l.Period)
   check(('level %d %s: 36 studs over %.1f tiles, no drift (%.2f)'):format(level,l.T.Name,l.Sum/l.Period,l.Sum),near(l.Sum,36,.45))
  end end
- check('no jump at a wrap: the biggest step of a frame is one tick of travel ('..string.format('%.3f',worst)..' studs, a 1/20 s tick is .15)',worst<=.16)
+ check('no jump at a wrap: the biggest step of a frame is one frame of travel ('..string.format('%.3f',worst)..' studs, a 1/60 s frame is .05; R153 jitter: every frame, was a 1/20 s tick)',worst<=.06)
  check('the offsets stay inside their tile (0 .. StudsPerTileV)',inside)
  check('every layer wrapped at least 6 times in 12 s ('..string.format('%.1f',laps)..' tiles at least)',laps>=6)
 end
@@ -191,7 +191,7 @@ end
 do
  reset({Tier=2,Training=true});local tr=tracker(m5);frames(120,tr.Step)
  local n=tr.Writes();local layers=#tr.Layers
- check(('2 s of scroll: %d writes for %d layers (at most 30 a second each, at least one a tick)'):format(n,layers),n>=layers*20 and n<=layers*60)
+ check(('2 s of scroll: %d writes for %d layers (one a frame each: R153 jitter, was one a 1/20 - 1/30 s tick)'):format(n,layers),n>=layers*100 and n<=layers*120)
  -- belt standing: no write at all (dt 0, far, Reduced Motion)
  local record;for _,r in pairs(controller.Records)do if r.Belt==m5.Belt then record=r end end
  check('the controller tracks the machine (a record with its layers)',record~=nil and #record.Lists.Textures==layers)
