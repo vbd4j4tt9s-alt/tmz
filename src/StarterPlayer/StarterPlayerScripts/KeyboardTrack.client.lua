@@ -489,14 +489,19 @@ local function start()
   for i=1,COLS do local l=letterLabel(gui);l.TextSize=FTEXT;l.Size=UDim2.fromOffset(KW*FPPS,KW*FPPS);labels[i]=l;vis[i]=true end
   return {Part=p,Gui=gui,Labels=labels,W=0,D=0,X=0,Z=0,Alpha=-1,On=true,Free=false,Parked=false,PX={},PY={},Tx={},Ink={},Vis=vis}
  end
+ -- R153 perf (lag audit D8): the far letters' render limit of the current tier (FarMaxDistanceByTier: 500 studs on tier 2), written only when it
+ -- changes; a tier change re-applies it to every strip already dressed (Far.Limit())
+ function Far.Limit(one)
+  local md=LG.FarMaxDistanceByTier and LG.FarMaxDistanceByTier[tier]or LG.FarMaxDistance
+  local function apply(st)if st and st.MaxDist~=md then st.MaxDist=md;pcall(function()st.Gui.MaxDistance=md end)end end
+  if one then apply(one)else for _,r in ipairs(Far.Rows)do apply(Far.Of[r])end end
+ end
  function Far.Bind(row)
   local za,zb=geo.RowZ(row);local d=zb-za;local z=(za+zb)/2;local stage=rowStage[row]
   local st
   if Far.N>0 then st=Far.Free[Far.N];Far.Free[Far.N]=nil;Far.N-=1 else st=newFar()end
   st.Free=false;st.Parked=false;st.Empty=false
-  -- (R153 perf, D8: the far letters' render limit of the tier this strip is dressed in; written only when it changes)
-  local md=LG.FarMaxDistanceByTier and LG.FarMaxDistanceByTier[tier]or LG.FarMaxDistance
-  if st.MaxDist~=md then st.MaxDist=md;pcall(function()st.Gui.MaxDistance=md end)end
+  Far.Limit(st) -- (R153 perf, D8: the far letters' render limit of this tier)
   local a0,a1=keyedSpan(row,1,COLS)
   if not a0 then emptyStrip(st)
   else
@@ -1271,10 +1276,10 @@ local function start()
   if tier==0 or T.Tier>=.5 then
    T.Tier=0
    local want=Fx and Fx.Get()or 3
-   if tier==0 then tier=want;wantTier=want;wantSince=now;tierCfg=K.Tier(tier);windowDirty=true
+   if tier==0 then tier=want;wantTier=want;wantSince=now;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit()
    elseif want~=wantTier then wantTier=want;wantSince=now end
    -- a tier change only applies once it has held for a few seconds (a device bouncing between tiers must not flicker)
-   if wantTier~=tier and now-wantSince>=C.TierHoldSeconds then tier=wantTier;tierCfg=K.Tier(tier);windowDirty=true end
+   if wantTier~=tier and now-wantSince>=C.TierHoldSeconds then tier=wantTier;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit()end
   end
   if T.Clear>=.25 then T.Clear=0;scanClearances()end
   if T.Keeper>=2 then T.Keeper=0;scanKeepers()end
