@@ -185,7 +185,7 @@ do
  end
  check(decode({GiftLocked=true}).GiftLocked==true,'A1: a saved GiftLocked=true reads as locked')
  check(decode({GiftLocked='yes'}).GiftLocked==nil and decode({GiftLocked=1}).GiftLocked==nil and decode({}).GiftLocked==nil,'A1: anything but exactly true (and an old row without the field) reads as not locked')
- check(decode({Kind='Seed',GiftLocked=true,SeedId='SunflowerSeed'}).GiftLocked==nil,'A1: a Seed row never carries the lock')
+ check(decode({Kind='Seed',GiftLocked=true,SeedId='SunflowerSeed'}).GiftLocked==true and decode({Kind='Seed',GiftLocked='yes',SeedId='SunflowerSeed'}).GiftLocked==nil,'A1: a Seed row carries the lock too (R153 review M2: the seed of a locked pack stays locked), exactly true only')
  local gifted=D:DecodeGiftedSeed(P,row);check(gifted and gifted.GiftLocked==true,'A1: a row that reached the gift decoder keeps its lock (it cannot be shed by a gift)')
  -- saved with the profile; another server loads it
  local plainId=plain.Id;D:Save(P,'test',true)
@@ -200,10 +200,10 @@ do
  check(c1 and c1.BagVariant==VC.Variant and c1.GiftLocked==true,'A1: ConvertVoidPack carries the lock to the Verity Pack')
  check(c2 and c2.BagVariant==VC.Variant and c2.GiftLocked==nil,'A1: ... and an ordinary Void pack gives an unlocked Verity Pack')
  check(D2:SerializeSeedRecord(c1).GiftLocked==true,'A1: the Verity Pack\'s saved row keeps it')
- -- opening a locked pack: the seed that comes out is a Seed (no lock)
+ -- opening a locked pack: the seed that comes out is a Seed that keeps the lock (R153 review M2; it was lost at the open before)
  local P3=makePlayer(D2,2041,'Opener');svc2:Step();svc2:Claim(P3);local lp=D2:GetChestRecords(P3)[1]
  local seed=D2:OpenSeedPack(P3,lp.Id,function()return .5 end)
- check(seed and seed.Kind=='Seed'and seed.GiftLocked==nil and D2:SerializeSeedRecord(seed).GiftLocked==nil,'A1: an opened pack is a Seed record without the lock')
+ check(seed and seed.Kind=='Seed'and seed.GiftLocked==true and D2:SerializeSeedRecord(seed).GiftLocked==true,'A1: an opened pack is a Seed record WITH the lock (and its saved row has it)')
  -- an R151 server (git history) loads a profile with the field, ignores it, and saves the row without it; everything else in the row is identical
  local old=RS:FindFirstChild('PlayerDataServiceR151')
  if not old then print('SKIP: the R151 PlayerDataService is not in the repository history, so the older-server check did not run')

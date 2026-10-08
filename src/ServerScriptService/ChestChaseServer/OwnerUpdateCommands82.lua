@@ -207,7 +207,7 @@ function X.Execute(ctx,p,action,a)
  elseif action=='daily'then
   -- R140 owner test of the login week and daily quests without waiting for midnight UTC:
   -- daily [@name] | daily next (a new day: the login claim and fresh quest progress) | daily done (finish today's
-  -- quests) | daily week (the next claim is day 7, the Mech pack) | daily reset.
+  -- quests) | daily week (the next claim is day 7, the Void Pack) | daily reset. Every pack these make claimable is a TEST pack (below).
   local D=require(RS.DailyRewards);local sub=tostring(a[1]or''):lower()
   if #a>1 or(sub~=''and sub~='next'and sub~='done'and sub~='week'and sub~='reset')then return false,'Use daily [next|done|week|reset] @username.'end
   local daily,quests,day=data:DailyData(p)
@@ -218,8 +218,20 @@ function X.Execute(ctx,p,action,a)
    for i,q in ipairs(quests.Keys)do daily.Quests.Progress[i]=D.Quests[q].Goal end
   elseif sub=='week'then daily.Login={Step=#D.Login-1,Day=day-1}
   elseif sub=='reset'then data:GetPremium(p).Daily=nil end
-  if sub=='next'or sub=='week'or sub=='reset'then TestPacks.Arm(p,'Daily',1)end -- R151: the login pack they make claimable is a TEST pack
-  if sub~=''then data:PublishDaily(p);save(ctx,p)end
+  if sub~=''then
+   -- R151: the login pack they make claimable is a TEST pack. R153 (review M1): so is every quest pack the command makes claimable (done: the unclaimed quests; next / reset: all
+   -- of today's fresh quests), each with its own arm ('Daily' = the login pack, 'DailyQuest' = a quest pack) so one claim can't use up the other's. The arms last until UTC
+   -- midnight (a test day), and the target is tainted for the hub boards (BEST PULL / BIGGEST FRUIT) like for every command that gives packs.
+   local left=D.SecondsLeft(os.time())
+   if sub=='next'or sub=='week'or sub=='reset'then TestPacks.Arm(p,'Daily',1,nil,left)end
+   if sub~='week'then
+    local _,fresh=data:DailyData(p);local open=0
+    for i=1,#fresh.Keys do if not fresh.Claimed[i]then open+=1 end end
+    TestPacks.Arm(p,'DailyQuest',open,nil,left)
+   end
+   local hub=ctx.Chase and ctx.Chase.HubDisplays;if hub then pcall(hub.NoteOwnerGrant,hub,p)end
+   data:PublishDaily(p);save(ctx,p)
+  end
   local state=data:DailyState(p);local rows={}
   for _,q in ipairs(state.Quests)do rows[#rows+1]=q.Text..' '..q.Progress..'/'..q.Goal..(q.Claimed and' ✓'or'')end
   return true,p.Name..': login day '..state.Login.Claimed..'/7 claimed'..(state.Login.Ready and(', day '..state.Login.Next..' ready')or', next tomorrow')..' | '..table.concat(rows,' | ')..' | new day in '..D.Countdown(state.ResetIn)

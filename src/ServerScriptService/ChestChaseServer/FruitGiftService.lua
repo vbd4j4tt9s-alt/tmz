@@ -95,6 +95,7 @@ function S:Offer(from,userId,cropId)
  if not self:Held(from,cropId)then self.Remote:FireClient(from,'Status','Hold the item u want to give.');return end
  local crop;for _,c in ipairs(self.Data.Gardens[from].Harvests)do if c.Id==cropId then crop=c;break end end
  if not crop then return end
+ if crop.GiftLocked then self.Remote:FireClient(from,'Status',S.LockedFruitText);return end -- R153: fruit from a gift-locked seed
  if crop.PaidRandom and(from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true)then self.Remote:FireClient(from,'Status','U can\'t gift a bought crop to that account.');return end
  if #self.Data.Gardens[to].Harvests>=self.Data.Config.MaxSavedHarvests then self.Remote:FireClient(from,'Status','Their bag is full.');return end
  for id,o in pairs(self.Offers)do if o.From==from or o.To==to then self.Offers[id]=nil end end
@@ -111,6 +112,7 @@ function S:Accept(to,id)
  local garden=self.Data.Gardens[from];garden.OutgoingGifts=garden.OutgoingGifts or{}
  if count(garden.OutgoingGifts)>=32 or #self.Data.Gardens[to].Harvests>=self.Data.Config.MaxSavedHarvests then self.Remote:FireClient(from,'Status','Finish ur pending gifts or make room in ur bag first.');return end
  local index,crop;for i,c in ipairs(garden.Harvests)do if c.Id==offer.CropId then index=i;crop=c;break end end;if not crop then return end
+ if crop.GiftLocked then self.Remote:FireClient(from,'Status',S.LockedFruitText);return end
  if crop.PaidRandom and(from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true)then return end
  -- No yield between inventory removal and persistent outbox staging.
  self.Busy[from]=true;self.Busy[to]=true
@@ -170,7 +172,11 @@ function S:SeedBlocked(p,id)
  return nil
 end
 -- R152: a free giveaway pack (record.GiftLocked) can't be gifted (alts claimed it for a main account).
-S.LockedText="Free giveaway packs can't be gifted"
+-- R153 (review M2 / L4): the lock goes with the value, not only with the pack: the seed opened from it, the plant grown from that seed and every fruit that plant gives are locked too
+-- (PlayerDataService:OpenSeedPack, PlantRules.NewCrop), and the day-7 login Void Pack is locked (DailyRewards.LockDay7Void). Each says what it is.
+S.LockedText="Free Void Packs can't be gifted"
+S.LockedSeedText="Seeds from a free Void Pack can't be gifted"
+S.LockedFruitText="Fruit from a free Void Pack can't be gifted"
 function S:SeedPaidBlocked(record,from,to)
  if not record.PaidRandom then return false end
  if from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true then return true end
@@ -186,7 +192,7 @@ function S:OfferSeed(from,userId,itemId)
  if not record or(record.Kind~='Pack'and record.Kind~='Seed')or not self:HeldSeed(from,itemId,record.Kind)then return end
  local blocked=self:SeedBlocked(from,itemId);if blocked then self.Remote:FireClient(from,'Status',blocked);return end
  local noun=record.Kind=='Pack'and'pack'or'seed'
- if record.GiftLocked then self.Remote:FireClient(from,'Status',S.LockedText);return end
+ if record.GiftLocked then self.Remote:FireClient(from,'Status',record.Kind=='Seed'and S.LockedSeedText or S.LockedText);return end
  if self:SeedPaidBlocked(record,from,to)then self.Remote:FireClient(from,'Status','This bought '..noun..' can\'t be gifted to that account.');return end
  if #self.Data:GetChestRecords(to)>=self.Data.Config.MaxSavedChests then self.Remote:FireClient(from,'Status','Their bag is full.');return end
  for id,o in pairs(self.Offers)do if o.From==from or o.To==to then self.Offers[id]=nil end end
@@ -199,7 +205,7 @@ function S:AcceptSeed(to,id,offer)
  if os.clock()>offer.Expires or not record or not self:Available(from)or not self:Available(to)or not self:Near(from,to)or not self:HeldSeed(from,offer.ItemId,record.Kind)or self:SeedBlocked(from,offer.ItemId)then
   self.Remote:FireClient(to,'Status','Gift timed out. Ask them to offer it again!');return
  end
- if record.GiftLocked then self.Remote:FireClient(from,'Status',S.LockedText);return end
+ if record.GiftLocked then self.Remote:FireClient(from,'Status',record.Kind=='Seed'and S.LockedSeedText or S.LockedText);return end
  local garden=self.Data.Gardens[from];garden.OutgoingSeedGifts=garden.OutgoingSeedGifts or{}
  if count(garden.OutgoingSeedGifts)>=32 or #self.Data:GetChestRecords(to)>=self.Data.Config.MaxSavedChests then self.Remote:FireClient(from,'Status','Finish ur pending gifts or make room in ur bag first.');return end
  if self:SeedPaidBlocked(record,from,to)then return end

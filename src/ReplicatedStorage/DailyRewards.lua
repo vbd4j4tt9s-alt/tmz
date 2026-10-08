@@ -5,6 +5,9 @@ local D={}
 -- One week of login rewards: one claim per day; after day 7 the week starts again at day 1.
 -- R153 (owner): quests and login packs are rolled like the treadmill bonus roll; day 7 is a normal Void Pack (it was a Mech pack).
 D.Login={{SeedPack=1},{SeedPack=1},{SeedPack=1},{SeedPack=1},{Gems=2},{Gems=3},{VoidPack=1}}
+-- R153 (review L4): true = the day-7 Void Pack can't be gifted (an alt logging in 7 days could pass a free Void Pack to a main account; the lock follows it into its seed, plant and fruit,
+-- like the free giveaway's). The owner sets false to allow gifting it. Only an exact false turns the lock off.
+D.LockDay7Void=true
 D.SeedPackStages={1,2,3,4,5,6,7}
 D.SeedPackVariants={Pack01=true,Pack02=true,Pack03=true,Pack04=true,Pack05=true,Pack06=true}
 -- false: a missed day only pauses the week (you continue where you left off). true: a missed day restarts it at day 1.

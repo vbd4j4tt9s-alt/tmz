@@ -13,6 +13,62 @@ local function startupFailure(message)
 		startupPhase, debug.traceback(tostring(message), 2))
 end
 
+-- BEGIN STARTUP_GUARD_153
+-- R153 (architecture review; owner: "if a server fails just kick them out"): a server that did not start does not run a game, so it must not keep players waiting on a half-built
+-- one. The SERVER decides (no client is asked or trusted): when ChestChaseStartupState reads "Failed", or is still not "Ready" after STARTUP_TIMEOUT seconds, every player is kicked
+-- with a short message and so is everybody who joins afterwards, so the broken server empties and Roblox closes it. In Studio nobody is kicked: the reason is warned in the Output and
+-- the same message is shown on screen (StartupNotice153 shows the ChestChaseStartupNotice attribute), so the owner can debug.
+-- A healthy start takes seconds: every wait in the boot path is a bounded WaitForChild or a loop that runs in its own thread (the hub displays, the social service, the free Void Pack pedestal ...),
+-- and the asset loads (trampolines, hub trees) are spawned. STARTUP_TIMEOUT is 90 s, far above that, so a slow but healthy start is never kicked.
+local STARTUP_TIMEOUT = 90
+local STARTUP_KICK_TEXT = "this server broke while loading 😭 pls rejoin"
+local function guardStartup()
+	local RunService = game:GetService("RunService")
+	task.spawn(function()
+		local waited = 0 -- seconds waited so far: summed from what task.wait really waited (wall time; os.clock may count CPU time, which does not advance while the boot sits in a yield)
+		local reason
+		while reason == nil do
+			local state = ReplicatedStorage:GetAttribute("ChestChaseStartupState")
+			if state == "Ready" then return end -- a healthy start: the guard ends here and never kicks anyone
+			if state == "Failed" then
+				reason = tostring(ReplicatedStorage:GetAttribute("ChestChaseStartupError") or "the start-up failed")
+			elseif waited >= STARTUP_TIMEOUT then
+				reason = string.format("this server was still not ready after %d s (stuck while: %s)", STARTUP_TIMEOUT, startupPhase)
+			else
+				waited += task.wait(1) or 1
+			end
+		end
+		warn("[R153] THIS SERVER DID NOT START: " .. reason)
+		if RunService:IsStudio() then
+			-- Studio: no kick. The message goes on screen (and stays until the Output is read); a start that was only slow clears it when it finishes after all.
+			local firstLine = string.sub(string.match(reason, "^[^\n]*"), 1, 160)
+			ReplicatedStorage:SetAttribute("ChestChaseStartupNotice", STARTUP_KICK_TEXT .. "\n(Studio: not kicking. " .. firstLine .. ")")
+			while ReplicatedStorage:GetAttribute("ChestChaseStartupState") == "Starting" do
+				task.wait(1)
+				if ReplicatedStorage:GetAttribute("ChestChaseStartupState") == "Ready" then
+					ReplicatedStorage:SetAttribute("ChestChaseStartupNotice", nil)
+					warn("[R153] The server finished starting after all (it was only slow).")
+				end
+			end
+			return
+		end
+		-- Live: stay failed for good (main must not mark Ready later), kick everybody now and everybody who joins later.
+		ReplicatedStorage:SetAttribute("ChestChaseStartupState", "Failed")
+		if ReplicatedStorage:GetAttribute("ChestChaseStartupError") == nil then ReplicatedStorage:SetAttribute("ChestChaseStartupError", reason) end
+		local kicked = setmetatable({}, { __mode = "k" }) -- (each player once: a Kick that worked is not repeated every sweep; one that errored is tried again)
+		local function kick(player)
+			if kicked[player] then return end
+			if pcall(function() player:Kick(STARTUP_KICK_TEXT) end) then kicked[player] = true end
+		end
+		Players.PlayerAdded:Connect(kick)
+		while true do
+			for _, player in ipairs(Players:GetPlayers()) do kick(player) end
+			task.wait(2)
+		end
+	end)
+end
+-- END STARTUP_GUARD_153
+
 local function runServer()
 	-- This check precedes shared status writes, so a duplicate cannot overwrite a
 	-- running server's Ready status. Disable duplicates manually; do not delete data.
@@ -28,6 +84,7 @@ local function runServer()
 	script:SetAttribute("ChestChaseBootstrap",true)
 	ReplicatedStorage:SetAttribute("ChestChaseStartupState","Starting")
 	ReplicatedStorage:SetAttribute("ChestChaseStartupError",nil)
+	do local okGuard,guardError = pcall(guardStartup);if not okGuard then warn("[R153] The start-up guard could not start: "..tostring(guardError)) end end
 
 	local modules = script.Parent:WaitForChild("ChestChaseServer", 10)
 	assert(modules and modules:IsA("Folder"),
@@ -170,6 +227,16 @@ local function runServer()
 	treadmillBonus:Start()
 	-- R123: owner test commands reach these services through the chase service (ctx.Chase).
 	chaseService.TrackHoles=trackHoles;chaseService.Gifts=gifts;chaseService.TreadmillBonus=treadmillBonus;chaseService.Mystery=mystery;chaseService.Verity=verity;chaseService.HubDisplays=hubDisplays
+	-- BEGIN OWNER_TOOLS_START_153
+	-- R153 (architecture review): the owner / test commands start here, last, in their own thread and inside a pcall. They used to start inside ChaseService:Start, so an error anywhere in
+	-- the most-edited test file (or a hang on a missing module) stopped ChaseService, and with it the whole server. Now a failure is a warning and the game runs without the commands.
+	task.spawn(function()
+		local okTools, toolsError = pcall(function()
+			require(modules.StudioTestCommands).Start(Config, playerData, chestService, chaseService, baseService, notifications, mapService)
+		end)
+		if not okTools then warn("[R153] Owner test commands failed to start (the game runs without them): " .. tostring(toolsError)) end
+	end)
+	-- END OWNER_TOOLS_START_153
 	startupPhase = "starting autosave and resetting field"
 	playerData:StartAutosave()
 	mapService:ResetCourse()
@@ -266,6 +333,10 @@ local function runServer()
 	-- callback, so it runs beside the profile saves (Shutdown reads gardens that are finalizing, never yields them).
 	game:BindToClose(function()social:Shutdown(Players:GetPlayers())end)
 
+	if ReplicatedStorage:GetAttribute("ChestChaseStartupState") == "Failed" then
+		warn("[R153] This server was already marked failed (the start-up guard gave up on it): it stays failed.")
+		return
+	end
 	ReplicatedStorage:SetAttribute("ChestChaseStartupState","Ready")
 	print(string.format("[%s] PASS - ChestChaseServerMain started; gameplay config %s.",
 		STARTUP_VERSION,tostring(Config.Version)))

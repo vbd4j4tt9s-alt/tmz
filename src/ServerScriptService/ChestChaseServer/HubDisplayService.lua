@@ -419,11 +419,21 @@ function S:Start()
  self:_syncDay() -- (the first day: sets the fruit board up and shows its display)
  self:_syncWindow() -- (R153: the first window: shows the pull display, empty)
  if not self.Opts.NoLoop then
+  -- R153 (review hardening): one bad value in a pass (the sleep, the day, the pull window, a display) is warned and the next pass still runs; the loop is what moves the BEST PULL window
+  -- on and the shared boards, so it must never end. A failed pass waits a few seconds so a value that stays bad can't spin; the warning repeats now and then, not every pass.
   task.spawn(function()
+   local failures=0
    while not self.Dead do
-    task.wait(self:SleepSeconds())
-    if self.Dead then break end
-    self:Step()
+    local ok,err=pcall(function()
+     task.wait(self:SleepSeconds())
+     if self.Dead then return end
+     self:Step()
+    end)
+    if not ok then
+     failures+=1
+     if failures==1 or failures%12==0 then warn('[R153] Hub displays: a loop pass failed ('..failures..' so far; it keeps going): '..tostring(err))end
+     task.wait(5)
+    end
    end
   end)
  end

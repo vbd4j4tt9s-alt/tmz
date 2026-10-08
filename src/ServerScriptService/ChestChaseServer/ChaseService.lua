@@ -1666,10 +1666,7 @@ end
 
 -- V087_CONCURRENT_KEEPERS
 ChaseService=require(script.Parent:WaitForChild("ConcurrentKeeperService"))(ChaseService)
-local startV142=ChaseService.Start
-function ChaseService:Start(...)
- startV142(self,...)
- require(script.Parent:WaitForChild('StudioTestCommands')).Start(self.Config,self.PlayerData,self.Chests,self,self.Bases,self.Notifications,self.Map)
-end
+-- R153 (architecture review): the owner / test commands no longer start from here (they used to, without a pcall, so an error in the most-edited test file stopped ChaseService:Start
+-- and with it the whole server). ChestChaseServerMain starts them after the game is up, inside a pcall.
 return ChaseService
 	
