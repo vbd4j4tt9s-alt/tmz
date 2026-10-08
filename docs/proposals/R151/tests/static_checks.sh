@@ -41,11 +41,11 @@ echo "ok: TEST packs, seed grants, gifts, the mystery pedestal, bonus rolls and 
 grep -q "PackMutation=coat,TestGrant=true," "$SS/StudioTestCommands.lua" || fail "/test pack and /test seed(s) must set TestGrant on the record (R152: seeds too)"
 grep -q "TestGrant=true" "$SS/RarePackTests.lua" || fail "/test rarepacks must set TestGrant on every pack record"
 [ "$(grep -c "{TestGrant=true})" "$SS/OwnerUpdateCommands82.lua")" = 1 ] || fail "packset / eclipse (void) / verity must call AddChest with {TestGrant=true} (one AddChest line serves all three)"
-for source in Mystery Daily Bonus; do
+for source in Mystery Daily DailyQuest Bonus; do # R153: the login pack ('Daily') and a quest pack ('DailyQuest') have their own arms
  grep -q "TestPacks.Arm(p,'$source'" "$SS/OwnerUpdateCommands82.lua" || fail "the $source owner commands must arm OwnerTestPacks"
 done
 grep -q "OwnerTestPacks).Claim(player,'Mystery'" "$SS/MysteryPackService.lua" || fail "MysteryPackService must Claim the Mystery arm when it adds the pack"
-grep -q "OwnerTestPacks).Claim(player,'Daily'" "$SS/DailyProgress.lua" || fail "DailyProgress must Claim the Daily arm when it adds the pack"
+grep -q "OwnerTestPacks).Claim(player,source=='DailyQuest'and'DailyQuest'or'Daily'" "$SS/DailyProgress.lua" || fail "DailyProgress must Claim the Daily (login pack) or DailyQuest (quest pack) arm when it adds the pack"
 grep -q "OwnerTestPacks).Claim(player,'Bonus'" "$SS/TreadmillBonusService.lua" || fail "TreadmillBonusService must Claim the Bonus arm when it adds the pack"
 grep -q "TestGrant=self.Forced==true" "$SS/VeiledEvent81.lua" && grep -q "self.Forced=force==true" "$SS/VeiledEvent81.lua" || fail "an owner-forced event must mark its world packs (TestGrant)"
 grep -q "seed.TestGrant == true then record.TestGrant = true" "$SS/ChestService.lua" || fail "ChestService:Bank must hand a world pack's TestGrant to the pack record"

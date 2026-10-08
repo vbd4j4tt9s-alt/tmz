@@ -127,12 +127,12 @@ local before=#Data:GetChestRecords(A);local rollsAtDay7=rolledPacks
 local o7,m7,i7=Data:ClaimDailyLogin(A)
 local voidPack;local voids,mechs=0,0;for _,r in ipairs(Data:GetChestRecords(A))do if r.BagVariant=='EclipseReliquary'then voidPack=r;voids+=1 elseif r.BagVariant=='MechLimited'then mechs+=1 end end
 check(o7 and i7.Day==7 and i7.Reward.VoidPack==1 and #Data:GetChestRecords(A)==before+1 and voidPack and voids==1 and mechs==0 and voidPack.Stage==7,'day 7: exactly one Void Pack (stage 7) in the Bag, no Mech pack ('..tostring(m7)..')')
-check(voidPack and not voidPack.PaidRandom and voidPack.GiftLocked==nil and voidPack.TestGrant==nil and voidPack.PackMutation=='None'and voidPack.OddsVersion==Rules.OddsVersion and sizeOk[voidPack.PackSize]==true,'a normal Void Pack: free, not gift-locked, not a test pack, a rolled size, the current odds')
+check(voidPack and not voidPack.PaidRandom and voidPack.GiftLocked==true and voidPack.TestGrant==nil and voidPack.PackMutation=='None'and voidPack.OddsVersion==Rules.OddsVersion and sizeOk[voidPack.PackSize]==true,'a real Void Pack: free, gift-locked (R153 review L4: DailyRewards.LockDay7Void), not a test pack, a rolled size, the current odds')
 check(tostring(m7):find('VOID PACK',1,true)~=nil and rolledPacks==rollsAtDay7,'the claim says VOID PACK and rolls no random pack (no bonus-roll pick)')
 local giveawayPack=W.module('VoidGiveawayRules152').Pack
-check(voidPack.BagVariant==giveawayPack.BagVariant and voidPack.Stage==giveawayPack.Stage and voidPack.Kind=='Pack','it is the same pack the Void giveaway hands out (stage 7 EclipseReliquary), just not gift-locked')
+check(voidPack.BagVariant==giveawayPack.BagVariant and voidPack.Stage==giveawayPack.Stage and voidPack.Kind=='Pack','it is the same pack the Void giveaway hands out (stage 7 EclipseReliquary), and, like it, gift-locked (R153 review L4)')
 check(Data:CheckVoidPack(A,voidPack.Id)==voidPack,'it is a real Void Pack: Verity can take it (CheckVoidPack finds it)')
-local conv=Data:ConvertVoidPack(A,voidPack.Id);check(conv and conv.BagVariant=='VerityReliquary'and conv.GiftLocked==nil,'... and turns it into a Verity pack that is not gift-locked either')
+local conv=Data:ConvertVoidPack(A,voidPack.Id);check(conv and conv.BagVariant=='VerityReliquary'and conv.GiftLocked==true,'... and turns it into a Verity pack that keeps the lock')
 check(#Data:GetChestRecords(A)==before+1,'(still one pack in the Bag)')
 local again7,again7why=Data:ClaimDailyLogin(A);check(not again7 and tostring(again7why):find('TOMORROW',1,true)and #Data:GetChestRecords(A)==before+1,'a player who claimed day 7 keeps what they got: no second pack the same day ('..tostring(again7why)..')')
 do local st7=D.ReadLogin({Step=7,Day=D.Day(R.clock)});local ls=D.LoginStatus(st7,D.Day(R.clock));local nx=D.LoginStatus(st7,D.Day(R.clock)+1)

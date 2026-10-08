@@ -127,10 +127,11 @@ mutate "a pack is given when the store failed" $SV "  if not ok then
    if outcome~='backoff'then" server
 mutate "the giveaway pack is not GiftLocked" $SV ";pack.GiftLocked=true" "" server
 mutate "AddChest drops the lock" ServerScriptService/ChestChaseServer/PlayerDataService.lua "        GiftLocked = chest.GiftLocked == true or nil," "" real
-mutate "a save drops the lock" ServerScriptService/ChestChaseServer/PlayerDataService.lua "            GiftLocked=(chestRecord.Kind==\"Pack\" and chestRecord.GiftLocked==true) or nil," "" real
-mutate "a load drops the lock" ServerScriptService/ChestChaseServer/PlayerDataService.lua "                GiftLocked=(savedChest.Kind==\"Pack\" and savedChest.GiftLocked==true) or nil," "" real
+mutate "a save drops the lock" ServerScriptService/ChestChaseServer/PlayerDataService.lua "            GiftLocked=chestRecord.GiftLocked==true or nil," "" real
+mutate "a load drops the lock" ServerScriptService/ChestChaseServer/PlayerDataService.lua "                GiftLocked=savedChest.GiftLocked==true or nil," "" real
+mutate "an open drops the lock (R153 review M2)" ServerScriptService/ChestChaseServer/PlayerDataService.lua "            GiftLocked=pack.GiftLocked==true or nil, -- R153" "            GiftLocked=nil, -- R153" real
 mutate "Verity drops the lock" ServerScriptService/ChestChaseServer/PlayerDataService.lua "			GiftLocked = pack.GiftLocked == true or nil," "" real
-mutate "the lock is not exactly true" ServerScriptService/ChestChaseServer/PlayerDataService.lua "GiftLocked=(savedChest.Kind==\"Pack\" and savedChest.GiftLocked==true) or nil" "GiftLocked=savedChest.GiftLocked" real
+mutate "the lock is not exactly true" ServerScriptService/ChestChaseServer/PlayerDataService.lua "GiftLocked=savedChest.GiftLocked==true or nil" "GiftLocked=savedChest.GiftLocked" real
 mutate "the account age rule is never checked" $SV " if not owed and minAge>0 and" " if false and" server
 mutate "the account age rule is on by default" $RU "R.MinAccountAgeDays=0" "R.MinAccountAgeDays=7" server
 mutate "claims ignore the store's backoff" $ST " if self.Mode~='Memory'and self.Clock()<self.NextTryAt then return false,'backoff'" " if false then return false,'backoff'" server

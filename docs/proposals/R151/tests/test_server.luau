@@ -467,8 +467,11 @@ do
  check(claimed2==true and#packs2==1 and packs2[1].BagVariant=='EclipseReliquary'and packs2[1].TestGrant==nil,'the next day 7 Void pack (no command) is a normal pack')
  local _,loudCount=openAll(Ann);settle(waitFor('King')+1)
  check(loudCount==1 and#ofKind(sinkLog,'Pull')>=1,'... and opening it IS announced (Void seeds are Secret and above)')
- -- daily done (finishes the quests) arms nothing
- TestPacks.Disarm(Ann,'Daily');command(Ann,'/test daily done');check(not TestPacks.Armed(Ann,'Daily'),'/test daily done (R153: quests pay normal packs; the owner\'s TestGrant rule is untouched) arms nothing')
+ -- daily done (finishes the quests): R153 review M1: the quest packs it makes claimable are TEST packs too, on their own arm (the login pack's 'Daily' arm is not touched)
+ TestPacks.Disarm(Ann,'Daily');TestPacks.Disarm(Ann,'DailyQuest');emptyBag(Ann);command(Ann,'/test daily done')
+ check(not TestPacks.Armed(Ann,'Daily')and TestPacks.Armed(Ann,'DailyQuest'),'/test daily done arms the quest packs (DailyQuest), not the login pack (Daily)')
+ local q=Data:ClaimDailyQuest(Ann,1);local qp=packsOf(Ann)
+ check(q==true and#qp==1 and qp[1].TestGrant==true,'... the quest pack it made claimable carries TestGrant')
  unwatch();emptyBag(Ann)
 end
 do

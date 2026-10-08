@@ -297,10 +297,12 @@ function Config.GetWalkSpeed(speedStat)
  return require(game:GetService('ReplicatedStorage').Progression81).Speed(speedStat)
 end
 
+local function ownerTestSpeed(player)return require(script.Parent.OwnerTestState82).GetSpeed(player)end -- (a named function: this runs on every walk speed lookup, no closure per call)
 function Config.GetPlayerWalkSpeed(player,speedStat)
     -- Server-private owner overrides leave saved training points unchanged.
-    local temporary=require(script.Parent.OwnerTestState82).GetSpeed(player)
-    if temporary then return temporary end
+    -- R153: a broken owner test module can never break walking: a failure means "no test override" (the real speed below)
+    local okTest,temporary=pcall(ownerTestSpeed,player)
+    if okTest and temporary then return temporary end
     local override=player and player:GetAttribute('StudioMovementSpeedOverride')
     if game:GetService('RunService'):IsStudio()and type(override)=='number'and override==override and math.abs(override)<math.huge then
         return math.clamp(override,Config.BaseWalkSpeed,500)

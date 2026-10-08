@@ -445,7 +445,11 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         if pack.Kind ~= "Pack" then return nil, "U ALREADY OPENED THIS PACK!" end
         if pack.PaidRandom and player:GetAttribute('PaidRandomAllowed')~=true then return nil,'THIS BOUGHT PACK DOESN\'T WORK ON THIS ACCOUNT' end
         local seed, rarity = PackRules.Roll(self.Config,pack.Stage,unitRoll,player:GetAttribute("ChestLuckMultiplier"),pack.BagVariant,pack.OddsVersion,pack.RateBoost)
-        local testSeed=require(script.Parent.RarePackTests).Expected(self,player,pack.Id)
+        local testSeed=nil
+        do -- R153: the owner's guaranteed-reveal test hook can never break a real open: a failure means "no test override"
+            local okTest,expected=pcall(function()return require(script.Parent.RarePackTests).Expected(self,player,pack.Id)end)
+            if okTest then testSeed=expected else warn("[R153] RarePackTests.Expected failed (the pack opens normally): "..tostring(expected)) end
+        end
         local luckTest=self:HasTestLuck(player) -- R152: the luck comes from owner-given boots (/test boots): a TEST open, like an owner-made pack (its seed is a TEST seed too)
         if testSeed then seed=self.Config.GetSeedById(testSeed);rarity=PackRules.GetRarity(testSeed)end
         if not seed then return nil, "REJOIN TO OPEN THIS PACK!" end
@@ -458,6 +462,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
             BagVariant=PackRules.VariantKey(pack.BagVariant),OddsVersion=pack.OddsVersion,
             PackSize=PackRules.SanitizePackSize(pack.PackSize),PackMutation=PackRules.MutationKey(pack.PackMutation),Weather=Weather.Key(pack.Weather),WeatherCheckedEvent=Weather.CheckedEvent(pack.WeatherCheckedEvent),
             TestGrant=(pack.TestGrant==true or luckTest) or nil, -- R152: the seed of a TEST open is a TEST seed (the fruit it grows never counts for the hub / announcements)
+            GiftLocked=pack.GiftLocked==true or nil, -- R153 (review M2): the seed of a gift-locked pack (the free giveaway's, the day-7 login Void Pack) is gift-locked too; PlantRules.NewCrop hands it on to the plant and its fruit
         }
         records[index] = reward
         self:_gardenChanged(player)
@@ -861,7 +866,7 @@ function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNu
                 PaidRandom=savedChest.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(savedChest.RateBoost),
                 TestGrant=savedChest.TestGrant==true or nil, -- R151 (optional; an older server drops it); R152: on a Seed record too (an owner-given seed, or the seed of a TEST opening)
                 PackShape=savedPackShape(savedChest), -- R151 (optional chip-bag shape 1-6; absent / anything else = the default shape)
-                GiftLocked=(savedChest.Kind=="Pack" and savedChest.GiftLocked==true) or nil, -- R152 (optional; an R151 server drops it)
+                GiftLocked=savedChest.GiftLocked==true or nil, -- R152 (optional; an R151 server drops it); R153: on a Seed row as well (a seed opened from a gift-locked pack)
                 BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=PackRules.ValidOddsVersion(savedChest.OddsVersion)and savedChest.OddsVersion or nil, -- R137: 81, 112 and 137 all load
             PackSize=PackRules.SanitizePackSize(savedChest.PackSize),PackMutation=PackRules.MutationKey(savedChest.PackMutation),Weather=Weather.Key(savedChest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(savedChest.WeatherCheckedEvent),
                 SeedScale = PackRules.SanitizeSeedScale(savedChest.SeedScale),
@@ -1212,7 +1217,7 @@ function PlayerDataService:SerializeSeedRecord(chestRecord)
             PaidRandom=chestRecord.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(chestRecord.RateBoost),
             TestGrant=chestRecord.TestGrant==true or nil, -- R151 (optional; an older server drops it); R152: Seed records too
             PackShape=savedPackShape(chestRecord), -- R151 (optional chip-bag shape 1-6)
-            GiftLocked=(chestRecord.Kind=="Pack" and chestRecord.GiftLocked==true) or nil, -- R152 (optional; an R151 server drops it)
+            GiftLocked=chestRecord.GiftLocked==true or nil, -- R152 (optional; an R151 server drops it); R153: Seed records too (an R152 server drops it from a seed)
             BagVariant = PackRules.VariantKey(chestRecord.BagVariant),OddsVersion=chestRecord.OddsVersion,
             PackSize=PackRules.SanitizePackSize(chestRecord.PackSize),PackMutation=PackRules.MutationKey(chestRecord.PackMutation),Weather=Weather.Key(chestRecord.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chestRecord.WeatherCheckedEvent),
             SeedScale = PackRules.SanitizeSeedScale(chestRecord.SeedScale),

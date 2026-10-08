@@ -279,14 +279,14 @@ do
  local told=lastFor(A)
  check(accepts==0,'R152: OfferSeed refuses it before any offer is made ('..accepts..' offers reached Accept)')
  check(find(A,free.Id)~=nil and find(B,free.Id)==nil and freeTool.Parent==A.Character,'R152: OfferSeed refuses a GiftLocked pack: the giver keeps it (and still holds it)')
- check(told and told.Action=='Status'and told.Text=="Free giveaway packs can't be gifted",'R152: ... with a short clear notice ('..tostring(told and told.Text)..')')
+ check(told and told.Action=='Status'and told.Text=="Free Void Packs can't be gifted",'R152: ... with a short clear notice ('..tostring(told and told.Text)..')')
  local outbox1=0;for _ in pairs(Data.Gardens[A].OutgoingSeedGifts or{})do outbox1+=1 end
  check(outbox1==outbox0 and seedRecords(A)==beforeA and seedRecords(B)==beforeB,'R152: ... nothing staged, nothing moved')
  -- an offer that already exists (made before the pack was locked, or forged): AcceptSeed refuses too
  local before=#fired;local offerId='locked-offer-1'
  Gifts.Offers[offerId]={From=A,To=B,ItemId=free.Id,Kind='Seed',Expires=math.huge}
  task2.spawn(function()Gifts:Accept(B,offerId)end);advance(5)
- local refusal;for i=before+1,#fired do if fired[i].P==A and fired[i].Text=="Free giveaway packs can't be gifted"then refusal=fired[i]end end
+ local refusal;for i=before+1,#fired do if fired[i].P==A and fired[i].Text=="Free Void Packs can't be gifted"then refusal=fired[i]end end
  check(find(A,free.Id)~=nil and find(B,free.Id)==nil and refusal~=nil,'R152: AcceptSeed refuses a GiftLocked pack too (same notice to the giver)')
  check(seedRecords(A)==beforeA and seedRecords(B)==beforeB and Gifts.Offers[offerId]==nil,'R152: ... nothing moved, the offer is gone')
  -- an ordinary Void pack (the track\'s) is still a gift, and arrives unlocked

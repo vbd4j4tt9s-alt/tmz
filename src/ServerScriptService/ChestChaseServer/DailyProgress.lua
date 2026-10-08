@@ -2,6 +2,8 @@
 -- claim markers commit without yielding, using existing inventory/currency APIs.
 -- R140 claimed quests retain their flags and count as 5 gems for today's cap (R141: 2; see DailyRewards.ReadQuests).
 -- R153: a quest claim grants ONE pack (GrantDailyPack) and the all-done bonus (ClaimDailyBonus) is the only quest Gems: 2 a day.
+-- R153 (review M1 / L4): every daily pack goes through OwnerTestPacks.Claim with its OWN source ('Daily' = the login pack, 'DailyQuest' = a quest pack), so a pack that an owner
+-- "daily" command made claimable is a TEST pack whichever claim comes first; the day-7 login Void Pack is GiftLocked unless DailyRewards.LockDay7Void is false (alt farming).
 local RS=game:GetService('ReplicatedStorage')
 local D=require(RS.DailyRewards)
 local PackRules=require(RS.SeedPackRules)
@@ -36,17 +38,19 @@ function T.Attach(Data)
   if not okay then warn('[R141 daily gems] '..tostring(result));return false,'COULDN\'T ADD THE GEMS! TRY AGAIN'end
   return false,why or 'COULDN\'T ADD THE GEMS! TRY AGAIN'
  end
- -- kind: nil = a random pack (R153: the bonus roll's), 'Void' = the login week's day 7 (R153: a normal Void Pack), true / 'Mech' = a Mech pack (no daily reward gives one any more).
- function Data:GrantDailyPack(player,kind)
+ -- kind: nil = a random pack (R153: the bonus roll's), 'Void' = the login week's day 7 (R153: a Void Pack), true / 'Mech' = a Mech pack (no daily reward gives one any more).
+ -- source: which owner-test arm this claim may use up: 'Daily' (a login pack, the default) or 'DailyQuest' (a quest pack; ClaimDailyQuest passes it).
+ function Data:GrantDailyPack(player,kind,source)
   local mech=kind==true or kind=='Mech';local void=kind=='Void'
   local records=self:GetChestRecords(player);local before=#records
   if before>=self.Config.MaxSavedChests then return nil,'MAKE ROOM FOR 1 PACK FIRST!'end
   local pack
   if void then
    -- R153 (owner: "change the mech pack to void pack for day 7"): a real Void Pack (stage 7 EclipseReliquary, as the Darkened's and the bonus roll's Void result): a rolled size with the
-   -- size pity, a normal giftable pack (no GiftLocked: that is only the free giveaway's); the Bag room was checked above, like every claim.
+   -- size pity; the Bag room was checked above, like every claim. R153 (review L4): it is GiftLocked like the free giveaway's Void Pack (an alt logging in 7 days could gift one to a
+   -- main account); DailyRewards.LockDay7Void = false lets it be gifted. Missing / anything but false = locked. The lock follows the pack into its seed, plant and fruit (PlayerDataService).
    if type(self.Config.SeedCatalogByStage)~='table'or not self.Config.SeedCatalogByStage[BonusRules.Void.Stage]then return nil,'DAILY PACKS AREN\'T READY YET'end
-   pack={Stage=BonusRules.Void.Stage,BagVariant=BonusRules.Void.Variant,PackSize=PackRules.RollPackSize(PackRandom:NextNumber()),PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion}
+   pack={Stage=BonusRules.Void.Stage,BagVariant=BonusRules.Void.Variant,PackSize=PackRules.RollPackSize(PackRandom:NextNumber()),PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion,GiftLocked=D.LockDay7Void~=false or nil}
   elseif not mech then
    -- R153: the treadmill bonus roll's pool (the best treadmill's biomes) and odds, its size roll and its size pity (Luck), like TreadmillBonusService:Roll
    local stages=BonusRules.PoolStages(self.Config.TreadmillTiers,self:GetTreadmillData(player).Tier)
@@ -63,7 +67,7 @@ function T.Attach(Data)
   local expectedVariant=mech and 'MechLimited'or pack.BagVariant
   if #records==before+1 and type(added)=='table'and type(added.Id)=='string'and added.Kind=='Pack'and added.Stage==expectedStage and added.BagVariant==expectedVariant then
    -- Inventory is the commit point, including a throw in a later display hook.
-   pcall(function()require(script.Parent.OwnerTestPacks).Claim(player,'Daily',added)end) -- R151: a login pack that an owner "daily" command made claimable is a TEST pack (never announced)
+   pcall(function()require(script.Parent.OwnerTestPacks).Claim(player,source=='DailyQuest'and'DailyQuest'or'Daily',added)end) -- R151: a pack that an owner "daily" command made claimable is a TEST pack (never announced); R153: the login pack and a quest pack have their own arms
    return added
   end
   if not okay then warn('[R141 daily pack] '..tostring(result));return nil,'COULDN\'T ADD THE PACK! TRY AGAIN'end
@@ -123,7 +127,7 @@ function T.Attach(Data)
   if quests.Claimed[index]then return false,'U ALREADY CLAIMED THIS!'end
   if quests.Progress[index]<D.Quests[quests.Keys[index]].Goal then return false,'FINISH THE QUEST FIRST'end
   -- R153: the reward is one random pack. A full Bag refuses it (nothing is lost, the quest stays claimable); the pack in the Bag is the commit point.
-  local record,why=self:GrantDailyPack(player,false);if not record then return false,why end
+  local record,why=self:GrantDailyPack(player,false,'DailyQuest');if not record then return false,why end
   daily.Quests.Claimed[index]=true
   self:MarkDirty(player);self:QueueGardenSave(player);self:PublishDaily(player)
   if D.BonusReady(select(2,self:DailyData(player)))then return true,'🎒 RANDOM SEED PACK! Now grab ur 💎'..D.AllDoneGems..' bonus!'end

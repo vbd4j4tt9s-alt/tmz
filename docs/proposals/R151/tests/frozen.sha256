@@ -1,9 +1,11 @@
-58d0043a10de2a17b41f9a7623e8db80d0a8b1f072c007fdbbe39550a568288e  src/ServerScriptService/ChestChaseServer/Config.lua
+# R153 (on purpose): Config.lua GetPlayerWalkSpeed asks the owner test state (OwnerTestState82) inside a pcall: a failing test module means "no override", never a broken walk speed (nothing else changed)
+c321d60b268b9c538d0d290e21524dcf43969adcd9f3a6075ee8efe0dbdd1a1a  src/ServerScriptService/ChestChaseServer/Config.lua
 052c0df01f4e131396996df31a2e3a64d2be1aa3dafa3172e2dc59b66eeab696  src/ReplicatedStorage/EconomyBalance90.lua
 e0056ebd12983a74ddd20e3393286862f3da4faeb8f0bba0e3d5cd9d28ff6afb  src/ReplicatedStorage/EconomyScaling91.lua
 b9dbf155ff24c0f63fa3189165814a71d18797b97b8e28b21c296d254be5438b  src/ReplicatedStorage/ItemWeight.lua
 # R153 (on purpose): DailyRewards.lua changed: quest = one random pack, ALL DONE = 2 Gems, reward version 153, login day 7 = a Void Pack (the login days 1-6 and their numbers are as they were)
-eb2feaf4f83e742edea89e30b0c90bd5e9ae749c82aa04c7abbc208687875ffe  src/ReplicatedStorage/DailyRewards.lua
+# R153 (on purpose, again): DailyRewards.lua gained the switch LockDay7Void (true: the day-7 login Void Pack is GiftLocked like the free giveaway's; false lets the owner allow gifting it); no number or reward changed
+7b49c9bd5c6f478eac85cafb05cc3e6352fa23caeba2ceb61b6eb523a5fcf7ae  src/ReplicatedStorage/DailyRewards.lua
 be7b27efe3f7450e5b27d4a97aa9ef00adc4ace48e143abb8830aad03c0a0806  src/ReplicatedStorage/PackOdds81.lua
 cd5596076060f0421ded9368e2d9fdea2ab7090296cfe6a01d6d314a42199b52  src/ReplicatedStorage/PackOdds112.lua
 cd8c19bedf3b73805b4c01522adb2d68fcd48803db7093b72a8056083a0ca1cb  src/ReplicatedStorage/PackOdds137.lua

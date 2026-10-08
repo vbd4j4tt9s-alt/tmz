@@ -20,7 +20,8 @@ function R.NewCrop(seed,id,definition,now,x,z)
   MatureAt=now+definition.Seconds,Value=definition.Value,OffsetX=x,OffsetZ=z,
   PaidRandom=seed.PaidRandom==true,SeedScale=size,PlantScale=R.PlantScale(size,R.Roll(seed.Id,'plant-size')),
   Mutation=R.Mutation(seed.PackMutation),Weather=Weather.Key(seed.Weather),HarvestCycle=0,PickedMask=0,TraitVersion=1,
-  TestGrant=seed.TestGrant==true or nil} -- R152: a plant from an owner-given seed stays a TEST plant (optional, kept with the crop and its harvests: its fruit never counts for the hub)
+  TestGrant=seed.TestGrant==true or nil, -- R152: a plant from an owner-given seed stays a TEST plant (optional, kept with the crop and its harvests: its fruit never counts for the hub)
+  GiftLocked=seed.GiftLocked==true or nil} -- R153 (review M2): a plant from a gift-locked seed (the free giveaway's, the day-7 login Void Pack) is gift-locked; so is every fruit it gives (HarvestPlant clones the crop), and FruitGiftService refuses it (optional, like TestGrant)
 end
 function R.Migrate(crop)
  if crop.TraitVersion==nil then

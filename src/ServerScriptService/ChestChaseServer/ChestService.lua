@@ -1135,7 +1135,8 @@ function ChestService:_createPackTool(record,backpack)
     local tool=Instance.new("Tool")
     tool.Name=PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)
     tool.ToolTip=PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation).." • Click / tap / RT 5 times to open"
-    local expected=require(script.Parent.RarePackTests).Expected(self.PlayerData,player,record.Id)
+    local okTest,expected=pcall(function()return require(script.Parent.RarePackTests).Expected(self.PlayerData,player,record.Id)end) -- R153: a broken owner test hook means "no test override", never a missing pack tool
+    if not okTest then warn("[R153] RarePackTests.Expected failed (the pack tool is the normal one): "..tostring(expected));expected=nil end
     if expected then
         local rarity=PackRules.GetRarity(expected);tool.Name='TEST '..rarity..' Pack'
         tool.ToolTip='Guaranteed '..rarity..' reveal • Click / tap / RT 5 times to open'
