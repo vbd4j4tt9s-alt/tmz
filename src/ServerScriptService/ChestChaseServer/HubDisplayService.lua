@@ -1,22 +1,27 @@
 -- R151 (owner: "best pull today" and "biggest fruit" displays in the hub's two empty corners, across all servers, with the champion's avatar beside a giant model):
--- the server half. What it does:
+-- the server half. R153 (owner: "make the best pull of the day refresh every 10 minutes and its a local server only thing to increase performance"): BEST PULL is this server's own
+-- board now, emptied at every wall-clock 10-minute mark (:00, :10, :20 ...: HubDisplayRules.PullWindowIndex of os.time()); it never touches the shared store or any other server
+-- (no MemoryStore, no saves, no MessagingService, nothing kept past the window). BIGGEST FRUIT is as it was: shared, daily. What it does:
 --  * Counts every real thing the server decides: a pack opened (PlayerDataService:OpenSeedPack calls NotePull with the reward and the pack it came from) and a fruit
 --    picked by hand (ChestService's garden Harvest calls NoteHarvest). Not counted: TEST packs (/test rarepacks), anything an owner command just gave that player
 --    (NoteOwnerGrant: the rest of that session; R152: and for good, what carries TestGrant: packs, seeds and the plants grown from them, pulls with owner-given boots), the owner's injected test pulls / fruit (they only ever show on this server).
---  * Keeps this server's view of today's two boards (HubDisplayBoard): the shared store's best (Remote), this server's own best (Local) and an injected one (Test). The
---    displays always show the best of the three. Everything an event does here is instant and local; the shared store (HubDisplayStore, MemoryStore) is written about 3 s
+--  * Keeps this server's view of the two boards (HubDisplayBoard): the shared store's best (Remote: the fruit's only), this server's own best (Local) and an injected one (Test). The
+--    displays always show the best of the three. Everything an event does here is instant and local; the FRUIT's shared store (HubDisplayStore, MemoryStore) is written about 3 s
 --    later (compare-and-set: only if better) and read about once a minute (45 s + 0..15 s of jitter), so the other servers' champions arrive within a minute. If the store
---    fails the server keeps its own board and keeps trying (the store backs off; see HubDisplayStore).
+--    fails the server keeps its own board and keeps trying (the store backs off; see HubDisplayStore). The PULL board has no Remote and no store: a pull is counted here, shown here, and
+--    gone at the next window.
 --  * Shows them: HubDisplayArt builds the two pedestals (the Fruit of the Hour's, bigger) in the hub's empty back corners; on a change this writes the words, the colours, a new showcase item
 --    and the champion's avatar (HubDisplayAvatar: 25 studs tall, made ready to dance: Animate; R153: each client plays the dance), each built once per champion (a generation number drops a build
 --    that a newer champion overtook; R153: a new record of the SAME champion keeps the avatar that stands there, so its dance goes on), and bumps the display's `Rev` attribute so every
 --    client pops it. R153: each client tells how the dance went on its screen (ChestChaseRemotes.HubDisplayAvatarReport -> NoteReport), shown by the owner's `/test hubdisplays`. When someone takes the top spot in THIS server it is announced in CHAT, through PullAnnouncer.Announce({Kind='Record', ...}) (the owner: pull announcements
---    only in chat): who hears it is PullAnnounceRules.RecordScope (a Secret+ best pull every server, Legendary / Mythic this server, lower nothing; a fruit record this server);
+--    only in chat): who hears it is PullAnnounceRules.RecordScope (R153: a best pull Legendary or better in THIS server, never another one, lower nothing; a fruit record this server);
 --    a record that comes from a pack open waits until the puller's reveal has shown the seed (AfterReveal), like the pull line; there is no notice banner of its own any more (it
 --    would be a second message). The celebration chime (a Remote the client plays GemClaim for) goes out in step with the line. An owner's test (bestpull / bigfruit) is told to its
 --    target only, and nothing is announced while previewing another day.
---  * UTC midnight (the daily rewards' day) clears both boards; the fruit of the day is HubDisplayRules.FruitForDay.
--- No per-frame work: one loop wakes every 5 s, does a few integer comparisons, and only touches MemoryStore when a timer is due.
+--  * UTC midnight (the daily rewards' day) clears the FRUIT board; the fruit of the day is HubDisplayRules.FruitForDay. R153: the wall-clock 10-minute mark clears the PULL board (Step /
+--    NotePull look at os.time(); the loop wakes just after the mark, SleepSeconds): the display goes back to its empty state (the black silhouette, a mystery seed, 'Nobody yet') and the
+--    champion's rig is destroyed with it, so every client drops its dance track (HubDisplayClient). A window that opens on an already empty board changes only the countdown.
+-- No per-frame work: one loop wakes every 5 s (and once at each window mark), does a few integer comparisons, and only touches MemoryStore (the fruit's) when a timer is due.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage')
 local Rules=require(RS:WaitForChild('HubDisplayRules'))
 local PackRules=require(RS:WaitForChild('SeedPackRules'))
@@ -28,6 +33,7 @@ local S={};S.__index=S
 S.LoopSeconds=5
 S.RemoteName='HubDisplayCelebrate'
 local KINDS={'Pull','Fruit'}
+local SHARED={'Fruit'} -- (R153: the boards that go through the shared store. BEST PULL is this server's alone.)
 local function guard(label,fn,...)
  local ok,result=pcall(fn,...)
  if not ok then warn('[R151] '..label..': '..tostring(result))end
@@ -41,7 +47,7 @@ function S.new(config,data,notes,map,opts)
  local self=setmetatable({Config=config,Data=data,Notes=notes,Map=map,Clock=clock,Time=opts.Time or os.time,Opts=opts,Art=opts.Art or Art,
   Board=Board.new(),Store=opts.Store or Store.new({Clock=clock}),Avatars=opts.Avatars or Avatar.new({Clock=clock}),
   Displays={},DayOffset=0,Tainted=setmetatable({},{__mode='k'}),Shown={Pull=nil,Fruit=nil},Gen={Pull=0,Fruit=0},Rev={Pull=0,Fruit=0},
-  NextPoll=0,NextWrite=0,Blocked={Pull=0,Fruit=0},LastNotice={Pull=-1e9,Fruit=-1e9},Events={Pull=0,Fruit=0},Dead=false,Built={Pull=nil,Fruit=nil},
+  NextPoll=0,NextWrite=0,Blocked={Fruit=0},LastNotice={Pull=-1e9,Fruit=-1e9},Events={Pull=0,Fruit=0},Dead=false,Built={Pull=nil,Fruit=nil},
   Random=opts.Random or Random.new()},S)
  self.Announce=opts.Announce or function(spec)
   local ok,announcer=pcall(require,script.Parent.PullAnnouncer)
@@ -68,36 +74,80 @@ function S:FruitName(id)
  return Rules.FruitLabel(id,def and def.HarvestName or id)
 end
 -- Day ------------------------------------------------------------------------------------------------------------------------------------------------------
--- Moves to today if the UTC day (or the preview offset) changed: both boards start empty, the fruit of the day is picked. Returns true when it changed.
+-- Moves to today if the UTC day (or the preview offset) changed: the FRUIT board starts empty, the fruit of the day is picked. Returns true when it changed. (R153: the pull board is not
+-- the day's: see _syncWindow.)
 function S:_syncDay()
  local day=self:Day();local fruit=self:FruitId(day)
  if not self.Board:SetDay(day,fruit)then return false end
- self.Shown={Pull=nil,Fruit=nil}
+ self.Shown.Fruit=nil
  self.NextPoll=self.Clock() -- (read the shared board for the new day at the next step)
- self.Blocked={Pull=0,Fruit=0}
- for _,kind in ipairs(KINDS)do self:_refresh(kind)end
+ self.Blocked={Fruit=0}
+ self:_refresh('Fruit')
  return true
+end
+-- Window (R153) --------------------------------------------------------------------------------------------------------------------------------------------
+-- BEST PULL's clock is the real wall clock (os.time(), never the previewed day): the window number is os.time() // PullWindow, so every server's windows start at the same :00 / :10 / :20.
+function S:Window()return Rules.PullWindowIndex(self.Time())end
+-- Moves to the current window if it changed: the pull board is emptied (all of it: this server's best and an injected test pull) and the display goes back to its empty state. A board
+-- that was already empty has nothing to rebuild (no new rig, item or sign): only its countdown moves on. Returns true when the window changed.
+function S:_syncWindow()
+ if not self.Board:SetWindow(self:Window())then return false end
+ if not self:_refresh('Pull')then self:_restamp('Pull')end
+ return true
+end
+-- Seconds the loop sleeps: LoopSeconds, or less to wake just after the next window mark (PullSecondsLeft is at least 1, so never a busy loop).
+function S:SleepSeconds()
+ local left=Rules.PullSecondsLeft(self.Time())
+ return math.min(S.LoopSeconds,left)
 end
 -- Showing --------------------------------------------------------------------------------------------------------------------------------------------------
 -- The display of a board shows its champion (or the empty state). Does nothing when what it shows is already right. The words and colours change at once; the showcase item and
 -- the avatar are built in a task of their own (yields: meshes, the avatar service, the dance loading) and dropped if a newer champion arrived meanwhile.
+-- The clock of a display: seconds to its next board and the server time of it (what each client counts down to). R153: BEST PULL's is its window (real time, whatever day is being
+-- previewed); BIGGEST FRUIT's is the UTC day, as ever.
+function S:_clock(kind)
+ if kind=='Pull'then
+  local real=math.floor(self.Time())
+  return Rules.PullSecondsLeft(real),Rules.PullWindowEnd(real)
+ end
+ local now=self:Now()
+ return Rules.SecondsLeft(now),Rules.NextAt(self.Board.Day or Rules.Day(now))-self.DayOffset*86400
+end
+function S:_text(kind,rec)
+ local fruitId=self.Board.FruitId
+ local left=self:_clock(kind)
+ local text=Rules.SignText(kind,rec,fruitId,left,kind=='Fruit'and fruitId and self:FruitName(fruitId)or nil)
+ if kind=='Fruit'and fruitId then text.Accent=Rules.RarityColor(PackRules.SeedRarityById[fruitId]or'Common')end
+ return text
+end
+-- The countdown's two attributes (the client counts down to NextAt, in the footer's words).
+function S:_stamp(kind)
+ local d=self.Displays[kind];if not d then return end
+ local _,nextAt=self:_clock(kind)
+ d.Model:SetAttribute('FooterPrefix',Rules.FooterPrefix(kind))
+ d.Model:SetAttribute('NextAt',nextAt)
+end
+-- A new window on a board that is empty before and after: nothing to build, only the countdown (its attributes and the words the server wrote on the label). No Rev bump, no pop.
+function S:_restamp(kind)
+ local d=self.Displays[kind];if not d then return end
+ guard('sign',self.Art.SetSign,d,self:_text(kind,self.Board:Best(kind)))
+ self:_stamp(kind)
+end
 function S:_refresh(kind,force)
  local d=self.Displays[kind];if not d then return false end
  local rec=self.Board:Best(kind)
  local fruitId=self.Board.FruitId
- local key=Rules.Key(rec)..'|'..tostring(kind=='Fruit'and fruitId or'')..'|'..tostring(self.Board.Day)
+ -- (R153: a pull's identity is the pull alone: not the day, not the window, so an empty board that stays empty across windows is not rebuilt)
+ local key=kind=='Pull'and Rules.Key(rec)or(Rules.Key(rec)..'|'..tostring(fruitId or'')..'|'..tostring(self.Board.Day))
  if key==self.Shown[kind]and not force then return false end
  self.Shown[kind]=key
  self.Gen[kind]+=1;local gen=self.Gen[kind]
- local now=self:Now()
- local text=Rules.SignText(kind,rec,fruitId,Rules.SecondsLeft(now),kind=='Fruit'and fruitId and self:FruitName(fruitId)or nil)
- if kind=='Fruit'and fruitId then text.Accent=Rules.RarityColor(PackRules.SeedRarityById[fruitId]or'Common')end
+ local text=self:_text(kind,rec)
  guard('sign',self.Art.SetSign,d,text)
  local calm=kind=='Pull'and rec==nil
  guard('tint',self.Art.Tint,d,text.Accent,calm and'Empty'or'Ready')
  local m=d.Model
- m:SetAttribute('FooterPrefix',kind=='Pull'and'New board in 'or'New fruit in ')
- m:SetAttribute('NextAt',Rules.NextAt(self.Board.Day or Rules.Day(now))-self.DayOffset*86400)
+ self:_stamp(kind)
  m:SetAttribute('FruitId',fruitId);m:SetAttribute('Champion',rec and rec.Name or nil);m:SetAttribute('ChampionUserId',rec and rec.Uid or nil)
  m:SetAttribute('Rarity',rec and rec.Rarity or nil)
  self.Rev[kind]+=1;m:SetAttribute('Rev',self.Rev[kind]) -- (last: the client reads the rest when this changes)
@@ -207,7 +257,7 @@ function S:NotePull(player,reward,info)
  info=type(info)=='table'and info or{}
  if info.Test==true then return false,'test pack'end
  if self.Tainted[player]then return false,'owner-granted'end
- self:_syncDay()
+ self:_syncWindow() -- (R153: a pull that comes right after a window mark is the new window's first, even before the loop has noticed the mark)
  local odds
  local ok,table_=pcall(PackRules.SeedOdds,self.Config,info.Stage,info.Variant,info.Luck,info.Version,info.Boost)
  if ok and type(table_)=='table'then odds=table_[reward.SeedId]end
@@ -277,13 +327,13 @@ function S:_celebrate(kind,rec,wait,only)
  if type(wait)=='number'and wait>0 then task.delay(wait,fire)else fire()end
 end
 -- Shared store -----------------------------------------------------------------------------------------------------------------------------------------------
+-- (R153: the shared store is BIGGEST FRUIT's alone: everything below reads, writes and merges the fruit. BEST PULL never comes through here.)
 function S:_preview()return self.DayOffset~=0 end
 -- Merges a store document into the board; refreshes what changed. Returns true when something did.
 function S:_merge(doc)
  local changed=false
- if self.Board:MergeRemote('Pull',doc.pull)then changed=true end
  if self.Board:MergeRemote('Fruit',doc.fruit)then changed=true end
- for _,kind in ipairs(KINDS)do self:_refresh(kind)end
+ self:_refresh('Fruit')
  return changed
 end
 function S:_poll()
@@ -298,15 +348,15 @@ function S:_poll()
 end
 function S:_needsWrite()
  local now=self.Clock()
- for _,kind in ipairs(KINDS)do if self.Board:Unsynced(kind)and now>=self.Blocked[kind]then return true end end
+ for _,kind in ipairs(SHARED)do if self.Board:Unsynced(kind)and now>=self.Blocked[kind]then return true end end
  return false
 end
--- Writes this server's better records (one per board, compare-and-set) and takes in the answer.
+-- Writes this server's better records (one per shared board, compare-and-set) and takes in the answer.
 function S:_push()
  if self:_preview()then return false end
  local now=self.Clock();self.NextWrite=now+Rules.WriteGap
  local wrote=false
- for _,kind in ipairs(KINDS)do
+ for _,kind in ipairs(SHARED)do
   if self.Board:Unsynced(kind)and now>=self.Blocked[kind]then
    local rec=self.Board:LocalBest(kind)
    local ok,doc,_,foreign=self.Store:Merge(self.Board.Day,kind,rec,self.Board.FruitId)
@@ -324,10 +374,11 @@ function S:_push()
  end
  return wrote
 end
--- One pass of the loop (the tests call it with a fake clock): the day, a due write, a due read.
+-- One pass of the loop (the tests call it with a fake clock): the day, the pull window, a due write, a due read.
 function S:Step()
  if self.Dead then return end
  self:_syncDay()
+ self:_syncWindow() -- (R153: before the preview check: the pull board has nothing to do with a previewed day)
  if self:_preview()then return end
  local now=self.Clock()
  if now>=self.NextWrite and self:_needsWrite()then guard('write',self._push,self)end
@@ -365,11 +416,12 @@ function S:Start()
   pcall(function()self.ReportConnection=report.OnServerEvent:Connect(function(player,info)if not self.Dead then pcall(self.NoteReport,self,player,info)end end)end)
  end
  self.NextPoll=self.Clock()+Rules.FirstPollDelay
- self:_syncDay() -- (the first day: sets the boards up and shows both displays)
+ self:_syncDay() -- (the first day: sets the fruit board up and shows its display)
+ self:_syncWindow() -- (R153: the first window: shows the pull display, empty)
  if not self.Opts.NoLoop then
   task.spawn(function()
    while not self.Dead do
-    task.wait(S.LoopSeconds)
+    task.wait(self:SleepSeconds())
     if self.Dead then break end
     self:Step()
    end
@@ -393,12 +445,12 @@ function S:FindSeed(query)
  end
  return nil
 end
--- A test pull for `player` (nobody opened a pack): the seed's chance (which ranks it) is its odds in its biome's Pack03 (Verity: the Verity pack); the words say its fixed 1/N (R153). Shown on this server only unless
--- share = true (then it is written to the shared store like a real one: use it to test MemoryStore, and `hubdisplays reset` afterwards).
-function S:InjectPull(player,seedQuery,share)
+-- A test pull for `player` (nobody opened a pack): the seed's chance (which ranks it) is its odds in its biome's Pack03 (Verity: the Verity pack); the words say its fixed 1/N (R153). Shown on this
+-- server only, and only until this window ends (R153: BEST PULL is never shared, so there is no `share` for it any more).
+function S:InjectPull(player,seedQuery)
  local spec=self:FindSeed(seedQuery)
  if not spec then return false,'Unknown seed. Use a seed id or plant name (/test catalog lists them).'end
- self:_syncDay()
+ self:_syncWindow()
  local rarity=PackRules.SeedRarityById[spec.id]or spec.rarity
  local odds
  pcall(function()
@@ -407,11 +459,11 @@ function S:InjectPull(player,seedQuery,share)
   odds=PackRules.SeedOdds(self.Config,stage,variant,1,PackRules.OddsVersion)[spec.id]
  end)
  if type(odds)~='number'or odds<=0 then local style=PackRules.Rarities[rarity];odds=style and style.Weight or 1 end
- local rec=Rules.CleanPull({Uid=player.UserId,Name=player.DisplayName,Id=spec.id,Seed=Rules.SeedLabel(spec.id,spec.name),Rarity=rarity,Odds=odds,Scale=1,Coat='None',At=self:Now(),Test=not share})
+ local rec=Rules.CleanPull({Uid=player.UserId,Name=player.DisplayName,Id=spec.id,Seed=Rules.SeedLabel(spec.id,spec.name),Rarity=rarity,Odds=odds,Scale=1,Coat='None',At=self:Now(),Test=true})
  if not rec then return false,'Could not make that pull.'end
  local ok,result=self:_event('Pull',rec,{Player=player,Injected=true})
- if not ok then return false,'Not better than what this server already holds for today.'end
- return true,('%s: %s %s, %s%s'):format(player.Name,rec.Rarity,rec.Seed,Rules.PullOddsText(rec),share and' (shared)'or' (this server only)')..(result=='took'and''or' - recorded, but someone\'s is better')
+ if not ok then return false,'Not better than what this server already holds in this window.'end
+ return true,('%s: %s %s, %s (this server only, until the board resets in %s)'):format(player.Name,rec.Rarity,rec.Seed,Rules.PullOddsText(rec),Rules.WindowCountdown(Rules.PullSecondsLeft(self.Time())))..(result=='took'and''or' - recorded, but someone\'s is better')
 end
 -- A test fruit of today's type weighing `kg` (the size is kg over the plant's base weight; the fruit size limit is 50). coat: 'Gold' | 'Diamond' | nil.
 function S:InjectFruit(player,kg,coat,share)
@@ -426,8 +478,8 @@ function S:InjectFruit(player,kg,coat,share)
  if not ok then return false,'Not heavier than what this server already holds for today.'end
  return true,('%s: %s %s, %s%s'):format(player.Name,rec.Coat~='None'and rec.Coat..' 'or'',self:FruitName(id),Rules.KgText(rec.Kg),share and' (shared)'or' (this server only)')..(result=='took'and''or' - recorded, but someone\'s is heavier')
 end
--- Clears today's boards on this server and, unless previewing another day, the shared document (every other server still holds its own best and writes it back at its next
--- step: reset them too, or restart them).
+-- Clears the boards on this server (R153: BEST PULL's is this server's alone, so that is all there is to it) and, unless previewing another day, the fruit's shared document (every other server
+-- still holds its own best fruit and writes it back at its next step: reset them too, or restart them).
 function S:Reset()
  self.Board:Clear();self.Shown={Pull=nil,Fruit=nil}
  self.Tainted=setmetatable({},{__mode='k'})
@@ -439,14 +491,15 @@ end
 -- Previews another day on this server only: `offset` days from today (0 = back to today). No shared reads or writes while it is not 0.
 function S:SetDayOffset(offset)
  self.DayOffset=math.clamp(math.floor(tonumber(offset)or 0),-400,400)
- self.Shown={Pull=nil,Fruit=nil}
+ self.Shown.Fruit=nil -- (R153: BEST PULL does not care which day is previewed: its board and its window stay)
  self.Board.Day=nil;self.Board.FruitId=nil
  self:_syncDay()
  return self.DayOffset
 end
 -- The state, for `/test hubdisplays` and the tests.
 function S:Snapshot()
- local out={Day=self.Board.Day,FruitId=self.Board.FruitId,DayOffset=self.DayOffset,Rev=table.clone(self.Rev),Store=self.Store:Status()}
+ local real=math.floor(self.Time())
+ local out={Day=self.Board.Day,FruitId=self.Board.FruitId,DayOffset=self.DayOffset,Rev=table.clone(self.Rev),Store=self.Store:Status(),Window=self.Board.Window,PullSecondsLeft=Rules.PullSecondsLeft(real)}
  for _,kind in ipairs(KINDS)do
   local rec,source=self.Board:Best(kind)
   out[kind]={Record=rec,Source=source,Unsynced=self.Board:Unsynced(kind),Events=self.Events[kind]}
@@ -456,14 +509,16 @@ end
 function S:StatusText(player) -- (player: the owner who asked; their own screen's dance is told)
  local snap=self:Snapshot();local lines={}
  local fruit=snap.FruitId and self:FruitName(snap.FruitId)or'(none)'
- lines[#lines+1]=('Day %s%s | fruit of the day: %s | new board in %s'):format(tostring(snap.Day),snap.DayOffset~=0 and(' (preview '..string.format('%+d',snap.DayOffset)..')')or'',fruit,Rules.Countdown(Rules.SecondsLeft(self:Now())))
+ lines[#lines+1]=('Day %s%s | fruit of the day: %s | new fruit in %s'):format(tostring(snap.Day),snap.DayOffset~=0 and(' (preview '..string.format('%+d',snap.DayOffset)..')')or'',fruit,Rules.Countdown(Rules.SecondsLeft(self:Now())))
  local p=snap.Pull
- lines[#lines+1]=p.Record and('BEST PULL: %s - %s %s, %s (%s%s)'):format(p.Record.Name,p.Record.Rarity,p.Record.Seed,Rules.PullOddsText(p.Record),p.Source,p.Unsynced and', not shared yet'or'')or'BEST PULL: nobody yet'
+ -- R153: BEST PULL is this server's alone and lasts one 10-minute window (the real clock, whatever day is previewed)
+ local windowText=('this server only | new board in %s'):format(Rules.WindowCountdown(snap.PullSecondsLeft))
+ lines[#lines+1]=p.Record and('BEST PULL: %s - %s %s, %s (%s) | %s'):format(p.Record.Name,p.Record.Rarity,p.Record.Seed,Rules.PullOddsText(p.Record),p.Source,windowText)or('BEST PULL: nobody yet | '..windowText)
  local f=snap.Fruit
  lines[#lines+1]=f.Record and('BIGGEST FRUIT: %s - %s%s (%s%s%s)'):format(f.Record.Name,Rules.KgText(f.Record.Kg),f.Record.Coat~='None'and(' '..f.Record.Coat)or'',f.Source,f.Unsynced and', not shared yet'or'',self.Board.Boards.Fruit.Foreign and', not shared: other servers have another fruit today'or'')or'BIGGEST FRUIT: nobody yet'
  local st=snap.Store
  lines[#lines+1]=self:_preview()and'Shared board: off while previewing another day'
-  or('Shared board: %s, %d request%s, %s'):format(st.Failures==0 and'ok'or('FAILING x'..st.Failures..(st.Throttled and' (throttled)'or'')),st.Requests,st.Requests==1 and''or's',st.LastError and('last error: '..st.LastError..'; retry in '..math.ceil(st.RetryIn)..' s')or(st.LastOk and'last ok'or'not read yet'))
+  or('Shared board (BIGGEST FRUIT only): %s, %d request%s, %s'):format(st.Failures==0 and'ok'or('FAILING x'..st.Failures..(st.Throttled and' (throttled)'or'')),st.Requests,st.Requests==1 and''or's',st.LastError and('last error: '..st.LastError..'; retry in '..math.ceil(st.RetryIn)..' s')or(st.LastOk and'last ok'or'not read yet'))
  for _,kind in ipairs(KINDS)do
   local d=self.Displays[kind]
   if d then local n=self.Art.Counts(d);lines[#lines+1]=('%s display: %d pedestal parts, %d item parts, %d avatar parts (%s) | %s'):format(kind,n.Frame,n.Item,n.Avatar,tostring(self.AvatarSource and self.AvatarSource[kind]or'-'),self:_danceText(kind,typeof(player)=='Instance'and player or nil))end

@@ -1,13 +1,17 @@
 --!nocheck
--- R151 hub displays: the pure rules (HubDisplayRules, HubDisplayBoard) with the REAL game modules (SeedPackRules, ItemWeight, PlantCatalog, DailyRewards ...):
+-- R151 hub displays: the pure rules (HubDisplayRules, HubDisplayBoard) with the REAL game modules (SeedPackRules, ItemWeight, PlantCatalog, DailyRewards ...).
+-- R153 (owner: "make the best pull of the day refresh every 10 minutes and its a local server only thing to increase performance"): BEST PULL is per server and per wall-clock
+-- 10-minute window: sections 2b / 3 / 5 / 6 below test the window numbers and the clock text, the pull board that has no store form, no Remote and no Unsynced, and the words with no "today".
 --  1. ranking: every tie-break of BEST PULL (rarity rank, then the smaller chance, then the heavier seed, then the earlier pull, then the user id, then the seed id) and of
 --     BIGGEST FRUIT (kg, earlier, user id), strictness (never both ways), transitivity, and one winner whatever the order the records arrive in; the real game's ranks
 --     (Common ... King, the Verity seed, the Mech seeds);
---  2. records: Clean* refuses bad fields, recomputes rank and weight, StorePull / CleanPull round-trip, names are short and printable;
---  3. the day: DailyRewards.Day / the midnight edge, countdown text, NextAt;
+--  2. records: Clean* refuses bad fields, recomputes rank and weight, names are short and printable; R153: a pull has no store form, the shared document holds the fruit only (a `pull`
+--     an older server wrote is ignored);
+--  3. the day: DailyRewards.Day / the midnight edge, countdown text, NextAt; R153: the pull window (os.time() // 600, the wall-clock :00 / :10 / :20), "7:42", the footer words per board;
 --  4. the fruit of the day: eligible list (harvestable, not retired, not limited-time, weighted), deterministic, any `n` consecutive days all different, never two days in a row,
 --     period n (no repeat for n days), the step is coprime with n, a plant without a meaningful weight is skipped;
---  5. the board: slots, Offer results, remote merge, unsynced, day change;
+--  5. the board: slots, Offer results, remote merge, unsynced, day change; R153: the pull board has no Remote and is never Unsynced, a new window empties it (every slot) and only it,
+--     a new day empties the fruit board and only it;
 --  6. texts and the words: notices, the label's rows (R153: one big label, no plaque; champion / empty, both boards: the title, the winner, the seed / weight, the rarity and chance /
 --     the fruit of the day, the countdown; its size: readable from 150 studs, never more than a third of the screen up close), every
 --     fruit title and every pull line fits its row at a readable size, the stand's numbers (a 25 stud avatar, the reserved corner).
@@ -117,21 +121,25 @@ do
  check(pull({Name=string.rep('W',60)}).Name==string.rep('W',24)and utf8.len(pull({Name=string.rep('é',40)}).Name)==24,'a name is at most 24 characters (counted as UTF-8)')
  check(pull({Name=''}).Name=='Player'and pull({Name=5}).Name=='Player'and pull({Name='\xff\xfe'}).Name=='Player','no usable name reads as "Player"')
  check(pull({Test=true}).Test==true and pull().Test==false,'the Test flag is kept as a boolean')
- local stored=Rules.StorePull(good)
- local keys=0;for _ in pairs(stored)do keys+=1 end
- check(keys==9 and stored.Rank==nil and stored.Kg==nil and stored.Test==nil,'what is stored is nine plain fields (no rank, no kg, no Test flag)')
- check(Rules.Key(Rules.CleanPull(stored))==Rules.Key(good),'a record survives the store round trip with the same key')
+ check(Rules.StorePull==nil,'R153: a pull has no store form any more (it is never stored or sent)')
+ -- what an older server (R151 / R152) wrote into the shared document: nine plain fields. It still cleans as a pull (CleanPull), and nothing here ever reads it
+ local stored={Uid=1,Name='A',Id='FirePepperSeed',Seed='Fire Pepper',Rarity='Mythic',Odds=.125,Scale=1,Coat='None',At=1000}
+ check(Rules.Key(Rules.CleanPull(stored))==Rules.Key(good),'a pull cleans the same from its plain fields (CleanPull keeps its key)')
  local fr=fruit()
  check(fr and fr.Kg>0 and fr.Weather=='None','a good fruit cleans')
  check(fruit({Scale=0})==nil and fruit({Scale=0/0})==nil and fruit({Scale=-1})==nil and fruit({Scale='3'})==nil and fruit({Id=''})==nil and fruit({At='x'})==nil,'a bad fruit is refused')
  check(fruit({Scale=1e6}).Scale<=50 and fruit({Weather='Bogus'}).Weather=='None'and fruit({Weather='Drippy'}).Weather=='Drippy','a huge size is capped, an unknown weather reads as none')
  check(Rules.Key(Rules.CleanFruit(Rules.StoreFruit(fr)))==Rules.Key(fr),'a fruit survives the store round trip')
  local doc=Rules.StoreDoc({pull=good,fruit=fr})
- check(doc.v==1 and doc.pull and doc.fruit,'a document is {v, pull, fruit}')
+ local docKeys=0;for _ in pairs(doc)do docKeys+=1 end
+ check(doc.v==1 and doc.fruit and doc.pull==nil and docKeys==2,'R153: a document is {v, fruit} (a pull handed to StoreDoc is never written)')
  local clean=Rules.CleanDoc({v=1,pull={Rarity='Bogus'},fruit='junk'})
  check(next(clean)==nil and next(Rules.CleanDoc(nil))==nil and next(Rules.CleanDoc(5))==nil,'a document with unusable parts keeps none of them')
- local half=Rules.CleanDoc({v=1,pull=stored,fruit={Id='x'}})
- check(half.pull and not half.fruit,'a usable part stays when the other is junk')
+ local old=Rules.CleanDoc({v=1,pull=stored,fruit=Rules.StoreFruit(fr)})
+ check(old.pull==nil and old.fruit and Rules.Key(old.fruit)==Rules.Key(fr),'R153: a usable `pull` left by an older server is ignored (not read, not kept); the fruit next to it stays')
+ check(Rules.CleanDoc({v=1,pull=stored}).pull==nil and next(Rules.CleanDoc({v=1,pull=stored}))==nil,'a document with only an old pull reads as empty (no migration)')
+ check(Rules.StoreDoc(Rules.CleanDoc({v=1,pull=stored,fruit=Rules.StoreFruit(fr)})).pull==nil,'and writing it back drops the old pull')
+ check(Rules.StoreDoc({}).fruit==nil and Rules.StoreDoc({}).v==1,'an empty document is just {v=1}')
 end
 
 -- 3. The day -------------------------------------------------------------------------------------------------------------------------------------------------
@@ -143,6 +151,33 @@ do
  check(Rules.NextAt(20000)==20001*86400 and Rules.NextAt(Rules.Day(20000*86400+5))-(20000*86400+5)==Rules.SecondsLeft(20000*86400+5),'NextAt is the next midnight, consistent with SecondsLeft')
  check(Rules.Countdown(18720)=='5h 12m'and Rules.Countdown(3600)=='1h 0m'and Rules.Countdown(3599)=='59m 59s'and Rules.Countdown(750)=='12m 30s'and Rules.Countdown(45)=='45s'and Rules.Countdown(0)=='0s','countdown text: 5h 12m, 12m 30s, 45s')
  check(Rules.Countdown(-5)=='0s'and Rules.Countdown(0/0)=='0s'and Rules.Countdown(nil)=='0s'and Rules.Countdown(86400)=='24h 0m','countdown text survives a negative, NaN or missing number')
+end
+
+-- 3b. R153: the pull windows -----------------------------------------------------------------------------------------------------------------------------------
+do
+ check(Rules.PullWindow==600,'a window is 10 minutes (600 s)')
+ check(Rules.PullWindowIndex(0)==0 and Rules.PullWindowIndex(599)==0 and Rules.PullWindowIndex(600)==1 and Rules.PullWindowIndex(1199)==1 and Rules.PullWindowIndex(1200)==2,'the window number is os.time() // 600: it turns over at :00, :10, :20 ...')
+ local T=20727*86400+3*3600 -- 03:00:00 UTC
+ check(Rules.PullWindowIndex(T)~=Rules.PullWindowIndex(T-1)and Rules.PullWindowIndex(T+599)==Rules.PullWindowIndex(T)and Rules.PullWindowIndex(T+600)==Rules.PullWindowIndex(T)+1,'03:00:00 starts a window; 03:09:59 is still in it; 03:10:00 starts the next')
+ local aligned,consistent,range=true,true,true
+ for _,t in ipairs({0,1,59,60,599,600,601,1799,1800,86399,86400,T,T+1,T+137,T+599,T+600,1.7e9,1.7e9+1,1.78e9+299,1.78e9+300,1.78e9+301})do
+  local fin=Rules.PullWindowEnd(t);local left=Rules.PullSecondsLeft(t)
+  if fin%600~=0 or fin<=t then aligned=false end
+  if math.floor(t)+left~=fin then consistent=false end
+  if left<1 or left>600 then range=false end
+ end
+ check(aligned,'the window ends on a multiple of 600 s (the wall-clock :00 / :10 / :20 ...), always after t')
+ check(consistent and range,'seconds left = the end - t, between 1 and 600 (never 0: the board has reset by the time it would read 0:00)')
+ check(Rules.PullSecondsLeft(T)==600 and Rules.PullSecondsLeft(T+599)==1 and Rules.PullSecondsLeft(T+137)==463 and Rules.PullSecondsLeft(T+137.9)==463,'600 at the first second, 1 at the last, 463 left at 03:02:17 (a fraction of a second changes nothing)')
+ -- every server that reads the same os.time() agrees, whatever else it does (nothing but the clock goes in)
+ check(Rules.PullWindowIndex(T+250)==Rules.PullWindowIndex(T+250.4)and Rules.PullWindowEnd(T+250)==T+600,'a window is the same for everyone')
+ check(Rules.PullWindowIndex(nil)==0 and Rules.PullWindowIndex('x')==0 and Rules.PullWindowIndex(0/0)==0 and Rules.PullWindowIndex(math.huge)==0 and Rules.PullSecondsLeft(nil)==600 and Rules.PullWindowEnd(0/0)==600,'a bad time reads as 0 (never an error)')
+ -- the clock text
+ check(Rules.WindowCountdown(462)=='7:42'and Rules.WindowCountdown(600)=='10:00'and Rules.WindowCountdown(61)=='1:01'and Rules.WindowCountdown(60)=='1:00'and Rules.WindowCountdown(59)=='0:59'and Rules.WindowCountdown(1)=='0:01'and Rules.WindowCountdown(0)=='0:00','the countdown reads minutes and seconds: 7:42, 10:00, 1:01, 0:59')
+ check(Rules.WindowCountdown(-5)=='0:00'and Rules.WindowCountdown(0/0)=='0:00'and Rules.WindowCountdown(nil)=='0:00'and Rules.WindowCountdown('9')=='0:00'and Rules.WindowCountdown(601)=='10:00'and Rules.WindowCountdown(1e9)=='10:00'and Rules.WindowCountdown(462.9)=='7:42','it survives a negative, NaN or missing number, is never above the window\'s 10:00 and drops a fraction')
+ check(Rules.FooterPrefix('Pull')=='new board in 'and Rules.FooterPrefix('Fruit')=='New fruit in ','the footer words: "new board in " for the pull board, "New fruit in " for the fruit (as it was)')
+ check(Rules.FooterCountdown('Pull',462)=='7:42'and Rules.FooterCountdown('Fruit',18720)=='5h 12m'and Rules.FooterCountdown('Fruit',750)==Rules.Countdown(750)and Rules.FooterCountdown('Fruit',45)=='45s','the pull board counts like "7:42"; the fruit board counts as it did ("5h 12m", "12m 30s", "45s")')
+ check(Rules.FooterCountdown(nil,462)==Rules.Countdown(462),'any other kind is the day\'s clock')
 end
 
 -- 4. The fruit of the day --------------------------------------------------------------------------------------------------------------------------------------
@@ -217,48 +252,60 @@ do
  local b=Board.new()
  check(b:Best('Pull')==nil and not b:Unsynced('Pull')and b:Best('Bogus')==nil and b:Offer('Bogus',{})=='ignored','a new board is empty; an unknown kind is ignored')
  check(b:SetDay(100,'SunflowerSeed')and not b:SetDay(100,'SunflowerSeed')and b:SetDay(100,'AppleSeed')and b:SetDay(101,'AppleSeed'),'SetDay says whether the day or the fruit changed')
+ check(b:SetWindow(7)and not b:SetWindow(7)and b:SetWindow(8)and b.Window==8,'R153: SetWindow says whether the pull window changed')
  local p1=pull({At=10})
  check(b:Offer('Pull',p1)=='took'and b:Best('Pull')==p1,'the first pull takes the spot')
  local source;_,source=b:Best('Pull');check(source=='Local','it came from this server')
- check(b:Unsynced('Pull'),'a Local record better than the shared one needs writing')
+ check(not b:Unsynced('Pull'),'R153: a pull is never "unsynced": BEST PULL is this server\'s alone, nothing is written anywhere')
  local worse=pull({Rarity='Rare',Odds=5,At=11})
  check(b:Offer('Pull',worse)=='ignored','a worse pull than this server\'s own best is ignored')
- check(b:MergeRemote('Pull',pull({Rarity='Secret',Odds=.01,At=20,Uid=2}))and b:Best('Pull').Rarity=='Secret','a better shared record becomes the champion')
- _,source=b:Best('Pull');check(source=='Remote','and says it came from the store')
- check(not b:Unsynced('Pull'),'our record is not better than the shared one: nothing to write')
- check(b:Offer('Pull',pull({Rarity='Mythic',Odds=.1,At=30}))=='kept'and b:Best('Pull').Rarity=='Secret','a pull better than our own but worse than the shared one is "kept" (recorded), not shown')
- check(b:Offer('Pull',pull({Rarity='King',Odds=1e-9,At=31}))=='took'and b:Unsynced('Pull'),'a better one takes the spot again and needs writing')
- check(b:MergeRemote('Pull',b:Best('Pull'))==true,'a store answer that differs from the last one says so (the display refreshes)')
- local sameRemote=pull({Rarity='King',Odds=1e-9,At=31})
- check(b:MergeRemote('Pull',sameRemote)==false,'the same store answer again changes nothing (nothing to refresh)')
- check(not b:Unsynced('Pull'),'once the store holds an equal record there is nothing left to write')
+ check(b:Offer('Pull',pull({Rarity='Mythic',Odds=.1,At=12}))=='took'and b:Best('Pull').Odds==.1,'a better pull in the window replaces the record (a rarer chance in the same rarity)')
+ check(b:Offer('Pull',pull({Rarity='Secret',Odds=.01,At=20,Uid=2}))=='took'and b:Best('Pull').Rarity=='Secret'and b:Best('Pull').Uid==2,'and a higher rarity replaces it again, whoever pulled it')
+ -- R153: the pull board takes nothing from a store
+ check(b:MergeRemote('Pull',pull({Rarity='King',Odds=1e-9,At=21,Uid=3}))==false and b:Best('Pull').Rarity=='Secret','R153: MergeRemote ignores the pull board (a shared record, from a store or an older server, never becomes the champion)')
+ check(b.Boards.Pull.Remote==nil and not b:Unsynced('Pull'),'it has no Remote and still needs no write')
  local t=pull({Rarity='King',Odds=1e-12,At=5,Test=true,Uid=3})
  check(b:Offer('Pull',t)=='took'and b:Best('Pull')==t,'an injected test pull shows')
  _,source=b:Best('Pull');check(source=='Test','from the Test slot')
- check(not b:Unsynced('Pull')or b:LocalBest('Pull')~=t,'and is never "unsynced": a test record is never written to the store')
  b:ClearLocal()
- check(b:Best('Pull').Rarity=='King'and b:LocalBest('Pull')==nil,'ClearLocal forgets this server\'s own and the test records; the store\'s stays')
- b:SetDay(102,'AppleSeed')
- check(b:Best('Pull')==nil and b:LocalBest('Pull')==nil,'a new day empties everything')
- -- fruit
+ check(b:Best('Pull')==nil and b:LocalBest('Pull')==nil,'ClearLocal forgets this server\'s own and the test records (the pull board has no store answer to keep)')
+ -- the window and the day are two clocks
+ b:SetWindow(9)
+ b:Offer('Pull',pull({At=30}));b:Offer('Pull',pull({At=31,Rarity='King',Odds=1e-9,Test=true}))
+ b:Offer('Fruit',fruit({Id='AppleSeed',At=32}))
+ local fruitBefore=b:Best('Fruit')
+ check(b:Best('Pull')~=nil and b.Boards.Pull.Local~=nil and b.Boards.Pull.Test~=nil and fruitBefore~=nil,'(a pull, a test pull and a fruit are on the boards)')
+ check(b:SetWindow(10)and b:Best('Pull')==nil and b:LocalBest('Pull')==nil and b.Boards.Pull.Test==nil and b.Boards.Pull.Local==nil,'R153: a new window empties the pull board: this server\'s best AND the injected test pull, back to an empty board')
+ check(b:Best('Fruit')==fruitBefore,'and does not touch the fruit board')
+ b:Offer('Pull',pull({At=40}))
+ local pullBefore=b:Best('Pull')
+ check(b:SetDay(102,'AppleSeed')and b:Best('Fruit')==nil and b:LocalBest('Fruit')==nil,'a new day empties the fruit board')
+ check(b:Best('Pull')==pullBefore and b.Window==10,'R153: and does not touch the pull board (its clock is the window, not the day)')
+ check(not b:SetWindow(10)and b:Best('Pull')==pullBefore,'the same window again changes nothing')
+ -- fruit (unchanged)
  b:SetDay(103,'SunflowerSeed')
  check(b:Offer('Fruit',fruit({Id='AppleSeed'}))=='ignored','a fruit of another type than today\'s is ignored')
  check(b:Offer('Fruit',fruit({Scale=2}))=='took'and b:Offer('Fruit',fruit({Scale=1,At=2}))=='ignored'and b:Offer('Fruit',fruit({Scale=4,At=3}))=='took','heavier fruit takes the spot; lighter does not')
+ check(b:Unsynced('Fruit'),'a Local fruit better than the shared one needs writing (the fruit board is the shared one)')
  check(not b:MergeRemote('Fruit',fruit({Id='AppleSeed',Scale=9}))and b:Best('Fruit').Kg==4*Weight.FruitBase('SunflowerSeed'),'a shared fruit of another type is not today\'s board')
  check(b:MergeRemote('Fruit',fruit({Scale=6,Uid=2}))and b:Best('Fruit').Scale==6,'a heavier shared fruit wins')
+ _,source=b:Best('Fruit');check(source=='Remote','and says it came from the store')
  check(not b:MergeRemote('Fruit',fruit({Scale=6,Uid=2})),'merging the same shared record changes nothing')
  check(b:MergeRemote('Fruit',nil)and b:Best('Fruit').Scale==4,'the shared record vanishing (an owner reset) leaves this server\'s own best')
- -- R152: the shared fruit is another list's (another type): this fruit board has nothing to write, and the BEST PULL board is not touched by it
- local c=Board.new();c:SetDay(104,'SunflowerSeed')
+ -- R152: the shared fruit is another list's (another type): this fruit board has nothing to write; R153: the pull board never needs a write at all
+ local c=Board.new();c:SetDay(104,'SunflowerSeed');c:SetWindow(1)
  c:Offer('Fruit',fruit({Scale=2}));c:Offer('Pull',pull({At=10}))
- check(c:Unsynced('Fruit')and c:Unsynced('Pull'),'(a local fruit and a local pull both need writing)')
+ check(c:Unsynced('Fruit')and not c:Unsynced('Pull'),'(a local fruit needs writing; a local pull does not)')
  c:MergeRemote('Fruit',fruit({Id='AppleSeed',Scale=9}))
  check(c.Boards.Fruit.Foreign==true and not c:Unsynced('Fruit'),'the stored fruit is of another type: the fruit board is Foreign and needs no write (it used to stay "unsynced" for ever)')
- check(c:Unsynced('Pull')and c.Boards.Pull.Foreign==false,'the BEST PULL board is unaffected')
+ check(c.Boards.Pull.Foreign==false and c:Best('Pull')~=nil,'the BEST PULL board is unaffected')
  c:MergeRemote('Fruit',nil);check(c.Boards.Fruit.Foreign==false and c:Unsynced('Fruit'),'when the other type is gone from the store the fruit board needs writing again')
- c:SetForeign('Fruit');check(not c:Unsynced('Fruit'),'the store saying "another list\'s fruit" does the same (SetForeign)');c:SetForeign('Pull');check(c:Unsynced('Pull'),'(only the fruit board can be Foreign)')
+ c:SetForeign('Fruit');check(not c:Unsynced('Fruit'),'the store saying "another list\'s fruit" does the same (SetForeign)');c:SetForeign('Pull');check(c.Boards.Pull.Foreign==false,'(only the fruit board can be Foreign)')
  c:MergeRemote('Fruit',fruit({Scale=1,Uid=2}));check(c.Boards.Fruit.Foreign==false,'a stored fruit of our type clears it')
  c:SetForeign('Fruit');c:SetDay(105,'SunflowerSeed');check(c.Boards.Fruit.Foreign==false,'a new day clears it')
+ -- Clear (the owner's `hubdisplays reset`) empties both and keeps the clocks
+ c:Offer('Pull',pull({At=11}));c:Offer('Fruit',fruit({Scale=2}));c:Clear()
+ check(c:Best('Pull')==nil and c:Best('Fruit')==nil and c.Window==1 and c.Day==105,'Clear empties both boards and keeps the window and the day')
 end
 
 -- 6. Texts and the sign --------------------------------------------------------------------------------------------------------------------------------------
@@ -270,17 +317,26 @@ do
  local fr=fruit({Name='Sam',Scale=2.5})
  check(Rules.KgText(12.4)=='12.4 kg'and Rules.KgText(.5)=='0.5 kg'and Rules.KgText(1250)=='1,250 kg'and Rules.KgText(999.96)=='1000.0 kg'and Rules.KgText(0)==''and Rules.KgText(0/0)=='','weights read "12.4 kg", "1,250 kg"')
  check(Rules.Emoji('SunflowerSeed')=='🍉'and Rules.Emoji('NoSuchSeed')=='🌱','🍉 for the watermelon, 🌱 for an unknown plant')
- local t=Rules.SignText('Pull',rec,nil,18720)
- check(t.State=='Champion'and t.Plaque.Title.Text=='BEST PULL TODAY'and t.Plaque.Name.Text=='Jess'and t.Plaque.Line.Text=='Mythic · 1/800'and t.Plaque.Footer.Text=='New board in 5h 12m',
-  'the BEST PULL plaque: the title, the winner, "Mythic · 1/800", "New board in 5h 12m"')
- check(t.Label.Title.Text=='BEST PULL TODAY'and t.Label.Name.Text=='Jess'and t.Label.Info.Text=='Fire Pepper','the label over the seed: the title, the winner, "Fire Pepper"')
- check(t.Label.Line==t.Plaque.Line and t.Label.Footer==t.Plaque.Footer and t.Label.Line.Text=='Mythic · 1/800'and t.Label.Footer.Text=='New board in 5h 12m','R153: and under them the rarity and chance (the same rule\'s text) and the countdown: everything is on the label')
+ local t=Rules.SignText('Pull',rec,nil,462)
+ check(t.State=='Champion'and t.Plaque.Title.Text=='BEST PULL'and t.Plaque.Name.Text=='Jess'and t.Plaque.Line.Text=='Mythic · 1/800'and t.Plaque.Footer.Text=='new board in 7:42',
+  'R153: the BEST PULL plaque: the title "BEST PULL" (no "today"), the winner, "Mythic · 1/800", "new board in 7:42"')
+ check(t.Label.Title.Text=='BEST PULL'and t.Label.Name.Text=='Jess'and t.Label.Info.Text=='Fire Pepper','the label over the seed: the title, the winner, "Fire Pepper"')
+ check(t.Label.Line==t.Plaque.Line and t.Label.Footer==t.Plaque.Footer and t.Label.Line.Text=='Mythic · 1/800'and t.Label.Footer.Text=='new board in 7:42','R153: and under them the rarity and chance (the same rule\'s text) and the countdown: everything is on the label')
  local c=Rules.RarityColor('Mythic');local game=P.Rarities.Mythic.Color
  check(t.Accent[1]==c[1]and t.Accent[2]==c[2]and t.Accent[3]==c[3]and c[1]==math.floor(game.R*255+.5)and c[2]==math.floor(game.G*255+.5)and c[3]==math.floor(game.B*255+.5),'the accent is the rarity\'s own colour (SeedPackRules.Rarities)')
  check(t.Label.Info.Color[1]==c[1]and t.Plaque.Line.Color[1]==c[1],'the seed is written in it')
+ -- R153: nothing a pull's board says is wrong about the day any more (the board lasts 10 minutes): no "today" in any of its rows, champion or empty, in any coat
+ local noToday=true
+ for _,tt in ipairs({t,e,Rules.SignText('Pull',pull({Coat='Gold'}),nil,60),Rules.SignText('Pull',pull({Coat='Diamond',Rarity='King',Odds=1e-9}),nil,1)})do
+  for _,group in ipairs({tt.Label,tt.Plaque})do for _,row in pairs(group)do if row.Text:lower():find('today',1,true)or row.Text:find('Today',1,true)then noToday=false end end end
+ end
+ check(noToday,'R153: no row of the BEST PULL label or plaque says "today"')
+ local fruitToday=Rules.SignText('Fruit',nil,'SunflowerSeed',60,'Watermelon')
+ check(fruitToday.Label.Title.Text=='BIGGEST FRUIT TODAY','(BIGGEST FRUIT is still a daily board: its title still says TODAY)')
  local gold=Rules.SignText('Pull',pull({Coat='Gold'}),nil,60)
- check(gold.Plaque.Line.Text=='Mythic · 1/800 · Gold','a coat is told after the chance')
+ check(gold.Plaque.Line.Text=='Mythic · 1/800 · Gold'and gold.Label.Footer.Text=='new board in 1:00','a coat is told after the chance; a minute left reads "1:00"')
  local e=Rules.SignText('Pull',nil,nil,99)
+ check(e.Label.Title.Text=='BEST PULL'and e.Label.Footer.Text=='new board in 1:39'and e.Plaque.Footer.Text=='new board in 1:39','R153: the empty board keeps the title and counts too: "new board in 1:39"')
  check(e.State=='Empty'and e.Label.Name.Text=='Nobody yet'and e.Plaque.Name.Text=='Nobody yet'and e.Label.Line.Text:find('Open a pack',1,true)and e.Label.Info.Text=='???','the empty BEST PULL invites the first pull (the mystery seed is "???": the invitation is said once)')
  local f=Rules.SignText('Fruit',fr,'SunflowerSeed',3600,'Watermelon')
  check(f.State=='Champion'and f.Plaque.Title.Text=='BIGGEST FRUIT TODAY'and f.Plaque.Name.Text=='Sam'and f.Label.Name.Text=='Sam'and f.Label.Info.Text==Rules.KgText(fr.Kg)and f.Plaque.Footer.Text=='New fruit in 1h 0m','the BIGGEST FRUIT plaque and label: the title, the winner, the weight, a countdown')

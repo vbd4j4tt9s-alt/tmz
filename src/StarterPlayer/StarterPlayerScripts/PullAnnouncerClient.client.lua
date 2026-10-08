@@ -4,7 +4,7 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 -- nothing it does can start an announcement. Every payload is sanitised again (PullAnnounceRules.Event: the rarity comes from the local seed catalog).
 --  * Chat only   one system line on RBXGeneral (TextChatService:DisplaySystemMessage, rich text) per announcement: a pull in this server in its rarity colour
 --                ("🌟 Ann pulled a MYTHIC Fire Pepper! (1/800)"), a pull in another server in gold ("🌐 Ann pulled a SECRET Obsidian Maw (1/1,000)!"), a record in amber
---                ("🏆 Ann took BEST PULL TODAY!"). Every part of the line is escaped. No Gui, no banner, no sound, no picture, no per-frame work: the script only
+--                ("🏆 Ann took BEST PULL!"). Every part of the line is escaped. No Gui, no banner, no sound, no picture, no per-frame work: the script only
 --                waits for the remote.
 --  * Once        an announcement id is remembered (the last 128), so the same line never shows twice on one client; at most ChatBurst lines per ChatWindow seconds.
 --  * Old chat    only when there is no RBXGeneral channel (the legacy chat) or writing to it failed: the same sentence as a plain coloured line (SetCore ChatMakeSystemMessage).

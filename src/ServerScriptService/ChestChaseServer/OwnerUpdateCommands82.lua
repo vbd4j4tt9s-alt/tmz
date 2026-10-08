@@ -237,9 +237,10 @@ function X.Execute(ctx,p,action,a)
   local status=st.Claimed and'taken today'or M.Unlocked(st)and('ready: '..st.Variant..' stage '..st.Stage)or('locked, '..M.Clock(M.Left(st))..' to go')
   return true,p.Name..': mystery pack '..status..(#st.Owed>0 and(' | '..#st.Owed..' owed (Bag was full)')or'')..' | pedestal '..(svc.Owner[p]and'in their base'or'not assigned')
  elseif action=='bestpull'or action=='bigfruit'or action=='hubdisplays'then
-  -- R151 owner tools for the hub's two corner displays (HubDisplayService). bestpull <seed id or plant name> [share] [@name] = a test pull for that player (the seed's odds in
-  -- its biome's Pack03); bigfruit <kg> [gold|diamond] [share] [@name] = a test fruit of TODAY's type; both show on this server only unless `share`. hubdisplays = print the state;
-  -- hubdisplays reset = empty both boards (this server and the shared one); hubdisplays day +1 = preview tomorrow's fruit (this server only; day 0 comes back).
+  -- R151 owner tools for the hub's two corner displays (HubDisplayService). bestpull <seed id or plant name> [@name] = a test pull for that player (the seed's odds in
+  -- its biome's Pack03); R153: it is this server's own and lasts until the 10-minute board resets (BEST PULL is never shared, so `share` is refused for it). bigfruit <kg> [gold|diamond] [share] [@name]
+  -- = a test fruit of TODAY's type (this server only unless `share`). hubdisplays = print the state; hubdisplays reset = empty both boards (this server, and the fruit's shared document);
+  -- hubdisplays day +1 = preview tomorrow's fruit (this server only; day 0 comes back; BEST PULL does not care).
   local hub=ctx.Chase and ctx.Chase.HubDisplays;if not hub then return false,'The hub displays are not running in this server.'end
   if action=='hubdisplays'then
    local sub=tostring(a[1]or''):lower()
@@ -247,7 +248,7 @@ function X.Execute(ctx,p,action,a)
    elseif sub=='reset'then
     if #a>1 then return false,'Use hubdisplays reset.'end
     local removed=hub:Reset()
-    return true,'Both boards are empty for today on this server'..(removed and' and in the shared store'or'')..'. Other servers keep their own best until they are reset too.\n'..hub:StatusText(p)
+    return true,'BEST PULL is empty on this server (it is this server\'s own: nothing else to clear). BIGGEST FRUIT is empty for today on this server'..(removed and' and in the shared store'or'')..'. Other servers keep their own best fruit until they are reset too.\n'..hub:StatusText(p)
    elseif sub=='day'then
     local n=({['0']=0,today=0,['+1']=1,['1']=1,tomorrow=1,['-1']=-1,yesterday=-1,['+2']=2,['2']=2,['+7']=7,['7']=7})[tostring(a[2]or''):lower()]
     if #a~=2 or n==nil then return false,'Use hubdisplays day +1 (tomorrow\'s fruit), +2, +7, -1 or 0 (back to today).'end
@@ -264,8 +265,9 @@ function X.Execute(ctx,p,action,a)
    else words[#words+1]=w end
   end
   if action=='bestpull'then
-   if #words==0 then return false,'Use bestpull <seed id or plant name> [share] @username.'end
-   return hub:InjectPull(p,table.concat(words,' '),share)
+   if share then return false,'BEST PULL is this server only now (it resets every 10 minutes and is never shared). Use bestpull <seed id or plant name> @username.'end
+   if #words==0 then return false,'Use bestpull <seed id or plant name> @username.'end
+   return hub:InjectPull(p,table.concat(words,' '))
   end
   if #words~=1 then return false,'Use bigfruit <kg> [gold|diamond] [share] @username.'end
   return hub:InjectFruit(p,words[1],coat,share)
