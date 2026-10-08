@@ -104,7 +104,8 @@ K.Config={
  -- MaxDistance = the guis' own render limit, RowsPerFrame = rows of letters dressed per frame (4, so a camera turn spreads the letters over several
  -- frames). The spacebars' biome names are big: they get their own render limit.
  Legend={PixelsPerStud=16,TextHeight=4.6,Margin=.05,MaxExtra=1.5,Rotation=270,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4,
-  FarPixelsPerStud=4,FarMaxDistance=800},                  -- R152: far letters, one strip (22 labels, 18 px text) per row at 4 px / stud, rendered out to 800 studs
+  FarPixelsPerStud=4,FarMaxDistance=800,                   -- R152: far letters, one strip (22 labels, 18 px text) per row at 4 px / stud, rendered out to 800 studs
+  FarMaxDistanceByTier={[2]=500}},                         -- R153 perf (lag audit D8): on tier 2 (phones) to 500 studs (a 4.6-stud letter is about 6 px tall there)
  SpacebarPixelsPerStud=10,SpacebarMaxDistance=800,
  GroundScanSeconds=2,
 }

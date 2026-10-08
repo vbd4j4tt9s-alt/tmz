@@ -494,6 +494,9 @@ local function start()
   local st
   if Far.N>0 then st=Far.Free[Far.N];Far.Free[Far.N]=nil;Far.N-=1 else st=newFar()end
   st.Free=false;st.Parked=false;st.Empty=false
+  -- (R153 perf, D8: the far letters' render limit of the tier this strip is dressed in; written only when it changes)
+  local md=LG.FarMaxDistanceByTier and LG.FarMaxDistanceByTier[tier]or LG.FarMaxDistance
+  if st.MaxDist~=md then st.MaxDist=md;pcall(function()st.Gui.MaxDistance=md end)end
   local a0,a1=keyedSpan(row,1,COLS)
   if not a0 then emptyStrip(st)
   else
