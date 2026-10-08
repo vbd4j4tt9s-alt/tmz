@@ -22,13 +22,22 @@ mkdir -p "$OUT"
 LUAU=${LUAU:-/opt/luau/luau};R=$REPO/docs/proposals/R151/tests;INV=$REPO/docs/proposals/inventory_R113/tests
 stage() { mkdir -p "$1";cp "$REPO/tools/tests/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$R/pack_world.luau" "$R/pack_templates.luau" "$R/pouch_mock.luau" "$HERE/test_pack_parts.luau" "$HERE/dump_pack_parts.luau" "$1/";python3 "$R/mkbundle_packs.py" "$1" "$2" >/dev/null; }
 
+# R153 perf (dead code retired): the V120 native render data (src/ReplicatedStorage/SeedPackArt<Biome><NN>.lua) is no longer shipped - no game script
+# required it, the pouches are uploaded meshes. This suite measures the pouches against that data, so "now" is this checkout's src plus those files
+# from the last commit that shipped them (PACK_ART_REF, default 0260e00); a checkout that still has them is used as it is.
+ART_REF=${PACK_ART_REF:-0260e00};NOW_SRC=$REPO/src
+if ! ls "$REPO"/src/ReplicatedStorage/SeedPackArt*.lua >/dev/null 2>&1;then
+ rm -rf "$OUT/now_src";mkdir -p "$OUT/now_src";cp -r "$REPO/src" "$OUT/now_src/"
+ git -C "$REPO" archive "$ART_REF" src/ReplicatedStorage | tar -x -C "$OUT/now_src" --wildcards 'src/ReplicatedStorage/SeedPackArt*'
+ NOW_SRC=$OUT/now_src/src;echo "(the retired pouch render data: $(ls "$NOW_SRC"/ReplicatedStorage/SeedPackArt*.lua | wc -l) files from $ART_REF)"
+fi
 echo "== this checkout: seal / strips against the crimps (every pack, context, shape)"
-stage "$OUT/now" "$REPO/src"
+stage "$OUT/now" "$NOW_SRC"
 (cd "$OUT/now" && timeout 900 $LUAU test_pack_parts.luau > t.log 2>&1) || { grep -v '^WARN' "$OUT/now/t.log" | tail -40;echo "FAIL: test_pack_parts";exit 1; }
 grep -v '^WARN' "$OUT/now/t.log" | tail -4
 echo "== this checkout: every part on its real pouch"
 (cd "$OUT/now" && timeout 600 $LUAU dump_pack_parts.luau > scenes.txt 2>&1)
-python3 "$HERE/check_pack_parts.py" "$OUT/now/scenes.txt" "$REPO/src" > "$OUT/now/check.log" || { cat "$OUT/now/check.log";echo "FAIL: check_pack_parts";exit 1; }
+python3 "$HERE/check_pack_parts.py" "$OUT/now/scenes.txt" "$NOW_SRC" > "$OUT/now/check.log" || { cat "$OUT/now/check.log";echo "FAIL: check_pack_parts";exit 1; }
 grep -vE '^[A-Z][a-z]+_0[0-9] ' "$OUT/now/check.log"
 
 echo "== reproduce on $BASE (R152): the same checks must find the reported bug"
@@ -45,5 +54,5 @@ grep -E '^worst:' "$OUT/base/t.log"
 (cd "$OUT/base" && timeout 600 $LUAU dump_pack_parts.luau > scenes.txt 2>&1)
 python3 "$HERE/check_pack_parts.py" "$OUT/base/scenes.txt" "$OUT/base_src/src" --expect-floating > "$OUT/base/check.log" || { cat "$OUT/base/check.log";echo "FAIL: on $BASE the Void's floating corner details are not seen";exit 1; }
 grep -E '^base:|floats \(base\): Void: RuneSigilF1_3' "$OUT/base/check.log"
-python3 "$HERE/check_pack_parts.py" "$OUT/base/scenes.txt" "$REPO/src" --seats || { echo "FAIL: EclipsePackArt.Seats is not what the pouch says under the details that float on $BASE";exit 1; }
+python3 "$HERE/check_pack_parts.py" "$OUT/base/scenes.txt" "$NOW_SRC" --seats || { echo "FAIL: EclipsePackArt.Seats is not what the pouch says under the details that float on $BASE";exit 1; }
 echo "all pack-parts checks passed"

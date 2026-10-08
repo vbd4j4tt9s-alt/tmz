@@ -5,7 +5,7 @@
 --     FastTravelService=<src>/ServerScriptService/ChestChaseServer/FastTravelService.lua \
 --     MovementGuard=<src>/ServerScriptService/ChestChaseServer/MovementGuard.lua \
 --     SecurityGate=<src>/ServerScriptService/ChestChaseServer/SecurityGate.lua \
---     HudLayout=<src>/ReplicatedStorage/HudLayout.lua VectorIcons91=<src>/ReplicatedStorage/VectorIcons91.lua \
+--     HudLayout=<src>/ReplicatedStorage/HudLayout.lua \
 --     TravelButtons=<src>/StarterPlayer/StarterPlayerScripts/TravelButtons.client.lua
 local R=require('./roblox');local B=require('./tp_bundle')
 local new,V3,CF=R.new,R.Vector3.new,R.CFrame.new
@@ -56,7 +56,7 @@ local motion=module(RS,'RunnerMotion',{Allowance=function(s,e)return s*e end,Bur
  Flat=function(v)return V3(v.X,0,v.Z)end,TravelAllowance=function(s,_,_,e)return s*e*1.2,s end})
 motion:SetAttribute('TrackBoundaryZ',-99.28);motion:SetAttribute('TrackCenterX',0);motion:SetAttribute('TrackHalfWidth',114)
 module(RS,'RunnerSweep',{Hull=function()return V3(2,5,1),V3()end,Cast=function(_,_,_,o)return o.Magnitude,false end})
-module(RS,'HudLayout',nil,'HudLayout');module(RS,'VectorIcons91',nil,'VectorIcons91')
+module(RS,'HudLayout',nil,'HudLayout') -- (R153 perf: VectorIcons91 was retired; TravelButtons never required it)
 module(RS,'GardenTextFit',{Attach=function()end})
 -- R150: TravelButtons plays a whoosh on arrival through LocalSfx (a recorder here) and the server marks its refusals kind 'Denied'.
 local whooshes={}

@@ -27,7 +27,7 @@ grep -n "PromptButtonHoldBegan" "$SP/InteractionFeedback.client.lua" | grep -v "
 grep -n "Audio" "$SP/PlantInspection.client.lua" && bad "PlantInspection plays a cue again"
 # the treadmill code makes no sound of its own
 for f in $S/ReplicatedStorage/TreadmillLook151.lua $S/ReplicatedStorage/TreadmillFx.lua $S/ReplicatedStorage/TreadmillPlayback.lua $S/ReplicatedStorage/TreadmillBeltArt151.lua \
- $SP/TreadmillAnimation.client.lua $S/ServerScriptService/ChestChaseServer/ActiveTraining81.lua; do
+ $SP/TreadmillAnimation.client.lua; do
  if grep -nE "Instance\.new\(.Sound.\)|SoundId|InteractionAudio|LocalSfx|Audio\.Play" "$f";then bad "$f makes a sound";fi
 done
 # the one remaining Equip cue is the shop's (EconomyClient: Transaction('Equip'))
