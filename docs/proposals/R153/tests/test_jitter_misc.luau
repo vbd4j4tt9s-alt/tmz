@@ -171,7 +171,11 @@ do
  check(B.CollectionViewport:find('connection=Run.RenderStepped:Connect',1,true)~=nil and B.CollectionViewport:find('elapsed',1,true)==nil,'CollectionViewport: the index cards\' seeds and weather effects every frame (20 Hz before)')
  check(B.HarvestPresentation:find('connection=RunService.RenderStepped:Connect',1,true)~=nil and B.HarvestPresentation:find('elapsed',1,true)==nil,'HarvestPresentation: the fruit previews every frame (20 Hz before)')
  check(B.PackViewport89:find('if clock<',1,true)==nil and B.HarvestViewport:find('Run.RenderStepped:Connect(step)',1,true)~=nil,'PackViewport89 / HarvestViewport: every frame in RenderStepped')
- check(B.KeeperSpeedLabels:find("entry.Gui.Adornee=Follow and Follow.Get(model)or root",1,true)~=nil,'KeeperSpeedLabels hangs the sign on the smoothed body\'s anchor')
+ -- (R153, the owner's spawn-pinned spec: the sign is pinned at the keeper's spawn point and never follows the keeper, so it needs no smoothed anchor and no frame signal)
+ local labelCode=(B.KeeperSpeedLabels:gsub('%-%-[^\n]*','')) -- (its code, comments left out)
+ check(labelCode:find("entry.Gui.Adornee=a;entry.Gui.Parent=a",1,true)~=nil and labelCode:find('KeeperFollow153',1,true)==nil and labelCode:find('Follow',1,true)==nil
+  and labelCode:find('RenderStepped',1,true)==nil and labelCode:find('Heartbeat',1,true)==nil and labelCode:find('KeeperHome',1,true)~=nil,
+  'KeeperSpeedLabels pins the sign on its own anchor at the keeper\'s spawn point (not the smoothed body\'s anchor, no per-frame signal)')
  check(B.PlantGrowthFx:find('Tick%2',1,true)==nil,'PlantGrowthFx: a flying fruit\'s size is written every frame')
  check(B.RunnerTrailArt:find('colors[(i+1)%n+1]',1,true)~=nil,'RunnerTrailArt.Cycle flows into the next colour (the Aurora halo snapped)')
  -- the server: no part tweened, and per-frame (Heartbeat / Stepped) only in the gameplay services

@@ -435,13 +435,20 @@ local keepers={}
 local pre=keeper('Forest',20);keepers[1]=pre
 local ks=R.new('LocalScript');ks.Name='KeeperSpeedLabels'
 local okK,errK=pcall(W.load,'KeeperSpeedLabels',ks);check(okK,'KeeperSpeedLabels loads: '..tostring(errK))
-local function pill(m)local gui=m:FindFirstChild('SpeedReq');return gui,gui and gui.Pill and gui.Pill.Value,gui and gui.Pill and gui.Pill.Edge end
+-- R153: the sign hangs on its own anchor part (KeeperSignAnchors, one per keeper, an ObjectValue 'Keeper' says whose), not on the keeper.
+local function signOf(m)
+ local f=workspace:FindFirstChild('KeeperSignAnchors');if not f then return nil end
+ for _,a in ipairs(f:GetChildren())do local link=a:FindFirstChild('Keeper');if link and link.Value==m then return a:FindFirstChild('SpeedReq'),a end end
+ return nil
+end
+local function pill(m)local gui=signOf(m);return gui,gui and gui.Pill and gui.Pill.Value,gui and gui.Pill and gui.Pill.Edge end
 local gui,value,edge=pill(pre)
-check(gui~=nil and gui:IsA('BillboardGui')and gui.Name=='SpeedReq'and gui.Pill.Caption.Text=='SPEED NEEDED'and gui.MaxDistance==160 and gui.AlwaysOnTop==false and gui.LightInfluence==0,'a keeper that was already tagged gets a "SpeedReq" billboard with the caption SPEED NEEDED, visible up to 160 studs')
+check(gui~=nil and gui:IsA('BillboardGui')and gui.Name=='SpeedReq'and gui.Pill.Caption.Text=='SPEED NEEDED'and gui.MaxDistance==250 and gui.AlwaysOnTop==false and gui.LightInfluence==0,'a keeper that was already tagged gets a "SpeedReq" billboard with the caption SPEED NEEDED, visible up to 250 studs (R153: raised from 160 for the higher sign)')
 local rootOf=pre:FindFirstChild('HumanoidRootPart')
-check(gui.Adornee==rootOf,'the label hangs on the keeper\'s root')
--- height: top of the box (15) minus the root (10) = 5, +2.5.
-check(near(gui.StudsOffsetWorldSpace.Y,7.5,1e-9)and gui.Size.X.Scale==0 and gui.Size.Y.Scale==0 and gui.Size.X.Offset==104 and gui.Size.Y.Offset==36,'[size] it floats just above the head (offset 7.5) as a small fixed 104x36 pixel sign (it was 150x50)')
+local _,anchor0=signOf(pre)
+check(gui.Adornee==anchor0 and anchor0~=nil and anchor0~=rootOf and near(anchor0.Position.X,rootOf.Position.X)and near(anchor0.Position.Y,rootOf.Position.Y)and near(anchor0.Position.Z,rootOf.Position.Z),'R153: the label hangs on its own anchor at the keeper\'s spawn point (where it stood), not on the keeper\'s root')
+-- height: top of the body (15) minus the root (10) = 5, +18 (R153: LIFT; it was +2.5 on the keeper's head).
+check(near(gui.StudsOffsetWorldSpace.Y,23,1e-9)and gui.Size.X.Scale==0 and gui.Size.Y.Scale==0 and gui.Size.X.Offset==104 and gui.Size.Y.Offset==36,'[size] it floats well above the head (offset 23 = 5 + 18) as a small fixed 104x36 pixel sign (it was 150x50)')
 local cap=gui.Pill.Caption
 check(near(cap.Size.Y.Scale,.3,1e-9)and near(gui.Pill.Value.Size.Y.Scale,.6,1e-9)and cap.Size.Y.Scale*36<12 and gui.Pill.Value.Size.Y.Scale*36>=20,'[size] the caption takes about 30% of the height (under 12 px), the number about 60% (over 20 px)')
 -- No PhysicalWalkSpeed yet: the player is a new runner (24).
@@ -628,26 +635,29 @@ plainK:SetAttribute('KeeperEscapeSpeed',20);check(select(2,pill(plainK)).Text=='
 -- A keeper that is tagged before it has parts: the label finds its root when it arrives.
 local late2=R.new('Model');late2.Name='LateKeeper';late2:SetAttribute('KeeperEscapeSpeed',80);late2.Parent=workspace;CS:AddTag(late2,'BiomeKeeper')
 local gl=pill(late2)
-check(gl~=nil and gl.Adornee==nil,'a keeper with no parts yet: a label that waits')
+check(gl==nil,'a keeper with no parts yet: no sign yet (it waits for a place and a body)')
 local lr=R.new('Part');lr.Name='HumanoidRootPart';lr.Size=R.Vector3.new(2,2,1);lr.CFrame=R.CFrame.new(0,10,0);lr.Parent=late2
-check(gl.Adornee==lr and gl.Enabled==true and gl.Size.X.Offset==104 and gl.Size.Y.Offset==36,'its root appears: the label hangs on it (the same small size)')
+adv(1);check(signOf(late2)==nil,'its root alone is not a body: still no sign')
+local lb=R.new('Part');lb.Name='Body';lb.Size=R.Vector3.new(4,6,2);lb.CFrame=R.CFrame.new(0,12,0);lb.Parent=late2
+adv(1);gl=pill(late2)
+check(gl~=nil and gl.Adornee~=lr and gl.Enabled==true and gl.Size.X.Offset==104 and gl.Size.Y.Offset==36 and near(gl.StudsOffsetWorldSpace.Y,5+18,1e-9),'R153: its body arrives: the sign appears over it, pinned at its spawn point (the same small size)')
 -- Tall keepers: higher up, but the sign stays the same small size (it is never scaled up).
 local tall=keeper('Giant',330,10,40)
 local gt=pill(tall)
-check(near(gt.StudsOffsetWorldSpace.Y,(10+(40/2-1)+40/2-10)+2.5,1e-6),'a 40-stud keeper: the label hangs higher up, above the head ('..tostring(gt.StudsOffsetWorldSpace.Y)..')')
+check(near(gt.StudsOffsetWorldSpace.Y,(10+(40/2-1)+40/2-10)+18,1e-6),'a 40-stud keeper: the label hangs higher up, 18 studs above the head ('..tostring(gt.StudsOffsetWorldSpace.Y)..')')
 check(gt.Size.X.Offset==104 and gt.Size.Y.Offset==36 and gt.Size.X.Scale==0 and gt.Size.Y.Scale==0,'[size] and it is still 104x36 pixels (it used to grow to 330x110): the same as over a normal keeper')
 local sizesOk=true;for _,k in ipairs({tall,pre,bySpeed[330],dark,huge,bySpeed[26]})do local g=pill(k);if g.Size.X.Offset~=104 or g.Size.Y.Offset~=36 then sizesOk=false end end
 check(sizesOk,'[size] every keeper\'s sign is 104x36: small, fixed, whatever the keeper\'s size')
 local giant2=keeper('Colossus',429,10,200);local g2=pill(giant2)
-check(g2.Size.X.Offset==104 and g2.Size.Y.Offset==36 and near(g2.StudsOffsetWorldSpace.Y,80+2.5,1e-6),'[size] a 200-stud keeper: still 104x36, and the height offset stays capped (80 + 2.5)')
+check(g2.Size.X.Offset==104 and g2.Size.Y.Offset==36 and near(g2.StudsOffsetWorldSpace.Y,80+18,1e-6),'[size] a 200-stud keeper: still 104x36, and the height offset stays capped (80 + 18)')
 -- Tag removal and teardown.
 CS:RemoveTag(plainK,'BiomeKeeper');check(gp.Parent==nil,'a keeper that loses the tag loses its label')
 plainK:SetAttribute('KeeperEscapeSpeed',99);check(gp.Parent==nil,'(and is not updated)')
 local tagged=#CS:GetTagged('BiomeKeeper')
 ks.Destroying:Fire()
-local left=0;for _,m in ipairs(CS:GetTagged('BiomeKeeper'))do if m:FindFirstChild('SpeedReq')then left+=1 end end
-check(left==0,'removing the script removes every label ('..tagged..' keepers)')
-local post=keeper('Post',50);check(post:FindFirstChild('SpeedReq')==nil,'and new keepers get none')
+local left=0;for _,m in ipairs(CS:GetTagged('BiomeKeeper'))do if signOf(m)then left+=1 end end
+check(left==0 and workspace:FindFirstChild('KeeperSignAnchors')==nil,'removing the script removes every label and every anchor ('..tagged..' keepers)')
+local post=keeper('Post',50);check(signOf(post)==nil,'and new keepers get none')
 player:SetAttribute('PhysicalWalkSpeed',100);check(true,'(no errors after teardown)')
 
 print(('%d checks, %d failures'):format(checks,fails))
