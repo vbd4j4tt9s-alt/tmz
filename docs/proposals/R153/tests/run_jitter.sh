@@ -46,9 +46,9 @@ prep "$REPO/src" "$OUT";cd "$OUT"
 rc=0
 for t in test_jitter_*.luau;do echo "== $t";if timeout 900 /opt/luau/luau "$t" > "$t.log" 2>&1;then grep -v '^WARN' "$t.log" | tail -1;else grep -v '^WARN' "$t.log" | tail -25;rc=1;fi;done
 # static: the server draws nothing decorative per frame and tweens no part. Its per-frame connections are the gameplay services' (timers, the chase,
-# keepers, training, holes, bats, storms, the fling); MapService's tween is the legacy course's stage fade (Transparency, tied to its collision change).
+# keepers, training, holes, bats, storms, the fling, R153 the track-wall guard: four checks a second); MapService's tween is the legacy course's stage fade (Transparency, tied to its collision change).
 echo "== server"
-ALLOW=" BaseService BatService ChaseService ConcurrentKeeperService FruitOfHourService MovementGuard MysteryPackService RagdollService ServerClearService StormService TrackHoleService TreadmillBonusService WeatherService "
+ALLOW=" BaseService BatService ChaseService ConcurrentKeeperService FruitOfHourService MovementGuard MysteryPackService RagdollService ServerClearService StormService TrackHoleService TrackWalls153 TreadmillBonusService WeatherService "
 n=0
 for f in $(grep -rlE "(Heartbeat|Stepped|PreSimulation|PostSimulation|RenderStepped):Connect|BindToRenderStep" "$REPO/src/ServerScriptService" || true);do
  b=$(basename "$f" .lua);b=${b%.server};n=$((n+1))
