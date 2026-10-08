@@ -16,7 +16,7 @@ d87454e7192cf498d6d50d2d18dd869acbe8e695c3cbad79eacb4c21c3114b38  src/Replicated
 # R154 (on purpose): SeedPackRules.lua gained an outermost wrapper (PackLuck154): the 4 Leaf Clover's x2 on the Void / Verity / Mech packs (a new last argument, passLuck) and the 80% rule on live packs (no seed over 80%, the others 19%, 1% upgrade); RawSeedOdds = the odds before both; every banked world pack and every pack without the clover the rule leaves alone is as before
 b0668737b8856383b7597b71f05fde9ca755451d824ad75b79a46fd7850c4896  src/ReplicatedStorage/SeedPackRules.lua
 # R154 (new odds file): PackLuck154.lua, the rules of that wrapper (Shape = the 80% rule, Shift / FixedOdds = the clover on the fixed-odds packs, Roll = the exact staged roll)
-fdebf97b79288cd24e1923ae851af136e99456b286bf13953be95812b5ec0f2b  src/ReplicatedStorage/PackLuck154.lua
+18fa5d7626a14f4475bcd64b4d83f40091569bc225fc127289b3e3c5d4cf68df  src/ReplicatedStorage/PackLuck154.lua
 a866bdc4e1a2872bd985c816c50224d9043b8c532b933b72c87cfb74bb45cf50  src/ReplicatedStorage/RarePackRules.lua
 7f769e802f2324c2b322c5f7a79299a538ce9f90d6199f1f1b782064b2b9b573  src/ReplicatedStorage/VerityPackOdds.lua
 aa1d6d9ac03ce00b1b494cae6965a5228fa0f1e157a354d3e39264cb588f9043  src/ReplicatedStorage/VoidPackOdds85.lua

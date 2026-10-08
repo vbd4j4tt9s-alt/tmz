@@ -146,7 +146,7 @@ end
 local function expected(raw)
  local total,n=0,0;for _,p in pairs(raw)do if p>0 then total+=p;n+=1 end end
  local t,tp=top(raw)
- if n<2 or tp/total<=.8 then return raw end
+ if n<2 or tp/total<=.8+1e-9 then return raw end
  local tr=rank(t);local nextR,rarest=nil,-1
  for id,p in pairs(raw)do if p>0 then local r=rank(id);if r>tr and(not nextR or r<nextR)then nextR=r end;if r>rarest then rarest=r end end end
  local want=nextR or rarest;local ups={};for id,p in pairs(raw)do if p>0 and rank(id)==want then ups[#ups+1]=id end end

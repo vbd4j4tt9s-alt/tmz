@@ -6,6 +6,8 @@
 #                         the frozen hashes, no script reads a displayed chance back (nothing parses "1/N" text; RarePullRules.TooltipOdds is called by nobody), the touched scripts compile;
 #  2. rolls unchanged   - dump_odds.luau on the base (R152 release) and on this checkout: every SeedOdds row (stage x variant x odds version x luck x boost), the Void / Verity / Mech rows,
 #                         the Index chip numbers, the hold-tooltip rows, 60,000+ seeded rolls and every seed's rarity: IDENTICAL, byte for byte; the Index numbers equal the new canonical ones;
+#                         R154: except what the 80% rule changes (live packs over 80%), each such line checked against an independent re-implementation (R154/tests/check_r154_dump.py),
+#                         and the canonical numbers still equal the base Index (the fixed display keeps the base-luck rate);
 #  3. test_seed_rarity  - the module (54 seeds, home pack, cache, formats, unknown / retired seeds), the Void example, ChestService's catalog, a held Void pack keeps its own rows, a real Void
 #                         pack opened through the real PullAnnouncer (Cosmic / Secret / King / Mech), chat rules, the plaque (ranking unchanged), owner commands, announcement rules by tier;
 #                         and the single-seed audit (section 9): no pack of any stage / tier / odds version / luck lists fewer than 2 seeds, a live pack's favourite stays under 90%;
@@ -35,7 +37,7 @@ done
 echo "ok: SeedRarity153 is in the manifest (sorted) and the 9 touched scripts compile"
 if sed 's/--.*//' "$S/ReplicatedStorage/SeedRarity153.lua" | grep -v "R153" | grep -nE '[0-9]{4,}|[0-9]\.[0-9]';then fail "SeedRarity153 holds a number that looks like copied odds";fi
 echo "ok: SeedRarity153 computes everything from the odds code (no copied number)"
-(cd "$REPO" && grep -E ' src/ReplicatedStorage/(PackOdds81|PackOdds112|PackOdds137|SeedPackRules|VoidPackOdds85|VerityPackOdds|PackSizePity|PackSchedule81|RarePackRules|MysteryPackRules)\.lua$|PackSizePityData' "$P/R151/tests/frozen.sha256" | sha256sum -c - >/dev/null) || fail "an odds / pity file differs from its frozen hash"
+(cd "$REPO" && grep -E ' src/ReplicatedStorage/(PackOdds81|PackOdds112|PackOdds137|SeedPackRules|PackLuck154|VoidPackOdds85|VerityPackOdds|PackSizePity|PackSchedule81|RarePackRules|MysteryPackRules)\.lua$|PackSizePityData' "$P/R151/tests/frozen.sha256" | sha256sum -c - >/dev/null) || fail "an odds / pity file differs from its frozen hash"
 echo "ok: the odds and pity files are byte-identical to their frozen hashes"
 if grep -rnE "match\('\^1/|match\(\"\^1/|TooltipOdds\(" "$S" | grep -v "RarePullRules.lua";then fail "a script reads a displayed chance back";fi
 echo "ok: no script parses a displayed chance (RarePullRules.TooltipOdds is called by nobody)"
@@ -55,8 +57,14 @@ python3 "$P/treadmill_bonus_R123/tests/mkbundle.py" "$OUT/dump/new" >/dev/null
 wait
 for d in base new;do grep -q '^VALIDATE	true' "$OUT/dump/$d/dump.txt" || { tail -5 "$OUT/dump/$d/err.txt";fail "the $d dump did not run (Config.Validate)"; };done
 grep -v '^CANON ' "$OUT/dump/new/dump.txt" > "$OUT/dump/new_core.txt"
-cmp "$OUT/dump/base/dump.txt" "$OUT/dump/new_core.txt" || fail "a roll table / odds row / seeded roll / rarity differs from the base"
-echo "ok: $(wc -l < "$OUT/dump/base/dump.txt") lines (SeedOdds rows, Void / Verity / Mech, Index chips, tooltips, seeded rolls, rarities): identical to the base, byte for byte"
+if cmp -s "$OUT/dump/base/dump.txt" "$OUT/dump/new_core.txt";then
+ echo "ok: $(wc -l < "$OUT/dump/base/dump.txt") lines (SeedOdds rows, Void / Verity / Mech, Index chips, tooltips, seeded rolls, rarities): identical to the base, byte for byte"
+else
+ # R154 (owner: no single-seed packs): the 80% rule changes the live packs that gave one seed more than 80%; every other line must still be identical, and every changed one must be
+ # exactly what an independent re-implementation of the rule makes of the base line (docs/proposals/R154/tests/check_r154_dump.py)
+ python3 -I "$P/R154/tests/check_r154_dump.py" "$OUT/dump/base/dump.txt" "$OUT/dump/new/dump.txt" || fail "a roll table / odds row / seeded roll / rarity differs from the base beyond the R154 80% rule"
+ echo "ok: $(wc -l < "$OUT/dump/base/dump.txt") lines (SeedOdds rows, Void / Verity / Mech, Index chips, tooltips, seeded rolls, rarities): identical to the base apart from the R154 80% rule"
+fi
 python3 - "$OUT/dump/base/dump.txt" "$OUT/dump/new/dump.txt" <<'PY'
 import sys
 base={};new={}
@@ -69,7 +77,7 @@ for l in open(sys.argv[2]):
 assert len(base)==54 and len(new)==54,(len(base),len(new))
 bad=[s for s in base if base[s][0]!=new[s][0] or abs(base[s][1]-new[s][1])>1e-9*max(1,base[s][1])]
 assert not bad,bad
-print('ok: the canonical chance of all 54 seeds = the number the Index showed before R153 (the Index keeps its values; the base pack for every seed was already its home pack)')
+print('ok: the canonical chance of all 54 seeds = the number the Index showed before R153 (the Index keeps its values; the base pack for every seed was already its home pack; R154: also where the 80% rule changed the home pack)')
 PY
 
 echo "== the tests"

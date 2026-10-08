@@ -15,7 +15,7 @@ local VoidPools=require(script.Parent.VoidPackOdds85)
 local Mech=require(script.Parent.MechCatalog)
 local Verity=require(script.Parent.VerityCatalog)
 local T=require(script.Parent.BalanceValues81)
-local L={Version=154,Limit=.8,Upgrade=.01}
+local L={Version=154,Limit=.8,Upgrade=.01,Slack=1e-9} -- Slack: a seed at exactly 80% (a starter-boosted Snow Rare pack: 1/2.5 x2) is not over it, whatever the rounding
 local function rank(rarityOf,id)return O.Rank[(rarityOf(id))]or 0 end
 local function positive(p)return type(p)=='number'and p==p and p>0 and p<math.huge end
 -- The luck passes' luck: a number from 1 to the passes' ceiling (x2 with the clover); anything else is 1.
@@ -33,7 +33,7 @@ function L.Shape(odds,rarityOf)
    if p>topP or(p==topP and top~=nil and id<top)then top,topP=id,p end
   end
  end
- if count<2 or not(total>0)or topP/total<=L.Limit then return odds,false end
+ if count<2 or not(total>0)or topP/total<=L.Limit+L.Slack then return odds,false end
  local topRank=rank(rarityOf,top);local nextRank,rarest=math.huge,-1
  for id,p in pairs(odds)do if positive(p)then
   local r=rank(rarityOf,id)
