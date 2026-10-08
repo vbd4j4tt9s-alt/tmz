@@ -93,6 +93,8 @@ function MapService.new(config)
     require(script.Parent.FloorSafety86).Apply(mapRoot)
     require(script.Parent.HideBushes124).Apply(mapRoot) -- R124: Forest/Jungle bushes big enough to hide in
     raiseMapBoundaries(mapRoot)
+    -- R153: nobody can stand on a track wall: tall invisible blockers on every wall top, flush with its inner face (the saved barriers leave a 1-stud strip of it open)
+    do local ok,err=pcall(function()require(script.Parent.TrackWalls153).Apply(mapRoot)end);if not ok then warn('[R153] Track wall blockers skipped: '..tostring(err))end end
 
 
 	local oldRuntime = mapRoot:FindFirstChild(config.RuntimeFolderName)
