@@ -11,11 +11,34 @@
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Players=game:GetService('Players');local Tags=game:GetService('CollectionService')
 local P={MaxTemplates=160,MaxViews=60,MaxParts=9000,MaxWarm=36,WarmParts=4000,WaitBuildSeconds=.008,WarmMargin=240,MaxSpare=48,SpareParts=4000,GuessParts=60,
- CloneSeconds=.0015,HurryCloneSeconds=.004,HurrySeconds=.4,BuildSeconds=.002,HurryBuildSeconds=.004,BuildParts=24,SweepSeconds=.2,Grace=3,RetrySeconds=15,LoadingRetrySeconds=2}
+ CloneSeconds=.0015,HurryCloneSeconds=.004,HurrySeconds=.4,BuildSeconds=.002,HurryBuildSeconds=.004,BuildParts=24,SweepSeconds=.2,Grace=3,RetrySeconds=15,LoadingRetrySeconds=2,LoadingNoteSeconds=5}
 local RGB=Color3.fromRGB
 local records=setmetatable({},{__mode='k'});local templates={};local templateCount=0
 local queue={};local queued={};local failed={};local fills={};local job;local connection;local sweepClock=0;local dirty=false
 local spare={};local spareCount,spareParts=0,0;local listed={};local warned={};local hurryUntil=0;local cloneSpent=0
+-- R154 (logging only): a build that fails with "... is still loading" (pack shapes, fruit meshes: retried in LoadingRetrySeconds) used to print one Studio warning per item.
+-- Now they are counted per kind and one summary line is printed every LoadingNoteSeconds ("[R112] 23 item pictures waiting for pack shapes"); a real failure still warns once.
+local loadWait={};local loadNoteDue=false
+local LOADING_KINDS={{'Pack shape','pack shapes'},{'Fruit mesh','fruit meshes'},{'Approved plant mesh','plant meshes'},{'Verity pouch','the Verity pouch'}}
+local function loadingKind(why)
+ for _,k in ipairs(LOADING_KINDS)do if tostring(why):find(k[1],1,true)then return k[2]end end
+ return'meshes'
+end
+local function noteLoading(key,why)
+ loadWait[key]=loadingKind(why)
+ if loadNoteDue then return end
+ loadNoteDue=true
+ task.delay(P.LoadingNoteSeconds,function()
+  loadNoteDue=false
+  local counts,kinds={},{}
+  for _,kind in pairs(loadWait)do if not counts[kind]then counts[kind]=0;kinds[#kinds+1]=kind end;counts[kind]+=1 end
+  table.clear(loadWait);table.sort(kinds)
+  if #kinds==0 then return end
+  local parts={}
+  for _,kind in ipairs(kinds)do parts[#parts+1]=counts[kind]..(counts[kind]==1 and' item picture'or' item pictures')..' waiting for '..kind end
+  warn('[R112] '..table.concat(parts,', '))
+ end)
+end
 local function mutationKey(value)return(value=='Gold'or value=='Diamond')and value or'None'end
 -- Same crop identity HarvestPresentation.Build uses, so the key matches what it draws.
 local function harvestCrop(tool,id)
@@ -266,7 +289,10 @@ local function stepBuild()
    -- Meshes that are still replicating come back quickly; real failures wait longer.
    failed[job.Key]=os.clock()+(tostring(why):find('still loading',1,true)and P.LoadingRetrySeconds or P.RetrySeconds)
    for _,m in ipairs(job.Models)do if not m.Parent then m:Destroy()end end
-   if Run:IsStudio()and not warned[job.Key]then warned[job.Key]=true;warn('[R112] Item picture fallback '..job.Key..': '..tostring(why))end
+   if Run:IsStudio()then
+    if tostring(why):find('still loading',1,true)then noteLoading(job.Key,why)
+    elseif not warned[job.Key]then warned[job.Key]=true;warn('[R112] Item picture fallback '..job.Key..': '..tostring(why))end
+   end
    job=nil
   elseif coroutine.status(job.Thread)=='dead'then job=nil end
  end
