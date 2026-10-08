@@ -235,7 +235,27 @@ function A.Duck(level)
  end
  A.DuckLevel=level
 end
+-- R154: a result collected while its reveal still rang: what still sounds (and the music duck) fades out over `seconds` and the sheet ends, so
+-- the collect's own sounds never stack on the reveal's tail. Self-driven for those few frames only; Stop / Begin end it at once.
+local fadeConn
+local function endFade()if fadeConn then fadeConn:Disconnect();fadeConn=nil end end
+function A.FadeOut(seconds)
+ if not sheet then return end
+ seconds=math.max(.02,tonumber(seconds)or .2)
+ local list={};for v in pairs(playing)do list[#list+1]={V=v,From=wrote[v]or v.Volume}end
+ local duck=A.DuckLevel
+ sheet=nil;events={};cursor=1;length=math.huge;table.clear(playing);table.clear(cold);endFade()
+ local t0=os.clock()
+ fadeConn=game:GetService('RunService').Heartbeat:Connect(function()
+  local k=math.clamp((os.clock()-t0)/seconds,0,1)
+  for _,it in ipairs(list)do if it.V.Parent then setLevel(it.V,it.From*(1-k))end end
+  A.Duck(duck*(1-k))
+  if k>=1 then for _,it in ipairs(list)do it.V:Stop()end;A.Duck(0);endFade()end
+ end)
+end
+function A.Fading()return fadeConn~=nil end
 function A.Stop()
+ endFade()
  sheet=nil;events={};cursor=1;length=math.huge
  table.clear(playing);table.clear(cold)
  for _,list in pairs(voices)do for _,pair in ipairs(list)do for _,v in ipairs(pair)do v:Stop()end end end

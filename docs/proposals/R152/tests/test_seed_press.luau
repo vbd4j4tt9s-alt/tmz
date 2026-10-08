@@ -13,6 +13,10 @@
 --     reveal's (a card that would take it; the whole story scene), put back as soon as a press would be the tool's again, on a tool swap
 --     and when the reveal ends; a tool that is manual already (a seed, the shovel) is never touched.
 --  6. a story scene owns every press: R2 through the garden's action plants nothing, the gift's R2 opens nothing.
+-- R154 (owner: "... the seed stays on the player's screen until they click and the seed goes to their inventory"): the press after the result
+-- now COLLECTS it (R153: closed it) and is just as much the reveal's; while the result WAITS (as long as it takes) every press is the reveal's:
+-- the first one collects it, none reaches the tool; the pack / the bat stay manual the whole wait; once collected the tools work at once.
+--  7. the seed of the pull is not "in the hand" for planting until it has flown in (EconomyClient: equippedGardenSeed, from its source).
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -25,7 +29,7 @@ UIS.TouchTapInWorld=UIS.TouchTapInWorld or R.signal()
 function UIS.GetMouseLocation()return R.Vector2.new(640,360)end
 UIS.GamepadEnabled=false
 local Mixer=W.module('AudioMixer');Mixer.Start()
-local M=W.module('RarePullCinematic');local L=W.module('RarePullRules');local Visuals=W.module('SeedPackVisuals')
+local M=W.module('RarePullCinematic');local L=W.module('RarePullRules');local Visuals=W.module('SeedPackVisuals');local Collect=W.module('SeedCollect154')
 local names={'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
 local cam=W.workspace.CurrentCamera
 local Players=W.service('Players')
@@ -114,7 +118,7 @@ local function start(rank)
  return run,bag
 end
 local function untilClock(run,t)local g=0;while not run.Done and run.Clock()<t and g<2000 do X.run(1/30);g+=1 end end
-local function gone(run,bag)local g=0;while M.Active()==run and g<400 do X.run(1/30);g+=1 end;bag:Destroy();X.run(.4)end
+local function gone(run,bag)local g=0;while(M.Active()==run or Collect.Flying()>0)and g<400 do X.run(1/30);g+=1 end;bag:Destroy();X.run(.4)end
 
 -- 1. planting ---------------------------------------------------------------------------------------------------------------------------------
 for _,how in ipairs({'click','tap','R2'})do
@@ -127,8 +131,12 @@ for _,how in ipairs({'click','tap','R2'})do
  check(placed==p0+1 and not run.Skipped,tag..': a press the card does not take yet (before '..tl.SkipFrom..' s) still plants')
  untilClock(run,tl.SkipFrom+.1);p0=placed;press()
  check(run.Skipped==1 and placed==p0,tag..': the press that skips the card plants nothing')
- untilClock(run,L.ShownAt(tl)+.3);p0=placed;press()
- check(run.Skipped==2 and placed==p0,tag..': the press that closes it plants nothing')
+ untilClock(run,L.ShownAt(tl)+.1);p0=placed;press()
+ check(not run.Collected and placed==p0,tag..': a press as the result lands (it only lands: R154) plants nothing either')
+ untilClock(run,tl.Length+20) -- (R154: the result waits, however long)
+ check(M.Active()==run and M.Waiting(),tag..': 20 s after its length the result still waits')
+ X.run(.3);p0=placed;press()
+ check(run.Collected and placed==p0,tag..': the press that collects it (R154; R153 closed it) plants nothing')
  gone(run,bag)
  p0=placed;press();check(placed==p0+1,tag..': the card gone, the next press plants as before')
 end
@@ -144,7 +152,7 @@ for _,how in ipairs({'click','tap','R2'})do
  untilClock(run,tl.SkipFrom+.1);local r0=removes;press()
  check(run.Skipped==1 and not shovelOpen()and X.pg:GetAttribute('SeedMenu')==nil,tag..': the press that skips opens no removal')
  untilClock(run,L.ShownAt(tl)+.3);press()
- check(run.Skipped==2 and not shovelOpen()and removes==r0,tag..': the press that closes opens none either, and nothing is removed')
+ check(run.Collected and not shovelOpen()and removes==r0,tag..': the press that collects it (R154) opens none either, and nothing is removed')
  gone(run,bag)
  press();check(shovelOpen(),tag..': the card gone, the next press opens it as before');shovelClose()
 end
@@ -160,7 +168,7 @@ do
   untilClock(run,tl.SkipFrom+.1);d0=digs;press()
   check(run.Skipped==1 and digs==d0,tag..': the press that skips digs nothing')
   untilClock(run,L.ShownAt(tl)+.3);press()
-  check(run.Skipped==2 and digs==d0,tag..': nor the one that closes it')
+  check(run.Collected and digs==d0,tag..': nor the one that collects it (R154)')
   gone(run,bag)
   press();check(digs==d0+1,tag..': the card gone, the next press digs')
  end
@@ -178,7 +186,7 @@ for _,how in ipairs({'click','tap'})do
  untilClock(run,tl.SkipFrom+.1);press()
  check(run.Skipped==1 and not giftOpen(),tag..': the press that skips asks nothing')
  untilClock(run,L.ShownAt(tl)+.3);press()
- check(run.Skipped==2 and not giftOpen()and gifts==0,tag..': nor the one that closes it; nothing is given')
+ check(run.Collected and not giftOpen()and gifts==0,tag..': nor the one that collects it (R154); nothing is given')
  gone(run,bag);X.run(.7)
  press();check(giftOpen(),tag..': the card gone, the next press asks again');giftClose()
 end
@@ -194,6 +202,7 @@ for _,t in ipairs({packTool,bat})do
  click();X.run(1/30);sample('justSkipped') -- (after a press, the next one is a run of clicks for SkipGap: the tool's again)
  untilClock(run,hit+.1);sample('hitToResult')
  untilClock(run,L.ShownAt(tl)+.3);sample('closeable')
+ untilClock(run,tl.Length+15);sample('waiting') -- (R154: the result waits)
  hold(seed);X.run(1/30)
  local swapped=t.ManualActivationOnly==false and seed.ManualActivationOnly==true
  hold(t);X.run(1/30);sample('back')
@@ -202,7 +211,8 @@ for _,t in ipairs({packTool,bat})do
  check(log.armed==true,tag..': once a click would skip the card, the tool does not take it (ManualActivationOnly on, this client only)')
  check(log.justSkipped==false,tag..': right after a press (a run of clicks does not skip) the tool has its clicks again')
  check(log.hitToResult==false,tag..': between the hit and the result (a click does nothing to the card) the clicks are the tool\'s')
- check(log.closeable==true,tag..': once the result is shown (a click closes the card) held again')
+ check(log.closeable==true,tag..': once the result is shown (a click collects it) held again')
+ check(log.waiting==true,tag..': and for as long as the result waits (R154: 15 s after its length)')
  check(swapped and log.back==true,tag..': swapping tools puts the old one back; a manual tool (the seed) is never touched; the tool taken out again is held again')
  check(t.ManualActivationOnly==false,tag..': the card gone: put back')
 end
@@ -210,7 +220,11 @@ do -- a story scene holds the tool the whole time
  reset();hold(packTool)
  local run,bag=start(6);local tl=run.TL;local all=true
  check(run.Kind=='Scene','(King / Secret story scene)')
- while M.Active()==run do X.run(1/30);if M.Active()==run and packTool.ManualActivationOnly~=true then all=false end end
+ local g=0
+ while M.Active()==run and g<2000 do
+  X.run(1/30);g+=1;if M.Active()==run and packTool.ManualActivationOnly~=true then all=false end
+  if not run.Collected and run.Clock()>=tl.Length+5 then local b=X.find(X.pg,'Backdrop');if b then b.Activated:Fire()end end -- (R154: it waits; the tap collects it)
+ end
  bag:Destroy();X.run(.3)
  check(all and packTool.ManualActivationOnly==false,'a story scene: the held pack does not activate for its whole length, and is put back after')
  M.Abort('test');hold(nil)
@@ -234,6 +248,18 @@ do -- one answer per press: the routes of one press (the card's listener, the to
  L.PressTaker=saved
  check(a and b and c and calls==2 and d,'one press asked by three routes: one answer, the reveal asked once; the next press is asked again ('..calls..' asks)')
  check(e==false,'nobody to take it (no director): no press is ever the reveal\'s')
+end
+-- 7. R154: the seed of a pull is not in the hand for planting until it has flown in (EconomyClient's equippedGardenSeed, from its source)
+do
+ local src=W.B.EconomyClient
+ local a=src:find('local function collectHeld',1,true);local b=select(2,src:find('\nlocal function sendGarden',a,true))
+ check(a and b,'EconomyClient: collectHeld and equippedGardenSeed are found in its source')
+ local env=setmetatable({player=X.player,ReplicatedStorage=W.RS},{__index=W.env})
+ local f=loadstring(src:sub(a,b-#'\nlocal function sendGarden')..'\nreturn equippedGardenSeed','=EconomyClient seed in hand');setfenv(f,env);local equipped=f()
+ reset();hold(seed);check(equipped()==seed,'a seed in the hand is the planting seed, as before')
+ Collect.Hold('seed-1');check(equipped()==nil,'R154: the same seed held back (its pull\'s result waits) is not: no planting, no aim')
+ Collect.Land('seed-1');check(equipped()==seed,'R154: once it has flown in it is')
+ hold(nil)
 end
 -- the source: every tool route asks before it acts
 do

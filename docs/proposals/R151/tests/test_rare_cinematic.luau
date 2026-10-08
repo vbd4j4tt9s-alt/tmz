@@ -1,6 +1,9 @@
 --!nocheck
 -- R151 pull reveals, part 2: the REAL RarePullCinematic (director) with RarePullScenes, RarePullCard, RarePullAudio, RarePullRules and
 -- AudioMixer / SoundTiming on the Roblox mock: each story scene played through frame by frame, every exit path, the variants.
+-- R154 (owner: "... the seed stays on the player's screen until they click and the seed goes to their inventory"): a presentation no longer
+-- ends by itself: its result waits for a press, which collects it (the seed flies home: SeedCollect154). Where these checks played a reveal to
+-- its end they now see it wait, then collect it (collect below); "a second skip ... closes it" is now "... collects it".
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -13,6 +16,18 @@ local Mixer=W.module('AudioMixer');Mixer.Start()
 local M=W.module('RarePullCinematic');local L=W.module('RarePullRules');local Audio=W.module('RarePullAudio');local Sounds=W.module('RarePullSounds')
 local Visuals=W.module('SeedPackVisuals')
 local cam=W.workspace.CurrentCamera;local Run=W.Run
+local Collect=W.module('SeedCollect154')
+-- R154: the result is up and waits; collect it (as a press does) and let the seed fly in. Returns whether it was waiting.
+local function collect(run)
+ local waited=false
+ if run and not run.Done and not run.Collected then
+  local g=0;while not run.SawResult and not run.Done and g<900 do X.run(1/30);g+=1 end
+  X.run(M.CollectAfter+.05);waited=M.Waiting();M.Collect()
+ end
+ local g=0;while(M.Active()or Collect.Flying()>0)and g<900 do X.run(1/30);g+=1 end
+ X.run(.1)
+ return waited
+end
 local names={'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
 local effects=Mixer.Group('Effects')
 local function voices(slot)local out={};for _,s in ipairs(E.sounds)do if s.Name:match('^RarePull_'..(slot or''))and s.Parent then out[#out+1]=s end end;return out end
@@ -56,6 +71,7 @@ local function restoredAll(tag,opts)
  check(X.pg:FindFirstChild('RarePullReveal')==nil,tag..': the reveal GUI is gone')
  check(W.rsBound[M.BindName]==nil and W.actions[M.SkipAction]==nil,tag..': no render step or skip binding left')
  check(X.player:GetAttribute('RarePullCinematic')==nil and X.player:GetAttribute('RarePullClimaxAt')==nil,tag..': the announcement attributes are cleared')
+ check(X.pg:FindFirstChild('SeedCollectFly')==nil and Collect.Flying()==0,tag..': no seed left flying (R154)')
  if not opts.result then check(anyPlaying()==nil,tag..': every reveal sound is stopped ('..tostring(anyPlaying())..')')end
  local same,key=X.same(X.base,X.lighting());check(same,tag..': Lighting untouched ('..tostring(key)..')')
 end
@@ -108,13 +124,22 @@ for rank=6,8 do
   end
   local same=X.same(X.base,X.lighting());if not same then log.lightingSame=false end
  end)
- check(M.Active()==nil,tag..': it ends by itself ('..string.format('%.1f',tl.Length)..' s)')
+ -- (R154: the result waits in the stage, the hero shot held; the press collects it: the way out from there, then the seed flies home)
+ check(M.Active()==run and M.Waiting()and run.InStage and cam.CameraType==R.Enum.CameraType.Scriptable,tag..': after its whole length ('..string.format('%.1f',tl.Length)..' s) the result still waits, on the hero shot')
+ local pressAt=R.clock-t0;local button=X.find(X.pg,'Backdrop');if button then button.Activated:Fire()end
+ X.run(M.SceneExit+(tl.Length-tl.Back)+.3,1/30,function(now)
+  local t=now-t0
+  if cam.CameraType==R.Enum.CameraType.Scriptable and(cam.CFrame.Position-L.StageOrigin).Magnitude>120 then log.nearStage=false end
+  if log.switchAt and not log.backAt and cam.CameraType~=R.Enum.CameraType.Scriptable then log.backAt=t end
+ end)
+ check(run.Collected and run.Done,tag..': a tap collects it, and it ends after its way out')
+ local g=0;while Collect.Flying()>0 and g<300 do X.run(1/30);g+=1 end
  check(log.hudHidden and log.coreOff and log.controlsHeld,tag..': HUD, Core GUI and movement are held for the whole scene')
  check(X.controls.Disables==disables+1,tag..': movement held once')
  check(log.grade and log.lightingSame,tag..': the colour grade lives on the Camera; Lighting is never written')
  check(log.blurSeen,tag..': a short blur on the fades (desktop)')
  check(log.switchAt and near(log.switchAt,tl.SceneIn-.05,.07),tag..': the camera cuts to the stage while the screen is black ('..tostring(log.switchAt)..' s)')
- check(log.backAt and near(log.backAt,tl.Back,.07),tag..': and back to the player at '..tostring(log.backAt)..' s')
+ check(log.backAt and near(log.backAt,pressAt+M.SceneExit,.07),tag..': and back to the player '..M.SceneExit..' s after the collect (at '..tostring(log.backAt)..' s)')
  check(log.nearStage,tag..': the camera only looks at the hidden stage')
  check(log.maxParts>20 and log.maxParts<=budgets[rank],tag..': '..log.maxParts..' parts (budget '..budgets[rank]..')')
  check(log.titleAt and near(log.titleAt,tl.Climax,.1),tag..': the title appears on the hit ('..tostring(log.titleAt)..')')
@@ -164,12 +189,12 @@ do
  check(near(t,tl.Climax,.12),'King: a tap after '..tl.SkipFrom..' s jumps straight to the hit ('..string.format('%.2f',t)..' s)')
  local impact=voices('Impact_1')[1]
  check(impact and impact.PlayLog[#impact.PlayLog]and R.clock-impact.PlayLog[#impact.PlayLog].At<.2,'King: the hit\'s Impact plays on the skip')
- X.run(.6)
+ X.run(L.ShownAt(tl)+M.CollectAfter+.05-run.Clock())
  check(W.actions[M.SkipAction]~=nil,'Space / Enter / A / B skip too (bound while the scene runs)')
  W.actions[M.SkipAction](M.SkipAction,R.Enum.UserInputState.Begin)
  X.run(.05)
- check(near(run.Clock(),tl.FloatEnd,.1),'King: a second skip goes to the way out')
- X.run(tl.Length-tl.FloatEnd+.3)
+ check(run.Collected,'King: a second press once the result is shown collects it (R154: it used to close it)')
+ X.run(M.SceneExit+(tl.Length-tl.Back)+.3);local g=0;while Collect.Flying()>0 and g<300 do X.run(1/30);g+=1 end
  check(M.Active()==nil,'King: skipped run ends')
  restoredAll('after skip')
 end
@@ -185,7 +210,8 @@ local function midScene(rank,how,tag,expectResult)
  if expectResult then
   check(active and active.Kind=='Result',tag..': the player still sees what they got (a compact result card)')
   check(cam.CameraType==R.Enum.CameraType.Custom and hudShown()and X.controls.Enabled and stage()==nil,tag..': the world is back at once')
-  X.run(3)
+  X.run(3);check(M.Active()==active and M.Waiting(),tag..': the result card waits (R154)')
+  collect(active)
  else check(active==nil,tag..': it stops at once') end
  check(M.Active()==nil,tag..': nothing left running')
  restoredAll(tag)
@@ -227,6 +253,7 @@ do -- ReducedMotion: the Calm scene - still shots (cuts only), no shake, no blur
    lastPos=p
   end
  end)
+ collect(run)
  check(moved==0,'ReducedMotion: the camera never moves inside a shot (cuts only; '..moved..' moving frames)')
  check(not blur,'ReducedMotion: no blur')
  check(tl.Length<L.Timeline(8,'Full').Length-2,'ReducedMotion: shorter ('..tl.Length..' s)')
@@ -241,6 +268,7 @@ do -- phone: lighter stage, gentle shake, no blur
   local st=stage();if st then local n=0;for _,d in ipairs(st:GetDescendants())do if d:IsA('BasePart')then n+=1 end end;parts=math.max(parts,n)end
   if cam:FindFirstChild('RarePullBlur')then blur=true end
  end)
+ collect(run)
  check(parts>20 and parts<=200,'phone: King stage '..parts..' parts (<= 200 with the pack, the seed and its aura)')
  check(not blur,'phone: no blur (no stacked post-processing)')
  restoredAll('phone')
@@ -262,7 +290,8 @@ do -- unsafe: the in-place version (no camera, no stage, HUD and movement untouc
    local gui=X.pg:FindFirstChild('RarePullReveal');local title=gui and X.find(gui,'Title')
    if title and title.TextTransparency<.5 then titleSeen=true;local _,y,_,h=X.rect(title,1280,720);if(y+h)/720>.5 then compactOk=false end end
   end)
-  check(not scriptable and not hudOff and not stageSeen,case[1]..': no camera, HUD stays, no hidden stage')
+  collect(run)
+ check(not scriptable and not hudOff and not stageSeen,case[1]..': no camera, HUD stays, no hidden stage')
   check(X.coreWrites==writes and X.controls.Disables==disables,case[1]..': Core GUI and movement untouched')
   check(titleSeen and compactOk,case[1]..': the compact title shows in the upper half')
   restoredAll(case[1])
@@ -289,7 +318,9 @@ for rank=1,5 do
  check(final=='1 in '..W.module('SeedRarity153').Count(X.byRank[rank])and final=='1 in '..({'2','4','16','60','400'})[rank],names[rank]..': "1 in N" ('..tostring(final)..'): the seed\'s fixed chance (here it is also the pack\'s tooltip row)')
  check((rank>=4)==(fovMin<69.9),names[rank]..': '..(rank>=4 and'a short camera push'or'no camera push')..' (FieldOfView down to '..string.format('%.1f',fovMin)..')')
  check(edge and math.abs(edge.R-L.Tiers[rank].Hint.R)<.02 and math.abs(edge.G-L.Tiers[rank].Hint.G)<.02,names[rank]..': the screen edges end the suspense in the tier colour')
- check(M.Active()==nil and near(cam.FieldOfView,70),names[rank]..': ends and the FieldOfView is back')
+ check(M.Active()==run and M.Waiting()and near(cam.FieldOfView,70),names[rank]..': after its length the card waits (R154) and the FieldOfView is back')
+ collect(run)
+ check(M.Active()==nil and near(cam.FieldOfView,70),names[rank]..': collected, it ends and the FieldOfView stays back')
  restoredAll(names[rank]..' card')
  bag:Destroy()
 end
@@ -300,11 +331,11 @@ do -- R153: packs opened back to back play in full every time (R151 made them qu
  check(not second.Quick and not L.IsQuick(bag2)and second.TL.Length==L.CardTimeline(2).Length,'R153: a pack opened right after the last reveal plays in full (and the world pack knows it)')
  X.run(.5);local third,bag3=start(3)
  check(not third.Quick and third.TL.Length==L.CardTimeline(3).Length,'R153: one opened while the last card is still up plays in full too')
- X.run(third.TL.Length+.2);restoredAll('back to back')
+ X.run(third.TL.Length+.2);collect(third);restoredAll('back to back')
  X.player:SetAttribute('SettingSkipCutscenes',true);reset()
  local fourth,bag4=start(2)
  check(fourth.Quick and L.IsQuick(bag4)and fourth.TL.Length<L.CardTimeline(2).Length,'R153: with "Skip pack animations" on: the short version ('..string.format('%.2f',fourth.TL.Length)..' s)')
- X.run(fourth.TL.Length+.2);restoredAll('skip pack animations')
+ X.run(fourth.TL.Length+.2);collect(fourth);restoredAll('skip pack animations')
  X.player:SetAttribute('SettingSkipCutscenes',nil)
  R.advance(5);local fifth,bag5=start(2);check(not fifth.Quick,'R153: and off again, the full suspense');M.Abort('test')
  for _,b in ipairs({bag1,bag2,bag3,bag4,bag5})do b:Destroy()end
@@ -312,7 +343,7 @@ do -- R153: packs opened back to back play in full every time (R151 made them qu
  X.player:SetAttribute('SettingSkipCutscenes',true);reset()
  local short,bag6=start(8)
  check(short.Kind=='InPlace'and short.Why=='skip pack animations is on','R153: with "Skip pack animations" on, King plays the in-place result card ('..tostring(short.Kind)..')')
- X.run(short.TL.Length+.2);restoredAll('King short');bag6:Destroy()
+ X.run(short.TL.Length+.2);collect(short);restoredAll('King short');bag6:Destroy()
  X.player:SetAttribute('SettingSkipCutscenes',nil);reset()
  local preview=M.Start({Rank=8,SeedId=X.byRank[8],At=W.workspace:GetServerTimeNow(),Preview=true})
  check(preview and preview.Kind=='Scene','R153: an owner preview is the full scene ('..tostring(preview and preview.Kind)..')');M.Abort('test')
@@ -328,8 +359,10 @@ do -- R153: every card can be skipped by the player (R151 / R152: only the story
   check(M.Skip()and near(run.Clock(),hit-.02,.01),tag..': a skip jumps straight to the hit')
   check(W.actions[M.SkipAction]==nil and X.find(X.pg,'Backdrop')==nil and X.controls.Enabled and hudShown(),tag..': nothing is taken from the player (no full-screen button, no bound keys, the HUD and movement stay)')
   X.run(L.ShownAt(tl)-run.Clock()+.1)
-  check(M.Skip(),tag..': a second skip once the result is shown closes it')
-  X.run(tl.Length-tl.FloatEnd+.2)
+  check(not M.Skip()and not run.Collected,tag..': a press just as the result lands does nothing yet (R154: CollectAfter)')
+  X.run(M.CollectAfter)
+  check(M.Skip()and run.Collected,tag..': a second press once the result is shown collects it (R154: it used to close it)')
+  collect(nil)
   check(M.Active()==nil,tag..': gone');restoredAll(tag);bag:Destroy()
  end
 end

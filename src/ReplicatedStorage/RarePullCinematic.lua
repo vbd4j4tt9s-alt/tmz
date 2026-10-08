@@ -22,14 +22,25 @@
 -- skip cutscene option in the settings"): every opening plays in full (no "quick" reveal for packs opened back to back). Skipping is the
 -- player's choice: every card is skippable too (M.Skip; a click / tap on the world, Enter, the gamepad's B / R2: to the hit, then closed),
 -- and the setting "Skip pack animations" gives the short version (RarePullRules.SkipAnimations / Decide).
+-- R154 (owner: "after obtaining the seed the seed stays on the player's screen until they click and the seed goes to their inventory"): the
+-- result WAITS. Once it is shown (the seed, its name, rarity and "1 in N": ShownAt) nothing closes it: no timer, the card / the story scene's
+-- hero shot stays, "click to collect!" / "tap to collect!" (Card) until a click / tap anywhere, Enter, B or R2 (the same rules as the skip;
+-- the press is the reveal's: RarePullRules.ClaimPress). That press COLLECTS it: the seed flies from the card into its hotbar slot (or the
+-- Bag button) and pops (SeedCollect154); a story scene first goes back to the world (its way out, quicker). Until it has flown in, the seed
+-- is held out of the hotbar and the hand on this screen (the server's timing is unchanged: the seed was the player's on the 5th click and
+-- its tool is handed over when the server ends the opening, as before). A waiting result is never lost: whatever takes the player away
+-- (death, a fling, a chase, a teleport, leaving the base or the track, a menu, the next pack opened) collects it first. The sounds and the
+-- duck end on the presentation's own Length as before (the result then waits in silence); a collect before that fades their tail
+-- (RarePullAudio.FadeOut), so the collect's whoosh and pop never stack on it.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Gui=game:GetService('GuiService');local UIS=game:GetService('UserInputService');local CAS=game:GetService('ContextActionService')
 local Collection=game:GetService('CollectionService');local StarterGui=game:GetService('StarterGui')
 local Rules=require(script.Parent.RarePullRules);local Audio=require(script.Parent.RarePullAudio)
 local Cache do local ok,m=pcall(require,script.Parent.PropCache152);Cache=ok and m or{new=function()return{Set=function(o,k,v)o[k]=v end}end}end -- (R152 perf)
+local Collect do local ok,m=pcall(require,script.Parent.SeedCollect154);Collect=ok and m or nil end -- (R154)
 local M={}
 M.BindName='ChestChaseRarePull';M.SkipAction='ChestChaseRarePullSkip'
-M.KeepGuis={TouchGui=true,Freecam=true}
+M.KeepGuis={TouchGui=true,Freecam=true,SeedCollectFly=true} -- (R154: the seed flying home is never hidden by a story scene)
 M.CoreTypes={'PlayerList','Chat','EmotesMenu','Health','Backpack'}
 M.DangerRadius=45;M.MoveLimit=8
 local current=nil;M.LastEnd=-math.huge
@@ -214,7 +225,15 @@ local function grade(run,b,c,s,tint,blur)
 end
 local WHITE=Color3.new(1,1,1)
 -- Finishing -----------------------------------------------------------------------------------------------------------------------------
-local finish
+local finish,collect
+-- R154: reasons that end a presentation without its seed flying in (the script going, a test, a failed start): the hold just ends
+M.NoCollect={aborted=true,destroyed=true,test=true,['start failed']=true}
+M.CollectAfter=.25 -- a press this soon after the result is shown only lands (the clicks of a skip go on for a moment)
+M.SceneExit=.35 -- a collected story scene's fade to black (R153: FloatEnd -> Back, .5-.7 s), then the world and the seed's flight
+M.TailFade=.2 -- a collect while the reveal still rings: its tail fades out over this
+M.TeleportStep=30 -- studs in one frame: a teleport (no runner moves that far in a frame)
+M.LeaveDistance=90 -- studs from where the result was shown: the player has left
+M.Forever=1e6 -- (seconds: a beat that does not come while the result waits)
 local function unbind(run)
  if run.Bound then run.Bound=false;pcall(function()Run:UnbindFromRenderStep(run.BindName or M.BindName)end)end
  if run.SkipBound then run.SkipBound=false;pcall(function()CAS:UnbindAction(M.SkipAction)end)end
@@ -260,11 +279,13 @@ function M.Fading()local n=0;for _ in pairs(fading)do n+=1 end;return n end
 local function clearFades()for f in pairs(fading)do fading[f]=nil;if f.Gui then f.Gui:Destroy()end;if f.Grade then f.Grade:Destroy()end end;if fadeConn then fadeConn:Disconnect();fadeConn=nil end end
 finish=function(run,reason)
  if run.Done then return end
+ -- R154: a revealed seed is never lost: whatever ends its presentation (death, a fling, a chase, a menu, the next pack ...) it flies in first
+ if run.SawClimax and not run.Collected and not M.NoCollect[reason]then return collect(run,reason)end
  run.Done=true;run.Reason=reason
  pcall(unbind,run)
  pcall(leaveStage,run)
  pcall(restoreCamera,run)
- if reason=='replaced'and run.Kind~='Scene'and run.Gui then
+ if(reason=='replaced'or run.Collected)and run.Kind~='Scene'and run.Gui then -- (R154: a collected card fades the same way, its seed flying off)
   pcall(fadeOut,run.Gui,run.Grade);run.Gui=nil;run.Grade=nil;run.Card=nil;run.SeedModel=nil
  end
  if run.Grade then run.Grade:Destroy();run.Grade=nil end
@@ -282,10 +303,105 @@ finish=function(run,reason)
  if M._building==run then M._building=nil end
  M.LastEnd=os.clock();Rules.RevealRunning=current~=nil
  -- a story scene that had to stop before its hit still shows the result (a compact card), unless the player died / left
- if(reason=='danger'or reason=='moved'or reason=='camera'or reason=='error')and run.Kind=='Scene'and not run.SawClimax and run.Info then
+ local follow=(reason=='danger'or reason=='moved'or reason=='camera'or reason=='error')and run.Kind=='Scene'and not run.SawClimax and run.Info
+ -- (R154: its hold goes on to that card; any other presentation that ends without its seed flying in lets it show now)
+ if Collect and not run.Collected and not follow then pcall(Collect.Release,run.Id);pcall(Collect.MarkBag,run.Info and run.Info.Bag,nil)end
+ if run.Fly then pcall(run.Fly.Go)end
+ if follow then
   local info=table.clone(run.Info);info.Result=true
-  task.defer(function()if not current then M.Start(info)end end)
+  task.defer(function()if not current then M.Start(info)elseif Collect then pcall(Collect.Release,run.Id)end end)
  end
+end
+-- R154 ---------------------------------------------------------------------------------------------------------------------------------------
+-- The seed flies home (SeedCollect154): a card's own seed view, or (a story scene) its hero seed, centred as the scene frames it. wait: seconds
+-- it rests there first (the scene's way out). Without the module or a model it arrives at once.
+local function startFly(run,wait)
+ if not Collect then return nil end
+ local opts={Id=run.Id,Spec=run.Spec,Reduced=run.Reduced,Wait=wait}
+ local seed=run.Card and run.Card.TakeSeed and run.Card:TakeSeed()
+ if seed then
+  opts.View=seed.View;opts.Centre=seed.Centre;opts.Base=seed.Base;opts.Yaw=seed.Yaw;opts.From={X=seed.X,Y=seed.Y,S=seed.S}
+  run.SeedModel=nil -- (it flies with its view)
+ else
+  local ok,m=pcall(M.SeedModel,run.Info.SeedId,run.Info.Mutation)
+  opts.Model=ok and m or nil;opts.FadeIn=.15;opts.From={X=.5,Y=.5,S=Rules.HeroDiameter.To*1.08}
+ end
+ local ok,h=pcall(Collect.Fly,opts)
+ if ok then return h end
+ warn('[RarePull] collect: '..tostring(h));pcall(Collect.Land,run.Id)
+ return nil
+end
+-- A story scene collected by the player: its way out from t (the fade to black over SceneExit, the world, the grade easing back).
+local function exitBeats(run,t)
+ local tl=run.TL;local b=table.clone(tl)
+ b.FloatEnd=t;b.Back=t+M.SceneExit;b.Length=b.Back+(tl.Length-tl.Back);b.WaitEnd=t
+ return b
+end
+-- What the card (and a story scene's screen beats) see while the result waits: nothing goes out (Out / Length, a scene's FloatEnd / Back far
+-- away). The stage, the camera, the grade of a card and the sounds keep the real timeline.
+local function waitBeats(run)
+ local b=table.clone(run.TL);b.Wait=true;b.Out=M.Forever;b.Length=M.Forever
+ if run.Kind=='Scene'then b.FloatEnd=M.Forever;b.Back=M.Forever end
+ return b
+end
+collect=function(run,why)
+ if run.Collected or run.Done then return end
+ run.Collected=true;run.CollectWhy=why
+ if Collect then pcall(Collect.MarkBag,run.Info and run.Info.Bag,os.clock())end
+ if run.Audio then run.Audio=false;pcall(Audio.FadeOut,M.TailFade)end
+ if run.Kind=='Scene'and why=='press'and run.InStage then
+  run.Beats=exitBeats(run,run.Clock());run.Exit=run.Beats
+  run.Fly=startFly(run,M.SceneExit)
+  return
+ end
+ run.Fly=startFly(run,0)
+ finish(run,why)
+end
+-- the pack this reveal opened: its inventory id is the seed's (the server keeps it); a pack put away on the frame its reveal began is found as
+-- the one the server switched off
+local function packId(info)
+ local tool=info.Tool;local id=tool and tool:GetAttribute('SeedInventoryId')
+ if id~=nil then return id end
+ local player=lp();local places={player.Character,player:FindFirstChildOfClass('Backpack')}
+ for i=1,2 do local c=places[i];if c then for _,t in ipairs(c:GetChildren())do if t:IsA('Tool')and t:GetAttribute('SeedPackTool')and t.Enabled==false then return t:GetAttribute('SeedInventoryId')end end end end
+ return nil
+end
+-- what the seed tool will look like (the Hotbar puts it with a stack of the same seed): the attributes the server gives it, from the pack
+local function specOf(info)
+ local bag=info.Bag;local spec={SeedId=info.SeedId}
+ local ok,Packs=pcall(require,RS:FindFirstChild('SeedPackRules'))
+ if bag and ok and Packs then
+  spec.Mutation=Packs.MutationKey(bag:GetAttribute('PackMutation')or info.Mutation)
+  local scale=bag:GetAttribute('SeedScale');if scale~=nil then spec.SeedScale=Packs.SanitizeSeedScale(scale)end
+ end
+ if bag then spec.Rarity=bag:GetAttribute('Rarity');spec.Weather=bag:GetAttribute('Weather')end
+ return spec
+end
+-- A waiting result collects itself (flies in) when the player is taken away from it: death, a ragdoll / fling, a chase (or a keeper chasing),
+-- a teleport, leaving the base or the track, a menu (the shop, the Bag ...) opening. Each counts as a CHANGE while it waits: one already going
+-- on when the result was shown does not, so a result is never collected the moment it appears.
+local function waitCheck(run)
+ local player=lp();local char=player and player.Character
+ if char~=run.Character then return'death'end
+ local root=char and char:FindFirstChild('HumanoidRootPart')
+ if root then
+  local p=root.Position
+  if run.LastPos and(p-run.LastPos).Magnitude>M.TeleportStep then return'teleport'end
+  run.LastPos=p
+ end
+ if os.clock()<(run.NextWait or 0)then return nil end
+ run.NextWait=os.clock()+.2
+ local s=M.Snapshot()
+ if not s.Alive then return'death'end
+ local now={Ragdoll=s.Ragdoll==true,Chase=s.Running==true or s.KeeperChasing==true,Menu=s.Menu==true,Track=s.OnTrack==true}
+ local was=run.WaitState;run.WaitState=now
+ if not was then run.WaitPos=s.Root and s.Root.Position;return nil end
+ if now.Ragdoll and not was.Ragdoll then return'ragdoll'end
+ if now.Chase and not was.Chase then return'chase'end
+ if now.Menu and not was.Menu then return'menu'end
+ if now.Track~=was.Track then return'left'end
+ if run.WaitPos and s.Root and(s.Root.Position-run.WaitPos).Magnitude>M.LeaveDistance then return'left'end
+ return nil
 end
 -- Starting ------------------------------------------------------------------------------------------------------------------------------
 -- info: {Rank, SeedId, At (RevealAt, server time), Bag, Tool, Mutation, Preview, Result}. Returns the run, or nil (nothing is left behind:
@@ -313,7 +429,7 @@ function M._start(info)
  if current and not current.Done and info.Bag~=nil and current.Info.Bag==info.Bag and current.At==tonumber(info.At)then return current end
  local hand
  if current then hand=handoff(current);finish(current,'replaced')end
- local run={Info=info,Rank=rank,Connections={},Reduced=reduced(),Phone=phone(),Lite=lite(),At=tonumber(info.At)or workspace:GetServerTimeNow()}
+ local run={Info=info,Rank=rank,Connections={},Reduced=reduced(),Phone=phone(),Lite=lite(),At=tonumber(info.At)or workspace:GetServerTimeNow(),Character=player.Character}
  run.Set=Cache.new().Set;run.Held={}
  M._building=run
  -- what kind of presentation
@@ -395,6 +511,13 @@ function M._start(info)
  end
  table.insert(run.Connections,player.CharacterRemoving:Connect(function()finish(run,'death')end))
  current=run;M._building=nil;Rules.RevealRunning=true
+ -- R154: the result waits (Beats); the seed is held out of the hotbar and the hand until it has flown in, the world seed of this pack with it
+ run.Beats=waitBeats(run)
+ if Collect and not info.Preview then
+  run.Id=packId(info);run.Spec=specOf(info)
+  if run.Id~=nil then pcall(Collect.Hold,run.Id,{Spec=run.Spec})end
+  pcall(Collect.MarkBag,info.Bag,'held')
+ end
  local priority=Enum.RenderPriority.Camera.Value+2
  pcall(function()Run:UnbindFromRenderStep(M.BindName)end) -- (a binding a failed run could not remove never blocks the next one)
  run.BindName=M.BindName
@@ -450,10 +573,12 @@ end
 -- The routes that act on a held tool (planting, the shovel, digging, giving) ask RarePullRules.ClaimPress first and do nothing when it is
 -- the reveal's; a tool the engine activates on a click (a pack, the bat) is set ManualActivationOnly on this client for as long as a press
 -- would be the reveal's, and put back the moment it would be the tool's again or the reveal ends. No reveal: the tools work as before.
+-- (R154: a result that waits takes every press, until it is collected)
 local function armed(run,t)
- if run.Kind=='Scene'then return false end
+ if run.Kind=='Scene'or run.Collected then return false end
+ if run.SawResult then return true end
  local tl=run.TL;local hit=tl.Climax or tl.Burst
- return t>=(tl.SkipFrom or math.huge)and t<tl.FloatEnd and not(t>=hit-.02 and t<Rules.ShownAt(tl))and os.clock()-lastPress>=M.SkipGap
+ return t>=(tl.SkipFrom or math.huge)and t<hit-.02 and os.clock()-lastPress>=M.SkipGap
 end
 local function holdTool(run,hold)
  local player=lp();local char=hold and player and player.Character;local tool=char and char:FindFirstChildOfClass('Tool')
@@ -462,19 +587,30 @@ local function holdTool(run,hold)
 end
 function M._step(run,pg)
  local t=run.Clock();local tl=run.TL;local tier=Rules.Tier(run.Rank)
- if t>=tl.Length then finish(run,'done');return end
+ -- (R154: a card never ends by itself now: it waits for the collect; a story scene ends with its way out after the collect)
+ if run.Exit and t>=run.Exit.Length then finish(run,'done');return end
  if t>=(tl.Climax or tl.Burst or 0)then run.SawClimax=true end
+ if not run.SawResult and t>=Rules.ShownAt(tl)then run.SawResult=true end
+ if t>=tl.Length and not run.Idle and not run.Collected then -- (R154: the reveal's sounds and duck are over: the result waits in silence)
+  run.Idle=true;if run.Audio then run.Audio=false;pcall(Audio.Stop)end;Rules.RevealRunning=false
+ end
+ if Collect and run.Id~=nil then Collect.Touch(run.Id)end
+ if run.SawResult and not run.Collected then
+  local ok,why=pcall(waitCheck,run)
+  if ok and why then finish(run,why);return end
+ end
  run.Armed=armed(run,t);part(run,'tool',holdTool,run,run.Armed or run.Kind=='Scene')
  local cam=workspace.CurrentCamera
+ local beats=run.Beats or tl
  if run.Kind=='Ladder'then
-  part(run,'card',run.Card.UpdateLadder,run.Card,t,tl)
+  part(run,'card',run.Card.UpdateLadder,run.Card,t,beats)
   local q=clamp01(t/tl.Burst)
   local amount=0
   if tier.Push>0 and not run.Reduced then amount=t<tl.Burst and tier.Push*Rules.Smooth(q)or tier.Push*(1-Rules.Smooth((t-tl.Burst)/.3))end
   part(run,'camera',push,run,cam,amount)
   part(run,'grade',ladderGrade,run,t,tl,tier)
  elseif run.Kind=='InPlace'or run.Kind=='Result'then
-  part(run,'card',run.Card.UpdateInPlace,run.Card,t,tl)
+  part(run,'card',run.Card.UpdateInPlace,run.Card,t,beats)
   part(run,'camera',push,run,cam,0)
   local pre=run.Kind=='InPlace'and clamp01(t/math.max(.01,tl.Climax))or 0
   local post=t>=tl.Climax and 1-clamp01((t-tl.Climax)/math.max(.1,tl.Length-tl.Climax))or 0
@@ -483,6 +619,7 @@ function M._step(run,pg)
   M._stepScene(run,pg,t,tl,tier,cam)
   if run.Done then return end
  end
+ if run.Idle or run.Collected then return end -- (the sheet is over, or its tail fades by itself: RarePullAudio.FadeOut)
  part(run,'duck',Audio.Duck,Rules.Duck(run.Kind,run.Rank,tl,t))
  part(run,'audio',Audio.Update,t)
 end
@@ -514,17 +651,20 @@ local function danger(run,pg)
  return nil
 end
 function M._stepScene(run,pg,t,tl,tier,cam)
- -- danger: stop and cut back to the world (the result card follows)
- if run.InStage or t<tl.Back then
+ -- (R154: the screen's beats wait with the result: beats.Back is far away until the collect, then the way out starts from it)
+ local beats=run.Beats or tl
+ -- danger: stop and cut back to the world (the result card follows; R154: a result already shown flies in)
+ if run.InStage or t<beats.Back then
   local ok,why=pcall(danger,run,pg)
   if ok and why then finish(run,why);return end
  end
- local inStage=t>=tl.SceneIn-.05 and t<tl.Back
+ local inStage=t>=tl.SceneIn-.05 and t<beats.Back
  if inStage and not run.InStage then
   if not run.Scene then finish(run,'error');return end
   run.InStage=true;cam.CameraType=Enum.CameraType.Scriptable
  elseif not inStage and run.InStage then
   leaveStage(run)
+  if run.Fly then pcall(run.Fly.Go)end -- (R154: the world and the hotbar are back: the seed flies home)
  elseif run.InStage and(cam~=run.CameraState.Camera or cam.CameraType~=Enum.CameraType.Scriptable)then
   finish(run,'camera');return
  end
@@ -545,9 +685,9 @@ function M._stepScene(run,pg,t,tl,tier,cam)
   -- the world: a slow push in (FieldOfView only; the player's own camera keeps control)
   part(run,'camera',push,run,cam,tier.Push*Rules.Smooth(t/math.max(.01,tl.Cut)))
  end
- part(run,'card',run.Card.UpdateScene,run.Card,t,tl,true)
+ part(run,'card',run.Card.UpdateScene,run.Card,t,beats,true)
  -- colour: the world dims and drains, the stage has its own look, the hit flashes, then the world eases back
- part(run,'grade',sceneGrade,run,t,tl,tier)
+ part(run,'grade',sceneGrade,run,t,beats,tier)
 end
 -- Skip (R153: every presentation, the player's choice; R151 / R152: the story scenes only): from SkipFrom until the seed is down / the card
 -- goes. Before the hit it jumps to the hit (the hit and the result still play: straight to the result); once the result is shown (title,
@@ -555,13 +695,19 @@ end
 -- close it unseen). A card runs on the reveal's server clock: its jump to the hit is handed to the opener's pack in the world
 -- (RarePullRules.SetShift), so the seed bursts out of it with the card. The seed itself is the server's (granted when the pack opened): a
 -- skip changes nothing there, and the puller's chat line, which waits for RarePullSeedShownAt, now waits for the skipped result.
+-- R154: once the result is shown the press COLLECTS it (the seed flies home: collect) instead of closing it; one in its first CollectAfter
+-- seconds only lands (the clicks of a skip go on for a moment).
 function M.Skip()
- local run=current;if not run or run.Done or not run.Offset then return false end
- local t=run.Clock();local tl=run.TL;local hit=tl.Climax or tl.Burst
- if t<(tl.SkipFrom or math.huge)or t>=tl.FloatEnd or(t>=hit-.02 and t<Rules.ShownAt(tl))then return false end
- local target=t<hit-.02 and hit-.02 or tl.FloatEnd
+ local run=current;if not run or run.Done or not run.Offset or run.Collected then return false end
+ local t=run.Clock();local tl=run.TL;local hit=tl.Climax or tl.Burst;local shownAt=Rules.ShownAt(tl)
+ if t>=shownAt then
+  if t<shownAt+M.CollectAfter then return false end
+  collect(run,'press');return true
+ end
+ if t<(tl.SkipFrom or math.huge)or t>=hit-.02 then return false end
+ local target=hit-.02
  run.Offset+=target-t;run.Skipped=(run.Skipped or 0)+1
- if run.Kind~='Scene'and target<tl.FloatEnd then Rules.SetShift(run.Info.Bag,run.Offset)end
+ if run.Kind~='Scene'then Rules.SetShift(run.Info.Bag,run.Offset)end
  pcall(Audio.Seek,target)
  local player=lp()
  if player then
@@ -582,9 +728,19 @@ Rules.PressTaker=function()
  lastPress=os.clock()
  local run=current;if not run or run.Done then return false end
  if run.Kind=='Scene'then return true end -- (its button and keys act on it)
+ if run.Collected then return false end
+ if run.SawResult or run.Clock()>=Rules.ShownAt(run.TL)then M.Skip();return true end -- (R154: the waiting result takes every press: it collects)
  if not run.Armed then return false end
  M.Skip();return true
 end
+-- R154: collect the waiting result now (the seed flies home), as a press would. False when there is none (not shown yet, or collected).
+function M.Collect(why)
+ local run=current
+ if not run or run.Done or run.Collected or not(run.SawResult or run.Clock()>=Rules.ShownAt(run.TL))then return false end
+ collect(run,why or'press');return true
+end
+-- R154: the presentation's result is on screen and waits for its collect
+function M.Waiting()local run=current;return run~=nil and not run.Done and not run.Collected and run.SawResult==true end
 function M.Press(processed)
  if processed then return false end
  return Rules.ClaimPress()
@@ -608,9 +764,11 @@ end
 local function unlisten()for _,c in ipairs(listening or{})do c:Disconnect()end;listening=nil end
 -- Everything at once (death of the script, a test): the presentation, a card still fading out, every sound and the music duck.
 function M.Abort(reason)
- if current then finish(current,reason or'aborted')end
- if M._building then local b=M._building;M._building=nil;finish(b,reason or'aborted')end
+ reason=reason or'aborted';if not M.NoCollect[reason]then reason='aborted'end -- (an abort never flies: R154)
+ if current then finish(current,reason)end
+ if M._building then local b=M._building;M._building=nil;finish(b,reason)end
  clearFades();pcall(Audio.Stop)
+ if Collect then pcall(Collect.Clear)end -- (R154: no seed left flying, every hold ended: the items show)
 end
 function M.Active()return current end
 function M.OwnsCamera()return current~=nil and current.Kind=='Scene'and not current.Done end

@@ -179,7 +179,9 @@ local function open(rank,dt,opts)
  X.run(dur+.05,dt,frame)
  if bag.Parent then bag:Destroy()end;tool:Destroy()
  -- (a story scene's climax can come after the world pack's reveal: what is heard is recorded until the director is done)
- local guard=0;while M.Active()and guard<200 do X.run(.2,dt,frame);guard+=1 end
+ -- (R154: its result waits for the player: collected once it is up, the seed flies home)
+ local Collect=W.module('SeedCollect154')
+ local guard=0;while(M.Active()or Collect.Flying()>0)and guard<200 do local r=M.Active();if r and r.SawResult and not r.Collected and r.Clock()>=L.ShownAt(r.TL)+M.CollectAfter then M.Collect()end;X.run(.2,dt,frame);guard+=1 end
  X.run(.3,dt)
  local o=opened[#opened];if #opened==before then o=nil end
  if opts.Died then X.hum.Health=100 end

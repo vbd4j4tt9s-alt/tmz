@@ -585,12 +585,14 @@ local HttpService = game:GetService("HttpService")
 local ContextActionService = game:GetService("ContextActionService")
 local Arrival = require(ReplicatedStorage:WaitForChild("HarvestArrival"))
 local gardenBusy, lastGardenAction = false, -math.huge
+-- R154: a pull reveal's seed is not in the hand (on this screen) until it has flown into the hotbar (SeedCollect154): no aim, no planting before that
+local function collectHeld(tool)local ok,held=pcall(function()return require(ReplicatedStorage.SeedCollect154).Holds(tool)end);return ok and held==true end
 local function equippedGardenSeed()
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then return nil end
 	for _, tool in ipairs(character:GetChildren()) do
-		if tool:IsA("Tool") and tool:GetAttribute("GardenSeed") and tool.Enabled then return tool end
+		if tool:IsA("Tool") and tool:GetAttribute("GardenSeed") and tool.Enabled and not collectHeld(tool) then return tool end
 	end
 end
 local function sendGarden(action, payload)

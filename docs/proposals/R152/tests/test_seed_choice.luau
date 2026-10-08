@@ -16,6 +16,11 @@
 --  5. the puller's chat line, held for their reveal, goes out at the SKIPPED result (not at the unskipped time), never before the seed
 --  6. "Skip pack animations" ON: the short version every time (the quick card and quick pack; Secret / Cosmic / King: the result card in
 --     place, no story scene, no camera); OFF again: full
+-- R154 (owner: "... the seed stays on the player's screen until they click and the seed goes to their inventory"): every presentation above
+-- now ends with its result WAITING; the press after it COLLECTS it (the seed flies home: SeedCollect154) where it used to close it. So "plays
+-- to its end" = its whole timeline played and then it waits (still there after its Length) until the press, which collects it; the opener's
+-- own world seed never flies into the hand while the result waits (it fades where it hovers) nor after the collect (it went with the card).
+-- The full collect / wait / edge-case checks: test_seed_collect.luau.
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local Y=require('./rare152_env')(W,E,F,X)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -36,7 +41,7 @@ function Players.GetPlayers()return {X.player}end
 function Players.GetPlayerFromCharacter(_,c)if c==X.char then return X.player end;return nil end
 local Visuals=W.module('SeedPackVisuals');local Rules=W.module('SeedPackRules');local L=W.module('RarePullRules')
 local World=W.module('RarePullWorld');local M=W.module('RarePullCinematic');local Audio=W.module('RarePullAudio')
-local Settings=W.module('SettingsConfig');local Art=W.module('RarePullArt');local Announce=W.module('PullAnnounceRules')
+local Settings=W.module('SettingsConfig');local Art=W.module('RarePullArt');local Announce=W.module('PullAnnounceRules');local Collect=W.module('SeedCollect154')
 local names={'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
 local cam=W.workspace.CurrentCamera
 local SS=W.service('SoundService')
@@ -86,6 +91,7 @@ local function clean(tag)
  check(W.rsBound[M.BindName]==nil and W.actions[M.SkipAction]==nil,tag..': no render step or skip binding left')
  check(cam.CameraType==R.Enum.CameraType.Custom and math.abs(cam.FieldOfView-70)<1e-6 and X.controls.Enabled and X.hud.Main.Enabled and X.hud.Hotbar.Enabled,tag..': the camera, movement and the HUD are the player\'s')
  check(worldReveals()==0,tag..': no world reveal left')
+ check(Collect.Flying()==0 and X.pg:FindFirstChild('SeedCollectFly')==nil,tag..': no seed left flying (R154)')
 end
 local function reset()
  M.Abort('test');World.Clear()
@@ -121,8 +127,23 @@ local function step(o,dt)
 end
 -- frames until the run's own clock reaches t
 local function untilClock(o,run,t,each)local g=0;while not run.Done and run.Clock()<t and g<3000 do step(o);g+=1;if each then each()end end end
--- frames until the presentation and the server's opening have both ended
-local function finish(o,each)local g=0;while(M.Active()~=nil or o.Bag.Parent)and g<3000 do step(o);g+=1;if each then each()end end;X.run(.1)end
+-- frames until the presentation and the server's opening have both ended. R154: a presentation that has played its whole timeline waits for
+-- the player: then it is collected (a click; the story scene's full-screen button) and the seed flies home.
+local collected={} -- run -> its clock when it was collected (and it was waiting then)
+local function finish(o,each)
+ local g=0
+ while(M.Active()~=nil or o.Bag.Parent or Collect.Flying()>0)and g<3000 do
+  local run=M.Active()
+  if run and not run.Done and not run.Collected and run.SawResult and run.Clock()>=math.max(run.TL.Length,L.ShownAt(run.TL)+M.CollectAfter)+.05 then
+   collected[run]={At=run.Clock(),Waiting=M.Waiting()}
+   if run.Kind=='Scene'then local b=X.find(revealGui(),'Backdrop');if b then b.Activated:Fire()end else W.UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,KeyCode=R.Enum.KeyCode.Unknown,Position=V3(400,300,0)},false)end
+  end
+  step(o);g+=1;if each then each()end
+ end
+ X.run(.1)
+end
+-- played its whole timeline, waited, and the press collected it (its story scene then went out by itself)
+local function playedOut(run)local c=collected[run];return run.Done and run.Collected and c~=nil and c.Waiting and c.At>=run.TL.Length-.05 end
 -- presses ---------------------------------------------------------------------------------------------------------------------------------
 local UT,KC=R.Enum.UserInputType,R.Enum.KeyCode
 local function click(processed)W.UIS.InputBegan:Fire({UserInputType=UT.MouseButton1,KeyCode=KC.Unknown,Position=V3(400,300,0)},processed==true)end
@@ -168,12 +189,12 @@ local function playFull(rank,tag)
   if not seedAt and seedOut()then seedAt=W.workspace:GetServerTimeNow()-o.At end
   if titleShown()then titled=true end
  end)
- check(run.Done and run.Reason=='done'and maxT>=run.TL.Length-.05,tag..': it plays to its end ('..tostring(run.Reason)..' at '..string.format('%.2f',maxT)..' of '..string.format('%.2f',run.TL.Length)..' s)')
+ check(playedOut(run)and maxT>=run.TL.Length-.05,tag..': it plays to its end and waits for the player, who collects it ('..tostring(run.Reason)..' at '..string.format('%.2f',maxT)..' of '..string.format('%.2f',run.TL.Length)..' s)')
  check(titled,tag..': the result is shown')
  check(seedAt and seedAt>=L.BurstAt(rank,false)-1e-6 and seedAt<=L.BurstAt(rank,false)+.1,tag..': the seed comes out of the pack in the world after the full suspense ('..string.format('%.2f',seedAt or -1)..' s, full '..L.BurstAt(rank,false)..')')
  local hits=0;for _,p in ipairs(Y.plays(t0))do if p.Slot=='PackBurst'or p.Slot=='TitleSlam'then hits+=1 end end
  check(hits>=2,tag..': its burst and its "1 in N" slam are heard ('..hits..')')
- if rank>=6 and run.Kind=='Scene'and run.Reason=='done'then fullScenes[rank]+=1 end
+ if rank>=6 and run.Kind=='Scene'and playedOut(run)then fullScenes[rank]+=1 end
  return o,run
 end
 reset()
@@ -191,7 +212,7 @@ do -- a pack opened while the last card is still up (Mythic: its card outlasts t
  check(M.Active()==first and not first.Done,'card still up: the Mythic card is still on screen when its pack\'s opening has ended')
  local shownBefore=first.Clock()>=L.ShownAt(first.TL)
  local o2,second=playFull(4,'opened while the last card is up: Legendary')
- check(first.Done and first.Reason=='replaced'and shownBefore,'card still up: the first card had shown its result and hands over to the new pack (the player opened it)')
+ check(first.Done and first.Reason=='replaced'and first.Collected and shownBefore,'card still up: the first card had shown its result and hands over to the new pack (the player opened it); R154: its seed flew in first')
  check(second and second~=first,'card still up: the new pack has its own full presentation')
 end
 check(total==73,'one session: '..total..' openings')
@@ -221,7 +242,7 @@ local function skipCase(rank,variant,how,close)
  local titleAt,seedAt,hitHeard,inWindow,beamAt=nil,nil,nil,nil,nil
  local hitSlot=rank<=3 and'PackBurst'or rank==7 and'CosmicBoom'or rank>=5 and'Impact'or'GroundImpact'
  local playsFrom=R.clock-1e-6
- untilClock(o,run,math.min(shownAt+.3,tl.FloatEnd-.08),function()
+ untilClock(o,run,shownAt+M.CollectAfter+.05,function()
   local now=W.workspace:GetServerTimeNow()
   if not titleAt and titleShown()and oddsFinal(run)then titleAt=now end
   if not seedAt and seedOut()then seedAt=now end
@@ -240,23 +261,20 @@ local function skipCase(rank,variant,how,close)
    check(beamAt and beamAt-t0<=.15,tag..': and lands with the card ('..string.format('%.2f',(beamAt or 99)-t0)..' s after the press)')
   end
  end
- -- closing: a second press once the result is shown
+ -- R154: the second press once the result is shown COLLECTS it (R153 closed it): the seed flies home
  local pressAt=R.clock
  press(o,close)
- check(run.Skipped==2,tag..': a second press closes the card')
+ check(run.Skipped==1 and run.Collected,tag..': a second press collects the result (the seed flies home)')
  local g=0;while M.Active()==run and g<200 do step(o);g+=1 end
- local fade=variant=='Ladder'and tl.Length-tl.FloatEnd or variant=='InPlace'and tl.Length-tl.FloatEnd or tl.Length-tl.FloatEnd
- check(run.Done and run.Reason=='done'and R.clock-pressAt<=fade+.1,tag..': it is gone after its fade ('..string.format('%.2f',R.clock-pressAt)..' s)')
- -- the server's end: the seed still flies into the hand when the server ends the opening, not earlier
- local g2=0;while o.Bag.Parent and g2<400 do step(o);g2+=1 end
- local early,late=nil,nil
- for _,p in ipairs(o.Track)do
-  if p.T>=o.Duration-.65 and p.T<=o.Duration-.5 then early=early and math.min(early,p.D)or p.D end
-  if p.T>=o.Duration-.06 then late=p.D end
- end
- check(early and early>.4,tag..': the seed still hovers until the server\'s slide (closest '..string.format('%.2f',early or -1)..' studs from the hand half a second before its end)')
- check(late and late<.3,tag..': and is in the hand when the server ends the opening ('..string.format('%.2f',late or -1)..' studs)')
- check(o.EndedAt and near(o.EndedAt-o.At,o.Duration,.05),tag..': the server ended the opening at its full RevealDuration ('..string.format('%.2f',o.Duration)..' s): the skip asks nothing of it')
+ local fade=variant=='Full'and M.SceneExit+(tl.Length-tl.Back)or M.FadeSeconds
+ check(run.Done and R.clock-pressAt<=fade+.1,tag..': it is gone after its fade ('..string.format('%.2f',R.clock-pressAt)..' s)')
+ -- the server's end: the opener's world seed never flies into the hand (it was collected: it went home with the card)
+ local after=nil;local g2=0
+ while o.Bag.Parent and g2<400 do step(o);g2+=1;if after==nil and R.clock-pressAt>.3 then after=seedOut()end end
+ local closest=math.huge;for _,p in ipairs(o.Track)do if p.T>=pressAt-o.At+.3 then closest=math.min(closest,p.D)end end
+ check((after==false or after==nil)and closest>.3,tag..': the world seed fades out once it is collected, never reaching the hand (R154: no second arrival; closest '..string.format('%.2f',closest)..' studs)')
+ check(o.EndedAt and near(o.EndedAt-o.At,o.Duration,.05),tag..': the server ended the opening at its full RevealDuration ('..string.format('%.2f',o.Duration)..' s): the skip and the collect ask nothing of it')
+ local gf=0;while Collect.Flying()>0 and gf<200 do step(o);gf+=1 end
  X.run(.3);World.Clear();X.run(.1);clean(tag)
 end
 for rank=1,5 do skipCase(rank,'Ladder',rank%2==0 and'tap'or'click',rank==5 and'ButtonR2'or'click')end
@@ -338,7 +356,7 @@ do
      check(run.Kind=='InPlace'and run.Why=='skip pack animations is on'and not scripted and not staged,tag..': no story scene: the result card in place (no camera, no stage)')
      check(run.TL.Length<L.Timeline(rank,'Full').Length,tag..': shorter than the story scene ('..string.format('%.2f',run.TL.Length)..' s)')
     end
-    check(titled and run.Done and run.Reason=='done',tag..': the result card is shown and it ends by itself')
+    check(titled and playedOut(run),tag..': the result card is shown and waits for the player (R154), who collects it')
    end
   end
  end

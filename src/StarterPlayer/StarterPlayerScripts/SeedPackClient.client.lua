@@ -49,6 +49,9 @@ local function cinematic()
     return RareCinematic or nil
 end
 local function cinematicOwnsCamera()local c=cinematic();return c~=nil and c.OwnsCamera()==true end
+-- R154: the opener's own result waits on their screen until they click, then flies into the hotbar (SeedCollect154): until then the world seed of
+-- their pack never flies into the hand (it fades where it hovers), and once collected it fades out (it went home with the card). Onlookers: as before.
+local Collect do local m=ReplicatedStorage:FindFirstChild("SeedCollect154");local ok,c=pcall(function()return m and require(m)end);Collect=ok and c or nil end
 -- R152: the opener's own Secret / Cosmic / King reveal has its own hit and fanfare (the director); the old chord at the world burst stacked on it
 local function cinematicRunning()local c=cinematic();return c~=nil and c.Active()~=nil end
 local function reducedMotion()local ok,v=pcall(function()return game:GetService("GuiService").ReducedMotionEnabled end);return ok and v==true end
@@ -306,6 +309,9 @@ local function renderReveal(record,now)
         record.Flourish:Update(root*CFrame.new(0,mouth,0),t,revealStart,not(char and bag:IsDescendantOf(char)))
     end
     local rise,slide=Ladder.SeedPhase(age,record.Hover+shift);local ease=1-(1-rise)^3
+    local held=Collect and bag.Parent==Players.LocalPlayer.Character and Collect.BagState(bag)or nil -- (R154: 'held', or when it was collected)
+    local away=0
+    if held then away=held=="held"and slide or math.max(slide,math.clamp((os.clock()-held)/.2,0,1));slide=0;record.SlideWhooshDone=true end
     local scale=record.SeedBaseScale -- slide the seed out at its real held size
     if not record.LastSeedScale or math.abs(scale-record.LastSeedScale)>.025 or (rise==1 and not record.SeedFullyGrown)then
         record.Seed:ScaleTo(scale);record.LastSeedScale=scale;record.SeedFullyGrown=rise==1;record.SeedPivot=nil
@@ -337,7 +343,7 @@ local function renderReveal(record,now)
     end
     -- (R152 perf: a seed that holds still is not moved again every frame; only this reveal moves it, and a rescale moves it again)
     if record.SeedPivot~=seedFrame then record.Seed:PivotTo(seedFrame);record.SeedPivot=seedFrame end
-    local fade=math.clamp((slide-.85)/.15,0,1);local visible=t>=revealStart and fade<1
+    local fade=math.max(math.clamp((slide-.85)/.15,0,1),away);local visible=t>=revealStart and fade<1
     -- (a giant seed's parts also get GiantVisualSafety's close-up fade: the value there is read, not remembered)
     local seedAlpha=visible and fade or 1
     for _,p in ipairs(record.SeedParts)do if p~=record.Seed.PrimaryPart and p.LocalTransparencyModifier~=seedAlpha then p.LocalTransparencyModifier=seedAlpha end end
@@ -405,7 +411,7 @@ local function updateHeldSeeds(dt,now)
         local candidates={}
         local character=Players.LocalPlayer and Players.LocalPlayer.Character
         for seed in pairs(trackedSeeds)do
-            if seed.Parent and seed.PrimaryPart and seed:IsDescendantOf(workspace)and not seed:GetAttribute("SeedMotionManaged")then
+            if seed.Parent and seed.PrimaryPart and seed:IsDescendantOf(workspace)and not seed:GetAttribute("SeedMotionManaged")and not(Collect and Collect.Hidden(seed))then -- (R154: not a seed held out of the hand until it flies in)
                 local distance=camera and(camera.CFrame.Position-seed.PrimaryPart.Position).Magnitude or math.huge
                 if distance<=Rules.SeedMotion.MaxDistance then
                     local owned=character and seed:IsDescendantOf(character)
