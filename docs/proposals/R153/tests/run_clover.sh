@@ -15,6 +15,7 @@
 #  4. client    - test_clover_shop.luau: the card (third PASSES card, "x2 Luck", Gem 999 | Robux live price, picture, buying, OWNED, Checking...), the id switched off (no Robux button, Gem
 #                 button full width, ROBUX SOON, OWNED by Gems), the HUD luck row (picture, x2, the cap), the purchase pop; renders the preview (render_clover.py) into $OUT/renders/clover.png
 #                 (CLOVER_PREVIEW=1 also copies it to docs/proposals/R153/clover.png)
+# R154: the cap is the boots' cap x the pass (the clover's x2 also applies on top of Thunder Boots: x100M); the old_cap mutation puts the R153 cap back.
 # "mutate" also breaks the game on purpose (the luck, the saved shape, the id default, the Robux button rule, the picture's priority ...): every break must make a suite fail.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -32,7 +33,7 @@ ID=$(sed -n 's/.*Key=.Clover.*DefaultId=\([0-9][0-9]*\).*/\1/p' "$CATALOG")
 [ -n "$ID" ] || fail "the Clover row of GamePassCatalog has no DefaultId=<number>"
 [ "$(grep -c 'DefaultId=' "$CATALOG")" = 1 ] || fail "DefaultId= must appear exactly once in GamePassCatalog"
 if [ -n "$ID" ] && [ "$ID" != 0 ];then
- COPIES=$(grep -rIlw "$ID" "$REPO/src" "$REPO/docs" "$REPO/tools" "$REPO/installers" 2>/dev/null | grep -v "^$CATALOG$" || true)
+ COPIES=$(grep -rIlw "$ID" "$REPO/src" "$REPO/docs" "$REPO/tools" "$REPO/installers" 2>/dev/null | grep -v "^$CATALOG$" | grep -vE "/docs/releases/|/docs/HANDOFF" || true) # (R154: the release notes and the handoff name it for the owner's publish checklist; code never copies it)
  [ -z "$COPIES" ] && echo "ok: the pass id ($ID) is in exactly one place: the DefaultId of the Clover row in GamePassCatalog.lua" || { fail "the pass id is copied outside the catalog:";echo "$COPIES"; }
 fi
 V=$(grep -c "Config.Version='V150 R153';Config.ProfileVersion=22" "$S/ServerScriptService/ChestChaseServer/Config.lua")
@@ -98,8 +99,8 @@ PY
   python3 "$HERE/mkbundle_clover.py" "$MUT/w_$name" "$modname=$MUT/$name.lua" --font "$P/shop_R120/tests/FredokaOne.ttf" > /dev/null
   if ( cd "$MUT/w_$name" && timeout 900 /opt/luau/luau "$suite.luau" > "$suite.log" 2>&1 );then fail "mutation $name was NOT noticed by $suite";else echo "ok: $name -> $suite fails ($(grep -c '^FAIL' "$MUT/w_$name/$suite.log") failing checks)";fi
  }
- mutate no_luck "$SSS/PlayerDataService.lua" "bestLuckMultiplier*self:PassLuck(player)" "bestLuckMultiplier" test_clover
- mutate no_cap "$SSS/PlayerDataService.lua" "math.clamp(bestLuckMultiplier*self:PassLuck(player),1,require(game:GetService('ReplicatedStorage').BalanceValues81).MaxLuck)" "bestLuckMultiplier*self:PassLuck(player)" test_clover
+ mutate no_luck "$SSS/PlayerDataService.lua" "bestLuckMultiplier=math.clamp(bestLuckMultiplier*passLuck," "bestLuckMultiplier=math.clamp(bestLuckMultiplier," test_clover
+ mutate old_cap "$SSS/PlayerDataService.lua" "BalanceValues81).MaxLuck*passLuck)" "BalanceValues81).MaxLuck)" test_clover
  mutate no_signal "$SSS/PlayerDataService.lua" "player:GetAttributeChangedSignal(pass.Attribute):Connect(" "player:GetAttributeChangedSignal('NeverSet'):Connect(" test_clover
  mutate unsplit_save "$SSS/PremiumProgress.lua" " premium.Later153=any and out or nil" " premium.Later153=nil;for k,v in pairs(out.Entitlements)do premium.Entitlements[k]=v end" test_clover
  mutate gem_price "$RSD/MechCatalog.lua" "Clover=999" "Clover=99" test_clover

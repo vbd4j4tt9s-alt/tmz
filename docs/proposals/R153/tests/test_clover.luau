@@ -17,7 +17,7 @@ local row;for _,p in ipairs(Catalog)do if p.Key=='Clover'then row=p end end
 -- 1. the pass --------------------------------------------------------------------------------------------------------------------------------------
 check(row~=nil and #Catalog==3 and Catalog[3]==row,'the catalog has the 4 Leaf Clover as its third pass')
 check(row.Name=='4 Leaf Clover'and row.Attribute=='CloverOwned'and row.IdAttribute=='CloverPassId'and row.Luck==2,'Key Clover, Name "4 Leaf Clover", Attribute CloverOwned, IdAttribute CloverPassId, Luck 2')
-check(row.Description=='2x luck on every pack u open! 🍀','the description is in the owner\'s voice: '..tostring(row.Description))
+check(row.Description=='x2 luck on EVERY pack u open! 🍀','the description is in the owner\'s voice: '..tostring(row.Description))
 check(Mech.PassGemPrices.Clover==999 and Mech.PassGemPrices.Growth==500 and Mech.PassGemPrices.Speed==400,'the Gem price is 999 (the other two are untouched)')
 check(type(row.DefaultId)=='number'and row.DefaultId>=0 and row.DefaultId%1==0,'DefaultId is a whole number (0 = not on sale): '..tostring(row.DefaultId))
 do
@@ -48,7 +48,9 @@ local function gems(p)return Data:GetPremium(p).Gems end
 local function setGems(p,n)Data:GetPremium(p).Gems=n;Data:PublishPremium(p)end
 local function luck(p)return p:GetAttribute('ChestLuckMultiplier')end
 local MAX=Balance.MaxLuck
-check(MAX==50000000 and boots[5].LuckMultiplier==MAX and boots[1].LuckMultiplier==50 and boots[4].LuckMultiplier==1000000,'(the cap is MaxLuck = 50,000,000 and Thunder Boots, the best pair, are exactly that)')
+check(MAX==50000000 and boots[5].LuckMultiplier==MAX and boots[1].LuckMultiplier==50 and boots[4].LuckMultiplier==1000000,'(the boots\' cap is MaxLuck = 50,000,000 and Thunder Boots, the best pair, are exactly that)')
+-- R154 (owner: "the 2x luck is universal"): the pass doubles the cap too: LuckCeiling = MaxLuck x 2
+check(Balance.LuckCeiling==2*MAX and Balance.PassLuckCeiling==2,'R154: LuckCeiling = MaxLuck x the clover = 100,000,000 (PassLuckCeiling 2)')
 -- 2. luck, without the pass --------------------------------------------------------------------------------------------------------------------
 local Ann=E.makePlayer(1001,'Ann')
 check(luck(Ann)==1 and Ann:GetAttribute('CloverOwned')~=true,'a new player: luck x1 and no pass')
@@ -82,10 +84,10 @@ local Dee=E.makePlayer(1003,'Dee');setGems(Dee,2000);invoke(Dee,'BuyPerk','Clove
 check(luck(Dee)==2,'the pass alone: x2')
 local expect={100,1000,40000,2000000,MAX}
 for i=1,5 do
- Data:AddBoost(Dee,boots[i].Id);local want=math.min(boots[i].LuckMultiplier*2,MAX)
+ Data:AddBoost(Dee,boots[i].Id);local want=boots[i].LuckMultiplier*2 -- R154: never capped below the clover's x2
  check(luck(Dee)==want,'boots '..i..' (x'..boots[i].LuckMultiplier..') + the pass: x'..want..' ('..tostring(luck(Dee))..')')
 end
-check(luck(Dee)==MAX and boots[5].LuckMultiplier*2>MAX,'THE CAP: Thunder Boots x50M x2 would be x100M, the one cap (MaxLuck) holds it at x50M: the pass adds nothing on top of the best boots')
+check(luck(Dee)==2*MAX and boots[5].LuckMultiplier*2==Balance.LuckCeiling,'THE CAP (R154): Thunder Boots x50M x2 = x100M: a clover owner\'s cap is doubled, so the pass adds its x2 on top of the best boots too')
 for i=1,4 do check(boots[i].LuckMultiplier*2<=MAX,'boots '..i..' x2 stays under the cap')end
 -- the best pair counts, not the sum; the pass multiplies that
 local Eve=E.makePlayer(1004,'Eve');Data:AddBoost(Eve,boots[2].Id);Data:AddBoost(Eve,boots[1].Id);check(luck(Eve)==500,'(boots do not add up: the best pair, x500)')
@@ -120,13 +122,13 @@ do
  Data:AddBoost(Gus,boots[5].Id,{TestGrant=true});Data:EquipBoost(Gus,boots[5].Id);Data:RefreshBoostMultipliers(Gus)
  check(Data:HasTestLuck(Gus)and luck(Gus)==MAX,'owner test boots: test luck, x50M')
  setGems(Gus,999);invoke(Gus,'BuyPerk','Clover')
- check(Data:HasTestLuck(Gus)and luck(Gus)==MAX,'+ the pass (bought): still TEST luck (the boots in use are the owner\'s), and the cap holds')
+ check(Data:HasTestLuck(Gus)and luck(Gus)==2*MAX,'+ the pass (bought): still TEST luck (the boots in use are the owner\'s), x100M (R154: the cap doubles with the pass)')
  local Hal=E.makePlayer(1008,'Hal');Data:AddBoost(Hal,boots[1].Id,{TestGrant=true});setGems(Hal,999);invoke(Hal,'BuyPerk','Clover')
  check(Data:HasTestLuck(Hal)and luck(Hal)==100,'owner Sand Boots + the pass: x100 and still test luck')
  local Ian=E.makePlayer(1009,'Ian');setGems(Ian,999);invoke(Ian,'BuyPerk','Clover')
  check(not Data:HasTestLuck(Ian)and luck(Ian)==2,'the pass alone is real luck, not test luck')
  Data:AddBoost(Ian,boots[2].Id);check(not Data:HasTestLuck(Ian)and luck(Ian)==1000,'bought boots + the pass: real luck')
- Data:AddBoost(Ian,boots[5].Id,{TestGrant=true});check(Data:HasTestLuck(Ian)and luck(Ian)==MAX,'... then owner Thunder Boots on top: test luck again (as in R152), x50M')
+ Data:AddBoost(Ian,boots[5].Id,{TestGrant=true});check(Data:HasTestLuck(Ian)and luck(Ian)==2*MAX,'... then owner Thunder Boots on top: test luck again (as in R152), x100M with the pass (R154)')
 end
 -- 4. Robux ownership -----------------------------------------------------------------------------------------------------------------------------
 do
