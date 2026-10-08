@@ -666,6 +666,9 @@ check(corner==0 and centre==255 and pb>pg2,'(the picture: transparent corner, an
 local art=logoRoot:FindFirstChild('Artwork')
 check(art and art._class=='ImageLabel'and art.Visible==false and logoRoot.SmoothFallback.Visible==true,'the image waits for its load: the fallback stays visible')
 if art then art.IsLoaded=true;W.frames(2)end
-check(art and art.Visible==true and logoRoot.SmoothFallback.Visible==false,'when the image has loaded it replaces the fallback')
+-- (R153 perf, lag audit D2: the fallback strips are removed once the image shows, and come back if it is unloaded again)
+check(art and art.Visible==true and(logoRoot:FindFirstChild('SmoothFallback')==nil or logoRoot.SmoothFallback.Visible==false),'when the image has loaded it replaces the fallback')
+if art then art.IsLoaded=false;W.frames(2)end
+check(art and art.Visible==false and logoRoot:FindFirstChild('SmoothFallback')and logoRoot.SmoothFallback.Visible==true and stripsOf(logoRoot)==#spec.Strips,'an image that is unloaded again: the fallback strips are drawn again')
 print(('%d checks, %d failures'):format(checks,fails))
 if fails>0 then error('FAILED')end
