@@ -20,8 +20,8 @@ local Pictures=require(RS:WaitForChild('ItemPictures'));local Weight=require(RS:
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local bag=player:WaitForChild('Backpack')
 local old=pg:FindFirstChild('ChestToolHotbar');if old then old:Destroy()end
 local gui=Instance.new('ScreenGui');gui.Name='ChestToolHotbar';gui.ResetOnSpawn=false;gui.IgnoreGuiInset=false;gui.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets;gui.DisplayOrder=25;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
-local C={Panel=Theme.Colors.Panel,Slot=Theme.Colors.Card,Green=Theme.Colors.Mint,Text=Theme.Colors.Text,Muted=Theme.Colors.Muted,
- Sheet=Color3.fromRGB(20,46,35),Tile=Color3.fromRGB(37,76,57),TileOn=Color3.fromRGB(65,120,76),Well=Color3.fromRGB(14,33,25)}
+local C={Panel=Theme.Colors.Panel,Slot=Theme.Colors.Card,Lit=Color3.fromRGB(234,240,255),Text=Theme.Colors.Text,Muted=Theme.Colors.Muted,
+ Sheet=Color3.fromRGB(31,34,70),Tile=Color3.fromRGB(48,54,106),TileOn=Color3.fromRGB(74,85,153),Well=Color3.fromRGB(25,32,65)}
 local function corner(p)local c=Instance.new('UICorner');c.CornerRadius=UDim.new(0,8);c.Parent=p end
 local function label(parent,name,size,position,text,fontSize)
  local l=Instance.new('TextLabel');l.Name=name;l.Size=size;l.Position=position;l.Text=text;l.TextColor3=C.Text;l.BackgroundTransparency=1;l.Font=Theme.Font;l.TextSize=fontSize or 13;l.TextWrapped=true;l.Parent=parent;Fit.Attach(l,fontSize or 13,8);return l
@@ -66,12 +66,12 @@ local panel=Instance.new('Frame');panel.Name='Inventory';panel.AnchorPoint=Vecto
 local constraint=Instance.new('UISizeConstraint');constraint.MaxSize=Vector2.new(1080,740);constraint.Parent=panel
 label(panel,'Title',UDim2.new(1,-65,0,40),UDim2.fromOffset(16,8),'Ur Bag',20).TextXAlignment=Enum.TextXAlignment.Left
 require(RS:WaitForChild('GardenMenuStyle')).Panel(panel,46)
-panel.BackgroundColor3=C.Sheet;panel.BackgroundTransparency=.1 -- R112: dark translucent green sheet.
+panel.BackgroundColor3=C.Sheet;panel.BackgroundTransparency=.1 -- R157: dark navy sheet, no green anywhere in the Bag (the trim, header band and rule are GardenMenuStyle.Panel's green for every other menu: the Bag recolours its own).
+panel.GardenTrim.Color=Color3.fromRGB(106,144,225);panel.GardenHeader.BackgroundColor3=Color3.fromRGB(66,74,128);panel.HeaderRule.BackgroundColor3=Color3.fromRGB(106,144,225)
 local close=button(panel,'Close','×',UDim2.fromOffset(36,36),UDim2.new(1,-48,0,10))
 local search=Instance.new('TextBox');search.Name='Search';search.PlaceholderText='Search';search.Text='';search.ClearTextOnFocus=false;search.Size=UDim2.new(1,-32,0,36);search.Position=UDim2.fromOffset(16,54);search.BackgroundColor3=C.Slot;search.TextColor3=C.Text;search.PlaceholderColor3=C.Muted;search.Font=Enum.Font.FredokaOne;search.TextSize=14;search.Parent=panel;corner(search);require(RS:WaitForChild('GardenMenuStyle')).Inset(search);search.BackgroundColor3=C.Well
 local filters=Instance.new('Frame');filters.Name='Categories';filters.BackgroundTransparency=1;filters.Size=UDim2.new(1,-32,0,32);filters.Position=UDim2.fromOffset(16,98);filters.Parent=panel
 local scroll=Instance.new('ScrollingFrame');scroll.Name='Items';scroll.BackgroundTransparency=1;scroll.BorderSizePixel=0;scroll.Size=UDim2.new(1,-32,1,-218);scroll.Position=UDim2.fromOffset(16,178);scroll.ScrollBarThickness=5;scroll.CanvasSize=UDim2.new();scroll.Parent=panel
-label(panel,'Hint',UDim2.new(1,-32,0,26),UDim2.new(0,16,1,-32),'Click to hold it • Drag it onto the hotbar',12).TextColor3=C.Muted
 local rarityFilter=button(panel,'RarityFilter','Rarity: All',UDim2.new(1,-32,0,30),UDim2.fromOffset(16,138));rarityFilter.BackgroundColor3=C.Tile
 local arrow=Theme.ControlIcon(rarityFilter,'chevron');arrow.Position=UDim2.new(1,-24,.5,-7)
 local rarityMenu=Instance.new('Frame');rarityMenu.Name='RarityOptions';rarityMenu.Position=UDim2.fromOffset(16,174);rarityMenu.Size=UDim2.new(1,-32,0,110);rarityMenu.BackgroundColor3=C.Sheet;rarityMenu.BorderSizePixel=0;rarityMenu.Visible=false;rarityMenu.ZIndex=10;rarityMenu.Parent=panel;corner(rarityMenu)
@@ -270,7 +270,7 @@ local function ringOf(b)
  local r=b:FindFirstChild('PendingRing')
  if not r then
   r=Instance.new('Frame');r.Name='PendingRing';r.BackgroundTransparency=1;r.Size=UDim2.fromScale(1,1);r.Active=false;r.ZIndex=(b.ZIndex or 1)+5;r.Visible=false;r.Parent=b;corner(r)
-  local st=Instance.new('UIStroke');st.Name='Ring';st.ApplyStrokeMode=Enum.ApplyStrokeMode.Border;st.Thickness=3;st.Color=C.Green;st.Parent=r
+  local st=Instance.new('UIStroke');st.Name='Ring';st.ApplyStrokeMode=Enum.ApplyStrokeMode.Border;st.Thickness=3;st.Color=C.Lit;st.Parent=r
  end
  return r
 end
@@ -321,14 +321,14 @@ local function cover(b,name,color,transparency)
  local f=b:FindFirstChild(name)
  if not f then
   f=Instance.new('Frame');f.Name=name;f.BackgroundColor3=color;f.BackgroundTransparency=transparency;f.BorderSizePixel=0;f.Size=UDim2.fromScale(1,1);f.Active=false;f.ZIndex=(b.ZIndex or 1)+8;f.Visible=false;f.Parent=b;corner(f)
-  if name=='DropTarget'then local st=Instance.new('UIStroke');st.Color=color;st.Thickness=3;st.Parent=f end
+  if name=='DropTarget'then local st=Instance.new('UIStroke');st.Color=color;st.Thickness=2;st.Transparency=.15;st.Parent=f end
  end
  return f
 end
 local function light(b)
  if lit==b then return end
  if lit then local f=lit:FindFirstChild('DropTarget');if f then f.Visible=false end end
- lit=b;if b then cover(b,'DropTarget',C.Green,.55).Visible=true end
+ lit=b;if b then cover(b,'DropTarget',C.Lit,b==panel and .92 or .86).Visible=true end
 end
 local function lift(d)
  d.Lifted=true;local e=State.Items[d.Key];local tool=e and e.Tool
@@ -741,7 +741,7 @@ layout=function()
   b.Picture.Position=UDim2.fromOffset(4,3);b.Picture.Size=UDim2.new(1,-8,1,-(caption+7))
   b.Caption.Position=UDim2.new(0,2,1,-(caption+4));b.Caption.Size=UDim2.new(1,-4,0,caption+2);Fit.Attach(b.Caption,caption,8)
  end
- local short=sheetHeight<300;panel.Hint.Visible=not short;title.Visible=not short or sheetWidth>=440
+ local short=sheetHeight<300;title.Visible=not short or sheetWidth>=440
  if short then
   -- Short sheets (phones): search and rarity share the header (with the title when it fits); the grid gets the rest.
   local room=sheetWidth-66-(title.Visible and 126 or 16);local rarityWidth=math.min(150,math.floor(room*.38));local searchWidth=room-rarityWidth-8
@@ -837,7 +837,7 @@ local function showLog()
  if on and not logBox then
   local f=Instance.new('Frame');f.Name='HotbarLog';f.BackgroundColor3=Color3.fromRGB(10,22,17);f.BackgroundTransparency=.12;f.BorderSizePixel=0;f.Position=UDim2.fromOffset(8,8);f.ZIndex=60;f.Parent=gui;corner(f)
   f.Size=UDim2.fromOffset(math.clamp((gui.AbsoluteSize.X>0 and gui.AbsoluteSize.X or 600)-16,240,520),250)
-  local t=Instance.new('TextLabel');t.Name='Title';t.BackgroundTransparency=1;t.Position=UDim2.fromOffset(8,4);t.Size=UDim2.new(1,-16,0,16);t.Font=Theme.Bold;t.TextSize=12;t.TextColor3=C.Green
+  local t=Instance.new('TextLabel');t.Name='Title';t.BackgroundTransparency=1;t.Position=UDim2.fromOffset(8,4);t.Size=UDim2.new(1,-16,0,16);t.Font=Theme.Bold;t.TextSize=12;t.TextColor3=C.Lit
   t.TextXAlignment=Enum.TextXAlignment.Left;t.Text='HOTBAR LOG - select the text to copy it (also in F9) - /test hotbar hides it';t.ZIndex=61;t.Parent=f
   logBox=Instance.new('TextBox');logBox.Name='Lines';logBox.BackgroundTransparency=1;logBox.Position=UDim2.fromOffset(8,22);logBox.Size=UDim2.new(1,-16,1,-28);logBox.Font=Enum.Font.Code;logBox.TextSize=11;logBox.TextColor3=C.Text
   logBox.TextXAlignment=Enum.TextXAlignment.Left;logBox.TextYAlignment=Enum.TextYAlignment.Bottom;logBox.TextWrapped=true;logBox.MultiLine=true;logBox.ClearTextOnFocus=false;logBox.TextEditable=false;logBox.ZIndex=61;logBox.Parent=f

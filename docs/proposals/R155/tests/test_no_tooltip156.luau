@@ -4,14 +4,14 @@
 -- selection. This test replaces test_tooltip155.luau. The REAL Hotbar + InventoryPanel155 + the real pity bars through R153's engine model (engine153 with this view's screen),
 -- in VIEW = 'pc' (1280 x 720, a mouse), 'phone' (844 x 390, touch) or 'portrait' (390 x 844, touch), with the same items as before (a Mech pack and a world pack with the
 -- server's long ToolTip, a seed with a one-line ToolTip, one with none) and the same moves. Nothing may show an item's description, anywhere, ever:
---  1. gone           - the ItemTooltip155 module is not in the game; InventoryPanel155 has no Hover / Leave / Focus / Unfocus / TipRefresh / Tip; the Bag's hint no longer
---                      promises "hover for info" / "hold for info" (and keeps the rest of it)
+--  1. gone           - the ItemTooltip155 module is not in the game; InventoryPanel155 has no Hover / Leave / Focus / Unfocus / TipRefresh / Tip; the Bag has no hint line any more
+--                      (R157; in R156 it only stopped promising "hover for info" / "hold for info")
 --  2. no forwarding  - the Hotbar does not call any of those on MouseEnter / MouseLeave / SelectionGained / SelectionLost of a slot or a Bag card (stubs put on the module
 --                      record every call: none), and a hover / selection creates not one Instance
 --  3. never created  - after every move below no Instance that was ever created is named like a tooltip or carries a description text (the odds, the lucky line, the coat
 --                      line, the pity rule, a one-line ToolTip): hover (mouse), a picked item / Bag card (touch hold, x button, Y), a pack just held (touch, gamepad A, mouse),
 --                      a pack whose odds arrive late, a ToolTip that changes, an item that goes, a drag
---  4. the rest works - the Bag's other behaviour is the same (picked: the green ring, the pick bar says what to do, tap puts it down; the count; Trash): test_inventory155
+--  4. the rest works - the Bag's other behaviour is the same (picked: the ring, the pick bar says what to do, tap puts it down; the count; Trash): test_inventory155
 --  (control) the scanner does catch a panel that is named like one / shows the odds
 local W=require('./world');local F=require('./fixtures');local E=require('./sfx_env')(W);local R=W.R
 local fails,checks=0,0
@@ -125,17 +125,19 @@ scan('the game as it starts')
 check(slotOf(mech)~=nil and slotOf(world)~=nil and slotOf(plain)~=nil and slotOf(apple)~=nil,'(the items are on the hotbar)')
 check(mech.ToolTip:find(Pity.Disclosure,1,true)~=nil and apple.ToolTip==ONE,'(the ToolTips are still on the tools: only the panel is gone)')
 
--- 1b. the Bag's hint: nothing about info, the rest stays ------------------------------------------------------------------------------------------------------
+-- 1b. the Bag's hint line: gone (R157, owner: "remove that text saying click to hold and so on"); the bottom bar keeps the count and Discard ----------------------------------
 do
  openBag()
- local hint=panel:FindFirstChild('Hint')
- check(hint~=nil,'(the Bag has its hint)')
- if hint then
-  local t=(hint.Text:gsub('%s+',' ')) -- (a narrow sheet wraps the hint with a line break)
-  check(not t:lower():find('info',1,true)and not t:lower():find('hover',1,true),'the hint no longer promises "hover for info" / "hold for info" ("'..t..'")')
-  if PHONE then check(t=='Tap to hold • hold to move or discard','the phone hint keeps "tap to hold" and "hold to move or discard" ("'..t..'")')
-  else check(t=='Click to hold • drag to move • right-click for more','the PC hint keeps "click to hold", "drag to move" and "right-click for more" ("'..t..'")')end
+ check(panel:FindFirstChild('Hint')==nil,'the Bag has no hint line (R157)')
+ local badText
+ for _,o in ipairs(panel:GetDescendants())do
+  if o:IsA('TextLabel')or o:IsA('TextButton')then
+   local t=(o.Text:gsub('%s+',' '));local l=t:lower()
+   if l:find('info',1,true)or l:find('hover',1,true)or l:find('click to hold',1,true)or l:find('tap to hold',1,true)or l:find('drag to move',1,true)or l:find('right-click',1,true)then badText=t end
+  end
  end
+ check(badText==nil,'no text on the Bag is a hint about how to use it'..(badText and' ("'..badText..'")'or''))
+ check(panel.BagBar:FindFirstChild('HeldCount')~=nil and panel.BagBar:FindFirstChild('Trash')~=nil,'the bottom bar keeps the count and Discard')
  closeBag()
 end
 
@@ -211,7 +213,7 @@ do
  check(Inv.Picked()~=nil and panel.Visible,'(a held mech pack is picked: the Bag opened)')
  scan('a picked pack (hold 0.4 s and let go)')
  -- the Bag's other behaviour is the same: the ring, the pick bar says what to do, the count
- check(s:FindFirstChild('PickedRing')~=nil and s.PickedRing.Visible,'the picked slot has its green ring')
+ check(s:FindFirstChild('PickedRing')~=nil and s.PickedRing.Visible,'the picked slot has its ring')
  local pick=panel.BagBar.PickBar
  check(pick.Visible and pick.PickName.Text:find('Moving',1,true)~=nil and pick.PickName.Text:find('Gold Limited Mech Pack',1,true)~=nil,'the pick bar says what is moving ("'..tostring(pick.PickName.Text)..'")')
  check(panel.BagBar:FindFirstChild('HeldCount')~=nil and panel.BagBar.HeldCount.Text:find('/200',1,true)~=nil,'the count is on the Bag bar ('..tostring(panel.BagBar.HeldCount.Text)..')')

@@ -2,10 +2,12 @@
 -- and i have a lot of options to manage my inventory i can have a blank hot bar if i put everything in my bag additionally make the max amount of items a
 -- person can hold 200", then "allow people to discard items"). The Bag's management half, started by the Hotbar (Hotbar.client.lua keeps the presses, the
 -- drag, equipping and drawing; GardenInventoryState keeps the layout rules). One Hotbar per client, so this module is its single instance.
---  * the bottom bar of the Bag: the hint (or, while an item is picked, what to do with it), the count "143/200" (amber from 180, red and FULL at 200; the
+--  * the bottom bar of the Bag: the count "143/200" (amber from 180, red and FULL at 200; the
 --    Bag button shows FULL too) and the Trash (drop an item on it, or tap it while an item is picked: the confirm popup, DiscardDialog155).
+--    (R157, owner: "dont make this green and remove that text saying click to hold and so on": the bar has no hint line on any device, and the Bag has no green; the lit colour is a light
+--    neutral, C.Lit.)
 --  * tap-tap (phones, and everyone): hold an item (0.4 s) and let go without moving it, or right-click it, or press Y on a gamepad: it is PICKED (a
---    green ring; every slot it can go to is outlined; the Bag opens). Then tap a slot (or press its number key) = put it there (swap if taken); tap a Bag
+--    light ring; every slot it can go to is outlined; the Bag opens). Then tap a slot (or press its number key) = put it there (swap if taken); tap a Bag
 --    card or "To Bag" (or the Bag button) = into the Bag (its slot stays blank); tap the Trash = discard; "Hold" = hold it; tap it again or the X = put it down.
 --  * search: Bag cards filter; hotbar slots that do not match dim.
 --  * the layout is sent to the server (ChestChaseRemotes.HotbarLayout155) a moment after it changes; at join the saved one (the player attribute
@@ -34,7 +36,7 @@ local function build()
  local count=Instance.new('TextLabel');count.Name='HeldCount';count.BackgroundColor3=C.Well;count.BackgroundTransparency=.1;count.Size=UDim2.fromOffset(88,30);count.Position=UDim2.new(1,-200,0,0)
  count.Font=ctx.Theme.Bold;count.TextSize=15;count.TextColor3=C.Text;count.Text='0/200';count.ZIndex=3;count.Parent=bar;ctx.corner(count)
  local pick=Instance.new('Frame');pick.Name='PickBar';pick.BackgroundTransparency=1;pick.Size=UDim2.new(1,-212,1,0);pick.Visible=false;pick.ZIndex=3;pick.Parent=bar
- local what=Instance.new('TextLabel');what.Name='PickName';what.BackgroundTransparency=1;what.Size=UDim2.new(1,-206,1,0);what.Font=ctx.Theme.Font;what.TextSize=13;what.TextColor3=C.Green
+ local what=Instance.new('TextLabel');what.Name='PickName';what.BackgroundTransparency=1;what.Size=UDim2.new(1,-206,1,0);what.Font=ctx.Theme.Font;what.TextSize=13;what.TextColor3=C.Lit
  what.TextXAlignment=Enum.TextXAlignment.Left;what.TextWrapped=true;what.TextScaled=true;what.Text='';what.ZIndex=3;what.Parent=pick
  do local fit=Instance.new('UITextSizeConstraint');fit.MaxTextSize=13;fit.MinTextSize=8;fit.Parent=what end
  local hold=ctx.button(pick,'PickHold','Hold',UDim2.fromOffset(62,30),UDim2.new(1,-202,0,0));hold.BackgroundColor3=C.TileOn;hold.TextSize=13
@@ -83,14 +85,14 @@ local function hintOf(b)
  local h=b:FindFirstChild('DropHint')
  if not h then
   h=Instance.new('Frame');h.Name='DropHint';h.BackgroundTransparency=1;h.Size=UDim2.fromScale(1,1);h.Active=false;h.ZIndex=(b.ZIndex or 1)+7;h.Visible=false;h.Parent=b;ctx.corner(h)
-  local s=Instance.new('UIStroke');s.Name='Line';s.Color=ctx.C.Green;s.Thickness=2;s.Transparency=.3;s.Parent=h
+  local s=Instance.new('UIStroke');s.Name='Line';s.Color=ctx.C.Lit;s.Thickness=2;s.Transparency=.3;s.Parent=h
  end
  return h
 end
 local function ringOf(b)
  local r=b:FindFirstChild('PickedRing')
  if not r then
-  r=Instance.new('Frame');r.Name='PickedRing';r.BackgroundColor3=ctx.C.Green;r.BackgroundTransparency=.78;r.Size=UDim2.fromScale(1,1);r.Active=false;r.ZIndex=(b.ZIndex or 1)+7;r.Visible=false;r.Parent=b;ctx.corner(r)
+  r=Instance.new('Frame');r.Name='PickedRing';r.BackgroundColor3=ctx.C.Lit;r.BackgroundTransparency=.78;r.Size=UDim2.fromScale(1,1);r.Active=false;r.ZIndex=(b.ZIndex or 1)+7;r.Visible=false;r.Parent=b;ctx.corner(r)
   local s=Instance.new('UIStroke');s.Name='Line';s.Color=Color3.new(1,1,1);s.Thickness=3;s.Parent=r
  end
  return r
@@ -109,7 +111,7 @@ local function paintPick()
   if want then hintOf(b).Visible=true;hints[b]=true elseif hints[b]then local h=b:FindFirstChild('DropHint');if h then h.Visible=false end;hints[b]=nil end
  end
  if ui.Pick then
-  ui.Pick.Visible=picked~=nil;if picking~=(picked~=nil)then picking=picked~=nil;paintCount()end;if ctx.panel:FindFirstChild('Hint')then ctx.panel.Hint.Visible=picked==nil and ctx.panel.Hint:GetAttribute('Room')~=false end
+  ui.Pick.Visible=picked~=nil;if picking~=(picked~=nil)then picking=picked~=nil;paintCount()end
   if picked then
    local e=State.Items[picked.Key];local n=e and e.Count or 1
    ui.What.Text='Moving '..nameOf(picked.Key)..(n>1 and' x'..n or'')..(picked.Slot and' - tap a slot, the Bag or 🗑'or' - tap a slot or 🗑')
@@ -259,17 +261,14 @@ function M.AfterRefresh()
 end
 function M.Opened()if ctx then paintSearch();paintCount()end end
 function M.Closed()if ctx then M.Unpick();paintSearch()end end
--- Where the bottom bar goes: short sheets (phones) give it the bottom of the grid; others use the hint's row.
+-- Where the bottom bar goes: the bottom row of the sheet (the count next to Discard; while an item is picked, what to do with it takes the left of the row).
 function M.Layout(short,sheetWidth)
  if not ui.Bar then return end
- local hint=ctx.panel:FindFirstChild('Hint')
  ui.Bar.Position=UDim2.new(0,16,1,short and-34 or-34);ui.Bar.Size=UDim2.new(1,-32,0,28)
  local narrow=sheetWidth<420
  ui.Trash.Text=narrow and'🗑'or'🗑 Discard';ui.Trash.Size=UDim2.fromOffset(narrow and 44 or 104,28);ui.Trash.Position=UDim2.new(1,narrow and-44 or-104,0,0)
  right=(narrow and 44 or 104)+8;barH=28;sheetW=sheetWidth -- (paintCount places the count and the pick bar from these: R155 review, it used a fixed offset that covered the x button)
  ui.What.Size=UDim2.new(1,-206,1,0)
- if hint then hint.Size=UDim2.new(1,-(32+right+96),0,26);hint.Position=UDim2.new(0,16,1,-33);hint:SetAttribute('Room',not short);hint.Visible=not short and picked==nil
-  hint.Text=Input.TouchEnabled and'Tap to hold • hold to move or discard'or'Click to hold • drag to move • right-click for more'end
  paintCount()
 end
 M.BarHeight=36

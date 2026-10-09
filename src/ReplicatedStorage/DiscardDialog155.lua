@@ -25,23 +25,23 @@ local function build(pg)
  local gui=Instance.new('ScreenGui');gui.Name='DiscardConfirm';gui.ResetOnSpawn=false;gui.IgnoreGuiInset=false;gui.DisplayOrder=D.DisplayOrder;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Enabled=false;gui.Parent=pg
  local shade=Instance.new('TextButton');shade.Name='Shade';shade.Text='';shade.AutoButtonColor=false;shade.BackgroundColor3=Color3.new(0,0,0);shade.BackgroundTransparency=.45;shade.Size=UDim2.fromScale(1,1);shade.ZIndex=60;shade.Parent=gui
  shade:SetAttribute('ButtonSound',false)
- local f=Instance.new('Frame');f.Name='Dialog';f.AnchorPoint=Vector2.new(.5,.5);f.Position=UDim2.fromScale(.5,.47);f.Size=UDim2.fromOffset(360,262);f.BackgroundColor3=Color3.fromRGB(20,46,35);f.Active=true;f.ZIndex=61;f.Parent=gui;corner(f,14)
- local st=Instance.new('UIStroke');st.Color=Theme.Colors.Mint;st.Transparency=.4;st.Thickness=1.5;st.Parent=f
+ local f=Instance.new('Frame');f.Name='Dialog';f.AnchorPoint=Vector2.new(.5,.5);f.Position=UDim2.fromScale(.5,.47);f.Size=UDim2.fromOffset(360,262);f.BackgroundColor3=Color3.fromRGB(31,34,70);f.Active=true;f.ZIndex=61;f.Parent=gui;corner(f,14)
+ local st=Instance.new('UIStroke');st.Color=Color3.fromRGB(106,144,225);st.Transparency=.4;st.Thickness=1.5;st.Parent=f
  local fit=Instance.new('UISizeConstraint');fit.MaxSize=Vector2.new(360,262);fit.Parent=f
  text(f,'Title','throw it away?',22,UDim2.fromOffset(16,10),UDim2.new(1,-32,0,30),Color3.new(1,1,1),true)
- local pic=Instance.new('Frame');pic.Name='Picture';pic.BackgroundColor3=Color3.fromRGB(37,76,57);pic.Position=UDim2.fromOffset(16,48);pic.Size=UDim2.fromOffset(72,72);pic.ZIndex=62;pic.Parent=f;corner(pic,10)
+ local pic=Instance.new('Frame');pic.Name='Picture';pic.BackgroundColor3=Color3.fromRGB(48,54,106);pic.Position=UDim2.fromOffset(16,48);pic.Size=UDim2.fromOffset(72,72);pic.ZIndex=62;pic.Parent=f;corner(pic,10)
  local name=text(f,'ItemName','',17,UDim2.fromOffset(98,48),UDim2.new(1,-114,0,40),nil,true);name.TextXAlignment=Enum.TextXAlignment.Left
  local warn=text(f,'Warning',"u sure? it's gone forever",14,UDim2.fromOffset(98,90),UDim2.new(1,-114,0,32),Color3.fromRGB(255,214,140));warn.TextXAlignment=Enum.TextXAlignment.Left
  local row=Instance.new('Frame');row.Name='Amount';row.BackgroundTransparency=1;row.Position=UDim2.fromOffset(16,130);row.Size=UDim2.new(1,-32,0,36);row.ZIndex=62;row.Parent=f
- local tile=Color3.fromRGB(37,76,57)
+ local tile=Color3.fromRGB(48,54,106)
  btn(row,'One','1',UDim2.fromOffset(0,0),UDim2.fromOffset(44,36),tile)
  btn(row,'Less','-',UDim2.fromOffset(52,0),UDim2.fromOffset(40,36),tile)
- local box=Instance.new('TextBox');box.Name='Count';box.Text='1';box.ClearTextOnFocus=false;box.Position=UDim2.fromOffset(100,0);box.Size=UDim2.new(1,-252,0,36);box.BackgroundColor3=Color3.fromRGB(14,33,25)
+ local box=Instance.new('TextBox');box.Name='Count';box.Text='1';box.ClearTextOnFocus=false;box.Position=UDim2.fromOffset(100,0);box.Size=UDim2.new(1,-252,0,36);box.BackgroundColor3=Color3.fromRGB(25,32,65)
  box.TextColor3=Color3.new(1,1,1);box.Font=Theme.Bold;box.TextSize=18;box.ZIndex=63;box.Parent=row;corner(box,8)
  btn(row,'More','+',UDim2.new(1,-144,0,0),UDim2.fromOffset(40,36),tile)
  btn(row,'All','All',UDim2.new(1,-96,0,0),UDim2.fromOffset(96,36),tile)
  local status=text(f,'Status','',13,UDim2.fromOffset(16,170),UDim2.new(1,-32,0,24),RED);status.Visible=false
- local keep=btn(f,'Keep','Keep it',UDim2.new(0,16,1,-62),UDim2.new(.5,-24,0,48),Color3.fromRGB(70,110,86))
+ local keep=btn(f,'Keep','Keep it',UDim2.new(0,16,1,-62),UDim2.new(.5,-24,0,48),Color3.fromRGB(66,76,138))
  local go=btn(f,'Confirm','Discard',UDim2.new(.5,8,1,-62),UDim2.new(.5,-24,0,48),Color3.fromRGB(196,64,72))
  local fill=Instance.new('Frame');fill.Name='HoldFill';fill.BackgroundColor3=Color3.new(1,1,1);fill.BackgroundTransparency=.62;fill.BorderSizePixel=0;fill.Size=UDim2.fromScale(0,1);fill.ZIndex=64;fill.Active=false;fill.Parent=go;corner(fill,10)
  ui={Gui=gui,Shade=shade,Frame=f,Picture=pic,Name=name,Warning=warn,Row=row,Box=box,Status=status,Keep=keep,Confirm=go,Fill=fill}
