@@ -232,6 +232,20 @@ for si,s in ipairs(screens)do
  check(#pack.Outcomes:GetChildren()>=6,name..': six pack outcomes')
  for _,seed in ipairs(Mech.Seeds)do local t=pack.Outcomes[seed.Id];check(inside(rect(t),rect(pack),1),name..': outcome tile '..seed.Id..' inside banner');textFits(t.Chance,'chance')end
  for _,b in ipairs({pack.BuyWithGems,pack.BuyWithRobux,pack.Quantity1,pack.Quantity5,pack.Quantity10,pack.PreviewStage})do check(inside(rect(b),rect(pack),1),name..': '..b.Name..' inside banner')end
+ -- R155: the coat line ("Gold 4.5% / Diamond 0.5% coat") and the limited event's countdown sit under the buttons: inside the banner, whole words, clear of everything else on it
+ do
+  local coatL,timerL=pack.CoatNote,pack.EventTimer
+  check(coatL.Text=='Gold 4.5% / Diamond 0.5% coat'and timerL.Text:match('^⏳ ENDS IN %d+d %d%dh %d%dm %d%ds$')~=nil,name..': the coat line and the countdown read "'..coatL.Text..'" / "'..timerL.Text..'"')
+  local others={pack.BuyWithGems,pack.BuyWithRobux,pack.Quantity1,pack.Quantity5,pack.Quantity10,pack.PreviewStage,pack.PackTitle,pack.Contents}
+  for _,seed in ipairs(Mech.Seeds)do others[#others+1]=pack.Outcomes[seed.Id]end
+  for _,l in ipairs({coatL,timerL})do
+   check(inside(rect(l),rect(pack),1),name..': '..l.Name..' inside banner')
+   textFits(l,l.Name)
+   for _,o in ipairs(others)do check(not L.Overlaps(rect(l),rect(o),-.5),name..': '..l.Name..' clear of '..o.Name)end
+  end
+  check(not L.Overlaps(rect(coatL),rect(timerL),-.5),name..': the coat line and the countdown do not overlap')
+  check(rect(coatL).H>=11 and rect(timerL).H>=11,name..': both lines are at least 11 px tall')
+ end
  for _,pass in ipairs(Passes)do
   local cards={page[pass.Key]}
   for _,c in ipairs(cards)do

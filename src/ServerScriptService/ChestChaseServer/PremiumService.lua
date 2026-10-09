@@ -97,12 +97,12 @@ function Service.new(data,chests,passes)
   if(action=='RobuxBundle'or action=='RobuxGift'or action=='RobuxPack')and not receiptSpace(data:GetPremium(p))then
    local state=self:State(p);state.Success=false;state.Message='ROBUX PURCHASES AREN\'T ON FOR THIS SAVE';return state
   end
-  local okay,message
+  local okay,message,extra
   if action=='ClaimSeed'then okay,message=data:ClaimIndexSeed(p,value)
   elseif action=='ClaimBiome'then okay,message=data:ClaimIndexBiome(p,value)
   elseif action=='ClaimBiomeHalf'then okay,message=data:ClaimIndexBiomeHalf(p,value)
   elseif action=='Convert'then okay,message=data:ConvertGems(p,value)
-  elseif action=='BuyPack'then okay,message=data:BuyMechPack(p,value);if okay then chests:SyncTools(p)end
+  elseif action=='BuyPack'then okay,message,extra=data:BuyMechPack(p,value);if okay then chests:SyncTools(p)end
   elseif action=='BuyBundle'then okay,message=data:BuyPremiumBundle(p,value)
   elseif action=='RobuxBundle'then
    local row=Pricing.Find(value);local info=row and self.Products[row.Key];local id=row and Pricing.ProductId(row)or 0
@@ -123,14 +123,16 @@ function Service.new(data,chests,passes)
    local offer=Catalog.Offer(value);local count=offer and offer.Count
    local entry=count and self:State(p).PackOffers[tostring(count)]
    local id=Catalog.ProductId(value);local route,routed=Routing.Resolve(id)
-   if entry and entry.RobuxAvailable and route=='Mech'and routed==count and data:CanReceiveMechPacks(p,count)then
+   -- R155: the limited event is over: no new Mech purchase starts (no prompt). A receipt of a prompt opened BEFORE the end is still granted (ProcessReceipt never asks the sale).
+   if offer and Catalog.EventOver()then okay=false;message=Catalog.Event.Refused
+   elseif entry and entry.RobuxAvailable and route=='Mech'and routed==count and data:CanReceiveMechPacks(p,count)then
     okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Couldn\'t open the purchase. Try again!'or nil -- R148: the opened prompt needs no status line
    else okay=false;message='CAN\'T BUY THIS RIGHT NOW'end
   else okay=false;message='TRY AGAIN!'end
   -- R148: a gem purchase that went through gets the notice, chime and sparkles; their confirmation line is then redundant
   -- (R152: the "Gems / Cash on the way." lines stay: the coins fly to the counter and claim themselves, nothing to collect).
   if okay==true then
-   if action=='BuyPack'then if self:Announce(p,'Pack',value)then message=nil end
+   if action=='BuyPack'then if self:Announce(p,'Pack',value,extra)then message=nil end
    elseif action=='BuyBundle'then
     local row=Pricing.Find(type(value)=='table'and value.Key or value)
     if row and self:Announce(p,'Bundle',row.Key)and row.Kind=='Speed'then message=nil end
@@ -218,7 +220,7 @@ function Service:ProcessReceipt(receipt)
    if not granted then return later end
    -- Pack and receipt enter the same profile transaction. Never acknowledge before a successful save.
    state.Receipts[receipt.PurchaseId]=true;self.Data:MarkDirty(player);fresh=true
-   owed[receipt.PurchaseId]=mech and{'Pack',key}or bundle and{'Bundle',bundle}or{'Gift',key}
+   owed[receipt.PurchaseId]=mech and{'Pack',key,granted}or bundle and{'Bundle',bundle}or{'Gift',key} -- (R155: a Mech grant's records tell the notice which packs came coated)
   end
   self.Data:WaitForSave(player,5)
   if not self.Data:Save(player,'PremiumProductReceipt',true)then return later end
@@ -230,13 +232,13 @@ function Service:ProcessReceipt(receipt)
  local result=okay and decision or later
  if result==Enum.ProductPurchaseDecision.PurchaseGranted then
   local item=owed[receipt.PurchaseId]
-  if item then owed[receipt.PurchaseId]=nil;self:Announce(player,item[1],item[2])end
+  if item then owed[receipt.PurchaseId]=nil;self:Announce(player,item[1],item[2],item[3])end
  end
  return result
 end
 -- R148: true when the buyer was sent PurchaseDone (and the notice).
-function Service:Announce(player,kind,arg)
- return self.Announcer~=nil and self.Announcer:Announce(player,kind,arg)==true
+function Service:Announce(player,kind,arg,extra)
+ return self.Announcer~=nil and self.Announcer:Announce(player,kind,arg,extra)==true
 end
 function Service:Notify(player,message)
  local n=self.Data.Notifications;if n and player.Parent then pcall(n.Show,n,player,message,nil,4)end

@@ -41,14 +41,28 @@ function A.new(data)
  if not remote then remote=Instance.new('RemoteEvent');remote.Name='PurchaseDone';remote.Parent=folder end
  return setmetatable({Data=data,Remote=remote},A)
 end
--- True when the buyer was sent the event (the notice is best effort next to it).
-function A:Announce(player,kind,arg)
+-- R155: how many of the packs just granted came coated (their records, PackMutation): "" when none did, else " ✨ GOLD MECH PACK!" / " 💎 DIAMOND MECH PACK!" for one, and
+-- " ✨ 2 GOLD + 💎 1 DIAMOND!" for several (the coats NoticeCopy83 already marks with ✨ and 💎). The same notice as always, one line; plain packs say nothing extra.
+function A.CoatText(records)
+ if type(records)~='table'then return''end
+ local gold,diamond=0,0
+ for _,r in ipairs(records)do if type(r)=='table'then if r.PackMutation=='Gold'then gold+=1 elseif r.PackMutation=='Diamond'then diamond+=1 end end end
+ if gold+diamond==0 then return''end
+ if gold+diamond==1 and #records==1 then return gold==1 and' ✨ GOLD MECH PACK!'or' 💎 DIAMOND MECH PACK!'end
+ local words={}
+ if gold>0 then words[#words+1]='✨ '..gold..' GOLD'end
+ if diamond>0 then words[#words+1]='💎 '..diamond..' DIAMOND'end
+ return' '..table.concat(words,' + ')..'!'
+end
+local function coatSuffix(extra)local ok,text=pcall(A.CoatText,extra);return ok and type(text)=='string'and text or''end
+-- True when the buyer was sent the event (the notice is best effort next to it). extra (optional, R155): a Mech grant's records (CoatText).
+function A:Announce(player,kind,arg,extra)
  local okay,name=pcall(A.Name,kind,arg)
  if not okay or type(name)~='string'or not player or not player.Parent then return false end
  -- R153: a pass with an Emoji (the 4 Leaf Clover 🍀) shows it in the line, and its Icon key goes to the client (PurchaseCelebration pops that picture); the other passes send exactly what they did.
  local row=(kind=='Pass'or kind=='Gift')and pass(arg)or nil
  local notices=self.Data and self.Data.Notifications
- if notices then pcall(notices.Show,notices,player,'✅ Bought: '..(row and row.Emoji and row.Emoji..' 'or'')..name..'!',A.Color,A.Seconds)end
+ if notices then pcall(notices.Show,notices,player,'✅ Bought: '..(row and row.Emoji and row.Emoji..' 'or'')..name..'!'..(kind=='Pack'and coatSuffix(extra)or''),A.Color,A.Seconds)end
  return(pcall(self.Remote.FireClient,self.Remote,player,{Kind=kind,Name=name,Icon=row and row.Icon or nil}))
 end
 return A

@@ -80,7 +80,11 @@ end end
 local pack=Art.Card(page,'LimitedMechPack',{C(255,196,60),C(255,96,44),C(196,34,74),C(110,30,150)})
 pack.Fill.Rotation=100
 local packTitle=Art.Text(pack,'PackTitle','LIMITED MECH PACK',34);packTitle.ZIndex=4;packTitle.TextXAlignment=Enum.TextXAlignment.Left
-local limited=Art.Text(pack,'Contents','LIMITED TIME!',20,C(255,236,90));limited.ZIndex=4;limited.TextXAlignment=Enum.TextXAlignment.Right
+local limited=Art.Text(pack,'Contents',Catalog.Event.Live,20,C(255,236,90));limited.ZIndex=4;limited.TextXAlignment=Enum.TextXAlignment.Right
+-- R155: the card's two small lines under the buttons: the coat's odds (next to the seed odds above them: "Gold 4.5% / Diamond 0.5% coat") and the limited event's live countdown to
+-- LimitedEvent.EndsAt, in the Index LIMITED tab's format ("⏳ ENDS IN 27d 04h 12m 09s"), on the server's clock. After the end: "EVENT OVER!" / "THANKS FOR PLAYING!" and both buy buttons are off.
+local coatNote=Art.Text(pack,'CoatNote',Catalog.CoatLine(),15,C(255,244,190));coatNote.ZIndex=4;coatNote.TextXAlignment=Enum.TextXAlignment.Left
+local timerNote=Art.Text(pack,'EventTimer',Catalog.TimerText(workspace:GetServerTimeNow()),15,C(255,236,90));timerNote.ZIndex=4;timerNote.TextXAlignment=Enum.TextXAlignment.Right
 local stage=Art.Frame(pack,'PreviewStage',C(20,12,40),.55);stage.ZIndex=2;Art.Corner(stage,10);Art.Stroke(stage,Art.Ink,2)
 local packView=require(RS.PackViewport89).Create(stage)
 local dock=stage:FindFirstChild('MechDockingBay');if dock then dock.Visible=false end
@@ -158,13 +162,23 @@ local waysDetail=Art.Text(ways,'Detail','Grab Gems from ur plant index!',15);way
 local function active(b,enabled)b.Interactable=enabled;b.Active=enabled;b.AutoButtonColor=enabled;b.BackgroundTransparency=enabled and 0 or .45 end
 local layoutKey;local content;local frame
 local function setPrice(b,text,icon,color)Art.SetCaption(b,text,icon,color)end
+-- R155: the limited event's clock (the server's) -> the card's words and its two buy buttons. Writes only a change; a flip (the event ending while the shop is open) refreshes the buttons.
+local eventOver
+local function updateEvent()
+ local now=workspace:GetServerTimeNow();local over=Catalog.EventOver(now)
+ local live=over and Catalog.Event.Over or Catalog.Event.Live;if limited.Text~=live then limited.Text=live end
+ local text=Catalog.TimerText(now);if timerNote.Text~=text then timerNote.Text=text end
+ timerNote.TextColor3=over and C(255,255,255)or C(255,236,90)
+ if eventOver~=over then eventOver=over;if refresh then refresh()end end
+end
 refresh=function()
  local offer=Catalog.Offer(packCount);local available=state.PackOffers and state.PackOffers[tostring(packCount)]or{}
- local gemLive=available.GemAvailable==true
- setPrice(gemBuy,state.OnSale==false and'Off sale'or(gemLive and tostring(offer.GemPrice)or'Unavailable'),gemLive);active(gemBuy,gemLive and not busy)
+ local over=Catalog.EventOver(workspace:GetServerTimeNow());eventOver=over -- R155: after the end both buy buttons say "Event over" and are off (the server refuses a new purchase too)
+ local gemLive=available.GemAvailable==true and not over
+ setPrice(gemBuy,over and Catalog.Event.Button or state.OnSale==false and'Off sale'or(gemLive and tostring(offer.GemPrice)or'Unavailable'),gemLive);active(gemBuy,gemLive and not busy)
  local packInfo=packInfos[packCount];local packPrice=packInfo and packInfo.PriceInRobux
- local packLive=available.RobuxAvailable==true and packPrice~=nil and packInfo.IsForSale~=false
- setPrice(robuxBuy,packLive and Art.RobuxText(packPrice)or'Unavailable',packLive);active(robuxBuy,packLive and not busy)
+ local packLive=available.RobuxAvailable==true and packPrice~=nil and packInfo.IsForSale~=false and not over
+ setPrice(robuxBuy,over and Catalog.Event.Button or packLive and Art.RobuxText(packPrice)or'Unavailable',packLive);active(robuxBuy,packLive and not busy)
  for count,b in pairs(quantityButtons)do Bright.Button(b,count==packCount and C(255,186,40)or C(70,74,96));Art.Stroke(b,Art.Ink,2.5,'BrightOutline');b:SetAttribute('Selected',count==packCount);active(b,not busy)end
  for key,row in pairs(bundleButtons)do
   local quote=state.Bundles and state.Bundles[key]
@@ -248,6 +262,8 @@ local function layoutFeatured(f,k,button)
   place(limited,{X=p,Y=p+h1,W=w-p*2,H=h2});limited.TextXAlignment=Enum.TextXAlignment.Left
   Art.SetTextSize(limited,math.floor((h2-2)/1.16),10)
  end
+ place(coatNote,f.Coat);Art.SetTextSize(coatNote,math.floor(f.Coat.H*.78),9);place(timerNote,f.Timer);Art.SetTextSize(timerNote,math.floor(f.Timer.H*.78),9) -- R155
+ if f.Wide then timerNote.TextXAlignment=Enum.TextXAlignment.Right else timerNote.TextXAlignment=Enum.TextXAlignment.Left end
  place(stage,f.Preview)
  local box={X=f.Tiles[1].X,Y=f.Tiles[1].Y,W=f.Tiles[#f.Tiles].X+f.Tiles[#f.Tiles].W-f.Tiles[1].X,H=f.Tiles[#f.Tiles].Y+f.Tiles[#f.Tiles].H-f.Tiles[1].Y}
  place(outcomes,box)
@@ -379,8 +395,21 @@ local function focusBundle()
   scrollTo(row.Rect.Y-headerH-content.Gap,false);pg:SetAttribute('PremiumFocus',nil)
  end)
 end
+-- R155: the countdown ticks every second while the shop is open (the Index LIMITED tab's way: a token ends the loop when the shop closes).
+local tickToken=0
+local function startTicking()
+ tickToken+=1;local token=tickToken;updateEvent()
+ local function tick()
+  task.delay(1,function()
+   if token~=tickToken or not gui.Parent or not panel.Visible then return end
+   updateEvent();tick()
+  end)
+ end
+ tick()
+end
 local function open(value)
  local changed=panel.Visible~=value
+ if value then if changed then startTicking()end else tickToken+=1 end
  if value then relayout()end
  panel.Visible=value;shade.Visible=value;jumpRoot.Visible=value
  if value then pcall(function()require(RS.CloverIcon153).Ensure()end)end -- R153: the clover picture is drawn when the shop opens (once per client)
@@ -421,4 +450,4 @@ end)
 local stopWatch=Hud.Watch(gui,function()if content then relayout()end end)
 watch(GuiService:GetPropertyChangedSignal('ReducedMotionEnabled'),function()if scrollTween and GuiService.ReducedMotionEnabled then scrollTween:Cancel();scrollTween=nil;local y=page:GetAttribute('TargetY');if y then page.CanvasPosition=Vector2.new(0,y)end end end)
 gui.Destroying:Connect(function()stopWatch();for _,r in ipairs(reveals)do r.Destroy()end;for _,c in ipairs(connections)do c:Disconnect()end end)
-relayout(true);refresh();setCurrent('Featured')
+relayout(true);refresh();updateEvent();setCurrent('Featured')

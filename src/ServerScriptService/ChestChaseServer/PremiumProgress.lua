@@ -5,6 +5,12 @@ local T=require(RS.BalanceValues81)
 local P={}
 -- R126 (owner): bought Mech packs roll a pack size like world packs (BalanceRules.PackSizes).
 local SizeRandom=Random.new()
+-- R155 (owner: "We can implement 1C"): every BOUGHT Mech pack rolls a Gold / Diamond coat exactly like a world pack (SeedPackRules.RollMutation: the world's own weights, None 95 /
+-- Gold 4.5 / Diamond .5), one roll per pack. The coat is the record's existing PackMutation field (saved and loaded like every pack's), so the seed it opens keeps it, the plant draws
+-- Gold / Diamond and its fruit get the coat's x3 / x6 at the usual 20% (PlantRules). A FREE Mech pack (a daily grant, paid == false) stays plain, as every free pack does (the daily
+-- and bonus-roll packs, the starter pack, the giveaway: PackMutation 'None'); a test pack (/test) never comes through here. P.RollCoat is the one place the roll is drawn (tests replace it).
+local CoatRandom=Random.new()
+function P.RollCoat()return PackRules.RollMutation(CoatRandom:NextNumber())end
 local function integer(n,lo,hi)return type(n)=='number'and n==n and n%1==0 and n>=lo and n<=hi end
 local function copy(t)local out={};for k,v in pairs(t)do out[k]=type(v)=='table'and copy(v)or v end;return out end
 -- R153: passes added after R152 (GamePassCatalog Late) keep their saved data apart, in the optional field Premium.Later153 = {Entitlements={Clover=true},GiftCredits={Clover=n},PassOutbox={[id]=gift}}:
@@ -174,7 +180,7 @@ function P.Attach(Data)
   local serial=player:GetAttribute('ChestInventorySerial');local added={}
   local success,err=pcall(function()
    for _=1,offer.Count do
-    local record,reason=self:AddChest(player,{Stage=8,BagVariant=Catalog.Variant,PackSize=PackRules.RollPackSize(SizeRandom:NextNumber()),PackMutation='None'})
+    local record,reason=self:AddChest(player,{Stage=8,BagVariant=Catalog.Variant,PackSize=PackRules.RollPackSize(SizeRandom:NextNumber()),PackMutation=paid==true and P.RollCoat()or'None'}) -- R155: a bought pack rolls its coat
     assert(record,reason or 'PACK COULD NOT BE ADDED')
     record.PaidRandom=paid==true;record.ChestName=Catalog.Name;added[#added+1]=record
    end
@@ -193,12 +199,13 @@ function P.Attach(Data)
   local offer=Catalog.Offer(count);if not offer then return false,'TRY AGAIN!'end
   if not self:IsLoaded(player)then return false,'HOLD ON, UR DATA IS LOADING!'end
   if player:GetAttribute('PaidRandomAllowed')~=true then return false,'CAN\'T BUY THIS PACK RIGHT NOW'end
+  if Catalog.EventOver()then return false,Catalog.Event.Refused end -- R155: the limited event is over: nothing is charged, nothing is granted
   if not Catalog.OnSale()then return false,'THIS PACK IS OFF SALE'end
   local state=self:GetPremium(player)
   if state.Gems<offer.GemPrice then return false,'NOT ENOUGH GEMS'end
   local packs,why=self:GrantMechPacks(player,true,offer.Count);if not packs then return false,why end
   state.Gems-=offer.GemPrice;self:PublishPremium(player);self:MarkDirty(player)
-  return true,offer.Count==1 and'Mech pack is in ur bag!'or offer.Count..' Mech packs are in ur bag!'
+  return true,offer.Count==1 and'Mech pack is in ur bag!'or offer.Count..' Mech packs are in ur bag!',packs -- R155: the third result is the new records (their coats go in the "Bought" notice)
  end
  -- R123: the R121 timed x2 boost and product gifts were removed; old saved fields are kept untouched and unused.
  function Data:CanReceiveBundle(player,key)

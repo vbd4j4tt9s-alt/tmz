@@ -2,7 +2,8 @@
 -- R153 z-fighting, the Mech pack (look B; not a test by itself: check_zfight_sweep.py mech reads it). The pack exactly as the game builds it on the REAL
 -- templates of the owner's place: on the server's generated flat pouch (VerityPouch151.Prepare baked on the EditableMesh mock, its real triangles dumped) in
 -- every context it is drawn - ground, held (R15 / R6), a picture - at a normal, a giant and a tiny size, plain and Gold / Diamond; on its plain-parts body
--- (no pouch made); and its opening copy (MechPackFx153) with the bolts backed out, a scan line sweeping and the steam up, at five moments of a Mythic reveal.
+-- (no pouch made; R155: plain, Gold, Diamond); and its opening copy (MechPackFx153) with the bolts backed out, a scan line sweeping and the steam up, at five moments of a Mythic reveal
+-- (R155: plain, Gold and Diamond).
 -- Output: "SCENE <name> <json>" lines in the zfight.py scene format (parts, "meshes": the baked pouch's world-space triangles).
 local H=require('./pack_world');local W,R=H.W,H.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local Mock=require('./pouch_mock')(W)
@@ -14,6 +15,9 @@ local assets=W.RS.SeedPackMeshAssets;local tpl=assets['Storm_02'].ApprovedMesh01
 Mock.reset()
 assert(Pouch.Prepare()==true,'the pouch did not bake')
 local Z=require('./zfight_world')
+-- R155: the opening's hiss is a Sound the bare mock cannot play: MechPackFx153 would stop at its first tear group (Failed, by design: one bad frame stops only the Mech touch) and
+-- every "opening" frame below would be an unmoved copy. A Sound that can play lets the bolts, the turbine, the stripes and the scan line really move through the frames.
+do local inew=R.Instance.new;R.Instance.new=function(class,parent)local o=inew(class,parent);if class=='Sound'then o.Play=function()end;o.Stop=function()end end;return o end end
 local function q(s)return string.format('%q',tostring(s))end
 local function dumpScene(name,root)
  local list=Z.dump(root,function()return'mech'end)
@@ -53,10 +57,10 @@ for _,size in ipairs({1,25,.5})do for _,coat in ipairs({'None','Gold','Diamond'}
  end
 end end
 -- the opening copy (SeedPackClient's clone: welds gone, every part anchored) driven by MechPackFx153 through a Mythic reveal: bolts out, the turbine turning,
--- the scan line on a pulse, the stripes with their strips, the steam ring
-do
+-- the scan line on a pulse, the stripes with their strips, the steam ring. R155: also in the Gold and the Diamond coat (a coated Mech pack is opened the same way)
+for _,openingCoat in ipairs({'None','Gold','Diamond'})do
  local L=W.module('RarePullRules');local Fx=W.module('MechPackFx153')
- fresh();local bag=H.ground(8,H.MECH,1,'None')
+ fresh();local bag=H.ground(8,H.MECH,1,openingCoat)
  local copy=H.openingCopy(bag);copy.Parent=W.workspace
  local burst=L.BurstAt(5,false)
  local record={RarityRank=5,Quick=false,BurstAt=burst,TearTicks=L.TearTicks(5,false),FlapFrames={},BagTransparency={},Effect=W.workspace,Bag=bag,At=0}
@@ -68,21 +72,24 @@ do
   -- frames run in order up to t (the cues fire on their beats)
   local at=frames[#frames]or 0
   while at<t do at=math.min(t,at+1/30);o:Update(at,copy.PrimaryPart.CFrame)end
+  assert(not o.Failed,'the Mech opening failed at t='..t)
   frames[#frames+1]=t
   bag.Parent=nil
-  dumpScene(string.format('opening_%.2f',t),W.workspace)
+  dumpScene(string.format('opening_%.2f%s',t,openingCoat=='None'and''or'_'..openingCoat),W.workspace)
   bag.Parent=W.workspace
  end
  o:Destroy();copy:Destroy();bag:Destroy()
 end
--- the plain-parts body (no flat pouch: a server still baking, a world without EditableMesh)
+-- the plain-parts body (no flat pouch: a server still baking, a world without EditableMesh); R155: plain, Gold and Diamond
 do
  local f=W.RS:FindFirstChild(Pouch.Folder);if f then f:Destroy()end
- for _,ctx in ipairs(contexts)do
-  fresh()
-  local bag=ctx[2](1,'None')
-  assert(bag:GetAttribute('MechPouch')==false,'the fallback is not the sachet: '..ctx[1])
-  dumpScene('sachet_'..ctx[1],W.workspace)
+ for _,coat in ipairs({'None','Gold','Diamond'})do
+  for _,ctx in ipairs(contexts)do
+   fresh()
+   local bag=ctx[2](1,coat)
+   assert(bag:GetAttribute('MechPouch')==false,'the fallback is not the sachet: '..ctx[1])
+   dumpScene('sachet_'..ctx[1]..(coat=='None'and''or'_'..coat),W.workspace)
+  end
+  for _,size in ipairs({25,.5})do fresh();H.ground(8,H.MECH,size,coat);dumpScene('sachet_ground_'..size..(coat=='None'and''or'_'..coat),W.workspace)end
  end
- for _,size in ipairs({25,.5})do fresh();H.ground(8,H.MECH,size,'None');dumpScene('sachet_ground_'..size,W.workspace)end
 end

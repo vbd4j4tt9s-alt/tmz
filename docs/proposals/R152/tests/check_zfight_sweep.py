@@ -174,7 +174,7 @@ def cmd_verity(dump):
 def cmd_mech(dump):
     """The Mech pack's look B on the flat pouch (its real triangles) in every context / size / coat, its opening copy (bolts out, scan, steam) and its
     plain-parts body: no counted finding at all (every layer of the design stands >= .024 off the one under it), no stacked images, one pouch MeshPart."""
-    bad = n = opening = sachet = 0
+    bad = n = opening = sachet = coated_opening = coated_sachet = scan_frames = 0
     tmp = dump + '.scene.json'
     for name, js in scenes_of(dump):
         n += 1
@@ -192,6 +192,9 @@ def cmd_mech(dump):
         meshes = [p for p in raw if p['class'] == 'MeshPart']
         opening += name.startswith('opening')
         sachet += name.startswith('sachet')
+        coated_opening += name.startswith('opening') and name.endswith(('_Gold', '_Diamond'))
+        scan_frames += name.startswith('opening') and any(p['name'] == 'MechScan' for p in raw)   # (R155: the opening frames really move: a scan line is up in the frames on a pulse)
+        coated_sachet += name.startswith('sachet') and name.endswith(('_Gold', '_Diamond'))
         if name.startswith('sachet'):
             if meshes:
                 print('  FAIL: %s: the plain-parts body has a MeshPart (%s)' % (name, ', '.join(p['name'] for p in meshes)))
@@ -200,9 +203,10 @@ def cmd_mech(dump):
             print('  FAIL: %s: the pack should be on ONE MeshPart, the flat pouch (%d)' % (name, len(meshes)))
             bad += 1
     os.remove(tmp)
-    ok = bad == 0 and n >= 30 and opening >= 5 and sachet >= 4
-    print('Mech pack (R153): %d scenes (ground, held R15 / R6, picture; sizes .5 / 1 / 25; plain, Gold, Diamond; %d opening frames; %d on the plain-parts body): %s' % (
-        n, opening, sachet, 'PASS' if ok else 'FAIL (%d)' % bad))
+    # R155: the opening frames and the plain-parts body in the Gold and the Diamond coat too (15 opening frames: 5 moments x plain / Gold / Diamond; 6 plain + 12 coated on the plain-parts body)
+    ok = bad == 0 and n >= 53 and opening >= 15 and sachet >= 18 and coated_opening >= 10 and coated_sachet >= 12 and scan_frames >= 6
+    print('Mech pack (R153 / R155 coats): %d scenes (ground, held R15 / R6, picture; sizes .5 / 1 / 25; plain, Gold, Diamond; %d opening frames, %d of them coated, %d with the scan line up; %d on the plain-parts body, %d of them coated): %s' % (
+        n, opening, coated_opening, scan_frames, sachet, coated_sachet, 'PASS' if ok else 'FAIL (%d)' % bad))
     return 0 if ok else 1
 
 

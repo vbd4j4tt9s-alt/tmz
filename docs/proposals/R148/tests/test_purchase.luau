@@ -82,6 +82,7 @@ RS.PassGiftCatalog:SetAttribute('GrowthGiftProductId',401);RS.PassGiftCatalog:Se
 RS.GamePassCatalog:SetAttribute('GrowthPassId',101);RS.GamePassCatalog:SetAttribute('SpeedPassId',102)
 -- Fake PlayerDataService (+ real PremiumProgress methods) ----------------------------------------
 local Progress=server('PremiumProgress')
+Progress.RollCoat=function()return'None'end -- R155: bought Mech packs roll a coat; this suite is about the plain "Bought" notice, so no pack is coated here (docs/proposals/R155/tests/test_mech_coats_server.luau covers the coat notice)
 local notes={}
 local Data={Premium={},CanSave={},Loaded={},Saved={},Gardens={},Chests={},Speed={},Cash={},FailSave=false,
  Config={MaxSavedChests=200,GardenPlants={}},Notifications={Show=function(_,p,msg,color,seconds)notes[#notes+1]={P=p,Text=msg,Color=color,Seconds=seconds}end}}

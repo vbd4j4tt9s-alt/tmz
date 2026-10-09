@@ -383,8 +383,13 @@ do
   local label=('%s stage %d %sx %s'):format(variant,stage,size,coat)
   if not check(okA==okB,label..': builds the same way before and after ('..tostring(okA)..'/'..tostring(okB)..')')then return end
   if okA then
-   local same,why=sameFingerprint(fingerprint(a),fingerprint(b))
-   check(same and #fingerprint(a)>1,label..': '..#fingerprint(a)..' instances, identical before and after'..(why and('\n   first difference: '..why)or''))
+   -- R155 (on purpose): a Gold / Diamond MECH pack keeps its lit parts and hazard stripes in their own colour (MechCoatKeep: docs/proposals/R155); the base paints them with the coat.
+   -- Those parts (by name) are left out of both sides; every other part of the coated Mech pack is still compared, and a plain Mech pack is compared whole.
+   local kept={}
+   if variant=='MechLimited'and coat~='None'then for _,d in ipairs(a:GetDescendants())do if d:IsA('BasePart')and d:GetAttribute('MechCoatKeep')then kept[d.Name]=true end end end
+   local function without(fp)if next(kept)==nil then return fp end;local out={};for _,line in ipairs(fp)do local name=line:match('^[^|]*|([^|]*)|');if not(name and kept[name])then out[#out+1]=line end end;return out end
+   local same,why=sameFingerprint(without(fingerprint(a)),without(fingerprint(b)))
+   check(same and #fingerprint(a)>1,label..': '..#fingerprint(a)..' instances, identical before and after'..(next(kept)and' (but the Mech pack\'s kept lit parts)'or'')..(why and('\n   first difference: '..why)or''))
    compared+=1;partsTotal+=#parts(a);a:Destroy();b:Destroy()
   end
   local bn,bo=Visuals.Bounds(stage,variant,size),VisualsBase.Bounds(stage,variant,size)
