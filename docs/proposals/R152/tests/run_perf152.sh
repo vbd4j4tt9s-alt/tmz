@@ -49,9 +49,10 @@ bad=0;n=0;for f in "$SP"/*.client.lua;do
  [ "$want" = "$have" ] || [ -z "$want" -a "$have" = 1 ] || { echo "the load guard moved in $rel (line ${want:-none} -> ${have:-none})";bad=1; };[ "$have" = 1 ] && n=$((n+1))
 done
 [ "$bad" = 0 ] && echo "ok: the load guard is where the candidate has it (line 1 of $n client scripts, Hotbar line 2)" || fail "load guard"
-git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | grep 'Config.Version' > "$OUT/version_base.txt"
-grep 'Config.Version' "$S/ServerScriptService/ChestChaseServer/Config.lua" > "$OUT/version_now.txt"
-cmp -s "$OUT/version_base.txt" "$OUT/version_now.txt" && echo "ok: Config.Version unchanged" || fail "Config.Version changed"
+# (the release number itself is the release step's: 'V150 R15x' on both sides; the rest of that line, ProfileVersion included, must not change)
+git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | grep 'Config.Version' | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/" > "$OUT/version_base.txt"
+grep 'Config.Version' "$S/ServerScriptService/ChestChaseServer/Config.lua" | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/" > "$OUT/version_now.txt"
+cmp -s "$OUT/version_base.txt" "$OUT/version_now.txt" && echo "ok: Config.Version line unchanged (but the release number)" || fail "Config.Version changed"
 bad=0;for f in $(git -C "$REPO" diff --name-only "$BASE" -- src | grep '\.lua$');do [ -f "$REPO/$f" ] || continue;/opt/luau/luau-compile --null "$REPO/$f" >/dev/null 2>&1 || { echo "does not compile: $f";bad=1; };done
 [ "$bad" = 0 ] && echo "ok: every script changed since $BASE compiles ($(git -C "$REPO" diff --name-only "$BASE" -- src | grep -c '\.lua$') files)" || fail "compile"
 else
