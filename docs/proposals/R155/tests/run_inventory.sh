@@ -3,7 +3,7 @@
 # have a blank hot bar if i put everything in my bag ... make the max amount of items a person can hold 200", "allow people to discard items") on the Roblox
 # mock (/opt/luau/luau) with the REAL modules / scripts of this checkout.
 #  static               - the new / edited scripts compile at -O0 (Roblox's 200-register limit: check_compile_O0.sh), the new files are in src/MANIFEST.tsv, Hotbar
-#                         lines 1 / 2 are the load guard, Config.Version unchanged, the Hotbar still plays no cue but the harvest landing, no model names.
+#                         lines 1 / 2 are the load guard, Config.lua unchanged but its Version (the release sets it), the Hotbar still plays no cue but the harvest landing, no model names.
 #  test_layout155.luau   - the layout model alone (GardenInventoryState): new-item rule, nothing moves by itself, blank slots, Place / Stow, respawn, rejoin
 #                         (Serialize / Parse / Restore), a phone's 5 slots, Target, 3000 random operations.
 #  test_inventory155.luau - the REAL Hotbar + InventoryPanel155 + DiscardDialog155 through R153's engine model (engine153.luau), in 6 engine variants x 2 event
@@ -36,17 +36,18 @@ if [ "$MODE" = all ] || [ "$MODE" = static ];then
  head -1 "$SP/Hotbar.client.lua" | grep -q "SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)" || bad "Hotbar line 1 must hide Roblox's backpack (R152 load guard)"
  sed -n 2p "$SP/Hotbar.client.lua" | grep -q "R152: start once the whole game has arrived" || bad "Hotbar line 2 must be the R152 load guard"
  if grep -nE "Audio\.Play\(" "$SP/Hotbar.client.lua" "$S/ReplicatedStorage/InventoryPanel155.lua" "$S/ReplicatedStorage/DiscardDialog155.lua" | grep -v "Bubble06";then bad "the hotbar / Bag play a cue of their own (only the harvest landing, Bubble06)";fi
- [ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | grep 'Config.Version')" = "$(grep 'Config.Version' "$SS/Config.lua")" ] || bad "Config.Version changed"
+ grep -qE "Config\.Version='V150 R15[0-9a-z]*'" "$SS/Config.lua" || bad "Config.Version must be a V150 R15x release number (the release step sets it)"
  grep -q "^S.Cap=200$" "$S/ReplicatedStorage/InventoryStacks155.lua" || bad "the cap (InventoryStacks155.Cap) is not 200"
  # (review) the tooltip: ChestService still writes the lines ItemTooltip155 parses (one line per row, joined with a newline), the Hotbar forwards hover / selection to it,
  # and the pack carried home is banked with Banked (the 200 cap never refuses it)
  grep -qF "tool.ToolTip=table.concat(rows,'\\n')" "$SS/ChestService.lua" || bad "ChestService no longer writes the hold tooltip as newline-joined rows (ItemTooltip155 parses them)"
  grep -qF "Inv.Hover(b,keyNow)" "$SP/Hotbar.client.lua" && grep -qF "Inv.Focus(b,keyNow)" "$SP/Hotbar.client.lua" || bad "the Hotbar does not forward hover / selection to the item tooltip"
  grep -qF "{Luck=true, Banked=true}" "$SS/ChestService.lua" || bad "ChestService:Bank does not pass Banked (a carried pack must never be refused for the 200 cap)"
- git -C "$REPO" diff --quiet "$BASE" -- "$SS/Config.lua" || bad "Config.lua changed (older suites keep it byte-identical)"
+ # the R155 release sets Config.Version; nothing else in Config.lua may change (older suites keep it byte-identical apart from that)
+ [ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | sed "s/Config\.Version='[^']*'/Config.Version=V/")" = "$(sed "s/Config\.Version='[^']*'/Config.Version=V/" "$SS/Config.lua")" ] || bad "Config.lua changed beyond Config.Version (older suites keep it byte-identical)"
  if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]" "$HERE" "$P/R155"/*.md 2>/dev/null;then bad "a model name in the R155 files";fi
  [ "$fail" = 0 ]
- echo "ok: the new scripts are in the manifest, every script compiles at -O0 within 180 registers, Hotbar lines 1 / 2 are the load guard, no new cue, Config.lua untouched, the cap is 200"
+ echo "ok: the new scripts are in the manifest, every script compiles at -O0 within 180 registers, Hotbar lines 1 / 2 are the load guard, no new cue, Config.lua untouched but its Version, the cap is 200"
 fi
 if [ "$MODE" = all ] || [ "$MODE" = layout ];then
  D=$OUT/layout;mkdir -p "$D";cp "$T/roblox.luau" "$INV/world.luau" "$HERE/test_layout155.luau" "$D/";python3 "$INV/mkbundle.py" "$D/rs_bundle.luau" >/dev/null

@@ -3,7 +3,7 @@
 # R155 pack pity (owner: "every 10th pack" x1.5 luck; "make the pity separate an event pity and a normal pity the event pity only counts for void, verity and mech";
 # "2 separate bars above the hot bar one coloured gold the other coloured purple", "always visible and polished properly"). On the Roblox mock (/opt/luau/luau):
 #  0. static  - the new / changed scripts compile at -O0; the four new scripts are in src/MANIFEST.tsv (sorted); the frozen odds files match R151's frozen.sha256 and the
-#               R155 pity changes carry their notes; Config.lua, Hotbar.client.lua, RarePullCinematic, RarePullCard and BackgroundMusic are untouched since the base;
+#               R155 pity changes carry their notes; Config.lua (but its Version), Hotbar.client.lua, RarePullCinematic, RarePullCard and BackgroundMusic are untouched since the base;
 #               the R152 load guard is line 1 of every client script; the wiring (the open plans before its roll and commits after it went through, the save and the
 #               load, the hold tooltip, /test odds, the Mech shop card's line, COMMANDS.md and the F4 help); no model names in the R155 pity files
 #  1. test    - test_pity155.luau (the R153 clover world, the real server code): rules, clamps, lucky odds, real opens per group, TEST / refused opens, saving, commands
@@ -38,11 +38,12 @@ echo "ok: the four new scripts are in the manifest (sorted)"
 for f in PackOdds112 PackLuck154;do grep -q "^# R155 (on purpose): .*$f.lua.*pack pity" "$P/R151/tests/frozen.sha256" || fail "frozen.sha256 has no R155 pity note for $f";done
 echo "ok: the frozen odds files match their hashes; PackOdds112 / 137 and PackLuck154 carry their R155 pity notes"
 # (after the R155 merges the cinematic, the card, the hotbar and SeedPackRules change for other R155 work, and the card's SKIP pill now keeps clear of the bars; these two never change)
-for f in src/ServerScriptService/ChestChaseServer/Config.lua src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua;do
- git -C "$REPO" diff --quiet "$BASE" -- "$f" || fail "$f changed since $BASE (Config.Version / ProfileVersion and the music stay as they are)"
-done
+# (the R155 release sets Config.Version: that one value may change, nothing else in Config.lua)
+git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua || fail "BackgroundMusic changed since $BASE (the music stays as it is)"
+[ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | sed "s/Config\.Version='[^']*'/Config.Version=V/")" = "$(sed "s/Config\.Version='[^']*'/Config.Version=V/" "$SS/Config.lua")" ] || fail "Config.lua changed beyond Config.Version since $BASE (ProfileVersion stays)"
+grep -qE "Config\.Version='V150 R15[0-9a-z]*'" "$SS/Config.lua" || fail "Config.Version must be a V150 R15x release number (the release step sets it)"
 grep -q "Config.ProfileVersion=22" "$SS/Config.lua" || fail "ProfileVersion is not 22"
-echo "ok: Config.lua (Version, ProfileVersion 22) and BackgroundMusic untouched since $BASE"
+echo "ok: Config.lua (all but its Version; ProfileVersion 22) and BackgroundMusic untouched since $BASE"
 sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 && echo "ok: the R152 load guard is still line 1 of every client script (the new one too)" || { fail "the load guard test fails";tail -5 "$OUT/guard.log"; }
 python3 - "$SS/PlayerDataService.lua" <<'PY' || fail "OpenSeedPack does not plan the pity before its roll and commit it after the open went through"
 import re,sys
