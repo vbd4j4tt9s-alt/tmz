@@ -110,9 +110,13 @@ return function(mode)
  assert(not game:GetService('RunService'):IsRunning(),'__TAG__ Stop Play first.')
  assert(mode=='install'or mode=='undo','Use install or undo.')
  local editor=game:GetService('ScriptEditorService')
+ -- R154b: a script open in a tab can take a moment to copy the editor's text into Source after a write; wait up to 3 s for it.
+ local function synced(item)
+  for _=1,60 do if item.Source==editor:GetEditorSource(item)then return true end;task.wait(.05)end
+  return item.Source==editor:GetEditorSource(item)
+ end
  local function read(item)
-  local source=editor:GetEditorSource(item)
-  assert(item.Source==source,'__TAG__ Unsaved editor changes: '..item:GetFullName());return source
+  assert(synced(item),'__TAG__ Unsaved editor changes (close its script tab): '..item:GetFullName());return editor:GetEditorSource(item)
  end
  local function write(item,before,after)
   editor:UpdateSourceAsync(item,function(current)
@@ -217,6 +221,12 @@ return function(mode)
    else c.Item.Parent=c.Entry end
    assert(state(c)==where,'__TAG__ Move did not persist: '..c.Name)
   else write(c.Item,c[where=='After'and'Before'or'After'],c[where])end
+ end
+ -- R154b: a script open in a script tab may not take a write cleanly (R154's first paste stopped on one): refuse up front, before anything changes.
+ local open={}
+ pcall(function()for _,doc in ipairs(editor:GetScriptDocuments())do if not doc:IsCommandBar()then local s=doc:GetScript();if s then open[s]=true end end end end)
+ for _,c in ipairs(sources)do
+  if not c.Retire and open[c.Item]then error('__TAG__ Close the script tab of '..c.Item:GetFullName()..' (close every script tab), then paste again. Nothing changed.')end
  end
  local fromCount,toCount=0,0
  for _,c in ipairs(sources)do

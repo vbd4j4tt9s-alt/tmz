@@ -368,4 +368,35 @@ do
   end
  end
 end
+-- R154b: a target script open in a script tab is refused before anything changes; pasting again once it is closed installs.
+do
+ local victim;for _,s in ipairs(D.Scripts)do if not s.New then victim=s;break end end
+ if victim then
+  local ow=world();local editor=ow.Game:GetService('ScriptEditorService');local openItem=ow.Items[victim.Path]
+  editor.GetScriptDocuments=function()return{{IsCommandBar=function()return true end,GetScript=function()return nil end},{IsCommandBar=function()return false end,GetScript=function()return openItem end}}end
+  local ok,err=ow.Run(D.PASTE)
+  check(not ok and tostring(err):find('Close the script tab',1,true)~=nil,'open tab: refused: '..tostring(err))
+  check(all(ow,'Before'),'open tab: nothing changed')
+  editor.GetScriptDocuments=function()return{}end
+  ok,err=ow.Run(D.PASTE);check(ok and all(ow,'After'),'open tab: pasting again once closed installs: '..tostring(err))
+ end
+end
+-- R154b: an editor whose text reaches Source a few waits after a write (a tab syncing) still installs, undoes and verifies.
+do
+ local lw=world();local editor=lw.Game:GetService('ScriptEditorService');local pending={}
+ editor.GetEditorSource=function(_,item)local p=pending[item];if p then return p.Text end;return item.Source end
+ editor.UpdateSourceAsync=function(_,item,fn)local text=fn(editor.GetEditorSource(editor,item));pending[item]={Text=text,Left=3}end
+ local realWait=R.task.wait
+ R.task.wait=function(t)for item,p in pairs(pending)do p.Left-=1;if p.Left<=0 then item.Source=p.Text;pending[item]=nil end end;return t or 0 end
+ local ok,err=lw.Run(D.PASTE);check(ok and all(lw,'After'),'sync lag: install waits for the editor text to reach Source: '..tostring(err))
+ local b=lw.Storage:FindFirstChild(BACKUP)
+ if b then ok,err=pcall(lw.Req(b.Installer),'undo');check(ok and all(lw,'Before'),'sync lag: undo too: '..tostring(err))end
+ -- a tab that never syncs: refused with the tab hint, rolled back cleanly is not possible, so the message must say why
+ R.task.wait=function(t)return t or 0 end
+ local nw=world();local ne=nw.Game:GetService('ScriptEditorService');local stuck={}
+ ne.GetEditorSource=function(_,item)return stuck[item]or item.Source end
+ ne.UpdateSourceAsync=function(_,item,fn)stuck[item]=fn(ne.GetEditorSource(ne,item))end
+ ok,err=nw.Run(D.PASTE);check(not ok and tostring(err):find('close its script tab',1,true)~=nil,'never syncs: the error names the tab: '..tostring(err))
+ R.task.wait=realWait
+end
 print(('%d checks, %d failures'):format(checks,fails))
