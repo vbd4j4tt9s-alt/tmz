@@ -246,9 +246,12 @@ mutate "a pack platform presses a key under a hole (the hole floats over the dip
 mutate "another player's landing on the key he pressed silently does not click" $S "elseif kind==2 and who and quietBy[idx]==who then" "elseif false then"
 mutate "a runner a little above the floor is not remembered (his landing is silent)" $S "return thrown and 4 or 5" "return 4"
 mutate "a part that is not at its record is lifted again relative to where it is (the dig tween makes the crumbs climb)" $S "   if abs(y-want)>1e-3 and(abs(y-base)<1e-3 or y>want+C.HoleCeiling)then setY(d,want)end" "   if abs(y-want)>1e-3 then setY(d,y+C.HoleLift)end"
-# R154 (lag audit B3): phones (tier 2) draw the near letters at 12 px / stud and carry 56 key rows ahead; a tier change re-applies the letters' size (section 9b)
+# R154 (lag audit B3): phones (tier 2) draw the near letters at 12 px / stud and carry 56 key rows ahead; a tier change re-applies the letters' size (section 9b); R155: tier 1 draws them at 12 px / stud too
 PHASE=r154
-mutate "R154: tier 2 near letters are 16 px / stud again" $R "PixelsPerStudByTier={[2]=12}" "PixelsPerStudByTier={[2]=16}"
+mutate "R154: tier 2 near letters are 16 px / stud again" $R "PixelsPerStudByTier={[1]=12,[2]=12}" "PixelsPerStudByTier={[1]=12,[2]=16}"
+# R155 (owner: tier 1 too): the lowest tier's near letters at 12 px / stud; its 45 key rows ahead are not touched (already under tier 2's 56)
+mutate "R155: tier 1 near letters are 16 px / stud again" $R "PixelsPerStudByTier={[1]=12,[2]=12}" "PixelsPerStudByTier={[1]=16,[2]=12}"
+mutate "R155: tier 1 key window grows to 56 rows ahead (it must stay at 45)" $R " [1]={Near=8,Back=22,Ahead=45," " [1]={Near=8,Back=22,Ahead=56,"
 mutate "R154: tier 2 carries 74 key rows ahead again" $R " [2]={Near=11,Back=28,Ahead=56," " [2]={Near=11,Back=28,Ahead=74,"
 mutate "R154: a tier change keeps the letters' old pixels a stud" $S "tierCfg=K.Tier(tier);windowDirty=true;Far.Limit();Far.Tune()end" "tierCfg=K.Tier(tier);windowDirty=true;Far.Limit()end"
 mutate "R154: strips waiting in the pool keep the old size on a tier change" $R " for k=1,#free do for i=1,freeN[k]do strip(free[k][i])end end" " for k=1,0 do for i=1,freeN[k]do strip(free[k][i])end end"

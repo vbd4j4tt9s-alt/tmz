@@ -7,7 +7,7 @@
 #  1. unit    - test_small_shadow154 (the 1.5-stud rule, parts it must not touch, no listener)
 #  2. log     - run_item_log154.sh (one summary line per 5 s instead of a line per item picture; a real failure still warns once)
 #  3. census  - run_census154.sh (B1 + B3 numbers, before -> after, and the rules: no script-built part under 1.5 studs casts a shadow, the saved map / characters /
-#               avatars / bigger parts are as they were, tiers 3 and 1 are unchanged, tier 2 has fewer keys and a smaller letter canvas). Needs the place file.
+#               avatars / bigger parts are as they were, tier 3 is unchanged, tier 2 has fewer keys and a smaller letter canvas, R155: tier 1 the same keys and a smaller letter canvas). Needs the place file.
 # The look/sound fingerprints with exactly B1 and B3 allowed to differ are run_perf153.sh (it undoes R154's two changes on its base side and loads
 # perf154_opts.luau): sh docs/proposals/R153/tests/run_perf153.sh <dir> <place.rbxl>.
 set -e

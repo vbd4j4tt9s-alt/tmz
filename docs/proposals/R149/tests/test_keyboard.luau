@@ -507,14 +507,15 @@ local function labelAudit(legendFolder,keysFolder,extra,label,minRows)
  for _,st in ipairs(legendFolder:GetChildren())do
   if st.Name=='LegendStrip'and st.CFrame.Position.Y>0 then
    stripsN+=1
-   local gui=st:FindFirstChildWhichIsA('SurfaceGui');local cw,ch=canvasOf(st,LT.PixelsPerStud)
+   local gui=st:FindFirstChildWhichIsA('SurfaceGui');local pps=gui.PixelsPerStud -- (R154 / R155: the near letters are 12 px / stud on tiers 2 and 1, 16 on tier 3: the audit reads the strip's own pixels a stud; section 9b checks which one a tier has)
+   local cw,ch=canvasOf(st,pps)
    if gui.Enabled==false or gui.Face~=R.Enum.NormalId.Top or gui.AlwaysOnTop~=false or gui.LightInfluence~=0 then bad.gui+=1 end
    for _,l in ipairs(gui:GetChildren())do
     if l._class=='TextLabel'then
      if not l.Visible then off+=1 else
       labels+=1
       local px,py=l.Position.X.Offset,l.Position.Y.Offset;local hw,hh=l.Size.X.Offset/2,l.Size.Y.Offset/2
-      local wx,wz=worldOf(st,px,py,LT.PixelsPerStud);local row,col=g.RowOfZ(wz),g.ColOfX(wx);local cxk,czk=g.CellCenter(row,col)
+      local wx,wz=worldOf(st,px,py,pps);local row,col=g.RowOfZ(wz),g.ColOfX(wx);local cxk,czk=g.CellCenter(row,col)
       perRow[row]=perRow[row]or{};perRow[row][col]=(perRow[row][col]or 0)+1
       if px-hw<-1e-6 or px+hw>cw+1e-6 or py-hh<-1e-6 or py+hh>ch+1e-6 then bad.canvas+=1 end
       if not cxk or abs(cxk-wx)>1e-6 or abs(czk-wz)>1e-6 then bad.pos+=1 end
@@ -2254,12 +2255,15 @@ hum.FloorMaterial=PLASTIC;plays={};put(cx(11),nil,2500);frames(14)
 check(#plays==0 and near(topOf(g.RowOfZ(2500),g.ColOfX(cx(11)))or 99,K.KeyTop(1),1e-6),'a key dressed under a standing runner is down at once and silent ('..#plays..' clicks)')
 end
 -- 9b. R154 (lag audit B3, owner: "for the lag fixes we can implement B3 and B1"): phones (tier 2) draw the NEAR letters at 12 px / stud (16 before) and carry 56 key rows
--- ahead (74 before); PC (tier 3) and tier 1 are unchanged. The numbers live in KeyboardTrack.lua (K.NearPPS / K.NearText / Tiers[2].Ahead); the client reads them and, like R153's
--- far-letter render limit, re-applies them when the tier changes: every strip (bound or parked in the pool) and every pressed-key letter.
+-- ahead (74 before); PC (tier 3) is unchanged. R155 (owner: "yes" to the lighter phone keyboard on the lowest graphics setting too): tier 1 draws its near letters at 12 px / stud
+-- as well; its key rows ahead (45) are under tier 2's 56 already, so its key window is unchanged. The numbers live in KeyboardTrack.lua (K.NearPPS / K.NearText / Tiers[2].Ahead);
+-- the client reads them and, like R153's far-letter render limit, re-applies them when the tier changes: every strip (bound or parked in the pool) and every pressed-key letter.
 do
-check(K.NearPPS(3)==16 and K.NearPPS(2)==12 and K.NearPPS(1)==16 and LT.PixelsPerStud==16,'R154 B3: the near letters are 16 px / stud on tiers 3 and 1 (unchanged) and 12 on tier 2 (K.NearPPS)')
+check(K.NearPPS(3)==16 and K.NearPPS(2)==12 and K.NearPPS(1)==12 and LT.PixelsPerStud==16,'R154 B3 + R155: the near letters are 16 px / stud on tier 3 (PC, unchanged) and 12 on tiers 2 and 1 (K.NearPPS)')
+check(K.NearPPS(0)==16 and K.NearPPS(4)==16 and K.NearPPS(nil)==16 and LT.PixelsPerStudByTier[3]==nil,'...an unknown tier / none reads 16 (PC): only tiers 1 and 2 are listed')
 check(K.NearText(12)==55 and K.NearText(16)==74 and K.NearText(12)*1<=100 and K.NearText(16)<=100,'...a 4.6-stud letter is 55 px tall at 12 px / stud, 74 at 16 (TextSize <= 100)')
 check(K.Tier(2).Ahead==56 and K.Tier(3).Ahead==122 and K.Tier(1).Ahead==45 and K.Tier(2).Back==28 and K.Side(2)==42,'R154 B3: tier 2 carries 56 key rows ahead (was 74; 3 and 1 unchanged), Back 28, Side 42 each way across')
+check(K.Tier(1).Ahead<=56 and K.Tier(1).Ahead==45 and K.Tier(1).Back==22 and K.Side(1)==(22+45)//2 and K.KeyCap(1,22)==(22+45+1+2*K.Tier(1).Hyst)*22,'R155: tier 1 keeps its 45 key rows ahead (already under tier 2\'s 56: nothing to cut), Back 22, Side 33; at most '..K.KeyCap(1,22)..' keys, as before')
 check(K.KeyCap(2,22)==(28+56+1+2*K.Tier(2).Hyst)*22 and K.KeyCap(2,22)<=1960 and K.KeyCap(3,22)==(40+122+1+8)*22,('...at most %d keys on a phone (was %d), PC %d'):format(K.KeyCap(2,22),(28+74+1+2*K.Tier(2).Hyst)*22,K.KeyCap(3,22)))
 check(K.Tier(2).Ahead*P>=455 and K.Tier(2).FarAhead<=K.Tier(2).Ahead and LT.FarMaxDistanceByTier[2]==500 and K.Tier(2).FarAhead*P+128<=LT.FarMaxDistanceByTier[2],('...the far letters (R153 D8: %d studs on tier 2) still cover the letter window: %d rows = %.0f studs ahead plus a camera zoomed out to 128 studs'):format(LT.FarMaxDistanceByTier[2],K.Tier(2).FarAhead,K.Tier(2).FarAhead*P))
 local function nearGuis()
@@ -2293,7 +2297,7 @@ local function nearAudit(pps,what)
  return n,labels
 end
 local function canvasPx()local px=0;for _,st in ipairs(nearGuis())do if st.CFrame.Position.Y>0 then local gui=st:FindFirstChildWhichIsA('SurfaceGui');local cw,ch=canvasOf(st,gui.PixelsPerStud);px+=cw*ch end end;return px end
--- tier 3 first (16 px), a key down so a pressed-key letter exists, then the phone (12), PC again (16), the slow device (tier 1: unchanged, 16), and the phone once more
+-- tier 3 first (16 px), a key down so a pressed-key letter exists, then the phone (12), PC again (16), the slow device (tier 1: 12 too since R155), and the phone once more
 hum.FloorMaterial=AIR;fxTier=3;put(cx(11),F+9,cz(BR));look(100);frames(60*5)
 hum.FloorMaterial=PLASTIC;put(cx(9),nil,cz(BR+2));frames(14)
 check(keyAt(BR+2,9):FindFirstChildWhichIsA('SurfaceGui')~=nil,'R154 B3: a key is down and carries its own letter while the tier changes')
@@ -2304,9 +2308,21 @@ check(px2>0 and px3>0,('...bound near canvas %d px (tier 3) vs %d px (tier 2); p
 fxTier=3;frames(60*4)
 nearAudit(16,'back to tier 3 (PC unchanged)')
 fxTier=1;frames(60*4)
-nearAudit(16,'tier 1 (unchanged by B3)')
+nearAudit(12,'tier 1 (R155: 12 px / stud like tier 2; a tier change re-applies the letters\' pixels a stud to every strip and pressed-key letter already made)');local px1=canvasPx()
+check(px1>0 and px1<px3,('...bound near canvas %d px (tier 1) vs %d px (tier 3): smaller (tier 1 binds fewer rows too)'):format(px1,px3))
+-- a key pressed WHILE on tier 1 gets a 12 px letter at once too
+hum.FloorMaterial=PLASTIC;put(cx(15),nil,cz(BR+3));frames(14)
+local kp1=keyAt(BR+3,15);local kg1=kp1 and kp1:FindFirstChildWhichIsA('SurfaceGui');local kl1=kg1 and kg1:FindFirstChildWhichIsA('TextLabel')
+check(kg1 and kl1 and kg1.PixelsPerStud==12 and kl1.TextSize==55 and kl1.Text==K.Legend(BR+3,15),'a key pressed on tier 1 carries a 12 px / stud letter, TextSize 55 (R155)')
+hum.FloorMaterial=AIR;put(cx(11),nil,cz(BR));frames(14)
 fxTier=2;frames(60*4)
 nearAudit(12,'tier 2 again')
+fxTier=1;frames(60*4)
+nearAudit(12,'tier 1 once more (back from the phone tier: nothing is re-sized, nothing is left at 16)')
+fxTier=3;frames(60*4)
+nearAudit(16,'tier 3 once more (the lowest tier\'s 12 px letters are all back at 16)')
+fxTier=2;frames(60*4)
+nearAudit(12,'tier 2 again, after tier 1 and 3')
 -- a key pressed WHILE on tier 2 gets a 12 px letter at once (it is made, or taken from the pool, at the tier's size)
 hum.FloorMaterial=PLASTIC;put(cx(14),nil,cz(BR+3));frames(14)
 local kp2=keyAt(BR+3,14);local kg2=kp2 and kp2:FindFirstChildWhichIsA('SurfaceGui');local kl2=kg2 and kg2:FindFirstChildWhichIsA('TextLabel')
