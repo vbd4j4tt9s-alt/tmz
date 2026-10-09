@@ -56,7 +56,7 @@ end
 local function partLine(d)
  local out={d._class,d._props.Name}
  local keys={};for k in pairs(d._props)do keys[#keys+1]=k end;table.sort(keys)
- for _,k in ipairs(keys)do if k~='Name'and k~='Parent'then out[#out+1]=k..'='..ser(d._props[k])end end
+ for _,k in ipairs(keys)do if k~='Name'and k~='Parent'and k~='CastShadow'then out[#out+1]=k..'='..ser(d._props[k])end end -- (R154 B1: parts under 1.5 studs cast no shadow, SmallShadow154; run_perf154 checks that rule)
  local akeys={};for k in pairs(d._attrs)do akeys[#akeys+1]=k end;table.sort(akeys)
  for _,k in ipairs(akeys)do out[#out+1]='@'..k..'='..ser(d._attrs[k])end
  return table.concat(out,'|')
