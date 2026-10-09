@@ -159,14 +159,18 @@ function P.Attach(Data)
   local garden=self.Gardens[player];garden.PendingSales=garden.PendingSales or{};table.insert(garden.PendingSales,receipt)
   self:_gardenChanged(player);self:QueueGardenSave(player);return true,'Ur Gems are on the way!'
  end
- function Data:CanReceiveMechPacks(player,count)
+ -- R155: the 200 cap (InventoryCap155.RoomFor) decides whether the shop offers the packs at all (gems and Robux). receipt = a paid Robux receipt being granted:
+ -- the cap never refuses it (the purchase was only offered when it fitted; an item that arrived in between must not cost the buyer the packs), only the old
+ -- storage ceiling (MaxSavedChests) can, and then the receipt waits (NotProcessedYet) as before.
+ function Data:CanReceiveMechPacks(player,count,receipt)
   local offer=Catalog.Offer(count)
   if not offer or not self:IsLoaded(player)then return false,'HOLD ON, UR DATA IS LOADING!'end
   if #self:GetChestRecords(player)+offer.Count>self.Config.MaxSavedChests then return false,'MAKE ROOM FOR '..offer.Count..' PACKS FIRST!'end
+  if type(self.RoomFor)=='function'and not self:RoomFor(player,offer.Count,{Receipt=receipt==true})then return false,'MAKE ROOM FOR '..offer.Count..' PACKS FIRST!'end
   return true
  end
- function Data:GrantMechPacks(player,paid,count)
-  local offer=Catalog.Offer(count);local okay,why=self:CanReceiveMechPacks(player,count)
+ function Data:GrantMechPacks(player,paid,count,receipt)
+  local offer=Catalog.Offer(count);local okay,why=self:CanReceiveMechPacks(player,count,receipt)
   if not okay then return nil,why end
   -- AddChest never yields. Check the entire batch before starting; roll back any
   -- unexpected failure before another request or profile save can observe it.
@@ -174,7 +178,7 @@ function P.Attach(Data)
   local serial=player:GetAttribute('ChestInventorySerial');local added={}
   local success,err=pcall(function()
    for _=1,offer.Count do
-    local record,reason=self:AddChest(player,{Stage=8,BagVariant=Catalog.Variant,PackSize=PackRules.RollPackSize(SizeRandom:NextNumber()),PackMutation='None'})
+    local record,reason=self:AddChest(player,{Stage=8,BagVariant=Catalog.Variant,PackSize=PackRules.RollPackSize(SizeRandom:NextNumber()),PackMutation='None'},receipt==true and{Receipt=true}or nil)
     assert(record,reason or 'PACK COULD NOT BE ADDED')
     record.PaidRandom=paid==true;record.ChestName=Catalog.Name;added[#added+1]=record
    end

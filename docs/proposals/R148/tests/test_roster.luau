@@ -473,6 +473,8 @@ for step=0,200 do
  local pf=addPack(A,4,'Pack06',137);local of=Data:OpenSeedPack(A,pf.Id,drawConstant(d));if of and of.SeedId=='FirePepperSeed'then bankedFire+=1 end
  local pm=addPack(A,5,'Pack06',137);local om=Data:OpenSeedPack(A,pm.Id,drawConstant(d));if om and om.SeedId=='MoonflowerSeed'then bankedMelon+=1 end
  local pc=addPack(A,4,'Pack01',137);local oc=Data:OpenSeedPack(A,pc.Id,drawConstant(d));if oc and oc.SeedId=='FirePepperSeed'then bankedFire+=1 end
+ -- (R155: a bag holds 200 items: the three opened seeds leave it again, so 603 opens fit in one bag)
+ local r=Data:GetChestRecords(A);for i=#r,1,-1 do local id=r[i].Id;if id==pf.Id or id==pm.Id or id==pc.Id then table.remove(r,i)end end
 end
 check(bankedFire==0 and bankedMelon==0,'opening 201 banked 137 Mythic and Common Lava packs and 201 Crystal ones, one per draw: never Fire Pepper, never Moon Melon')
 local pd=addPack(A,2,'Pack06',137);local openedD=Data:OpenSeedPack(A,pd.Id,drawConstant(.5))

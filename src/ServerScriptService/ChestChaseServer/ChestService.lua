@@ -926,6 +926,11 @@ end
 function ChestService:_finishOpening(player, opening, skipSync)
     if not opening or self.Openings[player] ~= opening then return end
     self.Openings[player]=nil
+    -- R155: the reward seed flies into the Bag on the opener's screen for a few seconds (SeedCollect154): it can't be discarded meanwhile (InventoryService155)
+    if opening.Committed and opening.RewardId then
+        self.RecentRewards=self.RecentRewards or setmetatable({},{__mode="k"})
+        local list=self.RecentRewards[player] or {};self.RecentRewards[player]=list;list[opening.RewardId]=os.clock()
+    end
     for _,connection in ipairs(opening.Connections) do connection:Disconnect() end
     if opening.Bag then opening.Bag:Destroy() end
     if opening.Committed and opening.Tool.Parent then opening.Tool:Destroy() end

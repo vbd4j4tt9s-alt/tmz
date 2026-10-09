@@ -98,8 +98,11 @@ for _,how in ipairs({'mouse','touch'})do
  local _,s2=slotOf(seed);local _,f2=slotOf(fruit)
  check(s2==fj and f2==empty and acts==0,('%s drag onto a taken slot swaps them (seed %s, fruit %s)'):format(how,tostring(s2),tostring(f2)))
  X.drag(how,slotOf(seed),slot(fi));X.drag(how,slotOf(fruit),slot(fj)) -- back
+ -- (R155: every slot takes any item, the shovel's too: R153 kept slot 1 for the shovel, R155 swaps like any slot, and the shovel can be dragged)
  local before=names();X.drag(how,slotOf(fruit),slot(1))
- check(table.concat(names(),'|')==table.concat(before,'|')and acts==0,how..' drag onto the shovel slot changes nothing')
+ check(at(fruit)==1 and at(shovel)==fj and acts==0,how..' drag onto the shovel\'s slot swaps them (R155: fruit '..tostring(at(fruit))..', shovel '..tostring(at(shovel))..')')
+ X.drag(how,slotOf(shovel),slot(1))
+ check(table.concat(names(),'|')==table.concat(before,'|')and acts==0,how..' and the shovel dragged back to slot 1 swaps them back')
 end
 -- a quick flick (press, release on another slot, no move reported) moves too; a drag that comes back to its own slot is a click (R152)
 settle();do local s,i=slotOf(bat);local t=slot(9);X.down('mouse',X.center(s));X.up(X.center(t));X.frames(2)
@@ -140,8 +143,19 @@ do local s,i=slotOf(fruit);X.drag('mouse',s,panel.Items);X.frames(5)
  check(at(seed)==3 and at(fruit)==4,'dragged back from the Bag, they are on the hotbar again')
  if panel.Visible then X.tap('mouse',panel.Close);X.frames(5)end
 end
-for k=6,4,-1 do extra[k]:Destroy();extra[k]=nil end;X.frames(10) -- (back to fewer stacks than slots: everything is on the hotbar again)
-check(slotOf(packA)and slotOf(packB)and slotOf(bat)and slotOf(seed)and slotOf(fruit),'(every item is on the hotbar again)')
+do -- (back to fewer stacks than slots)
+ local filled=0;for i=1,10 do if slot(i).ItemName.Text~=''then filled+=1 end end
+ for k=6,4,-1 do extra[k]:Destroy();extra[k]=nil end;X.frames(10)
+ -- R155 (owner: "make it function like the normal inventory"): a slot that frees up stays free; nothing jumps onto it from the Bag (R153 refilled it)
+ local after=0;for i=1,10 do if slot(i).ItemName.Text~=''then after+=1 end end
+ check(after<=filled,'R155: items used up free their slots, and no Bag item jumps onto them ('..filled..' -> '..after..' filled)')
+ for _,t in ipairs({packA,packB,bat,seed,fruit})do if not slotOf(t)then
+  openBag();local free;for i=10,1,-1 do if slot(i).ItemName.Text==''then free=i;break end end -- (the last free slot: section 4 then drags them about)
+  local card=cardOf(t);if card and free then X.drag('mouse',card,slot(free))end
+ end end
+ if panel.Visible then X.tap('mouse',panel.Close);X.frames(5)end
+end
+check(slotOf(packA)and slotOf(packB)and slotOf(bat)and slotOf(seed)and slotOf(fruit),'(every item is on the hotbar again: dragged back from the Bag)')
 
 -- 4. the order holds -------------------------------------------------------------------------------------------------------------------------------------
 settle()
@@ -277,6 +291,11 @@ do
 end
 
 -- 6. buttons that change under the pointer; ScreenGui stacking --------------------------------------------------------------------------------------
+local fillers={} -- (R155: the Bag lists only what is not on the hotbar: fill the free slots, then four more go to the Bag)
+do local free=0;for i=1,10 do if slot(i).ItemName.Text==''then free+=1 end end
+ for k=1,free+4 do local t=harvest(({'KiwiSeed','PearSeed','GrapeSeed','CherrySeed','LemonSeed','MelonSeed','CocoaSeed','OliveSeed','DateSeed','RiceSeed','BeanSeed','CornSeed','TeaSeed','NutSeed'})[k],'plant-f'..k);t.Parent=bag();fillers[#fillers+1]=t end
+ X.frames(10)
+end
 do -- the Bag grid re-sorts between the press and the release (an item before the card is used up)
  settle();openBag()
  local cards={};for _,c in ipairs(panel.Items:GetChildren())do if c.Name=='Item'and c.Visible then cards[#cards+1]=c end end
@@ -293,6 +312,7 @@ do -- the Bag grid re-sorts between the press and the release (an item before th
  else check(false,'(three cards and a first item to remove)')end
  if panel.Visible then X.tap('mouse',panel.Close);X.frames(5)end
 end
+for _,t in ipairs(fillers)do t:Destroy()end;X.frames(5)
 do -- an Active backdrop above a slot takes the press; a plain label above a slot lets it through
  settle()
  local top=R.Instance.new('ScreenGui');top.Name='Overlay';top.DisplayOrder=40;top.Parent=pg

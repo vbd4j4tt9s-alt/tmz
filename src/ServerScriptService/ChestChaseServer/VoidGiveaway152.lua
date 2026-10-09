@@ -78,7 +78,7 @@ function S:_owed(player)
  if self:_flag(player)then return false end
  return self.Users[tostring(player.UserId)]~=nil or self.Reserved[player.UserId]==true
 end
-function S:_room(player)return #self.Data:GetChestRecords(player)<self.Config.MaxSavedChests end
+function S:_room(player)return #self.Data:GetChestRecords(player)<self.Config.MaxSavedChests and(type(self.Data.RoomFor)~='function'or(self.Data:RoomFor(player,1)))end -- R155: the 200 cap
 function S:_near(player)
  local c=player.Character;local root=c and c:FindFirstChild('HumanoidRootPart');if not root or not self.Center then return false end
  return(root.Position-self.Center).Magnitude<=S.MaxDistance
@@ -100,6 +100,7 @@ function S:_grant(player)
  if premium[Rules.Flag]==true then return nil,'claimed'end
  local records=data:GetChestRecords(player);local before=#records
  if before>=self.Config.MaxSavedChests then return nil,'room'end
+ if type(data.RoomFor)=='function'and not data:RoomFor(player,1)then return nil,'room'end -- R155: the 200 cap (InventoryCap155)
  local pack=table.clone(Rules.Pack);pack.OddsVersion=PackRules.OddsVersion;pack.GiftLocked=true -- (a free pack can't be gifted: saved as the optional record field GiftLocked)
  local ok,record,why=pcall(function()return data:AddChest(player,pack)end) -- a real pack: no options (no TestGrant, no luck roll: a plain 1x Void Pack)
  local added=records[before+1]

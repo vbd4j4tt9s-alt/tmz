@@ -78,6 +78,11 @@ function S:Held(p,id)
  local c=p.Character;for _,t in ipairs(c and c:GetChildren()or{})do if t:IsA('Tool')and t:GetAttribute('HarvestItemTool')and t:GetAttribute('HarvestInventoryId')==id then return t end end;return nil
 end
 -- R130: a gift to a player who walked out of reach says so instead of doing nothing.
+-- R155: room for one more item under the 200 cap (InventoryCap155; a data service without it: no cap)
+function S:Room(p)
+ local data=self.Data;if type(data.RoomFor)~='function'then return true end
+ return(data:RoomFor(p,1))==true
+end
 function S:TooFar(from,to)
  if self:Near(from,to)then return false end
  local a,b=body(from),body(to)
@@ -97,7 +102,7 @@ function S:Offer(from,userId,cropId)
  if not crop then return end
  if crop.GiftLocked then self.Remote:FireClient(from,'Status',S.LockedFruitText);return end -- R153: fruit from a gift-locked seed
  if crop.PaidRandom and(from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true)then self.Remote:FireClient(from,'Status','U can\'t gift a bought crop to that account.');return end
- if #self.Data.Gardens[to].Harvests>=self.Data.Config.MaxSavedHarvests then self.Remote:FireClient(from,'Status','Their bag is full.');return end
+ if #self.Data.Gardens[to].Harvests>=self.Data.Config.MaxSavedHarvests or not S.Room(self,to)then self.Remote:FireClient(from,'Status','Their bag is full.');return end -- R155: the 200 cap
  for id,o in pairs(self.Offers)do if o.From==from or o.To==to then self.Offers[id]=nil end end
  local id=Http:GenerateGUID(false);self.Offers[id]={From=from,To=to,CropId=cropId,Expires=now+25}
  self:Accept(to,id) -- sender's direct click is the complete gift action
@@ -110,6 +115,7 @@ function S:Accept(to,id)
  local from=offer.From
  if os.clock()>offer.Expires or not self:Available(from)or not self:Available(to)or not self:Near(from,to)or not self:Held(from,offer.CropId)then self.Remote:FireClient(to,'Status','Gift timed out. Ask them to offer it again!');return end
  local garden=self.Data.Gardens[from];garden.OutgoingGifts=garden.OutgoingGifts or{}
+ if not S.Room(self,to)then self.Remote:FireClient(from,'Status','Their bag is full.');return end -- R155: the 200 cap
  if count(garden.OutgoingGifts)>=32 or #self.Data.Gardens[to].Harvests>=self.Data.Config.MaxSavedHarvests then self.Remote:FireClient(from,'Status','Finish ur pending gifts or make room in ur bag first.');return end
  local index,crop;for i,c in ipairs(garden.Harvests)do if c.Id==offer.CropId then index=i;crop=c;break end end;if not crop then return end
  if crop.GiftLocked then self.Remote:FireClient(from,'Status',S.LockedFruitText);return end
@@ -194,7 +200,7 @@ function S:OfferSeed(from,userId,itemId)
  local noun=record.Kind=='Pack'and'pack'or'seed'
  if record.GiftLocked then self.Remote:FireClient(from,'Status',record.Kind=='Seed'and S.LockedSeedText or S.LockedText);return end
  if self:SeedPaidBlocked(record,from,to)then self.Remote:FireClient(from,'Status','This bought '..noun..' can\'t be gifted to that account.');return end
- if #self.Data:GetChestRecords(to)>=self.Data.Config.MaxSavedChests then self.Remote:FireClient(from,'Status','Their bag is full.');return end
+ if #self.Data:GetChestRecords(to)>=self.Data.Config.MaxSavedChests or not S.Room(self,to)then self.Remote:FireClient(from,'Status','Their bag is full.');return end -- R155: the 200 cap
  for id,o in pairs(self.Offers)do if o.From==from or o.To==to then self.Offers[id]=nil end end
  local id=Http:GenerateGUID(false);self.Offers[id]={From=from,To=to,ItemId=itemId,Kind='Seed',Expires=now+25}
  self:Accept(to,id) -- same as fruit: the sender's click is the complete gift action
@@ -207,6 +213,7 @@ function S:AcceptSeed(to,id,offer)
  end
  if record.GiftLocked then self.Remote:FireClient(from,'Status',record.Kind=='Seed'and S.LockedSeedText or S.LockedText);return end
  local garden=self.Data.Gardens[from];garden.OutgoingSeedGifts=garden.OutgoingSeedGifts or{}
+ if not S.Room(self,to)then self.Remote:FireClient(from,'Status','Their bag is full.');return end -- R155: the 200 cap
  if count(garden.OutgoingSeedGifts)>=32 or #self.Data:GetChestRecords(to)>=self.Data.Config.MaxSavedChests then self.Remote:FireClient(from,'Status','Finish ur pending gifts or make room in ur bag first.');return end
  if self:SeedPaidBlocked(record,from,to)then return end
  local row=self.Data:SerializeSeedRecord(record)
@@ -233,7 +240,7 @@ function S:_receiveSeed(p,garden,receipts,id,gift)
  if row.PaidRandom==true and(p:GetAttribute('PaidTradingAllowed')~=true or(row.Kind=='Pack'and p:GetAttribute('PaidRandomAllowed')~=true))then return false end
  if receipts[id]then return true end
  local records=self.Data:GetChestRecords(p)
- if #records>=self.Data.Config.MaxSavedChests then return false end
+ if #records>=self.Data.Config.MaxSavedChests or not S.Room(self,p)then return false end -- R155: a full bag (200 items) leaves the gift waiting in the inbox
  local record=self.Data:DecodeGiftedSeed(p,row)
  if not record then warn('[R122] Invalid seed gift retained for review: '..id);return false end
  local already=false;for _,r in ipairs(records)do if r.Id==record.Id then already=true end end
@@ -313,7 +320,7 @@ function S:_recoverChannel(p,channel)
    else
     if gift.Crop and gift.Crop.PaidRandom and p:GetAttribute('PaidTradingAllowed')~=true then continue end
     if not receipts[id]then
-     if #garden.Harvests>=self.Data.Config.MaxSavedHarvests then continue end
+     if #garden.Harvests>=self.Data.Config.MaxSavedHarvests or not S.Room(self,p)then continue end -- R155: a full bag (200 items) leaves the gift waiting
      -- Verify the donated record with the same decoder used for a saved crop bag.
      local valid=self.Data:DecodeGarden({Version=self.Data.Config.GardenSchemaVersion,Plots={},Harvests={gift.Crop}})
      if not valid then warn('[R52] Invalid gift retained for review: '..id);continue end

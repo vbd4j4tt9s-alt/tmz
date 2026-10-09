@@ -36,7 +36,7 @@ function T.Grant(data,player,selector,requester)
  if selector=='roster'then for _,id in ipairs({'FirePepperSeed','MoonflowerSeed','DesertAloeSeed','SandFruitSeed'})do table.insert(selected,Packs.SeedDesignById[id])end end
  if #selected==0 then return false,'Use /test rarepacks [mech|verity|roster|legendary|mythic|secret|cosmic|king].'end
  local records=data:GetChestRecords(player)
- if #records+#selected>data.Config.MaxSavedChests then return false,'Inventory full. Make space first.'end
+ if #records+#selected>data.Config.MaxSavedChests or(type(data.RoomFor)=='function'and not data:RoomFor(player,#selected))then return false,'Inventory full (200 items max). Make space first.'end -- R155: the cap
  local pending={};local serial=player:GetAttribute('ChestInventorySerial')or 0
  for _,pick in ipairs(selected)do
   if pick.Spec==nil then pick={Spec=pick}end -- (mech / verity / roster: a plain spec)

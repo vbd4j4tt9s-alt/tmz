@@ -212,7 +212,7 @@ do
  check((Data:ClaimDailyLogin(A))and pendingGems(A)[g0+1]==2,'with a saving profile the claim goes through (day 5: 2 Gems)')
 end
 -- A full Bag holds a pack claim (nothing lost, the claim stays): the seed pack days and the Void Pack day.
-local fill={};local cap=Config.MaxSavedChests
+local fill={};local cap=Data:HeldItemCap()-(Data:HeldItemCount(A)-#records) -- (R155: the Bag is full at 200 items held, PlayerDataService:HeldItemCap)
 local saved=table.clone(records);while #records<cap do records[#records+1]={Id='filler'..#records,Kind='Seed',SeedId='SunflowerSeed',ChestNumber=1}end
 Data:GetPremium(A).Daily.Login={Step=2,Day=D.Day(R.clock)-1}
 local fullSeed,fullSeedWhy=Data:ClaimDailyLogin(A)
@@ -298,7 +298,7 @@ local function claimAll()local oks=0;for i=1,3 do if(Data:ClaimDailyQuest(A,i))t
 -- A full Bag: the quest pack waits (nothing is lost, the quest stays claimable); the Gems of the bonus do not need room.
 do
  clearGems();local s0=setQuests({RewardVersion=D.RewardVersion,Progress={3,3,3},Claimed={false,false,false}})
- local keep=table.clone(records);local cap=Config.MaxSavedChests
+ local keep=table.clone(records);local cap=Data:HeldItemCap()-(Data:HeldItemCount(A)-#records) -- (R155: full = 200 items held)
  while #records<cap do records[#records+1]={Id='qfull'..#records,Kind='Seed',SeedId='SunflowerSeed',ChestNumber=1}end
  local realLuck2=Data.RollPackLuck;local l0=0;Data.RollPackLuck=function(...)l0+=1;return realLuck2(...)end
  local refused,why1=0,nil

@@ -266,16 +266,21 @@ function PlayerDataService:GetDiscoveredSeeds(player)
 	return result
 end
 
-function PlayerDataService:CanReceiveSeed(player)
+-- R155: one cap of Config.MaxHeldItems (200) items held in total (InventoryCap155.RoomFor: packs, seeds, fruit, loot; a carried pack keeps its place);
+-- MaxSavedChests stays the old storage ceiling. opts (AddChest's options): Banked = the carried pack itself, Receipt = a paid Robux receipt.
+function PlayerDataService:CanReceiveSeed(player, opts)
 	if not self:IsLoaded(player) then return false, "YOUR DATA IS STILL LOADING" end
 	if #self:GetChestRecords(player) >= self.Config.MaxSavedChests then
 		return false, "BAG FULL - MAKE ROOM IN UR BAG FIRST"
 	end
+	local room, why = self:RoomFor(player, 1, opts)
+	if not room then return false, why end
 	return true
 end
 
 function PlayerDataService:_notifySeedInventory(player)
 	player:SetAttribute("SeedInventoryCount", #self:GetChestRecords(player))
+	if self.PublishHeld then self:PublishHeld(player) end -- R155: the Bag's "143/200"
 	player:SetAttribute("SeedInventoryRevision", (player:GetAttribute("SeedInventoryRevision") or 0) + 1)
 end
 
@@ -408,7 +413,7 @@ end
 -- a pack made here (bonus rolls, daily rewards, the mystery pedestal, owner commands ...) rolls its own, once. The record keeps it as an OPTIONAL field (absent = the
 -- default shape, which is every record saved before it), so ProfileVersion stays 22.
 function PlayerDataService:AddChest(player, chest, options)
-	local canReceive, reason = self:CanReceiveSeed(player)
+	local canReceive, reason = self:CanReceiveSeed(player, options) -- R155: the 200 cap (options.Banked / options.Receipt, InventoryCap155)
 	if not canReceive then return nil, reason end
 	local packSize = chest.PackSize
 	if type(options) == "table" and options.Luck then packSize = self:RollPackLuck(player, chest.Stage, PackRules.VariantKey(chest.BagVariant), PackRules.SanitizePackSize(chest.PackSize)) end
@@ -1182,6 +1187,7 @@ function PlayerDataService:Load(player)
 	player:SetAttribute("PackSerialAtJoin", player:GetAttribute("ChestInventorySerial")) -- R139: packs numbered above this are new (hotbar rainbow)
 	player:SetAttribute("SeedInventoryCount", #self.ChestRecords[player])
 	player:SetAttribute("LootCount", loadedItemCount)
+	self:LoadHotbarLayout(player) -- R155: the saved hotbar layout (Premium.Hotbar155) for the client: HotbarLayout155
     local pedestalMigrationNeeded = self.PedestalItems[player] ~= nil
     if pedestalMigrationNeeded then
         self:ReturnLootRecord(player,self.PedestalItems[player])
@@ -1192,6 +1198,7 @@ function PlayerDataService:Load(player)
     self:LoadPackLuck(player,type(storedData)=='table'and storedData.PackLuck or nil)
 	player:SetAttribute("DataStatus", "Loaded")
 	self.Loaded[player] = true
+	self:PublishHeld(player) -- R155: what the player holds (an older save above 200 loads whole: nothing is cut)
 	self.CanSave[player] = true
     local oldRosterSettled=self:SettleOldRoster148(player) -- R148: which Index milestones were met before the Aloe and the Sand Fruit joined Desert (saved below)
     self:PublishPremium(player);self:PublishTutorial(player)
@@ -1599,6 +1606,7 @@ end
 function PlayerDataService:_gardenChanged(player)
 	self:MarkDirty(player)
 	player:SetAttribute("GardenRevision", (player:GetAttribute("GardenRevision") or 0) + 1)
+	if self.PublishHeld then self:PublishHeld(player) end -- R155: the Bag's "143/200"
 end
 
 function PlayerDataService:QueueGardenSave(player)
@@ -1670,6 +1678,7 @@ function PlayerDataService:HarvestPlant(player, slot, expectedCropId, now, fruit
 	if not self.Config.GardenPlants[crop.SeedId] then return false, "THIS PLANT NEEDS A NEWER UPDATE" end
 	if now < crop.ReadyAt then return false, "YOUR PLANT IS STILL GROWING" end
 	if #garden.Harvests >= self.Config.MaxSavedHarvests then return false, "HARVEST BAG FULL — SELL SOME HARVESTS FIRST" end
+	if not self:RoomFor(player, 1) then return false, require(script.Parent.InventoryCap155).HarvestFullText end -- R155: the 200 cap
     local definition = self.Config.GardenPlants[crop.SeedId]
     fruitIndex = fruitIndex or PlantRules.NextFruit(crop, definition, now)
     if not gardenInteger(fruitIndex, 1, definition.FruitCount) or not PlantRules.FruitReady(crop, fruitIndex, now) then
@@ -1911,4 +1920,5 @@ require(script.Parent.PackSizePityData).Install(PlayerDataService)
 require(script.Parent.PremiumProgress).Attach(PlayerDataService)
 require(script.Parent.TutorialProgress).Attach(PlayerDataService)
 require(script.Parent.DailyProgress).Attach(PlayerDataService) -- R140: login rewards + daily quests
+require(script.Parent.InventoryCap155).Attach(PlayerDataService) -- R155: the 200 cap, the saved hotbar layout, discarding
 return PlayerDataService

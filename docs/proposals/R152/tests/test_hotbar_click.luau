@@ -148,12 +148,16 @@ do -- no lock-out: a click right after a drop works at once
  gesture(slot8,{at(slot8),at(ap)},'release first')
  check(slotOf(apple)==ap,'(put back)')
 end
-do -- the shovel slot refuses a drop: nothing moves, nothing equips
+do -- R155 (owner: "make it function like the normal inventory"): every slot takes any item, the shovel's too (R152 refused a drop on slot 1 and kept the shovel there)
  reset();local ap=slotOf(apple);local one=dock.Slot1;local shovelName=one.ItemName.Text
  gesture(ap,{at(ap),at(ap,10,0),at(one)},'release first')
- check(slotOf(apple)==ap and one.ItemName.Text==shovelName and acts==0,'a drop on the shovel slot changes nothing')
+ check(slotOf(apple)==one and ap.ItemName.Text==shovelName and acts==0,'R155: a drop on the shovel\'s slot swaps them, nothing equips')
+ gesture(ap,{at(ap),at(ap,10,0),at(one)},'release first')
+ check(slotOf(apple)==ap and one.ItemName.Text==shovelName and acts==0,'... and the shovel dropped back on slot 1 swaps them back')
  gesture(one,{at(one),at(one,30,0),at(slot9)},'release first')
- check(slotOf(apple)==ap and acts==0 and slot9.ItemName.Text=='','the shovel cannot be dragged off its slot')
+ check(slot9.ItemName.Text==shovelName and one.ItemName.Text==''and acts==0,'R155: the shovel can be dragged to another slot')
+ gesture(slot9,{at(slot9),at(slot9,-30,0),at(one)},'release first')
+ check(one.ItemName.Text==shovelName and slot9.ItemName.Text==''and acts==0,'(and back)')
 end
 do -- a click on the shovel's own slot still equips it, once
  reset();local one=dock.Slot1
@@ -174,7 +178,11 @@ end
 
 -- 5. the Bag ------------------------------------------------------------------------------------------------------------------------------------
 reset()
-local open=dock.OpenInventory;open.Activated:Fire();frames(10)
+local open=dock.OpenInventory
+-- (R155: the Bag lists only what is not on the hotbar: the plum and the clover go in it first, dragged onto the Bag button)
+for _,t in ipairs({plum,clover})do local s=slotOf(t);if s then gesture(s,{at(s),at(s,30,0),at(open)},'release first')end end
+check(slotOf(plum)==nil and slotOf(clover)==nil and acts==0,'(R155: the plum and the clover are in the Bag)')
+open.Activated:Fire();frames(10)
 check(panel.Visible,'(the Bag is open)')
 local function cards()local out={};for _,c in ipairs(panel.Items:GetChildren())do if c.Name=='Item'and c.Visible then out[#out+1]=c end end;table.sort(out,function(a,b)return a.AbsolutePosition.X<b.AbsolutePosition.X end);return out end
 local function cardOf(tool)for _,c in ipairs(cards())do if c.ItemName.Text:find(Names.Tool(tool,Catalog),1,true)then return c end end end
@@ -201,9 +209,9 @@ if card then
  gesture(card,{at(card),at(card,25,0),at(target)},'release first','touch')
  check(slotOf(clover)==target and acts==0 and held()==nil,'a Bag card dragged onto a slot is placed there, first try, not equipped ('..acts..')')
  -- a number key equips while the Bag is open (it did nothing until you closed the Bag)
- local _,slotNo=slotOf(plum);local NUM={'One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Zero'}
+ local _,slotNo=slotOf(clover);local NUM={'One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Zero'} -- (R155: the clover, now on slot 9; the plum is in the Bag)
  W.UIS.InputBegan:Fire({KeyCode=R.Enum.KeyCode[NUM[slotNo]],UserInputType=R.Enum.UserInputType.Keyboard},false);frames(2)
- check(acts==1 and held()==plum and not panel.Visible,'a number key with the Bag open equips once ('..acts..')')
+ check(acts==1 and held()==clover and not panel.Visible,'a number key with the Bag open equips once ('..acts..')')
  -- other menus still block the keys
  reset();pg:SetAttribute('SeedMenu','Settings');W.UIS.InputBegan:Fire({KeyCode=R.Enum.KeyCode[NUM[slotNo]],UserInputType=R.Enum.UserInputType.Keyboard},false);frames(2)
  check(acts==0,'a number key while another menu is open still does nothing');pg:SetAttribute('SeedMenu',nil)

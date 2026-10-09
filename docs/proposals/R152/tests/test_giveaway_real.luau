@@ -3,7 +3,7 @@
 -- Config, SeedPackRules, SecurityGate, with the real VoidGiveaway152 / VoidGiveawayStore152 / VoidGiveawayArt152 on top (a recording ChestService stand-in and notice feed). Checks:
 --  1. the pack the claim gives is a REAL Void Pack: Kind Pack, stage 7, EclipseReliquary, the current odds version, size 1, no coat, NOT TestGrant, no chip-bag shape (a Void pack has none);
 --  2. it is what Verity takes (PlayerDataService:CheckVoidPack / ConvertVoidPack), and opening it counts as a real open (OnPackOpened with Test false: it announces like any pack);
---  3. the Bag limit is the game's own (Config.MaxSavedChests = 1000): a full Bag reserves nothing; 999 + 1 is fine;
+--  3. the Bag limit is the game's own (R155: 200 items held, PlayerDataService:HeldItemCap; it was Config.MaxSavedChests = 1000): a full Bag reserves nothing; 199 + 1 is fine;
 --  4. the profile flag lives in the saved Premium table: it survives Save and Load on another server, a profile without it (an old save) is simply not flagged, and the profile
 --     version is unchanged (22): an older server copies the field it does not know (PremiumProgress.Decode keeps it);
 --  5. a profile that cannot save is refused (a pack that cannot be saved would be lost); a reservation whose pack was lost with an unsaved profile is given again, once.
@@ -72,7 +72,7 @@ end
 -- 1. The pack is a real Void Pack ---------------------------------------------------------------------------------------------------------------------------------
 local D1=dataServer();local svc1=giveaway(D1)
 local A=makePlayer(D1,2001,'Ava');svc1:Step()
-check(Config.MaxSavedChests==1000,'the game\'s Bag limit is 1000 packs (Config.MaxSavedChests)')
+check(D1:HeldItemCap()==200,'the game\'s Bag limit is 200 items (R155: PlayerDataService:HeldItemCap; it was 1000 packs, Config.MaxSavedChests)')
 local ok,record=svc1:Claim(A)
 check(ok==true and record,'the claim works on the real player data ('..tostring(record)..')')
 check(record.Kind=='Pack'and record.Stage==7 and record.BagVariant=='EclipseReliquary','a Void Pack: Kind Pack, stage 7, EclipseReliquary')
@@ -108,14 +108,14 @@ end
 -- 3. The Bag limit is the game's own ----------------------------------------------------------------------------------------------------------------------------------
 do
  local F=makePlayer(D1,2010,'Full');svc1:Step()
- for i=1,Config.MaxSavedChests do assert(D1:AddChest(F,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion}),'fill '..i)end
+ for i=1,D1:HeldItemCap() do assert(D1:AddChest(F,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion}),'fill '..i)end
  local before=stores['VoidGiveaway152']and stores['VoidGiveaway152'].Version.Claims
  local ok2,why=svc1:Claim(F)
- check(ok2==false and why=='room'and #D1:GetChestRecords(F)==Config.MaxSavedChests,'a full Bag (1000 packs): refused, nothing added')
+ check(ok2==false and why=='room'and #D1:GetChestRecords(F)==D1:HeldItemCap(),'a full Bag (200 packs): refused, nothing added')
  check((stores['VoidGiveaway152']and stores['VoidGiveaway152'].Version.Claims)==before and not(stores['VoidGiveaway152'].Data.Claims.Users['2010']),'nothing reserved: the shared list does not have them and was not written')
  check(D1:GetPremium(F).VoidGift152==nil,'no flag')
  table.remove(D1:GetChestRecords(F));D1:_notifySeedInventory(F)
- check(svc1:Claim(F)==true and #D1:GetChestRecords(F)==Config.MaxSavedChests,'999 packs + 1 = exactly 1000: allowed')
+ check(svc1:Claim(F)==true and #D1:GetChestRecords(F)==D1:HeldItemCap(),'199 packs + 1 = exactly 200: allowed')
  check(lastText(F):find('FREE VOID PACK',1,true)~=nil,'and told')
 end
 

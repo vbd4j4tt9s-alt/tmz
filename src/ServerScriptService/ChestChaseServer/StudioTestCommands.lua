@@ -127,7 +127,9 @@ local function executeFor(ctx,player,text,requester)
   local c=player.Character;local held=c and c:FindFirstChildOfClass('Tool')
   return true,table.concat({'Hotbar log '..(on and'ON: each press, what it did and anything the server moved shows top-left (select it to copy) and in the F9 console.'or'OFF.'),
    'Server sees in the hand: '..(held and held.Name or'nothing')..' | pack held: '..(type(op)=='table'and op.Tool and((op.Committed and'revealing 'or'')..op.Tool.Name)or'none'),
-   'Packs the server held late or sent back (newest last): '..(log and #log>0 and table.concat(log,' | ')or'none')},'\n')
+   'Packs the server held late or sent back (newest last): '..(log and #log>0 and table.concat(log,' | ')or'none'),
+   -- R155: what this player holds (the 200 cap) and what they threw away (each discard is also an Output line "[R155 Discard] ...")
+   'Items held: '..tostring(ctx.Data.HeldItemCount and ctx.Data:HeldItemCount(player)or'?')..'/'..tostring(ctx.Data.HeldItemCap and ctx.Data:HeldItemCap()or'?')..' | thrown away (newest last): '..(ctx.Data.DiscardLog and ctx.Data.DiscardLog[player]and #ctx.Data.DiscardLog[player]>0 and table.concat(ctx.Data.DiscardLog[player],' | ')or'none')},'\n')
  elseif action=='effects'then
   if not exact(1)or(a[1]~='normal'and a[1]~='low'and a[1]~='off')then return false,'Use /test effects normal, low or off.'end
   player:SetAttribute('StudioPlantEffects',a[1]);return true,'Plant effects: '..a[1]
@@ -200,7 +202,7 @@ local function executeFor(ctx,player,text,requester)
   local selected=choose(a[1],many or isPack)
   if #selected==0 or(isPack and not biomeIDs[key(a[1])])then return false,'Unknown seed/biome. Use /test catalog.'end
   if isPack then selected={selected[1]}end
-  local records=data:GetChestRecords(player);if #records+#selected*count>config.MaxSavedChests then return false,'Inventory full. Clear some seeds or packs first.'end
+  local records=data:GetChestRecords(player);if #records+#selected*count>config.MaxSavedChests or not data:RoomFor(player,#selected*count)then return false,'Inventory full (200 items max). Clear some seeds or packs first.'end -- R155: the cap
   local pending={};local serial=player:GetAttribute('ChestInventorySerial')or 0
   for _,spec in ipairs(selected)do
    local seed=config.GetSeedById(spec.id);if not seed then return false,'Seed catalog mismatch.'end
