@@ -1,6 +1,6 @@
 # R153 (on purpose): Config.lua GetPlayerWalkSpeed asks the owner test state (OwnerTestState82) inside a pcall: a failing test module means "no override", never a broken walk speed (nothing else changed)
-# R155 release: Config.Version 'V150 R155' (nothing else changed)
-ce5e0a8ade06a28d99ca959e8d0cd31e31751d23fbd3ac6895b68df8ecdec212  src/ServerScriptService/ChestChaseServer/Config.lua
+# R156 release: Config.Version 'V150 R156' (nothing else changed)
+5a03b7d821e8316c8d56a6cce902967a36321bc50ce1dad84fcf6d9e05fd9abb  src/ServerScriptService/ChestChaseServer/Config.lua
 052c0df01f4e131396996df31a2e3a64d2be1aa3dafa3172e2dc59b66eeab696  src/ReplicatedStorage/EconomyBalance90.lua
 e0056ebd12983a74ddd20e3393286862f3da4faeb8f0bba0e3d5cd9d28ff6afb  src/ReplicatedStorage/EconomyScaling91.lua
 b9dbf155ff24c0f63fa3189165814a71d18797b97b8e28b21c296d254be5438b  src/ReplicatedStorage/ItemWeight.lua

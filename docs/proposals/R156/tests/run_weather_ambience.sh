@@ -1,6 +1,6 @@
 #!/bin/sh
-# Usage: sh run_weather_ambience.sh [scratch dir]      (NO_MUTATE=1 skips the teeth; R156_BASE=<ref> = the commit this was built on, default: the merge-base with
-#                                                       origin/claude/compassionate-brown-lohfok, else 7cd9e87)
+# Usage: sh run_weather_ambience.sh [scratch dir]      (NO_MUTATE=1 skips the teeth; R156_BASE=<ref> = the commit this was built on,
+#                                                       default 7cd9e87 = the R155 release)
 # R156 weather ambience (owner: three looping ambiences, "each should play during its own weather": Blizzard 87749574738390, Thunderstorm 137593145026034, Rain 107960597100236).
 # On the Roblox mock (/opt/luau/luau) with the REAL BiomeMood and the REAL BiomeAmbience.client of this checkout (bundled from THIS src tree by R151's bundle_cloudy.py):
 #  0. static  - every script in src/ compiles at -O0 (check_compile_O0.sh); BackgroundMusic.client.lua and Config.lua are untouched since the base (Config.lua: but for its
@@ -12,9 +12,7 @@
 #  2. teeth   - the same test on broken copies of src (each must FAIL)
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
-BASE=${R156_BASE:-}
-[ -n "$BASE" ] || BASE=$(git -C "$REPO" merge-base HEAD origin/claude/compassionate-brown-lohfok 2>/dev/null) || BASE=
-[ -n "$BASE" ] || BASE=7cd9e87
+BASE=${R156_BASE:-7cd9e87} # the R155 release (a merge-base would be HEAD itself once this is merged, and compare nothing)
 T=$REPO/tools/tests;P=$REPO/docs/proposals;S=$REPO/src;SS=$S/ServerScriptService/ChestChaseServer;RSD=$S/ReplicatedStorage;C=$S/StarterPlayer/StarterPlayerScripts
 INV=$P/inventory_R113/tests
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
