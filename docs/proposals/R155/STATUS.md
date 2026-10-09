@@ -12,12 +12,12 @@ Base: R154 release `8aa15fd`. **Released (built, not installed yet):** two insta
 - Cinematic camera for Secret / Cosmic / King and skip only with the SKIP button (`cinematic_camera.md`).
 - Mech coats (1C) + countdown to `LimitedEvent.EndsAt`, off sale after (`mech_coats.md`).
 - Pack pity: NORMAL / EVENT counts, every 10th open x1.5 luck and cap, two always-visible bars (`pity.md`).
-- Inventory like Roblox's Backpack, 200 items max, discard with a ~1 s hold on every item, item tooltip panel (`inventory.md`).
+- Inventory like Roblox's Backpack, 200 items max, discard with a ~1 s hold on every item (`inventory.md`; the item tooltip panel it shipped with was removed in R156, owner).
 - Installer engine: refuses open script tabs up front, waits up to 3 s for an open tab to sync (`tools/installer_engine.lua`).
 
 ## Open owner calls (listed in R155.md "Your call")
 - Mech pack card when the Bag is full: a "make room first" button instead of not offering it?
-- Item tooltip odds for packs never held (computed when the tool is built)?
+- (Item tooltip odds for packs never held: moot, the tooltip panel was removed in R156.)
 - Lucky roll at the per-tier ceilings (11 of 42 world packs don't move at Thunder + clover).
 - Still from R154: the clover at the very top.
 

@@ -20,7 +20,7 @@
 -- Review fixes: 11. a slow profile load (the saved layout arrives after the 8 s join fallback: nothing goes live or is sent meanwhile, it is applied when it arrives, unless
 --     the player already moved something); 12. the count label on a narrow and a wide sheet, FULL or not, never over the Trash or the pick bar's buttons; 13. DPad-Up
 --     navigates inside the Bag / the hotbar and only opens / closes the Bag from outside; 14. a discard reply that comes after "Keep it" and a new popup changes nothing;
---     Esc in the popup closes only the popup. (The item ToolTip is test_tooltip155.luau.)
+--     Esc in the popup closes only the popup. (R156: the item ToolTip panel is gone: test_no_tooltip156.luau.)
 local W=require('./world');local F=require('./fixtures');local E=require('./sfx_env')(W);local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
