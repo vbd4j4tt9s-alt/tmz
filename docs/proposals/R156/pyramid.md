@@ -56,4 +56,9 @@ The prompt reaches **37.7 studs** from the pack: the base's half-diagonal (31.7)
 - Small hooks: `MapService` (builds the pyramid with the other map passes), `ChestService:Bank` (the claim), `ChestChaseServerMain` (starts it), `KeyboardSkip152` (keys under it), `OwnerUpdateCommands82` + `OwnerCommandTargets82` + `StudioTestHelp` (`/test pyramid`), `MANIFEST.tsv`. Config is not touched, and neither is the keeper code (`ConcurrentKeeperService`, frozen since R149): "caught / lost goes back" is two small wrappers that `SecretPyramid156` puts on the running chase service, and they only touch the secret pack. R151's list of files that make packs now has `SecretPyramid156` on it (a real source, so a pull from it gets announced like any other), and so does its pack-shape list (the secret pack keeps the default chip-bag shape for good, so it looks the same floating, carried and in the Bag).
 - Tests: `docs/proposals/R156/tests/run_pyramid156.sh` (in `tools/tests/run_all_suites.sh`). Preview: `docs/proposals/R156/preview/run_pyramid_preview156.sh`.
 
+## Checked
+
+- `sh docs/proposals/R156/tests/run_pyramid156.sh <scratch dir> <ur place .rbxl>`: server 70 checks, client 28, ur place 23 (all 0 failures), z-fighting PASS (nothing touches the pyramid, no two pyramid faces share a plane). Add `mutate` as a 3rd argument and 11 broken copies of the code all get caught.
+- Every other suite in `tools/tests/run_all_suites.sh` passes too, including the whole-map z-fighting sweep, the keyboard, the keepers, the inventory, the pack pity and the -O0 compile check.
+
 Performance: 60 static anchored parts. The floating pack is built only on players' screens within 220 studs, and only if they haven't claimed it. Its turn and bob are 4 tweens made once, so no script runs every frame for them. The prompt check runs 5 times a second, only while the pyramid is streamed in.
