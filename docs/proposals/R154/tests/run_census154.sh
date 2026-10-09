@@ -13,9 +13,13 @@
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/5ea4542b-sapkeee.rbxl}
-BASE=${R154_BASE:-006daa1} # (the R153 release head: the commit R154 starts from)
+# The base side: this checkout with B1 + B3 switched off (perf154.patch undone), so the other R154 changes (the hub tidy, the bed ramps, the
+# trampolines) are on both sides and only B1 / B3 differ. R154_BASE=<commit> uses that commit's src instead (the R153 release: 006daa1).
+BASE=${R154_BASE:-}
 [ -f "$PLACE" ] || { echo "no place file at $PLACE";exit 1; }
-mkdir -p "$OUT/base_src";rm -rf "$OUT/base_src/src";git -C "$REPO" archive "$BASE" src | tar -x -C "$OUT/base_src"
+mkdir -p "$OUT/base_src";rm -rf "$OUT/base_src/src"
+if [ -n "$BASE" ];then git -C "$REPO" archive "$BASE" src | tar -x -C "$OUT/base_src"
+else cp -R "$REPO/src" "$OUT/base_src/src";patch -s -R -p1 -d "$OUT/base_src" < "$HERE/perf154.patch" || { echo "perf154.patch no longer undoes cleanly (regenerate it: perf154.md)";exit 1; };BASE="this checkout without B1 + B3";fi
 python3 -I "$REPO/docs/proposals/R149/tools/rbxl_geom.py" --tree "$PLACE" "$OUT/place_tree.luau" Workspace/ChestChaseMap >/dev/null
 for side in base now;do
  src=$REPO/src;[ "$side" = base ] && src=$OUT/base_src/src

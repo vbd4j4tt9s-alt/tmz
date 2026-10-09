@@ -63,7 +63,7 @@ def main():
                 bad.append('B1 %s: parts of 1.5 studs and more changed (%s %d -> %d)' % (tag, k, b[k], n[k]))
         if n['casters'] != b['casters'] - (b['tiny_casters'] - n['tiny_casters']) - (b['kb_casters'] - n['kb_casters']):
             bad.append('B1 %s: casters do not add up (%d -> %d)' % (tag, b['casters'], n['casters']))
-    print('B1: the sun\'s shadow casters, before -> after (R153 release -> this checkout)')
+    print('B1: the sun\'s shadow casters, before -> after (B1 + B3 off -> on)')
     print('| run | casters within 400 studs | of them under 1.5 studs | all casters in the workspace | script-built under 1.5 studs | saved map\'s own under 1.5 studs |')
     print('|---|---|---|---|---|---|')
     for tag, b, n in rows:

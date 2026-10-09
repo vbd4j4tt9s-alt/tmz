@@ -95,6 +95,8 @@ compared as before (see the table above: identical).
 
 ### `run_census154.sh` (rules, then the before -> after tables)
 
+(After the hub merge: the base side is this checkout with `perf154.patch` undone, so the hub tidy, bed ramps and trampolines are on both sides and only B1 / B3 differ. With the tidy in, the hub plaza at tier 3 is 3,186 -> 2,315 casters within 400 studs, 871 -> 0 script-built under 1.5 studs. `R154_BASE=006daa1` gives the old R153-release comparison.)
+
 Builds the census world (the place + every real start-up builder + the hub / keyboard / snow clients) with the R153 release and with this checkout, per tier 3 / 2 / 1 at the hub
 and on the track, and checks: no script-built drawn part under 1.5 studs casts a shadow (930 -> 0 at the hub on PC); the saved map's parts are the same (295 tiny casters, the same
 casters and non-casters); characters and avatars (any model with a Humanoid) are the same; parts of 1.5 studs and more cast / do not cast exactly as before (it caught the market's
