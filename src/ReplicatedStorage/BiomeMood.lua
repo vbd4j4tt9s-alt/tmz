@@ -103,7 +103,13 @@ M.Audio={
  {Key='Wind',Name='BiomeWind',Id='3308152153',Attribute='WindAssetId'},
  {Key='Crystal',Name='BiomeCrystalHum',Id='9125719267',Attribute='CrystalAssetId'},
  {Key='Rumble',Name='BiomeLowRumble',Id='9120018695',Attribute='RumbleAssetId'},
+ -- R156 (owner): one looping ambience per event weather (see M.WeatherBeds); BiomeMood:SetAttribute('RainBedAssetId', id) etc. swaps one.
+ {Key='RainBed',Name='WeatherRainAmbience',Id='107960597100236',Attribute='RainBedAssetId'},
+ {Key='ThunderBed',Name='WeatherThunderAmbience',Id='137593145026034',Attribute='ThunderBedAssetId'},
+ {Key='BlizzardBed',Name='WeatherBlizzardAmbience',Id='87749574738390',Attribute='BlizzardBedAssetId'},
 }
+-- R156 (owner): the weather's own ambience, by GlobalWeather. Volume is the target (0..1, before the Ambience slider); louder / quieter = change it here.
+M.WeatherBeds={Rain={Key='RainBed',Volume=.3},Thunderstorm={Key='ThunderBed',Volume=.32},Blizzard={Key='BlizzardBed',Volume=.3}}
 function M.AudioId(row)
  local value=script:GetAttribute(row.Attribute)
  if value==nil then value=row.Id end
@@ -112,7 +118,7 @@ function M.AudioId(row)
  return 'rbxassetid://'..string.format('%.0f',value)
 end
 function M.SoundTargets(stage,weather,refresh,chase,alive)
- local t={Birds=0,Leaves=0,Wind=0,Crystal=0,Rumble=0}
+ local t={Birds=0,Leaves=0,Wind=0,Crystal=0,Rumble=0,RainBed=0,ThunderBed=0,BlizzardBed=0}
  if not alive then return t end
  if stage==0 then t.Birds=.018;t.Leaves=.022
  elseif stage==1 then t.Birds=.040;t.Leaves=.035
@@ -126,6 +132,8 @@ function M.SoundTargets(stage,weather,refresh,chase,alive)
   t.Birds*=.15;t.Leaves*=.65;t.Wind=math.max(t.Wind,weather=='Blizzard'and .055 or .040)
   if weather=='Thunderstorm'then t.Rumble=math.max(t.Rumble,.022)end
  end
+ local bed=stage==0 and M.WeatherBeds[weather] -- R156 (owner): base / hub only (the track has no weather); one bed, the weather's own
+ if bed then t[bed.Key]=bed.Volume end
  if refresh then t.Birds=0;t.Leaves*=.4;t.Wind=math.max(t.Wind,.018)end
  if chase then for key,value in pairs(t)do t[key]=value*.12 end end
  return t
