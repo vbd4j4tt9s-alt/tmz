@@ -345,9 +345,11 @@ do
  clean('bag')
 end
 -- a collect before the server ends the opening (a skipper): the seed rests on its slot until its tool is there
+-- (R157: only Secret / Cosmic / King can be skipped: the skipper's card is Secret's, opened in place - a keeper near)
 do
- reset()
- local o=open(5);local run=o.Run;local tl=run.TL
+ reset();X.keeper(V3(25,3,100),{})
+ local o=open(6);local run=o.Run;local tl=run.TL
+ check(run.Kind=='InPlace','early collect: (Secret in place)')
  untilT(o,run,tl.SkipFrom+.3);press(o,'skip');check(run.Skipped==1,'early collect: skipped to the hit (the SKIP button)')
  untilT(o,run,L.ShownAt(tl)+M.CollectAfter+.05)
  check(o.Bag.Parent~=nil,'early collect: the server has not ended the opening yet')
@@ -476,7 +478,25 @@ end
 do -- R155 (owner: "... skip it by spam clicking disable this feature and u can only skip at the bottom right of the screen"): the skip is the
  -- SKIP button (or gamepad B / R2, Enter) only; spam presses in every phase do nothing; then the first press that BEGAN after the result was
  -- shown (+ CollectAfter) collects it, one held down from before does not
- local cases={{3,'skip'},{5,'ButtonB'},{7,'B key'},{8,'skip'},{6,'ButtonB',true}}
+ -- R157 (owner: "the skip button only appears for secret and above"): a Common..Mythic card: the SKIP button's press and keys (B / R2 / Enter), clicks and taps do
+ -- nothing in any phase (no SKIP button, nothing to skip); the first fresh press after its result collects it
+ for _,c in ipairs({{3,'skip'},{5,'ButtonB'},{2,'ButtonR2'}})do
+  reset()
+  local o=open(c[1]);local run=o.Run;local tl=run.TL;local shownAt=L.ShownAt(tl)
+  local tag='no skip on a card ('..names[c[1]]..' '..run.Kind..', '..c[2]..')'
+  local k=0
+  local function spamUntil(t)local g=0;while run.Clock()<t and not run.Done and g<400 do k+=1;if k%2==0 then click()else touch(o,0,2)end;if k%5==0 then press(o,c[2])end;step(o);g+=1 end;return g end
+  local n=spamUntil(shownAt-.02)
+  check(run.Kind=='Ladder'and tl.SkipFrom==nil and not run.Skipped and not run.Collected and not skipShows(),tag..': '..n..' presses (clicks, taps, '..c[2]..') all through the build skip nothing; no SKIP button')
+  spamUntil(shownAt+M.CollectAfter-.15)
+  check(run.SawResult and not run.Collected and not run.Skipped,tag..': the result just shown: spam presses do nothing (none began after it)')
+  untilT(o,run,shownAt+M.CollectAfter+.12);step(o);step(o);step(o);step(o)
+  press(o,'tap')
+  check(run.Collected and run.CollectWhy=='press'and not run.Skipped,tag..': the next fresh tap collects it')
+  landAll(o);check(slotShowing(o.Name)~=nil,tag..': in the hotbar');clean(tag)
+ end
+ -- (the skippable ones: the story scenes, and Secret / Cosmic / King opened in place)
+ local cases={{7,'B key'},{8,'skip'},{6,'ButtonB',true},{7,'skip',true},{8,'ButtonR2',true}}
  for _,c in ipairs(cases)do
   reset()
   if c[3]then X.keeper(V3(25,3,100),{})end
@@ -545,7 +565,7 @@ do
  for _,rank in ipairs({5,8})do
   reset()
   local o=open(rank);local run=o.Run;local tl=run.TL;local tag='sound ('..names[rank]..')'
-  untilT(o,run,tl.SkipFrom+.1);press(o,run.Kind=='Scene'and'button'or'click')
+  untilT(o,run,(tl.SkipFrom or L.CardSkipFrom)+.1);press(o,run.Kind=='Scene'and'button'or'click') -- (R157: a Mythic card has no SkipFrom: where R153's card skip began)
   untilT(o,run,L.ShownAt(tl)+M.CollectAfter+.05)
   local ringing=#rarePlaying()
   check(ringing>0 and run.Clock()<tl.Length,tag..': (the reveal still rings: '..ringing..' voices)')

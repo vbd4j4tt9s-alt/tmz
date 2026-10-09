@@ -1,8 +1,9 @@
 -- R155 (owner): the pack pity's two bars, always on the HUD, slightly above the hotbar. Owner: "upon holding a pack a bar would show on the players screen
 -- slightly above the hot bar 1/10 pity" -> "there can be 2 separate bars above the hot bar one coloured gold the other coloured purple" -> "make it so that
 -- they are always visible and they are polished properly". The counts are the server's (PackPity155 attributes on the player); this only shows them.
---  * NORMAL pity in GOLD on the left ("3/10 pity"), EVENT pity (Void / Verity / Mech) in PURPLE on the right ("3/10 event pity"). The fill moves in ten
---    steps and eases to a new count; ten ticks mark the steps.
+--  * NORMAL pity on the left ("3/10 pity"), EVENT pity (Void / Verity / Mech) on the right ("3/10 event pity"). The fill moves in ten
+--    steps and eases to a new count; ten ticks mark the steps. (R157: NORMAL clover green, EVENT gold with a clover-green rim, the clover at the left end;
+--    R155 had them gold and purple with a diamond.)
 --  * 9/10: the bar glows (a soft pulse) and says "9/10 next one's lucky!".
 --  * The bar of the group of the pack in your hand is brighter and slightly larger; the other one stays, a little dimmer.
 --  * A lucky pack: its reveal tells you and the bar pops (full, a flash, a shine across, a ring, "LUCKY PACK! x1.5 luck", then it drains back to 0/10).
@@ -13,8 +14,9 @@
 --  * Reduced Motion: no shine sweep, no pop / highlight scaling, no pulse, no ring; counts change at once; the lucky moment is the words and a steady glow.
 --  * Placement: its own ScreenGui (DisplayOrder 23, like the status HUD it never overlaps: under the hotbar / Bag (25), the tutorial (25 / 26), BASE / TRACK and the
 --    plant indicators (24), the reveal cards (96) and the notices (100)), centred on the hotbar
---    (ChestToolHotbar.Dock, found by name at every layout change; the same HudLayout metrics when it is not there), above the held item's name. It keeps
---    clear of every other HUD box (HudLayout.HudBoxes: menu, balances, status, thumb / jump zones, owner tools, BASE / TRACK) and of the SKIP button of an
+--    (ChestToolHotbar.Dock, found by name at every layout change; the same HudLayout metrics when it is not there), just over its slots (R157; the held item's
+--    name rows sit above the bars, R155 had the bars above them). It keeps
+--    clear of every other HUD box (HudLayout.HudBoxes: menu, balances, status, thumb / jump zones, owner tools) and of the SKIP button of an
 --    opening (the bottom-right corner, SkipZone); the SKIP button in turn keeps clear of the bars' extent (B.Reserved, taken by RarePullCard.SkipRect as a box:
 --    on a phone the thumb controls push the button left of the corner, up to where the bars are); hidden while a menu covers the HUD (SeedMenu), like the status HUD.
 --  * The treadmill BONUS ROLL button also wants the place just above the hotbar: it takes the bars' extent as a box and sits above them (B.ButtonSpot, which
@@ -24,7 +26,19 @@
 local Run=game:GetService('RunService');local GuiService=game:GetService('GuiService')
 local Pity=require(script.Parent.PackPity155)
 local Hud=require(script.Parent.HudLayout)
-local B={Name='PackPityBars155',TagName='PackPityLuckyTag155',TagOrder=97,DisplayOrder=23,Lift=6,Pad=2,Glow=5,HeldScale=1.06,MaxRise=60,PopSeconds=1.7,DrainAt=1.05,Settle=.3,MaxWait=180}
+-- R157 (the R156 preview "pity bars v2", owner: "the pity bar is too high up and should be closer to the hot bar like really close but with a small gap"): the bars
+-- used to sit 6 px above the held item's name and traits rows, which are 44 px tall (Hotbar.client: SelectedName -44 .. -18, SelectedTraits -18 .. -2 above the slots), so the
+-- gap to the slots was 44 + 6 = 50 px. Now they sit B.Gap(...) px above the slots (8 on a PC, 6 / 5 on a phone) and the name / traits rows sit ABOVE them (B.NameRow: how far
+-- up the Hotbar puts them, published as the PlayerGui attribute PityBarsRow). The clover (CloverIcon153) replaces the diamond; the fill starts after it (B.Lead). The numbers
+-- live in HudLayout (PityGap, PityBarHeight, NameClear / NameBand / NameWidth), which tells from them whether the rows can show on a screen.
+local B={Name='PackPityBars155',TagName='PackPityLuckyTag155',TagOrder=97,DisplayOrder=23,Pad=2,Glow=5,HeldScale=1.06,MaxRise=60,PopSeconds=1.7,DrainAt=1.05,Settle=.3,MaxWait=180}
+B.NameClear=Hud.NameClear -- the held item's name / traits rows end this far above the bars' top edge (the 9/10 glow is a soft halo and may touch them)
+B.NameBand=Hud.NameBand -- their height (SelectedName 26 + SelectedTraits 16)
+B.NameWidth=Hud.NameWidth -- at most this wide, centred on the hotbar (their text is centred)
+-- The gap between the bars' bottom edge and the slots' top: 8 px on a PC (the held bar's 2 px rim and the selected slot's 2 px ring sit in it), 6 px on a phone, 5 on a thin phone bar.
+B.Gap=Hud.PityGap
+-- The clover's disc takes the left end (barH wide); the fill runs from there to the right end.
+function B.Lead(barH)return math.floor(barH*.92)end
 B.Font=Enum.Font.FredokaOne
 local RGB=Color3.fromRGB
 local WHITE=Color3.new(1,1,1)
@@ -51,15 +65,12 @@ B.MinText=9
 function B.Place(w,h,m,dock)
  dock=dock or B.DefaultDock(m,w,h)
  local phone=m.Phone==true
- local barH=phone and(h<380 and 18 or 20)or(h<560 and 20 or 24)
+ local barH=Hud.PityBarHeight(phone,h)
  local gap=phone and 8 or 12;local rowGap=4
- local detail=m.HotbarDetails~=false and 44 or 0
- local bottom=dock.Y-detail-B.Lift
  local boxes={}
  for _,b in ipairs(Hud.HudBoxes(m,w,h,false))do if b.N~='Hotbar'then boxes[#boxes+1]=b end end
- if m.Travel then boxes[#boxes+1]={N='Travel',X=m.Travel.X,Y=m.Travel.Y,W=m.Travel.W,H=m.Travel.H}end
  boxes[#boxes+1]=B.SkipZone(w,h)
- local below={N='Dock',X=dock.X,Y=dock.Y-detail,W=dock.W,H=dock.H+detail} -- the hotbar and its item name: the bars sit just above (their glow may reach its empty top)
+ local below={N='Dock',X=dock.X,Y=dock.Y,W=dock.W,H=dock.H} -- the hotbar's slots: the bars sit just above (R157: the item's name and traits rows are above the bars now)
  local cx=dock.X+dock.W/2
  local half=math.floor((dock.W-gap)/2)
  local wide=phone and math.clamp(math.floor(half*.8),130,200)or math.clamp(math.floor(dock.W*.25),150,230)
@@ -86,7 +97,7 @@ function B.Place(w,h,m,dock)
     local r=shape.Stacked and{W=shape.W,H=shape.H*2+rowGap}or{W=shape.W*2+gap,H=shape.H}
     for step=0,maxShift,4 do
      for _,dx in ipairs(step==0 and{0}or{step,-step})do
-      local pair={X=cx-r.W/2+dx,Y=bottom-r.H-rise,W=r.W,H=r.H}
+      local pair={X=cx-r.W/2+dx,Y=dock.Y-B.Gap(phone,shape.H)-r.H-rise,W=r.W,H=r.H}
       if fits(pair,shape.W,shape.H)then found={Pair=pair,W=shape.W,H=shape.H,Stacked=shape.Stacked==true};break end
      end
      if found then break end
@@ -97,7 +108,7 @@ function B.Place(w,h,m,dock)
   if found then break end
  end if found then break end end
  local clear=found~=nil
- if not found then found={Pair={X=cx-wide-gap/2,Y=bottom-barH,W=wide*2+gap,H=barH},W=wide,H=barH,Stacked=false}end
+ if not found then found={Pair={X=cx-wide-gap/2,Y=dock.Y-B.Gap(phone,barH)-barH,W=wide*2+gap,H=barH},W=wide,H=barH,Stacked=false}end
  local pair,barW=found.Pair,found.W;barH=found.H
  local centers
  if found.Stacked then centers={Normal={X=pair.X+barW/2,Y=pair.Y+barH/2},Event={X=pair.X+barW/2,Y=pair.Y+barH+rowGap+barH/2}}
@@ -110,23 +121,60 @@ function B.Extent(r,barW,barH)
  return {X=r.X-gx,Y=r.Y-gy,W=r.W+gx*2,H=r.H+gy*2}
 end
 -- The room the bars take on a screen (their extent: the glow and the held bar's scale included) as a HUD box, from the same inputs they are placed with. The SKIP
--- button of an opening (RarePullCard.SkipRect) keeps clear of it; dock: the hotbar's rect (nil = HudLayout's default).
+-- button of an opening (RarePullCard.SkipRect), the BONUS ROLL button (B.ButtonSpot) and the reveal card (RarePullCard.FitBand) keep clear of it; dock: the hotbar's
+-- rect (nil = HudLayout's default). R157: the held item's name / traits rows sit right above the bars now (B.NameRows), so the box takes them in too where they show.
 function B.Reserved(w,h,m,dock)
- local place=B.Place(w,h,m,dock)
+ local d=dock or B.DefaultDock(m,w,h)
+ local place=B.Place(w,h,m,d)
  local e=B.Extent(place.Pair,place.Bar.W,place.Bar.H)
- return {N='PityBars',X=e.X,Y=e.Y,W=e.W,H=e.H}
+ local x0,y0,x1,y1=e.X,e.Y,e.X+e.W,e.Y+e.H
+ if m.HotbarDetails~=false then
+  local r=B.NameRows(w,h,m,d,place)
+  x0=math.min(x0,r.X);x1=math.max(x1,r.X+r.W);y0=math.min(y0,r.Y)
+ end
+ return {N='PityBars',X=x0,Y=y0,W=x1-x0,H=y1-y0}
+end
+-- R157: how far above the slots the held item's name / traits rows end: Hotbar.client puts SelectedTraits' bottom edge this far above the dock's top (it was a fixed 2 px) and
+-- SelectedName above it (-> SelectedTraits.Y = -(row + 16), SelectedName.Y = -(row + 42); with no traits line the name drops into its row: -(row + 26)); just over the bars'
+-- top edge, wherever Place put them. The Hotbar reads it from the PlayerGui attribute PityBarsRow, which the bars write whenever they are placed (like ChestHotbarReserve).
+-- dock: the hotbar's rect (nil = DefaultDock); place: B.Place's answer when the caller has it.
+function B.NameRow(w,h,m,dock,place)
+ local d=dock or B.DefaultDock(m,w,h)
+ return math.ceil(d.Y-(place or B.Place(w,h,m,d)).Pair.Y)+B.NameClear
+end
+-- R157: the rows' box {N, X, Y, W, H} (the Hotbar's labels: NameBand tall, at most NameWidth wide, centred on the hotbar), whether or not this screen shows them.
+function B.NameRows(w,h,m,dock,place)
+ local d=dock or B.DefaultDock(m,w,h)
+ local width=math.min(d.W,B.NameWidth)
+ return {N='NameRows',X=d.X+d.W/2-width/2,Y=d.Y-B.NameRow(w,h,m,d,place)-B.NameBand,W=width,H=B.NameBand}
 end
 -- The treadmill BONUS ROLL button (TreadmillBonusClient) wants the same place, just above the hotbar. It takes the bars' extent as one more box and lifts its
 -- preferred spot above it: TreadmillBonusRules.Place measures that spot from m.HotbarBottom, so it gets a copy of m with the bars' height added to it; every
 -- other spot Rules.Place tries is tested against the bars too. The answer is the same whether the button shows or not (the bars are always there), so nothing
 -- flickers when it comes and goes. rules: TreadmillBonusRules; boxes, extra: what the client gives Rules.Place; returns its rect {X, Y, W, H}.
+-- R157: the menu wheel's two new lower options (DAILY, INVITE) stand just over the bars on a portrait phone, so the place right above them is often taken by an option of
+-- the open wheel (boxes): before the rules send the button to the screen's edge, it slides sideways along that row (8 px steps, up to a third of the screen), clear of
+-- every box by the rules' own 6 px and 8 px from the edges. (TreadmillBonusRules itself is frozen: its preferred rect is asked of it, with nothing in the way.)
 function B.ButtonSpot(rules,m,w,h,boxes,extra,dock)
  local e=B.Reserved(w,h,m,dock)
  local more={e}
  for _,b in ipairs(extra or{})do more[#more+1]=b end
  local detail=m.HotbarDetails~=false and 44 or 0
- local rise=math.max(0,h-m.HotbarBottom-m.SlotSize-detail-(e.Y+3)) -- (the button's bottom edge ends up 7 px above the bars' glow: its own 10 px gap less 3)
- return rules.Place(setmetatable({HotbarBottom=m.HotbarBottom+rise},{__index=m}),w,h,boxes,more)
+ local rise=math.max(0,h-m.HotbarBottom-m.SlotSize-detail-(e.Y+3)) -- (the button's bottom edge ends up 7 px above the box: its own 10 px gap less 3; R157: the box includes the name rows)
+ local lifted=setmetatable({HotbarBottom=m.HotbarBottom+rise},{__index=m})
+ local r=rules.Place(lifted,w,h,boxes,more)
+ local want=rules.Place(lifted,w,h,{},{})
+ if r.X==want.X and r.Y==want.Y and r.W==want.W then return r end
+ local function clear(x)
+  if x<8 or want.Y<8 or x+want.W>w-8 or want.Y+want.H>h-8 then return false end
+  local test={X=x,Y=want.Y,W=want.W,H=want.H}
+  for _,list in ipairs({boxes,more})do for _,b in ipairs(list)do if overlaps(test,b,6)then return false end end end
+  return true
+ end
+ for dx=8,math.floor(w/3),8 do
+  for _,x in ipairs({want.X+dx,want.X-dx})do if clear(x)then return {X=x,Y=want.Y,W=want.W,H=want.H}end end
+ end
+ return r
 end
 -- The label's size for a text in a bar (FredokaOne is about .52 em a letter): as big as the bar allows, at least 8.
 function B.TextSize(text,barW,barH)
@@ -142,23 +190,35 @@ function B.Words(group,count,barW,barH,pop)
  if B.TextSize(short,barW,barH)>B.TextSize(long,barW,barH)then return short end
  return long
 end
--- The lucky TAG on the opener's reveal card (kind = the RarePullCinematic attribute): {Y = its centre in screen px, H = its height}. The full card ('Ladder')
--- has a free band between the seed (the biggest card seed: Mythic) and its "1 in N" line (RarePullRules.Layout); the compact card ('InPlace' / 'Result', the
--- upper third) gets it just under its name.
-function B.TagPlace(kind,phone,w,h)
- local ok,Rules=pcall(require,script.Parent.RarePullRules)
+-- The lucky TAG on the opener's reveal card (kind = the RarePullCinematic attribute): {Y = its centre in screen px, H = its height}. R157: the card is fitted to the
+-- screen now (RarePullRules.FitLayout), so it publishes where its rows are (RarePullCard.Rows: the seed at rest, "1 in N", the name and the collect hint under it, px
+-- of the full screen) and the tag follows them: rows = that table (nil: the card's unfitted layout, RarePullRules.Layout). The full card ('Ladder') has it in the gap
+-- between the seed and its "1 in N" line; where the fit left that gap too small for a readable tag (a small phone) it sits on the lower edge of the seed's square, never
+-- over "1 in N". The compact card ('InPlace' / 'Result', the upper part of the screen) gets it just under its collect hint, which is under the name.
+B.TagMin=14
+function B.TagPlace(kind,phone,w,h,rows)
  local th=phone and 22 or math.clamp(math.floor(h*.034),26,40)
- if kind=='Ladder'then
-  local L=ok and Rules.Layout(phone,false,5)or{Odds={Y=.78,H=.08}}
-  local seed=ok and Rules.Tier(5).SeedSize or .38
-  local top,bottom=.5+seed/2,L.Odds.Y-L.Odds.H/2
-  th=math.max(14,math.min(th,math.floor((bottom-top)*h*.9)))
-  return {Y=(top+bottom)/2*h,H=th}
+ if not rows then
+  local ok,Rules=pcall(require,script.Parent.RarePullRules)
+  local L=ok and Rules.Layout(phone,kind~='Ladder',5)or{Seed={Y=.5,H=.38},Odds={Y=.775,H=.08},Hint={Y=.4325,H=.03}}
+  local seedH=kind=='Ladder'and(ok and Rules.Tier(5).SeedSize or .38)or L.Seed.H
+  rows={SeedTop=(L.Seed.Y-seedH/2)*h,SeedBottom=(L.Seed.Y+seedH/2)*h,OddsTop=(L.Odds.Y-L.Odds.H/2)*h,HintBottom=(L.Hint.Y+L.Hint.H/2)*h}
  end
- local L=ok and Rules.Layout(phone,true,5)or{Name={Y=.39,H=.035}}
- return {Y=(L.Name.Y+L.Name.H/2)*h+th/2+6,H=th}
+ if kind=='Ladder'then
+  local gap=rows.OddsTop-rows.SeedBottom
+  if gap>=B.TagMin then
+   local size=math.max(B.TagMin,math.min(th,math.floor(gap*.9)))
+   return {Y=(rows.SeedBottom+rows.OddsTop)/2,H=size}
+  end
+  local size=math.max(B.TagMin,math.min(th,math.floor((rows.SeedBottom-rows.SeedTop)*.24)))
+  return {Y=rows.SeedBottom-size/2-1,H=size}
+ end
+ return {Y=rows.HintBottom+th/2+6,H=th}
 end
 -- Building ---------------------------------------------------------------------------------------------------------------------------------------------
+-- R157: the lucky pop's shine sweep and flash in the group's own colours (c: PackPity155.Colors[group]): a near-white tint of its Light / Glow, not plain white.
+function B.ShineColor(c)return c.Light:Lerp(WHITE,.6)end
+function B.FlashColor(c)return c.Glow:Lerp(WHITE,.35)end
 local function new(class,props,parent)
  local o=Instance.new(class)
  for k,v in pairs(props)do o[k]=v end
@@ -173,23 +233,26 @@ local function buildBar(root,group)
  local glow=new('Frame',{Name='Glow',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.new(1,10,1,10),BackgroundColor3=c.Glow,BackgroundTransparency=1,ZIndex=1},bar);round(glow)
  local ring=new('Frame',{Name='Ring',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Visible=false,ZIndex=1},bar);round(ring)
  local ringStroke=new('UIStroke',{Name='Line',Color=c.Light,Thickness=3,Transparency=1},ring)
- local track=new('Frame',{Name='Track',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromScale(1,1),BackgroundColor3=TRACK,BackgroundTransparency=.22,ZIndex=2},bar);round(track)
- local edge=new('UIStroke',{Name='Edge',Color=c.Deep,Thickness=1.5,Transparency=.1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},track)
+ local track=new('Frame',{Name='Track',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromScale(1,1),BackgroundColor3=c.Track or TRACK,BackgroundTransparency=.22,ZIndex=2},bar);round(track)
+ local edge=new('UIStroke',{Name='Edge',Color=c.Rim or c.Deep,Thickness=1.5,Transparency=.1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},track)
  local fill=new('Frame',{Name='Fill',BackgroundColor3=WHITE,BackgroundTransparency=0,ZIndex=3},track);round(fill)
  local fillGradient=new('UIGradient',{Name='Shade',Rotation=90,Color=ColorSequence.new(c.Light,c.Deep)},fill)
- local shine=new('Frame',{Name='Shine',Size=UDim2.fromScale(1,1),BackgroundColor3=WHITE,BackgroundTransparency=.15,Visible=false,ZIndex=4},fill);round(shine)
+ -- (R157: the lucky pop's shine and flash are light tints of the bar's own colours, B.ShineColor / B.FlashColor, so they follow the clover-green / gold palette)
+ local shine=new('Frame',{Name='Shine',Size=UDim2.fromScale(1,1),BackgroundColor3=B.ShineColor(c),BackgroundTransparency=.15,Visible=false,ZIndex=4},fill);round(shine)
  local band=new('UIGradient',{Name='Band',Rotation=20,Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.42,1),NumberSequenceKeypoint.new(.5,.05),NumberSequenceKeypoint.new(.58,1),NumberSequenceKeypoint.new(1,1)}),Offset=Vector2.new(-1,0)},shine)
- local flash=new('Frame',{Name='Flash',Size=UDim2.fromScale(1,1),BackgroundColor3=WHITE,BackgroundTransparency=1,ZIndex=5},track);round(flash)
+ local flash=new('Frame',{Name='Flash',Size=UDim2.fromScale(1,1),BackgroundColor3=B.FlashColor(c),BackgroundTransparency=1,ZIndex=5},track);round(flash)
  local ticks={}
  for i=1,Pity.Every-1 do ticks[i]=new('Frame',{Name='Tick'..i,AnchorPoint=Vector2.new(.5,.5),BackgroundColor3=WHITE,BackgroundTransparency=.72,ZIndex=4},track)end
- local mark=new('Frame',{Name='Mark',AnchorPoint=Vector2.new(.5,.5),Rotation=45,BackgroundColor3=WHITE,ZIndex=6},bar)
- new('UIGradient',{Rotation=-45,Color=ColorSequence.new(c.Light,c.Deep)},mark)
- local markEdge=new('UIStroke',{Name='Edge',Color=c.Ink,Thickness=1.5},mark)
- new('UICorner',{CornerRadius=UDim.new(0,3)},mark)
+ -- R157: the clover (CloverIcon153: the uploaded picture, the drawn copy, or the plain shapes) on a dark disc in the group's rim colour; the disc keeps it readable over the fill. The
+ -- icon sits in a CanvasGroup so the HUD's dim / the other bar's dimming (GroupTransparency) reaches the picture too.
+ local badge=new('Frame',{Name='Badge',AnchorPoint=Vector2.new(.5,.5),BackgroundColor3=c.Badge or c.Ink,ZIndex=6},bar);round(badge)
+ local badgeRim=new('UIStroke',{Name='Rim',Color=c.Rim or c.Deep,Thickness=1.5,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},badge)
+ local icon=new('CanvasGroup',{Name='Clover',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromScale(.86,.86),BackgroundTransparency=1,ZIndex=2},badge)
+ pcall(function()require(script.Parent.CloverIcon153).Attach(icon)end)
  local label=new('TextLabel',{Name='Label',AnchorPoint=Vector2.new(.5,.5),BackgroundTransparency=1,Font=B.Font,Text='',TextColor3=WHITE,TextScaled=false,TextWrapped=false,ZIndex=7},bar)
- local stroke=new('UIStroke',{Name='Outline',Color=c.Ink,Thickness=1.6,ApplyStrokeMode=Enum.ApplyStrokeMode.Contextual},label)
+ local stroke=new('UIStroke',{Name='Outline',Color=c.Ink,Thickness=2,ApplyStrokeMode=Enum.ApplyStrokeMode.Contextual},label)
  return {Group=group,Colors=c,Root=bar,Scale=scale,Glow=glow,Ring=ring,RingStroke=ringStroke,Track=track,Edge=edge,Fill=fill,FillGradient=fillGradient,Shine=shine,Band=band,
-  Flash=flash,Ticks=ticks,Mark=mark,MarkEdge=markEdge,Label=label,Outline=stroke,
+  Flash=flash,Ticks=ticks,Badge=badge,BadgeRim=badgeRim,Icon=icon,Label=label,Outline=stroke,
   Count=0,Shown=0,Held=false,Pending=0,PopAt=nil,Lucky=nil,HeldScale=1,PopScale=1}
 end
 local function buildTag(gui)
@@ -209,6 +272,17 @@ local function setter()
  if ok and Cache then return Cache.new().Set end
  return function(o,k,v)if o[k]~=v then o[k]=v end end
 end
+-- R157: where the opener's reveal card has its rows right now (RarePullCard publishes them as shares of the screen's height: the attributes Card.RowKeys of the Folder
+-- 'FitRows' under its root frame), in px of a
+-- screen h tall; nil when no card is up or it published nothing (B.TagPlace then uses the unfitted layout).
+B.CardRowKeys={SeedTop='FitSeedTop',SeedBottom='FitSeedBottom',OddsTop='FitOddsTop',NameBottom='FitNameBottom',HintTop='FitHintTop',HintBottom='FitHintBottom'}
+function B.CardRows(pg,h)
+ local reveal=pg and pg:FindFirstChild('RarePullReveal');local root=reveal and reveal:FindFirstChild('RarePull');root=root and root:FindFirstChild('FitRows')
+ if not root then return nil end
+ local rows={}
+ for key,attr in pairs(B.CardRowKeys)do local v=root:GetAttribute(attr);if type(v)~='number'then return nil end;rows[key]=v*h end
+ return rows
+end
 -- The tag at this moment: pops in (x0.6 -> x1.1 -> x1), one shine across, fades out when the card goes (Reduced Motion: no pop, no shine). Returns true while it moves.
 local function paintTag(s,now)
  local t,st,S=s.Tag,s.TagState,s.Set
@@ -217,12 +291,12 @@ local function paintTag(s,now)
  local hide=st.HideAt and now-st.HideAt or nil
  if hide and hide>=.25 then s.TagState=nil;S(t.Root,'Visible',false);return false end
  local age=now-st.At;local view=Hud.Viewport(s.TagGui);local phone=s.Metrics and s.Metrics.Phone==true
- local place=B.TagPlace(st.Kind,phone,view.X,view.Y);local c=Pity.Colors[st.Group]
+ local place=B.TagPlace(st.Kind,phone,view.X,view.Y,B.CardRows(s.TagGui.Parent,view.Y));local c=Pity.Colors[st.Group]
  local text=Pity.TagText(st.Group);local size=math.max(9,math.floor(place.H*.6))
  S(t.Root,'Visible',true);S(t.Root,'Position',UDim2.fromOffset(math.floor(view.X/2+.5),math.floor(place.Y+.5)))
  S(t.Root,'Size',UDim2.fromOffset(math.min(math.floor(view.X*.9),math.floor((utf8.len(text)or#text)*size*.56+place.H*1.4)),place.H))
  S(t.Label,'Text',text);S(t.Label,'TextSize',size);S(t.Outline,'Color',c.Ink);S(t.Edge,'Color',c.Light:Lerp(WHITE,.4))
- if t.Group~=st.Group then t.Group=st.Group;t.Shade.Color=ColorSequence.new(c.Light,c.Deep)end
+ if t.Group~=st.Group then t.Group=st.Group;t.Shade.Color=ColorSequence.new(c.Light,c.Deep);t.Shine.BackgroundColor3=B.ShineColor(c)end
  local a=hide and math.clamp(hide/.25,0,1)or 0
  S(t.Root,'BackgroundTransparency',a);S(t.Label,'TextTransparency',a);S(t.Outline,'Transparency',a);S(t.Edge,'Transparency',a)
  local pop=1
@@ -248,20 +322,22 @@ local function paint(s,bar,now)
  if popping then dim=0 end
  local held=s.Held==bar.Group
  local other=s.Held~=nil and not held
- local k=(1-dim)*(other and .75 or 1);bar.K=k
+ local k=(1-dim)*(other and .85 or 1);bar.K=k -- (R157: the other bar dims less, .85 not .75: a dimmed gold fill over grass turns olive and stops reading as gold)
  -- size and place (written again only when the layout changes)
  local center=placement.Centers[bar.Group]
  local cx,cy=math.floor(center.X+.5),math.floor(center.Y+.5)
  if bar.GeoW~=w or bar.GeoH~=h or bar.GeoX~=cx or bar.GeoY~=cy then
   bar.GeoW,bar.GeoH,bar.GeoX,bar.GeoY=w,h,cx,cy
   bar.Root.Position=UDim2.fromOffset(cx,cy);bar.Root.Size=UDim2.fromOffset(w,h)
-  bar.Fill.Position=UDim2.fromOffset(2,2)
-  for i,t in ipairs(bar.Ticks)do t.Position=UDim2.fromOffset(math.floor(2+(w-4)*i/Pity.Every+.5),math.floor(h/2));t.Size=UDim2.fromOffset(1,math.max(2,h-10))end
-  local mark=math.floor(h*.78)
-  bar.Mark.Size=UDim2.fromOffset(mark,mark);bar.Mark.Position=UDim2.fromOffset(math.floor(h*.62),math.floor(h/2))
-  bar.Label.Position=UDim2.fromOffset(math.floor(w/2+h*.3),math.floor(h/2));bar.Label.Size=UDim2.fromOffset(w-math.floor(h*1.3),h)
+  local lead=B.Lead(h) -- (R157: the clover's disc is the bar's left end; the fill and its ten steps run from there to the right end; 6 px of the fill's start hide under the disc)
+  bar.Fill.Position=UDim2.fromOffset(lead-6,2)
+  for i,t in ipairs(bar.Ticks)do t.Position=UDim2.fromOffset(math.floor(lead+(w-2-lead)*i/Pity.Every+.5),math.floor(h/2));t.Size=UDim2.fromOffset(1,math.max(2,h-10))end
+  bar.Badge.Size=UDim2.fromOffset(h,h);bar.Badge.Position=UDim2.fromOffset(math.floor(h/2),math.floor(h/2))
+  local room=w-lead-2-math.floor(h*.35)
+  bar.Label.Position=UDim2.fromOffset(lead+2+math.floor(room/2),math.floor(h/2));bar.Label.Size=UDim2.fromOffset(room,h)
  end
- local fillW=math.floor((w-4)*math.clamp(bar.Shown,0,1)+.5)
+ local fillW=0
+ if bar.Shown>.004 then fillW=6+math.floor((w-2-B.Lead(h))*math.clamp(bar.Shown,0,1)+.5)end
  if bar.FillW~=fillW or bar.FillH~=h then bar.FillW,bar.FillH=fillW,h;S(bar.Fill,'Size',UDim2.fromOffset(fillW,h-4))end
  S(bar.Fill,'Visible',fillW>=2)
  local tickA=fade(.72,k);for _,t in ipairs(bar.Ticks)do S(t,'BackgroundTransparency',tickA)end
@@ -280,14 +356,16 @@ local function paint(s,bar,now)
  S(bar.Glow,'BackgroundTransparency',fade(glow,k))
  -- the bar itself: brighter when its group is in your hand or it is about to be lucky
  local hot=held or Pity.IsLucky(bar.Count)or bar.Pending>0 or popping
- S(bar.Track,'BackgroundTransparency',fade(held and .1 or .22,k))
- S(bar.Edge,'Color',hot and bar.Colors.Light or bar.Colors.Deep);S(bar.Edge,'Thickness',held and 2.2 or 1.5);S(bar.Edge,'Transparency',fade(held and 0 or .1,k))
+ S(bar.Track,'BackgroundTransparency',fade(held and .05 or .12,k)) -- (R157: the track keeps its tint over any backdrop: .12, not .22)
+ local rim=hot and(bar.Colors.RimHot or bar.Colors.Light)or(bar.Colors.Rim or bar.Colors.Deep)
+ S(bar.Edge,'Color',rim);S(bar.Edge,'Thickness',held and 2.2 or 1.5);S(bar.Edge,'Transparency',fade(held and 0 or .1,k))
+ S(bar.BadgeRim,'Color',rim);S(bar.BadgeRim,'Thickness',held and 2 or 1.5);S(bar.BadgeRim,'Transparency',fade(0,k))
  S(bar.Fill,'BackgroundTransparency',fade(0,k))
  if bar.GradHeld~=held then
   bar.GradHeld=held
   bar.FillGradient.Color=ColorSequence.new(held and bar.Colors.Light:Lerp(WHITE,.25)or bar.Colors.Light,held and bar.Colors.Deep:Lerp(bar.Colors.Light,.2)or bar.Colors.Deep)
  end
- S(bar.Mark,'BackgroundTransparency',fade(0,k));S(bar.MarkEdge,'Transparency',fade(0,k))
+ S(bar.Badge,'BackgroundTransparency',fade(0,k));S(bar.Icon,'GroupTransparency',fade(0,k))
  S(bar.Label,'TextTransparency',fade(0,k));S(bar.Outline,'Transparency',fade(0,k))
  -- the pop: flash, shine sweep, ring, scale (the last three never with Reduced Motion)
  local flash=1
@@ -361,6 +439,7 @@ function B.Start(player,opts)
  local clock=opts.Clock or os.clock
  local s={Gui=gui,Root=root,Player=player,Bars={},Held=nil,Dim=0,Reduced=GuiService.ReducedMotionEnabled==true,Connections={},Dead=false,Set=setter(),Rev=0}
  for _,group in ipairs(Pity.Groups)do s.Bars[group]=buildBar(root,group)end
+ pcall(function()require(script.Parent.CloverIcon153).Ensure()end) -- (R157: the clover picture the bars show; the HUD luck row and the shop share it)
  -- the lucky tag's own layer, just above the reveal card (RarePullReveal, 96) and under the notices (100); full screen like the card
  local tagGui=Instance.new('ScreenGui');tagGui.Name=B.TagName;tagGui.ResetOnSpawn=false;tagGui.IgnoreGuiInset=true;tagGui.DisplayOrder=B.TagOrder
  tagGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;pcall(function()tagGui.ScreenInsets=Enum.ScreenInsets.None end);tagGui.Parent=pg
@@ -405,6 +484,9 @@ function B.Start(player,opts)
   local r,dock=dockRect(view,m)
   s.Metrics=m;s.View=view;s.Dock=r
   s.Placement=B.Place(view.X,view.Y,m,r)
+  -- R157: the held item's name / traits rows (Hotbar.client) sit above the bars: it reads how far up from this attribute (B.NameRow) and lays them out again when it changes
+  local row=B.NameRow(view.X,view.Y,m,r,s.Placement)
+  if pg:GetAttribute('PityBarsRow')~=row then pg:SetAttribute('PityBarsRow',row)end
   if dock~=watchedDock then
    for _,c in ipairs(dockConns)do c:Disconnect()end;table.clear(dockConns);watchedDock=dock
    if dock then for _,p in ipairs({'AbsolutePosition','AbsoluteSize','Visible'})do dockConns[#dockConns+1]=dock:GetPropertyChangedSignal(p):Connect(function()task.defer(function()if s.Relayout then s.Relayout()end end)end)end end
@@ -510,6 +592,7 @@ function B.Start(player,opts)
   for _,c in ipairs(s.Connections)do c:Disconnect()end
   for _,c in ipairs(charConns)do c:Disconnect()end
   for _,c in ipairs(dockConns)do c:Disconnect()end
+  pg:SetAttribute('PityBarsRow',nil)
   if gui.Parent then gui:Destroy()end
   if tagGui.Parent then tagGui:Destroy()end
  end

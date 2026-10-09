@@ -43,11 +43,12 @@ local function measure(tag,rank,extra,setup,skip)
  reset();if setup then setup()end
  local run=start(rank,extra);if not run then return nil end
  Y.record(function()return run.Clock()end)
- local skipped=false -- (skip: seconds after SkipFrom at which the player skips)
- X.run(run.TL.Length+.3,1/60,skip and function()if not skipped and not run.Done and run.Clock()>=(run.TL.SkipFrom or math.huge)+skip then skipped=M.Skip()end end or nil)
+ local skipped=false -- (skip: seconds after SkipFrom at which the player skips; R157: a card without SkipFrom is asked from where R153's card skip began, until its hit)
+ local hitAt=run.TL.Climax or run.TL.Burst or 0
+ X.run(run.TL.Length+.3,1/60,skip and function()if not skipped and not run.Done and run.Clock()>=(run.TL.SkipFrom or L.CardSkipFrom)+skip and run.Clock()<hitAt-.02 then skipped=M.Skip()end end or nil)
  local frames=Y.stop()
  local r={Tag=tag,Rank=rank,Kind=run.Kind,Mix=-99,MixAt=0,Voice=-99,VoiceSlot='',Peak=-99,Voices=0,Whoosh=-99,Bed=-99,Hit=-99,SlotMax={},PreHitMix=-99,PostHitMix=-99}
- local hitT=run.TL.Climax or run.TL.Burst or 0;r.Skip=skip
+ local hitT=run.TL.Climax or run.TL.Burst or 0;r.Skip=skip;r.Skipped=skipped
  for _,f in ipairs(frames)do
   local mix=Y.mixLoudness(f)
   if mix>r.Mix then r.Mix=mix;r.MixAt=f.T or 0 end
@@ -81,7 +82,9 @@ local full={};for _,r in ipairs(rows)do full[r.Tag]=r end
 local skips={}
 for rank=1,5 do
  local r=measure(names[rank]..' short',rank,nil,function()X.player:SetAttribute('SettingSkipCutscenes',true)end);if r then r.Extra=true end
- for _,at in ipairs({.05,.5})do local k=measure(names[rank]..' skip+'..at,rank,nil,nil,at);if k then k.Extra=true;skips[#skips+1]={Row=k,Full=full[names[rank]..' card']}end end
+ -- (R157: a Common..Mythic card has no SkipFrom: a skip asked of it changes nothing - it plays, and sounds, exactly as the full card)
+ local k=measure(names[rank]..' no skip',rank,nil,nil,.05)
+ if k then local f=full[names[rank]..' card'];k.Extra=true;skips[#skips+1]={Row=k,Full=f};check(k.Skipped==false and f and k.Mix<=f.Mix+.5,k.Tag..': R157: Enter / B / R2 asked all through the build skip nothing; it sounds as the full card does ('..string.format('%.1f vs %.1f',k.Mix,f and f.Mix or -99)..' LUFS)')end
 end
 for rank=6,8 do
  for _,at in ipairs({.05,1})do local k=measure(names[rank]..' skip+'..at,rank,nil,nil,at);if k then k.Extra=true;skips[#skips+1]={Row=k,Full=full[names[rank]..' Full']}end end

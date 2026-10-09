@@ -2,6 +2,9 @@
 -- R151: the DAILY button's and DAILY tabs' red badges are the SAME component as the Index's (NotifyBadge151; DailyRewardsClient carried an identical copy of the R138 badge). The real TravelButtons +
 -- DailyRewardsClient on the Roblox mock with the layout engine of layout_badges.luau (the fake server of the R140 client test): the badge counts what is waiting ("3", "9+"), is the polished badge
 -- (revision 151, circle, gradient, ring, shadow, centred count), is not clipped by anything on nine screens, the tab dots sit inside their tabs, and Reduced Motion stops the pulse.
+-- R157 (owner: "daily and invite can also be put into the menu wheel ... we can put the daily notifier at the correct position without anything obstructing it"): DAILY is option 4 of
+-- the menu wheel (HudLayout.Navigation), no longer a square in the top bar row (TravelButtons has no TopIcons): its badge is the INDEX button's - the Count size and overhang on the
+-- top-right corner - and the wheel's CanvasGroup keeps room for it, so nothing clips it with the wheel open; with the wheel closed the MENU button's "!" says a reward waits.
 local W=require('./world');local F=require('./fixtures');local R=W.R
 local L=require('./layout_badges')(R)
 local fails,checks=0,0
@@ -32,9 +35,12 @@ player:SetAttribute('TutorialDone',false)
 local tb=R.new('LocalScript');tb.Name='TravelButtons';check(pcall(W.load,'TravelButtons',tb),'TravelButtons loads')
 local sc=R.new('LocalScript');sc.Name='DailyRewardsClient';local okD,errD=pcall(W.load,'DailyRewardsClient',sc);check(okD,'DailyRewardsClient loads: '..tostring(errD))
 frames(10)
-local travel=pg.TravelButtons;local icons=travel.TopIcons
-local daily=icons.Daily:FindFirstChild('DailyButton')
-check(daily~=nil,'the DAILY button sits in its top bar slot')
+local travel=pg.TravelButtons
+check(travel:FindFirstChild('TopIcons')==nil,'R157: the top bar row holds BASE / TRACK alone (no DAILY / INVITE squares)')
+local nav=pg:FindFirstChild('GardenNavigation');local option=nav and nav:FindFirstChild('MenuOption4')
+local daily=option and option:FindFirstChild('DailyButton')
+check(daily~=nil and option:IsA('CanvasGroup'),'R157: the DAILY button is option 4 of the menu wheel (in its CanvasGroup)')
+local function openWheel(open)local hub=nav.MenuButton;if(hub:GetAttribute('Expanded')==true)~=open then hub.Activated:Fire()end;frames(2)end
 local function badge()return daily:FindFirstChild('RewardBadge')end
 -- 1. what it counts -------------------------------------------------------------------------------------------------------------------------------------
 check(badge()~=nil and not badge().Visible,'nothing waiting: the badge is there and hidden')
@@ -54,11 +60,12 @@ do
  local src=require('./rs_bundle').DailyRewardsClient
  check(not src:find('local function badge%(')and select(2,src:gsub('Badge%.Make%(',''))==3,'DailyRewardsClient makes its three badges with NotifyBadge151.Make and has no copy of the old one')
 end
--- 3. not clipped, on nine screens --------------------------------------------------------------------------------------------------------------------------
+-- 3. not clipped, on nine screens (R157: with the wheel open, where the option shows) ----------------------------------------------------------------------------
 local function reach(o)return L.badgeReach(Badge,o)end
 local overshoot=L.overshoot
 local SCREENS={{1920,1080,140,1920},{1280,720,120,1280},{1024,768,120,1024},{844,390,150,800},{667,375,140,667},{430,932,120,430},{390,844,110,390},{375,667,110,375},{360,640,110,360}}
 local worst=0
+openWheel(true)
 for _,s in ipairs(SCREENS)do
  inset(s[3],s[4],0,s[2]>500 and 52 or 44);resize(s[1],s[2])
  local o=badge();local a=reach(o);local cut=0
@@ -67,7 +74,11 @@ for _,s in ipairs(SCREENS)do
  check(cut==0,s[1]..'x'..s[2]..': the DAILY badge is not clipped (cut '..cut..' px)')
  local br=L.rect(daily)
  check(overshoot(a,{x0=0,y0=0,x1=s[1],y1=s[2]})==0,s[1]..'x'..s[2]..': it is on screen (button '..string.format('%.0f,%.0f %.0fx%.0f',br.x0,br.y0,br.x1-br.x0,br.y1-br.y0)..', badge reach '..string.format('%.1f,%.1f..%.1f,%.1f',a.x0,a.y0,a.x1,a.y1)..')')
- local r=L.rect(o);check(near(r.x1-r.x0,r.y1-r.y0)and near(r.x1-r.x0,Badge.Sizes.Daily),s[1]..'x'..s[2]..': a '..Badge.Sizes.Daily..' px square (a circle; R153: 1.5x the R151 20 px)')
+ local r=L.rect(o);check(near(r.x1-r.x0,r.y1-r.y0)and near(r.x1-r.x0,Badge.Sizes.Count),s[1]..'x'..s[2]..': a '..Badge.Sizes.Count..' px square (a circle; R157: the INDEX count\'s size)')
+ -- R157: on the option's top-right corner exactly like the INDEX badge (centre size/2 - overhang inside the corner on both axes)
+ local inset=Badge.Sizes.Count/2-Badge.Overhang.Count
+ check(o.Position.X.Scale==1 and near(o.Position.X.Offset,-inset)and o.Position.Y.Scale==0 and near(o.Position.Y.Offset,inset)and near(r.x1-br.x1,Badge.Overhang.Count,.5)and near(br.y0-r.y0,Badge.Overhang.Count,.5),
+  s[1]..'x'..s[2]..': R157: it hangs '..Badge.Overhang.Count..' px past the option\'s top-right corner on both sides, as the INDEX badge does')
 end
 inset(120,1280,0,52);resize(1280,720)
 -- R154 (owner: "the number and signs in the notification bubble is also too small"): the DAILY count fills its bubble as the INDEX count does, on a computer and on phones, for "3" and "9+"
@@ -79,11 +90,21 @@ for _,s in ipairs({{1920,1080,140,1920},{1280,720,120,1280},{844,390,150,800},{3
   local o=badge();local f=L.textFill(o)
   check(o.Count.Text==(case[2]=='3'and'3'or'9+'),tag..': the DAILY badge reads "'..o.Count.Text..'"')
   check(f.FillEm>=.6 and f.FillEm<=.8 and f.FillDisc>=.55 and f.FillDisc<=.72 and f.FillInk>=.45,string.format('%s "%s": the text is %.0f%% of the badge (%d px), the digits %.0f%% of the red disc, %.0f%% of the badge',tag,o.Count.Text,f.FillEm*100,f.Em,f.FillDisc*100,f.FillInk*100))
-  check(f.InkW<=f.Disc-2 and f.Corner<=f.Radius-1 and f.Centred and o.Count.TextScaled==false and o.Count.TextSize==Badge.TextSize(Badge.Sizes.Daily,o.Count.Text),tag..' "'..o.Count.Text..'": the glyphs stay inside the badge, centred, at the explicit size')
+  check(f.InkW<=f.Disc-2 and f.Corner<=f.Radius-1 and f.Centred and o.Count.TextScaled==false and o.Count.TextSize==Badge.TextSize(Badge.Sizes.Count,o.Count.Text),tag..' "'..o.Count.Text..'": the glyphs stay inside the badge, centred, at the explicit size')
  end
 end
 player:SetAttribute('DailyQuestsReady',2)
 inset(120,1280,0,52);resize(1280,720)
+-- R157: the closed wheel: the MENU button carries the red "!" while a reward waits (the DAILY count lives inside the wheel)
+openWheel(false)
+do
+ local alert=nav.MenuButton:FindFirstChild('IndexRewardAlert')
+ check(alert and alert.Visible and alert.Count.Text=='!'and alert:GetAttribute('BadgeSize')==Badge.Sizes.Alert and pg:GetAttribute('MenuAlertDaily')==3,'R157: the wheel closed and 3 rewards waiting: the MENU button shows the red "!" (Alert size); DailyRewardsClient tells it through MenuAlertDaily')
+ player:SetAttribute('DailyLoginReady',false);player:SetAttribute('DailyQuestsReady',0);frames(3)
+ check(not alert.Visible,'R157: nothing waiting (and no Index reward): no "!"')
+ player:SetAttribute('DailyLoginReady',true);player:SetAttribute('DailyQuestsReady',2);frames(3)
+ check(alert.Visible,'... and it comes back with the next reward')
+end
 -- 4. the window's tab dots --------------------------------------------------------------------------------------------------------------------------------
 daily.Activated:Fire();frames(6)
 local panel=pg.DailyRewardsGui.DailyPanel

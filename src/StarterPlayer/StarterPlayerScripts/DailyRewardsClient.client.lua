@@ -28,9 +28,9 @@ local function pop(o,from)
  local sc=o:FindFirstChildOfClass('UIScale');if not sc or GuiService.ReducedMotionEnabled then return end
  sc.Scale=from or 1.4;Tween:Create(sc,TweenInfo.new(.35,Enum.EasingStyle.Back),{Scale=1}):Play()
 end
--- Top bar buttons ---------------------------------------------------------------------------------------------------
+-- The DAILY / INVITE buttons (R157: options 4 and 5 of the menu wheel; R140 - R156: squares in the top bar row) ------------
 local function topButton(name,emoji,caption,color,label)
- local b=new('TextButton',{Name=name,Text='',Size=UDim2.fromScale(1,1),BorderSizePixel=0,ZIndex=10,AutoButtonColor=true},nil)
+ local b=new('TextButton',{Name=name,Text='',Size=UDim2.fromOffset(64,64),BorderSizePixel=0,ZIndex=10,AutoButtonColor=true},nil) -- R157: a wheel option (HudLayout.Navigation sizes it)
  Bright.Button(b,color);b:SetAttribute('ButtonSound','Bubble04');b:SetAttribute('AccessibleLabel',label)
  local icon=new('TextLabel',{Name='Icon',Text=emoji,BackgroundTransparency=1,Position=UDim2.fromScale(0,.04),Size=UDim2.fromScale(1,.6),TextScaled=true,Font=Enum.Font.FredokaOne,TextColor3=Color3.new(1,1,1),ZIndex=12},b)
  local cap=text(b,'Caption',caption,10);cap.Position=UDim2.fromScale(0,.62);cap.Size=UDim2.fromScale(1,.36);cap.TextScaled=true;cap.ZIndex=12
@@ -40,18 +40,9 @@ end
 local dailyButton=topButton('DailyButton','🎁','DAILY',RGB(255,150,48),'Daily rewards and quests')
 dailyButton:SetAttribute('ButtonSound','MenuClick') -- R150: it opens the DAILY window (ButtonFeedback's SeedMenu click is the same cue, so it plays once)
 local inviteButton=topButton('InviteButton','👥','INVITE',RGB(64,170,255),'Invite friends. Each friend here: +'..math.floor(D.FriendBoostPerFriend*100+.5)..'% speed gain')
-local function mount()
- local tb=pg:FindFirstChild('TravelButtons');local icons=tb and tb:FindFirstChild('TopIcons')
- if tb and not icons then tb.ChildAdded:Once(function()task.defer(mount)end)end
- if not icons then return false end
- local daily,invite=icons:FindFirstChild('Daily'),icons:FindFirstChild('Invite')
- if not daily or not invite then return false end
- if dailyButton.Parent~=daily then dailyButton.Parent=daily end
- if inviteButton.Parent~=invite then inviteButton.Parent=invite end
- return true
-end
-watch(pg.ChildAdded,function(child)if child.Name=='TravelButtons'then task.defer(mount)end end)
-task.defer(mount)
+-- R157 (owner: "daily and invite can also be put into the menu wheel"): DAILY and INVITE are options of the menu wheel - 4 down-right, 5 straight down - no longer squares
+-- next to BASE / TRACK in the top bar row. Navigation reparents each into its option frame (its click is the wheel's MenuClick and closes the wheel, as SHOP's does).
+do local Hud=require(RS.HudLayout);dailyButton.Parent=gui;inviteButton.Parent=gui;Hud.Navigation(dailyButton,4);Hud.Navigation(inviteButton,5)end
 -- The DAILY window ---------------------------------------------------------------------------------------------------
 local shade=new('TextButton',{Name='Shade',Text='',AutoButtonColor=false,Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.new(),BackgroundTransparency=.48,BorderSizePixel=0,Visible=false},gui)
 shade:SetAttribute('ButtonSound',false)
@@ -268,9 +259,11 @@ end
 local function updateBadges()
  local loginReady=player:GetAttribute('DailyLoginReady')==true;local quests=tonumber(player:GetAttribute('DailyQuestsReady'))or 0
  local n=(loginReady and 1 or 0)+quests
- -- (the DAILY button sits 4 px under the top of the screen, which cuts off whatever hangs past it: R153's 30 px badge sits inside the corner, Overhang.Daily)
- local b=Badge.Make(dailyButton,'RewardBadge',Badge.Sizes.Daily,Badge.Overhang.Daily,false,Badge.OverhangTop and Badge.OverhangTop.Daily);local before=b.Visible and tonumber(b.Count.Text)or 0
+ -- R157: the DAILY button is a wheel option now, so its badge sits on the top-right corner exactly like the INDEX badge (Sizes.Count / Overhang.Count): the wheel's CanvasGroup keeps
+ -- NotifyBadge151.Margin round the button and nothing is above it any more (R155's Sizes.Daily / Overhang.Daily / OverhangTop.Daily, the "4 px under the screen top" workaround, are gone)
+ local b=Badge.Make(dailyButton,'RewardBadge',Badge.Sizes.Count,Badge.Overhang.Count);local before=b.Visible and tonumber(b.Count.Text)or 0
  Badge.Set(b,Badge.Text(n),n>0,n>before)
+ pg:SetAttribute('MenuAlertDaily',n) -- (R157: the MENU button's red "!" while a reward waits: HudLayout adds this to the Index rewards)
  Badge.Set(Badge.Make(tabs.Login,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot),'',loginReady,false)
  Badge.Set(Badge.Make(tabs.Quests,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot),'',quests>0,false)
 end
@@ -350,9 +343,16 @@ end
 for _,key in ipairs({'DailyLoginReady','TutorialDone'})do watch(player:GetAttributeChangedSignal(key),autoOpen)end
 for _,key in ipairs({'TitleActive','SeedMenu'})do watch(pg:GetAttributeChangedSignal(key),autoOpen)end
 -- Invite + friend boost (R148: friends speed up the speed GAINED from training, not the walk speed) --------------------
-local inviteHint=text(inviteButton,'InviteHint','',14,Theme.Colors.Muted);inviteHint.Visible=false;inviteHint.BackgroundTransparency=.15;inviteHint.BackgroundColor3=Theme.Colors.Panel;inviteHint.ZIndex=30;Theme.Corner(inviteHint,8)
-inviteHint.AnchorPoint=Vector2.new(.5,0);inviteHint.Position=UDim2.new(.5,0,1,6);inviteHint.Size=UDim2.fromOffset(230,26)
+-- (R157: INVITE is a wheel option, inside a CanvasGroup that clips anything past its 16 px margin, and a tap on it closes the wheel: the hint lives on this script's own layer
+-- and shows just under the MENU button, where INVITE is kept; 230 x 26 as before, kept on screen)
+local inviteHint=text(gui,'InviteHint','',14,Theme.Colors.Muted);inviteHint.Visible=false;inviteHint.BackgroundTransparency=.15;inviteHint.BackgroundColor3=Theme.Colors.Panel;inviteHint.ZIndex=30;Theme.Corner(inviteHint,8)
+inviteHint.AnchorPoint=Vector2.new(0,0);inviteHint.Size=UDim2.fromOffset(230,26)
 local function hint(message)
+ local nav=pg:FindFirstChild('GardenNavigation');local hub=nav and nav:FindFirstChild('MenuButton');local area=gui.AbsoluteSize;local origin=gui.AbsolutePosition
+ if hub and hub.AbsoluteSize.X>0 then
+  local x=hub.AbsolutePosition.X-origin.X;local y=hub.AbsolutePosition.Y-origin.Y+hub.AbsoluteSize.Y+6
+  inviteHint.Position=UDim2.fromOffset(math.max(4,math.min(x,area.X-234)),math.max(4,math.min(y,area.Y-30)))
+ else inviteHint.Position=UDim2.new(.5,-115,0,8)end
  inviteHint.Text=message;inviteHint.Visible=true;local serial=(inviteHint:GetAttribute('Serial')or 0)+1;inviteHint:SetAttribute('Serial',serial)
  task.delay(2.5,function()if inviteHint:GetAttribute('Serial')==serial then inviteHint.Visible=false end end)
 end
@@ -375,6 +375,8 @@ local function friendChip()
  chip.Visible=n>0;chip.Text='+'..math.floor((boost-1)*100+.5)..'%'
  inviteButton:SetAttribute('AccessibleLabel',n>0 and('Invite friends. '..n..' here: +'..math.floor((boost-1)*100+.5)..'% speed gain')or'Invite friends. Each friend here: +'..math.floor(D.FriendBoostPerFriend*100+.5)..'% speed gain')
  if chip.Visible and chip.Text~=before then pop(chip)end
+ -- (R157: the chip is on the INVITE option, inside the wheel; while the wheel is closed the MENU button shows the same words beside it: HudLayout reads this attribute)
+ pg:SetAttribute('MenuFriendBoost',chip.Visible and chip.Text or nil)
 end
 for _,key in ipairs({'FriendsInServer','FriendSpeedBoost'})do watch(player:GetAttributeChangedSignal(key),friendChip)end
 -- "Your plant is ready" opt-in: asked once a session, a moment after planting, when the owner has set it up --------------
@@ -390,4 +392,4 @@ watch(player:GetAttributeChangedSignal('SeedsPlanted'),function()
  end)
 end)
 updateBadges();friendChip();autoOpen();layout()
-gui.Destroying:Connect(function()stopPulses();for _,c in ipairs(connections)do c:Disconnect()end;dailyButton:Destroy();inviteButton:Destroy()end)
+gui.Destroying:Connect(function()stopPulses();for _,c in ipairs(connections)do c:Disconnect()end;dailyButton:Destroy();inviteButton:Destroy();pg:SetAttribute('MenuAlertDaily',nil);pg:SetAttribute('MenuFriendBoost',nil)end)

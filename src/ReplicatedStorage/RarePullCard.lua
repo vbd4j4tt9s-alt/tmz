@@ -18,6 +18,15 @@
 -- R155 review: a player in Shift Lock or first person has no mouse to click it with (the cursor is locked to the middle): the button is MODAL while it shows
 -- (Roblox frees the mouse for as long as a modal button is visible, and gives the lock back when it goes), and a keyboard's pill carries a small "Enter" key
 -- (the gamepad's has its "B"). Its place also keeps clear of the pity bars above the hotbar (PityBars155.Reserved), which a phone's thumb controls would put it on.
+-- R157 (owner: "this skip is not placed at the correct spot it should be at the bottom right side of the screen and additionally the click to collect should be
+-- below the fruit name and also reduce the size of the seed display so it fits perfectly between the base buttons and the hotbar while also making it so that the
+-- skip button only appears for secret and above"):
+--  * SKIP: a story scene (kind 'Scene') hides the whole HUD, so nothing of it can be in the pill's way: it goes to the corner of the safe area (14 px in), and keeps
+--    clear only of a thumb control that is really on screen (Card.ControlBoxes). A card that leaves the HUD up (the compact in-place card) keeps today's rule (SkipBoxes).
+--    Only Secret / Cosmic / King can be skipped: Common..Mythic have no SkipFrom (RarePullRules.CardTimeline), so no pill.
+--  * The collect hint ("click to collect!" / "tap to collect!") sits directly under the seed's name, centred, in every card (Layout.Hint).
+--  * The Common..Mythic card, and the compact card of an opening in place, are fitted to the band between BASE / TRACK and the pity bars / hotbar (Card.FitBand,
+--    RarePullRules.FitLayout); the story scenes keep their layout (their HUD is hidden).
 local RS=game:GetService('ReplicatedStorage')
 local Rules=require(script.Parent.RarePullRules)
 local Cache=require(script.Parent.PropCache152)
@@ -76,7 +85,10 @@ end
 function Card.Create(gui,kind,opts)
  local rank=math.clamp(opts.Rank or 1,1,8);local tier=Rules.Tier(rank)
  local self=setmetatable({Gui=gui,Kind=kind,Rank=rank,Tier=tier,Phone=opts.Phone==true,Reduced=opts.Reduced==true,Lite=opts.Lite==true,Quick=opts.Quick==true,
-  Odds=opts.Odds,SeedName=opts.SeedName or'',Layout=Rules.Layout(opts.Phone==true,kind=='InPlace',rank)},Card)
+  Odds=opts.Odds,SeedName=opts.SeedName or'',Layout=Rules.Layout(opts.Phone==true,kind=='InPlace',rank),
+  HudHidden=kind=='Scene'}, -- (R157: a story scene hides the whole HUD: nothing of it is in the SKIP button's way)
+  Card)
+ if kind~='Scene'then self.Layout=self:_fit()or self.Layout end -- (R157: Common..Mythic and the compact card: fitted to the band between BASE / TRACK and the pity bars / hotbar)
  local root=frame(gui,'RarePull',BLACK,1);root.Size=UDim2.fromScale(1,1);self.Root=root
  local cache=Cache.new();self.Set,self.Scale=cache.Set,cache.Scale -- (R152 perf: per-frame writes only when a value changes)
  local accent=tier.Theme or tier.Hint
@@ -191,16 +203,60 @@ function Card.Create(gui,kind,opts)
  self.Flash=frame(root,'Flash',tier.Glow,31,{BackgroundTransparency=1})
  do -- (R154: every card: the collect hint, and the skip hint before it)
   local hint=label(root,'Skip hint',Enum.Font.GothamBold,C(230,230,240),BLACK,32)
-  -- (R152: inside the device's safe area: on a notched / rounded phone the corner of the full-screen layer is cut off)
-  -- (R153: the cards are skippable too; the in-place card has no letterbox band, its hint keeps the full card's place and size)
-  local right,bottom=Card.SafeInsets();local bar=L.Bar>0 and L.Bar or Rules.Layout(self.Phone,false,rank).Bar
-  hint.AnchorPoint=Vector2.new(1,.5);hint.Position=UDim2.fromScale(.975-right,1-math.max(bar*.5,bottom+bar*.25));hint.Size=UDim2.fromScale(.22,bar*.42);hint.TextXAlignment=Enum.TextXAlignment.Right
+  -- (R157: it was in the bottom-right corner, inside the device's safe area; now it is directly under the seed's name, centred: Layout.Hint)
+  hint.AnchorPoint=Vector2.new(.5,.5);hint.Position=UDim2.fromScale(.5,L.Hint.Y);hint.Size=UDim2.fromScale(.6,L.Hint.H);hint.TextXAlignment=Enum.TextXAlignment.Center
   self.CollectText=Card.CollectText(self.Phone)
   hint.Text='';self.SkipHint=hint
  end
+ self:_place()
  if opts.Skip then self:_buildSkip(gui)end -- (R155: on the screen layer itself, above a story scene's full-screen button)
  if opts.Seed then self:SetSeed(opts.Seed)end
  return self
+end
+-- R157: the static sizes of the pieces from self.Layout: once the pieces exist, and again when a fitted card's screen changes size (_refit)
+function Card:_place()
+ local L=self.Layout;local S=self.Scale
+ S(self.Title,'Size',.92,L.Title.H);S(self.OddsLabel,'Size',.8,L.Odds.H);S(self.NameLabel,'Size',.7,L.Name.H)
+ if self.SkipHint then S(self.SkipHint,'Size',.6,L.Hint.H)end
+ if self.View then
+  local w=L.Seed.W or L.Seed.H;local glow=self.GlowIsImage and 1.5 or 1.05
+  S(self.View,'Size',w,L.Seed.H);S(self.SeedGlow,'Size',w*glow,L.Seed.H*glow)
+  if self.SeedHalo then S(self.SeedHalo,'Size',w*1.25,L.Seed.H*1.25)end
+ end
+ if self.Crown then S(self.Crown,'Size',L.Title.H*.7,L.Title.H*.7)end
+ -- R157: the card tells where its rows are (Card.Rows), so the lucky pack's tag (PityBars155.TagPlace) follows the fitted card: as the attributes of a Folder under its root
+ -- frame (Card.RowsName; a folder is never drawn, the frame's own look stays as it was)
+ if self.View then
+  local box=self.RowsBox
+  if not box then box=Instance.new('Folder');box.Name=Card.RowsName;box.Parent=self.Root;self.RowsBox=box end
+  for key,value in pairs(Card.Rows(L))do box:SetAttribute(Card.RowKeys[key],value)end
+ end
+end
+-- R157: the rows of a seed card's layout L as shares of the screen's height: the seed's square where it comes to rest (Seed.Y + Rules.Fit.Float), the top of
+-- "1 in N", the bottom of the name, the collect hint's row. Published as the attributes Card.RowKeys of the root frame's Folder Card.RowsName (PityBars155.CardRows reads them).
+Card.RowsName='FitRows'
+Card.RowKeys={SeedTop='FitSeedTop',SeedBottom='FitSeedBottom',OddsTop='FitOddsTop',NameBottom='FitNameBottom',HintTop='FitHintTop',HintBottom='FitHintBottom'}
+function Card.Rows(L)
+ local rest=L.Seed.Y+Rules.Fit.Float
+ return {SeedTop=rest-L.Seed.H/2,SeedBottom=rest+L.Seed.H/2,OddsTop=L.Odds.Y-L.Odds.H/2,NameBottom=L.Name.Y+L.Name.H/2,HintTop=L.Hint.Y-L.Hint.H/2,HintBottom=L.Hint.Y+L.Hint.H/2}
+end
+-- (R157: the screen changed size - a window resized, a phone turned: the card is fitted to the new band)
+function Card:_refit()
+ local cam=workspace.CurrentCamera
+ if self.FitFor and cam and cam.ViewportSize~=self.FitFor then local layout=self:_fit();if layout then self.Layout=layout;self:_place()end end
+end
+-- R157: the card's layout for the screen it is on (Common..Mythic, and the compact card of an opening in place): RarePullRules.FitLayout in the band FitBand gives. nil when that
+-- cannot be told (no camera / no HudLayout): the card keeps RarePullRules.Layout, as before.
+function Card:_fit()
+ local cam=workspace.CurrentCamera;local vp=cam and cam.ViewportSize
+ if not vp or vp.X<=0 or vp.Y<=0 then return nil end
+ local ok,layout=pcall(function()
+  local compact=self.Kind=='InPlace'
+  local top,bottom=Card.FitBand(self.Gui,vp,self.Rank,self.Phone,compact)
+  return Rules.FitLayout(self.Phone,self.Rank,top,bottom,vp.X,vp.Y,compact)
+ end)
+ if not(ok and type(layout)=='table')then return nil end
+ self.FitFor=vp;return layout
 end
 -- The seed card's model: centred in its viewport, framed by its bounding sphere.
 function Card:SetSeed(model)
@@ -257,14 +313,16 @@ function Card:_hint(t,tl)
  if t>=shown and(tl.Wait or tl.WaitEnd)then
   local a=clamp01((t-shown-Card.CollectHint)/.3)*(tl.WaitEnd and 1-clamp01((t-tl.WaitEnd)/.15)or 1)*(self.Reduced and 1 or .82+.18*math.sin((t-shown)*3.2))
   S(h,'Text',self.CollectText);S(h,'TextTransparency',1-.9*a);S(h,'TextStrokeTransparency',1-.5*a);S(h,'Visible',a>.01)
+  self.Scale(h,'Position',.5,self.Layout.Hint.Y-(self.Lift or 0)) -- (R157: under the name, lifting with it as the card goes)
   return
  end
  S(h,'Visible',false)
 end
 -- R155: the SKIP button ----------------------------------------------------------------------------------------------------------------------
 -- Where it goes, in pixels of the safe area (w x h; boxes: HudLayout.HudBoxes in the same space): the bottom row first, from the right edge
--- leftwards (never left of the middle), then the rows above it (never above .45 of the height); the first spot clear of the screen's edge by
--- 12 px and of every box by 8 px. Its height: 6.5 % of the screen's (34 - 48 px; at least 40 on a touch screen: a thumb's target).
+-- leftwards (never left of the middle), then the rows above it (never above .45 of the height; R157: .2 when nothing lower is clear); the first spot clear of the screen's edge by
+-- 14 px (R157: was 12) and of every box by 8 px. Its height: 6.5 % of the screen's (34 - 48 px; at least 40 on a touch screen: a thumb's target).
+-- R157: a story scene passes no boxes (its HUD is hidden): the first spot is the corner, 14 px from the right and bottom edges of the safe area.
 Card.SkipLabel='SKIP  ▸▸'
 Card.EnterLabel='Enter'
 -- (the word's place and size on the pill: alone, beside the gamepad's B, beside the keyboard's Enter key; built once, not per frame)
@@ -272,7 +330,7 @@ local WORD_AT,WORD_PAD_AT,WORD_KEY_AT=UDim2.fromScale(.5,.5),UDim2.fromScale(.58
 local WORD_SIZE,WORD_KEY_SIZE=UDim2.fromScale(.74,.5),UDim2.fromScale(.5,.5)
 function Card.SkipRect(w,h,touch,boxes)
  local bh=math.floor(math.clamp(h*.065,touch and 40 or 34,48)+.5);local bw=math.floor(bh*2.75+.5)
- local margin,pad=12,8
+ local margin,pad=14,8
  local function clear(x,y)
   if x<margin or y<margin or x+bw>w-margin or y+bh>h-margin then return false end
   for _,b in ipairs(boxes or{})do if x<b.X+b.W+pad and x+bw>b.X-pad and y<b.Y+b.H+pad and y+bh>b.Y-pad then return false end end
@@ -280,6 +338,9 @@ function Card.SkipRect(w,h,touch,boxes)
  end
  local x0,y0=w-margin-bw,h-margin-bh
  for y=y0,math.floor(h*.45),-4 do for x=x0,math.floor(w*.5),-4 do if clear(x,y)then return x,y,bw,bh end end end
+ -- (R157 build: a tiny window - 640 x 360, 420 x 420 - whose hotbar, bars and status stack fill the whole lower right: higher up the right half, to .2 of the height,
+ -- before it would lie on the slots)
+ for y=math.floor(h*.45)-4,math.floor(h*.2),-4 do for x=x0,math.floor(w*.5),-4 do if clear(x,y)then return x,y,bw,bh end end end
  return x0,y0,bw,bh -- (nothing is clear: the corner itself)
 end
 -- What the button keeps clear of in a safe area w x h: HudLayout's boxes (controls: a touch screen's real thumb controls, HudLayout.Controls, or nil) and, R155 review,
@@ -295,6 +356,34 @@ function Card.SkipBoxes(w,h,touch,controls)
   return list
  end)
  return ok and type(list)=='table'and list or{}
+end
+-- R157 (owner: the seed display "fits perfectly between the base buttons and the hotbar"): the band of the full screen, top and bottom in px, the Common..Mythic seed card
+-- may fill. Its top: the bottom edge of BASE / TRACK (HudLayout.TravelBottom, from GuiService.TopbarInset: where TravelButtons draws them) and a small margin; for
+-- Mythic also under its letterbox bar. Its bottom: the top of whatever is highest above the bottom of the screen of the hotbar (HudLayout's box: the slots and the held
+-- item's name line), the pity bars (PityBars155.Reserved: their glow and the held bar's scale included) and, in a narrow window, the balances / status stack where they reach
+-- into the column the card's words fill (centred, .4 of the height wide: HudLayout lifts them up beside the hotbar there), less the same margin. The HUD is measured in the safe area
+-- (as SkipBoxes does) and moved to the full screen's coordinates. gui: the card's ScreenGui (the real thumb controls); vp: the screen's size; rank: 1-5; phone: the card's.
+function Card.FitBand(gui,vp,rank,phone,compact)
+ local Layout=require(RS:FindFirstChild('HudLayout'))
+ local ox,oy,w,h=Card.SafeArea(vp)
+ local touch=game:GetService('UserInputService').TouchEnabled
+ local okC,controls=pcall(function()return Layout.Controls(gui)end)
+ local m=Layout.Read(Vector2.new(w,h),touch,okC and controls or nil)
+ local margin=math.max(8,math.floor(vp.Y*.012+.5))
+ local top=Layout.TravelBottom(game:GetService('GuiService').TopbarInset)+margin
+ if Rules.Tier(rank).Letterbox then top=math.max(top,Rules.Layout(phone,false,rank).Bar*vp.Y+margin)end -- (Mythic's bar, while it is up)
+ local lowest=h
+ for _,b in ipairs(Layout.HudBoxes(m,w,h,false))do
+  if b.N=='Hotbar'then lowest=math.min(lowest,b.Y)
+  -- (a narrow window lifts the balances and the status stack up beside the hotbar: where they reach into the column the card's words fill, .4 of the height wide and
+  -- centred, they are the card's floor too)
+  elseif b.Y>h*.35 and(b.N:sub(1,6)=='Wallet'or b.N=='Status')and b.X<w/2+h*.2 and b.X+b.W>w/2-h*.2 then lowest=math.min(lowest,b.Y)end
+ end
+ local okB,Bars=pcall(require,RS:FindFirstChild('PityBars155'))
+ if okB and Bars then local okR,box=pcall(Bars.Reserved,w,h,m,nil);if okR and type(box)=='table'then lowest=math.min(lowest,box.Y)end end
+ local bottom=oy+lowest-margin
+ if compact then bottom=math.min(bottom,math.max(vp.Y*.45,top+140))end -- (the compact card keeps to the upper part of the screen: the middle stays clear)
+ return top,bottom
 end
 function Card:_buildSkip(parent)
  local b=new('TextButton',{Name='Skip button',Text='',AutoButtonColor=false,BackgroundColor3=C(18,16,30),BackgroundTransparency=1,ZIndex=45,Visible=false,
@@ -319,28 +408,48 @@ function Card:_buildSkip(parent)
  self.SkipButton,self.SkipWord,self.SkipPad,self.SkipPadText,self.SkipKey,self.SkipKeyText=b,text,pad,pl,key,kl
  self.Input=game:GetService('UserInputService') -- (once: _skip asks it every frame)
 end
--- (placed again whenever the screen changes size)
-function Card:_placeSkip()
- local b=self.SkipButton;local cam=workspace.CurrentCamera;local vp=cam and cam.ViewportSize
- if not b or not vp or vp==self.SkipFor then return end
- self.SkipFor=vp
+-- R157: the device's safe area in px (CoreUISafeInsets, kept within the screen itself): its corner ox, oy and its size w, h. vp: the screen's size.
+function Card.SafeArea(vp)
  local ox,oy,w,h=0,0,vp.X,vp.Y
  local okA,area=pcall(function()return game:GetService('GuiService'):GetInsetArea(Enum.ScreenInsets.CoreUISafeInsets)end)
  if okA and area and area.Width and area.Width>0 and area.Height>0 then -- (never outside the screen itself: a stale or odd safe area)
   ox,oy=math.clamp(area.Min.X,0,vp.X*.25),math.clamp(area.Min.Y,0,vp.Y*.25)
   w,h=math.clamp(area.Width,vp.X*.5,vp.X-ox),math.clamp(area.Height,vp.Y*.5,vp.Y-oy)
  end
+ return ox,oy,w,h
+end
+-- R157: what a story scene's SKIP button keeps clear of: the thumb controls (HudLayout.Controls: {Joystick, Jump} in the safe area) that are really on screen, if any. The
+-- scene hides the rest of the HUD, and ControlModule:Disable() (RarePullCinematic.holdControls) hides the controls too, so this is normally nothing: the corner.
+function Card.ControlBoxes(controls)
+ local list={}
+ for _,key in ipairs({'Joystick','Jump'})do
+  local c=type(controls)=='table'and controls[key]
+  if c and c.W>0 and c.H>0 then list[#list+1]={N=key,X=c.X,Y=c.Y,W=c.W,H=c.H}end
+ end
+ return list
+end
+-- (placed again whenever the screen changes size; R157: and for a story scene when it first shows, once the director has hidden the HUD and held the controls)
+function Card:_placeSkip(shown)
+ local b=self.SkipButton;local cam=workspace.CurrentCamera;local vp=cam and cam.ViewportSize
+ if not b or not vp then return end
+ local key=shown and 1 or 0
+ if vp==self.SkipFor and(key==self.SkipShown or not self.HudHidden)then return end
+ self.SkipFor,self.SkipShown=vp,key
+ local ox,oy,w,h=Card.SafeArea(vp)
  local touch=game:GetService('UserInputService').TouchEnabled
  local okC,controls=pcall(function()return require(RS:FindFirstChild('HudLayout')).Controls(self.Gui)end) -- (a touch screen's real thumb controls)
- local x,y,bw,bh=Card.SkipRect(w,h,touch,Card.SkipBoxes(w,h,touch,okC and controls or nil))
+ controls=okC and controls or nil
+ -- (R157: a story scene has no HUD on screen: the corner, unless a thumb control really is there; a card that leaves the HUD up keeps clear of all of it)
+ local boxes=self.HudHidden and Card.ControlBoxes(controls)or Card.SkipBoxes(w,h,touch,controls)
+ local x,y,bw,bh=Card.SkipRect(w,h,touch,boxes)
  b.Position=UDim2.fromOffset(ox+x,oy+y);b.Size=UDim2.fromOffset(bw,bh);self.SkipBox={X=ox+x,Y=oy+y,W=bw,H=bh}
 end
 function Card:_skip(t,tl)
  local b=self.SkipButton;if not b then return end
- self:_placeSkip()
  local S=self.Set;local hit=tl.Climax or tl.Burst or 0
  local a=clamp01((t-(tl.SkipFrom or math.huge))/.25)*(1-clamp01((t-(hit-.02))/.12))
  local shown=a>.01
+ self:_placeSkip(shown)
  S(b,'Visible',shown);if b.Modal~=shown then b.Modal=shown end -- (modal exactly while it shows: the mouse is free for it, and locked again when it goes)
  S(b,'BackgroundTransparency',1-.78*a);S(self.SkipStroke,'Transparency',1-.6*a);S(self.SkipWord,'TextTransparency',1-a)
  -- (a gamepad: its B; else a keyboard: its Enter key - the keys the director answers on the button's behalf)
@@ -428,7 +537,8 @@ function Card:_seed(t,appear,floatEnd,outAt,goneAt)
  S(self.View,'Visible',shown);S(self.SeedGlow,'Visible',shown);if self.SeedHalo then S(self.SeedHalo,'Visible',shown)end
  if not shown then return end
  local k=clamp01((t-appear)/.2);local f=clamp01((t-appear)/math.max(.05,floatEnd-appear))
- local y=self.Layout.Seed.Y+(self.Reduced and 0 or(-.03+.06*Rules.Smooth(f))-.03*Rules.EaseIn(1-out))
+ -- (R157: Reduced Motion's seed sits where the floating one comes to rest, Seed.Y + .03, so the fitted card's rows are the same with and without motion)
+ local y=self.Layout.Seed.Y+(self.Reduced and .03 or(-.03+.06*Rules.Smooth(f))-.03*Rules.EaseIn(1-out))
  Sc(self.View,'Position',.5,y);Sc(self.SeedGlow,'Position',.5,y)
  S(self.View,'ImageTransparency',1-k*out)
  if self.GlowIsImage then S(self.SeedGlow,'ImageTransparency',1-.6*k*out)else S(self.SeedGlow,'BackgroundTransparency',1-.55*k*out)end
@@ -445,6 +555,7 @@ end
 -- Ladder: t on the reveal's server clock -------------------------------------------------------------------------------------------------
 function Card:UpdateLadder(t,tl)
  local rank=self.Rank;local burst=tl.Burst
+ self:_refit()
  local q=clamp01(t/burst)
  if t<burst then
   local color,strength=Rules.Hint(rank,q)
@@ -505,6 +616,7 @@ function Card:UpdateScene(t,tl,skipShown)
 end
 -- InPlace: t on the reveal's server clock (or from 0 for a result card) --------------------------------------------------------------------
 function Card:UpdateInPlace(t,tl)
+ self:_refit()
  local accent=self.Tier.Theme or self.Tier.Hint
  local pre=tl.ResultOnly and 0 or clamp01(t/math.max(.01,tl.Climax))
  -- (R152: before the hit the edges and motes walk the same rarity hint as the pack in the world, as on the ladder; the tier colour

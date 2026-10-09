@@ -142,8 +142,9 @@ PY
  con(pg.ChildAdded,function(c)if c.Name=='ChestToolHotbar'"
  mutate no_placement_guard "$RSD/PityBars155.lua" "local moving=s.Placement~=nil and step(s,dt or 1/60,clock())" "local moving=step(s,dt or 1/60,clock())" " if s.Placement and s.Root.Visible then" " if s.Root.Visible then" "local placement=s.Placement;if not placement then return end" "local placement=s.Placement"
  mutate skip_over_bars "$RSD/RarePullCard.lua" "if okB and Bars then local okR,box=pcall(Bars.Reserved,w,h,m,nil);if okR and type(box)=='table'then list[#list+1]=box end end" ""
- mutate bonus_over_bars "$RSD/PityBars155.lua" " return rules.Place(setmetatable({HotbarBottom=m.HotbarBottom+rise},{__index=m}),w,h,boxes,more)" " return rules.Place(m,w,h,boxes,extra)"
- mutate bonus_not_lifted "$RSD/PityBars155.lua" " return rules.Place(setmetatable({HotbarBottom=m.HotbarBottom+rise},{__index=m}),w,h,boxes,more)" " return rules.Place(m,w,h,boxes,more)"
+ # (R157: ButtonSpot asks the rules with the lifted metrics, then slides the preferred spot sideways when an option of the open wheel is in it)
+ mutate bonus_over_bars "$RSD/PityBars155.lua" " local r=rules.Place(lifted,w,h,boxes,more)" " do return rules.Place(m,w,h,boxes,extra)end;local r"
+ mutate bonus_not_lifted "$RSD/PityBars155.lua" " local r=rules.Place(lifted,w,h,boxes,more)" " do return rules.Place(m,w,h,boxes,more)end;local r"
  mutate paints_every_frame "$RSD/PityBars155.lua" "   local changed=bar.Rev~=s.Rev" "   local changed=true"
  mutate hidden_paints "$RSD/PityBars155.lua" " if s.Placement and s.Root.Visible then" " if s.Placement then"
  mutate dimmed_pulses "$RSD/PityBars155.lua" " and not dimmed and bar.Pending==0" " and bar.Pending==0"

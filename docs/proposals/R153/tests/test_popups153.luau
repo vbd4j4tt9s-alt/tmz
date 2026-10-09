@@ -112,8 +112,12 @@ for _,sc in ipairs(screens)do
    local rect={X=hx+f.X-f.HW,Y=hy+f.Y-f.HH,W=f.HW*2,H=f.HH*2}
    if rect.X<0 or rect.Y<0 or rect.X+rect.W>w or rect.Y+rect.H>h then off+=1 end
    local soft=false
+   -- (R157: the owner-approved five-option menu wheel moves the MENU button up on the small phones - 568 x 320, 375 x 667, 320 x 568 - to fit DAILY / INVITE above the
+   -- bars, into the popups' fan around the head. The popups are a world-space BillboardGui, which Roblox draws under every ScreenGui: they pass BEHIND the MENU button,
+   -- which stays whole and pressable. A moved-up MENU button counts as an info row there; where it sits as before - the middle of the left edge - it stays a control.)
+   local movedHub=(m.MenuShiftY or 0)<0
    for _,b in ipairs(boxes)do if b.N~='OwnerTools'and inter(rect,b)then
-    if b.N=='Status'or b.N:sub(1,6)=='Wallet'then soft=true;softNames[b.N]=true else hudHits+=1;hudNames[b.N]=true end
+    if b.N=='Status'or b.N:sub(1,6)=='Wallet'or(b.N=='Hub'and movedHub)then soft=true;softNames[b.N]=true else hudHits+=1;hudNames[b.N]=true end
    end end
    if soft then softHits+=1 end
    total+=1

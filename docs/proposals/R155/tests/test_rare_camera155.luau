@@ -556,9 +556,12 @@ end
 
 -- 3. the SKIP button (R155, owner: "for some cutscenes u can skip it by spam clicking disable this feature and u can only skip at the bottom right
 -- of the screen") -----------------------------------------------------------------------------------------------------------------------------
+-- R157 (owner: "this skip is not placed at the correct spot it should be at the bottom right side of the screen ... the skip button only appears for secret and
+-- above"): a story scene (Secret / Cosmic / King) hides the whole HUD, so its pill sits in the safe area's corner, 14 px in, clear only of a thumb control that is really on
+-- screen (none here); a card that leaves the HUD up (Secret+ in place) keeps clear of the HUD boxes, 14 px from the edges (was 12); Common..Mythic have no pill at all.
 local Card=W.module('RarePullCard');local Hud=W.module('HudLayout')
-do -- where it goes: the bottom right of the safe area, clear of every HUD box (the hotbar and its details, the status / timer stack, the
- -- balances, a phone's thumb controls) by 8 px and of the screen's edge by 12 px; a thumb-sized target on a touch screen
+do -- where it goes (a card that leaves the HUD up): the bottom right of the safe area, clear of every HUD box (the hotbar and its details, the status / timer stack, the
+ -- balances, a phone's thumb controls) by 8 px and of the screen's edge by 14 px (R157: was 12); a thumb-sized target on a touch screen
  local screens={{1280,720,false,'desktop 1280x720'},{1920,1080,false,'desktop 1920x1080'},{1366,768,false,'laptop 1366x768'},{1024,600,false,'small window 1024x600'},
   {800,450,false,'narrow window 800x450'},{844,390,true,'phone 844x390'},{667,375,true,'phone 667x375'},{932,430,true,'phone 932x430'},
   {1024,768,true,'tablet 1024x768'},{1180,820,true,'tablet 1180x820'},{390,844,true,'phone portrait 390x844'}}
@@ -568,18 +571,22 @@ do -- where it goes: the bottom right of the safe area, clear of every HUD box (
   local x,y,bw,bh=Card.SkipRect(w,h,touch,boxes)
   local hits={};for _,b in ipairs(boxes)do if x<b.X+b.W+8 and x+bw>b.X-8 and y<b.Y+b.H+8 and y+bh>b.Y-8 then hits[#hits+1]=b.N end end
   local names_={};for _,b in ipairs(boxes)do names_[#names_+1]=b.N end
-  check(x>=12 and y>=12 and x+bw<=w-12 and y+bh<=h-12,fmt('%s: on screen, 12 px from its edges (%d,%d %dx%d)',tag,x,y,bw,bh))
+  check(x>=14 and y>=14 and x+bw<=w-14 and y+bh<=h-14,fmt('%s: on screen, 14 px from its edges (%d,%d %dx%d)',tag,x,y,bw,bh))
   check(#hits==0,fmt('%s: clear of every HUD box by 8 px (%s)%s',tag,table.concat(names_,' '),#hits>0 and' - overlaps '..table.concat(hits,' ')or''))
   check(x+bw/2>=w*.5 and y>=h*.45 and w-(x+bw)<=w*.35,fmt('%s: at the bottom right (right edge %d px from the screen\'s, top at %.0f %% of the height)',tag,w-(x+bw),100*y/h))
   check(bh>=(touch and 40 or 34)and bh<=48 and near(bw/bh,2.75,.05),fmt('%s: %d px high (at least %d: %s), a pill %.2f x its height',tag,bh,touch and 40 or 34,touch and'a thumb\'s target'or'a pointer\'s',bw/bh))
+  -- R157: a story scene hides the HUD: with no thumb control on screen its pill is the corner itself, 14 px from the right and bottom edges
+  local cx,cy,cw,ch=Card.SkipRect(w,h,touch,Card.ControlBoxes(nil))
+  check(cx==w-14-cw and cy==h-14-ch and cw==bw and ch==bh,fmt('%s, in a story scene: the corner, 14 px in (%d,%d %dx%d)',tag,cx,cy,cw,ch))
  end
 end
 do -- the real button, frame by frame at 60 fps: a card and a story scene, on a desktop and on a phone with a notch (its safe area), a gamepad on
  -- (and on screens the mock's GuiService:GetInsetArea - always 1280 x 720 - overstates: the button keeps to the screen itself)
  local Gui=W.Gui;local origInset=Gui.GetInsetArea
- for _,c in ipairs({{4,1280,720,false},{7,1280,720,false},{3,844,390,true,true},{8,844,390,true,true},{5,768,432,false},{6,844,390,true}})do
+ for _,c in ipairs({{4,1280,720,false},{7,1280,720,false},{3,844,390,true,true},{8,844,390,true,true},{5,768,432,false},{6,844,390,true},{6,1280,720,false,nil,true},{8,844,390,true,true,true}})do
   reset()
   local w,h=c[2],c[3];cam.ViewportSize=R.Vector2.new(w,h);W.UIS.TouchEnabled=c[4];W.UIS.KeyboardEnabled=not c[4];W.UIS.GamepadEnabled=true
+  X.player:SetAttribute('SettingSkipCutscenes',c[6]and true or nil) -- (R157: c[6]: Secret+ opened in place, its compact card keeps the HUD up)
   local area={X=0,Y=0,W=w,H=h}
   if c[5]then area={X=48,Y=0,W=w-96,H=h-21};Gui.GetInsetArea=function()return{Min=R.Vector2.new(area.X,area.Y),Width=area.W,Height=area.H}end end
   local run,bag=start(c[1]);local tl=run.TL;local hit=tl.Climax or tl.Burst
@@ -587,6 +594,20 @@ do -- the real button, frame by frame at 60 fps: a card and a story scene, on a 
   local function gui()return X.pg:FindFirstChild('RarePullReveal')end
   local early,shown,inside,badge,above,presses,box=false,0,true,true,true,0,nil
   local g=0
+  if c[1]<=5 then
+   -- R157: Common..Mythic: no SKIP pill at any time, spam clicks and Enter / B / R2 skip nothing; the result still waits to be collected
+   local pill=false
+   while not run.Done and run.Clock()<hit-.1 and g<3000 do
+    W.UIS.InputBegan:Fire({UserInputType=Enum.UserInputType.MouseButton1,KeyCode=Enum.KeyCode.Unknown,Position=V3(400,300,0)},false)
+    if M.Skip()then pill=true end
+    presses+=1;X.run(1/60,1/60);g+=1
+    if X.find(gui(),'Skip button')then pill=true end
+   end
+   check(tl.SkipFrom==nil and not pill and not run.Skipped,tag..': R157: a '..names[c[1]]..' card has no SKIP button and nothing skips it ('..presses..' clicks / presses)')
+   settle();restored(tag);bag:Destroy()
+   Gui.GetInsetArea=origInset;W.UIS.GamepadEnabled=false
+   continue
+  end
   while not run.Done and run.Clock()<math.min(tl.SkipFrom+.5,hit-.1)and g<3000 do
    -- a burst of clicks on the world every frame (a story scene: on its full-screen button too)
    W.UIS.InputBegan:Fire({UserInputType=Enum.UserInputType.MouseButton1,KeyCode=Enum.KeyCode.Unknown,Position=V3(400,300,0)},false)
@@ -597,14 +618,16 @@ do -- the real button, frame by frame at 60 fps: a card and a story scene, on a 
     if t<tl.SkipFrom then early=true end
     shown+=1
     local p,s=b.Position,b.Size;box={p.X.Offset,p.Y.Offset,s.X.Offset,s.Y.Offset}
-    if box[1]<area.X+12 or box[2]<area.Y+12 or box[1]+box[3]>area.X+area.W-12 or box[2]+box[4]>area.Y+area.H-12 or box[1]+box[3]/2<area.X+area.W/2 then inside=false end
+    if box[1]<area.X+14 or box[2]<area.Y+14 or box[1]+box[3]>area.X+area.W-14 or box[2]+box[4]>area.Y+area.H-14 or box[1]+box[3]/2<area.X+area.W/2 then inside=false end
+    -- R157: a story scene's pill is the safe area's corner itself, 14 px in (no HUD on screen, no thumb control here)
+    if run.Kind=='Scene'and(box[1]~=area.X+area.W-14-box[3]or box[2]~=area.Y+area.H-14-box[4])then inside=false end
     local pad=b:FindFirstChild('Gamepad B');if not(pad and pad.Visible)then badge=false end
     if b.Parent~=gui()or(bd and not(b.ZIndex>bd.ZIndex))then above=false end
    end
   end
   check(not early and shown>0,tag..': it shows from SkipFrom ('..fmt('%.2f',tl.SkipFrom)..' s), not before')
   check(not run.Skipped and run.Clock()>tl.SkipFrom+.3,tag..': '..presses..' spam clicks (one a frame from the first frame) never skip')
-  check(inside,tag..': inside the safe area, at its bottom right ('..(box and fmt('%d,%d %dx%d',box[1],box[2],box[3],box[4])or'-')..')')
+  check(inside,tag..': inside the safe area, at its bottom right'..(run.Kind=='Scene'and' (R157: the corner itself, 14 px in)'or' (14 px in)')..' ('..(box and fmt('%d,%d %dx%d',box[1],box[2],box[3],box[4])or'-')..')')
   check(badge,tag..': with a gamepad its B badge shows (B / R2 press it)')
   check(above,tag..': on the reveal\'s screen'..(run.Kind=='Scene'and', above the story scene\'s full-screen button'or''))
   local b=X.find(gui(),'Skip button');b.Activated:Fire()
@@ -613,7 +636,7 @@ do -- the real button, frame by frame at 60 fps: a card and a story scene, on a 
   while not run.Done and run.Clock()<L.ShownAt(tl)+.5 and g<6000 do X.run(1/60,1/60);g+=1;if run.Clock()>hit+.12 and b.Visible then gone=false end end
   check(gone and run.SawResult,tag..': it is gone once the hit has played; the result is up')
   settle();restored(tag);bag:Destroy()
-  Gui.GetInsetArea=origInset;W.UIS.GamepadEnabled=false
+  Gui.GetInsetArea=origInset;W.UIS.GamepadEnabled=false;X.player:SetAttribute('SettingSkipCutscenes',nil)
  end
 end
 -- 3b. Shift Lock and first person (R155 review): the mouse is locked to the middle of the screen there, so nothing on it could be clicked and the pill was dead for those
@@ -627,8 +650,10 @@ do
  end
  local Bars=W.module('PityBars155');local HudL=W.module('HudLayout')
  local inputs={{'keyboard',{Keyboard=true}},{'gamepad',{Gamepad=true}},{'keyboard and gamepad',{Keyboard=true,Gamepad=true}},{'touch',{Touch=true}}}
- for _,c in ipairs({{4,'Legendary card'},{7,'Cosmic scene'}})do for _,inp in ipairs(inputs)do
+ -- (R157: the Legendary card has no pill any more: the card with a pill is Secret's compact card, opened in place with "Skip pack animations" on)
+ for _,c in ipairs({{6,'Secret card in place',true},{7,'Cosmic scene'}})do for _,inp in ipairs(inputs)do
   reset();UIS.TouchEnabled=inp[2].Touch==true;UIS.KeyboardEnabled=inp[2].Keyboard==true;UIS.GamepadEnabled=inp[2].Gamepad==true
+  X.player:SetAttribute('SettingSkipCutscenes',c[3]and true or nil)
   local run,bag=start(c[1]);local tl=run.TL;local hit=tl.Climax or tl.Burst
   local tag=fmt('the SKIP button, %s, %s',c[2],inp[1])
   local shown,early,wrong,keyN,padN,both,maxModal,keyText,overBars=0,0,0,0,0,0,0,nil,0
@@ -660,7 +685,7 @@ do
   else check(keyN==0 and padN==0,tag..': a touch screen shows neither key') end
   check(both==0,tag..': never both badges')
   check(overBars==0,tag..': never over the pity bars ('..overBars..' frames)')
-  settle();bag:Destroy()
+  settle();bag:Destroy();X.player:SetAttribute('SettingSkipCutscenes',nil)
   check(modalButtons()==0,tag..': when the opening is over no modal button is left (the mouse lock is back)')
  end end
  -- every way out hands the mouse back (the button hidden, or destroyed): while it was showing and pressed, aborted, the player dying, the next pack replacing it, the script going
@@ -672,8 +697,9 @@ do
   {'the next pack replacing it',function()local _,b2=start(5);X.run(.1,1/60)end},
   {'left to run out and collected',function(run)X.run(run.TL.Length+.5,1/60)end},
  }
- for _,c in ipairs({{4,'Legendary card'},{7,'Cosmic scene'}})do for _,e in ipairs(exits)do
+ for _,c in ipairs({{6,'Secret card in place',true},{7,'Cosmic scene'}})do for _,e in ipairs(exits)do
   reset();UIS.TouchEnabled=false;UIS.KeyboardEnabled=true;UIS.GamepadEnabled=false
+  X.player:SetAttribute('SettingSkipCutscenes',c[3]and true or nil)
   local run,bag=start(c[1]);X.run(run.TL.SkipFrom+.3,1/60)
   local tag=fmt('the SKIP button, %s, %s',c[2],e[1])
   check(modalButtons()==1,tag..': (up and modal: one visible modal button)')
@@ -683,13 +709,13 @@ do
   check(modalButtons()==pills and(M.Active()or pills==0),tag..fmt(': the mouse is free exactly while a pill shows (%d pills, %d modal, the opening %s)',pills,modalButtons(),M.Active()and'goes on'or'is over'))
   settle();X.run(.6,1/60)
   check(modalButtons()==0,tag..': ... and none left when it is all over ('..modalButtons()..')')
-  bag:Destroy()
+  bag:Destroy();X.player:SetAttribute('SettingSkipCutscenes',nil)
  end end
  reset()
  -- the card makes nothing per frame for the pill: no UDim2, no service lookup (a probe card driven by hand, the keyboard on)
  UIS.KeyboardEnabled=true;UIS.GamepadEnabled=false
  local probe=R.new('ScreenGui');probe.Name='SkipProbe';probe.Parent=X.pg
- local card=Card.Create(probe,'Ladder',{Rank=4,Skip=true,SeedName='Probe',Odds='1 in 100'})
+ local card=Card.Create(probe,'InPlace',{Rank=6,Skip=true,SeedName='Probe',Odds='1 in 100'}) -- (R157: a pill is Secret+'s: the compact card)
  local ptl={SkipFrom=.3,Burst=6}
  card:_skip(2,ptl);card:_skip(2.01,ptl)
  local udim,svc=0,0

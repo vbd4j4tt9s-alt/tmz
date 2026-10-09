@@ -501,6 +501,7 @@ paintHeld=function()
  for i,b in ipairs(slots)do local want=k~=nil and State.Slots[i]==k;if b:GetAttribute('Selected')~=want then b:SetAttribute('Selected',want)end end
  for rowKey,b in pairs(rows)do local want=rowKey==k;if b:GetAttribute('Selected')~=want then b:SetAttribute('Selected',want)end end
  selectedLabel.Text=h and weighedName(h)or'';selectedTraits.Text=h and traits(h)or'';Traits.Style(selectedTraits,Traits.Tool(h));decorate(selectedLabel,h,14)
+ local at=selectedTraits.Position;selectedLabel.Position=UDim2.new(at.X.Scale,at.X.Offset,0,at.Y.Offset-(selectedTraits.Text~=''and 26 or 10)) -- (R157: no traits line: the name drops into its row, right over the bars)
 end
 -- R112: identical packs, seeds and fruit share one card/slot with a count; tools stay separate. (R155: the key is InventoryStacks155.Key, shared with the server's discard)
 local freeCards={}
@@ -614,6 +615,7 @@ refresh=function()
  selectedLabel.Text=selectedTool and weighedName(selectedTool)or''
  selectedTraits.Text=selectedTool and traits(selectedTool)or'';Traits.Style(selectedTraits,Traits.Tool(selectedTool))
  decorate(selectedLabel,selectedTool,14)
+ local at=selectedTraits.Position;selectedLabel.Position=UDim2.new(at.X.Scale,at.X.Offset,0,at.Y.Offset-(selectedTraits.Text~=''and 26 or 10)) -- (R157: the name over the bars, see layout)
  for i,b in ipairs(slots)do guard('a slot',function()
   local e=items[State.Slots[i]];local tool=e and e.Tool
   b.ItemName.Text=tool and Names.Tool(tool,Catalog)or'';tint(b.ItemName,tool and rarity(tool)or'Common')
@@ -640,7 +642,10 @@ local function hudBoxes(m,w,h)
  -- R129: on landscape phones the balances, timers, menu stack and BASE/TRACK hide while the Bag is open (SeedMenu), so
  -- the sheet only has to clear the hotbar and the jump button.
  if shared and m.PhoneWide then local out={};for _,x in ipairs(shared(m,w,h,false))do if x.N=='Hotbar'or x.N=='Jump'then out[#out+1]=x end end;return out end
- if shared then local b=shared(m,w,h,false);local t=m.Travel;if t then table.insert(b,{X=t.X,Y=t.Y,W=t.W,H=t.H})end;return b end
+ -- R157: R113's BASE / TRACK spot beside the MENU button is gone (the real pair lives in the top bar row). The MENU button hides while a menu is open (HudLayout.Navigation:
+ -- SeedMenu), so the sheet need not keep clear of it; on a portrait phone, where the five-option wheel moves it up into the column the category cards use (320 x 568), the
+ -- sheet keeps clear of the middle of the left edge, where it was before, so the Bag's layout does not change with the wheel
+ if shared then local out=shared(m,w,h,false);for _,x in ipairs(out)do if x.N=='Hub'and m.PhonePortrait then x.Y=h/2-x.H/2 end end;return out end
  local b={{X=m.MenuX,Y=h/2+(m.MenuShiftY or 0)-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}}
  local bar=(m.Slots+1)*m.SlotSize+m.Slots*6
  table.insert(b,{X=w/2+(m.HotbarShiftX or 0)-bar/2,Y=h-m.HotbarBottom-m.SlotSize,W=bar,H=m.SlotSize})
@@ -714,6 +719,14 @@ layout=function()
  visibleSlots=metrics.Slots;if State.Visible~=visibleSlots then State.Visible=visibleSlots;listDirty=true;queue()end -- (R155: an item on a slot this screen does not show is a Bag item here)
  local gap=6;local side=metrics.SlotSize
  dock.Position=UDim2.new(.5,metrics.HotbarShiftX or 0,1,-metrics.HotbarBottom);dock.Size=UDim2.fromOffset((visibleSlots+1)*side+visibleSlots*gap,side)
+ -- R157 (pity bars v2): the held item's name and traits rows sit ABOVE the pity bars, which sit just over the slots: PityBars155 writes how far up their top edge is
+ -- (the PlayerGui attribute PityBarsRow; without the bars 2 px, R155's place); at most HudLayout.NameWidth wide, centred (the text is centred). With no traits line
+ -- the name drops into the traits row, right over the bars (paintHeld / refresh keep that up as the text changes).
+ do
+  local row=tonumber(pg:GetAttribute('PityBarsRow'))or 2;local nameWidth=math.min((visibleSlots+1)*side+visibleSlots*gap,require(RS.HudLayout).NameWidth or 240)
+  selectedTraits.Size=UDim2.fromOffset(nameWidth,16);selectedTraits.Position=UDim2.new(.5,-nameWidth/2,0,-(row+16))
+  selectedLabel.Size=UDim2.fromOffset(nameWidth,26);selectedLabel.Position=UDim2.new(.5,-nameWidth/2,0,-(row+(selectedTraits.Text~=''and 42 or 26)))
+ end
  local nameHeight=math.max(12,math.floor(side*.3));local small=math.max(8,math.floor(side*.15))
  for i,b in ipairs(slots)do b.Visible=i<=visibleSlots;b.Size=UDim2.fromOffset(side,side);b.Position=UDim2.fromOffset((i-1)*(side+gap),0)
   -- R112: picture fills the slot above a two-line name strip; weight and count sit on the picture's lower edge.
@@ -886,7 +899,7 @@ end
 Inv.Start({player=player,pg=pg,gui=gui,dock=dock,panel=panel,open=open,scroll=scroll,search=search,slots=slots,rows=rows,State=State,Names=Names,Catalog=Catalog,Theme=Theme,C=C,
  refresh=function()refresh()end,toggle=toggle,equip=function(k,how)equip(k,how)end,note=note,cover=cover,corner=corner,button=button}) -- R155: the Bag bar, tap-tap, discarding, the saved layout
 local stopHudLayout=require(RS.HudLayout).Watch(gui,layout)
-connect(pg:GetAttributeChangedSignal('HudNoticeBottom'),layout);refresh()
+connect(pg:GetAttributeChangedSignal('HudNoticeBottom'),layout);connect(pg:GetAttributeChangedSignal('PityBarsRow'),layout);refresh() -- (R157: the name rows follow the pity bars)
 for attempt=1,5 do local okay=pcall(function()StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)end);if okay then break end;task.wait(.2)end
 script.Destroying:Connect(function()
  if glowConn then glowConn:Disconnect();glowConn=nil end

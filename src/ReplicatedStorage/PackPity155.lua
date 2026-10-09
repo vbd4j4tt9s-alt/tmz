@@ -89,16 +89,21 @@ function P.ShortText(group,count)
  return ('%d/%d %s'):format(count,P.Every,group=='Event'and'event'or P.Name.Normal)
 end
 function P.NoticeText(group)
- return group=='Event'and'💜 LUCKY EVENT PACK! x1.5 luck on this one!'or'🍀 LUCKY PACK! x1.5 luck on this one!'
+ return group=='Event'and'⭐ LUCKY EVENT PACK! x1.5 luck on this one!'or'🍀 LUCKY PACK! x1.5 luck on this one!'
 end
 -- the tag on the reveal card of a lucky pack
-function P.TagText(group)return group=='Event'and'💜 LUCKY EVENT PACK! x1.5 luck'or'🍀 LUCKY PACK! x1.5 luck'end
+function P.TagText(group)return group=='Event'and'⭐ LUCKY EVENT PACK! x1.5 luck'or'🍀 LUCKY PACK! x1.5 luck'end
 P.PopText='LUCKY PACK! x1.5 luck'
 P.PopShort='LUCKY! x1.5'
--- Colours: NORMAL pity gold, EVENT pity purple ({Light, Deep, Glow, Ink}).
+-- Colours (R157; the R156 preview, owner: "the icon for the pity bars should also the clover and make them a colour that pairs well with the clover"; then: NORMAL = clover
+-- GREEN, EVENT = GOLD AND GREEN; the owner picked shade 1 "Fresh", the clover picture's own lime / leaf green). Each group: Light / Deep (the fill's gradient, top / bottom), Glow
+-- (the 9/10 halo and the pop), Ink (the text's outline and the tag's), Track (the empty part of the bar, tinted: the second cue next to the fill's hue), Rim / RimHot (the bar's
+-- edge at rest / held or 9/10), Badge (the dark disc the clover sits on, so it reads over the fill too). NORMAL = a green fill in a green-black track; EVENT = a gold fill in a
+-- warm-black track with a clover-green rim: the fills are 70-100 deg of hue AND 27-33 L* apart (the gold is pale, the green leaf-dark), so greyscale and colour-blind viewers
+-- still see two bars (docs/proposals/R156/pity_bars_v2.md).
 local RGB=Color3.fromRGB
 P.Colors={
- Normal={Light=RGB(255,232,120),Deep=RGB(236,152,22),Glow=RGB(255,206,64),Ink=RGB(92,52,4)},
- Event={Light=RGB(214,162,255),Deep=RGB(122,56,224),Glow=RGB(186,110,255),Ink=RGB(44,12,84)},
+ Normal={Light=RGB(110,215,70),Deep=RGB(10,120,36),Glow=RGB(170,255,110),Ink=RGB(6,52,18),Track=RGB(8,36,16),Rim=RGB(96,206,60),RimHot=RGB(214,255,160),Badge=RGB(6,46,18)},
+ Event={Light=RGB(255,242,150),Deep=RGB(255,192,44),Glow=RGB(255,214,70),Ink=RGB(66,42,2),Track=RGB(40,30,8),Rim=RGB(70,196,52),RimHot=RGB(150,244,80),Badge=RGB(6,46,18)},
 }
 return P

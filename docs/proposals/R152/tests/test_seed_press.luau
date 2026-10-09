@@ -116,6 +116,13 @@ local function skipButton()local b=X.find(X.pg,'Skip button');if b and b.Visible
 -- (a press during the animation: R2 is the SKIP button's key and skips; a click / tap does nothing, then the SKIP button skips)
 local function skipWith(run,how,press,tag,what)
  press()
+ if run.TL.SkipFrom==nil then
+  -- R157 (owner: "the skip button only appears for secret and above"): a Common..Mythic card has no SKIP button: R2 / a click / a tap skip nothing, and the press is
+  -- still the reveal's (the tool does nothing)
+  X.run(.15);skipButton()
+  check(not run.Skipped and X.find(X.pg,'Skip button')==nil and what(),tag..': R157: a '..how..' during the animation neither skips (no SKIP button on a Common..Mythic card) nor reaches the tool')
+  return
+ end
  if how=='R2'then check(run.Skipped==1 and what(),tag..': R2 (the SKIP button\'s key, through the tool\'s own action) skips the card, '..'and the tool does nothing')
  else
   check(not run.Skipped and what(),tag..': R155: a '..how..' during the animation neither skips nor reaches the tool')
@@ -146,8 +153,8 @@ for _,how in ipairs({'click','tap','R2'})do
  X.run(.5)
  local run,bag=start(4);local tl=run.TL;local tag='planting ('..how..') under a Legendary card'
  X.run(.1);p0=placed;press()
- check(placed==p0 and not run.Skipped,tag..': R155: from the card\'s first frame a press is the reveal\'s: it plants nothing, nor skips (before '..tl.SkipFrom..' s)')
- untilClock(run,tl.SkipFrom+.1);p0=placed
+ check(placed==p0 and not run.Skipped,tag..': R155: from the card\'s first frame a press is the reveal\'s: it plants nothing, nor skips (before '..(tl.SkipFrom or L.CardSkipFrom)..' s)')
+ untilClock(run,(tl.SkipFrom or L.CardSkipFrom)+.1);p0=placed -- (R157: where R153's card skip began)
  skipWith(run,how,press,tag,function()return placed==p0 end)
  untilClock(run,L.ShownAt(tl)+.1);p0=placed;press()
  check(not run.Collected and placed==p0,tag..': a press as the result lands (it only lands: R154) plants nothing either')
@@ -158,6 +165,19 @@ for _,how in ipairs({'click','tap','R2'})do
  gone(run,bag)
  p0=placed;press();check(placed==p0+1,tag..': the card gone, the next press plants as before')
 end
+-- (R157: a card that can still be skipped - Secret opened in place, a keeper near - R2 through the seed's own action skips it, and plants nothing)
+do
+ reset();hold(seed);aim='soil';X.keeper(V3(25,3,100),{})
+ local press=function()r2('GardenPlaceSeed')end
+ local run,bag=start(6);local tl=run.TL;local tag='planting (R2) under a Secret card in place'
+ check(run.Kind=='InPlace'and tl.SkipFrom~=nil,tag..': (the compact card, skippable)')
+ untilClock(run,tl.SkipFrom+.1);local p0=placed
+ skipWith(run,'R2',press,tag,function()return placed==p0 end)
+ untilClock(run,L.ShownAt(tl)+.3);press()
+ check(run.Collected and placed==p0,tag..': the press that collects it plants nothing either')
+ gone(run,bag)
+ for _,k in ipairs(W.CS:GetTagged('BiomeKeeper'))do k:Destroy()end
+end
 -- 2. the shovel ---------------------------------------------------------------------------------------------------------------------------------
 local function shovelOpen()return shovelBox~=nil and shovelBox.Visible==true end
 local function shovelClose()X.pg:SetAttribute('SeedMenu',nil);X.run(.1)end
@@ -167,7 +187,7 @@ for _,how in ipairs({'click','tap','R2'})do
  local press=how=='click'and click or how=='tap'and tap or function()r2('GardenShovelRemove')end
  press();check(shovelOpen(),'shovel ('..how..'): no reveal: a press on my plant opens the removal dialog, as before');shovelClose()
  local run,bag=start(3);local tl=run.TL;local tag='shovel ('..how..') under a Rare card'
- untilClock(run,tl.SkipFrom+.1);local r0=removes
+ untilClock(run,(tl.SkipFrom or L.CardSkipFrom)+.1);local r0=removes
  skipWith(run,how,press,tag,function()return not shovelOpen()and X.pg:GetAttribute('SeedMenu')==nil end)
  untilClock(run,L.ShownAt(tl)+.3);press()
  check(run.Collected and not shovelOpen()and removes==r0,tag..': the press that collects it (R154) opens none either, and nothing is removed')
@@ -183,7 +203,7 @@ do
   local d0=digs;press();check(digs==d0+1,'digging ('..how..'): no reveal: a press on the track digs, as before')
   X.run(.5)
   local run,bag=start(2);local tl=run.TL;local tag='digging ('..how..') under an Uncommon card'
-  untilClock(run,tl.SkipFrom+.1);d0=digs
+  untilClock(run,(tl.SkipFrom or L.CardSkipFrom)+.1);d0=digs
   skipWith(run,how,press,tag,function()return digs==d0 end)
   untilClock(run,L.ShownAt(tl)+.3);press()
   check(run.Collected and digs==d0,tag..': nor the one that collects it (R154)')
@@ -201,7 +221,7 @@ for _,how in ipairs({'click','tap'})do
  local press=how=='click'and click or tap
  press();check(giftOpen(),'giving ('..how..'): no reveal: a press on a nearby player asks to give, as before');giftClose()
  local run,bag=start(5);local tl=run.TL;local tag='giving ('..how..') under a Mythic card'
- untilClock(run,tl.SkipFrom+.1)
+ untilClock(run,(tl.SkipFrom or L.CardSkipFrom)+.1)
  skipWith(run,how,press,tag,function()return not giftOpen()end)
  untilClock(run,L.ShownAt(tl)+.3);press()
  check(run.Collected and not giftOpen()and gifts==0,tag..': nor the one that collects it (R154); nothing is given')
@@ -216,7 +236,7 @@ for _,t in ipairs({packTool,bat})do
  local log={}
  local function sample(label)log[label]=t.ManualActivationOnly end
  X.run(.1);sample('early')
- untilClock(run,tl.SkipFrom+.1);sample('armed')
+ untilClock(run,(tl.SkipFrom or L.CardSkipFrom)+.1);sample('armed')
  click();X.run(1/30);sample('justClicked') -- (R155: a click never skips; the card keeps every press until it is collected)
  untilClock(run,hit+.1);sample('hitToResult')
  untilClock(run,L.ShownAt(tl)+.3);sample('closeable')
@@ -226,7 +246,7 @@ for _,t in ipairs({packTool,bat})do
  hold(t);X.run(1/30);sample('back')
  click();gone(run,bag)
  check(log.early==true,tag..': R155: from the card\'s first frame its clicks are the reveal\'s, not the tool\'s (ManualActivationOnly on, this client only)')
- check(log.armed==true,tag..': while it can be skipped (by the SKIP button) too')
+ check(log.armed==true,tag..': past where R153\'s card skip began too (R157: a Mythic card has no SKIP button; the press is still the reveal\'s)')
  check(log.justClicked==true and not run.Skipped,tag..': a click on the world skips nothing and still does not reach the tool')
  check(log.hitToResult==true,tag..': between the hit and the result too')
  check(log.closeable==true,tag..': once the result is shown (a click collects it) held again')

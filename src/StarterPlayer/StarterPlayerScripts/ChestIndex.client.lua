@@ -153,8 +153,7 @@ local function updateAlerts()
  -- The INDEX button's count: 9 px of the badge hang past the button's corner; the wheel's CanvasGroup (HudLayout) keeps NotifyBadge151.Margin around the button, which holds it.
  -- R150 review: the badge pops SILENTLY (as in R149). A chime here fired the moment the server opened a pack (OpenSeedPack commits the seed's reward at once), before the reveal shows the seed.
  Badge.Set(Badge.Make(toggle,'RewardBadge',Badge.Sizes.Count,Badge.Overhang.Count),Badge.Text(total),total>0,grew)
- local nav=pg:FindFirstChild('GardenNavigation');local hub=nav and nav:FindFirstChild('MenuButton')
- if hub then Badge.Set(Badge.Make(hub,'IndexRewardAlert',Badge.Sizes.Alert,Badge.Overhang.Alert),'!',total>0,grew)end
+ pg:SetAttribute('MenuAlertIndex',total) -- R157: HudLayout draws the MENU button's "!" for the Index and DAILY rewards together (it pops when the sum grows)
  alertTotal=total
 end
 local alertQueued=false

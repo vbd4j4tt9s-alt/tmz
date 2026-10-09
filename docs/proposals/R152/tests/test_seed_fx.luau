@@ -393,11 +393,13 @@ for rank=6,8 do
  end
 end
 -- R153: a card the player skipped and closed (Common..Mythic, a story tier in place) leaves nothing either (R154: closed = collected)
+-- (R157: a Common..Mythic card cannot be skipped: a press before its hit does nothing, it plays out and is collected; it leaves nothing either)
 for _,c in ipairs({{1,false},{4,false},{5,false},{6,true},{8,true}})do
  reset();if c[2]then X.keeper(V3(25,3,100),{})end
  local base=set(fxIn(W.workspace))
- local run=start(c[1]);local tl=run.TL;local tag=names[c[1]]..(c[2]and' in place'or' card')..' skipped and closed'
- X.run(tl.SkipFrom+.1);check(M.Skip(),tag..': skipped to the hit')
+ local run=start(c[1]);local tl=run.TL;local tag=names[c[1]]..(c[2]and' in place'or' card')..(c[1]<=5 and' pressed (no skip) and collected'or' skipped and closed')
+ if c[1]<=5 then X.run(L.CardSkipFrom+.1);check(tl.SkipFrom==nil and not M.Skip()and not run.Skipped,tag..': R157: nothing to skip')
+ else X.run(tl.SkipFrom+.1);check(M.Skip(),tag..': skipped to the hit')end
  X.run(L.ShownAt(tl)-run.Clock()+M.CollectAfter+.05);check(M.Skip()and run.Collected,tag..': collected once the result was shown')
  X.run(1);collectOut()
  check(M.Active()==nil and X.pg:FindFirstChild('RarePullReveal')==nil and cam:FindFirstChild('RarePullGrade')==nil and M.Fading()==0,tag..': no card, GUI or colour grade left')

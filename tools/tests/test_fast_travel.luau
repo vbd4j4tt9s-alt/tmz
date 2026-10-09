@@ -113,10 +113,11 @@ check(trackButton.Position.X.Offset==baseButton.Size.X.Offset+8,'TRACK beside BA
 local function inside()local half=pair.Size.X.Offset/2;local x=pair.Position.X.Offset;local i=Gui.TopbarInset;return x-half>=i.Min.X and x+half<=i.Max.X end
 check(inside(),'pair stays between Roblox buttons (PC)')
 inset(60,0,330,44);gui.AbsoluteSize=R.Vector2.new(390,844);frames()
-do -- R140: the DAILY / INVITE squares share the row: the pair narrows, then the row slides left, so the GROUP is centred and fits
- local icons=gui.TopIcons;local left=pair.Position.X.Offset-pair.Size.X.Offset/2;local right=icons.Position.X.Offset+icons.Size.X.Offset
- check(inside()and baseButton.Size.Y.Offset>=30 and baseButton.Size.X.Offset>=72 and icons.Position.Y.Offset<44 and left>=60+8 and right<=330-8
-  and math.abs((left+right)/2-195)<=1,'phone: the pair + DAILY / INVITE row is centred and fits')
+do -- R140: the DAILY / INVITE squares shared the row (the pair narrowed, the GROUP centred); R157: DAILY / INVITE are options of the menu wheel, so the row holds
+ -- BASE / TRACK alone: no squares, the pair centred on the screen and inside the free part of the row
+ local left=pair.Position.X.Offset-pair.Size.X.Offset/2;local right=left+pair.Size.X.Offset
+ check(gui:FindFirstChild('TopIcons')==nil and inside()and baseButton.Size.Y.Offset>=30 and baseButton.Size.X.Offset>=72 and left>=60+8 and right<=330-8
+  and math.abs(pair.Position.X.Offset-195)<=1,'phone: the pair (R157: alone, no DAILY / INVITE squares) is centred and fits')
 end
 inset(150,0,330,44);gui.AbsoluteSize=R.Vector2.new(390,844);frames()
 check(inside()and pair.Position.X.Offset==240,'screen centre too close to Roblox buttons: centres in the free row')

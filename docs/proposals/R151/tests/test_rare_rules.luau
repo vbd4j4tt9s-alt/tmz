@@ -217,7 +217,9 @@ end
 -- R153: the player's "Skip pack animations": the in-place result card even when safe; every card is skippable (from SkipFrom), the story
 -- scenes as before; and the short (quick) timing is the setting's alone (no window after the last reveal)
 do local s=table.clone(safe);s.SkipCutscenes=true;check(L.Decide(s)=='InPlace','R153: "Skip pack animations" on: the in-place result card, never the story scene')end
-for rank=1,5 do local tl=L.CardTimeline(rank);check(tl.SkipFrom and tl.SkipFrom>0 and tl.SkipFrom<tl.Burst-.02 and tl.SkipFrom<tl.FloatEnd,names[rank]..': the card can be skipped from '..tostring(tl.SkipFrom)..' s, before its hit')end
+-- R157 (owner: "the skip button only appears for secret and above"): the Common..Mythic card has NO SkipFrom (no SKIP button; its result is still collected), with or
+-- without the quick timing; Secret / Cosmic / King keep theirs (below, and the story scenes)
+for rank=1,5 do for _,quick in ipairs({false,true})do local tl=L.CardTimeline(rank,quick);check(tl.SkipFrom==nil and tl.Burst>0 and tl.FloatEnd>tl.Burst,names[rank]..(quick and' (quick)'or'')..': R157: the card cannot be skipped (no SkipFrom: '..tostring(tl.SkipFrom)..')')end end
 for rank=6,8 do for _,v in ipairs({'InPlace','Result'})do local tl=L.Timeline(rank,v);check(tl.SkipFrom and tl.SkipFrom<tl.FloatEnd,names[rank]..' '..v..': skippable too ('..tostring(tl.SkipFrom)..' s)')end end
 check(L.QuickWindow==nil and L.QuickFor(nil)==false,'R153: no quick window: without the setting a reveal is never short')
 -- 7. odds ------------------------------------------------------------------------------------------------------------------------------

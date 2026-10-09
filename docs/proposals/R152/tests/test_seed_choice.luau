@@ -285,13 +285,38 @@ local function skipCase(rank,variant,how,close)
  local gf=0;while Collect.Flying()>0 and gf<200 do step(o);gf+=1 end
  X.run(.3);World.Clear();X.run(.1);clean(tag)
 end
-for rank=1,5 do skipCase(rank,'Ladder',({'skip button','ButtonB','skip button','ButtonR2','Return'})[rank],rank==5 and'ButtonR2'or rank==2 and'tap'or'click')end
+-- R157 (owner: "the skip button only appears for secret and above"): a Common..Mythic card has no SKIP button and no SkipFrom: no press skips it (the SKIP button's keys B / R2 /
+-- Enter, a click, a tap); its result shows at its own time and the press after that collects it; the pack in the world is told of no jump
+local function noSkipCase(rank,how,close)
+ reset()
+ local o=open(rank);local run=o.Run;o.Track={}
+ local tag=names[rank]..' Ladder, not skippable ('..how..'; collected with '..close..')'
+ if not check(run and run.Kind=='Ladder',tag..': starts as Ladder ('..tostring(run and run.Kind)..')')then finish(o);return end
+ local tl=run.TL;local hit=tl.Burst;local shownAt=L.ShownAt(tl)
+ local g=0;local spam=rank%2==0 and'tap'or'click'
+ while run.Clock()<hit-.12 and g<400 do press(o,spam);press(o,how);step(o);g+=1 end
+ check(tl.SkipFrom==nil and not run.Skipped and X.find(revealGui(),'Skip button')==nil and(L.Shift(o.Bag)or 0)==0,tag..': R157: '..g..' '..spam..'s and presses before the hit skip nothing; no SKIP button; the pack in the world keeps its own pace')
+ untilClock(o,run,shownAt+M.CollectAfter+.05)
+ check(not run.Skipped and not run.Collected and titleShown()and oddsFinal(run),tag..': the result is up at its own time and waits')
+ local pressAt=R.clock
+ press(o,close)
+ check(run.Collected and not run.Skipped,tag..': the press after it collects it (the seed flies home)')
+ local g2=0;while M.Active()==run and g2<200 do step(o);g2+=1 end
+ check(run.Done and R.clock-pressAt<=M.FadeSeconds+.1,tag..': it is gone after its fade ('..string.format('%.2f',R.clock-pressAt)..' s)')
+ local g3=0;while o.Bag.Parent and g3<400 do step(o);g3+=1 end
+ check(o.EndedAt and near(o.EndedAt-o.At,o.Duration,.05),tag..': the server ended the opening at its full RevealDuration ('..string.format('%.2f',o.Duration)..' s)')
+ local gf=0;while Collect.Flying()>0 and gf<200 do step(o);gf+=1 end
+ X.run(.3);World.Clear();X.run(.1);clean(tag)
+end
+for rank=1,5 do noSkipCase(rank,({'skip button','ButtonB','skip button','ButtonR2','Return'})[rank],rank==5 and'ButtonR2'or rank==2 and'tap'or'click')end
 for rank=6,8 do skipCase(rank,'Full',rank==7 and'B key'or rank==8 and'R2 key'or'skip button',rank==8 and'R2 key'or'button')end
 for rank=6,8 do skipCase(rank,'InPlace',rank==7 and'ButtonB'or rank==6 and'skip button'or'Return','ButtonB')end
 -- presses that are not the player's choice to skip
 do
- reset()
- local o=open(5);local run=o.Run
+ -- (R157: the card with a SKIP button is a story tier's compact card: Secret opened in place, a keeper near)
+ reset();X.keeper(V3(25,3,100),{})
+ local o=open(6);local run=o.Run
+ check(run and run.Kind=='InPlace'and run.TL.SkipFrom==L.CardSkipFrom,'(R157: the pressed card is Secret in place; its SKIP button shows from CardSkipFrom)')
  -- the clicks that opened the pack go on for a moment (a run of clicks .1 s apart through SkipFrom): never a skip
  for _=1,6 do click();step(o);step(o);step(o)end
  check(run.Clock()>=L.CardSkipFrom and not run.Skipped,'a run of clicks (the opening clicks going on past SkipFrom) never skips')
@@ -356,7 +381,7 @@ do
    check(at and near(at,unskipped+margin,.1),tag..': it waits for the full reveal\'s seed ('..string.format('%.2f',at and at-o.At or -1)..' s)')
   end
  end
- for _,rank in ipairs({4,5})do trial(rank,'Ladder',false);trial(rank,'Ladder',true)end
+ for _,rank in ipairs({4,5})do trial(rank,'Ladder',false)end -- (R157: a Common..Mythic card is never skipped: its line always waits for the full reveal's seed)
  for _,rank in ipairs({6,8})do trial(rank,'Full',false);trial(rank,'Full',true);trial(rank,'InPlace',true)end
  reset();clean('chat')
 end

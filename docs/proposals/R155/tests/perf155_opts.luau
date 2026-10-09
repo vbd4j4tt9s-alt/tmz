@@ -10,11 +10,30 @@
 --    RarePullReveal screen, and what is under it), and the corner hint ('Skip hint') for as long as it is not the collect hint: R154 wrote
 --    "CLICK TO SKIP" / "TAP TO SKIP" there from SkipFrom to the hit, R155 leaves it empty and hidden. From the moment it says "click to collect!" /
 --    "tap to collect!" it is compared in full again.
+--  * R157 (the owner-approved R156 reveal fixes: "reduce the size of the seed display so it fits perfectly between the base buttons and the hotbar", "the click to
+--    collect should be below the fruit name"): WHERE the card's pieces are - the Position and Size of the rarity word (and its dressing), the seed's viewport, glow and
+--    halo, its rays and ring, "1 in N", the seed's name and the hint, under RarePullReveal/RarePull - is fitted to the screen on a Common..Mythic card and moved on a
+--    story result ("1 in N" and the name up a little, the hint under the name); the hint, centred under the name now, also anchors at its middle and centres its text
+--    (AnchorPoint, TextXAlignment: it was right-aligned in the corner); and the collected seed's flight home (SeedCollect154: the card's seed viewport, moved to the
+--    SeedCollectFly screen) starts where and as big as the fitted card showed it, so its Position and Size differ on the first frames of the flight (it lands in the
+--    same slot). Their text, colours, transparency, rotation, timing and visibility are still compared, and so
+--    is everything else on the card. (The rows the card publishes for the lucky tag are attributes of a Folder, never drawn: not compared.)
 -- Everything else is compared exactly as before: the Camera outside the stage (the world's lens-only push, the restore), its type and subject, the
 -- grade and the blur, the stage itself (every part, beam, emitter, light, image), the card (but its SKIP button), the collect hint, the sounds and
 -- their schedule, Lighting, the onlookers' world effects, and every Common..Mythic reveal (no stage: their camera is compared in full on every frame).
 return function(FP,W)
  local prevNormal,prevSkip=FP.Normal,FP.Skip
+ -- (R157: the card's laid-out pieces, by name: a piece of the card is a child of the frame RarePull on the RarePullReveal screen)
+ local FITTED={Title=true,Seed=true,['Seed glow']=true,['Seed halo']=true,Odds=true,['Seed name']=true,['Skip hint']=true,Rays=true,Shockwave=true,['Title crown']=true}
+ local FITTED_PREFIX={'Title split ','Title star ','Title planet '}
+ local function fittedPiece(o)
+  local root=o._parent;if not(root and root._class=='Frame'and root._props.Name=='RarePull')then return false end
+  local gui=root._parent;if not(gui and gui._class=='ScreenGui'and gui._props.Name=='RarePullReveal')then return false end
+  local name=o._props.Name;if type(name)~='string'then return false end
+  if FITTED[name]then return true end
+  for _,p in ipairs(FITTED_PREFIX)do if name:sub(1,#p)==p then return true end end
+  return false
+ end
  local function inStage()
   local cam=W.workspace.CurrentCamera;local ty=cam and cam._props.CameraType
   return ty~=nil and ty.Name=='Scriptable'and W.workspace:FindFirstChild('_RarePullStage')~=nil
@@ -32,6 +51,10 @@ return function(FP,W)
  end
  FP.Normal=function(o,k,v)
   if o._class=='Camera'and CAMERA[k]and inStage()then return'(the story stage\'s camera: R155)'end
+  if(k=='Position'or k=='Size')and fittedPiece(o)then return'(the card\'s fitted layout: R157)'end
+  if(k=='AnchorPoint'or k=='TextXAlignment')and o._class=='TextLabel'and o._props.Name=='Skip hint'and fittedPiece(o)then return'(the hint centred under the name: R157)'end
+  if(k=='Position'or k=='Size')and o._class=='ViewportFrame'and o._props.Name=='Seed'and o._parent and o._parent._class=='ScreenGui'and o._parent._props.Name=='SeedCollectFly'then
+   return'(the collected seed flies from the fitted card: R157)'end
   if prevNormal then return prevNormal(o,k,v)end
   return nil
  end

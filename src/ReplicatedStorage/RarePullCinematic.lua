@@ -42,6 +42,8 @@
 -- the reveal's, never a tool's: no planting, digging or swinging). The skip is the SKIP button at the bottom right (RarePullCard) - and
 -- gamepad B / R2 and Enter, which press it - from SkipFrom until the hit. The waiting result is still collected by a click / tap anywhere,
 -- but only by a press that STARTED once it had been shown for CollectAfter s (M.Tap): a burst of clicks from the animation never collects it.
+-- R157 (owner: "the skip button only appears for secret and above"): Common..Mythic (the Ladder card) have no SkipFrom (RarePullRules.CardTimeline), so no SKIP button and
+-- M.Skip answers false before the hit; "Skip pack animations" still gives them the Quick timing, and Enter / B / R2 and a click still COLLECT the shown result.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Gui=game:GetService('GuiService');local UIS=game:GetService('UserInputService');local CAS=game:GetService('ContextActionService')
 local Collection=game:GetService('CollectionService');local StarterGui=game:GetService('StarterGui')

@@ -231,12 +231,15 @@ function L.TearTicks(rank,quick)local at=L.BurstAt(rank,quick);local out={};for 
 -- The opener's screen for Common..Mythic: the seed card --------------------------------------------------------------------------------
 -- Times on the reveal's server clock (seconds after RevealAt). R153: SkipFrom: a click / tap from then on skips to the hit, a second one
 -- closes the card (RarePullCinematic.Skip; the clicks that opened the pack are over by then).
+-- R157 (owner: "the skip button only appears for secret and above"): Common..Mythic are short, so their card has NO SkipFrom: no SKIP button, and
+-- RarePullCinematic.Skip answers false before the hit (Enter / B / R2 still collect the result once it is shown). CardSkipFrom is now the compact
+-- Secret / Cosmic / King card's only (L.InPlace); the story scenes have their own SkipFrom (L.Scenes).
 L.CardSkipFrom=.35
 function L.CardTimeline(rank,quick)
  local tier=L.Tier(rank);local burst=L.BurstAt(rank,quick);local card=quick and tier.QuickCard or tier.Card
  local slam=burst+math.min(.6,.25+.08*rank)*(quick and .7 or 1)
  return {Burst=burst,TitleIn=burst,Count=burst+.06,Odds=slam,FloatEnd=burst+card,Out=burst+card,Length=burst+card+.2,
-  Letterbox=tier.Letterbox==true,Quick=quick==true,SkipFrom=L.CardSkipFrom}
+  Letterbox=tier.Letterbox==true,Quick=quick==true}
 end
 -- Secret / Cosmic / King story scenes ------------------------------------------------------------------------------------------------------
 -- Beats in seconds after the cinematic starts (the opener's clock). Dim: the world darkens; Cut: fade to black; SceneIn: the hidden stage;
@@ -495,13 +498,55 @@ end
 -- third, so the middle of the screen (the player, a keeper) stays clear.
 function L.Layout(phone,compact,rank)
  local tier=L.Tier(rank or 6)
+ -- R157 (owner: "the click to collect should be below the fruit name"): every layout has a Hint row, directly under the name
  if compact then
-  return {Bar=0,Title={Y=.115,H=.075},Seed={Y=.235,H=.15},Odds={Y=.345,H=.05},Name={Y=.39,H=.035},Compact=true}
+  return {Bar=0,Title={Y=.115,H=.075},Seed={Y=.235,H=.15},Odds={Y=.345,H=.05},Name={Y=.39,H=.035},Hint={Y=.4325,H=.03},Compact=true}
  end
  local bar=phone and .07 or .085
  local th=tier.TitleSize;local sh=tier.SeedSize
- -- the title just under the letterbox, "1 in N" and the name low: the middle band (about .25-.74 of the height) is the seed's
- return {Bar=bar,Title={Y=bar+th/2+.012,H=th},Seed={Y=.5,H=sh},Odds={Y=.78,H=.08},Name={Y=.85,H=.045}}
+ -- the title just under the letterbox, "1 in N", the name and its hint low: the middle band (about .25-.74 of the height) is the seed's
+ -- (R157: "1 in N" moved up .005 and the name .008, so the hint fits above the bottom letterbox bar; the Secret / Cosmic / King story scenes use this)
+ return {Bar=bar,Title={Y=bar+th/2+.012,H=th},Seed={Y=.5,H=sh},Odds={Y=.775,H=.08},Name={Y=.842,H=.045},Hint={Y=.8855,H=.034}}
+end
+-- R157 (owner: "reduce the size of the seed display so it fits perfectly between the base buttons and the hotbar"): the Common..Mythic seed card (and the compact
+-- Secret / Cosmic / King card of an opening in place) fitted to a band of the screen. top, bottom: the band in px of the full screen (RarePullCard.FitBand: just under
+-- BASE / TRACK, just over the pity bars and the hotbar's item name, a small margin kept); w, h: the screen in px. Five rows from the top: the rarity word, the seed,
+-- "1 in N", the seed's name and its hint. Each row has the size it always had (TitleSize, SeedSize, .08, .045 and .034 of the screen's height; the compact card's
+-- .075, .15, .05, .035 and .03); when they do not fit the band they all shrink alike (k), the words down to a
+-- least height in px (they must stay readable) and the seed down to a least, so the SEED gives the rest. A band with room to spare spreads it into the gaps
+-- (up to GapMax) and the stack is centred in the band. Returns what Layout returns ({Bar, Title, Seed, Odds, Name, Hint}: Y the row's centre and H its height, shares
+-- of the screen's HEIGHT; Seed.W its width, a share of the screen's WIDTH, so the seed is a square on any screen) and Fit = {Top, Bottom, K}.
+-- The seed floats down by Float on its way in (RarePullCard._seed): its Y is where it starts, 2 * Float above where it rests.
+L.Fit={Gap=.012,GapMax=.04,SeedWidth=.62,Float=.03,Least={Title=24,Seed=44,Odds=20,Name=15,Hint=13}}
+function L.FitLayout(phone,rank,top,bottom,w,h,compact)
+ local tier=L.Tier(rank or 1);w=math.max(1,w);h=math.max(1,h)
+ local want=compact and{Title=.075*h,Seed=.15*h,Odds=.05*h,Name=.035*h,Hint=.03*h}
+  or{Title=tier.TitleSize*h,Seed=tier.SeedSize*h,Odds=.08*h,Name=.045*h,Hint=.034*h}
+ local room=math.max(1,bottom-top);local least=L.Fit.Least
+ local function sizes(k)
+  local s={}
+  for key,v in pairs(want)do s[key]=math.max(least[key],v*k)end
+  s.Seed=math.min(s.Seed,L.Fit.SeedWidth*w) -- (a seed is never wider than that, on a portrait phone)
+  return s
+ end
+ local function total(s,gap)return s.Title+s.Seed+s.Odds+s.Name+s.Hint+4*gap end
+ local k=1
+ while k>.1 and total(sizes(k),math.max(3,L.Fit.Gap*h*k))>room do k-=.02 end
+ local s=sizes(k);local gap=math.max(3,L.Fit.Gap*h*k)
+ local spare=room-total(s,gap)
+ if spare<0 then
+  -- (R157 build: a band shorter than the least stack - only a window or screen under about 320 px tall, which no phone or tablet is - and everything shrinks
+  -- alike past the least, so the card still never leaves its band)
+  gap=3;local f=math.max(.4,(room-4*gap)/(s.Title+s.Seed+s.Odds+s.Name+s.Hint))
+  for key,v in pairs(s)do s[key]=v*f end
+ elseif spare>0 then gap=math.min(L.Fit.GapMax*h,gap+spare/4)end
+ local y=top+(room-total(s,gap))/2
+ local out={Bar=compact and 0 or phone and .07 or .085,Fit={Top=top/h,Bottom=bottom/h,K=k},Compact=compact==true or nil}
+ for _,key in ipairs({'Title','Seed','Odds','Name','Hint'})do
+  out[key]={Y=(y+s[key]/2)/h,H=s[key]/h};y+=s[key]+gap
+ end
+ out.Seed.W=s.Seed/w;out.Seed.Y-=L.Fit.Float
+ return out
 end
 -- Projection of a stage point for a camera (eye, target, vertical fov in degrees, aspect = width / height) -> screen x, y (0..1), depth.
 function L.Project(eye,target,fov,aspect,point)

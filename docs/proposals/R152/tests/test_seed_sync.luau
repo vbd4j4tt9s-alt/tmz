@@ -271,8 +271,24 @@ for rank=6,8 do
 end
 -- 4b. R153: every card can be skipped too (the player's choice): after the jump the hit is still HEARD on the frame that shows it (the one
 -- clock), the result follows, a second skip closes it, and everything is cleaned up. Common..Mythic cards and the story tiers in place.
+-- R157 (owner: "the skip button only appears for secret and above"): only the story tiers in place can be skipped; a Common..Mythic card has no SkipFrom: Enter / B / R2
+-- (M.Skip) do nothing before its hit, its hit is still heard on the frame that shows it, and the press after the result collects it.
+for _,dt in ipairs({1/30,1/60})do
+ for rank=1,5 do
+  reset()
+  local run=start(rank);local tl=run.TL;local hit=tl.Burst;local tag=names[rank]..' card, not skippable @'..math.floor(1/dt+.5)..'fps'
+  local any=false
+  X.run(hit*.25,dt);if M.Skip()then any=true end;X.run(hit*.5,dt);if M.Skip()then any=true end
+  check(tl.SkipFrom==nil and not any and not run.Skipped,tag..': no SkipFrom; Enter / B / R2 skip nothing before the hit')
+  X.run(L.ShownAt(tl)-run.Clock()+M.CollectAfter+.05,dt)
+  check(M.Skip()and run.Collected,tag..': the press after the result is shown collects it')
+  X.run(tl.Length-tl.FloatEnd+.4,dt);settle(dt)
+  cleanAll(tag)
+  check(M.Fading()==0,tag..': nothing fading')
+ end
+end
 for _,dt in ipairs({1/30,1/60,1/144})do
- for rank=1,8 do
+ for rank=6,8 do
   reset()
   if rank>=6 then X.keeper(V3(10,3,100),{GuardianBehavior='WANDER'})end
   local run=start(rank);local tl=run.TL;local hit=tl.Climax or tl.Burst

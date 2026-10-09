@@ -152,8 +152,9 @@ if after then
  relay(390,844);openWheel();relay(390,844)
  -- (the R151 sizes were 24 / 20 / 20 / 14 px: the owner asked for a bigger bubble, "about 1.5x")
  -- (R155, owner: "reposition these bubbles make them slightly smaller as they are obscuring the image": 30 / 26 / 24, out on the corner (DAILY out to the right only); the dots stay 21)
- check(Badge.Sizes.Count==30 and Badge.Sizes.Alert==26 and Badge.Sizes.Daily==24 and Badge.Sizes.Dot==21,'R155: the badges are INDEX count 30, MENU alert 26, DAILY 24, dots 21')
- for _,k in ipairs({'Count','Alert','Daily'})do
+ -- (R157: DAILY is a menu wheel option: its badge is the INDEX count's, 30 px on the corner; R155's DAILY-only size and its top-edge rule are gone)
+ check(Badge.Sizes.Count==30 and Badge.Sizes.Alert==26 and Badge.Sizes.Daily==nil and Badge.Overhang.Daily==nil and Badge.OverhangTop==nil and Badge.Sizes.Dot==21,'R155 / R157: the badges are INDEX (and DAILY) count 30, MENU alert 26, dots 21; no DAILY-only size or top overhang')
+ for _,k in ipairs({'Count','Alert'})do
   local size,o=Badge.Sizes[k],Badge.Overhang[k]
   check(size/2-o+size/2<=20 and o>=size/2-6,'R155: the '..k..' badge sits out on the corner: it covers '..(size-o)..' px of the button (at most 20), centre '..(size/2-o)..' px in')
   check(Badge.Extent(size,o)<=Badge.Margin-1,'R155: ... and stays a px inside the '..Badge.Margin..' px margin (extent '..Badge.Extent(size,o)..')')
@@ -201,8 +202,8 @@ if after then
   local worst=cut(indexBadge());check(worst<=1e-6,tag..': nothing clips the INDEX count and its text (cut '..worst..' px)')
  end
  print('R154 badge text (FredokaOne metrics):');for _,r in ipairs(rows)do print(r)end
- -- the sizes themselves: one character 78%, two 68%
- for _,k in ipairs({'Count','Alert','Daily'})do
+ -- the sizes themselves: one character 78%, two 68% (R157: no DAILY-only size any more: DAILY is a Count badge)
+ for _,k in ipairs({'Count','Alert'})do
   local d=Badge.Sizes[k]
   check(Badge.TextSize(d,'2')>=d*.75 and Badge.TextSize(d,'!')==Badge.TextSize(d,'2')and Badge.TextSize(d,'9+')>=d*.65 and Badge.TextSize(d,'9+')<Badge.TextSize(d,'2'),'Badge.TextSize for the '..k..' badge ('..d..' px): one character '..Badge.TextSize(d,'2')..', two '..Badge.TextSize(d,'9+'))
  end
@@ -252,7 +253,9 @@ if after then
  check(not idx:find('local function badge%('),'ChestIndex no longer builds its own badge')
  check(not daily:find('local function badge%('),'DailyRewardsClient no longer carries a copy of the badge')
  local _,nIndex=idx:gsub('Badge%.Make%(','');local _,nDaily=daily:gsub('Badge%.Make%(','')
- check(nIndex==3 and nDaily==3,'every Index badge (count, MENU alert, tab dots: '..nIndex..') and every DAILY badge (button, two tabs: '..nDaily..') is made by NotifyBadge151.Make')
+ -- (R157: the MENU button's "!" is HudLayout's own now - it adds up the Index and DAILY rewards that ChestIndex / DailyRewardsClient publish - so ChestIndex makes two)
+ local hud=source('HudLayout');local _,nHud=hud:gsub('NotifyBadge%.Make%(hub,\'IndexRewardAlert\'','')
+ check(nIndex==2 and nDaily==3 and nHud==1 and idx:find("pg:SetAttribute('MenuAlertIndex',total)",1,true)~=nil,'every Index badge (count, tab dots: '..nIndex..'; the MENU alert: HudLayout '..nHud..') and every DAILY badge (button, two tabs: '..nDaily..') is made by NotifyBadge151.Make')
  local nb=source('NotifyBadge151')
  local _,uses=nb:gsub("UIStroke",'')
  check(not nb:find('TextStrokeTransparency=1'),'(no hidden text stroke switch)')

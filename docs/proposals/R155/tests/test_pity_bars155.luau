@@ -19,6 +19,10 @@
 --                      a step before the first layout is harmless
 -- 11. cost           - R155 review: a bar at 9/10 writes its glow and nothing else (no UDim2, no words); a bar nobody can see (dimmed out, hidden) costs nothing and the
 --                      frame loop stops
+-- R157 (the owner-approved R156 preview "pity bars v2": "closer to the hot bar like really close but with a small gap", the clover, NORMAL clover green, EVENT gold with a
+-- clover-green rim, shade "Fresh"): every expectation above that named gold / purple, the diamond, "above the item name" or the 44 px rows now names the new look and place:
+-- the green normal bar and the gold event bar, the clover disc at the left end (the fill starts after it, B.Lead), the bars B.Gap px over the slots (8 / 6 / 5) with the
+-- held item's name rows ABOVE them (B.NameRows; part of B.Reserved), the SKIP pill 14 px in, the lucky tag following the fitted card's published rows.
 local W=require('./world');local R=W.R
 local checks,fails=0,0
 local function check(c,m)checks+=1;if not c then fails+=1;print('FAIL: '..m)end;return c end
@@ -34,34 +38,46 @@ local gui=pg:FindFirstChild(B.Name)
 local function frames(n,dt)W.frames(n,dt or 1/60)end
 local function bar(g)return s.Bars[g]end
 local function fillW(g)local f=bar(g).Fill;return f.Visible and f.Size.X.Offset or 0 end
-local function innerW()return s.Placement.Bar.W-4 end
+-- (R157: the fill runs from under the clover's disc to the right end: 6 px under the disc + (W - 2 - B.Lead(H)) * share; empty = none)
+local function fillFor(k)if k<=.004 then return 0 end;local P=s.Placement.Bar;return 6+math.floor((P.W-2-B.Lead(P.H))*k+.5)end
 -- 1. always there -------------------------------------------------------------------------------------------------------------------------------
 check(gui and gui:IsA('ScreenGui')and gui.DisplayOrder==23 and gui.ResetOnSpawn==false and gui.ScreenInsets==R.Enum.ScreenInsets.CoreUISafeInsets,'its own ScreenGui, DisplayOrder 23 (under the hotbar / Bag 25, the tutorial 25 / 26, BASE / TRACK and the plant indicators 24), the HUD\'s safe area, kept on respawn')
 frames(2)
 check(s.Root.Visible and bar('Normal').Root.Parent==s.Root and bar('Event').Root.Parent==s.Root,'both bars are on the HUD from the start, nothing in hand')
 check(bar('Normal').Label.Text=='0/10 pity'and bar('Event').Label.Text=='0/10 event pity'and fillW('Normal')==0,'before any count arrives: "0/10 pity" and "0/10 event pity", empty')
-check(bar('Normal').Root.Position.X.Offset<bar('Event').Root.Position.X.Offset and bar('Normal').Root.Position.Y.Offset==bar('Event').Root.Position.Y.Offset,'gold (normal) on the left, purple (event) on the right, side by side')
-local gold,purple=Pity.Colors.Normal,Pity.Colors.Event
-check(bar('Normal').FillGradient.Color.A==gold.Light and bar('Normal').FillGradient.Color.B==gold.Deep and bar('Event').FillGradient.Color.A==purple.Light and bar('Event').FillGradient.Color.B==purple.Deep,'the normal bar fills GOLD, the event bar PURPLE')
+check(bar('Normal').Root.Position.X.Offset<bar('Event').Root.Position.X.Offset and bar('Normal').Root.Position.Y.Offset==bar('Event').Root.Position.Y.Offset,'green (normal) on the left, gold (event) on the right, side by side')
+local green,gold=Pity.Colors.Normal,Pity.Colors.Event
+local function rgb(c)return math.floor(c.R*255+.5),math.floor(c.G*255+.5),math.floor(c.B*255+.5)end
+local function is(c,r,g,b)local x,y,z=rgb(c);return x==r and y==g and z==b end
+check(bar('Normal').FillGradient.Color.A==green.Light and bar('Normal').FillGradient.Color.B==green.Deep and bar('Event').FillGradient.Color.A==gold.Light and bar('Event').FillGradient.Color.B==gold.Deep,'R157: the normal bar fills clover GREEN, the event bar GOLD')
+check(is(green.Light,0x6E,0xD7,0x46)and is(green.Deep,0x0A,0x78,0x24)and is(green.Rim,0x60,0xCE,0x3C)and is(green.RimHot,0xD6,0xFF,0xA0)and is(green.Glow,0xAA,0xFF,0x6E)and is(green.Track,0x08,0x24,0x10)and is(green.Ink,0x06,0x34,0x12)
+ and is(gold.Light,0xFF,0xF2,0x96)and is(gold.Deep,0xFF,0xC0,0x2C)and is(gold.Rim,0x46,0xC4,0x34)and is(gold.RimHot,0x96,0xF4,0x50)and is(gold.Track,0x28,0x1E,0x08)and is(gold.Glow,0xFF,0xD6,0x46)and is(gold.Ink,0x42,0x2A,0x02)
+ and is(green.Badge,0x06,0x2E,0x12)and is(gold.Badge,0x06,0x2E,0x12)and Pity.Palettes==nil and Pity.Use==nil,'R157: shade 1 "Fresh" exactly (NORMAL #6ED746 -> #0A7824, rim #60CE3C; EVENT #FFF296 -> #FFC02C with the clover-green rim #46C434; clover disc #062E12); no second shade left')
+check(bar('Normal').Edge.Color==green.Rim and bar('Event').Edge.Color==gold.Rim and bar('Event').Track.BackgroundColor3==gold.Track and bar('Normal').Track.BackgroundColor3==green.Track,'R157: the event bar\'s rim is clover green; each track is tinted (green-black / warm-black)')
+do
+ local b=bar('Normal');local icon=b.Badge and b.Badge:FindFirstChild('Clover')
+ check(b.Root:FindFirstChild('Mark')==nil and b.Badge and icon and icon.ClassName=='CanvasGroup'and b.Badge.BackgroundColor3==green.Badge and b.BadgeRim.Color==green.Rim,'R157: the clover (CloverIcon153 in a CanvasGroup, on a dark disc with a rim in the bar\'s colour) replaces the diamond at the left end of each bar')
+ check(b.Badge.Position.X.Offset==math.floor(s.Placement.Bar.H/2)and b.Badge.Size.X.Offset==s.Placement.Bar.H and b.Fill.Position.X.Offset==B.Lead(s.Placement.Bar.H)-6,'R157: the disc is the bar\'s left end (H x H) and the fill starts under it (B.Lead - 6 px)')
+end
 check(#bar('Normal').Ticks==9 and #bar('Event').Ticks==9,'ten steps: nine ticks on each bar')
 -- 2. values ------------------------------------------------------------------------------------------------------------------------------------
 player:SetAttribute('PackPityNormal',3);player:SetAttribute('PackPityEvent',3)
 frames(1)
-local w1=fillW('Normal');local want=math.floor(innerW()*.3+.5)
+local w1=fillW('Normal');local want=fillFor(.3)
 check(bar('Normal').Label.Text=='3/10 pity'and bar('Event').Label.Text=='3/10 event pity','"3/10 pity" and "3/10 event pity"')
 check(w1>0 and w1<want,'the fill eases to the new count (one frame in: '..w1..' of '..want..' px)')
 frames(90)
 check(fillW('Normal')==want and fillW('Event')==want,'... and lands on 3 of 10 steps ('..fillW('Normal')..' px)')
 check(s.Root:GetAttribute('AccessibleLabel')=='3/10 pity, 3/10 event pity','the accessible label reads both')
 player:SetAttribute('PackPityEvent',7);frames(90)
-check(fillW('Event')==math.floor(innerW()*.7+.5)and fillW('Normal')==want,'each bar moves on its own (event 7/10, normal still 3/10)')
+check(fillW('Event')==fillFor(.7)and fillW('Normal')==want,'each bar moves on its own (event 7/10, normal still 3/10)')
 -- 3. 9/10 ---------------------------------------------------------------------------------------------------------------------------------------
 player:SetAttribute('PackPityNormal',9);frames(60)
 local g1=bar('Normal').Glow.BackgroundTransparency;frames(12);local g2=bar('Normal').Glow.BackgroundTransparency
 check(bar('Normal').Label.Text=='9/10 next one\'s lucky!','9/10: "9/10 next one\'s lucky!"')
 check(g1<.8 and g2<.8 and math.abs(g1-g2)>.01,'9/10: the bar glows, a soft pulse ('..string.format('%.2f -> %.2f',g1,g2)..')')
 check(bar('Event').Glow.BackgroundTransparency>=.999,'... only the bar at 9/10 glows')
-check(bar('Normal').Edge.Color==gold.Light,'... its edge lights up')
+check(bar('Normal').Edge.Color==green.RimHot and bar('Normal').BadgeRim.Color==green.RimHot,'... its edge (and the clover disc\'s rim) lights up (R157: RimHot)')
 -- 4. held pack ------------------------------------------------------------------------------------------------------------------------------------
 local char=R.new('Model');char.Name='Ann';player.Character=char;player.CharacterAdded:Fire(char)
 local function hold(variant)
@@ -71,10 +87,11 @@ local function hold(variant)
 end
 player:SetAttribute('PackPityNormal',4);frames(60)
 hold('Pack03')
-check(s.Held=='Normal'and math.abs(bar('Normal').Scale.Scale-1.06)<.01 and bar('Event').Scale.Scale==1,'holding a world pack: the GOLD bar is slightly larger (x1.06)')
-check(bar('Normal').Edge.Thickness>bar('Event').Edge.Thickness and bar('Normal').Track.BackgroundTransparency<bar('Event').Track.BackgroundTransparency,'... brighter (thicker edge, solid track); the purple one stays, a little dimmer')
+check(s.Held=='Normal'and math.abs(bar('Normal').Scale.Scale-1.06)<.01 and bar('Event').Scale.Scale==1,'holding a world pack: the GREEN bar is slightly larger (x1.06)')
+check(bar('Normal').Edge.Thickness>bar('Event').Edge.Thickness and bar('Normal').Track.BackgroundTransparency<bar('Event').Track.BackgroundTransparency,'... brighter (thicker edge, solid track); the gold event one stays, a little dimmer')
+check(math.abs(bar('Event').K-.85)<1e-6,'R157: the bar not in hand dims to .85 (was .75: a dimmed gold over grass turned olive)')
 check(bar('Event').Label.TextTransparency>0 and bar('Event').Label.TextTransparency<.5 and bar('Normal').Label.TextTransparency==0,'... the other bar is still readable (dimmed, not hidden)')
-for _,v in ipairs({'MechLimited','EclipseReliquary','VerityReliquary'})do hold(v);check(s.Held=='Event'and math.abs(bar('Event').Scale.Scale-1.06)<.01 and math.abs(bar('Normal').Scale.Scale-1)<.01,'holding a '..v..' pack: the PURPLE bar is highlighted')end
+for _,v in ipairs({'MechLimited','EclipseReliquary','VerityReliquary'})do hold(v);check(s.Held=='Event'and math.abs(bar('Event').Scale.Scale-1.06)<.01 and math.abs(bar('Normal').Scale.Scale-1)<.01,'holding a '..v..' pack: the GOLD event bar is highlighted')end
 hold(nil)
 check(s.Held==nil and math.abs(bar('Normal').Scale.Scale-1)<.01 and math.abs(bar('Event').Scale.Scale-1)<.01 and bar('Event').Label.TextTransparency==0,'nothing in hand: both plain, both fully visible')
 -- 5. lucky pack ----------------------------------------------------------------------------------------------------------------------------------
@@ -93,12 +110,18 @@ local sawScale,sawShine,sawRing,sawFlash,full,popAt=0,false,false,false,true,nil
 for _=1,80 do
  frames(1);local b=bar('Normal');popAt=popAt or b.PopAt
  sawScale=math.max(sawScale,b.Scale.Scale);sawShine=sawShine or b.Shine.Visible;sawRing=sawRing or b.Ring.Visible;sawFlash=sawFlash or b.Flash.BackgroundTransparency<.5
- if b.PopAt and R.clock-b.PopAt<.9 and fillW('Normal')<innerW()-2 then full=false end
+ if b.PopAt and R.clock-b.PopAt<.9 and fillW('Normal')<fillFor(1)-2 then full=false end
 end
 check(#notices==before+1 and notices[#notices].Text==Pity.NoticeText('Normal')and notices[#notices].Text:find('LUCKY PACK! x1.5 luck',1,true),'the notice: "'..tostring(notices[#notices]and notices[#notices].Text)..'"')
 check(popAt~=nil and bar('Normal').Pending==0,'the bar pops')
 check(sawScale>1.15,'... a pop: it scales up (to x'..string.format('%.2f',sawScale)..') and settles back')
-check(sawShine and sawRing and sawFlash,'... a white flash, a ring and a shine sweeping across')
+check(sawShine and sawRing and sawFlash,'... a flash, a ring and a shine sweeping across')
+local function same(a,b)return math.abs(a.R-b.R)<1e-6 and math.abs(a.G-b.G)<1e-6 and math.abs(a.B-b.B)<1e-6 end
+local white=R.Color3.new(1,1,1)
+check(same(bar('Normal').Shine.BackgroundColor3,B.ShineColor(green))and same(bar('Normal').Flash.BackgroundColor3,B.FlashColor(green))and same(bar('Normal').RingStroke.Color,green.Light)
+ and same(bar('Event').Shine.BackgroundColor3,B.ShineColor(gold))and same(bar('Event').Flash.BackgroundColor3,B.FlashColor(gold))and same(bar('Event').RingStroke.Color,gold.Light)and same(bar('Normal').Glow.BackgroundColor3,green.Glow)
+ and not same(B.ShineColor(green),white)and not same(B.FlashColor(gold),white)and same(B.ShineColor(green),green.Light:Lerp(white,.6))and same(B.FlashColor(gold),gold.Glow:Lerp(white,.35)),
+ 'R157: the lucky pop\'s shine, flash, ring and glow are in the bar\'s own new colours (light green tints on the normal bar, light gold on the event bar), not plain white')
 check(full,'... the fill stays full while it pops')
 frames(120)
 check(bar('Normal').PopAt==nil and bar('Normal').Label.Text=='0/10 pity'and fillW('Normal')==0 and math.abs(bar('Normal').Scale.Scale-1)<.001 and not bar('Normal').Shine.Visible,'... then it drains back to "0/10 pity" and rests')
@@ -113,38 +136,59 @@ frames(150)
 check(bar('Event').Label.Text=='0/10 event pity'and fillW('Event')==0,'... and rests at "0/10 event pity"')
 -- an owner command dropping a count (no lucky pack): the bar just moves after the short wait, no pop
 player:SetAttribute('PackPityNormal',6);frames(90);player:SetAttribute('PackPityNormal',2);frames(90)
-check(bar('Normal').Label.Text=='2/10 pity'and bar('Normal').PopAt==nil and fillW('Normal')==math.floor(innerW()*.2+.5),'a count set lower (/test pity set): the bar moves down, no pop')
+check(bar('Normal').Label.Text=='2/10 pity'and bar('Normal').PopAt==nil and fillW('Normal')==fillFor(.2),'a count set lower (/test pity set): the bar moves down, no pop')
 -- the reveal card: its words sit where the bars are, so the bars step aside; a lucky pack gets a TAG on the card (between the seed and its "1 in N"), the bar pops
 -- once the seed is collected; the compact card gets the tag under it and the bar pops at once; a story scene holds the notice and the pop; no reveal: the notice
 local tagGui=pg:FindFirstChild(B.TagName)
 check(tagGui and tagGui.DisplayOrder==97 and tagGui.IgnoreGuiInset==true,'the lucky tag has its own full-screen layer just above the reveal card (96) and under the notices (100)')
 local function tag()return tagGui:FindFirstChild('LuckyTag')end
 local function tagShown()local t=tag();return t and t.Visible and t.BackgroundTransparency<.5 end
+-- (R157: a REAL reveal card, fitted to this 1280 x 720 screen, publishes where its rows are; the tag follows them)
+tagGui.AbsoluteSize=V2(1280,720);W.workspace.CurrentCamera.ViewportSize=V2(1280,720)
+local Card=W.module('RarePullCard')
+local function realCard(kind,rank)
+ local old=pg:FindFirstChild('RarePullReveal');if old then old:Destroy()end
+ local cg=R.new('ScreenGui');cg.Name='RarePullReveal';cg.DisplayOrder=96;cg.IgnoreGuiInset=true;cg.AbsoluteSize=V2(1280,720);cg.Parent=pg
+ return Card.Create(cg,kind,{Rank=rank,Phone=false,SeedName='Sand Fruit Seed',Odds=90})
+end
+local function rowsPx(c)local out={};for k,v in pairs(Card.Rows(c.Layout))do out[k]=v*720 end;return out end
 player:SetAttribute('PackPityNormal',9);frames(30)
+local ladder=realCard('Ladder',5)
 player:SetAttribute('RarePullCinematic','Ladder');frames(5)
 check(s.Dim==1 and bar('Normal').Track.BackgroundTransparency>=.999 and bar('Normal').Label.TextTransparency>=.999,'under the reveal card the bars step aside (its seed name and "1 in N" sit right there)')
 local n0=#notices;luckyOpen('Normal',false);local sawTagPop=0
 for _=1,40 do frames(1);local t=tag();if t and t.Visible then sawTagPop=math.max(sawTagPop,t:FindFirstChild('Scale').Scale)end end
 check(tagShown()and tag().Label.Text==Pity.TagText('Normal')and #notices==n0,'a lucky pack with its reveal card up: the card gets the tag "'..Pity.TagText('Normal')..'" (no notice over the card\'s title)')
 do
- local t=tag();local h=tagGui.AbsoluteSize.Y;local Rules=W.module('RarePullRules');local L=Rules.Layout(false,false,5)
- local top=(.5+Rules.Tier(5).SeedSize/2)*h;local bottom=(L.Odds.Y-L.Odds.H/2)*h
+ -- R157: the card is fitted to the screen (RarePullRules.FitLayout); it publishes its rows and the tag sits in the gap between the seed and "1 in N" (or, where the fit left
+ -- no readable gap, on the seed square's lower edge), never over "1 in N"
+ local t=tag();local rows=rowsPx(ladder);local pub=B.CardRows(pg,720)
+ local same=pub~=nil;if pub then for k,v in pairs(rows)do if math.abs(pub[k]-v)>.01 then same=false end end end
+ check(ladder.Layout.Fit~=nil and same,'R157: the fitted card publishes its rows (a Folder under its root frame: B.CardRows reads the same seed / "1 in N" / name / hint rows as RarePullCard.Rows)')
+ local top,bottom=rows.SeedBottom,rows.OddsTop
  local y=t.Position.Y.Offset;local th=t.Size.Y.Offset
- check(y-th/2>=top-.5 and y+th/2<=bottom+.5 and math.abs(t.Position.X.Offset-tagGui.AbsoluteSize.X/2)<=1,('... in the free band of the card: between the seed (to %.0f px) and the "1 in N" line (from %.0f px): %d..%d px, centred'):format(top,bottom,y-th/2,y+th/2))
+ local inGap=bottom-top>=B.TagMin and y-th/2>=top-.5 and y+th/2<=bottom+.5
+ local onEdge=bottom-top<B.TagMin and y+th/2<=top+.5 and y-th/2>=rows.SeedTop
+ check((inGap or onEdge)and y+th/2<=bottom+.5 and math.abs(t.Position.X.Offset-tagGui.AbsoluteSize.X/2)<=1,('... in the free band of the fitted card: between the seed (to %.0f px) and the "1 in N" line (from %.0f px): %d..%d px, centred'):format(top,bottom,y-th/2,y+th/2))
 end
 check(sawTagPop>1.05 and tag():FindFirstChild('Scale').Scale==1,'... it pops in (to x'..string.format('%.2f',sawTagPop)..') and settles')
 check(bar('Normal').Pending==1 and bar('Normal').PopAt==nil,'... the bar holds "'..Pity.PopText..'" (full, out of sight) and waits for the card')
 frames(120);check(tagShown(),'... the tag stays while the result waits to be collected')
 player:SetAttribute('RarePullCinematic',nil);frames(20)
-check(bar('Normal').PopAt~=nil and s.Dim==0 and not tagShown(),'the seed is collected: the card and its tag go, the bars come back and the gold one pops')
+check(bar('Normal').PopAt~=nil and s.Dim==0 and not tagShown(),'the seed is collected: the card and its tag go, the bars come back and the green one pops')
+ladder:Destroy()
 frames(150)
 player:SetAttribute('PackPityEvent',9);frames(30)
+local compact=realCard('InPlace',6)
 player:SetAttribute('RarePullCinematic','InPlace');frames(5)
 check(s.Dim==0,'the compact card (upper third, "skip pack animations"): the bars stay')
 local n2=#notices;luckyOpen('Event',false);frames(40)
-local h2=tagGui.AbsoluteSize.Y;local Lc=W.module('RarePullRules').Layout(false,true,5)
-check(tagShown()and tag().Label.Text==Pity.TagText('Event')and bar('Event').PopAt~=nil and #notices==n2 and tag().Position.Y.Offset-tag().Size.Y.Offset/2>=(Lc.Name.Y+Lc.Name.H/2)*h2,'a lucky event pack with the compact card: "'..Pity.TagText('Event')..'" under the card, the purple bar pops at once')
+local crow=rowsPx(compact)
+check(tagShown()and tag().Label.Text==Pity.TagText('Event')and bar('Event').PopAt~=nil and #notices==n2 and tag().Position.Y.Offset-tag().Size.Y.Offset/2>=crow.HintBottom-.5 and crow.HintTop>=crow.NameBottom-.5,
+ 'a lucky event pack with the compact card: "'..Pity.TagText('Event')..'" under the card (R157: under its collect hint, which is under the name), the gold event bar pops at once')
+check(Pity.TagText('Event'):sub(1,3)=='⭐'and Pity.NoticeText('Event'):sub(1,3)=='⭐'and Pity.TagText('Normal'):sub(1,4)=='🍀','R157: the event tag and notice carry a gold star (the purple heart no longer matches); the normal ones keep the clover')
 player:SetAttribute('RarePullCinematic',nil);frames(20);check(not tagShown(),'... the tag goes with the card')
+compact:Destroy();pg.RarePullReveal:Destroy()
 frames(150)
 player:SetAttribute('PackPityNormal',9);frames(30)
 player:SetAttribute('RarePullCinematic','Scene');local n1=#notices;luckyOpen('Normal',false);frames(120)
@@ -155,7 +199,7 @@ frames(150)
 -- Reduced Motion
 W.Gui.ReducedMotionEnabled=true;frames(2)
 player:SetAttribute('PackPityEvent',4);frames(1)
-check(fillW('Event')==math.floor(innerW()*.4+.5),'Reduced Motion: a count change shows at once (no easing)')
+check(fillW('Event')==fillFor(.4),'Reduced Motion: a count change shows at once (no easing)')
 player:SetAttribute('PackPityEvent',9);frames(2)
 local r1=bar('Event').Glow.BackgroundTransparency;frames(15);local r2=bar('Event').Glow.BackgroundTransparency
 check(r1<.8 and r1==r2,'Reduced Motion: the 9/10 glow is steady (no pulse)')
@@ -197,15 +241,26 @@ for _,sc in ipairs(SCREENS)do
  local pair=place.Pair;local bad={}
  if not place.Clear then bad[#bad+1]='no clear spot'end
  if pair.X<0 or pair.Y<0 or pair.X+pair.W>w or pair.Y+pair.H>h then bad[#bad+1]='off screen'end
- local dock=B.DefaultDock(m,w,h);local detail=m.HotbarDetails~=false and 44 or 0
- if pair.Y+pair.H>dock.Y-detail-4 then bad[#bad+1]='not above the hotbar + item name'end
+ local dock=B.DefaultDock(m,w,h)
+ -- R157 (owner: "closer to the hot bar like really close but with a small gap"): exactly B.Gap px over the slots (8 on a computer, 6 on a phone, 5 under a thin phone bar),
+ -- never on them; the held item's name rows ABOVE the bars, B.NameClear px over their top edge, where this screen shows them
+ local gap=dock.Y-(pair.Y+pair.H);local want=B.Gap(m.Phone==true,place.Bar.H)
+ if gap~=want then bad[#bad+1]=('not %d px over the slots (%d)'):format(want,gap)end
+ if want~=(m.Phone and(place.Bar.H<=16 and 5 or 6)or 8)then bad[#bad+1]='the gap is not 8 px on a computer / 6 on a phone'end
  if pair.X+pair.W<dock.X+8 or pair.X>dock.X+dock.W-8 then bad[#bad+1]='not over the hotbar'end
- if pair.Y+pair.H<dock.Y-detail-80 then bad[#bad+1]='not slightly above the hotbar ('..math.floor(dock.Y-detail-pair.Y-pair.H)..' px up)'end
+ if overlaps(pair,dock,0)then bad[#bad+1]='on the slots'end
  -- what the bars can cover: the bar, its glow (5 px) and the held bar's 1.06 scale
  local gx,gy=5+place.Bar.W*.03,5+place.Bar.H*.03;local ext={X=pair.X-gx,Y=pair.Y-gy,W=pair.W+gx*2,H=pair.H+gy*2}
- for _,b in ipairs(Hud.HudBoxes(m,w,h,false))do if overlaps(ext,b,0)then bad[#bad+1]='covers '..tostring(b.N)end end
- if m.Travel and overlaps(ext,{X=m.Travel.X,Y=m.Travel.Y,W=m.Travel.W,H=m.Travel.H},0)then bad[#bad+1]='covers BASE / TRACK'end
+ -- (HudLayout's Hotbar box is the slots and the 44 px over them: the bars' own place since R157, checked above against the slots themselves)
+ for _,b in ipairs(Hud.HudBoxes(m,w,h,false))do if b.N~='Hotbar'and overlaps(ext,b,0)then bad[#bad+1]='covers '..tostring(b.N)end end
+ if m.Travel~=nil then bad[#bad+1]='R113\'s BASE / TRACK spot (m.Travel) is back'end
  if overlaps(ext,B.SkipZone(w,h),0)then bad[#bad+1]='in the SKIP corner'end
+ if m.HotbarDetails~=false then
+  local rows=B.NameRows(w,h,m,dock,place)
+  if rows.Y+rows.H>pair.Y-B.NameClear+.5 or rows.Y+rows.H<pair.Y-B.NameClear-.5 then bad[#bad+1]='the name rows are not right above the bars'end
+  if rows.W>B.NameWidth or math.abs(rows.X+rows.W/2-(dock.X+dock.W/2))>.5 then bad[#bad+1]='the name rows are not centred on the hotbar'end
+  for _,b in ipairs(Hud.HudBoxes(m,w,h,false))do if b.N~='Hotbar'and b.N~='Status'and overlaps(rows,b,0)then bad[#bad+1]='the name rows cover '..tostring(b.N)end end
+ end
  local shown={}
  for _,wd in ipairs(WORDS)do
   local t=B.Words(wd[1],wd[2],place.Bar.W,place.Bar.H,wd[3]);shown[#shown+1]=t
@@ -214,9 +269,9 @@ for _,sc in ipairs(SCREENS)do
  end
  if place.Bar.H<(touch and 16 or 20) or place.Bar.W<96 then bad[#bad+1]='bars too small'end
  if #bad>0 then layoutFails+=1;print(('FAIL: %s %dx%d%s: %s'):format(name,w,h,touch and' touch'or'',table.concat(bad,'; ')))end
- print(('LAYOUT %s %dx%d%s bars %dx%d%s at %d,%d (pair %dx%d, %+d px off centre) above the hotbar by %d px; text %d px "%s"'):format(name,w,h,touch and' touch'or'',place.Bar.W,place.Bar.H,place.Stacked and' stacked'or'',math.floor(pair.X),math.floor(pair.Y),math.floor(pair.W),pair.H,math.floor(pair.X+pair.W/2-(dock.X+dock.W/2)),math.floor(dock.Y-detail-pair.Y-pair.H),B.TextSize(shown[2],place.Bar.W,place.Bar.H),shown[2]))
+ print(('LAYOUT %s %dx%d%s bars %dx%d%s at %d,%d (pair %dx%d, %+d px off centre) above the slots by %d px, name rows %s; text %d px "%s"'):format(name,w,h,touch and' touch'or'',place.Bar.W,place.Bar.H,place.Stacked and' stacked'or'',math.floor(pair.X),math.floor(pair.Y),math.floor(pair.W),pair.H,math.floor(pair.X+pair.W/2-(dock.X+dock.W/2)),gap,m.HotbarDetails~=false and'above them'or'hidden',B.TextSize(shown[2],place.Bar.W,place.Bar.H),shown[2]))
 end
-check(layoutFails==0,#SCREENS..' screens: inside the screen, slightly above the hotbar and its item name (centred on it), clear of the menu, balances, status, jump / thumb zones, owner tools, BASE / TRACK and the SKIP corner; every text fits ('..layoutFails..' failing)')
+check(layoutFails==0,#SCREENS..' screens: inside the screen, R157: 8 px (computer) / 6 px (phone) over the slots (centred on them) with the item name rows above, clear of the menu, balances, status, jump / thumb zones, owner tools and the SKIP corner; every text fits ('..layoutFails..' failing)')
 -- the real gui follows the screen
 for _,sc in ipairs({{844,390,true},{390,844,true},{1920,1080,false}})do
  W.UIS.TouchEnabled=sc[3];gui.AbsoluteSize=V2(sc[1],sc[2]);frames(2)
@@ -271,10 +326,10 @@ for _,sc in ipairs(SCREENS)do
   if not hasBars then bad[#bad+1]='the card does not give SkipRect the bars\' extent'end
   if overlaps(skip,ext,0)then bad[#bad+1]='the SKIP button covers the bars'end
   if not place.Clear then bad[#bad+1]='the bars have no clear spot'end
-  if not(x>=12 and y>=12 and x+bw<=w-12 and y+bh<=h-12)then bad[#bad+1]='the SKIP button is not 12 px inside the screen'end
+  if not(x>=14 and y>=14 and x+bw<=w-14 and y+bh<=h-14)then bad[#bad+1]='the SKIP button is not 14 px inside the screen (R157: was 12)'end
   if not(x+bw/2>=w*.5 and y>=h*.45)then bad[#bad+1]='the SKIP button is not at the bottom right'end
   for _,b in ipairs(Hud.HudBoxes(m,w,h,false))do if overlaps(skip,b,8)then bad[#bad+1]='the SKIP button is within 8 px of '..tostring(b.N)end end
-  if m.Travel and overlaps(skip,{X=m.Travel.X,Y=m.Travel.Y,W=m.Travel.W,H=m.Travel.H},0)then bad[#bad+1]='the SKIP button covers the BASE / TRACK box'end
+  if m.Travel~=nil then bad[#bad+1]='R113\'s BASE / TRACK spot (m.Travel) is back'end
   skipChecked+=1
   if #bad>0 then skipFails+=1;print(('FAIL: SKIP %s: %s'):format(tag,table.concat(bad,'; ')))end
   -- 9. the BONUS ROLL button, with the notice rows the client gives Place as well
@@ -288,11 +343,12 @@ for _,sc in ipairs(SCREENS)do
   for _,b in ipairs(wheel)do if overlaps(btn,b,6)then bb[#bb+1]='covers '..tostring(b.N)end end
   for _,b in ipairs(extra)do if overlaps(btn,b,6)then bb[#bb+1]='covers the '..tostring(b.N)..' notice row'end end
   local detail=m.HotbarDetails~=false and 44 or 0;local top=h-m.HotbarBottom-m.SlotSize-detail
-  local up=top-(btn.Y+btn.H) -- how far above the hotbar's item name the button ends
-  if up<0 then bb[#bb+1]='the BONUS button is under the item name'end
-  -- where there was room (the old place was just above the hotbar) it stays near it: above the bars by their height and a gap
+  -- (R157: the bars sit right over the slots and the item name rows above them: B.Reserved holds both, and the button sits above all of it)
+  local up=ext.Y-(btn.Y+btn.H) -- how far above the bars and the item name rows the button ends
+  if up<0 and btn.X<ext.X+ext.W and btn.X+btn.W>ext.X then bb[#bb+1]='the BONUS button is beside or under the bars / the item name rows'end
+  -- where there was room (the old place was just above the hotbar) it stays near it: just above the bars and the rows, as it was above R155's stack
   local oldUp=top-(old.Y+old.H)
-  if oldUp<=60 and up>oldUp+ext.H+24 then
+  if oldUp<=60 and up>oldUp+24 then
    -- (a portrait phone as narrow as 360 px has its menu wheel's third option right over that spot when the wheel is open: the button then takes the next clear place)
    if touch and w<380 then bonusWheel[#bonusWheel+1]=('%s (%d px up, was %d)'):format(tag,up,oldUp)
    else bonusFar[#bonusFar+1]=('%s (%d px up, was %d)'):format(tag,up,oldUp)end
@@ -302,10 +358,10 @@ for _,sc in ipairs(SCREENS)do
   if again.X~=btn.X or again.Y~=btn.Y or again.W~=btn.W or again.H~=btn.H then bb[#bb+1]='not the same twice'end
   bonusChecked+=1
   if #bb>0 then bonusFails+=1;print(('FAIL: BONUS %s: %s'):format(tag,table.concat(bb,'; ')))end
-  print(('SKIPBONUS %s skip %d,%d %dx%d bonus %d,%d %dx%d (%d px above the item name)'):format(tag,x,y,bw,bh,btn.X,btn.Y,btn.W,btn.H,up))
+  print(('SKIPBONUS %s skip %d,%d %dx%d bonus %d,%d %dx%d (%d px above the bars and the item name rows)'):format(tag,x,y,bw,bh,btn.X,btn.Y,btn.W,btn.H,up))
  end
 end
-check(skipFails==0,('the SKIP button of an opening never touches the bars: %d screens (with and without thumb controls), at the bottom right, 12 px inside the screen, 8 px clear of every HUD box (%d failing)'):format(skipChecked,skipFails))
+check(skipFails==0,('the SKIP button of an opening never touches the bars (R157: nor the name rows above them): %d screens (with and without thumb controls), at the bottom right, 14 px inside the screen, 8 px clear of every HUD box (%d failing)'):format(skipChecked,skipFails))
 check(bonusFails==0,('the BONUS ROLL button sits above the bars, never over them (6 px of air), clear of the wheel, the notice rows and the margins, on %d screens, always at the same place (%d failing)'):format(bonusChecked,bonusFails))
 check(#bonusFar==0,'... and near the hotbar wherever it was before: '..(#bonusFar==0 and'all of them'or table.concat(bonusFar,'; ')))
 if #bonusWheel>0 then print('(the menu wheel keeps the button further up on: '..table.concat(bonusWheel,'; ')..')')end
@@ -423,7 +479,7 @@ do
  check(s.Root.Visible and steppers()>=1 and bar('Normal').Glow.BackgroundTransparency<.9,'... and drawn again, pulsing, when the menu closes')
  -- a count that changes while the HUD is hidden shows right after it comes back
  pg:SetAttribute('SeedMenu','Shop');frames(5);player:SetAttribute('PackPityEvent',2);frames(30);pg:SetAttribute('SeedMenu',nil);frames(120)
- check(bar('Event').Label.Text=='2/10 event pity'and fillW('Event')==math.floor(innerW()*.2+.5),'a count that changed while a menu hid the bars is shown right after (2/10)')
+ check(bar('Event').Label.Text=='2/10 event pity'and fillW('Event')==fillFor(.2),'a count that changed while a menu hid the bars is shown right after (2/10)')
  -- Reduced Motion: a steady glow, no loop at all once it is drawn
  W.Gui.ReducedMotionEnabled=true;frames(5);local rm=measure(30)
  check(rm.writes==0 and steppers()==0,('Reduced Motion at 9/10: the glow is steady, 30 frames, %d writes, %d frame loops'):format(rm.writes,steppers()))

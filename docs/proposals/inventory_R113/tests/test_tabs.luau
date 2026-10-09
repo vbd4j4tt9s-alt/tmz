@@ -29,6 +29,9 @@ local function boxes(m,w,h)
   for _,z in ipairs(m.ThumbZones)do b[#b+1]={N='Jump',X=z.X,Y=z.Y,W=z.W,H=z.H}end
   return b
  end
+ -- (R157: the MENU button hides while the Bag is open (SeedMenu: HudLayout.Navigation, checked by R157's run_hud157.sh); on a portrait phone the five-option wheel moves it
+ -- up into the cards' column, so the Bag keeps clear of the middle of the left edge, where it was before R157, and the Bag's layout stays as it was: that spot is checked)
+ if m.PhonePortrait then shift=0 end
  b[#b+1]={N='Hub',X=m.MenuX,Y=h/2+shift-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}
  local bw=(m.Slots+1)*m.SlotSize+m.Slots*6
  b[#b+1]={N='Hotbar',X=w/2+(m.HotbarShiftX or 0)-bw/2,Y=h-m.HotbarBottom-m.SlotSize,W=bw,H=m.SlotSize}
@@ -41,7 +44,7 @@ local function boxes(m,w,h)
   local sw=(m.StatusStacked and 190 or 337)*m.StatusScale;local sh=(m.StatusStacked and 211 or 125)*m.StatusScale
   b[#b+1]={N='Status',X=w-12-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh};b[#b+1]={N='OwnerTools',X=10,Y=8,W=48,H=48}
  end
- if m.Travel then b[#b+1]={N='Travel',X=m.Travel.X,Y=m.Travel.Y,W=m.Travel.W,H=m.Travel.H}end
+ if m.Travel then b[#b+1]={N='Travel',X=m.Travel.X,Y=m.Travel.Y,W=m.Travel.W,H=m.Travel.H}end -- (R157: m.Travel is gone; BASE / TRACK live in the top bar row)
  return b
 end
 local views={}

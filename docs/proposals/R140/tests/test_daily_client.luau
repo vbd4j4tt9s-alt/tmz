@@ -7,6 +7,9 @@
 -- PremiumRequest 'Daily' (a fake server here), fits phones and computers; it opens by itself once when a login reward
 -- waits (after the tutorial); INVITE prompts Roblox's invite; the friend chip shows the boost (R149: a speed GAIN boost, not a walk speed one); the plant-ready opt-in
 -- is asked once, after planting, only when the owner has set notifications up.
+-- R157 (owner: "daily and invite can also be put into the menu wheel"): DAILY and INVITE are options 4 (down-right) and 5 (straight down) of the menu wheel, not squares in the
+-- top bar row (BASE / TRACK own that row); their badge, the MENU button's "!", the INVITE hint (on the script's own layer, under the MENU button) and the friend chip (on INVITE,
+-- and beside the MENU button while the wheel is closed) follow.
 local W=require('./world');local F=require('./fixtures');local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -82,37 +85,46 @@ local asked={};do local Pic=W.module('ItemPictures');local realShow=Pic.Show
 local tb=R.new('LocalScript');tb.Name='TravelButtons';local okT,errT=pcall(W.load,'TravelButtons',tb);check(okT,'TravelButtons loads: '..tostring(errT))
 local sc=R.new('LocalScript');sc.Name='DailyRewardsClient';local okD,errD=pcall(W.load,'DailyRewardsClient',sc);check(okD,'DailyRewardsClient loads: '..tostring(errD))
 frames(10)
-local travel=pg.TravelButtons;local icons=travel.TopIcons;local pair=travel.TravelPair
-local daily=icons.Daily:FindFirstChild('DailyButton');local invite=icons.Invite:FindFirstChild('InviteButton')
-check(daily and invite,'🎁 DAILY and 👥 INVITE sit in the top bar slots')
+local travel=pg.TravelButtons;local pair=travel.TravelPair
+local nav=pg:FindFirstChild('GardenNavigation');local hub=nav and nav:FindFirstChild('MenuButton')
+local daily=nav and nav:FindFirstChild('MenuOption4')and nav.MenuOption4:FindFirstChild('DailyButton')
+local invite=nav and nav:FindFirstChild('MenuOption5')and nav.MenuOption5:FindFirstChild('InviteButton')
+check(daily and invite and travel:FindFirstChild('TopIcons')==nil,'R157: 🎁 DAILY and 👥 INVITE are options 4 and 5 of the menu wheel; the top bar row has no DAILY / INVITE slots')
+local function openWheel(open)if(hub:GetAttribute('Expanded')==true)~=open then hub.Activated:Fire()end;frames(2)end
 check(daily and daily.Icon.Text=='🎁'and daily.Caption.Text=='DAILY'and invite.Icon.Text=='👥'and invite.Caption.Text=='INVITE','icons and captions')
--- 1. The top bar row on many screens.
+-- 1. R157: BASE / TRACK alone in the top bar row; DAILY / INVITE in the open wheel, on many screens.
 local function rect(o)return {X=o.AbsolutePosition.X,Y=o.AbsolutePosition.Y,W=o.AbsoluteSize.X,H=o.AbsoluteSize.Y}end
 local function overlap(a,b)return a.X<b.X+b.W and a.X+a.W>b.X and a.Y<b.Y+b.H and a.Y+a.H>b.Y end
+local Hud=W.module('HudLayout')
 local screens={{1920,1080,140,1920,'desktop 1080p'},{1280,720,120,1280,'desktop 720p'},{1024,768,120,1024,'tablet'},{844,390,150,800,'phone landscape'},
  {667,375,140,667,'small phone landscape'},{430,932,120,430,'big phone portrait'},{390,844,110,390,'phone portrait'},{375,667,110,375,'small phone portrait'},{360,640,110,360,'tiny phone portrait'}}
+openWheel(true)
 for _,s in ipairs(screens)do
  inset(s[3],s[4],0,s[2]>500 and 52 or 44);resize(s[1],s[2])
- local base,track,row=rect(pair.BaseButton),rect(pair.TrackButton),rect(icons)
- local d,i=rect(daily),rect(invite)
- local same=math.abs((d.Y+d.H/2)-(track.Y+track.H/2))<2
- local ok=not overlap(d,base)and not overlap(d,track)and not overlap(i,base)and not overlap(i,track)and not overlap(d,i)
- local inside=d.X>=0 and i.X+i.W<=s[1]and d.Y>=0 and d.W>=30 and d.W==d.H
- local right=same and d.X>=track.X+track.W+4 and i.X+i.W<=s[4]-8
- local under=not same and d.Y>=track.Y+track.H and d.X>=s[3]
- check(ok and inside and(right or under),('%s %dx%d: %s (DAILY at %d,%d size %d; TRACK ends %d; Roblox buttons from %d)'):format(s[5],s[1],s[2],same and'right of TRACK'or'under the row',d.X,d.Y,d.W,track.X+track.W,s[4]))
+ local base,track=rect(pair.BaseButton),rect(pair.TrackButton)
+ local d,i,menu=rect(daily),rect(invite),rect(hub)
+ local m=Hud.Read(R.Vector2.new(s[1],s[2]),false,nil);local o4,o5=m.MenuOffsets[4],m.MenuOffsets[5]
+ local function at(r)return r.X+r.W/2-(menu.X+menu.W/2),r.Y+r.H/2-(menu.Y+menu.H/2)end
+ local dx,dy=at(d);local ix,iy=at(i)
+ local placed=math.abs(dx-o4.X)<1 and math.abs(dy-o4.Y)<1 and math.abs(ix-o5.X)<1 and math.abs(iy-o5.Y)<1
+ local ok=not overlap(d,base)and not overlap(d,track)and not overlap(i,base)and not overlap(i,track)and not overlap(d,i)and not overlap(d,menu)and not overlap(i,menu)
+ local inside=d.X>=0 and i.X+i.W<=s[1]and d.Y>=0 and i.Y+i.H<=s[2]and d.W==m.MenuOptionSize and d.W==d.H and i.W==d.W
+ local c=(base.X+track.X+track.W)/2;local row=math.abs((base.Y+base.H/2)-(track.Y+track.H/2))<1 and base.X+base.W<=track.X and(math.abs(c-s[1]/2)<=1 or math.abs(c-(s[3]+s[4])/2)<=1)
+ check(placed and ok and inside and row,('%s %dx%d: DAILY at the wheel\'s option 4 (%+d,%+d), INVITE at option 5 (%+d,%+d), %d px; BASE / TRACK alone and centred in the top bar row'):format(s[5],s[1],s[2],dx,dy,ix,iy,d.W))
 end
+openWheel(false)
 inset(120,1280,0,52);resize(1280,720)
 -- 2. The badge.
 player:SetAttribute('DailyLoginReady',true);player:SetAttribute('DailyQuestsReady',1);frames(2)
 local b=daily:FindFirstChild('RewardBadge')
 check(b and b.Visible and b.Count.Text=='2','badge: login + 1 quest = 2')
 -- 3. The window.
-daily.Activated:Fire();frames(5)
+openWheel(true);table.clear(audioLog);daily.Activated:Fire();frames(5) -- (R157: DAILY is pressed in the open wheel)
 local gui=pg.DailyRewardsGui;local panel=gui.DailyPanel
 check(panel.Visible and pg:GetAttribute('SeedMenu')=='Daily','DAILY opens the window (SeedMenu = Daily)')
-check(daily:GetAttribute('ButtonSound')=='MenuClick','R150: the DAILY button clicks MenuClick (it opens a menu), not the generic Bubble04')
-check(not icons.Visible,'the top bar buttons hide while it is open (like the other menus)')
+-- (R157: DAILY is a wheel option: the option itself is silent - ButtonSound false - and the wheel plays MenuClick for it, as for SETTINGS / INDEX / SHOP; INVITE too, no longer Bubble04)
+check(daily:GetAttribute('ButtonSound')==false and invite:GetAttribute('ButtonSound')==false and audioHas('MenuClick')and hub:GetAttribute('Expanded')==false,'R150 / R157: the DAILY button clicks MenuClick (the wheel\'s, it opens a menu), not the generic Bubble04; so does INVITE')
+check(not pair.Visible and not hub.Visible,'the top bar buttons and the MENU button hide while it is open (like the other menus)')
 local login=panel.LoginPage;local quests=panel.QuestsPage
 check(login.Visible and not quests.Visible,'the LOGIN tab first (a login reward is waiting)')
 local cards={};for d=1,7 do cards[d]=login:FindFirstChild('Day'..d)end
@@ -154,7 +166,7 @@ check(panel.Status.Text=='Your Gems are on the way!','the server message shows')
 srv.Step=6;srv.Ready=true;panel.QuestsTab.Activated:Fire();panel.LoginTab.Activated:Fire();player:SetAttribute('DailyRevision',5);frames(5)
 check(login.ClaimButton.Caption.Text:find('VOID PACK',1,true)and not login.ClaimButton.Caption.Text:find('MECH',1,true)and cards[7].Today.Visible,'day 7: CLAIM YOUR VOID PACK!')
 -- Quests.
-panel.QuestsTab.Activated:Fire();frames(3)
+panel.QuestsTab.Activated:Fire();frames(12) -- (R157: ItemPictures clones on a real-time budget per frame; the menu wheel's two options make these frames a little busier: a few more frames for the rewards' pictures)
 check(quests.Visible and not login.Visible,'QUESTS tab')
 local rows={};for i=1,3 do rows[i]=quests:FindFirstChild('Quest'..i)end;rows[4]=quests:FindFirstChild('Bonus')
 check(rows[4]~=nil and rows[4].Visible and rows[4].Task.Text=='ALL DONE BONUS!','R153: a fourth ALL DONE row')
@@ -203,7 +215,7 @@ local limitGone=true;for i=1,4 do if rows[i].Done.Text=='DAILY LIMIT'then limitG
 check(limitGone,'(no row says DAILY LIMIT: quests are packs now)')
 -- Close.
 panel.Header.Close.Activated:Fire();frames(3)
-check(not panel.Visible and pg:GetAttribute('SeedMenu')==nil and icons.Visible,'X closes it and the top bar buttons come back')
+check(not panel.Visible and pg:GetAttribute('SeedMenu')==nil and pair.Visible and hub.Visible,'X closes it and the top bar buttons and the MENU button come back')
 -- Another menu opening closes it.
 daily.Activated:Fire();frames(2);pg:SetAttribute('SeedMenu','Index');frames(2)
 check(not panel.Visible,'opening another menu closes DAILY');pg:SetAttribute('SeedMenu',nil);frames(2)
@@ -247,16 +259,29 @@ invite.Activated:Fire();R.advance(.1);frames(1)
 check(#invites==1 and type(invites[1])~='string'and invites[1].PromptMessage~=nil,'INVITE opens Roblox\'s invite prompt (with our message)')
 check(type(invites[1])~='string'and invites[1].PromptMessage:find('speed gain',1,true)and not invites[1].PromptMessage:lower():find('faster',1,true)and #invites[1].PromptMessage<=60,'(R149: the message is about faster speed gains, short: '..tostring(invites[1].PromptMessage)..')')
 check(tostring(invite:GetAttribute('AccessibleLabel')):find('+10% speed gain',1,true)~=nil,'(and so is the INVITE tooltip: '..tostring(invite:GetAttribute('AccessibleLabel'))..')')
-canInvite=false;invite.Activated:Fire();R.advance(.1);frames(1)
-check(#invites==1 and invite.InviteHint.Visible and invite.InviteHint.Text:find('right now',1,true),'where invites are off it says so')
-R.advance(3);frames(1);check(not invite.InviteHint.Visible,'(the hint goes away)')
+canInvite=false;openWheel(true);invite.Activated:Fire();R.advance(.1);frames(1)
+do
+ -- R157: the hint is on the script's own layer (a 230 x 26 child of a wheel option would be cut by its CanvasGroup), just under the MENU button where INVITE is kept; the tap closed the wheel
+ local hintL=gui:FindFirstChild('InviteHint');local h,menu=hintL and rect(hintL),rect(hub)
+ check(#invites==1 and hintL and hintL.Visible and hintL.Text:find('right now',1,true)and invite:FindFirstChild('InviteHint')==nil,'where invites are off it says so (R157: on the DAILY / INVITE layer, not inside the option)')
+ check(hub:GetAttribute('Expanded')==false and h and h.W==230 and h.H==26 and h.Y>=menu.Y+menu.H and h.Y<=menu.Y+menu.H+10 and h.X>=0 and h.X+h.W<=1280,('R157: the tap closed the wheel and the hint sits just under the MENU button, on screen (%d,%d %dx%d; MENU ends at %d)'):format(h and h.X or -1,h and h.Y or -1,h and h.W or 0,h and h.H or 0,menu.Y+menu.H))
+ R.advance(3);frames(1);check(not hintL.Visible,'(the hint goes away)')
+end
 -- 7. Friend chip.
 player:SetAttribute('FriendsInServer',2);player:SetAttribute('FriendSpeedBoost',1.2);frames(2)
 local chip=invite:FindFirstChild('Boost')
 check(chip and chip.Visible and chip.Text=='+20%','2 friends here: a +20% chip on INVITE')
+do
+ -- R157: INVITE is inside the closed wheel, so the MENU button carries the same chip just right of it while the wheel is closed (HudLayout, from MenuFriendBoost)
+ local copy=hub:FindFirstChild('FriendBoost');local c,menu=copy and rect(copy),rect(hub)
+ check(pg:GetAttribute('MenuFriendBoost')=='+20%'and copy and copy.Visible and copy.Text=='+20%'and hub:GetAttribute('Expanded')==false,'R157: the wheel closed: the MENU button shows "+20%" too')
+ check(c and c.X>=menu.X+menu.W+2 and math.abs((c.Y+c.H/2)-(menu.Y+menu.H/2))<1 and c.X+c.W<=1280,('R157: ... just right of the MENU button, centred on it (%d,%d %dx%d)'):format(c and c.X or -1,c and c.Y or -1,c and c.W or 0,c and c.H or 0))
+ openWheel(true);check(not copy.Visible and chip.Visible,'R157: the wheel open: the chip shows on INVITE only');openWheel(false)
+ check(copy.Visible,'... and back on the MENU button when it closes')
+end
 check(tostring(invite:GetAttribute('AccessibleLabel')):find('2 here: +20% speed gain',1,true)~=nil,'(the tooltip says "+20% speed gain": '..tostring(invite:GetAttribute('AccessibleLabel'))..')')
 player:SetAttribute('FriendsInServer',0);player:SetAttribute('FriendSpeedBoost',1);frames(2)
-check(not chip.Visible,'no friends: no chip')
+check(not chip.Visible and not hub.FriendBoost.Visible and pg:GetAttribute('MenuFriendBoost')==nil,'no friends: no chip (on INVITE or beside the MENU button)')
 -- 8. Plant-ready opt-in.
 player:SetAttribute('PlantReadyAlerts',false);player:SetAttribute('SeedsPlanted',1);R.advance(3);frames(1)
 check(#optIns==0,'not asked while notifications are not set up')

@@ -370,21 +370,33 @@ do -- R153: packs opened back to back play in full every time (R151 made them qu
  check(preview and preview.Kind=='Scene','R153: an owner preview is the full scene ('..tostring(preview and preview.Kind)..')');M.Abort('test')
 end
 do -- R153: every card can be skipped by the player (R151 / R152: only the story scenes): the hint, the jump to the hit, the close
+ -- R157 (owner: "the skip button only appears for secret and above"): the Common..Mythic card has NO SKIP button and nothing skips it before its hit (no SkipFrom);
+ -- Enter / B / R2 (M.Skip) and a click still COLLECT its result once it is shown. Secret / Cosmic / King in place keep the SKIP button: the jump to the hit, the close.
  for _,c in ipairs({{3,false},{5,false},{7,true}})do
   reset();if c[2]then X.keeper(V3(25,3,100),{})end
   local run,bag=start(c[1]);local tl=run.TL;local hit=tl.Climax or tl.Burst;local tag='R153 '..names[c[1]]..(c[2]and' in place'or' card')
-  X.run(tl.SkipFrom-.1);check(M.Skip()==false,tag..': no skip before '..tl.SkipFrom..' s')
-  X.run(.3)
-  local skipB=X.find(X.pg,'Skip button')
-  check(skipB and skipB.Visible and skipB.BackgroundTransparency<1,tag..': the SKIP button shows (R155: it replaces the "click to skip" hint)')
-  W.UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,KeyCode=R.Enum.KeyCode.Unknown,Position=V3(400,300,0)},false)
-  check(not run.Skipped,tag..': R155: a click on the world does not skip')
-  check(M.Skip()and near(run.Clock(),hit-.02,.01),tag..': the SKIP button jumps straight to the hit')
-  check(W.actions[M.SkipAction]==nil and X.find(X.pg,'Backdrop')==nil and X.controls.Enabled and hudShown(),tag..': nothing is taken from the player (no full-screen button, no bound keys, the HUD and movement stay)')
+  if c[1]<=5 then
+   check(tl.SkipFrom==nil,tag..': R157: the card has no SkipFrom')
+   local shown=false
+   for _=1,math.max(1,math.floor((hit-.1)/.1))do X.run(.1);local b=X.find(X.pg,'Skip button');if b and b.Visible then shown=true end;if M.Skip()then shown=true end end
+   check(not shown and X.find(X.pg,'Skip button')==nil and not run.Skipped,tag..': R157: no SKIP button is built and Enter / B / R2 (M.Skip) skip nothing, all the way to the hit')
+   W.UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,KeyCode=R.Enum.KeyCode.Unknown,Position=V3(400,300,0)},false)
+   check(not run.Skipped,tag..': R155: a click on the world does not skip')
+   check(W.actions[M.SkipAction]==nil and X.find(X.pg,'Backdrop')==nil and X.controls.Enabled and hudShown(),tag..': nothing is taken from the player (no full-screen button, no bound keys, the HUD and movement stay)')
+  else
+   X.run(tl.SkipFrom-.1);check(M.Skip()==false,tag..': no skip before '..tl.SkipFrom..' s')
+   X.run(.3)
+   local skipB=X.find(X.pg,'Skip button')
+   check(skipB and skipB.Visible and skipB.BackgroundTransparency<1,tag..': the SKIP button shows (R155: it replaces the "click to skip" hint)')
+   W.UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,KeyCode=R.Enum.KeyCode.Unknown,Position=V3(400,300,0)},false)
+   check(not run.Skipped,tag..': R155: a click on the world does not skip')
+   check(M.Skip()and near(run.Clock(),hit-.02,.01),tag..': the SKIP button jumps straight to the hit')
+   check(W.actions[M.SkipAction]==nil and X.find(X.pg,'Backdrop')==nil and X.controls.Enabled and hudShown(),tag..': nothing is taken from the player (no full-screen button, no bound keys, the HUD and movement stay)')
+  end
   X.run(L.ShownAt(tl)-run.Clock()+.1)
   check(not M.Skip()and not run.Collected,tag..': a press just as the result lands does nothing yet (R154: CollectAfter)')
   X.run(M.CollectAfter)
-  check(M.Skip()and run.Collected,tag..': a second press once the result is shown collects it (R154: it used to close it)')
+  check(M.Skip()and run.Collected,tag..': a press once the result is shown collects it (R154: it used to close it; R157: Enter / B / R2 still do on Common..Mythic)')
   collect(nil)
   check(M.Active()==nil,tag..': gone');restoredAll(tag);bag:Destroy()
  end

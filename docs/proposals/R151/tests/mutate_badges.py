@@ -28,8 +28,8 @@ M = {
     'dot_out': ('badge', 'ChestIndex.client.lua', "Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot,true)", "Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,3,true)"),
     # R153 client bug review (finding 7): the tab dot is back on the top-right corner, over the end of the count text
     'dot_on_count': ('badge', 'ChestIndex.client.lua', "Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot,true)", "Badge.Make(t.Button,'RewardDot',Badge.Sizes.Dot,Badge.Overhang.Dot)"),
-    # the DAILY badge hangs off the top of the screen again
-    'daily_off_screen': ('daily', 'DailyRewardsClient.client.lua', "Badge.Make(dailyButton,'RewardBadge',Badge.Sizes.Daily,Badge.Overhang.Daily)", "Badge.Make(dailyButton,'RewardBadge',Badge.Sizes.Daily,12)"),
+    # R157: the DAILY badge is not the INDEX badge any more (R155's 24 px one that hung out to the right only, from the top bar row)
+    'daily_off_screen': ('daily', 'DailyRewardsClient.client.lua', "Badge.Make(dailyButton,'RewardBadge',Badge.Sizes.Count,Badge.Overhang.Count)", "Badge.Make(dailyButton,'RewardBadge',24,10,false,0)"),
     # past nine the badge says 10, 11 ...
     'no_overflow': ('badge', 'NotifyBadge151.lua', "return n>9 and'9+'or tostring(n)", 'return tostring(n)'),
     # the count is not centred on the disc
@@ -39,11 +39,11 @@ M = {
     # switching Reduced Motion on does not stop the pulses that are running
     'reduced_keeps_pulse': ('badge', 'NotifyBadge151.lua', 'if Gui.ReducedMotionEnabled then for badge in pairs(pulses)do stop(badge)end end', 'if false then for badge in pairs(pulses)do stop(badge)end end'),
     # R153: the badges are back at their R151 size (24 / 20 / 20 / 14)
-    'sizes_r151': ('badge', 'NotifyBadge151.lua', 'B.Sizes={Count=36,Alert=30,Daily=30,Dot=21}', 'B.Sizes={Count=24,Alert=20,Daily=20,Dot=14}'),
+    'sizes_r151': ('badge', 'NotifyBadge151.lua', 'B.Sizes={Count=30,Alert=26,Dot=21}', 'B.Sizes={Count=24,Alert=20,Dot=14}'),
     # R153: the MENU alert hangs so far past its corner that it leaves the screen
-    'alert_off_screen': ('badge', 'NotifyBadge151.lua', 'B.Overhang={Count=9,Alert=9,', 'B.Overhang={Count=9,Alert=26,'),
+    'alert_off_screen': ('badge', 'NotifyBadge151.lua', 'B.Overhang={Count=10,Alert=10,', 'B.Overhang={Count=10,Alert=26,'),
     # R153: the INDEX count hangs further than the wheel's CanvasGroup keeps room for (cut flat again)
-    'count_cut': ('badge', 'NotifyBadge151.lua', 'B.Overhang={Count=9,', 'B.Overhang={Count=20,'),
+    'count_cut': ('badge', 'NotifyBadge151.lua', 'B.Overhang={Count=10,', 'B.Overhang={Count=20,'),
     # R154: the count's text is back at the R153 size (62% of the diameter, a third of the bubble in the engine)
     'text_small': ('badge', 'NotifyBadge151.lua', 'TextFill1=.78,', 'TextFill1=.4,'),
     # R154: "9+" is set as big as one character, so it runs out of the disc
