@@ -32,7 +32,8 @@ A store model can carry code, so it is never used as it is. It is cloned (the or
 
 ### Fitting it in
 
-- `Model:ScaleTo` so its FARTHEST point (any part's corner, sideways) lies on the collider's circle: for a round look that is its whole width, so it fills the circle; a look that is not
+- `Model:ScaleTo(GetScale() * k)` so its FARTHEST point lies on the collider's circle (R154 review: a round part - upright Cylinder, Ball, round MeshPart / union - is measured by its circle, not by its box
+  corners, which put a round look at 71% of the circle; a model saved at scale 2 is scaled from there): for a round look that is its whole width, so it fills the circle; a look that is not
   round (a square one) is fitted INSIDE the circle by its corners, and `/test trampoline` says so ("not round ... fitted inside the circle by its corners");
 - centred on the nook; its mat (the largest roughly flat part in the top half, preferring a name like Mat / Bouncy / Jump; frames, legs, springs, poles and nets are never the mat)
   with its top at the collider's walking top, 4.9. A model with no mat that can be told (one part, or two like candidates) has its top surface there instead;
@@ -67,6 +68,8 @@ count are reported by `/test trampoline` once it loads, and the cap (400 parts p
 - **Why the beds' sides were still blocked**: the first ramps skipped the pad's 1.0-stud aprons beside the fence and were measured against the runner sweep's
   1.1-stud clearance, but the Humanoid does not walk up a 0.8 step. Every raised block (each soil bed and the pad) now has a continuous 22 degree skirt: a wedge along each face and a fan
   of wedges at each convex corner (`GardenBaseLayout.RampSpecs`); tested by walking every side, corner, rim and fence pillar of all 6 bases and a flood fill from the lawn.
+  R154 review: the 46 x 3 stud strip of soil drawn in front of DirtPlot_5 (up to DirtPlot_9's front edge) had no floor (feet 0.4 - 0.8 below the soil you see); its skirt now stands at its real
+  edge and an invisible flat block `Soil edge top` (soil plane 5.8) in `GardenBedRamps153` is its floor.
 - The measurements use the owner's current place (`5ea4542b-sapkeee.rbxl`); against the older snapshot (`b4f113d1-sapkeyver.rbxl`) the pads, plots and nooks are identical (it
   differs only by the installed R151 - R153 scripts and the ServerStorage backups).
 - The lane nook trampoline stands 5.4 studs from the pads of Bases 5 and 6; its ring and the neighbouring beds' skirts join in a valley 0.28 over the floor (tested).

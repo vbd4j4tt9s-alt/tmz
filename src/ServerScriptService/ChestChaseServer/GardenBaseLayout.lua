@@ -106,6 +106,10 @@ end
 -- sweep both treat it as ground; not touchable), invisible, and lies wholly under the soil's plane: a ray that ends on soil or on a plant (planting's "KEEP A
 -- CLEAR VIEW OF THE SOIL" check, digging, inspection) comes from above that plane and never crosses one. They stand in Workspace.ChestChaseMap.GardenBedRamps153
 -- (not under a base: WalkthroughProps90 would make them walk-through).
+-- R154 (review): L.Base's 'Soil edge finish' - the 3-stud strip of soil in front of DirtPlot_5, filled up to DirtPlot_9's front edge - is drawn soil that no plot carries (it is
+-- decoration under the base, so walk-through): walking in over the front border the feet sank 0.4 - 0.8 studs below the soil you see (the ramps of DirtPlot_5 stood at its old
+-- edge, 3 studs back). Now the strip counts as part of DirtPlot_5 for the ramps (the skirt stands round its real front edge and its two sides) and an invisible flat top, the strip's
+-- own box (the soil's thickness, its top exactly the soil plane, 0.02 into DirtPlot_5 so no seam), stands in this folder as 'Soil edge top': a floor at soil height like the plots.
 L.RampFolder='GardenBedRamps153'
 L.Ramp={Slope=2.5,MinLength=.5,MinRise=.15,Blades=6,Overlap=1.15}
 -- The ramps of one base, as {Name, Cf (world), Size} (pure: reads the pad and the plots).
@@ -119,6 +123,16 @@ function L.RampSpecs(base)
   local at=cf:PointToObjectSpace(plot.Position)
   table.insert(soil,{X0=rounded(at.X-plot.Size.X/2),X1=rounded(at.X+plot.Size.X/2),Z0=rounded(at.Z-plot.Size.Z/2),Z1=rounded(at.Z+plot.Size.Z/2),Top=rounded(at.Y+plot.Size.Y/2),Name=plot.Name})
  end end
+ -- the strip L.Base drew in front of DirtPlot_5 (the soil edge finish) is soil for the ramps: DirtPlot_5's rect grows to its front edge
+ local infill
+ local design=base:FindFirstChild('GardenDesign36');local fin=design and design:FindFirstChild('Soil edge finish')
+ if fin and fin:IsA('BasePart')then
+  local at,fs=cf:PointToObjectSpace(fin.Position),fin.Size
+  local r={X0=rounded(at.X-fs.X/2),X1=rounded(at.X+fs.X/2),Z0=rounded(at.Z-fs.Z/2),Z1=rounded(at.Z+fs.Z/2),Top=rounded(at.Y+fs.Y/2),Y=at.Y,H=fs.Y}
+  for _,q in ipairs(soil)do
+   if math.abs(q.X0-r.X0)<.02 and math.abs(q.X1-r.X1)<.02 and math.abs(q.Z1-r.Z0)<.02 and math.abs(q.Top-r.Top)<.02 then q.Z1=r.Z1;infill=r;break end
+  end
+ end
  local padRect={X0=-hx,X1=hx,Z0=-hz,Z1=hz,Top=hy,Name='Pad',Pad=true}
  local rects={padRect};for _,r in ipairs(soil)do table.insert(rects,r)end
  local faces={}
@@ -199,6 +213,11 @@ function L.RampSpecs(base)
   end end
   corners({r},r)
  end end
+ -- the flat top over the strip (a block, not a wedge): the soil's own thickness, its top the soil plane (never above it), 0.02 into DirtPlot_5
+ if infill then
+  local z0=infill.Z0-.02
+  table.insert(out,{Name='Soil edge top',Cf=cf*CFrame.new((infill.X0+infill.X1)/2,infill.Y,(z0+infill.Z1)/2),Size=Vector3.new(infill.X1-infill.X0,infill.H,infill.Z1-z0),Rise=infill.Top-floorY,Run=0,Flat=true})
+ end
  return out
 end
 function L.Ramps(map)
@@ -207,7 +226,7 @@ function L.Ramps(map)
  local n=0
  for _,base in ipairs(map.Bases:GetChildren())do if base:IsA('Model')and base:GetAttribute('BaseIndex')then
   for _,spec in ipairs(L.RampSpecs(base))do
-   local p=Instance.new('WedgePart');p.Name=spec.Name;p.Size=spec.Size;p.CFrame=spec.Cf;p.Anchored=true;p.CanCollide=true;p.CanTouch=false;p.CanQuery=true
+   local p=Instance.new(spec.Flat and'Part'or'WedgePart');p.Name=spec.Name;p.Size=spec.Size;p.CFrame=spec.Cf;p.Anchored=true;p.CanCollide=true;p.CanTouch=false;p.CanQuery=true
    p.Transparency=1;p.CastShadow=false;p.Material=Enum.Material.Plastic;p:SetAttribute('BaseIndex',base:GetAttribute('BaseIndex'));p.Parent=folder;n+=1
   end
  end end

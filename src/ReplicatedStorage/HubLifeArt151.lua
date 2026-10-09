@@ -483,7 +483,8 @@ A.Full={ -- (R154: everything the square had; A.Layout, below, is what is built 
 --   Pebbles  the scattered pebbles along the side streets and the garden walks (40 balls): gone
 --   Lamps    the lamp posts kept, by their x, z in A.Full.lamps: 12 of 26, evenly spaced along the streets and round the market (all 8 that carry a real light, and the 4
 --            that hold the bunting up); true keeps all 26. A lamp's bunting goes with it unless re-hung (BuntingExtra)
---   everything else the square had stays (trees, bushes, topiary, bunting, grass patches, verges, wall lanterns, butterflies)
+--            (a butterfly homed on a bed that went goes too: 6 of the 12 circled the beds' flowers; the other 6, over the lawns, the nooks and the lane, stay)
+--   everything else the square had stays (trees, bushes, topiary, bunting, grass patches, verges, wall lanterns, the other butterflies)
 A.Tidy={
  Beds=false,Benches=false,Pebbles=false,
  Lamps={
@@ -499,7 +500,17 @@ local function lampAt(l,x,z)return math.abs(l[1]-x)<.01 and math.abs(l[2]-z)<.01
 function A.Filter(full,tidy)
  local out={}
  for k,v in pairs(full)do out[k]=v end
- if tidy.Beds==false then out.beds={} end
+ if tidy.Beds==false then
+  out.beds={}
+  -- a butterfly homed on a bed that went circled its flowers; with no flowers it would circle bare lawn: it goes with the bed (and comes back with Beds on). Those that stay
+  -- keep their number in the full list (their wing colour and flutter are seeded by it), as the 4th entry.
+  out.butterflies={}
+  for k,b in ipairs(full.butterflies)do
+   local home=false
+   for _,bed in ipairs(full.beds)do if (b[1]-bed[1])^2+(b[3]-bed[2])^2<=(bed[3]+2)^2 then home=true end end
+   if not home then out.butterflies[#out.butterflies+1]={b[1],b[2],b[3],k} end
+  end
+ end
  if tidy.Benches==false then out.benches={} end
  local keptLamp=function(x,z)
   if tidy.Lamps==true or tidy.Lamps==nil then return true end
@@ -580,7 +591,7 @@ function A.Build(root,tier,bases,templates)
  end
  for _,l in ipairs(K.WallLanterns)do local sec=K.Sections[l.Sec];A.WallLantern(ctx,sec,K.SOf(sec,l.W),K.WallTop)end
  local wings={{255,140,60},{255,230,90},{120,200,255},{240,130,230},{255,255,255}}
- for k,p in ipairs(L.butterflies)do A.Butterfly(ctx,p[1],p[2],p[3],wings[(k-1)%#wings+1],k)end
+ for k,p in ipairs(L.butterflies)do local id=p[4]or k;A.Butterfly(ctx,p[1],p[2],p[3],wings[(id-1)%#wings+1],id)end
  for _,cell in pairs(ctx.Cells)do cell.Center=cell.N>0 and cell.Sum/cell.N or V(0,0,0)end
  -- what was really placed (a clone that could not be placed fell back to the part-built tree)
  local used=0;for _,n in pairs(ctx.Templated)do used+=n end

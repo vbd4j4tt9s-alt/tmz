@@ -517,6 +517,9 @@ local function measure(includeRamps)
   for _,p in ipairs(base.GardenPlots:GetChildren())do
    local a,b=aabb(p);plots[#plots+1]={P=p,X0=a[1],X1=b[1],Z0=a[3],Z1=b[3],Top=b[2]}
   end
+  -- R154 review: the soil edge finish (GardenBaseLayout.Base's 3-stud strip of soil in front of DirtPlot_5, visible, no plot) is soil you see: walked on every side like a plot
+  local dsg=base:FindFirstChild('GardenDesign36');local fin=dsg and dsg:FindFirstChild('Soil edge finish')
+  if fin then local a,b=aabb(fin);plots[#plots+1]={P=fin,X0=a[1],X1=b[1],Z0=a[3],Z1=b[3],Top=b[2]} end
   local pa,pb=aabb(base.Pad);lox,hix,loz,hiz=pa[1],pb[1],pa[3],pb[3]
   local near=nearParts(lox-DEPTH-9,hix+DEPTH+9,loz-DEPTH-9,hiz+DEPTH+9)
   if not includeRamps then local keep={};for _,p in ipairs(near)do if p._class~='WedgePart'then keep[#keep+1]=p end end;near=keep end
@@ -602,6 +605,66 @@ if not MUT then
  local lows={};for _,f in ipairs(before.Fail)do if f.Cliff>.7 and f.Cliff<.9 then lows[f.Label:match('^%a+')]=true end end
  check('gardens: and the 0.8-stud step from the pad onto the soil (the apron beside the fence) fails it too: that is the step the first R153 ramps left',next(lows)~=nil)
 end
+-- THE FRONT STRIP (R154 review). GardenBaseLayout.Base fills the 3-stud recess in front of DirtPlot_5 with soil you can see ('Soil edge finish', up to DirtPlot_9's front edge): decoration under the
+-- base, so walk-through, while the ramps stood at DirtPlot_5's old edge. Walking in over the front border the feet were 0.4 - 0.8 studs below the soil you see. Now the strip has a ramp skirt
+-- at its real front edge and sides and an invisible flat top (GardenBedRamps153 'Soil edge top'). Walked here: in from 6 studs out over the front border every .5 stud across the strip's 46
+-- studs, and in from either end at three depths of the strip; the ground must never step up over CLIFF nor climb over SLOPE per stud, and every foot sample over the strip must stand at the
+-- soil plane (5.8), which is what the eye sees.
+do
+ local TOP=5.8
+ local function crossStrips(withFlat)
+  local rep={Walks=0,Cliff=0,Slope=0,MinH=math.huge,MaxH=-math.huge,Strips=0,Samples=0}
+  for i=1,6 do
+   local base=bases[i];local dsg=base:FindFirstChild('GardenDesign36');local fin=dsg and dsg:FindFirstChild('Soil edge finish');local p5=base.GardenPlots:FindFirstChild('DirtPlot_5')
+   if fin and p5 then
+    rep.Strips+=1
+    local fa,fb=aabb(fin);local pa,pb=aabb(p5)
+    local near=nearParts(fa[1]-DEPTH-9,fb[1]+DEPTH+9,fa[3]-DEPTH-9,fb[3]+DEPTH+9)
+    if not withFlat then local keep={};for _,p in ipairs(near)do if p.Name~='Soil edge top'then keep[#keep+1]=p end end;near=keep end
+    local entries=boxes(near)
+    local thinX=(fb[1]-fa[1])<(fb[3]-fa[3]) -- the strip is 3 studs deep: along X on the bases turned a quarter, along Z on the others
+    local ax=thinX and 1 or 3;local lat=thinX and 3 or 1
+    local out=((fa[ax]+fb[ax])/2>(pa[ax]+pb[ax])/2)and 1 or-1 -- the way out, away from DirtPlot_5
+    local edge=out>0 and fb[ax]or fa[ax];local depth=fb[ax]-fa[ax]
+    local function walk(qx,qz,nx,nz,d0,d1)
+     local c,s,hs=walkMetrics(entries,qx,qz,nx,nz,d0,d1)
+     rep.Walks+=1;if c>rep.Cliff then rep.Cliff=c end;if s>rep.Slope then rep.Slope=s end
+     local d=d0
+     for k=1,#hs do
+      local x,z=qx+nx*d,qz+nz*d
+      if x>fa[1]+.05 and x<fb[1]-.05 and z>fa[3]+.05 and z<fb[3]-.05 then
+       rep.Samples+=1;if hs[k]<rep.MinH then rep.MinH=hs[k] end;if hs[k]>rep.MaxH then rep.MaxH=hs[k] end
+      end
+      d-=STEP
+     end
+    end
+    -- straight in over the front border, from 6 studs out to 1 stud into DirtPlot_5, every .5 stud across the strip
+    local t=fa[lat]+.25
+    while t<fb[lat] do
+     if thinX then walk(edge,t,out,0,DEPTH,-(depth+1))else walk(t,edge,0,out,DEPTH,-(depth+1))end
+     t+=.5
+    end
+    -- in from either end (the aisle side, and the side beside the fence), at three depths of the strip, to 2 studs in
+    for _,endSign in ipairs({-1,1})do
+     for _,f in ipairs({.5,depth/2,depth-.5})do
+      local along=edge-out*f;local e=endSign<0 and fa[lat]or fb[lat]
+      if thinX then walk(along,e,0,endSign,DEPTH,-2)else walk(e,along,endSign,0,DEPTH,-2)end
+     end
+    end
+   end
+  end
+  return rep
+ end
+ local with=crossStrips(true)
+ info(string.format('gardens (R154): the soil strip in front of DirtPlot_5, %d bases, %d walks over it (%d foot samples): worst cliff %.2f, worst slope %.2f per stud; the ground over it stands %.3f - %.3f (the soil plane is %.1f)',with.Strips,with.Walks,with.Samples,with.Cliff,with.Slope,with.MinH,with.MaxH,TOP))
+ check('gardens (R154): the 3-stud strip of soil in front of DirtPlot_5 (all 6 bases) is walkable at the height it shows: '..with.Walks..' walks in over the front border and from both ends have no ledge over '..CLIFF..' and no slope over '..SLOPE..', and the feet stand at the soil plane 5.8 all over it (lowest '..string.format('%.3f',with.MinH)..', highest '..string.format('%.3f',with.MaxH)..'), not below it',
+  with.Strips==6 and with.Walks>=560 and with.Samples>20000 and with.Cliff<=CLIFF+1e-6 and with.Slope<=SLOPE+1e-6 and with.MinH>=TOP-.02 and with.MaxH<=TOP+.001,string.format('%d strips %d walks cliff %.2f slope %.2f min %.3f max %.3f',with.Strips,with.Walks,with.Cliff,with.Slope,with.MinH,with.MaxH))
+ if not MUT then
+  local without=crossStrips(false)
+  info(string.format('gardens (R154): without the flat top the ground over the strip stands at %.2f - %.2f (the pad, %.2f below the soil you see)',without.MinH,without.MaxH,TOP-without.MinH))
+  check('gardens (R154): the strip measurement has teeth: without the flat top the feet over the strip stand on the pad, 0.8 studs below the soil you see',without.Strips==6 and without.MinH<=TOP-.75)
+ end
+end
 -- WALKING ONTO A TRAMPOLINE. The collider's top is 0.9 over the floor: a ledge to a walking body (the garden beds' 0.8 was one), so each collider is skirted by a ring of invisible
 -- wedges. From 8 studs outside the ring in 16 directions (the garden walk's centre line and the lane's way in among them) to the middle: the same cliff / slope limits as the beds,
 -- the top reached at the collider's edge, which is where the bounce starts (T.OnMat).
@@ -659,6 +722,7 @@ do
   local dx,dy,dz=x-q.X,y-q.Y,z-q.Z
   local lx=dx*r[1][1]+dz*r[3][1];local lz=dx*r[1][3]+dz*r[3][3]
   if math.abs(lx)>=s.X/2 or math.abs(lz)>=s.Z/2 then return false end
+  if p.Name=='Soil edge top'then return dy>-s.Y/2 and dy<s.Y/2-1e-6 end -- (R154: the flat top over the soil strip is a box, not a wedge)
   return dy>-s.Y/2 and dy<-s.Y/2+s.Y*((lz+s.Z/2)/s.Z)-1e-6
  end
  for i=1,6 do
@@ -722,9 +786,11 @@ do
  check('gardens: every plot still collides (the soil keeps its walkable height)',#notSolid==0)
  local bad={}
  for _,p in ipairs(rampParts)do
-  if p._props.CanQuery~=true or p._props.CanTouch~=false or p._props.CanCollide~=true or p._props.Anchored~=true or p._props.Transparency~=1 or p._class~='WedgePart'then bad[#bad+1]=p.Name end
+  local flatTop=p.Name=='Soil edge top' -- (R154 review: the one flat block per base over the soil strip in front of DirtPlot_5; every other ramp is a wedge)
+  if p._props.CanQuery~=true or p._props.CanTouch~=false or p._props.CanCollide~=true or p._props.Anchored~=true or p._props.Transparency~=1 or p._class~=(flatTop and'Part'or'WedgePart')then bad[#bad+1]=p.Name end
  end
- check('gardens: every ramp is an anchored, invisible, solid wedge that is queryable (a floor to the Humanoid and the runner sweep, like the pad and the soil) and untouchable',#bad==0 and #rampParts>0,first(bad)or#rampParts)
+ local flats=0;for _,p in ipairs(rampParts)do if p.Name=='Soil edge top'then flats+=1 end end
+ check('gardens: every ramp is an anchored, invisible, solid wedge (and the 6 flat \'Soil edge top\' blocks, one per base) that is queryable (a floor to the Humanoid and the runner sweep, like the pad and the soil) and untouchable',#bad==0 and #rampParts>0 and(MUT=='noramps'or flats==6),first(bad)or(#rampParts..' / '..flats))
  -- never above the soil, never over a plot (but .03 into its face), never off the hub floor
  local over,inside,outside={},{},{}
  for _,p in ipairs(rampParts)do
@@ -888,6 +954,133 @@ do
   reload(function()return container(asset())end,DENIED) -- (back to the asset look, the state section A left for B and C)
   check('loader: a store model carrying scripts named HubTrampolineRules153 / HubTrampolineTemplates153 / HubTrampoline153 is loaded (asset route '..tostring(viaAsset)..', template route '..tostring(viaTemplate)..') and NOTHING reaches ReplicatedStorage: one rules module, the same instance and source, the same children, no copy of an impostor in the world',
    viaAsset and viaTemplate and stillThere and count==1 and rules._source==src0 and snapshot()==snap0 and #inWorld==0 and kids==1,'children '..snap0..' -> '..snapshot()..' world '..tostring(inWorld[1]))
+ end
+ -- A3. R154 review: the look's REACH is measured as it is DRAWN. A round look (cylinders, balls, round meshes, unions) used to be fitted by the 8 corners of each part's box: a
+ -- 20-stud cylinder "reached" D/sqrt2 = 14.1, so its rim ended at 71% of the circle (8.9 of a garden nook's 12.6, 6.8 of the lane's 9.6) while the invisible collider, the ramps
+ -- and the bounce fill all of it. Also Model:ScaleTo takes the ABSOLUTE scale: a model saved at scale 2 used to be scaled to half the size it should have been.
+ do
+  local PT=R.Enum.PartType
+  local rawIsA=R.Inst.IsA
+  function R.Inst.IsA(self,c)if self._class=='UnionOperation'and(c=='BasePart'or c=='PVInstance'or c=='PartOperation')then return true end;return rawIsA(self,c)end -- (the mock knows no unions)
+  local function mk(class,parent,name,size,cf,shape)
+   local p=R.new(class);p.Name=name;p.Size=size;p.CFrame=cf;p.Anchored=false;p.CanCollide=true;p.CanTouch=true;p.CanQuery=true;p.Transparency=0
+   if shape then p.Shape=shape end
+   p.Parent=parent;return p
+  end
+  local UP=R.CFrame.Angles(0,0,math.pi/2) -- (a Roblox cylinder's axis is its local X: turned about Z it stands up)
+  local function cyl(parent,name,diam,height,x,y,z)return mk('Part',parent,name,V3(height,diam,diam),CF(x,y,z)*UP,PT.Cylinder)end
+  local function ball(parent,name,diam,x,y,z)return mk('Part',parent,name,V3(diam,diam,diam),CF(x,y,z),PT.Ball)end
+  -- the drawn radius of a part that is round from above (nil for the rest)
+  local function drawnRadius(p)
+   local c,sz,shape=p._props.CFrame,p._props.Size,p._props.Shape
+   if shape==PT.Ball then return math.max(sz.X,sz.Y,sz.Z)/2 end
+   if shape==PT.Cylinder and math.abs(c.RightVector.Y)>.99 then return math.max(sz.Y,sz.Z)/2 end
+   if(p._class=='MeshPart'or p._class=='UnionOperation')and c.UpVector.Y>.99 then return math.max(sz.X,sz.Z)/2 end
+   return nil
+  end
+  -- the look's true outline from above: 720 points round every round part's rim, the 8 corners of any other box
+  local function rimReach(look,sp)
+   local far=0
+   local function see(x,z)local d=math.sqrt((x-sp.X)^2+(z-sp.Z)^2);if d>far then far=d end end
+   for _,p in ipairs(parts(look))do
+    local r=drawnRadius(p)
+    if r then local q=p._props.CFrame.Position;for k=0,719 do local a=k/720*math.pi*2;see(q.X+math.cos(a)*r,q.Z+math.sin(a)*r)end
+    else for _,v in ipairs(corners(p))do see(v.X,v.Z)end end
+   end
+   return far
+  end
+  local function roundTramp(o) -- a round store trampoline in its own units (20 wide): a frame, 4 legs inside it, a mat, and a script
+   local m=R.new('Model');m.Name='Round Trampoline'
+   if o.Mesh then mk('MeshPart',m,'Frame',V3(20,.6,20),CF(0,3.3,0))else cyl(m,'Frame',20,.6,0,3.3,0)end
+   for _,c in ipairs({{6,6},{-6,6},{6,-6},{-6,-6}})do cyl(m,'Leg',1,3,c[1],1.5,c[2])end
+   if o.Union then mk('UnionOperation',m,'Mat',V3(17,.4,17),CF(0,3.2,0))
+   elseif o.Mesh then mk('MeshPart',m,'Mat',V3(17,.4,17),CF(0,3.2,0))
+   else cyl(m,'Mat',17,.4,0,3.2,0)end
+   local sc=R.new('Script');sc.Name='Evil';sc.Parent=m
+   return m
+  end
+  local function onCircle(label,make)
+   local st=reload(function()return container(make())end,DENIED)
+   local worst,placed,lockBad,oneLook=0,true,{},true
+   for _,spot in ipairs(T.Spots)do
+    local _,look=lookOf(spot)
+    if not look then oneLook=false else
+     local d=math.abs(rimReach(look,spot)-spot.Radius);if d>worst then worst=d end
+     local lo,hi=box(look);if math.abs((lo[1]+hi[1])/2-spot.X)>.01 or math.abs((lo[3]+hi[3])/2-spot.Z)>.01 then placed=false end
+     for _,p in ipairs(parts(look))do if p._props.Anchored~=true or p._props.CanCollide~=false or p._props.CanTouch~=false or p._props.CanQuery~=false then lockBad[#lockBad+1]=p.Name end end
+    end
+   end
+   check('look (R154, '..label..'): the visible rim lands on the collider\'s circle on all three nooks (12.6 / 12.6 / 9.6; worst '..string.format('%.3f',worst)..' off), centred, locked',HT.Look=='asset'and oneLook and worst<=.02 and placed and #lockBad==0,string.format('%s %.3f',tostring(HT.Look),worst))
+   return st
+  end
+  -- 1. a round cylinder look: a 20-stud cylinder frame, a cylinder mat, cylinder legs
+  local st1=onCircle('a round cylinder look',function()return roundTramp({})end)
+  local _,l1=lookOf(T.Spots[1]);local _,l3=lookOf(T.Spots[3])
+  local k1,k3=l1:GetAttribute('Scale'),l3:GetAttribute('Scale')
+  info(string.format('look (R154): a 20-stud cylinder look: rim %.2f of the garden nook\'s 12.60 (before: %.2f, 71%%) and %.2f of the lane\'s 9.60 (before: %.2f); scale %.4f (before %.4f)',
+   rimReach(l1,T.Spots[1]),T.Spots[1].Radius/math.sqrt(2),rimReach(l3,T.Spots[3]),T.Spots[3].Radius/math.sqrt(2),k1,T.Spots[1].Radius/(10*math.sqrt(2))))
+  check('look (R154, cylinder): scaled by radius / 10 (its rim is 10 studs from its middle), not by the box corners\' radius / 14.14; the mat is found (squash) and Round = 1',
+   math.abs(k1-T.Spots[1].Radius/10)<1e-6 and math.abs(k3-T.Spots[3].Radius/10)<1e-6 and st1.MatName=='Mat' and lookOf(T.Spots[1]):GetAttribute('HasMat')==true and math.abs(st1.Round-1)<.01,tostring(k1)..' '..tostring(st1.Round))
+  local okc,textc=HT.Command(nil,nil,{})
+  check('command (R154, cylinder): /test trampoline says the look is round and its rim lies on the collider\'s circle (no "not round")',okc and textc:find('round, so its rim lies on the collider',1,true)~=nil and textc:find('not round',1,true)==nil and textc:find('brick circle',1,true)~=nil,textc)
+  -- 2. balls and a cylinder: 4 balls (3 studs) at 8.5 round a cylinder frame of 18; the balls are the farthest (8.5 + 1.5 = 10)
+  onCircle('balls and a cylinder',function()
+   local m=R.new('Model');m.Name='Ball Trampoline'
+   cyl(m,'Frame',18,.6,0,3.3,0);cyl(m,'Mat',15,.4,0,3.2,0)
+   for _,c in ipairs({{8.5,0},{-8.5,0},{0,8.5},{0,-8.5}})do ball(m,'Ball',3,c[1],1.5,c[2])end
+   return m end)
+  local _,lb=lookOf(T.Spots[2])
+  check('look (R154, balls): the farthest points are the balls\' outer sides (a ball is measured by its circle, 10 studs out): scaled by radius / 10',math.abs(lb:GetAttribute('Scale')-T.Spots[2].Radius/10)<1e-6,tostring(lb:GetAttribute('Scale')))
+  -- 3. round meshes and a union
+  onCircle('a round MeshPart frame and mat',function()return roundTramp({Mesh=true})end)
+  onCircle('a round MeshPart frame and a union mat',function()return roundTramp({Mesh=true,Union=true})end)
+  -- 4. a look that is not round stays INSIDE the circle by its corners: a square frame of four MeshPart bars (20 x 1: a bar off the middle is not "round about its middle")
+  do
+   local st=reload(function()
+    local m=R.new('Model');m.Name='Square Frame'
+    mk('MeshPart',m,'Frame',V3(20,.6,1),CF(0,3.3,9.5));mk('MeshPart',m,'Frame',V3(20,.6,1),CF(0,3.3,-9.5))
+    mk('MeshPart',m,'Frame',V3(1,.6,20),CF(9.5,3.3,0));mk('MeshPart',m,'Frame',V3(1,.6,20),CF(-9.5,3.3,0))
+    mk('MeshPart',m,'Mat',V3(17,.4,17),CF(0,3.2,0))
+    return container(m) end,DENIED)
+   local _,ls=lookOf(T.Spots[1]);local lo,hi=box(ls)
+   local half=(hi[1]-lo[1])/2
+   check('look (R154, not round): a square frame of mesh bars is still fitted INSIDE the circle by its corners (corners on 12.6, the frame\'s half-width '..string.format('%.2f',half)..' studs), Round = 1.41',
+    HT.Look=='asset'and math.abs(reachOf(ls,T.Spots[1])-T.Spots[1].Radius)<.02 and half<T.Spots[1].Radius*.75 and st.Round>1.3,string.format('%.2f half %.2f round %.2f',reachOf(ls,T.Spots[1]),half,st.Round))
+   local okq,textq=HT.Command(nil,nil,{})
+   check('command (R154, not round): /test trampoline says "not round" and that the corners fit it inside',okq and textq:find('not round',1,true)~=nil and textq:find('INSIDE the circle',1,true)~=nil,textq)
+  end
+  -- 5. a model SAVED at scale 2 (Model:ScaleTo takes the absolute scale): the square test model, doubled, as a hand-placed template and as the asset itself; the same final look as at scale 1
+  do
+   local function scaled(name,k)local m=asset({Name=name,Junk=false});m:ScaleTo(k);return m end
+   local tfs=R.new('Folder');tfs.Name=T.TemplateFolder;tfs.Parent=RS
+   local hand3=scaled('Scale 2',2);hand3.Parent=tfs
+   reload(DENIED,DENIED)
+   local worst,scaleOk,matOk=0,true,true
+   for _,spot in ipairs(T.Spots)do
+    local _,look=lookOf(spot)
+    if not look then worst=math.huge else
+     worst=math.max(worst,math.abs(reachOf(look,spot)-spot.Radius))
+     if math.abs(look:GetScale()-spot.Radius/(10*math.sqrt(2)))>1e-6 or math.abs(look:GetAttribute('Scale')-spot.Radius/(20*math.sqrt(2)))>1e-6 then scaleOk=false end
+     local mat=look:FindFirstChild('Trampoline mat',true);if not mat or math.abs(mat._props.Size.X-17*spot.Radius/(10*math.sqrt(2)))>.01 then matOk=false end
+    end
+   end
+   check('look (R154, scale): a template saved at scale 2 (parts twice the size, GetScale 2) is fitted to the same circle as at scale 1 (corners on 12.6 / 12.6 / 9.6, worst '..string.format('%.3f',worst)..' off) and ends at the same scale and mat size: ScaleTo gets GetScale() x the factor',
+    HT.Look=='template'and worst<=.02 and scaleOk and matOk,string.format('%s %.3f',tostring(HT.Look),worst))
+   tfs:Destroy()
+   -- the asset route hands back a model saved at scale 3 itself
+   reload(function()return scaled('Scale 3',3)end,DENIED)
+   local worst2=0;for _,spot in ipairs(T.Spots)do local _,look=lookOf(spot);worst2=math.max(worst2,look and math.abs(reachOf(look,spot)-spot.Radius)or math.huge)end
+   check('look (R154, scale): and an asset that comes back as a model saved at scale 3 lands on the circle too (worst '..string.format('%.3f',worst2)..' off)',HT.Look=='asset'and worst2<=.02,tostring(worst2))
+  end
+  -- 6. a round look saved at scale 2.5 (both fixes together)
+  do
+   local m=roundTramp({});m:ScaleTo(2.5)
+   reload(function()return m end,DENIED)
+   local worst=0;for _,spot in ipairs(T.Spots)do local _,look=lookOf(spot);worst=math.max(worst,look and math.abs(rimReach(look,spot)-spot.Radius)or math.huge)end
+   check('look (R154, scale): a round cylinder look saved at scale 2.5 has its rim on the circle too (worst '..string.format('%.3f',worst)..' off)',HT.Look=='asset'and worst<=.02,tostring(worst))
+  end
+  R.Inst.IsA=rawIsA
+  reload(function()return container(asset())end,DENIED) -- (back to the square asset look, the state section A left for B and C)
  end
  -- B. a rebuild (HubDecor151.Apply again) re-dresses at once, no second load
  local before=calls.IS;HT.Build(map)

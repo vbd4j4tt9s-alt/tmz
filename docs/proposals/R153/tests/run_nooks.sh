@@ -26,6 +26,9 @@
 #     InsertService:LoadAsset, else the built one): section 6 of the test mocks the routes: a store model with scripts and junk inside (stripped: scripts, sounds, prompts, welds, humanoids,
 #     absurd and invisible parts), its scale / centring / mat height, one collider, the squash on its mat, the same bounce and debounce, "User is not authorized to access Asset" -> the
 #     hand-placed template -> the built trampoline, a timeout, too many parts, a single part, a look with no findable mat, the paving-plane nudge, /test trampoline.)
+#  (R154 review: section 6 also fits round looks - a cylinder look, balls and a cylinder, round MeshPart / union looks, each with the visible rim 720-point-sampled on the collider's circle (12.6 / 12.6 /
+#     9.6) - a square mesh frame that must stay inside by its corners, and models saved at scale 2 / 2.5 / 3 (ScaleTo takes the absolute scale); and the gardens' 3-stud soil strip in front of
+#     DirtPlot_5 is walked on every side of every base: the feet stand at the soil plane 5.8 all over it ('Soil edge top' in GardenBedRamps153), without it 0.8 below.)
 # "mutate" as the 3rd argument also runs broken copies (no ramps; a bounce that stacks; no debounce; a loader that strips nothing) that the test must fail.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)

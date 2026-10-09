@@ -235,6 +235,11 @@ RS:SetAttribute('GlobalWeather','Thunderstorm');frames(6)
 check(near(Lighting.Brightness,stormP.Light.Brightness,.02),'Thunderstorm: its own look ('..Lighting.Brightness..')')
 RS:SetAttribute('GlobalWeather','Blizzard');frames(6)
 check(near(Lighting.Brightness,Mood.Palette(0,'Blizzard',false,false).Light.Brightness,.02),'Blizzard: its own look')
+do -- R154 review: the lamps glow in every dim weather, so the Blizzard has to be one: it dims the world (HubLife151.isDark follows this)
+ local clearP,snowP=Mood.Palette(0,'Clear',false,false,0),Mood.Palette(0,'Blizzard',false,false)
+ check(snowP.Light.Brightness<=clearP.Light.Brightness*.8 and snowP.Light.ExposureCompensation<clearP.Light.ExposureCompensation and snowP.Sun==0 and snowP.Air.Haze>clearP.Air.Haze and snowP.Air.Density>clearP.Air.Density,
+  ('Blizzard dims the world against Clear: Brightness %.2f -> %.2f, exposure %.3f -> %.3f, no sun rays, Haze %.2f -> %.2f, Density %.2f -> %.2f'):format(clearP.Light.Brightness,snowP.Light.Brightness,clearP.Light.ExposureCompensation,snowP.Light.ExposureCompensation,clearP.Air.Haze,snowP.Air.Haze,clearP.Air.Density,snowP.Air.Density))
+end
 RS:SetAttribute('GlobalWeather','Clear');frames(8)
 check(near(Lighting.Brightness,cloudyB,.01),'the event ends: back to the Cloudy look, not to Clear ('..Lighting.Brightness..')')
 -- on the track: the biome's own mood; back in the base: cloudy again
