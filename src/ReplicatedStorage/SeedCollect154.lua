@@ -79,10 +79,11 @@ function C.Hidden(inst)
 end
 -- Holds ------------------------------------------------------------------------------------------------------------------------------------
 local function ends(id,cue,target)holds[id]=nil;holdsChanged();fire(id,cue,target)end
-local function watchdog(id,e)
- task.delay(C.Backstop,function()
+local function watchdog(id,e,wait) -- (a touched hold is checked again when its Due comes, not a whole Backstop later)
+ task.delay(wait or C.Backstop,function()
   if holds[id]~=e then return end
-  if e.Due-os.clock()>.01 then watchdog(id,e)else ends(id,false)end
+  local left=e.Due-os.clock()
+  if left>.01 then watchdog(id,e,math.max(.05,left))else ends(id,false)end
  end)
 end
 function C.Hold(id,info)

@@ -43,7 +43,9 @@
 #                               the pickup cue on that frame; the press is the reveal's; every edge case collects it by itself (the next pack,
 #                               death, ragdoll / fling, a chase, a teleport, onto the track, far away, the shop / the Bag), a collect before
 #                               the server's end rests on its slot, Reduced Motion fades, mobile taps (HUD / hotbar / drags / long presses
-#                               do not), skip then collect, onlookers as before; the collect never stacks on the reveal's tail.
+#                               do not), skip then collect, onlookers as before; the collect never stacks on the reveal's tail; a held-back
+#                               seed's weather / Mech effects (the real ItemCosmetics) off until it lands; the watchdog's due time; a cut-short
+#                               scene's hold let go when its result card cannot start; a fast runner / a hitch / a fall is no teleport.
 #  (and every suite above: a result waits now, the press after it collects it; the stress run collects every opening, each seed flies in)
 # "all" (default) also runs the suites that touch the same files: R151 run_rare_pull.sh (only), R150 run_sfx.sh, R138, R151 run_announce.sh,
 # R150 test_packs (in run_sfx.sh), R147 Verity UI and R149 Verity pack.
