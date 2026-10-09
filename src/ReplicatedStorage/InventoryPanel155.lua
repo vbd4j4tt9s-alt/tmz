@@ -154,9 +154,8 @@ function M.Discard(key,how)
  M.Unpick()
  local tool=e.Tool
  if not Stacks.Counts(tool)then say('u can\'t throw that away',true);return false end
- local rare=Stacks.Rare(tool)
- note(('discard? %s x%d (%s)%s'):format(tool.Name,e.Count or 1,how or'trash',rare and', rare: hold to confirm'or''))
- Dialog.Open(ctx.pg,{Tool=tool,Name=ctx.Names.Tool(tool,ctx.Catalog),Rarity=tool:GetAttribute('Rarity'),Count=e.Count or 1,Rare=rare},function(amount)
+ note(('discard? %s x%d (%s), hold to confirm'):format(tool.Name,e.Count or 1,how or'trash'))
+ Dialog.Open(ctx.pg,{Tool=tool,Name=ctx.Names.Tool(tool,ctx.Catalog),Rarity=tool:GetAttribute('Rarity'),Count=e.Count or 1},function(amount)
   local remotes=RS:FindFirstChild('ChestChaseRemotes');local remote=remotes and remotes:FindFirstChild('DiscardItems')
   if not remote then Dialog.Fail('try again in a sec');return end
   local request={Kind=Stacks.Kind(tool),Id=Stacks.Id(tool),Count=amount}

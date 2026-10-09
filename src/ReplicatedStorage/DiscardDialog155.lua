@@ -1,8 +1,7 @@
 -- R155 (owner: "allow people to discard items"): the confirm popup of the Bag's Discard (InventoryPanel155 opens it; the server decides, InventoryService155).
 --  * the item (its picture, its name in its rarity colour) and how many: a stack picks 1, a number (- / + or typed) or All. One item asks nothing more.
---  * "u sure? it's gone forever". Keep it / Discard. A rare item (InventoryStacks155.Rare: Secret / Cosmic / King, a Mech / Verity / Void pack, a Mech /
---    Verity seed or fruit, anything mutated) needs the Discard button HELD for HoldSeconds (its bar fills; letting go early starts it again), so a mis-tap
---    can't throw it away. A gamepad holds A on it.
+--  * "u sure? it's gone forever". Keep it / Discard. EVERY item needs the Discard button HELD for HoldSeconds (owner: "every item needs it"; its bar
+--    fills; a tap does nothing and letting go early starts it again), so a mis-tap can't throw anything away. A gamepad holds A on it.
 --  * while the server answers the button says so; a refusal is shown in red and the popup stays; a success closes it.
 -- Its own ScreenGui (DiscardConfirm, above the hotbar and the Bag). Silent itself: its buttons are ordinary buttons (ButtonFeedback clicks for them).
 local RS=game:GetService('ReplicatedStorage');local Input=game:GetService('UserInputService');local Run=game:GetService('RunService');local GuiService=game:GetService('GuiService')
@@ -52,7 +51,7 @@ local function paint()
  if ui.Box.Text~=tostring(state.Amount)then ui.Box.Text=tostring(state.Amount)end
  ui.Warning.Text=state.Max>1 and("u sure? "..amountText().." of them, gone forever")or"u sure? it's gone forever"
  local busy=state.Busy
- ui.Confirm.Text=busy and'...'or state.Rare and(state.Holding and'keep holding...'or'hold to discard')or(state.Max>1 and'Discard '..state.Amount or'Discard')
+ ui.Confirm.Text=busy and'...'or state.Holding and'keep holding...'or(state.Max>1 and'hold to discard '..state.Amount or'hold to discard')
  ui.Confirm.AutoButtonColor=not busy
  if not state.Holding then ui.Fill.Size=UDim2.fromScale(0,1)end
 end
@@ -71,14 +70,14 @@ local function step()
  if u>=1 then stopHold();confirm()end
 end
 local function startHold()
- if not state or not state.Rare or state.Busy or state.Holding then return end
+ if not state or state.Busy or state.Holding then return end
  state.Holding=true;state.HoldAt=os.clock();paint()
  if not stepConn then stepConn=Run.RenderStepped:Connect(step)end
 end
 local function wire()
  local function on(sig,fn)conns[#conns+1]=sig:Connect(fn)end
  local go=ui.Confirm
- on(go.Activated,function()if state and not state.Rare then confirm()end end)
+ -- (no Activated: a tap never confirms, the hold below does)
  on(go.InputBegan,function(i)if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then startHold()end end)
  if go.MouseButton1Down then on(go.MouseButton1Down,startHold)end
  if go.MouseButton1Up then on(go.MouseButton1Up,function()if state and state.Holding then stopHold()end end)end
@@ -101,12 +100,12 @@ local function wire()
  on(row.More.Activated,function()if state then state.Amount+=1;paint()end end)
  on(ui.Box.FocusLost,function()if state then state.Amount=tonumber((ui.Box.Text:gsub('%D','')))or state.Amount;paint()end end)
 end
--- spec: {Tool=, Name=, Rarity=, Count= (the stack), Rare=bool}; onConfirm(amount) runs in its own thread and answers with D.Done / D.Fail.
+-- spec: {Tool=, Name=, Rarity=, Count= (the stack)}; onConfirm(amount) runs in its own thread and answers with D.Done / D.Fail.
 function D.Open(pg,spec,onConfirm)
  if not ui then build(pg);wire()end
  if ui.Gui.Parent~=pg then ui.Gui.Parent=pg end
  stopHold()
- state={Tool=spec.Tool,Max=math.max(1,math.floor(tonumber(spec.Count)or 1)),Amount=1,Rare=spec.Rare==true,OnConfirm=onConfirm}
+ state={Tool=spec.Tool,Max=math.max(1,math.floor(tonumber(spec.Count)or 1)),Amount=1,OnConfirm=onConfirm}
  ui.Name.Text=spec.Name or(spec.Tool and spec.Tool.Name)or'';Theme.RarityText(ui.Name,spec.Rarity or'Common',17,false)
  ui.Name.TextXAlignment=Enum.TextXAlignment.Left
  pcall(Pictures.Show,ui.Picture,spec.Tool,1)
