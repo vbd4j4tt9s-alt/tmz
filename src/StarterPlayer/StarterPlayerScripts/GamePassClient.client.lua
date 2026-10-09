@@ -86,6 +86,10 @@ local packView=require(RS.PackViewport89).Create(stage)
 local dock=stage:FindFirstChild('MechDockingBay');if dock then dock.Visible=false end
 packView.AnchorPoint=Vector2.zero;packView.Position=UDim2.fromScale(0,0);packView.Size=UDim2.fromScale(1,1);packView.ZIndex=3
 require(RS.GuiShine).Attach(pack,false)
+-- R155 (owner): the pack pity is listed with the odds (the paid-random disclosure): a caption along the bottom of the pack preview
+-- (wrapped and scaled by Roblox to the box, never cut: every word of it is the disclosure)
+do local pity=Art.Text(stage,'PityRule',require(RS:WaitForChild('PackPity155')).EventDisclosure,13,C(236,222,255));pity.ZIndex=5;pity.TextWrapped=true;pity.TextScaled=true;pity.AnchorPoint=Vector2.new(.5,1);pity.Position=UDim2.new(.5,0,1,-3);pity.Size=UDim2.new(1,-10,.26,0);pity.BackgroundColor3=C(20,12,40);pity.BackgroundTransparency=.25;Art.Corner(pity,6)
+ local fit=Instance.new('UITextSizeConstraint');fit.MinTextSize=7;fit.MaxTextSize=13;fit.Parent=pity;local pad=Instance.new('UIPadding');pad.PaddingLeft=UDim.new(0,4);pad.PaddingRight=UDim.new(0,4);pad.Parent=pity end
 local outcomes=Art.Frame(pack,'Outcomes',nil,1);outcomes.ZIndex=3
 for i,s in ipairs(Catalog.Seeds)do
  local item=Instance.new('TextButton');item.Text='';item.AutoButtonColor=false;item.Name=s.Id;item.LayoutOrder=i;item.BorderSizePixel=0;item.BackgroundColor3=Color3.new(1,1,1);item.ZIndex=3;item.Parent=outcomes

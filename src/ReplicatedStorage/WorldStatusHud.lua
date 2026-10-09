@@ -14,14 +14,27 @@ function SpeedBoost.Clock(seconds)
  return string.format('%ds',s)
 end
 local H={};local C=Color3.fromRGB
-function H.Boosts(player)
+function H.Boosts(player,lucky)
  local tier=math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)
  -- R121: the timed x2 boost multiplies with the permanent pass (same as the server's BaseService).
  local speed=Balance.Training(Balance.TrainingTiers[tier]or 1,player:GetAttribute('TreadmillMultiplier'),player:GetAttribute('DoubleSpeedOwned')==true)*SpeedBoost.PlayerFactor(player)
  local luck=tonumber(player:GetAttribute('ChestLuckMultiplier'))or 1
  if luck~=luck or luck==math.huge or luck==-math.huge then luck=1 end
  local balance=require(RS.BalanceValues81)
+ -- R155: lucky = the pack in hand opens as the pack pity's LUCKY 10th (H.LuckyHeld): that roll takes x1.5 and its cap is x1.5 too (LuckyLuckCeiling, x75M); never otherwise
+ if lucky==true then return speed,math.clamp(luck*(balance.LuckyPackBoost or 1.5),1,balance.LuckyLuckCeiling or(balance.LuckCeiling or balance.MaxLuck)*1.5)end
  return speed,math.clamp(luck,1,balance.LuckCeiling or balance.MaxLuck) -- R154: up to the boots' cap x the clover (R155: x50M)
+end
+-- R155: true while the player holds a pack whose open is the pack pity's lucky 10th of the NORMAL group (the one boots' luck reaches; the Void / Verity / Mech packs
+-- take the clover alone, which this row does not show). The luck row then shows that roll's luck (x1.5) in gold.
+function H.LuckyHeld(player)
+ local c=player.Character;local m=RS:FindFirstChild('PackPity155')
+ if not c or not m then return false end
+ local ok,P=pcall(require,m);if not ok then return false end
+ for _,t in ipairs(c:GetChildren())do
+  if t:IsA('Tool')and t:GetAttribute('SeedPackTool')then return P.Group(t:GetAttribute('BagVariant'))=='Normal'and P.IsLucky(player:GetAttribute(P.Attribute.Normal))end
+ end
+ return false
 end
 function H.Multiplier(n)
  if n>=1000 then
@@ -163,26 +176,38 @@ function H.Create(pg,player)
   if on~=boostWasActive then boostWasActive=on;task.defer(function()if not dead and updateBoosts then updateBoosts()end end)end
  end
  updateBoosts=function()
-  local values={H.Boosts(player)};hasBoosts=false
+  local lucky=H.LuckyHeld(player) -- R155: the pity's lucky pack in hand
+  local values={H.Boosts(player,lucky)};hasBoosts=false
   for i,row in ipairs(boostRows)do
    local active=values[i]>1;row.Root.Visible=active;hasBoosts=hasBoosts or active
    if i==2 and active then pcall(function()require(RS.CloverIcon153).Ensure()end)end -- R153: drawn when the row first shows
    local text=H.Multiplier(values[i]);if row.Value.Text~=text then row.Value.Text=text end
    row.Root:SetAttribute('AccessibleLabel',row.Label..' '..text)
+   if i==2 then local want=lucky and C(255,214,64)or C(116,243,180);if row.Value.TextColor3~=want then row.Value.TextColor3=want end;row.Root:SetAttribute('LuckyPack',lucky or nil)end
    if i==1 then row.Root:SetAttribute('PointsPerSecond',100*values[i]);row.Root:SetAttribute('Breakdown',tostring(Balance.TrainingTiers[math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)])..' machine × '..tostring(player:GetAttribute('TreadmillMultiplier')or 1)..' trail × '..(player:GetAttribute('DoubleSpeedOwned')and'2' or'1')..' pass × '..SpeedBoost.PlayerFactor(player)..' boost')end
   end
   update()
  end
- for _,attribute in ipairs({'TreadmillTier','TreadmillMultiplier','ChestLuckMultiplier','DoubleSpeedOwned',SpeedBoost.Attribute})do
+ for _,attribute in ipairs({'TreadmillTier','TreadmillMultiplier','ChestLuckMultiplier','DoubleSpeedOwned',SpeedBoost.Attribute,'PackPityNormal'})do -- (R155: + the pack pity's normal count)
   connections[#connections+1]=player:GetAttributeChangedSignal(attribute):Connect(updateBoosts)
  end
  connections[#connections+1]=Run.Heartbeat:Connect(function(dt)elapsed+=dt;if elapsed>=.25 or tickFast then elapsed=0;update()end end)
  connections[#connections+1]=pg:GetAttributeChangedSignal('SeedMenu'):Connect(function()root.Visible=pg:GetAttribute('SeedMenu')==nil end)
  local stopLayout
+ -- R155: the pack in hand (H.LuckyHeld)
+ local heldConns={}
+ local function watchHeld(c)
+  for _,x in ipairs(heldConns)do x:Disconnect()end;table.clear(heldConns)
+  local function tool(x)if x:IsA('Tool')then updateBoosts()end end
+  if c then heldConns[1]=c.ChildAdded:Connect(tool);heldConns[2]=c.ChildRemoved:Connect(tool)end
+ end
+ if player.CharacterAdded then connections[#connections+1]=player.CharacterAdded:Connect(function(c)watchHeld(c);updateBoosts()end)end
+ watchHeld(player.Character)
  local function cleanup()
   if dead then return end;dead=true
   if stopLayout then stopLayout()end
   for _,c in ipairs(connections)do c:Disconnect()end
+  for _,c in ipairs(heldConns)do c:Disconnect()end
  end
  connections[#connections+1]=gui.Destroying:Connect(cleanup)
  updateBoosts();stopLayout=Layout.Watch(gui,function()update()end)

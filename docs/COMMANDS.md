@@ -55,8 +55,9 @@
 | `seeds snow @name`, `seeds all @name`, `seeds verity @name` | Every seed of a biome, every seed in the game, or the Verity seed |
 | `give big diamond apple seed to @name` | One seed by plant name. `big`/`giant` and `gold`/`diamond` are optional |
 | `take apple seeds from @name` | Remove seeds |
-| `catalog storm`, `odds storm mythic 1`, `odds event`, `odds verity` | Seed list and real odds (`odds verity` = the Verity Pack). R154: no seed over 80%; luck up to 50M (R155 halved the boots: Thunder Boots x25M, x50M with the 4 Leaf Clover's x2; it was 100M); `odds event clover` / `odds verity clover` = with the clover's x2 (without the word: the target's own clover) |
+| `catalog storm`, `odds storm mythic 1`, `odds event`, `odds verity` | Seed list and real odds (`odds verity` = the Verity Pack). R154: no seed over 80%; luck up to 50M (R155 halved the boots: Thunder Boots x25M, x50M with the 4 Leaf Clover's x2; it was 100M); `odds event clover` / `odds verity clover` = with the clover's x2 (without the word: the target's own clover). R155: add `lucky` at the end (`odds storm mythic 50000000 lucky`, `odds event clover lucky`) for the pack pity's lucky 10th: x1.5 luck and the x1.5 cap (up to x75M); the last line is the pity rule |
 | `indexinfo storm @name` / `claimindex storm @name` | Index rewards (`verity` = the R147 VERITY tab) |
+| `pity @name`, `pity set 9 9 @name` | R155 pack pity: the target's NORMAL and EVENT counts (event = Void, Verity and Mech packs) and which next pack is lucky; `pity set <normal> <event>` sets them (0–9, saved; 9 = the next pack of that group is the lucky one: x1.5 luck). TEST packs never count. `pity 30` (a number alone) is still the track reset preview below |
 | `mystery @name`, `mystery ready`, `mystery next`, `mystery reset` | R147 base mystery pack: show the state (and packs owed to a full Bag); unlock in 3 s; pretend a new day; start over (owed packs are kept) |
 
 ## Garden
@@ -74,7 +75,7 @@
 |---|---|
 | `refreshpacks` (server) | Refresh the track now |
 | `refreshcycle 30` (server) | Refresh into reset 30. Legendary every 5 resets, Mythic every 10, The Darkened every 3 |
-| `pity 30`, `spawnodds`, `routes` | Look at guarantees, spawn chances and keeper speeds |
+| `pity 30`, `spawnodds`, `routes` | Look at guarantees, spawn chances and keeper speeds (R155: `pity` with no number is the player's pack pity, see Packs and seeds) |
 | `daily`, `daily next`, `daily done`, `daily week`, `daily reset` (`@name`) | R140 login week + daily quests: show the state; pretend a new day (login claim back, quests from 0); finish today's quests; make the next claim day 7 (R153: a Void pack, gift-locked unless `DailyRewards.LockDay7Void` is false); start over. R153: every pack they make claimable is a TEST pack |
 | `plantnotify`, `plantnotify send`, `plantnotify reset` | R151 offline "your plant is ready" notifier: what is missing from the setup (MessageId, HTTP, secret), the shared queue, your entry and cooldown, this server's counts; send you a notification now (Roblox delivers 1 a day, only if you opted in and are 13+); clear your cooldown |
 | `packluck`, `packluck 29 @name` | R137 hidden big-pack luck (players never see it): packs since a 5x+ / 10x+ and the track's refreshes; a number sets the 5x count (29 = next earned pack is 5x+) |

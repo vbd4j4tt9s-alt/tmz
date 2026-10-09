@@ -2,7 +2,7 @@
 -- 1. "the 2x luck is universal": the Void, Verity and Limited Mech packs had fixed odds (no luck at all). They now take the 4 Leaf Clover's x2 and ONLY that
 --    (passLuck: the luck passes a player owns; boots never change these packs), the way a biome pack takes luck: each tier above the pack's lowest gets its
 --    chance x luck^Power (PackOdds137.Power: Mythic ^.16, Secret ^.28, Cosmic ^.40, King ^1 ...), the lowest tier gives it up (keeping at least 40% of its own
---    share, never reached at x2). No Cap: these packs only ever see x1 or x2. A pack's branches keep their size: the Void pack's 1/200 Mech roll is a Mech
+--    share, never reached at x2). No Cap: these packs only ever see x1 or x2 (R155: x1.5 / x3 on the pack pity's lucky roll). A pack's branches keep their size: the Void pack's 1/200 Mech roll is a Mech
 --    pack roll (with the same luck), the Verity seed is the Verity pack's King (1/100 -> 1/50).
 -- 2. "the elderbloom only pack is not supposed to be intentional": the 80% rule (Shape), the last step of every roll of a live pack. When one seed would
 --    take more than 80% of a pack's rolls: 1% goes to an UPGRADE (the seeds of the next tier above that seed in the pack, split evenly; when nothing is rarer,
@@ -15,13 +15,15 @@ local VoidPools=require(script.Parent.VoidPackOdds85)
 local Mech=require(script.Parent.MechCatalog)
 local Verity=require(script.Parent.VerityCatalog)
 local T=require(script.Parent.BalanceValues81)
+local Pity=require(script.Parent.PackPity155) -- R155: the pack pity's lucky roll
 local L={Version=154,Limit=.8,Upgrade=.01,Slack=1e-9} -- Slack: a seed at exactly 80% (a starter-boosted Snow Rare pack: 1/2.5 x2) is not over it, whatever the rounding
 local function rank(rarityOf,id)return O.Rank[(rarityOf(id))]or 0 end
 local function positive(p)return type(p)=='number'and p==p and p>0 and p<math.huge end
 -- The luck passes' luck: a number from 1 to the passes' ceiling (x2 with the clover); anything else is 1.
+-- R155: the pack pity's LUCKY roll (PackPity155.Scoped) takes x1.5 on top (x1.5 without the clover, x3 with it) and its ceiling is x1.5 higher for that roll only.
 function L.PassLuck(value)
  if not positive(value)then return 1 end
- return math.clamp(value,1,T.PassLuckCeiling or 2)
+ return math.clamp(value,1,Pity.Ceiling(T.PassLuckCeiling or 2))
 end
 -- The 80% rule. Returns the table to roll and true, or the SAME table and false when no seed is over Limit (or the pack has fewer than 2 seeds).
 function L.Shape(odds,rarityOf)

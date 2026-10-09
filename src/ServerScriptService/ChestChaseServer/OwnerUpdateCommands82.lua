@@ -183,6 +183,8 @@ function X.Execute(ctx,p,action,a)
   return true,'Treadmill only | base '..ctx.Config.TrainingPointsPerSecond..'/s | multiplier '..ctx.Bases:GetTreadmillMultiplier(p)..' | friends x'..string.format('%g',math.floor(ctx.Bases:GetFriendGainMultiplier(p)*100+.5)/100)..' | total '..string.format('%g',math.floor(ctx.Config.TrainingPointsPerSecond*ctx.Bases:GetTreadmillMultiplier(p)*ctx.Bases:GetFriendGainMultiplier(p)*100+.5)/100)..'/s | training '..tostring(p:GetAttribute('TreadmillTraining')==true)..' | physical '..string.format('%.2f',ctx.Config.GetPlayerWalkSpeed(p,points))..' | points '..points
  elseif action=='odds'then
   local st,key,luck,word
+  -- R155: a last word "lucky" = the pack pity's lucky 10th (x1.5 on the luck / the clover, and the x1.5 cap for that roll: up to x75M)
+  local Pity=require(RS.PackPity155);local lucky=a[#a]=='lucky';if lucky then a=table.clone(a);table.remove(a)end
   if a[1]=='event'or a[1]=='eclipse'then st=7;key='EclipseReliquary';word=a[2];if #a>2 then return false,'Use odds event [luck|clover].'end
   elseif a[1]=='verity'then st=7;key='VerityReliquary';word=a[2];if #a>2 then return false,'Use odds verity [luck|clover].'end
   else st=stage(a[1]);key=variant(a[2]);word=a[3];if #a>3 then return false,'Use odds <biome> <tier> [luck].'end end
@@ -194,13 +196,24 @@ function X.Execute(ctx,p,action,a)
   end
   luck=tonumber(word or p:GetAttribute('ChestLuckMultiplier')or 1)
   local ceiling=T.LuckCeiling or T.MaxLuck
-  if not st or st>=8 or not key or not luck or luck~=luck or luck<1 or luck>ceiling then return false,'Use odds storm mythic [1–'..ceiling..'], odds event [clover] or odds verity [clover].'end
+  if not st or st>=8 or not key or not luck or luck~=luck or luck<1 or luck>ceiling then return false,'Use odds storm mythic [1–'..ceiling..'], odds event [clover] or odds verity [clover]; add lucky for the pity\'s lucky 10th (x1.5).'end
   local cloverText=' | boots never change this pack; the 4 Leaf Clover '..(clover>1 and'x'..clover..' is on'or'is off (odds event clover shows it)')
-  local lines={key=='EclipseReliquary'and 'Void Pack | all regular Secret/Cosmic/King seeds | 1/200 normal Mech roll'..cloverText or key=='VerityReliquary'and 'Verity Pack | Verity seed 1/100, then the Void pack without its King seeds (1/200 Mech roll without the Crowncore Tree)'..cloverText or ctx.Config.BiomeNames[st]..' | '..Packs.GetPackTier(key).Name..' | luck '..luck};local odds=Packs.SeedOdds(ctx.Config,st,key,luck,Packs.OddsVersion,nil,clover)
+  local lines={key=='EclipseReliquary'and 'Void Pack | all regular Secret/Cosmic/King seeds | 1/200 normal Mech roll'..cloverText or key=='VerityReliquary'and 'Verity Pack | Verity seed 1/100, then the Void pack without its King seeds (1/200 Mech roll without the Crowncore Tree)'..cloverText or ctx.Config.BiomeNames[st]..' | '..Packs.GetPackTier(key).Name..' | luck '..luck};local odds=Pity.Scoped(lucky,Packs.SeedOdds,ctx.Config,st,key,Pity.Luck(luck,lucky),Packs.OddsVersion,nil,Pity.Luck(clover,lucky))
+  if lucky then lines[1]..=fixed and' | LUCKY 10th: x1.5 (the clover\'s luck x'..clover..' -> x'..Pity.Luck(clover,true)..')'or' | LUCKY 10th: x1.5 luck (x'..luck..' -> x'..Pity.Luck(luck,true)..', cap x'..(T.LuckyLuckCeiling or ceiling*Pity.Boost)..')'end
   for _,seed in ipairs(Packs.OddsRows(ctx.Config,st,key,odds))do table.insert(lines,seed.Name..': '..require(RS.OddsText85).Format(odds[seed.Id]))end -- R148: by rarity rank, then name
+  table.insert(lines,'pity: '..Pity.Disclosure) -- R155: the rule, listed with the odds
   return true,table.concat(lines,'\n')
  elseif action=='pity'then
-  local cycle=integer(a[1],0,1000000);if #a~=1 or not cycle then return false,'Use pity <completed reset number>.'end
+  -- R155: the pack pity (PackPityData155): pity = the target's two counts and which next pack is lucky; pity set <normal> <event> (0-9, saved) for testing.
+  -- A single number is still the R81 track preview (what that reset guarantees).
+  if #a==0 then return true,p.Name..': '..data:PackPityStatus(p)end
+  if a[1]=='set'then
+   local normal,eventCount=integer(a[2],0,9),integer(a[3],0,9)
+   if #a~=3 or not normal or not eventCount then return false,'Use pity set <0-9> <0-9> (normal, event; 9 = the next one is lucky).'end
+   local state,why=data:SetPackPity(p,normal,eventCount);if not state then return false,why end
+   save(ctx,p);return true,p.Name..': '..data:PackPityStatus(p)
+  end
+  local cycle=integer(a[1],0,1000000);if #a~=1 or not cycle then return false,'Use pity, pity set <0-9> <0-9>, or pity <completed reset number>.'end
   local plan=require(RS.PackSchedule81).Plan(cycle,table.create(35,'Pack01'),function(lo)return lo end)
   return true,'Reset '..cycle..': 35 ordinary slots | Legendary guaranteed '..tostring(table.find(plan,'Pack05')~=nil)..' | Mythic guaranteed '..tostring(table.find(plan,'Pack06')~=nil)..' | event '..tostring(require(RS.PackSchedule81).Event(cycle))
  elseif action=='packluck'then

@@ -22,6 +22,9 @@ do
  for _,pass in ipairs(require(script.Parent.GamePassCatalog))do local luck=tonumber(pass.Luck)or 1;if luck>1 then passes*=luck end end
  T.PassLuckCeiling=passes;T.LuckCeiling=T.MaxLuck*passes
 end
+-- R155 (owner: "a 1.5x luck boost at the 10th pack", "every 10th pack"): the pack pity's LUCKY pack (PackPity155) takes x1.5 on top of everything its roll takes,
+-- and for that roll alone every luck cap is x1.5 too: a lucky roll may reach LuckyLuckCeiling (x75M = Thunder Boots x the clover x1.5); no other roll can.
+T.LuckyPackBoost=1.5;T.LuckyLuckCeiling=T.LuckCeiling*T.LuckyPackBoost
 -- Early purchases now take a few normal harvests rather than hundreds.
 T.MachineCosts={0,250000,5000000,150000000,10000000000,500000000000,8000000000000}
 T.TrailCosts={MintTrail=200000,ArcTrail=4000000,SolarTrail=120000000,AuroraTrail=12000000000,NebulaTrail=800000000000,RoyalTrail=9000000000000}

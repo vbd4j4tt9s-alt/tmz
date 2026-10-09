@@ -378,8 +378,11 @@ check(row(r0,'Fire Pepper Seed')==nil and row(r0,'Ember Pumpkin Seed')~=nil,'...
 local tipSeedNames={};for stage=1,7 do for _,seed in ipairs(Rules.ObtainablePool(Config,stage))do tipSeedNames[seed.Name]=seed.Id end end
 local function sortedTip(rows,label)
  local lastRank,lastName=0,'';local ok,why=true,''
- for i=2,#rows do
+ -- (R155: the pack pity's rule line under the odds, and its "LUCKY PACK" line on a lucky 10th, are not seed rows)
+ local Pity=W.module('PackPity155');local last=#rows;if rows[last]==Pity.Disclosure then last-=1 end
+ for i=2,last do
   local name=rows[i]:match('^(.-): ');local id=tipSeedNames[name];local style;if id then style=select(2,Rules.GetRarity(id))end
+  if rows[i]==Pity.LuckyLine then continue end
   if not id then ok=false;why='unknown row '..rows[i]
   elseif style.Rank<lastRank or(style.Rank==lastRank and name<lastName)then ok=false;why=rows[i]..' after '..lastName end
   lastRank,lastName=style and style.Rank or 0,name

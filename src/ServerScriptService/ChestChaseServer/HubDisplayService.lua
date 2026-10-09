@@ -259,7 +259,8 @@ function S:NotePull(player,reward,info)
  if self.Tainted[player]then return false,'owner-granted'end
  self:_syncWindow() -- (R153: a pull that comes right after a window mark is the new window's first, even before the loop has noticed the mark)
  local odds
- local ok,table_=pcall(PackRules.SeedOdds,self.Config,info.Stage,info.Variant,info.Luck,info.Version,info.Boost,info.PassLuck) -- R154: + the clover's luck (Void / Verity / Mech packs)
+ -- R155: a pack pity's lucky pack (info.Lucky) rolled with x1.5 luck and the x1.5 cap: its odds are read the same way (PackPity155.Scoped)
+ local ok,table_=pcall(require(RS:WaitForChild('PackPity155')).Scoped,info.Lucky==true,PackRules.SeedOdds,self.Config,info.Stage,info.Variant,info.Luck,info.Version,info.Boost,info.PassLuck) -- R154: + the clover's luck (Void / Verity / Mech packs)
  if ok and type(table_)=='table'then odds=table_[reward.SeedId]end
  if type(odds)~='number'or odds~=odds or odds<=0 then local style=PackRules.Rarities[reward.Rarity];odds=style and style.Weight or nil end
  local rec=Rules.CleanPull({Uid=player.UserId,Name=player.DisplayName,Id=reward.SeedId,Seed=Rules.SeedLabel(reward.SeedId,reward.SeedName),Rarity=reward.Rarity,
