@@ -50,7 +50,7 @@
 | `void 1 @name` | Void Pack(s), 1–20 |
 | `verity 1 @name` | R147 Verity Pack(s), 1–20 (Verity seed 1/100, then the Void pack's odds without the King seeds) |
 | `rarepacks @name` | 5 TEST packs that reveal Legendary, Mythic, Secret, Cosmic and King (R154: each a random seed of that rarity from any biome, in that biome's pack; `rarepacks mythic` is not always Elderbloom any more) |
-| `rarepacks mech @name` / `rarepacks king @name` / `rarepacks verity @name` | TEST packs: the six Mech designs, one King, or a Verity Pack that reveals the Verity seed |
+| `rarepacks mech @name` / `rarepacks king @name` / `rarepacks verity @name` | TEST packs: the six Mech designs, one King, or a Verity Pack that reveals the Verity seed. R155: add `gold` or `diamond` (`rarepacks mech gold`) for that coat (a bought Mech pack rolls its own: Gold 4.5% / Diamond 0.5%) |
 | `rarepacks roster @name` | R148 four TEST packs that reveal Fire Pepper (Mythic), Moon Melon (Legendary), Aloe (Rare) and Sand Fruit (Legendary) |
 | `seeds snow @name`, `seeds all @name`, `seeds verity @name` | Every seed of a biome, every seed in the game, or the Verity seed |
 | `give big diamond apple seed to @name` | One seed by plant name. `big`/`giant` and `gold`/`diamond` are optional |
@@ -169,7 +169,7 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 ## Hotbar (R153)
 | Command | What it does |
 |---|---|
-| `hotbar` | R153: the hotbar log on / off for you: every press (PC, phone, gamepad), what it did (equip, unequip, moved, stowed, ignored) and anything the server moved back, with times, in a copyable box top-left and as `[Hotbar]` lines in F9. The last 60 lines are kept even while it is off. The reply also prints the server's view: what is in your hand, the pack it holds, recent late holds or refusals and why. Paste it to me if a press ever goes missing |
+| `hotbar` | R153: the hotbar log on / off for you: every press (PC, phone, gamepad), what it did (equip, unequip, moved, stowed, ignored) and anything the server moved back, with times, in a copyable box top-left and as `[Hotbar]` lines in F9. The last 60 lines are kept even while it is off. The reply also prints the server's view: what is in your hand, the pack it holds, recent late holds or refusals and why. Paste it to me if a press ever goes missing R155: also prints the items held (of 200) and every discard. |
 
 ## Verity's voice
 | Command | What it does |
@@ -177,7 +177,7 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 | `verityvoice 2.1`, `verityvoice 2.1 0.3` (server) | R149: find where "Hello, my name is Verity" ends by ear. `verityvoice <end> [start]` (seconds into the audio) sets the cut for this server and plays it for you at once, from anywhere (no @name). Run it again with a new end until it stops right after "Verity". `verityvoice` alone plays it again and prints the numbers in force; `verityvoice reset` goes back to the config. Nothing is saved: write the final numbers into `ReplicatedStorage.VerityConfig` (`GreetingStart`, `GreetingEnd`) and publish |
 
 ## Checks
-`economy`, `mechshop`, `voidcheck`, `collisions` (server), `perf`, `effects low|normal|off`.
+`economy`, `mechshop` (R155: also the Mech coat line and the event end), `voidcheck`, `collisions` (server), `perf`, `effects low|normal|off`.
 
 ## Old shortcuts that still work
 English phrases like `give me money`, `go home`, `grow my garden` and `clear my inventory` still work. They aren't
