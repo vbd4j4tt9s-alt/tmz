@@ -985,6 +985,7 @@ local function settleHold(self,player,tool)
     return false
 end
 -- R155 (review): the pack's tooltip, built from its record: one function for the hold and for the refresh below (the pity counts and the boots luck move while a pack is put away).
+-- R156 (owner): the client no longer shows this tooltip (the item info panel was removed); it is still written, cheap and harmless.
 function ChestService:_packTooltip(player,record)
     -- R139 (owner): the free starter pack's 2x luck is secret, so its tooltip shows the plain pack odds.
     -- R154: the pack's real odds: the 80% rule (SeedPackRules) and the 4 Leaf Clover's x2 on the Void / Verity / Mech packs (PassLuck, the passes alone) too.

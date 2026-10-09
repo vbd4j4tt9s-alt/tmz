@@ -71,7 +71,7 @@ The shop banner and the Index show the plain pack (the coat is not known before 
 | Where | Text |
 | --- | --- |
 | Shop card (under the buy buttons, next to the countdown) | `Gold 4.5% / Diamond 0.5% coat` |
-| Hold tooltip | the pack's name ("Gold Limited Mech Pack"), the six seed odds, then the same last line (drawn by `ItemTooltip155`, on a PC when the slot or Bag card is hovered, on a phone / gamepad for a picked or just-held pack: `inventory.md`, "The item tooltip") |
+| Hold tooltip | the pack's name ("Gold Limited Mech Pack"), the six seed odds, then the same last line (written into `Tool.ToolTip`; R155 drew it with `ItemTooltip155`, **removed in R156 (owner)**: `inventory.md`, "The item tooltip") |
 | `/test mechshop` | `Gold 4.5% / Diamond 0.5% coat on every pack u buy (each pack rolls its own; free packs stay plain).` and the event line |
 | `/test odds` | does not cover Mech (it refuses stage 8): nothing to add |
 | "Bought" notice (the existing R148 one: one line, one `PurchaseDone`) | `Bought: 10 Mech Packs! (sparkle) 1 GOLD + (gem) 1 DIAMOND!`; one coated single: `Bought: 1 Mech Pack! (sparkle) GOLD MECH PACK!`; nothing coated: the plain line as before |
