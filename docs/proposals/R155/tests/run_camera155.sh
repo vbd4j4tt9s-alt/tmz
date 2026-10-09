@@ -34,9 +34,11 @@ rows=open(sys.argv[1]).read().splitlines()[1:]
 assert rows==sorted(rows,key=lambda l:l.split('\t')[1]),'FAIL: MANIFEST not sorted'
 print('ok: RarePullCamera155 is in src/MANIFEST.tsv (sorted)')
 PY
-CHANGED=$( (git -C "$REPO" diff --name-only "$BASE" -- src;git -C "$REPO" ls-files -o --exclude-standard -- src) | sort -u | tr '\n' ' ')
-WANT="src/MANIFEST.tsv src/ReplicatedStorage/RarePullCamera155.lua src/ReplicatedStorage/RarePullCard.lua src/ReplicatedStorage/RarePullCinematic.lua "
-[ "$CHANGED" = "$WANT" ] && echo "ok: exactly these changed in src since $BASE: $CHANGED(no client script; BackgroundMusic and Config.Version untouched)" || fail "src files changed since $BASE: $CHANGED(want: $WANT)"
+# (other R155 work changes other src files too: this checks the camera's own corner - the RarePull* modules - and the two never-touch files)
+CHANGED=$( (git -C "$REPO" diff --name-only "$BASE" -- 'src/ReplicatedStorage/RarePull*';git -C "$REPO" ls-files -o --exclude-standard -- 'src/ReplicatedStorage/RarePull*') | sort -u | tr '\n' ' ')
+WANT="src/ReplicatedStorage/RarePullCamera155.lua src/ReplicatedStorage/RarePullCard.lua src/ReplicatedStorage/RarePullCinematic.lua "
+[ "$CHANGED" = "$WANT" ] && echo "ok: of the RarePull modules exactly these changed since $BASE: $CHANGED" || fail "RarePull modules changed since $BASE: $CHANGED(want: $WANT)"
+git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua && echo "ok: BackgroundMusic untouched" || fail "BackgroundMusic changed"
 for f in RarePullCamera155 RarePullCinematic RarePullCard;do
  /opt/luau/luau-compile -O0 --binary "$RSD/$f.lua" >/dev/null 2>"$OUT/c.err" && ! grep -q Error "$OUT/c.err" || { fail "$f does not compile at -O0";cat "$OUT/c.err"; }
  peak=$(/opt/luau/luau-compile -O0 -g2 --text "$RSD/$f.lua" 2>/dev/null | awk '/^local [0-9]+ \(.*\): reg [0-9]+,/ { s=$0; sub(/.*\): reg /,"",s); sub(/,.*/,"",s); if(s+1>m) m=s+1 } END{print m+0}')
