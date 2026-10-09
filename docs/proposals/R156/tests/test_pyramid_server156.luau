@@ -20,6 +20,9 @@
 -- 10. one each: a second player gets their own; nobody gets two
 -- 11. save / load: the claim survives a save and a load in another server; an old save loads; the refresh closure refuses a trigger
 -- 12. the owner command: /test pyramid status, /test pyramid @name reset (the owner's word order), and the claim back
+-- 13. the biome refresh (R157 review fix): the refresh banks every carrier it finds (the evacuation in the track, the stale-runs loop outside it) and its time is public,
+--     so a secret carry is ended first as NOT banked: back in the pyramid, not claimed, not saved, not in the Bag, nothing dropped, the keeper released, the 'Refresh'
+--     notice; a normal pack is banked as before; Hold E is refused (nothing changed, a notice) while the refresh runs and within Rules.RefreshGuard seconds before it
 local H=require('./pack_world');local W,R=H.W,H.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -201,13 +204,18 @@ check(not okAgain and whyAgain=='out'and chase.Runs[A]==run,'nor one a second la
 do -- the hooks sit on this chase object only (the ConcurrentKeeperService class is not changed), once, and every other pack goes to the normal code
  local class=getmetatable(chase)
  check(rawget(chase,'_dropChestAfterCatch')~=nil and rawget(chase,'_returnPackToOrigin')~=nil and class._dropChestAfterCatch~=chase._dropChestAfterCatch
-  and class._returnPackToOrigin~=chase._returnPackToOrigin and Pyr.HookChase(chase)==false,'the catch / return hooks are on the chase object, once; the class is untouched')
+  and class._returnPackToOrigin~=chase._returnPackToOrigin and rawget(chase,'_beginBiomeRefresh')~=nil and class._beginBiomeRefresh~=chase._beginBiomeRefresh
+  and Pyr.HookChase(chase)==false,'the catch / return / refresh hooks are on the chase object, once; the class is untouched')
  local calls={}
  local fake=setmetatable({},{__index={_dropChestAfterCatch=function(_,r,h)calls[#calls+1]='drop:'..tostring(h and h.Cause)end,
-  _returnPackToOrigin=function(_,c)calls[#calls+1]='back:'..tostring(c.OriginSlot);return true end}})
+  _returnPackToOrigin=function(_,c)calls[#calls+1]='back:'..tostring(c.OriginSlot);return true end,
+  _beginBiomeRefresh=function(_,now)calls[#calls+1]='refresh:'..tostring(now);return 'went' end}})
  local hooked=Pyr.HookChase(fake)
  fake:_dropChestAfterCatch({Chest={Kind='Pack',OriginSlot='s1'}},{Cause='Bat'});local back=fake:_returnPackToOrigin({Kind='Pack',OriginSlot='s2'})
- check(hooked and calls[1]=='drop:Bat'and calls[2]=='back:s2'and back==true and #calls==2,'any other pack: the normal catch (drop on the track) and return code ('..table.concat(calls,', ')..')')
+ local went=fake:_beginBiomeRefresh(77) -- (no service on this object: the refresh code goes straight through)
+ check(hooked and calls[1]=='drop:Bat'and calls[2]=='back:s2'and back==true and calls[3]=='refresh:77'and went=='went'and #calls==3,'any other pack: the normal catch (drop on the track), return and refresh code ('..table.concat(calls,', ')..')')
+ local noRefresh=pcall(Pyr.HookChase,setmetatable({},{__index={_dropChestAfterCatch=function()end,_returnPackToOrigin=function()end}}))
+ check(not noRefresh,'a chase object without refresh code is refused (the hook fails loudly, never silently open)')
 end
 local drops=0;for _ in pairs(chase.Drops)do drops+=1 end
 chase:Finish(false,true,run)
@@ -260,7 +268,7 @@ local serial=0
 local function seedRow(p)serial+=1;local s=Config.GetSeedById('SunflowerSeed');return {Id=p.UserId..'_s'..serial,ChestNumber=900000+serial,ChestName=s.Name,Kind='Seed',Stage=1,SeedId=s.Id,SeedName=s.Name,SeedEmoji=s.Emoji,AccentColor=s.Color,SeedScale=1,PackMutation='None',BagVariant='Pack01',OddsVersion=PackRules.OddsVersion,PackSize=1}end
 local rows=Data:GetChestRecords(B);while Data:HeldItemCount(B)<200 do rows[#rows+1]=seedRow(B)end;Data:_notifySeedInventory(B)
 local okFull,whyFull=take(B)
-check(not okFull and chase.Runs[B]==nil and B:GetAttribute(Rules.Attr)=='Open'and svc.Out[B]==nil and lastNote(B)=='BAG FULL - MAKE ROOM IN UR BAG FIRST','a full bag (200): the pickup stops with the full-bag notice, nothing changes ('..tostring(whyFull)..')')
+check(not okFull and chase.Runs[B]==nil and B:GetAttribute(Rules.Attr)=='Open'and svc.Out[B]==nil and lastNote(B)=='BAG FULL - MAKE ROOM IN YOUR BAG FIRST','a full bag (200): the pickup stops with the full-bag notice, nothing changes ('..tostring(whyFull)..')')
 table.remove(rows);Data:_notifySeedInventory(B)
 
 -- 10. One each ------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -293,8 +301,8 @@ character(A2);standAt(A2,V3(C0.X,ground,C0.Z-half-3));R.clock+=2
 local okLoaded,whyLoaded=svc2:Trigger(A2)
 check(not okLoaded and whyLoaded=='claimed','... and her trigger does nothing (one per player, ever)')
 -- the refresh closure
-local Rex=makePlayer(707,'Rex');Map.Refreshing=true;local okRef=take(Rex);Map.Refreshing=false
-check(not okRef,'while the biomes refresh (the track is closed) a trigger does nothing')
+local Rex=makePlayer(707,'Rex');Map.Refreshing=true;local okRef,whyRef=take(Rex);Map.Refreshing=false
+check(not okRef and whyRef=='refresh' and chase.Runs[Rex]==nil,'while the biomes refresh (the track is closed) a trigger does nothing ('..tostring(whyRef)..')')
 
 -- 12. The owner command -------------------------------------------------------------------------------------------------------------------------------------------------
 local Targets=server('OwnerCommandTargets82');local Owner=server('OwnerUpdateCommands82')
@@ -312,6 +320,112 @@ check(pyramidPacks(A)==1,'... the pack she banked stays in her Bag')
 local okT=take(A);check(okT and chase.Runs[A]~=nil,'... and she can take it again')
 chase:Finish(false,false,chase.Runs[A])
 local okBad,whyBad=Owner.Execute(ctx,A,'pyramid',{'explode'});check(not okBad and tostring(whyBad):find('pyramid @username reset',1,true),'a wrong word gets the usage line')
+
+-- 13. The biome refresh (R157 review fix) ------------------------------------------------------------------------------------------------------------------------------
+-- The REAL ConcurrentKeeperService refresh code runs here (_updateBiomeRefresh -> _beginBiomeRefresh: the evacuation of the biome track, the stale-runs loop, the queue
+-- reset); only the map, the ragdoll and the notifications are faked. The pyramid is inside the track (Z > -100 here); the hub / base side is Z <= -100.
+local function fresh(id,name)local p=makePlayer(id,name);character(p);return p end
+local function sawNote(p,text,from)for i=from or 1,#shown do if shown[i].P==p and shown[i].Text==text then return true end end;return false end
+local function dropsCount()local n=0;for _ in pairs(chase.Drops)do n+=1 end;return n end
+local function nextRefresh(seconds)chase.NextRefreshAt=R.clock+seconds end
+local function startRefresh()chase.NextRefreshAt=R.clock;chase:_updateBiomeRefresh(R.clock)end -- (the chase's own step: due now -> _beginBiomeRefresh)
+local function endRefresh()Map.Refreshing=false;chase.RefreshEndsAt=nil;nextRefresh(300)end
+local function inTrack(p)return Map:IsInsideBiomeTrack(p.Character.HumanoidRootPart.Position)end
+local function normalCarry(p,pos) -- a normal (not secret) carry of a Desert Mythic world pack, started the way the steal does it
+ standAt(p,pos or V3(C0.X,ground,C0.Z-half-3))
+ local c,h,r=chase:_canTake(p,p.Character.HumanoidRootPart.Position)
+ if not c then return nil end
+ chase.Starting[p]=true
+ local rec=svc:Pack(p);rec.Pyramid156=nil
+ pcall(chase._acceptSeed,chase,p,rec,c,h,r)
+ chase.Starting[p]=nil
+ return chase.Runs[p]
+end
+local function snapshot(p)return{Records=#Data:GetChestRecords(p),Hits=#hits,Drops=dropsCount(),Notes=#shown,Dirty=Data.Dirty[p],Returns=svc.Returns,Banks=svc.Banks}end
+local function backInPyramid(p,before,label) -- the carry ended as a loss: nothing banked, nothing claimed, nothing saved, nothing dropped, everything cleaned, the notice
+ check(chase.Runs[p]==nil and chase.Starting[p]==nil,label..': the carry is over')
+ check(not Rules.Claimed(Data:GetPremium(p))and Data:GetPremium(p).Secrets156==nil and Data.Dirty[p]==before.Dirty and svc.Banks==before.Banks,label..': NOT claimed, nothing to save')
+ check(#Data:GetChestRecords(p)==before.Records,label..': nothing in the Bag')
+ check(p:GetAttribute(Rules.Attr)=='Open'and svc.Out[p]==nil,label..': the pack is back in the pyramid (\'Open\')')
+ check(p:GetAttribute('ChestChaseSeedCarrying')==false and p:GetAttribute('ChestChaseQueued')==false and p:GetAttribute('ChestChaseRunActive')~=true and p.Character:FindFirstChild('CarriedSeed')==nil,
+  label..': the carrying attributes and the held pack are cleaned (a normal non-banked end)')
+ check(dropsCount()==before.Drops and runtime:FindFirstChild('DroppedSeed')==nil and #hits==before.Hits,label..': nothing dropped on the track, no fling')
+ check(sawNote(p,Rules.Text.Refresh,before.Notes+1)and not sawNote(p,Rules.Text.Claimed,before.Notes+1)and svc.Returns==before.Returns+1,label..': told "'..Rules.Text.Refresh..'"')
+end
+nextRefresh(300)
+-- (a) a carrier inside the biome track: the evacuation used to bank the pack (Finish(true))
+local P1=fresh(710,'Pia');local ok1=take(P1);local run1=chase.Runs[P1]
+check(ok1 and run1 and inTrack(P1)and chase.KeeperTargets[2]==run1 and P1:GetAttribute('ChestChaseSeedCarrying')==true,'(Pia carries the secret pack inside the biome track, the snake after her)')
+local b1=snapshot(P1);startRefresh()
+check(Map.Refreshing==true and chase.RefreshEndsAt~=nil,'(the refresh is running: the track is closed)')
+backInPyramid(P1,b1,'refresh, carrier inside the track')
+check(chase.KeeperTargets[2]==nil and snake:GetAttribute('TargetUserId')==0 and #(chase.KeeperQueues[2]or{})==0,'... the snake lets go of her (no keeper lease left over)')
+check(P1.Character.CFrame and P1.Character.CFrame.Position.Z<-100,'... and she was moved out like every player in the track (the refresh code still ran: PivotTo to the return spot)')
+endRefresh()
+local againOk=take(P1);check(againOk and chase.Runs[P1]~=nil and P1:GetAttribute(Rules.Attr)=='Out','... after the refresh she can take it again')
+chase:Finish(false,false,chase.Runs[P1])
+-- (b) a carrier outside the track (already at the hub): the stale-runs loop used to bank the pack (Finish(true) for a run with a valid character)
+local P2=fresh(711,'Pete');take(P2);local run2=chase.Runs[P2];standAt(P2,V3(0,7,-120))
+check(run2 and not inTrack(P2),'(Pete carries it and stands outside the biome track, in the hub)')
+local b2=snapshot(P2);startRefresh()
+backInPyramid(P2,b2,'refresh, carrier outside the track');endRefresh()
+-- (c) a normal pack: unchanged (kept = banked, inside the track and outside)
+local N1=fresh(712,'Nell');local nrun1=normalCarry(N1);local nb1=snapshot(N1)
+check(nrun1 and nrun1.Chest.Pyramid156==nil and inTrack(N1),'(Nell carries a normal pack inside the track)')
+local N2=fresh(713,'Nick');local nrun2=normalCarry(N2);standAt(N2,V3(0,7,-120));local nb2=snapshot(N2)
+check(nrun2 and not inTrack(N2),'(Nick carries a normal pack and stands in the hub)')
+startRefresh()
+check(chase.Runs[N1]==nil and #Data:GetChestRecords(N1)==nb1.Records+1 and not Rules.Claimed(Data:GetPremium(N1))and N1:GetAttribute(Rules.Attr)=='Open'and not sawNote(N1,Rules.Text.Refresh,nb1.Notes+1),
+ 'refresh, normal pack inside the track: kept, as before (banked, one more in the Bag, no pyramid claim, no pyramid notice)')
+check(chase.Runs[N2]==nil and #Data:GetChestRecords(N2)==nb2.Records+1 and not Rules.Claimed(Data:GetPremium(N2))and not sawNote(N2,Rules.Text.Refresh,nb2.Notes+1),
+ 'refresh, normal pack outside the track: kept, as before')
+check(svc.Returns==nb1.Returns,'... and the pyramid sent nothing back for them');endRefresh()
+-- (d) a mix in one keeper queue: a secret carrier first (the snake's target) and a normal carrier behind, then the other way round
+local Q1=fresh(714,'Quin');local Q2=fresh(715,'Quill')
+take(Q1);local qa=chase.Runs[Q1];local qb=normalCarry(Q2)
+check(qa and qb and chase.KeeperTargets[2]==qa and qb.Chest.Pyramid156==nil,'(Quin carries the secret pack and is the snake\'s target; Quill\'s normal pack waits behind)')
+local bq1,bq2=snapshot(Q1),snapshot(Q2);startRefresh()
+backInPyramid(Q1,bq1,'refresh, secret carrier first in the queue')
+check(chase.Runs[Q2]==nil and #Data:GetChestRecords(Q2)==bq2.Records+1 and not sawNote(Q2,Rules.Text.Refresh,bq2.Notes+1),'... the normal carrier behind her is kept, as before')
+check(chase.KeeperTargets[2]==nil and #(chase.KeeperQueues[2]or{})==0 and Q1:GetAttribute('ChestChaseQueued')==false and Q2:GetAttribute('ChestChaseQueued')==false,'... the keeper queue is empty and nobody is left queued');endRefresh()
+local R1=fresh(716,'Rosa');local R2=fresh(717,'Rob')
+normalCarry(R1);local ra=chase.Runs[R1];take(R2);local rb=chase.Runs[R2]
+check(ra and rb and chase.KeeperTargets[2]==ra and rb.Chest.Pyramid156==R2.UserId,'(Rosa\'s normal pack is the snake\'s target; Rob\'s secret pack waits behind)')
+local br1,br2=snapshot(R1),snapshot(R2);startRefresh()
+backInPyramid(R2,br2,'refresh, secret carrier waiting in the queue')
+check(chase.Runs[R1]==nil and #Data:GetChestRecords(R1)==br1.Records+1 and chase.KeeperTargets[2]==nil and #(chase.KeeperQueues[2]or{})==0,'... the normal target is kept, as before; the queue is empty');endRefresh()
+-- (e) the owner's test commands start the same refresh on the same object
+local S1=fresh(718,'Sia');take(S1);local bs=snapshot(S1)
+chase:_beginBiomeRefresh(R.clock)
+backInPyramid(S1,bs,'a refresh started by a test command (ctx.Chase:_beginBiomeRefresh)');endRefresh()
+
+-- Hold E near the refresh: refused (nothing changed, a notice), outside the window it works
+local G=fresh(720,'Gus')
+local function attempt(p,untilRefresh)standAt(p,V3(C0.X,ground,C0.Z-half-3));R.clock+=Rules.Cooldown+.01;if untilRefresh~=nil then nextRefresh(untilRefresh)end;return svc:Trigger(p)end
+local function untouched(p,b,label)
+ check(chase.Runs[p]==nil and svc.Out[p]==nil and p:GetAttribute(Rules.Attr)=='Open'and #Data:GetChestRecords(p)==b.Records and Data.Dirty[p]==b.Dirty and chase.Starting[p]==nil
+  and p:GetAttribute('ChestChaseSeedCarrying')~=true and snake:GetAttribute('TargetUserId')==0 and sawNote(p,Rules.Text.RefreshSoon,b.Notes+1),label..': nothing changed, and the notice "'..Rules.Text.RefreshSoon..'"')
+end
+check(type(Rules.RefreshGuard)=='number'and Rules.RefreshGuard>=10 and Rules.RefreshGuard<=30,'the guard is '..tostring(Rules.RefreshGuard)..' seconds (R157 review fix)')
+local taken0=svc.Taken
+for _,case in ipairs({{Rules.RefreshGuard-.5,'the refresh is '..(Rules.RefreshGuard-.5)..' s away'},{Rules.RefreshGuard,'exactly '..Rules.RefreshGuard..' s away (inside the window)'},{3,'3 s away'},{0,'due now'},{-5,'5 s overdue'}})do
+ local b=snapshot(G);local ok,why=attempt(G,case[1])
+ check(not ok and why=='refresh','a trigger when '..case[2]..' is refused ('..tostring(why)..')');untouched(G,b,'... ')
+end
+do local b=snapshot(G);Map.Refreshing=true;nextRefresh(300);local ok,why=attempt(G)
+ check(not ok and why=='refresh','a trigger while the refresh runs (the track is closed) is refused ('..tostring(why)..')');untouched(G,b,'... ');Map.Refreshing=false
+ b=snapshot(G);chase.RefreshEndsAt=R.clock+5;local ok2,why2=attempt(G)
+ check(not ok2 and why2=='refresh','... also while only the closing time is set ('..tostring(why2)..')');untouched(G,b,'... ');chase.RefreshEndsAt=nil
+end
+check(svc.Taken==taken0 and(svc.Refused.refresh or 0)>=7,'... none of them took a pack ('..tostring(svc.Refused.refresh)..' refusals counted)')
+local okEdge,whyEdge=attempt(G,Rules.RefreshGuard+.5);local runG=chase.Runs[G]
+check(okEdge and runG~=nil and G:GetAttribute(Rules.Attr)=='Out','just outside the window ('..(Rules.RefreshGuard+.5)..' s before the refresh) the trigger works ('..tostring(whyEdge)..')')
+local bg2=snapshot(G);startRefresh() -- (the refresh arrives while she carries it)
+backInPyramid(G,bg2,'a carry that meets the refresh');endRefresh()
+local okFar=attempt(G,300);check(okFar and chase.Runs[G]~=nil,'a refresh 300 s away: the trigger works');chase:Finish(false,false,chase.Runs[G])
+chase.NextRefreshAt=nil;local okNil=attempt(G);check(okNil and chase.Runs[G]~=nil,'no refresh time known (the chase has not started its clock): the trigger works');chase:Finish(false,false,chase.Runs[G]);nextRefresh(300)
+check(Rules.Text.Refresh:find('BIOMES REFRESHING',1,true)and Rules.Text.Refresh:find('PYRAMID',1,true)and Rules.Text.RefreshSoon:find('REFRESH',1,true),'the two refresh notices say what happened (simple words)')
+
 -- the words players read: simple, "you" / "your" in full
 local plain=true
 for k,text in pairs(Rules.Text)do local l=' '..text:lower()..' ';if l:find('[^%a]ur[^%a]')or l:find('[^%a]u[^%a]')then plain=false;print('  short word in '..k..': '..text)end end

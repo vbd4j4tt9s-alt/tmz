@@ -1,5 +1,5 @@
 #!/bin/sh
-# Usage: sh run_hud157.sh [scratch dir]     (NO_MUTATE=1 skips the teeth; R157_BASE=<ref> = the commit R157 was built on, default d1640c1: the R156 previews merged)
+# Usage: sh run_hud157.sh [scratch dir]     (NO_MUTATE=1 skips the teeth; R157_BASE=<ref> = the release R157 is built on, default c432356: R156; R157_HUD=<ref> = the HUD merge, default fae6e8c)
 # R157 HUD: the three owner-approved R156 previews built together - the pity bars v2 (8 / 6 px over the slots, the clover, shade 1 "Fresh", the name rows above the bars),
 # the reveal fixes (SKIP only for Secret / Cosmic / King and in the corner of a story scene, the card fitted between BASE / TRACK and the bars, the collect hint under the name)
 # and DAILY / INVITE in the menu wheel (the five-option half circle, the MENU button's "!", BASE / TRACK alone in the top bar row). On the Roblox mock (/opt/luau/luau):
@@ -15,7 +15,7 @@
 #  4. teeth   - each break must make a test fail
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
-BASE=${R157_BASE:-d1640c1}
+BASE=${R157_BASE:-c432356};HUD=${R157_HUD:-fae6e8c}
 T=$REPO/tools/tests;P=$REPO/docs/proposals;S=$REPO/src;RSD=$S/ReplicatedStorage;C=$S/StarterPlayer/StarterPlayerScripts;INV=$P/inventory_R113/tests
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
 echo "== 0. static (since $BASE)"
@@ -31,9 +31,9 @@ done
 echo "ok: line 1 of the $n changed client scripts is unchanged (the load guard)"
 for f in src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua src/ReplicatedStorage/BiomeMood.lua src/ServerScriptService/ChestChaseServer/Config.lua src/ReplicatedStorage/TitleScreen104.lua \
  src/ReplicatedFirst/TitleScreen.client.lua src/ReplicatedStorage/InventoryPanel155.lua src/ReplicatedStorage/GardenMenuStyle.lua src/ReplicatedStorage/DiscardDialog155.lua src/MANIFEST.tsv;do
- git -C "$REPO" diff --quiet "$BASE" -- "$f" || fail "$f changed (another branch owns it / no new script)"
+ git -C "$REPO" diff --quiet "$HUD^" "$HUD" -- "$f" || fail "$f changed in the HUD merge $HUD (another branch owns it / no new script)"
 done
-echo "ok: BackgroundMusic, BiomeMood, Config.lua, the title screen (TitleScreen104), the Bag's look and the manifest are untouched"
+echo "ok: the HUD merge ($HUD) left BackgroundMusic, BiomeMood, Config.lua, the title screen (TitleScreen104), the Bag's look and the manifest alone"
 (cd "$REPO" && grep -v '^#' "$P/R151/tests/frozen.sha256" | sha256sum -c --quiet -) && echo "ok: the frozen files (R151 frozen.sha256) match" || fail "a frozen file changed"
 # the new player-visible words (string literals on the lines R157 adds to src): "you" / "your" in full, never "u" / "ur"
 git -C "$REPO" diff -U0 "$BASE" -- src | grep '^+' | grep -v '^+++' | sed 's/--.*$//' > "$OUT/added.txt"
@@ -48,7 +48,7 @@ if bad:print('FAIL: new words with "u" / "ur":',bad);sys.exit(1)
 print('ok: no new player-visible words with "u" / "ur" (every string R157 adds to src)')
 PY
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]|gp[t]-?[0-9]" "$P/R157" 2>/dev/null | grep -v "^Binary";then fail "a model name in the R157 files";else echo "ok: no model names in the R157 files";fi
-sed -n 6p "$T/run_all_suites.sh" | grep -q "docs/proposals/R157/tests/run_hud157.sh; do$" && echo "ok: registered at the end of line 6 of tools/tests/run_all_suites.sh" || fail "run_hud157.sh is not at the end of line 6 of tools/tests/run_all_suites.sh"
+sed -n 6p "$T/run_all_suites.sh" | grep -q " docs/proposals/R157/tests/run_hud157.sh[; ]" && echo "ok: registered on line 6 of tools/tests/run_all_suites.sh" || fail "run_hud157.sh is not on line 6 of tools/tests/run_all_suites.sh"
 grep -q 'Instance.new("BillboardGui")' "$C/SpeedGainPopup.client.lua" && grep -q "gui.Name='GardenNavigation'" "$RSD/HudLayout.lua" && echo "ok: the speed popups are a world-space BillboardGui, the MENU button a ScreenGui (drawn above them)" || fail "the speed popups / the MENU button changed kind"
 # the tests -------------------------------------------------------------------------------------------------------------------------------------------------------------
 build(){ # dir [Name=path ...]

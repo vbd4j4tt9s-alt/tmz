@@ -49,6 +49,7 @@ P.State={Open='Open',Out='Out',Claimed='Claimed'}
 P.Flag='Secrets156';P.Key='Pyramid' -- Premium.Secrets156.Pyramid = true
 P.Cooldown=1               -- seconds between two triggers of one player that the server looks at
 P.Slack=2                  -- studs the server allows over the reach (lag), like the world packs' 24 / 26
+P.RefreshGuard=15          -- R157 review fix: no Hold E while the biomes refresh or within this many seconds before (a carry that meets the refresh goes back, never banks)
 -- The client: build the pack within BuildIn studs of the camera (let it go past BuildOut), turn it within SpinIn (stop past SpinOut), Rate poses a second.
 P.Client={BuildIn=220,BuildOut=260,SpinIn=140,SpinOut=170,Rate=20,Check=.2}
 P.Spin={Period=8,BobPeriod=4,Bob=.25}
@@ -60,6 +61,8 @@ P.Text={
  Bat='SMACK! THE PACK WENT BACK IN THE PYRAMID',
  Lightning='ZAP! THE PACK WENT BACK IN THE PYRAMID',
  Lost='THE PACK WENT BACK IN THE PYRAMID. TRY AGAIN!',
+ Refresh='BIOMES REFRESHING! THE PACK WENT BACK IN THE PYRAMID',
+ RefreshSoon='THE BIOMES REFRESH SOON! TRY AGAIN AFTER THE REFRESH',
 }
 
 -- Sizes / heights at a scale: slab i = {x, z, y of its centre over the ground}, the slab height.

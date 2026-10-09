@@ -13,8 +13,12 @@
 --                normal one ({Luck = true, Banked = true}): the hidden pack-size pity and the pack pity count it like any world pack.
 --      Returned  the chase hooks (HookChase) call it when the carry ends without a bank: caught by the snake (the hit lands as usual; the pack does NOT drop on
 --                the track: it goes straight back into the pyramid for that player), a bat / lightning / a hole, a fall, a death, leaving. The player can try again.
---      HookChase Start puts two small wrappers on the chase service OBJECT (_dropChestAfterCatch, _returnPackToOrigin), so ConcurrentKeeperService itself stays
---                as it is (R149 freezes it). They act on a secret pack only; every other pack goes straight to the normal code.
+--      HookChase Start puts three small wrappers on the chase service OBJECT (_dropChestAfterCatch, _returnPackToOrigin, _beginBiomeRefresh), so
+--                ConcurrentKeeperService itself stays as it is (R149 freezes it). They act on a secret pack only; every other pack goes straight to the normal code.
+--      Refresh   (R157 review fix) the biome refresh banks every carrier it finds (_evacuateBiomePlayers, the stale-runs loop: Finish(true)), and its time is public,
+--                so a pyramid carrier would get the one-time pack with no chase. _beginBiomeRefresh is wrapped: BEFORE the original, every secret carry is ended with
+--                Finish(false,false,run) (not banked, not caught: nothing drops on the track) and goes back into the pyramid ('Refresh' notice). Trigger also refuses
+--                while the refresh runs and in the Rules.RefreshGuard seconds before it, so a run is not wasted.
 --      Each player has their own pack: the state is per player (Out / the saved claim), published as the Player attribute PyramidRules156.Attr.
 --  * Command     /test pyramid [@username] (status), /test pyramid @username reset (clears the claim; saved). OwnerUpdateCommands82 dispatches here.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local CS=game:GetService('CollectionService')
@@ -133,6 +137,14 @@ function M:Pack(player)
   PackShape=0,Weather='None',OddsVersion=PackRules.OddsVersion,SeedScale=PackRules.NewSeedScale(p.Stage,p.BagVariant,p.PackSize), -- (PackShape 0: the default chip-bag shape for life, on the float, the carry and in the Bag; absent would make the Bag roll one)
   Body=self.Anchor,Model=self.Model,Pyramid156=player.UserId}
 end
+-- The biome refresh (ConcurrentKeeperService): running (Map.Refreshing / RefreshEndsAt) or due within Rules.RefreshGuard seconds. NextRefreshAt is on the chase's
+-- own clock (os.clock, the same as this service's Clock). Overdue (negative) counts as near: the next heartbeat starts it.
+function M:RefreshNear(now)
+ local chase=self.Chase;local map=chase and chase.Map or self.Map
+ if(map and map.Refreshing==true)or(chase and chase.RefreshEndsAt~=nil)then return true end
+ local due=chase and chase.NextRefreshAt
+ return type(due)=='number'and due-(now or self.Clock())<=Rules.RefreshGuard
+end
 local function refuse(self,why)self.Refused[why]=(self.Refused[why]or 0)+1;return false,why end
 -- "Hold E" finished. Returns true, or false and why (every refusal leaves nothing changed).
 function M:Trigger(player)
@@ -150,6 +162,7 @@ function M:Trigger(player)
  if not root then return refuse(self,'nobody')end
  local inside,where=Rules.InZone(self.Zone,root.Position,Rules.Slack)
  if not inside then return refuse(self,'far:'..tostring(where))end
+ if self:RefreshNear(now)then say(self,player,Rules.Text.RefreshSoon,AMBER);return refuse(self,'refresh')end -- (R157 review fix: the biomes refresh now or within Rules.RefreshGuard s)
  -- the normal steal checks; the pyramid's own reach replaced the world packs' 26 studs above, so they are asked at the player's own spot
  local c,h,r=chase:_canTake(player,root.Position)
  if not c then return refuse(self,'steal rules')end
@@ -178,10 +191,12 @@ function M:Banked(player,chest,record)
  say(self,player,Rules.Text.Claimed,GOLD)
  return true
 end
-local CAUSES={Keeper='Caught',Bat='Bat',Lightning='Lightning'} -- (anything else, a hole too, is 'Lost': a hole's own notice says the pack dropped; this one says where it went)
--- The carry ended without a bank (the chase hooks below). cause: 'Keeper' / 'Bat' / 'Lightning' / 'Hole' (caught) or nil (lost).
+local CAUSES={Keeper='Caught',Bat='Bat',Lightning='Lightning',Refresh='Refresh'} -- (anything else, a hole too, is 'Lost': a hole's own notice says the pack dropped; this one says where it went)
+-- The carry ended without a bank (the chase hooks below). cause: 'Keeper' / 'Bat' / 'Lightning' / 'Hole' (caught) or nil (lost; 'Refresh' when RefreshReturns ended it:
+-- Finish calls _returnPackToOrigin(chest) with no cause, so that one rides on the record).
 function M:Returned(chest,cause)
  if type(chest)~='table'or chest.Pyramid156==nil then return false end
+ cause=cause or chest.Pyramid156End
  local player=Players:GetPlayerByUserId(chest.Pyramid156)
  self.Returns+=1
  if player then
@@ -190,14 +205,40 @@ function M:Returned(chest,cause)
  end
  return true
 end
+-- A biome refresh is about to start (the hook below calls this BEFORE ConcurrentKeeperService:_beginBiomeRefresh). That code banks every carrier it finds (Finish(true) in
+-- _evacuateBiomePlayers for a player in the biome track, and again in its stale-runs loop for any run with a valid character), and its time is public. So every secret carry
+-- is ended here, first, with Finish(false,false,run): not banked (no Bag, no claim), not caught (no fling, nothing dropped on the track). Finish then does exactly what it does
+-- for a fall or leaving: the keeper lease, the queue slot, the carrying / queued attributes, the speed, the held pack and the keeper's alert are all cleaned, and it calls
+-- _returnPackToOrigin(run.Chest), which the hook below sends to Returned (the pack is back in the pyramid, the 'Refresh' notice). Returns how many went back.
+function M:RefreshReturns()
+ local chase=self.Chase;local ended={}
+ for _,run in pairs(chase.Runs or{})do
+  if type(run)=='table'and type(run.Chest)=='table'and run.Chest.Pyramid156~=nil then ended[#ended+1]=run end
+ end
+ for _,run in ipairs(ended)do
+  run.Chest.Pyramid156End='Refresh'
+  local ok,err=pcall(chase.Finish,chase,false,false,run)
+  if not ok then warn('[R157] A pyramid pack could not be sent back before the refresh: '..tostring(err))end
+  if chase.Runs[run.Player]==run then run.Chest.Pyramid156End=nil end -- (Finish refused: the refresh code will meet this run as it always did)
+ end
+ return #ended
+end
 -- The chase hooks: wrappers on the chase service object (once per object; the class, ConcurrentKeeperService, is not changed). A secret pack has no world slot
 -- and never drops on the track. Caught (snake / bat / lightning / hole): the hit lands with the same fling code as a normal catch, then the pack goes back into
 -- the pyramid for its player. Any other end without a bank (a fall, a death, leaving, a failed bank): back too ('lost'). Other packs: the normal code.
+-- A biome refresh (R157 review fix): RefreshReturns sends every secret carry back first, so the refresh never banks one.
 function M.HookChase(chase)
  if type(chase)~='table'or rawget(chase,'Pyramid156Hooks')then return false end
- local drop,back=chase._dropChestAfterCatch,chase._returnPackToOrigin
- assert(type(drop)=='function'and type(back)=='function','[R156] the chase service has no catch / return code to hook')
+ local drop,back,refresh=chase._dropChestAfterCatch,chase._returnPackToOrigin,chase._beginBiomeRefresh
+ assert(type(drop)=='function'and type(back)=='function'and type(refresh)=='function','[R156] the chase service has no catch / return / refresh code to hook')
  chase.Pyramid156Hooks=true
+ chase._beginBiomeRefresh=function(self,now)
+  if self.Pyramid156 then
+   local ok,err=pcall(self.Pyramid156.RefreshReturns,self.Pyramid156)
+   if not ok then warn('[R157] The pyramid packs could not be sent back before the refresh: '..tostring(err))end
+  end
+  return refresh(self,now)
+ end
  chase._returnPackToOrigin=function(self,chest,cause)
   if type(chest)=='table'and chest.Pyramid156~=nil then return self.Pyramid156~=nil and self.Pyramid156:Returned(chest,cause)==true end
   return back(self,chest,cause)

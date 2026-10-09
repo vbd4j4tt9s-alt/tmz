@@ -10,7 +10,10 @@
 #  test_pyramid_server156.luau  the map pass on a Sunscar stand-in; the prompt (the world packs' Hold E); joining (new, old and broken saves); reach from the 4 sides and the
 #                               4 corners at ground level, not from twice that; the take (the normal steal checks, a Desert Mythic world pack's record, the Sand Snake
 #                               chases); caught / a bat / lightning / a hole / a fall / leaving: back in the pyramid; banked: the claim (saved), the pack-size pity and the
-#                               pack pity count it; a claimed player's trigger; the 200 cap's refusal; one each; save / load; the refresh closure; /test pyramid (+ reset)
+#                               pack pity count it; a claimed player's trigger; the 200 cap's refusal; one each; save / load; the refresh closure; /test pyramid (+ reset);
+#                               R157 review fix, the biome refresh on the REAL refresh code: a secret carrier inside the track / outside it (the stale-runs loop) / waiting in the
+#                               keeper queue goes back (not banked, not claimed, not saved, 'Refresh' notice), a normal pack is kept as before, and Hold E is refused (nothing changed,
+#                               a notice) while the refresh runs and in the RefreshGuard seconds before it, and works just outside that window
 #  test_pyramid_client156.luau  the floating pack (built per player, the Desert Mythic art, at the centre), the turn and the bob (4 tweens, nothing per frame), the prompt
 #                               from the sides / corners / steps / inside and not from twice the reach, 'Out' / 'Claimed' / reset, far away, streaming
 #  pyramid_map156.luau          the owner's place after the REAL start-up passes: the Sunscar Pyramid replaced in place, every slab of the owner's model (read from his
@@ -22,7 +25,7 @@
 # a step fail (the checks have teeth).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
-OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};MODE=$3;BASE=${BASE:-e650788}
+OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};MODE=$3;BASE=${BASE:-c432356}
 mkdir -p "$OUT"
 T=$REPO/tools/tests;P=$REPO/docs/proposals;S=$REPO/src;SS=$S/ServerScriptService/ChestChaseServer;SP=$S/StarterPlayer/StarterPlayerScripts;RS=$S/ReplicatedStorage
 CLIENT=StarterPlayer/StarterPlayerScripts/SecretPyramidClient156.client.lua
@@ -71,13 +74,17 @@ grep -q "self.Pyramid156.Banked, self.Pyramid156, player, seed, record" "$SS/Che
 grep -q "self:_returnPackToOrigin(run.Chest,hit and hit.Cause or'Keeper')" "$SS/SecretPyramid156.lua" || bad "a caught pyramid pack is not sent back to the pyramid"
 grep -q "if type(chest)=='table'and chest.Pyramid156~=nil then return self.Pyramid156~=nil and self.Pyramid156:Returned(chest,cause)==true end" "$SS/SecretPyramid156.lua" || bad "a lost pyramid pack is not sent back to the pyramid"
 grep -q "self.Chase.Pyramid156=self;self.Chests.Pyramid156=self;M.HookChase(self.Chase)" "$SS/SecretPyramid156.lua" || bad "Start does not hook the chase service"
+grep -q "local ok,err=pcall(self.Pyramid156.RefreshReturns,self.Pyramid156)" "$SS/SecretPyramid156.lua" && grep -q "pcall(chase.Finish,chase,false,false,run)" "$SS/SecretPyramid156.lua" || bad "the biome refresh does not send the secret carries back first (Finish(false,false,run))"
+grep -q "if self:RefreshNear(now)then say(self,player,Rules.Text.RefreshSoon,AMBER);return refuse(self,'refresh')end" "$SS/SecretPyramid156.lua" || bad "Trigger does not refuse near the biome refresh"
 # the chase hooks sit on the chase service object: ConcurrentKeeperService itself (frozen by R149's run_tiger_gear) is not touched
 git -C "$REPO" diff --quiet "$BASE" -- src/ServerScriptService/ChestChaseServer/ConcurrentKeeperService.lua || bad "ConcurrentKeeperService.lua changed (R149 freezes it: the pyramid hooks the chase service object instead)"
 grep -q "require(modules.SecretPyramid156).new(Config,playerData,chestService,chaseService,notifications,mapService):Start()" "$S/ServerScriptService/ChestChaseServerMain.server.lua" || bad "the server does not start the pyramid"
 grep -q "^X.Actions.pyramid=true" "$SS/OwnerUpdateCommands82.lua" && grep -q "action=='pyramid'then return require(script.Parent.SecretPyramid156).Command" "$SS/OwnerUpdateCommands82.lua" || bad "/test pyramid is not dispatched"
 grep -q "'/test pyramid @username reset'" "$RS/StudioTestHelp.lua" || bad "/test pyramid is not in the F4 help"
+# (BASE = the R156 release R157 is built on; Config may differ only in its Version line, which every release bumps)
 for f in src/ServerScriptService/ChestChaseServer/Config.lua src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua src/ReplicatedStorage/BiomeMood.lua;do
- git -C "$REPO" show "$BASE:$f" | cmp -s - "$REPO/$f" || bad "$f changed (the pyramid must not touch it)"
+ git -C "$REPO" show "$BASE:$f" | sed "s/Config.Version='V150 R1[0-9a-z]*'/Config.Version='V150 R1xx'/" > "$OUT/base_file.txt"
+ sed "s/Config.Version='V150 R1[0-9a-z]*'/Config.Version='V150 R1xx'/" "$REPO/$f" | cmp -s - "$OUT/base_file.txt" || bad "$f changed (the pyramid must not touch it)"
 done
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]" "$HERE" "$P/R156/pyramid.md" "$P/R156/preview" "$RS/PyramidRules156.lua" "$SS/SecretPyramid156.lua" "$S/$CLIENT" 2>/dev/null;then bad "a model name in the R156 pyramid files";fi
 [ "$fail" = 0 ]
@@ -111,6 +118,14 @@ mutate "a caught pyramid pack is dropped on the track (no way back into the pyra
 mutate "a lost pyramid pack goes to the normal return code (never back into the pyramid)" $C/SecretPyramid156.lua "if type(chest)=='table'and chest.Pyramid156~=nil then return self.Pyramid156~=nil and self.Pyramid156:Returned(chest,cause)==true end" "" server
 mutate "the bank does not claim it" $C/ChestService.lua "if seed.Pyramid156 ~= nil and self.Pyramid156 then" "if false then" server
 mutate "a claimed player may take it again" $C/SecretPyramid156.lua "if self:Claimed(player)then self:_publish(player);return refuse(self,'claimed')end" "" server
+mutate "the biome refresh banks a secret carry again (the refresh hook is gone)" $C/SecretPyramid156.lua "local ok,err=pcall(self.Pyramid156.RefreshReturns,self.Pyramid156)" "local ok,err=true,nil" server
+mutate "the refresh return banks the pack (Finish(true))" $C/SecretPyramid156.lua "pcall(chase.Finish,chase,false,false,run)" "pcall(chase.Finish,chase,true,false,run)" server
+mutate "only a secret carrier inside the biome track is sent back for the refresh (the stale-runs loop banks the others)" $C/SecretPyramid156.lua "run.Chest.Pyramid156~=nil then ended[#ended+1]=run end" "run.Chest.Pyramid156~=nil and chase.Map:IsInsideBiomeTrack(run.HumanoidRootPart.Position)then ended[#ended+1]=run end" server
+mutate "the refresh return shows the 'lost' notice, not the refresh notice" $C/SecretPyramid156.lua " cause=cause or chest.Pyramid156End
+" "
+" server
+mutate "Hold E works while the biomes refresh and just before (no guard)" $C/SecretPyramid156.lua " if self:RefreshNear(now)then say(self,player,Rules.Text.RefreshSoon,AMBER);return refuse(self,'refresh')end" "" server
+mutate "the guard is only 1 second" ReplicatedStorage/PyramidRules156.lua "P.RefreshGuard=15 " "P.RefreshGuard=1 " server
 mutate "the zone reaches 40 studs past the base" ReplicatedStorage/PyramidRules156.lua "P.Margin=6 " "P.Margin=40 " server
 mutate "the steal rules are skipped (no 200 cap)" $C/SecretPyramid156.lua "local c,h,r=chase:_canTake(player,root.Position)" "local c,h,r=player.Character,player.Character:FindFirstChildOfClass('Humanoid'),root" server
 mutate "the client shows the pack to a claimed player" StarterPlayer/StarterPlayerScripts/SecretPyramidClient156.client.lua "local open=state()==Rules.State.Open" "local open=state()~=nil" client
