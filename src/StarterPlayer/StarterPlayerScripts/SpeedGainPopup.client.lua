@@ -9,6 +9,9 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 -- Cheap by construction: one BillboardGui per player that has popups, from a small pool, holding pooled popup frames that are moved and reused; ONE RenderStepped
 -- updater for all of them, connected only while a popup is alive or queued; no TweenService, no task.delay, no Instance created or destroyed once the pool exists.
 -- (The server still publishes Config.TreadmillPopupLifetime as the remote's PopupLifetime attribute; the lifetime now lives in SpeedPopupStyle.)
+-- R155 (owner: "make the speed popups consistent in size so when zooming out they don't become bigger ... at a certain point it can disappear"): the popups are world-sized: the field's
+-- container frame carries one UIScale = the default camera distance / the camera's distance to the head (SpeedPopupStyle.ZoomScale: 1 at 12.5 studs, half at 25, capped at 1.3x close up),
+-- written from the same RenderStepped step only when it changed by more than an epsilon; past 31 studs the popups fade (their alpha x the field's fade) and past 36.5 they are hidden.
 do
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -87,7 +90,7 @@ local function makePopup(field)
 	local icon, iconStroke = makeLabel(frame, "Lightning", Style.Icon, Style.Size.Icon, ICON_COLOR, Style.Size.IconBox, 1)
 	local amount, amountStroke = makeLabel(frame, "Amount", "", Style.Size.Text, TEXT_COLOR, 0, 2)
 	amount.AutomaticSize = Enum.AutomaticSize.X
-	frame.Parent = field.Gui
+	frame.Parent = field.Zoom
 	local popup = {
 		Field = field, Frame = frame, Scale = uiScale, Icon = icon, IconStroke = iconStroke, Amount = amount, AmountStroke = amountStroke,
 		Plan = {}, At = 0, Retired = nil, Reduced = false, Unit = 1, FanX = 1, FanY = 1, PX = 0, PY = 0, PS = 1, PA = 1,
@@ -109,7 +112,35 @@ local function makeField()
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Enabled = false
 	gui.Parent = playerGui
-	return {Gui = gui, Popups = {}, Free = {}, Seq = 0}
+	-- R155: every popup frame lives in this container, filling the billboard; its UIScale is the zoom (a UIScale scales a frame and all it holds, about the frame's centre = the head)
+	local zoom = Instance.new("Frame")
+	zoom.Name = "Zoom"
+	zoom.AnchorPoint = Vector2.new(0.5, 0.5)
+	zoom.Position = UDim2.fromScale(0.5, 0.5)
+	zoom.Size = UDim2.fromScale(1, 1)
+	zoom.BackgroundTransparency = 1
+	zoom.BorderSizePixel = 0
+	zoom.Parent = gui
+	local zoomScale = Instance.new("UIScale")
+	zoomScale.Parent = zoom
+	return {Gui = gui, Zoom = zoom, ZoomScale = zoomScale, Popups = {}, Free = {}, Seq = 0, Anchor = nil, Offset = Vector3.zero, ZS = nil, Fade = 1, Hidden = false}
+end
+
+-- R155: the zoom of one field, once a frame: the camera's distance to the head decides the field's scale and fade (SpeedPopupStyle.ZoomScale). The scale is written only when it moved by more
+-- than Style.Zoom.Epsilon (one property on one frame, and nothing while the camera rests); past the hide distance the container is hidden and its popups are not moved at all.
+local cameraPosition -- the camera's position this frame (set by step; nil without a camera)
+local function refreshZoom(field)
+	local scale, fade = 1, 1
+	if cameraPosition then scale, fade = Style.ZoomScale((field.Anchor.Position + field.Offset - cameraPosition).Magnitude) end
+	field.Fade = fade
+	if (fade <= 0) ~= field.Hidden then
+		field.Hidden = fade <= 0
+		field.Zoom.Visible = not field.Hidden
+	end
+	if not field.Hidden and (field.ZS == nil or math.abs(scale - field.ZS) > Style.Zoom.Epsilon) then
+		field.ZS = scale
+		field.ZoomScale.Scale = scale
+	end
 end
 
 -- R153 (owner: "reduce jitter in effects"): the field hangs on the HumanoidRootPart at the head's height (StudsOffsetWorldSpace), not on the Head:
@@ -121,6 +152,8 @@ local function takeField(head)
 	local root = head.Parent and head.Parent:FindFirstChild("HumanoidRootPart")
 	field.Gui.Adornee = root or head
 	field.Gui.StudsOffsetWorldSpace = root and Vector3.new(0, head.Position.Y - root.Position.Y, 0) or Vector3.zero
+	field.Anchor, field.Offset, field.ZS = root or head, field.Gui.StudsOffsetWorldSpace, nil -- (R155: where the camera distance is measured to)
+	refreshZoom(field)
 	field.Gui.Enabled = true
 	return field
 end
@@ -165,6 +198,7 @@ local function apply(popup, x, y, scale, alpha)
 		popup.PS = scale
 		popup.Scale.Scale = scale
 	end
+	alpha = alpha * popup.Field.Fade -- (R155: the field's fade when the camera is far)
 	if math.abs(alpha - popup.PA) > 0.004 then
 		popup.PA = alpha
 		local t = 1 - alpha
@@ -240,7 +274,7 @@ local function spawnPopup(entry, item, now)
 	popup.Amount.Text = "+" .. Style.FormatGain(item.Amount)
 	popup.PX, popup.PY, popup.PS, popup.PA = math.huge, math.huge, -1, -1 -- the first pose writes everything
 	local x, y, scale, alpha = Style.Pose(plan, now - item.At, reduced)
-	apply(popup, x, y, scale, alpha)
+	if not field.Hidden then apply(popup, x, y, scale, alpha) end -- (R155: a hidden field is not moved; the first frame it shows writes the whole pose)
 	popup.Frame.Visible = true
 	active[#active + 1] = popup
 end
@@ -249,6 +283,7 @@ end
 local function updateEntry(entry, now)
 	local player = entry.Player
 	if player.Parent == nil or player.Character ~= entry.Character or entry.Head.Parent == nil then return false end
+	if entry.Field then refreshZoom(entry.Field) end
 	local pending = entry.Pending
 	local index = 1
 	while index <= #pending do
@@ -268,7 +303,7 @@ local function updateEntry(entry, now)
 		local popup = active[index]
 		local x, y, scale, alpha, alive = Style.Pose(popup.Plan, now - popup.At, popup.Reduced, popup.Retired)
 		if alive then
-			apply(popup, x, y, scale, alpha)
+			if not popup.Field.Hidden then apply(popup, x, y, scale, alpha) end
 			index += 1
 		else
 			table.remove(active, index)
@@ -280,6 +315,8 @@ end
 
 local function step()
 	local now = os.clock()
+	local camera = workspace.CurrentCamera
+	cameraPosition = camera and camera.CFrame.Position or nil
 	for player, entry in pairs(entries) do
 		if not updateEntry(entry, now) then
 			finishEntry(entry)

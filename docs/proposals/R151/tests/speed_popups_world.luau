@@ -39,14 +39,19 @@ function PW.newPlayer(name,opts)
 end
 function PW.leave(p)Players.PlayerRemoving:Fire(p);p.Parent=nil end
 function PW.view(height)W.workspace.CurrentCamera.ViewportSize=R.Vector2.new(height*16/9,height)end
+-- R155: the popup field scales with the camera's distance to the head (SpeedPopupStyle.Zoom), so a test says where its camera is. PW.camera(d) puts it d studs from the head of a character
+-- spawned at y = 3 (the head is at 4.5, straight behind it); the default is the game's default camera zoom, 12.5 studs, where the popups are exactly their R154 size. PW.boot starts there.
+PW.ZoomDistance=12.5
+function PW.camera(d)W.workspace.CurrentCamera.CFrame=R.CFrame.new(0,4.5,-(d or PW.ZoomDistance))end
 function PW.frames(n,dt)W.frames(n,dt or 1/60)end
 function PW.seconds(s,dt)dt=dt or 1/60;W.frames(math.floor(s/dt+.5),dt)end
 function PW.live(signal)local n=0;for _,c in ipairs(signal._c)do if c.Connected then n+=1 end end;return n end
 function PW.frameListeners()local Run=W.Run;return PW.live(Run.RenderStepped)+PW.live(Run.Heartbeat)+PW.live(Run.Stepped)+PW.live(Run.PreSimulation)+PW.live(Run.PostSimulation)end
 -- readers ------------------------------------------------------------------------------------------------------------------------------------------
 function PW.fields(pg)local out={};for _,c in ipairs(pg:GetChildren())do if c.Name=='SpeedGainField'then out[#out+1]=c end end;return out end
-function PW.frameList(field)local out={};for _,f in ipairs(field:GetChildren())do if f.Name=='Popup'then out[#out+1]=f end end;return out end
-function PW.visible(field)local out={};for _,f in ipairs(field:GetChildren())do if f.Name=='Popup'and f.Visible then out[#out+1]=f end end;return out end
+function PW.host(field)return field:FindFirstChild('Zoom')or field end -- (R155: the popup frames live in the field's 'Zoom' container, whose UIScale is the camera-distance scale)
+function PW.frameList(field)local out={};for _,f in ipairs(PW.host(field):GetChildren())do if f.Name=='Popup'then out[#out+1]=f end end;return out end
+function PW.visible(field)local out={};for _,f in ipairs(PW.host(field):GetChildren())do if f.Name=='Popup'and f.Visible then out[#out+1]=f end end;return out end
 function PW.visibleAll(pg)local n=0;for _,field in ipairs(PW.fields(pg))do n+=#PW.visible(field)end;return n end
 function PW.enabledFields(pg)local n=0;for _,field in ipairs(PW.fields(pg))do if field.Enabled then n+=1 end end;return n end
 function PW.fieldOf(pg,head)for _,field in ipairs(PW.fields(pg))do if field.Enabled and(field.Adornee==head or head and field.Adornee==head.Parent:FindFirstChild('HumanoidRootPart'))then return field end end;return nil end -- (R153: on the root at the head's height)
@@ -61,6 +66,7 @@ function PW.boot(opts)
  opts=opts or{}
  PW.Tier=opts.tier or 3
  if opts.view then PW.view(opts.view)else PW.view(1080)end
+ PW.camera() -- (R155: at the default zoom)
  local me=PW.newPlayer('Me',{Local=true,Id=1,Pos=V3(0,3,0)})
  local pg=me:FindFirstChild('PlayerGui')
  W.stub('ClientFxBudget',{Get=function()return PW.Tier end})

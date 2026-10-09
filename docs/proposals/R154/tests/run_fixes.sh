@@ -5,11 +5,13 @@
 #               character, 68% for "9+"), >= 60% of the badge and >= 55% of the red disc's height, inside the badge, centred, on 5 screens (computer and phones) for the INDEX count, the MENU
 #               alert and the DAILY count, and not clipped by the wheel's CanvasGroup / tab row: the R151 badge suites (docs/proposals/R151/tests/run_badges.sh carries the R154 checks)
 #  2. popups  - "the numbers for speed also should be kept at a consistent size throughout, reduce the size of the speed notifier number by 20% and fix the glitchyness": test_popups154.luau
-#               (35 / 32 px, constant size from the first frame to the last and at any camera distance, no showing frame reused, nothing cut short in the normal stream on any tier, smooth
-#               frame-by-frame flight at 30 / 60 / 144 fps) + the R153 popup test and the R151 speed popup suites, which follow the new numbers
+#               (35 / 32 px, constant size from the first frame to the last, no showing frame reused, nothing cut short in the normal stream on any tier, smooth
+#               frame-by-frame flight at 30 / 60 / 144 fps; R155, section 5: "make the speed popups consistent in size so when zooming out they don't become bigger ... at a certain point it can
+#               disappear": at the default camera zoom, 12.5 studs, they are the R154 size, then they follow the camera's distance (half at 25 studs), are capped at 1.3x close up, fade from 31.25 and are
+#               hidden past 36.46 studs, with a smooth zoom change in flight) + the R153 popup test and the R151 speed popup suites, which follow the new numbers
 #  static     - every changed script compiles at -O0 (Roblox's 200-locals limit shows only there), line 1 of every client script is still the R152 load guard (BackgroundMusic untouched),
 #               Config.Version unchanged, no model names in the R154 files
-# "mutate" breaks a copy of the popup code 18 ways (mutate154.py) and the badge text 3 ways (mutate_badges.py) and expects a failure each time.
+# "mutate" breaks a copy of the popup code 36 ways (mutate154.py; 18 of them R155's zoom) and the badge text 3 ways (mutate_badges.py) and expects a failure each time.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};MODE=$2

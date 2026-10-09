@@ -80,7 +80,7 @@ do
  local field=fieldOf()
  if check(field~=nil,'SpeedGainPopup: a popup field is shown')then
   J.everyFrame(check,'a speed popup flying out',.3,function()ev.OnClientEvent:Fire(me,120,nil,1,.2,char);J.frame(1/60)end,function()
-   local f=fieldOf();local p;for _,c in ipairs(f and f:GetChildren()or{})do if c.Name=='Popup'and c.Visible and(not p or c.ZIndex>p.ZIndex)then p=c end end
+   local f=fieldOf();local p;for _,c in ipairs(f and(f:FindFirstChild('Zoom')or f):GetChildren()or{})do if c.Name=='Popup'and c.Visible and(not p or c.ZIndex>p.ZIndex)then p=c end end
    return p and p.Position end)
  end
  sp:Destroy()
