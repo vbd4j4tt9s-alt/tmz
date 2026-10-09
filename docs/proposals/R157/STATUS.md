@@ -22,3 +22,9 @@ Base: R156 (weather ambience, music, item info panel removed; installer `install
   one claim per player (counts when banked; caught / lost -> straight back into the pyramid); the Sand Snake chases; the 42 keys under it are
   left out. Preview `docs/proposals/R156/pyramid.png`, notes `pyramid.md`.
 - Free Void Pack: claimable after 20 minutes of total play (`Premium.PlaySeconds157`), countdown on the pedestal, owed packs still given.
+
+## Owner calls answered during R157 (old R155 / R154 questions)
+- Per-tier ceilings (King 1%, Cosmic 5%, Secret 25%, Mythic 45%) stay for the lucky roll and for clover owners: owner picked **A, leave it** for both.
+- Mech packs with a full Bag: the shop should say BAG FULL (owner). **Next update (R158):** buy buttons read BAG FULL and a press shows
+  "BAG FULL! MAKE ROOM FIRST" (server: a `BagFull` flag on `PremiumService:State` offers; client: `GamePassClient` Mech buttons). Bonus rolls already say BAG FULL.
+

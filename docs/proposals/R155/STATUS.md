@@ -15,11 +15,12 @@ Base: R154 release `8aa15fd`. **Released (built, not installed yet):** two insta
 - Inventory like Roblox's Backpack, 200 items max, discard with a ~1 s hold on every item (`inventory.md`; the item tooltip panel it shipped with was removed in R156, owner).
 - Installer engine: refuses open script tabs up front, waits up to 3 s for an open tab to sync (`tools/installer_engine.lua`).
 
-## Open owner calls (listed in R155.md "Your call")
-- Mech pack card when the Bag is full: a "make room first" button instead of not offering it?
+## Owner calls (answered 10 Oct, during R157)
+- Mech pack card when the Bag is full: owner: "if bag is full and player tries to buy a pack or get a pack via the rolls it says bag full". Planned for R158:
+  the buy buttons read BAG FULL (not "Unavailable") and a press shows "BAG FULL! MAKE ROOM FIRST". Bonus rolls already say "BAG FULL!" and keep the roll.
 - (Item tooltip odds for packs never held: moot, the tooltip panel was removed in R156.)
-- Lucky roll at the per-tier ceilings (11 of 42 world packs don't move at Thunder + clover).
-- Still from R154: the clover at the very top.
+- Lucky roll at the per-tier ceilings: **A, leave it** (the ceilings stay; 11 of 42 world packs don't move at Thunder + clover).
+- From R154, the clover at the very top: **A, leave it** (the ceilings stay; 6 packs don't move with the clover at Thunder).
 
 ## Owner notes
 - R154 install: the first paste stopped on `HubTrampolineRules153` (its script tab was open), then "Mixed" on re-paste; a repair snippet was given and
