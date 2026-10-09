@@ -981,7 +981,8 @@ function ChestService:_holdPack(player,tool)
     for _,candidate in ipairs(self.PlayerData:GetChestRecords(player))do if candidate.Id==tool:GetAttribute('SeedInventoryId')then record=candidate;break end end
     if record then
         -- R139 (owner): the free starter pack's 2x luck is secret, so its tooltip shows the plain pack odds.
-        local odds=PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,player:GetAttribute('ChestLuckMultiplier'),record.OddsVersion or 0)
+        -- R154: the pack's real odds: the 80% rule (SeedPackRules) and the 4 Leaf Clover's x2 on the Void / Verity / Mech packs (PassLuck, the passes alone) too.
+        local odds=PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,player:GetAttribute('ChestLuckMultiplier'),record.OddsVersion or 0,nil,self.PlayerData:PassLuck(player))
         local rows={PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)}
         for _,seed in ipairs(PackRules.OddsRows(self.Config,record.Stage,record.BagVariant,odds))do -- R148: by rarity rank, then name
             table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))

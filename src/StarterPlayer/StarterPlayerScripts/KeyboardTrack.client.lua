@@ -300,16 +300,22 @@ local function start()
  local rowBound,boundRows,boundRowPos={},{},{}
  local boundKeys=0
  local rowKeys={}                                   -- row -> keys bound in it (COLS less the cells the keyboard leaves out)
- local downPos,animPos,animT0,animFrom,animTo,animDur={},{},{},{},{},{}
- local stampAt,moveMark,mutedAt,quietBy={},{},{},{}    -- mutedAt: a key that went down silently this frame (a keeper / a thrown body): a runner who really steps on it the same frame still clicks. quietBy: a key a runner pressed silently while his feet were a little above it (R153 review: his LANDING on it clicks once)
- local downList,animList,moveList={},{},{}
- local moveN=0;local moveParts,moveCFs={},{}
+ local downPos,animPos={},{}                         -- (R153 hotfix: animT0 / animFrom / animTo / animDur live with the presses, mutedAt too)
+ local stampAt,quietBy={},{}    -- quietBy: a key a runner pressed silently while his feet were a little above it (R153 review: his LANDING on it clicks once)
+ local downList,animList={},{}                       -- (R153 hotfix: moveMark / moveList / moveN / moveParts / moveCFs live with queueMove / flushMoves)
  local oRow,oCol,oKind,oWho,oX,oZ,oN={},{},{},{},{},{},0 -- cells other players / keepers press (30 Hz)
  local keepers={}
  local holeCell,platCell,platList={},{},{};local barHole,barPlat={},{}
- local holeRects,platRects,clearSig,holesFolder={},{},nil,nil
  local windowDirty,pendingBind,pendingLegend=true,false,false
  local facing,facingWant,facingSince=1,1,0                         -- the window's long side: +1 = toward +Z, -1 = toward -Z (see K.Facing)
+
+ -- R153 hotfix (owner's Studio log: "Out of local registers when trying to allocate barTouched: exceeded limit 200"): Roblox compiles a script
+ -- without folding its constant locals, and start() held more than Luau's 200 live locals (our -O1 compiles folded them away). The keys, letters
+ -- and presses below live in do-blocks, so their own helpers go out of scope once they are built; what the frame step and the clearances use
+ -- from them is declared here. tools/tests/check_compile_O0.sh compiles every script the way Roblox does and keeps each function under 180.
+ local flushMoves,labelShown,setLabel,flushLabels,releaseRow,windowPass,legendWindowPass,publishTop,swapPass,releaseKey,touch,pressCell,animate,keyLegendPass
+ local stripRows,Far,bars
+ do
 
  -- Lists with O(1) removal --------------------------------------------------------------------------------------
  local function listAdd(list,pos,idx)local n=#list+1;list[n]=idx;pos[idx]=n end
@@ -317,10 +323,14 @@ local function start()
   local n=#list;local at=pos[idx];local last=list[n]
   list[at]=last;pos[last]=at;list[n]=nil;pos[idx]=nil
  end
- local function queueMove(idx)
+ local queueMove
+ do
+ local moveMark,moveList={},{}
+ local moveN=0;local moveParts,moveCFs={},{}
+ function queueMove(idx)
   if moveMark[idx]~=frameNo then moveMark[idx]=frameNo;moveN+=1;moveList[moveN]=idx end
  end
- local function flushMoves()
+ function flushMoves()
   if moveN==0 then return end
   for i=1,moveN do
    local idx=moveList[i];moveParts[i]=kPart[idx];moveCFs[i]=CF(kX[idx],K.KeyTop(kDepth[idx])-C.KeyY/2+kOff[idx],kZ[idx])
@@ -328,6 +338,7 @@ local function start()
   for i=#moveParts,moveN+1,-1 do moveParts[i]=nil;moveCFs[i]=nil end
   workspace:BulkMoveTo(moveParts,moveCFs,Enum.BulkMoveMode.FireCFrameChanged)
   moveN=0
+ end
  end
  local function clearKeyState(idx)
   if downPos[idx]then listRemove(downList,downPos,idx)end
@@ -337,19 +348,23 @@ local function start()
  end
 
  -- Letters ----------------------------------------------------------------------------------------------------------
- local LG=C.Legend;local PPS=LG.PixelsPerStud;local TEXT=min(100,floor(LG.TextHeight*PPS+.5))
- local FONT=Enum.Font[LG.Font]
+ -- (R153 hotfix: the letters' own helpers live in the do-block below; what the keys, the window passes and the presses use from it is declared here)
+ local LG,FONT,inkColor,creamInk,ROT,topExtra,parkList,parkN,stripsOfRow,visibleRestTop,keyLegendOf,markLabel,stripAlpha,bindStrips,releaseStrips
+ local klFree,klFreeN,klMade,klList,klPos,klStamp,newKeyLegend,applyTopExtra,dropKeyLegend
+ do
+ LG=C.Legend;local PPS=LG.PixelsPerStud;local TEXT=min(100,floor(LG.TextHeight*PPS+.5))
+ FONT=Enum.Font[LG.Font]
  local SPAN=LG.KeysPerStrip;local STRIPS=ceil(COLS/SPAN)
  local inkCache={}
- local function inkColor(stage,row,col)
+ function inkColor(stage,row,col)
   local ink=K.ShadeInk(stage,K.ShadeIndex(stage,row,col,1))
   local c=inkCache[ink];if not c then c=Color3.fromRGB(ink[1],ink[2],ink[3]);inkCache[ink]=c end
   return c
  end
- local creamInk=Color3.fromRGB(K.CreamInk[1],K.CreamInk[2],K.CreamInk[3])
+ creamInk=Color3.fromRGB(K.CreamInk[1],K.CreamInk[2],K.CreamInk[3])
  -- The Top face's canvas (K.TopCanvas / K.TopPoint, R151): x toward world -Z, y toward world +X. An unrotated label reads toward -Z with its up
  -- toward -X; turned 270 degrees (clockwise, about the label's centre) it reads toward -X = a +Z runner's right with its up toward +Z.
- local ROT=LG.Rotation
+ ROT=LG.Rotation
  local function letterLabel(parent)
   local l=Instance.new('TextLabel');l.Name='Letter';l.BackgroundTransparency=1;l.BorderSizePixel=0;l.AnchorPoint=V2(.5,.5)
   l.Rotation=ROT;l.Font=FONT;l.TextScaled=false;l.TextSize=TEXT;l.TextStrokeTransparency=1;l.Parent=parent
@@ -357,7 +372,7 @@ local function start()
  end
  -- topExtra: how far the keycap mesh's visible top stands above the configured key top (measured once the template is there, see measureKeyTop).
  -- A letter strip is lifted by it; a pooled per-key letter, which rides on the key's own face, is offset toward the camera by it (ZOffset).
- local topExtra=0
+ topExtra=0
  local function letterGui(name,parent)
   local gui=Instance.new('SurfaceGui');gui.Name=name;gui.Face=Enum.NormalId.Top;gui.SizingMode=Enum.SurfaceGuiSizingMode.PixelsPerStud
   gui.PixelsPerStud=PPS;gui.LightInfluence=0;gui.AlwaysOnTop=false;pcall(function()gui.MaxDistance=LG.MaxDistance end);gui.Parent=parent
@@ -367,11 +382,11 @@ local function start()
  -- A strip released in a pass is only parked (moved away, its gui switched off) at the end of the pass if no row took it again.
  local stripFree,stripFreeN={}, {}
  for k=1,STRIPS do stripFree[k]={};stripFreeN[k]=0 end
- local parkList,parkN={},0
- local stripsOfRow,stripRows,stripRowPos={},{},{}
+ parkList,parkN={},0
+ stripsOfRow,stripRows={},{};local stripRowPos={}
  local STRIP_H=.05                                   -- the strip is a thin plate; its top face carries the SurfaceGui
  -- the strip's centre height: its top face stands Legend.Margin above the visible top of a resting key (a mesh key's top is KeyTop + TopOffset + the measured excess)
- local function visibleRestTop()return K.KeyTop(0)+(template and C.TopOffset or 0)+topExtra end
+ function visibleRestTop()return K.KeyTop(0)+(template and C.TopOffset or 0)+topExtra end
  local function stripCentreY()return visibleRestTop()+LG.Margin-STRIP_H/2 end
  local function newStrip(k)
   local p=Instance.new('Part');p.Name='LegendStrip';flat(p);p.Transparency=1;p.Size=V3(1,STRIP_H,1);p.CFrame=CF(CX,F-200,0);p.Parent=legendFolder
@@ -381,16 +396,16 @@ local function start()
   -- the last value written to each label (a TextLabel change re-renders the whole 1440 x 131 px SurfaceGui: unchanged values are never written)
   return {Part=p,Gui=gui,Labels=labels,K=k,W=0,D=0,X=0,Z=0,Alpha=-1,On=true,Free=false,Parked=false,PX={},PY={},Tx={},Ink={},Vis={true,true,true,true,true,true,true,true,true,true,true}}
  end
- local keyLegendOf={}                                -- slot -> pooled per-key letter while the key is down
- local Far={Of={},Rows={},Pos={},Free={},N=0}          -- R152 far letters: row -> its one strip, bound rows (O(1) list), pooled strips (in a table: start() is near the 200-locals limit)
- local function labelShown(row,col)
+ keyLegendOf={}                                      -- slot -> pooled per-key letter while the key is down
+ Far={Of={},Rows={},Pos={},Free={},N=0}                -- R152 far letters: row -> its one strip, bound rows (O(1) list), pooled strips (in a table: start() is near the 200-locals limit)
+ function labelShown(row,col)
   local key=row*64+col
   if holeCell[key]or platCell[key]then return false end
   local s=slotOf[key];if not s then return false end
   if keyLegendOf[s]or kDepth[s]~=0 or animPos[s]then return false end
   return true
  end
- local function setLabel(row,col,shown)
+ function setLabel(row,col,shown)
   local f=Far.Of[row]
   if f then if f.Vis[col]~=shown then f.Vis[col]=shown;f.Labels[col].Visible=shown end;return end
   local list=stripsOfRow[row];if not list then return end
@@ -399,11 +414,11 @@ local function start()
   if st.Vis[i]~=shown then st.Vis[i]=shown;st.Labels[i].Visible=shown end
  end
  local labelMarks,labelMarkN,labelMarkAt={},0,{}
- local function markLabel(slot)
+ function markLabel(slot)
   if slot>=BARBASE or labelMarkAt[slot]==frameNo then return end
   labelMarkAt[slot]=frameNo;labelMarkN+=1;labelMarks[labelMarkN]=slot
  end
- local function flushLabels()
+ function flushLabels()
   for i=1,labelMarkN do
    local s=labelMarks[i];local key=kKey[s]
    if key and key>0 then local row,col=key//64,key%64;setLabel(row,col,labelShown(row,col))end
@@ -411,7 +426,7 @@ local function start()
   end
   labelMarkN=0
  end
- local function stripAlpha(st,a)
+ function stripAlpha(st,a)
   if st.Alpha==a then return end
   st.Alpha=a
   for _,l in ipairs(st.Labels)do l.TextTransparency=a end
@@ -432,7 +447,7 @@ local function start()
   st.Part.CFrame=CF(CX,F-200,0)
   for i,l in ipairs(st.Labels)do if st.Vis[i]~=false then st.Vis[i]=false;l.Visible=false end end
  end
- local function bindStrips(row)
+ function bindStrips(row)
   local za,zb=geo.RowZ(row);local d=zb-za;local z=(za+zb)/2;local stage=rowStage[row]
   local y=stripCentreY()
   local list={}
@@ -468,7 +483,7 @@ local function start()
   end
   stripsOfRow[row]=list;listAdd(stripRows,stripRowPos,row)
  end
- local function releaseStrips(row)
+ function releaseStrips(row)
   local list=stripsOfRow[row];if not list then return end
   for _,st in ipairs(list)do
    st.Free=true;local k=st.K;stripFreeN[k]+=1;stripFree[k][stripFreeN[k]]=st
@@ -533,14 +548,16 @@ local function start()
  end
  end
  -- per-key letters (a key that is down keeps its letter while it moves)
- local klFree,klFreeN,klMade={},0,0
- local klList,klPos,klStamp={},{},{}
+ klFree,klFreeN,klMade={},0,0
+ klList,klPos,klStamp={},{},{}
  local klAll={}                                       -- every pooled per-key letter ever made (applyTopExtra reaches the idle ones too)
+ -- R154 (lag audit B3): the near letters' pixels a stud on this tier (K.NearPPS: 12 on tier 2, 16 elsewhere); a tier change re-applies it to every strip and pressed-key letter already made
+ function Far.Tune()local want=K.NearPPS(tier);if want~=PPS then PPS=want;TEXT=K.NearText(want);K.RetuneLetters(want,TEXT,KW,{stripFree,stripFreeN,stripRows,stripsOfRow,klAll})end end
  local function keyLegendOffset(gui)
   -- a letter on a key's own face is exactly at the configured top; when the mesh stands higher it is drawn that much toward the camera
   if topExtra>0 then pcall(function()gui.ZOffset=topExtra+LG.Margin end)end
  end
- local function newKeyLegend()
+ function newKeyLegend()
   local gui=letterGui('KeyLegend',legendFolder)
   local l=letterLabel(gui);l.Position=UDim2.fromScale(.5,.5);l.Size=UDim2.fromScale(1,1)
   keyLegendOffset(gui)
@@ -548,7 +565,7 @@ local function start()
   return e
  end
  -- The keycap's visible top was measured (once, after the template arrived): lift every bound strip, offset every per-key letter.
- local function applyTopExtra(extra)
+ function applyTopExtra(extra)
   if extra==topExtra then return end
   topExtra=extra
   local y=stripCentreY()
@@ -558,12 +575,13 @@ local function start()
   for _,r in ipairs(Far.Rows)do local st=Far.Of[r];if not st.Empty then st.Part.CFrame=CF(st.X,y,st.Z)end end
   for _,e in ipairs(klAll)do keyLegendOffset(e.Gui)end
  end
- local function dropKeyLegend(slot)
+ function dropKeyLegend(slot)
   local e=keyLegendOf[slot];if not e then return end
   keyLegendOf[slot]=nil;listRemove(klList,klPos,e)
   e.Gui.Parent=legendFolder;e.Slot=0
   klFreeN+=1;klFree[klFreeN]=e
   markLabel(slot)
+ end
  end
 
  -- Keys ---------------------------------------------------------------------------------------------------------------
@@ -610,7 +628,7 @@ local function start()
   end end
   rowBound[row]=true;rowKeys[row]=n;listAdd(boundRows,boundRowPos,row);boundKeys+=n
  end
- local function releaseRow(row)
+ function releaseRow(row)
   releaseStrips(row);Far.Release(row)
   for col=1,COLS do
    local key=row*64+col;local s=slotOf[key]
@@ -688,7 +706,6 @@ local function start()
  -- nearest first within the budget (the tier's Bind x min(2, dt x 60), x TeleportBurst after a teleport, plus twice the rows the runner
  -- crossed since the last pass, so a sprint at any speed never falls behind). A camera turn only moves the far side (the near zone is the
  -- same both ways): it stays spread over a few frames, the stand-ins covering what waits.
- local windowPass
  do
  local lastPassRow=nil
  local function releaseFarthest(na,nb)
@@ -746,7 +763,7 @@ local function start()
  -- The letters' rows (R152): near rows (K.LegendWindow) get the two full-size strips, the rest of K.FarLegendWindow one far strip; nearest first, the near
  -- ones RowsPerFrame rows a frame, the far ones the tier's FarRows. A near strip is kept one row past its window (no flicker); a far strip of a row that
  -- has become near is only given back when its near strips are bound.
- local function legendWindowPass()
+ function legendWindowPass()
   local na,nb=K.LegendWindow(geo,tier,focusRow,facing)
   local fa,fb=K.FarLegendWindow(geo,tier,focusRow,facing)
   for i=#stripRows,1,-1 do
@@ -792,7 +809,7 @@ local function start()
  end
 
  -- Spacebars: one cream bar per biome start, always present ------------------------------------------------------
- local bars=geo.Bars
+ bars=geo.Bars
  do
  local cr,cg,cb=K.CreamRGB()
  for i,bar in ipairs(bars)do
@@ -822,7 +839,7 @@ local function start()
  -- mesh's collision shape may not be there on the first frame: the rays are repeated every half second for up to 3 s. K.TopExtra combines them
  -- (>= 0, capped); the letter strips and the per-key letters follow it (applyTopExtra). The result is published on the keyboard folder
  -- (KeyTopConfigured / KeyTopExtra / LegendTop attributes) so Studio's Explorer shows what was measured.
- local function publishTop()
+ function publishTop()
   if folder then
    folder:SetAttribute('KeyTopConfigured',K.KeyTop(0));folder:SetAttribute('KeyTopExtra',topExtra);folder:SetAttribute('LegendTop',visibleRestTop()+LG.Margin)
   end
@@ -896,7 +913,7 @@ local function start()
   if not template and C.UseKeycapMesh~=false then warn('[R149] keyboard: ReplicatedStorage.R142Keycap is missing; the keys are plain blocks')end
   if template then pcall(measureKeyTop)end
  end)
- local function swapPass()
+ function swapPass()
   local n=0
   for s=1,made do
    if plainSlot[s]then if not swapSlot(s)then return end;n+=1;if n>=tierCfg.Bind then return end end
@@ -951,6 +968,9 @@ local function start()
  end
 
  -- Presses --------------------------------------------------------------------------------------------------------
+ do
+ local animT0,animFrom,animTo,animDur={},{},{},{}
+ local mutedAt={}    -- a key that went down silently this frame (a keeper / a thrown body): a runner who really steps on it the same frame still clicks
  local function startAnim(idx,to)
   local from=kDepth[idx];local span=min(1,abs(to-from))
   animFrom[idx]=from;animTo[idx]=to;animT0[idx]=now
@@ -975,12 +995,12 @@ local function start()
    quietBy[idx]=kind==5 and who or nil
   end
  end
- local function releaseKey(idx)
+ function releaseKey(idx)
   listRemove(downList,downPos,idx)
   quietBy[idx]=nil
   startAnim(idx,0)
  end
- local function touch(idx,kind,who,px,pz)
+ function touch(idx,kind,who,px,pz)
   if stampAt[idx]==frameNo then
    if mutedAt[idx]==frameNo and kind>0 and kind<3 then mutedAt[idx]=nil;playKey(idx,kind,who,px,pz)end -- a runner who really steps on it wins over a keeper / a thrown body that pressed it first
    return
@@ -990,7 +1010,7 @@ local function start()
   elseif kind==2 and who and quietBy[idx]==who then quietBy[idx]=nil;playKey(idx,kind,who,px,pz) end -- R153 review: the runner who pressed it silently on the way down now LANDS on it: one click
  end
  -- A cell (row, column) is pressed by `kind` / `who`; px, pz = where the presser stands. Keys under a shovel hole stay up.
- local function pressCell(row,col,kind,who,px,pz)
+ function pressCell(row,col,kind,who,px,pz)
   local bar=barOfRow[row]
   if bar then
    if not barHole[bar]then touch(BARBASE+bar,kind,who,px,pz)end
@@ -1000,7 +1020,7 @@ local function start()
    local slot=slotOf[key];if slot then touch(slot,kind,who,px,pz)end
   end
  end
- local function animate()
+ function animate()
   local ease=K.Ease
   for i=#animList,1,-1 do
    local idx=animList[i]
@@ -1010,6 +1030,7 @@ local function start()
    else kDepth[idx]=animFrom[idx]+(to-animFrom[idx])*(to==1 and ease.QuadOut(t)or ease.BackOut(t))end
    queueMove(idx)
   end
+ end
  end
  -- letters riding on keys that are down (within the rows that show letters), given back once the key is up again
  local klA,klB,klLimit=1,0,0
@@ -1028,12 +1049,13 @@ local function start()
   e.Gui.Parent=kPart[idx];keyLegendOf[idx]=e;listAdd(klList,klPos,e)
   markLabel(idx)
  end
- local function keyLegendPass()
+ function keyLegendPass()
   klA,klB=K.LegendWindow(geo,tier,focusRow,facing);klLimit=tierCfg.KeyLegends
   for _,idx in ipairs(downList)do wantKeyLegend(idx)end
   for _,idx in ipairs(animList)do wantKeyLegend(idx)end
   for i=#klList,1,-1 do local e=klList[i];if klStamp[e.Slot]~=frameNo or #klList>klLimit then dropKeyLegend(e.Slot)end end
  end
+ end -- (R153 hotfix: the end of the do-block that holds the keys, the letters and the presses)
 
  -- Other players and keepers (30 Hz) ------------------------------------------------------------------------------
  -- R153: how a runner presses the keys under him. 1 / 2 (you / another player) = he really steps on them: the key sounds (K.Steps: feet within StepReach of the floor,
@@ -1111,6 +1133,7 @@ local function start()
  -- TrackHoleService: Folder 'TrackHoles' in the map's _GameplayRuntime, a Model per hole with a 'Pit' part (+ Rim, crumbs).
  local scanClearances
  do
+ local holeRects,platRects,clearSig,holesFolder={},{},nil,nil
  local function findHoles()
   if holesFolder and holesFolder:IsDescendantOf(workspace)then return holesFolder end
   local runtime=map:FindFirstChild('_GameplayRuntime')
@@ -1276,10 +1299,10 @@ local function start()
   if tier==0 or T.Tier>=.5 then
    T.Tier=0
    local want=Fx and Fx.Get()or 3
-   if tier==0 then tier=want;wantTier=want;wantSince=now;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit()
+   if tier==0 then tier=want;wantTier=want;wantSince=now;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit();Far.Tune()
    elseif want~=wantTier then wantTier=want;wantSince=now end
    -- a tier change only applies once it has held for a few seconds (a device bouncing between tiers must not flicker)
-   if wantTier~=tier and now-wantSince>=C.TierHoldSeconds then tier=wantTier;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit()end
+   if wantTier~=tier and now-wantSince>=C.TierHoldSeconds then tier=wantTier;tierCfg=K.Tier(tier);windowDirty=true;Far.Limit();Far.Tune()end
   end
   if T.Clear>=.25 then T.Clear=0;scanClearances()end
   if T.Keeper>=2 then T.Keeper=0;scanKeepers()end

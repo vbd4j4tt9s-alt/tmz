@@ -11,6 +11,10 @@
 --  6. the music duck follows the presentation's clock (down by the cut, back by the end, gone after)
 --  7. files still loading on their beat join on the clock (never a late hit)
 --  8. the chat line about a pull never shows before the puller's own screen has shown the seed (a slow device, a skip)
+-- R154 (owner: "... the seed stays on the player's screen until they click and the seed goes to their inventory"): a presentation no longer
+-- ends by itself: its sounds and duck still end ON its Length (its "end" here), then its result waits for the press that collects it (the
+-- seed flies home). Where these checks played a reveal out they now collect it (settle) before checking that nothing is left; the second
+-- skip is now the collect.
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local Y=require('./rare152_env')(W,E,F,X)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -19,7 +23,7 @@ local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)
 local function near(a,b,tol)return type(a)=='number'and type(b)=='number'and math.abs(a-b)<=(tol or 1e-6)end
 local Mixer=W.module('AudioMixer');Mixer.Start()
 local M=W.module('RarePullCinematic');local L=W.module('RarePullRules');local Audio=W.module('RarePullAudio');local Sounds=W.module('RarePullSounds')
-local Visuals=W.module('SeedPackVisuals')
+local Visuals=W.module('SeedPackVisuals');local Collect=W.module('SeedCollect154')
 local names={'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
 local cam=W.workspace.CurrentCamera
 local SS=W.service('SoundService')
@@ -50,6 +54,11 @@ local function start(rank,extra)
  return M.Start(info),bag
 end
 local function stage()return W.workspace:FindFirstChild('_RarePullStage')end
+-- R154: collect a waiting result (as the press does) and let it go: its story scene's way out, the seed's flight
+local function settle(dt)
+ M.Collect()
+ local g=0;while(M.Active()or Collect.Flying()>0)and g<1200 do X.run(dt or 1/60,dt or 1/60);g+=1;M.Collect()end
+end
 local function cleanAll(tag)
  check(M.Active()==nil and stage()==nil and X.pg:FindFirstChild('RarePullReveal')==nil,tag..': no presentation, stage or reveal GUI left')
  check(cam:FindFirstChild('RarePullGrade')==nil and cam:FindFirstChild('RarePullBlur')==nil and cam:FindFirstChild('RarePullGradeOut')==nil,tag..': no grade / blur left on the camera')
@@ -132,10 +141,10 @@ local function verify(p,dt)
    f.Pack=run.Scene.PackCF and run.Scene.PackCF.Position
    local plate=st:FindFirstChild('Lock plate');f.Plate=plate and plate.CFrame
   end
-  if not M.Active()and not endClock then endClock=now end
+  if(not M.Active()or run.Idle)and not endClock then endClock=now end -- (R154: its sounds and duck end on its Length; the result then waits)
  end)
  local frames=Y.stop()
- check(endClock~=nil,tag..': it ends by itself')
+ check(endClock~=nil and M.Active()==run and M.Waiting(),tag..': its sounds end by themselves on its Length, and the result waits (R154)')
  endClock=endClock or R.clock
  local plays=Y.plays(startClock)
  local used={}
@@ -230,7 +239,7 @@ local function verify(p,dt)
   if v.Gain>.2*math.max(peak,1e-3)+1e-4 then loud[#loud+1]=v.Sound.Name end
  end
  check(#loud==0,tag..': every voice has faded out by the end ('..table.concat(loud,',')..' still loud)')
- cleanAll(tag)
+ settle(dt);cleanAll(tag)
 end
 for _,dt in ipairs({1/30,1/60,1/144})do
  for _,p in ipairs(presentations())do verify(p,dt)end
@@ -245,9 +254,9 @@ for rank=6,8 do
   if when=='skip early'then
    X.run(tl.SkipFrom+.1);check(M.Skip(),tag..': skipped');X.run(.05)
    check(run.Clock()>=tl.Climax-.03,tag..': straight to the hit')
-   X.run(tl.Length+.5)
-  elseif when=='skip late'then
-   X.run(tl.Rise+.2);check(M.Skip(),tag..': skipped');X.run(tl.Length+.5)
+   X.run(tl.Length+.5);settle()
+  elseif when=='skip late'then -- (R154: the press once the result is shown collects it)
+   X.run(L.ShownAt(tl)+M.CollectAfter+.05);check(M.Skip()and run.Collected,tag..': collected');X.run(tl.Length+.5);settle()
   elseif when=='abort'then
    X.run(tl.SceneIn+.6);M.Abort('test')
   elseif when=='death'then
@@ -279,11 +288,11 @@ for _,dt in ipairs({1/30,1/60,1/144})do
   check(#carried==0,tag..': nothing from before the jump rings on into the hit (every voice stops; a bed / riser spanning the target joins on the clock) ('..table.concat(carried,',')..')')
   local gui=X.pg:FindFirstChild('RarePullReveal');local flash=gui and X.find(gui,'Flash')
   local flashAt;local closed=false
-  X.run(L.ShownAt(tl)-run.Clock()+.2,dt,function()
+  X.run(L.ShownAt(tl)-run.Clock()+M.CollectAfter+.05,dt,function()
    local f=Y.frames[#Y.frames];if f and flash and not flashAt and flash.BackgroundTransparency<.9 then flashAt=f.T end
   end)
   local frames=Y.stop()
-  check(M.Skip(),tag..': a second skip closes it once the result is shown')
+  check(M.Skip()and run.Collected,tag..': a second press collects it once the result is shown (R154: it used to close it)')
   local slot=rank<=3 and'PackBurst'or rank==7 and'CosmicBoom'or rank>=5 and'Impact'or'GroundImpact'
   local l=Audio.Layers(slot)[1];local def=Sounds.Get(slot)
   local pl;for _,p in ipairs(Y.plays(t0))do if p.Slot==slot and not pl then pl=p end end
@@ -297,7 +306,7 @@ for _,dt in ipairs({1/30,1/60,1/144})do
    stats.worstHit=math.max(stats.worstHit,heard and math.abs(heard-vf.T)or 0)
   end
   check(flashAt and vf and math.abs(flashAt-vf.T)<1e-6,tag..': the flash is on that frame too')
-  X.run(tl.Length-tl.FloatEnd+.4,dt)
+  X.run(tl.Length-tl.FloatEnd+.4,dt);settle(dt)
   cleanAll(tag)
   check(M.Fading()==0,tag..': nothing fading')
  end
@@ -327,7 +336,7 @@ for rank=1,5 do
   check(jump<=.6,tag..': no FieldOfView snap (largest step '..string.format('%.2f',jump)..' degrees a frame)')
   check(maxGuis<=2 and afterGuis<=1,tag..': the first card fades out under the second ('..maxGuis..' at once, '..afterGuis..' after .25 s)')
   check(maxGrades<=2 and afterGrades<=1,tag..': and its colour grade with it')
-  cleanAll(tag)
+  settle();cleanAll(tag)
  end
 end
 do -- the same reveal asked for again (the pack re-equipped mid-reveal) keeps playing
@@ -335,7 +344,7 @@ do -- the same reveal asked for again (the pack re-equipped mid-reveal) keeps pl
  local run,bag=start(4);X.run(.5)
  local again=M.Start({Rank=4,SeedId=X.byRank[4],At=run.At,Bag=bag,Mutation='None'})
  check(again==run and not run.Done and not run.Quick,'the same reveal asked for again keeps playing (it is not restarted as a quick one)')
- X.run(run.TL.Length+.3);cleanAll('re-equip')
+ X.run(run.TL.Length+.3);settle();cleanAll('re-equip')
 end
 -- 6. the music duck ---------------------------------------------------------------------------------------------------------------------
 do
@@ -392,7 +401,7 @@ do
    end
   end
   check(late==0,names[rank]..' with every file loading late: no hit is ever heard late ('..late..'; '..joined..' joined the clock part-way)')
-  X.run(.3);cleanAll(names[rank]..' cold')
+  X.run(.3);settle();cleanAll(names[rank]..' cold')
   for _,s in ipairs(cold)do Y.load(s)end
  end
 end

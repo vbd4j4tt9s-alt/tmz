@@ -1,6 +1,7 @@
 --!nocheck
 -- R151 pull reveals, part 3: the REAL SeedPackClient and PackOpeningFeedback (with RevealFlourish, PackSuspense, RarePullWorld,
 -- RarePullCinematic, RarityRevealAudio, InteractionAudio, LocalSfx) on the Roblox mock - what the opener and the people watching see.
+-- R154: the opener's result waits for a press now (it collects it: the seed flies home); the checks that saw it end by itself press first.
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -90,11 +91,14 @@ for rank=1,5 do
   local low=({'Reveal_Pop','Reveal_Pop','Reveal_Spark'})[rank];local v;for _,s in ipairs(E.sounds)do if s.Name==low then v=s end end
   local l=v and v.PlayLog[#v.PlayLog];check(l and near(l.At-t0,burst,.06),names[rank]..': the R138 pull sound still plays, now on the burst')
  end
- -- the server ends the opening; the card finishes by itself, everything goes
+ -- the server ends the opening; the card waits for its collect (R154), then everything goes
  bag:Destroy();tool:Destroy();W.frames(3,1/30)
  check(opening()==nil,names[rank]..': the world reveal is released with the pack')
  X.run(5)
- check(M.Active()==nil and X.pg:FindFirstChild('RarePullReveal')==nil,names[rank]..': the card ends by itself')
+ check(M.Active()==run and M.Waiting(),names[rank]..': the card waits for the player (R154)')
+ W.UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,KeyCode=R.Enum.KeyCode.Unknown,Position=V3(400,300,0)},false)
+ X.run(1.5)
+ check(run.Collected and M.Active()==nil and X.pg:FindFirstChild('RarePullReveal')==nil,names[rank]..': a click collects it and the card goes')
 end
 -- 2. the opener's own King pull: the story scene owns the camera (even for a giant pack) --------------------------------------------------
 do
@@ -108,7 +112,10 @@ do
  local w=World.Get(X.player);check(w~=nil,'the opener\'s own pillar / aura run in the world too (seen by others, and by them when the camera is back)')
  bag:Destroy();tool:Destroy()
  X.run(run.TL.Length)
- check(M.Active()==nil and cam.CameraType==R.Enum.CameraType.Custom,'King: the scene ends with the camera back')
+ check(M.Active()==run and M.Waiting()and cam.CameraType==R.Enum.CameraType.Scriptable,'King: the result waits on the hero shot (R154)')
+ local b=X.find(X.pg,'Backdrop');if b then b.Activated:Fire()end
+ X.run(M.SceneExit+(run.TL.Length-run.TL.Back)+1)
+ check(M.Active()==nil and cam.CameraType==R.Enum.CameraType.Custom,'King: collected, the scene ends with the camera back')
  local aura=X.root:FindFirstChild('RarePullAura');check(aura~=nil,'back in the world, the King aura is around the player')
 end
 -- 3. someone else's Secret / Cosmic / King pull: the world effects only --------------------------------------------------------------------

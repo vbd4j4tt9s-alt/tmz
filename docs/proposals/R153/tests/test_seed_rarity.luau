@@ -71,11 +71,11 @@ do -- the definition, recomputed here from the REAL Config and the existing odds
  for _,spec in ipairs(Packs.SeedDesigns)do
   local stage,variant=spec.stage,'Pack01'
   if Verity.Is(spec.id)then stage,variant=Verity.PackStage,Verity.Variant elseif spec.stage==8 then variant='MechLimited'end
-  local p=Packs.SeedOdds(Config,stage,variant,1,Packs.OddsVersion)[spec.id]
+  local p=(Packs.RawSeedOdds or Packs.SeedOdds)(Config,stage,variant,1,Packs.OddsVersion)[spec.id] -- R154: the table before the 80% rule (the Desert / Snow Common packs' rule does not move the display)
   if not near(Canon.Percent(spec.id),p,1e-12)then bad[#bad+1]=spec.id..' '..tostring(Canon.Percent(spec.id))..' vs '..tostring(p)end
   local hs,hv=Canon.Home(spec.id);if hs~=stage or hv~=variant then bad[#bad+1]=spec.id..' home '..tostring(hs)..'/'..tostring(hv)end
  end
- check(#bad==0,'canonical = the seed\'s chance in its home pack (the biome\'s Pack01 / the Verity pack / the Mech pack) at luck 1, current version, no boost: '..table.concat(bad,'; '))
+ check(#bad==0,'canonical = the seed\'s chance in its home pack (the biome\'s Pack01 / the Verity pack / the Mech pack) at luck 1, current version, no boost, before the R154 80% rule: '..table.concat(bad,'; '))
 end
 do -- the owner-approved numbers (R137 / R148 / R147 / Mech), as printed
  local want={FirePepperSeed='1/800',MoonflowerSeed='1/150',DesertAloeSeed='1/8',SandFruitSeed='1/90',VeritySeed='1/100',PlasmaPepperSeed='1/2',NebulaVineSeed='1/40',CrowncoreTreeSeed='1/200',
@@ -330,6 +330,8 @@ end
 -- 9. no pack is a single-seed pack (owner, after R152: "the mythic forest pack can only roll elderbloom ... make it not 100%"). The audit of the real tables: nothing is 100% one seed today (what the
 -- owner saw there is the TEST pack of `/test rarepacks mythic`: a guaranteed reveal of the first Mythic seed, Elderbloom, by design). Kept as an invariant, so a later roster change that leaves a
 -- pack with one seed fails here. The live packs (odds version 149) also keep their favourite under 90%.
+-- R154 (owner: "the elderbloom only pack is not supposed to be intentional"): the 80% rule (PackLuck154) holds a live pack's favourite at 80% at most, at any luck (the R154 suite sweeps
+-- every pack x luck); /test rarepacks <rarity> reveals a random seed of that rarity (any biome), not always the first one.
 do
  local bad,rowsSeen={},0
  local audit={}
@@ -343,11 +345,11 @@ do
    if count<2 then bad[#bad+1]=('%s %s v%s luck %g boost %d: %d seed(s)'):format(names[stage],pack,tostring(version),luck,boost,count)end
    if version==149 and luck==1 and boost==0 and pack:sub(1,4)=='Pack'then
     audit[#audit+1]=('AUDIT %s %s %d %.4f %s'):format(names[stage],pack,count,top,topId)
-    if top>90 then bad[#bad+1]=('%s %s (live): the favourite %s is %.2f%%'):format(names[stage],pack,topId,top)end
+    if top>80+1e-9 then bad[#bad+1]=('%s %s (live): the favourite %s is %.2f%%'):format(names[stage],pack,topId,top)end -- R154: 80% (was 90%)
    end
   end end end
  end end
- check(rowsSeen>2000 and#bad==0,'no pack is a one-seed pack: every stage x pack x odds version (nil / 0 / 81 / 112 / 137 / 149) x luck x boost lists 2 or more seeds ('..rowsSeen..' rows), and a live pack\'s favourite stays under 90%: '..table.concat(bad,'; '))
+ check(rowsSeen>2000 and#bad==0,'no pack is a one-seed pack: every stage x pack x odds version (nil / 0 / 81 / 112 / 137 / 149) x luck x boost lists 2 or more seeds ('..rowsSeen..' rows), and a live pack\'s favourite is at most 80% (R154): '..table.concat(bad,'; '))
  for _,l in ipairs(audit)do print(l)end
  for _,case in ipairs({{Packs.OddsVersion,7,'EclipseReliquary'},{Packs.OddsVersion,7,'VerityReliquary'},{Packs.OddsVersion,8,'MechLimited'}})do
   local odds=Packs.SeedOdds(Config,case[2],case[3],1,case[1]);local n=0;for _,p in pairs(odds)do if p>0 then n+=1 end end

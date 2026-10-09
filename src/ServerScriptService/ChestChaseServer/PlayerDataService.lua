@@ -444,7 +444,8 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         if pack.Id ~= inventoryId then continue end
         if pack.Kind ~= "Pack" then return nil, "U ALREADY OPENED THIS PACK!" end
         if pack.PaidRandom and player:GetAttribute('PaidRandomAllowed')~=true then return nil,'THIS BOUGHT PACK DOESN\'T WORK ON THIS ACCOUNT' end
-        local seed, rarity = PackRules.Roll(self.Config,pack.Stage,unitRoll,player:GetAttribute("ChestLuckMultiplier"),pack.BagVariant,pack.OddsVersion,pack.RateBoost)
+        local passLuck=self:PassLuck(player) -- R154: the luck passes alone (the 4 Leaf Clover's x2): the only luck the Void, Verity and Mech packs take
+        local seed, rarity = PackRules.Roll(self.Config,pack.Stage,unitRoll,player:GetAttribute("ChestLuckMultiplier"),pack.BagVariant,pack.OddsVersion,pack.RateBoost,passLuck)
         local testSeed=nil
         do -- R153: the owner's guaranteed-reveal test hook can never break a real open: a failure means "no test override"
             local okTest,expected=pcall(function()return require(script.Parent.RarePackTests).Expected(self,player,pack.Id)end)
@@ -478,7 +479,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         -- R151: the hub's BEST PULL board (this server's own, R153; HubDisplayService.NotePull; set by the main script). It never yields or throws here; a TEST pack (/test rarepacks, or any pack an owner command made:
         -- TestGrant) is flagged so it is not counted and never announced as a record.
         local hook=self.OnPackOpened
-        if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=player:GetAttribute("ChestLuckMultiplier"),Test=testSeed~=nil or pack.TestGrant==true or luckTest}) end
+        if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=player:GetAttribute("ChestLuckMultiplier"),PassLuck=passLuck,Test=testSeed~=nil or pack.TestGrant==true or luckTest}) end
         return reward
     end
     return nil, "THAT PACK IS GONE FROM UR BAG!"
@@ -765,9 +766,11 @@ function PlayerDataService:RefreshBoostMultipliers(player)
 		end
 	end
 	player:SetAttribute("TreadmillMultiplier", bestSpeedMultiplier)
-	-- R153: the best boots (owner test boots too) x every luck pass the player owns (GamePassCatalog Luck: the 4 Leaf Clover = x2, bought with Robux or Gems), then the one cap (MaxLuck).
+	-- R153: the best boots (owner test boots too) x every luck pass the player owns (GamePassCatalog Luck: the 4 Leaf Clover = x2, bought with Robux or Gems), then the cap.
 	-- The pass multiplies real and test luck alike, so HasTestLuck still says whether the BOOTS in use are the owner's.
-	bestLuckMultiplier=math.clamp(bestLuckMultiplier*self:PassLuck(player),1,require(game:GetService('ReplicatedStorage').BalanceValues81).MaxLuck)
+	-- R154 (owner: "the 2x luck is universal"): the cap is the boots' cap (MaxLuck) x the passes too, so the clover's x2 also applies on top of Thunder Boots (x50M -> x100M).
+	local passLuck=self:PassLuck(player)
+	bestLuckMultiplier=math.clamp(bestLuckMultiplier*passLuck,1,require(game:GetService('ReplicatedStorage').BalanceValues81).MaxLuck*passLuck)
 	player:SetAttribute("ChestLuckMultiplier", bestLuckMultiplier)
 	self.TestLuck[player] = testLuck > realLuck
 	return bestSpeedMultiplier, bestLuckMultiplier

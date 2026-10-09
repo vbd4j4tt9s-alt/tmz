@@ -543,4 +543,52 @@ Rules.Roll=function(config,stage,draw,luck,variantKey,version,boost)
  return roll137(config,stage,draw,luck,variantKey,version,boost)
 end
 
+-- R154 (owner: "the 2x luck is universal" / "the elderbloom only pack is not supposed to be intentional"): the OUTERMOST wrapper; the rules live in PackLuck154.
+--  * passLuck, a new LAST argument of SeedOdds and Roll: the luck passes the player owns (the 4 Leaf Clover = 2; PlayerDataService:PassLuck) and nothing else.
+--    The Void (current odds path: OddsVersion 112 / 137 / 149), Verity and Limited Mech packs take only this luck (boots never change them), shifted toward their
+--    rarer seeds the way a biome pack's tiers are. Omitted / 1 = their odds exactly as before. (A Void pack banked before R112 keeps its old table.)
+--  * the 80% rule, the LAST step of every roll of a live pack: a world pack at OddsVersion 149 (SeedOdds: also no version), a current Void pack, every Verity and
+--    Mech pack, at any luck. No seed over 80%, the others at least 19%, 1% to an upgrade. Banked world packs (OddsVersion 137 / 112 / 81 / none) are not changed
+--    (the R148 "no windfall"). A pack the rule leaves alone rolls exactly as before (same draws).
+--  * RawSeedOdds = the odds without both (what R153 printed): the fixed "original rate" display (SeedRarity153) reads it, so the Index / card / chat / plaque keep
+--    each seed's base-luck rate in its home pack.
+local PackLuck=require(script.Parent.PackLuck154)
+local roll153,odds153=Rules.Roll,Rules.SeedOdds
+Rules.RawSeedOdds=odds153
+Rules.PackLuck=PackLuck
+local currentVoid={[N.Version]=true,[N137.Version]=true,[149]=true}
+-- 'Void' / 'Verity' / 'Mech' for a fixed-odds pack whose odds the clover changes, else nil.
+function Rules.FixedOddsKind(stage,variantKey,version)
+ if variantKey=='EclipseReliquary'then return stage==7 and currentVoid[version]and'Void'or nil end
+ if variantKey==Verity.Variant then return stage==Verity.PackStage and'Verity'or nil end
+ if variantKey=='MechLimited'then return stage==8 and'Mech'or nil end
+ return nil
+end
+-- True when the 80% rule applies (a live pack); version as the roll sees it.
+function Rules.LiveOdds(stage,variantKey,version)
+ if Rules.FixedOddsKind(stage,variantKey,version)then return true end
+ return version==149 and worldPack(stage,variantKey)and N137.PackFloor[variantKey]~=nil
+end
+local function fixedOdds(config,stage,variantKey,version,passLuck)
+ local kind=Rules.FixedOddsKind(stage,variantKey,version)
+ local luck=PackLuck.PassLuck(passLuck)
+ if kind and luck>1 then return PackLuck.FixedOdds(kind,config,Rules,luck)end
+ return nil
+end
+Rules.SeedOdds=function(config,stage,variantKey,luck,version,boost,passLuck)
+ local seen=version==nil and 149 or version
+ local odds=fixedOdds(config,stage,variantKey,seen,passLuck)or odds153(config,stage,variantKey,luck,version,boost)
+ if Rules.LiveOdds(stage,variantKey,seen)then odds=PackLuck.Shape(odds,Rules.GetRarity)end
+ return odds
+end
+Rules.Roll=function(config,stage,draw,luck,variantKey,version,boost,passLuck)
+ local clover=fixedOdds(config,stage,variantKey,version,passLuck)
+ if clover then return PackLuck.Roll(config,(PackLuck.Shape(clover,Rules.GetRarity)),Rules.GetRarity,draw)end
+ if type(draw)=='function'and Rules.LiveOdds(stage,variantKey,version)then
+  local shaped,changed=PackLuck.Shape(odds153(config,stage,variantKey,luck,version,boost),Rules.GetRarity)
+  if changed then return PackLuck.Roll(config,shaped,Rules.GetRarity,draw)end
+ end
+ return roll153(config,stage,draw,luck,variantKey,version,boost)
+end
+
 return Rules

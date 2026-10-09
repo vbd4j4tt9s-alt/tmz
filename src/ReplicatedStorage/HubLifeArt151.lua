@@ -324,7 +324,7 @@ function A.Lamp(ctx,x,z,kind,lit,yaw)
  end
  if kind=='double'then
   local turn=CFrame.Angles(0,yaw or 0,0)
-  ctx.Part('core',x,z,'Lamp arm',V(5.4,.4,.4),CF(x,FLOOR+12.2,z)*turn,metal,Mat.Metal)
+  ctx.Part('core',x,z,'Lamp arm',V(5.4,.4,.4),CF(x,FLOOR+12.15,z)*turn,metal,Mat.Metal) -- (R154: .05 under the caps' bottoms, was flush: textured metal flickered)
   for _,sx in ipairs({-1,1})do lantern(CF(x,FLOOR+11,z)*turn*CF(sx*2.5,0,0))end
  else lantern(CF(x,FLOOR+13,z))end
  if lit then for _,g in ipairs(glows)do
@@ -357,15 +357,50 @@ function A.Bunting(ctx,a,b,colours,spacing)
  end
 end
 
--- Grass patches (two heights, never overlapping at the same height), pebbles, butterflies, wall lanterns, base verges and pots.
-function A.Patch(ctx,x,z,r,color,top)
- -- a soft blob: a disc and two smaller ones of the same colour at the same height (look-alike overlaps cannot flicker)
+-- Grass patches (two layers: a layer-2 patch lies over the layer-1 patch it meets), pebbles, butterflies, wall lanterns, base verges and pots.
+-- R154 (owner: "remove the cases of z fighting in the hub area too"): Grass is a textured material, laid out from each part's own position, so
+-- two overlapping discs in one plane flicker even in one colour (the blob's three discs did, all over the square). Every grass disc now takes
+-- the lowest of A.PatchPlanes that stands at least A.PatchGap from each grass disc it overlaps, above every disc of a lower layer it overlaps
+-- and under every disc of a higher one (ctx.Grass keeps the discs already laid; the layout order is fixed, so every client gets the same).
+-- A.PatchDiscs gives the same discs as pure data: HubSnow151 keeps the blizzard's drift tops off them.
+A.PatchPlanes={4.07,4.12,4.17,4.22,4.27};A.PatchGap=.049
+function A.PatchTop(ctx,x,z,r,base)
+ local laid=ctx.Grass or{};ctx.Grass=laid
+ local chosen=A.PatchPlanes[#A.PatchPlanes]
+ for _,top in ipairs(A.PatchPlanes)do if top>=base-1e-6 then
+  local ok=true
+  for _,g in ipairs(laid)do if(g.X-x)^2+(g.Z-z)^2<(g.R+r)^2 then
+   if math.abs(g.Top-top)<A.PatchGap or(g.Base<base and top<g.Top)or(g.Base>base and top>g.Top)then ok=false;break end
+  end end
+  if ok then chosen=top;break end
+ end end
+ laid[#laid+1]={X=x,Z=z,R=r,Top=chosen,Base=base}
+ return chosen
+end
+-- a soft blob: a disc and two smaller ones of the same colour, each on its own plane ({x, z, radius, top} in the order they are laid)
+function A.PatchShape(ctx,x,z,r,top)
  local rng=K.Rng('patch'..x..z)
- local main=ctx.VCyl('core',x,z,'Grass patch',r*2,3.9,top,x,z,color,Mat.Grass,{shadow=false})
- for i=1,2 do local a=rng(0,math.pi*2);local rr=r*rng(.45,.7)
-  ctx.VCyl('core',x,z,'Grass patch',rr*2,3.9,top,x+math.cos(a)*r*.75,z+math.sin(a)*r*.75,color,Mat.Grass,{shadow=false})
+ local out={{x,z,r,A.PatchTop(ctx,x,z,r,top)}}
+ for i=1,2 do local a=rng(0,math.pi*2);local rr=r*rng(.45,.7);local cx,cz=x+math.cos(a)*r*.75,z+math.sin(a)*r*.75
+  out[#out+1]={cx,cz,rr,A.PatchTop(ctx,cx,cz,rr,top)}
+ end
+ return out
+end
+function A.Patch(ctx,x,z,r,color,top)
+ local main
+ for i,d in ipairs(A.PatchShape(ctx,x,z,r,top))do
+  local p=ctx.VCyl('core',x,z,'Grass patch',d[3]*2,3.9,d[4],d[1],d[2],color,Mat.Grass,{shadow=false})
+  if i==1 then main=p end
  end
  return main
+end
+-- Every lawn disc of the layout as A.Build lays it: {X, Z, R, Top} (pure data, no parts).
+function A.PatchDiscs()
+ local ctx,out={},{}
+ for _,p in ipairs(A.Layout.patches)do
+  for _,d in ipairs(A.PatchShape(ctx,p[1],p[2],p[3],p[5]==1 and 4.07 or 4.12))do out[#out+1]={X=d[1],Z=d[2],R=d[3],Top=d[4]}end
+ end
+ return out
 end
 function A.Pebbles(ctx,x,z,n,spread,seed)
  local rng=K.Rng('pebbles'..(seed or'')..x..z)

@@ -24,7 +24,13 @@ local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)
 local Mixer=W.module('AudioMixer');Mixer.Start()
 local M=W.module('RarePullCinematic');local L=W.module('RarePullRules');local Scenes=W.module('RarePullScenes')
 local Fx=W.module('RarePullFx');local Art=W.module('RarePullArt');local World=W.module('RarePullWorld');local Flourish=W.module('RevealFlourish')
-local Visuals=W.module('SeedPackVisuals')
+local Visuals=W.module('SeedPackVisuals');local Collect=W.module('SeedCollect154')
+-- R154: a result waits for the press that collects it (the seed flies home); where a presentation was played to its end it is collected
+-- first (its story scene's way out runs from the press), then the checks that nothing is left
+local function collectOut(each)
+ M.Collect();local g=0
+ while(M.Active()or Collect.Flying()>0)and g<900 do X.run(1/60,1/60,each);g+=1 end
+end
 local names={'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
 local cam=W.workspace.CurrentCamera
 local FXC={Beam=true,ParticleEmitter=true,PointLight=true,SpotLight=true,SurfaceLight=true,BillboardGui=true,SurfaceGui=true,Highlight=true,Decal=true,Texture=true,Trail=true}
@@ -268,6 +274,7 @@ for rank=6,8 do
    end
   end
  end)
+ collectOut() -- (R154: the result waited on the hero shot; collected, the way out)
  local function keys(s)local o={};for k in pairs(s)do o[#o+1]=k end;table.sort(o);return table.concat(o,', ')end
  check(next(stray)==nil,tag..': every effect is in the stage (strays: '..keys(stray)..')')
  check(next(unhooked)==nil,tag..': every beam / emitter / light / image hangs on a part or attachment of the stage ('..keys(unhooked)..')')
@@ -364,8 +371,8 @@ for rank=6,8 do
   local base=set(fxIn(W.workspace))
   local run=start(rank);local tl=run.TL;local tag=names[rank]..' '..when
   local sc
-  if when=='skip early'then X.run(tl.SkipFrom+.1);sc=run.Scene;M.Skip();X.run(tl.Length+.5)
-  elseif when=='skip late'then X.run(tl.Rise+.2);sc=run.Scene;M.Skip();X.run(tl.Length+.5)
+  if when=='skip early'then X.run(tl.SkipFrom+.1);sc=run.Scene;M.Skip();X.run(tl.Length+.5);collectOut()
+  elseif when=='skip late'then X.run(L.ShownAt(tl)+M.CollectAfter+.05);sc=run.Scene;M.Skip();X.run(tl.Length+.5);collectOut() -- (R154: the press after the result collects it)
   elseif when=='abort'then X.run(tl.SceneIn+.6);sc=run.Scene;M.Abort('test')
   elseif when=='death'then X.run(tl.SceneIn+.6);sc=run.Scene;X.hum.Died:Fire();X.run(.1)
   elseif when=='destroyed'then X.run(tl.SceneIn+.6);sc=run.Scene;local holder=R.new('LocalScript');M.Bind(holder);holder.Destroying:Fire()
@@ -383,14 +390,14 @@ for rank=6,8 do
   check(#left==0,tag..': no beam / emitter / light / image left ('..table.concat(left,', ')..')')
  end
 end
--- R153: a card the player skipped and closed (Common..Mythic, a story tier in place) leaves nothing either
+-- R153: a card the player skipped and closed (Common..Mythic, a story tier in place) leaves nothing either (R154: closed = collected)
 for _,c in ipairs({{1,false},{4,false},{5,false},{6,true},{8,true}})do
  reset();if c[2]then X.keeper(V3(25,3,100),{})end
  local base=set(fxIn(W.workspace))
  local run=start(c[1]);local tl=run.TL;local tag=names[c[1]]..(c[2]and' in place'or' card')..' skipped and closed'
  X.run(tl.SkipFrom+.1);check(M.Skip(),tag..': skipped to the hit')
- X.run(L.ShownAt(tl)-run.Clock()+.15);check(M.Skip(),tag..': closed once the result was shown')
- X.run(1)
+ X.run(L.ShownAt(tl)-run.Clock()+M.CollectAfter+.05);check(M.Skip()and run.Collected,tag..': collected once the result was shown')
+ X.run(1);collectOut()
  check(M.Active()==nil and X.pg:FindFirstChild('RarePullReveal')==nil and cam:FindFirstChild('RarePullGrade')==nil and M.Fading()==0,tag..': no card, GUI or colour grade left')
  local left={};for _,d in ipairs(fxIn(W.workspace))do if not base[d]and not d:IsDescendantOf(X.char)then left[#left+1]=d.Name end end
  check(#left==0,tag..': no beam / emitter / light / image left ('..table.concat(left,', ')..')')

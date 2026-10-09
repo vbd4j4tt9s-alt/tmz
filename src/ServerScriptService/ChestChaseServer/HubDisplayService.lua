@@ -250,7 +250,7 @@ end
 -- An owner command just gave this player packs / seeds / plants: what they open or pick for the rest of this session is not counted.
 function S:NoteOwnerGrant(player)if player then self.Tainted[player]=true end end
 local function wholeNumber(n)return type(n)=='number'and n==n and n%1==0 end
--- A pack was opened: reward = the record OpenSeedPack made (SeedId, SeedName, Rarity, SeedScale, PackMutation), info = {Stage, Variant, Version, Boost, Luck, Test} of the PACK it
+-- A pack was opened: reward = the record OpenSeedPack made (SeedId, SeedName, Rarity, SeedScale, PackMutation), info = {Stage, Variant, Version, Boost, Luck, PassLuck (R154), Test} of the PACK it
 -- came from (Test = a guaranteed TEST reveal, an owner-made TestGrant pack, or luck from owner-given boots: R152). Never throws, never yields. Returns true when the pull was counted.
 function S:NotePull(player,reward,info)
  if self.Dead or type(reward)~='table'or typeof(player)~='Instance'then return false end
@@ -259,7 +259,7 @@ function S:NotePull(player,reward,info)
  if self.Tainted[player]then return false,'owner-granted'end
  self:_syncWindow() -- (R153: a pull that comes right after a window mark is the new window's first, even before the loop has noticed the mark)
  local odds
- local ok,table_=pcall(PackRules.SeedOdds,self.Config,info.Stage,info.Variant,info.Luck,info.Version,info.Boost)
+ local ok,table_=pcall(PackRules.SeedOdds,self.Config,info.Stage,info.Variant,info.Luck,info.Version,info.Boost,info.PassLuck) -- R154: + the clover's luck (Void / Verity / Mech packs)
  if ok and type(table_)=='table'then odds=table_[reward.SeedId]end
  if type(odds)~='number'or odds~=odds or odds<=0 then local style=PackRules.Rarities[reward.Rarity];odds=style and style.Weight or nil end
  local rec=Rules.CleanPull({Uid=player.UserId,Name=player.DisplayName,Id=reward.SeedId,Seed=Rules.SeedLabel(reward.SeedId,reward.SeedName),Rarity=reward.Rarity,

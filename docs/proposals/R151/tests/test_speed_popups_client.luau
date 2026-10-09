@@ -153,17 +153,17 @@ local function stream(player,seconds,cap)
  return maxVisible,maxPool,worstVanish,opaqueMax,f0
 end
 local before
-for _,case in ipairs({{1,4,1},{2,6,2},{3,8,3}})do
+for _,case in ipairs({{1,8,1},{2,8,2},{3,8,3}})do -- (R154: own cap 8 at every tier; R151: 4 / 6 / 8)
  local tier,ownCap,otherCap=case[1],case[2],case[3]
  -- own
  PW.Tier=tier;before=#amounts
  local maxVisible,maxPool,worstVanish,opaqueMax=stream(me,4,ownCap)
  check(maxPool<=poolSize,'tier '..tier..' own: the pooled field holds at most '..poolSize..' frames, never more ('..maxPool..')')
  local cap=Style.Cap(tier,true,false)
- if tier<3 then check(maxVisible>=cap and maxVisible<=cap+Style.Field.Spare,'tier '..tier..' own: the cap binds, '..cap..' alive (+ the ones fading out): '..maxVisible)
- else check(maxVisible>=6 and maxVisible<=cap+Style.Field.Spare,'tier 3 own: about 6.5 alive at 10 a second, at most '..(cap+2)..': '..maxVisible)end
+ -- R154: the own cap is 8 at every tier, above the stream's 7: it no longer binds in the normal stream (it used to: 6 / 4 at tiers 2 / 1 cut every popup short)
+ check(maxVisible>=6 and maxVisible<=cap+Style.Field.Spare,'tier '..tier..' own: about 6.5 alive at 10 a second, at most '..(cap+2)..': '..maxVisible)
  check(opaqueMax<=cap+1,'tier '..tier..' own: never more than cap (+1 on the frame that replaces one) fully opaque: '..opaqueMax)
- check(worstVanish<=0.45,'tier '..tier..' own: nothing vanishes while opaque, the cap fades the oldest in 0.08 s (last alpha seen '..string.format('%.2f',worstVanish)..')')
+ check(worstVanish<=0.12,'tier '..tier..' own: nothing vanishes while opaque: every popup is seen to the end of its fade (R154; at tiers 1 / 2 the cap used to cut them at full alpha). Last alpha seen '..string.format('%.2f',worstVanish))
  check(#amounts-before>=38 and #amounts-before<=42,'tier '..tier..' own: 10 popups a second (2 per 1/5 s tick): '..(#amounts-before)..' in 4 s')
  settle()
  -- others
@@ -175,12 +175,20 @@ for _,case in ipairs({{1,4,1},{2,6,2},{3,8,3}})do
  check(#amounts-before>=18 and #amounts-before<=22,'tier '..tier..' other: NOT split, 5 popups a second: '..(#amounts-before)..' in 4 s')
  settle()
 end
+-- the cap itself still works: R154 raised the own caps above the stream (8), so it no longer binds in the normal stream; with a LOWER cap on the style table the client holds that many alive
+-- and the oldest fade out (the style table is the one the client requires)
+do
+ local saved=Style.Caps[1].Own;Style.Caps[1].Own=4;PW.Tier=1
+ local maxVisible,_,_,opaqueMax=stream(me,4,4)
+ check(maxVisible>=4 and maxVisible<=4+Style.Field.Spare and opaqueMax<=5,'a cap of 4 (set on the style table) binds: 4 alive + the ones fading out ('..maxVisible..', '..opaqueMax..' opaque)')
+ Style.Caps[1].Own=saved;PW.Tier=3;settle()
+end
 -- FastMode is tier 1 whatever the governor says
 PW.Tier=3;me:SetAttribute('FastMode',true)
 do
  local mv,mp=stream(me,3,4)
- check(mv<=4+Style.Field.Spare and mp<=10,'FastMode: own cap 4 even with tier 3 from the governor ('..mv..')')
- check(mv>=4,'FastMode: and it still shows 4')
+ check(mv<=8+Style.Field.Spare and mp<=10,'FastMode: own cap 8 (R154; it was 4) even with tier 3 from the governor ('..mv..')')
+ check(mv>=6,'FastMode: and it still shows the whole stream (about 6.5)')
  settle()
  local ov=stream(other,3,1)
  check(ov<=1+Style.Field.Spare,'FastMode: others cap 1 ('..ov..')')
@@ -463,8 +471,8 @@ do
  check(frames>=poolSize,'colour check ran over '..frames..' pooled frames')
  check(ok.Bolt,'the bolt is still the yellow (255,222,66) ⚡')
  check(ok.Text,'the amount is still (125,248,255), the pale cyan the owner calls white')
- check(ok.Stroke,'the outlines are still navy (17,26,42) (R153: 5 px on the 2x text), the legacy stroke black, FredokaOne, Contextual')
- check(ok.Misc and Style.Size.Icon==40 and Style.Size.Text==44,'R153: the sizes are 2x the approved 20 / 22 (40 / 44), no background')
+ check(ok.Stroke,'the outlines are still navy (17,26,42) (R154: 4 px on the 35 px text), the legacy stroke black, FredokaOne, Contextual')
+ check(ok.Misc and Style.Size.Icon==32 and Style.Size.Text==35,'R154: the sizes are 0.8 of R153\'s 40 / 44 (32 / 35), no background')
  local lf=PW.visible(PW.fieldOf(pg,head(me)))[1]
  if lf then
   check(lf.Amount.AutomaticSize.Name=='X' and lf.Amount.TextXAlignment.Name=='Center','the number sizes itself and sits next to the bolt')

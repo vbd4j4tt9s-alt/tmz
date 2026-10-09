@@ -13,6 +13,8 @@ return function(W)
  local FP={}
  -- (R153: run_perf153.sh puts perf153_opts.luau next to the drivers; it sets FP.Normal / FP.Drop to compare what the engine can draw. Absent: no change.)
  local okOpts,optsFn=pcall(require,'./perf153_opts')
+ -- (R154: run_perf153.sh also puts perf154_opts.luau there: the differences B1 / B3 are allowed to make (FP.Skip(o) leaves an instance and what is under it out, FP.Label = the shot being made))
+ local okOpts4,optsFn4=pcall(require,'./perf154_opts')
  local fmt=string.format
  -- (as Roblox: two CFrames with the same components are ==; the shared mock compares them by identity. Both sides of a comparison run with it.)
  do local mt=getmetatable(R.CFrame.new(0,0,0))
@@ -132,6 +134,7 @@ return function(W)
  function FP.tree(root,emit,opts,depth0,ctx0)
   local count=0
   local function walk(o,depth,ctx)
+   if FP.Skip and FP.Skip(o)then return end
    local vis,cctx=mark(o,ctx)
    emit(FP.line(o,depth,vis,opts));count+=1
    for _,c in ipairs(o._children)do walk(c,depth+1,cctx)end
@@ -146,6 +149,7 @@ return function(W)
  end
  -- a shot: several roots under one label (a root that is nil is printed as missing)
  function FP.shot(label,roots,opts)
+  FP.Label=label
   local buf={'SHOT '..label}
   local function emit(l)buf[#buf+1]=l end
   local total=0
@@ -366,5 +370,6 @@ return function(W)
  end
  function FP.timed()return times end
   if okOpts and type(optsFn)=='function'then optsFn(FP,W)end
+ if okOpts4 and type(optsFn4)=='function'then optsFn4(FP,W)end
  return FP
 end

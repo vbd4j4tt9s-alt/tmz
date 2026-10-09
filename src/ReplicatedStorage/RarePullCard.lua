@@ -7,6 +7,8 @@
 --   the flash on the hit, the per-tier title (SECRET void-purple glitch, COSMIC nebula with stars and orbiting planets, KING gold with a crown
 --   and turning rays), "1 in N", the name and the skip hint. The seed is the real 3D seed in the scene, framed in the free middle band.
 --  InPlace (Secret+ when the full scene is not safe): a compact card in the upper third; the middle of the screen stays clear.
+-- R154: the result WAITS on screen (the director's tl.Wait: nothing fades out) until the player collects it; the hint then says so
+-- ("click to collect!" / "tap to collect!") and the seed's view leaves the card to fly home (TakeSeed, SeedCollect154).
 -- Nothing here blocks input (Active=false everywhere); the director owns the skip button. All sizes are shares of the screen, so desktop
 -- and phone keep the same framing (RarePullRules.Layout); ReducedMotion: no float, spin, jitter or moving motes; lite: fewer pieces.
 local RS=game:GetService('ReplicatedStorage')
@@ -63,7 +65,7 @@ function Card.SafeInsets()
  return 0,0
 end
 -- kind: 'Ladder' | 'Scene' | 'InPlace'; opts: {Rank, Phone, Reduced, Lite, Quick, SeedName, Odds (final "N" text or nil), Seed (Model or nil),
--- Skip (R153: the card is skippable: it shows the skip hint too)}
+-- Skip (R153: the card is skippable: it shows the skip hint too; R154: every card has the hint, it says how to collect the result)}
 function Card.Create(gui,kind,opts)
  local rank=math.clamp(opts.Rank or 1,1,8);local tier=Rules.Tier(rank)
  local self=setmetatable({Gui=gui,Kind=kind,Rank=rank,Tier=tier,Phone=opts.Phone==true,Reduced=opts.Reduced==true,Lite=opts.Lite==true,Quick=opts.Quick==true,
@@ -180,13 +182,14 @@ function Card.Create(gui,kind,opts)
  end
  self.Fade=frame(root,'Fade',BLACK,30,{BackgroundTransparency=1})
  self.Flash=frame(root,'Flash',tier.Glow,31,{BackgroundTransparency=1})
- if kind=='Scene'or opts.Skip then
+ do -- (R154: every card: the collect hint, and the skip hint before it)
   local hint=label(root,'Skip hint',Enum.Font.GothamBold,C(230,230,240),BLACK,32)
   -- (R152: inside the device's safe area: on a notched / rounded phone the corner of the full-screen layer is cut off)
   -- (R153: the cards are skippable too; the in-place card has no letterbox band, its hint keeps the full card's place and size)
   local right,bottom=Card.SafeInsets();local bar=L.Bar>0 and L.Bar or Rules.Layout(self.Phone,false,rank).Bar
   hint.AnchorPoint=Vector2.new(1,.5);hint.Position=UDim2.fromScale(.975-right,1-math.max(bar*.5,bottom+bar*.25));hint.Size=UDim2.fromScale(.22,bar*.42);hint.TextXAlignment=Enum.TextXAlignment.Right
-  hint.Text=opts.SkipText or(self.Phone and'TAP TO SKIP  ▸'or'CLICK TO SKIP  ▸');self.SkipHint=hint
+  self.SkipText=opts.SkipText or(self.Phone and'TAP TO SKIP  ▸'or'CLICK TO SKIP  ▸');self.CollectText=Card.CollectText(self.Phone)
+  hint.Text=self.SkipText;self.SkipHint=hint
  end
  if opts.Seed then self:SetSeed(opts.Seed)end
  return self
@@ -235,11 +238,29 @@ function Card:_ring(k,alpha)
 end
 function Card:_flash(a)self.Set(self.Flash,'BackgroundTransparency',1-clamp01(a)*(self.Reduced and .35 or 1))end
 function Card:_fade(a)self.Set(self.Fade,'BackgroundTransparency',1-clamp01(a))end
--- (R153) the skip hint of a card: in from `from`, gone by `to` (the card closing)
-function Card:_skipHint(t,from,to)
- if not self.SkipHint then return end
- local a=clamp01((t-(from or math.huge))/.3)*(1-clamp01((t-to)/.2))
- self.Set(self.SkipHint,'TextTransparency',1-.75*a);self.Set(self.SkipHint,'Visible',a>.01)
+-- R153 the skip hint, R154 the collect hint, one label: "CLICK TO SKIP  ▸" from SkipFrom until the hit (R153 kept it until the card closed);
+-- once the result is shown and waits (tl.Wait) "click to collect!" / "tap to collect!" (owner's voice), in after CollectHint s, breathing
+-- softly (held still with Reduced Motion); it goes with the collect (tl.WaitEnd: a story scene's way out).
+Card.CollectHint=.25
+function Card.CollectText(phone)return phone and'tap to collect!'or'click to collect!'end
+function Card:_hint(t,tl)
+ local h=self.SkipHint;if not h then return end
+ local S=self.Set;local hit=tl.Climax or tl.Burst or 0;local shown=Rules.ShownAt(tl)
+ if t>=shown and(tl.Wait or tl.WaitEnd)then
+  local a=clamp01((t-shown-Card.CollectHint)/.3)*(tl.WaitEnd and 1-clamp01((t-tl.WaitEnd)/.15)or 1)*(self.Reduced and 1 or .82+.18*math.sin((t-shown)*3.2))
+  S(h,'Text',self.CollectText);S(h,'TextTransparency',1-.9*a);S(h,'TextStrokeTransparency',1-.5*a);S(h,'Visible',a>.01)
+  return
+ end
+ local a=clamp01((t-(tl.SkipFrom or math.huge))/.3)*(1-clamp01((t-(hit-.02))/.15))
+ S(h,'Text',self.SkipText);S(h,'TextTransparency',1-.75*a);S(h,'TextStrokeTransparency',1);S(h,'Visible',a>.01)
+end
+-- R154: the seed flies home (SeedCollect154.Fly): its view leaves the card, which goes on (and fades) without it. Where it is now: its centre and
+-- height in shares of the screen, its spin.
+function Card:TakeSeed()
+ local v=self.View;if not v then return nil end
+ self.View=nil
+ local scale=self.ViewScale and self.ViewScale.Scale or 1
+ return {View=v,Centre=self.SeedCentre,Base=self.SeedBase,Yaw=self.SeedYawShown,X=v.Position.X.Scale,Y=v.Position.Y.Scale,S=v.Size.Y.Scale*scale}
 end
 -- Texts: title pops in at `inAt`, odds count from `countAt` and slam at `slamAt`, everything fades out between `outAt` and `goneAt`.
 function Card:_texts(t,inAt,countAt,slamAt,outAt,goneAt)
@@ -338,8 +359,10 @@ function Card:UpdateLadder(t,tl)
   local a=1-clamp01((t-burst)/.45)
   self:_edges(self.Tier.Hint,(.1+.06*rank)*a);self:_motes(1,t,self.Tier.Hint,0)
  end
- -- (R152: the letterbox eases out over the card's own fade, gone on Length; it used to be cut off at a fifth of its height)
- self:_bars(tl.Letterbox and(t<burst and Rules.Smooth((q-.45)/.3)or 1-Rules.Smooth((t-tl.Out)/math.max(.05,tl.Length-tl.Out)))*.6 or 0)
+ -- (R152: the letterbox eases out over the card's own fade, gone on Length; it used to be cut off at a fifth of its height. R154: a waiting
+ -- result lets it go once the seed has floated down, so it never covers the hotbar while it waits)
+ local outAt=tl.Wait and tl.FloatEnd or tl.Out;local goneAt=tl.Wait and tl.FloatEnd+.4 or tl.Length
+ self:_bars(tl.Letterbox and(t<burst and Rules.Smooth((q-.45)/.3)or 1-Rules.Smooth((t-outAt)/math.max(.05,goneAt-outAt)))*.6 or 0)
  self:_flash(t>=burst and(.18+.08*rank)*(1-clamp01((t-burst)/.28))or 0)
  self:_ring(clamp01((t-burst)/.55),t>=burst and 1 or 0)
  local _,out=self:_texts(t,tl.TitleIn,tl.Count,tl.Odds,tl.Out,tl.Length)
@@ -347,7 +370,7 @@ function Card:UpdateLadder(t,tl)
  self:_seed(t,burst,tl.FloatEnd,tl.Out,tl.Length)
  self:_dress(t,t-burst,0)
  self:_fade(0)
- self:_skipHint(t,tl.SkipFrom,tl.FloatEnd)
+ self:_hint(t,tl)
 end
 -- Scene: t on the cinematic's clock ----------------------------------------------------------------------------------------------------
 function Card:UpdateScene(t,tl,skipShown)
@@ -380,10 +403,7 @@ function Card:UpdateScene(t,tl,skipShown)
    if v then self.Scale(g,'Size',.3+.5*math.abs(math.sin(t*37+i)),.012+.02*math.abs(math.sin(t*53+i*2)));self.Scale(g,'Position',.5+math.sin(t*41+i)*.25,(i*.19+t*3.1)%1)end
   end
  end
- if self.SkipHint then
-  local a=skipShown and clamp01((t-tl.SkipFrom)/.3)*(1-clamp01((t-tl.FloatEnd)/.2))or 0
-  self.Set(self.SkipHint,'TextTransparency',1-.75*a);self.Set(self.SkipHint,'Visible',a>.01)
- end
+ if skipShown~=false then self:_hint(t,tl)elseif self.SkipHint then self.Set(self.SkipHint,'Visible',false)end
 end
 -- InPlace: t on the reveal's server clock (or from 0 for a result card) --------------------------------------------------------------------
 function Card:UpdateInPlace(t,tl)
@@ -397,11 +417,12 @@ function Card:UpdateInPlace(t,tl)
  self:_bars(0);self:_fade(0)
  self:_flash(t>=tl.Climax and .35*(1-clamp01((t-tl.Climax)/.35))or 0)
  self:_ring(clamp01((t-tl.Climax)/.6),t>=tl.Climax and .6 or 0)
- local shown,out=self:_texts(t,tl.Climax,tl.Climax+.08,tl.Odds,tl.FloatEnd,tl.Length)
+ local outAt=tl.Out or tl.FloatEnd -- (R154: a waiting result: Out and Length are far away, the seed still floats down by FloatEnd)
+ local shown,out=self:_texts(t,tl.Climax,tl.Climax+.08,tl.Odds,outAt,tl.Length)
  self:_rays(t,0)
  self:_dress(t,t-tl.Climax,shown and out or 0)
- self:_seed(t,tl.Climax,tl.FloatEnd,tl.FloatEnd,tl.Length)
- self:_skipHint(t,tl.SkipFrom,tl.FloatEnd)
+ self:_seed(t,tl.Climax,tl.FloatEnd,outAt,tl.Length)
+ self:_hint(t,tl)
 end
 function Card:Destroy()
  if self.Destroyed then return end

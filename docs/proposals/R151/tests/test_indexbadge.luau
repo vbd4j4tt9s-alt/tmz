@@ -3,7 +3,7 @@
 -- notification badge on the Roblox mock, with the REAL ChestIndex, HudLayout, NotifyBadge151 and DailyRewardsClient of this checkout (MODE 'after') or the R150 ChestIndex +
 -- HudLayout from git (MODE 'before': proves the root cause, the old badge IS cut by the wheel's CanvasGroup and by the tab row). run_badges.sh runs both.
 --  1. the polished badge: a square holder (UIAspectRatioConstraint 1) with a PERFECT circle (UICorner 1,0) in a bright red gradient with a white ring that stays inside the holder,
---     a soft two-layer drop shadow behind it, and the count (FredokaOne, white, TextScaled inside a size constraint, centred on the disc): "!", the count, "9+" past nine, nothing for a dot
+--     a soft two-layer drop shadow behind it, and the count (FredokaOne, white, at an explicit size since R154, centred on the disc): "!", the count, "9+" past nine, nothing for a dot
 --  2. NOT CLIPPED: on every screen from a 360 px phone to 1920x1080 the badge's outermost reach (ring, shadow, the pop's biggest size, the pulse's halo) stays inside every ancestor that
 --     clips (the wheel's CanvasGroup, the tab row's ScrollingFrame, any ClipsDescendants frame); the tab dots sit inside their tab
 --  3. the ROOT CAUSE, measured on the R150 code: the INDEX badge overhangs the button's corner by 8 px (ring included) and the CanvasGroup gave it 4 px; the tab dot hung out of the tab by 3 px
@@ -91,9 +91,10 @@ if after then
  local sr,tr=L.rect(soft),L.rect(tight)
  check(sr.y1>r.y1 and tr.y1>r.y1 and sr.y1-r.y1<=5*Badge.Grow and(sr.x1-sr.x0)>(r.x1-r.x0)and(sr.y0+sr.y1)/2>(r.y0+r.y1)/2,'... dropped a little below the badge (the shadow is lower and a touch wider)')
  local label=b:FindFirstChild('Count');local lr=L.rect(label)
- check(label and label._class=='TextLabel'and label.Font.Name=='FredokaOne'and label.TextScaled==true and label.TextColor3.R==1 and label.TextColor3.G==1 and label.TextColor3.B==1,'the count is FredokaOne, white and TextScaled')
- local fit=label and label:FindFirstChildOfClass('UITextSizeConstraint')
- check(fit and fit.MaxTextSize<=Badge.Sizes.Count*.7 and fit.MaxTextSize>=Badge.Sizes.Count*.4 and fit.MinTextSize>=6,'... inside a UITextSizeConstraint (max '..tostring(fit and fit.MaxTextSize)..', min '..tostring(fit and fit.MinTextSize)..'), so it never fills the disc edge to edge')
+ check(label and label._class=='TextLabel'and label.Font.Name=='FredokaOne'and label.TextColor3.R==1 and label.TextColor3.G==1 and label.TextColor3.B==1,'the count is FredokaOne and white')
+ -- R154: the size is explicit (the engine's TextScaled fit left the digits a third of the bubble): no TextScaled, no UITextSizeConstraint, the size is Badge.TextSize
+ check(label.TextScaled==false and label:FindFirstChildOfClass('UITextSizeConstraint')==nil and label.TextSize==Badge.TextSize(Badge.Sizes.Count,label.Text),'R154: ... at an explicit TextSize ('..tostring(label.TextSize)..', TextScaled off, no size constraint to shrink it)')
+ check(label.TextStrokeTransparency<=.5 and label.TextStrokeColor3.R<.6 and label.TextStrokeColor3.G<.2,'... with its dark red edge')
  check(label.TextXAlignment.Name=='Center'and label.TextYAlignment.Name=='Center','the text is centred both ways')
  local lcx,lcy,dcx,dcy=(lr.x0+lr.x1)/2,(lr.y0+lr.y1)/2,(dr.x0+dr.x1)/2,(dr.y0+dr.y1)/2
  check(near(lcx,dcx,.01)and near(lcy,dcy,.01),'the label is centred on the disc ('..string.format('%.2f,%.2f vs %.2f,%.2f',lcx,lcy,dcx,dcy)..')')
@@ -156,13 +157,49 @@ if after then
   check(near(r.x1-r.x0,size)and near(r.y1-r.y0,size)and b:GetAttribute('BadgeSize')==size,'R153: the '..name..' is '..size..' px ('..(r.x1-r.x0)..')')
   local ring=b.Disc:FindFirstChildOfClass('UIStroke').Thickness
   check(ring>=size*.07 and ring<=size*.1,'R153: its white ring grows with it ('..ring..' px on '..size..')')
-  local fit=b.Count:FindFirstChildOfClass('UITextSizeConstraint')
-  check(fit.MaxTextSize>=size*.55 and fit.MaxTextSize<=size*.65,'R153: its count grows with it (max text size '..fit.MaxTextSize..' on '..size..')')
+  check(b.Count.TextSize==Badge.TextSize(size,b.Count.Text)and b.Count.TextSize>=size*.6,'R153 / R154: its count grows with it (text size '..b.Count.TextSize..' on '..size..')')
  end
- -- "9+" (the widest text) still fits in the disc at its biggest text size, with the mock's width rule (utf8.len * size * .52)
- local fits=true;local label=indexBadge().Count;local lr=L.rect(label);local widest=utf8.len(Badge.Text(99))*label:FindFirstChildOfClass('UITextSizeConstraint').MaxTextSize*.52
- check(widest<=lr.x1-lr.x0,'R153: "9+" at the INDEX count\'s biggest text size ('..widest..' px wide) fits in the disc\'s label ('..(lr.x1-lr.x0)..' px)')
  check(Badge.Extent(Badge.Sizes.Count,Badge.Overhang.Count)==15 and Badge.Margin==16,'R153: the INDEX count reaches 15 px past its corner and the wheel keeps '..Badge.Margin..' px round a button')
+end
+-- R154 (owner, after R153: "the number and signs in the notification bubble is also too small"; the digits were about a third of the bubble) ---------------------------------------------------
+-- The text FILLS the bubble: for every text a badge shows ("2", "9+", "!") on a computer and on phones, the text size is >= 60% of the badge, the digits are >= 55% of the red disc's height (one character:
+-- 58% of the badge, "9+": 50%) and no more than 72% of it, the glyphs stay within the badge (not into the shadow, the ring only at the ink box's empty corners), the width stays between the ring's
+-- inner edges, and the text is centred on the disc. Measured with FredokaOne's real advance widths and digit height (layout_badges.luau L.textFill).
+if after then
+ local function fillRow(tag,b)
+  local f=L.textFill(b);local text=b.Count.Text
+  check(f.FillEm>=.6 and f.FillEm<=.8,string.format('%s "%s": the text size is %.0f%% of the badge (%d px on %d; 60..80%%)',tag,text,f.FillEm*100,f.Em,f.Size))
+  check(f.FillDisc>=.55 and f.FillDisc<=.72 and f.FillInk>=.45,string.format('%s "%s": the digits are %.0f%% of the red disc and %.0f%% of the badge tall (>= 55%% of the disc, <= 72%%, >= 45%% of the badge)',tag,text,f.FillDisc*100,f.FillInk*100))
+  check(f.InkW<=f.Disc-2 and f.Corner<=f.Radius-1,string.format('%s "%s": the glyphs stay inside the badge (%.1f px wide in a %.0f px disc, corner %.1f of radius %.1f)',tag,text,f.InkW,f.Disc,f.Corner,f.Radius))
+  check(f.Centred,tag..' "'..text..'": the text is centred on the disc')
+  return f
+ end
+ local rows={}
+ for _,sz in ipairs({{1920,1080},{1280,720},{390,844},{844,390},{360,640}})do
+  relay(sz[1],sz[2]);openWheel();relay(sz[1],sz[2])
+  local tag=sz[1]..'x'..sz[2]..(math.min(sz[1],sz[2])<=500 and' (phone)'or' (computer)')
+  local one=fillRow(tag..' INDEX count',indexBadge());fillRow(tag..' MENU alert',alertBadge())
+  check(indexBadge().Count.Text=='2'and alertBadge().Count.Text=='!','('..tag..': the badges read "2" and "!")')
+  rows[#rows+1]=string.format('   %-20s "2" text %d px = %.0f%% of the badge, digits %.0f%% of the disc',tag,one.Em,one.FillEm*100,one.FillDisc*100)
+  -- the longest text: "9+" (eleven rewards waiting), then back
+  local fresh={};for _,id in ipairs(ids)do if not seeds:FindFirstChild(id)and #fresh<9 then fresh[#fresh+1]=id end end
+  for _,id in ipairs(fresh)do found(seeds,id,1000)end
+  W.frames(5);relay(sz[1],sz[2])
+  local nine=fillRow(tag..' INDEX count',indexBadge())
+  check(indexBadge().Count.Text=='9+'and nine.Chars==2,tag..': the longest text, "9+", was measured')
+  check(nine.Em<one.Em and nine.Em>=Badge.Sizes.Count*.6,string.format('%s: "9+" is set smaller than one character (%d px < %d px) so it stays in the disc, still >= 60%% of the badge',tag,nine.Em,one.Em))
+  for _,id in ipairs(fresh)do seeds[id]:Destroy()end
+  W.frames(5);relay(sz[1],sz[2])
+  check(indexBadge().Count.TextSize==one.Em,tag..': back to one character, back to its size')
+  -- the text is never clipped: no ancestor that clips cuts the holder (the text is inside it), on this screen
+  local worst=cut(indexBadge());check(worst<=1e-6,tag..': nothing clips the INDEX count and its text (cut '..worst..' px)')
+ end
+ print('R154 badge text (FredokaOne metrics):');for _,r in ipairs(rows)do print(r)end
+ -- the sizes themselves: one character 78%, two 68%
+ for _,k in ipairs({'Count','Alert','Daily'})do
+  local d=Badge.Sizes[k]
+  check(Badge.TextSize(d,'2')>=d*.75 and Badge.TextSize(d,'!')==Badge.TextSize(d,'2')and Badge.TextSize(d,'9+')>=d*.65 and Badge.TextSize(d,'9+')<Badge.TextSize(d,'2'),'Badge.TextSize for the '..k..' badge ('..d..' px): one character '..Badge.TextSize(d,'2')..', two '..Badge.TextSize(d,'9+'))
+ end
 end
 -- 3b. R153 client bug review, finding 7: the 1.5x tab dot never covers the count --------------------------------------------------------------------------------
 -- The dot (21 px) used to sit on the tab's top-right corner and covered the end of the count text ("18 / 40") on a PC tab (122 x 58) and on a phone's compact tab (106 x 40). It must clear the

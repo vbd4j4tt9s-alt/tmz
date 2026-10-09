@@ -36,6 +36,15 @@
 #                               shows, a pack equipped during a reveal goes back to the Backpack and opens after it; nothing stuck or lost.
 #  (and test_seed_sync / loudness / fx check the card skips too: the hit heard on its frame, no louder than the full reveal, nothing left;
 #  the setting's menu row and its saving: R151 run_announce.sh, test_settings / test_settings_client.)
+#  R154 (owner: "... the seed stays on the player's screen until they click and the seed goes to their inventory"):
+#  test_seed_collect.luau     - the real client scripts with the REAL Hotbar: every presentation's result waits (120 s without input: still
+#                               there, its hint, no sound, the seed not in the hotbar nor in the hand), the press collects it: the seed flies
+#                               and lands ON its slot (first free, its stack's, the Bag button), the hotbar shows it from that frame only,
+#                               the pickup cue on that frame; the press is the reveal's; every edge case collects it by itself (the next pack,
+#                               death, ragdoll / fling, a chase, a teleport, onto the track, far away, the shop / the Bag), a collect before
+#                               the server's end rests on its slot, Reduced Motion fades, mobile taps (HUD / hotbar / drags / long presses
+#                               do not), skip then collect, onlookers as before; the collect never stacks on the reveal's tail.
+#  (and every suite above: a result waits now, the press after it collects it; the stress run collects every opening, each seed flies in)
 # "all" (default) also runs the suites that touch the same files: R151 run_rare_pull.sh (only), R150 run_sfx.sh, R138, R151 run_announce.sh,
 # R150 test_packs (in run_sfx.sh), R147 Verity UI and R149 Verity pack.
 set -e
@@ -52,7 +61,7 @@ INV=$P/inventory_R113/tests
 cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$P/R150/tests/sfx_env.luau" "$P/R151/tests/rare_env.luau" "$HERE"/*.luau "$OUT/cl/"
 python3 "$P/R151/tests/mkbundle_rare.py" "$OUT/cl" all-client >/dev/null
 cd "$OUT/cl"
-for t in test_seed_sync test_seed_loudness test_seed_fx test_seed_stress test_seed_choice test_seed_press;do
+for t in test_seed_sync test_seed_loudness test_seed_fx test_seed_stress test_seed_choice test_seed_press test_seed_collect;do
  [ -f $t.luau ] || continue
  echo "== $t"
  timeout 1800 /opt/luau/luau $t.luau > $t.log 2>&1 || { grep -v '^WARN' $t.log | tail -40;exit 1; }
