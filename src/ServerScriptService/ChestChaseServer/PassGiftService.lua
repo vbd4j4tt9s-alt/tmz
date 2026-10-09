@@ -54,7 +54,7 @@ function S:Send(from,key,userId,payment)
   if owned then return false,'They already have this pass!'end
   if not self:Ready(from)or not self:Ready(to)then return false,'That player isn\'t here.'end
   local state=self.Data:GetPremium(from)
-  if count(state.PassOutbox)>=Catalog.MaxOutbox then return false,'Ur other gifts are still saving.'end
+  if count(state.PassOutbox)>=Catalog.MaxOutbox then return false,'Your other gifts are still saving.'end
   for _,v in pairs(state.PassOutbox)do if v.RecipientId==userId and v.PassKey==key then return false,'This gift is already on its way!'end end
   local price=Mech.PassGemPrices[key]
   if payment=='Gems'and state.Gems<price then return false,'Not enough Gems!'end

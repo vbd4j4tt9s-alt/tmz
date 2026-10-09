@@ -612,7 +612,7 @@ local recG=dG:GetPremium(G).OldRoster148
 check(recG.Half['2']==true and recG.Full['2']==nil and G:GetAttribute('IndexOldHalf2')==true and G:GetAttribute('IndexOldFull2')==false,'Gil (3 of 5, saved before the update): halfway recorded, completion not (published as IndexOldHalf2)')
 check(dG:IndexMilestone(G,2,false)and not dG:IndexMilestone(G,2,true),'... so the halfway reward stays claimable (live 3+3 of 14 is not halfway) and the completion does not')
 local h1,h1why=dG:ClaimIndexBiomeHalf(G,2);local h2,h2why=dG:ClaimIndexBiomeHalf(G,2)
-check(h1 and not h2 and h2why=='U ALREADY CLAIMED THIS!','the halfway reward claims once, the second claim says U ALREADY CLAIMED THIS! ('..tostring(h2why)..')')
+check(h1 and not h2 and h2why=='YOU ALREADY CLAIMED THIS!','the halfway reward claims once, the second claim says YOU ALREADY CLAIMED THIS! ('..tostring(h2why)..')')
 check(not select(1,dG:ClaimIndexBiome(G,2)),'(completion is still refused)')
 discoverOn(dG,G,OLD5[4],true);discoverOn(dG,G,OLD5[5],true)
 check(not dG:IndexMilestone(G,2,true)and not select(1,dG:ClaimIndexBiome(G,2)),'the other two old seeds found after the update: still not complete (the flag only ever covers what was reached before)')
@@ -629,14 +629,14 @@ check(recH.Half['2']==true and recH.Full['2']==true and H:GetAttribute('IndexOld
 check(dH:IndexMilestone(H,2,true)and dH:BiomeComplete(H,2),'old 5/5: complete, so BiomeComplete is true (no reward is taken away)')
 local hh,hhWhy=dH:ClaimIndexBiomeHalf(H,2)
 local c1,c1why=dH:ClaimIndexBiome(H,2);local c2,c2why=dH:ClaimIndexBiome(H,2)
-check(hh and c1 and not c2 and c2why=='U ALREADY CLAIMED THIS!'and H:GetAttribute('IndexBiomeReward2')==true and H:GetAttribute('IndexBiomeHalfReward2')==true,'both rewards claim once, then U ALREADY CLAIMED THIS!; the claimed attributes follow ('..tostring(c2why)..')')
+check(hh and c1 and not c2 and c2why=='YOU ALREADY CLAIMED THIS!'and H:GetAttribute('IndexBiomeReward2')==true and H:GetAttribute('IndexBiomeHalfReward2')==true,'both rewards claim once, then YOU ALREADY CLAIMED THIS!; the claimed attributes follow ('..tostring(c2why)..')')
 check(pendingGems(dH,H)=='5,10','the Gems: 5 (halfway) and 10 (completion) once each (R153: halved from 10 and 20) ('..pendingGems(dH,H)..')')
 discoverOn(dH,H,'DesertAloeSeed',true);discoverOn(dH,H,'SandFruitSeed',true)
 check(not select(1,dH:ClaimIndexBiome(H,2))and not select(1,dH:ClaimIndexBiomeHalf(H,2))and pendingGems(dH,H)=='5,10','finding the two new seeds later pays nothing more')
 -- (4) A player who claimed both before the update cannot claim again, whatever they have found.
 local dI,I=oldPlayer(754,'Ian',5,function(row)row.Premium.Biomes['2']=true;row.Premium.BiomeHalfRewards=row.Premium.BiomeHalfRewards or{};row.Premium.BiomeHalfRewards['2']=true end)
 local g1,g1why=dI:ClaimIndexBiomeHalf(I,2);local g2,g2why=dI:ClaimIndexBiome(I,2)
-check(not g1 and g1why=='U ALREADY CLAIMED THIS!'and not g2 and g2why=='U ALREADY CLAIMED THIS!'and pendingGems(dI,I)=='','a player who claimed both rewards before the update gets U ALREADY CLAIMED THIS! (no duplicate)')
+check(not g1 and g1why=='YOU ALREADY CLAIMED THIS!'and not g2 and g2why=='YOU ALREADY CLAIMED THIS!'and pendingGems(dI,I)=='','a player who claimed both rewards before the update gets YOU ALREADY CLAIMED THIS! (no duplicate)')
 -- (5) A new player (created after the update): nothing is recorded, and they need the seven.
 local N5=makePlayer(755,'Nia')
 local recN=Data:GetPremium(N5).OldRoster148

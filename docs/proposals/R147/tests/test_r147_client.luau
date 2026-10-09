@@ -51,7 +51,7 @@ mine:SetAttribute('OwnerUserId',77);mine:SetAttribute('OwnerName','Tester');mine
 mine:SetAttribute('UnlockAt',UNLOCK);mine:SetAttribute('State','Locked')
 local gm=label(mine)
 check(gm.Enabled==true,'Locked: the label shows')
-check(gm.Title.Text=='❓ UR MYSTERY PACK'and rgb(gm.Title.TextColor3,190,140,255),'title: ❓ UR MYSTERY PACK (violet)')
+check(gm.Title.Text=='❓ YOUR MYSTERY PACK'and rgb(gm.Title.TextColor3,190,140,255),'title: ❓ YOUR MYSTERY PACK (violet)')
 check(gm.Status.Text=='🔒 15:00','status: 🔒 15:00 ('..gm.Status.Text..')')
 check(gm.Bar.Visible==true and near(gm.Bar.Fill.Size.X.Scale,0,1e-9)and gm.Bar.Fill.Size.Y.Scale==1 and rgb(gm.Bar.Fill.BackgroundColor3,190,140,255),'the bar is empty and violet')
 check(minePrompt.Enabled==false,'the prompt stays off while locked, even for the owner')
@@ -73,7 +73,7 @@ check(label(fresh).Status.Text=='🔒 15:00','no UnlockAt (yet): the full 15:00'
 -- Ready: mine.
 mine:SetAttribute('UnlockAt',nil);mine:SetAttribute('Variant','Pack03');local b0=bursts()
 mine:SetAttribute('State','Ready')
-check(gm.Title.Text=='✨ UR MYSTERY PACK'and rgb(gm.Title.TextColor3,255,214,90),'Ready, mine: ✨ UR MYSTERY PACK in gold')
+check(gm.Title.Text=='✨ YOUR MYSTERY PACK'and rgb(gm.Title.TextColor3,255,214,90),'Ready, mine: ✨ YOUR MYSTERY PACK in gold')
 check(gm.Status.Text=='UNLOCKED! GRAB IT 🎁'and rgb(gm.Status.TextColor3,255,214,90),'status: UNLOCKED! TAKE IT 🎁')
 check(gm.Bar.Visible==true and gm.Bar.Fill.Size.X.Scale==1 and rgb(gm.Bar.Fill.BackgroundColor3,255,214,90),'the bar is full and gold')
 check(minePrompt.Enabled==true,'the prompt turns on for the owner')

@@ -271,7 +271,7 @@ local function update(entry)
  local gui=entry.Gui;gui.Enabled=state~='Empty';gui.MaxDistance=mine and FAR_MINE or FAR
  applyPrompt(entry);if state~='Empty'then place(entry)end
  if state=='Empty'then entry.State=state;refresh(entry);return end
- local owner=mine and'UR'or(tostring(m:GetAttribute('OwnerName')or'?'):upper().."'S")
+ local owner=mine and'YOUR'or(tostring(m:GetAttribute('OwnerName')or'?'):upper().."'S")
  local bar,fill=gui.Bar,gui.Bar.Fill
  dress(gui,state,mine)
  if state=='Locked'then

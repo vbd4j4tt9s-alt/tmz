@@ -84,7 +84,7 @@ end
 
 -- Status line while the strip spins; a = 0..1 progress of the spin. Returns the line and its index (the label changes only
 -- when the index does).
-S.SpinLines={'Unwrapping ur gift...','Ooh, what could it be?','Slowing down...','Here it comes!'}
+S.SpinLines={'Unwrapping your gift...','Ooh, what could it be?','Slowing down...','Here it comes!'}
 S.SpinAt={0,.3,.62,.86}
 function S.SpinLine(a) -- R153: no bag hint line under it any more (owner: "remove this bonus ready bag")
  a=tonumber(a)or 0;local index=1

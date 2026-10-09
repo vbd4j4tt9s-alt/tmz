@@ -28,7 +28,7 @@ function T.Attach(Data)
  -- Dependencies must remain non-yielding, like the existing R140 claim contract.
  function Data:QueueDailyGems(player,amount)
   local garden=self.Gardens[player]
-  if not garden then return false,'UR GARDEN IS LOADING...'end
+  if not garden then return false,'YOUR GARDEN IS LOADING...'end
   local before=#(garden.PendingSales or{})
   local okay,result,why=pcall(self.QueueCurrency,self,player,amount,'Gems')
   local pending=garden.PendingSales or{};local receipt=pending[before+1]
@@ -92,7 +92,7 @@ function T.Attach(Data)
   player:SetAttribute('DailyRevision',(player:GetAttribute('DailyRevision')or 0)+1)
  end
  function Data:DailyState(player)
-  if not self:IsLoaded(player)then return {Success=false,Message='HOLD ON, UR DATA IS LOADING!'}end
+  if not self:IsLoaded(player)then return {Success=false,Message='HOLD ON, YOUR DATA IS LOADING!'}end
   local daily,quests,day=self:DailyData(player);local login=D.LoginStatus(daily.Login,day);local rows={}
   for i,q in ipairs(quests.Keys)do local spec=D.Quests[q]
    rows[i]={Key=spec.Key,Text=spec.Text,Icon=spec.Icon,Goal=spec.Goal,Progress=quests.Progress[i],Claimed=quests.Claimed[i],Packs=D.QuestPacks}
@@ -103,51 +103,51 @@ function T.Attach(Data)
   return {Success=true,Login=login,Quests=rows,Bonus=bonus,ResetIn=D.SecondsLeft(os.time()),Day=day,QuestGemsGranted=quests.GemsGranted,QuestGemCap=D.QuestGemCap}
  end
  function Data:ClaimDailyLogin(player)
-  if not self:IsLoaded(player)then return false,'HOLD ON, UR DATA IS LOADING!'end
-  if not self.CanSave[player]then return false,'NO REWARDS UNTIL UR DATA CAN SAVE'end
+  if not self:IsLoaded(player)then return false,'HOLD ON, YOUR DATA IS LOADING!'end
+  if not self.CanSave[player]then return false,'NO REWARDS UNTIL YOUR DATA CAN SAVE'end
   local daily,_,day=self:DailyData(player);local login=D.LoginStatus(daily.Login,day)
   if not login.Ready then return false,'COME BACK TOMORROW FOR DAY '..(login.Claimed%#D.Login+1)end
   local reward=D.Login[login.Next];local message
   if reward.SeedPack or reward.MechPack or reward.VoidPack then
    local record,why=self:GrantDailyPack(player,reward.VoidPack and'Void'or reward.MechPack and'Mech'or nil)
    if not record then return false,why end
-   message=reward.VoidPack and '🌑 FREE VOID PACK! Check ur bag!'or reward.MechPack and '🤖 FREE MECH PACK! Check ur bag!'or '🎒 RANDOM SEED PACK! Check ur bag!'
+   message=reward.VoidPack and '🌑 FREE VOID PACK! Check your bag!'or reward.MechPack and '🤖 FREE MECH PACK! Check your bag!'or '🎒 RANDOM SEED PACK! Check your bag!'
   else
    local okay,why=self:QueueDailyGems(player,reward.Gems);if not okay then return false,why end
-   message='Ur Gems are on the way!'
+   message='Your Gems are on the way!'
   end
   daily.Login={Step=login.Next,Day=day}
   self:MarkDirty(player);self:QueueGardenSave(player);self:PublishDaily(player)
   return true,message,{Day=login.Next,Reward=reward}
  end
  function Data:ClaimDailyQuest(player,index)
-  if not self:IsLoaded(player)then return false,'HOLD ON, UR DATA IS LOADING!'end
-  if not self.CanSave[player]then return false,'NO REWARDS UNTIL UR DATA CAN SAVE'end
+  if not self:IsLoaded(player)then return false,'HOLD ON, YOUR DATA IS LOADING!'end
+  if not self.CanSave[player]then return false,'NO REWARDS UNTIL YOUR DATA CAN SAVE'end
   local daily,quests=self:DailyData(player)
   if type(index)~='number'or index%1~=0 or not quests.Keys[index]then return false,'TRY AGAIN!'end
-  if quests.Claimed[index]then return false,'U ALREADY CLAIMED THIS!'end
+  if quests.Claimed[index]then return false,'YOU ALREADY CLAIMED THIS!'end
   if quests.Progress[index]<D.Quests[quests.Keys[index]].Goal then return false,'FINISH THE QUEST FIRST'end
   -- R153: the reward is one random pack. A full Bag refuses it (nothing is lost, the quest stays claimable); the pack in the Bag is the commit point.
   local record,why=self:GrantDailyPack(player,false,'DailyQuest');if not record then return false,why end
   daily.Quests.Claimed[index]=true
   self:MarkDirty(player);self:QueueGardenSave(player);self:PublishDaily(player)
-  if D.BonusReady(select(2,self:DailyData(player)))then return true,'🎒 RANDOM SEED PACK! Now grab ur 💎'..D.AllDoneGems..' bonus!'end
-  return true,'🎒 RANDOM SEED PACK! Check ur bag!'
+  if D.BonusReady(select(2,self:DailyData(player)))then return true,'🎒 RANDOM SEED PACK! Now grab your 💎'..D.AllDoneGems..' bonus!'end
+  return true,'🎒 RANDOM SEED PACK! Check your bag!'
  end
  -- R153: claiming every quest of the day gives 2 Gems once. Its own marker (Bonus) is set only after the Gems are queued, so a refusal (the receipts are full, the Gems are maxed out)
  -- leaves it claimable. Today's quest Gems never go over D.QuestGemCap: a day with older-style claims (they paid Gems already) has no bonus left.
  function Data:ClaimDailyBonus(player)
-  if not self:IsLoaded(player)then return false,'HOLD ON, UR DATA IS LOADING!'end
-  if not self.CanSave[player]then return false,'NO REWARDS UNTIL UR DATA CAN SAVE'end
+  if not self:IsLoaded(player)then return false,'HOLD ON, YOUR DATA IS LOADING!'end
+  if not self.CanSave[player]then return false,'NO REWARDS UNTIL YOUR DATA CAN SAVE'end
   local daily,quests=self:DailyData(player)
-  if quests.Bonus then return false,'U ALREADY CLAIMED THIS!'end
+  if quests.Bonus then return false,'YOU ALREADY CLAIMED THIS!'end
   if not D.AllClaimed(quests)then return false,'CLAIM ALL THE QUESTS FIRST!'end
-  if D.BonusBlocked(quests)then return false,'U ALREADY GOT UR DAILY 💎!'end
+  if D.BonusBlocked(quests)then return false,'YOU ALREADY GOT YOUR DAILY 💎!'end
   local okay,why=self:QueueDailyGems(player,D.AllDoneGems);if not okay then return false,why end
   daily.Quests.Bonus=true
   daily.Quests.GemsGranted=quests.GemsGranted+D.AllDoneGems
   self:MarkDirty(player);self:QueueGardenSave(player);self:PublishDaily(player)
-  return true,'🎉 ALL DONE! Ur Gems are on the way!'
+  return true,'🎉 ALL DONE! Your Gems are on the way!'
  end
  -- Called where the action really happens (ChestService.Bank, OpenSeedPack, PlantSeed, HarvestPlant, selling).
  function Data:QuestEvent(player,key,count)
@@ -164,7 +164,7 @@ function T.Attach(Data)
   if not changed then return false end
   self:MarkDirty(player);self:PublishDaily(player)
   if finished and self.Notifications then
-   pcall(function()self.Notifications:Show(player,'✅ QUEST DONE: '..finished.Text..'! Grab ur 🎒 pack in 🎁 DAILY',Color3.fromRGB(120,255,150),5)end)
+   pcall(function()self.Notifications:Show(player,'✅ QUEST DONE: '..finished.Text..'! Grab your 🎒 pack in 🎁 DAILY',Color3.fromRGB(120,255,150),5)end)
   end
   return true
  end

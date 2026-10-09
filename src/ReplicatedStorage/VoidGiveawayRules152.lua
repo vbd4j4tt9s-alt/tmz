@@ -28,7 +28,7 @@ R.SignNear=30                     -- closer than this the sign stops growing (Bi
 R.SignFar=320                     -- and it shows up to here (it reads from across the plaza and well past it)
 -- Texts. The number is "<n> / <cap> LEFT" ("487 / 500 LEFT").
 R.Title='FREE VOID PACK';R.TitleDone='ALL CLAIMED';R.Loading='…';R.Hint='LIMITED! 1 PER PLAYER';R.Mine='CLAIMED ✓';R.Busy='CLAIMING…'
-R.PromptAction='Grab ur FREE Void Pack';R.PromptObject='Void Pack giveaway'
+R.PromptAction='Grab your FREE Void Pack';R.PromptObject='Void Pack giveaway'
 local function whole(n)
  if type(n)~='number'or n~=n or n<0 then return 0 end
  return math.floor(math.min(n,1e9))

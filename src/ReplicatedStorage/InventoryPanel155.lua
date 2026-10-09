@@ -171,7 +171,7 @@ function M.Discard(key,how)
  local e=key and ctx.State.Items[key];if not e then return false end
  M.Unpick()
  local tool=e.Tool
- if not Stacks.Counts(tool)then say('u can\'t throw that away',true);return false end
+ if not Stacks.Counts(tool)then say('you can\'t throw that away',true);return false end
  note(('discard? %s x%d (%s), hold to confirm'):format(tool.Name,e.Count or 1,how or'trash'))
  -- (R155 review) the reply is tagged with the popup it belongs to (`ticket`): "Keep it" while a request is in flight and then another discard must not have the old
  -- reply close, or fail, the new popup. The old reply still says what happened (the item may really be gone).

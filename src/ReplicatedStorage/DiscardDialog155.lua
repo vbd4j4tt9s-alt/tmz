@@ -31,7 +31,7 @@ local function build(pg)
  text(f,'Title','throw it away?',22,UDim2.fromOffset(16,10),UDim2.new(1,-32,0,30),Color3.new(1,1,1),true)
  local pic=Instance.new('Frame');pic.Name='Picture';pic.BackgroundColor3=Color3.fromRGB(37,76,57);pic.Position=UDim2.fromOffset(16,48);pic.Size=UDim2.fromOffset(72,72);pic.ZIndex=62;pic.Parent=f;corner(pic,10)
  local name=text(f,'ItemName','',17,UDim2.fromOffset(98,48),UDim2.new(1,-114,0,40),nil,true);name.TextXAlignment=Enum.TextXAlignment.Left
- local warn=text(f,'Warning',"u sure? it's gone forever",14,UDim2.fromOffset(98,90),UDim2.new(1,-114,0,32),Color3.fromRGB(255,214,140));warn.TextXAlignment=Enum.TextXAlignment.Left
+ local warn=text(f,'Warning',"you sure? it's gone forever",14,UDim2.fromOffset(98,90),UDim2.new(1,-114,0,32),Color3.fromRGB(255,214,140));warn.TextXAlignment=Enum.TextXAlignment.Left
  local row=Instance.new('Frame');row.Name='Amount';row.BackgroundTransparency=1;row.Position=UDim2.fromOffset(16,130);row.Size=UDim2.new(1,-32,0,36);row.ZIndex=62;row.Parent=f
  local tile=Color3.fromRGB(37,76,57)
  btn(row,'One','1',UDim2.fromOffset(0,0),UDim2.fromOffset(44,36),tile)
@@ -52,7 +52,7 @@ local function paint()
  if not state then return end
  state.Amount=math.clamp(math.floor(state.Amount),1,state.Max)
  if ui.Box.Text~=tostring(state.Amount)then ui.Box.Text=tostring(state.Amount)end
- ui.Warning.Text=state.Max>1 and("u sure? "..amountText().." of them, gone forever")or"u sure? it's gone forever"
+ ui.Warning.Text=state.Max>1 and("you sure? "..amountText().." of them, gone forever")or"you sure? it's gone forever"
  local busy=state.Busy
  ui.Confirm.Text=busy and'...'or state.Holding and'keep holding...'or(state.Max>1 and'hold to discard '..state.Amount or'hold to discard')
  ui.Confirm.AutoButtonColor=not busy

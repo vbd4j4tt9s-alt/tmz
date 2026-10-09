@@ -61,7 +61,7 @@ grep -q "require(script.Parent.PackPityData155).Install(PlayerDataService)" "$SS
 grep -q "self.PlayerData:PackPityTooltip(player,record," "$SS/ChestService.lua" || fail "the hold tooltip does not ask the pity"
 grep -q "table.insert(lines,'pity: '..Pity.Disclosure)" "$SS/OwnerUpdateCommands82.lua" || fail "/test odds does not list the pity rule"
 grep -q "PackPity155')).EventDisclosure" "$C/GamePassClient.client.lua" || fail "the Mech shop card does not list the pity rule"
-grep -q "every 10th pack u open is lucky: x1.5 luck (event packs count separately)" "$RSD/PackPity155.lua" || fail "the rule's words changed"
+grep -q "every 10th pack you open is lucky: x1.5 luck (event packs count separately)" "$RSD/PackPity155.lua" || fail "the rule's words changed"
 grep -q '`pity @name`, `pity set 9 9 @name`' "$REPO/docs/COMMANDS.md" && grep -q "/test pity @username" "$RSD/StudioTestHelp.lua" || fail "the pity commands are not in COMMANDS.md / the F4 help"
 grep -q ".Scoped,info.Lucky==true,PackRules.SeedOdds,self.Config,info.Stage,info.Variant,info.Luck,info.Version,info.Boost,info.PassLuck)" "$SS/HubDisplayService.lua" || fail "BEST PULL does not read a lucky pull's odds the lucky way"
 echo "ok: the wiring (plan before the roll, commit after the open, save / load, tooltip, /test odds, the Mech card, BEST PULL, COMMANDS.md and the F4 help)"

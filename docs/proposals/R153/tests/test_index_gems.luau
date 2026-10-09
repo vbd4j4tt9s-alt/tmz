@@ -124,7 +124,7 @@ check(C:GetAttribute('IndexBiomeBackpay2')==5 and C:GetAttribute('IndexBiomeBack
 -- 4. A reward already claimed stays claimed, nothing is paid again ----------------------------------------------------------------------------------------------
 local E=makePlayer(604,'Eve');local pe=Data:GetPremium(E);pe.Biomes['3']=true;pe.BiomeHalfRewards['3']=true;Data:PublishPremium(E)
 local e1,e1why=Data:ClaimIndexBiomeHalf(E,3);local e2,e2why=Data:ClaimIndexBiome(E,3)
-check(not e1 and e1why=='U ALREADY CLAIMED THIS!'and not e2 and e2why=='U ALREADY CLAIMED THIS!'and #pendingGems(E)==0 and E:GetAttribute('IndexBiomeReward3')==true and E:GetAttribute('IndexBiomeHalfReward3')==true,'a player who claimed before the change: both stay claimed, nothing paid again')
+check(not e1 and e1why=='YOU ALREADY CLAIMED THIS!'and not e2 and e2why=='YOU ALREADY CLAIMED THIS!'and #pendingGems(E)==0 and E:GetAttribute('IndexBiomeReward3')==true and E:GetAttribute('IndexBiomeHalfReward3')==true,'a player who claimed before the change: both stay claimed, nothing paid again')
 -- 5. Nothing else in the Index changed ----------------------------------------------------------------------------------------------------------------------------
 local D=W.module('DailyRewards')
 check(Data:SeedCollectReward(E,'SunflowerSeed')==T.IndexFirst.SunflowerSeed,'seed cash: the first-find reward is still T.IndexFirst (cash is not gems)')

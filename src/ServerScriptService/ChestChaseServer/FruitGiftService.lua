@@ -45,13 +45,13 @@ function S.SetStudio(on)studio=on==true end -- tests
 function S:Refusal(from,to)
  local function who(p,me,other)
   if not p.Parent then return other end
-  if not self.Data:IsLoaded(p)then return me and'Ur data is still loading.'or p.DisplayName..'\'s data is still loading.'end
+  if not self.Data:IsLoaded(p)then return me and'Your data is still loading.'or p.DisplayName..'\'s data is still loading.'end
   if not self.Data.CanSave[p]then
    if studio then return'Gifts need saving: turn on Studio API access (Game Settings > Security) and test again.'end
-   return me and'Ur save isn\'t ready, so gifts are off. Rejoin to fix it!'or p.DisplayName..'\'s save is not ready, so they can\'t receive gifts.'
+   return me and'Your save isn\'t ready, so gifts are off. Rejoin to fix it!'or p.DisplayName..'\'s save is not ready, so they can\'t receive gifts.'
   end
-  if self.Busy[p]or self.Working[p]then return me and'Still saving ur last gift. Try again in a sec!'or p.DisplayName..' is getting another gift. Try again in a sec!'end
-  if self.Chase:IsPlayerBusy(p)then return me and'Finish ur run first!'or p.DisplayName..' is in a run right now.'end
+  if self.Busy[p]or self.Working[p]then return me and'Still saving your last gift. Try again in a sec!'or p.DisplayName..' is getting another gift. Try again in a sec!'end
+  if self.Chase:IsPlayerBusy(p)then return me and'Finish your run first!'or p.DisplayName..' is in a run right now.'end
   if p:GetAttribute('GuardianRagdollActive')or not body(p)then return'Try again in a sec!'end
   return nil
  end
@@ -88,7 +88,7 @@ function S:TooFar(from,to)
  local a,b=body(from),body(to)
  if to and to.Parent and a and b then
   local close=(a.Position-b.Position).Magnitude<=18
-  self.Remote:FireClient(from,'Status',close and('Something is blocking '..to.DisplayName..'. Move so u can see them!')or('Get closer to '..to.DisplayName..' first!'))
+  self.Remote:FireClient(from,'Status',close and('Something is blocking '..to.DisplayName..'. Move so you can see them!')or('Get closer to '..to.DisplayName..' first!'))
  end
  return true
 end
@@ -97,11 +97,11 @@ function S:Offer(from,userId,cropId)
  if not S.ValidUserId(userId)or type(cropId)~='string'or #cropId>100 then return end
  local to=Players:GetPlayerByUserId(userId)
  if not to or to==from or not require(script.Parent.MovementGuard).Check(from)or not self:CanStart(from,to)or self:TooFar(from,to)then return end
- if not self:Held(from,cropId)then self.Remote:FireClient(from,'Status','Hold the item u want to give.');return end
+ if not self:Held(from,cropId)then self.Remote:FireClient(from,'Status','Hold the item you want to give.');return end
  local crop;for _,c in ipairs(self.Data.Gardens[from].Harvests)do if c.Id==cropId then crop=c;break end end
  if not crop then return end
  if crop.GiftLocked then self.Remote:FireClient(from,'Status',S.LockedFruitText);return end -- R153: fruit from a gift-locked seed
- if crop.PaidRandom and(from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true)then self.Remote:FireClient(from,'Status','U can\'t gift a bought crop to that account.');return end
+ if crop.PaidRandom and(from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true)then self.Remote:FireClient(from,'Status','You can\'t gift a bought crop to that account.');return end
  if #self.Data.Gardens[to].Harvests>=self.Data.Config.MaxSavedHarvests or not S.Room(self,to)then self.Remote:FireClient(from,'Status','Their bag is full.');return end -- R155: the 200 cap
  for id,o in pairs(self.Offers)do if o.From==from or o.To==to then self.Offers[id]=nil end end
  local id=Http:GenerateGUID(false);self.Offers[id]={From=from,To=to,CropId=cropId,Expires=now+25}
@@ -116,7 +116,7 @@ function S:Accept(to,id)
  if os.clock()>offer.Expires or not self:Available(from)or not self:Available(to)or not self:Near(from,to)or not self:Held(from,offer.CropId)then self.Remote:FireClient(to,'Status','Gift timed out. Ask them to offer it again!');return end
  local garden=self.Data.Gardens[from];garden.OutgoingGifts=garden.OutgoingGifts or{}
  if not S.Room(self,to)then self.Remote:FireClient(from,'Status','Their bag is full.');return end -- R155: the 200 cap
- if count(garden.OutgoingGifts)>=32 or #self.Data.Gardens[to].Harvests>=self.Data.Config.MaxSavedHarvests then self.Remote:FireClient(from,'Status','Finish ur pending gifts or make room in ur bag first.');return end
+ if count(garden.OutgoingGifts)>=32 or #self.Data.Gardens[to].Harvests>=self.Data.Config.MaxSavedHarvests then self.Remote:FireClient(from,'Status','Finish your pending gifts or make room in your bag first.');return end
  local index,crop;for i,c in ipairs(garden.Harvests)do if c.Id==offer.CropId then index=i;crop=c;break end end;if not crop then return end
  if crop.GiftLocked then self.Remote:FireClient(from,'Status',S.LockedFruitText);return end
  if crop.PaidRandom and(from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true)then return end
@@ -125,7 +125,7 @@ function S:Accept(to,id)
  local gift={RecipientId=to.UserId,Crop=clone(crop),State='Pending',Name=itemName(self:Held(from,offer.CropId))}
  table.remove(garden.Harvests,index);garden.OutgoingGifts[id]=gift
  self.Data:MarkDirty(from);self.Data:_gardenChanged(from);self.Chests:SyncTools(from)
- self.Remote:FireClient(from,'Status','Saving ur gift…')
+ self.Remote:FireClient(from,'Status','Saving your gift…')
  self:_deliver(from,to,id,gift,CHANNELS[1])
 end
 -- Shared tail of a debit: save the sender's outbox, then publish to the recipient's inbox.
@@ -169,12 +169,12 @@ end
 -- Why this giver cannot hand out a seed or pack right now (nil = allowed).
 function S:SeedBlocked(p,id)
  if p:GetAttribute('ChestChaseSeedCarrying')or p:GetAttribute('ChestChaseRunActive')or p:GetAttribute('ChestChaseQueued')or p:GetAttribute('GuardianFlingActive')then
-  return 'Bring ur pack back to ur base first!'
+  return 'Bring your pack back to your base first!'
  end
  local step=tonumber(p:GetAttribute('TutorialStep'))or 0
  if p:GetAttribute('TutorialDone')~=true and step>=1 and step<=4 then return 'Finish the tutorial first.'end
  local opening=self.Chests.Openings and self.Chests.Openings[p]
- if opening and(opening.Committed or(opening.Tool and opening.Tool:GetAttribute('SeedInventoryId')~=id))then return 'Wait for ur pack to finish opening!'end
+ if opening and(opening.Committed or(opening.Tool and opening.Tool:GetAttribute('SeedInventoryId')~=id))then return 'Wait for your pack to finish opening!'end
  return nil
 end
 -- R152: a free giveaway pack (record.GiftLocked) can't be gifted (alts claimed it for a main account).
@@ -214,11 +214,11 @@ function S:AcceptSeed(to,id,offer)
  if record.GiftLocked then self.Remote:FireClient(from,'Status',record.Kind=='Seed'and S.LockedSeedText or S.LockedText);return end
  local garden=self.Data.Gardens[from];garden.OutgoingSeedGifts=garden.OutgoingSeedGifts or{}
  if not S.Room(self,to)then self.Remote:FireClient(from,'Status','Their bag is full.');return end -- R155: the 200 cap
- if count(garden.OutgoingSeedGifts)>=32 or #self.Data:GetChestRecords(to)>=self.Data.Config.MaxSavedChests then self.Remote:FireClient(from,'Status','Finish ur pending gifts or make room in ur bag first.');return end
+ if count(garden.OutgoingSeedGifts)>=32 or #self.Data:GetChestRecords(to)>=self.Data.Config.MaxSavedChests then self.Remote:FireClient(from,'Status','Finish your pending gifts or make room in your bag first.');return end
  if self:SeedPaidBlocked(record,from,to)then return end
  local row=self.Data:SerializeSeedRecord(record)
  row.RateBoost=nil -- R139 (owner: the free pack is "a 1 time thing"): its luck stays with the player who earned it
- if not self.Data:DecodeGiftedSeed(to,row)then self.Remote:FireClient(from,'Status','U can\'t gift this item.');return end
+ if not self.Data:DecodeGiftedSeed(to,row)then self.Remote:FireClient(from,'Status','You can\'t gift this item.');return end
  local tool=self:HeldSeed(from,offer.ItemId,record.Kind)
  -- No yield between inventory removal and persistent outbox staging.
  self.Busy[from]=true;self.Busy[to]=true
@@ -230,7 +230,7 @@ function S:AcceptSeed(to,id,offer)
  local humanoid=from.Character and from.Character:FindFirstChildOfClass('Humanoid')
  if humanoid and tool and tool.Parent==from.Character then humanoid:UnequipTools()end
  self.Chests:SyncTools(from)
- self.Remote:FireClient(from,'Status','Saving ur gift…')
+ self.Remote:FireClient(from,'Status','Saving your gift…')
  return self:_deliver(from,to,id,gift,CHANNELS[2])
 end
 -- Recipient side of a seed/pack gift. Returns false to leave the inbox entry for a later retry.

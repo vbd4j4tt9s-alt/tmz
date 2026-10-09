@@ -36,10 +36,10 @@ function request.InvokeServer(_,action,value)
  if value=='State'then return stateNow()end
  if value=='ClaimLogin'then
   if not srv.Ready then local s=stateNow();s.Success=false;s.Message='COME BACK TOMORROW';return s end
-  srv.Step+=1;srv.Ready=false;local s=stateNow();s.Message='Ur Gems are on the way!';return s
+  srv.Step+=1;srv.Ready=false;local s=stateNow();s.Message='Your Gems are on the way!';return s
  end
- if value=='ClaimBonus'then if bonusNow().Ready then srv.BonusClaimed=true;local s=stateNow();s.Message='🎉 ALL DONE! Ur Gems are on the way!';return s end end
- if type(value)=='table'then local q=srv.Quests[value.Quest];if q and q.Progress>=q.Goal and not q.Claimed then q.Claimed=true;local s=stateNow();s.Message='🎒 RANDOM SEED PACK! Check ur bag!';return s end end
+ if value=='ClaimBonus'then if bonusNow().Ready then srv.BonusClaimed=true;local s=stateNow();s.Message='🎉 ALL DONE! Your Gems are on the way!';return s end end
+ if type(value)=='table'then local q=srv.Quests[value.Quest];if q and q.Progress>=q.Goal and not q.Claimed then q.Claimed=true;local s=stateNow();s.Message='🎒 RANDOM SEED PACK! Check your bag!';return s end end
  local s=stateNow();s.Success=false;s.Message='NO';return s
 end
 -- Roblox services the script uses.
@@ -149,7 +149,7 @@ check(calls[#calls][1]=='Daily'and calls[#calls][2]=='ClaimLogin','claiming asks
 check(audioHas('GemClaim')and not audioHas('Denied'),'R150: a successful claim clicks GemClaim and never Denied')
 check(cards[1].Check.Visible and not cards[1].Today.Visible,'day 1 gets a ✓')
 check(login.ClaimButton.Caption.Text:find('NEXT REWARD IN 5h',1,true),'then the button counts down: '..login.ClaimButton.Caption.Text)
-check(panel.Status.Text=='Ur Gems are on the way!','the server message shows')
+check(panel.Status.Text=='Your Gems are on the way!','the server message shows')
 -- Day 7 wording.
 srv.Step=6;srv.Ready=true;panel.QuestsTab.Activated:Fire();panel.LoginTab.Activated:Fire();player:SetAttribute('DailyRevision',5);frames(5)
 check(login.ClaimButton.Caption.Text:find('VOID PACK',1,true)and not login.ClaimButton.Caption.Text:find('MECH',1,true)and cards[7].Today.Visible,'day 7: CLAIM YOUR VOID PACK!')
@@ -195,7 +195,7 @@ callsBefore=#calls;rows[4].Claim.Activated:Fire();frames(2);check(#calls==callsB
 srv.BonusClaimed=false;audioLog={};srv.Quests[1].Claimed=false;player:SetAttribute('DailyRevision',(player:GetAttribute('DailyRevision')or 0)+1);frames(5)
 check(not rows[4].Claim.Visible and rows[4].Bar.Count.Text=='2 / 3'and rows[1].Claim.Visible,'(a quest that is not claimed takes the CLAIM away from ALL DONE again)')
 srv.Quests[1].Claimed=true;srv.BonusBlocked=true;player:SetAttribute('DailyRevision',(player:GetAttribute('DailyRevision')or 0)+1);panel.LoginTab.Activated:Fire();panel.QuestsTab.Activated:Fire();frames(5)
-check(not rows[4].Claim.Visible and rows[4].Done.Visible and rows[4].Done.Text=='GOT UR 💎'and rows[4].Bar.Count.Text=='3 / 3','older-style claims already paid today\'s Gems: ALL DONE says GOT UR 💎 (nothing to claim)')
+check(not rows[4].Claim.Visible and rows[4].Done.Visible and rows[4].Done.Text=='GOT YOUR 💎'and rows[4].Bar.Count.Text=='3 / 3','older-style claims already paid today\'s Gems: ALL DONE says GOT YOUR 💎 (nothing to claim)')
 srv.BonusBlocked=false;srv.Quests[2].Progress=1;srv.Quests[2].Claimed=false;srv.Quests[3].Progress=0;srv.Quests[3].Claimed=false
 player:SetAttribute('DailyRevision',(player:GetAttribute('DailyRevision')or 0)+1);panel.LoginTab.Activated:Fire();panel.QuestsTab.Activated:Fire();frames(5)
 check(not rows[3].Done.Visible and not rows[3].Claim.Visible and not rows[2].Done.Visible and not rows[2].Claim.Visible and not rows[4].Done.Visible and not rows[4].Claim.Visible,'an unfinished quest shows neither CLAIM nor DONE (and no DAILY LIMIT any more)')

@@ -194,7 +194,7 @@ local before=#sounds
 serverStep={Kind='Safety',Target=V3(0,3,38)};player:SetAttribute('ChestChaseSeedCarrying',true);frames(6)
 popped('picked it up');check(#sounds>before,'a sound for the pop')
 check(card.Progress.Dot1.BackgroundColor3.G>.8 and card.Progress.Dot1.BackgroundColor3.R<.6 and card.Progress.Dot1.Glyph.Text=='✓','step row: step 1 ticked green')
-frames(60);says('RUN HOME!!','➜ to ur base','step 2')
+frames(60);says('RUN HOME!!','➜ to your base','step 2')
 check(card.StepIcon.Glyph.Text=='🏠'and gui.Goal.Bubble.Icon.Text=='🏠','step 2: 🏠 icon + bubble')
 check(beamAt()and near(beamAt(),0,38),'a beam on the home line')
 check(not tapUi.Visible,'no BASE button while carrying (you can\'t teleport with a pack)')
@@ -209,7 +209,7 @@ local tool=new('Tool');tool.Name='Forest Pack';tool:SetAttribute('SeedPackTool',
 dock.Slot2.ItemName.Text='Forest Pack';player:SetAttribute('TutorialStep',3);frames(6)
 popped('banked')
 frames(60)
-says('OPEN IT!','[CLICK] ur pack','step 3');check(card.StepIcon.Glyph.Text=='🎁','step 3: 🎁')
+says('OPEN IT!','[CLICK] your pack','step 3');check(card.StepIcon.Glyph.Text=='🎁','step 3: 🎁')
 check(ringOn(dock.Slot2),'a ring + pressing hand on the pack\'s slot')
 local fx=tapUi.Hand.Position.X.Offset;check(fx>=540 and fx<=540+64,'the finger is on the slot ('..fx..')')
 check(shownChevrons()==0 and not gui.Goal.Enabled,'no world pointer on step 3')
@@ -259,7 +259,7 @@ do local w=writes;frames(60);local per=(writes-w)/60;check(per<60,('animated ste
 inputFree('step 4')
 -- The seed went back to the Bag: tap ur seed (its slot).
 seed.Parent=backpack;dock.Slot1.ItemName.Text='Carrot Seed';frames(20)
-says('PLANT IT!','[TAP] ur seed','seed not in hand');check(ringOn(dock.Slot1),'a ring + hand on the seed\'s slot')
+says('PLANT IT!','[TAP] your seed','seed not in hand');check(ringOn(dock.Slot1),'a ring + hand on the seed\'s slot')
 check(shownChevrons()==0 and not gui.TapSpot.Enabled,'no world pointer until the seed is in hand')
 seed.Parent=character;frames(12);popped('seed in hand');frames(50);says('PLANT IT!','[TAP] the dirt','back to the dirt')
 -- Ran off to the track: GO HOME (BASE ringed), only then.
@@ -281,7 +281,7 @@ player:SetAttribute('TreadmillTraining',true);frames(3)
 check(table.find(commands,'TreadmillInfo')~=nil,'stepping on the treadmill finishes the tutorial')
 check(player:GetAttribute('TutorialDone')==true,'done')
 -- The finish: U GOT THIS!! + the free pack, confetti, then nothing left.
-says('U GOT THIS!!','🎁 FREE PACK!','finish card');check(card.StepIcon.Glyph.Text=='🏆'and sounds[#sounds]=='GemClaim','🏆 + the gem sound')
+says('YOU GOT THIS!!','🎁 FREE PACK!','finish card');check(card.StepIcon.Glyph.Text=='🏆'and sounds[#sounds]=='GemClaim','🏆 + the gem sound')
 check(gui.Confetti.Visible,'confetti')
 check(trail()==nil,'the world pieces are gone as soon as it is done')
 check(not tapUi.Visible and not gui.Goal.Enabled and not gui.TapSpot.Enabled and not gui.ClickHint.Visible,'no pointer on the finish card')
@@ -304,7 +304,7 @@ says('GRAB A PACK!','[👆] hold it','replay on a phone: step 1 again');check(tr
 -- Step 5 with no treadmill in your base: done at once. Then the replay finish.
 serverStep={Kind='Treadmill',Target=nil};player:SetAttribute('TutorialStep',5);frames(90)
 check(player:GetAttribute('TutorialDone')==true,'no treadmill: step 5 finishes by itself')
-says('U GOT THIS!!','have fun Alex!','replay finish: no second free pack promised')
+says('YOU GOT THIS!!','have fun Alex!','replay finish: no second free pack promised')
 frames(60*5);nothingLeft('after the replay')
 -- Step 5 ignored: it finishes by itself after its time, so the free pack still comes.
 player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialMask',31);player:SetAttribute('TutorialStep',5);serverStep={Kind='Treadmill',Target=V3(12,3,-6)};root.CFrame=CF(0,3,20)

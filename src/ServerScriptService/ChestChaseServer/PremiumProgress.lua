@@ -144,11 +144,11 @@ function P.Attach(Data)
  function Data:CurrencyReceipt(player,amount,currency)
   if not self:IsLoaded(player)or not integer(amount,1,Receipts.MaxCash)then return nil,'TRY AGAIN!'end
   if currency~='Cash'and currency~='Gems'then return nil,'TRY AGAIN!'end
-  local garden=self.Gardens[player];if not garden then return nil,'UR GARDEN IS LOADING...'end
+  local garden=self.Gardens[player];if not garden then return nil,'YOUR GARDEN IS LOADING...'end
   local pending=garden.PendingSales or{};local limit=currency=='Gems'and Catalog.MaxGems or Receipts.MaxCash
   local balance=currency=='Gems'and self:GetPremium(player).Gems or self:GetCash(player)
-  if #pending>=Receipts.MaxReceipts then return nil,'UR LAST REWARDS ARE STILL ARRIVING'end
-  if balance+Receipts.Total(pending,currency)+amount>limit then return nil,'U\'RE MAXED OUT! SPEND SOME FIRST'end
+  if #pending>=Receipts.MaxReceipts then return nil,'YOUR LAST REWARDS ARE STILL ARRIVING'end
+  if balance+Receipts.Total(pending,currency)+amount>limit then return nil,'YOU\'RE MAXED OUT! SPEND SOME FIRST'end
   return {Id=Http:GenerateGUID(false),Currency=currency,Amount=amount,Count=currency=='Gems'and math.min(amount,math.random(3,5))or math.random(8,13),Claimed=0}
  end
  function Data:QueueCurrency(player,amount,currency)
@@ -163,14 +163,14 @@ function P.Attach(Data)
   local receipt,why=self:CurrencyReceipt(player,count,'Gems');if not receipt then return false,why end
   if not self:SpendCash(player,cost)then return false,'NOT ENOUGH CASH'end
   local garden=self.Gardens[player];garden.PendingSales=garden.PendingSales or{};table.insert(garden.PendingSales,receipt)
-  self:_gardenChanged(player);self:QueueGardenSave(player);return true,'Ur Gems are on the way!'
+  self:_gardenChanged(player);self:QueueGardenSave(player);return true,'Your Gems are on the way!'
  end
  -- R155: the 200 cap (InventoryCap155.RoomFor) decides whether the shop offers the packs at all (gems and Robux). receipt = a paid Robux receipt being granted:
  -- the cap never refuses it (the purchase was only offered when it fitted; an item that arrived in between must not cost the buyer the packs), only the old
  -- storage ceiling (MaxSavedChests) can, and then the receipt waits (NotProcessedYet) as before.
  function Data:CanReceiveMechPacks(player,count,receipt)
   local offer=Catalog.Offer(count)
-  if not offer or not self:IsLoaded(player)then return false,'HOLD ON, UR DATA IS LOADING!'end
+  if not offer or not self:IsLoaded(player)then return false,'HOLD ON, YOUR DATA IS LOADING!'end
   if #self:GetChestRecords(player)+offer.Count>self.Config.MaxSavedChests then return false,'MAKE ROOM FOR '..offer.Count..' PACKS FIRST!'end
   if type(self.RoomFor)=='function'and not self:RoomFor(player,offer.Count,{Receipt=receipt==true})then return false,'MAKE ROOM FOR '..offer.Count..' PACKS FIRST!'end
   return true
@@ -201,7 +201,7 @@ function P.Attach(Data)
  end
  function Data:BuyMechPack(player,count)
   local offer=Catalog.Offer(count);if not offer then return false,'TRY AGAIN!'end
-  if not self:IsLoaded(player)then return false,'HOLD ON, UR DATA IS LOADING!'end
+  if not self:IsLoaded(player)then return false,'HOLD ON, YOUR DATA IS LOADING!'end
   if player:GetAttribute('PaidRandomAllowed')~=true then return false,'CAN\'T BUY THIS PACK RIGHT NOW'end
   if Catalog.EventOver()then return false,Catalog.Event.Refused end -- R155: the limited event is over: nothing is charged, nothing is granted
   if not Catalog.OnSale()then return false,'THIS PACK IS OFF SALE'end
@@ -209,7 +209,7 @@ function P.Attach(Data)
   if state.Gems<offer.GemPrice then return false,'NOT ENOUGH GEMS'end
   local packs,why=self:GrantMechPacks(player,true,offer.Count);if not packs then return false,why end
   state.Gems-=offer.GemPrice;self:PublishPremium(player);self:MarkDirty(player)
-  return true,offer.Count==1 and'Mech pack is in ur bag!'or offer.Count..' Mech packs are in ur bag!',packs -- R155: the third result is the new records (their coats go in the "Bought" notice)
+  return true,offer.Count==1 and'Mech pack is in your bag!'or offer.Count..' Mech packs are in your bag!',packs -- R155: the third result is the new records (their coats go in the "Bought" notice)
  end
  -- R123: the R121 timed x2 boost and product gifts were removed; old saved fields are kept untouched and unused.
  function Data:CanReceiveBundle(player,key)
@@ -246,21 +246,21 @@ function P.Attach(Data)
   else okay,why=self:GrantPremiumBundle(player,key)end
   if not okay then return false,why end
   state.Gems-=quote.GemPrice;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player)
-  return true,quote.Kind=='Cash'and'Ur Cash is on the way!'or'Speed added!'
+  return true,quote.Kind=='Cash'and'Your Cash is on the way!'or'Speed added!'
  end
  function Data:BuyGemPerk(player,key)
-  if not self:IsLoaded(player)or not self.CanSave[player]or type(key)~='string'then return false,'HOLD ON, UR DATA IS LOADING!'end
+  if not self:IsLoaded(player)or not self.CanSave[player]or type(key)~='string'then return false,'HOLD ON, YOUR DATA IS LOADING!'end
   local price=Catalog.PassGemPrices[key];if not price then return false,'TRY AGAIN!'end
   local state=self:GetPremium(player);local pass
   for _,p in ipairs(require(RS.GamePassCatalog))do if p.Key==key then pass=p;break end end
-  if not pass or state.Entitlements[key]or player:GetAttribute(pass.Attribute)then return false,'U ALREADY HAVE THIS!'end
+  if not pass or state.Entitlements[key]or player:GetAttribute(pass.Attribute)then return false,'YOU ALREADY HAVE THIS!'end
   if state.Gems<price then return false,'NOT ENOUGH GEMS'end
-  if type(self.PassOwnership)~='function'then return false,'STILL CHECKING WHAT U OWN...'end
+  if type(self.PassOwnership)~='function'then return false,'STILL CHECKING WHAT YOU OWN...'end
   local okay,owned=pcall(self.PassOwnership,player,key)
-  if not player.Parent or not self:IsLoaded(player)or not self.CanSave[player]or self:GetPremium(player)~=state then return false,'HOLD ON, UR DATA IS LOADING!'end
+  if not player.Parent or not self:IsLoaded(player)or not self.CanSave[player]or self:GetPremium(player)~=state then return false,'HOLD ON, YOUR DATA IS LOADING!'end
   -- Recheck after the ownership request; a purchase or gift may have completed.
-  if state.Entitlements[key]or player:GetAttribute(pass.Attribute)or owned==true then return false,'U ALREADY HAVE THIS!'end
-  if not okay or owned~=false then return false,'STILL CHECKING WHAT U OWN...'end
+  if state.Entitlements[key]or player:GetAttribute(pass.Attribute)or owned==true then return false,'YOU ALREADY HAVE THIS!'end
+  if not okay or owned~=false then return false,'STILL CHECKING WHAT YOU OWN...'end
   if state.Gems<price then return false,'NOT ENOUGH GEMS'end
   state.Gems-=price;state.Entitlements[key]=true;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player)
   return true,pass.Name..' unlocked!'
@@ -328,7 +328,7 @@ function P.Attach(Data)
   local discovered=self:GetOrCreateDiscoveredSeeds(player):FindFirstChild(seedId)
   local amount=(discovered and T.IndexRepeat[seedId]or T.IndexFirst[seedId])or 100*rarity.Rank*(self.Config.BiomeRank[stage]or stage);local total=amount
   for _,n in pairs(self:GetPremium(player).SeedRewards)do total+=n end
-  if total>Receipts.MaxCash then return nil,'CLAIM UR INDEX REWARDS FIRST!'end
+  if total>Receipts.MaxCash then return nil,'CLAIM YOUR INDEX REWARDS FIRST!'end
   return amount
  end
  function Data:CommitSeedReward(player,seedId,amount)
@@ -342,28 +342,28 @@ function P.Attach(Data)
   -- Queueing and clearing the entitlement never yield; a replay cannot grant it twice.
   local okay,why=self:QueueCurrency(player,amount,'Cash');if not okay then return false,why end
   state.SeedRewards[id]=nil;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player)
-  return true,'Ur Cash is on the way!'
+  return true,'Your Cash is on the way!'
  end
  function Data:ClaimIndexBiomeHalf(player,stage)
   if not self:IsLoaded(player)or not integer(stage,1,9)then return false,'TRY AGAIN!'end
   local state=self:GetPremium(player);local key=tostring(stage)
-  if(state.BiomeHalfRewards or{})[key]then return false,'U ALREADY CLAIMED THIS!'end
+  if(state.BiomeHalfRewards or{})[key]then return false,'YOU ALREADY CLAIMED THIS!'end
   if not self:IndexMilestone(player,stage,false)then return false,'FILL HALF OF THIS INDEX FIRST!'end
   local amount=T.HalfwayGems
   local okay,why=self:QueueCurrency(player,amount,'Gems');if not okay then return false,why end
   state.BiomeHalfRewards=state.BiomeHalfRewards or{};state.BiomeHalfRewards[key]=true
-  self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true,'Ur Gems are on the way!'
+  self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true,'Your Gems are on the way!'
  end
  function Data:ClaimIndexBiome(player,stage)
   if not self:IsLoaded(player)or not integer(stage,1,9)then return false,'TRY AGAIN!'end
   local state=self:GetPremium(player);local key=tostring(stage)
   local backpay=(state.BiomeBackpay81 or{})[key]or 0
-  if state.Biomes[key]and backpay==0 then return false,'U ALREADY CLAIMED THIS!'end
+  if state.Biomes[key]and backpay==0 then return false,'YOU ALREADY CLAIMED THIS!'end
   if backpay==0 and not self:BiomeComplete(player,stage)then return false,'FIND EVERY SEED AND GROW EVERY PLANT!'end
   local amount=backpay>0 and T.HalveGems(backpay)or T.CompletionGems[stage] -- R153: Index gems are halved
   local okay,why=self:QueueCurrency(player,amount,'Gems');if not okay then return false,why end
   state.Biomes[key]=true
-  state.BiomeBackpay81=state.BiomeBackpay81 or{};state.BiomeBackpay81[key]=nil;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true,'Ur Gems are on the way!'
+  state.BiomeBackpay81=state.BiomeBackpay81 or{};state.BiomeBackpay81[key]=nil;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player);return true,'Your Gems are on the way!'
  end
 end
 return P

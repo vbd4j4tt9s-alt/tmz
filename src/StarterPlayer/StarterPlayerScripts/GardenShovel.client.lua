@@ -66,7 +66,7 @@ local function revealPress()local ok,taken=pcall(function()return require(game:G
 local function prompt(position,center)
  if busy or not equipped()or revealPress()then return end;local model=aim(position,center);if not model then return end
  pending=model;box.Visible=true;pg:SetAttribute('SeedMenu','Shovel');selectionView:Clear()
- local def=Catalog[model:GetAttribute('SeedId')];title.Text='Remove '..(def.Name or def.HarvestName)..'?\nThis removes the plant and any fruit still on it. U won\'t get the seed back.'
+ local def=Catalog[model:GetAttribute('SeedId')];title.Text='Remove '..(def.Name or def.HarvestName)..'?\nThis removes the plant and any fruit still on it. You won\'t get the seed back.'
 end
 connect(remove.Activated,function()
  local model=pending;if busy or not equipped()or not valid(model)then close();return end

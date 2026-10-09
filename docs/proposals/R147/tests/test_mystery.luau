@@ -694,7 +694,7 @@ check(Veiled.EnsureGuardian({Home=nil,Folder=evFolder})==nil,'(no Home: no keepe
  check(d1.Day==today()and d1.Claimed==false and d1.Stage==nil and d1.Seconds==6 and attr(rec3,'State')=='Locked'and near(attr(rec3,'UnlockAt')-W.workspace:GetServerTimeNow(),894,1.01),'[owed] today starts fresh and its 15 minutes run: 6 s counted, 894 s on the countdown (the old pack no longer blocks it)')
  check(prompt(rec3).Enabled==false and pack(rec3)~=nil and pack(rec3):GetAttribute('BagVariant')=='Pack01','[prompt] the pedestal is a locked silhouette again, prompt off')
  local n1=notes(Dee,from1)
- check(#n1==1 and n1[1]:find('Make room in ur bag! 1 mystery pack waiting',1,true),'[owed] the player is told once: '..tostring(n1[1]))
+ check(#n1==1 and n1[1]:find('Make room in your bag! 1 mystery pack waiting',1,true),'[owed] the player is told once: '..tostring(n1[1]))
  -- Days 2 and 3: the same again; the list grows oldest first.
  check(readyBy(.8)and attr(rec3,'Variant')=='Pack04','(day 2: Ready, Pack04)')
  nextDay();play(1)

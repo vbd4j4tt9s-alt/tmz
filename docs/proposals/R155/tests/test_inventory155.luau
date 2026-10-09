@@ -53,7 +53,7 @@ discardRemote.InvokeServer=function(_,req)
  if not chosen then return {Ok=false,Message='THAT ITEM IS ALREADY GONE!'}end
  local key=Stacks.Key(chosen);local list={}
  for _,c in ipairs({bag(),char()})do for _,t in ipairs(c:GetChildren())do if t:IsA('Tool')and(t==chosen or key and Stacks.Key(t)==key)then list[#list+1]=t end end end
- if req.Count>#list then return {Ok=false,Message='U DON\'T HAVE THAT MANY!'}end
+ if req.Count>#list then return {Ok=false,Message='YOU DON\'T HAVE THAT MANY!'}end
  for i=1,req.Count do list[i]:Destroy()end
  return {Ok=true,Removed=req.Count,Message='threw away '..req.Count..'x '..chosen.Name}
 end
@@ -257,7 +257,7 @@ do
  openBag();X.drag('mouse',s,panel.BagBar.Trash);X.frames(3)
  local ui=Dialog.UI()
  local function holdConfirm(kind)local p=X.center(ui.Confirm);X.down(kind,p);X.wait(1.15);X.up(p);X.frames(3)end -- (owner: every item needs the ~1 s hold)
- check(Dialog.IsOpen()and ui.Row.Visible and ui.Warning.Text:find("gone forever",1,true)~=nil,'a stack dropped on the Trash: "u sure? it\'s gone forever" with 1 / - n + / All')
+ check(Dialog.IsOpen()and ui.Row.Visible and ui.Warning.Text:find("gone forever",1,true)~=nil,'a stack dropped on the Trash: "you sure? it\'s gone forever" with 1 / - n + / All')
  check(ui.Name.Text==Names.Tool(stack[1],Catalog),'the popup names the item ('..ui.Name.Text..')')
  X.tap('mouse',ui.Row.More);X.tap('mouse',ui.Row.More);X.tap('mouse',ui.Row.More);check(ui.Row.Count.Text=='3','+ stops at the stack size (3)')
  X.tap('mouse',ui.Row.One);check(ui.Row.Count.Text=='1','1')
@@ -282,7 +282,7 @@ do
  openBag();X.drag('mouse',slotOf(blue),panel.BagBar.Trash);X.frames(2);X.tap('mouse',ui.Keep);X.frames(2)
  check(not Dialog.IsOpen()and #requests==2 and blue.Parent~=nil,'Keep it: nothing is sent, the item stays')
  -- a refusal: shown in the popup, which stays
- refuseWith='WAIT FOR UR PACK TO FINISH OPENING!'
+ refuseWith='WAIT FOR YOUR PACK TO FINISH OPENING!'
  openBag();X.drag('mouse',slotOf(blue),panel.BagBar.Trash);X.frames(2);holdConfirm('mouse')
  check(Dialog.IsOpen()and ui.Status.Visible and ui.Status.Text:find('finish opening',1,true)~=nil and blue.Parent~=nil,'a server refusal is shown and the popup stays ('..ui.Status.Text..')')
  refuseWith=nil;X.tap('mouse',ui.Keep);X.frames(2)
@@ -468,7 +468,7 @@ do
  -- the new popup's own reply still works
  local r3=X.center(ui.Confirm);X.down('mouse',r3);X.wait(1.15);X.up(r3);X.frames(2)
  check(#waiting==3 and ui.Confirm.Text=='...','(the new popup sends its own request)')
- coroutine.resume(waiting[3],{Ok=false,Message='WAIT FOR UR PACK TO FINISH OPENING!'})
+ coroutine.resume(waiting[3],{Ok=false,Message='WAIT FOR YOUR PACK TO FINISH OPENING!'})
  check(Dialog.IsOpen()and ui.Status.Visible and ui.Status.Text:find('finish opening',1,true)~=nil,'its own reply is shown')
  X.tap('mouse',ui.Keep);X.frames(2)
  discardRemote.InvokeServer=real

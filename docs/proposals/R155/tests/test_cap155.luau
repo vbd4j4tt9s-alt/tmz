@@ -63,7 +63,7 @@ local serial=0
 local function seedRow(p,seedId)serial+=1;local s=Config.GetSeedById(seedId or'SunflowerSeed');return {Id=p.UserId..'_s'..serial,ChestNumber=900000+serial,ChestName=s.Name,Kind='Seed',Stage=1,SeedId=s.Id,SeedName=s.Name,SeedEmoji=s.Emoji,AccentColor=s.Color,Rarity='Common',SeedScale=1,PackMutation='None',BagVariant='Pack01',OddsVersion=Rules.OddsVersion,PackSize=1}end
 local function fillTo(p,n)local r=Data:GetChestRecords(p);while Data:HeldItemCount(p)<n do r[#r+1]=seedRow(p)end;while Data:HeldItemCount(p)>n and #r>0 do table.remove(r)end;Data:_notifySeedInventory(p)end
 local function held(p)return Data:HeldItemCount(p)end
-local FULL='BAG FULL - MAKE ROOM IN UR BAG FIRST'
+local FULL='BAG FULL - MAKE ROOM IN YOUR BAG FIRST'
 
 -- 0 / 1. the numbers, what counts -----------------------------------------------------------------------------------------------------------------
 check(Data:HeldItemCap()==200 and W.module('InventoryStacks155').Cap==200 and Config.MaxHeldItems==nil and Config.MaxSavedChests==1000 and Config.MaxSavedHarvests==500,'the cap is 200 (InventoryStacks155.Cap; Config.lua untouched); the old storage ceilings (1000 / 500) stay for the save validators')
@@ -262,29 +262,29 @@ local h0=held(C)
 check(h0==10 and C:GetAttribute('HeldItemCount')==10,'(5 seeds + 3 packs + 1 fruit + 1 loot item = 10: '..h0..')')
 -- refusals
 Data.Loaded[C]=false;local res=ask({Kind='Seed',Id=seedIds[1],Count=1});Data.Loaded[C]=true
-check(not res.Ok and res.Message=='HOLD ON, UR DATA IS LOADING!','refused while the data loads')
+check(not res.Ok and res.Message=='HOLD ON, YOUR DATA IS LOADING!','refused while the data loads')
 Data.CanSave[C]=false;res=ask({Kind='Seed',Id=seedIds[1],Count=1});Data.CanSave[C]=true
 check(not res.Ok and res.Message:find("CAN'T SAVE",1,true),'refused while the profile can not save')
 for _,bad in ipairs({{Kind='Seed',Id=seedIds[1],Count=0},{Kind='Seed',Id=seedIds[1],Count=1.5},{Kind='Seed',Id=string.rep('x',200),Count=1},{Kind='Seed',Count=1},'nope'})do
  res=ask(bad);check(not res.Ok and res.Message=='TRY AGAIN!','a malformed request is refused ('..tostring(type(bad)=='table'and bad.Count or bad)..')')
 end
-res=ask({Kind='Shovel',Id='shovel',Count=1});check(not res.Ok and res.Message=="U CAN'T THROW THAT AWAY"and shovel.Parent~=nil,'the shovel can not be thrown away')
-res=ask({Kind='Tool',Id='Bat',Count=1});check(not res.Ok and res.Message=="U CAN'T THROW THAT AWAY"and batT.Parent~=nil,'nor the bat (gear)')
+res=ask({Kind='Shovel',Id='shovel',Count=1});check(not res.Ok and res.Message=="YOU CAN'T THROW THAT AWAY"and shovel.Parent~=nil,'the shovel can not be thrown away')
+res=ask({Kind='Tool',Id='Bat',Count=1});check(not res.Ok and res.Message=="YOU CAN'T THROW THAT AWAY"and batT.Parent~=nil,'nor the bat (gear)')
 res=ask({Kind='Seed',Id='C-not-mine',Count=1});check(not res.Ok and res.Message=='THAT ITEM IS ALREADY GONE!','an id the player does not hold: gone')
 res=ask({Kind='Pack',Id=seedIds[1],Count=1});check(not res.Ok and res.Message=='TRY AGAIN!','the wrong kind for an id: refused')
 C:SetAttribute('ChestChaseSeedCarrying',true);res=ask({Kind='Seed',Id=seedIds[1],Count=1});C:SetAttribute('ChestChaseSeedCarrying',nil)
-check(not res.Ok and res.Message=='FINISH UR STEAL FIRST!','refused while carrying a stolen pack')
+check(not res.Ok and res.Message=='FINISH YOUR STEAL FIRST!','refused while carrying a stolen pack')
 C:SetAttribute('ChestChaseRunActive',true);res=ask({Kind='Seed',Id=seedIds[1],Count=1});C:SetAttribute('ChestChaseRunActive',nil);check(not res.Ok,'... and in a chase')
 giftsFake.Busy[C]=true;res=ask({Kind='Seed',Id=seedIds[1],Count=1});giftsFake.Busy[C]=nil
-check(not res.Ok and res.Message=='WAIT FOR UR GIFT TO SEND FIRST!','refused while a gift is being saved')
+check(not res.Ok and res.Message=='WAIT FOR YOUR GIFT TO SEND FIRST!','refused while a gift is being saved')
 Chests.Openings[C]={Tool=toolOf(packs[1].Id),Clicks=2};res=ask({Kind='Pack',Id=packs[1].Id,Count=1})
-check(not res.Ok and res.Message=='WAIT FOR UR PACK TO FINISH OPENING!','the pack being opened can not be thrown away')
+check(not res.Ok and res.Message=='WAIT FOR YOUR PACK TO FINISH OPENING!','the pack being opened can not be thrown away')
 res=ask({Kind='Pack',Id=packs[2].Id,Count=3})
-check(not res.Ok and res.Message=="U DON'T HAVE THAT MANY!",'and it does not count in its stack meanwhile (all 3 asked, 2 may go: '..tostring(res.Message)..')')
+check(not res.Ok and res.Message=="YOU DON'T HAVE THAT MANY!",'and it does not count in its stack meanwhile (all 3 asked, 2 may go: '..tostring(res.Message)..')')
 Chests.Openings[C]={Tool=toolOf(packs[1].Id),Clicks=0} -- (only held: it may go)
 Chests.RecentRewards={[C]={[seedIds[5]]=R.clock}} -- (the server's clock)
-res=ask({Kind='Seed',Id=seedIds[5],Count=1});check(not res.Ok and res.Message=='WAIT FOR UR SEED TO LAND FIRST!','a reward seed still flying in can not be thrown away')
-res=ask({Kind='Seed',Id=seedIds[1],Count=5});check(not res.Ok and res.Message=="U DON'T HAVE THAT MANY!",'... nor counted in its stack (5 asked, 4 may go)')
+res=ask({Kind='Seed',Id=seedIds[5],Count=1});check(not res.Ok and res.Message=='WAIT FOR YOUR SEED TO LAND FIRST!','a reward seed still flying in can not be thrown away')
+res=ask({Kind='Seed',Id=seedIds[1],Count=5});check(not res.Ok and res.Message=="YOU DON'T HAVE THAT MANY!",'... nor counted in its stack (5 asked, 4 may go)')
 check(held(C)==h0 and synced>=0,'(every refusal changed nothing: '..held(C)..')')
 -- a stack: 3 of the 5 seeds, the one in hand last
 R.advance(11)

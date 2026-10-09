@@ -102,26 +102,26 @@ C.PackName=Catalog.PackName
 -- for one, ragdolled / flung by a keeper). Checked in this order.
 C.BusyAttributes={{'ChestChaseSeedCarrying','Busy'},{'ChestChaseRunActive','Busy'},{'ChestChaseQueued','Busy'},{'GuardianRagdollActive','Moment'},{'GuardianFlingActive','Moment'}}
 -- Texts (R152, in her voice: a good answer is sentence case, a refusal one short capitalised line) ---------------------------------------------
-C.Quest='I dare u to steal a Void Pack from the scary Darkened One at the end of Storm Peaks! Bring it to me and I\'ll give u a '..Catalog.PackName..'!'
+C.Quest='I dare you to steal a Void Pack from the scary Darkened One at the end of Storm Peaks! Bring it to me and I\'ll give you a '..Catalog.PackName..'!'
 C.RewardText='SWAP! 1 VOID PACK = 1 '..Catalog.PackName:upper()
-C.Thanks='Yay, thanks! Here\'s ur '..Catalog.PackName..'!'
-C.Notice='🌟 Yippee! Verity gave u a '..Catalog.PackName..'!'
+C.Thanks='Yay, thanks! Here\'s your '..Catalog.PackName..'!'
+C.Notice='🌟 Yippee! Verity gave you a '..Catalog.PackName..'!'
 -- The window's other labels. VoidChip / DoneChip: the two stat boxes (short titles). Give / Busy: the hand-in button (Busy while it waits for the
 -- server; the emoji is glued to "PACK" with a no-break space so a narrow phone never wraps it onto a line of its own). Close: the other button.
 -- Here / Next / Arriving: the line about The Darkened (purple while it is here, blue before; Next is followed by the time left, "12m 3s").
 C.Dialog={
- VoidChip='UR VOID PACKS',DoneChip='YOU GAVE ME',
+ VoidChip='YOUR VOID PACKS',DoneChip='YOU GAVE ME',
  Give='GIVE VOID PACK\u{00A0}🌑',Busy='SWAPPING... ✨',Close='BYE! 👋',
  Here='🌑 THE DARKENED IS HERE!!',Next='🌑 THE DARKENED WAKES IN ',Arriving='🌑 THE DARKENED IS WAKING UP...',
 }
 -- The status line when the server has said nothing to show (right after Open): what to do next, by what you carry. Have: a Void Pack (green).
 -- Here: none, and The Darkened is here (gold). Wait: none, and it is not (pale blue). Over: the event has ended (pale blue).
-C.Hint={Have='Ooh, a Void Pack! Hand it over!',Here='Quick! Steal one in Storm Peaks!',Wait='Get ready to steal one!',Over='Thanks for playing, u were great!'}
+C.Hint={Have='Ooh, a Void Pack! Hand it over!',Here='Quick! Steal one in Storm Peaks!',Wait='Get ready to steal one!',Over='Thanks for playing, you were great!'}
 C.Reasons={
- Loading='HOLD ON, UR DATA IS LOADING!',
- CannotSave='OOPS! UR DATA CAN\'T SAVE NOW',
+ Loading='HOLD ON, YOUR DATA IS LOADING!',
+ CannotSave='OOPS! YOUR DATA CAN\'T SAVE NOW',
  TooFar='OVER HERE! COME CLOSER TO ME!',
- Busy='WHOA, FINISH UR RUN FIRST!',
+ Busy='WHOA, FINISH YOUR RUN FIRST!',
  Moment='WAIT A SEC, THEN TRY AGAIN!',
  Opening='FINISH OPENING THAT PACK FIRST!',
  NoVoid='NO VOID PACK YET! GO STEAL ONE!',
@@ -131,6 +131,6 @@ C.Reasons={
  -- what ChestService:ConvertVoidPack and PlayerDataService:CheckVoidPack answer (the hand-in passes their reason on as it is)
  Invalid='HMM, I CAN\'T USE THAT PACK',
  NotVoid='ONLY A VOID PACK WORKS FOR ME!',
- Gone='THAT PACK LEFT UR BAG! TRY AGAIN',
+ Gone='THAT PACK LEFT YOUR BAG! TRY AGAIN',
 }
 return C

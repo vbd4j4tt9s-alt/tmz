@@ -47,7 +47,7 @@ do
  check(s.Normal==4 and s.Event==9 and j.Normal==0 and j.Event==0 and n.Normal==0 and n.Event==0,'State: saved counts, junk and no field = 0 / 0')
  check(Pity.Left(0)==10 and Pity.Left(9)==1,'Left: 10 opens from 0, 1 from 9')
  check(Pity.Text('Normal',3)=='3/10 pity'and Pity.Text('Event',3)=='3/10 event pity'and Pity.Text('Normal',9)=='9/10 next one\'s lucky!'and Pity.Text('Event',0)=='0/10 event pity','the bar words: "3/10 pity", "3/10 event pity", "9/10 next one\'s lucky!"')
- check(Pity.Disclosure=='every 10th pack u open is lucky: x1.5 luck (event packs count separately)','the rule line (owner\'s voice)')
+ check(Pity.Disclosure=='every 10th pack you open is lucky: x1.5 luck (event packs count separately)','the rule line (owner\'s voice)')
 end
 do
  check(not Pity.Lucky()and Pity.Ceiling(5e7)==5e7,'outside a lucky roll: no lucky ceiling')
@@ -233,7 +233,7 @@ do -- refused / failed opens never move or skip the count
  local rX=Data:OpenSeedPack(cy,'nope',uniform(21));check(rX==nil and select(1,counts(cy))==9,'a pack that is not in the bag: refused, unchanged')
  failRoll=true;local rF,whyF=Data:OpenSeedPack(cy,rec.Id,uniform(22));failRoll=false
  check(rF==nil and tostring(whyF):find('REJOIN',1,true)and select(1,counts(cy))==9 and cy:GetAttribute('PackPityLuckyNormal')==0,'a roll that fails (REJOIN TO OPEN): the count stays 9/10 and the lucky pack is not used up')
- local keep=Data.SeedCollectReward;Data.SeedCollectReward=function()return nil,'BAG FULL - MAKE ROOM IN UR BAG FIRST'end
+ local keep=Data.SeedCollectReward;Data.SeedCollectReward=function()return nil,'BAG FULL - MAKE ROOM IN YOUR BAG FIRST'end
  local rB,whyB=Data:OpenSeedPack(cy,rec.Id,uniform(23));Data.SeedCollectReward=keep
  check(rB==nil and tostring(whyB):find('BAG FULL',1,true)and select(1,counts(cy))==9,'a refused open (the reward refused, e.g. a full bag): unchanged')
  local paid=Data:AddChest(cy,pack(NORMAL_KINDS[1]));paid.PaidRandom=true;local rP=Data:OpenSeedPack(cy,paid.Id,uniform(24))

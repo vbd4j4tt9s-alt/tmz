@@ -72,8 +72,8 @@ function P.Legacy(map,luck)
 end
 -- Text (the owner's voice) ------------------------------------------------------------------------------------------------------------------------
 -- The rule, listed with the odds (the hold tooltip, /test odds; the Mech shop card has the event one).
-P.Disclosure='every 10th pack u open is lucky: x1.5 luck (event packs count separately)'
-P.EventDisclosure='every 10th event pack u open (Void, Verity, Mech) is lucky: x1.5 luck'
+P.Disclosure='every 10th pack you open is lucky: x1.5 luck (event packs count separately)'
+P.EventDisclosure='every 10th event pack you open (Void, Verity, Mech) is lucky: x1.5 luck'
 P.LuckyLine='LUCKY PACK: x1.5 luck on this one!'
 P.Name={Normal='pity',Event='event pity'}
 -- The bar's words for a count: "3/10 pity", "3/10 event pity"; at 9/10 "9/10 next one's lucky!".

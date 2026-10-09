@@ -337,7 +337,7 @@ for _,bad in ipairs({5,true,{}})do local r=Data:ConvertVoidPack(A,bad);if r~=nil
 local r3=Data:ConvertVoidPack(A,nil);if r3~=nil then allRefused=false end
 check(allRefused,'Pack06, Mech, Verity, unknown, empty and non-string ids are all refused with a reason ('..reasons[1]..' | '..reasons[3]..' | '..reasons[6]..')')
 -- R152: the reasons are in Verity's voice (they reach her window as they are): not a Void pack / not in the bag any more / not an id at all
-check(reasons[1]=='ONLY A VOID PACK WORKS FOR ME!'and reasons[2]=='ONLY A VOID PACK WORKS FOR ME!'and reasons[6]=='THAT PACK LEFT UR BAG! TRY AGAIN'and reasons[8]=='HMM, I CAN\'T USE THAT PACK','the reasons: "'..reasons[1]..'" / "'..reasons[6]..'" / "'..reasons[8]..'"')
+check(reasons[1]=='ONLY A VOID PACK WORKS FOR ME!'and reasons[2]=='ONLY A VOID PACK WORKS FOR ME!'and reasons[6]=='THAT PACK LEFT YOUR BAG! TRY AGAIN'and reasons[8]=='HMM, I CAN\'T USE THAT PACK','the reasons: "'..reasons[1]..'" / "'..reasons[6]..'" / "'..reasons[8]..'"')
 check(snapshotBag()==before and find(A,pack6.Id)==pack6,'...and nothing changed (bag order, serial and revision all the same)')
 local seedRec={Id='701_seedfix',Kind='Seed',BagVariant='EclipseReliquary',Stage=7,ChestNumber=900,SeedId='MirageFigSeed',SeedName='Mirage Fig Seed',SeedEmoji='x',ChestName='x',AccentColor=R.Color3.new(1,1,1),PackSize=1,PackMutation='None',SeedScale=1}
 table.insert(Data:GetChestRecords(A),seedRec)
@@ -348,7 +348,7 @@ check(Data:ConvertVoidPack(A,odd.Id)==nil and odd.BagVariant=='EclipseReliquary'
 Data:RemoveChest(A,odd.Id)
 local B0=makePlayer(702,'Ben');Data.Loaded[B0]=nil
 check(Data:ConvertVoidPack(B0,void2.Id)==nil and find(A,void2.Id)==void2,'a player whose data is not loaded gets nothing')
-check(select(2,Data:ConvertVoidPack(B0,void2.Id))=='HOLD ON, UR DATA IS LOADING!','(R152: "HOLD ON, UR DATA IS LOADING!")');Data.Loaded[B0]=true
+check(select(2,Data:ConvertVoidPack(B0,void2.Id))=='HOLD ON, YOUR DATA IS LOADING!','(R152: "HOLD ON, YOUR DATA IS LOADING!")');Data.Loaded[B0]=true
 end
 -- It works with a full bag.
 do
@@ -563,7 +563,7 @@ check(X.Actions.verity==true and X.Actions.eclipse==true and X.Actions.void==tru
 local okOdds,textOdds=X.Execute(ctx,D,'odds',{'verity'})
 check(okOdds and textOdds:find('Verity Pack',1,true)and textOdds:find('Verity Seed: 1/100',1,true)and textOdds:find('Plasma Pepper Seed: '..Odds.Format(exact.PlasmaPepperSeed),1,true)and not textOdds:find('Crowncore Tree Seed',1,true),'odds verity shows the Verity pack odds')
 local lineCount=0;for _ in textOdds:gmatch('[^\n]+')do lineCount+=1 end
-check(lineCount==18 and textOdds:find('\npity: every 10th pack u open is lucky',1,true)~=nil,'odds verity: header + 16 seeds + the pity rule (R155: the pack pity is listed with the odds) ('..lineCount..')')
+check(lineCount==18 and textOdds:find('\npity: every 10th pack you open is lucky',1,true)~=nil,'odds verity: header + 16 seeds + the pity rule (R155: the pack pity is listed with the odds) ('..lineCount..')')
 local okOdds2,textOdds2=X.Execute(ctx,D,'odds',{'verity','50000'})
 check(okOdds2 and select(2,textOdds2:gsub('Seed:',''))==16,'odds verity <luck> works and does not change anything')
 check(not X.Execute(ctx,D,'odds',{'verity','1','2'})and not X.Execute(ctx,D,'odds',{'mech','mythic'}),'odds verity with too many words, and odds mech, are refused')

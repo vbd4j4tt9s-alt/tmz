@@ -33,10 +33,10 @@ local looks={}
 for i,st in ipairs(G.Steps)do looks[#looks+1]={'step '..i,st.Title,st.Chip,st.Icon};if st.EquippedTitle then looks[#looks+1]={'step '..i..' (in hand)',st.EquippedTitle,st.EquippedChip,st.Icon}end end
 for _,k in ipairs({'TravelTrack','TravelBase','PickSeed','Waiting','Nice','Finished'})do local l=G[k];looks[#looks+1]={k,l.Title,l.Chip,l.Icon}end
 looks[#looks+1]={'FinishedAgain',G.Finished.Title,G.FinishedAgain,G.Finished.Icon}
--- Every word on screen is one of these (a typo fails the test). Owner's voice: "grab a pack", "bring it back to ur base", "u got this".
+-- Every word on screen is one of these (a typo fails the test). Owner's voice: "grab a pack", "bring it back to your base", "you got this" (R157: u / ur are written out).
 local vocab={}
-for w in ([[grab a pack run home to ur base open it keep tapping clicking pressing plant the dirt seed go track tap click select get
- faster hop on packs coming hang tight nice u got this free have fun hold forest check bag]]):gmatch('%a+')do vocab[w]=true end
+for w in ([[grab a pack run home to your base open it keep tapping clicking pressing plant the dirt seed go track tap click select get
+ faster hop on packs coming hang tight nice you got this free have fun hold forest check bag]]):gmatch('%a+')do vocab[w]=true end
 local words={}
 for _,d in ipairs({'Mouse','Touch','Gamepad'})do for _,l in ipairs(looks)do
  local title=G.Format(l[2],d,'Alex');local label=l[3]and G.Format(l[3].Label or'',d,'Alex')or'';local key=l[3]and l[3].Key and G.Plain(G.Format(l[3].Key,d,'Alex'))
@@ -48,7 +48,7 @@ for _,d in ipairs({'Mouse','Touch','Gamepad'})do for _,l in ipairs(looks)do
  check(key==nil or utf8.len(key)<=5,('%s %s: the key cap is short (%s)'):format(d,l[1],tostring(key)))
  for w in(G.Plain(title)..' '..G.Plain(label)):lower():gsub('alex',''):gmatch('%a+')do if not vocab[w]then words[#words+1]=w end end
  local plain=(G.Plain(title)..' '..G.Plain(label)):lower()
- check(not plain:find('your',1,true)and not plain:find('follow',1,true)and not plain:find('arrow',1,true),d..' '..l[1]..': says it, does not explain it ('..plain..')')
+ check(plain:match('%f[%a]ur?%f[%A]')==nil and not plain:find('follow',1,true)and not plain:find('arrow',1,true),d..' '..l[1]..': says it, does not explain it, and u / ur are written out ('..plain..')')
 end end
 check(#words==0,'every word is a known, correctly spelled word: '..table.concat(words,', '))
 for w in G.StarterPack.Notice:lower():gmatch('%a+')do check(vocab[w],'notice word: '..w)end

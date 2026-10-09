@@ -161,8 +161,8 @@ local maxButton=button(gems,'Maximum','MAX',UDim2.new(),UDim2.new(),C(255,196,52
 local cost=Art.Text(gems,'Cost','Cost: '..Cash.Compact(Catalog.CashPerGem)..' Cash',15);cost.ZIndex=4;cost.TextXAlignment=Enum.TextXAlignment.Left
 local convert=button(gems,'Convert','CONVERT',UDim2.new(),UDim2.new(),C(98,211,255))
 local ways=Art.Card(page,'EarnGems',{C(90,94,124),C(58,60,86)},false)
-local waysTitle=Art.Text(ways,'Title','FILL UR PLANT INDEX',20,Theme.Colors.Gold);waysTitle.ZIndex=4;waysTitle.TextXAlignment=Enum.TextXAlignment.Left
-local waysDetail=Art.Text(ways,'Detail','Grab Gems from ur plant index!',15);waysDetail.ZIndex=4;waysDetail.TextXAlignment=Enum.TextXAlignment.Left
+local waysTitle=Art.Text(ways,'Title','FILL YOUR PLANT INDEX',20,Theme.Colors.Gold);waysTitle.ZIndex=4;waysTitle.TextXAlignment=Enum.TextXAlignment.Left
+local waysDetail=Art.Text(ways,'Detail','Grab Gems from your plant index!',15);waysDetail.ZIndex=4;waysDetail.TextXAlignment=Enum.TextXAlignment.Left
 local function active(b,enabled)b.Interactable=enabled;b.Active=enabled;b.AutoButtonColor=enabled;b.BackgroundTransparency=enabled and 0 or .45 end
 local layoutKey;local content;local frame
 local function setPrice(b,text,icon,color)Art.SetCaption(b,text,icon,color)end

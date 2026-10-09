@@ -6,7 +6,7 @@ local Art=require(RS.PremiumShopArt);local Bright=require(RS.BrightUI);local Cat
 local B={};local C=Color3.fromRGB
 -- R153: the 4 Leaf Clover pass (2x luck on every pack). Its picture is CloverIcon153 (the pass's own Roblox icon, else the owner's clover drawn on the client, else shapes) on a soft glow so the
 -- green stands out on the sky-blue card. A pass whose id is 0 (CloverPassId set to 0) has no Robux button: the card says so and the Gem button takes the whole row (Layout).
-B.Copy={Growth={Title='x2 Growth',Detail='Plants grow 2x faster!'},Speed={Title='x2 Speed',Detail='Train with 2x speed!'},Clover={Title='x2 Luck',Detail='x2 luck on EVERY pack u open!'}}
+B.Copy={Growth={Title='x2 Growth',Detail='Plants grow 2x faster!'},Speed={Title='x2 Speed',Detail='Train with 2x speed!'},Clover={Title='x2 Luck',Detail='x2 luck on EVERY pack you open!'}}
 local function buttons(card,pass)
  Art.Button(card,'GemPerk',Art.Colors.Gem,'Gem');Art.SetCaption(card.GemPerk,tostring(Catalog.PassGemPrices[pass.Key]))
  Art.Button(card,'RobuxPass',Art.Colors.Robux);Art.SetCaption(card.RobuxPass,'Unavailable',false)

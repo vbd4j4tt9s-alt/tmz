@@ -181,7 +181,7 @@ do
  b2.Race=function()s2.Data:AddChest(q,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',Weather='None'})end -- a pack lands while we wait for the store
  local ok3,why3=s2.Svc:Claim(q)
  check(ok3==false and why3=='room'and stored(b2).Count==1 and s2.Data:voidPacks(q)==0,'a Bag that filled during the wait: the reservation stands, no pack yet')
- check(s2.Notes:last(q).Text:lower():find('saved for u',1,true)~=nil,'"your Void Pack is reserved! Make room"')
+ check(s2.Notes:last(q).Text:lower():find('saved for you',1,true)~=nil,'"your Void Pack is reserved! Make room"')
  table.remove(s2.Data:GetChestRecords(q),1);s2.Svc:Step()
  check(s2.Data:voidPacks(q)==1 and stored(b2).Count==1,'as soon as there is room the server gives it (once), without a second reservation')
  s2.Svc:Step();s2.Svc:Step();check(s2.Data:voidPacks(q)==1,'and never twice')
@@ -414,7 +414,7 @@ do
  local nochar=G.player(s,1405,'NoBody',{Stand=false});ok,why=s.Svc:Claim(nochar);check(not ok and why=='far','no character: refused')
  -- the prompt calls Claim
  local pp=G.player(s,1406,'Presser');prompt(s).Triggered:Fire(pp);check(voidPacks(s,pp)==1,'the pedestal\'s prompt (Triggered) makes the claim')
- check(prompt(s).ActionText=='Grab ur FREE Void Pack'and prompt(s).MaxActivationDistance>=10,'the prompt says "Grab ur FREE Void Pack"')
+ check(prompt(s).ActionText=='Grab your FREE Void Pack'and prompt(s).MaxActivationDistance>=10,'the prompt says "Grab your FREE Void Pack"')
  -- busy: a second press while the first waits for the store
  local b2=G.backend();local s2=new(b2,nil);local q=G.player(s2,1407,'Double')
  local inner

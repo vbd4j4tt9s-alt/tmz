@@ -64,7 +64,7 @@ local open=button(dock,'OpenInventory','Bag',UDim2.fromOffset(56,56),UDim2.new(1
 open:SetAttribute('ButtonSound',false) -- R150: the Bag opens / closes through SeedMenu; ButtonFeedback plays MenuClick / MenuClose for it
 local panel=Instance.new('Frame');panel.Name='Inventory';panel.AnchorPoint=Vector2.new(.5,.5);panel.Position=UDim2.fromScale(.5,.49);panel.Size=UDim2.new(.86,0,.66,0);panel.BackgroundColor3=C.Panel;panel.BackgroundTransparency=.05;panel.Visible=false;panel.Parent=gui;corner(panel)
 local constraint=Instance.new('UISizeConstraint');constraint.MaxSize=Vector2.new(1080,740);constraint.Parent=panel
-label(panel,'Title',UDim2.new(1,-65,0,40),UDim2.fromOffset(16,8),'Ur Bag',20).TextXAlignment=Enum.TextXAlignment.Left
+label(panel,'Title',UDim2.new(1,-65,0,40),UDim2.fromOffset(16,8),'Your Bag',20).TextXAlignment=Enum.TextXAlignment.Left
 require(RS:WaitForChild('GardenMenuStyle')).Panel(panel,46)
 panel.BackgroundColor3=C.Sheet;panel.BackgroundTransparency=.1 -- R112: dark translucent green sheet.
 local close=button(panel,'Close','×',UDim2.fromOffset(36,36),UDim2.new(1,-48,0,10))

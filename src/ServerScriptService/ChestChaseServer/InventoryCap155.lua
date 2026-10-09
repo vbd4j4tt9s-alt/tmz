@@ -19,7 +19,7 @@
 --  * DiscardRecords removes exactly the given records (InventoryService155 decides which, after its checks).
 local M={}
 M.Default=require(game:GetService('ReplicatedStorage'):WaitForChild('InventoryStacks155')).Cap -- 200 (a Config.MaxHeldItems would override it)
-M.FullText='BAG FULL - MAKE ROOM IN UR BAG FIRST'
+M.FullText='BAG FULL - MAKE ROOM IN YOUR BAG FIRST'
 M.HarvestFullText='BAG FULL - SELL OR PLANT SOMETHING FIRST'
 M.LogSize=20
 function M.ValidLayout(text)

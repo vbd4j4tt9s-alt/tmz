@@ -12,8 +12,8 @@ G.GuideName='TMZ'
 -- Target = what the server points the beam at (TutorialTargets); Marker = the icon over it; Hand = a pressing hand on it.
 G.Steps={
  {Icon='🎒',Title='GRAB A PACK!',Chip={Key='{StealKey}',Label='{HoldIt}'},Target='Pack',Marker='🎒'},
- {Icon='🏠',Title='RUN HOME!!',Chip={Arrow=true,Label='to ur base'},Target='Safety',Marker='🏠'},
- {Icon='🎁',Title='OPEN IT!',Chip={Key='{PickKey}',Label='ur pack'},Pick='Pack',
+ {Icon='🏠',Title='RUN HOME!!',Chip={Arrow=true,Label='to your base'},Target='Safety',Marker='🏠'},
+ {Icon='🎁',Title='OPEN IT!',Chip={Key='{PickKey}',Label='your pack'},Pick='Pack',
   EquippedTitle='KEEP {OpenVerb}!!',EquippedChip={Key='{OpenKey}',Label='open it'}},
  {Icon='🌱',Title='PLANT IT!',Chip={Key='{PlantKey}',Label='the dirt'},Target='Garden',Hand=true,Home=true},
  -- R152: step 5 is the treadmill (it was 3 tip slides): done when you step on it, or after Seconds anyway.
@@ -25,17 +25,17 @@ G.TravelTrack={Icon='🏃',Title='GO TO THE TRACK!',Chip={Key='TRACK',KeyStyle='
 -- Steps 4-5 (Home=true) while you're on the track: the BASE button.
 G.TravelBase={Icon='🏠',Title='GO HOME!',Chip={Key='BASE',KeyStyle='Base',Label='{TapIt}'},Button='BaseButton'}
 -- Step 4 while the seed is not in your hand: its hotbar slot.
-G.PickSeed={Icon='🌱',Title='PLANT IT!',Chip={Key='{PickKey}',Label='ur seed'}}
+G.PickSeed={Icon='🌱',Title='PLANT IT!',Chip={Key='{PickKey}',Label='your seed'}}
 G.Waiting={Icon='⏳',Title='PACKS COMING!',Chip={Label='hang tight'}}
 -- The tiny pop between steps.
 G.Nice={Icon='✓',Title='NICE!!'}
 G.NiceSeconds=.7;G.RevealSeconds=2.5;G.FinishSeconds=4
-G.Finished={Icon='🏆',Title='U GOT THIS!!',Chip={Label='🎁 FREE PACK!'}}
+G.Finished={Icon='🏆',Title='YOU GOT THIS!!',Chip={Label='🎁 FREE PACK!'}}
 G.FinishedAgain={Label='have fun {name}!'} -- the chip when the free pack was already given (a replay)
 -- R138 (owner): finishing the tutorial gives one free Forest pack with 2x rates (server: TutorialProgress.GrantStarterPack).
 -- R139 (owner: "make it so that players dont know that the pack is 2x luck"): it is named, announced and shows its odds
 -- exactly like any Forest pack; only the server knows.
-G.StarterPack={Name='Seed Pack',Notice='🎁 FREE Forest pack!! check ur Bag'}
+G.StarterPack={Name='Seed Pack',Notice='🎁 FREE Forest pack!! check your Bag'}
 -- The step row on the card: one icon per step.
 G.Progress={'🎒','🏠','🎁','🌱','⚡'}
 -- R138 (owner: "a clicking indicator to visually show players to keep clicking to open a pack").

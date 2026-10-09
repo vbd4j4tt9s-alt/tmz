@@ -79,7 +79,7 @@ for _,p in ipairs(rs)do
 end
 check(runeProps,'[locked] violet, neon, a little see-through (dim), anchored, not solid, no touch / query / shadow')
 local sig=sign()
-check(sig.Enabled==true and sig.Status.Text:find('🔒 12:',1,true)==1 and sig.Title.Text=='❓ UR MYSTERY PACK','[locked] the sign: ❓ UR MYSTERY PACK / 🔒 12:xx')
+check(sig.Enabled==true and sig.Status.Text:find('🔒 12:',1,true)==1 and sig.Title.Text=='❓ YOUR MYSTERY PACK','[locked] the sign: ❓ YOUR MYSTERY PACK / 🔒 12:xx')
 -- The halo orbits the pack: a tilted ring of radius 3.4 around (a little under) its centre, clear of the pack, moving.
 local centre=PACK+V3(0,-.2,0)
 local function radiusOk()for _,p in ipairs(runes())do if not near((p.Position-centre).Magnitude,Fx.Tuning.Radius,1e-6)then return false end end;return true end
@@ -137,7 +137,7 @@ do
  -- Ready
  mine('Ready');H.run(.6)
  check(rgb(pill.BackgroundColor3,58,40,10)and rgb(pill.Outline.Color,255,214,90)and rgb(t.TextColor3,255,214,90)and rgb(s.TextColor3,255,214,90),'[sign] Ready: warm gold pill, gold outline, gold caption and state line')
- check(s.Text=='UNLOCKED! GRAB IT 🎁'and t.Text=='✨ UR MYSTERY PACK'and b.Visible==true and b.Fill.Size.X.Scale==1,'[sign] Ready: ✨ UR MYSTERY PACK / UNLOCKED! TAKE IT 🎁 and a full bar')
+ check(s.Text=='UNLOCKED! GRAB IT 🎁'and t.Text=='✨ YOUR MYSTERY PACK'and b.Visible==true and b.Fill.Size.X.Scale==1,'[sign] Ready: ✨ YOUR MYSTERY PACK / UNLOCKED! TAKE IT 🎁 and a full bar')
  check(near(g.Size.X.Scale,10,1e-9)and near(g.Size.Y.Scale,3.6,1e-9),'[sign] (the pop at the change settles back to exactly 10 x 3.6)')
  -- Someone else's pill is quieter
  H.publish(recs[2],'Ready',{Owner=88,Name='Ben',Variant='Pack04'})
