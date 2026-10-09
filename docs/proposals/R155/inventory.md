@@ -94,15 +94,9 @@ The cap is `InventoryStacks155.Cap = 200`, shared by the server (`PlayerDataServ
 - right-click to pick, then the Trash;
 - gamepad: Y to pick, then the Trash.
 
-**The popup:** "throw it away?" shows the item's picture and name, then "u sure? it's gone forever". For a stack you choose 1, a number (- / + or type it) or All. The buttons are **Keep it** and **Discard**.
+**The popup:** "throw it away?" shows the item's picture and name, then "u sure? it's gone forever". For a stack you choose 1, a number (- / + or type it) or All. The buttons are **Keep it** and **hold to discard** (with the amount for a stack).
 
-**Rare items need a 1 s hold:**
-- Secret / Cosmic / King;
-- a Mech, Verity or Void pack;
-- a Mech or Verity seed or fruit;
-- anything mutated (Gold, Diamond ...).
-
-The button fills while you hold it; letting go early starts it again, and a tap does nothing.
+**Every item needs a ~1 s hold** (owner: "every item needs it"): the button says "hold to discard" and fills while you hold it (mouse, finger, or A on a gamepad). A tap does nothing, and letting go early starts it again, so a mis-tap can never throw anything away.
 
 **The server decides** (`ChestChaseRemotes.DiscardItems`, InventoryService155). The client sends one item's id and how many. The server finds that item among the player's own Tools, takes its stack (the same key the client drew, `InventoryStacks155`), puts the held one last, and deletes exactly that many records. It frees room under the cap, and nothing comes back (no money, no item). It refuses, saying why, when:
 - the data is loading, or can't save;
@@ -133,7 +127,7 @@ Nothing runs per frame while idle: the pick ring and outlines are static, the ho
 ## Files
 
 - `src/ReplicatedStorage/GardenInventoryState.lua`: the layout model, rewritten with the rules above (Reconcile, Place, Stow, Target, Remember, Serialize / Parse / Restore, GoLive).
-- `src/ReplicatedStorage/InventoryStacks155.lua` (new): stack key, kind, id, the rare test and the hash, shared with the server.
+- `src/ReplicatedStorage/InventoryStacks155.lua` (new): stack key, kind, id and the hash, shared with the server.
 - `src/ReplicatedStorage/InventoryPanel155.lua` (new): the Bag bar (count, Trash, pick bar), tap-tap, search dimming, discarding, saving the layout, join / live.
 - `src/ReplicatedStorage/DiscardDialog155.lua` (new): the confirm popup.
 - `src/StarterPlayer/StarterPlayerScripts/Hotbar.client.lua`: the Bag lists Bag items only; any slot takes anything; drop on the Trash; a hold let go picks; right-click picks; equipping from the Bag stays in the Bag; the instant held paint; the collect target. Lines 1 and 2 are untouched, the main chunk is at 174 registers (as R154), and it still plays no cue but the harvest landing.
@@ -144,7 +138,7 @@ Nothing runs per frame while idle: the pick ring and outlines are static, the ho
 ## Tests: `tests/run_inventory.sh [dir] [all|static|layout|client|server|perf]`
 
 - `test_layout155.luau`: the model alone, with 62 checks and 3000 random operations (never one key on two slots, never a slot pointing at a missing item, blank slots never fill by themselves).
-- `test_inventory155.luau`: the real Hotbar through R153's engine model in 6 engine variants x 2 event orders, 117 checks each. It covers every drag path (and the drop-target outlines while dragging), the blank hotbar, tap-tap (touch hold, right-click + number key, gamepad Y / A), instant highlight, search, keys, the count, discarding (amounts, the rare hold, a refusal, the shovel), respawn and rejoin, and the seed collect target.
+- `test_inventory155.luau`: the real Hotbar through R153's engine model in 6 engine variants x 2 event orders, 122 checks each. It covers every drag path (and the drop-target outlines while dragging), the blank hotbar, tap-tap (touch hold, right-click + number key, gamepad Y / A), instant highlight, search, keys, the count, discarding (amounts, the ~1 s hold for every item by mouse, touch and gamepad A, a refusal, the shovel), respawn and rejoin, and the seed collect target.
 - `test_cap155.luau`: the real server, 88 checks. It covers the cap on every grant path above, the carried pack, the receipt, the 650-item old save, every discard refusal, stacks, the count, persistence after a rejoin, the remotes and their rate limit, and the saved layout including a broken one.
 - `perf_inventory155.luau`: 200 items, R154 against R155.
 - R153 `run_hotbar.sh` now ends by running `run_inventory.sh all`, so the whole-game `tools/tests/run_all_suites.sh` runs the R155 suites with the other hotbar tests.
@@ -157,9 +151,9 @@ Nothing runs per frame while idle: the pick ring and outlines are static, the ho
   - R148 `test_roster`: its 603 test opens drop their seeds again (a bag holds 200).
   - R151 `check_shape_plumbing.py`: the stack key that must name PackShape now lives in InventoryStacks155.
 
-## For the owner to decide
+## Owner decisions
 
-1. **New items and blank slots.** Now: a slot you emptied into the Bag stays blank, and emptying the whole bar keeps it blank. If you want the strict Roblox behaviour (any empty slot takes the next new item), it is one line in `GardenInventoryState.FirstFree`.
-2. **Paid receipts may go over 200.** A Mech pack bought with Robux is never lost: if something arrived between the purchase prompt and the receipt, the packs are added even past 200. The shop never offers packs that don't fit.
-3. **Discarding while carrying a stolen pack or in a chase is refused.** The brief asked to refuse "being stolen"; a stolen pack is not in the Bag yet, so the whole Bag waits until the run ends.
-4. **The rare hold list** is Secret / Cosmic / King, Mech / Verity / Void, and any mutation. Weather-only items have no hold.
+1. **New items and blank slots (decided: keep as built).** A slot you emptied into the Bag stays blank, and emptying the whole bar keeps it blank. If you want the strict Roblox behaviour (any empty slot takes the next new item), it is one line in `GardenInventoryState.FirstFree`.
+2. **Paid receipts may go over 200 (still open).** A Mech pack bought with Robux is never lost: if something arrived between the purchase prompt and the receipt, the packs are added even past 200. The shop never offers packs that don't fit.
+3. **Discarding while carrying a stolen pack or in a chase is refused (decided: keep as built).** The brief asked to refuse "being stolen"; a stolen pack is not in the Bag yet, so the whole Bag waits until the run ends.
+4. **The discard hold (decided: every item).** The ~1 s hold on the Discard button is required for every item, not only rare ones; same length and look.

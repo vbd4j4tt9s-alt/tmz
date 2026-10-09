@@ -8,7 +8,7 @@
 #                         (Serialize / Parse / Restore), a phone's 5 slots, Target, 3000 random operations.
 #  test_inventory155.luau - the REAL Hotbar + InventoryPanel155 + DiscardDialog155 through R153's engine model (engine153.luau), in 6 engine variants x 2 event
 #                         orders: every drag, the blank hotbar, tap-tap (touch hold, right-click + number key, gamepad Y / A), instant equip, search, the count,
-#                         discarding (amounts, the rare hold, refusals), the layout across a respawn and a rejoin, the seed collect target.
+#                         discarding (amounts, the ~1 s hold on every item, refusals), the layout across a respawn and a rejoin, the seed collect target.
 #  test_cap155.luau      - the server: the 200 cap on every grant path (steal / bank with the carried pack's place kept, the bonus roll, daily login + quest, the
 #                         mystery pedestal, the Void giveaway, Verity, Mech for Gems and a Robux receipt, gifts in and out, harvesting, the starter pack, owner
 #                         grants), an old save above 200 loads whole, the discard service (every refusal, a stack, the count, after a rejoin), the saved layout.

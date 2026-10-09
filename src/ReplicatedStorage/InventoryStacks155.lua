@@ -1,12 +1,10 @@
 -- R155 (owner: "make it function like the normal inventory ... make the max amount of items a person can hold 200", then "allow people to discard
--- items"): what one inventory item IS, shared by the Hotbar / Bag (client) and the server's discard (DiscardService155), so both see the same stacks.
+-- items"): what one inventory item IS, shared by the Hotbar / Bag (client) and the server's discard (InventoryService155), so both see the same stacks.
 --  * Key(tool)   the stack an item joins: identical packs, seeds and fruit share one hotbar slot / Bag card with a count (R112; the exact key the
 --                Hotbar used from R112 to R154, so a layout saved by R155 matches what every client shows). Tools that never stack (the bat, a legacy
 --                loot item) and the shovel have no stack key.
 --  * Kind(tool)  'Pack' | 'Seed' | 'Fruit' | 'Loot' (an item: it counts toward the 200 cap and can be discarded) | 'Shovel' | 'Tool' (gear: the bat ...).
 --  * Id(tool)    the saved record behind an item (SeedInventoryId, HarvestInventoryId, LootInstanceName).
---  * Rare(tool)  true (and why) when throwing it away needs the 1 s hold in the confirm popup: Secret / Cosmic / King, a Mech / Verity / Void pack or a
---                Mech / Verity seed or fruit, and anything mutated (Gold, Diamond ...).
 --  * Hash(key)   8 hex characters for a stack key: the saved hotbar layout (Hotbar155) stores these, never the long keys.
 -- A stack of N counts N toward the cap: the server and the save hold N separate records (each with its own id, size, weight and traits; each is opened,
 -- planted, gifted and sold on its own); a stack is only how the inventory DRAWS identical records.
@@ -17,8 +15,6 @@ S.Cap=200
 S.Fields={Pack={'Stage','BagVariant','PackSize','PackMutation','Weather','SeedScale','PackShape'}, -- (R151: packs of different chip-bag shapes never share a card)
  Seed={'SeedId','SeedScale','Mutation','Weather','Rarity'},
  Fruit={'SeedId','FruitScale','Mutation','Weather','SellValue','FruitName','FruitIndex','Rarity'}}
-S.RareRarity={Secret=true,Cosmic=true,King=true}
-S.RareVariant={MechLimited='Mech',VerityReliquary='Verity',EclipseReliquary='Void'}
 local function attr(tool,name)local ok,v=pcall(tool.GetAttribute,tool,name);if ok then return v end;return nil end
 function S.Group(tool)
  if attr(tool,'SeedPackTool')then return'Pack'end
@@ -45,20 +41,6 @@ function S.Id(tool)
  if kind=='Fruit'then return attr(tool,'HarvestInventoryId')end
  if kind=='Loot'then return attr(tool,'LootInstanceName')end
  return nil
-end
-local special={PlasmaPepperSeed=true,VeritySeed=true}
-function S.Rare(tool)
- local rarity=attr(tool,'Rarity')
- if S.RareRarity[rarity]then return true,rarity end
- local variant=S.RareVariant[attr(tool,'BagVariant')];if variant then return true,variant end
- for _,field in ipairs({'Mutation','PackMutation'})do local m=attr(tool,field);if type(m)=='string'and m~=''and m~='None'then return true,m end end
- local seed=attr(tool,'SeedId')
- if type(seed)=='string'then
-  if special[seed]then return true,seed=='VeritySeed'and'Verity'or'Mech'end
-  local ok,mech=pcall(function()return require(script.Parent.MechCatalog).Is(seed)end)
-  if ok and mech then return true,'Mech'end
- end
- return false,nil
 end
 -- (sdbm over the bytes, 32 bits: a few hundred keys never meet; a clash would only put one item on the wrong slot when the layout is restored)
 function S.Hash(key)

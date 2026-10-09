@@ -12,7 +12,8 @@
 --  5. instant equip: the slot (and a Bag card) shows as held on the very frame the press ends (before any server reply); equipping from the Bag leaves it in the Bag.
 --  6. search filters the Bag and dims the hotbar slots that do not match; backtick (`) and B open / close the Bag.
 --  7. the count: "143/200" (white), amber from 180, "200/200 FULL" in red with FULL on the Bag button; with no count from the server it counts the items it sees.
---  8. discard: a stack dropped on the Trash (1 / a number / All), a single item via tap-tap, a rare item needs the 1 s hold (a tap or a short press does nothing),
+--  8. discard: a stack dropped on the Trash (1 / a number / All), a single item via tap-tap, EVERY item needs the ~1 s hold (owner;
+--     a tap or a short press does nothing; mouse, touch and gamepad A),
 --     the shovel can't be thrown away, a server refusal is shown and the popup stays, Keep it sends nothing.
 --  9. the layout survives a respawn and a REJOIN (a new Hotbar with the layout the first one sent to the server, the items handed over in another order).
 -- 10. the seed collect target (R154) is the slot the seed will really take, or the Bag button when every free slot is blank.
@@ -250,42 +251,56 @@ do
  local stack={F.seed(W,bag(),'CloverSeed',1,'None'),F.seed(W,bag(),'CloverSeed',1,'None'),F.seed(W,bag(),'CloverSeed',1,'None')};X.frames(5)
  local s,i=slotOf(stack[1]);check(s and s.Count.Text=='x3','(a stack of 3 on slot '..tostring(i)..')')
  openBag();X.drag('mouse',s,panel.BagBar.Trash);X.frames(3)
- local ui=Dialog.UI();check(Dialog.IsOpen()and ui.Row.Visible and ui.Warning.Text:find("gone forever",1,true)~=nil,'a stack dropped on the Trash: "u sure? it\'s gone forever" with 1 / - n + / All')
+ local ui=Dialog.UI()
+ local function holdConfirm(kind)local p=X.center(ui.Confirm);X.down(kind,p);X.wait(1.15);X.up(p);X.frames(3)end -- (owner: every item needs the ~1 s hold)
+ check(Dialog.IsOpen()and ui.Row.Visible and ui.Warning.Text:find("gone forever",1,true)~=nil,'a stack dropped on the Trash: "u sure? it\'s gone forever" with 1 / - n + / All')
  check(ui.Name.Text==Names.Tool(stack[1],Catalog),'the popup names the item ('..ui.Name.Text..')')
  X.tap('mouse',ui.Row.More);X.tap('mouse',ui.Row.More);X.tap('mouse',ui.Row.More);check(ui.Row.Count.Text=='3','+ stops at the stack size (3)')
  X.tap('mouse',ui.Row.One);check(ui.Row.Count.Text=='1','1')
  ui.Row.Count.Text='2';ui.Row.Count.FocusLost:Fire();X.frames(1);check(ui.Row.Count.Text=='2','a typed number')
- X.tap('mouse',ui.Confirm);X.frames(3)
+ -- every item needs the button HELD ~1 s (owner: "every item needs it"): a plain stack too
+ check(ui.Confirm.Text=='hold to discard 2','a plain stack asks for the hold too: "hold to discard 2" ('..ui.Confirm.Text..')')
+ X.tap('mouse',ui.Confirm);X.frames(3);check(#requests==0 and Dialog.IsOpen(),'a tap throws nothing away (any item)')
+ local hp=X.center(ui.Confirm);X.down('mouse',hp);X.wait(.5)
+ local u=ui.Fill.Size.X.Scale;check(ui.Confirm.Text=='keep holding...'and u>.3 and u<.8,'holding: "keep holding..." and the bar fills ('..u..')')
+ X.wait(.65);X.up(hp);X.frames(3)
  check(#requests==1 and requests[1].Count==2 and requests[1].Kind=='Seed'and not Dialog.IsOpen(),'Discard: the server is asked for exactly 2 of that stack; the popup closes')
  X.frames(5);local s2=slotOf(stack[3])or slotOf(stack[1])or slotOf(stack[2])
  check(s2 and s2.Count.Visible==false,'one left on its slot')
  -- the last one, by tap-tap: hold, then the Trash; one item asks no amount
  holdRelease(s2);X.tap('touch',panel.BagBar.Trash);X.frames(2)
- check(Dialog.IsOpen()and not ui.Row.Visible,'tap-tap: picked, then the Trash: the popup (one item: no amount)')
- X.tap('touch',ui.Confirm);X.frames(5)
- check(#requests==2 and requests[2].Count==1,'and Discard sends 1')
+ check(Dialog.IsOpen()and not ui.Row.Visible and ui.Confirm.Text=='hold to discard','tap-tap: picked, then the Trash: the popup (one item: no amount, "hold to discard")')
+ X.tap('touch',ui.Confirm);X.frames(5);check(#requests==1 and Dialog.IsOpen(),'a tap on a phone throws nothing away either')
+ holdConfirm('touch');X.frames(2)
+ check(#requests==2 and requests[2].Count==1,'held ~1 s: Discard sends 1')
  local freed=true;for _,t in ipairs(stack)do if t.Parent then freed=false end end;check(freed,'(all three are gone)')
  -- Keep it: nothing is sent
  openBag();X.drag('mouse',slotOf(blue),panel.BagBar.Trash);X.frames(2);X.tap('mouse',ui.Keep);X.frames(2)
  check(not Dialog.IsOpen()and #requests==2 and blue.Parent~=nil,'Keep it: nothing is sent, the item stays')
  -- a refusal: shown in the popup, which stays
  refuseWith='WAIT FOR UR PACK TO FINISH OPENING!'
- openBag();X.drag('mouse',slotOf(blue),panel.BagBar.Trash);X.frames(2);X.tap('mouse',ui.Confirm);X.frames(3)
+ openBag();X.drag('mouse',slotOf(blue),panel.BagBar.Trash);X.frames(2);holdConfirm('mouse')
  check(Dialog.IsOpen()and ui.Status.Visible and ui.Status.Text:find('finish opening',1,true)~=nil and blue.Parent~=nil,'a server refusal is shown and the popup stays ('..ui.Status.Text..')')
  refuseWith=nil;X.tap('mouse',ui.Keep);X.frames(2)
- -- a rare item: a tap does nothing, a short press does nothing, a 1 s hold throws it away
+ -- a mutated item: the same (a tap does nothing, a short press does nothing, a 1 s hold throws it away)
  local gold=F.seed(W,bag(),'CloverSeed',1,'Gold');X.frames(5)
  openBag();X.drag('mouse',slotOf(gold)or cardOf(gold),panel.BagBar.Trash);X.frames(2)
- check(Dialog.IsOpen()and ui.Confirm.Text:lower():find('hold',1,true)~=nil,'a Gold (mutated) item: the button says hold to discard')
- local n0=#requests;X.tap('mouse',ui.Confirm);X.frames(3);check(#requests==n0,'a tap does not throw a rare item away')
+ check(Dialog.IsOpen()and ui.Confirm.Text:lower():find('hold',1,true)~=nil,'a Gold (mutated) item: the same hold: the button says hold to discard')
+ local n0=#requests;X.tap('mouse',ui.Confirm);X.frames(3);check(#requests==n0,'a tap does not throw it away')
  local p=X.center(ui.Confirm);X.down('mouse',p);X.wait(.4);X.up(p);X.frames(3);check(#requests==n0 and Dialog.IsOpen(),'a short press does not either (the bar starts again)')
  X.down('touch',p);X.wait(1.15);X.up(p);X.frames(3)
  check(#requests==n0+1 and gold.Parent==nil,'held for 1 s: thrown away')
- -- a Secret seed and a Mech / Verity / Void pack need the hold too; plain ones do not
- local secret=F.seed(W,bag(),'CloverSeed',1,'None');secret:SetAttribute('Rarity','Secret')
- check(Stacks.Rare(secret)and Stacks.Rare(F.pack(W,nil,7,'EclipseReliquary',1,'None'))and Stacks.Rare(F.pack(W,nil,8,'MechLimited',1,'None'))and Stacks.Rare(F.pack(W,nil,7,'VerityReliquary',1,'None')),'Secret / Cosmic / King, Void / Mech / Verity packs: the hold')
- check(not Stacks.Rare(apple)and not Stacks.Rare(packA),'a plain seed or pack: no hold')
- secret:Destroy()
+ -- a gamepad: A on the selected button must be held too (a press of A alone sends nothing)
+ local padItem=F.seed(W,bag(),'KiwiSeed',1,'None');X.frames(5)
+ openBag();X.drag('mouse',slotOf(padItem)or cardOf(padItem),panel.BagBar.Trash);X.frames(2);local nG=#requests
+ check(Dialog.IsOpen(),'(the popup for a plain Kiwi Seed)')
+ local GS=W.Gui;GS.SelectedObject=ui.Confirm
+ local function padA(state)local i={KeyCode=R.Enum.KeyCode.ButtonA,UserInputType=R.Enum.UserInputType.Gamepad1,UserInputState=state,Position=R.Vector3.new(0,0,0)}return i end
+ W.UIS.InputBegan:Fire(padA(R.Enum.UserInputState.Begin),true);X.frames(1);ui.Confirm.Activated:Fire(padA(R.Enum.UserInputState.End),1);W.UIS.InputEnded:Fire(padA(R.Enum.UserInputState.End),true);X.frames(3)
+ check(#requests==nG and Dialog.IsOpen(),'gamepad: pressing A on Discard sends nothing')
+ W.UIS.InputBegan:Fire(padA(R.Enum.UserInputState.Begin),true);X.wait(1.15);W.UIS.InputEnded:Fire(padA(R.Enum.UserInputState.End),true);X.frames(3)
+ check(#requests==nG+1 and padItem.Parent==nil,'gamepad: holding A ~1 s throws it away')
+ GS.SelectedObject=nil
  -- the shovel can't be thrown away
  openBag();local nD=#requests;X.drag('mouse',slotOf(shovel),panel.BagBar.Trash);X.frames(3)
  check(not Dialog.IsOpen()and #requests==nD and shovel.Parent~=nil,'the shovel can\'t be thrown away (no popup, nothing sent)')

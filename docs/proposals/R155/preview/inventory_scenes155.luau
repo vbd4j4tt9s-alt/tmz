@@ -93,12 +93,12 @@ if not PHONE then
  -- 5. discard a stack: drop it on the Trash
  X.drag('mouse',slotOf(apples[1]),panel.BagBar.Trash);X.frames(2)
  local ui=Dialog.UI();X.tap('mouse',ui.Row.More);X.frames(1)
- scene('pc_discard','Discard: drop it on the Trash; a stack picks 1, a number or All; "u sure? it\'s gone forever"')
+ scene('pc_discard','Discard: drop it on the Trash; a stack picks 1, a number or All; "u sure? it\'s gone forever"; the button says "hold to discard"')
  X.tap('mouse',ui.Keep);X.frames(2)
- -- 6. a rare one: hold to discard
- X.drag('mouse',cardOf(gold)or slotOf(gold),panel.BagBar.Trash);X.frames(2)
+ -- 6. every item: hold to discard (a plain one here)
+ X.drag('mouse',slotOf(kiwi)or cardOf(kiwi),panel.BagBar.Trash);X.frames(2)
  local p=X.center(ui.Confirm);X.down('mouse',p);X.wait(.6)
- scene('pc_rare','A rare item (Secret / Cosmic / King, Mech / Verity / Void, Gold / Diamond ...): HOLD the button 1 s')
+ scene('pc_hold','Every item: HOLD the button ~1 s (its bar fills; a tap or letting go early throws nothing away)')
  X.up(p);X.frames(2);X.tap('mouse',ui.Keep);X.frames(2)
  -- 7. a fully blank hotbar
  for i=1,10 do local s=slot(i);if s.ItemName.Text~=''then X.drag('mouse',s,panel.Items);X.frames(2)end end
