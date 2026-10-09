@@ -1,21 +1,23 @@
 --!nocheck
 -- R156 preview data (not a test): the REAL title screen (TitleScreen104, the scratch copy with Style B from patch_title156.py) started on the Roblox mock at a PC / landscape-phone /
--- portrait-phone size, stepped through its own frame function, and its GUI trees (the Shade backdrop + the title content) printed as SCENE lines for headless Chromium.
+-- portrait-phone size, stepped through its own frame function at 120 fps, and its GUI trees (the Shade backdrop + the title content) printed as SCENE lines for headless Chromium.
 -- The 3D seed pack (a ViewportFrame in the game) cannot be built on the mock: an ImageLabel stand-in sits where the viewport is (Position .71,.04 / Size .29,.92 of the logo).
--- VIEW (set by run_title_tips156.sh): 'pc' (1920 x 1080), 'land' (844 x 390), 'port' (390 x 844).
--- Frames (all through the real rotation; TitleScreen104.TipOrder picks the tips): tip 1 settled, tip 2 settled (5 s later), tip 3 settled, and the fade-out of a 4th tip at 50%.
--- Prints: SCENE <name><TAB><backdrop json><TAB><title json>      and      TIP <view> <frame> <kind> <alpha of the label> <text>
+-- VIEW (set by run_title_tips156.sh): 'pc' (1920 x 1080), 'land' (844 x 390), 'port' (390 x 844).   REDUCED = true runs it with Reduced Motion (and asserts: no fade, no pulse, no bob).
+-- Frames, all through the real rotation (TitleScreen104.TipOrder picks the tips): tip 1 settled, tip 2 settled (one Interval later), tip 3 settled, the fade-out of a 4th tip at 50%,
+-- and on the PC also tip 1's pulse at its largest (+5%) and its smallest (-5%).
+-- Prints: SCENE <name><TAB><backdrop json><TAB><title json>   and   TIP<TAB><frame><TAB><kind><TAB><label alpha><TAB><pulse scale><TAB><bob px><TAB><layout json><TAB><label text (RichText)>
+--         TIPLINE<TAB><kind><TAB><the line as RichText>  (every tip, in list order: the fit / overlap check reads them)
 local W=require('./world');local R=W.R
 local dump=require('./dump_tree153')
 local V2=R.Vector2.new
 local VIEWS={pc={1920,1080,false},land={844,390,true},port={390,844,true}}
 local VIEW=VIEW or'pc'
 local SW,SH,TOUCH=VIEWS[VIEW][1],VIEWS[VIEW][2],VIEWS[VIEW][3]
--- which tips each view shows: {settled 1, settled 2, settled 3, fading 4} as pieces of their text (TitleTips156 finds them)
+-- which tips each view shows: {settled 1, settled 2, settled 3, fading 4} as pieces of their plain text (TitleTips156 finds them)
 local PICKS={
- pc={'mythic packs give','beware the darkened','pyramid','shovel holes'},
- land={'swing the bat','when the lights go out','pyramid','every 10th pack'},
- port={'each friend in ur server','something waits','pyramid','hold E'},
+ pc={'mythic packs','beware the darkened','pyramid','dig holes'},
+ land={'hit thieves','lights go out','pyramid','every 10th pack'},
+ port={'friends in your server','something waits','pyramid','hold E'},
 }
 local REDUCED=REDUCED==true -- (set by the runner for the Reduced Motion check)
 W.UIS.TouchEnabled=TOUCH;W.UIS.KeyboardEnabled=not TOUCH;W.UIS.GamepadEnabled=false
@@ -41,15 +43,16 @@ W.service('ContextActionService').BindActionAtPriority=function(_,name,fn)W.acti
 local Players=W.service('Players')
 local player=R.new('Player');player.Name='Ann';player.UserId=1;player.Parent=Players;Players.LocalPlayer=player
 local pg=R.new('PlayerGui');pg.Name='PlayerGui';pg.Parent=player
-local T=W.module('TitleScreen104');local Tips=W.module('TitleTips156')
+local T=W.module('TitleScreen104');local Tips=W.module('TitleTips156');local Today=W.module('TitleScreen104Today')
 local function find(piece)
- for i,tip in ipairs(Tips.Tips)do if tip.Text:find(piece,1,true)then return i end end
+ for i,tip in ipairs(Tips.Tips)do if Tips.Plain(tip.Text):find(piece,1,true)then return i end end
  error('no tip with: '..piece)
 end
 local picks=PICKS[VIEW]
 local order={find(picks[1]),find(picks[2]),find(picks[3]),find(picks[4])}
 for i=1,#Tips.Tips do local used=false;for _,o in ipairs(order)do if o==i then used=true end end;if not used then order[#order+1]=i end end
 T.TipOrder=order
+for i,tip in ipairs(Tips.Tips)do print('TIPLINE\t'..tip.Kind..'\t'..Tips.Line(i))end
 local stop=T.Start(player,pg)
 local backdrop=pg:FindFirstChild('StealAPackTitleBackdrop');local screen=pg:FindFirstChild('StealAPackTitle')
 local group=screen:FindFirstChild('TitleContent')
@@ -60,12 +63,16 @@ local native=group:FindFirstChild('Logo'):FindFirstChild('NativeTitle')
 local art=R.new('ImageLabel');art.Name='ForestMythicPack (stand-in)';art.BackgroundTransparency=1;art.Position=R.UDim2.fromScale(.71,.04);art.Size=R.UDim2.fromScale(.29,.92)
 art.ImageContent='stand-in';art.Parent=native
 local label
-local function tick(seconds)
+local now=0
+local DT=1/120
+local function at(seconds) -- step the real frame function until `seconds` after the title started
  local frame=binds.StealAPackTitle104;assert(frame,'the title did not bind its frame step')
- local n=math.floor(seconds*60+.5)
- for _=1,n do R.advance(1/60);frame(1/60)end
+ local n=math.floor((seconds-now)/DT+.5)
+ for _=1,n do R.advance(DT);frame(DT)end
+ now+=n*DT
 end
-local function snap(name,kind)
+local function near(a,b,tol)return math.abs(a-b)<=tol end
+local function snap(name,kind,expect)
  for _,root in ipairs({backdrop,screen})do -- (dump_tree153 reads Color3.new for a label that sets no stroke colour; its module has no Color3 global)
   for _,o in ipairs(root:GetDescendants())do
    if o.ClassName=='TextLabel'or o.ClassName=='TextButton'then
@@ -76,18 +83,38 @@ local function snap(name,kind)
  end
  label=group:FindFirstChild('TipLine')
  assert(label,'the tip line was not built')
+ local L=T.Layout(SW,SH)
+ local alpha=1-(label.TextTransparency or 0)
+ local scale=label:FindFirstChildOfClass('UIScale').Scale
+ local bob=label.Position.Y.Offset-L.TipY
+ -- the line floats centred in the gap between the logo (with its pack) and the button; its pulse and bob keep it clear of both (the button grows 3.5% when hovered)
+ local logoBottom=L.LogoY+L.LogoHeight/2;local buttonTop=L.ButtonY-L.ButtonHeight/2*1.035
+ local gap=buttonTop-logoBottom
+ local top=L.TipY-L.TipHeight/2*1.05-1.5;local bottom=L.TipY+L.TipHeight/2*1.05+1.5
+ assert(top>=logoBottom+4 and bottom<=buttonTop-4,('the tip line (%.1f..%.1f) is not clear of the logo (bottom %.1f) and the button (top %.1f)'):format(top,bottom,logoBottom,buttonTop))
+ assert(math.abs((L.TipY-logoBottom)-(L.ButtonY-L.ButtonHeight/2-L.TipY))<.01,'the tip line is not vertically centred between the logo and the button')
+ if REDUCED then assert(alpha==1 and scale==1 and bob==0,('Reduced Motion: alpha %.2f scale %.3f bob %.2f'):format(alpha,scale,bob))end
+ if expect and not REDUCED then
+  if expect.scale then assert(near(scale,expect.scale,.004),('%s: pulse scale %.4f, expected %.3f'):format(name,scale,expect.scale))end
+  if expect.alpha then assert(near(alpha,expect.alpha,.03),('%s: alpha %.3f, expected %.2f'):format(name,alpha,expect.alpha))end
+ end
  local bd,sc=dump(backdrop,SW,SH),dump(screen,SW,SH)
  print('SCENE '..name..'\t'..bd..'\t'..sc)
- local alpha=1-(label.TextTransparency or 0)
- print(('TIP %s %s %s alpha=%.2f layout: logo %.0fx%.0f y=%.0f  tip y=%.0f h=%.0f size<=%.0f  button y=%.0f | %s'):format(VIEW,name,kind,alpha,T.Layout(SW,SH).LogoWidth,T.Layout(SW,SH).LogoHeight,T.Layout(SW,SH).LogoY,
-  T.Layout(SW,SH).TipY,T.Layout(SW,SH).TipHeight,T.Layout(SW,SH).TipSize,T.Layout(SW,SH).ButtonY,label.Text))
+ local T0=Today.Layout(SW,SH)
+ print(('TIP\t%s\t%s\t%.2f\t%.3f\t%.2f\t{"logoW":%.0f,"logoH":%.0f,"logoY":%.0f,"logoBottom":%.0f,"buttonTop":%.0f,"gap":%.0f,"tipY":%.1f,"tipH":%.0f,"tipSize":%.0f,"buttonY":%.0f,"todayLogoW":%.0f,"todayLogoH":%.0f}\t%s'):format(
+  name,kind,alpha,scale,bob,L.LogoWidth,L.LogoHeight,L.LogoY,logoBottom,L.ButtonY-L.ButtonHeight/2,L.ButtonY-L.ButtonHeight/2-logoBottom,L.TipY,L.TipHeight,L.TipSize,L.ButtonY,T0.LogoWidth,T0.LogoHeight,label.Text))
 end
 local kinds={}
 for i,o in ipairs(order)do kinds[i]=Tips.Tips[o].Kind end
--- settle: the reveal (.72 s) and the first tip's fade-in
-tick(2.5);snap(VIEW..'_1',kinds[1])
-tick(5);snap(VIEW..'_2',kinds[2])
-tick(5);snap(VIEW..'_3',kinds[3])
--- the 4th tip, 4.825 s into its 5 s: its fade-out is 50% through (with Reduced Motion there is no fade: it is fully visible)
-tick(2.5+5-.175);snap(VIEW..'_fade',kinds[4])
+local I,F=Tips.Interval,Tips.Fade
+-- tip 1 settled (the reveal takes .72 s, then the first fade-in); the pulse clock runs from the start, so at 2.5 s it is back at its start (scale 1)
+at(2.5);snap(VIEW..'_1',kinds[1],{scale=1,alpha=1})
+if VIEW=='pc'then
+ at(2.5+.125);snap('pc_big',kinds[1],{scale=1+Tips.PulseAmount}) -- a quarter of a breath later: the largest
+ at(2.5+.375);snap('pc_small',kinds[1],{scale=1-Tips.PulseAmount}) -- three quarters: the smallest
+end
+at(I+2.5);snap(VIEW..'_2',kinds[2],{scale=1,alpha=1})
+at(2*I+2.5);snap(VIEW..'_3',kinds[3],{scale=1,alpha=1})
+-- the 4th tip, F/2 s before its end: the fade-out is 50% through (with Reduced Motion there is no fade: it is fully visible)
+at(4*I-F/2);snap(VIEW..'_fade',kinds[4],{alpha=.5})
 if stop then stop()end

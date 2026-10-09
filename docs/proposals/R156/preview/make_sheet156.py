@@ -56,13 +56,39 @@ for view in VIEWS:
             b, t = json.loads(backdrop), json.loads(title)
             t['kids'] = b['kids'] + t['kids']  # the Shade veil first, then the title content
             scenes.append({'name': name, 'json': json.dumps(t), 'scale': 1, 'bg': bgs[view], 'img': PACK_URI})
-        elif line.startswith('TIP '):
-            m = re.match(r'TIP (\w+) (\w+) (\w+) alpha=([\d.]+) layout: (.*?) \| (.*)$', line.rstrip('\n'))
-            info[m.group(2)] = {'kind': m.group(3), 'alpha': float(m.group(4)), 'layout': m.group(5), 'text': m.group(6)}
+        elif line.startswith('TIP\t'):
+            _, name, kind, alpha, scale, bob, layout, label = line.rstrip('\n').split('\t')
+            info[name] = {'kind': kind, 'alpha': float(alpha), 'scale': float(scale), 'bob': float(bob), 'layout': json.loads(layout), 'label': label}
 with open(os.path.join(S, 'scenes.json'), 'w', encoding='utf-8') as f:
     json.dump(scenes, f)
 render = os.path.join(HERE, 'render_gui156.mjs')
 subprocess.run(['node', render, os.path.join(S, 'scenes.json'), os.path.join(S, 'png'), FONTS if os.path.isdir(FONTS) else ''], check=True)
+
+# the tip list, with its mini-markup ({y}..{/y} yellow, {g}..{/g} green)
+TIPS = [(k, t.replace("\\'", "'")) for k, t in re.findall(r"\{Kind='(\w+)',Text='((?:[^'\\]|\\.)*)'\}", open(os.path.join(HERE, 'TitleTips156.lua'), encoding='utf-8').read())]
+HI = {'y': (255, 225, 77), 'g': (119, 229, 66)}
+
+
+def segments(text):
+    """[(string, colour letter or None)] from the mini-markup, emoji removed (the sheet's own font has none)."""
+    out, pos = [], 0
+    for m in re.finditer(r'\{([yg])\}(.*?)\{/\1\}', text):
+        if m.start() > pos:
+            out.append((text[pos:m.start()], None))
+        out.append((m.group(2), m.group(1)))
+        pos = m.end()
+    if pos < len(text):
+        out.append((text[pos:], None))
+    return [(re.sub('[\U0001F000-\U0001FFFF☀-➿⬀-⯿]', '', s_), c) for s_, c in out]
+
+
+def plain(text):
+    return ''.join(s_ for s_, _ in segments(text)).strip()
+
+
+def highlighted(frame):
+    """The highlighted words of the tip a frame shows (from the label's RichText)."""
+    return [re.sub(r'<[^>]+>', '', m) for m in re.findall(r'<font color="#(?:FFE14D|77E542)">(.*?)</font>', info[frame]['label'])]
 
 
 def font(px, fredoka=False):
@@ -86,7 +112,7 @@ def png(name, width=None, crop=None):
 INK, PAPER, MUTED, CARD = (24, 28, 44), (246, 247, 251), (92, 100, 124), (255, 255, 255)
 KIND = {'howto': ('HOW-TO (checked in the code)', (46, 150, 66)), 'lore': ('LORE / OMINOUS', (126, 70, 214)), 'egg': ('EASTER EGG (owner\'s line)', (226, 130, 24))}
 W_SHEET, M = 2400, 40
-sheet = Image.new('RGB', (W_SHEET, 3600), PAPER)
+sheet = Image.new('RGB', (W_SHEET, 4200), PAPER)
 d = ImageDraw.Draw(sheet)
 
 
@@ -103,96 +129,113 @@ def chip(x, y, kind):
     return x + w + 10
 
 
-def frame(im, x, y, kind, caption, width_for_caption):
-    d.rounded_rectangle((x - 4, y - 4, x + im.width + 4, y + im.height + 4), 8, fill=KIND[kind][1])
-    sheet.paste(im, (x, y))
-    cy = y + im.height + 10
-    chip(x, cy, kind)
-    # wrapped caption
-    f = font(16)
-    words, line, lines = caption.split(), '', []
+def wrap(s, f, width):
+    words, line, lines = s.split(), '', []
     for wd in words:
         trial = (line + ' ' + wd).strip()
-        if d.textlength(trial, font=f) > width_for_caption:
+        if d.textlength(trial, font=f) > width:
             lines.append(line);line = wd
         else:
             line = trial
     lines.append(line)
+    return lines
+
+
+def frame(im, x, y, name, caption, width_for_caption, kind=None):
+    kind = kind or info[name]['kind']
+    d.rounded_rectangle((x - 4, y - 4, x + im.width + 4, y + im.height + 4), 8, fill=KIND[kind][1])
+    sheet.paste(im, (x, y))
+    cy = y + im.height + 10
+    chip(x, cy, kind)
+    f = font(16)
+    words = highlighted(name)
+    if words:
+        caption += ' Highlighted: ' + ', '.join(words) + '.'
+    lines = wrap(caption, f, width_for_caption)
     for i, ln in enumerate(lines):
         d.text((x, cy + 38 + i * 21), ln, font=f, fill=MUTED)
     return cy + 38 + len(lines) * 21
 
 
+def panel(x0, y0, x1, y1, dark=False):
+    d.rounded_rectangle((x0, y0, x1, y1), 16, fill=(22, 32, 28) if dark else CARD, outline=(214, 218, 230) if not dark else (60, 80, 70), width=2)
+
+
+def bullets(x, y, items, width, color=INK, px=18):
+    f = font(px)
+    for s_ in items:
+        lines = wrap(s_, f, width - 20)
+        d.text((x, y), '-', font=f, fill=MUTED)
+        for ln in lines:
+            d.text((x + 20, y), ln, font=f, fill=color);y += px + 7
+        y += 9
+    return y
+
+
+L1 = info['land_1']['layout']
+LP = info['port_1']['layout']
+LC = info['pc_1']['layout']
 y = 28
-text(M, y, 'STEAL A PACK: tips on the title screen, Style B (the owner\'s pick)', 46, INK, True)
+text(M, y, 'STEAL A PACK: tips on the title screen, Style B (the owner\'s pick), second round', 46, INK, True)
 y += 62
-text(M, y, 'PREVIEW, not a release. The title is the real TitleScreen104 on the Roblox mock plus a "tip:" line above Click to play!; a new tip every 5 s with a 0.35 s fade (no fade with Reduced Motion).', 21, MUTED)
-y += 30
-text(M, y, 'APPROXIMATE, not a Studio screenshot: the blurred hub is a stand-in (a blurred crop of an earlier hub render) and the green pack is a stand-in for the 3D pack; everything else is drawn from the real GUI tree.', 21, MUTED)
-y += 42
+for ln in wrap('PREVIEW, not a release. The tip floats in the middle of the gap between the logo (with the pack) and Click to play!, a new one every 10 s with a fade, pulsing a little like Minecraft\'s splash, '
+               'with 1-2 highlighted words in yellow or green. Simple words (3rd grade), the game\'s own words. The title is the real TitleScreen104 on the Roblox mock; the blurred hub and the green pack are '
+               'stand-ins. APPROXIMATE, not a Studio screenshot.', font(21), W_SHEET - 2 * M):
+    text(M, y, ln, 21, MUTED)
+    y += 28
+y += 14
 x = M
 for k in ('howto', 'lore', 'egg'):
     x = chip(x, y, k)
-text(x + 12, y + 4, 'Each frame\'s frame colour = the tip\'s kind. Three kinds are mixed in each rotation.', 18, MUTED)
+text(x + 12, y + 4, 'The frame colour is the tip\'s kind.  Highlights:', 18, MUTED)
+x += 12 + d.textlength('The frame colour is the tip\'s kind.  Highlights:', font=font(18)) + 14
+for letter, label in (('y', 'yellow = the key thing'), ('g', 'green = what it gives / does')):
+    d.rounded_rectangle((x, y, x + d.textlength(label, font=font(17)) + 24, y + 30), 15, fill=(22, 32, 28))
+    d.text((x + 12, y + 15), label, font=font(17), fill=HI[letter], anchor='lm')
+    x += d.textlength(label, font=font(17)) + 36
 y += 56
 
 # ---- PC -------------------------------------------------------------------------------------------------------------------------
 text(M, y, 'PC 1920 x 1080', 30, INK, True)
 y += 44
 big = png('pc_1', 1150)
-sheet_y = y
-frame(big, M, y, info['pc_1']['kind'], 'tip 1 settled (the whole screen): the line sits just above the button, clear of the logo, the pack and the button. ' + info['pc_1']['layout'], 1150)
-sx = M + 1150 + 40
-sy = y
-STRIP = (0, 700, 1920, 1080)
-for name, label in (('pc_2', 'tip 2 settled, 5 s later (lore)'), ('pc_3', 'tip 3 (the easter egg)'), ('pc_fade', 'mid-fade: 4.8 s into a tip, the line is ~50% see-through')):
+pc_top = y
+bottom_left = frame(big, M, y, 'pc_1', 'tip 1 settled: the line floats in the middle of the gap between the logo with the pack (bottom %d) and the button (top %d), %d px of air above and below; the logo, pack and button are exactly where they are today.' % (LC['logoBottom'], LC['buttonTop'], (LC['gap'] - LC['tipH']) / 2), 1150)
+# the two pulse frames: the line at its largest (+5%) and its smallest (-5%), cropped around the line at the same size
+y2 = bottom_left + 14
+PULSE = (460, int(LC['tipY']) - 48, 1460, int(LC['tipY']) + 48)
+for name, label in (('pc_big', 'zoomed in on the line - pulse, largest: scale %.2f (a full breath every 0.5 s)' % info['pc_big']['scale']), ('pc_small', 'zoomed in - pulse, smallest: scale %.2f (same tip, 0.25 s later)' % info['pc_small']['scale'])):
+    im = png(name, 1150, PULSE)
+    y2 = frame(im, M, y2, name, label + '.', 1150) + 14
+right_x = M + 1150 + 40
+sy = pc_top
+STRIP = (0, 640, 1920, 1080)
+for name, label in (('pc_2', 'tip 2 settled, one interval (10 s) later (lore); bottom of the screen'), ('pc_3', 'tip 3 (the easter egg)'), ('pc_fade', 'mid-fade: 9.8 s into a tip, the line is 50% see-through')):
     im = png(name, 1130, STRIP)
-    bottom = frame(im, sx, sy, info[name]['kind'], label + ' (bottom of the screen)', 1130)
-    sy = bottom + 16
-y = max(sy, sheet_y + big.height + 120) + 24
+    sy = frame(im, right_x, sy, name, label + '.', 1130) + 16
+y = max(sy, y2) + 24
 
 # ---- landscape phone (native size, 2 x 2) + how it behaves ------------------------------------------------------------------------------------
-text(M, y, 'Landscape phone 844 x 390 (the logo is ~11% smaller here to make room; nothing is covered)', 30, INK, True)
+text(M, y, 'Landscape phone 844 x 390 (the logo is %d%% smaller here to make room; nothing is covered)' % round(100 - 100 * L1['logoW'] / L1['todayLogoW']), 30, INK, True)
 y += 44
 gy = y
 bottoms = []
-for i, (name, label) in enumerate((('land_1', 'tip 1 settled: the longest tip fits on one line'), ('land_2', 'tip 2 settled (lore)'),
-                                   ('land_3', 'tip 3 (the easter egg)'), ('land_fade', 'mid-fade: ~50% see-through'))):
+for i, (name, label) in enumerate((('land_1', 'tip 1 settled: one line, centred in the gap'), ('land_2', 'tip 2 settled (lore)'), ('land_3', 'tip 3 (the easter egg)'), ('land_fade', 'mid-fade: 50% see-through'))):
     im = png(name)
     x = M + (i % 2) * (844 + 28)
-    yy = gy + (i // 2) * (390 + 100)
-    bottoms.append(frame(im, x, yy, info[name]['kind'], label, 844))
+    yy = gy + (i // 2) * (390 + 120)
+    bottoms.append(frame(im, x, yy, name, label + '.', 844))
 nx = M + 2 * (844 + 28) + 16
-panel_h = max(bottoms) - gy
-d.rounded_rectangle((nx, gy, W_SHEET - M, gy + panel_h), 16, fill=CARD, outline=(214, 218, 230), width=2)
-notes = [
-    ('How it behaves', None),
-    ('A tip every 5 s: it fades in over 0.35 s, holds, fades out over the last 0.35 s; the text changes while it is invisible.', 1),
-    ('The first tip of a visit is random; the rest follow in a shuffled order, so no tip repeats before every tip has shown.', 1),
-    ('Reduced Motion: no fade. The text just changes every 5 s.', 1),
-    ('It lives in the title\'s CanvasGroup: it fades in with the title, fades out when u click, and never takes a click.', 1),
-    ('One line on a PC / landscape phone, two on a portrait phone; the text shrinks to fit (11 to 32 px).', 1),
-    ('PC and portrait phone: the logo, the pack and the button stay exactly where they are today. Landscape phone: the logo is ~11% smaller (422 px wide, was 477) to make room.', 1),
-    ('The tip list is one module, TitleTips156 (ReplicatedStorage): add a tip = add one line.', 1),
-]
-ty = gy + 20
-f = font(18)
-for s_, bullet in notes:
-    if bullet is None:
-        d.text((nx + 24, ty), s_, font=font(26, True), fill=INK);ty += 44
-        continue
-    words, line, lines = s_.split(), '', []
-    for wd in words:
-        trial = (line + ' ' + wd).strip()
-        if d.textlength(trial, font=f) > W_SHEET - M - nx - 70:
-            lines.append(line);line = wd
-        else:
-            line = trial
-    lines.append(line)
-    d.text((nx + 24, ty), '-', font=f, fill=MUTED)
-    for ln in lines:
-        d.text((nx + 44, ty), ln, font=f, fill=INK);ty += 25
-    ty += 10
+panel(nx, gy, W_SHEET - M, max(bottoms))
+d.text((nx + 24, gy + 18), 'How it behaves', font=font(26, True), fill=INK)
+bullets(nx + 24, gy + 62, [
+    'Where: vertically centred in the gap between the bottom of the logo (the pack art is inside it) and the top of the button. The gap is kept at least the line\'s height + 20 px, so the pulse and the bob never touch the logo or the button.',
+    'When: a new tip every 10 s. It fades in over 0.4 s, holds, fades out over the last 0.4 s; the text changes while it is invisible. The first tip of a visit is random, then a shuffled order (no repeats until all have shown).',
+    'Motion: a gentle splash pulse, +-5% in size, a full breath every 0.5 s, plus a 1.5 px bob (a slow 1.9 s). Reduced Motion: no pulse, no bob and no fade; the text just changes every 10 s.',
+    'Highlights: write {y}word{/y} (yellow #FFE14D) or {g}word{/g} (green #77E542, the title\'s PACK green) in the tip\'s text in TitleTips156; the title turns it into RichText. The rest is white with the title\'s dark outline.',
+    'Size: one line on a PC / landscape phone, two on a portrait phone; the text shrinks to fit (11 to 32 px). The label takes no clicks.',
+    'PC and portrait phone: the logo, pack and button stay exactly where they are today. Landscape phone: the logo is %d px wide (was %d) to make the room.' % (L1['logoW'], L1['todayLogoW']),
+], W_SHEET - M - nx - 48)
 y = max(bottoms) + 28
 
 # ---- portrait phone (native size) + the whole tip list --------------------------------------------------------------------------------------
@@ -200,31 +243,32 @@ text(M, y, 'Portrait phone 390 x 844 (a long tip wraps to two lines; the logo an
 y += 44
 x = M
 bottom = y
-for name, label in (('port_1', 'tip 1 settled: a long tip wraps to 2 lines'), ('port_2', 'tip 2 settled (lore)'), ('port_3', 'tip 3 (the easter egg)'), ('port_fade', 'mid-fade: ~50% see-through')):
+for name, label in (('port_1', 'tip 1 settled: a long tip wraps to 2 lines'), ('port_2', 'tip 2 settled (lore)'), ('port_3', 'tip 3 (the easter egg)'), ('port_fade', 'mid-fade: 50% see-through')):
     im = png(name)
-    bottom = max(bottom, frame(im, x, y, info[name]['kind'], label, 390))
+    bottom = max(bottom, frame(im, x, y, name, label + '.', 390))
     x += 390 + 26
 nx = x + 14
-tips = re.findall(r"\{Kind='(\w+)',Text='((?:[^'\\]|\\.)*)'\}", open(os.path.join(HERE, 'TitleTips156.lua'), encoding='utf-8').read())
-tips = [(k, t.replace("\\'", "'")) for k, t in tips]
-d.rounded_rectangle((nx, y, W_SHEET - M, bottom), 16, fill=CARD, outline=(214, 218, 230), width=2)
+panel(nx, y, W_SHEET - M, bottom, dark=True)
 ty = y + 18
-d.text((nx + 24, ty), 'All %d tips (TitleTips156.lua)' % len(tips), font=font(26, True), fill=INK)
+d.text((nx + 24, ty), 'All %d tips (TitleTips156.lua)' % len(TIPS), font=font(26, True), fill=(255, 255, 242))
 ty += 34
-d.text((nx + 24, ty), '(the emoji some tips carry are left out of this list)', font=font(14), fill=MUTED)
-ty += 26
+d.text((nx + 24, ty), '(the emoji some tips carry are left out of this list)', font=font(14), fill=(160, 178, 170))
+ty += 28
+f15 = font(15)
 for kind in ('howto', 'lore', 'egg'):
-    chip_x = nx + 24
-    chip(chip_x, ty, kind)
-    ty += 40
-    for k, t in tips:
+    chip(nx + 24, ty, kind)
+    ty += 38
+    for k, t in TIPS:
         if k != kind:
             continue
-        d.text((nx + 30, ty), 'tip: ' + re.sub('[\U0001F000-\U0001FFFF\u2600-\u27BF\u2B00-\u2BFF]', '', t).strip(), font=font(15), fill=INK)
+        cx = nx + 30
+        for seg, c in [('tip: ', None)] + segments(t):
+            d.text((cx, ty), seg, font=f15, fill=HI[c] if c else (232, 238, 244))
+            cx += d.textlength(seg, font=f15)
         ty += 21
-    ty += 12
+    ty += 10
 y = bottom + 28
-text(M, y, 'docs/proposals/R156/title_tips.md has the tip list with each tip\'s source file, the timings and how the tips are stored. Made by docs/proposals/R156/preview/run_title_tips156.sh.', 18, MUTED)
+text(M, y, 'docs/proposals/R156/title_tips.md has the tip list with each tip\'s source file and highlighted words, the timings and how the tips are stored. Made by docs/proposals/R156/preview/run_title_tips156.sh.', 18, MUTED)
 y += 40
 sheet = sheet.crop((0, 0, W_SHEET, y))
 sheet.save(OUT, optimize=True)
