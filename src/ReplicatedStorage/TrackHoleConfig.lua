@@ -51,12 +51,12 @@ return {
   PlayerCap='%d HOLES MAX! COVER ONE OR WAIT',
   ServerCap='TOO MANY HOLES ON THE TRACK',
   Covered='HOLE COVERED',
-  Trapped='U FELL IN A HOLE! PACK DROPPED',
+  Trapped='YOU FELL IN A HOLE! PACK DROPPED',
   Tripped='%s FELL IN YOUR HOLE!',
  },
  -- R124: a short tip when the shovel comes out, then it fades (replaces the permanent hint line). R153 (owner): the shovel also removes plants,
  -- so the tip says both; it shows wherever the shovel is pulled out (garden or track), the first HintTimes pull-outs of a session.
- Hint='🕳️ dig holes on the track to trap players • tap a plant in ur garden to remove it', -- R125 (owner): 'players', not 'pack thieves'
+ Hint='🕳️ dig holes on the track to trap players • tap a plant in your garden to remove it', -- R125 (owner): 'players', not 'pack thieves'
  HintSeconds=5,
  HintTimes=3,          -- pull-outs per session that show it (then never again until the next join)
  HintRepeatSeconds=8,  -- a pull-out while the last tip is still on screen shows nothing and is not counted

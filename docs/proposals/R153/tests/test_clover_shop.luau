@@ -193,7 +193,7 @@ for si,s in ipairs(screens)do
   check(rc.W==rg.W and rc.H==rg.H,name..': same size as the other pass cards')
   check(not L.Overlaps(rc,rg,-.5)and not L.Overlaps(rc,rs_,-.5),name..': no overlap with the other cards')
   check(card.Title.Text=='x2 Luck','title "x2 Luck" ('..tostring(card.Title.Text)..')');textFits(card.Title,'Clover title')
-  check((card.Detail.Text:gsub('\n',' '))=='x2 luck on EVERY pack u open!','detail in the owner\'s voice: '..tostring(card.Detail.Text));textFits(card.Detail,'Clover detail')
+  check((card.Detail.Text:gsub('\n',' '))=='x2 luck on EVERY pack you open!','detail in the owner\'s voice: '..tostring(card.Detail.Text));textFits(card.Detail,'Clover detail')
   check(card.Permanent.Text=='PERMANENT','tag PERMANENT');textFits(card.Permanent,'Clover tag')
   check(caption(card.GemPerk)=='999','Gem button: 999 ('..tostring(caption(card.GemPerk))..')')
   check(caption(card.RobuxPass)==rbx(999),'Robux button: the live price ('..tostring(caption(card.RobuxPass))..')')

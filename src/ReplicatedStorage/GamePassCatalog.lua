@@ -5,8 +5,8 @@
 -- Icon = the art key CloverIcon153 draws; Emoji = what a plain text line (the purchase notice) shows next to the name.
 local C={
  {Key='Growth',Name='Double Plant Growth',Attribute='DoubleGrowthOwned',IdAttribute='GrowthPassId',Price=400,Description='Plants and new fruit grow 2x faster!'},
- {Key='Speed',Name='Double Speed',Attribute='DoubleSpeedOwned',IdAttribute='SpeedPassId',Price=300,Description='Get 2x speed when u train!'},
- {Key='Clover',Name='4 Leaf Clover',Attribute='CloverOwned',IdAttribute='CloverPassId',DefaultId=2005041797,Price=999,Description='x2 luck on EVERY pack u open! 🍀',Late=153,Icon='Clover',Emoji='🍀',Luck=2},
+ {Key='Speed',Name='Double Speed',Attribute='DoubleSpeedOwned',IdAttribute='SpeedPassId',Price=300,Description='Get 2x speed when you train!'},
+ {Key='Clover',Name='4 Leaf Clover',Attribute='CloverOwned',IdAttribute='CloverPassId',DefaultId=2005041797,Price=999,Description='x2 luck on EVERY pack you open! 🍀',Late=153,Icon='Clover',Emoji='🍀',Luck=2},
 }
 function C.Id(pass)
  local id=script:GetAttribute(pass.IdAttribute)

@@ -111,7 +111,7 @@ local function confirm()
  local p=pending;if not p then return end
  -- Matched by inventory id: a refreshed Tool for the same item is still the same gift.
  local held,id,action=giftable()
- if not held or id~=p.Id or action~=p.Action then close(true);say('Hold the item u want to give.',true);return end
+ if not held or id~=p.Id or action~=p.Action then close(true);say('Hold the item you want to give.',true);return end
  if not p.Target.Parent then close();return end
  if not inReach(p.Target)then close(true);say('Get closer to '..p.Target.DisplayName..' first!',true);return end
  close(true);Audio.Play('Bubble06') -- R150: Give: the dialog closes and the gift goes out on this click

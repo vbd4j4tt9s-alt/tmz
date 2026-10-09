@@ -69,7 +69,7 @@ end
 local faces=0;for _ in pairs(seen)do faces+=1 end;check(faces==4,'the four faces of the column each carry one')
 -- the prompt and the light
 local prompt=ped.Prompt
-check(prompt.ActionText=='Grab ur FREE Void Pack','the prompt: "Grab ur FREE Void Pack"')
+check(prompt.ActionText=='Grab your FREE Void Pack','the prompt: "Grab your FREE Void Pack"')
 check(prompt.HoldDuration>0 and prompt.HoldDuration<=1 and prompt.RequiresLineOfSight==false and prompt.MaxActivationDistance>=12 and prompt.MaxActivationDistance<=24,'a short hold, no line of sight needed, reachable from the footing\'s edge')
 check(prompt.Parent==parts('PromptAnchor')[1],'the prompt hangs on its own anchor, in the column')
 local lights={};for _,d in ipairs(m:GetDescendants())do if d:IsA('Light')then lights[#lights+1]=d end end

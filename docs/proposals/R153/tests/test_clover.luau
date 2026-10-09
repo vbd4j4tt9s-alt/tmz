@@ -17,7 +17,7 @@ local row;for _,p in ipairs(Catalog)do if p.Key=='Clover'then row=p end end
 -- 1. the pass --------------------------------------------------------------------------------------------------------------------------------------
 check(row~=nil and #Catalog==3 and Catalog[3]==row,'the catalog has the 4 Leaf Clover as its third pass')
 check(row.Name=='4 Leaf Clover'and row.Attribute=='CloverOwned'and row.IdAttribute=='CloverPassId'and row.Luck==2,'Key Clover, Name "4 Leaf Clover", Attribute CloverOwned, IdAttribute CloverPassId, Luck 2')
-check(row.Description=='x2 luck on EVERY pack u open! 🍀','the description is in the owner\'s voice: '..tostring(row.Description))
+check(row.Description=='x2 luck on EVERY pack you open! 🍀','the description is in the owner\'s voice: '..tostring(row.Description))
 check(Mech.PassGemPrices.Clover==999 and Mech.PassGemPrices.Growth==500 and Mech.PassGemPrices.Speed==400,'the Gem price is 999 (the other two are untouched)')
 check(type(row.DefaultId)=='number'and row.DefaultId>=0 and row.DefaultId%1==0,'DefaultId is a whole number (0 = not on sale): '..tostring(row.DefaultId))
 do
@@ -72,7 +72,7 @@ local done;for _,s in ipairs(E.sent)do if s.Remote=='PurchaseDone'and s.P==Ann t
 check(done and done.Kind=='Pass'and done.Name=='4 Leaf Clover Pass'and done.Icon=='Clover','PurchaseDone {Kind Pass, Name "4 Leaf Clover Pass", Icon Clover} goes to the buyer')
 local again=invoke(Ann,'BuyPerk','Clover')
 check(again.Success==false and gems(Ann)==5000-999,'a second purchase is refused and costs nothing ('..tostring(again.Message)..')')
-check(again.Message=='U ALREADY HAVE THIS!','... "U ALREADY HAVE THIS!"')
+check(again.Message=='YOU ALREADY HAVE THIS!','... "YOU ALREADY HAVE THIS!"')
 local other=invoke(Ann,'BuyPerk','Growth');check(other.Success==true and gems(Ann)==5000-999-500,'(the other passes still sell: Growth 500)')
 -- too few Gems
 setGems(Cy,998);local poor=invoke(Cy,'BuyPerk','Clover')
@@ -138,7 +138,7 @@ do
  check(Jo:GetAttribute('CloverOwned')==true and Jo:GetAttribute('CloverOwnershipReady')==true,'Robux ownership (UserOwnsGamePassAsync) grants the pass')
  check(luck(Jo)==2,'... and the luck is x2 ('..tostring(luck(Jo))..')')
  check(Data:GetPremium(Jo).Entitlements.Clover==nil,'... nothing is saved for it (Roblox is asked on every join)')
- local no=invoke(Jo,'BuyPerk','Clover');check(no.Success==false and no.Message=='U ALREADY HAVE THIS!','a player who owns it with Robux cannot buy it with Gems too')
+ local no=invoke(Jo,'BuyPerk','Clover');check(no.Success==false and no.Message=='YOU ALREADY HAVE THIS!','a player who owns it with Robux cannot buy it with Gems too')
  Data:AddBoost(Jo,boots[3].Id);check(luck(Jo)==20000,'Robux pass + Lava Boots: x20000 (R155: Lava x10K, halved)')
  -- the other passes do not give luck
  local Kim=E.makePlayer(1011,'Kim');owners[1011]={[101]=true,[102]=true};RS.GamePassCatalog:SetAttribute('GrowthPassId',101);RS.GamePassCatalog:SetAttribute('SpeedPassId',102)

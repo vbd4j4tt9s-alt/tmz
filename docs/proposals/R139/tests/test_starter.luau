@@ -63,7 +63,7 @@ scan(Guide,'BeginnerGuide')
 check(#words==0,'no tutorial text mentions luck or 2x'..(#words>0 and(': '..table.concat(words,' | '))or''))
 check(Guide.Finished.Chip.Label=='🎁 FREE PACK!','the finish card says 🎁 FREE PACK!')
 -- (R152: the notice is in the owner's words; it still names it a Forest pack, like any other)
-check(Guide.StarterPack.Notice=='🎁 FREE Forest pack!! check ur Bag','the notice: '..Guide.StarterPack.Notice)
+check(Guide.StarterPack.Notice=='🎁 FREE Forest pack!! check your Bag','the notice: '..Guide.StarterPack.Notice)
 -- The pack tool and its hold tooltip (ChestService) read exactly like a normal Forest pack's.
 local Chests=server('ChestService')
 local fake=setmetatable({PlayerData=Data,Config=Config,Openings={}},{__index=Chests})
@@ -76,7 +76,7 @@ fake.Openings[A]=true -- (an opening in progress: _holdPack only writes the tool
 Chests._holdPack(fake,A,tLucky);Chests._holdPack(fake,A,tNormal)
 check(tLucky.ToolTip==tNormal.ToolTip,'holding it shows the same tooltip as a normal Forest pack')
 -- (R155: every pack's tooltip ends with the pack pity's rule, "every 10th pack u open is lucky: x1.5 luck ...", the same for every pack: it says nothing of the starter boost)
-local tipLucky=tLucky.ToolTip:gsub('\n[^\n]*every 10th pack u open is lucky[^\n]*','')
+local tipLucky=tLucky.ToolTip:gsub('\n[^\n]*every 10th pack you open is lucky[^\n]*','')
 check(not tipLucky:lower():find('luck',1,true)and not tipLucky:find('🍀',1,true),'no LUCK row (apart from the R155 pity rule every pack lists)')
 local plain=Rules.SeedOdds(Config,1,'Pack01',A:GetAttribute('ChestLuckMultiplier'),Rules.OddsVersion)
 local Odds=W.module('OddsText85');local listed=0

@@ -40,7 +40,7 @@ function Service.new(data,chests,passes)
  local self=setmetatable({Data=data,Chests=chests,Passes=passes,Last={},Busy={},Unannounced={},Announcer=announcer(data),Product=nil,PackProducts={},Products={},GiftProducts={},Gifts=require(script.Parent.PassGiftService).new(data,passes),Remote=remote},Service)
  remote.OnServerInvoke=function(p,action,value)
   if not Gate.Allow(p,'PremiumRequest',action,value)then return {Success=false,Message='Wait a sec!'}end
-  if not data:IsLoaded(p)then return {Success=false,Message='HOLD ON, UR DATA IS LOADING!'}end
+  if not data:IsLoaded(p)then return {Success=false,Message='HOLD ON, YOUR DATA IS LOADING!'}end
   if action=='Tutorial'then
    self.Last[p]=self.Last[p]or{};local now=os.clock()
    if now-(self.Last[p].Tutorial or-10)<.2 then return {Success=false}end;self.Last[p].Tutorial=now
@@ -61,7 +61,7 @@ function Service.new(data,chests,passes)
    self.Last[p]=self.Last[p]or{};local now=os.clock()
    if now-(self.Last[p].Daily or-10)<.3 then return {Success=false,Message='TRY AGAIN IN A SEC!'}end;self.Last[p].Daily=now
    if value=='State'then return data:DailyState(p)end
-   if not data.CanSave[p]then local state=data:DailyState(p);state.Success=false;state.Message='NO REWARDS UNTIL UR DATA CAN SAVE';return state end
+   if not data.CanSave[p]then local state=data:DailyState(p);state.Success=false;state.Message='NO REWARDS UNTIL YOUR DATA CAN SAVE';return state end
    local okay,message
    if value=='ClaimLogin'then
     okay,message=data:ClaimDailyLogin(p)
@@ -93,7 +93,7 @@ function Service.new(data,chests,passes)
    end
    return self:State(p)
   end
-  if not data.CanSave[p]then return {Success=false,Message='NO PURCHASES UNTIL UR DATA CAN SAVE'}end
+  if not data.CanSave[p]then return {Success=false,Message='NO PURCHASES UNTIL YOUR DATA CAN SAVE'}end
   if(action=='RobuxBundle'or action=='RobuxGift'or action=='RobuxPack')and not receiptSpace(data:GetPremium(p))then
    local state=self:State(p);state.Success=false;state.Message='ROBUX PURCHASES AREN\'T ON FOR THIS SAVE';return state
   end

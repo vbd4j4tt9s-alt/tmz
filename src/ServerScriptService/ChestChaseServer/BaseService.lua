@@ -597,7 +597,7 @@ function BaseService:SetupTreadmillRemotes(folder)
     local request=remote('ManageTreadmill','RemoteFunction')
     request.OnServerInvoke=function(player,action,expected)
         if not require(script.Parent.SecurityGate).Allow(player,'ManageTreadmill',action,expected)or not require(script.Parent.MovementGuard).Check(player)then return {Error='Please try again.'}end
-        if not self:CanManageTreadmill(player)then return {Error='Go to ur own treadmill!'}end
+        if not self:CanManageTreadmill(player)then return {Error='Go to your own treadmill!'}end
         local now=os.clock()
         if now-(self.TreadmillRequests[player]or -math.huge)<.25 then return {Error='Wait a sec!'}end
         self.TreadmillRequests[player]=now

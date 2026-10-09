@@ -15,9 +15,9 @@ local S={};S.__index=S
 S.RewardSeconds=10 -- a reward seed handed over this recently may still be flying in on the opener's screen
 S.LogIds=6 -- the discard log names up to this many record ids
 S.Kinds={Pack=true,Seed=true,Fruit=true,Loot=true}
-S.Text={Loading='HOLD ON, UR DATA IS LOADING!',Saving='UR DATA CAN\'T SAVE RIGHT NOW, TRY AGAIN LATER',NotItem='U CAN\'T THROW THAT AWAY',Gone='THAT ITEM IS ALREADY GONE!',
- Busy='FINISH UR STEAL FIRST!',Gift='WAIT FOR UR GIFT TO SEND FIRST!',Opening='WAIT FOR UR PACK TO FINISH OPENING!',Landing='WAIT FOR UR SEED TO LAND FIRST!',
- Amount='U DON\'T HAVE THAT MANY!',Invalid='TRY AGAIN!'}
+S.Text={Loading='HOLD ON, YOUR DATA IS LOADING!',Saving='YOUR DATA CAN\'T SAVE RIGHT NOW, TRY AGAIN LATER',NotItem='YOU CAN\'T THROW THAT AWAY',Gone='THAT ITEM IS ALREADY GONE!',
+ Busy='FINISH YOUR STEAL FIRST!',Gift='WAIT FOR YOUR GIFT TO SEND FIRST!',Opening='WAIT FOR YOUR PACK TO FINISH OPENING!',Landing='WAIT FOR YOUR SEED TO LAND FIRST!',
+ Amount='YOU DON\'T HAVE THAT MANY!',Invalid='TRY AGAIN!'}
 function S.new(config,data,chests,gifts,notes)
  return setmetatable({Config=config,Data=data,Chests=chests,Gifts=gifts,Notes=notes},S)
 end

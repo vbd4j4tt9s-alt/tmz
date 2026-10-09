@@ -245,7 +245,7 @@ local function render()
    if r.Row.Visible then
     local total=math.max(1,tonumber(b.Total)or D.QuestsPerDay);local got=math.clamp(tonumber(b.Done)or 0,0,total)
     r.Count.Text=got..' / '..total;r.Fill.Size=UDim2.fromScale(got/total,1)
-    r.Claim.Visible=b.Ready==true and b.Claimed~=true;r.Done.Visible=b.Claimed==true or(b.Blocked==true and b.Claimed~=true);r.Done.Text=b.Claimed and'✓ DONE'or'GOT UR 💎'
+    r.Claim.Visible=b.Ready==true and b.Claimed~=true;r.Done.Visible=b.Claimed==true or(b.Blocked==true and b.Claimed~=true);r.Done.Text=b.Claimed and'✓ DONE'or'GOT YOUR 💎'
     r.Gems.Text='+'..tostring(b.Gems or D.AllDoneGems)
     r.Edge.Color=r.Claim.Visible and GOLD or Theme.Colors.Line;r.Row.BackgroundColor3=(b.Claimed or b.Blocked)and Theme.Colors.Inset or Theme.Colors.Card
     if r.Claim.Visible then pulse(r.Claim.Pulse,'Scale',1,1.06)end
@@ -360,7 +360,7 @@ inviteButton.Activated:Connect(function()
  task.spawn(function()
   local ok,can=pcall(SocialService.CanSendGameInviteAsync,SocialService,player)
   if not ok or not can then hint('Can\'t invite here right now');Audio.Play('Denied');return end
-  local options;pcall(function()options=Instance.new('ExperienceInviteOptions');options.PromptMessage='Friends here boost ur speed gain! 👥'end)
+  local options;pcall(function()options=Instance.new('ExperienceInviteOptions');options.PromptMessage='Friends here boost your speed gain! 👥'end)
   if not pcall(SocialService.PromptGameInvite,SocialService,player,options)then pcall(SocialService.PromptGameInvite,SocialService,player)end
  end)
 end)

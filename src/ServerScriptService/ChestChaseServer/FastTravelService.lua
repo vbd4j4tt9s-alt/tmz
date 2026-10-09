@@ -64,7 +64,7 @@ function FastTravelService:_refusal(player, destination)
 	end
 	if player:GetAttribute("GuardianRagdollActive") or player:GetAttribute("GuardianFlingActive")
 		or humanoid.PlatformStand then
-		return "WAIT TILL U CAN MOVE!"
+		return "WAIT TILL YOU CAN MOVE!"
 	end
 	if self.Bases.TrainingSessions and self.Bases.TrainingSessions[player] then
 		return "GET OFF THE TREADMILL FIRST!"
@@ -74,7 +74,7 @@ function FastTravelService:_refusal(player, destination)
 	end
 	local chests = self.Chase.Chests
 	if chests and chests.IsOpening and chests:IsOpening(player) then
-		return "FINISH OPENING UR PACK FIRST!"
+		return "FINISH OPENING YOUR PACK FIRST!"
 	end
 	if humanoid.SeatPart then
 		return "GET UP FIRST!"

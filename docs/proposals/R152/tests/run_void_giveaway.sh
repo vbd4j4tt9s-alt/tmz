@@ -165,7 +165,7 @@ mutate "the giveaway pack is a TestGrant pack" $SV "pcall(function()return data:
 mutate "the profile flag is not set" $SV " premium[Rules.Flag]=true
  data:MarkDirty(player)" " data:MarkDirty(player)" server
 mutate "a flagged profile gets a second pack" $SV " if premium[Rules.Flag]==true then return nil,'claimed'end" "" server
-mutate "a flagged player is not refused at the door" $SV " if self:_flag(player)then self:_state(player,'Claimed');return refuse('✅ U already grabbed ur free Void Pack!','claimed')end" "" server
+mutate "a flagged player is not refused at the door" $SV " if self:_flag(player)then self:_state(player,'Claimed');return refuse('✅ You already grabbed your free Void Pack!','claimed')end" "" server
 mutate "the grant is not saved" $SV " data:MarkDirty(player);data:QueueGardenSave(player)
  pcall(function()self.Chests:SyncTools(player)end)" " pcall(function()self.Chests:SyncTools(player)end)" server
 mutate "an owed player is never given the pack" $SV "  if self.Ready[player]and not self.Busy[player]and self.Data:IsLoaded(player)and self:_owed(player)then task.spawn(self.Claim,self,player,true)end" "" server
@@ -205,7 +205,7 @@ mutate "the beam reaches behind the pack" $AR "local packBottom=Rules.PackHeight
 mutate "a disc behind the pack" $AR " local packAnchor=anchor('PackAnchor',Rules.PackHeight)" " local back=drum(m,'Pack disc',Rules.PackSize,-1,1,C.Glow,Enum.Material.Neon,y+Rules.PackHeight)
  local packAnchor=anchor('PackAnchor',Rules.PackHeight)" art
 mutate "the lettering is on one face only" $AR "for i,face in ipairs({{0,-1,0},{0,1,math.pi},{1,0,-math.pi/2},{-1,0,math.pi/2}})do" "for i,face in ipairs({{0,-1,0}})do" art
-mutate "the prompt text is wrong" $RU "R.PromptAction='Grab ur FREE Void Pack'" "R.PromptAction='Take'" art
+mutate "the prompt text is wrong" $RU "R.PromptAction='Grab your FREE Void Pack'" "R.PromptAction='Take'" art
 mutate "the blizzard drifts are not kept off" $AR " game:GetService('CollectionService'):AddTag(m,'SnowAvoid')" "" art
 mutate "the plaques lie in the column's plane (z-fighting)" $AR "Plaque={W=4*K,H=1.6*K,D=.12*K,Y=4.55*K,Out=.03*K}" "Plaque={W=4*K,H=1.6*K,D=.12*K,Y=4.55*K,Out=-.06*K}" zfight
 mutate "the capital top shares a face with the capital" $AR "Top={Size=7.2*K,Y0=7.4*K,Y1=7.76*K}" "Top={Size=6.4*K,Y0=7.4*K,Y1=7.4*K}" zfight

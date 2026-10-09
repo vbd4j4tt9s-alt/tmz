@@ -83,7 +83,7 @@ reply.Message=nil;act(pack.BuyWithRobux)
 check(shut(),'the next action without a message clears the strip at once')
 -- 3. Real errors and hints still show, for 3 seconds ----------------------------------------------------------------------------------
 successful=false
-for _,text in ipairs({'Couldn\'t open the purchase. Try again!','CAN\'T BUY THIS RIGHT NOW','CAN\'T GIFT THIS RIGHT NOW','NOT ENOUGH GEMS','NO PURCHASES UNTIL UR DATA CAN SAVE','TRY AGAIN IN A SEC!'})do
+for _,text in ipairs({'Couldn\'t open the purchase. Try again!','CAN\'T BUY THIS RIGHT NOW','CAN\'T GIFT THIS RIGHT NOW','NOT ENOUGH GEMS','NO PURCHASES UNTIL YOUR DATA CAN SAVE','TRY AGAIN IN A SEC!'})do
  plays={};reply.Message=text;act(pack.BuyWithRobux)
  check(plays[#plays]=='Denied','R150: the refused purchase "'..text..'" clicks Denied')
  check(status.Visible and said()==text,'"'..text..'" is shown')
@@ -91,9 +91,9 @@ for _,text in ipairs({'Couldn\'t open the purchase. Try again!','CAN\'T BUY THIS
  R.advance(.3);check(shut(),'"'..text..'" hides after 3 s')
 end
 successful=true
-local gems_=page.ConvertCash;reply.Message='Ur Gems are on the way!';gems_.GemQuantity.Text='5';plays={};act(gems_.Convert)
+local gems_=page.ConvertCash;reply.Message='Your Gems are on the way!';gems_.GemQuantity.Text='5';plays={};act(gems_.Convert)
 check(not table.find(plays,'Denied'),'R150: a successful action (the Convert hint) never clicks Denied')
-check(calls[#calls][1]=='Convert'and calls[#calls][2]==5 and status.Visible and said()=='Ur Gems are on the way!','Convert keeps its "Ur Gems are on the way!" hint')
+check(calls[#calls][1]=='Convert'and calls[#calls][2]==5 and status.Visible and said()=='Your Gems are on the way!','Convert keeps its "Your Gems are on the way!" hint')
 R.advance(3.1);check(shut(),'...and it hides after 3 s')
 gems_.GemQuantity.Text='abc';act(gems_.Convert)
 check(status.Visible and said()=='Type a whole number of Gems.','a client-side input error shows')

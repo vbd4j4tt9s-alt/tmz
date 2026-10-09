@@ -109,7 +109,7 @@ function X.Execute(ctx,p,action,a)
   if #a~=0 then return false,'Use mechshop.'end
   local C=require(RS.MechCatalog);local lines={'Mech packs: select SINGLE / 5 PACKS / 10 PACKS in SHOP.'}
   for _,offer in ipairs(C.Offers)do lines[#lines+1]=offer.Count..' for '..offer.GemPrice..' Gems | target '..offer.TargetRobuxPrice..' Robux | product '..(C.ProductId(offer.Count)>0 and'configured'or'not configured')end
-  lines[#lines+1]=C.CoatLine()..' on every pack u buy (each pack rolls its own; free packs stay plain).' -- R155
+  lines[#lines+1]=C.CoatLine()..' on every pack you buy (each pack rolls its own; free packs stay plain).' -- R155
   local Limited=require(RS.LimitedEvent);lines[#lines+1]=C.EventOver()and'Limited event: OVER. No new purchase starts (a Robux receipt from before still gets its packs).'or'Limited event: ends in '..Limited.Text(Limited.Left(os.time()))..'.' -- R155
   lines[#lines+1]='Robux buttons use the live Roblox price. This command grants nothing.';return true,table.concat(lines,'\n')
  end
