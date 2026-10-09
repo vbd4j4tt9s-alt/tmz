@@ -12,6 +12,8 @@
 --                     allowed, spam) neither move nor skip the count
 --  5. saved         - the optional PackPity field: save, load, rejoin, old profiles, junk; ProfileVersion 22
 --  6. owner / text  - /test pity, /test pity set, /test pity 30 (the old preview), /test odds ... lucky and the rule line; the hold tooltip (lucky odds + the rule)
+--  7. held tooltip  - (R155 review) a held pack's tooltip is rebuilt when a pity count or the boots luck changes (one refresh a frame, a never-held pack keeps its short line, a bad record
+--                     does not stop the others); the Mech coat line only on a bought pack
 local E=require('./clover_env');local W,R,check=E.W,E.R,E.check
 local Config,Data=E.Config,E.Data
 local Rules=W.module('SeedPackRules');local Pity=W.module('PackPity155');local Balance=W.module('BalanceValues81')
@@ -309,5 +311,74 @@ do
   local tip=tostring(tool.ToolTip)
   check(tip:find(Pity.LuckyLine,1,true)and tip:find(Pity.Disclosure,1,true)and tip:find('Solar Starfruit Seed: '..Odds.Format(oddsAt(2,'Pack01',1.5,1,true).SolarStarfruitSeed),1,true),'ChestService:_holdPack: the pack tool\'s tooltip has the lucky line, the lucky odds and the rule')
  else check(false,'ChestService loads on the mock ('..tostring(Chest)..')')end
+end
+
+-- 7. R155 review: a held pack's tooltip follows the pity counts and the boots luck (the real ChestService on the mock) -------------------------------------------
+do
+ local Chest=E.server('ChestService');local Mech=W.module('MechCatalog')
+ local host=setmetatable({Config=Config,PlayerData=Data,Openings={}},{__index=Chest});host._canOpenPack=function()return false end -- (a bare host: _holdPack writes the tooltip, then refuses the hold)
+ local tp=E.makePlayer(6040,'PityTip');local bp=tp:FindFirstChildOfClass('Backpack')
+ local function expectTip(rec,lucky,coat) -- the tooltip as the rules say it: label, (LUCKY), the odds rows, (the coat line), the rule
+  local luck,pass=tp:GetAttribute('ChestLuckMultiplier'),Data:PassLuck(tp)
+  local odds=Pity.Scoped(lucky,Rules.SeedOdds,Config,rec.Stage,rec.BagVariant,Pity.Luck(luck,lucky),rec.OddsVersion or 0,nil,Pity.Luck(pass,lucky))
+  local rows={Rules.PackLabel(rec.Stage,rec.BagVariant,rec.PackSize,rec.PackMutation)}
+  if lucky then rows[#rows+1]=Pity.LuckyLine end
+  for _,seed in ipairs(Rules.OddsRows(Config,rec.Stage,rec.BagVariant,odds))do rows[#rows+1]=seed.Name..': '..Odds.Format(odds[seed.Id])end
+  if coat then rows[#rows+1]=Mech.CoatLine()end
+  rows[#rows+1]=Pity.Disclosure
+  return table.concat(rows,'\n')
+ end
+ local function hold(tool)pcall(Chest._holdPack,host,tp,tool)end
+ local function flush()E.advance(0)end
+ local SHORT=' • Click / tap / RT 5 times to open'
+ local calls=0;local realRefresh=Chest._refreshPackTooltips;Chest._refreshPackTooltips=function(...)calls+=1;return realRefresh(...)end
+ Data:SetPackPity(tp,0,9)
+ local recA=Data:AddChest(tp,pack(EVENT_KINDS[3]))           -- Mech pack A (a free one: no coat line)
+ local recC=Data:AddChest(tp,pack(NORMAL_KINDS[1]))          -- a pack that is never held
+ local toolA,toolC=Chest._createPackTool(host,recA,bp),Chest._createPackTool(host,recC,bp)
+ local shortC=Rules.PackLabel(recC.Stage,recC.BagVariant,recC.PackSize,recC.PackMutation)..SHORT
+ check(toolA.ToolTip==Rules.PackLabel(recA.Stage,recA.BagVariant,recA.PackSize,recA.PackMutation)..SHORT and toolC.ToolTip==shortC and toolA:GetAttribute('OddsTooltip155')==nil,'a new pack tool has the short "Click / tap / RT 5 times to open" tooltip and is not marked yet')
+ -- 1. event count 9, A held: the LUCKY line and the x1.5 odds
+ hold(toolA)
+ check(toolA.ToolTip==expectTip(recA,true,false)and toolA.ToolTip:find(Pity.LuckyLine,1,true)and toolA:GetAttribute('OddsTooltip155')==true,'event count 9, Mech pack A held: its tooltip has the LUCKY line and the x1.5 odds (marked OddsTooltip155)')
+ check(expectTip(recA,true,false)~=expectTip(recA,false,false),'(the x1.5 odds really differ from the x1 odds for this pack)')
+ toolA.Parent=bp
+ -- 2. a lucky open of another event pack: the count goes to 0, A is put away and says so
+ local before=calls
+ local recB=Data:AddChest(tp,pack(EVENT_KINDS[1]));local r,why,plan=Data:OpenSeedPack(tp,recB.Id,uniform(7001))
+ check(r and plan and plan.Lucky and Data:GetPackPity(tp).Event==0,'event pack B takes the lucky roll: the event count is 0 ('..tostring(why)..')')
+ check(toolA.ToolTip:find(Pity.LuckyLine,1,true)~=nil and calls==before,'... nothing is rebuilt in the same frame (deferred)')
+ flush()
+ check(calls==before+1 and toolA.ToolTip==expectTip(recA,false,false)and not toolA.ToolTip:find('LUCKY',1,true),'... after the deferred refresh A\'s tooltip has no LUCKY line and its odds are the x1 odds ('..(calls-before)..' refresh)')
+ check(toolC.ToolTip==shortC and toolC:GetAttribute('OddsTooltip155')==nil,'... the never-held pack C keeps its short tooltip (no odds are computed for it)')
+ -- 3. the owner sets the count back to 9: A is lucky again
+ Data:SetPackPity(tp,0,9);flush()
+ check(toolA.ToolTip==expectTip(recA,true,false)and toolA.ToolTip:find(Pity.LuckyLine,1,true),'the owner sets the event count to 9: A\'s tooltip gains the LUCKY line and the x1.5 odds again')
+ -- one refresh per frame however many things change
+ before=calls;Data:SetPackPity(tp,3,3);tp:SetAttribute('ChestLuckMultiplier',7);tp:SetAttribute('ChestLuckMultiplier',9);Data:SetPackPity(tp,4,4);flush()
+ check(calls==before+1,'a pity count, the luck and a count again in one frame: ONE refresh ('..(calls-before)..')')
+ before=calls;tp:SetAttribute('ChestLuckMultiplier',9);Data:SetPackPity(tp,4,4);flush()
+ check(calls==before,'nothing changed (same values): no refresh')
+ tp:SetAttribute('ChestLuckMultiplier',1);flush()
+ -- 4. never held, still short after all of that
+ check(toolC.ToolTip==shortC and toolC:GetAttribute('OddsTooltip155')==nil,'a never-held pack tool\'s tooltip stays the short one through every change above')
+ -- 5. the boots luck: a held world pack's odds follow ChestLuckMultiplier
+ local recW=Data:AddChest(tp,pack(NORMAL_KINDS[1]));local toolW=Chest._createPackTool(host,recW,bp);hold(toolW);toolW.Parent=bp
+ local plain=toolW.ToolTip
+ check(plain==expectTip(recW,false,false),'a held world pack (normal count 4: not lucky) shows its plain odds')
+ tp:SetAttribute('ChestLuckMultiplier',1000);flush()
+ check(toolW.ToolTip==expectTip(recW,false,false)and toolW.ToolTip~=plain,'ChestLuckMultiplier changes to x1000: the held world pack\'s odds are rebuilt for it')
+ -- the Mech coat line: a bought pack only
+ local recP=Data:AddChest(tp,pack(EVENT_KINDS[3]));recP.PaidRandom=true;local toolP=Chest._createPackTool(host,recP,bp);hold(toolP);toolP.Parent=bp
+ check(toolP.ToolTip==expectTip(recP,false,true)and toolP.ToolTip:find(Mech.CoatLine(),1,true)and not toolA.ToolTip:find(Mech.CoatLine(),1,true),'the coat line is on a BOUGHT Mech pack (PaidRandom) and not on the free one')
+ -- a bad record does not stop the others; a record that is gone is skipped
+ local realTip=Chest._packTooltip;Chest._packTooltip=function(self,player,record)if record.Id==recA.Id then error('bad record')end;return realTip(self,player,record)end
+ local stale=toolA.ToolTip;tp:SetAttribute('ChestLuckMultiplier',3);flush()
+ check(toolA.ToolTip==stale and toolW.ToolTip==expectTip(recW,false,false)and toolP.ToolTip==expectTip(recP,false,true),'one record that cannot be built (A) keeps its old text and the other held packs are still rebuilt (x3)')
+ Chest._packTooltip=realTip
+ local ghost=Chest._createPackTool(host,recC,bp);ghost:SetAttribute('OddsTooltip155',true);ghost:SetAttribute('SeedInventoryId','gone-for-good');ghost.ToolTip='old'
+ tp:SetAttribute('ChestLuckMultiplier',4);flush()
+ check(ghost.ToolTip=='old'and toolA.ToolTip==expectTip(recA,false,false),'a tool whose record is gone is skipped (its text is left alone); the next refresh rebuilds A again (event count 4: no LUCKY)')
+ Chest._refreshPackTooltips=realRefresh
 end
 E.finish('R155 pack pity')

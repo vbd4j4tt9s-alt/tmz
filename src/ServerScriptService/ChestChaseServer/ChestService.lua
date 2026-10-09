@@ -984,25 +984,54 @@ local function settleHold(self,player,tool)
     if not existing.Committed and existing.Tool.Parent~=player.Character then ChestService._finishOpening(self,player,existing) end
     return false
 end
+-- R155 (review): the pack's tooltip, built from its record: one function for the hold and for the refresh below (the pity counts and the boots luck move while a pack is put away).
+function ChestService:_packTooltip(player,record)
+    -- R139 (owner): the free starter pack's 2x luck is secret, so its tooltip shows the plain pack odds.
+    -- R154: the pack's real odds: the 80% rule (SeedPackRules) and the 4 Leaf Clover's x2 on the Void / Verity / Mech packs (PassLuck, the passes alone) too.
+    local odds=PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,player:GetAttribute('ChestLuckMultiplier'),record.OddsVersion or 0,nil,self.PlayerData:PassLuck(player))
+    -- R155 (owner): the pack pity. When this pack's open would be its group's lucky 10th, its odds are the lucky roll's (x1.5) and a line says so; the rule is listed with the odds.
+    local lucky,before,after=nil,{},{}
+    if self.PlayerData.PackPityTooltip then lucky,before,after=self.PlayerData:PackPityTooltip(player,record,function(luck,passLuck)return PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,luck,record.OddsVersion or 0,nil,passLuck)end)end
+    if lucky then odds=lucky end
+    local rows={PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)}
+    for _,line in ipairs(before)do table.insert(rows,line)end
+    for _,seed in ipairs(PackRules.OddsRows(self.Config,record.Stage,record.BagVariant,odds))do -- R148: by rarity rank, then name
+        table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))
+    end
+    if record.BagVariant=='MechLimited' and record.PaidRandom==true then table.insert(rows,require(ReplicatedStorage.MechCatalog).CoatLine()) end -- R155: the coat line next to a Mech pack's odds (R155 review: a BOUGHT one only; a free / TEST Mech pack never rolls a coat)
+    for _,line in ipairs(after)do table.insert(rows,line)end
+    return table.concat(rows,'\n')
+end
+-- R155 (review): the tooltip of every pack this player has held is rebuilt from its record (the pity counts and the boots luck change what it says); a never-held pack keeps its short line.
+function ChestService:_refreshPackTooltips(player)
+    if not player.Parent then return end
+    local byId={};for _,record in ipairs(self.PlayerData:GetChestRecords(player))do byId[record.Id]=record end
+    for _,container in ipairs((ChestService._getToolContainers(self,player)))do for _,tool in ipairs(container:GetChildren())do
+        if tool:IsA('Tool')and tool:GetAttribute('SeedPackTool')and tool:GetAttribute('OddsTooltip155')==true then
+            local record=byId[tool:GetAttribute('SeedInventoryId')]
+            if record and record.Kind=='Pack' then pcall(function()tool.ToolTip=ChestService._packTooltip(self,player,record)end)end -- (no record, or a seed now: its tool goes at the next sync)
+        end
+    end end
+end
+local packTipWatchers=setmetatable({},{__mode='k'})
+-- R155 (review): once per player (at its first pack tool): a change of a pity count or of the boots luck rebuilds the held packs' tooltips, at most once a frame (never yields).
+local function watchPackTooltips(self,player)
+    if packTipWatchers[player]then return end;packTipWatchers[player]=true
+    local queued=false
+    local function refresh()
+        if queued then return end;queued=true
+        task.defer(function()
+            queued=false
+            local ok,err=pcall(ChestService._refreshPackTooltips,self,player);if not ok then warn("[R155] pack tooltip refresh failed: "..tostring(err))end
+        end)
+    end
+    for _,name in ipairs({'PackPityNormal','PackPityEvent','ChestLuckMultiplier'})do player:GetAttributeChangedSignal(name):Connect(refresh)end
+end
 function ChestService:_holdPack(player,tool)
     local record
     for _,candidate in ipairs(self.PlayerData:GetChestRecords(player))do if candidate.Id==tool:GetAttribute('SeedInventoryId')then record=candidate;break end end
     if record then
-        -- R139 (owner): the free starter pack's 2x luck is secret, so its tooltip shows the plain pack odds.
-        -- R154: the pack's real odds: the 80% rule (SeedPackRules) and the 4 Leaf Clover's x2 on the Void / Verity / Mech packs (PassLuck, the passes alone) too.
-        local odds=PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,player:GetAttribute('ChestLuckMultiplier'),record.OddsVersion or 0,nil,self.PlayerData:PassLuck(player))
-        -- R155 (owner): the pack pity. When this pack's open would be its group's lucky 10th, its odds are the lucky roll's (x1.5) and a line says so; the rule is listed with the odds.
-        local lucky,before,after=nil,{},{}
-        if self.PlayerData.PackPityTooltip then lucky,before,after=self.PlayerData:PackPityTooltip(player,record,function(luck,passLuck)return PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,luck,record.OddsVersion or 0,nil,passLuck)end)end
-        if lucky then odds=lucky end
-        local rows={PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)}
-        for _,line in ipairs(before)do table.insert(rows,line)end
-        for _,seed in ipairs(PackRules.OddsRows(self.Config,record.Stage,record.BagVariant,odds))do -- R148: by rarity rank, then name
-            table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))
-        end
-        if record.BagVariant=='MechLimited' then table.insert(rows,require(ReplicatedStorage.MechCatalog).CoatLine()) end -- R155: the coat line next to the Mech pack's odds
-        for _,line in ipairs(after)do table.insert(rows,line)end
-        tool.ToolTip=table.concat(rows,'\n')
+        tool.ToolTip=ChestService._packTooltip(self,player,record);tool:SetAttribute('OddsTooltip155',true) -- R155 (review): from now on the pity / luck refresh keeps it true
     end
     if settleHold(self,player,tool) then return end
     if self.Openings[player] or not self:_canOpenPack(player,tool) then bounce(self,player,tool);return end
@@ -1094,6 +1123,7 @@ function ChestService:_createPackTool(record,backpack)
     tool:SetAttribute("BagVariant",PackRules.VariantKey(record.BagVariant))
     tool:SetAttribute("SeedScale",PackRules.SanitizeSeedScale(record.SeedScale))
     local shape=PackShapes.Sanitize(record.PackShape);if shape>0 then tool:SetAttribute("PackShape",shape) end -- R151: the pack's own chip-bag shape (absent = the default: every record saved before it)
+    if player then watchPackTooltips(self,player) end -- R155 (review)
     tool.Equipped:Connect(function() self:_holdPack(player,tool) end)
     tool.Activated:Connect(function() self:_activatePack(player,tool) end)
     tool.Unequipped:Connect(function()
