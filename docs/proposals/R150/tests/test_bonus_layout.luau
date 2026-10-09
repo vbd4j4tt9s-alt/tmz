@@ -90,9 +90,15 @@ for _,v in ipairs(views)do
    end
    check(b.RX>=8 and b.RY>=8 and b.RX+b.RW<=w-8 and b.RY+b.RH<=h-8,tag..': the button keeps the 8 px screen margin')
    -- R150 review: the button is anchored at its centre (its pop and pulse scale about it); its placement is exactly the one TreadmillBonusRules.Place gives
-   local want=Rules.Place(m,w,h,boxes,extra)
+   -- (R155 review: the one it gives with the pity bars as one more box and the preferred spot lifted above them: PityBars155.ButtonSpot)
+   local Bars=W.module('PityBars155')
+   local want=Bars.ButtonSpot(Rules,m,w,h,boxes,extra)
    check(button.AnchorPoint.X==.5 and button.AnchorPoint.Y==.5 and want and math.abs(b.RX-want.X)<.01 and math.abs(b.RY-want.Y)<.01 and math.abs(b.RW-want.W)<.01 and math.abs(b.RH-want.H)<.01,
     tag..string.format(': R150 review: the centre-anchored button sits exactly where Place puts its top-left corner (%.1f,%.1f vs %.1f,%.1f)',b.RX,b.RY,want and want.X or-1,want and want.Y or-1))
+   -- R155 review: the pity bars (always on the HUD, the glow and the held bar's scale included) are never under the button or its badge, with the button's own 6 px of air
+   local ext=Bars.Reserved(w,h,m,nil)
+   check(not ov(union,ext,0),tag..string.format(': R155 review: button + badge clear of the pity bars (%d,%d %dx%d)',ext.X,ext.Y,ext.W,ext.H))
+   check(not ov({X=b.RX,Y=b.RY,W=b.RW,H=b.RH},ext,6),tag..': R155 review: ... with the 6 px of air of every other box')
    check(union.X>=2 and union.Y>=2 and union.X+union.W<=w-2 and union.Y+union.H<=h-2,tag..': button and badge are on screen')
    for _,bx in ipairs(boxes)do check(not ov(union,bx,0),tag..': button + badge clear of '..bx.N)end
    for _,bx in ipairs(extra)do check(not ov(union,bx,0),tag..': button + badge clear of notice row '..bx.N)end

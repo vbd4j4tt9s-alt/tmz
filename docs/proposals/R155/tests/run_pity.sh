@@ -7,7 +7,9 @@
 #               the R152 load guard is line 1 of every client script; the wiring (the open plans before its roll and commits after it went through, the save and the
 #               load, the hold tooltip, /test odds, the Mech shop card's line, COMMANDS.md and the F4 help); no model names in the R155 pity files
 #  1. test    - test_pity155.luau (the R153 clover world, the real server code): rules, clamps, lucky odds, real opens per group, TEST / refused opens, saving, commands
-#  2. test    - test_pity_bars155.luau (the real client bars): always there, values, 9/10 glow, the held pack, the lucky pop and the card tag, Reduced Motion, 30 screens
+#  2. test    - test_pity_bars155.luau (the real client bars): always there, values, 9/10 glow, the held pack, the lucky pop and the card tag, Reduced Motion, 36 screens;
+#               R155 review: the SKIP pill and the treadmill BONUS ROLL button never touch the bars (60 screen / controls cases), the bars start with the tutorial card up / a
+#               pack in hand / a reveal card / a menu (no error), a bar at 9/10 writes its glow and nothing else, a hidden / dimmed bar costs nothing
 #  3. teeth   - the same tests on broken copies (each must FAIL)
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
@@ -35,12 +37,12 @@ echo "ok: the four new scripts are in the manifest (sorted)"
 (cd "$REPO" && grep -v '^#' "$P/R151/tests/frozen.sha256" | sha256sum -c --quiet -) || fail "a frozen file differs from R151's frozen.sha256"
 for f in PackOdds112 PackLuck154;do grep -q "^# R155 (on purpose): .*$f.lua.*pack pity" "$P/R151/tests/frozen.sha256" || fail "frozen.sha256 has no R155 pity note for $f";done
 echo "ok: the frozen odds files match their hashes; PackOdds112 / 137 and PackLuck154 carry their R155 pity notes"
-# (after the R155 merges the cinematic, the card, the hotbar and SeedPackRules change for other R155 work: the pity itself never touches them; these two never change)
+# (after the R155 merges the cinematic, the card, the hotbar and SeedPackRules change for other R155 work, and the card's SKIP pill now keeps clear of the bars; these two never change)
 for f in src/ServerScriptService/ChestChaseServer/Config.lua src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua;do
  git -C "$REPO" diff --quiet "$BASE" -- "$f" || fail "$f changed since $BASE (Config.Version / ProfileVersion and the music stay as they are)"
 done
 grep -q "Config.ProfileVersion=22" "$SS/Config.lua" || fail "ProfileVersion is not 22"
-echo "ok: Config.lua (Version, ProfileVersion 22), Hotbar.client.lua, RarePullCinematic, RarePullCard, BackgroundMusic and SeedPackRules untouched since $BASE"
+echo "ok: Config.lua (Version, ProfileVersion 22) and BackgroundMusic untouched since $BASE"
 sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 && echo "ok: the R152 load guard is still line 1 of every client script (the new one too)" || { fail "the load guard test fails";tail -5 "$OUT/guard.log"; }
 python3 - "$SS/PlayerDataService.lua" <<'PY' || fail "OpenSeedPack does not plan the pity before its roll and commit it after the open went through"
 import re,sys
@@ -84,12 +86,11 @@ echo "(the bars on 30 screens: $OUT/layouts.txt)"
 if [ -z "$NO_MUTATE" ];then
  echo "== 3. teeth: each break must make a test fail"
  M=$OUT/mut;mkdir -p "$M"
- mutate(){ # name file old new [old2 new2]
-  name=$1;file=$2
-  python3 - "$file" "$M/$name.lua" "$3" "$4" "${5:-}" "${6:-}" <<'PY' || { fail "mutation $name: the pattern is not in the file";return 0; }
+ mutate(){ # name file old new [old2 new2 ...]
+  name=$1;file=$2;shift 2
+  python3 - "$file" "$M/$name.lua" "$@" <<'PY' || { fail "mutation $name: the pattern is not in the file";return 0; }
 import sys
-f,out=sys.argv[1:3];pairs=[(sys.argv[3],sys.argv[4])]
-if sys.argv[5]:pairs.append((sys.argv[5],sys.argv[6]))
+f,out=sys.argv[1:3];rest=sys.argv[3:];pairs=list(zip(rest[0::2],rest[1::2]))
 s=open(f,encoding='utf-8').read()
 for old,new in pairs:
     assert old in s,old
@@ -124,6 +125,19 @@ PY
  mutate no_card_tag "$RSD/PityBars155.lua" "cardKind=kind;s.TagState={Group=group,Kind=kind,At=clock()}" "cardKind=kind"
  mutate over_the_hud "$RSD/PityBars155.lua" "  for _,b in ipairs(boxes)do if overlaps(e,b,B.Pad)then return false end end
   return true" "  return true"
+ # R155 review: the start order, the SKIP pill and BONUS button over the bars, the per-frame cost
+ mutate step_before_layout "$RSD/PityBars155.lua" "local moving=s.Placement~=nil and step(s,dt or 1/60,clock())" "local moving=step(s,dt or 1/60,clock())" " if s.Placement and s.Root.Visible then" " if s.Root.Visible then" "local placement=s.Placement;if not placement then return end" "local placement=s.Placement" " local stopLayout=Hud.Watch(gui,layout)
+ local charConns={}" " local charConns={}" " con(pg.ChildAdded,function(c)if c.Name=='ChestToolHotbar'" " local stopLayout=Hud.Watch(gui,layout)
+ con(pg.ChildAdded,function(c)if c.Name=='ChestToolHotbar'"
+ mutate no_placement_guard "$RSD/PityBars155.lua" "local moving=s.Placement~=nil and step(s,dt or 1/60,clock())" "local moving=step(s,dt or 1/60,clock())" " if s.Placement and s.Root.Visible then" " if s.Root.Visible then" "local placement=s.Placement;if not placement then return end" "local placement=s.Placement"
+ mutate skip_over_bars "$RSD/RarePullCard.lua" "if okB and Bars then local okR,box=pcall(Bars.Reserved,w,h,m,nil);if okR and type(box)=='table'then list[#list+1]=box end end" ""
+ mutate bonus_over_bars "$RSD/PityBars155.lua" " return rules.Place(setmetatable({HotbarBottom=m.HotbarBottom+rise},{__index=m}),w,h,boxes,more)" " return rules.Place(m,w,h,boxes,extra)"
+ mutate bonus_not_lifted "$RSD/PityBars155.lua" " return rules.Place(setmetatable({HotbarBottom=m.HotbarBottom+rise},{__index=m}),w,h,boxes,more)" " return rules.Place(m,w,h,boxes,more)"
+ mutate paints_every_frame "$RSD/PityBars155.lua" "   local changed=bar.Rev~=s.Rev" "   local changed=true"
+ mutate hidden_paints "$RSD/PityBars155.lua" " if s.Placement and s.Root.Visible then" " if s.Placement then"
+ mutate dimmed_pulses "$RSD/PityBars155.lua" " and not dimmed and bar.Pending==0" " and bar.Pending==0"
+ mutate words_every_paint "$RSD/PityBars155.lua" " if bar.WordCount~=bar.Count or bar.WordPop~=pop or bar.WordW~=w or bar.WordH~=h then" " if true then"
+ mutate menu_does_not_wake "$RSD/PityBars155.lua" "function()root.Visible=visible();wake()end" "function()root.Visible=visible()end"
 fi
 [ $RC = 0 ] && echo "R155 pack pity: ALL PASS" || echo "R155 pack pity: FAIL"
 exit $RC

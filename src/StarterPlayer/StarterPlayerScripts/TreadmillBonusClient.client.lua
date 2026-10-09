@@ -322,7 +322,11 @@ local function layoutButton()
   local ok,rows=pcall(Notices.Calculate,w,h,top,Rules.NoticeFlags)
   if ok then for name,row in pairs(rows)do if type(row)=='table'then table.insert(extra,{N=name,X=row.X-row.Width/2,Y=row.Y,W=row.Width,H=row.Height})end end end
  end
- local r=Rules.Place(m,w,h,Layout.HudBoxes(m,w,h,true),extra)
+ local boxes=Layout.HudBoxes(m,w,h,true)
+ -- R155 review: the pity bars (PityBars155, always on the HUD) take the place just above the hotbar this button wants: it sits above them (the module knows where
+ -- they are; no module = the place it always had)
+ local okBars,r=pcall(function()return require(RS:FindFirstChild('PityBars155')).ButtonSpot(Rules,m,w,h,boxes,extra)end)
+ if not(okBars and type(r)=='table')then r=Rules.Place(m,w,h,boxes,extra)end
  button.AnchorPoint=Vector2.new(.5,.5);button.Position=UDim2.fromOffset(r.X+r.W/2,r.Y+r.H/2);button.Size=UDim2.fromOffset(r.W,r.H) -- R150 review: the ready pop and the pulse scale about the button's centre
  local fh=r.H-LIP
  -- Narrow phones get the text-only size: drop the pack icon and use the full width for the caption.
@@ -334,6 +338,9 @@ local function layoutButton()
  layoutText()
 end
 connect(hud:GetPropertyChangedSignal('AbsoluteSize'),layoutButton);task.defer(layoutButton)
+-- (R155 review: where it goes depends on the pity bars, which follow the thumb controls, the touch setting and the camera too: laid out again whenever HudLayout says
+-- the HUD changed, as the bars do - a pair that agree on every frame)
+table.insert(connections,{Disconnect=Layout.Watch(hud,function()task.defer(layoutButton)end)})
 local function nudge()
  if reduced()then return end
  local t=0

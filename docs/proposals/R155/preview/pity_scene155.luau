@@ -4,13 +4,16 @@
 -- (RarePullCard, Legendary) are in the same scenes. The rest of the HUD (hotbar slots, the held item's name, balances, status, MENU, BASE / TRACK, jump / stick) is a
 -- STAND-IN drawn from HudLayout's own metrics (the boxes every HUD script places itself by), so the bars are seen where they sit among them.
 -- VIEW (set by run_pity_preview155.sh): 'pc' (1920 x 1080), 'land' (844 x 390 phone), 'port' (390 x 844 phone).
+-- R155 review: the treadmill BONUS ROLL button (a stand-in at the very rect PityBars155.ButtonSpot gives TreadmillBonusClient) above the bars, and the real SKIP pill of
+-- an opening (RarePullCard) clear of them, with the keyboard's Enter key on a PC.
 -- Prints: SCENE <name> <cropX> <cropY> <cropW> <cropH> <scale> <json>
 local W=require('./world');local R=W.R
 local dump=require('./dump_tree153')
 local V2=R.Vector2.new;local RGB=R.Color3.fromRGB
 local VIEWS={pc={1920,1080,false},land={844,390,true},port={390,844,true}}
 local view=VIEWS[VIEW or'pc'];local SW,SH,TOUCH=view[1],view[2],view[3]
-W.UIS.TouchEnabled=TOUCH
+W.UIS.TouchEnabled=TOUCH;W.UIS.KeyboardEnabled=not TOUCH;W.UIS.GamepadEnabled=false
+W.Gui.GetInsetArea=function()return{Min=V2(0,0),Width=SW,Height=SH}end -- (the mock's safe area is always 1280 x 720)
 W.workspace.CurrentCamera.ViewportSize=V2(SW,SH)
 local Players=W.service('Players')
 local player=R.new('Player');player.Name='Ann';player.UserId=1;player.Parent=Players;Players.LocalPlayer=player;player.CharacterAdded=R.signal()
@@ -46,6 +49,21 @@ for _,b in ipairs(Hud.HudBoxes(m,SW,SH,false))do
  elseif b.N=='ThumbL'then box('Stick',b.X+b.W/2-45,b.Y+b.H/2-45,90,90,RGB(255,255,255),.82,45,'',12)end
 end
 if m.Travel then local t=m.Travel;box('Base',t.X,t.Y,t.Horizontal and t.Size or t.W,t.Horizontal and t.H or t.Size,RGB(70,170,90),.15,8,'BASE',11);box('Track',t.Horizontal and t.X+t.Size+t.Gap or t.X,t.Horizontal and t.Y or t.Y+t.Size+t.Gap,t.Horizontal and t.Size or t.W,t.Horizontal and t.H or t.Size,RGB(220,120,60),.15,8,'TRACK',11)end
+-- the BONUS ROLL button: a stand-in drawn where TreadmillBonusClient puts the real one (PityBars155.ButtonSpot with the same boxes and notice rows)
+local TB=W.module('TreadmillBonusRules');local Notice=W.module('HudNoticeLayout')
+local function bonusRect()
+ local rows=Notice.Calculate(SW,SH,36,TB.NoticeFlags);local extra={}
+ for name,row in pairs(rows)do if type(row)=='table'then extra[#extra+1]={N=name,X=row.X-row.Width/2,Y=row.Y,W=row.Width,H=row.Height}end end
+ return W.module('PityBars155').ButtonSpot(TB,m,SW,SH,Hud.HudBoxes(m,SW,SH,true),extra)
+end
+-- (the real BASE / TRACK sit in the top bar row, TravelButtons; the stand-ins are at HudLayout's older box beside the MENU, which the bars, the pill and the button
+-- all keep clear of: in the review's scenes they are left out so they are not taken for the real place)
+local function hideTravel()for _,n in ipairs({'Base','Track'})do local f=ctx:FindFirstChild(n);if f then f.Visible=false end end end
+local bonus
+local function showBonus(on)
+ if bonus then bonus:Destroy();bonus=nil end
+ if on then local r=bonusRect();bonus=box('BonusRoll',r.X,r.Y,r.W,r.H,RGB(255,176,38),.05,14,'BONUS ROLL  NEXT 3:12',math.max(11,math.floor(r.H*.3)),RGB(70,30,4));print(('BONUS %s button %d,%d %dx%d'):format(VIEW or'pc',r.X,r.Y,r.W,r.H))end
+end
 -- the real bars -------------------------------------------------------------------------------------------------------------------------------------
 local s=B.Start(player,{})
 local gui=pg:FindFirstChild(B.Name);gui.AbsoluteSize=V2(SW,SH)
@@ -93,6 +111,18 @@ end
 local function untilPop(group)for _=1,120 do frames(1);if s.Bars[group].PopAt then return end end end
 local function toAge(group,age)local at=s.Bars[group].PopAt;while R.clock-at<age-1e-6 do frames(1)end end
 local function clearNotices()local g=pg:FindFirstChild('ChestChaseNotices83');if g then local host=g:FindFirstChild('NoticeStack');if host then for _,c in ipairs(host:GetChildren())do c.Visible=false end end end end
+-- an opening's SKIP pill: the real card at its suspense (the pill is up from SkipFrom to the hit). kind: 'Ladder' (Common..Mythic) or 'InPlace' (compact)
+local function skipCard(kind,rank,phone)
+ local cg=R.Instance.new('ScreenGui');cg.Name='RarePullReveal';cg.DisplayOrder=96;cg.Parent=pg;cg.AbsoluteSize=V2(SW,SH)
+ local Card=W.module('RarePullCard');local Rules=W.module('RarePullRules')
+ local okC,c=pcall(Card.Create,cg,kind,{Rank=rank,Phone=phone,SeedName='Sand Fruit Seed',Odds=90,Skip=true})
+ if not okC then print('CARD failed: '..tostring(c));return end
+ if kind=='Ladder'then local tl=Rules.CardTimeline(rank,false);c:UpdateLadder(tl.Burst*.6,tl)
+ else local tl=Rules.Timeline(rank,'InPlace');c:UpdateInPlace(math.max(tl.SkipFrom+.6,tl.Climax-1),tl)end
+ card=cg;local b=cg:FindFirstChild('Skip button',true)
+ if b then print(('SKIP %s pill %d,%d %dx%d modal=%s'):format(VIEW or'pc',b.Position.X.Offset,b.Position.Y.Offset,b.Size.X.Offset,b.Size.Y.Offset,tostring(b.Modal)))end
+end
+local function dropCard()if card then card:Destroy();card=nil end end
 -- the bars' own region (crop) and the whole screen
 local P=s.Placement.Pair
 local barsCrop={math.max(0,math.floor(dock.X-16)),math.max(0,math.floor(P.Y-(TOUCH and 40 or 64))),0,0}
@@ -120,13 +150,23 @@ if VIEW=='pc'or VIEW==nil then
  -- Reduced Motion: the same pop without the scale / shine / ring
  W.Gui.ReducedMotionEnabled=true;set(9,4);lucky('Normal');untilPop('Normal');toAge('Normal',.42);emit('pc_reduced',barsCrop,1);W.Gui.ReducedMotionEnabled=false
  frames(240)
+ -- R155 review: the BONUS ROLL button above the bars (on a treadmill / a roll is ready); the SKIP pill (with the keyboard's Enter key) of an opening
+ hideTravel();set(3,3);showBonus(true);local br=bonusRect();emit('pc_bonus',{barsCrop[1],math.max(0,math.floor(br.Y-24)),barsCrop[3],SH-math.max(0,math.floor(br.Y-24))},1);showBonus(false)
+ skipCard('Ladder',4,false);emit('pc_skip',nil,.5);local pill=card:FindFirstChild('Skip button',true);emit('pc_skip_zoom',{math.floor(pill.Position.X.Offset-40),math.floor(pill.Position.Y.Offset-24),pill.Size.X.Offset+80,pill.Size.Y.Offset+48},4);dropCard()
 elseif VIEW=='land'then
  set(3,3);emit('land_33',nil,1)
  holdPack('Limited Mech Pack','MechLimited');set(3,9);emit('land_held9',nil,1)
  holdPack(nil,nil);set(3,9);lucky('Event');untilPop('Event');toAge('Event',.14);emit('land_pop',nil,1)
  frames(240);clearNotices();frames(30)
  set(9,3);reveal(true);player:SetAttribute('RarePullCinematic','Ladder');frames(10);lucky('Normal');frames(80);emit('land_reveal',nil,1)
+ dropCard();player:SetAttribute('RarePullCinematic',nil);frames(300);clearNotices();frames(30)
+ -- R155 review: the BONUS ROLL button above the bars; the SKIP pill of an in-place card left of the jump button, clear of the bars
+ hideTravel();set(3,3);showBonus(true);emit('land_bonus',nil,1);showBonus(false)
+ player:SetAttribute('RarePullCinematic','InPlace');frames(10);skipCard('InPlace',6,true);emit('land_skip',nil,1);dropCard();player:SetAttribute('RarePullCinematic',nil)
 else
  set(3,3);emit('port_33',nil,1)
  holdPack('Desert Common Pack','Pack01');set(9,3);emit('port_held9',nil,1)
+ -- R155 review: the BONUS ROLL button above the bars; the SKIP pill of a card, up where the thumb controls and the bars leave room
+ hideTravel();holdPack(nil,nil);set(3,3);showBonus(true);emit('port_bonus',nil,1);showBonus(false)
+ skipCard('Ladder',4,true);emit('port_skip',nil,1);dropCard()
 end

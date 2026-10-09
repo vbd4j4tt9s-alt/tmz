@@ -616,6 +616,94 @@ do -- the real button, frame by frame at 60 fps: a card and a story scene, on a 
   Gui.GetInsetArea=origInset;W.UIS.GamepadEnabled=false
  end
 end
+-- 3b. Shift Lock and first person (R155 review): the mouse is locked to the middle of the screen there, so nothing on it could be clicked and the pill was dead for those
+-- players. The SKIP button is MODAL for exactly as long as it shows (Roblox frees the mouse for a visible modal button); a keyboard's pill carries its Enter key (the gamepad's
+-- its B); the card makes nothing and asks no service for it on a frame; the pity bars (PityBars155, above the hotbar) are never under it.
+do
+ local UIS=W.UIS
+ local function gui()return X.pg:FindFirstChild('RarePullReveal')end
+ local function modalButtons() -- the visible modal buttons on the player's screens: each one frees the mouse
+  local n=0;for _,d in ipairs(X.pg:GetDescendants())do if d:IsA('GuiButton')and d.Modal==true and d.Visible then n+=1 end end;return n
+ end
+ local Bars=W.module('PityBars155');local HudL=W.module('HudLayout')
+ local inputs={{'keyboard',{Keyboard=true}},{'gamepad',{Gamepad=true}},{'keyboard and gamepad',{Keyboard=true,Gamepad=true}},{'touch',{Touch=true}}}
+ for _,c in ipairs({{4,'Legendary card'},{7,'Cosmic scene'}})do for _,inp in ipairs(inputs)do
+  reset();UIS.TouchEnabled=inp[2].Touch==true;UIS.KeyboardEnabled=inp[2].Keyboard==true;UIS.GamepadEnabled=inp[2].Gamepad==true
+  local run,bag=start(c[1]);local tl=run.TL;local hit=tl.Climax or tl.Burst
+  local tag=fmt('the SKIP button, %s, %s',c[2],inp[1])
+  local shown,early,wrong,keyN,padN,both,maxModal,keyText,overBars=0,0,0,0,0,0,0,nil,0
+  local g=0
+  while not run.Done and run.Clock()<hit-.15 and g<4000 do
+   X.run(1/60,1/60);g+=1
+   local b=X.find(gui(),'Skip button')
+   if b then
+    local key,pad=b:FindFirstChild('Enter key'),b:FindFirstChild('Gamepad B')
+    if b.Visible~=(b.Modal==true)then wrong+=1 end
+    if b.Visible then
+     shown+=1;if run.Clock()<tl.SkipFrom then early+=1 end
+     local k=key and key.Visible;local p=pad and pad.Visible
+     if k then keyN+=1;local l=key:FindFirstChild('Enter');keyText=l and l.Text end
+     if p then padN+=1 end
+     if k and p then both+=1 end
+     -- the real pill against the bars' extent (the same screen, the same HUD metrics)
+     local view=cam.ViewportSize;local m=HudL.Read(view,UIS.TouchEnabled,nil);local ext=Bars.Reserved(view.X,view.Y,m,nil)
+     local pos,size=b.Position,b.Size
+     if pos.X.Offset<ext.X+ext.W and pos.X.Offset+size.X.Offset>ext.X and pos.Y.Offset<ext.Y+ext.H and pos.Y.Offset+size.Y.Offset>ext.Y then overBars+=1 end
+    end
+   end
+   maxModal=math.max(maxModal,modalButtons())
+  end
+  check(shown>0 and wrong==0 and early==0,fmt('%s: modal exactly while it shows (%d frames visible, %d frames where Modal and Visible disagree, %d before SkipFrom)',tag,shown,wrong,early))
+  check(maxModal<=1,tag..': at most one modal button at a time ('..maxModal..')')
+  if inp[2].Gamepad then check(padN==shown and keyN==0,fmt('%s: the gamepad\'s B shows, not the Enter key (%d / %d frames)',tag,padN,shown))
+  elseif inp[2].Keyboard then check(keyN==shown and padN==0 and keyText=='Enter',fmt('%s: the Enter key shows on the pill ("%s", %d / %d frames), not the B',tag,tostring(keyText),keyN,shown))
+  else check(keyN==0 and padN==0,tag..': a touch screen shows neither key') end
+  check(both==0,tag..': never both badges')
+  check(overBars==0,tag..': never over the pity bars ('..overBars..' frames)')
+  settle();bag:Destroy()
+  check(modalButtons()==0,tag..': when the opening is over no modal button is left (the mouse lock is back)')
+ end end
+ -- every way out hands the mouse back (the button hidden, or destroyed): while it was showing and pressed, aborted, the player dying, the next pack replacing it, the script going
+ local exits={
+  {'pressed, then collected',function(run)X.find(gui(),'Skip button').Activated:Fire();X.run(.8,1/60);M.Collect();X.run(.2,1/60)end},
+  {'aborted',function()M.Abort('test')end},
+  {'the player died',function()X.hum.Died:Fire()end},
+  {'the character removed',function()X.player.CharacterRemoving:Fire(X.char)end},
+  {'the next pack replacing it',function()local _,b2=start(5);X.run(.1,1/60)end},
+  {'left to run out and collected',function(run)X.run(run.TL.Length+.5,1/60)end},
+ }
+ for _,c in ipairs({{4,'Legendary card'},{7,'Cosmic scene'}})do for _,e in ipairs(exits)do
+  reset();UIS.TouchEnabled=false;UIS.KeyboardEnabled=true;UIS.GamepadEnabled=false
+  local run,bag=start(c[1]);X.run(run.TL.SkipFrom+.3,1/60)
+  local tag=fmt('the SKIP button, %s, %s',c[2],e[1])
+  check(modalButtons()==1,tag..': (up and modal: one visible modal button)')
+  e[2](run);X.run(.4,1/60)
+  local pills=0;for _,d in ipairs(X.pg:GetDescendants())do if d.Name=='Skip button'and d.Visible then pills+=1 end end
+  -- (a card goes on after the player dies and a story scene goes on while the next pack is being opened: the pill, and the free mouse, with it)
+  check(modalButtons()==pills and(M.Active()or pills==0),tag..fmt(': the mouse is free exactly while a pill shows (%d pills, %d modal, the opening %s)',pills,modalButtons(),M.Active()and'goes on'or'is over'))
+  settle();X.run(.6,1/60)
+  check(modalButtons()==0,tag..': ... and none left when it is all over ('..modalButtons()..')')
+  bag:Destroy()
+ end end
+ reset()
+ -- the card makes nothing per frame for the pill: no UDim2, no service lookup (a probe card driven by hand, the keyboard on)
+ UIS.KeyboardEnabled=true;UIS.GamepadEnabled=false
+ local probe=R.new('ScreenGui');probe.Name='SkipProbe';probe.Parent=X.pg
+ local card=Card.Create(probe,'Ladder',{Rank=4,Skip=true,SeedName='Probe',Odds='1 in 100'})
+ local ptl={SkipFrom=.3,Burst=6}
+ card:_skip(2,ptl);card:_skip(2.01,ptl)
+ local udim,svc=0,0
+ local saved={};for _,k in ipairs({'fromOffset','new','fromScale'})do local f=R.UDim2[k];saved[k]=f;R.UDim2[k]=function(...)udim+=1;return f(...)end end
+ local gs=W.game.GetService;W.game.GetService=function(self,n)svc+=1;return gs(self,n)end
+ for i=1,120 do card:_skip(2+i/60,ptl)end
+ W.game.GetService=gs;for k,f in pairs(saved)do R.UDim2[k]=f end
+ check(udim==0 and svc==0,fmt('the pill on a steady frame: 120 frames, %d UDim2 made, %d service lookups',udim,svc))
+ local kb=probe:FindFirstChild('Skip button',true)
+ check(kb and kb.Visible and kb.Modal==true and kb:FindFirstChild('Enter key').Visible,'... (the probe pill is up, modal, with its Enter key)')
+ card:_skip(0,ptl);check(not kb.Visible and kb.Modal==false,'a card before SkipFrom: hidden, not modal')
+ card:_skip(2,ptl);card:Destroy();check(not probe:FindFirstChild('Skip button',true),'Destroy takes the pill with it')
+ probe:Destroy()
+end
 reset()
 print(('R155 camera checks %d, fails %d'):format(checks,fails))
 if fails>0 then error('failures')end

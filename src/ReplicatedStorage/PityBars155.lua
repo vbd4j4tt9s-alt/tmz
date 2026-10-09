@@ -14,8 +14,13 @@
 --  * Placement: its own ScreenGui (DisplayOrder 23, like the status HUD it never overlaps: under the hotbar / Bag (25), the tutorial (25 / 26), BASE / TRACK and the
 --    plant indicators (24), the reveal cards (96) and the notices (100)), centred on the hotbar
 --    (ChestToolHotbar.Dock, found by name at every layout change; the same HudLayout metrics when it is not there), above the held item's name. It keeps
---    clear of every other HUD box (HudLayout.HudBoxes: menu, balances, status, thumb / jump zones, owner tools, BASE / TRACK) and of the bottom-right corner
---    where the SKIP button sits during an opening (SkipZone); hidden while a menu covers the HUD (SeedMenu), like the status HUD.
+--    clear of every other HUD box (HudLayout.HudBoxes: menu, balances, status, thumb / jump zones, owner tools, BASE / TRACK) and of the SKIP button of an
+--    opening (the bottom-right corner, SkipZone); the SKIP button in turn keeps clear of the bars' extent (B.Reserved, taken by RarePullCard.SkipRect as a box:
+--    on a phone the thumb controls push the button left of the corner, up to where the bars are); hidden while a menu covers the HUD (SeedMenu), like the status HUD.
+--  * The treadmill BONUS ROLL button also wants the place just above the hotbar: it takes the bars' extent as a box and sits above them (B.ButtonSpot, which
+--    TreadmillBonusClient asks; TreadmillBonusRules itself is unchanged), so the bars never move when the button comes and goes.
+--  * Cost: a bar at rest costs nothing; a bar at 9/10 only writes its glow's transparency each frame (the rest is painted when something changes); nothing
+--    is drawn while the HUD is hidden.
 local Run=game:GetService('RunService');local GuiService=game:GetService('GuiService')
 local Pity=require(script.Parent.PackPity155)
 local Hud=require(script.Parent.HudLayout)
@@ -104,6 +109,25 @@ function B.Extent(r,barW,barH)
  local gx=B.Glow+barW*(B.HeldScale-1)/2;local gy=B.Glow+barH*(B.HeldScale-1)/2
  return {X=r.X-gx,Y=r.Y-gy,W=r.W+gx*2,H=r.H+gy*2}
 end
+-- The room the bars take on a screen (their extent: the glow and the held bar's scale included) as a HUD box, from the same inputs they are placed with. The SKIP
+-- button of an opening (RarePullCard.SkipRect) keeps clear of it; dock: the hotbar's rect (nil = HudLayout's default).
+function B.Reserved(w,h,m,dock)
+ local place=B.Place(w,h,m,dock)
+ local e=B.Extent(place.Pair,place.Bar.W,place.Bar.H)
+ return {N='PityBars',X=e.X,Y=e.Y,W=e.W,H=e.H}
+end
+-- The treadmill BONUS ROLL button (TreadmillBonusClient) wants the same place, just above the hotbar. It takes the bars' extent as one more box and lifts its
+-- preferred spot above it: TreadmillBonusRules.Place measures that spot from m.HotbarBottom, so it gets a copy of m with the bars' height added to it; every
+-- other spot Rules.Place tries is tested against the bars too. The answer is the same whether the button shows or not (the bars are always there), so nothing
+-- flickers when it comes and goes. rules: TreadmillBonusRules; boxes, extra: what the client gives Rules.Place; returns its rect {X, Y, W, H}.
+function B.ButtonSpot(rules,m,w,h,boxes,extra,dock)
+ local e=B.Reserved(w,h,m,dock)
+ local more={e}
+ for _,b in ipairs(extra or{})do more[#more+1]=b end
+ local detail=m.HotbarDetails~=false and 44 or 0
+ local rise=math.max(0,h-m.HotbarBottom-m.SlotSize-detail-(e.Y+3)) -- (the button's bottom edge ends up 7 px above the bars' glow: its own 10 px gap less 3)
+ return rules.Place(setmetatable({HotbarBottom=m.HotbarBottom+rise},{__index=m}),w,h,boxes,more)
+end
 -- The label's size for a text in a bar (FredokaOne is about .52 em a letter): as big as the bar allows, at least 8.
 function B.TextSize(text,barW,barH)
  local byHeight=math.floor(barH*.66)
@@ -189,7 +213,7 @@ end
 local function paintTag(s,now)
  local t,st,S=s.Tag,s.TagState,s.Set
  if not t then return false end
- if not st then S(t.Root,'Visible',false);return false end
+ if not st then if t.Root.Visible then S(t.Root,'Visible',false)end;return false end -- (no tag up: nothing to do, not even a write)
  local hide=st.HideAt and now-st.HideAt or nil
  if hide and hide>=.25 then s.TagState=nil;S(t.Root,'Visible',false);return false end
  local age=now-st.At;local view=Hud.Viewport(s.TagGui);local phone=s.Metrics and s.Metrics.Phone==true
@@ -210,24 +234,27 @@ local function paintTag(s,now)
  S(t.Shine,'Visible',sweep);if sweep then t.Band.Offset=Vector2.new(-1+2*(age-.3)/.7,0)end
  return age<1.05 or hide~=nil
 end
--- One bar's look at this moment (no state change): the fill from bar.Shown, the rest from the bar's and the HUD's state.
+-- A value's transparency once the HUD's dim and the other bar's dimming are applied: k = (1-dim)*(1-base) (one function for all, no closure per frame).
+local function fade(t,k)return 1-(1-t)*k end
+-- One bar's look at this moment (no state change): the fill from bar.Shown, the rest from the bar's and the HUD's state. Everything that is not time
+-- (the geometry, the words, the fill's size) is worked out again only when its inputs change: a bar sitting at 9/10 costs the glow alone (Pulse).
 local function paint(s,bar,now)
+ local placement=s.Placement;if not placement then return end -- (not placed yet: a layout comes first and paints it)
  local reduced,S=s.Reduced,s.Set
- local placement=s.Placement;local w,h=placement.Bar.W,placement.Bar.H
+ local w,h=placement.Bar.W,placement.Bar.H
  local dim=s.Dim
  local popAge=bar.PopAt and now-bar.PopAt or nil
  local popping=popAge~=nil and popAge<B.PopSeconds
  if popping then dim=0 end
  local held=s.Held==bar.Group
  local other=s.Held~=nil and not held
- local base=other and .25 or 0
- local function a(t)return 1-(1-t)*(1-dim)*(1-base)end
+ local k=(1-dim)*(other and .75 or 1);bar.K=k
  -- size and place (written again only when the layout changes)
  local center=placement.Centers[bar.Group]
- local key=w..'x'..h..'@'..math.floor(center.X+.5)..','..math.floor(center.Y+.5)
- if bar.GeoKey~=key then
-  bar.GeoKey=key
-  bar.Root.Position=UDim2.fromOffset(math.floor(center.X+.5),math.floor(center.Y+.5));bar.Root.Size=UDim2.fromOffset(w,h)
+ local cx,cy=math.floor(center.X+.5),math.floor(center.Y+.5)
+ if bar.GeoW~=w or bar.GeoH~=h or bar.GeoX~=cx or bar.GeoY~=cy then
+  bar.GeoW,bar.GeoH,bar.GeoX,bar.GeoY=w,h,cx,cy
+  bar.Root.Position=UDim2.fromOffset(cx,cy);bar.Root.Size=UDim2.fromOffset(w,h)
   bar.Fill.Position=UDim2.fromOffset(2,2)
   for i,t in ipairs(bar.Ticks)do t.Position=UDim2.fromOffset(math.floor(2+(w-4)*i/Pity.Every+.5),math.floor(h/2));t.Size=UDim2.fromOffset(1,math.max(2,h-10))end
   local mark=math.floor(h*.78)
@@ -235,28 +262,33 @@ local function paint(s,bar,now)
   bar.Label.Position=UDim2.fromOffset(math.floor(w/2+h*.3),math.floor(h/2));bar.Label.Size=UDim2.fromOffset(w-math.floor(h*1.3),h)
  end
  local fillW=math.floor((w-4)*math.clamp(bar.Shown,0,1)+.5)
- S(bar.Fill,'Size',UDim2.fromOffset(fillW,h-4));S(bar.Fill,'Visible',fillW>=2)
- local tickA=a(.72);for _,t in ipairs(bar.Ticks)do S(t,'BackgroundTransparency',tickA)end
- -- words
- local text=B.Words(bar.Group,bar.Count,w,h,bar.Pending>0 or popping and popAge<B.DrainAt+.35)
- S(bar.Label,'Text',text);S(bar.Label,'TextSize',B.TextSize(text,w,h))
+ if bar.FillW~=fillW or bar.FillH~=h then bar.FillW,bar.FillH=fillW,h;S(bar.Fill,'Size',UDim2.fromOffset(fillW,h-4))end
+ S(bar.Fill,'Visible',fillW>=2)
+ local tickA=fade(.72,k);for _,t in ipairs(bar.Ticks)do S(t,'BackgroundTransparency',tickA)end
+ -- words (cached by group, count, size and whether the pop's words show)
+ local pop=bar.Pending>0 or(popping and popAge<B.DrainAt+.35)
+ if bar.WordCount~=bar.Count or bar.WordPop~=pop or bar.WordW~=w or bar.WordH~=h then
+  bar.WordCount,bar.WordPop,bar.WordW,bar.WordH=bar.Count,pop,w,h
+  local text=B.Words(bar.Group,bar.Count,w,h,pop);bar.Words=text;bar.WordSize=B.TextSize(text,w,h)
+ end
+ S(bar.Label,'Text',bar.Words);S(bar.Label,'TextSize',bar.WordSize)
  -- glow: 9/10 (a pulse; steady with Reduced Motion), a lucky pack waiting, the pop
  local glow=1
  if bar.Pending>0 then glow=.45
  elseif popping then glow=reduced and .45 or .25+.6*math.clamp(popAge/B.PopSeconds,0,1)
  elseif Pity.IsLucky(bar.Count)then glow=reduced and .55 or .58+.17*math.sin(now*4.2)end
- S(bar.Glow,'BackgroundTransparency',a(glow))
+ S(bar.Glow,'BackgroundTransparency',fade(glow,k))
  -- the bar itself: brighter when its group is in your hand or it is about to be lucky
  local hot=held or Pity.IsLucky(bar.Count)or bar.Pending>0 or popping
- S(bar.Track,'BackgroundTransparency',a(held and .1 or .22))
- S(bar.Edge,'Color',hot and bar.Colors.Light or bar.Colors.Deep);S(bar.Edge,'Thickness',held and 2.2 or 1.5);S(bar.Edge,'Transparency',a(held and 0 or .1))
- S(bar.Fill,'BackgroundTransparency',a(0))
+ S(bar.Track,'BackgroundTransparency',fade(held and .1 or .22,k))
+ S(bar.Edge,'Color',hot and bar.Colors.Light or bar.Colors.Deep);S(bar.Edge,'Thickness',held and 2.2 or 1.5);S(bar.Edge,'Transparency',fade(held and 0 or .1,k))
+ S(bar.Fill,'BackgroundTransparency',fade(0,k))
  if bar.GradHeld~=held then
   bar.GradHeld=held
   bar.FillGradient.Color=ColorSequence.new(held and bar.Colors.Light:Lerp(WHITE,.25)or bar.Colors.Light,held and bar.Colors.Deep:Lerp(bar.Colors.Light,.2)or bar.Colors.Deep)
  end
- S(bar.Mark,'BackgroundTransparency',a(0));S(bar.MarkEdge,'Transparency',a(0))
- S(bar.Label,'TextTransparency',a(0));S(bar.Outline,'Transparency',a(0))
+ S(bar.Mark,'BackgroundTransparency',fade(0,k));S(bar.MarkEdge,'Transparency',fade(0,k))
+ S(bar.Label,'TextTransparency',fade(0,k));S(bar.Outline,'Transparency',fade(0,k))
  -- the pop: flash, shine sweep, ring, scale (the last three never with Reduced Motion)
  local flash=1
  if popping then flash=popAge<.5 and(reduced and .7 or .2+.8*math.clamp(popAge/.5,0,1))or 1 end
@@ -266,37 +298,52 @@ local function paint(s,bar,now)
  if sweep then bar.Band.Offset=Vector2.new(-1+2*(popAge-.08)/.7,0)end
  local ring=popping and not reduced and popAge<.7
  S(bar.Ring,'Visible',ring)
- if ring then local k=popAge/.7;bar.Ring.Size=UDim2.new(1,math.floor(28*k),1,math.floor(22*k));bar.RingStroke.Transparency=.15+.85*k end
- local pop=1
+ if ring then local r=popAge/.7;bar.Ring.Size=UDim2.new(1,math.floor(28*r),1,math.floor(22*r));bar.RingStroke.Transparency=.15+.85*r end
+ local scale=1
  if popping and not reduced then
-  if popAge<.12 then pop=1+.2*(popAge/.12)
-  elseif popAge<.5 then local k=(popAge-.12)/.38;pop=1+.2*(1-k)^2*math.cos(k*math.pi*1.5)
+  if popAge<.12 then scale=1+.2*(popAge/.12)
+  elseif popAge<.5 then local r=(popAge-.12)/.38;scale=1+.2*(1-r)^2*math.cos(r*math.pi*1.5)
   end
  end
- S(bar.Scale,'Scale',(reduced and 1 or bar.HeldScale)*pop)
+ S(bar.Scale,'Scale',(reduced and 1 or bar.HeldScale)*scale)
 end
--- the state: a display step (eases the fill and the highlight); returns true while something still moves
+-- A bar at rest on 9/10 (nothing else changes): the glow's pulse is the only thing that moves, and it is the only thing written (paint's own glow, same value).
+local function pulse(s,bar,now)
+ s.Set(bar.Glow,'BackgroundTransparency',fade(.58+.17*math.sin(now*4.2),bar.K))
+end
+-- the state: a display step (eases the fill and the highlight); returns true while something still moves. A frame where nothing changed since the last paint
+-- (s.Rev: bumped by every wake) paints nothing, or only the 9/10 glow; a hidden HUD (a menu over it) draws nothing: the next wake paints it.
 local function step(s,dt,now)
  local moving=false
- for _,bar in pairs(s.Bars)do
-  local popAge=bar.PopAt and now-bar.PopAt or nil
-  local target=bar.Count/Pity.Every
-  if bar.Pending>0 or(popAge and popAge<B.DrainAt)then target=1 end
-  if popAge and popAge>=B.PopSeconds then bar.PopAt=nil;popAge=nil;if bar.Read then bar.Count=bar.Read()end end
-  if s.Reduced then bar.Shown=target
-  else
-   local d=target-bar.Shown
-   if math.abs(d)<.002 then bar.Shown=target else bar.Shown+=d*(1-math.exp(-dt*(d<0 and 7 or 11)));moving=true end
+ if s.Placement and s.Root.Visible then
+  local dimmed=s.Dim>=1
+  for _,bar in pairs(s.Bars)do
+   local popAge=bar.PopAt and now-bar.PopAt or nil
+   local changed=bar.Rev~=s.Rev
+   local target=bar.Count/Pity.Every
+   if bar.Pending>0 or(popAge and popAge<B.DrainAt)then target=1 end
+   if popAge and popAge>=B.PopSeconds then bar.PopAt=nil;popAge=nil;changed=true;if bar.Read then bar.Count=bar.Read()end end
+   local shown=bar.Shown
+   if s.Reduced then bar.Shown=target
+   else
+    local d=target-shown
+    if math.abs(d)<.002 then bar.Shown=target else bar.Shown+=d*(1-math.exp(-dt*(d<0 and 7 or 11)));moving=true end
+   end
+   local heldScale=s.Held==bar.Group and B.HeldScale or 1
+   local scaled=bar.HeldScale
+   if s.Reduced then bar.HeldScale=heldScale
+   else
+    local d=heldScale-scaled
+    if math.abs(d)<.002 then bar.HeldScale=heldScale else bar.HeldScale+=d*(1-math.exp(-dt*14));moving=true end
+   end
+   if popAge then moving=true;changed=true end
+   if bar.Shown~=shown or bar.HeldScale~=scaled then changed=true end
+   -- (a bar nobody can see - the whole HUD dimmed out under a reveal card - does not pulse)
+   local pulsing=Pity.IsLucky(bar.Count)and not s.Reduced and not dimmed and bar.Pending==0 and not popAge
+   if changed then paint(s,bar,now);bar.Rev=s.Rev
+   elseif pulsing then pulse(s,bar,now)end
+   if pulsing then moving=true end
   end
-  local heldScale=s.Held==bar.Group and B.HeldScale or 1
-  if s.Reduced then bar.HeldScale=heldScale
-  else
-   local d=heldScale-bar.HeldScale
-   if math.abs(d)<.002 then bar.HeldScale=heldScale else bar.HeldScale+=d*(1-math.exp(-dt*14));moving=true end
-  end
-  if popAge then moving=true end
-  if Pity.IsLucky(bar.Count)and not s.Reduced then moving=true end
-  paint(s,bar,now)
  end
  if paintTag(s,now)then moving=true end
  return moving
@@ -312,7 +359,7 @@ function B.Start(player,opts)
  gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
  local root=new('Frame',{Name='PityBars',BackgroundTransparency=1,Size=UDim2.fromScale(1,1),ZIndex=1},gui)
  local clock=opts.Clock or os.clock
- local s={Gui=gui,Root=root,Player=player,Bars={},Held=nil,Dim=0,Reduced=GuiService.ReducedMotionEnabled==true,Connections={},Dead=false,Set=setter()}
+ local s={Gui=gui,Root=root,Player=player,Bars={},Held=nil,Dim=0,Reduced=GuiService.ReducedMotionEnabled==true,Connections={},Dead=false,Set=setter(),Rev=0}
  for _,group in ipairs(Pity.Groups)do s.Bars[group]=buildBar(root,group)end
  -- the lucky tag's own layer, just above the reveal card (RarePullReveal, 96) and under the notices (100); full screen like the card
  local tagGui=Instance.new('ScreenGui');tagGui.Name=B.TagName;tagGui.ResetOnSpawn=false;tagGui.IgnoreGuiInset=true;tagGui.DisplayOrder=B.TagOrder
@@ -322,11 +369,12 @@ function B.Start(player,opts)
  local function con(signal,fn)local c=signal:Connect(fn);s.Connections[#s.Connections+1]=c;return c end
  local function frame(dt)
   if s.Dead then return end
-  local moving=step(s,dt or 1/60,clock())
+  local moving=s.Placement~=nil and step(s,dt or 1/60,clock()) -- (before its first layout there is nothing to draw: the layout wakes it)
   if not moving and stepConn then stepConn:Disconnect();stepConn=nil end
  end
  local function wake()
   if s.Dead then return end
+  s.Rev+=1 -- (something changed: every bar is painted afresh on this frame)
   frame(0)
   if not stepConn then stepConn=Run.RenderStepped:Connect(frame)end
  end
@@ -429,6 +477,9 @@ function B.Start(player,opts)
   end)
  end
  accessible()
+ -- placed first (Hud.Watch lays out at once): everything below that wakes the bars - the hand, the tutorial card - finds a placement to draw in (joining mid-tutorial or
+ -- with a pack in hand used to paint before the first layout: "attempt to index nil with 'Bar'")
+ local stopLayout=Hud.Watch(gui,layout)
  local charConns={}
  local function heldGroup()
   local c=player.Character;if not c then return nil end
@@ -449,10 +500,9 @@ function B.Start(player,opts)
   if d~=s.Dim then s.Dim=d;wake()end
  end
  con(player:GetAttributeChangedSignal('RarePullCinematic'),dim);con(pg:GetAttributeChangedSignal('TutorialCardBottom'),dim);dim()
- con(pg:GetAttributeChangedSignal('SeedMenu'),function()root.Visible=visible()end)
+ con(pg:GetAttributeChangedSignal('SeedMenu'),function()root.Visible=visible();wake()end)
  con(GuiService:GetPropertyChangedSignal('ReducedMotionEnabled'),function()s.Reduced=GuiService.ReducedMotionEnabled==true;wake()end)
  con(pg.ChildAdded,function(c)if c.Name=='ChestToolHotbar'then task.defer(function()if s.Relayout then s.Relayout()end end)end end)
- local stopLayout=Hud.Watch(gui,layout)
  function s:Destroy()
   if s.Dead then return end;s.Dead=true
   if stepConn then stepConn:Disconnect();stepConn=nil end

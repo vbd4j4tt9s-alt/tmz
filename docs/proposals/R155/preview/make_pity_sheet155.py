@@ -70,6 +70,15 @@ blocks.append(('Phones: the bars keep clear of the hotbar, the item name, the ju
     (png('port_33', 270), 'portrait phone 390 x 844: 3/10, 3/10'),
     (png('port_held9', 270), 'held normal pack: 9/10, glowing')]))
 
+blocks.append(('BONUS ROLL button and SKIP pill clear of the bars (R155 review; BASE / TRACK sit in the top bar and are not drawn)', [
+    (png('pc_bonus', 480), 'PC: the BONUS ROLL button (on a treadmill, or a roll is ready) sits just above the bars; the bars stay where they are whether it shows or not'),
+    (png('pc_skip', 560), 'PC: an opening\'s SKIP pill at the bottom right, with the keyboard\'s Enter key on it; the bars and the hotbar are clear of it'),
+    (png('pc_skip_zoom', 330), 'the pill, zoomed: the Enter key on its left (a gamepad shows its red B there instead; Shift Lock / first person can click it: it is modal while it shows)'),
+    (png('land_bonus', 540), 'landscape phone: the BONUS ROLL button above the bars'),
+    (png('land_skip', 540), 'landscape phone, an in-place card: the SKIP pill sits left of the jump button, clear of the bars (it used to cover their right end)'),
+    (png('port_bonus', 260), 'portrait phone: the BONUS ROLL button above the bars'),
+    (png('port_skip', 260), 'portrait phone: the SKIP pill up where the thumb controls and the bars leave room')]))
+
 W_ = 1900
 pad, gap = 24, 18
 title_f, head_f, cap_f, foot_f = font(34), font(24), font(16), font(15)
@@ -109,8 +118,9 @@ for head, items in blocks:
         row_h = max(row_h, h)
     layout.append((head, placed, head_y))
     y += row_h + gap
-FOOT = ('APPROXIMATE: the bars, the lucky tag, the notices and the reveal card are the real GUI trees (PityBars155, NoticeFeed83, RarePullCard) on the Roblox mock, '
-        'drawn by Chromium; the hotbar, balances, status, MENU, BASE / TRACK and the touch controls are stand-ins placed by HudLayout\'s metrics. Not a Studio screenshot.')
+FOOT = ('APPROXIMATE: the bars, the lucky tag, the notices, the reveal card and the SKIP pill are the real GUI trees (PityBars155, NoticeFeed83, RarePullCard) on the Roblox mock, '
+        'drawn by Chromium; the hotbar, balances, status, MENU, BASE / TRACK, the touch controls and the BONUS ROLL button (at the rect PityBars155.ButtonSpot gives the real one) '
+        'are stand-ins placed by HudLayout\'s metrics. Not a Studio screenshot.')
 foot_lines = wrap(FOOT, foot_f, W_ - pad * 2, probe)
 H_ = y + 20 + len(foot_lines) * 20 + pad
 sheet = Image.new('RGB', (W_, H_), PAPER)

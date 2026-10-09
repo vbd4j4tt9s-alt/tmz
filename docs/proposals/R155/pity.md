@@ -89,7 +89,8 @@ its old boots mapping (x1.15 ... x2 -> the same old boot, then x1.5 once).
 notices 100). Centred on the hotbar's frame (`ChestToolHotbar.Dock`, looked up by name at every layout change and followed when it moves; HudLayout's own hotbar metrics when
 it is not there or mid-layout), 6 px above the held item's name. It keeps clear of every HUD box (`HudLayout.HudBoxes`: MENU, balances, status, the jump / thumb zones, owner
 tools, BASE / TRACK) and of the bottom-right corner where the SKIP button sits during an opening, counting its glow and the held bar's 1.06x. When something is in the way it
-slides sideways a little, then tries narrower bars, a thinner pair (phones), the two bars one above the other, and only then a little higher. Checked on 30 screens:
+slides sideways a little, then tries narrower bars, a thinner pair (phones), the two bars one above the other, and only then a little higher. Checked on 36 screens (the table
+covers the first 30; 1280 x 540, 960 x 480, 700 x 400, 812 x 375, 430 x 932 and 360 x 740 were added by the review, section 3a):
 
 | Screen | Bars | Where |
 |---|---|---|
@@ -100,6 +101,35 @@ slides sideways a little, then tries narrower bars, a thinner pair (phones), the
 | portrait phones 390 x 844, 414 x 896, 375 x 667, 360 x 800, 320 x 568 | 130-152 x 20, text 10-12 px | centred, above the raised hotbar |
 | portrait 360 x 640 (MENU and BASE / TRACK sit just above the item name) | 113 x 16, text 10 px | 24 px right of centre |
 | tablets / touch PC | 162 x 20 | centred |
+
+### 3a. Review fixes (R155 review of the bars, the SKIP pill and the BONUS ROLL button)
+
+1. **The bars no longer die when the player joins mid-tutorial or with a pack in hand (HIGH).** `Start` woke the bars (`character()`, `dim()`) before `Hud.Watch` had laid
+   them out, so `paint` read `s.Placement.Bar` on nil and the client script died for the whole session. `Hud.Watch` (which lays out at once) now runs first, and
+   `frame` / `step` / `paint` all return when there is no placement yet (the layout that follows draws everything with what changed meanwhile). Tests set those states before
+   `Start`: the tutorial card up, a Mech / world pack in hand, a reveal card, a story scene, a menu, counts of 9 saved, all at once; and a step / wake / frames with no
+   placement.
+2. **The treadmill BONUS ROLL button no longer sits on the bars (MEDIUM).** Both wanted "just above the hotbar, centred". `PityBars155.ButtonSpot(Rules, m, w, h, boxes,
+   extra)` is what `TreadmillBonusClient.layoutButton` now asks: the bars' extent (`B.Reserved`: the bars plus their 5 px glow and the held bar's 1.06x) is one more box for
+   `TreadmillBonusRules.Place`, and its preferred spot is lifted above the bars (`Rules.Place` measures it from `m.HotbarBottom`, so it gets a copy of `m` with the bars' height
+   added; `TreadmillBonusRules` itself is byte for byte as before, its R150 frozen hash stands). The button ends 7 px above the bars' glow (13 px above the bars): about 30 px
+   higher than before, still the first thing above the hotbar. Where the old place was already far from the hotbar (short windows and landscape phones, where the notice
+   rows sit in the way) it is where it was; on a 360-px-wide portrait phone the menu wheel's third option is over the lifted spot, so the button takes its next clear
+   place (the right edge). The bars never move for the button (they are always there and do not look at it), and the answer depends on the screen alone, so nothing flickers
+   when the button appears or goes. The client lays the button out again whenever HudLayout says the HUD changed (`Layout.Watch`: the screen, the touch setting, the thumb
+   controls), as the bars do, so the two always agree; no module = the place `Rules.Place` gives (a pcall fallback). `TreadmillBonusClient`'s main chunk is still 178 of 180
+   registers (no new top-level local).
+3. **The SKIP pill no longer sits on the bars on phones (LOW).** The bars only avoided `SkipZone` (the bottom-right quarter), but `Card.SkipRect` moves left of it when the thumb
+   controls take the corner (844 x 390: 570..680, 226..266 against the bars' 256..588, 250..270). The bars do not know the pill (so they never move for it); the pill takes the
+   bars' extent as one more box (`Card.SkipBoxes` = `HudLayout.HudBoxes` + `PityBars155.Reserved`), exactly as it takes the hotbar. On the 14 phone sizes that were affected (every landscape phone but the 932 x 430 / 896 x 414, every portrait one) it moves up by 28-32 px (56 on a 360 x 740)
+   (844 x 390: y 226 -> 194; 375 x 667: 348 -> 316, 47% of the height, still below the 45% line the button never goes above); on every PC / tablet screen it is where it was. Checked on 60 screen / thumb-control cases: never touching
+   the bars, at the bottom right (right of the middle, below 45% of the height), 12 px inside the screen, 8 px clear of every HUD box.
+4. **A bar at 9/10 costs the glow alone (LOW).** Every frame used to allocate a closure, a UDim2, the words and a geometry string per bar (the loop runs for ever at 9/10), even
+   while hidden. Now: the closure is a module function; the geometry is compared as four numbers; the fill's UDim2 is made only when the fill moves; the words are cached by
+   (group, count, size, pop); a frame with nothing changed since the last paint (a counter bumped by every wake) paints nothing or, at 9/10, writes only the glow's
+   transparency (the very value a full paint gives); a bar nobody can see (the HUD dimmed out under a reveal card, hidden under a menu, Reduced Motion's steady glow) does
+   nothing and the frame loop stops (the menu closing wakes it). Test: 60 frames at 9/10 = 60 writes, all on the glow, 60 property lookups, no UDim2 / ColorSequence / words;
+   0 / 0 / 0 under a reveal card, under a menu and with Reduced Motion.
 
 ## 4. Listed with the odds
 
@@ -131,7 +161,8 @@ hashes updated with R155 notes), `WorldStatusHud` (the luck row for a lucky pack
 `src/MANIFEST.tsv`, `tools/tests/run_all_suites.sh` (+ `run_pity.sh`). Older tests that count tooltip / odds lines now expect the rule line under the odds:
 `R147/tests/test_verity_pack.luau` (`/test odds verity` and the Verity / Void hold tooltips), `R148/tests/test_roster.luau` (the tooltip row parser skips it),
 `R139/tests/test_starter.luau` (the starter pack's "no luck row" ignores it: it is the same line on every pack and says nothing of the starter's secret 2x).
-Not touched: `Config.lua`, `SeedPackRules`, `Hotbar.client.lua`, `RarePullCinematic`, `RarePullCard`, `BackgroundMusic`.
+Not touched: `Config.lua`, `SeedPackRules`, `Hotbar.client.lua`, `RarePullCinematic`, `BackgroundMusic`. (The review fixes touch `RarePullCard` - the pill keeps clear of the bars, see
+`cinematic_camera.md` - and `TreadmillBonusClient`: its button asks `PityBars155.ButtonSpot`; `TreadmillBonusRules` stays byte for byte.)
 
 ## 7. Tests
 
@@ -146,17 +177,20 @@ Not touched: `Config.lua`, `SeedPackRules`, `Hotbar.client.lua`, `RarePullCinema
   opens: lucky at 10 and 20 / 10, the roll got x1.5 luck and pass luck exactly once with the lucky cap, the BEST PULL hook told; interleaved groups; no boots / no clover;
   TEST packs, `/test rarepacks`, owner boots excluded; loading, unknown, failed roll, refused reward, paid pack, spam; save / load / rejoin / old profile / junk / the real
   DataStore save; `/test pity`, `pity set` (and bad input), `pity 30`, `/test odds ... lucky` and its rule line; the hold tooltip (also through the real `ChestService:_holdPack`).
-- **`test_pity_bars155.luau`** (69 checks, the real client): its own layer and order; both bars from the start; gold / purple; values and the easing; 9/10 glow and pulse;
+- **`test_pity_bars155.luau`** (124 checks, the real client; sections 8-11 are the review's: the SKIP pill and the BONUS ROLL button over 60 screen / controls cases, starting in the middle
+  of things, the per-frame cost): its own layer and order; both bars from the start; gold / purple; values and the easing; 9/10 glow and pulse;
   the held pack's highlight for each kind; the lucky pop (scale, flash, ring, shine, full, back to 0/10) whichever signal comes first; a count lowered by a command;
   the card: the bars step aside, the tag in the card's free band, the pop after the collect; the compact card; a story scene; Reduced Motion (no easing, steady glow,
   no pop / shine / ring, tag without pop); menus / Bag / hidden hotbar; the tutorial dim; 30 screens (inside, above the hotbar and its item name, over the hotbar,
   clear of every HUD box and the SKIP corner counting the glow and the 1.06x, every text fits); the real gui follows the screen; it finds the hotbar's frame by name and
   follows it, and ignores a frame that is not the hotbar's shape; the game's notice stack gets the lucky notice; Destroy.
-- **18 teeth** (each must fail): Mech counted as normal, every 11th, no reset, x1.5 twice, no lucky cap, the lucky cap on every roll, TEST packs counted, counting before
+- **28 teeth** (each must fail): Mech counted as normal, every 11th, no reset, x1.5 twice, no lucky cap, the lucky cap on every roll, TEST packs counted, counting before
   the open went through, not saved, not loaded, no rule in the tooltip, no rule in `/test odds`, the HUD's lucky row always on, no highlight, no 9/10 glow, a pop that
-  scales with Reduced Motion, no card tag, bars over the HUD.
+  scales with Reduced Motion, no card tag, bars over the HUD; and the review's ten: the start order and the guards put back, the guards alone, the SKIP pill that ignores the
+  bars, the BONUS button that ignores them / is not lifted, a paint every frame, a paint while hidden, a pulse while dimmed out, the words made on every paint, a menu that does
+  not wake the bars.
 
-**Results** (private scratch dirs, one suite at a time): `run_pity.sh` ALL PASS (93 + 69 checks, 18 of 18 teeth). The full runner (`run_all_suites.sh`) on this
+**Results** (private scratch dirs, one suite at a time): `run_pity.sh` ALL PASS (93 + 124 checks, 28 of 28 teeth after the review fixes; 93 + 69 and 18 of 18 before). The full runner (`run_all_suites.sh`) on this
 branch: 85 suites PASS, 3 FAIL that were the tooltip / odds line counts above (fixed, then R139, R147 verity_pack and R148 roster PASS); the runner was terminated
 during R153 perf153, so the rest was run one by one: R153 perf153, check_compile_O0 (511 scripts, busiest function 178 of 180, unchanged), R154 luck_odds (with its 13
 teeth), R154 fixes, hub_zfight154, perf154, R155 pity, and again after the last changes R153 clover, shop_R120 and R129 phone HUD: all PASS. Among them the ones asked for:
@@ -164,4 +198,5 @@ R154 luck_odds, R153 clover, seed_rarity, mech_pack, R152 void_giveaway, seed_op
 
 Not checked: anything in real Studio, including the bars on a real phone (the mock has no text measuring: Fredoka One is taken as .52 em a letter), the tag on a real
 reveal card next to the 3D seed, the colour emoji in the tag and the notice, and how the other R155 agents' hotbar / Bag and SKIP button will finally sit (the bars find the
-hotbar's frame by name and keep clear of the whole bottom-right corner, so a moved dock or a SKIP button there is covered).
+hotbar's frame by name and keep clear of the whole bottom-right corner, so a moved dock or a SKIP button there is covered). After the review fixes: the real look of the BONUS ROLL
+button above the bars (`pity_bars.png` draws a stand-in at the rect `ButtonSpot` gives) and of the SKIP pill's Enter key (Fredoka / Montserrat stand in for Roblox's fonts).
