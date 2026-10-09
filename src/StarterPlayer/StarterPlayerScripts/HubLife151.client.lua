@@ -8,7 +8,7 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 --    the camera is far down the track (z > 320); hidden levels are unparented Folders (no per-part work);
 --  * per-frame work only for the tiny ambience (butterflies and falling petals), and only while the
 --    camera is within 150 studs of it, at tier >= 2 and without Reduced Motion (Reduced Motion: everything stands still, no particles);
---  * lamps with a PointLight switch on in the dark (The Darkened's blackout via EnvironmentLighting.Level, Rain / Thunderstorm);
+--  * lamps with a PointLight switch on in the dark (The Darkened's blackout via EnvironmentLighting.Level, Rain / Thunderstorm / Blizzard: R154 review, the Blizzard's palette also dims the world - Brightness 2.55 -> 1.9, no sun rays, denser haze);
 --  * R154: at full glow (full Cloudy, and the dark) a lit lamp's real light is also x1.5 brighter, x1.3 wider and warmer (amber): WeatherCycle151.Lamps.Boost / LightWarm; the
 --    lamp heads warm in the dark too. The lights are the same 8 (the tier caps are unchanged) and still change only on the half-second tick's steps.
 --  * R151 Cloudy (WeatherCycle151, the default sky's other half): as the sky dims the lamps and lanterns warm up and glow: every lamp head and wall lantern
@@ -95,7 +95,7 @@ local Cycle;pcall(function()Cycle=require(RS:WaitForChild('WeatherCycle151',5))e
 local function isDark()
  local level=Env and tonumber(Env.Level)or 0
  local weather=RS:GetAttribute('GlobalWeather')
- return level>.3 or weather=='Rain'or weather=='Thunderstorm'
+ return level>.3 or weather=='Rain'or weather=='Thunderstorm'or weather=='Blizzard' -- (every event weather: BiomeMood.Palette dims the light under all three)
 end
 -- The Cloudy level the hub's lamps follow (0 in event weather: the storms have their own rules above).
 local function hubCloud()

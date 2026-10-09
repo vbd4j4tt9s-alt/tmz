@@ -606,9 +606,21 @@ do
  api4.Near.detail=1e6;api4.Near.fine=1e6;api4.ApplyLod()
  local by=names(life4);local ctx4=api4.State.Ctx
  -- the table
- local same=true;for _,k in ipairs({'trees','bushes','topiary','patches','butterflies'})do if #Art.Layout[k]~=#Art.Full[k]then same=false end end
- check('tidy: the table: no beds, no benches, no pebbles, 12 of the 26 lamps; the trees (24), bushes (16), topiary (8), grass patches (14) and butterflies (12) are exactly the full layout\'s (the owner: "the bushes and flags can stay")',
+ local same=true;for _,k in ipairs({'trees','bushes','topiary','patches'})do if #Art.Layout[k]~=#Art.Full[k]then same=false end end
+ check('tidy: the table: no beds, no benches, no pebbles, 12 of the 26 lamps; the trees (24), bushes (16), topiary (8) and grass patches (14) are exactly the full layout\'s (the owner: "the bushes and flags can stay")',
   T.Beds==false and T.Benches==false and T.Pebbles==false and #T.Lamps==12 and #Art.Full.lamps==26 and same and #Art.Full.trees==24 and #Art.Full.bushes==16 and #Art.Full.topiary==8 and #Art.Full.patches==14,#T.Lamps)
+ -- R154 review: 6 of the 12 butterflies were homed on the removed beds and would circle bare lawn: they go with the beds; the other 6 stay (numbered as before: same wings, same flutter)
+ do
+  local function onBed(b)for _,bed in ipairs(Art.Full.beds)do if (b[1]-bed[1])^2+(b[3]-bed[2])^2<=(bed[3]+2)^2 then return true end end;return false end
+  local goneN,keptBad={},0
+  for _,b in ipairs(Art.Full.butterflies)do if onBed(b)then goneN[#goneN+1]=string.format('(%d,%d)',b[1],b[3])end end
+  for _,b in ipairs(Art.Layout.butterflies)do if onBed(b)or b[4]==nil then keptBad+=1 end end
+  local homes={};for _,b in ipairs(ctx4.Butterflies)do homes[#homes+1]=b.Home;if onBed({b.Home.X,b.Home.Y,b.Home.Z})then keptBad+=1 end end
+  local want={'(60,-196)','(-60,-198)','(36,-252)','(-36,-300)','(118,-161)','(-118,-409)'}
+  table.sort(want);table.sort(goneN)
+  check('tidy: butterflies: the 6 homed on a removed bed '..table.concat(goneN,' ')..' are gone with it (6 of the 12 stay, over the lawns, the nooks and the lane); none of the built ones circles a bed\'s spot',
+   #Art.Full.butterflies==12 and #Art.Layout.butterflies==6 and table.concat(goneN,' ')==table.concat(want,' ') and keptBad==0 and #ctx4.Butterflies==6 and (by['Butterfly wing']or 0)==12 and #homes==6,#Art.Layout.butterflies..'/'..#ctx4.Butterflies..'/'..keptBad)
+ end
  check('tidy: the layout: 12 lamps (all 8 that carry a real light and the 4 that hold the candy bunting), no bed, no bench; the 6 bunting strings of the full layout are 5 (the avenue\'s two crossing ones, which hung from the two lower posts that went, are one string between the two that stay)',
   #Art.Layout.lamps==12 and #Art.Layout.beds==0 and #Art.Layout.benches==0 and #Art.Full.bunting==6 and #Art.Layout.bunting==5,#Art.Layout.lamps..'/'..#Art.Layout.bunting)
  local litFull,litKept=0,0
@@ -660,7 +672,7 @@ do
   local before=Art.Build(full,t,{},{});local b=before.Counts.core+before.Counts.detail+before.Counts.fine
   if t==3 then
    local nm=names(full)
-   check('tidy: flipping the table back brings every kind back: 26 lamps (22 posts and 4 bollards), 4 benches, 10 beds, the pebbles (A.Full)',#Art.Layout.lamps==26 and #Art.Layout.benches==4 and #Art.Layout.beds==10 and nm['Lamp pole']==22 and (nm['Bench seat']or 0)==4 and (nm['Bed rim']or 0)==10 and (nm['Pebble']or 0)>0,
+   check('tidy: flipping the table back brings every kind back: 26 lamps (22 posts and 4 bollards), 4 benches, 10 beds, 12 butterflies (the 6 that circle the beds with them), the pebbles (A.Full)',#Art.Layout.lamps==26 and #Art.Layout.benches==4 and #Art.Layout.beds==10 and #Art.Layout.butterflies==12 and (nm['Butterfly wing']or 0)==24 and nm['Lamp pole']==22 and (nm['Bench seat']or 0)==4 and (nm['Bed rim']or 0)==10 and (nm['Pebble']or 0)>0,
     #Art.Layout.lamps..'/'..tostring(nm['Lamp pole'])..'/'..tostring(nm['Bench seat'])..'/'..tostring(nm['Bed rim']))
   end
   Art.SetTidy()

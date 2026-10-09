@@ -116,7 +116,7 @@ for _,tier in ipairs({3,2,1})do
  sc.Destroying:Fire()
 end
 budget.Tier=3
--- the dark rule on the real square: The Darkened, Rain, Thunderstorm light all 8 on every tier
+-- the dark rule on the real square: The Darkened, Rain, Thunderstorm and (R154 review: its palette dims the world too) Blizzard light all 8 on every tier
 do
  local Env=W.module('EnvironmentLighting')
  for _,tier in ipairs({3,2,1})do
@@ -124,7 +124,7 @@ do
   Env.Level=1;api.ApplyLamps();local d1=lit(ctx);Env.Level=0;api.ApplyLamps()
   RS:SetAttribute('GlobalWeather','Rain');api.ApplyLamps();local d2=lit(ctx);RS:SetAttribute('GlobalWeather','Thunderstorm');api.ApplyLamps();local d3=lit(ctx)
   RS:SetAttribute('GlobalWeather','Blizzard');api.ApplyLamps();local d4=lit(ctx);RS:SetAttribute('GlobalWeather','Clear');api.ApplyLamps()
-  check('tier '..tier..': the dark keeps the R151 rule (Darkened '..d1..', Rain '..d2..', Thunderstorm '..d3..' of 8; Blizzard '..d4..')',d1==8 and d2==8 and d3==8 and d4==0)
+  check('tier '..tier..': the dark keeps the R151 rule (Darkened '..d1..', Rain '..d2..', Thunderstorm '..d3..', Blizzard '..d4..' of 8)',d1==8 and d2==8 and d3==8 and d4==8)
   sc.Destroying:Fire()
  end
 end

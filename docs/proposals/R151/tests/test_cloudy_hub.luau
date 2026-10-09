@@ -5,7 +5,7 @@
 --  * Clear: nothing changes (lights off, heads and lanterns in their own colours);
 --  * Cloudy: the lamp heads and wall lanterns warm up at every tier, the real lights fade in within the device tier's cap (8 desktop / 4 phone / 0 FastMode),
 --    the market's lights strengthen; the fade is a handful of steps from the half-second tick (nothing per frame, nothing once settled);
---  * the dark (The Darkened, Rain, Thunderstorm) keeps its R151 rule exactly (all 8 lights, every tier); a Blizzard does not light them; event weather
+--  * the dark (The Darkened, Rain, Thunderstorm) keeps its R151 rule exactly (all 8 lights, every tier); R154 review: so does a Blizzard (its palette dims the world too); event weather
 --    suppresses the Cloudy part and the lamps return to it afterwards;
 --  * Reduced Motion, FastMode, a late joiner, damaged state, streaming, teardown.
 local W=require('./world');local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -201,9 +201,9 @@ do
  Env.Level=0;a.ApplyLamps();check(brightLights(c)==0,'... off when the lights come back')
  for _,t in ipairs({3,2,1})do
   budget.Tier=t;local b,scb=load();local d=b.State.Ctx
-  for _,weather in ipairs({'Rain','Thunderstorm'})do
+  for _,weather in ipairs({'Rain','Thunderstorm','Blizzard'})do
    RS:SetAttribute('GlobalWeather',weather);sky('Clear',R.clock-300,30,1);b.ApplyLamps()
-   check(brightLights(d)==8,('tier %d, %s: all 8 lights, as before'):format(t,weather))
+   check(brightLights(d)==8,('tier %d, %s: all 8 lights'):format(t,weather))
   end
   RS:SetAttribute('GlobalWeather','Clear');unload(scb)
  end
@@ -221,7 +221,9 @@ do
  local headsFull=true;for _,p in ipairs(d.Heads)do if not near(p.Color.G,baseHead[p].G+(Cycle.Lamps.Warm.G-baseHead[p].G)*Cycle.Lamps.WarmShare,.01)then headsFull=false end end
  check(brightLights(d)==8 and headsFull and not allWarmOff,'Rain over a Cloudy sky: the storm rule (8 lights, phone too) at full glow and the heads at full warm (R154: the dark warms them; Cloudy itself is off under an event)')
  RS:SetAttribute('GlobalWeather','Blizzard');b.ApplyLamps()
- check(brightLights(d)==0,'a Blizzard does not light the lamps (as before), Cloudy or not')
+ local snowFull=true;for _,p in ipairs(d.Heads)do if not near(p.Color.G,baseHead[p].G+(Cycle.Lamps.Warm.G-baseHead[p].G)*Cycle.Lamps.WarmShare,.01)then snowFull=false end end
+ local snowLights=true;for _,l in ipairs(d.Lights)do if not(l.Enabled and l.Brightness>baseLights[l]*1.4)then snowLights=false end end
+ check(brightLights(d)==8 and snowFull and snowLights,'Blizzard over a Cloudy sky (R154 review: its palette dims the world, Brightness 2.55 -> 1.9, no sun rays): the storm rule too, 8 lights at full glow (phone too) and the heads at full warm')
  RS:SetAttribute('GlobalWeather','Clear');b.ApplyLamps()
  local back=brightLights(d)==4;for _,p in ipairs(d.Heads)do if not near(p.Color.G,warmNow[p].G,1e-9)then back=false end end
  check(back,'the event ends: the lamps are exactly as Cloudy had them (4 lights, warm heads)')

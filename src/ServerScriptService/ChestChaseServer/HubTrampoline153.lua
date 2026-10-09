@@ -95,15 +95,46 @@ local function aabb(p) -- the world box of a part
  return c.Position-e,c.Position+e
 end
 local function partsOf(model)local out={};for _,d in ipairs(model:GetDescendants())do if d:IsA('BasePart')then out[#out+1]=d end end;return out end
--- How far the farthest corner of any part lies from `centre`, sideways: the radius of the circle the look fits in.
+-- How far the farthest point of any part lies from `centre`, sideways: the radius of the circle the look fits in. A part is measured as it is DRAWN. R154 (a review of the
+-- owner's "it should fit the whole circle"): the 8 corners of a round part's box lie at D/sqrt2, so a look made of cylinders / balls / round meshes was fitted by the box and
+-- ended at 71% of the circle (radius 8.9 of the collider's 12.6 in a garden nook, 6.8 of 9.6 in the lane's) while the invisible collider, ramps and bounce fill all of it. Now
+--  * an upright Cylinder (its axis, local X, standing): the centre's sideways distance + the wider of its two diameters / 2 (a lying one is a plain rectangle from above: corners);
+--  * a Ball: the centre's distance + its widest side / 2 (it is a sphere whichever way it is turned);
+--  * a MeshPart / union / negate / intersect with one axis standing: the centre's distance + the wider of its two flat sides / 2 (it is taken as round about its centre);
+--  * any other part, or a tilted one: its 8 box corners.
+-- and no part is measured past its own box corners (a long thin mesh bar off the middle is not "round about its centre": the smaller of the two reaches is taken), so a look
+-- that is not round (a square frame) is still fitted INSIDE the circle by its corners.
+local UPRIGHT=.98 -- |axis.Y| at or over this: the axis stands up (within about 11 degrees)
+local function boxReach(p,centre)
+ local far=0;local c,sz=p.CFrame,p.Size
+ for _,sx in ipairs({-1,1})do for _,sy in ipairs({-1,1})do for _,sz2 in ipairs({-1,1})do
+  local q=(c*CF(sx*sz.X/2,sy*sz.Y/2,sz2*sz.Z/2)).Position
+  local d=math.sqrt((q.X-centre.X)^2+(q.Z-centre.Z)^2);if d>far then far=d end
+ end end end
+ return far
+end
+local function circleReach(p,centre) -- the reach of a part that is round from above, or nil when it is not known to be
+ local c,s=p.CFrame,p.Size
+ local d=math.sqrt((c.Position.X-centre.X)^2+(c.Position.Z-centre.Z)^2)
+ if p:IsA('Part')then
+  local shape=p.Shape
+  if shape==Enum.PartType.Ball then return d+math.max(s.X,s.Y,s.Z)/2 end
+  if shape==Enum.PartType.Cylinder and math.abs(c.RightVector.Y)>=UPRIGHT then return d+math.max(s.Y,s.Z)/2 end
+  return nil
+ end
+ if p:IsA('MeshPart')or p:IsA('PartOperation')then
+  if math.abs(c.UpVector.Y)>=UPRIGHT then return d+math.max(s.X,s.Z)/2 end
+  if math.abs(c.RightVector.Y)>=UPRIGHT then return d+math.max(s.Y,s.Z)/2 end
+  if math.abs(c.LookVector.Y)>=UPRIGHT then return d+math.max(s.X,s.Y)/2 end
+ end
+ return nil
+end
 local function reachOf(model,centre)
  local far=0
  for _,p in ipairs(partsOf(model))do
-  local c,sz=p.CFrame,p.Size
-  for _,sx in ipairs({-1,1})do for _,sy in ipairs({-1,1})do for _,sz2 in ipairs({-1,1})do
-   local q=(c*CF(sx*sz.X/2,sy*sz.Y/2,sz2*sz.Z/2)).Position
-   local d=math.sqrt((q.X-centre.X)^2+(q.Z-centre.Z)^2);if d>far then far=d end
-  end end end
+  local r=boxReach(p,centre);local round=circleReach(p,centre)
+  if round and round<r then r=round end
+  if r>far then far=r end
  end
  return far
 end
@@ -155,15 +186,16 @@ function M.Prepare(src)
  local matI=findMat(list,centre-size/2,centre+size/2)
  local reach=reachOf(model,centre);local half=math.max(size.X,size.Z)/2
  return{Model=model,Parts=#list,Scripts=scripts,Other=other,Dropped=dropped,MatIndex=matI,MatName=matI and list[matI].Name or nil,Name=src.Name,
-  Round=half>0 and reach/half or 1,Footprint=string.format('%.1f x %.1f',size.X,size.Z)} -- (Round: 1 for a round look, 1.41 for a square one)
+  Round=half>0 and reach/half or 1,Footprint=string.format('%.1f x %.1f',size.X,size.Z)} -- (Round: 1 for a round look, 1.41 for a square one: its farthest point over its half-width)
 end
--- One look, cloned, scaled so its farthest point (the frame's outer edge, for a round look: a frame that is not round is fitted inside the circle by its corners) lies on the
+-- One look, cloned, scaled so its farthest point (a round look's rim, measured by its circle; a frame that is not round is fitted inside the circle by its corners) lies on the
 -- collider's circle (spot.Radius, which is the nook's disc less Inset), centred on the nook, its mat at the collider's top, held off the paving's planes (nothing is in the world yet).
+-- ScaleTo takes the model's ABSOLUTE scale (a model saved at scale 2 reports 2): the factor multiplies what it is now, as HubStudTrees151 / MarketLayout do.
 local function fit(spot)
  local look=prepared.Model:Clone();look.Name='Trampoline look'
  local centre=Trees.Box(look)
  local k=spot.Radius/reachOf(look,centre)
- look:ScaleTo(k)
+ look:ScaleTo(look:GetScale()*k)
  local list=partsOf(look);local mat=prepared.MatIndex and list[prepared.MatIndex]or nil
  local size
  centre,size=Trees.Box(look)
@@ -291,7 +323,8 @@ function M.Describe()
  if M.Look~='built'then
   out[#out+1]=string.format('  %d parts per trampoline (cap %d), %d script(s) and %d other instance(s) removed, %d invisible or absurd part(s) dropped; mat for the squash: %s.',st.Parts or 0,T.AssetMaxParts,st.Scripts or 0,st.Other or 0,st.Dropped or 0,st.MatName and('"'..st.MatName..'"')or'not found (no squash)')
   local round=(st.Round or 1)<=1.08
-  out[#out+1]=string.format('  fitted to each nook\'s brick circle by its farthest point (the frame\'s edge %.1f studs inside the rim); its footprint is %s studs: %s.',T.Dims.Inset,tostring(st.Footprint),round and'round, so it fills the circle'or string.format('not round (corners reach %.2fx its half-width): fitted INSIDE the circle by its corners, so its larger side is shorter than the circle',st.Round or 1))
+  out[#out+1]=string.format('  fitted to each nook\'s brick circle by its farthest point, measured as it is drawn (a cylinder, ball or round mesh by its circle, any other part by its box corners), so the collider\'s rim (%.1f studs inside the disc\'s) is where it ends; its footprint is %s studs: %s.',T.Dims.Inset,tostring(st.Footprint),
+   round and'round, so its rim lies on the collider\'s circle and it fills the circle'or string.format('not round (its corners reach %.2fx its half-width): fitted INSIDE the circle by its corners, so its larger side is shorter than the circle',st.Round or 1))
  end
  out[#out+1]='  ReplicatedStorage.'..T.TemplateFolder..': '..hand..'.'
  local lost=false
