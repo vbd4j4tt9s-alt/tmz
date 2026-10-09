@@ -11,11 +11,12 @@ T.PointCurve={{0,24},{500,26},{1500,28},{3000,31},{6000,35},{120000,55},{1500000
 T.MachineMultipliers={1,4,20,100,600,4000,30000}
 -- R112: displayed boot luck. PackOdds112 applies it per tier as luck^power (King full, Cosmic ^.40 ... Legendary ^.08).
 -- R112b: every boot x10 so Thunder Boots (x50M) see a King about 1 in 1,000 packs.
-T.BootLuck={50,500,20000,1000000,50000000}
-T.MaxLuck=50000000 -- the boots' cap (owner test boots too); server, HUD and owner commands read it here.
+-- R155 (owner: "Nerf the boots by halfing all of their rates"): every boot's luck is halved (Sand x25, Frost x250, Lava x10K, Crystal x500K, Thunder x25M).
+T.BootLuck={25,250,10000,500000,25000000}
+T.MaxLuck=25000000 -- the boots' cap (owner test boots too; R155: was 50M, halved with the boots); server, HUD and owner commands read it here.
 -- R154 (owner: "the 2x luck is universal"): a luck pass (GamePassCatalog Luck: the 4 Leaf Clover = 2) multiplies the cap too, so its x2 always applies on top of the
 -- best boots: a clover owner's cap is MaxLuck x 2 (PlayerDataService). PassLuckCeiling = every luck pass at once; LuckCeiling = the highest luck any pack roll takes
--- (Thunder Boots x the clover = x100M; PackOdds112 / PackOdds137 clamp to it, the HUD and the owner's odds command read it).
+-- (Thunder Boots x the clover = x50M since R155, was x100M; PackOdds112 / PackOdds137 clamp to it, the HUD and the owner's odds command read it).
 do
  local passes=1
  for _,pass in ipairs(require(script.Parent.GamePassCatalog))do local luck=tonumber(pass.Luck)or 1;if luck>1 then passes*=luck end end

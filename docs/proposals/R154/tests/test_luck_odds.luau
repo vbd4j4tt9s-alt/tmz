@@ -1,11 +1,13 @@
 --!nocheck
 -- R154 on the Roblox mock with the REAL SeedPackRules / PackLuck154 / PackOdds / PlayerDataService / RarePackTests / SeedRarity153 / Config of this checkout (the R153 clover world):
---  1. the cap      - LuckCeiling = MaxLuck x the clover; a clover owner's luck is never capped below the clover's x2 (Thunder Boots x50M -> x100M, owner test boots too), without the
---                    pass it is as before; PackOdds112 / 137 take x100M; the King of a pack doubles from x50M to x100M; an open hands the roll x100M and the clover's x2 (passLuck)
+--  1. the cap      - LuckCeiling = MaxLuck x the clover; a clover owner's luck is never capped below the clover's x2 (Thunder Boots x25M -> x50M, owner test boots too), without the
+--                    pass it is the boots alone; PackOdds112 / 137 take x50M; the King of a pack doubles from x25M to x50M; an open hands the roll x50M and the clover's x2 (passLuck)
+--                    R155 (owner: "Nerf the boots by halfing all of their rates"): every boot's luck is halved (Sand x25 ... Thunder x25M), MaxLuck 25M, LuckCeiling 50M; a no-clover
+--                    Thunder player has x25M, a clover Thunder player x50M; the Void / Verity / Mech packs take only the clover whatever the boots
 --  2. fixed packs  - the Void / Verity / Mech packs: without the clover (or with boots only) byte-for-byte their old tables; with it, each tier above the pack's lowest x2^Power (King x2,
 --                    Cosmic x2^.40, Secret x2^.28, Mythic x2^.16), the branches keep their size; junk / bigger pass luck; real rolls follow the tables (and the exact roll at the extremes);
 --                    a real open of each by a clover owner and by a player without it
---  3. the 80% rule - every world pack x live odds version x luck (1, 10, 1e3, 1e6, 5e7, 1e8 and a dense sweep) x starter boost, the fixed packs x clover: no seed over 80%, the others at
+--  3. the 80% rule - every world pack x live odds version x luck (1, 10, 1e3, 1e6, 2.5e7, 5e7 and a dense sweep) x starter boost, the fixed packs x clover: no seed over 80%, the others at
 --                    least 19% (+ the 1% upgrade), the upgrade is the next tier's seed, the table equals an INDEPENDENT re-implementation of the rule; banked versions untouched;
 --                    rolls follow the shaped table, the exact roll still reaches a 1 in a trillion seed
 --  4. rarepacks    - /test rarepacks <rarity>: a random real seed of that rarity from any biome (every one of them comes up), in its biome's pack, still a guaranteed TEST reveal
@@ -43,31 +45,46 @@ local BIOME={[1]='Forest',[6]='Jungle',[2]='Desert',[3]='Snow',[4]='Lava',[5]='C
 
 -- 1. the cap ---------------------------------------------------------------------------------------------------------------------------------
 local MAX=Balance.MaxLuck
-check(MAX==5e7 and Balance.PassLuckCeiling==2 and Balance.LuckCeiling==1e8,'LuckCeiling = MaxLuck (50M, the boots\' cap) x the passes (2) = 100M ('..tostring(Balance.LuckCeiling)..')')
+-- R155 (owner: "Nerf the boots by halfing all of their rates"): the boots' luck is halved, the cap with it
+check(#Balance.BootLuck==5 and Balance.BootLuck[1]==25 and Balance.BootLuck[2]==250 and Balance.BootLuck[3]==10000 and Balance.BootLuck[4]==500000 and Balance.BootLuck[5]==25000000,'R155: BootLuck is halved: Sand x25, Frost x250, Lava x10K, Crystal x500K, Thunder x25M ('..table.concat(Balance.BootLuck,', ')..')')
+check(#boots==5 and boots[1].LuckMultiplier==25 and boots[2].LuckMultiplier==250 and boots[3].LuckMultiplier==10000 and boots[4].LuckMultiplier==500000 and boots[5].LuckMultiplier==25000000,'R155: the shop\'s five boots carry the halved luck (Config copies BootLuck into ShopCatalog.Accessories)')
+check(MAX==2.5e7 and boots[5].LuckMultiplier==MAX,'R155: MaxLuck = 25M, the boots\' cap = Thunder Boots')
+check(MAX==2.5e7 and Balance.PassLuckCeiling==2 and Balance.LuckCeiling==5e7,'R155: LuckCeiling = MaxLuck (25M, the boots\' cap) x the passes (2) = 50M; the clover is still x2 ('..tostring(Balance.LuckCeiling)..')')
+-- packs banked before R112 map the luck to the old boots (x1.15 ... x2) by the best boot it reaches (BootLuck): every real boot, alone and with the clover, still lands on its own old multiplier
 for _,O in ipairs({O137,O112})do
- check(O.Luck(1e8)==1e8 and O.Luck(2e8)==1e8 and O.Luck(5e7)==5e7 and O.Luck(0)==1 and O.Luck(0/0)==1 and O.Luck('x')==1,'PackOdds'..O.Version..'.Luck takes up to x100M (and clamps above / junk as before)')
+ local want={{1,1},{2,1},{24,1},{25,1.15},{50,1.15},{249,1.15},{250,1.3},{500,1.3},{10000,1.5},{20000,1.5},{500000,1.75},{1e6,1.75},{2.5e7,2},{5e7,2}}
+ local ok=true;for _,w in ipairs(want)do if O.LegacyLuck(w[1])~=w[2]then ok=false;print('FAIL: LegacyLuck('..w[1]..') = '..tostring(O.LegacyLuck(w[1]))..', want '..w[2])end end
+ check(ok,'PackOdds'..O.Version..'.LegacyLuck: Sand x25 / x50 with the clover -> 1.15, Frost x250 / x500 -> 1.3, Lava x10K / x20K -> 1.5, Crystal x500K / x1M -> 1.75, Thunder x25M / x50M -> 2; no boots or the clover alone -> 1 (banked packs keep the old boots\' mapping)')
+end
+for _,O in ipairs({O137,O112})do
+ check(O.Luck(5e7)==5e7 and O.Luck(1e8)==5e7 and O.Luck(2.5e7)==2.5e7 and O.Luck(0)==1 and O.Luck(0/0)==1 and O.Luck('x')==1,'PackOdds'..O.Version..'.Luck takes up to x50M (and clamps above, e.g. the old x100M, / junk as before)')
 end
 do
  local ann=E.makePlayer(5401,'Ann');Data:AddBoost(ann,boots[5].Id)
- check(ann:GetAttribute('ChestLuckMultiplier')==MAX,'Thunder Boots without the clover: x50M, as before')
+ check(ann:GetAttribute('ChestLuckMultiplier')==MAX and MAX==2.5e7,'Thunder Boots without the clover: x25M (R155; was x50M)')
  ann:SetAttribute('CloverOwned',true);Data:RefreshBoostMultipliers(ann)
- check(ann:GetAttribute('ChestLuckMultiplier')==2*MAX,'Thunder Boots + the 4 Leaf Clover: x100M, the clover\'s x2 on top ('..tostring(ann:GetAttribute('ChestLuckMultiplier'))..')')
+ check(ann:GetAttribute('ChestLuckMultiplier')==2*MAX and 2*MAX==5e7,'Thunder Boots + the 4 Leaf Clover: x50M, the clover\'s x2 on top ('..tostring(ann:GetAttribute('ChestLuckMultiplier'))..')')
  check(Data:PassLuck(ann)==2,'PassLuck = 2 (the clover alone)')
  local bob=E.makePlayer(5402,'Bob');Data:AddBoost(bob,boots[5].Id,{TestGrant=true});bob:SetAttribute('CloverOwned',true);Data:RefreshBoostMultipliers(bob)
- check(bob:GetAttribute('ChestLuckMultiplier')==2*MAX and Data:HasTestLuck(bob),'owner test Thunder Boots + the clover: x100M, still test luck')
+ check(bob:GetAttribute('ChestLuckMultiplier')==2*MAX and Data:HasTestLuck(bob),'owner test Thunder Boots + the clover: x50M, still test luck')
+ local bobNo=E.makePlayer(5406,'BobNo');Data:AddBoost(bobNo,boots[5].Id,{TestGrant=true});Data:RefreshBoostMultipliers(bobNo)
+ check(bobNo:GetAttribute('ChestLuckMultiplier')==2.5e7 and Data:HasTestLuck(bobNo),'owner test Thunder Boots without the clover: x25M, test luck (the owner\'s boots are halved too)')
+ local eve=E.makePlayer(5407,'Eve');Data:RefreshBoostMultipliers(eve);local eveLuck=eve:GetAttribute('ChestLuckMultiplier');eve:SetAttribute('CloverOwned',true);Data:RefreshBoostMultipliers(eve)
+ check(eveLuck==1 and eve:GetAttribute('ChestLuckMultiplier')==2,'no boots: x1, and x2 with the clover (unchanged)')
  for i=1,4 do local p=E.makePlayer(5410+i,'B'..i);Data:AddBoost(p,boots[i].Id);local was=p:GetAttribute('ChestLuckMultiplier');p:SetAttribute('CloverOwned',true);Data:RefreshBoostMultipliers(p)
-  check(was==boots[i].LuckMultiplier and p:GetAttribute('ChestLuckMultiplier')==2*was,'boots '..i..': x'..was..' -> x'..(2*was)..' with the clover')end
+  check(was==({25,250,10000,500000})[i] and p:GetAttribute('ChestLuckMultiplier')==2*was,'boots '..i..': x'..was..' -> x'..(2*was)..' with the clover')end
  -- the King of a pack follows: Desert Common pack (King power 1)
  local function king(l)return Rules.SeedOdds(Config,2,'Pack01',l,149).SolarStarfruitSeed end
- check(near(king(1e8),2*king(5e7)),'Desert Common pack: Solar Starfruit (King) doubles from x50M to x100M ('..Odds.Format(king(5e7))..' -> '..Odds.Format(king(1e8))..')')
- check(near(Rules.SeedOdds(Config,2,'Pack01',1e8,112).SolarStarfruitSeed,2*Rules.SeedOdds(Config,2,'Pack01',5e7,112).SolarStarfruitSeed),'... a banked OddsVersion 112 pack too (the clover is luck, not a rule change)')
+ check(near(king(5e7),2*king(2.5e7)),'Desert Common pack: Solar Starfruit (King) doubles from x25M to x50M ('..Odds.Format(king(2.5e7))..' -> '..Odds.Format(king(5e7))..')')
+ check(near(king(1e8),king(5e7)),'... and nothing is above the ceiling: x100M reads as x50M')
+ check(near(Rules.SeedOdds(Config,2,'Pack01',5e7,112).SolarStarfruitSeed,2*Rules.SeedOdds(Config,2,'Pack01',2.5e7,112).SolarStarfruitSeed),'... a banked OddsVersion 112 pack too (the clover is luck, not a rule change)')
  -- an open hands the roll both lucks
  local seen={};local orig=Rules.Roll
  Rules.Roll=function(...)local a={...};seen[#seen+1]={Luck=a[4],Variant=a[5],Pass=a[8]};return orig(...)end
  local info;Data.OnPackOpened=function(_,_,i)info=i end
  local pack=Data:AddChest(ann,{Stage=2,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Rules.OddsVersion})
  local reward=Data:OpenSeedPack(ann,pack.Id,uniform(7))
- check(reward and reward.Kind=='Seed'and #seen==1 and seen[1].Luck==2*MAX and seen[1].Pass==2,'a clover owner\'s open: the roll gets luck x100M and passLuck 2 ('..tostring(seen[1]and seen[1].Luck)..', '..tostring(seen[1]and seen[1].Pass)..')')
+ check(reward and reward.Kind=='Seed'and #seen==1 and seen[1].Luck==2*MAX and seen[1].Pass==2,'a clover owner\'s open: the roll gets luck x50M and passLuck 2 ('..tostring(seen[1]and seen[1].Luck)..', '..tostring(seen[1]and seen[1].Pass)..')')
  check(info and info.Luck==2*MAX and info.PassLuck==2,'... and the BEST PULL hook sees both (its odds include the clover)')
  local cy=E.makePlayer(5403,'Cy');local p2=Data:AddChest(cy,{Stage=8,BagVariant='MechLimited',PackSize=1,PackMutation='None'});Data:OpenSeedPack(cy,p2.Id,uniform(8))
  check(#seen==2 and seen[2].Pass==1 and seen[2].Variant=='MechLimited','no clover: passLuck 1 (a Mech pack opens exactly as before)')
@@ -77,16 +94,21 @@ end
 -- 2. the fixed-odds packs --------------------------------------------------------------------------------------------------------------------
 local FIXED={{Kind='Void',Stage=7,Variant='EclipseReliquary',Version=149},{Kind='Verity',Stage=7,Variant='VerityReliquary',Version=149},{Kind='Mech',Stage=8,Variant='MechLimited',Version=81}}
 local P2={Legendary=2^.08,Mythic=2^.16,Secret=2^.28,Cosmic=2^.40,King=2}
+local thor=E.makePlayer(5408,'Thor');Data:AddBoost(thor,boots[5].Id);Data:RefreshBoostMultipliers(thor) -- R155: a real Thunder Boots player (x25M, no clover)
+local thorClover=E.makePlayer(5409,'ThorClover');Data:AddBoost(thorClover,boots[5].Id);thorClover:SetAttribute('CloverOwned',true);Data:RefreshBoostMultipliers(thorClover) -- ... and with the clover (x50M, pass luck 2)
 for _,f in ipairs(FIXED)do
  local base=Rules.RawSeedOdds(Config,f.Stage,f.Variant,1,f.Version)
  local plain=Rules.SeedOdds(Config,f.Stage,f.Variant,1,f.Version)
  check(same(base,plain,0),f.Kind..' pack without the clover: exactly its old table')
- for _,l in ipairs({50,1e6,5e7,1e8})do check(same(base,Rules.SeedOdds(Config,f.Stage,f.Variant,l,f.Version),0),f.Kind..' pack: boots luck x'..l..' changes nothing (only the clover does)')end
+ for _,l in ipairs({25,250,10000,500000,2.5e7,5e7})do check(same(base,Rules.SeedOdds(Config,f.Stage,f.Variant,l,f.Version),0),f.Kind..' pack: boots luck x'..l..' changes nothing (only the clover does)')end
  for _,junk in ipairs({1,0,-2,.5,0/0,math.huge,'2',true})do check(same(base,Rules.SeedOdds(Config,f.Stage,f.Variant,1,f.Version,nil,junk),0),f.Kind..' pack: pass luck '..tostring(junk)..' = none')end
  check(same(base,L.FixedOdds(f.Kind,Config,Rules,1),1e-12),f.Kind..': PackLuck154.FixedOdds at x1 rebuilds the pack\'s own table')
  local clover=Rules.SeedOdds(Config,f.Stage,f.Variant,1,f.Version,nil,2)
  check(near(sum(clover),100,1e-12),f.Kind..' with the clover: adds up to 100% ('..sum(clover)..')')
  check(same(clover,Rules.SeedOdds(Config,f.Stage,f.Variant,1,f.Version,nil,5),0),f.Kind..': pass luck above the ceiling = x2')
+ -- R155: the boots (halved) never reach these packs: a real Thunder Boots player gets the plain table, a Thunder Boots + clover player exactly the clover's table
+ check(thor:GetAttribute('ChestLuckMultiplier')==2.5e7 and same(base,Rules.SeedOdds(Config,f.Stage,f.Variant,thor:GetAttribute('ChestLuckMultiplier'),f.Version,nil,Data:PassLuck(thor)),0),f.Kind..' pack, Thunder Boots (x25M) without the clover: the plain table, boots change nothing')
+ check(thorClover:GetAttribute('ChestLuckMultiplier')==5e7 and same(clover,Rules.SeedOdds(Config,f.Stage,f.Variant,thorClover:GetAttribute('ChestLuckMultiplier'),f.Version,nil,Data:PassLuck(thorClover)),0),f.Kind..' pack, Thunder Boots + clover (x50M): exactly the clover\'s table (only the x2)')
  local ids=0;for id,p in pairs(base)do ids+=1;check(clover[id]and clover[id]>0,f.Kind..': '..name(id)..' still drops')end
  check(E.count(clover)==ids,f.Kind..': the same seeds')
  print('TABLE '..f.Kind..' before: '..show(base))
@@ -141,6 +163,25 @@ do -- the exact numbers, tier by tier
  check(got.Mech=='CrowncoreTreeSeed'and rarity(got.Void or'')=='King'and got.Verity==Verity.Id,'a clover owner opens a Mech / Void / Verity pack through the clover\'s roll ('..tostring(got.Mech)..', '..tostring(got.Void)..', '..tostring(got.Verity)..')')
 end
 
+-- 2b. R155: the owner's /test odds reads the new top (LuckCeiling 50M); boots never change the Void / Verity packs' answer
+do
+ local X=E.server('OwnerUpdateCommands82')
+ local ctx={Config=Config,Data=Data,Map={MapRoot=R.new('Folder')},Chase={IsPlayerBusy=function()return false end},Chests={IsOpening=function()return false end,SyncTools=function()end}}
+ local owner=E.makePlayer(5410,'OddsOwner')
+ local ok1,t1=X.Execute(ctx,owner,'odds',{'desert','common','50000000'})
+ local ok2,t2=X.Execute(ctx,owner,'odds',{'desert','common','50000001'})
+ local ok3,t3=X.Execute(ctx,owner,'odds',{'desert','common','100000000'})
+ check(ok1 and tostring(t1):find('luck 50000000',1,true)~=nil,'/test odds desert common 50000000 (Thunder Boots + the clover, the new top) is answered ('..tostring(t1):sub(1,60)..')')
+ check(ok2==false and ok3==false and tostring(t2):find('[1–50000000]',1,true)~=nil and tostring(t3):find('[1–50000000]',1,true)~=nil,'/test odds above 50M (the old 100M too) is refused and the usage text says 1–50000000 ('..tostring(t3)..')')
+ local plain=E.makePlayer(5411,'OddsPlain')
+ for _,word in ipairs({'event','verity'})do
+  local okT,tT=X.Execute(ctx,thor,'odds',{word});local okP,tP=X.Execute(ctx,plain,'odds',{word})
+  check(okT and okP and tT==tP,'/test odds '..word..': a Thunder Boots (x25M) player gets the very same answer as a player without boots (boots never reach it)')
+ end
+ local okC,tC=X.Execute(ctx,thor,'odds',{'event','clover'});local okN,tN=X.Execute(ctx,thor,'odds',{'event'})
+ check(okC and okN and tC~=tN and tostring(tC):find('x2 is on',1,true)~=nil,'... and only the word "clover" (the clover\'s x2) changes it')
+end
+
 -- 3. the 80% rule ----------------------------------------------------------------------------------------------------------------------------
 -- An independent re-implementation of the rule (from the R154 spec, not PackLuck154): returns the expected table, and the top / upgrade ids when it acts.
 local function expected(raw)
@@ -162,7 +203,7 @@ local function expected(raw)
  for _,id in ipairs(ups)do out[id]+=.01*total/#ups end
  return out,t,ups
 end
-local LUCKS={1,10,1e3,1e6,5e7,1e8};for k=1,32 do LUCKS[#LUCKS+1]=10^(k/4)end
+local LUCKS={1,10,1e3,1e6,2.5e7,5e7};for k=1,32 do LUCKS[#LUCKS+1]=10^(k/4)end
 local cases,acted,bad,badMsg=0,0,0,''
 local function audit(label,raw,new)
  cases+=1
@@ -188,18 +229,18 @@ for _,f in ipairs(FIXED)do for _,pass in ipairs({1,2})do
 end end
 check(bad==0,'the 80% rule on '..cases..' live tables (7 biomes x 6 packs x OddsVersion 149 / none x '..#LUCKS..' lucks x starter boost, + Void / Verity / Mech x clover): no seed over 80%, the others >= 19% + the 1% upgrade (rarer than the top), equal to an independent re-implementation ('..acted..' tables changed) '..badMsg)
 check(acted>0,'(the rule acted somewhere: '..acted..' tables)')
--- the R154 sweep the owner asked for, by name: every pack x live version x luck 1, 10, 1e3, 1e6, 5e7, 1e8: top <= 80
+-- the R154 sweep the owner asked for, by name: every pack x live version x luck 1, 10, 1e3, 1e6, 2.5e7, 5e7 (R155: Thunder Boots, and with the clover): top <= 80
 do
  local worst,at=0,''
- for _,stage in ipairs(STAGES)do for _,v in ipairs(PACKS)do for _,l in ipairs({1,10,1e3,1e6,5e7,1e8})do
+ for _,stage in ipairs(STAGES)do for _,v in ipairs(PACKS)do for _,l in ipairs({1,10,1e3,1e6,2.5e7,5e7})do
   local t=Rules.SeedOdds(Config,stage,v,l,149);local _,p=top(t);if p>worst then worst,at=p,BIOME[stage]..' '..v..' L'..l end
  end end end
- check(worst<=80+1e-9,'every biome pack at luck 1 / 10 / 1e3 / 1e6 / 5e7 / 1e8: the biggest share of one seed is '..('%.4g'):format(worst)..'% ('..at..')')
+ check(worst<=80+1e-9,'every biome pack at luck 1 / 10 / 1e3 / 1e6 / 2.5e7 / 5e7: the biggest share of one seed is '..('%.4g'):format(worst)..'% ('..at..')')
 end
 -- banked packs: untouched (the R148 "no windfall")
 do
  local diff=0
- for _,stage in ipairs(STAGES)do for _,v in ipairs(PACKS)do for _,ver in ipairs({0,81,112,137})do for _,l in ipairs({1,1e6,5e7})do
+ for _,stage in ipairs(STAGES)do for _,v in ipairs(PACKS)do for _,ver in ipairs({0,81,112,137})do for _,l in ipairs({1,1e6,2.5e7,5e7})do
   if not same(Rules.RawSeedOdds(Config,stage,v,l,ver),Rules.SeedOdds(Config,stage,v,l,ver),0)then diff+=1 end
  end end end end
  check(diff==0,'banked world packs (OddsVersion 0 / 81 / 112 / 137): exactly their old tables at every luck ('..diff..' differ)')
@@ -225,7 +266,7 @@ do
 end
 -- the before -> after tables for the note
 for _,case in ipairs({{1,'Pack06'},{2,'Pack01'},{3,'Pack01'},{3,'Pack04'},{3,'Pack06'},{4,'Pack06'},{5,'Pack06'},{7,'Pack06'}})do
- for _,l in ipairs({1,1e6,5e7,1e8})do
+ for _,l in ipairs({1,1e6,2.5e7,5e7})do
   local raw,new=Rules.RawSeedOdds(Config,case[1],case[2],l,149),Rules.SeedOdds(Config,case[1],case[2],l,149)
   print(('TABLE %s %s L%g before: %s'):format(BIOME[case[1]],case[2],l,show(raw)))
   print(('TABLE %s %s L%g after: %s'):format(BIOME[case[1]],case[2],l,show(new)))

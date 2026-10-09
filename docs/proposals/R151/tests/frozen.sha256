@@ -9,8 +9,9 @@ b9dbf155ff24c0f63fa3189165814a71d18797b97b8e28b21c296d254be5438b  src/Replicated
 7b49c9bd5c6f478eac85cafb05cc3e6352fa23caeba2ceb61b6eb523a5fcf7ae  src/ReplicatedStorage/DailyRewards.lua
 be7b27efe3f7450e5b27d4a97aa9ef00adc4ace48e143abb8830aad03c0a0806  src/ReplicatedStorage/PackOdds81.lua
 # R154 (on purpose): PackOdds112.lua and PackOdds137.lua clamp luck at BalanceValues81.LuckCeiling (the boots' cap x the luck passes: x100M with the 4 Leaf Clover) instead of MaxLuck; nothing else changed (luck without a pass is exactly as before)
-57728fa5f9a79a471eb942efd167c9fd76520fb388146a25b74829048b9368b6  src/ReplicatedStorage/PackOdds112.lua
-f892199eac5ae821cb1ebe5b975d8f318844970493c8dcbc2a74649e797f048f  src/ReplicatedStorage/PackOdds137.lua
+# R155 (on purpose): PackOdds112.lua and PackOdds137.lua: only the R154 comment above O.Luck changed (the boots are halved, Thunder Boots x25M, x50M with the clover); no code or number changed
+c86d360833235a1c928ef203a352e72d0ad9d3fed9c515bd774b67b7ebff6289  src/ReplicatedStorage/PackOdds112.lua
+c53919f40a7a54039943e65678b94831ac3acf5b712216ed2a350a9d835ed0cb  src/ReplicatedStorage/PackOdds137.lua
 d91252dd8786225ce55e6c248ddc962aea83e93094293f03951cdab0dd6c067d  src/ReplicatedStorage/PackSizePity.lua
 d87454e7192cf498d6d50d2d18dd869acbe8e695c3cbad79eacb4c21c3114b38  src/ReplicatedStorage/PackSchedule81.lua
 # R154 (on purpose): SeedPackRules.lua gained an outermost wrapper (PackLuck154): the 4 Leaf Clover's x2 on the Void / Verity / Mech packs (a new last argument, passLuck) and the 80% rule on live packs (no seed over 80%, the others 19%, 1% upgrade); RawSeedOdds = the odds before both; every banked world pack and every pack without the clover the rule leaves alone is as before

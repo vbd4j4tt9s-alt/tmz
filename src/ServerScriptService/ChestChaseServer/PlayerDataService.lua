@@ -768,7 +768,7 @@ function PlayerDataService:RefreshBoostMultipliers(player)
 	player:SetAttribute("TreadmillMultiplier", bestSpeedMultiplier)
 	-- R153: the best boots (owner test boots too) x every luck pass the player owns (GamePassCatalog Luck: the 4 Leaf Clover = x2, bought with Robux or Gems), then the cap.
 	-- The pass multiplies real and test luck alike, so HasTestLuck still says whether the BOOTS in use are the owner's.
-	-- R154 (owner: "the 2x luck is universal"): the cap is the boots' cap (MaxLuck) x the passes too, so the clover's x2 also applies on top of Thunder Boots (x50M -> x100M).
+	-- R154 (owner: "the 2x luck is universal"): the cap is the boots' cap (MaxLuck) x the passes too, so the clover's x2 also applies on top of Thunder Boots (R155: the boots are x25M, a clover owner's x50M).
 	local passLuck=self:PassLuck(player)
 	bestLuckMultiplier=math.clamp(bestLuckMultiplier*passLuck,1,require(game:GetService('ReplicatedStorage').BalanceValues81).MaxLuck*passLuck)
 	player:SetAttribute("ChestLuckMultiplier", bestLuckMultiplier)
