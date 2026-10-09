@@ -17,6 +17,10 @@
 --     the shovel can't be thrown away, a server refusal is shown and the popup stays, Keep it sends nothing.
 --  9. the layout survives a respawn and a REJOIN (a new Hotbar with the layout the first one sent to the server, the items handed over in another order).
 -- 10. the seed collect target (R154) is the slot the seed will really take, or the Bag button when every free slot is blank.
+-- Review fixes: 11. a slow profile load (the saved layout arrives after the 8 s join fallback: nothing goes live or is sent meanwhile, it is applied when it arrives, unless
+--     the player already moved something); 12. the count label on a narrow and a wide sheet, FULL or not, never over the Trash or the pick bar's buttons; 13. DPad-Up
+--     navigates inside the Bag / the hotbar and only opens / closes the Bag from outside; 14. a discard reply that comes after "Keep it" and a new popup changes nothing;
+--     Esc in the popup closes only the popup. (The item ToolTip is test_tooltip155.luau.)
 local W=require('./world');local F=require('./fixtures');local E=require('./sfx_env')(W);local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -331,7 +335,8 @@ end
 
 -- 9. the layout survives a respawn and a rejoin --------------------------------------------------------------------------------------------------
 do
- X.wait(Inv.JoinFallback+1) -- (no server here: the join ends by itself)
+ player:SetAttribute('HotbarLayout155','') -- (the server's reply once the profile has loaded: nothing saved yet; with no reply at all the hotbar keeps joining, review fix 5)
+ X.wait(Inv.JoinFallback+1) -- (no InventorySynced155 here: the join ends by itself)
  X.drag('mouse',slotOf(packA),slot(6));X.drag('mouse',slotOf(packA),slot(7));X.wait(3)
  check(#sent>=1,'the layout is sent to the server a moment after it changes ('..#sent..' sends)')
  local saved=sent[#sent]
@@ -375,6 +380,158 @@ do
   local b3=Collect.Target('another',{SeedId='OrangeSeed',SeedScale=1,Mutation='None',Weather='None'})
   check(b3==slot(tSlot),'another of the same stack flies to that stack\'s slot')
  else check(false,'(a free slot for the temp item)')end
+end
+
+-- 11. a slow profile load (review): the saved layout arrives after the join fallback --------------------------------------------------------------------
+do
+ local function rejoin(layoutAttr) -- the Hotbar starts again; its items arrive in reverse order (new instances)
+  local tools={};for _,t in ipairs(bag():GetChildren())do if t:IsA('Tool')then tools[#tools+1]=t end end
+  sc:Destroy();X.frames(2)
+  local nb=bag();for _,t in ipairs(tools)do t.Parent=nil end
+  player:SetAttribute('HotbarLayout155',layoutAttr);player:SetAttribute('InventorySynced155',false)
+  local s2=R.new('LocalScript');s2.Name='Hotbar';check(pcall(W.load,'Hotbar',s2),'the Hotbar starts again (slow load)');sc=s2;grab();X.frames(5)
+  for k=#tools,1,-1 do copyTool(tools[k],nb);if k%3==0 then X.frames(2)end end
+  X.frames(5)
+ end
+ local before=table.concat(names(),'|');local saved=Inv.Layout155():Serialize();local n0=#sent
+ rejoin(nil)
+ local arrival=table.concat(names(),'|')
+ check(arrival~=before,'(the items arrive in another order: the arrival-order layout is not the saved one)')
+ X.wait(Inv.JoinFallback+3)
+ check(Inv.Layout155().Phase=='join','a slow profile load: past the 8 s fallback the hotbar is still joining (HotbarLayout155 has not arrived)')
+ player:SetAttribute('InventorySynced155',true);X.wait(3)
+ check(Inv.Layout155().Phase=='join'and #sent==n0,'... even when the server says every item is there: nothing goes live and nothing is sent ('..(#sent-n0)..' sends)')
+ local gift=harvest('GrapeSeed','plant-slow');gift.Parent=bag();X.frames(5)
+ check(#sent==n0,'... a new item meanwhile is placed as usual and still sends nothing')
+ gift:Destroy();X.frames(5)
+ player:SetAttribute('HotbarLayout155',saved);X.wait(3)
+ check(table.concat(names(),'|')==before,'the layout arrives: every item goes to its saved slot ('..table.concat(names(),'|')..')')
+ check(Inv.Layout155().Phase=='live','... and the hotbar goes live then')
+ X.wait(Inv.SaveDelay+1);check(#sent==n0,'... the arrival-order layout was never sent ('..(#sent-n0)..' sends)')
+ local from,to;for i=1,10 do if slot(i).ItemName.Text~=''and not from then from=slot(i)end;if slot(i).ItemName.Text==''then to=slot(i)end end
+ if from and to then X.drag('mouse',from,to);X.wait(Inv.SaveDelay+1);check(#sent==n0+1 and sent[#sent]~=saved,'a change afterwards is saved as usual')end
+ -- the player moves something before the layout arrives: what they did stays, and is saved
+ saved=Inv.Layout155():Serialize();n0=#sent
+ rejoin(nil);X.wait(Inv.JoinFallback+1)
+ local a,b;for i=1,10 do if slot(i).ItemName.Text~=''and not a then a=slot(i)end;if slot(i).ItemName.Text==''then b=slot(i)end end
+ if a and b then X.drag('mouse',a,b);X.frames(3)end
+ local mine=table.concat(names(),'|')
+ player:SetAttribute('HotbarLayout155',saved);X.wait(3)
+ check(table.concat(names(),'|')==mine,'a layout that arrives after the player already moved something is not applied')
+ X.wait(Inv.SaveDelay+1)
+ check(#sent==n0+1 and sent[#sent]==Inv.Layout155():Serialize()and sent[#sent]~=saved,'... what the player did is the layout that is saved ('..(#sent-n0)..' sends)')
+ player:SetAttribute('InventorySynced155',true);X.wait(2)
+end
+
+-- 13. DPad-Up (review) -----------------------------------------------------------------------------------------------------------------------------------
+do
+ closeBag();W.Gui.SelectedObject=nil
+ local PASS,SINK=R.Enum.ContextActionResult.Pass,R.Enum.ContextActionResult.Sink
+ local function dpad()return W.actions.GardenBagToggle('GardenBagToggle',R.Enum.UserInputState.Begin,{KeyCode=R.Enum.KeyCode.DPadUp})end
+ W.Gui.SelectedObject=slot(2);local r=dpad();X.frames(2)
+ check(r==PASS and not panel.Visible,'gamepad: with the selection on a hotbar slot DPad-Up moves it (Pass), the Bag stays shut')
+ W.Gui.SelectedObject=open;r=dpad();check(r==PASS and not panel.Visible,'... on the Bag button too')
+ W.Gui.SelectedObject=nil;r=dpad();X.frames(2)
+ check(r==SINK and panel.Visible,'with no selection it opens the Bag (Sink)')
+ local c=cards()[1]or panel.Items;W.Gui.SelectedObject=c;r=dpad();X.frames(2)
+ check(r==PASS and panel.Visible,'with the selection on a Bag card (or the grid) it navigates (Pass), the Bag stays open')
+ W.Gui.SelectedObject=panel.Search;r=dpad();check(r==PASS and panel.Visible,'... anywhere inside the Bag sheet')
+ W.Gui.SelectedObject=nil;r=dpad();X.frames(2)
+ check(r==SINK and not panel.Visible,'with no selection it closes the Bag')
+ local other=R.new('TextButton');other.Parent=pg;W.Gui.SelectedObject=other;r=dpad();X.frames(2)
+ check(r==SINK and panel.Visible,'a selection somewhere else (another menu\'s button) does not stop it opening the Bag');W.Gui.SelectedObject=nil;other:Destroy();closeBag()
+end
+
+-- 14. the discard popup: stale replies, Esc (review) ----------------------------------------------------------------------------------------------------
+do
+ closeBag();settle()
+ local counting={};for _,t in ipairs(bag():GetChildren())do if t:IsA('Tool')and Stacks.Counts(t)then counting[#counting+1]=t end end
+ check(#counting>=2,'(two items to throw away: '..#counting..')')
+ local function toTrash(t)openBag();local from=slotOf(t)or cardOf(t);X.drag('mouse',from,panel.BagBar.Trash);X.frames(2)end
+ local ui=Dialog.UI();local waiting={}
+ local real=discardRemote.InvokeServer
+ discardRemote.InvokeServer=function(_,req)requests[#requests+1]=req;waiting[#waiting+1]=coroutine.running();return coroutine.yield()end -- (a request in flight: it answers when the test says)
+ local n0=#requests
+ toTrash(counting[1]);ui=Dialog.UI()
+ local p=X.center(ui.Confirm);X.down('mouse',p);X.wait(1.15);X.up(p);X.frames(2)
+ check(#requests==n0+1 and #waiting==1 and ui.Confirm.Text=='...','(a discard is in flight: the button says "...")')
+ X.tap('mouse',ui.Keep);X.frames(2);check(not Dialog.IsOpen(),'"Keep it" closes the popup while the request is in flight')
+ toTrash(counting[2]);check(Dialog.IsOpen()and ui.Confirm.Text:find('hold',1,true)~=nil,'... and another discard opens a new popup')
+ coroutine.resume(waiting[1],{Ok=true,Message='threw away the first one'})
+ check(Dialog.IsOpen()and ui.Confirm.Text:find('hold',1,true)~=nil,'the OLD request\'s reply (Ok) does not close the new popup')
+ -- an old refusal does not fail the new popup either
+ local q=X.center(ui.Confirm);X.down('mouse',q);X.wait(1.15);X.up(q);X.frames(2)
+ check(#waiting==2 and ui.Confirm.Text=='...','(the second popup\'s request is in flight)')
+ X.tap('mouse',ui.Keep);X.frames(2);toTrash(counting[1])
+ coroutine.resume(waiting[2],{Ok=false,Message='SOMETHING WENT WRONG'})
+ check(Dialog.IsOpen()and not ui.Status.Visible and ui.Confirm.Text:find('hold',1,true)~=nil,'the OLD request\'s refusal is not shown in the new popup')
+ -- the new popup's own reply still works
+ local r3=X.center(ui.Confirm);X.down('mouse',r3);X.wait(1.15);X.up(r3);X.frames(2)
+ check(#waiting==3 and ui.Confirm.Text=='...','(the new popup sends its own request)')
+ coroutine.resume(waiting[3],{Ok=false,Message='WAIT FOR UR PACK TO FINISH OPENING!'})
+ check(Dialog.IsOpen()and ui.Status.Visible and ui.Status.Text:find('finish opening',1,true)~=nil,'its own reply is shown')
+ X.tap('mouse',ui.Keep);X.frames(2)
+ discardRemote.InvokeServer=real
+ -- Esc closes only the popup
+ toTrash(counting[1]);check(Dialog.IsOpen()and panel.Visible,'(a popup over the open Bag)')
+ key('Escape');check(not Dialog.IsOpen()and panel.Visible,'Esc in the discard popup closes only the popup, the Bag stays open')
+ check(Inv.PopupEsc(),'(the Hotbar is told that Esc was the popup\'s, whichever of them heard it first)')
+ X.wait(.3);check(not Inv.PopupEsc(),'(... for a moment only)')
+ key('Escape');check(not panel.Visible,'the next Esc closes the Bag as before')
+end
+
+-- 12. the count label (review): narrow and wide sheets, FULL or not, an item picked or not ------------------------------------------------------------------
+do
+ openBag()
+ local function x0(o,pw)return o.Position.X.Scale*pw+o.Position.X.Offset end
+ local function w0(o,pw)return o.Size.X.Scale*pw+o.Size.X.Offset end
+ local bar=panel.BagBar;local pick=bar.PickBar
+ local key1,slot1;for i=1,10 do if Inv.Layout155().Slots[i]and not key1 then key1,slot1=Inv.Layout155().Slots[i],i end end
+ check(key1~=nil,'(an item to pick)')
+ for _,picking in ipairs({false,true})do
+  if picking then Inv.Pick(key1,slot1,'test')else Inv.Unpick()end
+  X.frames(1)
+  for _,width in ipairs({320,360,380,400,419,420,430,440,560,800,1080})do
+   for _,n in ipairs({143,185,200,230})do
+    player:SetAttribute('HeldItemCap',200);player:SetAttribute('HeldItemCount',n);Inv.Layout(width<440,width);X.frames(1)
+    local barW=width-32;local full=n>=200
+    local cl,cr=x0(bar.HeldCount,barW),x0(bar.HeldCount,barW)+w0(bar.HeldCount,barW)
+    local tl,tr=x0(bar.Trash,barW),x0(bar.Trash,barW)+w0(bar.Trash,barW)
+    local pl,pr=x0(pick,barW),x0(pick,barW)+w0(pick,barW)
+    local tag=('sheet %d, %d/200%s, %s'):format(width,n,full and' FULL'or'',picking and'an item picked'or'nothing picked')
+    check(bar.HeldCount.Visible==(not picking or pr<=cl),tag..': the count is shown unless the pick bar needs its room')
+    if bar.HeldCount.Visible then
+     check(cl>=(picking and pr or 0)-.5 and cr<=tl+.5 and w0(bar.HeldCount,barW)==(full and 112 or 88),tag..': the count ('..cl..'-'..cr..', '..w0(bar.HeldCount,barW)..' wide) sits right of the pick bar (ends '..pr..') and left of the Trash (starts '..tl..')')
+    end
+    check(tr<=barW+.5 and pr<=tl+.5,tag..': the pick bar ends before the Trash')
+    if picking then
+     local pw=pr-pl;local prev=-1e9
+     check(pick.Visible,tag..': the pick bar is shown')
+     for _,name in ipairs({'PickHold','PickStash','PickCancel'})do
+      local b=pick[name];local l,r=x0(b,pw),x0(b,pw)+w0(b,pw)
+      check(l>=prev-.5 and r<=pw+.5 and l>=0,tag..': '..name..' ('..l..'-'..r..') is inside the pick bar ('..pw..') and clear of its neighbour');prev=r
+     end
+     local what=pick.PickName;if what.Visible then check(x0(what,pw)+w0(what,pw)<=x0(pick.PickHold,pw)+.5 and w0(what,pw)>=60,tag..': the pick text has room ('..w0(what,pw)..' px)')end
+    end
+   end
+  end
+ end
+ Inv.Unpick()
+ -- the real thing on the engine: the x button is the top GUI at its edges (the count does not cover it), FULL or not
+ player:SetAttribute('HeldItemCount',12);Inv.Layout(false,panel.AbsoluteSize.X);X.frames(2)
+ local s=slotOf(shovel)or slotOf(apple)
+ if s then
+  for _,n in ipairs({12,200})do
+   player:SetAttribute('HeldItemCount',n);holdRelease(s);X.frames(2)
+   local cancel=panel.BagBar.PickBar.PickCancel
+   local a,z=cancel.AbsolutePosition,cancel.AbsoluteSize
+   local top=X.at(R.Vector2.new(a.X+z.X-3,a.Y+z.Y/2))[1]
+   check(Inv.Picked()~=nil and top==cancel,'the pick bar\'s x button is not covered at '..n..'/200 (the top GUI there: '..tostring(top and top.Name)..')')
+   top=X.at(R.Vector2.new(a.X+3,a.Y+z.Y/2))[1];check(top==cancel,'... nor at its left edge')
+   X.tap('touch',cancel);X.frames(2)
+  end
+ end
+ player:SetAttribute('HeldItemCount',12);closeBag()
 end
 print(('R155 inventory checks %d, fails %d'):format(checks,fails))
 if fails>0 then error('failures')end

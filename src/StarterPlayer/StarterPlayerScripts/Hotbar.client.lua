@@ -433,6 +433,11 @@ local function hook(b,slot,keyNow)
  local down,up=b.MouseButton1Down,b.MouseButton1Up -- (a few test worlds have no such events)
  if down then down:Connect(function(x,y)downOn(b,slot,keyNow(),x,y)end)end
  if up then up:Connect(function(x,y)upOn(b,x,y)end)end
+ -- R155 (review): the item's ToolTip, the way Roblox's backpack shows it (ItemTooltip155): hover (mouse), selection (gamepad); a picked item shows it too (InventoryPanel155)
+ if b.MouseEnter then b.MouseEnter:Connect(function()Inv.Hover(b,keyNow)end)end
+ if b.MouseLeave then b.MouseLeave:Connect(function()Inv.Leave(b)end)end
+ if b.SelectionGained then b.SelectionGained:Connect(function()Inv.Focus(b,keyNow)end)end
+ if b.SelectionLost then b.SelectionLost:Connect(function()Inv.Unfocus(b)end)end
 end
 tick=function()
  local now=os.clock();local char=player.Character;local d=press
@@ -785,7 +790,7 @@ if player.CharacterRemoving then connect(player.CharacterRemoving,function()Stat
 -- A hold ended (the fruit arrived, or none will): show the item now. `cue` is false for a request that failed (nothing to celebrate).
 table.insert(allConns,Arrival.OnRelease(function(k,cue)if cue then released[k]=os.clock()end;queue()end))
 connect(search:GetPropertyChangedSignal('Text'),function()listDirty=true;scroll.CanvasPosition=Vector2.zero;renderRows();Inv.PaintSearch()end)
-connect(scroll:GetPropertyChangedSignal('CanvasPosition'),function()Pictures.Hurry();renderRows()end);connect(scroll:GetPropertyChangedSignal('AbsoluteSize'),renderRows)
+connect(scroll:GetPropertyChangedSignal('CanvasPosition'),function()Pictures.Hurry();renderRows();Inv.TipRefresh()end);connect(scroll:GetPropertyChangedSignal('AbsoluteSize'),renderRows)
 connect(pg:GetAttributeChangedSignal('SeedMenu'),function()dock.Visible=(pg:GetAttribute('SeedMenu')==nil or pg:GetAttribute('SeedMenu')=='Inventory');if panel.Visible and pg:GetAttribute('SeedMenu')~='Inventory'then toggle(false)end end)
 connect(Input.InputChanged,function(input) -- R153: the press follows ITS pointer: the mouse, or its own touch (the first touch near it when the engine gave no InputObject)
  local d=press;if not d or d.Done then return end
@@ -818,7 +823,7 @@ connect(Input.InputBegan,function(input,processed)
  if processed or Input:GetFocusedTextBox()then return end
  if input.KeyCode==Enum.KeyCode.Backquote or input.KeyCode==Enum.KeyCode.B then toggle(not panel.Visible)
  elseif numbers[input.KeyCode]and(pg:GetAttribute('SeedMenu')==nil or pg:GetAttribute('SeedMenu')=='Inventory')then local n=numbers[input.KeyCode];local key=State.Slots[n];if not Inv.Click(key,n,'key '..(n%10))and key then equip(key,'key '..(n%10))end -- (R152: with the Bag open a number key equips too; R155: with an item picked it puts it on that slot)
- elseif input.KeyCode==Enum.KeyCode.Escape and panel.Visible then if Inv.Picked()then Inv.Unpick('Esc')else toggle(false)end end
+ elseif input.KeyCode==Enum.KeyCode.Escape and panel.Visible then if Inv.PopupEsc()then return elseif Inv.Picked()then Inv.Unpick('Esc')else toggle(false)end end -- (R155: Esc in the discard popup closes only the popup)
 end)
 CAS:BindAction('GardenHotbarCycle',function(_,state,input)
  if state~=Enum.UserInputState.Begin or pg:GetAttribute('SeedMenu')then return Enum.ContextActionResult.Pass end

@@ -2,12 +2,15 @@
 --  * the item (its picture, its name in its rarity colour) and how many: a stack picks 1, a number (- / + or typed) or All. One item asks nothing more.
 --  * "u sure? it's gone forever". Keep it / Discard. EVERY item needs the Discard button HELD for HoldSeconds (owner: "every item needs it"; its bar
 --    fills; a tap does nothing and letting go early starts it again), so a mis-tap can't throw anything away. A gamepad holds A on it.
---  * while the server answers the button says so; a refusal is shown in red and the popup stays; a success closes it.
+--  * while the server answers the button says so; a refusal is shown in red and the popup stays; a success closes it. (R155 review) Each Open hands its confirm callback a
+--    ticket: Done / Fail with a ticket that is not the open popup's are ignored, so a reply that comes after "Keep it" and a new discard can not close or fail the new popup.
+--    Esc / B close only this popup (EscAt tells the Hotbar, whichever of them hears the key first, not to close the Bag too).
 -- Its own ScreenGui (DiscardConfirm, above the hotbar and the Bag). Silent itself: its buttons are ordinary buttons (ButtonFeedback clicks for them).
 local RS=game:GetService('ReplicatedStorage');local Input=game:GetService('UserInputService');local Run=game:GetService('RunService');local GuiService=game:GetService('GuiService')
 local Theme=require(RS:WaitForChild('GardenTheme'));local Pictures=require(RS:WaitForChild('ItemPictures'))
 local D={HoldSeconds=1,DisplayOrder=60}
 local ui,state,conns=nil,nil,{}
+local serial=0
 local RED=Color3.fromRGB(255,110,110)
 local function corner(p,r)local c=Instance.new('UICorner');c.CornerRadius=UDim.new(0,r or 8);c.Parent=p;return c end
 local function text(parent,name,t,size,pos,sz,color,bold)
@@ -60,8 +63,8 @@ local function stopHold()if state then state.Holding=nil;state.HoldAt=nil end;if
 local function confirm()
  if not state or state.Busy then return end
  state.Busy=true;ui.Status.Visible=false;paint()
- local cb=state.OnConfirm;local amount=state.Amount
- task.spawn(function()local ok,err=pcall(cb,amount);if not ok then warn('[R155] discard: '..tostring(err));D.Fail('try again!')end end)
+ local cb=state.OnConfirm;local amount=state.Amount;local ticket=state.Ticket
+ task.spawn(function()local ok,err=pcall(cb,amount,ticket);if not ok then warn('[R155] discard: '..tostring(err));D.Fail('try again!',ticket)end end)
 end
 local function step()
  if not state or not state.HoldAt then stopHold();return end
@@ -89,7 +92,7 @@ local function wire()
  on(Input.InputBegan,function(i)
   if not state then return end
   if i.KeyCode==Enum.KeyCode.ButtonA and GuiService.SelectedObject==go then startHold()
-  elseif i.KeyCode==Enum.KeyCode.Escape or i.KeyCode==Enum.KeyCode.ButtonB then D.Close()end
+  elseif i.KeyCode==Enum.KeyCode.Escape or i.KeyCode==Enum.KeyCode.ButtonB then D.EscAt=os.clock();D.Close()end
  end)
  on(ui.Keep.Activated,function()D.Close()end)
  on(ui.Shade.Activated,function()if state and not state.Busy then D.Close()end end)
@@ -100,12 +103,13 @@ local function wire()
  on(row.More.Activated,function()if state then state.Amount+=1;paint()end end)
  on(ui.Box.FocusLost,function()if state then state.Amount=tonumber((ui.Box.Text:gsub('%D','')))or state.Amount;paint()end end)
 end
--- spec: {Tool=, Name=, Rarity=, Count= (the stack)}; onConfirm(amount) runs in its own thread and answers with D.Done / D.Fail.
+-- spec: {Tool=, Name=, Rarity=, Count= (the stack)}; onConfirm(amount, ticket) runs in its own thread and answers with D.Done(ticket) / D.Fail(why, ticket).
 function D.Open(pg,spec,onConfirm)
  if not ui then build(pg);wire()end
  if ui.Gui.Parent~=pg then ui.Gui.Parent=pg end
  stopHold()
- state={Tool=spec.Tool,Max=math.max(1,math.floor(tonumber(spec.Count)or 1)),Amount=1,OnConfirm=onConfirm}
+ serial+=1
+ state={Tool=spec.Tool,Max=math.max(1,math.floor(tonumber(spec.Count)or 1)),Amount=1,OnConfirm=onConfirm,Ticket=serial}
  ui.Name.Text=spec.Name or(spec.Tool and spec.Tool.Name)or'';Theme.RarityText(ui.Name,spec.Rarity or'Common',17,false)
  ui.Name.TextXAlignment=Enum.TextXAlignment.Left
  pcall(Pictures.Show,ui.Picture,spec.Tool,1)
@@ -118,9 +122,11 @@ function D.Close()
  stopHold();state=nil
  if ui then ui.Gui.Enabled=false;pcall(Pictures.Clear,ui.Picture)end
 end
-function D.Done()D.Close()end
-function D.Fail(why)
+-- (a ticket that is not the open popup's belongs to a popup that was closed meanwhile: its reply changes nothing; no ticket = whatever is open)
+function D.Done(ticket)if ticket~=nil and(not state or state.Ticket~=ticket)then return end;D.Close()end
+function D.Fail(why,ticket)
  if not state then return end
+ if ticket~=nil and state.Ticket~=ticket then return end
  state.Busy=nil;ui.Status.Text=tostring(why or'try again!');ui.Status.Visible=true;paint()
 end
 function D.State()return state end

@@ -190,7 +190,10 @@ function ChestService:OnCharacterAdded(player)
 end
 
 function ChestService:Bank(player, seed)
-	local record, reason = self.PlayerData:AddChest(player, seed, {Luck=true}) -- R137: hidden pack-size pity
+	-- R137: hidden pack-size pity. R155 (review): Banked = this is the pack the player carried home. Its place was kept at the pickup (every other grant counted it),
+	-- so the 200 cap never refuses it, even when a paid Robux receipt (never refused for the cap) filled that place meanwhile (InventoryCap155.RoomFor);
+	-- the old storage ceiling (Config.MaxSavedChests, CanReceiveSeed) still applies.
+	local record, reason = self.PlayerData:AddChest(player, seed, {Luck=true, Banked=true})
 	if not record then return nil, reason end
 	if seed.TestGrant == true then record.TestGrant = true end -- R151: a world pack an owner command spawned (a forced event) is a TEST pack: never announced when opened
 	self.PlayerData:QuestEvent(player,'Steal',1) -- R140 daily quest: a pack stolen from the track and banked

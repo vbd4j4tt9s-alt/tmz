@@ -411,7 +411,8 @@ do
  end
  Progress.RollCoat=realRoll
  -- a late receipt with a full Bag keeps its old behaviour: not processed yet (retried), never a lost purchase
- emptyBag(Ann);for _=1,Config.MaxSavedChests do Data:AddChest(Ann,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})end
+ -- (the 200-item cap stops AddChest at 200; {Receipt=true} skips it, as a paid receipt does, so the bag can be filled to the old 1000-record storage ceiling that still makes a receipt wait)
+ emptyBag(Ann);for _=1,Config.MaxSavedChests do Data:AddChest(Ann,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{Receipt=true})end
  local dFull=receipt(Ann,301);check(dFull==Later,'(unchanged) a late receipt with a full Bag is NotProcessedYet and retried, never refused')
  emptyBag(Ann);local dAgain,pid=receipt(Ann,301)
  check(dAgain==Granted,'... and is granted once there is room')

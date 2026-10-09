@@ -2,7 +2,7 @@
 
 Owner: "hot bar and inventory management is still not fixed just make it function like the normal inventory (not look like) it should feel responsive and i have a lot of options to manage my inventory i can have a blank hot bar if i put everything in my bag additionally make the max amount of items a person can hold 200". Then: "allow people to discard items".
 
-Preview: `inventory.png` (the real Hotbar / Bag / discard popup of this checkout on the mock, PC 1280x720 with a mouse and a landscape phone 844x390 with touch; item pictures are stand-in emoji because the game's pictures are 3D). Rebuild it with `sh preview/run_inventory_preview.sh <scratch dir>`.
+Preview: `inventory.png` (the real Hotbar / Bag / discard popup of this checkout on the mock, PC 1280x720 with a mouse and a landscape phone 844x390 with touch; item pictures are stand-in emoji because the game's pictures are 3D). The last scenes show the item tooltip (hover on a PC, a picked pack and a just-held pack on a phone) with the real pity bars above the hotbar. Rebuild it with `sh preview/run_inventory_preview.sh <scratch dir>`.
 
 ## What was still broken (found on the mock, R154 Hotbar)
 
@@ -20,7 +20,7 @@ Preview: `inventory.png` (the real Hotbar / Bag / discard popup of this checkout
 
 **Hotbar.** Same 10 slots and look, same place on screen (the pity bars above it keep their room). Number keys 1-9 / 0 equip or put away that slot; a click or tap equips, again puts away. The held slot lights up on the very frame of the press. The server confirms afterwards, as before (a pack still shows its "on its way" ring until its bag is in the hand). Every slot takes any item, the shovel's too.
 
-**Bag.** The Bag shows only what is **not** on the hotbar (on a phone that also means items on slots 6-10). Open it with the Bag button, the backtick key (like Roblox) or B; a gamepad uses DPad-Up. It keeps the search box, the All / Seeds / Fruit / Tools cards, the rarity filter and the scrolling grid. Search also dims the hotbar slots that don't match. The new bottom bar has the hint, the count **143/200** (amber from 180, red with **FULL** at 200, and FULL on the Bag button too) and the **🗑 Discard** Trash.
+**Bag.** The Bag shows only what is **not** on the hotbar (on a phone that also means items on slots 6-10). Open it with the Bag button, the backtick key (like Roblox) or B; a gamepad uses DPad-Up (only while nothing in the Bag or on the hotbar is selected: with the selection there DPad-Up moves it, as Roblox's GUI navigation does). It keeps the search box, the All / Seeds / Fruit / Tools cards, the rarity filter and the scrolling grid. Search also dims the hotbar slots that don't match. The new bottom bar has the hint, the count **143/200** (amber from 180, red with **FULL** at 200, and FULL on the Bag button too) and the **🗑 Discard** Trash. The count sits left of the Trash on every sheet width (FULL is wider and the pick bar ends where the count starts); on a sheet too narrow for the pick bar's three buttons beside it (a portrait phone) the count steps aside while an item is picked.
 
 **Moving items (every way).**
 - **Drag (mouse; on a phone hold 0.4 s first).** You can drag:
@@ -54,7 +54,7 @@ I picked this over Roblox's exact rule (a new tool fills any empty slot) because
 **Saved layout.** Which item is on which slot, and which slots are blank, is kept:
 - **Across respawns:** each item goes back to its slot or to the Bag, even when the server hands them back in another order.
 - **Across sessions:** it is saved as the optional field `Premium.Hotbar155`. That is about 100 characters: an 8-character hash of each slot's stack key plus a blank mask, so long names never bloat the save. The client sends it about 2 s after a change, never in the middle of a respawn. An older server keeps an unknown Premium field as it is, so playing on an R154 server does not lose it. ProfileVersion is unchanged.
-- **At join:** the server hands the layout over as the attribute `HotbarLayout155`. While your items arrive, each goes back to its saved slot and everything else to the Bag. When the server says every item is there (`InventorySynced155`, set after the first full tool sync), new items follow the normal rule. A saved slot whose item is gone (used, sold, gifted, planted, stolen while away) becomes free. A broken or old value is dropped quietly; it is never a reason to refuse a save.
+- **At join:** the server hands the layout over as the attribute `HotbarLayout155` (set when the profile has loaded: `''` = none saved). While your items arrive, each goes back to its saved slot and everything else to the Bag. When the server says every item is there (`InventorySynced155`, set after the first full tool sync), new items follow the normal rule. **A slow profile load** (review): the 8 s fallback no longer goes live, and nothing is sent to the server, while `HotbarLayout155` has not arrived (an arrival-order layout would have been saved over the player's own); the join goes on, and when the layout arrives it is applied and the hotbar goes live. If the player already moved something before it arrived, what they did stays (and is what gets saved) instead of being undone. A saved slot whose item is gone (used, sold, gifted, planted, stolen while away) becomes free. A broken or old value is dropped quietly; it is never a reason to refuse a save.
 - **First session:** a new player, or anyone's first R155 session, fills the bar in arrival order with the shovel first, exactly like R154.
 
 **Kept working.** Gifting (hold, then click a player), selling, planting with a held seed, the shovel and the bat, mutation highlights, the R139 rainbow on new packs, R149 / R151 fruit arrival flashes, the R153 debug log (`/test hotbar` now also prints items held of 200 and every discard), the queued / "on its way" ring, and the tutorial (it still points at the item's slot, or at the Bag button).
@@ -70,7 +70,7 @@ The cap is `InventoryStacks155.Cap = 200`, shared by the server (`PlayerDataServ
 | Path | At 200 |
 |---|---|
 | Stealing / picking up a world pack, a dropped pack (`CanReceiveSeed`) | doesn't start: "BAG FULL - MAKE ROOM IN UR BAG FIRST" |
-| Banking the pack you carried | always lands: while you carry it, its place is kept, so every *other* grant counts it (a full bag never eats a stolen pack) |
+| Banking the pack you carried | always lands: while you carry it, its place is kept, so every *other* grant counts it (a full bag never eats a stolen pack). `ChestService:Bank` passes `Banked`, which `RoomFor` never refuses: at 199 the pickup is allowed, a Robux receipt (which skips the cap) can take the kept place (200), and the pack is still banked (201) instead of going back to the track with "BAG FULL". Only the old 1000-record storage ceiling can refuse it. |
 | Bonus roll | "SEED BAG FULL! Make room - your roll stays ready." (the roll is kept) |
 | Daily login / quest pack | "MAKE ROOM FOR 1 PACK FIRST!" (the claim stays open) |
 | Mystery pedestal | not given, owed as before |
@@ -94,7 +94,7 @@ The cap is `InventoryStacks155.Cap = 200`, shared by the server (`PlayerDataServ
 - right-click to pick, then the Trash;
 - gamepad: Y to pick, then the Trash.
 
-**The popup:** "throw it away?" shows the item's picture and name, then "u sure? it's gone forever". For a stack you choose 1, a number (- / + or type it) or All. The buttons are **Keep it** and **hold to discard** (with the amount for a stack).
+**The popup:** "throw it away?" shows the item's picture and name, then "u sure? it's gone forever". For a stack you choose 1, a number (- / + or type it) or All. The buttons are **Keep it** and **hold to discard** (with the amount for a stack). Esc closes only the popup (the Bag stays open; the next Esc closes the Bag). Each popup tags its request with a ticket: if you press **Keep it** while a request is in flight and then open another discard, the old reply can no longer close, or fail, the new popup (the old reply still says what happened).
 
 **Every item needs a ~1 s hold** (owner: "every item needs it"): the button says "hold to discard" and fills while you hold it (mouse, finger, or A on a gamepad). A tap does nothing, and letting go early starts it again, so a mis-tap can never throw anything away.
 
@@ -107,7 +107,19 @@ The cap is `InventoryStacks155.Cap = 200`, shared by the server (`PlayerDataServ
 - that pack is being opened;
 - that seed is still flying in after a reveal (R154, first 10 s).
 
-Requests are rate limited. Every discard prints an Output line `[R155 Discard] name (id): threw away 3x Apple Seed (...)` and is listed by `/test hotbar`, so a "my seed vanished" report can be checked.
+Requests are rate limited. Every discard prints an Output line `[R155 Discard] name (id): threw away 3x Apple Seed (Seed 12_9, 12_8, 12_7)` and is listed by `/test hotbar`. The ids are the records that **really went**, newest first (the one in hand last): the client sends the id of the stack's representative (its oldest or held member), which stays when fewer than all are thrown away, so the log says `; asked about 12_1, kept` then instead of naming it as if it had gone. (I kept the delete order, newest first: deleting the asked-about record first would change the stack's order in the Bag each time.) Selling or taking a legacy loot item publishes the Bag's count at once (`SellLoot` / `TakeBestLoot`).
+
+## The item tooltip (review)
+
+A pack's odds, the pity lines ("LUCKY PACK: x1.5 luck on this one!", the rule) and the Mech coat line ("Gold 4.5% / Diamond 0.5% coat") are written by `ChestService:_holdPack` into `Tool.ToolTip`, and nothing drew them: the Hotbar switches Roblox's backpack, the only built-in UI that shows a ToolTip, off. `ItemTooltip155` shows it the way Roblox does, on every platform (it is the paid-random odds disclosure for the Mech pack):
+
+| Where | How |
+|---|---|
+| PC (mouse) | hover a hotbar slot or a Bag card; leaving hides it; a drag hides it; the text follows the item (the server rewrites a pack's tooltip when it is held again) |
+| Phone (touch) | a finger is no hover. A **picked** item (tap-tap: hold 0.4 s and let go) shows it until it is put down, a Bag card too; a **pack that is just held** (a tap on its slot) shows it for about 5 s once the server has written its odds. The Bag's hint now says "hold for info" |
+| Gamepad | moving the selection onto a slot or card shows it; Y picks, as before; a held pack announces itself like on a phone |
+
+The panel is the Bag's look (dark green, the item's name in its rarity colour, the odds as a name / odds column, the lucky line gold, the coat line, the pity rule dimmed). It is clamped inside the screen and never over the pity bars above the hotbar, the held item's name or the Bag's bottom bar (a hotbar slot's tooltip has one baseline along the whole hotbar, above the pity bars; a Bag card's goes above the card, or below it when that shows more). It takes no input (a tap goes through it). On a small screen a tall tooltip drops odds rows from the end of the odds ("+4 more") and keeps the coat line and the rule. Nothing runs per frame: it is built on the first show and redrawn only when something it reads changes. **Known limit:** the server writes the odds when a pack is held, so a pack never held shows its short line ("Gold Limited Mech Pack • Click / tap / RT 5 times to open"); the odds are also as of the last hold (pity lines included). Computing them when the pack tool is built would show them from the start, at the cost of a SeedOdds per pack tool on every sync (200 packs).
 
 ## Responsiveness (200 items, `tests/perf_inventory155.luau`)
 
@@ -129,17 +141,19 @@ Nothing runs per frame while idle: the pick ring and outlines are static, the ho
 - `src/ReplicatedStorage/GardenInventoryState.lua`: the layout model, rewritten with the rules above (Reconcile, Place, Stow, Target, Remember, Serialize / Parse / Restore, GoLive).
 - `src/ReplicatedStorage/InventoryStacks155.lua` (new): stack key, kind, id and the hash, shared with the server.
 - `src/ReplicatedStorage/InventoryPanel155.lua` (new): the Bag bar (count, Trash, pick bar), tap-tap, search dimming, discarding, saving the layout, join / live.
-- `src/ReplicatedStorage/DiscardDialog155.lua` (new): the confirm popup.
-- `src/StarterPlayer/StarterPlayerScripts/Hotbar.client.lua`: the Bag lists Bag items only; any slot takes anything; drop on the Trash; a hold let go picks; right-click picks; equipping from the Bag stays in the Bag; the instant held paint; the collect target. Lines 1 and 2 are untouched, the main chunk is at 174 registers (as R154), and it still plays no cue but the harvest landing.
-- `src/ServerScriptService/ChestChaseServer/InventoryCap155.lua` (new): HeldItemCount, RoomFor, PublishHeld, the saved layout and DiscardRecords, attached to PlayerDataService.
+- `src/ReplicatedStorage/DiscardDialog155.lua` (new): the confirm popup (review: request tickets, `EscAt`).
+- `src/ReplicatedStorage/ItemTooltip155.lua` (new, in the manifest): the item's ToolTip panel (review); `InventoryPanel155` forwards the Hotbar's hover / selection and the picked item to it, and announces a just-held pack.
+- `src/StarterPlayer/StarterPlayerScripts/Hotbar.client.lua`: the Bag lists Bag items only; any slot takes anything; drop on the Trash; a hold let go picks; right-click picks; equipping from the Bag stays in the Bag; the instant held paint; the collect target. Lines 1 and 2 are untouched, the main chunk is at 174 registers (as R154: the review fixes add no top-level local), and it still plays no cue but the harvest landing. Review: each slot / card forwards MouseEnter / MouseLeave / SelectionGained / SelectionLost to `ItemTooltip155` (inside `hook`), and Esc in the discard popup no longer closes the Bag.
+- `src/ServerScriptService/ChestChaseServer/InventoryCap155.lua` (new): HeldItemCount, RoomFor (review: `Banked` is never refused), PublishHeld, the saved layout and DiscardRecords (review: also returns the ids that went), attached to PlayerDataService. `GardenInventoryState` (review) remembers that the player moved something (`Touched`).
 - `src/ServerScriptService/ChestChaseServer/InventoryService155.lua` (new): the DiscardItems and HotbarLayout155 remotes.
 - The cap is wired into PlayerDataService (CanReceiveSeed, AddChest options, HarvestPlant, publishing, layout at load), ChestService (reward-landing times), HarvestToolService (InventorySynced155), DailyProgress, VoidGiveaway152, PremiumProgress and PremiumService (receipts), FruitGiftService, RarePackTests, StudioSeedCommands, StudioTestCommands (+ `/test hotbar`), OwnerPlayerCommands, OwnerUpdateCommands82, SecurityGate (rate limits), ChestChaseServerMain (starts the service) and MANIFEST. Config.lua is unchanged.
 
-## Tests: `tests/run_inventory.sh [dir] [all|static|layout|client|server|perf]`
+## Tests: `tests/run_inventory.sh [dir] [all|static|layout|client|tooltip|server|perf]`
 
 - `test_layout155.luau`: the model alone, with 62 checks and 3000 random operations (never one key on two slots, never a slot pointing at a missing item, blank slots never fill by themselves).
-- `test_inventory155.luau`: the real Hotbar through R153's engine model in 6 engine variants x 2 event orders, 122 checks each. It covers every drag path (and the drop-target outlines while dragging), the blank hotbar, tap-tap (touch hold, right-click + number key, gamepad Y / A), instant highlight, search, keys, the count, discarding (amounts, the ~1 s hold for every item by mouse, touch and gamepad A, a refusal, the shovel), respawn and rejoin, and the seed collect target.
-- `test_cap155.luau`: the real server, 88 checks. It covers the cap on every grant path above, the carried pack, the receipt, the 650-item old save, every discard refusal, stacks, the count, persistence after a rejoin, the remotes and their rate limit, and the saved layout including a broken one.
+- `test_inventory155.luau`: the real Hotbar through R153's engine model in 6 engine variants x 2 event orders, 608 checks each (review sections 11-14: a slow profile load with a delayed `HotbarLayout155`, the count label on 11 sheet widths x FULL or not x picked or not, DPad-Up, stale discard replies and Esc). It covers every drag path (and the drop-target outlines while dragging), the blank hotbar, tap-tap (touch hold, right-click + number key, gamepad Y / A), instant highlight, search, keys, the count, discarding (amounts, the ~1 s hold for every item by mouse, touch and gamepad A, a refusal, the shovel), respawn and rejoin, and the seed collect target.
+- `test_tooltip155.luau` (review): the real Hotbar + `ItemTooltip155` + the real pity bars on a PC (84 checks), a landscape phone and a portrait phone (48 each): hover, Bag cards, drag, a changed or gone item, a picked pack / card, a just-held pack (touch and gamepad), gamepad selection, the place (inside the screen, clear of the pity bars, the held item's name and the Bag's bottom bar, one baseline along the hotbar, a 60-seed tooltip truncated with "+N more"), no input taken, and the pure parts (`Parse`, `Fit`).
+- `test_cap155.luau`: the real server, 102 checks (review: the Robux receipt during a carry, the 1000 ceiling for the banked pack, the honest discard log, the loot count). It covers the cap on every grant path above, the carried pack, the receipt, the 650-item old save, every discard refusal, stacks, the count, persistence after a rejoin, the remotes and their rate limit, and the saved layout including a broken one.
 - `perf_inventory155.luau`: 200 items, R154 against R155.
 - R153 `run_hotbar.sh` now ends by running `run_inventory.sh all`, so the whole-game `tools/tests/run_all_suites.sh` runs the R155 suites with the other hotbar tests.
 - Older tests updated where the owner's new rules change what is right (each change is commented "R155" in the test):
@@ -157,3 +171,4 @@ Nothing runs per frame while idle: the pick ring and outlines are static, the ho
 2. **Paid receipts may go over 200 (still open).** A Mech pack bought with Robux is never lost: if something arrived between the purchase prompt and the receipt, the packs are added even past 200. The shop never offers packs that don't fit.
 3. **Discarding while carrying a stolen pack or in a chase is refused (decided: keep as built).** The brief asked to refuse "being stolen"; a stolen pack is not in the Bag yet, so the whole Bag waits until the run ends.
 4. **The discard hold (decided: every item).** The ~1 s hold on the Discard button is required for every item, not only rare ones; same length and look.
+5. **Odds in the tooltip start at the first hold (review, open).** See "The item tooltip": a never-held pack shows only its short line; say so if you want the odds there from the start (the server would compute them when it builds each pack tool).

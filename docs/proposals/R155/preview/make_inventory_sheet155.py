@@ -10,13 +10,13 @@ from PIL import Image, ImageDraw, ImageFont
 S, OUT = sys.argv[1], sys.argv[2]
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, '../../../..'))
-FONTS = os.path.join(S, 'fonts', 'node_modules', '@fontsource', 'montserrat', 'files')
+FONTS = os.path.join(S, 'fonts', 'node_modules', '@fontsource', 'fredoka-one', 'files')  # (render_gui155.mjs: Fredoka One for the pity bars + Montserrat beside it)
 SKY = 'linear-gradient(180deg,#8fd0f6 0%,#cdeafb 46%,#78c060 47%,#4e9c48 100%)'
 
 
 def font(px, weight='700'):
     try:
-        return ImageFont.truetype(os.path.join(FONTS, 'montserrat-latin-%s-normal.woff' % weight), px)
+        return ImageFont.truetype(os.path.join(FONTS, '..', '..', 'montserrat', 'files', 'montserrat-latin-%s-normal.woff' % weight), px)
     except Exception:
         return ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', px)
 
@@ -35,7 +35,7 @@ for view in ('pc', 'phone'):
 os.makedirs(os.path.join(S, 'png'), exist_ok=True)
 with open(os.path.join(S, 'scenes.json'), 'w', encoding='utf-8') as f:
     json.dump(scenes, f)
-subprocess.run(['node', os.path.join(REPO, 'docs/proposals/R153/preview/render_gui153.mjs'), os.path.join(S, 'scenes.json'), os.path.join(S, 'png'),
+subprocess.run(['node', os.path.join(HERE, 'render_gui155.mjs'), os.path.join(S, 'scenes.json'), os.path.join(S, 'png'),
                 FONTS if os.path.isdir(FONTS) else ''], check=True)
 
 
@@ -65,7 +65,7 @@ height = title_h + sum(max(t[1].height for t in row) + CAP_H + PAD for row in ro
 width = PAD + 2 * (CELL_W + PAD)
 sheet = Image.new('RGB', (width, height), (24, 40, 33))
 d = ImageDraw.Draw(sheet)
-d.text((PAD, 18), 'R155: the hotbar and the Bag work like Roblox\'s own inventory; 200 items max; discarding', font=font(26, '900'), fill=(255, 255, 255))
+d.text((PAD, 18), 'R155: the hotbar and the Bag work like Roblox\'s inventory; 200 items; discarding; tooltips', font=font(26, '900'), fill=(255, 255, 255))
 d.text((PAD, 52), 'The real Hotbar / Bag of this checkout on the mock (pc 1280x720 mouse, phone 844x390 touch). Item pictures are stand-in emoji (the game draws 3D pictures).',
        font=font(14, '500'), fill=(190, 225, 200))
 y = title_h

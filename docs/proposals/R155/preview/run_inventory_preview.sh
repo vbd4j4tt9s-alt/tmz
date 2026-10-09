@@ -2,14 +2,15 @@
 # Usage: sh run_inventory_preview.sh <scratch dir> [out.png]   -> docs/proposals/R155/inventory.png
 # R155 preview: the REAL Hotbar / Bag / discard popup of this checkout on the Roblox mock, driven through R153's engine model (engine153.luau with the view's screen
 # size: pc 1280 x 720 with a mouse, phone 844 x 390 with touch) into each state of the storyboard; the GUI trees are dumped (R153's dump_tree153.luau) and drawn by
-# headless Chromium (R153's render_gui153.mjs); make_inventory_sheet155.py lays them out with their captions.
-# Needs /opt/luau, python3 + Pillow, node + playwright (PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers) and, for the font, @fontsource/montserrat (npm; without it DejaVu Sans).
+# headless Chromium (render_gui155.mjs); make_inventory_sheet155.py lays them out with their captions. The last scenes show the item's ToolTip (hover, a picked pack, a just-held
+# pack) with the real pity bars (PityBars155) above the hotbar.
+# Needs /opt/luau, python3 + Pillow, node + playwright (PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers) and, for the fonts, @fontsource/montserrat + fredoka-one (npm; without them DejaVu Sans).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd);S=${1:?scratch dir};OUT=${2:-$REPO/docs/proposals/R155/inventory.png}
 P=$REPO/docs/proposals;T=$REPO/tools/tests;INV=$P/inventory_R113/tests
 mkdir -p "$S"
-if [ ! -d "$S/fonts/node_modules/@fontsource/montserrat" ];then
- mkdir -p "$S/fonts";npm install --prefix "$S/fonts" @fontsource/montserrat >/dev/null 2>&1 || echo "no font package: falling back to DejaVu Sans"
+if [ ! -d "$S/fonts/node_modules/@fontsource/montserrat" ] || [ ! -d "$S/fonts/node_modules/@fontsource/fredoka-one" ];then
+ mkdir -p "$S/fonts";npm install --prefix "$S/fonts" @fontsource/montserrat @fontsource/fredoka-one >/dev/null 2>&1 || echo "no font package: falling back to DejaVu Sans"
 fi
 for view in pc phone;do
  D=$S/$view;mkdir -p "$D"

@@ -2,6 +2,8 @@
 -- R155 preview (not a test): the REAL Hotbar / Bag / discard popup on the Roblox mock, driven through R153's engine model (engine153.luau with the screen size of
 -- the view), printed as SCENE lines (dump_tree153.luau) for render_gui153.mjs. VIEW = 'pc' (1280 x 720, mouse) or 'phone' (844 x 390, touch).
 -- Item pictures: the game draws each item's 3D picture (a ViewportFrame the renderer can not draw); here each slot / card shows a stand-in emoji of its kind.
+-- The last scenes show the item's ToolTip (review): a pack's odds, the pity lines and the Mech coat line, hovered (mouse), picked (phone) or just held (phone), with the
+-- real pity bars above the hotbar.
 local W=require('./world');local F=require('./fixtures');local E=require('./sfx_env')(W);local R=W.R
 local dump=require('./dump_tree153')
 F.packAssets(W);W.Run.IsStudio=function()return true end
@@ -10,11 +12,17 @@ Meshes.Get=function(key)local p=meshCache[key];if not p then p=R.new('MeshPart')
 Meshes.Status=function()return'Ready'end
 E.recorder()
 do local inew=R.Instance.new;R.Instance.new=function(class,parent)local o=inew(class,parent);if class:find('Button')then o.MouseButton2Click=R.signal()end;return o end end
+W.service('TextService').GetTextSize=function(_,text,size,_,bounds)
+ local per=math.max(1,math.floor(bounds.X/(size*.56)));local lines,widest=0,0
+ for l in(text..'\n'):gmatch('(.-)\n')do lines+=math.max(1,math.ceil(#l/per));widest=math.max(widest,#l)end
+ return R.Vector2.new(math.min(bounds.X,widest*size*.56),lines*size*1.2)
+end
 local PHONE=VIEW=='phone'
 local SW,SH=PHONE and 844 or 1280,PHONE and 390 or 720
 W.UIS.TouchEnabled=PHONE;W.UIS.MouseEnabled=not PHONE;W.workspace.CurrentCamera.ViewportSize=R.Vector2.new(SW,SH)
 E.player('Tester')
 local player,pg=E.Player,E.pg
+local hum=E.hum
 local X=require('./engine155p')(W,E,F,{Variant='began',Order='release first',Handoff='empty',Screen=R.Vector2.new(SW,SH),Inset=PHONE and 0 or 58})
 local bag=function()return player:FindFirstChildOfClass('Backpack')end
 local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=W.RS
@@ -26,8 +34,21 @@ local shovel=F.shovel(W,bag());emoji[shovel]='⛏'
 local apples={};for i=1,3 do apples[i]=F.seed(W,bag(),'AppleSeed',1,'None');emoji[apples[i]]='🌱'end
 local blue=fruit('BluebellSeed',1,'🫐')
 local bat=F.bat(W,bag());emoji[bat]='🏏'
+-- (the pack tooltips are what ChestService:_holdPack writes: the label, the lucky line, the odds, the Mech coat line, the pity rule)
+local Mech=W.module('MechCatalog');local Pity=W.module('PackPity155');local Odds=W.module('OddsText85')
+local function serverTip(label,lucky,seeds,coat)
+ local rows={label};if lucky then rows[#rows+1]=Pity.LuckyLine end
+ for _,sd in ipairs(seeds)do rows[#rows+1]=sd.Name..': '..Odds.Format(sd.Chance)end
+ if coat then rows[#rows+1]=Mech.CoatLine()end
+ rows[#rows+1]=Pity.Disclosure
+ return table.concat(rows,'\n')
+end
 local forest=F.pack(W,bag(),1,'Pack01',1,'None');emoji[forest]='📦'
-local desert=F.pack(W,bag(),2,'Pack03',1,'None');emoji[desert]='📦'
+forest.ToolTip=serverTip(forest.Name,false,{{Name='Sunflower Seed',Chance=30},{Name='Daisy Seed',Chance=24},{Name='Bluebell Seed',Chance=18},{Name='Apple Seed',Chance=12},{Name='Clover Seed',Chance=9},{Name='Golden Acorn Seed',Chance=4},{Name='Moon Fern Seed',Chance=2.5},{Name='Dragon Fig Seed',Chance=.5}},false)
+local desert=F.pack(W,bag(),8,'MechLimited',1,'Gold','Gold Limited Mech Pack');emoji[desert]='📦'
+desert.ToolTip=serverTip('Gold Limited Mech Pack',true,Mech.Seeds,true)
+local bagMech=F.pack(W,bag(),8,'MechLimited',1,'Diamond','Diamond Limited Mech Pack');emoji[bagMech]='📦'
+bagMech.ToolTip=serverTip('Diamond Limited Mech Pack',false,Mech.Seeds,true)
 local mango=fruit('MangoSeed',1.2,'🥭');local plum=fruit('PlumSeed',1.1,'🍑');local orange=fruit('OrangeSeed',1,'🍊')
 local lime=fruit('LimeSeed',1.3,'🍋');local fig=fruit('FigSeed',1,'🍇');local kiwi=fruit('KiwiSeed',1.1,'🥝')
 local straw=F.seed(W,bag(),'CloverSeed',1,'None');emoji[straw]='🌱'
@@ -38,9 +59,10 @@ local Names=W.module('GardenDisplayNames');local Catalog=W.module('PlantCatalog'
 local gui=pg.ChestToolHotbar;local dock=gui.Dock;local panel=gui.Inventory;local open=dock.OpenInventory
 local function slot(i)return dock['Slot'..i]end
 local function nameOf(t)return Names.Tool(t,Catalog)end
-local function toolNamed(text)if text==''then return nil end;for t in pairs(emoji)do if t.Parent and text:sub(1,#nameOf(t))==nameOf(t)then return t end end end
+local function flat(text)return(text:gsub('%s+',' '))end -- (a long name wraps on a card: "Gold Limited Mech\nPack (3kg)")
+local function toolNamed(text)if text==''then return nil end;text=flat(text);for t in pairs(emoji)do if t.Parent and text:sub(1,#nameOf(t))==nameOf(t)then return t end end end
 local function slotOf(t)for i=1,10 do local s=slot(i);if s.Visible and s.ItemName.Text==nameOf(t)then return s,i end end end
-local function cardOf(t)for _,c in ipairs(panel.Items:GetChildren())do if c.Name=='Item'and c.Visible and c.ItemName.Text:sub(1,#nameOf(t))==nameOf(t)then return c end end end
+local function cardOf(t)for _,c in ipairs(panel.Items:GetChildren())do if c.Name=='Item'and c.Visible and flat(c.ItemName.Text):sub(1,#nameOf(t))==nameOf(t)then return c end end end
 -- stand-in pictures
 local function standIn(holder,t)
  if not holder then return end
@@ -61,7 +83,7 @@ local function scene(name,caption)
  -- (the renderer's approximations of two engine defaults: a ScrollingFrame clips its cards; a Contextual UIStroke outlines text only, so an empty label shows nothing)
  panel.Items.ClipsDescendants=true
  for _,l in ipairs({dock.SelectedName,dock.SelectedTraits})do local st=l:FindFirstChild('RarityOutline');if st then st.Enabled=l.Text~=''end end
- local roots={};for _,g in ipairs(pg:GetChildren())do if g:IsA('ScreenGui')and g.Enabled~=false and(g.Name=='ChestToolHotbar'or g.Name=='DiscardConfirm')then roots[#roots+1]=g end end
+ local roots={};for _,g in ipairs(pg:GetChildren())do if g:IsA('ScreenGui')and g.Enabled~=false and(g.Name=='ChestToolHotbar'or g.Name=='DiscardConfirm'or g.Name=='PackPityBars155')then roots[#roots+1]=g end end
  table.sort(roots,function(a,b)return(a.DisplayOrder or 0)<(b.DisplayOrder or 0)end)
  local kids={};for _,g in ipairs(roots)do for _,c in ipairs(g:GetChildren())do kids[#kids+1]=c end end
  print(('SCENE %s 0 0 %d %d 1 %s'):format(name,SW,SH,dump({GetChildren=function()return kids end},SW,SH)))
@@ -106,6 +128,22 @@ if not PHONE then
  scene('pc_blank','A fully blank hotbar: everything in the Bag; new items go to the Bag until u put something on it')
  openBag();player:SetAttribute('HeldItemCount',143);X.frames(2)
  scene('pc_count','The Bag with everything in it: 143/200 (amber from 180)')
+  -- 8. the item's ToolTip (review): hover a hotbar slot, then a Bag card
+  closeBag()
+  openBag()
+  local function tidy()for i=1,10 do local s=slot(i);if s.ItemName.Text~=''then X.drag('mouse',s,panel.Items);X.frames(2)end end end
+  tidy();closeBag()
+  local want={shovel,apples[1],blue,bat,desert,forest,mango,plum,orange}
+  openBag();for k,t in ipairs(want)do local c=cardOf(t);if c then X.drag('mouse',c,slot(k));X.frames(2);openBag()end end;closeBag();X.frames(3)
+  local Bars=W.module('PityBars155').Start(player)
+  player:SetAttribute('PackPityNormal',4);player:SetAttribute('PackPityEvent',9);X.wait(2)
+  local s6=slotOf(desert);s6.MouseEnter:Fire();X.frames(3)
+  scene('pc_tooltip','Hover a hotbar slot: the item\'s ToolTip like Roblox\'s backpack: the Mech pack\'s odds, the coat line, the pity rule (above the pity bars, never over them)')
+  s6.MouseLeave:Fire();X.frames(2)
+  openBag();local mc=cardOf(bagMech);if not mc then panel.Search.Text='diamond';X.frames(3);mc=cardOf(bagMech)end
+  if mc then mc.MouseEnter:Fire();X.frames(3)
+   scene('pc_tooltip_card','... and a Bag card: the paid-random odds of a Mech pack are one hover away');mc.MouseLeave:Fire()end
+  panel.Search.Text='';X.frames(2);closeBag()
 else
  -- phone: tap-tap
  local s=slotOf(blue);local p=X.center(s);X.down('touch',p);X.wait(.55);X.up(p);X.frames(3)
@@ -120,4 +158,17 @@ else
  for i=1,10 do local s2=slot(i);if s2.Visible and s2.ItemName.Text~=''then openBag();X.drag('touch',s2,open,.5);X.frames(2)end end
  closeBag();X.frames(3)
  scene('phone_blank','Phone: a blank hotbar (everything in the Bag)')
+ -- the item's ToolTip (review): a picked pack, a pack just held
+ openBag();for k,t in ipairs({shovel,apples[1],blue,bat,desert})do local c=cardOf(t);if c then X.drag('touch',c,slot(k),.5);X.frames(2);openBag()end end;closeBag();X.frames(3)
+ local Bars=W.module('PityBars155').Start(player)
+ player:SetAttribute('PackPityNormal',4);player:SetAttribute('PackPityEvent',9);X.wait(2)
+ local d=slotOf(desert)
+ if d then
+  X.tap('touch',d);X.wait(.6)
+  scene('phone_tooltip_held','Phone: tap a pack\'s slot to hold it and its odds show for a few seconds (above the pity bars and its name)')
+  hum:UnequipTools();X.wait(5.6)
+  local p2=X.center(slotOf(desert));X.down('touch',p2);X.wait(.55);X.up(p2);X.frames(4)
+  scene('phone_tooltip_pick','Phone tap-tap: hold a pack and let go (picked): its ToolTip shows for as long as it is picked, clear of the Bag bar\'s buttons')
+  X.tap('touch',panel.BagBar.PickBar.PickCancel);X.frames(2)
+ end
 end
