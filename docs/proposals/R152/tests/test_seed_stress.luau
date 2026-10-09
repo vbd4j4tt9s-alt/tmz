@@ -151,7 +151,7 @@ local function clean(tag)
  local ok=true
  local function c(v,msg)if not check(v,tag..': '..msg)then ok=false end end
  c(M.Active()==nil and W.workspace:FindFirstChild('_RarePullStage')==nil and revealGui()==nil,'no presentation, stage or reveal GUI left')
- c(cam:FindFirstChild('RarePullGrade')==nil and cam:FindFirstChild('RarePullBlur')==nil,'no grade / blur left')
+ c(cam:FindFirstChild('RarePullGrade')==nil and cam:FindFirstChild('RarePullBlur')==nil and cam:FindFirstChild('RarePullDof')==nil,'no grade / blur / depth of field (R155) left')
  c(#rarePlaying()==0,'every reveal sound has stopped ('..table.concat(rarePlaying(),',')..')')
  c(ducks()==0 and not Audio.Running(),'no duck, no sound sheet')
  c(W.rsBound[M.BindName]==nil,'no render step left')

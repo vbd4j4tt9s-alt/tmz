@@ -32,6 +32,16 @@
 -- (death, a fling, a chase, a teleport, leaving the base or the track, a menu, the next pack opened) collects it first. The sounds and the
 -- duck end on the presentation's own Length as before (the result then waits in silence); a collect before that fades their tail
 -- (RarePullAudio.FadeOut), so the collect's whoosh and pop never stack on it.
+-- R155 (owner: "... dynamic camera movement like a cinema scene ... only secret to king"): inside the stage the Secret / Cosmic / King camera
+-- is the cinematic one (RarePullCamera155: shots, cuts on the sounds, moves, dutch tilt, lens; a pure function of the scene's clock) with a
+-- depth of field on the Camera (RarePullDof, every device; made on entering the stage, gone with it on every exit path). The world before the
+-- cut to black (the lens-only push) and the cut back to the world are today's: the player's own camera is never moved. Without the module (or
+-- if it fails three frames in a row) the stage keeps today's camera (RarePullRules.Shot). Common..Mythic are unchanged.
+-- R155 (owner: "for some cutscenes u can skip it by spam clicking disable this feature and u can only skip at the bottom right of the
+-- screen"), every presentation: a click / tap anywhere never skips any more (a run of clicks during the animation does nothing; it is still
+-- the reveal's, never a tool's: no planting, digging or swinging). The skip is the SKIP button at the bottom right (RarePullCard) - and
+-- gamepad B / R2 and Enter, which press it - from SkipFrom until the hit. The waiting result is still collected by a click / tap anywhere,
+-- but only by a press that STARTED once it had been shown for CollectAfter s (M.Tap): a burst of clicks from the animation never collects it.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Gui=game:GetService('GuiService');local UIS=game:GetService('UserInputService');local CAS=game:GetService('ContextActionService')
 local Collection=game:GetService('CollectionService');local StarterGui=game:GetService('StarterGui')
@@ -39,12 +49,14 @@ local Rules=require(script.Parent.RarePullRules);local Audio=require(script.Pare
 local Cache do local ok,m=pcall(require,script.Parent.PropCache152);Cache=ok and m or{new=function()return{Set=function(o,k,v)o[k]=v end}end}end -- (R152 perf)
 local Collect do local ok,m=pcall(require,script.Parent.SeedCollect154);Collect=ok and m or nil end -- (R154)
 local M={}
+do local ok,m=pcall(require,script.Parent.RarePullCamera155);M.Camera=ok and m or nil end -- (R155: the story scenes' cinematic camera)
 M.BindName='ChestChaseRarePull';M.SkipAction='ChestChaseRarePullSkip'
 M.KeepGuis={TouchGui=true,Freecam=true,SeedCollectFly=true} -- (R154: the seed flying home is never hidden by a story scene)
 M.CoreTypes={'PlayerList','Chat','EmotesMenu','Health','Backpack'}
 M.DangerRadius=45;M.MoveLimit=8
 local current=nil;M.LastEnd=-math.huge
-local lastPress=-math.huge -- (R153: the last press on the world: a run of clicks never skips, M.SkipGap)
+local lastPress=-math.huge -- (R153: the last press on the world)
+local pressBegan,pressKey=nil,false -- (R155: the press being claimed: when it began, and whether it is a key that presses the SKIP button)
 local function clamp01(x)return math.clamp(x,0,1)end
 local function lp()return Players.LocalPlayer end
 local function reduced()local ok,v=pcall(function()return Gui.ReducedMotionEnabled end);return ok and v==true end
@@ -242,6 +254,7 @@ local function unbind(run)
  for _,c in ipairs(run.Connections)do c:Disconnect()end;table.clear(run.Connections)
 end
 local function leaveStage(run)
+ if run.Dof then run.Dof:Destroy();run.Dof=nil end -- (R155: the stage's depth of field goes with it)
  restoreCamera(run);showHud(run);releaseControls(run)
  if run.SkipBound then run.SkipBound=false;pcall(function()CAS:UnbindAction(M.SkipAction)end)end
  if run.SkipButton then run.SkipButton:Destroy();run.SkipButton=nil end
@@ -292,6 +305,7 @@ finish=function(run,reason)
  end
  if run.Grade then run.Grade:Destroy();run.Grade=nil end
  if run.Blur then run.Blur:Destroy();run.Blur=nil end
+ if run.Dof then run.Dof:Destroy();run.Dof=nil end
  if run.Card then pcall(function()run.Card:Destroy()end);run.Card=nil end
  if run.Gui then run.Gui:Destroy();run.Gui=nil end
  if run.SeedModel and run.SeedModel.Parent then run.SeedModel:Destroy()end
@@ -486,6 +500,8 @@ function M._start(info)
  pcall(Audio.Preload,slots)
  -- (R152: the sounds belong to this run even when their first frame failed - the sheet is set and plays on - so its end always stops them;
  -- an error there used to leave them playing after the reveal)
+ -- (R155: the SKIP button at the bottom right: the only way to skip, with gamepad B / R2 and Enter)
+ if run.Card.SkipButton then table.insert(run.Connections,run.Card.SkipButton.Activated:Connect(function()if current==run then M.Skip()end end))end
  local okA,errA=pcall(Audio.Begin,run.Cues,run.Clock(),run.TL.Length);run.Audio=true
  if not okA then warn('[RarePull] sounds: '..tostring(errA))end
  -- the hit and the moment the seed is shown, for the announcements
@@ -506,10 +522,18 @@ function M._start(info)
   local button=Instance.new('TextButton');button.Name='Backdrop';button:SetAttribute('ButtonHighlight',false);button:SetAttribute('ButtonSound',false)
   button.BackgroundTransparency=1;button.Text='';button.AutoButtonColor=false;button.Size=UDim2.fromScale(1,1);button.ZIndex=40;button.Selectable=false;button.Parent=gui
   run.SkipButton=button
-  table.insert(run.Connections,button.Activated:Connect(function()M.Skip()end))
+  -- (R155: the full-screen button takes every click / tap - the world never gets one - but it only ever collects the waiting result, and only
+  -- a press that began after it was shown: its InputBegan says when; the SKIP button above it is the skip)
+  table.insert(run.Connections,button.InputBegan:Connect(function(input)
+   local ty=input and input.UserInputType;if ty==Enum.UserInputType.MouseButton1 or ty==Enum.UserInputType.Touch then run.TapBegan=os.clock()end
+  end))
+  table.insert(run.Connections,button.Activated:Connect(function()local began=run.TapBegan;run.TapBegan=nil;M.Tap(began)end))
   local ok2=pcall(function()
-   CAS:BindActionAtPriority(M.SkipAction,function(_,state)
-    if state==Enum.UserInputState.Begin then M.Skip()end
+   CAS:BindActionAtPriority(M.SkipAction,function(_,state,input)
+    if state==Enum.UserInputState.Begin then
+     local k=input and input.KeyCode
+     if M.SkipKeys[k]then M.Skip()else M.Tap(os.clock())end -- (B / R2 / Enter: the SKIP button's keys; Space / A collect only)
+    end
     return Enum.ContextActionResult.Sink
    end,false,Enum.ContextActionPriority.High.Value,Enum.KeyCode.Space,Enum.KeyCode.Return,Enum.KeyCode.ButtonA,Enum.KeyCode.ButtonB,Enum.KeyCode.ButtonR2)
   end)
@@ -560,6 +584,27 @@ local function shake(run,t)
  local k=(1-a/.5)^2*(run.Phone and .35 or 1)*Rules.Smooth(a/.03) -- (R152: the hit's shake swells in over 30 ms: no camera jump on the hit frame)
  return CFrame.new(math.sin(t*90)*.12*k,math.sin(t*73)*.09*k,0)*CFrame.Angles(0,0,math.sin(t*61)*math.rad(1.1)*k)
 end
+-- R155: the stage camera at t: the cinematic camera (RarePullCamera155) with its depth of field (RarePullDof on the Camera, like the grade and
+-- the blur; on every device: the owner's choice), or today's (RarePullRules.Shot) without the module, and for good once it has failed three
+-- frames in a row (one bad frame shows today's framing for that frame only). Returns eye, target (stage-local), FieldOfView, roll (degrees).
+local function sceneCamera(run,t,tl,cam)
+ local rig=run.Cam
+ if rig and(run.CamErrors or 0)<3 then
+  local vp=cam.ViewportSize
+  local ok,eye,target,fov,roll=pcall(M.Camera.Shot,rig,t,vp and vp.Y>0 and vp.X/vp.Y or nil)
+  if ok then
+   run.CamErrors=nil
+   local d=run.Dof
+   if not d or d.Parent~=cam then if d then d:Destroy()end;d=Instance.new('DepthOfFieldEffect');d.Name='RarePullDof';d.Parent=cam;run.Dof=d end
+   local S=run.Set;S(d,'FocusDistance',rig.Focus);S(d,'InFocusRadius',rig.Radius);S(d,'FarIntensity',rig.Far);S(d,'NearIntensity',rig.Near)
+   return eye,target,fov,roll
+  end
+  run.CamErrors=(run.CamErrors or 0)+1;if run.CamErrors==1 then warn('[RarePull] camera: '..tostring(eye))end
+ end
+ if run.Dof and(run.CamErrors or 0)>=3 then run.Dof:Destroy();run.Dof=nil end -- (given up: today's camera has no depth of field)
+ local eye,target,fov=Rules.Shot(run.Rank,run.Variant,t,tl)
+ return eye,target,fov,0
+end
 -- FieldOfView push in the world (the player's camera keeps control; only written while nobody else has changed it)
 local function push(run,cam,amount)
  amount=math.max(amount,carry(run))
@@ -586,11 +631,10 @@ end
 -- the reveal's; a tool the engine activates on a click (a pack, the bat) is set ManualActivationOnly on this client for as long as a press
 -- would be the reveal's, and put back the moment it would be the tool's again or the reveal ends. No reveal: the tools work as before.
 -- (R154: a result that waits takes every press, until it is collected)
+-- (R155: a card takes every press from its first frame until it is collected: a click never skips, but it is never the tool's either)
 local function armed(run,t)
  if run.Kind=='Scene'or run.Collected then return false end
- if run.SawResult then return true end
- local tl=run.TL;local hit=tl.Climax or tl.Burst
- return t>=(tl.SkipFrom or math.huge)and t<hit-.02 and os.clock()-lastPress>=M.SkipGap
+ return true
 end
 local function holdTool(run,hold)
  local player=lp();local char=hold and player and player.Character;local tool=char and char:FindFirstChildOfClass('Tool')
@@ -674,6 +718,7 @@ function M._stepScene(run,pg,t,tl,tier,cam)
  if inStage and not run.InStage then
   if not run.Scene then finish(run,'error');return end
   run.InStage=true;cam.CameraType=Enum.CameraType.Scriptable
+  if M.Camera then local ok,rig=pcall(M.Camera.New,run.Rank,run.Variant,tl);run.Cam=ok and rig or nil end -- (R155)
  elseif not inStage and run.InStage then
   leaveStage(run)
   if run.Fly then pcall(run.Fly.Go)end -- (R154: the world and the hotbar are back: the seed flies home)
@@ -689,10 +734,11 @@ function M._stepScene(run,pg,t,tl,tier,cam)
    run.StageErrors=(run.StageErrors or 0)+1;if run.StageErrors==1 then warn('[RarePull] stage: '..tostring(errS))end
    if run.StageErrors>=3 then finish(run,'error');return end
   end
-  local eye,target,fov=Rules.Shot(run.Rank,run.Variant,t,tl)
+  local eye,target,fov,roll=sceneCamera(run,t,tl,cam)
   local origin=run.Scene.Origin
-  local cf=origin*CFrame.lookAt(eye,target)*shake(run,t)
-  cam.CFrame=cf;cam.Focus=origin*CFrame.new(target);if cam.FieldOfView~=fov then cam.FieldOfView=fov end
+  local cf=origin*CFrame.lookAt(eye,target)
+  if roll~=0 then cf=cf*CFrame.Angles(0,0,-math.rad(roll))end -- (R155: the dutch tilt, about the view: positive turns the camera's up toward its right, as in the approved preview rig)
+  cam.CFrame=cf*shake(run,t);cam.Focus=origin*CFrame.new(target);if cam.FieldOfView~=fov then cam.FieldOfView=fov end
  elseif t<tl.SceneIn and not run.Reduced then
   -- the world: a slow push in (FieldOfView only; the player's own camera keeps control)
   part(run,'camera',push,run,cam,tier.Push*Rules.Smooth(t/math.max(.01,tl.Cut)))
@@ -709,6 +755,7 @@ end
 -- skip changes nothing there, and the puller's chat line, which waits for RarePullSeedShownAt, now waits for the skipped result.
 -- R154: once the result is shown the press COLLECTS it (the seed flies home: collect) instead of closing it; one in its first CollectAfter
 -- seconds only lands (the clicks of a skip go on for a moment).
+-- R155: this is the SKIP button's press (and B / R2 / Enter, its keys): a click / tap anywhere is M.Tap and never skips.
 function M.Skip()
  local run=current;if not run or run.Done or not run.Offset or run.Collected then return false end
  local t=run.Clock();local tl=run.TL;local hit=tl.Climax or tl.Burst;local shownAt=Rules.ShownAt(tl)
@@ -728,22 +775,35 @@ function M.Skip()
  end
  return true
 end
--- R153: a card (Ladder, InPlace, Result) is skipped by a click / tap on the world, Enter or the gamepad's B / R2. The HUD and the controls
+-- R153: a card (Ladder, InPlace, Result) listens to a click / tap on the world, Enter and the gamepad's B / R2. The HUD and the controls
 -- stay the player's, so nothing is taken from them: a press the game already used (a button, the chat box) is ignored, a touch counts as a
--- tap on its release (a drag turns the camera; the engine's TouchTapInWorld counts too), and a press under SkipGap after the one before is
--- part of a run of clicks (the clicks that opened the pack go on for a moment). The story scene has its own: the full-screen button and the
--- bound keys. Every route of a press (these, and the tools' own: see armed) goes through RarePullRules.ClaimPress: one answer per press.
+-- tap on its release (a drag turns the camera; the engine's TouchTapInWorld counts too). The story scene has its own: the full-screen button
+-- and the bound keys. Every route of a press (these, and the tools' own: see armed) goes through RarePullRules.ClaimPress: one answer per
+-- press. R155: a click / tap only ever collects (M.Tap: a press that began after the result was shown); B / R2 / Enter are the SKIP button's
+-- keys (M.Skip). (SkipGap, R153's "a run of clicks never skips", is kept for whoever reads it: clicks never skip now.)
 M.SkipGap=.25;M.TapSeconds=.35;M.TapMove=14
 local listening=nil
 -- (the reveal's side of RarePullRules.ClaimPress, asked once per press by whichever route comes first)
+-- (R155: a tool's own route that asks first - R2 through a tool's action - is the SKIP button's key when B / R2 is held down right now)
+local function padSkipDown()
+ local ok,down=pcall(function()
+  return UIS:IsGamepadButtonDown(Enum.UserInputType.Gamepad1,Enum.KeyCode.ButtonR2)or UIS:IsGamepadButtonDown(Enum.UserInputType.Gamepad1,Enum.KeyCode.ButtonB)
+ end)
+ return ok and down==true
+end
 Rules.PressTaker=function()
  lastPress=os.clock()
+ local mine=pressBegan~=nil -- (the reveal's own listener asks: it says when the press began and whether it is a key)
+ local began,key=pressBegan or os.clock(),pressKey -- (a route that asks first, as a press begins: it began now)
+ if not mine then key=padSkipDown()end
  local run=current;if not run or run.Done then return false end
- if run.Kind=='Scene'then return true end -- (its button and keys act on it)
+ if run.Kind=='Scene'then return true end -- (its buttons and keys act on it)
  if run.Collected then return false end
- if run.SawResult or run.Clock()>=Rules.ShownAt(run.TL)then M.Skip();return true end -- (R154: the waiting result takes every press: it collects)
- if not run.Armed then return false end
- M.Skip();return true
+ -- R155: every press is the reveal's while it runs (from its first frame), but a click / tap never skips: B / R2 / Enter press the SKIP
+ -- button (M.Skip), a click / tap only collects the waiting result, and only when it began after the result had been shown (M.Tap)
+ if key then if not mine then M.Skip()end -- (the listener's key has pressed it already: M.Press)
+ else M.Tap(began)end
+ return true
 end
 -- R154: collect the waiting result now (the seed flies home), as a press would. False when there is none (not shown yet, or collected).
 function M.Collect(why)
@@ -751,27 +811,47 @@ function M.Collect(why)
  if not run or run.Done or run.Collected or not(run.SawResult or run.Clock()>=Rules.ShownAt(run.TL))then return false end
  collect(run,why or'press');return true
 end
+-- R155: a click / tap anywhere (or Space / A in a story scene): it never skips; it collects the waiting result when it BEGAN (began: os.clock()
+-- of the press's start) at least CollectAfter s after the result was shown. A press held down from before, or a burst of clicks from the
+-- animation, does nothing. False when it did nothing.
+function M.Tap(began)
+ local run=current
+ if not run or run.Done or run.Collected or not(run.SawResult or run.Clock()>=Rules.ShownAt(run.TL))then return false end
+ local at=run.Clock()-(os.clock()-(began or os.clock())) -- (the run's clock when the press began)
+ if at<Rules.ShownAt(run.TL)+M.CollectAfter then return false end
+ collect(run,'press');return true
+end
 -- R154: the presentation's result is on screen and waits for its collect
 function M.Waiting()local run=current;return run~=nil and not run.Done and not run.Collected and run.SawResult==true end
-function M.Press(processed)
+-- began: when the press started (os.clock; a tap counts on its release); key: a key that presses the SKIP button (B / R2 / Enter). One
+-- physical press may come in by several routes (a mouse button, a tool's own, R2's action): RarePullRules.ClaimPress gives them one answer.
+function M.Press(processed,began,key)
  if processed then return false end
- return Rules.ClaimPress()
+ if key then -- (R155: B / R2 / Enter press the SKIP button themselves: a key is its own press, whatever clicks came just before it)
+  local run=current;if run and not run.Done and run.Kind~='Scene'and not run.Collected then M.Skip()end
+ end
+ pressBegan,pressKey=began or os.clock(),key==true
+ local taken=Rules.ClaimPress()
+ pressBegan,pressKey=nil,false
+ return taken
 end
 local pressKeys={[Enum.KeyCode.Return]=true,[Enum.KeyCode.ButtonB]=true,[Enum.KeyCode.ButtonR2]=true}
+M.SkipKeys=pressKeys -- (R155: the keys of the SKIP button)
 function M.Listen()
  if listening then return end
  listening={}
- local touches=setmetatable({},{__mode='k'})
+ local touches=setmetatable({},{__mode='k'});local lastTouch=nil
  local function on(signal,fn)local ok,c=pcall(function()return signal():Connect(fn)end);if ok and c then listening[#listening+1]=c end end
  on(function()return UIS.InputBegan end,function(input,processed)
-  if input.UserInputType==Enum.UserInputType.Touch then if not processed then touches[input]={At=os.clock(),Pos=input.Position}end;return end
-  if input.UserInputType==Enum.UserInputType.MouseButton1 or pressKeys[input.KeyCode]then M.Press(processed)end
+  if input.UserInputType==Enum.UserInputType.Touch then if not processed then touches[input]={At=os.clock(),Pos=input.Position};lastTouch=os.clock()end;return end
+  if input.UserInputType==Enum.UserInputType.MouseButton1 then M.Press(processed,os.clock(),false)
+  elseif pressKeys[input.KeyCode]then M.Press(processed,os.clock(),true)end
  end)
  on(function()return UIS.InputEnded end,function(input)
   local t=touches[input];if not t then return end;touches[input]=nil
-  if os.clock()-t.At<=M.TapSeconds and(input.Position-t.Pos).Magnitude<=M.TapMove then M.Press(false)end
+  if os.clock()-t.At<=M.TapSeconds and(input.Position-t.Pos).Magnitude<=M.TapMove then M.Press(false,t.At,false)end
  end)
- on(function()return UIS.TouchTapInWorld end,function(_,processed)M.Press(processed)end)
+ on(function()return UIS.TouchTapInWorld end,function(_,processed)M.Press(processed,lastTouch,false)end)
 end
 local function unlisten()for _,c in ipairs(listening or{})do c:Disconnect()end;listening=nil end
 -- Everything at once (death of the script, a test): the presentation, a card still fading out, every sound and the music duck.

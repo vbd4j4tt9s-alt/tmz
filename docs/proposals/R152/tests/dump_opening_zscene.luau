@@ -54,20 +54,42 @@ local function scene(name)
  print('SCENE '..name..' {"parts":['..table.concat(kept,',')..']}')
 end
 -- 1. the story stages, in the real run (camera, HUD, stage, pack, seed) ----------------------------------------------------------------------
+-- (R155: the camera moves through the stages now - the cinematic camera, RarePullCamera155 - so how close it comes to a part is a camera-dependent
+-- check: a part nearer than the camera's near plane (0.5 stud) is cut open and shows its inside / its seams. Every stage frame: the nearest
+-- visible part to the camera (box distance; a ball's surface) -> "CLEARANCE <tier> <tag> <studs> <part> <t>", checked by check_zfight_sweep.py.
+-- The pack and the seed are left out here: zfight_world's PivotTo (needed for the z-fighting scenes) lets a model that moves every frame lose its
+-- rotation over many frames, so their parts' boxes are not trustworthy in this run; R155's test_rare_camera155 checks them with exact poses.)
+local function nearest(stage,eye)
+ local best,what=math.huge,'-'
+ for _,d in ipairs(stage:GetDescendants())do
+  local own=d:FindFirstAncestor('RarePullPack')or d:FindFirstAncestor('RarePullSeed')
+  if not own and d:IsA('BasePart')and 1-(1-(d.Transparency or 0))*(1-(d.LocalTransparencyModifier or 0))<.95 and d.CFrame and d.Size then
+   local l=d.CFrame:Inverse()*eye;local s=d.Size;local dd
+   if d.Shape and d.Shape.Name=='Ball'then dd=math.max(0,l.Magnitude-math.min(s.X,s.Y,s.Z)/2)
+   else local dx,dy,dz=math.max(0,math.abs(l.X)-s.X/2),math.max(0,math.abs(l.Y)-s.Y/2),math.max(0,math.abs(l.Z)-s.Z/2);dd=math.sqrt(dx*dx+dy*dy+dz*dz)end
+   if dd<best then best,what=dd,d.Name end
+  end
+ end
+ return best,what
+end
 local function stages(tag,withArt)
  for rank=6,8 do
   reset()
   local run=start(rank);local tl=run.TL
   local marks={tl.SceneIn+.1,tl.SceneIn+(tl.Climax-tl.SceneIn)*.35,tl.SceneIn+(tl.Climax-tl.SceneIn)*.7,tl.Climax-.15,tl.Climax+.1,tl.Climax+.7,(tl.Climax+tl.FloatEnd)/2,tl.FloatEnd-.1}
   local mi=1;local t0=R.clock
+  local clear,clearPart,clearT=math.huge,'-',0
   X.run(tl.Length+.3,1/30,function()
    local t=run.Done and math.huge or run.Clock()
+   local cam=W.workspace.CurrentCamera;local st0=W.workspace:FindFirstChild('_RarePullStage')
+   if st0 and cam.CameraType==R.Enum.CameraType.Scriptable then local d,w=nearest(st0,cam.CFrame.Position);if d<clear then clear,clearPart,clearT=d,w,t end end
    while mi<=#marks and t>=marks[mi]do
     local st=W.workspace:FindFirstChild('_RarePullStage')
     if st then scene(string.format('stage_%s_%s_%d',names[rank],tag,mi))end
     mi+=1
    end
   end)
+  print(string.format('CLEARANCE %s %s %.3f %s %.2f',names[rank],tag,clear,clearPart,clearT))
  end
  -- (R154: the result now waits for a collect, so the last stage would still stand when the lite stages are built; a new opening ends the old
  --  one first in the game too: M.Start -> finish(current,'replaced') destroys its stage)

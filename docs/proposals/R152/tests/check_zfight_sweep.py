@@ -18,6 +18,7 @@ import zfight as Z  # noqa: E402
 R15 = {'Head', 'UpperTorso', 'LowerTorso', 'LeftUpperArm', 'LeftLowerArm', 'LeftHand', 'RightUpperArm', 'RightLowerArm', 'RightHand', 'LeftUpperLeg', 'LeftLowerLeg', 'LeftFoot',
        'RightUpperLeg', 'RightLowerLeg', 'RightFoot', 'HumanoidRootPart'}
 MIN_GAP = 0.049      # the layers R152 stacks (strip over key, rings over cracks ...) stand this far apart: the depth rule's .043 plus the quantisation
+MIN_CLEAR = 0.7      # R155: the story stages' camera (the cinematic camera) keeps this far from every visible stage part: Roblox's near plane is 0.5
 
 
 def allowed(f):
@@ -261,6 +262,16 @@ def cmd_opening(dump):
     need = {'ring over the cracks', 'glow ring over the cracks', 'glow ring over the white ring', 'Mythic flourish: second ring over the first', 'void vault: rim glow over the rune circle'}
     for lab in sorted(need - set(heights)):
         print('  FAIL: the sweep never saw: %s' % lab)
+        bad += 1
+    # R155: the camera moves through the stages (the cinematic camera): no visible part ever comes nearer than its near plane (it would be cut
+    # open and show its inside / seams). dump_opening_zscene.luau prints the nearest part over every stage frame of every tier.
+    clear = [l.split() for l in open(dump, encoding='utf-8') if l.startswith('CLEARANCE ')]
+    for c in clear:
+        ok = float(c[3]) >= MIN_CLEAR
+        print('opening: camera clearance %-6s %-5s %.3f stud (nearest: %s at %s s): %s' % (c[1], c[2], float(c[3]), ' '.join(c[4:-1]), c[-1], 'ok' if ok else 'TOO CLOSE (at least %.1f)' % MIN_CLEAR))
+        bad += 0 if ok else 1
+    if len(clear) < 6:
+        print('  FAIL: the sweep saw the camera clearance of %d stage runs (want 6: 3 tiers, with / without images)' % len(clear))
         bad += 1
     os.remove(tmp)
     print('pack-opening scenes: %d scenes (story stages with / without images and lite, the sky beam at 3 tiers, the flourish at 3 scales): %s' % (n, 'PASS' if bad == 0 else 'FAIL (%d)' % bad))

@@ -23,6 +23,10 @@
 # perf152_canon.py compares each pair: what is drawn must be identical; the allowed differences (instances that are never drawn, a display item frozen
 # while off screen) are listed. The PERF lines (instances, SurfaceGuis, writes per frame, Lua ms on the mock) are tabled by perf152_report.py.
 # Without the place file the hub and keyboard parts are skipped.
+# R155: against a base before R155 (PERF_BASE=8aa15fd, the R154 release, or older) the story stages' camera differs by design (the cinematic camera,
+# RarePullCamera155, and its depth of field RarePullDof): add docs/proposals/R155/tests/perf155_opts.luau to PERF_EXTRA (with R153's perf153_opts.luau)
+# and exactly that - the Camera's CFrame / Focus / FieldOfView while a story stage is on screen, and RarePullDof - may differ; everything else is
+# compared as before. docs/proposals/R155/tests/run_camera155.sh step 2 runs it so (ONLY=seed). The default run (both sides this checkout) needs none.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.claude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};BASE=${PERF_BASE:-}

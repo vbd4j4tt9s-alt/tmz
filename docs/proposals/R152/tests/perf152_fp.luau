@@ -15,6 +15,9 @@ return function(W)
  local okOpts,optsFn=pcall(require,'./perf153_opts')
  -- (R154: run_perf153.sh also puts perf154_opts.luau there: the differences B1 / B3 are allowed to make (FP.Skip(o) leaves an instance and what is under it out, FP.Label = the shot being made))
  local okOpts4,optsFn4=pcall(require,'./perf154_opts')
+ -- (R155: docs/proposals/R155/tests/run_camera155.sh puts perf155_opts.luau there when it compares against the R154 release: the cinematic camera's
+ --  in-stage CFrame / Focus / FieldOfView and its depth of field are the only differences allowed)
+ local okOpts5,optsFn5=pcall(require,'./perf155_opts')
  local fmt=string.format
  -- (as Roblox: two CFrames with the same components are ==; the shared mock compares them by identity. Both sides of a comparison run with it.)
  do local mt=getmetatable(R.CFrame.new(0,0,0))
@@ -209,6 +212,7 @@ return function(W)
    local now={}
    local ids,cache=self.Ids,self.Cache
    local function walk(o,pid,ctx)
+    if FP.StreamSkip and FP.StreamSkip(o)then return end -- (R155: perf155_opts.luau leaves the cinematic camera's depth of field out of the frame streams)
     local id=ids[o];if not id then self.Next+=1;id=self.Next;ids[o]=id end
     if now[id]then return end
     now[id]=true
@@ -371,5 +375,6 @@ return function(W)
  function FP.timed()return times end
   if okOpts and type(optsFn)=='function'then optsFn(FP,W)end
  if okOpts4 and type(optsFn4)=='function'then optsFn4(FP,W)end
+ if okOpts5 and type(optsFn5)=='function'then optsFn5(FP,W)end
  return FP
 end

@@ -155,11 +155,14 @@ local function touch(o,hold,move)
  local t0=R.clock;while R.clock-t0<hold-1e-9 do step(o)end
  input.Position=V3(300+(move or 0),200,0);W.UIS.InputEnded:Fire(input,false)
 end
+-- (R155: 'skip button' = the SKIP button at the bottom right; 'button' = a story scene's screen-wide button (a click / tap anywhere);
+--  'R2 key' / 'B key' = a story scene's bound keys)
 local function press(o,how)
  if how=='click'then click()elseif how=='tap'then touch(o,0,2)elseif how=='Return'then key('Return')
  elseif how=='ButtonB'or how=='ButtonR2'then pad(how)
- elseif how=='button'then local b=X.find(revealGui(),'Backdrop');if b then b.Activated:Fire()end
- elseif how=='R2 key'then local fn=W.actions[M.SkipAction];if fn then fn(M.SkipAction,R.Enum.UserInputState.Begin)end end
+ elseif how=='button'then local b=X.find(revealGui(),'Backdrop');if b then b.InputBegan:Fire({UserInputType=UT.MouseButton1});b.Activated:Fire()end
+ elseif how=='skip button'then local b=X.find(revealGui(),'Skip button');if b and b.Visible then b.Activated:Fire()end
+ elseif how=='R2 key'or how=='B key'then local fn=W.actions[M.SkipAction];if fn then fn(M.SkipAction,R.Enum.UserInputState.Begin,{KeyCode=how=='R2 key'and KC.ButtonR2 or KC.ButtonB})end end
 end
 
 -- 1. off by default ---------------------------------------------------------------------------------------------------------------------------
@@ -231,9 +234,14 @@ local function skipCase(rank,variant,how,close)
  local tl=run.TL;local hit=tl.Climax or tl.Burst;local shownAt=L.ShownAt(tl)
  local shownAttr=X.player:GetAttribute('RarePullSeedShownAt')
  if variant=='Full'then check(table.find(boundKeys[M.SkipAction]or{},KC.ButtonR2)~=nil and table.find(boundKeys[M.SkipAction],KC.ButtonB)~=nil,tag..': the gamepad\'s R2 and B are bound while the story scene runs')end
- untilClock(o,run,tl.SkipFrom+.1)
- local hint=X.find(revealGui(),'Skip hint');step(o);step(o);step(o)
- check(hint and hint.Visible and hint.TextTransparency<.9,tag..': the skip hint shows')
+ -- R155 (owner: "... skip it by spam clicking disable this feature and u can only skip at the bottom right of the screen"): a burst of clicks /
+ -- taps on the screen from the first frame through SkipFrom does nothing
+ local spam=variant=='Full'and'button'or(rank%2==0 and'tap'or'click')
+ local g=0;local spamUntil=math.min(tl.SkipFrom+.4,hit-.12) -- (a Common card's hit is .25 s after SkipFrom)
+ while run.Clock()<spamUntil and g<200 do press(o,spam);step(o);g+=1 end
+ check(not run.Skipped and run.Clock()<hit-.05,tag..': R155: spam '..spam..'s during the animation never skip ('..g..' presses)')
+ local skipB=X.find(revealGui(),'Skip button')
+ check(skipB and skipB.Visible and skipB.BackgroundTransparency<.9,tag..': the SKIP button shows at the bottom right (R155: it replaces "click to skip")')
  local t0=W.workspace:GetServerTimeNow();local before=run.Clock()
  press(o,how)
  check(run.Skipped==1 and near(run.Clock(),hit-.02,.03),tag..': straight to the hit ('..string.format('%.2f -> %.2f, hit %.2f',before,run.Clock(),hit)..')')
@@ -277,9 +285,9 @@ local function skipCase(rank,variant,how,close)
  local gf=0;while Collect.Flying()>0 and gf<200 do step(o);gf+=1 end
  X.run(.3);World.Clear();X.run(.1);clean(tag)
 end
-for rank=1,5 do skipCase(rank,'Ladder',rank%2==0 and'tap'or'click',rank==5 and'ButtonR2'or'click')end
-for rank=6,8 do skipCase(rank,'Full','button',rank==8 and'R2 key'or'button')end
-for rank=6,8 do skipCase(rank,'InPlace',rank==7 and'ButtonB'or'Return','ButtonB')end
+for rank=1,5 do skipCase(rank,'Ladder',({'skip button','ButtonB','skip button','ButtonR2','Return'})[rank],rank==5 and'ButtonR2'or rank==2 and'tap'or'click')end
+for rank=6,8 do skipCase(rank,'Full',rank==7 and'B key'or rank==8 and'R2 key'or'skip button',rank==8 and'R2 key'or'button')end
+for rank=6,8 do skipCase(rank,'InPlace',rank==7 and'ButtonB'or rank==6 and'skip button'or'Return','ButtonB')end
 -- presses that are not the player's choice to skip
 do
  reset()
@@ -291,8 +299,29 @@ do
  click(true);check(not run.Skipped,'a click the game used (a HUD button) does not skip')
  touch(o,.1,60);check(not run.Skipped,'a drag (turning the camera) does not skip')
  key('Space');pad('ButtonA');key('W');check(not run.Skipped,'the jump keys and movement do not skip')
- touch(o,.05,3);check(run.Skipped==1,'a tap does')
+ touch(o,.05,3);check(not run.Skipped,'R155: a tap does not skip either (only the SKIP button)')
+ click();check(not run.Skipped,'R155: nor a click')
+ press(o,'skip button');check(run.Skipped==1,'R155: the SKIP button does')
  finish(o);clean('presses')
+ -- R155: the waiting result is collected only by a press that BEGAN after it was shown (+ CollectAfter): one held from before does nothing
+ for _,c in ipairs({{4,'Ladder'},{7,'Full'}})do
+  reset()
+  local o3=open(c[1]);local run3=o3.Run;local tl3=run3.TL;local tag='held press, '..names[c[1]]..' '..c[2]
+  untilClock(o3,run3,L.ShownAt(tl3)-.2)
+  local spam=c[2]=='Full'and'button'or'click'
+  for _=1,6 do press(o3,spam);step(o3)end
+  check(not run3.Collected and not run3.Skipped,tag..': a burst of presses through the moment the result lands neither skips nor collects')
+  local b=X.find(revealGui(),'Backdrop')
+  local input={UserInputType=UT.Touch,KeyCode=KC.Unknown,Position=V3(300,200,0)}
+  if b then b.InputBegan:Fire(input)end;W.UIS.InputBegan:Fire(input,b~=nil)
+  untilClock(o3,run3,L.ShownAt(tl3)+M.CollectAfter+.3)
+  W.UIS.InputEnded:Fire(input,b~=nil);if b then b.Activated:Fire()end
+  check(not run3.Collected,tag..': a press held from before the result, released after it, does not collect')
+  step(o3);step(o3);step(o3);step(o3) -- (a new press: RarePullRules.ClaimPress takes presses closer than PressWindow for one)
+  press(o3,c[2]=='Full'and'button'or'tap')
+  check(run3.Collected,tag..': the next tap anywhere collects it')
+  finish(o3);clean(tag)
+ end
  reset()
  local o2=open(4);local run2=o2.Run
  untilClock(o2,run2,L.CardSkipFrom+.05);touch(o2,.6,0)
@@ -314,7 +343,7 @@ do
   local unskipped=X.player:GetAttribute('RarePullSeedShownAt')
   local seen;local skippedAt
   finish(o,function()
-   if skip and not run.Skipped and not run.Done and run.Clock()>=run.TL.SkipFrom+.05 then press(o,variant=='Full'and'button'or'click');skippedAt=W.workspace:GetServerTimeNow()end
+   if skip and not run.Skipped and not run.Done and run.Clock()>=run.TL.SkipFrom+.05 then press(o,'skip button');skippedAt=W.workspace:GetServerTimeNow()end
    if not seen and titleShown()and oddsFinal(run)then seen=W.workspace:GetServerTimeNow()end
   end)
   check(#chat==1,tag..': one line ('..#chat..')')

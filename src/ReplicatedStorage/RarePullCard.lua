@@ -9,8 +9,12 @@
 --  InPlace (Secret+ when the full scene is not safe): a compact card in the upper third; the middle of the screen stays clear.
 -- R154: the result WAITS on screen (the director's tl.Wait: nothing fades out) until the player collects it; the hint then says so
 -- ("click to collect!" / "tap to collect!") and the seed's view leaves the card to fly home (TakeSeed, SeedCollect154).
--- Nothing here blocks input (Active=false everywhere); the director owns the skip button. All sizes are shares of the screen, so desktop
--- and phone keep the same framing (RarePullRules.Layout); ReducedMotion: no float, spin, jitter or moving motes; lite: fewer pieces.
+-- Nothing here blocks input (Active=false everywhere) but the SKIP button (R155); the director owns the buttons. All sizes are shares of the
+-- screen, so desktop and phone keep the same framing (RarePullRules.Layout); ReducedMotion: no float, spin, jitter or moving motes; lite: fewer pieces.
+-- R155 (owner: "for some cutscenes u can skip it by spam clicking disable this feature and u can only skip at the bottom right of the screen"):
+-- a click / tap anywhere no longer skips. The skip is a small SKIP button at the bottom right (Card.SkipRect: inside the device's safe area,
+-- clear of every HUD box - the hotbar, the status / timers stack, the balances, a phone's thumb controls); it shows from SkipFrom until the hit
+-- (gamepad B / R2 and Enter press it: the director), then the corner says how to collect the result.
 local RS=game:GetService('ReplicatedStorage')
 local Rules=require(script.Parent.RarePullRules)
 local Cache=require(script.Parent.PropCache152)
@@ -188,9 +192,10 @@ function Card.Create(gui,kind,opts)
   -- (R153: the cards are skippable too; the in-place card has no letterbox band, its hint keeps the full card's place and size)
   local right,bottom=Card.SafeInsets();local bar=L.Bar>0 and L.Bar or Rules.Layout(self.Phone,false,rank).Bar
   hint.AnchorPoint=Vector2.new(1,.5);hint.Position=UDim2.fromScale(.975-right,1-math.max(bar*.5,bottom+bar*.25));hint.Size=UDim2.fromScale(.22,bar*.42);hint.TextXAlignment=Enum.TextXAlignment.Right
-  self.SkipText=opts.SkipText or(self.Phone and'TAP TO SKIP  ▸'or'CLICK TO SKIP  ▸');self.CollectText=Card.CollectText(self.Phone)
-  hint.Text=self.SkipText;self.SkipHint=hint
+  self.CollectText=Card.CollectText(self.Phone)
+  hint.Text='';self.SkipHint=hint
  end
+ if opts.Skip then self:_buildSkip(gui)end -- (R155: on the screen layer itself, above a story scene's full-screen button)
  if opts.Seed then self:SetSeed(opts.Seed)end
  return self
 end
@@ -238,9 +243,9 @@ function Card:_ring(k,alpha)
 end
 function Card:_flash(a)self.Set(self.Flash,'BackgroundTransparency',1-clamp01(a)*(self.Reduced and .35 or 1))end
 function Card:_fade(a)self.Set(self.Fade,'BackgroundTransparency',1-clamp01(a))end
--- R153 the skip hint, R154 the collect hint, one label: "CLICK TO SKIP  ▸" from SkipFrom until the hit (R153 kept it until the card closed);
--- once the result is shown and waits (tl.Wait) "click to collect!" / "tap to collect!" (owner's voice), in after CollectHint s, breathing
--- softly (held still with Reduced Motion); it goes with the collect (tl.WaitEnd: a story scene's way out).
+-- R154 the collect hint: once the result is shown and waits (tl.Wait) "click to collect!" / "tap to collect!" (owner's voice), in after
+-- CollectHint s, breathing softly (held still with Reduced Motion); it goes with the collect (tl.WaitEnd: a story scene's way out). (R153's
+-- "CLICK TO SKIP" before it is gone: R155 skips with the SKIP button only, Card:_skip.)
 Card.CollectHint=.25
 function Card.CollectText(phone)return phone and'tap to collect!'or'click to collect!'end
 function Card:_hint(t,tl)
@@ -251,8 +256,68 @@ function Card:_hint(t,tl)
   S(h,'Text',self.CollectText);S(h,'TextTransparency',1-.9*a);S(h,'TextStrokeTransparency',1-.5*a);S(h,'Visible',a>.01)
   return
  end
- local a=clamp01((t-(tl.SkipFrom or math.huge))/.3)*(1-clamp01((t-(hit-.02))/.15))
- S(h,'Text',self.SkipText);S(h,'TextTransparency',1-.75*a);S(h,'TextStrokeTransparency',1);S(h,'Visible',a>.01)
+ S(h,'Visible',false)
+end
+-- R155: the SKIP button ----------------------------------------------------------------------------------------------------------------------
+-- Where it goes, in pixels of the safe area (w x h; boxes: HudLayout.HudBoxes in the same space): the bottom row first, from the right edge
+-- leftwards (never left of the middle), then the rows above it (never above .45 of the height); the first spot clear of the screen's edge by
+-- 12 px and of every box by 8 px. Its height: 6.5 % of the screen's (34 - 48 px; at least 40 on a touch screen: a thumb's target).
+Card.SkipLabel='SKIP  ▸▸'
+function Card.SkipRect(w,h,touch,boxes)
+ local bh=math.floor(math.clamp(h*.065,touch and 40 or 34,48)+.5);local bw=math.floor(bh*2.75+.5)
+ local margin,pad=12,8
+ local function clear(x,y)
+  if x<margin or y<margin or x+bw>w-margin or y+bh>h-margin then return false end
+  for _,b in ipairs(boxes or{})do if x<b.X+b.W+pad and x+bw>b.X-pad and y<b.Y+b.H+pad and y+bh>b.Y-pad then return false end end
+  return true
+ end
+ local x0,y0=w-margin-bw,h-margin-bh
+ for y=y0,math.floor(h*.45),-4 do for x=x0,math.floor(w*.5),-4 do if clear(x,y)then return x,y,bw,bh end end end
+ return x0,y0,bw,bh -- (nothing is clear: the corner itself)
+end
+function Card:_buildSkip(parent)
+ local b=new('TextButton',{Name='Skip button',Text='',AutoButtonColor=false,BackgroundColor3=C(18,16,30),BackgroundTransparency=1,ZIndex=45,Visible=false,
+  Selectable=false,Size=UDim2.fromOffset(110,40),Position=UDim2.fromScale(.88,.9)},parent)
+ b.Active=true;b:SetAttribute('ButtonSound',false);b:SetAttribute('ButtonHighlight',false) -- (the hit is the sound of a skip)
+ new('UICorner',{CornerRadius=UDim.new(.5,0)},b)
+ self.SkipStroke=new('UIStroke',{Color=WHITE,Thickness=1.5,Transparency=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},b)
+ local text=label(b,'Label',Enum.Font.GothamBlack,WHITE,BLACK,46);text.Size=UDim2.fromScale(.74,.5);text.Position=UDim2.fromScale(.5,.5);text.Text=Card.SkipLabel
+ -- (a gamepad: its B on the left of the pill, the button it answers to)
+ local pad=frame(b,'Gamepad B',C(226,72,72),46,{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.16,.5),Size=UDim2.fromScale(.24,.62),Visible=false})
+ new('UIAspectRatioConstraint',{AspectRatio=1},pad);new('UICorner',{CornerRadius=UDim.new(.5,0)},pad)
+ local pl=label(pad,'B',Enum.Font.GothamBlack,WHITE,BLACK,47);pl.Size=UDim2.fromScale(.8,.8);pl.Text='B'
+ self.SkipButton,self.SkipWord,self.SkipPad,self.SkipPadText=b,text,pad,pl
+end
+-- (placed again whenever the screen changes size)
+function Card:_placeSkip()
+ local b=self.SkipButton;local cam=workspace.CurrentCamera;local vp=cam and cam.ViewportSize
+ if not b or not vp or vp==self.SkipFor then return end
+ self.SkipFor=vp
+ local ox,oy,w,h=0,0,vp.X,vp.Y
+ local okA,area=pcall(function()return game:GetService('GuiService'):GetInsetArea(Enum.ScreenInsets.CoreUISafeInsets)end)
+ if okA and area and area.Width and area.Width>0 and area.Height>0 then -- (never outside the screen itself: a stale or odd safe area)
+  ox,oy=math.clamp(area.Min.X,0,vp.X*.25),math.clamp(area.Min.Y,0,vp.Y*.25)
+  w,h=math.clamp(area.Width,vp.X*.5,vp.X-ox),math.clamp(area.Height,vp.Y*.5,vp.Y-oy)
+ end
+ local UIS=game:GetService('UserInputService');local touch=UIS.TouchEnabled
+ local boxes={}
+ local okL,Layout=pcall(require,RS:FindFirstChild('HudLayout'))
+ if okL and Layout then
+  local ok2,list=pcall(function()return Layout.HudBoxes(Layout.Read(Vector2.new(w,h),touch,Layout.Controls(self.Gui)),w,h,false)end)
+  if ok2 and type(list)=='table'then boxes=list end
+ end
+ local x,y,bw,bh=Card.SkipRect(w,h,touch,boxes)
+ b.Position=UDim2.fromOffset(ox+x,oy+y);b.Size=UDim2.fromOffset(bw,bh);self.SkipBox={X=ox+x,Y=oy+y,W=bw,H=bh}
+end
+function Card:_skip(t,tl)
+ local b=self.SkipButton;if not b then return end
+ self:_placeSkip()
+ local S=self.Set;local hit=tl.Climax or tl.Burst or 0
+ local a=clamp01((t-(tl.SkipFrom or math.huge))/.25)*(1-clamp01((t-(hit-.02))/.12))
+ S(b,'Visible',a>.01);S(b,'BackgroundTransparency',1-.78*a);S(self.SkipStroke,'Transparency',1-.6*a);S(self.SkipWord,'TextTransparency',1-a)
+ local pad=a>.01 and game:GetService('UserInputService').GamepadEnabled==true
+ S(self.SkipPad,'Visible',pad);S(self.SkipPad,'BackgroundTransparency',1-a);S(self.SkipPadText,'TextTransparency',1-a)
+ S(self.SkipWord,'Position',pad and UDim2.fromScale(.58,.5)or UDim2.fromScale(.5,.5))
 end
 -- R154: the seed flies home (SeedCollect154.Fly): its view leaves the card, which goes on (and fades) without it. Where it is now: its centre and
 -- height in shares of the screen, its spin.
@@ -370,7 +435,7 @@ function Card:UpdateLadder(t,tl)
  self:_seed(t,burst,tl.FloatEnd,tl.Out,tl.Length)
  self:_dress(t,t-burst,0)
  self:_fade(0)
- self:_hint(t,tl)
+ self:_hint(t,tl);self:_skip(t,tl)
 end
 -- Scene: t on the cinematic's clock ----------------------------------------------------------------------------------------------------
 function Card:UpdateScene(t,tl,skipShown)
@@ -404,6 +469,7 @@ function Card:UpdateScene(t,tl,skipShown)
   end
  end
  if skipShown~=false then self:_hint(t,tl)elseif self.SkipHint then self.Set(self.SkipHint,'Visible',false)end
+ self:_skip(t,tl)
 end
 -- InPlace: t on the reveal's server clock (or from 0 for a result card) --------------------------------------------------------------------
 function Card:UpdateInPlace(t,tl)
@@ -422,10 +488,11 @@ function Card:UpdateInPlace(t,tl)
  self:_rays(t,0)
  self:_dress(t,t-tl.Climax,shown and out or 0)
  self:_seed(t,tl.Climax,tl.FloatEnd,outAt,tl.Length)
- self:_hint(t,tl)
+ self:_hint(t,tl);self:_skip(t,tl)
 end
 function Card:Destroy()
  if self.Destroyed then return end
  self.Destroyed=true;self.Root:Destroy()
+ if self.SkipButton then self.SkipButton:Destroy()end
 end
 return Card

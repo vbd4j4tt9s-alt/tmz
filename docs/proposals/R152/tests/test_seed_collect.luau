@@ -17,8 +17,8 @@
 --     death, a ragdoll, a fling, a chase starting, a keeper chasing, a teleport, walking onto the track, walking far away, the shop opening,
 --     the Bag opening; a menu already open when the result appears does not; a collect before the server ends the opening (a skipper): the
 --     seed rests on its slot until its tool is there; Reduced Motion: a quick fade in place; mobile: a tap anywhere collects, a HUD button /
---     a hotbar slot / a drag / a long press do not (the slot still equips); the R153 skip: the first press jumps to the hit, the next one after
---     the result collects; an onlooker's pack: as before (no hold, its seed flies into their hand)
+--     a hotbar slot / a drag / a long press do not (the slot still equips); R155: the skip is the SKIP button / gamepad B / Enter only (spam in
+--     every phase does nothing), the first press that BEGAN after the result (+ CollectAfter) collects, one held from before does not; an onlooker's pack: as before (no hold, its seed flies into their hand)
 --  5. sound: the collect never stacks on the reveal's tail (a collect while it rings fades it out first: silent by the landing), the flight's
 --     whoosh swells on its fastest frame and stays soft, the pickup cue is heard on the landing frame
 --  6. review fixes: a held-back seed's weather / Mech effects (drawn by the real ItemCosmetics outside the tool) stay off until it lands, then
@@ -182,8 +182,12 @@ local function press(o,how)
  if how=='click'then click()elseif how=='tap'then touch(o,0,2)elseif how=='Return'then W.UIS.InputBegan:Fire({UserInputType=UT.Keyboard,KeyCode=KC.Return,Position=V3(0,0,0)},false)
  elseif how=='ButtonB'or how=='ButtonR2'then W.UIS.InputBegan:Fire({UserInputType=UT.Gamepad1,KeyCode=KC[how],Position=V3(0,0,0)},false)
  elseif how=='button'then local b=X.find(revealGui(),'Backdrop');if b then b.Activated:Fire()end
- elseif how=='key'then local fn=W.actions[M.SkipAction];if fn then fn(M.SkipAction,R.Enum.UserInputState.Begin)end end
+ elseif how=='key'then local fn=W.actions[M.SkipAction];if fn then fn(M.SkipAction,R.Enum.UserInputState.Begin)end
+ -- R155: the SKIP button at the bottom right (only while it shows), and the story scene's bound gamepad B
+ elseif how=='skip'then local b=X.find(revealGui(),'Skip button');if b and b.Visible then b.Activated:Fire()end
+ elseif how=='B key'then local fn=W.actions[M.SkipAction];if fn then fn(M.SkipAction,R.Enum.UserInputState.Begin,{KeyCode=KC.ButtonB})end end
 end
+local function skipShows()local b=revealGui()and X.find(revealGui(),'Skip button');return b~=nil and b.Visible==true and b.BackgroundTransparency<.9 end
 -- reset between cases ---------------------------------------------------------------------------------------------------------------------
 local function clearItems()
  for _,c in ipairs(X.char:GetChildren())do if(c:IsA('Tool')and c~=shovel)or c.Name=='CarriedSeed'then c:Destroy()end end
@@ -344,7 +348,7 @@ end
 do
  reset()
  local o=open(5);local run=o.Run;local tl=run.TL
- untilT(o,run,tl.SkipFrom+.1);press(o,'click');check(run.Skipped==1,'early collect: skipped to the hit')
+ untilT(o,run,tl.SkipFrom+.3);press(o,'skip');check(run.Skipped==1,'early collect: skipped to the hit (the SKIP button)')
  untilT(o,run,L.ShownAt(tl)+M.CollectAfter+.05)
  check(o.Bag.Parent~=nil,'early collect: the server has not ended the opening yet')
  local packSlot=slotShowing('Seed Pack')
@@ -469,19 +473,49 @@ do -- mobile: a tap anywhere collects; a HUD button, a hotbar slot, a drag, a lo
  X.run(.3);touch(o,.05,3);check(run.Collected and run.CollectWhy=='press','mobile: a tap anywhere does')
  landAll(o);check(slotShowing(o.Name)~=nil,'mobile: the seed is on the hotbar');clean('mobile')
 end
-do -- the R153 skip: the first press jumps to the hit, the next one after the result collects
- for _,rank in ipairs({3,7})do
+do -- R155 (owner: "... skip it by spam clicking disable this feature and u can only skip at the bottom right of the screen"): the skip is the
+ -- SKIP button (or gamepad B / R2, Enter) only; spam presses in every phase do nothing; then the first press that BEGAN after the result was
+ -- shown (+ CollectAfter) collects it, one held down from before does not
+ local cases={{3,'skip'},{5,'ButtonB'},{7,'B key'},{8,'skip'},{6,'ButtonB',true}}
+ for _,c in ipairs(cases)do
   reset()
-  local o=open(rank);local run=o.Run;local tl=run.TL;local hit=tl.Climax or tl.Burst;local tag='skip then collect ('..names[rank]..')'
-  untilT(o,run,tl.SkipFrom+.1)
-  press(o,run.Kind=='Scene'and'button'or'click')
-  check(run.Skipped==1 and near(run.Clock(),hit-.02,.04)and not run.Collected,tag..': the first press jumps to the hit')
-  untilT(o,run,hit+.1);local before=run.Clock()
-  press(o,run.Kind=='Scene'and'button'or'click')
-  check(not run.Collected and run.Skipped==1,tag..': a press before the result is up does nothing')
-  untilT(o,run,L.ShownAt(tl)+M.CollectAfter+.05)
-  press(o,run.Kind=='Scene'and'button'or'click')
-  check(run.Collected,tag..': the next press after the result collects it')
+  if c[3]then X.keeper(V3(25,3,100),{})end
+  local o=open(c[1]);local run=o.Run;local tl=run.TL;local hit=tl.Climax or tl.Burst;local shownAt=L.ShownAt(tl)
+  local scene=run.Kind=='Scene'
+  local tag='skip then collect ('..names[c[1]]..' '..run.Kind..', '..c[2]..')'
+  -- a burst of presses: clicks and taps on the world (a story scene: on its full-screen button, and Space)
+  local k=0
+  local function spam()
+   k+=1
+   if scene then local b=X.find(revealGui(),'Backdrop');if b then b.InputBegan:Fire({UserInputType=UT.MouseButton1});b.Activated:Fire()end;if k%3==0 then press(o,'key')end
+   elseif k%2==0 then click()else touch(o,0,2)end
+  end
+  local function spamUntil(t)local g=0;while run.Clock()<t and not run.Done and g<400 do spam();step(o);g+=1 end;return g end
+  local n1=spamUntil(tl.SkipFrom-.02)
+  check(not run.Skipped and not run.Collected and not skipShows(),tag..': opening: '..n1..' spam presses do nothing, no SKIP button yet')
+  local n2=spamUntil(math.min(tl.SkipFrom+.4,hit-.12))
+  check(not run.Skipped and run.Clock()<hit-.1,tag..': skip window: '..n2..' spam presses never skip')
+  check(skipShows(),tag..': the SKIP button shows')
+  local before=run.Clock()
+  press(o,c[2])
+  check(run.Skipped==1 and near(run.Clock(),hit-.02,.04)and not run.Collected,tag..': the '..(c[2]=='skip'and'SKIP button'or c[2])..' jumps to the hit ('..string.format('%.2f -> %.2f',before,run.Clock())..')')
+  step(o);step(o);step(o);step(o)
+  local n3=spamUntil(shownAt-.02)
+  check(run.Skipped==1 and not run.Collected,tag..': hit to result: '..n3..' spam presses do nothing')
+  check(not skipShows(),tag..': the SKIP button is gone once the hit has played')
+  local n4=spamUntil(shownAt+M.CollectAfter-.15)
+  check(run.SawResult and not run.Collected,tag..': the result just shown: '..n4..' spam presses do nothing (none began after it)')
+  -- a press held down from just before the collect delay ended, let go after it (still a tap: under TapSeconds, not moved)
+  local input={UserInputType=UT.Touch,KeyCode=KC.Unknown,Position=V3(300,200,0)}
+  local b=scene and X.find(revealGui(),'Backdrop')
+  if b then b.InputBegan:Fire(input)end;W.UIS.InputBegan:Fire(input,b~=nil and b~=false)
+  local heldAt=run.Clock()
+  untilT(o,run,shownAt+M.CollectAfter+.12) -- (its release, the press's claim, comes after PressWindow: a press of its own)
+  W.UIS.InputEnded:Fire(input,b~=nil and b~=false);if b then b.Activated:Fire()end
+  check(heldAt<shownAt+M.CollectAfter and run.Clock()-heldAt<M.TapSeconds and not run.Collected,tag..': a press held from before ('..string.format('%.2f',heldAt-shownAt)..' s after the result), let go after the delay, does not collect')
+  step(o);step(o);step(o);step(o)
+  press(o,scene and'button'or'tap')
+  check(run.Collected and run.CollectWhy=='press',tag..': the next fresh tap collects it')
   landAll(o);check(slotShowing(o.Name)~=nil,tag..': in the hotbar');clean(tag)
  end
 end

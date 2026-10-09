@@ -61,7 +61,7 @@ local function settle(dt)
 end
 local function cleanAll(tag)
  check(M.Active()==nil and stage()==nil and X.pg:FindFirstChild('RarePullReveal')==nil,tag..': no presentation, stage or reveal GUI left')
- check(cam:FindFirstChild('RarePullGrade')==nil and cam:FindFirstChild('RarePullBlur')==nil and cam:FindFirstChild('RarePullGradeOut')==nil,tag..': no grade / blur left on the camera')
+ check(cam:FindFirstChild('RarePullGrade')==nil and cam:FindFirstChild('RarePullBlur')==nil and cam:FindFirstChild('RarePullGradeOut')==nil and cam:FindFirstChild('RarePullDof')==nil,tag..': no grade / blur / depth of field (R155) left on the camera')
  check(#rarePlaying()==0,tag..': every reveal sound has stopped ('..table.concat(rarePlaying(),',')..')')
  check(ducks()==0 and Audio.DuckLevel==0,tag..': the music is no longer ducked')
  check(not Audio.Running()and Audio.Waiting()==0,tag..': no sound sheet or waiting file left')

@@ -17,6 +17,9 @@
 -- now COLLECTS it (R153: closed it) and is just as much the reveal's; while the result WAITS (as long as it takes) every press is the reveal's:
 -- the first one collects it, none reaches the tool; the pack / the bat stay manual the whole wait; once collected the tools work at once.
 --  7. the seed of the pull is not "in the hand" for planting until it has flown in (EconomyClient: equippedGardenSeed, from its source).
+-- R155 (owner: "for some cutscenes u can skip it by spam clicking disable this feature and u can only skip at the bottom right of the
+-- screen"): a click / tap never skips; it is the reveal's from the card's FIRST frame (nothing plants, digs, gives or swings until it is
+-- collected), the SKIP button skips (and R2 / B: through a tool's own R2 action too), the pack / the bat stay manual the whole card.
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -99,10 +102,25 @@ local function tap()
  local input={UserInputType=UT.Touch,KeyCode=KC.Unknown,Position=V3(300,200,0)}
  UIS.InputBegan:Fire(input,false);UIS.InputEnded:Fire(input,false);UIS.TouchTapInWorld:Fire(R.Vector2.new(300,200),false)
 end
--- R2: the engine runs the top CAS action for it and tells UserInputService the input was processed
+-- R2: the engine runs the top CAS action for it and tells UserInputService the input was processed (R155: and R2 is down meanwhile)
+local r2Down=false
+function UIS.IsGamepadButtonDown(_,pad,k)return r2Down and pad==UT.Gamepad1 and k==KC.ButtonR2 end
 local function r2(action)
+ r2Down=true
  local fn=action and W.actions[action];local r=fn and fn(action,R.Enum.UserInputState.Begin,{KeyCode=KC.ButtonR2})
  UIS.InputBegan:Fire({UserInputType=UT.Gamepad1,KeyCode=KC.ButtonR2,Position=V3(0,0,0)},fn~=nil and r==R.Enum.ContextActionResult.Sink)
+ r2Down=false
+end
+-- R155: the SKIP button at the bottom right
+local function skipButton()local b=X.find(X.pg,'Skip button');if b and b.Visible then b.Activated:Fire()end end
+-- (a press during the animation: R2 is the SKIP button's key and skips; a click / tap does nothing, then the SKIP button skips)
+local function skipWith(run,how,press,tag,what)
+ press()
+ if how=='R2'then check(run.Skipped==1 and what(),tag..': R2 (the SKIP button\'s key, through the tool\'s own action) skips the card, '..'and the tool does nothing')
+ else
+  check(not run.Skipped and what(),tag..': R155: a '..how..' during the animation neither skips nor reaches the tool')
+  X.run(.15);skipButton();check(run.Skipped==1 and what(),tag..': the SKIP button skips it, the tool does nothing')
+ end
 end
 local function reset()
  M.Abort('test');W.module('RarePullWorld').Clear()
@@ -128,9 +146,9 @@ for _,how in ipairs({'click','tap','R2'})do
  X.run(.5)
  local run,bag=start(4);local tl=run.TL;local tag='planting ('..how..') under a Legendary card'
  X.run(.1);p0=placed;press()
- check(placed==p0+1 and not run.Skipped,tag..': a press the card does not take yet (before '..tl.SkipFrom..' s) still plants')
- untilClock(run,tl.SkipFrom+.1);p0=placed;press()
- check(run.Skipped==1 and placed==p0,tag..': the press that skips the card plants nothing')
+ check(placed==p0 and not run.Skipped,tag..': R155: from the card\'s first frame a press is the reveal\'s: it plants nothing, nor skips (before '..tl.SkipFrom..' s)')
+ untilClock(run,tl.SkipFrom+.1);p0=placed
+ skipWith(run,how,press,tag,function()return placed==p0 end)
  untilClock(run,L.ShownAt(tl)+.1);p0=placed;press()
  check(not run.Collected and placed==p0,tag..': a press as the result lands (it only lands: R154) plants nothing either')
  untilClock(run,tl.Length+20) -- (R154: the result waits, however long)
@@ -149,8 +167,8 @@ for _,how in ipairs({'click','tap','R2'})do
  local press=how=='click'and click or how=='tap'and tap or function()r2('GardenShovelRemove')end
  press();check(shovelOpen(),'shovel ('..how..'): no reveal: a press on my plant opens the removal dialog, as before');shovelClose()
  local run,bag=start(3);local tl=run.TL;local tag='shovel ('..how..') under a Rare card'
- untilClock(run,tl.SkipFrom+.1);local r0=removes;press()
- check(run.Skipped==1 and not shovelOpen()and X.pg:GetAttribute('SeedMenu')==nil,tag..': the press that skips opens no removal')
+ untilClock(run,tl.SkipFrom+.1);local r0=removes
+ skipWith(run,how,press,tag,function()return not shovelOpen()and X.pg:GetAttribute('SeedMenu')==nil end)
  untilClock(run,L.ShownAt(tl)+.3);press()
  check(run.Collected and not shovelOpen()and removes==r0,tag..': the press that collects it (R154) opens none either, and nothing is removed')
  gone(run,bag)
@@ -165,8 +183,8 @@ do
   local d0=digs;press();check(digs==d0+1,'digging ('..how..'): no reveal: a press on the track digs, as before')
   X.run(.5)
   local run,bag=start(2);local tl=run.TL;local tag='digging ('..how..') under an Uncommon card'
-  untilClock(run,tl.SkipFrom+.1);d0=digs;press()
-  check(run.Skipped==1 and digs==d0,tag..': the press that skips digs nothing')
+  untilClock(run,tl.SkipFrom+.1);d0=digs
+  skipWith(run,how,press,tag,function()return digs==d0 end)
   untilClock(run,L.ShownAt(tl)+.3);press()
   check(run.Collected and digs==d0,tag..': nor the one that collects it (R154)')
   gone(run,bag)
@@ -183,8 +201,8 @@ for _,how in ipairs({'click','tap'})do
  local press=how=='click'and click or tap
  press();check(giftOpen(),'giving ('..how..'): no reveal: a press on a nearby player asks to give, as before');giftClose()
  local run,bag=start(5);local tl=run.TL;local tag='giving ('..how..') under a Mythic card'
- untilClock(run,tl.SkipFrom+.1);press()
- check(run.Skipped==1 and not giftOpen(),tag..': the press that skips asks nothing')
+ untilClock(run,tl.SkipFrom+.1)
+ skipWith(run,how,press,tag,function()return not giftOpen()end)
  untilClock(run,L.ShownAt(tl)+.3);press()
  check(run.Collected and not giftOpen()and gifts==0,tag..': nor the one that collects it (R154); nothing is given')
  gone(run,bag);X.run(.7)
@@ -199,7 +217,7 @@ for _,t in ipairs({packTool,bat})do
  local function sample(label)log[label]=t.ManualActivationOnly end
  X.run(.1);sample('early')
  untilClock(run,tl.SkipFrom+.1);sample('armed')
- click();X.run(1/30);sample('justSkipped') -- (after a press, the next one is a run of clicks for SkipGap: the tool's again)
+ click();X.run(1/30);sample('justClicked') -- (R155: a click never skips; the card keeps every press until it is collected)
  untilClock(run,hit+.1);sample('hitToResult')
  untilClock(run,L.ShownAt(tl)+.3);sample('closeable')
  untilClock(run,tl.Length+15);sample('waiting') -- (R154: the result waits)
@@ -207,10 +225,10 @@ for _,t in ipairs({packTool,bat})do
  local swapped=t.ManualActivationOnly==false and seed.ManualActivationOnly==true
  hold(t);X.run(1/30);sample('back')
  click();gone(run,bag)
- check(log.early==false,tag..': before the card can be skipped its clicks are the tool\'s (ManualActivationOnly off)')
- check(log.armed==true,tag..': once a click would skip the card, the tool does not take it (ManualActivationOnly on, this client only)')
- check(log.justSkipped==false,tag..': right after a press (a run of clicks does not skip) the tool has its clicks again')
- check(log.hitToResult==false,tag..': between the hit and the result (a click does nothing to the card) the clicks are the tool\'s')
+ check(log.early==true,tag..': R155: from the card\'s first frame its clicks are the reveal\'s, not the tool\'s (ManualActivationOnly on, this client only)')
+ check(log.armed==true,tag..': while it can be skipped (by the SKIP button) too')
+ check(log.justClicked==true and not run.Skipped,tag..': a click on the world skips nothing and still does not reach the tool')
+ check(log.hitToResult==true,tag..': between the hit and the result too')
  check(log.closeable==true,tag..': once the result is shown (a click collects it) held again')
  check(log.waiting==true,tag..': and for as long as the result waits (R154: 15 s after its length)')
  check(swapped and log.back==true,tag..': swapping tools puts the old one back; a manual tool (the seed) is never touched; the tool taken out again is held again')
