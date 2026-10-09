@@ -45,7 +45,8 @@ bad=0;n=0;for f in "$SP"/*.client.lua;do
  rel=src/StarterPlayer/StarterPlayerScripts/$(basename "$f")
  want=$(git -C "$REPO" show "$BASE:$rel" 2>/dev/null | grep -n "R152: start once the whole game has arrived" | head -1 | cut -d: -f1)
  have=$(grep -n "R152: start once the whole game has arrived" "$f" | head -1 | cut -d: -f1)
- [ "$want" = "$have" ] || { echo "the load guard moved in $rel (line ${want:-none} -> ${have:-none})";bad=1; };[ "$have" = 1 ] && n=$((n+1))
+ # (a client script that is new since the base - R155's PityBarsClient155 - has no old line to keep: its guard just has to be line 1)
+ [ "$want" = "$have" ] || [ -z "$want" -a "$have" = 1 ] || { echo "the load guard moved in $rel (line ${want:-none} -> ${have:-none})";bad=1; };[ "$have" = 1 ] && n=$((n+1))
 done
 [ "$bad" = 0 ] && echo "ok: the load guard is where the candidate has it (line 1 of $n client scripts, Hotbar line 2)" || fail "load guard"
 git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | grep 'Config.Version' > "$OUT/version_base.txt"

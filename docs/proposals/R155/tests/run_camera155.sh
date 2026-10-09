@@ -11,7 +11,8 @@
 #               the hero framing through a 120 s wait, the wait's drift, Calm, the clearance from every stage part) and the real director frame by
 #               frame at 30 / 60 / 144 fps (the camera before / after the stage = today's, in the stage = the rig, the cuts on their frames with
 #               their sounds within 0.01 s, RarePullDof on every device, every exit path, a skip at every phase, the setting, Common..Mythic);
-#               the R155 SKIP button (where it goes on every screen, clear of the HUD, its timing, the only skip: spam does nothing).
+#               the R155 SKIP button (where it goes on every screen, clear of the HUD, its timing, the only skip: spam does nothing); R155 review: modal exactly while it shows
+#               (Shift Lock / first person), no modal button left on any way out, the keyboard's Enter key / the gamepad's B, never over the pity bars, nothing made per frame.
 #  2. against the R154 release, byte for byte: R152's seed-opening fingerprints (run_perf152.sh, PERF_BASE=8aa15fd, ONLY=seed: every rarity on
 #               desktop / phone / low quality at 60 and 30 fps and an onlooker's Secret / King; every frame of the stage, the world effects, the
 #               characters, the card, the camera and its grade / blur, Lighting, and the sound schedule) with perf155_opts.luau: the ONLY allowed

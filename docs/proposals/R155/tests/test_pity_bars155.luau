@@ -8,9 +8,17 @@
 --  5. lucky pack     - the notice ("LUCKY PACK! x1.5 luck"), the pop (full, flash, ring, shine, scale), then back to 0/10; whichever of the two signals comes first;
 --                      waits for the reveal card / story scene (the notice waits only for a scene); Reduced Motion: no scale / shine / ring
 --  6. hidden / dim   - hidden under a menu (SeedMenu, the Bag) or when the hotbar is hidden; dimmed under a reveal card and while the tutorial card is up
---  7. layout         - 30 screens (PC, landscape / portrait phones, tablets): inside the screen, above the hotbar and its item name, clear of every HUD box (menu,
+--  7. layout         - 36 screens (PC, landscape / portrait phones, tablets): inside the screen, above the hotbar and its item name, clear of every HUD box (menu,
 --                      balances, status, jump / thumb zones, owner tools, BASE / TRACK) and of the SKIP corner, text fits; the real gui matches; it follows the hotbar's
 --                      frame found by name (and its moves), with HudLayout's default without it
+--  8. SKIP button    - R155 review: the SKIP pill of an opening (RarePullCard.SkipRect with the boxes the card gives it) never touches the bars on any of the screens, with and
+--                      without the phone's thumb controls, and stays at the bottom right, inside the margins, clear of every HUD box
+--  9. BONUS button   - R155 review: the treadmill BONUS ROLL button (PityBars155.ButtonSpot, what TreadmillBonusClient asks) sits above the bars, never over them, on the same
+--                      screens; near the hotbar where there is room; the answer depends on the screen alone (nothing flickers when the button comes and goes)
+-- 10. starting       - R155 review: the bars start with the tutorial card up, with a pack in hand, under a reveal card, hidden, with a story scene: no error, placed and drawn;
+--                      a step before the first layout is harmless
+-- 11. cost           - R155 review: a bar at 9/10 writes its glow and nothing else (no UDim2, no words); a bar nobody can see (dimmed out, hidden) costs nothing and the
+--                      frame loop stops
 local W=require('./world');local R=W.R
 local checks,fails=0,0
 local function check(c,m)checks+=1;if not c then fails+=1;print('FAIL: '..m)end;return c end
@@ -178,6 +186,7 @@ local SCREENS={
  {390,844,true,'iPhone 14 portrait'},{375,667,true,'iPhone 8 portrait'},{360,640,true,'Android portrait'},{414,896,true,'iPhone 11 portrait'},{320,568,true,'iPhone SE portrait'},{360,800,true,'Android tall'},
  {1024,768,true,'iPad landscape'},{768,1024,true,'iPad portrait'},{1180,820,true,'iPad Air landscape'},{820,1180,true,'iPad Air portrait'},{1366,1024,true,'iPad Pro landscape'},
  {1280,800,true,'Android tablet'},{800,1280,true,'Android tablet portrait'},{1920,1080,true,'touch PC'},{1440,900,false,'MacBook'},{1280,1024,false,'5:4 monitor'},
+ {1280,540,false,'short PC window'},{960,480,false,'narrow short window'},{700,400,false,'tiny landscape window'},{812,375,true,'iPhone X landscape'},{430,932,true,'iPhone Pro Max portrait'},{360,740,true,'Android portrait 740'},
 }
 local WORDS={{'Normal',0},{'Normal',9},{'Event',3},{'Event',9},{'Normal',0,true}}
 local layoutFails=0
@@ -233,6 +242,193 @@ do
  dock.Visible=false;frames(3);check(not s.Root.Visible,'the hotbar hidden: the bars hide with it')
  dock.Visible=true;frames(3);check(s.Root.Visible,'... and come back with it')
  hot:Destroy();s.Relayout();frames(2)
+end
+-- 8. the SKIP button of an opening (R155 review: on a phone it sat on the bars during the in-place and result cards) ---------------------------------------------------
+local Card=W.module('RarePullCard');local TB=W.module('TreadmillBonusRules');local Notice=W.module('HudNoticeLayout')
+local function controls(w,h) -- the phone's thumb controls the way Roblox puts them (the hud harness's)
+ if math.min(w,h)<=500 then return {Joystick={X=20,Y=h-90-20,W=90,H=90},Jump={X=w-95,Y=h-90,W=70,H=70}}end
+ return {Joystick={X=60,Y=h-60-120,W=120,H=120},Jump={X=w-170,Y=h-210,W=120,H=120}}
+end
+local function noticeRows(w,h)
+ local rows=Notice.Calculate(w,h,36,TB.NoticeFlags);local extra={}
+ for name,row in pairs(rows)do if type(row)=='table'then extra[#extra+1]={N=name,X=row.X-row.Width/2,Y=row.Y,W=row.Width,H=row.Height}end end
+ return extra
+end
+local skipFails,skipChecked=0,0
+local bonusFails,bonusChecked,bonusFar,bonusWheel=0,0,{},{}
+for _,sc in ipairs(SCREENS)do
+ local w,h,touch,name=sc[1],sc[2],sc[3],sc[4]
+ for _,ctl in ipairs(touch and{false,true}or{false})do
+  local c=ctl and controls(w,h)or nil
+  local m=Hud.Read(V2(w,h),touch,c)
+  local tag=('%s %dx%d%s%s'):format(name,w,h,touch and' touch'or'',ctl and' with thumb controls'or'')
+  local place=B.Place(w,h,m,nil);local ext=B.Reserved(w,h,m,nil)
+  -- the boxes the card gives SkipRect: HudLayout's and the bars' extent
+  local boxes=Card.SkipBoxes(w,h,touch,c)
+  local hasBars=false;for _,b in ipairs(boxes)do if b.N=='PityBars'and b.X==ext.X and b.Y==ext.Y and b.W==ext.W and b.H==ext.H then hasBars=true end end
+  local x,y,bw,bh=Card.SkipRect(w,h,touch,boxes);local skip={X=x,Y=y,W=bw,H=bh}
+  local bad={}
+  if not hasBars then bad[#bad+1]='the card does not give SkipRect the bars\' extent'end
+  if overlaps(skip,ext,0)then bad[#bad+1]='the SKIP button covers the bars'end
+  if not place.Clear then bad[#bad+1]='the bars have no clear spot'end
+  if not(x>=12 and y>=12 and x+bw<=w-12 and y+bh<=h-12)then bad[#bad+1]='the SKIP button is not 12 px inside the screen'end
+  if not(x+bw/2>=w*.5 and y>=h*.45)then bad[#bad+1]='the SKIP button is not at the bottom right'end
+  for _,b in ipairs(Hud.HudBoxes(m,w,h,false))do if overlaps(skip,b,8)then bad[#bad+1]='the SKIP button is within 8 px of '..tostring(b.N)end end
+  if m.Travel and overlaps(skip,{X=m.Travel.X,Y=m.Travel.Y,W=m.Travel.W,H=m.Travel.H},0)then bad[#bad+1]='the SKIP button covers the BASE / TRACK box'end
+  skipChecked+=1
+  if #bad>0 then skipFails+=1;print(('FAIL: SKIP %s: %s'):format(tag,table.concat(bad,'; ')))end
+  -- 9. the BONUS ROLL button, with the notice rows the client gives Place as well
+  local extra=noticeRows(w,h);local wheel=Hud.HudBoxes(m,w,h,true)
+  local btn=B.ButtonSpot(TB,m,w,h,wheel,extra)
+  local old=TB.Place(m,w,h,wheel,extra)
+  local bb={}
+  if overlaps(btn,ext,0)then bb[#bb+1]='the BONUS button covers the bars'end
+  if overlaps(btn,ext,6)then bb[#bb+1]='... with less than the 6 px of air every other box gets'end
+  if btn.X<8 or btn.Y<8 or btn.X+btn.W>w-8 or btn.Y+btn.H>h-8 then bb[#bb+1]='off the 8 px margin'end
+  for _,b in ipairs(wheel)do if overlaps(btn,b,6)then bb[#bb+1]='covers '..tostring(b.N)end end
+  for _,b in ipairs(extra)do if overlaps(btn,b,6)then bb[#bb+1]='covers the '..tostring(b.N)..' notice row'end end
+  local detail=m.HotbarDetails~=false and 44 or 0;local top=h-m.HotbarBottom-m.SlotSize-detail
+  local up=top-(btn.Y+btn.H) -- how far above the hotbar's item name the button ends
+  if up<0 then bb[#bb+1]='the BONUS button is under the item name'end
+  -- where there was room (the old place was just above the hotbar) it stays near it: above the bars by their height and a gap
+  local oldUp=top-(old.Y+old.H)
+  if oldUp<=60 and up>oldUp+ext.H+24 then
+   -- (a portrait phone as narrow as 360 px has its menu wheel's third option right over that spot when the wheel is open: the button then takes the next clear place)
+   if touch and w<380 then bonusWheel[#bonusWheel+1]=('%s (%d px up, was %d)'):format(tag,up,oldUp)
+   else bonusFar[#bonusFar+1]=('%s (%d px up, was %d)'):format(tag,up,oldUp)end
+  end
+  -- the same rect every time: it depends on the screen alone, not on whether the button shows (nothing flickers when it comes and goes)
+  local again=B.ButtonSpot(TB,m,w,h,wheel,extra)
+  if again.X~=btn.X or again.Y~=btn.Y or again.W~=btn.W or again.H~=btn.H then bb[#bb+1]='not the same twice'end
+  bonusChecked+=1
+  if #bb>0 then bonusFails+=1;print(('FAIL: BONUS %s: %s'):format(tag,table.concat(bb,'; ')))end
+  print(('SKIPBONUS %s skip %d,%d %dx%d bonus %d,%d %dx%d (%d px above the item name)'):format(tag,x,y,bw,bh,btn.X,btn.Y,btn.W,btn.H,up))
+ end
+end
+check(skipFails==0,('the SKIP button of an opening never touches the bars: %d screens (with and without thumb controls), at the bottom right, 12 px inside the screen, 8 px clear of every HUD box (%d failing)'):format(skipChecked,skipFails))
+check(bonusFails==0,('the BONUS ROLL button sits above the bars, never over them (6 px of air), clear of the wheel, the notice rows and the margins, on %d screens, always at the same place (%d failing)'):format(bonusChecked,bonusFails))
+check(#bonusFar==0,'... and near the hotbar wherever it was before: '..(#bonusFar==0 and'all of them'or table.concat(bonusFar,'; ')))
+if #bonusWheel>0 then print('(the menu wheel keeps the button further up on: '..table.concat(bonusWheel,'; ')..')')end
+-- the client without the module keeps the place the rules give (TreadmillBonusClient's fallback is TreadmillBonusRules.Place itself)
+do
+ local m=Hud.Read(V2(1280,720),false,nil);local wheel=Hud.HudBoxes(m,1280,720,true)
+ local want=TB.Place(m,1280,720,wheel,{});local lifted=B.ButtonSpot(TB,m,1280,720,wheel,{})
+ check(want.Y>lifted.Y and want.X==lifted.X and want.W==lifted.W,('1280x720: the rules alone put the button at y=%d; with the bars it sits at y=%d, same column and size'):format(want.Y,lifted.Y))
+end
+
+-- 10. starting in the middle of things (R155 review: "attempt to index nil with 'Bar'" killed the client script when the tutorial card was up or a pack was in hand) ----------
+local function fresh(name,setup)
+ local p=R.new('Player');p.Name=name;p.UserId=2;p.Parent=Players
+ p.CharacterAdded=R.signal()
+ local g=R.new('PlayerGui');g.Name='PlayerGui';g.Parent=p
+ local state={Player=p,PG=g}
+ if setup then setup(p,g)end
+ local ok,res=pcall(B.Start,p,{Notice=function()end})
+ state.OK,state.S=ok,ok and res or nil;state.Err=ok and nil or res
+ return state
+end
+do
+ local function packIn(p,variant)
+  local char=R.new('Model');char.Name=p.Name;p.Character=char
+  local t=R.new('Tool');t.Name='Pack';t:SetAttribute('SeedPackTool',true);t:SetAttribute('BagVariant',variant);t.Parent=char
+ end
+ local cases={
+  {'the tutorial card up',function(p,g)g:SetAttribute('TutorialCardBottom',140)end,function(r)return r.S.Dim==.35 and r.S.Bars.Normal.Label.TextTransparency>0 and r.S.Bars.Normal.Label.TextTransparency<1 end},
+  {'a Mech pack in hand',function(p)packIn(p,'MechLimited')end,function(r)return r.S.Held=='Event' and math.abs(r.S.Bars.Event.Scale.Scale-1.06)<.01 end},
+  {'a world pack in hand',function(p)packIn(p,'Pack03')end,function(r)return r.S.Held=='Normal' and math.abs(r.S.Bars.Normal.Scale.Scale-1.06)<.01 end},
+  {'the tutorial card up and a pack in hand',function(p,g)g:SetAttribute('TutorialCardBottom',140);packIn(p,'Pack01')end,function(r)return r.S.Dim==.35 and r.S.Held=='Normal' end},
+  {'a reveal card up (the bars step aside)',function(p)p:SetAttribute('RarePullCinematic','Ladder')end,function(r)return r.S.Dim==1 and r.S.Bars.Normal.Track.BackgroundTransparency>=.999 end},
+  {'a story scene running',function(p)p:SetAttribute('RarePullCinematic','Scene')end,function(r)return r.S.Dim==1 end},
+  {'a menu open (SeedMenu)',function(p,g)g:SetAttribute('SeedMenu','Shop')end,function(r)return not r.S.Root.Visible end},
+  {'counts of 9 and 4 saved on the player',function(p)p:SetAttribute('PackPityNormal',9);p:SetAttribute('PackPityEvent',4)end,function(r)return r.S.Bars.Normal.Label.Text=="9/10 next one's lucky!" and r.S.Bars.Event.Label.Text=='4/10 event pity' end},
+  {'everything at once',function(p,g)g:SetAttribute('TutorialCardBottom',140);g:SetAttribute('SeedMenu','Inventory');packIn(p,'EclipseReliquary');p:SetAttribute('RarePullCinematic','InPlace');p:SetAttribute('PackPityNormal',9)end,function(r)return r.S.Held=='Event' end},
+ }
+ for _,case in ipairs(cases)do
+  local r=fresh('Joiner',case[2])
+  if check(r.OK,'starting with '..case[1]..': no error'..(r.OK and''or(' ('..tostring(r.Err)..')')))then
+   frames(60)
+   local s2=r.S
+   check(s2.Placement~=nil and s2.Placement.Bar.W>0 and(not s2.Root.Visible or s2.Bars.Normal.Root.Size.X.Offset==s2.Placement.Bar.W),'... ('..case[1]..') placed, and drawn unless a menu hides it (bars '..s2.Placement.Bar.W..'x'..s2.Placement.Bar.H..')')
+   check(case[3](r),'... ('..case[1]..') and in the state that case needs')
+   -- later changes reach the running script (the HUD wakes): a count arrives and is drawn
+   r.Player:SetAttribute('PackPityNormal',3);r.PG:SetAttribute('SeedMenu',nil);r.Player:SetAttribute('RarePullCinematic',nil);frames(120)
+   check(r.S.Bars.Normal.Label.Text=='3/10 pity'and r.S.Root.Visible,'... and it keeps running: a count of 3 arrives and is drawn once the cards and menus are gone')
+   r.S:Destroy();r.Player:Destroy()
+  end
+ end
+ -- a step before the first layout (nothing placed yet) draws nothing and does not fail; the layout that follows draws everything
+ local r=fresh('Early',nil)
+ local s2=r.S
+ s2.Placement=nil
+ local ok1=pcall(B.Step,s2,1/60,R.clock)
+ local ok2=pcall(s2.Wake)
+ r.Player:SetAttribute('PackPityNormal',5)
+ local ok3=pcall(function()frames(3)end)
+ check(ok1 and ok2 and ok3,'a step / a wake / the frames before the first layout (no placement): nothing to draw, no error')
+ s2.Relayout();frames(3)
+ check(s2.Placement~=nil and s2.Bars.Normal.Label.Text=='5/10 pity'and s2.Bars.Normal.Root.Size.X.Offset==s2.Placement.Bar.W,'... and the layout that follows draws the bars with what changed meanwhile')
+ s2:Destroy();r.Player:Destroy()
+end
+
+-- 11. cost (R155 review: a bar at 9/10 allocated a closure, a UDim2, its words and a geometry string every frame, even while hidden) ---------------------------------------
+do
+ local function measure(n)
+  local c={writes=0,glow=0,other={},udim=0,words=0,text=0,seq=0,sets=0}
+  local mt=R.instMeta;local orig=mt.__newindex
+  mt.__newindex=function(o,k,v)
+   c.writes+=1
+   if k=='BackgroundTransparency'and(o==bar('Normal').Glow or o==bar('Event').Glow)then c.glow+=1 else c.other[#c.other+1]=tostring(o:GetFullName())..'.'..tostring(k)end
+   return orig(o,k,v)
+  end
+  local saved={}
+  for _,k in ipairs({'fromOffset','new','fromScale'})do local f=R.UDim2[k];saved[k]=f;R.UDim2[k]=function(...)c.udim+=1;return f(...)end end
+  local seqNew=R.ColorSequence.new;R.ColorSequence.new=function(...)c.seq+=1;return seqNew(...)end
+  local words,text=B.Words,Pity.Text
+  B.Words=function(...)c.words+=1;return words(...)end
+  Pity.Text=function(...)c.text+=1;return text(...)end
+  local set=s.Set;s.Set=function(...)c.sets+=1;return set(...)end -- (every property a frame looks at goes through it)
+  frames(n)
+  s.Set=set;mt.__newindex=orig;for k,f in pairs(saved)do R.UDim2[k]=f end;R.ColorSequence.new=seqNew;B.Words=words;Pity.Text=text
+  return c
+ end
+ local function steppers()local n=0;for _,c in ipairs(W.Run.RenderStepped._c)do if c.Connected then n+=1 end end;return n end
+ -- Normal at 9/10, nothing in hand, nothing over the HUD; the event bar rests at 7/10
+ hold(nil);player:SetAttribute('PackPityEvent',7);player:SetAttribute('PackPityNormal',9);frames(120)
+ check(s.Held==nil and s.Dim==0 and s.Root.Visible and bar('Normal').Label.Text=="9/10 next one's lucky!",'(a bar at 9/10, nothing in hand, the HUD shown)')
+ local c=measure(60)
+ check(c.writes==60 and c.glow==60,('9/10 at rest: 60 frames write exactly the glow of the bar at 9/10 once each (%d writes, %d of them on a glow%s)'):format(c.writes,c.glow,#c.other>0 and'; also '..table.concat(c.other,', ',1,math.min(#c.other,4))or''))
+ check(c.udim==0 and c.seq==0 and c.words==0 and c.text==0,('... no UDim2, no ColorSequence, no words made or formatted (%d / %d / %d / %d)'):format(c.udim,c.seq,c.words,c.text))
+ check(c.sets==60,('... and it looks at nothing else: one property a frame (the glow), not the forty of a full paint (%d in 60 frames)'):format(c.sets))
+ check(steppers()>=1,'... the frame loop runs (the glow pulses)')
+ -- the pulse is the glow the full paint gives (a wake paints everything afresh; the frames after it only pulse)
+ s.Wake();local full=bar('Normal').Glow.BackgroundTransparency
+ check(math.abs(full-(1-(1-(.58+.17*math.sin(R.clock*4.2)))))<1e-9,('... and it is the very value the full paint writes (%.4f)'):format(full))
+ -- the words are made when the count changes, not on the frames after
+ do
+  local words=B.Words;local n=0;B.Words=function(...)n+=1;return words(...)end
+  player:SetAttribute('PackPityEvent',8);frames(30);local afterChange=n
+  frames(60);B.Words=words
+  check(afterChange>=1 and afterChange<=3 and n==afterChange,('the words are made when the count changes (%d times) and not on the 60 frames after (%d more)'):format(afterChange,n-afterChange))
+ end
+ -- a bar nobody can see costs nothing: the HUD dimmed out under a reveal card; hidden under a menu
+ player:SetAttribute('RarePullCinematic','Ladder');frames(10)
+ local d=measure(60)
+ check(d.writes==0 and d.sets==0 and steppers()==0,('under a reveal card (dimmed out): 60 frames, %d writes, %d properties looked at, %d frame loops running'):format(d.writes,d.sets,steppers()))
+ player:SetAttribute('RarePullCinematic',nil);frames(10)
+ check(s.Dim==0 and steppers()>=1 and bar('Normal').Glow.BackgroundTransparency<.9,'... and it comes back, pulsing')
+ pg:SetAttribute('SeedMenu','Shop');frames(10)
+ local hd=measure(60)
+ check(hd.writes==0 and hd.sets==0 and steppers()==0 and not s.Root.Visible,('hidden under a menu: 60 frames, %d writes, %d properties looked at, %d frame loops running'):format(hd.writes,hd.sets,steppers()))
+ pg:SetAttribute('SeedMenu',nil);frames(10)
+ check(s.Root.Visible and steppers()>=1 and bar('Normal').Glow.BackgroundTransparency<.9,'... and drawn again, pulsing, when the menu closes')
+ -- a count that changes while the HUD is hidden shows right after it comes back
+ pg:SetAttribute('SeedMenu','Shop');frames(5);player:SetAttribute('PackPityEvent',2);frames(30);pg:SetAttribute('SeedMenu',nil);frames(120)
+ check(bar('Event').Label.Text=='2/10 event pity'and fillW('Event')==math.floor(innerW()*.2+.5),'a count that changed while a menu hid the bars is shown right after (2/10)')
+ -- Reduced Motion: a steady glow, no loop at all once it is drawn
+ W.Gui.ReducedMotionEnabled=true;frames(5);local rm=measure(30)
+ check(rm.writes==0 and steppers()==0,('Reduced Motion at 9/10: the glow is steady, 30 frames, %d writes, %d frame loops'):format(rm.writes,steppers()))
+ W.Gui.ReducedMotionEnabled=false;frames(10)
+ player:SetAttribute('PackPityNormal',0);player:SetAttribute('PackPityEvent',0);frames(120)
 end
 -- the default notice path: the top notices (NoticeFeed83)
 do

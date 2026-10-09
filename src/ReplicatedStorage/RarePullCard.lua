@@ -15,6 +15,9 @@
 -- a click / tap anywhere no longer skips. The skip is a small SKIP button at the bottom right (Card.SkipRect: inside the device's safe area,
 -- clear of every HUD box - the hotbar, the status / timers stack, the balances, a phone's thumb controls); it shows from SkipFrom until the hit
 -- (gamepad B / R2 and Enter press it: the director), then the corner says how to collect the result.
+-- R155 review: a player in Shift Lock or first person has no mouse to click it with (the cursor is locked to the middle): the button is MODAL while it shows
+-- (Roblox frees the mouse for as long as a modal button is visible, and gives the lock back when it goes), and a keyboard's pill carries a small "Enter" key
+-- (the gamepad's has its "B"). Its place also keeps clear of the pity bars above the hotbar (PityBars155.Reserved), which a phone's thumb controls would put it on.
 local RS=game:GetService('ReplicatedStorage')
 local Rules=require(script.Parent.RarePullRules)
 local Cache=require(script.Parent.PropCache152)
@@ -263,6 +266,10 @@ end
 -- leftwards (never left of the middle), then the rows above it (never above .45 of the height); the first spot clear of the screen's edge by
 -- 12 px and of every box by 8 px. Its height: 6.5 % of the screen's (34 - 48 px; at least 40 on a touch screen: a thumb's target).
 Card.SkipLabel='SKIP  ▸▸'
+Card.EnterLabel='Enter'
+-- (the word's place and size on the pill: alone, beside the gamepad's B, beside the keyboard's Enter key; built once, not per frame)
+local WORD_AT,WORD_PAD_AT,WORD_KEY_AT=UDim2.fromScale(.5,.5),UDim2.fromScale(.58,.5),UDim2.fromScale(.675,.5)
+local WORD_SIZE,WORD_KEY_SIZE=UDim2.fromScale(.74,.5),UDim2.fromScale(.5,.5)
 function Card.SkipRect(w,h,touch,boxes)
  local bh=math.floor(math.clamp(h*.065,touch and 40 or 34,48)+.5);local bw=math.floor(bh*2.75+.5)
  local margin,pad=12,8
@@ -275,10 +282,29 @@ function Card.SkipRect(w,h,touch,boxes)
  for y=y0,math.floor(h*.45),-4 do for x=x0,math.floor(w*.5),-4 do if clear(x,y)then return x,y,bw,bh end end end
  return x0,y0,bw,bh -- (nothing is clear: the corner itself)
 end
+-- What the button keeps clear of in a safe area w x h: HudLayout's boxes (controls: a touch screen's real thumb controls, HudLayout.Controls, or nil) and, R155 review,
+-- the pity bars' extent: they are above the hotbar all the time, and on a phone the thumb controls push the button up to where they are.
+function Card.SkipBoxes(w,h,touch,controls)
+ local okL,Layout=pcall(require,RS:FindFirstChild('HudLayout'))
+ if not(okL and Layout)then return{} end
+ local ok,list=pcall(function()
+  local m=Layout.Read(Vector2.new(w,h),touch,controls)
+  local list=Layout.HudBoxes(m,w,h,false)
+  local okB,Bars=pcall(require,RS:FindFirstChild('PityBars155'))
+  if okB and Bars then local okR,box=pcall(Bars.Reserved,w,h,m,nil);if okR and type(box)=='table'then list[#list+1]=box end end
+  return list
+ end)
+ return ok and type(list)=='table'and list or{}
+end
 function Card:_buildSkip(parent)
  local b=new('TextButton',{Name='Skip button',Text='',AutoButtonColor=false,BackgroundColor3=C(18,16,30),BackgroundTransparency=1,ZIndex=45,Visible=false,
   Selectable=false,Size=UDim2.fromOffset(110,40),Position=UDim2.fromScale(.88,.9)},parent)
  b.Active=true;b:SetAttribute('ButtonSound',false);b:SetAttribute('ButtonHighlight',false) -- (the hit is the sound of a skip)
+ -- (R155 review: MODAL while it shows - Shift Lock and first person lock the mouse to the middle, and then nothing on the screen can be clicked; a modal button
+ -- that is visible frees it. _skip turns it on with the button's fade-in and off with its fade-out; a button that is hidden any other way - the card's fade-out
+ -- hides every button - turns it off here, and Destroy does)
+ b.Modal=false
+ b:GetPropertyChangedSignal('Visible'):Connect(function()if not b.Visible and b.Modal then b.Modal=false end end)
  new('UICorner',{CornerRadius=UDim.new(.5,0)},b)
  self.SkipStroke=new('UIStroke',{Color=WHITE,Thickness=1.5,Transparency=1,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},b)
  local text=label(b,'Label',Enum.Font.GothamBlack,WHITE,BLACK,46);text.Size=UDim2.fromScale(.74,.5);text.Position=UDim2.fromScale(.5,.5);text.Text=Card.SkipLabel
@@ -286,7 +312,12 @@ function Card:_buildSkip(parent)
  local pad=frame(b,'Gamepad B',C(226,72,72),46,{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.16,.5),Size=UDim2.fromScale(.24,.62),Visible=false})
  new('UIAspectRatioConstraint',{AspectRatio=1},pad);new('UICorner',{CornerRadius=UDim.new(.5,0)},pad)
  local pl=label(pad,'B',Enum.Font.GothamBlack,WHITE,BLACK,47);pl.Size=UDim2.fromScale(.8,.8);pl.Text='B'
- self.SkipButton,self.SkipWord,self.SkipPad,self.SkipPadText=b,text,pad,pl
+ -- (a keyboard: its Enter key on the left of the pill - R155 review: nothing said that Enter skips)
+ local key=frame(b,'Enter key',C(236,236,244),46,{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.2,.5),Size=UDim2.fromScale(.32,.6),Visible=false})
+ new('UICorner',{CornerRadius=UDim.new(.24,0)},key)
+ local kl=label(key,'Enter',Enum.Font.GothamBlack,C(34,28,56),BLACK,47);kl.Size=UDim2.fromScale(.92,.66);kl.Text=Card.EnterLabel
+ self.SkipButton,self.SkipWord,self.SkipPad,self.SkipPadText,self.SkipKey,self.SkipKeyText=b,text,pad,pl,key,kl
+ self.Input=game:GetService('UserInputService') -- (once: _skip asks it every frame)
 end
 -- (placed again whenever the screen changes size)
 function Card:_placeSkip()
@@ -299,14 +330,9 @@ function Card:_placeSkip()
   ox,oy=math.clamp(area.Min.X,0,vp.X*.25),math.clamp(area.Min.Y,0,vp.Y*.25)
   w,h=math.clamp(area.Width,vp.X*.5,vp.X-ox),math.clamp(area.Height,vp.Y*.5,vp.Y-oy)
  end
- local UIS=game:GetService('UserInputService');local touch=UIS.TouchEnabled
- local boxes={}
- local okL,Layout=pcall(require,RS:FindFirstChild('HudLayout'))
- if okL and Layout then
-  local ok2,list=pcall(function()return Layout.HudBoxes(Layout.Read(Vector2.new(w,h),touch,Layout.Controls(self.Gui)),w,h,false)end)
-  if ok2 and type(list)=='table'then boxes=list end
- end
- local x,y,bw,bh=Card.SkipRect(w,h,touch,boxes)
+ local touch=game:GetService('UserInputService').TouchEnabled
+ local okC,controls=pcall(function()return require(RS:FindFirstChild('HudLayout')).Controls(self.Gui)end) -- (a touch screen's real thumb controls)
+ local x,y,bw,bh=Card.SkipRect(w,h,touch,Card.SkipBoxes(w,h,touch,okC and controls or nil))
  b.Position=UDim2.fromOffset(ox+x,oy+y);b.Size=UDim2.fromOffset(bw,bh);self.SkipBox={X=ox+x,Y=oy+y,W=bw,H=bh}
 end
 function Card:_skip(t,tl)
@@ -314,10 +340,16 @@ function Card:_skip(t,tl)
  self:_placeSkip()
  local S=self.Set;local hit=tl.Climax or tl.Burst or 0
  local a=clamp01((t-(tl.SkipFrom or math.huge))/.25)*(1-clamp01((t-(hit-.02))/.12))
- S(b,'Visible',a>.01);S(b,'BackgroundTransparency',1-.78*a);S(self.SkipStroke,'Transparency',1-.6*a);S(self.SkipWord,'TextTransparency',1-a)
- local pad=a>.01 and game:GetService('UserInputService').GamepadEnabled==true
+ local shown=a>.01
+ S(b,'Visible',shown);if b.Modal~=shown then b.Modal=shown end -- (modal exactly while it shows: the mouse is free for it, and locked again when it goes)
+ S(b,'BackgroundTransparency',1-.78*a);S(self.SkipStroke,'Transparency',1-.6*a);S(self.SkipWord,'TextTransparency',1-a)
+ -- (a gamepad: its B; else a keyboard: its Enter key - the keys the director answers on the button's behalf)
+ local input=self.Input
+ local pad=shown and input.GamepadEnabled==true
+ local key=shown and not pad and input.KeyboardEnabled==true
  S(self.SkipPad,'Visible',pad);S(self.SkipPad,'BackgroundTransparency',1-a);S(self.SkipPadText,'TextTransparency',1-a)
- S(self.SkipWord,'Position',pad and UDim2.fromScale(.58,.5)or UDim2.fromScale(.5,.5))
+ S(self.SkipKey,'Visible',key);S(self.SkipKey,'BackgroundTransparency',1-.92*a);S(self.SkipKeyText,'TextTransparency',1-a)
+ S(self.SkipWord,'Position',pad and WORD_PAD_AT or key and WORD_KEY_AT or WORD_AT);S(self.SkipWord,'Size',key and WORD_KEY_SIZE or WORD_SIZE)
 end
 -- R154: the seed flies home (SeedCollect154.Fly): its view leaves the card, which goes on (and fades) without it. Where it is now: its centre and
 -- height in shares of the screen, its spin.
@@ -493,6 +525,6 @@ end
 function Card:Destroy()
  if self.Destroyed then return end
  self.Destroyed=true;self.Root:Destroy()
- if self.SkipButton then self.SkipButton:Destroy()end
+ if self.SkipButton then self.SkipButton.Modal=false;self.SkipButton:Destroy()end -- (the mouse lock comes back with it)
 end
 return Card

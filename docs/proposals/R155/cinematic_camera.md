@@ -102,13 +102,24 @@ covers every pack opening: the Common to Mythic cards, the Secret, Cosmic and Ki
     every HUD box (`HudLayout.HudBoxes`): the hotbar and its item details, the status / timers stack in the bottom-right corner, the
     balances, the menu hub and, on touch screens, the jump button and the thumbstick.
   - It starts in the corner. If that spot is taken it moves left (never past the middle), then up (never above 45% of the height).
+  - (R155 review) It also keeps clear of the pity bars above the hotbar (`PityBars155.Reserved`, their glow and the held bar's scale included), as one more box beside
+    the HUD's own (`Card.SkipBoxes`). The bars do not know the pill, so they never move for it. On the phones the thumb controls take the corner and the pill sat on the
+    bars' right end (844 x 390: pill 570..680 x 226..266, bars 256..588 x 250..270); it now moves up 28-32 px (844 x 390: y 194; 375 x 667: y 316, 47% of the height). On a
+    desktop or a tablet nothing moves.
   - It is 6.5% of the screen height: 34–48 px, and at least 40 px on a touch screen (a thumb's target).
-  - Where it lands: 1280×720 at (1139, 661); 1920×1080 at (1428, 884), left of the status stack; an 844×390 phone at (570, 226), above
-    the hotbar and left of the jump button. Every screen in the test list passes, including a notched phone. It is in the same place in
+  - Where it lands: 1280×720 at (1139, 661); 1920×1080 at (1428, 884), left of the status stack; an 844×390 phone at (570, 194), above
+    the hotbar and the bars and left of the jump button (before the pity bars, (570, 226)). Every screen in the test list passes, including a notched phone. It is in the same place in
     a card and in a story scene (the scene hides the hotbar, but keeps the jump button).
   - In a story scene it sits on the reveal's screen, above the full-screen button that catches the clicks.
 - **Gamepad: B and R2 press it, and so does Enter.** With a gamepad connected it shows a red "B" badge. In a story scene, Space and A
   only collect.
+- **A keyboard shows its key (R155 review).** Without a gamepad, a keyboard's pill carries a small light "Enter" key on its left (the word "SKIP ▸▸" moves right and
+  shrinks to make room: it is a pill 94-132 px wide). With both a gamepad and a keyboard the B shows. A touch screen shows neither.
+- **Shift Lock and first person can click it (R155 review).** There the mouse is locked to the middle of the screen, and nothing on it can be clicked (the clicks no longer skip,
+  so only Enter worked and nothing said so). The button is `Modal` for exactly as long as it shows: Roblox frees the mouse for a visible modal button and gives the lock
+  back when it goes. It is turned on with the fade-in and off with the fade-out (`_skip`), off the moment the button is hidden any other way (the card's fade-out screen hides
+  every button), and off in `Card:Destroy`. The test follows it through every way out of a card and a story scene (pressed and collected, aborted, the player dying, the
+  character removed, the next pack replacing it, left to run out): no visible modal button is left at the end, and none outlives its pill.
 - **Collecting is still a click or tap anywhere** (or Enter, B, R2, Space, A), but only a press that STARTS at least 0.25 s
   (`CollectAfter`) after the result is shown. A press held down from before does nothing. So does a burst of clicks from the animation.
   The next fresh press collects.
@@ -222,6 +233,10 @@ the fade in and the hit's first 0.5 s. The hit has R152's shake (35% on phones) 
       safe area is bigger than the screen, all with a gamepad: it shows from SkipFrom; one spam click per frame never skips; it stays
       inside the safe area; its B badge shows; it sits above the scene's full-screen button; pressing it goes to the hit; it is gone
       after the hit.
+    - (R155 review) a Legendary card and a Cosmic scene with a keyboard, a gamepad, both and a touch screen: modal exactly while it shows (never one frame out of step, none before
+      SkipFrom), at most one modal button, the Enter key with a keyboard, the B with a gamepad (never both), neither on touch, never over the pity bars; every way out (pressed
+      and collected, aborted, the player died, the character removed, the next pack replacing it, left to run out) leaves no visible modal button; a probe card driven by hand
+      makes no UDim2 and asks no service for the pill on 120 steady frames.
   - **2. Byte for byte against the R154 release.** R152's seed-opening fingerprints (`run_perf152.sh`, `PERF_BASE=8aa15fd`, `ONLY=seed`)
     cover every rarity on desktop, phone and low quality at 60 and 30 fps, plus an onlooker's Secret and King. With `perf155_opts.luau`, the
     only differences allowed are the Camera's CFrame, Focus and FieldOfView while a story stage is on screen, `RarePullDof`, and the
@@ -271,6 +286,6 @@ the fade in and the hit's first 0.5 s. The hit has R152's shake (35% on phones) 
 - **The SKIP button on a real phone.** On an 844×390 phone the corner belongs to the jump button, so the SKIP button sits just left of it and
   above the hotbar, at 58% of the height. Check that it is easy to reach with the right thumb. On a desktop it is in the corner, below the
   status / timers stack; on a 1920×1080 screen it sits left of that stack.
-- **"Pity bars".** No pity bar is drawn on screen in this build. The button keeps clear of every HUD box, including the bottom-right status /
-  timers stack, which is what the request seems to mean. Say if another bar is meant.
+- **"Pity bars".** The two pity bars (`pity.md`) are on the HUD above the hotbar in the merged build, and the pill keeps clear of them as well as of every other HUD box, including the
+  bottom-right status / timers stack.
 - **Gamepad.** B and R2 press the SKIP button and the button shows a red "B". Check it on a console controller in Studio.
