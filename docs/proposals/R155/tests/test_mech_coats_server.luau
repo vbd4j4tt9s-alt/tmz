@@ -411,7 +411,9 @@ do
  end
  Progress.RollCoat=realRoll
  -- a late receipt with a full Bag keeps its old behaviour: not processed yet (retried), never a lost purchase
- emptyBag(Ann);for _=1,Config.MaxSavedChests do Data:AddChest(Ann,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})end
+ -- (R155 inventory: normal grants stop at the 200 cap; a receipt grant skips it, so the Bag is filled to the 1000 saved ceiling the receipt way)
+ emptyBag(Ann);for _=1,Config.MaxSavedChests do Data:AddChest(Ann,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{Receipt=true})end
+ check(#Data:GetChestRecords(Ann)>=Config.MaxSavedChests,'(setup) the Bag is at the '..Config.MaxSavedChests..' saved ceiling ('..#Data:GetChestRecords(Ann)..')')
  local dFull=receipt(Ann,301);check(dFull==Later,'(unchanged) a late receipt with a full Bag is NotProcessedYet and retried, never refused')
  emptyBag(Ann);local dAgain,pid=receipt(Ann,301)
  check(dAgain==Granted,'... and is granted once there is room')
