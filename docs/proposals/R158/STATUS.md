@@ -15,8 +15,11 @@
 - Mech packs with a full Bag: buttons say Bag full, a press says BAG FULL! MAKE ROOM FIRST.
 - Quieter Output: tree models that can't load (not the owner's assets), the item-picture loading note.
 - DAILY: no white tile behind the mystery pack (quests and login days).
-- Pity: owner TEST packs (/test eclipse, /test verity ...) count toward pity too (real Void / Verity packs already counted as Event; test opens were left out on purpose since R155).
 
 ## Previews for the owner (not built)
 - Track walls per biome, outer track designs, base wall tops (`docs/proposals/R158/design/`).
 - PC HUD lock + MENU higher (`docs/proposals/R158/hud_lock/`).
+
+## Answered, no change
+- Void / Verity packs not moving the event pity: the owner's Darkened was started with a test command and the boots were /test boots, so those
+  were TEST opens, which R155 leaves out of the pity on purpose. Owner: "its fine no worries its ok no fixes are needed". Real packs already count.
