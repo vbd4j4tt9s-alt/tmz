@@ -151,8 +151,8 @@ end
 if after then
  relay(390,844);openWheel();relay(390,844)
  -- (the R151 sizes were 24 / 20 / 20 / 14 px: the owner asked for a bigger bubble, "about 1.5x")
- -- (R155, owner: "reposition these bubbles make them slightly smaller as they are obscuring the image": 30 / 26 / 26, out on the corner; the dots stay 21)
- check(Badge.Sizes.Count==30 and Badge.Sizes.Alert==26 and Badge.Sizes.Daily==26 and Badge.Sizes.Dot==21,'R155: the badges are INDEX count 30, MENU alert 26, DAILY 26, dots 21')
+ -- (R155, owner: "reposition these bubbles make them slightly smaller as they are obscuring the image": 30 / 26 / 24, out on the corner (DAILY out to the right only); the dots stay 21)
+ check(Badge.Sizes.Count==30 and Badge.Sizes.Alert==26 and Badge.Sizes.Daily==24 and Badge.Sizes.Dot==21,'R155: the badges are INDEX count 30, MENU alert 26, DAILY 24, dots 21')
  for _,k in ipairs({'Count','Alert','Daily'})do
   local size,o=Badge.Sizes[k],Badge.Overhang[k]
   check(size/2-o+size/2<=20 and o>=size/2-6,'R155: the '..k..' badge sits out on the corner: it covers '..(size-o)..' px of the button (at most 20), centre '..(size/2-o)..' px in')

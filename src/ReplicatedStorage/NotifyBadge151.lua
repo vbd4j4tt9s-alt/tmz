@@ -35,8 +35,11 @@ local B={Revision=151,Grow=1.5,
 -- Outer diameter (px) and overhang past the corner (px; negative = inside it) of every badge in the game. R151: 24 / 20 / 20 / 14 and 6 / 6 / 1 / -3.
 -- R155 (owner: "reposition these bubbles make them slightly smaller as they are obscuring the image"): Count 36 -> 30, Alert / Daily 30 -> 26, and they sit out on the
 -- corner (overhang 10: B.Extent 15, a px inside the 16 px Margin so nothing next to it clips it), so they cover 20 / 16 px of the button's corner instead of 27 / 31. The dot is unchanged.
-B.Sizes={Count=30,Alert=26,Daily=26,Dot=21}
+-- DAILY's button sits 4 px under the top of the screen, so its badge hangs out to the RIGHT only (B.OverhangTop 0: its top edge stays on the button's, and the pop / pulse
+-- still end on screen) and is 24 px: it covers 14 x 24 px of the corner instead of 31 x 31.
+B.Sizes={Count=30,Alert=26,Daily=24,Dot=21}
 B.Overhang={Count=10,Alert=10,Daily=10,Dot=-4}
+B.OverhangTop={Daily=0} -- px hanging past the TOP edge when it differs from the side (default: the same as Overhang)
 local pulses=setmetatable({},{__mode='k'})
 local hooked
 -- The ring is part of `size` (the holder is the OUTER diameter): 1.5 px on a dot, 2 on the 20-24 px badges.
@@ -101,21 +104,22 @@ local function build(parent,name,size)
 end
 -- Puts the badge's centre `size/2 - overhang` px inside the parent's top-right corner: `overhang` px of it hang past the top and the right (0 = fully inside).
 -- R153 client bug review (finding 7): with `left` it goes on the top-LEFT corner instead (the same distances), for a parent whose top-right holds text (the Index biome tabs' count).
-local function place(b,size,overhang,left)
- left=left==true
- if b:GetAttribute('BadgeOverhang')==overhang and b:GetAttribute('BadgeLeft')==left then return end
- local inset=size/2-overhang;b.Position=left and UDim2.new(0,inset,0,inset)or UDim2.new(1,-inset,0,inset);b:SetAttribute('BadgeOverhang',overhang);b:SetAttribute('BadgeLeft',left)
+local function place(b,size,overhang,left,top)
+ left=left==true;top=tonumber(top)or overhang
+ if b:GetAttribute('BadgeOverhang')==overhang and b:GetAttribute('BadgeOverhangTop')==top and b:GetAttribute('BadgeLeft')==left then return end
+ local inset,insetTop=size/2-overhang,size/2-top
+ b.Position=left and UDim2.new(0,inset,0,insetTop)or UDim2.new(1,-inset,0,insetTop);b:SetAttribute('BadgeOverhang',overhang);b:SetAttribute('BadgeOverhangTop',top);b:SetAttribute('BadgeLeft',left)
 end
 -- parent: the button / tab it sits on (its top-right corner); name: 'RewardBadge' / 'RewardDot' / 'IndexRewardAlert'; size: the outer diameter in px (the old badge
 -- sizes were 24, 20 and 14); overhang: px hanging past the corner (the parent's clip must have B.Extent(size,overhang) to spare; default 0 = inside);
--- left: true = the top-left corner (default: the top-right one).
+-- left: true = the top-left corner (default: the top-right one); top (R155): px past the TOP edge when it differs from the side's overhang (B.OverhangTop).
 -- Idempotent: asking again for the same name returns the same badge (and restyles it when the size changed).
-function B.Make(parent,name,size,overhang,left)
+function B.Make(parent,name,size,overhang,left,top)
  size=math.max(10,math.floor((tonumber(size)or 20)+.5));overhang=tonumber(overhang)or 0
  local b=parent:FindFirstChild(name)
  if not(b and b:GetAttribute('NotifyBadge')==B.Revision)then if b then b:Destroy()end;b=build(parent,name,size)end
  if b:GetAttribute('BadgeSize')~=size then style(b,size);b:SetAttribute('BadgeOverhang',nil)end
- place(b,size,overhang,left)
+ place(b,size,overhang,left,top)
  return b
 end
 local function stop(b)
