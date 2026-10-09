@@ -55,7 +55,7 @@ chances = [float(x) for x in re.findall(r'Chance=([0-9.]+)', cat)]
 offers = re.findall(r'\{Count=(\d+),GemPrice=(\d+),TargetRobuxPrice=(\d+)', cat)
 need(chances == [48, 26, 16, 7, 2.5, 0.5] and offers == [('1', '80', '80'), ('5', '375', '375'), ('10', '700', '700')], "the Mech odds or prices moved")
 need("ProfileVersion=22" in config.replace(' ', '') or 'ProfileVersion = 22' in config, "ProfileVersion must stay 22")
-need(re.search(r"Version\s*=\s*'V150 R154'", config) is not None, "Config.Version must stay 'V150 R154' (the owner's release number)")
+need(re.search(r"Version\s*=\s*'V150 R15[0-9a-z]*'", config) is not None, "Config.Version must be a V150 R15x release number (the release step sets it)")
 # 3. the disclosure line: one source, read from the world table; shown on the card, the hold tooltip and /test mechshop
 need("function C.CoatLine()" in cat and "SeedPackRules" in cat and "M.Gold.Weight" in cat and "M.Diamond.Weight" in cat, "MechCatalog.CoatLine must read the world coat weights")
 need('4.5' not in cat.split('function C.CoatLine()')[1].split('\nend')[0], "CoatLine must not hard-code the numbers")

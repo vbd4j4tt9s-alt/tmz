@@ -36,8 +36,8 @@ if [ -n "$ID" ] && [ "$ID" != 0 ];then
  COPIES=$(grep -rIlw "$ID" "$REPO/src" "$REPO/docs" "$REPO/tools" "$REPO/installers" 2>/dev/null | grep -v "^$CATALOG$" | grep -vE "/docs/releases/|/docs/HANDOFF" || true) # (R154: the release notes and the handoff name it for the owner's publish checklist; code never copies it)
  [ -z "$COPIES" ] && echo "ok: the pass id ($ID) is in exactly one place: the DefaultId of the Clover row in GamePassCatalog.lua" || { fail "the pass id is copied outside the catalog:";echo "$COPIES"; }
 fi
-V=$(grep -c "Config.Version='V150 R154';Config.ProfileVersion=22" "$S/ServerScriptService/ChestChaseServer/Config.lua")
-[ "$V" = 1 ] && echo "ok: Config.Version is 'V150 R154' and ProfileVersion 22" || fail "Config.Version / ProfileVersion changed"
+V=$(grep -c "Config.Version='V150 R155';Config.ProfileVersion=22" "$S/ServerScriptService/ChestChaseServer/Config.lua")
+[ "$V" = 1 ] && echo "ok: Config.Version is 'V150 R155' and ProfileVersion 22" || fail "Config.Version / ProfileVersion changed"
 for p in CloverIcon153 CloverPassImage153;do grep -q "ReplicatedStorage/$p	" "$S/MANIFEST.tsv" || fail "$p is not in src/MANIFEST.tsv";done;echo "ok: the 2 new modules are in src/MANIFEST.tsv"
 sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 && echo "ok: the R152 load guard is still line 1 of every client script ($(tail -1 "$OUT/guard.log"))" || { fail "the load guard test fails";tail -5 "$OUT/guard.log"; }
 BYTES=$(wc -c < "$S/ReplicatedStorage/CloverPassImage153.lua");[ "$BYTES" -lt 20480 ] && echo "ok: the picture module is $BYTES bytes (under 20 KB)" || fail "the picture module is $BYTES bytes"
