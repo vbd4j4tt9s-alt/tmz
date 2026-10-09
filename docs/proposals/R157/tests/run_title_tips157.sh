@@ -63,8 +63,8 @@ grep -q "WaitForChild('TitleScreen104',20)" "$F" || fail "TitleScreen.client.lua
 grep -q "game:IsLoaded\|game.Loaded" "$F" && fail "TitleScreen.client.lua must not wait for game.Loaded"
 echo "ok: TitleScreen.client.lua (ReplicatedFirst) has no load guard and waits for its module with WaitForChild(20), as it did"
 sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 && echo "ok: $(tail -2 "$OUT/guard.log" | head -1)" || { fail "the R152 load guard test fails";tail -5 "$OUT/guard.log"; }
-sed -n 6p "$T/run_all_suites.sh" | grep -q "docs/proposals/R157/tests/run_title_tips157.sh; do$" || fail "run_title_tips157.sh is not at the end of line 6 of tools/tests/run_all_suites.sh"
-echo "ok: registered at the end of line 6 of run_all_suites.sh"
+sed -n 6p "$T/run_all_suites.sh" | grep -q " docs/proposals/R157/tests/run_title_tips157.sh[; ]" || fail "run_title_tips157.sh is not on line 6 of tools/tests/run_all_suites.sh"
+echo "ok: registered on line 6 of run_all_suites.sh"
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|\b(op[u]s|sonn[e]t|haik[u]|gemin[i]|llam[a])\b|gp[t]-?[0-9]" "$HERE" "$P/R157/title_tips157.md" "$P/R157/preview" "$TS" "$TIPS" 2>/dev/null | grep -q .;then fail "a model name in the files of this round";else echo "ok: no model names in the files of this round";fi
 # the test ----------------------------------------------------------------------------------------------------------------------------------------
 build(){ # dir [TitleScreen104 file] [TitleTips156 file]

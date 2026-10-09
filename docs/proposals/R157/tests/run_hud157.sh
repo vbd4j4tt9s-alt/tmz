@@ -26,7 +26,9 @@ head -2 "$C/Hotbar.client.lua" > "$OUT/hb_now.txt";git -C "$REPO" show "$BASE:sr
 cmp -s "$OUT/hb_now.txt" "$OUT/hb_base.txt" && echo "ok: Hotbar's lines 1 / 2 (the load guards) are as they were" || fail "Hotbar's lines 1 / 2 changed"
 n=0
 for f in $(git -C "$REPO" diff --name-only "$BASE" -- 'src/StarterPlayer/StarterPlayerScripts/*.client.lua');do
- n=$((n+1));[ "$(head -1 "$REPO/$f")" = "$(git -C "$REPO" show "$BASE:$f" | head -1)" ] || fail "$f: line 1 (the load guard) changed"
+ n=$((n+1))
+ if git -C "$REPO" cat-file -e "$BASE:$f" 2>/dev/null;then [ "$(head -1 "$REPO/$f")" = "$(git -C "$REPO" show "$BASE:$f" | head -1)" ] || fail "$f: line 1 (the load guard) changed"
+ else head -1 "$REPO/$f" | grep -q "^do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end" || fail "$f (new in R157): line 1 is not the R152 load guard";fi
 done
 echo "ok: line 1 of the $n changed client scripts is unchanged (the load guard)"
 for f in src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua src/ReplicatedStorage/BiomeMood.lua src/ServerScriptService/ChestChaseServer/Config.lua src/ReplicatedStorage/TitleScreen104.lua \
