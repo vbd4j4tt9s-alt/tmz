@@ -1,0 +1,134 @@
+{
+ "note": "Cameras for the R154 hub tidy sheet (render_cloudy.mjs + cloudy.html; world studs, the track runs to +Z, hub floor top y = 4). aerial / plaza / corner are drawn before and after under a Clear sky, plaza / street before and after under a Cloudy sky. avatars: [x, y, z, yaw, shirt colour].",
+ "views": [
+  {
+   "name": "aerial",
+   "title": "From above (the festival square between the bases: market, Verity, the lawns)",
+   "fov": 62,
+   "pos": [
+    0,
+    190,
+    -96
+   ],
+   "look": [
+    0,
+    0,
+    -300
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -300
+   ],
+   "shadowExtent": 380,
+   "fogNear": 900,
+   "fogFar": 2600
+  },
+  {
+   "name": "plaza",
+   "title": "From the plaza (the market ahead, the west lawn's bed and bench, lamps and flags)",
+   "fov": 66,
+   "pos": [
+    -62,
+    13,
+    -150
+   ],
+   "look": [
+    2,
+    5,
+    -262
+   ],
+   "avatars": [
+    [
+     -50,
+     4.2,
+     -178,
+     0.5,
+     13775418
+    ]
+   ],
+   "shadowAt": [
+    -40,
+    4,
+    -230
+   ],
+   "shadowExtent": 260,
+   "fogNear": 700,
+   "fogFar": 2000
+  },
+  {
+   "name": "corner",
+   "title": "The east lawn at the avenue (a bed, a bench, a lamp, pebbles along the street)",
+   "fov": 64,
+   "pos": [
+    18,
+    11,
+    -222
+   ],
+   "look": [
+    72,
+    4,
+    -196
+   ],
+   "avatars": [
+    [
+     48,
+     4.2,
+     -206,
+     3.3,
+     4285074
+    ]
+   ],
+   "shadowAt": [
+    60,
+    4,
+    -200
+   ],
+   "shadowExtent": 150,
+   "fogNear": 700,
+   "fogFar": 2000
+  },
+  {
+   "name": "street",
+   "title": "Down the west side street at dusk: the lamps along it",
+   "fov": 64,
+   "pos": [
+    -119,
+    10,
+    -172
+   ],
+   "look": [
+    -117,
+    9,
+    -340
+   ],
+   "avatars": [
+    [
+     -121,
+     4.2,
+     -198,
+     3.1,
+     2976360
+    ]
+   ],
+   "shadowAt": [
+    -110,
+    4,
+    -260
+   ],
+   "shadowExtent": 260,
+   "fogNear": 700,
+   "fogFar": 2000
+  }
+ ],
+ "plan": {
+  "ortho": [
+   0,
+   -361,
+   350,
+   275
+  ],
+  "w": 1400,
+  "h": 1100
+ }
+}

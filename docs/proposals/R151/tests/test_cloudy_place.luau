@@ -1,7 +1,7 @@
 --!nocheck
 -- R151 Cloudy sky, part 4: the lanterns on the OWNER'S PLACE (place_tree.luau from docs/proposals/R149/tools/rbxl_geom.py) in the R149 Roblox mock, after the
 -- real start-up builders: the real MapService.new (MarketLayout with its tagged warm lights, HubDecor151), the real HubLife151.client + HubLifeArt151
--- (26 lamps, 8 with real lights, 14 wall lanterns) and the real sky state. Which lamps and lanterns light up, tier by tier, and that the market's warm
+-- (R154 tidy: 12 lamps with 16 heads, 8 of them with real lights, 14 wall lanterns) and the real sky state. Which lamps and lanterns light up, tier by tier, and that the market's warm
 -- lights are found by their tag.
 local Z=require('./zfight_world');local W=Z.W;local R=Z.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local RS=W.RS
@@ -89,7 +89,7 @@ RS:SetAttribute('GlobalWeather','Clear')
 for _,tier in ipairs({3,2,1})do
  budget.Tier=tier;sky('Clear',R.clock-300,30,1)
  local api,sc=load();local ctx=api.State.Ctx
- check('tier '..tier..': the square builds with 26 lamps (30 neon heads), 8 lit lamps'..(tier>=2 and' and 14 wall lanterns'or''),ctx~=nil and #ctx.Heads==30 and #ctx.Lights==8 and #ctx.Lanterns==(tier>=2 and 14 or 0),ctx and(#ctx.Heads..'/'..#ctx.Lights..'/'..#ctx.Lanterns))
+ check('tier '..tier..': the square builds with 12 lamps (16 neon heads), 8 lit lamps'..(tier>=2 and' and 14 wall lanterns'or''),ctx~=nil and #ctx.Heads==16 and #ctx.Lights==8 and #ctx.Lanterns==(tier>=2 and 14 or 0),ctx and(#ctx.Heads..'/'..#ctx.Lights..'/'..#ctx.Lanterns))
  local base={};for _,p in ipairs(ctx.Heads)do base[p]=p.Color end;for _,p in ipairs(ctx.Lanterns)do base[p]=p.Color end
  check('tier '..tier..': Clear: no light on, every colour its own',lit(ctx)==0)
  sky('Cloudy',R.clock-300,30,0);api.Tick(.5);R.advance(.5);api.Tick(.5)
@@ -97,7 +97,7 @@ for _,tier in ipairs({3,2,1})do
  check('tier '..tier..': Cloudy: '..want..' of the 8 lamp lights on (the tier\'s cap)',lit(ctx)==want,lit(ctx))
  local warmer=0;local total=0
  for p,c in pairs(base)do total+=1;if warmth(p.Color)<warmth(c)-.05 then warmer+=1 end end
- check('tier '..tier..': all '..total..' lamp heads and wall lanterns glow warm',warmer==total and total==30+(tier>=2 and 14 or 0),warmer..'/'..total)
+ check('tier '..tier..': all '..total..' lamp heads and wall lanterns glow warm',warmer==total and total==16+(tier>=2 and 14 or 0),warmer..'/'..total)
  -- which lamps
  if tier==2 then
   local pos={};for i,l in ipairs(ctx.Lights)do if l.Enabled then pos[#pos+1]=string.format('(%.0f,%.0f)',ctx.LightAt[l][1],ctx.LightAt[l][2])end end

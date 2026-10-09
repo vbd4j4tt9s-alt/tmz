@@ -94,32 +94,41 @@ local function restoreExpandedHub(map)
  if floor then floor.Size-=Vector3.new(amount*2,0,amount);floor.CFrame=CFrame.new(0,0,amount/2)*floor.CFrame end
  map:SetAttribute('GardenLayout32',nil);map:SetAttribute('GardenDesign34',nil)
 end
--- R153 (owner: "at some points like the side of the garden bed players have to jump to pass it"). The wooden bed borders are walk-through
--- (WalkthroughProps90), but the soil beds are not: they stand 0.8 over the pad, and the rear bed 1.8 over the hub floor (it is flush with the pad's
--- three outer edges). The game's own runner sweep (RunnerSweep.Hull) steps over anything within 1.1 studs of the feet, so those 1.8 faces stopped a
--- runner until they jumped. Fix: every exposed soil face gets an invisible low ramp (a wedge from the outside surface up to the soil top, 2.5 studs of
--- run per stud of rise: a 22 degree slope). The soil itself, the borders, the plants and the planting frames are untouched. A ramp is a floor like the
--- pad and the soil (solid and queryable, so the Humanoid and the runner sweep both treat it as ground; not touchable), invisible, and lies wholly under
--- the soil's plane: a ray that ends on soil or on a plant (planting's "KEEP A CLEAR VIEW OF THE SOIL" check, digging, inspection) comes from above that
--- plane and never crosses one. They stand in Workspace.ChestChaseMap.GardenBedRamps153 (not under a base: WalkthroughProps90 would make them walk-through).
+-- R153 (owner: "at some points like the side of the garden bed players have to jump to pass it"; then "these garden sides also have not been fixed and players cant
+-- walk over them"). Every step the soil makes is a ledge to the Humanoid: the beds stand 0.8 over the pad (and the rim 1.0 over the hub floor, the rear bed
+-- 1.8 over the floor: it is flush with the pad's three outer edges). The first R153 ramps only covered what stopped the runner sweep's hull (RunnerSweep.Hull
+-- steps over 1.1 studs) and skipped the pad's 1.0-stud aprons beside the rows, so the 0.8 step to the soil stayed exactly where the fence stands: a player on the
+-- apron could not walk onto the bed. Now the whole walkable skirt around every raised block (each soil bed AND the pad itself) is one continuous 22 degree slope
+-- (2.5 studs of run per stud of rise): a wedge along every exposed face and a fan of 8 wedges at every convex corner (a cone, so a diagonal approach climbs too;
+-- a straight wedge would end in a cliff beside the wall). The skirt is the soil's top minus 0.4 per stud of distance from the soil, on top of the pad and the
+-- floor, so across a 1.0 apron and over the pad's rim it is one slope from the hub floor to the soil. The soil, the borders, the fence (walk-through, never
+-- touched), the plants and the planting frames are untouched. A ramp is a floor like the pad and the soil (solid and queryable, so the Humanoid and the runner
+-- sweep both treat it as ground; not touchable), invisible, and lies wholly under the soil's plane: a ray that ends on soil or on a plant (planting's "KEEP A
+-- CLEAR VIEW OF THE SOIL" check, digging, inspection) comes from above that plane and never crosses one. They stand in Workspace.ChestChaseMap.GardenBedRamps153
+-- (not under a base: WalkthroughProps90 would make them walk-through).
 L.RampFolder='GardenBedRamps153'
-L.Ramp={Slope=2.5,PadRun=2,MinLength=1.2,MinRise=.15,MinRun=1.5,RimMargin=1.2}
+L.Ramp={Slope=2.5,MinLength=.5,MinRise=.15,Blades=6,Overlap=1.15}
 -- The ramps of one base, as {Name, Cf (world), Size} (pure: reads the pad and the plots).
 function L.RampSpecs(base)
  local pad=base:FindFirstChild('Pad');local plots=base:FindFirstChild('GardenPlots');local out={}
  if not pad or not plots or not pad:IsA('BasePart')then return out end
  local cf=pad.CFrame;local hx,hy,hz=pad.Size.X/2,pad.Size.Y/2,pad.Size.Z/2;local R=L.Ramp
- local rects,faces={},{}
+ local floorY=-hy -- (local y of the hub floor under the pad)
+ local soil={}
  for _,plot in ipairs(plots:GetChildren())do if plot:IsA('BasePart')and plot.CanCollide then
   local at=cf:PointToObjectSpace(plot.Position)
-  table.insert(rects,{X0=rounded(at.X-plot.Size.X/2),X1=rounded(at.X+plot.Size.X/2),Z0=rounded(at.Z-plot.Size.Z/2),Z1=rounded(at.Z+plot.Size.Z/2),Top=rounded(at.Y+plot.Size.Y/2),Name=plot.Name})
+  table.insert(soil,{X0=rounded(at.X-plot.Size.X/2),X1=rounded(at.X+plot.Size.X/2),Z0=rounded(at.Z-plot.Size.Z/2),Z1=rounded(at.Z+plot.Size.Z/2),Top=rounded(at.Y+plot.Size.Y/2),Name=plot.Name})
  end end
+ local padRect={X0=-hx,X1=hx,Z0=-hz,Z1=hz,Top=hy,Name='Pad',Pad=true}
+ local rects={padRect};for _,r in ipairs(soil)do table.insert(rects,r)end
+ local faces={}
  for _,r in ipairs(rects)do
+  local rise=r.Top-floorY
   -- the four sides: axis (1 = X, 2 = Z), outward sign, the face's coordinate and its span along the other axis
   for _,side in ipairs({{1,-1,r.X0,r.Z0,r.Z1},{1,1,r.X1,r.Z0,r.Z1},{2,-1,r.Z0,r.X0,r.X1},{2,1,r.Z1,r.X0,r.X1}})do
    local axis,sign,c,a,b=side[1],side[2],side[3],side[4],side[5]
    local spans={{a,b}}
-   for _,q in ipairs(rects)do if q~=r then -- a neighbour covering the face (touching it from outside) hides that part of it
+   for _,q in ipairs(soil)do if q~=r then -- a bed covering the face (touching it from outside, or flush with the pad's rim) hides that part of it
     local lo,hi,qa,qb=q.X0,q.X1,q.Z0,q.Z1;if axis==2 then lo,hi,qa,qb=q.Z0,q.Z1,q.X0,q.X1 end
     if lo-.02<=c and c<=hi+.02 then
      local nextSpans={}
@@ -133,18 +142,9 @@ function L.RampSpecs(base)
      spans=nextSpans
     end
    end end
-   for _,s in ipairs(spans)do if s[2]-s[1]>=R.MinLength then
-    local mid=(s[1]+s[2])/2
-    local px,pz=c+sign*.05,mid;if axis==2 then px,pz=mid,c+sign*.05 end
-    local inPad=math.abs(px)<hx-.02 and math.abs(pz)<hz-.02
-    local ground=inPad and hy or -hy -- (local y of the surface just outside the face: the pad's top, or the hub floor under the pad)
-    local rise=r.Top-ground
-    if rise>=R.MinRise then
-     local half=axis==1 and hx or hz
-     local run=inPad and math.min(R.PadRun,sign>0 and half-c or c+half)or rise*R.Slope
-     if run>=R.MinRun then table.insert(faces,{Axis=axis,Sign=sign,C=c,A=s[1],B=s[2],Ground=ground,Rise=rise,Run=run,OnPad=inPad})end
-    end
-   end end
+   if rise>=R.MinRise then for _,s in ipairs(spans)do if s[2]-s[1]>=R.MinLength then
+    table.insert(faces,{Axis=axis,Sign=sign,C=c,A=s[1],B=s[2],Rise=rise,Run=rise*R.Slope,Pad=r.Pad})
+   end end end
   end
  end
  -- neighbouring faces on one line (a row of beds) become one ramp
@@ -158,19 +158,47 @@ function L.RampSpecs(base)
   if last and last.Axis==f.Axis and last.Sign==f.Sign and math.abs(last.C-f.C)<=.02 and math.abs(last.Rise-f.Rise)<.01 and f.A<=last.B+.02 then last.B=math.max(last.B,f.B)
   else table.insert(merged,table.clone(f))end
  end
+ local up=Vector3.new(0,1,0)
  for i,f in ipairs(merged)do
-  local axis,sign,c,run,rise,ground=f.Axis,f.Sign,f.C,f.Run,f.Rise,f.Ground
-  -- the ramp runs `run` past each end of its face (mitred with its neighbour's at a corner: no uncovered diagonal); on the pad it stops RimMargin
-  -- short of the pad's rim, so the rim's own 1.0 step and the ramp's height never add up
-  local s0,s1=f.A-run,f.B+run
-  if f.OnPad then local along=(axis==1 and hz or hx)-R.RimMargin;s0,s1=math.max(s0,-along),math.min(s1,along)end
-  local len,mid=s1-s0,(s0+s1)/2;local d=run+.02 -- (.02 under the soil: no seam at the top)
+  local axis,sign,c,run,rise=f.Axis,f.Sign,f.C,f.Run,f.Rise
+  local len,mid=f.B-f.A,(f.A+f.B)/2;local d=run+.02 -- (.02 under the soil: no seam at the top)
   local centre=c+sign*(run/2-.01)
-  local pos=axis==1 and Vector3.new(centre,ground+rise/2,mid)or Vector3.new(mid,ground+rise/2,centre)
+  local pos=axis==1 and Vector3.new(centre,floorY+rise/2,mid)or Vector3.new(mid,floorY+rise/2,centre)
   local back=axis==1 and Vector3.new(-sign,0,0)or Vector3.new(0,0,-sign) -- the tall end points at the soil
-  local up=Vector3.new(0,1,0);local right=up:Cross(back)
-  table.insert(out,{Name='Bed ramp '..(axis==1 and'X'or'Z')..(sign>0 and'+'or'-')..' '..i,Cf=cf*CFrame.fromMatrix(pos,right,up,back),Size=Vector3.new(len,rise,d),Rise=rise,Run=run,OnPad=f.OnPad})
+  table.insert(out,{Name=(f.Pad and'Pad ramp 'or'Bed ramp ')..(axis==1 and'X'or'Z')..(sign>0 and'+'or'-')..' '..i,Cf=cf*CFrame.fromMatrix(pos,up:Cross(back),up,back),Size=Vector3.new(len,rise,d),Rise=rise,Run=run,Face=true})
  end
+ -- a convex corner (the block in exactly one of the four quadrants round it): a fan of wedges over the free quadrant, each rising toward the corner
+ local seen={}
+ local function solid(list,x,z)for _,q in ipairs(list)do if x>q.X0+.001 and x<q.X1-.001 and z>q.Z0+.001 and z<q.Z1-.001 then return true end end return false end
+ local function corners(list,r)
+  local rise=r.Top-floorY;local run=rise*R.Slope
+  if rise<R.MinRise then return end
+  for _,sx in ipairs({-1,1})do for _,sz in ipairs({-1,1})do
+   local px,pz=sx<0 and r.X0 or r.X1,sz<0 and r.Z0 or r.Z1 -- (the free quadrant is the one on the (sx, sz) side)
+   local n=0
+   for _,qx in ipairs({-1,1})do for _,qz in ipairs({-1,1})do if solid(list,px+qx*.05,pz+qz*.05)then n+=1 end end end
+   local key=string.format('%.2f,%.2f,%d,%d',px,pz,sx,sz)
+   if n==1 and not seen[key]then
+    seen[key]=true
+    for k=0,R.Blades-1 do
+     local th=(k+.5)*math.pi/2/R.Blades;local dx,dz=sx*math.cos(th),sz*math.sin(th)
+     local wide=2*run*math.tan(math.pi/4/R.Blades)*R.Overlap
+     local back=Vector3.new(-dx,0,-dz)
+     table.insert(out,{Name=(r.Pad and'Pad corner 'or'Bed corner ')..#out,Cf=cf*CFrame.fromMatrix(Vector3.new(px+dx*(run/2-.01),floorY+rise/2,pz+dz*(run/2-.01)),up:Cross(back),up,back),
+      Size=Vector3.new(wide,rise,run+.02),Rise=rise,Run=run,Corner=true})
+    end
+   end
+  end end
+ end
+ for _,r in ipairs(soil)do corners(soil,r)end
+ -- (a pad corner a bed already stands in is the bed's: the taller skirt covers it)
+ for _,r in ipairs(rects)do if r.Pad then
+  for _,sx in ipairs({-1,1})do for _,sz in ipairs({-1,1})do
+   local px,pz=sx<0 and r.X0 or r.X1,sz<0 and r.Z0 or r.Z1
+   for _,q in ipairs(soil)do if math.abs((sx<0 and q.X0 or q.X1)-px)<.02 and math.abs((sz<0 and q.Z0 or q.Z1)-pz)<.02 then seen[string.format('%.2f,%.2f,%d,%d',px,pz,sx,sz)]=true end end
+  end end
+  corners({r},r)
+ end end
  return out
 end
 function L.Ramps(map)

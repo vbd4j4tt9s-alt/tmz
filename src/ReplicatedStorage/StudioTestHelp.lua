@@ -112,7 +112,7 @@ return {
  {'/test voidcheck','Check the Void Pack odds add up. Grants nothing.'},
  {'/test collisions','server: Re-apply walk-through decorations.'},
  {'/test hubtrees','server: R151 hub trees: how each studded tree model loaded (by id or placed by hand), scripts removed, part counts, which trees each device tier uses.'},
- {'/test trampoline','server: R153 the garden-nook trampolines: which look they have (the asset 12088629887, a model you dropped into ReplicatedStorage.HubTrampolineTemplates153, or the built one), why the others were not used ("not authorized" = Get Model with the game owner\'s account), parts, scripts removed. trampoline reload tries again.'},
+ {'/test trampoline','server: R153 the three nook trampolines (two garden nooks and the back lane nook): which look they have (the asset 12088629887, a model you dropped into ReplicatedStorage.HubTrampolineTemplates153, or the built one), why the others were not used ("not authorized" = Get Model with the game owner\'s account), parts, scripts removed. trampoline reload tries again.'},
  {'/test perf','Toggle the performance display.'},
  {'/test hotbar','R153: hotbar log on / off: every press, what it did (equip, unequip, move, ignored) and anything the server moved back, with times, top-left and in F9. Paste it if a press goes missing. Also prints the packs the server held late or refused.'},
  {'/test effects low','Plant effects: normal, low or off.'},

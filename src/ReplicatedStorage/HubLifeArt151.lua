@@ -301,6 +301,9 @@ end
 -- Lamps: post / double / bollard variants; 'lit' ones carry a PointLight the client turns on in the dark.
 -- R151 Cloudy (WeatherCycle151): every lamp head (ctx.Heads: all 30 neon lanterns, at every device tier) and every wall lantern (ctx.Lanterns) warms its colour
 -- with the sky; the lit lamps' real lights (ctx.Lights, in priority order, see A.OrderLights) switch on for it within the tier's cap.
+-- R154 (owner, with the tidy's fewer lamps: "make each lamp brighter in its warmth"): a lit lamp's real light, before and after (it was Range 22, Brightness 1.4). HubLife151.client
+-- takes it further under Cloudy and in the dark (WeatherCycle151.Lamps.Boost: x1.5 brightness and x1.3 range at full glow, the colour warming toward amber).
+A.LampLight={Range=28,Brightness=1.8}
 function A.Lamp(ctx,x,z,kind,lit,yaw)
  local metal,trim=P.Metal,P.Gold
  if kind=='bollard'then
@@ -325,7 +328,7 @@ function A.Lamp(ctx,x,z,kind,lit,yaw)
   for _,sx in ipairs({-1,1})do lantern(CF(x,FLOOR+11,z)*turn*CF(sx*2.5,0,0))end
  else lantern(CF(x,FLOOR+13,z))end
  if lit then for _,g in ipairs(glows)do
-  local l=Instance.new('PointLight');l.Name='HubLampLight';l.Color=RGB(255,214,150);l.Range=22;l.Brightness=1.4;l.Shadows=false;l.Enabled=false;l.Parent=g
+  local l=Instance.new('PointLight');l.Name='HubLampLight';l.Color=RGB(255,214,150);l.Range=A.LampLight.Range;l.Brightness=A.LampLight.Brightness;l.Shadows=false;l.Enabled=false;l.Parent=g
   table.insert(ctx.Lights,l);ctx.LightAt[l]={x,z};break
  end end
  return glows[1]
@@ -431,7 +434,7 @@ end
 -- The square's layout --------------------------------------------------------------------------------------------------------------------------
 -- (positions avoid the streets, bases, run-up, market, Verity and the reserved corners: tests check every one with A.Clear; a 4th
 -- topiary field true = a pot standing on the market square's paving by design)
-A.Layout={
+A.Full={ -- (R154: everything the square had; A.Layout, below, is what is built after the tidy)
  trees={
   -- R152 (owner: "reduce the amount of trees"): 24 of the 62 stay. They frame the square - the front corners by the gate, the lawns' outer
   -- edges, the market's sides, the south corners, the garden alleys' ends, the snow lane's far end; the middle, the streets and the
@@ -451,7 +454,7 @@ A.Layout={
   {230,-248,'desert'},{280,-288,'desert'},{-230,-249,'ember'},{-280,-289,'ember'},
  },
  beds={{60,-196,5.5,'warm'},{-60,-196,5.5,'cool'},{36,-250,3.5,'warm',4.2},{-36,-250,3.5,'cool',4.2},{36,-300,3.5,'cool',4.2},{-36,-300,3.5,'warm',4.2},
-  {118,-159,4,'warm',4.26},{-118,-159,4,'cool',4.26},{118,-411,4,'cool',4.26},{-118,-411,4,'warm',4.26},{0,-596,3.5,'snow',4.26}}, -- (R153: the two garden nooks' beds went with their benches: a trampoline stands there)
+  {118,-159,4,'warm',4.26},{-118,-159,4,'cool',4.26},{118,-411,4,'cool',4.26},{-118,-411,4,'warm',4.26}}, -- (R153: the three nooks' beds went with their benches: a trampoline fills each brick circle)
  topiary={{49,-236,'cone',true},{-49,-236,'cone',true},{49,-308,'ball',true},{-49,-308,'ball',true},{16,-170,'ball'},{-16,-170,'ball'},{322,-284,'cone'},{-322,-284,'cone'}},
  lamps={
   {106,-190,'post'},{106,-240,'post',true},{106,-290,'post'},{106,-340,'post',true},{106,-390,'post'},
@@ -461,8 +464,8 @@ A.Layout={
   {30,-400,'post'},{-30,-400,'post'},{140,-257,'post'},{-140,-257,'post'},
   {200,-279,'bollard'},{260,-259,'bollard'},{-200,-279,'bollard'},{-260,-259,'bollard'},
  },
- benches={ -- (R152: the four benches round the fountain are gone with it; R153: so are the two pairs at the garden nooks, where the trampolines stand)
-  {75,-200,math.pi/2,'wood'},{-75,-200,-math.pi/2,'wood'},{44,-275,math.pi/2,'garden'},{-44,-275,-math.pi/2,'garden'},{0,-588,math.pi,'stone'}},
+ benches={ -- (R152: the four benches round the fountain are gone with it; R153: so are the two pairs at the garden nooks and the stone one at the lane nook, where the trampolines stand)
+  {75,-200,math.pi/2,'wood'},{-75,-200,-math.pi/2,'wood'},{44,-275,math.pi/2,'garden'},{-44,-275,-math.pi/2,'garden'}},
  bunting={{{-15.4,17.4,-200},{15.4,17.4,-228},'rainbow'},{{15.4,17.4,-200},{-15.4,17.4,-228},'rainbow'},
   {{55,17.4,-236},{22,23,-250},'candy'},{{-55,17.4,-236},{-22,23,-250},'candy'},{{55,17.4,-308},{22,23,-287},'candy'},{{-55,17.4,-308},{-22,23,-287},'candy'}},
  patches={ -- x, z, r, shade (1 light, 2 deep, 3 sand, 4 ash), height layer (1 = 4.07, 2 = 4.12)
@@ -471,6 +474,56 @@ A.Layout={
  },
  butterflies={{60,8,-196},{-60,9,-198},{36,7,-252},{-36,8,-300},{118,8,-161},{-118,7,-409},{70,8,-382},{-70,9,-376},{312,8,-266},{-312,8,-272},{0,7,-592},{90,9,-240}},
 }
+
+-- R154 TIDY (owner: "reduce the amount of props in the base area like reduce the amount of lamps and to remove the soil beds and benches beside it just leave those parts
+-- empty. basically just tidy up the base area"; then "the bushes and flags can stay"). ONE table says what the square keeps; flip a value to bring a kind back (A.Full has
+-- all of it, A.Layout is A.Full through this table, and the whole build, the clearance tests and the lights follow A.Layout):
+--   Beds     the round flower beds (white rim, black soil, orange / pink flowers): 10 on the lawns and round the market, none now (the trampoline nooks have none either)
+--   Benches  the 4 benches beside them: none now
+--   Pebbles  the scattered pebbles along the side streets and the garden walks (40 balls): gone
+--   Lamps    the lamp posts kept, by their x, z in A.Full.lamps: 12 of 26, evenly spaced along the streets and round the market (all 8 that carry a real light, and the 4
+--            that hold the bunting up); true keeps all 26. A lamp's bunting goes with it unless re-hung (BuntingExtra)
+--   everything else the square had stays (trees, bushes, topiary, bunting, grass patches, verges, wall lanterns, butterflies)
+A.Tidy={
+ Beds=false,Benches=false,Pebbles=false,
+ Lamps={
+  {106,-240},{106,-340},{-106,-240},{-106,-340}, -- the side streets (both lit; the old 5 per street were 50 studs apart, these are 100)
+  {15.4,-200},{-15.4,-200},                      -- the avenue's mouth (lit); its two lower posts are gone
+  {55,-236},{-55,-236},{55,-308},{-55,-308},     -- the market's four corner doubles (the first pair lit); they hold the candy bunting
+  {140,-257},{-140,-257},                        -- the garden walks' first posts
+ },
+ BuntingExtra={{{-15.4,17.4,-200},{15.4,17.4,-200},'rainbow'}}, -- (the avenue's two crossing strings lost their lower posts: one string now joins the two that stay)
+}
+local function lampAt(l,x,z)return math.abs(l[1]-x)<.01 and math.abs(l[2]-z)<.01 end
+-- A layout from the full one through a tidy table (pure).
+function A.Filter(full,tidy)
+ local out={}
+ for k,v in pairs(full)do out[k]=v end
+ if tidy.Beds==false then out.beds={} end
+ if tidy.Benches==false then out.benches={} end
+ local keptLamp=function(x,z)
+  if tidy.Lamps==true or tidy.Lamps==nil then return true end
+  for _,k in ipairs(tidy.Lamps)do if lampAt(k,x,z)then return true end end
+  return false
+ end
+ if tidy.Lamps~=true and tidy.Lamps~=nil then
+  out.lamps={};for _,l in ipairs(full.lamps)do if keptLamp(l[1],l[2])then out.lamps[#out.lamps+1]=l end end
+  -- a string of bunting hangs between two lamps: one whose end stood on a lamp that went is dropped
+  local function hungFrom(e)for _,l in ipairs(full.lamps)do if lampAt(l,e[1],e[3])then return l end end;return nil end
+  out.bunting={}
+  for _,b in ipairs(full.bunting)do
+   local ok=true
+   for _,e in ipairs({b[1],b[2]})do local l=hungFrom(e);if l and not keptLamp(l[1],l[2])then ok=false end end
+   if ok then out.bunting[#out.bunting+1]=b end
+  end
+  for _,b in ipairs(tidy.BuntingExtra or{})do out.bunting[#out.bunting+1]=b end
+ end
+ return out
+end
+A.Layout=A.Filter(A.Full,A.Tidy)
+-- (tests and the owner: A.SetTidy(table) rebuilds A.Layout; nil puts the shipped table back)
+local shipped=A.Tidy
+function A.SetTidy(t)A.Tidy=t or shipped;A.Layout=A.Filter(A.Full,A.Tidy);return A.Layout end
 A.LayoutFns={}
 -- The tree slots in layout order (HubStudTrees151.Plan fills the leafy ones with the owner's models in this order).
 function A.TreeSlots()
@@ -517,11 +570,11 @@ function A.Build(root,tier,bases,templates)
  for _,b in ipairs(L.benches)do A.Bench(ctx,b[1],b[2],b[3],b[4])end
  for _,b in ipairs(L.bunting)do A.Bunting(ctx,V(b[1][1],b[1][2],b[1][3]),V(b[2][1],b[2][2],b[2][3]),BUNTING[b[3]])end
  for _,p in ipairs(L.patches)do A.Patch(ctx,p[1],p[2],p[3],PATCH_COLOURS[p[4]],p[5]==1 and 4.07 or 4.12)end
- -- pebbles along the outer edges of the side streets and the garden walks
- for _,sx in ipairs({-1,1})do
+ -- pebbles along the outer edges of the side streets and the garden walks (R154 tidy: gone unless A.Tidy.Pebbles)
+ if A.Tidy.Pebbles~=false then for _,sx in ipairs({-1,1})do
   for _,z in ipairs({-222,-320,-386})do A.Pebbles(ctx,sx*131,z,3,1.6,'s')end
   for _,x in ipairs({160,215,250,290})do A.Pebbles(ctx,sx*x,-279.5,2,1.2,'g');A.Pebbles(ctx,sx*(x+12),-258.5,2,1.2,'g')end
- end
+ end end
  for i,b in pairs(bases or{})do
   A.Verge(ctx,b,i) -- (R152: no potted topiary guarding the spur's street end any more: nothing gate-like at a base)
  end

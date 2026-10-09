@@ -20,7 +20,7 @@ local V=Vector3.new
 local BOING={Id='rbxassetid://94320656351627',Volume=.30,Pitch=1} -- (the owner's trampoline bounce file; no pitch shift; LocalSfx plays it on the Effects group)
 local NEAR=60;local COARSE=.5
 
-local spots={}                                     -- {X, Z, Mat, Badge, MatCF, BadgeCF, At, Want} (Mat / Badge may be missing: a look from the store whose mat cannot be told does not squash)
+local spots={}                                     -- {X, Z, R, Mat, Badge, MatCF, BadgeCF, At, Want} (Mat / Badge may be missing: a look from the store whose mat cannot be told does not squash)
 local active={}                                    -- spots that are squashing
 local states=setmetatable({},{__mode='k'})         -- HumanoidRootPart -> debounce state
 local connections={}
@@ -44,7 +44,8 @@ local function collect()
   local mat,badge=m:FindFirstChild('Trampoline mat',true),m:FindFirstChild('Trampoline badge',true)
   if type(x)=='number'and type(z)=='number'then -- (the bounce needs only the spot; the squash needs the mat)
    local mr,br=restOf(mat),restOf(badge)
-   spots[#spots+1]={X=x,Z=z,Mat=mat,Badge=badge,MatCF=mr and mr.CF,BadgeCF=br and br.CF,At=-math.huge,Want=m:GetAttribute('HasMat')==true}
+   local r=m:GetAttribute('Radius') -- (the collider's radius: the whole circle bounces; each nook has its own)
+   spots[#spots+1]={X=x,Z=z,R=type(r)=='number'and r or T.Spots[1].Radius,Mat=mat,Badge=badge,MatCF=mr and mr.CF,BadgeCF=br and br.CF,At=-math.huge,Want=m:GetAttribute('HasMat')==true}
   end
  end
 end
@@ -90,10 +91,10 @@ local function body(plr,mine)
  local pos=root.Position
  for _,s in ipairs(spots)do
   local dx,dz=pos.X-s.X,pos.Z-s.Z
-  if dx*dx+dz*dz<=(T.Dims.Radius+3)^2 then
+  if dx*dx+dz*dz<=(s.R+3)^2 then
    local st=states[root];if not st then st=T.NewState();states[root]=st end
    local v=root.AssemblyLinearVelocity
-   local up=T.Step(st,os.clock(),dx,dz,feetY(char,root,hum),v.Y,workspace.Gravity)
+   local up=T.Step(st,os.clock(),dx,dz,feetY(char,root,hum),v.Y,workspace.Gravity,s.R)
    if up then
     if mine then
      root.AssemblyLinearVelocity=T.Launch(v,up)

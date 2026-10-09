@@ -479,7 +479,7 @@ do
   check('removed: no fountain sparkles emitter, ctx.Fountain / ctx.Signs / ApplySigns gone',sparkles==0 and api3.State.Ctx.Fountain==nil and api3.State.Ctx.Signs==nil and api3.ApplySigns==nil)
   local spurPots={};for _,p in ipairs(cp)do if p.Name=='Topiary pot'then local q=p._props.CFrame.Position;if math.abs(math.abs(q.X)-131)<.01 or math.abs(q.Z+420.4)<.01 then spurPots[#spurPots+1]=path(p)end end end
   check('removed: no potted topiary guarding a base spur\'s street end',#spurPots==0,first(spurPots))
-  check('removed: the layout has 5 benches (the four round the fountain are gone, R153: so are the four at the garden nooks, where trampolines stand)',#Art.Layout.benches==5,#Art.Layout.benches)
+  check('removed: the layout has no bench (the four round the fountain went in R152, the nooks\' in R153, the other four and every flower bed in the R154 tidy: HubLifeArt151.Tidy) and the 12 lamps and the bunting between them stay',#Art.Layout.benches==0 and #Art.Layout.beds==0 and #Art.Layout.lamps==12 and #Art.Layout.bunting==5 and #Art.Full.benches==4 and #Art.Full.beds==10 and #Art.Full.lamps==26,#Art.Layout.benches..'/'..#Art.Layout.beds..'/'..#Art.Layout.lamps)
   -- the free Void Pack pedestal's plaza: a plain 18-stud circle round (0, -392) (Kit.Open): no tree, bush, bed, topiary, lamp, bench or sign, in the layout or built
   do local near,L={},Art.Layout
    local function chk(list,label,rad)for _,t in ipairs(list)do local x,z=t[1],t[2];if label=='tree'then x,z=t[2],t[3]end
@@ -594,6 +594,82 @@ do
   local ok2,at2=covered(1,sx>0 and 6.6 or-106,sx>0 and 106 or-6.6,3,-418.3);if not ok2 then gaps[#gaps+1]='south street edge '..sx..': bare from x='..at2 end
  end
  check('no gaps: the street curbs meet every spur flush (no bare lawn between a curb end and a spur)',#gaps==0,first(gaps))
+end
+
+-- 18. R154: the tidy (owner: "reduce the amount of lamps and remove the soil beds and benches ... just leave those parts empty. basically just tidy up the base area"; then "the bushes and
+-- flags can stay"). HubLifeArt151.Tidy is the one table of what the square keeps; A.Full is everything it had, A.Layout is what is built. ------------------------------------------------
+do
+ local Art=W.module('HubLifeArt151');local T=Art.Tidy
+ local function names(root)local by={};for _,p in ipairs(partsUnder(root))do by[p.Name]=(by[p.Name]or 0)+1 end;return by end
+ local function xz(p)local q=p._props.CFrame.Position;return math.floor(q.X*10+.5)/10,math.floor(q.Z*10+.5)/10 end
+ budget.Tier=3;local api4,sc4=load();tick(1);local life4=W.workspace:FindFirstChild('HubLife151')
+ api4.Near.detail=1e6;api4.Near.fine=1e6;api4.ApplyLod()
+ local by=names(life4);local ctx4=api4.State.Ctx
+ -- the table
+ local same=true;for _,k in ipairs({'trees','bushes','topiary','patches','butterflies'})do if #Art.Layout[k]~=#Art.Full[k]then same=false end end
+ check('tidy: the table: no beds, no benches, no pebbles, 12 of the 26 lamps; the trees (24), bushes (16), topiary (8), grass patches (14) and butterflies (12) are exactly the full layout\'s (the owner: "the bushes and flags can stay")',
+  T.Beds==false and T.Benches==false and T.Pebbles==false and #T.Lamps==12 and #Art.Full.lamps==26 and same and #Art.Full.trees==24 and #Art.Full.bushes==16 and #Art.Full.topiary==8 and #Art.Full.patches==14,#T.Lamps)
+ check('tidy: the layout: 12 lamps (all 8 that carry a real light and the 4 that hold the candy bunting), no bed, no bench; the 6 bunting strings of the full layout are 5 (the avenue\'s two crossing ones, which hung from the two lower posts that went, are one string between the two that stay)',
+  #Art.Layout.lamps==12 and #Art.Layout.beds==0 and #Art.Layout.benches==0 and #Art.Full.bunting==6 and #Art.Layout.bunting==5,#Art.Layout.lamps..'/'..#Art.Layout.bunting)
+ local litFull,litKept=0,0
+ for _,l in ipairs(Art.Full.lamps)do if l[4]then litFull+=1 end end
+ for _,l in ipairs(Art.Layout.lamps)do if l[4]then litKept+=1 end end
+ check('tidy: every lit lamp stays (8 of 8: the real lights, their tier caps and the mirror pairs are unchanged)',litFull==8 and litKept==8 and #ctx4.Lights==8,litKept)
+ -- built: nothing of what went
+ local gone={}
+ for _,n in ipairs({'Bed rim','Bed soil','Flower','Flower stem','Bench seat','Bench back','Bench leg','Bench knob','Bench slab','Bench block','Pebble','Bollard'})do if by[n]then gone[#gone+1]=n..' x'..by[n]end end
+ check('tidy: built: no bed, flower, bench, pebble or bollard part is left anywhere on the square',#gone==0,first(gone))
+ -- built: the lamps are whole: no base without its pole, no head without its cap (nothing floats, nothing is left standing alone)
+ local bases,collars,poles={}, {}, {}
+ for _,p in ipairs(partsUnder(life4))do local x,z=xz(p);local k=string.format('%.1f,%.1f',x,z)
+  if p.Name=='Lamp base'then bases[k]=(bases[k]or 0)+1 elseif p.Name=='Lamp collar'then collars[k]=(collars[k]or 0)+1 elseif p.Name=='Lamp pole'then poles[k]=(poles[k]or 0)+1 end end
+ local nb,mismatch=0,{}
+ for k,n in pairs(bases)do nb+=n;if poles[k]~=n or collars[k]~=n then mismatch[#mismatch+1]='base at '..k end end
+ for k in pairs(poles)do if not bases[k]then mismatch[#mismatch+1]='pole at '..k end end
+ local want={};for _,l in ipairs(Art.Layout.lamps)do want[string.format('%.1f,%.1f',l[1],l[2])]=true end
+ for k in pairs(bases)do if not want[k]then mismatch[#mismatch+1]='unlisted lamp at '..k end end
+ local wanted=0;for _ in pairs(want)do wanted+=1 end
+ check('tidy: built: 12 lamp bases, each with its collar and its pole at the same spot (no base without a post, no post without a base), each standing at a layout lamp',nb==12 and wanted==12 and #mismatch==0 and by['Lamp pole']==12 and by['Lamp base']==12,first(mismatch)or nb)
+ local heads,caps,arms=by['Lamp lantern']or 0,by['Lamp cap']or 0,by['Lamp arm']or 0
+ local loose={}
+ for _,p in ipairs(partsUnder(life4))do if p.Name=='Lamp lantern'then
+  local x,z=p._props.CFrame.Position.X,p._props.CFrame.Position.Z;local near=false
+  for _,l in ipairs(Art.Layout.lamps)do if (x-l[1])^2+(z-l[2])^2<=3.1^2 then near=true end end
+  if not near then loose[#loose+1]=path(p)end
+ end end
+ check('tidy: built: 16 lamp heads (8 posts + 4 doubles x 2), each with a cap, 4 arms, and every head within 3 studs of a layout lamp (none floating alone)',heads==16 and caps==16 and arms==4 and #loose==0 and #ctx4.Heads==16,first(loose)or(heads..'/'..caps..'/'..arms))
+ -- the lights and the bunting still find their lamps
+ local badLight=0;for _,l in ipairs(ctx4.Lights)do local at=ctx4.LightAt[l];local ok=false;for _,k in ipairs(Art.Layout.lamps)do if k[4]and math.abs(at[1]-k[1])<.01 and math.abs(at[2]-k[2])<.01 then ok=true end end;if not ok or not l.Parent or l.Parent.Name~='Lamp lantern'then badLight+=1 end end
+ check('tidy: the lighting script still finds its lamps: 8 real lights, each on a lamp head at a kept lit lamp, 16 heads in ctx.Heads (all neon), in mirror pairs',badLight==0 and #ctx4.Lights==8 and #ctx4.Heads==16,badLight)
+ local lines,pennants=by['Bunting line']or 0,by['Pennant']or 0
+ local hungOk=true
+ for _,b in ipairs(Art.Layout.bunting)do for _,e in ipairs({b[1],b[2]})do
+  for _,l in ipairs(Art.Full.lamps)do if math.abs(l[1]-e[1])<.01 and math.abs(l[2]-e[3])<.01 and not want[string.format('%.1f,%.1f',l[1],l[2])]then hungOk=false end end
+ end end
+ check('tidy: the flags stay and hang from lamps that stay: 5 strings of bunting built ('..lines..' lines, '..pennants..' pennants), none from a lamp that went',lines==5 and pennants>20 and hungOk,lines..' / '..pennants)
+ check('tidy: nothing else changed on the square: 24 trees, the bushes, topiary pots and grass patches are all built',(by['Grass patch']or 0)>=14 and (by['Topiary pot']or 0)>=8 and (by['Bush']or 0)>=16)
+ sc4:Destroy()
+ -- the table is the knob: every kind comes back by flipping its value (the full layout), then the tidy is put back
+ local root=R.new('Folder');root.Name='TidyBack';root.Parent=W.workspace
+ local total={}
+ for _,t in ipairs({1,2,3})do
+  local fa=R.new('Folder');fa.Name='TidyAfter'..t;fa.Parent=root
+  local after=Art.Build(fa,t,{},{});local a=after.Counts.core+after.Counts.detail+after.Counts.fine
+  Art.SetTidy({Beds=true,Benches=true,Pebbles=true,Lamps=true})
+  local full=R.new('Folder');full.Name='TidyFull'..t;full.Parent=root
+  local before=Art.Build(full,t,{},{});local b=before.Counts.core+before.Counts.detail+before.Counts.fine
+  if t==3 then
+   local nm=names(full)
+   check('tidy: flipping the table back brings every kind back: 26 lamps (22 posts and 4 bollards), 4 benches, 10 beds, the pebbles (A.Full)',#Art.Layout.lamps==26 and #Art.Layout.benches==4 and #Art.Layout.beds==10 and nm['Lamp pole']==22 and (nm['Bench seat']or 0)==4 and (nm['Bed rim']or 0)==10 and (nm['Pebble']or 0)>0,
+    #Art.Layout.lamps..'/'..tostring(nm['Lamp pole'])..'/'..tostring(nm['Bench seat'])..'/'..tostring(nm['Bed rim']))
+  end
+  Art.SetTidy()
+  total[t]={Before=b,After=a}
+  print(string.format('BUDGET tidy tier %d: %d parts with everything (A.Full), %d after the tidy (%d fewer)',t,b,a,b-a))
+ end
+ check('tidy: the part counts fall on every tier (the numbers above): tier 1 '..total[1].Before..' -> '..total[1].After..', tier 2 '..total[2].Before..' -> '..total[2].After..', tier 3 '..total[3].Before..' -> '..total[3].After,
+  total[1].After<total[1].Before and total[2].After<total[2].Before and total[3].After<total[3].Before and #Art.Layout.lamps==12 and #Art.Layout.beds==0)
+ root:Destroy()
 end
 
 print(string.format('R151 base area: %d passed, %d failed',passed,failed))
