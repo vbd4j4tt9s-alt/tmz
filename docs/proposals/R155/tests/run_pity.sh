@@ -7,6 +7,7 @@
 #               the R152 load guard is line 1 of every client script; the wiring (the open plans before its roll and commits after it went through, the save and the
 #               load, the hold tooltip, /test odds, the Mech shop card's line, COMMANDS.md and the F4 help); no model names in the R155 pity files
 #  1. test    - test_pity155.luau (the R153 clover world, the real server code): rules, clamps, lucky odds, real opens per group, TEST / refused opens, saving, commands
+#               R155 review: a held pack's tooltip is rebuilt when a pity count or the boots luck changes (section 7: the real ChestService on the mock; teeth tip_*)
 #  2. test    - test_pity_bars155.luau (the real client bars): always there, values, 9/10 glow, the held pack, the lucky pop and the card tag, Reduced Motion, 36 screens;
 #               R155 review: the SKIP pill and the treadmill BONUS ROLL button never touch the bars (60 screen / controls cases), the bars start with the tutorial card up / a
 #               pack in hand / a reveal card / a menu (no error), a bar at 9/10 writes its glow and nothing else, a hidden / dimmed bar costs nothing
@@ -117,6 +118,15 @@ PY
  mutate no_tooltip_rule "$SS/PackPityData155.lua" "return odds,lines,{Pity.Disclosure}" "return odds,lines,{}"
  mutate no_odds_rule "$SS/OwnerUpdateCommands82.lua" "  table.insert(lines,'pity: '..Pity.Disclosure) -- R155: the rule, listed with the odds
 " ""
+ # R155 review: a held pack's tooltip follows the pity counts and the boots luck
+ mutate tip_never_refreshed "$SS/ChestService.lua" "    if player then watchPackTooltips(self,player) end -- R155 (review)
+" ""
+ mutate tip_ignores_pity "$SS/ChestService.lua" "for _,name in ipairs({'PackPityNormal','PackPityEvent','ChestLuckMultiplier'})do" "for _,name in ipairs({'ChestLuckMultiplier'})do"
+ mutate tip_ignores_luck "$SS/ChestService.lua" "for _,name in ipairs({'PackPityNormal','PackPityEvent','ChestLuckMultiplier'})do" "for _,name in ipairs({'PackPityNormal','PackPityEvent'})do"
+ mutate tip_not_debounced "$SS/ChestService.lua" "        if queued then return end;queued=true
+        task.defer(function()" "        task.defer(function()"
+ mutate tip_for_unheld_packs "$SS/ChestService.lua" "and tool:GetAttribute('OddsTooltip155')==true then" "then"
+ mutate tip_one_bad_stops_all "$SS/ChestService.lua" "then pcall(function()tool.ToolTip=ChestService._packTooltip(self,player,record)end)end" "then tool.ToolTip=ChestService._packTooltip(self,player,record)end"
  mutate hud_lucky_always "$RSD/WorldStatusHud.lua" " if lucky==true then return speed," " if true then return speed,"
  mutate no_highlight "$RSD/PityBars155.lua" " local function held()local g=heldGroup();if g~=s.Held then s.Held=g;wake()end end" " local function held()end"
  mutate no_glow "$RSD/PityBars155.lua" " elseif Pity.IsLucky(bar.Count)then glow=reduced and .55 or .58+.17*math.sin(now*4.2)end" " end"

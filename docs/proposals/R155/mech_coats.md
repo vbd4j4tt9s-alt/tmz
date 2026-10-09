@@ -133,7 +133,7 @@ Game (`src/`):
 - `ServerScriptService/ChestChaseServer/PremiumProgress.lua`: `RollCoat`, the roll in `GrantMechPacks`, the event check in `BuyMechPack` (which now also returns the new records)
 - `.../PremiumService.lua`: a Robux prompt after the end is refused; the notice gets the records (gems and receipts); `ProcessReceipt` untouched
 - `.../PurchaseAnnouncer.lua`: `CoatText`, the coat words in the "Bought" notice
-- `.../ChestService.lua`: the coat line on the Mech hold tooltip
+- `.../ChestService.lua`: the coat line on the Mech hold tooltip (a bought pack's only: a free or TEST Mech pack never rolls a coat)
 - `.../OwnerUpdateCommands82.lua`: `/test mechshop` shows the coat line and the event
 - `.../RarePackTests.lua`, `.../StudioTestCommands.lua`: `/test rarepacks [rarity] [gold|diamond]`
 - `StarterPlayer/StarterPlayerScripts/GamePassClient.client.lua`: the coat line, the live countdown, the ended card

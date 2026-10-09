@@ -445,6 +445,12 @@ do
  for k=9,#g do check(not g[k]:find('coat',1,true),'... nothing after the coat line is another coat line ("'..g[k]..'")')end
  check(g[2]:match('Plasma Pepper')and g[7]:match('Crowncore'),'... the seed lines keep their order (the Mech pool: Plasma Pepper first, Crowncore last)')
  check(#w==#lines(worldTip)and not worldTip:find('coat',1,true),'(control) a world pack\'s tooltip has no coat line')
+ -- R155 review: the coat line is for BOUGHT Mech packs (the only ones that roll a coat); a free (login / daily) or owner TEST Mech pack never rolls one, so its tooltip has none
+ local free=assert(Data:GrantMechPacks(Ann,false,1))[1];local freeTip=tooltip(free);local f=lines(freeTip)
+ check(free.PaidRandom~=true and packs[1].PaidRandom==true,'(a free Mech pack is not PaidRandom; a bought one is)')
+ check(not freeTip:find('coat',1,true)and f[1]=='Limited Mech Pack'and f[2]==g[2]and f[7]==g[7]and #f==#g-1,'a FREE Mech pack\'s tooltip has no coat line: the six seed odds, then the rule ('..#f..' lines; the bought ones have '..#g..')')
+ local test=assert(Data:GrantMechPacks(Ann,false,1))[1];test.TestGrant=true;check(not tooltip(test):find('coat',1,true),'... nor has an owner TEST Mech pack')
+ check(g[8]=='Gold 4.5% / Diamond 0.5% coat'and p[8]==g[8]and d[8]==g[8],'... while the bought packs keep the coat line at line 8')
 end
 
 print(string.format('%d checks, %d failures',checks,fails))

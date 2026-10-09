@@ -39,8 +39,8 @@ if [ "$MODE" = all ] || [ "$MODE" = static ];then
  grep -qE "Config\.Version='V150 R15[0-9a-z]*'" "$SS/Config.lua" || bad "Config.Version must be a V150 R15x release number (the release step sets it)"
  grep -q "^S.Cap=200$" "$S/ReplicatedStorage/InventoryStacks155.lua" || bad "the cap (InventoryStacks155.Cap) is not 200"
  # (review) the tooltip: ChestService still writes the lines ItemTooltip155 parses (one line per row, joined with a newline), the Hotbar forwards hover / selection to it,
- # and the pack carried home is banked with Banked (the 200 cap never refuses it)
- grep -qF "tool.ToolTip=table.concat(rows,'\\n')" "$SS/ChestService.lua" || bad "ChestService no longer writes the hold tooltip as newline-joined rows (ItemTooltip155 parses them)"
+ # and the pack carried home is banked with Banked (the 200 cap never refuses it). (R155 review: the rows are built by ChestService:_packTooltip, which the hold and the refresh both use)
+ grep -qF "return table.concat(rows,'\\n')" "$SS/ChestService.lua" && grep -qF "tool.ToolTip=ChestService._packTooltip(self,player,record)" "$SS/ChestService.lua" || bad "ChestService no longer writes the hold tooltip as newline-joined rows (ItemTooltip155 parses them)"
  grep -qF "Inv.Hover(b,keyNow)" "$SP/Hotbar.client.lua" && grep -qF "Inv.Focus(b,keyNow)" "$SP/Hotbar.client.lua" || bad "the Hotbar does not forward hover / selection to the item tooltip"
  grep -qF "{Luck=true, Banked=true}" "$SS/ChestService.lua" || bad "ChestService:Bank does not pass Banked (a carried pack must never be refused for the 200 cap)"
  # the R155 release sets Config.Version; nothing else in Config.lua may change (older suites keep it byte-identical apart from that)
