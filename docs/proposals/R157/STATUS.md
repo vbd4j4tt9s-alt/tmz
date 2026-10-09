@@ -15,7 +15,10 @@ Base: R156 (weather ambience, music, item info panel removed; installer `install
 - Game-wide text: every "u" / "ur" becomes "you" / "your" / "you're" (owner: "this goes for all u and urs in the game"). From now on all new
   player-visible text uses "you" / "your", simple words (about a 3rd-grade level).
 
-## Being built, preview pending
+## Approved after its preview (owner: "yes")
 - The owner's Classic Pyramid (Creator Store 113814131474028; 18 limestone slabs, parsed to `docs/proposals/R156/pyramid/`) replaces the
-  Sunscar Pyramid in the Desert, hollow, with the Desert Mythic pack floating inside; hold E from outside; one claim per player (counts when
-  banked; caught -> it returns); the Sand Snake chases. Assumed (not yet confirmed by the owner): the pack is plain (no coat).
+  Sunscar Pyramid in the Desert at 0.6834 scale (the old 44.8-stud footprint; full size would cut the Desert's wall), walk-through like every
+  landmark, hollow, with the plain Desert Mythic pack (Pack06) floating inside; hold E from outside (37.7 studs, only inside a box around it);
+  one claim per player (counts when banked; caught / lost -> straight back into the pyramid); the Sand Snake chases; the 42 keys under it are
+  left out. Preview `docs/proposals/R156/pyramid.png`, notes `pyramid.md`.
+- Free Void Pack: claimable after 20 minutes of total play (`Premium.PlaySeconds157`), countdown on the pedestal, owed packs still given.
