@@ -7,6 +7,8 @@
 --   PROPS = any other scenery part standing on the floor high enough to meet a key (its top above the floor + PropMinTop, its foot no higher than the resting key top):
 --      rocks, logs, roots, palm trunks and their stone bases, wall banks, cliffs, landmarks ... a key is left out only when it is mostly BURIED: at least Prop (60%) of its
 --      footprint is covered. A partly covered key (a wall bank along the edge column) stays, poking into the prop as in R151, so the track edge shows no bare gaps.
+--   CLEAR features (R156) = a prop whose part or model has the attribute KeyboardClear = true (the Desert's Classic Pyramid, whose slabs are 1.12 tall: a resting key, 1.2,
+--      would poke through its bottom step): EVERY key whose square its footprint box overlaps is left out, not only the mostly buried ones; the floor shows there.
 -- Only scenery counts (the roots in S.Roots); floors, walls, barriers, bases, the hub, seeds, keepers and anything invisible do not. Footprint = the convex hull of the part's
 -- projected box (a circle for a ball / a standing disc); coverage = a Grid x Grid sample of the key's footprint, the union over every feature. Spacebar rows are never touched.
 local K=require(script.Parent.KeyboardTrack)
@@ -14,6 +16,7 @@ local S={}
 S.Config={
  Flat=.10,Prop=.60,Grid=8,
  PropMinTop=.3,                  -- a prop's top must stand this far above the floor top to meet a key (a flush patch sits under the keys)
+ ClearOverlap=.05,               -- R156: a CLEAR feature's footprint box must overlap a key's square by more than this (studs, both ways) to leave it out
  InvisibleAt=.95,                -- parts at least this transparent (barriers, anchors) are not scenery
  MaxFootprint=60000,             -- bigger footprints (a whole-biome slab) are floors, not features
  Liquid={'water','oasis','pond','pool','lava','magma','molten','puddle','lake','river','stream','frozen','slush','quicksand','swamp','bog','sinkhole','crater','tar pit','mud'},
@@ -101,8 +104,8 @@ local function sceneryParts(map)
   if root then
    for _,d in ipairs(root:GetDescendants())do
     if d:IsA('BasePart')and d.Transparency<S.Config.InvisibleAt and not d.Name:match('^BiomeGround_')and d.Name~='LeftBiomeEdge'and d.Name~='RightBiomeEdge'then
-     local chain={};local a=d.Parent
-     while a and a~=root do table.insert(chain,1,a.Name);a=a.Parent end
+     local chain={};local a=d.Parent;local clear=d:GetAttribute('KeyboardClear')==true
+     while a and a~=root do table.insert(chain,1,a.Name);if a:GetAttribute('KeyboardClear')==true then clear=true end;a=a.Parent end
      local flat=isLiquidName(d.Name);local ignored=hasWord(S.Config.Ignore,d.Name)
      for _,n in ipairs(chain)do if isLiquidName(n)then flat=true end;if hasWord(S.Config.Ignore,n)then ignored=true end end
      local group
@@ -110,7 +113,7 @@ local function sceneryParts(map)
      else group=chain[2]and(chain[1]..'/'..chain[2])or chain[1]or d.Name end
      local okM,mat=pcall(function()return d.Material end)
      if okM and mat==Enum.Material.Water then flat=true end
-     if not ignored then out[#out+1]={Part=d,Group=group,Flat=flat}end
+     if not ignored then out[#out+1]={Part=d,Group=group,Flat=flat,Clear=clear}end
     end
    end
   end
@@ -119,13 +122,14 @@ local function sceneryParts(map)
 end
 
 -- Scan(map, geo): the cells to leave out. geo = K.Geometry of the same map (without KeyboardSkip). Returns {Cells = set (row * 64 + col), Count, Report}.
--- Report[stage] = list of {Name, Class = 'flat' | 'prop', Cells} (cells credited to the first feature that covers them), Parts = scenery parts looked at.
+-- Report[stage] = list of {Name, Class = 'flat' | 'prop', Cells} (cells credited to the first feature that covers them; a CLEAR feature's cells are props), Parts = scenery parts looked at.
 function S.Scan(map,geo)
  local C=S.Config;local KC=K.Config
  local F=KC.FloorTop;local KW=K.KeySize(geo.Pitch);local G=C.Grid;local N=G*G;local WORDS=(N+31)//32
  local sampleX,sampleZ={}, {}
  for i=1,G do local o=((i-.5)/G-.5)*KW;sampleX[i]=o;sampleZ[i]=o end
  local flatMask,propMask={},{}      -- cell key -> the covered samples as a bit set of WORDS 32-bit words
+ local clearCells,clearBy={},{}     -- R156: cell key -> true / the group of the CLEAR feature over it
  local flatBy,propBy={}, {}         -- cell key -> group name of the first feature that covered it
  local looked=0
  for _,item in ipairs(sceneryParts(map))do
@@ -133,7 +137,19 @@ function S.Scan(map,geo)
   if fp and(fp.X1-fp.X0)*(fp.Z1-fp.Z0)<=C.MaxFootprint then
    local flat=item.Flat and fp.Y0<=F+1.0 and fp.Y1>=F-.5
    local prop=not item.Flat and fp.Y0<=K.KeyTop(0)and fp.Y1>=F+C.PropMinTop
-   if flat or prop then
+   if item.Clear and(flat or prop)then -- R156: every key the footprint box overlaps (by more than ClearOverlap in both directions)
+    looked+=1
+    local c1,c2,r1,r2=geo.CellRange(fp.X0,fp.X1,fp.Z0,fp.Z1)
+    for r=r1,r2 do if not geo.BarOfRow[r]then
+     local za,zb=geo.RowZ(r);local zc=(za+zb)/2
+     if math.min(fp.Z1,zc+KW/2)-math.max(fp.Z0,zc-KW/2)>C.ClearOverlap then
+      for c=c1,c2 do
+       local xc=geo.ColCenter(c)
+       if math.min(fp.X1,xc+KW/2)-math.max(fp.X0,xc-KW/2)>C.ClearOverlap then local key=r*64+c;clearCells[key]=true;if not clearBy[key]then clearBy[key]=item.Group end end
+      end
+     end
+    end end
+   elseif flat or prop then
     looked+=1
     local c1,c2,r1,r2=geo.CellRange(fp.X0,fp.X1,fp.Z0,fp.Z1)
     local masks,by=flat and flatMask or propMask,flat and flatBy or propBy
@@ -163,6 +179,7 @@ function S.Scan(map,geo)
  for key,m in pairs(propMask)do
   if not cells[key]and count(m)/N>=C.Prop then cells[key]=true;seen[key]='prop' end
  end
+ for key in pairs(clearCells)do if not cells[key]then cells[key]=true;seen[key]='prop';propBy[key]=clearBy[key]end end
  local perStage={}
  for key,class in pairs(seen)do
   total+=1
