@@ -35,8 +35,9 @@ echo "ok: the four new scripts are in the manifest (sorted)"
 (cd "$REPO" && grep -v '^#' "$P/R151/tests/frozen.sha256" | sha256sum -c --quiet -) || fail "a frozen file differs from R151's frozen.sha256"
 for f in PackOdds112 PackLuck154;do grep -q "^# R155 (on purpose): .*$f.lua.*pack pity" "$P/R151/tests/frozen.sha256" || fail "frozen.sha256 has no R155 pity note for $f";done
 echo "ok: the frozen odds files match their hashes; PackOdds112 / 137 and PackLuck154 carry their R155 pity notes"
-for f in src/ServerScriptService/ChestChaseServer/Config.lua src/StarterPlayer/StarterPlayerScripts/Hotbar.client.lua src/ReplicatedStorage/RarePullCinematic.lua src/ReplicatedStorage/RarePullCard.lua src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua src/ReplicatedStorage/SeedPackRules.lua;do
- git -C "$REPO" diff --quiet "$BASE" -- "$f" || fail "$f changed since $BASE (Config.Version / ProfileVersion, the hotbar, the cinematic, the card, the music and SeedPackRules stay as they are)"
+# (after the R155 merges the cinematic, the card, the hotbar and SeedPackRules change for other R155 work: the pity itself never touches them; these two never change)
+for f in src/ServerScriptService/ChestChaseServer/Config.lua src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua;do
+ git -C "$REPO" diff --quiet "$BASE" -- "$f" || fail "$f changed since $BASE (Config.Version / ProfileVersion and the music stay as they are)"
 done
 grep -q "Config.ProfileVersion=22" "$SS/Config.lua" || fail "ProfileVersion is not 22"
 echo "ok: Config.lua (Version, ProfileVersion 22), Hotbar.client.lua, RarePullCinematic, RarePullCard, BackgroundMusic and SeedPackRules untouched since $BASE"

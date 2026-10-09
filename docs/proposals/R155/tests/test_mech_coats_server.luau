@@ -439,7 +439,8 @@ do
  local function lines(t)local out={};for l in(t..'\n'):gmatch('(.-)\n')do out[#out+1]=l end;return out end
  local g,p,d,w=lines(gold),lines(plain),lines(diamond),lines(worldTip)
  check(g[1]=='Gold Limited Mech Pack'and p[1]=='Limited Mech Pack'and d[1]=='Diamond Limited Mech Pack','the hold tooltip names the coat: "'..g[1]..'" / "'..p[1]..'" / "'..d[1]..'"')
- check(#g==8 and g[#g]=='Gold 4.5% / Diamond 0.5% coat'and g[#g]==p[#p]and g[#g]==d[#d],'... the six seed odds, then ONE last line "Gold 4.5% / Diamond 0.5% coat" ('..#g..' lines; "'..tostring(g[#g])..'")')
+ check(g[8]=='Gold 4.5% / Diamond 0.5% coat'and g[8]==p[8]and g[8]==d[8]and #g==#p and #g==#d,'... the six seed odds, then the line "Gold 4.5% / Diamond 0.5% coat" (line 8 of '..#g..'; "'..tostring(g[8])..'"; R155 pity: its rule line may follow)')
+ for k=9,#g do check(not g[k]:find('coat',1,true),'... nothing after the coat line is another coat line ("'..g[k]..'")')end
  check(g[2]:match('Plasma Pepper')and g[7]:match('Crowncore'),'... the seed lines keep their order (the Mech pool: Plasma Pepper first, Crowncore last)')
  check(#w==#lines(worldTip)and not worldTip:find('coat',1,true),'(control) a world pack\'s tooltip has no coat line')
 end
