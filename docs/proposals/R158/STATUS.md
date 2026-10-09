@@ -20,6 +20,10 @@
 - Track walls per biome, outer track designs, base wall tops (`docs/proposals/R158/design/`).
 - PC HUD lock + MENU higher (`docs/proposals/R158/hud_lock/`).
 
+## Next, after this round (owner)
+- **Bats as a whole:** polish the swing animations and the hit effects (the owner sends a reference video), and make the hitbox consistent,
+  especially against fast-moving players. Code: `BatService.lua`, `BatHitbox.lua`, `BatSwingPose.lua`, `BatConfig.lua`, `BatArt.lua`, `BatClient.client.lua`.
+
 ## Answered, no change
 - Void / Verity packs not moving the event pity: the owner's Darkened was started with a test command and the boots were /test boots, so those
   were TEST opens, which R155 leaves out of the pity on purpose. Owner: "its fine no worries its ok no fixes are needed". Real packs already count.
