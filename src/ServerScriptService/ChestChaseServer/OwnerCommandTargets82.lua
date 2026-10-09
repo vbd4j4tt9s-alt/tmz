@@ -5,6 +5,9 @@ function T.Split(text)
  text=text:match('^%s*(.-)%s*$')
  local body,target=text:match('^(.-)%s+@([%w_]+)$')
  if body then return body,target end
+ -- R157: "playtime @name 12" (the name before the minutes) means "playtime 12 @name": the one command that is typed that way
+ local head,name,rest=text:match('^(.-)%s+@([%w_]+)%s+(%S+)$')
+ if head and(head:lower():gsub('^/cctest%s+',''):gsub('^/test%s+',''))=='playtime'then return head..' '..rest,name end
  if text:find('@',1,true)then return nil,nil,'Put @username, @me or @all at the end.'end
  return text,nil
 end

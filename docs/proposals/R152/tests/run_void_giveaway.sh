@@ -17,6 +17,11 @@
 #  test_giveaway_client      - the local player's screen: the number ("487 / 500 LEFT", live), the pop on a change, "CLAIMED ✓", ALL CLAIMED at 0, the sign's size / range (studs, stops growing
 #                              close up), the Void Pack built the game's way and its glow / particles attached to it, the slow turn, the prompt for the one who claimed, the claim moment
 #                              (the game's chime, no new sound), quality tiers, reduced motion, streaming, cost (nothing per frame when far), teardown.
+# R157 (owner: "make it so that the void pack is only claimable after playing for 20 minutes"): the same suites cover the play time rule (a loaded player has played enough unless a test says
+# otherwise): test_giveaway_server 15 (the rule and its words, refused under 20 min with no reservation / store request / state change, allowed at 20, an owed player is not held up, the counting
+# in Step: whole seconds, one attribute write a minute, MarkDirty every 30 s, a save at 20 min, "not ready yet" is never a refusal, Studio without DataStore keeps it in memory, voidgift status and
+# /test playtime, the parser, no per-frame cost); test_giveaway_real 7 (saved and loaded across visits on the real player data, an old save = 0, junk = 0, owed with 0 minutes); test_giveaway_client
+# 4b + 6 (the line "play 12 more min to claim" and the disabled prompt, gone at 20 min, claimed players unchanged, nothing per frame, the real server and client together); wiring (below).
 # With "mutate" as the 2nd argument, broken copies of src must each make a suite fail (the tests have teeth; ONLY=<words of one mutation's name> runs just that one).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -77,6 +82,20 @@ wiring() { # $1 = the src tree to check (this checkout's, or a mutated copy)
  # DataStore / MessagingService: the giveaway's own, nobody else's
  m=$(grep -rl "GetService('MessagingService')" "$S" --include=*.lua | xargs -n1 basename | sort | tr '\n' ' ')
  [ "$m" = "PullAnnouncer.lua VoidGiveaway152.lua " ] || { echo "MessagingService is used by [$m] (expected the announcer and the giveaway)";return 1; }
+ # R157: the play time rule (an optional Premium field, no new loop, a per-player Studio-only command, no change to the frozen Config)
+ grep -q "R.MinPlaySeconds=20\*60" "$RSD/VoidGiveawayRules152.lua" && grep -q "R.PlayField='PlaySeconds157'" "$RSD/VoidGiveawayRules152.lua" && grep -q "R.Attr.PlayLeft='VoidPlayLeft157'" "$RSD/VoidGiveawayRules152.lua" || { echo "the play time rule is not 20 minutes in Premium.PlaySeconds157 / VoidPlayLeft157";return 1; }
+ if grep -q "PlaySeconds157" "$SRV/PlayerDataService.lua";then echo "PlayerDataService must not know the play time field (it is an optional Premium field, saved with the whole table)";return 1;fi
+ if grep -q "PlaySeconds" "$SRV/Config.lua";then echo "Config.lua is frozen: the play time rule belongs in VoidGiveawayRules152";return 1;fi
+ a=$(grep -n "Rules.PlayRefusalText(played)" "$SRV/VoidGiveaway152.lua" | head -1 | cut -d: -f1);b=$(grep -n "self.Busy\[player\]=true;self:_state(player,'Busy')" "$SRV/VoidGiveaway152.lua" | head -1 | cut -d: -f1);c=$(grep -n "minAge>0 and" "$SRV/VoidGiveaway152.lua" | head -1 | cut -d: -f1)
+ [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ "$c" -lt "$a" ] && [ "$a" -lt "$b" ] || { echo "the play time refusal must come after the account age rule and before the claim is marked busy / reserved";return 1; }
+ grep -q "X.Actions.playtime=true" "$SRV/OwnerUpdateCommands82.lua" && grep -q "VoidGiveaway152).PlaytimeCommand(ctx,p,a)" "$SRV/OwnerUpdateCommands82.lua" || { echo "playtime is not wired into OwnerUpdateCommands82";return 1; }
+ if sed -n '/^function T.IsGlobal/,/^end/p' "$SRV/OwnerCommandTargets82.lua" | grep -q playtime;then echo "playtime takes an @name: it must not be a server-wide command";return 1;fi
+ grep -q "if not self.Studio then return false,'playtime <minutes> works in Studio only" "$SRV/VoidGiveaway152.lua" || { echo "playtime <minutes> must refuse outside Studio";return 1; }
+ grep -q "/test playtime" "$RSD/StudioTestHelp.lua" && grep -q "playtime" "$REPO/docs/COMMANDS.md" || { echo "playtime is not in the F4 help / docs/COMMANDS.md";return 1; }
+ # the play time is counted by the giveaway's existing 2 s loop (Step), never by a new loop: plain arithmetic, no task / event / Instance in the counting
+ if sed -n '/^function S:_tickPlay/,/^end/p' "$SRV/VoidGiveaway152.lua" | grep -n -E "task\.|Connect|Heartbeat|RenderStepped|Stepped|while |Instance.new";then echo "the play time counting must be plain arithmetic inside the existing loop";return 1;fi
+ # the client: the play time is not in the per-frame function
+ if sed -n '/^local function frame(dt)/,/^local function wake/p' "$CL/VoidGiveawayClient152.client.lua" | grep -n -i -E "play|wait";then echo "the per-frame function must not touch the play time";return 1;fi
  echo "wiring ok"
 }
 frozen() {
@@ -199,8 +218,8 @@ mutate "CLAIMED is not shown" $CLI " if mine=='Claimed'then note,color=Rules.Min
 mutate "the prompt stays on after you claimed" $CLI "local want=entry.Model:GetAttribute(A.State)=='Open'and player:GetAttribute(A.Player)=='Open'" "local want=entry.Model:GetAttribute(A.State)=='Open'" client
 mutate "ALL CLAIMED is not shown" $CLI "set(entry.Title,'Text',done and Rules.TitleDone or Rules.Title)" "set(entry.Title,'Text',Rules.Title)" client
 mutate "the pack does not turn" $CLI "if not rm then entry.Spin=((entry.Spin or 0)+dt*Rules.PackSpin)%(math.pi*2)end" "" client
-mutate "reduced motion still moves the pack" $CLI " if rm then -- reduced motion" " if false then -- reduced motion" client
-mutate "the effects are left behind (not moved with the pack)" $CLI " if r.Fx then PackFx.Pulse(r,now,rm);PackFx.Step(r,now,frame,tierNow,rm,true,parts,frames)end" " if r.Fx then PackFx.Pulse(r,now,rm)end" client
+mutate "reduced motion still moves the pack" $CLI " elseif rm then -- reduced motion" " elseif false then -- reduced motion" client
+mutate "the effects are left behind (not moved with the pack)" $CLI " if r.Fx then if not hidden then PackFx.Pulse(r,now,rm)end;PackFx.Step(r,now,frame,tierNow,rm,true,parts,frames)end" " if r.Fx then if not hidden then PackFx.Pulse(r,now,rm)end end" client
 mutate "the pack is the track's (tagged: a second owner)" $CLI "CS:RemoveTag(bag,'BiomeSeedPackVisual')" "" client
 mutate "the pack is built by hand, not the game's art" $CLI " return Visuals.Bag(at,packFolder(),scale,nil,Rules.Pack.Stage,Rules.Pack.BagVariant,1,1,'None')" " error('no art')" client
 mutate "a far pedestal keeps its frame loop" $CLI " if not busy and loop then loop:Disconnect();loop=nil end" "" client
@@ -218,5 +237,59 @@ mutate "voidgift is a per-player command" ServerScriptService/ChestChaseServer/O
 mutate "a new sound asset" $CLI "local Audio;pcall(" "local SOUND='rbxassetid://1234567';local Audio;pcall(" wiring
 mutate "the giveaway uses SetAsync" $ST "function S:Status()" "function S:Wipe()self.Store:SetAsync(self.Key,nil)end
 function S:Status()" wiring
+# R157: the play time (ONLY=R157 runs just these)
+PR=ServerScriptService/ChestChaseServer/PremiumProgress.lua;OT=ServerScriptService/ChestChaseServer/OwnerCommandTargets82.lua
+mutate "R157: the play time rule is 0 minutes" $RU "R.MinPlaySeconds=20*60" "R.MinPlaySeconds=0" server
+mutate "R157: the play time rule is 30 minutes" $RU "R.MinPlaySeconds=20*60" "R.MinPlaySeconds=30*60" server
+mutate "R157: the play time is never checked" $SV "if played<Rules.MinPlaySeconds then return refuse(" "if false then return refuse(" server
+mutate "R157: an owed player is held up by the play time" $SV " if not owed then
+  local played=self:_played(player)" " if true then
+  local played=self:_played(player)" server
+mutate "R157: a counter that is not ready counts as 0" $SV "if played==nil then return refuse(Rules.PlayLoading,'loading')end" "if played==nil then played=0 end" server
+mutate "R157: the minutes round down" $RU "function R.PlayMinutes(seconds)return math.ceil(" "function R.PlayMinutes(seconds)return math.floor(" server
+mutate "R157: the refusal says ur" $RU "to get your free void pack!'" "to get ur free void pack!'" server
+mutate "R157: the refusal reserves first (a store request)" $SV " if not owed then
+  local played=self:_played(player)" " if not owed then local _,_=self.Store:Reserve(player.UserId) end
+ if not owed then
+  local played=self:_played(player)" server
+mutate "R157: a hitch counts in full" $SV "math.clamp(now-last,0,S.PlayMaxStep)" "math.max(now-last,0)" server
+mutate "R157: the counter loses the part of a second" $SV "self.PlayFrac[player]=acc-whole" "self.PlayFrac[player]=0" server
+mutate "R157: the 20 minutes are not saved at once" $SV "self.PlayUnsaved[player]=0;self.Data:MarkDirty(player);self.Data:QueueGardenSave(player)
+ elseif" "self.PlayUnsaved[player]=0;self.Data:MarkDirty(player)
+ elseif" server
+mutate "R157: the profile is marked dirty at every look" $SV "elseif unsaved>=(total>=Rules.MinPlaySeconds and S.PlaySaveDone or S.PlaySaveEvery)then" "elseif true then" server
+mutate "R157: the counter stops at the 20 minutes" $SV "local total=math.min(Rules.PlayCap,have+whole)" "local total=math.min(Rules.MinPlaySeconds,have+whole)" server
+mutate "R157: the attribute is written at every look" $SV "if player:GetAttribute(Rules.Attr.PlayLeft)~=shown then player:SetAttribute(" "if true then player:SetAttribute(" server
+mutate "R157: a player whose data is not loaded is counted" $SV "  if self.Data:IsLoaded(player)then
+   if not self.Ready[player]then" "  if true then
+   if not self.Ready[player]then" server
+mutate "R157: playtime works on a live server" $SV "if not self.Studio then return false,'playtime <minutes> works in Studio only" "if false then return false,'playtime <minutes> works in Studio only" server
+mutate "R157: the status line is gone" $SV " if player then lines[#lines+1]=self:PlayText(player)end" "" server
+mutate "R157: playtime @name 12 does not parse" $OT " local head,name,rest=text:match('^(.-)%s+@([%w_]+)%s+(%S+)\$')" " local head,name,rest=nil,nil,nil" server
+mutate "R157: playtime is a server-wide command" $OT "or s:match('^voidgift')~=nil or" "or s:match('^voidgift')~=nil or s:match('^playtime')~=nil or" server
+mutate "R157: playtime is not wired" ServerScriptService/ChestChaseServer/OwnerUpdateCommands82.lua "X.Actions.playtime=true" "" wiring
+mutate "R157: a per-frame loop counts the time" $SV "S.LoopSeconds=2;" "S.LoopSeconds=2;game:GetService('RunService').Heartbeat:Connect(function()end);" wiring
+mutate "R157: the field moves into Config" ServerScriptService/ChestChaseServer/Config.lua "Config.AutosaveInterval = 30" "Config.AutosaveInterval = 30 Config.PlaySeconds = 1200" wiring
+mutate "R157: PlayerDataService knows the field" ServerScriptService/ChestChaseServer/PlayerDataService.lua "function PlayerDataService:MarkDirty(player)" "local _PlaySeconds157=true
+function PlayerDataService:MarkDirty(player)" wiring
+mutate "R157: a load drops the play time" $PR " result.IndexRewardVersion=104
+ result.Plants=result.Plants or{}" " result.IndexRewardVersion=104;result.PlaySeconds157=nil
+ result.Plants=result.Plants or{}" real
+mutate "R157: the play time is not counted for a loaded real profile" $SV "local have=Rules.CleanPlayed(premium[Rules.PlayField])" "local have=0" real
+mutate "R157: the line is not shown" $CLI "elseif state=='Open'and wait then -- R157" "elseif false then -- R157" client
+mutate "R157: the prompt stays on while you wait" $CLI "and player:GetAttribute(A.Player)=='Open'and playWait()==nil" "and player:GetAttribute(A.Player)=='Open'" client
+mutate "R157: the line says u" $RU "R.PlayHint='play %d more min to claim'" "R.PlayHint='play %d more min for u to claim'" server
+mutate "R157: the client rounds minutes down" $CLI "local minutes=Rules.PlayMinutes(wait)" "local minutes=math.floor(wait/60)" client
+mutate "R157: the text is rebuilt at every refresh" $CLI "if entry.WaitMin~=minutes then entry.WaitMin=minutes;" "if true then entry.WaitMin=minutes;" client
+mutate "R157: a claimed player sees the countdown" $CLI " if mine=='Claimed'then note,color=Rules.Mine,RGB(126,240,170)
+ elseif mine=='Busy'then note,color=Rules.Busy,RGB(255,225,150)
+ elseif state=='Open'and wait then" " if state=='Open'and wait then note,color=Rules.PlayHintText(Rules.PlayMinutes(wait)),RGB(255,205,120)
+ elseif mine=='Claimed'then note,color=Rules.Mine,RGB(126,240,170)
+ elseif mine=='Busy'then note,color=Rules.Busy,RGB(255,225,150)
+ elseif state=='Open'and false then" client
+mutate "R157: the countdown is in the frame function" $CLI "local function frame(dt)
+ local busy=false;" "local function frame(dt)
+ local waited=playWait()
+ local busy=false;" wiring
 echo "$caught of $total mutations caught"
 [ "$caught" = "$total" ]
