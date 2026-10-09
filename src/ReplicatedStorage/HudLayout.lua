@@ -242,8 +242,8 @@ local function phoneLayout(w,h,controls)
   ThumbZones={left,right}}
  return m
 end
-function L.Read(view,touch,controls)
- local w,h=math.max(240,view.X),math.max(150,view.Y)
+-- The layout of a screen w x h (already at least 240 x 150) with all its searching (wheelArc, barsClear below); L.Read memoizes it.
+local function readLayout(w,h,touch,controls)
  if touch then return phoneLayout(w,h,controls)end
  local short=h<480;local compact=w<1050 or(touch and h<650)
  local slots=compact and 5 or 10
@@ -361,6 +361,66 @@ function L.Read(view,touch,controls)
   walletX,speedY,walletH,gap,walletStack=table.unpack(first or natural)
   m=metrics()
  end
+ return m
+end
+-- R157 review (performance): the search above is dear - up to ~80 ms on a short PC window (640 x 360), tens of ms on 1920 x 300 and 1280 x 320 - and L.Read is asked all the
+-- time (WorldStatusHud every .25 s and every frame of the refresh 3-2-1, every reveal's RarePullCard.FitBand / SkipBoxes, every layout change). The layout is a pure function of
+-- what is keyed below, so the last CacheSize answers are kept: the same screen again costs a few comparisons and allocates nothing, a new size searches once.
+--  The key, in this order (KeyLength slots, every one compared by value):
+--   1  w   2  h       the HUD area, clamped to 240 x 150 exactly as readLayout takes it (view = HudLayout.Viewport: the safe area, so the insets are in it)
+--   3  touch          true / false (a phone's layout, or a computer's)
+--   4 - 7  Joystick X, Y, W, H     8 - 11  Jump X, Y, W, H     the thumb controls (HudLayout.Controls: safe-area px); false when absent. Only a phone reads them,
+--                                                              so a computer's key holds false here (its controls cannot change its layout)
+--   12 - 14  L.NameBand, L.NameWidth, L.NameClear      15, 16  L.PityBarHeight, L.PityGap     what L.NameRows (the details rule) reads
+--   17  PityBars155 (the module, or false: a partial bundle)   18  its Place   19  L.HudBoxes     what barsClear searches with (a computer only)
+--  Nothing else is read: no attribute, no setting, no clock. The answer is shared and FROZEN (deeply: table.freeze) - callers read it, none writes into it (checked for every
+--  caller in src), and a write would raise instead of changing what the next caller sees. The caller's `controls` rects are copied before the search, so the answer holds no
+--  table of the caller's (m.Joystick / m.Jump of a landscape phone used to be the caller's own rects).
+local CacheSize,KeyLength=8,19
+local cache,cacheAt,cacheLast,probe={},0,0,{}
+local function requireBars()return require(script.Parent.PityBars155)end
+-- (equal by value; -0 is not +0 here, an input that differs in anything is a new key; NaN equals nothing, so it just searches again)
+local function sameKey(a,b)
+ for i=1,KeyLength do
+  local x,y=a[i],b[i]
+  if x~=y or(x==0 and 1/x~=1/y)then return false end
+ end
+ return true
+end
+local function freeze(t)
+ if table.isfrozen(t)then return t end
+ table.freeze(t)
+ for _,v in pairs(t)do if type(v)=='table'then freeze(v)end end
+ return t
+end
+local function rectOf(r)return r and{X=r.X,Y=r.Y,W=r.W,H=r.H}or nil end
+-- view: a Vector2 (the HUD area); touch: TouchEnabled; controls: HudLayout.Controls(gui) or nil. Returns the metrics table (see HudBoxes) - shared, frozen, never to be written to.
+function L.Read(view,touch,controls)
+ local w,h=math.max(240,view.X),math.max(150,view.Y)
+ touch=touch and true or false
+ local ok,bars -- (first: a module that loads for the first time may run other code, none of which may find the probe half written)
+ if not touch then ok,bars=pcall(requireBars)end
+ local k=probe
+ k[1],k[2],k[3]=w,h,touch
+ if touch then
+  local stick,jump=controls and controls.Joystick,controls and controls.Jump
+  if stick then k[4],k[5],k[6],k[7]=stick.X,stick.Y,stick.W,stick.H else k[4],k[5],k[6],k[7]=false,false,false,false end
+  if jump then k[8],k[9],k[10],k[11]=jump.X,jump.Y,jump.W,jump.H else k[8],k[9],k[10],k[11]=false,false,false,false end
+  k[17],k[18],k[19]=false,false,false
+ else
+  k[4],k[5],k[6],k[7],k[8],k[9],k[10],k[11]=false,false,false,false,false,false,false,false
+  k[17]=ok and bars or false;k[18]=ok and type(bars)=='table'and bars.Place or false;k[19]=L.HudBoxes
+ end
+ k[12],k[13],k[14],k[15],k[16]=L.NameBand,L.NameWidth,L.NameClear,L.PityBarHeight,L.PityGap
+ local hit=cache[cacheLast]
+ if not(hit and sameKey(hit.Key,k))then
+  hit=nil
+  for i=1,#cache do local entry=cache[i];if sameKey(entry.Key,k)then hit=entry;cacheLast=i;break end end
+ end
+ if hit then return hit.Layout end
+ local key=table.clone(k) -- (before the search: a Read inside it would overwrite the probe)
+ local m=freeze(readLayout(w,h,touch,touch and{Joystick=rectOf(controls and controls.Joystick),Jump=rectOf(controls and controls.Jump)}or nil))
+ cacheAt=cacheAt%CacheSize+1;cacheLast=cacheAt;cache[cacheAt]={Key=key,Layout=m}
  return m
 end
 -- R157: the top bar row BASE / TRACK live in (TravelButtons): GuiService.TopbarInset's free part of Roblox's top bar - its left and right ends, top and height - or, when that
