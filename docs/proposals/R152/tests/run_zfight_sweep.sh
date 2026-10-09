@@ -11,6 +11,9 @@
 #  2. verity  - the Verity pack (generated flat pouch, seal, strips, the two face Decals) in every context, size and coat.
 #  3. opening - the pack-opening scenes: the void vault, the space stage and the throne room (with / without the drawn images, lite), the sky beam's landing on a floor at all three tiers
 #               (rings, cracks, debris) and the Legendary / Mythic flourish at three pack scales, sampled through the whole impact; the layer gaps are checked frame by frame.
+#               R155: the stages' camera moves through them (the cinematic camera, RarePullCamera155), so the one camera-dependent check is made too: on every stage
+#               frame of every tier, no visible part comes nearer to the camera than 0.7 stud (Roblox's near plane is 0.5: nearer, a part is cut open, its inside
+#               and seams show). The z-fighting rule itself does not depend on the camera (every overlap counts wherever it is seen from).
 #  4. keepers - docs/proposals/R152/tests/run_keepers.sh step 4 (the baked models' triangles).
 #  5. mech    - R153: the Mech pack's look B (docs/proposals/R153/tests/dump_mech_zscene.luau): on the flat pouch in every context, size and coat, its opening copy, its plain-parts body.
 # With "mutate" as the 3rd argument, broken copies of src must each make the sweep fail (the checks have teeth): the letter strips back at .04 over the keys, the opening's ring / crack /

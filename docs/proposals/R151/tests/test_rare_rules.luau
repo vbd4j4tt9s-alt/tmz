@@ -163,6 +163,37 @@ for rank=6,8 do
   check(inside,tag..': the camera stays inside the stage (the map and sky are never seen)')
  end
 end
+-- R155: the cinematic camera (RarePullCamera155, the stage's camera from R155 on; RarePullRules.Shot stays as its fallback and Calm's hero shot)
+-- keeps the same framing rules for the seed's hero shot - from .3 s after the hit; Cosmic from the star, the owner's answer 2 - and the same box
+do local Cam=W.module('RarePullCamera155')
+ for rank=6,8 do for _,variant in ipairs({'Full','Calm'})do
+  local tl=L.Timeline(rank,variant);local rig=Cam.New(rank,variant,tl);local tag='R155 camera: '..names[rank]..' '..variant
+  local from=(variant=='Full'and rank==7)and tl.StarIn or tl.Climax+.3
+  for _,a in ipairs(aspects)do
+   local lay=L.Layout(a[3],false,rank)
+   local worst={dx=0,dy=0,overlap=nil,small=nil,maxDia=0,endDia=0}
+   local samples={};for t=from,tl.FloatEnd,.05 do samples[#samples+1]=t end;samples[#samples+1]=tl.FloatEnd
+   for _,t in ipairs(samples)do
+    local eye,target,fov=Cam.Shot(rig,t,a[2]);local seed=L.SeedPose(rank,tl,t)
+    local x,y,z=L.Project(eye,target,fov,a[2],seed)
+    if not x then worst.overlap='behind the camera at '..t
+    else
+     local r=L.ProjectedRadius(fov,z,L.SeedHeroSize*.5)
+     worst.dx=math.max(worst.dx,math.abs(x-.5));worst.dy=math.max(worst.dy,math.abs(y-.5))
+     if y-r<lay.Title.Y+lay.Title.H/2-.005 then worst.overlap=string.format('title at %.2f s',t)end
+     if y+r>lay.Odds.Y-lay.Odds.H/2+.005 then worst.overlap=string.format('odds at %.2f s',t)end
+     if 2*r<.30 then worst.small=string.format('%.3f of the height at %.2f s',2*r,t)end
+     worst.maxDia=math.max(worst.maxDia,2*r);if t>=tl.FloatEnd-.01 then worst.endDia=2*r end
+    end
+   end
+   check(worst.dx<=.12 and worst.dy<=.16 and not worst.overlap and not worst.small and worst.endDia>=.35 and worst.maxDia<=.45,
+    ('%s %s: the seed centred (off %.3f, %.3f), never under the title / "1 in N" (%s), big (%s), %.0f%% at the end (at most %.0f%%)'):format(tag,a[1],worst.dx,worst.dy,tostring(worst.overlap),tostring(worst.small),worst.endDia*100,worst.maxDia*100))
+  end
+  local b=boxes[rank];local inside=true
+  for t=tl.SceneIn-.05,tl.FloatEnd+3,.05 do local eye=Cam.Shot(rig,t,16/9);if math.abs(eye.X)>b[1]or eye.Z<b[2]or eye.Z>b[3]or eye.Y<=b[4]or eye.Y>=b[5]then inside=false end end
+  check(inside,tag..': the camera stays inside the stage (the map and sky are never seen)')
+ end end
+end
 -- King: the crown lands on the PACK, then rises with the seed
 do local tl=L.Timeline(8,'Full');local pack=L.PackPose(8,tl,tl.CrownOn+.1)
  local c0=L.CrownPose(tl,tl.CrownStart-.1);local c1,_,a1=L.CrownPose(tl,tl.CrownOn+.35);local c2=L.CrownPose(tl,tl.Climax+1) -- (R152: c1 after the little press as it lands)

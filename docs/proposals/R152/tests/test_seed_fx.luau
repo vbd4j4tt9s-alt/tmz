@@ -15,6 +15,8 @@
 --     flourish beam goes with its pack
 --  6. smoothness, at 30 and 60 fps: the pack, the seed, the crown, the camera and the card's seed never jump (no pop) and never change speed
 --     in one frame (no kink) at any phase boundary, and every one of them is in the same place at the same moment at 30 and at 60 fps
+--     R155: the story stages' camera is the cinematic camera (RarePullCamera155): its own cuts and its designed breaks - the dead stop on the
+--     silence, the lens snaps on the lock clicks / the crown, the glitch jitter, each a frame either side of its beat - are the only exceptions.
 --  7. budgets per tier: beam layers, particles emitted per presentation
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local Y=require('./rare152_env')(W,E,F,X)
@@ -455,8 +457,22 @@ local function record(p,dt)
  local tr={Pack=tracker(),Seed=tracker(),Crown=tracker(),Eye=tracker(),Look=tracker(),Fov=tracker(),Card=tracker(),CardSize=tracker(),Halo=tracker()}
  local gui=X.pg:FindFirstChild('RarePullReveal');local view=gui and X.find(gui,'Seed');local scale=view and view:FindFirstChildOfClass('UIScale')
  local cutTimes={}
- if run.Kind=='Scene'then for _,k in ipairs(L.Shots[p.Rank][tl.Variant=='Calm'and'Calm'or'Full'])do if k.Cut then cutTimes[#cutTimes+1]=(tl[k.Beat]or 0)+(k.Offset or 0)end end end
+ -- R155: the story stages' camera is the cinematic one (RarePullCamera155): its cuts are its own, and it has a few breaks that are designed, each
+ -- on its beat: the dead stop on the silence (it speeds up into it, then stops), the lens snaps on the lock clicks / the crown, the glitch
+ -- jitter. Exactly those moments (a frame either side) are left out of the camera's smoothness; everything else must be smooth.
+ local Cam155=M.Camera;local rig=run.Kind=='Scene'and Cam155 and Cam155.New(p.Rank,tl.Variant,tl)or nil
+ local breaks={} -- {from, to, which: 'all' | 'fov' | 'move'}
+ if rig then
+  for _,c in ipairs(rig.Cuts)do cutTimes[#cutTimes+1]=c end
+  if not rig.Calm then
+   breaks[#breaks+1]={tl.Silence,tl.Silence,'all'}
+   for _,c in ipairs(rig.Clicks or{})do breaks[#breaks+1]={c,c+Cam155.Limits.SnapSeconds,'all'}end
+   if p.Rank==8 then breaks[#breaks+1]={tl.CrownOn,tl.CrownOn+Cam155.Limits.SnapSeconds,'fov'}end
+   if p.Rank==6 then for _,g in ipairs({'Glitch1','Glitch2'})do breaks[#breaks+1]={tl[g],tl[g]+.22,'move'}end end
+  end
+ elseif run.Kind=='Scene'then for _,k in ipairs(L.Shots[p.Rank][tl.Variant=='Calm'and'Calm'or'Full'])do if k.Cut then cutTimes[#cutTimes+1]=(tl[k.Beat]or 0)+(k.Offset or 0)end end end
  local function nearCut(t)for _,c in ipairs(cutTimes)do if t>=c-dt-1e-6 and t<c+dt+1e-6 then return true end end;return false end
+ local function inBreak(t,what)for _,b in ipairs(breaks)do if(b[3]=='all'or b[3]==what)and t>=b[1]-dt-1e-6 and t<b[2]+dt+1e-6 then return true end end;return false end
  X.run(tl.Length+.2,dt,function()
   if run.Done then for _,x in pairs(tr)do x.add(0,nil)end;return end
   local t=run.Clock();local st=stage();local sc=run.Scene
@@ -472,8 +488,9 @@ local function record(p,dt)
   else tr.Crown.add(t,nil)end
   -- the camera in the stage (not across a cut; not in the hit's shake, which is meant to shake)
   local camOk=inStage and t>=tl.SceneIn and not nearCut(t)and not(t>=tl.Climax-dt and t<tl.Climax+.5+dt)
-  tr.Eye.add(t,camOk and cam.CFrame.Position or nil);tr.Look.add(t,camOk and cam.CFrame.LookVector*10 or nil)
-  tr.Fov.add(t,(camOk or(not inStage and(run.Kind=='Ladder'or t<(tl.SceneIn or math.huge)-.1)))and cam.FieldOfView or nil)
+  local moveOk=camOk and not inBreak(t,'move')
+  tr.Eye.add(t,moveOk and cam.CFrame.Position or nil);tr.Look.add(t,moveOk and cam.CFrame.LookVector*10 or nil)
+  tr.Fov.add(t,((camOk and not inBreak(t,'fov'))or(not inStage and(run.Kind=='Ladder'or t<(tl.SceneIn or math.huge)-.1)))and cam.FieldOfView or nil)
   -- the card's seed (screen heights)
   if view and view.Parent and view.Visible and t>=(tl.Burst or tl.Climax)+.21 then tr.Card.add(t,view.Position.Y.Scale);tr.CardSize.add(t,scale and scale.Scale or 1)
   else tr.Card.add(t,nil);tr.CardSize.add(t,nil)end

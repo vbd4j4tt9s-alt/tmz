@@ -126,8 +126,10 @@ for rank=6,8 do
  local bag=reveal(oc,rank);local t0=R.clock;local tl=L.WorldTimeline(rank);local dur=Rules.GetRevealDuration(names[rank])
  local who=Players:GetPlayerFromCharacter(oc)
  local early,pillar,ring,aura,stageSeen,cinematic=false,false,false,false,false,false;local landedAt
+ local camMoved=false;local cf0,fov0=tostring(cam.CFrame.Position)..tostring(cam.CFrame.LookVector),cam.FieldOfView -- (R155)
  X.run(dur-.05,1/30,function(now)
   local t=now-t0;local e=World.Get(who)
+  if tostring(cam.CFrame.Position)..tostring(cam.CFrame.LookVector)~=cf0 or cam.FieldOfView~=fov0 or cam.CameraType~=R.Enum.CameraType.Custom or cam:FindFirstChild('RarePullDof')then camMoved=true end
   if W.workspace:FindFirstChild('_RarePullStage')then stageSeen=true end
   if M.Active()then cinematic=true end
   if e then
@@ -144,6 +146,7 @@ for rank=6,8 do
  check(landedAt and landedAt>=tl.Burst-.001 and landedAt<tl.Burst+1/30+.001,names[rank]..': and lands on it ('..tostring(landedAt)..' s)')
  check(ring,names[rank]..': a shockwave ring on the ground')
  check(not stageSeen and not cinematic,names[rank]..': onlookers never get the story scene (no hidden stage, no camera)')
+ check(not camMoved,names[rank]..': R155: an onlooker\'s camera is never written (CFrame, FieldOfView, type; no depth of field)')
  bag:Destroy();X.run(1)
  local root=oc:FindFirstChild('HumanoidRootPart')
  check(World.Get(who)~=nil and root:FindFirstChild('RarePullAura')~=nil,names[rank]..': the afterglow aura stays after the reveal ends')

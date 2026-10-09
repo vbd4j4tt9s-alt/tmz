@@ -67,6 +67,7 @@ local function restoredAll(tag,opts)
  check(X.core.PlayerList==true and X.core.Chat==true and X.core.Backpack==false,tag..': Core GUI restored (and the Backpack, already off, left off)')
  check(X.controls.Enabled,tag..': movement is back')
  check(cam:FindFirstChild('RarePullGrade')==nil and cam:FindFirstChild('RarePullBlur')==nil,tag..': the colour grade and blur are gone')
+ check(cam:FindFirstChild('RarePullDof')==nil,tag..': the depth of field is gone (R155)')
  check(stage()==nil,tag..': the hidden stage is destroyed')
  check(X.pg:FindFirstChild('RarePullReveal')==nil,tag..': the reveal GUI is gone')
  check(W.rsBound[M.BindName]==nil and W.actions[M.SkipAction]==nil,tag..': no render step or skip binding left')
@@ -99,6 +100,7 @@ for rank=6,8 do
   end
   if cam:FindFirstChild('RarePullGrade')then log.grade=true end
   if cam:FindFirstChild('RarePullBlur')then log.blurSeen=true end
+  if cam.CameraType==R.Enum.CameraType.Scriptable then log.stageFrames=(log.stageFrames or 0)+1;if cam:FindFirstChild('RarePullDof')then log.dofFrames=(log.dofFrames or 0)+1 end elseif cam:FindFirstChild('RarePullDof')then log.dofOutside=true end
   if cam.CameraType==R.Enum.CameraType.Scriptable and not log.switchAt then log.switchAt=t end
   if log.switchAt and not log.backAt and cam.CameraType~=R.Enum.CameraType.Scriptable then log.backAt=t end
   if cam.CameraType==R.Enum.CameraType.Scriptable and(cam.CFrame.Position-L.StageOrigin).Magnitude>120 then log.nearStage=false end
@@ -138,6 +140,7 @@ for rank=6,8 do
  check(X.controls.Disables==disables+1,tag..': movement held once')
  check(log.grade and log.lightingSame,tag..': the colour grade lives on the Camera; Lighting is never written')
  check(log.blurSeen,tag..': a short blur on the fades (desktop)')
+ check(log.stageFrames and log.dofFrames==log.stageFrames and not log.dofOutside,tag..': R155: the depth of field (RarePullDof) on the Camera on every stage frame, never outside the stage')
  check(log.switchAt and near(log.switchAt,tl.SceneIn-.05,.07),tag..': the camera cuts to the stage while the screen is black ('..tostring(log.switchAt)..' s)')
  check(log.backAt and near(log.backAt,pressAt+M.SceneExit,.07),tag..': and back to the player '..M.SceneExit..' s after the collect (at '..tostring(log.backAt)..' s)')
  check(log.nearStage,tag..': the camera only looks at the hidden stage')
@@ -175,23 +178,34 @@ do local S=W.module('RarePullScenes')
  end end
 end
 -- 2. skip ----------------------------------------------------------------------------------------------------------------------------------
+-- R155 (owner: "for some cutscenes u can skip it by spam clicking disable this feature and u can only skip at the bottom right of the
+-- screen"): a click / tap anywhere never skips; the SKIP button at the bottom right does (and gamepad B / R2, Enter)
 reset();E.resetPlays()
 do
  local run=start(8);local tl=run.TL;local t0=R.clock
  X.run(1.0)
- check(M.Skip()==false,'King: no skip before '..tl.SkipFrom..' s')
+ local skip=X.find(X.pg,'Skip button')
+ check(M.Skip()==false and skip and not skip.Visible,'King: no skip before '..tl.SkipFrom..' s (no SKIP button yet)')
  X.run(1.5)
  local button=X.find(X.pg,'Backdrop')
- check(button and button:GetAttribute('ButtonHighlight')==false and button:GetAttribute('ButtonSound')==false,'the tap-anywhere skip is silent and unhighlighted')
- button.Activated:Fire()
+ check(button and button:GetAttribute('ButtonHighlight')==false and button:GetAttribute('ButtonSound')==false,'the screen-wide button (it takes every click) is silent and unhighlighted')
+ local c0,r0=run.Clock(),R.clock
+ for _=1,8 do button.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1});button.Activated:Fire();X.run(.05)end
+ check(not run.Skipped and run.Clock()<tl.Climax-.5 and near(run.Clock()-c0,R.clock-r0,1e-6),'King: R155: spam clicks / taps on the screen do not skip ('..string.format('%.2f',run.Clock())..' s)')
+ check(skip.Visible and skip.Parent==button.Parent and skip.ZIndex>button.ZIndex and skip.Active,'King: R155: the SKIP button shows, above the screen-wide button')
+ do local x,y,w,h=X.rect(skip,1280,720)
+  check(x>=640 and x+w<=1280-12+1e-6 and y>=720*.45 and y+h<=720-12+1e-6 and h>=34,('King: R155: the SKIP button sits at the bottom right (%.0f, %.0f, %.0f x %.0f of 1280 x 720)'):format(x,y,w,h))
+ end
+ skip.Activated:Fire()
  X.run(.1)
  local t=run.Clock()
- check(near(t,tl.Climax,.12),'King: a tap after '..tl.SkipFrom..' s jumps straight to the hit ('..string.format('%.2f',t)..' s)')
+ check(near(t,tl.Climax,.12),'King: the SKIP button after '..tl.SkipFrom..' s jumps straight to the hit ('..string.format('%.2f',t)..' s)')
  local impact=voices('Impact_1')[1]
  check(impact and impact.PlayLog[#impact.PlayLog]and R.clock-impact.PlayLog[#impact.PlayLog].At<.2,'King: the hit\'s Impact plays on the skip')
+ X.run(.2);check(not skip.Visible,'King: R155: the SKIP button goes once the hit has come')
  X.run(L.ShownAt(tl)+M.CollectAfter+.05-run.Clock())
- check(W.actions[M.SkipAction]~=nil,'Space / Enter / A / B skip too (bound while the scene runs)')
- W.actions[M.SkipAction](M.SkipAction,R.Enum.UserInputState.Begin)
+ check(W.actions[M.SkipAction]~=nil,'Space / Enter / A / B / R2 are bound while the scene runs (R155: B / R2 / Enter press the SKIP button; any of them collects)')
+ W.actions[M.SkipAction](M.SkipAction,R.Enum.UserInputState.Begin,{KeyCode=R.Enum.KeyCode.ButtonB})
  X.run(.05)
  check(run.Collected,'King: a second press once the result is shown collects it (R154: it used to close it)')
  X.run(M.SceneExit+(tl.Length-tl.Back)+.3);local g=0;while Collect.Flying()>0 and g<300 do X.run(1/30);g+=1 end
@@ -243,11 +257,14 @@ do -- ReducedMotion: the Calm scene - still shots (cuts only), no shake, no blur
  local run=start(8);local tl=run.TL;local t0=R.clock
  check(run.Kind=='Scene'and run.Variant=='Calm','ReducedMotion: the Calm scene')
  local moved,blur,lastPos,lastT=0,false,nil,nil
+ local dofCalm,rollCalm=nil,false -- (R155)
  local cuts={tl.SceneIn,tl.Climax}
  X.run(tl.Length+.3,1/30,function(now)
   local t=now-t0
   if cam:FindFirstChild('RarePullBlur')then blur=true end
   if cam.CameraType==R.Enum.CameraType.Scriptable then
+   if cam:FindFirstChild('RarePullDof')then dofCalm=(dofCalm or 0)+1 end
+   if math.abs(cam.CFrame.RightVector.Y)>1e-9 then rollCalm=true end
    local p=cam.CFrame.Position
    if lastPos and(p-lastPos).Magnitude>1e-6 then local isCut=false;for _,c in ipairs(cuts)do if math.abs(t-c)<.07 then isCut=true end end;if not isCut then moved+=1 end end
    lastPos=p
@@ -256,6 +273,7 @@ do -- ReducedMotion: the Calm scene - still shots (cuts only), no shake, no blur
  collect(run)
  check(moved==0,'ReducedMotion: the camera never moves inside a shot (cuts only; '..moved..' moving frames)')
  check(not blur,'ReducedMotion: no blur')
+ check(dofCalm and not rollCalm,'ReducedMotion: R155: no dutch tilt; a still depth of field stays on (the owner: background blur on every device)')
  check(tl.Length<L.Timeline(8,'Full').Length-2,'ReducedMotion: shorter ('..tl.Length..' s)')
  check(X.controls.Enabled and hudShown(),'ReducedMotion: restored');restoredAll('ReducedMotion')
 end
@@ -264,13 +282,16 @@ do -- phone: lighter stage, gentle shake, no blur
  local run=start(8);local tl=run.TL
  check(run.Lite and run.Phone,'phone: the light version')
  local parts,blur=0,false
+ local dofPhone=true -- (R155)
  X.run(tl.Length+.3,1/30,function()
   local st=stage();if st then local n=0;for _,d in ipairs(st:GetDescendants())do if d:IsA('BasePart')then n+=1 end end;parts=math.max(parts,n)end
   if cam:FindFirstChild('RarePullBlur')then blur=true end
+  if cam.CameraType==R.Enum.CameraType.Scriptable then dofPhone=dofPhone and cam:FindFirstChild('RarePullDof')~=nil end
  end)
  collect(run)
  check(parts>20 and parts<=200,'phone: King stage '..parts..' parts (<= 200 with the pack, the seed and its aura)')
  check(not blur,'phone: no blur (no stacked post-processing)')
+ check(dofPhone,'phone: R155: the depth of field (the background blur) is on the phone too (the owner: "background blur on all devices")')
  restoredAll('phone')
 end
 do -- unsafe: the in-place version (no camera, no stage, HUD and movement untouched)
@@ -354,9 +375,11 @@ do -- R153: every card can be skipped by the player (R151 / R152: only the story
   local run,bag=start(c[1]);local tl=run.TL;local hit=tl.Climax or tl.Burst;local tag='R153 '..names[c[1]]..(c[2]and' in place'or' card')
   X.run(tl.SkipFrom-.1);check(M.Skip()==false,tag..': no skip before '..tl.SkipFrom..' s')
   X.run(.3)
-  local hint=X.find(X.pg,'Skip hint')
-  check(hint and hint.Visible and hint.TextTransparency<1,tag..': the skip hint shows')
-  check(M.Skip()and near(run.Clock(),hit-.02,.01),tag..': a skip jumps straight to the hit')
+  local skipB=X.find(X.pg,'Skip button')
+  check(skipB and skipB.Visible and skipB.BackgroundTransparency<1,tag..': the SKIP button shows (R155: it replaces the "click to skip" hint)')
+  W.UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,KeyCode=R.Enum.KeyCode.Unknown,Position=V3(400,300,0)},false)
+  check(not run.Skipped,tag..': R155: a click on the world does not skip')
+  check(M.Skip()and near(run.Clock(),hit-.02,.01),tag..': the SKIP button jumps straight to the hit')
   check(W.actions[M.SkipAction]==nil and X.find(X.pg,'Backdrop')==nil and X.controls.Enabled and hudShown(),tag..': nothing is taken from the player (no full-screen button, no bound keys, the HUD and movement stay)')
   X.run(L.ShownAt(tl)-run.Clock()+.1)
   check(not M.Skip()and not run.Collected,tag..': a press just as the result lands does nothing yet (R154: CollectAfter)')

@@ -55,7 +55,7 @@ assert owner==confirmed,'slot ids are not exactly the owner\'s confirmed uploads
 print('ok: the fallback sounds use only the game\'s existing sounds (%d ids); the slots carry exactly the owner\'s 17 confirmed uploads (8 shared, 3 King, 4 Cosmic, 2 Secret)'%len(ids))
 PY
 # Lighting is never written by the reveal (its grade / blur live on the Camera)
-if grep -nE "Lighting\.|GetService\('Lighting'\)|GetService\(\"Lighting\"\)" "$S/ReplicatedStorage/RarePullCinematic.lua" "$S/ReplicatedStorage/RarePullCard.lua" "$S/ReplicatedStorage/RarePullScenes.lua" "$S/ReplicatedStorage/RarePullWorld.lua" "$S/ReplicatedStorage/PackSuspense.lua";then echo "FAIL: a reveal module touches Lighting";exit 1;fi
+if grep -nE "Lighting\.|GetService\('Lighting'\)|GetService\(\"Lighting\"\)" "$S/ReplicatedStorage/RarePullCinematic.lua" "$S/ReplicatedStorage/RarePullCard.lua" "$S/ReplicatedStorage/RarePullScenes.lua" "$S/ReplicatedStorage/RarePullWorld.lua" "$S/ReplicatedStorage/PackSuspense.lua" "$S/ReplicatedStorage/RarePullCamera155.lua";then echo "FAIL: a reveal module touches Lighting";exit 1;fi
 echo "ok: no reveal module touches Lighting"
 INV=$P/inventory_R113/tests
 cp "$T/roblox.luau" "$INV/world.luau" "$INV/fixtures.luau" "$P/R150/tests/sfx_env.luau" "$HERE"/*.luau "$OUT/cl/"
