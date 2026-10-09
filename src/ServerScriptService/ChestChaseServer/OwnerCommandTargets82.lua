@@ -3,6 +3,8 @@ local T={}
 function T.Split(text)
  if type(text)~='string'or #text>220 then return nil,nil,'Command must be 1–220 characters.'end
  text=text:match('^%s*(.-)%s*$')
+ -- R156: "/test pyramid @name reset" (the owner's order) is "/test pyramid reset @name"
+ do local head,who,tail=text:match('^(.-[Pp][Yy][Rr][Aa][Mm][Ii][Dd])%s+@([%w_]+)%s+(%a+)$');if head and head:lower():match('pyramid$')then return head..' '..tail,who end end
  local body,target=text:match('^(.-)%s+@([%w_]+)$')
  if body then return body,target end
  -- R157: "playtime @name 12" (the name before the minutes) means "playtime 12 @name": the one command that is typed that way

@@ -191,6 +191,8 @@ local function runServer()
 	do local ok,err=pcall(function()require(modules.VoidGiveaway152).new(Config,playerData,chestService,notifications,mapService):Start()end);if not ok then warn('[R152] Void giveaway failed to start: '..tostring(err))end end
 	-- R155: the Bag's server half (discarding items, the saved hotbar layout). A failure here never stops the server: no discarding, the layout is not saved.
 	do local ok,err=pcall(function()require(modules.InventoryService155).new(Config,playerData,chestService,gifts,notifications):Start()end);if not ok then warn('[R155] Inventory service failed to start: '..tostring(err))end end
+	-- R156: the Desert pyramid's secret Mythic pack (Hold E from outside, carried home past the Sand Snake, one per player once banked). A failure here never stops the server: no secret pack.
+	do local ok,err=pcall(function()require(modules.SecretPyramid156).new(Config,playerData,chestService,chaseService,notifications,mapService):Start()end);if not ok then warn('[R156] Secret pyramid failed to start: '..tostring(err))end end
 	require(modules.MovementGuard).Start(Config,playerData,baseService)
 	-- R153: a body that rests on a track wall top (or in the blockers on it) is put back on the track; four looks a second. A failure here never stops the server.
 	do local ok,err=pcall(function()require(modules.TrackWalls153).Start()end);if not ok then warn('[R153] Track wall guard failed to start: '..tostring(err))end end

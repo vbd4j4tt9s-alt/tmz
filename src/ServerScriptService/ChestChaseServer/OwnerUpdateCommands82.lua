@@ -39,12 +39,15 @@ X.Actions.keepermodels=true
 X.Actions.voidgift=true
 -- R157: playtime [<minutes>] (per player, Studio only to set): the play time the free Void Pack's claim waits for (VoidGiveaway152): /test playtime @name <minutes>.
 X.Actions.playtime=true
+-- R156: pyramid [@username] (status), pyramid @username reset (clears the secret pyramid pack's claim; saved): SecretPyramid156.
+X.Actions.pyramid=true
 function X.Execute(ctx,p,action,a)
  if action=='keepermodels'then return require(script.Parent.KeeperMeshCommand152).Execute(ctx,p,a)end
  if action=='hubtrees'then return require(script.Parent.HubTreeLoader151).Command(ctx,p,a)end
  if action=='trampoline'then return require(script.Parent.HubTrampoline153).Command(ctx,p,a)end
  if action=='voidgift'then return require(script.Parent.VoidGiveaway152).Command(ctx,p,a)end
  if action=='playtime'then return require(script.Parent.VoidGiveaway152).PlaytimeCommand(ctx,p,a)end
+ if action=='pyramid'then return require(script.Parent.SecretPyramid156).Command(ctx,p,a)end
  if action=='rarepull'or action=='raresound'then return require(script.Parent.RarePullTestCommands).Execute(ctx,p,action,a)end
  if action=='plantnotify'then return require(script.Parent.SocialService).Command(ctx,p,a)end
  if action=='packshape'then return require(script.Parent.PackShapeCommand151).Execute(ctx,p,a)end

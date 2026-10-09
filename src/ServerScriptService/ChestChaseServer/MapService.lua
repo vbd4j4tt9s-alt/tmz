@@ -95,6 +95,8 @@ function MapService.new(config)
     raiseMapBoundaries(mapRoot)
     -- R153: nobody can stand on a track wall: tall invisible blockers on every wall top, flush with its inner face (the saved barriers leave a 1-stud strip of it open)
     do local ok,err=pcall(function()require(script.Parent.TrackWalls153).Apply(mapRoot)end);if not ok then warn('[R153] Track wall blockers skipped: '..tostring(err))end end
+    -- R156: the owner's Classic Pyramid (hollow, a secret Mythic pack inside) replaces the Sunscar Pyramid on its footprint; before the keyboard scan and the pack-placement cache. A failure keeps the old pyramid.
+    do local ok,err=pcall(function()require(script.Parent.SecretPyramid156).Apply(mapRoot)end);if not ok then warn('[R156] Desert pyramid skipped: '..tostring(err))end end
 
 
 	local oldRuntime = mapRoot:FindFirstChild(config.RuntimeFolderName)

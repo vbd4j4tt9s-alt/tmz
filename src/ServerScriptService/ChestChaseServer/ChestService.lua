@@ -196,6 +196,10 @@ function ChestService:Bank(player, seed)
 	local record, reason = self.PlayerData:AddChest(player, seed, {Luck=true, Banked=true})
 	if not record then return nil, reason end
 	if seed.TestGrant == true then record.TestGrant = true end -- R151: a world pack an owner command spawned (a forced event) is a TEST pack: never announced when opened
+	if seed.Pyramid156 ~= nil and self.Pyramid156 then -- R156: the Desert pyramid's secret pack is claimed in the same step it is banked (SecretPyramid156:Banked; never yields)
+		local okClaim, claimError = pcall(self.Pyramid156.Banked, self.Pyramid156, player, seed, record)
+		if not okClaim then warn("[R156] Secret pyramid claim: " .. tostring(claimError)) end
+	end
 	self.PlayerData:QuestEvent(player,'Steal',1) -- R140 daily quest: a pack stolen from the track and banked
 	self:SyncTools(player)
 	return record

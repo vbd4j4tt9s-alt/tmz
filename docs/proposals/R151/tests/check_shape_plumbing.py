@@ -33,6 +33,7 @@ EXPECTED = {
     'ServerScriptService/ChestChaseServer/MysteryPackService.lua', # the pedestal
     'ServerScriptService/ChestChaseServer/StudioTestCommands.lua', # /test pack (hand-made records)
     'ServerScriptService/ChestChaseServer/RarePackTests.lua',      # /test rarepacks (hand-made records)
+    'ServerScriptService/ChestChaseServer/SecretPyramid156.lua',   # R156: the Desert pyramid's secret pack record: PackShape 0 (the default shape for life, so the Bag does not roll one)
 }
 found = set()
 for base, _, files in os.walk(src):
