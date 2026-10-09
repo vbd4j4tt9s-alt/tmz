@@ -39,7 +39,7 @@ PY
 CHANGED=$( (git -C "$REPO" diff --name-only "$BASE" -- 'src/ReplicatedStorage/RarePull*';git -C "$REPO" ls-files -o --exclude-standard -- 'src/ReplicatedStorage/RarePull*') | sort -u | tr '\n' ' ')
 WANT="src/ReplicatedStorage/RarePullCamera155.lua src/ReplicatedStorage/RarePullCard.lua src/ReplicatedStorage/RarePullCinematic.lua "
 [ "$CHANGED" = "$WANT" ] && echo "ok: of the RarePull modules exactly these changed since $BASE: $CHANGED" || fail "RarePull modules changed since $BASE: $CHANGED(want: $WANT)"
-git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua && echo "ok: BackgroundMusic untouched" || fail "BackgroundMusic changed"
+{ git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua || sh "$REPO/tools/tests/bgm_frozen.sh" "$REPO"; } && echo "ok: BackgroundMusic untouched (or the R156 music script frozen in frozen.sha256)" || fail "BackgroundMusic changed"
 for f in RarePullCamera155 RarePullCinematic RarePullCard;do
  /opt/luau/luau-compile -O0 --binary "$RSD/$f.lua" >/dev/null 2>"$OUT/c.err" && ! grep -q Error "$OUT/c.err" || { fail "$f does not compile at -O0";cat "$OUT/c.err"; }
  peak=$(/opt/luau/luau-compile -O0 -g2 --text "$RSD/$f.lua" 2>/dev/null | awk '/^local [0-9]+ \(.*\): reg [0-9]+,/ { s=$0; sub(/.*\): reg /,"",s); sub(/,.*/,"",s); if(s+1>m) m=s+1 } END{print m+0}')

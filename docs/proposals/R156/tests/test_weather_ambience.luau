@@ -3,7 +3,7 @@
 -- weather"). On the Roblox mock with the REAL BiomeMood and the REAL BiomeAmbience.client of this checkout:
 --  A. BiomeMood.SoundTargets: in the base each of the 3 weathers gives exactly its bed at its volume and the other two at 0; Clear / Cloudy / unknown weather give none; the
 --     track (stages 1-7) gives none in any weather; not alive gives all 0; the chase gives x0.12; never two beds; and every OLD key (Birds / Leaves / Wind / Crystal / Rumble)
---     has exactly the old formula's target for every stage, weather, refresh, chase and alive combination (the old function is copied below as the reference).
+--     has exactly the old formula's target (the track stages 1-7 x1.25, R156) for every stage, weather, refresh, chase and alive combination (the old function is copied below as the reference).
 --  B. the rows: the 3 new ones, the 5 old ones untouched, well formed, unique; the asset ids; the owner's override attribute; M.WeatherBeds is the one place for the volumes.
 --  C. the real BiomeAmbience.client: it makes and preloads a Sound per row (the 3 new ones too, on the Ambience group, looped, silent), fades each bed in and out through
 --     its alpha (no jump, a crossfade between two weathers, paused at 0 and resumed), is silent on the track, quiet in a chase, follows the Ambience slider and the
@@ -17,17 +17,19 @@ local RS=W.RS;local Mood=W.module('BiomeMood')
 local OLDKEYS={'Birds','Leaves','Wind','Crystal','Rumble'};local BEDKEYS={'RainBed','ThunderBed','BlizzardBed'}
 
 -- The pre-R156 function, copied as it was (src/ReplicatedStorage/BiomeMood.lua before this round): the reference for "the old keys did not move".
+-- R156 (owner: the track ambience "a bit" louder, in the same release): the track stages 1-7 are x1.25 (TRACK_GAIN); stage 0 and every rule below are as they were.
+local TRACK_GAIN=1.25
 local function oldTargets(stage,weather,refresh,chase,alive)
  local t={Birds=0,Leaves=0,Wind=0,Crystal=0,Rumble=0}
  if not alive then return t end
  if stage==0 then t.Birds=.018;t.Leaves=.022
- elseif stage==1 then t.Birds=.040;t.Leaves=.035
- elseif stage==6 then t.Birds=.033;t.Leaves=.045
- elseif stage==2 then t.Wind=.035
- elseif stage==3 then t.Wind=.045
- elseif stage==5 then t.Crystal=.008;t.Wind=.012
- elseif stage==4 then t.Rumble=.018;t.Wind=.016
- elseif stage==7 then t.Wind=.055;t.Rumble=.025 end
+ elseif stage==1 then t.Birds=.040*TRACK_GAIN;t.Leaves=.035*TRACK_GAIN
+ elseif stage==6 then t.Birds=.033*TRACK_GAIN;t.Leaves=.045*TRACK_GAIN
+ elseif stage==2 then t.Wind=.035*TRACK_GAIN
+ elseif stage==3 then t.Wind=.045*TRACK_GAIN
+ elseif stage==5 then t.Crystal=.008*TRACK_GAIN;t.Wind=.012*TRACK_GAIN
+ elseif stage==4 then t.Rumble=.018*TRACK_GAIN;t.Wind=.016*TRACK_GAIN
+ elseif stage==7 then t.Wind=.055*TRACK_GAIN;t.Rumble=.025*TRACK_GAIN end
  if weather=='Rain'or weather=='Thunderstorm'or weather=='Blizzard'then
   t.Birds*=.15;t.Leaves*=.65;t.Wind=math.max(t.Wind,weather=='Blizzard'and .055 or .040)
   if weather=='Thunderstorm'then t.Rumble=math.max(t.Rumble,.022)end
@@ -139,7 +141,7 @@ do
   if nonzero>1 then twoBeds+=1 end
  end end end end end
  print(('  %d combinations (stage -1..8, 9 weathers, refresh, chase, alive true / false / nil)'):format(combos))
- check(badOld==0,('every old key (Birds / Leaves / Wind / Crystal / Rumble) has exactly the old formula\'s target in all %d combinations (%d differ) %s'):format(combos,badOld,tostring(firstBad)))
+ check(badOld==0,('every old key (Birds / Leaves / Wind / Crystal / Rumble) has exactly the old formula\'s target (the track stages x1.25) in all %d combinations (%d differ) %s'):format(combos,badOld,tostring(firstBad)))
  check(badBed==0,('every bed is its Volume only in the base, alive, in its own weather; x0.12 in a chase; 0 otherwise (%d wrong) %s'):format(badBed,tostring(firstBad)))
  check(badKeys==0,'the result has exactly the 8 keys (5 old + 3 beds), always')
  check(twoBeds==0,'never two beds at once, in any combination')

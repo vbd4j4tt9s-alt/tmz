@@ -40,7 +40,7 @@ for f in PackOdds112 PackLuck154;do grep -q "^# R155 (on purpose): .*$f.lua.*pac
 echo "ok: the frozen odds files match their hashes; PackOdds112 / 137 and PackLuck154 carry their R155 pity notes"
 # (after the R155 merges the cinematic, the card, the hotbar and SeedPackRules change for other R155 work, and the card's SKIP pill now keeps clear of the bars; these two never change)
 # (the R155 release sets Config.Version: that one value may change, nothing else in Config.lua)
-git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua || fail "BackgroundMusic changed since $BASE (the music stays as it is)"
+git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua || sh "$REPO/tools/tests/bgm_frozen.sh" "$REPO" || fail "BackgroundMusic changed since $BASE (the music stays as it is)" # R156 (on purpose): but for the owner's music change, accepted by its frozen hash
 [ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | sed "s/Config\.Version='[^']*'/Config.Version=V/")" = "$(sed "s/Config\.Version='[^']*'/Config.Version=V/" "$SS/Config.lua")" ] || fail "Config.lua changed beyond Config.Version since $BASE (ProfileVersion stays)"
 grep -qE "Config\.Version='V150 R15[0-9a-z]*'" "$SS/Config.lua" || fail "Config.Version must be a V150 R15x release number (the release step sets it)"
 grep -q "Config.ProfileVersion=22" "$SS/Config.lua" || fail "ProfileVersion is not 22"

@@ -117,17 +117,19 @@ function M.AudioId(row)
  if not value or value%1~=0 or value<=0 or value>=9007199254740991 then return nil end
  return 'rbxassetid://'..string.format('%.0f',value)
 end
+-- R156 (owner: "for the track ambience ... increase the volume by a bit"): the track stages 1-7 are x1.25 (TRACK_GAIN: louder / quieter = change it); stage 0, the weather / refresh / chase rules and M.WeatherBeds are as they were.
+local TRACK_GAIN=1.25
 function M.SoundTargets(stage,weather,refresh,chase,alive)
  local t={Birds=0,Leaves=0,Wind=0,Crystal=0,Rumble=0,RainBed=0,ThunderBed=0,BlizzardBed=0}
  if not alive then return t end
  if stage==0 then t.Birds=.018;t.Leaves=.022
- elseif stage==1 then t.Birds=.040;t.Leaves=.035
- elseif stage==6 then t.Birds=.033;t.Leaves=.045
- elseif stage==2 then t.Wind=.035
- elseif stage==3 then t.Wind=.045
- elseif stage==5 then t.Crystal=.008;t.Wind=.012
- elseif stage==4 then t.Rumble=.018;t.Wind=.016
- elseif stage==7 then t.Wind=.055;t.Rumble=.025 end
+ elseif stage==1 then t.Birds=.040*TRACK_GAIN;t.Leaves=.035*TRACK_GAIN
+ elseif stage==6 then t.Birds=.033*TRACK_GAIN;t.Leaves=.045*TRACK_GAIN
+ elseif stage==2 then t.Wind=.035*TRACK_GAIN
+ elseif stage==3 then t.Wind=.045*TRACK_GAIN
+ elseif stage==5 then t.Crystal=.008*TRACK_GAIN;t.Wind=.012*TRACK_GAIN
+ elseif stage==4 then t.Rumble=.018*TRACK_GAIN;t.Wind=.016*TRACK_GAIN
+ elseif stage==7 then t.Wind=.055*TRACK_GAIN;t.Rumble=.025*TRACK_GAIN end
  if weather=='Rain'or weather=='Thunderstorm'or weather=='Blizzard'then
   t.Birds*=.15;t.Leaves*=.65;t.Wind=math.max(t.Wind,weather=='Blizzard'and .055 or .040)
   if weather=='Thunderstorm'then t.Rumble=math.max(t.Rumble,.022)end
