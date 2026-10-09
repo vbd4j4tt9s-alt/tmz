@@ -127,7 +127,26 @@ if hasNew then
  print('added-script paths covered')
 end
 -- 9) Retired objects: moved into the backup and back, all-or-nothing. Needs the retire list the installer was built with.
-if #D.Retire<3 then print('retire checks skipped: no retire list in the bundle (pass the --retire file to installer_testdata.py)')
+if #D.Retire==0 then print('retire checks skipped: no retire list in the bundle (pass the --retire file to installer_testdata.py)')
+elseif #D.Retire<3 then
+ -- R156: a short retire list (R156 retires one module) can't feed the full set below (it needs 3+ paths, a slash name and mixed Disabled flags);
+ -- the core round trip still runs: install parks each object in the backup, undo puts it back exactly, redo / undo again, and a missing one is skipped.
+ local function parkedIn(w,b)for _,item in pairs(w.Retired)do local p=item.Parent;if not(p and p.Name=='Parked'and p.Parent and p.Parent.Parent==b:FindFirstChild('Retired'))then return false end end;return true end
+ local function snap(w)local s={};for i,item in pairs(w.Retired)do s[i]={Item=item,Parent=item.Parent,Name=item.Name}end;return s end
+ local function back(s)for _,e in pairs(s)do if e.Item.Parent~=e.Parent or e.Item.Name~=e.Name then return false end end;return true end
+ local sw=world();local ss=snap(sw);local n=0;for _ in pairs(ss)do n+=1 end
+ check(n==#D.Retire,'retire (short list): every path exists in the test world ('..n..' of '..#D.Retire..')')
+ ok,err=sw.Run(D.PASTE);check(ok,'retire (short list): paste runs: '..tostring(err))
+ local sb=sw.Storage:FindFirstChild(BACKUP)
+ check(sb~=nil and parkedIn(sw,sb)and all(sw,'After'),'retire (short list): parked in the backup, scripts patched')
+ check(sb and #sb.Retired:GetChildren()==#D.Retire and sb:GetAttribute('RetireCount')==#D.Retire,'retire (short list): one backup entry per path')
+ local si=sw.Req(sb.Installer)
+ ok,err=pcall(si,'undo');check(ok and back(ss)and all(sw,'Before'),'retire (short list): undo restores the object and the scripts: '..tostring(err))
+ ok,err=pcall(si,'install');check(ok and parkedIn(sw,sb)and all(sw,'After'),'retire (short list): redo parks it again: '..tostring(err))
+ ok,err=pcall(si,'undo');check(ok and back(ss)and all(sw,'Before'),'retire (short list): second undo restores again: '..tostring(err))
+ local mw=world();for _,item in pairs(mw.Retired)do item.Parent=nil end
+ ok,err=mw.Run(D.PASTE);check(ok and all(mw,'After'),'retire (short list): a missing object is skipped, the scripts still install: '..tostring(err))
+ print('retire (short list) checks done: '..#D.Retire..' path(s)')
 else
  local function show(names)local out={};for i,n in ipairs(names)do out[#out+1]=n:match('^[%a_][%w_]*$')and(i>1 and'.'..n or n)or('["'..n..'"]')end;return table.concat(out)end
  local function scriptsOf(item)local list=item:IsA('BaseScript')and{item}or{};for _,d in ipairs(item:GetDescendants())do if d:IsA('BaseScript')then list[#list+1]=d end end;return list end
