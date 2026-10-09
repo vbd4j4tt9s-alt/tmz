@@ -8,7 +8,7 @@
 #  * characters and avatars (parts of a model with a Humanoid): the same casters on both sides
 #  * parts of 1.5 studs and more: the same number of casters and non-casters on both sides (bigger parts keep their shadows)
 #  * the sun's shadow casters within 400 studs of the runner and the total: before -> after (printed)
-#  * B3: the keyboard's keys, SurfaceGuis, letter canvas pixels and letters per tier: before -> after (printed); tiers 3 and 1 must be unchanged, tier 2 must have fewer keys and a smaller canvas
+#  * B3: the keyboard's keys, SurfaceGuis, letter canvas pixels and letters per tier: before -> after (printed); tier 3 must be unchanged, tier 2 must have fewer keys and a smaller canvas, tier 1 (R155: owner "yes" to the lighter keyboard on the lowest setting too) the same keys / letters and a smaller canvas
 # Without the place file the runner stops (the census needs the map).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)

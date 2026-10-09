@@ -196,7 +196,7 @@ local function seq(luck)
   local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)];Data:RemoveChest(A2,last.Id)end
  return table.concat(out,'|')
 end
-check(seq(1)==seq(50000000),'boot luck x50M gives the identical 40 claims')
+check(seq(1)==seq(25000000)and seq(1)==seq(50000000),'boot luck x25M (Thunder Boots, R155) and x50M (the cap, with the clover) give the identical 40 claims')
 -- R126 (owner): every roll also rolls the pack size from the world table (BalanceRules.PackSizes), luck-free.
 do
  local want,weights={},{};for _,row in ipairs(PackRules.PackSizes)do want[row.Scale]=row.Weight/100 end

@@ -200,7 +200,7 @@ for _,version in ipairs({'none',0,81,112,137,99})do
  local ok,which=matches(o)
  check(ok and near(sum(o),100,1e-12),('Verity odds equal the table and add up to 100 for version %s (%s, total %.12f)'):format(tostring(version),tostring(which),sum(o)))
 end
-check(matches(oddsFor(137,50000000))and matches(oddsFor(137,nil))and matches(oddsFor(137,3.5)),'boots luck never changes the Verity pack')
+check(matches(oddsFor(137,25000000))and matches(oddsFor(137,50000000))and matches(oddsFor(137,nil))and matches(oddsFor(137,3.5)),'boots luck never changes the Verity pack (R155: Thunder Boots x25M, and x50M with the clover)')
 local formula=.99*.995*.95/5*100
 check(near(oddsFor(137)['SilentFrostbellSeed'],formula,1e-13)and near(oddsFor(137)['MirageFigSeed'],.99*.995*.05/5*100,1e-13)
  and near(oddsFor(137)['PlasmaPepperSeed'],.99*.005*48/99.5*100,1e-13)and oddsFor(137)['VeritySeed']==1,'exact formulas: Secret .99*.995*.95/5, Cosmic .99*.995*.05/5, Mech .99*.005*Chance/99.5, Verity 1')

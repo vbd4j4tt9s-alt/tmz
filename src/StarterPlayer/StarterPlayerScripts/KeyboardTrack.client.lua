@@ -551,7 +551,7 @@ local function start()
  klFree,klFreeN,klMade={},0,0
  klList,klPos,klStamp={},{},{}
  local klAll={}                                       -- every pooled per-key letter ever made (applyTopExtra reaches the idle ones too)
- -- R154 (lag audit B3): the near letters' pixels a stud on this tier (K.NearPPS: 12 on tier 2, 16 elsewhere); a tier change re-applies it to every strip and pressed-key letter already made
+ -- R154 (lag audit B3): the near letters' pixels a stud on this tier (K.NearPPS: 12 on tiers 2 and 1, 16 on tier 3); a tier change re-applies it to every strip and pressed-key letter already made
  function Far.Tune()local want=K.NearPPS(tier);if want~=PPS then PPS=want;TEXT=K.NearText(want);K.RetuneLetters(want,TEXT,KW,{stripFree,stripFreeN,stripRows,stripsOfRow,klAll})end end
  local function keyLegendOffset(gui)
   -- a letter on a key's own face is exactly at the configured top; when the mesh stands higher it is drawn that much toward the camera

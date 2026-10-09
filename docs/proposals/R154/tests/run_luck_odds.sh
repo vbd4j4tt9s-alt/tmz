@@ -8,7 +8,8 @@
 #  1. test    - test_luck_odds.luau (the R153 clover world): the doubled cap, the Void / Verity / Mech packs with and without the clover, the 80% rule on every pack x live version x
 #               luck sweep (against an independent re-implementation), banked packs untouched, real rolls, /test rarepacks randomness, the fixed display at base luck
 #  2. teeth   - the same test on broken copies (each must FAIL): the R153 cap back, the clover ignored by the fixed packs, the rule at 90%, the rule never applied, the upgrade
-#               dropped, /test rarepacks back to the first seed, the display reading the shaped table, the open not passing the clover's luck
+#               dropped, /test rarepacks back to the first seed, the display reading the shaped table, the open not passing the clover's luck; R155: the old boots (x50 ... x50M),
+#               the old 50M cap, the boots reaching the Void / Verity / Mech packs
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
@@ -83,6 +84,10 @@ PY
  mutate first_seed "$SS/RarePackTests.lua" "return list[T.Random:NextInteger(1,#list)]" "return list[1]"
  mutate shaped_display "$RSD/SeedRarity153.lua" "pcall(Rules.RawSeedOdds or Rules.SeedOdds," "pcall(Rules.SeedOdds,"
  mutate open_no_pass "$SS/PlayerDataService.lua" "pack.BagVariant,pack.OddsVersion,pack.RateBoost,passLuck)" "pack.BagVariant,pack.OddsVersion,pack.RateBoost)"
+ # R155 (owner: "Nerf the boots by halfing all of their rates"): the old boots, the old cap, boots reaching the fixed-odds packs
+ mutate old_boots "$RSD/BalanceValues81.lua" "T.BootLuck={25,250,10000,500000,25000000}" "T.BootLuck={50,500,20000,1000000,50000000}"
+ mutate old_maxluck "$RSD/BalanceValues81.lua" "T.MaxLuck=25000000" "T.MaxLuck=50000000"
+ mutate boots_reach_fixed "$RSD/SeedPackRules.lua" "local odds=fixedOdds(config,stage,variantKey,seen,passLuck)or" "local odds=fixedOdds(config,stage,variantKey,seen,math.max(passLuck or 1,luck or 1))or"
 fi
 [ $RC = 0 ] && echo "R154 luck and odds: ALL PASS" || echo "R154 luck and odds: FAIL"
 exit $RC

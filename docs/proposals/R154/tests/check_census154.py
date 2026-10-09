@@ -1,7 +1,8 @@
 """R154 checks and numbers for run_census154.sh (base = the R153 release, now = this checkout).
 Usage: python3 check_census154.py <base cw dir> <now cw dir>  (each holds s_t<tier>_<spot>.out: the census of lag153_census.luau + census154_tail.luau)
 B1 (the SHADOWS lines): rules that must hold, then the before -> after table of the sun's shadow casters.
-B3 (the census lines of the keyboard): rules on the phone's numbers (tier 2 only; tiers 3 and 1 are unchanged), then the before -> after table of the keyboard's
+B3 (the census lines of the keyboard): rules on the phone's numbers (tier 2: fewer keys, a smaller letter canvas; R155: tier 1 draws its near letters at 12 px / stud too, so
+a smaller canvas with the same keys, SurfaceGuis and letters; tier 3 is unchanged), then the before -> after table of the keyboard's
 keys, SurfaceGuis, letter canvas pixels (= letter texture memory at 4 bytes a pixel) and letters.
 Exit 1 when a rule fails."""
 import os, re, sys
@@ -83,11 +84,23 @@ def main():
             continue
         print('| tier %d %s | %d -> %d | %d -> %d | %.1f -> %.1f | %.1f -> %.1f | %d -> %d | %d -> %d |' % (
             tier, spot, b['keys'], n['keys'], b['sgui'], n['sgui'], b['px'], n['px'], b['px'] * 4, n['px'] * 4, b['labels'], n['labels'], b['inst'], n['inst']))
-    for tier in (3, 1):  # PC and tier 1 are unchanged by B3
-        for spot in ('hub', 'track'):
-            b, n = kb[(tier, spot)]
-            if b != n:
-                bad.append('B3 tier %d %s: the keyboard changed on a tier B3 does not touch (%s -> %s)' % (tier, spot, b, n))
+    for spot in ('hub', 'track'):  # PC is unchanged by B3
+        b, n = kb[(3, spot)]
+        if b != n:
+            bad.append('B3 tier 3 %s: the keyboard changed on a tier B3 does not touch (%s -> %s)' % (spot, b, n))
+    for spot in ('hub', 'track'):  # R155: tier 1 draws the near letters at 12 px / stud, nothing else changes: the same keys, SurfaceGuis, letters and instances, a smaller canvas
+        b, n = kb[(1, spot)]
+        if not b or not n:
+            bad.append('B3 tier 1 %s: no keyboard numbers' % spot)
+            continue
+        for k in ('keys', 'sgui', 'labels', 'inst', 'drawn'):
+            if b[k] != n[k]:
+                bad.append('B3 tier 1 %s: %s changed (%s -> %s); only the letters\' pixels a stud may' % (spot, k, b[k], n[k]))
+        if not n['px'] < b['px']:
+            bad.append('B3 tier 1 %s: no smaller letter canvas (%.1f -> %.1f M px)' % (spot, b['px'], n['px']))
+        lo, hi = (0.6, 0.8) if spot == 'track' else (0.7, 0.95)  # (the hub shows fewer near letters, so the far letters weigh more: tier 2 is 68% on the track, 84% at the hub)
+        if not (lo < n['px'] / b['px'] < hi):
+            bad.append('B3 tier 1 %s: the letter canvas should be %d-%d%% of the 16 px one (the near letters 56%%, the unchanged far letters on top) (%.1f -> %.1f M px)' % (spot, lo * 100, hi * 100, b['px'], n['px']))
     b, n = kb[(2, 'track')]
     if not b or not n:
         bad.append('B3 tier 2 track: no keyboard numbers')
@@ -103,7 +116,7 @@ def main():
             print('FAIL: ' + x)
         sys.exit(1)
     print('\nok B1: no script-built part under 1.5 studs casts a shadow; the saved map, characters / avatars and every part of 1.5 studs and more are as they were')
-    print('ok B3: tier 2 has fewer keys, a smaller letter canvas and no more letters; tiers 3 and 1 are as they were')
+    print('ok B3: tier 2 has fewer keys, a smaller letter canvas and no more letters; tier 1 has the same keys and letters and a smaller canvas (R155); tier 3 is as it was')
 
 
 if __name__ == '__main__':

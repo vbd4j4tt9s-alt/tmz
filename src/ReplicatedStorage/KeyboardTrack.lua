@@ -106,7 +106,7 @@ K.Config={
  Legend={PixelsPerStud=16,TextHeight=4.6,Margin=.05,MaxExtra=1.5,Rotation=270,KeysPerStrip=11,MaxDistance=420,Font='FredokaOne',RowsPerFrame=4,
   FarPixelsPerStud=4,FarMaxDistance=800,                   -- R152: far letters, one strip (22 labels, 18 px text) per row at 4 px / stud, rendered out to 800 studs
   FarMaxDistanceByTier={[2]=500},                          -- R153 perf (lag audit D8): on tier 2 (phones) to 500 studs (a 4.6-stud letter is about 6 px tall there)
-  PixelsPerStudByTier={[2]=12}},                           -- R154 (lag audit B3, owner-approved): the NEAR letters (strips and pressed-key letters) at 12 px / stud on tier 2 (16 elsewhere: PC unchanged); K.NearPPS
+  PixelsPerStudByTier={[1]=12,[2]=12}},                    -- R154 (lag audit B3, owner-approved): the NEAR letters (strips and pressed-key letters) at 12 px / stud on tier 2, R155 (owner: tier 1 too) on tier 1 (16 on tier 3: PC unchanged); K.NearPPS
  SpacebarPixelsPerStud=10,SpacebarMaxDistance=800,
  GroundScanSeconds=2,
 }
@@ -167,6 +167,8 @@ K.Tiers={
 function K.Tier(tier)return K.Tiers[tier]or K.Tiers[3]end
 -- R154 (lag audit B3, owner: "for the lag fixes we can implement B3 and B1"): phones (tier 2) carry 56 key rows ahead (74 before: the keys end ~460 studs ahead, not
 -- ~600) and their near letters are drawn at 12 px / stud (16 before: a canvas 44% smaller, the letters a little softer); tier 3 (PC) is unchanged.
+-- R155 (owner: "yes" to the lighter phone keyboard on the lowest graphics setting too): tier 1 draws its near letters at 12 px / stud as well. Its key rows ahead are 45, already
+-- under tier 2's 56, so they stay.
 -- K.NearPPS(tier) = the near letters' pixels a stud on a tier, K.NearText(pps) = their TextSize. The client reads both and re-applies them on a tier change
 -- (K.RetuneLetters: every strip and pressed-key letter already made), the way R153's far-letter render limit (Legend.FarMaxDistanceByTier) is.
 function K.NearPPS(tier)local by=C.Legend.PixelsPerStudByTier;return by and by[tier]or C.Legend.PixelsPerStud end

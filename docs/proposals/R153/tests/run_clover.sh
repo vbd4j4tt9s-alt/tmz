@@ -15,7 +15,7 @@
 #  4. client    - test_clover_shop.luau: the card (third PASSES card, "x2 Luck", Gem 999 | Robux live price, picture, buying, OWNED, Checking...), the id switched off (no Robux button, Gem
 #                 button full width, ROBUX SOON, OWNED by Gems), the HUD luck row (picture, x2, the cap), the purchase pop; renders the preview (render_clover.py) into $OUT/renders/clover.png
 #                 (CLOVER_PREVIEW=1 also copies it to docs/proposals/R153/clover.png)
-# R154: the cap is the boots' cap x the pass (the clover's x2 also applies on top of Thunder Boots: x100M); the old_cap mutation puts the R153 cap back.
+# R154: the cap is the boots' cap x the pass (the clover's x2 also applies on top of Thunder Boots; R155: the boots are halved, so that is x25M x 2 = x50M); the old_cap mutation puts the R153 cap back.
 # "mutate" also breaks the game on purpose (the luck, the saved shape, the id default, the Robux button rule, the picture's priority ...): every break must make a suite fail.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)

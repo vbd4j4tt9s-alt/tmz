@@ -4,6 +4,8 @@ Owner answers to the R153 open questions:
 1. "the 2x luck is universal": the 4 Leaf Clover must double luck everywhere.
 2. "the elderbloom only pack is not supposed to be intentional": no pack may be (almost) one seed, at any luck.
 
+> **R155 halved every boot** (section 6 at the end). The x50M / x100M in sections 1 and 2 are R154's numbers; today Thunder Boots are x25M and x50M with the clover.
+
 Code: `PackLuck154` (new, frozen), the outermost wrapper at the end of `SeedPackRules`, `BalanceValues81` (the cap), `PlayerDataService` (the cap, the open),
 `ChestService` (hold tooltip), `HubDisplayService` (BEST PULL odds), `RarePackTests`, `SeedRarity153`, the owner `odds` command, shop and card text.
 `Config.Version` is unchanged.
@@ -209,3 +211,79 @@ It is still a guaranteed TEST reveal, never announced. `rarepacks` (all five), `
 The full runner was not run.
 
 Not checked: anything in real Studio, including the HUD showing ×100M and the shop card's new line fitting on a real phone.
+
+## 6. R155: boots halved
+
+Owner: *"Nerf the boots by halfing all of their rates"*. Every boot gives half the luck it gave. Boots give only luck, so this is the whole change. The clover is
+untouched (still x2 on every pack, still on top of the boots), and so are the per-tier ceilings inside a pack (King at most 1%, Cosmic 5%, Secret 25%, Mythic 45%
+unless the pack's own chance is higher), the 80% rule, the Void / Verity / Limited Mech packs (they take only the clover, boots never reach them), prices and
+`Config.Version`.
+
+| | Sand | Frost | Lava | Crystal | Thunder | cap (`MaxLuck`) | highest roll (`LuckCeiling`) |
+|---|---|---|---|---|---|---|---|
+| R154 | x50 | x500 | x20K | x1M | x50M | 50M | 100M |
+| **R155** | **x25** | **x250** | **x10K** | **x500K** | **x25M** | **25M** | **50M** |
+| R155 with the clover | x50 | x500 | x20K | x1M | x50M | (cap = 25M x 2) | |
+
+`PassLuckCeiling` stays 2. Only `BalanceValues81` holds the numbers (`T.BootLuck`, `T.MaxLuck`; `LuckCeiling` = `MaxLuck` x the passes). Everything else reads them,
+and none of it needed a change in behaviour:
+
+| Reader | What it does with them |
+|---|---|
+| `Config.lua` (~760) | copies `BootLuck` into `ShopCatalog.Accessories[i].LuckMultiplier`; the five defaults further up (1.5 ... 3.5) are overwritten by it and are not used |
+| shop boot cards (`ShopMenu`) | print `LuckMultiplier` through `WorldStatusHud.Multiplier`: x25, x250, x10K, x500K, x25M |
+| `PlayerDataService:RefreshBoostMultipliers` | best boot (owner test boots too) x the passes, capped at `MaxLuck` x the passes: no pass 25M, clover 50M |
+| `PackOdds112` / `PackOdds137` (`O.Luck`) | clamp to `LuckCeiling` (50M); only their R154 comment changed, and their frozen hashes carry an R155 note |
+| `PackOdds112/137.LegacyLuck` | packs banked before R112 map the luck to the old boots (x1.15 ... x2) by the best boot it reaches, read from `BootLuck`; each real boot (and boot x clover) still lands on the same old multiplier |
+| `WorldStatusHud.Boosts` | the HUD luck row clamps to `LuckCeiling`: Thunder Boots read x25M, with the clover x50M |
+| `OwnerUpdateCommands82` | `/test odds` accepts luck up to `LuckCeiling` (the usage text prints it: `[1–50000000]`); `/test boots 1-5` gives the halved boots |
+
+No game text names a boot's number (the cards, the HUD and the tooltips print the live value), and nothing saved holds a luck number (it is recomputed from the owned
+boots when a player joins), so there is nothing to migrate.
+
+### Thunder Boots, before -> after
+
+Real `SeedPackRules.SeedOdds` at the current odds version (149) for a Thunder Boots player, without and with the clover (R154 -> R155). Luck: no clover x50M -> x25M, clover x100M -> x50M.
+
+| Pack | Tier | Thunder, no clover | Thunder + clover |
+|---|---|---|---|
+| Desert Common | King | 1/20K -> 1/40K | 1/10K -> 1/20K |
+| | Cosmic | 1/833 -> 1/1,100 | 1/631 -> 1/833 |
+| | Secret | 1/70 -> 1/85 | 1/58 -> 1/70 |
+| | Mythic | 1/35 -> 1/39 | 1/31 -> 1/35 |
+| Forest Pack03 | Mythic (no King / Cosmic / Secret in the Forest) | 28.4% -> 25.4% | 31.8% -> 28.4% |
+| Desert Pack05 (the same King in Snow and Storm) | King | 1/333 (0.3%) -> 1/667 (0.15%) | 1/167 (0.6%) -> 1/333 (0.3%) |
+| | Cosmic | 5% -> 5% (ceiling) | 5% -> 5% (ceiling) |
+| | Secret | 25% -> 25% (ceiling) | 25% -> 25% (ceiling) |
+| | Mythic | 32.9% -> 33.1% | 32.6% -> 32.9% |
+| Forest Mythic (Pack06) | Mythic | 45% -> 45% | 45% -> 45% (Sunflower 55% / Elderbloom 45%, as in section 2) |
+| Desert Mythic (Pack06) | King | 1/100 (1%, ceiling) -> 1/200 (0.5%) | 1/100 -> 1/100 (ceiling) |
+| | Mythic | 37.8% -> 38.3% | 37.8% -> 37.8% |
+
+(The Pack05 and Pack06 tiers that read the same before and after are at their ceilings at both luck levels. A Mythic share can go up a little when a rarer tier
+gets less, because the lowest tier gives back what the higher ones take.)
+
+**The clover now moves 36 of the 42 biome packs at Thunder Boots.** R154 said 32; counted again on the R154 code it is 31 (the 11 that did not move are the 7 Mythic
+packs plus Forest and Jungle Pack04-05, exactly the list in section 1: the "10" there was a miscount). The 6 that still do not move are Forest and Jungle Pack04, Pack05
+and Pack06: they top out at Mythic, which is at its 45% ceiling at x25M already. The five other Mythic packs (Desert, Snow, Lava, Crystal, Storm) now move: their King
+1/200 -> 1/100 with the clover (0.5% -> 1%). Cosmic (5%) and Secret (25%) are still at their ceilings with or without the clover in the Pack05 and Pack06 of every
+King biome (and Secret in Pack04 with the clover), so the clover's room there is King, plus every tier of the lower packs. **Owner call:** raising the Cosmic / Secret /
+Mythic ceilings is still a separate change.
+
+### Tests (R155)
+
+- `R154/tests/test_luck_odds.luau` (`run_luck_odds.sh`): `BootLuck` halved, the shop's five boots carry it, `MaxLuck` 25M, `LuckCeiling` 50M, `PassLuckCeiling` 2; a no-clover
+  Thunder player has x25M and a clover Thunder player x50M (owner test boots too, still test luck); boots 1-4 double with the clover; `PackOdds112` / `137` clamp at 50M
+  (the old 100M reads as 50M); the Void / Verity / Mech packs give a Thunder player the plain table and a Thunder + clover player exactly the clover's table;
+  `/test odds` answers up to 50000000 and refuses above (old 100M included); the sweeps use 25M and 50M. Three new teeth: the old boots, the old 50M cap, boots reaching the fixed packs.
+- `R153/tests/test_clover.luau`, `test_clover_shop.luau` (HUD ×25M / ×50M), `R147/tests/test_verity_pack.luau`, `treadmill_bonus_R123/tests/test_server.luau`: the literals follow the new numbers.
+- Left alone on purpose: `dump_odds.luau`, `dump_roster.luau` (they run on the R152 base too, so their luck list must read the same there) and the sweeps that use 5e7 as "the highest luck":
+  5e7 is the clover's ceiling now, so they still cover the top.
+- `docs/proposals/R151/tests/frozen.sha256`: new hashes for `PackOdds112` / `137` with an R155 note (comment only).
+
+**Results** (R155, private scratch dirs, one suite at a time), all PASS: R154 `run_luck_odds.sh` (204 checks, 13 of 13 teeth); R153 `run_clover.sh` (plain and `mutate`) and
+`run_seed_rarity.sh` (117 checks, rolls identical to the R152 base apart from the 80% rule); R153 `run_fixes_server.sh`, `run_track_walls.sh`, `run.sh`; R147 / R149 Verity pack;
+R148 roster and index_limited; treadmill bonus R123; R139 starter; R140 daily; R129 phone HUD; shop R120; R151 packs, hub_displays, pack_shapes, rare_pull, announce, badges,
+speed_popups, static_checks; R150 bonus_ui; R152 void_giveaway and seed_opening; `check_compile_O0.sh`. The full runner was not run.
+
+Not checked: anything in real Studio, including the HUD reading ×25M / ×50M and the five boot cards' new numbers on a real phone.

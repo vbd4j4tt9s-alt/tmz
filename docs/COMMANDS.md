@@ -27,7 +27,7 @@
 | `gems add 100 @name` / `gems set …` | Gems |
 | `speed 100000000000 @name` | Saved speed points |
 | `treadmill 7 @name` | Treadmill tier 1–7 (Forest … Storm) |
-| `boots 5 @name`, `trail 6 @name`, `fence 7 @name` | Unlock and equip upgrades |
+| `boots 5 @name`, `trail 6 @name`, `fence 7 @name` | Unlock and equip upgrades (boots 1-5 give luck x25, x250, x10K, x500K, x25M since R155; they were twice that) |
 | `bundle SpeedSmall @name` | Give a shop bundle with no purchase |
 | `training @name` | Treadmill gain per second (machine x friends) and physical speed |
 | `gardenbonus @name`, `cashoffers @name` | Garden bonuses; cash bundle amounts |
@@ -55,7 +55,7 @@
 | `seeds snow @name`, `seeds all @name`, `seeds verity @name` | Every seed of a biome, every seed in the game, or the Verity seed |
 | `give big diamond apple seed to @name` | One seed by plant name. `big`/`giant` and `gold`/`diamond` are optional |
 | `take apple seeds from @name` | Remove seeds |
-| `catalog storm`, `odds storm mythic 1`, `odds event`, `odds verity` | Seed list and real odds (`odds verity` = the Verity Pack). R154: luck up to 100M (Thunder Boots x the 4 Leaf Clover), no seed over 80%; `odds event clover` / `odds verity clover` = with the clover's x2 (without the word: the target's own clover) |
+| `catalog storm`, `odds storm mythic 1`, `odds event`, `odds verity` | Seed list and real odds (`odds verity` = the Verity Pack). R154: no seed over 80%; luck up to 50M (R155 halved the boots: Thunder Boots x25M, x50M with the 4 Leaf Clover's x2; it was 100M); `odds event clover` / `odds verity clover` = with the clover's x2 (without the word: the target's own clover) |
 | `indexinfo storm @name` / `claimindex storm @name` | Index rewards (`verity` = the R147 VERITY tab) |
 | `mystery @name`, `mystery ready`, `mystery next`, `mystery reset` | R147 base mystery pack: show the state (and packs owed to a full Bag); unlock in 3 s; pretend a new day; start over (owed packs are kept) |
 
