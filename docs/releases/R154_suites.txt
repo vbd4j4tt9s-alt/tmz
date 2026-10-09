@@ -1,5 +1,5 @@
 # R154: every suite on the release source 2e3e8dc (src identical to the release commit; the later commits add only the installer and docs).
-# REPO=<checkout of 2e3e8dc> LOGDIR=<dir> sh tools/tests/run_all_suites.sh ; 94 PASS, 0 FAIL. Place: the owner's 5ea4542b-sapkeee.rbxl where a suite reads one.
+# REPO=<checkout of 2e3e8dc> LOGDIR=<dir> sh tools/tests/run_all_suites.sh ; 94 PASS, 0 FAIL. Places: each suite's default (the R149-R153 map suites read the older b4f113d1-sapkeyver.rbxl, the R153 nooks and R154 suites the new 5ea4542b-sapkeee.rbxl; the map contents of the two are identical).
 PASS R127 1s :: 53 checks, 0 failures 25 checks, 0 failures 
 PASS R128 0s :: 8 checks, 0 failures 22 checks, 0 failures 21 checks, 0 failures 
 PASS R129 1s :: 119 checks, 0 failures 27 checks, 0 failures 
