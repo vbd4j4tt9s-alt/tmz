@@ -33,7 +33,7 @@ static(){ # $1 = the src tree to check; $2 = "full" also checks what only this c
   [ -f "$D/$f" ] || { sfail A4 "missing $f";continue; }
   /opt/luau/luau-compile --null "$D/$f" >/dev/null 2>&1 || sfail A4 "$f does not compile"
  done
- grep -q "Config.Version='V150 R153b';Config.ProfileVersion=22" "$SS/Config.lua" && echo "ok: Config.Version is 'V150 R153b' and ProfileVersion 22" || sfail A4 "Config.Version / ProfileVersion changed"
+ grep -q "Config.Version='V150 R154';Config.ProfileVersion=22" "$SS/Config.lua" && echo "ok: Config.Version is 'V150 R154' and ProfileVersion 22" || sfail A4 "Config.Version / ProfileVersion changed"
  # [A4] the notice: its own client script, load guard on line 1, in the manifest, no module / remote
  if [ -f "$NOTICE" ];then
   head -1 "$NOTICE" | grep -qF "R152: start once the whole game has arrived" && echo "ok: StartupNotice153 starts with the R152 load guard" || sfail A4 "StartupNotice153: line 1 is not the load guard"

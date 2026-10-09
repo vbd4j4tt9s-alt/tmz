@@ -20,7 +20,7 @@ suite() { # $1 = src dir, $2 = work dir, $3 = log
 echo "== static checks"
 SRV=$REPO/src/ServerScriptService/ChestChaseServer
 /opt/luau/luau-compile --null "$SRV/PlayerDataService.lua" >/dev/null || { echo "FAIL: PlayerDataService does not compile";exit 1; }
-grep -q "Config.Version='V150 R153b'" "$SRV/Config.lua" && grep -q "Config.ProfileVersion=22" "$SRV/Config.lua" || { echo "FAIL: Config.Version / ProfileVersion changed";exit 1; }
+grep -q "Config.Version='V150 R154'" "$SRV/Config.lua" && grep -q "Config.ProfileVersion=22" "$SRV/Config.lua" || { echo "FAIL: Config.Version / ProfileVersion changed";exit 1; }
 n=0
 for f in "$SRV"/*.lua; do
  hits=$(awk '{c=$0;sub(/--.*$/,"",c)} c~/Gems[ \t]*[+-]=/ || (c~/[A-Za-z]\.Gems[ \t]*=[^=]/ && c!~/Values\.Gems/) {print FILENAME":"FNR}' "$f")

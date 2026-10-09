@@ -105,7 +105,7 @@ wiring() {
  python3 -I "$HERE/check_best_pull_local.py" "$REPO" > "$OUT/local.log" 2>&1 || { cat "$OUT/local.log";return 1; }
  echo "wiring ok: best pull is local ($(grep -c '^ok:' "$OUT/local.log") static checks)"
  # saves / economy / odds unchanged: ProfileVersion and the version string are the base's, and the gameplay files are byte-identical (sha256 list)
- grep -q "Config.ProfileVersion=22" "$SRV/Config.lua" && grep -q "Config.Version='V150 R153b'" "$SRV/Config.lua" || { echo "Config.ProfileVersion / Version changed";return 1; }
+ grep -q "Config.ProfileVersion=22" "$SRV/Config.lua" && grep -q "Config.Version='V150 R154'" "$SRV/Config.lua" || { echo "Config.ProfileVersion / Version changed";return 1; }
  (cd "$REPO" && sha256sum -c "$HERE/frozen.sha256" > "$OUT/frozen.log" 2>&1) || { cat "$OUT/frozen.log";return 1; }
  echo "wiring ok ($(grep -vc "^#" "$HERE/frozen.sha256") gameplay files byte-identical)"
 }
