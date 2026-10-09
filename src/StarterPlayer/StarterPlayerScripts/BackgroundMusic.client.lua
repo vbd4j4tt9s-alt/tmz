@@ -21,6 +21,19 @@ local PEACEFUL_PLAYLIST = {
 		Name = "Claude Debussy - Clair de Lune",
 		SoundId = "rbxassetid://1844513698",
 	},
+	-- R156 (owner): three more base tracks (the real titles are not known); the playlist logic is unchanged.
+	{
+		Name = "Base track 1837487700",
+		SoundId = "rbxassetid://1837487700",
+	},
+	{
+		Name = "Base track 1837487818",
+		SoundId = "rbxassetid://1837487818",
+	},
+	{
+		Name = "Base track 1836280952",
+		SoundId = "rbxassetid://1836280952",
+	},
 }
 
 -- APMOfficial / Bruno Jose Marc Le Roux: Playful Chase (92-second version).
@@ -33,11 +46,23 @@ local CHASE_TRACK = {
 
 -- R151 (owner): The Darkened's (secret keeper) chase theme is the owner's uploaded "tunetank-intense" track.
 local SPECIAL_TRACK={Name='Intense',SoundId='rbxassetid://127003062753525'}
--- Recovered from the pre-R73 BiomeAmbience source: the original track-entry music.
-local SCENIC_TRACK={Name='Nature Inspiration',SoundId='rbxassetid://96110001912212'}
-local SCENIC_VOLUME=.055
+-- Recovered from the pre-R73 BiomeAmbience source: the original track-entry music (the first of the list).
+-- R156 (owner): the track music is a playlist of three that alternate in order (1 > 2 > 3 > 1). Each plays once to its end; the next one starts
+-- PLAYLIST_CROSSFADE_SECONDS before that end and the two cross over. One Sound per track, all named BiomeScenicMusic (AudioMixer.Route maps that name to the Music slider).
+local SCENIC_PLAYLIST={
+	{Name='Nature Inspiration',SoundId='rbxassetid://96110001912212'},
+	{Name='Track music 74095461107598',SoundId='rbxassetid://74095461107598'},
+	{Name='Track music 132448918728086',SoundId='rbxassetid://132448918728086'},
+}
+local SCENIC_VOLUME=.07 -- R156 (owner: "increase the volume by a bit"): .055 -> .07 for all three tracks
 local specialTrackReady=false
-local scenicTrackReady=false
+local scenicTrackReady=false -- R156: true once at least one of the three has loaded
+local scenicSounds={} -- R156: [i] = the Sound of track i
+local scenicReady={} -- R156: [i] = true once track i has loaded
+local scenicTweens={} -- R156: [i] = the running volume tween of track i
+local scenicIndex=1 -- R156: the track in the ear: playing, or paused where it was
+local scenicNext=nil -- R156: the incoming track while two cross over
+local scenicOn=false -- R156: true while the track music is meant to be heard
 local insideTrack=false
 local destroyed=false
 local PEACEFUL_VOLUME = 0.2                                                                
@@ -129,9 +154,19 @@ specialMusic.SoundId=SPECIAL_TRACK.SoundId;specialMusic.Volume=0;specialMusic.Lo
 specialMusic.PlaybackSpeed=1;specialMusic.SoundGroup=chaseGroup;specialMusic.Parent=SoundService
 specialMusic:SetAttribute('ChaseTrackName',SPECIAL_TRACK.Name)
 
-local scenicMusic=Instance.new('Sound');scenicMusic.Name='BiomeScenicMusic';scenicMusic.SoundId=SCENIC_TRACK.SoundId
-scenicMusic.Volume=0;scenicMusic.Looped=true;scenicMusic.PlaybackSpeed=1;scenicMusic.SoundGroup=peacefulGroup;scenicMusic.Parent=SoundService
-scenicMusic:SetAttribute('TrackName',SCENIC_TRACK.Name)
+-- R156 (owner): one Sound per track of the track playlist, all in the Music group. Looped is false: a track plays once to its end (only a track alone loops).
+for index,trackData in ipairs(SCENIC_PLAYLIST) do
+	local music = Instance.new('Sound')
+	music.Name = 'BiomeScenicMusic'
+	music.SoundId = trackData.SoundId
+	music.Volume = 0
+	music.Looped = false
+	music.PlaybackSpeed = 1
+	music.SoundGroup = peacefulGroup
+	music:SetAttribute('TrackName', trackData.Name)
+	music.Parent = SoundService
+	scenicSounds[index] = music
+end
 
 local function tween(instance, targetProperties, duration)
  local entry=peacefulVoices[instance]
@@ -198,7 +233,6 @@ local chaseTrackReady = false
 local chaseLoadFinished = false
 local transitionSerial = 0
 local peacefulGainTween
-local scenicVolumeTween
 local connections={}
 local function watch(signal,fn)local c=signal:Connect(fn);connections[#connections+1]=c;return c end
 local chaseVolumeTween
@@ -238,16 +272,109 @@ local function trackIsActive()
  return p.Z>edge and p.Z<=(tonumber(map:GetAttribute('BiomeTrackEndZ'))or 1475)
   and math.abs(p.X-line.Position.X)<=(tonumber(map:GetAttribute('FieldWidth'))or 180)/2+2 and p.Y> -20 and p.Y<=300
 end
+-- R156 (owner): the track playlist. scenicIndex is the track in the ear: playing, or paused where it was. A track plays once to its end; with
+-- PLAYLIST_CROSSFADE_SECONDS left the next loaded one starts from 0 and the two cross over (the old one is stopped and rewound once silent). Leaving the
+-- track in the middle of a crossfade makes the incoming one the track in the ear. Nothing here runs per frame: stepScenic (every 0.1 s) only reads
+-- properties, and tweens are made only when something changes.
+local function nextScenic(from)
+	for step = 1, #scenicSounds - 1 do
+		local index = (from + step - 1) % #scenicSounds + 1
+		if scenicReady[index] then return index end
+	end
+	return nil
+end
+
+-- A track that has no loaded companion loops instead of waiting for one.
+local function setScenicLooping()
+	local alone = nextScenic(scenicIndex) == nil
+	for index = 1, #scenicSounds do
+		scenicSounds[index].Looped = alone and index == scenicIndex
+	end
+end
+
+-- Fades the track music in (on) or out over `seconds`; on also starts or resumes the track in the ear. A crossfade that is running is left to finish.
+local function fadeScenic(on, seconds)
+	scenicOn = on
+	if on then
+		if not scenicReady[scenicIndex] then scenicIndex = nextScenic(scenicIndex) or scenicIndex end
+		setScenicLooping()
+		if scenicNext then return end
+		local current = scenicSounds[scenicIndex]
+		if not current.IsPlaying then
+			if current.IsPaused then current:Resume() else current:Play() end
+		end
+	elseif scenicNext then
+		scenicIndex, scenicNext = scenicNext, nil
+	end
+	for index = 1, #scenicSounds do
+		cancelTween(scenicTweens[index])
+		scenicTweens[index] = tween(scenicSounds[index], {Volume = on and index == scenicIndex and SCENIC_VOLUME or 0}, seconds)
+	end
+end
+
+local function startScenicCrossfade(nextIndex)
+	local outgoing, incoming = scenicSounds[scenicIndex], scenicSounds[nextIndex]
+	scenicNext = nextIndex
+	cancelTween(scenicTweens[scenicIndex])
+	cancelTween(scenicTweens[nextIndex])
+	incoming.Volume = 0
+	incoming.TimePosition = 0
+	incoming:Play()
+	scenicTweens[scenicIndex] = tween(outgoing, {Volume = 0}, PLAYLIST_CROSSFADE_SECONDS)
+	scenicTweens[nextIndex] = tween(incoming, {Volume = SCENIC_VOLUME}, PLAYLIST_CROSSFADE_SECONDS)
+end
+
+local function stepScenic()
+	local current = scenicSounds[scenicIndex]
+	if scenicOn then
+		if scenicNext then
+			if current.Volume <= 0 or not current.IsPlaying then
+				-- the crossfade is over: the incoming track is the track in the ear
+				cancelTween(scenicTweens[scenicIndex])
+				current:Stop()
+				current.TimePosition = 0
+				current.Volume = 0
+				scenicIndex, scenicNext = scenicNext, nil
+				setScenicLooping()
+			end
+		elseif current.IsPlaying and current.TimeLength - current.TimePosition <= PLAYLIST_CROSSFADE_SECONDS then
+			local nextIndex = nextScenic(scenicIndex)
+			if nextIndex then startScenicCrossfade(nextIndex) end
+		end
+	end
+	-- a silent track: the one in the ear pauses where it is (never while it is being heard), any other is stopped and rewound
+	for index = 1, #scenicSounds do
+		local sound = scenicSounds[index]
+		if sound.Volume == 0 and sound.IsPlaying and index ~= scenicNext then
+			if index ~= scenicIndex then
+				sound:Stop()
+				sound.TimePosition = 0
+			elseif not scenicOn then
+				sound:Pause()
+			end
+		end
+	end
+end
+
+-- Once a second: a track in the ear that stopped by itself (a stall longer than the crossfade ran past its end) goes on with the next loaded one.
+local function recoverScenic()
+	if not scenicOn or scenicNext then return end
+	local current = scenicSounds[scenicIndex]
+	if current.IsPlaying or current.IsPaused then return end
+	scenicIndex = nextScenic(scenicIndex) or scenicIndex
+	scenicSounds[scenicIndex].TimePosition = 0
+	fadeScenic(true, PLAYLIST_CROSSFADE_SECONDS)
+end
+
 local function setChaseMusicActive(isActive)
  if destroyed then return end
  transitionSerial+=1;local serial=transitionSerial
- cancelTween(peacefulGainTween);cancelTween(scenicVolumeTween);cancelTween(chaseVolumeTween);cancelTween(specialVolumeTween)
+ cancelTween(peacefulGainTween);cancelTween(chaseVolumeTween);cancelTween(specialVolumeTween)
  local selected,ready=selectedMusic();local audible=isActive and ready
  if audible then ensureChasePlayback()end
  local scenic=insideTrack and scenicTrackReady and not audible and not characterRemoving
- if scenic and not scenicMusic.IsPlaying then if scenicMusic.IsPaused then scenicMusic:Resume()else scenicMusic:Play()end end
  peacefulGainTween=tween(peacefulGain,{Value=(audible or scenic)and 0 or 1},audible and CHASE_FADE_IN_SECONDS or PEACEFUL_RESUME_SECONDS)
- scenicVolumeTween=tween(scenicMusic,{Volume=scenic and SCENIC_VOLUME or 0},audible and CHASE_FADE_IN_SECONDS or 1.2)
+ fadeScenic(scenic,audible and CHASE_FADE_IN_SECONDS or 1.2) -- R156 (owner): the track playlist (was one looped Sound)
  chaseVolumeTween=tween(chaseMusic,{Volume=audible and selected==chaseMusic and CHASE_VOLUME or 0},.45)
  specialVolumeTween=tween(specialMusic,{Volume=audible and selected==specialMusic and .16 or 0},.45)
  task.delay(.5,function()
@@ -268,18 +395,20 @@ local loopConnection=RunService.Heartbeat:Connect(function(dt)
     if zoneCheck>=.1 then
      zoneCheck=0;local inside=trackIsActive()
      if inside~=insideTrack then insideTrack=inside;setChaseMusicActive(chaseIsActive())end
-     if scenicMusic.Volume==0 and scenicMusic.IsPlaying then scenicMusic:Pause()end
+     stepScenic() -- R156 (owner): the track playlist's step (was: pause the one scenic Sound at 0)
     end
     loopCheck+=dt
-    if loopCheck>=1 then loopCheck=0;ensureChasePlayback()end
+    if loopCheck>=1 then loopCheck=0;ensureChasePlayback();recoverScenic()end
 end)
 script.Destroying:Connect(function()
     destroyed=true;transitionSerial+=1
     endedConnection:Disconnect();specialEnded:Disconnect();loopConnection:Disconnect()
     for _,connection in ipairs(connections)do connection:Disconnect()end
-    cancelTween(peacefulGainTween);cancelTween(scenicVolumeTween);cancelTween(chaseVolumeTween);cancelTween(specialVolumeTween)
+    cancelTween(peacefulGainTween);cancelTween(chaseVolumeTween);cancelTween(specialVolumeTween)
+    for index=1,#scenicSounds do cancelTween(scenicTweens[index])end
     for sound in pairs(peacefulVoices)do sound:Destroy()end
-    gainConnection:Disconnect();peacefulGain:Destroy();chaseMusic:Destroy();specialMusic:Destroy();scenicMusic:Destroy()
+    gainConnection:Disconnect();peacefulGain:Destroy();chaseMusic:Destroy();specialMusic:Destroy()
+    for _,sound in ipairs(scenicSounds)do sound:Destroy()end
 end)
 
 watch(player:GetAttributeChangedSignal("ChestChaseRunActive"),function()
@@ -335,19 +464,28 @@ task.spawn(function()
 	-- Keep SoundId intact: Sound.Loaded can still recover after a late download.
 end)
 
-watch(scenicMusic.Loaded,function()
- if scenicMusic.TimeLength>2 then scenicTrackReady=true;insideTrack=trackIsActive();setChaseMusicActive(chaseIsActive())end
-end)
-task.spawn(function()
- for attempt=1,3 do
-  if destroyed then return end
-  local ready,reason=waitForTrack(scenicMusic,2);scenicTrackReady=ready
-  insideTrack=trackIsActive();setChaseMusicActive(chaseIsActive())
-  if ready then return end
-  reportLoadFailure(SCENIC_TRACK,reason)
-  if attempt<3 then task.wait(RETRY_DELAY_SECONDS*attempt)end
- end
-end)
+-- R156 (owner): each track of the track playlist loads on its own, so one that does not load is skipped (with the usual warning) and never holds the
+-- others back. The first loaded track starts the music if the player is already on the track; a later one joins the rotation.
+local function noteScenicReady(index,ready)
+	scenicReady[index]=ready;scenicTrackReady=false
+	for i=1,#SCENIC_PLAYLIST do if scenicReady[i] then scenicTrackReady=true end end
+	insideTrack=trackIsActive();setChaseMusicActive(chaseIsActive())
+end
+for index,trackData in ipairs(SCENIC_PLAYLIST) do
+	local music=scenicSounds[index]
+	watch(music.Loaded,function()
+		if music.TimeLength>2 then noteScenicReady(index,true)end
+	end)
+	task.spawn(function()
+		for attempt=1,3 do
+			if destroyed then return end
+			local ready,reason=waitForTrack(music,2);noteScenicReady(index,ready)
+			if ready then return end
+			reportLoadFailure(trackData,reason)
+			if attempt<3 then task.wait(RETRY_DELAY_SECONDS*attempt)end
+		end
+	end)
+end
 
 task.spawn(function()
 	local randomizer = Random.new()

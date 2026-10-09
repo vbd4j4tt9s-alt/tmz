@@ -3,7 +3,7 @@
 #                                                       default 7cd9e87 = the R155 release)
 # R156 weather ambience (owner: three looping ambiences, "each should play during its own weather": Blizzard 87749574738390, Thunderstorm 137593145026034, Rain 107960597100236).
 # On the Roblox mock (/opt/luau/luau) with the REAL BiomeMood and the REAL BiomeAmbience.client of this checkout (bundled from THIS src tree by R151's bundle_cloudy.py):
-#  0. static  - every script in src/ compiles at -O0 (check_compile_O0.sh); BackgroundMusic.client.lua and Config.lua are untouched since the base (Config.lua: but for its
+#  0. static  - every script in src/ compiles at -O0 (check_compile_O0.sh); BackgroundMusic.client.lua (but for the R156 music script frozen in frozen.sha256) and Config.lua are untouched since the base (Config.lua: but for its
 #               Config.Version, which the release step sets, as in R155); the R152 load guard is still line 1 of every client script; this suite is in run_all_suites.sh;
 #               no model names in the R156 files and the file this round changed
 #  1. test    - test_weather_ambience.luau: SoundTargets (each weather's bed at its volume in the base and only there, none on the track, none when not alive, x0.12 in a chase,
@@ -19,10 +19,10 @@ RC=0;fail(){ echo "FAIL: $1";RC=1; }
 echo "== 0. static"
 git -C "$REPO" rev-parse --verify -q "$BASE^{commit}" >/dev/null || fail "the base commit $BASE is not in this repository (set R156_BASE)"
 sh "$T/check_compile_O0.sh" "$REPO" > "$OUT/compile.log" 2>&1 && echo "ok: $(tail -2 "$OUT/compile.log" | head -1)" || { fail "check_compile_O0.sh";tail -8 "$OUT/compile.log"; }
-git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua || fail "BackgroundMusic.client.lua changed since $BASE (the music stays as it is)"
+git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua || sh "$T/bgm_frozen.sh" "$REPO" || fail "BackgroundMusic.client.lua changed since $BASE (the music stays as it is)" # R156 (on purpose): but for the owner's music change, accepted by its frozen hash
 norm(){ sed "s/Config\.Version='[^']*'/Config.Version=V/"; }
 [ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | norm)" = "$(norm < "$SS/Config.lua")" ] || fail "Config.lua changed beyond Config.Version since $BASE"
-echo "ok: BackgroundMusic.client.lua and Config.lua (all but its Version) are untouched since $BASE"
+echo "ok: BackgroundMusic.client.lua (or the R156 music script frozen in frozen.sha256) and Config.lua (all but its Version) are untouched since $BASE"
 sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 && echo "ok: $(tail -2 "$OUT/guard.log" | head -1)" || { fail "the R152 load guard test fails";tail -5 "$OUT/guard.log"; }
 grep -q "docs/proposals/R156/tests/run_weather_ambience.sh" "$T/run_all_suites.sh" || fail "run_weather_ambience.sh is not registered in tools/tests/run_all_suites.sh"
 for row in "Key='RainBed',Name='WeatherRainAmbience',Id='107960597100236',Attribute='RainBedAssetId'" "Key='ThunderBed',Name='WeatherThunderAmbience',Id='137593145026034',Attribute='ThunderBedAssetId'" \
@@ -73,6 +73,8 @@ PY
  mutate two_beds_in_a_storm $BM " if bed then t[bed.Key]=bed.Volume end" " if bed then t[bed.Key]=bed.Volume;t.RainBed=math.max(t.RainBed,.3)end"
  mutate cloudy_has_a_bed $BM "Blizzard={Key='BlizzardBed',Volume=.3}}" "Blizzard={Key='BlizzardBed',Volume=.3},Cloudy={Key='RainBed',Volume=.1}}"
  mutate beds_in_old_formula $BM "if stage==0 then t.Birds=.018;t.Leaves=.022" "if stage==0 then t.Birds=.019;t.Leaves=.022"
+ mutate track_gain_off $BM "local TRACK_GAIN=1.25" "local TRACK_GAIN=1"
+ mutate base_louder_too $BM "if stage==0 then t.Birds=.018;t.Leaves=.022" "if stage==0 then t.Birds=.018*TRACK_GAIN;t.Leaves=.022"
  mutate wrong_rain_id $BM "Id='107960597100236'" "Id='107960597100263'"
  mutate no_blizzard_row $BM " {Key='BlizzardBed',Name='WeatherBlizzardAmbience',Id='87749574738390',Attribute='BlizzardBedAssetId'},
 " ""

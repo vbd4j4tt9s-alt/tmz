@@ -68,7 +68,7 @@ static(){ # $1 = the src tree to check; $2 = "full" also checks what only this c
   sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 && echo "ok: the R152 load guard is line 1 of every client script ($(tail -1 "$OUT/guard.log"))" || { fail "the load guard test fails";tail -5 "$OUT/guard.log"; }
   if git -C "$REPO" cat-file -e "$BASE:src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua" 2>/dev/null;then
    git -C "$REPO" show "$BASE:src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua" > "$OUT/bgm_base.txt"
-   cmp -s "$OUT/bgm_base.txt" "$CL/BackgroundMusic.client.lua" && echo "ok: BackgroundMusic.client.lua is byte-identical to the commit before the fixes" || fail "BackgroundMusic.client.lua changed"
+   cmp -s "$OUT/bgm_base.txt" "$CL/BackgroundMusic.client.lua" && echo "ok: BackgroundMusic.client.lua is byte-identical to the commit before the fixes" || { sh "$T/bgm_frozen.sh" "$REPO" "$CL/BackgroundMusic.client.lua" && echo "ok: BackgroundMusic.client.lua is the R156 music script frozen in frozen.sha256 (R156, on purpose: the only change)" || fail "BackgroundMusic.client.lua changed"; }
   else echo "SKIP: BackgroundMusic check (commit $BASE not in the history)";fi
  fi
 }

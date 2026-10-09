@@ -34,7 +34,7 @@ bad=0;c=0;for f in "$SP"/*.client.lua;do
  sed -n "${line}p" "$f" | grep -qF "R152: start once the whole game has arrived" || { echo "the load guard is not line $line of $b";bad=1; }
 done
 [ "$bad" = 0 ] && echo "ok: line 1 of every client script is the R152 load guard (Hotbar: line 2), $c scripts" || fail "load guard"
-git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua && echo "ok: BackgroundMusic untouched" || fail "BackgroundMusic changed"
+{ git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua || sh "$REPO/tools/tests/bgm_frozen.sh" "$REPO"; } && echo "ok: BackgroundMusic untouched (or the R156 music script frozen in frozen.sha256)" || fail "BackgroundMusic changed"
 # Config.lua: only the Config.Version string may differ from the base (R153b hotfix, the R154 release bump)
 cfg=src/ServerScriptService/ChestChaseServer/Config.lua
 if [ "$(git -C "$REPO" show "$BASE:$cfg" | sed "s/Config.Version='[^']*'/Config.Version='V'/")" = "$(sed "s/Config.Version='[^']*'/Config.Version='V'/" "$REPO/$cfg")" ];then echo "ok: Config.lua untouched apart from Config.Version";else fail "Config.lua changed (beyond Config.Version)";fi

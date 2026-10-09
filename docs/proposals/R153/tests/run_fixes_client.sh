@@ -48,7 +48,7 @@ grep -q "	ReplicatedStorage/KeeperFollow153	" "$S/MANIFEST.tsv" && bad "src/MANI
 [ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" 2>/dev/null | grep 'Config.Version' | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/")" = "$(grep 'Config.Version' "$SS/Config.lua" | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/")" ] || bad "Config.Version changed"
 if grep -rniE "cla[u]de|op[u]s|sonn[e]t|haik[u]|anthrop[i]c|gp[t]-?[0-9]" "$HERE" 2>/dev/null;then bad "a model name in the R153 files";fi
 BG=$SP/BackgroundMusic.client.lua
-[ -z "$(git -C "$REPO" status --porcelain -- "$BG")" ] || bad "BackgroundMusic.client.lua was touched"
+[ -z "$(git -C "$REPO" status --porcelain -- "$BG")" ] || sh "$REPO/tools/tests/bgm_frozen.sh" "$REPO" || bad "BackgroundMusic.client.lua was touched" # R156 (on purpose): the owner's music change is accepted by its frozen hash
 [ "$fail" = 0 ]
 echo "ok: the touched scripts compile, line 1 of every client script is the R152 load guard (Hotbar: its Backpack line, then the guard), KeeperFollow153 is gone, the fixes are in place, Config.Version unchanged, no model names"
 # --- finding 6: the server's launch allowance ----------------------------------------------------------------------------------------------------------------

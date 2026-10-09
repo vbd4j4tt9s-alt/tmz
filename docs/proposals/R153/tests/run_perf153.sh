@@ -43,7 +43,7 @@ bad=0;n=0;for f in "$SP"/*.client.lua;do
  sed -n "${line}p" "$f" | grep -qF "R152: start once the whole game has arrived" || { echo "the load guard is not line $line of $b";bad=1; }
 done
 [ "$bad" = 0 ] && echo "ok: line 1 of every client script is the R152 load guard (Hotbar: line 2, after its Backpack line), $n scripts" || fail "load guard"
-cmp -s "$B/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua" "$SP/BackgroundMusic.client.lua" && echo "ok: BackgroundMusic untouched" || fail "BackgroundMusic changed"
+{ cmp -s "$B/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua" "$SP/BackgroundMusic.client.lua" || sh "$REPO/tools/tests/bgm_frozen.sh" "$REPO" "$SP/BackgroundMusic.client.lua"; } && echo "ok: BackgroundMusic untouched (or the R156 music script frozen in frozen.sha256)" || fail "BackgroundMusic changed"
 [ "$(grep 'Config.Version' "$B/ServerScriptService/ChestChaseServer/Config.lua" | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/")" = "$(grep 'Config.Version' "$SS/Config.lua" | sed "s/Config.Version='V150 R15[0-9a-z]*'/Config.Version='V150 R15x'/")" ] && echo "ok: Config.Version unchanged" || fail "Config.Version changed"
 retired=0;left=0
 for p in ReplicatedStorage/AncientWorldrootSeedArt45 ReplicatedStorage/ElderbloomSeedArt45 ReplicatedStorage/NavigationArtwork ReplicatedStorage/TopNavigationLayout ReplicatedStorage/VectorIcons91 \
