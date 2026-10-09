@@ -231,7 +231,9 @@ M.NoCollect={aborted=true,destroyed=true,test=true,['start failed']=true}
 M.CollectAfter=.25 -- a press this soon after the result is shown only lands (the clicks of a skip go on for a moment)
 M.SceneExit=.35 -- a collected story scene's fade to black (R153: FloatEnd -> Back, .5-.7 s), then the world and the seed's flight
 M.TailFade=.2 -- a collect while the reveal still rings: its tail fades out over this
-M.TeleportStep=30 -- studs in one frame: a teleport (no runner moves that far in a frame)
+M.TeleportStep=30 -- studs in one frame: a teleport (no runner moves that far in a frame) ...
+M.TeleportRuns=3 -- ... and no more than this many times the distance the runner's WalkSpeed covers in the time since the last frame (a hitch, 10-15 fps)
+M.TeleportMaxDt=1 -- (seconds counted for that: a longer freeze is not a reason to stop seeing a teleport)
 M.LeaveDistance=90 -- studs from where the result was shown: the player has left
 M.Forever=1e6 -- (seconds: a beat that does not come while the result waits)
 local function unbind(run)
@@ -309,7 +311,11 @@ finish=function(run,reason)
  if run.Fly then pcall(run.Fly.Go)end
  if follow then
   local info=table.clone(run.Info);info.Result=true
-  task.defer(function()if not current then M.Start(info)elseif Collect then pcall(Collect.Release,run.Id)end end)
+  -- (R154: a follow-up that does not start - no PlayerGui, a failure before it has its id - leaves nothing to release the hold: do it here)
+  task.defer(function()
+   if not current then if not M.Start(info)and Collect then pcall(Collect.Release,run.Id)end
+   elseif Collect then pcall(Collect.Release,run.Id)end
+  end)
  end
 end
 -- R154 ---------------------------------------------------------------------------------------------------------------------------------------
@@ -386,8 +392,14 @@ local function waitCheck(run)
  local root=char and char:FindFirstChild('HumanoidRootPart')
  if root then
   local p=root.Position
-  if run.LastPos and(p-run.LastPos).Magnitude>M.TeleportStep then return'teleport'end
-  run.LastPos=p
+  local at=os.clock();local dt=math.clamp(at-(run.LastPosAt or at),0,M.TeleportMaxDt)
+  if run.LastPos then
+   -- the farthest a runner gets between two checks: the floor, or what its speed (WalkSpeed, or a faster fall / push) covers in the time between them, times a margin
+   local hum=char:FindFirstChildOfClass('Humanoid');local speed=hum and tonumber(hum.WalkSpeed)or 0
+   local vel=root.AssemblyLinearVelocity;if vel and vel.Magnitude>speed then speed=vel.Magnitude end
+   if(p-run.LastPos).Magnitude>math.max(M.TeleportStep,speed*dt*M.TeleportRuns)then return'teleport'end
+  end
+  run.LastPos=p;run.LastPosAt=at
  end
  if os.clock()<(run.NextWait or 0)then return nil end
  run.NextWait=os.clock()+.2

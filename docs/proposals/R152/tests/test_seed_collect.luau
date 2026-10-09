@@ -21,6 +21,9 @@
 --     the result collects; an onlooker's pack: as before (no hold, its seed flies into their hand)
 --  5. sound: the collect never stacks on the reveal's tail (a collect while it rings fades it out first: silent by the landing), the flight's
 --     whoosh swells on its fastest frame and stays soft, the pickup cue is heard on the landing frame
+--  6. review fixes: a held-back seed's weather / Mech effects (drawn by the real ItemCosmetics outside the tool) stay off until it lands, then
+--     come back at once; the watchdog ends a touched hold at its Due, not a Backstop later; a story scene cut short whose result card cannot
+--     start lets its hold go at once; a fast runner on a slow frame / a hitch / a fall is not a "teleport" (a real one still is)
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local Y=require('./rare152_env')(W,E,F,X)
 local R=W.R;local V3,CF=R.Vector3.new,R.CFrame.new
@@ -133,7 +136,7 @@ local function open(rank,opts)
  local at=W.workspace:GetServerTimeNow();bag:SetAttribute('RevealAt',at)
  W.frames(1,1/30)
  local spec=Rules.SeedDesignById[seedId]
- local o={Bag=bag,Tool=tool,Rank=rank,At=at,Duration=dur,SeedId=seedId,Id=id,Rarity=rarity,Char=char,Run=char==X.char and M.Active()or nil,Track={}}
+ local o={Bag=bag,Tool=tool,Rank=rank,At=at,Duration=dur,SeedId=seedId,Id=id,Rarity=rarity,Char=char,Run=char==X.char and M.Active()or nil,Track={},FX=opts.FX,Mech=opts.Mech}
  o.Name=Names.Tool({GetAttribute=function(_,k)return({SeedId=seedId,GardenSeed=true,Mutation='None'})[k]end,Name=(spec and spec.name or seedId)},Catalog)
  return o
 end
@@ -155,6 +158,11 @@ local function step(o,dt)
   o.BuildAt=nil -- (the server builds the seed on Equipped: a model with its own effects)
   local m=R.new('Model');m.Name='LooseSeed';local p=R.new('Part');p.Name='Packet';p.Size=V3(.5,.5,.5);p.Transparency=0;p.Parent=m
   local fx=R.new('ParticleEmitter');fx.Name='Sparkle';fx.Enabled=true;fx.Parent=p;m.Parent=o.SeedTool;o.Packet=p;o.PacketFx=fx
+  if o.FX or o.Mech then -- (ItemEffectAnchor.Set, as the server does it: the weather / Mech effects are drawn by ItemCosmetics, outside the tool)
+   p.CFrame=CF(0,4,100);p:SetAttribute('WeatherTrait',o.FX or'None');p:SetAttribute('EffectRadius',1.2);p:SetAttribute('EffectHeight',2)
+   if o.Mech then p:SetAttribute('MechFX',true)end
+   W.CS:AddTag(p,'GardenItemFX')
+  end
  end
  local s=worldSeed()
  if s and s.PrimaryPart and o.Bag.Parent then o.Track[#o.Track+1]={T=W.workspace:GetServerTimeNow()-o.At,D=(s:GetPivot().Position-(hand.CFrame*CF(0,-.5,0)).Position).Magnitude,V=worldSeedVisible()}end
@@ -188,7 +196,7 @@ local function reset()
  clearItems()
  cam.CameraType=R.Enum.CameraType.Custom;cam.FieldOfView=70;cam.CFrame=CF(3,9,112);cam.Focus=CF(0,3,100);cam.CameraSubject=X.hum
  X.root.CFrame=CF(0,3,100);X.state=R.Enum.HumanoidStateType.Running;X.hum.Health=100
- W.Gui.ReducedMotionEnabled=false;W.UIS.TouchEnabled=false;W.UIS.KeyboardEnabled=true;X.lowFx=false
+ W.Gui.ReducedMotionEnabled=false;W.UIS.TouchEnabled=false;W.UIS.KeyboardEnabled=true;X.lowFx=false;X.hum.WalkSpeed=16;X.root.AssemblyLinearVelocity=nil
  X.player:SetAttribute(ATTR,nil);X.pg:SetAttribute('SeedMenu',nil)
  for _,a in ipairs({'GuardianRagdollActive','GuardianFlingActive','ChestChaseRunActive','ChestChaseQueued','ChestChaseSeedCarrying'})do X.player:SetAttribute(a,nil)end
  local motion=W.RS:FindFirstChild('RunnerMotion');if motion then motion:SetAttribute('TrackBoundaryZ',nil);motion:SetAttribute('TrackCenterX',nil);motion:SetAttribute('TrackHalfWidth',nil)end
@@ -534,6 +542,124 @@ do
   check(cueVol and cueVol<=.25,tag..': the pickup cue at its own level (the bag\'s Bubble06, '..tostring(cueVol)..')')
   landAll(o);clean(tag)
  end
+end
+-- 6. review fixes -------------------------------------------------------------------------------------------------------------------------
+do -- the weather / Mech effects of a seed held out of the hand stay off with it, and come back as it lands (ItemCosmetics, the real script)
+ local sc=R.new('LocalScript');sc.Name='ItemCosmetics';local okc,errc=pcall(W.load,'ItemCosmetics',sc);check(okc,'effects: the real ItemCosmetics loads: '..tostring(errc))
+ local function sets()local f=W.workspace:FindFirstChild('_ItemCosmeticsR59');return f and #f:GetChildren()or-1 end
+ for _,v in ipairs({{Tag='Drippy seed',Rank=4,FX='Drippy'},{Tag='Mech seed',Rank=5,Mech=true},{Tag='Frosted seed',Rank=3,FX='Frosted'}})do
+  reset();X.run(.5)
+  local tag='effects: '..v.Tag
+  check(sets()==0,tag..': (no effect set before it)')
+  local o,run=waiting(v.Rank,{FX=v.FX,Mech=v.Mech})
+  check(o.Equipped and o.Packet and o.Packet.Parent~=nil and #W.CS:GetTagged('GardenItemFX')==1,tag..': in the hand, built and tagged (GardenItemFX) as the server does')
+  local drawn=0;local frames=0
+  for _=1,120 do step(o,1/20);frames+=1;if sets()~=0 then drawn+=1 end end
+  check(M.Waiting()and not run.Collected,tag..': (the result still waits)')
+  check(drawn==0,tag..': no drips / frost / gears at the opener\'s hand while the result waits ('..drawn..' of '..frames..' frames drew some)')
+  press(o,run.Kind=='Scene'and'button'or'click')
+  local early=false;local g=0
+  while not landingOf(o.Id)and g<400 do step(o,1/60);g+=1;if sets()~=0 then early=true end end
+  local land=landingOf(o.Id)
+  check(land~=nil and not early,tag..': and none while the seed flies in')
+  local at=nil;g=0
+  while not at and g<120 do if sets()>0 then at=R.clock else step(o,1/60);g+=1 end end
+  check(at~=nil and land and at-land.At<=.1,tag..': they are back on the frames after it lands ('..(at and land and string.format('%.3f s',at-land.At)or'never')..')')
+  landAll(o);X.run(.5)
+  check(sets()==1,tag..': and stay ('..sets()..' set)')
+  reset();X.run(.5);check(sets()==0,tag..': the seed gone, its effects gone')
+ end
+ sc:Destroy()
+end
+do -- the watchdog: a hold nobody touches ends when its time is up, a touched one at its Due (not a whole Backstop after that), a live one never
+ reset();local t0=R.clock
+ Collect.Hold('wd-a');Collect.Hold('wd-b');Collect.Hold('wd-c')
+ local nextTouch=0
+ while R.clock-t0<14 do
+  W.frames(1,.05)
+  if R.clock-t0>=nextTouch then nextTouch+=.1;Collect.Touch('wd-c')end -- (the director: every frame; here every .1 s)
+  if math.abs(R.clock-t0-4.5)<.026 and not landingOf('wd-b')then Collect.Touch('wd-b')end
+ end
+ local a,b,c=landingOf('wd-a'),landingOf('wd-b'),landingOf('wd-c')
+ check(a and a.Cue==false and a.At-t0>=Collect.Backstop-.06 and a.At-t0<=Collect.Backstop+.1,'watchdog: an untouched hold ends after Backstop ('..(a and string.format('%.2f',a.At-t0)or'never')..' s)')
+ local due=4.5+Collect.Backstop
+ check(b and b.Cue==false and b.At-t0>=due-.06 and b.At-t0<=due+.1,'watchdog: a hold touched at 4.5 s ends at its Due, '..string.format('%.1f',due)..' s, not a Backstop after the first check ('..(b and string.format('%.2f',b.At-t0)or'never')..' s)')
+ check(c==nil and Collect.Held('wd-c'),'watchdog: a hold touched all the time is still there after 14 s')
+ Collect.Release('wd-c');check(landingOf('wd-c')~=nil and not Collect.Held('wd-c'),'watchdog: and ends when released')
+ Collect.Clear()
+end
+do -- a story scene cut short before its hit: its result card follows; when that card cannot start, the hold is let go at once
+ local function cutShort(tag,prepare)
+  reset()
+  local o=open(7);local run=o.Run
+  if not check(run~=nil and run.Kind=='Scene','follow-up '..tag..': a story scene starts')then landAll(o);return nil end
+  untilT(o,run,1)
+  check(not run.SawClimax and Collect.Held(o.Id),'follow-up '..tag..': before its hit, the seed is held')
+  prepare()
+  for z=100,112 do X.root.CFrame=CF(0,3,z);W.frames(1,1/30)end -- (pushed in the stage: it cuts back to the world)
+  local doneAt=nil;local g=0
+  while g<60 and not(doneAt and R.clock-doneAt>=.5)do W.frames(1,1/30);g+=1;if run.Done and not doneAt then doneAt=R.clock end end
+  return o,run,doneAt
+ end
+ for _,mode in ipairs({'Start gives nothing','no PlayerGui'})do
+  local realStart=M.Start;local o,run,doneAt
+  if mode=='Start gives nothing'then
+   o,run,doneAt=cutShort(mode,function()M.Start=function()return nil end end)
+   M.Start=realStart
+  else
+   o,run,doneAt=cutShort(mode,function()X.pg.Parent=nil end)
+   X.pg.Parent=X.player
+  end
+  if o then
+   check(run.Done and run.Reason=='moved','follow-up '..mode..': the scene was cut short ('..tostring(run.Reason)..')')
+   check(M.Active()==nil,'follow-up '..mode..': and its result card did not start')
+   local l=landingOf(o.Id)
+   check(not Collect.Held(o.Id)and l and l.Cue==false and doneAt and l.At-doneAt<=.2,'follow-up '..mode..': the hold is let go at once, not by the watchdog ('..(l and doneAt and string.format('%.2f s',l.At-doneAt)or'still held')..')')
+   landAll(o);reset()
+  end
+ end
+ -- the result card that follows when it does start: still held, and collected by the next press
+ reset()
+ local o=open(7);local run=o.Run;untilT(o,run,1)
+ for z=100,112 do X.root.CFrame=CF(0,3,z);W.frames(1,1/30)end
+ W.frames(3,1/30)
+ local card=M.Active()
+ check(run.Done and card and card~=run and card.Kind=='Result' and Collect.Held(o.Id),'follow-up: the result card follows the cut-short scene, the seed still held')
+ if card then
+  untilShown(o,card);untilT(o,card,L.ShownAt(card.TL)+M.CollectAfter+.05)
+  press(o,'click');check(card.Collected,'follow-up: its press collects it')
+  landAll(o);check(slotShowing(o.Name)~=nil and landingOf(o.Id)and landingOf(o.Id).Cue,'follow-up: the seed flies into the hotbar')
+ end
+ reset()
+end
+do -- a teleport is still one, but a fast runner on a slow frame, a hitch and a fall are not
+ local function moves(speed,dt,frames,pos,vel)
+  reset();local o,run=waiting(4);X.hum.WalkSpeed=speed
+  local base=X.root.CFrame.Position
+  for i=1,frames do
+   local p=pos(i,base);X.root.CFrame=CF(p.X,p.Y,p.Z);if vel then X.root.AssemblyLinearVelocity=vel end
+   step(o,dt)
+  end
+  return o,run
+ end
+ -- WalkSpeed 300 at 8 fps: 36 studs a frame, back and forth on the spot (it does not leave)
+ local o,run=moves(300,.12,16,function(i,b)return V3(b.X,b.Y,b.Z+(i%2==0 and 0 or 36))end)
+ check(not run.Collected and M.Waiting(),'teleport: a runner at WalkSpeed 300 moving 36 studs a frame (8 fps) does not collect the result ('..tostring(run.CollectWhy)..')')
+ -- the same at WalkSpeed 16 is no runner: it is a teleport
+ o,run=moves(16,.12,4,function(i,b)return V3(b.X,b.Y,b.Z+(i%2==0 and 0 or 36))end)
+ check(run.Collected and run.CollectWhy=='teleport','teleport: 36 studs in a frame at WalkSpeed 16 is a teleport ('..tostring(run.CollectWhy)..')');landAll(o)
+ -- a hitch: a second with no frame, the runner (WalkSpeed 16) got 40 studs further
+ o,run=moves(16,1,1,function(i,b)return V3(b.X,b.Y,b.Z+40)end)
+ check(not run.Collected and M.Waiting(),'teleport: 40 studs over a 1 s hitch at WalkSpeed 16 does not collect the result ('..tostring(run.CollectWhy)..')')
+ -- a fall: 50 studs down in a quarter second (it is falling at 200 studs/s)
+ o,run=moves(16,.25,1,function(i,b)return V3(b.X,b.Y-50,b.Z)end,V3(0,-200,0))
+ check(not run.Collected and M.Waiting(),'teleport: falling 50 studs in a quarter second does not collect the result ('..tostring(run.CollectWhy)..')')
+ -- the real thing: the base / track teleport buttons jump hundreds of studs, whoever is running and however slow the frame
+ for _,t in ipairs({{'at 60 fps',16,1/60},{'at 8 fps, WalkSpeed 300',300,.12},{'after a 1 s hitch',16,1}})do
+  o,run=moves(t[2],t[3],2,function(i,b)return V3(b.X,b.Y,b.Z+(i==1 and 0 or 300))end)
+  check(run.Collected and run.CollectWhy=='teleport','teleport: 300 studs ('..t[1]..') still collects the waiting result ('..tostring(run.CollectWhy)..')');landAll(o)
+ end
+ reset()
 end
 print(('R154 collect checks %d, fails %d'):format(checks,fails))
 if fails>0 then error('failures')end
