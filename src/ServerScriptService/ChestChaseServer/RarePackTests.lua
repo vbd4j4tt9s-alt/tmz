@@ -20,7 +20,8 @@ function T.Pick(config,rarity)
  if #list==0 then return nil end
  return list[T.Random:NextInteger(1,#list)]
 end
-function T.Grant(data,player,selector,requester)
+-- coat (R155, optional): 'Gold' / 'Diamond' for every TEST pack made (/test rarepacks mech gold); nothing = plain, as always. A bought Mech pack rolls its own coat (PremiumProgress).
+function T.Grant(data,player,selector,requester,coat)
  if not require(script.Parent.OwnerCommandAccess).IsAllowed(requester or player)then return false,'Owner or configured admin required.'end
  if not data:IsLoaded(player)then return false,'Wait for your data to load.'end
  selector=tostring(selector or'all'):lower();local selected={}
@@ -44,7 +45,7 @@ function T.Grant(data,player,selector,requester)
   local seed=data.Config.GetSeedById(spec.id);if not seed then return false,'Seed catalog mismatch.'end
   serial+=1;table.insert(pending,{Id=Http:GenerateGUID(false),Kind='Pack',ChestNumber=serial,ChestName=seed.Name,
    Stage=Verity.Is(spec.id)and Verity.PackStage or pick.Stage or spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,AccentColor=seed.Color,Rarity=pick.Rarity or spec.rarity,
-   SeedScale=1,OddsVersion=Verity.Is(spec.id)and Packs.OddsVersion or 81,BagVariant=Verity.Is(spec.id)and Verity.Variant or spec.stage==8 and'MechLimited'or'Pack06',PackSize=1,PackMutation='None',TestGrant=true,
+   SeedScale=1,OddsVersion=Verity.Is(spec.id)and Packs.OddsVersion or 81,BagVariant=Verity.Is(spec.id)and Verity.Variant or spec.stage==8 and'MechLimited'or'Pack06',PackSize=1,PackMutation=Packs.MutationKey(coat),TestGrant=true,
    PackShape=require(game:GetService('ReplicatedStorage').PackShapes151).Roll(Verity.Is(spec.id)and Verity.Variant or spec.stage==8 and'MechLimited'or'Pack06')}) -- R151: also marked on the record (never announced); it rolls its chip-bag shape like any pack
  end
  data.StudioPackRewards=data.StudioPackRewards or setmetatable({},{__mode='k'})

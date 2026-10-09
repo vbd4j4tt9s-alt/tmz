@@ -28,7 +28,7 @@ function A.FaceFrame(side)
  local P=A.Pouch;local z=P.Center.Z+side*P.Depth/2
  return side<0 and CF(0,P.Center.Y,z)*ANG(0,PI,0)or CF(0,P.Center.Y,z)
 end
--- The design at scale 1 in the root's frame: {Name,Size,Frame,Color,Material,Shape?,Motion?,Pivot?,Rate?,Pulse?,Phase?,Glow?,Bolt?,Face?,Tear?,Blink?}.
+-- The design at scale 1 in the root's frame: {Name,Size,Frame,Color,Material,Shape?,Motion?,Pivot?,Rate?,Pulse?,Phase?,Glow?,Bolt?,Face?,Tear?,Blink?,Keep?}.
 local specs
 function A.Specs()
  if specs then return specs end
@@ -108,6 +108,14 @@ function A.Specs()
  add('AntennaBase',V(.10,.06,.09),CF(x,.985,zc),C.Mast,M.Metal)
  add('AntennaMast',V(.33,.022,.022),CF(x,1.18,zc-.03)*ANG(0,0,PI/2),C.Steel,M.Metal,Enum.PartType.Cylinder)
  add('AntennaLED',V(.05,.05,.05),CF(x,1.365,zc-.03),C.Led,M.Neon,Enum.PartType.Ball).Blink=.9
+ -- R155 (owner: Mech packs can be Gold / Diamond): a coat paints the pouch, the seal, the strips, the frame, the bolts, the reactor housing, the blades and gears and the antenna like
+ -- any pack (SeedPackVisuals.Bag: the coat's colour, Metal / Glass, reflectance, a Diamond's transparency), but NOT the parts that make the pack read as a machine: the lit parts (the
+ -- core, the facet, the traces, the ring's cyan edges, the MECH letters and their plate, the teal inset under the core, the antenna's LED) and the black hazard stripes keep their
+ -- colour (MechCoatKeep), so a Gold or Diamond Mech pack still shows its cyan circuit, its blinking LED and its hazard seal. The pulse / blink / scan cues (MechPackFx153) only touch these.
+ for _,s in ipairs(out)do
+  local n=s.Name
+  if s.Glow or s.Pulse or s.Blink or n:find('^HazardStripe')or n:find('^HazardSeal')or n:find('^MechLetter')or n:find('^MechPlate')or n:find('^ReactorInset')or n:find('^CoreFacet')then s.Keep=true end
+ end
  specs=out;return out
 end
 -- The plain-parts body (no flat pouch yet): the same width, height, faces, rounded long edges, tapered ends and crimps as the generated pouch.
@@ -194,6 +202,7 @@ function A.Build(bag)
   end
   if s.Pulse then p:SetAttribute('MechPulse',s.Pulse);p:SetAttribute('MechMotionPhase',s.Phase or 0)end
   if s.Glow then p:SetAttribute('MechGlow',true)end
+  if s.Keep then p:SetAttribute('MechCoatKeep',true)end -- R155: a Gold / Diamond coat leaves this part's colour alone
   if s.Blink then p:SetAttribute('MechBlink',s.Blink)end
   if s.Tear then p:SetAttribute('MechTear',s.Tear)end
   if s.Bolt then local bp=shift*s.BoltPivot;p:SetAttribute('MechBolt',s.Bolt);p:SetAttribute('MechFace',s.Face);p:SetAttribute('MechBoltPivot',CF(bp.Position*scale)*bp.Rotation)end

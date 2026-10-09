@@ -301,7 +301,7 @@ function Rules.RollMutation(value)
 end
 function Rules.PackLabel(stage,variant,size,mutation)
     if variant=='EclipseReliquary'then local m=Rules.MutationKey(mutation);return(m~='None'and m..' 'or'')..'Void Pack'end
-    if variant=='MechLimited'then return 'Limited Mech Pack'end
+    if variant=='MechLimited'then local m=Rules.MutationKey(mutation);return(m~='None'and m..' 'or'')..'Limited Mech Pack'end -- R155: a bought Mech pack can be Gold / Diamond too (PremiumProgress:GrantMechPacks)
     if variant==Verity.Variant then local m=Rules.MutationKey(mutation);return(m~='None'and m..' 'or'')..Verity.PackName end -- R147
     mutation=Rules.MutationKey(mutation)
     return (mutation~='None'and mutation..' 'or '')..

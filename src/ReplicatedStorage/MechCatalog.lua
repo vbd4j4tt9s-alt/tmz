@@ -25,9 +25,30 @@ function C.ProductId(count)
  local id=tonumber(script:GetAttribute(offer.Attribute))
  return id and id>0 and id<9007199254740991 and id%1==0 and id or 0
 end
-function C.OnSale()
+-- R155 (owner: the card's "LIMITED TIME!" gets a real end, the same as Verity's event): the pack is on sale only while the limited event runs (LimitedEvent.EndsAt,
+-- 2026-11-01 00:00 UTC, shared with the Index LIMITED tab and Verity), as well as the owner's own switch (SaleEnabled / SaleEndsAt). `now` (optional, Unix seconds) is the
+-- clock to ask (the client passes the server's); the server's os.time() by default. It only gates STARTING a purchase: a Robux receipt that arrives later is still granted
+-- (PremiumService:ProcessReceipt never asks), and the packs a player already owns work as before.
+local Limited=require(script.Parent.LimitedEvent)
+function C.EventOver(now)return not Limited.Active(now or os.time())end
+function C.OnSale(now)
+ now=now or os.time()
  local untilTime=tonumber(script:GetAttribute('SaleEndsAt'))or 0
- return script:GetAttribute('SaleEnabled')~=false and(untilTime==0 or os.time()<untilTime)
+ return script:GetAttribute('SaleEnabled')~=false and(untilTime==0 or now<untilTime)and Limited.Active(now)
+end
+-- The card's words (owner's voice, Verity's "EVENT OVER! THANKS!" style). Refused: what the server says to a purchase started after the end (as VerityConfig.Text.EventEnded).
+C.Event={Live='LIMITED TIME!',Prefix='⏳ ENDS IN ',Over='EVENT OVER!',Thanks='THANKS FOR PLAYING!',Button='Event over',Refused='EVENT\'S OVER! THANKS FOR PLAYING!'}
+-- "⏳ ENDS IN 27d 04h 12m 09s" (the Index LIMITED tab's format: LimitedEvent.Text) or, after the end, "THANKS FOR PLAYING!".
+function C.TimerText(now)
+ if not Limited.Active(now)then return C.Event.Thanks end
+ return C.Event.Prefix..Limited.Text(Limited.Left(now))
+end
+-- R155: every BOUGHT Mech pack rolls a coat like a world pack (PremiumProgress:GrantMechPacks); this is the line next to the odds (shop card, hold tooltip, /test mechshop).
+-- The numbers are read from the world packs' own table (SeedPackRules.PackMutations: Gold 4.5%, Diamond 0.5%), so the line can never disagree with the roll.
+function C.CoatLine()
+ local M=require(script.Parent.SeedPackRules).PackMutations
+ local function pct(n)return(string.format('%.2f',n):gsub('0+$',''):gsub('%.$',''))end
+ return'Gold '..pct(M.Gold.Weight)..'% / Diamond '..pct(M.Diamond.Weight)..'% coat'
 end
 function C.ApplyPlants(catalog)
  for _,s in ipairs(C.Seeds)do

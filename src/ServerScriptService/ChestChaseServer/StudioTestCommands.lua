@@ -186,8 +186,10 @@ local function executeFor(ctx,player,text,requester)
   local point=Vector3.new(x,at.Position.Y,z+15)
   return teleport(ctx,player,CFrame.lookAt(point,point+Vector3.new(0,0,1)))
  elseif action=='rarepacks'then
-  if not exact(0,1)then return false,'Use /test rarepacks [rarity].'end
-  local okay,message=require(script.Parent.RarePackTests).Grant(data,player,a[1],requester)
+  if not exact(0,2)then return false,'Use /test rarepacks [rarity] [gold|diamond].'end
+  local coat=a[2]~=nil and mutation(a[2])or nil -- R155: an optional coat word, so a TEST Mech pack (rarepacks mech gold) can be seen Gold / Diamond without 20 purchases (a bought pack rolls its own)
+  if a[2]~=nil and not coat then return false,'Use /test rarepacks [rarity] [gold|diamond].'end
+  local okay,message=require(script.Parent.RarePackTests).Grant(data,player,a[1],requester,coat)
   if okay then ctx.Chests:SyncTools(player)end
   return okay,message
  elseif action=='seed'or action=='seeds'or action=='pack'then

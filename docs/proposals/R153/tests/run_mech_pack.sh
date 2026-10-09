@@ -33,8 +33,9 @@ cat = open(src + '/ReplicatedStorage/MechCatalog.lua', encoding='utf-8').read()
 chances = [float(x) for x in re.findall(r'Chance=([0-9.]+)', cat)]
 offers = re.findall(r'\{Count=(\d+),GemPrice=(\d+),TargetRobuxPrice=(\d+)', cat)
 prem = open(src + '/ServerScriptService/ChestChaseServer/PremiumProgress.lua', encoding='utf-8').read()
-ok = chances == [48, 26, 16, 7, 2.5, 0.5] and offers == [('1', '80', '80'), ('5', '375', '375'), ('10', '700', '700')] and "BagVariant=Catalog.Variant,PackSize=PackRules.RollPackSize(SizeRandom:NextNumber()),PackMutation='None'" in prem
-print(('ok' if ok else 'FAIL') + ': no value change: the Mech odds %s, the offers %s, bought Mech packs plain (no coat; pity and Config.Version: the R151 frozen hashes)' % (chances, offers))
+# R155 (owner: "We can implement 1C"): a BOUGHT Mech pack rolls the world packs' coat (P.RollCoat); a free one (paid == false) stays plain. The odds and the offers did not move.
+ok = chances == [48, 26, 16, 7, 2.5, 0.5] and offers == [('1', '80', '80'), ('5', '375', '375'), ('10', '700', '700')] and "BagVariant=Catalog.Variant,PackSize=PackRules.RollPackSize(SizeRandom:NextNumber()),PackMutation=paid==true and P.RollCoat()or'None'" in prem
+print(('ok' if ok else 'FAIL') + ': no odds / price change: the Mech odds %s, the offers %s; bought Mech packs roll a coat (R155), free ones stay plain (pity and Config.Version: the R151 frozen hashes)' % (chances, offers))
 sys.exit(0 if ok else 1)
 PY
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]|gp[t]-?[0-9]" "$HERE"/*mech* "$HERE"/run_mech_pack.sh "$P/R153/mech_pack" "$S/ReplicatedStorage/MechPackArt153.lua" "$S/ReplicatedStorage/MechPackFx153.lua" 2>/dev/null | grep -v "^Binary";then echo "FAIL: a model name in the R153 Mech files";exit 1;fi

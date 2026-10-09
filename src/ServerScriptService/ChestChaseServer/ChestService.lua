@@ -987,6 +987,7 @@ function ChestService:_holdPack(player,tool)
         for _,seed in ipairs(PackRules.OddsRows(self.Config,record.Stage,record.BagVariant,odds))do -- R148: by rarity rank, then name
             table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))
         end
+        if record.BagVariant=='MechLimited' then table.insert(rows,require(ReplicatedStorage.MechCatalog).CoatLine()) end -- R155: the coat line next to the Mech pack's odds
         tool.ToolTip=table.concat(rows,'\n')
     end
     if settleHold(self,player,tool) then return end
