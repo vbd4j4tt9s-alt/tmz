@@ -159,6 +159,8 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 | `voidgift` (server) | R152: the giveaway pedestal in the middle of the plaza: how many of the 500 are claimed and left, whether YOU have claimed (profile flag, the shared list, your state), which store this server uses (`DataStore` live, the Studio test store, or the in-memory counter when Studio has no API access), messages sent / received, and the pedestal (state, prompt). No @name |
 | `voidgift reset me` (server, **Studio only**) | Clears YOUR claim and your profile flag (the shared list loses you, the count goes down by one) so you can claim again. The pack you already got stays in your Bag (`clear packs` removes it). A live server refuses: it never changes the shared count |
 | `voidgift left 3` (server, **Studio only**) | Sets how many the pedestal shows as left (0 = ALL CLAIMED, 487 = a fresh start). Players already in the list keep their places, so the number cannot go above 500 minus them. Studio only; a live server refuses |
+| `playtime @name` | R157: how long that player has played in total (saved with the profile as `Premium.PlaySeconds157`, counted up to 3 hours) and how long is left until the free Void Pack can be claimed (20 minutes). `voidgift` shows yours too |
+| `playtime @name 12` (**Studio only** to set) | Sets that player's play time to 12 minutes (0 to 180), saved the usual way; `playtime 12 @name` works too. Use `playtime @name 19` to test the 20-minute rule: the pack opens a minute later. A live server refuses |
 
 ## Keepers (R152)
 | Command | What it does |

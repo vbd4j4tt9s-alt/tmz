@@ -103,6 +103,8 @@ return {
  {'/test voidgift','server: The giveaway pedestal: how many of the 500 are claimed / left, whether YOU have claimed (profile flag and the shared list), which store this server uses (live DataStore, Studio test store or the in-memory counter), messages and the pedestal.'},
  {'/test voidgift reset me','Studio only: clears YOUR claim and flag so you can claim again (the pack you got stays in your Bag). A live server refuses: it never changes the shared count.'},
  {'/test voidgift left 3','Studio only: sets how many the pedestal shows as left (0 = ALL CLAIMED). Studio uses its own store or an in-memory counter, never the live count.'},
+ {'/test playtime @username','R157: how long that player has played in total (saved; the free Void Pack can be claimed after 20 minutes) and how long is left. voidgift shows yours too.'},
+ {'/test playtime @username 12','Studio only: sets that player\'s play time to 12 minutes (0 to 180; /test playtime 12 @username works too). A live server refuses: it never changes play time.'},
 
  {'— VERITY\'S VOICE —',''},
  {'/test verityvoice 2.1 0.3','server: Find where "Hello, my name is Verity" ends by ear. verityvoice <end seconds> [start seconds] sets the cut for this server and plays it for you at once (from anywhere); verityvoice alone plays it again and prints the numbers; verityvoice reset goes back to VerityConfig. Copy the final numbers into VerityConfig.GreetingStart / GreetingEnd.'},

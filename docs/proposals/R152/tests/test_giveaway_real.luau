@@ -7,6 +7,8 @@
 --  4. the profile flag lives in the saved Premium table: it survives Save and Load on another server, a profile without it (an old save) is simply not flagged, and the profile
 --     version is unchanged (22): an older server copies the field it does not know (PremiumProgress.Decode keeps it);
 --  5. a profile that cannot save is refused (a pack that cannot be saved would be lost); a reservation whose pack was lost with an unsaved profile is given again, once.
+--  7. R157 (a claim needs 20 minutes of play time): the time counted by the giveaway's loop is saved with the profile (Premium.PlaySeconds157, ProfileVersion still 22) and loaded on the next visit /
+--     another server; the 20 minutes add up across visits; an old save (no field) and a field that is junk read as 0; a profile that cannot save counts in memory; a player reserved before the rule is still given the pack.
 local W=require('./world');local R=W.R;local E=require('./announce_env')
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -46,11 +48,13 @@ local function lastText(p)for i=#told,1,-1 do if told[i].P==p then return told[i
 local synced=0;local Chests={SyncTools=function()synced+=1 end}
 R.clock=20727*86400+3600*5
 local function dataServer()return PDS.new(Config,Map,Notes)end
-local function makePlayer(Data,id,name)
+-- played (R157): the seconds the player has played when the profile is in memory (default: the 20 minutes the claim needs); false = leave what the profile loaded (the saved value, or none)
+local function makePlayer(Data,id,name,played)
  local p=R.new('Player');p.Name=name;p.DisplayName=name;p.UserId=id;p.Parent=Players;present[id]=p;order[#order+1]=p
  function p.Kick(_,why)error('kicked '..name..': '..tostring(why),0)end
  R.new('Backpack').Parent=p
  Data:PreparePlayer(p);assert(Data:Load(p),'load '..name)
+ if played~=false then Data:GetPremium(p)[Rules.PlayField]=played or Rules.MinPlaySeconds end
  local m=R.new('Model');m.Name=name;local root=R.new('Part');root.Name='HumanoidRootPart';root.Size=V3(2,2,1);root.CFrame=CF(0,5,-380);root.Parent=m;m.PrimaryPart=root
  local hum=R.new('Humanoid');hum.Health=100;hum.Parent=m;m.Parent=W.workspace;p.Character=m
  return p
@@ -226,6 +230,72 @@ do
   local D3=dataServer();local P5=makePlayer(D3,2042,'Old151');local again=recOf(D3,P5,lockedId)
   check(again and again.Kind=='Pack'and again.BagVariant=='EclipseReliquary','A1: an R152 server reads what the R151 server wrote (the pack is a normal Void pack)')
  end
+end
+
+-- 7. R157 (owner: "make it so that the void pack is only claimable after playing for 20 minutes"): the play time on the REAL player data -------------------------------------------------------
+-- (makePlayer(Data, id, name, played): the default is the 20 minutes the claim needs; false leaves what the profile loaded: the saved value, or none)
+do
+ local profileStore=stores[Config.GetDataStoreName(false)]
+ local function savedPremium(id)local v=profileStore.Data['Player_'..id];return v and v.Premium end
+ local function played(D,p)return D:GetPremium(p)[Rules.PlayField]end
+ local function tick(svc,seconds)for _=1,math.floor(seconds/2+.5)do clock.t+=2;svc:Step()end end
+ local function claims()return stores['VoidGiveaway152']and stores['VoidGiveaway152'].Data.Claims end
+ check(Config.ProfileVersion==22,'R157: ProfileVersion is still 22 (the play time is an optional field of the saved Premium table)')
+ -- a profile from before the rule has no field and reads as 0; the claim is refused without a trace
+ local D1=dataServer();local svc1=giveaway(D1)
+ local P=makePlayer(D1,2101,'Fresh',false);svc1:Step()
+ check(played(D1,P)==nil and svc1:_played(P)==0,'R157: a profile with no play-time field (every save from before the rule) reads as 0 seconds')
+ local before=claims()and claims().Count or 0
+ local ok,why=svc1:Claim(P)
+ check(ok==false and why=='playtime'and lastText(P)=='play 20 more min to get your free void pack!','R157: ... and it cannot claim yet: "play 20 more min to get your free void pack!"')
+ check(#D1:GetChestRecords(P)==0 and D1:GetPremium(P).VoidGift152==nil and(claims()and claims().Count or 0)==before and not(claims()and claims().Users['2101']),'R157: ... nothing reserved, no pack, no flag')
+ check(P:GetAttribute(Rules.Attr.PlayLeft)==1200,'R157: the client attribute says 1200 s to go')
+ -- the real server counts it, marks the profile dirty, and a save writes it
+ D1.Dirty[P]=false;tick(svc1,600)
+ check(played(D1,P)==600 and D1.Dirty[P]==true and P:GetAttribute(Rules.Attr.PlayLeft)==600,'R157: 10 minutes of looks: 600 s in the profile, marked dirty, 600 s to go')
+ check(D1:Save(P,'test',true)==true and(savedPremium(2101)or{})[Rules.PlayField]==600,'R157: a save writes Premium.PlaySeconds157 = 600')
+ -- the next visit (another server): it loads, counts on, and the last seconds are in the final save on leaving even if they were never marked dirty
+ leave(D1,P)
+ local D2=dataServer();local svc2=giveaway(D2)
+ local P2=makePlayer(D2,2101,'Fresh',false);svc2:Step()
+ check(played(D2,P2)==600 and svc2:_played(P2)==600 and P2:GetAttribute(Rules.Attr.PlayLeft)==600,'R157: the next visit loads 600 s (the time is saved across visits), and publishes it')
+ tick(svc2,310);check(played(D2,P2)==910,'R157: 310 s more: 910')
+ leave(D2,P2)
+ check((savedPremium(2101)or{})[Rules.PlayField]==910,'R157: leaving saves the last seconds too (the final save is forced: 910)')
+ -- the third visit reaches the 20 minutes in total (600 + 310 + 290) and the claim goes through
+ local D3=dataServer();local svc3=giveaway(D3)
+ local P3=makePlayer(D3,2101,'Fresh',false);svc3:Step()
+ check(svc3:Claim(P3)==false and lastText(P3)=='play 5 more min to get your free void pack!','R157: the third visit starts at 910 s: "play 5 more min ..." (rounded up from 4 min 50 s)')
+ tick(svc3,290);check(played(D3,P3)==1200 and P3:GetAttribute(Rules.Attr.PlayLeft)==0,'R157: 290 s later: 1200 s in all (3 visits), 0 to go')
+ local ok3,rec=svc3:Claim(P3)
+ check(ok3==true and rec and rec.BagVariant=='EclipseReliquary'and #D3:GetChestRecords(P3)==1 and D3:GetPremium(P3).VoidGift152==true,'R157: the claim works: one real Void Pack and the flag')
+ check(D3:Save(P3,'test',true)==true and savedPremium(2101)[Rules.PlayField]==1200 and savedPremium(2101).VoidGift152==true,'R157: the saved profile holds both the time (1200) and the flag')
+ leave(D3,P3)
+ -- a Premium table keeps the field through Decode (any server since R57 copies a field it does not know), clean or not
+ local PP=server('PremiumProgress');local base={Version=2,Gems=0,Entitlements={},Biomes={},Receipts={},Plants={},SeedRewards={},BalanceVersion81=81,IndexRewardVersion=104}
+ local function decode(v)local t={};for k,x in pairs(base)do t[k]=x end;t[Rules.PlayField]=v;return PP.Decode(t)end
+ check(decode(300)and decode(300)[Rules.PlayField]==300,'R157: PremiumProgress.Decode keeps Premium.PlaySeconds157 (an older server copies it back unchanged)')
+ check(PP.Decode(base)and PP.Decode(base)[Rules.PlayField]==nil,'R157: a saved Premium without it loads without it (no field is invented)')
+ -- junk in the field: read as 0, written over by the next count
+ local J=makePlayer(D3,2105,'Junk',false);D3:Save(J,'test',true);leave(D3,J)
+ profileStore.Data['Player_2105'].Premium[Rules.PlayField]='abc'
+ local D4=dataServer();local svc4=giveaway(D4);local J2=makePlayer(D4,2105,'Junk',false);svc4:Step()
+ check(svc4:_played(J2)==0 and J2:GetAttribute(Rules.Attr.PlayLeft)==1200,'R157: a saved value that is not a number reads as 0')
+ tick(svc4,4);check(played(D4,J2)==4,'R157: ... and the next count writes a number over it')
+ -- the owner's command sets it on real data, Studio only (this server is a live one: refused)
+ local okC,tC=Svc.PlaytimeCommand(nil,J2,{'30'});check(okC==false and tC:find('Studio only',1,true)and played(D4,J2)==4,'R157: /test playtime on a live server is refused and changes nothing')
+ -- a profile that cannot save (Studio without API access): counted in memory, nothing written
+ local N=makePlayer(D4,2102,'Memory',false);D4.CanSave[N]=false;svc4:Step();local v0=profileStore.Version['Player_2102']
+ tick(svc4,60);check(played(D4,N)==60 and N:GetAttribute(Rules.Attr.PlayLeft)==1140,'R157: a profile that cannot save still counts, in memory (60 s)')
+ check(D4:Save(N,'test',true)==false and profileStore.Version['Player_2102']==v0 and profileStore.Data['Player_2102']==nil,'R157: ... and nothing is written for it')
+ -- a player who was RESERVED before the rule (the grant never saved): loads with 0 minutes, and is still given the pack
+ local D5=dataServer();local svc5=giveaway(D5);local L=makePlayer(D5,2110,'Reserved');svc5:Step();svc5:Claim(L)
+ check(#D5:GetChestRecords(L)==1 and claims().Users['2110']~=nil,'(granted, listed, never saved)')
+ present[2110]=nil;L.Parent=nil -- (the server crashed: no save)
+ local D6=dataServer();local svc6=giveaway(D6);local L2=makePlayer(D6,2110,'Reserved',false)
+ check(played(D6,L2)==nil and #D6:GetChestRecords(L2)==0,'(the new session: no pack, no play time)')
+ svc6:Step();check(#D6:GetChestRecords(L2)==1 and D6:GetPremium(L2).VoidGift152==true and lastText(L2):find('play ',1,true)==nil,'R157: a player the giveaway already reserved for is given the pack with 0 minutes played (the rule does not hold them up)')
+ svc6:Step();svc6:Claim(L2);check(#D6:GetChestRecords(L2)==1,'... once')
 end
 
 print(string.format('giveaway real data: %d checks, %d failed',checks,fails))
