@@ -540,7 +540,8 @@ Chests._holdPack(fake,D,tip);fake.Openings[D]=nil
 local tipRows={};for line in tip.ToolTip:gmatch('[^\n]+')do tipRows[#tipRows+1]=line end
 local _,poolAll=VPO.Pools(Config,Rules);local wantRows={Rules.PackLabel(7,'VerityReliquary',rOther.PackSize,rOther.PackMutation)}
 for _,seed in ipairs(poolAll)do wantRows[#wantRows+1]=seed.Name..': '..Odds.Format(exact[seed.Id])end
-check(tipRows[1]=='Verity Pack'and #tipRows==17,'the hold tooltip: "Verity Pack" and 16 seed rows ('..#tipRows..')')
+wantRows[#wantRows+1]=W.module('PackPity155').Disclosure -- R155: the pack pity's rule, listed under the odds
+check(tipRows[1]=='Verity Pack'and #tipRows==18,'the hold tooltip: "Verity Pack", 16 seed rows and the R155 pity rule ('..#tipRows..')')
 check(table.concat(tipRows,'\n')==table.concat(wantRows,'\n'),'every row is "<seed>: <1/N>" from the table, in the pool order (Verity Seed first)')
 check(tipRows[2]=='Verity Seed: 1/100'and tipRows[3]=='Mirage Fig Seed: '..Odds.Format(exact.MirageFigSeed)and tipRows[17]=='Nebula Vine Seed: '..Odds.Format(exact.NebulaVineSeed),'first rows: '..tostring(tipRows[2])..' | '..tostring(tipRows[3])..' ... '..tostring(tipRows[17]))
 local text=tip.ToolTip
@@ -551,7 +552,7 @@ check(not anyKing,'none of the six other King seeds is listed')
 -- A Void pack's tooltip is as before (Kings and Crowncore included, no Verity).
 local voidKeep=Data:AddChest(D,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',OddsVersion=137});Chests.SyncTools(fake,D)
 local vtool=toolFor(D,voidKeep.Id);Chests._holdPack(fake,D,vtool);local vrows={};for line in vtool.ToolTip:gmatch('[^\n]+')do vrows[#vrows+1]=line end
-check(vrows[1]=='Void Pack'and #vrows==22 and vtool.ToolTip:find('Crowncore Tree Seed:',1,true)and not vtool.ToolTip:find('Verity',1,true),'a Void pack tooltip is unchanged: 21 seeds with the Kings and the Crowncore Tree, no Verity')
+check(vrows[1]=='Void Pack'and #vrows==23 and vrows[23]==W.module('PackPity155').Disclosure and vtool.ToolTip:find('Crowncore Tree Seed:',1,true)and not vtool.ToolTip:find('Verity',1,true),'a Void pack tooltip is unchanged: 21 seeds with the Kings and the Crowncore Tree, no Verity (R155: and the pity rule under them)')
 fake.Openings[D]=nil
 
 -- 7. Owner commands --------------------------------------------------------------------------------------------------
@@ -562,7 +563,7 @@ check(X.Actions.verity==true and X.Actions.eclipse==true and X.Actions.void==tru
 local okOdds,textOdds=X.Execute(ctx,D,'odds',{'verity'})
 check(okOdds and textOdds:find('Verity Pack',1,true)and textOdds:find('Verity Seed: 1/100',1,true)and textOdds:find('Plasma Pepper Seed: '..Odds.Format(exact.PlasmaPepperSeed),1,true)and not textOdds:find('Crowncore Tree Seed',1,true),'odds verity shows the Verity pack odds')
 local lineCount=0;for _ in textOdds:gmatch('[^\n]+')do lineCount+=1 end
-check(lineCount==17,'odds verity: header + 16 seeds ('..lineCount..')')
+check(lineCount==18 and textOdds:find('\npity: every 10th pack u open is lucky',1,true)~=nil,'odds verity: header + 16 seeds + the pity rule (R155: the pack pity is listed with the odds) ('..lineCount..')')
 local okOdds2,textOdds2=X.Execute(ctx,D,'odds',{'verity','50000'})
 check(okOdds2 and select(2,textOdds2:gsub('Seed:',''))==16,'odds verity <luck> works and does not change anything')
 check(not X.Execute(ctx,D,'odds',{'verity','1','2'})and not X.Execute(ctx,D,'odds',{'mech','mythic'}),'odds verity with too many words, and odds mech, are refused')

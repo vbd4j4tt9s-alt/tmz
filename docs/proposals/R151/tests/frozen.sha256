@@ -10,15 +10,17 @@ b9dbf155ff24c0f63fa3189165814a71d18797b97b8e28b21c296d254be5438b  src/Replicated
 be7b27efe3f7450e5b27d4a97aa9ef00adc4ace48e143abb8830aad03c0a0806  src/ReplicatedStorage/PackOdds81.lua
 # R154 (on purpose): PackOdds112.lua and PackOdds137.lua clamp luck at BalanceValues81.LuckCeiling (the boots' cap x the luck passes: x100M with the 4 Leaf Clover) instead of MaxLuck; nothing else changed (luck without a pass is exactly as before)
 # R155 (on purpose): PackOdds112.lua and PackOdds137.lua: only the R154 comment above O.Luck changed (the boots are halved, Thunder Boots x25M, x50M with the clover); no code or number changed
-c86d360833235a1c928ef203a352e72d0ad9d3fed9c515bd774b67b7ebff6289  src/ReplicatedStorage/PackOdds112.lua
-c53919f40a7a54039943e65678b94831ac3acf5b712216ed2a350a9d835ed0cb  src/ReplicatedStorage/PackOdds137.lua
+# R155 (on purpose): PackOdds112.lua and PackOdds137.lua: the pack pity's LUCKY roll (PackPity155, the owner's "every 10th pack" x1.5): while that roll is worked out (PackPity155.Scoped) O.Luck clamps at x1.5 the ceiling (x75M) and LegacyLuck gives a pre-R112 pack's old multiplier the x1.5 once; every other roll is exactly as before (same clamp, same mapping)
+35e1e9fe7e8f4c6f7a37cec96eb2e110fcd81fa7f883471b5311df73e5336d0f  src/ReplicatedStorage/PackOdds112.lua
+c90adf51c6cf1a352057be46b2c4bf59e7e23f03284b2831182ab7e7ddb33c70  src/ReplicatedStorage/PackOdds137.lua
 d91252dd8786225ce55e6c248ddc962aea83e93094293f03951cdab0dd6c067d  src/ReplicatedStorage/PackSizePity.lua
 d87454e7192cf498d6d50d2d18dd869acbe8e695c3cbad79eacb4c21c3114b38  src/ReplicatedStorage/PackSchedule81.lua
 # R154 (on purpose): SeedPackRules.lua gained an outermost wrapper (PackLuck154): the 4 Leaf Clover's x2 on the Void / Verity / Mech packs (a new last argument, passLuck) and the 80% rule on live packs (no seed over 80%, the others 19%, 1% upgrade); RawSeedOdds = the odds before both; every banked world pack and every pack without the clover the rule leaves alone is as before
 # R155 (on purpose): SeedPackRules.lua: PackLabel names a coated Mech pack ("Gold Limited Mech Pack", like the Void / Verity / world packs); the odds, weights, sizes and rolls are untouched (the Mech coat roll is PremiumProgress:GrantMechPacks, with the world's own RollMutation)
 c53b3579f792b60a0b3c589f3a422cb8422a640af24839be43950720135574be  src/ReplicatedStorage/SeedPackRules.lua
 # R154 (new odds file): PackLuck154.lua, the rules of that wrapper (Shape = the 80% rule, Shift / FixedOdds = the clover on the fixed-odds packs, Roll = the exact staged roll)
-18fa5d7626a14f4475bcd64b4d83f40091569bc225fc127289b3e3c5d4cf68df  src/ReplicatedStorage/PackLuck154.lua
+# R155 (on purpose): PackLuck154.lua: PassLuck's ceiling is x1.5 (the clover's x2 -> x3) only on the pack pity's LUCKY roll (PackPity155.Scoped); nothing else changed
+05d509238fba524565ac58eb5fd0bd398000ccef6138014921ced0a2f96abbf8  src/ReplicatedStorage/PackLuck154.lua
 a866bdc4e1a2872bd985c816c50224d9043b8c532b933b72c87cfb74bb45cf50  src/ReplicatedStorage/RarePackRules.lua
 7f769e802f2324c2b322c5f7a79299a538ce9f90d6199f1f1b782064b2b9b573  src/ReplicatedStorage/VerityPackOdds.lua
 aa1d6d9ac03ce00b1b494cae6965a5228fa0f1e157a354d3e39264cb588f9043  src/ReplicatedStorage/VoidPackOdds85.lua

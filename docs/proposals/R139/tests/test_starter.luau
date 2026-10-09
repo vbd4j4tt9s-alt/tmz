@@ -75,7 +75,9 @@ check(#attrs==0,'no boost / luck attribute on the tool'..(#attrs>0 and(': '..tab
 fake.Openings[A]=true -- (an opening in progress: _holdPack only writes the tooltip)
 Chests._holdPack(fake,A,tLucky);Chests._holdPack(fake,A,tNormal)
 check(tLucky.ToolTip==tNormal.ToolTip,'holding it shows the same tooltip as a normal Forest pack')
-check(not tLucky.ToolTip:lower():find('luck',1,true)and not tLucky.ToolTip:find('🍀',1,true),'no LUCK row')
+-- (R155: every pack's tooltip ends with the pack pity's rule, "every 10th pack u open is lucky: x1.5 luck ...", the same for every pack: it says nothing of the starter boost)
+local tipLucky=tLucky.ToolTip:gsub('\n[^\n]*every 10th pack u open is lucky[^\n]*','')
+check(not tipLucky:lower():find('luck',1,true)and not tipLucky:find('🍀',1,true),'no LUCK row (apart from the R155 pity rule every pack lists)')
 local plain=Rules.SeedOdds(Config,1,'Pack01',A:GetAttribute('ChestLuckMultiplier'),Rules.OddsVersion)
 local Odds=W.module('OddsText85');local listed=0
 for _,seed in ipairs(Rules.RewardPool(Config,1,'Pack01')or{})do if(plain[seed.Id]or 0)>0 then

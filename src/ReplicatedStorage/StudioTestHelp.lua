@@ -40,7 +40,8 @@ return {
  {'/test seeds snow @username','All seeds of a biome (seeds all = every seed, seeds verity = the Verity seed).'},
  {'/test seed <SeedId> @username','One seed by id (see catalog). Or type: give big diamond apple seed to @username.'},
  {'/test catalog storm','List seed ids, biomes and rarities.'},
- {'/test odds storm mythic 1','Real per-seed odds for a biome + tier + luck (no seed over 80%). odds event = Void Pack odds, odds verity = Verity Pack odds (add clover: with the 4 Leaf Clover\'s x2).'},
+ {'/test odds storm mythic 1','Real per-seed odds for a biome + tier + luck (no seed over 80%). odds event = Void Pack odds, odds verity = Verity Pack odds (add clover: with the 4 Leaf Clover\'s x2). Add lucky at the end: the pack pity\'s lucky 10th (x1.5).'},
+ {'/test pity @username','R155 pack pity: the normal and event counts (event = Void, Verity, Mech) and which next pack is lucky. pity set 9 9 = the next pack of each is lucky (0-9, saved). TEST packs never count.'},
  {'/test indexinfo storm @username','Index reward status. claimindex claims it the normal way.'},
  {'take apple seeds from @username','Remove matching seeds (seed = one, seeds = all).'},
 
@@ -57,7 +58,7 @@ return {
  {'— TRACK, KEEPERS & EVENTS —',''},
  {'/test refreshpacks','server: Run the normal track refresh now.'},
  {'/test refreshcycle 30','server: Refresh into reset 30 (Legendary every 5, Mythic every 10, The Darkened every 3).'},
- {'/test pity 30','Preview what reset 30 guarantees. spawnodds shows normal slot chances.'},
+ {'/test pity 30','Preview what reset 30 guarantees (a number; pity alone is the pack pity). spawnodds shows normal slot chances.'},
  {'/test mystery @username','R141 base mystery pack. ready = unlocks in 3 s, next = pretend a new day, reset.'},
  {'/test daily @username','R140 login week + daily quests. next = pretend a new day, done = finish today\'s quests, week = next claim is day 7 (Void pack), reset. The packs they make claimable are TEST packs.'},
  {'/test plantnotify','R151 offline "your plant is ready" notifier: setup check + queue + your cooldown. send = send you one now (Roblox: 1 a day), reset = clear your cooldown.'},

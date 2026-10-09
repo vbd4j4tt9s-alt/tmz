@@ -983,11 +983,17 @@ function ChestService:_holdPack(player,tool)
         -- R139 (owner): the free starter pack's 2x luck is secret, so its tooltip shows the plain pack odds.
         -- R154: the pack's real odds: the 80% rule (SeedPackRules) and the 4 Leaf Clover's x2 on the Void / Verity / Mech packs (PassLuck, the passes alone) too.
         local odds=PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,player:GetAttribute('ChestLuckMultiplier'),record.OddsVersion or 0,nil,self.PlayerData:PassLuck(player))
+        -- R155 (owner): the pack pity. When this pack's open would be its group's lucky 10th, its odds are the lucky roll's (x1.5) and a line says so; the rule is listed with the odds.
+        local lucky,before,after=nil,{},{}
+        if self.PlayerData.PackPityTooltip then lucky,before,after=self.PlayerData:PackPityTooltip(player,record,function(luck,passLuck)return PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,luck,record.OddsVersion or 0,nil,passLuck)end)end
+        if lucky then odds=lucky end
         local rows={PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)}
+        for _,line in ipairs(before)do table.insert(rows,line)end
         for _,seed in ipairs(PackRules.OddsRows(self.Config,record.Stage,record.BagVariant,odds))do -- R148: by rarity rank, then name
             table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))
         end
         if record.BagVariant=='MechLimited' then table.insert(rows,require(ReplicatedStorage.MechCatalog).CoatLine()) end -- R155: the coat line next to the Mech pack's odds
+        for _,line in ipairs(after)do table.insert(rows,line)end
         tool.ToolTip=table.concat(rows,'\n')
     end
     if settleHold(self,player,tool) then return end

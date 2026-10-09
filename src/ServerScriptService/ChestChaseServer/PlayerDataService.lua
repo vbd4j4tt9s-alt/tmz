@@ -444,14 +444,17 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         if pack.Id ~= inventoryId then continue end
         if pack.Kind ~= "Pack" then return nil, "U ALREADY OPENED THIS PACK!" end
         if pack.PaidRandom and player:GetAttribute('PaidRandomAllowed')~=true then return nil,'THIS BOUGHT PACK DOESN\'T WORK ON THIS ACCOUNT' end
-        local passLuck=self:PassLuck(player) -- R154: the luck passes alone (the 4 Leaf Clover's x2): the only luck the Void, Verity and Mech packs take
-        local seed, rarity = PackRules.Roll(self.Config,pack.Stage,unitRoll,player:GetAttribute("ChestLuckMultiplier"),pack.BagVariant,pack.OddsVersion,pack.RateBoost,passLuck)
         local testSeed=nil
         do -- R153: the owner's guaranteed-reveal test hook can never break a real open: a failure means "no test override"
             local okTest,expected=pcall(function()return require(script.Parent.RarePackTests).Expected(self,player,pack.Id)end)
             if okTest then testSeed=expected else warn("[R153] RarePackTests.Expected failed (the pack opens normally): "..tostring(expected)) end
         end
         local luckTest=self:HasTestLuck(player) -- R152: the luck comes from owner-given boots (/test boots): a TEST open, like an owner-made pack (its seed is a TEST seed too)
+        -- R155 (owner): the pack pity (PackPityData155): is this the 10th open of its group (Normal, or Event = Void / Verity / Mech)? Then it is LUCKY: x1.5 on the luck
+        -- and on the pass luck below, and the luck cap x1.5 for this roll only. A TEST open neither counts nor is lucky. The count moves only once the open went through.
+        local pity=self:PlanPackPity(player,pack,testSeed~=nil or pack.TestGrant==true or luckTest)
+        local luck,passLuck=self:PackPityLuck(pity,player:GetAttribute("ChestLuckMultiplier"),self:PassLuck(player)) -- R154: passLuck = the luck passes alone (the 4 Leaf Clover's x2): the only luck the Void, Verity and Mech packs take
+        local seed, rarity = self:PackPityRoll(pity,PackRules.Roll,self.Config,pack.Stage,unitRoll,luck,pack.BagVariant,pack.OddsVersion,pack.RateBoost,passLuck)
         if testSeed then seed=self.Config.GetSeedById(testSeed);rarity=PackRules.GetRarity(testSeed)end
         if not seed then return nil, "REJOIN TO OPEN THIS PACK!" end
         local rewardCash,reason=self:SeedCollectReward(player,seed.Id)
@@ -466,6 +469,7 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
             GiftLocked=pack.GiftLocked==true or nil, -- R153 (review M2): the seed of a gift-locked pack (the free giveaway's, the day-7 login Void Pack) is gift-locked too; PlantRules.NewCrop hands it on to the plant and its fruit
         }
         records[index] = reward
+        self:CommitPackPity(player,pity) -- R155: the open went through: its group's count moves on (the lucky one back to 0)
         self:_gardenChanged(player)
         if testSeed then self.StudioPackRewards[player][pack.Id]=nil end
         self:MarkDirty(player)
@@ -479,8 +483,8 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         -- R151: the hub's BEST PULL board (this server's own, R153; HubDisplayService.NotePull; set by the main script). It never yields or throws here; a TEST pack (/test rarepacks, or any pack an owner command made:
         -- TestGrant) is flagged so it is not counted and never announced as a record.
         local hook=self.OnPackOpened
-        if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=player:GetAttribute("ChestLuckMultiplier"),PassLuck=passLuck,Test=testSeed~=nil or pack.TestGrant==true or luckTest}) end
-        return reward
+        if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=luck,PassLuck=passLuck,Lucky=pity~=nil and pity.Lucky or nil,Test=testSeed~=nil or pack.TestGrant==true or luckTest}) end -- (R155: the luck the roll took; Lucky = the pity's lucky pack)
+        return reward,nil,pity -- (R155: this open's pack pity {Group, Lucky, Count}; nil for a TEST open)
     end
     return nil, "THAT PACK IS GONE FROM UR BAG!"
 end
@@ -1190,6 +1194,7 @@ function PlayerDataService:Load(player)
 	self:LoadTreadmillData(player,type(storedData)=="table" and storedData.Treadmill or nil)
     self:LoadFenceData(player,type(storedData)=='table'and storedData.Fence or nil)
     self:LoadPackLuck(player,type(storedData)=='table'and storedData.PackLuck or nil)
+    self:LoadPackPity(player,type(storedData)=='table'and storedData.PackPity or nil) -- R155: the pack pity's two counts (optional field; absent = 0 / 0)
 	player:SetAttribute("DataStatus", "Loaded")
 	self.Loaded[player] = true
 	self.CanSave[player] = true
@@ -1320,6 +1325,7 @@ function PlayerDataService:_buildSaveData(player)
         Treadmill = self:CopyTreadmillData(player),
         Fence = self:CopyFenceData(player),
         PackLuck = self:CopyPackLuck(player),
+        PackPity = self:CopyPackPity(player), -- R155 (optional; an R154 server drops it)
 		DiscoveredItems = discoveredItems,
 		PedestalItem = savedPedestalItem,
 		SavedAt = os.time(),
@@ -1908,6 +1914,7 @@ end
 
 require(script.Parent.GardenFenceData).Install(PlayerDataService)
 require(script.Parent.PackSizePityData).Install(PlayerDataService)
+require(script.Parent.PackPityData155).Install(PlayerDataService) -- R155: the pack pity (Normal / Event counts, the lucky 10th)
 require(script.Parent.PremiumProgress).Attach(PlayerDataService)
 require(script.Parent.TutorialProgress).Attach(PlayerDataService)
 require(script.Parent.DailyProgress).Attach(PlayerDataService) -- R140: login rewards + daily quests
