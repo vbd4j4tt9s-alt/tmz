@@ -44,6 +44,7 @@ function T.Attach(Data)
   local mech=kind==true or kind=='Mech';local void=kind=='Void'
   local records=self:GetChestRecords(player);local before=#records
   if before>=self.Config.MaxSavedChests then return nil,'MAKE ROOM FOR 1 PACK FIRST!'end
+  if type(self.RoomFor)=='function'and not self:RoomFor(player,1)then return nil,'MAKE ROOM FOR 1 PACK FIRST!'end -- R155: the 200 cap (InventoryCap155)
   local pack
   if void then
    -- R153 (owner: "change the mech pack to void pack for day 7"): a real Void Pack (stage 7 EclipseReliquary, as the Darkened's and the bonus roll's Void result): a rolled size with the

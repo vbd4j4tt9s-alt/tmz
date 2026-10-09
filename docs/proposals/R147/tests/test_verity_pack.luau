@@ -352,7 +352,7 @@ check(select(2,Data:ConvertVoidPack(B0,void2.Id))=='HOLD ON, UR DATA IS LOADING!
 end
 -- It works with a full bag.
 do
- local C=makePlayer(703,'Cy');local full=Config.MaxSavedChests
+ local C=makePlayer(703,'Cy');local full=Data:HeldItemCap() -- (R155: a full bag is 200 items held)
  local firstVoid
  for i=1,full do local rec=Data:AddChest(C,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',OddsVersion=137});if i==full then firstVoid=rec end end
  check(#Data:GetChestRecords(C)==full and not Data:AddChest(C,{Stage=1,BagVariant='Pack01'}),'(fixture: a full bag)')

@@ -83,7 +83,7 @@ function Admin.Execute(ctx,requester,command)
   else
    local records=data:GetChestRecords(p);local count=0;local inventory=command.Item~='garden'
    if command.Operation=='give'then
-    if #records+#selected>ctx.Config.MaxSavedChests then reason='seed inventory is full'
+    if #records+#selected>ctx.Config.MaxSavedChests or not data:RoomFor(p,#selected)then reason='inventory is full (200 items max)' -- R155: the cap
     else
      local pending={};local serial=p:GetAttribute('ChestInventorySerial')or 0
      for _,spec in ipairs(selected)do

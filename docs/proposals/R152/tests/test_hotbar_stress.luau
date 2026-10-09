@@ -72,7 +72,7 @@ local function liveTools(name)local out={};for _,t in ipairs(tools[name]or{})do 
 local M={slots={},held=nil}
 local function display()local out={};for i=1,10 do out[i]=dock['Slot'..i].ItemName.Text end;return out end
 local function resync()M.slots=display()end
-local function emptySlot()for i=2,10 do if M.slots[i]==''then return i end end end
+local function emptySlot()for i=1,10 do if M.slots[i]==''then return i end end end -- (R155: every slot is the same, the shovel's too: a new item takes the first free one)
 local function heldTool()for _,t in ipairs(char:GetChildren())do if t:IsA('Tool')then return t end end end
 local function heldName()local t=heldTool();if not t then return nil end;if t:GetAttribute('GardenShovel')then return'Shovel'end;return Names.Tool(t,Catalog)end
 local function slotHas(name)for i=1,10 do if M.slots[i]==name then return i end end end
@@ -158,7 +158,7 @@ function actions.drag()
  reset();local kind=chance(.5)and'touch'or'mouse'
  local e=0
  if i==j then e=expectToggle(name==shovelName and'Shovel'or name);if name==''then e=0 end -- a drag that comes back to its own slot is a click
- elseif name~=''and i>=2 and j>=2 then M.slots[i],M.slots[j]=M.slots[j],M.slots[i]end
+ elseif name~=''then M.slots[i],M.slots[j]=M.slots[j],M.slots[i]end -- (R155: any slot swaps, slot 1 and the shovel too)
  local path={at(from),at(from,rnd(13)-7,rnd(7)-4),at(to),at(to,rnd(9)-5,rnd(9)-5)}
  if chance(.25)then path={at(from),at(to,rnd(9)-5,rnd(9)-5),flick=true}end -- a fast flick: the engine reports only the press and the release
  gesture(from,path,ORDERS[rnd(3)],kind)
@@ -181,8 +181,10 @@ function actions.bagDrag()
  if#cards==0 then return end
  local card=cards[rnd(#cards)];local text=card.ItemName.Text;local name
  for n in pairs(tools)do if text==n or text:sub(1,#n+2)==n..' ('then name=n end end
+ if text==shovelName or text:sub(1,#shovelName+2)==shovelName..' ('then name=shovelName end
  local j=rnd(9)+1;local to=slotBtn(j);reset()
- if name and#liveTools(name)>0 then local i=slotHas(name);if i and i~=j then M.slots[i],M.slots[j]=M.slots[j],M.slots[i]end end
+ -- (R155: the Bag lists only what is not on the hotbar; a card dropped on a slot takes it and what was there goes to the Bag)
+ if name and(name==shovelName or#liveTools(name)>0)then local i=slotHas(name);if i then if i~=j then M.slots[i],M.slots[j]=M.slots[j],M.slots[i]end else M.slots[j]=name end end
  gesture(card,chance(.25)and{at(card),at(to,rnd(7)-3,rnd(7)-3),flick=true}or{at(card),at(card,20,10),at(to),at(to,rnd(7)-3,rnd(7)-3)},ORDERS[rnd(3)],chance(.5)and'touch'or'mouse')
  verify('Bag card "'..text..'" dragged to slot '..j,0,false);count('carddrag')
 end
@@ -262,6 +264,7 @@ function actions.respawn()
  check(acts==0 and dead==0,'a click while the backpack is empty (respawn) does nothing ('..acts..')');reset()
  -- the server rebuilds the tools (same items, new instances)
  F.shovel(W,nb)
+ local onBar={};for k=1,10 do if M.slots[k]~=''then onBar[M.slots[k]]=true end end -- (R155: each item comes back where it was: its slot, or the Bag)
  local old2={};for n,l in pairs(tools)do old2[n]=#l end
  tools={}
  for n,c in pairs(old2)do for _=1,c do for _,s in ipairs(SEEDS)do local t,name=newTool(s);if name==n then t.Parent=nb;tools[name]=tools[name]or{};table.insert(tools[name],t);break else t:Destroy()end end end end
@@ -269,8 +272,8 @@ function actions.respawn()
  -- the same stacks, no ghosts, no duplicates
  local d=display();local seen={}
  for i=1,10 do if d[i]~=''then check(not seen[d[i]],'respawn: "'..d[i]..'" is on the hotbar once');seen[d[i]]=true end end
- for n,l in pairs(tools)do if#l>0 then check(seen[n]==true,'respawn: "'..n..'" is back on the hotbar') end end
- check(seen[shovelName]==true,'respawn: the shovel is back')
+ for n,l in pairs(tools)do if#l>0 then check((seen[n]==true)==(onBar[n]==true),'respawn: "'..n..'" is back where it was ('..(onBar[n]and'its slot'or'the Bag')..')') end end
+ check((seen[shovelName]==true)==(onBar[shovelName]==true),'respawn: the shovel is back where it was')
  verify('after the respawn',0,false)
 end
 local weighted={{'click',30},{'key',14},{'drag',12},{'bagOpenClick',8},{'bagDrag',4},{'closeBag',3},{'add',9},{'remove',6},{'removeThenClick',6},{'cycle',3},{'doubleclick',3},{'cancelledPress',2},{'respawn',2}}

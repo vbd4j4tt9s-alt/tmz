@@ -409,7 +409,7 @@ function X.Execute(ctx,p,action,a)
   if action=='verity'then count=integer(a[1]or'1',1,20);st=7
   else count=action=='eclipse'and integer(a[1]or'1',1,20)or 6;st=action=='eclipse'and 7 or stage(a[1])end
   if #a>1 or not count or not st or st>=8 then return false,action=='eclipse'and'Use eclipse [1–20].'or action=='verity'and'Use verity [1–20].'or'Use packset <biome>.'end
-  if #data:GetChestRecords(p)+count>ctx.Config.MaxSavedChests then return false,'Make space in the target inventory.'end
+  if #data:GetChestRecords(p)+count>ctx.Config.MaxSavedChests or not data:RoomFor(p,count)then return false,'Make space in the target inventory (200 items max).'end -- R155: the cap counts owner grants too
   for i=1,count do
    local record,reason=data:AddChest(p,{Stage=st,BagVariant=action=='eclipse'and'EclipseReliquary'or action=='verity'and'VerityReliquary'or string.format('Pack%02d',i),PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{TestGrant=true}) -- R151: TEST packs (never announced)
    if not record then return false,'Stopped after '..(i-1)..' packs: '..tostring(reason)end

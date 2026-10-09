@@ -92,6 +92,8 @@ check(rec.count()==0,'hovering / focusing the slots plays nothing ('..rec.keys()
 
 -- 2. the Bag -----------------------------------------------------------------------------------------------------------------------------------------
 local open=dock.OpenInventory
+-- (R155: the Bag lists only what is not on the hotbar: nine more fruits fill the free slots and three of them go to the Bag; they leave again before the drags)
+local fillers={};for k=1,9 do local t=harvest(({'MangoSeed','PeachSeed','OrangeSeed','LimeSeed','FigSeed','KiwiSeed','PearSeed','GrapeSeed','CherrySeed'})[k],'plant-F'..k,1);t.Parent=bag;fillers[k]=t end;frames(10)
 check(open:GetAttribute('ButtonSound')==false,'the Bag button is silent itself: ButtonFeedback plays MenuClick / MenuClose for SeedMenu')
 rec.clear();open.Activated:Fire();frames(10)
 check(panel.Visible and pg:GetAttribute('SeedMenu')=='Inventory','(the Bag is open)')
@@ -110,6 +112,7 @@ open.Activated:Fire();frames(5)
 rec.clear();panel.Close.Activated:Fire();frames(1)
 check(not panel.Visible and rec.count()==0,'the Bag\'s X: the Hotbar adds nothing (its Close button is named Close: MenuClose through ButtonHighlights)')
 
+for _,t in ipairs(fillers)do t:Destroy()end;frames(10)
 -- 3. drag ------------------------------------------------------------------------------------------------------------------------------------------
 do
  local from,to=dock['Slot'..appleSlot],dock['Slot9']

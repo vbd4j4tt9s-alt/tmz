@@ -10,6 +10,11 @@ local Names=require(RS:WaitForChild('GardenDisplayNames'));local Info=require(RS
 local Arrival=require(RS:WaitForChild('HarvestArrival'))
 local Collect do local ok,m=pcall(function()return require(RS:WaitForChild('SeedCollect154',10))end);Collect=ok and m or nil end -- R154: a pull reveal's seed shows once it has flown in
 local Audio=require(RS:WaitForChild('InteractionAudio'))
+-- R155 (owner: "just make it function like the normal inventory ... i can have a blank hot bar if i put everything in my bag ... max amount of items a person can
+-- hold 200", "allow people to discard items"): the layout rules live in GardenInventoryState (new items: their stack, else the first free slot, else the Bag;
+-- nothing moves by itself; slots emptied into the Bag stay blank; saved between sessions), the Bag's count / Trash / tap-tap / discarding in InventoryPanel155.
+-- Here: the Bag lists only what is not on the hotbar; every slot (the shovel's too) takes any item; equipping from the Bag leaves the item in the Bag.
+local Inv=require(RS:WaitForChild('InventoryPanel155'))
 -- R112: item pictures (cached 3D renders or flat icons) and display-only kg weights.
 local Pictures=require(RS:WaitForChild('ItemPictures'));local Weight=require(RS:WaitForChild('ItemWeight'))
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local bag=player:WaitForChild('Backpack')
@@ -72,7 +77,7 @@ local arrow=Theme.ControlIcon(rarityFilter,'chevron');arrow.Position=UDim2.new(1
 local rarityMenu=Instance.new('Frame');rarityMenu.Name='RarityOptions';rarityMenu.Position=UDim2.fromOffset(16,174);rarityMenu.Size=UDim2.new(1,-32,0,110);rarityMenu.BackgroundColor3=C.Sheet;rarityMenu.BorderSizePixel=0;rarityMenu.Visible=false;rarityMenu.ZIndex=10;rarityMenu.Parent=panel;corner(rarityMenu)
 local rarityCategory='All'
 local slots={};local rows={};local category='All';local visibleSlots=10;local sequence=0;local seen=setmetatable({},{__mode='k'});local toolConns={};local characterConns={};local allConns={};local queued=false;local selectedKey
-local refresh,renderRows,layout,cancelPress
+local refresh,renderRows,layout,cancelPress,paintHeld
 -- R152 (reliability): one odd tool or picture must never freeze the hotbar (an error inside refresh left every later slot, the Bag and new items stale, so
 -- clicks went to things that no longer matched). Each item and each slot is guarded; the first failure of a kind is warned once.
 local warned={}
@@ -171,11 +176,14 @@ local function flash(b)
 end
 local matched={};local listDirty=true;local viewKey
 local function connect(signal,fn)local c=signal:Connect(fn);table.insert(allConns,c);return c end
+local function queue()
+ if queued then return end;queued=true;task.defer(function()queued=false;if gui.Parent then refresh()end end)
+end
 local function toggle(show)
  if show and cancelPress then cancelPress('the Bag opened')end
  panel.Visible=show;rarityMenu.Visible=false;selectedLabel.Visible=not show and showSelectedDetails;selectedTraits.Visible=not show and showSelectedDetails
- if show then pg:SetAttribute('SeedMenu','Inventory');search:ReleaseFocus();layout();renderRows()
- elseif pg:GetAttribute('SeedMenu')=='Inventory'then pg:SetAttribute('SeedMenu',nil)end
+ if show then pg:SetAttribute('SeedMenu','Inventory');search:ReleaseFocus();layout();renderRows();Inv.Opened()
+ else Inv.Closed();if pg:GetAttribute('SeedMenu')=='Inventory'then pg:SetAttribute('SeedMenu',nil)end end
 end
 -- R152 (owner: "hot bar movements ... no sound effect"): the hotbar is silent. Equipping (keys 1-0, L1 / R1, a slot, a Bag card), unequipping,
 -- an empty slot and moving an item between slots play nothing (R150 clicked Equip / Bubble04 for them). Equipping from the Bag closes it
@@ -230,10 +238,9 @@ local function equip(key,how,quiet)
   mine[held]={At=os.clock(),Hand=false};humanoid:UnequipTools();selectedKey=nil;pending=nil;note(how..': unequip '..held.Name)
  elseif busy(tool)then note(how..': '..tool.Name..' refused (carrying a pack / in a chase)');notice('FINISH THAT FIRST!');return
  elseif knocked()or tool:GetAttribute('SeedPackTool')and revealing(char)then
-  State:Ensure(key,visibleSlots);pending={Key=key,Tool=tool,At=os.clock(),Queued=true};wake()
+  pending={Key=key,Tool=tool,At=os.clock(),Queued=true};wake()
   note(how..': '..tool.Name..' waits ('..(knocked()and'knocked down'or'a pack is being opened')..')')
  else
-  State:Ensure(key,visibleSlots)
   if held then mine[held]={At=os.clock(),Hand=false}end;mine[tool]={At=os.clock(),Hand=true}
   humanoid:EquipTool(tool);selectedKey=key
   pending=nil;if tool:GetAttribute('SeedPackTool')then pending={Key=key,Tool=tool,At=os.clock(),Old=carried(char)};wake()end
@@ -241,7 +248,7 @@ local function equip(key,how,quiet)
  end
  if quiet then refresh();return end
  if panel.Visible then Audio.Mute('MenuClose',.25)end
- toggle(false);refresh()
+ toggle(false);paintHeld();queue() -- R155: the held item shows at once; the rest follows in ONE deferred refresh (the hand's ChildAdded / ChildRemoved queue it too: was two full refreshes)
 end
 -- A tool entered the hand / the Backpack: the hotbar's own move, a new item, or something else (the server) moved it (logged, with the server's reason).
 local function moved(tool,hand)
@@ -335,18 +342,19 @@ local function lift(d)
  Pictures.Show(ghost.Picture,tool,1);ghost.Visible=true
  d.Shade=d.Slot and slots[d.Slot]or rows[d.Key];if d.Shade then cover(d.Shade,'DragShade',Color3.new(0,0,0),.55).Visible=true end
  if d.Card then d.Scrolling=scroll.ScrollingEnabled;scroll.ScrollingEnabled=false end
- note('picked up '..nameOf(d.Key))
+ Inv.Dragging(true,d.Slot);note('picked up '..nameOf(d.Key))
 end
 local function follow(d,p)
  if ghost then local g=gui.AbsolutePosition;ghost.Position=UDim2.fromOffset(p.X-g.X,p.Y-g.Y)end
  local to=slotAt(p)
- if to then light(to~=d.Slot and to>1 and slots[to]or nil)
+ if to then light(to~=d.Slot and slots[to]or nil)
+ elseif Inv.OverTrash(p)then light(Inv.TrashButton) -- R155: drop it on the Trash to throw it away
  elseif d.Slot and overBag(p)then light(panel.Visible and within(panel,p)and panel or open)
  else light(nil)end
 end
 local function settle(d) -- the ghost, the lights and the Bag grid back to normal
  if ghost and ghost.Visible then ghost.Visible=false;Pictures.Clear(ghost.Picture)end
- light(nil)
+ light(nil);Inv.Dragging(false)
  if d.Shade then local s=d.Shade:FindFirstChild('DragShade');if s then s.Visible=false end end
  if d.Scrolling~=nil then scroll.ScrollingEnabled=d.Scrolling;d.Scrolling=nil end
  if rowsHeld then rowsHeld=false;renderRows()end
@@ -392,17 +400,17 @@ local function finish(p,how)
  if d.Done then return end
  p=d.Pos;local moved=d.Moved or d.Lifted or(p-d.Start).Magnitude>MOVE
  local to=moved and slotAt(p)
- if to and to~=d.Slot then d.Done=os.clock()
-  if d.Key=='shovel'or to==1 then note(('drop on slot %d: the shovel keeps slot 1'):format(to))
-  elseif State:Place(d.Key,to)then note(('%s moved to slot %d (%s)'):format(nameOf(d.Key),to,how));refresh()end
+ if to and to~=d.Slot then d.Done=os.clock();Inv.Unpick() -- (R155: any slot, the shovel's too; a taken slot swaps, a Bag item sends what was there to the Bag)
+  if State:Place(d.Key,to)then note(('%s moved to slot %d (%s)'):format(nameOf(d.Key),to,how));refresh()end
   return
  end
- if moved and not to and d.Slot and overBag(p)then d.Done=os.clock()
-  if State:Stow(d.Key)then note(nameOf(d.Key)..' put in the Bag (off the hotbar)');refresh()end
+ if d.Lifted and not to and Inv.OverTrash(p)then d.Done=os.clock();Inv.Discard(d.Key,'dropped on the Trash ('..how..')');return end -- R155 (a real drag: a finger that scrolled the grid onto it is no drop)
+ if moved and not to and d.Slot and overBag(p)then d.Done=os.clock();Inv.Unpick()
+  if State:Stow(d.Key)then note(nameOf(d.Key)..' put in the Bag (its slot stays blank)');refresh()end
   return
  end
- if os.clock()-d.At<8 and onSelf(d,p)and not(d.ScrollY and scroll.CanvasPosition.Y~=d.ScrollY)then d.Done=os.clock();equip(d.Key,'click ('..how..')');return end
- d.Ended=os.clock();note('let go away from it ('..how..'): nothing')
+ if os.clock()-d.At<8 and onSelf(d,p)and not(d.ScrollY and scroll.CanvasPosition.Y~=d.ScrollY)then Inv.Release(d,'click ('..how..')');return end -- (R155: a hold let go in place picks it: tap-tap)
+ if d.Lifted then d.Done=os.clock()else d.Ended=os.clock()end;note('let go away from it ('..how..'): nothing') -- (R155: a lifted item let go in the world is a cancelled drag; an Activated that follows is no click)
 end
 local function upOn(b,x,y) -- let go over button b: the release of a press that has no InputObject of its own (else UserInputService's InputEnded, or the next frame)
  local d=press;if not d then return end
@@ -413,14 +421,15 @@ local function activated(b,input,direct)
  if(t==nil or t==Enum.UserInputType.MouseButton1 or t==Enum.UserInputType.Touch)and d and os.clock()-d.At<8 then
   if d.Done then if os.clock()-d.Done<.5 then return end
   elseif press==d then -- (Activated before the release: a click, unless the pointer is known to be away from its button: a drag the release will drop)
-   if not(d.Up and not onSelf(d,d.Up)or(d.Moved or d.Lifted)and not onSelf(d,d.Pos))then d.Done=os.clock();equip(d.Key,'click (Activated)')end;return
-  elseif d.Ended and os.clock()-d.Ended<.5 then d.Done=os.clock();equip(d.Key,'click (Activated after the release)');return end
+   if not(d.Up and not onSelf(d,d.Up)or(d.Moved or d.Lifted)and not onSelf(d,d.Pos))then Inv.Release(d,'click (Activated)')end;return
+  elseif d.Ended and os.clock()-d.Ended<.5 then Inv.Release(d,'click (Activated after the release)');return end
  end
  direct()
 end
 local function hook(b,slot,keyNow)
- b.Activated:Connect(function(input)activated(b,input,function()local key=keyNow();if key then equip(key,slot and'slot '..slot or'Bag card')end end)end)
+ b.Activated:Connect(function(input)activated(b,input,function()local key=keyNow();if not Inv.Click(key,slot,slot and'slot '..slot or'Bag card')and key then equip(key,slot and'slot '..slot or'Bag card')end end)end)
  b.InputBegan:Connect(function(input)beganOn(b,slot,keyNow(),input)end)
+ local right=b.MouseButton2Click;if right then right:Connect(function()local key=keyNow();if key then Inv.Pick(key,slot,'right-click')end end)end -- R155: right-click picks it (tap-tap: then click where it goes)
  local down,up=b.MouseButton1Down,b.MouseButton1Up -- (a few test worlds have no such events)
  if down then down:Connect(function(x,y)downOn(b,slot,keyNow(),x,y)end)end
  if up then up:Connect(function(x,y)upOn(b,x,y)end)end
@@ -432,7 +441,7 @@ tick=function()
   elseif d.UpAt and now>d.UpAt then finish(d.Up,'button up')
   elseif d.Kind=='mouse'and d.Input and now-d.At>.1 and select(2,pcall(function()return Input:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)end))==false then finish(nil,'the button is up')
   elseif d.Input and d.Input.UserInputState==Enum.UserInputState.Cancel then cancelPress('the touch was cancelled')
-  elseif d.Kind=='touch'and not d.Lifted and not d.Moved and d.Key~='shovel'and now-d.At>=HOLD then lift(d);follow(d,d.Pos)end
+  elseif d.Kind=='touch'and not d.Lifted and not d.Moved and now-d.At>=HOLD then lift(d);follow(d,d.Pos)end
  end
  local p=pending
  if p then
@@ -485,16 +494,15 @@ local function rarityBorder(button0,tool)
 end
 local function kind(tool)return tool:GetAttribute('HarvestItemTool')and'Fruit'or(tool:GetAttribute('GardenSeed')or tool:GetAttribute('SeedPackTool'))and'Seeds'or'Tools'end
 local function weighedName(tool)local kg=Weight.ToolText(tool);local name=Names.Tool(tool,Catalog);return kg~=''and name..' ('..kg..')'or name end
--- R112: identical packs, seeds and fruit share one card/slot with a count; tools stay separate.
-local stackFields={Pack={'Stage','BagVariant','PackSize','PackMutation','Weather','SeedScale','PackShape'}, -- (R151: packs of different chip-bag shapes never share a card)
- Seed={'SeedId','SeedScale','Mutation','Weather','Rarity'},
- Fruit={'SeedId','FruitScale','Mutation','Weather','SellValue','FruitName','FruitIndex','Rarity'}}
-local function stackKey(tool)
- local group=tool:GetAttribute('SeedPackTool')and'Pack'or tool:GetAttribute('GardenSeed')and'Seed'or tool:GetAttribute('HarvestItemTool')and'Fruit'
- if not group then return nil end
- local parts={group,tool.Name};for _,field in ipairs(stackFields[group])do table.insert(parts,tostring(tool:GetAttribute(field)))end
- return 'stack|'..table.concat(parts,'|')
+-- R155 (owner: "it should feel responsive"): what the hand holds, painted at once on a press (the slot, its Bag card, the name above the hotbar); cheap with 200 items.
+paintHeld=function()
+ local char=player.Character;local h=char and char:FindFirstChildOfClass('Tool');local k=h and keyOf[h]
+ selectedKey=k
+ for i,b in ipairs(slots)do local want=k~=nil and State.Slots[i]==k;if b:GetAttribute('Selected')~=want then b:SetAttribute('Selected',want)end end
+ for rowKey,b in pairs(rows)do local want=rowKey==k;if b:GetAttribute('Selected')~=want then b:SetAttribute('Selected',want)end end
+ selectedLabel.Text=h and weighedName(h)or'';selectedTraits.Text=h and traits(h)or'';Traits.Style(selectedTraits,Traits.Tool(h));decorate(selectedLabel,h,14)
 end
+-- R112: identical packs, seeds and fruit share one card/slot with a count; tools stay separate. (R155: the key is InventoryStacks155.Key, shared with the server's discard)
 local freeCards={}
 local function makeCard()
  local b=button(scroll,'Item','',UDim2.fromOffset(92,92),UDim2.new());b.TextWrapped=true;b.BackgroundColor3=C.Tile
@@ -514,7 +522,7 @@ renderRows=function()
  local changed=listDirty
  if listDirty then
   table.clear(matched);local term=search.Text:lower()
-  for key,e in pairs(State.Items)do if(category=='All'or kind(e.Tool)==category)and(rarityCategory=='All'or rarity(e.Tool)==rarityCategory)and Names.Search(e.Tool,Catalog):find(term,1,true)then table.insert(matched,{Key=key,Entry=e})end end
+  for key,e in pairs(State.Items)do if not State:Shown(key)and(category=='All'or kind(e.Tool)==category)and(rarityCategory=='All'or rarity(e.Tool)==rarityCategory)and Names.Search(e.Tool,Catalog):find(term,1,true)then table.insert(matched,{Key=key,Entry=e})end end
   table.sort(matched,function(a,b)return a.Entry.Order<b.Entry.Order end);listDirty=false
   for name,b in pairs(filterButtons)do b.BackgroundColor3=name==category and C.TileOn or C.Tile;b:SetAttribute('Selected',name==category)end
  end
@@ -551,6 +559,7 @@ renderRows=function()
   b:SetAttribute('Selected',tool.Parent==player.Character)
   paintGlow(b,item.Key)
  end
+ Inv.PaintPick()
 end
 
 rarityFilter.Activated:Connect(function()rarityMenu.Visible=not rarityMenu.Visible end)
@@ -575,7 +584,7 @@ refresh=function()
   -- (R149: only a tool that was never shown is held back; an older fruit of the same plant and slot keeps its place while the new one flies)
   local isNew=not seen[tool]
   if isNew then sequence+=1;seen[tool]=sequence end
-  local key=stackKey(tool)or Info.Key(tool)
+  local key=Inv.Key(tool)or Info.Key(tool)
   if not key then table.insert(loose,tool);return end
   add(tool,key,isNew)
  end
@@ -613,7 +622,7 @@ refresh=function()
   rarityBorder(b,tool);b:SetAttribute('Selected',e~=nil and tool.Parent==player.Character);b.BackgroundTransparency=e and .10 or .50
   paintGlow(b,e and State.Slots[i]or nil)
  end)end
- guard('the Bag',renderRows);paintPending()
+ guard('the Bag',renderRows);paintPending();guard('the Bag bar',Inv.AfterRefresh)
  if arrived then
   -- R150: the "it landed in your bag" cue belongs to this flash (the fruit's arrival), not to the server reply that lifted it off.
   Audio.Play('Bubble06')
@@ -624,9 +633,6 @@ refresh=function()
    if panel.Visible and rows[key]then flash(rows[key])end
   end
  end
-end
-local function queue()
- if queued then return end;queued=true;task.defer(function()queued=false;if gui.Parent then refresh()end end)
 end
 -- R113: HUD boxes that stay on screen while the bag is open (same metrics HudLayout gives each HUD script).
 local function hudBoxes(m,w,h)
@@ -705,7 +711,7 @@ layout=function()
  local metrics=require(RS.HudLayout).Read(view,Input.TouchEnabled,require(RS.HudLayout).Controls(gui))
  showSelectedDetails=metrics.HotbarDetails~=false
  selectedLabel.Visible=showSelectedDetails and not panel.Visible;selectedTraits.Visible=showSelectedDetails and not panel.Visible
- visibleSlots=metrics.Slots
+ visibleSlots=metrics.Slots;if State.Visible~=visibleSlots then State.Visible=visibleSlots;listDirty=true;queue()end -- (R155: an item on a slot this screen does not show is a Bag item here)
  local gap=6;local side=metrics.SlotSize
  dock.Position=UDim2.new(.5,metrics.HotbarShiftX or 0,1,-metrics.HotbarBottom);dock.Size=UDim2.fromOffset((visibleSlots+1)*side+visibleSlots*gap,side)
  local nameHeight=math.max(12,math.floor(side*.3));local small=math.max(8,math.floor(side*.15))
@@ -743,7 +749,7 @@ layout=function()
   search.Position=UDim2.new(1,-(searchWidth+rarityWidth+66),0,12);search.Size=UDim2.fromOffset(searchWidth,30)
   rarityFilter.Position=UDim2.new(1,-(rarityWidth+58),0,12);rarityFilter.Size=UDim2.fromOffset(rarityWidth,30)
   rarityMenu.Position=UDim2.fromOffset(16,48);rarityMenu.Size=UDim2.new(1,-32,0,110)
-  scroll.Position=UDim2.fromOffset(16,54);scroll.Size=UDim2.new(1,-32,1,-62)
+  scroll.Position=UDim2.fromOffset(16,54);scroll.Size=UDim2.new(1,-32,1,-92) -- (R155: the Bag bar below: count, Trash)
  elseif sheetWidth>=560 then
   -- Wide sheets: search in the header, rarity row, then the grid.
   local searchWidth=math.clamp(math.floor(sheetWidth*.34),160,280)
@@ -759,6 +765,7 @@ layout=function()
   rarityMenu.Position=UDim2.fromOffset(16,128);rarityMenu.Size=UDim2.new(1,-32,0,110)
   scroll.Position=UDim2.fromOffset(16,132);scroll.Size=UDim2.new(1,-32,1,-166)
  end
+ Inv.Layout(short,sheetWidth)
  renderRows()
 end
 local function character(char)
@@ -774,10 +781,10 @@ end
 connect(player.ChildAdded,function(child)if child:IsA('Backpack')then watchBag(child)end end)
 connect(panel:GetPropertyChangedSignal('Visible'),function()if next(fresh)then listDirty=true;renderRows()end end)
 watchBag(bag);connect(player.CharacterAdded,character);character(player.Character)
-if player.CharacterRemoving then connect(player.CharacterRemoving,function()State:Remember();cancelPress('respawn');pending=nil;note('respawn: the hotbar keeps its order')end)end
+if player.CharacterRemoving then connect(player.CharacterRemoving,function()State:Remember();cancelPress('respawn');Inv.Unpick('respawn');pending=nil;note('respawn: the hotbar keeps its order')end)end
 -- A hold ended (the fruit arrived, or none will): show the item now. `cue` is false for a request that failed (nothing to celebrate).
 table.insert(allConns,Arrival.OnRelease(function(k,cue)if cue then released[k]=os.clock()end;queue()end))
-connect(search:GetPropertyChangedSignal('Text'),function()listDirty=true;scroll.CanvasPosition=Vector2.zero;renderRows()end)
+connect(search:GetPropertyChangedSignal('Text'),function()listDirty=true;scroll.CanvasPosition=Vector2.zero;renderRows();Inv.PaintSearch()end)
 connect(scroll:GetPropertyChangedSignal('CanvasPosition'),function()Pictures.Hurry();renderRows()end);connect(scroll:GetPropertyChangedSignal('AbsoluteSize'),renderRows)
 connect(pg:GetAttributeChangedSignal('SeedMenu'),function()dock.Visible=(pg:GetAttribute('SeedMenu')==nil or pg:GetAttribute('SeedMenu')=='Inventory');if panel.Visible and pg:GetAttribute('SeedMenu')~='Inventory'then toggle(false)end end)
 connect(Input.InputChanged,function(input) -- R153: the press follows ITS pointer: the mouse, or its own touch (the first touch near it when the engine gave no InputObject)
@@ -790,7 +797,7 @@ connect(Input.InputChanged,function(input) -- R153: the press follows ITS pointe
  local p=fromInput(input);d.Pos=p;d.Tracked=true
  if not d.Moved and(p-d.Start).Magnitude>MOVE then d.Moved=true end
  -- (a Bag card on a phone is picked up when it leaves the grid, or by the hold: a finger moving inside the grid scrolls it)
- if d.Moved and not d.Lifted and d.Key~='shovel'and(not d.Card or d.Kind=='mouse'or not within(scroll,p))then lift(d)end
+ if d.Moved and not d.Lifted and(not d.Card or d.Kind=='mouse'or not within(scroll,p))then lift(d)end
  if d.Lifted then follow(d,p)end
 end)
 connect(Input.InputEnded,function(input)
@@ -810,8 +817,8 @@ connect(Input.InputBegan,function(input,processed)
  end
  if processed or Input:GetFocusedTextBox()then return end
  if input.KeyCode==Enum.KeyCode.Backquote or input.KeyCode==Enum.KeyCode.B then toggle(not panel.Visible)
- elseif numbers[input.KeyCode]and(pg:GetAttribute('SeedMenu')==nil or pg:GetAttribute('SeedMenu')=='Inventory')then local n=numbers[input.KeyCode];local key=State.Slots[n];if key then equip(key,'key '..(n%10))end -- (R152: with the Bag open a number key equips too; it used to do nothing until you closed the Bag)
- elseif input.KeyCode==Enum.KeyCode.Escape and panel.Visible then toggle(false)end
+ elseif numbers[input.KeyCode]and(pg:GetAttribute('SeedMenu')==nil or pg:GetAttribute('SeedMenu')=='Inventory')then local n=numbers[input.KeyCode];local key=State.Slots[n];if not Inv.Click(key,n,'key '..(n%10))and key then equip(key,'key '..(n%10))end -- (R152: with the Bag open a number key equips too; R155: with an item picked it puts it on that slot)
+ elseif input.KeyCode==Enum.KeyCode.Escape and panel.Visible then if Inv.Picked()then Inv.Unpick('Esc')else toggle(false)end end
 end)
 CAS:BindAction('GardenHotbarCycle',function(_,state,input)
  if state~=Enum.UserInputState.Begin or pg:GetAttribute('SeedMenu')then return Enum.ContextActionResult.Pass end
@@ -821,7 +828,7 @@ CAS:BindAction('GardenHotbarCycle',function(_,state,input)
  return Enum.ContextActionResult.Sink
 end,false,Enum.KeyCode.ButtonL1,Enum.KeyCode.ButtonR1)
 selectionBorder(open);Theme.CardBorder(open,'Common')
-open.Activated:Connect(function()toggle(not panel.Visible)end);close.Activated:Connect(function()toggle(false)end)
+open.Activated:Connect(function()if Inv.Picked()and Inv.Picked().Slot then Inv.Stash('the Bag button')else toggle(not panel.Visible)end end);close.Activated:Connect(function()toggle(false)end) -- (R155: with a hotbar item picked the Bag button takes it)
 if open.MouseButton1Up then connect(open.MouseButton1Up,function(x,y)upOn(open,x,y)end)end -- (R153: let go over the Bag button)
 -- R153 debug aid: /test hotbar (an owner command) turns the player's HotbarLog on / off: a box top-left with the last lines (select them to copy) and every new
 -- line in the F9 console. The first line says what this device is; the server's own reply lists the packs it held late or refused, with why.
@@ -856,17 +863,15 @@ if Collect then
   if id==nil then return open,true end -- (an owner preview: nothing is granted)
   local tool
   for _,c in ipairs({bag,player.Character or bag})do for _,t in ipairs(c:GetChildren())do if t:IsA('Tool')and t:GetAttribute('GardenSeed')and t:GetAttribute('SeedInventoryId')==id then tool=t end end end
-  local key=tool and(stackKey(tool)or Info.Key(tool));local shown=tool~=nil and seen[tool]~=nil
+  local key=tool and(Inv.Key(tool)or Info.Key(tool));local shown=tool~=nil and seen[tool]~=nil
   if key then local b=onBar(key);if b then return b,shown,key end end
   if shown then return open,true,key end -- (on show, in the Bag: not on a visible slot)
-  if not tool and spec then for i=1,visibleSlots do local e=State.Items[State.Slots[i]];if e and slots[i].Visible and e.Tool:GetAttribute('GardenSeed')and fits(e.Tool,spec)then return slots[i],false,State.Slots[i]end end end
-  for i=2,10 do
-   local k=State.Slots[i];local e=k and State.Items[k]
-   if not k or(e and e.Count==1 and e.Tool:GetAttribute('SeedPackTool')and e.Tool:GetAttribute('SeedInventoryId')==id)then
-    if i<=visibleSlots and slots[i].Visible then return slots[i],false,key end
-    break
-   end
-  end
+  if not tool and spec then for k,e in pairs(State.Items)do if e.Tool:GetAttribute('GardenSeed')and fits(e.Tool,spec)then local b=onBar(k);return b or open,false,k end end end -- (the stack it joins: on the hotbar, or in the Bag)
+  -- R155: the slot it will really take (GardenInventoryState:Target, the rule a new item follows: the first free slot that is not blank, the opened pack's own slot
+  -- when it was the last of its stack), else the Bag button
+  local freeing;for i=1,10 do local k=State.Slots[i];local e=k and State.Items[k];if e and e.Count==1 and e.Tool:GetAttribute('SeedPackTool')and e.Tool:GetAttribute('SeedInventoryId')==id then freeing=k end end
+  local i=State:Target(key,freeing)
+  if i and slots[i]and slots[i].Visible then return slots[i],false,key end
   return open,false,key
  end
  Collect.SetTarget(function(id,spec)if not(gui.Enabled and dock.Visible)then return nil,false end;return target(id,spec)end)
@@ -878,6 +883,8 @@ if Collect then
   note('a pull\'s seed flew in ('..tostring(id)..')')
  end))
 end
+Inv.Start({player=player,pg=pg,gui=gui,dock=dock,panel=panel,open=open,scroll=scroll,search=search,slots=slots,rows=rows,State=State,Names=Names,Catalog=Catalog,Theme=Theme,C=C,
+ refresh=function()refresh()end,toggle=toggle,equip=function(k,how)equip(k,how)end,note=note,cover=cover,corner=corner,button=button}) -- R155: the Bag bar, tap-tap, discarding, the saved layout
 local stopHudLayout=require(RS.HudLayout).Watch(gui,layout)
 connect(pg:GetAttributeChangedSignal('HudNoticeBottom'),layout);refresh()
 for attempt=1,5 do local okay=pcall(function()StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,false)end);if okay then break end;task.wait(.2)end
@@ -887,6 +894,6 @@ script.Destroying:Connect(function()
  if tickConn then tickConn:Disconnect();tickConn=nil end
  for _,c in ipairs(allConns)do c:Disconnect()end;for _,c in ipairs(characterConns)do c:Disconnect()end;for _,c in pairs(toolConns)do c:Disconnect()end
  for _,c in ipairs(bagConns)do c:Disconnect()end
- stopHudLayout();CAS:UnbindAction('GardenHotbarCycle');pg:SetAttribute('ChestHotbarReserve',nil);gui:Destroy()
+ stopHudLayout();CAS:UnbindAction('GardenHotbarCycle');pg:SetAttribute('ChestHotbarReserve',nil);Inv.Stop();gui:Destroy()
  pcall(function()StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,true)end)
 end)

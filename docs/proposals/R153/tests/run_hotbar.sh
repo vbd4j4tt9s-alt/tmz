@@ -7,6 +7,8 @@
 #  test_hold_server153.luau - the server half on R151's pack harness: the reward hand-off leaves an item the player picked during the reveal in the hand;
 #                             a refused pack says why (HoldRefused, ChestService.HoldLog for /test hotbar); a hold that waited for its shape is listed.
 #  static checks            - the edited scripts compile, Config.Version unchanged, the load guard lines of Hotbar (lines 1 / 2) untouched, no model names.
+#  R155                     - then docs/proposals/R155/tests/run_inventory.sh all (the layout model, the real Hotbar + Bag in the same 6 x 2 engine runs, the
+#                             200-item cap and discarding on the server, 200-item performance).
 # "mutate" bundles the R152 Hotbar, GardenInventoryState and HeldHarvests (BASE=<the R152 release head>) and the R152 ChestService, and expects every run to FAIL:
 # proof the tests catch what the owner reported.
 set -e
@@ -70,4 +72,6 @@ serverside "$OUT/srv"
 echo "== test_hold_server153"
 (cd "$OUT/srv" && timeout 900 /opt/luau/luau test_hold_server153.luau > test_hold_server153.log 2>&1) || { grep -v '^WARN' "$OUT/srv/test_hold_server153.log" | tail -30;exit 1; }
 grep -v '^WARN' "$OUT/srv/test_hold_server153.log" | tail -1
+# R155 (the hotbar / Bag made to work like Roblox's Backpack, the 200-item cap, discarding): its suites run here too, so every hotbar test runs together.
+if [ -f "$P/R155/tests/run_inventory.sh" ];then echo "== R155 inventory (docs/proposals/R155/tests/run_inventory.sh)";BASE=ad789e1 sh "$P/R155/tests/run_inventory.sh" "$OUT/r155" all || exit 1;fi
 echo "R153 suites passed"

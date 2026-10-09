@@ -26,7 +26,7 @@ EXPECTED = {
     'ReplicatedStorage/SeedPackVisuals.lua',        # Bag / CarryBag: the shape argument -> the attribute
     'ReplicatedStorage/SeedPackRenderer.lua',       # reads it for the ordinary pouch
     'ReplicatedStorage/ItemPictures.lua',           # the picture key and spec of a hotbar / Bag tool
-    'StarterPlayer/StarterPlayerScripts/Hotbar.client.lua',  # the stack key
+    'ReplicatedStorage/InventoryStacks155.lua',     # the stack key (R155: moved out of the Hotbar, shared with the server's discard)
     'ServerScriptService/ChestChaseServer/ChestService.lua',       # the world spawn, the tool, the hand
     'ServerScriptService/ChestChaseServer/ChaseService.lua',       # the carry and the drop
     'ServerScriptService/ChestChaseServer/PlayerDataService.lua',  # the item record
@@ -82,9 +82,9 @@ if not re.search(r"function M\.Applies\(variantKey\)\n if [^\n]*variantKey==requ
 pd0 = read('ServerScriptService/ChestChaseServer/PlayerDataService.lua')
 if 'PackShapes.Applies(PackRules.VariantKey(row.BagVariant))' not in pd0:
     problems.append('PlayerDataService.savedPackShape must drop the shape of a pack that takes none (an older Verity record): PackShapes.Applies(PackRules.VariantKey(row.BagVariant))')
-hot = read('StarterPlayer/StarterPlayerScripts/Hotbar.client.lua')
-if not re.search(r"stackFields=\{Pack=\{[^}]*'PackShape'", hot):
-    problems.append("Hotbar's stackFields.Pack lacks 'PackShape': packs of different shapes would share a card")
+hot = read('ReplicatedStorage/InventoryStacks155.lua')  # (R155: the Hotbar's stack key moved here, shared with the server's discard)
+if not re.search(r"S\.Fields=\{Pack=\{[^}]*'PackShape'", hot):
+    problems.append("InventoryStacks155's Fields.Pack lacks 'PackShape': packs of different shapes would share a card")
 chase = read('ServerScriptService/ChestChaseServer/ChaseService.lua')
 if len(re.findall(r'chest\.PackShape\)', chase)) != 3:
     problems.append('ChaseService must pass chest.PackShape to the carry, the dropped pack and the dropped model (found %d)' % len(re.findall(r'chest\.PackShape\)', chase)))

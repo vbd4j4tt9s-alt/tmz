@@ -211,7 +211,7 @@ function Service:ProcessReceipt(receipt)
   if not state.Receipts[receipt.PurchaseId]then
    if not receiptSpace(state)then return later end
    local granted
-   if mech then granted=self.Data:GrantMechPacks(player,true,key)
+   if mech then granted=self.Data:GrantMechPacks(player,true,key,true) -- R155: a paid receipt is never refused for the 200 cap (InventoryCap155)
    elseif bundle then granted=self.Data:GrantPremiumBundle(player,bundle)
    else
     if(state.GiftCredits[key]or 0)>=Gifts.MaxCredits then return later end
