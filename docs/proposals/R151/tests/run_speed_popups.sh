@@ -31,7 +31,7 @@ for pat in 'Tween' 'task\.delay' 'task\.defer' 'task\.spawn' 'task\.wait' 'Heart
  if printf '%s\n' "$code" | grep -Eq "$pat"; then fail "the popup half of SpeedGainPopup uses $pat"; fi
 done
 [ "$(printf '%s\n' "$code" | grep -c 'RenderStepped:Connect')" = 1 ] || fail "the popup half must connect RenderStepped in exactly one place"
-[ "$(printf '%s\n' "$code" | grep -c 'Instance.new')" = 6 ] || fail "the popup half must create Instances in the pool builders only (TextLabel, UIStroke, Frame, UIListLayout, UIScale, BillboardGui = 6 sites)"
+[ "$(printf '%s\n' "$code" | grep -c 'Instance.new')" = 8 ] || fail "the popup half must create Instances in the pool builders only (TextLabel, UIStroke, Frame, UIListLayout, UIScale, BillboardGui = 6 sites; R155: the field's zoom Frame and its UIScale = 8)"
 echo "ok: the popup half: no TweenService, task.*, Heartbeat; one RenderStepped connection site; Instances only in the pool builders"
 # 2. the belt arrows are untouched
 (cd "$OUT" && sha256sum belt_half.lua) > "$OUT/belt.sha"

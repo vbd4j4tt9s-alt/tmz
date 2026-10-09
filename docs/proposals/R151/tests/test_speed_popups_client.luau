@@ -40,7 +40,7 @@ local field=PW.fields(pg)[1]
 local rootOf=me.Character:FindFirstChild('HumanoidRootPart')
 check(#PW.fields(pg)==1 and field.Enabled==true and field.Adornee==rootOf and field.StudsOffsetWorldSpace==V3(0,head(me).Position.Y-rootOf.Position.Y,0),'one field, on, on the root at the head\'s height')
 check(field.AlwaysOnTop==true and field.MaxDistance==100 and field.LightInfluence==0 and field.ResetOnSpawn==false and field.Active==false,'field: AlwaysOnTop, 100 studs, no light, no reset on spawn')
-check(field.Size.X.Scale==0 and field.Size.Y.Scale==0 and field.Size.X.Offset==Style.Field.Width and field.Size.Y.Offset==Style.Field.Height,'field: a fixed pixel size (no scale: the same on screen at any camera distance)')
+check(field.Size.X.Scale==0 and field.Size.Y.Scale==0 and field.Size.X.Offset==Style.Field.Width and field.Size.Y.Offset==Style.Field.Height,'field: a fixed pixel size (no scale; R155: the camera distance scales the zoom container inside it, not the field)')
 check((field.StudsOffset==nil or field.StudsOffset==V3(0,0,0))and field.StudsOffsetWorldSpace.Y>0,'field: centred on the head (no camera-space offset; a world offset up to the head)')
 local vis=PW.visible(field)
 check(#vis==1,'first frame: the first share shows ('..#vis..')')
@@ -58,7 +58,7 @@ settle()
 check(PW.visibleAll(pg)==0 and PW.live(Run.RenderStepped)==0,'done: all popups hidden, the updater disconnected')
 check(field.Enabled==false and field.Adornee==nil,'done: the field is parked (off, no adornee)')
 check(#PW.fields(pg)==1 and #PW.frameList(field)==poolSize,'done: the field and its frames are kept for the next run')
-check(#PW.frameList(field)==poolSize and #R.created-created0==1+7*poolSize,'the pool is built whole at first use: 1 field + '..poolSize..' popups (cap 8 + 2 spare) of 7 Instances ('..(#R.created-created0)..')')
+check(#PW.frameList(field)==poolSize and #R.created-created0==3+7*poolSize,'the pool is built whole at first use: 1 field + its zoom frame and UIScale (R155) + '..poolSize..' popups (cap 8 + 2 spare) of 7 Instances ('..(#R.created-created0)..')')
 
 -- 2. the curves at sample times ----------------------------------------------------------------------------------------------------------------------------
 do
@@ -323,6 +323,7 @@ do
  check(f~=nil and #PW.visible(f)==1,'another player in range: one popup per award')
  settle()
  -- cutoff: camera at (0,20,-30); a head 100 studs away or more is not shown
+ W.workspace.CurrentCamera.CFrame=R.CFrame.new(0,20,-30) -- (R155: the world's default camera is at the popups' default zoom, 12.5 studs from the head; this block measures ranges from here)
  local edge=PW.newPlayer('Edge',{Pos=V3(0,3,68)}) -- head at (0,4.5,68): 99.2 from the camera
  local edgeDist=(W.workspace.CurrentCamera.CFrame.Position-head(edge).Position).Magnitude
  C.fire(edge,4200,1,1/5);PW.frames(2,1/60)
@@ -343,7 +344,7 @@ do
  check(PW.fieldOf(pg,head(other))==nil,'the camera is far from the head: dropped at once')
  C.fire(me,4200,1,1/5);PW.seconds(0.4,1/60)
  check(PW.fieldOf(pg,head(me))==nil,'(the same rule for the local player: nothing is drawn 200 studs away)')
- W.workspace.CurrentCamera.CFrame=R.CFrame.new(0,20,-30)
+ PW.camera()
  settle()
  for _,p in ipairs({far,near1,edge,past})do PW.leave(p)end
 end

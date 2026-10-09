@@ -1,4 +1,4 @@
-"""R154: deliberate breakages of SpeedGainPopup.client.lua / SpeedPopupStyle.lua, each of which must make test_popups154 (docs/proposals/R154/tests) or the R151 style test fail: a suite that
+"""R154 (+ R155's zoom): deliberate breakages of SpeedGainPopup.client.lua / SpeedPopupStyle.lua, each of which must make test_popups154 (docs/proposals/R154/tests) or the R151 style test fail: a suite that
 still passes with the breakage would not protect the popups' constant size, their smooth flight, the caps or the pool.
 (The badge text has its own mutants in docs/proposals/R151/tests/mutate_badges.py: text_small, text_nine_wide, text_scaled.)
 Usage: python3 mutate154.py SCRATCH_DIR   (run_fixes.sh mutate calls it)"""
@@ -54,6 +54,27 @@ MUTATIONS = [
     ('the pop starts far too small', 'style', 'S.Pop = {From = 0.45,', 'S.Pop = {From = 0.2,'),
     # the label sizes itself in scale
     ('the text is TextScaled', 'script', '\tlabel.TextSize = textSize\n', '\tlabel.TextSize = textSize\n\tlabel.TextScaled = true\n'),
+    # R155 (the zoom): the pure curve
+    ('R155: the popups do not shrink with the distance', 'style', 'local scale = math.min(z.Distance / math.max(num(distance, z.Distance), 0.05), z.MaxScale)', 'local scale = 1'),
+    ('R155: no cap when the camera is close', 'style', 'local scale = math.min(z.Distance / math.max(num(distance, z.Distance), 0.05), z.MaxScale)', 'local scale = z.Distance / math.max(num(distance, z.Distance), 0.05)'),
+    ('R155: the cap is 2x', 'style', 'MaxScale = 1.3,', 'MaxScale = 2.0,'),
+    ('R155: the default zoom is 20 studs', 'style', 'S.Zoom = {Distance = 12.5,', 'S.Zoom = {Distance = 20,'),
+    ('R155: never hidden', 'style', 'HideText = 12,', 'HideText = 0,'),
+    ('R155: hidden at once, no fade', 'style', 'return scale, clamp((scale - hide) / (from - hide), 0, 1)', 'return scale, (scale > hide) and 1 or 0'),
+    ('R155: a coarse epsilon (the size steps)', 'style', 'Epsilon = 0.004}', 'Epsilon = 0.1}'),
+    ('R155: the field is R154\'s 768 x 608 again', 'style', "Width = 1000, Height = 792,", "Width = 768, Height = 608,"),
+    # R155: the client
+    ('R155: the container scale is never written', 'script', '\t\tfield.ZoomScale.Scale = scale\n', '\t\tfield.ZoomScale.Scale = 1\n'),
+    ('R155: the container scale is written every frame', 'script', 'if not field.Hidden and (field.ZS == nil or math.abs(scale - field.ZS) > Style.Zoom.Epsilon) then', 'if not field.Hidden then'),
+    ('R155: the container is never hidden', 'script', '\t\tfield.Zoom.Visible = not field.Hidden\n', '\t\tfield.Zoom.Visible = true\n'),
+    ('R155: the fade is not applied to the popups', 'script', '\talpha = alpha * popup.Field.Fade -- (R155: the field\'s fade when the camera is far)\n', ''),
+    ('R155: the camera is ignored', 'script', '\tcameraPosition = camera and camera.CFrame.Position or nil\n', '\tcameraPosition = nil\n'),
+    ('R155: the distance is measured from the world origin', 'script', '(field.Anchor.Position + field.Offset - cameraPosition).Magnitude', '(field.Anchor.Position + field.Offset).Magnitude'),
+    ('R155: the zoom is a frame late', 'script', ['\tif entry.Field then refreshZoom(entry.Field) end\n\tlocal pending = entry.Pending\n', '\treturn #active > 0 or #pending > 0\nend\n\nlocal function step()'],
+     ['\tlocal pending = entry.Pending\n', '\tif entry.Field then refreshZoom(entry.Field) end\n\treturn #active > 0 or #pending > 0\nend\n\nlocal function step()']),
+    ('R155: the popup itself takes the zoom (it would shrink twice)', 'script', '\tscale = scale * unit\n', '\tscale = scale * unit * (popup.Field.ZS or 1)\n'),
+    ('R155: a hidden field is still moved', 'script', '\t\t\tif not popup.Field.Hidden then apply(popup, x, y, scale, alpha) end\n', '\t\t\tapply(popup, x, y, scale, alpha)\n'),
+    ('R155: the popups are not in the container', 'script', '\tframe.Parent = field.Zoom\n', '\tframe.Parent = field.Gui\n'),
 ]
 
 survivors = []
