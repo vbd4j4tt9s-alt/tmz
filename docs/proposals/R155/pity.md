@@ -134,7 +134,7 @@ covers the first 30; 1280 x 540, 960 x 480, 700 x 400, 812 x 375, 430 x 932 and 
 ## 4. Listed with the odds
 
 The rule, in the owner's voice: **"every 10th pack u open is lucky: x1.5 luck (event packs count separately)"**.
-- **The hold tooltip** of every pack: its odds, then this line; when its open would be its group's lucky 10th, "LUCKY PACK: x1.5 luck on this one!" right under the name
+- **The hold tooltip** of every pack (shown on screen by `ItemTooltip155`: hover, a picked item, a just-held pack, a gamepad selection; see `inventory.md`, "The item tooltip"): its odds, then this line; when its open would be its group's lucky 10th, "LUCKY PACK: x1.5 luck on this one!" right under the name
   and the odds are the lucky roll's (a TEST pack is never lucky).
 - **The Limited Mech pack's shop card** (the paid-random disclosure): a caption along the bottom of the pack preview, "every 10th event pack u open (Void, Verity, Mech) is
   lucky: x1.5 luck", wrapped and scaled to its box (never cut; checked in the R120 shop renders on PC and the 844 x 390 phone).

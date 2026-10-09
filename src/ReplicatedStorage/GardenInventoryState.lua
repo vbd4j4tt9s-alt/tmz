@@ -82,6 +82,7 @@ end
 function S:Place(key,slot)
  if not self.Items[key]or type(slot)~='number'or slot<1 or slot>S.Count then return false end
  local prior=self:SlotOf(key);if prior==slot then return false end
+ self.Touched=true -- (the player arranged something: a saved layout that arrives later must not undo it)
  if prior and prior>self.Visible then self.Slots[prior]=nil;prior=nil end -- (on a slot this screen does not show: it is a Bag item here)
  local occupant=self.Slots[slot];if occupant and not self.Items[occupant]then occupant=nil end
  if prior then self.Slots[prior]=occupant end -- (a swap; with nothing there the old slot is just free)
@@ -92,7 +93,7 @@ function S:Stow(key)
  if not self.Items[key]then return false end
  local found=false;for i=1,S.Count do if self.Slots[i]==key then self.Slots[i]=nil;self.Blank[i]=true;found=true end end
  -- the last item off the hotbar: the player wants it blank, so every slot is blank (new items go to the Bag until something is put on it)
- if found then local any=false;for i=1,S.Count do if self.Slots[i]and self.Items[self.Slots[i]]then any=true end end;if not any then for i=1,S.Count do self.Blank[i]=true end end end
+ if found then self.Touched=true;local any=false;for i=1,S.Count do if self.Slots[i]and self.Items[self.Slots[i]]then any=true end end;if not any then for i=1,S.Count do self.Blank[i]=true end end end
  table.clear(self.Back);table.clear(self.Gone);if found then bump(self)end;return found
 end
 -- Where a new item with this key would land now: its stack's shown slot, else (its stack is in the Bag) nil; a key not here yet: the first free slot

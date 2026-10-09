@@ -141,7 +141,8 @@ Data:LoadPackLuck(B,{Big='x',Giant=-5});check(Data:GetPackLuck(B).Big==0 and Dat
 local old=Data:_decodeSavedSeedRecord(A,{Id='201_90',Kind='Pack',Stage=2,BagVariant='Pack04',OddsVersion=112,PackSize=1,ChestNumber=90},90)
 check(old.OddsVersion==112,'a saved 112 pack still loads as 112 (it would have fallen back to the old 81 odds)')
 check(not Data.PublishPackLuck and A:GetAttribute('PackLuck')==nil and A:GetAttribute('PackLuckBig')==nil,'nothing about it is shown to the player')
-check(W.B.ChestService:find('AddChest(player, seed, {Luck=true})',1,true)and W.B.TreadmillBonusService:find("},{Luck=true})",1,true)
+-- (R155 review: ChestService:Bank also passes Banked, the carried pack's kept place)
+check(W.B.ChestService:find('AddChest(player, seed, {Luck=true, Banked=true})',1,true)and W.B.TreadmillBonusService:find("},{Luck=true})",1,true)
  and not W.B.PremiumProgress:find('Luck=true',1,true),'stolen/event packs and treadmill bonus packs go through it; bought Mech packs do not')
 -- 5. Track pity -----------------------------------------------------------------------------------------------------
 check(Pity.Chance(Pity.Track.Big,1)==0 and Pity.Chance(Pity.Track.Big,6)==1 and Pity.Chance(Pity.Track.Giant,12)==1,'track: sure by the 6th refresh (30 min) for 5x+ and the 12th (1 h) for 10x+')

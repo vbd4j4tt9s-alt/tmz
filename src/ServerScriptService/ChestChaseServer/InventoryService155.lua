@@ -13,6 +13,7 @@ local Players=game:GetService('Players');local RS=game:GetService('ReplicatedSto
 local Stacks=require(RS:WaitForChild('InventoryStacks155'))
 local S={};S.__index=S
 S.RewardSeconds=10 -- a reward seed handed over this recently may still be flying in on the opener's screen
+S.LogIds=6 -- the discard log names up to this many record ids
 S.Kinds={Pack=true,Seed=true,Fruit=true,Loot=true}
 S.Text={Loading='HOLD ON, UR DATA IS LOADING!',Saving='UR DATA CAN\'T SAVE RIGHT NOW, TRY AGAIN LATER',NotItem='U CAN\'T THROW THAT AWAY',Gone='THAT ITEM IS ALREADY GONE!',
  Busy='FINISH UR STEAL FIRST!',Gift='WAIT FOR UR GIFT TO SEND FIRST!',Opening='WAIT FOR UR PACK TO FINISH OPENING!',Landing='WAIT FOR UR SEED TO LAND FIRST!',
@@ -69,14 +70,18 @@ function S:Discard(player,request)
  local order={};for i,r in ipairs(data:GetChestRecords(player))do order[r.Id]=i end
  local garden=data.Gardens[player];for i,r in ipairs(garden and garden.Harvests or{})do order[r.Id]=i end
  table.sort(members,function(a,b)if a.Held~=b.Held then return b.Held end;return(order[a.Id]or 0)>(order[b.Id]or 0)end)
- local ids={};local unequip=false
- for i=1,count do ids[members[i].Id]=true;if members[i].Held then unequip=true end end
+ local ids,picked={},{};local unequip=false
+ for i=1,count do ids[members[i].Id]=true;picked[#picked+1]=members[i].Id;if members[i].Held then unequip=true end end
  local name=chosen.Name
  -- an item in the hand is put away first (a held pack ends its uncommitted opening normally, as a gift does)
  if unequip then local h=player.Character and player.Character:FindFirstChildOfClass('Humanoid');if h then pcall(function()h:UnequipTools()end)end end
- local removed=data:DiscardRecords(player,kind,ids)
+ local removed,gone=data:DiscardRecords(player,kind,ids)
  if removed<=0 then return refuse(S.Text.Gone)end
- data:NoteDiscard(player,('threw away %dx %s (%s %s%s)'):format(removed,name,kind,id,removed>1 and' +'..(removed-1)or''))
+ -- (R155 review) the log names the records that REALLY went, in the order they went (the newest first, the one in hand last), not the id the client asked
+ -- about: that one is the stack's representative (the oldest or the one in hand) and stays when fewer than all are thrown away
+ local went={};for _,tid in ipairs(picked)do if gone[tid]then went[#went+1]=tid end end
+ local shown=table.concat(went,', ',1,math.min(#went,S.LogIds));if #went>S.LogIds then shown..=' +'..(#went-S.LogIds)..' more' end
+ data:NoteDiscard(player,('threw away %dx %s (%s %s%s)'):format(removed,name,kind,shown,gone[id]and''or'; asked about '..id..', kept'))
  if self.Chests then pcall(function()self.Chests:SyncTools(player)end)end
  return {Ok=true,Removed=removed,Name=name,Held=data:HeldItemCount(player),Message=removed==1 and('threw away '..name)or('threw away '..removed..'x '..name)}
 end

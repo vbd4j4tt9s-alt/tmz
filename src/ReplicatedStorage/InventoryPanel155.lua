@@ -10,11 +10,14 @@
 --  * search: Bag cards filter; hotbar slots that do not match dim.
 --  * the layout is sent to the server (ChestChaseRemotes.HotbarLayout155) a moment after it changes; at join the saved one (the player attribute
 --    HotbarLayout155) puts each item back on its slot, and once the server says every item is there (InventorySynced155) new items are placed as new.
+--    Nothing goes live or is sent while that attribute has not arrived (a slow profile load): an arrival-order layout would be saved over the player's own.
+--  * the item's ToolTip (ItemTooltip155): hover (mouse), selection (gamepad), the picked item (touch and everyone), a just-held pack (touch / gamepad).
 local RS=game:GetService('ReplicatedStorage');local Input=game:GetService('UserInputService');local GuiService=game:GetService('GuiService')
 local CAS=game:GetService('ContextActionService')
-local Stacks=require(RS:WaitForChild('InventoryStacks155'));local Dialog=require(RS:WaitForChild('DiscardDialog155'))
-local M={Stacks=Stacks,Key=Stacks.Key,Dialog=Dialog,Cap=Stacks.Cap,SaveDelay=2,LiveDelay=1,JoinFallback=8}
+local Stacks=require(RS:WaitForChild('InventoryStacks155'));local Dialog=require(RS:WaitForChild('DiscardDialog155'));local Tip=require(RS:WaitForChild('ItemTooltip155'))
+local M={Stacks=Stacks,Key=Stacks.Key,Dialog=Dialog,Tip=Tip,Cap=Stacks.Cap,SaveDelay=2,LiveDelay=1,JoinFallback=8}
 local ctx,picked,ui,conns=nil,nil,{},{}
+local right,barH,sheetW=112,30,500 -- the Trash's width + 8 and the bar's height (M.Layout sets them with the sheet's width: a narrow sheet has a small Trash)
 local RED,AMBER=Color3.fromRGB(255,96,96),Color3.fromRGB(255,190,70)
 local lastSent,saveDue,lastVersion=nil,nil,-1
 local function on(sig,fn)if sig then conns[#conns+1]=sig:Connect(fn)end end
@@ -48,6 +51,8 @@ local function held()
  if type(n)~='number'then n=0;for _,e in pairs(ctx.State.Items)do if Stacks.Counts(e.Tool)then n+=e.Count or 1 end end end
  return n,type(cap)=='number'and cap or M.Cap
 end
+local NEED=202 -- the pick bar's three buttons (Hold, To Bag, x) and the gaps between them
+local picking -- (set by paintPick: an item is picked)
 local function paintCount()
  if not ui.Count then return end
  local n,cap=held();local full=n>=cap
@@ -55,7 +60,20 @@ local function paintCount()
  if ui.Count.Text~=text then ui.Count.Text=text end
  local color=full and RED or n>=math.floor(cap*.9)and AMBER or ctx.C.Text
  if ui.Count.TextColor3~=color then ui.Count.TextColor3=color end
- ui.Count.Size=UDim2.fromOffset(full and 112 or 88,30);ui.Count.Position=UDim2.new(1,full and-224 or-200,0,0)
+ -- (R155 review) the count sits left of the Trash, wherever the sheet's width put it (M.Layout's `right`); FULL is wider, and the pick bar ends where the count starts,
+ -- so neither covers the pick bar's x button on a narrow sheet or on a wide one
+ local w=full and 112 or 88
+ local barW=sheetW-32;local room=barW-(right+w+8) -- (the pick bar's width beside the count)
+ -- a picked item's buttons need NEED px: on a sheet too narrow for them beside the count (a portrait phone), the count steps aside while an item is picked
+ local showCount=not picking or room>=NEED
+ if ui.Count.Visible~=showCount then ui.Count.Visible=showCount end
+ ui.Count.Size=UDim2.fromOffset(w,barH);ui.Count.Position=UDim2.new(1,-(right+w),0,0)
+ if ui.Pick then
+  local pw=showCount and room or barW-right
+  ui.Pick.Size=UDim2.new(1,-(barW-pw),1,0)
+  local text=pw-206 -- (the text left of the three buttons: too small to read on a very narrow sheet: the outlined slots say it)
+  if ui.What.Visible~=(text>=60)then ui.What.Visible=text>=60 end
+ end
  if ui.Badge.Visible~=full then ui.Badge.Visible=full end
 end
 M.Held=held
@@ -91,15 +109,21 @@ local function paintPick()
   if want then hintOf(b).Visible=true;hints[b]=true elseif hints[b]then local h=b:FindFirstChild('DropHint');if h then h.Visible=false end;hints[b]=nil end
  end
  if ui.Pick then
-  ui.Pick.Visible=picked~=nil;if ctx.panel:FindFirstChild('Hint')then ctx.panel.Hint.Visible=picked==nil and ctx.panel.Hint:GetAttribute('Room')~=false end
+  ui.Pick.Visible=picked~=nil;if picking~=(picked~=nil)then picking=picked~=nil;paintCount()end;if ctx.panel:FindFirstChild('Hint')then ctx.panel.Hint.Visible=picked==nil and ctx.panel.Hint:GetAttribute('Room')~=false end
   if picked then
    local e=State.Items[picked.Key];local n=e and e.Count or 1
    ui.What.Text='Moving '..nameOf(picked.Key)..(n>1 and' x'..n or'')..(picked.Slot and' - tap a slot, the Bag or 🗑'or' - tap a slot or 🗑')
    ui.Stash.Visible=picked.Slot~=nil
   end
  end
+ Tip.Pick(picked and picked.Key or nil,src) -- (the picked item's ToolTip: the odds of a pack, on a phone too)
 end
 function M.Picked()return picked end
+function M.Hover(b,fn)if ctx then Tip.Hover(b,fn)end end -- (the Hotbar's slots and Bag cards: the item's ToolTip, ItemTooltip155)
+function M.Leave(b)if ctx then Tip.Leave(b)end end
+function M.Focus(b,fn)if ctx then Tip.Focus(b,fn)end end
+function M.Unfocus(b)if ctx then Tip.Unfocus(b)end end
+function M.TipRefresh()if ctx then Tip.Refresh()end end -- (the Bag grid scrolled: a card's tooltip follows it)
 function M.Layout155()return ctx and ctx.State end -- (tests / the owner's debugging: the hotbar's layout model)
 function M.Pick(key,slot,how)
  if not key or not ctx.State.Items[key]then return false end
@@ -124,7 +148,7 @@ function M.Release(d,how)
 end
 function M.PaintPick()if ctx then paintPick()end end
 -- The Hotbar lifts an item (mouse drag / a phone's hold) and lets it go: every slot it can go to is outlined meanwhile ("clear drop targets" on a phone too).
-function M.Dragging(on,slot)if not on and not drag then return end;drag=on and{Slot=slot}or nil;if ctx then paintPick()end end
+function M.Dragging(on,slot)if not on and not drag then return end;drag=on and{Slot=slot}or nil;if ctx then Tip.Suppress(on==true);paintPick()end end
 -- A click on a slot (slot = its number, key = what is on it or nil) or on a Bag card (slot nil) while an item is picked. True = handled (no equip).
 function M.Click(key,slot,how)
  if not picked then return false end
@@ -155,20 +179,24 @@ function M.Discard(key,how)
  local tool=e.Tool
  if not Stacks.Counts(tool)then say('u can\'t throw that away',true);return false end
  note(('discard? %s x%d (%s), hold to confirm'):format(tool.Name,e.Count or 1,how or'trash'))
- Dialog.Open(ctx.pg,{Tool=tool,Name=ctx.Names.Tool(tool,ctx.Catalog),Rarity=tool:GetAttribute('Rarity'),Count=e.Count or 1},function(amount)
+ -- (R155 review) the reply is tagged with the popup it belongs to (`ticket`): "Keep it" while a request is in flight and then another discard must not have the old
+ -- reply close, or fail, the new popup. The old reply still says what happened (the item may really be gone).
+ Dialog.Open(ctx.pg,{Tool=tool,Name=ctx.Names.Tool(tool,ctx.Catalog),Rarity=tool:GetAttribute('Rarity'),Count=e.Count or 1},function(amount,ticket)
   local remotes=RS:FindFirstChild('ChestChaseRemotes');local remote=remotes and remotes:FindFirstChild('DiscardItems')
-  if not remote then Dialog.Fail('try again in a sec');return end
+  if not remote then Dialog.Fail('try again in a sec',ticket);return end
   local request={Kind=Stacks.Kind(tool),Id=Stacks.Id(tool),Count=amount}
   local ok,result=pcall(function()return remote:InvokeServer(request)end)
   if ok and type(result)=='table'and result.Ok then
-   Dialog.Done();say(tostring(result.Message or'thrown away'))
+   Dialog.Done(ticket);say(tostring(result.Message or'thrown away'))
   else
    local why=ok and type(result)=='table'and result.Message or'try again!'
-   note('discard refused: '..tostring(why));Dialog.Fail(tostring(why):lower())
+   note('discard refused: '..tostring(why));Dialog.Fail(tostring(why):lower(),ticket)
   end
  end)
  return true
 end
+-- Esc belongs to the discard popup while it is open (or was closed by that very Esc a moment ago): the Hotbar must not close the Bag as well.
+function M.PopupEsc()return Dialog.IsOpen()or os.clock()-(Dialog.EscAt or-1)<.1 end
 function M.OverTrash(p)
  local t=ui.Trash;if not(t and ctx.panel.Visible and t.Visible)then return false end
  local a,z=t.AbsolutePosition,t.AbsoluteSize;return p.X>=a.X-4 and p.Y>=a.Y-4 and p.X<=a.X+z.X+4 and p.Y<=a.Y+z.Y+4
@@ -188,9 +216,11 @@ end
 M.PaintSearch=paintSearch
 -- The saved layout ------------------------------------------------------------------------------------------------------------------------------------
 local function remote()local f=RS:FindFirstChild('ChestChaseRemotes');return f and f:FindFirstChild('HotbarLayout155')end
+local function layoutKnown()return type(ctx.player:GetAttribute('HotbarLayout155'))=='string'end -- (the server sets it, '' = none saved, when the profile has loaded)
 local function flush()
  saveDue=nil
  local State=ctx.State;if State.Phase~='live'then return end -- (going live bumps the layout: it is sent then)
+ if not layoutKnown()then return end -- (R155 review: the saved layout has not arrived: what this client has is arrival order, which would be saved over the player's own)
  if State:Waiting()and os.clock()<=State.BackUntil then -- (a respawn: wait until every item is back, then send)
   saveDue=os.clock()+.5;task.delay(.5,function()if ctx and saveDue then flush()end end);return
  end
@@ -204,31 +234,47 @@ local function scheduleSave()
  task.delay(M.SaveDelay,function()if ctx then flush()end end)
 end
 function M.Flush()saveDue=nil;flush()end
-local liveQueued=false
+local liveQueued,liveWaits=false,false
 local function goLiveSoon(delay)
  if liveQueued or ctx.State.Phase=='live'then return end
  liveQueued=true
  task.delay(delay,function()
   liveQueued=false;if not ctx then return end
+  -- (R155 review) a slow profile load: the saved layout (HotbarLayout155) has not arrived, so the join goes on (new items follow the same rule meanwhile); going live now
+  -- would send this client's arrival-order layout over the player's saved one. It goes live when the layout arrives (restore).
+  if not layoutKnown()then liveWaits=true;note('waiting for the saved layout');return end
   ctx.refresh()
   if ctx.State:GoLive()then note('every item is here: new items now go to the first free slot');ctx.refresh()end
  end)
 end
 local function restore()
  local text=ctx.player:GetAttribute('HotbarLayout155')
- if type(text)=='string'and text~=''and ctx.State.Phase=='join'then
+ if type(text)~='string'then return end
+ -- (R155 review) a layout that arrives after the player already moved something is not applied: what the player did stays, and is saved
+ if text~=''and ctx.State.Phase=='join'and not ctx.State.Touched then
   if ctx.State:Restore(text)then lastSent=text;note('saved layout restored');ctx.refresh()end
- elseif type(text)=='string'then lastSent=lastSent or text end
+ else lastSent=lastSent or text end
+ if liveWaits then liveWaits=false;goLiveSoon(0)end
 end
 -- Each refresh of the Hotbar ends here (cheap: no allocation unless something changed).
+local lastHeld
+local function watchHeld() -- a pack that has just been put in the hand (a tap on its slot): its odds show for a few seconds on a phone / gamepad (ItemTooltip155)
+ local c=ctx.player.Character;local t=c and c:FindFirstChildOfClass('Tool')
+ if t==lastHeld then return end
+ lastHeld=t
+ if t and t:GetAttribute('SeedPackTool')then
+  local key=Stacks.Key(t);local slot=key and ctx.State:Shown(key)
+  Tip.Announce(t,slot and ctx.slots[slot]or nil)
+ end
+end
 function M.AfterRefresh()
  if not ctx then return end
- paintCount();paintPick();paintSearch()
+ paintCount();paintPick();paintSearch();watchHeld();Tip.Refresh()
  local State=ctx.State
  if State.Version~=lastVersion then lastVersion=State.Version;if State.Phase=='live'then scheduleSave()end end
 end
-function M.Opened()if ctx then paintSearch();paintCount()end end
-function M.Closed()if ctx then M.Unpick();paintSearch()end end
+function M.Opened()if ctx then Tip.Reset();paintSearch();paintCount()end end
+function M.Closed()if ctx then M.Unpick();Tip.Reset();paintSearch()end end
 -- Where the bottom bar goes: short sheets (phones) give it the bottom of the grid; others use the hint's row.
 function M.Layout(short,sheetWidth)
  if not ui.Bar then return end
@@ -236,17 +282,17 @@ function M.Layout(short,sheetWidth)
  ui.Bar.Position=UDim2.new(0,16,1,short and-34 or-34);ui.Bar.Size=UDim2.new(1,-32,0,28)
  local narrow=sheetWidth<420
  ui.Trash.Text=narrow and'🗑'or'🗑 Discard';ui.Trash.Size=UDim2.fromOffset(narrow and 44 or 104,28);ui.Trash.Position=UDim2.new(1,narrow and-44 or-104,0,0)
- local right=(narrow and 44 or 104)+8
- ui.Count.Size=UDim2.fromOffset(88,28);ui.Count.Position=UDim2.new(1,-(right+88),0,0)
- ui.Pick.Size=UDim2.new(1,-(right+96),1,0)
- ui.What.Size=UDim2.new(1,-206,1,0);ui.What.Visible=sheetWidth>=380 -- (a very narrow sheet: the outlined slots say it)
+ right=(narrow and 44 or 104)+8;barH=28;sheetW=sheetWidth -- (paintCount places the count and the pick bar from these: R155 review, it used a fixed offset that covered the x button)
+ ui.What.Size=UDim2.new(1,-206,1,0)
  if hint then hint.Size=UDim2.new(1,-(32+right+96),0,26);hint.Position=UDim2.new(0,16,1,-33);hint:SetAttribute('Room',not short);hint.Visible=not short and picked==nil
-  hint.Text=Input.TouchEnabled and'Tap to hold • hold to move or discard'or'Click to hold • drag to move • right-click for more'end
- paintCount()
+  hint.Text=Input.TouchEnabled and'Tap to hold • hold for info, to move or discard'or'Click to hold • hover for info • drag to move • right-click for more'end
+ paintCount();Tip.Refresh()
 end
 M.BarHeight=36
 function M.Start(c)
- ctx=c;picked=nil;drag=nil;ringOn=nil;lastSent=nil;saveDue=nil;lastVersion=-1;liveQueued=false;table.clear(hints);table.clear(dimmed) -- (a new Hotbar: nothing of the last one)
+ ctx=c;picked=nil;picking=false;drag=nil;ringOn=nil;lastSent=nil;saveDue=nil;lastVersion=-1;liveQueued=false;liveWaits=false;lastHeld=nil;table.clear(hints);table.clear(dimmed) -- (a new Hotbar: nothing of the last one)
+ right,barH,sheetW=112,30,500
+ Tip.Start(c)
  build()
  on(ui.Hold.Activated,function()if picked then local k=picked.Key;M.Unpick();ctx.equip(k,'Hold (picked)')end end)
  on(ui.Stash.Activated,function()M.Stash('To Bag')end)
@@ -260,7 +306,7 @@ function M.Start(c)
   local t=input.UserInputType
   if t==Enum.UserInputType.MouseButton1 or t==Enum.UserInputType.Touch then M.Unpick('tapped away')end -- (a tap in the world puts it down)
  end)
- -- gamepad: Y on the focused slot or card picks it (with the Bag open; X is the garden's Pick prompt); DPad-Up opens / closes the Bag
+ -- gamepad: Y on the focused slot or card picks it (with the Bag open; X is the garden's Pick prompt); DPad-Up opens / closes the Bag (and moves the selection when it is on the Bag or the hotbar)
  local function focusedKey()
   local o=GuiService.SelectedObject;if not o then return nil end
   for i,b in ipairs(ctx.slots)do if b==o then return ctx.State.Slots[i],i end end
@@ -277,6 +323,9 @@ function M.Start(c)
   CAS:BindAction('GardenBagToggle',function(_,state)
    if state~=Enum.UserInputState.Begin then return Enum.ContextActionResult.Pass end
    local menu=ctx.pg:GetAttribute('SeedMenu');if menu~=nil and menu~='Inventory'then return Enum.ContextActionResult.Pass end
+   -- (R155 review) with the selection inside the Bag or on the hotbar, DPad-Up moves it (Roblox's GUI navigation); it only opens / closes the Bag from outside
+   local o=GuiService.SelectedObject
+   if o and(o==ctx.dock or o:IsDescendantOf(ctx.dock)or o:IsDescendantOf(ctx.panel))then return Enum.ContextActionResult.Pass end
    ctx.toggle(not ctx.panel.Visible);return Enum.ContextActionResult.Sink
   end,false,Enum.KeyCode.DPadUp)
  end)
@@ -289,6 +338,6 @@ end
 function M.Stop()
  for _,c in ipairs(conns)do c:Disconnect()end;table.clear(conns)
  pcall(function()CAS:UnbindAction('GardenBagPick');CAS:UnbindAction('GardenBagToggle')end)
- Dialog.Destroy();picked=nil;drag=nil;ctx=nil
+ Tip.Stop();Dialog.Destroy();picked=nil;drag=nil;ctx=nil
 end
 return M

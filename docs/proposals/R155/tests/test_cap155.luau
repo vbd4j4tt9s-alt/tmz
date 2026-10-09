@@ -14,6 +14,8 @@
 --     being saved, the pack being opened, a reward seed still landing); a stack (in hand last), fruit, a loot item; the count drops; the Output / /test hotbar
 --     line; nothing comes back; after a rejoin the items are still gone; the remotes and their rate limit.
 --  5. the saved hotbar layout: validated, kept in Premium.Hotbar155, handed back at join as HotbarLayout155, a broken one is dropped (the save still loads).
+--  Review fixes: 2b. a Robux receipt during a carry (199 + the carried pack + a receipt = 200) must not cost the player the stolen pack: Bank always lands (Banked), the old
+--  1000 ceiling still applies; 4b. the discard log names the records that really went (not the id the client asked about); 1b. selling / taking loot publishes the count.
 local W=require('./world');local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -73,14 +75,26 @@ local loot=Data:AwardLoot(A,1,'Rare','Golden Idol')
 g.Plots['1']={{Id='plant-x',SeedId='SunflowerSeed'}} -- (a plant)
 Data.OwnedBoosts[A]['boots-1']=true -- (gear)
 check(held(A)==9 and A:GetAttribute('HeldItemCount')==9,'1 pack + 4 seeds (a stack of 4 = 4) + 3 fruit + 1 loot item = 9; the plant and the gear do not count ('..held(A)..')')
-g.Plots['1']={};loot:Destroy();table.clear(g.Harvests);Data:_gardenChanged(A)
+-- (review) legacy loot leaves the bag by SellLoot / TakeBestLoot: the Bag's count (HeldItemCount) drops at once, not at the next change
+do
+ local okSell,sold=Data:SellLoot(A,loot.Name)
+ check(okSell and held(A)==8 and A:GetAttribute('HeldItemCount')==8,'selling a loot item publishes the count at once (8, not a stale 9: '..tostring(A:GetAttribute('HeldItemCount'))..')')
+ local l2=Data:AwardLoot(A,1,'Rare','Silver Idol');local l3=Data:AwardLoot(A,1,'Common','Old Boot')
+ check(A:GetAttribute('HeldItemCount')==10,'(two more loot items: 10)')
+ local taken=Data:TakeBestLoot(A)
+ check(taken~=nil and taken.Name=='Silver Idol'and held(A)==9 and A:GetAttribute('HeldItemCount')==9,'taking the best loot item publishes the count at once (9: '..tostring(A:GetAttribute('HeldItemCount'))..')')
+ l3:Destroy();Data:PublishHeld(A)
+end
+g.Plots['1']={};table.clear(g.Harvests);Data:_gardenChanged(A)
 
 -- 2. every grant path at the cap -----------------------------------------------------------------------------------------------------------------------
 -- a stolen pack banked (ChestService:Bank), the steal / pick-up start (CanReceiveSeed)
 local Chest=server('ChestService')
 local bankSelf={PlayerData=Data,SyncTools=function()end}
 fillTo(A,199);check((Chest.Bank(bankSelf,A,pack()))~=nil and held(A)==200,'199: a stolen pack is banked (200)')
-local r2,why2=Chest.Bank(bankSelf,A,pack());check(r2==nil and why2==FULL and held(A)==200,'200: banking is refused with "'..tostring(why2)..'"')
+-- (review) Bank is only ever called for the pack a player carried home, whose place was kept at the pickup: it is never refused for the 200 cap (Banked)
+local r2,why2=Chest.Bank(bankSelf,A,pack());check(r2~=nil and held(A)==201,'200: the pack carried home is still banked (Banked): 201, nothing eaten ('..tostring(why2)..')')
+fillTo(A,200)
 local okStart,whyStart=Data:CanReceiveSeed(A);check(okStart==false and whyStart==FULL,'200: a steal / pick-up does not start (CanReceiveSeed: '..tostring(whyStart)..')')
 fillTo(A,199);A:SetAttribute('ChestChaseSeedCarrying',true)
 check(not Data:CanReceiveSeed(A)and not Data:RoomFor(A,1),'199 while carrying a pack home: its place is kept, so every other grant sees a full bag')
@@ -125,6 +139,24 @@ check(decision==R.Enum.ProductPurchaseDecision.PurchaseGranted and held(A)==201 
 check(Premium.ProcessReceipt(svc,{ProductId=777001,PurchaseId='buy-1',PlayerId=601})==R.Enum.ProductPurchaseDecision.PurchaseGranted and held(A)==201,'(the same receipt again grants nothing more)')
 do local r=Data:GetChestRecords(A);while #r<Config.MaxSavedChests do r[#r+1]=seedRow(A)end
  check(Premium.ProcessReceipt(svc,{ProductId=777001,PurchaseId='buy-2',PlayerId=601})==R.Enum.ProductPurchaseDecision.NotProcessedYet,'only the old storage ceiling (1000 records) makes a receipt wait (NotProcessedYet: Roblox asks again, nothing lost)')
+end
+-- (review) 2b. a Robux receipt DURING a carry: the pickup was allowed at 199, the receipt skips the cap (200), then the keeper run clears the carry flag and banks the pack
+do
+ local K=makePlayer(607,'Kit');K:SetAttribute('PaidRandomAllowed',true);fillTo(K,199)
+ check(Data:CanReceiveSeed(K)==true,'199: picking up a stolen pack is allowed')
+ K:SetAttribute('ChestChaseSeedCarrying',true)
+ check(not Data:CanReceiveSeed(K),'(while carrying, every other grant sees a full bag)')
+ local carried=Premium.ProcessReceipt(svc,{ProductId=777001,PurchaseId='late-carry',PlayerId=607})
+ check(carried==R.Enum.ProductPurchaseDecision.PurchaseGranted and held(K)==200,'a Robux receipt for a prompt opened before the pickup is granted during the carry (200)')
+ K:SetAttribute('ChestChaseSeedCarrying',false) -- ConcurrentKeeperService:Finish clears it, then banks
+ local rec,why=Chest.Bank(bankSelf,K,pack())
+ check(rec~=nil and held(K)==201 and why==nil,'... and the stolen pack is STILL banked (201), not sent back to the track ('..tostring(why)..')')
+ -- the old storage ceiling still applies to it
+ local rows=Data:GetChestRecords(K);while #rows<Config.MaxSavedChests do rows[#rows+1]=seedRow(K)end;Data:_notifySeedInventory(K)
+ local rec2,why2=Chest.Bank(bankSelf,K,pack())
+ check(rec2==nil and why2==FULL,'... but the old 1000-record storage ceiling (MaxSavedChests) still refuses it ("'..tostring(why2)..'")')
+ -- the ChestService source passes the flag (the test above uses the real Bank)
+ local src=W.B.ChestService or'';check(src:find('{Luck=true, Banked=true}',1,true)~=nil,'(ChestService:Bank asks for the carried pack\'s kept place: Banked)')
 end
 -- gifts in: a seed / pack and a fruit wait in the inbox while the bag is full
 local B=makePlayer(602,'Bo')
@@ -182,7 +214,7 @@ do
  Data:PreparePlayer(Old);local okL=Data:Load(Old);Data.CanSave[Old]=true
  check(okL and #Data:GetChestRecords(Old)==350 and #Data.Gardens[Old].Harvests==300,'a save with 350 packs / seeds and 300 fruit loads whole ('..#Data:GetChestRecords(Old)..' + '..#Data.Gardens[Old].Harvests..')')
  check(Old:GetAttribute('HeldItemCount')==650 and not Data:RoomFor(Old,1),'it holds 650 of 200: nothing is cut, it just receives nothing')
- check(Data:AddChest(Old,pack())==nil and(Chest.Bank(bankSelf,Old,pack()))==nil,'(no pack, no steal)')
+ check(Data:AddChest(Old,pack())==nil and not Data:CanReceiveSeed(Old),'(no pack, and no steal can start: the pickup is refused, so there is never a carried pack to bank)')
  local saved=Data:_buildSaveData(Old);check(#saved.Seeds==350 and #saved.Garden.Harvests==300,'and it saves whole')
  check(Data:DecodeGarden(saved.Garden)~=nil,'the save validator accepts its 300 fruit (old ceiling 500)')
  local okSell,total,count=Data:SellAllHarvests(Old);check(okSell and count==300 and held(Old)==350,'selling the fruit: 350 left')
@@ -262,6 +294,27 @@ check(res.Ok and res.Removed==3 and held(C)==h0-3 and C:GetAttribute('HeldItemCo
 check(inHand.Parent==C.Character and toolOf(seedIds[2])==inHand,'the one in hand is kept while others are left')
 local seedsLeft=0;for _,r in ipairs(Data:GetChestRecords(C))do if r.Kind=='Seed'then seedsLeft+=1 end end;check(seedsLeft==2,'2 seeds left')
 res=ask({Kind='Seed',Id=seedIds[2],Count=2});check(res.Ok and inHand.Parent==nil,'all of them: the one in hand goes too (put away first)')
+-- (review) 4b. the log names the records that REALLY went (the newest first), not the id the client asked about (the stack's representative)
+do
+ local before=#Data.DiscardLog[C]
+ local sids={};for _,r in ipairs(Data:GetChestRecords(C))do if r.Kind=='Seed'then sids[#sids+1]=r.Id end end
+ for _=1,4 do table.insert(Data:GetChestRecords(C),seedRow(C,'SunflowerSeed'))end;Data:_notifySeedInventory(C);rebuild(C)
+ local ids={};for _,r in ipairs(Data:GetChestRecords(C))do if r.Kind=='Seed'then ids[#ids+1]=r.Id end end
+ local asked=ids[1] -- (the oldest: what the client sends for a stack it draws from its oldest member)
+ local res2=ask({Kind='Seed',Id=asked,Count=2})
+ local left={};for _,r in ipairs(Data:GetChestRecords(C))do left[r.Id]=true end
+ local line=Data.DiscardLog[C][#Data.DiscardLog[C]]
+ check(res2.Ok and res2.Removed==2 and left[asked]and not left[ids[#ids]]and not left[ids[#ids-1]],'2 of a stack of '..#ids..': the newest two went, the one asked about stays ('..tostring(left[asked])..')')
+ check(#Data.DiscardLog[C]==before+1 and line:find(ids[#ids],1,true)and line:find(ids[#ids-1],1,true),'the log names the two records that went ('..tostring(line)..')')
+ check(not line:find('Seed '..asked..',',1,true)and not line:find('Seed '..asked..')',1,true)and line:find('asked about '..asked..', kept',1,true),'... not the id asked about as if it had gone: it says that one was kept')
+ local printedLine=false;for _,l in ipairs(printed)do if l:find('[R155 Discard] Cy (604): threw away 2x',1,true)and l:find(ids[#ids],1,true)then printedLine=true end end
+ check(printedLine,'... and so does the Output line')
+ -- all of a stack: every id is named, none "kept"
+ local all=ask({Kind='Seed',Id=asked,Count=#ids-2});line=Data.DiscardLog[C][#Data.DiscardLog[C]]
+ check(all.Ok and line:find(asked,1,true)and not line:find('kept',1,true),'when the asked-about record goes too, the log names it and says nothing about "kept"')
+ -- (the section below counts 5 log lines: these two are extra, so it reads the earlier ones)
+ Data.DiscardLog[C]={table.unpack(Data.DiscardLog[C],1,before)}
+end
 -- a pack held but not opened, fruit, a loot item
 res=ask({Kind='Pack',Id=packs[1].Id,Count=3});check(res.Ok and res.Removed==3,'the 3 packs (one only held, not opened)')
 res=ask({Kind='Fruit',Id=fruit.Id,Count=1});check(res.Ok and #Data.Gardens[C].Harvests==0,'a fruit')

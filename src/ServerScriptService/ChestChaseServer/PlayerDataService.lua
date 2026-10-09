@@ -629,6 +629,7 @@ function PlayerDataService:TakeBestLoot(player)
 	local item = self:_lootRecordFromValue(selected)
 	selected:Destroy()
 	self:MarkDirty(player)
+	if self.PublishHeld then self:PublishHeld(player) end -- R155 (review): a loot item left the bag, so the Bag's count (HeldItemCount) drops now
 	return item
 end
 
@@ -664,6 +665,7 @@ function PlayerDataService:SellLoot(player, lootInstanceName)
 	local cashValue = self:GetOrCreateCashValue(player)
 	cashValue.Value = cashValue.Value + value
 	self:MarkDirty(player)
+	if self.PublishHeld then self:PublishHeld(player) end -- R155 (review): a loot item left the bag, so the Bag's count (HeldItemCount) drops now
 	return true, value
 end
 
