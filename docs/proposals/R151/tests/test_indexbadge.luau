@@ -151,7 +151,13 @@ end
 if after then
  relay(390,844);openWheel();relay(390,844)
  -- (the R151 sizes were 24 / 20 / 20 / 14 px: the owner asked for a bigger bubble, "about 1.5x")
- check(Badge.Grow==1.5 and Badge.Sizes.Count==24*1.5 and Badge.Sizes.Alert==20*1.5 and Badge.Sizes.Daily==20*1.5 and Badge.Sizes.Dot==14*1.5,'R153: every badge is 1.5x its R151 size (INDEX count 36, MENU alert 30, DAILY 30, dots 21)')
+ -- (R155, owner: "reposition these bubbles make them slightly smaller as they are obscuring the image": 30 / 26 / 26, out on the corner; the dots stay 21)
+ check(Badge.Sizes.Count==30 and Badge.Sizes.Alert==26 and Badge.Sizes.Daily==26 and Badge.Sizes.Dot==21,'R155: the badges are INDEX count 30, MENU alert 26, DAILY 26, dots 21')
+ for _,k in ipairs({'Count','Alert','Daily'})do
+  local size,o=Badge.Sizes[k],Badge.Overhang[k]
+  check(size/2-o+size/2<=20 and o>=size/2-6,'R155: the '..k..' badge sits out on the corner: it covers '..(size-o)..' px of the button (at most 20), centre '..(size/2-o)..' px in')
+  check(Badge.Extent(size,o)<=Badge.Margin-1,'R155: ... and stays a px inside the '..Badge.Margin..' px margin (extent '..Badge.Extent(size,o)..')')
+ end
  for _,pair in ipairs({{indexBadge(),Badge.Sizes.Count,'INDEX count'},{alertBadge(),Badge.Sizes.Alert,'MENU alert'},{(dotOf(1)),Badge.Sizes.Dot,'tab dot'}})do
   local b,size,name=pair[1],pair[2],pair[3];local r=L.rect(b)
   check(near(r.x1-r.x0,size)and near(r.y1-r.y0,size)and b:GetAttribute('BadgeSize')==size,'R153: the '..name..' is '..size..' px ('..(r.x1-r.x0)..')')
@@ -234,7 +240,7 @@ if after then
   check(overNote==0,tag..': no tab dot covers the LIMITED tab\'s note')
   check(notLeft==0,tag..': the tab dots sit on the tabs\' top-left corner, clear of the count')
   check(wrongSize==0 and outside==0,tag..': ...still the 1.5x dot (21 px) and fully inside its tab')
-  check(indexBadge():GetAttribute('BadgeLeft')==false and alertBadge():GetAttribute('BadgeLeft')==false and near(L.rect(indexBadge()).x1-L.rect(indexBadge()).x0,36)and near(L.rect(alertBadge()).x1-L.rect(alertBadge()).x0,30),tag..': the INDEX count (36 px) and the MENU alert (30 px) stay 1.5x on their buttons\' top-right corners')
+  check(indexBadge():GetAttribute('BadgeLeft')==false and alertBadge():GetAttribute('BadgeLeft')==false and near(L.rect(indexBadge()).x1-L.rect(indexBadge()).x0,Badge.Sizes.Count)and near(L.rect(alertBadge()).x1-L.rect(alertBadge()).x0,Badge.Sizes.Alert),tag..': the INDEX count ('..Badge.Sizes.Count..' px) and the MENU alert ('..Badge.Sizes.Alert..' px, R155) stay on their buttons\' top-right corners')
  end
  check(compactSeen and wideSeen and checkedTabs>=56,'both tab sizes were measured: the phone\'s compact tab and the PC tab ('..checkedTabs..' tab dots in all)')
  relay(390,844)

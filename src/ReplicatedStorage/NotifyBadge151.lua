@@ -33,8 +33,10 @@ local B={Revision=151,Grow=1.5,
  PopSeconds=.32,PulseSeconds=1.3,PulseDelay=.6,
  Colors={Top=RGB(255,104,116),Bottom=RGB(214,24,54),Ring=Color3.new(1,1,1),Shadow=RGB(14,0,10),Edge=RGB(124,10,30),Halo=RGB(255,72,88)}}
 -- Outer diameter (px) and overhang past the corner (px; negative = inside it) of every badge in the game. R151: 24 / 20 / 20 / 14 and 6 / 6 / 1 / -3.
-B.Sizes={Count=36,Alert=30,Daily=30,Dot=21}
-B.Overhang={Count=9,Alert=9,Daily=-1,Dot=-4}
+-- R155 (owner: "reposition these bubbles make them slightly smaller as they are obscuring the image"): Count 36 -> 30, Alert / Daily 30 -> 26, and they sit out on the
+-- corner (overhang 10: B.Extent 15, a px inside the 16 px Margin so nothing next to it clips it), so they cover 20 / 16 px of the button's corner instead of 27 / 31. The dot is unchanged.
+B.Sizes={Count=30,Alert=26,Daily=26,Dot=21}
+B.Overhang={Count=10,Alert=10,Daily=10,Dot=-4}
 local pulses=setmetatable({},{__mode='k'})
 local hooked
 -- The ring is part of `size` (the holder is the OUTER diameter): 1.5 px on a dot, 2 on the 20-24 px badges.
