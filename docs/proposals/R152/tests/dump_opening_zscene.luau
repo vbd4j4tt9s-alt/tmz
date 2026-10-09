@@ -69,6 +69,9 @@ local function stages(tag,withArt)
    end
   end)
  end
+ -- (R154: the result now waits for a collect, so the last stage would still stand when the lite stages are built; a new opening ends the old
+ --  one first in the game too: M.Start -> finish(current,'replaced') destroys its stage)
+ reset()
 end
 drawAll(true);stages('art',true)
 drawAll(false);stages('plain',false)
