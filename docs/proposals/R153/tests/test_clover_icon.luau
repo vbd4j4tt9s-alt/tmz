@@ -234,6 +234,22 @@ do
  if ok then local label=root.Fallback:FindFirstChild('Emoji');check(label~=nil and label.Text=='🍀','... the last fallback is the 🍀 emoji')end
  emblems.Draw=oldDraw
 end
+-- R155: the owner's uploaded clover (image 121815230112848) comes first --------------------------------------------------------------------------
+fresh()
+do
+ check(Icon.AssetId==121815230112848,'R155: the uploaded clover is image 121815230112848')
+ local root=Icon.Attach(frame());local asset=root:FindFirstChild('AssetIcon')
+ check(asset~=nil and asset.Image=='rbxassetid://121815230112848'and asset.ScaleType==R.Enum.ScaleType.Fit,'R155: every Attach gets an AssetIcon showing it')
+ check(Icon.Source(root)=='fallback'and asset.Visible==false,'R155: until it has loaded the plain clover shows')
+ Icon.Ensure();check(Icon.Source(root)=='embedded'and #created==1,'R155: ... or the drawn one, while the upload has not loaded')
+ Icon.SetInfo({IconImageAssetId=444});local _,_,pass=parts(root);pass.IsLoaded=true;pass:GetPropertyChangedSignal('IsLoaded'):Fire()
+ check(Icon.Source(root)=='pass','R155: a loaded pass icon still beats the drawn one')
+ asset.IsLoaded=true;asset:GetPropertyChangedSignal('IsLoaded'):Fire()
+ check(Icon.Source(root)=='asset'and asset.Visible==true and pass.Visible==false,'R155: once the upload has loaded it shows, above the pass icon')
+ check(live()==0,'R155: ... and the drawn picture was let go (no EditableImage kept)')
+ local late=Icon.Attach(frame());check(late:FindFirstChild('AssetIcon')~=nil,'R155: later Attaches get it too')
+ local saved=Icon.AssetId;Icon.AssetId=0;local off=Icon.Attach(frame());check(off:FindFirstChild('AssetIcon')==nil,'R155: AssetId 0 turns it off');Icon.AssetId=saved
+end
 Icon.Reset()
 check(live()==0,'at the end nothing is alive')
 print(string.format('R153 clover icon: %d checks, %d failures',checks,fails))

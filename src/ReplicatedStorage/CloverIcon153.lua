@@ -8,21 +8,25 @@
 --     is called (the shop opens, the luck row appears, a clover is bought), never for an Attach whose pass icon has already loaded, and an Attach lets go of it (A.Release / its own pass icon
 --     loading) so the EditableImage is not kept for nothing.
 --  3. the plain clover that is always there (no Image API, nothing loaded yet): drawn with UI shapes (PremiumEmblems 'Clover', a few dozen static frames, no image), or a 🍀 if even that is missing.
--- The Frame's attribute IconSource says which one is showing (pass / embedded / fallback). Tests replace the engine calls through A.Hooks.Preload and EmbeddedImage153.Hooks.
-local A={Version=153,Key='Clover'}
+-- R155 (owner uploaded the same picture: image 121815230112848): 0. that uploaded image comes first (A.AssetId; 0 / nil = off), loaded like the pass icon; once it
+--  shows, the Attach lets go of the drawn picture. The pass icon, the drawn picture and the plain clover stay as the next choices.
+-- The Frame's attribute IconSource says which one is showing (asset / pass / embedded / fallback). Tests replace the engine calls through A.Hooks.Preload and EmbeddedImage153.Hooks.
+local A={Version=153,Key='Clover',AssetId=121815230112848}
 A.Hooks={} -- Preload(imageLabel)
 local S={Wanted=false} -- Wanted: somebody asked for the drawn picture (Ensure); PassId once SetInfo had an icon
 local roots=setmetatable({},{__mode='k'}) -- every Attach's Frame
 local function embedded()return require(script.Parent.EmbeddedImage153)end
 local function refresh(root)
  if not root.Parent then return end
- local fallback,emb,pass=root:FindFirstChild('Fallback'),root:FindFirstChild('Embedded'),root:FindFirstChild('PassIcon')
- local usePass=pass~=nil and pass.IsLoaded==true
- local useEmbedded=not usePass and emb~=nil and root:GetAttribute('EmbeddedRoute')=='image'
+ local fallback,emb,pass,asset=root:FindFirstChild('Fallback'),root:FindFirstChild('Embedded'),root:FindFirstChild('PassIcon'),root:FindFirstChild('AssetIcon')
+ local useAsset=asset~=nil and asset.IsLoaded==true
+ local usePass=not useAsset and pass~=nil and pass.IsLoaded==true
+ local useEmbedded=not(useAsset or usePass)and emb~=nil and root:GetAttribute('EmbeddedRoute')=='image'
+ if asset then asset.Visible=useAsset end
  if pass then pass.Visible=usePass end
  if emb then emb.Visible=useEmbedded end
- if fallback then fallback.Visible=not(usePass or useEmbedded)end
- root:SetAttribute('IconSource',usePass and'pass'or useEmbedded and'embedded'or'fallback')
+ if fallback then fallback.Visible=not(useAsset or usePass or useEmbedded)end
+ root:SetAttribute('IconSource',useAsset and'asset'or usePass and'pass'or useEmbedded and'embedded'or'fallback')
 end
 -- the drawn picture for one Attach (EmbeddedImage153 shares the image between them)
 local function startRoot(root)
@@ -58,6 +62,19 @@ local function attachPass(root)
  end)
  refresh(root)
 end
+-- R155: the owner's uploaded clover (0)
+local function attachAsset(root)
+ local id=tonumber(A.AssetId);if not(id and id>0)then return end
+ local label=image(root,'AssetIcon',4);label.Image='rbxassetid://'..math.floor(id)
+ label:GetPropertyChangedSignal('IsLoaded'):Connect(function()
+  if label.IsLoaded==true then stopRoot(root)end
+  refresh(root)
+ end)
+ task.spawn(function()
+  pcall(function()if A.Hooks.Preload then A.Hooks.Preload(label)else game:GetService('ContentProvider'):PreloadAsync({label})end end)
+  if root.Parent then refresh(root)end
+ end)
+end
 function A.Attach(parent)
  local root=Instance.new('Frame');root.Name='CloverIcon153';root.BackgroundTransparency=1;root.BorderSizePixel=0;root.Size=UDim2.fromScale(1,1);root.Active=false;root.Parent=parent
  local fallback=Instance.new('Frame');fallback.Name='Fallback';fallback.BackgroundTransparency=1;fallback.BorderSizePixel=0;fallback.Size=UDim2.fromScale(1,1);fallback.Active=false;fallback.Parent=root
@@ -68,7 +85,7 @@ function A.Attach(parent)
  end
  image(root,'Embedded',2)
  roots[root]=true
- attachPass(root);refresh(root)
+ attachAsset(root);attachPass(root);refresh(root)
  if S.Wanted then startRoot(root)end
  return root
 end
@@ -87,8 +104,8 @@ end
 function A.Ensure()
  S.Wanted=true
  for root in pairs(roots)do
-  local pass=root:FindFirstChild('PassIcon')
-  if not(pass and pass.IsLoaded==true)then startRoot(root)end
+  local pass,asset=root:FindFirstChild('PassIcon'),root:FindFirstChild('AssetIcon')
+  if not(pass and pass.IsLoaded==true)and not(asset and asset.IsLoaded==true)then startRoot(root)end
  end
 end
 -- Lets go of the drawn picture everywhere (the last one to let go destroys the EditableImage). The Attach frames show the pass icon or the plain clover until Ensure draws it again.
