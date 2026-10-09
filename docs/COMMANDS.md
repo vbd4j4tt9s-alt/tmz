@@ -161,6 +161,8 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 | `voidgift left 3` (server, **Studio only**) | Sets how many the pedestal shows as left (0 = ALL CLAIMED, 487 = a fresh start). Players already in the list keep their places, so the number cannot go above 500 minus them. Studio only; a live server refuses |
 | `playtime @name` | R157: how long that player has played in total (saved with the profile as `Premium.PlaySeconds157`, counted up to 3 hours) and how long is left until the free Void Pack can be claimed (20 minutes). `voidgift` shows yours too |
 | `playtime @name 12` (**Studio only** to set) | Sets that player's play time to 12 minutes (0 to 180), saved the usual way; `playtime 12 @name` works too. Use `playtime @name 19` to test the 20-minute rule: the pack opens a minute later. A live server refuses |
+| `pyramid @name` | R157: the secret pyramid in the Desert: does that player have its pack (saved as `Premium.Secrets156.Pyramid`), are they carrying it now, the pyramid's spot, size and Hold-E reach |
+| `pyramid @name reset` | Clears that player's pyramid claim (saved), so the pack floats in the pyramid for them again; packs already in their Bag stay. `pyramid reset @name` works too |
 
 ## Keepers (R152)
 | Command | What it does |
