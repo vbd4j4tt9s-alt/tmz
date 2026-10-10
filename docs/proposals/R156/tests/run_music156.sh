@@ -34,7 +34,7 @@ def block(s, name):
     m = re.search(r'^local function ' + name + r'\(.*?^end$', s, re.S | re.M)
     return m.group(0) if m else None
 bad = []
-names = ['reportLoadFailure', 'createPeacefulTrack', 'waitForTrack', 'findPlayablePeacefulTrack', 'chaseIsActive', 'selectedMusic', 'ensureChasePlayback', 'trackIsActive', 'tween', 'cancelTween']
+names = ['reportLoadFailure', 'createPeacefulTrack', 'waitForTrack', 'findPlayablePeacefulTrack', 'chaseIsActive', 'selectedMusic', 'ensureChasePlayback', 'tween', 'cancelTween'] # R157b fix (on purpose): trackIsActive is not in the list any more (it finds the line's Z and X from RunnerMotion when the streamed line is gone: docs/proposals/R157/tests/run_track_music157.sh pins it)
 for n in names:
     a, b = block(old, n), block(new, n)
     if a is None or a != b:

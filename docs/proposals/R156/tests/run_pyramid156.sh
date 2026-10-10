@@ -84,7 +84,7 @@ grep -q "'/test pyramid @username reset'" "$RS/StudioTestHelp.lua" || bad "/test
 # (BASE = the R156 release R157 is built on; Config may differ only in its Version line, which every release bumps)
 for f in src/ServerScriptService/ChestChaseServer/Config.lua src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua src/ReplicatedStorage/BiomeMood.lua;do
  git -C "$REPO" show "$BASE:$f" | sed "s/Config.Version='V150 R1[0-9a-z]*'/Config.Version='V150 R1xx'/" > "$OUT/base_file.txt"
- sed "s/Config.Version='V150 R1[0-9a-z]*'/Config.Version='V150 R1xx'/" "$REPO/$f" | cmp -s - "$OUT/base_file.txt" || bad "$f changed (the pyramid must not touch it)"
+ sed "s/Config.Version='V150 R1[0-9a-z]*'/Config.Version='V150 R1xx'/" "$REPO/$f" | cmp -s - "$OUT/base_file.txt" || { [ "$f" = src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua ] && sh "$T/bgm_frozen.sh" "$REPO"; } || bad "$f changed (the pyramid must not touch it)" # R157b fix (on purpose): the track music fix in BackgroundMusic is accepted by its frozen hash
 done
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]" "$HERE" "$P/R156/pyramid.md" "$P/R156/preview" "$RS/PyramidRules156.lua" "$SS/SecretPyramid156.lua" "$S/$CLIENT" 2>/dev/null;then bad "a model name in the R156 pyramid files";fi
 [ "$fail" = 0 ]

@@ -29,4 +29,5 @@ f6ab026611779a832edb8079b5f3237bc86174edeeccb02a26b1b610689751f9  src/ServerScri
 53f60dd8a42aa1ec5c0c0303458517dd9c6294f23c65caa22d4566c16445aca6  src/ServerScriptService/ChestChaseServer/PackSizePityData.lua
 c3890a3e6022dd3000eb7d0b8994d96cb6373990c2191df4ea8d0c488b18e918  src/ReplicatedStorage/PlantCatalog.lua
 # R156 (on purpose): BackgroundMusic.client.lua: the track playlist (Nature Inspiration + 74095461107598 + 132448918728086, alternating, .07) and three base tracks
-8a0c58b6314eeccc0e2140e1f63c48ee3e7f8ba2a97ec8706f4c55b029a82ba9  src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua
+# R157b fix (on purpose): BackgroundMusic.client.lua: trackIsActive finds the track's start line (Z and X) from RunnerMotion's TrackBoundaryZ / TrackCenterX when Lobby.BaseBoundaryLine has streamed out (a player far down the track, the Desert) instead of calling it "not on the track" (the base music came back); nothing else changed
+0da60ca9c237932d464714091930aa7a5c0762006968c6aee2be1e495ad4f57a  src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua

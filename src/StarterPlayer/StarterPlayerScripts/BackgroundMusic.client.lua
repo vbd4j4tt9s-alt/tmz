@@ -261,16 +261,31 @@ local function ensureChasePlayback()
  end
 end
 
+-- R157b fix (owner: "at some points in the track the track music will be replaced with the base music, this happens when entering desert"): the place streams
+-- (Workspace.StreamingEnabled, StreamingTargetRadius 1024, StreamOutBehavior Opportunistic) and Lobby.BaseBoundaryLine is a plain Part at the track's start (Z -99.3),
+-- so a client drops it once the player is that far down the track: past Z 925 with the full radius (inside the Desert, Z 530 to 1180), and from Z 501 on when the engine
+-- shrinks the radius to 600 (the Desert's door is Z 530). With no line trackIsActive said "not on the track" and the base music came back; walking back brought the line
+-- (and the track music) back. Nothing else trackIsActive reads can stream out (the map and its attributes are Folders, the character is the player's own), and the line's
+-- Z and X are also on ReplicatedStorage.RunnerMotion (TrackBoundaryZ / TrackCenterX: MapService.new writes them from the line, and the runner's own speed zones read
+-- them on the client too). The live line still wins when it is there (the same numbers), the attributes stand in when it is not, and with neither the answer is false, as before.
+local function trackLine(lobby)
+ local line=lobby and lobby:FindFirstChild('BaseBoundaryLine')
+ if line then return line.Position.Z,line.Position.X end
+ local motion=game:GetService('ReplicatedStorage'):FindFirstChild('RunnerMotion')
+ local z,x=motion and motion:GetAttribute('TrackBoundaryZ'),motion and motion:GetAttribute('TrackCenterX')
+ if type(z)=='number'and type(x)=='number'then return z,x end
+ return nil,nil
+end
 local function trackIsActive()
  local character=not characterRemoving and player.Character
  local root=character and character:FindFirstChild('HumanoidRootPart')
  local hum=character and character:FindFirstChildOfClass('Humanoid')
  local map=workspace:FindFirstChild('ChestChaseMap');local lobby=map and map:FindFirstChild('Lobby')
- local line=lobby and lobby:FindFirstChild('BaseBoundaryLine')
- if not root or not hum or hum.Health<=0 or not line then return false end
- local p=root.Position;local edge=line.Position.Z+(insideTrack and-.5 or .5)
+ local lineZ,lineX=trackLine(lobby)
+ if not root or not hum or hum.Health<=0 or not map or not lineZ then return false end
+ local p=root.Position;local edge=lineZ+(insideTrack and-.5 or .5)
  return p.Z>edge and p.Z<=(tonumber(map:GetAttribute('BiomeTrackEndZ'))or 1475)
-  and math.abs(p.X-line.Position.X)<=(tonumber(map:GetAttribute('FieldWidth'))or 180)/2+2 and p.Y> -20 and p.Y<=300
+  and math.abs(p.X-lineX)<=(tonumber(map:GetAttribute('FieldWidth'))or 180)/2+2 and p.Y> -20 and p.Y<=300
 end
 -- R156 (owner): the track playlist. scenicIndex is the track in the ear: playing, or paused where it was. A track plays once to its end; with
 -- PLAYLIST_CROSSFADE_SECONDS left the next loaded one starts from 0 and the two cross over (the old one is stopped and rewound once silent). Leaving the
