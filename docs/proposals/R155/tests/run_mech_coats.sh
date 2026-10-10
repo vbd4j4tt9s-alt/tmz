@@ -9,7 +9,7 @@
 #  2. shop             test_mech_coats_shop: the real GamePassClient: the coat line, the live countdown (ticks, stops when shut), the end (EVENT OVER!, buttons off, nothing sent)
 #  3. art              test_mech_coats_art: a Gold / Diamond Mech pack in every context is a world pack's coat on the pouch and the structure, with the lit parts and hazard stripes kept; the
 #                      hotbar picture key; the rig; the seed / plant / fruit looks
-#  4. opening          the R153 opening suite (167 checks) run on a Gold and on a Diamond Mech pack (make_opening_coat.py), plus: the seed the real SeedPackClient reveals keeps the coat
+#  4. opening          the R153 opening suite (213 checks) run on a Gold and on a Diamond Mech pack (make_opening_coat.py), plus: the seed the real SeedPackClient reveals keeps the coat
 #  5. z-fighting       R153's dump_mech_zscene (now also the opening frames and the plain-parts body in both coats) through R152's sweep step
 # mutate_mech_coats.py: broken copies of src must each make a suite fail (the checks have teeth).
 set -e

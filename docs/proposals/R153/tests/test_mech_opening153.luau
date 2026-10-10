@@ -12,7 +12,8 @@
 --               under the hit; the whole mix with it <= -18 LUFS (the files measured: R152 sound_levels.luau)
 --  4. calm      ReducedMotion and low quality: no bolt / turbine motion and no steam, just the scan colour
 --  5. others    an onlooker sees the cues on someone else's pack (the bolts come out in the reveal's first moment); a Secret story scene skipped: the world
---               cues keep their beats
+--               cues keep their beats; R157: SKIP only for Secret / Cosmic / King: a Mythic card's skip is ignored (no clock jump, the touch plays in full), the
+--               compact in-place Secret / Cosmic / King card keeps its skip (the jump to the hit, no hiss / steam bunched)
 --  6. clean     after the reveal, the pack closed mid-reveal, the opener dying mid-reveal: no scan part, steam, hiss or Mech object left
 local W=require('./world');local E=require('./sfx_env')(W);local F=require('./fixtures');local X=require('./rare_env')(W,E,F)
 local Y=require('./rare152_env')(W,E,F,X)
@@ -155,6 +156,7 @@ end
 local function open(rank,dt,opts)
  opts=opts or{}
  reset()
+ if opts.InPlace then X.state=R.Enum.HumanoidStateType.Freefall end -- (R157: in the air, RarePullRules.Decide: Secret / Cosmic / King play the compact in-place card, not a story scene)
  if opts.Calm=='reduced'then W.Gui.ReducedMotionEnabled=true elseif opts.Calm=='low'then X.lowFx=true end
  local char=opts.Onlooker and onlookerChar or X.char
  local tool=packTool(char,opts.Pack or MECHPACK);local bag=serverBag(char,opts.Pack or MECHPACK)
@@ -166,7 +168,7 @@ local function open(rank,dt,opts)
  local frames={}
  local stopAt=opts.CloseAt and at+opts.CloseAt or nil
  local function frame(now)
-  if opts.SkipAt and not opts.Skipped and now-at>=opts.SkipAt then opts.Skipped=true;pcall(M.Skip)end
+  if opts.SkipAt and not opts.Skipped and now-at>=opts.SkipAt then opts.Skipped=true;local ok,res=pcall(M.Skip);opts.SkipAnswer=ok and res;opts.SkipRun=M.Active()end
   if opts.DieAt and not opts.Died and now-at>=opts.DieAt then opts.Died=true;X.hum.Health=0;X.hum.Died:Fire()end
   if stopAt and now>=stopAt and bag.Parent then bag:Destroy()end
   -- every sound heard this frame (the director's and the Mech hiss): file position and gain
@@ -185,6 +187,7 @@ local function open(rank,dt,opts)
  X.run(.3,dt)
  local o=opened[#opened];if #opened==before then o=nil end
  if opts.Died then X.hum.Health=100 end
+ if opts.InPlace then X.state=R.Enum.HumanoidStateType.Running end
  return o,frames,{At=at,Rank=rank,Quick=false,Seed=seed}
 end
 local function firstAt(log,pred)for _,e in ipairs(log)do if pred(e)then return e.T end end;return nil end
@@ -292,14 +295,19 @@ for _,dt in ipairs({1/30,1/60})do
   check(o.Destroyed==true,tag..': the Mech touch is gone with the reveal');local l=leftovers();check(#l==0,tag..': nothing left ('..table.concat(l,', ')..')')
  end
 end
+-- (the updates on which a puff / hiss / ring fired)
+local function cues(log)local c={};local lastE,lastH,rung=0,0,false
+ for _,e in ipairs(log)do if e.Emitted~=lastE or e.Hissed~=lastH or(e.Rung and not rung)then c[#c+1]=e.T;lastE,lastH,rung=e.Emitted,e.Hissed,e.Rung end end;return c end
+local function sameCues(a,b)
+ local ca,cb=cues(a),cues(b);local ok=#ca==#cb
+ for i=1,math.min(#ca,#cb)do if math.abs(ca[i]-cb[i])>1/30+1e-6 then ok=false end end
+ return ok,#ca
+end
 do -- the same cues at 30 and 60 fps (each within one reveal update of the other)
  local a,b=logs[1/30],logs[1/60]
  if a and b then
-  local function cues(log)local c={};local lastE,lastH,rung=0,0,false
-   for _,e in ipairs(log)do if e.Emitted~=lastE or e.Hissed~=lastH or(e.Rung and not rung)then c[#c+1]=e.T;lastE,lastH,rung=e.Emitted,e.Hissed,e.Rung end end;return c end
-  local ca,cb=cues(a),cues(b);local ok=#ca==#cb
-  for i=1,math.min(#ca,#cb)do if math.abs(ca[i]-cb[i])>1/30+1e-6 then ok=false end end
-  check(ok,('the steam / hiss / ring cues fire on the same beats at 30 and 60 fps (%d cues)'):format(#ca))
+  local ok,n=sameCues(a,b)
+  check(ok,('the steam / hiss / ring cues fire on the same beats at 30 and 60 fps (%d cues)'):format(n))
  end
 end
 for _,rank in ipairs({4,6,7,8})do
@@ -326,25 +334,57 @@ do
  local p=open(5,1/30,{Pack=PLAIN})
  check(p==nil,'any other pack: no Mech touch')
 end
--- 5b. the card skipped (R153 release: RarePullCinematic.Skip jumps the world pack's clock by RarePullRules.Shift; the Mech touch reads that t)
-do
- local o,frames=open(5,1/30,{SkipAt=.5})
- if check(o~=nil,'Mythic card skipped: the Mech touch plays')then
+-- 5b. R157: SKIP only for Secret / Cosmic / King (owner: "the skip button only appears for secret and above", docs/proposals/R156/reveal_fixes.md, R157/hud157.md item 2).
+-- Common..Mythic have no SkipFrom: RarePullCinematic.Skip (the SKIP button's press, Enter / B / R2) answers false before the result shows and the world pack's clock is
+-- never jumped (RarePullRules.SetShift is not called); once the result shows a click / tap / Enter / B / R2 only COLLECTS it (open() collects with M.Collect). Secret / Cosmic /
+-- King keep their SKIP: in place (the compact card: a keeper near, in the air, "Skip pack animations" ...) it jumps the card to the hit and hands the same seconds to the
+-- opener's world pack, which the Mech touch reads (the story scene is never shifted: 5, "a Secret story scene skipped").
+do -- 5b-1. a Mythic Mech card, a skip request at .5 s: ignored, the whole touch plays in order, nothing skipped
+ local opts={SkipAt=.5}
+ local o,frames=open(5,1/30,opts)
+ local tag='Mythic, skip request at .5 s'
+ if check(o~=nil,tag..': the Mech touch plays')then
+  local log=o.Log;local B=o.BurstAt;local last=log[#log]
+  check(opts.SkipRun~=nil and opts.SkipRun.Kind=='Ladder'and opts.SkipAnswer==false and not opts.SkipRun.Skipped and M.Active()==nil,
+   tag..': R157: Common..Mythic have no SkipFrom: the skip (button / Enter / B / R2) answers false, skips nothing, and the card still ends by being collected')
+  local step,at=0,0;for k=2,#log do if log[k].T-log[k-1].T>step then step=log[k].T-log[k-1].T;at=log[k].T end end
+  check(step<=.3,('%s: the world pack\'s clock is not jumped (no update moves on by more than .3 s: the largest is %.3f s at %.2f)'):format(tag,step,at))
+  -- the whole touch plays in order, as when nobody asked to skip: every pulse / tear group / the ring on the burst, the turbine, the bolts (beats), and the same cues as the plain Mythic above
+  beats(o,tag,5,false)
+  check(last.Hissed==#o.Ticks and last.Emitted==#o.Ticks*Fx.Steam.Puff+Fx.Steam.Ring,
+   ('%s: every tear group hisses and steams once (%d hiss, %d groups) and the ring comes once (%d puffs)'):format(tag,last.Hissed,#o.Ticks,last.Emitted))
+  local tr=firstAt(log,function(e)return e.Rung end)
+  check(tr and tr>=B-1e-9 and tr-B<=1/30+1e-6,('%s: the steam ring on the burst (%.3f, BurstAt %.3f)'):format(tag,tr or -1,B))
+  local stray=false;for _,e in ipairs(log)do if e.Scan and e.T>=B then stray=true end end
+  check(not stray,tag..': no scan line after the burst')
+  local ref=logs[1/30];local same,n=false,0;if ref then same,n=sameCues(ref,log)end
+  check(same and n>0,('%s: the cues fire on the same beats as the plain Mythic opening\'s at 30 fps (%d cues: the request changed nothing)'):format(tag,n))
+ end
+ voicesCheck(frames,'Mythic skip ignored')
+ check(o~=nil and o.Destroyed==true and #leftovers()==0,'Mythic skip ignored: the Mech touch is gone with the reveal, nothing left')
+end
+-- 5b-2. Secret / Cosmic / King in place (the compact card keeps its SKIP): the jump to the hit shifts the world pack's clock, the Mech touch reads that t
+for _,rank in ipairs({6,7,8})do
+ local opts={SkipAt=.5,InPlace=true}
+ local o,frames=open(rank,1/30,opts)
+ local tag=({[6]='Secret',[7]='Cosmic',[8]='King'})[rank]..' in place, skipped at .5 s'
+ if check(o~=nil,tag..': the Mech touch plays')then
   local log=o.Log;local B=o.BurstAt;local jump
+  check(opts.SkipRun~=nil and opts.SkipRun.Kind=='InPlace'and opts.SkipAnswer==true and opts.SkipRun.Skipped==1,tag..': R157: the compact card keeps its SKIP (the card is the in-place one, the skip is taken)')
   for k=2,#log do if log[k].T-log[k-1].T>.3 then jump=k;break end end
-  if check(jump~=nil,'the skip jumps the world pack\'s clock (one update moves on by more than .3 s)')then
+  if check(jump~=nil,tag..': the skip jumps the world pack\'s clock (one update moves on by more than .3 s)')then
    -- (a group jumped by more than Steam.Grace stays silent, like a tick that reaches the client late; one within it plays late, from its own point)
    local a,b=log[jump-1],log[jump];local passed,late=0,0;for _,tk in ipairs(o.Ticks)do if tk>a.T and tk<=b.T then passed+=1;if b.T-tk<=Fx.Steam.Grace then late+=1 end end end
    local ring=(b.Rung and not a.Rung)and Fx.Steam.Ring or 0 -- (the jump can land on the burst itself: its ring is the burst's)
    check(passed>0 and late<=1 and b.Hissed-a.Hissed==late and b.Emitted-a.Emitted==late*Fx.Steam.Puff+ring,
-    ('the tear groups jumped over (%d) stay silent, but one under %.2f s late (%d): no hiss / steam bunched on the skip (%d hiss)'):format(passed,Fx.Steam.Grace,late,b.Hissed-a.Hissed))
+    ('%s: the tear groups jumped over (%d) stay silent, but one under %.2f s late (%d): no hiss / steam bunched on the skip (%d hiss)'):format(tag,passed,Fx.Steam.Grace,late,b.Hissed-a.Hissed))
    local tr=firstAt(log,function(e)return e.Rung end)
-   check(tr and tr>=B-1e-9 and tr-B<=1/30+1e-6,('the steam ring still comes on the (earlier) burst (%.3f, BurstAt %.3f)'):format(tr or -1,B))
+   check(tr and tr>=B-1e-9 and tr-B<=1/30+1e-6,('%s: the steam ring still comes on the (earlier) burst (%.3f, BurstAt %.3f)'):format(tag,tr or -1,B))
    local stray=false;for k=jump,#log do if log[k].Scan and log[k].T>=B then stray=true end end
-   check(not stray,'no scan line after the burst')
+   check(not stray,tag..': no scan line after the burst')
   end
-  voicesCheck(frames,'Mythic skipped')
-  check(o.Destroyed==true and #leftovers()==0,'Mythic skipped: the Mech touch is gone with the reveal, nothing left')
+  voicesCheck(frames,tag)
+  check(o.Destroyed==true and #leftovers()==0,tag..': the Mech touch is gone with the reveal, nothing left')
  end
 end
 

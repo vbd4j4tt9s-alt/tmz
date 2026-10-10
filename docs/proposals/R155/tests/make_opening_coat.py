@@ -1,7 +1,7 @@
 """R155: the R153 Mech opening suite (docs/proposals/R153/tests/test_mech_opening153.luau) run on a GOLD or a DIAMOND Mech pack.
 Usage: python3 make_opening_coat.py Gold|Diamond OUT.luau
 
-Reads the R153 test and writes a copy in which the server's carried Mech pack (ChestService / SeedPackVisuals.CarryBag) has the coat, so every one of its 167 checks (the clicks, the beats,
+Reads the R153 test and writes a copy in which the server's carried Mech pack (ChestService / SeedPackVisuals.CarryBag) has the coat, so every one of its 213 checks (the clicks, the beats,
 the sound caps, calm, onlooker, skip, clean-up) runs on a coated pack, plus one more check at the end: the seed the REAL SeedPackClient reveals from a coated Mech pack is the same coat
 (the model's Mutation attribute and the material of every visible part), for every opening the suite drove; a plain pack of another biome reveals a plain seed.
 The copy is mechanical (three literal replacements, each asserted), so the R153 suite and this one can never drift apart."""

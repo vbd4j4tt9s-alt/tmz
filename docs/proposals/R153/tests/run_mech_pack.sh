@@ -9,7 +9,7 @@
 #                         bounds, the shop banner, the rig
 #     + check_packs.py     on its SCENE lines (R151's geometry check): no floating part, no z-fighting, on the pouch and on the plain-parts body, held, .5x / 25x
 #  2. test_mech_opening153 the opening: clicks 1-4 (bolts + tick), the scan / glow on the pulses, steam + hiss on the tear groups, the ring + spin-down on the
-#                         burst, at 30 / 60 fps, every tier; voices and loudness caps; calm; onlooker; skip; clean-up on close / death / script end
+#                         burst, at 30 / 60 fps, every tier; voices and loudness caps; calm; onlooker; skip (R157: ignored on a Mythic card, kept on the Secret / Cosmic / King in-place card); clean-up on close / death / script end
 #  3. z-fighting          R152's sweep, its Mech step (check_zfight_sweep.py mech): the pack on the flat pouch in every context / size / coat, its opening copy,
 #                         its plain-parts body
 set -e

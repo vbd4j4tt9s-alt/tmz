@@ -42,6 +42,7 @@ M = {
     'keep_flag_removed': ('3', [(RSD + 'MechPackArt153.lua', "  if s.Keep then p:SetAttribute('MechCoatKeep',true)end -- R155: a Gold / Diamond coat leaves this part's colour alone\n", "")]),
     'coat_paints_the_lit_parts': ('3', [(RSD + 'SeedPackVisuals.lua', " and not p:GetAttribute('MechCoatKeep')then", " then")]),
     'mech_plant_not_coated': ('3', [(RSD + 'MechArt.lua', "if mutation=='Gold'or mutation=='Diamond'then\n   q.Color=", "if false then\n   q.Color=")]),
+    'mythic_skip_comes_back': ('4', [(RSD + 'RarePullRules.lua', "Letterbox=tier.Letterbox==true,Quick=quick==true}", "Letterbox=tier.Letterbox==true,Quick=quick==true,SkipFrom=L.CardSkipFrom}")]),  # R157: a Mythic card's skip must stay ignored
     'opening_seed_loses_coat': ('4', [(SP + 'SeedPackClient.client.lua', 'require(ReplicatedStorage:WaitForChild("PlantVisuals")).Coat(seed,record.Bag:GetAttribute("PackMutation"))', "")]),
     'layer_too_thin': ('5', [(RSD + 'MechPackArt153.lua', "local A={Revision=153,TemplateKey='Forest_01',Layer=.046}", "local A={Revision=153,TemplateKey='Forest_01',Layer=.004}")]),
 }
