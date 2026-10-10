@@ -46,3 +46,9 @@
 - For the owner to check in Studio (the mock can't): (1) with chat open, does the open MENU wheel sit under Roblox's chat window (top-left)?
   The wheel top is now ~207 px below the top bar at 1920 x 1080; (2) UIStroke outlines and text size limits on a small window (e.g. 1280 x 720);
   (3) touchscreen PCs (TouchEnabled) still get the phone layout, as before (the "mobile" rule is decided by TouchEnabled).
+
+## Owner decisions (10 Oct, morning)
+- **Bats:** build the plan in `bats/` (instant swing, client sweep + server lag-compensated check, the flat hip-height swing, trail on the strike, hit
+  burst + sparks + short hit-stop). Choices: **no camera shake for the hitter, no "SMACK!" word**, trail **white** (default).
+- **Walls:** **base walls A** (stone caps), **and** the per-biome track walls **and** the outer track backdrops as in `design/`.
+- These go in R158 (after R157b).
