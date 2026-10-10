@@ -6,7 +6,8 @@
 - **Mobile (phones, tablets): the current layout is OK and frozen.** Nothing moves there.
 - **Portrait: no more work** ("its a waste of time").
 - "menu can also be higher" (PC): owner picked **A** (MENU centre at 1/3 of the height; balances full size; the PC layout scales down on small windows,
-  as in `hud_lock/pc_scale.png`). Not built yet.
+  as in `hud_lock/pc_scale.png`). Owner: MENU must not get too small: shrinking is ok, but it has to stay close to its
+  original size so it doesn't look off (so MENU / the wheel get a size floor, e.g. never under ~85% of the 1920 x 1080 size). Not built yet.
 
 ## Hotfix R157b (bugs, being built)
 - Title screen loaded InteractionAudio before the game had loaded; AudioMixer was missing -> the module crashed and took the HUD with it.
