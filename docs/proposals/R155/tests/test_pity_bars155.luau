@@ -39,7 +39,8 @@ local function frames(n,dt)W.frames(n,dt or 1/60)end
 local function bar(g)return s.Bars[g]end
 local function fillW(g)local f=bar(g).Fill;return f.Visible and f.Size.X.Offset or 0 end
 -- (R157: the fill runs from under the clover's disc to the right end: 6 px under the disc + (W - 2 - B.Lead(H)) * share; empty = none)
-local function fillFor(k)if k<=.004 then return 0 end;local P=s.Placement.Bar;return 6+math.floor((P.W-2-B.Lead(P.H))*k+.5)end
+local function hudOf(p)return p.Hud or p end -- (R158: what the bars are drawn from: HUD px; the same table at scale 1)
+local function fillFor(k)if k<=.004 then return 0 end;local P=hudOf(s.Placement).Bar;return 6+math.floor((P.W-2-B.Lead(P.H))*k+.5)end
 -- 1. always there -------------------------------------------------------------------------------------------------------------------------------
 check(gui and gui:IsA('ScreenGui')and gui.DisplayOrder==23 and gui.ResetOnSpawn==false and gui.ScreenInsets==R.Enum.ScreenInsets.CoreUISafeInsets,'its own ScreenGui, DisplayOrder 23 (under the hotbar / Bag 25, the tutorial 25 / 26, BASE / TRACK and the plant indicators 24), the HUD\'s safe area, kept on respawn')
 frames(2)
@@ -57,7 +58,7 @@ check(bar('Normal').Edge.Color==green.Rim and bar('Event').Edge.Color==gold.Rim 
 do
  local b=bar('Normal');local icon=b.Badge and b.Badge:FindFirstChild('Clover')
  check(b.Root:FindFirstChild('Mark')==nil and b.Badge and icon and icon.ClassName=='CanvasGroup'and b.Badge.BackgroundColor3==green.Badge and b.BadgeRim.Color==green.Rim,'R157: the clover (CloverIcon153 in a CanvasGroup, on a dark disc with a rim in the bar\'s colour) replaces the diamond at the left end of each bar')
- check(b.Badge.Position.X.Offset==math.floor(s.Placement.Bar.H/2)and b.Badge.Size.X.Offset==s.Placement.Bar.H and b.Fill.Position.X.Offset==B.Lead(s.Placement.Bar.H)-6,'R157: the disc is the bar\'s left end (H x H) and the fill starts under it (B.Lead - 6 px)')
+ check(b.Badge.Position.X.Offset==math.floor(hudOf(s.Placement).Bar.H/2)and b.Badge.Size.X.Offset==hudOf(s.Placement).Bar.H and b.Fill.Position.X.Offset==B.Lead(hudOf(s.Placement).Bar.H)-6,'R157: the disc is the bar\'s left end (H x H) and the fill starts under it (B.Lead - 6 px)')
 end
 check(#bar('Normal').Ticks==9 and #bar('Event').Ticks==9,'ten steps: nine ticks on each bar')
 -- 2. values ------------------------------------------------------------------------------------------------------------------------------------
@@ -238,36 +239,40 @@ for _,sc in ipairs(SCREENS)do
  local w,h,touch,name=sc[1],sc[2],sc[3],sc[4]
  local m=Hud.Read(V2(w,h),touch,nil)
  local place=B.Place(w,h,m,nil)
+ -- R158: a computer's HUD is drawn at m.Scale: Place's answer is in screen px (place.Hud has it in HUD px, the bars' own numbers: 24 px bars, 8 px gap, 5 px glow, 3 px name clearance ...),
+ -- so each fixed number below is times k, and the words / sizes are the HUD px ones. k is 1 on a phone and on a window of 1920 x 720 or more: nothing changes there.
+ local k=m.Scale or 1;local hudBar=(place.Hud or place).Bar
  local pair=place.Pair;local bad={}
  if not place.Clear then bad[#bad+1]='no clear spot'end
  if pair.X<0 or pair.Y<0 or pair.X+pair.W>w or pair.Y+pair.H>h then bad[#bad+1]='off screen'end
  local dock=B.DefaultDock(m,w,h)
  -- R157 (owner: "closer to the hot bar like really close but with a small gap"): exactly B.Gap px over the slots (8 on a computer, 6 on a phone, 5 under a thin phone bar),
  -- never on them; the held item's name rows ABOVE the bars, B.NameClear px over their top edge, where this screen shows them
- local gap=dock.Y-(pair.Y+pair.H);local want=B.Gap(m.Phone==true,place.Bar.H)
- if gap~=want then bad[#bad+1]=('not %d px over the slots (%d)'):format(want,gap)end
- if want~=(m.Phone and(place.Bar.H<=16 and 5 or 6)or 8)then bad[#bad+1]='the gap is not 8 px on a computer / 6 on a phone'end
+ local gap=(dock.Y-(pair.Y+pair.H))/k;local want=B.Gap(m.Phone==true,hudBar.H)
+ if math.abs(gap-want)>1e-6 then bad[#bad+1]=('not %d px over the slots (%d)'):format(want,gap)end
+ if want~=(m.Phone and(hudBar.H<=16 and 5 or 6)or 8)then bad[#bad+1]='the gap is not 8 px on a computer / 6 on a phone'end
  if pair.X+pair.W<dock.X+8 or pair.X>dock.X+dock.W-8 then bad[#bad+1]='not over the hotbar'end
  if overlaps(pair,dock,0)then bad[#bad+1]='on the slots'end
  -- what the bars can cover: the bar, its glow (5 px) and the held bar's 1.06 scale
- local gx,gy=5+place.Bar.W*.03,5+place.Bar.H*.03;local ext={X=pair.X-gx,Y=pair.Y-gy,W=pair.W+gx*2,H=pair.H+gy*2}
+ local gx,gy=5*k+place.Bar.W*.03,5*k+place.Bar.H*.03;local ext={X=pair.X-gx,Y=pair.Y-gy,W=pair.W+gx*2,H=pair.H+gy*2}
  -- (HudLayout's Hotbar box is the slots and the 44 px over them: the bars' own place since R157, checked above against the slots themselves)
  for _,b in ipairs(Hud.HudBoxes(m,w,h,false))do if b.N~='Hotbar'and overlaps(ext,b,0)then bad[#bad+1]='covers '..tostring(b.N)end end
  if m.Travel~=nil then bad[#bad+1]='R113\'s BASE / TRACK spot (m.Travel) is back'end
- if overlaps(ext,B.SkipZone(w,h),0)then bad[#bad+1]='in the SKIP corner'end
+ local zone=B.SkipZone(w/k,h/k);zone={X=zone.X*k,Y=zone.Y*k,W=zone.W*k,H=zone.H*k}
+ if overlaps(ext,zone,0)then bad[#bad+1]='in the SKIP corner'end
  if m.HotbarDetails~=false then
   local rows=B.NameRows(w,h,m,dock,place)
-  if rows.Y+rows.H>pair.Y-B.NameClear+.5 or rows.Y+rows.H<pair.Y-B.NameClear-.5 then bad[#bad+1]='the name rows are not right above the bars'end
-  if rows.W>B.NameWidth or math.abs(rows.X+rows.W/2-(dock.X+dock.W/2))>.5 then bad[#bad+1]='the name rows are not centred on the hotbar'end
+  if rows.Y+rows.H>pair.Y-B.NameClear*k+.5 or rows.Y+rows.H<pair.Y-B.NameClear*k-.5 then bad[#bad+1]='the name rows are not right above the bars'end
+  if rows.W>B.NameWidth*k+1e-6 or math.abs(rows.X+rows.W/2-(dock.X+dock.W/2))>.5 then bad[#bad+1]='the name rows are not centred on the hotbar'end
   for _,b in ipairs(Hud.HudBoxes(m,w,h,false))do if b.N~='Hotbar'and b.N~='Status'and overlaps(rows,b,0)then bad[#bad+1]='the name rows cover '..tostring(b.N)end end
  end
  local shown={}
  for _,wd in ipairs(WORDS)do
-  local t=B.Words(wd[1],wd[2],place.Bar.W,place.Bar.H,wd[3]);shown[#shown+1]=t
-  local size=B.TextSize(t,place.Bar.W,place.Bar.H);local width=utf8.len(t)*size*.52
-  if size<B.MinText or width>place.Bar.W-math.floor(place.Bar.H*1.3)then bad[#bad+1]='"'..t..'" does not fit ('..size..' px)'end
+  local t=B.Words(wd[1],wd[2],hudBar.W,hudBar.H,wd[3]);shown[#shown+1]=t
+  local size=B.TextSize(t,hudBar.W,hudBar.H);local width=utf8.len(t)*size*.52
+  if size<B.MinText or width>hudBar.W-math.floor(hudBar.H*1.3)then bad[#bad+1]='"'..t..'" does not fit ('..size..' px)'end
  end
- if place.Bar.H<(touch and 16 or 20) or place.Bar.W<96 then bad[#bad+1]='bars too small'end
+ if hudBar.H<(touch and 16 or 20) or hudBar.W<96 then bad[#bad+1]='bars too small'end
  if #bad>0 then layoutFails+=1;print(('FAIL: %s %dx%d%s: %s'):format(name,w,h,touch and' touch'or'',table.concat(bad,'; ')))end
  print(('LAYOUT %s %dx%d%s bars %dx%d%s at %d,%d (pair %dx%d, %+d px off centre) above the slots by %d px, name rows %s; text %d px "%s"'):format(name,w,h,touch and' touch'or'',place.Bar.W,place.Bar.H,place.Stacked and' stacked'or'',math.floor(pair.X),math.floor(pair.Y),math.floor(pair.W),pair.H,math.floor(pair.X+pair.W/2-(dock.X+dock.W/2)),gap,m.HotbarDetails~=false and'above them'or'hidden',B.TextSize(shown[2],place.Bar.W,place.Bar.H),shown[2]))
 end
@@ -277,23 +282,24 @@ for _,sc in ipairs({{844,390,true},{390,844,true},{1920,1080,false}})do
  W.UIS.TouchEnabled=sc[3];gui.AbsoluteSize=V2(sc[1],sc[2]);frames(2)
  local m=Hud.Read(V2(sc[1],sc[2]),sc[3],nil);local place=B.Place(sc[1],sc[2],m,nil)
  local p=bar('Event').Root.Position;local z=bar('Event').Root.Size
- check(p.X.Offset==math.floor(place.Centers.Event.X+.5)and p.Y.Offset==math.floor(place.Centers.Event.Y+.5)and z.X.Offset==place.Bar.W and z.Y.Offset==place.Bar.H,('the real bars sit where the layout says on %dx%d'):format(sc[1],sc[2]))
+ local hudPlace=place.Hud or place -- (R158: the bars are drawn in HUD px inside their scaled root)
+ check(p.X.Offset==math.floor(hudPlace.Centers.Event.X+.5)and p.Y.Offset==math.floor(hudPlace.Centers.Event.Y+.5)and z.X.Offset==hudPlace.Bar.W and z.Y.Offset==hudPlace.Bar.H,('the real bars sit where the layout says on %dx%d'):format(sc[1],sc[2]))
 end
 W.UIS.TouchEnabled=false;gui.AbsoluteSize=V2(1280,720);frames(2)
 -- the hotbar's frame, found by name: the bars centre on it and follow it
 do
- local m=Hud.Read(V2(1280,720),false,nil);local d=B.DefaultDock(m,1280,720)
+ local m=Hud.Read(V2(1280,720),false,nil);local d=B.DefaultDock(m,1280,720);local k=m.Scale or 1 -- (R158: the bars' root is drawn at k: their offsets are HUD px)
  local hot=R.new('ScreenGui');hot.Name='ChestToolHotbar';hot.AbsolutePosition=V2(0,0);hot.AbsoluteSize=V2(1280,720);hot.Parent=pg
  local dock=R.new('Frame');dock.Name='Dock';dock.AbsoluteSize=V2(d.W,d.H);dock.AbsolutePosition=V2(d.X-20,d.Y);dock.Parent=hot
  frames(2);s.Relayout();frames(2)
  local cx=(bar('Normal').Root.Position.X.Offset+bar('Event').Root.Position.X.Offset)/2
- check(math.abs(cx-(d.X-20+d.W/2))<=1,'the hotbar frame (ChestToolHotbar.Dock) is found by name: the bars centre on it ('..cx..')')
+ check(math.abs(cx*k-(d.X-20+d.W/2))<=1,'the hotbar frame (ChestToolHotbar.Dock) is found by name: the bars centre on it ('..cx..')')
  dock.AbsolutePosition=V2(d.X-40,d.Y);frames(3)
  cx=(bar('Normal').Root.Position.X.Offset+bar('Event').Root.Position.X.Offset)/2
- check(math.abs(cx-(d.X-40+d.W/2))<=1,'... and follow it when it moves')
+ check(math.abs(cx*k-(d.X-40+d.W/2))<=1,'... and follow it when it moves')
  dock.AbsoluteSize=V2(30,10);frames(3)
  cx=(bar('Normal').Root.Position.X.Offset+bar('Event').Root.Position.X.Offset)/2
- check(math.abs(cx-(d.X+d.W/2))<=1,'a frame that is not the hotbar\'s shape (mid-layout) is not trusted: HudLayout\'s default place')
+ check(math.abs(cx*k-(d.X+d.W/2))<=1,'a frame that is not the hotbar\'s shape (mid-layout) is not trusted: HudLayout\'s default place')
  dock.Visible=false;frames(3);check(not s.Root.Visible,'the hotbar hidden: the bars hide with it')
  dock.Visible=true;frames(3);check(s.Root.Visible,'... and come back with it')
  hot:Destroy();s.Relayout();frames(2)
@@ -368,7 +374,7 @@ if #bonusWheel>0 then print('(the menu wheel keeps the button further up on: '..
 -- the client without the module keeps the place the rules give (TreadmillBonusClient's fallback is TreadmillBonusRules.Place itself)
 do
  local m=Hud.Read(V2(1280,720),false,nil);local wheel=Hud.HudBoxes(m,1280,720,true)
- local want=TB.Place(m,1280,720,wheel,{});local lifted=B.ButtonSpot(TB,m,1280,720,wheel,{})
+ local want=TB.Place(Hud.Real(m),1280,720,wheel,{});local lifted=B.ButtonSpot(TB,m,1280,720,wheel,{}) -- (R158: the rules work in screen px: Hud.Real(m), as TreadmillBonusClient's fallback does)
  check(want.Y>lifted.Y and want.X==lifted.X and want.W==lifted.W,('1280x720: the rules alone put the button at y=%d; with the bars it sits at y=%d, same column and size'):format(want.Y,lifted.Y))
 end
 
@@ -404,7 +410,7 @@ do
   if check(r.OK,'starting with '..case[1]..': no error'..(r.OK and''or(' ('..tostring(r.Err)..')')))then
    frames(60)
    local s2=r.S
-   check(s2.Placement~=nil and s2.Placement.Bar.W>0 and(not s2.Root.Visible or s2.Bars.Normal.Root.Size.X.Offset==s2.Placement.Bar.W),'... ('..case[1]..') placed, and drawn unless a menu hides it (bars '..s2.Placement.Bar.W..'x'..s2.Placement.Bar.H..')')
+   check(s2.Placement~=nil and s2.Placement.Bar.W>0 and(not s2.Root.Visible or s2.Bars.Normal.Root.Size.X.Offset==hudOf(s2.Placement).Bar.W),'... ('..case[1]..') placed, and drawn unless a menu hides it (bars '..s2.Placement.Bar.W..'x'..s2.Placement.Bar.H..')')
    check(case[3](r),'... ('..case[1]..') and in the state that case needs')
    -- later changes reach the running script (the HUD wakes): a count arrives and is drawn
    r.Player:SetAttribute('PackPityNormal',3);r.PG:SetAttribute('SeedMenu',nil);r.Player:SetAttribute('RarePullCinematic',nil);frames(120)
@@ -422,7 +428,7 @@ do
  local ok3=pcall(function()frames(3)end)
  check(ok1 and ok2 and ok3,'a step / a wake / the frames before the first layout (no placement): nothing to draw, no error')
  s2.Relayout();frames(3)
- check(s2.Placement~=nil and s2.Bars.Normal.Label.Text=='5/10 pity'and s2.Bars.Normal.Root.Size.X.Offset==s2.Placement.Bar.W,'... and the layout that follows draws the bars with what changed meanwhile')
+ check(s2.Placement~=nil and s2.Bars.Normal.Label.Text=='5/10 pity'and s2.Bars.Normal.Root.Size.X.Offset==hudOf(s2.Placement).Bar.W,'... and the layout that follows draws the bars with what changed meanwhile')
  s2:Destroy();r.Player:Destroy()
 end
 

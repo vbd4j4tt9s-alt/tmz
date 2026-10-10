@@ -7,7 +7,10 @@
 - **Portrait: no more work** ("its a waste of time").
 - "menu can also be higher" (PC): owner picked **A** (MENU centre at 1/3 of the height; balances full size; the PC layout scales down on small windows,
   as in `hud_lock/pc_scale.png`). Owner: MENU must not get too small: shrinking is ok, but it has to stay close to its
-  original size so it doesn't look off (so MENU / the wheel get a size floor, e.g. never under ~85% of the 1920 x 1080 size). Not built yet.
+  original size so it doesn't look off (so MENU / the wheel get a size floor, e.g. never under ~85% of the 1920 x 1080 size).
+  **Built (10 Oct, `hud_lock/hud_lock.md` "Built", pictures `hud_lock/built_menu.png` and `built_scale.png`):** the PC HUD is the 1920 x 1080 arrangement drawn at
+  min(1, w / 1920, h / 720); MENU a third of the way down, never under 85% of its size (54.4 px of 64); balances, hotbar, bars and status stay in their
+  places and shrink together; phones and tablets are byte-for-byte as before (`R158/tests/run_hud158.sh`).
 
 ## Hotfix R157b (bugs, being built)
 - Title screen loaded InteractionAudio before the game had loaded; AudioMixer was missing -> the module crashed and took the HUD with it.

@@ -48,10 +48,29 @@ function B.SkipZone(w,h)
  local zh=math.max(80,math.floor(h*.16))
  return {N='Skip',X=math.floor(w*.75),Y=h-zh,W=w-math.floor(w*.75),H=zh}
 end
+-- R158: a computer's HUD is the 1920 x 1080 arrangement drawn at m.Scale (HudLayout): its pieces are laid out in HUD px (the window m.VW x m.VH) and shrunk by m.Scale, and the
+-- bars live in that space too (their root is a UIScale'd frame of that size). The public functions below keep working in REAL screen px - w, h, the dock, the answers (Place's Pair /
+-- Centers / Bar, Reserved, NameRows, ButtonSpot) - as they always did, so every caller (RarePullCard, TreadmillBonusClient, the tests) is right at any scale; each does its work in HUD
+-- px and scales the answer by m.Scale. A real Place answer also carries `Hud`, the same answer in HUD px (what the bars are drawn from); both are the same table at scale 1 (no Hud).
+-- B.NameRow is the one HUD-px number (how far up inside the scaled dock the rows end: the Hotbar's own units). m.Scale is nil / 1 on a phone and on a window of 1920 x 720 or more.
+local function sc(r,s)return {X=r.X*s,Y=r.Y*s,W=r.W*s,H=r.H*s}end
+-- HudLayout's boxes in HUD px (w, h: the window's size in HUD px)
+local function boxesHud(m,w,h)
+ local s=m.Scale or 1
+ if s==1 then return Hud.HudBoxes(m,w,h,false)end
+ local out=Hud.HudBoxes(m,w*s,h*s,false)
+ for _,b in ipairs(out)do b.X,b.Y,b.W,b.H=b.X/s,b.Y/s,b.W/s,b.H/s end
+ return out
+end
 -- The hotbar's rect as HudLayout gives it (the hotbar's own layout): {X, Y, W, H}.
-function B.DefaultDock(m,w,h)
+local function dockHud(m,w,h)
  local side=m.SlotSize;local width=(m.Slots+1)*side+m.Slots*6
  return {X=w/2+(m.HotbarShiftX or 0)-width/2,Y=h-m.HotbarBottom-side,W=width,H=side}
+end
+function B.DefaultDock(m,w,h)
+ local s=m.Scale or 1
+ if s==1 then return dockHud(m,w,h)end
+ return sc(dockHud(m,m.VW,m.VH),s)
 end
 local function overlaps(a,b,pad)
  return a.X<b.X+b.W+pad and a.X+a.W>b.X-pad and a.Y<b.Y+b.H+pad and a.Y+a.H>b.Y-pad
@@ -62,13 +81,13 @@ end
 -- narrower pair, then the two bars one above the other, then a little higher (never more than MaxRise); the first that is clear of everything wins.
 -- Returns {Bar = {W, H}, Gap, Stacked, Pair = {X, Y, W, H} (the room both take), Centers = {Normal = {X, Y}, Event = {X, Y}}, Clear = nothing in the way}.
 B.MinText=9
-function B.Place(w,h,m,dock)
- dock=dock or B.DefaultDock(m,w,h)
+local function placeHud(w,h,m,dock)
+ dock=dock or dockHud(m,w,h)
  local phone=m.Phone==true
  local barH=Hud.PityBarHeight(phone,h)
  local gap=phone and 8 or 12;local rowGap=4
  local boxes={}
- for _,b in ipairs(Hud.HudBoxes(m,w,h,false))do if b.N~='Hotbar'then boxes[#boxes+1]=b end end
+ for _,b in ipairs(boxesHud(m,w,h))do if b.N~='Hotbar'then boxes[#boxes+1]=b end end
  boxes[#boxes+1]=B.SkipZone(w,h)
  local below={N='Dock',X=dock.X,Y=dock.Y,W=dock.W,H=dock.H} -- the hotbar's slots: the bars sit just above (R157: the item's name and traits rows are above the bars now)
  local cx=dock.X+dock.W/2
@@ -115,38 +134,66 @@ function B.Place(w,h,m,dock)
  else centers={Normal={X=pair.X+barW/2,Y=pair.Y+barH/2},Event={X=pair.X+barW+gap+barW/2,Y=pair.Y+barH/2}}end
  return {Bar={W=barW,H=barH},Gap=gap,Stacked=found.Stacked,Pair=pair,Clear=clear,Phone=phone,Centers=centers}
 end
--- The room a pair {X, Y, W, H} of bars (each barW x barH) can cover: its glow (B.Glow px) and the held bar's scale.
-function B.Extent(r,barW,barH)
- local gx=B.Glow+barW*(B.HeldScale-1)/2;local gy=B.Glow+barH*(B.HeldScale-1)/2
+function B.Place(w,h,m,dock)
+ local s=m.Scale or 1
+ if s==1 then return placeHud(w,h,m,dock)end
+ local p=placeHud(m.VW,m.VH,m,dock and sc(dock,1/s)or nil)
+ return {Bar={W=p.Bar.W*s,H=p.Bar.H*s},Gap=p.Gap*s,Stacked=p.Stacked,Pair=sc(p.Pair,s),Clear=p.Clear,Phone=p.Phone,Scale=s,Hud=p,
+  Centers={Normal={X=p.Centers.Normal.X*s,Y=p.Centers.Normal.Y*s},Event={X=p.Centers.Event.X*s,Y=p.Centers.Event.Y*s}}}
+end
+-- The room a pair {X, Y, W, H} of bars (each barW x barH) can cover: its glow (B.Glow px) and the held bar's scale. k: the scale the numbers are in (a real Place answer: its
+-- m.Scale; the glow is B.Glow HUD px), 1 by default.
+function B.Extent(r,barW,barH,k)
+ k=k or 1
+ local gx=B.Glow*k+barW*(B.HeldScale-1)/2;local gy=B.Glow*k+barH*(B.HeldScale-1)/2
  return {X=r.X-gx,Y=r.Y-gy,W=r.W+gx*2,H=r.H+gy*2}
 end
 -- The room the bars take on a screen (their extent: the glow and the held bar's scale included) as a HUD box, from the same inputs they are placed with. The SKIP
 -- button of an opening (RarePullCard.SkipRect), the BONUS ROLL button (B.ButtonSpot) and the reveal card (RarePullCard.FitBand) keep clear of it; dock: the hotbar's
 -- rect (nil = HudLayout's default). R157: the held item's name / traits rows sit right above the bars now (B.NameRows), so the box takes them in too where they show.
-function B.Reserved(w,h,m,dock)
- local d=dock or B.DefaultDock(m,w,h)
- local place=B.Place(w,h,m,d)
+local nameRowsHud
+local function reservedHud(w,h,m,dock)
+ local d=dock or dockHud(m,w,h)
+ local place=placeHud(w,h,m,d)
  local e=B.Extent(place.Pair,place.Bar.W,place.Bar.H)
  local x0,y0,x1,y1=e.X,e.Y,e.X+e.W,e.Y+e.H
  if m.HotbarDetails~=false then
-  local r=B.NameRows(w,h,m,d,place)
+  local r=nameRowsHud(w,h,m,d,place)
   x0=math.min(x0,r.X);x1=math.max(x1,r.X+r.W);y0=math.min(y0,r.Y)
  end
  return {N='PityBars',X=x0,Y=y0,W=x1-x0,H=y1-y0}
+end
+function B.Reserved(w,h,m,dock)
+ local s=m.Scale or 1
+ if s==1 then return reservedHud(w,h,m,dock)end
+ local box=sc(reservedHud(m.VW,m.VH,m,dock and sc(dock,1/s)or nil),s);box.N='PityBars'
+ return box
 end
 -- R157: how far above the slots the held item's name / traits rows end: Hotbar.client puts SelectedTraits' bottom edge this far above the dock's top (it was a fixed 2 px) and
 -- SelectedName above it (-> SelectedTraits.Y = -(row + 16), SelectedName.Y = -(row + 42); with no traits line the name drops into its row: -(row + 26)); just over the bars'
 -- top edge, wherever Place put them. The Hotbar reads it from the PlayerGui attribute PityBarsRow, which the bars write whenever they are placed (like ChestHotbarReserve).
 -- dock: the hotbar's rect (nil = DefaultDock); place: B.Place's answer when the caller has it.
-function B.NameRow(w,h,m,dock,place)
- local d=dock or B.DefaultDock(m,w,h)
- return math.ceil(d.Y-(place or B.Place(w,h,m,d)).Pair.Y)+B.NameClear
+local function nameRowHud(w,h,m,dock,place)
+ local d=dock or dockHud(m,w,h)
+ return math.ceil(d.Y-(place or placeHud(w,h,m,d)).Pair.Y)+B.NameClear
 end
--- R157: the rows' box {N, X, Y, W, H} (the Hotbar's labels: NameBand tall, at most NameWidth wide, centred on the hotbar), whether or not this screen shows them.
-function B.NameRows(w,h,m,dock,place)
- local d=dock or B.DefaultDock(m,w,h)
+nameRowsHud=function(w,h,m,dock,place)
+ local d=dock or dockHud(m,w,h)
  local width=math.min(d.W,B.NameWidth)
- return {N='NameRows',X=d.X+d.W/2-width/2,Y=d.Y-B.NameRow(w,h,m,d,place)-B.NameBand,W=width,H=B.NameBand}
+ return {N='NameRows',X=d.X+d.W/2-width/2,Y=d.Y-nameRowHud(w,h,m,d,place)-B.NameBand,W=width,H=B.NameBand}
+end
+-- (R158: at a scale under 1 the answer is in HUD px - the units inside the scaled dock, which is where the Hotbar puts the rows - and place is B.Place's real answer or nil)
+function B.NameRow(w,h,m,dock,place)
+ local s=m.Scale or 1
+ if s==1 then return nameRowHud(w,h,m,dock,place)end
+ return nameRowHud(m.VW,m.VH,m,dock and sc(dock,1/s)or nil,place and place.Hud or nil)
+end
+-- R157: the rows' box {N, X, Y, W, H} (the Hotbar's labels: NameBand tall, at most NameWidth wide, centred on the hotbar), whether or not this screen shows them (real screen px).
+function B.NameRows(w,h,m,dock,place)
+ local s=m.Scale or 1
+ if s==1 then return nameRowsHud(w,h,m,dock,place)end
+ local box=sc(nameRowsHud(m.VW,m.VH,m,dock and sc(dock,1/s)or nil,place and place.Hud or nil),s);box.N='NameRows'
+ return box
 end
 -- The treadmill BONUS ROLL button (TreadmillBonusClient) wants the same place, just above the hotbar. It takes the bars' extent as one more box and lifts its
 -- preferred spot above it: TreadmillBonusRules.Place measures that spot from m.HotbarBottom, so it gets a copy of m with the bars' height added to it; every
@@ -157,6 +204,7 @@ end
 -- every box by the rules' own 6 px and 8 px from the edges. (TreadmillBonusRules itself is frozen: its preferred rect is asked of it, with nothing in the way.)
 function B.ButtonSpot(rules,m,w,h,boxes,extra,dock)
  local e=B.Reserved(w,h,m,dock)
+ m=Hud.Real(m) -- (R158: the button works in screen px; a scaled computer layout becomes one in real px - a phone's is returned as it is)
  local more={e}
  for _,b in ipairs(extra or{})do more[#more+1]=b end
  local detail=m.HotbarDetails~=false and 44 or 0
@@ -314,6 +362,7 @@ local function fade(t,k)return 1-(1-t)*k end
 -- (the geometry, the words, the fill's size) is worked out again only when its inputs change: a bar sitting at 9/10 costs the glow alone (Pulse).
 local function paint(s,bar,now)
  local placement=s.Placement;if not placement then return end -- (not placed yet: a layout comes first and paints it)
+ placement=placement.Hud or placement -- (R158: the bars are drawn in HUD px inside their scaled root; at scale 1 the answer is its own)
  local reduced,S=s.Reduced,s.Set
  local w,h=placement.Bar.W,placement.Bar.H
  local dim=s.Dim
@@ -484,6 +533,10 @@ function B.Start(player,opts)
   local r,dock=dockRect(view,m)
   s.Metrics=m;s.View=view;s.Dock=r
   s.Placement=B.Place(view.X,view.Y,m,r)
+  -- R158: a computer's HUD is drawn at m.Scale (HudLayout): the bars' root is a frame of the laid-out window's size (m.VW x m.VH) with a UIScale of it, so the bars, their words, the
+  -- glow and the clover are placed in HUD px and shrink with the hotbar; at scale 1 it is the whole screen, as before
+  local hudScale=m.Scale or 1
+  root.Size=hudScale==1 and UDim2.fromScale(1,1)or UDim2.fromOffset(m.VW,m.VH);Hud.ApplyScale(root,hudScale)
   -- R157: the held item's name / traits rows (Hotbar.client) sit above the bars: it reads how far up from this attribute (B.NameRow) and lays them out again when it changes
   local row=B.NameRow(view.X,view.Y,m,r,s.Placement)
   if pg:GetAttribute('PityBarsRow')~=row then pg:SetAttribute('PityBarsRow',row)end

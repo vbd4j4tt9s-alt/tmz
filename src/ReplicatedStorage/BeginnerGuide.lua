@@ -89,23 +89,32 @@ function G.Action(state,action)
 end
 -- R157: how far above the hotbar's slots its stack reaches: the held item's name rows sit above the pity bars now (HudLayout.NameRows: 71 - 77 px; R155: 44 px, the rows
 -- right over the slots); 0 where this screen hides the rows (the bars alone, which dim under the card, as in R155).
+-- R158: m as HudLayout.Read gives it; a computer's HUD is laid out in HUD px and drawn at m.Scale, so the rows are measured on the laid-out window (m.VH) and the answer, in screen px, is
+-- times the scale (1 on a phone and on a window of 1920 x 720 or more: unchanged).
 function G.HotbarDetail(m,h)
  if m.HotbarDetails==false then return 0 end
+ local s=m.Scale or 1;if s~=1 then h=m.VH end
  local ok,rows=pcall(function()
   local Hud=require(script.Parent.HudLayout);local side=m.SlotSize
   return Hud.NameRows({X=0,Y=0,W=(m.Slots+1)*side+m.Slots*6,H=side},m.Phone==true,h)
  end)
- return ok and type(rows)=='table'and math.max(44,math.ceil(-rows.Y))or 44
+ return(ok and type(rows)=='table'and math.max(44,math.ceil(-rows.Y))or 44)*s
+end
+-- (the layout in screen px: a computer's scaled layout as HudLayout.Real gives it, a phone's as it is)
+local function real(m)
+ local ok,Hud=pcall(function()return require(script.Parent.HudLayout)end)
+ return ok and type(Hud)=='table'and Hud.Real and Hud.Real(m)or m
 end
 -- Screen boxes the tutorial card must never cover (mirrors how each HUD script positions itself).
 -- The default camera keeps the character in the middle of the screen, head near the centre, feet below it,
 -- so that area is reserved too: the card must never hide the player or the start of the arrow trail.
 function G.Obstacles(m,w,h,relaxed)
+ local layout=m;m=real(m) -- (R158: the boxes are in screen px; HotbarDetail takes the layout as it came)
  local boxes={};local shift=m.MenuShiftY or 0
  if m.PhoneWide then
   -- R129: landscape phones: MENU button, both corners, hotbar and the jump button.
   if not relaxed then boxes[#boxes+1]={X=m.MenuX,Y=h/2+shift-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}end
-  local barWidth=(m.Slots+1)*m.SlotSize+m.Slots*6;local barY=h-m.HotbarBottom-m.SlotSize;local detail=G.HotbarDetail(m,h)
+  local barWidth=(m.Slots+1)*m.SlotSize+m.Slots*(m.SlotGap or 6);local barY=h-m.HotbarBottom-m.SlotSize;local detail=G.HotbarDetail(layout,h)
   boxes[#boxes+1]={X=w/2+(m.HotbarShiftX or 0)-barWidth/2,Y=barY-detail,W=barWidth,H=m.SlotSize+detail}
   for _,k in ipairs({'Speed','Cash','Gem'})do boxes[#boxes+1]={X=m[k..'X']or m.WalletX,Y=m[k..'Y'],W=m.WalletWidth,H=m.WalletHeight}end
   boxes[#boxes+1]={X=m.StatusBox.X,Y=m.StatusBox.Y,W=m.StatusBox.W,H=m.StatusBox.H}
@@ -117,7 +126,7 @@ function G.Obstacles(m,w,h,relaxed)
  -- Relaxed: the menu button draws above the tutorial (DisplayOrder 33 vs 25), so it may sit over the card edge.
  if not relaxed then boxes[#boxes+1]={X=m.MenuX,Y=h/2+shift-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}end
  -- The open menu wheel is not listed: the card hides while the wheel is open.
- local barWidth=(m.Slots+1)*m.SlotSize+m.Slots*6;local barY=h-m.HotbarBottom-m.SlotSize;local detail=G.HotbarDetail(m,h)
+ local barWidth=(m.Slots+1)*m.SlotSize+m.Slots*(m.SlotGap or 6);local barY=h-m.HotbarBottom-m.SlotSize;local detail=G.HotbarDetail(layout,h)
  boxes[#boxes+1]={X=w/2+(m.HotbarShiftX or 0)-barWidth/2,Y=barY-detail,W=barWidth,H=m.SlotSize+detail}
  for _,k in ipairs({'Speed','Cash','Gem'})do boxes[#boxes+1]={X=m[k..'X']or m.WalletX,Y=m[k..'Y'],W=m.WalletWidth,H=m.WalletHeight}end
  if m.Phone then
@@ -126,7 +135,7 @@ function G.Obstacles(m,w,h,relaxed)
   for _,z in ipairs(m.ThumbZones or{})do boxes[#boxes+1]={X=z.X,Y=z.Y,W=z.W,H=z.H}end
  else
   local sw=(m.StatusStacked and 190 or 337)*m.StatusScale;local sh=(m.StatusStacked and 211 or 125)*m.StatusScale
-  boxes[#boxes+1]={X=w-12-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh}
+  boxes[#boxes+1]={X=w-(m.StatusRight or 12)-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh}
  end
  -- relaxed 1 lets the card reach the head (small phones); relaxed 2 drops the reservation (tiniest screens).
  local half=math.max(50,h*.09);local from=relaxed==1 and h*.5 or h*.42
@@ -139,6 +148,7 @@ function G.Font(m,w,h)return m.Phone and((h<400 or w<400)and 16 or 17)or(h<560 a
 -- R152: top = where to start looking (below a ringed top-bar button); want = the width its words need (it hugs them).
 function G.Card(w,h,m,heightFor,relaxed,top,want)
  local boxes=G.Obstacles(m,w,h,relaxed);top=math.max(8,top or 8)
+ m=real(m)
  local widest=math.min(want or 9999,m.Phone and 460 or 540,w-24)
  local tallest=math.max(150,heightFor(widest)*1.6)
  local function clear(box)

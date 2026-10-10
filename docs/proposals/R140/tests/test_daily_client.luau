@@ -58,15 +58,19 @@ local function inset(l,r,top,rowH)Gui.TopbarInset={__type='Rect',Min=R.Vector2.n
 inset(120,1280,0,52)
 -- Layout emulation (absolute rects from UDim2 + AnchorPoint + UISizeConstraint, as the R113 inventory test).
 local function set(o,k,v)local c=o._props[k];if not c or c.X~=v.X or c.Y~=v.Y then o[k]=v end end
-local function lay(o,px,py,pw,ph)
+-- (R158: the HUD's own UIScale (HudScale: HudLayout.ApplyScale) scales its object - about its AnchorPoint - and everything in it; a child's UDim2 resolves against its parent's unscaled size; ps: the parent's accumulated scale)
+local function lay(o,px,py,pw,ph,ps)
+ ps=ps or 1
  for _,c in ipairs(o._children)do if c:IsA('GuiObject')then
   local s,p=c._props.Size,c._props.Position;local a=c._props.AnchorPoint or R.Vector2.new(0,0)
   if s and p then
-   local w=s.X.Scale*pw+s.X.Offset;local h=s.Y.Scale*ph+s.Y.Offset
+   local ui=c:FindFirstChild('HudScale');local k=ui and(ui._props.Scale or 1)or 1
+   local w=s.X.Scale*(pw/ps)+s.X.Offset;local h=s.Y.Scale*(ph/ps)+s.Y.Offset
    local lim=c:FindFirstChildOfClass('UISizeConstraint');if lim and lim.MaxSize then w=math.min(w,lim.MaxSize.X);h=math.min(h,lim.MaxSize.Y)end
-   local x=px+p.X.Scale*pw+p.X.Offset-a.X*w;local y=py+p.Y.Scale*ph+p.Y.Offset-a.Y*h
+   w,h=w*ps*k,h*ps*k
+   local x=px+(p.X.Scale*(pw/ps)+p.X.Offset)*ps-a.X*w;local y=py+(p.Y.Scale*(ph/ps)+p.Y.Offset)*ps-a.Y*h
    set(c,'AbsoluteSize',R.Vector2.new(w,h));set(c,'AbsolutePosition',R.Vector2.new(x,y))
-   lay(c,x,y,w,h)
+   lay(c,x,y,w,h,ps*k)
   end
  end end
 end
@@ -103,7 +107,7 @@ for _,s in ipairs(screens)do
  inset(s[3],s[4],0,s[2]>500 and 52 or 44);resize(s[1],s[2])
  local base,track=rect(pair.BaseButton),rect(pair.TrackButton)
  local d,i,menu=rect(daily),rect(invite),rect(hub)
- local m=Hud.Read(R.Vector2.new(s[1],s[2]),false,nil);local o4,o5=m.MenuOffsets[4],m.MenuOffsets[5]
+ local m=Hud.Real(Hud.Read(R.Vector2.new(s[1],s[2]),false,nil));local o4,o5=m.MenuOffsets[4],m.MenuOffsets[5] -- (R158: in screen px; every one of these screens is a computer's)
  local function at(r)return r.X+r.W/2-(menu.X+menu.W/2),r.Y+r.H/2-(menu.Y+menu.H/2)end
  local dx,dy=at(d);local ix,iy=at(i)
  local placed=math.abs(dx-o4.X)<1 and math.abs(dy-o4.Y)<1 and math.abs(ix-o5.X)<1 and math.abs(iy-o5.Y)<1

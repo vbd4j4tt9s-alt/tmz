@@ -108,14 +108,14 @@ PY
  mutate no_links "$RSD/HudLayout.lua" "  links();boostChip()" "  boostChip()"
  mutate no_alert "$RSD/HudLayout.lua" "  local total=(tonumber(pg:GetAttribute('MenuAlertIndex'))or 0)+(tonumber(pg:GetAttribute('MenuAlertDaily'))or 0)" "  local total=tonumber(pg:GetAttribute('MenuAlertIndex'))or 0"
  mutate hint_in_option "$C/DailyRewardsClient.client.lua" "local inviteHint=text(gui,'InviteHint'" "local inviteHint=text(inviteButton,'InviteHint'"
- mutate travel_back "$RSD/HudLayout.lua" " return {Slots=slots,SlotSize=side," " return {Travel={X=70,Y=8,W=112,H=52},Slots=slots,SlotSize=side,"
+ mutate travel_back "$RSD/HudLayout.lua" "  Slots=slots,SlotSize=side,SlotGap=gap,HotbarBottom=hotbarBottom," "  Travel={X=70,Y=8,W=112,H=52},Slots=slots,SlotSize=side,SlotGap=gap,HotbarBottom=hotbarBottom,"
  mutate daily_badge_r155 "$C/DailyRewardsClient.client.lua" "Badge.Make(dailyButton,'RewardBadge',Badge.Sizes.Count,Badge.Overhang.Count)" "Badge.Make(dailyButton,'RewardBadge',24,10,false,0)"
  mutate no_chip_copy "$C/DailyRewardsClient.client.lua" " pg:SetAttribute('MenuFriendBoost',chip.Visible and chip.Text or nil)" ""
  mutate tag_old_layout "$RSD/PityBars155.lua" "B.TagPlace(st.Kind,phone,view.X,view.Y,B.CardRows(s.TagGui.Parent,view.Y))" "B.TagPlace(st.Kind,phone,view.X,view.Y)"
- mutate wallet_under_wheel "$RSD/HudLayout.lua" "   if compactHeight>=16 then walletH=math.min(walletH,compactHeight);gap=2;walletStack=walletH*3+gap*2;speedY=h-bottom-walletStack end" ""
- mutate skip_no_climb "$RSD/RarePullCard.lua" " for y=math.floor(h*.45)-4,math.floor(h*.2),-4 do for x=x0,math.floor(w*.5),-4 do if clear(x,y)then return x,y,bw,bh end end end" ""
+ # (R158, on purpose: R157's "wallet_under_wheel" - the shorter balance rows under the wheel - and "skip_no_climb" / "fallback_r156" - the 640 x 360 computer window's SKIP climb and ring pull-in -
+ # tested rules that no longer exist: a computer's HUD is the 1920 x 1080 arrangement scaled, the balances never shrink; the new break is "wallet_shortened")
+ mutate wallet_shortened "$RSD/HudLayout.lua" " local walletW,walletH,walletGap=290,56,7" " local walletW,walletH,walletGap=290,40,7"
  mutate fit_overflows "$RSD/RarePullRules.lua" "  for key,v in pairs(s)do s[key]=v*f end" ""
- mutate fallback_r156 "$RSD/HudLayout.lua" "    if wheelClear(o,hub,optionSize)and wheelFree(o,y,hub,optionSize,avoid)then r,rx,fan,done=test,x,c,true;break end" "    r,rx,fan,done=test,test<72 and WheelMaxX or test,.7071,true;break"
 fi
 [ $RC = 0 ] && echo "R157 HUD: ALL PASS" || echo "R157 HUD: FAIL"
 exit $RC

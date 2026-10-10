@@ -36,13 +36,17 @@ local function inset(l,r,top,rowH)Gui.TopbarInset={__type='Rect',Min=V2(l,top),M
 inset(120,1280,0,52)
 -- layout emulation (absolute rects from UDim2 + AnchorPoint), as the R140 client test
 local function set(o,k,v)local c=o._props[k];if not c or c.X~=v.X or c.Y~=v.Y then o[k]=v end end
-local function lay(o,px,py,pw,ph)
+-- (R158: the HUD's own UIScale - HudScale, HudLayout.ApplyScale - scales its object about its AnchorPoint and everything in it; a child's UDim2 resolves against its parent's UNSCALED size;
+-- ps: the parent's accumulated scale. With no HudScale in the tree this is the old emulation.)
+local function lay(o,px,py,pw,ph,ps)
+ ps=ps or 1
  for _,c in ipairs(o._children)do if c:IsA('GuiObject')then
   local s,p=c._props.Size,c._props.Position;local a=c._props.AnchorPoint or V2(0,0)
   if s and p then
-   local w=s.X.Scale*pw+s.X.Offset;local h=s.Y.Scale*ph+s.Y.Offset
-   local x=px+p.X.Scale*pw+p.X.Offset-a.X*w;local y=py+p.Y.Scale*ph+p.Y.Offset-a.Y*h
-   set(c,'AbsoluteSize',V2(w,h));set(c,'AbsolutePosition',V2(x,y));lay(c,x,y,w,h)
+   local ui=c:FindFirstChild('HudScale');local k=ui and(ui._props.Scale or 1)or 1
+   local w=(s.X.Scale*(pw/ps)+s.X.Offset)*ps*k;local h=(s.Y.Scale*(ph/ps)+s.Y.Offset)*ps*k
+   local x=px+(p.X.Scale*(pw/ps)+p.X.Offset)*ps-a.X*w;local y=py+(p.Y.Scale*(ph/ps)+p.Y.Offset)*ps-a.Y*h
+   set(c,'AbsoluteSize',V2(w,h));set(c,'AbsolutePosition',V2(x,y));lay(c,x,y,w,h,ps*k)
   end
  end end
 end
@@ -76,13 +80,14 @@ check(okZ,'five options, each in its CanvasGroup, later ones drawn over earlier 
 openWheel(true)
 for _,s in ipairs({{1920,1080,false},{1366,768,false},{844,390,true},{390,844,true},{750,311,true},{640,280,true},{600,250,true},{360,640,true}})do
  resize(s[1],s[2],s[3])
- local m=Hud.Read(screen,s[3],nil);local menu=rect(hub);local ok=true;local got={}
- check(near(menu.Y+menu.H/2,s[2]/2+(m.MenuShiftY or 0),.5)and menu.W==m.MenuSize,fmt('%dx%d: the MENU button where HudLayout puts it (centre %.0f)',s[1],s[2],menu.Y+menu.H/2))
+ local m=Hud.Real(Hud.Read(screen,s[3],nil)) -- (R158: in screen px: a computer's MENU is drawn at its own scale)
+ local menu=rect(hub);local ok=true;local got={}
+ check(near(menu.Y+menu.H/2,s[2]/2+(m.MenuShiftY or 0),.5)and near(menu.W,m.MenuSize,.01),fmt('%dx%d: the MENU button where HudLayout puts it (centre %.0f)',s[1],s[2],menu.Y+menu.H/2))
  for i=1,5 do
   local b=opt(i):FindFirstChildWhichIsA('GuiButton');local r=rect(b)
   local dx,dy=r.X+r.W/2-(menu.X+menu.W/2),r.Y+r.H/2-(menu.Y+menu.H/2)
   got[i]=fmt('(%.0f,%.0f)',dx,dy)
-  if not(near(dx,m.MenuOffsets[i].X,.6)and near(dy,m.MenuOffsets[i].Y,.6)and r.W==m.MenuOptionSize and opt(i).Visible and opt(i).GroupTransparency==0)then ok=false end
+  if not(near(dx,m.MenuOffsets[i].X,.6)and near(dy,m.MenuOffsets[i].Y,.6)and near(r.W,m.MenuOptionSize,.01)and opt(i).Visible and opt(i).GroupTransparency==0)then ok=false end
  end
  check(ok,fmt('%dx%d%s: the open wheel\'s five options sit at HudLayout\'s offsets, %d px: %s',s[1],s[2],s[3]and' touch'or'',m.MenuOptionSize,table.concat(got,' ')))
 end
@@ -142,7 +147,7 @@ do
  local chip=invite:FindFirstChild('Boost');local copy=hub:FindFirstChild('FriendBoost')
  check(chip and chip.Visible and chip.Text=='+20%','2 friends here: "+20%" on the INVITE option')
  local c,m2=copy and rect(copy),rect(hub)
- check(copy and copy.Visible and copy.Text=='+20%'and c.X>=m2.X+m2.W+2 and near(c.Y+c.H/2,m2.Y+m2.H/2,.5)and c.W==Hud.ChipSize.X,'... and, the wheel closed, beside the MENU button (right of it, centred on it)')
+ check(copy and copy.Visible and copy.Text=='+20%'and c.X>=m2.X+m2.W+2 and near(c.Y+c.H/2,m2.Y+m2.H/2,.5)and near(c.W,Hud.ChipSize.X*(Hud.Read(screen,false,nil).MenuScale or 1),.01),'... and, the wheel closed, beside the MENU button (right of it, centred on it)')
  openWheel(true);check(not copy.Visible,'the wheel open: only INVITE carries it');openWheel(false)
  player:SetAttribute('FriendsInServer',0);player:SetAttribute('FriendSpeedBoost',1);frames(2)
  check(not chip.Visible and not copy.Visible,'no friend here: no chip anywhere')
@@ -159,7 +164,7 @@ do
   local hot=pg.ChestToolHotbar;local dock=hot.Dock;local name,traits=dock.SelectedName,dock.SelectedTraits
   local row=pg:GetAttribute('PityBarsRow')
   local m=Hud.Read(screen,sz[3],nil);local d=B.DefaultDock(m,sz[1],sz[2]);local place=B.Place(sz[1],sz[2],m,d)
-  local want=B.NameRow(sz[1],sz[2],m,d,place);local width=math.min(d.W,Hud.NameWidth)
+  local want=B.NameRow(sz[1],sz[2],m,d,place);local k=m.Scale or 1;local width=math.min(d.W/k,Hud.NameWidth) -- (R158: the rows are laid out inside the scaled dock: HUD px)
   check(row==want and traits.Position.Y.Offset==-(row+16)and traits.Size.X.Offset==width and traits.Position.X.Scale==.5 and traits.Position.X.Offset==-width/2,
    fmt('%dx%d: the traits row ends %d px over the slots (PityBarsRow, right over the bars: %d px), %d px wide, centred',sz[1],sz[2],row or -1,dock.Size.Y.Offset and(d.Y-place.Pair.Y)or 0,width))
   check(name.Position.Y.Offset==-(row+(traits.Text~=''and 42 or 26))and name.Size.X.Offset==width,fmt('%dx%d: the name row right above it (or in its place with no traits line)',sz[1],sz[2]))

@@ -177,7 +177,8 @@ for _,v in ipairs(views)do
  end
 end
 local count=0;for _ in pairs(sizesSeen)do count+=1 end
-check(count>=3,'the screens produced several button sizes ('..count..')')
+-- (R158, on purpose: every computer window is the same arrangement now, so the smaller sizes the rules fall back to on a crowded small PC window are gone: a computer's 212 x 52 and a phone's 176 x 46 remain)
+check(count>=2,'the screens produced several button sizes ('..count..')')
 -- =====================================================================================================================
 -- 2. The roll screen on every screen size
 -- =====================================================================================================================

@@ -7,7 +7,8 @@
 #  1. test    - test_hudlayout_cache157.luau: the cached Read is exactly a fresh computation on 46 screens x (computer, phone with its thumb controls, phone without) and the R157 layout
 #               from before the cache (a fingerprint per case); the same screen again is the same table, runs no search, costs microseconds and allocates nothing; every input is in
 #               the key; a small ring; the answer is frozen and holds none of the caller's tables; the real WorldStatusHud and RarePullCard.SkipBoxes run the search once
-#  1b. same   - the differential: HudLayout as it was before the cache (git show $R157_LAYOUT_BASE) and now give the same fingerprint on every case (skipped when that commit is not here)
+#  1b. same   - the differential: HudLayout as it was before the cache (git show $R157_LAYOUT_BASE) and now give the same fingerprint on every phone case (R158, on purpose: not on the computer
+#               cases - a computer's layout is the scaled 1920 x 1080 arrangement now; skipped when that commit is not here)
 #  2. teeth   - each break of the cache must make the test fail
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
@@ -34,10 +35,10 @@ if git -C "$REPO" cat-file -e "$LB:src/ReplicatedStorage/HudLayout.lua" 2>/dev/n
  git -C "$REPO" show "$LB:src/ReplicatedStorage/HudLayout.lua" > "$OUT/HudLayout_before.lua"
  if grep -q "^function L.Read" "$OUT/HudLayout_before.lua" && ! grep -q "CacheSize" "$OUT/HudLayout_before.lua";then
   build "$OUT/wb" "HudLayout=$OUT/HudLayout_before.lua"
-  ( cd "$OUT/wb" && timeout 1200 /opt/luau/luau test_hudlayout_cache157.luau -a golden 2>&1 | grep '^GOLDEN' > golden.txt )
-  ( cd "$OUT/w" && timeout 1200 /opt/luau/luau test_hudlayout_cache157.luau -a golden 2>&1 | grep '^GOLDEN' > golden.txt )
+  ( cd "$OUT/wb" && timeout 1200 /opt/luau/luau test_hudlayout_cache157.luau -a golden 2>&1 | grep '^GOLDEN' | grep -v ':pc' > golden.txt )
+  ( cd "$OUT/w" && timeout 1200 /opt/luau/luau test_hudlayout_cache157.luau -a golden 2>&1 | grep '^GOLDEN' | grep -v ':pc' > golden.txt )
   n=$(wc -l < "$OUT/w/golden.txt")
-  [ "$n" -ge 120 ] && cmp -s "$OUT/wb/golden.txt" "$OUT/w/golden.txt" && echo "ok: $n cases, HudLayout before the cache and now give the same fingerprint on every one" || fail "the layout differs from the one before the cache ($n cases)"
+  [ "$n" -ge 90 ] && cmp -s "$OUT/wb/golden.txt" "$OUT/w/golden.txt" && echo "ok: $n phone cases, HudLayout before the cache and now give the same fingerprint on every one" || fail "the phone layout differs from the one before the cache ($n cases)"
   rm -rf "$OUT/wb"
  else echo "skipped: $LB's HudLayout is not the one before the cache";fi
 else echo "skipped: commit $LB is not in this clone";fi
@@ -66,7 +67,6 @@ PY
  mutate no_jump_x "k[8],k[9],k[10],k[11]=jump.X,jump.Y,jump.W,jump.H" "k[8],k[9],k[10],k[11]=0,jump.Y,jump.W,jump.H"
  mutate no_stick_y "k[4],k[5],k[6],k[7]=stick.X,stick.Y,stick.W,stick.H" "k[4],k[5],k[6],k[7]=stick.X,0,stick.W,stick.H"
  mutate no_stick_w "k[4],k[5],k[6],k[7]=stick.X,stick.Y,stick.W,stick.H" "k[4],k[5],k[6],k[7]=stick.X,stick.Y,0,stick.H"
- mutate no_place "k[17]=ok and bars or false;k[18]=ok and type(bars)=='table'and bars.Place or false;k[19]=L.HudBoxes" "k[17]=ok and bars or false;k[18]=false;k[19]=L.HudBoxes"
  mutate no_name_width "k[12],k[13],k[14],k[15],k[16]=L.NameBand,L.NameWidth,L.NameClear,L.PityBarHeight,L.PityGap" "k[12],k[13],k[14],k[15],k[16]=L.NameBand,0,L.NameClear,L.PityBarHeight,L.PityGap"
  mutate no_bar_height "k[12],k[13],k[14],k[15],k[16]=L.NameBand,L.NameWidth,L.NameClear,L.PityBarHeight,L.PityGap" "k[12],k[13],k[14],k[15],k[16]=L.NameBand,L.NameWidth,L.NameClear,false,L.PityGap"
  mutate not_frozen "local m=freeze(readLayout(" "local m=(readLayout("

@@ -468,7 +468,8 @@ local function updateClick()
  local inset=gui.AbsolutePosition
  -- Phones: 72% size, and kept between the card and the hotbar (it never covers the slots).
  local k=metrics and metrics.Phone and .72 or 1;local half=95*k
- local barTop=metrics and(view.Y-metrics.HotbarBottom-metrics.SlotSize-(metrics.HotbarDetails~=false and 44 or 0)-8)or view.Y-120
+ local mr=metrics and Layout.Real(metrics) -- (R158: screen px; a computer's HUD is drawn at metrics.Scale)
+ local barTop=mr and(view.Y-mr.HotbarBottom-mr.SlotSize-(mr.HotbarDetails~=false and(mr.HotbarDetailH or 44)or 0)-8)or view.Y-120
  local x=math.max(100*k,math.min(at.X-inset.X+(onScreen and 130*k or 0),view.X-100*k))
  local y=math.min(barTop-half,math.max(cardBottom+half-12,at.Y-inset.Y));if barTop-half<cardBottom+half-12 then y=(barTop+cardBottom-12)/2 end
  set(CH.Hint,'Position',UDim2.fromOffset(math.floor(x),math.floor(y)));set(CH.Hint,'Visible',true)

@@ -326,7 +326,7 @@ local function layoutButton()
  -- R155 review: the pity bars (PityBars155, always on the HUD) take the place just above the hotbar this button wants: it sits above them (the module knows where
  -- they are; no module = the place it always had)
  local okBars,r=pcall(function()return require(RS:FindFirstChild('PityBars155')).ButtonSpot(Rules,m,w,h,boxes,extra)end)
- if not(okBars and type(r)=='table')then r=Rules.Place(m,w,h,boxes,extra)end
+ if not(okBars and type(r)=='table')then r=Rules.Place(Layout.Real(m),w,h,boxes,extra)end -- (R158: in screen px)
  button.AnchorPoint=Vector2.new(.5,.5);button.Position=UDim2.fromOffset(r.X+r.W/2,r.Y+r.H/2);button.Size=UDim2.fromOffset(r.W,r.H) -- R150 review: the ready pop and the pulse scale about the button's centre
  local fh=r.H-LIP
  -- Narrow phones get the text-only size: drop the pack icon and use the full width for the caption.

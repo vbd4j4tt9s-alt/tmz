@@ -718,7 +718,10 @@ layout=function()
  selectedLabel.Visible=showSelectedDetails and not panel.Visible;selectedTraits.Visible=showSelectedDetails and not panel.Visible
  visibleSlots=metrics.Slots;if State.Visible~=visibleSlots then State.Visible=visibleSlots;listDirty=true;queue()end -- (R155: an item on a slot this screen does not show is a Bag item here)
  local gap=6;local side=metrics.SlotSize
- dock.Position=UDim2.new(.5,metrics.HotbarShiftX or 0,1,-metrics.HotbarBottom);dock.Size=UDim2.fromOffset((visibleSlots+1)*side+visibleSlots*gap,side)
+ -- R158: a computer's HUD is the 1920 x 1080 arrangement scaled by metrics.Scale (HudLayout): the dock's place from the screen's bottom centre is times it and it carries a UIScale
+ -- of it (its slots, the name rows and the Bag button shrink with it); metrics.Scale is 1 - no UIScale, the same numbers - on a phone, a tablet and a window of 1920 x 720 or more
+ local hudScale=metrics.Scale or 1
+ dock.Position=UDim2.new(.5,(metrics.HotbarShiftX or 0)*hudScale,1,-metrics.HotbarBottom*hudScale);dock.Size=UDim2.fromOffset((visibleSlots+1)*side+visibleSlots*gap,side);require(RS.HudLayout).ApplyScale(dock,hudScale)
  -- R157 (pity bars v2): the held item's name and traits rows sit ABOVE the pity bars, which sit just over the slots: PityBars155 writes how far up their top edge is
  -- (the PlayerGui attribute PityBarsRow; without the bars 2 px, R155's place); at most HudLayout.NameWidth wide, centred (the text is centred). With no traits line
  -- the name drops into the traits row, right over the bars (paintHeld / refresh keep that up as the text changes).
@@ -741,6 +744,7 @@ layout=function()
  open.Size=UDim2.fromOffset(side,side);open.Position=UDim2.new(1,-side,0,0)
  -- R113: raised hotbars (portrait phones sit it above the thumb controls) reserve their real height, so sheets end above it.
  local reserve=side+78+math.max(0,(metrics.HotbarBottom or 12)-12)
+ if hudScale~=1 then reserve=math.ceil(reserve*hudScale)end -- (screen px: the sheets end above the scaled hotbar)
  if pg:GetAttribute('ChestHotbarReserve')~=reserve then pg:SetAttribute('ChestHotbarReserve',reserve)end
  local height=view.Y
  -- R113: category cards sit outside the sheet: a column (or 2x2 block) on its left, else a row above it; never over the HUD.

@@ -356,10 +356,10 @@ do
   local screen=R.Instance.new('ScreenGui');screen.Name='WalletHost';screen.Parent=pg;screen.AbsoluteSize=size
   local ok,wallet=pcall(Wallet.new,screen);check(ok and wallet,label..': the real wallet builds ('..tostring(wallet)..')')
   if ok and wallet then
-   local m=Layout.Read(size,touch,nil)
-   for _,row in ipairs({wallet,wallet.Gems})do -- the mock does no layout: the icon's screen place = its row + its offset in the row
+   local mv=Layout.Read(size,touch,nil);local k=mv.Scale or 1;local m=Layout.Real(mv) -- (R158: a computer's rows are drawn at mv.Scale; m is the layout in screen px, a phone's as it is)
+   for _,row in ipairs({wallet,wallet.Gems})do -- the mock does no layout: the icon's screen place = its row + its offset in the row (times the row's scale)
     local rp,ip,isz=row.Root.Position,row.Icon.Position,row.Icon.Size
-    row.Icon._props.AbsolutePosition=V2(rp.X.Offset+ip.X.Offset,rp.Y.Offset+ip.Y.Offset);row.Icon._props.AbsoluteSize=V2(isz.X.Offset,isz.Y.Offset)
+    row.Icon._props.AbsolutePosition=V2(rp.X.Offset+ip.X.Offset*k,rp.Y.Offset+ip.Y.Offset*k);row.Icon._props.AbsoluteSize=V2(isz.X.Offset*k,isz.Y.Offset*k)
    end
    local cashAt,gemAt=wallet:TargetPosition(),wallet.Gems:TargetPosition()
    local side=m.WalletIcon or m.WalletHeight

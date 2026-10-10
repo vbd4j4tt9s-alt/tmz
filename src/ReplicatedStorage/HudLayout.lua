@@ -1,17 +1,28 @@
 -- R110: larger menu wheel and hotbar slots on every screen; phones keep five slots when they fit.
+-- R158 (owner, 10 Oct: "this should be the absolute layout of gui for all devices throughout ... except for mobile ... menu can also be higher"): the COMPUTER HUD (every window
+-- size, consoles too) is ONE arrangement, the owner's 1920 x 1080 screenshot, laid out as a window at least 1920 x 720 and then drawn shrunk to fit (pcLayout below). Numbers in a
+-- computer's layout `m` are of two kinds:
+--   * HUD px (the HUD pieces: hotbar, balances, status stack, bars): px of the laid-out window, m.VW x m.VH. A script puts each piece's root where m says, times m.Scale
+--     (x / y / bottom offsets), and gives it a UIScale of m.Scale (L.ApplyScale), so everything inside the piece shrinks with it.
+--   * MENU px (every m.Menu* number: the MENU button, its wheel): px of the MENU's own window, w / m.MenuScale x h / m.MenuScale. MENU shrinks no further than MenuFloor
+--     (85%) of its 1920 x 1080 look, so m.MenuScale >= m.Scale.
+-- m.Scale and m.MenuScale are 1 on a window of 1920 x 720 or more, and a touch screen's layout has neither (nor VW / VH): every phone and tablet number is as it was in R157.
+-- L.Real(m) gives the same layout with every number in real screen px (Scale and MenuScale 1): for code that works in screen px (L.HudBoxes, the reveal card, BONUS ROLL ...).
 local L={}
 local function overlaps(a,b,pad)
  pad=pad or 0
  return a.X<b.X+b.W+pad and a.X+a.W>b.X-pad and a.Y<b.Y+b.H+pad and a.Y+a.H>b.Y-pad
 end
--- The HUD's boxes on a screen w x h (m: L.Read): the MENU button (and, with `wheel`, the options of the open wheel), the hotbar (its slots and the 44 px over them: the
--- pity bars' place since R157 - PityBars155.Reserved adds the bars and the held item's name rows above them), the balances, the status stack, a phone's thumb zones and
--- a computer's owner tools tile. (R157: R113's BASE / TRACK spot beside the MENU button, m.Travel, is gone: the real pair lives in the top bar row, TravelButtons.)
+-- The HUD's boxes on a screen w x h (m: L.Read; w, h: the real HUD area), in real screen px: the MENU button (and, with `wheel`, the options of the open wheel), the hotbar (its slots
+-- and the 44 px over them: the pity bars' place since R157 - PityBars155.Reserved adds the bars and the held item's name rows above them), the balances, the status stack, a
+-- phone's thumb zones and a computer's owner tools tile. (R157: R113's BASE / TRACK spot beside the MENU button, m.Travel, is gone: the real pair lives in the top bar row,
+-- TravelButtons.)
 function L.HudBoxes(m,w,h,wheel)
+ m=L.Real(m)
  local b={};local shift=m.MenuShiftY or 0
  b[#b+1]={N='Hub',X=m.MenuX,Y=h/2+shift-m.MenuSize/2,W=m.MenuSize,H=m.MenuSize}
  if wheel then for i,o in ipairs(m.MenuOffsets)do b[#b+1]={N='Opt'..i,X=m.MenuX+(m.MenuSize-m.MenuOptionSize)/2+o.X,Y=h/2+shift-m.MenuOptionSize/2+o.Y,W=m.MenuOptionSize,H=m.MenuOptionSize}end end
- local bw=(m.Slots+1)*m.SlotSize+m.Slots*6;local detail=m.HotbarDetails~=false and 44 or 0
+ local bw=(m.Slots+1)*m.SlotSize+m.Slots*(m.SlotGap or 6);local detail=m.HotbarDetails~=false and(m.HotbarDetailH or 44)or 0
  b[#b+1]={N='Hotbar',X=w/2+(m.HotbarShiftX or 0)-bw/2,Y=h-m.HotbarBottom-m.SlotSize-detail,W=bw,H=m.SlotSize+detail}
  for _,k in ipairs({'Speed','Cash','Gem'})do b[#b+1]={N='Wallet'..k,X=m[k..'X']or m.WalletX,Y=m[k..'Y'],W=m.WalletWidth,H=m.WalletHeight}end
  if m.PhoneWide then
@@ -24,7 +35,7 @@ function L.HudBoxes(m,w,h,wheel)
   for i,z in ipairs(m.ThumbZones)do b[#b+1]={N=i==1 and'ThumbL'or'ThumbR',X=z.X,Y=z.Y,W=z.W,H=z.H}end
  else
   local sw=(m.StatusStacked and 190 or 337)*m.StatusScale;local sh=(m.StatusStacked and 211 or 125)*m.StatusScale
-  b[#b+1]={N='Status',X=w-12-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh}
+  b[#b+1]={N='Status',X=w-(m.StatusRight or 12)-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh}
   b[#b+1]={N='OwnerTools',X=10,Y=8,W=48,H=48}
  end
  return b
@@ -242,143 +253,85 @@ local function phoneLayout(w,h,controls)
   ThumbZones={left,right}}
  return m
 end
--- The layout of a screen w x h (already at least 240 x 150) with all its searching (wheelArc, barsClear below); L.Read memoizes it.
+-- R158: THE COMPUTER HUD. Owner (10 Oct, with a 1900 x 313 screenshot of the bottom of the 1920 x 1080 HUD: the balances bottom-left with their + buttons, the hotbar in the centre with
+-- the two pity bars over it, the luck rows, the timers and THE DARKENED card bottom-right): "this should be the absolute layout of gui for all devices throughout ... just keep this
+-- all the same except for mobile ... menu can also be higher"; then "Menu should sit at A" and "make sure menu size is not too small and somewhat consistent with the original sizes
+-- basically shrinking is ok but just not too much that it looks off or different".
+--  * Scale: the HUD is laid out as a window of at least PcWidth x PcHeight (1920 x 720; a 16:9 window is 1920 x 1080) and drawn shrunk by  s = min(1, w / 1920, h / 720)  - never
+--    above 1, so a bigger window just has more room. A smaller window shows the same arrangement, smaller: no 5-slot hotbar, no shorter balance rows, no rearranging.
+--  * The hotbar (10 slots and the Bag, 82 px slots), the balances (290 x 56 rows, the + buttons), the status stack (the luck rows, the timers, THE DARKENED card) and the bars keep
+--    their 1920 x 1080 places, in HUD px (m.VW x m.VH is the laid-out window).
+--  * MENU sits at option A: its centre is a third of the window's height from the top (the wheel opens round it, clear of the balances at every size), and it keeps close to its
+--    original look: it shrinks with the window only down to MenuFloor (85%) of its 1920 x 1080 size, i.e. its own scale is ms = max(s, MenuFloor). Where the open wheel at that size does
+--    not fit between the top of the window and the balances, the hub moves up (wheelArc, fixed = false) rather than shrinking the wheel further; only a window so short that even a
+--    moved wheel cannot fit gets wheelArc's old fallbacks (smaller options down to 44 px, a flatter fan). Every m.Menu* number is in MENU px: the MENU's window is w / ms x h / ms.
+local PcWidth,PcHeight,MenuFloor=1920,720,.85
+-- the scale of a computer's HUD and of its MENU button on a window w x h (the same numbers pcLayout uses)
+function L.PcScales(w,h)
+ local s=math.min(1,w/PcWidth,h/PcHeight)
+ return s,math.max(s,MenuFloor)
+end
+local function pcLayout(w,h)
+ local sw,sh=w/PcWidth,h/PcHeight
+ local s,ms=L.PcScales(w,h)
+ -- the laid-out window (HUD px): exactly 1920 wide or exactly 720 tall when the window is smaller, the window itself when it is not
+ local vw,vh=w,h
+ if s<1 then if s==sw then vw,vh=PcWidth,h/s else vw,vh=w/s,PcHeight end end
+ local slots,side,gap=10,82,6
+ local barWidth=(slots+1)*side+slots*gap
+ local hotbarBottom,bottom=12,16
+ local walletW,walletH,walletGap=290,56,7
+ local walletStack=walletH*3+walletGap*2
+ local walletX,speedY=12,vh-bottom-walletStack
+ local cashY=speedY+walletH+walletGap;local gemY=cashY+walletH+walletGap
+ local statusW,statusH=337,125
+ -- the MENU's window (MENU px). Where the HUD pieces stand in it: a HUD box times k
+ local mw,mh=vw,vh;if ms~=s then mw,mh=w/ms,h/ms end
+ local k=s/ms
+ local hubSize=mh<280 and 52 or 64
+ local optionSize=mh<224 and 44 or mh<280 and 50 or 64
+ local margin=mh<212 and 4 or 8
+ local wallet={X=walletX*k,Y=speedY*k,W=walletW*k,H=walletStack*k}
+ local status={X=(vw-12-statusW)*k,Y=(vh-bottom-statusH)*k,W=statusW*k,H=statusH*k}
+ local hotbar={X=(vw-barWidth)/2*k,Y=(vh-hotbarBottom-side-44)*k,W=barWidth*k,H=(side+44)*k}
+ -- the arc: the hub's preferred centre a third of the way down; the band ends over the balances (the wheel's lower options reach furthest down, and sit over their corner).
+ -- (The owner-only TOOLS tile in the top-left corner is not avoided: StudioTestClient hides it while the wheel is open, and the closed hub is a third of the way down.)
+ local arc=wheelArc(hubSize,optionSize,hubSize==64 and 102 or 84,margin,wallet.Y-8,mh/3,false,mw,{hotbar,status})
+ local center,radius,radiusX,offsets=arc.Center,arc.Radius,arc.RadiusX,arc.Offsets
+ -- the held item's name rows (L.NameRows) show when their box is 4 px clear of the balances, the MENU button and every option of the open wheel (HUD px)
+ local q=ms/s
+ local function inHud(b)return {X=b.X*q,Y=b.Y*q,W=b.W*q,H=b.H*q}end
+ local avoid={{X=walletX,Y=speedY,W=walletW,H=walletStack},inHud({X=10,Y=center-hubSize/2,W=hubSize,H=hubSize})}
+ for _,o in ipairs(wheelBoxes(arc,hubSize,center))do avoid[#avoid+1]=inHud(o)end
+ local showDetails=rowsClear(L.NameRows({X=(vw-barWidth)/2,Y=vh-hotbarBottom-side,W=barWidth,H=side},false,vh),avoid)
+ return {Scale=s,MenuScale=ms,VW=vw,VH=vh,
+  Slots=slots,SlotSize=side,SlotGap=gap,HotbarBottom=hotbarBottom,HotbarDetails=showDetails,HotbarDetailH=44,
+  WalletWidth=walletW,WalletHeight=walletH,WalletX=walletX,SpeedY=speedY,CashY=cashY,GemY=gemY,
+  MenuSize=hubSize,MenuX=10,MenuShiftY=center-mh/2,MenuOptionSize=arc.OptionSize,MenuOffsets=offsets,MenuRadius=radius,MenuRadiusX=radiusX,
+  Short=false,Compact=false,StatusScale=1,StatusBottom=bottom,StatusRight=12,StatusStacked=false,OwnerToolsSize=48,OwnerToolsY=8}
+end
+-- The layout of a screen w x h (already at least 240 x 150); L.Read memoizes it.
 local function readLayout(w,h,touch,controls)
  if touch then return phoneLayout(w,h,controls)end
- local short=h<480;local compact=w<1050 or(touch and h<650)
- local slots=compact and 5 or 10
- -- R127 (owner): bigger hotbar slots on computers: 82 px (was 66), 72 px on narrow windows (was 60).
- local side=math.min(touch and(compact and 44 or 48)or(compact and 72 or 82),math.floor((w-32-slots*6)/(slots+1)))
- if h<300 then side=math.min(side,math.floor(h*.18))end
- local hotbarBottom=touch and w<500 and h>w and math.min(100,math.floor(h*.16))or(h<240 and 8 or 12)
- local nav=short and math.min(48,math.max(28,math.floor(h*.18)))or compact and 48 or 58
- local navWidth=short and nav or compact and(w<500 and 52 or 144)or 190
- local navGap=short and 6 or 8
- local gap=short and 4 or compact and 6 or 7
- local walletW=short and 144 or compact and 188 or 290
- if w<500 then walletW=math.min(170,math.floor((w-36)*.48))end
- local walletH=short and 30 or compact and 36 or 56
- local stacked=w<620
- local statusScale=short and .63 or compact and .76 or 1
- local statusWidth=stacked and 190 or 337
- statusScale=math.min(statusScale,math.max(1,w-walletW-36)/statusWidth)
- if short then nav=math.min(nav,math.floor((w-statusWidth*statusScale-32-navGap*2)/3));navWidth=nav end
- local barWidth=(slots+1)*side+slots*6
- local hudExtent=math.max(walletW,statusWidth*statusScale)+20
- -- R128 (owner): shrink the hotbar a bit (never below the pre-R127 66 / 60 px) when that lets the balances, boosts and
- -- timers sit at the bottom beside it instead of being lifted above it.
- local fitSide=math.floor((w-2*hudExtent-slots*6)/(slots+1))
- if(w-barWidth)/2<hudExtent and fitSide>=math.min(side,compact and 60 or 66)then side=math.min(side,fitSide);barWidth=(slots+1)*side+slots*6 end
- local bottom=(w-barWidth)/2<hudExtent and hotbarBottom+side+12 or 16
- if touch then bottom=math.max(bottom,math.min(160,math.floor(h*.32)))end
- -- Only the navigation dock becomes a compact row on shallow viewports. The balances stay left/bottom.
- local navY=8
- if short then walletH=math.min(walletH,math.floor((h-bottom-navY-nav-12-gap*2)/3))end
- walletH=math.max(16,walletH)
- local walletStack=walletH*3+gap*2
- local speedY=h-bottom-walletStack;local walletX=12
- -- The closed hub stays centered. Only resolve a real collision with the balances.
- local hubSize=h<280 and 52 or 64;local hubTop=(h-hubSize)/2
- if speedY<hubTop+hubSize+8 and h-bottom>hubTop-8 then
-  local compactHeight=math.floor((h-bottom-hubTop-hubSize-12)/3)
-  if compactHeight>=20 then walletH=math.min(walletH,compactHeight);gap=2;walletStack=walletH*3+gap*2;speedY=h-bottom-walletStack
-  elseif 70+walletW+12<=w-12-statusWidth*statusScale and h-bottom<=h-hotbarBottom-side-4 then walletX=70
-  else
-   gap=h<200 and 0 or 2;walletH=math.min(walletH,math.max(16,math.floor((hubTop-12-gap*2)/3)))
-   walletStack=walletH*3+gap*2;speedY=math.max(0,hubTop-4-walletStack)
-  end
- end
- local cashY=speedY+walletH+gap;local gemY=cashY+walletH+gap
- if not short then navY=math.max(8,math.min(math.floor(h*.42-nav),speedY-(nav*3+navGap*2)-16))end
- -- Reserve the largest status state (both boosts plus an event) so transitions cannot clip.
- local ownerSize=short and nav or 48
- local statusHeight=stacked and 211 or 125
- statusScale=math.min(statusScale,math.max(1,h-bottom-8-(short and ownerSize+8 or 0))/statusHeight)
- local ownerY=short and 8 or math.max(8,math.min(h*.5-24,h-bottom-statusHeight*statusScale-ownerSize-8))
- local optionSize=h<224 and 44 or h<280 and 50 or 64
- -- R157: five options round the hub, which stays in the middle (the radius shrinks, the fan flattens, then the options shrink, never below 44 px), clear of the tools tile and the hotbar (with its item-name row)
- local margin=h<212 and 4 or 8
- local arc=wheelArc(hubSize,optionSize,hubSize==64 and 102 or 84,margin,h-margin,h/2,true,w,{{X=10,Y=8,W=48,H=48},{X=(w-barWidth)/2,Y=h-hotbarBottom-side-44,W=barWidth,H=side+44}})
- local radius,radiusX,offsets=arc.Radius,arc.RadiusX,arc.Offsets;optionSize=arc.OptionSize
- local boxes={{X=10,Y=(h-hubSize)/2,W=hubSize,H=hubSize},
-  {X=w-12-statusWidth*statusScale,Y=h-bottom-statusHeight*statusScale,W=statusWidth*statusScale,H=statusHeight*statusScale},
-  -- Owner Tools uses this top-left tile while the wheel is closed.
-  {X=10,Y=8,W=48,H=48},
-  {X=(w-barWidth)/2,Y=h-hotbarBottom-side,W=barWidth,H=side}}
- for _,at in ipairs(offsets)do boxes[#boxes+1]={X=10+(hubSize-optionSize)/2+at.X,Y=(h-optionSize)/2+at.Y,W=optionSize,H=optionSize}end
- -- R157: the five-option wheel reaches lower than the three-option one (INVITE straight under the MENU button): where its lowest options reach into the balances' corner
- -- (1366 x 768, 1280 x 720 ...), the three rows get shorter and stay in that corner, under the wheel, as R155 does for the closed MENU button (down to the HUD's 16 px rows:
- -- 800 x 600); only when even that does not fit do they move to the spots below (the R113 fallbacks).
- do
-  local reach=nil
-  for _,at in ipairs(offsets)do
-   local x0=10+(hubSize-optionSize)/2+at.X
-   if x0<walletX+walletW+4 and x0+optionSize>walletX-4 then reach=math.max(reach or 0,h/2+at.Y+optionSize/2)end
-  end
-  if reach and speedY<reach+8 then
-   local compactHeight=math.floor((h-bottom-(reach+8)-4)/3)
-   if compactHeight>=16 then walletH=math.min(walletH,compactHeight);gap=2;walletStack=walletH*3+gap*2;speedY=h-bottom-walletStack end
-  end
- end
- local function fits(x,y,width,height)
-  if x<0 or y<0 or x+width>w or y+height>h-bottom+.01 then return false end
-  for _,box in ipairs(boxes)do if x<box.X+box.W+4 and x+width>box.X-4 and y<box.Y+box.H+4 and y+height>box.Y-4 then return false end end
-  return true
- end
- local function metrics()
-  cashY=speedY+walletH+gap;gemY=cashY+walletH+gap
-  -- R157: the held item's name rows sit above the pity bars (L.NameRows); on a small window they hide when they would run into the balances, the MENU button or an
-  -- option of the open wheel. A computer always showed them before; the reserved status box may touch the label's empty ends on a narrow window, as in R155 (its text is
-  -- centred and short).
-  local avoid={boxes[1],{X=walletX,Y=speedY,W=walletW,H=walletStack}}
-  for _,b in ipairs(wheelBoxes(arc,hubSize,h/2))do avoid[#avoid+1]=b end
-  local showDetails=rowsClear(L.NameRows({X=(w-barWidth)/2,Y=h-hotbarBottom-side,W=barWidth,H=side},false,h),avoid)
-  return {Slots=slots,SlotSize=side,HotbarBottom=hotbarBottom,HotbarDetails=showDetails,NavSize=nav,NavWidth=navWidth,NavGap=navGap,NavX=10,NavY=navY,NavHorizontal=short,
-   WalletWidth=walletW,WalletHeight=walletH,WalletX=walletX,MenuSize=hubSize,MenuX=10,MenuOptionSize=optionSize,MenuOffsets=offsets,MenuRadius=radius,MenuRadiusX=radiusX,SpeedY=speedY,CashY=cashY,GemY=gemY,Short=short,Compact=compact,
-   StatusScale=statusScale,StatusBottom=bottom,StatusStacked=stacked,OwnerToolsSize=ownerSize,OwnerToolsY=ownerY}
- end
- -- R157: the balances' spot must also leave the pity bars a clear place over the hotbar (a small window: the wheel's lower options push the balances beside it).
- -- PityBars155.Place is asked once a layout is built; without that module (a partial test bundle) any spot that clears the boxes does, as before.
- local function barsClear(m)
-  local ok,clear=pcall(function()return require(script.Parent.PityBars155).Place(w,h,m,nil).Clear end)
-  return not ok or clear~=false
- end
- local m=metrics()
- if not fits(walletX,speedY,walletW,walletStack)or not barsClear(m)then
-  local sideX=10+(hubSize-optionSize)/2+radiusX+optionSize+12
-  local natural={walletX,speedY,walletH,gap,walletStack};local first
-  for _,height in ipairs({walletH,math.max(20,math.min(walletH,24)),20})do
-   local spacing=height==walletH and gap or 2;local stack=height*3+spacing*2
-   for _,at in ipairs({{sideX,h-bottom-stack},{12,h-bottom-stack},{70,8},{sideX,8}})do
-    if fits(at[1],at[2],walletW,stack)then
-     walletX,speedY,walletH,gap,walletStack=at[1],at[2],height,spacing,stack
-     local candidate=metrics();if barsClear(candidate)then return candidate end
-     first=first or {at[1],at[2],height,spacing,stack}
-    end
-   end
-  end
-  -- (no spot leaves the bars clear: the first that clears the boxes, as before R157; none at all: where they were)
-  walletX,speedY,walletH,gap,walletStack=table.unpack(first or natural)
-  m=metrics()
- end
- return m
+ return pcLayout(w,h)
 end
--- R157 review (performance): the search above is dear - up to ~80 ms on a short PC window (640 x 360), tens of ms on 1920 x 300 and 1280 x 320 - and L.Read is asked all the
--- time (WorldStatusHud every .25 s and every frame of the refresh 3-2-1, every reveal's RarePullCard.FitBand / SkipBoxes, every layout change). The layout is a pure function of
--- what is keyed below, so the last CacheSize answers are kept: the same screen again costs a few comparisons and allocates nothing, a new size searches once.
+-- R157 review (performance): the wheel's search is dear (R157's computer layout took up to ~80 ms on a short window; R158's moves the MENU button with one search, a phone's wheel
+-- still searches) and L.Read is asked all the time (WorldStatusHud every .25 s and every frame of the refresh 3-2-1, every reveal's RarePullCard.FitBand / SkipBoxes, every layout
+-- change). The layout is a pure function of what is keyed below, so the last CacheSize answers are kept: the same screen again costs a few comparisons and allocates nothing, a new
+-- size searches once.
 --  The key, in this order (KeyLength slots, every one compared by value):
 --   1  w   2  h       the HUD area, clamped to 240 x 150 exactly as readLayout takes it (view = HudLayout.Viewport: the safe area, so the insets are in it)
 --   3  touch          true / false (a phone's layout, or a computer's)
 --   4 - 7  Joystick X, Y, W, H     8 - 11  Jump X, Y, W, H     the thumb controls (HudLayout.Controls: safe-area px); false when absent. Only a phone reads them,
 --                                                              so a computer's key holds false here (its controls cannot change its layout)
 --   12 - 14  L.NameBand, L.NameWidth, L.NameClear      15, 16  L.PityBarHeight, L.PityGap     what L.NameRows (the details rule) reads
---   17  PityBars155 (the module, or false: a partial bundle)   18  its Place   19  L.HudBoxes     what barsClear searches with (a computer only)
+--  (R158: slots 17 - 19, PityBars155 / its Place / L.HudBoxes, are gone: the computer layout no longer searches the balances' spot with the bars - it is the fixed 1920 x 1080
+--  arrangement, scaled - so nothing reads them)
 --  Nothing else is read: no attribute, no setting, no clock. The answer is shared and FROZEN (deeply: table.freeze) - callers read it, none writes into it (checked for every
 --  caller in src), and a write would raise instead of changing what the next caller sees. The caller's `controls` rects are copied before the search, so the answer holds no
 --  table of the caller's (m.Joystick / m.Jump of a landscape phone used to be the caller's own rects).
-local CacheSize,KeyLength=8,19
+local CacheSize,KeyLength=8,16
 local cache,cacheAt,cacheLast,probe={},0,0,{}
-local function requireBars()return require(script.Parent.PityBars155)end
 -- (equal by value; -0 is not +0 here, an input that differs in anything is a new key; NaN equals nothing, so it just searches again)
 local function sameKey(a,b)
  for i=1,KeyLength do
@@ -394,22 +347,47 @@ local function freeze(t)
  return t
 end
 local function rectOf(r)return r and{X=r.X,Y=r.Y,W=r.W,H=r.H}or nil end
+-- R158: a computer's layout in real screen px. The HUD numbers (positions, sizes, offsets from an edge) times m.Scale, the MENU numbers (m.Menu*, the wheel's offsets and
+-- radii) times m.MenuScale; Scale and MenuScale of the copy are 1 and VW / VH are gone. A layout that is not scaled (a touch screen's, a window of 1920 x 720 or more) is returned
+-- as it is, so callers that work in screen px (HudBoxes, the reveal card, BONUS ROLL, the tutorial) get a phone's numbers untouched. The copy is shared, frozen and kept per layout.
+local REAL_HUD={'SlotSize','SlotGap','HotbarBottom','HotbarShiftX','HotbarDetailH','WalletWidth','WalletHeight','WalletX','SpeedX','CashX','GemX','SpeedY','CashY','GemY','StatusBottom','StatusRight','StatusScale'}
+local REAL_MENU={'MenuX','MenuSize','MenuOptionSize','MenuShiftY','MenuRadius','MenuRadiusX'}
+local realOf=setmetatable({},{__mode='k'})
+function L.Real(m)
+ local s,ms=m.Scale or 1,m.MenuScale or 1
+ if s==1 and ms==1 then return m end
+ local r=realOf[m]
+ if r then return r end
+ r=table.clone(m)
+ for _,key in ipairs(REAL_HUD)do if m[key]~=nil then r[key]=m[key]*s end end
+ for _,key in ipairs(REAL_MENU)do if m[key]~=nil then r[key]=m[key]*ms end end
+ if m.MenuOffsets then local o={};for i,p in ipairs(m.MenuOffsets)do o[i]={X=p.X*ms,Y=p.Y*ms}end;r.MenuOffsets=o end
+ r.Scale,r.MenuScale,r.VW,r.VH=1,1,nil,nil
+ realOf[m]=freeze(r)
+ return r
+end
+-- R158: a piece of the HUD drawn at scale s (m.Scale, or m.MenuScale for the MENU): its root gets a UIScale (HudScale) of s, which shrinks the root and everything in it about its
+-- AnchorPoint. At 1 (every touch screen, a window of 1920 x 720 or more) no instance is made and an existing one is set back to 1.
+function L.ApplyScale(root,s)
+ local u=root:FindFirstChild('HudScale')
+ if not u then
+  if s==1 then return end
+  u=Instance.new('UIScale');u.Name='HudScale';u.Parent=root
+ end
+ if u.Scale~=s then u.Scale=s end
+end
 -- view: a Vector2 (the HUD area); touch: TouchEnabled; controls: HudLayout.Controls(gui) or nil. Returns the metrics table (see HudBoxes) - shared, frozen, never to be written to.
 function L.Read(view,touch,controls)
  local w,h=math.max(240,view.X),math.max(150,view.Y)
  touch=touch and true or false
- local ok,bars -- (first: a module that loads for the first time may run other code, none of which may find the probe half written)
- if not touch then ok,bars=pcall(requireBars)end
  local k=probe
  k[1],k[2],k[3]=w,h,touch
  if touch then
   local stick,jump=controls and controls.Joystick,controls and controls.Jump
   if stick then k[4],k[5],k[6],k[7]=stick.X,stick.Y,stick.W,stick.H else k[4],k[5],k[6],k[7]=false,false,false,false end
   if jump then k[8],k[9],k[10],k[11]=jump.X,jump.Y,jump.W,jump.H else k[8],k[9],k[10],k[11]=false,false,false,false end
-  k[17],k[18],k[19]=false,false,false
  else
   k[4],k[5],k[6],k[7],k[8],k[9],k[10],k[11]=false,false,false,false,false,false,false,false
-  k[17]=ok and bars or false;k[18]=ok and type(bars)=='table'and bars.Place or false;k[19]=L.HudBoxes
  end
  k[12],k[13],k[14],k[15],k[16]=L.NameBand,L.NameWidth,L.NameClear,L.PityBarHeight,L.PityGap
  local hit=cache[cacheLast]
@@ -525,9 +503,11 @@ local function createNavigation(pg)
   if record.Completed then record.Completed:Disconnect();record.Completed=nil end
   for _,tween in ipairs(record.Tweens)do tween:Cancel()end;table.clear(record.Tweens)
  end
+ -- (R158: a computer's MENU is drawn at its own scale m.MenuScale - the hub and each option's group carry a UIScale of it - so the offsets, which are in MENU px, are times it;
+ -- 1 on a phone and on a window of 1920 x 720 or more: the same numbers as before)
  local function position(entry,opened)
-  local m=state.Metrics;local at=m.MenuOffsets[entry.Index];local x,y=at.X,at.Y
-  return UDim2.new(0,m.MenuX+(m.MenuSize-m.MenuOptionSize)/2-PAD+(opened and x or 0),.5,(m.MenuShiftY or 0)-m.MenuOptionSize/2-PAD+(opened and y or 0))
+  local m=state.Metrics;local at=m.MenuOffsets[entry.Index];local x,y=at.X,at.Y;local ms=m.MenuScale or 1
+  return UDim2.new(0,(m.MenuX+(m.MenuSize-m.MenuOptionSize)/2-PAD+(opened and x or 0))*ms,.5,((m.MenuShiftY or 0)-m.MenuOptionSize/2-PAD+(opened and y or 0))*ms)
  end
  local function animate(entry,instant)
   cancel(entry);local shown=state.Open and pg:GetAttribute('SeedMenu')==nil
@@ -587,13 +567,14 @@ local function createNavigation(pg)
  end
  local function layout(m)
   if state.Dead then return end;state.Metrics=m
-  hub.AnchorPoint=Vector2.zero;hub.Position=UDim2.new(0,m.MenuX,.5,(m.MenuShiftY or 0)-m.MenuSize/2);hub.Size=UDim2.fromOffset(m.MenuSize,m.MenuSize)
+  local ms=m.MenuScale or 1
+  hub.AnchorPoint=Vector2.zero;hub.Position=UDim2.new(0,m.MenuX*ms,.5,((m.MenuShiftY or 0)-m.MenuSize/2)*ms);hub.Size=UDim2.fromOffset(m.MenuSize,m.MenuSize);L.ApplyScale(hub,ms)
   local size=m.MenuSize;local captionHeight=menuPixels(14,size)
   glyph.Position=UDim2.new(.5,0,0,menuPixels(18,size));glyph.Size=UDim2.fromOffset(menuPixels(22,size),menuPixels(22,size))
   for i=0,3 do local tile=glyph:FindFirstChild('Tile'..i);tile.Size=UDim2.fromOffset(menuPixels(8,size),menuPixels(8,size));tile.Position=UDim2.fromOffset(menuPixels(i%2*14,size),menuPixels(math.floor(i/2)*14,size))end
   caption.Position=UDim2.new(0,0,1,-captionHeight);caption.Size=UDim2.new(1,0,0,captionHeight);caption.TextSize=menuPixels(10,size)
   require(script.Parent.GardenTextFit).Attach(caption,menuPixels(10,size),menuPixels(9,size))
-  for _,entry in pairs(state.Entries)do entry.Group.Size=UDim2.fromOffset(m.MenuOptionSize+PAD*2,m.MenuOptionSize+PAD*2);styleOption(entry.Button,m.MenuOptionSize)end
+  for _,entry in pairs(state.Entries)do entry.Group.Size=UDim2.fromOffset(m.MenuOptionSize+PAD*2,m.MenuOptionSize+PAD*2);L.ApplyScale(entry.Group,ms);styleOption(entry.Button,m.MenuOptionSize)end
   state:SetOpen(state.Open,true)
  end
  state.StopLayout=L.Watch(gui,layout)
@@ -632,7 +613,7 @@ function L.Navigation(button,index)
  local state=navigation;local previous=state.Entries[index]
  if previous and previous.Button==button then return previous.Remove end
  if previous then previous.Remove(true)end
- local group=Instance.new('CanvasGroup');group.Name='MenuOption'..index;group.BackgroundTransparency=1;group.Size=UDim2.fromOffset(state.Metrics.MenuOptionSize+PAD*2,state.Metrics.MenuOptionSize+PAD*2);group.GroupTransparency=1;group.Visible=false;group.ZIndex=2+index;group.Parent=state.Gui
+ local group=Instance.new('CanvasGroup');group.Name='MenuOption'..index;group.BackgroundTransparency=1;group.Size=UDim2.fromOffset(state.Metrics.MenuOptionSize+PAD*2,state.Metrics.MenuOptionSize+PAD*2);group.GroupTransparency=1;group.Visible=false;group.ZIndex=2+index;group.Parent=state.Gui;L.ApplyScale(group,state.Metrics.MenuScale or 1)
  local entry={Index=index,Button=button,Group=group,Connections={},Tweens={}};state.Entries[index]=entry;button:SetAttribute('ButtonSound',false);button.Parent=group
  function entry.Remove(replacing)
   if entry.Removed then return end;entry.Removed=true

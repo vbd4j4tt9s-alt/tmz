@@ -35,8 +35,11 @@ function Wallet.new(parent)
  local function layout(m)
   local shared=require(RS.HudLayout)
   m=m or shared.Read(shared.Viewport(parent),game:GetService('UserInputService').TouchEnabled,shared.Controls(parent))
+  -- R158: a computer's HUD is the 1920 x 1080 arrangement scaled by m.Scale (HudLayout): each row's place is times it and the row carries a UIScale of it, so the icon, the number and
+  -- the + button shrink with the row; m.Scale is 1 (no UIScale, the same numbers) on every phone and tablet and on a window of 1920 x 720 or more
+  local k=m.Scale or 1
   for i,r in ipairs(rows)do
-   r.Root.Position=UDim2.fromOffset(({m.SpeedX or m.WalletX,m.CashX or m.WalletX,m.GemX or m.WalletX})[i],({m.SpeedY,m.CashY,m.GemY})[i]);r.Root.Size=UDim2.fromOffset(m.WalletWidth,m.WalletHeight)
+   r.Root.Position=UDim2.fromOffset(({m.SpeedX or m.WalletX,m.CashX or m.WalletX,m.GemX or m.WalletX})[i]*k,({m.SpeedY,m.CashY,m.GemY})[i]*k);r.Root.Size=UDim2.fromOffset(m.WalletWidth,m.WalletHeight);shared.ApplyScale(r.Root,k)
    local side=m.WalletIcon or m.WalletHeight;local plus=m.WalletPlus or math.min(36,math.max(16,math.floor(side*.78)))
    r.Icon.Position=UDim2.fromOffset(0,(m.WalletHeight-side)/2);r.Icon.Size=UDim2.fromOffset(side,side)
    r.More.Size=UDim2.fromOffset(plus,plus);r.More.Position=UDim2.new(1,-plus,.5,-plus*.5);r.More.TextSize=math.min(28,plus)

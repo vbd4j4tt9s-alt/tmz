@@ -14,6 +14,11 @@
 --                 card / HUD boxes; the name rows vs the HUD; the open wheel vs the balances / timers / hotbar / jump / the top of the HUD area / the bars / the name rows; the
 --                 closed wheel's friend chip vs everything
 -- Prints a WHEEL / SCREEN / FIT line per screen; "R157 HUD layout checks N, fails 0".
+-- R158 (on purpose; the computer rows of this test): a computer's HUD is the 1920 x 1080 arrangement drawn at m.Scale = min(1, w / 1920, h / 720) and its MENU button a third of the way down at
+-- m.MenuScale = max(Scale, .85) (HudLayout). The public layout functions still answer in real screen px; the bars' own fixed numbers (8 px gap, 3 px name clearance, 5 px glow, 24 px bars) are
+-- HUD px, so they are times k = m.Scale below (1 on a phone and on a window of 1920 x 720 or more: nothing changes there). What is not true any more, and goes: the balances' R157 rule
+-- (shorter rows under the wheel), the 640 x 360 ring and its pull-in off the owner tools tile (the tile hides while the wheel is open and the wheel fits at every window), the PC
+-- rows of the .md's wheel table (MENU in the middle: now a third down).
 local W=require('./world');local R=W.R
 local V2=R.Vector2.new
 local checks,fails=0,0
@@ -81,16 +86,17 @@ do
   local w,h,touch,name=s[1],s[2],s[3],s[4]
   for _,ctl in ipairs(touch and{false,true}or{false})do
    local c=ctl and controls(w,h)or nil;local m=Hud.Read(V2(w,h),touch,c);local dock=B.DefaultDock(m,w,h);local place=B.Place(w,h,m,dock);local pair=place.Pair
+   local k=m.Scale or 1;local hudBar=(place.Hud or place).Bar
    local tag=fmt('%s%s',name,ctl and' (thumb controls)'or'')
-   local gap=dock.Y-(pair.Y+pair.H);local wantGap=B.Gap(touch,place.Bar.H)
-   check(place.Clear and gap==wantGap,fmt('%s: the bars sit %d px over the slots (want %d), a clear spot',tag,gap,wantGap))
+   local gap=(dock.Y-(pair.Y+pair.H))/k;local wantGap=B.Gap(touch,hudBar.H)
+   check(place.Clear and near(gap,wantGap,1e-6),fmt('%s: the bars sit %d px over the slots (want %d), a clear spot',tag,gap,wantGap))
    check(m.Travel==nil,tag..': R113\'s BASE / TRACK spot (m.Travel) is gone')
    local row=B.NameRow(w,h,m,dock,place);local rows=B.NameRows(w,h,m,dock,place)
-   check(row==math.ceil(dock.Y-pair.Y)+3 and near(rows.Y+rows.H,dock.Y-row)and rows.Y+rows.H<=pair.Y-3+1e-6 and near(rows.X+rows.W/2,dock.X+dock.W/2)and rows.W==math.min(dock.W,Hud.NameWidth),fmt('%s: the name rows end %d px over the slots, right above the bars (%d px), centred, %d px wide',tag,row,gap+place.Bar.H,rows.W))
+   check(row==math.ceil((dock.Y-pair.Y)/k-1e-6)+3 and near(rows.Y+rows.H,dock.Y-row*k)and rows.Y+rows.H<=pair.Y-3*k+1e-6 and near(rows.X+rows.W/2,dock.X+dock.W/2)and near(rows.W,math.min(dock.W,Hud.NameWidth*k)),fmt('%s: the name rows end %d HUD px over the slots, right above the bars (%d px), centred, %d px wide',tag,row,gap+hudBar.H,rows.W/k))
    -- HudLayout's own estimate (it tells whether the rows show before the bars exist) is where they really are wherever they show: the bars are never raised there
    -- (a screen whose bars stack - 420 x 420 - hides the rows; section 5 checks the REAL rows against the HUD on every screen that shows them)
-   local est=Hud.NameRows({X=dock.X,Y=dock.Y,W=dock.W,H=dock.H},touch,h)
-   if m.HotbarDetails~=false then check(near(est.Y,rows.Y,.5)and near(est.X,rows.X),fmt('%s: HudLayout.NameRows (%d) is where the rows go (%d)',tag,est.Y,rows.Y))end
+   local est=Hud.NameRows({X=dock.X/k,Y=dock.Y/k,W=dock.W/k,H=dock.H/k},touch,h/k) -- (HUD px)
+   if m.HotbarDetails~=false then check(near(est.Y*k,rows.Y,.5)and near(est.X*k,rows.X,.5),fmt('%s: HudLayout.NameRows (%d) is where the rows go (%d)',tag,est.Y*k,rows.Y))end
    if m.HotbarDetails==false then hidden[#hidden+1]=fmt('%dx%d',w,h)end
   end
  end
@@ -237,11 +243,12 @@ end
 do
  -- menu_wheel_daily.md: MENU centre y, option px, radius up / down and the five offsets (the md rounds a diagonal to the px)
  local TABLE={
-  ['1920x1080']={false,540,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
-  ['1366x768']={false,384,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
-  ['1280x720']={false,360,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
-  ['1024x768']={false,384,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
-  ['800x600']={false,300,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
+  -- (R158, on purpose: a computer's MENU a third of the way down - screen px; the offsets are in MENU px, the same half circle at every window, drawn at m.MenuScale)
+  ['1920x1080']={false,360,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
+  ['1366x768']={false,256,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
+  ['1280x720']={false,240,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
+  ['1024x768']={false,256,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
+  ['800x600']={false,200,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
   ['932x430']={true,173,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
   ['844x390']={true,142,64,{{0,-102},{72,-72},{102,0},{72,78},{0,111}}},
   ['740x360']={true,134,64,{{0,-94},{96,-52},{174,0},{96,52},{0,95}}},
@@ -257,7 +264,7 @@ do
  }
  for key,row in pairs(TABLE)do
   local w,h=key:match('(%d+)x(%d+)');w,h=tonumber(w),tonumber(h)
-  local m=Hud.Read(V2(w,h),row[1],nil);local o=m.MenuOffsets;local centre=h/2+(m.MenuShiftY or 0)
+  local m=Hud.Read(V2(w,h),row[1],nil);local o=m.MenuOffsets;local centre=h/2+(m.MenuShiftY or 0)*(m.MenuScale or 1)
   local same=#o==5 and m.MenuOptionSize==row[3]and math.abs(centre-row[2])<=1
   for i=1,5 do if not(o[i]and math.abs(o[i].X-row[4][i][1])<=1 and math.abs(o[i].Y-row[4][i][2])<=1)then same=false end end
   local got={};for i=1,#o do got[i]=fmt('(%.0f,%.0f)',o[i].X,o[i].Y)end
@@ -267,19 +274,23 @@ do
  local m=Hud.Read(V2(1920,1080),false,nil);local o=m.MenuOffsets
  check(o[4].X>0 and o[4].Y>0 and o[5].X==0 and o[5].Y>0 and o[5].Y>-o[1].Y and o[1].X==0 and o[3].Y==0,'1920x1080: SETTINGS up, INDEX up-right, SHOP right (where they were), DAILY down-right, INVITE straight down (111 px, under the 102 px up)')
  -- the fallbacks: under ~280 px smaller buttons, under ~230 px DAILY / INVITE in a row beyond SHOP; nothing overlaps there either (section 5)
- local f1=Hud.Read(V2(640,280),true,nil);local f2=Hud.Read(V2(600,250),true,nil);local f3=Hud.Read(V2(560,220),true,nil);local f4=Hud.Read(V2(640,360),false,nil)
+ local f1=Hud.Read(V2(640,280),true,nil);local f2=Hud.Read(V2(600,250),true,nil);local f3=Hud.Read(V2(560,220),true,nil)
  check(f1.MenuOptionSize<64 and f1.MenuOffsets[4].X<f1.MenuOffsets[3].X and f1.MenuOffsets[5].Y>0,'640x280 (under ~280 px): smaller buttons ('..f1.MenuOptionSize..' px), still the half circle')
- for _,c in ipairs({{f2,'600x250'},{f3,'560x220'},{f4,'PC 640x360'}})do
+ for _,c in ipairs({{f2,'600x250'},{f3,'560x220'}})do
   local q=c[1].MenuOffsets
   check(q[4].Y==0 and q[5].Y==0 and q[4].X>q[3].X and q[5].X>q[4].X and q[4].X-q[3].X>=c[1].MenuOptionSize+8 and q[5].X-q[4].X>=c[1].MenuOptionSize+8,c[2]..': the fallback - DAILY / INVITE in a row beyond SHOP, 8 px apart')
  end
- -- the balances keep their bottom-left corner under the five-option wheel on a computer: where its lower options reach into it the three rows get shorter (16 px at least:
- -- 800 x 600); R113's other spots only where even that does not fit (700 x 400 and smaller windows)
- for _,s in ipairs({{1920,1080},{1366,768},{1280,720},{1024,768},{800,600},{1600,900},{1440,900},{1280,1024},{960,480},{1891,733}})do
-  local w,h=s[1],s[2];local m=Hud.Read(V2(w,h),false,nil)
-  check(m.WalletX==12 and m.WalletHeight>=16 and math.abs(m.GemY+m.WalletHeight-(h-m.StatusBottom))<=.5,fmt('PC %dx%d: the balances stay in the bottom-left corner under the wheel (x %d, rows %d px, ending %d px over the bottom)',w,h,m.WalletX,m.WalletHeight,h-(m.GemY+m.WalletHeight)))
+ -- R158 (on purpose): the balances never move or shrink for the wheel on a computer (R157's "shorter rows under the wheel" rule is gone): the three 56 HUD px rows stay in the bottom-left
+ -- corner, 12 px from the left, the last 16 px over the bottom, at every window (the whole HUD is drawn at m.Scale); the MENU button is a third of the way down so the wheel clears them. The 5-option
+ -- half circle fits at every one of these windows (no fallback ring), and its first option is not pulled in off the owner tools tile any more (the tile hides while the wheel is open).
+ for _,s in ipairs({{1920,1080},{1366,768},{1280,720},{1024,768},{800,600},{1600,900},{1440,900},{1280,1024},{960,480},{1891,733},{640,360},{420,420}})do
+  local w,h=s[1],s[2];local m=Hud.Read(V2(w,h),false,nil);local ms=m.MenuScale
+  check(m.WalletX==12 and m.WalletHeight==56 and m.WalletWidth==290 and math.abs(m.GemY+m.WalletHeight-(m.VH-m.StatusBottom))<=.5 and m.StatusBottom==16,fmt('PC %dx%d: the balances keep their full size in the bottom-left corner (x %d, rows %d HUD px, ending %d HUD px over the bottom)',w,h,m.WalletX,m.WalletHeight,m.VH-(m.GemY+m.WalletHeight)))
+  local o=m.MenuOffsets;local fan=o[4].X>o[3].X
+  check(not fan and #o==5 and o[5].X==0 and o[5].Y>0,fmt('PC %dx%d: the five options are the half circle (no fallback ring)',w,h))
+  local lowest=h/2+m.MenuShiftY*ms+(o[5].Y+m.MenuOptionSize/2)*ms
+  check(lowest<=(m.SpeedY)*m.Scale-8*ms+.5,fmt('PC %dx%d: the open wheel ends (%.0f) 8 px over the balances (%.0f)',w,h,lowest,m.SpeedY*m.Scale))
  end
- check(f4.MenuOffsets[1].Y>-102,'PC 640x360: the fallback ring\'s first option is pulled in off the owner tools tile (radius '..(-f4.MenuOffsets[1].Y)..')')
  local okSlots=pcall(function()local g=R.new('ScreenGui');local b=R.new('TextButton');b.Parent=g;Hud.Navigation(b,6)end)
  check(not okSlots,'Navigation takes slots 1..5 only')
 end
@@ -297,7 +308,8 @@ do
   for _,ctl in ipairs(touch and{false,true}or{false})do
    local c=ctl and controls(w,h)or nil;setScreen(w,h,touch)
    local m=Hud.Read(V2(w,h),touch,c);local tag=name..(ctl and' (thumb controls)'or'')
-   local dock=B.DefaultDock(m,w,h);local place=B.Place(w,h,m,dock);local ext=B.Extent(place.Pair,place.Bar.W,place.Bar.H)
+   local k=m.Scale or 1;local ms=m.MenuScale or 1 -- (R158: the bars' fixed numbers are HUD px, the MENU's are MENU px)
+   local dock=B.DefaultDock(m,w,h);local place=B.Place(w,h,m,dock);local ext=B.Extent(place.Pair,place.Bar.W,place.Bar.H,k)
    local rows=m.HotbarDetails~=false and B.NameRows(w,h,m,dock,place)or nil
    local res=B.Reserved(w,h,m,dock)
    local boxes=Hud.HudBoxes(m,w,h,false);local wheel=Hud.HudBoxes(m,w,h,true)
@@ -306,7 +318,7 @@ do
    -- the bars
    if ov(place.Pair,dock,0)then bad[#bad+1]='bars on the slots'end
    for _,b in ipairs(boxes)do if b.N~='Hotbar'and ov(ext,b,0)then bad[#bad+1]='bars x '..b.N end end
-   if rows and ov(rows,ext,0)and rows.Y+rows.H>place.Pair.Y-3+1e-6 then bad[#bad+1]='name rows x bars'end
+   if rows and ov(rows,ext,0)and rows.Y+rows.H>place.Pair.Y-3*k+1e-6 then bad[#bad+1]='name rows x bars'end
    if rows then for _,b in ipairs(boxes)do if b.N~='Hotbar'and(b.N~='Status'or touch)and ov(rows,b,0)then bad[#bad+1]='name rows x '..b.N end end end
    -- the BONUS ROLL button (what TreadmillBonusClient asks: PityBars155.ButtonSpot with the open wheel's boxes and the notice rows)
    local btn=B.ButtonSpot(TB,m,w,h,wheel,noticeRows(w,h))
@@ -325,18 +337,19 @@ do
    if bottom>res.Y then bad[#bad+1]='card band over the bars'end
    -- the open wheel
    for i,a in ipairs(opts)do
-    if a.X<0 or a.Y<8-1e-6 or a.X+a.W>w or a.Y+a.H>h then bad[#bad+1]=a.N..' off the HUD area'end
+    if a.X<0 or a.Y<8*ms-1e-6 or a.X+a.W>w or a.Y+a.H>h then bad[#bad+1]=a.N..' off the HUD area'end
     if ov(a,wheel[1],0)then bad[#bad+1]=a.N..' x MENU'end
     for j=i+1,#opts do if ov(a,opts[j],0)then bad[#bad+1]=a.N..' x '..opts[j].N end end
     for _,b in ipairs(boxes)do if b.N~='Hub'and b.N~='OwnerTools'and b.N~='Hotbar'and ov(a,b,0)then bad[#bad+1]=a.N..' x '..b.N end end
     if ov(a,dock,0)then bad[#bad+1]=a.N..' x slots'end
     if ov(a,ext,0)then bad[#bad+1]=a.N..' x bars'end
     if rows and ov(a,rows,0)then bad[#bad+1]=a.N..' x name rows'end
-    -- (the owner tools tile hides while the wheel is open: StudioTestClient; a 640 x 360 window's ring still stays off it)
-    for _,b in ipairs(boxes)do if b.N=='OwnerTools'and ov(a,b,0)then bad[#bad+1]=a.N..' x OwnerTools'end end
+    -- (the owner tools tile hides while the wheel is open: StudioTestClient; R158: a computer's wheel may stand where it is)
+    if touch then for _,b in ipairs(boxes)do if b.N=='OwnerTools'and ov(a,b,0)then bad[#bad+1]=a.N..' x OwnerTools'end end end
    end
+   if not touch then for _,b in ipairs(boxes)do if b.N=='OwnerTools'and ov(wheel[1],b,0)then bad[#bad+1]='the closed MENU button x OwnerTools'end end end
    -- the closed wheel's friend chip, right of the MENU button
-   local hub=wheel[1];local chip={X=hub.X+hub.W+Hud.ChipSize.Gap,Y=hub.Y+hub.H/2-Hud.ChipSize.Y/2,W=Hud.ChipSize.X,H=Hud.ChipSize.Y}
+   local hub=wheel[1];local chip={X=hub.X+hub.W+Hud.ChipSize.Gap*ms,Y=hub.Y+hub.H/2-Hud.ChipSize.Y*ms/2,W=Hud.ChipSize.X*ms,H=Hud.ChipSize.Y*ms}
    if chip.X+chip.W>w then bad[#bad+1]='friend chip off screen'end
    for _,b in ipairs(boxes)do if b.N~='Hub'and b.N~='OwnerTools'and ov(chip,b,0)then bad[#bad+1]='friend chip x '..b.N end end
    if ov(chip,ext,0)or(rows and ov(chip,rows,0))then bad[#bad+1]='friend chip x bars / name rows'end

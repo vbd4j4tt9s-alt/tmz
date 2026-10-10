@@ -1,0 +1,16 @@
+# w h        R158 PC HUD: the HUD area (under Roblox's 52 px top bar) of every computer window run by test_pc_hud158.luau. The first five are the owner's: 1920 x 1080 is the screenshot.
+1920 1080
+1366 768
+1280 720
+1024 768
+800 600
+# (more windows: bigger than 1080p, 16:10, the shortest 16:9 a game window gets, wide and short, and tiny)
+2560 1440
+1600 900
+1440 900
+1280 1024
+960 540
+640 360
+1920 300
+1280 400
+420 420

@@ -124,7 +124,9 @@ function H.Create(pg,player)
   local hint=active and(player:GetAttribute('SpecialKeeperChase84')and'CHASING YOU' or'AT STORM PEAKS')or(event and'COMING IN '..SpeedBoost.Clock(waitFor))or''
   if specialHint.Text~=hint then specialHint.Text=hint end
   special:SetAttribute('AccessibleLabel','The Darkened '..hint:lower())
-  scale.Scale=m.StatusScale
+  -- (R158: a computer's HUD is scaled by m.Scale as a whole: the stack's UIScale is the status scale times it, and its place from the corner is times it; m.Scale is 1 elsewhere)
+  local hudScale=m.Scale or 1
+  scale.Scale=m.StatusScale*hudScale
   -- R129: plain text rows (no card) on landscape phones; cards everywhere else.
   for _,name in ipairs({'Weather','Track'})do local want=m.StatusPlain and 1 or .73;if rows[name].Root.BackgroundTransparency~=want then rows[name].Root.BackgroundTransparency=want end end
   if m.StatusCorner then
@@ -155,13 +157,13 @@ function H.Create(pg,player)
    root.Size=UDim2.fromOffset(hasBoosts and not stacked and 337 or 190,82+offset+(stacked and 86 or 0));
    special.Position=UDim2.fromOffset(hasBoosts and not stacked and 147 or 0,0)
    for i,row in ipairs(boostRows)do row.Root.Position=UDim2.fromOffset(stacked and 26 or 0,offset+(i-1)*43)end
-   scale.Scale=m.StatusScale
+   scale.Scale=m.StatusScale*hudScale
    for i,name in ipairs({'Weather','Track'})do
    rows[name].Root.Position=UDim2.fromOffset(hasBoosts and not stacked and 147 or 0,offset+(stacked and 86 or 0)+(i-1)*43);rows[name].Root.Size=UDim2.fromOffset(190,39)
    end
   end
   root.AnchorPoint=Vector2.new(1,m.StatusTop and 0 or 1)
-  root.Position=m.StatusTop and UDim2.new(1,-12,0,m.StatusTop)or UDim2.new(1,-(m.StatusRight or 12),1,-m.StatusBottom)
+  root.Position=m.StatusTop and UDim2.new(1,-12,0,m.StatusTop)or UDim2.new(1,-(m.StatusRight or 12)*hudScale,1,-m.StatusBottom*hudScale)
   root.Visible=pg:GetAttribute('SeedMenu')==nil
   local character=player.Character;local hum=character and character:FindFirstChildOfClass('Humanoid');local part=character and character:FindFirstChild('HumanoidRootPart')
   local point=part and hum and hum.Health>0 and part.Position or nil

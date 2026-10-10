@@ -12,6 +12,9 @@
 --  5. frozen   - the answer is deeply frozen (a write raises and changes nothing for the next caller); the caller's own control rects are never frozen, kept or aliased
 --  6. callers  - the real WorldStatusHud ticking for 10 s on a 640 x 360 computer, and RarePullCard.SkipBoxes asked again and again, run the search once
 -- "R157 HUD layout cache checks N, fails 0". `luau test_hudlayout_cache157.luau -a golden` prints the fingerprints (run it on the code to compare against).
+-- R158 (on purpose): a computer's layout is the 1920 x 1080 arrangement scaled (HudLayout.PcScales): its ":pc" fingerprints are the R158 layout (the touch ones, ":touch" and ":bare", are still
+-- R157's byte for byte); it no longer searches the balances' spot with PityBars155.Place (barsClear is gone), so the key has 16 slots (the PityBars155 / its Place / HudBoxes slots are gone)
+-- and a swapped Place changes nothing; a layout computation is counted through HudLayout.NameRows, which every layout asks once (the details rule), next to the bars' Place calls.
 local W=require('./world');local R=W.R
 local V2=R.Vector2.new
 local checks,fails=0,0
@@ -95,40 +98,40 @@ if MODE=='golden'then
 end
 -- the R157 layout before the cache (HudLayout as of the R157 HUD merge): a fingerprint of every case, taken from that code
 local GOLDEN={
- ['1920x1080:pc']='c2fd8dd8',['1920x1080:touch']='1b28a66d',['1920x1080:bare']='1b28a66d',['2560x1440:pc']='6deb6256',
- ['2560x1440:touch']='17c580c1',['2560x1440:bare']='17c580c1',['1366x768:pc']='d5a69f8b',['1366x768:touch']='85d06d46',
- ['1366x768:bare']='85d06d46',['1280x720:pc']='6f009fff',['1280x720:touch']='9bd86eed',['1280x720:bare']='9bd86eed',
- ['1024x768:pc']='dcf1707d',['1024x768:touch']='56eae9f6',['1024x768:bare']='56eae9f6',['800x600:pc']='8ade670a',
- ['800x600:touch']='969501fa',['800x600:bare']='969501fa',['1600x900:pc']='b41a4340',['1600x900:touch']='03e2b759',
- ['1600x900:bare']='03e2b759',['844x390:pc']='8a9215cd',['844x390:touch']='156d0ad7',['844x390:bare']='156d0ad7',
- ['932x430:pc']='1acf6824',['932x430:touch']='fe30af20',['932x430:bare']='fe30af20',['667x375:pc']='d793b289',
- ['667x375:touch']='382563db',['667x375:bare']='382563db',['568x320:pc']='8e9e7f2c',['568x320:touch']='12d78f1b',
- ['568x320:bare']='12d78f1b',['740x360:pc']='25305d0b',['740x360:touch']='17d9b5d5',['740x360:bare']='17d9b5d5',
- ['800x360:pc']='aaa4cc7d',['800x360:touch']='b56b644e',['800x360:bare']='b56b644e',['896x414:pc']='7cd21323',
- ['896x414:touch']='dbe439ec',['896x414:bare']='dbe439ec',['390x844:pc']='cbd52f58',['390x844:touch']='8a978597',
- ['390x844:bare']='8a978597',['375x667:pc']='65d3bc4c',['375x667:touch']='2ffde8e8',['375x667:bare']='2ffde8e8',
- ['360x640:pc']='70858580',['360x640:touch']='de08c28f',['360x640:bare']='de08c28f',['414x896:pc']='076d86cb',
- ['414x896:touch']='922d2702',['414x896:bare']='922d2702',['320x568:pc']='60ed3b6c',['320x568:touch']='3bd78c0c',
- ['320x568:bare']='3bd78c0c',['360x800:pc']='47ed0cd2',['360x800:touch']='261b103d',['360x800:bare']='261b103d',
- ['768x1024:pc']='70a11d7c',['768x1024:touch']='2d6a8a05',['768x1024:bare']='a380ca70',['1180x820:pc']='66e9654b',
- ['1180x820:touch']='2708cab8',['1180x820:bare']='2708cab8',['820x1180:pc']='bd62ec12',['820x1180:touch']='a5c05dde',
- ['820x1180:bare']='23287f91',['1366x1024:pc']='496a75f5',['1366x1024:touch']='7bad900a',['1366x1024:bare']='7bad900a',
- ['1280x800:pc']='e24b8532',['1280x800:touch']='91b7be57',['1280x800:bare']='91b7be57',['800x1280:pc']='fb53dc4c',
- ['800x1280:touch']='aa3dd0f1',['800x1280:bare']='472c6010',['1440x900:pc']='0844b05e',['1440x900:touch']='337f2edb',
- ['1440x900:bare']='337f2edb',['1280x1024:pc']='496a75f5',['1280x1024:touch']='5dfedb1c',['1280x1024:bare']='5dfedb1c',
- ['1280x540:pc']='f767354c',['1280x540:touch']='af1cee75',['1280x540:bare']='af1cee75',['960x480:pc']='7cba6f8b',
- ['960x480:touch']='37a39c0d',['960x480:bare']='37a39c0d',['700x400:pc']='ef3fee4f',['700x400:touch']='0ea2047e',
- ['700x400:bare']='0ea2047e',['812x375:pc']='6738d55f',['812x375:touch']='bcd36936',['812x375:bare']='bcd36936',
- ['430x932:pc']='cc525397',['430x932:touch']='bf532103',['430x932:bare']='bf532103',['360x740:pc']='3e6c76ab',
- ['360x740:touch']='4a7ac84d',['360x740:bare']='4a7ac84d',['640x360:pc']='984a4324',['640x360:touch']='574fb618',
- ['640x360:bare']='574fb618',['750x311:pc']='8a800cfd',['750x311:touch']='3ebda264',['750x311:bare']='3ebda264',
- ['640x280:pc']='23ea5336',['640x280:touch']='00d782b4',['640x280:bare']='00d782b4',['600x250:pc']='7bf05bb7',
- ['600x250:touch']='c3ff7013',['600x250:bare']='c3ff7013',['560x220:pc']='8d47478d',['560x220:touch']='ea7101cb',
- ['560x220:bare']='ea7101cb',['1891x733:pc']='25005e07',['1891x733:touch']='4826988e',['1891x733:bare']='4826988e',
- ['1280x400:pc']='39ea5362',['1280x400:touch']='12cffdc7',['1280x400:bare']='12cffdc7',['530x593:pc']='4680b6e7',
- ['530x593:touch']='87f2e1a5',['530x593:bare']='68187e60',['420x420:pc']='004f0f86',['420x420:touch']='639cf5fc',
- ['420x420:bare']='639cf5fc',['1920x300:pc']='3c88711f',['1920x300:touch']='d475c272',['1920x300:bare']='d475c272',
- ['1280x320:pc']='79642b72',['1280x320:touch']='dc1e6aa3',['1280x320:bare']='dc1e6aa3',['640x640:pc']='8b0c451f',
+ ['1920x1080:pc']='f5a08a25',['1920x1080:touch']='1b28a66d',['1920x1080:bare']='1b28a66d',['2560x1440:pc']='407c307a',
+ ['2560x1440:touch']='17c580c1',['2560x1440:bare']='17c580c1',['1366x768:pc']='9a1054d6',['1366x768:touch']='85d06d46',
+ ['1366x768:bare']='85d06d46',['1280x720:pc']='d886c604',['1280x720:touch']='9bd86eed',['1280x720:bare']='9bd86eed',
+ ['1024x768:pc']='4dab5fe9',['1024x768:touch']='56eae9f6',['1024x768:bare']='56eae9f6',['800x600:pc']='9bfac641',
+ ['800x600:touch']='969501fa',['800x600:bare']='969501fa',['1600x900:pc']='bf63ea78',['1600x900:touch']='03e2b759',
+ ['1600x900:bare']='03e2b759',['844x390:pc']='6ca5b515',['844x390:touch']='156d0ad7',['844x390:bare']='156d0ad7',
+ ['932x430:pc']='594416a4',['932x430:touch']='fe30af20',['932x430:bare']='fe30af20',['667x375:pc']='f4d26b65',
+ ['667x375:touch']='382563db',['667x375:bare']='382563db',['568x320:pc']='4ba69472',['568x320:touch']='12d78f1b',
+ ['568x320:bare']='12d78f1b',['740x360:pc']='e181d459',['740x360:touch']='17d9b5d5',['740x360:bare']='17d9b5d5',
+ ['800x360:pc']='8bf058d0',['800x360:touch']='b56b644e',['800x360:bare']='b56b644e',['896x414:pc']='f3e1975b',
+ ['896x414:touch']='dbe439ec',['896x414:bare']='dbe439ec',['390x844:pc']='e6e8b00e',['390x844:touch']='8a978597',
+ ['390x844:bare']='8a978597',['375x667:pc']='deedf3ed',['375x667:touch']='2ffde8e8',['375x667:bare']='2ffde8e8',
+ ['360x640:pc']='58c49399',['360x640:touch']='de08c28f',['360x640:bare']='de08c28f',['414x896:pc']='de2240d4',
+ ['414x896:touch']='922d2702',['414x896:bare']='922d2702',['320x568:pc']='9d13053d',['320x568:touch']='3bd78c0c',
+ ['320x568:bare']='3bd78c0c',['360x800:pc']='dd58ff2e',['360x800:touch']='261b103d',['360x800:bare']='261b103d',
+ ['768x1024:pc']='c0c6960e',['768x1024:touch']='2d6a8a05',['768x1024:bare']='a380ca70',['1180x820:pc']='d0ca95d7',
+ ['1180x820:touch']='2708cab8',['1180x820:bare']='2708cab8',['820x1180:pc']='3ccb9b03',['820x1180:touch']='a5c05dde',
+ ['820x1180:bare']='23287f91',['1366x1024:pc']='76b27b65',['1366x1024:touch']='7bad900a',['1366x1024:bare']='7bad900a',
+ ['1280x800:pc']='5a53f607',['1280x800:touch']='91b7be57',['1280x800:bare']='91b7be57',['800x1280:pc']='967d6bc4',
+ ['800x1280:touch']='aa3dd0f1',['800x1280:bare']='472c6010',['1440x900:pc']='e299b334',['1440x900:touch']='337f2edb',
+ ['1440x900:bare']='337f2edb',['1280x1024:pc']='38bfc4ed',['1280x1024:touch']='5dfedb1c',['1280x1024:bare']='5dfedb1c',
+ ['1280x540:pc']='a4ff945d',['1280x540:touch']='af1cee75',['1280x540:bare']='af1cee75',['960x480:pc']='502f05ad',
+ ['960x480:touch']='37a39c0d',['960x480:bare']='37a39c0d',['700x400:pc']='d8ac0595',['700x400:touch']='0ea2047e',
+ ['700x400:bare']='0ea2047e',['812x375:pc']='b6124c05',['812x375:touch']='bcd36936',['812x375:bare']='bcd36936',
+ ['430x932:pc']='07de0ff8',['430x932:touch']='bf532103',['430x932:bare']='bf532103',['360x740:pc']='879f7414',
+ ['360x740:touch']='4a7ac84d',['360x740:bare']='4a7ac84d',['640x360:pc']='931b9fa3',['640x360:touch']='574fb618',
+ ['640x360:bare']='574fb618',['750x311:pc']='dfa7a2dc',['750x311:touch']='3ebda264',['750x311:bare']='3ebda264',
+ ['640x280:pc']='e0095316',['640x280:touch']='00d782b4',['640x280:bare']='00d782b4',['600x250:pc']='b1ca29f0',
+ ['600x250:touch']='c3ff7013',['600x250:bare']='c3ff7013',['560x220:pc']='36298744',['560x220:touch']='ea7101cb',
+ ['560x220:bare']='ea7101cb',['1891x733:pc']='9aa8b58c',['1891x733:touch']='4826988e',['1891x733:bare']='4826988e',
+ ['1280x400:pc']='cd131ad8',['1280x400:touch']='12cffdc7',['1280x400:bare']='12cffdc7',['530x593:pc']='aac279d8',
+ ['530x593:touch']='87f2e1a5',['530x593:bare']='68187e60',['420x420:pc']='c4d07257',['420x420:touch']='639cf5fc',
+ ['420x420:bare']='639cf5fc',['1920x300:pc']='334955dd',['1920x300:touch']='d475c272',['1920x300:bare']='d475c272',
+ ['1280x320:pc']='1c178924',['1280x320:touch']='dc1e6aa3',['1280x320:bare']='dc1e6aa3',['640x640:pc']='3a7f2652',
  ['640x640:touch']='c6e09393',['640x640:bare']='d504c09b',
 }
 local slow={} -- (the search is slow on the short PC windows; the sweep says how slow)
@@ -171,7 +174,10 @@ end
 
 -- 2. served from the cache ------------------------------------------------------------------------------------------------------------------------------------------------
 local placeCalls=0;local realPlace=B.Place
-B.Place=function(...)placeCalls+=1;return realPlace(...)end -- (a counting Place: part of the key, so every computer layout is searched afresh below)
+B.Place=function(...)placeCalls+=1;return realPlace(...)end -- (a counting Place: the bars' own placement)
+-- (R158: every layout computation - the computer's and the phones' - asks L.NameRows once, for the details rule: counted too; a cached Read asks nothing)
+local realRows=Hud.NameRows
+Hud.NameRows=function(...)placeCalls+=1;return realRows(...)end
 local costs={}
 do
  for _,s in ipairs({{640,360},{1920,300},{1280,320},{640,640},{1920,1080},{1280,720}})do
@@ -185,12 +191,12 @@ do
   t1=os.clock()
   for _=1,n do Hud.Read(v,false,nil)end
   local per=(os.clock()-t1)/n
-  check(placeCalls==0,tag..': '..n..' more Reads run no search ('..placeCalls..' calls of PityBars155.Place)')
+  check(placeCalls==0,tag..': '..n..' more Reads run no search ('..placeCalls..' layout computations / PityBars155.Place calls)')
   check(rawequal(Hud.Read(v,false,nil),m),tag..': the same table again')
   check(per<first/50 or per<2e-5,fmt('%s: a repeated Read costs %.4f ms, the first %.3f ms',tag,per*1000,first*1000))
   check(per<5e-4,fmt('%s: a repeated Read is under 0.5 ms (%.4f ms)',tag,per*1000))
   costs[#costs+1]=fmt('%s first %.3f ms (%d Place calls), repeated %.4f ms',tag,first*1000,searches,per*1000)
-  if s[1]==640 and s[2]==360 then check(searches>=1,'640x360: a new size runs the PityBars search (it did '..searches..' times)')end
+  if s[1]==640 and s[2]==360 then check(searches>=1,'640x360: a new size computes its layout (it did '..searches..' times)')end
  end
  local c=controls(844,390);local v=V2(844,390)
  local m=Hud.Read(v,true,c);local per
@@ -271,7 +277,7 @@ do
  W.Gui.GetInsetArea=oldInset;W.UIS.TouchEnabled=oldTouch
  -- the tunables L.NameRows reads (the details rule): one at a time, on the screens it matters on. Each screen is read with the default (cached), with the tunable changed (a new
  -- answer, exact against a fresh copy changed the same way), and with the default again (the first answer is still there)
- local tuneSizes={{640,360,false},{800,600,false},{1366,768,false},{1280,720,false},{1024,768,false},{700,400,false},{1920,1080,false},{360,740,true},{844,390,true},{390,844,true},{667,375,true},{320,568,true},{375,667,true},{932,430,true}}
+ local tuneSizes={{640,360,false},{800,600,false},{1366,768,false},{1280,720,false},{1024,768,false},{700,400,false},{1920,1080,false},{360,740,true},{844,390,true},{390,844,true},{667,375,true},{320,568,true},{375,667,true},{932,430,true},{740,360,true},{750,311,true},{640,280,true}} -- (R158: + the landscape phones where the name rows' width decides whether they show: a computer's layout no longer depends on it)
  local tunables={
   {'NameBand = 300',function(L)L.NameBand=300 end},
   {'NameWidth = 1000',function(L)L.NameWidth=1000 end},
@@ -296,25 +302,19 @@ do
   check(differ>=1,tn[1]..' can change a layout ('..differ..' of '..#tuneSizes..' screens did), so it is in the key')
   differs[#differs+1]=tn[1]:match('^%a+')..' '..differ
  end
- -- what barsClear searches with: a swapped PityBars155.Place (here: nothing ever leaves the bars a clear place). The screens it matters on, found with fresh copies;
- -- each is read with the real Place (cached), then with the swapped one (a new answer, exact), then with the real one again (the first answer is still there)
- local counting=B.Place
- local function never(w,h,m,dock)local r=counting(w,h,m,dock);local copy=table.clone(r);copy.Clear=false;return copy end
- local sensitive={}
- for _,s in ipairs(SIZES)do
-  local v=V2(s[1],s[2]);local plainText=ser(fresh().Read(v,false,nil))
-  B.Place=never;local neverText=ser(fresh().Read(v,false,nil));B.Place=counting
-  if plainText~=neverText then sensitive[#sensitive+1]=s end
+ -- R158: a computer's layout no longer reads PityBars155 (barsClear is gone): a swapped Place changes no answer and is not in the key - the cached answer stays
+ do
+  local counting=B.Place
+  local function never(w,h,m,dock)local r=counting(w,h,m,dock);local copy=table.clone(r);copy.Clear=false;return copy end
+  local same=0
+  for _,s in ipairs(SIZES)do
+   local v=V2(s[1],s[2]);local m1=Hud.Read(v,false,nil);local plainText=ser(fresh().Read(v,false,nil))
+   B.Place=never;local neverText=ser(fresh().Read(v,false,nil));local m2=Hud.Read(v,false,nil);B.Place=counting
+   if plainText==neverText and rawequal(m1,m2)then same+=1 end
+  end
+  check(same==#SIZES,'a Place that never finds room changes no computer layout and no cached answer ('..same..' of '..#SIZES..' computer screens)')
  end
- check(#sensitive>=1,'PityBars155.Place can change a layout ('..#sensitive..' of '..#SIZES..' computer screens), so it is in the key')
- for _,s in ipairs(sensitive)do
-  local v=V2(s[1],s[2]);local tag=s[1]..'x'..s[2]
-  local m1=Hud.Read(v,false,nil)
-  B.Place=never;local m2=Hud.Read(v,false,nil);local ref=fresh().Read(v,false,nil);B.Place=counting
-  check(ser(m2)==ser(ref)and ser(m2)~=ser(m1)and not rawequal(m1,m2),tag..': with a Place that never finds room the answer is a new, exact one')
-  check(rawequal(Hud.Read(v,false,nil),m1),tag..': the real Place put back: the first answer again')
- end
- print(fmt('(keyed inputs that really change layouts, of %d screens: %s; PityBars155.Place %d of %d computer screens)',#tuneSizes,table.concat(differs,', '),#sensitive,#SIZES))
+ print(fmt('(keyed inputs that really change layouts, of %d screens: %s)',#tuneSizes,table.concat(differs,', ')))
 end
 
 -- 4. a small ring ---------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -384,7 +384,7 @@ do
  placeCalls=0
  local status=W.module('WorldStatusHud').Create(pg,player)
  local built=placeCalls
- check(built>=1,'WorldStatusHud at 640x360 searches once when it is built ('..built..' Place calls)')
+ check(built>=1,'WorldStatusHud at 640x360 computes the layout once when it is built ('..built..' computations / Place calls)')
  placeCalls=0;reads=0
  W.frames(60*10)
  check(reads>=35,'WorldStatusHud read the layout '..reads..' times in 10 s (every .25 s)')
