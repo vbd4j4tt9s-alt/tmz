@@ -3,7 +3,7 @@
 # R157: renders the title tips AS BUILT. The REAL src/ReplicatedStorage/TitleScreen104.lua and src/ReplicatedStorage/TitleTips156.lua (no scratch copy, no patch) are started on the Roblox
 # mock at each size, stepped through the title's own frame function at 120 fps (title_tips_scene157.luau), their GUI trees are dumped as JSON (R153's dump_tree153.luau) and drawn by headless
 # Chromium (R156's render_gui156.mjs); make_sheet157.py lays out the PNG. The title before the change (R157_BASE) is bundled as TitleScreen104Today, only for the "was ... px" logo sizes.
-# The scene asserts the pulse (1.05 / 0.95), the 50% fade frame, Reduced Motion (no fade, pulse or bob), and that the line is centred and clear of the logo and the button.
+# The scene asserts the pulse (1.03 / 0.97), the 50% fade frame, Reduced Motion (no fade, no pulse), that the line is never moved, and that it is centred and clear of the logo and the button.
 # Also: check_tip_fit156.mjs (every tip fits each size, the line never overlaps the logo / pack / button, on the rendered pages) and verify_king_odds.luau (tip 2, on the real odds code).
 # Needs /opt/luau, python3 + Pillow, node + playwright (global, PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers) and, for the font, npm (@fontsource/fredoka-one in the scratch dir; without it
 # DejaVu Sans stands in). APPROXIMATE: not a Studio screenshot.
@@ -26,11 +26,11 @@ bundle(){ # dir view [reduced]
 }
 for view in pc land port;do
  bundle "$S/$view" "$view"
- awk -F'\t' '$1=="TIP"{print $2,$3,"alpha="$4,"scale="$5,"bob="$6}' "$S/$view/scenes.log"
+ awk -F'\t' '$1=="TIP"{print $2,$3,"alpha="$4,"scale="$5,"moved="$6}' "$S/$view/scenes.log"
 done
-# Reduced Motion: the fade frame must be fully opaque (no fade) and no pulse, no bob
+# Reduced Motion: the fade frame must be fully opaque (no fade) and no pulse
 bundle "$S/reduced" pc reduced
-echo "REDUCED MOTION (the scene asserts no fade, no pulse, no bob):";awk -F'\t' '$1=="TIP"{print $2,$3,"alpha="$4,"scale="$5,"bob="$6}' "$S/reduced/scenes.log"
+echo "REDUCED MOTION (the scene asserts no fade, no pulse):";awk -F'\t' '$1=="TIP"{print $2,$3,"alpha="$4,"scale="$5,"moved="$6}' "$S/reduced/scenes.log"
 # the king-odds check (real SeedPackRules / PackOdds137 / PackLuck154 under the mock)
 K=$S/odds;mkdir -p "$K"
 cp "$REPO/tools/tests/roblox.luau" "$REPO/docs/proposals/treadmill_bonus_R123/tests/world.luau" "$K/"

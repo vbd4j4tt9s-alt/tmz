@@ -6,8 +6,10 @@
 -- Pick 1-2 key words per tip; the rest stays white with the title's dark outline. (Plain RichText is not used in the list, so a stray "<" can never break a line.)
 -- The title (ReplicatedStorage.TitleScreen104) requires this module with WaitForChild + pcall, like its other modules: a missing or broken list leaves the line out and never blocks "Click to play!".
 local T={Interval=10,Fade=.4,Prefix='tip:',PrefixColor='#C8D9E8',
- PulseAmount=.05,PulsePeriod=.5,   -- the Minecraft-style splash pulse: the line breathes +-5% in size, a full breath every 0.5 s (none with Reduced Motion)
- BobPixels=1.5,BobPeriod=1.9,      -- and bobs up and down by 1.5 px, slowly (none with Reduced Motion)
+ -- The Minecraft-style splash pulse: the line breathes +-3% in size (a UIScale about its centre), a full breath every 1.8 s; none with Reduced Motion.
+ -- (R157b, owner: "the tips lines are too jittery". It was +-5% every 0.5 s and a 1.5 px bob. Text is drawn in whole pixels: that fast pulse crossed a font-size step several times a second, the bob
+ -- hopped a pixel at a time, and a slow frame while the game loads skipped a fifth of a breath. Now slower, smaller, and no bob: the line only breathes, like Minecraft's splash.)
+ PulseAmount=.03,PulsePeriod=1.8,
  Colors={y='#FFE14D',g='#77E542'}}
 T.Tips={
  {Kind='howto',Text='{y}rare packs{/y} = {g}better seeds{/g}'},

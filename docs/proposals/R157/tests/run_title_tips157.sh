@@ -5,7 +5,7 @@
 #               highlighted words, kind); TitleTips156 is in ReplicatedStorage with a MANIFEST row; the title requires it with WaitForChild + pcall like its other modules; TitleScreen.client.lua
 #               (ReplicatedFirst: it covers the loading, so it has no R152 load guard and must not wait for the game) is as it was; the R152 load guard test still passes; this suite is in
 #               run_all_suites.sh; no model names in the files of this round
-#  1. test    - test_title_tips157.luau: the list and its markup, the RichText, the order, the 10 s rotation, the fade / pulse / bob numbers, Reduced Motion, the layout at six (and six more) screen
+#  1. test    - test_title_tips157.luau: the list and its markup, the RichText, the order, the 10 s rotation, the fade / pulse numbers (R157b: +-3% every 1.8 s through a UIScale, no bob, the line never moves), Reduced Motion, the layout at six (and six more) screen
 #               sizes (centred, gap >= line + 20 px, no overlap with the logo / pack / button), no input, nothing allocated per frame, a missing / broken / late list
 #  2. teeth   - the same test on broken copies of the two modules (each must FAIL)
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -98,10 +98,11 @@ PY
  }
  mutate interval_9s TIPS "T={Interval=10," "T={Interval=9,"
  mutate fade_slower TIPS "Fade=.4," "Fade=.3,"
- mutate pulse_bigger TIPS "PulseAmount=.05,PulsePeriod=.5," "PulseAmount=.08,PulsePeriod=.5,"
- mutate pulse_slower TIPS "PulsePeriod=.5," "PulsePeriod=.6,"
- mutate bob_bigger TIPS "BobPixels=1.5," "BobPixels=3,"
- mutate bob_period TIPS "BobPeriod=1.9," "BobPeriod=2.5,"
+ mutate pulse_bigger TIPS "PulseAmount=.03,PulsePeriod=1.8," "PulseAmount=.05,PulsePeriod=1.8,"
+ mutate pulse_faster TIPS "PulseAmount=.03,PulsePeriod=1.8," "PulseAmount=.03,PulsePeriod=1.2,"
+ mutate pulse_slower TIPS "PulseAmount=.03,PulsePeriod=1.8," "PulseAmount=.03,PulsePeriod=2.6,"
+ mutate the_jittery_numbers_back TIPS "PulseAmount=.03,PulsePeriod=1.8," "PulseAmount=.05,PulsePeriod=.5,"
+ mutate bob_numbers_back TIPS "PulseAmount=.03,PulsePeriod=1.8," "PulseAmount=.03,PulsePeriod=1.8,BobPixels=1.5,BobPeriod=1.9,"
  mutate yellow_changed TIPS "y='#FFE14D'" "y='#FFE14E'"
  mutate green_changed TIPS "g='#77E542'" "g='#77E543'"
  mutate a_tip_reworded TIPS "dont look into the {y}pyramid{/y}" "don\\'t look into the {y}pyramid{/y}"
@@ -117,12 +118,11 @@ PY
  mutate fade_in_slow TITLE "math.min(1,tipClock/tips.Fade," "math.min(1,tipClock/(tips.Fade*2),"
  mutate pulse_too_big TITLE "1+tips.PulseAmount*math.sin(" "1+tips.PulseAmount*1.6*math.sin("
  mutate pulse_slow TITLE "pulseClock*math.pi*2/tips.PulsePeriod)" "pulseClock*math.pi*2/(tips.PulsePeriod*1.2))"
- mutate no_bob TITLE "tipLabel.Position=tipBob[step]end" "tipLabel.Position=tipRest end"
- mutate reduced_still_pulses TITLE "   if reduced then
-    tipScale.Scale=1" "   if false then
-    tipScale.Scale=1"
+ mutate reduced_still_pulses TITLE "local pulse=reduced and 1 or 1+tips.PulseAmount*math.sin(" "local pulse=1+tips.PulseAmount*math.sin("
  mutate reduced_still_fades TITLE "local alpha=reduced and 1 or math.min(" "local alpha=math.min("
- mutate bob_builds_a_udim2 TITLE "tipLabel.Position=tipBob[step]" "tipLabel.Position=UDim2.fromOffset(tipRest.X.Offset,tipRest.Y.Offset+tips.BobPixels*math.sin(pulseClock*math.pi*2/tips.BobPeriod))"
+ mutate the_line_bobs_again TITLE "if pulse~=tipPulse then tipPulse=pulse;tipScale.Scale=pulse end" "if pulse~=tipPulse then tipPulse=pulse;tipScale.Scale=pulse;tipLabel.Position=UDim2.fromOffset(tipLabel.Position.X.Offset,layout.TipY+1.5*(pulse-1)/tips.PulseAmount)end"
+ mutate pulse_through_size TITLE "tipScale.Scale=pulse end" "tipLabel.Size=UDim2.fromOffset(layout.TipWidth*pulse,layout.TipHeight*pulse)end"
+ mutate step_builds_a_udim2 TITLE "if pulse~=tipPulse then tipPulse=pulse;tipScale.Scale=pulse end" "if pulse~=tipPulse then tipPulse=pulse;tipScale.Scale=pulse;local _=UDim2.fromOffset(0,0)end"
  mutate takes_the_click TITLE "Active=false,Interactable=false,Selectable=false" "Active=true,Interactable=false,Selectable=false"
  mutate interactable TITLE "Active=false,Interactable=false,Selectable=false" "Active=false,Interactable=true,Selectable=false"
  mutate runs_while_leaving TITLE "if tipLabel and phase~='Leaving'then stepTip(dt,reduced)end" "if tipLabel then stepTip(dt,reduced)end"
@@ -135,6 +135,8 @@ PY
  mutate outline_colour TITLE "Color=RGB(23,37,16),LineJoinMode=Enum.LineJoinMode.Round,Transparency=1" "Color=RGB(0,0,0),LineJoinMode=Enum.LineJoinMode.Round,Transparency=1"
  mutate text_size_cap TITLE "MaxTextSize=layout.TipSize" "MaxTextSize=40"
  mutate resize_ignored TITLE "    tipLabel.Size=UDim2.fromOffset(layout.TipWidth,layout.TipHeight)
+" ""
+ mutate position_not_set_on_resize TITLE "    tipLabel.Position=UDim2.fromOffset(size.X/2,layout.TipY) -- (written here only: the line never moves while it shows)
 " ""
  echo "$caught of $total breaks caught"
  [ "$caught" = "$total" ] || fail "a break was not caught"

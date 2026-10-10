@@ -1,6 +1,6 @@
 -- SoundGroup gain sits above existing fades; volume changes never restart a track.
 local SoundService=game:GetService('SoundService');local Players=game:GetService('Players')
-local Config=require(script.Parent.SettingsConfig);local M={};local values=Config.Read();local groups={};local started=false
+local Config=require(script.Parent:WaitForChild('SettingsConfig'));local M={};local values=Config.Read();local groups={};local started=false -- R157b fix: WaitForChild (this module can be required before SettingsConfig has replicated, e.g. by InteractionAudio from the title)
 local names={Music='ChestChaseMusic',Chase='ChestChaseActionMusic',Ambience='GardenAmbience',Effects='GardenEffects',Interface='GardenInterface'}
 -- R150: the saved mix as early as it can be known. PlayerDataService publishes it on the Player as number attributes the moment the profile is
 -- read (replicated, no remote to wait for); the groups take those values as soon as they exist, and keep following them until the player

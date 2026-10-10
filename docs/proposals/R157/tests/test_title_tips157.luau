@@ -5,13 +5,14 @@
 --  B. the markup as RichText (T.Rich / T.Plain / T.Line), what a stray & < > does, an unknown {x}
 --  C. the order: a shuffle of all 24 with no repeats, a random first tip, a new shuffle (not the same tip twice in a row) when every tip has shown
 --  D. the rotation in the title: a new tip every 10 s, every tip once before any repeat, the text changes while the line is invisible
---  E. the fade (0.4 s in / out), the pulse (+-5%, a full breath every 0.5 s) and the bob (+-1.5 px, 1.9 s)
---  F. Reduced Motion: no fade, no pulse, no bob (also switched on and off while the title shows)
+--  E. the fade (0.4 s in / out) and the pulse (R157b, "too jittery": +-3%, a full breath every 1.8 s, a UIScale; was +-5% every 0.5 s with a 1.5 px bob): the line is never moved, and a slow
+--     frame (0.1 s) moves the scale by 1% at most (was 6.3%)
+--  F. Reduced Motion: no fade, no pulse (also switched on and off while the title shows)
 --  G. the layout at PC 1920x1080, 1366x768, 844x390, 390x844, 360x640, 320x568 (and more): the line is centred in the gap, the gap is at least the line's height + 20 px, the line (grown by
---     the pulse and the bob) never touches the logo, the pack or the button (grown by its hover), the logo is 443 px wide at 844x390 and unchanged where the room was there; a resize
+--     the pulse) never touches the logo, the pack or the button (grown by its hover), the logo is 443 px wide at 844x390 and unchanged where the room was there; a resize
 --  H. no input: the label is not active, not interactable, has no listener; the click and Enter still start the game; it fades out with the title
 --  I. nothing allocated per frame (no UDim2 / Vector2 / Color3 / Instance ... built by the tip line, A / B against the title without tips; the step's code has no table, closure, string);
---     the pulse and the bob run only while the title shows and stop when it closes
+--     the pulse runs only while the title shows and stops when it closes
 --  J. a missing / broken / late list never blocks the title
 local W=require('./world');local R=W.R
 local V2=R.Vector2.new
@@ -150,7 +151,7 @@ for i,e in ipairs(EXPECTED)do
 end
 check(kinds.howto==19 and kinds.lore==4 and kinds.egg==1,('19 how-to, 4 lore, 1 easter egg (%d / %d / %d)'):format(kinds.howto,kinds.lore,kinds.egg))
 check(Tips.Tips[24].Text=='dont look into the {y}pyramid{/y}' and Tips.Plain(Tips.Tips[24].Text)=='dont look into the pyramid','the easter egg is "dont look into the pyramid"')
-check(Tips.Interval==10 and Tips.Fade==.4 and Tips.Prefix=='tip:' and Tips.PulseAmount==.05 and Tips.PulsePeriod==.5 and Tips.BobPixels==1.5 and Tips.BobPeriod==1.9,'the numbers at the top of the list: 10 s, 0.4 s, "tip:", +-5%, 0.5 s, 1.5 px, 1.9 s')
+check(Tips.Interval==10 and Tips.Fade==.4 and Tips.Prefix=='tip:' and Tips.PulseAmount==.03 and Tips.PulsePeriod==1.8 and Tips.BobPixels==nil and Tips.BobPeriod==nil,'the numbers at the top of the list: 10 s, 0.4 s, "tip:", pulse +-3% every 1.8 s, no bob (R157b: was +-5% every 0.5 s and a 1.5 px bob every 1.9 s)')
 check(Tips.Colors.y=='#FFE14D' and Tips.Colors.g=='#77E542','yellow #FFE14D and green #77E542')
 local seen={}
 for i,tip in ipairs(Tips.Tips)do
@@ -279,21 +280,22 @@ do
 end
 
 -- ======================================================================================================================
--- E. fade, pulse, bob
+-- E. fade, pulse (and no bob)
 -- ======================================================================================================================
-print('-- E. fade, pulse, bob')
+print('-- E. fade, pulse')
 do
  local t=boot({seed=3});local label=t.label();local stroke=label:FindFirstChildOfClass('UIStroke');local scale=label:FindFirstChildOfClass('UIScale')
  local L=T.Layout(1920,1080)
  local DT=1/240
  local clock,pulse=0,0
- local worstFade,worstPulse,worstBob,worstStroke=0,0,0,0
- local maxS,minS,maxB,minB=-9,9,-9,9
- local pulseUp,bobUp={},{}
- local prevS,prevB
+ local worstFade,worstPulse,worstStroke=0,0,0
+ local maxS,minS=-9,9
+ local pulseUp={}
+ local prevS,maxSpeed
  local atHalfIn,atFull,atHalfOut,atZero
- local x0=label.Position.X.Offset
- local sameX=true
+ local rest=label.Position
+ local moved=0
+ maxSpeed=0
  for _=1,240*24 do
   t.step(1,DT)
   clock+=DT;pulse+=DT
@@ -302,16 +304,12 @@ do
   local expect=math.min(1,clock/Tips.Fade,(Tips.Interval-clock)/Tips.Fade)
   worstFade=math.max(worstFade,math.abs(alpha-expect));worstStroke=math.max(worstStroke,math.abs(stroke.Transparency-label.TextTransparency))
   local s=scale.Scale
-  worstPulse=math.max(worstPulse,math.abs(s-(1+.05*math.sin(pulse*math.pi*2/.5))))
+  worstPulse=math.max(worstPulse,math.abs(s-(1+.03*math.sin(pulse*math.pi*2/1.8))))
   maxS=math.max(maxS,s);minS=math.min(minS,s)
+  if prevS then maxSpeed=math.max(maxSpeed,math.abs(s-prevS)/DT) end
   if prevS and prevS<1 and s>=1 then pulseUp[#pulseUp+1]=t.t end
   prevS=s
-  local bob=label.Position.Y.Offset-L.TipY
-  worstBob=math.max(worstBob,math.abs(bob-1.5*math.sin(pulse*math.pi*2/1.9)))
-  maxB=math.max(maxB,bob);minB=math.min(minB,bob)
-  if prevB and prevB<0 and bob>=0 then bobUp[#bobUp+1]=t.t end
-  prevB=bob
-  if label.Position.X.Offset~=x0 then sameX=false end
+  if label.Position~=rest or label.Position.X.Offset~=1920/2 or label.Position.Y.Offset~=L.TipY then moved+=1 end
   if math.abs(t.t-.2)<DT/2 then atHalfIn=alpha end
   if math.abs(t.t-.4)<DT/2 then atFull=alpha end
   if math.abs(t.t-9.8)<DT/2 then atHalfOut=alpha end
@@ -323,18 +321,22 @@ do
  check(atFull and near(atFull,1,.02),'fade in: fully visible at 0.4 s ('..tostring(atFull)..')')
  check(atHalfOut and near(atHalfOut,.5,.02),'fade out: half way at 9.8 s ('..tostring(atHalfOut)..')')
  check(atZero and atZero<.02,'fade out: invisible at 10 s ('..tostring(atZero)..')')
- check(worstPulse<1e-9,('the pulse is 1 + 0.05 sin(2 pi t / 0.5) every frame (worst %.2e)'):format(worstPulse))
- check(near(maxS,1.05,1e-3)and near(minS,.95,1e-3)and maxS<=1.05+1e-9 and minS>=.95-1e-9,('pulse amplitude +-5%%: %.4f .. %.4f'):format(minS,maxS))
- local periodOk=#pulseUp>=40
- for i=2,#pulseUp do if not near(pulseUp[i]-pulseUp[i-1],.5,2*DT)then periodOk=false end end
- check(periodOk,'pulse period: a full breath every 0.5 s ('..#pulseUp..' breaths in 24 s)')
- check(maxB<=1.5+1e-9 and maxB>=1.49 and minB>=-1.5-1e-9 and minB<=-1.49,('bob amplitude +-1.5 px: %.4f .. %.4f'):format(minB,maxB))
- check(worstBob<=.08,('the bob follows 1.5 sin(2 pi t / 1.9) to within a step (worst %.3f px)'):format(worstBob))
- local bobOk=#bobUp>=11
- for i=2,#bobUp do if not near(bobUp[i]-bobUp[i-1],1.9,.03)then bobOk=false end end
- check(bobOk,'bob period: a full cycle every 1.9 s ('..#bobUp..' cycles)')
- check(sameX,'the bob only moves the line up and down')
+ check(worstPulse<1e-9,('the pulse is 1 + 0.03 sin(2 pi t / 1.8) every frame (worst %.2e)'):format(worstPulse))
+ check(near(maxS,1.03,1e-3)and near(minS,.97,1e-3)and maxS<=1.03+1e-9 and minS>=.97-1e-9,('pulse amplitude +-3%%: %.4f .. %.4f'):format(minS,maxS))
+ local periodOk=#pulseUp>=12
+ for i=2,#pulseUp do if not near(pulseUp[i]-pulseUp[i-1],1.8,2*DT)then periodOk=false end end
+ check(periodOk,'pulse period: a full breath every 1.8 s ('..#pulseUp..' breaths in 24 s)')
+ -- calm: the fastest the scale ever changes. R157b: it was 0.63 per second (+-5% every 0.5 s); the sine's top speed is amplitude * 2 pi / period
+ check(maxSpeed<=.03*math.pi*2/1.8*1.001 and maxSpeed>=.03*math.pi*2/1.8*.98,('the scale changes by at most %.3f per second (0.105 expected; it was 0.628: 6 times calmer)'):format(maxSpeed))
+ check(maxSpeed*L.TipSize<=3.5,('... at the biggest text (%d px) that is %.2f px of text size per second (it was %.1f)'):format(L.TipSize,maxSpeed*L.TipSize,.05*math.pi*2/.5*L.TipSize))
+ -- the line is never moved (R157b: no bob): the same Position in every frame, so there is no pixel to hop to
+ check(moved==0,'the line never moves: the same Position (centre, '..L.TipY..') in all '..(240*24)..' frames ('..moved..' differ)')
  t.close()
+ -- a slow frame (the game is loading; the title clamps a frame to 0.1 s): the scale moves by 1% at most (it was 6.3%)
+ local t2=boot({seed=3});local s2=t2.label():FindFirstChildOfClass('UIScale');local worstJump,prev=0,1
+ for _=1,400 do t2.step(1,.1);local s=s2.Scale;worstJump=math.max(worstJump,math.abs(s-prev));prev=s end
+ check(worstJump<=.03*math.pi*2*.1/1.8+1e-9,('a 0.1 s frame (the title\'s longest) changes the scale by %.4f at most (0.0105 = 1%%; it was 0.063)'):format(worstJump))
+ t2.close()
 end
 
 -- ======================================================================================================================
@@ -350,7 +352,7 @@ do
   if label.TextTransparency~=0 or stroke.Transparency~=0 or scale.Scale~=1 or label.Position.Y.Offset~=L.TipY or label.Position.X.Offset~=1920/2 then bad+=1 end
   if label.Text~=last then changes+=1;when[#when+1]=t.t;last=label.Text end
  end
- check(bad==0,'Reduced Motion: fully visible, scale 1, no bob in every frame ('..bad..' frames differ)')
+ check(bad==0,'Reduced Motion: fully visible, scale 1, not moved, in every frame ('..bad..' frames differ)')
  check(changes==2 and near(when[1],10,1/60+1e-6)and near(when[2],20,1/60+1e-6),'Reduced Motion: the text still changes every 10 s (at '..table.concat(when,', ')..')')
  t.close()
  -- switched on and off while the title shows
@@ -358,9 +360,9 @@ do
  t2.step(60*3+7)
  check(scale2.Scale~=1,'(not reduced: the line pulses)')
  W.Gui.ReducedMotionEnabled=true;t2.step(1)
- check(scale2.Scale==1 and label2.TextTransparency==0 and label2.Position.Y.Offset==L.TipY,'Reduced Motion switched on: the next frame has no pulse, no bob, no fade')
+ check(scale2.Scale==1 and label2.TextTransparency==0 and label2.Position.Y.Offset==L.TipY,'Reduced Motion switched on: the next frame has no pulse, no fade')
  W.Gui.ReducedMotionEnabled=false;t2.step(6)
- check(scale2.Scale~=1 and label2.Position.Y.Offset~=L.TipY,'... and switched off again: the pulse and the bob are back')
+ check(scale2.Scale~=1 and label2.Position.Y.Offset==L.TipY,'... and switched off again: the pulse is back (and the line is where it was)')
  t2.close()
 end
 
@@ -405,7 +407,7 @@ for _,s in ipairs(SIZES)do
   worst=math.min(worst,size)
  end
  check(worst>=11,('%s: every tip fits in %d line(s) at %.1f px or more (11 is the smallest allowed)'):format(name,lines,worst))
- -- the real title at this size: the actual boxes, over one second of pulse and bob, with the button hovered
+ -- the real title at this size: the actual boxes, over a full breath (1.8 s) of the pulse, with the button hovered
  local t=boot({w=w,h=h,touch=touch,seed=2});local label=t.label()
  t.button.MouseEnter:Fire();t.step(90)
  local scale=label:FindFirstChildOfClass('UIScale')
@@ -416,13 +418,13 @@ for _,s in ipairs(SIZES)do
  check(label:FindFirstChildOfClass('UITextSizeConstraint').MaxTextSize==L.TipSize and label:FindFirstChildOfClass('UITextSizeConstraint').MinTextSize==11,name..': TextScaled between 11 and '..L.TipSize..' px')
  check(label.TextScaled==true and label.RichText==true and label.TextWrapped==true,name..': TextScaled, RichText, wrapped')
  local airAbove,airBelow,airPack=1e9,1e9,1e9;local inside=true
- for _=1,300 do
+ for _=1,440 do
   t.step(1,1/240)
   local tip=rectOf(label,scale.Scale)
   airAbove=math.min(airAbove,tip.t-logo.b);airBelow=math.min(airBelow,btn.t-tip.b);airPack=math.min(airPack,tip.t-pack.b)
   if tip.l<0 or tip.r>w then inside=false end
  end
- check(airAbove>=4 and airBelow>=4 and airPack>=4,('%s: the line (pulsing, bobbing) stays clear of the logo %.1f px, the pack %.1f px and the hovered button %.1f px'):format(name,airAbove,airPack,airBelow))
+ check(airAbove>=4 and airBelow>=4 and airPack>=4,('%s: the line (pulsing) stays clear of the logo %.1f px, the pack %.1f px and the hovered button %.1f px'):format(name,airAbove,airPack,airBelow))
  check(inside,name..': the line stays on the screen')
  check(pack.b<=logo.b+1e-6 and pack.t>=logo.t-1e-6,name..': the pack is inside the logo\'s box')
  minAir=math.min(minAir,airAbove,airBelow)
@@ -465,9 +467,9 @@ do -- a resize while the title shows (a window drag, a rotation)
  t.group.AbsoluteSize=V2(390,844);t.step(60)
  local L=T.Layout(390,844)
  check(label.Size.X.Offset==L.TipWidth and label.Size.Y.Offset==L.TipHeight and label.Position.X.Offset==195,'a resize to 390x844: the line box follows')
- local maxB,minB=-9,9
- for _=1,480 do t.step(1,1/240);local b=label.Position.Y.Offset-L.TipY;maxB=math.max(maxB,b);minB=math.min(minB,b)end
- check(maxB<=1.5+1e-9 and maxB>=1.49 and minB>=-1.5-1e-9 and minB<=-1.49,('... and it bobs +-1.5 px about the new centre (%.3f .. %.3f)'):format(minB,maxB))
+ local still=true
+ for _=1,480 do t.step(1,1/240);if label.Position.X.Offset~=195 or label.Position.Y.Offset~=L.TipY then still=false end end
+ check(still,'... and it stays on the new centre (195, '..L.TipY..') while it pulses: it is never moved')
  check(label:FindFirstChildOfClass('UITextSizeConstraint').MaxTextSize==L.TipSize,'... with the new text size cap '..L.TipSize)
  t.close()
 end
@@ -526,7 +528,7 @@ do
  if step then
   local code=step:gsub('%-%-[^\n]*','')
   local bad={}
-  for _,pat in ipairs({'{','function%s*%(','Instance%.new','UDim2','UDim%.','Vector2','Vector3','Color3','CFrame','Random%.','table%.','string%.','tostring','%.%.','format','task%.','Line%(','Rich%(','Plain%(','require','GetService','FindFirst','Clone','Tween'})do
+  for _,pat in ipairs({'{','function%s*%(','Instance%.new','UDim2','Position','UDim%.','Vector2','Vector3','Color3','CFrame','Random%.','table%.','string%.','tostring','%.%.','format','task%.','Line%(','Rich%(','Plain%(','require','GetService','FindFirst','Clone','Tween'})do
    if code:find(pat)then bad[#bad+1]=pat end
   end
   check(#bad==0,'the tip step (run every frame) builds no table, closure, string, UDim2, Vector or Instance: '..table.concat(bad,' '))
@@ -536,7 +538,7 @@ do
   local function run(withTips)
    if not withTips then hideTips(true)end
    local t=boot({seed=6,reduced=reduced});t.step(120)
-   local a=snapshot();t.step(60*25) -- 25 s: the text changes twice, the fade, the pulse and the bob all run
+   local a=snapshot();t.step(60*25) -- 25 s: the text changes twice, the fade and the pulse run
    local b=snapshot();local alive=t.alive()
    local label=t.label();t.close()
    if not withTips then hideTips(false)end
@@ -547,19 +549,19 @@ do
   check(sameDiff(dWith,dWithout),(reduced and 'Reduced Motion: 'or'')..'the tip line builds nothing per frame: the same constructor calls with and without it ['..show(dWith)..'] vs ['..show(dWithout)..']')
   check((dWith._created or 0)==0,(reduced and 'Reduced Motion: 'or'')..'no Instance created in 1500 frames ('..(dWith._created or 0)..')')
  end
- -- the pulse and the bob stop when the title closes: unbound, the line is gone, nothing runs on
+ -- the pulse stops when the title closes: unbound, the line is gone, nothing runs on
  local t=boot({seed=2});local label=t.label();local scale=label:FindFirstChildOfClass('UIScale');t.step(100)
  check(binds[BINDING]~=nil,'(the title is up: its frame step is bound)')
  t.close()
  check(binds[BINDING]==nil and label.Parent==nil and t.screen.Parent==nil,'closing the title unbinds the frame step and removes the line')
  local before=scale.Scale;local posBefore=label.Position
  for _=1,30 do R.advance(1/60)end
- check(scale.Scale==before and label.Position==posBefore,'... and the pulse and the bob do not run any more')
- -- leaving: the line stops where it is while the title fades out (no pulse or bob after the click)
+ check(scale.Scale==before and label.Position==posBefore,'... and the pulse does not run any more')
+ -- leaving: the line stops where it is while the title fades out (no pulse after the click)
  local t2=boot({seed=2});local l2=t2.label();local s2=l2:FindFirstChildOfClass('UIScale');t2.step(100)
  t2.button.Activated:Fire();t2.step(1)
  local sc,pos,tx=s2.Scale,l2.Position,l2.TextTransparency;t2.step(10)
- check(s2.Scale==sc and l2.Position==pos and l2.TextTransparency==tx,'after the click the line stops pulsing and bobbing while the title fades out')
+ check(s2.Scale==sc and l2.Position==pos and l2.TextTransparency==tx,'after the click the line stops pulsing while the title fades out')
  t2.step(120);t2.close()
  -- a Heartbeat / RenderStepped / task of its own? none: the title has one bound step and no tip-line connection survives
  local t3=boot({seed=2});t3.step(10)
@@ -601,9 +603,9 @@ do
  bad('Interval is text',with({Interval='ten'}),true)
  bad('a Fade as long as the interval',with({Fade=6}),true)
  bad('a zero pulse period',with({PulsePeriod=0}),true)
- bad('NaN bob',with({BobPeriod=0/0}),true)
+ bad('a NaN pulse period',with({PulsePeriod=0/0}),true)
  bad('a pulse amount that is text',with({PulseAmount='big'}),true)
- bad('a bob that is a table',with({BobPixels={}}),true)
+ bad('a pulse period that is a table',with({PulsePeriod={}}),true)
  bad('Line gives a number',with({Line=function()return 5 end}),true)
  bad('Order is missing',with({Order=false}),true)
  W.stub('TitleTips156',RealTips)

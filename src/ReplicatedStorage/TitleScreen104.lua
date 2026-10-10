@@ -12,7 +12,7 @@ function T.Layout(width,height)
  local bottom=math.max(20,math.min(46,height*.06))
  local buttonY=height-bottom-buttonHeight/2
  -- R157: the tip line floats in the middle of the gap between the logo (with the pack) and the button: one line on a PC / landscape phone, two on a portrait phone.
- -- The gap is kept at least tipGap = the line's height + 20 px (10 px of air each side: the pulse and the bob stay inside it). Where the gap was already that big (a
+ -- The gap is kept at least tipGap = the line's height + 20 px (10 px of air each side: the pulse stays inside it). Where the gap was already that big (a
  -- 1920 x 1080 PC, a portrait phone) the logo, the pack and the button do not move; where it was not, the logo gets a little smaller (844 x 390: 443 px wide, was 477).
  local tipSize=math.clamp(math.floor(height*.03),16,32)
  local tipHeight=math.ceil(tipSize*1.15*(width<520 and 2 or 1))+4
@@ -52,8 +52,13 @@ function T.Start(player,pg)
  local previewBag,previewRest,previewAmplitude
  local promptBefore=Prompts.Enabled
  -- R150: the start click. Loaded while the title is up (its voices warm in the meantime), so Enter / gamepad A / a click all sound the same.
+ -- R157b fix: not before the whole game has arrived. The title runs from ReplicatedFirst before game.Loaded; requiring InteractionAudio the moment it appeared ran its body while AudioMixer had not
+ -- replicated yet, the require failed (Roblox keeps a failed require's error) and every HUD script that later required InteractionAudio died with "Requested module experienced an error while loading".
+ -- A click before the game has loaded simply has no click sound (Audio stays nil; start() checks it). The guard is the R152 line (a stand-in without IsLoaded runs on).
  local Audio
  task.spawn(function()
+  do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end
+  if dead then return end
   local module=RS:WaitForChild('InteractionAudio',10)
   if module then local ok,loaded=pcall(require,module);if ok then Audio=loaded end end
  end)
@@ -203,13 +208,12 @@ function T.Start(player,pg)
   if Input.GamepadEnabled then Gui.SelectedObject=button end
   local layout
   -- R157 (owner: "add tips in the starting screen"; Style B, then "in the middle", "a new tip every 10 s", a small pulse like Minecraft's splash, highlighted words): one tip line
-  -- floating between the logo and Click to play!. A new tip every Tips.Interval s (fades out / in), a gentle pulse (+-Tips.PulseAmount in size, a full breath every Tips.PulsePeriod s)
-  -- and a very small bob (Tips.BobPixels). Reduced Motion: no fade, no pulse, no bob (the text just changes). The list, its timings and the highlight mini-markup are
+  -- floating between the logo and Click to play!. A new tip every Tips.Interval s (fades out / in) and a gentle pulse (+-Tips.PulseAmount in size, a full breath every Tips.PulsePeriod s)
+  -- through a UIScale about the line's centre. R157b (owner: "too jittery"): slower and smaller than the first version (+-5% every 0.5 s), and the bob is gone: the line is never moved,
+  -- so nothing hops from one pixel to the next. Reduced Motion: no fade, no pulse (the text just changes). The list, its timings and the highlight mini-markup are
   -- ReplicatedStorage.TitleTips156 (one line per tip), required below with WaitForChild + pcall like the title's other modules. A missing / broken list just leaves the line out.
-  -- Nothing is allocated per frame: the lines, the order and the bob's positions are built once (the bob walks through TIP_BOB_STEPS ready-made UDim2 values).
-  local tipLabel,tipStroke,tipScale,tips,tipLines,tipOrder,tipRandom,tipIndex,tipClock,pulseClock,tipAlpha
-  local tipBob,tipRest,tipBobAt={},nil,0
-  local TIP_BOB_STEPS=60
+  -- Nothing is allocated per frame: the lines and the order are built once, and the line's position is only written on a resize.
+  local tipLabel,tipStroke,tipScale,tips,tipLines,tipOrder,tipRandom,tipIndex,tipClock,pulseClock,tipAlpha,tipPulse
   local function resize()
    local size=group.AbsoluteSize;layout=T.Layout(size.X,size.Y)
    visual.Size=UDim2.fromOffset(layout.LogoWidth,layout.LogoHeight)
@@ -218,9 +222,7 @@ function T.Start(player,pg)
    if tipLabel then
     tipLabel.Size=UDim2.fromOffset(layout.TipWidth,layout.TipHeight)
     tipLabel:FindFirstChildOfClass('UITextSizeConstraint').MaxTextSize=layout.TipSize
-    tipRest=UDim2.fromOffset(size.X/2,layout.TipY)
-    for i=1,TIP_BOB_STEPS do tipBob[i]=UDim2.fromOffset(size.X/2,layout.TipY+tips.BobPixels*math.sin((i-1)*math.pi*2/TIP_BOB_STEPS))end
-    tipBobAt=0;tipLabel.Position=tipRest
+    tipLabel.Position=UDim2.fromOffset(size.X/2,layout.TipY) -- (written here only: the line never moves while it shows)
    end
   end
   connect(group:GetPropertyChangedSignal('AbsoluteSize'),resize);resize()
@@ -230,8 +232,8 @@ function T.Start(player,pg)
    local label
    local built,why=pcall(function()
     -- a list with a missing / wrong number or line must not reach the frame step (an error there would close the title): check it once, here
-    for _,key in ipairs({'Interval','Fade','PulseAmount','PulsePeriod','BobPixels','BobPeriod'})do assert(type(list[key])=='number'and list[key]==list[key],'Tips.'..key)end
-    assert(list.Fade>0 and list.Interval>list.Fade*2 and list.PulsePeriod>0 and list.BobPeriod>0,'Tips timings')
+    for _,key in ipairs({'Interval','Fade','PulseAmount','PulsePeriod'})do assert(type(list[key])=='number'and list[key]==list[key],'Tips.'..key)end
+    assert(list.Fade>0 and list.Interval>list.Fade*2 and list.PulsePeriod>0,'Tips timings')
     local lines={};for i=1,#list.Tips do lines[i]=list.Line(i);assert(type(lines[i])=='string','Tips.Line('..i..')')end
     local random=Random.new()
     local order=T.TipOrder and table.clone(T.TipOrder)or list.Order(random) -- (T.TipOrder: a fixed order for the tests and the preview)
@@ -241,7 +243,7 @@ function T.Start(player,pg)
     make('UITextSizeConstraint',label,{MaxTextSize=26,MinTextSize=11})
     tipStroke=make('UIStroke',label,{Thickness=2,Color=RGB(23,37,16),LineJoinMode=Enum.LineJoinMode.Round,Transparency=1})
     tipScale=make('UIScale',label,{Scale=1})
-    tips,tipLines,tipOrder,tipRandom,tipIndex,tipClock,pulseClock,tipAlpha=list,lines,order,random,1,0,0,nil
+    tips,tipLines,tipOrder,tipRandom,tipIndex,tipClock,pulseClock,tipAlpha,tipPulse=list,lines,order,random,1,0,0,nil,1
     tipLabel=label;resize()
    end)
    if not built then
@@ -307,8 +309,8 @@ function T.Start(player,pg)
    local lobby=map and map:FindFirstChild('Lobby');local spawn=lobby and lobby:FindFirstChild('FallbackSpawn')
    if spawn and spawn:IsA('BasePart')then return spawn.Position,125 end
   end
-  -- R157: the tip line's clock (run from frame while the title shows, not while it leaves). It builds no table, closure, string or UDim2: the text, the order and the bob's positions are
-  -- ready-made, and a property is only written when its value changes.
+  -- R157: the tip line's clock (run from frame while the title shows, not while it leaves). It builds no table, closure, string or UDim2: the text and the order are ready-made, and a
+  -- property is only written when its value changes.
   local function stepTip(dt,reduced)
    tipClock+=dt;pulseClock+=dt
    if tipClock>=tips.Interval then
@@ -319,15 +321,9 @@ function T.Start(player,pg)
    -- fade in over Fade s, hold, fade out over the last Fade s (the text changes while it is invisible); Reduced Motion: no fade, the text just changes
    local alpha=reduced and 1 or math.min(1,tipClock/tips.Fade,(tips.Interval-tipClock)/tips.Fade)
    if alpha~=tipAlpha then tipAlpha=alpha;tipLabel.TextTransparency=1-alpha;tipStroke.Transparency=1-alpha end
-   if reduced then
-    tipScale.Scale=1
-    if tipBobAt~=0 then tipBobAt=0;tipLabel.Position=tipRest end
-   else
-    -- the pulse about the label's centre, and the bob (the nearest of TIP_BOB_STEPS positions along its sine)
-    tipScale.Scale=1+tips.PulseAmount*math.sin(pulseClock*math.pi*2/tips.PulsePeriod)
-    local step=math.floor(pulseClock/tips.BobPeriod%1*TIP_BOB_STEPS+.5)%TIP_BOB_STEPS+1
-    if step~=tipBobAt then tipBobAt=step;tipLabel.Position=tipBob[step]end
-   end
+   -- the pulse: a slow sine on the label's UIScale, about its centre (the line is never moved); Reduced Motion: scale 1
+   local pulse=reduced and 1 or 1+tips.PulseAmount*math.sin(pulseClock*math.pi*2/tips.PulsePeriod)
+   if pulse~=tipPulse then tipPulse=pulse;tipScale.Scale=pulse end
   end
   local function frame(dt)
    dt=math.clamp(dt,0,.1);clock+=dt

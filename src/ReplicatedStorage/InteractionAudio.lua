@@ -6,6 +6,13 @@ local Debris=game:GetService('Debris')
 local Content=game:GetService('ContentProvider')
 local Timing=require(script.Parent:WaitForChild('SoundTiming')) -- R152: WaitForChild (it could run before SoundTiming had replicated)
 local M={}
+-- R157b fix: AudioMixer is fetched the first time a voice needs it, with WaitForChild (like SoundTiming above): this module can be required before AudioMixer has replicated (the title does it
+-- while the game is still loading), and a failed require is cached by Roblox, so the HUD scripts that need this module later failed with it.
+local mixer
+local function Mixer()
+ if not mixer then mixer=require(script.Parent:WaitForChild('AudioMixer'))end
+ return mixer
+end
 -- R150: MenuClose is the MenuClick file a little lower; Denied is the built-in ping, low and muted (no new upload).
 M.AssetIds={Bubble04=96764044228884,Bubble06=131731955363530,UpgradeClick=87218932219010,Equip=99675704394731,KaChing=86218459564041,GemClaim=82559527540705,MenuClick=116737765668953,
  MenuClose=116737765668953,Denied='rbxasset://sounds/electronicpingshort.wav',MechClick=87218932219010} -- (R153: MechClick is UpgradeClick's file at Bubble04's volume: the Mech pack's clicks 1-4)
@@ -28,12 +35,13 @@ function M.Asset(key)
 end
 local pools={};local nextRetry=setmetatable({},{__mode='k'}) -- per pool (MenuClose shares MenuClick's file but has its own voices to warm)
 local function pool(key,id)
+ local mix=Mixer() -- (R157b fix: first, so a wait for AudioMixer never leaves a half-built pool behind)
  local existing=pools[key];if existing and existing.Id==id then return existing end
  if existing then for _,voice in ipairs(existing.Voices)do voice:Destroy()end end
  local p={Id=id,Voices={},Index=0};pools[key]=p
  for i=1,3 do
   local voice=Instance.new('Sound');voice.Name='Interaction_'..key;voice.SoundId=id;voice.Volume=defaults[key]or .4;voice.PlaybackSpeed=M.Speeds[key]or 1
-  require(script.Parent.AudioMixer).Route(voice,'Interface');voice.Parent=SoundService;p.Voices[i]=voice
+  mix.Route(voice,'Interface');voice.Parent=SoundService;p.Voices[i]=voice
  end
  return p
 end
@@ -70,5 +78,6 @@ function M.Transaction(kind)
  if kind=='Buy'or kind=='Sell'then return M.Play('KaChing')elseif kind=='Equip'then return M.Play('Equip')end
  return false
 end
-M.Preload()
+-- R157b fix: the warm-up runs in its own thread inside a pcall: it waits for AudioMixer there if needed, and a failure in it can no longer fail this module's require.
+task.spawn(function()local ok,why=pcall(M.Preload);if not ok then warn('[InteractionAudio] preload: '..tostring(why))end end)
 return M

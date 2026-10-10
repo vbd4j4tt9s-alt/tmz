@@ -2,10 +2,10 @@
 -- R157 preview data (not a test; a copy of R156's title_tips_scene156.luau): the REAL title screen (src/ReplicatedStorage/TitleScreen104.lua, with the real TitleTips156) started on the Roblox mock at a PC / landscape-phone /
 -- portrait-phone size, stepped through its own frame function at 120 fps, and its GUI trees (the Shade backdrop + the title content) printed as SCENE lines for headless Chromium.
 -- The 3D seed pack (a ViewportFrame in the game) cannot be built on the mock: an ImageLabel stand-in sits where the viewport is (Position .71,.04 / Size .29,.92 of the logo).
--- VIEW (set by render_title_tips157.sh): 'pc' (1920 x 1080), 'land' (844 x 390), 'port' (390 x 844).   REDUCED = true runs it with Reduced Motion (and asserts: no fade, no pulse, no bob).
+-- VIEW (set by render_title_tips157.sh): 'pc' (1920 x 1080), 'land' (844 x 390), 'port' (390 x 844).   REDUCED = true runs it with Reduced Motion (and asserts: no fade, no pulse). The line itself is never moved (R157b: no bob), in every frame.
 -- Frames, all through the real rotation (TitleScreen104.TipOrder, the title's fixed-order hook, picks the tips): tip 1 settled, tip 2 settled (one Interval later), tip 3 settled, the fade-out of a 4th tip at 50%,
--- and on the PC also tip 1's pulse at its largest (+5%) and its smallest (-5%).
--- Prints: SCENE <name><TAB><backdrop json><TAB><title json>   and   TIP<TAB><frame><TAB><kind><TAB><label alpha><TAB><pulse scale><TAB><bob px><TAB><layout json><TAB><label text (RichText)>
+-- and on the PC also tip 1's pulse at its largest (+3%) and its smallest (-3%): a full breath is Tips.PulsePeriod = 1.8 s.
+-- Prints: SCENE <name><TAB><backdrop json><TAB><title json>   and   TIP<TAB><frame><TAB><kind><TAB><label alpha><TAB><pulse scale><TAB><moved px (always 0)><TAB><layout json><TAB><label text (RichText)>
 --         TIPLINE<TAB><kind><TAB><the line as RichText>  (every tip, in list order: the fit / overlap check reads them)
 local W=require('./world');local R=W.R
 local dump=require('./dump_tree153')
@@ -86,14 +86,15 @@ local function snap(name,kind,expect)
  local L=T.Layout(SW,SH)
  local alpha=1-(label.TextTransparency or 0)
  local scale=label:FindFirstChildOfClass('UIScale').Scale
- local bob=label.Position.Y.Offset-L.TipY
- -- the line floats centred in the gap between the logo (with its pack) and the button; its pulse and bob keep it clear of both (the button grows 3.5% when hovered)
+ local moved=label.Position.Y.Offset-L.TipY
+ assert(moved==0 and label.Position.X.Offset==SW/2,'the tip line must never be moved (no bob): '..moved)
+ -- the line floats centred in the gap between the logo (with its pack) and the button; its pulse keeps it clear of both (the button grows 3.5% when hovered)
  local logoBottom=L.LogoY+L.LogoHeight/2;local buttonTop=L.ButtonY-L.ButtonHeight/2*1.035
  local gap=buttonTop-logoBottom
- local top=L.TipY-L.TipHeight/2*1.05-1.5;local bottom=L.TipY+L.TipHeight/2*1.05+1.5
+ local top=L.TipY-L.TipHeight/2*(1+Tips.PulseAmount);local bottom=L.TipY+L.TipHeight/2*(1+Tips.PulseAmount)
  assert(top>=logoBottom+4 and bottom<=buttonTop-4,('the tip line (%.1f..%.1f) is not clear of the logo (bottom %.1f) and the button (top %.1f)'):format(top,bottom,logoBottom,buttonTop))
  assert(math.abs((L.TipY-logoBottom)-(L.ButtonY-L.ButtonHeight/2-L.TipY))<.01,'the tip line is not vertically centred between the logo and the button')
- if REDUCED then assert(alpha==1 and scale==1 and bob==0,('Reduced Motion: alpha %.2f scale %.3f bob %.2f'):format(alpha,scale,bob))end
+ if REDUCED then assert(alpha==1 and scale==1,('Reduced Motion: alpha %.2f scale %.3f'):format(alpha,scale))end
  if expect and not REDUCED then
   if expect.scale then assert(near(scale,expect.scale,.004),('%s: pulse scale %.4f, expected %.3f'):format(name,scale,expect.scale))end
   if expect.alpha then assert(near(alpha,expect.alpha,.03),('%s: alpha %.3f, expected %.2f'):format(name,alpha,expect.alpha))end
@@ -102,19 +103,20 @@ local function snap(name,kind,expect)
  print('SCENE '..name..'\t'..bd..'\t'..sc)
  local T0=Today.Layout(SW,SH)
  print(('TIP\t%s\t%s\t%.2f\t%.3f\t%.2f\t{"logoW":%.0f,"logoH":%.0f,"logoY":%.0f,"logoBottom":%.0f,"buttonTop":%.0f,"gap":%.0f,"tipY":%.1f,"tipH":%.0f,"tipSize":%.0f,"buttonY":%.0f,"todayLogoW":%.0f,"todayLogoH":%.0f}\t%s'):format(
-  name,kind,alpha,scale,bob,L.LogoWidth,L.LogoHeight,L.LogoY,logoBottom,L.ButtonY-L.ButtonHeight/2,L.ButtonY-L.ButtonHeight/2-logoBottom,L.TipY,L.TipHeight,L.TipSize,L.ButtonY,T0.LogoWidth,T0.LogoHeight,label.Text))
+  name,kind,alpha,scale,moved,L.LogoWidth,L.LogoHeight,L.LogoY,logoBottom,L.ButtonY-L.ButtonHeight/2,L.ButtonY-L.ButtonHeight/2-logoBottom,L.TipY,L.TipHeight,L.TipSize,L.ButtonY,T0.LogoWidth,T0.LogoHeight,label.Text))
 end
 local kinds={}
 for i,o in ipairs(order)do kinds[i]=Tips.Tips[o].Kind end
 local I,F=Tips.Interval,Tips.Fade
--- tip 1 settled (the reveal takes .72 s, then the first fade-in); the pulse clock runs from the start, so at 2.5 s it is back at its start (scale 1)
-at(2.5);snap(VIEW..'_1',kinds[1],{scale=1,alpha=1})
+-- tip 1 settled (the reveal takes .72 s, then the first fade-in); the pulse clock runs from the start, so at 1.5 breaths (2.7 s) it is back at scale 1
+local P=Tips.PulsePeriod
+at(1.5*P);snap(VIEW..'_1',kinds[1],{scale=1,alpha=1})
 if VIEW=='pc'then
- at(2.5+.125);snap('pc_big',kinds[1],{scale=1+Tips.PulseAmount}) -- a quarter of a breath later: the largest
- at(2.5+.375);snap('pc_small',kinds[1],{scale=1-Tips.PulseAmount}) -- three quarters: the smallest
+ at(1.5*P+P/4);snap('pc_small',kinds[1],{scale=1-Tips.PulseAmount}) -- (1.5 breaths in, the sine is going down:) a quarter of a breath later: the smallest
+ at(1.5*P+3*P/4);snap('pc_big',kinds[1],{scale=1+Tips.PulseAmount}) -- three quarters: the largest
 end
-at(I+2.5);snap(VIEW..'_2',kinds[2],{scale=1,alpha=1})
-at(2*I+2.5);snap(VIEW..'_3',kinds[3],{scale=1,alpha=1})
+at(7*P);snap(VIEW..'_2',kinds[2],{scale=1,alpha=1}) -- (a whole number of half breaths after the start: scale 1; 12.6 s, tip 2 has been up 2.6 s)
+at(12*P);snap(VIEW..'_3',kinds[3],{scale=1,alpha=1}) -- (21.6 s)
 -- the 4th tip, F/2 s before its end: the fade-out is 50% through (with Reduced Motion there is no fade: it is fully visible)
 at(4*I-F/2);snap(VIEW..'_fade',kinds[4],{alpha=.5})
 if stop then stop()end

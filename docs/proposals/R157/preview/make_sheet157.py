@@ -202,10 +202,10 @@ y += 44
 big = png('pc_1', 1150)
 pc_top = y
 bottom_left = frame(big, M, y, 'pc_1', 'tip 1 settled: the line floats in the middle of the gap between the logo with the pack (bottom %d) and the button (top %d), %d px of air above and below; the logo, pack and button are exactly where they were before the tips.' % (LC['logoBottom'], LC['buttonTop'], (LC['gap'] - LC['tipH']) / 2), 1150)
-# the two pulse frames: the line at its largest (+5%) and its smallest (-5%), cropped around the line at the same size
+# the two pulse frames: the line at its largest (+3%) and its smallest (-3%), cropped around the line at the same size
 y2 = bottom_left + 14
 PULSE = (460, int(LC['tipY']) - 48, 1460, int(LC['tipY']) + 48)
-for name, label in (('pc_big', 'zoomed in on the line - pulse, largest: scale %.2f (a full breath every 0.5 s)' % info['pc_big']['scale']), ('pc_small', 'zoomed in - pulse, smallest: scale %.2f (same tip, 0.25 s later)' % info['pc_small']['scale'])):
+for name, label in (('pc_big', 'zoomed in on the line - pulse, largest: scale %.2f (a full breath every 1.8 s)' % info['pc_big']['scale']), ('pc_small', 'zoomed in - pulse, smallest: scale %.2f (same tip, half a breath, 0.9 s, apart)' % info['pc_small']['scale'])):
     im = png(name, 1150, PULSE)
     y2 = frame(im, M, y2, name, label + '.', 1150) + 14
 right_x = M + 1150 + 40
@@ -230,9 +230,9 @@ nx = M + 2 * (844 + 28) + 16
 panel(nx, gy, W_SHEET - M, max(bottoms))
 d.text((nx + 24, gy + 18), 'How it behaves', font=font(26, True), fill=INK)
 bullets(nx + 24, gy + 62, [
-    'Where: vertically centred in the gap between the bottom of the logo (the pack art is inside it) and the top of the button. The gap is kept at least the line\'s height + 20 px, so the pulse and the bob never touch the logo or the button.',
+    'Where: vertically centred in the gap between the bottom of the logo (the pack art is inside it) and the top of the button. The gap is kept at least the line\'s height + 20 px, so the pulse never touches the logo or the button.',
     'When: a new tip every 10 s. It fades in over 0.4 s, holds, fades out over the last 0.4 s; the text changes while it is invisible. The first tip of a visit is random, then a shuffled order (no repeats until all have shown).',
-    'Motion: a gentle splash pulse, +-5% in size, a full breath every 0.5 s, plus a 1.5 px bob (a slow 1.9 s). Reduced Motion: no pulse, no bob and no fade; the text just changes every 10 s.',
+    'Motion: a calm splash pulse, +-3% in size, a full breath every 1.8 s (a UIScale; the line itself never moves). Reduced Motion: no pulse and no fade; the text just changes every 10 s.',
     'Highlights: write {y}word{/y} (yellow #FFE14D) or {g}word{/g} (green #77E542, the title\'s PACK green) in the tip\'s text in TitleTips156; the title turns it into RichText. The rest is white with the title\'s dark outline.',
     'Size: one line on a PC / landscape phone, two on a portrait phone; the text shrinks to fit (11 to 32 px). The label takes no clicks.',
     '1920 x 1080 and the portrait phone: the logo, pack and button stay exactly where they were (the room was already there). Landscape phone: the logo is %d px wide (was %d) to make the room.' % (L1['logoW'], L1['todayLogoW']),
