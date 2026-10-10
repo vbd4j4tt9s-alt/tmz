@@ -28,7 +28,12 @@
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};MODE=$3
-BASE=${R158_BASE:-e9c0900}
+# BASE = the commit before the walls build (the parent of the commit that added TrackWalls158.lua), found in git, so later builds merged on top
+# (bats, popups, bunting, the release Version line) never trip step 0. R158_BASE overrides it.
+BASE=${R158_BASE:-}
+if [ -z "$BASE" ];then first=$(git -C "$REPO" log --diff-filter=A --format=%H -- src/ServerScriptService/ChestChaseServer/TrackWalls158.lua 2>/dev/null | tail -1)
+ [ -n "$first" ] && BASE=$(git -C "$REPO" rev-parse -q --verify "$first^" 2>/dev/null);fi
+BASE=${BASE:-e9c0900}
 S=$REPO/src;SS=$S/ServerScriptService/ChestChaseServer;T=$REPO/tools/tests;P=$REPO/docs/proposals
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
 mkdir -p "$OUT"
@@ -44,17 +49,19 @@ grep -q "pcall(function()require(script.Parent.TrackWalls158).Apply(mapRoot)end)
 awk '/TrackWalls158/{a=NR}/LavaVolcano158/{b=NR}/KeyboardSkip152/{c=NR}/HubDecor151/{h=NR}END{if(h<a&&a<b&&b<c)print "ok: order in MapService.new: HubDecor151, then the R158 walls, then the volcano, all before the keyboard skip scan (the keys fill the floor where lava was)";else exit 1}' "$SS/MapService.lua" || fail "the R158 lines are not between HubDecor151 and the keyboard scan"
 if grep -rniE "cla[u]de|op[u]s|sonn[e]t|haik[u]|gp[t]-?[0-9]" $(for m in $NEW;do echo "$SS/$m.lua";done) "$HERE"/*.luau "$HERE"/*.py "$P/R158/design/make_models158.py" "$P/R158/design/outer_track_assets.md" "$P/R158/design/design.md" 2>/dev/null;then fail "a model name in the R158 walls files";else echo "ok: no model names in the R158 walls files";fi
 if git -C "$REPO" cat-file -e "$BASE^{commit}" 2>/dev/null;then
- for f in "src/ServerScriptService/ChestChaseServer/Config.lua" src/ServerScriptService/ChestChaseServer/BatService.lua src/ServerScriptService/ChestChaseServer/BatArt.lua src/ReplicatedStorage/BatHitbox.lua src/ReplicatedStorage/BatSwingPose.lua src/ReplicatedStorage/BatConfig.lua src/StarterPlayer/StarterPlayerScripts/BatClient.client.lua;do
-  [ -e "$REPO/$f" ] || continue
-  git -C "$REPO" diff --quiet "$BASE" -- "$f" || fail "$f changed (Config.lua is frozen; the bat files belong to another build)"
+ # Only the walls build's OWN commits are checked (every commit since BASE that touched a walls file): each may change only the walls files, MapService, MANIFEST,
+ # LavaFlow (the one client script) and KeyboardSkip152 (the mesh volcano's footprint, review fix 5). Config.lua is pinned by frozen.sha256 below.
+ WFILES="src/ServerScriptService/ChestChaseServer/TrackWallSpecs158.lua src/ServerScriptService/ChestChaseServer/TrackWalls158.lua src/ServerScriptService/ChestChaseServer/OuterTrackAssets158.lua src/ServerScriptService/ChestChaseServer/OuterTrackLoader158.lua src/ServerScriptService/ChestChaseServer/OuterTrackModels158.lua src/ServerScriptService/ChestChaseServer/LavaVolcano158.lua"
+ ALLOW="src/MANIFEST.tsv|ServerScriptService/ChestChaseServer/MapService.lua|StarterPlayerScripts/LavaFlow.client.lua|TrackWallSpecs158|TrackWalls158|OuterTrack(Assets|Loader|Models)158|LavaVolcano158|ReplicatedStorage/KeyboardSkip152.lua"
+ commits=$(git -C "$REPO" rev-list "$BASE"..HEAD -- $WFILES)
+ [ -n "$commits" ] || fail "no commit since $BASE touched the walls files"
+ for c in $commits;do
+  other=$(git -C "$REPO" diff-tree --no-commit-id --name-only -r -m "$c" -- src | sort -u | grep -v -E "$ALLOW" || true)
+  [ -z "$other" ] || fail "walls commit $(git -C "$REPO" log -1 --format=%h "$c") changed src files this build should not touch: $(echo $other)"
  done
- echo "ok: Config.lua and the bat files are as at $BASE"
- changed=$(git -C "$REPO" diff --name-only "$BASE" -- src/StarterPlayer | tr '\n' ' ')
- [ "$changed" = "src/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua " ] && echo "ok: the one client script changed is LavaFlow.client.lua (no client script added)" || fail "client scripts changed against $BASE: $changed"
- [ "$(git -C "$REPO" show "$BASE:src/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua" | head -1)" = "$(head -1 "$S/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua")" ] && echo "ok: LavaFlow's line 1 (the R152 load guard) is untouched" || fail "LavaFlow's line 1 changed"
- other=$(git -C "$REPO" diff --name-only "$BASE" -- src | grep -v -E "MANIFEST.tsv|MapService.lua|LavaFlow.client.lua|TrackWallSpecs158|TrackWalls158|OuterTrack|LavaVolcano158" || true)
- [ -z "$other" ] && echo "ok: nothing else under src/ changed" || fail "src/ files changed that this build should not touch: $other"
-else echo "skip: $BASE is not in this checkout (Config / bat / client-script diffs not run)";fi
+ echo "ok: the walls build's $(echo $commits | wc -w) commit(s) since $BASE touch only the walls files, MapService, MANIFEST, LavaFlow (the one client script) and KeyboardSkip152"
+ [ "$(git -C "$REPO" show "$BASE:src/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua" | head -1)" = "$(head -1 "$S/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua")" ] && echo "ok: LavaFlow's line 1 (the R152 load guard) is untouched" || fail "LavaFlow's line 1 (the load guard) changed"
+else echo "skip: $BASE is not in this checkout (the walls commits' file check not run)";fi
 (cd "$REPO" && grep -v '^#' "$P/R151/tests/frozen.sha256" | sha256sum -c --quiet - ) && echo "ok: the frozen file hashes (docs/proposals/R151/tests/frozen.sha256) still hold" || fail "a frozen file's hash changed"
 sed -n 6p "$T/run_all_suites.sh" | grep -q "docs/proposals/R158/tests/run_walls158.sh docs/proposals/R156/tests/run_pyramid156.sh" && echo "ok: run_walls158.sh is on line 6 of tools/tests/run_all_suites.sh, before run_pyramid156.sh" || fail "run_walls158.sh is not registered on line 6 of run_all_suites.sh before run_pyramid156.sh"
 sed -n 9p "$T/run_all_suites.sh" | grep -q "R158run_walls158" && echo "ok: ... and its place-file argument is in the case on line 9" || fail "R158run_walls158 is not in the case on line 9 of run_all_suites.sh"
