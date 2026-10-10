@@ -29,8 +29,9 @@ end
 print(('DROPPED %d of %d keys (%d scenery parts looked at)'):format(dropped,geo.Rows*geo.Cols,res.Parts))
 local desertFlat=0;for _,e in ipairs(res.Report[2]or{})do if e.Class=='flat'and e.Name=='Small oasis'then desertFlat=e.Cells end end
 check(desertFlat>=10,'the Desert oasis (Small oasis: water, its stone and palm bases) leaves out '..desertFlat..' keys')
-local lavaFlat=0;for _,e in ipairs(res.Report[4]or{})do if e.Class=='flat'then lavaFlat+=e.Cells end end
-check(lavaFlat>=15,'the Lava biome leaves out '..lavaFlat..' keys over its lava river / pools / channels')
+local lavaFlat=0;local lavaStream;for _,e in ipairs(res.Report[4]or{})do if e.Class=='flat'then lavaFlat+=e.Cells;local n=e.Name:lower();if n:find('river',1,true)or n:find('magma',1,true)or n:find('channel',1,true)or n:find('pool',1,true)or n:find('stream',1,true)then lavaStream=e.Name end end end
+-- R158 (on purpose, owner: "yes remove the streams entirely" / "and the lava pool"): the Lava biome has no lava river, pool or channel any more, so no key is left out for lava (it was 15+)
+check(lavaStream==nil and lavaFlat<=6,'the Lava biome leaves out '..lavaFlat..' keys for lava-named rocks only (Lava entrance rocks): no stream, pool, river or channel is left to leave keys out for ('..tostring(lavaStream)..'; R158)')
 -- props only when mostly buried (60%): the wall banks / rocky edges along the track's edge leave their edge keys in (R151 look, no bare gaps along the walls)
 local bankCells,flatTotal,propTotal=0,0,0
 for stage=1,7 do for _,e in ipairs(res.Report[stage]or{})do
@@ -38,7 +39,7 @@ for stage=1,7 do for _,e in ipairs(res.Report[stage]or{})do
  local n=e.Name:lower();if n:find('wall bank',1,true)or n:find('rocky edge',1,true)then bankCells+=e.Cells end
 end end
 check(bankCells<=12,('wall banks / rocky edges drop only %d keys in all (was 175 at a 25%% threshold)'):format(bankCells))
-check(flatTotal>=40 and propTotal>=60,('%d keys dropped for water / lava, %d for props that bury them'):format(flatTotal,propTotal))
+check(flatTotal>=20 and propTotal>=60,('%d keys dropped for water (the Desert oasis ...; R158: no lava), %d for props that bury them'):format(flatTotal,propTotal)) -- (R158: was flatTotal >= 40 with the lava's 15+)
 print(('SPLIT water/lava %d, props %d'):format(flatTotal,propTotal))
 -- the live oasis: its water parts (oriented boxes, turned a little about the vertical axis), found by name in the finished map
 local function find(root,path)for n in path:gmatch('[^/]+')do root=root and root:FindFirstChild(n)end;return root end

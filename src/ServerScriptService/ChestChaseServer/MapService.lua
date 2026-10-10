@@ -136,6 +136,10 @@ function MapService.new(config)
  require(game:GetService('ReplicatedStorage').WalkthroughProps90).Bind(mapRoot)
  -- R151 Seed Festival Square: the dressed hub walls, murals, track gate, streets and base arches (the client adds trees and props).
  do local ok,err=pcall(function()require(script.Parent.HubDecor151).Apply(mapRoot)end);if not ok then warn('[R151] Hub dressing skipped: '..tostring(err))end end
+ -- R158 (owner approved docs/proposals/R158/design): a wall dressing per biome (+ the border towers), the ground outside the track's walls, the owner's backdrop models and stone caps on the hub wall. Parts only (no collision, no scripts); a failure leaves the map as it was.
+ do local ok,err=pcall(function()require(script.Parent.TrackWalls158).Apply(mapRoot)end);if not ok then warn('[R158] Track walls skipped: '..tostring(err))end end
+ -- R158 (owner: "use this volcano to replace our current volcano", "yes remove the streams entirely", "and the lava pool"): no lava streams or pools in the Lava biome, the owner's volcano model in place of the old cone. Before the keyboard's skip scan below, so the keys fill the floor where lava was.
+ do local ok,err=pcall(function()require(script.Parent.LavaVolcano158).Apply(mapRoot)end);if not ok then warn('[R158] Lava volcano skipped: '..tostring(err))end end
 	self.EconomyHub = requireChild(config, mapRoot, "EconomyHub", "Folder")
 	self.BuyStation = requireChild(config, self.EconomyHub, "BuyStation", "BasePart")
 	self.SellStation = requireChild(config, self.EconomyHub, "SellStation", "BasePart")

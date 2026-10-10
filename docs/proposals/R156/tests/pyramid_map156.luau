@@ -132,7 +132,9 @@ check(spawnMin>=200,('no spawn point near it (nearest %.0f studs)'):format(spawn
 
 -- 5. The zone --------------------------------------------------------------------------------------------------------------------------------------------------------------------
 local m=Rules.Margin
-local zhits=overlapping(V3(lo0.X-m,SPOT.Y-Rules.Below,lo0.Z-m),V3(hi0.X+m,SPOT.Y+G.Top+m,hi0.Z+m),function(d)return ground(d)or d==wall end)
+-- R158 (on purpose): the Desert wall's own dressing (TrackWalls158: flat bands under 0.7 studs proud on this stretch, no pillar, door or obelisk: D.KeepClear) is part of the wall, not a building
+local function wallDress(d)return d:GetFullName():find('.TrackWalls158.',1,true)~=nil end
+local zhits=overlapping(V3(lo0.X-m,SPOT.Y-Rules.Below,lo0.Z-m),V3(hi0.X+m,SPOT.Y+G.Top+m,hi0.Z+m),function(d)return ground(d)or d==wall or wallDress(d)end)
 check(#zhits==0,'nothing else stands in the Hold E zone (only the floor and the Desert\'s wall): no prompt from inside another building'..(#zhits>0 and(': '..table.concat(zhits,', '))or''))
 
 -- 6. The keyboard ---------------------------------------------------------------------------------------------------------------------------------------------------------------------

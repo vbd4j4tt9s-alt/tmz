@@ -25,7 +25,7 @@
 - DAILY: the "TODAY" tag in white letters with a black outline (owner: barely visible).
 
 ## Previews for the owner (not built)
-- Track walls per biome, outer track designs, base wall tops (`docs/proposals/R158/design/`).
+- Track walls per biome, outer track designs, base wall tops (`docs/proposals/R158/design/`): **BUILT, see below.**
 - PC HUD lock + MENU higher (`docs/proposals/R158/hud_lock/`).
 
 ## Next, after this round (owner)
@@ -52,3 +52,13 @@
   burst + sparks + short hit-stop). Choices: **no camera shake for the hitter, no "SMACK!" word**, trail **white** (default).
 - **Walls:** **base walls A** (stone caps), **and** the per-biome track walls **and** the outer track backdrops as in `design/`.
 - These go in R158 (after R157b).
+
+## Walls, outer track and Lava: BUILT (10 Oct, in the R158 build; details in `design/design.md` "Built" and `design/outer_track_assets.md`)
+- **Track walls** per biome: 1,481 parts (design 1,747 at most), full version everywhere, details from a fixed seed per wall (owner: no repeated look). **Base walls A** (stone caps, five close shades): 261 parts.
+  **Ground** outside the walls: 15 slabs. Built by `TrackWalls158` (data `TrackWallSpecs158`), called from `MapService.new` after `HubDecor151`. The wall parts over the refresh cover (502) are hidden while the track refreshes.
+- **Outer track = models, not parts** (owner: "just place the stuff"): `OuterTrackAssets158` (keys, ids, spots), `OuterTrackLoader158`, `OuterTrackModels158` (the owner's pyramid 9981304 as data, his dark mountain cut from 1,532 to 280 blocks a copy, the snow hills' layout).
+  Sources in order: a model dragged into `ServerStorage.OuterTrackAssets158` (named by the key), the owner's files built in (pyramid, dark mountain; the volcano and snow hills by mesh id through `CreateMeshPartAsync`), the game's own models (oaks, jungle trees, ice trees, crystals), an id. Waiting for models: the Jungle temple and cliff, the Desert dunes and obelisks, the Crystal mountains, the Storm tower / lightning / end mountain.
+- **Lava** (owner: "remove the streams entirely", "and the lava pool"): the river, the two side pools, the three channels, the molten crater and the pond's "Pool shore" are gone (762 parts; none was a hazard), the owner's volcano replaces the old cone at its footprint (`LavaVolcano158`),
+  `LavaFlow.client.lua` is idle with no streams. The keyboard fills the floor where the lava was.
+- Tests: `R158/tests/run_walls158.sh` (line 6 of `run_all_suites.sh`); changed on purpose: `R149/tests/keyboard_place.luau`, `R156/tests/pyramid_map156.luau`.
+- For the owner to check in Studio: phone frame rate (Forest, Storm Peaks), night / cloudy glow, the volcano (size, texture, mouth), the snow hills, the refresh cover, the keyboard in the Lava biome.
