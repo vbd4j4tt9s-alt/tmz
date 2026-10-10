@@ -19,6 +19,8 @@
 #  3. test_bat_pose158.luau  the swing: contact at .30 = Windup, .85 s, the keys, = the approved preview, upper body only, R6 60 % twist / no lean, smooth
 #  4. test_bat_client158.luau + test_hit_effects158.luau  the click (no wait), the sweep and the claim, your hit at once (slap, pooled star, sparks,
 #                   hit-stop), NO hitter shake (the victim / bystanders keep theirs), the white trail on the strike only, Fast Mode, nothing made per frame,
+#                   (R158b, owner: "there is only a sound effect for hitting someone") a SWING IS SILENT: no whoosh for yours or anyone else's, hit or miss, the
+#                   whoosh file is not preloaded, BatConfig has no swing-sound settings; the slap of a hit is the only sound ever played and is unchanged,
 #                   upper body only R15 / R6, the carrier (right arm only, order of the two scripts does not matter), no SMACK word; the star pool, sparks;
 #                   (R158 review) a slow device's claims stay inside the strike (60 to 10 fps), someone else's hit on the player you swung at is shown
 #  5. test_bat_pyramid158  R156's pyramid server world (its own set-up), then a REAL bat claim on the secret-pack carrier: back in the pyramid ('Bat');
@@ -28,7 +30,7 @@
 #                   star pool, a coloured trail, the carry pose takes the bat's arm, contact moved, a leg in the swing, no hit-stop; R158 review: the start
 #                   or the claim's travel not held to the measured lag, no drift rule, a jump sample as a position, an unclamped extrapolation, a one-step
 #                   velocity, no cooldown slack or an unpaid one, the whole frame swept, own hits by victim only, no hitter in the packet, the SMACK notice
-#                   back): each must fail a test
+#                   back; R158b: the whoosh back in a swing, the whoosh preloaded again): each must fail a test
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};N=${2:-400};mkdir -p "$OUT"
@@ -55,6 +57,13 @@ if git -C "$REPO" cat-file -e "$BASE^{commit}" 2>/dev/null;then
  if sh "$T/r152_real_diff.sh" "$REPO" "$BASE" $FROZEN >/dev/null;then echo "ok: what a hit does is untouched: HitByBat (ConcurrentKeeperService), the ragdoll, knockback, MovementGuard, the pyramid, the chase, Config, BatArt, the Hotbar, SeedPackClient, the ragdoll / fling clients, LocalSfx are identical to $BASE (apart from Config.Version, no SMACK, the hitter in the bat packet)"
  else fail "a file that must not change changed against $BASE:";sh "$T/r152_real_diff.sh" "$REPO" "$BASE" $FROZEN || true;fi
 else echo "skip: $BASE is not in this checkout (the unchanged-files check and today's side of the sim need it)";fi
+# R158b (owner): a swing makes no sound. No whoosh (LocalSfx's WhooshId) and no SwingSound* setting in the bat client / config (they stay in LocalSfx, TravelButtons
+# and EconomyClient: the fast-travel arrival and the go-to-top sounds use them); the slap of a hit (SlapSoundId, SlapVolume .48, played at the hit) is exactly as before
+if grep -nE "WhooshId|SwingSound" "$SP/BatClient.client.lua" "$RSD/BatConfig.lua";then fail "the bat swing has a sound setting or the whoosh again";else echo "ok: R158b: no whoosh and no swing-sound settings in BatClient / BatConfig";fi
+grep -q "Sfx.Play(C.SlapSoundId,at,C.SlapVolume,1,2)" "$SP/BatClient.client.lua" && grep -q "SlapSoundId='rbxassetid://81700629330286',SlapVolume=.48," "$RSD/BatConfig.lua" && grep -q "Sfx.Preload({C.SlapSoundId})" "$SP/BatClient.client.lua" \
+ && echo "ok: R158b: the slap of a hit is as before (id, volume .48, played at the hit, preloaded)" || fail "the slap changed"
+grep -q "^Sfx.WhooshId='rbxassetid://9120768742'" "$RSD/LocalSfx.lua" && grep -q "Sfx.WhooshId" "$SP/TravelButtons.client.lua" && grep -q "LocalSfx.WhooshId" "$SP/EconomyClient.client.lua" \
+ && echo "ok: R158b: LocalSfx.WhooshId stays for the fast-travel and go-to-top sounds" || fail "LocalSfx.WhooshId was removed but other scripts use it"
 grep -q "Windup=.30,Recovery=.55,Cooldown=1.0," "$RSD/BatConfig.lua" && echo "ok: the hit time (Windup .30) and the cooldown (1.0 s) as before; the swing is .85 s" || fail "BatConfig Windup / Cooldown changed"
 grep -q "BatHit={Rate=2,Burst=3}" "$SS/SecurityGate.lua" && echo "ok: SecurityGate BatHit = 2 a second, 3 at once" || fail "no SecurityGate BatHit policy"
 if grep -niE "smack" "$SP/BatClient.client.lua" "$RSD/HitBurstFx.lua" "$SS/BatService.lua" "$SS/BatLagComp.lua" "$RSD/BatHitbox.lua" | grep -vE '^[^:]+:[0-9]+: *--';then fail "a SMACK word in the new bat code";else echo "ok: no SMACK word in the new bat code";fi
@@ -206,6 +215,9 @@ mutate waits_for_server "$SP/BatClient.client.lua" "s/^ begin(character,tool,han
 mutate hitter_shake "$SP/BatClient.client.lua" "s/^ Sfx.Play(C.SlapSoundId,at,C.SlapVolume,1,2);/ workspace.CurrentCamera.CFrame=workspace.CurrentCamera.CFrame*CFrame.new(0,.3,0);Sfx.Play(C.SlapSoundId,at,C.SlapVolume,1,2);/" cli BatClient
 mutate own_hit_not_skipped "$SP/KeeperHitEffects.client.lua" "s/ if batHit and Burst.IsOwnPacket(hit,player.UserId)then return end.*//" cli KeeperHitEffects
 mutate smack_word "$SP/BatClient.client.lua" "s/^ Burst.NoteOwnHit(other.UserId)$/ Burst.NoteOwnHit(other.UserId);local g=Instance.new('TextLabel');g.Text='SMACK!';g.Parent=workspace/" cli BatClient
+# R158b: the swing's whoosh put back (played at the swing / preloaded again) must fail the silent-swing checks
+mutate whoosh_back "$SP/BatClient.client.lua" "s/^ local entries=joints(character,handle);if #entries==0 then return end\$/ Sfx.Play(Sfx.WhooshId,root and root.Position,.25,1.4,2);&/" cli BatClient
+mutate whoosh_preloaded "$SP/BatClient.client.lua" "s/^Sfx.Preload({C.SlapSoundId})/Sfx.Preload({C.SlapSoundId,Sfx.WhooshId})/" cli BatClient
 mutate no_hit_stop "$SP/BatClient.client.lua" "s/^ if p and not p.StopUntil then p.StopAt=now-p.At;p.StopUntil=now+C.HitStop end$//" cli BatClient
 mutate trail_colour "$RSD/BatConfig.lua" "s/TrailRGB={255,255,255}/TrailRGB={255,120,40}/" cli BatConfig
 mutate trail_always "$SP/BatClient.client.lua" "s/local on=p.TrailAllowed and t>=C.TrailFrom and t<C.TrailTo/local on=p.TrailAllowed/" cli BatClient

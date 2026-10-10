@@ -2,8 +2,10 @@
 -- R158 bats, BUILT: the swinger's client on the Roblox mock with the REAL scripts / modules of this checkout: BatClient, BatSwingPose, BatHitbox,
 -- HitBurstFx, KeeperHitEffects, SeedCarryPose (LocalSfx is a recorder; the Animator is played by the test: every joint gets its animation pose before
 -- PreSimulation, the hips a running swing).
---  1. the click: the request {Kind=Swing, Start, Id} goes at once, the pose starts at once (no server echo needed), the whoosh is timed from the click
---     (meets contact), the local cooldown; the server's echo of your own swing changes nothing; another player's swing plays from its packet (Lead).
+--  1. the click: the request {Kind=Swing, Start, Id} goes at once, the pose starts at once (no server echo needed), the local cooldown; the server's echo of
+--     your own swing changes nothing; another player's swing plays from its packet (Lead). (R158b, owner: "there is only a sound effect for hitting someone")
+--     A SWING MAKES NO SOUND, yours or anyone else's, hit or miss, near or far, and the whoosh is not preloaded: the slap of a hit is the only sound this
+--     script ever plays (section 3), exactly as before.
 --  2. the sweep: a player crossing in front is claimed once with {Kind=Hit, Id, Victim, ViewTime inside the strike, Own, Look}; nobody in reach, a
 --     ForceField, a knocked-down player, a player behind the base line, a swinger in the hub: no claim.
 --  3. your hit at once: the slap (once), the pooled star, the sparks, HitBurstFx.IsOwnHit; the 0.05 s hit-stop (the pose holds, then runs 0.05 s late);
@@ -24,9 +26,10 @@ local function near(a,b,e)return type(a)=='number'and type(b)=='number'and math.
 local RS=W.RS;local Run=W.Run;Run.PreAnimation=R.signal()
 W.env.bit32=bit32
 -- recorders ----------------------------------------------------------------------------------------------------------------------------------------
-local sfx={Log={},WhooshId='rbxassetid://9120768742'}
-function sfx.Play(id,pos,vol,pitch,life,skip)sfx.Log[#sfx.Log+1]={Id=id,Pos=pos,Vol=vol,Pitch=pitch,Skip=skip,At=R.clock};return true end
-function sfx.Preload()end
+local sfx={Log={},Ever={},Preloaded={},WhooshId='rbxassetid://9120768742'}
+function sfx.Play(id,pos,vol,pitch,life,skip)sfx.Log[#sfx.Log+1]={Id=id,Pos=pos,Vol=vol,Pitch=pitch,Skip=skip,At=R.clock};sfx.Ever[id]=(sfx.Ever[id]or 0)+1;return true end
+function sfx.Preload(ids)for _,id in ipairs(ids or{})do sfx.Preloaded[id]=true end end
+function sfx.others()local n=0;for _,e in ipairs(sfx.Log)do if e.Id~=sfx.SlapId then n+=1 end end;return n end -- (anything but the slap)
 function sfx.count(id)local n=0;for _,e in ipairs(sfx.Log)do if not id or e.Id==id then n+=1 end end;return n end
 W.stub('LocalSfx',sfx)
 local emits,clears=0,0
@@ -39,7 +42,7 @@ local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=RS
 local batRemote=R.Instance.new('RemoteEvent');batRemote.Name='BatSwing';batRemote.Parent=remotes
 local sent={};function batRemote.FireServer(_,p)sent[#sent+1]=p end
 local hitRemote=R.Instance.new('RemoteEvent');hitRemote.Name='KeeperHit';hitRemote.Parent=remotes
-local C=W.module('BatConfig');local Pose=W.module('BatSwingPose');local Burst=W.module('HitBurstFx');local Carry=W.module('SeedCarryPose')
+local C=W.module('BatConfig');sfx.SlapId=C.SlapSoundId;local Pose=W.module('BatSwingPose');local Burst=W.module('HitBurstFx');local Carry=W.module('SeedCarryPose')
 local motion=RS:FindFirstChild('RunnerMotion');motion:SetAttribute('TrackBoundaryZ',-100);motion:SetAttribute('TrackCenterX',0);motion:SetAttribute('TrackHalfWidth',114)
 -- rigs -----------------------------------------------------------------------------------------------------------------------------------------------
 local function part(c,name,size)local p=R.new('Part');p.Name=name;p.Size=size or V3(1,1,1);p.Parent=c;return p end
@@ -120,18 +123,18 @@ check(char:GetAttribute('BatSwingArm')==true,'the swing owns the right arm from 
 frames(3)
 local rs=motorOf(char,'RightShoulder')
 check(not isIdentity(rs.Transform),'your swing is moving 0.05 s after the click (no server echo needed)')
-local whooshAt
-for _=1,28 do frame();if not whooshAt and sfx.count(sfx.WhooshId)>0 then whooshAt=R.clock-t0 end end
-check(whooshAt and near(whooshAt,C.Windup-C.SwingSoundLead,.02),'the whoosh is timed from the click: '..tostring(whooshAt)..' s (contact - lead '..(C.Windup-C.SwingSoundLead)..')')
-check(sfx.count(sfx.WhooshId)==1,'... once')
+-- R158b (owner): the swing is silent. Nothing plays from the click, through the contact (.30 s) and the recovery; the whoosh file is not preloaded; the slap is.
+check(sfx.Preloaded[C.SlapSoundId]==true and sfx.Preloaded[sfx.WhooshId]==nil,'R158b: the slap is preloaded, the whoosh is not')
+check(C.SwingSoundVolume==nil and C.SwingSoundPitch==nil and C.SwingSoundLead==nil and C.SwingSoundRange==nil,'R158b: BatConfig has no swing-sound settings any more')
+for _=1,28 do frame()end
+check(sfx.count()==0,'R158b: your swing makes no sound: nothing played from the click to past the contact frame ('..sfx.count()..' sounds)')
 local nSent=#sent;bat.Activated:Fire()
 check(#sent==nSent,'a click within the 1.0 s cooldown sends nothing')
 -- the server's echo of your own swing: nothing restarts
 do
  local before=rs.Transform
  batRemote.OnClientEvent:Fire({Kind='Swing',Character=char,At=t0+.05,Serial=1,Id=1});frame()
- local p=sfx.count(sfx.WhooshId)
- check(p==1,'the echo of your own swing plays no second whoosh')
+ check(sfx.count()==0,'the echo of your own swing plays nothing (R158b: no whoosh at all)')
 end
 frames(60)
 check(isIdentity(motorOf(char,'RightShoulder').Transform)and char:GetAttribute('BatSwingArm')==nil,'the swing ends: the arm is the Animator\'s again, BatSwingArm cleared')
@@ -214,8 +217,9 @@ do
   string.format('the trail is on only from %.2f to %.2f s of the swing (seen %.3f .. %.3f)',C.TrailFrom,C.TrailTo,onFrom or-1,onTo or-1))
  check(clears==clears0+1,'it is cleared once as it comes on (no old streak)')
  check(#bat.Handle:GetChildren()==3,'still one trail (and its two attachments) on the bat after several swings: made once ('..#bat.Handle:GetChildren()..')')
- -- a miss: no claim, the whoosh still plays
+ -- a miss: no claim, and (R158b) no sound at all
  check(sent[#sent].Kind=='Swing','a swing with nobody in reach claims nothing (a miss)')
+ check(sfx.others()==0,'R158b: a miss makes no sound (no whoosh)')
  player:SetAttribute('FastMode',true);R.advance(2);frames(2)
  local s1=W.workspace:GetServerTimeNow();bat.Activated:Fire();local seen=false
  for _=1,60 do frame();if trail.Enabled then seen=true end end
@@ -237,7 +241,7 @@ tryHit(function()R.new('ForceField').Parent=vChar end,function()vChar:FindFirstC
 tryHit(function()vChar:SetAttribute('ChestChaseRagdollActive',true)end,function()vChar:SetAttribute('ChestChaseRagdollActive',nil)end,'the victim is knocked down')
 tryHit(function()V:SetAttribute('GuardianFlingActive',true)end,function()V:SetAttribute('GuardianFlingActive',nil)end,'the victim was just thrown')
 tryHit(function()motion:SetAttribute('TrackBoundaryZ',5)end,function()motion:SetAttribute('TrackBoundaryZ',-100)end,'both behind the base line (the hub)')
--- 1b. another player's swing plays from its packet (late, Lead) with the whoosh timed to its contact
+-- 1b. another player's swing plays from its packet (late, Lead); R158b: it is silent too
 do
  local O,oChar,oRoot=other('Other',3,6,-6);table.insert(animated,oChar)
  local oHand=rigR15(oChar,oRoot);oChar.Humanoid.RigType=R.Enum.HumanoidRigType.R15;equip(oChar,oHand)
@@ -246,7 +250,7 @@ do
  frame()
  check(not isIdentity(motorOf(oChar,'RightShoulder').Transform),'another player\'s swing plays from the server\'s packet (Id 1 is ITS number, not yours)')
  check(oChar:GetAttribute('BatSwingArm')==true,'... and owns its right arm for the carry pose')
- frames(10);check(sfx.count(sfx.WhooshId)==1,'... with its whoosh timed to its contact')
+ frames(10);R.advance(1);check(sfx.count()==0 and sfx.count(sfx.WhooshId)==0,'... and silent: no whoosh for someone else\'s swing (R158b)')
  frames(60)
 end
 -- 6. upper body only (R15 here; R6 below) ------------------------------------------------------------------------------------------------------------
@@ -366,6 +370,11 @@ do
  hitRemote.OnClientEvent:Fire({Id=51,At=W.workspace:GetServerTimeNow(),Position=V3(4,3,4),VictimUserId=777,Direction=V3(1,0,0),Cause='Bat'})
  moved=false;for _=1,6 do frame();if (camera.CFrame.Position-base.Position).Magnitude>1e-6 then moved=true end end
  check(moved,'a player near someone else\'s bat hit still gets the small shake')
+end
+-- R158b: across the whole run (swings near and far, hits, misses, Fast Mode, carrying, other players) the slap is the only sound that was ever played
+do
+ local others=0;local slaps=sfx.Ever[C.SlapSoundId]or 0;for id,n in pairs(sfx.Ever)do if id~=C.SlapSoundId then others+=n end end
+ check(others==0 and slaps>=1,'R158b: the whole run played '..slaps..' slaps and '..others..' other sounds (no whoosh, ever)')
 end
 sc.Destroying:Fire();kh.Destroying:Fire()
 print(string.format('bat client: %d checks, %d failed',checks,fails))

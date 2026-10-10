@@ -5,7 +5,8 @@
 --     cooldown and a refused press do not.
 --  2. InteractionFeedback: an upgrade BOUGHT rings KaChing, a REFUSED one clicks Denied (server serials), the press keeps UpgradeClick. R152: treadmills are
 --     silent (stepping on / off plays nothing; R150 clicked Equip) and holding E on a prompt no longer clicks as the hold begins (the finish has its own cue).
---  3. BatClient: a swing is heard (a whoosh timed to meet the contact frame), a miss included; far swings and late echoes are handled.
+--  3. BatClient: R158b (owner: "there is only a sound effect for hitting someone") a swing makes NO sound (the R150 whoosh is gone), a miss included; far
+--     swings, late echoes and other players' swings are silent too, and the whoosh file is not preloaded (the slap of a hit is).
 --  4. FruitGiftClient: the dialog opens / closes with MenuClick / MenuClose, Give sends with Bubble06, "Get closer" / "Hold the item" click Denied.
 --  5. GardenShovel: a removed plant is heard as the planting Dig layer at the plant, a refused removal clicks Denied, its buttons are silent themselves.
 --  6. SettingsClient: the volume previews (Interface row = click, Effects row = reveal pop, at the NEW level), and the mixer starts before the remote wait.
@@ -82,15 +83,19 @@ do
  sc.Destroying:Fire()
 end
 
--- 3. BatClient ----------------------------------------------------------------------------------------------------------------------------------------
+-- 3. BatClient ---------------------------------------------------------------------------------------------------------------------------------------
+-- R158b (owner: "remove the sound effect for swinging a bat, there is only a sound effect for hitting someone"): R150 made a swing audible (a whoosh timed to
+-- the contact frame, a miss included); that is removed on purpose. Every case below that used to be heard is now SILENT; the whoosh stays in LocalSfx for
+-- TravelButtons / EconomyClient (sections 1 and the wiring checks).
 do
  local C=W.module('BatConfig')
- check(C.SwingSoundVolume and C.SwingSoundPitch and C.SwingSoundLead and C.SwingSoundRange,'the swing whoosh tuning lives in BatConfig (volume, pitch, lead, range)')
+ check(C.SwingSoundVolume==nil and C.SwingSoundPitch==nil and C.SwingSoundLead==nil and C.SwingSoundRange==nil,'BatConfig has no swing-sound tuning any more (R158b)')
  local swing=remote('RemoteEvent','BatSwing')
  local bat=F.bat(W,char);bat.Activated=R.signal()
  local camera=W.workspace.CurrentCamera;camera.CFrame=CF(0,5,110)
+ sfx.Preloaded=nil -- (TravelButtons preloaded the whoosh in section 1: only what BatClient asks for counts here)
  local sc=R.new('LocalScript');sc.Name='BatClient';local ok,err=pcall(W.load,'BatClient',sc);check(ok,'BatClient loads: '..tostring(err))
- check(sfx.Preloaded and sfx.Preloaded[sfx.WhooshId],'the whoosh is preloaded with the slap')
+ check(sfx.Preloaded and sfx.Preloaded[C.SlapSoundId] and not sfx.Preloaded[sfx.WhooshId],'the slap is preloaded, the whoosh is not (R158b)')
  sfx.Log={}
  local function echo(age,character)
   local at=W.workspace:GetServerTimeNow()-(age or 0)
@@ -99,27 +104,24 @@ do
  end
  R.advance(2)
  local at=echo(0)
- check(sfx.count()==0,'the whoosh is not played at the echo: it is timed to the contact frame (At + Windup - lead)')
- R.advance(C.Windup-C.SwingSoundLead-.02);check(sfx.count()==0,'(still waiting)')
+ check(sfx.count()==0,'the echo of a swing plays nothing')
+ R.advance(C.Windup-.02);check(sfx.count()==0,'(still nothing just before contact)')
  R.advance(.04)
- check(sfx.count(sfx.WhooshId)==1,'one whoosh arrives '..C.SwingSoundLead..' s before contact')
- local e=sfx.Log[1]
- check(e and near(e.At-at,C.Windup-C.SwingSoundLead,.03),'at ~'..(C.Windup-C.SwingSoundLead)..' s after the swing starts ('..tostring(e and (e.At-at))..')')
- check(e and e.Pos and near(e.Pos.Z,root.Position.Z,.01) and e.Vol==C.SwingSoundVolume and e.Pitch==C.SwingSoundPitch and(e.Skip or 0)==0,'3D at the swinger, the configured volume and pitch, not a late join')
+ check(sfx.count()==0 and sfx.count(sfx.WhooshId)==0,'nothing at the contact frame either: a swing is silent (R158b)')
  R.advance(2);sfx.Log={}
- echo(C.Windup-C.SwingSoundLead+.07)
- check(sfx.count()==1 and near(sfx.Log[1].Skip,.07,.01),'an echo that arrives late joins the cue part-way (skip .07 s) instead of dropping it')
+ echo(.19)
+ R.advance(1);check(sfx.count()==0,'an echo that arrives late is silent too')
  R.advance(2);sfx.Log={}
  echo(C.Windup+C.Recovery+.5)
  check(sfx.count()==0,'an echo older than the whole swing is ignored')
  camera.CFrame=CF(0,5,400);R.advance(2);echo(0);R.advance(.5)
- check(sfx.count()==0,'a swing 300 studs away is not rendered as sound')
+ check(sfx.count()==0,'a swing 300 studs away is silent')
  camera.CFrame=CF(0,5,110);R.advance(2)
  local noRoot=R.new('Model');noRoot.Name='Ghost';noRoot.Parent=W.workspace
  echo(0,noRoot);R.advance(.5);check(sfx.count()==0,'a character with no root: nothing')
- -- a miss is the common case: no hit packet ever arrives, the swing still sounds
+ -- a miss is the common case: no hit packet ever arrives, and now the swing is silent
  sfx.Log={};R.advance(2);echo(0);R.advance(.3)
- check(sfx.count(sfx.WhooshId)==1,'a miss (no KeeperHit follows) is heard')
+ check(sfx.count(sfx.WhooshId)==0 and sfx.count()==0,'a miss (no KeeperHit follows) makes no sound (R158b: only a hit has one)')
  sc.Destroying:Fire();bat:Destroy()
 end
 

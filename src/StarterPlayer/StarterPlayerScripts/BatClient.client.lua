@@ -18,7 +18,7 @@ local Burst=require(RS:WaitForChild('HitBurstFx'))
 local player=Players.LocalPlayer
 local folder=RS:WaitForChild('ChestChaseRemotes',20);if not folder then return end
 local remote=folder:WaitForChild('BatSwing',20);if not remote then return end
-Sfx.Preload({C.SlapSoundId,Sfx.WhooshId})
+Sfx.Preload({C.SlapSoundId}) -- (R158b, owner: "there is only a sound effect for hitting someone": a swing makes no sound of its own, only the slap of a hit; no whoosh is preloaded)
 local bound,poses,connections={},{},{}
 local preAnimation,preSimulation
 local activateFrames
@@ -87,17 +87,12 @@ local function trailFor(tool,handle)
  trail.Enabled=false;trail.Parent=handle;trails[tool]=trail
  return trail
 end
--- a swing's pose (and whoosh, and trail) on a character: yours at your click, anyone else's from the server's packet. at = the swing's start (server time).
+-- a swing's pose (and trail) on a character: yours at your click, anyone else's from the server's packet. at = the swing's start (server time).
+-- R158b (owner): a swing is SILENT, yours and everyone else's; the only sound is the slap of a hit (claim(), below; the server's packet for other players' hits).
 local function begin(character,tool,handle,at)
  restore(character)
- -- R150: a swing is heard even when it misses: the whoosh is timed so it meets the contact frame (At + Windup), and joins late like the pose does.
  local root=character:FindFirstChild('HumanoidRootPart');local camera=workspace.CurrentCamera
- local near=root~=nil and camera~=nil and (camera.CFrame.Position-root.Position).Magnitude<=C.SwingSoundRange
- if near then
-  local wait=at+C.Windup-C.SwingSoundLead-workspace:GetServerTimeNow()
-  local function whoosh()if root.Parent then Sfx.Play(Sfx.WhooshId,root.Position,C.SwingSoundVolume,C.SwingSoundPitch,2,wait<0 and-wait or 0)end end
-  if wait>0 then task.delay(wait,whoosh)else whoosh()end
- end
+ local near=root~=nil and camera~=nil and (camera.CFrame.Position-root.Position).Magnitude<=C.TrailRange
  local entries=joints(character,handle);if #entries==0 then return end
  -- R112: Lead lets a late-arriving swing still show its full wind-back; R6 samples the one-piece arm.
  local hum=character:FindFirstChildOfClass('Humanoid')

@@ -129,12 +129,27 @@ holeRemote.OnClientEvent:Fire({Kind='Dig',Id=9,Position=V3(0,0,100),OwnerUserId=
 Tween0.Create=create0
 check(grew[pit]and near(grew[pit].To.Y,HC.Diameter)and near(grew[pit].To.Z,HC.Diameter)and near(grew[pit].From.Y,HC.Diameter*.25)
  and grew[rimPart]and near(grew[rimPart].To.Y,rimD)and near(grew[rimPart].From.Z,rimD*.25),'dig animation: pit and rim open from 1/4 to exactly the configured size ('..HC.Diameter..' / '..rimD..')')
+-- R158b (owner: "add the dirt sound effect when making holes"): DIGGING a hole plays the planting 'Dig' sound (PlantingEffects.Sounds, rbxassetid://118769294546013 at
+-- Volume .5, Pitch .96 - 1.04) at the hole through LocalSfx, not the long dig recording; covering a hole and the trap thud are as before.
+local digDef;for _,d in ipairs(W.module('PlantingEffects').Sounds)do if d.Key=='Dig'then digDef=d end end
 local digSound=sounds[#sounds]
-check(#sounds==before+1 and digSound.SoundId==W.module('TrackHoleConfig').DigSound.Id and digSound.IsPlaying,'dig plays the dig recording')
-check(digSound.Parent and near(digSound.Parent.Position.Z,100)and digSound.SoundGroup~=nil,'positional at the hole, routed through AudioMixer')
+check(digDef and digDef.Id:match('^rbxassetid://%d+$')~=nil,'the planting Dig sound is read from PlantingEffects.Sounds (the owner\'s 118769294546013 unless swapped there): '..tostring(digDef and digDef.Id))
+check(#sounds==before+1 and digDef and digSound.SoundId==digDef.Id and digSound.IsPlaying,'dig plays the planting Dig sound')
+check(digSound.SoundId~=W.module('TrackHoleConfig').DigSound.Id,'... and not the long dig recording any more')
+check(digSound.Parent and digSound.Parent.Name=='ChestChaseSfx'and near(digSound.Parent.Position.Z,100)and digSound.SoundGroup~=nil,'positional at the hole (a LocalSfx anchor part at it), routed through AudioMixer')
+check(digDef and near(digSound.Volume,digDef.Volume)and digSound.PlaybackSpeed>=digDef.Pitch[1]-1e-9 and digSound.PlaybackSpeed<=digDef.Pitch[2]+1e-9,'at the planting volume and a pitch inside the planting range ('..tostring(digSound.PlaybackSpeed)..')')
+do -- the pitch is random inside the range, 40 digs (spaced out so LocalSfx\'s duplicate guard and 12-voice cap do not hide any)
+ local lo,hi,minP,maxP=digDef.Pitch[1],digDef.Pitch[2],math.huge,0;local played=0
+ for i=1,40 do
+  R.advance(1);local n=#sounds;holeRemote.OnClientEvent:Fire({Kind='Dig',Id=9,Position=V3(0,0,100),OwnerUserId=7})
+  local sd=sounds[#sounds];if #sounds==n+1 and sd.SoundId==digDef.Id then played+=1;minP=math.min(minP,sd.PlaybackSpeed);maxP=math.max(maxP,sd.PlaybackSpeed)end
+ end
+ check(played==40 and minP>=lo-1e-9 and maxP<=hi+1e-9 and maxP-minP>.02,('40 digs: each plays the Dig sound, pitch between %.3f and %.3f (range %.2f - %.2f)'):format(minP,maxP,lo,hi))
+end
+before=#sounds
 check(near(pit.Size.Y,HC.Diameter)and near(pit.Size.Z,HC.Diameter)and near(pit.Size.X,.08)and near(rimPart.Size.Y,rimD),'hole grows back to full size (the drawn pit = Config.Diameter)')
 holeRemote.OnClientEvent:Fire({Kind='Cover',Id=9,Position=V3(0,0,100),OwnerUserId=7})
-check(#sounds==before+2 and sounds[#sounds].PlaybackSpeed<1,'cover uses the variant player, lower pitch')
+check(#sounds==before+1 and sounds[#sounds].PlaybackSpeed<1 and sounds[#sounds].SoundId==W.module('TrackHoleConfig').DigSound.Id,'cover still uses the variant player (the long dig recording), lower pitch')
 holeRemote.OnClientEvent:Fire({Kind='Trap',Id=9,Position=V3(0,0,100)})
 holeRemote.OnClientEvent:Fire('junk');holeRemote.OnClientEvent:Fire({Kind='Dig'})
 check(true,'junk fx payloads ignored')

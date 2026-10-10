@@ -7,7 +7,7 @@
 #  test_hotbar.luau - the real Hotbar: equip keys / L1 R1 / slot / Bag card, quiet Bag close, drag, the harvest cue on the arrival flash.
 #                     (R152: the hotbar movement sounds were removed, so the equip / slot / drag checks now assert SILENCE; the Equip cue stays only in the shop.)
 #  test_packs.luau  - pack-opening clicks at the accepted rate, onlooker Secret / Cosmic / King pulls.
-#  test_inputs.luau - (R152: treadmill step-on, prompt hold-begin and plant select are now silent) TravelButtons, InteractionFeedback, BatClient, FruitGiftClient, GardenShovel, SettingsClient, SaleMoneyEffects, the wallet and the
+#  test_inputs.luau - (R152: treadmill step-on, prompt hold-begin and plant select are now silent) TravelButtons, InteractionFeedback, BatClient (R158b, owner: a swing is SILENT, only a hit has a sound: the whoosh checks now assert silence), FruitGiftClient, GardenShovel, SettingsClient, SaleMoneyEffects, the wallet and the
 #                     gift picker, TitleScreen104, PlantInspection, the EconomyClient wiring, WorldStatusHud.
 #  test_server.luau - the saved mix published at data load, Denied kinds from the server, GardenUpgradeService bought / refused serials.
 #  tools/tests/test_fast_travel.luau (extended) - the arrival whoosh and the Denied kinds through the real remote flow (must now be 0 failures).

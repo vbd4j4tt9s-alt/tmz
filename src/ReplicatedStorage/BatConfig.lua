@@ -5,9 +5,9 @@
 return {
  AssetId=16428159315,SlapSoundId='rbxassetid://81700629330286',SlapVolume=.48,
  Windup=.30,Recovery=.55,Cooldown=1.0,
- -- R150: the swing "whoosh" (the existing 9120768742 file, its .44 s lead-in skipped by SoundTiming): it starts SwingSoundLead before contact so
- -- the swish builds through the strike and meets the hit at At+Windup. A miss is no longer silent. Tune by ear.
- SwingSoundVolume=.25,SwingSoundPitch=1.4,SwingSoundLead=.12,SwingSoundRange=150,AppearanceScale=1.5,
+ -- R158b (owner: "remove the sound effect for swinging a bat, there is only a sound effect for hitting someone"): the R150 swing whoosh and its sound
+ -- settings are gone; a swing is silent, only a hit has a sound (SlapSoundId). TrailRange: a swing is drawn with its white trail only this close to the camera.
+ TrailRange=150,AppearanceScale=1.5,
  SpawnGrace=3,RequireBiome=true,SafeLineMargin=4,
  -- R158 the hit (docs/proposals/R158/bats/hitbox.md 4.2-4.5). The strike: HitFrom..HitTo seconds after the swing starts (contact at Windup).
  -- Where: a flat sector in front, Reach studs, HalfAngle degrees each side, +-Height up / down, plus an Inner circle all round (someone inside you).

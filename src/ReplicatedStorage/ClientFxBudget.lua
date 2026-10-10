@@ -35,12 +35,17 @@ end
 B.MaxHighlights,B.HighlightReserve=31,1
 local tracked=setmetatable({},{__mode='k'})
 function B.TrackHighlight(h)if typeof(h)=='Instance'then tracked[h]=true end end
-function B.HighlightRoom()
+-- R158b: the same count, before it is clamped: HighlightsUsed() > MaxHighlights means Roblox is already skipping some (the dropped packs' outlines, which hold some of
+-- these slots themselves, give theirs back first: DroppedPackHighlight158b). HighlightRoom() is unchanged.
+function B.HighlightsUsed()
  local used=B.HighlightReserve
  for h in pairs(tracked)do if h.Parent and h.Enabled then used+=1 end end
  local ok,list=pcall(function()return game:GetService('CollectionService'):GetTagged('MutationGlow')end)
  if ok and list then for _,h in ipairs(list)do if h.Parent and h.Enabled~=false then used+=1 end end end
- return math.max(0,B.MaxHighlights-used)
+ return used
+end
+function B.HighlightRoom()
+ return math.max(0,B.MaxHighlights-B.HighlightsUsed())
 end
 function B.Get()
  if not state then

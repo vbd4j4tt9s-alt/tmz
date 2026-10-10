@@ -14,9 +14,16 @@ local Motion=RS:WaitForChild('RunnerMotion')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
 local remote=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('TrackHole')
 local V3=Vector3.new
-local sounds={};for _,s in ipairs(Planting.Sounds)do sounds[s.Key]=s.Id end
+local sounds={};local digDef;for _,s in ipairs(Planting.Sounds)do sounds[s.Key]=s.Id;if s.Key=='Dig'and s.Id~=''then digDef=s end end
 -- R123: the trap thud (planting 'Land' layer) is preloaded with the dig recording so the first fall is not silent / late.
-local digSound=DigSound.new();Sfx.Preload({C.DigSound.Id,sounds.Land})
+-- R158b (owner: "add the dirt sound effect when making holes"): DIGGING a hole plays the owner's planting 'Dig' sound (read from PlantingEffects.Sounds,
+-- so a swap there carries over) at the hole, with the planting pitch spread; covering a hole still plays the long dig recording (lower), the fall the 'Land' thud.
+local digSound=DigSound.new();Sfx.Preload({C.DigSound.Id,sounds.Land});if digDef then Sfx.Preload({digDef.Id})end
+local function digThud(position)
+ if not digDef then return end
+ local pitch=digDef.Pitch;local lo,hi=pitch and pitch[1]or 1,pitch and pitch[2]or 1
+ Sfx.Play(digDef.Id,position,digDef.Volume,lo+(hi-lo)*math.random(),2)
+end
 local Fx=require(RS:WaitForChild('ClientFxBudget'));local Gui=game:GetService('GuiService')
 local Feed=require(RS:WaitForChild('NoticeFeed83'))
 local conns={};local lastSend=-math.huge;local wasHeld=false;local hintAt,hintShown=-math.huge,0;local elapsed=0
@@ -120,7 +127,7 @@ table.insert(conns,remote.OnClientEvent:Connect(function(fx)
  local soil=Color3.fromRGB(104,69,41)
  if fx.Kind=='Dig'then
   local model=holeModel(fx.Id);if model then grow(model)end
-  burst(fx.Position,8,soil,2.2);digSound:Play(fx.Position)
+  burst(fx.Position,8,soil,2.2);digThud(fx.Position)
  elseif fx.Kind=='Cover'then
   burst(fx.Position,6,soil,1);digSound:Play(fx.Position,C.DigSound.CoverPitch)
  elseif fx.Kind=='Trap'then

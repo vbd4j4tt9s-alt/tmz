@@ -41,7 +41,7 @@ Look at **`swing_preview.png`** (still pictures) and **`swing_preview.gif`** (mo
 - **Swing trail:** a short white streak behind the bat, only during the fast part of the swing.
 - **Hit:** the star burst you have now, plus small sparks, plus a tiny "freeze" of your swing for a split second so the hit feels strong.
   The slap sound plays right away on your screen.
-- **Miss:** the whoosh you have now (it plays at the click now, not late).
+- **Miss:** no sound at all. (R158b, owner: "there is only a sound effect for hitting someone": the swing whoosh is gone for every swing, yours and everyone else's; only a hit has a sound.)
 - All effects are reused, so they do not slow the game down. They turn off in Fast Mode.
 
 ## 5. Your choices
@@ -68,7 +68,7 @@ The pictures in `swing_preview.png` are now drawn from the **built** swing (rows
   0.85 seconds. Only your top half swings: your legs keep running and jumping. It works for R15 and R6 bodies.
 - **When you hit:** the slap plays at once, the star burst and small sparks show at once, and your swing freezes for a tiny moment
   (0.05 seconds). Your camera does **not** shake. The player you hit still shakes, like before. No "SMACK!" word.
-- **When you miss:** the whoosh, timed from your click.
+- **When you miss:** nothing is heard. A swing is silent (R158b: the old whoosh was removed on purpose); only a hit makes the slap sound.
 - **Trail:** a short white streak behind the bat, only while it sweeps (0.21 to 0.40 seconds). Off in Fast Mode, on slow devices, and
   for swings far away (150+ studs).
 - **Carrying a pack:** you can still swing (the same rule as before). Your right arm swings the bat, your left hand stays on the pack.
@@ -127,7 +127,7 @@ screen delay is 0.05 seconds: measure it in Studio, item 5 below).
 
 ### To check in Studio
 1. **Feel:** swing a few times standing, running and jumping, R15 and R6. Is the hip-height sweep right? Is the tiny freeze at a hit
-   nice or too much (`BatConfig.HitStop`, 0.05)? Slap and whoosh volumes together.
+   nice or too much (`BatConfig.HitStop`, 0.05)? The slap volume (a swing makes no sound since R158b, so the slap is the only sound).
 2. **The trail on the real bat:** it runs from half way up the bat to near the tip (found from the bat's parts). Check it sits on the
    barrel of the imported bat.
 3. **Carrying a pack and swinging:** the left hand should stay on the pack.
