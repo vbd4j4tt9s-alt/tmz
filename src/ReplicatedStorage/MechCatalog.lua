@@ -40,7 +40,14 @@ end
 C.Event={Live='LIMITED TIME!',Prefix='⏳ ENDS IN ',Over='EVENT OVER!',Thanks='THANKS FOR PLAYING!',Button='Event over',Refused='EVENT\'S OVER! THANKS FOR PLAYING!'}
 -- R157 (owner: "if bag is full and player tries to buy a pack ... it says bag full"): a full Bag (the 200 cap, InventoryCap155) is not "Unavailable". Both buy buttons read Button and a
 -- press shows Notice (client, red, with the Denied click; no purchase prompt); the server refuses a gem purchase or a Robux prompt with the same Notice. Event over / Off sale come first.
-C.BagFull={Button='Bag full',Notice='BAG FULL! MAKE ROOM FIRST'}
+C.BagFull={Button='Bag full',Notice='BAG FULL! MAKE ROOM FIRST',Many='BAG FULL! MAKE ROOM FOR %d PACKS FIRST'}
+-- R157b review: the Bag is full PER QUANTITY (at 195 items the 1-pack fits and the 10-pack does not), so the notice says which: one pack = Notice, more = Many with the real count
+-- ("BAG FULL! MAKE ROOM FOR 10 PACKS FIRST"). The button stays "Bag full" for any quantity that does not fit. The server's answers and the shop's press both use this function.
+function C.BagFullNotice(count)
+ count=tonumber(count)or 1
+ if count>1 then return string.format(C.BagFull.Many,math.floor(count))end
+ return C.BagFull.Notice
+end
 -- "⏳ ENDS IN 27d 04h 12m 09s" (the Index LIMITED tab's format: LimitedEvent.Text) or, after the end, "THANKS FOR PLAYING!".
 function C.TimerText(now)
  if not Limited.Active(now)then return C.Event.Thanks end

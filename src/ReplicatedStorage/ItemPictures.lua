@@ -168,7 +168,8 @@ local function silhouette(model)
    if d:IsA('MeshPart')then d.TextureID=''end
   end
  end
- pcall(lightEdge,model)
+ -- R157b review: a failure part-way through leaves no half edge: every rim already added is removed, so the picture is the plain near-black silhouette (as said above), never a rim on some parts only
+ if not pcall(lightEdge,model)then for _,d in ipairs(model:GetDescendants())do if d.Name=='SilhouetteRim'then d:Destroy()end end end
 end
 local function build(spec,work)
  if spec.Kind=='Pack'then

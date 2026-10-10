@@ -171,9 +171,10 @@ function P.Attach(Data)
  function Data:CanReceiveMechPacks(player,count,receipt)
   local offer=Catalog.Offer(count)
   if not offer or not self:IsLoaded(player)then return false,'HOLD ON, YOUR DATA IS LOADING!'end
-  -- R157: a full Bag says one simple thing on every Mech path (the shop's state flag BagFull, a gem purchase, a Robux prompt): MechCatalog.BagFull.Notice
-  if #self:GetChestRecords(player)+offer.Count>self.Config.MaxSavedChests then return false,Catalog.BagFull.Notice end
-  if type(self.RoomFor)=='function'and not self:RoomFor(player,offer.Count,{Receipt=receipt==true})then return false,Catalog.BagFull.Notice end
+  -- R157: a full Bag says one simple thing on every Mech path (the shop's state flag BagFull, a gem purchase, a Robux prompt): MechCatalog.BagFullNotice(count)
+  -- (R157b review: "BAG FULL! MAKE ROOM FIRST" for one pack, "... MAKE ROOM FOR 10 PACKS FIRST" with the real count for more, because the Bag is full per quantity)
+  if #self:GetChestRecords(player)+offer.Count>self.Config.MaxSavedChests then return false,Catalog.BagFullNotice(offer.Count)end
+  if type(self.RoomFor)=='function'and not self:RoomFor(player,offer.Count,{Receipt=receipt==true})then return false,Catalog.BagFullNotice(offer.Count)end
   return true
  end
  function Data:GrantMechPacks(player,paid,count,receipt)

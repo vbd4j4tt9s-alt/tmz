@@ -8,7 +8,7 @@
 # REAL BackgroundMusic, BiomeMood, WeatherWorld149 and MapService:
 #  0. static  - BackgroundMusic compiles at -O0 and is the file frozen in R151's frozen.sha256 (with its R157b note); it differs from the R156 release only in trackIsActive and the
 #               helper before it; Config.lua is as at the base (but for Version); MapService writes the attributes from the line; no other client script reads the line; this suite is
-#               in run_all_suites.sh (before the pyramid suite); no model names in the files of this round
+#               on line 6 of run_all_suites.sh; no model names in the files of this round
 #  1. the proof - the R156 release's script on the owner's place (track_music157.luau, Expect = old): all streamed in it is right everywhere (the box is right), with the line
 #               streamed out it fails exactly where the line streams out: Z 933 at the place's radius 1024 (inside the Desert), Z 508 at 600, at the first stud at 64, and stays wrong
 #               to the end of the track
@@ -36,6 +36,13 @@ python3 - "$OUT/bgm_base.lua" "$C/BackgroundMusic.client.lua" > "$OUT/same.log" 
 import re, sys
 old = open(sys.argv[1], encoding='utf-8').read()
 new = open(sys.argv[2], encoding='utf-8').read()
+# R157b review fix (on purpose): the one other change in the script is the AudioMixer fetch (WaitForChild instead of a dot index: the script can start before AudioMixer has replicated).
+# It is undone here before the comparison, so everything else must still be byte for byte the R156 release's script (run_early_audio157.sh pins the WaitForChild itself).
+fetch_new = 'require(game:GetService("ReplicatedStorage"):WaitForChild("AudioMixer"))'
+fetch_old = 'require(game:GetService("ReplicatedStorage").AudioMixer)'
+if new.count(fetch_new) != 1 or old.count(fetch_old) != 1:
+    print('the AudioMixer fetch is not where the R157b review fix put it (WaitForChild in the script, the dot index in the release)'); sys.exit(1)
+new = new.replace(fetch_new, fetch_old)
 # the region R157b owns: from the R157b note (new) / `local function trackIsActive` (old) to the R156 playlist note that follows trackIsActive
 def cut(s, start_pat):
     a = re.search(start_pat, s, re.M)
@@ -48,7 +55,7 @@ if o_rest != n_rest:
     print('the script differs from the R156 release outside trackIsActive'); sys.exit(1)
 if 'BiomeTrackEndZ' not in n_reg or "'FieldWidth'" not in n_reg or 'p.Y> -20 and p.Y<=300' not in n_reg or 'hum.Health<=0' not in n_reg or 'insideTrack and-.5 or .5' not in n_reg:
     print('trackIsActive lost one of its terms (end Z, field width, Y range, health, hysteresis)'); sys.exit(1)
-print('everything but trackIsActive (%d -> %d lines with its helper) is byte for byte the R156 release\'s script; its terms (end Z, field width, Y range, health, hysteresis) are all there' % (o_reg.count('\n'), n_reg.count('\n')))
+print('everything but trackIsActive (%d -> %d lines with its helper) is byte for byte the R156 release\'s script (but for the AudioMixer WaitForChild); its terms (end Z, field width, Y range, health, hysteresis) are all there' % (o_reg.count('\n'), n_reg.count('\n')))
 PY
 norm(){ sed "s/Config\.Version='[^']*'/Config.Version=V/"; }
 [ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | norm)" = "$(norm < "$SS/Config.lua")" ] && echo "ok: Config.lua is as at $BASE (but for Version)" || fail "Config.lua changed beyond Config.Version since $BASE"
@@ -56,7 +63,7 @@ grep -q "movement:SetAttribute('TrackBoundaryZ',self.BaseBoundaryLine.Position.Z
 others=$(grep -rln "BaseBoundaryLine" "$S/StarterPlayer" "$S/ReplicatedFirst" "$S/ReplicatedStorage" 2>/dev/null | grep -v "BackgroundMusic.client.lua")
 [ -z "$others" ] && echo "ok: no other client or shared script reads the streamed line (BackgroundMusic reads it with the RunnerMotion stand-in)" || fail "these scripts read Lobby.BaseBoundaryLine, which streams out: $others"
 grep -q "TrackBoundaryZ" "$C/BackgroundMusic.client.lua" && grep -q "TrackCenterX" "$C/BackgroundMusic.client.lua" || fail "BackgroundMusic does not use RunnerMotion's TrackBoundaryZ / TrackCenterX"
-grep -q "docs/proposals/R157/tests/run_track_music157.sh docs/proposals/R156/tests/run_pyramid156.sh" "$T/run_all_suites.sh" || fail "run_track_music157.sh is not registered in tools/tests/run_all_suites.sh right before run_pyramid156.sh"
+sed -n 6p "$T/run_all_suites.sh" | grep -q " docs/proposals/R157/tests/run_track_music157.sh[; ]" || fail "run_track_music157.sh is not on line 6 of tools/tests/run_all_suites.sh" # R157b review fix: anywhere on line 6 (it used to have to sit right before run_pyramid156.sh, and a later merge put run_early_audio157.sh between them)
 grep -q "R157b" "$P/R156/music156.md" || fail "docs/proposals/R156/music156.md has no R157b fix note"
 echo "ok: registered in run_all_suites.sh, noted in music156.md"
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|\b(op[u]s|sonn[e]t|haik[u]|gemin[i]|llam[a])\b|gp[t]-?[0-9]" "$HERE/run_track_music157.sh" "$HERE/track_music157.luau" "$HERE/bundle_track_music157.py" "$HERE/place_streaming157.py" "$P/R156/music156.md" "$C/BackgroundMusic.client.lua" "$P/R151/tests/frozen.sha256" 2>/dev/null | grep -q .;then fail "a model name in the files of this round";else echo "ok: no model names in the files of this round";fi

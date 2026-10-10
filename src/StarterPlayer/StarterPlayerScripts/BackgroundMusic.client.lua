@@ -107,7 +107,7 @@ local function getOrCreateSoundGroup(name)
 		group.Name = name
 		group.Parent = SoundService
 	end
-	group.Volume = require(game:GetService("ReplicatedStorage").AudioMixer).Get(name=="ChestChaseMusic"and"Music"or"Chase")/100
+	group.Volume = require(game:GetService("ReplicatedStorage"):WaitForChild("AudioMixer")).Get(name=="ChestChaseMusic"and"Music"or"Chase")/100
 	return group
 end
 

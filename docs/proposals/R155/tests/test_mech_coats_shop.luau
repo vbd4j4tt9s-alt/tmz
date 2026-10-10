@@ -36,11 +36,13 @@ W.workspace.GetServerTimeNow=function()return serverClock()end
 local function jumpTo(left)R.clock=LEFT0-left end -- (the mock clock to the moment `left` seconds remain)
 -- scripted server: everything on sale (the CLIENT must turn the buttons off by the clock)
 -- (R157) mode.BagFull: the server says the Bag is full (BagFull = true, both buy flags false); mode.Stale: ... and, wrongly, still says the buy flags are on; mode.Unavailable: off for another reason
-local mode={BagFull=false,Stale=false,Unavailable=false}
+-- (R157b review) mode.FullFor = {[count]=true}: the Bag is full for those quantities only (195 items: the 1-pack fits, the 5- and 10-pack do not); mode.Hook = a function run once inside the next request
+local mode={BagFull=false,Stale=false,Unavailable=false,FullFor=nil,Hook=nil}
 local function serverState()
  local offers={};for _,o in ipairs(Mech.Offers)do
-  local on=not mode.BagFull and not mode.Unavailable or mode.Stale
-  offers[tostring(o.Count)]={Count=o.Count,GemPrice=o.GemPrice,GemAvailable=on,RobuxAvailable=on,RobuxPrice=o.TargetRobuxPrice,BagFull=mode.BagFull and true or nil}
+  local full=mode.BagFull or(mode.FullFor~=nil and mode.FullFor[o.Count]==true)
+  local on=not full and not mode.Unavailable or mode.Stale
+  offers[tostring(o.Count)]={Count=o.Count,GemPrice=o.GemPrice,GemAvailable=on,RobuxAvailable=on,RobuxPrice=o.TargetRobuxPrice,BagFull=full and true or nil}
  end
  local bundles={};for _,row in ipairs(Pricing.Bundles)do bundles[row.Key]={Available=true,Amount=row.Amount,GemPrice=row.GemPrice,RobuxAmount=row.Amount}end
  return {PackOffers=offers,Bundles=bundles,GiftProducts={Growth={Available=true},Speed={Available=true}},GiftCredits={},Gems=5000,OnSale=true,Success=true}
@@ -49,7 +51,8 @@ local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=RS
 local remote=R.new('RemoteFunction');remote.Name='PremiumRequest';remote.Parent=remotes
 local calls={};local reply={Message=nil,OnSale=true}
 remote.InvokeServer=function(_,action,value)
- calls[#calls+1]={action,value}
+ calls[#calls+1]={action,value,R.clock}
+ if mode.Hook then local h=mode.Hook;mode.Hook=nil;h()end
  local s=serverState();s.OnSale=reply.OnSale;if action~='State'then s.Message=reply.Message end;return s
 end
 local played={};local function plays(name)local n=0;for _,v in ipairs(played)do if v==name then n+=1 end end;return n end
@@ -167,6 +170,7 @@ check(calls[#calls][1]=='BuyPack'and panel.Status.Visible and(panel.Status.Text:
 -- 5. R157 (owner: "if bag is full and player tries to buy a pack or get a pack via the rolls it says bag full"): a full Bag is not "Unavailable" -----------------------------------------
 -- The server flags it (BagFull = true on the offer; both buy flags false). Both buttons read "Bag full" in the dim look of "Unavailable" / "Off sale" but can be pressed: a press shows the game's
 -- red notice "BAG FULL! MAKE ROOM FIRST" with the Denied click, sends nothing, opens no prompt. Event over and Off sale come first. With room the buttons are what they were.
+-- (R157b review) the notice names the quantity that does not fit ("BAG FULL! MAKE ROOM FOR 10 PACKS FIRST": the Bag is full per quantity), and when the Bag gains room while the shop is open the buttons come back.
 do
  local Text=W.module('SimpleGameText')
  local function reopen()jumpTo(100000);act(panel.Header.Close);act(toggle);R.advance(1);R.advance(1)end
@@ -178,7 +182,7 @@ do
  local dimGem,dimRobux=pack.BuyWithGems.BackgroundTransparency,pack.BuyWithRobux.BackgroundTransparency
  mode.Unavailable=false
  -- the Bag is full
- mode.BagFull=true;reopen()
+ mode.BagFull=true;reopen();act(pack.Quantity1) -- (the chip picked in the sections above is still 10)
  check(caption(pack.BuyWithGems)=='Bag full'and caption(pack.BuyWithRobux)=='Bag full','a full Bag: both Mech buy buttons read "Bag full" ('..tostring(caption(pack.BuyWithGems))..' / '..tostring(caption(pack.BuyWithRobux))..')')
  check(caption(pack.BuyWithGems)==Mech.BagFull.Button,'... the words come from MechCatalog.BagFull.Button')
  check(pack.BuyWithGems.BackgroundTransparency==dimGem and pack.BuyWithRobux.BackgroundTransparency==dimRobux and dimGem>0,'... in the same dim button style as "Unavailable" / "Off sale" ('..tostring(pack.BuyWithGems.BackgroundTransparency)..')')
@@ -189,7 +193,8 @@ do
  check(notices[#notices].Color==Text.Red and notices[#notices].Key==nil,'... in the game\'s red, with no key (so the next press shows it again)')
  check(plays('Denied')==deny0+1,'... and plays the Denied click ('..(plays('Denied')-deny0)..')')
  check(sends()==sent0 and prompted==prompts0,'... nothing is sent to the server and no purchase prompt opens')
- check(Text.Format('BAG FULL! MAKE ROOM FIRST')=='BAG FULL! MAKE ROOM FIRST','(SimpleGameText keeps the words as they are)')
+ check(Text.Format('BAG FULL! MAKE ROOM FIRST')=='BAG FULL! MAKE ROOM FIRST'and select(2,Text.Format('BAG FULL! MAKE ROOM FIRST'))==Text.Red,'(SimpleGameText keeps the words as they are, in red)')
+ check(Text.Format(Mech.BagFullNotice(10))=='BAG FULL! MAKE ROOM FOR 10 PACKS FIRST'and select(2,Text.Format(Mech.BagFullNotice(10)))==Text.Red and select(2,Text.Format(Mech.BagFullNotice(5)))==Text.Red,'(and the words for 5 and 10 packs, also in red)')
  R.advance(1);notes0,deny0=#notices,plays('Denied')
  act(pack.BuyWithRobux)
  check(#notices==notes0+1 and notices[#notices].Text=='BAG FULL! MAKE ROOM FIRST'and plays('Denied')==deny0+1 and sends()==sent0 and prompted==prompts0,'the Robux button does the same: notice, Denied, nothing sent, no prompt')
@@ -197,6 +202,11 @@ do
  check(#notices==notes0 and plays('Denied')==deny0+2,'presses in the same instant show the notice once (no pile-up) but every press clicks Denied')
  for _,count in ipairs({5,10})do act(pack['Quantity'..count])
   check(caption(pack.BuyWithGems)=='Bag full'and caption(pack.BuyWithRobux)=='Bag full','the '..count..'-pack picked: still "Bag full"')
+  local want='BAG FULL! MAKE ROOM FOR '..count..' PACKS FIRST'
+  R.advance(1);notes0,deny0=#notices,plays('Denied');act(pack.BuyWithGems)
+  check(#notices==notes0+1 and notices[#notices].Text==want and notices[#notices].Text==Mech.BagFullNotice(count)and notices[#notices].Color==Text.Red and plays('Denied')==deny0+1 and sends()==sent0 and prompted==prompts0,'... a gem press says "'..want..'" (the real count), red, Denied, nothing sent ('..tostring(notices[#notices]and notices[#notices].Text)..')')
+  R.advance(1);notes0=#notices;act(pack.BuyWithRobux)
+  check(#notices==notes0+1 and notices[#notices].Text==want and sends()==sent0 and prompted==prompts0,'... and so does the Robux press')
  end
  -- a server that wrongly still says the buy flags are on: the client never lets a purchase start
  mode.Stale=true;reopen()
@@ -218,6 +228,66 @@ do
  check(caption(pack.BuyWithGems)=='80'and caption(pack.BuyWithRobux)=='80 Robux'and live(pack.BuyWithGems)and live(pack.BuyWithRobux)and pack.BuyWithGems.BackgroundTransparency==0,'with room: the buttons are what they were (80 / 80 Robux, on, full colour)')
  notes0,sent0=#notices,sends();act(pack.BuyWithGems)
  check(sends()==sent0+1 and calls[#calls][1]=='BuyPack'and #notices==notes0,'... a press buys (BuyPack goes to the server) and shows no bag notice')
+
+ -- R157b review: the Bag is full PER QUANTITY. At 195 of 200 the 1-pack and the 5-pack fit and the 10-pack does not: the button reads "Bag full" for the 10-pack only, and its notice names the 10 packs
+ local later=0
+ local function reopenLater()later+=1;jumpTo(100000-later*5000);act(panel.Header.Close);act(toggle);R.advance(1);R.advance(1)end -- (always later than the sections above: the notice's 0.7 s guard reads the clock)
+ mode.FullFor={[10]=true};reopenLater();act(pack.Quantity1)
+ check(caption(pack.BuyWithGems)=='80'and caption(pack.BuyWithRobux)=='80 Robux'and live(pack.BuyWithGems)and live(pack.BuyWithRobux),'195 of 200, the 1-pack picked: both buttons are on (80 / 80 Robux)')
+ act(pack.Quantity5);check(caption(pack.BuyWithGems)~='Bag full'and caption(pack.BuyWithRobux)~='Bag full'and live(pack.BuyWithGems)and live(pack.BuyWithRobux),'... the 5-pack picked: still on (it fits)')
+ act(pack.Quantity10);R.advance(1)
+ check(caption(pack.BuyWithGems)=='Bag full'and caption(pack.BuyWithRobux)=='Bag full','... the 10-pack picked: both read "Bag full" (the button text is the same for any quantity)')
+ notes0,sent0=#notices,sends();act(pack.BuyWithGems)
+ check(#notices==notes0+1 and notices[#notices].Text=='BAG FULL! MAKE ROOM FOR 10 PACKS FIRST','... and the notice is exact: "BAG FULL! MAKE ROOM FOR 10 PACKS FIRST" ('..tostring(notices[#notices]and notices[#notices].Text)..')')
+ act(pack.Quantity1);R.advance(1);notes0,sent0=#notices,sends();act(pack.BuyWithGems)
+ check(sends()==sent0+1 and calls[#calls][1]=='BuyPack'and calls[#calls][2]==1 and #notices==notes0,'... back on the single pack a press buys it, with no bag notice')
+ mode.FullFor=nil
+
+ -- R157b review: a "Bag full" press never asks the server, so room made in the Bag while the shop is open must reach the buttons by itself. The 200 cap publishes HeldItemCount / HeldItemCap on the
+ -- player (the Bag's "143/200"): the shop reads State again when they change (at most once every 0.5 s, never while shut, after a request in flight when one is running)
+ local function stateReads(from)local n=0;for i=from+1,#calls do if calls[i][1]=='State'then n+=1 end end;return n end
+ act(panel.Header.Close);player:SetAttribute('HeldItemCount',200);player:SetAttribute('HeldItemCap',200)
+ mode.BagFull=true;reopenLater()
+ check(caption(pack.BuyWithGems)=='Bag full'and caption(pack.BuyWithRobux)=='Bag full','200 of 200 with the shop open: both read "Bag full"')
+ local c0=#calls
+ mode.BagFull=false;player:SetAttribute('HeldItemCount',199);R.advance(.01)
+ check(stateReads(c0)==1,'room is made while the shop is open (HeldItemCount 200 -> 199): the shop reads State again by itself ('..stateReads(c0)..')')
+ check(caption(pack.BuyWithGems)=='80'and caption(pack.BuyWithRobux)=='80 Robux'and live(pack.BuyWithGems)and live(pack.BuyWithRobux)and not pack.BuyWithGems:GetAttribute('BagFull'),'... and both buttons are back on (80 / 80 Robux), no longer "Bag full"')
+ notes0,sent0=#notices,sends();R.advance(1);act(pack.BuyWithGems)
+ check(sends()==sent0+1 and calls[#calls][1]=='BuyPack'and #notices==notes0,'... a press now buys instead of showing the notice')
+ -- the other way: the Bag fills while the shop is open, the buttons read "Bag full" without a press
+ R.advance(1);c0=#calls;mode.BagFull=true;player:SetAttribute('HeldItemCount',200);R.advance(.01)
+ check(stateReads(c0)==1 and caption(pack.BuyWithGems)=='Bag full'and caption(pack.BuyWithRobux)=='Bag full','the Bag fills (199 -> 200): the buttons read "Bag full" at once')
+ -- the cap changing counts too, and so does a carried pack (it keeps its place in the Bag: Data:RoomFor counts it)
+ R.advance(1);c0=#calls;mode.BagFull=false;player:SetAttribute('HeldItemCap',250);R.advance(.01)
+ check(stateReads(c0)==1 and caption(pack.BuyWithGems)=='80','HeldItemCap changes (200 -> 250): read again ('..stateReads(c0)..')')
+ R.advance(1);c0=#calls;player:SetAttribute('ChestChaseSeedCarrying',true);R.advance(.01)
+ check(stateReads(c0)==1,'a pack carried home (ChestChaseSeedCarrying) is read too ('..stateReads(c0)..')')
+ player:SetAttribute('ChestChaseSeedCarrying',nil)
+ -- throttled: 20 changes in one second are read at most once every half second, and the last one is not lost
+ R.advance(1);c0=#calls
+ for i=1,20 do player:SetAttribute('HeldItemCount',100+i);R.advance(.05)end
+ R.advance(1)
+ local reads,last,gapsOk=stateReads(c0),nil,true
+ for i=c0+1,#calls do if calls[i][1]=='State'then if last and calls[i][3]-last<.5-1e-6 then gapsOk=false end;last=calls[i][3]end end
+ check(reads>=2 and reads<=3,'20 changes in one second: 2 or 3 reads ('..reads..'), not 20')
+ check(gapsOk,'... never two reads less than half a second apart')
+ R.advance(1);mode.BagFull=false;player:SetAttribute('HeldItemCount',150);R.advance(.01) -- (a read now)
+ mode.BagFull=true;player:SetAttribute('HeldItemCount',200);R.advance(.1)
+ check(caption(pack.BuyWithGems)~='Bag full','a change right after a read waits (the half second is not over)')
+ R.advance(.5)
+ check(caption(pack.BuyWithGems)=='Bag full'and caption(pack.BuyWithRobux)=='Bag full','... and is read when the half second is over (the last change is not lost)')
+ -- a shut shop reads nothing
+ mode.BagFull=false;act(panel.Header.Close);R.advance(1);c0=#calls
+ player:SetAttribute('HeldItemCount',10);player:SetAttribute('HeldItemCap',200);player:SetAttribute('ChestChaseSeedCarrying',true);R.advance(2)
+ check(stateReads(c0)==0,'a shut shop reads nothing when the Bag changes ('..stateReads(c0)..')')
+ player:SetAttribute('ChestChaseSeedCarrying',nil);R.advance(1)
+ -- a change while a request is in flight is read when that request is done (once), not dropped and not doubled
+ c0=#calls;mode.Hook=function()player:SetAttribute('HeldItemCount',77);R.advance(1)end
+ act(toggle);R.advance(.01)
+ check(panel.Visible and stateReads(c0)==2,'a change in the middle of a request is read right after it (2 reads: the opening one and the follow-up) ('..stateReads(c0)..')')
+ check(caption(pack.BuyWithGems)=='80'and live(pack.BuyWithGems),'... and the shop is as the last State says')
+ player:SetAttribute('HeldItemCount',nil);player:SetAttribute('HeldItemCap',nil)
 end
 
 print(string.format('%d checks, %d failures',checks,fails))

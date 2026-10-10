@@ -8,10 +8,19 @@ local Timing=require(script.Parent:WaitForChild('SoundTiming')) -- R152: WaitFor
 local M={}
 -- R157b fix: AudioMixer is fetched the first time a voice needs it, with WaitForChild (like SoundTiming above): this module can be required before AudioMixer has replicated (the title does it
 -- while the game is still loading), and a failed require is cached by Roblox, so the HUD scripts that need this module later failed with it.
-local mixer
+-- R157b review: the fetch is in a pcall and a failure is remembered. With no mixer (it errors while loading, or has no Route) the voices are simply not routed: they play from SoundService at their own
+-- volume, the Interface slider does not reach them, there is one warning, and a Play never throws into its caller (before, every Play required AudioMixer again and threw again, e.g. out of a shop
+-- button's handler before its refresh). A Route that errors costs only that voice its routing: the pool still gets all 3 voices.
+local mixer,mixerFailed
+local told={}
+local function tell(tag,text)if not told[tag]then told[tag]=true;warn('[InteractionAudio] '..text)end end
 local function Mixer()
- if not mixer then mixer=require(script.Parent:WaitForChild('AudioMixer'))end
- return mixer
+ if mixer then return mixer end
+ if mixerFailed then return nil end
+ local ok,loaded=pcall(function()return require(script.Parent:WaitForChild('AudioMixer'))end)
+ if ok and type(loaded)=='table'and type(loaded.Route)=='function'then mixer=loaded;return mixer end
+ mixerFailed=true;tell('mixer','AudioMixer did not load ('..tostring(loaded)..'): the click sounds play without the Interface slider')
+ return nil
 end
 -- R150: MenuClose is the MenuClick file a little lower; Denied is the built-in ping, low and muted (no new upload).
 M.AssetIds={Bubble04=96764044228884,Bubble06=131731955363530,UpgradeClick=87218932219010,Equip=99675704394731,KaChing=86218459564041,GemClaim=82559527540705,MenuClick=116737765668953,
@@ -35,14 +44,16 @@ function M.Asset(key)
 end
 local pools={};local nextRetry=setmetatable({},{__mode='k'}) -- per pool (MenuClose shares MenuClick's file but has its own voices to warm)
 local function pool(key,id)
- local mix=Mixer() -- (R157b fix: first, so a wait for AudioMixer never leaves a half-built pool behind)
- local existing=pools[key];if existing and existing.Id==id then return existing end
+ local mix=Mixer() -- (R157b fix: first, so a wait for AudioMixer never leaves a half-built pool behind) (nil after a failure: the voices are then not routed)
+ local existing=pools[key];if existing and existing.Id==id and #existing.Voices==3 then return existing end -- (R157b review: a short pool is rebuilt)
  if existing then for _,voice in ipairs(existing.Voices)do voice:Destroy()end end
- local p={Id=id,Voices={},Index=0};pools[key]=p
+ local p={Id=id,Voices={},Index=0}
  for i=1,3 do
   local voice=Instance.new('Sound');voice.Name='Interaction_'..key;voice.SoundId=id;voice.Volume=defaults[key]or .4;voice.PlaybackSpeed=M.Speeds[key]or 1
-  mix.Route(voice,'Interface');voice.Parent=SoundService;p.Voices[i]=voice
+  if mix then local ok,why=pcall(mix.Route,voice,'Interface');if not ok then tell('route','AudioMixer.Route failed ('..tostring(why)..'): that click plays without the Interface slider')end end
+  voice.Parent=SoundService;p.Voices[i]=voice
  end
+ pools[key]=p
  return p
 end
 local function warm(p)
@@ -64,14 +75,20 @@ function M.Play(key,minGap)
  local gap=tonumber(minGap)or M.Gaps[key]or M.DefaultGap
  local now=os.clock();if now<(mutedUntil[key]or 0)then return false end
  if now-(last[key]or -math.huge)<gap then return false end;last[key]=now
- local p=pool(key,id);p.Index=p.Index%#p.Voices+1;local sound=p.Voices[p.Index]
+ local made,p=pcall(pool,key,id) -- R157b review: never throws into the caller; a pool that is not there (or not whole) is no sound this time
+ if not made then tell('pool','could not build the '..key..' voices ('..tostring(p)..')');return false end
+ if type(p)~='table'or #p.Voices==0 then return false end
+ p.Index=p.Index%#p.Voices+1;local sound=p.Voices[p.Index]
  -- An unavailable/cold click is discarded, never queued to pop after the menu appears.
  if not sound.IsLoaded then warm(p);return false end
  -- A new menu cue replaces the previous menu cue (open or close); other feedback keeps its pool.
  if menuKeys[key]then
   for other in pairs(menuKeys)do local op=pools[other];if op then for _,voice in ipairs(op.Voices)do voice:Stop()end end end
  else sound:Stop()end
- Timing.Play(sound);return true
+ -- R157b review: SoundTiming.Play routes the sound through AudioMixer first (its own require), which throws when the mixer cannot load; that must not stop the click or reach the caller. It throws
+ -- before it has done anything else, so the fallback is the plain play: the lead-in offset and Play (the sound is loaded here, so there is no cold-file wait to keep).
+ if not pcall(Timing.Play,sound)then pcall(function()sound.TimePosition=Timing.Offset(sound);sound:Play()end)end
+ return true
 end
 -- R51: success-only transaction feedback, separate from navigation and upgrade clicks.
 function M.Transaction(kind)

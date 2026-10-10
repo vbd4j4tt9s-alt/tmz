@@ -9,12 +9,16 @@
 #               (the R152 guard style, pcall around IsLoaded) before it requires InteractionAudio, and (as before) before SeedPackVisuals; no top-level dot-indexed require is left in
 #               InteractionAudio / AudioMixer / SoundTiming / SettingsConfig / TitleTips156; line 1 of every client script (the R152 guard) is untouched; this suite is in run_all_suites.sh;
 #               no model names in the files of this round
-#  1. test    - test_early_audio157.luau on the Roblox mock (/opt/luau/luau) with the REAL modules, in a ReplicatedStorage where AudioMixer / SettingsConfig arrive late and the game is not loaded
-#  2. teeth   - the same test on broken copies (the old dot-indexed requires, a synchronous warm-up, no pcall, no wait in the title): each must FAIL
+#               R157b review: the AudioMixer fetch in InteractionAudio is in a pcall and a failure is remembered (no throw into a Play); each voice's Route is in a pcall; SoundTiming.Play (which routes through AudioMixer first) is called in a pcall with a plain-play fallback, so a broken mixer never stops a click; BackgroundMusic
+#               fetches AudioMixer with WaitForChild too (its one line; the same race: no music for the session)
+#  1. test    - test_early_audio157.luau on the Roblox mock (/opt/luau/luau) with the REAL modules, in a ReplicatedStorage where AudioMixer / SettingsConfig arrive late and the game is not loaded;
+#               R157b review: a mixer that errors on require / a Route that errors never breaks a Play (sections E1-E4), BackgroundMusic waits for AudioMixer and goes on when it arrives (F)
+#  2. teeth   - the same test on broken copies (the old dot-indexed requires, a synchronous warm-up, no pcall, no wait in the title, a BackgroundMusic that dot-indexes AudioMixer, a mixer
+#               failure that is not remembered / not pcall'd, a Route that is not pcall'd): each must FAIL
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
 T=$REPO/tools/tests;P=$REPO/docs/proposals;S=$REPO/src;RSD=$S/ReplicatedStorage
-IA=$RSD/InteractionAudio.lua;AM=$RSD/AudioMixer.lua;TS=$RSD/TitleScreen104.lua
+IA=$RSD/InteractionAudio.lua;AM=$RSD/AudioMixer.lua;TS=$RSD/TitleScreen104.lua;BGM=$S/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
 echo "== 0. static"
 grep -q "require(script.Parent:WaitForChild('AudioMixer'))" "$IA" || fail "InteractionAudio must WaitForChild('AudioMixer')"
@@ -22,6 +26,14 @@ grep -q "require(script.Parent.AudioMixer)" "$IA" && fail "InteractionAudio stil
 grep -q "pcall(M.Preload)" "$IA" || fail "InteractionAudio must warm its voices inside a pcall"
 [ "$(grep -c "^M.Preload()" "$IA")" = 0 ] || fail "InteractionAudio must not call M.Preload() directly in its body"
 echo "ok: InteractionAudio waits for AudioMixer (WaitForChild, lazily) and warms in a pcall'd task"
+grep -q "pcall(function()return require(script.Parent:WaitForChild('AudioMixer'))end)" "$IA" || fail "InteractionAudio must fetch AudioMixer inside a pcall (a failure is remembered: no throw into a Play)"
+grep -q "pcall(mix.Route,voice,'Interface')" "$IA" || fail "InteractionAudio must route each voice inside a pcall (a Route error must not leave a short pool)"
+grep -q "if not pcall(Timing.Play,sound)then pcall(function()sound.TimePosition=Timing.Offset(sound);sound:Play()end)end" "$IA" || fail "InteractionAudio must call Timing.Play inside a pcall with the plain-play fallback (SoundTiming routes through AudioMixer first and throws when it cannot load)"
+echo "ok: InteractionAudio fetches AudioMixer, routes each voice and calls SoundTiming.Play inside a pcall (R157b review)"
+# R157b review: BackgroundMusic (a script of the same early-load race): its AudioMixer fetch waits for it (the one line of the script that changed, see frozen.sha256)
+grep -q 'require(game:GetService("ReplicatedStorage"):WaitForChild("AudioMixer"))' "$BGM" || fail "BackgroundMusic must WaitForChild(\"AudioMixer\")"
+grep -q 'GetService("ReplicatedStorage").AudioMixer' "$BGM" && fail "BackgroundMusic still indexes AudioMixer directly"
+echo "ok: BackgroundMusic fetches AudioMixer with WaitForChild"
 grep -q "require(script.Parent:WaitForChild('SettingsConfig'))" "$AM" || fail "AudioMixer must WaitForChild('SettingsConfig')"
 grep -q "require(script.Parent.SettingsConfig)" "$AM" && fail "AudioMixer still indexes SettingsConfig directly"
 echo "ok: AudioMixer waits for SettingsConfig"
@@ -45,10 +57,10 @@ sed -n 6p "$T/run_all_suites.sh" | grep -q " docs/proposals/R157/tests/run_early
 echo "ok: registered on line 6 of run_all_suites.sh"
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|\b(op[u]s|sonn[e]t|haik[u]|gemin[i]|llam[a])\b|gp[t]-?[0-9]" "$HERE/run_early_audio157.sh" "$HERE/test_early_audio157.luau" "$IA" "$AM" "$TS" 2>/dev/null | grep -q .;then fail "a model name in the files of this round";else echo "ok: no model names in the files of this round";fi
 # the test ----------------------------------------------------------------------------------------------------------------------------------------
-build(){ # dir [InteractionAudio file] [AudioMixer file] [TitleScreen104 file]
+build(){ # dir [InteractionAudio file] [AudioMixer file] [TitleScreen104 file] [BackgroundMusic file]
  d=$1;rm -rf "$d";mkdir -p "$d"
  cp "$T/roblox.luau" "$P/treadmill_bonus_R123/tests/world.luau" "$P/R150/tests/sfx_env.luau" "$HERE/test_early_audio157.luau" "$d/"
- python3 "$P/R150/tests/mkbundle.py" "$d" InteractionAudio="${2:-$IA}" AudioMixer="${3:-$AM}" TitleScreen104="${4:-$TS}" > /dev/null
+ python3 "$P/R150/tests/mkbundle.py" "$d" InteractionAudio="${2:-$IA}" AudioMixer="${3:-$AM}" TitleScreen104="${4:-$TS}" BackgroundMusic="${5:-$BGM}" > /dev/null
 }
 runtest(){ ( cd "$1" && timeout 600 /opt/luau/luau test_early_audio157.luau > test.log 2>&1 ); }
 echo "== 1. test_early_audio157"
@@ -58,10 +70,10 @@ if runtest "$OUT/w";then grep -v '^WARN' "$OUT/w/test.log" | tail -8;else grep -
 if [ -z "$NO_MUTATE" ];then
  echo "== 2. teeth: each break must make the test fail"
  M=$OUT/mut;mkdir -p "$M";caught=0;total=0
- mutate(){ # name which(IA|AM|TS) old new [old2 new2 ...]
+ mutate(){ # name which(IA|AM|TS|BGM) old new [old2 new2 ...]
   name=$1;which=$2;shift 2
-  cp "$IA" "$M/InteractionAudio.lua";cp "$AM" "$M/AudioMixer.lua";cp "$TS" "$M/TitleScreen104.lua"
-  case $which in IA) target=$M/InteractionAudio.lua;; AM) target=$M/AudioMixer.lua;; *) target=$M/TitleScreen104.lua;; esac
+  cp "$IA" "$M/InteractionAudio.lua";cp "$AM" "$M/AudioMixer.lua";cp "$TS" "$M/TitleScreen104.lua";cp "$BGM" "$M/BackgroundMusic.lua"
+  case $which in IA) target=$M/InteractionAudio.lua;; AM) target=$M/AudioMixer.lua;; BGM) target=$M/BackgroundMusic.lua;; *) target=$M/TitleScreen104.lua;; esac
   python3 - "$target" "$@" <<'PY' || { fail "mutation $name: the pattern is not in the file";return 0; }
 import sys
 f = sys.argv[1]; rest = sys.argv[2:]; pairs = list(zip(rest[0::2], rest[1::2]))
@@ -71,18 +83,37 @@ for old, new in pairs:
     s = s.replace(old, new, 1)
 open(f, 'w', encoding='utf-8').write(s)
 PY
-  build "$M/w" "$M/InteractionAudio.lua" "$M/AudioMixer.lua" "$M/TitleScreen104.lua";total=$((total+1))
+  build "$M/w" "$M/InteractionAudio.lua" "$M/AudioMixer.lua" "$M/TitleScreen104.lua" "$M/BackgroundMusic.lua";total=$((total+1))
   if runtest "$M/w";then fail "mutation $name was NOT noticed";else caught=$((caught+1));echo "ok: $name -> fails ($(grep -c '^FAIL' "$M/w/test.log") failing checks)";fi
  }
  # the code before this fix, restored in full (the owner's crash): the dot-indexed require inside pool() and the warm-up run by the module body
- mutate the_old_code_restored IA " local mix=Mixer() -- (R157b fix: first, so a wait for AudioMixer never leaves a half-built pool behind)
-" "" "  mix.Route(voice,'Interface')" "  require(script.Parent.AudioMixer).Route(voice,'Interface')" "task.spawn(function()local ok,why=pcall(M.Preload);if not ok then warn('[InteractionAudio] preload: '..tostring(why))end end)" "M.Preload()"
- mutate interaction_audio_dot_indexes_mixer IA "mixer=require(script.Parent:WaitForChild('AudioMixer'))" "mixer=require(script.Parent.AudioMixer)"
+ mutate the_old_code_restored IA " local mix=Mixer() -- (R157b fix: first, so a wait for AudioMixer never leaves a half-built pool behind) (nil after a failure: the voices are then not routed)
+" "" "  if mix then local ok,why=pcall(mix.Route,voice,'Interface');if not ok then tell('route','AudioMixer.Route failed ('..tostring(why)..'): that click plays without the Interface slider')end end" "  require(script.Parent.AudioMixer).Route(voice,'Interface')" "task.spawn(function()local ok,why=pcall(M.Preload);if not ok then warn('[InteractionAudio] preload: '..tostring(why))end end)" "M.Preload()"
+ mutate interaction_audio_dot_indexes_mixer IA "return require(script.Parent:WaitForChild('AudioMixer'))end)" "return require(script.Parent.AudioMixer)end)"
  mutate audio_mixer_dot_indexes_config AM "require(script.Parent:WaitForChild('SettingsConfig'))" "require(script.Parent.SettingsConfig)"
  mutate warm_up_runs_in_the_require IA "task.spawn(function()local ok,why=pcall(M.Preload);if not ok then warn('[InteractionAudio] preload: '..tostring(why))end end)" "M.Preload()"
  mutate warm_up_without_pcall IA "task.spawn(function()local ok,why=pcall(M.Preload);if not ok then warn('[InteractionAudio] preload: '..tostring(why))end end)" "task.spawn(M.Preload)"
- mutate mixer_fetched_inside_the_voice_loop IA " local mix=Mixer() -- (R157b fix: first, so a wait for AudioMixer never leaves a half-built pool behind)
-" "" "  mix.Route(voice,'Interface')" "  Mixer().Route(voice,'Interface')"
+ mutate mixer_fetched_inside_the_voice_loop IA " local mix=Mixer() -- (R157b fix: first, so a wait for AudioMixer never leaves a half-built pool behind) (nil after a failure: the voices are then not routed)
+" "" "  if mix then local ok,why=pcall(mix.Route,voice,'Interface')" "  local mix=Mixer();if mix then local ok,why=pcall(mix.Route,voice,'Interface')"
+ # R157b review: a broken mixer never breaks a Play
+ mutate mixer_failure_not_remembered IA " if mixerFailed then return nil end
+" ""
+ mutate mixer_require_not_pcalled IA "local ok,loaded=pcall(function()return require(script.Parent:WaitForChild('AudioMixer'))end)" "local ok,loaded=true,require(script.Parent:WaitForChild('AudioMixer'))"
+ mutate route_not_pcalled IA "local ok,why=pcall(mix.Route,voice,'Interface');if not ok then tell('route','AudioMixer.Route failed ('..tostring(why)..'): that click plays without the Interface slider')end" "mix.Route(voice,'Interface')"
+ mutate play_lets_a_pool_error_through IA " local made,p=pcall(pool,key,id) -- R157b review: never throws into the caller; a pool that is not there (or not whole) is no sound this time
+ if not made then tell('pool','could not build the '..key..' voices ('..tostring(p)..')');return false end
+" " local p=pool(key,id)
+"
+ mutate short_pool_is_kept_and_trusted IA " local p={Id=id,Voices={},Index=0}
+" " local p={Id=id,Voices={},Index=0};pools[key]=p
+" " and #existing.Voices==3 then return existing end -- (R157b review: a short pool is rebuilt)" " then return existing end" " if type(p)~='table'or #p.Voices==0 then return false end
+" "" " local made,p=pcall(pool,key,id) -- R157b review: never throws into the caller; a pool that is not there (or not whole) is no sound this time
+ if not made then tell('pool','could not build the '..key..' voices ('..tostring(p)..')');return false end
+" " local p=pool(key,id)
+"
+ mutate sound_timing_play_not_pcalled IA "if not pcall(Timing.Play,sound)then pcall(function()sound.TimePosition=Timing.Offset(sound);sound:Play()end)end" "Timing.Play(sound)"
+ mutate sound_timing_failure_is_silent IA "if not pcall(Timing.Play,sound)then pcall(function()sound.TimePosition=Timing.Offset(sound);sound:Play()end)end" "pcall(Timing.Play,sound)"
+ mutate background_music_dot_indexes_mixer BGM 'require(game:GetService("ReplicatedStorage"):WaitForChild("AudioMixer"))' 'require(game:GetService("ReplicatedStorage").AudioMixer)'
  mutate title_does_not_wait_for_loaded TS "do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end
   if dead then return end
   local module=RS:WaitForChild('InteractionAudio',10)" "local module=RS:WaitForChild('InteractionAudio',10)"

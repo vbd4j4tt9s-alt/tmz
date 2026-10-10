@@ -456,9 +456,14 @@ end
 -- 8. R157 (owner: "if bag is full and player tries to buy a pack or get a pack via the rolls it says bag full"): a full Bag (the 200 cap) is not "Unavailable" ----------------------
 -- State flags it (BagFull = true on each offer that would not fit, with the sale on, the data ready and paid random items allowed; GemAvailable / RobuxAvailable stay false), a gem purchase
 -- and a Robux prompt are refused with the same simple words and nothing starts; Off sale and Event over keep their own words. The bonus roll already says BAG FULL.
+-- R157b review: the Bag is full PER QUANTITY, so the words name it: one pack "BAG FULL! MAKE ROOM FIRST", more "BAG FULL! MAKE ROOM FOR 10 PACKS FIRST" (the real count); the button stays "Bag full".
 do
  local BAG=Catalog.BagFull.Notice
+ local WORDS={[1]=BAG,[5]='BAG FULL! MAKE ROOM FOR 5 PACKS FIRST',[10]='BAG FULL! MAKE ROOM FOR 10 PACKS FIRST'}
  check(BAG=='BAG FULL! MAKE ROOM FIRST'and Catalog.BagFull.Button=='Bag full','the words: button "Bag full", notice "BAG FULL! MAKE ROOM FIRST"')
+ check(Catalog.BagFullNotice(1)==BAG and Catalog.BagFullNotice(5)==WORDS[5]and Catalog.BagFullNotice(10)==WORDS[10]and Catalog.BagFullNotice()==BAG and Catalog.BagFullNotice(0)==BAG,'MechCatalog.BagFullNotice: 1 pack = "BAG FULL! MAKE ROOM FIRST", more = "BAG FULL! MAKE ROOM FOR <count> PACKS FIRST" (5, 10)')
+ for _,offer in ipairs(Catalog.Offers)do check(Catalog.BagFullNotice(offer.Count)==WORDS[offer.Count],'(every offer has its words: '..offer.Count..')')end
+ check(W.module('SimpleGameText').Format(WORDS[10])==WORDS[10]and select(2,W.module('SimpleGameText').Format(WORDS[10]))==W.module('SimpleGameText').Red and select(2,W.module('SimpleGameText').Format(WORDS[5]))==W.module('SimpleGameText').Red,'SimpleGameText shows both in the shared red, the words as they are')
  local Cat=makePlayer(803,'Cat');Data:GetPremium(Cat).Gems=100000
  local function fill(p,n)while Data:HeldItemCount(p)<n do Data:AddChest(p,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{Receipt=true})end end
  local function offers(p)return invoke(p,'State').PackOffers end
@@ -485,25 +490,31 @@ do
  local gems=Data:GetPremium(Cat).Gems;local before=packCount(Cat);local m=mark()
  for _,count in ipairs({1,5,10})do
   r=invoke(Cat,'BuyPack',count)
-  check(r.Success==false and r.Message==BAG,'a gem purchase of '..count..' with a full Bag: "'..tostring(r.Message)..'"')
+  check(r.Success==false and r.Message==WORDS[count],'a gem purchase of '..count..' with a full Bag: "'..tostring(r.Message)..'"')
  end
  check(Data:GetPremium(Cat).Gems==gems and packCount(Cat)==before and Data:HeldItemCount(Cat)==200,'... no gems taken ('..Data:GetPremium(Cat).Gems..'), no pack granted')
  check(#doneSince(m)==0 and #notesSince(m)==0,'... nothing announced')
- local okD,whyD=Data:BuyMechPack(Cat,5);check(okD==false and whyD==BAG,'Data:BuyMechPack says it too ("'..tostring(whyD)..'")')
+ local okD,whyD=Data:BuyMechPack(Cat,5);check(okD==false and whyD==WORDS[5],'Data:BuyMechPack says it too ("'..tostring(whyD)..'")')
  Data:GetPremium(Cat).Gems=10;r=invoke(Cat,'BuyPack',1)
  check(r.Success==false and r.Message==BAG,'a full Bag is told first, even with too few gems to buy ("'..tostring(r.Message)..'")')
  Data:GetPremium(Cat).Gems=gems
- local okC,whyC=Data:CanReceiveMechPacks(Cat,10);check(okC==false and whyC==BAG,'CanReceiveMechPacks gives the same words (no more "MAKE ROOM FOR N PACKS FIRST!")')
+ local okC,whyC=Data:CanReceiveMechPacks(Cat,10);check(okC==false and whyC==WORDS[10],'CanReceiveMechPacks gives the same words ("'..tostring(whyC)..'")')
  -- a Robux press: the same words, no prompt
  for _,count in ipairs({1,5,10})do
   prompts={};r=invoke(Cat,'RobuxPack',count)
-  check(r.Success==false and r.Message==BAG and #prompts==0,'a Robux press for '..count..' packs with a full Bag: "'..tostring(r.Message)..'", no prompt opened')
+  check(r.Success==false and r.Message==WORDS[count]and #prompts==0,'a Robux press for '..count..' packs with a full Bag: "'..tostring(r.Message)..'", no prompt opened')
  end
  -- per offer: 196 items = a 1-pack fits, a 5-pack and a 10-pack do not
  emptyBag(Cat);fill(Cat,196);o=offers(Cat)
  check(o['1'].BagFull==nil and o['1'].GemAvailable==true and o['5'].BagFull==true and o['5'].GemAvailable==false and o['10'].BagFull==true,'196 items: the 1-pack is on, the 5-pack and 10-pack say BagFull')
  prompts={};r=invoke(Cat,'RobuxPack',1);check(r.Success==true and #prompts==1,'... the 1-pack Robux prompt still opens')
- prompts={};r=invoke(Cat,'RobuxPack',5);check(r.Success==false and r.Message==BAG and #prompts==0,'... the 5-pack Robux press is refused with the words and no prompt')
+ prompts={};r=invoke(Cat,'RobuxPack',5);check(r.Success==false and r.Message==WORDS[5]and #prompts==0,'... the 5-pack Robux press is refused with its words ("'..tostring(r.Message)..'") and no prompt')
+ -- R157b review: 195 items = the 1-pack and the 5-pack fit, the 10-pack does not: the notice for the 10-pack must not say the Bag is full for one pack
+ emptyBag(Cat);fill(Cat,195);o=offers(Cat)
+ check(o['1'].BagFull==nil and o['5'].BagFull==nil and o['10'].BagFull==true and o['1'].GemAvailable==true and o['5'].GemAvailable==true and o['10'].GemAvailable==false,'195 items: the 1-pack and the 5-pack are on, only the 10-pack says BagFull')
+ r=invoke(Cat,'BuyPack',10);check(r.Success==false and r.Message=='BAG FULL! MAKE ROOM FOR 10 PACKS FIRST'and r.Message~=BAG,'... a gem purchase of 10 says "BAG FULL! MAKE ROOM FOR 10 PACKS FIRST", not the one-pack words ("'..tostring(r.Message)..'")')
+ prompts={};r=invoke(Cat,'RobuxPack',10);check(r.Success==false and r.Message=='BAG FULL! MAKE ROOM FOR 10 PACKS FIRST'and #prompts==0,'... and so does a Robux press for 10 (no prompt)')
+ gems0=Data:GetPremium(Cat).Gems;r=invoke(Cat,'BuyPack',1);check(r.Success==true and Data:GetPremium(Cat).Gems==gems0-80,'... while the single pack still works and charges 80')
  -- room again: back to normal
  emptyBag(Cat);fill(Cat,199);o=offers(Cat)
  check(o['1'].BagFull==nil and o['1'].GemAvailable==true and o['1'].RobuxAvailable==true,'199 items: room for one pack again, the flag is gone')
@@ -513,7 +524,7 @@ do
  st=invoke(Cat,'State');o=st.PackOffers
  check(st.OnSale==false and o['1'].BagFull==nil and o['5'].BagFull==nil and o['10'].BagFull==nil and o['1'].GemAvailable==false,'Off sale (Bag full too): no BagFull flag, the shop says Off sale')
  r=invoke(Cat,'BuyPack',1);check(r.Success==false and r.Message=='THIS PACK IS OFF SALE','... a gem purchase says "THIS PACK IS OFF SALE" ('..tostring(r.Message)..')')
- prompts={};r=invoke(Cat,'RobuxPack',1);check(r.Success==false and r.Message~=BAG and #prompts==0,'... a Robux press is not told "bag full" ('..tostring(r.Message)..')')
+ prompts={};r=invoke(Cat,'RobuxPack',1);check(r.Success==false and r.Message~=BAG and not tostring(r.Message):find('BAG FULL',1,true)and #prompts==0,'... a Robux press is not told "bag full" ('..tostring(r.Message)..')')
  RS.MechCatalog:SetAttribute('SaleEnabled',nil)
  Cat:SetAttribute('PaidRandomAllowed',false);o=offers(Cat)
  check(o['1'].BagFull==nil and o['1'].GemAvailable==false,'paid random items not allowed (Bag full too): no BagFull flag - the Bag is not the only reason')

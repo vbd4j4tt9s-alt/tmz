@@ -72,6 +72,7 @@ function Text.Format(message)
         or message:match("^RETURNED TO BASE %d+$") then return "", nil end
     local entry = copy[message]
     if entry then return entry[1], Text[entry[2]] end
+    if message:match("^BAG FULL! MAKE ROOM FOR %d+ PACKS FIRST$") then return message, Text.Red end -- R157b review: the Mech shop's full-Bag text for more than one pack (MechCatalog.BagFullNotice): the words as they are, in red
     if message:match(" planted!$") then return "PLANTED! 🌱", Text.Green end
     if message:match(" harvested! Visit Sell to earn cash%.$") then return "PICKED! 🌾", Text.Green end
     if message:match("^PURCHASED ") then return "BOUGHT! ✅", Text.Green end

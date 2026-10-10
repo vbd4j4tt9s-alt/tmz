@@ -30,4 +30,5 @@ f6ab026611779a832edb8079b5f3237bc86174edeeccb02a26b1b610689751f9  src/ServerScri
 c3890a3e6022dd3000eb7d0b8994d96cb6373990c2191df4ea8d0c488b18e918  src/ReplicatedStorage/PlantCatalog.lua
 # R156 (on purpose): BackgroundMusic.client.lua: the track playlist (Nature Inspiration + 74095461107598 + 132448918728086, alternating, .07) and three base tracks
 # R157b fix (on purpose): BackgroundMusic.client.lua: trackIsActive finds the track's start line (Z and X) from RunnerMotion's TrackBoundaryZ / TrackCenterX when Lobby.BaseBoundaryLine has streamed out (a player far down the track, the Desert) instead of calling it "not on the track" (the base music came back); nothing else changed
-0da60ca9c237932d464714091930aa7a5c0762006968c6aee2be1e495ad4f57a  src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua
+# R157b review fix (on purpose): BackgroundMusic.client.lua: the one line that fetches AudioMixer (getOrCreateSoundGroup) is require(game:GetService("ReplicatedStorage"):WaitForChild("AudioMixer")) instead of the dot index, so a script that starts before AudioMixer has replicated waits for it instead of erroring (no music for the session); nothing else changed
+7c85c8c32b764d5079b59a196fab9785eaefa8318af7f0653ca8a3b116a9a946  src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua

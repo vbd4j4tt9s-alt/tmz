@@ -51,3 +51,48 @@ Owner: "the TODAY is barely visible, colour the letters white and give it a blac
 * `DailyRewardsClient.client.lua`: the tag's letters are `#FFFFFF`; a black `UIStroke` (2 thick, solid, Contextual so it follows the letters) is added; the old thin text edge is turned off so the two do not stack. The tag's yellow fill, size, text size and position are not touched.
 * Picture: the login card in `docs/proposals/R157/daily_tile157.png` shows the tag before (dark letters) and after (white with the outline).
 * Test: `R140/tests/test_daily_client.luau` checks white letters, one black Contextual UIStroke 2 thick and opaque, no text edge, the gold fill, and the tag's size and place.
+
+## Review follow-ups
+
+A bug review of the R157b hotfix found six small things. Each is fixed minimally and has a test.
+
+### 1. Test bookkeeping: the track music suite said FAILED though every behaviour check passed
+
+`R157/tests/run_track_music157.sh` wanted `run_track_music157.sh` to sit right before `run_pyramid156.sh` on line 6 of `tools/tests/run_all_suites.sh`. A later merge put `run_early_audio157.sh` between them, so the suite printed FAILED. It now accepts the runner anywhere on line 6 (the same check the other R157 runners use: `sed -n 6p ... | grep -q " <runner>[; ]"`). `run_early_audio157.sh` already did that, and `run_hudlayout_cache157.sh` only looks for its name on line 6 (not position specific), so neither changed.
+
+### 2. The Bag-full notice names the pack count that does not fit
+
+The Bag is full per quantity: with 195 of 200 items the single pack and the 5-pack fit, the 10-pack does not. The old notice ("BAG FULL! MAKE ROOM FIRST" for every quantity) said the Bag was full while the single pack still worked.
+
+**You see (shop):** the button still reads **Bag full** for any quantity that does not fit. The red notice is now exact: one pack says **BAG FULL! MAKE ROOM FIRST**, more says **BAG FULL! MAKE ROOM FOR 10 PACKS FIRST** (with the real count: 5 or 10).
+
+* One function makes the words: `MechCatalog.BagFullNotice(count)` (`BagFull.Notice` for one pack, `BagFull.Many` with the count for more). The server (`PremiumProgress:CanReceiveMechPacks`, so a gem purchase, a Robux press and the shop's State flag) and the shop's own press (`GamePassClient`) all call it, so both say the same thing.
+* `SimpleGameText` shows the new words in the shared red, as they are (a pattern, so any count works).
+* Tests: `R155/tests/test_mech_coats_server.luau` (section 8: the words per count, the 195-item case where only the 10-pack is refused and the single pack still buys), `test_mech_coats_shop.luau` (the press names the count; the 195-item case), `test_cap155.luau` (195 items: the 10-pack is refused with the exact words, the single pack fits). `mutate_mech_coats.py` has new broken copies that must be caught.
+
+### 3. Room made in the Bag while the shop is open
+
+A "Bag full" press never asks the server, and the shop only read its State on open, when paid random items changed, or when the products changed. If the Bag gained room while the shop was open, the buttons stayed on "Bag full".
+
+**You see:** sell, throw away or open something with the shop open, and the buttons come back by themselves (a Bag that fills up flips them to "Bag full" the same way).
+
+* `GamePassClient.client.lua`: the 200 cap already publishes `HeldItemCount` / `HeldItemCap` on the player (`InventoryCap155.PublishHeld`, the Bag's "143/200"), and a pack carried home keeps its place (`ChestChaseSeedCarrying`). A change of any of the three, with the shop open, reads State again, at most once every 0.5 s (a change inside that time is read when it is over; a change in the middle of a request is read right after it; a shut shop reads nothing).
+* Test: `test_mech_coats_shop.luau` (the buttons come back when room is made, flip to "Bag full" when it fills, the cap and the carried pack count, 20 changes in a second are 2 or 3 reads never closer than half a second, the last change is not lost, a shut shop reads nothing, a change during a request is read after it).
+
+### 4. A broken AudioMixer never breaks a click sound
+
+* `InteractionAudio.lua`: `Mixer()` fetches AudioMixer inside a pcall and remembers a failure (one warning; the voices are not routed, they play from SoundService at their own volume; it is not required again on every Play). Each voice's `Route` is in its own pcall, so an error costs that voice its routing only and the pool always has its 3 voices (before, a pool built part-way stayed in the table and `Index % 0` was NaN). The pool is only kept when it has 3 voices, and `Play` never throws: a pool it cannot build is `false` this time and is built again on the next Play.
+* `Play` also calls `SoundTiming.Play` inside a pcall. `SoundTiming.Play` routes the sound through AudioMixer first (its own dot-indexed `require`, unchanged: `SoundTiming` is frozen by the R153 swoosh suite), so a mixer that errors on load would throw out of it before the sound started. That throw is caught; the fallback is the plain play (the lead-in offset, then Play), so the click still sounds and nothing reaches the caller.
+* Tests: `R157/tests/test_early_audio157.luau` sections B4 (a warm-up that cannot make a Sound), E1 (AudioMixer errors on require: Play returns without throwing, 40 of 40 sounds play, one warning), E2 (a Route that errors for 5 of 30 voices: every pool has 3 voices, none threw), E3 (a Play that waited for the mixer, which arrives broken), E4 (a pool that cannot be built: `false`, then built whole). `run_early_audio157.sh` has new broken copies for each.
+
+### 5. BackgroundMusic had the same early-load race
+
+`BackgroundMusic.client.lua` fetched `require(game:GetService("ReplicatedStorage").AudioMixer)` when it started (to set the volume of its two sound groups). If AudioMixer had not replicated yet the script errored and there was no music for the session. That one line is now `require(game:GetService("ReplicatedStorage"):WaitForChild("AudioMixer"))`; everything else in the script is byte for byte the same.
+
+* `docs/proposals/R151/tests/frozen.sha256`: the BackgroundMusic hash is updated, with a "# R157b review fix (on purpose)" note. `bgm_frozen.sh` and the older "BackgroundMusic untouched" checks read that hash, so they accept it as they did the R156 and R157b changes; `run_music156.sh` and `run_pyramid156.sh` needed no change.
+* `run_track_music157.sh`: its "everything but trackIsActive is byte for byte the R156 script" check first turns this one line back (and says so), so the rest is still compared byte for byte.
+* Test: `run_early_audio157.sh` checks that BackgroundMusic uses WaitForChild for AudioMixer, and `test_early_audio157.luau` section F runs the real script's start with AudioMixer not there (it waits, then goes on when it arrives).
+
+### 6. A failed light edge leaves the plain silhouette
+
+`ItemPictures.lua`: `pcall(lightEdge, model)` did not undo the rims already added if it failed part-way, so a picture could have a rim on some parts only. On failure every `SilhouetteRim` in the model is now removed, so the picture is the plain near-black silhouette, as its comment says. Test: `R140/tests/test_daily_client.luau` makes the 2nd rim fail and checks the four mystery pictures have no rim left (and have their edge again on the next build).

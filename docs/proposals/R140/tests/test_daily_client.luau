@@ -179,6 +179,26 @@ local rimsOK,rimWhy=true,nil;for d=1,4 do local ok,why=rimOK(cards[d].Art);if no
 check(rimsOK,'R157: ... with a thin light edge so it reads on the dark card without the tile: a pale copy of every body part, 14% bigger, pushed back behind it ('..tostring(rimWhy)..')')
 local noRim=true;do local v=cards[7].Art:FindFirstChild('ItemViewport');for _,d in ipairs(v and v:GetDescendants()or{})do if d.Name=='SilhouetteRim'then noRim=false end end end
 check(noRim,'(the Void day\'s real pack has no rim)')
+-- R157b review: if the light edge fails part-way (a rim or two already added), those rims are removed: the picture is the plain near-black silhouette, never a rim on some parts only. The 2nd rim's
+-- clone is made to fail (debug.info names the caller: lightEdge) and every picture is built again (ItemPictures.Reset): the first rim was added, then removed.
+do
+ local Pic=W.module('ItemPictures');local realClone=R.Inst.Clone;local clones=0
+ local okBefore,bodiesBefore=dark(cards[1].Art)
+ R.Inst.Clone=function(self,...)if debug.info(2,'n')=='lightEdge'then clones+=1;if clones==2 then error('rim boom')end end;return realClone(self,...)end
+ Pic.Reset();frames(12);R.Inst.Clone=realClone
+ check(okBefore and #bodiesBefore>=2,'(control) the pack silhouette has more than one body part, so a failure on the 2nd rim leaves a first one ('..tostring(bodiesBefore and #bodiesBefore)..' parts)')
+ check(clones>=2,'R157b review: the light edge was started and its 2nd rim failed ('..clones..' rim clones)')
+ local plain=true;local seen=0
+ for d=1,4 do
+  local ok,bodies,rims=dark(cards[d].Art)
+  if ok then seen+=1 end
+  if not(ok and #rims==0 and #bodies>=2)then plain=false end
+ end
+ check(plain and seen==4,'R157b review: ... and the four pictures are the plain silhouette: every rim the failed edge had added is removed (no rim on some parts only)')
+ Pic.Reset();frames(12)
+ local back=true;for d=1,4 do if not rimOK(cards[d].Art)then back=false end end
+ check(back,'(and with nothing failing the next build has its edge again)')
+end
 local sameSil=true;for d=1,4 do local a=asked[cards[d].Art];if not(a and a.Pack and a.Silhouette==true and a.Shape==nil and a.Stage==1 and a.Variant=='Pack01')then sameSil=false end end
 check(sameSil,'R153: the four mystery pictures are all the same proxy: the plain Forest pack, no PackShape (the default shape, like the other reward pictures), Silhouette (nothing about the pack that will be rolled)')
 local v7=asked[cards[7].Art];check(v7 and v7.Pack and v7.Variant=='EclipseReliquary'and v7.Stage==7 and v7.Silhouette==nil,'R153: day 7 asks for the Void pack\'s own art (stage 7 EclipseReliquary), no silhouette')

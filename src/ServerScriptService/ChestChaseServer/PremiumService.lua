@@ -127,7 +127,7 @@ function Service.new(data,chests,passes)
    if offer and Catalog.EventOver()then okay=false;message=Catalog.Event.Refused
    elseif entry and entry.RobuxAvailable and route=='Mech'and routed==count and data:CanReceiveMechPacks(p,count)then
     okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Couldn\'t open the purchase. Try again!'or nil -- R148: the opened prompt needs no status line
-   elseif offer and entry and entry.BagFull then okay=false;message=Catalog.BagFull.Notice -- R157: a full Bag is told plainly (no prompt)
+   elseif offer and entry and entry.BagFull then okay=false;message=Catalog.BagFullNotice(count) -- R157: a full Bag is told plainly (no prompt); R157b review: with the real count for more than one pack
    else okay=false;message='CAN\'T BUY THIS RIGHT NOW'end
   else okay=false;message='TRY AGAIN!'end
   -- R148: a gem purchase that went through gets the notice, chime and sparkles; their confirmation line is then redundant
@@ -187,7 +187,7 @@ function Service:State(player)
   local allowed=ready and fits==true
   offers[tostring(count)]={Count=count,GemPrice=offer.GemPrice,GemAvailable=allowed,
    RobuxAvailable=allowed and robuxReady and route=='Mech'and key==count and info~=nil and info.IsForSale~=false,
-   RobuxPrice=info and info.PriceInRobux,BagFull=ready and not allowed and why==Catalog.BagFull.Notice or nil}
+   RobuxPrice=info and info.PriceInRobux,BagFull=ready and not allowed and why==Catalog.BagFullNotice(count)or nil}
  end
  for _,row in ipairs(Pricing.Bundles)do
   local info=(self.Products or{})[row.Key];local route,key=Routing.Resolve(Pricing.ProductId(row));local quote=self.Data:BundleQuote(player,row.Key)

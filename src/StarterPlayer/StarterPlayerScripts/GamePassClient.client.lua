@@ -169,7 +169,7 @@ local function active(b,enabled)b.Interactable=enabled;b.Active=enabled;b.AutoBu
 local Feed;local lastBagNotice=-10
 local function bagFullPress()
  Audio.Play('Denied');local now=os.clock();if now-lastBagNotice<.7 then return end;lastBagNotice=now
- pcall(function()Feed=Feed or require(RS:WaitForChild('NoticeFeed83'));Feed.Plain(Catalog.BagFull.Notice,require(RS:WaitForChild('SimpleGameText')).Red,2.5)end)
+ pcall(function()Feed=Feed or require(RS:WaitForChild('NoticeFeed83'));Feed.Plain(Catalog.BagFullNotice(packCount),require(RS:WaitForChild('SimpleGameText')).Red,2.5)end) -- R157b review: the notice names the pack count that does not fit (the server's answers use the same function)
 end
 local layoutKey;local content;local frame
 local function setPrice(b,text,icon,color)Art.SetCaption(b,text,icon,color)end
@@ -443,6 +443,18 @@ watch(pg:GetAttributeChangedSignal('PremiumPage'),function()if panel.Visible and
 watch(pg:GetAttributeChangedSignal('PremiumFocus'),function()if panel.Visible then focusBundle()end end)
 watch(pg:GetAttributeChangedSignal('SeedMenu'),function()open(pg:GetAttribute('SeedMenu')=='Passes')end)
 watch(player:GetAttributeChangedSignal('PaidRandomAllowed'),function()if panel.Visible and not busy then act('State')end end)
+-- R157b review: a "Bag full" press never asks the server, and State was only read on open / PaidRandomAllowed / a products revision, so room made in the Bag while the shop was open left both buttons on "Bag full".
+-- The 200 cap publishes HeldItemCount / HeldItemCap on the player (InventoryCap155.PublishHeld; the Bag's "143/200" reads them) and a carried pack keeps its place (ChestChaseSeedCarrying): when any of them changes
+-- with the shop open the State is read again, at most once every 0.5 s (a change inside that time is read when it is over; one in the middle of another request waits for it, like the products revision).
+local heldQueued=false;local lastHeldRead=-10
+local function heldChanged()
+ if not panel.Visible or heldQueued then return end
+ heldQueued=true;task.delay(math.max(0,lastHeldRead+.5-os.clock()),function()
+  heldQueued=false;if not gui.Parent or not panel.Visible then return end
+  lastHeldRead=os.clock();if busy then pendingState=true else act('State')end
+ end)
+end
+for _,name in ipairs({'HeldItemCount','HeldItemCap','ChestChaseSeedCarrying'})do watch(player:GetAttributeChangedSignal(name),heldChanged)end
 local productsQueued=false
 watch(RS:GetAttributeChangedSignal('PremiumProductsRevision'),function()
  if not panel.Visible or productsQueued then return end

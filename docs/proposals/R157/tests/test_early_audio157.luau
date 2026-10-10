@@ -9,6 +9,9 @@
 --  C. AudioMixer required before SettingsConfig has arrived waits for it and then loads
 --  D. the title: no require of InteractionAudio (or SeedPackVisuals) before game.Loaded; a click before the game has loaded is silent and harmless; after Loaded the start click sounds
 --     (MenuClick, once, through the Interface group); a title that has closed by then loads nothing; a game that is already loaded, or a stand-in without IsLoaded, runs on at once
+--  E. (R157b review) a broken mixer never breaks a Play: an AudioMixer that errors while loading is remembered (not required again on every Play, one warning), Play returns without throwing and the
+--     sounds still play from SoundService; a Route that errors for some voices leaves every pool with its 3 voices (the others routed), Play never throws (no Index % 0), one warning
+--  F. (R157b review) BackgroundMusic starts before AudioMixer has replicated: it waits for it (WaitForChild) instead of erroring, and goes on when it arrives (no music for the session otherwise)
 local W=require('./world');local R=W.R
 local E=require('./sfx_env')(W)
 local fails,checks=0,0
@@ -51,6 +54,10 @@ end
 -- sources that exist only in this test
 W.B.BrokenRouteMixer="return {Route=function()error('mixer boom')end,Group=function()return nil end}"
 W.B.BrokenConfig="error('config boom')"
+W.B.BrokenLoadMixer="error('mixer load boom')"
+-- (R157b review) a mixer whose Route errors on every 7th call starting with the 2nd (calls 2, 9, 16, 23, 30): the others route their voice to one Interface group
+W.B.FlakyRouteMixer=[[local n=0;local group=Instance.new('SoundGroup');group.Name='GardenInterface'
+return {Route=function(sound,key)n+=1;if n%7==2 then error('route boom '..n)end;sound.SoundGroup=group end,Group=function()return group end,Get=function()return 100 end}]]
 W.B.StubSeedPackVisuals="return {Bag=function()error('no pack art in this test')end}"
 local function newModule(parent,name,source)local m=R.new('ModuleScript');m.Name=name;m._source=source or name;m.Parent=parent;return m end
 local function newFolder(name)local f=R.new('Folder');f.Name=name or 'ReplicatedStorageStandIn';return f end
@@ -111,7 +118,8 @@ do
  local ia=newModule(rs,'InteractionAudio')
  local co,ok,res=tryRequire(ia)
  check(ok and coroutine.status(co)=='dead'and type(res)=='table'and type(res.Play)=='function','B1 the require survives a mixer that errors in the warm-up: '..tostring(res))
- check(warned('[InteractionAudio] preload')==1,'B1 the failure is one warning ('..table.concat(warnings,' | ')..')')
+ check(warned('[InteractionAudio]')==1,'B1 the failure is one warning ('..table.concat(warnings,' | ')..')')
+ check(#voices()==30,'B1 every pool still has its 3 voices (the Route error costs a voice its routing only: '..#voices()..' voices)')
  local ok2,again=pcall(W.require,ia)
  check(ok2 and again==res,'B2 and a later require still gives the module')
  -- a mixer that fails to load at all (its SettingsConfig errors)
@@ -120,7 +128,20 @@ do
  local ia2=newModule(rs2,'InteractionAudio')
  local _,ok3,res3=tryRequire(ia2)
  check(ok3 and type(res3)=='table','B3 AudioMixer failing to load does not fail the require either: '..tostring(res3))
- check(warned('[InteractionAudio] preload')==1,'B3 one warning ('..table.concat(warnings,' | ')..')')
+ check(warned('[InteractionAudio]')==1,'B3 one warning ('..table.concat(warnings,' | ')..')')
+end
+do
+ -- B4. (R157b review: the mixer and its Route are handled inside InteractionAudio now, so this is what is left for the warm-up's own pcall) a voice that cannot be made at all
+ reset();E.player('B4');gameLoaded=true
+ local rs=newFolder();newModule(rs,'SoundTiming');newModule(rs,'SettingsConfig');newModule(rs,'AudioMixer')
+ local ia=newModule(rs,'InteractionAudio')
+ local realNew=R.Instance.new;R.Instance.new=function(class,parent)if class=='Sound'then error('no sounds today')end;return realNew(class,parent)end
+ local co,ok,res=tryRequire(ia)
+ R.Instance.new=realNew
+ check(ok and coroutine.status(co)=='dead'and type(res)=='table','B4 the require survives a warm-up that cannot make a Sound: '..tostring(res))
+ check(warned('[InteractionAudio] preload')==1 and #voices()==0,'B4 the failure is one "preload" warning ('..table.concat(warnings,' | ')..')')
+ R.advance(1);local okp,played=pcall(res.Play,'Equip')
+ check(okp and played==true and #voices()==3,'B4 and a later Play builds its pool and sounds ('..tostring(okp)..' '..tostring(played)..', '..#voices()..' voices)')
 end
 
 -- ======================================================================================================================
@@ -250,6 +271,123 @@ do
  check(E.plays('Interaction_MenuClick')==1,'D4 and the click sounds')
  check(t2.finish()and titleWarnings()==0,'D4 clean close')
  W.game.IsLoaded=realIsLoaded;gameLoaded=true
+end
+
+-- ======================================================================================================================
+-- E. (R157b review) a broken mixer never breaks a Play
+-- ======================================================================================================================
+print('-- E. a broken mixer never breaks Play')
+local function perName()local out={};for _,v in ipairs(voices())do out[v.Name]=(out[v.Name]or 0)+1 end;return out end
+local function poolsWhole(res) -- how many cues have a pool, and how many of those do not hold exactly 3 voices
+ local counts=perName();local n,bad=0,0
+ for key in pairs(res.AssetIds)do if res.Asset(key)then n+=1;if counts['Interaction_'..key]~=3 then bad+=1 end end end
+ return n,bad
+end
+local function playAll(res,rounds) -- every cue `rounds` times, a second apart: how many Plays threw, how many did not sound
+ local thrown,silent=0,0
+ for _=1,rounds do for key in pairs(res.AssetIds)do
+  R.advance(1)
+  local ok,r=pcall(res.Play,key);if not ok then thrown+=1 elseif r~=true then silent+=1 end
+ end end
+ return thrown,silent
+end
+local function unrouted()local n=0;for _,v in ipairs(voices())do if v.SoundGroup==nil then n+=1 end end;return n end
+do
+ -- E1. AudioMixer errors while it loads (its SettingsConfig errors): remembered, one warning, every Play returns, the sounds still play from SoundService
+ reset();E.player('E1');gameLoaded=true
+ local rs=newFolder();newModule(rs,'SoundTiming');newModule(rs,'SettingsConfig');newModule(rs,'AudioMixer','BrokenLoadMixer')
+ local ia=newModule(rs,'InteractionAudio')
+ local _,ok,res=tryRequire(ia)
+ check(ok and type(res)=='table','E1 the require works with an AudioMixer that errors while loading: '..tostring(res))
+ if type(res)~='table'then print(('R157 early audio: %d checks, %d failures'):format(checks,fails+1));error('failed')end
+ check(requires.AudioMixer==1 and warned('[InteractionAudio]')==1,'E1 the warm-up tried the mixer once and warned once ('..tostring(requires.AudioMixer)..' requires, '..table.concat(warnings,' | ')..')')
+ local n,bad=poolsWhole(res)
+ check(n==10 and bad==0 and #voices()==30,'E1 every cue still has its pool of 3 voices ('..#voices()..' voices)')
+ check(unrouted()==30,'E1 none is routed (there is no mixer): they play from SoundService at their own volume ('..unrouted()..' unrouted)')
+ local thrown,silent=playAll(res,4)
+ check(thrown==0,'E1 no Play threw into its caller in 40 plays ('..thrown..')')
+ check(silent==0 and E.totalPlays()==40,'E1 and every one sounded ('..E.totalPlays()..' plays, '..silent..' silent)')
+ -- (SoundTiming.Play routes each sound itself and asks for AudioMixer once per sound: 40; InteractionAudio's own fetch was the 1 of the warm-up. Its throw is caught in InteractionAudio.Play, which plays the click plainly)
+ check(requires.AudioMixer==1+E.totalPlays()and warned('[InteractionAudio]')==1,'E1 the failure is remembered: InteractionAudio does not require AudioMixer again on every Play (only SoundTiming asks, once per sound), and there is still one warning ('..tostring(requires.AudioMixer)..' requires, '..E.totalPlays()..' plays, '..warned('[InteractionAudio]')..' warnings)')
+ R.advance(1);local ok2,ret=pcall(res.Transaction,'Buy');check(ok2 and ret==true,'E1 Transaction (KaChing) works too')
+end
+do
+ -- E2. a Route that errors for some voices: those voices are not routed, the pools are whole, Play never throws (no Index % 0)
+ reset();E.player('E2');gameLoaded=true
+ local rs=newFolder();newModule(rs,'SoundTiming');newModule(rs,'SettingsConfig');newModule(rs,'AudioMixer','FlakyRouteMixer')
+ local ia=newModule(rs,'InteractionAudio')
+ local _,ok,res=tryRequire(ia)
+ check(ok and type(res)=='table','E2 the require works with a Route that errors now and then: '..tostring(res))
+ if type(res)~='table'then print(('R157 early audio: %d checks, %d failures'):format(checks,fails+1));error('failed')end
+ local n,bad=poolsWhole(res)
+ check(n==10 and bad==0 and #voices()==30,'E2 every cue still has its pool of 3 voices: the Route error costs only that voice its routing ('..#voices()..' voices, '..bad..' short pools)')
+ check(unrouted()==5,'E2 the 5 voices whose Route errored are not routed, the other 25 are ('..unrouted()..' unrouted)')
+ check(warned('[InteractionAudio]')==1,'E2 one warning for all of it ('..table.concat(warnings,' | ')..')')
+ local thrown,silent=playAll(res,7)
+ check(thrown==0 and silent==0 and E.totalPlays()==70,'E2 70 plays (7 rounds over all 10 cues, cycling the 3 voices): none threw, all sounded ('..thrown..' threw, '..silent..' silent, '..E.totalPlays()..' plays)')
+end
+do
+ -- E3. a Play that waited for AudioMixer, which then arrives broken: it goes on, unrouted, and does not throw
+ reset();E.player('E3');gameLoaded=true
+ local rs=newFolder();newModule(rs,'SoundTiming');newModule(rs,'SettingsConfig')
+ local ia=newModule(rs,'InteractionAudio')
+ local _,ok,res=tryRequire(ia)
+ local early;local earlyCo=coroutine.create(function()early={pcall(res.Play,'Equip')}end);coroutine.resume(earlyCo)
+ check(ok and coroutine.status(earlyCo)=='suspended','E3 an early Play waits for AudioMixer')
+ newModule(rs,'AudioMixer','BrokenLoadMixer')
+ check(coroutine.status(earlyCo)=='dead'and early and early[1]==true and early[2]==true,'E3 the mixer arrives broken: the Play goes on and sounds, without throwing ('..tostring(early and early[1])..' '..tostring(early and early[2])..')')
+ check(E.plays('Interaction_Equip')==1 and warned('[InteractionAudio]')==1,'E3 one Equip sound, one warning ('..table.concat(warnings,' | ')..')')
+end
+do
+ -- E4. a pool that cannot be built (a voice cannot be made while a cue's file changes): Play returns false, never throws, and the next Play builds the pool whole
+ reset();E.player('E4');gameLoaded=true
+ local rs=newFolder();newModule(rs,'SoundTiming');newModule(rs,'SettingsConfig');newModule(rs,'AudioMixer')
+ local ia=newModule(rs,'InteractionAudio')
+ local _,ok,res=tryRequire(ia)
+ check(ok and type(res)=='table'and #voices()==30,'E4 (setup) the module and its 30 voices')
+ local realNew=R.Instance.new;local failSounds=false
+ R.Instance.new=function(class,parent)if class=='Sound'and failSounds then error('no more sounds')end;return realNew(class,parent)end
+ ia:SetAttribute('EquipAssetId',99999) -- the Equip file changes: its pool is built again on the next Play
+ failSounds=true;R.advance(1)
+ local ok1,r1=pcall(res.Play,'Equip')
+ check(ok1 and r1==false,'E4 a pool that cannot be built: Play returns false and does not throw ('..tostring(ok1)..' '..tostring(r1)..')')
+ check(warned('[InteractionAudio]')==1,'E4 one warning ('..table.concat(warnings,' | ')..')')
+ failSounds=false;R.advance(1)
+ local ok2,r2=pcall(res.Play,'Equip')
+ local equip=0;for _,v in ipairs(voices())do if v.Name=='Interaction_Equip'and v.SoundId=='rbxassetid://99999'then equip+=1 end end
+ check(ok2 and r2==true and equip==3,'E4 the next Play builds the pool whole (3 voices for the new file) and sounds ('..tostring(ok2)..' '..tostring(r2)..', '..equip..' voices)')
+ R.Instance.new=realNew
+end
+
+-- ======================================================================================================================
+-- F. (R157b review) BackgroundMusic before AudioMixer has replicated
+-- ======================================================================================================================
+-- The real script, up to the two sound groups it makes at the start (the one place it fetches AudioMixer): the playlists after it need a clock that really runs (run_music156.sh and
+-- run_track_music157.sh test those with the real script). Before this fix the fetch was a dot index: with AudioMixer not replicated yet the script errored and there was no music for the session.
+print('-- F. BackgroundMusic before AudioMixer')
+do
+ reset();E.player('F');gameLoaded=true
+ local src=W.B.BackgroundMusic
+ local marker='local peacefulGroup = getOrCreateSoundGroup("ChestChaseMusic")'
+ local cut=src and src:find(marker,1,true)
+ check(cut~=nil,'F0 the real BackgroundMusic is in the test bundle and makes its two sound groups at the start')
+ check(src~=nil and src:find('require(game:GetService("ReplicatedStorage"):WaitForChild("AudioMixer"))',1,true)~=nil and not src:find('ReplicatedStorage").AudioMixer',1,true),'F0 it fetches AudioMixer with WaitForChild (no dot index)')
+ if cut then
+  W.B.BackgroundMusicStart=src:sub(1,cut-1)..'return {Music=getOrCreateSoundGroup("ChestChaseMusic"),Chase=getOrCreateSoundGroup("ChestChaseActionMusic")}'
+  setRS('SettingsConfig','SoundTiming') -- AudioMixer has not replicated yet
+  local result;local co=coroutine.create(function()result=W.load('BackgroundMusicStart',R.new('LocalScript'))end)
+  local ok,err=coroutine.resume(co)
+  check(ok,'F1 the script starts with no AudioMixer in ReplicatedStorage without an error: '..tostring(err))
+  check(coroutine.status(co)=='suspended'and result==nil,'F1 it waits for AudioMixer (suspended at its WaitForChild, not dead)')
+  addModules('AudioMixer')
+  local SS=W.service('SoundService');local mixer=W.module('AudioMixer')
+  check(coroutine.status(co)=='dead'and type(result)=='table','F2 AudioMixer arrives: the script goes on')
+  check(result and result.Music and result.Music.Name=='ChestChaseMusic'and result.Music.Parent==SS and result.Chase and result.Chase.Name=='ChestChaseActionMusic'and result.Chase.Parent==SS,'F2 and makes its two sound groups (ChestChaseMusic, ChestChaseActionMusic) in SoundService')
+  check(result and result.Music.Volume==mixer.Get('Music')/100 and result.Chase.Volume==mixer.Get('Chase')/100,'F2 at the mixer\'s volumes (the Music and Chase sliders)')
+  -- AudioMixer already there: no wait at all
+  local again;local co2=coroutine.create(function()again=W.load('BackgroundMusicStart',R.new('LocalScript'))end);coroutine.resume(co2)
+  check(coroutine.status(co2)=='dead'and type(again)=='table','F3 with AudioMixer already there the script does not wait')
+ end
 end
 
 print(('R157 early audio: %d checks, %d failures'):format(checks,fails))
