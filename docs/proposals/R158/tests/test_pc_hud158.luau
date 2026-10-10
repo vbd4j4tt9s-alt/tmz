@@ -34,6 +34,8 @@ local function nearRect(a,b,t,what)
 end
 local function ov(a,b)return a.X<b.X+b.W and a.X+a.W>b.X and a.Y<b.Y+b.H and a.Y+a.H>b.Y end
 local function rect(o)return S.rect(o)end
+-- (the room the bars can cover, in real px: B.Extent of the HUD-px answer - the glow is 5 HUD px - times the scale)
+local function extentOf(place)local p=place.Hud or place;local k=place.Scale or 1;local e=B.Extent(p.Pair,p.Bar.W,p.Bar.H);return {X=e.X*k,Y=e.Y*k,W=e.W*k,H=e.H*k} end
 local function boxOf(list,name)for _,b in ipairs(list)do if b.N==name then return b end end end
 local tag=fmt('%dx%d',w,h)
 local m=Hud.Read(V2(w,h),false,nil)
@@ -95,7 +97,7 @@ do
  nearRect(dockR,{X=boxOf(boxes,'Hotbar').X,Y=boxOf(boxes,'Hotbar').Y+boxOf(boxes,'Hotbar').H-dockR.H,W=boxOf(boxes,'Hotbar').W,H=dockR.H},.02,'the dock')
  nearRect(rect(eco.SpeedHud),boxOf(boxes,'WalletSpeed'),.02,'the Speed row');nearRect(rect(eco.CashHud),boxOf(boxes,'WalletCash'),.02,'the Cash row');nearRect(rect(eco.GemHud),boxOf(boxes,'WalletGem'),.02,'the Gems row')
  nearRect(rect(stack),boxOf(boxes,'Status'),.02,'the status stack')
- local pl=S.Pity.Placement;local ext=B.Extent(pl.Pair,pl.Bar.W,pl.Bar.H,pl.Scale or 1)
+ local pl=S.Pity.Placement;local ext=extentOf(pl)
  local nb,eb=rect(barsGui.NormalPity),rect(barsGui.EventPity)
  nearRect({X=math.min(nb.X,eb.X),Y=nb.Y,W=eb.X+eb.W-nb.X,H=nb.H},pl.Pair,1,'the pair of bars (centres are whole HUD px)')
  local hubR=rect(S.hub)
@@ -212,20 +214,140 @@ if golden then
  return
 end
 if dump then for _,o in ipairs(out)do print('=== '..o[1]..' '..o[2]);print(o[4])end;return end
+-- 7. review follow-ups (the fixes after the HUD lock's review) -----------------------------------------------------------------------------------------------------------------------
+--  a. text       - every readable-text minimum holds in REAL px under the HUD scale (size x s): the slot names (7 px, at most what the strip's two lines hold), the held item's name (8), the bars' words (8, the short words when the long
+--                  ones do not fit at that size, measured at the bar's real width); a size is never more than one line of its box holds; at scale 1 everything is as it was
+--  b. bonus gap  - BONUS ROLL sits 7 px over the bars + name rows box at every window (where it keeps its place above the hotbar), the fallback (no PityBars155) 10 px over the name rows
+--  c. menus      - a menu's bottom is at least 12 real px over the slots (20 at scale 1: as it was), at every window
+--  d. SKIP       - the corner the bars keep out of has its 80 px minimum in real px
+--  e. key        - replacing L.PcScales changes no layout (the layout is memoized by a key that does not hold it); B.Extent has no unused parameter
+local review={} -- (the numbers the summary below prints)
+do
+ local Fit=W.module('GardenTextFit');local Style=W.module('GardenMenuStyle');local Pity=W.module('PackPity155')
+ local wantsHud=s<1
+ -- a. text ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ check(Fit.Floor(8,1,26)==8 and Fit.Floor(8,nil,26)==8 and Fit.Floor(30,.4,56)==30 and Fit.Floor(8,.4,26)==20 and Fit.Floor(8,.4,8)==8 and Fit.Floor(7,.5,24)==14,
+  tag..': GardenTextFit.Floor: the minimum at scale 1, minimum / scale (at most one line of the box) under it, a design-size minimum (over 9) as it is')
+ do -- a label under a HUD scale and one under a phone's status scale: only the first is held in real px
+  local gui=R.Instance.new('ScreenGui');gui.Name='Fit158';gui.Parent=pg
+  local function holder(name,k)
+   local f=R.Instance.new('Frame');f.Name=name;f.Parent=gui;local u=R.Instance.new('UIScale');u.Name=name=='Hud'and'HudScale'or'UIScale';u.Scale=k;u.Parent=f
+   local l=R.Instance.new('TextLabel');l.Font=R.Enum.Font.FredokaOne;l.Parent=f;l.AbsoluteSize=V2(240*k,26*k);l.Text='Mooncap Seed'
+   Fit.Attach(l,14,8);return l
+  end
+  local hud,plain=holder('Hud',.4),holder('Plain',.4)
+  check(hud.TextSize==Fit.Floor(8,.4,26)and hud.TextSize*.4>=8-1e-6,fmt('%s: a label under a HudScale of .4 is %d px (%.1f real, at least 8)',tag,hud.TextSize,hud.TextSize*.4))
+  check(plain.TextSize==14,tag..': a label under another UIScale (a phone\'s status scale) is as it was: 14 px')
+  gui:Destroy()
+ end
+ do -- the status stack's UIScale is called HudScale under a HUD scale, so its labels' minimums are held in real px too
+  local u=stack:FindFirstChild('HudScale')
+  check((s<1)==(u~=nil)and(u==nil or near(u.Scale,s,1e-12)),fmt('%s: the status stack carries a UIScale named HudScale of %.3f under a HUD scale (and none at scale 1)',tag,s))
+ end
+ do -- the slot names
+  local nameH=math.max(12,math.floor(82*.3));local fit=dock.Slot1.ItemName:FindFirstChildOfClass('UITextSizeConstraint')
+  local lo=Fit.Floor(7,s,nameH/2+1) -- (two lines of the strip)
+  review.names=fmt('%.2f..%.2f',fit.MinTextSize*s,fit.MaxTextSize*s)
+  check(fit.MinTextSize==lo and fit.MaxTextSize==math.max(13,lo),fmt('%s: the slot names run from %s to %s px (a minimum of 7 real px, the biggest rising to it)',tag,tostring(fit.MinTextSize),tostring(fit.MaxTextSize)))
+  check(not wantsHud and fit.MinTextSize==7 and fit.MaxTextSize==13 or wantsHud and(lo*s>=7-1e-6 or lo==math.floor((nameH/2-1)/1.15)),fmt('%s: the smallest slot name is %.2f real px (7, or what the two lines of the %d px strip hold)',tag,lo*s,nameH))
+ end
+ do -- the held item's name and the bars' words
+  local sel=dock.SelectedName;local selFloor=Fit.Floor(8,s,26)
+  local okSel,worst=true,math.huge
+  for _,text in ipairs({'Sunflower','Mooncap Seed','Golden Sunflower Seed Pack Deluxe'})do
+   sel.Text=text;S.frames(3)
+   if sel.TextSize<selFloor or(wantsHud and sel.TextSize*s<8-1e-6 and sel.TextSize<math.floor(24/1.15))then okSel=false end
+   worst=math.min(worst,sel.TextSize*s)
+  end
+  sel.Text='';review.sel=fmt('%.2f',worst)
+  check(okSel,fmt('%s: the held item\'s name is never under 8 real px (or one line of its 26 px row): at least %.2f real px',tag,worst))
+  local barsHud=(S.Pity.Placement.Hud or S.Pity.Placement).Bar;local barW,barH=barsHud.W,barsHud.H
+  local shown,okBars,okWidth,worstBar={},true,true,math.huge
+  local function barCase(group,count)
+   S.player:SetAttribute(group=='Normal'and'PackPityNormal'or'PackPityEvent',count);S.frames(4)
+   local b=S.Pity.Bars[group];local size=b.Label.TextSize;local text=b.Label.Text
+   shown[#shown+1]=text
+   if size<B.TextSize(text,barW,barH,s)then okBars=false end
+   if wantsHud and size*s<8-1e-6 and size<math.floor((barH-2)/1.15)then okBars=false end
+   if utf8.len(text)*size*.52>barW-math.floor(barH*1.3)+1e-6 then okWidth=false end
+   worstBar=math.min(worstBar,size*s)
+   return text
+  end
+  local normal9=barCase('Normal',9);barCase('Normal',3);barCase('Event',0);local event9=barCase('Event',9)
+  S.player:SetAttribute('PackPityNormal',3);S.player:SetAttribute('PackPityEvent',0);S.frames(4)
+  review.bars=fmt('%.2f',worstBar);review.words=normal9
+  check(okBars,fmt('%s: the bars\' words are at least 8 real px (or one line of the bar): %.2f real px',tag,worstBar))
+  check(okWidth,tag..': the words fit the bar at the size they are drawn at ('..table.concat(shown,' | ')..')')
+  local popText=B.Words('Normal',0,barW,barH,true,s)
+  -- the short words come where the full ones would not fit the real bar at that size (a 96 px bar under 1024 x 768), and nowhere else
+  local expectShort=s<.5
+  check((normal9==Pity.ShortText('Normal',9)and event9==Pity.ShortText('Event',9)and popText==Pity.PopShort)==expectShort and(expectShort or(normal9==Pity.Text('Normal',9)and popText==Pity.PopText)),
+   fmt('%s: the %s words at 9/10 and for the pop ("%s", "%s")',tag,expectShort and'short'or'full',normal9,popText))
+  check(s<1 or B.TextSize(normal9,barW,barH)==15,tag..': at scale 1 the bars\' words are 15 px, as they were')
+ end
+ -- b. BONUS ROLL's gap to the bars --------------------------------------------------------------------------------------------------------------------------------------------
+ do
+  local notice={}
+  for name,r in pairs(Notice.Calculate(w,h,TOP,TBR.NoticeFlags))do if type(r)=='table'then notice[#notice+1]={N=name,X=r.X-r.Width/2,Y=r.Y,W=r.Width,H=r.Height}end end
+  local btn=B.ButtonSpot(TBR,m,w,h,wheel,notice);local res=B.Reserved(w,h,m,nil)
+  local mid=w/2
+  if math.abs(btn.X+btn.W/2-mid)<1.01 then
+   local gap=res.Y-(btn.Y+btn.H);review.bonus=fmt('%.2f',gap)
+   check(gap>=7-1e-6 and gap<8,fmt('%s: BONUS ROLL (%dx%d) sits %.2f px over the bars (7 - 8, as at 1920 x 1080)',tag,btn.W,btn.H,gap))
+  else print(fmt('NOTE %s: BONUS ROLL stands at %d,%d (not over the hotbar)',tag,btn.X,btn.Y)) end
+  -- the fallback (no PityBars155): the rules' own place, 10 px over the (scaled) name rows' 44 px
+  local r=TBR.Place(Hud.RulesView(m),w,h,wheel,notice);local mr=Hud.Real(m)
+  if math.abs(r.X+r.W/2-mid)<1.01 then
+   local top=h-mr.HotbarBottom-mr.SlotSize-(m.HotbarDetails~=false and(mr.HotbarDetailH or 44)or 0)
+   local gap=top-(r.Y+r.H)
+   check(gap>=10-1e-6 and gap<11,fmt('%s: BONUS ROLL without the bars sits %.2f px over the name rows (10 - 11)',tag,gap))
+  end
+ end
+ -- c. menus: the gap to the slots --------------------------------------------------------------------------------------------------------------------------------------------------
+ do
+  local gui=R.Instance.new('ScreenGui');gui.Name='Menu158';gui.Parent=pg
+  local panel=R.Instance.new('Frame');panel.AnchorPoint=V2(.5,.5);panel.Parent=gui
+  Style.Place(panel,pg,520,4000)
+  local bottom=panel.Position.Y.Offset+panel.Size.Y.Offset/2;local slotsTop=dockR.Y
+  local gap=slotsTop-bottom;review.menu=fmt('%.2f',gap)
+  check(gap>=12-1e-6 and(s<1 or near(gap,20,1e-6)),fmt('%s: a menu ends %.2f real px over the slots (at least 12; 20 at scale 1)',tag,gap))
+  check(near(pg:GetAttribute('ChestHudScale')or 1,s,1e-12)and(s<1)==(pg:GetAttribute('ChestHudScale')~=nil),tag..': the Hotbar publishes the HUD scale for the menus (none at scale 1)')
+  gui:Destroy()
+ end
+ -- d. the SKIP corner ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ do
+  local d=B.DefaultDock(m,w,h);local zone=B.SkipZone(w,h)
+  -- the hotbar pushed to the right edge, 72 px from the bottom, so that the bars' natural place is in the corner's thin top band: they must keep clear of the real zone
+  local moved={X=w-d.W-4,Y=h-72+8*s,W=d.W,H=d.H}
+  local p=B.Place(w,h,m,moved)
+  local e=extentOf(p)
+  check(not p.Clear or not ov(e,zone),fmt('%s: the bars keep clear of the real SKIP corner (%d,%d %dx%d)%s',tag,zone.X,zone.Y,zone.W,zone.H,p.Clear and''or' (no clear spot)'))
+ end
+ -- e. the cache key and B.Extent -----------------------------------------------------------------------------------------------------------------------------------------------------
+ do
+  local saved=Hud.PcScales;Hud.PcScales=function()return .123,.456 end
+  local m2=Hud.Read(V2(w+13,h+7),false,nil);Hud.PcScales=saved
+  local want=math.min(1,(w+13)/1920,(h+7)/720)
+  check(near(m2.Scale,want,1e-12),fmt('%s: replacing HudLayout.PcScales changes no layout (a new size gave %.4f, want %.4f)',tag,m2.Scale,want))
+  check(debug.info(B.Extent,'a')==3,tag..': B.Extent takes three numbers (no unused parameter)')
+  local ps,pm=saved(w,h);check(ps==s and pm==ms,tag..': PcScales(w, h) is the layout\'s own scales')
+ end
+end
 -- the owner-size summary (the report's numbers)
 do
  local hub=boxOf(wheel,'Hub');local top,bottom=math.huge,0;for i=1,5 do local o=boxOf(wheel,'Opt'..i);top=math.min(top,o.Y);bottom=math.max(bottom,o.Y+o.H)end
- print(fmt('PC %s: HUD scale %.3f (laid out %.0f x %.0f), MENU scale %.3f: hub %.1f px at centre %.0f, options %.1f px, wheel %.0f..%.0f, balances at %.0f; slots %.1f px, balance rows %.1f px',
+ print(fmt('REVIEW %s: item names %s real px, held name >= %s, bar words >= %s ("%s"), BONUS ROLL %s px over the bars, menu %s px over the slots',tag,review.names,review.sel,review.bars,review.words,tostring(review.bonus),review.menu))
+print(fmt('PC %s: HUD scale %.3f (laid out %.0f x %.0f), MENU scale %.3f: hub %.1f px at centre %.0f, options %.1f px, wheel %.0f..%.0f, balances at %.0f; slots %.1f px, balance rows %.1f px',
   tag,s,m.VW,m.VH,ms,hub.W,hub.Y+hub.H/2,boxOf(wheel,'Opt1').W,top,bottom,boxOf(boxes,'WalletSpeed').Y,82*s,56*s))
 end
 -- the golden fingerprints, taken from the built layout -------------------------------------------------------------------------------------------------------------------------------
 local GOLDEN={}
 -- GOLDEN-BEGIN
  GOLDEN['1920x1080:read']='f5a08a25' GOLDEN['1920x1080:boxes']='4407256e' GOLDEN['1920x1080:boxes_open']='94c24ef8' GOLDEN['1920x1080:hotbar']='afe03d8d' GOLDEN['1920x1080:wallet']='cff059bb' GOLDEN['1920x1080:status']='52fd2f33' GOLDEN['1920x1080:bars']='215814cb' GOLDEN['1920x1080:wheel_closed']='6ae01816' GOLDEN['1920x1080:wheel_open']='4578bd2c' GOLDEN['1920x1080:daily']='8b3f4ab6' GOLDEN['1920x1080:travel']='2ec3321f' GOLDEN['1920x1080:pity']='83af7408'
- GOLDEN['1366x768:read']='9a1054d6' GOLDEN['1366x768:boxes']='c15031ae' GOLDEN['1366x768:boxes_open']='23ffd80f' GOLDEN['1366x768:hotbar']='7a490638' GOLDEN['1366x768:wallet']='2de34223' GOLDEN['1366x768:status']='41702f5c' GOLDEN['1366x768:bars']='99a1183a' GOLDEN['1366x768:wheel_closed']='7edb72bf' GOLDEN['1366x768:wheel_open']='6909b62a' GOLDEN['1366x768:daily']='f302159e' GOLDEN['1366x768:travel']='2431840d' GOLDEN['1366x768:pity']='e1cf0790'
- GOLDEN['1280x720:read']='d886c604' GOLDEN['1280x720:boxes']='e503d4cc' GOLDEN['1280x720:boxes_open']='c444f112' GOLDEN['1280x720:hotbar']='a9c4405f' GOLDEN['1280x720:wallet']='5b8d0ddb' GOLDEN['1280x720:status']='4998e006' GOLDEN['1280x720:bars']='52f70af5' GOLDEN['1280x720:wheel_closed']='53ae14f0' GOLDEN['1280x720:wheel_open']='6ba3217d' GOLDEN['1280x720:daily']='09d20ac9' GOLDEN['1280x720:travel']='4cbc9bb8' GOLDEN['1280x720:pity']='1735539f'
- GOLDEN['1024x768:read']='4dab5fe9' GOLDEN['1024x768:boxes']='e5b8e1ef' GOLDEN['1024x768:boxes_open']='886214c6' GOLDEN['1024x768:hotbar']='19c7b834' GOLDEN['1024x768:wallet']='5f3fdf86' GOLDEN['1024x768:status']='cb14a75e' GOLDEN['1024x768:bars']='27177393' GOLDEN['1024x768:wheel_closed']='7edb72bf' GOLDEN['1024x768:wheel_open']='6909b62a' GOLDEN['1024x768:daily']='9c767946' GOLDEN['1024x768:travel']='89014fda' GOLDEN['1024x768:pity']='37ab9cf7'
- GOLDEN['800x600:read']='9bfac641' GOLDEN['800x600:boxes']='bf30bf4d' GOLDEN['800x600:boxes_open']='39858ca7' GOLDEN['800x600:hotbar']='79d1746b' GOLDEN['800x600:wallet']='e40987ba' GOLDEN['800x600:status']='a275b612' GOLDEN['800x600:bars']='68c90ec6' GOLDEN['800x600:wheel_closed']='738dc00e' GOLDEN['800x600:wheel_open']='e21c23d8' GOLDEN['800x600:daily']='505298ec' GOLDEN['800x600:travel']='6e8685f2' GOLDEN['800x600:pity']='9d7a97e4'
+ GOLDEN['1366x768:read']='9a1054d6' GOLDEN['1366x768:boxes']='c15031ae' GOLDEN['1366x768:boxes_open']='23ffd80f' GOLDEN['1366x768:hotbar']='8b3cafb5' GOLDEN['1366x768:wallet']='2de34223' GOLDEN['1366x768:status']='4758e053' GOLDEN['1366x768:bars']='99a1183a' GOLDEN['1366x768:wheel_closed']='7edb72bf' GOLDEN['1366x768:wheel_open']='6909b62a' GOLDEN['1366x768:daily']='f302159e' GOLDEN['1366x768:travel']='2431840d' GOLDEN['1366x768:pity']='e1cf0790'
+ GOLDEN['1280x720:read']='d886c604' GOLDEN['1280x720:boxes']='e503d4cc' GOLDEN['1280x720:boxes_open']='c444f112' GOLDEN['1280x720:hotbar']='20ddbe88' GOLDEN['1280x720:wallet']='5b8d0ddb' GOLDEN['1280x720:status']='42c08735' GOLDEN['1280x720:bars']='52f70af5' GOLDEN['1280x720:wheel_closed']='53ae14f0' GOLDEN['1280x720:wheel_open']='6ba3217d' GOLDEN['1280x720:daily']='09d20ac9' GOLDEN['1280x720:travel']='4cbc9bb8' GOLDEN['1280x720:pity']='1735539f'
+ GOLDEN['1024x768:read']='4dab5fe9' GOLDEN['1024x768:boxes']='e5b8e1ef' GOLDEN['1024x768:boxes_open']='886214c6' GOLDEN['1024x768:hotbar']='ba640c5d' GOLDEN['1024x768:wallet']='5f3fdf86' GOLDEN['1024x768:status']='17430e0d' GOLDEN['1024x768:bars']='27177393' GOLDEN['1024x768:wheel_closed']='7edb72bf' GOLDEN['1024x768:wheel_open']='6909b62a' GOLDEN['1024x768:daily']='9c767946' GOLDEN['1024x768:travel']='89014fda' GOLDEN['1024x768:pity']='37ab9cf7'
+ GOLDEN['800x600:read']='9bfac641' GOLDEN['800x600:boxes']='bf30bf4d' GOLDEN['800x600:boxes_open']='39858ca7' GOLDEN['800x600:hotbar']='07f7b0ca' GOLDEN['800x600:wallet']='e40987ba' GOLDEN['800x600:status']='09301d3f' GOLDEN['800x600:bars']='a9043fbe' GOLDEN['800x600:wheel_closed']='738dc00e' GOLDEN['800x600:wheel_open']='e21c23d8' GOLDEN['800x600:daily']='505298ec' GOLDEN['800x600:travel']='6e8685f2' GOLDEN['800x600:pity']='9d7a97e4'
 -- GOLDEN-END
 for _,o in ipairs(out)do
  -- (the owner's five windows have fingerprints; the other windows are checked by the numbers above)

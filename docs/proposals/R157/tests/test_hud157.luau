@@ -309,7 +309,7 @@ do
    local c=ctl and controls(w,h)or nil;setScreen(w,h,touch)
    local m=Hud.Read(V2(w,h),touch,c);local tag=name..(ctl and' (thumb controls)'or'')
    local k=m.Scale or 1;local ms=m.MenuScale or 1 -- (R158: the bars' fixed numbers are HUD px, the MENU's are MENU px)
-   local dock=B.DefaultDock(m,w,h);local place=B.Place(w,h,m,dock);local ext=B.Extent(place.Pair,place.Bar.W,place.Bar.H,k)
+   local dock=B.DefaultDock(m,w,h);local place=B.Place(w,h,m,dock);local ext=(function()local hp=place.Hud or place;local e=B.Extent(hp.Pair,hp.Bar.W,hp.Bar.H);return {X=e.X*k,Y=e.Y*k,W=e.W*k,H=e.H*k}end)() -- (R158 review: B.Extent is in the units it is given: the HUD-px answer, times the scale)
    local rows=m.HotbarDetails~=false and B.NameRows(w,h,m,dock,place)or nil
    local res=B.Reserved(w,h,m,dock)
    local boxes=Hud.HudBoxes(m,w,h,false);local wheel=Hud.HudBoxes(m,w,h,true)

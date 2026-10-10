@@ -11,6 +11,8 @@
   **Built (10 Oct, `hud_lock/hud_lock.md` "Built", pictures `hud_lock/built_menu.png` and `built_scale.png`):** the PC HUD is the 1920 x 1080 arrangement drawn at
   min(1, w / 1920, h / 720); MENU a third of the way down, never under 85% of its size (54.4 px of 64); balances, hotbar, bars and status stay in their
   places and shrink together; phones and tablets are byte-for-byte as before (`R158/tests/run_hud158.sh`).
+  **Review follow-ups (10 Oct, `hud_lock/hud_lock.md` "Review follow-ups"):** small-text minimums are real px under the scale (names, held name, pity words), BONUS ROLL sits 7 px
+  over the bars at every window, menus end 15+ px over the slots, the SKIP corner's 80 px is real px, `pcLayout` no longer reads `L.PcScales`, `B.Extent` lost its unused `k`.
 
 ## Hotfix R157b (bugs, being built)
 - Title screen loaded InteractionAudio before the game had loaded; AudioMixer was missing -> the module crashed and took the HUD with it.

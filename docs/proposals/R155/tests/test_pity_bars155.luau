@@ -258,7 +258,7 @@ for _,sc in ipairs(SCREENS)do
  -- (HudLayout's Hotbar box is the slots and the 44 px over them: the bars' own place since R157, checked above against the slots themselves)
  for _,b in ipairs(Hud.HudBoxes(m,w,h,false))do if b.N~='Hotbar'and overlaps(ext,b,0)then bad[#bad+1]='covers '..tostring(b.N)end end
  if m.Travel~=nil then bad[#bad+1]='R113\'s BASE / TRACK spot (m.Travel) is back'end
- local zone=B.SkipZone(w/k,h/k);zone={X=zone.X*k,Y=zone.Y*k,W=zone.W*k,H=zone.H*k}
+ local zone=B.SkipZone(w,h) -- (R158 review: real px - its 80 px minimum is 80 on the screen, a scaled HUD asks the real window)
  if overlaps(ext,zone,0)then bad[#bad+1]='in the SKIP corner'end
  if m.HotbarDetails~=false then
   local rows=B.NameRows(w,h,m,dock,place)
@@ -268,9 +268,11 @@ for _,sc in ipairs(SCREENS)do
  end
  local shown={}
  for _,wd in ipairs(WORDS)do
-  local t=B.Words(wd[1],wd[2],hudBar.W,hudBar.H,wd[3]);shown[#shown+1]=t
-  local size=B.TextSize(t,hudBar.W,hudBar.H);local width=utf8.len(t)*size*.52
-  if size<B.MinText or width>hudBar.W-math.floor(hudBar.H*1.3)then bad[#bad+1]='"'..t..'" does not fit ('..size..' px)'end
+  -- (R158 review: under a HUD scale k the words are chosen and sized for the bar's real width, and the minimum is real px: the HUD-px size that shows as 8, at most one line of the bar)
+  local t=B.Words(wd[1],wd[2],hudBar.W,hudBar.H,wd[3],k);shown[#shown+1]=t
+  local size=B.TextSize(t,hudBar.W,hudBar.H,k);local width=utf8.len(t)*size*.52
+  local least=k==1 and B.MinText or math.min(math.floor((hudBar.H-2)/1.15),math.ceil(8/k-1e-6))
+  if size<least or width>hudBar.W-math.floor(hudBar.H*1.3)then bad[#bad+1]='"'..t..'" does not fit ('..size..' px)'end
  end
  if hudBar.H<(touch and 16 or 20) or hudBar.W<96 then bad[#bad+1]='bars too small'end
  if #bad>0 then layoutFails+=1;print(('FAIL: %s %dx%d%s: %s'):format(name,w,h,touch and' touch'or'',table.concat(bad,'; ')))end

@@ -738,7 +738,9 @@ layout=function()
   b.ItemWeight.Visible=side>=52;b.ItemWeight.Position=UDim2.new(0,2,1,-(nameHeight+small+3));b.ItemWeight.Size=UDim2.new(1,-4,0,small+2);Fit.Attach(b.ItemWeight,small+1,7)
   b.Count.Position=UDim2.new(0,3,1,-(nameHeight+small+5));b.Count.Size=UDim2.fromOffset(math.max(22,math.floor(side*.4)),small+4);b.Count.TextSize=small+1
   -- R110: slot text grows with the larger slots.
-  local fit=b.ItemName:FindFirstChildOfClass('UITextSizeConstraint');if fit then fit.MaxTextSize=math.max(8,math.floor(side*.17))end
+  -- R158 review: the 7 px minimum is real px: under the HUD scale the smallest size that shows as 7 (GardenTextFit.Floor), and the biggest rises to it. The name strip is nameHeight tall
+  -- and holds TWO lines (two-word names), so the floor is at most what two lines hold (9 HUD px of 24): a bigger one would run the second line into the weight and the next slot
+  local fit=b.ItemName:FindFirstChildOfClass('UITextSizeConstraint');if fit then local lo=Fit.Floor(7,hudScale,nameHeight/2+1);fit.MinTextSize=7;fit.MaxTextSize=math.max(8,math.floor(side*.17),lo);fit.MinTextSize=lo end
   b.Number.TextSize=math.max(11,math.floor(side*.2));b.Number.Size=UDim2.fromOffset(math.floor(side*.34),math.floor(side*.29))
  end
  open.Size=UDim2.fromOffset(side,side);open.Position=UDim2.new(1,-side,0,0)
@@ -746,6 +748,9 @@ layout=function()
  local reserve=side+78+math.max(0,(metrics.HotbarBottom or 12)-12)
  if hudScale~=1 then reserve=math.ceil(reserve*hudScale)end -- (screen px: the sheets end above the scaled hotbar)
  if pg:GetAttribute('ChestHotbarReserve')~=reserve then pg:SetAttribute('ChestHotbarReserve',reserve)end
+ -- R158 review: GardenMenuStyle takes 54 px off this reserve (the name rows' share), and those 54 are HUD px: the scale goes with it (nothing at scale 1: no attribute on a phone)
+ local scaleAttr=hudScale~=1 and hudScale or nil
+ if pg:GetAttribute('ChestHudScale')~=scaleAttr then pg:SetAttribute('ChestHudScale',scaleAttr)end
  local height=view.Y
  -- R113: category cards sit outside the sheet: a column (or 2x2 block) on its left, else a row above it; never over the HUD.
  local mode,tab,across,rowX=placeTabs(metrics,width,height) -- rowX: row x, or the column's vertical shift
@@ -911,6 +916,6 @@ script.Destroying:Connect(function()
  if tickConn then tickConn:Disconnect();tickConn=nil end
  for _,c in ipairs(allConns)do c:Disconnect()end;for _,c in ipairs(characterConns)do c:Disconnect()end;for _,c in pairs(toolConns)do c:Disconnect()end
  for _,c in ipairs(bagConns)do c:Disconnect()end
- stopHudLayout();CAS:UnbindAction('GardenHotbarCycle');pg:SetAttribute('ChestHotbarReserve',nil);Inv.Stop();gui:Destroy()
+ stopHudLayout();CAS:UnbindAction('GardenHotbarCycle');pg:SetAttribute('ChestHotbarReserve',nil);pg:SetAttribute('ChestHudScale',nil);Inv.Stop();gui:Destroy()
  pcall(function()StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack,true)end)
 end)

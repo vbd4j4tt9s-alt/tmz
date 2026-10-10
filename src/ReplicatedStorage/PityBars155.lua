@@ -26,6 +26,13 @@
 local Run=game:GetService('RunService');local GuiService=game:GetService('GuiService')
 local Pity=require(script.Parent.PackPity155)
 local Hud=require(script.Parent.HudLayout)
+-- R158 review: a text's minimum is in REAL screen px, but the bars are drawn in HUD px (their root carries a UIScale of the HUD scale k), so a minimum of 8 shows as 8 x k px. realMin
+-- asks GardenTextFit.Floor for the HUD-px size that keeps the real minimum (never more than one line of a box `height` tall holds). k is nil / 1 on a phone and on a window of 1920 x 720 or
+-- more: the minimum itself, and GardenTextFit is not even loaded.
+local function realMin(minimum,k,height)
+ if not k or k>=1 then return minimum end
+ return require(script.Parent.GardenTextFit).Floor(minimum,k,height)
+end
 -- R157 (the R156 preview "pity bars v2", owner: "the pity bar is too high up and should be closer to the hot bar like really close but with a small gap"): the bars
 -- used to sit 6 px above the held item's name and traits rows, which are 44 px tall (Hotbar.client: SelectedName -44 .. -18, SelectedTraits -18 .. -2 above the slots), so the
 -- gap to the slots was 44 + 6 = 50 px. Now they sit B.Gap(...) px above the slots (8 on a PC, 6 / 5 on a phone) and the name / traits rows sit ABOVE them (B.NameRow: how far
@@ -43,7 +50,8 @@ B.Font=Enum.Font.FredokaOne
 local RGB=Color3.fromRGB
 local WHITE=Color3.new(1,1,1)
 local TRACK=RGB(18,14,30)
--- The bottom-right corner the R155 SKIP button uses while a pack opens (it sits there on every device): the bars never go there.
+-- The bottom-right corner the R155 SKIP button uses while a pack opens (it sits there on every device): the bars never go there. w, h: the screen in REAL px - its 80 px minimum is 80 on the
+-- screen (R158 review: a scaled computer HUD asks for the real window and gets the zone back in HUD px, see placeHud).
 function B.SkipZone(w,h)
  local zh=math.max(80,math.floor(h*.16))
  return {N='Skip',X=math.floor(w*.75),Y=h-zh,W=w-math.floor(w*.75),H=zh}
@@ -80,15 +88,17 @@ end
 -- and the status beside the hotbar; a short portrait phone has the MENU button and BASE / TRACK on the left) it slides sideways a little, then tries a
 -- narrower pair, then the two bars one above the other, then a little higher (never more than MaxRise); the first that is clear of everything wins.
 -- Returns {Bar = {W, H}, Gap, Stacked, Pair = {X, Y, W, H} (the room both take), Centers = {Normal = {X, Y}, Event = {X, Y}}, Clear = nothing in the way}.
-B.MinText=9
+B.MinText=9 -- (real px: the bars' words are never planned smaller than this; under a HUD scale it is the HUD-px size that shows as 9, at most what the bar's height holds, B.TextSize)
 local function placeHud(w,h,m,dock)
  dock=dock or dockHud(m,w,h)
+ local hk=m.Scale or 1 -- (R158: the HUD scale the words' real-px minimums are held under; 1 = none)
  local phone=m.Phone==true
  local barH=Hud.PityBarHeight(phone,h)
  local gap=phone and 8 or 12;local rowGap=4
  local boxes={}
  for _,b in ipairs(boxesHud(m,w,h))do if b.N~='Hotbar'then boxes[#boxes+1]=b end end
- boxes[#boxes+1]=B.SkipZone(w,h)
+ -- (R158 review: the corner is real px, its 80 px minimum too: asked of the real window - w, h are HUD px of a window w x hk - and drawn back in HUD px)
+ boxes[#boxes+1]=hk==1 and B.SkipZone(w,h)or sc(B.SkipZone(math.floor(w*hk+.5),math.floor(h*hk+.5)),1/hk)
  local below={N='Dock',X=dock.X,Y=dock.Y,W=dock.W,H=dock.H} -- the hotbar's slots: the bars sit just above (R157: the item's name and traits rows are above the bars now)
  local cx=dock.X+dock.W/2
  local half=math.floor((dock.W-gap)/2)
@@ -101,7 +111,13 @@ local function placeHud(w,h,m,dock)
   for _,b in ipairs(boxes)do if overlaps(e,b,B.Pad)then return false end end
   return true
  end
- local function readable(barW,bh)return B.TextSize(B.Words('Normal',Pity.Every-1,barW,bh),barW,bh)>=B.MinText and B.TextSize(B.Words('Event',0,barW,bh),barW,bh)>=B.MinText end
+ local function readable(barW,bh)
+  if hk==1 then return B.TextSize(B.Words('Normal',Pity.Every-1,barW,bh),barW,bh)>=B.MinText and B.TextSize(B.Words('Event',0,barW,bh),barW,bh)>=B.MinText end
+  -- (R158 review: scaled, the words must fit the bar at the size that shows as MinText real px - or the most the bar's height holds)
+  local want=B.WantSize(B.MinText,bh,hk)
+  local _,normal=B.Limits(B.Words('Normal',Pity.Every-1,barW,bh,nil,hk),barW,bh);local _,event=B.Limits(B.Words('Event',0,barW,bh,nil,hk),barW,bh)
+  return normal>=want and event>=want
+ end
  local narrow=math.max(96,math.floor(wide*.85))
  local shapes={{W=wide,H=barH},{W=narrow,H=barH}}
  -- (phones: a thinner pair first, where the MENU button / BASE / TRACK sit just above the hotbar's item name, then the two bars one above the other)
@@ -141,11 +157,10 @@ function B.Place(w,h,m,dock)
  return {Bar={W=p.Bar.W*s,H=p.Bar.H*s},Gap=p.Gap*s,Stacked=p.Stacked,Pair=sc(p.Pair,s),Clear=p.Clear,Phone=p.Phone,Scale=s,Hud=p,
   Centers={Normal={X=p.Centers.Normal.X*s,Y=p.Centers.Normal.Y*s},Event={X=p.Centers.Event.X*s,Y=p.Centers.Event.Y*s}}}
 end
--- The room a pair {X, Y, W, H} of bars (each barW x barH) can cover: its glow (B.Glow px) and the held bar's scale. k: the scale the numbers are in (a real Place answer: its
--- m.Scale; the glow is B.Glow HUD px), 1 by default.
-function B.Extent(r,barW,barH,k)
- k=k or 1
- local gx=B.Glow*k+barW*(B.HeldScale-1)/2;local gy=B.Glow*k+barH*(B.HeldScale-1)/2
+-- The room a pair {X, Y, W, H} of bars (each barW x barH) can cover: its glow (B.Glow px) and the held bar's scale. In the units of the numbers it is given (HUD px for a scaled
+-- computer's Place answer's Hud; the glow is B.Glow HUD px).
+function B.Extent(r,barW,barH)
+ local gx=B.Glow+barW*(B.HeldScale-1)/2;local gy=B.Glow+barH*(B.HeldScale-1)/2
  return {X=r.X-gx,Y=r.Y-gy,W=r.W+gx*2,H=r.H+gy*2}
 end
 -- The room the bars take on a screen (their extent: the glow and the held bar's scale included) as a HUD box, from the same inputs they are placed with. The SKIP
@@ -204,11 +219,15 @@ end
 -- every box by the rules' own 6 px and 8 px from the edges. (TreadmillBonusRules itself is frozen: its preferred rect is asked of it, with nothing in the way.)
 function B.ButtonSpot(rules,m,w,h,boxes,extra,dock)
  local e=B.Reserved(w,h,m,dock)
+ local scaled=(m.Scale or 1)~=1
  m=Hud.Real(m) -- (R158: the button works in screen px; a scaled computer layout becomes one in real px - a phone's is returned as it is)
  local more={e}
  for _,b in ipairs(extra or{})do more[#more+1]=b end
- local detail=m.HotbarDetails~=false and 44 or 0
- local rise=math.max(0,h-m.HotbarBottom-m.SlotSize-detail-(e.Y+3)) -- (the button's bottom edge ends up 7 px above the box: its own 10 px gap less 3; R157: the box includes the name rows)
+ local detail=m.HotbarDetails~=false and 44 or 0 -- (TreadmillBonusRules.Place's own 44 for the name rows over the slots: the rules' number, in screen px at every scale, not the layout's)
+ local rise=h-m.HotbarBottom-m.SlotSize-detail-(e.Y+3) -- (the button's bottom edge ends up 7 px above the box: its own 10 px gap less 3; R157: the box includes the name rows)
+ -- R158 review: on a scaled computer HUD the rows end 77 x Scale px over the slots, under the rules' 44 + 3 px once the scale is under .61, so the lift is negative there: clamping it at 0
+ -- left the button 13.8 px over the bars at 1024 x 768 and 22.8 at 800 x 600 (7 px at every size is the rule). A phone and a window of 1920 x 720 or more keep the clamp.
+ if not scaled then rise=math.max(0,rise)end
  local lifted=setmetatable({HotbarBottom=m.HotbarBottom+rise},{__index=m})
  local r=rules.Place(lifted,w,h,boxes,more)
  local want=rules.Place(lifted,w,h,{},{})
@@ -224,18 +243,36 @@ function B.ButtonSpot(rules,m,w,h,boxes,extra,dock)
  end
  return r
 end
--- The label's size for a text in a bar (FredokaOne is about .52 em a letter): as big as the bar allows, at least 8.
-function B.TextSize(text,barW,barH)
- local byHeight=math.floor(barH*.66)
- local byWidth=math.floor((barW-math.floor(barH*1.3))/math.max(1,utf8.len(text)or#text)/.52)
- return math.max(8,math.min(byHeight,byWidth))
+-- The most a bar allows for a text (FredokaOne is about .52 em a letter): by the bar's height (two thirds of it) and by its width (the room after the clover's disc). Returns both.
+function B.Limits(text,barW,barH)
+ return math.floor(barH*.66),math.floor((barW-math.floor(barH*1.3))/math.max(1,utf8.len(text)or#text)/.52)
 end
--- The words a bar shows: the full ones ("9/10 next one's lucky!", "LUCKY PACK! x1.5 luck") or, on a bar too small for them, the short ones.
-function B.Words(group,count,barW,barH,pop)
+-- The label's size for a text in a bar: as big as the bar allows, at least 8. k: the HUD scale the bar is drawn at (a scaled Place answer's Scale; nil = 1): the 8 is real px then - the
+-- HUD-px size that shows as 8 (GardenTextFit.Floor: never more than one line of the bar's height holds) - and the answer is in HUD px (what the label's TextSize is).
+function B.TextSize(text,barW,barH,k)
+ local byHeight,byWidth=B.Limits(text,barW,barH)
+ return math.max(realMin(8,k,barH),math.min(byHeight,byWidth))
+end
+-- The size a bar's words are wanted at (R158 review): `threshold` real px (10 for the full words, MinText for a bar to be readable), at least the real 8, at most what the bar's height
+-- holds - in HUD px under the HUD scale k (under 1), so a words that does not reach it by width is cut down to the short ones. Only for k under 1.
+function B.WantSize(threshold,barH,k)
+ return math.max(realMin(8,k,barH),math.min(math.ceil(threshold/k-1e-6),math.floor(barH*.66)))
+end
+-- The words a bar shows: the full ones ("9/10 next one's lucky!", "LUCKY PACK! x1.5 luck") or, on a bar too small for them, the short ones. k: as in B.TextSize. Under a HUD scale
+-- (k under 1) the bar is measured at its real on-screen width (R158 review: in HUD px the bar is always full size, so the short words never came): the full words stay when their
+-- width allows the size they will be drawn at (WantSize), else the short ones when they fit better.
+function B.Words(group,count,barW,barH,pop,k)
  local long=pop and Pity.PopText or Pity.Text(group,count)
- if B.TextSize(long,barW,barH)>=10 then return long end
  local short=pop and Pity.PopShort or Pity.ShortText(group,count)
- if B.TextSize(short,barW,barH)>B.TextSize(long,barW,barH)then return short end
+ if not k or k>=1 then
+  if B.TextSize(long,barW,barH)>=10 then return long end
+  if B.TextSize(short,barW,barH)>B.TextSize(long,barW,barH)then return short end
+  return long
+ end
+ local _,longWidth=B.Limits(long,barW,barH)
+ if longWidth>=B.WantSize(10,barH,k)then return long end
+ local _,shortWidth=B.Limits(short,barW,barH)
+ if shortWidth>longWidth then return short end
  return long
 end
 -- The lucky TAG on the opener's reveal card (kind = the RarePullCinematic attribute): {Y = its centre in screen px, H = its height}. R157: the card is fitted to the
@@ -362,6 +399,7 @@ local function fade(t,k)return 1-(1-t)*k end
 -- (the geometry, the words, the fill's size) is worked out again only when its inputs change: a bar sitting at 9/10 costs the glow alone (Pulse).
 local function paint(s,bar,now)
  local placement=s.Placement;if not placement then return end -- (not placed yet: a layout comes first and paints it)
+ local hk=placement.Scale or 1 -- (R158: the HUD scale the bars are drawn at; 1 on a phone and on a window of 1920 x 720 or more)
  placement=placement.Hud or placement -- (R158: the bars are drawn in HUD px inside their scaled root; at scale 1 the answer is its own)
  local reduced,S=s.Reduced,s.Set
  local w,h=placement.Bar.W,placement.Bar.H
@@ -392,9 +430,9 @@ local function paint(s,bar,now)
  local tickA=fade(.72,k);for _,t in ipairs(bar.Ticks)do S(t,'BackgroundTransparency',tickA)end
  -- words (cached by group, count, size and whether the pop's words show)
  local pop=bar.Pending>0 or(popping and popAge<B.DrainAt+.35)
- if bar.WordCount~=bar.Count or bar.WordPop~=pop or bar.WordW~=w or bar.WordH~=h then
-  bar.WordCount,bar.WordPop,bar.WordW,bar.WordH=bar.Count,pop,w,h
-  local text=B.Words(bar.Group,bar.Count,w,h,pop);bar.Words=text;bar.WordSize=B.TextSize(text,w,h)
+ if bar.WordCount~=bar.Count or bar.WordPop~=pop or bar.WordW~=w or bar.WordH~=h or bar.WordK~=hk then
+  bar.WordCount,bar.WordPop,bar.WordW,bar.WordH,bar.WordK=bar.Count,pop,w,h,hk
+  local text=B.Words(bar.Group,bar.Count,w,h,pop,hk);bar.Words=text;bar.WordSize=B.TextSize(text,w,h,hk)
  end
  S(bar.Label,'Text',bar.Words);S(bar.Label,'TextSize',bar.WordSize)
  -- glow: 9/10 (a pulse; steady with Reduced Motion), a lucky pack waiting, the pop

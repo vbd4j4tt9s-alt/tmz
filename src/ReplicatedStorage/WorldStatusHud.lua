@@ -126,6 +126,9 @@ function H.Create(pg,player)
   special:SetAttribute('AccessibleLabel','The Darkened '..hint:lower())
   -- (R158: a computer's HUD is scaled by m.Scale as a whole: the stack's UIScale is the status scale times it, and its place from the corner is times it; m.Scale is 1 elsewhere)
   local hudScale=m.Scale or 1
+  -- (R158 review: under a computer's HUD scale the UIScale is called HudScale, like every other piece's (HudLayout.ApplyScale), so GardenTextFit holds its labels' minimums in real px;
+  -- a phone's (hudScale 1) keeps its name)
+  if(scale.Name=='HudScale')~=(hudScale~=1)then scale.Name=hudScale~=1 and'HudScale'or'UIScale'end
   scale.Scale=m.StatusScale*hudScale
   -- R129: plain text rows (no card) on landscape phones; cards everywhere else.
   for _,name in ipairs({'Weather','Track'})do local want=m.StatusPlain and 1 or .73;if rows[name].Root.BackgroundTransparency~=want then rows[name].Root.BackgroundTransparency=want end end

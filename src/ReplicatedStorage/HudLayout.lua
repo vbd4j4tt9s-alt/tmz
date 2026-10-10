@@ -266,14 +266,17 @@ end
 --    not fit between the top of the window and the balances, the hub moves up (wheelArc, fixed = false) rather than shrinking the wheel further; only a window so short that even a
 --    moved wheel cannot fit gets wheelArc's old fallbacks (smaller options down to 44 px, a flatter fan). Every m.Menu* number is in MENU px: the MENU's window is w / ms x h / ms.
 local PcWidth,PcHeight,MenuFloor=1920,720,.85
--- the scale of a computer's HUD and of its MENU button on a window w x h (the same numbers pcLayout uses)
-function L.PcScales(w,h)
+-- the scale of a computer's HUD and of its MENU button on a window w x h. (R158 review: pcLayout calls this LOCAL, not the public L.PcScales below: the layout is memoized by the key
+-- of L.Read, which holds only the window, the touch flag, the thumb controls and the numbers L.NameRows reads, so a layout must not read a field somebody can replace - a replaced
+-- L.PcScales would give a stale layout from the cache. The three numbers above are constants.)
+local function pcScales(w,h)
  local s=math.min(1,w/PcWidth,h/PcHeight)
  return s,math.max(s,MenuFloor)
 end
+L.PcScales=pcScales -- (public for callers that want the numbers; nothing in this file looks it up again: replacing it changes no layout)
 local function pcLayout(w,h)
  local sw,sh=w/PcWidth,h/PcHeight
- local s,ms=L.PcScales(w,h)
+ local s,ms=pcScales(w,h)
  -- the laid-out window (HUD px): exactly 1920 wide or exactly 720 tall when the window is smaller, the window itself when it is not
  local vw,vh=w,h
  if s<1 then if s==sw then vw,vh=PcWidth,h/s else vw,vh=w/s,PcHeight end end
@@ -327,7 +330,8 @@ end
 --   12 - 14  L.NameBand, L.NameWidth, L.NameClear      15, 16  L.PityBarHeight, L.PityGap     what L.NameRows (the details rule) reads
 --  (R158: slots 17 - 19, PityBars155 / its Place / L.HudBoxes, are gone: the computer layout no longer searches the balances' spot with the bars - it is the fixed 1920 x 1080
 --  arrangement, scaled - so nothing reads them)
---  Nothing else is read: no attribute, no setting, no clock. The answer is shared and FROZEN (deeply: table.freeze) - callers read it, none writes into it (checked for every
+--  Nothing else is read: no attribute, no setting, no clock, no number of L but those above. (R158 review: pcLayout used to call the public L.PcScales, which is not in the key and could be replaced;
+--  it calls a local now. L.NameRows is called through L on purpose - the cache test counts layout computations by wrapping it - and reads only the numbers above.) The answer is shared and FROZEN (deeply: table.freeze) - callers read it, none writes into it (checked for every
 --  caller in src), and a write would raise instead of changing what the next caller sees. The caller's `controls` rects are copied before the search, so the answer holds no
 --  table of the caller's (m.Joystick / m.Jump of a landscape phone used to be the caller's own rects).
 local CacheSize,KeyLength=8,16
@@ -366,8 +370,24 @@ function L.Real(m)
  realOf[m]=freeze(r)
  return r
 end
+-- R158 review: the layout in real px for TreadmillBonusRules.Place (frozen), which counts the held item's name rows as a fixed 44 px over the slots (and keeps its own 10 px gap): in a
+-- scaled computer layout those rows are 44 x Scale real px, so HotbarBottom is lowered by 44 x (1 - Scale) and the rules' 44 px end where the rows really end (the BONUS ROLL
+-- button keeps its real size and the same gap above them at every size). A phone's layout, a window of 1920 x 720 or more and a screen that hides the rows are L.Real's, as they are.
+local rulesOf=setmetatable({},{__mode='k'})
+function L.RulesView(m)
+ local r=L.Real(m)
+ local s=m.Scale or 1
+ if s==1 or m.HotbarDetails==false then return r end
+ local v=rulesOf[m]
+ if not v then
+  v=table.clone(r);v.HotbarBottom=r.HotbarBottom-44*(1-s)
+  rulesOf[m]=table.freeze(v)
+ end
+ return v
+end
 -- R158: a piece of the HUD drawn at scale s (m.Scale, or m.MenuScale for the MENU): its root gets a UIScale (HudScale) of s, which shrinks the root and everything in it about its
--- AnchorPoint. At 1 (every touch screen, a window of 1920 x 720 or more) no instance is made and an existing one is set back to 1.
+-- AnchorPoint. At 1 (every touch screen, a window of 1920 x 720 or more) no instance is made and an existing one is set back to 1. The NAME HudScale is a contract: GardenTextFit
+-- finds the HUD scale of a label by it and holds the label's readable-text minimum in real px (GardenTextFit.Floor); WorldStatusHud names its UIScale so under a HUD scale too.
 function L.ApplyScale(root,s)
  local u=root:FindFirstChild('HudScale')
  if not u then

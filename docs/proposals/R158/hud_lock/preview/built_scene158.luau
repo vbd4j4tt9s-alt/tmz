@@ -82,9 +82,29 @@ W.RS:SetAttribute('GlobalWeather','Clear')
 F.bat(W,bag);F.shovel(W,bag)
 for _,id in ipairs({'SunflowerSeed','BluebellSeed','AppleSeed','MooncapSeed','CocoaSeed','LanternFernSeed','PineappleSeed','CactusSeed'})do F.seed(W,bag,id,1,'None')end
 -- the HUD scripts ----------------------------------------------------------------------------------------------------------------------------------
+-- (R158 review: a layout emulation, as R158's tests have it (hud_world158.luau): every GuiObject gets its real AbsoluteSize / AbsolutePosition from its UDim2, AnchorPoint and the UIScales above
+-- it, so GardenTextFit - which holds a label's smallest size in real px under a HudScale - sees the box the label really has; the mock's default 100 x 40 made every label look roomy)
+local function setAbs(x,k,v)local c=x._props[k];if not c or c.X~=v.X or c.Y~=v.Y then x[k]=v end end
+local function lay(x,px,py,pw,ph,ps)
+ for _,c in ipairs(x._children)do if c:IsA('GuiObject')then
+  local sz,pos=c._props.Size,c._props.Position;local a=c._props.AnchorPoint or V2(0,0)
+  if sz and pos then
+   local ui=c:FindFirstChildOfClass('UIScale');local k=ui and(ui._props.Scale or 1)or 1
+   local lw=sz.X.Scale*(pw/ps)+sz.X.Offset;local lh=sz.Y.Scale*(ph/ps)+sz.Y.Offset
+   local rw,rh=lw*ps*k,lh*ps*k
+   local ax=px+(pos.X.Scale*(pw/ps)+pos.X.Offset)*ps-a.X*rw;local ay=py+(pos.Y.Scale*(ph/ps)+pos.Y.Offset)*ps-a.Y*rh
+   setAbs(c,'AbsoluteSize',V2(rw,rh));setAbs(c,'AbsolutePosition',V2(ax,ay))
+   lay(c,ax,ay,rw,rh,ps*k)
+  end
+ end end
+end
 local function sized()
  for _,g in ipairs(pg:GetChildren())do
-  if g:IsA('ScreenGui')then local full=g.Name=='TravelButtons'or g.Name=='RobloxTopBar';g.AbsoluteSize=V2(SW,full and FULLH or SH);g.AbsolutePosition=V2(0,0)end
+  if g:IsA('ScreenGui')then
+   local full=g.Name=='TravelButtons'or g.Name=='RobloxTopBar';local gh=full and FULLH or SH
+   g.AbsoluteSize=V2(SW,gh);g.AbsolutePosition=V2(0,0)
+   if g.Name~='TouchGui'then lay(g,0,0,SW,gh,1)end
+  end
  end
 end
 pg.ChildAdded:Connect(function(c)if c.ClassName=='ScreenGui'then c.AbsoluteSize=V2(SW,(c.Name=='TravelButtons')and FULLH or SH)end end)

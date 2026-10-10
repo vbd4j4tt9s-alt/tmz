@@ -54,3 +54,63 @@ the layout emulation knows the HUD's UIScale), R150 `test_bonus_layout` (the but
 counters' places are scaled), R155 `test_pity_bars155` (the bars' own numbers are HUD px; the real size is times the scale), R157 `test_hud157` / `test_hud157_client` (balances never shorter,
 MENU a third down, no 640 x 360 ring, the tools tile is free while the wheel is open) and `test_hudlayout_cache157` (the computer fingerprints are the new layout; the key has 16 slots now:
 the computer layout no longer asks PityBars155; the phone fingerprints are byte-for-byte R157's).
+
+## Review follow-ups (10 Oct)
+A review of the built HUD lock found six small things. All six are fixed on computers only. Phones and tablets did not change: `tests/test_touch_lock158.luau` passes untouched. At scale 1
+(1920 x 1080 and bigger) nothing changed either: its fingerprints are the same as before. The new checks are section 7 of `tests/test_pc_hud158.luau` (run on all 14 windows) and ten new
+"teeth" in `tests/run_hud158.sh` (each fix is taken out once; the test must notice).
+
+**1. Small text was too small on small windows.** The text rules (a smallest size, and the switch to the short words) were written in HUD px, and a window at scale 0.42 shrinks HUD px
+too: a rule of "8 px" gave 3.3 px on the screen. Now each smallest size is a real screen size. A smallest size m becomes m / scale in HUD px (7 real px at scale 0.42 is 17 HUD px), but never
+more than one line of its own box holds, and at scale 1 it is the same number as before. How:
+- `GardenTextFit.Floor(minimum, scale, height)` does the sum. `GardenTextFit` finds the scale from the UIScale named `HudScale` above the label (the name is now a contract; `WorldStatusHud`
+  names its UIScale that way too, on a computer under scale 1 only). Only small minimums (up to 9 px) are treated as "readable text"; bigger ones (the wallet's 29, the status card's 13 and
+  16) are the label's design size and keep their HUD value. So the wallet and the status numbers are not changed.
+- Slot names (`Hotbar.client.lua`): smallest 7 real px where the strip can hold it. The name strip is 24 HUD px tall and holds two lines (two-word names), so its smallest size is
+  at most what two lines hold, 9 HUD px (a bigger one ran the second line into the weight and the next slot in the picture; I tried 17 at 800 x 600 and drew it). So on the smaller
+  windows the smallest name is 6.4 - 3.8 real px, not 7: that is the limit of a strip 10 real px tall, not of the rule. Names that fit on one line draw at their full size.
+- The held item's name: smallest 8 real px, through the same fitter. (The Hotbar's own 11 / 14 constraint on that label is not what sizes it, GardenTextFit is, and its minimum was 8: that 8
+  is the one held.) The Bag button's word and the traits row follow the same rule.
+- The pity bars' words (`PityBars155`): smallest 8 real px (the HUD size that shows as 8, at most what one line of the bar holds: 19 HUD px). The bar is now measured at its real
+  on-screen width, so where the full words do not fit at that size the short ones come ("next one's lucky!", "LUCKY! x1.5"): that happens under scale 0.5 (800 x 600). The bars' "readable"
+  rule (`B.MinText`, 9) is real px too.
+- Long names that cannot fit at their smallest real size are cut with "..." (as the fitter always did at its smallest size) instead of shrinking to 3 px.
+
+What is drawn, in screen px (before -> after). "Names" = the slot names (smallest to biggest size), "held" = the held item's name for a short name, "bars" = the pity words:
+
+| window | scale | names | held | bars |
+|---|---|---|---|---|
+| 1920 x 1080 | 1.00 | 7.0 - 13.0 -> 7.0 - 13.0 | 14.0 -> 14.0 | 15.0 -> 15.0 |
+| 1366 x 768 | 0.71 | 5.0 - 9.2 -> 6.4 - 9.2 | 10.0 -> 10.0 | 10.7 -> 10.7 |
+| 1280 x 720 | 0.67 | 4.7 - 8.7 -> 6.0 - 8.7 | 9.3 -> 9.3 | 10.0 -> 10.0 |
+| 1024 x 768 | 0.53 | 3.7 - 6.9 -> 4.8 - 6.9 | 7.5 -> 8.0 | 8.0 -> 8.0 |
+| 800 x 600 | 0.42 | 2.9 - 5.4 -> 3.8 - 5.4 | 5.8 -> 8.3 | 6.3 -> 7.9 (short words at 9/10 and in the pop) |
+
+The smallest the old rules allowed, at 800 x 600, was 2.9 px (names), 3.3 px (held name) and 3.3 - 3.75 px (bars); now 3.8, 8.3 and 7.9. Sizes only grow where they were under their real minimum, so the bigger windows
+look the same. The held item's name box and the Bag button's word are a bit bigger at 1024 x 768 and 800 x 600 (the Bag word 14 -> 15 and 14 -> 20 HUD px: 8 real px).
+
+**2. BONUS ROLL drifted away from the pity bars on small windows.** TreadmillBonusRules (frozen) counts the held item's name rows as a fixed 44 px over the slots. On a scaled HUD the rows are
+77 x scale px tall, so under scale 0.61 the lift that `PityBars155.ButtonSpot` worked out was negative and was cut off at 0: the button floated 13.8 px over the bars at 1024 x 768 and
+22.8 px at 800 x 600. `ButtonSpot` no longer cuts the lift off on a scaled computer HUD (a phone and a window of 1920 x 720 or more keep the cut-off: unchanged). The fallback in
+`TreadmillBonusClient` (no PityBars155) asks the rules through the new `HudLayout.RulesView(m)`, which lowers the hotbar's bottom by 44 x (1 - scale) so the rules' 44 px end where the scaled
+rows end. Gap from the button to the bars (px, the button sits on whole pixels so it is 7.0 - 7.8): 1920 x 1080 7.0 -> 7.0, 1366 x 768 7.3 -> 7.3, 1280 x 720 7.0 -> 7.0, 1024 x 768 13.8 -> 7.8,
+960 x 540 15.5 -> 7.5, 800 x 600 22.8 -> 7.8, 640 x 360 11.0 -> 7.0, 1280 x 400 12.0 -> 7.0, 420 x 420 37.6 -> 7.6. Without the bars the button sits 10 px over the name rows at every size.
+
+**3. Menus sat too close to the hotbar.** `Hotbar.client` publishes `ChestHotbarReserve` in screen px (scaled) but `GardenMenuStyle` took an unscaled 54 px off it (the name rows' share). The
+Hotbar now also publishes the HUD scale as `ChestHudScale` (nothing at scale 1: no new attribute on a phone) and the 54 is times it. The gap between a menu's bottom and the slots is
+8 + 12 x scale px where the reserve rules (20 at scale 1, as it was) and the old 64 px floor takes over under scale 0.6 (never under 15 px anywhere). Gap now (before): 1920 x 1080 20.0 (20.0),
+1366 x 768 16.7 (5.1), 1280 x 720 16.3 (9.3), 1024 x 768 21.9 (21.9), 960 x 540 25.0 (25.0), 800 x 600 32.8 (32.8). Test: at least 12 real px on all 14 windows.
+
+**4. The SKIP corner's 80 px minimum was 80 HUD px.** `B.SkipZone` was asked in HUD px, so on a short window its 80 px minimum was 80 x scale on the screen (48 px at 1920 x 300). The scaled
+HUD now asks it of the real window and draws the answer back in HUD px: the minimum is 80 real px. Test: the bars, placed with the hotbar pushed into the corner, stay clear of the real zone.
+
+**5. `HudLayout.pcLayout` read `L.PcScales`, which is not in the cache key.** Replacing it would have left a stale layout in `L.Read`'s cache. The scales are now a local function
+(`pcScales`); `L.PcScales` is still there for callers but nothing in the layout looks it up. The key comment says exactly what is read. A cache hit still allocates nothing
+(`run_hudlayout_cache157.sh`). Test: replacing `L.PcScales` and asking a new size gives the right scale.
+
+**6. `B.Extent` had a `k` nobody passed.** Removed: `B.Extent(rect, barW, barH)` works in the units it is given (HUD px for a scaled answer's `Hud`); the two tests that passed `k` now scale
+the answer themselves. `B.Words` / `B.TextSize` got an optional `k` (the HUD scale: nothing at scale 1, so phones and 1920 x 720 and bigger take the old code path).
+
+Tests changed on purpose: R155 `test_pity_bars155` (the SKIP corner is real px; the words are chosen and sized for the HUD scale) and `run_pity.sh` (one mutation's pattern), R157 `test_hud157`
+(`B.Extent` has no `k`), R158 `test_pc_hud158` (section 7; the fingerprints of the hotbar and status trees at 1366 / 1280 / 1024 / 800 and the bars at 800 x 600 changed: text sizes, the status
+UIScale's name, the short words; 1920 x 1080 is unchanged).

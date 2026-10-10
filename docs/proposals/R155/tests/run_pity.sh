@@ -148,7 +148,7 @@ PY
  mutate paints_every_frame "$RSD/PityBars155.lua" "   local changed=bar.Rev~=s.Rev" "   local changed=true"
  mutate hidden_paints "$RSD/PityBars155.lua" " if s.Placement and s.Root.Visible then" " if s.Placement then"
  mutate dimmed_pulses "$RSD/PityBars155.lua" " and not dimmed and bar.Pending==0" " and bar.Pending==0"
- mutate words_every_paint "$RSD/PityBars155.lua" " if bar.WordCount~=bar.Count or bar.WordPop~=pop or bar.WordW~=w or bar.WordH~=h then" " if true then"
+ mutate words_every_paint "$RSD/PityBars155.lua" " if bar.WordCount~=bar.Count or bar.WordPop~=pop or bar.WordW~=w or bar.WordH~=h or bar.WordK~=hk then" " if true then"
  mutate menu_does_not_wake "$RSD/PityBars155.lua" "function()root.Visible=visible();wake()end" "function()root.Visible=visible()end"
 fi
 [ $RC = 0 ] && echo "R155 pack pity: ALL PASS" || echo "R155 pack pity: FAIL"

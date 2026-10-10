@@ -12,6 +12,9 @@
 #               every real GUI object where HudLayout says, MENU a third of the way down at max(scale, 85%), nothing overlapping with the wheel open (the five options, the balances, the
 #               hotbar and name rows, the bars, the status stack, BONUS ROLL, the SKIP pill, BASE / TRACK, Roblox's top-left buttons, the friend chip), the badges inside their groups, the tutorial's
 #               boxes; fingerprints of the five owner windows
+#               R158 review follow-ups (section 7 of the PC test): every readable-text minimum (slot names 7, the held item's name 8, the bars' words 8) holds in REAL px under the HUD
+#               scale, the short words where the full ones do not fit the real bar; BONUS ROLL 7 px over the bars at every window; a menu 12+ real px over the slots; the SKIP
+#               corner's 80 px is real; replacing HudLayout.PcScales changes no layout; B.Extent has three parameters
 #  3. teeth   - each break must make the touch or the PC test fail
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
@@ -38,6 +41,7 @@ else echo "skipped: commit $BASE is not in this clone (the load guard / Config c
 (cd "$REPO" && grep -v '^#' "$P/R150/tests/frozen.sha256" | sha256sum -c --quiet -) && echo "ok: the frozen files (R150 frozen.sha256: TreadmillBonusRules / Service) match" || fail "a R150 frozen file changed"
 if grep -rniE "cla[u]de[ -]?(op[u]s|sonn[e]t|haik[u]|[0-9])|cla[u]de-[a-z]+-[0-9]|(op[u]s|sonn[e]t|haik[u])[ -]?[0-9]|gp[t]-?[0-9]" "$P/R158" --include=*.md --include=*.sh --include=*.luau --include=*.py --include=*.txt 2>/dev/null;then fail "a model name in the R158 files";else echo "ok: no model names in the R158 files";fi
 sed -n 6p "$T/run_all_suites.sh" | grep -q " docs/proposals/R158/tests/run_hud158.sh[; ]" && echo "ok: registered on line 6 of tools/tests/run_all_suites.sh" || fail "run_hud158.sh is not on line 6 of tools/tests/run_all_suites.sh"
+grep -q "Layout.RulesView(m)" "$C/TreadmillBonusClient.client.lua" && echo "ok: BONUS ROLL's fallback (no PityBars155) asks the rules through HudLayout.RulesView" || fail "TreadmillBonusClient's fallback does not use HudLayout.RulesView"
 echo "== 1. touch lock: every phone and tablet as before the PC rework"
 sh "$HERE/touch_lock158.sh" "$OUT/touch" > "$OUT/touch.log" 2>&1 && echo "ok: $(tail -1 "$OUT/touch.log")" || { tail -20 "$OUT/touch.log";fail "the touch lock"; }
 echo "== 2. the PC HUD on 14 windows"
@@ -94,6 +98,17 @@ PY
  mutate pc hub_no_uiscale "$RSD/HudLayout.lua" ";L.ApplyScale(hub,ms)" ""
  mutate pc groups_no_uiscale "$RSD/HudLayout.lua" ";L.ApplyScale(entry.Group,ms);styleOption" ";styleOption" ";L.ApplyScale(group,state.Metrics.MenuScale or 1)" ""
  mutate pc guide_not_real "$RSD/BeginnerGuide.lua" " local layout=m;m=real(m)" " local layout=m"
+ # the review follow-ups: each fix, taken out, must be noticed
+ mutate pc text_floor_off "$RSD/GardenTextFit.lua" " if not k or k>=1 or minimum>M.RealCap then return minimum end" " do return minimum end"
+ mutate pc bars_words_hud_px "$RSD/PityBars155.lua" "local text=B.Words(bar.Group,bar.Count,w,h,pop,hk);bar.Words=text;bar.WordSize=B.TextSize(text,w,h,hk)" "local text=B.Words(bar.Group,bar.Count,w,h,pop);bar.Words=text;bar.WordSize=B.TextSize(text,w,h)"
+ mutate pc skip_zone_hud_px "$RSD/PityBars155.lua" " boxes[#boxes+1]=hk==1 and B.SkipZone(w,h)or sc(B.SkipZone(math.floor(w*hk+.5),math.floor(h*hk+.5)),1/hk)" " boxes[#boxes+1]=B.SkipZone(w,h)"
+ mutate pc bonus_rise_clamped "$RSD/PityBars155.lua" " if not scaled then rise=math.max(0,rise)end" " rise=math.max(0,rise)"
+ mutate pc menu_54_unscaled "$RSD/GardenMenuStyle.lua" "(pg:GetAttribute('ChestHotbarReserve')or 134)-54*hudScale)" "(pg:GetAttribute('ChestHotbarReserve')or 134)-54)"
+ mutate pc hud_scale_unpublished "$C/Hotbar.client.lua" " if pg:GetAttribute('ChestHudScale')~=scaleAttr then pg:SetAttribute('ChestHudScale',scaleAttr)end" ""
+ mutate pc slot_name_min_hud_px "$C/Hotbar.client.lua" "local lo=Fit.Floor(7,hudScale,nameHeight/2+1);" "local lo=7;"
+ mutate pc status_scale_unnamed "$RSD/WorldStatusHud.lua" "  if(scale.Name=='HudScale')~=(hudScale~=1)then scale.Name=hudScale~=1 and'HudScale'or'UIScale'end" ""
+ mutate pc pcscales_read_public "$RSD/HudLayout.lua" " local s,ms=pcScales(w,h)" " local s,ms=L.PcScales(w,h)"
+ mutate pc rules_view_plain "$RSD/HudLayout.lua" "v=table.clone(r);v.HotbarBottom=r.HotbarBottom-44*(1-s)" "v=table.clone(r)"
  mutate pc statusright_12 "$RSD/HudLayout.lua" "X=w-(m.StatusRight or 12)-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh}
   b[#b+1]={N='OwnerTools'" "X=w-12-sw,Y=h-m.StatusBottom-sh,W=sw,H=sh}
   b[#b+1]={N='OwnerTools'"
