@@ -14,6 +14,9 @@ function T.Attach(Data)
   self:PublishTutorial(player);self:MarkDirty(player);self:QueueGardenSave(player);return true
  end
  function Data:TutorialAction(player,action)
+  -- R158c (owner: "make it so that you can't replay the tutorial, to prevent any issues"): a replay would set TutorialDone back to false. The request is refused at the door, changing nothing
+  -- (an old client with the old Settings button, or an exploit, gets a plain failure from PremiumService). BeginnerGuide.Action still knows 'Replay' as plain data; nothing here reaches it.
+  if action=='Replay'then return false end
   if not self:IsLoaded(player)then return false end
   local premium=self:GetPremium(player);premium.Tutorial=premium.Tutorial or G.Read()
   if not G.Action(premium.Tutorial,action)then return false end

@@ -51,7 +51,11 @@ local A=makePlayer(301,'Ava')
 local function packs(p)local n,lucky=0,nil;for _,r in ipairs(Data:GetChestRecords(p))do if r.Kind=='Pack'then n+=1;if r.RateBoost then lucky=r end end end;return n,lucky end
 check(Data:GrantStarterPack(A)==nil,'nothing before the tutorial is finished')
 Data:TutorialAction(A,'Skip');check(Data:GrantStarterPack(A)==nil and select(2,packs(A))==nil,'skipping the tutorial at the start gives nothing')
-Data:TutorialAction(A,'Replay')
+-- R158c (owner: "make it so that you can't replay the tutorial"): the Replay request is refused and changes nothing; this test starts the tutorial again by hand where it used to replay
+do local before=Data:GetPremium(A).Tutorial;local done,mask=before.Done,before.Mask
+ check(Data:TutorialAction(A,'Replay')==false and before.Done==done and before.Mask==mask and A:GetAttribute('TutorialDone')==true,'the Replay request is refused: TutorialDone stays true, nothing changes')
+ before.Mask=1;before.Done=false;Data:PublishTutorial(A)
+end
 -- Finish the tutorial as PremiumService's Tutorial request does (PremiumService.new itself starts product loaders
 -- that never settle on the mock, so its Tutorial branch is checked from source below).
 local synced=0
@@ -70,9 +74,9 @@ check(gift and gift.Stage==1 and gift.BagVariant=='Pack01'and gift.RateBoost==2 
 check(gift and gift.ChestName==Guide.StarterPack.Name,'named '..tostring(gift and gift.ChestName))
 check(synced>=1 and shownNotes[#shownNotes]==Guide.StarterPack.Notice,'it shows up in the hotbar and a notice says so')
 -- Once per account.
-Data:TutorialAction(A,'Replay');local s2=Data:GetPremium(A).Tutorial;s2.Mask=bit32.bor(s2.Mask,Guide.Bits.Pack,Guide.Bits.Seed,Guide.Bits.Plant);Data:PublishTutorial(A)
+local s2=Data:GetPremium(A).Tutorial;s2.Mask=1;s2.Done=false;s2.Mask=bit32.bor(s2.Mask,Guide.Bits.Pack,Guide.Bits.Seed,Guide.Bits.Plant);Data:PublishTutorial(A) -- (started again by hand: a Replay request is refused now)
 finish()
-check(select(1,packs(A))==n,'replaying the tutorial does not give another')
+check(select(1,packs(A))==n,'finishing the tutorial again does not give another')
 -- Saved and loaded with its boost.
 local saved=Data:_buildSaveData(A)
 local row;for _,r in ipairs(saved.Seeds or{})do if r.RateBoost then row=r end end

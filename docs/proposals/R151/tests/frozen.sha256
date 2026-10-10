@@ -3,7 +3,8 @@
 # R157b release: Config.Version 'V150 R157b' (nothing else changed)
 # R158 release: Config.Version 'V150 R158' (nothing else changed)
 # R158b release: Config.Version 'V150 R158b' (nothing else changed)
-90c2bfd950c6e2b7e4c5f13c2fabf5e481315fde226dcc672188e05fd894af40  src/ServerScriptService/ChestChaseServer/Config.lua
+# R158c release: Config.Version 'V150 R158c' (nothing else changed)
+a80386fc3a52a0020bab1202fe659015b84a2b0f61739fe267037b0b0202b081  src/ServerScriptService/ChestChaseServer/Config.lua
 052c0df01f4e131396996df31a2e3a64d2be1aa3dafa3172e2dc59b66eeab696  src/ReplicatedStorage/EconomyBalance90.lua
 e0056ebd12983a74ddd20e3393286862f3da4faeb8f0bba0e3d5cd9d28ff6afb  src/ReplicatedStorage/EconomyScaling91.lua
 b9dbf155ff24c0f63fa3189165814a71d18797b97b8e28b21c296d254be5438b  src/ReplicatedStorage/ItemWeight.lua

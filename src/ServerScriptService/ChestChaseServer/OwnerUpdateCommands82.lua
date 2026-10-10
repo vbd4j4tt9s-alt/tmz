@@ -37,7 +37,7 @@ X.Actions.trampoline=true
 X.Actions.keepermodels=true
 -- R152: voidgift [reset me | left <n>]: the free Void Pack pedestal's status; the two edits are Studio only (VoidGiveaway152).
 X.Actions.voidgift=true
--- R157: playtime [<minutes>] (per player, Studio only to set): the play time the free Void Pack's claim waits for (VoidGiveaway152): /test playtime @name <minutes>.
+-- R157: playtime [<minutes>] (per player, Studio only to set): the play time counter (VoidGiveaway152; since R158c the free Void Pack's claim needs a finished tutorial, not play time): /test playtime @name <minutes>.
 X.Actions.playtime=true
 -- R156: pyramid [@username] (status), pyramid @username reset (clears the secret pyramid pack's claim; saved): SecretPyramid156.
 X.Actions.pyramid=true

@@ -6,7 +6,7 @@
 --    numbers), every request is counted, any call can fail with any message (`backend.Fail`);
 --  * the MessagingService bus of R151's announce_env (a subscriber hears every server's messages on the topic, the publisher's own included; calls can fail);
 --  * a fake PlayerDataService (the inventory limit, the Premium table, the save calls, AddChest as the real one builds a record) so a test controls the player's data exactly
---    (R157: a player has played the 20 minutes the claim needs unless the test passes Played: seconds, or false = a save with no play-time field);
+--    (R158c: a player has finished the tutorial the claim needs unless the test passes Tutorial=false; Played = the R157 play-time counter, which no rule uses now);
 --  * servers: a VoidGiveaway152 on a shared backend / bus with its own fake data, a fake clock and a recorded wait.
 -- The real PlayerDataService / ChestService / VerityService are used by test_giveaway_real.luau.
 local H=require('./pedestal_harness');local E=require('./announce_env')
@@ -104,16 +104,16 @@ function G.fakeData(config)
  end
  function D:MarkDirty(p)self.Dirty[p]=(self.Dirty[p]or 0)+1 end
  function D:QueueGardenSave(p)self.Saves[p]=(self.Saves[p]or 0)+1 end
- -- A player whose profile just loaded. o: {Room (extra packs already in the Bag), Flag, CanSave, Played (R157)}
+ -- A player whose profile just loaded. o: {Room (extra packs already in the Bag), Flag, CanSave, Tutorial (R158c: false = not finished, 'unset' = no attribute; default finished), Played (R157 counter)}
  function D:load(p,o)
   o=o or{};self.Loaded[p]=true;self.CanSave[p]=o.CanSave~=false
   for i=1,o.Packs or 0 do self:AddChest(p,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',Weather='None'});end
   self.AddCalls=0
   if o.Flag then self:GetPremium(p).VoidGift152=true end
-  -- R157: the claim needs 20 minutes of play time (Premium.PlaySeconds157). A player here has played enough unless the test says otherwise: Played = seconds, or false = a save from before
-  -- the rule (no field at all, which reads as 0).
-  local played=o.Played;if played==nil then played=G.Rules.MinPlaySeconds end
-  if played~=false then self:GetPremium(p)[G.Rules.PlayField]=played end
+  -- R158c: the claim needs a finished tutorial (the player attribute TutorialDone, set by TutorialProgress). A player here has finished it unless the test says Tutorial=false (not finished) or
+  -- Tutorial='unset' (the attribute was never published). Played (R157, a counter only now) = seconds in Premium.PlaySeconds157, or nothing / false = a save with no such field.
+  if o.Tutorial=='unset' then p:SetAttribute(G.Rules.TutorialAttr,nil)else p:SetAttribute(G.Rules.TutorialAttr,o.Tutorial~=false)end
+  if o.Played then self:GetPremium(p)[G.Rules.PlayField]=o.Played end
   return p
  end
  function D:voidPacks(p)local n=0;for _,r in ipairs(self:GetChestRecords(p))do if r.BagVariant=='EclipseReliquary'then n+=1 end end;return n end

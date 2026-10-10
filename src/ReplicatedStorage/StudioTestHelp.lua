@@ -100,10 +100,10 @@ return {
  {'/test hubdisplays','server: Both corner displays: the day, the fruit of the day, the champions and where they came from, BEST PULL\'s clock (this server only, new board every 10 minutes), the fruit\'s shared board health and the part counts. hubdisplays reset empties both boards (this server, and the fruit\'s shared one); hubdisplays day +1 previews tomorrow\'s fruit on this server (day 0 comes back; BEST PULL does not change).'},
 
  {'— FREE VOID PACK PEDESTAL (R152) —',''},
- {'/test voidgift','server: The giveaway pedestal: how many of the 500 are claimed / left, whether YOU have claimed (profile flag and the shared list), which store this server uses (live DataStore, Studio test store or the in-memory counter), messages and the pedestal.'},
+ {'/test voidgift','server: The giveaway pedestal: how many of the 500 are claimed / left, whether YOU have claimed (profile flag and the shared list), whether your tutorial is finished (the claim needs it), which store this server uses (live DataStore, Studio test store or the in-memory counter), messages and the pedestal.'},
  {'/test voidgift reset me','Studio only: clears YOUR claim and flag so you can claim again (the pack you got stays in your Bag). A live server refuses: it never changes the shared count.'},
  {'/test voidgift left 3','Studio only: sets how many the pedestal shows as left (0 = ALL CLAIMED). Studio uses its own store or an in-memory counter, never the live count.'},
- {'/test playtime @username','R157: how long that player has played in total (saved; the free Void Pack can be claimed after 20 minutes) and how long is left. voidgift shows yours too.'},
+ {'/test playtime @username','R157: how long that player has played in total (saved; only a counter now: the free Void Pack needs a finished tutorial, not play time). voidgift shows yours too.'},
  {'/test playtime @username 12','Studio only: sets that player\'s play time to 12 minutes (0 to 180; /test playtime 12 @username works too). A live server refuses: it never changes play time.'},
 
  {'— DESERT PYRAMID (R157) —',''},

@@ -19,11 +19,10 @@
 --  * Fixes after review (R152): the pack is saved GiftLocked (a free pack can't be gifted: alts claimed it for a main account; FruitGiftService refuses, Verity keeps the lock);
 --    Rules.MinAccountAgeDays (0 = off) can refuse young accounts; claims honour the store's backoff (refused at once, "try again in N s", no request) and a player waits 10 s
 --    after a store failure; the loop's retries of an owed pack tell the player once and back off after a failure instead of every 2 s.
---  * R157 (owner: "make it so that the void pack is only claimable after playing for 20 minutes"): Claim has one more refusal, next to the account-age one and before any reservation: under
---    Rules.MinPlaySeconds (20 min) of TOTAL play time the claim is refused with no side effect (no store request, no state change): "play {m} more min to get your free void pack!". The
---    time is counted here, in Step (every 2 s: this loop is the per-player tick; no new loop), only for a player whose profile is loaded, into the optional saved field Premium.PlaySeconds157
---    (whole seconds; MarkDirty every 30 s, with a save when the 20 minutes are reached), and published as the player's attribute VoidPlayLeft157 for the client's countdown. A player who
---    is owed a pack (reserved before) is never held up by it; a counter that is not loaded is "not ready yet" (the same soft refusal as data that is still loading), never a number of minutes.
+--  * R158c (owner: "for the void pack there isn't a 20 minute lock anymore and requirement is just finishing the tutorial"): Claim has one refusal, next to the account-age one and before any
+--    reservation: the player's attribute TutorialDone (TutorialProgress; true also after a skip, as in TrackHoleService / PremiumService / FruitGiftService) must be true, or the claim is refused
+--    with no side effect (no store request, no state change): "finish the tutorial to get your free void pack!". A player who is owed a pack (reserved before) is never held up by it. The R157
+--    20-minute play-time rule is gone; its counter (Premium.PlaySeconds157, counted in Step) and /test playtime stay, but nothing is refused for play time.
 -- Builds: VoidGiveawayArt152 (the stone and the prompt). Client: VoidGiveawayClient152 (the pack, the number, the prompt for the one who already claimed).
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage')
 local Rules=require(RS:WaitForChild('VoidGiveawayRules152'));local PackRules=require(RS:WaitForChild('SeedPackRules'))
@@ -34,7 +33,7 @@ local VIOLET,AMBER=RGB(190,144,255),RGB(255,190,90)
 S.LoopSeconds=2;S.PollSeconds=45;S.PollJitter=15;S.PublishGap=1.5;S.MaxDistance=48
 S.StoreCooldown=10 -- seconds a player waits after a store failure; S.FailBase/FailMax: the wait before the loop retries a pack that could not be added (5, 10, 20 .. 60 s)
 S.FailBase,S.FailMax=5,60
-S.PlayMaxStep=5;S.PlaySaveEvery=30;S.PlaySaveDone=300 -- R157: a look counts at most 5 s (a hitch or a paused Studio is not play); the field is marked dirty every 30 s (every 5 min once the 20 are in)
+S.PlayMaxStep=5;S.PlaySaveEvery=30;S.PlaySaveDone=300;S.PlayMark=1200 -- R157 counter: a look counts at most 5 s (a hitch or a paused Studio is not play); the field is marked dirty every 30 s (every 5 min once 20 min (PlayMark) are in)
 -- config, data (PlayerDataService), chests (ChestService), notes (NotificationService), map (MapService). opts (all optional; the tests pass fakes): Store, Clock (seconds), Time (Unix
 -- seconds), Messaging, Random, Studio, Art, NoLoop.
 function S.new(config,data,chests,notes,map,opts)
@@ -100,23 +99,16 @@ end
 function S:_setup(player)
  self.Ready[player]=true;self.PlayAt[player]=self.Clock()
  self:_state(player,self:_flag(player)and'Claimed'or'Open')
- self:_publishPlay(player)
 end
--- R157: the play time -----------------------------------------------------------------------------------------------------------------------------------
+-- The play time counter (R157; kept, no rule uses it) -----------------------------------------------------------------------------------------------------------------------------------
 -- Whole seconds this player has played (Premium.PlaySeconds157; no field = 0), or nil when the counter is not ready (the profile is not loaded, or it cannot be read): never a number then.
 function S:_played(player)
  local data=self.Data;if not data:IsLoaded(player)then return nil end
  local ok,premium=pcall(data.GetPremium,data,player);if not ok or type(premium)~='table'then return nil end
  return Rules.CleanPlayed(premium[Rules.PlayField])
 end
--- What the player's client reads (VoidPlayLeft157): the wait, rounded up to a whole minute. Written only when it changes; nothing is written while the counter is not ready.
-function S:_publishPlay(player,played)
- played=played or self:_played(player);if played==nil or not player.Parent then return end
- local shown=Rules.PlayShown(played)
- if player:GetAttribute(Rules.Attr.PlayLeft)~=shown then player:SetAttribute(Rules.Attr.PlayLeft,shown)end
-end
 -- One look at one player whose profile is loaded (called from Step): the time since the last look (at most S.PlayMaxStep) is added; whole seconds go into the profile, the rest waits here.
--- Saved like other progress: MarkDirty now and then (the autosave and the final save on leaving write it), MarkDirty + QueueGardenSave when the 20 minutes are reached.
+-- Saved like other progress: MarkDirty now and then (the autosave and the final save on leaving write it), MarkDirty + QueueGardenSave when 20 minutes are reached (as before).
 function S:_tickPlay(player,now)
  local last=self.PlayAt[player];self.PlayAt[player]=now
  if not last then return end
@@ -128,11 +120,10 @@ function S:_tickPlay(player,now)
  if whole<1 then return end
  local total=math.min(Rules.PlayCap,have+whole);premium[Rules.PlayField]=total
  local unsaved=(self.PlayUnsaved[player]or 0)+whole
- if have<Rules.MinPlaySeconds and total>=Rules.MinPlaySeconds then
+ if have<S.PlayMark and total>=S.PlayMark then
   self.PlayUnsaved[player]=0;self.Data:MarkDirty(player);self.Data:QueueGardenSave(player)
- elseif unsaved>=(total>=Rules.MinPlaySeconds and S.PlaySaveDone or S.PlaySaveEvery)then self.PlayUnsaved[player]=0;self.Data:MarkDirty(player)
+ elseif unsaved>=(total>=S.PlayMark and S.PlaySaveDone or S.PlaySaveEvery)then self.PlayUnsaved[player]=0;self.Data:MarkDirty(player)
  else self.PlayUnsaved[player]=unsaved end
- self:_publishPlay(player,total)
 end
 -- Gives the pack. NEVER yields. Returns the record, or nil and why ('claimed' = this profile already had it, 'room', 'add').
 function S:_grant(player)
@@ -201,13 +192,9 @@ function S:Claim(player,auto)
  if not owed and self:Full()then return refuse('🌑 All '..Rules.Cap..' free Void Packs are gone!','empty')end
  local minAge=Rules.MinAccountAgeDays -- (0 = off; a reserved player is owed their pack whatever the rule says now)
  if not owed and minAge>0 and(tonumber(player.AccountAge)or 0)<minAge then return refuse('🌑 The free Void Pack is for accounts '..minAge..' days old or more. Come back in '..math.ceil(minAge-(tonumber(player.AccountAge)or 0))..' day(s)!','young')end
- -- R157: the play time rule, refused before anything is reserved (no store request, no state change, no cooldown). A reserved player is owed their pack whatever this rule says; a counter that is
- -- not ready (nil) is "not ready yet", never "play more": the same soft refusal as data that is still loading.
- if not owed then
-  local played=self:_played(player)
-  if played==nil then return refuse(Rules.PlayLoading,'loading')end
-  if played<Rules.MinPlaySeconds then return refuse(Rules.PlayRefusalText(played),'playtime')end
- end
+ -- R158c: the tutorial rule, refused before anything is reserved (no store request, no state change, no cooldown). TutorialDone is the player attribute TutorialProgress sets (true after finishing OR
+ -- skipping); anything else, a missing attribute included, is "not finished". A player who already claimed was answered above; a reserved player is owed their pack whatever this rule says.
+ if not owed and not Rules.TutorialDone(player:GetAttribute(Rules.TutorialAttr))then return refuse(Rules.TutorialRefusal,'tutorial')end
  if not auto and not self:_near(player)then return false,'far'end
  if not self:_room(player)then
   if not auto or not self.Told[player]then self.Told[player]=true;self:_say(player,owed and'🎒 Your Void Pack is saved for you! Make room in your bag.'or'🎒 Make room in your bag first! (nothing got used)')end
@@ -341,15 +328,18 @@ function S:Status()
  return{Count=self.Count,Left=self:Left(),Cap=Rules.Cap,Source=self.Source,Mode=st.Mode,Store=st.Store,Key=st.Key,Studio=self.Studio,Failures=st.Failures,LastError=st.LastError,Why=st.Why,
   ReadAt=self.ReadAt,Subscribed=self.Subscribed,Sent=self.Sent,Received=self.Received,Full=self:Full(),Settled=self.ReadFull,PollError=self.PollError,Users=self.Users}
 end
--- R157: "12 min 30 s" (whole seconds).
+-- "12 min 30 s" (whole seconds).
 local function minSec(seconds)seconds=Rules.CleanPlayed(seconds);return string.format('%d min %d s',seconds//60,seconds%60)end
--- The play time line of voidgift: how long this player has played, what the claim needs, how long is left (or that the counter is not ready).
+-- The play time line of voidgift: how long this player has played (a counter only: the claim never waits for it).
 function S:PlayText(player)
  local played=self:_played(player)
- if played==nil then return'Play time: not loaded yet (the claim waits for it; it is never refused for it).'end
- local wait=Rules.PlayWait(played)
- return string.format('Play time: %s played, the claim needs %d min (%s; saved in Premium.%s%s).',minSec(played),Rules.MinPlaySeconds//60,
-  wait>0 and(minSec(wait)..' to go')or'long enough',Rules.PlayField,self.Data.CanSave[player]==false and', but this profile cannot save: kept in memory'or'')
+ if played==nil then return'Play time: not loaded yet (it is only a counter: the claim does not use it).'end
+ return string.format('Play time: %s played (saved in Premium.%s%s; the claim does not use it).',minSec(played),Rules.PlayField,self.Data.CanSave[player]==false and', but this profile cannot save: kept in memory'or'')
+end
+-- The tutorial line of voidgift: the claim needs a finished (or skipped) tutorial.
+function S:TutorialText(player)
+ local done=Rules.TutorialDone(player:GetAttribute(Rules.TutorialAttr))
+ return'Tutorial: '..(done and'finished (the claim is open for you)'or'NOT finished (the claim says "'..Rules.TutorialRefusal..'")')..'.'
 end
 function S:StatusText(player)
  local s=self:Status();local lines={}
@@ -362,7 +352,7 @@ function S:StatusText(player)
   or("DataStore '"..s.Store.."' key '"..s.Key.."' (LIVE)")
  lines[#lines+1]='Store: '..where..'; failures '..s.Failures..(s.LastError and('; last error: '..s.LastError)or'')..(s.PollError and('; poll: '..s.PollError)or'')..'.'
  lines[#lines+1]=string.format('Messages: %s; sent %d, received %d.',s.Subscribed and'subscribed'or(s.Mode=='Memory'and'off (memory mode)'or'NOT subscribed'),s.Sent,s.Received)
- if player then lines[#lines+1]=self:PlayText(player)end
+ if player then lines[#lines+1]=self:TutorialText(player);lines[#lines+1]=self:PlayText(player)end
  local prompt=self.Pedestal and self.Pedestal.Prompt
  lines[#lines+1]='Pedestal: '..(self.Model and tostring(self.Model:GetAttribute(Rules.Attr.State))or'not built')..'; prompt '..(prompt and prompt.Enabled and'on'or'off')..'.'
  lines[#lines+1]=self.Studio and'Studio tools: voidgift reset me (clears your claim and flag), voidgift left <0-'..Rules.Cap..'> (sets how many are left).'or'A live server never resets or edits the shared count (the Studio-only tools are off here).'
@@ -391,8 +381,8 @@ function S:_command(player,a)
  return true,'The Studio counter now shows '..left..' / '..Rules.Cap..' LEFT'..(left~=n and(' (the '..#self:_userList()..' players already in the list keep their places)')or'')..'.'
 end
 function S:_userList()local out={};for k in pairs(self.Users)do out[#out+1]=k end;return out end
--- R157: playtime [<minutes>] (per player: /test playtime @name <minutes>). No number = shows the player's play time. A number sets it (Studio only, like the voidgift edits: a live server never
--- changes a player's play time): the profile field, saved the usual way, the player's attribute at once, the half second not counted yet forgotten.
+-- R157 counter: playtime [<minutes>] (per player: /test playtime @name <minutes>). No number = shows the player's play time. A number sets it (Studio only, like the voidgift edits: a live server never
+-- changes a player's play time): the profile field, saved the usual way, the half second not counted yet forgotten. It is a counter only: no claim waits for it (R158c).
 function S:_playtime(player,a)
  local played=self:_played(player)
  if played==nil then return false,'Wait for the player data to load.'end
@@ -404,7 +394,6 @@ function S:_playtime(player,a)
  self.Data:GetPremium(player)[Rules.PlayField]=seconds
  self.PlayFrac[player]=nil;self.PlayUnsaved[player]=0
  self.Data:MarkDirty(player);self.Data:QueueGardenSave(player)
- self:_publishPlay(player,seconds)
  return true,'Play time set. '..self:PlayText(player)
 end
 function S.PlaytimeCommand(_,player,a)

@@ -1,6 +1,6 @@
 --!nocheck
 -- R151 setting "Announcements from other servers", the SETTINGS MENU half: the real SettingsClient on the Roblox mock (real AudioMixer, SettingsConfig, BrightUI, GardenTheme):
---  * the new row sits after the Quality row and before "Replay tutorial"; the canvas grew to fit; the volume rows are where they were
+--  * the new row sits after the Quality row; the canvas fits it; the volume rows are where they were (R158c: the "Replay tutorial" button is gone: nothing below the last row)
 --  * it shows On (default) / Off, a tap flips it and sends {Key='GlobalAnnouncements', Value=<boolean>} to the server through SetSetting, "Saved" follows
 --  * the value the server answers (SettingsState) is shown, unless the player already touched it
 --  * a failed save is retried; the volume rows and Quality still work next to it (a number or a word, never a boolean, reaches the mixer)
@@ -47,9 +47,11 @@ local row=controls:FindFirstChild('GlobalAnnouncements')
 check(row~=nil and row:IsA('TextButton'),'there is a GlobalAnnouncements row (a button)')
 check(row.Label:GetAttribute('FullText')=='Announcements from other servers','its label: "'..tostring(row.Label:GetAttribute('FullText'))..'"')
 check(row.Value.Text=='On','default: On')
-local quality,replay=controls.Quality,controls.ReplayTutorial
-check(row.Position.Y.Offset>quality.Position.Y.Offset+quality.Size.Y.Offset-1 and row.Position.Y.Offset+row.Size.Y.Offset<=replay.Position.Y.Offset,'it sits below Quality and above "Replay tutorial"')
-check(row.Position.Y.Offset==340 and replay.Position.Y.Offset==446 and controls.CanvasSize.Y.Offset==497 and replay.Position.Y.Offset+replay.Size.Y.Offset<=controls.CanvasSize.Y.Offset,'positions: row 340, replay 446, canvas 497 (R153: "Skip pack animations" at 393; everything fits the canvas)')
+local quality=controls.Quality
+check(row.Position.Y.Offset>quality.Position.Y.Offset+quality.Size.Y.Offset-1,'it sits below Quality')
+check(controls:FindFirstChild('ReplayTutorial')==nil,'R158c: there is no "Replay tutorial" button any more (the tutorial cannot be replayed)')
+local lastBottom=0;for _,c in ipairs(controls:GetChildren())do if c:IsA('GuiObject')then lastBottom=math.max(lastBottom,c.Position.Y.Offset+c.Size.Y.Offset)end end
+check(row.Position.Y.Offset==340 and controls.CanvasSize.Y.Offset==444 and lastBottom==436 and lastBottom<=controls.CanvasSize.Y.Offset and controls.CanvasSize.Y.Offset-lastBottom<=8,'positions: row 340, "Skip pack animations" at 393 (the last row, ends at 436), canvas 444 (R158c: no empty gap under the last row, everything fits)')
 check(row.Size.Y.Offset==quality.Size.Y.Offset and row.Size.X.Scale==quality.Size.X.Scale and row.Size.X.Offset==quality.Size.X.Offset,'it is the same size as the Quality row')
 local volumes={};for _,k in ipairs({'Music','Chase','Ambience','Effects','Interface'})do volumes[k]=controls:FindFirstChild(k)end
 check(volumes.Music.Position.Y.Offset==0 and volumes.Chase.Position.Y.Offset==56 and volumes.Interface.Position.Y.Offset==224 and quality.Position.Y.Offset==287,'the volume rows and Quality are where they were')
@@ -98,12 +100,12 @@ do
  local Config=W.module('SettingsConfig')
  local function sameU(u,v)return u.X.Scale==v.X.Scale and u.X.Offset==v.X.Offset and u.Y.Scale==v.Y.Scale and u.Y.Offset==v.Y.Offset end
  sc,gui,panel,controls=boot()
- local skip=controls:FindFirstChild('SkipCutscenes');local ann,replay2=controls.GlobalAnnouncements,controls.ReplayTutorial
+ local skip=controls:FindFirstChild('SkipCutscenes');local ann=controls.GlobalAnnouncements
  check(skip~=nil and skip:IsA('TextButton'),'R153: there is a SkipCutscenes row (a button)')
  check(skip.Label:GetAttribute('FullText')=='Skip pack animations','R153: its label: "'..tostring(skip.Label:GetAttribute('FullText'))..'"')
  check(skip.Value.Text=='Off'and Config.Defaults.SkipCutscenes==false,'R153: default: Off')
  check(me:GetAttribute('SettingSkipCutscenes')==false,'R153: the saved Off (SettingsState) is published on the LocalPlayer for the reveal')
- check(skip.Position.Y.Offset==393 and skip.Position.Y.Offset>=ann.Position.Y.Offset+ann.Size.Y.Offset and skip.Position.Y.Offset+skip.Size.Y.Offset<=replay2.Position.Y.Offset,'R153: it sits below "Announcements from other servers" and above "Replay tutorial"')
+ check(skip.Position.Y.Offset==393 and skip.Position.Y.Offset>=ann.Position.Y.Offset+ann.Size.Y.Offset and skip.Position.Y.Offset+skip.Size.Y.Offset<=controls.CanvasSize.Y.Offset,'R153: it sits below "Announcements from other servers" and inside the canvas (R158c: it is the last row)')
  check(skip.Size.Y.Offset==ann.Size.Y.Offset and skip.Size.X.Scale==ann.Size.X.Scale and skip.Size.X.Offset==ann.Size.X.Offset and sameU(skip.Label.Size,ann.Label.Size)and sameU(skip.Value.Position,ann.Value.Position)and sameU(skip.Value.Size,ann.Value.Size),'R153: the same row as the other on / off setting (label and value in the same places)')
  -- (fits a phone: the label shrinks to fit like every settings text (GardenTextFit), and it is shorter than the announcements one, which fits)
  check(#'Skip pack animations'<#'Announcements from other servers'and skip.Label:GetAttribute('FullText')~=nil,'R153: the label is shorter than the announcements label and fitted the same way (phones)')

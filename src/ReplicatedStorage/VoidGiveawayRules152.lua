@@ -16,17 +16,16 @@ R.Pack={Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',Wea
 -- Attributes. The pedestal model: Cap, Count (claims so far), Left (Cap - Count), State = Loading (the first read has not come back) / Open / Empty (all claimed, for ever).
 -- The player: VoidGift152 = Open / Busy (a claim is in flight) / Claimed; VoidGiftAt152 = the server time of a pack just given (the client's claim moment).
 R.Attr={Cap='Cap',Count='Count',Left='Left',State='State',Player='VoidGift152',At='VoidGiftAt152'}
--- R157 (owner: "make it so that the void pack is only claimable after playing for 20 minutes"): a player must have played MinPlaySeconds IN TOTAL (every visit counts) before a claim is
--- accepted. The server counts it in the optional saved field Premium.PlaySeconds157 (whole seconds, no ProfileVersion change: an old save has none and reads as 0; an older server keeps
--- the field it does not know) and publishes what is left on the player as VoidPlayLeft157 (seconds, rounded UP to a whole minute, so it changes once a minute; 0 = the claim is open;
--- no attribute = the counter is not loaded yet, which is "not ready yet", never a refusal). A player the giveaway already reserved a pack for (owed) is not held up by this rule.
-R.MinPlaySeconds=20*60
+-- R158c (owner: "for the void pack there isn't a 20 minute lock anymore and requirement is just finishing the tutorial"): the R157 rule of 20 minutes of play time is gone. A claim now needs
+-- the tutorial to be FINISHED (skipping it counts, exactly as everywhere else): the player attribute TutorialDone (TutorialProgress) must be true. The server checks it in Claim, right where the
+-- play-time check was (a refusal with no side effect), and the sign / prompt follow the same attribute live. A player the giveaway already reserved a pack for (owed) is never held up by it.
+-- The play-time counter (saved field Premium.PlaySeconds157, whole seconds, no ProfileVersion change) and /test playtime stay as they were, but nothing refuses a claim for play time.
 R.PlayField='PlaySeconds157'
-R.PlayCap=3*3600 -- counted up to here (nothing needs more; a few hours of room if the rule is ever raised)
-R.Attr.PlayLeft='VoidPlayLeft157'
-R.PlayRefusal='play %d more min to get your free void pack!' -- the refusal notice (%d = whole minutes left, rounded up)
-R.PlayHint='play %d more min to claim' -- the small line on the sign under the number, for a player who has not played long enough
-R.PlayLoading='your play time is still loading. try again in a sec!' -- (the counter is not ready: not a number of minutes, never an error)
+R.PlayCap=3*3600 -- counted up to here (a harmless counter now; nothing needs more)
+R.TutorialAttr='TutorialDone' -- the player attribute the server sets (TutorialProgress.PublishTutorial); true = finished or skipped
+R.TutorialRefusal='finish the tutorial to get your free void pack!' -- the refusal notice
+R.TutorialHint='finish the tutorial to claim' -- the small line on the sign under the number, for a player who has not finished the tutorial
+function R.TutorialDone(v)return v==true end -- the one test, the way TrackHoleService / PremiumService / FruitGiftService read the attribute
 -- Where: the middle of the hub's plaza (HubDecor151 "Fountain plaza": a brick disc, 21 studs across the radius, centre X 0 / Z -392, top .26 over the lobby floor).
 R.Center=Vector3.new(0,0,-392);R.FloorTop=4;R.PlazaRise=.26
 -- Studs above the plaza for what the client hangs on the pedestal (VoidGiveawayArt152 builds the stone below them). Scale = how big the stone is (1 = the first design; the plaza is
@@ -50,18 +49,11 @@ function R.LeftText(left,cap)
  if left==nil then return R.Loading..' / '..tostring(cap or R.Cap)..' LEFT'end
  return string.format('%d / %d LEFT',left,cap or R.Cap)
 end
--- R157: the play time. A saved value made clean: whole seconds from 0 to PlayCap (nothing, a string, NaN or a negative number reads as 0).
+-- The play time counter (kept; no rule uses it now). A saved value made clean: whole seconds from 0 to PlayCap (nothing, a string, NaN or a negative number reads as 0).
 function R.CleanPlayed(v)
  if type(v)~='number'or v~=v then return 0 end
  return math.floor(math.clamp(v,0,R.PlayCap))
 end
--- Seconds still to play before a claim is accepted (0 = long enough), and the same as whole minutes rounded up (a player with 1 s to go is told "1 more min").
-function R.PlayWait(played)return math.max(0,R.MinPlaySeconds-R.CleanPlayed(played))end
-function R.PlayMinutes(seconds)return math.ceil(math.max(0,seconds)/60)end
--- What the server publishes (VoidPlayLeft157): the wait rounded up to a whole minute, so the attribute (and the client's line) change once a minute, not every second.
-function R.PlayShown(played)return R.PlayMinutes(R.PlayWait(played))*60 end
-function R.PlayRefusalText(played)return string.format(R.PlayRefusal,R.PlayMinutes(R.PlayWait(played)))end
-function R.PlayHintText(minutes)return string.format(R.PlayHint,minutes)end
 -- Any value read from the store, made clean: Count a whole number at least as big as the number of users, Users a table of canonical user-id strings to numbers. Returns a NEW table.
 function R.Clean(value)
  local users,n={},0

@@ -91,7 +91,9 @@ check(type(A:GetAttribute('PackSerialAtJoin'))=='number'and gift.ChestNumber>A:G
 fake.Openings[A]=nil;tLucky:Destroy();tNormal:Destroy()
 -- 3. A one-time thing: once per account, and its luck stays with the player who earned it.
 local before=boosted(A)
-Data:TutorialAction(A,'Replay');check(finishTutorial(A)==nil and boosted(A)==before,'replaying the tutorial never gives another')
+-- (R158c: the Replay request is refused now; the tutorial is started again by hand here, as a replay used to do, to check that a second finish never gives another)
+local st=Data:GetPremium(A).Tutorial;st.Mask=1;st.Done=false;Data:PublishTutorial(A)
+check(finishTutorial(A)==nil and boosted(A)==before,'finishing the tutorial a second time never gives another')
 local saved=Data:_buildSaveData(A);check(saved.Premium and saved.Premium.StarterPack==true,'the "given" flag is saved with the account')
 local row=Data:SerializeSeedRecord(gift)
 check(row.RateBoost==2,'(its own save row keeps the 2x)')

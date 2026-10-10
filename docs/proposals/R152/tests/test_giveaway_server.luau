@@ -525,219 +525,246 @@ do
  check(said(s3,r,'claim it')==1,'A3: a claim that throws is announced once by the loop ('..said(s3,r,'claim it')..')')
 end
 
--- 15. R157 (owner: "make it so that the void pack is only claimable after playing for 20 minutes"): the play time -----------------------------------------------------------------
--- (every player the harness loads has already played the 20 minutes unless a test says Played = seconds, or false = a save from before the rule)
-local function refusal(minutes)return 'play '..minutes..' more min to get your free void pack!' end
+-- 15. R158c (owner: "for the void pack there isn't a 20 minute lock anymore and requirement is just finishing the tutorial"): the tutorial rule replaces R157's play time rule -------------
+-- (every player the harness loads has finished the tutorial unless a test says Tutorial=false, or 'unset' = the attribute was never published; Played = the R157 counter, which no rule uses now)
+local REFUSAL='finish the tutorial to get your free void pack!'
 local function field(s,p)return s.Data:GetPremium(p)[Rules.PlayField]end
 local function wordsOk(t)local padded=' '..t:lower()..' ';return padded:find('%f[%a]ur%f[%A]')==nil and padded:find('%f[%a]u%f[%A]')==nil end
 local function tick(s,seconds,every)every=every or 2;for _=1,math.floor(seconds/every+.5)do s.Clock.advance(every);s.Svc:Step()end end
--- A. the rule, the saved field, the attribute and the words
+-- A. the rule and the words
 do
- check(Rules.MinPlaySeconds==20*60,'R157 A: the rule is 20 minutes of TOTAL play time (1200 s)')
- check(Rules.PlayField=='PlaySeconds157'and Rules.Attr.PlayLeft=='VoidPlayLeft157','R157 A: saved as the optional Premium field PlaySeconds157, published as the player attribute VoidPlayLeft157')
- check(Rules.PlayCap==3*3600 and Rules.PlayCap>=Rules.MinPlaySeconds,'R157 A: counted up to a few hours (3 h), never less than the rule')
- check(Rules.CleanPlayed(nil)==0 and Rules.CleanPlayed('9')==0 and Rules.CleanPlayed(0/0)==0 and Rules.CleanPlayed(-5)==0 and Rules.CleanPlayed({})==0 and Rules.CleanPlayed(true)==0,'R157 A: no field (an old save), a string, NaN, a negative number, a table: all read as 0 seconds played')
- check(Rules.CleanPlayed(61.9)==61 and Rules.CleanPlayed(1e12)==Rules.PlayCap and Rules.CleanPlayed(math.huge)==Rules.PlayCap and Rules.CleanPlayed(-math.huge)==0,'R157 A: whole seconds, never above the cap')
- check(Rules.PlayWait(0)==1200 and Rules.PlayWait(1)==1199 and Rules.PlayWait(1199)==1 and Rules.PlayWait(1200)==0 and Rules.PlayWait(99999)==0 and Rules.PlayWait(nil)==1200,'R157 A: the wait is 1200 - played, never below 0')
- check(Rules.PlayMinutes(0)==0 and Rules.PlayMinutes(1)==1 and Rules.PlayMinutes(60)==1 and Rules.PlayMinutes(61)==2 and Rules.PlayMinutes(1199)==20 and Rules.PlayMinutes(1200)==20,'R157 A: whole minutes round UP (1 s to go is "1 more min")')
- check(Rules.PlayShown(0)==1200 and Rules.PlayShown(59)==1200 and Rules.PlayShown(60)==1140 and Rules.PlayShown(1139)==120 and Rules.PlayShown(1140)==60 and Rules.PlayShown(1199)==60 and Rules.PlayShown(1200)==0 and Rules.PlayShown(5000)==0,'R157 A: what is published is the wait rounded up to a whole minute (1200 .. 60, then 0 = open): it changes once a minute')
- check(Rules.PlayRefusalText(0)==refusal(20)and Rules.PlayRefusalText(8*60)==refusal(12)and Rules.PlayRefusalText(1199)==refusal(1)and Rules.PlayRefusalText(61)==refusal(19),'R157 A: the refusal reads "play {m} more min to get your free void pack!" (whole minutes, rounded up)')
- check(Rules.PlayHintText(12)=='play 12 more min to claim','R157 A: the sign\'s line reads "play 12 more min to claim"')
- for _,t in ipairs({Rules.PlayRefusalText(0),Rules.PlayHintText(5),Rules.PlayLoading})do
-  check(wordsOk(t)and not t:lower():find('cla[u]de')and not t:lower():find('op[u]s')and not t:lower():find('sonn[e]t')and not t:lower():find('haik[u]'),'R157 A: the new text "'..t..'" has no "u" / "ur" and no model name')
+ check(Rules.MinPlaySeconds==nil and Rules.PlayRefusal==nil and Rules.PlayHint==nil and Rules.PlayLoading==nil and Rules.Attr.PlayLeft==nil,'R158c A: the 20 minute rule is gone from the rules (no minimum, no play-time texts, no VoidPlayLeft157 attribute)')
+ check(Rules.PlayWait==nil and Rules.PlayMinutes==nil and Rules.PlayShown==nil and Rules.PlayRefusalText==nil and Rules.PlayHintText==nil,'R158c A: ... and no wait / minutes helpers either')
+ check(Rules.TutorialAttr=='TutorialDone','R158c A: the rule reads the player attribute TutorialDone (the one TutorialProgress sets)')
+ check(Rules.TutorialRefusal==REFUSAL,'R158c A: the refusal reads "finish the tutorial to get your free void pack!"')
+ check(Rules.TutorialHint=='finish the tutorial to claim','R158c A: the sign\'s line reads "finish the tutorial to claim"')
+ check(Rules.TutorialDone(true)==true and Rules.TutorialDone(false)==false and Rules.TutorialDone(nil)==false and Rules.TutorialDone(1)==false and Rules.TutorialDone('true')==false and Rules.TutorialDone({})==false,'R158c A: done = the attribute is exactly true (the way TrackHoleService / PremiumService / FruitGiftService read it); false, missing, 1, "true": not done')
+ check(Rules.PlayField=='PlaySeconds157'and Rules.PlayCap==3*3600,'R158c A: the play-time counter is kept: the optional Premium field PlaySeconds157, up to 3 h (saved data stays compatible)')
+ check(Rules.CleanPlayed(nil)==0 and Rules.CleanPlayed('9')==0 and Rules.CleanPlayed(0/0)==0 and Rules.CleanPlayed(-5)==0 and Rules.CleanPlayed({})==0 and Rules.CleanPlayed(true)==0,'R158c A: no field (an old save), a string, NaN, a negative number, a table: all read as 0 seconds played')
+ check(Rules.CleanPlayed(61.9)==61 and Rules.CleanPlayed(1e12)==Rules.PlayCap and Rules.CleanPlayed(math.huge)==Rules.PlayCap and Rules.CleanPlayed(-math.huge)==0,'R158c A: whole seconds, never above the cap')
+ for _,t in ipairs({Rules.TutorialRefusal,Rules.TutorialHint})do
+  check(wordsOk(t)and not t:lower():find('cla[u]de')and not t:lower():find('op[u]s')and not t:lower():find('sonn[e]t')and not t:lower():find('haik[u]'),'R158c A: the new text "'..t..'" has no "u" / "ur" and no model name')
  end
- check(Rules.PlayRefusalText(0):find('your free void pack',1,true)~=nil and Rules.PlayLoading:find('your play time',1,true)~=nil,'R157 A: ... and says "your" in full')
+ check(Rules.TutorialRefusal:find('your free void pack',1,true)~=nil,'R158c A: ... and says "your" in full')
 end
--- B. under 20 minutes: refused, and NOTHING happens (no reservation, no store request, no state change)
+-- B. tutorial NOT finished: refused, and NOTHING happens (no reservation, no store request, no state change), whatever the play time
 do
  local b=G.backend();local bus=E.bus(function()return 0 end,function()return 0 end);local s=new(b,bus)
- local p=G.player(s,1801,'Fresh',{Played=0});s.Svc:Step() -- (set up: the player is Open)
+ local p=G.player(s,1801,'Fresh',{Tutorial=false});s.Svc:Step() -- (set up: the player is Open)
  local g0,u0,w0,t0=b.Calls.Get,b.Calls.Update,b.Calls.Writes,b.Calls.Transforms;local dirty0,saves0,syncs0=s.Data.Dirty[p]or 0,s.Data.Saves[p]or 0,s.Chests.Syncs
  local ok,why=s.Svc:Claim(p)
- check(ok==false and why=='playtime','R157 B: at 0 minutes the claim is refused (playtime)')
- local n=s.Notes:last(p);check(n and n.Text==refusal(20)and n.Kind=='Denied','R157 B: ... "play 20 more min to get your free void pack!" (a refusal click)')
- check(b.Calls.Get==g0 and b.Calls.Update==u0 and b.Calls.Writes==w0 and b.Calls.Transforms==t0 and b.Data[KEY]==nil and next(b.Data)==nil,'R157 B: no store request of any kind, nothing written (no reservation)')
- check(voidPacks(s,p)==0 and s.Data.AddCalls==0 and s.Data:GetPremium(p).VoidGift152==nil and s.Chests.Syncs==syncs0,'R157 B: no pack, no flag, no hotbar sync')
- check((s.Data.Dirty[p]or 0)==dirty0 and(s.Data.Saves[p]or 0)==saves0,'R157 B: nothing marked dirty, no save queued')
- check(s.Svc.Reserved[p.UserId]==nil and s.Svc.Busy[p]==nil and s.Svc.Cool[p]==nil and s.Svc.Failed[p]==nil and s.Svc.Told[p]==nil,'R157 B: no reservation here, not busy, no cooldown, nothing remembered')
- check(p:GetAttribute('VoidGift152')=='Open'and attr(s,'Count')==0 and attr(s,'Left')==500 and prompt(s).Enabled==true,'R157 B: the player is still Open, the pedestal still says 500 left and its prompt stays on for everyone')
+ check(ok==false and why=='tutorial','R158c B: the tutorial is not finished: the claim is refused (tutorial)')
+ local n=s.Notes:last(p);check(n and n.Text==REFUSAL and n.Kind=='Denied','R158c B: ... "finish the tutorial to get your free void pack!" (a refusal click)')
+ check(b.Calls.Get==g0 and b.Calls.Update==u0 and b.Calls.Writes==w0 and b.Calls.Transforms==t0 and b.Data[KEY]==nil and next(b.Data)==nil,'R158c B: no store request of any kind, nothing written (no reservation)')
+ check(voidPacks(s,p)==0 and s.Data.AddCalls==0 and s.Data:GetPremium(p).VoidGift152==nil and s.Chests.Syncs==syncs0,'R158c B: no pack, no flag, no hotbar sync')
+ check((s.Data.Dirty[p]or 0)==dirty0 and(s.Data.Saves[p]or 0)==saves0,'R158c B: nothing marked dirty, no save queued')
+ check(s.Svc.Reserved[p.UserId]==nil and s.Svc.Busy[p]==nil and s.Svc.Cool[p]==nil and s.Svc.Failed[p]==nil and s.Svc.Told[p]==nil,'R158c B: no reservation here, not busy, no cooldown, nothing remembered')
+ check(p:GetAttribute('VoidGift152')=='Open'and attr(s,'Count')==0 and attr(s,'Left')==500 and prompt(s).Enabled==true,'R158c B: the player is still Open, the pedestal still says 500 left and its prompt stays on for everyone')
  -- the prompt makes the same claim
- local q=G.player(s,1802,'Presser',{Played=0});prompt(s).Triggered:Fire(q)
- check(voidPacks(s,q)==0 and s.Notes:last(q).Text==refusal(20)and b.Calls.Update==u0,'R157 B: the prompt (Triggered) is refused the same way')
- -- minutes, rounded up
- for _,row in ipairs({{1,20},{59,20},{60,19},{61,19},{600,10},{720,8},{1139,2},{1140,1},{1199,1}})do
-  local r=G.player(s,1810+row[1],'M'..row[1],{Played=row[1]});local okr,whyr=s.Svc:Claim(r)
-  check(okr==false and whyr=='playtime'and s.Notes:last(r).Text==refusal(row[2]),'R157 B: '..row[1]..' s played: "play '..row[2]..' more min ..." ('..tostring(s.Notes:last(r)and s.Notes:last(r).Text)..')')
- end
- check(b.Calls.Update==u0 and next(b.Data)==nil and attr(s,'Count')==0,'R157 B: nine more refusals, still no store request and no claim counted')
- -- a profile with no field at all (an old save) is the same as 0
- local old=G.player(s,1830,'Old save',{Played=false});check(field(s,old)==nil,'(an old save has no field)')
- local oko,whyo=s.Svc:Claim(old);check(oko==false and whyo=='playtime'and s.Notes:last(old).Text==refusal(20),'R157 B: an old save reads as 0: "play 20 more min ..."')
- check(next(b.Data)==nil and field(s,old)==nil,'R157 B: ... and refusing it wrote nothing (not even the field)')
+ local q=G.player(s,1802,'Presser',{Tutorial=false});prompt(s).Triggered:Fire(q)
+ check(voidPacks(s,q)==0 and s.Notes:last(q).Text==REFUSAL and b.Calls.Update==u0,'R158c B: the prompt (Triggered) is refused the same way')
+ -- a lot of play time does not open it (3 hours played, tutorial not finished), and none is the same
+ local long=G.player(s,1803,'Long play',{Tutorial=false,Played=Rules.PlayCap});local okL,whyL=s.Svc:Claim(long)
+ check(okL==false and whyL=='tutorial'and s.Notes:last(long).Text==REFUSAL and voidPacks(s,long)==0,'R158c B: 3 hours of play time and no finished tutorial: refused (play time never opens it)')
+ local none=G.player(s,1804,'No time',{Tutorial=false,Played=false});local okN,whyN=s.Svc:Claim(none)
+ check(okN==false and whyN=='tutorial'and s.Notes:last(none).Text==REFUSAL,'R158c B: an old save with no play time and no finished tutorial: the same refusal')
+ -- an attribute that was never published is "not done" (the same test as the other systems: exactly true)
+ local unset=G.player(s,1805,'Unset',{Tutorial='unset'});check(unset:GetAttribute('TutorialDone')==nil,'(no attribute)')
+ local okU,whyU=s.Svc:Claim(unset);check(okU==false and whyU=='tutorial'and s.Notes:last(unset).Text==REFUSAL,'R158c B: no TutorialDone attribute at all: not finished, refused')
+ check(b.Calls.Update==u0 and next(b.Data)==nil and attr(s,'Count')==0,'R158c B: five refusals in all, still no store request and no claim counted')
+ -- far from the pedestal and not finished: the tutorial refusal comes first (as the old play-time refusal did): the player is told
+ local far=G.player(s,1806,'Far',{Tutorial=false,Dist=200});local okF,whyF=s.Svc:Claim(far);check(okF==false and whyF=='tutorial'and s.Notes:last(far).Text==REFUSAL,'R158c B: far away and not finished: still told to finish the tutorial')
+ -- the loop (Step) never gives a pack to a player who is not owed one and has not finished the tutorial
+ s.Svc:Step();s.Svc:Step();check(voidPacks(s,p)==0 and voidPacks(s,q)==0 and next(b.Data)==nil,'R158c B: the server loop gives nothing to them')
 end
--- C. at 20 minutes: allowed (and the pack is the usual one)
+-- C. tutorial finished (or skipped: the same attribute): the claim goes through; play time never refuses
 do
  local b=G.backend();local s=new(b,nil)
- local almost=G.player(s,1901,'Almost',{Played=1199});local okA,whyA=s.Svc:Claim(almost)
- check(okA==false and whyA=='playtime'and s.Notes:last(almost).Text==refusal(1)and b.Calls.Update==0,'R157 C: 19 min 59 s: "play 1 more min ...", refused')
- local exact=G.player(s,1902,'Exact',{Played=1200});local okE,rec=s.Svc:Claim(exact)
- check(okE==true and rec.BagVariant=='EclipseReliquary'and voidPacks(s,exact)==1 and stored(b).Users['1902']~=nil and s.Data:GetPremium(exact).VoidGift152==true,'R157 C: exactly 20 minutes: allowed (one Void Pack, reserved, flag set)')
- local long=G.player(s,1903,'Long',{Played=Rules.PlayCap});check(s.Svc:Claim(long)==true and voidPacks(s,long)==1,'R157 C: 3 hours: allowed')
- -- the clock does it: 19 min 58 s + two looks
- local late=G.player(s,1904,'Late',{Played=1198});s.Svc:Step();check(s.Svc:Claim(late)==false,'R157 C: 1198 s: refused')
- tick(s,2);check(field(s,late)==1200 and s.Svc:Claim(late)==true and voidPacks(s,late)==1,'R157 C: two seconds of the server\'s own counting later it is allowed')
- -- the account-age rule and the play rule stand side by side (the play rule is checked after it, before any reservation)
+ for i,row in ipairs({{'no play time field',false},{'0 s played',0},{'1 s played',1},{'19 min 59 s played',1199},{'20 min played',1200},{'3 h played',Rules.PlayCap}})do
+  local id=1900+i;local p=G.player(s,id,'T'..i,{Played=row[2]});s.Svc:Step()
+  local ok,rec=s.Svc:Claim(p)
+  check(ok==true and rec.BagVariant=='EclipseReliquary'and voidPacks(s,p)==1 and stored(b).Users[tostring(id)]~=nil and s.Data:GetPremium(p).VoidGift152==true and said(s,p,'finish the tutorial')==0,'R158c C: finished tutorial, '..row[1]..': the claim goes through (one Void Pack, reserved, flag set, no "finish the tutorial")')
+ end
+ check(stored(b).Count==6 and attr(s,'Count')==6,'R158c C: six players, six packs, Count 6')
+ -- play time is never a reason ("play N more min" is nowhere)
+ local anyPlay=false;for _,x in ipairs(s.Notes.Log)do if x.Text:lower():find('more min',1,true)or x.Text:lower():find('play ',1,true)then anyPlay=true end end
+ check(not anyPlay,'R158c C: nobody was ever told "play N more min"')
+ -- live: the attribute changes while the player stands there. not finished -> finished -> claim
+ local late=G.player(s,1950,'Late',{Tutorial=false});s.Svc:Step()
+ check(s.Svc:Claim(late)==false and voidPacks(s,late)==0 and stored(b).Users['1950']==nil,'R158c C: not finished: refused')
+ late:SetAttribute('TutorialDone',true)
+ local ok2,rec2=s.Svc:Claim(late);check(ok2==true and rec2.BagVariant=='EclipseReliquary'and voidPacks(s,late)==1,'R158c C: the tutorial gets finished (or skipped): the very next claim goes through')
+ -- the server reads the attribute fresh at every claim: false again (nothing sets it any more, but a stale yes is never kept) -> refused, true -> allowed
+ local again=G.player(s,1951,'Flip');s.Svc:Step();again:SetAttribute('TutorialDone',false)
+ local ok3,why3=s.Svc:Claim(again);check(ok3==false and why3=='tutorial'and voidPacks(s,again)==0,'R158c C: TutorialDone false again: refused (the answer is never remembered)')
+ again:SetAttribute('TutorialDone',true);check(s.Svc:Claim(again)==true and voidPacks(s,again)==1,'R158c C: ... and allowed once it is true')
+ -- the account-age rule and the tutorial rule stand side by side (the tutorial rule is checked after it, before any reservation)
  Rules.MinAccountAgeDays=7
- local young=G.player(s,1905,'YoungNew',{Played=0});young.AccountAge=1;local okY,whyY=s.Svc:Claim(young)
- check(okY==false and whyY=='young','R157 C: with both rules on, a young account that has not played is told about the account age first (the order: age, then play time)')
+ local young=G.player(s,1960,'YoungNew',{Tutorial=false});young.AccountAge=1;local okY,whyY=s.Svc:Claim(young)
+ check(okY==false and whyY=='young','R158c C: with both rules on, a young account that has not finished the tutorial is told about the account age first (the order: age, then tutorial)')
  Rules.MinAccountAgeDays=0
- check(s.Svc:Claim(young)==false and s.Notes:last(young).Text==refusal(20),'R157 C: with the age rule off it is the play rule')
+ check(s.Svc:Claim(young)==false and s.Notes:last(young).Text==REFUSAL,'R158c C: with the age rule off it is the tutorial rule')
 end
--- D. a player who is already owed a pack (reserved before the rule existed) is NOT held up by it
+-- D. a player who is already owed a pack (reserved before) is NOT held up by the rule
 do
- -- in the shared list, no flag, no play time: the press gives the pack, and the server gives it by itself
+ -- in the shared list, no flag, tutorial not finished: the press gives the pack, and the server gives it by itself
  local b=G.backend();seedStore(b,3,{2001,2002,2003});local s=new(b,nil)
- local a=G.player(s,2001,'Owed press',{Played=0});local w0=b.Calls.Writes
- local ok=s.Svc:Claim(a);check(ok==true and voidPacks(s,a)==1 and s.Data:GetPremium(a).VoidGift152==true,'R157 D: reserved earlier, 0 minutes played: the press gives the pack')
- check(b.Calls.Writes==w0 and stored(b).Count==3 and said(s,a,'play ')==0,'R157 D: the same reservation (nothing written), and no "play more" line')
- local c=G.player(s,2002,'Owed loop',{Played=false});s.Svc:Step()
- check(voidPacks(s,c)==1 and said(s,c,'play ')==0,'R157 D: reserved earlier, an old save with no play time: the server gives the pack by itself')
- -- reserved on THIS server (the grant failed), then the play time is gone: still given
- local b2=G.backend();local s2=new(b2,nil);local r=G.player(s2,2010,'Crash',{Played=1200});s2.Data.ThrowAdd=true
+ local a=G.player(s,2001,'Owed press',{Tutorial=false});local w0=b.Calls.Writes
+ local ok=s.Svc:Claim(a);check(ok==true and voidPacks(s,a)==1 and s.Data:GetPremium(a).VoidGift152==true,'R158c D: reserved earlier, tutorial not finished: the press gives the pack')
+ check(b.Calls.Writes==w0 and stored(b).Count==3 and said(s,a,'finish the tutorial')==0,'R158c D: the same reservation (nothing written), and no "finish the tutorial" line')
+ local c=G.player(s,2002,'Owed loop',{Tutorial=false});s.Svc:Step()
+ check(voidPacks(s,c)==1 and said(s,c,'finish the tutorial')==0,'R158c D: reserved earlier, tutorial not finished: the server gives the pack by itself')
+ local c2=G.player(s,2003,'Owed unset',{Tutorial='unset'});s.Svc:Step()
+ check(voidPacks(s,c2)==1,'R158c D: ... also with no TutorialDone attribute at all')
+ -- reserved on THIS server (the grant failed), then the attribute is not true: still given
+ local b2=G.backend();local s2=new(b2,nil);local r=G.player(s2,2010,'Crash');s2.Data.ThrowAdd=true
  local ok2,why2=s2.Svc:Claim(r);check(ok2==false and why2=='add'and s2.Svc.Reserved[2010]==true,'(reserved, the pack could not be added)')
- s2.Data:GetPremium(r)[Rules.PlayField]=0;s2.Data.ThrowAdd=false;s2.Clock.advance(6);s2.Svc:Step()
- check(voidPacks(s2,r)==1,'R157 D: reserved here, play time since set back to 0: the pack is still given')
- -- and a player who is NOT owed, with the same 0 minutes, is refused (it is the reservation that decides)
- local d=G.player(s,2020,'Not owed',{Played=0});check(s.Svc:Claim(d)==false and voidPacks(s,d)==0,'R157 D: a player who is not in the list is still refused')
+ r:SetAttribute('TutorialDone',false);s2.Data.ThrowAdd=false;s2.Clock.advance(6);s2.Svc:Step()
+ check(voidPacks(s2,r)==1,'R158c D: reserved here, TutorialDone false since: the pack is still given')
+ -- and a player who is NOT owed, with an unfinished tutorial, is refused (it is the reservation that decides)
+ local d=G.player(s,2020,'Not owed',{Tutorial=false});check(s.Svc:Claim(d)==false and voidPacks(s,d)==0,'R158c D: a player who is not in the list is still refused')
  -- at 0 left an owed player is still given it (as before)
  local b3=G.backend();seedStore(b3,500,filler(2100,499));b3.Data[KEY].Users['2099']=1;b3.Data[KEY].Count=500
- local s3=new(b3,nil);local z=G.player(s3,2099,'Owed at zero',{Played=0});s3.Svc:Step()
- check(voidPacks(s3,z)==1,'R157 D: owed at 0 left and 0 minutes played: given')
+ local s3=new(b3,nil);local z=G.player(s3,2099,'Owed at zero',{Tutorial=false});s3.Svc:Step()
+ check(voidPacks(s3,z)==1,'R158c D: owed at 0 left and tutorial not finished: given')
 end
--- E. the counting: the server's loop (Step) counts whole seconds into the profile, publishes once a minute, saves the way other progress is saved
+-- D2. ONE pack per player (owner: "it is still one Void Pack per player"): unchanged by the new rule
+do
+ local b=G.backend();local s=new(b,nil);local p=G.player(s,2300,'Once');s.Svc:Step()
+ local ok,rec=s.Svc:Claim(p);check(ok==true and rec and voidPacks(s,p)==1 and attr(s,'Count')==1 and p:GetAttribute('VoidGift152')=='Claimed','R158c D2: finished the tutorial and claimed: one pack, Count 1, CLAIMED')
+ local u0,w0,g0=b.Calls.Update,b.Calls.Writes,b.Calls.Get
+ local ok2,why2=s.Svc:Claim(p)
+ check(ok2==false and why2=='claimed'and voidPacks(s,p)==1 and attr(s,'Count')==1,'R158c D2: a second claim is refused (claimed): still one pack, Count 1')
+ check(s.Notes:last(p).Text:find('already grabbed',1,true)~=nil and said(s,p,'finish the tutorial')==0,'R158c D2: ... it says "already grabbed", never "finish the tutorial"')
+ check(b.Calls.Update==u0 and b.Calls.Writes==w0 and b.Calls.Get==g0 and stored(b).Count==1,'R158c D2: ... and the store was not asked')
+ prompt(s).Triggered:Fire(p);s.Svc:Step();s.Svc:Step()
+ check(voidPacks(s,p)==1 and p:GetAttribute('VoidGift152')=='Claimed','R158c D2: the prompt and the server loop do not give a second pack (the sign stays on CLAIMED)')
+ -- TutorialDone false after the claim: the answer is still "claimed", the state stays Claimed, no second pack
+ p:SetAttribute('TutorialDone',false);local ok3,why3=s.Svc:Claim(p)
+ check(ok3==false and why3=='claimed'and voidPacks(s,p)==1 and p:GetAttribute('VoidGift152')=='Claimed'and s.Notes:last(p).Text:find('already grabbed',1,true)~=nil,'R158c D2: TutorialDone false after claiming: still "claimed", one pack, state Claimed')
+ p:SetAttribute('TutorialDone',true);check(s.Svc:Claim(p)==false and voidPacks(s,p)==1 and attr(s,'Count')==1,'R158c D2: and true again gives nothing more')
+ -- the global count is as before: another player counts once, the cap rule is untouched
+ local q=G.player(s,2301,'Second');s.Svc:Step();check(s.Svc:Claim(q)==true and attr(s,'Count')==2 and attr(s,'Left')==498,'R158c D2: a different player: Count 2, 498 left (the global count is as before)')
+end
+-- E. the play-time counter (R157, kept; no rule uses it): the server's loop (Step) counts whole seconds into the profile and saves the way other progress is saved
 do
  local b=G.backend();local s=new(b,nil);local p=G.player(s,2201,'Counter',{Played=false});local q=G.player(s,2202,'Other',{Played=300})
- check(p:GetAttribute(Rules.Attr.PlayLeft)==nil,'R157 E: before the player is set up there is no attribute (not ready yet)')
+ check(p:GetAttribute('VoidPlayLeft157')==nil,'R158c E: before the player is set up there is no play-time attribute (and there never is one now)')
  s.Svc:Step()
- check(p:GetAttribute(Rules.Attr.PlayLeft)==1200 and q:GetAttribute(Rules.Attr.PlayLeft)==900,'R157 E: set up: the attribute is the wait to the next whole minute (1200 s, and 900 s for 5 min played)')
- check(field(s,p)==nil,'R157 E: nothing is counted at the first look (an old save keeps no field yet)')
- local changes,dirty0,saves0=0,s.Data.Dirty[p]or 0,s.Data.Saves[p]or 0
- p:GetAttributeChangedSignal(Rules.Attr.PlayLeft):Connect(function()changes+=1 end)
+ check(p:GetAttribute('VoidPlayLeft157')==nil and q:GetAttribute('VoidPlayLeft157')==nil,'R158c E: set up: still no VoidPlayLeft157 attribute (nothing is published for a rule that is gone)')
+ check(field(s,p)==nil,'R158c E: nothing is counted at the first look (an old save keeps no field yet)')
+ local dirty0,saves0=s.Data.Dirty[p]or 0,s.Data.Saves[p]or 0
  tick(s,60)
- check(field(s,p)==60 and field(s,q)==360,'R157 E: 60 s later: 60 s played (and 360 for the other player), whole seconds')
- check(p:GetAttribute(Rules.Attr.PlayLeft)==1140 and q:GetAttribute(Rules.Attr.PlayLeft)==840,'R157 E: ... the attribute is 1140 / 840')
- check(changes==1,'R157 E: the attribute was written once in that minute, not every look ('..changes..')')
- check((s.Data.Dirty[p]or 0)-dirty0==2 and(s.Data.Saves[p]or 0)==saves0,'R157 E: marked dirty every 30 s (2 times in 60 s), no save queued yet')
+ check(field(s,p)==60 and field(s,q)==360,'R158c E: 60 s later: 60 s played (and 360 for the other player), whole seconds')
+ check((s.Data.Dirty[p]or 0)-dirty0==2 and(s.Data.Saves[p]or 0)==saves0,'R158c E: marked dirty every 30 s (2 times in 60 s), no save queued yet')
  -- a pause is not play: a look 60 s after the last counts at most 5 s
- s.Clock.advance(60);s.Svc:Step();check(field(s,p)==65,'R157 E: a 60 s gap between two looks (a hitch, a paused Studio) counts at most 5 s ('..tostring(field(s,p))..')')
+ s.Clock.advance(60);s.Svc:Step();check(field(s,p)==65,'R158c E: a 60 s gap between two looks (a hitch, a paused Studio) counts at most 5 s ('..tostring(field(s,p))..')')
  -- a fraction of a second is kept until it is a whole one
  local f0=field(s,p);for _=1,3 do s.Clock.advance(.4);s.Svc:Step()end
- check(field(s,p)==f0+1,'R157 E: 3 looks of .4 s: 1 whole second counted, .2 s kept ('..tostring(field(s,p)-f0)..')')
- for _=1,3 do s.Clock.advance(.4);s.Svc:Step()end;check(field(s,p)==f0+2,'R157 E: and counted when it adds up')
+ check(field(s,p)==f0+1,'R158c E: 3 looks of .4 s: 1 whole second counted, .2 s kept ('..tostring(field(s,p)-f0)..')')
+ for _=1,3 do s.Clock.advance(.4);s.Svc:Step()end;check(field(s,p)==f0+2,'R158c E: and counted when it adds up')
  -- not loaded: nothing is counted, nothing is said
- local w0=warnCount();s.Data.Loaded[p]=false;local before=field(s,p);tick(s,20);check(field(s,p)==before,'R157 E: a player whose data is not loaded (leaving, loading) is not counted')
- s.Data.Loaded[p]=true;tick(s,2);check(field(s,p)==before+G.Service.PlayMaxStep and G.Service.PlayMaxStep==5,'R157 E: and counting goes on when it is (the first look after the gap counts at most 5 s)')
- check(warnCount()==w0,'R157 E: no warn on the way')
- -- up to 20 minutes: the save, the attribute, and the claim opens
+ local w0=warnCount();s.Data.Loaded[p]=false;local before=field(s,p);tick(s,20);check(field(s,p)==before,'R158c E: a player whose data is not loaded (leaving, loading) is not counted')
+ s.Data.Loaded[p]=true;tick(s,2);check(field(s,p)==before+G.Service.PlayMaxStep and G.Service.PlayMaxStep==5,'R158c E: and counting goes on when it is (the first look after the gap counts at most 5 s)')
+ check(warnCount()==w0,'R158c E: no warn on the way')
+ -- up to 20 minutes: the save is queued once (the counter is saved, never lost), and nothing about the claim changes
  local saves1=s.Data.Saves[p]or 0
- tick(s,Rules.MinPlaySeconds-field(s,p)-2);check(field(s,p)==1198 and p:GetAttribute(Rules.Attr.PlayLeft)==60 and s.Svc:Claim(p)==false,'R157 E: 1198 s: the attribute says 60 s, the claim is refused')
- check((s.Data.Saves[p]or 0)==saves1,'R157 E: (no save queued before the 20 minutes)')
- tick(s,2);check(field(s,p)==1200 and p:GetAttribute(Rules.Attr.PlayLeft)==0,'R157 E: 1200 s: the attribute is 0: the claim is open')
- check((s.Data.Saves[p]or 0)==saves1+1,'R157 E: reaching the 20 minutes queues a save (QueueGardenSave) so it is never lost')
- check(s.Svc:Claim(p)==true and voidPacks(s,p)==1,'R157 E: and the claim goes through')
+ tick(s,G.Service.PlayMark-field(s,p)-2);check(field(s,p)==1198 and(s.Data.Saves[p]or 0)==saves1,'R158c E: 1198 s: no save queued yet')
+ tick(s,2);check(field(s,p)==1200 and(s.Data.Saves[p]or 0)==saves1+1,'R158c E: 1200 s: a save is queued (QueueGardenSave) so the counter is never lost')
+ check(s.Svc:Claim(p)==true and voidPacks(s,p)==1,'R158c E: the claim does not care (a finished tutorial is all it needs)')
  -- after that: still counted, up to the cap, marked dirty far less often
- local d1=s.Data.Dirty[p];tick(s,600);check((s.Data.Dirty[p]-d1)<=2 and field(s,p)==1800,'R157 E: after the 20 minutes the field is marked dirty every 5 minutes, not every 30 s ('..(s.Data.Dirty[p]-d1)..' in 10 min)')
- tick(s,Rules.PlayCap+600);check(field(s,p)==Rules.PlayCap,'R157 E: counted up to the cap (3 h) and no further')
- local dirtyCap=s.Data.Dirty[p];tick(s,60);check(s.Data.Dirty[p]==dirtyCap and field(s,p)==Rules.PlayCap,'R157 E: at the cap nothing is written any more')
+ local d1=s.Data.Dirty[p];tick(s,600);check((s.Data.Dirty[p]-d1)<=2 and field(s,p)==1800,'R158c E: after 20 minutes the field is marked dirty every 5 minutes, not every 30 s ('..(s.Data.Dirty[p]-d1)..' in 10 min)')
+ tick(s,Rules.PlayCap+600);check(field(s,p)==Rules.PlayCap,'R158c E: counted up to the cap (3 h) and no further')
+ local dirtyCap=s.Data.Dirty[p];tick(s,60);check(s.Data.Dirty[p]==dirtyCap and field(s,p)==Rules.PlayCap,'R158c E: at the cap nothing is written any more')
  -- a malformed saved value heals itself; the counter of a player who leaves is forgotten
  local bad=G.player(s,2203,'Bad field',{Played=false});s.Data:GetPremium(bad)[Rules.PlayField]='abc';s.Svc:Step()
- check(bad:GetAttribute(Rules.Attr.PlayLeft)==1200,'R157 E: a field that is not a number reads as 0')
- tick(s,2);check(field(s,bad)==2,'R157 E: ... and is written over with a number by the next count')
- G.leave(bad);check(s.Svc.PlayAt[bad]==nil and s.Svc.PlayFrac[bad]==nil and s.Svc.PlayUnsaved[bad]==nil,'R157 E: a player who leaves is forgotten (no leftovers)')
+ check(s.Svc:_played(bad)==0,'R158c E: a field that is not a number reads as 0')
+ tick(s,2);check(field(s,bad)==2,'R158c E: ... and is written over with a number by the next count')
+ G.leave(bad);check(s.Svc.PlayAt[bad]==nil and s.Svc.PlayFrac[bad]==nil and s.Svc.PlayUnsaved[bad]==nil,'R158c E: a player who leaves is forgotten (no leftovers)')
 end
--- F. "not ready yet" is never a refusal for minutes, never an error
+-- F. "not ready yet" is never an error; the in-memory Studio case
 do
  local b=G.backend();local s=new(b,nil);local w0=warnCount()
  local loading=H.player(2301,'Still loading');local ok,why=s.Svc:Claim(loading)
- check(ok==false and why=='loading'and s.Svc:_played(loading)==nil and loading:GetAttribute(Rules.Attr.PlayLeft)==nil,'R157 F: data not loaded: "loading", no counter (nil), no attribute')
- check(s.Notes:last(loading)==nil or not s.Notes:last(loading).Text:find('play ',1,true),'R157 F: ... and never told "play 20 more min"')
- s.Svc:Step();check(loading:GetAttribute(Rules.Attr.PlayLeft)==nil and s.Svc.PlayAt[loading]==nil,'R157 F: a Step does not count or publish for it')
- -- the counter cannot be read at the moment of the check (it is not ready): the soft refusal, the store is not asked, the player is not told minutes
- local p=G.player(s,2302,'Unready',{Played=0});local calls=0
- local raw=s.Data.IsLoaded;function s.Data:IsLoaded(pl)calls+=1;if calls==2 then return false end;return raw(self,pl)end
- local u0=b.Calls.Update;local ok2,why2=s.Svc:Claim(p);s.Data.IsLoaded=raw
- check(ok2==false and why2=='loading'and s.Notes:last(p).Text==Rules.PlayLoading and b.Calls.Update==u0,'R157 F: a counter that is not ready: the soft "your play time is still loading" ('..tostring(s.Notes:last(p).Text)..'), nothing reserved')
+ check(ok==false and why=='loading'and s.Svc:_played(loading)==nil,'R158c F: data not loaded: "loading", no counter (nil)')
+ check(s.Notes:last(loading)==nil or(not s.Notes:last(loading).Text:find('tutorial',1,true)and not s.Notes:last(loading).Text:find('play ',1,true)),'R158c F: ... and never told about the tutorial or play time (the data comes first)')
+ s.Svc:Step();check(s.Svc.PlayAt[loading]==nil and loading:GetAttribute('VoidPlayLeft157')==nil,'R158c F: a Step does not count or publish for it')
  -- what _played says for each state
- local data=s.Data;local rawPremium=data.GetPremium
- data.GetPremium=function()error('premium exploded')end;check(s.Svc:_played(p)==nil,'R157 F: a premium table that throws is "not ready" (nil), not an error')
- data.GetPremium=function()return nil end;check(s.Svc:_played(p)==nil,'R157 F: so is no table at all')
- data.GetPremium=rawPremium;check(s.Svc:_played(p)==0,'R157 F: and a normal profile with no field is 0')
- data.GetPremium=function()error('premium exploded')end;s.Svc:_tickPlay(p,s.Clock.now()+2);s.Svc:_publishPlay(p);data.GetPremium=rawPremium
- check(warnCount()==w0,'R157 F: counting / publishing with an unreadable profile throws nothing and warns nothing')
- -- Studio without DataStore access: the counter lives in memory (the profile cannot save), claims are refused only for minutes, never for the failed store
+ local p=G.player(s,2302,'Unready');local data=s.Data;local rawPremium=data.GetPremium
+ data.GetPremium=function()error('premium exploded')end;check(s.Svc:_played(p)==nil,'R158c F: a premium table that throws is "not ready" (nil), not an error')
+ data.GetPremium=function()return nil end;check(s.Svc:_played(p)==nil,'R158c F: so is no table at all')
+ data.GetPremium=rawPremium;check(s.Svc:_played(p)==0,'R158c F: and a normal profile with no field is 0')
+ data.GetPremium=function()error('premium exploded')end;s.Svc:_tickPlay(p,s.Clock.now()+2);data.GetPremium=rawPremium
+ check(warnCount()==w0,'R158c F: counting with an unreadable profile throws nothing and warns nothing')
+ -- Studio without DataStore access: the counter lives in memory (the profile cannot save); the claim needs the tutorial and nothing else
  local backend=G.backend();local st=new(backend,nil,{Studio=true,Memory=true,Name='ST157'});local w1=warnCount()
- local t=G.player(st,2303,'StudioNoApi',{CanSave=false,Played=false});st.Svc:Step()
- check(t:GetAttribute(Rules.Attr.PlayLeft)==1200,'R157 F: Studio without API access: the player gets the countdown too')
- tick(st,Rules.MinPlaySeconds-60);check(field(st,t)==1140 and st.Svc:Claim(t)==false and st.Notes:last(t).Text==refusal(1),'R157 F: it counts in memory (the profile cannot save): 19 min: "play 1 more min ..."')
- tick(st,60);local okS=st.Svc:Claim(t)
- check(okS==true and st.Data:voidPacks(t)==1 and next(backend.Data)==nil,'R157 F: at 20 minutes the in-memory counter opens the claim (nothing is written to a DataStore)')
- check(warnCount()==w1,'R157 F: ... with no warn for any of it ('..(warnCount()-w1)..')')
+ local t=G.player(st,2303,'StudioNoApi',{CanSave=false,Tutorial=false});st.Svc:Step()
+ tick(st,60);check(field(st,t)==60 and st.Svc:Claim(t)==false and st.Notes:last(t).Text==REFUSAL,'R158c F: Studio without API access: it counts in memory (60 s), and an unfinished tutorial is refused')
+ t:SetAttribute('TutorialDone',true);local okS=st.Svc:Claim(t)
+ check(okS==true and st.Data:voidPacks(t)==1 and next(backend.Data)==nil,'R158c F: finished: the claim goes through at once with 1 minute played (nothing is written to a DataStore)')
+ check(warnCount()==w1,'R158c F: ... with no warn for any of it ('..(warnCount()-w1)..')')
 end
--- G. the owner's tools: voidgift status prints the play time; playtime shows / sets it (Studio only); the command is wired and parses
+-- G. the owner's tools: voidgift status prints the tutorial and the play time; playtime shows / sets the counter (Studio only); the command is wired and parses
 do
  local b=G.backend();local bus=E.bus(function()return 0 end,function()return 0 end)
  local s=new(b,bus,{Studio=true,Name='O157'});local p=G.player(s,2401,'Owner',{Played=false});s.Svc:Step();local Cmd=G.Service.Command;local PT=G.Service.PlaytimeCommand
  local ok,text=Cmd(nil,p,{})
- check(ok==true and text:find('Play time: 0 min 0 s played',1,true)and text:find('needs 20 min',1,true)and text:find('20 min 0 s to go',1,true)and text:find('Premium.PlaySeconds157',1,true),'R157 G: voidgift status prints the play time ("'..tostring(text:match('Play time:[^\n]*'))..'")')
- tick(s,90);ok,text=Cmd(nil,p,{});check(text:find('Play time: 1 min 30 s played',1,true)and text:find('18 min 30 s to go',1,true),'R157 G: ... and it moves with the counting ("'..tostring(text:match('Play time:[^\n]*'))..'")')
- s.Data.CanSave[p]=false;ok,text=Cmd(nil,p,{});check(text:find('cannot save: kept in memory',1,true)~=nil,'R157 G: a profile that cannot save says the time is kept in memory');s.Data.CanSave[p]=true
+ check(ok==true and text:find('Play time: 0 min 0 s played',1,true)and text:find('the claim does not use it',1,true)and not text:find('needs 20',1,true)and not text:find('to go',1,true)and text:find('Premium.PlaySeconds157',1,true),'R158c G: voidgift status prints the play time as a counter ("'..tostring(text:match('Play time:[^\n]*'))..'")')
+ check(text:find('Tutorial: finished',1,true)~=nil,'R158c G: ... and the tutorial line ("'..tostring(text:match('Tutorial:[^\n]*'))..'")')
+ local nf=G.player(s,2404,'Unfinished',{Tutorial=false});ok,text=Cmd(nil,nf,{});check(text:find('Tutorial: NOT finished',1,true)and text:find(REFUSAL,1,true),'R158c G: an unfinished tutorial is said so in voidgift ("'..tostring(text:match('Tutorial:[^\n]*'))..'")')
+ tick(s,90);ok,text=Cmd(nil,p,{});check(text:find('Play time: 1 min 30 s played',1,true)~=nil,'R158c G: the play time moves with the counting ("'..tostring(text:match('Play time:[^\n]*'))..'")')
+ s.Data.CanSave[p]=false;ok,text=Cmd(nil,p,{});check(text:find('cannot save: kept in memory',1,true)~=nil,'R158c G: a profile that cannot save says the time is kept in memory');s.Data.CanSave[p]=true
  -- playtime: show
- ok,text=PT(nil,p,{});check(ok==true and text:find('1 min 30 s played',1,true)~=nil,'R157 G: playtime (no number) shows it')
- -- playtime 12: sets, saves, publishes
+ ok,text=PT(nil,p,{});check(ok==true and text:find('1 min 30 s played',1,true)~=nil,'R158c G: playtime (no number) shows it')
+ -- playtime 12: sets, saves; nothing is published for a claim
  local dirty0,saves0=s.Data.Dirty[p]or 0,s.Data.Saves[p]or 0
  ok,text=PT(nil,p,{'12'})
- check(ok==true and field(s,p)==720 and text:find('12 min 0 s played',1,true)and text:find('8 min 0 s to go',1,true),'R157 G: playtime 12 sets 720 s ("'..tostring(text)..'")')
- check(p:GetAttribute(Rules.Attr.PlayLeft)==480,'R157 G: ... the attribute at once (480 s)')
- check((s.Data.Dirty[p]or 0)>dirty0 and(s.Data.Saves[p]or 0)==saves0+1,'R157 G: ... saved the usual way (MarkDirty + QueueGardenSave)')
- check(s.Svc:Claim(p)==false and s.Notes:last(p).Text==refusal(8),'R157 G: ... and the claim says 8 more minutes')
- ok,text=PT(nil,p,{'19.5'});check(ok==true and field(s,p)==1170 and p:GetAttribute(Rules.Attr.PlayLeft)==60,'R157 G: playtime 19.5 = 1170 s')
- ok,text=PT(nil,p,{'20'});check(ok==true and field(s,p)==1200 and p:GetAttribute(Rules.Attr.PlayLeft)==0 and text:find('long enough',1,true),'R157 G: playtime 20 opens the claim ("'..tostring(text:match('Play time:[^\n]*'))..'")')
- check(s.Svc:Claim(p)==true and voidPacks(s,p)==1,'R157 G: and the claim works')
- ok,text=PT(nil,p,{'0'});check(ok==true and field(s,p)==0 and p:GetAttribute(Rules.Attr.PlayLeft)==1200,'R157 G: playtime 0 starts again')
- ok=PT(nil,p,{'180'});check(ok==true and field(s,p)==10800,'R157 G: 180 minutes is the largest (the cap)')
+ check(ok==true and field(s,p)==720 and text:find('12 min 0 s played',1,true)~=nil,'R158c G: playtime 12 sets 720 s ("'..tostring(text)..'")')
+ check(p:GetAttribute('VoidPlayLeft157')==nil,'R158c G: ... and publishes no attribute')
+ check((s.Data.Dirty[p]or 0)>dirty0 and(s.Data.Saves[p]or 0)==saves0+1,'R158c G: ... saved the usual way (MarkDirty + QueueGardenSave)')
+ ok,text=PT(nil,p,{'19.5'});check(ok==true and field(s,p)==1170,'R158c G: playtime 19.5 = 1170 s')
+ ok,text=PT(nil,p,{'20'});check(ok==true and field(s,p)==1200,'R158c G: playtime 20 = 1200 s')
+ ok,text=PT(nil,p,{'0'});check(ok==true and field(s,p)==0,'R158c G: playtime 0 starts again')
+ check(s.Svc:Claim(p)==true and voidPacks(s,p)==1,'R158c G: ... and with 0 minutes played the claim still works (a finished tutorial is all it needs)')
+ ok=PT(nil,p,{'180'});check(ok==true and field(s,p)==10800,'R158c G: 180 minutes is the largest (the cap)')
  local f=field(s,p)
- check(PT(nil,p,{'-1'})==false and PT(nil,p,{'x'})==false and PT(nil,p,{'181'})==false and PT(nil,p,{'1','2'})==false and PT(nil,p,{'nan'})==false and PT(nil,p,{'inf'})==false and PT(nil,p,{'1e9'})==false and field(s,p)==f,'R157 G: a negative, a word, more than 180, two numbers, nan / inf: refused, nothing changed')
+ check(PT(nil,p,{'-1'})==false and PT(nil,p,{'x'})==false and PT(nil,p,{'181'})==false and PT(nil,p,{'1','2'})==false and PT(nil,p,{'nan'})==false and PT(nil,p,{'inf'})==false and PT(nil,p,{'1e9'})==false and field(s,p)==f,'R158c G: a negative, a word, more than 180, two numbers, nan / inf: refused, nothing changed')
+ check(PT(nil,nf,{'180'})==true and s.Svc:Claim(nf)==false and s.Notes:last(nf).Text==REFUSAL,'R158c G: 180 minutes of play time does not open the claim for an unfinished tutorial')
  -- the whole owner path (StudioTestCommands.Execute: access, @name, the parser, the dispatcher): /test playtime @name <minutes>
  do
   local rawStudio=W.Run.IsStudio;W.Run.IsStudio=function()return true end
   local SC=H.server('StudioTestCommands');local bob=G.player(s,2403,'Bobby',{Played=false});local ctx={Data=s.Data,Config=s.Data.Config}
   local o1,m1=SC.Execute(ctx,p,'/test playtime @Bobby 12')
-  check(o1==true and field(s,bob)==720 and bob:GetAttribute(Rules.Attr.PlayLeft)==480 and m1:find('@Bobby',1,true)and m1:find('12 min 0 s played',1,true),'R157 G: "/test playtime @Bobby 12" sets Bobby to 12 minutes, saved, published ('..tostring(m1)..')')
-  o1,m1=SC.Execute(ctx,p,'/test playtime 7 @Bobby');check(o1==true and field(s,bob)==420,'R157 G: "/test playtime 7 @Bobby" (the usual order) works too')
-  o1,m1=SC.Execute(ctx,p,'playtime @Bobby 19.5');check(o1==true and field(s,bob)==1170,'R157 G: ... and so does the F4 box form ("playtime @Bobby 19.5")')
-  o1,m1=SC.Execute(ctx,p,'/test playtime @Bobby');check(o1==true and field(s,bob)==1170 and m1:find('19 min 30 s played',1,true),'R157 G: "/test playtime @Bobby" shows it and changes nothing')
-  o1,m1=SC.Execute(ctx,p,'/test playtime @Nobody 5');check(o1==false and field(s,bob)==1170,'R157 G: an unknown name is refused')
-  o1,m1=SC.Execute(ctx,p,'/test playtime @Bobby soon');check(o1==false and field(s,bob)==1170,'R157 G: a word instead of the minutes is refused')
-  o1,m1=SC.Execute(ctx,p,'/test playtime @me 4');check(o1==true and field(s,p)==240,'R157 G: "@me" is the owner')
+  check(o1==true and field(s,bob)==720 and m1:find('@Bobby',1,true)and m1:find('12 min 0 s played',1,true),'R158c G: "/test playtime @Bobby 12" sets Bobby to 12 minutes, saved ('..tostring(m1)..')')
+  o1,m1=SC.Execute(ctx,p,'/test playtime 7 @Bobby');check(o1==true and field(s,bob)==420,'R158c G: "/test playtime 7 @Bobby" (the usual order) works too')
+  o1,m1=SC.Execute(ctx,p,'playtime @Bobby 19.5');check(o1==true and field(s,bob)==1170,'R158c G: ... and so does the F4 box form ("playtime @Bobby 19.5")')
+  o1,m1=SC.Execute(ctx,p,'/test playtime @Bobby');check(o1==true and field(s,bob)==1170 and m1:find('19 min 30 s played',1,true),'R158c G: "/test playtime @Bobby" shows it and changes nothing')
+  o1,m1=SC.Execute(ctx,p,'/test playtime @Nobody 5');check(o1==false and field(s,bob)==1170,'R158c G: an unknown name is refused')
+  o1,m1=SC.Execute(ctx,p,'/test playtime @Bobby soon');check(o1==false and field(s,bob)==1170,'R158c G: a word instead of the minutes is refused')
+  o1,m1=SC.Execute(ctx,p,'/test playtime @me 4');check(o1==true and field(s,p)==240,'R158c G: "@me" is the owner')
   W.Run.IsStudio=rawStudio
  end
  -- a LIVE server: shows, refuses to set, changes nothing
  local live=new(G.backend(),nil,{Studio=false,Name='L157'});local o=G.player(live,2402,'Live owner',{Played=300})
- local okL,tL=G.Service.PlaytimeCommand(nil,o,{});check(okL==true and tL:find('5 min 0 s played',1,true),'R157 G: live: playtime shows the time')
+ local okL,tL=G.Service.PlaytimeCommand(nil,o,{});check(okL==true and tL:find('5 min 0 s played',1,true),'R158c G: live: playtime shows the time')
  local d0,s0=live.Data.Dirty[o]or 0,live.Data.Saves[o]or 0
- local okS,tS=G.Service.PlaytimeCommand(nil,o,{'30'});check(okS==false and tS:find('works in Studio only',1,true)and field(live,o)==300 and(live.Data.Dirty[o]or 0)==d0 and(live.Data.Saves[o]or 0)==s0,'R157 G: live: playtime 30 is refused ("works in Studio only"), nothing changed, nothing saved')
- local okV,tV=G.Service.Command(nil,o,{});check(okV==true and tV:find('Play time: 5 min 0 s played',1,true),'R157 G: live: voidgift status still prints it')
+ local okS,tS=G.Service.PlaytimeCommand(nil,o,{'30'});check(okS==false and tS:find('works in Studio only',1,true)and field(live,o)==300 and(live.Data.Dirty[o]or 0)==d0 and(live.Data.Saves[o]or 0)==s0,'R158c G: live: playtime 30 is refused ("works in Studio only"), nothing changed, nothing saved')
+ local okV,tV=G.Service.Command(nil,o,{});check(okV==true and tV:find('Play time: 5 min 0 s played',1,true),'R158c G: live: voidgift status still prints it')
  -- wiring: the owner's dispatcher, the parser, the help and the docs
- local U=H.server('OwnerUpdateCommands82');check(U.Actions.playtime==true,'R157 G: playtime is an owner action (OwnerUpdateCommands82.Actions)')
+ local U=H.server('OwnerUpdateCommands82');check(U.Actions.playtime==true,'R158c G: playtime is an owner action (OwnerUpdateCommands82.Actions)')
  local Targets=H.server('OwnerCommandTargets82')
  local b1,t1=Targets.Split('/test playtime @Bob 12');local b2,t2=Targets.Split('playtime @Bob 12');local b3,t3=Targets.Split('/test playtime 12 @Bob');local b4,t4=Targets.Split('playtime @me')
- check(b1=='/test playtime 12'and t1=='Bob'and b2=='playtime 12'and t2=='Bob'and b3=='/test playtime 12'and t3=='Bob'and b4=='playtime'and t4=='me','R157 G: "playtime @name 12" and "playtime 12 @name" both parse to the minutes and the target')
- local b5,t5,w5=Targets.Split('cash @Bob 5');check(b5==nil and w5:find('at the end',1,true),'R157 G: every other command still needs the name at the end')
- check(not Targets.IsGlobal('playtime 12')and not Targets.IsGlobal('/test playtime')and Targets.IsGlobal('voidgift'),'R157 G: playtime is a per-player command (takes @name); voidgift stays server-wide')
- local Help=W.module('StudioTestHelp');local helped=false;for _,row in ipairs(Help)do if row[1]:find('/test playtime',1,true)then helped=true;check(wordsOk(row[2]),'R157 G: help row "'..row[1]..'" has no "u" / "ur"')end end
- check(helped,'R157 G: /test playtime is in the F4 help')
+ check(b1=='/test playtime 12'and t1=='Bob'and b2=='playtime 12'and t2=='Bob'and b3=='/test playtime 12'and t3=='Bob'and b4=='playtime'and t4=='me','R158c G: "playtime @name 12" and "playtime 12 @name" both parse to the minutes and the target')
+ local b5,t5,w5=Targets.Split('cash @Bob 5');check(b5==nil and w5:find('at the end',1,true),'R158c G: every other command still needs the name at the end')
+ check(not Targets.IsGlobal('playtime 12')and not Targets.IsGlobal('/test playtime')and Targets.IsGlobal('voidgift'),'R158c G: playtime is a per-player command (takes @name); voidgift stays server-wide')
+ local Help=W.module('StudioTestHelp');local helped,gift=false,false
+ for _,row in ipairs(Help)do
+  if row[1]:find('/test playtime',1,true)then helped=true;check(wordsOk(row[2])and not row[2]:find('after 20 minutes',1,true),'R158c G: help row "'..row[1]..'" has no "u" / "ur" and no "after 20 minutes"')end
+  if row[1]=='/test voidgift'then gift=true;check(row[2]:find('tutorial',1,true)~=nil,'R158c G: the voidgift help row mentions the tutorial')end
+ end
+ check(helped and gift,'R158c G: /test playtime and /test voidgift are in the F4 help')
 end
--- H. cost: nothing per frame, nothing allocated per look beyond numbers
+-- H. cost: nothing per frame, nothing allocated per look beyond numbers, no attribute written for play time
 do
  local function connected(sig)local n=0;for _,c in ipairs(sig._c or{})do if c.Connected then n+=1 end end;return n end
  local function frameConnections()return connected(W.Run.Heartbeat),connected(W.Run.RenderStepped),W.Run.Stepped and connected(W.Run.Stepped)or 0 end
@@ -746,24 +773,23 @@ do
  for i=1,12 do players[i]=G.player(s,2500+i,'C'..i,{Played=false})end
  s.Svc:Step()
  local h1,r1,s1=frameConnections()
- check(h1==h0 and r1==r0 and s1==s0,'R157 H: counting adds no Heartbeat / RenderStepped / Stepped connection (it rides the giveaway\'s existing 2 s loop)')
- -- 300 looks (10 minutes) of 12 players: no Instance is created, attributes are written about once a minute, saves are marked every 30 s
+ check(h1==h0 and r1==r0 and s1==s0,'R158c H: counting adds no Heartbeat / RenderStepped / Stepped connection (it rides the giveaway\'s existing 2 s loop)')
+ -- 300 looks (10 minutes) of 12 players: no Instance is created, no play-time attribute is written, saves are marked every 30 s
  local made=0;local inew=R.Instance.new;R.Instance.new=function(...)made+=1;return inew(...)end
- local sets,writes=0,0;for _,pl in ipairs(players)do pl:GetAttributeChangedSignal(Rules.Attr.PlayLeft):Connect(function()sets+=1 end)end
- local rawSet=R.Inst.SetAttribute;function R.Inst.SetAttribute(self,k,v)if k==Rules.Attr.PlayLeft then writes+=1 end;return rawSet(self,k,v)end
+ local writes=0;local rawSet=R.Inst.SetAttribute;function R.Inst.SetAttribute(self,k,v)if k=='VoidPlayLeft157'then writes+=1 end;return rawSet(self,k,v)end
  local dirty0=0;for _,pl in ipairs(players)do dirty0+=s.Data.Dirty[pl]or 0 end
  tick(s,600)
  R.Instance.new=inew;R.Inst.SetAttribute=rawSet
  local dirty=0;for _,pl in ipairs(players)do dirty+=(s.Data.Dirty[pl]or 0)end;dirty-=dirty0
- check(made==0,'R157 H: 300 looks of 12 players create no Instance ('..made..')')
- check(sets==12*10 and writes==12*10,'R157 H: ... and write the attribute once a minute per player (120 in 10 minutes: '..sets..' changes, '..writes..' writes), not at every look (3600)')
- check(dirty==12*20,'R157 H: ... and mark the profile dirty every 30 s (240 in 10 minutes: '..dirty..')')
- local counted=true;for _,pl in ipairs(players)do if field(s,pl)~=600 then counted=false end end;check(counted,'R157 H: all 12 counted exactly 600 s')
+ check(made==0,'R158c H: 300 looks of 12 players create no Instance ('..made..')')
+ check(writes==0,'R158c H: ... and write no play-time attribute at all ('..writes..')')
+ check(dirty==12*20,'R158c H: ... and mark the profile dirty every 30 s (240 in 10 minutes: '..dirty..')')
+ local counted=true;for _,pl in ipairs(players)do if field(s,pl)~=600 then counted=false end end;check(counted,'R158c H: all 12 counted exactly 600 s')
  -- the loop that counts is the existing one: S.LoopSeconds is still 2 s and there is no new loop
- check(G.Service.LoopSeconds==2,'R157 H: the loop is the giveaway\'s own, every 2 s (unchanged)')
+ check(G.Service.LoopSeconds==2,'R158c H: the loop is the giveaway\'s own, every 2 s (unchanged)')
  -- heap: a thousand more looks leave nothing behind
  collectgarbage();collectgarbage();local m0=collectgarbage('count');tick(s,2000);collectgarbage();collectgarbage();local m1=collectgarbage('count')
- check(m1-m0<64,string.format('R157 H: 1000 more looks keep nothing (heap %.0f -> %.0f KB)',m0,m1))
+ check(m1-m0<64,string.format('R158c H: 1000 more looks keep nothing (heap %.0f -> %.0f KB)',m0,m1))
 end
 
 print(string.format('giveaway server: %d checks, %d failed',checks,fails))

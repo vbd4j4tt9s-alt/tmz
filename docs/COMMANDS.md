@@ -156,11 +156,11 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 ## Free Void Pack pedestal
 | Command | What it does |
 |---|---|
-| `voidgift` (server) | R152: the giveaway pedestal in the middle of the plaza: how many of the 500 are claimed and left, whether YOU have claimed (profile flag, the shared list, your state), which store this server uses (`DataStore` live, the Studio test store, or the in-memory counter when Studio has no API access), messages sent / received, and the pedestal (state, prompt). No @name |
+| `voidgift` (server) | R152: the giveaway pedestal in the middle of the plaza: how many of the 500 are claimed and left, whether YOU have claimed (profile flag, the shared list, your state), whether your tutorial is finished (R158c: the claim needs it), which store this server uses (`DataStore` live, the Studio test store, or the in-memory counter when Studio has no API access), messages sent / received, and the pedestal (state, prompt). No @name |
 | `voidgift reset me` (server, **Studio only**) | Clears YOUR claim and your profile flag (the shared list loses you, the count goes down by one) so you can claim again. The pack you already got stays in your Bag (`clear packs` removes it). A live server refuses: it never changes the shared count |
 | `voidgift left 3` (server, **Studio only**) | Sets how many the pedestal shows as left (0 = ALL CLAIMED, 487 = a fresh start). Players already in the list keep their places, so the number cannot go above 500 minus them. Studio only; a live server refuses |
-| `playtime @name` | R157: how long that player has played in total (saved with the profile as `Premium.PlaySeconds157`, counted up to 3 hours) and how long is left until the free Void Pack can be claimed (20 minutes). `voidgift` shows yours too |
-| `playtime @name 12` (**Studio only** to set) | Sets that player's play time to 12 minutes (0 to 180), saved the usual way; `playtime 12 @name` works too. Use `playtime @name 19` to test the 20-minute rule: the pack opens a minute later. A live server refuses |
+| `playtime @name` | R157: how long that player has played in total (saved with the profile as `Premium.PlaySeconds157`, counted up to 3 hours) (only a counter now: since R158c the free Void Pack needs a finished tutorial, not play time). `voidgift` shows yours too |
+| `playtime @name 12` (**Studio only** to set) | Sets that player's play time to 12 minutes (0 to 180), saved the usual way; `playtime 12 @name` works too. It does not change the free Void Pack claim any more. To test the R158c rule (the claim needs a finished or skipped tutorial), use a new account or a new profile (claim refused, the sign says "finish the tutorial to claim"), then finish or skip the tutorial (the claim opens). The tutorial cannot be replayed any more. A live server refuses |
 | `pyramid @name` | R157: the secret pyramid in the Desert: does that player have its pack (saved as `Premium.Secrets156.Pyramid`), are they carrying it now, the pyramid's spot, size and Hold-E reach |
 | `pyramid @name reset` | Clears that player's pyramid claim (saved), so the pack floats in the pyramid for them again; packs already in their Bag stay. `pyramid reset @name` works too |
 
@@ -278,7 +278,7 @@ listed separately any more because each one is the same as a command above.
 18. **R133:**
    - Market: fruit sits on the crates and steps (no floating), all 4 shelves are full of mixed packs, soil in the planters and flower boxes, a wall behind the front sign, no MARKET text from inside, lamps hang from a ceiling beam, pots and a barrel at the back.
    - Fruit of the Hour: big fruit, small two-line label above it. `fruithour apple 3` to switch it.
-   - Tutorial: Settings > replay the tutorial: casual lines with emojis.
+   - Tutorial: a brand-new profile (R158c: the tutorial can't be replayed any more, the Settings button is gone): casual lines with emojis.
 19. **R134:**
    - `seeds all`, open the Bag: every seed looks different, no side wings. Hold Diamond Vine, Prism Pepper, Ash Tomato, Iceberry, Venom Vine, Prism Monarch.
    - Hold a Legendary+ seed: flames/crystals/glows animate; `give prism monarch seed`: crown and golden rays.
@@ -294,14 +294,14 @@ listed separately any more because each one is the same as a command above.
    - Graphics Low: hotbar, Bag and the bonus reel still show real 3D pictures (no flat icons).
    - Index: rarity + 1/N chips, SEED/GROWN chips, CLAIM pill, Common → King order, ringed tab, FOUND total.
 23. **R138:**
-   - Settings > replay the tutorial: picture welcome, icon + 2-3 word cards with key chips, step icon row, clicking indicator while opening (pips fill), 3 picture slides, YOU'RE READY! + confetti.
+   - a brand-new profile (R158c: no replay button any more): picture welcome, icon + 2-3 word cards with key chips, step icon row, clicking indicator while opening (pips fill), 3 picture slides, YOU'RE READY! + confetti.
    - Finishing it (first time on the account) gives a free Forest pack with 2x rates (R139: kept secret, see 24).
    - Open packs: Common pop, Uncommon pop + note, Rare sparkle + two notes, small ring/sparkles; `rarepacks @you`: Secret/Cosmic/King louder.
    - Index: a waiting reward puts a count on INDEX, ! on MENU and a dot on its biome tab; claiming plays ka-ching / gem sound; no gray box above names.
 24. **R139:**
    - Steal and bank a pack: its hotbar slot (and Bag card) gets a spinning rainbow border, ~4 s, then it fades. Packs you joined with stay plain, also after a reset.
    - Hotbar full: a new pack's Bag card glows when you open the Bag.
-   - Free tutorial pack: the finish card says 🎁 FREE PACK!, the notice FREE Forest Seed Pack; its tooltip matches a normal Forest pack (no luck row). Replay: no second one. Gift it: the alt gets a normal Forest pack.
+   - Free tutorial pack: the finish card says 🎁 FREE PACK!, the notice FREE Forest Seed Pack; its tooltip matches a normal Forest pack (no luck row). Finishing it again by any route: no second one. Gift it: the alt gets a normal Forest pack.
 25. **R140:**
    - 🎁 DAILY and 👥 INVITE sit right of TRACK in the top bar (phone too). DAILY's red number = login reward + finished quests.
    - After the tutorial the week opens by itself: claim day 1 (Gems float in). `daily next` → claim day 2; `daily week` → claim day 7 = a Void pack in the Bag (R153; it was a Mech pack).

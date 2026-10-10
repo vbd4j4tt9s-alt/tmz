@@ -11,10 +11,9 @@ do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==
 --    pack sleeps: it still turns, its glow and sparks are off.
 --  * turns the prompt off for YOU once you have claimed (the server turns it off for everyone at 0), and plays the claim moment when your pack arrives: the pack hops, a spark
 --    burst, the sign pops, and the game's reward chime (InteractionAudio GemClaim: no new sound). The text notice ("FREE VOID PACK! Check your Bag!") is the server's.
---  * R157 (owner: "make it so that the void pack is only claimable after playing for 20 minutes"): for a player who has not played the 20 minutes yet (the server's player attribute
---    VoidPlayLeft157 = seconds to go, rounded up to a whole minute; none = not loaded yet, which shows and blocks nothing) the line under the number reads "play 12 more min to claim" (whole
---    minutes, rounded up) and the prompt is off; at 20 minutes the line is gone (the hint is back) and the prompt works as before. Players who already claimed see what they saw before.
---    The text is rebuilt only when the minute changes, and none of this is in the frame function.
+--  * R158c (owner: "for the void pack there isn't a 20 minute lock anymore and requirement is just finishing the tutorial"): until your player attribute TutorialDone is true (finished or skipped)
+--    the line under the number reads "finish the tutorial to claim" and the prompt is off for you; it updates the moment TutorialDone changes. Once you have claimed the sign says "CLAIMED ✓"
+--    whatever the tutorial says (one pack per player), and the line is only for a player the server has set up (your VoidGift152 is Open). The text is a constant: nothing is rebuilt per frame.
 -- Per frame: only while a pedestal's pack is inside ACTIVE_IN studs of the camera (leaves at ACTIVE_OUT); nothing runs for a pedestal that is far. Tier 3 steps it every frame;
 -- tier 2 and below at 30 Hz and without the pack's Highlight (VoidPackFx.Create's noHighlight): the per-frame costs a phone felt. Quality tiers and the plant
 -- effects setting limit the effects like the track's Void packs (ClientFxBudget / VoidPackFx.Budget); Reduced Motion: no turn, no bob, no pop, no moving fx (the same parts, still).
@@ -38,12 +37,8 @@ local LOOK={ -- the sign's pill: fill, outline, how see-through
 local entries={};local connections={};local folder
 local tierNow=3
 local function reduced()return GuiService.ReducedMotionEnabled==true end
--- R157: seconds you still have to play before the claim opens, or nil (not loaded yet, or long enough: nothing to wait for).
-local function playWait()
- local left=player:GetAttribute(A.PlayLeft)
- if type(left)=='number'and left==left and left>0 then return left end
- return nil
-end
+-- R158c: true while you still have to finish the tutorial (TutorialDone is not true: the same test the server makes).
+local function tutorialLeft()return not Rules.TutorialDone(player:GetAttribute(Rules.TutorialAttr))end
 local function quality()
  local tier=3
  if Budget then local ok,t=pcall(Budget.Get);if ok and type(t)=='number'then tier=t end end
@@ -85,13 +80,9 @@ local function render(entry)
  set(entry.Count,'Text',Rules.LeftText(left,m:GetAttribute(A.Cap)or Rules.Cap))
  set(entry.Count,'TextColor3',done and RGB(150,132,184)or(left and left<=25)and RGB(255,205,120)or RGB(240,226,255))
  local note,color='',RGB(170,140,230)
- local wait=playWait()
  if mine=='Claimed'then note,color=Rules.Mine,RGB(126,240,170)
  elseif mine=='Busy'then note,color=Rules.Busy,RGB(255,225,150)
- elseif state=='Open'and wait then -- R157: not played long enough yet: how many minutes to go (the text is rebuilt only when the minute changes)
-  local minutes=Rules.PlayMinutes(wait)
-  if entry.WaitMin~=minutes then entry.WaitMin=minutes;entry.WaitText=Rules.PlayHintText(minutes)end
-  note,color=entry.WaitText,RGB(255,205,120)
+ elseif state=='Open'and mine=='Open'and tutorialLeft()then note,color=Rules.TutorialHint,RGB(255,205,120) -- R158c: finish the tutorial first
  elseif state=='Open'then note=Rules.Hint end
  set(entry.Note,'Text',note);set(entry.Note,'TextColor3',color)
  set(entry.Pill,'BackgroundColor3',look.Pill);set(entry.Pill,'BackgroundTransparency',look.Alpha);set(entry.Stroke,'Color',look.Stroke)
@@ -106,7 +97,7 @@ end
 -- The prompt: on only while the server says Open AND you have not claimed (and no claim of yours is in flight).
 local function applyPrompt(entry)
  local prompt=entry.Prompt;if not prompt or not prompt.Parent then return end
- local want=entry.Model:GetAttribute(A.State)=='Open'and player:GetAttribute(A.Player)=='Open'and playWait()==nil -- (R157: off while you still have minutes to play)
+ local want=entry.Model:GetAttribute(A.State)=='Open'and player:GetAttribute(A.Player)=='Open'and not tutorialLeft() -- (R158c: off until the tutorial is finished)
  if prompt.Enabled~=want then prompt.Enabled=want end
 end
 -- The pack ---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -313,7 +304,7 @@ for _,m in ipairs(CS:GetTagged(Rules.Tag))do add(m)end
 table.insert(connections,CS:GetInstanceAddedSignal(Rules.Tag):Connect(add))
 table.insert(connections,CS:GetInstanceRemovedSignal(Rules.Tag):Connect(remove))
 table.insert(connections,player:GetAttributeChangedSignal(A.Player):Connect(function()for _,entry in pairs(entries)do render(entry);applyPrompt(entry)end end))
-table.insert(connections,player:GetAttributeChangedSignal(A.PlayLeft):Connect(function()for _,entry in pairs(entries)do render(entry);applyPrompt(entry)end end)) -- R157: once a minute
+table.insert(connections,player:GetAttributeChangedSignal(Rules.TutorialAttr):Connect(function()for _,entry in pairs(entries)do render(entry);applyPrompt(entry)end end)) -- R158c: finishing (or skipping) the tutorial opens the claim at once
 table.insert(connections,player:GetAttributeChangedSignal(A.At):Connect(moment))
 -- Twice a second: parts that arrived, how far the camera is, who is near enough to turn (nothing is per frame for a far pedestal).
 local clock=0

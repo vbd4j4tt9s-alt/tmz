@@ -29,7 +29,7 @@ local panel=Instance.new('Frame');panel.Name='SettingsPanel';panel.AnchorPoint=V
 local cap=Instance.new('UISizeConstraint');cap.MaxSize=Vector2.new(520,470);cap.Parent=panel
 text(panel,'Title','SETTINGS',UDim2.fromOffset(16,7),UDim2.new(1,-78,0,37),26)
 local close=button(panel,'Close','X',UDim2.new(1,-49,0,8),UDim2.fromOffset(36,36),Color3.fromRGB(239,76,99))
-local scroll=Instance.new('ScrollingFrame');scroll.Name='Controls';scroll.Position=UDim2.fromOffset(12,57);scroll.Size=UDim2.new(1,-24,1,-89);scroll.CanvasSize=UDim2.fromOffset(0,497);scroll.BackgroundTransparency=1;scroll.BorderSizePixel=0;scroll.ScrollBarThickness=4;scroll.Parent=panel
+local scroll=Instance.new('ScrollingFrame');scroll.Name='Controls';scroll.Position=UDim2.fromOffset(12,57);scroll.Size=UDim2.new(1,-24,1,-89);scroll.CanvasSize=UDim2.fromOffset(0,444);scroll.BackgroundTransparency=1;scroll.BorderSizePixel=0;scroll.ScrollBarThickness=4;scroll.Parent=panel
 local status=text(panel,'SaveStatus','',UDim2.new(0,16,1,-27),UDim2.new(1,-32,0,22),13)
 local values=Config.Read();local controls={};local dirty={};local touched={};local serial=0;local saving=false;local dead=false;local connections={}
 local function apply(key,value)
@@ -114,11 +114,7 @@ local function open(value)
  elseif pg:GetAttribute('SeedMenu')=='Settings'then pg:SetAttribute('SeedMenu',nil)end
  -- The shared navigation wheel owns its option visibility.
 end
-local replay=button(scroll,'ReplayTutorial','Replay tutorial',UDim2.fromOffset(3,446),UDim2.new(1,-12,0,43),Color3.fromRGB(55,168,135))
-replay.TextSize=19;Bright.Button(replay,Color3.fromRGB(55,168,135))
-replay.Activated:Connect(function()
- task.spawn(function()local ok,result=pcall(request.InvokeServer,request,'Tutorial','Replay');if ok and result and result.Success then open(false)end end)
-end)
+-- R158c (owner: "make it so that you can't replay the tutorial, to prevent any issues"): the "Replay tutorial" button is gone (the server refuses the request too), and the canvas ends under the last row.
 toggle.Activated:Connect(function()open(not panel.Visible)end);close.Activated:Connect(function()open(false)end);shade.Activated:Connect(function()open(false)end)
 connections[#connections+1]=pg:GetAttributeChangedSignal('SeedMenu'):Connect(function()open(pg:GetAttribute('SeedMenu')=='Settings')end)
 local slow,healthy=0,0

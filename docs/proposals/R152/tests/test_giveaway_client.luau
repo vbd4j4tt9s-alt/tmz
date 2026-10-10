@@ -9,16 +9,16 @@
 --  4. the claim moment: the chime (InteractionAudio GemClaim, no new sound), the pack hops, a spark burst, the sign pops; a stale stamp (joining) does nothing;
 --  5. cost: nothing per frame while the pedestal is far, connected only while near, fx cleared when leaving; streaming (parts that arrive late, a pedestal that goes away and comes back);
 --     the pack art failing falls back to a plain pouch; teardown.
---  6. R157 (a claim needs 20 minutes of play time; sections 4b and 6): under 20 minutes the line under the number reads "play 12 more min to claim" (whole minutes, rounded up) and the prompt is off for you;
---     at 20 minutes the line goes and the prompt works as before; a player who claimed sees what they saw before; no attribute = not loaded yet = nothing shown or blocked; the text is built only when the
---     minute changes and none of it is in the frame function; the real server and the real client together.
+--  6. R158c (a claim needs a finished tutorial; sections 4b and 6): until your TutorialDone is true the line under the number reads "finish the tutorial to claim" and the prompt is off for you; it
+--     updates the moment TutorialDone changes; a player who claimed sees "CLAIMED ✓" whatever the tutorial says (one pack per player); no state yet = the hint as before; the text is a constant and none of it
+--     is in the frame function; the real server and the real client together (play time opens nothing).
 local G=require('./giveaway_harness');local H,W,R=G.H,G.W,G.R;local V3=R.Vector3.new
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
 local Rules=G.Rules;local A=Rules.Attr
 local warns={};W.env.warn=function(...)local t={};for _,v in ipairs({...})do t[#t+1]=tostring(v)end;warns[#warns+1]=table.concat(t,' ')end
 R.clock=20000*86400+3600
-local me=H.player(77,'Tester',true);H.character(me,V3(0,5,-370))
+local me=H.player(77,'Tester',true);H.character(me,V3(0,5,-370));me:SetAttribute('TutorialDone',true) -- (R158c: a player who has finished the tutorial, unless a section says otherwise)
 local CENTER=V3(0,18,-392)
 local function setup(o)
  o=o or{}
@@ -240,64 +240,62 @@ do
  W.Gui.ReducedMotionEnabled=false;G.run(.3)
 end
 
--- 4b. R157 (owner: "make it so that the void pack is only claimable after playing for 20 minutes"): the line under the number, and the prompt, for a player who has not played long enough ------------
+-- 4b. R158c (owner: "for the void pack there isn't a 20 minute lock anymore and requirement is just finishing the tutorial"): the line under the number, and the prompt, until your tutorial is finished ------------
 do
  local function note()return text(s,'Note')end
  local function noteLabel()return sign(s):FindFirstChild('Note')end
  local function words(t)local padded=' '..t:lower()..' ';return padded:find('%f[%a]ur%f[%A]')==nil and padded:find('%f[%a]u%f[%A]')==nil end
- m:SetAttribute('Count',13);m:SetAttribute('Left',487);m:SetAttribute('State','Open');me:SetAttribute(A.Player,'Open');ped.Prompt.Enabled=true;G.run(.6)
- -- not loaded yet (no attribute): nothing new, nothing blocked
- check(me:GetAttribute(A.PlayLeft)==nil and note()==Rules.Hint and prompt.Enabled==true,'R157: no play-time attribute (the counter is not loaded yet): the hint and the prompt are as before (not ready yet is never a block)')
+ local LINE='finish the tutorial to claim'
+ m:SetAttribute('Count',13);m:SetAttribute('Left',487);m:SetAttribute('State','Open');me:SetAttribute(A.Player,'Open');ped.Prompt.Enabled=true;me:SetAttribute('TutorialDone',true);G.run(.6)
+ -- finished: the hint and the prompt, as ever
+ check(Rules.TutorialAttr=='TutorialDone'and note()==Rules.Hint and prompt.Enabled==true,'R158c: tutorial finished (TutorialDone true): the hint and the prompt are as before')
  local hint=noteLabel().TextColor3
- -- 12 minutes to go
- me:SetAttribute(A.PlayLeft,720);G.run(.1)
- check(note()=='play 12 more min to claim','R157: 12 minutes to go: the line under the number reads "play 12 more min to claim"')
- check(prompt.Enabled==false,'R157: ... and the prompt is off for you')
- local c=noteLabel().TextColor3;check(c.R>.9 and c.G>.7 and c.G<.9 and c.B<.55,'R157: ... in a warm yellow, so it reads as "wait" (not the quiet violet of the hint)')
- check(text(s,'Count')=='487 / 500 LEFT'and text(s,'Title')=='FREE VOID PACK','R157: ... the title and the number above it are as before')
- check(noteLabel().Size.Y.Scale<=.2 and noteLabel().Size.X.Scale<=.9 and noteLabel().TextScaled==true and #note()<=26,'R157: ... a small line (the same label: .88 x .17 of the sign, scaled to fit; '..#note()..' letters)')
- check(words(note())and not note():lower():find('cla[u]de')and not note():lower():find('op[u]s')and not note():lower():find('sonn[e]t')and not note():lower():find('haik[u]'),'R157: ... simple words, no "u" / "ur"')
- prompt.Enabled=true;G.run(.1);check(prompt.Enabled==false,'R157: the server turning the prompt on (a state change) is undone for you')
- G.run(.6);check(prompt.Enabled==false and note()=='play 12 more min to claim','R157: ... and it stays that way')
- -- whole minutes, rounded up (the server sends whole minutes; the client rounds up if it were ever sent seconds)
- for _,row in ipairs({{1200,20},{661,12},{660,11},{61,2},{60,1},{1,1}})do
-  me:SetAttribute(A.PlayLeft,row[1]);G.run(.05)
-  check(note()=='play '..row[2]..' more min to claim'and prompt.Enabled==false,'R157: '..row[1]..' s to go: "play '..row[2]..' more min to claim"')
+ -- not finished
+ me:SetAttribute('TutorialDone',false);G.run(.1)
+ check(note()==LINE,'R158c: tutorial not finished: the line under the number reads "finish the tutorial to claim"')
+ check(prompt.Enabled==false,'R158c: ... and the prompt is off for you')
+ local c=noteLabel().TextColor3;check(c.R>.9 and c.G>.7 and c.G<.9 and c.B<.55,'R158c: ... in a warm yellow, so it reads as "wait" (not the quiet violet of the hint)')
+ check(text(s,'Count')=='487 / 500 LEFT'and text(s,'Title')=='FREE VOID PACK','R158c: ... the title and the number above it are as before')
+ check(noteLabel().Size.Y.Scale<=.2 and noteLabel().Size.X.Scale<=.9 and noteLabel().TextScaled==true and #note()<=30,'R158c: ... a small line (the same label: .88 x .17 of the sign, scaled to fit; '..#note()..' letters)')
+ check(words(note())and not note():lower():find('cla[u]de')and not note():lower():find('op[u]s')and not note():lower():find('sonn[e]t')and not note():lower():find('haik[u]'),'R158c: ... simple words, no "u" / "ur"')
+ prompt.Enabled=true;G.run(.1);check(prompt.Enabled==false,'R158c: the server turning the prompt on (a state change) is undone for you')
+ G.run(.6);check(prompt.Enabled==false and note()==LINE,'R158c: ... and it stays that way')
+ -- it updates the moment TutorialDone changes (finished / skipped = true), and back
+ me:SetAttribute('TutorialDone',true);G.run(.05)
+ check(note()==Rules.Hint and prompt.Enabled==true,'R158c: the tutorial gets finished (or skipped): at once the line is gone (the hint is back) and the prompt works')
+ local back=noteLabel().TextColor3;check(back.R==hint.R and back.G==hint.G and back.B==hint.B,'R158c: ... in its old colour')
+ me:SetAttribute('TutorialDone',false);G.run(.05);check(note()==LINE and prompt.Enabled==false,'R158c: and back to the line if it reads false again')
+ -- not published yet / junk: only exactly true counts as finished (the server\'s test)
+ me:SetAttribute('TutorialDone',nil);G.run(.1);check(note()==LINE and prompt.Enabled==false,'R158c: no TutorialDone attribute (not published yet): "not finished", as the server counts it')
+ for _,bad in ipairs({'yes',1,0,'true'})do
+  me:SetAttribute('TutorialDone',bad);G.run(.05)
+  check(note()==LINE and prompt.Enabled==false,'R158c: a junk value ('..tostring(bad)..') is not "finished"')
  end
- -- 20 minutes reached: the line goes, the prompt works as before
- me:SetAttribute(A.PlayLeft,0);G.run(.1)
- check(note()==Rules.Hint and prompt.Enabled==true,'R157: at 20 minutes (0 to go) the line is gone (the hint is back) and the prompt works as before')
- local back=noteLabel().TextColor3;check(back.R==hint.R and back.G==hint.G and back.B==hint.B,'R157: ... in its old colour')
- -- players who already claimed see what they see today
- me:SetAttribute(A.PlayLeft,300);G.run(.05);check(note()=='play 5 more min to claim','(5 minutes to go again)')
- me:SetAttribute(A.Player,'Claimed');G.run(.1);check(note()=='CLAIMED ✓'and prompt.Enabled==false,'R157: a player who claimed sees "CLAIMED ✓" and no prompt, as today (never the countdown)')
- me:SetAttribute(A.Player,'Busy');G.run(.1);check(note()=='CLAIMING…'and prompt.Enabled==false,'R157: while the claim is in flight: "CLAIMING…" as today')
- me:SetAttribute(A.Player,'Open');G.run(.1);check(note()=='play 5 more min to claim','R157: and back to the countdown if it is still running')
+ -- players who already claimed see what they see today, whatever the tutorial says (one pack per player)
+ for _,done in ipairs({true,false})do
+  me:SetAttribute('TutorialDone',done);me:SetAttribute(A.Player,'Claimed');G.run(.1)
+  check(note()=='CLAIMED ✓'and prompt.Enabled==false,'R158c: a player who claimed (tutorial '..tostring(done)..') sees "CLAIMED ✓" and no prompt, as today (never "finish the tutorial")')
+ end
+ me:SetAttribute('TutorialDone',false);me:SetAttribute(A.Player,'Busy');G.run(.1);check(note()=='CLAIMING…'and prompt.Enabled==false,'R158c: while the claim is in flight: "CLAIMING…" as today')
+ me:SetAttribute(A.Player,'Open');G.run(.1);check(note()==LINE,'R158c: and back to the line if the claim did not go through and the tutorial is not finished')
+ -- your state is not known yet (no VoidGift152): the hint, no prompt, as before
+ me:SetAttribute(A.Player,nil);G.run(.1);check(note()==Rules.Hint and prompt.Enabled==false,'R158c: your state is not known yet: the hint and no prompt (as before; the line is for players the server has set up)')
+ me:SetAttribute(A.Player,'Open');G.run(.1)
  -- at 0 left the sign says nothing under the number, as today
  m:SetAttribute('Count',500);m:SetAttribute('Left',0);m:SetAttribute('State','Empty');G.run(.2)
- check(note()==''and prompt.Enabled==false and text(s,'Title')=='ALL CLAIMED','R157: at 0 left there is no countdown line (ALL CLAIMED, nothing under the number), as today')
+ check(note()==''and prompt.Enabled==false and text(s,'Title')=='ALL CLAIMED','R158c: at 0 left there is no tutorial line (ALL CLAIMED, nothing under the number), as today')
  m:SetAttribute('Count',13);m:SetAttribute('Left',487);m:SetAttribute('State','Open');G.run(.2)
- check(note()=='play 5 more min to claim','R157: reopened: the countdown is back')
- -- anything that is not a positive number is "not known": the hint, the prompt as before
- for _,bad in ipairs({'soon',-5,0/0,true})do
-  me:SetAttribute(A.PlayLeft,bad);G.run(.05)
-  check(note()==Rules.Hint and prompt.Enabled==true,'R157: a junk value ('..tostring(bad)..') shows and blocks nothing')
- end
- me:SetAttribute(A.PlayLeft,nil);G.run(.1);check(note()==Rules.Hint and prompt.Enabled==true,'R157: no attribute: as before')
- -- cost: the text is built when the minute changes, not per frame (nor per half second); no Instance is made; the frame function has none of it
- local built=0;local rawHint=Rules.PlayHintText;Rules.PlayHintText=function(...)built+=1;return rawHint(...)end
+ check(note()==LINE,'R158c: reopened: the line is back')
+ -- cost: the text is a constant; nothing is built per refresh, no Instance is made; the frame function has none of it
  local made=0;local inew=R.Instance.new;R.Instance.new=function(...)made+=1;return inew(...)end
- me:SetAttribute(A.PlayLeft,600);G.run(.1);local b0=built
- check(note()=='play 10 more min to claim'and b0==1,'R157: the text is built once for a new minute ('..b0..')')
  G.run(3,1/60)
- check(built==b0 and made==0,'R157: 180 frames and 6 half-second refreshes later: still built once, no Instance made ('..built..' / '..made..')')
- me:SetAttribute(A.PlayLeft,600);G.run(.6);check(built==b0,'R157: the same value again builds nothing')
- me:SetAttribute(A.PlayLeft,540);G.run(.1);check(built==b0+1 and note()=='play 9 more min to claim','R157: the next minute builds it once more')
- R.Instance.new=inew;Rules.PlayHintText=rawHint
+ R.Instance.new=inew
+ check(made==0 and note()==LINE,'R158c: 180 frames and 6 half-second refreshes later: no Instance made ('..made..')')
  local src=require('./rs_bundle').VoidGiveawayClient152;local a,z=src:find('local function frame(dt)',1,true),src:find('local function wake()',1,true)
- check(a and z and z>a and not src:sub(a,z):find('Play',1,true)and not src:sub(a,z):find('wait',1,true),'R157: the per-frame function (frame) does not touch any of it')
- check(not src:find('Heartbeat:Connect',1,true)or select(2,src:gsub('Heartbeat:Connect','',100))==1,'R157: and there is still just the one half-second Heartbeat tick (no new loop)')
- me:SetAttribute(A.PlayLeft,nil);G.run(.1)
+ check(a and z and z>a and not src:sub(a,z):find('utorial',1,true)and not src:sub(a,z):find('Play',1,true),'R158c: the per-frame function (frame) does not touch any of it')
+ check(not src:find('Heartbeat:Connect',1,true)or select(2,src:gsub('Heartbeat:Connect','',100))==1,'R158c: and there is still just the one half-second Heartbeat tick (no new loop)')
+ check(not src:find('PlayLeft',1,true)and not src:find('VoidPlayLeft157',1,true)and not src:find('PlayHintText',1,true),'R158c: the client has no trace of the 20 minute countdown')
+ me:SetAttribute('TutorialDone',true);me:SetAttribute(A.Player,'Open');G.run(.1)
 end
 
 -- 5. Cost, streaming, failure, teardown --------------------------------------------------------------------------------------------------------------------------
@@ -348,24 +346,33 @@ do
  local sc=s5.Svc.Model:FindFirstChild('VoidGiveawaySign');check(sc==nil,'the sign is gone too')
 end
 
--- 6. R157 end to end: the real server counts, the real client shows it ------------------------------------------------------------------------------------------------------
+-- 6. R158c end to end: the real server checks the tutorial, the real client shows it ------------------------------------------------------------------------------------------------------
 do
  local s6=setup();G.look(V3(0,10,-360),CENTER);G.loadClient();G.run(1)
- me:SetAttribute(A.Player,nil);me:SetAttribute(A.PlayLeft,nil);me:SetAttribute(A.At,nil)
+ me:SetAttribute(A.Player,nil);me:SetAttribute('TutorialDone',nil);me:SetAttribute(A.At,nil)
  local function note()return text(s6,'Note')end
  local pr=s6.Svc.Pedestal.Prompt
- G.run(.6);check(note()==Rules.Hint and pr.Enabled==false,'R157 e2e: before the profile is loaded: the hint, and no prompt for you (as before: your state is not known yet)')
- s6.Data:load(me,{Played=false});s6.Svc:Step();G.run(.6)
- check(me:GetAttribute(A.PlayLeft)==1200 and me:GetAttribute(A.Player)=='Open','R157 e2e: the profile loads (an old save: 0 minutes): the server publishes 1200 s to go')
- check(note()=='play 20 more min to claim'and pr.Enabled==false,'R157 e2e: ... your sign says "play 20 more min to claim" and the prompt is off')
+ local LINE='finish the tutorial to claim';local REFUSAL='finish the tutorial to get your free void pack!'
+ G.run(.6);check(note()==Rules.Hint and pr.Enabled==false,'R158c e2e: before the profile is loaded: the hint, and no prompt for you (as before: your state is not known yet)')
+ s6.Data:load(me,{Tutorial=false});s6.Svc:Step();G.run(.6)
+ check(me:GetAttribute('TutorialDone')==false and me:GetAttribute(A.Player)=='Open'and me:GetAttribute('VoidPlayLeft157')==nil,'R158c e2e: the profile loads with the tutorial not finished: your state is Open, and there is no play-time attribute')
+ check(note()==LINE and pr.Enabled==false,'R158c e2e: ... your sign says "finish the tutorial to claim" and the prompt is off')
  for _=1,150 do s6.Clock.advance(2);s6.Svc:Step()end;G.run(.1)
- check(me:GetAttribute(A.PlayLeft)==900 and note()=='play 15 more min to claim','R157 e2e: 5 minutes of play later: "play 15 more min to claim"')
+ check(note()==LINE and pr.Enabled==false and s6.Data:GetPremium(me)[Rules.PlayField]==300,'R158c e2e: 5 minutes of play later it is still the tutorial line (play time does nothing; the counter is at 300)')
  local ok,why=s6.Svc:Claim(me)
- check(ok==false and why=='playtime'and s6.Data:voidPacks(me)==0 and s6.Notes:last(me).Text=='play 15 more min to get your free void pack!','R157 e2e: pressing anyway is refused by the server: "play 15 more min to get your free void pack!"')
+ check(ok==false and why=='tutorial'and s6.Data:voidPacks(me)==0 and s6.Notes:last(me).Text==REFUSAL,'R158c e2e: pressing anyway is refused by the server: "finish the tutorial to get your free void pack!"')
  for _=1,450 do s6.Clock.advance(2);s6.Svc:Step()end;G.run(.1)
- check(me:GetAttribute(A.PlayLeft)==0 and note()==Rules.Hint and pr.Enabled==true,'R157 e2e: after 20 minutes in all: the line is gone (the hint is back) and the prompt is on')
+ check(note()==LINE and pr.Enabled==false and s6.Svc:Claim(me)==false and s6.Data:voidPacks(me)==0,'R158c e2e: 20 minutes in all: still the tutorial line, still refused (the old 20 minute rule opens nothing)')
+ me:SetAttribute('TutorialDone',true);G.run(.1) -- (what TutorialProgress.PublishTutorial does when the tutorial is finished or skipped)
+ check(note()==Rules.Hint and pr.Enabled==true,'R158c e2e: the tutorial is finished: the line is gone (the hint is back) and the prompt is on, at once')
  local ok2=s6.Svc:Claim(me);G.run(.2)
- check(ok2==true and s6.Data:voidPacks(me)==1 and me:GetAttribute(A.Player)=='Claimed'and note()=='CLAIMED ✓'and pr.Enabled==false,'R157 e2e: the claim works, and you see what you saw before the rule: "CLAIMED ✓", no prompt')
+ check(ok2==true and s6.Data:voidPacks(me)==1 and me:GetAttribute(A.Player)=='Claimed'and note()=='CLAIMED ✓'and pr.Enabled==false,'R158c e2e: the claim works, and you see "CLAIMED ✓", no prompt')
+ -- one pack per player: pressing again is refused and the sign stays on CLAIMED, with the tutorial finished or not
+ local ok3,why3=s6.Svc:Claim(me);G.run(.2)
+ check(ok3==false and why3=='claimed'and s6.Data:voidPacks(me)==1 and note()=='CLAIMED ✓'and pr.Enabled==false and s6.Notes:last(me).Text:find('already grabbed',1,true)~=nil,'R158c e2e: a second claim is refused ("already grabbed"): still one pack, the sign still says "CLAIMED ✓"')
+ me:SetAttribute('TutorialDone',false);G.run(.1)
+ local ok4,why4=s6.Svc:Claim(me);G.run(.1)
+ check(ok4==false and why4=='claimed'and s6.Data:voidPacks(me)==1 and note()=='CLAIMED ✓'and s6.Notes:last(me).Text~=REFUSAL,'R158c e2e: even if TutorialDone read false, a player who claimed sees "CLAIMED ✓" and is told "already grabbed", never "finish the tutorial"')
  s6.Svc.Model:Destroy();G.run(.3)
 end
 
