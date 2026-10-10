@@ -179,7 +179,7 @@ return function(W)
   local function full(o,c)
    c.S={};c.Raw={};c.A={}
    for k,v in pairs(o._props)do if not SKIP[k]then local x=FP.serKey(o,k,v);if x then c.S[k]=x end;c.Raw[k]=v end end
-   for k,v in pairs(o._attrs)do local x=ser(v);if x then c.S['@'..k]=x end;c.A[k]=v end
+   for k,v in pairs(o._attrs)do local x=not(FP.Drop and FP.Drop['@'..k])and ser(v)or nil;if x then c.S['@'..k]=x end;c.A[k]=v end -- (R158d: FP.Drop['@name'] leaves an attribute out of the streams too, as of the shots)
    local tg=tagsOf(o);c.S['#']=tg;c.Name=o._props.Name
   end
   local function tokens(c)
@@ -199,7 +199,7 @@ return function(W)
    local a=o._attrs
    for k,v in pairs(a)do
     if c.A[k]~=v then
-     c.A[k]=v;local x=ser(v);local key='@'..k
+     c.A[k]=v;local x=not(FP.Drop and FP.Drop['@'..k])and ser(v)or nil;local key='@'..k
      if x~=c.S[key]then c.S[key]=x;out[#out+1]=x and(key..'='..x)or key end
     end
    end

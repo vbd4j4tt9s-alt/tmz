@@ -63,7 +63,7 @@ if git -C "$REPO" cat-file -e "$BASE^{commit}" 2>/dev/null;then
  [ "$(git -C "$REPO" show "$BASE:src/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua" | head -1)" = "$(head -1 "$S/StarterPlayer/StarterPlayerScripts/LavaFlow.client.lua")" ] && echo "ok: LavaFlow's line 1 (the R152 load guard) is untouched" || fail "LavaFlow's line 1 (the load guard) changed"
 else echo "skip: $BASE is not in this checkout (the walls commits' file check not run)";fi
 (cd "$REPO" && grep -v '^#' "$P/R151/tests/frozen.sha256" | sha256sum -c --quiet - ) && echo "ok: the frozen file hashes (docs/proposals/R151/tests/frozen.sha256) still hold" || fail "a frozen file's hash changed"
-sed -n 6p "$T/run_all_suites.sh" | grep -q "docs/proposals/R158/tests/run_walls158.sh docs/proposals/R156/tests/run_pyramid156.sh" && echo "ok: run_walls158.sh is on line 6 of tools/tests/run_all_suites.sh, before run_pyramid156.sh" || fail "run_walls158.sh is not registered on line 6 of run_all_suites.sh before run_pyramid156.sh"
+sed -n 6p "$T/run_all_suites.sh" | grep -q " docs/proposals/R158/tests/run_walls158.sh .* docs/proposals/R156/tests/run_pyramid156.sh" && echo "ok: run_walls158.sh is on line 6 of tools/tests/run_all_suites.sh, before run_pyramid156.sh" || fail "run_walls158.sh is not registered on line 6 of run_all_suites.sh before run_pyramid156.sh"
 sed -n 9p "$T/run_all_suites.sh" | grep -q "R158run_walls158" && echo "ok: ... and its place-file argument is in the case on line 9" || fail "R158run_walls158 is not in the case on line 9 of run_all_suites.sh"
 [ $RC = 0 ] || exit 1
 echo "== 1. data (the walls, the ground, the caps)"

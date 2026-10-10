@@ -38,7 +38,8 @@ PY
 # (other R155 work changes other src files too: this checks the camera's own corner - the RarePull* modules - and the two never-touch files)
 CHANGED=$( (git -C "$REPO" diff --name-only "$BASE" -- 'src/ReplicatedStorage/RarePull*';git -C "$REPO" ls-files -o --exclude-standard -- 'src/ReplicatedStorage/RarePull*') | sort -u | tr '\n' ' ')
 # (R157, on purpose: RarePullRules too - the Common..Mythic card has no SkipFrom, every layout a Hint row under the name, RarePullRules.FitLayout fits the card to its band)
-WANT="src/ReplicatedStorage/RarePullCamera155.lua src/ReplicatedStorage/RarePullCard.lua src/ReplicatedStorage/RarePullCinematic.lua src/ReplicatedStorage/RarePullRules.lua "
+# (R158d, on purpose: RarePullScenes too - the hero seed hides in the pack until the hit and its own effects wait for it, docs/proposals/R158b/pack_leak158d.md)
+WANT="src/ReplicatedStorage/RarePullCamera155.lua src/ReplicatedStorage/RarePullCard.lua src/ReplicatedStorage/RarePullCinematic.lua src/ReplicatedStorage/RarePullRules.lua src/ReplicatedStorage/RarePullScenes.lua "
 [ "$CHANGED" = "$WANT" ] && echo "ok: of the RarePull modules exactly these changed since $BASE: $CHANGED" || fail "RarePull modules changed since $BASE: $CHANGED(want: $WANT)"
 { git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua || sh "$REPO/tools/tests/bgm_frozen.sh" "$REPO"; } && echo "ok: BackgroundMusic untouched (or the R156 music script frozen in frozen.sha256)" || fail "BackgroundMusic changed"
 for f in RarePullCamera155 RarePullCinematic RarePullCard;do

@@ -18,11 +18,23 @@
 --    SeedCollectFly screen) starts where and as big as the fitted card showed it, so its Position and Size differ on the first frames of the flight (it lands in the
 --    same slot). Their text, colours, transparency, rotation, timing and visibility are still compared, and so
 --    is everything else on the card. (The rows the card publishes for the lucky tag are attributes of a Folder, never drawn: not compared.)
+--  * R158d (owner: "the mech pack seeds, and also check for other seeds that have similar issues: their effects are already there even before the pack opens. This ruins the
+--    surprise of the pack opening"): the hero seed on the stage is HELD until the hit (ItemEffectAnchor.Hold / Release). Its root carries the flag FxHeld (nothing draws it: left out of
+--    the shots and the streams), and its own effects (its rarity sparkles ...) are off while it is hidden; R154 had them on, around a seed nobody could see. An effect of the hero
+--    seed that is off (Enabled=false) reads as on, so the comparison does not depend on when the seed shows; that the effects ARE on once the seed shows is checked by
+--    docs/proposals/R158b/tests/test_pack_leak158d.luau.
 -- Everything else is compared exactly as before: the Camera outside the stage (the world's lens-only push, the restore), its type and subject, the
 -- grade and the blur, the stage itself (every part, beam, emitter, light, image), the card (but its SKIP button), the collect hint, the sounds and
 -- their schedule, Lighting, the onlookers' world effects, and every Common..Mythic reveal (no stage: their camera is compared in full on every frame).
 return function(FP,W)
  local prevNormal,prevSkip=FP.Normal,FP.Skip
+ -- (R158d: the hold flag is never drawn)
+ FP.Drop=FP.Drop or{};FP.Drop['@FxHeld']=true
+ local HERO_EFFECT={ParticleEmitter=true,Beam=true,Trail=true,PointLight=true,SpotLight=true,SurfaceLight=true,BillboardGui=true,SurfaceGui=true,Highlight=true,Fire=true,Smoke=true,Sparkles=true}
+ local function inHeroSeed(o)
+  local m=o._parent;while m and not(m._class=='Model'and m._props.Name=='RarePullSeed')do m=m._parent end
+  return m~=nil
+ end
  -- (R157: the card's laid-out pieces, by name: a piece of the card is a child of the frame RarePull on the RarePullReveal screen)
  local FITTED={Title=true,Seed=true,['Seed glow']=true,['Seed halo']=true,Odds=true,['Seed name']=true,['Skip hint']=true,Rays=true,Shockwave=true,['Title crown']=true}
  local FITTED_PREFIX={'Title split ','Title star ','Title planet '}
@@ -51,6 +63,7 @@ return function(FP,W)
  end
  FP.Normal=function(o,k,v)
   if o._class=='Camera'and CAMERA[k]and inStage()then return'(the story stage\'s camera: R155)'end
+  if k=='Enabled'and v==false and HERO_EFFECT[o._class]and inHeroSeed(o)then return'true'end -- (R158d: off while the hero seed is held reads as on, as R154 had it)
   if(k=='Position'or k=='Size')and fittedPiece(o)then return'(the card\'s fitted layout: R157)'end
   if(k=='AnchorPoint'or k=='TextXAlignment')and o._class=='TextLabel'and o._props.Name=='Skip hint'and fittedPiece(o)then return'(the hint centred under the name: R157)'end
   if(k=='Position'or k=='Size')and o._class=='ViewportFrame'and o._props.Name=='Seed'and o._parent and o._parent._class=='ScreenGui'and o._parent._props.Name=='SeedCollectFly'then

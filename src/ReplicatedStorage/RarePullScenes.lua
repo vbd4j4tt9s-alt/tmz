@@ -17,6 +17,7 @@ local RS=game:GetService('ReplicatedStorage')
 local Rules=require(script.Parent.RarePullRules)
 local Fx=require(script.Parent.RarePullFx)
 local Art=require(script.Parent.RarePullArt)
+local Anchor do local ok,m=pcall(function()return require(script.Parent.ItemEffectAnchor)end);Anchor=ok and m or nil end -- (R158d: the hero seed's own effects wait for the seed)
 local S={}
 -- R152 (owner: "planets have to look good by texturing", "improve look on the beam and assets used in the animations"): the same stages,
 -- dressed better. Images drawn on the client (RarePullArt, ready a while after the client starts) where they help: textured planets with
@@ -181,6 +182,9 @@ function S.Build(rank,opts)
    if ok2 then self.Motion=motion end
   end
   setAlpha(self.SeedParts,0)
+  -- R158d (owner: the seed's effects "are already there even before the pack opens"): the hero seed sits hidden in the pack until the hit. Its Mech scanner / weather effect (ItemCosmetics) and its own
+  -- sparkles / lights wait too, and come with it (_placeSeed: the first frame it shows)
+  if Anchor then self.SeedHeld=pcall(Anchor.Hold,seed,true)end
  end
  self.Key=self:Part('Seed key light',V(.1,.1,.1),CF(0,-60,0),C(255,255,255),SMOOTH,1)
  self.KeyLight=self:Light(self.Key,C(255,246,232),0,11)
@@ -452,6 +456,7 @@ function Scene:_placeSeed(pos,alpha,t)
  local cf=CF(pos)*ANG(0,Rules.SeedYaw(t,self.Reduced),0)*FRONT
  pcall(function()self.Seed:PivotTo(self.Origin*cf*self.SeedRel)end)
  if self.LastSeedAlpha~=alpha then self.LastSeedAlpha=alpha;setAlpha(self.SeedParts,alpha)end
+ if alpha>0 and self.SeedHeld then self.SeedHeld=nil;pcall(Anchor.Release,self.Seed)end -- (R158d)
  if self.Motion then pcall(function()self.Motion:Update(self.Origin*cf,t,self.SeedScale or 1,alpha)end)end
  -- one key light from the camera side: on the pack until the seed is out (the stages are dark at night), then on the seed
  local S=self.Set

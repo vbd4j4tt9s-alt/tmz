@@ -166,6 +166,9 @@ local function beginReveal(record,at,seedId,now)
         record.Scraps[i]=scrap
     end
     local seed=built and template or template:Clone();seed.Name="RewardSeed"
+    -- R158d (owner: "... their effects are already there even before the pack opens. This ruins the surprise"): the seed hides inside the closed pack until it bursts out. Its Mech scanner / weather
+    -- effect (drawn by ItemCosmetics for every GardenItemFX part, hidden or not) waits for it too: ItemEffectAnchor.Hold now, Release on the frame it shows (renderReveal).
+    record.SeedFxShown=nil;require(ReplicatedStorage.ItemEffectAnchor).Hold(seed)
     seed:SetAttribute("SeedMotionManaged",true);CollectionService:RemoveTag(seed,Rules.SeedMotion.Tag)
     require(ReplicatedStorage:WaitForChild("PlantVisuals")).Coat(seed,record.Bag:GetAttribute("PackMutation"))
     seed.Parent=effect;record.Seed=seed
@@ -351,6 +354,7 @@ local function renderReveal(record,now)
         record.SeedVisible=visible
         for _,p in ipairs(record.SeedEffects)do p.Enabled=visible end
     end
+    if visible and not record.SeedFxShown then record.SeedFxShown=true;require(ReplicatedStorage.ItemEffectAnchor).Release(record.Seed)end -- (R158d: the seed shows, its effects come with it)
     if record.SeedMotion then record.SeedMotion:Update(seedFrame,age,scale,visible and (1-fade)*ease or 0)end
     local radius=math.max(.001,math.max(1.25,record.SeedBaseScale*1.5)*ease)
     for i,p in ipairs(record.Celestial)do

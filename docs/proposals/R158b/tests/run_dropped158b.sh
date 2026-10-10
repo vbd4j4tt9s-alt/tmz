@@ -62,7 +62,7 @@ grep -q "burst(fx.Position,6,soil,1);digSound:Play(fx.Position,C.DigSound.CoverP
  && echo "ok: the COVER sound and the trap (Land) sound lines are as they were" || fail "the cover or the trap sound line changed"
 grep -q "^Sfx.WhooshId='rbxassetid://9120768742'" "$RSD/LocalSfx.lua" && echo "ok: LocalSfx.WhooshId stays (fast travel and go-to-top use it); the bat no longer does" || fail "LocalSfx.WhooshId is gone"
 if grep -rnE "WhooshId|SwingSound" "$S" | grep -vE "LocalSfx.lua|TravelButtons.client.lua|EconomyClient.client.lua";then fail "something else still uses the whoosh / swing-sound settings";else echo "ok: nothing in src but LocalSfx, TravelButtons and EconomyClient mentions the whoosh; no SwingSound setting anywhere";fi
-sed -n 6p "$T/run_all_suites.sh" | grep -q " docs/proposals/R158b/tests/run_dropped158b.sh docs/proposals/R156/tests/run_pyramid156.sh; do" && echo "ok: registered on line 6 of tools/tests/run_all_suites.sh (just before the pyramid suite)" || fail "not registered on line 6 of run_all_suites.sh just before run_pyramid156.sh"
+sed -n 6p "$T/run_all_suites.sh" | grep -q " docs/proposals/R158b/tests/run_dropped158b.sh .* docs/proposals/R156/tests/run_pyramid156.sh; do" && echo "ok: registered on line 6 of tools/tests/run_all_suites.sh (just before the pyramid suite)" || fail "not registered on line 6 of run_all_suites.sh just before run_pyramid156.sh"
 # -- the world -------------------------------------------------------------------------------------------------------------------------------------
 build(){ # $1 dir, then Name=path overrides (this checkout's modules and script, as a bundle for the R113 world)
  d=$1;shift;mkdir -p "$d"

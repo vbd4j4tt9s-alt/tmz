@@ -9,8 +9,15 @@ local folder=Instance.new('Folder');folder.Name='_ItemCosmeticsR59';folder.Paren
 -- with it; SeedCollect154 says which tools it hides (the effects are drawn outside the tool, in the folder above).
 local Collect do local m=RS:FindFirstChild('SeedCollect154');local ok,c=pcall(function()return m and require(m)end);Collect=ok and c or nil end
 local targets={};local records={};local selected={};local pending={};local pendingIndex=1;local scan=1
-local function remove(p)targets[p]=nil;selected[p]=nil;if records[p]then Effects.Destroy(records[p]);records[p]=nil end end
-local function add(p)if p:IsA('BasePart')then targets[p]=true end end
+-- R158d (owner: "... their effects are already there even before the pack opens. This ruins the surprise"): a part whose FxHeld attribute is true (the seed hidden inside an
+-- opening pack: ItemEffectAnchor.Hold) is drawn nothing for, and is looked at again the frame it is released (the effect comes with the seed, not up to .3 s after it).
+local watching=setmetatable({},{__mode='k'})
+local function remove(p)targets[p]=nil;selected[p]=nil;if watching[p]then watching[p]:Disconnect();watching[p]=nil end;if records[p]then Effects.Destroy(records[p]);records[p]=nil end end
+local function add(p)
+ if not p:IsA('BasePart')then return end
+ targets[p]=true
+ if p:GetAttribute('FxHeld')~=nil and not watching[p]then watching[p]=p:GetAttributeChangedSignal('FxHeld'):Connect(function()scan=1 end)end
+end
 for _,p in ipairs(Tags:GetTagged('GardenItemFX'))do add(p)end
 local added=Tags:GetInstanceAddedSignal('GardenItemFX'):Connect(add);local removed=Tags:GetInstanceRemovedSignal('GardenItemFX'):Connect(remove)
 -- R128 (owner): an item someone is carrying has its effect stepped every frame so the rings and orbits stay on it while running.
@@ -19,6 +26,7 @@ local added=Tags:GetInstanceAddedSignal('GardenItemFX'):Connect(add);local remov
 -- on screen, within 180 studs, inside CosmeticBudget's parts (96 low / 240), so the per-frame cost is at most those parts in one batch.
 local function visible(p)
  if not p:IsDescendantOf(workspace)then return false end
+ if p:GetAttribute('FxHeld')==true then return false end -- (R158d: the seed inside a closed pack shows no effect until it is revealed)
  if Collect and Collect.Hidden(p)then return false end -- (R154: the seed in the hand that has not landed yet; its effects come back with it)
  local a=p.Parent
  while a and a~=workspace do
