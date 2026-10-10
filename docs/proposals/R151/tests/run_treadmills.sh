@@ -39,7 +39,7 @@ for n in TreadmillLook151 TreadmillBeltArt151;do grep -q "^ModuleScript	Replicat
 tail -n +2 "$S/MANIFEST.tsv" | cut -f2 > "$OUT/manifest_paths.txt";LC_ALL=C sort -c "$OUT/manifest_paths.txt" || fail "src/MANIFEST.tsv is not sorted"
 if git -C "$REPO" rev-parse -q --verify $BASE >/dev/null 2>&1;then
  sh "$T/r152_real_diff.sh" "$REPO" $BASE "$S/StarterPlayer/StarterPlayerScripts/TreadmillAnimation.client.lua" >/dev/null || fail "the treadmill animation changed" # (the R152 load guard line aside)
- # R153 (owner: "numbers should also be bigger", then "2x bigger"; R154: "reduce the size of the speed notifier number by 20%" and "fix the glitchyness"): the speed popups are 2x, then 1.6x; R154 also holds the own caps at 8 and never reuses a showing frame; R155 ("make the speed popups consistent in size so when zooming out ...") scales the field with the camera's distance (SpeedPopupStyle.Zoom / ZoomScale, the field's zoom container in the client). SpeedGainPopup.client.lua changed in exactly three places (the pooled popup carries the fan's
+ # R153 (owner: "numbers should also be bigger", then "2x bigger"; R154: "reduce the size of the speed notifier number by 20%" and "fix the glitchyness"): the speed popups are 2x, then 1.6x; R154 also holds the own caps at 8 and never reuses a showing frame; R155 ("make the speed popups consistent in size so when zooming out ...") scales the field with the camera's distance (SpeedPopupStyle.Zoom / ZoomScale, the field's zoom container in the client); R158 ("increase the size of the speed popups") makes them 1.5x (the same constants, plus SizeScale / Layout: the unit and the fan of a screen in one call, for the one client line that takes them). SpeedGainPopup.client.lua changed in exactly three places (the pooled popup carries the fan's
  # size on this screen, FanX / FanY, and apply() multiplies by it: SpeedPopupStyle.FanScale) and SpeedPopupStyle in its sizes (Size, StrokeThickness), the pooled field (Field), the fan
  # numbers (Fan) and FanScale; everything else of both must still be what it was at $BASE (the motion curves, the rate, the colours, the formatting).
  git -C "$REPO" show $BASE:src/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua > "$OUT/popup_base.lua"
@@ -77,7 +77,8 @@ undo = [  # R155 first (the zoom container, back to the R154 text), then the thr
     ("\tlocal camera = workspace.CurrentCamera\n\tcameraPosition = camera and camera.CFrame.Position or nil\n", ""),
     ("Unit = 1, FanX = 1, FanY = 1, PX = 0,", "Unit = 1, PX = 0,"),
     ("\tx, y = x * unit * popup.FanX, y * unit * popup.FanY -- (R153: the fan's size on this screen, SpeedPopupStyle.FanScale)", "\tx, y = x * unit, y * unit"),
-    ("\tlocal viewport = camera and camera.ViewportSize\n\tpopup.Unit = Style.Unit(viewport and viewport.Y)\n\tpopup.FanX, popup.FanY = Style.FanScale(viewport and viewport.X, viewport and viewport.Y)", "\tpopup.Unit = Style.Unit(camera and camera.ViewportSize.Y)"),
+    # R158 (owner: "increase the size of the speed popups as they are too small right now"): the one line that takes the unit and the fan for the screen is SpeedPopupStyle.Layout (the unit carries the size share of a small screen)
+    ("\tlocal viewport = camera and camera.ViewportSize\n\tpopup.Unit, popup.FanX, popup.FanY = Style.Layout(viewport and viewport.X, viewport and viewport.Y) -- (R158: the unit carries the popup's size on this screen: bigger popups, a little smaller where the fan lacks room)\n", "\tpopup.Unit = Style.Unit(camera and camera.ViewportSize.Y)\n"),
     # R154 (owner: "fix the glitchyness"): a popup frame that is still showing is never taken for a new popup; the pool grows by one frame instead (the base took the oldest live one)
     ("\t-- R154 (owner: \"fix the glitchyness\"): a frame that is still showing is NEVER taken for a new popup (it used to jump, mid-flight, to the new popup's place and text when every frame was\n\t-- busy, which a lag spike makes happen: the cap's live popups + the retired ones still fading). The pool gets one more frame instead, up to Style.Field.MaxFrames; past that this popup is not shown.\n\tif #field.Free == 0 and #field.Popups < Style.Field.MaxFrames then\n\t\tlocal built = makePopup(field)\n\t\tfield.Free[#field.Free + 1] = built\n\tend\n\tlocal popup = table.remove(field.Free)\n\tif not popup then return end\n",
      "\tlocal popup = table.remove(field.Free)\n\tif not popup then popup = table.remove(active, 1) end -- every frame is busy (not expected): the oldest goes at once\n"),
@@ -100,13 +101,17 @@ def strip(path):
         s = cut(s, 'function S.FanScale(')                        # R153: the fan's size on this screen (does not exist at the base)
     if 'function S.ZoomScale(' in s:
         s = cut(s, 'function S.ZoomScale(')                       # R155: the field's scale and fade for the camera's distance (does not exist at the base)
+    for head in ('local function fanAt(', 'function S.SizeScale(', 'function S.Layout('):
+        if head in s:
+            s = cut(s, head)                                      # R158: the fan for a screen at a popup size, the size share of a small screen, and what the client needs per popup (not at the base)
     s = s.replace('num(interval, 1 / 6)', 'num(interval, STEP)').replace('num(interval, 1 / 5)', 'num(interval, STEP)')   # the default step: 1/6 -> 1/5 s
     out = []
     for line in s.split('\n'):
         line = re.sub(r'\s*--.*$', '', line)                      # comments may change (the cadence note: 10 a second at the 1/5 s step)
         # R153 (owner: "numbers should also be bigger", then "2x bigger"): the popup sizes, the outline, the pooled field and the fan numbers are new values
         # R154: the own caps (8 at every tier), the field's MaxFrames and the 0.8x sizes / fan are new values too
-        # R155: S.Zoom (the camera-distance numbers) is new too
+        # R155: S.Zoom (the camera-distance numbers) is new too (R158: its two cutoffs are scales, FadeScale / HideScale, not text px)
+        # R158: the popups are 1.5x (Size, StrokeThickness, Field, Fan numbers, plus the size share's two numbers Fan.Keep / MinSize)
         if re.match(r'^S\.(Size|StrokeThickness|Field|Fan|Caps|Zoom) = ', line.strip()):
             continue
         if line.strip():
@@ -114,7 +119,7 @@ def strip(path):
     return '\n'.join(out)
 sys.exit(0 if strip(sys.argv[1]) == strip(sys.argv[2]) else 1)
 EOF
- echo "ok: TreadmillAnimation.client.lua as at $BASE; SpeedGainPopup.client.lua and SpeedPopupStyle changed only in the R153 2x popups (sizes, outline, field, fan scale), the R155 zoom (the field's zoom container, S.Zoom, ZoomScale), FormatGain, the default step (1/5 s) and comments"
+ echo "ok: TreadmillAnimation.client.lua as at $BASE; SpeedGainPopup.client.lua and SpeedPopupStyle changed only in the R153 2x popups (sizes, outline, field, fan scale), the R155 zoom (the field's zoom container, S.Zoom, ZoomScale), R158's 1.5x (the same constants; SizeScale / Layout and the one client line that calls it), FormatGain, the default step (1/5 s) and comments"
 fi
 if grep -niE "claude|opus|sonnet|haiku|anthropic|gpt" $NEW "$HERE/test_treadmills151.luau" "$HERE/check_belt_images.py" "$HERE/mutation_treadmills.py" "$P/R151/treadmills.md" "$P/R151/treadmills/"*.luau "$P/R151/treadmills/"*.py "$P/R151/treadmills/"*.mjs "$P/R151/treadmills/"*.html;then fail "a model name in the treadmill files";fi
 echo "ok: everything compiles, the two modules are in src/MANIFEST.tsv (sorted), no model names"

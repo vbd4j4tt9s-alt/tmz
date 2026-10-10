@@ -113,11 +113,14 @@ do
 end
 
 -- 3. units: the sizes follow the screen height ---------------------------------------------------------------------------------------------------------------
+-- (R158: a popup's size is the unit x SizeScale: 1 on a computer, a little less where the fan has no room; the 16:9 screens of these cases are 640 x 360 .. 3840 x 2160)
 for _,case in ipairs({{360,0.8},{720,0.8},{1080,1},{1296,1.2},{2160,1.35}})do
  PW.view(case[1]);C.fire(me,1000,1,1/5);PW.frames(1,0)
  local f=PW.fields(pg)[1];local r=PW.read(PW.visible(f)[1])
  local _,fy=fan()
- check(near(r.Scale,0.45*case[2],1e-6) and near(r.Y,-Style.Spawn.Lift*case[2]*fy,1e-6),'unit at '..case[1]..' px high: '..case[2]..' (size '..r.Scale..', offset '..r.Y..', fan Y '..fy..')')
+ local k=Style.SizeScale(case[1]*16/9,case[1])
+ check(near(r.Scale,0.45*case[2]*k,1e-6) and near(r.Y,-Style.Spawn.Lift*case[2]*k*fy,1e-6),'unit at '..case[1]..' px high: '..case[2]..' x '..string.format('%.3f',k)..' (size '..r.Scale..', offset '..r.Y..', fan Y '..fy..')')
+ check((case[1]>=720)==(k==1) and k>=Style.Fan.MinSize and k<=1,'... the size share is 1 from 1280 x 720 up and in 2/3 .. 1 on the 640 x 360 screen ('..k..')')
  settle()
 end
 PW.view(1080)
@@ -472,8 +475,8 @@ do
  check(frames>=poolSize,'colour check ran over '..frames..' pooled frames')
  check(ok.Bolt,'the bolt is still the yellow (255,222,66) ⚡')
  check(ok.Text,'the amount is still (125,248,255), the pale cyan the owner calls white')
- check(ok.Stroke,'the outlines are still navy (17,26,42) (R154: 4 px on the 35 px text), the legacy stroke black, FredokaOne, Contextual')
- check(ok.Misc and Style.Size.Icon==32 and Style.Size.Text==35,'R154: the sizes are 0.8 of R153\'s 40 / 44 (32 / 35), no background')
+ check(ok.Stroke,'the outlines are still navy (17,26,42) (R158: 6 px on the 53 px text), the legacy stroke black, FredokaOne, Contextual')
+ check(ok.Misc and Style.Size.Icon==48 and Style.Size.Text==53,'R158: the sizes are 1.5x R154\'s 32 / 35 (48 / 53), no background')
  local lf=PW.visible(PW.fieldOf(pg,head(me)))[1]
  if lf then
   check(lf.Amount.AutomaticSize.Name=='X' and lf.Amount.TextXAlignment.Name=='Center','the number sizes itself and sits next to the bolt')

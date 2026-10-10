@@ -261,8 +261,7 @@ local function spawnPopup(entry, item, now)
 	if not popup then return end
 	local camera = workspace.CurrentCamera
 	local viewport = camera and camera.ViewportSize
-	popup.Unit = Style.Unit(viewport and viewport.Y)
-	popup.FanX, popup.FanY = Style.FanScale(viewport and viewport.X, viewport and viewport.Y)
+	popup.Unit, popup.FanX, popup.FanY = Style.Layout(viewport and viewport.X, viewport and viewport.Y) -- (R158: the unit carries the popup's size on this screen: bigger popups, a little smaller where the fan lacks room)
 	popup.Reduced = reduced
 	popup.At = item.At
 	popup.Retired = nil

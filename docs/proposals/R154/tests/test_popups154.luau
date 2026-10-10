@@ -2,18 +2,19 @@
 -- R154 (owner, after R153: "the numbers for speed also should be kept at a consistent size throughout, reduce the size of the speed notifier number by 20% and fix the glitchyness they have in them";
 -- his screenshot: "+72K" popups of visibly different sizes over a treadmill, one half faded). The REAL SpeedGainPopup.client.lua + SpeedPopupStyle on the Roblox mock, frame by frame at 30 / 60 / 144 fps and
 -- on every quality tier, with lag spikes and bursts:
---  1. size       35 / 32 px text and bolt, a 240 x 58 box, a 4 px outline: 0.8 of R153, on every pooled frame
+--  1. size       R158 (owner: "increase the size of the speed popups as they are too small right now", ON PURPOSE): 53 / 48 px text and bolt, a 360 x 86 box, a 6 px outline = 1.5x R154's 35 / 32 / 240 x 58 / 4
+--                (R154: 0.8 of R153), on every pooled frame
 --  2. constant   a popup is the same on-screen size from its first frame to its last: after the 0.28 s pop-in (0.45 -> 1.07 -> 1, the one allowed change) its UIScale is exactly the screen's unit, whatever
 --                it is doing (flying, holding, fading, retired), whatever the frame rate, and a resize of the window in flight does not change a popup that is already flying; text size,
 --                outline, box and tilt never change either. (R155: the camera distance does not reach a popup either - only the field's zoom container, section 5 - so every check of 1-4 runs
---                at the game's default camera zoom, 12.5 studs, where the popups are exactly what R154 drew)
+--                at the game's default camera zoom, 12.5 studs, where the popups are the default size, R158: 53 px text; R154: 35)
 --  3. no reuse   a frame that is showing is never taken for a new popup (it used to jump to the new popup's place and text when every frame was busy: a lag spike); nothing is cut short by the cap in
 --                the normal stream at any tier (the own caps were 6 / 4 on phones / FastMode / a slow Studio, below the 7 popups the stream keeps alive), and in a burst a cut popup fades out
 --  4. smooth     frame to frame every popup moves on a straight line, never backwards, never faster than its curve allows, decelerating (the cubic ease-out) with no speed-up or stall in between;
 --                the number is opaque to the fade and then clears in steps no bigger than its curve; the z order is the spawn order and never changes during a life; the fan hangs on the root at the head's
 --                height: a head bob does not move it
 --  5. zoom       (R155, owner: "make the speed popups consistent in size so when zooming out they don't become bigger they stay consistent in their size when zooming out at a certain point it
---                can disappear it's ok") the popups are world-sized: at the default zoom (12.5 studs from the head) they are the R154 size, at 2x that distance half, at 4x a quarter (hidden), capped at
+--                can disappear it's ok") the popups are world-sized: at the default zoom (12.5 studs from the head) they are the default size (R154: 35 px text; R158: 53), at 2x that distance half, at 4x a quarter (hidden), capped at
 --                1.3x when the camera is close (first person included), faded over 31.25 .. 36.46 studs (text 14 -> 12 px at 1080 p) and hidden past; at any fixed zoom a popup's on-screen size is
 --                steady for its whole life; a zoom change in flight moves the one container scale smoothly (no jump, nothing else changes, at most one write a frame, none while the camera rests);
 --                every field is scaled by its own distance; nothing else in the PlayerGui is touched; the field holds the biggest fan at the cap
@@ -35,13 +36,13 @@ local watched,posWatched,posWrites={},{},0 -- (posWrites: writes to the Position
 C.fire(me,72000,1,1/5);PW.frames(2,1/60)
 local field=PW.fieldOf(pg,head(me))
 local sz=Style.Size
-check(sz.Text==35 and sz.Icon==32 and sz.Box[1]==240 and sz.Box[2]==58 and sz.IconBox==38 and sz.Gap==3 and Style.StrokeThickness==4,'R154: text 35, bolt 32, box 240 x 58, bolt box 38, gap 3, outline 4 (0.8 of R153)')
+check(sz.Text==53 and sz.Icon==48 and sz.Box[1]==360 and sz.Box[2]==86 and sz.IconBox==58 and sz.Gap==5 and Style.StrokeThickness==6,'R158: text 53, bolt 48, box 360 x 86, bolt box 58, gap 5, outline 6 (1.5x R154\'s 35 / 32 / 240 x 58 / 38 / 3 / 4)')
 do
  local ok=true;local n=0
  for _,fr in ipairs(PW.frameList(field))do
   n+=1
   local icon,amt=fr.Lightning,fr.Amount
-  if not(icon.TextSize==32 and amt.TextSize==35 and icon.Size.X.Offset==38 and icon.Size.Y.Offset==58 and fr.Size.X.Offset==240 and fr.Size.Y.Offset==58 and icon.BoldOutline86.Thickness==4 and amt.BoldOutline86.Thickness==4)then ok=false end
+  if not(icon.TextSize==48 and amt.TextSize==53 and icon.Size.X.Offset==58 and icon.Size.Y.Offset==86 and fr.Size.X.Offset==360 and fr.Size.Y.Offset==86 and icon.BoldOutline86.Thickness==6 and amt.BoldOutline86.Thickness==6)then ok=false end
   if fr.Size.X.Scale~=0 or fr.Size.Y.Scale~=0 or icon.Size.X.Scale~=0 or icon.Size.Y.Scale~=0 or amt.Size.Y.Scale~=0 or amt.TextScaled==true then ok=false end
  end
  check(ok and n>=10,'every pooled popup ('..n..' frames) is built at those sizes, in pixels (no scale component, no TextScaled)')
@@ -122,7 +123,7 @@ local function run(o)
   end
  end
  out.Expected=expected
- out.Anchors=anchors;out.Unit=Style.Unit(camera.ViewportSize.Y);out.PosWrites=posWrites-pos0
+ out.Anchors=anchors;out.Unit=(Style.Layout(camera.ViewportSize.X,camera.ViewportSize.Y));out.PosWrites=posWrites-pos0
  PW.camera();PW.seconds(1.7);W.Gui.ReducedMotionEnabled=false;me:SetAttribute('FastMode',nil);PW.view(1080);headPart.Position=rest
  return out
 end
@@ -159,8 +160,9 @@ do
  check(o.Cut>=20,'(a cap of 4 does cut popups: '..o.Cut..' of '..#o.Pops..')')
 end
 -- other screens: the unit follows the screen height (once per popup, at its birth)
-for _,h in ipairs({540,720,1440})do
- local o=run({fps=60,seconds=4,view=h});sizeChecks(h..' px high',o,Style.Unit(h))
+-- (R158: the unit is the screen's unit x SizeScale, 1 from 960 x 540 up and a little less on a small screen: the 640 x 360 case)
+for _,h in ipairs({360,540,720,1440})do
+ local o=run({fps=60,seconds=4,view=h});sizeChecks(h..' px high',o,(Style.Layout(h*16/9,h)))
 end
 PW.view(1080)
 -- (the camera distance and the popups' zoom: section 5, after the rest; everything above and below runs at the default zoom, 12.5 studs)
@@ -247,7 +249,9 @@ do local fx,fy=fanOf();local o=run({fps=60,seconds=6,tier=1});motionChecks('tier
 -- at a phone's fan too
 do
  PW.view(390);W.workspace.CurrentCamera.ViewportSize=R.Vector2.new(844,390);local fx,fy=fanOf()
- local o=run({fps=60,seconds=5});motionChecks('844 x 390 phone (fan '..string.format('%.2f x %.2f',fx,fy)..')',o,fx,fy,Style.Unit(390))
+ local u=(Style.Layout(844,390))
+ local o=run({fps=60,seconds=5});motionChecks('844 x 390 phone (fan '..string.format('%.2f x %.2f',fx,fy)..')',o,fx,fy,u)
+ sizeChecks('844 x 390 phone (R158: the unit is '..string.format('%.3f',u)..' = 0.8 x the size share)',o,u)
  PW.view(1080)
 end
 -- Reduced Motion: it rises, never backwards, never changes size
@@ -281,28 +285,30 @@ end
 
 -- 5. the zoom (R155) ---------------------------------------------------------------------------------------------------------------------------------------
 -- The owner's rule, as numbers: the popups behave like objects in the world. Roblox's default camera zoom is 12.5 studs (nothing in the game sets it; the place's StarterPlayer has Roblox's 0.5 / 128
--- and GiantVisualSafety caps it at 100): there the popups are exactly the R154 size (35 px text at 1080 p). Zoomed out they shrink in proportion to the camera's distance to the head
--- (25 studs: half, 50: a quarter), fade between the distance where the text is 14 px (31.25 studs) and 12 px (36.46) and are gone past it. Closer than 9.6 studs they stop growing at 1.3x.
+-- and GiantVisualSafety caps it at 100): there the popups are exactly the default size (R158: 53 px text at 1080 p; R155: 35). Zoomed out they shrink in proportion to the camera's distance to the head
+-- (25 studs: half, 50: a quarter), fade between 31.25 studs (scale 0.4) and 36.46 studs (scale 12/35: R155's "text 14 px / 12 px of 35") and are gone past it. Closer than 9.6 studs they stop growing at 1.3x.
+-- R158 made the text 1.5x bigger and kept those DISTANCES (the thresholds are scales now, not text px: 14 / 12 px of a 53 px text would have moved the cutoff out to 47 / 55 studs).
 -- The expected values below are written from those rules, not read from the code under test.
 local Z=Style.Zoom
-check(Z.Distance==12.5 and Z.MaxScale==1.3 and Z.FadeText==14 and Z.HideText==12 and Z.Epsilon<=.005 and Style.Size.Text==35,'R155 zoom numbers: default distance 12.5 studs, cap 1.3x, fade from 14 px text, hidden at 12 px')
+local TEXT=53 -- (R158: the text at the default zoom and 1080 p)
+check(Z.Distance==12.5 and Z.MaxScale==1.3 and Z.FadeScale==.4 and math.abs(Z.HideScale-12/35)<1e-12 and Z.Epsilon<=.005 and Style.Size.Text==TEXT,'R155 zoom numbers, kept by R158: default distance 12.5 studs, cap 1.3x, fade from scale 0.4 (31.25 studs), hidden at scale 12 / 35 (36.46 studs)')
 local function expScale(d)return math.min(12.5/math.max(d,.05),1.3)end
-local function expFade(d)local sc=expScale(d);return math.max(0,math.min(1,(sc-12/35)/(14/35-12/35)))end
-local FADE_AT,HIDE_AT=12.5*35/14,12.5*35/12 -- 31.25 and 36.46 studs
+local function expFade(d)local sc=expScale(d);return math.max(0,math.min(1,(sc-12/35)/(.4-12/35)))end
+local FADE_AT,HIDE_AT=12.5/.4,12.5*35/12 -- 31.25 and 36.46 studs
 -- (a) the pure curve ----------------------------------------------------------------------------------------------------------------------------------------
 do
  local s1,f1=Style.ZoomScale(12.5);local s2,f2=Style.ZoomScale(25);local s4,f4=Style.ZoomScale(50);local sc,fc=Style.ZoomScale(12.5/1.3)
- check(s1==1 and f1==1,'ZoomScale(12.5) = 1, fully clear: the R154 size at the default zoom')
- check(math.abs(s2-.5)<1e-12 and f2==1 and math.abs(35*s2-17.5)<1e-9,'ZoomScale(25) = 0.5: twice as far, half the size (17.5 px text), still clear')
+ check(s1==1 and f1==1,'ZoomScale(12.5) = 1, fully clear: the default size at the default zoom')
+ check(math.abs(s2-.5)<1e-12 and f2==1 and math.abs(TEXT*s2-26.5)<1e-9,'ZoomScale(25) = 0.5: twice as far, half the size (26.5 px text), still clear')
  check(math.abs(s4-.25)<1e-12 and f4==0,'ZoomScale(50) = 0.25 and gone (fade 0): four times as far')
  check(math.abs(sc-1.3)<1e-12,'the cap starts at 12.5 / 1.3 = 9.6 studs')
  local ok=true
  for _,d in ipairs({9,8,5,2,1,.5,.1,0,-3,-1e9})do local s0,f0=Style.ZoomScale(d);if s0~=1.3 or f0~=1 then ok=false end end
  check(ok,'closer than 9.6 studs, first person (0.5, 0.1, 0 studs) and nonsense below zero: capped at exactly 1.3, clear')
  local sn,fn=Style.ZoomScale(0/0);local sx,fx=Style.ZoomScale('far');local sm,fm=Style.ZoomScale(nil);local si,fi=Style.ZoomScale(math.huge)
- check(sn==1 and fn==1 and sx==1 and fx==1 and sm==1 and fm==1 and si==1 and fi==1,'bad numbers (NaN, infinity, a string, nil) read as the default distance: the popups are what R154 drew')
+ check(sn==1 and fn==1 and sx==1 and fx==1 and sm==1 and fm==1 and si==1 and fi==1,'bad numbers (NaN, infinity, a string, nil) read as the default distance: the popups are the default size')
  local sh,fh=Style.ZoomScale(HIDE_AT);local sf,ff=Style.ZoomScale(FADE_AT)
- check(math.abs(35*sh-12)<1e-9 and fh==0 and math.abs(35*sf-14)<1e-9 and math.abs(ff-1)<1e-9,string.format('the cutoff: the text is 12.0 px at %.2f studs (gone), 14.0 px at %.2f (the fade starts)',HIDE_AT,FADE_AT))
+ check(math.abs(sh-12/35)<1e-12 and fh==0 and math.abs(sf-.4)<1e-12 and math.abs(ff-1)<1e-9,string.format('the cutoff: scale 0.343 at %.2f studs (gone: the text is %.1f px), 0.4 at %.2f (the fade starts: %.1f px) - the R155 distances',HIDE_AT,TEXT*sh,FADE_AT,TEXT*sf))
  local mono,smooth,prevS,prevF=true,true,nil,nil
  for i=0,2400 do
   local d=i*.05;local s0,f0=Style.ZoomScale(d)
@@ -317,7 +323,7 @@ end
 -- (b) the real client at a fixed zoom: the on-screen size is the world-consistent one and steady ------------------------------------------------------------------
 -- on-screen text px = TextSize x the popup's UIScale x the field container's UIScale (a BillboardGui sized in offsets draws one pixel per unit)
 local function zoomChecks(tag,o,d,fadeToo)
- local unit=o.Unit;local want=35*unit*expScale(d);local worst,lo,hi,n,shown,hidden=0,math.huge,0,0,0,0
+ local unit=o.Unit;local want=TEXT*unit*expScale(d);local worst,lo,hi,n,shown,hidden=0,math.huge,0,0,0,0
  local zoomWorst=0;local alphaWorst=0;local alphaN=0
  for _,p in ipairs(o.Pops)do
   for _,s in ipairs(p.Samples)do
@@ -332,7 +338,7 @@ local function zoomChecks(tag,o,d,fadeToo)
  end
  check(n>=100 and shown>0 and hidden==0,string.format('%s: %d popups, %d samples after the pop, the zoom container is shown',tag,#o.Pops,n))
  check(zoomWorst<=1e-9,string.format('%s: the container scale is exactly min(1.3, 12.5 / %.2f) = %.4f (off by %.1e)',tag,d,expScale(d),zoomWorst))
- check(worst<=Z.Epsilon/expScale(d)+1e-9 and(hi-lo)/want<1e-9,string.format('%s: on-screen text %.2f px = 35 x %.3f x unit, the same for every popup and every frame of its life (spread %.1e)',tag,want,expScale(d),(hi-lo)/want))
+ check(worst<=Z.Epsilon/expScale(d)+1e-9 and(hi-lo)/want<1e-9,string.format('%s: on-screen text %.2f px = 53 x %.3f x unit, the same for every popup and every frame of its life (spread %.1e)',tag,want,expScale(d),(hi-lo)/want))
  if fadeToo then check(alphaN>=100 and alphaWorst<=.0045,string.format('%s: the fade: alpha %.3f while held (off by %.4f)',tag,expFade(d),alphaWorst))end
 end
 local zoomRun={}
@@ -345,7 +351,7 @@ end
 do
  local o=zoomRun[12.5];local exact=true
  for _,p in ipairs(o.Pops)do for _,s in ipairs(p.Samples)do if s.Zoom~=1 then exact=false end end end
- check(exact,'at the default zoom, 12.5 studs, the container scale is exactly 1: popups are what R154 drew (35 px text, 32 px bolt, 240 x 58 box at 1080 p)')
+ check(exact,'at the default zoom, 12.5 studs, the container scale is exactly 1: popups are the default size (53 px text, 48 px bolt, 360 x 86 box at 1080 p)')
  local function late(o2)local v;for _,p in ipairs(o2.Pops)do for _,s in ipairs(p.Samples)do if s.t-p.T0>=.3 then v=v or s.TextSize*s.Scale*s.Zoom end end end return v end
  local t1,t2,t4=late(zoomRun[12.5]),late(zoomRun[25]),late(zoomRun[6.25])
  check(math.abs(t2/t1-.5)<=.004 and math.abs(t4/t1-1.3)<1e-9,string.format('twice the default distance (25 studs): %.2f px = %.3f of the default size %.2f px (half); half the distance (6.25): %.2f px, capped at 1.3',t2,t2/t1,t1,t4))
@@ -358,7 +364,7 @@ do
  for _,d in ipairs({32,34,36})do
   local o=run({fps=60,seconds=4,distance=d})
   zoomChecks(string.format('zoom %.0f studs (fading)',d),o,d,true)
-  local a=expFade(d);check(a<last and a>0,string.format('(%.0f studs: fade %.3f, text %.1f px)',d,a,35*expScale(d)));last=a
+  local a=expFade(d);check(a<last and a>0,string.format('(%.0f studs: fade %.3f, text %.1f px)',d,a,TEXT*expScale(d)));last=a
  end
  for _,d in ipairs({36.5,40,60,95})do
   local o=run({fps=60,seconds=3,distance=d});local shown,n=0,0
@@ -386,8 +392,8 @@ do
    end
   end
  end
- -- the camera moves 12.5 studs in 1.5 s = 0.139 stud a frame: the text changes by at most 35 x 12.5 / (12.5)^2 x 0.139 = 0.39 px a frame at the near end
- check(n>=300 and jumpPx<=.45,string.format('a zoom change in flight changes a popup\'s on-screen size by %.2f px a frame at most (%d steps): no jump',jumpPx,n))
+ -- the camera moves 12.5 studs in 1.5 s = 0.139 stud a frame: the text changes by at most 53 x 12.5 / (12.5)^2 x 0.139 = 0.59 px a frame at the near end (R154: 35 px text, 0.39)
+ check(n>=300 and jumpPx<=.675,string.format('a zoom change in flight changes a popup\'s on-screen size by %.2f px a frame at most (%d steps): no jump',jumpPx,n))
  check(worstTrack<=Z.Epsilon+1e-9,string.format('the container scale follows min(1.3, 12.5 / distance) frame by frame to within the epsilon (%.4f)',worstTrack))
  local moving,rest,restFrames=0,0,0
  for _,w in ipairs(o.ZoomWrites)do
@@ -412,7 +418,7 @@ end
 do
  local o=run({fps=60,seconds=3,distanceAt=function(t)return 12.5+.012*math.sin(t*40)end})
  local all=0;for _,w in ipairs(o.ZoomWrites)do all+=w.w end
- check(all==0 and #o.ZoomWrites>100,string.format('a +-0.012 stud wobble of the camera (%.2f px of text) writes nothing in %d frames',35*(12.5/12.488-1),#o.ZoomWrites))
+ check(all==0 and #o.ZoomWrites>100,string.format('a +-0.012 stud wobble of the camera (%.2f px of text) writes nothing in %d frames',TEXT*(12.5/12.488-1),#o.ZoomWrites))
 end
 
 -- (e) out past the cutoff and back: hidden while far, the popups in flight come back at their true place ----------------------------------------------------------
@@ -443,10 +449,10 @@ do
  check(o.ZoomShowFlips==16,'... the container is shown / hidden only when it crosses the cutoff ('..o.ZoomShowFlips..' changes in 8 round trips)')
 end
 
--- (f) Reduced Motion keeps the world size; a later run at the default zoom is back to exactly R154 -------------------------------------------------------------------
+-- (f) Reduced Motion keeps the world size; a later run at the default zoom is back to exactly the default size -------------------------------------------------------------------
 do
  local o=run({fps=60,seconds=4,distance=25,reduced=true});local ok,n=true,0
- for _,p in ipairs(o.Pops)do for _,s in ipairs(p.Samples)do if s.t-p.T0>=.3 then n+=1;if math.abs(s.TextSize*s.Scale*s.Zoom-17.5)>.15 then ok=false end end end end
+ for _,p in ipairs(o.Pops)do for _,s in ipairs(p.Samples)do if s.t-p.T0>=.3 then n+=1;if math.abs(s.TextSize*s.Scale*s.Zoom-TEXT/2)>.15 then ok=false end end end end
  check(n>=50 and ok,'Reduced Motion at 25 studs: also half size (the zoom is the size of a thing in the world, not a motion)')
  local o2=run({fps=60,seconds=4});local back=true
  for _,p in ipairs(o2.Pops)do for _,s in ipairs(p.Samples)do if s.Zoom~=1 or not s.ZoomShown then back=false end end end

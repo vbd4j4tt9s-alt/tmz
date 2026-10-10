@@ -48,8 +48,8 @@ MUTATIONS = [
     # a cut popup vanishes at once
     ('a cut popup vanishes opaque', 'style', 'S.RetireFade = 0.08', 'S.RetireFade = 0.0001'),
     # R153's sizes
-    ('the sizes are R153\'s 2x again', 'style', 'S.Size = {Text = 35, Icon = 32, Box = {240, 58}, IconBox = 38, Gap = 3,', 'S.Size = {Text = 44, Icon = 40, Box = {300, 72}, IconBox = 48, Gap = 4,'),
-    ('the outline is R153\'s 5 px', 'style', 'S.StrokeThickness = 4\n', 'S.StrokeThickness = 5\n'),
+    ('the sizes are R153\'s 2x again', 'style', 'S.Size = {Text = 53, Icon = 48, Box = {360, 86}, IconBox = 58, Gap = 5,', 'S.Size = {Text = 44, Icon = 40, Box = {300, 72}, IconBox = 48, Gap = 4,'),
+    ('the outline is R153\'s 5 px (R158: 6)', 'style', 'S.StrokeThickness = 6\n', 'S.StrokeThickness = 5\n'),
     # the pop is removed from the size check's reach: popups start tiny
     ('the pop starts far too small', 'style', 'S.Pop = {From = 0.45,', 'S.Pop = {From = 0.2,'),
     # the label sizes itself in scale
@@ -59,10 +59,10 @@ MUTATIONS = [
     ('R155: no cap when the camera is close', 'style', 'local scale = math.min(z.Distance / math.max(num(distance, z.Distance), 0.05), z.MaxScale)', 'local scale = z.Distance / math.max(num(distance, z.Distance), 0.05)'),
     ('R155: the cap is 2x', 'style', 'MaxScale = 1.3,', 'MaxScale = 2.0,'),
     ('R155: the default zoom is 20 studs', 'style', 'S.Zoom = {Distance = 12.5,', 'S.Zoom = {Distance = 20,'),
-    ('R155: never hidden', 'style', 'HideText = 12,', 'HideText = 0,'),
+    ('R155: never hidden', 'style', 'HideScale = 12 / 35,', 'HideScale = 0,'),
     ('R155: hidden at once, no fade', 'style', 'return scale, clamp((scale - hide) / (from - hide), 0, 1)', 'return scale, (scale > hide) and 1 or 0'),
     ('R155: a coarse epsilon (the size steps)', 'style', 'Epsilon = 0.004}', 'Epsilon = 0.1}'),
-    ('R155: the field is R154\'s 768 x 608 again', 'style', "Width = 1000, Height = 792,", "Width = 768, Height = 608,"),
+    ('R155: the field is R154\'s 768 x 608 again', 'style', "Width = 1500, Height = 1188,", "Width = 768, Height = 608,"),
     # R155: the client
     ('R155: the container scale is never written', 'script', '\t\tfield.ZoomScale.Scale = scale\n', '\t\tfield.ZoomScale.Scale = 1\n'),
     ('R155: the container scale is written every frame', 'script', 'if not field.Hidden and (field.ZS == nil or math.abs(scale - field.ZS) > Style.Zoom.Epsilon) then', 'if not field.Hidden then'),

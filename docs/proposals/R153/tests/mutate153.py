@@ -47,20 +47,20 @@ M = {
     'belt_always_write': ('belt', RS + 'TreadmillFx.lua', "if e.Wrote~=offset then e.Wrote=offset;v['OffsetStuds'..axis]=offset end", "e.Wrote=offset;v['OffsetStuds'..axis]=offset"),
     # the live Sign override is ignored
     'belt_sign_ignored': ('belt', RS + 'TreadmillFx.lua', 'self.Axis=(axis==\'U\'or axis==\'V\')and axis or nil;self.Sign=(sign==1 or sign==-1)and sign or nil', 'self.Axis=nil;self.Sign=nil'),
-    # the popups are 1x again (R154: the sizes are 1.6x R151's: 35 / 32 / 240 x 58 / 38 / 3)
-    'popup_size_1x': ('popups', RS + 'SpeedPopupStyle.lua', 'S.Size = {Text = 35, Icon = 32, Box = {240, 58}, IconBox = 38, Gap = 3,', 'S.Size = {Text = 22, Icon = 20, Box = {150, 36}, IconBox = 24, Gap = 2,'),
-    # R154: the popups are back at R153's 2x (the owner asked for 20% less)
-    'popup_size_2x': ('popups', RS + 'SpeedPopupStyle.lua', 'S.Size = {Text = 35, Icon = 32, Box = {240, 58}, IconBox = 38, Gap = 3,', 'S.Size = {Text = 44, Icon = 40, Box = {300, 72}, IconBox = 48, Gap = 4,'),
+    # the popups are 1x again (R158: the sizes are 2.4x R151's: 53 / 48 / 360 x 86 / 58 / 5; R154: 1.6x, 35 / 32 / 240 x 58 / 38 / 3)
+    'popup_size_1x': ('popups', RS + 'SpeedPopupStyle.lua', 'S.Size = {Text = 53, Icon = 48, Box = {360, 86}, IconBox = 58, Gap = 5,', 'S.Size = {Text = 22, Icon = 20, Box = {150, 36}, IconBox = 24, Gap = 2,'),
+    # the popups are back at R153's 2x (R154: the owner asked for 20% less; R158: 1.5x more than that again)
+    'popup_size_2x': ('popups', RS + 'SpeedPopupStyle.lua', 'S.Size = {Text = 53, Icon = 48, Box = {360, 86}, IconBox = 58, Gap = 5,', 'S.Size = {Text = 44, Icon = 40, Box = {300, 72}, IconBox = 48, Gap = 4,'),
     # the icon is not scaled
-    'popup_icon_small': ('popups', RS + 'SpeedPopupStyle.lua', 'S.Size = {Text = 35, Icon = 32,', 'S.Size = {Text = 35, Icon = 20,'),
-    # the fan ignores the screen (Base x Base everywhere: off a phone's screen)
-    'popup_fan_blind': ('popups', RS + 'SpeedPopupStyle.lua', 'return clamp(x, f.Min, f.Max), clamp(y, f.Min, f.Max)', 'return 1.6, 1.6'),
+    'popup_icon_small': ('popups', RS + 'SpeedPopupStyle.lua', 'S.Size = {Text = 53, Icon = 48,', 'S.Size = {Text = 53, Icon = 20,'),
+    # the fan ignores the screen (Base x Base everywhere: off a phone's screen; R158: and the popups keep their full size there)
+    'popup_fan_blind': ('popups', RS + 'SpeedPopupStyle.lua', 'return clamp(x, f.Min, f.Max), clamp(y, f.Min, f.Max)', 'return f.Base, f.Base'),
     # the motion changed: a slower fling
     'popup_slow_fling': ('popups', RS + 'SpeedPopupStyle.lua', 'S.Fling = {Time = 0.40,', 'S.Fling = {Time = 0.55,'),
     # the rate changed: 15 a second
     'popup_rate': ('popups', RS + 'SpeedPopupStyle.lua', 'S.Cadence = {SplitTo = 2,', 'S.Cadence = {SplitTo = 3,'),
     # the pooled field no longer holds the biggest fan
-    'popup_field_small': ('popups', RS + 'SpeedPopupStyle.lua', 'Width = 768, Height = 608,', 'Width = 440, Height = 330,'),
+    'popup_field_small': ('popups', RS + 'SpeedPopupStyle.lua', 'Width = 1500, Height = 1188,', 'Width = 440, Height = 330,'),
 }
 if name == 'list':
     print(' '.join(M))

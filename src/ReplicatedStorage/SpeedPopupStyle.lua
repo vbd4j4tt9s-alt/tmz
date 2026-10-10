@@ -19,7 +19,7 @@ S.Colors = {
 }
 S.Font = 'FredokaOne'
 S.Icon = '\u{26A1}'
-S.StrokeThickness = 4
+S.StrokeThickness = 6
 -- Reference: the video's text is ~1.8% of the screen height; ours was 26 px on a 1080 p screen (2.4%). Smaller = "many small popups".
 -- Box = the frame the bolt and the number sit in (centred, Gap px apart); the tilts are random +- degrees per popup.
 -- R153 (owner, in Studio: "numbers should also be bigger", then "2x bigger"): every size is 2x its R151 value (text 22 -> 44, bolt 20 -> 40, box 150 x 36 -> 300 x 72, bolt box
@@ -27,7 +27,9 @@ S.StrokeThickness = 4
 -- R154 (owner: "reduce the size of the speed notifier number by 20%"): 0.8 of the R153 sizes, so 1.6x R151's: text 44 -> 35, bolt 40 -> 32, box 300 x 72 -> 240 x 58, bolt box 48 -> 38,
 -- gap 4 -> 3, outline 5 -> 4. A popup is this size from its first frame to its last (SpeedGainPopup: a pixel-sized BillboardGui; only the brief pop-in
 -- below, 0.45 -> 1.07 -> 1 in 0.28 s, changes it). R155: these are the sizes at the default camera distance; the field's scale follows the zoom (S.Zoom).
-S.Size = {Text = 35, Icon = 32, Box = {240, 58}, IconBox = 38, Gap = 3, IconTilt = 14, TextTilt = 3}
+-- R158 (owner: "increase the size of the speed popups as they are too small right now"): 1.5x R154's, so 2.4x R151's, to whole pixels: text 35 -> 53, bolt 32 -> 48, box 240 x 58 -> 360 x 86,
+-- bolt box 38 -> 58, gap 3 -> 5, outline 4 -> 6 (the same shape, bolder to match). These are the sizes on a computer; a small screen shows them a little smaller, see S.SizeScale.
+S.Size = {Text = 53, Icon = 48, Box = {360, 86}, IconBox = 58, Gap = 5, IconTilt = 14, TextTilt = 3}
 
 -- Spawn: the popup starts AT the head (the video: head centre, within a few px), already 45% of full size, nothing in front of the face.
 S.Spawn = {Lift = 5, Jitter = 6}     -- px above the head centre, +- px of random start offset
@@ -68,7 +70,8 @@ S.Cadence = {SplitTo = 2, MaxShares = 12, MaxTicks = 10, MinInterval = 0.1, MaxI
 -- R154: 0.8 of R153's 960 x 760 (the popups and the fan are 0.8 of it); MaxFrames bounds the pool's growth in a burst (a lag spike delivers several awards at once): a frame that is
 -- still showing is never reused for a new popup, the pool gets one more frame instead (never more than MaxFrames; then that popup is not shown).
 -- R155: Width / Height x Zoom.MaxScale (1.3): 768 x 608 -> 1000 x 792, the room for the biggest fan when the camera is close and the field is scaled up to its cap.
-S.Field = {Name = 'SpeedGainField', Width = 1000, Height = 792, Spare = 2, FreeFields = 4, MaxFrames = 24}
+-- R158: x 1.5 with the popups and the fan: 1500 x 1188 (the biggest fan, at 4K, with the pop's overshoot and the 1.3 cap, is 1400 x 1038).
+S.Field = {Name = 'SpeedGainField', Width = 1500, Height = 1188, Spare = 2, FreeFields = 4, MaxFrames = 24}
 -- R153: the fan's size on THIS screen. The popups fly out of the head in a fan of design px; at 2x text the fan that kept R151's look (x2 on both axes) reaches 324 px to each side of the head and 248 px
 -- above it (design px), more than a phone has: a landscape phone (844 x 390) has no room above the head, a portrait phone (390 x 844) none at the sides. FanScale(w, h) returns
 -- X, Y: the multipliers of a popup's x / y offset (the client applies them with the Unit). Base = 2 (the same fan, 2x, so the popups pile up exactly as much as in R151: about
@@ -76,16 +79,21 @@ S.Field = {Name = 'SpeedGainField', Width = 1000, Height = 792, Spare = 2, FreeF
 -- HalfHeight wide / tall at the widest "+999.5K") gets what fits (never below Min), and the other direction takes the room back (up to Max) so the fan keeps its area.
 -- A portrait phone keeps the top PortraitTop px clear too: HudLayout puts the status box up there (down to y 67; the three balances under it reach y 209 at the right).
 -- R154: the popups are 0.8 of R153's, and so is the fan (Base 1.6 = 0.8 x 2, Max 2.4, Min 0.6, the half popup 89 x 24): the same arrangement and pile-up as R151 / R153, 20% smaller.
-S.Fan = {Base = 1.6, Max = 2.4, Min = 0.6, HeadY = 0.36, Margin = 12, PortraitTop = 72, HalfWidth = 89, HalfHeight = 24}
+-- R158: the popups are 1.5x R154's and so is the fan (Base 2.4, Max 3.6, Min 0.9, the half popup 134 x 36): the same arrangement and pile-up as R151 / R154 (46% of a popup under others), 1.5x bigger.
+-- A phone has not got the room for a fan that size (a landscape phone has 140 px above the head, a portrait phone's HUD stack takes the top), so SizeScale makes the popups smaller on a small screen:
+-- the biggest share of S.Size, never below MinSize = 2/3 (= R154's size), at which the fan still keeps Keep = 85% of its area. 1 on every computer and tablet screen (800 x 600 and up), 0.97 at 932 x 430,
+-- 0.87 at 844 x 390, 0.76 at 390 x 844, and the 2/3 floor (today's size) on the narrow ones (375 x 667, 360 x 740, 320 x 568, 568 x 320): docs/proposals/R158/tests/test_popups158.luau.
+S.Fan = {Base = 2.4, Max = 3.6, Min = 0.9, HeadY = 0.36, Margin = 12, PortraitTop = 72, HalfWidth = 134, HalfHeight = 36, Keep = 0.85, MinSize = 2 / 3}
 -- R155 (owner: "make the speed popups consistent in size so when zooming out they don't become bigger they stay consistent in their size when zooming out at a certain point it can
 -- disappear it's ok"): the popups were pixel-sized, the same on screen at every camera distance, so zooming out shrank the runner but not the numbers. Now the whole popup field is an object in
 -- the world: its on-screen size follows the camera's distance to it (the head) like the runner's. Scale = Distance / camera distance, so
 --   Distance   = 12.5 studs: Roblox's default camera zoom (nothing in the game sets it: StarterPlayer's CameraMin / MaxZoomDistance are 0.5 / 128, GiantVisualSafety caps it at 100). At this
---                distance the popups are exactly the R154 sizes (35 px text at 1080 p); twice as far (25 studs) = half the size; four times (50) = a quarter.
---   MaxScale   = 1.3: closer than 12.5 / 1.3 = 9.6 studs the popups stop growing (1.3x R154: 45 px text), so a close-up or first person never shows a giant popup.
---   FadeText / HideText = 14 / 12: the text size at 1080 p where the popups start to fade (31.3 studs) and where they are gone (36.5 studs: 12.5 x 35 / 12); the fade is linear in the size.
---   Epsilon    = 0.004: the field's scale is written only when it changed by more than this (0.14 px of a 35 px text).
-S.Zoom = {Distance = 12.5, MaxScale = 1.3, FadeText = 14, HideText = 12, Epsilon = 0.004}
+--                distance the popups are exactly their S.Size sizes (R154: 35 px text at 1080 p; R158: 53); twice as far (25 studs) = half the size; four times (50) = a quarter.
+--   MaxScale   = 1.3: closer than 12.5 / 1.3 = 9.6 studs the popups stop growing (1.3x: 69 px text at 1080 p, R154: 45), so a close-up or first person never shows a giant popup.
+--   FadeScale / HideScale = 0.4 / 12 / 35: the scale where the popups start to fade (12.5 / 0.4 = 31.25 studs) and where they are gone (12.5 x 35 / 12 = 36.46 studs); the fade is linear in the scale.
+--                R155 wrote them as the text size at 1080 p (14 / 12 px of 35). R158 (the text is 53 px) keeps the same DISTANCES: as 14 / 12 px they would have moved out to 47 / 55 studs.
+--   Epsilon    = 0.004: the field's scale is written only when it changed by more than this (0.2 px of a 53 px text).
+S.Zoom = {Distance = 12.5, MaxScale = 1.3, FadeScale = 0.4, HideScale = 12 / 35, Epsilon = 0.004}
 
 local function clamp(v, lo, hi) return v < lo and lo or (v > hi and hi or v) end
 S.Clamp = clamp
@@ -101,12 +109,10 @@ function S.Unit(viewportHeight)
 	return clamp(num(viewportHeight, 1080) / 1080, 0.8, 1.35)
 end
 
--- The fan's X / Y multipliers for a viewport (see S.Fan). Unknown sizes read as a 16:9 desktop screen: 2, 2.
-function S.FanScale(viewportWidth, viewportHeight)
+-- The fan's X / Y multipliers for a w x h screen when the popups are `size` times S.Size (see S.Fan). `size` is folded into the unit: the room is measured in the popup's own design px.
+local function fanAt(w, h, size)
 	local f = S.Fan
-	local h = num(viewportHeight, 1080)
-	local w = num(viewportWidth, h * 16 / 9)
-	local u = S.Unit(h)
+	local u = S.Unit(h) * size
 	local reach = S.Fling.Radius[2]
 	local roomX = (w / 2 - f.Margin) / u - f.HalfWidth                      -- design px from the head to the side edge, less the half popup
 	local top = (h > w and w <= 500) and f.PortraitTop or f.Margin
@@ -120,12 +126,46 @@ function S.FanScale(viewportWidth, viewportHeight)
 	return clamp(x, f.Min, f.Max), clamp(y, f.Min, f.Max)
 end
 
+-- R158: the popups' size on this screen as a share of S.Size: 1 wherever the fan fits (a computer, a big phone), else the biggest share (never below Fan.MinSize, today's phone size)
+-- at which the fan still keeps Fan.Keep of its area (the pile-up and the HUD rows are what a squeezed fan costs). Bisection over the pure fan; numbers only, nothing allocated.
+function S.SizeScale(viewportWidth, viewportHeight)
+	local f = S.Fan
+	local h = num(viewportHeight, 1080)
+	local w = num(viewportWidth, h * 16 / 9)
+	local want = f.Keep * f.Base * f.Base
+	local x, y = fanAt(w, h, 1)
+	if x * y >= want then return 1 end
+	local lo, hi = f.MinSize, 1
+	for _ = 1, 12 do
+		local mid = (lo + hi) / 2
+		x, y = fanAt(w, h, mid)
+		if x * y >= want then lo = mid else hi = mid end
+	end
+	return lo
+end
+
+-- The fan's X / Y multipliers for a viewport (see S.Fan). Unknown sizes read as a 16:9 desktop screen: Base, Base.
+function S.FanScale(viewportWidth, viewportHeight)
+	local h = num(viewportHeight, 1080)
+	local w = num(viewportWidth, h * 16 / 9)
+	return fanAt(w, h, S.SizeScale(w, h))
+end
+
+-- What the client needs for one popup on a w x h screen: the unit (px per design px of this popup: S.Unit x S.SizeScale) and the fan's X, Y.
+function S.Layout(viewportWidth, viewportHeight)
+	local h = num(viewportHeight, 1080)
+	local w = num(viewportWidth, h * 16 / 9)
+	local size = S.SizeScale(w, h)
+	local x, y = fanAt(w, h, size)
+	return S.Unit(h) * size, x, y
+end
+
 -- R155: how the field is scaled for a camera `distance` studs from the head, and how clear it is. Returns scale (1 at S.Zoom.Distance, Distance / distance beyond, never above
--- S.Zoom.MaxScale) and fade (1 opaque .. 0 gone: linear in the scale from the size where the text is FadeText px down to HideText px; 0 means hidden). Pure and allocation-free.
+-- S.Zoom.MaxScale) and fade (1 opaque .. 0 gone: linear in the scale from FadeScale down to HideScale; 0 means hidden). Pure and allocation-free.
 function S.ZoomScale(distance)
 	local z = S.Zoom
 	local scale = math.min(z.Distance / math.max(num(distance, z.Distance), 0.05), z.MaxScale)
-	local hide, from = z.HideText / S.Size.Text, z.FadeText / S.Size.Text
+	local hide, from = z.HideScale, z.FadeScale
 	return scale, clamp((scale - hide) / (from - hide), 0, 1)
 end
 

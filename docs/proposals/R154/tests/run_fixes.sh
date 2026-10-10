@@ -4,7 +4,7 @@
 #  1. badges  - "the number and signs in the notification bubble is also too small": the count / "9+" / "!" are set at an explicit size (NotifyBadge151.TextSize: 78% of the badge for one
 #               character, 68% for "9+"), >= 60% of the badge and >= 55% of the red disc's height, inside the badge, centred, on 5 screens (computer and phones) for the INDEX count, the MENU
 #               alert and the DAILY count, and not clipped by the wheel's CanvasGroup / tab row: the R151 badge suites (docs/proposals/R151/tests/run_badges.sh carries the R154 checks)
-#  2. popups  - "the numbers for speed also should be kept at a consistent size throughout, reduce the size of the speed notifier number by 20% and fix the glitchyness": test_popups154.luau
+#  2. popups  - "the numbers for speed also should be kept at a consistent size throughout, reduce the size of the speed notifier number by 20% and fix the glitchyness": test_popups154.luau (R158, on purpose: the sizes are 1.5x, 53 / 48 px; the zoom cutoffs are scales, the same distances)
 #               (35 / 32 px, constant size from the first frame to the last, no showing frame reused, nothing cut short in the normal stream on any tier, smooth
 #               frame-by-frame flight at 30 / 60 / 144 fps; R155, section 5: "make the speed popups consistent in size so when zooming out they don't become bigger ... at a certain point it can
 #               disappear": at the default camera zoom, 12.5 studs, they are the R154 size, then they follow the camera's distance (half at 25 studs), are capped at 1.3x close up, fade from 31.25 and are

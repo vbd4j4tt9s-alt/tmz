@@ -2,10 +2,11 @@
 -- R153 (owner, in Studio, about the treadmill speed-gain popups: "numbers should also be bigger", then "2x bigger"): the popups' size, motion and screens against the R152
 -- SpeedPopupStyle (ref_style.luau, the module as it was: the R151 look) on the Roblox mock with the REAL SpeedPopupStyle and HudLayout of this checkout.
 --  1. size      R154 (owner: "reduce the size of the speed notifier number by 20%"): text 35, bolt 32, box 240 x 58, bolt box 38, gap 3, outline 4: 0.8 of R153's 44 / 40 / 300 x 72 / 48 / 4 / 5, so 1.6x the
---               reference (to whole pixels); the pooled field holds the biggest fan
+--               reference (to whole pixels); R158 (owner: "increase the size of the speed popups as they are too small right now", ON PURPOSE): 1.5x that, 2.4x the reference: text 53, bolt 48, box
+--               360 x 86, bolt box 58, gap 5, outline 6; the pooled field holds the biggest fan
 --  2. unchanged the pop, fling, hold, fade and life numbers; the curves (Pose of the same plans at 200 ages, retired and Reduced Motion too); the plans; the cadence (10 a second:
 --               SplitTo, Shares, Spacing, SplitFor, Split); the caps per tier; Unit; the colours, font, bolt and the 1K / 1M formatting
---  3. screens   FanScale: Base (R154: 1.6) x Base where there is room (the same fan as R151 at the popups' size, so they pile up exactly as much); where a direction has none (a landscape
+--  3. screens   FanScale: Base (R154: 1.6, R158: 2.4) x Base where there is room (the same fan as R151 at the popups' size, so they pile up exactly as much); where a direction has none (a landscape
 --               phone above the head, a portrait phone at the sides) it takes what fits and the other direction more. On 12 phone and 5 computer screens the biggest popup
 --               (a 7 character "+999.5K") stays inside the screen with the head where Roblox's camera puts it (HeadY of the way down) and clear of every HUD box (HudLayout.Read)
 --  4. pile-up   the mean share of a popup that other living popups cover (10 popups a second) is at most 1.25x R151's (~46%) on a computer or a phone with room (the fan is as wide as
@@ -17,9 +18,9 @@ local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)
 local function near(a,b,tol)return type(a)=='number'and type(b)=='number'and math.abs(a-b)<=(tol or 1e-9)end
 -- 1. size -------------------------------------------------------------------------------------------------------------------------------------------------
 local sz,rz=Style.Size,Ref.Size
-local function r16(v)return math.floor(v*1.6+.5)end -- (R154: 1.6x the R151 size, to whole pixels)
-check(sz.Text==r16(rz.Text)and sz.Icon==r16(rz.Icon)and sz.IconBox==r16(rz.IconBox)and sz.Gap==r16(rz.Gap)and sz.Box[1]==r16(rz.Box[1])and sz.Box[2]==r16(rz.Box[2]),'text '..sz.Text..', bolt '..sz.Icon..', bolt box '..sz.IconBox..', gap '..sz.Gap..', box '..sz.Box[1]..' x '..sz.Box[2]..': every size is 1.6x the R151 one (0.8 of R153\'s 2x)')
-check(sz.Text==35 and sz.Icon==32 and Style.StrokeThickness==4 and Ref.StrokeThickness==2.5 and math.abs(Style.StrokeThickness-Ref.StrokeThickness*1.6)<=.5,'35 / 32 px, a 4 px outline (R153: 44 / 40 / 5; R151: 22 / 20 / 2.5)')
+local function r24(v)return math.floor(v*2.4+.5)end -- (R158: 2.4x the R151 size = 1.5x R154's 1.6x, to whole pixels)
+check(sz.Text==r24(rz.Text)and sz.Icon==r24(rz.Icon)and sz.IconBox==r24(rz.IconBox)and sz.Gap==r24(rz.Gap)and sz.Box[1]==r24(rz.Box[1])and sz.Box[2]==r24(rz.Box[2]),'text '..sz.Text..', bolt '..sz.Icon..', bolt box '..sz.IconBox..', gap '..sz.Gap..', box '..sz.Box[1]..' x '..sz.Box[2]..': every size is 2.4x the R151 one (1.5x R154\'s 1.6x)')
+check(sz.Text==53 and sz.Icon==48 and Style.StrokeThickness==6 and Ref.StrokeThickness==2.5 and math.abs(Style.StrokeThickness-Ref.StrokeThickness*2.4)<=.5,'53 / 48 px, a 6 px outline (R154: 35 / 32 / 4; R153: 44 / 40 / 5; R151: 22 / 20 / 2.5)')
 check(sz.IconTilt==rz.IconTilt and sz.TextTilt==rz.TextTilt,'the random tilts are the same degrees')
 -- 2. unchanged -------------------------------------------------------------------------------------------------------------------------------------------
 local function same(a,b)
@@ -65,7 +66,7 @@ check(cad and Style.SplitFor(true,false)==2,'the rate (2 popups per 1/5 s tick =
 -- 3. screens ---------------------------------------------------------------------------------------------------------------------------------------------
 local fx,fy=Style.FanScale(1920,1080)
 local base=Style.Fan.Base
-check(base==1.6 and fx==base and fy==base,'1920 x 1080: the fan is '..base..' x '..base..' (the R151 fan at the popups\' 1.6x size)')
+check(base==2.4 and fx==base and fy==base,'1920 x 1080: the fan is '..base..' x '..base..' (the R151 fan at the popups\' 2.4x size)')
 check(select(1,Style.FanScale(nil,nil))==base and select(2,Style.FanScale(nil,nil))==base,'an unknown screen reads as a desktop ('..base..' x '..base..')')
 local lx,ly=Style.FanScale(844,390)
 check(lx>base and ly<base and ly>=base/2 and lx<=Style.Fan.Max,string.format('a landscape phone (844 x 390) has no room above the head: the fan is %.2f wide, %.2f tall',lx,ly))
@@ -82,7 +83,7 @@ end
 -- all popups of one stream on a screen: the rectangle of each (a 7 character "+999.5K") at rest and at the pop's peak, relative to the head
 local function footprints(w,h,count,S)
  S=S or Style
- local u=S.Unit(h);local x,y=1,1;if S==Style then x,y=Style.FanScale(w,h)end
+ local u=S.Unit(h);local x,y=1,1;if S==Style then u,x,y=Style.Layout(w,h)end -- (R158: the unit carries the popup's size on this screen)
  local zz=S.Size;local halfW=(zz.IconBox+zz.Gap+7*zz.Text*.55)/2*u;local halfH=zz.Text*.6*u
  local s=11;local function r()s=(s*16807)%2147483647;return s/2147483647 end
  local bg={};local out={}
@@ -144,7 +145,7 @@ end
 -- 4. pile-up --------------------------------------------------------------------------------------------------------------------------------------------------
 -- popups every .1 s alive .65 s; a box is the bolt + the text of `chars` characters (.55 em each) x 1.2 em; the share of each box covered by the others, averaged
 local function pileUp(S,w,h,chars,fanX,fanY)
- local u=S.Unit(h);local s=5;local function r()s=(s*16807)%2147483647;return s/2147483647 end
+ local u=S.Unit(h);if S==Style then u=Style.Layout(w,h)end;local s=5;local function r()s=(s*16807)%2147483647;return s/2147483647 end
  local bag={};local plans={}
  for i=1,1500 do local p=S.Plan(r,bag,{});plans[i]={Angle=p.Angle,Radius=p.Radius,StartX=p.StartX,StartY=p.StartY} end
  local bw=(S.Size.IconBox+S.Size.Gap+chars*S.Size.Text*.55);local bh=S.Size.Text*1.2

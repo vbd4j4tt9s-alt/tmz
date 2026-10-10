@@ -189,14 +189,17 @@ check(C.TextStroke[1]==17 and C.TextStroke[2]==26 and C.TextStroke[3]==42,'outli
 check(C.Icon[1]==255 and C.Icon[2]==222 and C.Icon[3]==66,'bolt colour as before (255,222,66)')
 check(C.LegacyStroke[1]==0 and C.LegacyStroke[2]==0 and C.LegacyStroke[3]==0,'legacy TextStroke colour as before (black)')
 check(Style.Font=='FredokaOne' and Style.Icon=='\u{26A1}','font FredokaOne and the bolt as before')
-check(Style.StrokeThickness==4,'R154: the outline is 4 px on the 35 px text (R153: 5 on 44; R151: 2.5 on 22)')
+check(Style.StrokeThickness==6,'R158: the outline is 6 px on the 53 px text (R154: 4 on 35; R153: 5 on 44; R151: 2.5 on 22)')
 -- the numbers of the proposal the owner approved
 check(Style.Pop.From==0.45 and Style.Pop.Time==0.28 and Style.Fling.Time==0.40 and Style.Fling.Power==3 and Style.Fade.Start==0.5 and Style.Fade.Length==0.15,'the approved pop / fling / fade numbers')
 check(Style.Fling.Radius[1]==44 and Style.Fling.Radius[2]==104 and Style.Fling.HalfAngle==75 and Style.Fling.Slots==7,'the approved fan: +-75 degrees in 7 slots, 44..104 px')
 -- R153 (owner: "numbers should also be bigger", then "2x bigger") made every size 2x its R151 value; R154 (owner: "reduce the size of the speed notifier number by 20%") took 20% off that: 1.6x R151, to whole pixels.
+-- R158 (owner: "increase the size of the speed popups as they are too small right now", on purpose): 1.5x R154's = 2.4x R151's, to whole pixels: text 35 -> 53, bolt 32 -> 48, box 240 x 58 -> 360 x 86,
+-- bolt box 38 -> 58, gap 3 -> 5, outline 4 -> 6.
 -- The tilts (degrees) are not sizes. test_popups153.luau (docs/proposals/R153/tests) has the fan, the screens and the pile-up.
-check(Style.Size.Text==35 and Style.Size.Icon==32 and Style.Size.Box[1]==240 and Style.Size.Box[2]==58 and Style.Size.IconBox==38 and Style.Size.Gap==3,'R154: the sizes are 0.8 of R153\'s: text 35, bolt 32, box 240 x 58, bolt box 38, gap 3')
-check(math.abs(Style.Size.Text-22*1.6)<=.5 and math.abs(Style.Size.Icon-20*1.6)<=.5 and math.abs(Style.Size.Box[1]-150*1.6)<=.5 and math.abs(Style.Size.Box[2]-36*1.6)<=.5 and math.abs(Style.Size.IconBox-24*1.6)<=.5 and math.abs(Style.Size.Gap-2*1.6)<=.5,'R154: ... which is 1.6x the R151 sizes, to the nearest pixel')
+check(Style.Size.Text==53 and Style.Size.Icon==48 and Style.Size.Box[1]==360 and Style.Size.Box[2]==86 and Style.Size.IconBox==58 and Style.Size.Gap==5,'R158: the sizes are 1.5x R154\'s 35 / 32 / 240 x 58 / 38 / 3: text 53, bolt 48, box 360 x 86, bolt box 58, gap 5')
+check(math.abs(Style.Size.Text-22*2.4)<=.5 and math.abs(Style.Size.Icon-20*2.4)<=.5 and math.abs(Style.Size.Box[1]-150*2.4)<=.5 and math.abs(Style.Size.Box[2]-36*2.4)<=.5 and math.abs(Style.Size.IconBox-24*2.4)<=.5 and math.abs(Style.Size.Gap-2*2.4)<=.5,'R158: ... which is 2.4x the R151 sizes, to the nearest pixel')
+check(math.abs(Style.Size.Text/35-1.5)<=.02 and math.abs(Style.Size.Icon/32-1.5)<=.001 and math.abs(Style.Size.Box[1]/240-1.5)<=.001 and math.abs(Style.Size.Box[2]/58-1.5)<=.02 and math.abs(Style.Size.IconBox/38-1.5)<=.03 and math.abs(Style.StrokeThickness/4-1.5)<=.001,'R158: ... and within 3% of 1.5x R154 (text 1.514, bolt 1.5, box 1.5 x 1.483, bolt box 1.526, outline 1.5; the gap 3 -> 5 is a pixel)')
 check(Style.Size.IconTilt==14 and Style.Size.TextTilt==3,'(the random tilts are the same degrees)')
 
 print(string.format('test_speed_popups_style: %d checks, %d failed',checks,fails))
