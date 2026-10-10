@@ -37,3 +37,10 @@
 ## Stopped by an interrupt (10 Oct), work saved as WIP commits on their branches (unfinished, untested)
 - worktree-agent-a8a50c2056188b487 (title / audio crash), -af021d48f7218dd80 (Desert music), -a4e5c7a2dc7c33ff6 (sign, Mech BAG FULL, Output,
   DAILY tile), -a9273fb3e3cd05eb1 (track / base wall design), -a5bed8e4860653d0b (HUD lock + MENU previews), -a0a3fa0f33470f2b1 (Mech skip tests).
+
+## HUD lock: built (merged b8c13c1), review follow-ups in progress
+- Review (read-only): no bug in the scaling. Follow-ups being fixed: text minimums in real px under the HUD scale, BONUS ROLL gap, menu gap
+  above the hotbar, SKIP zone minimum, PcScales in the cache key.
+- For the owner to check in Studio (the mock can't): (1) with chat open, does the open MENU wheel sit under Roblox's chat window (top-left)?
+  The wheel top is now ~207 px below the top bar at 1920 x 1080; (2) UIStroke outlines and text size limits on a small window (e.g. 1280 x 720);
+  (3) touchscreen PCs (TouchEnabled) still get the phone layout, as before (the "mobile" rule is decided by TouchEnabled).
