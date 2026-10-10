@@ -1,5 +1,6 @@
 # R157 release suites on 4d2365b (the installer's source): 103 PASS, 2 FAIL
-# The 2 FAILs are stale tests: they skip a Mythic Mech reveal mid-way, which R157 (owner) no longer allows (SKIP only for Secret / Cosmic / King). Test update follows; no src change.
+# The 2 FAILs were stale tests: they skipped a Mythic Mech reveal mid-way, which R157 (owner) no longer allows (SKIP only for Secret / Cosmic / King).
+# Updated (test-only, no src change): R153run_mech_pack opening 213 checks / 0 failures, R155run_mech_coats steps 0-5 all 0 failures (opening Gold / Diamond 214 / 0).
 
 PASS R127 1s :: 53 checks, 0 failures 25 checks, 0 failures 
 PASS R128 0s :: 8 checks, 0 failures 22 checks, 0 failures 21 checks, 0 failures 
