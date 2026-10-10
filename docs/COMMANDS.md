@@ -197,6 +197,12 @@ listed separately any more because each one is the same as a command above.
 - **Find an asset:** paste `installers/find_asset.lua` into the Command Bar. It shows where an asset id is used
   (e.g. the animation 114302219876492).
 - **Undo a release:** `require(game.ServerStorage.ChestChase_R123_Backup.Installer)("undo")`.
+- **Bat hit counters (R158):** during Play, select `ReplicatedStorage > ChestChaseRemotes > BatSwing` and look at its attributes
+  (`Claims_hit`, `Claims_out_of_reach`, ...). Each counts how many bat hits the server allowed or refused, and why. If one refusal reason
+  keeps growing while you are hitting people for real, tell us.
+- **Outer track models (R158):** `ServerStorage.OuterTrackAssets158` holds your own models for outside the track (`LavaVolcano`,
+  `SnowMountains`). A model there, named by its key, is used before anything else. The keys are listed in
+  `docs/proposals/R158/design/outer_track_assets.md`.
 
 ## Test plan by feature (two accounts help: a main and an alt)
 1. **Treadmill bonus:**

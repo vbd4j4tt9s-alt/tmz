@@ -1,5 +1,11 @@
 # R158 status (final changes round), in progress
 
+## R158 release (10 Oct): built and sent
+- Installer `installers/R158_install.lua` (27 scripts, ~295 KB, base R157b `ee176b5`), notes `docs/releases/R158.md`, suites `docs/releases/R158_suites.txt`.
+- In it: bats overhaul + review fixes (`bats/`), no SMACK anywhere, track walls / base walls A / outer track / Lava streams and pools removed + review fixes (`design/`), Forest and Jungle outer track = large trees only (the game's own), no balls or drips on any wall, speed popups 1.5x (`speed_popups158.md`), bunting fixed (`bunting158.png`).
+- R157b's "Hotfix" section below is done (released as R157b).
+- Still waiting for models (nothing built there): Desert dune, Desert obelisk, Crystal mountain, Storm tower, Storm lightning, Storm end peak (`design/outer_track_assets.md`).
+
 ## Owner rules from now on (10 Oct)
 - **The PC HUD in the owner's screenshot is THE layout for every non-phone device** (all PC window sizes, consoles): same pieces in the same
   places; small windows scale it rather than rearrange it.
