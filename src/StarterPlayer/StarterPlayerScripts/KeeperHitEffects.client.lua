@@ -1,16 +1,20 @@
 do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R39: shared snap impact, Knight catch grunt, a local hit burst and bounded camera kick.
+-- R158 bats (docs/proposals/R158/bats/animation.md 4, owner-approved): the contact star comes from HitBurstFx's pool (made once; it was a new Part +
+-- BillboardGui + 8 Frames per hit), a bat hit adds the shared sparks, and the hitter's own bat hit is skipped here: its client already played it
+-- the moment its swing found the victim (BatClient), so no second slap or star and, by the owner's choice, no camera shake for the hitter. The one
+-- who is hit and the players near it get exactly what they got before.
 local RS=game:GetService('ReplicatedStorage')
 local Players=game:GetService('Players')
 local Run=game:GetService('RunService')
 local GuiService=game:GetService('GuiService')
-local Debris=game:GetService('Debris')
 local Audio=require(RS:WaitForChild('KeeperAudio'))
 local Bat=require(RS:WaitForChild('BatConfig'))
 local Voices=require(RS:WaitForChild('KeeperVoices'))
 local Sfx=require(RS:WaitForChild('LocalSfx'))
 local KFx=require(RS:WaitForChild('KeeperFx')) -- R113: pooled ground ring + dust at a keeper hit
 local Signature=require(RS:WaitForChild('KeeperSignatureStrike'))
+local Burst=require(RS:WaitForChild('HitBurstFx')) -- R158: the pooled contact star, the bat sparks, the hitter's own-hit note
 -- R124: The Darkened's catch: its own sound and a sci-fi purple impact (pooled neon shell + beam, rings, sparks).
 local VEILED={Sound='rbxassetid://119010321306307',Volume=.5,Color=Color3.fromRGB(168,92,255),Core=Color3.fromRGB(236,214,255),Seconds=.45}
 local player=Players.LocalPlayer
@@ -27,7 +31,7 @@ local borders={}
 for i,layout in ipairs({{0,0,1,.025},{0,.975,1,.025},{0,0,.016,1},{.984,0,.016,1}})do
  local f=Instance.new('Frame');f.Name='HitEdge'..i;f.Position=UDim2.fromScale(layout[1],layout[2]);f.Size=UDim2.fromScale(layout[3],layout[4]);f.BorderSizePixel=0;f.BackgroundColor3=Color3.fromRGB(209,74,55);f.BackgroundTransparency=1;f.Parent=gui;table.insert(borders,f)
 end
-local effects={};local lastId=0;local kick;local lastCamera,lastOffset,lastWritten
+local lastId=0;local kick;local lastCamera,lastOffset,lastWritten
 local shell,beam,veiledFx -- pooled neon parts + the live purple impact
 local function reduced()
  local okay,value=pcall(function()return GuiService.ReducedMotionEnabled end)
@@ -40,7 +44,7 @@ end
 local function clear()
  resetCamera();kick=nil;flash.BackgroundTransparency=1
  for _,f in ipairs(borders)do f.BackgroundTransparency=1 end
- for _,e in ipairs(effects)do e.Anchor:Destroy()end;table.clear(effects)
+ Burst.Clear()
 end
 local function lowGraphics()
  if player:GetAttribute('FastMode')==true then return true end
@@ -59,16 +63,6 @@ local function veiledImpact(position)
  beam=beam and beam.Parent and beam or neon('VeiledImpactBeam',Enum.PartType.Cylinder);beam.Color=VEILED.Core
  veiledFx={At=os.clock(),Position=position,Ground=ground}
 end
-local function burst(position,color)
- if #effects>=4 then table.remove(effects,1).Anchor:Destroy()end
- local anchor=Instance.new('Part');anchor.Name='KeeperHitBurst';anchor.Size=Vector3.one;anchor.CFrame=CFrame.new(position+Vector3.new(0,.6,0));anchor.Transparency=1;anchor.Anchored=true;anchor.CanCollide=false;anchor.CanQuery=false;anchor.CanTouch=false;anchor.Parent=workspace
- local billboard=Instance.new('BillboardGui');billboard.Name='ContactStar';billboard.Size=UDim2.fromScale(7,7);billboard.AlwaysOnTop=false;billboard.LightInfluence=0;billboard.Parent=anchor
- local rays={}
- for i=1,8 do
-  local angle=(i-1)*math.pi/4;local ray=Instance.new('Frame');ray.Name='ImpactRay';ray.AnchorPoint=Vector2.new(.5,.5);ray.BorderSizePixel=0;ray.BackgroundColor3=color or Color3.fromRGB(255,232,172);ray.Rotation=math.deg(angle);ray.Parent=billboard;table.insert(rays,{Item=ray,Angle=angle})
- end
- table.insert(effects,{Anchor=anchor,Rays=rays,At=os.clock()});Debris:AddItem(anchor,.6)
-end
 local connection=remote.OnClientEvent:Connect(function(hit)
  if type(hit)~='table'or type(hit.Id)~='number'or hit.Id<=lastId or typeof(hit.Position)~='Vector3'then return end
  lastId=hit.Id
@@ -77,6 +71,7 @@ local connection=remote.OnClientEvent:Connect(function(hit)
  local distance=(camera.CFrame.Position-hit.Position).Magnitude
  if distance>260 then return end
  local batHit=hit.Cause=='Bat';local veiled=hit.Veiled==true and not batHit
+ if batHit and Burst.IsOwnHit(hit.VictimUserId)then return end -- R158: your own bat hit: already shown on your screen at once (BatClient)
  -- R124: a ground-smash keeper's slam sound already played at the visual impact (KeeperFx.Slam, in range), so the
  -- generic snap is skipped there; The Darkened has its own catch sound instead of the snap and voice.
  local move=not batHit and not veiled and Signature.Moves[hit.Stage]
@@ -88,7 +83,8 @@ local connection=remote.OnClientEvent:Connect(function(hit)
   if voice then Sfx.Play(voice,hit.Position,volume,pitch,3)end
  end
  if distance<150 then
-  burst(hit.Position,veiled and VEILED.Core or nil)
+  Burst.Star(hit.Position,veiled and VEILED.Core or nil)
+  if batHit then Burst.Sparks(hit.Position)end
   if veiled then veiledImpact(hit.Position)end
   local look=not batHit and not veiled and KFx.Stages[hit.Stage]
   if look then
@@ -114,24 +110,13 @@ Run:BindToRenderStep('ChestChaseKeeperImpact',Enum.RenderPriority.Camera.Value+2
    beam.Size=Vector3.new(18,1.4*(1-u)+.15,1.4*(1-u)+.15);beam.CFrame=CFrame.new(veiledFx.Ground+Vector3.new(0,9,0))*CFrame.Angles(0,0,math.pi/2);beam.Transparency=.15+.85*u
   end
  end
- -- R121: with no burst and no kick, the overlay is already clear; skip the five per-frame writes.
- if #effects==0 and not kick then
+ -- R121: with no kick, the overlay is already clear; skip the five per-frame writes. (R158: the stars animate in HitBurstFx.)
+ if not kick then
   if not idle then idle=true;flash.BackgroundTransparency=1;for _,f in ipairs(borders)do f.BackgroundTransparency=1 end end
   return
  end
  idle=false
- for i=#effects,1,-1 do
-  local e=effects[i];local u=(now-e.At)/.26
-  if u>=1 or not e.Anchor.Parent then e.Anchor:Destroy();table.remove(effects,i)
-  else
-   for _,r in ipairs(e.Rays)do
-    local radius=.08+.30*u;r.Item.Position=UDim2.fromScale(.5+math.cos(r.Angle)*radius,.5+math.sin(r.Angle)*radius)
-    r.Item.Size=UDim2.fromScale(.24*(1-u)+.04,.026*(1-u)+.004);r.Item.BackgroundTransparency=u*u
-   end
-  end
- end
  flash.BackgroundTransparency=1;for _,f in ipairs(borders)do f.BackgroundTransparency=1 end
- if not kick then return end
  local t=now-kick.At;local u=t/.25
  if u>=1 then kick=nil;return end
  local strength=kick.Strength*(1-u)^2;local quiet=reduced()

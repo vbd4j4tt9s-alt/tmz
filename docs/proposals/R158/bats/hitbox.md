@@ -1,5 +1,7 @@
 # R158 bats: hit detection today, why fast players are not hit, and the proposed fix
 
+**BUILT (R158, 10 Oct): see `bats.md` section 6 (the built suite: `../tests/run_bats158.sh`, its results: `../tests/results158.txt`). The text below is the plan as approved.**
+
 PREVIEW, nothing in `src/` changes until the owner approves. Owner: "improve hitbox consistency especially with fast moving players".
 Checkout: `V150 R157`. Numbers come from the code, from `tests/sim_bat_hits.luau` (offline mock; today's side runs the real
 `BatHitbox.lua` + `BatConfig.lua`), and from `tests/test_bat_anticheat.luau`. Re-run both with `sh tests/run_bat_hits.sh <scratch>`; full tables

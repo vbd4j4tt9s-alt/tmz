@@ -16,7 +16,11 @@ mkdir -p "$S/render/out" "$S/refs" "$S/gif"
 python3 -I "$HERE/solve_keys158.py" > "$S/keys158.json"
 python3 -I "$HERE/make_pose158.py" "$S/keys158.json" > "$S/BatSwingPose158.luau"
 cmp -s "$S/BatSwingPose158.luau" "$HERE/BatSwingPose158.luau" && echo "ok: BatSwingPose158.luau matches the solved keys" || echo "NOTE: the solved keys differ from the committed BatSwingPose158.luau"
-python3 "$REPO/tools/tests/bundle.py" "$S/pose_bundle.luau" BatConfig="$REPO/src/ReplicatedStorage/BatConfig.lua" BatSwingPose="$REPO/src/ReplicatedStorage/BatSwingPose.lua" BatSwingPose158="$S/BatSwingPose158.luau"
+# (R158 built: src now holds the built swing; "today" is the approved checkout's swing, read from git: BATS_BASE, default e9c0900 = V150 R157b + notes.
+#  docs/proposals/R158/tests/render_built158.sh draws the BUILT swing from src in the proposed rows)
+BASE=${BATS_BASE:-e9c0900}
+git -C "$REPO" show "$BASE:src/ReplicatedStorage/BatConfig.lua" > "$S/BatConfig_today.lua";git -C "$REPO" show "$BASE:src/ReplicatedStorage/BatSwingPose.lua" > "$S/BatSwingPose_today.lua"
+python3 "$REPO/tools/tests/bundle.py" "$S/pose_bundle.luau" BatConfig="$S/BatConfig_today.lua" BatSwingPose="$S/BatSwingPose_today.lua" BatSwingPose158="$S/BatSwingPose158.luau"
 cp "$HERE/dump_poses158.luau" "$S/"
 (cd "$S" && /opt/luau/luau dump_poses158.luau -a 120 0.97 > poses.jsonl)
 cp "$HERE/swing_render158.html" "$HERE/render_swing158.mjs" "$S/render/"

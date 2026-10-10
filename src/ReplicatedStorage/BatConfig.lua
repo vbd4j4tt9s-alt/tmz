@@ -1,9 +1,31 @@
 -- R43. A free utility bat: knockback, a short stun, and stolen-pack disarm.
+-- R158 (owner: "improve hitbox consistency especially with fast moving players", and the reference video for the swing): the swing starts on the
+-- swinger's screen at the click; the swinger's client sweeps the strike on what its screen shows and names the victim; the server re-checks that
+-- claim against a short history of everyone's positions (BatLagComp). Contact stays at Windup (.30 s); the swing is now .85 s (Windup + Recovery).
 return {
  AssetId=16428159315,SlapSoundId='rbxassetid://81700629330286',SlapVolume=.48,
- Windup=.30,Recovery=.44,Cooldown=1.0,
+ Windup=.30,Recovery=.55,Cooldown=1.0,
  -- R150: the swing "whoosh" (the existing 9120768742 file, its .44 s lead-in skipped by SoundTiming): it starts SwingSoundLead before contact so
  -- the swish builds through the strike and meets the hit at At+Windup. A miss is no longer silent. Tune by ear.
- SwingSoundVolume=.25,SwingSoundPitch=1.4,SwingSoundLead=.12,SwingSoundRange=150,HitboxSize=Vector3.new(16,10,14),AppearanceScale=1.5,
+ SwingSoundVolume=.25,SwingSoundPitch=1.4,SwingSoundLead=.12,SwingSoundRange=150,AppearanceScale=1.5,
  SpawnGrace=3,RequireBiome=true,SafeLineMargin=4,
+ -- R158 the hit (docs/proposals/R158/bats/hitbox.md 4.2-4.5). The strike: HitFrom..HitTo seconds after the swing starts (contact at Windup).
+ -- Where: a flat sector in front, Reach studs, HalfAngle degrees each side, +-Height up / down, plus an Inner circle all round (someone inside you).
+ -- Paths, not points: a target's path since the last frame is tested in sub-steps of Step studs (at most MaxSubSteps per frame).
+ HitFrom=.24,HitTo=.36,Reach=14,HalfAngle=75,Inner=4,Height=5,Step=2,MaxSubSteps=32,
+ -- The server's history: every player's root and flat facing, HistoryHz samples a second, HistorySize samples (~1.07 s), reused ring buffers.
+ -- A step between two samples faster than JumpSpeed studs/s is a teleport / respawn, never a path (nothing is swept along it).
+ HistoryHz=30,HistorySize=32,JumpSpeed=1200,
+ -- The server's check of a claim: the swing's Start is taken from the client within [receipt - StartBack, receipt + StartAhead]; a claim's time must be in the
+ -- strike +- StrikeSlack, not later than the server clock + FutureSlack, and arrive within MaxClaimDelay. The swinger's claimed spot must lie within OwnSlack
+ -- studs of its own server path (ViewTime - OwnBack .. now, + OwnAhead s along its newest velocity), its facing within LookSlack degrees of one the server
+ -- saw. The victim is looked up at ViewTime - min(MaxRewind, the claim's travel time + Buffer) +- TimeSlack (Buffer = the client's interpolation
+ -- delay: measure it in Studio, hitbox.md 5). Reach grows by BonusPerSpeed per stud/s of relative speed (at most MaxBonus); AngleSlack widens the sector.
+ StartBack=.50,StartAhead=.02,StrikeSlack=.05,FutureSlack=.02,MaxClaimDelay=.50,OwnSlack=4,OwnBack=.20,OwnAhead=.06,LookSlack=45,
+ Buffer=.10,MaxRewind=.30,TimeSlack=.08,AngleSlack=15,BonusPerSpeed=.02,MaxBonus=6,
+ -- The server's cooldown is the same 1.0 s, on the swing's own start times; receipts may come up to CooldownSlack early (network jitter).
+ CooldownSlack=.15,
+ -- R158 effects (animation.md 4; owner: a white trail, no camera shake for the hitter, no "SMACK!" word). The trail is on from TrailFrom to TrailTo s of
+ -- the swing only; HitStop = the hitter's own swing pauses this long at its hit (its screen only; the server's timing does not move).
+ TrailFrom=.21,TrailTo=.40,TrailLifetime=.12,TrailRGB={255,255,255},TrailLightEmission=.6,TrailWidth=1,HitStop=.05,
 }

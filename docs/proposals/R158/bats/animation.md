@@ -1,5 +1,7 @@
 # R158 bats: swing animation and effects (preview)
 
+**BUILT (R158, 10 Oct): see `bats.md` section 6; the owner chose no camera shake for the hitter, no "SMACK!" word, a white trail. The text below is the plan as approved.**
+
 PREVIEW, nothing in `src/` changes until the owner approves. Owner: "polish up the animations ... a reference video will be sent for the
 animation polish and effect work". Pictures: **`swing_preview.png`** (reference vs today vs proposed, R15 and R6, timing chart, top views,
 effects) and **`swing_preview.gif`** (reference / today / proposed side by side, half speed). The renders are **approximate** (see section 6).

@@ -31,7 +31,9 @@ for n in Golem JungleKing SandSnake IceFang LavaDragon CrystalKnight StormColoss
 CHANGED="src/MANIFEST.tsv src/ReplicatedStorage/BeastPose.lua src/ReplicatedStorage/KeeperAccents.lua src/ReplicatedStorage/KeeperFx.lua src/ReplicatedStorage/KeeperSignatureStrike.lua src/ReplicatedStorage/KeeperSleep.lua src/ReplicatedStorage/KeeperStrikeFrames.lua src/ReplicatedStorage/KeeperSurge.lua src/ReplicatedStorage/KeeperUpgradePose.lua src/ReplicatedStorage/StudioTestHelp.lua src/ReplicatedStorage/VeiledKeeper81.lua src/ServerScriptService/ApprovedPlantsBootstrap.server.lua src/ServerScriptService/ChestChaseServer/BeastModels.lua src/ServerScriptService/ChestChaseServer/KeeperContact.lua src/ServerScriptService/ChestChaseServer/OwnerUpdateCommands82.lua src/ServerScriptService/ChestChaseServer/VeiledEvent81.lua src/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua src/StarterPlayer/StarterPlayerScripts/VeiledEventClient81.client.lua"
 # R153 (the speed sign over a keeper): the sign script.
 R153="src/StarterPlayer/StarterPlayerScripts/KeeperSpeedLabels.client.lua"
-for f in $NEW $DATA $CHANGED $R153;do echo $f;done | grep -v MANIFEST | LC_ALL=C sort > "$OUT/allowed.txt";echo src/MANIFEST.tsv >> "$OUT/allowed.txt";LC_ALL=C sort -o "$OUT/allowed.txt" "$OUT/allowed.txt"
+# R158 bats (on purpose): the hit effects script (the contact star from the HitBurstFx pool, bat sparks, the hitter's own bat hit not shown twice).
+R158="src/StarterPlayer/StarterPlayerScripts/KeeperHitEffects.client.lua"
+for f in $NEW $DATA $CHANGED $R153 $R158;do echo $f;done | grep -v MANIFEST | LC_ALL=C sort > "$OUT/allowed.txt";echo src/MANIFEST.tsv >> "$OUT/allowed.txt";LC_ALL=C sort -o "$OUT/allowed.txt" "$OUT/allowed.txt"
 # the keeper code proper (by file name: Keeper* / Beast* modules and scripts, the Darkened's VeiledKeeper81 / VeiledEvent81 /
 # VeiledEventClient81, ChaseService, the two Config.lua): every one that differs from the base must be on R152's list. Other agents' R152
 # work (hub, packs, keyboard track, Void giveaway, Verity's texts in VerityConfig.lua) and the shared hook files R152 also edits
